@@ -554,15 +554,13 @@ cmLoadModules cmstate1 mg2unsorted
 
 	-- The "bad" boot modules are the ones for which we have
 	-- B.hs-boot in the module graph, but no B.hs
+	-- The downsweep should have ensured this does not happen
+	-- (see msDeps)
         let all_home_mods = [ms_mod s | s <- mg2unsorted, not (isBootSummary s)]
 	    bad_boot_mods = [s 	      | s <- mg2unsorted, isBootSummary s,
 					not (ms_mod s `elem` all_home_mods)]
-	
-	if not (null bad_boot_mods) 
-	  then do { mapM reportBadBootMod bad_boot_mods
-		  ; return (cmstate1, Failed, []) }
-	  else do
-			      
+	ASSERT( null bad_boot_mods ) return ()
+
         -- Do the downsweep to reestablish the module graph
         -- mg2 should be cycle free; but it includes hi-boot ModSummary nodes
         let mg2 :: [SCC ModSummary]
@@ -735,12 +733,6 @@ cmLoadModules cmstate1 mg2unsorted
 	      let cmstate3 = cmstate1 { cm_mg = mods_to_keep,
 					cm_hsc = hsc_env3 { hsc_HPT = hpt4 } }
 	      cmLoadFinish Failed linkresult cmstate3
-
-reportBadBootMod :: ModSummary -> IO ()
-reportBadBootMod s
-  = hPutStrLn stderr $ showSDoc $
-    ptext SLIT("Module") <+> quotes (ppr (ms_mod s)) <+>
-	ptext SLIT("is {-# SOURCE #-} imported, but nowhere imported ordinarily")
 
 -- Finish up after a cmLoad.
 
@@ -1158,7 +1150,7 @@ cmDownsweep :: DynFlags
 cmDownsweep dflags roots old_summaries excl_mods
    = do rootSummaries <- mapM getRootSummary roots
 	checkDuplicates rootSummaries
-        loop (concatMap msImports rootSummaries) 
+        loop (concatMap msDeps rootSummaries) 
 	     (mkNodeMap rootSummaries)
      where
 	old_summary_map :: NodeMap ModSummary
@@ -1213,16 +1205,24 @@ cmDownsweep dflags roots old_summaries excl_mods
 						 wanted_mod excl_mods
 				   ; case mb_s of
 					Nothing -> loop ss done
-					Just s  -> loop (msImports s ++ ss) 
+					Just s  -> loop (msDeps s ++ ss) 
 							(addToFM done key s) }
 	  where
 	    key = (wanted_mod, if is_boot then HsBootFile else HsSrcFile)
 
-msImports :: ModSummary -> [(FilePath, 		-- Importing module
-			     Module,	 	-- Imported module
-			     IsBootInterface)]	 -- {-# SOURCE #-} import or not
-msImports s =  [(f, m,True)  | m <- ms_srcimps s] 
-	    ++ [(f, m,False) | m <- ms_imps    s] 
+msDeps :: ModSummary -> [(FilePath, 		-- Importing module
+			  Module,	 	-- Imported module
+			  IsBootInterface)]	 -- {-# SOURCE #-} import or not
+-- (msDeps s) returns the dependencies of the ModSummary s.
+-- A wrinkle is that for a {-# SOURCE #-} import we return
+--	*both* the hs-boot file
+--	*and* the source file
+-- as "dependencies".  That ensures that the list of all relevant
+-- modules always contains B.hs if it contains B.hs-boot.
+-- Remember, this pass isn't doing the topological sort.  It's
+-- just gathering the list of all relevant ModSummaries
+msDeps s =  concat [ [(f, m, True), (f,m,False)] | m <- ms_srcimps s] 
+	 ++ [(f,m,False) | m <- ms_imps    s] 
 	where
 	  f = msHsFilePath s	-- Keep the importing module for error reporting
 
