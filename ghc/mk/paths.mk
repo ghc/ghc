@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.36 2001/07/31 14:31:28 simonmar Exp $
+# $Id: paths.mk,v 1.37 2001/09/10 12:57:25 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -7,12 +7,6 @@
 #-----------------------------------------------------------------------------
 # HsTags
 
-ifdef UseInstalledUtils
-HSTAGS	 		= hstags
-else
-HSTAGS	 		= $(HSTAGS_DIR)/hstags
-HSTAGS_DIR 		= $(GHC_UTILS_DIR)/hstags
-endif
 
 #-----------------------------------------------------------------------------
 # Extra things ``only for'' for the ghc project
@@ -45,8 +39,11 @@ GHC_MANGLER		= ghc-asm
 GHC_SPLIT_DIR	 	= $(GHC_DRIVER_DIR)/split
 GHC_SPLIT		= ghc-split
 
-GHC_SYSMAN    		= $(GHC_RUNTIME_DIR)/parallel/SysMan
 GHC_SYSMAN_DIR 		= $(GHC_RUNTIME_DIR)/parallel
+GHC_SYSMAN    		= SysMan
+
+GHC_HSTAGS_DIR 		= $(GHC_UTILS_DIR)/hstags
+GHC_HSTAGS 		= hstags
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 
