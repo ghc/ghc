@@ -96,6 +96,29 @@
         implement on all targets, and their meaning is intended to be
         unambiguous, and the same on all targets, regardless of word
         size or endianness.
+        <p>
+        <b>A note on <code>MagicId</code>s.</b>
+        Those which are assigned to
+        registers on the current target are left unmodified.  Those
+        which are not are stored in memory as offsets from
+        <code>BaseReg</code> (which is assumed to permanently have the
+        value <code>(&MainCapability.r)</code>), so the constant folder
+        calculates the offsets and inserts suitable loads/stores.  One
+        complication is that not all archs have <code>BaseReg</code>
+        itself in a register, so for those (sparc), we instead
+        generate the address as an offset from the static symbol
+        <code>MainCapability</code>, since the register table lives in
+        there.
+        <p>
+        Finally, <code>BaseReg</code> does occasionally itself get
+        mentioned in Stix expression trees, and in this case what is
+        denoted is precisely <code>(&MainCapability.r)</code>, not, as
+        in all other cases, the value of memory at some offset from
+        the start of the register table.  Since what it denotes is an
+        r-value and not an l-value, assigning <code>BaseReg</code> is
+        meaningless, so the machinery checks to ensure this never
+        happens.  All these details are taken into account by the
+        constant folder.
     <p>
     <li><b>Instruction selection.</b>  This is the only majorly
         target-specific phase.  It turns Stix statements and
