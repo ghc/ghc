@@ -91,16 +91,16 @@ options =
 	"be verbose",
     Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
 	"read an interface from FILE",
-    Option []  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
-        "dump an interface for these modules in FILE",
     Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
 	"The CSS file to use for HTML output",
+    Option []  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
+        "dump an interface for these modules in FILE",
     Option []  ["lib"]         (ReqArg Flag_Lib "DIR") 
 	"Location of Haddock's auxiliary files",
-    Option []  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
- 	"Do not assume Prelude is imported",
     Option []  ["ms-help"]    (NoArg Flag_MSHtmlHelp)
-	"Produce Microsoft HTML Help files (with -h)"
+	"Produce Microsoft HTML Help files (with -h)",
+    Option []  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
+ 	"Do not assume Prelude is imported"
   ]
 
 saved_flags :: IORef [Flag]
