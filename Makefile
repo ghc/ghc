@@ -46,12 +46,14 @@ BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      ghc/RELEASE \
 	      install-sh \
 	      config.guess \
-	      config.sub
+	      config.sub   \
+	      aclocal.m4
 
 binary-dist::
 	@for i in $(BIN_DIST_TOP); do \
 	  echo cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
 	  cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
+	  chmod 664 $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/`basename $$i`; \
 	done;
 	@echo "hackily rename some of these chaps.."
 	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in 
