@@ -400,15 +400,23 @@ pprInstr (SEGMENT TextSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
 	,IF_ARCH_sparc(SLIT("\t.text\n\t.align 4") {-word boundary-}
-	,IF_ARCH_i386((_PK_ ".text\n\t.align 2\x2c\&0x90") {-needs per-OS variation!-}
+	,IF_ARCH_i386((_PK_ ".text\n\t.align 4") {-needs per-OS variation!-}
 	,)))
+
+#if 0
+	,IF_ARCH_i386((_PK_ ".text\n\t.align 2\x2c\&0x90") {-needs per-OS variation!-}
+#endif
 
 pprInstr (SEGMENT DataSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT("\t.data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(SLIT(".data\n\t.align 2")
+	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
 	,)))
+
+#if 0
+	,IF_ARCH_i386(SLIT(".data\n\t.align 2")
+#endif
 
 pprInstr (LABEL clab)
   = let
