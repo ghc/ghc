@@ -43,7 +43,7 @@ module Type (
         mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy, 
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	applyTy, applyTys, hoistForAllTys,
+	applyTy, applyTys, hoistForAllTys, isForAllTy,
 
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
@@ -564,6 +564,11 @@ mkForAllTys tyvars ty = case splitUsgTy_maybe ty of
                           Just (usg,ty') -> NoteTy (UsgNote usg)
 						   (foldr ForAllTy ty' tyvars)
                           Nothing        -> foldr ForAllTy ty tyvars
+
+isForAllTy :: Type -> Bool
+isForAllTy (NoteTy _ ty)  = isForAllTy ty
+isForAllTy (ForAllTy _ _) = True
+isForAllTy other_ty	  = False
 
 splitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
 splitForAllTy_maybe ty = case splitUsgTy_maybe ty of
