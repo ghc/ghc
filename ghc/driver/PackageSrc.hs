@@ -154,7 +154,7 @@ package_details installing
                             ,
 	extra_libraries   = [ "HSstd_cbits" ] ++
 #                           ifdef mingw32_TARGET_OS
-                            [ "wsock32", "msvcrt" ]
+                            [ "wsock32", "msvcrt", "kernel32" ]
 #                           else
                             [ ]
 #                           endif
