@@ -50,7 +50,7 @@ import CoreUtils	( exprType, mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..) )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
-                          tyConTheta, isProductTyCon, isUnboxedTupleTyCon )
+                          tyConTheta, isProductTyCon, isDataTyCon )
 import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
@@ -178,20 +178,13 @@ mkDataConId work_name data_con
 
     strict_info = mkStrictnessInfo (dataConRepStrictness data_con, False)
 
+    tycon = dataConTyCon data_con
     cpr_info | isProductTyCon tycon && 
-	       not (isUnboxedTupleTyCon tycon) && 
-	       arity > 0 			= ReturnsCPR
-	     | otherwise 			= NoCPRInfo
-	     where
-		tycon = dataConTyCon data_con
-		-- Newtypes don't have a worker at all
-		-- 
-		-- If we are a product with 0 args we must be void(like)
-		-- We can't create an unboxed tuple with 0 args for this
-		-- and since Void has only one, constant value it should 
-		-- just mean returning a pointer to a pre-existing cell. 
-		-- So we won't really gain from doing anything fancy
-		-- and we treat this case as Top.
+	       isDataTyCon tycon    &&
+	       arity > 0 		= ReturnsCPR
+	     | otherwise 		= NoCPRInfo
+	-- ReturnsCPR is only true for products that are real data types;
+	-- that is, not unboxed tuples or newtypes
 \end{code}
 
 The wrapper for a constructor is an ordinary top-level binding that evaluates

@@ -11,7 +11,7 @@ import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUtils	( exprIsValue )
 import Id               ( Id, setIdCprInfo, idCprInfo, idArity,
-			  isBottomingId, idDemandInfo )
+			  isBottomingId, idDemandInfo, isImplicitId )
 import IdInfo           ( CprInfo(..) )
 import Demand		( isStrict )
 import VarEnv
@@ -155,6 +155,9 @@ with ids decorated with their CPR info.
 -- Return environment extended with info from this binding 
 cprAnalBind :: CPREnv -> CoreBind -> (CPREnv, CoreBind)
 cprAnalBind rho (NonRec b e) 
+  | isImplicitId b	-- Don't touch the CPR info on constructors, selectors etc
+  = (rho, NonRec b e)	
+  | otherwise
   = (extendVarEnv rho b absval, NonRec b' e')
   where
     (e', absval) = cprAnalExpr rho e
