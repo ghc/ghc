@@ -101,6 +101,14 @@ install ::
 	@$(RM) $(SCRIPT_PROG)
 	@$(MAKE) $(MFLAGS) BIN_DIST=0 $(SCRIPT_PROG)
 
+#
+# Another hack (hmm..I can see a pattern developing here :-)
+# In ghc/driver, we create a symlink from ghc-<whatever-version> to
+# ghc, but we don't want this included in a source distribution.
+# We `solve' this by removing `ghc' from the dist tree here.
+dist ::
+	@echo "Patching dist tree: removing $(SRC_DIST_DIR)/ghc symlink"
+	$(RM) $(SRC_DIST_DIR)/ghc
 
 #
 # Option vars for the special ways (that the driver has special pleading for).
