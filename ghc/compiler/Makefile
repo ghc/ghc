@@ -159,6 +159,7 @@ endif
 # be to do `env PATH=$(PATH) make ghc' to minimise the environment. (or the
 # equivalent of `env' if it doesn't exist locally).
 #
+ifneq "$(BuildPackageGHC)" "YES"
 ifneq "$(way)" "dll"
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HS_PROG=$(odir)/ghc$(_way)-$(ProjectVersion)
@@ -167,6 +168,7 @@ HS_PROG=$(odir)/ghc$(_way)
 endif
 else
 HS_PROG=$(odir)/ghc-$(ProjectVersion)
+endif
 endif
 
 # -----------------------------------------------------------------------------
@@ -558,6 +560,17 @@ endif
 # absCSyn/PprAbsC_HC_OPTS += -auto-all
 
 coreSyn/CorePrep_HC_OPTS += -auto-all
+
+#-----------------------------------------------------------------------------
+# Building GHC package
+
+ifeq "$(BuildPackageGHC)" "YES"
+
+PACKAGE = ghc
+STANDALONE_PACKAGE = YES
+PACKAGE_DEPS = base haskell98
+
+endif
 
 #-----------------------------------------------------------------------------
 # 		clean
