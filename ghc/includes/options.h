@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.10 $
- * $Date: 1999/11/01 12:12:58 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/12 16:38:33 $
  * ------------------------------------------------------------------------*/
 
 
@@ -72,12 +72,6 @@
  * o converting to lower case (only in case-insensitive filesystems)
  */
 #define PATH_CANONICALIZATION 0
-
-/* Define if a command line editor is available and should be used. 
- * There are two choices of command line editor that can be used with Hugs:
- * GNU readline and editline (from comp.sources.misc, vol 31, issue 71)
- */
-#define USE_READLINE 0
 
 /* Define if you want the small startup banner.
  */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/26 17:27:39 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/12 16:38:31 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -29,9 +29,21 @@
 #include <windows.h>
 #endif
 
-#if IS_WIN32 | HUGS_FOR_WINDOWS
+#if IS_WIN32 || HUGS_FOR_WINDOWS
 #undef IN
 #endif
+
+#if HAVE_LIBREADLINE && HAVE_READLINE_READLINE_H
+#define USE_READLINE 1
+#else
+#define USE_READLINE 0
+#endif
+
+#if USE_READLINE
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif
+
 
 /* --------------------------------------------------------------------------
  * Global data:
@@ -187,7 +199,7 @@ static  unsigned char   ctable[NUM_CHARS];
 #define LARGE           0x04
 #define SYMBOL          0x08
 #define IDAFTER         0x10
-#define SPACE           0x20
+#define ZPACE           0x20
 #define PRINT           0x40
 
 static Void local initCharTab() {       /* Initialize char decode table    */
@@ -219,9 +231,9 @@ static Void local initCharTab() {       /* Initialize char decode table    */
     setChar (IDAFTER,   '\'');          /* Characters in identifier        */
     setCopy (IDAFTER,   (DIGIT|SMALL|LARGE));
 
-    setChar (SPACE,     ' ');           /* ASCII space character           */
-    setChar (SPACE,     160);           /* ISO non breaking space          */
-    setRange(SPACE,     9,13);          /* special whitespace: \t\n\v\f\r  */
+    setChar (ZPACE,     ' ');           /* ASCII space character           */
+    setChar (ZPACE,     160);           /* ISO non breaking space          */
+    setRange(ZPACE,     9,13);          /* special whitespace: \t\n\v\f\r  */
 
     setChars(PRINT,     "(),;[]_`{}");  /* Special characters              */
     setChars(PRINT,     " '\"");        /* Space and quotes                */
@@ -266,8 +278,6 @@ static  String currentLine;            /* editline or GNU readline         */
 static  String nextChar;
 #define nextConsoleChar() \
            (unsigned char)(*nextChar=='\0' ? '\n' : *nextChar++)
-extern  Void add_history  Args((String));
-extern  String readline   Args((String));
 #else
 #define nextConsoleChar() getc(stdin)
 #endif
@@ -468,7 +478,7 @@ String line; {
     if (s[i] != '\0') {                 /* check s `isPrefixOf` line       */
         return FALSE;
     }
-    while (isIn(line[i], SPACE)) {      /* allow whitespace at end of line */
+    while (isIn(line[i], ZPACE)) {      /* allow whitespace at end of line */
         ++i;
     }
     return (line[i] == '\0');
@@ -621,7 +631,7 @@ static Void local newlineSkip() {      /* skip `\n' (supports lit scripts) */
                 litLines++;
                 return;
             }
-            while (c0 != '\n' && isIn(c0,SPACE)) /* maybe line is blank?   */
+            while (c0 != '\n' && isIn(c0,ZPACE)) /* maybe line is blank?   */
                 skip();
             if (c0=='\n' || c0==EOF)
                 thisLineIs(BLANKLINE);
@@ -975,7 +985,7 @@ Bool isStrLit; {
                         ERRMSG(row) "Illegal escape sequence"
                         EEND;
                     }
-                    else if (isIn(c0,SPACE)) {
+                    else if (isIn(c0,ZPACE)) {
                         if (isStrLit) {
                             skipGap();
                             return NIL;
@@ -1006,7 +1016,7 @@ static Void local skipGap() {          /* skip over gap in string literal  */
             newlineSkip();
         else
             skip();
-    while (isISO(c0) && isIn(c0,SPACE));
+    while (isISO(c0) && isIn(c0,ZPACE));
     if (c0!='\\') {
         ERRMSG(row) "Missing `\\' terminating string literal gap"
         EEND;
@@ -1136,7 +1146,7 @@ String s; {                            /* escapes if any parts need them   */
         String t = s;                  
         Char   c;                      
         while ((c = *t)!=0 && isISO(c)
-                           && isIn(c,PRINT) && c!='"' && !isIn(c,SPACE)) {
+                           && isIn(c,PRINT) && c!='"' && !isIn(c,ZPACE)) {
             t++;                       
         }
         if (*t) {                      
@@ -1180,7 +1190,7 @@ Char   sys; {                          /* character for shell escape       */
         do {                           /* which is empty                   */
             saveTokenChar(c0);
             skip();
-        } while (c0!=EOF && !isIn(c0,SPACE));
+        } while (c0!=EOF && !isIn(c0,ZPACE));
     endToken();
 
     for (; cmds->cmdString; ++cmds)
@@ -1203,7 +1213,7 @@ String readFilename() {                /* Read filename from input (if any)*/
         return 0;
 
     startToken();
-    while (c0!=EOF && !isIn(c0,SPACE)) {
+    while (c0!=EOF && !isIn(c0,ZPACE)) {
         if (c0=='"') {
             skip();
             while (c0!=EOF && c0!='\"') {
@@ -1292,7 +1302,7 @@ static Void local skipWhitespace() {   /* Skip over whitespace/comments    */
             return;                    /* report allows ...                */
         else if (c0=='\n')                                                 
             newlineSkip();                                                 
-        else if (isIn(c0,SPACE))                                           
+        else if (isIn(c0,ZPACE))                                           
             skip();                                                        
         else if (c0=='{' && c1=='-') { /* (potentially) nested comment     */
             Int nesting = 1;                                               
