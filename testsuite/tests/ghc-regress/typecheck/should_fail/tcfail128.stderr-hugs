@@ -1,0 +1,5 @@
+ERROR "tcfail128.hs":12 - Cannot justify constraints in explicitly typed binding
+*** Expression    : main
+*** Type          : IO ()
+*** Given context : ()
+*** Constraints   : MArray a (UArray Int Double) IO
