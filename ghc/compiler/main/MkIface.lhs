@@ -237,13 +237,15 @@ ifaceDeprecations if_hdl [] = return ()
 ifaceDeprecations if_hdl deprecations
   = printForIface if_hdl (vcat [
 		ptext SLIT("{-## __D"),
-		vcat [ pprIfaceDeprec d <> semi | d <- deprecations ],
+		vcat [ pprIE ie <+> doubleQuotes (ppr txt) <> semi | Deprecation ie txt <- deprecations ],
 		ptext SLIT("##-}")
        ])
   where
-    -- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
-    pprIfaceDeprec (Deprecation (IEModuleContents _) txt) =           doubleQuotes (ppr txt)
-    pprIfaceDeprec (Deprecation (IEVar            n) txt) = ppr n <+> doubleQuotes (ppr txt)
+    pprIE (IEVar            n   ) = ppr n
+    pprIE (IEThingAbs       n   ) = ppr n
+    pprIE (IEThingAll       n   ) = hcat [ppr n, text "(..)"]
+    pprIE (IEThingWith      n ns) = ppr n <> parens (hcat (punctuate comma (map ppr ns)))
+    pprIE (IEModuleContents _   ) = empty
 \end{code}
 
 %************************************************************************

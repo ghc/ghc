@@ -375,7 +375,8 @@ deprec		: STRING		{ Deprecation (IEModuleContents undefined) $1 }
 
 -- SUP: TEMPORARY HACK
 deprec_name	:: { RdrNameIE }
-		: var_name		{ IEVar $1 }
+		: var_name		{ IEVar      $1 }
+		| data_name		{ IEThingAbs $1 }
 
 -----------------------------------------------------------------------------
 

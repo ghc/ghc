@@ -519,6 +519,8 @@ renameSigs sigs_required binders lookup_occ_nm sigs
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
 
+renameSig :: (RdrName -> RnMS Name) -> Sig RdrName -> RnMS (Sig Name, FreeVars)
+
 renameSig lookup_occ_nm (Sig v ty src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v				`thenRn` \ new_v ->
@@ -541,11 +543,10 @@ renameSig lookup_occ_nm (FixSig (FixitySig v fix src_loc))
     lookup_occ_nm v		`thenRn` \ new_v ->
     returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
 
--- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
-renameSig lookup_occ_nm (DeprecSig (Deprecation (IEVar v) txt) src_loc)
+renameSig lookup_occ_nm (DeprecSig (Deprecation ie txt) src_loc)
   = pushSrcLocRn src_loc $
-    lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (DeprecSig (Deprecation (IEVar new_v) txt) src_loc, unitFV new_v)
+    renameIE lookup_occ_nm ie	`thenRn` \ (new_ie, fvs) ->
+    returnRn (DeprecSig (Deprecation new_ie txt) src_loc, fvs)
 
 renameSig lookup_occ_nm (InlineSig v p src_loc)
   = pushSrcLocRn src_loc $
@@ -558,15 +559,37 @@ renameSig lookup_occ_nm (NoInlineSig v p src_loc)
     returnRn (NoInlineSig new_v p src_loc, unitFV new_v)
 \end{code}
 
+\begin{code}
+renameIE :: (RdrName -> RnMS Name) -> IE RdrName -> RnMS (IE Name, FreeVars)
+renameIE lookup_occ_nm (IEVar v)
+  = lookup_occ_nm v		`thenRn` \ new_v ->
+    returnRn (IEVar new_v, unitFV new_v)
+
+renameIE lookup_occ_nm (IEThingAbs v)
+  = lookup_occ_nm v		`thenRn` \ new_v ->
+    returnRn (IEThingAbs new_v, unitFV new_v)
+
+renameIE lookup_occ_nm (IEThingAll v)
+  = lookup_occ_nm v		`thenRn` \ new_v ->
+    returnRn (IEThingAll new_v, unitFV new_v)
+
+renameIE lookup_occ_nm (IEThingWith v vs)
+  = lookup_occ_nm v		`thenRn` \ new_v ->
+    mapRn lookup_occ_nm vs	`thenRn` \ new_vs ->
+    returnRn (IEThingWith new_v new_vs, plusFVs [ unitFV x | x <- new_v:new_vs ])
+
+renameIE lookup_occ_nm (IEModuleContents m)
+  = returnRn (IEModuleContents m, emptyFVs)
+\end{code}
+
 Checking for distinct signatures; oh, so boring
 
 
 \begin{code}
 cmp_sig :: RenamedSig -> RenamedSig -> Ordering
 cmp_sig (Sig n1 _ _)         (Sig n2 _ _)         = n1 `compare` n2
--- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
-cmp_sig (DeprecSig (Deprecation (IEVar n1) _) _)
-        (DeprecSig (Deprecation (IEVar n2) _) _)  = n1 `compare` n2
+cmp_sig (DeprecSig (Deprecation ie1 _) _)
+        (DeprecSig (Deprecation ie2 _) _)         = cmp_ie ie1 ie2
 cmp_sig (InlineSig n1 _ _)   (InlineSig n2 _ _)   = n1 `compare` n2
 cmp_sig (NoInlineSig n1 _ _) (NoInlineSig n2 _ _) = n1 `compare` n2
 cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = cmpHsType compare ty1 ty2
@@ -578,6 +601,14 @@ cmp_sig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _)
 cmp_sig other_1 other_2					-- Tags *must* be different
   | (sig_tag other_1) _LT_ (sig_tag other_2) = LT 
   | otherwise				     = GT
+
+cmp_ie :: IE Name -> IE Name -> Ordering
+cmp_ie (IEVar            n1  ) (IEVar            n2  ) = n1 `compare` n2
+cmp_ie (IEThingAbs       n1  ) (IEThingAbs       n2  ) = n1 `compare` n2
+cmp_ie (IEThingAll       n1  ) (IEThingAll       n2  ) = n1 `compare` n2
+-- Hmmm...
+cmp_ie (IEThingWith      n1 _) (IEThingWith      n2 _) = n1 `compare` n2
+cmp_ie (IEModuleContents _   ) (IEModuleContents _   ) = EQ
 
 sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
 sig_tag (SpecSig n1 _ _)    	   = ILIT(2)

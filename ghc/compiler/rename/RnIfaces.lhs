@@ -341,16 +341,23 @@ loadRule mod rules decl@(IfaceRuleDecl var body src_loc)
     mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
     returnRn ((unitNameSet var_name, (mod, RuleD decl)) `consBag` rules)
 
--- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
+-- SUP: TEMPORARY HACK, ignoring module deprecations for now
 loadDeprec :: Module -> DeprecationEnv -> RdrNameDeprecation -> RnM d DeprecationEnv
 loadDeprec mod deprec_env (Deprecation (IEModuleContents _) txt)
   = traceRn (text "module deprecation not yet implemented:" <+> ppr mod <> colon <+> ppr txt) `thenRn_`
     returnRn deprec_env
-loadDeprec mod deprec_env (Deprecation (IEVar rdr_name) txt)
+loadDeprec mod deprec_env (Deprecation ie txt)
   = setModuleRn (moduleName mod) $
-    mkImportedGlobalFromRdrName rdr_name `thenRn` \ name ->
-    traceRn (text "loaded deprecation for" <+> ppr name <> colon <+> ppr txt) `thenRn_`
-    returnRn (addToNameEnv deprec_env name txt)
+    mapRn mkImportedGlobalFromRdrName (namesFromIE ie) `thenRn` \ names ->
+    traceRn (text "loaded deprecation(s) for" <+> hcat (punctuate comma (map ppr names)) <> colon <+> ppr txt) `thenRn_`
+    returnRn (extendNameEnv deprec_env (zip names (repeat txt)))
+
+namesFromIE :: IE a -> [a]
+namesFromIE (IEVar            n   ) = [n]
+namesFromIE (IEThingAbs       n   ) = [n]
+namesFromIE (IEThingAll       n   ) = [n]
+namesFromIE (IEThingWith      n ns) = n:ns
+namesFromIE (IEModuleContents _   ) = []
 \end{code}
 
 
