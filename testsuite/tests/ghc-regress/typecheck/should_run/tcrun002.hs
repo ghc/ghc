@@ -5,7 +5,7 @@ module Main where
 -- care.  See comment about polymorphic recursion in TcMonoBinds.lhs
 
 import System(getArgs)
-import PrelIOBase
+import GHC.IOBase
 
 sfoldl :: (a -> Int -> a) -> a -> [Int] -> a
 sfoldl f z [] = z

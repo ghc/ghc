@@ -3,9 +3,7 @@
 -- !!! Test generics
 module Main where
 
-import PrelBase		-- In a real program it would be 'import Generics'
-			-- but Generics is in package lang, so importing
-			-- PrelBase reduces dependencies
+import Data.Generics
 
 class Bin a where
   toBin   :: a -> [Int]

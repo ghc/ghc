@@ -10,7 +10,7 @@
 module Main where
 
 import IO
-import PrelIOBase( unsafePerformIO )
+import System.IO.Unsafe ( unsafePerformIO )
 
 {-# NOINLINE [0] sndSnd #-}
 -- Dont inline till last, to give the rule a chance
