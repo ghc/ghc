@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.214 2002/03/26 21:59:41 sof Exp $
+# $Id: Makefile,v 1.215 2002/04/22 14:35:02 simonmar Exp $
 
 TOP = ..
 
@@ -216,13 +216,11 @@ prelude/PrelRules_HC_OPTS	= -fvia-C
 main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
 # Use -fvia-C since the NCG can't handle the narrow16Int# (and intToInt16#?)
 # primops on all platforms.
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns -fvia-C
 parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns -fvia-C
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
 ifeq "$(compiling_with_4xx)" "YES"
-rename/ParseIface_HC_OPTS 	+= -K2m
 parser/Parser_HC_OPTS 		+= -K2m
 endif
 
@@ -233,13 +231,17 @@ endif
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
 
+ifeq "$(bootstrapped)" "YES"
+utils/Binary_HC_OPTS		= -funbox-strict-fields
+endif
+
 # flags for PrimPacked:
 #
-# -monly-3-regs 
-#	because it contains a 'ccall strlen', which gets inlined by
-# 	gcc, causing a lack of registers.
+# -monly-2-regs 
+#	because it contains 'ccall strlen' and 'ccall memcmp', which gets 
+#	inlined by gcc, causing a lack of registers.
 #
-utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
+utils/PrimPacked_HC_OPTS	= -fvia-C -monly-2-regs
 
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
@@ -373,8 +375,7 @@ rename/RnSource_HC_OPTS += -auto-all
 #-----------------------------------------------------------------------------
 # 		clean
 
-MAINTAINER_CLEAN_FILES += \
-	parser/Parser.info rename/ParseIface.info main/ParsePkgConf.info
+MAINTAINER_CLEAN_FILES += parser/Parser.info main/ParsePkgConf.info
 
 #-----------------------------------------------------------------------------
 # 		Include target-rule boilerplate
