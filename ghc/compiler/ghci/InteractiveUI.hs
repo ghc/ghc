@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.49 2001/02/13 18:37:53 qrczak Exp $
+-- $Id: InteractiveUI.hs,v 1.50 2001/02/14 11:03:59 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -47,7 +47,8 @@ import Monad 		( when )
 import PrelGHC 		( unsafeCoerce# )
 import PrelPack 	( packString )
 import PrelByteArr
-import Foreign		( Ptr, nullPtr )
+import Foreign		( nullPtr )
+import CString		( peekCString )
 
 -----------------------------------------------------------------------------
 
@@ -686,13 +687,14 @@ linkPackages cmdline_libs pkgs
                              else do loadObj static_ish
                                      putStr "done.\n"
                    Right dll_unadorned
-                      -> do dll_ok <- addDLL dll_unadorned
-                            if    dll_ok
+                      -> do maybe_errmsg <- addDLL dll_unadorned
+                            if    maybe_errmsg == nullPtr
                              then putStr "done.\n"
-                             else do putStr "not found.\n"
+                             else do str <- peekCString maybe_errmsg
+                                     putStr ("failed (" ++ str ++ ")\n")
                                      croak
 
-        croak = throwDyn (OtherError "user specified .o/.so/.DLL cannot be found.")
+        croak = throwDyn (OtherError "user specified .o/.so/.DLL could not be loaded.")
 
         classify a_lib
            = let a_libr = reverse a_lib
@@ -739,11 +741,12 @@ loadClassified :: Either FilePath String -> IO ()
 loadClassified (Left obj_absolute_filename)
    = do loadObj obj_absolute_filename
 loadClassified (Right dll_unadorned)
-   = do dll_ok <- addDLL dll_unadorned
-        if dll_ok
+   = do maybe_errmsg <- addDLL dll_unadorned
+        if    maybe_errmsg == nullPtr
          then return ()
-         else throwDyn (OtherError ("can't find .o or .so/.DLL for: " 
-                                    ++ dll_unadorned))
+         else do str <- peekCString maybe_errmsg
+                 throwDyn (OtherError ("can't find .o or .so/.DLL for: " 
+                                       ++ dll_unadorned ++ " (" ++ str ++ ")" ))
 
 locateOneObj :: [FilePath] -> String -> IO (Either FilePath String)
 locateOneObj []     obj 

@@ -11,9 +11,10 @@ module Linker (
    unloadObj,    -- :: String -> IO ()
    lookupSymbol, -- :: String -> IO (Maybe (Ptr a))
    resolveObjs,  -- :: IO ()
-   addDLL	 -- :: String -> IO Bool
+   addDLL	 -- :: String -> IO (Ptr CChar)
   )  where
 
+import CTypes		( CChar )
 import Foreign		( Ptr, nullPtr )
 import PrelByteArr
 import PrelPack 	(packString)
@@ -48,8 +49,8 @@ resolveObjs = do
 	else return ()
 
 addDLL str = do
-   r <- c_addDLL (packString str)
-   return (r == 0)
+   maybe_errmsg <- c_addDLL (packString str)
+   return maybe_errmsg
 
 type PackedString = ByteArray Int
 
@@ -69,6 +70,6 @@ foreign import "initLinker" unsafe
    initLinker :: IO ()
 
 foreign import "addDLL" unsafe 
-   c_addDLL :: PackedString -> IO Int
+   c_addDLL :: PackedString -> IO (Ptr CChar)
 
 \end{code}
