@@ -166,6 +166,12 @@ endif
 MKDEPENDC_SRCS     = $(C_SRCS) $(HC_SRCS)
 SRC_MKDEPENDC_OPTS += -I. -I../includes
 
+# Hack: we define every way-related option here, so that we get (hopefully)
+# a superset of the dependencies.  To do this properly, we should generate
+# a different set of dependencies for each way.  Further hack: PROFILING and
+# TICKY_TICKY can't be used together, so we omit TICKY_TICKY for now.
+SRC_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
+
 # -----------------------------------------------------------------------------
 # The auto-generated apply code
 
