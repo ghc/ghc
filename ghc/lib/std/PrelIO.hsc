@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.14 2001/09/17 16:21:41 simonmar Exp $
+-- $Id: PrelIO.hsc,v 1.15 2001/09/17 16:51:55 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -626,13 +626,15 @@ commitBuffer' hdl raw sz@(I## _) count@(I## _) flush release
 			     else allocateBuffer size WriteBuffer
 
       -- release the buffer if necessary
-      if release && bufSize buf_ret == size
-	 then do
+      case buf_ret of
+        Buffer{ bufSize=buf_ret_sz, bufBuf=buf_ret_raw } -> do
+          if release && buf_ret_sz == size
+	    then do
 	      spare_bufs <- readIORef spare_buf_ref
 	      writeIORef spare_buf_ref 
-		(BufferListCons (bufBuf buf_ret) spare_bufs)
+		(BufferListCons buf_ret_raw spare_bufs)
 	      return buf_ret
-	 else
+	    else
 	      return buf_ret
 
 
