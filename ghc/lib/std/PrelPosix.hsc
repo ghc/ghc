@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.4 2001/05/22 13:22:14 simonmar Exp $
+-- $Id: PrelPosix.hsc,v 1.5 2001/05/30 16:39:22 sewardj Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -42,7 +42,10 @@ type CIno    = #type ino_t
 type CMode   = #type mode_t
 type COff    = #type off_t
 type CPid    = #type pid_t
-#ifndef mingw32_TARGET_OS
+
+#ifdef mingw32_TARGET_OS
+type CSsize  = #type size_t
+#else
 type CGid    = #type gid_t
 type CNlink  = #type nlink_t
 type CSsize  = #type ssize_t
@@ -96,14 +99,20 @@ foreign import "s_isdir_wrap" s_isdir :: CMode -> Bool
 foreign import "s_isfifo_wrap" s_isfifo :: CMode -> Bool
 #def inline int s_isfifo_wrap(m) { return S_ISFIFO(m); }
 
+#ifndef mingw32_TARGET_OS
 foreign import "s_issock_wrap" s_issock :: CMode -> Bool
 #def inline int s_issock_wrap(m) { return S_ISSOCK(m); }
-
+#else
+s_issock :: CMode -> Bool
+s_issock cmode = False
+#endif
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
 
 fdIsTTY :: Int -> IO Bool
 fdIsTTY fd = c_isatty (fromIntegral fd) >>= return.toBool
+
+#ifndef mingw32_TARGET_OS
 
 type Termios = ()
 
@@ -165,8 +174,24 @@ tcSetAttr fd options p_tios = do
 	 c_tcsetattr (fromIntegral fd) options p_tios
      c_sigprocmask (#const SIG_SETMASK) p_old_sigset nullPtr
 
+#else
+
+-- bogus defns for win32
+setCooked :: Int -> Bool -> IO ()
+setCooked fd cooked = return ()
+
+setEcho :: Int -> Bool -> IO ()
+setEcho fd on = return ()
+
+getEcho :: Int -> IO Bool
+getEcho fd = return False
+
+#endif
+
 -- ---------------------------------------------------------------------------
 -- Turning on non-blocking for a file descriptor
+
+#ifndef mingw32_TARGET_OS
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
@@ -174,6 +199,12 @@ setNonBlockingFD fd = do
   throwErrnoIfMinus1Retry "setNonBlockingFD"
 	(fcntl_write (fromIntegral fd) 
 	   (#const F_SETFL) (flags .|. #const O_NONBLOCK))
+#else
+
+-- bogus defns for win32
+setNonBlockingFD fd = return ()
+
+#endif
 
 -- -----------------------------------------------------------------------------
 -- foreign imports
@@ -199,13 +230,33 @@ o_RDWR      = (#const O_RDWR)	   :: CInt
 o_APPEND    = (#const O_APPEND)	   :: CInt
 o_CREAT     = (#const O_CREAT)	   :: CInt
 o_EXCL	    = (#const O_EXCL)	   :: CInt
-o_NOCTTY    = (#const O_NOCTTY)	   :: CInt
 o_TRUNC     = (#const O_TRUNC)	   :: CInt
+
+#ifdef mingw32_TARGET_OS
+o_NOCTTY    = 0 :: CInt
+o_NONBLOCK  = 0 :: CInt
+#else
+o_NOCTTY    = (#const O_NOCTTY)	   :: CInt
 o_NONBLOCK  = (#const O_NONBLOCK)  :: CInt
+#endif
+
+#ifdef HAVE_O_BINARY
+o_BINARY    = (#const O_BINARY)	   :: CInt
+#endif
+
+foreign import "isatty" unsafe
+   c_isatty :: CInt -> IO CInt
 
 foreign import "close" unsafe
    c_close :: CInt -> IO CInt
 
+foreign import "lseek" unsafe
+   c_lseek :: CInt -> COff -> CInt -> IO COff
+
+foreign import "write" unsafe 
+   c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
+
+#ifndef mingw32_TARGET_OS
 foreign import "fcntl" unsafe
    fcntl_read  :: CInt -> CInt -> IO CInt
 
@@ -214,12 +265,6 @@ foreign import "fcntl" unsafe
 
 foreign import "fork" unsafe
    fork :: IO CPid 
-
-foreign import "isatty" unsafe
-   c_isatty :: CInt -> IO CInt
-
-foreign import "lseek" unsafe
-   c_lseek :: CInt -> COff -> CInt -> IO COff
 
 foreign import "read" unsafe 
    c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
@@ -241,7 +286,4 @@ foreign import "tcsetattr" unsafe
 
 foreign import "waitpid" unsafe
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
-
-foreign import "write" unsafe 
-   c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
-
+#endif

@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.5 2001/05/24 10:41:13 simonmar Exp $
+-- $Id: PrelHandle.hsc,v 1.6 2001/05/30 16:39:22 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -341,11 +341,11 @@ getBuffer :: FD -> BufferState -> IO (IORef Buffer, BufferMode)
 getBuffer fd state = do
   buffer <- allocateBuffer dEFAULT_BUFFER_SIZE state
   ioref  <- newIORef buffer
-  is_tty <- c_isatty (fromIntegral fd)
+  is_tty <- fdIsTTY fd
 
   let buffer_mode 
-         | toBool is_tty = LineBuffering 
-         | otherwise     = BlockBuffering Nothing
+         | is_tty    = LineBuffering 
+         | otherwise = BlockBuffering Nothing
 
   return (ioref, buffer_mode)
 
@@ -1132,11 +1132,11 @@ hIsTerminalDevice handle = do
 
 #ifdef _WIN32
 hSetBinaryMode handle bin = 
-  withHandle "hSetBinaryMode" handle $ \ handle_ ->
-    let flg | bin       = (#const O_BINARY)
-	    | otherwise = (#const O_TEXT)
-    throwErrnoIfMinus1_ "hSetBinaryMode" $
-	setmode (fromIntegral (haFD handle_)) flg
+  withHandle_ "hSetBinaryMode" handle $ \ handle_ ->
+    do let flg | bin       = (#const O_BINARY)
+	       | otherwise = (#const O_TEXT)
+       throwErrnoIfMinus1_ "hSetBinaryMode"
+          (setmode (fromIntegral (haFD handle_)) flg)
 
 foreign import "setmode" setmode :: CInt -> CInt -> IO CInt
 #else

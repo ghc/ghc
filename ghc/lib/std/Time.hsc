@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.13 2001/05/18 16:54:05 simonmar Exp $
+-- $Id: Time.hsc,v 1.14 2001/05/30 16:39:22 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -316,7 +316,7 @@ zone x      = (#peek struct tm,tm_zone) x
 gmtoff x    = (#peek struct tm,tm_gmtoff) x
 
 #else /* ! HAVE_TM_ZONE */
-# if HAVE_TZNAME || _WIN32
+# if HAVE_TZNAME || defined(_WIN32)
 #  if cygwin32_TARGET_OS
 #   define tzname _tzname
 #  endif

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.12 2001/05/18 16:54:06 simonmar Exp $
+ * $Id: system.c,v 1.13 2001/05/30 16:39:22 sewardj Exp $
  *
  * system Runtime Support
  */
@@ -20,8 +20,6 @@ systemCmd(HsAddr cmd)
       until the sub shell has finished before returning. Using Sleep()
       works around that.) */
   if (system(cmd) < 0) {
-     cvtErrno();
-     stdErrno();
      return -1;
   }
   Sleep(1000);
