@@ -761,9 +761,11 @@ check_tau_type :: Rank -> UbxTupFlag -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- No foralls otherwise
 
-check_tau_type rank ubx_tup ty@(ForAllTy _ _) = failWithTc (forAllTyErr ty)
-check_tau_type rank ubx_tup (PredTy sty)    = getDOpts		`thenM` \ dflags ->
-						check_source_ty dflags TypeCtxt sty
+check_tau_type rank ubx_tup ty@(ForAllTy _ _)       = failWithTc (forAllTyErr ty)
+check_tau_type rank ubx_tup ty@(FunTy (PredTy _) _) = failWithTc (forAllTyErr ty)
+	-- Reject e.g. (Maybe (?x::Int => Int)), with a decent error message
+check_tau_type rank ubx_tup ty@(PredTy _) = pprPanic "check_tau_type" (ppr ty)
+
 check_tau_type rank ubx_tup (TyVarTy _)       = returnM ()
 check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
   = check_poly_type rank UT_NotOk arg_ty	`thenM_`
@@ -831,7 +833,7 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
     ubx_tup_msg = ubxArgTyErr ty
 
 ----------------------------------------
-forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr ty
+forAllTyErr     ty = ptext SLIT("Illegal polymorphic or qualified type:") <+> ppr ty
 unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr ty
 ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr ty
 kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
