@@ -77,7 +77,14 @@ def say_fail_because_nonempty ( $filename1 )
 def say_fail_because_compiler_barfd ( $res )
 {
    print "--- FAIL because the compiler returned non-zero exit code = " ++ $res
+   $comp_stderr = qualify("comp.stderr")
+   if   exists($comp_stderr)
+   then print "--- Error messages:"
+        $barfage = contents(qualify("comp.stderr"))
+        print $barfage
+   fi
 }
+
 
 ---------------------------------------------------------------
 --- COMPILATION                                             ---
@@ -145,15 +152,6 @@ def simple_build_Main_WRK ( $_extra_args )
           ++ $srcname ++ " &> " ++ $errname
    $res = run $cmd
    return $res
-}
-
--- Compile testname.hs into testname; comp errors -> testname.comp.stderr.
--- Used for run tests, so framefail if compilation fails.
-
-def simple_build_Main ( $_extra_args ) 
-{
-   $res = simple_build_Main_WRK ( $_extra_args )
-   if $res /= "0" then framefail "simple_build_Main: failed" fi
 }
 
 
@@ -263,7 +261,14 @@ def multimod-run-test-actions ( $extra_compile_args,
                                 $allowable_nonzero_exit_code )
 {
    pretest_cleanup()
-   simple_build_Main( $extra_compile_args )
+
+   $res = simple_build_Main_WRK( $extra_compile_args )
+   -- If the compiler barf'd, fail.
+   if   $res /= "0" 
+   then say_fail_because_compiler_barfd ( $res )
+        return False 
+   fi
+
    $res = simple_run_main( $extra_run_args )
    if   $res /= "0" && $res /= $allowable_nonzero_exit_code
    then print "multimod-test: unexpected exit code (" ++ $res 

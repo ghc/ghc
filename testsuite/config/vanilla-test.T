@@ -71,6 +71,12 @@ def say_fail_because_nonempty ( $filename1 )
 def say_fail_because_compiler_barfd ( $res )
 {
    print "--- FAIL because the compiler returned non-zero exit code = " ++ $res
+   $comp_stderr = qualify("comp.stderr")
+   if   exists($comp_stderr)
+   then print "--- Error messages:"
+        $barfage = contents(qualify("comp.stderr"))
+        print $barfage
+   fi
 }
 
 ---------------------------------------------------------------
@@ -131,15 +137,6 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
           ++ $srcname ++ " &> " ++ $errname
    $res = run $cmd
    return $res
-}
-
--- Compile testname.hs into testname; comp errors -> testname.comp.stderr.
--- Used for run tests, so framefail if compilation fails.
-
-def simple_build_Main ( $_extra_args ) 
-{
-   $res = simple_build_Main_WRK ( $_extra_args, False )
-   if $res /= "0" then framefail "simple_build_Main: failed" fi
 }
 
 
@@ -249,7 +246,14 @@ def vanilla-run-test-actions ( $extra_compile_args,
                                $allowable_nonzero_exit_code )
 {
    pretest_cleanup()
-   simple_build_Main( $extra_compile_args )
+
+   $res = simple_build_Main_WRK( $extra_compile_args )
+   -- If the compiler barf'd, fail.
+   if   $res /= "0" 
+   then say_fail_because_compiler_barfd ( $res )
+        return False 
+   fi
+
    $res = simple_run_main( $extra_run_args )
    if   $res /= "0" && $res /= $allowable_nonzero_exit_code
    then print "vanilla-test: unexpected exit code (" ++ $res 
@@ -284,8 +288,8 @@ def vanilla-compok-test-actions ( $extra_compile_args )
    then $stderr_a = normalise_errmsg(contents($actual_stderr))
         $stderr_e = normalise_errmsg(contents($expected_stderr))
         if   $stderr_e /= $stderr_a
-        then print ( "-- UNMATCHED WARNING MSGS: EXPECTED\n" ++ $stderr_e ++
-                     "-- ACTUAL\n" ++ $stderr_a ++ "-- END\n" )
+        then print "UNMATCHED WARNING MSGS:"
+             $dummy = run ("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
              return False
         else return True
         fi
@@ -319,12 +323,13 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
 
    $res = simple_build_Main_WRK ( $extra_compile_args, True )
 
-   $stderr_a = normalise_errmsg(contents(qualify("comp.stderr")))
+   $actual_stderr = qualify("comp.stderr")
+   $stderr_a = normalise_errmsg(contents($actual_stderr))
    $stderr_e = normalise_errmsg(contents($expected_stderr))
 
-   if $stderr_e /= $stderr_a
-   then print ( "-- UNMATCHED ERROR MSGS: EXPECTED\n" ++ $stderr_e ++
-                "-- ACTUAL\n" ++ $stderr_a ++ "-- END\n" )
+   if   $stderr_e /= $stderr_a
+   then print "UNMATCHED ERROR MSGS:"
+        $dummy = run ("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
    fi
 
    if $res /= "0" && $stderr_e == $stderr_a
