@@ -39,7 +39,7 @@ prel: ilx
 
 %.$(ilx_way).exe : %.$(ilx_way).il ../Entry.$(ilx_way).il 
 	cat $*.$(ilx_way).il ../Entry.$(ilx_way).il > $@.tmp
-	echo "call devcorb2gen free" > tmp.bat
+#	echo "call devcorb2gen free" > tmp.bat
 	echo "ilasm /DEBUG /QUIET /OUT=$@ $@.tmp" >> tmp.bat
 	cmd /c tmp.bat
 
@@ -57,42 +57,49 @@ prel: ilx
 # Used to run performance comparisons against native code GHC
 
 %.Onot.exe: %.hs
-	ghc -Onot -o $@ $<
+	$(GHC_INPLACE) -Onot -o $@ $<
 
 %.O.exe: %.hs
-	ghc -O -o $@ $<
+	$(GHC_INPLACE) -O -o $@ $<
 
-%.run: %.exe
+WIN_TOP_ABS = $(subst /,\,$(FPTOOLS_TOP_ABS))
+WIN_ILX2IL_HOME = $(subst /,\,$(ILX2IL_HOME))
+
+app.config:
+	echo "<configuration>" > $@
+	echo "<runtime>" >> $@
+	echo "<assemblyBinding xmlns=\"urn:schemas-microsoft-com:asm.v1\">" >> $@
+	echo "<probing privatePath=\"$(WIN_TOP_ABS)\\ghc\\lib\\std;$(WIN_ILX2IL_HOME)\\bin\"/>" >> $@
+	echo "</assemblyBinding>" >> $@
+	echo "</runtime>" >> $@
+	echo "</configuration>" >> $@
+
+%.run: %.exe app.config
 	time -p $<
 
 #------------------------------------------------------------------------
 # Running:
 
-HSstd_cbits.dll: ../../../lib/std/cbits/HSstd_cbits.dll
+HSstd_cbits.dll: $(DLL_PEN)/HSstd_cbits.dll
 	cp $< $@
 
 %.cordbg.run: HSstd_cbits.dll %.exe
-	cp $(TOP)/lib/std/*.$(ilx_way).dll .
-	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).dll .
-	cp $(TOP)/lib/std/*.$(ilx_way).pdb .
-	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).pdb .
-	echo "call devcorb2gen fastchecked" > $@.bat
+	cp app.config $@.config
+#	echo "call devcorb2gen fastchecked" > $@.bat
 	echo "$(LOCALRUN)$(subst /,\\,$*).exe 2>&1" >> $@.bat
 	time -p cmd /c $(subst /,\\,$@).bat
 	rm $@.bat
 
 %.debug.run: HSstd_cbits.dll %.exe
-	cp $(TOP)/lib/std/*.$(ilx_way).dll .
-	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).dll .
-	echo "call devcorb2gen fastchecked" > $@.bat
+	cp app.config $@.config
+#	echo "call devcorb2gen fastchecked" > $@.bat
 	echo "$(LOCALRUN)$(subst /,\\,$*).exe 2>&1" >> $@.bat
 	time -p cmd /c $(subst /,\\,$@).bat
 	rm $@.bat
 
 %.retail.run: HSstd_cbits.dll %.exe
-	cp $(TOP)/lib/std/*.$(ilx_way).dll .
-	cp $(ILX2IL_HOME)/bin/msilxlib$(ilx2il_suffix).dll .
-	echo "call devcorb2gen free" > $@.bat
+	cp app.config $@.config
+#	echo "call devcorb2gen free" > $@.bat
 	echo "$(LOCALRUN)$(subst /,\\,$*).exe 2>&1" >> $@.bat
 	time -p cmd /c $(subst /,\\,$@).bat
 	rm $@.bat
