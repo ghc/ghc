@@ -343,7 +343,7 @@ lazyReadBlock handle =
           if bytes < 0 then
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
 	      writeForeignObj fp ``NULL''           >>
 	      ioToST (writeHandle handle (SemiClosedHandle fp (``NULL'', 0))) >>
 #else
@@ -371,7 +371,7 @@ lazyReadLine handle =
           if bytes < 0 then
               _ccall_ free buf			    >>= \ () ->
               _ccall_ closeFile fp	            >>
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
 	      writeForeignObj fp ``NULL''           >>
 	      ioToST (writeHandle handle (SemiClosedHandle fp (``NULL'', 0))) >>
 #else
@@ -395,7 +395,7 @@ lazyReadChar handle =
 	  _ccall_ readChar fp			    >>= \ char ->
           if char == ``EOF'' then
               _ccall_ closeFile fp	            >>
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
 	      writeForeignObj fp ``NULL''           >>
 	      ioToST (writeHandle handle (SemiClosedHandle fp (``NULL'', 0))) >>
 #else
@@ -498,14 +498,14 @@ hPutStr handle str =
           else
               constructErrorAndFail "hPutStr"
   where
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
     writeLines :: ForeignObj -> String -> PrimIO Bool
 #else
     writeLines :: Addr -> String -> PrimIO Bool
 #endif
     writeLines = writeChunks ``BUFSIZ'' True 
 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
     writeBlocks :: ForeignObj -> Int -> String -> PrimIO Bool
 #else
     writeBlocks :: Addr -> Int -> String -> PrimIO Bool
@@ -524,7 +524,7 @@ hPutStr handle str =
       a whole lot quicker. -- SOF 3/96
     -}
 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
     writeChunks :: Int -> Bool -> ForeignObj -> String -> PrimIO Bool
 #else
     writeChunks :: Int -> Bool -> Addr -> String -> PrimIO Bool
@@ -562,7 +562,7 @@ hPutStr handle str =
      in
      shoveString 0# s
 
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
     writeChars :: ForeignObj -> String -> PrimIO Bool
 #else
     writeChars :: Addr -> String -> PrimIO Bool

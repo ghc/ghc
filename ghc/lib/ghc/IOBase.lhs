@@ -396,7 +396,7 @@ type Handle = MutableVar RealWorld Handle__
 data Handle__
   = ErrorHandle		IOError
   | ClosedHandle
-#ifndef PAR
+#ifndef __PARALLEL_HASKELL__
   | SemiClosedHandle	ForeignObj (Addr, Int)
   | ReadHandle		ForeignObj (Maybe BufferMode) Bool
   | WriteHandle		ForeignObj (Maybe BufferMode) Bool
