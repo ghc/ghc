@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.56 2003/03/25 17:23:05 sof Exp $
+ * $Id: Printer.c,v 1.57 2003/03/25 17:58:48 sof Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -971,7 +971,7 @@ extern void DEBUG_LoadSymbols( char *name )
             }
         }
 
-        free(symbol_table);
+        stgFree(symbol_table);
     }
     prepare_table();
 }

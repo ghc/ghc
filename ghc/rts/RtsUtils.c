@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.31 2003/03/25 17:24:30 sof Exp $
+ * $Id: RtsUtils.c,v 1.32 2003/03/25 17:58:49 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -128,6 +128,15 @@ stgCallocBytes (int n, int m, char *msg)
   char* p  = stgMallocBytes(sz, msg);
   for (i = 0; i < sz; i++) p[i] = 0;
   return p;
+}
+
+/* To simplify changing the underlying allocator used
+ * by stgMallocBytes(), provide stgFree() as well.
+ */
+void
+stgFree(void* p)
+{
+  free(p);
 }
 
 void 

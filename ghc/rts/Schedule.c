@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.164 2003/03/25 17:26:09 sof Exp $
+ * $Id: Schedule.c,v 1.165 2003/03/25 17:58:50 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2359,7 +2359,7 @@ waitThread_(StgMainThread* m
 
   IF_DEBUG(scheduler, fprintf(stderr, "== scheduler: main thread (%d) finished\n", 
 			      m->tso->id));
-  free(m);
+  stgFree(m);
 
   // Postcondition: sched_mutex still held
   return stat;

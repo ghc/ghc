@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Sparks.c,v 1.5 2002/01/24 02:06:49 sof Exp $
+ * $Id: Sparks.c,v 1.6 2003/03/25 17:58:50 sof Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -575,7 +575,7 @@ disposeSpark(spark)
 rtsSpark *spark;
 {
   ASSERT(spark!=NULL);
-  free(spark);
+  stgFree(spark);
 }
 
 //@cindex disposeSparkQ
@@ -595,7 +595,7 @@ rtsSparkQ spark;
   }
 # endif
 
-  free(spark);
+  stgFree(spark);
 }
 
 /*

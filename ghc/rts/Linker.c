@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.115 2003/02/21 05:34:15 sof Exp $
+ * $Id: Linker.c,v 1.116 2003/03/25 17:58:47 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -768,13 +768,13 @@ addDLL( char *dll_name )
 	 sprintf(buf, "%s.DRV", dll_name);	// KAA: allow loading of drivers (like winspool.drv)
 	 instance = LoadLibrary(buf);
 	 if (instance == NULL) {
-		free(buf);
+		stgFree(buf);
 
 	    /* LoadLibrary failed; return a ptr to the error msg. */
 	    return "addDLL: unknown error";
    	 }
    }
-   free(buf);
+   stgFree(buf);
 
    /* Add this DLL to the list of DLLs in which to search for symbols. */
    o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
@@ -950,7 +950,7 @@ loadObj( char *path )
 #  elif defined(OBJFORMAT_MACHO)
    oc->formatName = "Mach-O";
 #  else
-   free(oc);
+   stgFree(oc);
    barf("loadObj: not implemented on this platform");
 #  endif
 
@@ -1115,14 +1115,14 @@ unloadObj( char *path )
 
 	    /* We're going to leave this in place, in case there are
 	       any pointers from the heap into it: */
-	    /* free(oc->image); */
-	    free(oc->fileName);
-	    free(oc->symbols);
-	    free(oc->sections);
+	    /* stgFree(oc->image); */
+	    stgFree(oc->fileName);
+	    stgFree(oc->symbols);
+	    stgFree(oc->sections);
 	    /* The local hash table should have been freed at the end
                of the ocResolve_ call on it. */
             ASSERT(oc->lochash == NULL);
-	    free(oc);
+	    stgFree(oc);
 	    return 1;
 	}
     }

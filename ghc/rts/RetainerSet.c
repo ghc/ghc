@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerSet.c,v 1.3 2002/07/18 09:12:36 simonmar Exp $
+ * $Id: RetainerSet.c,v 1.4 2003/03/25 17:58:49 sof Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -493,7 +493,7 @@ outputAllRetainerSet(FILE *prof_file)
 	fprintf(prof_file, "}\n");
     }
 
-    free(rsArray);
+    stgFree(rsArray);
 }
 #endif // SECOND_APPROACH
 

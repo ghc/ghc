@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.c,v 1.9 2002/07/17 09:21:49 simonmar Exp $
+ * $Id: Hash.c,v 1.10 2003/03/25 17:58:47 sof Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1995-1998
  * (c) The GHC Team, 1999
@@ -325,11 +325,11 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
 	    }
 	    index--;
 	}
-	free(table->dir[segment]);
+	stgFree(table->dir[segment]);
 	segment--;
 	index = HSEGSIZE - 1;
     }
-    free(table);
+    stgFree(table);
 }
 
 /* -----------------------------------------------------------------------------

@@ -9,6 +9,7 @@
 
 #include "PosixSource.h"
 #include "ThreadLabels.h"
+#include "RtsUtils.h"
 
 #include <stdlib.h>
 
@@ -41,6 +42,6 @@ removeThreadLabel(StgWord key)
   void * old = NULL;
   if ((old = lookupHashTable(threadLabels,key))) {
     removeHashTable(threadLabels,key,old);
-    free(old);
+    stgFree(old);
   }  
 }

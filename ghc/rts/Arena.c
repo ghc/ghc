@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   $Id: Arena.c,v 1.5 2003/02/18 05:40:20 sof Exp $ 
+   $Id: Arena.c,v 1.6 2003/03/25 17:58:47 sof Exp $ 
    (c) The University of Glasgow 2001
 
    Arena allocation.  Arenas provide fast memory allocation at the
@@ -109,7 +109,7 @@ arenaFree( Arena *arena )
 	ASSERT(arena_blocks >= 0);
 	freeGroup(bd);
     }
-    free(arena);
+    stgFree(arena);
 }
 
 unsigned long

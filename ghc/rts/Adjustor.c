@@ -520,6 +520,6 @@ freeHaskellFunctionPtr(void* ptr)
 #endif
  *((unsigned char*)ptr) = '\0';
 
- free(ptr);
+ stgFree(ptr);
 }
 
