@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.24 2001/12/18 19:42:41 sebc Exp $
+ * $Id: InfoTables.h,v 1.25 2002/01/29 16:50:08 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -33,11 +33,6 @@ typedef struct {
 } StgParInfo;
 
 #endif /* 0 */
-
-typedef struct {
-	/* empty */
-} StgParInfo;
-
 
 /*
    Copied from ghc-0.29; ToDo: check this code -- HWL
