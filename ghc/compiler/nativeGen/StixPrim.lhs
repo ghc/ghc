@@ -91,6 +91,12 @@ primCode [res] SameMutableArrayOp args
 
 primCode res@[_] SameMutableByteArrayOp args
   = primCode res SameMutableArrayOp args
+
+primCode res@[_] SameMutVarOp args
+  = primCode res SameMutableArrayOp args
+
+primCode res@[_] SameMVarOp args
+  = primCode res SameMutableArrayOp args
 \end{code}
 
 Freezing an array of pointers is a double assignment.  We fix the
@@ -195,7 +201,7 @@ primCode [lhs] (IndexOffForeignObjOp pk) [obj, ix]
 	lhs' = amodeToStix lhs
     	obj' = amodeToStix obj
     	ix' = amodeToStix ix
-	obj'' = StIndex PtrRep obj' fixedHS
+	obj'' = StIndex AddrRep obj' fixedHS
     	assign = StAssign pk lhs' (StInd pk (StIndex pk obj'' ix'))
     in
     returnUs (\xs -> assign : xs)
@@ -216,6 +222,15 @@ primCode [] (WriteByteArrayOp pk) [obj, ix, v]
     	v' = amodeToStix v
     	base = StIndex IntRep obj' arrWordsHS
     	assign = StAssign pk (StInd pk (StIndex pk base ix')) v'
+    in
+    returnUs (\xs -> assign : xs)
+
+primCode [] WriteForeignObjOp [obj, v]
+  = let
+    	obj' = amodeToStix obj
+    	v' = amodeToStix v
+	obj'' = StIndex AddrRep obj' (StInt 4711) -- fixedHS
+    	assign = StAssign AddrRep (StInd AddrRep obj'') v'
     in
     returnUs (\xs -> assign : xs)
 \end{code}
