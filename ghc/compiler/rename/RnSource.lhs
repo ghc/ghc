@@ -20,7 +20,7 @@ import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
 import RnHsSyn
 import HsCore
 
-import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
+import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, unknownSigErr )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, 
 			  lookupImplicitOccRn, addImplicitOccRn,
 			  bindLocalsRn, 
@@ -193,12 +193,17 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname sr
 
 	-- Check the signatures
     let
-		-- Filter out fixity signatures;
-		-- they are done at top level
-	  nofix_sigs = nonFixitySigs sigs
+	    -- First process the class op sigs, then the fixity sigs.
+	  (op_sigs, non_op_sigs) = partition isClassOpSig sigs
+	  (fix_sigs, non_sigs)   = partition isFixitySig  non_op_sigs
     in
-    checkDupOrQualNames sig_doc sig_rdr_names_w_locs 		`thenRn_` 
-    mapAndUnzipRn (rn_op cname' clas_tyvar_names) nofix_sigs	`thenRn` \ (sigs', sig_fvs_s) ->
+    checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	  `thenRn_` 
+    mapAndUnzipRn (rn_op cname' clas_tyvar_names) op_sigs `thenRn` \ (sigs', sig_fvs_s) ->
+    mapRn_  (unknownSigErr) non_sigs			  `thenRn_`
+    let
+     binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
+    in
+    renameSigs False binders lookupOccRn fix_sigs	  `thenRn` \ (fixs', fix_fvs) ->
 
 	-- Check the methods
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
@@ -210,8 +215,12 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname sr
 	-- for instance decls.
 
     ASSERT(isNoClassPragmas pragmas)
-    returnRn (TyClD (ClassDecl context' cname' tyvars' sigs' mbinds' NoClassPragmas tname' dname' src_loc),
-	      plusFVs sig_fvs_s `plusFV` cxt_fvs `plusFV` meth_fvs)
+    returnRn (TyClD (ClassDecl context' cname' tyvars' (fixs' ++ sigs') mbinds' NoClassPragmas tname' dname' src_loc),
+	      plusFVs sig_fvs_s `plusFV`
+	      fix_fvs	        `plusFV`
+	      cxt_fvs		`plusFV`
+	      meth_fvs
+	     )
     )
   where
     cls_doc  = text "the declaration for class" 	<+> ppr cname
@@ -232,7 +241,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname sr
 	    check_in_op_ty clas_tyvar = checkRn (clas_tyvar `elemNameSet` op_ty_fvs)
 					        (classTyVarNotInOpTyErr clas_tyvar sig)
 	in
-        mapRn check_in_op_ty clas_tyvars		 `thenRn_`
+        mapRn_ check_in_op_ty clas_tyvars		 `thenRn_`
 
 		-- Make the default-method name
 	let
@@ -286,10 +295,26 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
     rnMethodBinds mbinds			`thenRn` \ (mbinds', meth_fvs) ->
     let 
 	binders = mkNameSet (map fst (bagToList (collectMonoBinders mbinds')))
+
+	-- Delete sigs (&report) sigs that aren't allowed inside an
+	-- instance decl:
+	--
+	--  + type signatures
+	--  + fixity decls
+	--
+	(ok_sigs, not_ok_idecl_sigs) = partition okInInstDecl uprags
+	
+	okInInstDecl (FixSig _)  = False
+	okInInstDecl (Sig _ _ _) = False
+	okInInstDecl _		 = True
+	
     in
-    renameSigs NotTopLevel True binders uprags	`thenRn` \ (new_uprags, prag_fvs) ->
-    mkDFunName inst_ty' maybe_dfun src_loc	`thenRn` \ dfun_name ->
-    addOccurrenceName dfun_name			`thenRn_`
+      -- You can't have fixity decls & type signatures
+      -- within an instance declaration.
+    mapRn_ unknownSigErr not_ok_idecl_sigs       `thenRn_`
+    renameSigs False binders lookupOccRn ok_sigs `thenRn` \ (new_uprags, prag_fvs) ->
+    mkDFunName inst_ty' maybe_dfun src_loc	 `thenRn` \ dfun_name ->
+    addOccurrenceName dfun_name			 `thenRn_`
 			-- The dfun is not optional, because we use its version number
 			-- to identify the version of the instance declaration
 
@@ -370,7 +395,7 @@ rnDerivs (Just ds)
 		Nothing -> addErrRn (derivingNonStdClassErr clas_name)	`thenRn_`
 			   returnRn clas_name
 
-		Just occs -> mapRn lookupImplicitOccRn occs	`thenRn_`
+		Just occs -> mapRn_ lookupImplicitOccRn occs	`thenRn_`
 			     returnRn clas_name
 
 \end{code}
@@ -557,8 +582,8 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt ty)
 	(bad_guys, warn_guys) = partition (`elem` constrained_tyvars) dubious_guys
 	forall_tyvar_names    = map getTyVarName forall_tyvars
     in
-    mapRn (forAllErr doc ty) bad_guys 				`thenRn_`
-    mapRn (forAllWarn doc ty) warn_guys				`thenRn_`
+    mapRn_ (forAllErr doc ty) bad_guys 				`thenRn_`
+    mapRn_ (forAllWarn doc ty) warn_guys			`thenRn_`
     checkConstraints True doc forall_tyvar_names ctxt ty	`thenRn` \ ctxt' ->
     rnForAll doc forall_tyvars ctxt' ty
 
@@ -609,7 +634,7 @@ rnContext doc ctxt
     in
 	-- Check for duplicate assertions
 	-- If this isn't an error, then it ought to be:
-    mapRn (addWarnRn . dupClassAssertWarn theta) dup_asserts	`thenRn_`
+    mapRn_ (addWarnRn . dupClassAssertWarn theta) dup_asserts	`thenRn_`
 
     returnRn (theta, plusFVs fvs_s)
   where

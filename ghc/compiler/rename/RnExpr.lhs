@@ -421,7 +421,7 @@ rnExpr (ArithSeqIn seq)
 
 \begin{code}
 rnRbinds str rbinds 
-  = mapRn field_dup_err dup_fields	`thenRn_`
+  = mapRn_ field_dup_err dup_fields	`thenRn_`
     mapAndUnzipRn rn_rbind rbinds	`thenRn` \ (rbinds', fvRbind_s) ->
     returnRn (rbinds', plusFVs fvRbind_s)
   where
@@ -435,7 +435,7 @@ rnRbinds str rbinds
 	returnRn ((fieldname, expr', pun), fvExpr `addOneFV` fieldname)
 
 rnRpats rpats
-  = mapRn field_dup_err dup_fields 	`thenRn_`
+  = mapRn_ field_dup_err dup_fields 	`thenRn_`
     mapAndUnzipRn rn_rpat rpats		`thenRn` \ (rpats', fvs_s) ->
     returnRn (rpats', plusFVs fvs_s)
   where

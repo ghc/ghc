@@ -255,10 +255,10 @@ importsFromLocalDecls mod rec_exp_fn decls
 		non_singleton other      = False
     in
 	-- Check for duplicate definitions
-    mapRn (addErrRn . dupDeclErr) dups				`thenRn_` 
+    mapRn_ (addErrRn . dupDeclErr) dups			`thenRn_` 
 
 	-- Record that locally-defined things are available
-    mapRn (recordSlurp Nothing Compulsory) avails	`thenRn_`
+    mapRn_ (recordSlurp Nothing Compulsory) avails	`thenRn_`
 
 	-- Build the environment
     qualifyImports mod 
@@ -308,10 +308,10 @@ fixitiesFromLocalDecls gbl_env decls
     getFixities acc (FixD fix)
       = fix_decl acc fix
 
+	
     getFixities acc (TyClD (ClassDecl _ _ _ sigs _ _ _ _ _))
       = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
-		-- Get fixities from class decl sigs too
-
+		-- Get fixities from class decl sigs too.
     getFixities acc other_decl
       = returnRn acc
 

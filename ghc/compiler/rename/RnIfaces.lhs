@@ -25,7 +25,7 @@ import CmdLineOpts	( opt_PruneTyDecls,  opt_PruneInstDecls,
 import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
 			  FixitySig(..),
-			  hsDeclName, countTyClDecls, isDataDecl, nonFixitySigs
+			  hsDeclName, countTyClDecls, isDataDecl, isClassOpSig
 			)
 import BasicTypes	( Version, NewOrData(..) )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl,
@@ -765,7 +765,7 @@ getImportedInstDecls :: RnMG [(Module,RdrNameInstDecl)]
 getImportedInstDecls
   = 	-- First load any special-instance modules that aren't aready loaded
     getSpecialInstModules 			`thenRn` \ inst_mods ->
-    mapRn load_it inst_mods			`thenRn_`
+    mapRn_ load_it inst_mods			`thenRn_`
 
 	-- Now we're ready to grab the instance declarations
 	-- Find the un-gated ones and return them, 
@@ -820,7 +820,7 @@ getImportedFixities gbl_env
 					   not (isLocallyDefined name)
 		       ]
     in
-    mapRn load (nub home_modules)	`thenRn_`
+    mapRn_ load (nub home_modules)	`thenRn_`
 
 	-- Now we can snaffle the fixity env
     getIfacesRn						`thenRn` \ ifaces ->
@@ -996,10 +996,10 @@ getDeclBinders new_name (TyClD (ClassDecl _ cname _ sigs _ _ tname dname src_loc
 
 	-- Record the names for the class ops
     let
-	-- ignoring fixity declarations
-	nonfix_sigs = nonFixitySigs sigs
+	-- just want class-op sigs
+	op_sigs = filter isClassOpSig sigs
     in
-    mapRn (getClassOpNames new_name) nonfix_sigs	`thenRn` \ sub_names ->
+    mapRn (getClassOpNames new_name) op_sigs	`thenRn` \ sub_names ->
 
     returnRn (Just (AvailTC class_name (class_name : sub_names)))
 

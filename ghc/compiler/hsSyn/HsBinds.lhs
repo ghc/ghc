@@ -253,11 +253,13 @@ sigsForMe f sigs
     sig_for_me (SpecInstSig _ _)      	  = False
     sig_for_me (FixSig (FixitySig n _ _)) = f n
 
-nonFixitySigs :: [Sig name] -> [Sig name]
-nonFixitySigs sigs = filter not_fix sigs
- 		   where
-		     not_fix (FixSig _) = False
-		     not_fix other	= True
+isFixitySig :: Sig name -> Bool
+isFixitySig (FixSig _) = True
+isFixitySig _	       = False
+
+isClassOpSig :: Sig name -> Bool
+isClassOpSig (ClassOpSig _ _ _ _) = True
+isClassOpSig _			  = False
 \end{code}
 
 \begin{code}

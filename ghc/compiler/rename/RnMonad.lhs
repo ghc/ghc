@@ -571,6 +571,7 @@ thenRn   :: RnM s d a -> (a -> RnM s d b) -> RnM s d b
 thenRn_  :: RnM s d a -> RnM s d b -> RnM s d b
 andRn    :: (a -> a -> a) -> RnM s d a -> RnM s d a -> RnM s d a
 mapRn    :: (a -> RnM s d b) -> [a] -> RnM s d [b]
+mapRn_   :: (a -> RnM s d b) -> [a] -> RnM s d ()
 mapMaybeRn :: (a -> RnM s d (Maybe b)) -> [a] -> RnM s d [b]
 sequenceRn :: [RnM s d a] -> RnM s d [a]
 foldlRn :: (b  -> a -> RnM s d b) -> b -> [a] -> RnM s d b
@@ -596,6 +597,11 @@ mapRn f (x:xs)
   = f x		`thenRn` \ r ->
     mapRn f xs 	`thenRn` \ rs ->
     returnRn (r:rs)
+
+mapRn_ f []     = returnRn ()
+mapRn_ f (x:xs) = 
+    f x		`thenRn_`
+    mapRn_ f xs
 
 foldlRn k z [] = returnRn z
 foldlRn k z (x:xs) = k z x	`thenRn` \ z' ->

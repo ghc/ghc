@@ -198,9 +198,9 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
     getLocalNameEnv			`thenRn` \ name_env ->
     (if opt_WarnNameShadowing
      then
-	mapRn (check_shadow name_env) rdr_names_w_loc
+	mapRn_ (check_shadow name_env) rdr_names_w_loc
      else
-	returnRn []
+	returnRn ()
     )					`thenRn_`
 	
     newLocalNames rdr_names_w_loc	`thenRn` \ names ->
@@ -288,15 +288,14 @@ checkDupOrQualNames, checkDupNames :: SDoc
 
 checkDupOrQualNames doc_str rdr_names_w_loc
   =	-- Check for use of qualified names
-    mapRn (qualNameErr doc_str) quals 	`thenRn_`
+    mapRn_ (qualNameErr doc_str) quals 	`thenRn_`
     checkDupNames doc_str rdr_names_w_loc
   where
     quals = filter (isQual.fst) rdr_names_w_loc
     
 checkDupNames doc_str rdr_names_w_loc
-  = 	-- Check for dupicated names in a binding group
-    mapRn (dupNamesErr doc_str) dups	`thenRn_`
-    returnRn ()
+  = 	-- Check for duplicated names in a binding group
+    mapRn_ (dupNamesErr doc_str) dups
   where
     (_, dups) = removeDups (\(n1,l1) (n2,l2) -> n1 `compare` n2) rdr_names_w_loc
 \end{code}
@@ -370,8 +369,7 @@ lookup_global_occ global_env rdr_name
 	Nothing -> getModeRn	`thenRn` \ mode ->
 		   case mode of 
 			-- Not found when processing source code; so fail
-			SourceMode    -> failWithRn (mkUnboundName rdr_name)
-					            (unknownNameErr rdr_name)
+			SourceMode    -> failUnboundNameErrRn rdr_name
 		
 			-- Not found when processing an imported declaration,
 			-- so we create a new name for the purpose
@@ -661,8 +659,7 @@ warnUnusedMatches names
 
 warnUnusedBinds :: (Bool -> Bool) -> [Name] -> RnM s d ()
 warnUnusedBinds warn_when_local names
-  = mapRn (warnUnusedGroup warn_when_local) groups	`thenRn_`
-    returnRn ()
+  = mapRn_ (warnUnusedGroup warn_when_local) groups
   where
 	-- Group by provenance
    groups = equivClasses cmp names
@@ -693,7 +690,7 @@ warnUnusedGroup emit_warning names
 	= case getNameProvenance name1 of
 		LocalDef loc _ 			     -> (True, loc, text "Defined but not used")
 		NonLocalDef (UserImport mod loc _) _ -> (True, loc, text "Imported from" <+> quotes (ppr mod) <+> 
-								     text "but but not used")
+								     text "but not used")
 		other -> (False, getSrcLoc name1, text "Strangely defined but not used")
 \end{code}
 
@@ -710,6 +707,11 @@ fixityClashErr (rdr_name, ((_,how_in_scope1), (_, how_in_scope2)))
   = hang (hsep [ptext SLIT("Conflicting fixities for"), quotes (ppr rdr_name)])
 	4 (vcat [ppr how_in_scope1,
 		 ppr how_in_scope2])
+
+failUnboundNameErrRn :: RdrName -> RnM s d Name
+failUnboundNameErrRn rdr_name =
+    failWithRn (mkUnboundName rdr_name)
+	       (unknownNameErr rdr_name)
 
 shadowedNameWarn shadow
   = hsep [ptext SLIT("This binding for"), 

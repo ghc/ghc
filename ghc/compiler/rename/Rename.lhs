@@ -304,7 +304,7 @@ reportUnusedNames (RnEnv gbl_env _) avail_env (ExportEnv export_avails _) mentio
 
 reportableUnusedName :: Name -> Bool
 reportableUnusedName name
-  = explicitlyImported (getNameProvenance name) && 
+  = explicitlyImported (getNameProvenance name) &&
     not (startsWithUnderscore (occNameUserString (nameOccName name)))
   where
     explicitlyImported (LocalDef _ _) 		             = True	-- Report unused defns of local vars
