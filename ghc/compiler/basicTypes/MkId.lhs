@@ -791,7 +791,7 @@ seqId
     ty  = mkForAllTys [alphaTyVar,betaTyVar]
 		      (mkFunTy alphaTy (mkFunTy betaTy betaTy))
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
-    rhs = mkLams [alphaTyVar,betaTyVar,x] (Case (Var x) x [(DEFAULT, [], Var y)])
+    rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x [(DEFAULT, [], Var y)])
 \end{code}
 
 @getTag#@ is another function which can't be defined in Haskell.  It needs to
