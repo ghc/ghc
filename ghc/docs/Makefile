@@ -6,6 +6,6 @@ include $(TOP)/mk/boilerplate.mk
 #
 export WAYS=
 
-SUBDIRS = users_guide
+SUBDIRS = set
 
 include $(TOP)/mk/target.mk
