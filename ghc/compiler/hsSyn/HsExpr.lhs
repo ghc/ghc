@@ -13,9 +13,10 @@ import HsBinds		( HsBinds(..), nullBinds )
 import HsLit		( HsLit, HsOverLit )
 import BasicTypes	( Fixity(..) )
 import HsTypes		( HsType )
+import HsImpExp		( isOperator )
 
 -- others:
-import Name		( Name, isLexSym )
+import Name		( Name )
 import Outputable	
 import PprType		( pprParendType )
 import Type		( Type )
@@ -386,14 +387,6 @@ pprParendExpr expr
       HsPar _		    -> pp_as_was
 
       _			    -> parens pp_as_was
-\end{code}
-
-\begin{code}
-isOperator :: Outputable a => a -> Bool
-isOperator v = isLexSym (_PK_ (showSDocUnqual (ppr v)))
-	-- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
-	-- that we don't need NamedThing in the context of all these functions.
-	-- Gruesome, but simple.
 \end{code}
 
 %************************************************************************

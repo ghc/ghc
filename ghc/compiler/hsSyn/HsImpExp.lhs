@@ -8,6 +8,7 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
+import Name 		( isLexSym )
 import Module		( ModuleName, WhereFrom )
 import Outputable
 import SrcLoc		( SrcLoc )
@@ -84,12 +85,23 @@ ieNames (IEModuleContents _   ) = []
 
 \begin{code}
 instance (Outputable name) => Outputable (IE name) where
-    ppr (IEVar	        var)	= ppr var
+    ppr (IEVar	        var)	= ppr_var var
     ppr (IEThingAbs	thing)	= ppr thing
     ppr (IEThingAll	thing)	= hcat [ppr thing, text "(..)"]
     ppr (IEThingWith thing withs)
-	= ppr thing <> parens (fsep (punctuate comma (map ppr withs)))
+	= ppr thing <> parens (fsep (punctuate comma (map ppr_var withs)))
     ppr (IEModuleContents mod)
 	= ptext SLIT("module") <+> ppr mod
+
+ppr_var v | isOperator v = parens (ppr v)
+	  | otherwise	 = ppr v
+\end{code}
+
+\begin{code}
+isOperator :: Outputable a => a -> Bool
+isOperator v = isLexSym (_PK_ (showSDocUnqual (ppr v)))
+	-- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
+	-- that we don't need NamedThing in the context of all these functions.
+	-- Gruesome, but simple.
 \end{code}
 
