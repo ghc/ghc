@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/11/11 16:27:30 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/22 18:11:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -193,7 +193,36 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
 #else
     AsmBCO bco = asmBeginContinuation(sp, alts);
 #endif
-    /* ppStgAlts(alts); */
+    Bool omit_test
+       = length(alts) == 2 &&
+         isDefaultAlt(hd(tl(alts))) &&
+         !isDefaultAlt(hd(alts));
+    if (omit_test) {
+       /* refine the condition */              
+       Name con;
+       Tycon t;
+       omit_test = FALSE;
+       con = stgCaseAltCon(hd(alts));
+
+       /* special case: dictionary constructors */
+       if (strncmp("Make.",textToStr(name(con).text),5)==0) {
+          omit_test = TRUE;
+          goto xyzzy;
+       }
+       /* special case: Tuples */
+       if (isTuple(con) || (isName(con) && con==nameUnit)) {
+          omit_test = TRUE;
+          goto xyzzy;
+       }          
+
+       t = name(con).parent;
+       if (tycon(t).what == DATATYPE) {
+          if (length(tycon(t).defn) == 1) omit_test = TRUE;
+       }
+    }
+
+    xyzzy:
+
     for(; nonNull(alts); alts=tl(alts)) {
         StgCaseAlt alt  = hd(alts);
         if (isDefaultAlt(alt)) {
@@ -205,8 +234,9 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
             StgDiscr con   = stgCaseAltCon(alt);
             List     vs    = stgCaseAltVars(alt);
             AsmSp    begin = asmBeginAlt(bco);
-            AsmPc    fix   = asmTest(bco,stgDiscrTag(con)); 
-                     /* ToDo: omit in single constructor types! */
+            AsmPc    fix;
+            if (omit_test) fix=-1; else fix = asmTest(bco,stgDiscrTag(con)); 
+
 	    asmBind(bco,PTR_REP); /* Adjust simulated sp to acct for return value */
             if (isBoxingCon(con)) {
                 setPos(hd(vs),asmUnbox(bco,boxingConRep(con)));
@@ -217,7 +247,7 @@ static AsmBCO cgAlts( AsmSp root, AsmSp sp, List alts )
             }
             cgExpr(bco,root,stgCaseAltBody(alt));
             asmEndAlt(bco,begin);
-            asmFixBranch(bco,fix);
+            if (fix != -1) asmFixBranch(bco,fix);
         }
     }
     /* if we got this far and didn't match, panic! */
