@@ -1255,10 +1255,10 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
 	              | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
 
     let target_defs = 
-	  [ "-D" ++ HOST_OS     ++ "BUILD_OS=1",
-	    "-D" ++ HOST_ARCH   ++ "BUILD_ARCH=1",
-	    "-D" ++ TARGET_OS   ++ "HOST_OS=1",
-	    "-D" ++ TARGET_ARCH ++ "HOST_ARCH=1" ]
+	  [ "-D" ++ HOST_OS     ++ "_BUILD_OS=1",
+	    "-D" ++ HOST_ARCH   ++ "_BUILD_ARCH=1",
+	    "-D" ++ TARGET_OS   ++ "_HOST_OS=1",
+	    "-D" ++ TARGET_ARCH ++ "_HOST_ARCH=1" ]
 	-- remember, in code we *compile*, the HOST is the same our TARGET,
 	-- and BUILD is the same as our HOST.
 
