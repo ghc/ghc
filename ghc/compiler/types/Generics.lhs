@@ -16,7 +16,7 @@ import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy )
 import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, isExistentialDataCon )
 
 import TyCon            ( TyCon, tyConTyVars, tyConDataCons_maybe, 
-			  tyConGenInfo, isNewTyCon, newTyConRep, isBoxedTupleTyCon
+			  tyConGenInfo, isNewTyCon, isBoxedTupleTyCon
 			)
 import Name		( Name, mkSystemName )
 import CoreSyn          ( mkLams, Expr(..), CoreExpr, AltCon(..), 
@@ -31,7 +31,7 @@ import TysWiredIn       ( genericTyCons,
 			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
 			  inlDataCon, crossTyCon, crossDataCon
 			)
-import IdInfo           ( noCafNoTyGenIdInfo, setUnfoldingInfo, setArityInfo )
+import IdInfo           ( noCafIdInfo, setUnfoldingInfo, setArityInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
 import Maybe		( isNothing )
@@ -271,9 +271,9 @@ mkTyConGenInfo tycon [from_name, to_name]
     tycon_ty	   = mkTyConApp tycon tyvar_tys	-- T a b c
     tyvar_tys      = mkTyVarTys tyvars
 
-    from_id_info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
+    from_id_info = noCafIdInfo `setUnfoldingInfo` mkTopUnfolding from_fn
 				      `setArityInfo`     exprArity from_fn
-    to_id_info   = noCafNoTyGenIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
+    to_id_info   = noCafIdInfo `setUnfoldingInfo` mkTopUnfolding to_fn
 				      `setArityInfo`     exprArity to_fn
 	-- It's important to set the arity info, so that
 	-- the calling convention (gotten from arity) 
@@ -284,9 +284,9 @@ mkTyConGenInfo tycon [from_name, to_name]
 
     (from_fn, to_fn, rep_ty) 
 	| isNewTyCon tycon
-	= ( mkLams tyvars $ Lam x  $ mkNewTypeBody tycon newrep_ty (Var x),
+	= ( mkLams tyvars $ Lam x  $ mkNewTypeBody tycon the_arg_ty (Var x),
 	    Var (dataConWrapId the_datacon),
-	    newrep_ty )
+	    the_arg_ty )
 
 	| otherwise
 	= ( mkLams tyvars $ Lam x     $ Case (Var x) x from_alts,
@@ -300,8 +300,12 @@ mkTyConGenInfo tycon [from_name, to_name]
 	    ----------------------
 	    -- 	Newtypes only
     [the_datacon]  = datacons
-    (_, newrep_ty) = newTyConRep tycon
-       
+    the_arg_ty	   = head (dataConOrigArgTys the_datacon)
+		-- NB: we use the arg type of the data constructor, rather than
+		--     the representation type of the newtype; in degnerate (recursive)
+		--     cases the rep type might be (), but the arg type is still T:
+		-- 		newtype T = MkT T
+
 	    ----------------------
 	    -- 	Non-newtypes only
     -- Recurse over the sum first
