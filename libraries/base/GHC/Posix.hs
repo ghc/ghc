@@ -92,10 +92,11 @@ fdType fd =
 statGetType p_stat = do
   c_mode <- st_mode p_stat :: IO CMode
   case () of
-      _ | s_isdir c_mode 	 	     -> return Directory
-        | s_isfifo c_mode || s_issock c_mode -> return Stream
-	| s_isreg c_mode 		     -> return RegularFile
-	| otherwise			     -> ioException ioe_unknownfiletype
+      _ | s_isdir c_mode    	-> return Directory
+        | s_isfifo c_mode || s_issock c_mode || s_ischr  c_mode
+			  	-> return Stream
+	| s_isreg c_mode	-> return RegularFile
+	| otherwise		-> ioException ioe_unknownfiletype
     
 
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
