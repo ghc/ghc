@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.13 1999/08/02 09:52:43 simonmar Exp $
+% $Id: glasgow_exts.vsgml,v 1.14 1999/08/16 15:53:50 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -2120,6 +2120,12 @@ because @wibble@ will be inlined (it's small).
 Later on in compilation, GHC starts inlining even things on the
 LHS of rules, but still leaves the rules enabled.  This inlining
 policy is controlled by the per-simplification-pass flag @-finline-phase@n.
+
+<item> All rules are implicitly exported from the module, and are therefore
+in force in any module that imports the module that defined the rule, directly
+or indirectly.  (That is, if A imports B, which imports C, then C's rules are
+in force when compiling A.)  The situation is very like that for instance
+declarations.
 </itemize>
 
 
