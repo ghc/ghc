@@ -117,20 +117,58 @@ AC_DEFUN([FP_COMPUTE_INT],
 AC_DEFUN([FP_CHECK_ALIGNMENT],
 [AS_LITERAL_IF([$1], [],
                [AC_FATAL([$0: requires literal arguments])])[]dnl
-AC_CHECK_TYPE([$1], [], [], [$3])
-AC_CACHE_CHECK([alignment of $1], AS_TR_SH([fp_cv_alignment_$1]),
+AC_CHECK_TYPE([$1], [], [], [$3])[]dnl
+m4_pushdef([fp_Cache], [AS_TR_SH([fp_cv_alignment_$1])])[]dnl
+AC_CACHE_CHECK([alignment of $1], [fp_Cache],
 [if test "$AS_TR_SH([ac_cv_type_$1])" = yes; then
   FP_COMPUTE_INT([(long) (&((struct { char c; $1 ty; } *)0)->ty)],
-                 [AS_TR_SH([fp_cv_alignment_$1])],
+                 [fp_Cache],
                  [AC_INCLUDES_DEFAULT([$3])],
                  [AC_MSG_ERROR([cannot compute alignment ($1)
 See `config.log' for more details.], [77])])
 else
-  AS_TR_SH([fp_cv_alignment_$1])=0
-fi])dnl
-AC_DEFINE_UNQUOTED(AS_TR_CPP(alignment_$1), $AS_TR_SH([fp_cv_alignment_$1]),
-                   [The alignment of a `$1'.])
+  fp_Cache=0
+fi])[]dnl
+AC_DEFINE_UNQUOTED(AS_TR_CPP(alignment_$1), $fp_Cache, [The alignment of a `$1'.])[]dnl
+m4_popdef([fp_Cache])[]dnl
 ])# FP_CHECK_ALIGNMENT
+
+
+# FP_CHECK_CONST(EXPRESSION, [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = (-1)])
+# ---------------------------------------------------------------------------------
+# Defines CONST_EXPRESSION to the value of the compile-time EXPRESSION, using
+# INCLUDES. If the value cannot be determined, use VALUE-IF-FAIL.
+AC_DEFUN([FP_CHECK_CONST],
+[AS_VAR_PUSHDEF([fp_Cache], [fp_cv_const_$1])[]dnl
+AC_CACHE_CHECK([value of $1], fp_Cache,
+[FP_COMPUTE_INT([$1], fp_check_const_result, [AC_INCLUDES_DEFAULT([$2])],
+                [fp_check_const_result=m4_default([$3], ['(-1)'])])
+AS_VAR_SET(fp_Cache, [$fp_check_const_result])])[]dnl
+AC_DEFINE_UNQUOTED(AS_TR_CPP([CONST_$1]), AS_VAR_GET(fp_Cache), [The value of $1.])[]dnl
+AS_VAR_POPDEF([fp_Cache])[]dnl
+])# FP_CHECK_CONST
+
+
+# FP_CHECK_CONSTS_TEMPLATE(EXPRESSION...)
+# ----------------------------------
+# autoheader helper for FP_CHECK_CONSTS
+m4_define([FP_CHECK_CONSTS_TEMPLATE],
+[AC_FOREACH([fp_Const], [$1],
+  [AH_TEMPLATE(AS_TR_CPP(CONST_[]fp_Const),
+               [The value of ]fp_Const[.])])[]dnl
+])# FP_CHECK_CONSTS_TEMPLATE
+
+
+# FP_CHECK_CONSTS(EXPRESSION..., [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = (-1)])
+# -------------------------------------------------------------------------------------
+# List version of FP_CHECK_CONST
+AC_DEFUN(FP_CHECK_CONSTS,
+[FP_CHECK_CONSTS_TEMPLATE([$1])dnl
+for fp_const_name in $1
+do
+FP_CHECK_CONST([$fp_const_name], [$2], [$3])
+done
+])# FP_CHECK_CONSTS
 
 
 dnl ** check for leading underscores in symbol names
@@ -702,56 +740,6 @@ AC_MSG_RESULT($AC_CV_NAME)
 AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME, [Define to Haskell type for $1])
 undefine([AC_TYPE_NAME])dnl
 undefine([AC_CV_NAME])dnl
-])
-
-
-dnl ** Obtain the value of a C constant.
-dnl    The value will be `(-1)' if the constant is undefined.
-dnl
-dnl    This is set up so that the argument can be a shell variable.
-dnl
-AC_DEFUN(FPTOOLS_CHECK_CCONST,
-[
-eval "cv_name=ac_cv_cconst_$1"
-AC_MSG_CHECKING(value of $1)
-AC_CACHE_VAL($cv_name,
-[AC_TRY_RUN([#include <stdio.h>
-#include <errno.h>
-main()
-{
-  FILE *f=fopen("conftestval", "w");
-  if (!f) exit(1);
-  fprintf(f, "%d\n", $1);
-  exit(0);
-}], 
-eval "$cv_name=`cat conftestval`",
-eval "$cv_name=-1",
-eval "$cv_name=-1")])dnl
-eval "fptools_check_cconst_result=`echo '$'{$cv_name}`"
-AC_MSG_RESULT($fptools_check_cconst_result)
-AC_DEFINE_UNQUOTED(CCONST_$1, $fptools_check_cconst_result, [The value of $1.])
-unset fptools_check_cconst_result
-])
-
-
-# FP_CHECK_CCONSTS_TEMPLATE(CONST...)
-# -----------------------------------
-m4_define([FP_CHECK_CCONSTS_TEMPLATE],
-[AC_FOREACH([FP_Const], [$1],
-  [AH_TEMPLATE(AS_TR_CPP(CCONST_[]FP_Const),
-               [The value of ]FP_Const[.])])[]dnl
-])# FP_CHECK_CCONSTS_TEMPLATE
-
-
-dnl ** Invoke AC_CHECK_CCONST on each argument (which have to separate with 
-dnl    spaces)
-dnl
-AC_DEFUN(FPTOOLS_CHECK_CCONSTS,
-[FP_CHECK_CCONSTS_TEMPLATE([$1])dnl
-for ac_const_name in $1
-do
-FPTOOLS_CHECK_CCONST($ac_const_name)dnl
-done
 ])
 
 
