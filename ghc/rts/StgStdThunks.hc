@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.6 1999/05/13 17:31:13 simonm Exp $
+ * $Id: StgStdThunks.hc,v 1.7 1999/06/29 12:00:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,9 +39,9 @@
 #endif
 
 #define SELECTOR_CODE_UPD(offset) \
-  IF_(__sel_ret_##offset##_upd_ret);					\
-  INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_upd_info,__sel_ret_##offset##_upd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, IF_, 0, 0);			\
-  IF_(__sel_ret_##offset##_upd_ret) {					\
+  EF_(__sel_ret_##offset##_upd_ret);					\
+  INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_upd_info,__sel_ret_##offset##_upd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);			\
+  EF_(__sel_ret_##offset##_upd_ret) {					\
     FB_									\
       R1.p=(P_)R1.cl->payload[offset];					\
       GET_SAVED_CCCS;							\
@@ -84,9 +84,8 @@ SELECTOR_CODE_UPD(14);
 SELECTOR_CODE_UPD(15);
 
 #define SELECTOR_CODE_NOUPD(offset) \
-  IF_(__sel_ret_##offset##_noupd_ret);					\
-  INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_noupd_info, __sel_ret_##offset##_noupd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, IF_, 0, 0);	\
-  IF_(__sel_ret_##offset##_noupd_ret) {					\
+  INFO_TABLE_SRT_BITMAP(__sel_ret_##offset##_noupd_info, __sel_ret_##offset##_noupd_ret, RET_BITMAP, 0, 0, 0, RET_SMALL, static, EF_, 0, 0);	\
+  EF_(__sel_ret_##offset##_noupd_ret) {					\
     FB_									\
       R1.p=(P_)R1.cl->payload[offset];					\
       GET_SAVED_CCCS;							\
@@ -102,7 +101,7 @@ SELECTOR_CODE_UPD(15);
       STK_CHK_NP(NOUPD_FRAME_SIZE,1,)					\
       ENTER_CCS(R1.p);							\
       SAVE_CCCS(NOUPD_FRAME_SIZE);					\
-      Sp[-NOUPD_FRAME_SIZE]=(W_)__sel_ret_##offset##_noupd_ret;		\
+      Sp[-NOUPD_FRAME_SIZE]=(W_)&__sel_ret_##offset##_noupd_info;	\
       R1.p = (P_)R1.cl->payload[0];					\
       Sp=Sp-NOUPD_FRAME_SIZE;						\
       JMP_(ENTRY_CODE(*R1.p));						\
