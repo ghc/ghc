@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.10 1999/10/13 16:39:24 simonmar Exp $
+ * $Id: Ticky.c,v 1.11 1999/10/14 13:44:55 simonpj Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -550,19 +550,19 @@ printRegisteredCounterInfo (FILE *tf)
     if ( ticky_entry_ctrs != NULL ) {
       fprintf(tf,"\n**************************************************\n\n");
     }
-    fprintf(tf, "%-30s %6s%6s    %-16s%-11s%-11s\n",
-	    "Function", "Arity", "Stack", "Kinds", "Entries",
-	    "Allocs");
+    fprintf(tf, "%-11s%-11s %6s%6s    %-16s%-30s\n",
+	    "Entries", "Allocs", "Arity", "Stack", "Kinds", "Function");
     fprintf(tf, "--------------------------------------------------------------------------------\n");
+    /* Function name at the end so it doesn't mess up the tabulation */
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-	fprintf(tf, "%-30s%6u%6u     %-11s%11ld%11ld",
-		p->str,
+	fprintf(tf, "%11ld%11ld%6u%6u     %-11s%-30s",
+		p->ctr,
+		p->allocs,
 		p->arity,
 		p->stk_args,
 		p->arg_kinds,
-		p->ctr,
-		p->allocs);
+		p->str);
 
 	fprintf(tf, "\n");
 
