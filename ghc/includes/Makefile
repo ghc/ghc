@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.24 2004/09/19 09:15:03 panne Exp $
+# $Id: Makefile,v 1.25 2004/10/08 10:16:14 ross Exp $
 #
 
 TOP = ..
@@ -74,7 +74,7 @@ endif
 	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
 	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 	1" >> $@
 #	Turn '#define PACKAGE_FOO "blah"' into '/* #undef PACKAGE_FOO */'.
-	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_BUGREPORT\|PACKAGE_NAME\|PACKAGE_STRING\|PACKAGE_TARNAME\|PACKAGE_VERSION\)[	 ].*$$,\1/* #undef \2 */,' $(FPTOOLS_TOP)/mk/config.h >> $@
+	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$,\1/* #undef \2 */,' $(FPTOOLS_TOP)/mk/config.h >> $@
 	@echo "#endif /* __GHCCONFIG_H__ */"          >> $@
 	@echo "Done."
 
