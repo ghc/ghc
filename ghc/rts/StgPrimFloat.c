@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgPrimFloat.c,v 1.6 2000/11/07 13:30:41 simonmar Exp $
+ * $Id: StgPrimFloat.c,v 1.7 2001/07/23 23:29:47 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -14,9 +14,26 @@
  * (lib/fltcode.c).
  */
 
+#ifdef _SHORT_LIMB
+#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_INT
+#else
+#ifdef _LONG_LONG_LIMB
+#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_LONG_LONG
+#else
+#define SIZEOF_LIMB_T SIZEOF_UNSIGNED_LONG
+#endif
+#endif
+
+#if SIZEOF_LIMB_T == 4
 #define GMP_BASE 4294967296.0
-#define DNBIGIT	 2  /* mantissa of a double will fit in two longs */
-#define FNBIGIT	 1  /* for float, one long */
+#elif SIZEOF_LIMB_T == 8
+#define GMP_BASE 18446744073709551616.0
+#else
+#error Cannot cope with SIZEOF_LIMB_T -- please add definition of GMP_BASE
+#endif
+
+#define DNBIGIT	 ((SIZEOF_DOUBLE+SIZEOF_LIMB_T-1)/SIZEOF_LIMB_T)
+#define FNBIGIT	 ((SIZEOF_FLOAT +SIZEOF_LIMB_T-1)/SIZEOF_LIMB_T)
 
 #if IEEE_FLOATING_POINT
 #define MY_DMINEXP  ((DBL_MIN_EXP) - (DBL_MANT_DIG) - 1)
@@ -43,7 +60,7 @@ StgDouble
 __encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 {
     StgDouble r;
-    W_ *arr = (W_ *)ba;
+    const mp_limb_t *const arr = (const mp_limb_t *)ba;
     I_ i;
 
     /* Convert MP_INT to a double; knows a lot about internal rep! */
@@ -84,7 +101,7 @@ StgFloat
 __encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
 {
     StgFloat r;
-    W_ *arr = (W_ *)ba;
+    const mp_limb_t *arr = (const mp_limb_t *)ba;
     I_ i;
 
     /* Convert MP_INT to a float; knows a lot about internal rep! */
@@ -127,9 +144,14 @@ void
 __decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
 {
     /* Do some bit fiddling on IEEE */
-    nat low, high; 	     	/* assuming 32 bit ints */
+    unsigned int low, high; 	     	/* assuming 32 bit ints */
     int sign, iexp;
-    union { double d; int i[2]; } u;	/* assuming 32 bit ints, 64 bit double */
+    union { double d; unsigned int i[2]; } u;	/* assuming 32 bit ints, 64 bit double */
+
+    ASSERT(sizeof(unsigned int ) == 4            );
+    ASSERT(sizeof(dbl          ) == SIZEOF_DOUBLE);
+    ASSERT(sizeof(man->_mp_d[0]) == SIZEOF_LIMB_T);
+    ASSERT(DNBIGIT*SIZEOF_LIMB_T >= SIZEOF_DOUBLE);
 
     u.d = dbl;	    /* grab chunks of the double */
     low = u.i[L];
@@ -164,13 +186,13 @@ __decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
 	}
         *exp = (I_) iexp;
 #if DNBIGIT == 2
-	man->_mp_d[0] = low;
-	man->_mp_d[1] = high;
+	man->_mp_d[0] = (mp_limb_t)low;
+	man->_mp_d[1] = (mp_limb_t)high;
 #else
 #if DNBIGIT == 1
-	man->_mp_d[0] = ((unsigned long)high) << 32 | (unsigned long)low;
+	man->_mp_d[0] = ((mp_limb_t)high) << 32 | (mp_limb_t)low;
 #else
-    	error : error : error : Cannae cope with DNBIGIT
+#error Cannot cope with DNBIGIT
 #endif
 #endif
 	if (sign < 0)
@@ -184,6 +206,11 @@ __decodeFloat (MP_INT *man, I_ *exp, StgFloat flt)
     /* Do some bit fiddling on IEEE */
     int high, sign; 	    	    /* assuming 32 bit ints */
     union { float f; int i; } u;    /* assuming 32 bit float and int */
+
+    ASSERT(sizeof(int          ) == 4            );
+    ASSERT(sizeof(flt          ) == SIZEOF_FLOAT );
+    ASSERT(sizeof(man->_mp_d[0]) == SIZEOF_LIMB_T);
+    ASSERT(FNBIGIT*SIZEOF_LIMB_T >= SIZEOF_FLOAT );
 
     u.f = flt;	    /* grab the float */
     high = u.i;
@@ -213,9 +240,9 @@ __decodeFloat (MP_INT *man, I_ *exp, StgFloat flt)
 	    }
 	}
 #if FNBIGIT == 1
-	man->_mp_d[0] = high;
+	man->_mp_d[0] = (mp_limb_t)high;
 #else
-    	error : error : error : Cannae cope with FNBIGIT
+#error Cannot cope with FNBIGIT
 #endif
 	if (sign < 0)
 	    man->_mp_size = -man->_mp_size;
