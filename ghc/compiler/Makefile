@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.69 2000/01/25 10:15:55 simonmar Exp $
+# $Id: Makefile,v 1.70 2000/02/04 17:29:24 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -119,7 +119,7 @@ absCSyn/PprAbsC_HC_OPTS 	= -H10m
 basicTypes/IdInfo_HC_OPTS 	= -K2m
 codeGen/CgCase_HC_OPTS		= -fno-prune-tydecls
 hsSyn/HsExpr_HC_OPTS 		= -K2m
-main/Main_HC_OPTS 		= -fvia-C
+main/Main_HC_OPTS 		= 
 main/Constants_HC_OPTS		= -DHscIfaceFileVersion=$(HscIfaceFileVersion)
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
@@ -128,16 +128,16 @@ main/Main_HC_OPTS 		+= -syslib misc -DREPORT_TO_MOTHERLODE
 endif
 endif
 
-main/CmdLineOpts_HC_OPTS 	= -fvia-C -K6m
+main/CmdLineOpts_HC_OPTS 	=  -K6m
 nativeGen/PprMach_HC_OPTS 	= -K2m
-nativeGen/MachMisc_HC_OPTS 	= -K2m -fvia-C
+nativeGen/MachMisc_HC_OPTS 	= -K2m 
 nativeGen/MachCode_HC_OPTS 	= -H10m
 
 # Avoids Bug in 3.02, it seems
 usageSP/UsageSPInf_HC_OPTS	= -Onot
 
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
-parser/Lex_HC_OPTS		= -K2m -H16m -fvia-C
+parser/Lex_HC_OPTS		= -fvia-C -K2m -H16m 
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
@@ -146,15 +146,15 @@ parser/Parser_HC_OPTS 		+= -Onot -H80m -optCrts-M80m -K2m -fno-warn-incomplete-p
 parser/Parser_HAPPY_OPTS    	+= -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
-rename/RnMonad_HC_OPTS 		= -fvia-C -O2 -O2-for-C
+rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif
 
-rename/RnEnv_HC_OPTS 		= -fvia-C
+rename/RnEnv_HC_OPTS 		= 
 rename/RnSource_HC_OPTS		= -H12m
-rename/RnIfaces_HC_OPTS		= -H8m -fvia-C
+rename/RnIfaces_HC_OPTS		= -H8m 
 rename/RnExpr_HC_OPTS		= -H10m
 rename/RnNames_HC_OPTS		= -H12m
-rename/RnMonad_HC_OPTS		= -fvia-C
+rename/RnMonad_HC_OPTS		= 
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 simplCore/Simplify_HC_OPTS	= -H15m	
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
@@ -180,15 +180,15 @@ typecheck/TcBinds_HC_OPTS       = -H10m
 
 typecheck/TcEnv_HC_OPTS		= -H10m
 utils/Argv_HC_OPTS 		= -fvia-C
-utils/SST_HC_OPTS 		= -fvia-C
-utils/FastString_HC_OPTS	= -fvia-C
+utils/SST_HC_OPTS 		= 
+utils/FastString_HC_OPTS	= 
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
-utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
-utils/DirUtils_HC_OPTS 		= -fvia-C
+utils/Digraph_HC_OPTS		= -fglasgow-exts 
+utils/DirUtils_HC_OPTS 		= 
 
 ifeq "$(alpha_HOST_ARCH)" "1"
 # "stbu" bug in alpha native code generator...
-basicTypes/Unique_HC_OPTS	= -fvia-C
+basicTypes/Unique_HC_OPTS	= 
 endif
 
 # flags for PrimPacked:
