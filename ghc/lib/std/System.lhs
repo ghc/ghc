@@ -5,7 +5,7 @@
 \section[System]{Module @System@}
 
 \begin{code}
-{-# OPTIONS -#include "cbits/stgio.h" -#include "RtsAPI.h" #-}
+{-# OPTIONS -#include "cbits/stgio.h" #-}
 module System 
     ( 
       ExitCode(ExitSuccess,ExitFailure)
