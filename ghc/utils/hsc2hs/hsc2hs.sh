@@ -1,5 +1,5 @@
 
-for arg; do
+for arg do
     case "$arg" in
         --cc=*) HSC2HS_EXTRA=;;
         --)     break;;
