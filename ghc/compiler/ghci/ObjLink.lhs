@@ -12,12 +12,12 @@ Primarily, this module consists of an interface to the C-land dynamic linker.
 {-# OPTIONS -#include "Linker.h" #-}
 
 module ObjLink ( 
-   initLinker,	 -- :: IO ()
-   loadDLL,	 -- :: String -> IO (Maybe String)
-   loadObj,      -- :: String -> IO ()
-   unloadObj,    -- :: String -> IO ()
-   lookupSymbol, -- :: String -> IO (Maybe (Ptr a))
-   resolveObjs   -- :: IO SuccessFlag
+   initObjLinker,	 -- :: IO ()
+   loadDLL,		 -- :: String -> IO (Maybe String)
+   loadObj,     	 -- :: String -> IO ()
+   unloadObj,   	 -- :: String -> IO ()
+   lookupSymbol,	 -- :: String -> IO (Maybe (Ptr a))
+   resolveObjs  	 -- :: IO SuccessFlag
   )  where
 
 import Monad            ( when )
@@ -75,7 +75,7 @@ resolveObjs = do
 
 #if __GLASGOW_HASKELL__ >= 504
 foreign import ccall unsafe "addDLL"	   c_addDLL :: CString -> IO CString
-foreign import ccall unsafe "initLinker"   initLinker :: IO ()
+foreign import ccall unsafe "initLinker"   initObjLinker :: IO ()
 foreign import ccall unsafe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr a)
 foreign import ccall unsafe "loadObj"      c_loadObj :: CString -> IO Int
 foreign import ccall unsafe "unloadObj"    c_unloadObj :: CString -> IO Int

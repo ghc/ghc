@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.152 2003/05/07 08:29:48 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.153 2003/05/19 15:39:17 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -8,7 +8,7 @@
 --
 -----------------------------------------------------------------------------
 module InteractiveUI ( 
-	interactiveUI,  -- :: CmState -> [FilePath] -> [LibrarySpec] -> IO ()
+	interactiveUI,  -- :: CmState -> [FilePath] -> IO ()
 	ghciWelcomeMsg
    ) where
 
@@ -17,14 +17,13 @@ module InteractiveUI (
 
 import CompManager
 import HscTypes		( TyThing(..), HomeModInfo(hm_linkable), HomePackageTable,
-			  isObjectLinkable )
+			  isObjectLinkable, GhciMode(..) )
 import HsSyn		( TyClDecl(..), ConDecl(..), Sig(..) )
 import MkIface		( ifaceTyThing )
 import DriverFlags
 import DriverState
 import DriverUtil	( remove_spaces, handle )
-import Linker		( initLinker, showLinkerState, linkLibraries, 
-			  linkPackages )
+import Linker		( showLinkerState, linkPackages )
 import Util
 import IdInfo		( GlobalIdDetails(..) )
 import Id		( isImplicitId, idName, globalIdDetails )
@@ -155,21 +154,15 @@ helpText = "\
 \                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
 
-interactiveUI :: CmState -> [FilePath] -> [FilePath] -> IO ()
-interactiveUI cmstate paths cmdline_objs = do
+interactiveUI :: [FilePath] -> IO ()
+interactiveUI srcs = do
+   dflags <- getDynFlags
+   saveDynFlags 	-- Save the dynamic flags, so that 
+			-- the later restore will find them
+   cmstate <- cmInit Interactive;
+
    hFlush stdout
    hSetBuffering stdout NoBuffering
-
-   dflags <- getDynFlags
-
-   initLinker
-
-	-- link packages requested explicitly on the command-line
-   expl <- readIORef v_ExplicitPackages
-   linkPackages dflags expl
-
-	-- link libraries from the command-line
-   linkLibraries dflags cmdline_objs
 
 	-- Initialise buffering for the *interpreted* I/O system
    cmstate <- initInterpBuffering cmstate dflags
@@ -185,10 +178,10 @@ interactiveUI cmstate paths cmdline_objs = do
    Readline.initialize
 #endif
 
-   startGHCi (runGHCi paths dflags) 
+   startGHCi (runGHCi srcs dflags) 
 	GHCiState{ progname = "<interactive>",
 		   args = [],
-		   targets = paths,
+		   targets = srcs,
 		   cmstate = cmstate,
 		   options = [] }
 
@@ -231,14 +224,14 @@ runGHCi paths dflags = do
   		  Left e    -> return ()
   		  Right hdl -> fileLoop hdl False
 
-  -- perform a :load for files given on the GHCi command line
+  -- Perform a :load for files given on the GHCi command line
   when (not (null paths)) $
      ghciHandle showException $
 	loadModule paths
 
   -- enter the interactive loop
 #if defined(mingw32_HOST_OS)
-   -- always show prompt, since hIsTerminalDevice returns True for Consoles
+   -- Always show prompt, since hIsTerminalDevice returns True for Consoles
    -- only, which we may or may not be running under (cf. Emacs sub-shells.)
   interactiveLoop True
 #else
@@ -251,7 +244,7 @@ runGHCi paths dflags = do
 
 
 interactiveLoop is_tty = do
-  -- ignore ^C exceptions caught here
+  -- Ignore ^C exceptions caught here
   ghciHandleDyn (\e -> case e of 
 			Interrupted -> ghciUnblock (interactiveLoop is_tty)
 			_other      -> return ()) $ do

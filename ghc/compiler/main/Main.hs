@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.119 2003/02/17 12:24:27 simonmar Exp $
+-- $Id: Main.hs,v 1.120 2003/05/19 15:39:18 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -18,8 +18,7 @@ module Main (main) where
 
 
 #ifdef GHCI
-import InteractiveUI
-import DriverPhases( objish_file )
+import InteractiveUI( ghciWelcomeMsg, interactiveUI )
 #endif
 
 
@@ -44,7 +43,7 @@ import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
-import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, isSourceFile )
+import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, objish_file, isSourceFile )
 
 import DriverUtil	( add, handle, handleDyn, later, splitFilename,
 			  unknownFlagsErr, getFileSuffix )
@@ -137,10 +136,9 @@ main =
    conf_file <- getPackageConfigPath
    readPackageConf conf_file
 
-	-- process all the other arguments, and get the source files
+	-- Process all the other arguments, and get the source files
    non_static <- processArgs static_flags argv' []
    mode <- readIORef v_GhcMode
-   stop_flag <- readIORef v_GhcModeFlag
 
 	-- -O and --interactive are not a good combination
 	-- ditto with any kind of way selection
@@ -193,15 +191,132 @@ main =
 		  	   verbosity = 1
 			})
 
-	-- the rest of the arguments are "dynamic"
-   srcs <- processArgs dynamic_flags (extra_non_static ++ non_static) []
+	-- The rest of the arguments are "dynamic"
+	-- Leftover ones are presumably files
+   fileish_args <- processArgs dynamic_flags (extra_non_static ++ non_static) []
 
-	-- save the "initial DynFlags" away
+	-- We split out the object files (.o, .dll) and add them
+	-- to v_Ld_inputs for use by the linker
+   let (objs, srcs) = partition objish_file fileish_args
+   mapM_ (add v_Ld_inputs) objs
+
+	---------------- Display banners and configuration -----------
+   showBanners mode conf_file static_opts
+
+	---------------- Final sanity checking -----------
+   checkOptions mode srcs objs
+
+	---------------- Do the business -----------
+   case mode of
+	DoMake 	       -> doMake srcs
+	DoMkDependHS   -> do { beginMkDependHS ; 
+			       compileFiles mode srcs; 
+			       endMkDependHS }
+	StopBefore p   -> do { compileFiles mode srcs; return () }
+	DoMkDLL	       -> do { o_files <- compileFiles mode srcs; 
+			       doMkDLL o_files }
+	DoLink	       -> do { o_files <- compileFiles mode srcs; 
+			       omit_linking <- readIORef v_NoLink;
+			       when (not omit_linking)
+				    (staticLink o_files [basePackage, haskell98Package]) }
+				-- We always link in the base package in one-shot linking.
+				-- Any other packages required must be given using -package
+				-- options on the command-line.
+#ifndef GHCI
+	DoInteractive -> throwDyn (CmdLineError "not built for interactive use")
+#else
+	DoInteractive -> interactiveUI srcs
+#endif
+
+--------------------------------------------------------------------------------------
+checkOptions :: GhcMode -> [String] -> [String] -> IO ()
+     -- Final sanity checking before kicking of a compilation (pipeline).
+checkOptions mode srcs objs = do
+	-- -ohi sanity check
+   ohi <- readIORef v_Output_hi
+   if (isJust ohi && 
+      (mode == DoMake || mode == DoInteractive || srcs `lengthExceeds` 1))
+	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
+	else do
+
+	-- -o sanity checking
+   o_file <- readIORef v_Output_file
+   if (srcs `lengthExceeds` 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
+	then throwDyn (UsageError "can't apply -o to multiple source files")
+	else do
+
+	-- Check that there are some input files (except in the interactive case)
+   if null srcs && null objs && mode /= DoInteractive
+	then throwDyn (UsageError "no input files")
+	else do
+
+     -- Complain about any unknown flags
+   let unknown_opts = [ f | f@('-':_) <- srcs ]
+   when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
+
+     -- Verify that output files point somewhere sensible.
+   verifyOutputFiles
+
+
+--------------------------------------------------------------------------------------
+compileFiles :: GhcMode 
+	     -> [String]	-- Source files
+	     -> IO [String]	-- Object files
+compileFiles mode srcs = do
+   stop_flag <- readIORef v_GhcModeFlag
+
+	-- Do the business; save the DynFlags at the
+	-- start, so we can restore them before each file
    saveDynFlags
+   mapM (compileFile mode stop_flag) srcs
 
-        -- perform some checks of the options set / report unknowns.
-   checkOptions srcs
+
+compileFile mode stop_flag src = do
+   restoreDynFlags
    
+   exists <- doesFileExist src
+   when (not exists) $ 
+   	throwDyn (CmdLineError ("file `" ++ src ++ "' does not exist"))
+   
+   -- We compile in two stages, because the file may have an
+   -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
+   let (basename, suffix) = splitFilename src
+   
+   -- just preprocess (Haskell source only)
+   let src_and_suff = (src, getFileSuffix src)
+   let not_hs_file  = not (haskellish_src_file src)
+   pp <- if not_hs_file || mode == StopBefore Hsc || mode == StopBefore HsPp
+   		then return src_and_suff else do
+   	phases <- genPipeline (StopBefore Hsc) stop_flag
+   			      False{-not persistent-} defaultHscLang
+   			      src_and_suff
+   	pipeLoop phases src_and_suff False{-no linking-} False{-no -o flag-}
+   		basename suffix
+   
+   -- rest of compilation
+   hsc_lang <- dynFlag hscLang
+   phases   <- genPipeline mode stop_flag True hsc_lang pp
+   (r,_)    <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL)
+   			      True{-use -o flag-} basename suffix
+   return r
+
+
+--------------------------------------------------------------------------------------
+doMake :: [String] -> IO ()
+doMake []    = throwDyn (UsageError "no input files")
+doMake srcs  = do 
+    dflags <- getDynFlags 
+    state  <- cmInit Batch
+    graph  <- cmDepAnal state dflags srcs
+    (_, ok_flag, _) <- cmLoadModules state dflags graph
+    when (failed ok_flag) (exitWith (ExitFailure 1))
+    return ()
+
+
+
+--------------------------------------------------------------------------------------
+showBanners :: GhcMode -> FilePath -> [String] -> IO ()
+showBanners mode conf_file static_opts = do
    verb <- dynFlag verbosity
 
 	-- Show the GHCi banner
@@ -225,128 +340,3 @@ main =
 
    when (verb >= 3) 
 	(hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts))
-
-	-- mkdependHS is special
-   when (mode == DoMkDependHS) beginMkDependHS
-
-	-- -ohi sanity checking
-   ohi    <- readIORef v_Output_hi
-   if (isJust ohi && 
-	(mode == DoMake || mode == DoInteractive || srcs `lengthExceeds` 1))
-	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
-	else do
-
-	-- make/interactive require invoking the compilation manager
-   if (mode == DoMake)        then beginMake srcs        else do
-   if (mode == DoInteractive) then beginInteractive srcs else do
-
-	-- -o sanity checking
-   let real_srcs = filter isSourceFile srcs -- filters out .a and .o that might appear
-   o_file <- readIORef v_Output_file
-   if (real_srcs `lengthExceeds` 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
-	then throwDyn (UsageError "can't apply -o to multiple source files")
-	else do
-
-   if null srcs then throwDyn (UsageError "no input files") else do
-
-   let compileFile src = do
-	  restoreDynFlags
-
-	  exists <- doesFileExist src
-          when (not exists) $ 
-		throwDyn (CmdLineError ("file `" ++ src ++ "' does not exist"))
-
-	  -- We compile in two stages, because the file may have an
-	  -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
-	  let (basename, suffix) = splitFilename src
-
-	  -- just preprocess (Haskell source only)
-   	  let src_and_suff = (src, getFileSuffix src)
-	  let not_hs_file  = not (haskellish_src_file src)
-	  pp <- if not_hs_file || mode == StopBefore Hsc || mode == StopBefore HsPp
-			then return src_and_suff else do
-		phases <- genPipeline (StopBefore Hsc) stop_flag
-				      False{-not persistent-} defaultHscLang
-				      src_and_suff
-	  	pipeLoop phases src_and_suff False{-no linking-} False{-no -o flag-}
-			basename suffix
-
-	  -- rest of compilation
-	  hsc_lang <- dynFlag hscLang
-	  phases   <- genPipeline mode stop_flag True hsc_lang pp
-	  (r,_)    <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL)
-	  			      True{-use -o flag-} basename suffix
-	  return r
-
-   o_files <- mapM compileFile srcs
-
-   when (mode == DoMkDependHS) endMkDependHS
-
-   omit_linking <- readIORef v_NoLink
-   when (mode == DoLink && not omit_linking) 
-	(staticLink o_files [basePackage, haskell98Package])
-		-- we always link in the base package in one-shot linking.
-		-- any other packages required must be given using -package
-		-- options on the command-line.
-
-   when (mode == DoMkDLL) (doMkDLL o_files)
-
-
-
-beginMake :: [String] -> IO ()
-beginMake fileish_args  = do 
-  -- anything that doesn't look like a Haskell source filename or
-  -- a module name is passed straight through to the linker
-  let (inputs, objects) = partition looks_like_an_input fileish_args
-  mapM_ (add v_Ld_inputs) objects
-  
-  case inputs of
-	[]    -> throwDyn (UsageError "no input files")
-	_     -> do dflags <- getDynFlags 
-		    state <- cmInit Batch
-		    graph <- cmDepAnal state dflags inputs
-		    (_, ok_flag, _) <- cmLoadModules state dflags graph
-		    when (failed ok_flag) (exitWith (ExitFailure 1))
-		    return ()
-  where
-    {-
-      The following things should be considered compilation manager inputs:
-
-       - haskell source files (strings ending in .hs, .lhs or other 
-         haskellish extension),
-
-       - module names (not forgetting hierarchical module names),
-
-       - and finally we consider everything not containing a '.' to be
-         a comp manager input, as shorthand for a .hs or .lhs filename.
-
-      Everything else is considered to be a linker object, and passed
-      straight through to the linker.
-    -}
-    looks_like_an_input m =  haskellish_src_file m 
-			  || looksLikeModuleName m
-			  || '.' `notElem` m
-
-
-beginInteractive :: [String] -> IO ()
-#ifndef GHCI
-beginInteractive = throwDyn (CmdLineError "not built for interactive use")
-#else
-beginInteractive fileish_args
-  = do state <- cmInit Interactive
-
-       let (objs, mods) = partition objish_file fileish_args
-
-       interactiveUI state mods objs
-#endif
-
-checkOptions :: [String] -> IO ()
-checkOptions srcs = do
-     -- complain about any unknown flags
-   let unknown_opts = [ f | f@('-':_) <- srcs ]
-   when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
-     -- verify that output files point somewhere sensible.
-   verifyOutputFiles
-     -- and anything else that it might be worth checking for
-     -- before kicking of a compilation (pipeline).
-

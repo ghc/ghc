@@ -15,23 +15,21 @@ necessary.
 
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
-module Linker ( HValue, initLinker, showLinkerState,
-		linkLibraries, linkExpr,
-		unload, extendLinkEnv, 
-		LibrarySpec(..),
+module Linker ( HValue, initDynLinker, showLinkerState,
+		linkExpr, unload, extendLinkEnv, 
 		linkPackages,
 	) where
 
 #include "../includes/config.h"
 #include "HsVersions.h"
 
-import ObjLink		( loadDLL, loadObj, unloadObj, resolveObjs, initLinker )
+import ObjLink		( loadDLL, loadObj, unloadObj, resolveObjs, initObjLinker )
 import ByteCodeLink	( HValue, ClosureEnv, extendClosureEnv, linkBCO )
 import ByteCodeItbls	( ItblEnv )
 import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
-import DriverState	( v_Library_paths, v_Opt_l, getStaticOpts )
+import DriverState	( v_Library_paths, v_Opt_l, v_Ld_inputs, getStaticOpts, v_ExplicitPackages )
 #ifdef darwin_TARGET_OS
 import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
 #endif
@@ -43,7 +41,7 @@ import NameSet		( nameSetToList )
 import Module
 import FastString	( FastString(..), unpackFS )
 import ListSetOps	( minusList )
-import CmdLineOpts	( DynFlags(verbosity) )
+import CmdLineOpts	( DynFlags(verbosity), getDynFlags )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )
@@ -82,7 +80,8 @@ The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
 
 \begin{code}
-GLOBAL_VAR(v_PersistentLinkerState, emptyPLS, PersistentLinkerState)
+GLOBAL_VAR(v_PersistentLinkerState, panic "Dynamic linker not initialised", PersistentLinkerState)
+GLOBAL_VAR(v_InitLinkerDone, False, Bool)	-- Set True when dynamic linker is initialised
 
 data PersistentLinkerState
    = PersistentLinkerState {
@@ -158,6 +157,126 @@ showLinkerState
 			
 	
 
+
+%************************************************************************
+%*									*
+\subsection{Initialisation}
+%*									*
+%************************************************************************
+
+We initialise the dynamic linker by
+
+a) calling the C initialisation procedure
+
+b) Loading any packages specified on the command line,
+   now held in v_ExplicitPackages
+
+c) Loading any packages specified on the command line,
+   now held in the -l options in v_Opt_l
+
+d) Loading any .o/.dll files specified on the command line,
+   now held in v_Ld_inputs
+
+e) Loading any MacOS frameworks
+
+\begin{code}
+initDynLinker :: IO ()
+-- This function is idempotent; if called more than once, it does nothing
+-- This is useful in Template Haskell, where we call it before trying to link
+initDynLinker 
+  = do	{ done <- readIORef v_InitLinkerDone
+	; if done then return () 
+		  else do { writeIORef v_InitLinkerDone True
+			  ; reallyInitDynLinker }
+	}
+
+reallyInitDynLinker
+  = do  { dflags <- getDynFlags
+
+		-- Initialise the linker state
+	; writeIORef v_PersistentLinkerState emptyPLS
+
+	 	-- (a) initialise the C dynamic linker
+	; initObjLinker 
+
+		-- (b) Load packages from the command-line
+	; expl <- readIORef v_ExplicitPackages
+	; linkPackages dflags expl
+
+	   	-- (c) Link libraries from the command-line
+	; opt_l  <- getStaticOpts v_Opt_l
+	; let minus_ls = [ lib | '-':'l':lib <- opt_l ]
+
+	   	-- (d) Link .o files from the command-line
+	; lib_paths    <- readIORef v_Library_paths
+	; cmdline_objs <- readIORef v_Ld_inputs
+
+	   	-- (e) Link any MacOS frameworks
+#ifdef darwin_TARGET_OS	
+	; framework_paths <- readIORef v_Framework_paths
+	; frameworks      <- readIORef v_Cmdline_frameworks
+#else
+	; let frameworks      = []
+	; let framework_paths = []
+#endif
+		-- Finally do (c),(d),(e)	
+        ; let cmdline_lib_specs = map Object    cmdline_objs
+			       ++ map DLL       minus_ls 
+			       ++ map Framework frameworks
+	; if null cmdline_lib_specs then return ()
+				    else do
+
+ 	{ mapM_ (preloadLib dflags lib_paths framework_paths) cmdline_lib_specs
+	; maybePutStr dflags "final link ... "
+	; ok <- resolveObjs
+
+	; if succeeded ok then maybePutStrLn dflags "done"
+	  else throwDyn (InstallationError "linking extra libraries/objects failed")
+	}}
+
+preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
+preloadLib dflags lib_paths framework_paths lib_spec
+  = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
+       case lib_spec of
+          Object static_ish
+             -> do b <- preload_static lib_paths static_ish
+                   maybePutStrLn dflags (if b  then "done"
+	 					else "not found")
+	 
+          DLL dll_unadorned
+             -> do maybe_errstr <- loadDynamic lib_paths dll_unadorned
+                   case maybe_errstr of
+                      Nothing -> maybePutStrLn dflags "done"
+                      Just mm -> preloadFailed mm lib_paths lib_spec
+                   
+#ifdef darwin_TARGET_OS
+	  Framework framework
+             -> do maybe_errstr <- loadFramework framework_paths framework
+                   case maybe_errstr of
+                      Nothing -> maybePutStrLn dflags "done"
+                      Just mm -> preloadFailed mm framework_paths lib_spec
+#endif
+  where
+    preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
+    preloadFailed sys_errmsg paths spec
+       = do maybePutStr dflags
+    	       ("failed.\nDynamic linker error message was:\n   " 
+                    ++ sys_errmsg  ++ "\nWhilst trying to load:  " 
+                    ++ showLS spec ++ "\nDirectories to search are:\n"
+                    ++ unlines (map ("   "++) paths) )
+            give_up
+    
+    -- Not interested in the paths in the static case.
+    preload_static paths name
+       = do b <- doesFileExist name
+            if not b then return False
+                     else loadObj name >> return True
+    
+    give_up = throwDyn $ 
+	      CmdLineError "user specified .o/.so/.DLL could not be loaded."
+\end{code}
+
+
 %************************************************************************
 %*									*
 		Link a byte-code expression
@@ -176,12 +295,15 @@ linkExpr :: HscEnv -> PersistentCompilerState
 
 linkExpr hsc_env pcs root_ul_bco
   = do {  
+	-- Initialise the linker (if it's not been done already)
+     initDynLinker
+
 	-- Find what packages and linkables are required
-     (lnks, pkgs) <- getLinkDeps hpt pit needed_mods ;
+   ; (lnks, pkgs) <- getLinkDeps hpt pit needed_mods
 
 	-- Link the packages and modules required
-     linkPackages dflags pkgs
-   ; ok <-  linkModules dflags lnks
+   ; linkPackages dflags pkgs
+   ; ok <- linkModules dflags lnks
    ; if failed ok then
 	dieWith empty
      else do {
@@ -378,88 +500,6 @@ rmDupLinkables already ls
 	| otherwise		  = go (l:already) (l:extras) ls
 \end{code}
 
-
-\begin{code}
-linkLibraries :: DynFlags 
-	      -> [String] 	-- foo.o files specified on command line
-	      -> IO ()
--- Used just at initialisation time to link in libraries
--- specified on the command line. 
-linkLibraries dflags objs
-   = do	{ lib_paths <- readIORef v_Library_paths
-	; opt_l  <- getStaticOpts v_Opt_l
-	; let minus_ls = [ lib | '-':'l':lib <- opt_l ]
-#ifdef darwin_TARGET_OS
-	; framework_paths <- readIORef v_Framework_paths
-	; frameworks <- readIORef v_Cmdline_frameworks
-#endif
-        ; let cmdline_lib_specs = map Object objs ++ map DLL minus_ls
-#ifdef darwin_TARGET_OS
-		++ map Framework frameworks
-#endif
-	; if (null cmdline_lib_specs) then return () 
- 	  else do {
-
-		-- Now link them
-#ifdef darwin_TARGET_OS
- 	; mapM_ (preloadLib dflags lib_paths framework_paths) cmdline_lib_specs
-#else
- 	; mapM_ (preloadLib dflags lib_paths) cmdline_lib_specs
-#endif
-	; maybePutStr dflags "final link ... "
-	; ok <- resolveObjs
-	; if succeeded ok then maybePutStrLn dflags "done."
-	  else throwDyn (InstallationError "linking extra libraries/objects failed")
-	}}
-     where
-#ifdef darwin_TARGET_OS
-        preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
-        preloadLib dflags lib_paths framework_paths lib_spec
-#else
-        preloadLib :: DynFlags -> [String] -> LibrarySpec -> IO ()
-        preloadLib dflags lib_paths lib_spec
-#endif
-           = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
-                case lib_spec of
-                   Object static_ish
-                      -> do b <- preload_static lib_paths static_ish
-                            maybePutStrLn dflags (if b  then "done." 
-							else "not found")
-                   DLL dll_unadorned
-                      -> do maybe_errstr <- loadDynamic lib_paths dll_unadorned
-                            case maybe_errstr of
-                               Nothing -> return ()
-                               Just mm -> preloadFailed mm lib_paths lib_spec
-                            maybePutStrLn dflags "done"
-#ifdef darwin_TARGET_OS
-                   Framework framework
-                      -> do maybe_errstr <- loadFramework framework_paths framework
-                            case maybe_errstr of
-                               Nothing -> return ()
-                               Just mm -> preloadFailed mm framework_paths lib_spec
-                            maybePutStrLn dflags "done"
-#endif
-        preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
-        preloadFailed sys_errmsg paths spec
-           = do maybePutStr dflags
-		       ("failed.\nDynamic linker error message was:\n   " 
-                        ++ sys_errmsg  ++ "\nWhilst trying to load:  " 
-                        ++ showLS spec ++ "\nDirectories to search are:\n"
-                        ++ unlines (map ("   "++) paths) )
-                give_up
-
-        -- not interested in the paths in the static case.
-        preload_static paths name
-           = do b <- doesFileExist name
-                if not b then return False
-                         else loadObj name >> return True
-
-        give_up 
-           = (throwDyn . CmdLineError)
-                "user specified .o/.so/.DLL could not be loaded."
-\end{code}
-
-
 %************************************************************************
 %*									*
 \subsection{The byte-code linker}
@@ -624,9 +664,8 @@ data LibrarySpec
 			--          On WinDoze  "burble"  denotes "burble.DLL"
 			--  loadDLL is platform-specific and adds the lib/.so/.DLL
 			--  suffixes platform-dependently
-#ifdef darwin_TARGET_OS
-   | Framework String
-#endif
+
+   | Framework String	-- Only used for darwin, but does no harm
 
 -- If this package is already part of the GHCi binary, we'll already
 -- have the right DLLs for this package loaded, so don't try to
@@ -644,11 +683,9 @@ partOfGHCi
            = [ "base", "haskell98", "haskell-src", "readline" ]
 #          endif
 
-showLS (Object nm)  = "(static) " ++ nm
-showLS (DLL nm) = "(dynamic) " ++ nm
-#ifdef darwin_TARGET_OS
+showLS (Object nm)    = "(static) " ++ nm
+showLS (DLL nm)       = "(dynamic) " ++ nm
 showLS (Framework nm) = "(framework) " ++ nm
-#endif
 
 linkPackages :: DynFlags -> [PackageName] -> IO ()
 -- Link exactly the specified packages, and their dependents
@@ -698,10 +735,6 @@ linkPackage dflags pkg
         let libs      =  Packages.hs_libraries pkg ++ extra_libraries pkg
 				++ [ lib | '-':'l':lib <- extra_ld_opts pkg ]
         classifieds   <- mapM (locateOneObj dirs) libs
-#ifdef darwin_TARGET_OS
-        let fwDirs    =  Packages.framework_dirs pkg
-        let frameworks=  Packages.extra_frameworks pkg
-#endif
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
 	let dlls = [ dll | DLL dll    <- classifieds ]
@@ -711,10 +744,8 @@ linkPackage dflags pkg
 
 	-- See comments with partOfGHCi
 	when (Packages.name pkg `notElem` partOfGHCi) $ do
-#ifdef darwin_TARGET_OS
-	    loadFrameworks fwDirs frameworks
-#endif
-	    loadDynamics dirs dlls
+	    loadFrameworks pkg
+	    mapM_ (load_dyn dirs) dlls
 	
 	-- After loading all the DLLs, we can load the static objects.
 	mapM_ loadObj objs
@@ -724,21 +755,24 @@ linkPackage dflags pkg
 	if succeeded ok then maybePutStrLn dflags "done."
 	      else panic ("can't load package `" ++ name pkg ++ "'")
 
-loadDynamics dirs [] = return ()
-loadDynamics dirs (dll:dlls) = do
-  r <- loadDynamic dirs dll
-  case r of
-    Nothing  -> loadDynamics dirs dlls
-    Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
-                                       ++ dll ++ " (" ++ err ++ ")" ))
-#ifdef darwin_TARGET_OS
-loadFrameworks dirs [] = return ()
-loadFrameworks dirs (fw:fws) = do
-  r <- loadFramework dirs fw
-  case r of
-    Nothing  -> loadFrameworks dirs fws
-    Just err -> throwDyn (CmdLineError ("can't load framework: " 
-                                       ++ fw ++ " (" ++ err ++ ")" ))
+load_dyn dirs dll = do r <- loadDynamic dirs dll
+		       case r of
+			 Nothing  -> return ()
+			 Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
+                                 			      ++ dll ++ " (" ++ err ++ ")" ))
+#ifndef darwin_TARGET_OS
+loadFrameworks pkg = return ()
+#else
+loadFrameworks pkg = mapM_ load frameworks
+  where
+    fw_dirs    = Packages.framework_dirs pkg
+    frameworks = Packages.extra_frameworks pkg
+
+    load fw = do  r <- loadFramework fw_dirs fw
+		  case r of
+		    Nothing  -> return ()
+		    Just err -> throwDyn (CmdLineError ("can't load framework: " 
+                               			        ++ fw ++ " (" ++ err ++ ")" ))
 #endif
 
 -- Try to find an object file for a given library in the given paths.
@@ -748,7 +782,7 @@ locateOneObj dirs lib
   = do	{ mb_obj_path <- findFile mk_obj_path dirs 
 	; case mb_obj_path of
 	    Just obj_path -> return (Object obj_path)
-	    Nothing	  -> return (DLL lib) } -- we assume
+	    Nothing	  -> return (DLL lib) }		-- We assume
    where
      mk_obj_path dir = dir ++ '/':lib ++ ".o"
 
