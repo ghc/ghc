@@ -307,6 +307,9 @@ indexWord64OffForeignObj#
   unsafeCoerce#
 ;
 
-1 class CCallable a :: ** ;
-1 class CReturnable a :: ** ;
+-- CCallable and CReturnable have kind (Type AnyBox) so that
+-- things like Int# can be instances of CCallable. 
+1 class CCallable a :: ? ;
+1 class CReturnable a :: ? ;
+
 1 assert :: __forall [a] => PrelBase.Bool -> a -> a ;
