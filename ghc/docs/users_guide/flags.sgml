@@ -119,6 +119,12 @@
 	  </thead>
 	  <tbody>
 	    <row>
+	      <entry><option>-hcsuf</option> <replaceable>suffix</replaceable></entry>
+	      <entry>set the suffix to use for intermediate C files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-hisuf</option> <replaceable>suffix</replaceable></entry>
 	      <entry>set the suffix to use for interface files</entry>
 	      <entry>static</entry>

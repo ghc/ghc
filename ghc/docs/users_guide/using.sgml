@@ -581,31 +581,29 @@ ghc --make Main.hs
       </varlistentry>
 
       <varlistentry>
-	<term><literal>-ohi</literal></term>
-	<indexterm><primary><literal>-ohi</literal></primary></indexterm>
+	<term><option>-osuf</option> <replaceable>suffix</replaceable></term>
+	<term><option>-hisuf</option> <replaceable>suffix</replaceable></term>
+	<term><option>-hcsuf</option> <replaceable>suffix</replaceable></term>
+	<indexterm><primary><option>-osuf</option></primary></indexterm>
+	<indexterm><primary><option>-hisuf</option></primary></indexterm>
+	<indexterm><primary><option>-hcsuf</option></primary></indexterm>
 	<listitem>
-	  <para></para>
-	</listitem>
-      </varlistentry>
+	  <para>EXOTICA: The <option>-osuf</option>
+          <replaceable>suffix</replaceable> will change the
+          <literal>.o</literal> file suffix for object files to
+          whatever you specify.  We use this when compiling libraries,
+          so that objects for the profiling versions of the libraries
+          don't clobber the normal ones.</para>
 
-      <varlistentry>
-	<term><literal>-osuf</literal></term>
-	<term><literal>-hisuf</literal></term>
-	<indexterm><primary><literal>-osuf</literal></primary></indexterm>
-	<indexterm><primary><literal>-hisuf</literal></primary></indexterm>
-	<listitem>
-	  <para>EXOTICA: The <option>-osuf
-          &lt;suffix&gt;</option><IndexTerm><Primary>-osuf
-          &lt;suffix&gt; option</Primary></IndexTerm> will change the
-          <filename>.o</filename> file suffix for object files to
-          whatever you specify.  (We use this in compiling the
-          prelude.).</para>
+	  <para>Similarly, the <option>-hisuf</option>
+          <replaceable>suffix</replaceable> will change the
+          <literal>.hi</literal> file suffix for non-system interface
+          files (see <XRef LinkEnd="hi-options">).</para>
 
-	  <para>Similarly, the <option>-hisuf
-          &lt;suffix&gt;</option><IndexTerm><Primary>-hisuf
-          &lt;suffix&gt; option</Primary></IndexTerm> will change the
-          <filename>.hi</filename> file suffix for non-system
-          interface files (see <XRef LinkEnd="hi-options">).</para>
+	  <para>Finally, the option <option>-hcsuf</option>
+          <replaceable>suffix</replaceable> will change the
+          <literal>.hc</literal> file suffix for compiler-generated
+          intermediate C files.</para>
 
 	  <para>The <option>-hisuf</option>/<option>-osuf</option>
           game is useful if you want to compile a program with both
