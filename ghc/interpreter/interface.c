@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/03/02 10:10:33 $
+ * $Revision: 1.34 $
+ * $Date: 2000/03/07 16:18:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -262,7 +262,10 @@ ZPair readInterface(String fname, Long fileSize)
           ConId m_to_imp = zfst(imp_decl);
           if (textOf(m_to_imp) != findText("PrelGHC")) {
              imports = cons(m_to_imp,imports);
-             /* fprintf(stderr, "add iface %s\n", textToStr(textOf(m_to_imp))); */
+#            ifdef DEBUG_IFACE
+             fprintf(stderr, "add iface %s\n", 
+                     textToStr(textOf(m_to_imp)));
+#            endif
           }
        }
     return zpair(iface,imports);
@@ -330,11 +333,15 @@ static Bool isExportedIFaceEntity ( Cell ife, List exlist_list )
       }
 
    }
+#  ifdef DEBUG_IFACE
    fprintf ( stderr, "     dump %s\n", textToStr(tnm) );
+#  endif
    return FALSE;
 
  retain:
+#  ifdef DEBUG_IFACE
    fprintf ( stderr, "   retain %s\n", textToStr(tnm) );
+#  endif
    return TRUE;
 }
 
@@ -380,7 +387,9 @@ static Cell deleteUnexportedIFaceEntities ( Cell root )
    List  exlist_list = NIL;
    List  t;
 
+#  ifdef DEBUG_IFACE
    fprintf(stderr, "\ncleanIFace: %s\n", textToStr(textOf(iname)));
+#  endif
 
    exlist_list = getExportDeclsInIFace ( root );
    /* exlist_list :: [I_EXPORT] */
@@ -422,9 +431,11 @@ static List addTyconsAndClassesFromIFace ( Cell root, List aktys )
 static Void ifentityAllTypesKnown_dumpmsg ( Cell entity )
 {
    ConVarId id = getIEntityName ( entity );
+#  ifdef DEBUG_IFACE
    fprintf ( stderr, 
              "dumping %s because of unknown type(s)\n",
              isNull(id) ? "(nameless entity?!)" : textToStr(textOf(id)) );
+#  endif
 }
 
 
@@ -517,9 +528,11 @@ static Void ifTypeDoesntRefUnknownTycon_dumpmsg ( Cell entity )
    ConVarId id = getIEntityName ( entity );
    assert (whatIs(entity)==I_TYPE);
    assert (isCon(id));
+#  ifdef DEBUG_IFACE
    fprintf ( stderr, 
              "dumping type %s because of unknown tycon(s)\n",
              textToStr(textOf(id)) );
+#  endif
 }
 
 
@@ -545,9 +558,11 @@ static List abstractifyExDecl ( Cell root, ConId toabs )
 
 static Void ppModule ( Text modt )
 {
+#  ifdef DEBUG_IFACE
    fflush(stderr); fflush(stdout);
    fprintf(stderr, "---------------- MODULE %s ----------------\n", 
                    textToStr(modt) );
+#  endif
 }
 
 
@@ -562,7 +577,7 @@ static void* ifFindItblFor ( Name n )
    char  buf[1000];
    Text  t;
 
-   sprintf ( buf, "%s_%s_con_info", 
+   sprintf ( buf, MAYBE_LEADING_UNDERSCORE_STR("%s_%s_con_info"), 
                   textToStr( module(name(n).mod).text ),
                   textToStr( name(n).text ) );
    t = enZcodeThenFindText(buf);
@@ -571,7 +586,7 @@ static void* ifFindItblFor ( Name n )
    if (p) return p;
 
    if (name(n).arity == 0) {
-      sprintf ( buf, "%s_%s_static_info", 
+      sprintf ( buf, MAYBE_LEADING_UNDERSCORE_STR("%s_%s_static_info"), 
                      textToStr( module(name(n).mod).text ),
                      textToStr( name(n).text ) );
       t = enZcodeThenFindText(buf);
@@ -690,9 +705,11 @@ Bool processInterfaces ( void )
 
     if (isNull(ifaces_outstanding)) return FALSE;
 
+#   ifdef DEBUG_IFACE
     fprintf ( stderr, 
               "processInterfaces: %d interfaces to process\n", 
               length(ifaces_outstanding) );
+#   endif
 
     /* unzip3 ifaces_outstanding into ifaces, iface_sizes, iface_onames */
     for (xs = ifaces_outstanding; nonNull(xs); xs=tl(xs)) {
@@ -728,7 +745,10 @@ Bool processInterfaces ( void )
 
        /* Have we reached a fixed point? */
        i = length(all_known_types);
-       printf ( "\n============= %d known types =============\n", i );
+#      ifdef DEBUG_IFACE
+       fprintf ( stderr,
+                 "\n============= %d known types =============\n", i );
+#      endif
        if (num_known_types == i) break;
        num_known_types = i;
 
@@ -782,9 +802,11 @@ Bool processInterfaces ( void )
 
           if (!allKnown) {
              absify = cons ( getIEntityName(ent), absify );
+#            ifdef DEBUG_IFACE
              fprintf ( stderr, 
                        "abstractifying %s because it uses an unknown type\n",
                        textToStr(textOf(getIEntityName(ent))) );
+#            endif
           }
        }
 
@@ -818,7 +840,10 @@ Bool processInterfaces ( void )
              data = z5ble ( zsel15(data), zsel25(data), zsel35(data),
                             zsel45(data), NIL /* the constr list */ );
              hd(es) = ap(I_DATA,data);
-fprintf(stderr, "abstractify data %s\n", textToStr(textOf(getIEntityName(ent))) );
+#            ifdef DEBUG_IFACE
+             fprintf(stderr, "abstractify data %s\n", 
+                     textToStr(textOf(getIEntityName(ent))) );
+#            endif
 	  }
           else if (whatIs(ent)==I_NEWTYPE
               && isExportedAbstractly ( getIEntityName(ent), 
@@ -827,7 +852,10 @@ fprintf(stderr, "abstractify data %s\n", textToStr(textOf(getIEntityName(ent))) 
              data = z5ble ( zsel15(data), zsel25(data), zsel35(data),
                             zsel45(data), NIL /* the constr-type pair */ );
              hd(es) = ap(I_NEWTYPE,data);
-fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent))) );
+#            ifdef DEBUG_IFACE
+             fprintf(stderr, "abstractify newtype %s\n", 
+                     textToStr(textOf(getIEntityName(ent))) );
+#            endif
           }
        }
 
@@ -841,8 +869,9 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        be value defns, classes and instances which refer to unknown types.
        Delete iteratively until a fixed point is reached.
     */
-    printf("\n");
-
+#   ifdef DEBUG_IFACE
+    fprintf(stderr,"\n");
+#   endif
     num_known_types = 999999999;
     while (TRUE) {
        Int i;
@@ -858,7 +887,10 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
 
        /* Have we reached a fixed point? */
        i = length(all_known_types);
-       printf ( "\n------------- %d known types -------------\n", i );
+#      ifdef DEBUG_IFACE
+       fprintf ( stderr,
+                 "\n------------- %d known types -------------\n", i );
+#      endif
        if (num_known_types == i) break;
        num_known_types = i;
 
@@ -966,8 +998,12 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        }       
     }
 
-    fprintf(stderr, "\n=========================================================\n");
-    fprintf(stderr, "=========================================================\n");
+#   ifdef DEBUG_IFACE
+    fprintf(stderr, "\n============================"
+                    "=============================\n");
+    fprintf(stderr, "=============================="
+                    "===========================\n");
+#   endif
 
     /* Traverse again the decl lists of the modules, this time 
        calling the finishGHC* functions.  But don't process
@@ -1037,8 +1073,12 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
           }
        }       
     }
-    fprintf(stderr, "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-    fprintf(stderr, "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+#   ifdef DEBUG_IFACE
+    fprintf(stderr, "\n+++++++++++++++++++++++++++++"
+                    "++++++++++++++++++++++++++++\n");
+    fprintf(stderr, "+++++++++++++++++++++++++++++++"
+                    "++++++++++++++++++++++++++\n");
+#   endif
 
     /* Build the module(m).export lists for each module, by running
        through the export lists in the iface.  Also, do the implicit
@@ -1070,7 +1110,9 @@ static void startGHCModule_errMsg ( char* msg )
 
 static void* startGHCModule_clientLookup ( char* sym )
 {
+#  ifdef DEBUG_IFACE
    /* fprintf ( stderr, "CLIENTLOOKUP %s\n", sym ); */
+#  endif
    return lookupObjName ( sym );
 }
 
@@ -1107,8 +1149,10 @@ static Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
 
    if (isNull(m)) {
       m = newModule(mname);
+#     ifdef DEBUG_IFACE
       fprintf ( stderr, "startGHCIface: name %16s   objsize %d\n", 
                          textToStr(mname), sizeObj );
+#     endif
    } else {
       if (module(m).fake) {
          module(m).fake = FALSE;
@@ -1176,7 +1220,9 @@ static Void finishGHCModule ( Cell root )
    List        t;
    ObjectCode* oc;
 
+#  ifdef DEBUG_IFACE
    fprintf(stderr, "begin finishGHCModule %s\n", textToStr(textOf(iname)));
+#  endif
 
    if (isNull(mod)) internal("finishExports(1)");
    setCurrModule(mod);
@@ -1203,7 +1249,9 @@ static Void finishGHCModule ( Cell root )
                q = mkQualId(exmod,ex);
                c = findQualNameWithoutConsultingExportList ( q );
                if (isNull(c)) goto notfound;
+#              ifdef DEBUG_IFACE
                fprintf(stderr, "   var %s\n", textToStr(textOf(ex)) );
+#              endif
                module(mod).exports = cons(c, module(mod).exports);
                addName(c);
                break;
@@ -1212,7 +1260,9 @@ static Void finishGHCModule ( Cell root )
                q = mkQualId(exmod,ex);
                c = findQualTyconWithoutConsultingExportList ( q );
                if (isNull(c)) goto notfound;
+#              ifdef DEBUG_IFACE
                fprintf(stderr, "   type %s\n", textToStr(textOf(ex)) );
+#              endif
                module(mod).exports = cons(pair(c,NIL), module(mod).exports);
                addTycon(c);
                break;
@@ -1224,7 +1274,10 @@ static Void finishGHCModule ( Cell root )
                c       = findQualTyconWithoutConsultingExportList ( q );
 
                if (nonNull(c)) { /* data */
-                  fprintf(stderr, "   data/newtype %s = { ", textToStr(textOf(ex)) );
+#                 ifdef DEBUG_IFACE
+                  fprintf(stderr, "   data/newtype %s = { ", 
+                          textToStr(textOf(ex)) );
+#                 endif
                   assert(tycon(c).what == DATATYPE || tycon(c).what==NEWTYPE);
                   abstract = isNull(tycon(c).defn);
                   /* This data/newtype could be abstract even tho the export list
@@ -1236,7 +1289,9 @@ static Void finishGHCModule ( Cell root )
                   if (abstract) {
                      module(mod).exports = cons(pair(c,NIL), module(mod).exports);
                      addTycon(c);
+#                    ifdef DEBUG_IFACE
                      fprintf ( stderr, "(abstract) ");
+#                    endif
 		  } else {
                      module(mod).exports = cons(pair(c,DOTDOT), module(mod).exports);
                      addTycon(c);
@@ -1246,18 +1301,24 @@ static Void finishGHCModule ( Cell root )
                                               /* isVar since could be a field name */
                         q = mkQualId(exmod,ent2);
                         c = findQualNameWithoutConsultingExportList ( q );
+#                       ifdef DEBUG_IFACE
                         fprintf(stderr, "%s ", textToStr(name(c).text));
+#                       endif
                         assert(nonNull(c));
                         /* module(mod).exports = cons(c, module(mod).exports); */
                         addName(c);
                      }
                   }
+#                 ifdef DEBUG_IFACE
                   fprintf(stderr, "}\n" );
+#                 endif
                } else { /* class */
                   q = mkQualId(exmod,ex);
                   c = findQualClassWithoutConsultingExportList ( q );
                   if (isNull(c)) goto notfound;
+#                 ifdef DEBUG_IFACE
                   fprintf(stderr, "   class %s { ", textToStr(textOf(ex)) );
+#                 endif
                   module(mod).exports = cons(pair(c,DOTDOT), module(mod).exports);
                   addClass(c);
                   for (; nonNull(subents); subents = tl(subents)) {
@@ -1265,12 +1326,16 @@ static Void finishGHCModule ( Cell root )
                      assert(isVar(ent2));
                      q = mkQualId(exmod,ent2);
                      c = findQualNameWithoutConsultingExportList ( q );
+#                    ifdef DEBUG_IFACE
                      fprintf(stderr, "%s ", textToStr(name(c).text));
+#                    endif
                      if (isNull(c)) goto notfound;
                      /* module(mod).exports = cons(c, module(mod).exports); */
                      addName(c);
                   }
+#                 ifdef DEBUG_IFACE
                   fprintf(stderr, "}\n" );
+#                 endif
                }
                break;
 
@@ -1283,8 +1348,10 @@ static Void finishGHCModule ( Cell root )
         notfound:
          /* q holds what ain't found */
          assert(whatIs(q)==QUALIDENT);
+#        ifdef DEBUG_IFACE
          fprintf( stderr, "   ------ IGNORED: %s.%s\n",
                   textToStr(qmodOf(q)), textToStr(qtextOf(q)) );
+#        endif
          continue;
       }
    }
@@ -1336,7 +1403,7 @@ static Void finishGHCModule ( Cell root )
 static Void startGHCExports ( ConId mn, List exlist )
 {
 #   ifdef DEBUG_IFACE
-    printf("startGHCExports %s\n", textToStr(textOf(mn)) );
+    fprintf(stderr,"startGHCExports %s\n", textToStr(textOf(mn)) );
 #   endif
    /* Nothing to do. */
 }
@@ -1344,7 +1411,7 @@ static Void startGHCExports ( ConId mn, List exlist )
 static Void finishGHCExports ( ConId mn, List exlist )
 {
 #   ifdef DEBUG_IFACE
-    printf("finishGHCExports %s\n", textToStr(textOf(mn)) );
+    fprintf(stderr,"finishGHCExports %s\n", textToStr(textOf(mn)) );
 #   endif
    /* Nothing to do. */
 }
@@ -1359,7 +1426,7 @@ static Void startGHCImports ( ConId mn, List syms )
 /* syms   [ConId | VarId] -- the names to import */
 {
 #  ifdef DEBUG_IFACE
-   printf("startGHCImports %s\n", textToStr(textOf(mn)) );
+   fprintf(stderr,"startGHCImports %s\n", textToStr(textOf(mn)) );
 #  endif
    /* Nothing to do. */
 }
@@ -1370,7 +1437,7 @@ static Void finishGHCImports ( ConId nm, List syms )
 /* syms   [ConId | VarId] -- the names to import */
 {
 #  ifdef DEBUG_IFACE
-   printf("finishGHCImports %s\n", textToStr(textOf(nm)) );
+   fprintf(stderr,"finishGHCImports %s\n", textToStr(textOf(nm)) );
 #  endif
   /* Nothing to do. */
 }
@@ -1447,7 +1514,7 @@ static void startGHCValue ( Int line, VarId vid, Type ty )
     Text   v = textOf(vid);
 
 #   ifdef DEBUG_IFACE
-    printf("begin startGHCValue %s\n", textToStr(v));
+    fprintf(stderr,"begin startGHCValue %s\n", textToStr(v));
 #   endif
 
     line = intOf(line);
@@ -1750,7 +1817,8 @@ static List finishGHCDataDecl ( ConId tyc )
     List  nms;
     Tycon tc = findTycon(textOf(tyc));
 #   ifdef DEBUG_IFACE
-    printf ( "begin finishGHCDataDecl %s\n", textToStr(textOf(tyc)) );
+    fprintf ( stderr, "begin finishGHCDataDecl %s\n", 
+              textToStr(textOf(tyc)) );
 #   endif
     if (isNull(tc)) internal("finishGHCDataDecl");
     
@@ -1836,7 +1904,8 @@ static Void finishGHCNewType ( ConId tyc )
 {
     Tycon tc = findTycon(textOf(tyc));
 #   ifdef DEBUG_IFACE
-    printf ( "begin finishGHCNewType %s\n", textToStr(textOf(tyc)) );
+    fprintf ( stderr, "begin finishGHCNewType %s\n", 
+              textToStr(textOf(tyc)) );
 #   endif
  
     if (isNull(tc)) internal("finishGHCNewType");
@@ -1877,7 +1946,7 @@ List  mems0; {    /* [((VarId, Type))]     */
     Text ct         = textOf(tc_name);
     Pair newCtx     = pair(tc_name, zfst(kinded_tv));
 #   ifdef DEBUG_IFACE
-    printf ( "begin startGHCClass %s\n", textToStr(ct) );
+    fprintf ( stderr, "begin startGHCClass %s\n", textToStr(ct) );
 #   endif
 
     line = intOf(line);
@@ -1983,7 +2052,7 @@ static Class finishGHCClass ( Tycon cls_tyc )
     Int   ctr;
     Class nw = findClass ( textOf(cls_tyc) );
 #   ifdef DEBUG_IFACE
-    printf ( "begin finishGHCClass %s\n", textToStr(cclass(nw).text) );
+    fprintf ( stderr, "begin finishGHCClass %s\n", textToStr(cclass(nw).text) );
 #   endif
     if (isNull(nw)) internal("finishGHCClass");
 
@@ -2031,7 +2100,7 @@ VarId var; {   /* VarId */
 
     Inst in = newInst();
 #   ifdef DEBUG_IFACE
-    printf ( "begin startGHCInstance\n" );
+    fprintf ( stderr, "begin startGHCInstance\n" );
 #   endif
 
     line = intOf(line);
@@ -2098,7 +2167,7 @@ static Void finishGHCInstance ( Inst in )
     Type   cls;
 
 #   ifdef DEBUG_IFACE
-    printf ( "begin finishGHCInstance\n" );
+    fprintf ( stderr, "begin finishGHCInstance\n" );
 #   endif
 
     assert (nonNull(in));
@@ -2334,7 +2403,10 @@ static Bool allTypesKnown ( Type  type,
          return TRUE; /*notreached*/
    }
   missing:
-   printf ( "allTypesKnown: unknown " ); print(type,10); printf("\n");
+#  ifdef DEBUG_IFACE
+   fprintf ( stderr,"allTypesKnown: unknown " ); print(type,10); 
+   fprintf(stderr,"\n");
+#  endif
    return FALSE;
 }
 
@@ -2420,7 +2492,25 @@ Type type; {
  * General object symbol query stuff
  * ------------------------------------------------------------------------*/
 
-#define EXTERN_SYMS                  \
+#if defined(linux_TARGET_OS)
+#define IF_linux(xxx)     xxx
+#define IF_cygwin32(xxx)  /**/
+#define IF_solaris2(xxx)  /**/
+#endif
+
+#if defined(solaris2_TARGET_OS)
+#define IF_linux(xxx)     /**/
+#define IF_cygwin32(xxx)  /**/
+#define IF_solaris2(xxx)  xxx
+#endif
+
+#if defined(cgywin32_TARGET_OS)
+#define IF_linux(xxx)     /**/
+#define IF_cygwin32(xxx)  xxx
+#define IF_solaris2(xxx)  /**/
+#endif
+
+#define EXTERN_SYMS_ALLPLATFORMS     \
       Sym(stg_gc_enter_1)            \
       Sym(stg_gc_noregs)             \
       Sym(stg_gc_seq_1)              \
@@ -2522,14 +2612,15 @@ Type type; {
       Sym(getStablePtr)              \
       Sym(stable_ptr_table)          \
       Sym(createAdjThunk)            \
+      Sym(shutdownHaskellAndExit)    \
+      Sym(stg_enterStackTop)         \
+      Sym(CAF_UNENTERED_entry)       \
+      Sym(stg_yield_to_Hugs)         \
+      Sym(StgReturn)                 \
                                      \
       /* needed by libHS_cbits */    \
       SymX(malloc)                   \
-      Sym(__errno_location)          \
       SymX(close)                    \
-      Sym(__xstat)                   \
-      Sym(__fxstat)                  \
-      Sym(__lxstat)                  \
       Sym(mkdir)                     \
       SymX(close)                    \
       Sym(opendir)                   \
@@ -2547,9 +2638,7 @@ Type type; {
       SymX(getcwd)                   \
       SymX(free)                     \
       SymX(strcpy)                   \
-      SymX(select)                   \
       Sym(fcntl)                     \
-      SymX(stderr)                   \
       SymX(fprintf)                  \
       SymX(exit)                     \
       Sym(open)                      \
@@ -2561,40 +2650,106 @@ Type type; {
       SymX(chdir)                    \
       Sym(localtime)                 \
       Sym(strftime)                  \
-      SymX(vfork)                    \
       SymX(execl)                    \
-      SymX(_exit)                    \
       Sym(waitpid)                   \
-      Sym(tzname)                    \
       Sym(timezone)                  \
       Sym(mktime)                    \
       Sym(gmtime)                    \
-      SymX(getenv)                   \
-      Sym(shutdownHaskellAndExit)    \
+      SymX(getenv)
+
+#define EXTERN_SYMS_cygwin32         \
+      SymX(GetCurrentProcess)        \
+      SymX(GetProcessTimes)          \
+      Sym(__udivdi3)                 \
+      SymX(bzero)                    \
+      Sym(select)                    \
+      SymX(_impure_ptr)              \
+      Sym(lstat)                     \
+      Sym(setmode)                   \
+      SymX(system)                   \
+      SymX(sleep)                    \
+      Sym(__imp__tzname)             \
+      Sym(__imp__timezone)           \
+      Sym(tzset)                     \
+      Sym(log)                       \
+      Sym(exp)                       \
+      Sym(sqrt)                      \
+      Sym(sin)                       \
+      Sym(cos)                       \
+      Sym(tan)                       \
+      Sym(asin)                      \
+      Sym(acos)                      \
+      Sym(atan)                      \
+      Sym(sinh)                      \
+      Sym(cosh)                      \
+      Sym(tanh)                      \
+      Sym(pow)                       \
+      Sym(__errno)                   \
+      Sym(stat)                      \
+      Sym(fstat)
 
 
-/* AJG Hack; for the moment, make EXTERN_SYMS vanish on Win32 */
-#ifdef _WIN32
-#undef EXTERN_SYMS
-#define EXTERN_SYMS
+#if 0
+      Sym(__errno_location)          \
+      Sym(__xstat)                   \
+      Sym(__fxstat)                  \
+      Sym(__lxstat)                  \
+      SymX(select)                   \
+      SymX(vfork)                    \
+      Sym(tzname)                    \
+      SymX(stderr)                   \
+
 #endif
 
+
+#if defined(linux_TARGET_OS)
+#define EXTERN_SYMS_THISPLATFORM EXTERN_SYMS_linux
+#endif
+
+#if defined(solaris2_TARGET_OS)
+#define EXTERN_SYMS_THISPLATFORM EXTERN_SYMS_solaris2
+#endif
+
+#if defined(cygwin32_TARGET_OS)
+#define EXTERN_SYMS_THISPLATFORM EXTERN_SYMS_cygwin32
+#endif
+
+
+
+
 /* entirely bogus claims about types of these symbols */
-#define Sym(vvv)  extern int vvv;
-#define SymX(vvv) /* nothing */
-EXTERN_SYMS
+#define Sym(vvv)  extern void (vvv);
+#define SymX(vvv) /**/
+EXTERN_SYMS_ALLPLATFORMS
+EXTERN_SYMS_THISPLATFORM
 #undef Sym
 #undef SymX
 
-#define Sym(vvv) { #vvv, &vvv },
-#define SymX(vvv) { #vvv, &vvv },
+
+#define Sym(vvv)  { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+                    &(vvv) },
+#define SymX(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+                    &(vvv) },
 OSym rtsTab[] 
    = { 
-       EXTERN_SYMS
+       EXTERN_SYMS_ALLPLATFORMS
+       EXTERN_SYMS_THISPLATFORM
        {0,0} 
      };
 #undef Sym
 #undef SymX
+
+
+/* A kludge to assist Win32 debugging. */
+char* nameFromStaticOPtr ( void* ptr )
+{
+   int k;
+   for (k = 0; rtsTab[k].nm; k++)
+      if (ptr == rtsTab[k].ad)
+         return rtsTab[k].nm;
+   return NULL;
+}
+
 
 static void* lookupObjName ( char* nm )
 {
@@ -2604,6 +2759,7 @@ static void* lookupObjName ( char* nm )
    Text   t;
    Module m;
    char   nm2[200];
+   int    first_real_char;
 
    nm2[199] = 0;
    strncpy(nm2,nm,200);
@@ -2620,10 +2776,15 @@ static void* lookupObjName ( char* nm )
    /* if not an RTS name, look in the 
       relevant module's object symbol table
    */
-   pp = strchr(nm2, '_');
-   if (!pp || !isupper(nm2[0])) goto not_found;
+#  if LEADING_UNDERSCORE
+   first_real_char = 1;
+#  else
+   first_real_char = 0;
+#  endif
+   pp = strchr(nm2+first_real_char, '_');
+   if (!pp || !isupper(nm2[first_real_char])) goto not_found;
    *pp = 0;
-   t = unZcodeThenFindText(nm2);
+   t = unZcodeThenFindText(nm2+first_real_char);
    m = findModule(t);
    if (isNull(m)) goto not_found;
 

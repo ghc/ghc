@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.46 $
- * $Date: 2000/02/25 10:53:54 $
+ * $Revision: 1.47 $
+ * $Date: 2000/03/07 16:18:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1509,6 +1509,12 @@ char* nameFromOPtr ( void* p )
          if (nm) return nm;
       }
    }
+#  if 0
+   /* A kludge to assist Win32 debugging; not actually necessary. */
+   { char* nm = nameFromStaticOPtr(p);
+     if (nm) return nm;
+   }
+#  endif
    return NULL;
 }
 

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.30 $
- * $Date: 2000/03/02 10:10:33 $
+ * $Revision: 1.31 $
+ * $Date: 2000/03/07 16:18:25 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -1070,5 +1070,13 @@ extern  Void   setLastExpr       Args((Cell));
 extern  Cell   getLastExpr       Args((Void));
 extern  List   addTyconsMatching Args((String,List));
 extern  List   addNamesMatching  Args((String,List));
+
+#if LEADING_UNDERSCORE
+#define MAYBE_LEADING_UNDERSCORE(sss)     _##sss
+#define MAYBE_LEADING_UNDERSCORE_STR(sss) "_" sss
+#else
+#define MAYBE_LEADING_UNDERSCORE(sss)     sss
+#define MAYBE_LEADING_UNDERSCORE_STR(sss) sss
+#endif
 
 /*-------------------------------------------------------------------------*/

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.16 $
- * $Date: 2000/02/08 15:32:29 $
+ * $Revision: 1.17 $
+ * $Date: 2000/03/07 16:18:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -23,6 +23,8 @@
 
 #include "Rts.h"    /* IF_DEBUG */
 #include "RtsFlags.h"
+
+/*#define DEBUG_CODEGEN*/
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -44,7 +46,6 @@ static Void  cgExpr        ( AsmBCO bco, AsmSp root, StgExpr e );
              
 static AsmBCO cgAlts       ( AsmSp root, AsmSp sp, List alts );
 static void   testPrimPats ( AsmBCO bco, AsmSp root, List pats, StgExpr e );
-//static void   cgPrimAlt    ( AsmBCO bco, AsmSp root, List vs, StgExpr e );
 static AsmBCO cgLambda     ( StgExpr e );
 static AsmBCO cgRhs        ( StgRhs rhs );
 static void   beginTop     ( StgVar v );
@@ -62,9 +63,10 @@ static Cell cptrFromName ( Name n )
    void* p;
    Module m = name(n).mod;
    Text  mt = module(m).text;
-   sprintf(buf,"%s_%s_closure", 
-               textToStr(mt), 
-               textToStr( enZcodeThenFindText ( textToStr (name(n).text) ) ) );
+   sprintf(buf, MAYBE_LEADING_UNDERSCORE_STR("%s_%s_closure"), 
+                textToStr(mt), 
+                textToStr( enZcodeThenFindText ( 
+                   textToStr (name(n).text) ) ) );
    p = lookupOTabName ( m, buf );
    if (!p) {
       ERRMSG(0) "Can't find object symbol %s", buf
@@ -161,8 +163,10 @@ print(e,10);printf("\n");
 	       pushVar(bco,name(e).stgVar);
             } else {
                Cell /*CPtr*/ addr = cptrFromName(e);
+#              ifdef DEBUG_CODEGEN
                fprintf ( stderr, "nativeAtom: name %s\n", 
                                  nameFromOPtr(cptrOf(addr)) );
+#              endif
 	       pushVar(bco,addr);
             }
             break;
@@ -284,15 +288,6 @@ static void testPrimPats( AsmBCO bco, AsmSp root, List pats, StgExpr e )
         }
     }
 }
-
-#if 0  /* appears to be unused */
-static void cgPrimAlt( AsmBCO bco, AsmSp root, List vs, StgExpr e )
-{
-    assert(0); /* ToDo: test for patterns */
-    map1Proc(cgBind,bco,vs); /* ToDo: are these in right order? */
-    cgExpr(bco,root,e);
-}
-#endif
 
 
 static AsmBCO cgLambda( StgExpr e )
@@ -558,8 +553,11 @@ static Void build( AsmBCO bco, StgVar v )
             if (isCPtr(fun)) {
                assert(isName(fun0));
                itsaPAP = name(fun0).arity > length(args);
+#              ifdef DEBUG_CODEGEN
                fprintf ( stderr, "nativeCall: name %s, arity %d, args %d\n",
-                         nameFromOPtr(cptrOf(fun)), name(fun0).arity, length(args) );
+                         nameFromOPtr(cptrOf(fun)), name(fun0).arity,
+                         length(args) );
+#              endif
             } else {
                itsaPAP = FALSE;
                if (nonNull(stgVarBody(fun))

@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <assert.h>
 #include "config.h"                             /* for linux_TARGET_OS etc */
 #include "object.h"
@@ -487,11 +488,16 @@ typedef
 
 /* From PE spec doc, section 5.4.2 and 5.4.4 */
 #define IMAGE_SYM_CLASS_EXTERNAL       2
+#define IMAGE_SYM_CLASS_STATIC         3
 #define IMAGE_SYM_UNDEFINED            0
 
 /* From PE spec doc, section 4.1 */
 #define IMAGE_SCN_CNT_CODE             0x00000020
 #define IMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040
+
+/* From PE spec doc, section 5.2.1 */
+#define IMAGE_REL_I386_DIR32           0x0006
+#define IMAGE_REL_I386_REL32           0x0014
 
 
 /* We use myindex to calculate array addresses, rather than
@@ -524,6 +530,96 @@ static void printName ( UChar* name, UChar* strtab )
 }
 
 
+static void copyName ( UChar* name, UChar* strtab, 
+                       UChar* dst, int dstSize )
+{
+   if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
+      UInt32 strtab_offset = * (UInt32*)(name+4);
+      strncpy ( dst, strtab+strtab_offset, dstSize );
+      dst[dstSize-1] = 0;
+   } else {
+      int i = 0;
+      while (1) {
+         if (i >= 8) break;
+         if (name[i] == 0) break;
+         dst[i] = name[i];
+         i++;
+      }
+      dst[i] = 0;
+   }
+}
+
+
+static UChar* cstring_from_COFF_symbol_name ( UChar* name, 
+                                              UChar* strtab )
+{
+   UChar* newstr;
+   /* If the string is longer than 8 bytes, look in the
+      string table for it -- this will be correctly zero terminated. 
+   */
+   if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
+      UInt32 strtab_offset = * (UInt32*)(name+4);
+      return ((UChar*)strtab) + strtab_offset;
+   }
+   /* Otherwise, if shorter than 8 bytes, return the original,
+      which by defn is correctly terminated.
+   */
+   if (name[7]==0) return name;
+   /* The annoying case: 8 bytes.  Copy into a temporary
+      (which is never freed ...)
+   */
+   newstr = malloc(9);
+   if (newstr) {
+      strncpy(newstr,name,8);
+      newstr[8] = 0;
+   }
+   return newstr;
+}
+
+
+/* Just compares the short names (first 8 chars) */
+static COFF_section* findPEi386SectionCalled ( ObjectCode* oc,
+                                               char* name )
+{
+   int i;
+   COFF_header* hdr 
+      = (COFF_header*)(oc->oImage);
+   COFF_section* sectab 
+      = (COFF_section*) (
+           ((UChar*)(oc->oImage)) 
+           + sizeof_COFF_header + hdr->SizeOfOptionalHeader
+        );
+   for (i = 0; i < hdr->NumberOfSections; i++) {
+      UChar* n1;
+      UChar* n2;
+      COFF_section* section_i 
+         = (COFF_section*)
+           myindex ( sizeof_COFF_section, i, sectab );
+      n1 = (UChar*) &(section_i->Name);
+      n2 = name;
+      if (n1[0]==n2[0] && n1[1]==n2[1] && n1[2]==n2[2] && 
+          n1[3]==n2[3] && n1[4]==n2[4] && n1[5]==n2[5] && 
+          n1[6]==n2[6] && n1[7]==n2[7])
+         return section_i;
+   }
+
+   return NULL;
+}
+
+
+static void zapTrailingAtSign ( UChar* sym )
+{
+   int i, j;
+   if (sym[0] == 0) return;
+   i = 0; 
+   while (sym[i] != 0) i++;
+   i--;
+   j = i;
+   while (j > 0 && isdigit(sym[j])) j--;
+   if (j > 0 && sym[j] == '@' && j != i) sym[j] = 0;
+}
+
+
 static int ocVerifyImage_PEi386 ( ObjectCode* oc, int verb )
 {
    int i, j;
@@ -531,7 +627,7 @@ static int ocVerifyImage_PEi386 ( ObjectCode* oc, int verb )
    COFF_section* sectab;
    COFF_symbol*  symtab;
    UChar*        strtab;
-   
+
    hdr = (COFF_header*)(oc->oImage);
    sectab = (COFF_section*) (
                ((UChar*)(oc->oImage)) 
@@ -553,7 +649,7 @@ static int ocVerifyImage_PEi386 ( ObjectCode* oc, int verb )
       oc->errMsg("PEi386 with nonempty optional header");
       return FALSE;
    }
-   if ( (hdr->Characteristics & IMAGE_FILE_RELOCS_STRIPPED) ||
+   if ( /* (hdr->Characteristics & IMAGE_FILE_RELOCS_STRIPPED) || */
         (hdr->Characteristics & IMAGE_FILE_EXECUTABLE_IMAGE) ||
         (hdr->Characteristics & IMAGE_FILE_DLL) ||
         (hdr->Characteristics & IMAGE_FILE_SYSTEM) ) {
@@ -561,7 +657,6 @@ static int ocVerifyImage_PEi386 ( ObjectCode* oc, int verb )
       return FALSE;
    }
    if ( (hdr->Characteristics & IMAGE_FILE_BYTES_REVERSED_HI) ||
-        !(hdr->Characteristics & IMAGE_FILE_BYTES_REVERSED_LO) ||
         !(hdr->Characteristics & IMAGE_FILE_32BIT_MACHINE) ) {
       oc->errMsg("Invalid PEi386 word size or endiannness");
       return FALSE;
@@ -687,33 +782,6 @@ static int ocVerifyImage_PEi386 ( ObjectCode* oc, int verb )
 }
 
 
-static UChar* cstring_from_COFF_symbol_name ( UChar* name, 
-                                              UChar* strtab )
-{
-   UChar* newstr;
-   /* If the string is longer than 8 bytes, look in the
-      string table for it -- this will be correctly zero terminated. 
-   */
-   if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
-      UInt32 strtab_offset = * (UInt32*)(name+4);
-      return ((UChar*)strtab) + strtab_offset;
-   }
-   /* Otherwise, if shorter than 8 bytes, return the original,
-      which by defn is correctly terminated.
-   */
-   if (name[7]==0) return name;
-   /* The annoying case: 8 bytes.  Copy into a temporary
-      (which is never freed ...)
-   */
-   newstr = malloc(9);
-   if (newstr) {
-      strncpy(newstr,name,8);
-      newstr[8] = 0;
-   }
-   return newstr;
-}
-
-
 static int ocGetNames_PEi386 ( ObjectCode* oc, int verb )
 {
    COFF_header*  hdr;
@@ -770,9 +838,9 @@ static int ocGetNames_PEi386 ( ObjectCode* oc, int verb )
                                symtab_i->SectionNumber-1,
                                sectab );
          addr = ((UChar*)(oc->oImage))
-                + sectabent->PointerToRawData
-                + symtab_i->Value;
-
+                + (sectabent->PointerToRawData
+                   + symtab_i->Value);
+         /* fprintf ( stderr, "addSymbol %p `%s'\n", addr,sname); */
          if (!addSymbol(oc,sname,addr)) return FALSE;
       }
       i += symtab_i->NumberOfAuxSymbols;
@@ -789,16 +857,37 @@ static int ocGetNames_PEi386 ( ObjectCode* oc, int verb )
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, i, sectab );
+      /* fprintf ( stderr, "section name = %s\n", sectab_i->Name ); */
 
+#if 0
+      /* I'm sure this is the Right Way to do it.  However, the 
+         alternative of testing the sectab_i->Name field seems to
+         work ok with Cygwin.
+      */
       if (sectab_i->Characteristics & IMAGE_SCN_CNT_CODE || 
           sectab_i->Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA)
          kind = HUGS_SECTIONKIND_CODE_OR_RODATA;
+#endif
+
+      if (0==strcmp(".text",sectab_i->Name))
+         kind = HUGS_SECTIONKIND_CODE_OR_RODATA;
+      if (0==strcmp(".data",sectab_i->Name) ||
+          0==strcmp(".bss",sectab_i->Name))
+         kind = HUGS_SECTIONKIND_RWDATA;
 
       start = ((UChar*)(oc->oImage)) 
               + sectab_i->PointerToRawData;
       end   = start 
               + sectab_i->SizeOfRawData - 1;
-      addSection ( oc, start, end, kind );
+
+      if (kind != HUGS_SECTIONKIND_OTHER) {
+         addSection ( oc, start, end, kind );
+      } else {
+         fprintf ( stderr, "unknown section name = `%s'\n", 
+                   sectab_i->Name);
+         oc->errMsg("Unknown PEi386 section name");
+         return FALSE;
+      }
    }
 
    return TRUE;   
@@ -807,7 +896,126 @@ static int ocGetNames_PEi386 ( ObjectCode* oc, int verb )
 
 static int ocResolve_PEi386 ( ObjectCode* oc, int verb )
 {
+   COFF_header*  hdr;
+   COFF_section* sectab;
+   COFF_symbol*  symtab;
+   UChar*        strtab;
+
+   UInt32        A;
+   UInt32        S;
+   UInt32*       pP;
+
+   int i, j;
+   char symbol[1000]; // ToDo
    
+   hdr = (COFF_header*)(oc->oImage);
+   sectab = (COFF_section*) (
+               ((UChar*)(oc->oImage)) 
+               + sizeof_COFF_header + hdr->SizeOfOptionalHeader
+            );
+   symtab = (COFF_symbol*) (
+               ((UChar*)(oc->oImage))
+               + hdr->PointerToSymbolTable 
+            );
+   strtab = ((UChar*)(oc->oImage))
+            + hdr->PointerToSymbolTable
+            + hdr->NumberOfSymbols * sizeof_COFF_symbol;
+
+   for (i = 0; i < hdr->NumberOfSections; i++) {
+      COFF_section* sectab_i
+         = (COFF_section*)
+           myindex ( sizeof_COFF_section, i, sectab );
+      COFF_reloc* reltab
+         = (COFF_reloc*) (
+              ((UChar*)(oc->oImage)) + sectab_i->PointerToRelocations
+           );
+      for (j = 0; j < sectab_i->NumberOfRelocations; j++) {
+         COFF_symbol* sym;
+         COFF_reloc* reltab_j 
+            = (COFF_reloc*)
+              myindex ( sizeof_COFF_reloc, j, reltab );
+
+         /* the location to patch */
+         pP = (UInt32*)(
+                 ((UChar*)(oc->oImage)) 
+                 + (sectab_i->PointerToRawData 
+                    + reltab_j->VirtualAddress)
+              );
+         /* the existing contents of pP */
+         A = *pP;
+         /* the symbol to connect to */
+         sym = (COFF_symbol*)
+               myindex ( sizeof_COFF_symbol, 
+                         reltab_j->SymbolTableIndex, symtab );
+         if (verb) {
+            fprintf ( stderr, 
+                   "reloc sec %2d num %3d:  type 0x%-4x   "
+                   "vaddr 0x%-8x   name `",
+                   i, j,
+                   (UInt32)reltab_j->Type, 
+                   reltab_j->VirtualAddress );
+            printName ( sym->Name, strtab );
+            fprintf ( stderr, "'\n" );
+         }
+
+         if (sym->StorageClass == IMAGE_SYM_CLASS_STATIC) {
+            COFF_section* section_sym 
+               = findPEi386SectionCalled ( oc, sym->Name );
+            if (!section_sym) {
+               fprintf ( stderr, "bad section = `%s'\n", sym->Name );
+               oc->errMsg("Can't find abovementioned PEi386 section");
+               return FALSE;
+            }
+            S = ((UInt32)(oc->oImage))
+                + (section_sym->PointerToRawData
+                   + sym->Value);
+         } else {
+         copyName ( sym->Name, strtab, symbol, 1000 );
+         zapTrailingAtSign ( symbol );
+         S = (UInt32) ocLookupSym ( oc, symbol );
+         if (S == 0) 
+            S = (UInt32)(oc->clientLookup ( symbol ));
+         if (S == 0) {
+            char errtxt[2000];
+            strcpy(errtxt,oc->objFileName);
+            strcat(errtxt,": unresolvable reference to: ");
+            strcat(errtxt,symbol);
+            oc->errMsg(errtxt);
+            return FALSE;
+         }
+         }
+
+         switch (reltab_j->Type) {
+            case IMAGE_REL_I386_DIR32: 
+               *pP = A + S; 
+               break;
+            case IMAGE_REL_I386_REL32:
+               /* Tricky.  We have to insert a displacement at
+                  pP which, when added to the PC for the _next_
+                  insn, gives the address of the target (S).
+                  Problem is to know the address of the next insn
+                  when we only know pP.  We assume that this
+                  literal field is always the last in the insn,
+                  so that the address of the next insn is pP+4
+                  -- hence the constant 4.
+                  Also I don't know if A should be added, but so
+                  far it has always been zero.
+	       */
+               assert(A==0);
+               *pP = S - ((UInt32)pP) - 4;
+               break;
+            default: 
+               fprintf(stderr, 
+                       "unhandled PEi386 relocation type %d\n",
+                       reltab_j->Type);
+               oc->errMsg("unhandled PEi386 relocation type");
+               return FALSE;
+         }
+
+      }
+   }
+   
+   return TRUE;
 }
 
 #endif /* defined(cygwin32_TARGET_OS) */
