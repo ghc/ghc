@@ -347,8 +347,12 @@ tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
     in
 
 	-- Arguments
-    mapNF_Tc (\ _ -> newTyVarTy_OpenKind) [1..(length args)]	`thenNF_Tc` \ arg_tys ->
-    tcMonoExprs args arg_tys		   			`thenTc`    \ (args', args_lie) ->
+    let n_args = length args
+	tv_idxs | n_args == 0 = []
+		| otherwise   = [1..n_args]
+    in
+    mapNF_Tc (\ _ -> newTyVarTy_OpenKind) tv_idxs	`thenNF_Tc` \ arg_tys ->
+    tcMonoExprs args arg_tys		   		`thenTc`    \ (args', args_lie) ->
 
 	-- The argument types can be unboxed or boxed; the result
 	-- type must, however, be boxed since it's an argument to the IO
