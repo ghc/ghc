@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TROOT=/home/v-julsew/Feb24
-
+CMODE=-c
 STGHUGSFLAGS=-P$TROOT/fpt/ghc/interpreter/lib
 NROOT=$TROOT/fpt/nofib
 HUGZ=$TROOT/fpt/ghc/interpreter
@@ -19,20 +19,20 @@ fi
 
 if [ -f $NROOT/$1/$2/$2.stdin ]
 then 
-echo "$HUGZ/hugs -Q -c -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9"
+echo "$HUGZ/hugs -Q $CMODE -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9"
 echo "     < $NROOT/$1/$2/$2.stdin 2> /dev/null"
 echo "     > $TMPFILE"
 else
-echo "$HUGZ/hugs -Q -c -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9"
+echo "$HUGZ/hugs -Q $CMODE -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9"
 echo "     < /dev/null 2> /dev/null"
 echo "     > $TMPFILE"
 fi
 
 if [ -f $NROOT/$1/$2/$2.stdin ]
 then 
-$HUGZ/hugs -Q -c -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9 < $NROOT/$1/$2/$2.stdin 2> /dev/null > $TMPFILE
+$HUGZ/hugs -Q $CMODE -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9 < $NROOT/$1/$2/$2.stdin 2> /dev/null > $TMPFILE
 else
-$HUGZ/hugs -Q -c -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9 < /dev/null  2> /dev/null > $TMPFILE
+$HUGZ/hugs -Q $CMODE -P$NROOT/$1/$2 Main -- $3 $4 $5 $6 $7 $8 $9 < /dev/null  2> /dev/null > $TMPFILE
 fi
 
 if [ $? -ne 0 ]; then
