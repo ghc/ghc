@@ -23,5 +23,6 @@ test "show001"		{ vtr("","","") }
 test "stableptr001"	{ lang_vtr("","+RTS -K4m -RTS","") }
 test "stableptr003"	{ lang_vtr("","","") }
 test "stableptr004"	{ lang_vtr("","+RTS -K4m -RTS","") }
+test "stableptr005"	{ lang_vtr("","","") }
 test "text001"		{ vtr("","","") }
 test "weak001"		{ lang_vtr("-fglasgow-exts","","") }
