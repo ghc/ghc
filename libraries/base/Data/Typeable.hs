@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Typeable
--- Copyright   :  (c) The University of Glasgow 2001
+-- Copyright   :  (c) The University of Glasgow, CWI 2001--2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
@@ -28,8 +28,7 @@ module Data.Typeable
 
 	-- * Type-safe cast
 	cast,			-- :: (Typeable a, Typeable b) => a -> Maybe b
-	castss,			-- a cast for kind "* -> *"
-	castarr,		-- another convenient variation
+	cast0,			-- a flexible variation on cast
 
 	-- * Type representations
 	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
@@ -44,8 +43,13 @@ module Data.Typeable
 	-- * Observation of type representations
 	typerepTyCon,	-- :: TypeRep -> TyCon
 	typerepArgs,	-- :: TypeRep -> [TypeRep]
-	tyconString	-- :: TyCon   -> String
+	tyconString,	-- :: TyCon   -> String
 
+	-- * The Typeable1 class
+	Typeable1( typeOf1 ),	-- :: t a -> TyCon
+	Typeable2( typeOf2 ),	-- :: t a b -> TyCon
+	cast1,			-- :: ... => c (t a) -> Maybe (c (t' a))
+	cast2			-- :: ... => c (t a b) -> Maybe (c (t' a b))
 
   ) where
 
@@ -265,39 +269,16 @@ cast x = r
 	       else Nothing
 
 
--- | A convenient variation for kind \"* -> *\"
-castss :: (Typeable a, Typeable b) => t a -> Maybe (t b)
-castss x = r
-       where
-	 r = if typeOf (get x) == typeOf (get (fromJust r))
-               then Just $ unsafeCoerce x
-	       else Nothing
-         get :: t c -> c
-	 get = undefined
+-- | A flexible variation parameterised in a type constructor
+cast0 :: (Typeable a, Typeable b) => c a -> Maybe (c b)
+cast0 x = r
+ where
+  r = if typeOf (getArg x) == typeOf (getArg (fromJust r))
+        then Just $ unsafeCoerce x
+        else Nothing
+  getArg :: c x -> x 
+  getArg = undefined
 
-
--- | Another variation
-castarr :: (Typeable a, Typeable b, Typeable c, Typeable d)
-        => (a -> t b) -> Maybe (c -> t d)
-castarr x = r
-       where
-	 r = if typeOf (get x) == typeOf (get (fromJust r))
-               then Just $ unsafeCoerce x
-	       else Nothing
-         get :: (e -> t f) -> (e, f)
-	 get = undefined
-
-{-
-
-The variations castss and castarr are arguably not really needed.
-Let's discuss castss in some detail. To get rid of castss, we can
-require "Typeable (t a)" and "Typeable (t b)" rather than just
-"Typeable a" and "Typeable b". In that case, the ordinary cast would
-work. Eventually, all kinds of library instances should become
-Typeable. (There is another potential use of variations as those given
-above. It allows quantification on type constructors.
-
--}
 
 
 -------------------------------------------------------------
@@ -487,3 +468,69 @@ appKey k1 k2
 
 appKeys :: Key -> [Key] -> Key
 appKeys k ks = foldl appKey k ks
+
+
+
+------------------------------------------------------------------------------
+--
+--	Typeable adopted for unary type constructors
+--	This adoption is at an experimental stage.
+--
+------------------------------------------------------------------------------
+
+
+-- | Variant for unary type constructors
+class Typeable (t ()) => Typeable1 t where
+  typeOf1 :: t a -> TyCon
+
+
+-- | Variant for binary type constructors
+class Typeable (t () ()) => Typeable2 t where
+  typeOf2 :: t a b -> TyCon
+
+
+-- | Instance for lists
+instance Typeable1 [] where
+  typeOf1 _ = typerepTyCon (typeOf (undefined::[()]))
+
+
+-- | Instance for maybes
+instance Typeable1 Maybe where
+  typeOf1 _ = typerepTyCon (typeOf (undefined::Maybe ()))
+
+
+-- | Instance for products
+instance Typeable2 (,) where
+  typeOf2 _ = typerepTyCon (typeOf (undefined::((),())))
+
+
+-- | Instance for sums
+instance Typeable2 Either where
+  typeOf2 _ = typerepTyCon (typeOf (undefined::Either () ()))
+
+
+-- | Instance for functions
+instance Typeable2 (->) where
+  typeOf2 _ = typerepTyCon (typeOf (undefined::() -> ()))
+
+
+-- | Cast for * -> *
+cast1 :: (Typeable1 t, Typeable1 t') => c (t a) -> Maybe (c (t' a)) 
+cast1 x = r
+ where
+  r = if typeOf1 (getArg x) == typeOf1 (getArg (fromJust r))
+       then Just $ unsafeCoerce x
+       else Nothing
+  getArg :: c x -> x 
+  getArg = undefined
+
+
+-- | Cast for * -> * -> *
+cast2 :: (Typeable2 t, Typeable2 t') => c (t a b) -> Maybe (c (t' a b)) 
+cast2 x = r
+ where
+  r = if typeOf2 (getArg x) == typeOf2 (getArg (fromJust r))
+       then Just $ unsafeCoerce x
+       else Nothing
+  getArg :: c x -> x 
+  getArg = undefined
