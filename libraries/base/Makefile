@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.19 2002/03/04 17:02:43 simonmar Exp $
+# $Id: Makefile,v 1.20 2002/03/05 14:31:47 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -64,23 +64,6 @@ GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt
 boot :: GHC/PrimopWrappers.hs
 
 CLEAN_FILES += GHC/PrimopWrappers.hs
-
-# -----------------------------------------------------------------------------
-# GHC/Prim.hi-boot
-
-GHC/Prim.$(way_)hi	: GHC/Prim.hi-boot
-	-$(GHC_INPLACE) --compile-iface $<
-
-ALL_PRIMS = GHC/Prim.hi $(foreach way, $(WAYS), GHC/Prim.$(way)_hi)
-INSTALL_DATAS_WITH_DIRS += GHC/Prim.$(way_)hi
-
-lib  : $(ALL_PRIMS)
-
-boot :: $(ALL_PRIMS)
-
-CLEAN_FILES += $(ALL_PRIMS)
-
-SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -traditional
 
 #-----------------------------------------------------------------------------
 # 	Building the library for GHCi
