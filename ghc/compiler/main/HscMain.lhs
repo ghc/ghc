@@ -174,7 +174,7 @@ hscNoRecomp ghci_mode dflags mod location (Just old_iface) hst hit pcs_ch
       }}}
 
 compMsg mod location =
-    mod_str ++ take (12 - length mod_str) (repeat ' ')
+    mod_str ++ take (max 0 (16 - length mod_str)) (repeat ' ')
     ++ " (" ++ unJust "hscRecomp" (ml_hs_file location) ++ ")"
  where mod_str = moduleUserString mod
 
