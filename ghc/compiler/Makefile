@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.184 2001/08/15 09:33:41 rrt Exp $
+# $Id: Makefile,v 1.185 2001/08/15 12:23:56 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -133,6 +133,10 @@ endif
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -ge 5010); then echo YES; else echo NO; fi)
 
+HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
+HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs $(CONFIG_HS), $(HS_SRCS))
+HS_SRCS += $(CONFIG_HS)
+
 # -----------------------------------------------
 # GHCi calls the C procedure 'rawSystem'; but alas GHC 4.08 
 # does not have this.  Everything is fine if you are compiling
@@ -156,10 +160,6 @@ endif
 endif
 #		End of system hack
 # -----------------------------------------------
-
-HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
-HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs $(CONFIG_HS), $(HS_SRCS))
-HS_SRCS += $(CONFIG_HS)
 
 ifneq "$(BootingFromHc)" "YES"
 HS_SRCS += rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs
