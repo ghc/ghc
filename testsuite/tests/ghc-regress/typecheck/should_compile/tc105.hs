@@ -3,8 +3,8 @@
 -- !!! Scoped type variables in result signatures
 module ShouldCompile where
 
-import PrelST
-import PrelArr
+import Control.Monad.ST
+import Data.STRef
 
 f:: ST s Int
 f:: ST s Int = do
