@@ -30,7 +30,7 @@ import SrcLoc		( srcSpanStart )
 import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt,
 			  opt_ErrorSpans )
 
-import List             ( replicate )
+import List             ( replicate, sortBy )
 import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, stderr, stdout )
 
@@ -133,7 +133,7 @@ pprBagOfErrors bag_of_errors
       sorted_errs = sortLt occ'ed_before bag_ls
 
       occ'ed_before err1 err2 = 
-         LT == compare (head (errMsgSpans err1)) (head (errMsgSpans err1))
+         LT == compare (head (errMsgSpans err1)) (head (errMsgSpans err2))
 
 pprBagOfWarnings :: Bag WarnMsg -> Pretty.Doc
 pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns
