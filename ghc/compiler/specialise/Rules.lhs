@@ -33,7 +33,7 @@ import Type		( mkTyVarTy )
 import qualified Unify	( match )
 
 import Outputable
-import Maybes		( maybeToBool )
+import Maybe		( isJust, isNothing, fromMaybe )
 import Util		( sortLt )
 \end{code}
 
@@ -180,7 +180,7 @@ matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
 				     mk_result_args subst done)
 	    Nothing	    -> Nothing	-- Failure
       where
-	(done, leftovers) = partition (\v -> maybeToBool (lookupSubstEnv subst_env v))
+	(done, leftovers) = partition (\v -> isJust (lookupSubstEnv subst_env v))
 				      (map zapOccInfo tpl_vars)
 		-- Zap the occ info 
 	subst_env = substEnv subst
@@ -355,7 +355,7 @@ bind vs1 vs2 matcher tpl_vars kont subst
     subst'        = bindSubstList subst vs1 vs2
 
 	-- The unBindSubst relies on no shadowing in the template
-    not_in_subst v = not (maybeToBool (lookupSubst subst v))
+    not_in_subst v = isNothing (lookupSubst subst v)
     bug_msg = sep [ppr vs1, ppr vs2]
 
 ----------------------------------------
@@ -421,7 +421,7 @@ insertRule rules new_rule@(Rule _ tpl_vars tpl_args _)
     go (rule:rules) | new_is_more_specific rule = (new_rule:rule:rules)
 		    | otherwise		        = rule : go rules
 
-    new_is_more_specific rule = maybeToBool (matchRule tpl_var_set rule tpl_args)
+    new_is_more_specific rule = isJust (matchRule tpl_var_set rule tpl_args)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id rules
@@ -483,10 +483,7 @@ extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
 	     (rule_fvs `unionVarSet` extendVarSet lhs_fvs id)
   where
     new_id = setIdSpecialisation id (addRule old_rules id rule)
-    old_rules = case lookupVarSet rule_ids id of
-		   Nothing  -> emptyCoreRules
-		   Just id' -> idSpecialisation id'
-    
+    old_rules = idSpecialisation (fromMaybe id (lookupVarSet rule_ids id))
     lhs_fvs = ruleLhsFreeIds rule
 	-- Finds *all* the free Ids of the LHS, not just
 	-- locally defined ones!!
