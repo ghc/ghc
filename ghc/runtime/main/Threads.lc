@@ -22,6 +22,14 @@
 % I haven't checked if GRAN can work with QP profiling. But as we use our
 % own profiling (GR profiling) that should be irrelevant. -- HWL
 
+NOTE: There's currently a couple of x86 only pieces in here. The reason
+for this is the need for an expedient hack to make Concurrent Haskell
+and stable pointers work sufficiently for Win32 applications.
+(the changes in here are not x86 specific, but other parts of this patch are
+(see PerformIO.lhc))
+
+ToDo: generalise to all platforms
+
 \begin{code}
 
 #if defined(CONCURRENT) /* the whole module! */
@@ -134,6 +142,11 @@ TYPE_OF_SPARK PendingSparksTl[SPARK_POOLS];
 #endif                                                      /* GRAN ; HWL */
 
 static jmp_buf scheduler_loop;
+#if defined(i386_TARGET_ARCH)
+void SchedLoop(int ret);
+extern StgInt entersFromC;
+static jmp_buf finish_sched;
+#endif
 
 I_ required_thread_count = 0;
 I_ advisory_thread_count = 0;
@@ -303,13 +316,30 @@ P_ topClosure;
 #ifdef PAR
     }   /*if IAmMainThread ...*/
 #endif
-
+#if defined(i386_TARGET_ARCH)
+    if (setjmp(finish_sched) < 0) {
+       return;
+    }
+    SchedLoop(0);
+}
     /* ----------------------------------------------------------------- */
     /* This part is the MAIN SCHEDULER LOOP; jumped at from ReSchedule   */
     /* ----------------------------------------------------------------- */
 
-    if(setjmp(scheduler_loop) < 0)
+void
+SchedLoop(ret)
+int ret;
+{
+    P_ tso;
+
+    if ( (ret <0) || ( (setjmp(scheduler_loop) < 0) )) {
+	longjmp(finish_sched,-1);
+    }
+#else
+    if( (setjmp(scheduler_loop) < 0) ) {
         return;
+    }
+#endif
 
 #if defined(GRAN) && defined(GRAN_CHECK)
     if ( RTSflags.GranFlags.debug & 0x80 ) {
@@ -339,9 +369,11 @@ P_ topClosure;
     while (RunnableThreadsHd == PrelBase_Z91Z93_closure) {
 	/* If we've no work */
 	if (WaitingThreadsHd == PrelBase_Z91Z93_closure) {
-	    fflush(stdout);
-	    fprintf(stderr, "No runnable threads!\n");
-	    EXIT(EXIT_FAILURE);
+	    int exitc;
+	    
+            exitc = NoRunnableThreadsHook();
+	    shutdownHaskell();
+	    EXIT(exitc);
 	}
 	/* Block indef. waiting for I/O and timer expire */
 	AwaitEvent(0);
@@ -465,9 +497,9 @@ P_ topClosure;
     }
 #endif
 
-#if 0 && defined(CONCURRENT)
-    fprintf(stderr, "ScheduleThreads: About to resume thread:%#x\n",
-	            CurrentTSO);
+#if 0 && defined(i386_TARGET_ARCH)
+    fprintf(stderr, "ScheduleThreads: About to resume thread:%#x %d\n",
+	            CurrentTSO, entersFromC);
 #endif
     miniInterpret((StgFunPtr)resumeThread);
 }
@@ -800,7 +832,19 @@ int what_next;           /* Run the current thread again? */
           fprintf(stderr,"Illegal event type %u\n",EVENT_TYPE(event));
           continue;
       }  /* switch */
+#if defined(i386_TARGET_ARCH)
+
+    if (entersFromC) { 
+        /* more than one thread has entered the Haskell world
+    	   via C (and stable pointers) - don't squeeze the C stack. */
+       SchedLoop(1);
+    } else {
+	/* Squeeze C stack */
+      longjmp(scheduler_loop, 1);
+    }
+#else
     longjmp(scheduler_loop, 1);
+#endif
   } while(1);
 }
 
@@ -1458,7 +1502,22 @@ int again;  	    	    	    	/* Run the current thread again? */
     PendingSparksHd[ADVISORY_POOL] = sparkp;
 
 #ifndef PAR
+# if defined(i386_TARGET_ARCH)
+    if (entersFromC) { /* more than one thread has entered the Haskell world
+    		          via C (and stable pointers) */
+	/* Don't squeeze C stack */
+       if (required_thread_count <= 0) {
+	  longjmp(scheduler_loop, -1);
+       } else {
+          SchedLoop(required_thread_count <= 0 ? -1 : 1);
+          longjmp(scheduler_loop, -1);
+       }
+    } else {
+      longjmp(scheduler_loop, required_thread_count == 0 ? -1 : 1);
+    }
+# else
     longjmp(scheduler_loop, required_thread_count == 0 ? -1 : 1);
+# endif
 #else
     longjmp(scheduler_loop, required_thread_count == 0 && IAmMainThread ? -1 : 1);
 #endif
