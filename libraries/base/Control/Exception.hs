@@ -118,13 +118,12 @@ import GHC.Exception 	as ExceptionBase hiding (catch)
 import GHC.Conc		( throwTo, ThreadId )
 import GHC.IOBase	( IO(..), IORef(..), newIORef, readIORef, writeIORef )
 import GHC.Handle       ( stdout, hFlush )
+import Foreign.C.String ( CString, withCStringLen )
 #endif
 
 #ifdef __HUGS__
 import Hugs.Exception	as ExceptionBase
 #endif
-
-import Foreign.C.String ( CString, withCStringLen )
 
 import Prelude 		hiding ( catch )
 import System.IO.Error	hiding ( catch, try )
