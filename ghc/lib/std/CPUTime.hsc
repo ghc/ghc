@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.5 2001/05/29 11:38:14 rrt Exp $
+-- $Id: CPUTime.hsc,v 1.6 2001/06/22 12:36:33 rrt Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -23,7 +23,7 @@ import PrelArrExtra     ( unsafeFreezeByteArray )
 import PrelIOBase	( IOException(..) )
 import Ratio
 
-#include "HsStd.h"
+#include "cbits/HsStd.h"
 
 -- -----------------------------------------------------------------------------
 -- Computation `getCPUTime' returns the number of picoseconds CPU time

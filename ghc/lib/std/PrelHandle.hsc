@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.9 2001/06/07 10:44:47 sewardj Exp $
+-- $Id: PrelHandle.hsc,v 1.10 2001/06/22 12:36:33 rrt Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -38,7 +38,7 @@ module PrelHandle (
 
  ) where
 
-#include "HsStd.h"
+#include "cbits/HsStd.h"
 
 import Monad
 
