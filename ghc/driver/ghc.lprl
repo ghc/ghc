@@ -2545,7 +2545,7 @@ arg: while($_ = $Args[0]) {
     /^-v$/	    && do { $Verbose = '-v'; $Time = 'time'; next arg; };
 
     #---------- what phases are to be run ----------------------------------
-    /^-(no-)?recomp/	    && do { $Do_recomp_chkr = ($1 ne '') ? 1 : 0; next arg; };
+    /^-(no-)?recomp/	    && do { $Do_recomp_chkr = ($1 eq '') ? 1 : 0; next arg; };
 
     /^-cpp$/	    && do { $Cpp_flag_set = 1; next arg; };
     # change the global default:
@@ -3020,7 +3020,7 @@ arg: while($_ = $Args[0]) {
 	}
 	next arg; };
 
-    /^-(K|Rmax-(stk|stack)size)(.*)/ && do {
+    /^(-K|Rmax-(stk|stack)size)(.*)/ && do {
         local($flag) = $1;
     	local($stk_size) = &grab_arg_arg(*Args,'-Rmax-stksize', $3);
     	if ($stk_size =~ /(\d+)[Kk]$/) {
