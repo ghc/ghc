@@ -133,8 +133,8 @@ instance Show TypeRep where
 
 To make it possible to convert values with user-defined types
 into type Dynamic, we need a systematic way of getting
-the type representation of an arbitrary type. Type class
-provide a good fit, here
+the type representation of an arbitrary type. A type
+class provides just the ticket,
 
 \begin{code}
 class Typeable a where
@@ -143,7 +143,7 @@ class Typeable a where
 
 NOTE: The argument to the overloaded `typeOf' is only
 used to carry type information, and Typeable instances
-should *never* look at its value.
+should *never* *ever* look at its value.
 
 \begin{code}
 isTupleTyCon :: TyCon -> Bool
@@ -153,11 +153,21 @@ isTupleTyCon _		       = False
 instance Show TyCon where
   showsPrec _ (TyCon _ s) = showString s
 
--- 
--- If we enforce the restriction that TyCons are
--- shared, we can map them onto Ints very simply
--- which allows for efficient comparison.
---
+\end{code}
+ 
+If we enforce the restriction that there is only one
+@TyCon@ for a type & it is shared among all its uses,
+we can map them onto Ints very simply. The benefit is,
+of course, that @TyCon@s can then be compared efficiently.
+
+Provided the implementor of other @Typeable@ instances
+takes care of making all the @TyCon@s CAFs (toplevel constants),
+this will work. 
+
+If this constraint does turn out to be a sore thumb, changing
+the Eq instance for TyCons is trivial.
+
+\begin{code}
 mkTyCon :: String -> TyCon
 mkTyCon str = unsafePerformIO $ do
    v <- readIORef uni
@@ -255,7 +265,7 @@ instance Typeable a => Typeable (Maybe a) where
       getJ = undefined
 
 instance (Typeable a, Typeable b) => Typeable (Either a b) where
-  typeOf ei = mkAppTy maybeTc [typeOf (getL ei), typeOf (getR ei)]
+  typeOf ei = mkAppTy eitherTc [typeOf (getL ei), typeOf (getR ei)]
     where
       getL :: Either a b -> a
       getL = undefined
@@ -294,8 +304,6 @@ instance (Typeable a, Typeable b) => Typeable (a,b) where
       snd :: (a,b) -> b
       snd = undefined
 
-      tup2Tc = mkTyCon ","
-
 instance ( Typeable a
          , Typeable b
 	 , Typeable c) => Typeable (a,b,c) where
@@ -310,8 +318,6 @@ instance ( Typeable a
       snd = undefined
       thd :: (a,b,c) -> c
       thd = undefined
-
-      tup3Tc = mkTyCon ",,"
 
 instance ( Typeable a
 	 , Typeable b
@@ -331,8 +337,6 @@ instance ( Typeable a
       thd = undefined
       fth :: (a,b,c,d) -> d
       fth = undefined
-
-      tup4Tc = mkTyCon ",,,"
 
 instance ( Typeable a
 	 , Typeable b
@@ -357,8 +361,6 @@ instance ( Typeable a
       ffth :: (a,b,c,d,e) -> e
       ffth = undefined
 
-      tup5Tc = mkTyCon ",,,,"
-
 \end{code}
 
 @TyCon@s are provided for the following:
@@ -369,6 +371,12 @@ intTc, charTc, boolTc :: TyCon
 intTc      = mkTyCon "Int"
 charTc     = mkTyCon "Char"
 boolTc     = mkTyCon "Bool"
+
+tup2Tc, tup3Tc, tup4Tc, tup5Tc :: TyCon
+tup2Tc = mkTyCon ","
+tup3Tc = mkTyCon ",,"
+tup4Tc = mkTyCon ",,,"
+tup5Tc = mkTyCon ",,,,"
 
 floatTc, doubleTc, integerTc :: TyCon
 floatTc    = mkTyCon "Float"
