@@ -16,6 +16,7 @@
 # 2.  GNU standard targets
 #	all*
 #	install* uninstall installcheck installdirs
+#       install-docs*
 #	clean* distclean* mostlyclean* maintainer-clean*
 #	tags*
 #	dvi ps (no info) FPTOOLS adds: pdf rtf html
@@ -73,10 +74,6 @@
 # the --no-print-directory flag which is passed to recursive
 # invocations of make.
 #
-# NOTE: Truly weird use of exit below to stop the for loop dead in
-# its tracks should any of the sub-makes fail. By my reckoning, 
-#  "cmd || exit $?" should be equivalent to "cmd"
-
 ifneq "$(SUBDIRS)" ""
 
 # we override the 'boot', 'all' and 'install' targets in the top
@@ -96,11 +93,13 @@ endif
 
 ifeq "$(NO_INSTALL_TARGET)" "YES"
 INSTALL_TARGET =
+INSTALL_DOCS_TARGET =
 else
 INSTALL_TARGET = install
+INSTALL_DOCS_TARGET = install-docs
 endif
 
-$(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) html ps dvi txt::
+$(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html ps dvi txt::
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
@@ -834,7 +833,7 @@ endif # LINK
 # friends can be overridden from their original settings in mk/config.mk.in
 # || mk/build.mk
 #
-.PHONY: install installdirs install-strip install-dirs uninstall install-docs show-install
+.PHONY: install install-docs installdirs install-strip install-dirs uninstall install-docs show-install
 
 show-install :
 	@echo "bindir = $(bindir)"
@@ -878,13 +877,7 @@ ifneq "$(INSTALL_PROGS)" ""
 # entry in the INSTALL_PROGS list. If there's no suffix, use
 # $(exeext).
 # 
-# This is bit of a pain to express since GNU make doesn't have
-# something like $(if ...), but possible using $(subst ...)
-# [Aside: I added support for $(if ...) to my local copy of GNU
-# make at one stage, perhaps I should propagate the patch to
-# the GNU make maintainers...] 
-#
-INSTALL_PROGS := $(foreach p, $(INSTALL_PROGS), $(addsuffix $(subst _,,$(subst __,$(exeext),_$(suffix $(p))_)), $(basename $(p))))
+INSTALL_PROGS := $(foreach p, $(INSTALL_PROGS), $(addsuffix $(if $(suffix $(p)),,$(exeext)), $(basename $(p))))
 
 install:: $(INSTALL_PROGS)
 	@$(INSTALL_DIR) $(bindir)
@@ -965,6 +958,23 @@ install:: $(INSTALL_INCLUDES)
 	@$(INSTALL_DIR) $(includedir)
 	for i in $(INSTALL_INCLUDES); do \
 		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(includedir); \
+	done
+endif
+
+ifneq "$(INSTALL_DOCS) $(INSTALL_SGML_DOCS)" ""
+install-docs:: $(INSTALL_DOCS) $(foreach i,$(INSTALL_SGML_DOCS),$(foreach j,$(SGMLDocWays),$i.$j))
+	@$(INSTALL_DIR) $(datadir)
+	for i in $(INSTALL_DOCS); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
+	done
+	for i in $(INSTALL_SGML_DOCS); do \
+		for j in $(SGMLDocWays); do \
+			if [ $$j = "html" ]; then \
+				$(CP) -r $$i $(datadir); \
+			else \
+				$(INSTALL_DATA) $(INSTALL_OPTS) $$i.$$j $(datadir); \
+			fi \
+		done \
 	done
 endif
 
@@ -1058,6 +1068,8 @@ show:
 .PHONY: dvi ps html pdf rtf
 
 ifneq "$(SGML_DOC)" ""
+
+all :: $(SGMLDocWays)
 
 # multi-file SGML document: main document name is specified in $(SGML_DOC),
 # sub-documents (.sgml files) listed in $(SGML_SRCS).
