@@ -2655,7 +2655,7 @@ sub add_syslib {
 	       ? "$InstLibDirGhc"
 	       : "$TopPwd/hslibs/util/cbits"
 	  )
-	, 'lang concurrent' . (( $TargetPlatform =~ /^.*(cygwin32|mingw32)$/ ) ? '' : 'posix' ) # Syslib dependencies
+	, 'lang concurrent' . (( $TargetPlatform =~ /^.*(cygwin32|mingw32)$/ ) ? '' : ' posix' ) # Syslib dependencies
 	, ''     # extra ghc opts
 	, ''     # extra cc opts
 	, "$LibsReadline"     # extra ld opts
