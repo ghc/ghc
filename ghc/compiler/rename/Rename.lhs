@@ -726,7 +726,10 @@ reportUnusedNames my_mod_iface unqual imports avail_env
     minimal_imports1 = foldr add_name     minimal_imports0 defined_and_used
     minimal_imports  = foldr add_inst_mod minimal_imports1 inst_mods
     
-    add_name (n,NonLocalDef (UserImport m _ _)) acc = addToFM_C plusAvailEnv acc (moduleName (nameModule n))
+	-- We've carefully preserved the provenance so that we can
+	-- construct minimal imports that import the name by (one of)
+	-- the same route(s) as the programmer originally did.
+    add_name (n,NonLocalDef (UserImport m _ _)) acc = addToFM_C plusAvailEnv acc (moduleName m)
 					    			(unitAvailEnv (mk_avail n))
     add_name (n,other_prov)			acc = acc
 
