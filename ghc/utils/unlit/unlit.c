@@ -283,7 +283,7 @@ FILE *ostream; {
  *
  * Main program.  Processes command line arguments, looking for leading:
  *  -q  quiet mode - do not complain about bad literate script files
- *  -n  noisy mpde - complain about bad literate script files.
+ *  -n  noisy mode - complain about bad literate script files.
  *  -r  remove cpp droppings in output.
  * Expects two additional arguments, a file name for the input and a file
  * name for the output file.  These two names must normally be distinct.
