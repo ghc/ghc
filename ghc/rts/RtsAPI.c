@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.29 2001/08/29 11:20:40 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.30 2001/10/23 11:30:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -397,17 +397,21 @@ rts_getBool (HaskellObj p)
 SchedulerStatus
 rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
 {
-  StgTSO *tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
-  scheduleThread(tso);
-  return waitThread(tso, ret);
+    StgTSO *tso;
+
+    tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
+    scheduleThread(tso);
+    return waitThread(tso, ret);
 }
 
 SchedulerStatus
 rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
-  StgTSO *tso = createGenThread(stack_size, p);
-  scheduleThread(tso);
-  return waitThread(tso, ret);
+    StgTSO *tso;
+    
+    tso = createGenThread(stack_size, p);
+    scheduleThread(tso);
+    return waitThread(tso, ret);
 }
 
 /*
@@ -417,9 +421,37 @@ rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 SchedulerStatus
 rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
 {
-  StgTSO* tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-  scheduleThread(tso);
-  return waitThread(tso, ret);
+    StgTSO* tso; 
+    
+    tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
+    scheduleThread(tso);
+    return waitThread(tso, ret);
+}
+
+/*
+ * rts_evalStableIO() is suitable for calling from Haskell.  It
+ * evaluates a value of the form (StablePtr (IO a)), forcing the
+ * action's result to WHNF before returning.  The result is returned
+ * in a StablePtr.
+ */
+SchedulerStatus
+rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
+{
+    StgTSO* tso;
+    StgClosure *p, *r;
+    SchedulerStatus stat;
+    
+    p = (StgClosure *)deRefStablePtr(s);
+    tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
+    scheduleThread(tso);
+    stat = waitThread(tso, &r);
+
+    if (stat == Success) {
+	ASSERT(r != NULL);
+	*ret = getStablePtr((StgPtr)r);
+    }
+
+    return stat;
 }
 
 /*
@@ -428,9 +460,11 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
 SchedulerStatus
 rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 {
-  StgTSO *tso = createIOThread(stack_size, p);
-  scheduleThread(tso);
-  return waitThread(tso, ret);
+    StgTSO *tso;
+
+    tso = createIOThread(stack_size, p);
+    scheduleThread(tso);
+    return waitThread(tso, ret);
 }
 
 /* Convenience function for decoding the returned status. */

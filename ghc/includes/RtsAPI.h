@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.22 2001/08/03 16:30:13 sof Exp $
+ * $Id: RtsAPI.h,v 1.23 2001/10/23 11:30:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -97,6 +97,9 @@ rts_eval_ ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret );
 
 SchedulerStatus 
 rts_evalIO ( HaskellObj p, /*out*/HaskellObj *ret );
+
+SchedulerStatus
+rts_evalStableIO ( HsStablePtr s, /*out*/HsStablePtr *ret );
 
 SchedulerStatus 
 rts_evalLazyIO ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret );
