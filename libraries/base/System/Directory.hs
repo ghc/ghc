@@ -64,17 +64,14 @@ module System.Directory
 #ifdef __NHC__
 import Directory
 import System (getEnv)
-getHomeDirectory :: IO FilePath
-getHomeDirectory = getEnv "HOME"
-getAppUserDataDirectory :: String -> IO FilePath
-getAppUserDataDirectory appName = do path <- getEnv "HOME"
-                                     return (path++'/':'.':appName)
-getUserDocumentsDirectory :: IO FilePath
-getUserDocumentsDirectory= getEnv "HOME"
-#elif defined(__HUGS__)
-import Hugs.Directory
-#else
+#endif /* __NHC__ */
 
+#ifdef __HUGS__
+import Hugs.Directory
+import System.Environment (getEnv)
+#endif /* __HUGS__ */
+
+#ifdef __GLASGOW_HASKELL__
 import Prelude
 
 import Control.Exception       ( bracket )
@@ -87,9 +84,7 @@ import System.IO.Error
 import Foreign
 import Foreign.C
 
-#ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
-#endif
 
 #ifndef mingw32_TARGET_OS
 import System.Environment
@@ -619,124 +614,6 @@ setCurrentDirectory path = do
        throwErrnoIfMinus1Retry_ "setCurrentDirectory" (c_chdir s)
 	-- ToDo: add path to error
 
-{- | Returns the current user's home directory.
-
-The directory returned is expected to be writable by the current user,
-but note that it isn't generally considered good practice to store
-application-specific data here; use 'getAppUserDataDirectory'
-instead.
-
-On Unix, 'getHomeDirectory' returns the value of the @HOME@
-environment variable.  On Windows, the system is queried for a
-suitable path; a typical path might be 
-@C:/Documents And Settings/user@.
-
-The operation may fail with:
-
-* 'UnsupportedOperation'
-The operating system has no notion of home directory.
-
-* 'isDoesNotExistError'
-The home directory for the current user does not exist, or
-cannot be found.
--}
-getHomeDirectory :: IO FilePath
-getHomeDirectory =
-#ifdef mingw32_TARGET_OS
-  allocaBytes long_path_size $ \pPath -> do
-     r <- c_SHGetFolderPath nullPtr csidl_PROFILE nullPtr 0 pPath
-     if (r < 0)
-       then c_SHGetFolderPath nullPtr csidl_WINDOWS nullPtr 0 pPath
-       else return 0
-     peekCString pPath
-#else
-  getEnv "HOME"
-#endif
-
-{- | Returns the pathname of a directory in which application-specific
-data for the current user can be stored.  The result of
-'getAppUserDataDirectory' for a given application is specific to
-the current user.
-
-The argument should be the name of the application, which will be used
-to construct the pathname (so avoid using unusual characters that
-might result in an invalid pathname).
-
-Note: the directory may not actually exist, and may need to be created
-first.  It is expected that the parent directory exists and is
-writable.
-
-On Unix, this function returns @$HOME\/.appName@.  On Windows, a
-typical path might be 
-
-> C:/Documents And Settings/user/Application Data/appName
-
-The operation may fail with:
-
-* 'UnsupportedOperation'
-The operating system has no notion of application-specific data directory.
-
-* 'isDoesNotExistError'
-The home directory for the current user does not exist, or
-cannot be found.
--}
-getAppUserDataDirectory :: String -> IO FilePath
-getAppUserDataDirectory appName = do
-#ifdef mingw32_TARGET_OS
-  allocaBytes long_path_size $ \pPath -> do
-     r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
-     s <- peekCString pPath
-     return (s++'\\':appName)
-#else
-  path <- getEnv "HOME"
-  return (path++'/':'.':appName)
-#endif
-
-{- | Returns the current user's document directory.
-
-The directory returned is expected to be writable by the current user,
-but note that it isn't generally considered good practice to store
-application-specific data here; use 'getAppUserDataDirectory'
-instead.
-
-On Unix, 'getUserDocumentsDirectory' returns the value of the @HOME@
-environment variable.  On Windows, the system is queried for a
-suitable path; a typical path might be 
-@C:\/Documents and Settings\/user\/My Documents@.
-
-The operation may fail with:
-
-* 'UnsupportedOperation'
-The operating system has no notion of document directory.
-
-* 'isDoesNotExistError'
-The document directory for the current user does not exist, or
-cannot be found.
--}
-getUserDocumentsDirectory :: IO FilePath
-getUserDocumentsDirectory = do
-#ifdef mingw32_TARGET_OS
-  allocaBytes long_path_size $ \pPath -> do
-     r <- c_SHGetFolderPath nullPtr csidl_PERSONAL nullPtr 0 pPath
-     peekCString pPath
-#else
-  getEnv "HOME"
-#endif
-
-#ifdef mingw32_TARGET_OS
-foreign import stdcall unsafe "SHGetFolderPath" 
-            c_SHGetFolderPath :: Ptr () 
-                              -> CInt 
-                              -> Ptr () 
-                              -> CInt 
-                              -> CString 
-                              -> IO CInt
-foreign import ccall unsafe "__hscore_CSIDL_PROFILE"  csidl_PROFILE  :: CInt
-foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
-foreign import ccall unsafe "__hscore_CSIDL_WINDOWS"  csidl_WINDOWS  :: CInt
-foreign import ccall unsafe "__hscore_CSIDL_PERSONAL" csidl_PERSONAL :: CInt
-#endif
-
 {- |The operation 'doesDirectoryExist' returns 'True' if the argument file
 exists and is a directory, and 'False' otherwise.
 -}
@@ -822,4 +699,122 @@ foreign import ccall unsafe "__hscore_S_IRUSR" s_IRUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IWUSR" s_IWUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IXUSR" s_IXUSR :: CMode
 
+#endif /* __GLASGOW_HASKELL__ */
+
+{- | Returns the current user's home directory.
+
+The directory returned is expected to be writable by the current user,
+but note that it isn't generally considered good practice to store
+application-specific data here; use 'getAppUserDataDirectory'
+instead.
+
+On Unix, 'getHomeDirectory' returns the value of the @HOME@
+environment variable.  On Windows, the system is queried for a
+suitable path; a typical path might be 
+@C:/Documents And Settings/user@.
+
+The operation may fail with:
+
+* 'UnsupportedOperation'
+The operating system has no notion of home directory.
+
+* 'isDoesNotExistError'
+The home directory for the current user does not exist, or
+cannot be found.
+-}
+getHomeDirectory :: IO FilePath
+getHomeDirectory =
+#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+  allocaBytes long_path_size $ \pPath -> do
+     r <- c_SHGetFolderPath nullPtr csidl_PROFILE nullPtr 0 pPath
+     if (r < 0)
+       then c_SHGetFolderPath nullPtr csidl_WINDOWS nullPtr 0 pPath
+       else return 0
+     peekCString pPath
+#else
+  getEnv "HOME"
+#endif
+
+{- | Returns the pathname of a directory in which application-specific
+data for the current user can be stored.  The result of
+'getAppUserDataDirectory' for a given application is specific to
+the current user.
+
+The argument should be the name of the application, which will be used
+to construct the pathname (so avoid using unusual characters that
+might result in an invalid pathname).
+
+Note: the directory may not actually exist, and may need to be created
+first.  It is expected that the parent directory exists and is
+writable.
+
+On Unix, this function returns @$HOME\/.appName@.  On Windows, a
+typical path might be 
+
+> C:/Documents And Settings/user/Application Data/appName
+
+The operation may fail with:
+
+* 'UnsupportedOperation'
+The operating system has no notion of application-specific data directory.
+
+* 'isDoesNotExistError'
+The home directory for the current user does not exist, or
+cannot be found.
+-}
+getAppUserDataDirectory :: String -> IO FilePath
+getAppUserDataDirectory appName = do
+#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+  allocaBytes long_path_size $ \pPath -> do
+     r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
+     s <- peekCString pPath
+     return (s++'\\':appName)
+#else
+  path <- getEnv "HOME"
+  return (path++'/':'.':appName)
+#endif
+
+{- | Returns the current user's document directory.
+
+The directory returned is expected to be writable by the current user,
+but note that it isn't generally considered good practice to store
+application-specific data here; use 'getAppUserDataDirectory'
+instead.
+
+On Unix, 'getUserDocumentsDirectory' returns the value of the @HOME@
+environment variable.  On Windows, the system is queried for a
+suitable path; a typical path might be 
+@C:\/Documents and Settings\/user\/My Documents@.
+
+The operation may fail with:
+
+* 'UnsupportedOperation'
+The operating system has no notion of document directory.
+
+* 'isDoesNotExistError'
+The document directory for the current user does not exist, or
+cannot be found.
+-}
+getUserDocumentsDirectory :: IO FilePath
+getUserDocumentsDirectory = do
+#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+  allocaBytes long_path_size $ \pPath -> do
+     r <- c_SHGetFolderPath nullPtr csidl_PERSONAL nullPtr 0 pPath
+     peekCString pPath
+#else
+  getEnv "HOME"
+#endif
+
+#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+foreign import stdcall unsafe "SHGetFolderPath" 
+            c_SHGetFolderPath :: Ptr () 
+                              -> CInt 
+                              -> Ptr () 
+                              -> CInt 
+                              -> CString 
+                              -> IO CInt
+foreign import ccall unsafe "__hscore_CSIDL_PROFILE"  csidl_PROFILE  :: CInt
+foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
+foreign import ccall unsafe "__hscore_CSIDL_WINDOWS"  csidl_WINDOWS  :: CInt
+foreign import ccall unsafe "__hscore_CSIDL_PERSONAL" csidl_PERSONAL :: CInt
 #endif
