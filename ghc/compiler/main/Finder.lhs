@@ -102,16 +102,17 @@ findModule = cached findModule'
   
 findModule' :: DynFlags -> Module -> Bool -> IO FindResult
 findModule' dflags name explicit = do
-   j <- maybeHomeModule dflags name
-   case j of
-	NotFound home_files -> do
-	    r <- findPackageModule' dflags name explicit
-	    case r of
-		NotFound pkg_files 
-			-> return (NotFound (home_files ++ pkg_files))
+    r <- findPackageModule' dflags name explicit
+    case r of
+	NotFound pkg_files -> do
+	   j <- maybeHomeModule dflags name
+	   case j of
+		NotFound home_files -> 
+			return (NotFound (home_files ++ pkg_files))
 		other_result
 			-> return other_result
-	other_result -> return other_result
+	other_result
+		-> return other_result
 
 cached fn dflags name explicit = do
   m <- lookupFinderCache name
