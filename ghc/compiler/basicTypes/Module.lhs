@@ -307,7 +307,7 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
    isLibraryPath ('/' : _	      ) = True
    isLibraryPath (_   : ':' : '/'  : _) = True
    isLibraryPath (_   : ':' : '\\' : _) = True
-   isLibraryPaty other			= False
+   isLibraryPath other			= False
 
    xiffus	 = reverse dotted_suffix 
    dotted_suffix = case suffix of
