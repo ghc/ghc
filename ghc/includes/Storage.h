@@ -232,8 +232,6 @@ recordMutable(StgClosure *p)
    The CAF table - used to let us revert CAFs in GHCi
    -------------------------------------------------------------------------- */
 
-void revertCAFs( void );
-
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */
 extern rtsBool keepCAFs;
