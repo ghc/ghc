@@ -95,3 +95,5 @@ test "tcfail097" { vtcf("") }
 -- this is an expected failure.
 test "tcfail098" { $expect = "fail" 
                    vtcf("") }
+
+test "tcfail099" { vtcf("") }
