@@ -73,8 +73,11 @@ data ParseResult a = POk PState a
       pattern.  This and similar checks are performed by the routines from <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/parser/ParseUtil.lhs"><code>ParseUtil</code></a>. In
       some cases, these routines do, in addition to checking for
-      wellformedness, also transform the parse tree, such that it fits into the
-      syntactic context in which it has been parsed.
+      wellformedness, also transform the parse tree, such that it fits into
+      the syntactic context in which it has been parsed; in fact, this happens
+      for patterns, which are transformed from a representation of type
+      <code>RdrNameHsExpr</code> into a representation of type
+      <code>RdrNamePat</code>.
 
     <h2>The Haskell Interface Parser</h2>
     <p>
@@ -89,7 +92,7 @@ data ParseResult a = POk PState a
     
     <p><small>
 <!-- hhmts start -->
-Last modified: Wed Dec 12 17:45:36 EST 2001
+Last modified: Wed Jan 16 00:30:14 EST 2002
 <!-- hhmts end -->
     </small>
   </body>
