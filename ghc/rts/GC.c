@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.70 2000/01/14 13:17:15 hwloidl Exp $
+ * $Id: GC.c,v 1.71 2000/01/14 14:55:03 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -3337,19 +3337,19 @@ threadPaused(StgTSO *tso)
     threadLazyBlackHole(tso);
 }
 
+/* -----------------------------------------------------------------------------
+ * Debugging
+ * -------------------------------------------------------------------------- */
+
 #if DEBUG
 //@cindex printMutOnceList
 void
 printMutOnceList(generation *gen)
 {
-  StgMutClosure *p, *next, *new_list;
+  StgMutClosure *p, *next;
 
   p = gen->mut_once_list;
-  new_list = END_MUT_LIST;
   next = p->mut_link;
-
-  evac_gen = gen->no;
-  failed_to_evac = rtsFalse;
 
   fprintf(stderr, "@@ Mut once list %p: ", gen->mut_once_list);
   for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
@@ -3368,12 +3368,9 @@ printMutableList(generation *gen)
   p = gen->saved_mut_list;
   next = p->mut_link;
 
-  evac_gen = 0;
-  failed_to_evac = rtsFalse;
-
   fprintf(stderr, "@@ Mutable list %p: ", gen->saved_mut_list);
   for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
-    fprintf(stderr, "%p (%s), ", 
+    fprintf(stderr, "%p (%s), ",
 	    p, info_type((StgClosure *)p));
   }
   fputc('\n', stderr);
