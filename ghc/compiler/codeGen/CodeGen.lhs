@@ -266,8 +266,6 @@ cgTopRhs bndr (StgRhsCon cc con args) srt
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag args body) srt
   =     -- There should be no free variables
     ASSERT(null fvs)
-	-- If the closure is a thunk, then the binder must be recorded as such.
-    ASSERT2(not (isUpdatable upd_flag) || mayHaveCafRefs (idCafInfo bndr), ppr bndr)
 
     getSRTLabel `thenFC` \srt_label ->
     let lf_info = 

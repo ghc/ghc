@@ -788,7 +788,8 @@ type LneM a =  IdEnv HowBound
 	    -> a
 
 data HowBound
-  = ImportBound
+  = ImportBound		-- Used only as a response to lookupBinding; never
+			-- exists in the range of the (IdEnv HowBound)
   | CaseBound
   | LambdaBound
   | LetBound
@@ -873,12 +874,13 @@ extendVarEnvLne ids_w_howbound expr env lvs_cont
   = expr (extendVarEnvList env ids_w_howbound) lvs_cont
 
 lookupVarLne :: Id -> LneM HowBound
-lookupVarLne v env lvs_cont
-  = returnLne (
-      case (lookupVarEnv env v) of
-	Just xx -> xx
-	Nothing -> ImportBound
-    ) env lvs_cont
+lookupVarLne v env lvs_cont = returnLne (lookupBinding env v) env lvs_cont
+
+lookupBinding :: IdEnv HowBound -> Id -> HowBound
+lookupBinding env v = case lookupVarEnv env v of
+			Just xx -> xx
+			Nothing -> ASSERT( isGlobalId v ) ImportBound
+
 
 -- The result of lookupLiveVarsForSet, a set of live variables, is
 -- only ever tacked onto a decorated expression. It is never used as
@@ -889,29 +891,24 @@ freeVarsToLiveVars fvs env live_in_cont
   = returnLne (lvs, cafs) env live_in_cont
   where
     (lvs_cont, cafs_cont) = live_in_cont -- not a strict pattern match!
-    (local, global) = partition isLocalId (allFreeIds fvs)
 
-    (lvs_from_fvs, caf_extras) = unzip (map do_one local)
+    (lvs_from_fvs, caf_from_fvs) = unzip (map do_one (allFreeIds fvs))
 
-    lvs = unionVarSets lvs_from_fvs
-		`unionVarSet` lvs_cont
-
-    cafs = mkVarSet (filter is_caf_one global) 
-		`unionVarSet` (unionVarSets caf_extras)
-		`unionVarSet` cafs_cont
+    lvs  = unionVarSets lvs_from_fvs `unionVarSet` lvs_cont
+    cafs = unionVarSets caf_from_fvs `unionVarSet` cafs_cont
 
     do_one v
-      = case (lookupVarEnv env v) of
-	      Just (LetBound _ (lvs,cafs) _) -> (extendVarSet lvs v, cafs)
-	      Just _		             -> (unitVarSet v, emptyVarSet)
-	      Nothing -> pprPanic "lookupLiveVarsForSet/do_one:" (ppr v)
+      = case lookupBinding env v of
+	  LetBound caf_ness (lvs,cafs) _ ->
+	    case caf_ness of
+		TopLevelHasCafs  -> ASSERT( isEmptyVarSet lvs ) (emptyVarSet, unitVarSet v)
+		TopLevelNoCafs   -> ASSERT( isEmptyVarSet lvs ) (emptyVarSet, emptyVarSet)
+		NotTopLevelBound -> (extendVarSet lvs v, cafs)
 
-    is_caf_one v
-      = case lookupVarEnv env v of
-		Just (LetBound TopLevelHasCafs (lvs,_) _) ->
-		    ASSERT( isEmptyVarSet lvs ) True
-	        Just (LetBound _ _ _) -> False
-		_otherwise 	    -> mayHaveCafRefs (idCafInfo v)
+	  ImportBound | mayHaveCafRefs (idCafInfo v) -> (emptyVarSet, unitVarSet v)
+		      | otherwise		     -> (emptyVarSet, emptyVarSet)
+
+	  _nested_binding -> (unitVarSet v, emptyVarSet)	-- Bound by lambda or case
 \end{code}
 
 %************************************************************************
@@ -1080,12 +1077,10 @@ hasCafRefss p exprs
 -- cafRefs compiles to beautiful code :)
 
 cafRefs p (Var id)
-  | isLocalId id = fastBool False
-  | otherwise = 
-      case lookupVarEnv p id of
-	Just (LetBound TopLevelHasCafs _ _) -> fastBool True
-        Just (LetBound _ _ _) -> fastBool False
-	Nothing -> fastBool (cgMayHaveCafRefs (idCgInfo id)) --  imported Ids
+  = case lookupBinding p id of
+	ImportBound		     -> fastBool (mayHaveCafRefs (idCafInfo id))
+	LetBound TopLevelHasCafs _ _ -> fastBool True
+        other			     -> fastBool False
 
 cafRefs p (Lit l) 	     = fastBool False
 cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
