@@ -46,10 +46,7 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
 import Outputable
-#ifdef GHCI
-import StgInterp	( stgToInterpSyn, ItblEnv )
-import InterpSyn	( UnlinkedIBind )
-#endif
+import Interpreter
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),

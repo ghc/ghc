@@ -23,7 +23,7 @@ import CmLink 		( PersistentLinkerState, emptyPLS, Linkable(..),
 			  link, LinkResult(..), 
 			  filterModuleLinkables, modname_of_linkable,
 			  is_package_linkable )
-import InterpSyn	( HValue )
+import Interpreter	( HValue )
 import CmSummarise	( summarise, ModSummary(..), 
 			  name_of_summary, deps_of_summary,
 			  mimp_name, ms_get_imports )

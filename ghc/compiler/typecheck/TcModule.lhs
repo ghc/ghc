@@ -252,7 +252,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
 			  tc_insts   = map iDFunId local_inst_info,
 			  tc_fords   = foi_decls ++ foe_decls',
 			  tc_rules   = local_rules'
-                        })
+                        }
     )
 
 get_binds decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]

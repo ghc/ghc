@@ -12,8 +12,7 @@ module CmLink ( Linkable(..),  Unlinked(..),
                 PersistentLinkerState{-abstractly!-}, emptyPLS )
 where
 
-import StgInterp	( linkIModules, ClosureEnv, ItblEnv )
-import Linker		( loadObj, resolveObjs )
+import Interpreter
 import CmStaticInfo	( PackageConfigInfo )
 import Module		( ModuleName, PackageName )
 import InterpSyn	( UnlinkedIBind, HValue, binder )
