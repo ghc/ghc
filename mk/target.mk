@@ -337,7 +337,7 @@ endif
 #
 # Outputs:
 #   $(LIBRARY)		the name of the library.a
-#   $(GHIC_LIBRARY)	the name of the library.o (for GHCi0
+#   $(GHIC_LIBRARY)	the name of the library.o (for GHCi)
 #   $(LIBOBJS)		objects to put in library
 #   $(STUBOBJS)		more objects to put in library
 # 
@@ -349,6 +349,9 @@ ifneq "$(PACKAGE)" ""
 
 ifeq "$(IS_CBITS_LIB)" "YES"
 _cbits := _cbits
+STUBOBJS += $(HSC_C_OBJS)
+# Add _hsc.c files to the cbits library
+SRCS       += $(wildcard ../*_hsc.c)
 endif
 
 LIBRARY      = libHS$(PACKAGE)$(_cbits)$(_way).a
@@ -366,7 +369,6 @@ ifeq "$(LIBOBJS)" ""
   endif
 endif
 
-STUBOBJS += $(HSC_C_OBJS)
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR)
 
 ifeq "$(IS_CBITS_LIB)" "YES"

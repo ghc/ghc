@@ -119,7 +119,9 @@ DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 EXCLUDED_HSC_SRCS     = $(filter %.hsc, $(EXCLUDED_SRCS))
 EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.h, $(EXCLUDED_HSC_SRCS)) \
-			$(patsubst %.hsc, %_hsc.c, $(EXCLUDED_HSC_SRCS))
+			$(patsubst %.hsc, %_hsc.c, $(HSC_SRCS))
+# Exclude _hsc.c files; they get built as part of the cbits library,
+# not part of the main library
 
 CLOSED_EXCLUDED_SRCS  = $(sort $(EXCLUDED_SRCS) $(EXCLUDED_DERIVED_SRCS))
 
