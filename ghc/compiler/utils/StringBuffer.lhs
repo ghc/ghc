@@ -73,7 +73,11 @@ import IOBase		( IOError(..), IOErrorType(..) )
 import IOHandle		( readHandle, writeHandle, filePtr )
 import PackBase 	( unpackCStringBA )
 #else
-import PrelIOBase	( IOError(..), IOErrorType(..), haFO__ )
+import PrelIOBase	( IOError(..), IOErrorType(..)
+#if __GLASGOW_HASKELL__ <= 302
+			, haFO__
+#endif
+			)
 import PrelHandle	( readHandle, writeHandle )
 import PrelPack		( unpackCStringBA )
 #endif
