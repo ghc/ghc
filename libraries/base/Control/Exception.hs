@@ -477,7 +477,7 @@ With 'takeMVar' interruptible, however, we can be
 safe in the knowledge that the thread can receive exceptions right up
 until the point when the 'takeMVar' succeeds.
 Similar arguments apply for other interruptible operations like
-'IO.openFile'.
+'GHC.Handle.openFile'.
 -}
 
 -- -----------------------------------------------------------------------------
