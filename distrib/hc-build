@@ -9,6 +9,18 @@
 
 configopts="$*"
 
+# check for GNU make
+#
+MAKENAMES="gmake make no-make"
+for make in $MAKENAMES; do
+  MAKE=$make
+  $make --version 2>&1 | grep "GNU Make" >/dev/null && break
+done
+if [ $MAKE = no-make ]; then
+  echo "Fatal error: Cannot find the GNU make utility"
+  exit 1
+fi
+
 # build configuration
 #
 cat >mk/build.mk <<END
@@ -26,9 +38,9 @@ touch ghc/compiler/parser/Parser.hs
 
 echo "*** Building hsc..."
 ./configure --enable-hc-boot $configopts        || exit 1
-gmake boot all                                   || exit 1
+$MAKE boot all                                  || exit 1
 
 echo "*** Building library..."
 echo "GhcWithHscBuiltViaC=NO" >>mk/build.mk
-gmake -C ghc/lib clean boot all			|| exit 1
-gmake -C hslibs  clean boot all
+$MAKE -C ghc/lib clean boot all			|| exit 1
+$MAKE -C hslibs  clean boot all
