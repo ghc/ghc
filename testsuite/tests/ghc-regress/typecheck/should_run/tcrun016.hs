@@ -1,3 +1,5 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 -- !!! Functional dependencies
 -- This one made the 5.00.1 typechecker go into an infinite loop.
 -- The context simplifier keep thinking it was doing an 'improve'
@@ -39,7 +41,7 @@ instance (Eq l, Eq' l) => Environment (BinTreeEnv l t) l t where
 				     else Nothing
 	get (Union d d') l = error "!??"
 
-attribute l t = AttributeLeaf l t
+        attribute l t = AttributeLeaf l t
 
 type Env1 = BinTreeEnv MyLabel Integer
 
