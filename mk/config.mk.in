@@ -135,10 +135,18 @@ IncludeTestDirsInBuild=NO
 #
 # Name variables for ghc:
 # 
-GhcProjectName       =The Glorious Glasgow Haskell Compilation System
-GhcProjectNameShort  =ghc
-GhcProjectVersion    =2.08
-GhcProjectPatchLevel =0
+GhcProjectName         = The Glorious Glasgow Haskell Compilation System
+GhcProjectNameShort    = ghc
+GhcProjectVersion      = 2.08
+GhcProjectPatchLevel   = 0
+
+#
+# Name variables for happy:
+#
+HappyProjectName       = Happy
+HappyProjectNameShort  = happy
+HappyProjectVersion    = 1.4
+HappyProjectPatchLevel = 0
 
 #
 # Name variables for the fptools, for now equal to the above
