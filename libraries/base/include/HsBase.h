@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.21 2003/05/08 16:06:41 ross Exp $
+ * $Id: HsBase.h,v 1.22 2003/06/12 16:06:07 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -114,7 +114,11 @@ int *ghcErrno(void);
 HsInt systemCmd(HsAddr cmd);
 
 /* in rawSystem.c */
-HsInt rawSystemCmd(HsAddr cmd);
+#if defined(mingw32_TARGET_OS)
+HsInt rawSystem(HsAddr cmd);
+#else
+HsInt rawSystem(HsAddr cmd, HsAddr args);
+#endif
 
 /* in inputReady.c */
 int inputReady(int fd, int msecs, int isSock);

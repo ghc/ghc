@@ -22,8 +22,9 @@ module System.Cmd
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
-import System.Exit
+import Foreign
 import Foreign.C
+import System.Exit
 import GHC.IOBase
 #endif
 
@@ -76,15 +77,44 @@ Will behave more portably between systems,
 because there is no interpretation of shell metasyntax.
 -}
 
-rawSystem :: String -> IO ExitCode
-rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
-rawSystem cmd =
-  withCString cmd $ \s -> do
-    status <- throwErrnoIfMinus1 "rawSystem" (primRawSystem s)
-    case status of
-        0  -> return ExitSuccess
-        n  -> return (ExitFailure n)
+rawSystem :: FilePath -> [String] -> IO ExitCode
 
-foreign import ccall unsafe "rawSystemCmd" primRawSystem :: CString -> IO Int
+#ifndef mingw32_TARGET_OS
+
+rawSystem cmd args =
+  withCString cmd $ \pcmd ->
+    withMany withCString (cmd:args) $ \cstrs ->
+      withArray0 nullPtr cstrs $ \arr -> do
+	status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmd arr)
+        case status of
+            0  -> return ExitSuccess
+            n  -> return (ExitFailure n)
+
+foreign import ccall unsafe "rawSystem"
+  c_rawSystem :: CString -> Ptr CString -> IO Int
+
+#else
+
+-- On Windows, the command line is passed to the operating system as
+-- a single string.  Command-line parsing is done by the executable
+-- itself.
+rawSystem cmd args = do
+  let cmdline = translate cmd ++ concat (map ((' ':) . translate) args)
+  withCString cmdline $ \pcmdline -> do
+    status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
+    case status of
+       0  -> return ExitSuccess
+       n  -> return (ExitFailure n)
+
+translate :: String -> String
+translate str = '"' : foldr escape "\"" str
+  where escape '"'  str = '\\' : '"'  : str
+	escape '\\' str = '\\' : '\\' : str
+	escape c    str = c : str
+
+foreign import ccall unsafe "rawSystem"
+  c_rawSystem :: CString -> IO Int
+
+#endif
 
 #endif  /* __GLASGOW_HASKELL__ */

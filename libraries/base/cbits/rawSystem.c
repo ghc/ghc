@@ -1,9 +1,7 @@
 /* 
- * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ * (c) The University of Glasgow 1994-2003
  *
- * $Id: rawSystem.c,v 1.1 2002/08/28 13:59:19 simonmar Exp $
- *
- * shell-less system Runtime Support
+ * shell-less system Runtime Support (see System.Cmd.rawSystem).
  */
 
 /* The itimer stuff in this module is non-posix */
@@ -41,11 +39,20 @@
 #include <windows.h>
 #endif
 
-HsInt
-rawSystemCmd(HsAddr cmd)
-{
-  /* -------------------- WINDOWS VERSION --------------------- */
+#ifdef HAVE_VFORK_H
+#include <vfork.h>
+#endif
+
+#ifdef HAVE_VFORK
+#define fork vfork
+#endif
+
 #if defined(mingw32_TARGET_OS)
+/* -------------------- WINDOWS VERSION --------------------- */
+
+HsInt
+rawSystem(HsAddr cmd)
+{
   STARTUPINFO sInfo;
   PROCESS_INFORMATION pInfo;
   DWORD retCode;
@@ -71,9 +78,14 @@ rawSystemCmd(HsAddr cmd)
   CloseHandle(pInfo.hProcess);
   CloseHandle(pInfo.hThread);
   return retCode;
+}
 
 #else
-  /* -------------------- UNIX VERSION --------------------- */
+/* -------------------- UNIX VERSION --------------------- */
+
+HsInt
+rawSystem(HsAddr cmd, HsAddr args)
+{
     int pid;
     int wstat;
 
@@ -98,7 +110,7 @@ rawSystemCmd(HsAddr cmd)
 #endif
 
 	/* the child */
-	execl(cmd, NULL);
+	execvp(cmd, args);
 	_exit(127);
       }
     }
@@ -118,5 +130,5 @@ rawSystemCmd(HsAddr cmd)
 	/* This should never happen */
     }
     return -1;
-#endif
 }
+#endif
