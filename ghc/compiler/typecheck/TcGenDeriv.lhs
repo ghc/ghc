@@ -483,11 +483,16 @@ gen_Enum_binds tycon
 
     to_enum
       = mk_easy_FunMonoBind tycon_loc toEnum_RDR [a_Pat] [] $
-	HsIf (HsApp (HsApp (HsVar gt_RDR) 
-			   (HsVar a_RDR))
-			   (HsVar (maxtag_RDR tycon)))
-	     (illegal_toEnum_tag occ_nm (maxtag_RDR tycon))
+	HsIf (HsApp (HsApp 
+	            (HsVar and_RDR)
+		    (HsApp (HsApp (HsVar ge_RDR)
+				  (HsVar a_RDR))
+				  (HsLit (HsInt 0))))
+                    (HsApp (HsApp (HsVar le_RDR)
+				  (HsVar a_RDR))
+				  (HsVar (maxtag_RDR tycon))))
              (mk_easy_App (tag2con_RDR tycon) [a_RDR])
+	     (illegal_toEnum_tag occ_nm (maxtag_RDR tycon))
 	     tycon_loc
 
     enum_from
