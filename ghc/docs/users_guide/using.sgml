@@ -2994,21 +2994,16 @@ the default is 2.
 <Term><Option>-C[&lt;us&gt;]</Option>:</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>-C&lt;us&gt; RTS option</Primary></IndexTerm>
-Sets the context switch interval to <Literal>&lt;us&gt;</Literal> microseconds.  A context
-switch will occur at the next heap allocation after the timer expires.
-With <Option>-C0</Option> or <Option>-C</Option>, context switches will occur as often as
-possible (at every heap allocation).  By default, context switches
-occur every 10 milliseconds.  Note that many interval timers are only
-capable of 10 millisecond granularity, so the default setting may be
-the finest granularity possible, short of a context switch at every
-heap allocation.
-</Para>
-
-<Para>
-&lsqb;NOTE: this option currently has no effect (version 4.00).  Context
-switches happen when the current heap block is full, i.e. every 4k of
-allocation].
+<IndexTerm><Primary>-C&lt;us&gt; RTS option</Primary></IndexTerm> Sets
+the context switch interval to <Literal>&lt;s&gt;</Literal> seconds.
+A context switch will occur at the next heap block allocation after
+the timer expires (a heap block allocation occurs every 4k of
+allocation).  With <Option>-C0</Option> or <Option>-C</Option>,
+context switches will occur as often as possible (at every heap block
+allocation).  By default, context switches occur every 20ms
+milliseconds.  Note that GHC's internal timer ticks every 20ms, and
+the context switch timer is always a multiple of this timer, so 20ms
+is the maximum granularity available for timed context switches.
 </Para>
 </ListItem>
 </VarListEntry>
