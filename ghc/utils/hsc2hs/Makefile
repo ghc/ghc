@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 2001/01/12 20:17:35 qrczak Exp $
+# $Id: Makefile,v 1.6 2001/01/14 10:48:34 panne Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -56,5 +56,8 @@ ifeq "$(INSTALLING)" "1"
 all clean veryclean maintainer-clean ::
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
 endif
+
+# hsc2hs-inplace is needed to boot in ghc/lib/std...
+boot :: all
 
 include $(TOP)/mk/target.mk
