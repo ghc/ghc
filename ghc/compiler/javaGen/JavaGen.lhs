@@ -3,6 +3,40 @@
 %
 \section{Generate Java}
 
+Name mangling for Java.
+~~~~~~~~~~~~~~~~~~~~~~
+
+Haskell has a number of namespaces. The Java translator uses
+the standard Haskell mangles (see OccName.lhs), and some extra
+mangles.
+
+All names are hidden inside packages.
+
+module name:
+  - becomes a first level java package.
+  - can not clash with java, because haskell modules are upper case,
+     java default packages are lower case.
+
+function names: 
+  - these turn into classes
+  - java keywords (eg. private) have the suffix "zdk" ($k) added.
+
+data *types*
+  - These have a base class, so need to appear in the 
+    same name space as other object. for example data Foo = Foo
+  - We add a postfix to types: "zdt" ($t)
+  - Types are upper case, so never clash with keywords
+
+data constructors
+  - There are tWO classes for each Constructor
+   (1) - Class with the payload extends the relevent datatype baseclass.
+       - This class has the prefix zdw ($W)
+   (2) - Constructor *wrapper* just use their own name.
+    - Constructors are upper case, so never clash with keywords
+    - So Foo would become 2 classes.
+	* Foo		-- the constructor wrapper
+	* zdwFoo	-- the worker, with the payload
+
 \begin{code}
 module JavaGen( javaGen ) where
 
@@ -63,14 +97,12 @@ javaTyCon tycon
   = tycon_jclass : concat (map constr_class constrs)
   where
     constrs = tyConDataCons tycon
-	-- We add a postfix to types ("$c"), because constructors
-	-- and datastructure types are in the same namespace in Java.
-    tycon_jclass_jname = javaName tycon ++ "zdc"
+    tycon_jclass_jname =  addCons (javaName tycon)
     tycon_jclass = Class [Public] (shortName tycon_jclass_jname) [] [] []
 
     constr_class data_con
-	= [ Class [Public] (shortName constr_jname) [tycon_jclass_jname] [] field_decls
-	  , Class [Public] (shortName constr_jname) [] [codeName] [enter_meth]
+	= [ Class [Public] (shortName constr_jname) [tycon_jclass_jname] []
+				(field_decls ++ [cons_meth,debug_meth])
 	  ]
 	where
 	  constr_jname = javaConstrWkrName data_con
@@ -81,13 +113,42 @@ javaTyCon tycon
 			 | (f,t) <- field_names
 			 ]
 
-	  n_val_args   = length field_names
-	  enter_meth   = Method [Public] objectType enterName [] [excName] stmts
-	  stmts	       = vmCOLLECT n_val_args this ++
-		     	 [var [Final] objectType f (vmPOP t) | (f,t) <- field_names] ++
-		     	 [Return (mkNew constr_jtype (map mkVar field_names))]
+	  cons_meth    = mkCons (shortName constr_jname) field_names
 
-	  mkVar (f,t) = Var f t
+	  debug_meth   = Method [Public] stringT
+					 "toString"
+					 []
+					 []
+		       (  [ Declaration (Field [] stringT "__txt" Nothing) ]
+		       ++ [ ExprStatement
+				(Assign txt (Literal 
+					    (StringLit 
+						("( " ++ 
+						  getOccString data_con ++ 
+						  " ")
+					    )
+					    stringT
+				       )
+				)
+			  ]
+		       ++ [ ExprStatement
+				(Assign txt 
+				   (Op txt "+" 
+				     (Op (Var f t) "+" litSp)
+				   )
+				)
+			  | (f,t) <- field_names
+			  ]
+		       ++ [ Return (Op txt "+" 
+				      (Literal (StringLit ")") stringT)
+				   )
+			  ]
+		       )
+
+	  stringT  = Type "java.lang.String"
+	  litSp    = Literal (StringLit " ") stringT
+	  txt      = Var "__txt" stringT
+	 
 
 mkNew :: Type -> [Expr] -> Expr
 mkNew t@(PrimType primType) [] = error "new primitive???"
@@ -95,9 +156,21 @@ mkNew t@(Type _)            es = New t es Nothing
 mkNew _                     _  = error "new with strange arguments"
 
 
+addCons :: Name -> Name
+addCons name = name ++ "zdc"
+
 constrToFields :: DataCon -> [(Name,Type)]
 constrToFields cons = zip (map fieldName [1..])
 			  (map javaTauType (dataConRepArgTys cons))
+
+mkCons :: Name -> [(Name,Type)] -> Decl
+mkCons name args = Constructor [Public] name
+	[ Parameter [] t n | (n,t) <- args ]
+	[ ExprStatement (Assign 
+			   (Access this n)
+			   (Var n t)
+			 )
+		    | (n,t) <- args ]
 \end{code}
 
 %************************************************************************
@@ -135,8 +208,8 @@ javaVar v | isGlobalName (idName v) = mkNew (javaGlobType v) []
 	  | otherwise	  	    = Var (javaName v) (javaType v)
 
 javaLit :: Literal.Literal -> Expr
-javaLit (MachInt i)  = Literal (UIntLit (fromInteger i)) (PrimType PrimInt)
-javaLit (MachChar c) = Literal (UCharLit c)              (PrimType PrimChar)
+javaLit (MachInt i)  = Literal (IntLit (fromInteger i)) (PrimType PrimInt)
+javaLit (MachChar c) = Literal (CharLit c)              (PrimType PrimChar)
 javaLit other	     = pprPanic "javaLit" (ppr other)
 
 javaExpr :: (Expr -> Expr) -> CoreExpr -> [Statement]
@@ -169,7 +242,15 @@ javaCase r e x alts
   where
      mk_alt (DEFAULT, [], rhs)   = (true, 	    Block (javaExpr r rhs))
      mk_alt (DataAlt d, bs, rhs) = (instanceOf x d, Block (bind_args d bs ++ javaExpr r rhs))
+     mk_alt alt@(LitAlt lit, [], rhs) 
+				 = (eqLit lit     , Block (javaExpr r rhs))
      mk_alt alt@(LitAlt _, _, _) = pprPanic "mk_alt" (ppr alt)
+
+
+     eqLit (MachInt n) = Op (Literal (IntLit n) (PrimType PrimInt))
+			    "=="
+			    (Var (javaName x) (PrimType PrimInt))
+     eqLit other       = pprPanic "eqLit" (ppr other)
 
      bind_args d bs = [var [Final] t (javaName b) 
 			   (Access (Cast (javaConstrWkrType d) (javaVar x)) f)
@@ -239,12 +320,10 @@ javaApp :: (Expr -> Expr) -> CoreExpr -> [CoreExpr] -> [Statement]
 javaApp r (CoreSyn.App f a) as = javaApp r f (a:as)
 javaApp r (CoreSyn.Var f) as
   = case isDataConId_maybe f of {
-{- For now, we are turning off all optimizations.
 	Just dc | length as == dataConRepArity dc
 		-> 	-- Saturated constructors
 		   [Return (New (javaGlobType f) (javaArgs as) Nothing)]
 
--}
     ; other ->   -- Not a saturated constructor
 	java_apply r (CoreSyn.Var f) as
     }
@@ -277,7 +356,7 @@ true = Var "true" (PrimType PrimBoolean)
 vmCOLLECT :: Int -> Expr -> [Statement]
 vmCOLLECT 0 e = []
 vmCOLLECT n e = [ExprStatement (Call varVM "COLLECT" 
-				     [Literal (IntLit n) (PrimType PrimInt), e])]
+				     [Literal (IntLit (toInteger n)) (PrimType PrimInt), e])]
 
 vmPOP :: Type -> Expr 
 vmPOP ty = Call varVM ("POP" ++ suffix ty) []
@@ -348,8 +427,8 @@ exprType _             = error "can't figure out an expression type"
 
 \begin{code}
 codeName, thunkName, enterName, vmName,excName :: Name
-codeName  = "Code"
-thunkName = "Thunk"
+codeName  = "haskell.runtime.Code"
+thunkName = "haskell.runtime.Thunk"
 enterName = "ENTER"
 vmName    = "VM"
 thisName  = "this"
@@ -468,6 +547,8 @@ addTypeMapping :: Name -> Name -> [Name] -> Env -> Env
 addTypeMapping origName newName frees (Env bound env) 
 	= Env bound ((origName,(newName,frees)) : env)
 
+-- This a list of bound vars (with types)
+-- and a mapping from types (?) to (result * [arg]) pairs
 data Env = Env Bound [(Name,(Name,[Name]))]
 
 newtype LifterM a = 
@@ -675,7 +756,7 @@ liftExpr = \ env expr ->
 		       ; return (Call e n es) 
 		       }
    ; Op e1 o e2 -> do { e1 <- liftExpr env e1
-		      ;	e2 <- liftExpr env e1
+		      ;	e2 <- liftExpr env e2
 		      ; return (Op e1 o e2)
 		      }
    ; New n es ds -> new env n es ds
@@ -717,14 +798,8 @@ liftClass env@(Env bound _) innerName inner xs is =
      ; (inner,frees) <- 
 	   getFrees (liftDecls False (env `combineEnv` newBound) inner)
      ; let trueFrees = filter (\ xs -> xs /= "VM") (both frees bound)
-     ; let mirrorFrees = [ "_" ++ name ++ "_" | name <- trueFrees ]
      ; let freeDefs = [ Field [Final] objectType n Nothing | n <- trueFrees ]
-     ; let cons = Constructor [Public] innerName 
-		    [ Parameter [] objectType name | name <- mirrorFrees ]
-		    [ ExprStatement (Assign (Var true (Type "<frees>")) 
-				            (Var mirror (Type "<frees>")))
-		    | (true,mirror) <- zip trueFrees mirrorFrees
-		    ]
+     ; let cons = mkCons innerName [(name,objectType) | name <- trueFrees ]
      ; let innerClass = Class [] innerName xs is (freeDefs ++ [cons] ++ inner)
      ; rememberClass innerClass
      ; return trueFrees
@@ -742,7 +817,7 @@ liftNew (Env _ env) typ@(Type name) exprs
    = case lookup name env of
 	Nothing                     -> New typ exprs Nothing
 	Just (nm,args) | null exprs 
-		-> New (Type nm) (map (\ v -> Var v (Type "<v-varg")) args) Nothing
+		-> New (Type nm) (map (\ v -> Var v (Type "<arg>")) args) Nothing
 	_ -> error "pre-lifted constructor with arguments"
 listNew _           typ exprs = New typ exprs Nothing
 \end{code}

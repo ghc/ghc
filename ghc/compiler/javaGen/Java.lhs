@@ -58,7 +58,7 @@ data Expr
   = Var Name Type
   | Literal Lit Type
   | Cast Type Expr
-  | Access Expr Name
+  | Access Expr Name		-- perhaps: Access Expr Var?
   | Assign Expr Expr
   | InstanceOf Expr Type
   | Call Expr Name [Expr]
@@ -99,17 +99,17 @@ type Exception   = TypeName	-- A class name that must be an exception.
 
 type TypeName    = String	-- a fully qualified type name
 				-- like "java.lang.Object".
+				-- has type "Type <the name>"
 
 type Name        = String	-- A class name or method etc, 
 				-- at defintion time,
 				-- this generally not a qualified name.
 
+
 data Lit
-  = IntLit Int		-- Boxed
-  | UIntLit Int		-- Unboxed
-  | CharLit Char	-- Boxed
-  | UCharLit Char	-- Unboxed
-  | StringLit String
+  = IntLit Integer	-- unboxed
+  | CharLit Char	-- unboxed
+  | StringLit String	-- java string
   deriving Show
 
 addModifier :: Modifier -> Decl -> Decl

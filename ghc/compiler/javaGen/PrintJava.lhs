@@ -214,9 +214,7 @@ call e n es = e <> dot <> n <> parens (hsep (punctuate comma (map expr es)))
 literal = \l ->
   case l of
     { IntLit i    -> text (show i)
-    ; UIntLit i	  -> text (show i)
     ; CharLit c   -> text (show c)
-    ; UCharLit c  -> text (show c)
     ; StringLit s -> text (show s)
     }
 
