@@ -8,8 +8,10 @@
 #define IF_NOT_GHC(a)
 
 module Util (
+#if NOT_USED
 	-- The Eager monad
 	Eager, thenEager, returnEager, mapEager, appEager, runEager,
+#endif
 
 	-- general list processing
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -76,6 +78,8 @@ used to allow you to express "do this and then that", mainly to avoid
 space leaks. It's done with a type synonym to save bureaucracy.
 
 \begin{code}
+#if NOT_USED
+
 type Eager ans a = (a -> ans) -> ans
 
 runEager :: Eager a a -> a
@@ -95,6 +99,7 @@ mapEager f [] = returnEager []
 mapEager f (x:xs) = f x			`thenEager` \ y ->
 		    mapEager f xs	`thenEager` \ ys ->
 		    returnEager (y:ys)
+#endif
 \end{code}
 
 %************************************************************************
@@ -369,6 +374,8 @@ equivClassesByUniq get_uniq xs
 %************************************************************************
 
 \begin{code}
+#if NOT_USED
+
 -- tail-recursive, etc., "quicker sort" [as per Meira thesis]
 quicksort :: (a -> a -> Bool)		-- Less-than predicate
 	  -> [a]			-- Input list
@@ -381,6 +388,7 @@ quicksort lt (x:xs)  = split x [] [] xs
     split x lo hi []		     = quicksort lt lo ++ (x : quicksort lt hi)
     split x lo hi (y:ys) | y `lt` x  = split x (y:lo) hi ys
 			 | True      = split x lo (y:hi) ys
+#endif
 \end{code}
 
 Quicksort variant from Lennart's Haskell-library contribution.  This
@@ -447,6 +455,7 @@ rqpart lt x (y:ys) rle rgt r =
 %************************************************************************
 
 \begin{code}
+#if NOT_USED
 mergesort :: (a -> a -> Ordering) -> [a] -> [a]
 
 mergesort cmp xs = merge_lists (split_into_runs [] xs)
@@ -471,6 +480,7 @@ mergesort cmp xs = merge_lists (split_into_runs [] xs)
 	  EQ  -> x : y : (merge xs ys)
 	  LT  -> x : (merge xs yl)
 	  GT -> y : (merge xl ys)
+#endif
 \end{code}
 
 %************************************************************************
