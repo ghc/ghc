@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.1 2001/01/11 17:25:58 simonmar Exp $
+ * $Id: CTypes.h,v 1.2 2001/02/05 11:49:20 chak Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -61,13 +61,6 @@ C :: TyCon ; \
 C = mkTyCon S ; \
 instance Typeable T where { \
   typeOf _ = mkAppTy C [] }
-
-#define INSTANCE_STORABLE(T) \
-instance Storable T where { \
-   sizeOf    (T x)       = sizeOf x ; \
-   alignment (T x)       = alignment x ; \
-   peekElemOff a i       = liftM T (peekElemOff a i) ; \
-   pokeElemOff a i (T x) = pokeElemOff a i x }
 
 #define INSTANCE_BOUNDED(T) \
 instance Bounded T where { \
@@ -239,13 +232,6 @@ instance Num T where { \
    signum		= unsafeCoerce# (signum :: B -> B); \
    fromInteger		= unsafeCoerce# (fromInteger :: Integer -> B); \
    fromInt		= unsafeCoerce# (fromInt :: Int -> B) }
-
-#define INSTANCE_STORABLE(T,B) \
-instance Storable T where { \
-   sizeOf  = unsafeCoerce# (sizeOf :: B -> Int); \
-   alignment = unsafeCoerce# (alignment :: B -> Int); \
-   peekElemOff = unsafeCoerce# (peekElemOff :: Ptr B -> Int -> IO B); \
-   pokeElemOff = unsafeCoerce# (pokeElemOff :: Ptr B -> Int -> B -> IO B); }
 
 #define INSTANCE_BOUNDED(T,B) \
 instance Bounded T where { \

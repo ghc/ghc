@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelStorable.lhs,v 1.2 2001/02/05 11:49:20 chak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -162,6 +162,9 @@ NSTORABLE(CLong)
 NSTORABLE(CULong)
 NSTORABLE(CLLong)
 NSTORABLE(CULLong)
+NSTORABLE(CFloat)
+NSTORABLE(CDouble)
+NSTORABLE(CLDouble)
 NSTORABLE(CPtrdiff)
 NSTORABLE(CSize)
 NSTORABLE(CWchar)
