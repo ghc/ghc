@@ -17,7 +17,7 @@ import DsHsSyn		( outPatType )
 import DsMonad
 import DsUtils
 
-import Id		( isDataCon, GenId{-instances-}, SYN_IE(Id) )
+import Id		( GenId{-instances-}, SYN_IE(Id) )
 import Util		( panic, assertPanic )
 \end{code}
 
@@ -89,8 +89,7 @@ Wadler's chapter in SLPJ.
 match_cons_used _ [{- no more eqns -}] _ = returnDs []
 
 match_cons_used vars eqns_info@(EqnInfo (ConPat data_con _ arg_pats : ps1) _ : eqns) shadows
-  = ASSERT(isDataCon data_con)
-    let
+  = let
 	(eqns_for_this_con, eqns_not_for_this_con)       = splitByCon eqns_info
 	(shadows_for_this_con, shadows_not_for_this_con) = splitByCon shadows
     in

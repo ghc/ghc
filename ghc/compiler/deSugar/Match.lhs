@@ -32,7 +32,7 @@ import Id		( idType, dataConFieldLabels,
 			  GenId{-instance-}, SYN_IE(Id)
 			)
 import Name		( Name {--O only-} )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )        
 import Pretty		( Doc )
 import PrelVals		( pAT_ERROR_ID )
@@ -51,10 +51,6 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			)
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic, pprPanic, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
-
 \end{code}
 
 The function @match@ is basically the same as in the Wadler chapter,
@@ -337,7 +333,7 @@ tidy1 v (RecPat con_id pat_ty rpats) match_result
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
-    (_, inst_tys, _) = {-trace "Match.getAppDataTyConExpandingDicts" $-} getAppDataTyConExpandingDicts pat_ty
+    (_, inst_tys, _) = getAppDataTyConExpandingDicts pat_ty
     con_arg_tys'     = dataConArgTys con_id inst_tys 
     tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels con_id)
 
