@@ -173,6 +173,10 @@ data PrimOp
     | MkWeakOp
     | DeRefWeakOp
 
+    | MakeStableNameOp
+    | EqStableNameOp
+    | StableNameToIntOp
+
     | MakeStablePtrOp
     | DeRefStablePtrOp
     | EqStablePtrOp
@@ -496,32 +500,35 @@ tagOf_PrimOp MakeForeignObjOp		      = ILIT(201)
 tagOf_PrimOp WriteForeignObjOp		      = ILIT(202)
 tagOf_PrimOp MkWeakOp			      = ILIT(203)
 tagOf_PrimOp DeRefWeakOp		      = ILIT(204)
-tagOf_PrimOp MakeStablePtrOp		      = ILIT(205)
-tagOf_PrimOp DeRefStablePtrOp		      = ILIT(206)
-tagOf_PrimOp EqStablePtrOp		      = ILIT(207)
-tagOf_PrimOp (CCallOp _ _ _ _)		      = ILIT(208)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(209)
-tagOf_PrimOp SeqOp			      = ILIT(210)
-tagOf_PrimOp ParOp			      = ILIT(211)
-tagOf_PrimOp ForkOp			      = ILIT(212)
-tagOf_PrimOp KillThreadOp		      = ILIT(213)
-tagOf_PrimOp DelayOp			      = ILIT(214)
-tagOf_PrimOp WaitReadOp			      = ILIT(215)
-tagOf_PrimOp WaitWriteOp		      = ILIT(216)
-tagOf_PrimOp ParGlobalOp		      = ILIT(217)
-tagOf_PrimOp ParLocalOp			      = ILIT(218)
-tagOf_PrimOp ParAtOp			      = ILIT(219)
-tagOf_PrimOp ParAtAbsOp			      = ILIT(220)
-tagOf_PrimOp ParAtRelOp			      = ILIT(221)
-tagOf_PrimOp ParAtForNowOp		      = ILIT(222)
-tagOf_PrimOp CopyableOp			      = ILIT(223)
-tagOf_PrimOp NoFollowOp			      = ILIT(224)
-tagOf_PrimOp NewMutVarOp		      = ILIT(225)
-tagOf_PrimOp ReadMutVarOp		      = ILIT(226)
-tagOf_PrimOp WriteMutVarOp		      = ILIT(227)
-tagOf_PrimOp SameMutVarOp		      = ILIT(228)
-tagOf_PrimOp CatchOp			      = ILIT(229)
-tagOf_PrimOp RaiseOp			      = ILIT(230)
+tagOf_PrimOp MakeStableNameOp		      = ILIT(205)
+tagOf_PrimOp EqStableNameOp		      = ILIT(206)
+tagOf_PrimOp StableNameToIntOp		      = ILIT(207)
+tagOf_PrimOp MakeStablePtrOp		      = ILIT(208)
+tagOf_PrimOp DeRefStablePtrOp		      = ILIT(209)
+tagOf_PrimOp EqStablePtrOp		      = ILIT(210)
+tagOf_PrimOp (CCallOp _ _ _ _)		      = ILIT(211)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(212)
+tagOf_PrimOp SeqOp			      = ILIT(213)
+tagOf_PrimOp ParOp			      = ILIT(214)
+tagOf_PrimOp ForkOp			      = ILIT(215)
+tagOf_PrimOp KillThreadOp		      = ILIT(216)
+tagOf_PrimOp DelayOp			      = ILIT(217)
+tagOf_PrimOp WaitReadOp			      = ILIT(218)
+tagOf_PrimOp WaitWriteOp		      = ILIT(219)
+tagOf_PrimOp ParGlobalOp		      = ILIT(220)
+tagOf_PrimOp ParLocalOp			      = ILIT(221)
+tagOf_PrimOp ParAtOp			      = ILIT(222)
+tagOf_PrimOp ParAtAbsOp			      = ILIT(223)
+tagOf_PrimOp ParAtRelOp			      = ILIT(224)
+tagOf_PrimOp ParAtForNowOp		      = ILIT(225)
+tagOf_PrimOp CopyableOp			      = ILIT(226)
+tagOf_PrimOp NoFollowOp			      = ILIT(227)
+tagOf_PrimOp NewMutVarOp		      = ILIT(228)
+tagOf_PrimOp ReadMutVarOp		      = ILIT(229)
+tagOf_PrimOp WriteMutVarOp		      = ILIT(230)
+tagOf_PrimOp SameMutVarOp		      = ILIT(231)
+tagOf_PrimOp CatchOp			      = ILIT(232)
+tagOf_PrimOp RaiseOp			      = ILIT(233)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 --panic# "tagOf_PrimOp: pattern-match"
@@ -758,6 +765,9 @@ allThePrimOps
 	WriteForeignObjOp,
 	MkWeakOp,
 	DeRefWeakOp,
+	MakeStableNameOp,
+	EqStableNameOp,
+	StableNameToIntOp,
 	MakeStablePtrOp,
 	DeRefStablePtrOp,
 	EqStablePtrOp,
@@ -874,6 +884,7 @@ primOpStrictness CatchOp	  = ([wwLazy, wwLazy], False)
 primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
 
 primOpStrictness MkWeakOp	  = ([wwLazy, wwLazy, wwLazy, wwPrim], False)
+primOpStrictness MakeStableNameOp = ([wwLazy, wwPrim], False)
 primOpStrictness MakeStablePtrOp  = ([wwLazy, wwPrim], False)
 
 	-- The rest all have primitive-typed arguments
@@ -1580,39 +1591,63 @@ primOpInfo DeRefWeakOp
 
 %************************************************************************
 %*									*
-\subsubsection[PrimOp-stable-pointers]{PrimOpInfo for ``stable pointers''}
+\subsubsection[PrimOp-stable-pointers]{PrimOpInfo for stable pointers and stable names}
 %*									*
 %************************************************************************
 
-A {\em stable pointer} is an index into a table of pointers into the
-heap.  Since the garbage collector is told about stable pointers, it
-is safe to pass a stable pointer to external systems such as C
+A {\em stable name/pointer} is an index into a table of stable name
+entries.  Since the garbage collector is told about stable pointers,
+it is safe to pass a stable pointer to external systems such as C
 routines.
 
-Here's what the operations and types are supposed to be (from
-state-interface document).
-
 \begin{verbatim}
-makeStablePtr#  :: a -> State# _RealWorld -> (# State# _RealWorld, a #)
-freeStablePtr#  :: StablePtr# a -> State# _RealWorld -> State# _RealWorld
-deRefStablePtr# :: StablePtr# a -> State# _RealWorld -> (# State# _RealWorld, a #)
+makeStablePtr#  :: a -> State# RealWorld -> (# State# RealWorld, a #)
+freeStablePtr   :: StablePtr# a -> State# RealWorld -> State# RealWorld
+deRefStablePtr# :: StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
 eqStablePtr#    :: StablePtr# a -> StablePtr# a -> Int#
 \end{verbatim}
 
-It may seem a bit surprising that @makeStablePtr#@ is a @PrimIO@
+It may seem a bit surprising that @makeStablePtr#@ is a @IO@
 operation since it doesn't (directly) involve IO operations.  The
 reason is that if some optimisation pass decided to duplicate calls to
 @makeStablePtr#@ and we only pass one of the stable pointers over, a
-massive space leak can result.  Putting it into the PrimIO monad
+massive space leak can result.  Putting it into the IO monad
 prevents this.  (Another reason for putting them in a monad is to
-ensure correct sequencing wrt the side-effecting @freeStablePtr#@
+ensure correct sequencing wrt the side-effecting @freeStablePtr@
 operation.)
+
+An important property of stable pointers is that if you call
+makeStablePtr# twice on the same object you get the same stable
+pointer back.
 
 Note that we can implement @freeStablePtr#@ using @_ccall_@ (and,
 besides, it's not likely to be used from Haskell) so it's not a
 primop.
 
-Question: Why @_RealWorld@ - won't any instance of @_ST@ do the job? [ADR]
+Question: Why @RealWorld@ - won't any instance of @_ST@ do the job? [ADR]
+
+Stable Names
+~~~~~~~~~~~~
+
+A stable name is like a stable pointer, but with three important differences:
+
+	(a) You can't deRef one to get back to the original object.
+	(b) You can convert one to an Int.
+	(c) You don't need to 'freeStableName'
+
+The existence of a stable name doesn't guarantee to keep the object it
+points to alive (unlike a stable pointer), hence (a).
+
+Invariants:
+	
+	(a) makeStableName always returns the same value for a given
+	    object (same as stable pointers).
+
+	(b) if two stable names are equal, it implies that the objects
+	    from which they were created were the same.
+
+	(c) stableNameToInt always returns the same Int for a given
+	    stable name.
 
 \begin{code}
 primOpInfo MakeStablePtrOp
@@ -1629,6 +1664,22 @@ primOpInfo DeRefStablePtrOp
 primOpInfo EqStablePtrOp
   = mkGenPrimOp SLIT("eqStablePtr#") [alphaTyVar, betaTyVar]
 	[mkStablePtrPrimTy alphaTy, mkStablePtrPrimTy betaTy]
+	intPrimTy
+
+primOpInfo MakeStableNameOp
+  = mkGenPrimOp SLIT("makeStableName#") [alphaTyVar]
+	[alphaTy, realWorldStatePrimTy]
+	(unboxedPair [realWorldStatePrimTy, 
+			mkTyConApp stableNamePrimTyCon [alphaTy]])
+
+primOpInfo EqStableNameOp
+  = mkGenPrimOp SLIT("eqStableName#") [alphaTyVar, betaTyVar]
+	[mkStableNamePrimTy alphaTy, mkStableNamePrimTy betaTy]
+	intPrimTy
+
+primOpInfo StableNameToIntOp
+  = mkGenPrimOp SLIT("stableNameToInt#") [alphaTyVar]
+	[mkStableNamePrimTy alphaTy]
 	intPrimTy
 \end{code}
 
@@ -1772,8 +1823,8 @@ primOpOutOfLine op
 	DoubleDecodeOp		-> True
 	MkWeakOp		-> True
 	DeRefWeakOp		-> True
+	MakeStableNameOp	-> True
 	MakeForeignObjOp	-> True
-	MakeStablePtrOp		-> True
 	NewMutVarOp		-> True
 	NewMVarOp		-> True
 	ForkOp			-> True
@@ -1854,6 +1905,7 @@ primOpHasSideEffects WriteForeignObjOp = True
 primOpHasSideEffects MkWeakOp  	       = True
 primOpHasSideEffects DeRefWeakOp       = True
 primOpHasSideEffects MakeStablePtrOp   = True
+primOpHasSideEffects MakeStableNameOp  = True
 primOpHasSideEffects EqStablePtrOp     = True  -- SOF
 primOpHasSideEffects DeRefStablePtrOp  = True  -- ??? JSM & ADR
 
@@ -1914,7 +1966,7 @@ primOpNeedsWrapper DoubleTanhOp	    	= True
 primOpNeedsWrapper DoublePowerOp    	= True
 primOpNeedsWrapper DoubleEncodeOp    	= True
 
-primOpNeedsWrapper MakeStablePtrOp	= True
+primOpNeedsWrapper MakeStableNameOp	= True
 primOpNeedsWrapper DeRefStablePtrOp	= True
 
 primOpNeedsWrapper DelayOp	    	= True

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.5 1999/01/21 10:31:50 simonm Exp $
+ * $Id: Schedule.c,v 1.6 1999/01/26 11:12:48 simonm Exp $
  *
  * Scheduler
  *
@@ -21,7 +21,6 @@
 #include "Printer.h"
 #include "Main.h"
 #include "Signals.h"
-#include "StablePtr.h"
 #include "Profiling.h"
 #include "Sanity.h"
 
@@ -607,8 +606,6 @@ static void GetRoots(void)
   for (i = 0; i < next_main_thread; i++) {
     main_threads[i] = (StgTSO *)MarkRoot((StgClosure *)main_threads[i]);
   }
-
-  markStablePtrTable();
 }
 
 /* -----------------------------------------------------------------------------

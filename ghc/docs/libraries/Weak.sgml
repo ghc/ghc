@@ -230,6 +230,7 @@ keys they refer to directly or indirectly.
 
 
 <sect1>Finalisation for foreign objects
+<label id="foreign-finalisers">
 <p>
 
 A foreign object is some data that lives outside the Haskell heap, for
@@ -250,15 +251,14 @@ references to its key and trigger the finaliser despite the fact that
 the program still holds the <tt/Addr#/ and intends to use it.
 
 To avoid this somewhat subtle race condition, we use another type of
-foreign address, called <tt/ForeignObj/.  Historical note:
-<tt/ForeignObj/ is identical to the old <tt/ForeignObj/ except that it
-no longer supports finalisation - that's provided by the weak
+foreign address, called <tt/ForeignObj/ (see Section <ref
+id="sec:Foreign" name="Foreign">).  Historical note: <tt/ForeignObj/
+is identical to the old <tt/ForeignObj/ except that it no longer
+supports finalisation - that's provided by the weak
 pointer/finalisation mechanism above.
 
 A <tt/ForeignObj/ is basically an address, but the <tt/ForeignObj/
 itself is a heap-resident object and can therefore be watched by weak
 pointers.  A <tt/ForeignObj/ can be passed to C functions (in which
 case the C function gets a straightforward pointer), but it cannot be
-decomposed into an <tt/Addr#/.  Operations on <tt/ForeignObj/ are
-provided by the <tt/Foreign/ module (see Section <ref name="Foreign"
-id="sec:Foreign">).
+decomposed into an <tt/Addr#/.

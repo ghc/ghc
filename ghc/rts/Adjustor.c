@@ -147,9 +147,9 @@ freeHaskellFunctionPtr(void* ptr)
 
  /* Free the stable pointer first..*/
  if (*(unsigned char*)ptr == 0x68) { /* Aha, a ccall adjustor! */
-    freeStablePointer(*((StgStablePtr*)((unsigned char*)ptr + 0x01)));
+    freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x01)));
  } else {
-    freeStablePointer(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
+    freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }    
  *((unsigned char*)ptr) = '\0';
 

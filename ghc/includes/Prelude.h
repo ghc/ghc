@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.2 1998/12/02 13:21:18 simonm Exp $
+ * $Id: Prelude.h,v 1.3 1999/01/26 11:12:56 simonm Exp $
  *
  * Prelude identifiers that we sometimes need to refer to in the RTS.
  *
@@ -30,8 +30,8 @@ extern const StgInfoTable PrelAddr_AZh_con_info;
 extern const StgInfoTable PrelAddr_WZh_con_info;
 extern const StgInfoTable PrelAddr_I64Zh_con_info;
 extern const StgInfoTable PrelAddr_W64Zh_con_info;
-extern const StgInfoTable PrelForeign_StablePtr_static_info;
-extern const StgInfoTable PrelForeign_StablePtr_con_info;
+extern const StgInfoTable PrelStable_StablePtr_static_info;
+extern const StgInfoTable PrelStable_StablePtr_con_info;
 
 /* Define canonical names so we can abstract away from the actual
  * module these names are defined in.
@@ -55,8 +55,8 @@ extern const StgInfoTable PrelForeign_StablePtr_con_info;
 #define WZh_con_info          PrelAddr_WZh_con_info
 #define W64Zh_con_info        PrelAddr_W64Zh_con_info
 #define I64Zh_con_info        PrelAddr_I64Zh_con_info
-#define StablePtr_static_info PrelForeign_StablePtr_static_info
-#define StablePtr_con_info    PrelForeign_StablePtr_con_info
+#define StablePtr_static_info PrelStable_StablePtr_static_info
+#define StablePtr_con_info    PrelStable_StablePtr_con_info
 #define mainIO_closure        PrelMain_mainIO_closure
 #define unpackCString_closure PrelPack_unpackCString_closure
 

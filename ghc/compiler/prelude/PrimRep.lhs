@@ -62,6 +62,12 @@ data PrimRep
 			-- there's some documentation gain from having
 			-- it special? [ADR]
 
+  | StableNameRep	-- A stable name is a real heap object, unpointed,
+			-- with one field containing an index into the
+			-- stable pointer table.  It has to be a heap
+			-- object so the garbage collector can track these
+			-- objects and reclaim stable pointer entries.
+
   | ThreadIdRep		-- Really a pointer to a TSO
 
   | ArrayRep		-- Primitive array of Haskell pointers
@@ -105,6 +111,7 @@ isFollowableRep ArrayRep      = True	-- all heap objects:
 isFollowableRep ByteArrayRep  = True	-- 	''
 isFollowableRep WeakPtrRep    = True	-- 	''
 isFollowableRep ForeignObjRep = True	-- 	''
+isFollowableRep StableNameRep = True    --      ''
 isFollowableRep ThreadIdRep   = True	-- pointer to a TSO
 
 isFollowableRep other	    	= False
@@ -179,6 +186,7 @@ getPrimRepSizeInBytes pr =
     WeakPtrRep     ->    4
     ForeignObjRep  ->    4
     StablePtrRep   ->    4
+    StableNameRep  ->    4
     ArrayRep       ->    4
     ByteArrayRep   ->    4
     _		   ->   panic "getPrimRepSize: ouch - this wasn't supposed to happen!"
@@ -217,6 +225,7 @@ showPrimRep DoubleRep	   = "StgDouble"
 showPrimRep ArrayRep	   = "P_" -- see comment below
 showPrimRep ByteArrayRep   = "StgByteArray"
 showPrimRep StablePtrRep   = "StgStablePtr"
+showPrimRep StableNameRep  = "P_"
 showPrimRep ThreadIdRep	   = "StgTSO*"
 showPrimRep WeakPtrRep     = "P_"
 showPrimRep ForeignObjRep  = "StgAddr"
@@ -233,6 +242,7 @@ primRepString DoubleRep 	= "Double"
 primRepString WeakPtrRep 	= "Weak"
 primRepString ForeignObjRep  	= "ForeignObj"
 primRepString StablePtrRep  	= "StablePtr"
+primRepString StableNameRep  	= "StableName"
 primRepString other     	= pprPanic "primRepString" (ppr other)
 
 showPrimRepToUser pr = primRepString pr

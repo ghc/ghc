@@ -941,8 +941,8 @@ okToInline sw_chkr in_scope id form guidance cont
 		IWantToBeINLINEd  -> True
 	
 		ICanSafelyBeINLINEd inside_lam one_branch
-			-> (small_enough || one_branch) &&
-			   ((whnf && some_benefit) || not_inside_lam)
+			-> (small_enough || one_branch) && some_benefit &&
+			   (whnf || not_inside_lam)
 		    
 			where
 			   not_inside_lam = case inside_lam of {InsideLam -> False; other -> True}

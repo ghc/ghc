@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1999/01/21 10:30:24 simonm Exp $
+# $Id: Makefile,v 1.5 1999/01/26 11:12:45 simonm Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -54,6 +54,7 @@ WARNING_OPTS += -optc-Wbad-function-cast
 #WARNING_OPTS += -optc-Wconversion
 
 SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts)
+SRC_CC_OPTS += $(GhcRtsCcOpts)
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include

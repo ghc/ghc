@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.18 1999/01/20 16:24:02 simonm Exp $
+ * $Id: GC.c,v 1.19 1999/01/26 11:12:43 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -20,6 +20,7 @@
 #include "DebugProf.h"
 #include "SchedAPI.h"
 #include "Weak.h"
+#include "StablePriv.h"
 
 StgCAF* enteredCAFs;
 
@@ -317,6 +318,10 @@ void GarbageCollect(void (*get_roots)(void))
   weak_ptr_list = NULL;
   weak_done = rtsFalse;
 
+  /* Mark the stable pointer table.
+   */
+  markStablePtrTable(major_gc);
+
 #ifdef INTERPRETER
   { 
       /* ToDo: To fix the caf leak, we need to make the commented out
@@ -391,6 +396,10 @@ void GarbageCollect(void (*get_roots)(void))
       goto loop;
     }
   }
+
+  /* Now see which stable names are still alive
+   */
+  gcStablePtrTable(major_gc);
 
   /* Set the maximum blocks for the oldest generation, based on twice
    * the amount of live data now, adjusted to fit the maximum heap
@@ -695,8 +704,7 @@ static rtsBool
 traverse_weak_ptr_list(void)
 {
   StgWeak *w, **last_w, *next_w;
-  StgClosure *target;
-  const StgInfoTable *info;
+  StgClosure *new;
   rtsBool flag = rtsFalse;
 
   if (weak_done) { return rtsFalse; }
@@ -708,56 +716,26 @@ traverse_weak_ptr_list(void)
 
   last_w = &old_weak_ptr_list;
   for (w = old_weak_ptr_list; w; w = next_w) {
-    target = w->key;
-  loop:
-    /* ignore weak pointers in older generations */
-    if (!LOOKS_LIKE_STATIC(target) && Bdescr((P_)target)->gen->no > N) {
-      IF_DEBUG(weak, fprintf(stderr,"Weak pointer still alive (in old gen) at %p\n", w));
-      /* remove this weak ptr from the old_weak_ptr list */
-      *last_w = w->link;
-      /* and put it on the new weak ptr list */
-      next_w  = w->link;
-      w->link = weak_ptr_list;
-      weak_ptr_list = w;
-      flag = rtsTrue;
-      continue;
-    }
 
-    info = get_itbl(target);
-    switch (info->type) {
-      
-    case IND:
-    case IND_STATIC:
-    case IND_PERM:
-    case IND_OLDGEN:		/* rely on compatible layout with StgInd */
-    case IND_OLDGEN_PERM:
-      /* follow indirections */
-      target = ((StgInd *)target)->indirectee;
-      goto loop;
-
-    case EVACUATED:
-      /* If key is alive, evacuate value and finaliser and 
-       * place weak ptr on new weak ptr list.
-       */
-      IF_DEBUG(weak, fprintf(stderr,"Weak pointer still alive at %p\n", w));
-      w->key = ((StgEvacuated *)target)->evacuee;
+    if ((new = isAlive(w->key))) {
+      w->key = new;
+      /* evacuate the value and finaliser */
       w->value = evacuate(w->value);
       w->finaliser = evacuate(w->finaliser);
-      
       /* remove this weak ptr from the old_weak_ptr list */
       *last_w = w->link;
-
       /* and put it on the new weak ptr list */
       next_w  = w->link;
       w->link = weak_ptr_list;
       weak_ptr_list = w;
       flag = rtsTrue;
-      break;
-
-    default:			/* key is dead */
+      IF_DEBUG(weak, fprintf(stderr,"Weak pointer still alive at %p -> %p\n", w, w->key));
+      continue;
+    }
+    else {
       last_w = &(w->link);
       next_w = w->link;
-      break;
+      continue;
     }
   }
   
@@ -776,11 +754,57 @@ traverse_weak_ptr_list(void)
   return rtsTrue;
 }
 
+/* -----------------------------------------------------------------------------
+   isAlive determines whether the given closure is still alive (after
+   a garbage collection) or not.  It returns the new address of the
+   closure if it is alive, or NULL otherwise.
+   -------------------------------------------------------------------------- */
+
+StgClosure *
+isAlive(StgClosure *p)
+{
+  StgInfoTable *info;
+
+  while (1) {
+
+    info = get_itbl(p);
+
+    /* ToDo: for static closures, check the static link field.
+     * Problem here is that we sometimes don't set the link field, eg.
+     * for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
+     */
+
+    /* ignore closures in generations that we're not collecting. */
+    if (LOOKS_LIKE_STATIC(p) || Bdescr((P_)p)->gen->no > N) {
+      return p;
+    }
+    
+    switch (info->type) {
+      
+    case IND:
+    case IND_STATIC:
+    case IND_PERM:
+    case IND_OLDGEN:		/* rely on compatible layout with StgInd */
+    case IND_OLDGEN_PERM:
+      /* follow indirections */
+      p = ((StgInd *)p)->indirectee;
+      continue;
+      
+    case EVACUATED:
+      /* alive! */
+      return ((StgEvacuated *)p)->evacuee;
+
+    default:
+      /* dead. */
+      return NULL;
+    }
+  }
+}
+
 StgClosure *
 MarkRoot(StgClosure *root)
 {
-  root = evacuate(root);
-  return root;
+  return evacuate(root);
 }
 
 static inline void addBlock(step *step)
@@ -1050,6 +1074,12 @@ loop:
     to = copy(q,sizeW_fromITBL(info),bd);
     upd_evacuee(q,to);
     evacuate_mutable((StgMutClosure *)to);
+    return to;
+
+  case STABLE_NAME:
+    stable_ptr_table[((StgStableName *)q)->sn].keep = rtsTrue;
+    to = copy(q,sizeofW(StgStableName),bd);
+    upd_evacuee(q,to);
     return to;
 
   case FUN:
@@ -1460,6 +1490,7 @@ scavenge(step *step)
     case CONSTR:
     case WEAK:
     case FOREIGN:
+    case STABLE_NAME:
     case IND_PERM:
     case IND_OLDGEN_PERM:
     case CAF_UNENTERED:

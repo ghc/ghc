@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.2 1998/12/02 13:28:46 simonm Exp $
+ * $Id: Signals.c,v 1.3 1999/01/26 11:12:49 simonm Exp $
  *
  * Signal processing / handling.
  *
@@ -10,7 +10,7 @@
 #include "Signals.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-#include "StablePtr.h"
+#include "StablePriv.h"
 
 #ifndef PAR
 
@@ -93,7 +93,7 @@ generic_handler(int sig)
        circumstances, depending on the signal.  
     */
 
-    *next_pending_handler++ = deRefStablePointer(handlers[sig]);
+    *next_pending_handler++ = deRefStablePtr(handlers[sig]);
 
     /* stack full? */
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
@@ -188,7 +188,7 @@ sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
        * by freeing the previous handler if there was one.
        */	 
       if (previous_spi >= 0) {
-	  freeStablePointer(handlers[sig]);
+	  freeStablePtr(handlers[sig]);
       }
       return STG_SIG_ERR;
     }

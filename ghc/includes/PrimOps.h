@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.9 1999/01/23 17:48:23 sof Exp $
+ * $Id: PrimOps.h,v 1.10 1999/01/26 11:12:56 simonm Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -633,54 +633,30 @@ EF_(raiseZh_fast);
 extern void stg_exit(I_ n)  __attribute__ ((noreturn));
 
 /* -----------------------------------------------------------------------------
-   Stable Pointer PrimOps.
+   Stable Name / Stable Pointer  PrimOps
    -------------------------------------------------------------------------- */
 
 #ifndef PAR
 
-extern StgPtr *stable_ptr_table;
-extern StgPtr *stable_ptr_free;
-#define deRefStablePtrZh(r,sp)   (r=stable_ptr_table[(sp)])
-#define eqStablePtrZh(r,sp1,sp2) (r=(sp1==sp2))
+EF_(makeStableNameZh_fast);
 
-#define freeStablePointer(stable_ptr)			\
- {							\
-  stable_ptr_table[stable_ptr] = (P_)stable_ptr_free;	\
-  stable_ptr_free = &stable_ptr_table[stable_ptr];	\
- }
+#define stableNameToIntZh(r,s)   (r = ((StgStableName *)s)->sn)
 
-EF_(makeStablePtrZh_fast);
+#define eqStableNameZh(r,sn1,sn2)					\
+    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
 
-#else /* PAR */
-#define deRefStablePtrZh(ri,sp)					    \
-do {								    \
-    fflush(stdout);						    \
-    fprintf(stderr, "deRefStablePtr#: no stable pointer support.\n");\
-    stg_exit(EXIT_FAILURE);					    \
-} while(0)
+#define makeStablePtrZh(r,a) \
+   r = RET_STGCALL1(StgStablePtr,getStablePtr,a)
 
-#define eqStablePtrZh(ri,sp1,sp2)				    \
-do {								    \
-    fflush(stdout);						    \
-    fprintf(stderr, "eqStablePtr#: no stable pointer support.\n");  \
-    stg_exit(EXIT_FAILURE);					    \
-} while(0)
+#define deRefStablePtrZh(r,sp) do {		\
+  ASSERT(stable_ptr_table[sp & ~STABLEPTR_WEIGHT_MASK].weight > 0);	\
+  r = stable_ptr_table[sp & ~STABLEPTR_WEIGHT_MASK].addr; \
+} while (0);
 
-#define makeStablePtrZh(stablePtr,liveness,unstablePtr)		    \
-do {								    \
-    fflush(stdout);						    \
-    fprintf(stderr, "makeStablePtr#: no stable pointer support.\n");\
-    EXIT(EXIT_FAILURE);						    \
-} while(0)
+#define eqStablePtrZh(r,sp1,sp2) \
+    (r = ((sp1 & ~STABLEPTR_WEIGHT_MASK) == (sp2 & ~STABLEPTR_WEIGHT_MASK)))
 
-#define freeStablePtrZh(stablePtr,liveness,unstablePtr)		    \
-do {								    \
-    fflush(stdout);						    \
-    fprintf(stderr, "makeStablePtr#: no stable pointer support.\n");\
-    EXIT(EXIT_FAILURE);						    \
-} while(0)
 #endif
-
 
 /* -----------------------------------------------------------------------------
    Parallel PrimOps.

@@ -30,6 +30,7 @@ module TysPrim(
 
 	mVarPrimTyCon,			mkMVarPrimTy,	
 	stablePtrPrimTyCon,		mkStablePtrPrimTy,
+	stableNamePrimTyCon,		mkStableNamePrimTy,
 	weakPrimTyCon,  		mkWeakPrimTy,
 	foreignObjPrimTyCon,		foreignObjPrimTy,
 	threadIdPrimTyCon,		threadIdPrimTy,
@@ -213,6 +214,18 @@ mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConKey SLIT("StablePtr#") 1 StablePtrRep
 
 mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[TysPrim-stable-names]{The stable-name type}
+%*									*
+%************************************************************************
+
+\begin{code}
+stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConKey SLIT("StableName#") 1 StableNameRep
+
+mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
 \end{code}
 
 %************************************************************************

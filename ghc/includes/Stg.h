@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.4 1999/01/21 10:31:43 simonm Exp $
+ * $Id: Stg.h,v 1.5 1999/01/26 11:12:57 simonm Exp $
  *
  * Top-level include file for everything STG-ish.  
  *
@@ -24,6 +24,32 @@
 #ifndef INTERPRETER
 #define COMPILER 1
 #endif
+
+/* bit macros
+ */
+#define BITS_PER_BYTE 8
+#define BITS_IN(x) (BITS_PER_BYTE * sizeof(x))
+
+/* -----------------------------------------------------------------------------
+   Assertions and Debuggery
+   -------------------------------------------------------------------------- */
+
+#ifndef DEBUG
+#define ASSERT(predicate) /* nothing */
+#else
+
+void _stgAssert (char *, unsigned int);
+
+#define ASSERT(predicate)			\
+	if (predicate)				\
+	    /*null*/;				\
+	else					\
+	    _stgAssert(__FILE__, __LINE__)
+#endif /* DEBUG */
+
+/* -----------------------------------------------------------------------------
+   Include everything STG-ish
+   -------------------------------------------------------------------------- */
 
 /* Global type definitions*/
 #include "StgTypes.h"
@@ -92,6 +118,7 @@
 #include "Updates.h"
 #include "StgTicky.h"
 #include "CCall.h"
+#include "Stable.h"
 
 /* Built-in entry points */
 #include "StgMiscClosures.h"
@@ -111,22 +138,5 @@ extern char **environ;
 */
 extern void* createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
 extern void  freeHaskellFunctionPtr(void* ptr);
-
-/* -----------------------------------------------------------------------------
-   Assertions and Debuggery
-   -------------------------------------------------------------------------- */
-
-#ifndef DEBUG
-#define ASSERT(predicate) /* nothing */
-#else
-
-void _stgAssert (char *, unsigned int);
-
-#define ASSERT(predicate)			\
-	if (predicate)				\
-	    /*null*/;				\
-	else					\
-	    _stgAssert(__FILE__, __LINE__)
-#endif /* DEBUG */
 
 #endif /* STG_H */

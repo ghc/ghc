@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.5 1999/01/23 17:52:21 sof Exp $
+ * $Id: RtsFlags.h,v 1.6 1999/01/26 11:12:46 simonm Exp $
  *
  * Datatypes that holds the command-line flag settings.
  *
@@ -49,6 +49,8 @@ struct DEBUG_FLAGS {
 
   /* flags to control consistency checking (often very expensive!) */
   rtsBool sanity      : 1; /* 128 */
+
+  rtsBool stable      : 1; /* 256 */
 };
 
 #if defined(PROFILING) || defined(PAR)

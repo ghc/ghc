@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.6 1999/01/19 16:56:50 simonm Exp $
+ * $Id: Sanity.c,v 1.7 1999/01/26 11:12:47 simonm Exp $
  *
  * Sanity checking code for the heap and stack.
  *
@@ -215,6 +215,7 @@ checkClosure( StgClosure* p )
     case BLACKHOLE:
     case BLACKHOLE_BQ:
     case FOREIGN:
+    case STABLE_NAME:
     case MUT_VAR:
     case CONSTR_INTLIKE:
     case CONSTR_CHARLIKE:

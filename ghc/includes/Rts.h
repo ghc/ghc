@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.4 1999/01/21 10:31:43 simonm Exp $
+ * $Id: Rts.h,v 1.5 1999/01/26 11:12:57 simonm Exp $
  *
  * Top-level include file for the RTS itself
  *
@@ -82,7 +82,6 @@ typedef enum {
 
 #define stg_min(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _a : _b; })
 #define stg_max(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _b : _a; })
-
 
 #define UNUSED __attribute__((unused))
 

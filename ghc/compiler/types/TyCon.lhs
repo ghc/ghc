@@ -322,6 +322,7 @@ maybeTyConSingleCon (AlgTyCon {dataCons = [c]})  = Just c
 maybeTyConSingleCon (AlgTyCon {})	         = Nothing
 maybeTyConSingleCon (TupleTyCon {dataCon = con}) = Just con
 maybeTyConSingleCon (PrimTyCon {})               = Nothing
+maybeTyConSingleCon other = panic (showSDoc (ppr other))
 \end{code}
 
 \begin{code}

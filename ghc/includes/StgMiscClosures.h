@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.5 1999/01/15 17:57:04 simonm Exp $
+ * $Id: StgMiscClosures.h,v 1.6 1999/01/26 11:12:58 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -27,6 +27,7 @@ STGFUN(EVACUATED_entry);
 STGFUN(FOREIGN_entry);
 STGFUN(WEAK_entry);
 STGFUN(DEAD_WEAK_entry);
+STGFUN(STABLE_NAME_entry);
 STGFUN(TSO_entry);
 STGFUN(FULL_MVAR_entry);
 STGFUN(EMPTY_MVAR_entry);
@@ -57,6 +58,7 @@ extern const StgInfoTable EVACUATED_info;
 extern const StgInfoTable FOREIGN_info;
 extern const StgInfoTable WEAK_info;
 extern const StgInfoTable DEAD_WEAK_info;
+extern const StgInfoTable STABLE_NAME_info;
 extern const StgInfoTable FULL_MVAR_info;
 extern const StgInfoTable EMPTY_MVAR_info;
 extern const StgInfoTable TSO_info;

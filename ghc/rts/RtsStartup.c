@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.4 1999/01/22 10:58:43 simonm Exp $
+ * $Id: RtsStartup.c,v 1.5 1999/01/26 11:12:47 simonm Exp $
  *
  * Main function for a standalone Haskell program.
  *
@@ -10,7 +10,7 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"  
 #include "Storage.h"    /* initStorage, exitStorage */
-#include "StablePtr.h"  /* initStablePtrTable */
+#include "StablePriv.h" /* initStablePtrTable */
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "Weak.h"

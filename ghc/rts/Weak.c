@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.3 1999/01/13 17:25:49 simonm Exp $
+ * $Id: Weak.c,v 1.4 1999/01/26 11:12:53 simonm Exp $
  *
  * Weak pointers / finalisers
  *
@@ -25,7 +25,7 @@ finaliseWeakPointersNow(void)
   StgWeak *w;
 
   for (w = weak_ptr_list; w; w = w->link) {
-    IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p\n", w));
+    IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
     w->header.info = &DEAD_WEAK_info;
     rts_evalIO(w->finaliser,NULL);
   }
@@ -43,19 +43,13 @@ scheduleFinalisers(StgWeak *list)
   StgWeak *w;
   
   for (w = list; w; w = w->link) {
-    IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p\n", w));
+    IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
 #ifdef INTERPRETER
     createGenThread(RtsFlags.GcFlags.initialStkSize, w->finaliser);
 #else
     createIOThread(RtsFlags.GcFlags.initialStkSize, w->finaliser);
 #endif
     w->header.info = &DEAD_WEAK_info;
-
-    /* need to fill the slop with zeros if we're sanity checking */
-    IF_DEBUG(sanity, {
-      nat dw_size = sizeW_fromITBL(get_itbl(w));
-      memset((P_)w + dw_size, 0, (sizeofW(StgWeak) - dw_size) * sizeof(W_));
-    });
   }
 }
 

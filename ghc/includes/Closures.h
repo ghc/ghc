@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.4 1999/01/18 15:21:41 simonm Exp $
+ * $Id: Closures.h,v 1.5 1999/01/26 11:12:55 simonm Exp $
  *
  * Closures
  *
@@ -242,6 +242,11 @@ typedef struct _StgForeignObj {
   StgHeader      header;
   StgAddr        data;		/* pointer to data in non-haskell-land */
 } StgForeignObj;
+  
+typedef struct _StgStableName {
+  StgHeader      header;
+  StgWord        sn;
+} StgStableName;
   
 typedef struct _StgWeak {	/* Weak v */
   StgHeader header;

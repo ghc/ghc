@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.6 1999/01/23 17:53:28 sof Exp $
+ * $Id: PrimOps.hc,v 1.7 1999/01/26 11:12:46 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -16,7 +16,7 @@
 #include "RtsUtils.h"
 #include "Storage.h"
 #include "BlockAlloc.h" /* tmp */
-#include "StablePtr.h"
+#include "StablePriv.h"
 
 /* ** temporary **
 
@@ -849,22 +849,25 @@ FN_(putMVarZh_fast)
    Stable pointer primitives
    -------------------------------------------------------------------------  */
 
-FN_(makeStablePtrZh_fast)
+FN_(makeStableNameZh_fast)
 {
-  StgInt stable_ptr;
-  FB_ 
+  StgWord index;
+  StgStableName *sn_obj;
+  FB_
 
-    if (stable_ptr_free == NULL) {
-      enlargeStablePtrTable();
-    }
+  HP_CHK_GEN(sizeofW(StgStableName), R1_PTR, makeStableNameZh_fast,);
+  TICK_ALLOC_PRIM(sizeofW(StgHeader), 
+		  sizeofW(StgStableName)-sizeofW(StgHeader), 0);
+  CCS_ALLOC(CCCS,sizeofW(StgStableName)); /* ccs prof */
+  
+  index = RET_STGCALL1(StgWord,lookupStableName,R1.p);
 
-    stable_ptr = stable_ptr_free - stable_ptr_table;
-    (P_)stable_ptr_free  = *stable_ptr_free;
-    stable_ptr_table[stable_ptr] = R1.p;
+  sn_obj = (StgStableName *) (Hp - sizeofW(StgStableName) + 1);
+  sn_obj->header.info = &STABLE_NAME_info;
+  sn_obj->sn = index;
 
-    R1.i = stable_ptr;
-    JMP_(ENTRY_CODE(Sp[0]));
-  FE_
+  TICK_RET_UNBOXED_TUP(1);
+  RET_P(sn_obj);
 }
 
 #endif /* COMPILER */

@@ -13,6 +13,7 @@
   <!ENTITY numexts    SYSTEM "NumExts.sgml">
   <!ENTITY pretty     SYSTEM "Pretty.sgml">
   <!ENTITY st         SYSTEM "ST.sgml">
+  <!ENTITY stable     SYSTEM "Stable.sgml">
   <!ENTITY weak       SYSTEM "Weak.sgml">
   <!ENTITY word       SYSTEM "Word.sgml">
 ]>
@@ -83,14 +84,15 @@ the form <tt/getXContents/, e.g., <tt/Channel.getChanContents/ and
 &dynamic
 &exception
 &foreign
+&getopt
 &glaexts
 &ioexts
 &int
 
 &numexts
 &pretty
-&getopt
 &st
+&stable
 
 <sect> <idx/LazyST/ 
 <label id="sec:LazyST">

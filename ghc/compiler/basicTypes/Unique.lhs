@@ -160,8 +160,9 @@ module Unique (
 	stablePtrDataConKey,
 	stablePtrPrimTyConKey,
 	stablePtrTyConKey,
-	stateDataConKey,
-	stateTyConKey,
+	stableNameDataConKey,
+	stableNamePrimTyConKey,
+	stableNameTyConKey,
 
 	statePrimTyConKey,
 	typeConKey,
@@ -517,8 +518,9 @@ rationalTyConKey			= mkPreludeTyConUnique 31
 realWorldTyConKey			= mkPreludeTyConUnique 32
 stablePtrPrimTyConKey			= mkPreludeTyConUnique 33
 stablePtrTyConKey			= mkPreludeTyConUnique 34
-stateTyConKey			        = mkPreludeTyConUnique 50
-statePrimTyConKey			= mkPreludeTyConUnique 51
+statePrimTyConKey			= mkPreludeTyConUnique 35
+stableNamePrimTyConKey			= mkPreludeTyConUnique 50
+stableNameTyConKey		        = mkPreludeTyConUnique 51
 mutableByteArrayTyConKey		= mkPreludeTyConUnique 52
 mutVarPrimTyConKey			= mkPreludeTyConUnique 53
 ioTyConKey				= mkPreludeTyConUnique 55
@@ -562,7 +564,7 @@ foreignObjDataConKey			= mkPreludeDataConUnique 13
 nilDataConKey				= mkPreludeDataConUnique 14
 ratioDataConKey				= mkPreludeDataConUnique 15
 stablePtrDataConKey			= mkPreludeDataConUnique 16
-stateDataConKey				= mkPreludeDataConUnique 33
+stableNameDataConKey			= mkPreludeDataConUnique 17
 trueDataConKey				= mkPreludeDataConUnique 34
 wordDataConKey				= mkPreludeDataConUnique 35
 word8DataConKey				= mkPreludeDataConUnique 36

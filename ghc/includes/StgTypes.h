@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.2 1998/12/02 13:21:41 simonm Exp $
+ * $Id: StgTypes.h,v 1.3 1999/01/26 11:12:58 simonm Exp $
  *
  * Various C datatypes used in the run-time system.
 
@@ -109,7 +109,6 @@ typedef StgWord            StgOffset;        /* byte offset within closure */
                            
 typedef struct StgTSO_*    StgTSOPtr;
 
-typedef StgWord            StgStablePtr;
 typedef void *             StgForeignPtr;
 
 typedef StgInt             StgStackOffset;   /* offset in words! */
@@ -124,6 +123,15 @@ typedef char*		   StgByteArray;    /* the goods of a ByteArray# */
 
 typedef StgInt64	       LI_;
 typedef StgNat64	       LW_;
+
+/* Stable Pointers:  A stable pointer is represented as an index into
+ * the stable pointer table in the low 24 bits with a weight in the
+ * upper 8 bits.
+ */
+typedef StgWord            StgStablePtr;
+
+#define STABLEPTR_WEIGHT_MASK   (0xff << ((sizeof(StgWord)-1) * BITS_PER_BYTE))
+#define STABLEPTR_WEIGHT_SHIFT  (BITS_IN(StgWord) - 8)
 
 /*
   Types for the generated C functions

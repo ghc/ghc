@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.7 1999/01/21 10:31:51 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.8 1999/01/26 11:12:52 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -245,6 +245,13 @@ NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 
 INFO_TABLE(FOREIGN_info,FOREIGN_entry,0,1,FOREIGN,const,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(FOREIGN);
+
+/* -----------------------------------------------------------------------------
+   Stable Names are unlifted too.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE(STABLE_NAME_info,STABLE_NAME_entry,0,1,STABLE_NAME,const,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(STABLE_NAME);
 
 /* -----------------------------------------------------------------------------
    MVars

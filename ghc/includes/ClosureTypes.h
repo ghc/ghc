@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.5 1999/01/15 17:57:03 simonm Exp $
+ * $Id: ClosureTypes.h,v 1.6 1999/01/26 11:12:55 simonm Exp $
  * 
  * Closure Type Constants
  *
@@ -55,9 +55,10 @@
 #define MUT_VAR		        49
 #define WEAK		        40
 #define FOREIGN		        41
-#define TSO		        42
-#define BLOCKED_FETCH	        43
-#define FETCH_ME                44
-#define EVACUATED               45
+#define STABLE_NAME	        42
+#define TSO		        43
+#define BLOCKED_FETCH	        44
+#define FETCH_ME                45
+#define EVACUATED               46
 
 #endif CLOSURETYPES_H

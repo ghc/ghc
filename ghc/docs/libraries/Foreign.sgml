@@ -1,47 +1,20 @@
-    <sect> <idx/Foreign/
+<sect> <idx/Foreign/
 <label id="sec:Foreign">
 <p>
 
-This module provides two types to better allow the Haskell world to
-share its data with the outside world (and vice versa), <em/foreign
-objects/ and <em/stable pointers/:
+This module provides the <tt/ForeignObj/ type, which is a Haskell
+reference to an object in the outside world.  Foreign objects are
+boxed versions of <tt/Addr#/, the only reason for their existence is
+so that they can be used with finalisers (see Section <ref
+id="foreign-finalisers" name="Finalisation for foreign objects">).
 
 <tscreen><verb>
 module Foreign where
 data ForeignObj  -- abstract, instance of: Eq
 
-makeForeignObj  :: Addr{-object-} -> Addr{-finaliser-} -> IO ForeignObj
+makeForeignObj  :: Addr{-object-} -> IO ForeignObj
 writeForeignObj :: ForeignObj -> Addr{-new value-} -> IO ()
-
-data StablePtr a  -- abstract, instance of: Eq.
-makeStablePtr  :: a -> IO (StablePtr a)
-deRefStablePtr :: StablePtr a -> IO a
-freeStablePtr  :: StablePtr a -> IO ()
 </verb> </tscreen>
-
-<itemize>
-<item>The <tt/ForeignObj/ type provides foreign objects, encapsulated
-references to values outside the Haskell heap. Foreign objects are
-finalised by the garbage collector when they become dead. The
-finaliser to use is given as second argument to <tt/makeForeignOj/,
-and is currently a function pointer to a C function with
-the following signature
-
-<tscreen><verb>
-void finaliseFO(void* obj);
-</verb></tscreen>
-
-The finaliser is passed the reference to the external object (i.e.,
-the first argument to <tt/makeForeignObj/.)
-
-<item>
-The <tt/writeForeignObj/ lets you overwrite the encapsulated foreign
-reference with another.
-
-<item>
-Stable pointers allow you to hand out references to Haskell heap
-objects to the outside world. <bf/ToDo:/ <em/say more./
-</itemize>
 
 In addition to the above, the following operations for indexing via
 a <tt/ForeignObj/ are also, mirrored on the same operations provided

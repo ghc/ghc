@@ -17,6 +17,7 @@ module PrelMods
 	pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR,
 	pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ,
 	pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN,
+	pREL_STABLE,
 
 	iNT, wORD
 	) where
@@ -31,7 +32,8 @@ import Panic	( panic )
 \begin{code}
 pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR      :: Module
 pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ      :: Module	
-pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN :: Module	
+pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR	  	    :: Module	
+pREL_FOREIGN, pREL_STABLE					    :: Module
 
 
 pRELUDE	     = mkModule "Prelude"
@@ -47,6 +49,7 @@ pREL_IO_BASE = mkModule "PrelIOBase"
 pREL_ST	     = mkModule "PrelST"
 pREL_ARR     = mkModule "PrelArr"
 pREL_FOREIGN = mkModule "PrelForeign"
+pREL_STABLE  = mkModule "PrelStable"
 pREL_ADDR    = mkModule "PrelAddr"
 pREL_ERR     = mkModule "PrelErr"
 

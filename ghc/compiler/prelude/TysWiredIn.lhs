@@ -61,10 +61,6 @@ module TysWiredIn (
 	unboxedTupleTyCon, unboxedTupleCon, 
 	unboxedPairTyCon, unboxedPairDataCon,
 
-	stateDataCon,
-	stateTyCon,
-	realWorldStateTy,
-
 	stablePtrTyCon,
 	stringTy,
 	trueDataCon,
@@ -383,22 +379,12 @@ doubleDataCon = pcDataCon doubleDataConKey pREL_BASE SLIT("D#") [] [] [doublePri
 \end{code}
 
 \begin{code}
-mkStateTy ty	 = mkTyConApp stateTyCon [ty]
-realWorldStateTy = mkStateTy realWorldTy -- a common use
-
-stateTyCon = pcNonRecDataTyCon stateTyConKey pREL_ST SLIT("State") alpha_tyvar [stateDataCon]
-stateDataCon
-  = pcDataCon stateDataConKey pREL_ST SLIT("S#")
-	alpha_tyvar [] [mkStatePrimTy alphaTy] stateTyCon
-\end{code}
-
-\begin{code}
 stablePtrTyCon
-  = pcNonRecDataTyCon stablePtrTyConKey pREL_FOREIGN SLIT("StablePtr")
+  = pcNonRecDataTyCon stablePtrTyConKey pREL_STABLE SLIT("StablePtr")
 	alpha_tyvar [stablePtrDataCon]
   where
     stablePtrDataCon
-      = pcDataCon stablePtrDataConKey pREL_FOREIGN SLIT("StablePtr")
+      = pcDataCon stablePtrDataConKey pREL_STABLE SLIT("StablePtr")
 	    alpha_tyvar [] [mkStablePtrPrimTy alphaTy] stablePtrTyCon
 \end{code}
 
@@ -460,7 +446,8 @@ primArgTyConKeys
     , wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
     , floatTyConKey, doubleTyConKey
     , addrTyConKey, charTyConKey, foreignObjTyConKey
-    , stablePtrTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey
+    , stablePtrTyConKey
+    , byteArrayTyConKey, mutableByteArrayTyConKey
     ]
 
 -- types that can be passed from the outside world into Haskell.

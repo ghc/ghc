@@ -1244,6 +1244,7 @@ pprUnionTag FloatRep		= char 'f'
 pprUnionTag DoubleRep		= panic "pprUnionTag:Double?"
 
 pprUnionTag StablePtrRep	= char 'i'
+pprUnionTag StableNameRep	= char 'p'
 pprUnionTag WeakPtrRep		= char 'p'
 pprUnionTag ForeignObjRep	= char 'p'
 

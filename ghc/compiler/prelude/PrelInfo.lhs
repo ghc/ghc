@@ -171,6 +171,7 @@ prim_tycons
     , mutVarPrimTyCon
     , realWorldTyCon
     , stablePtrPrimTyCon
+    , stableNamePrimTyCon
     , statePrimTyCon
     , threadIdPrimTyCon
     , wordPrimTyCon
@@ -459,9 +460,9 @@ byteArrayTyCon_RDR		= tcQual (pREL_ARR,  SLIT("ByteArray"))
 mutableByteArrayTyCon_RDR	= tcQual (pREL_ARR,  SLIT("MutableByteArray"))
 
 foreignObjTyCon_RDR	= tcQual (pREL_IO_BASE, SLIT("ForeignObj"))
-stablePtrTyCon_RDR	= tcQual (pREL_FOREIGN, SLIT("StablePtr"))
-deRefStablePtr_RDR      = varQual (pREL_FOREIGN, SLIT("deRefStablePtr"))
-makeStablePtr_RDR       = varQual (pREL_FOREIGN, SLIT("makeStablePtr"))
+stablePtrTyCon_RDR	= tcQual (pREL_STABLE,  SLIT("StablePtr"))
+deRefStablePtr_RDR      = varQual (pREL_STABLE, SLIT("deRefStablePtr"))
+makeStablePtr_RDR       = varQual (pREL_STABLE, SLIT("makeStablePtr"))
 
 eqClass_RDR		= tcQual (pREL_BASE, SLIT("Eq"))
 ordClass_RDR		= tcQual (pREL_BASE, SLIT("Ord"))
