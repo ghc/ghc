@@ -46,7 +46,7 @@ package_details installing =
                             then [ clibdir ]
                             else [ ghc_src_dir cGHC_RUNTIME_DIR ],
         hs_libraries      = [ "HSrts" ],
-	extra_libraries   = [],
+	extra_libraries   = [ "dl" ],
         include_dirs   = if installing
                             then [ clibdir ++ "/includes" ]
                             else [ ghc_src_dir cGHC_INCLUDE_DIR ],
@@ -154,7 +154,7 @@ package_details installing =
          include_dirs   = if installing
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/concurrent/cbits" ],
-         c_includes     = [ "HsConcurrent.h" ],
+         c_includes     = [],
          package_deps   = [ "lang" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
@@ -178,7 +178,7 @@ package_details installing =
          include_dirs   = if installing
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/data/cbits" ],
-         c_includes     = [ "HsData.h" ],
+         c_includes     = [],
          package_deps   = [ "lang" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
