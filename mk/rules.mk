@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: rules.mk,v 1.2 1996/11/21 16:50:38 simonm Exp $
+# $Id: rules.mk,v 1.3 1997/01/21 10:55:01 sof Exp $
 
 # This file defines the default suffix rules.  It replaces suffixes.jm in the
 # jmake system.
@@ -285,6 +285,12 @@ endif
 
 ifdef SuffixRule_o_hi
 %.hi : %.o
+	@if [ ! -f $@ ] ; then \
+	    echo You need to create an initial $@ by hand ; \
+	    exit 1; \
+	else exit 0 ; \
+	fi							
+%.$(suffix)_hi : %.$(suffix)_o
 	@if [ ! -f $@ ] ; then \
 	    echo You need to create an initial $@ by hand ; \
 	    exit 1; \
