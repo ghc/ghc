@@ -85,7 +85,8 @@ import Addr
 #endif
 
 #if __GLASGOW_HASKELL__ < 301
-import IOBase		( IOError(..), IOErrorType(..) )
+import IOBase		( Handle, IOError(..), IOErrorType(..),
+			  constructErrorAndFail )
 import IOHandle		( readHandle, writeHandle, filePtr )
 import PackBase 	( unpackCStringBA )
 #else
