@@ -35,6 +35,7 @@ import Class		( Class, classTyCon )
 import Type		( Type, repType, splitRepFunTys )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem,
 			  isSingleton, lengthIs )
+import DataCon		( dataConRepArity )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
 import PrimRep		( isFollowableRep )
@@ -64,7 +65,7 @@ import PrelBase		( Int(..) )
 import PrelGHC		( ByteArray# )
 import PrelIOBase	( IO(..) )
 import Monad		( when )
-
+import Maybe		( isJust )
 \end{code}
 
 %************************************************************************
@@ -585,23 +586,34 @@ schemeT d s p app
               other -> Nothing
 
       -- Extract the args (R->L) and fn
-      (args_r_to_l_raw, fn) = chomp app
+      (args_r_to_l, fn) = chomp app
       chomp expr
          = case snd expr of
               AnnVar v    -> ([], v)
-              AnnApp f a  -> case chomp f of (az, f) -> (a:az, f)
+              AnnApp f a
+		 | isTypeAtom (snd a) -> chomp f
+		 | otherwise          -> case chomp f of (az, f) -> (a:az, f)
               AnnNote n e -> chomp e
               other       -> pprPanic "schemeT" 
-                                (ppr (deAnnotate (panic "schemeT.chomp", other)))
-         
-      args_r_to_l = filter (not.isTypeAtom.snd) args_r_to_l_raw
+                               (ppr (deAnnotate (panic "schemeT.chomp", other)))
+
+      n_args = length args_r_to_l
+
       isTypeAtom (AnnType _) = True
       isTypeAtom _           = False
 
-      -- decide if this is a constructor call, and rearrange
-      -- args appropriately.
-      maybe_dcon  = isDataConId_maybe fn
-      is_con_call = case maybe_dcon of Nothing -> False; Just _ -> True
+      -- decide if this is a constructor application, because we need
+      -- to rearrange the arguments on the stack if so.  For building
+      -- a constructor, we put pointers before non-pointers and omit
+      -- the tags.
+      --
+      -- Also if the constructor is not saturated, we just arrange to
+      -- call the curried worker instead.
+
+      maybe_dcon  = case isDataConId_maybe fn of
+			Just con | dataConRepArity con == n_args -> Just con
+			_ -> Nothing
+      is_con_call = isJust maybe_dcon
       (Just con)  = maybe_dcon
 
       args_final_r_to_l
@@ -636,7 +648,6 @@ schemeT d s p app
                     returnBc (push `appOL` mkSLIDE (narg_words+arg_words) 
                                                    (d - s - narg_words)
                               `snocOL` ENTER)
-
 
 
 {- Deal with a CCall.  Taggedly push the args onto the stack R->L,
