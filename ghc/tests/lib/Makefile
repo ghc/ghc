@@ -1,9 +1,9 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1998/08/08 19:27:16 sof Exp $
+# $Id: Makefile,v 1.3 1998/09/06 14:20:45 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = should_run socket posix
+SUBDIRS = should_run posix
 
 include $(TOP)/mk/target.mk
