@@ -240,11 +240,10 @@ while ($_ && $_ ne $End_magic_str) { # delete 'til End_magic_str
     $_ = <OMKF>;
 }
 # insert dependencies
-print $Begin_magic_str;
-print @Depend_lines;
-print $End_magic_str;
+print $Begin_magic_str, @Depend_lines, $End_magic_str || die "Failed to write out dependencies ($!)";
+
 while (<OMKF>) { # copy the rest through
-    print $_;
+    print $_ || die "Failed to write out dependencies ($!)";
 }
 close(NMKF) || exit(1);
 close(OMKF) || exit(1);
