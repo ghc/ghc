@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.21 2001/02/13 17:40:37 qrczak Exp $
+-- $Id: Main.hs,v 1.22 2001/02/22 22:39:56 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -32,6 +32,7 @@ data Flag
     | Linker   String
     | CompFlag String
     | LinkFlag String
+    | Keep
     | Include  String
 
 include :: String -> Flag
@@ -42,13 +43,14 @@ include s          = Include ("\""++s++"\"")
 options :: [OptDescr Flag]
 options = [
     Option "t" ["template"] (ReqArg Template   "FILE") "template file",
-    Option ""  ["cc"]       (ReqArg Compiler   "PROG") "C compiler to use",
-    Option ""  ["ld"]       (ReqArg Linker     "PROG") "linker to use",
-    Option ""  ["cflag"]    (ReqArg CompFlag   "FLAG") "flag to pass to the C compiler",
+    Option "c" ["cc"]       (ReqArg Compiler   "PROG") "C compiler to use",
+    Option "l" ["ld"]       (ReqArg Linker     "PROG") "linker to use",
+    Option "C" ["cflag"]    (ReqArg CompFlag   "FLAG") "flag to pass to the C compiler",
     Option "I" []           (ReqArg (CompFlag . ("-I"++))
                                                "DIR")  "passed to the C compiler",
-    Option ""  ["lflag"]    (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
-    Option ""  ["include"]  (ReqArg include    "FILE") "as if placed in the source",
+    Option "L" ["lflag"]    (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
+    Option ""  ["keep"]     (NoArg  Keep)              "don't delete *.hs_make.c",
+    Option "i" ["include"]  (ReqArg include    "FILE") "as if placed in the source",
     Option ""  ["help"]     (NoArg  Help)              "display this help and exit",
     Option ""  ["version"]  (NoArg  Version)           "output version information and exit"]
 
@@ -185,9 +187,9 @@ output flags name toks = let
     baseName = case reverse name of
         'c':base -> reverse base
         _        -> name++".hs"
-    cProgName = baseName++"c_make_hs.c"
-    oProgName = baseName++"c_make_hs.o"
-    progName  = baseName++"c_make_hs"
+    cProgName = baseName++"_make.c"
+    oProgName = baseName++"_make.o"
+    progName  = baseName++"_make"
     outHsName = baseName
     outHName  = baseName++".h"
     outCName  = baseName++".c"
@@ -236,7 +238,7 @@ output flags name toks = let
     case compilerStatus of
         e@(ExitFailure _) -> exitWith e
         _                 -> return ()
-    removeFile cProgName
+    when (null [() | Keep <- flags]) $ removeFile cProgName
     
     linkerStatus <- system $
         linker++
