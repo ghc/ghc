@@ -198,7 +198,7 @@ $white_no_nl+ 				;
   "[|"					{ token ITopenExpQuote }
   "[e|"					{ token ITopenExpQuote }
   "[p|"					{ token ITopenPatQuote }
-  "[d|"					{ token ITopenDecQuote }
+  "[d|"					{ layout_token ITopenDecQuote }
   "[t|"					{ token ITopenTypQuote }
   "|]"					{ token ITcloseQuote }
 }
@@ -561,8 +561,9 @@ type Action = SrcLoc -> SrcLoc -> StringBuffer -> Int -> P Token
 special :: Token__ -> Action
 special tok loc end _buf len = return (T loc end tok)
 
-token :: Token__ -> Action
+token, layout_token :: Token__ -> Action
 token t loc end buf len = return (T loc end t)
+layout_token t loc end buf len = pushLexState layout >> return (T loc end t)
 
 idtoken :: (StringBuffer -> Int -> Token__) -> Action
 idtoken f loc end buf len = return (T loc end $! (f buf len))
@@ -770,6 +771,7 @@ maybe_layout ITmdo	= pushLexState layout_do
 maybe_layout ITof	= pushLexState layout
 maybe_layout ITlet	= pushLexState layout
 maybe_layout ITwhere	= pushLexState layout
+maybe_layout ITrec	= pushLexState layout
 maybe_layout _	        = return ()
 
 -- Pushing a new implicit layout context.  If the indentation of the
