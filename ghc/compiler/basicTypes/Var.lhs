@@ -14,7 +14,7 @@ module Var (
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique,
 	mkTyVar, mkSysTyVar, 
-	newMutTyVar, readMutTyVar, writeMutTyVar, makeTyVarImmutable,
+	newMutTyVar, readMutTyVar, writeMutTyVar, makeTyVarImmutable, 
 
 	-- Ids
 	Id, DictId,
