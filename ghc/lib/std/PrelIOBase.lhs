@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.16 1999/12/03 16:17:42 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.17 2000/01/30 10:11:32 simonmar Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -54,6 +54,23 @@ import PrelArr	  ( MutableVar, readVar )
 The IO Monad is just an instance of the ST monad, where the state is
 the real world.  We use the exception mechanism (in PrelException) to
 implement IO exceptions.
+
+NOTE: The IO representation is deeply wired in to various parts of the
+system.  The following list may or may not be exhaustive:
+
+Compiler  - types of various primitives in PrimOp.lhs
+
+RTS 	  - forceIO (StgMiscClosures.hc)
+	  - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast 
+	    (Exceptions.hc)
+	  - raiseAsync (Schedule.c)
+
+Prelude   - PrelIOBase.lhs, and several other places including
+	    PrelException.lhs.
+
+Libraries - parts of hslibs/lang.
+
+--SDM
 
 \begin{code}
 #ifndef __HUGS__
