@@ -2,16 +2,16 @@
 #
 ./life_space_leak | sum > /tmp/sum-real-$$
 
-cat > /tmp/sum-expected-$$ << EOTHING
+cat > ./sum-expected-$$ << EOTHING
 02845  1350
 EOTHING
 
-if cmp -s /tmp/sum-real-$$ /tmp/sum-expected-$$ ; then
-    /bin/rm /tmp/sum*$$
+if cmp -s ./sum-real-$$ ./sum-expected-$$ ; then
+    /bin/rm ./sum*$$
     exit 0
 else
-    echo -n '*** sum I got: ' ;      cat /tmp/sum-real-$$ 
-    echo -n '*** sum I expected: ' ; cat /tmp/sum-expected-$$ 
-    /bin/rm /tmp/sum*$$
+    echo -n '*** sum I got: ' ;      cat ./sum-real-$$ 
+    echo -n '*** sum I expected: ' ; cat ./sum-expected-$$ 
+    /bin/rm ./sum*$$
     exit 1
 fi
