@@ -18,7 +18,7 @@ import CmLink
 import CmTypes
 import HscTypes
 import Module		( ModuleName, moduleName,
-			  isModuleInThisPackage, moduleEnvElts,
+			  isHomeModule, moduleEnvElts,
 			  moduleNameUserString )
 import CmStaticInfo	( PackageConfigInfo, GhciMode(..) )
 import DriverPipeline
@@ -73,7 +73,7 @@ cmGetExpr :: CmState
           -> IO (CmState, Maybe HValue)
 cmGetExpr cmstate dflags modname expr
    = do (new_pcs, maybe_unlinked_iexpr) <- 
-	   hscExpr dflags hst hit pcs (mkModuleInThisPackage modname) expr
+	   hscExpr dflags hst hit pcs (mkHomeModule modname) expr
         case maybe_unlinked_iexpr of
 	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
 	   Just uiexpr -> do
@@ -440,19 +440,19 @@ upsweep_mod ghci_mode oldUI threaded1 summary1 reachable_from_here
 
         case compresult of
 
-           -- Compilation "succeeded", but didn't return a new iface or
+           -- Compilation "succeeded", but didn't return a new
            -- linkable, meaning that compilation wasn't needed, and the
            -- new details were manufactured from the old iface.
-           CompOK details Nothing pcs2
-              -> let hst2         = addToUFM hst1 mod_name details
-                     hit2         = hit1
+           CompOK pcs2 new_details new_iface Nothing
+              -> let hst2         = addToUFM hst1 mod_name new_details
+                     hit2         = addToUFM hit1 mod_name new_iface
                      threaded2    = CmThreaded pcs2 hst2 hit2
                  in  return (threaded2, Just old_linkable)
 
            -- Compilation really did happen, and succeeded.  A new
            -- details, iface and linkable are returned.
-           CompOK details (Just (new_iface, new_linkable)) pcs2
-              -> let hst2      = addToUFM hst1 mod_name details
+           CompOK pcs2 new_details new_iface (Just new_linkable)
+              -> let hst2      = addToUFM hst1 mod_name new_details
                      hit2      = addToUFM hit1 mod_name new_iface
                      threaded2 = CmThreaded pcs2 hst2 hit2
                  in  return (threaded2, Just new_linkable)
@@ -545,7 +545,7 @@ topological_sort include_source_imports summaries
 downsweep :: [FilePath] -> IO [ModSummary]
 downsweep rootNm
    = do rootSummaries <- mapM getRootSummary rootNm
-        loop (filter (isModuleInThisPackage.ms_mod) rootSummaries)
+        loop (filter (isHomeModule.ms_mod) rootSummaries)
      where
 	getRootSummary :: FilePath -> IO ModSummary
 	getRootSummary file
@@ -584,7 +584,7 @@ downsweep rootNm
                 neededSummaries
                        <- mapM getSummary neededImps
                 let newHomeSummaries
-                       = filter (isModuleInThisPackage.ms_mod) neededSummaries
+                       = filter (isHomeModule.ms_mod) neededSummaries
                 if null newHomeSummaries
                  then return homeSummaries
                  else loop (newHomeSummaries ++ homeSummaries)
@@ -627,7 +627,7 @@ summariseFile file
 -- Summarise a module, and pick up source and interface timestamps.
 summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
-   | isModuleInThisPackage mod
+   | isHomeModule mod
    = do let hs_fn = unJust "summarise" (ml_hs_file location)
         hspp_fn <- preprocess hs_fn
         modsrc <- readFile hspp_fn

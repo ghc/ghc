@@ -44,7 +44,7 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 			 )
 import Name 		( elemNameEnv, delFromNameEnv )
 import Module		( Module, ModuleEnv, 
-			  moduleName, isModuleInThisPackage,
+			  moduleName, isHomeModule,
 			  ModuleName, WhereFrom(..),
 			  emptyModuleEnv, 
 			  extendModuleEnv_C, foldModuleEnv, lookupModuleEnv,
@@ -178,7 +178,7 @@ mkImportInfo this_mod imports
 
 	    mod		    = mi_module iface
 	    mod_name	    = moduleName mod
-	    is_home_pkg_mod = isModuleInThisPackage mod
+	    is_home_pkg_mod = isHomeModule mod
 	    version_info    = mi_version iface
 	    version_env     = vers_decls   version_info
 	    mod_vers	    = vers_module  version_info
@@ -341,8 +341,8 @@ recordSlurp ifaces@(Ifaces { iDecls = (decls_map, n_slurped),
     main_name  = availName avail
     mod	       = nameModule main_name
     new_slurped_names = addAvailToNameSet slurped_names avail
-    new_vslurp | isModuleInThisPackage mod = (imp_mods, addOneToNameSet imp_names main_name)
-    	       | otherwise		   = (extendModuleSet imp_mods mod, imp_names)
+    new_vslurp | isHomeModule mod = (imp_mods, addOneToNameSet imp_names main_name)
+    	       | otherwise        = (extendModuleSet imp_mods mod, imp_names)
 
 recordLocalSlurps new_names
   = getIfacesRn 	`thenRn` \ ifaces ->

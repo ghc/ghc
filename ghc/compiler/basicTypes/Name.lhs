@@ -42,7 +42,7 @@ module Name (
 #include "HsVersions.h"
 
 import OccName		-- All of it
-import Module		( Module, moduleName, mkVanillaModule, isModuleInThisPackage )
+import Module		( Module, moduleName, mkVanillaModule, isHomeModule )
 import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
@@ -334,7 +334,7 @@ isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
 isDllName nm = not opt_Static &&
 	       not (isLocalName nm) &&				-- isLocalName test needed 'cos
-	       not (isModuleInThisPackage (nameModule nm))	-- nameModule won't work on local names
+	       not (isHomeModule (nameModule nm))	-- nameModule won't work on local names
 
 
 

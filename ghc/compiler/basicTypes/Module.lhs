@@ -24,7 +24,6 @@ module Module
       Module, moduleName, packageOfModule,
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
-    , isModuleInThisPackage, mkModuleInThisPackage,
     , printModulePrefix
 
     , moduleNameString		-- :: ModuleName -> EncodedString
@@ -38,8 +37,7 @@ module Module
     , mkPrelModule		-- :: UserString -> Module
     , mkModule			-- :: ModuleName -> PackageName -> Module
     , mkHomeModule		-- :: ModuleName -> Module
-
---    , mkSrcModule
+    , isHomeModule		-- :: Module -> Bool
 
     , mkModuleName		-- :: UserString -> ModuleName
     , mkModuleNameFS		-- :: UserFS    -> ModuleName
@@ -192,10 +190,6 @@ mkModuleNameFS s = ModuleName (encodeFS s)
 -- used to be called mkSysModuleFS
 mkSysModuleNameFS :: EncodedFS -> ModuleName
 mkSysModuleNameFS s = ModuleName s 
-
--- Make a module in this package
-mkModuleInThisPackage :: ModuleName -> Module
-mkModuleInThisPackage nm = Module nm ThisPackage
 \end{code}
 
 \begin{code}
@@ -241,6 +235,10 @@ mkModule mod_nm pack_name
 mkHomeModule :: ModuleName -> Module
 mkHomeModule mod_nm = Module mod_nm ThisPackage
 
+isHomeModule :: Module -> Bool
+isHomeModule (Module nm ThisPackage) = True
+isHomeModule _                       = False
+
 -- Used temporarily when we first come across Foo.x in an interface
 -- file, but before we've opened Foo.hi.
 -- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
@@ -258,10 +256,6 @@ moduleName (Module mod pkg_info) = mod
 
 moduleUserString :: Module -> UserString
 moduleUserString (Module mod _) = moduleNameUserString mod
-
-isModuleInThisPackage :: Module -> Bool
-isModuleInThisPackage (Module nm ThisPackage) = True
-isModuleInThisPackage _                       = False
 
 packageOfModule :: Module -> Maybe PackageName
 packageOfModule (Module nm (AnotherPackage pn)) = Just pn

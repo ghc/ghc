@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.32 2000/11/20 13:39:26 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.33 2000/11/20 17:42:00 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -467,8 +467,10 @@ run_phase Hsc basename suff input_fn output_fn
 
 	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1));
 
-	    HscOK details maybe_iface maybe_stub_h maybe_stub_c 
-			_maybe_interpreted_code pcs -> do
+            HscNoRecomp pcs details iface -> return False;
+
+	    HscRecomp pcs details iface maybe_stub_h maybe_stub_c 
+		      _maybe_interpreted_code -> do
 
 	    -- deal with stubs
 	maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
@@ -476,8 +478,7 @@ run_phase Hsc basename suff input_fn output_fn
 		Nothing -> return ()
 		Just stub_o -> add v_Ld_inputs stub_o
 
-        let keep_going = case maybe_iface of Just _ -> True; Nothing -> False
-	return keep_going
+	return True
     }
 
 -----------------------------------------------------------------------------
@@ -758,11 +759,12 @@ compile :: GhciMode                -- distinguish batch from interactive
         -> IO CompResult
 
 data CompResult
-   = CompOK   ModDetails  -- new details (HST additions)
-              (Maybe (ModIface, Linkable))
-                       -- summary and code; Nothing => compilation not reqd
-                       -- (old summary and code are still valid)
-              PersistentCompilerState	-- updated PCS
+   = CompOK   PersistentCompilerState	-- updated PCS
+              ModDetails  -- new details (HST additions)
+              ModIface    -- new iface   (HIT additions)
+              (Maybe Linkable)
+                       -- new code; Nothing => compilation was not reqd
+                       -- (old code is still valid)
 
    | CompErrs PersistentCompilerState	-- updated PCS
 
@@ -800,17 +802,14 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 			 source_unchanged
                          location old_iface hst hit pcs
 
-   case hsc_result of {
-      HscFail pcs -> return (CompErrs pcs);
+   case hsc_result of
+      HscFail pcs -> return (CompErrs pcs)
 
-      HscOK details maybe_iface 
-	maybe_stub_h maybe_stub_c maybe_interpreted_code pcs -> do
+      HscNoRecomp pcs details iface -> return (CompOK pcs details iface Nothing)
+
+      HscRecomp pcs details iface
+	maybe_stub_h maybe_stub_c maybe_interpreted_code -> do
 	   
-	   -- if no compilation happened, bail out early
-	   case maybe_iface of {
-		Nothing -> return (CompOK details Nothing pcs);
-		Just iface -> do
-
 	   let (basename, _) = splitFilename input_fn
 	   maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
 	   let stub_unlinked = case maybe_stub_o of
@@ -843,9 +842,8 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 	   let linkable = LM unlinked_time (moduleName (ms_mod summary)) 
 			     (hs_unlinked ++ stub_unlinked)
 
-	   return (CompOK details (Just (iface, linkable)) pcs)
-          }
-   }
+	   return (CompOK pcs details iface (Just linkable))
+
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)

@@ -44,7 +44,7 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 			 )
 import Name		( mkNameEnv, extendNameEnv )
 import Module		( Module, 
-			  moduleName, isModuleInThisPackage,
+			  moduleName, isHomeModule,
 			  ModuleName, WhereFrom(..),
 			  extendModuleEnv, mkVanillaModule
 			)
@@ -176,7 +176,7 @@ tryLoadInterface doc_str mod_name from
 	-- about, it should be from a different package to this one
     WARN( not (maybeToBool mod_info) && 
 	  case from of { ImportBySystem -> True; other -> False } &&
-	  isModuleInThisPackage mod,
+	  isHomeModule mod,
 	  ppr mod )
 
     loadDecls mod		(iDecls ifaces)	  (pi_decls iface)	`thenRn` \ (decls_vers, new_decls) ->
@@ -241,7 +241,7 @@ addModDeps mod is_loaded new_deps mod_deps
 	-- and in that case, forget about the boot indicator
     filtered_new_deps :: [(ModuleName, (WhetherHasOrphans, IsBootInterface))]
     filtered_new_deps
-	| isModuleInThisPackage mod 
+	| isHomeModule mod 
 			    = [ (imp_mod, (has_orphans, is_boot))
 			      | (imp_mod, has_orphans, is_boot, _) <- new_deps,
 				not (is_loaded imp_mod)

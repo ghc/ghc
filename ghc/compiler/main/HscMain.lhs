@@ -40,7 +40,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleName, mkModuleInThisPackage )
+import Module		( ModuleName, moduleName, mkHomeModule )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Util		( unJust )
@@ -76,14 +76,21 @@ import IO		( hPutStrLn, stderr )
 
 \begin{code}
 data HscResult
-   = HscOK   ModDetails  	     -- new details (HomeSymbolTable additions)
-	     (Maybe ModIface)	     -- new iface (if any compilation was done)
-	     (Maybe String)  	     -- generated stub_h filename (in /tmp)
-	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
-	     (Maybe ([UnlinkedIBind],ItblEnv)) -- interpreted code, if any
-             PersistentCompilerState -- updated PCS
+   -- compilation failed
+   = HscFail     PersistentCompilerState -- updated PCS
+   -- concluded that it wasn't necessary
+   | HscNoRecomp PersistentCompilerState -- updated PCS
+                 ModDetails  	         -- new details (HomeSymbolTable additions)
+	         ModIface	         -- new iface (if any compilation was done)
+   -- did recompilation
+   | HscRecomp   PersistentCompilerState -- updated PCS
+                 ModDetails  		 -- new details (HomeSymbolTable additions)
+                 ModIface		 -- new iface (if any compilation was done)
+	         (Maybe String) 	 -- generated stub_h filename (in /tmp)
+	         (Maybe String)  	 -- generated stub_c filename (in /tmp)
+	         (Maybe ([UnlinkedIBind],ItblEnv)) -- interpreted code, if any
+             
 
-   | HscFail PersistentCompilerState -- updated PCS
 	-- no errors or warnings; the individual passes
 	-- (parse/rename/typecheck) print messages themselves
 
@@ -125,12 +132,8 @@ hscMain ghci_mode dflags source_unchanged location maybe_old_iface hst hit pcs
 -- we definitely expect to have the old interface available
 hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
  | ghci_mode == OneShot
- = return (HscOK
-           (panic "hscNoRecomp:OneShot") -- no details
-           Nothing -- makes run_phase Hsc stop
-           Nothing Nothing -- foreign export stuff
-           Nothing -- ibinds
-           pcs_ch)
+ = let bomb = panic "hscNoRecomp:OneShot"
+   in  return (HscNoRecomp pcs_ch bomb bomb)
  | otherwise
  = do {
       hPutStrLn stderr "COMPILATION NOT REQUIRED";
@@ -156,11 +159,7 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
       -- create a new details from the closed, typechecked, old iface
       let new_details = mkModDetailsFromIface env_tc local_insts local_rules
       ;
-      return (HscOK new_details
-		    Nothing -- tells CM to use old iface and linkables
-		    Nothing Nothing -- foreign export stuff
-                    Nothing -- ibinds
-		    pcs_tc)
+      return (HscNoRecomp pcs_tc new_details old_iface)
       }}}}
 
 
@@ -179,7 +178,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
 	; case maybe_parsed of {
       	     Nothing -> return (HscFail pcs_ch);
       	     Just rdr_module -> do {
-	; let this_mod = mkModuleInThisPackage (hsModuleName rdr_module)
+	; let this_mod = mkHomeModule (hsModuleName rdr_module)
     
  	    -------------------
  	    -- RENAME
@@ -238,9 +237,9 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
       		   hit (pcs_PIT pcs_tc)       
 
       	  -- and the answer is ...
-	; return (HscOK new_details (Just final_iface)
- 			maybe_stub_h_filename maybe_stub_c_filename
-      			maybe_ibinds pcs_tc)
+	; return (HscRecomp pcs_tc new_details final_iface
+                            maybe_stub_h_filename maybe_stub_c_filename
+      			    maybe_ibinds)
       	  }}}}}}}
 
 
