@@ -292,6 +292,9 @@ endif
 ifeq "$(GhcUnregisterised)" "YES"
 SplitObjs=NO
 endif
+ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
+SplitObjs=NO
+endif
 
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
