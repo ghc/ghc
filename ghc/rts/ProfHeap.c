@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.4 2000/03/07 11:53:12 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.5 2000/03/07 12:03:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -33,6 +33,8 @@ static void fprint_data(FILE *fp);
 char prof_filename[128];	/* urk */
 
 #ifdef DEBUG_HEAP_PROF
+FILE *prof_file;
+
 void initProfiling( void )
 {
   initHeapProfiling();
