@@ -404,7 +404,7 @@ $TopClosureFile # defaults to 1.2 one; will be mangled later
 
 # make depend for Haskell
 $MkDependHS
-	= ( $INSTALLING ) ? "$InstBinDirGhc/mkdependHS"
+	= ( $INSTALLING ) ? "$InstLibExecDirGhc/mkdependHS"
 			  : "$TopPwd/$CURRENT_DIR/$GHC_UTILS_DIR/mkdependHS/mkdependHS";
 # Fill in later
 @MkDependHS_flags = ();

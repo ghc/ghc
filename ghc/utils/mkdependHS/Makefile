@@ -17,7 +17,7 @@ INTERP=perl
 #
 # install setup
 #
-INSTALL_SCRIPTS += $(SCRIPT_PROG)
+INSTALL_LIB_SCRIPTS += $(SCRIPT_PROG)
 
 ifneq "$(BIN_DIST)" "1"
 SCRIPT_SUBST_VARS += libdir datadir RAWCPP TMPDIR SED
