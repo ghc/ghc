@@ -60,6 +60,9 @@ import Lex
 import FiniteMap
 import Outputable
 import Bag
+import Config
+
+import Directory
 \end{code}
 
 
@@ -480,15 +483,16 @@ findAndReadIface doc_str mod_name hi_boot_file
     case maybe_found of
 
       Right (Just (wanted_mod,locn))
-        -> readIface (mkHiPath hi_boot_file (ml_hi_file locn))	`thenRn` \ read_result ->
+        -> mkHiPath hi_boot_file locn `thenRn` \ file -> 
+	   readIface file `thenRn` \ read_result ->
 	   case read_result of
-              Left bad -> returnRn (Left bad)
-              Right iface 
-                 -> let read_mod = pi_mod iface
-		    in warnCheckRn (wanted_mod == read_mod)
-		   	           (hiModuleNameMismatchWarn wanted_mod read_mod) 
-				  	`thenRn_`
-		       returnRn (Right (wanted_mod, iface))
+                Left bad -> returnRn (Left bad)
+                Right iface 
+                   -> let read_mod = pi_mod iface
+		      in warnCheckRn (wanted_mod == read_mod)
+		   	             (hiModuleNameMismatchWarn wanted_mod 
+					read_mod) `thenRn_`
+		         returnRn (Right (wanted_mod, iface))
 	-- Can't find it
       other   -> traceRn (ptext SLIT("...not found"))	`thenRn_`
 		 returnRn (Left (noIfaceErr mod_name hi_boot_file))
@@ -500,9 +504,15 @@ findAndReadIface doc_str mod_name hi_boot_file
 			   ppr mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
 
-mkHiPath hi_boot_file (Just path)
-  | hi_boot_file = path ++ "-boot-5"
-  | otherwise    = path
+mkHiPath hi_boot_file locn
+  | hi_boot_file = 
+	ioToRnM_no_fail (doesFileExist hi_boot_ver_path) `thenRn` \ b ->
+	if b then returnRn hi_boot_ver_path
+	     else returnRn hi_boot_path
+  | otherwise    = returnRn hi_path
+	where (Just hi_path)   = ml_hi_file locn
+    	      hi_boot_path     = hi_path ++ "-boot"
+    	      hi_boot_ver_path = hi_path ++ "-boot-" ++ cHscIfaceFileVersion
 \end{code}
 
 @readIface@ tries just the one file.
