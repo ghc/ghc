@@ -190,8 +190,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
     size_up (Note _ body)     = size_up body	-- Notes cost nothing
 
-    size_up (App fun (Type t))  = size_up fun
-    size_up (App fun arg)     = size_up_app fun [arg]
+    size_up (App fun (Type t)) = size_up fun
+    size_up (App fun arg)      = size_up_app fun [arg]
 
     size_up (Lit lit) | litIsDupable lit = sizeOne
 		      | otherwise	 = sizeN opt_UF_DearOp	-- For lack of anything better
@@ -220,7 +220,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 	(a) It's too eager.  We don't want to inline a wrapper into a
 	    context with no benefit.  
-	    E.g.  \ x. f (x+x)   	o point in inlining (+) here!
+	    E.g.  \ x. f (x+x)   	no point in inlining (+) here!
 
 	(b) It's ineffective. Once g's wrapper is inlined, its case-expressions 
 	    aren't scrutinising arguments any more
@@ -374,7 +374,12 @@ conSizeN n      = SizeIs (_ILIT 1) emptyBag (iUnbox n +# _ILIT 1)
 
 primOpSize op n_args
  | not (primOpIsDupable op) = sizeN opt_UF_DearOp
- | not (primOpOutOfLine op) = sizeZero			-- These are good to inline
+ | not (primOpOutOfLine op) = sizeN (1 - n_args)
+	-- Be very keen to inline simple primops.
+	-- We give a discount of 1 for each arg so that (op# x y z) costs 1.
+	-- I found occasions where we had 
+	--	f x y z = case op# x y z of { s -> (# s, () #) }
+	-- and f wasn't getting inlined
  | otherwise	      	    = sizeOne
 
 buildSize = SizeIs (-2#) emptyBag 4#
