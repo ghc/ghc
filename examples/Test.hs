@@ -64,6 +64,8 @@ module Test (
 
 	-- $aux11
 
+	-- $aux12
+
 	-- | This is some inline documentation in the export list
 	--
 	-- > a code block using bird-tracks
@@ -332,6 +334,12 @@ test1
 test2
 @
 -}
+
+-- $aux12
+-- > foo
+-- 
+-- > bar
+-- 
 
 -- | A data-type using existential\/universal types
 data Ex a 
