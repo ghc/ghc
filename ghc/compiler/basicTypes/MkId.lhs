@@ -589,7 +589,22 @@ mkReboxingAlt us con args rhs
 Selecting a field for a dictionary.  If there is just one field, then
 there's nothing to do.  
 
-ToDo: unify with mkRecordSelId.
+Dictionary selectors may get nested forall-types.  Thus:
+
+	class Foo a where
+	  op :: forall b. Ord b => a -> b -> b
+
+Then the top-level type for op is
+
+	op :: forall a. Foo a => 
+	      forall b. Ord b => 
+	      a -> b -> b
+
+This is unlike ordinary record selectors, which have all the for-alls
+at the outside.  When dealing with classes it's very convenient to
+recover the original type signature from the class op selector.
+
+ToDo: unify with mkRecordSelId?
 
 \begin{code}
 mkDictSelId :: Name -> Class -> Id
