@@ -10,8 +10,6 @@
 #include "constants.h"
 #include "utils.h"
 
-#define PARSER_VERSION "2.01 (Haskell 1.3)"
-
 tree root; 		/* The root of the built syntax tree. */
 list Lnil;
 
