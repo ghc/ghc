@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.187 2001/08/15 14:36:21 rrt Exp $
+# $Id: Makefile,v 1.188 2001/08/15 18:31:57 qrczak Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -128,14 +128,14 @@ DIRS += ghci
 endif
 endif
 
+HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
+HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs $(CONFIG_HS), $(HS_SRCS))
+HS_SRCS += $(CONFIG_HS)
+
 # Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
 # for explanatory comment as to what this does.
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -ge 5010); then echo YES; else echo NO; fi)
-
-HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
-HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs main/ParsePkgConf.hs $(CONFIG_HS), $(HS_SRCS))
-HS_SRCS += $(CONFIG_HS)
 
 # -----------------------------------------------
 # GHCi calls the C procedure 'rawSystem'; but alas GHC 4.08 
