@@ -19,7 +19,7 @@ module Id (
 	recordSelectorFieldLabel,
 
 	-- Modifying an Id
-	setIdName, setIdUnique, Id.setIdType, setIdLocalExported, 
+	setIdName, setIdUnique, Id.setIdType, setIdExported, setIdNotExported, 
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
 	zapLamIdInfo, zapDemandIdInfo, 
 
@@ -84,7 +84,8 @@ import BasicTypes	( Arity )
 import Var		( Id, DictId,
 			  isId, isExportedId, isSpecPragmaId, isLocalId,
 			  idName, idType, idUnique, idInfo, isGlobalId,
-			  setIdName, setIdType, setIdUnique, setIdLocalExported,
+			  setIdName, setIdType, setIdUnique, 
+			  setIdExported, setIdNotExported,
 			  setIdInfo, lazySetIdInfo, modifyIdInfo, 
 			  maybeModifyIdInfo,
 			  globalIdDetails

@@ -19,7 +19,7 @@ module Var (
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
 	setIdName, setIdUnique, setIdType, setIdInfo, lazySetIdInfo, 
-	setIdLocalExported, zapSpecPragmaId,
+	setIdExported, setIdNotExported, zapSpecPragmaId,
 
 	globalIdDetails, globaliseId, 
 
@@ -215,9 +215,20 @@ setIdName = setVarName
 setIdType :: Id -> Type -> Id
 setIdType id ty = id {idType = ty}
 
-setIdLocalExported :: Id -> Id
--- It had better be a LocalId already
-setIdLocalExported id = id { lclDetails = Exported }
+setIdExported :: Id -> Id
+-- Can be called on GlobalIds, such as data cons and class ops,
+-- which are "born" as GlobalIds and automatically exported
+setIdExported id@(LocalId {}) = id { lclDetails = Exported }
+setIdExported other_id	      = ASSERT( isId other_id ) other_id
+
+setIdNotExported :: Id -> Id
+-- We can only do this to LocalIds
+setIdNotExported id = ASSERT( isLocalId id ) id { lclDetails = NotExported }
+
+zapSpecPragmaId :: Id -> Id
+zapSpecPragmaId id
+  | isSpecPragmaId id = id {lclDetails = NotExported}
+  | otherwise         = id
 
 globaliseId :: GlobalIdDetails -> Id -> Id
 -- If it's a local, make it global
@@ -226,11 +237,6 @@ globaliseId details id = GlobalId { varName    = varName id,
 			   	    idType     = idType id,
 				    idInfo     = idInfo id,
 				    gblDetails = details }
-
-zapSpecPragmaId :: Id -> Id
-zapSpecPragmaId id
-  | isSpecPragmaId id = id {lclDetails = NotExported}
-  | otherwise         = id
 
 lazySetIdInfo :: Id -> IdInfo -> Id
 lazySetIdInfo id info = id {idInfo = info}

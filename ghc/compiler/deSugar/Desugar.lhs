@@ -15,7 +15,7 @@ import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
-import Id		( Id, setIdLocalExported, idName, idIsFrom, isLocalId )
+import Id		( Id, setIdExported, idName, idIsFrom, isLocalId )
 import Name		( Name, isExternalName )
 import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
@@ -214,11 +214,8 @@ addExportFlags ghci_mode exports keep_alive prs rules
   = [(add_export bndr, rhs) | (bndr,rhs) <- prs]
   where
     add_export bndr
-	| isLocalId bndr && dont_discard bndr  = setIdLocalExported bndr
-		-- The isLocalId check is to avoid fiddling with
-		-- locally-defined Ids like data cons and class ops
-		-- which are "born" as GlobalIds
-	| otherwise	 		       = bndr
+	| dont_discard bndr = setIdExported bndr
+	| otherwise	    = bndr
 
     orph_rhs_fvs = unionVarSets [ ruleRhsFreeVars rule
 			        | IdCoreRule _ is_orphan_rule rule <- rules, 

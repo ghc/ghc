@@ -12,7 +12,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..), opt_LiberateCaseThreshold )
 import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )
-import Var		( Id )
+import Var		( Id, setIdNotExported )
 import VarEnv
 import Outputable
 import Util             ( notNull )
@@ -189,8 +189,14 @@ libCaseBind env (Rec pairs)
 	-- We extend the rec-env by binding each Id to its rhs, first
 	-- processing the rhs with an *un-extended* environment, so
 	-- that the same process doesn't occur for ever!
+	--
+	-- Furthermore (subtle!) reset the export flags on the binders so
+	-- that we don't get name clashes on exported things if the 
+	-- local binding floats out to top level.  This is most unlikely
+	-- to happen, since the whole point concerns free variables. 
+	-- But resetting the export flag is right regardless.
 
-    extended_env = addRecBinds env [ (binder, libCase env_body rhs)
+    extended_env = addRecBinds env [ (setIdNotExported binder, libCase env_body rhs)
 				   | (binder, rhs) <- pairs ]
 
     rhs_small_enough rhs = couldBeSmallEnoughToInline lIBERATE_BOMB_SIZE rhs

@@ -733,7 +733,7 @@ It's OK for dfuns to be LocalIds, because we form the instance-env to
 pass on to the next module (md_insts) in CoreTidy, afer tidying
 and globalising the top-level Ids.
 
-BUT make sure they are *exported* LocalIds (setIdLocalExported) so 
+BUT make sure they are *exported* LocalIds (mkExportedLocalId) so 
 that they aren't discarded by the occurrence analyser.
 
 \begin{code}
