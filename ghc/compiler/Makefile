@@ -427,7 +427,6 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-needs-wrapper.hs-incl  \
             primop-can-fail.hs-incl  \
             primop-strictness.hs-incl  \
-            primop-usage.hs-incl  \
             primop-primop-info.hs-incl
 
 CLEAN_FILES += prelude/primops.txt
@@ -462,10 +461,13 @@ primop-can-fail.hs-incl: prelude/primops.txt
 	$(GENPOC) --can-fail           < $< > $@
 primop-strictness.hs-incl: prelude/primops.txt
 	$(GENPOC) --strictness         < $< > $@
-primop-usage.hs-incl: prelude/primops.txt
-	$(GENPOC) --usage              < $< > $@
 primop-primop-info.hs-incl: prelude/primops.txt
 	$(GENPOC) --primop-primop-info < $< > $@
+
+# Usages aren't used any more; but the generator 
+# can still generate them if we want them back
+primop-usage.hs-incl: prelude/primops.txt
+	$(GENPOC) --usage              < $< > $@
 
 
 
