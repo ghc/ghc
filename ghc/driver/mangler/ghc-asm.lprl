@@ -899,7 +899,7 @@ sub mangle_asm {
 	    #    blah_closure:
 	    #		...
             #
-	    if ( $TargetPlatform =~ /^(i386|sparc)/ && $to_move =~ /${T_COPY_DIRVS}/ ) {
+	    if ( $TargetPlatform =~ /^(i386|sparc|powerpc)/ && $to_move =~ /${T_COPY_DIRVS}/ ) {
 		$j = $i + 1;
 		while ( $j < $numchks  && $chk[$j] =~ /$T_CONST_LBL/) {
 			$j++;
