@@ -1127,9 +1127,10 @@ Haskell programs without knowing their typing.
 </title>
 
 <para> Functional dependencies are implemented as described by Mark Jones
-in "Type Classes with Functional Dependencies", Mark P. Jones, 
+in &ldquo;<ulink url="http://www.cse.ogi.edu/~mpj/pubs/fundeps.html">Type Classes with Functional Dependencies</ulink>&rdquo;, Mark P. Jones, 
 In Proceedings of the 9th European Symposium on Programming, 
-ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782.
+ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782,
+.
 </para>
 
 <para>
