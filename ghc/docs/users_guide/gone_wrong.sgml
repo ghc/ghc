@@ -315,7 +315,8 @@ exception (please report it if it does).
 
 <Para>
 Glasgow Haskell is a changing system so there are sure to be bugs in
-it.  Please report them to <Email>glasgow-haskell-bugs@haskell.org</Email>!  (However, please
+it.  Please report them to
+<Email>glasgow-haskell-bugs@haskell.org</Email>!  (However, please
 check the earlier part of this section to be sure it's not a known
 not-really-a problem.)
 </Para>
@@ -331,9 +332,9 @@ Don't omit them because &ldquo;Oh, they won't be interested&hellip;&rdquo;
 <ListItem>
 
 <Para>
- What kind of machine are you running on, and exactly what
-version of the operating system are you using? (<Command>uname -a</Command> or <Command>cat
-/etc/motd</Command> will show the desired information.)
+What kind of machine are you running on, and exactly what version of
+the operating system are you using? (<Command>uname -a</Command> or
+<Command>cat /etc/motd</Command> will show the desired information.)
 
 </Para>
 </ListItem>
@@ -373,8 +374,8 @@ have, etc.
 <ListItem>
 
 <Para>
- If practical, please send enough source files/interface files
-for us to duplicate the problem.
+ If practical, please send enough source files for us to duplicate the
+ problem.
 
 </Para>
 </ListItem>
@@ -434,9 +435,9 @@ it <Emphasis>probably is</Emphasis> a GC bug.
 <ListItem>
 
 <Para>
-If it crashes with the normal
-collector, but not when you force two-space collection (<Option>-F2s</Option>
-runtime flag), then it <Emphasis>probably is</Emphasis> a GC bug.
+If it crashes with the normal collector, but not when you force
+two-space collection (<Option>-G1</Option> runtime flag), then it
+<Emphasis>probably is</Emphasis> a GC bug.
 </Para>
 </ListItem>
 
@@ -445,9 +446,9 @@ runtime flag), then it <Emphasis>probably is</Emphasis> a GC bug.
 </Para>
 
 <Para>
-If it <Emphasis>is</Emphasis> a GC bug, you may be able to avoid it by using a
-particular heap size or by using a <Option>-F2s</Option> runtime flag.  (But don't
-forget to report the bug!!!)
+If it <Emphasis>is</Emphasis> a GC bug, you may be able to avoid it by
+using a particular heap size or by using a <Option>-G1</Option>
+runtime flag.  (But don't forget to report the bug!!!)
 </Para>
 
 <Para>

@@ -120,11 +120,10 @@ to correct it.
 </Para>
 
 <Para>
-The parts of the compiler that seem most prone to wandering off for a
-long time are the abstract interpreters (strictness and update
-analysers).  You can turn these off individually with
-<Option>-fno-strictness</Option><IndexTerm><Primary>-fno-strictness anti-option</Primary></IndexTerm> and
-<Option>-fno-update-analysis</Option>.<IndexTerm><Primary>-fno-update-analysis anti-option</Primary></IndexTerm>
+The part of the compiler that is occasionally prone to wandering off
+for a long time is the strictness analyser.  You can turn this off
+individually with <Option>-fno-strictness</Option>.
+<IndexTerm><Primary>-fno-strictness anti-option</Primary></IndexTerm>
 </Para>
 
 <Para>
@@ -550,16 +549,19 @@ Use <Literal>strip</Literal> on your executables.
 </Para>
 
 <Para>
-&ldquo;I think I have a space leak&hellip;&rdquo;  Re-run your program with
-<Option>+RTS -Sstderr</Option>,<IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> and remove all doubt!
-(You'll see the heap usage get bigger and bigger&hellip;)  &lsqb;Hmmm&hellip;this
-might be even easier with the <Option>-F2s</Option><IndexTerm><Primary>-F2s RTS option</Primary></IndexTerm> RTS
-option; so&hellip; <Command>./a.out +RTS -Sstderr -F2s</Command>...]
+&ldquo;I think I have a space leak&hellip;&rdquo; Re-run your program
+with <Option>+RTS -Sstderr</Option>, and remove all doubt!  (You'll
+see the heap usage get bigger and bigger&hellip;)
+&lsqb;Hmmm&hellip;this might be even easier with the
+<Option>-G1</Option> RTS option; so&hellip; <Command>./a.out +RTS
+-Sstderr -G1</Command>...]
+<IndexTerm><Primary>-G RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm>
 </Para>
 
 <Para>
-Once again, the profiling facilities (<XRef LinkEnd="profiling">) are the basic tool for demystifying the space
-behaviour of your program.
+Once again, the profiling facilities (<XRef LinkEnd="profiling">) are
+the basic tool for demystifying the space behaviour of your program.
 </Para>
 
 <Para>
