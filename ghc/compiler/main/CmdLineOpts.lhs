@@ -99,7 +99,6 @@ module CmdLineOpts (
 	opt_UnboxStrictFields,
 	opt_SimplNoPreInlining,
 	opt_SimplDoEtaReduction,
-	opt_SimplDoCaseElim,
 	opt_SimplDoLambdaEtaExpansion,
 	opt_SimplCaseOfCase,
 	opt_SimplCaseMerge,
@@ -407,7 +406,6 @@ opt_SimplNoPreInlining		= lookUp SLIT("-fno-pre-inlining")
 	-- NoPreInlining is there just to see how bad things
 	-- get if you don't do it!
 opt_SimplDoEtaReduction		= lookUp SLIT("-fdo-eta-reduction")
-opt_SimplDoCaseElim		= lookUp SLIT("-fdo-case-elim")
 opt_SimplDoLambdaEtaExpansion	= lookUp SLIT("-fdo-lambda-eta-expansion")
 opt_SimplCaseOfCase		= lookUp SLIT("-fcase-of-case")
 opt_SimplCaseMerge		= lookUp SLIT("-fcase-merge")

@@ -702,7 +702,6 @@ sub setupOptimiseFlags {
 	'-ffoldr-build-on',
 
         '-fdo-eta-reduction',
-	'-fdo-case-elim',
 	'-fdo-lambda-eta-expansion',
 	'-fcase-of-case',
  	'-fcase-merge',

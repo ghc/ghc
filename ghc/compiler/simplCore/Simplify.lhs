@@ -11,7 +11,6 @@ module Simplify ( simplTopBinds, simplExpr ) where
 import CmdLineOpts	( intSwitchSet,
 			  opt_SccProfilingOn, opt_PprStyle_Debug, opt_SimplDoEtaReduction,
 			  opt_SimplNoPreInlining, opt_DictsStrict, opt_SimplPedanticBottoms,
-			  opt_SimplDoCaseElim,
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
@@ -991,8 +990,12 @@ rebuild scrut (Select _ bndr alts se cont)
 -- 	other problems
        )
 
-    && opt_SimplDoCaseElim
-  =   	-- Get rid of the case altogether
+--    && opt_SimplDoCaseElim
+--	[June 99; don't test this flag.  The code generator dies if it sees
+--		case (\x.e) of f -> ...  
+--	so better to always do it
+
+=   	-- Get rid of the case altogether
 	-- See the extensive notes on case-elimination below
 	-- Remember to bind the binder though!
     tick (CaseElim bndr)		`thenSmpl_` (
