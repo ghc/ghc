@@ -3,10 +3,57 @@
 
   <sect2>
     <title>User-visible compiler changes</title>
+
+    <itemizedlist>
+      <listitem>
+	<para>Several small changes to bring GHC into line with the
+	newest Haskell&nbsp;98 report.</para>
+      </listitem>
+
+      <listitem>
+	<para>RTS options can now be specified using the environment
+	variable <envar>GHCRTS</envar>.</para>
+      </listitem>
+      
+      <listitem>
+	<para>The maximum heap size, set with 
+        <literal>+RTS -M<replaceable>size</replaceable></literal>,
+        now defaults to unlimited.  We recommend however that you set
+        a maximum heap size appropriate for your machine using the
+        <envar>GHCRTS</envar> variable.</para>
+      </listitem>
+
+      <listitem>
+	<para>Thanks to the heroic efforts of Ken Shan
+	<email>ken@digitas.harvard.edu</email>, GHC now works again on
+	the Alpha architecture (just Tru64 at the moment), and many
+	(all?) of the 64-bit bugs have been shaken out.</para>
+      </listitem>
+
+      <listitem>
+	<para>New option: <option>-fno-code</option> which causes GHC
+	to omit code generation and all future compilation stages (see
+	<xref linkend="options-codegen">).</para>
+      </listitem>
+    </itemizedlist>
   </sect2>
 
   <sect2>
     <title>New experimental features</title>
+
+    <itemizedlist>
+      <!-- don't forget: 31-bit support -->
+
+      <listitem>
+	<para>A compacting garbage collector has been added.  It isn't
+	on by default, because it is somewhat slower than the existing
+	copying collector, but can be automatically enabled when
+	memory gets tight by setting the maximum heap size (see <xref
+	linkend="rts-options-gc">).  Compaction works together with
+	the existing generational scheme: it is only used on the
+	oldest generation.</para>
+      </listitem>
+    </itemizedlist>
   </sect2>
 
   <sect2>
@@ -29,15 +76,95 @@
 	See <xref linkend="sec-Dynamic-Exceptions">.</para>
       </listitem>
 
+      <listitem>
+	<para><literal>BlockedOnDeadMVar</literal> and
+        <literal>ThreadKilled</literal> exceptions no longer generate
+        any output by default for forked threads.</para>
+      </listitem>
+
+      <listitem>
+	<para><literal>Weak.addForeignFinalizer</literal> is
+	deprecated; use the <literal>ForeignPtr</literal> library
+	instead.</para>
+      </listitem>
+
+      <listitem>
+	<para>The I/O library has been completely rewritten, using the
+	new FFI libraries and <command>hsc2hs</command>.  The main
+	improvement is to the way streams are handled: simultaneous
+	read and write with multiple threads using a socket or FIFO is
+	now possible, whereas before it was necessary to use two
+	separate handles.</para>
+      </listitem>
+
+      <listitem>
+	<para>As a result of the I/O rewrite, the extensions
+	<literal>IOExts.hConnectTo</literal> and
+	<literal>IOExts.withHandleFor</literal> have been removed.
+	Also, <literal>hGetBuf</literal> and
+	<literal>hPutBuf</literal> have been removed, and
+	<literal>hGetBufFull</literal> and
+	<literal>hPutBufFull</literal> have been renamed to
+	<literal>hGetBuf</literal> and <literal>hPutBuf</literal>
+	respectively (similary for the <literal>BA</literal>
+	versions of these functions).</para>
+      </listitem>
+
+      <listitem>
+	<para><literal>System.exitWith</literal> now throws
+	<literal>ExitException</literal> rather than causing the
+	program to exit immediately.  <literal>ExitException</literal>
+	is by default caught by the top level exception handler in the
+	main thread, where it causes the program to exit.  Hence, calling
+	<literal>System.exitWith</literal> in GHCi no longer causes
+	GHCi itself to exit.</para>
+      </listitem>
+
+      <listitem>
+	<para>New function: <literal>MVar.addMVarFinalizer</literal>
+	(see <xref linkend="sec-MVars">).</para>
+      </listitem>
+
+      <listitem>
+	<para>New module <literal>SystemExts</literal> for useful
+	system-ish functionality (see <xref
+	linkend="sec-SystemExts">).</para>
+      </listitem>
+
+      <listitem>
+	<para><literal>SocketPrim</literal>: added instances of
+	<literal>Eq</literal> and <literal>Show</literal> for the
+	<literal>Socket</literal> type.</para>
+      </listitem>
+
+      <listitem>
+	<para>The implementation of
+	<literal>MarsalAlloc.allocaBytes</literal> now uses GHC's
+	internal allocator and is much faster than before.  As a
+	result, the <literal>UnsafeCString</literal> type and
+	functions are no longer necessary and have been removed from
+	<literal>CString</literal>.</para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
-    <title>Build system changes</title>
-  </sect2>
-
-  <sect2>
     <title>Internal changes</title>
+    <itemizedlist>
+      <listitem>
+	<para>The implementation of the <literal>Array</literal>,
+	<literal>IArray</literal> and <literal>MArray</literal>
+	libraries have been rewritten so that bulk operations like
+	<literal>listArray</literal> and <literal>elems</literal> do
+	less range checking and hence go faster.</para>
+      </listitem>
+
+      <listitem>
+	<para>The <literal>CPUTime</literal> library has been replaced
+	by one written using the FFI.  No externally visible
+	changes.</para>
+      </listitem>
+    </itemizedlist>
   </sect2>
 
 </sect1>
