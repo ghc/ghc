@@ -102,7 +102,7 @@ add perm@(Perm mf fs) p
 
 addopt :: PermParser tok st (a -> b) -> a -> GenParser tok st a -> PermParser tok st b
 addopt perm@(Perm mf fs) x p
-  = Perm (fmap ($x) mf) (first:map insert fs)
+  = Perm (fmap ($ x) mf) (first:map insert fs)
   where
     first   = Branch perm p
     insert (Branch perm' p')
