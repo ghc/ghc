@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.65 $
- * $Date: 2000/04/10 14:28:14 $
+ * $Revision: 1.66 $
+ * $Date: 2000/04/10 15:39:09 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -80,6 +80,8 @@ static Void   local failed            ( Void );
 static String local strCopy           ( String );
 static Void   local browseit	      ( Module,String,Bool );
 static Void   local browse	      ( Void );
+static void   local clearCurrentFile  ( void );
+
 
 /* --------------------------------------------------------------------------
  * Machine dependent code for Hugs interpreter:
@@ -312,8 +314,9 @@ Bool state; {
             *toggle[i].flag = state;
             return;
         }
+    clearCurrentFile();
     ERRMSG(0) "Unknown toggle `%c'", c
-    EEND;
+    EEND_NO_LONGJMP;
 }
 
 static Void local togglesIn(state)      /* Print current list of toggles in*/
@@ -666,7 +669,7 @@ static Void local changeDir() {         /* change directory                */
     String s = readFilename();
     if (s && chdir(s)) {
         ERRMSG(0) "Unable to change to directory \"%s\"", s
-        EEND;
+        EEND_NO_LONGJMP;
     }
 }
 
@@ -1727,6 +1730,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
         bd = type;
 
     if (whatIs(bd)==QUAL) {
+       clearCurrentFile();
        ERRMSG(0) "Unresolved overloading" ETHEN
        ERRTEXT   "\n*** Type       : "    ETHEN ERRTYPE(type);
        ERRTEXT   "\n*** Expression : "    ETHEN ERREXPR(inputExpr);
@@ -1743,6 +1747,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     } else {
         Cell d = provePred(ks,NIL,ap(classShow,bd));
         if (isNull(d)) {
+       clearCurrentFile();
            ERRMSG(0) "Cannot find \"show\" function for:" ETHEN
            ERRTEXT   "\n*** expression : "   ETHEN ERREXPR(inputExpr);
            ERRTEXT   "\n*** of type    : "   ETHEN ERRTYPE(type);
@@ -2266,6 +2271,7 @@ static Void local listNames() {         /* list names matching optional pat*/
         names = addNamesMatching((String)0,names);
     }
     if (isNull(names)) {                /* Then print them out             */
+        clearCurrentFile();
         ERRMSG(0) "No names selected"
         EEND_NO_LONGJMP;
         return;
@@ -2329,7 +2335,6 @@ String argv[]; {
     modConIds = initialize(argc,argv);  /* the initial modules to load     */
     setBreakAction ( HugsIgnoreBreak );
     prelOK    = loadThePrelude();
-    if (combined) everybody(POSTPREL);
 
     if (!prelOK) {
        if (autoMain)
@@ -2339,6 +2344,7 @@ String argv[]; {
        exit(1);
     }    
 
+    if (combined) everybody(POSTPREL);
     loadActions(modConIds);
 
     if (autoMain) {

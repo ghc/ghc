@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/04/10 09:40:03 $
+ * $Revision: 1.29 $
+ * $Date: 2000/04/10 15:39:09 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -208,6 +208,7 @@ static Bool   local tryEndings    ( String );
 
 #if (DOS_FILENAMES || __CYGWIN32__) 
 # define SLASH                   '\\'
+# define SLASH_STR               "\\"
 # define isSLASH(c)              ((c)=='\\' || (c)=='/')
 # define PATHSEP                 ';'
 # define PATHSEP_STR             ";"
@@ -221,6 +222,7 @@ static Bool   local tryEndings    ( String );
 # define DLL_ENDING              ".pef" 
 #else
 # define SLASH                   '/'
+# define SLASH_STR               "/"
 # define isSLASH(c)              ((c)==SLASH)
 # define PATHSEP                 ':'
 # define PATHSEP_STR             ":"
@@ -612,7 +614,7 @@ Bool findFilesForModule (
    Int    nPath;
    Bool   literate;
    String peStart, peEnd;
-   String augdPath;       /* .:hugsPath:installDir/GhcPrel:installDir/lib */
+   String augdPath;       /* .:hugsPath:installDir/../lib/std:installDir/lib */
    Time   oTime,  iTime;
    Bool   oAvail, iAvail;
 
@@ -621,7 +623,7 @@ Bool findFilesForModule (
    *sSize  = *oSize  = *iSize  = 0;
 
    augdPath = malloc( 2*(10+3+strlen(installDir)) 
-                      +strlen(hugsPath) +10/*paranoia*/);
+                      +strlen(hugsPath) +50/*paranoia*/);
    if (!augdPath)
       internal("moduleNameToFileNames: malloc failed(2)");
 
@@ -634,7 +636,11 @@ Bool findFilesForModule (
 
    if (combined) {
       strcat(augdPath, installDir);
-      strcat(augdPath, "GhcPrel");
+      strcat(augdPath, "..");
+      strcat(augdPath, SLASH_STR);
+      strcat(augdPath, "lib");
+      strcat(augdPath, SLASH_STR);
+      strcat(augdPath, "std");
       strcat(augdPath, PATHSEP_STR);
    }
 
@@ -642,7 +648,7 @@ Bool findFilesForModule (
    strcat(augdPath, "lib");
    strcat(augdPath, PATHSEP_STR);
 
-   /*   fprintf ( stderr, "augdpath = `%s'\n", augdPath ); */
+   /* fprintf ( stderr, "augdpath = `%s'\n", augdPath ); */
 
    peEnd = augdPath-1;
    while (1) {
