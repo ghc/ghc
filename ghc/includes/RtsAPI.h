@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.28 2002/07/15 08:41:02 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.29 2002/07/16 10:58:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -122,8 +122,8 @@ rts_checkSchedStatus ( char* site, SchedulerStatus rc);
    These are used by foreign export and foreign import "wrapper" stubs.
    ----------------------------------------------------------------------- */
 
-extern DLL_IMPORT StgClosure GHCziTopHandler_runIO_closure;
-extern DLL_IMPORT StgClosure GHCziTopHandler_runNonIO_closure;
+extern StgClosure GHCziTopHandler_runIO_closure;
+extern StgClosure GHCziTopHandler_runNonIO_closure;
 #define runIO_closure		  (&GHCziTopHandler_runIO_closure)
 #define runNonIO_closure	  (&GHCziTopHandler_runNonIO_closure)
 
