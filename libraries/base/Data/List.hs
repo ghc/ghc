@@ -527,8 +527,8 @@ merge cmp xs [] = xs
 merge cmp [] ys = ys
 merge cmp (x:xs) (y:ys)
  = case x `cmp` y of
-	LT -> x : merge cmp    xs (y:ys)
-	_  -> y : merge cmp (x:xs)   ys
+        GT -> y : merge cmp (x:xs)   ys
+        _  -> x : merge cmp    xs (y:ys)
 
 wrap :: a -> [a]
 wrap x = [x]
