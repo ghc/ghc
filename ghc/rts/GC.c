@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.124 2001/10/17 15:19:24 simonmar Exp $
+ * $Id: GC.c,v 1.125 2001/10/19 09:41:11 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -142,7 +142,6 @@ static void         scavenge_large          ( step * );
 static void         scavenge_static         ( void );
 static void         scavenge_mutable_list   ( generation *g );
 static void         scavenge_mut_once_list  ( generation *g );
-static void         scavengeCAFs            ( void );
 
 #if 0 && defined(DEBUG)
 static void         gcCAFs                  ( void );
@@ -462,7 +461,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     }
   }
 
-  scavengeCAFs();
+  /* follow roots from the CAF list (used by GHCi)
+   */
+  evac_gen = 0;
+  markCAFs(mark_root);
 
   /* follow all the roots that the application knows about.
    */
@@ -3473,15 +3475,14 @@ revertCAFs( void )
 }
 
 void
-scavengeCAFs( void )
+markCAFs( evac_fn evac )
 {
     StgIndStatic *c;
 
-    evac_gen = 0;
     for (c = (StgIndStatic *)caf_list; c != NULL; 
 	 c = (StgIndStatic *)c->static_link) 
     {
-	c->indirectee = evacuate(c->indirectee);
+	evac(&c->indirectee);
     }
 }
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.9 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: GCCompact.c,v 1.10 2001/10/19 09:41:11 sewardj Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -872,6 +872,9 @@ compact( void (*get_roots)(evac_fn) )
 
     // the stable pointer table
     threadStablePtrTable((evac_fn)thread);
+
+    // the CAF list (used by GHCi)
+    markCAFs((evac_fn)thread);
 
     // 2. update forward ptrs
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {

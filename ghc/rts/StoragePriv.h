@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.17 2001/08/08 10:50:37 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.18 2001/10/19 09:41:11 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -91,7 +91,8 @@ int is_not_dynamically_loaded_ptr            ( void* p );
 
 /* Functions from GC.c 
  */
-void threadPaused(StgTSO *);
-StgClosure *isAlive(StgClosure *p);
+extern void         threadPaused ( StgTSO * );
+extern StgClosure * isAlive      ( StgClosure *p );
+extern void         markCAFs     ( evac_fn evac );
 
 #endif /* STORAGEPRIV_H */
