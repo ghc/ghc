@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.23 2001/03/01 20:32:51 qrczak Exp $
+-- $Id: Main.hs,v 1.24 2001/03/04 11:18:03 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -145,19 +145,19 @@ special = do
     pos <- getPosition
     char '#'
     skipMany (oneOf " \t")
-    keyArg pos <|> do
+    keyArg pos pzero <|> do
         char '{'
         skipMany (oneOf " \t")
-        sp <- keyArg pos
+        sp <- keyArg pos (string "\n")
         char '}'
         return sp
 
-keyArg :: SourcePos -> Parser Token
-keyArg pos = do
+keyArg :: SourcePos -> Parser String -> Parser Token
+keyArg pos eol = do
     key <- liftM2 (:) (letter <|> char '_') (many (alphaNum <|> char '_'))
         <?> "hsc directive"
     skipMany (oneOf " \t")
-    arg <- argument pzero
+    arg <- argument eol
     return (Special pos key arg)
 
 argument :: Parser String -> Parser String
