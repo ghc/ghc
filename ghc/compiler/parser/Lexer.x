@@ -157,7 +157,7 @@ $white_no_nl+ 				;
 -- Haskell-style line pragmas, of the form
 --    {-# LINE <line> "<file>" #-}
 <line_prag2> $digit+			{ set_line line_prag2a }
-<line_prag2a> \" $graphic* \"		{ set_file line_prag2b }
+<line_prag2a> \" [$graphic \ ]* \"	{ set_file line_prag2b }
 <line_prag2b> "#-}"			{ pop }
 
 <0,glaexts> {
