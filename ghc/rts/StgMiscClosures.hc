@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.48 2000/09/11 11:17:09 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.49 2000/10/09 11:41:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -160,7 +160,7 @@ STGFUN(mci_make_constrI_entry)
     /* The total number of words to copy off the stack is np + nw.
        That doesn't include tag words, tho.
     */
-    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
+    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constrI_entry, );
     TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
     CCS_ALLOC(CCCS,size); /* ccs prof */
 
@@ -206,7 +206,7 @@ STGFUN(mci_make_constrPP_entry)
     /* The total number of words to copy off the stack is np + nw.
        That doesn't include tag words, tho.
     */
-    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
+    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constrPP_entry, );
     TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
     CCS_ALLOC(CCCS,size); /* ccs prof */
 
