@@ -118,8 +118,10 @@ STGFUN(startPerformIO)
     /* Save away C stack pointer so that we can restore it when we leave
        the Haskell world.
     */
+#if defined(CONCURRENT) && defined(i386_TARGET_ARCH)
     SpB -= BREL(1);
     *SpB = (W_)SAVE_esp;
+#endif
 
     /* Put a World State Token on the B stack */
     /* This is necessary because we've not unboxed it (to reveal a void) yet */
