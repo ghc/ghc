@@ -522,6 +522,10 @@ checkErrsRn (RnDown {rn_errs = errs_var}) l_down
 doptRn :: DynFlag -> RnM d Bool
 doptRn dflag (RnDown { rn_dflags = dflags}) l_down
    = return (dopt dflag dflags)
+
+getDOptsRn :: RnM d DynFlags
+getDOptsRn (RnDown { rn_dflags = dflags}) l_down
+   = return dflags
 \end{code}
 
 

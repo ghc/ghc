@@ -39,14 +39,15 @@ import NameSet
 import OccName		( mkDefaultMethodOcc, isTvOcc )
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys )
-import PrelNames	( deRefStablePtr_RDR, makeStablePtr_RDR, 
+import PrelNames	( deRefStablePtr_RDR, makeStablePtr_RDR,
 			  bindIO_RDR, returnIO_RDR
 			)
 import Bag		( bagToList )
 import List		( partition, nub )
 import Outputable
 import SrcLoc		( SrcLoc )
-import CmdLineOpts	( opt_WarnUnusedMatches, dopt_GlasgowExts )	-- Warn of unused for-all'd tyvars
+import CmdLineOpts	( DynFlags, DynFlag(..) )
+				-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
 import ErrUtils		( Message )
 import CStrings		( isCLabelString )
@@ -155,7 +156,7 @@ rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivin
 
 rnDecl (TyClD (TySynonym name tyvars ty src_loc))
   = pushSrcLocRn src_loc $
-    doptsRn dopt_GlasgowExts			`thenRn` \ glaExts ->
+    doptRn Opt_GlasgowExts			`thenRn` \ glaExts ->
     lookupTopBndrRn name			`thenRn` \ name' ->
     bindTyVarsFVRn syn_doc tyvars 		$ \ tyvars' ->
     rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ (ty', ty_fvs) ->
@@ -574,7 +575,7 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- Explicitly quantified but not mentioned in ctxt or tau
 	warn_guys			= filter (`notElem` mentioned) forall_tyvar_names
     in
-    mapRn_ (forAllWarn doc tau) warn_guys			`thenRn_`
+    mapRn_ (forAllWarn doc tau) warn_guys	`thenRn_`
     rnForAll doc forall_tyvars ctxt tau
 
 rnHsType doc (HsTyVar tyvar)
@@ -911,23 +912,24 @@ badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
 forAllWarn doc ty tyvar
-  | not opt_WarnUnusedMatches = returnRn ()
-  | otherwise
-  = getModeRn		`thenRn` \ mode ->
-    case mode of {
+  = doptRn Opt_WarnUnusedMatches `thenRn` \ warn_unused -> case () of
+    () | not warn_unused -> returnRn ()
+       | otherwise
+       -> getModeRn		`thenRn` \ mode ->
+          case mode of {
 #ifndef DEBUG
-	InterfaceMode -> returnRn () ;	-- Don't warn of unused tyvars in interface files
-					-- unless DEBUG is on, in which case it is slightly
-					-- informative.  They can arise from mkRhsTyLam,
-#endif					-- leading to (say) 	f :: forall a b. [b] -> [b]
-	other ->
-
-    addWarnRn (
-      sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
-	   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
-      $$
-      (ptext SLIT("In") <+> doc))
-    }
+	     InterfaceMode -> returnRn () ; -- Don't warn of unused tyvars in interface files
+		                            -- unless DEBUG is on, in which case it is slightly
+					    -- informative.  They can arise from mkRhsTyLam,
+#endif					    -- leading to (say) 	f :: forall a b. [b] -> [b]
+	     other ->
+		addWarnRn (
+		   sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
+		   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
+		   $$
+		   (ptext SLIT("In") <+> doc)
+                )
+          }
 
 badRuleLhsErr name lhs
   = sep [ptext SLIT("Rule") <+> ptext name <> colon,

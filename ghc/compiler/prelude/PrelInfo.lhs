@@ -10,7 +10,8 @@ module PrelInfo (
 
 	wiredInNames, 	-- Names of wired in things
 	wiredInThings,
-
+	maybeWiredInTyConName,
+	maybeWiredInIdName,
 	
 	-- Primop RdrNames
 	eqH_Char_RDR,   ltH_Char_RDR,   eqH_Word_RDR,  ltH_Word_RDR, 
@@ -39,11 +40,12 @@ import MkId		-- All of it, for re-export
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
 import HscTypes 	( TyThing(..) )
+import Id		( Id, idName )
 
 -- others:
 import RdrName		( RdrName )
 import Name		( Name, getName )
-import TyCon		( tyConDataConsIfAvailable, TyCon )
+import TyCon		( tyConDataConsIfAvailable, TyCon, tyConName )
 import Class	 	( Class, classKey )
 import Type		( funTyCon )
 import Bag
@@ -85,6 +87,18 @@ tyThingNames (ATyCon tc)
    = getName tc : [ getName n | dc <- tyConDataConsIfAvailable tc, 
                                 n  <- [dataConId dc, dataConWrapId dc] ]
 						-- Synonyms return empty list of constructors
+
+maybeWiredInIdName :: Name -> Maybe Id
+maybeWiredInIdName nm
+   = case filter ((== nm).idName) wiredInIds of
+        []     -> Nothing
+        (i:is) -> Just i
+
+maybeWiredInTyConName :: Name -> Maybe TyCon
+maybeWiredInTyConName nm
+   = case filter ((== nm).tyConName) wiredInTyCons of
+        []       -> Nothing
+        (tc:tcs) -> Just tc
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make

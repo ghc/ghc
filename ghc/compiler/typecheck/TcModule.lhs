@@ -43,7 +43,7 @@ import Type		( funResultTy, splitForAllTys )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
 import Id		( idType, idName, idUnfolding )
-import Module           ( Module, moduleName, {-mkThisModule,-} plusModuleEnv )
+import Module           ( Module, moduleName, plusModuleEnv )
 import Name		( nameOccName, isLocallyDefined, isGlobalName,
 			  toRdrName, nameEnvElts, emptyNameEnv
 			)
@@ -83,12 +83,13 @@ data TcResults
 ---------------
 typecheckModule
 	:: DynFlags
+	-> Module
 	-> PersistentCompilerState
 	-> HomeSymbolTable
 	-> RenamedHsModule
 	-> IO (Maybe (TcEnv, TcResults))
 
-typecheckModule dflags pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
+typecheckModule dflags this_mod pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
   = do env <- initTcEnv global_symbol_table
        (maybe_result, (errs,warns)) <- initTc dflags env src_loc tc_module
        printErrorsAndWarnings (errs,warns)
@@ -98,7 +99,6 @@ typecheckModule dflags pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
          else 
           return maybe_result
   where
-    this_mod	        = panic "mkThisModule: unimp"  -- WAS: mkThisModule
     global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
 
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst this_mod decls unf_env)

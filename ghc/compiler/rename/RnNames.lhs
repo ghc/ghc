@@ -10,38 +10,40 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_NoImplicitPrelude )
 
-import HsSyn	( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
-		  collectTopBinders
-		)
-import RdrHsSyn	( RdrNameIE, RdrNameImportDecl,
-		  RdrNameHsModule, RdrNameHsDecl
-		)
-import RnIfaces	( getInterfaceExports, getDeclBinders, 
-		  recordLocalSlurps, checkModUsage, findAndReadIface, outOfDate
-		)
+import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
+			  collectTopBinders
+			)
+import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
+			  RdrNameHsModule, RdrNameHsDecl
+			)
+import RnIfaces		( getInterfaceExports, getDeclBinders, 
+			  recordLocalSlurps, checkModUsage, 
+			  outOfDate, findAndReadIface )
 import RnEnv
 import RnMonad
 
 import FiniteMap
-import PrelNames ( pRELUDE_Name, mAIN_Name, main_RDR )
-import UniqFM	( lookupUFM )
-import Bag	( bagToList )
-import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
+import PrelNames	( pRELUDE_Name, mAIN_Name, main_RDR )
+import UniqFM		( lookupUFM )
+import Bag		( bagToList )
+import Module		( ModuleName, mkModuleInThisPackage, WhereFrom(..) )
 import NameSet
-import Name	( Name, ImportReason(..), Provenance(..),
-		  setLocalNameSort, nameOccName,  nameEnvElts
-		)
-import RdrName	( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isQual, isUnqual )
-import OccName	( setOccNameSpace, dataName )
-import NameSet	( elemNameSet, emptyNameSet )
+import Name		( Name, nameSrcLoc,
+			  setLocalNameSort, nameOccName,  nameEnvElts )
+import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
+			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv )
+import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, 
+			  isQual, isUnqual )
+import OccName		( setOccNameSpace, dataName )
+import NameSet		( elemNameSet, emptyNameSet )
 import Outputable
-import Maybes	( maybeToBool, catMaybes, mapMaybe )
-import UniqFM   ( emptyUFM, listToUFM )
-import ListSetOps ( removeDups )
-import Util	( sortLt )
-import List	( partition )
+import Maybes		( maybeToBool, catMaybes, mapMaybe )
+import UniqFM		( emptyUFM, listToUFM )
+import ListSetOps	( removeDups )
+import Util		( sortLt )
+import List		( partition )
 \end{code}
 
 
@@ -176,7 +178,7 @@ checkEarlyExit mod_name
 	-- CHECK WHETHER WE HAVE IT ALREADY
     case maybe_iface of
 	Left err -> 	-- Old interface file not found, so we'd better bail out
-		    traceRn (vcat [ptext SLIT("No old interface file for") <+> pprModuleName mod_name,
+		    traceRn (vcat [ptext SLIT("No old interface file for") <+> ppr mod_name,
 				   err])			`thenRn_`
 		    returnRn (outOfDate, Nothing)
 
@@ -192,7 +194,7 @@ checkEarlyExit mod_name
 	     returnRn (up_to_date, Just iface)
   where
 	-- Only look in current directory, with suffix .hi
-    doc_str = sep [ptext SLIT("need usage info from"), pprModuleName mod_name]
+    doc_str = sep [ptext SLIT("need usage info from"), ppr mod_name]
 \end{code}
 	
 \begin{code}
@@ -215,7 +217,7 @@ importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod i
 
     let
 	mk_provenance name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-					 (is_unqual name))
+					 (is_unqual name)
     in
 
     qualifyImports imp_mod_name
@@ -253,7 +255,7 @@ importsFromLocalDecls mod_name rec_exp_fn decls
 		   (\n -> LocalDef)	-- Provenance is local
 		   avails
   where
-    mod = mkThisModule mod_name
+    mod = mkModuleInThisPackage mod_name
 
 getLocalDeclBinders :: Module 
 		    -> (Name -> Bool)	-- Is-exported predicate
@@ -531,8 +533,10 @@ exportsFromAvail this_mod Nothing export_avails global_name_env
 exportsFromAvail this_mod (Just export_items) 
 		 (mod_avail_env, entity_avail_env)
 	         global_name_env
-  = foldlRn exports_from_item
-	    ([], emptyFM, emptyAvailEnv) export_items	`thenRn` \ (_, _, export_avail_map) ->
+  = doptRn Opt_WarnDuplicateExports 		`thenRn` \ warn_dup_exports ->
+    foldlRn (exports_from_item warn_dup_exports)
+	    ([], emptyFM, emptyAvailEnv) export_items
+						`thenRn` \ (_, _, export_avail_map) ->
     let
 	export_avails :: [AvailInfo]
 	export_avails   = nameEnvElts export_avail_map
@@ -540,12 +544,11 @@ exportsFromAvail this_mod (Just export_items)
     returnRn export_avails
 
   where
-    exports_from_item :: ExportAccum -> RdrNameIE -> RnMG ExportAccum
+    exports_from_item :: Bool -> ExportAccum -> RdrNameIE -> RnMG ExportAccum
 
-    exports_from_item acc@(mods, occs, avails) ie@(IEModuleContents mod)
+    exports_from_item warn_dups acc@(mods, occs, avails) ie@(IEModuleContents mod)
 	| mod `elem` mods 	-- Duplicate export of M
-	= warnCheckRn opt_WarnDuplicateExports
-		      (dupModuleExport mod)	`thenRn_`
+	= warnCheckRn warn_dups (dupModuleExport mod)	`thenRn_`
 	  returnRn acc
 
 	| otherwise
@@ -558,12 +561,12 @@ exportsFromAvail this_mod (Just export_items)
 				   in
 				   returnRn (mod:mods, occs', avails')
 
-    exports_from_item acc@(mods, occs, avails) ie
+    exports_from_item warn_dups acc@(mods, occs, avails) ie
 	| not (maybeToBool maybe_in_scope) 
 	= failWithRn acc (unknownNameErr (ieName ie))
 
 	| not (null dup_names)
-	= addNameClashErrRn rdr_name (name:dup_names)	`thenRn_`
+	= addNameClashErrRn rdr_name ((name,prov):dup_names)	`thenRn_`
 	  returnRn acc
 
 #ifdef DEBUG
@@ -587,7 +590,7 @@ exportsFromAvail this_mod (Just export_items)
        where
 	  rdr_name	  = ieName ie
           maybe_in_scope  = lookupFM global_name_env rdr_name
-	  Just ((name,_):dup_names) = maybe_in_scope
+	  Just ((name,prov):dup_names) = maybe_in_scope
 	  maybe_avail        = lookupUFM entity_avail_env name
 	  Just avail         = maybe_avail
  	  maybe_export_avail = filterAvail ie avail
@@ -602,14 +605,15 @@ exportsFromAvail this_mod (Just export_items)
 
 check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> RnMG ExportOccMap
 check_occs ie occs avail 
-  = foldlRn check occs (availNames avail)
+  = doptRn Opt_WarnDuplicateExports	`thenRn` \ warn_dup_exports ->
+    foldlRn (check warn_dup_exports) occs (availNames avail)
   where
-    check occs name
+    check warn_dup occs name
       = case lookupFM occs name_occ of
 	  Nothing	    -> returnRn (addToFM occs name_occ (name, ie))
 	  Just (name', ie') 
 	    | name == name' -> 	-- Duplicate export
-				warnCheckRn opt_WarnDuplicateExports
+				warnCheckRn warn_dup
 					    (dupExportWarn name_occ ie ie')
 				`thenRn_` returnRn occs
 
@@ -630,7 +634,7 @@ mk_export_fn exported_names = \name ->  name `elemNameSet` exported_names
 
 \begin{code}
 badImportItemErr mod ie
-  = sep [ptext SLIT("Module"), quotes (pprModuleName mod), 
+  = sep [ptext SLIT("Module"), quotes (ppr mod), 
 	 ptext SLIT("does not export"), quotes (ppr ie)]
 
 dodgyImportWarn mod item = dodgyMsg (ptext SLIT("import")) item
@@ -642,7 +646,7 @@ dodgyMsg kind item@(IEThingAll tc)
 	  ptext SLIT("but it has none; it is a type synonym or abstract type or class") ]
 	  
 modExportErr mod
-  = hsep [ ptext SLIT("Unknown module in export list: module"), quotes (pprModuleName mod)]
+  = hsep [ ptext SLIT("Unknown module in export list: module"), quotes (ppr mod)]
 
 exportItemErr export_item
   = sep [ ptext SLIT("The export item") <+> quotes (ppr export_item),
@@ -667,6 +671,6 @@ dupExportWarn occ_name ie1 ie2
 
 dupModuleExport mod
   = hsep [ptext SLIT("Duplicate"),
-	  quotes (ptext SLIT("Module") <+> pprModuleName mod), 
+	  quotes (ptext SLIT("Module") <+> ppr mod), 
           ptext SLIT("in export list")]
 \end{code}

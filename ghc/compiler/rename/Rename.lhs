@@ -15,14 +15,13 @@ import RnHsSyn		( RenamedHsModule, RenamedHsDecl,
 			  extractHsTyNames, extractHsCtxtTyNames
 			)
 
-import CmdLineOpts	( dopt_D_dump_rn_trace, dopt_D_dump_minimal_imports,
-			  opt_D_dump_rn, opt_D_dump_rn_stats, opt_WarnDeprecations,
-			  opt_WarnUnusedBinds
-		        )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
+import Finder		( Finder )
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
-import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, getInterfaceExports,
+import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, 
+			  getInterfaceExports,
 			  getImportedRules, getSlurped, removeContext,
 			  loadBuiltinRules, getDeferredDecls, ImportDeclResult(..)
 			)
@@ -33,12 +32,13 @@ import RnEnv		( availName, availsToNameSet,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
-			  moduleNameUserString, mkSearchPath, moduleName, mkThisModule
+			  moduleNameUserString, moduleName, mkModuleInThisPackage
 			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
-			  nameOccName, nameUnique, nameModule, maybeUserImportedFrom,
-			  isUserImportedExplicitlyName, isUserImportedName,
-			  maybeWiredInTyConName, maybeWiredInIdName,
+			  nameOccName, nameUnique, nameModule, 
+--			  maybeUserImportedFrom,
+--			  isUserImportedExplicitlyName, isUserImportedName,
+--			  maybeWiredInTyConName, maybeWiredInIdName,
 			  isUserExportedName, toRdrName,
 			  nameEnvElts, extendNameEnv
 			)
@@ -53,7 +53,8 @@ import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
 			  unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
 			  eqString_RDR
 			)
-import PrelInfo		( fractionalClassKeys, derivingOccurrences )
+import PrelInfo		( fractionalClassKeys, derivingOccurrences,
+			  maybeWiredInTyConName, maybeWiredInIdName )
 import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( Version, initialVersion )
@@ -67,28 +68,40 @@ import SrcLoc		( noSrcLoc )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
 import IO		( openFile, IOMode(..) )
+import HscTypes		( PersistentCompilerState, HomeSymbolTable, GlobalRdrEnv,
+			  AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
+			  Provenance(..), ImportReason(..) )
+
+-- HACKS:
+maybeUserImportedFrom        = panic "maybeUserImportedFrom"
+isUserImportedExplicitlyName = panic "isUserImportedExplicitlyName"
+isUserImportedName           = panic "isUserImportedName"
+iDeprecs                     = panic "iDeprecs"
+type FixityEnv = LocalFixityEnv
 \end{code}
 
 
 
 \begin{code}
-type RenameResult = ( PersistentCompilerState,
+type RenameResult = ( PersistentCompilerState
 		    , Module		-- This module
 		    , RenamedHsModule	-- Renamed module
 		    , Maybe ParsedIface	-- The existing interface file, if any
 		    , ParsedIface	-- The new interface
 		    , [Module])		-- Imported modules
 		   
-renameModule :: PersistentCompilerState -> HomeSymbolTable
+renameModule :: DynFlags -> Finder 
+	     -> PersistentCompilerState -> HomeSymbolTable
 	     -> RdrNameHsModule -> IO (Maybe RenameResult)
-renameModule old_pcs hst this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
+renameModule dflags finder old_pcs hst 
+             this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
     do {
-	((maybe_rn_stuff, dump_action), msgs, new_pcs) 
+	((maybe_rn_stuff, dump_action), (rn_warns_bag, rn_errs_bag), new_pcs) 
 	   <- initRn dflags finder old_pcs hst loc (rename this_mod) ;
 
 	-- Check for warnings
-	printErrorsAndWarnings msgs ;
+	printErrorsAndWarnings (rn_warns_bag, rn_errs_bag) ;
 
 	-- Dump any debugging output
 	dump_action ;
@@ -170,7 +183,7 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 	user_import ImportByUserSource = True
 	user_import _ = False
 
-	this_module	   = mkThisModule mod_name
+	this_module	   = mkModuleInThisPackage mod_name
 
 	-- Export only those fixities that are for names that are
 	--	(a) defined in this module
@@ -596,24 +609,26 @@ getInstDeclGates other				    = emptyFVs
 \begin{code}
 fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG FixityEnv
 fixitiesFromLocalDecls gbl_env decls
-  = foldlRn getFixities emptyNameEnv decls				`thenRn` \ env -> 
-    traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts env)))	`thenRn_`
+  = doptRn Opt_WarnUnusedBinds				  `thenRn` \ warn_unused ->
+    foldlRn (getFixities warn_unused) emptyNameEnv decls  `thenRn` \ env -> 
+    traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts env)))
+							  `thenRn_`
     returnRn env
   where
-    getFixities :: FixityEnv -> RdrNameHsDecl -> RnMG FixityEnv
-    getFixities acc (FixD fix)
-      = fix_decl acc fix
+    getFixities :: Bool -> FixityEnv -> RdrNameHsDecl -> RnMG FixityEnv
+    getFixities warn_uu acc (FixD fix)
+      = fix_decl warn_uu acc fix
 
-    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ ))
-      = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
+    getFixities warn_uu acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ ))
+      = foldlRn (fix_decl warn_uu) acc [sig | FixSig sig <- sigs]
 		-- Get fixities from class decl sigs too.
-    getFixities acc other_decl
+    getFixities warn_uu acc other_decl
       = returnRn acc
 
-    fix_decl acc sig@(FixitySig rdr_name fixity loc)
+    fix_decl warn_uu acc sig@(FixitySig rdr_name fixity loc)
 	= 	-- Check for fixity decl for something not declared
 	  case lookupRdrEnv gbl_env rdr_name of {
-	    Nothing | opt_WarnUnusedBinds 
+	    Nothing | warn_uu
 		    -> pushSrcLocRn loc (addWarnRn (unusedFixityDecl rdr_name fixity))
 		       `thenRn_` returnRn acc 
 		    | otherwise -> returnRn acc ;
@@ -718,7 +733,7 @@ reportUnusedNames mod_name direct_import_mods
 	bad_locals     = [n     | (n,LocalDef) <- defined_but_not_used]
 	
 	bad_imp_names :: [(Name,Provenance)]
-	bad_imp_names  = [(n,p) | (n,p@(UserImport mod _ True) <- defined_but_not_used,
+	bad_imp_names  = [(n,p) | (n,p@(UserImport mod _ True)) <- defined_but_not_used,
 				  not (module_unused mod)]
 
 	deprec_used deprec_env = [ (n,txt)
@@ -783,13 +798,18 @@ reportUnusedNames mod_name direct_import_mods
     warnUnusedImports bad_imp_names				`thenRn_`
     printMinimalImports mod_name minimal_imports		`thenRn_`
     getIfacesRn							`thenRn` \ ifaces ->
-    (if opt_WarnDeprecations
+    doptRn Opt_WarnDeprecations					`thenRn` \ warn_drs ->
+    (if warn_drs
 	then mapRn_ warnDeprec (deprec_used (iDeprecs ifaces))
 	else returnRn ())
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports mod_name imps
-  | not opt_D_dump_minimal_imports
+  = doptRn Opt_D_dump_minimal_imports		`thenRn` \ dump_minimal ->
+    printMinimalImports_wrk dump_minimal mod_name imps
+
+printMinimalImports_wrk dump_minimal mod_name imps
+  | not dump_minimal
   = returnRn ()
   | otherwise
   = mapRn to_ies (fmToList imps)		`thenRn` \ mod_ies ->
@@ -825,16 +845,16 @@ rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 	-> [RenamedHsDecl] 	-- Renamed local decls
 	-> RnMG (IO ())
 rnDump imp_decls local_decls
-        | opt_D_dump_rn_trace || 
-	  opt_D_dump_rn_stats ||
-	  opt_D_dump_rn 
- 	= getRnStats imp_decls		`thenRn` \ stats_msg ->
-
-	  returnRn (printErrs stats_msg >> 
-		    dumpIfSet opt_D_dump_rn "Renamer:" 
-			      (vcat (map ppr (local_decls ++ imp_decls))))
-
-	| otherwise = returnRn (return ())
+   = doptRn Opt_D_dump_rn_trace 	`thenRn` \ dump_rn_trace ->
+     doptRn Opt_D_dump_rn_stats 	`thenRn` \ dump_rn_stats ->
+     doptRn Opt_D_dump_rn 		`thenRn` \ dump_rn ->
+     if dump_rn_trace || dump_rn_stats || dump_rn then
+ 	getRnStats imp_decls		`thenRn` \ stats_msg ->
+	returnRn (printErrs stats_msg >> 
+	          dumpIfSet dump_rn "Renamer:" 
+			    (vcat (map ppr (local_decls ++ imp_decls))))
+     else
+	returnRn (return ())
 \end{code}
 
 

@@ -24,7 +24,7 @@ module Module
       Module, moduleName
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
-    , isModuleInThisPackage
+    , isModuleInThisPackage, mkModuleInThisPackage
 
     , moduleNameString		-- :: ModuleName -> EncodedString
     , moduleNameUserString	-- :: ModuleName -> UserString
@@ -181,6 +181,10 @@ mkModuleNameFS s = ModuleName (encodeFS s)
 -- used to be called mkSysModuleFS
 mkSysModuleNameFS :: EncodedFS -> ModuleName
 mkSysModuleNameFS s = ModuleName s 
+
+-- Make a module in this package
+mkModuleInThisPackage :: ModuleName -> Module
+mkModuleInThisPackage nm = Module nm ThisPackage
 \end{code}
 
 \begin{code}

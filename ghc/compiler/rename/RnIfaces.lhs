@@ -4,10 +4,9 @@
 \section[RnIfaces]{Cacheing and Renaming of Interfaces}
 
 \begin{code}
-module RnIfaces (
-#if 1
-	lookupFixityRn
-#else
+module RnIfaces
+#if 0
+       (
  	findAndReadIface, 
 
 	getInterfaceExports, getDeferredDecls,
@@ -20,8 +19,9 @@ module RnIfaces (
 
 	getDeclBinders, getDeclSysBinders,
 	removeContext	 	-- removeContext probably belongs somewhere else
+       )
 #endif
-    ) where
+where
 
 #include "HsVersions.h"
 
@@ -72,7 +72,26 @@ import List	( nub )
 
 #if 1
 import Panic ( panic )
-lookupFixityRn = panic "lookupFixityRn"
+lookupFixityRn      = panic "lookupFixityRn"
+findAndReadIface    = panic "findAndReadIface"
+getInterfaceExports = panic "getInterfaceExports"
+getDeclBinders      = panic "getDeclBinders"
+recordLocalSlurps   = panic "recordLocalSlurps"
+checkModUsage       = panic "checkModUsage"
+outOfDate           = panic "outOfDate"
+getSlurped          = panic "getSlurped"
+removeContext       = panic "removeContext"
+loadBuiltinRules    = panic "loadBuiltinRules"
+getDeferredDecls    = panic "getDeferredDecls"
+data ImportDeclResult
+  = AlreadySlurped
+  | WiredIn	
+  | Deferred
+  | HereItIs (Module, RdrNameHsDecl)
+getImportedInstDecls = panic "getImportedInstDecls"
+importDecl           = panic "importDecl"
+mkImportExportInfo   = panic "mkImportExportInfo"
+getImportedRules     = panic "getImportedRules"
 #else
 \end{code}
 
