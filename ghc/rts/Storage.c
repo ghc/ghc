@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.60 2002/03/21 11:23:59 sebc Exp $
+ * $Id: Storage.c,v 1.61 2002/04/19 12:31:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,39 +27,18 @@
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
 
 #ifdef darwin_TARGET_OS
-#include <mach/mach.h>
-#include <mach/task.h>
-#include <mach/message.h>
-#include <mach/vm_prot.h>
-#include <mach/vm_region.h>
 #include <mach-o/getsect.h>
 unsigned long macho_etext = 0;
 unsigned long macho_edata = 0;
-#define IN_RANGE(base,size,x) (((P_)base) <= ((P_)x) && ((P_)x) < ((P_)((unsigned long)base + size)))
+
 static void macosx_get_memory_layout(void)
 {
-  vm_address_t address;
-  vm_size_t size;
-  struct vm_region_basic_info info;
-  mach_msg_type_number_t info_count;
-  mach_port_t object_name;
-  task_t task = mach_task_self();
-  P_ in_text = ((P_*)(&stg_BLACKHOLE_info))[0];
-  P_ in_data = (P_)&stg_dummy_ret_closure;
+  struct segment_command *seg;
 
-  address = 0; /* VM_MIN_ADDRESS */
-  while (1) {
-    info_count = VM_REGION_BASIC_INFO_COUNT;
-    if (vm_region(task, &address, &size, VM_REGION_BASIC_INFO,
-		  (vm_region_info_t)&info, &info_count, &object_name)
-	!= KERN_SUCCESS)
-      break;
-    if (IN_RANGE(address, size, in_text))
-      macho_etext = address + size;
-    if (IN_RANGE(address, size, in_data))
-      macho_edata = address + size;
-    address += size;
-  }
+  seg = getsegbyname("__TEXT");
+  macho_etext = seg->vmaddr + seg->vmsize;
+  seg = getsegbyname("__DATA");
+  macho_edata = seg->vmaddr + seg->vmsize;
 }
 #endif
 
