@@ -72,7 +72,6 @@ import {-# SOURCE #-} GHC.Unicode	( isDigit )
 import GHC.Num
 import GHC.Real
 import GHC.Float
-import GHC.List
 import GHC.Show
 import GHC.Base
 import GHC.Arr
@@ -533,7 +532,7 @@ instance (Integral a, Read a) => Read (Ratio a) where
 
 %*********************************************************
 %*							*
-\subsection{Tuple instances of Read}
+	Tuple instances of Read, up to size 15
 %*							*
 %*********************************************************
 
@@ -550,71 +549,145 @@ instance Read () where
   readList     = readListDefault
 
 instance (Read a, Read b) => Read (a,b) where
-  readPrec =
-    parens
-    ( paren
-      ( do x <- readPrec
-           L.Punc "," <- lexP
-           y <- readPrec
-           return (x,y)
-      )
-    )
-
+  readPrec = wrap_tup read_tup2
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+wrap_tup :: ReadPrec a -> ReadPrec a
+wrap_tup p = parens (paren p)
+
+read_comma :: ReadPrec ()
+read_comma = do { L.Punc "," <- lexP; return () }
+
+read_tup2 :: (Read a, Read b) => ReadPrec (a,b)
+-- Reads "a , b"  no parens!
+read_tup2 = do x <- readPrec
+	       read_comma
+	       y <- readPrec
+	       return (x,y)
+
+read_tup4 :: (Read a, Read b, Read c, Read d) => ReadPrec (a,b,c,d)
+read_tup4 = do	(a,b) <- read_tup2
+		read_comma
+		(c,d) <- read_tup2
+		return (a,b,c,d)
+
+
+read_tup8 :: (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h)
+	  => ReadPrec (a,b,c,d,e,f,g,h)
+read_tup8 = do	(a,b,c,d) <- read_tup4
+		read_comma
+		(e,f,g,h) <- read_tup4
+		return (a,b,c,d,e,f,g,h)
+
 
 instance (Read a, Read b, Read c) => Read (a, b, c) where
-  readPrec =
-    parens
-    ( paren
-      ( do x <- readPrec
-           L.Punc "," <- lexP
-           y <- readPrec
-           L.Punc "," <- lexP
-           z <- readPrec
-           return (x,y,z)
-      )
-    )
-
+  readPrec = wrap_tup (do { (a,b) <- read_tup2; read_comma 
+			  ; c <- readPrec 
+			  ; return (a,b,c) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d) => Read (a, b, c, d) where
-  readPrec =
-    parens
-    ( paren
-      ( do w <- readPrec
-           L.Punc "," <- lexP
-           x <- readPrec
-           L.Punc "," <- lexP
-           y <- readPrec
-           L.Punc "," <- lexP
-           z <- readPrec
-           return (w,x,y,z)
-      )
-    )
-
+  readPrec = wrap_tup read_tup4
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
-  readPrec =
-    parens
-    ( paren
-      ( do v <- readPrec
-           L.Punc "," <- lexP
-           w <- readPrec
-           L.Punc "," <- lexP
-           x <- readPrec
-           L.Punc "," <- lexP
-           y <- readPrec
-           L.Punc "," <- lexP
-           z <- readPrec
-           return (v,w,x,y,z)
-      )
-    )
+  readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
+			  ; e <- readPrec
+			  ; return (a,b,c,d,e) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
 
+instance (Read a, Read b, Read c, Read d, Read e, Read f)
+	=> Read (a, b, c, d, e, f) where
+  readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
+			  ; (e,f) <- read_tup2
+			  ; return (a,b,c,d,e,f) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g)
+	=> Read (a, b, c, d, e, f, g) where
+  readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
+			  ; (e,f) <- read_tup2; read_comma
+			  ; g <- readPrec
+			  ; return (a,b,c,d,e,f,g) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h)
+	=> Read (a, b, c, d, e, f, g, h) where
+  readPrec     = wrap_tup read_tup8
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
+	  Read i)
+	=> Read (a, b, c, d, e, f, g, h, i) where
+  readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
+			  ; i <- readPrec
+			  ; return (a,b,c,d,e,f,g,h,i) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
+	  Read i, Read j)
+	=> Read (a, b, c, d, e, f, g, h, i, j) where
+  readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
+			  ; (i,j) <- read_tup2
+			  ; return (a,b,c,d,e,f,g,h,i,j) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
+	  Read i, Read j, Read k)
+	=> Read (a, b, c, d, e, f, g, h, i, j, k) where
+  readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
+			  ; (i,j) <- read_tup2; read_comma
+			  ; k <- readPrec
+			  ; return (a,b,c,d,e,f,g,h,i,j,k) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
+	  Read i, Read j, Read k, Read l)
+	=> Read (a, b, c, d, e, f, g, h, i, j, k, l) where
+  readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
+			  ; (i,j,k,l) <- read_tup4
+			  ; return (a,b,c,d,e,f,g,h,i,j,k,l) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
+	  Read i, Read j, Read k, Read l, Read m)
+	=> Read (a, b, c, d, e, f, g, h, i, j, k, l, m) where
+  readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
+			  ; (i,j,k,l) <- read_tup4; read_comma
+			  ; m <- readPrec
+			  ; return (a,b,c,d,e,f,g,h,i,j,k,l,m) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
+	  Read i, Read j, Read k, Read l, Read m, Read n)
+	=> Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n) where
+  readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
+			  ; (i,j,k,l) <- read_tup4; read_comma
+			  ; (m,n) <- read_tup2
+			  ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n) })
+  readListPrec = readListPrecDefault
+  readList     = readListDefault
+
+instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
+	  Read i, Read j, Read k, Read l, Read m, Read n, Read o)
+	=> Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) where
+  readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
+			  ; (i,j,k,l) <- read_tup4; read_comma
+			  ; (m,n) <- read_tup2; read_comma
+			  ; o <- readPrec
+			  ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 \end{code}
