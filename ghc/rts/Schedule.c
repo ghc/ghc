@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.197 2004/05/27 15:18:31 simonmar Exp $
+ * $Id: Schedule.c,v 1.198 2004/05/27 15:21:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -395,7 +395,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
 #endif
 
-//     IF_DEBUG(scheduler, printAllThreads());
+     IF_DEBUG(scheduler, printAllThreads());
 
 #if defined(RTS_SUPPORTS_THREADS)
       // Yield the capability to higher-priority tasks if necessary.
