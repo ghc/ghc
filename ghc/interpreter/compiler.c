@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.26 $
- * $Date: 2000/04/06 14:23:55 $
+ * $Revision: 1.27 $
+ * $Date: 2000/04/11 16:36:53 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1490,6 +1490,27 @@ Void evalExp ( void ) {             /* compile and run input expression    */
        unless doRevertCAFs below is permanently TRUE.
      */
     /* initScheduler(); */
+
+    /* Further comments, JRS 000411.
+       When control returns to Hugs, you have to be pretty careful about
+       the state of the heap.  In particular, hugs.c may subsequently call
+       nukeModule() in storage.c, which removes modules from the system.
+       If a module defines a particular data constructor, the relevant
+       info table is also free()d.  That gives a problem if there are
+       still closures hanging round in the heap with references to that
+       info table.
+
+       The solution is to firstly to revert CAFs, and then force a major
+       collection in between transitions from the mutation, ie actually
+       running Haskell, and nukeModule.  Since major GCs are potentially
+       expensive, we don't want to do one at every call to nukeModule,
+       so the flag nukeModule_needs_major_gc is used to signal when one
+       is needed.
+
+       This all also seems to imply that doRevertCAFs should always
+       be TRUE.
+    */
+
 #   ifdef CRUDE_PROFILING
     cp_init();
 #   endif
@@ -1499,6 +1520,7 @@ Void evalExp ( void ) {             /* compile and run input expression    */
         SchedulerStatus status;
         Bool            doRevertCAFs = TRUE;  /* do not change -- comment above */
         HugsBreakAction brkOld = setBreakAction ( HugsRtsInterrupt ); 
+        nukeModule_needs_major_gc = TRUE;
         status              = rts_eval_(closureOfVar(v),10000,&result);
         setBreakAction ( brkOld );
         fflush (stderr); 

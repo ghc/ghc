@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.14 2000/01/13 14:34:05 hwloidl Exp $
+ * $Id: Storage.h,v 1.15 2000/04/11 16:36:54 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -78,7 +78,7 @@ extern void PleaseStopAllocating(void);
    MarkRoot(StgClosure *p)	Returns the new location of the root.
    -------------------------------------------------------------------------- */
 
-extern void   GarbageCollect(void (*get_roots)(void));
+extern void   GarbageCollect(void (*get_roots)(void),rtsBool force_major_gc);
 extern StgClosure *MarkRoot(StgClosure *p);
 
 /* -----------------------------------------------------------------------------

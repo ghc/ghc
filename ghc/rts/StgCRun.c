@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.15 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: StgCRun.c,v 1.16 2000/04/11 16:36:54 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -72,12 +72,19 @@ extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
     memcpy((void *) jmp_environment, (void *) save_buf, sizeof(jmp_buf));
     if (setjmp(jmp_environment) == 0) {
 	while ( 1 ) {
+StgFunPtr f_old;
             IF_DEBUG(evaluator,
 		     fprintf(stderr,"Jumping to ");
 		     printPtr((P_)f);
 		     fprintf(stderr,"\n");
 		     );
+f_old = f;
 	    f = (StgFunPtr) (f)();
+ if (!IS_CODE_PTR(f)) {
+fprintf ( stderr,"bad ptr given by %p %s\n", f_old, nameFromOPtr(f_old) );
+assert(IS_CODE_PTR(f));
+ }
+
 	}
     }
     /* Restore jmp_environment for previous call */
@@ -93,10 +100,17 @@ EXTFUN(StgReturn)
 
 #else
 
+#define CHECK_STACK   0
+#define STACK_DETAILS 0
+
+static int enters = 0;
+
 static void scanStackSeg ( W_* ptr, int nwords )
 {
    W_ w;
+#if CHECK_STACK
    int nwords0 = nwords;
+#if STACK_DETAILS
    while (nwords > 0) {
       w = *ptr;
       if (IS_ARG_TAG(w)) {
@@ -109,80 +123,104 @@ static void scanStackSeg ( W_* ptr, int nwords )
       }
    }
    if (nwords < 0) fprintf(stderr, "erk: nwords < 0\n");
+#endif
    checkStackChunk ( ptr, ptr-nwords0 );
+#endif
 }
 
-
+extern StgFunPtr stg_enterStackTop;
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     char* nm;
     while (1) {
 
-// #define STACK_DETAILS 0  // I like details -- HWL
-
-#if STACK_DETAILS
+#if CHECK_STACK
    {
    int i;
-   StgWord* sp  = basereg->rSp;
-   StgWord* su  = basereg->rSu;
    StgTSO*  tso = basereg->rCurrentTSO;
    StgWord* sb  = tso->stack + tso->stack_size;
+   StgWord* sp;
+   StgWord* su;
    int ws;
 
-   fprintf(stderr, "== SP = %p   SU = %p\n", sp,su);
+   if (f == &stg_enterStackTop) {
+      sp = tso->sp;
+      su = tso->su;
+   } else {
+      sp  = basereg->rSp;
+      su  = basereg->rSu;
+   }
+
+#if STACK_DETAILS
+   fprintf(stderr, 
+           "== SB = %p   SP = %p(%p)   SU = %p   SpLim = %p(%p)\n", 
+           sb, sp, tso->sp,   su, basereg->rSpLim, tso->splim);
+#endif
 
    if (su >= sb) goto postloop;
    if (!sp || !su) goto postloop;
 
-   //printStack ( sp, sb, su);
+   printStack ( sp, sb, su);
 
    while (1) {
       ws = su - sp;
       switch (get_itbl((StgClosure*)su)->type) {
          case STOP_FRAME: 
             scanStackSeg(sp,ws);
+#if STACK_DETAILS
             fprintf(stderr, "S%d ",ws); 
             fprintf(stderr, "\n");
+#endif
             goto postloop;
          case UPDATE_FRAME: 
             scanStackSeg(sp,ws);
+#if STACK_DETAILS
             fprintf(stderr,"U%d ",ws); 
+#endif
             sp = su + sizeofW(StgUpdateFrame);
             su = ((StgUpdateFrame*)su)->link;
             break;
          case SEQ_FRAME: 
             scanStackSeg(sp,ws);
+#if STACK_DETAILS
             fprintf(stderr,"Q%d ",ws); 
+#endif
             sp = su + sizeofW(StgSeqFrame);
             su = ((StgSeqFrame*)su)->link;
             break;
          case CATCH_FRAME: 
             scanStackSeg(sp,ws);
+#if STACK_DETAILS
             fprintf(stderr,"C%d ",ws); 
+#endif
             sp = su + sizeofW(StgCatchFrame);
             su = ((StgCatchFrame*)su)->link;
             break;
          default:
             fprintf(stderr, "?\nweird record on stack\n");
+            assert(0);
             goto postloop;
       }
    }
    postloop:
    }
-#endif    
-
+#endif
 #if STACK_DETAILS
        fprintf(stderr,"\n");
 #endif
-       fprintf(stderr,"-- enter: ");
+#if 1
+       fprintf(stderr,"-- enter %p ", f);
        nm = nameFromOPtr ( f );
-       if (nm)
-            fprintf(stderr, "%s (%p)", nm, f); else
-            printPtr((P_)f);
+          if (nm) fprintf(stderr, "%s", nm); else
+          printPtr((P_)f);
        fprintf ( stderr, "\n");
+#endif
 #if STACK_DETAILS
        fprintf(stderr,"\n");
 #endif
+    zzz:
+       if (enters % 1000 == 0) fprintf(stderr, "%d enters\n",enters);
+       enters++;
        f = (StgFunPtr) (f)();
        if (!f) break;
     }

@@ -1,9 +1,9 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.6 1999/11/09 15:47:09 simonmar Exp $
+ * $Id: StgStorage.h,v 1.7 2000/04/11 16:36:53 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
- * STG Storage Manger Interface
+ * STG Storage Manager Interface
  *
  * ---------------------------------------------------------------------------*/
 
@@ -108,6 +108,7 @@ typedef struct _generation {
    -------------------------------------------------------------------------- */
 
 extern void performGC(void);
+extern void performMajorGC(void);
 extern void performGCWithRoots(void (*get_roots)(void));
 
 #endif /* STGSTORAGE_H */

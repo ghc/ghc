@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.65 2000/04/07 09:47:38 simonmar Exp $
+ * $Id: Schedule.c,v 1.66 2000/04/11 16:36:53 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1089,7 +1089,7 @@ schedule( void )
 #ifdef SMP
       IF_DEBUG(scheduler,sched_belch("doing GC"));
 #endif
-      GarbageCollect(GetRoots);
+      GarbageCollect(GetRoots,rtsFalse);
       ready_to_gc = rtsFalse;
 #ifdef SMP
       pthread_cond_broadcast(&gc_pending_cond);
@@ -1943,7 +1943,13 @@ void (*extra_roots)(void);
 void
 performGC(void)
 {
-  GarbageCollect(GetRoots);
+  GarbageCollect(GetRoots,rtsFalse);
+}
+
+void
+performMajorGC(void)
+{
+  GarbageCollect(GetRoots,rtsTrue);
 }
 
 static void
@@ -1958,7 +1964,7 @@ performGCWithRoots(void (*get_roots)(void))
 {
   extra_roots = get_roots;
 
-  GarbageCollect(AllRoots);
+  GarbageCollect(AllRoots,rtsFalse);
 }
 
 /* -----------------------------------------------------------------------------

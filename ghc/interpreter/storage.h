@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.42 $
- * $Date: 2000/04/07 16:25:20 $
+ * $Revision: 1.43 $
+ * $Date: 2000/04/11 16:36:53 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE               /* a moderate level of sanity checking */
@@ -619,7 +619,7 @@ extern Module currentModule;           /* Module currently being processed */
 extern List   moduleGraph;             /* :: [GRP_REC | GRP_NONREC]        */
 extern List   prelModules;             /* :: [CONID]                       */
 extern List   targetModules;           /* :: [CONID]                       */
-
+extern Bool   nukeModule_needs_major_gc; /* see comment in compiler.c      */
 
 extern Bool         isValidModule   ( Module );
 extern Module       newModule       ( Text );

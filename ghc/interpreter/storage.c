@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.68 $
- * $Date: 2000/04/07 16:25:19 $
+ * $Revision: 1.69 $
+ * $Date: 2000/04/11 16:36:53 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -19,6 +19,7 @@
 #include "errors.h"
 #include "object.h"
 #include <setjmp.h>
+#include "Stg.h"
 
 /*#define DEBUG_SHOWUSE*/
 
@@ -1628,13 +1629,25 @@ Module newModule ( Text t )             /* add new module to module table  */
     return mod;
 }
 
+
+Bool nukeModule_needs_major_gc = TRUE;
+
 void nukeModule ( Module m )
 {
    ObjectCode* oc;
    ObjectCode* oc2;
    Int         i;
-assert(isModule(m));
-/*fprintf(stderr, "NUKEMODULE `%s'\n", textToStr(module(m).text)); */
+
+   if (!isModule(m)) internal("nukeModule");
+
+   /* see comment in compiler.c about this, 
+      and interaction with info tables */
+   if (nukeModule_needs_major_gc) {
+      /* fprintf ( stderr, "doing major GC in nukeModule\n"); */
+      performMajorGC();
+      nukeModule_needs_major_gc = FALSE;
+   }
+
    oc = module(m).object;
    while (oc) {
       oc2 = oc->next;

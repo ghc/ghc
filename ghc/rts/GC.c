@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.77 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: GC.c,v 1.78 2000/04/11 16:36:53 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -187,7 +187,7 @@ static void         gcCAFs                  ( void );
    -------------------------------------------------------------------------- */
 //@cindex GarbageCollect
 
-void GarbageCollect(void (*get_roots)(void))
+void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 {
   bdescr *bd;
   step *step;
@@ -217,13 +217,18 @@ void GarbageCollect(void (*get_roots)(void))
 
   /* Figure out which generation to collect
    */
-  N = 0;
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    if (generations[g].steps[0].n_blocks >= generations[g].max_blocks) {
-      N = g;
+  if (force_major_gc) {
+    N = RtsFlags.GcFlags.generations - 1;
+    major_gc = rtsTrue;
+  } else {
+    N = 0;
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      if (generations[g].steps[0].n_blocks >= generations[g].max_blocks) {
+        N = g;
+      }
     }
+    major_gc = (N == RtsFlags.GcFlags.generations-1);
   }
-  major_gc = (N == RtsFlags.GcFlags.generations-1);
 
   /* check stack sanity *before* GC (ToDo: check all threads) */
 #if defined(GRAN)
