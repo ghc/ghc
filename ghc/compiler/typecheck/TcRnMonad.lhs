@@ -782,8 +782,7 @@ incProcLevel
 \begin{code}
 initRn :: RnMode -> RnM a -> TcRn m a
 initRn mode thing_inside
- = do { env <- getGblEnv ;
-	let { lcl_env = RnLclEnv {
+ = do { let { lcl_env = RnLclEnv {
 			     rn_mode = mode,
 			     rn_lenv = emptyRdrEnv }} ;
 	setLclEnv lcl_env thing_inside }
