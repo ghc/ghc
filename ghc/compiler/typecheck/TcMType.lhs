@@ -76,7 +76,7 @@ import Var		( TyVar, idType, idName, tyVarKind, tyVarName, isTyVar,
 -- others:
 import Generics		( validGenericMethodType )
 import TcRnMonad          -- TcType, amongst others
-import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
+import PrelNames	( hasKey )
 import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
 import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
@@ -1106,15 +1106,6 @@ checkValidInstHead ty	-- Should be a source type
     }}
 
 check_inst_head dflags clas tys
-  |	-- CCALL CHECK
-	-- A user declaration of a CCallable/CReturnable instance
-	-- must be for a "boxed primitive" type.
-        (clas `hasKey` cCallableClassKey   
-            && not (ccallable_type first_ty)) 
-  ||    (clas `hasKey` cReturnableClassKey 
-            && not (creturnable_type first_ty))
-  = failWithTc (nonBoxedPrimCCallErr clas first_ty)
-
 	-- If GlasgowExts then check at least one isn't a type variable
   | dopt Opt_GlasgowExts dflags
   = check_tyvars dflags clas tys
@@ -1134,9 +1125,6 @@ check_inst_head dflags clas tys
   where
     (first_ty : _)       = tys
 
-    ccallable_type   ty = isFFIArgumentTy dflags PlayRisky ty
-    creturnable_type ty = isFFIImportResultTy dflags ty
-	
     head_shape_msg = parens (text "The instance type must be of form (T a b c)" $$
 			     text "where T is not a synonym, and a,b,c are distinct type variables")
 
@@ -1157,8 +1145,4 @@ undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
 instTypeErr pp_ty msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes pp_ty, 
 	 nest 4 msg]
-
-nonBoxedPrimCCallErr clas inst_ty
-  = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
-	 4 (pprClassPred clas [inst_ty])
 \end{code}

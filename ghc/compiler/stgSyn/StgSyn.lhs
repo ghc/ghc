@@ -34,7 +34,7 @@ module StgSyn (
 
 	-- utils
 	stgBindHasCafRefs,  stgArgHasCafRefs, stgRhsArity, getArgPrimRep, 
-	isLitLitArg, isDllConApp, isStgTypeArg,
+	isDllConApp, isStgTypeArg,
 	stgArgType, stgBinders,
 
 	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs
@@ -52,7 +52,7 @@ import Var		( isId )
 import Id		( Id, idName, idPrimRep, idType, idCafInfo )
 import IdInfo		( mayHaveCafRefs )
 import Name		( isDllName )
-import Literal		( Literal, literalType, isLitLitLit, literalPrimRep )
+import Literal		( Literal, literalType, literalPrimRep )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
 import CoreSyn		( AltCon )
@@ -107,17 +107,14 @@ data GenStgArg occ
 getArgPrimRep (StgVarArg local) = idPrimRep local
 getArgPrimRep (StgLitArg lit)	= literalPrimRep lit
 
-isLitLitArg (StgLitArg lit) = isLitLitLit lit
-isLitLitArg _		    = False
-
 isStgTypeArg (StgTypeArg _) = True
 isStgTypeArg other	    = False
 
 isDllArg :: StgArg -> Bool
 	-- Does this argument refer to something in a different DLL?
-isDllArg (StgTypeArg v)   = False
+isDllArg (StgTypeArg v)  = False
 isDllArg (StgVarArg v)   = isDllName (idName v)
-isDllArg (StgLitArg lit) = isLitLitLit lit
+isDllArg (StgLitArg lit) = False
 
 isDllConApp :: DataCon -> [StgArg] -> Bool
 	-- Does this constructor application refer to 

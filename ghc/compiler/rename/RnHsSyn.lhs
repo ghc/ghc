@@ -209,7 +209,6 @@ hsIdInfoFVs other	     = emptyFVs
 ----------------
 ufExprFVs (UfVar n) 	  = unitFV n
 ufExprFVs (UfLit l) 	  = emptyFVs
-ufExprFVs (UfLitLit l ty) = extractHsTyNames ty
 ufExprFVs (UfFCall cc ty) = extractHsTyNames ty
 ufExprFVs (UfType ty)     = extractHsTyNames ty
 ufExprFVs (UfTuple tc es) = hsTupConFVs tc `plusFV` plusFVs (map ufExprFVs es)
@@ -229,7 +228,6 @@ ufAltFVs (con, vs, e) = ufConFVs con `plusFV` delFVs vs (ufExprFVs e)
 
 ufConFVs (UfDataAlt n)      = unitFV n
 ufConFVs (UfTupleAlt t)     = hsTupConFVs t
-ufConFVs (UfLitLitAlt _ ty) = extractHsTyNames ty
 ufConFVs other		    = emptyFVs
 
 ufNoteFVs (UfCoerce ty) = extractHsTyNames ty

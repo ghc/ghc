@@ -36,7 +36,6 @@ import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..),
 			  defaultFixity, negateFixity, compareFixity )
 import PrelNames	( hasKey, assertIdKey, 
 			  foldrName, buildName, 
-			  cCallableClassName, cReturnableClassName, 
 			  enumClassName, 
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  splitName, fstName, sndName, ioDataConName, 
@@ -260,14 +259,6 @@ rnExpr section@(SectionR op expr)
     rnExpr expr	 				`thenM` \ (expr', fvs_expr) ->
     checkSectionPrec InfixR section op' expr'	`thenM_`
     returnM (SectionR op' expr', fvs_op `plusFV` fvs_expr)
-
-rnExpr (HsCCall fun args may_gc is_casm _)
-	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
-  = rnExprs args				`thenM` \ (args', fvs_args) ->
-    returnM (HsCCall fun args' may_gc is_casm placeHolderType, 
-	      fvs_args `plusFV` mkFVs [cCallableClassName, 
-				       cReturnableClassName, 
-				       ioDataConName])
 
 rnExpr (HsCoreAnn ann expr)
   = rnExpr expr `thenM` \ (expr', fvs_expr) ->

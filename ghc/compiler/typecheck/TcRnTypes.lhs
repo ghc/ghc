@@ -919,8 +919,6 @@ data InstOrigin
 			(Maybe RenamedHsExpr)	-- Nothing if it's the result
 						-- Just arg, for an argument
 
-  | LitLitOrigin	String	-- the litlit
-
   | UnknownOrigin	-- Help! I give up...
 \end{code}
 
@@ -969,8 +967,6 @@ pprInstLoc (InstLoc orig locn ctxt)
     pp_orig (CCallOrigin clabel (Just arg_expr))
 	= hsep [ptext SLIT("an argument in the _ccall_ to"), quotes (text clabel) <> comma, 
 		text "namely", quotes (ppr arg_expr)]
-    pp_orig (LitLitOrigin s)
-	= hsep [ptext SLIT("the ``literal-literal''"), quotes (text s)]
     pp_orig (UnknownOrigin)
 	= ptext SLIT("...oops -- I don't know where the overloading came from!")
 \end{code}

@@ -949,7 +949,6 @@ pprFCall call uniq args results vol_regs
 
     call_str tgt 
       = case tgt of
-	  CasmTarget str  -> unpackFS str
   	  StaticTarget fn -> mk_ccall_str (pprCLabelString fn) ccall_args
 	  DynamicTarget   -> mk_ccall_str dyn_fun	       (tail ccall_args)
 

@@ -794,8 +794,6 @@ instance Outputable ForeignImport where
 	pprLib lib <> ppr lbl
       pprCEntity header lib (CFunction (DynamicTarget)) = 
         ptext SLIT("dynamic")
-      pprCEntity header lib (CFunction (CasmTarget _)) = 
-        panic "HsDecls.pprCEntity: malformed C function target"
       pprCEntity _      _   (CWrapper) = ptext SLIT("wrapper")
       --
       pprLib lib | nullFastString lib = empty

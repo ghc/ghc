@@ -288,9 +288,6 @@ $white_no_nl+ 				;
   \" 				{ lex_string_tok }
 }
 
-<glaexts> "``" (([$graphic $whitechar] # \') | \' ([$graphic $whitechar] # \'))*
-		"''"		{ clitlit }
-
 {
 -- work around bug in Alex 2.0
 #if __GLASGOW_HASKELL__ < 503
@@ -341,7 +338,6 @@ data Token__
   | ITstdcallconv
   | ITccallconv
   | ITdotnet
-  | ITccall (Bool,Bool,Safety)	-- (is_dyn, is_casm, may_gc)
   | ITmdo
 
   | ITspecialise_prag		-- Pragmas
@@ -416,7 +412,6 @@ data Token__
   | ITprimint    Integer
   | ITprimfloat  Rational
   | ITprimdouble Rational
-  | ITlitlit     FastString
 
   -- MetaHaskell extension tokens
   | ITopenExpQuote  		-- [| or [e|
@@ -522,17 +517,7 @@ reservedWordsFM = listToUFM $
 	( "with",	ITwith,		 bit withBit),
 
 	( "rec",	ITrec,		 bit arrowsBit),
-	( "proc",	ITproc,		 bit arrowsBit),
-
-	-- On death row
-        ("_ccall_",	ITccall (False, False, PlayRisky),
-					 bit glaExtsBit),
-        ("_ccall_GC_",	ITccall (False, False, PlaySafe False),
-					 bit glaExtsBit),
-        ("_casm_",	ITccall (False, True,  PlayRisky),
-					 bit glaExtsBit),
-        ("_casm_GC_",	ITccall (False, True,  PlaySafe False),
-					 bit glaExtsBit)
+	( "proc",	ITproc,		 bit arrowsBit)
      ]
 
 reservedSymsFM = listToUFM $
@@ -748,10 +733,6 @@ parseInteger buf len radix to_int
   = go 0 0
   where go i x | i == len  = x
 	       | otherwise = go (i+1) (x * radix + toInteger (to_int (lookAhead buf i)))
-
-clitlit :: Action
-clitlit loc end buf len = 
-  return (T loc end (ITlitlit $! lexemeToFastString (stepOnBy 2 buf) (len-4)))
 
 -- -----------------------------------------------------------------------------
 -- Layout processing

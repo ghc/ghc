@@ -17,14 +17,11 @@ import HsTypes		( HsType, PostTcType, SyntaxName )
 import HsImpExp		( isOperator, pprHsVar )
 
 -- others:
-import ForeignCall	( Safety )
 import PprType		( pprParendType )
 import Type		( Type )
 import Var		( TyVar, Id )
 import Name		( Name )
-import NameSet		( FreeVars )
 import DataCon		( DataCon )
-import CStrings		( CLabelString, pprCLabelString )
 import BasicTypes	( IPName, Boxity, tupleParens, Fixity(..) )
 import SrcLoc		( SrcLoc )
 import Outputable	
@@ -140,19 +137,6 @@ data HsExpr id
   | PArrSeqOut
 		(HsExpr id)		-- (typechecked, of course)
 		(ArithSeqInfo id)
-
-  | HsCCall	CLabelString	-- call into the C world; string is
-		[HsExpr id]	-- the C function; exprs are the
-				-- arguments to pass.
-		Safety		-- True <=> might cause Haskell
-				-- garbage-collection (must generate
-				-- more paranoid code)
-		Bool		-- True <=> it's really a "casm"
-				-- NOTE: this CCall is the *boxed*
-				-- version; the desugarer will convert
-				-- it into the unboxed "ccall#".
-		PostTcType	-- The result type; will be *bottom*
-				-- until the typechecker gets ahold of it
 
   | HsSCC	FastString	-- "set cost centre" (_scc_) annotation
 		(HsExpr id) 	-- expr whose cost is to be measured
@@ -389,12 +373,6 @@ ppr_expr (PArrSeqOut expr info)
 ppr_expr EWildPat = char '_'
 ppr_expr (ELazyPat e) = char '~' <> pprParendExpr e
 ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
-
-ppr_expr (HsCCall fun args _ is_asm result_ty)
-  = hang (if is_asm
-	  then ptext SLIT("_casm_ ``") <> pprCLabelString fun <> ptext SLIT("''")
-	  else ptext SLIT("_ccall_") <+> pprCLabelString fun)
-       4 (sep (map pprParendExpr args))
 
 ppr_expr (HsSCC lbl expr)
   = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ftext lbl), pprParendExpr expr ]

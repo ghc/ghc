@@ -10,24 +10,21 @@ module PrelInfo (
 
 	wiredInThingEnv,
 	ghcPrimExports,
-	cCallableClassDecl, cReturnableClassDecl,
 	knownKeyNames,
 	
 	-- Random other things
 	maybeCharLikeCon, maybeIntLikeCon,
 
 	-- Class categories
-	isCcallishClass, isCreturnableClass, isNoDictClass, 
-	isNumericClass, isStandardClass
+	isNoDictClass, isNumericClass, isStandardClass
 
     ) where
 
 #include "HsVersions.h"
 
 import PrelNames	( basicKnownKeyNames, 
-			  cCallableClassName, cReturnableClassName,
 			  hasKey, charDataConKey, intDataConKey,
-			  numericClassKeys, standardClassKeys, cCallishClassKeys,
+			  numericClassKeys, standardClassKeys,
 			  noDictClassKeys )
 #ifdef GHCI
 import DsMeta		( templateHaskellNames )
@@ -40,18 +37,16 @@ import Id		( idName )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import Name		( Name, nameOccName, NamedThing(..) )
-import RdrName		( mkRdrUnqual, getRdrName )
+import RdrName		( mkRdrUnqual )
 import HsSyn		( HsTyVarBndr(..) )
 import OccName		( mkVarOcc )
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
-import RdrHsSyn		( mkClassDecl )
 import HscTypes 	( TyThing(..), implicitTyThings, TypeEnv, mkTypeEnv,
 			  GenAvailInfo(..), RdrAvailInfo )
 import Class	 	( Class, classKey, className )
 import Type		( funTyCon, openTypeKind, liftedTypeKind )
 import TyCon		( tyConName )
-import SrcLoc		( noSrcLoc )
 import Util		( isIn )
 \end{code}
 
@@ -104,36 +99,15 @@ sense of them in interface pragmas. It's cool, though they all have
 %************************************************************************
 
 GHC.Prim "exports" all the primops and primitive types, some 
-wired-in Ids, and the CCallable & CReturnable classes.
+wired-in Ids.
 
 \begin{code}
 ghcPrimExports :: [RdrAvailInfo]
- = AvailTC cCallableOcc [ cCallableOcc ] :
-   AvailTC cReturnableOcc [ cReturnableOcc ] :
-   map (Avail . nameOccName . idName) ghcPrimIds ++
+ = map (Avail . nameOccName . idName) ghcPrimIds ++
    map (Avail . primOpOcc) allThePrimOps ++
    [ AvailTC occ [occ] |
      n <- funTyCon : primTyCons, let occ = nameOccName (tyConName n) 
    ]
- where
-   cCallableOcc = nameOccName cCallableClassName
-   cReturnableOcc = nameOccName cReturnableClassName
-
-cCallableClassDecl
-  = mkClassDecl
-    ([], getRdrName cCallableClassName, [openAlpha])
-    [] -- no fds
-    [] -- no sigs
-    Nothing -- no mbinds
-    noSrcLoc
-
-cReturnableClassDecl
-  = mkClassDecl
-    ([], getRdrName cReturnableClassName, [openAlpha])
-    [] -- no fds
-    [] -- no sigs
-    Nothing -- no mbinds
-    noSrcLoc
 
 alpha = mkRdrUnqual (mkVarOcc FSLIT("a"))
 openAlpha = IfaceTyVar alpha openTypeKind
@@ -163,13 +137,10 @@ maybeIntLikeCon  con = con `hasKey` intDataConKey
 %************************************************************************
 
 \begin{code}
-isCcallishClass, isCreturnableClass, isNoDictClass, 
-  isNumericClass, isStandardClass :: Class -> Bool
+isNoDictClass, isNumericClass, isStandardClass :: Class -> Bool
 
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
 isStandardClass    clas = classKey clas `is_elem` standardClassKeys
-isCcallishClass	   clas = classKey clas `is_elem` cCallishClassKeys
-isCreturnableClass clas = className clas == cReturnableClassName
 isNoDictClass      clas = classKey clas `is_elem` noDictClassKeys
 is_elem = isIn "is_X_Class"
 \end{code}

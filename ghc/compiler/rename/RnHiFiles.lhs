@@ -39,7 +39,7 @@ import RnEnv
 import TcRnMonad
 
 import PrelNames	( gHC_PRIM_Name, gHC_PRIM )
-import PrelInfo		( ghcPrimExports, cCallableClassDecl, cReturnableClassDecl )
+import PrelInfo		( ghcPrimExports )
 import Name		( Name {-instance NamedThing-}, 
 			  nameModule, isInternalName )
 import NameEnv
@@ -685,8 +685,7 @@ ghcPrimIface = ParsedIface {
       pi_orphan  = False,
       pi_usages  = [],
       pi_exports = (1, [(gHC_PRIM_Name, ghcPrimExports)]),
-      pi_decls   = [(1,cCallableClassDecl), 
-		    (1,cReturnableClassDecl)],
+      pi_decls   = [],
       pi_fixity  = [FixitySig (nameRdrName (idName seqId)) 
 			      (Fixity 0 InfixR) noSrcLoc],
 		-- seq is infixr 0

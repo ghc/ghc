@@ -24,7 +24,6 @@ module CoreUnfold (
 
 	couldBeSmallEnoughToInline, 
 	certainlyWillInline, 
-	okToUnfoldInHiFile,
 
 	callSiteInline
     ) where
@@ -35,7 +34,7 @@ import CmdLineOpts	( opt_UF_CreationThreshold,
 			  opt_UF_UseThreshold,
 			  opt_UF_FunAppDiscount,
 		  	  opt_UF_KeenessFactor,
-			  opt_UF_DearOp, opt_UnfoldCasms,
+			  opt_UF_DearOp,
 			  DynFlags, DynFlag(..), dopt
 			)
 import CoreSyn
@@ -47,9 +46,8 @@ import Id		( Id, idType, isId,
 			  isFCallId_maybe, globalIdDetails
 			)
 import DataCon		( isUnboxedTupleCon )
-import Literal		( isLitLitLit, litSize )
+import Literal		( litSize )
 import PrimOp		( primOpIsDupable, primOpOutOfLine )
-import ForeignCall	( okToExposeFCall )
 import IdInfo		( OccInfo(..), GlobalIdDetails(..) )
 import Type		( isUnLiftedType )
 import PrelNames	( hasKey, buildIdKey, augmentIdKey )
@@ -466,36 +464,6 @@ certainlyWillInline (CoreUnfolding _ _ _ is_cheap (UnfoldIfGoodArgs n_vals _ siz
 certainlyWillInline other
   = False
 \end{code}
-
-@okToUnfoldInHifile@ is used when emitting unfolding info into an interface
-file to determine whether an unfolding candidate really should be unfolded.
-The predicate is needed to prevent @_casm_@s (+ lit-lits) from being emitted
-into interface files. 
-
-The reason for inlining expressions containing _casm_s into interface files
-is that these fragments of C are likely to mention functions/#defines that
-will be out-of-scope when inlined into another module. This is not an
-unfixable problem for the user (just need to -#include the approp. header
-file), but turning it off seems to the simplest thing to do.
-
-\begin{code}
-okToUnfoldInHiFile :: CoreExpr -> Bool
-okToUnfoldInHiFile e = opt_UnfoldCasms || go e
- where
-    -- Race over an expression looking for CCalls..
-    go (Var v)                = case isFCallId_maybe v of
-				  Just fcall -> okToExposeFCall fcall
-				  Nothing    -> True
-    go (Lit lit)	      = not (isLitLitLit lit)
-    go (App fun arg)          = go fun && go arg
-    go (Lam _ body)           = go body
-    go (Let binds body)       = and (map go (body :rhssOfBind binds))
-    go (Case scrut bndr alts) = and (map go (scrut:rhssOfAlts alts)) &&
-				not (any isLitLitLit [ lit | (LitAlt lit, _, _) <- alts ])
-    go (Note _ body)          = go body
-    go (Type _)		      = True
-\end{code}
-
 
 %************************************************************************
 %*									*

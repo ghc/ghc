@@ -788,12 +788,8 @@ instance (Binary name) => Binary (UfExpr name) where
     put_ bh (UfLit ap) = do
 	    putByte bh 8
 	    put_ bh ap
-    put_ bh (UfLitLit aq ar) = do
-	    putByte bh 9
-	    put_ bh aq
-	    put_ bh ar
     put_ bh (UfFCall as at) = do
-	    putByte bh 10
+	    putByte bh 9
 	    put_ bh as
 	    put_ bh at
     get bh = do
@@ -824,9 +820,6 @@ instance (Binary name) => Binary (UfExpr name) where
 		      return (UfNote an ao)
 	      8 -> do ap <- get bh
 		      return (UfLit ap)
-	      9 -> do aq <- get bh
-		      ar <- get bh
-		      return (UfLitLit aq ar)
 	      _ -> do as <- get bh
 		      at <- get bh
 		      return (UfFCall as at)
@@ -843,10 +836,6 @@ instance (Binary name) => Binary (UfConAlt name) where
     put_ bh (UfLitAlt ac) = do
 	    putByte bh 3
 	    put_ bh ac
-    put_ bh (UfLitLitAlt ad ae) = do
-	    putByte bh 4
-	    put_ bh ad
-	    put_ bh ae
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -855,11 +844,8 @@ instance (Binary name) => Binary (UfConAlt name) where
 		      return (UfDataAlt aa)
 	      2 -> do ab <- get bh
 		      return (UfTupleAlt ab)
-	      3 -> do ac <- get bh
+	      _ -> do ac <- get bh
 		      return (UfLitAlt ac)
-	      _ -> do ad <- get bh
-		      ae <- get bh
-		      return (UfLitLitAlt ad ae)
 
 instance (Binary name) => Binary (UfBinding name) where
     put_ bh (UfNonRec aa ab) = do

@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.122 2003/09/08 11:52:25 simonmar Exp $
+$Id: Parser.y,v 1.123 2003/09/16 13:03:44 simonmar Exp $
 
 Haskell grammar.
 
@@ -134,10 +134,6 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  'dotnet'       { T _ _ ITdotnet }
  'proc'		{ T _ _ ITproc }		-- for arrow notation extension
  'rec'		{ T _ _ ITrec }		-- for arrow notation extension
- '_ccall_'	{ T _ _ (ITccall (False, False, PlayRisky)) }
- '_ccall_GC_'	{ T _ _ (ITccall (False, False, PlaySafe False)) }
- '_casm_'	{ T _ _ (ITccall (False, True,  PlayRisky)) }
- '_casm_GC_'	{ T _ _ (ITccall (False, True,  PlaySafe False)) }
 
  '{-# SPECIALISE'  { T _ _ ITspecialise_prag }
  '{-# SOURCE'	   { T _ _ ITsource_prag }
@@ -211,7 +207,6 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  PRIMINTEGER	{ T _ _ (ITprimint    $$) }
  PRIMFLOAT	{ T _ _ (ITprimfloat  $$) }
  PRIMDOUBLE	{ T _ _ (ITprimdouble $$) }
- CLITLIT	{ T _ _ (ITlitlit     $$) }
  
 -- Template Haskell
 '[|'            { T _ _ ITopenExpQuote  }       
@@ -937,11 +932,6 @@ exp10 :: { RdrNameHsExpr }
   	| srcloc 'mdo' stmtlist			{% checkMDo $3  >>= \ stmts ->
 						   return (mkHsDo MDoExpr stmts $1) }
 
-	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False placeHolderType }
-	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 (PlaySafe False) False placeHolderType }
-	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 PlayRisky True  placeHolderType }
-	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 (PlaySafe False) True  placeHolderType }
-
         | scc_annot exp		    		{ if opt_SccProfilingOn
 							then HsSCC $1 $2
 							else HsPar $2 }
@@ -1421,7 +1411,6 @@ literal :: { HsLit }
 	| PRIMSTRING		{ HsStringPrim $1 }
 	| PRIMFLOAT		{ HsFloatPrim  $1 }
 	| PRIMDOUBLE		{ HsDoublePrim $1 }
-	| CLITLIT		{ HsLitLit     $1 placeHolderType }
 
 srcloc :: { SrcLoc }	:	{% getSrcLoc }
 

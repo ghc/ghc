@@ -1,7 +1,7 @@
 %
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
-\section[DsCCall]{Desugaring \tr{_ccall_}s and \tr{_casm_}s}
+\section[DsCCall]{Desugaring C calls}
 
 \begin{code}
 module DsCCall 
@@ -103,17 +103,15 @@ follows:
 dsCCall :: CLabelString	-- C routine to invoke
 	-> [CoreExpr]	-- Arguments (desugared)
 	-> Safety	-- Safety of the call
-	-> Bool		-- True <=> really a "_casm_"
 	-> Type		-- Type of the result: IO t
 	-> DsM CoreExpr
 
-dsCCall lbl args may_gc is_asm result_ty
+dsCCall lbl args may_gc result_ty
   = mapAndUnzipDs unboxArg args	       `thenDs` \ (unboxed_args, arg_wrappers) ->
     boxResult [] id Nothing result_ty  `thenDs` \ (ccall_result_ty, res_wrapper) ->
     getUniqueDs			       `thenDs` \ uniq ->
     let
-	target | is_asm    = CasmTarget lbl
-	       | otherwise = StaticTarget lbl
+	target = StaticTarget lbl
 	the_fcall    = CCall (CCallSpec target CCallConv may_gc)
  	the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
     in

@@ -10,7 +10,7 @@ module TidyPgm( tidyCorePgm, tidyCoreExpr ) where
 
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
-import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
+import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
 import CoreTidy		( tidyExpr, tidyVarOcc, tidyIdRules )
 import PprCore 		( pprIdRules )
@@ -374,8 +374,7 @@ addExternal (id,rhs) needed
     show_unfold = not bottoming_fn	 &&	-- Not necessary
 		  not dont_inline	 &&
 		  not loop_breaker	 &&
-		  rhs_is_small		 &&	-- Small enough
-		  okToUnfoldInHiFile rhs 	-- No casms etc
+		  rhs_is_small		 	-- Small enough
 
     unfold_ids | show_unfold = exprSomeFreeVars isLocalId rhs
 	       | otherwise   = emptyVarSet

@@ -191,7 +191,6 @@ hsLitType (HsInteger i)    = integerTy
 hsLitType (HsRat _ ty)	   = ty
 hsLitType (HsFloatPrim f)  = floatPrimTy
 hsLitType (HsDoublePrim d) = doublePrimTy
-hsLitType (HsLitLit _ ty)  = ty
 \end{code}
 
 %************************************************************************
@@ -488,10 +487,6 @@ zonkExpr env (HsLit (HsRat f ty))
   = zonkTcTypeToType env ty	   `thenM` \ new_ty  ->
     returnM (HsLit (HsRat f new_ty))
 
-zonkExpr env (HsLit (HsLitLit lit ty))
-  = zonkTcTypeToType env ty	    `thenM` \ new_ty  ->
-    returnM (HsLit (HsLitLit lit new_ty))
-
 zonkExpr env (HsLit lit)
   = returnM (HsLit lit)
 
@@ -604,11 +599,6 @@ zonkExpr env (PArrSeqOut expr info)
   = zonkExpr env expr		`thenM` \ new_expr ->
     zonkArithSeq env info	`thenM` \ new_info ->
     returnM (PArrSeqOut new_expr new_info)
-
-zonkExpr env (HsCCall fun args may_gc is_casm result_ty)
-  = zonkExprs env args			`thenM` \ new_args ->
-    zonkTcTypeToType env result_ty	`thenM` \ new_result_ty ->
-    returnM (HsCCall fun new_args may_gc is_casm new_result_ty)
 
 zonkExpr env (HsSCC lbl expr)
   = zonkExpr env expr	`thenM` \ new_expr ->

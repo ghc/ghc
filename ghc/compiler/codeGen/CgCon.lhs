@@ -68,7 +68,7 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> [StgArg]		-- Args
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
-  = ASSERT( not (isDllConApp con args) )	-- checks for litlit args too
+  = ASSERT( not (isDllConApp con args) )
     ASSERT( args `lengthIs` dataConRepArity con )
 
 	-- LAY IT OUT

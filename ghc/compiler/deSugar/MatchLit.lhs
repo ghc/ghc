@@ -12,7 +12,6 @@ import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr )
 
 import DsMonad
-import DsCCall		( resultWrapper )
 import DsUtils
 
 import HsSyn		( HsLit(..), Pat(..), HsExpr(..) )
@@ -26,9 +25,7 @@ import PrelNames	( ratioTyConKey )
 import Unique		( hasKey )
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
-import Type		( isUnLiftedType )
 import Panic		( panic, assertPanic )
-import Maybe		( isJust )
 import Ratio 		( numerator, denominator )
 \end{code}
 
@@ -64,11 +61,6 @@ dsLit (HsInt i)	       = returnDs (mkIntExpr i)
 dsLit (HsIntPrim i)    = returnDs (mkIntLit i)
 dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))
 dsLit (HsDoublePrim d) = returnDs (mkLit (MachDouble d))
-dsLit (HsLitLit str ty)
-  = resultWrapper ty `thenDs` \ (maybe_ty, wrap_fn) ->
-    ASSERT( isJust maybe_ty )
-      let (Just rep_ty) = maybe_ty in 
-      returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
 
 dsLit (HsRat r ty)
   = mkIntegerExpr (numerator r)		`thenDs` \ num ->
@@ -133,8 +125,6 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal : ps1
 	mk_core_lit (HsStringPrim  s) 	 = MachStr    s
 	mk_core_lit (HsFloatPrim   f) 	 = MachFloat  f
 	mk_core_lit (HsDoublePrim  d)    = MachDouble d
-	mk_core_lit (HsLitLit      s ty) = ASSERT(isUnLiftedType ty)
-		    		           MachLitLit s ty
     	mk_core_lit other	         = panic "matchLiterals:mk_core_lit:unhandled"
 \end{code}
 

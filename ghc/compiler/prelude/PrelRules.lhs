@@ -21,7 +21,7 @@ module PrelRules ( primOpRules, builtinRules ) where
 
 import CoreSyn
 import Id		( mkWildId )
-import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
+import Literal		( Literal(..), mkMachInt, mkMachWord
 			, literalType
 			, word2IntLit, int2WordLit
 			, narrow8IntLit, narrow16IntLit, narrow32IntLit
@@ -177,16 +177,14 @@ primOpRules op = primop_rule op
 %*									*
 %************************************************************************
 
-	IMPORTANT NOTE
-
-In all these operations we might find a LitLit as an operand; that's
-why we have the catch-all Nothing case.
+ToDo: the reason these all return Nothing is because there used to be
+the possibility of an argument being a litlit.  Litlits are now gone,
+so this could be cleaned up.
 
 \begin{code}
 --------------------------
 litCoerce :: (Literal -> Literal) -> Literal -> Maybe CoreExpr
-litCoerce fn lit | isLitLitLit lit = Nothing
-                 | otherwise       = Just (Lit (fn lit))
+litCoerce fn lit = Just (Lit (fn lit))
 
 --------------------------
 cmpOp :: (Ordering -> Bool) -> Literal -> Literal -> Maybe CoreExpr

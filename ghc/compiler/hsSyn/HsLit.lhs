@@ -38,11 +38,6 @@ data HsLit
 					-- 	(overloaded literals are done with HsOverLit)
   | HsFloatPrim	    Rational		-- Unboxed Float
   | HsDoublePrim    Rational		-- Unboxed Double
-  | HsLitLit	    FastString PostTcType	-- to pass ``literal literals'' through to C
-						-- also: "overloaded" type; but
-						-- must resolve to boxed-primitive!
-	-- The Type in HsLitLit is needed when desuaring;
-	-- before the typechecker it's just an error value
 
 instance Eq HsLit where
   (HsChar x1)	    == (HsChar x2)	 = x1==x2
@@ -55,7 +50,6 @@ instance Eq HsLit where
   (HsRat x1 _)	    == (HsRat x2 _)      = x1==x2
   (HsFloatPrim x1)  == (HsFloatPrim x2)  = x1==x2
   (HsDoublePrim x1) == (HsDoublePrim x2) = x1==x2
-  (HsLitLit x1 _)   == (HsLitLit x2 _)   = x1==x2
   lit1		    == lit2		 = False
 
 data HsOverLit 			-- An overloaded literal
@@ -88,11 +82,8 @@ instance Outputable HsLit where
     ppr (HsFloatPrim f)	 = rational f <> char '#'
     ppr (HsDoublePrim d) = rational d <> text "##"
     ppr (HsIntPrim i)	 = integer i  <> char '#'
-    ppr (HsLitLit s _)	 = hcat [text "``", ftext s, text "''"]
 
 instance Outputable HsOverLit where
   ppr (HsIntegral i _)   = integer i
   ppr (HsFractional f _) = rational f
 \end{code}
-
-

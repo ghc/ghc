@@ -230,12 +230,6 @@ tcCoreExpr (UfVar name)
 tcCoreExpr (UfLit lit)
   = returnM (Lit lit)
 
--- The dreaded lit-lits are also similar, except here the type
--- is read in explicitly rather than being implicit
-tcCoreExpr (UfLitLit lit ty)
-  = tcIfaceType ty		`thenM` \ ty' ->
-    returnM (Lit (MachLitLit lit ty'))
-
 tcCoreExpr (UfFCall cc ty)
   = tcIfaceType ty 	`thenM` \ ty' ->
     newUnique		`thenM` \ u ->
@@ -348,12 +342,6 @@ tcCoreAlt scrut_ty (UfLitAlt lit, names, rhs)
   = ASSERT( null names )
     tcCoreExpr rhs		`thenM` \ rhs' ->
     returnM (LitAlt lit, [], rhs')
-
-tcCoreAlt scrut_ty (UfLitLitAlt str ty, names, rhs)
-  = ASSERT( null names )
-    tcCoreExpr rhs		`thenM` \ rhs' ->
-    tcIfaceType ty		`thenM` \ ty' ->
-    returnM (LitAlt (MachLitLit str ty'), [], rhs')
 
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can

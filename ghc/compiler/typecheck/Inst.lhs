@@ -27,7 +27,7 @@ module Inst (
 	isDict, isClassDict, isMethod, 
 	isLinearInst, linearInstType, isIPDict, isInheritableInst,
 	isTyVarDict, isStdClassTyVarDict, isMethodFor, 
-	instBindingRequired, instCanBeGeneralised,
+	instBindingRequired,
 
 	zonkInst, zonkInsts,
 	instToId, instName,
@@ -65,7 +65,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon,dataConSig )
 import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
-import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
+import PrelInfo	( isStandardClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
 import PprType	( pprPred, pprParendType )	
 import Subst	( substTy, substTyWith, substTheta, mkTyVarSubst )
@@ -194,10 +194,6 @@ must be witnessed by an actual binding; the second tells whether an
 instBindingRequired :: Inst -> Bool
 instBindingRequired (Dict _ (ClassP clas _) _) = not (isNoDictClass clas)
 instBindingRequired other		       = True
-
-instCanBeGeneralised :: Inst -> Bool
-instCanBeGeneralised (Dict _ (ClassP clas _) _) = not (isCcallishClass clas)
-instCanBeGeneralised other		        = True
 \end{code}
 
 

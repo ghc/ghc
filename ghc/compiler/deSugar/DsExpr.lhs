@@ -236,11 +236,6 @@ dsExpr (SectionR op expr)
     returnDs (bindNonRec y_id y_core $
 	      Lam x_id (mkApps core_op [Var x_id, Var y_id]))
 
-dsExpr (HsCCall lbl args may_gc is_asm result_ty)
-  = mapDs dsExpr args		`thenDs` \ core_args ->
-    dsCCall lbl core_args may_gc is_asm result_ty
-	-- dsCCall does all the unboxification, etc.
-
 dsExpr (HsSCC cc expr)
   = dsExpr expr			`thenDs` \ core_expr ->
     getModuleDs			`thenDs` \ mod_name ->

@@ -153,8 +153,6 @@ basicKnownKeyNames
 	floatingClassName,		-- numeric
 	realFracClassName,		-- numeric
 	realFloatClassName,		-- numeric
-	cCallableClassName,		-- mentioned, ccallish
-	cReturnableClassName,		-- mentioned, ccallish
 	dataClassName, 
 	typeableClassName,
 
@@ -356,8 +354,6 @@ numClass_RDR 		= nameRdrName numClassName
 ordClass_RDR 		= nameRdrName ordClassName
 enumClass_RDR		= nameRdrName enumClassName
 monadClass_RDR		= nameRdrName monadClassName
-cCallableClass_RDR	= nameRdrName cCallableClassName
-cReturnableClass_RDR	= nameRdrName cReturnableClassName
 
 map_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("map")
 append_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("++")
@@ -505,8 +501,6 @@ foreignObjPrimTyConName       = tcQual  gHC_PRIM_Name FSLIT("ForeignObj#") forei
 bcoPrimTyConName 	      = tcQual  gHC_PRIM_Name FSLIT("BCO#") bcoPrimTyConKey 
 weakPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Weak#") weakPrimTyConKey 
 threadIdPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("ThreadId#") threadIdPrimTyConKey 
-cCallableClassName   	      = clsQual gHC_PRIM_Name FSLIT("CCallable") cCallableClassKey
-cReturnableClassName 	      = clsQual gHC_PRIM_Name FSLIT("CReturnable") cReturnableClassKey
 
 unsafeCoerceName = wVarQual gHC_PRIM_Name FSLIT("unsafeCoerce#") unsafeCoerceIdKey 
 nullAddrName     = wVarQual gHC_PRIM_Name FSLIT("nullAddr#")	nullAddrIdKey
@@ -788,8 +782,6 @@ realClassKey		= mkPreludeClassUnique 14
 realFloatClassKey	= mkPreludeClassUnique 15
 realFracClassKey	= mkPreludeClassUnique 16
 showClassKey		= mkPreludeClassUnique 17
-cCallableClassKey	= mkPreludeClassUnique 18
-cReturnableClassKey	= mkPreludeClassUnique 19
 ixClassKey		= mkPreludeClassUnique 20
 \end{code}
 
@@ -1114,24 +1106,9 @@ needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
   	[ readClassKey
     	]
 
-cCallishClassKeys = 
-	[ cCallableClassKey
-	, cReturnableClassKey
-	]
+standardClassKeys = derivableClassKeys ++ numericClassKeys
 
-standardClassKeys
-  = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys
-    --
-    -- We have to have "CCallable" and "CReturnable" in the standard
-    -- classes, so that if you go...
-    --
-    --	    _ccall_ foo ... 93{-numeric literal-} ...
-    --
-    -- ... it can do The Right Thing on the 93.
-
-noDictClassKeys 	-- These classes are used only for type annotations;
-			-- they are not implemented by dictionaries, ever.
-  = cCallishClassKeys
+noDictClassKeys = [] -- ToDo: remove?
 \end{code}
 
 @derivableClassKeys@ is also used in checking \tr{deriving} constructs

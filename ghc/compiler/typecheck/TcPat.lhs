@@ -36,7 +36,7 @@ import TysWiredIn	( stringTy )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( DataCon, dataConFieldLabels, dataConSourceArity )
 import PrelNames	( eqStringName, eqName, geName, negateName, minusName, 
-			  integralClassName, cCallableClassName )
+			  integralClassName )
 import BasicTypes	( isBoxed )
 import Bag
 import Outputable
@@ -242,15 +242,6 @@ tcPat tc_bndr pat_in@(ConPatIn con_name arg_pats) pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat tc_bndr (LitPat lit@(HsLitLit s _)) pat_ty 
-	-- cf tcExpr on LitLits
-  = zapExpectedType pat_ty				`thenM` \ pat_ty' ->
-    tcLookupClass cCallableClassName			`thenM` \ cCallableClass ->
-    newDicts (LitLitOrigin (unpackFS s))
-	     [mkClassPred cCallableClass [pat_ty']]	`thenM` \ dicts ->
-    extendLIEs dicts					`thenM_`
-    returnM (LitPat (HsLitLit s pat_ty'), emptyBag, emptyBag, [])
-
 tcPat tc_bndr pat@(LitPat lit@(HsString _)) pat_ty
   = zapExpectedType pat_ty		`thenM` \ pat_ty' ->
     unifyTauTy pat_ty' stringTy		`thenM_` 

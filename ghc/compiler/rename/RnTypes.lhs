@@ -24,9 +24,9 @@ import RnEnv	( lookupOccRn, lookupBndrRn, lookupSyntaxName, lookupGlobalOccRn,
 		  bindPatSigTyVarsFV, bindLocalsFV, warnUnusedMatches )
 import TcRnMonad
 
-import PrelNames( cCallishClassKeys, eqStringName, eqClassName, integralClassName, 
+import PrelNames( eqStringName, eqClassName, integralClassName, 
 		  negateName, minusName, lengthPName, indexPName, plusIntegerName, fromIntegerName,
-		  timesIntegerName, ratioDataConName, fromRationalName, cCallableClassName )
+		  timesIntegerName, ratioDataConName, fromRationalName )
 import Constants	( mAX_TUPLE_SIZE )
 import TysWiredIn	( intTyCon )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
@@ -264,18 +264,8 @@ rnContext doc ctxt
 
     returnM theta
   where
-   	--Someone discovered that @CCallable@ and @CReturnable@
-	-- could be used in contexts such as:
-	--	foo :: CCallable a => a -> PrimIO Int
-	-- Doing this utterly wrecks the whole point of introducing these
-	-- classes so we specifically check that this isn't being done.
     rn_pred pred = rnPred doc pred				`thenM` \ pred'->
-		   checkErr (not (bad_pred pred'))
-			    (naughtyCCallContextErr pred')	`thenM_`
 		   returnM pred'
-
-    bad_pred (HsClassP clas _) = getUnique clas `elem` cCallishClassKeys
-    bad_pred other	       = False
 
 
 rnPred doc (HsClassP clas tys)
@@ -506,7 +496,6 @@ litFVs (HsInt i)	      = returnM (unitFV (getName intTyCon))
 litFVs (HsIntPrim i)          = returnM (unitFV (getName intPrimTyCon))
 litFVs (HsFloatPrim f)        = returnM (unitFV (getName floatPrimTyCon))
 litFVs (HsDoublePrim d)       = returnM (unitFV (getName doublePrimTyCon))
-litFVs (HsLitLit l bogus_ty)  = returnM (unitFV cCallableClassName)
 litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat only appear 
 									-- in post-typechecker translations
 bogusCharError c

@@ -809,10 +809,6 @@ rnCoreExpr (UfVar v)
 rnCoreExpr (UfLit l)
   = returnM (UfLit l)
 
-rnCoreExpr (UfLitLit l ty)
-  = rnHsType (text "litlit") ty	`thenM` \ ty' ->
-    returnM (UfLitLit l ty')
-
 rnCoreExpr (UfFCall cc ty)
   = rnHsType (text "ccall") ty	`thenM` \ ty' ->
     returnM (UfFCall cc ty')
@@ -903,10 +899,6 @@ rnUfCon (UfDataAlt con)
 
 rnUfCon (UfLitAlt lit)
   = returnM (UfLitAlt lit)
-
-rnUfCon (UfLitLitAlt lit ty)
-  = rnHsType (text "litlit") ty		`thenM` \ ty' ->
-    returnM (UfLitLitAlt lit ty')
 \end{code}
 
 %*********************************************************

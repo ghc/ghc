@@ -46,7 +46,7 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  toDNType
 			)
 import ForeignCall	( CExportSpec(..), CCallTarget(..), 
-			  isDynamicTarget, isCasmTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
+			  isDynamicTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
 import CmdLineOpts	( dopt_HscLang, HscLang(..) )
@@ -154,8 +154,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ _ (CFunction targe
 	checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty  `thenM_`
 	return idecl
   | otherwise 		-- Normal foreign import
-  = checkCg (if isCasmTarget target
-	     then checkC else checkCOrAsmOrDotNetOrInterp)	`thenM_`
+  = checkCg (checkCOrAsmOrDotNetOrInterp)			`thenM_`
     checkCTarget target						`thenM_`
     getDOpts							`thenM` \ dflags ->
     checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenM_`
@@ -167,9 +166,6 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ _ (CFunction targe
 checkCTarget (StaticTarget str) 
   = checkCg checkCOrAsmOrDotNetOrInterp	 	`thenM_`
     check (isCLabelString str) (badCName str)
-
-checkCTarget (CasmTarget _)
-  = checkCg checkC
 \end{code}
 
 On an Alpha, with foreign export dynamic, due to a giant hack when

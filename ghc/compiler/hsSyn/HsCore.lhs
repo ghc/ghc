@@ -39,7 +39,7 @@ import RdrName		( RdrName, rdrNameOcc )
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import NewDemand	( StrictSig, pprIfaceStrictSig )
-import Literal		( Literal, maybeLitLit )
+import Literal		( Literal )
 import ForeignCall	( ForeignCall )
 import DataCon		( dataConTyCon, dataConSourceArity )
 import TyCon		( isTupleTyCon, tupleTyConBoxity )
@@ -69,7 +69,6 @@ data UfExpr name
   | UfLet	(UfBinding name)  (UfExpr name)
   | UfNote	(UfNote name) (UfExpr name)
   | UfLit	Literal
-  | UfLitLit	FastString (HsType name)
   | UfFCall	ForeignCall (HsType name)
 
 data UfNote name = UfSCC CostCentre
@@ -84,7 +83,6 @@ data UfConAlt name = UfDefault
  		   | UfDataAlt name
 		   | UfTupleAlt HsTupCon
 		   | UfLitAlt Literal
-		   | UfLitLitAlt FastString (HsType name)
 
 data UfBinding name
   = UfNonRec	(UfBinder name)
@@ -110,9 +108,7 @@ ufBinderName (UfTyBinder  n _) = n
 \begin{code}
 toUfExpr :: CoreExpr -> UfExpr Name
 toUfExpr (Var v) = toUfVar v
-toUfExpr (Lit l) = case maybeLitLit l of
-			Just (s,ty) -> UfLitLit s (toHsType ty)
-			Nothing     -> UfLit l
+toUfExpr (Lit l) = UfLit l
 toUfExpr (Type ty) = UfType (toHsType ty)
 toUfExpr (Lam x b) = UfLam (toUfBndr x) (toUfExpr b)
 toUfExpr (App f a) = toUfApp f [a]
@@ -140,9 +136,7 @@ toUfCon (DataAlt dc) | isTupleTyCon tc = UfTupleAlt (mk_hs_tup_con tc dc)
 		     where
 		       tc = dataConTyCon dc
 
-toUfCon (LitAlt l)   = case maybeLitLit l of
-			 Just (s,ty) -> UfLitLitAlt s (toHsType ty)
-			 Nothing     -> UfLitAlt l
+toUfCon (LitAlt l)   = UfLitAlt l
 toUfCon DEFAULT	     = UfDefault
 
 ---------------------
@@ -207,7 +201,6 @@ pprUfExpr :: OutputableBndr name => (SDoc -> SDoc) -> UfExpr name -> SDoc
 
 pprUfExpr add_par (UfVar v)       = ppr v
 pprUfExpr add_par (UfLit l)       = ppr l
-pprUfExpr add_par (UfLitLit l ty) = add_par (hsep [ptext SLIT("__litlit"), pprHsString l, pprParendHsType ty])
 pprUfExpr add_par (UfFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprUfExpr add_par (UfType ty)     = char '@' <+> pprParendHsType ty
 
@@ -259,7 +252,6 @@ instance Outputable name => Outputable (UfNote name) where
 instance Outputable name => Outputable (UfConAlt name) where
     ppr UfDefault	   = text "__DEFAULT"
     ppr (UfLitAlt l)       = ppr l
-    ppr (UfLitLitAlt l ty) = parens (hsep [ptext SLIT("__litlit"), pprHsString l, pprParendHsType ty])
     ppr (UfDataAlt d)	   = ppr d
 
 instance Outputable name => Outputable (UfBinder name) where
@@ -326,7 +318,6 @@ eq_ufVar env n1 n2 = case lookupFM env n1 of
 eq_ufExpr :: (NamedThing name, Ord name) => EqHsEnv name -> UfExpr name -> UfExpr name -> Bool
 eq_ufExpr env (UfVar v1)	(UfVar v2)	  = eq_ufVar env v1 v2
 eq_ufExpr env (UfLit l1)        (UfLit l2) 	  = l1 == l2
-eq_ufExpr env (UfLitLit l1 ty1) (UfLitLit l2 ty2) = l1==l2 && eq_hsType env ty1 ty2
 eq_ufExpr env (UfFCall c1 ty1)  (UfFCall c2 ty2)  = c1==c2 && eq_hsType env ty1 ty2
 eq_ufExpr env (UfType ty1)      (UfType ty2)	  = eq_hsType env ty1 ty2
 eq_ufExpr env (UfTuple n1 as1)  (UfTuple n2 as2)  = n1==n2 && eqListBy (eq_ufExpr env) as1 as2
@@ -366,7 +357,6 @@ eq_ufConAlt env UfDefault	    UfDefault		= True
 eq_ufConAlt env (UfDataAlt n1)	    (UfDataAlt n2)	= n1==n2
 eq_ufConAlt env (UfTupleAlt c1)	    (UfTupleAlt c2)	= c1==c2
 eq_ufConAlt env (UfLitAlt l1)	    (UfLitAlt l2)	= l1==l2
-eq_ufConAlt env (UfLitLitAlt s1 t1) (UfLitLitAlt s2 t2) = s1==s2 && eq_hsType env t1 t2
 eq_ufConAlt env _ _ = False
 \end{code}
 

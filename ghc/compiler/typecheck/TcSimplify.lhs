@@ -33,7 +33,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  isStdClassTyVarDict, isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
-			  instBindingRequired, instCanBeGeneralised,
+			  instBindingRequired,
 			  newDictsFromOld, tcInstClassOp,
 			  getDictClassTys, isTyVarDict,
 			  instLoc, zonkInst, tidyInsts, tidyMoreInsts,
@@ -53,7 +53,7 @@ import Name		( getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig, classKey )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
-import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass ) 
+import PrelInfo		( isNumericClass ) 
 import PrelNames	( splitName, fstName, sndName, showClassKey, eqClassKey, ordClassKey)
 import HscTypes		( GhciMode(Interactive) )
 
@@ -551,9 +551,6 @@ tcSimplifyInfer
 tcSimplifyInfer doc tau_tvs wanted_lie
   = inferLoop doc (varSetElems tau_tvs)
 	      wanted_lie		`thenM` \ (qtvs, frees, binds, irreds) ->
-
-	-- Check for non-generalisable insts
-    mappM_ addCantGenErr (filter (not . instCanBeGeneralised) irreds)	`thenM_`
 
     extendLIEs frees							`thenM_`
     returnM (qtvs, binds, map instToId irreds)
@@ -1081,6 +1078,7 @@ data Avail
 
   | NoRhs 		-- Used for Insts like (CCallable f)
 			-- where no witness is required.
+			-- ToDo: remove?
 
   | Rhs 		-- Used when there is a RHS
 	TcExpr	 	-- The RHS
@@ -1773,10 +1771,6 @@ disambigGroup :: Bool	-- True <=> simplifying at top-level interactive loop
 
 disambigGroup is_interactive dicts
   |   any std_default_class classes 	-- Guaranteed all standard classes
-	  -- See comment at the end of function for reasons as to
-	  -- why the defaulting mechanism doesn't apply to groups that
-	  -- include CCallable or CReturnable dicts.
-   && not (any isCcallishClass classes)
   = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
 	-- SO, TRY DEFAULT TYPES IN ORDER
 
@@ -1802,9 +1796,6 @@ disambigGroup is_interactive dicts
     case mb_ty of
 	Left  _ 		-> bomb_out
 	Right chosen_default_ty -> choose_default chosen_default_ty
-
-  | all isCreturnableClass classes	-- Default CCall stuff to ()
-  = choose_default unitTy
 
   | otherwise 				-- No defaults
   = bomb_out
@@ -2155,9 +2146,4 @@ reduceDepthErr n stack
 	  nest 4 (pprInstsInFull stack)]
 
 reduceDepthMsg n stack = nest 4 (pprInstsInFull stack)
-
------------------------------------------------
-addCantGenErr inst
-  = addErrTc (sep [ptext SLIT("Cannot generalise these overloadings (in a _ccall_):"),
-		   nest 4 (ppr inst <+> pprInstLoc (instLoc inst))])
 \end{code}

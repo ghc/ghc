@@ -391,7 +391,7 @@ dsFExportDynamic id cconv
 		      StdCallConv -> Just sz_args
 		      _ 	  -> Nothing
      in
-     dsCCall adjustor adj_args PlayRisky False io_res_ty	`thenDs` \ ccall_adj ->
+     dsCCall adjustor adj_args PlayRisky io_res_ty	`thenDs` \ ccall_adj ->
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
      let ccall_adj_ty = exprType ccall_adj
          ccall_io_adj = mkLams [stbl_value]		     $

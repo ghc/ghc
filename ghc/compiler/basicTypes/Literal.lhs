@@ -8,7 +8,7 @@ module Literal
 	( Literal(..)		-- Exported to ParseIface
 	, mkMachInt, mkMachWord
 	, mkMachInt64, mkMachWord64
-	, isLitLitLit, maybeLitLit, litSize
+	, litSize
 	, litIsDupable, litIsTrivial
 	, literalType, literalPrimRep
 	, hashLiteral
@@ -123,16 +123,9 @@ data Literal
 					-- 'stdcall' labels.
 					-- Just x => "@<x>" will be appended to label
 					--           name when emitting asm.
-
-	-- lit-lits only work for via-C compilation, hence they
-	-- are deprecated.  The string is emitted verbatim into
-	-- the C file, and can therefore be any C expression,
-	-- macro call, #defined constant etc.
-  | MachLitLit  FastString Type	-- Type might be Addr# or Int# etc
 \end{code}
 
-Binary instance: must do this manually, because we don't want the type
-arg of MachLitLit involved.
+Binary instance
 
 \begin{code}
 instance Binary Literal where
@@ -146,7 +139,6 @@ instance Binary Literal where
     put_ bh (MachFloat ah)    = do putByte bh 7; put_ bh ah
     put_ bh (MachDouble ai)   = do putByte bh 8; put_ bh ai
     put_ bh (MachLabel aj mb) = do putByte bh 9; put_ bh aj ; put_ bh mb
-    put_ bh (MachLitLit ak _) = do putByte bh 10; put_ bh ak
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -180,9 +172,6 @@ instance Binary Literal where
 		    aj <- get bh
 		    mb <- get bh
 		    return (MachLabel aj mb)
-	      10 -> do
-		    ak <- get bh
-		    return (MachLitLit ak (error "MachLitLit: no type"))
 \end{code}
 
 \begin{code}
@@ -283,12 +272,6 @@ nullAddrLit = MachNullAddr
 	Predicates
 	~~~~~~~~~~
 \begin{code}
-isLitLitLit (MachLitLit _ _) = True
-isLitLitLit _	    	     = False
-
-maybeLitLit (MachLitLit s t) = Just (s,t)
-maybeLitLit _		     = Nothing
-
 litIsTrivial :: Literal -> Bool
 -- True if there is absolutely no penalty to duplicating the literal
 --	c.f. CoreUtils.exprIsTrivial
@@ -326,7 +309,6 @@ literalType (MachWord64  _)	  = word64PrimTy
 literalType (MachFloat _)	  = floatPrimTy
 literalType (MachDouble _)	  = doublePrimTy
 literalType (MachLabel _ _)	  = addrPrimTy
-literalType (MachLitLit _ ty)	  = ty
 \end{code}
 
 \begin{code}
@@ -342,7 +324,6 @@ literalPrimRep (MachWord64 _)	  = Word64Rep
 literalPrimRep (MachFloat _)	  = FloatRep
 literalPrimRep (MachDouble _)	  = DoubleRep
 literalPrimRep (MachLabel _ _)	  = AddrRep
-literalPrimRep (MachLitLit _ ty)  = typePrimRep ty
 \end{code}
 
 
@@ -359,7 +340,6 @@ cmpLit (MachWord64    a)   (MachWord64	   b)   = a `compare` b
 cmpLit (MachFloat     a)   (MachFloat	   b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble	   b)   = a `compare` b
 cmpLit (MachLabel     a _) (MachLabel      b _) = a `compare` b
-cmpLit (MachLitLit    a b) (MachLitLit    c d)  = (a `compare` c) `thenCmp` (b `tcCmpType` d)
 cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
 					        | otherwise  		       = GT
 
@@ -373,7 +353,6 @@ litTag (MachWord64    _)   = _ILIT(7)
 litTag (MachFloat     _)   = _ILIT(8)
 litTag (MachDouble    _)   = _ILIT(9)
 litTag (MachLabel   _ _)   = _ILIT(10)
-litTag (MachLitLit  _ _)   = _ILIT(11)
 \end{code}
 
 	Printing
@@ -426,11 +405,6 @@ pprLit lit
 	       Nothing -> pprHsString l
 	       Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
 
-      MachLitLit s ty | code_style  -> ftext s
-		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 
-						     pprHsString s,
-						     pprParendType ty])
-
 -- negative floating literals in code style need parentheses to avoid
 -- interacting with surrounding syntax.
 code_rational d | d < 0     = parens (rational d)
@@ -476,7 +450,6 @@ hashLiteral (MachWord64 i) 	= hashInteger i
 hashLiteral (MachFloat r)   	= hashRational r
 hashLiteral (MachDouble r)  	= hashRational r
 hashLiteral (MachLabel s _)     = hashFS s
-hashLiteral (MachLitLit s _)    = hashFS s
 
 hashRational :: Rational -> Int
 hashRational r = hashInteger (numerator r)

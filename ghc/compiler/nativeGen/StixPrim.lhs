@@ -50,13 +50,10 @@ foreignCallCode
 %*									*
 %************************************************************************
 
-First, the dreaded @ccall@.  We can't handle @casm@s.
+First, the dreaded @ccall@.
 
 Usually, this compiles to an assignment, but when the left-hand side
 is empty, we just perform the call and ignore the result.
-
-btw Why not let programmer use casm to provide assembly code instead
-of C code?  ADR
 
 ToDo: saving/restoring of volatile regs around ccalls.
 
@@ -96,9 +93,6 @@ foreignCallCode lhs call@(CCall (CCallSpec ctarget cconv safety)) rhs
              StaticTarget nm -> (rhs, Left nm)
              DynamicTarget |  notNull rhs -- an assertion
                            -> (tail rhs, Right (amodeToStix (head rhs)))
-             CasmTarget _
-                -> ncgPrimopMoan "Native code generator can't handle foreign call" 
-                                 (ppr call)
 
     stix_args = map amodeToStix' cargs
 
@@ -187,7 +181,6 @@ amodeToStix (CLit core)
       MachNullAddr   -> StInt 0
       MachInt i      -> StInt i
       MachWord w     -> case word2IntLit core of MachInt iw -> StInt iw
-      MachLitLit s _ -> litLitErr
                                                        -- dreadful, but rare.
       MachLabel l (Just x) -> StCLbl (mkForeignLabel (mkFastString (unpackFS l ++ '@':show x)) False)
       MachLabel l _        -> StCLbl (mkForeignLabel l False{-ToDo: dynamic-})
@@ -221,9 +214,6 @@ amodeToStix (CMacroExpr _ macro [arg])
 
 amodeToStix other
    = pprPanic "StixPrim.amodeToStix" (pprAmode other)
-
-litLitErr 
-   = ncgPrimopMoan "native code generator can't handle lit-lits" empty
 \end{code}
 
 Sizes of the CharLike and IntLike closures that are arranged as arrays

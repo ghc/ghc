@@ -45,7 +45,7 @@ import Var		( Var, isId, isTyVar )
 import VarEnv
 import Name		( hashName, isDllName )
 import Literal		( hashLiteral, literalType, litIsDupable, 
-			  litIsTrivial, isZeroLit, isLitLitLit )
+			  litIsTrivial, isZeroLit )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,
 			  isExistentialDataCon, dataConTyCon, dataConName )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
@@ -1157,11 +1157,10 @@ hashId id = hashName (idName id)
 %*									*
 %************************************************************************
 
-Top-level constructor applications can usually be allocated 
-statically, but they can't if 
-   a) the constructor, or any of the arguments, come from another DLL
-   b) any of the arguments are LitLits
-(because we can't refer to static labels in other DLLs).
+Top-level constructor applications can usually be allocated
+statically, but they can't if the constructor, or any of the
+arguments, come from another DLL (because we can't refer to static
+labels in other DLLs).
 
 If this happens we simply make the RHS into an updatable thunk, 
 and 'exectute' it rather than allocating it statically.
@@ -1235,10 +1234,7 @@ is_static False (Lam b e) = isRuntimeVar b || is_static False e
 
 is_static in_arg (Note (SCC _) e) = False
 is_static in_arg (Note _ e)       = is_static in_arg e
-
-is_static in_arg (Lit lit)        = not (isLitLitLit lit)
-	-- lit-lit arguments cannot be used in static constructors either.  
-	-- (litlits are deprecated, so I'm not going to bother cleaning up this infelicity --SDM).
+is_static in_arg (Lit lit)        = True
 
 is_static in_arg other_expr = go other_expr 0
   where

@@ -75,7 +75,6 @@ module CmdLineOpts (
 	opt_DoSemiTagging,
 	opt_LiberateCaseThreshold,
 	opt_StgDoLetNoEscapes,
-	opt_UnfoldCasms,
 	opt_CprOff,
 	opt_RulesOff,
 	opt_UnboxStrictFields,
@@ -592,7 +591,6 @@ opt_RulesOff			= lookUp  FSLIT("-frules-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_StgDoLetNoEscapes		= lookUp  FSLIT("-flet-no-escape")
-opt_UnfoldCasms		        = lookUp  FSLIT("-funfold-casms-in-hi-file")
 opt_UnboxStrictFields		= lookUp  FSLIT("-funbox-strict-fields")
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
@@ -666,7 +664,6 @@ isStaticHscFlag f =
 	"fflatten",
 	"fsemi-tagging",
 	"flet-no-escape",
-	"funfold-casms-in-hi-file",
 	"funbox-strict-fields",
 	"femit-extern-decls",
 	"fglobalise-toplev-names",

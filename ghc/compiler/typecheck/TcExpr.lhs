@@ -54,8 +54,7 @@ import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy )
-import PrelNames	( cCallableClassName, cReturnableClassName, 
-			  enumFromName, enumFromThenName, 
+import PrelNames	( enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
 			  enumFromToPName, enumFromThenToPName,
 			  ioTyConName
@@ -313,70 +312,6 @@ tcMonoExpr (HsProc pat cmd loc) res_ty
     tcProc pat cmd res_ty			`thenM` \ (pat', cmd') ->
     returnM (HsProc pat' cmd' loc)
 \end{code}
-
-
-%************************************************************************
-%*									*
-		Foreign calls
-%*									*
-%************************************************************************
-
-The interesting thing about @ccall@ is that it is just a template
-which we instantiate by filling in details about the types of its
-argument and result (ie minimal typechecking is performed).  So, the
-basic story is that we allocate a load of type variables (to hold the
-arg/result types); unify them with the args/result; and store them for
-later use.
-
-\begin{code}
-tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
-
-  = getDOpts				`thenM` \ dflags ->
-
-    checkTc (not (is_casm && dopt_HscLang dflags /= HscC)) 
-        (vcat [text "_casm_ is only supported when compiling via C (-fvia-C).",
-               text "Either compile with -fvia-C, or, better, rewrite your code",
-               text "to use the foreign function interface.  _casm_s are deprecated",
-               text "and support for them may one day disappear."])
-					`thenM_`
-
-    -- Get the callable and returnable classes.
-    tcLookupClass cCallableClassName	`thenM` \ cCallableClass ->
-    tcLookupClass cReturnableClassName	`thenM` \ cReturnableClass ->
-    tcLookupTyCon ioTyConName		`thenM` \ ioTyCon ->
-    let
-	new_arg_dict (arg, arg_ty)
-	  = newDicts (CCallOrigin (unpackFS lbl) (Just arg))
-		     [mkClassPred cCallableClass [arg_ty]]	`thenM` \ arg_dicts ->
-	    returnM arg_dicts	-- Actually a singleton bag
-
-	result_origin = CCallOrigin (unpackFS lbl) Nothing {- Not an arg -}
-    in
-
-	-- Arguments
-    let tv_idxs | null args  = []
-		| otherwise  = [1..length args]
-    in
-    newTyVarTys (length tv_idxs) openTypeKind		`thenM` \ arg_tys ->
-    tcCheckRhos args arg_tys		   		`thenM` \ args' ->
-
-	-- The argument types can be unlifted or lifted; the result
-	-- type must, however, be lifted since it's an argument to the IO
-	-- type constructor.
-    newTyVarTy liftedTypeKind  		`thenM` \ result_ty ->
-    let
-	io_result_ty = mkTyConApp ioTyCon [result_ty]
-    in
-    zapExpectedTo res_ty io_result_ty	`thenM_`
-
-	-- Construct the extra insts, which encode the
-	-- constraints on the argument and result types.
-    mappM new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenM` \ ccarg_dicts_s ->
-    newDicts result_origin [mkClassPred cReturnableClass [result_ty]]	`thenM` \ ccres_dict ->
-    extendLIEs (ccres_dict ++ concat ccarg_dicts_s)			`thenM_`
-    returnM (HsCCall lbl args' may_gc is_casm io_result_ty)
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -1025,14 +960,6 @@ Overloaded literals.
 
 \begin{code}
 tcLit :: HsLit -> Expected TcRhoType -> TcM TcExpr
-tcLit (HsLitLit s _) res_ty
-  = zapExpectedType res_ty				`thenM` \ res_ty' ->
-    tcLookupClass cCallableClassName			`thenM` \ cCallableClass ->
-    newDicts (LitLitOrigin (unpackFS s))
-	     [mkClassPred cCallableClass [res_ty']]	`thenM` \ dicts ->
-    extendLIEs dicts					`thenM_`
-    returnM (HsLit (HsLitLit s res_ty'))
-
 tcLit lit res_ty 
   = zapExpectedTo res_ty (hsLitType lit)		`thenM_`
     returnM (HsLit lit)
