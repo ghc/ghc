@@ -353,6 +353,26 @@ fi
 AC_SUBST(LdXFlag)
 ])
 
+dnl
+dnl Check for GNU ld
+dnl
+AC_DEFUN(FPTOOLS_GNU_LD,
+[AC_CACHE_CHECK([whether ld is GNU ld], fptools_cv_gnu_ld,
+[
+if ${LdCmd} -v | grep GNU 2>&1 >/dev/null; then
+   fptools_cv_gnu_ld=yes
+else
+   fptools_cv_gnu_ld=no
+fi
+])
+if test "$fptools_cv_gnu_ld" = yes; then
+	LdIsGNULd=YES
+else
+	LdIsGNULd=NO
+fi
+AC_SUBST(LdIsGNULd)
+])
+
 
 # FP_PROG_AR
 # ----------

@@ -1257,6 +1257,7 @@ case $HostOS_CPP in
 esac
 AC_SUBST(LdCmd)
 FPTOOLS_LD_X
+FPTOOLS_GNU_LD
 
 AC_CONFIG_FILES([mk/config.mk])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
