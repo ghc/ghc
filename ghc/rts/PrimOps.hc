@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.114 2003/10/01 10:57:41 wolfgang Exp $
+ * $Id: PrimOps.hc,v 1.115 2003/10/22 15:01:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -402,7 +402,22 @@ FN_(unsafeThawArrayzh_fast)
 {
   FB_
   SET_INFO((StgClosure *)R1.cl,&stg_MUT_ARR_PTRS_info);
-  recordMutable((StgMutClosure*)R1.cl);
+
+  // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
+  //
+  // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN 
+  // normally doesn't.  However, when we freeze a MUT_ARR_PTRS, we leave
+  // it on the mutable list for the GC to remove (removing something from
+  // the mutable list is not easy, because the mut_list is only singly-linked).
+  // 
+  // So, when we thaw a MUT_ARR_PTRS_FROZEN, we must cope with two cases:
+  // either it is on a mut_list, or it isn't.  We adopt the convention that
+  // the mut_link field is NULL if it isn't on a mut_list, and the GC
+  // maintains this invariant.
+  //
+  if (((StgMutArrPtrs *)R1.cl)->mut_link == NULL) {
+	recordMutable((StgMutClosure*)R1.cl);
+  }
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(R1.p);
