@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.73 2001/10/01 13:57:13 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.74 2001/10/08 13:24:53 simonmar Exp $
 --
 -- Driver flags
 --
@@ -463,7 +463,8 @@ buildStaticHscOpts = do
 	    0 -> hsc_minusNoO_flags
 	    1 -> hsc_minusO_flags
 	    2 -> hsc_minusO2_flags
-	    _ -> error "unknown opt level"
+	    n -> throwDyn (CmdLineError ("unknown optimisation level: "
+					  ++ show n))
 	    -- ToDo: -Ofile
  
 	-- take into account -fno-* flags by removing the equivalent -f*
