@@ -1451,8 +1451,7 @@ sub rev_tbl {
 		    ($hi, $lo) = (4294967295 - $hi, 4294967296 - $lo)
 			if $sign eq "-";
 		    $_ = "\t.align 3\n\t.long $lo\n\t.long $hi\n";
-		    printf STDERR "TURNING %s into 0x %08x %08x\n",
-			$number, $hi, $lo;
+		    # printf STDERR "TURNING %s into 0x %08x %08x\n", $number, $hi, $lo;
 		} else {
 		    print STDERR "Cannot handle \".quad $number\" in info table\n";
 		    exit 1;
