@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.88 2002/04/23 17:33:54 ken Exp $
+ * $Id: Linker.c,v 1.89 2002/05/01 15:46:14 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -473,23 +473,14 @@ static OpenedDLL* opened_dlls = NULL;
 
 
 
-char*
-addDLL ( __attribute((unused)) char* path, char* dll_name )
+char *
+addDLL( char *dll_name )
 {
 #  if defined(OBJFORMAT_ELF)
    void *hdl;
-   char *buf;
    char *errmsg;
 
-   if (path == NULL || strlen(path) == 0) {
-      buf = stgMallocBytes(strlen(dll_name) + 10, "addDll");
-      sprintf(buf, "lib%s.so", dll_name);
-   } else {
-      buf = stgMallocBytes(strlen(path) + 1 + strlen(dll_name) + 10, "addDll");
-      sprintf(buf, "%s/lib%s.so", path, dll_name);
-   }
-   hdl = dlopen(buf, RTLD_NOW | RTLD_GLOBAL );
-   free(buf);
+   hdl= dlopen(dll_name, RTLD_NOW | RTLD_GLOBAL);
    if (hdl == NULL) {
       /* dlopen failed; return a ptr to the error msg. */
       errmsg = dlerror();

@@ -1,13 +1,17 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.121 2002/04/24 09:42:18 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.122 2002/05/01 15:46:15 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
 -- (c) The GHC Team 2000
 --
 -----------------------------------------------------------------------------
-module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
+module InteractiveUI ( 
+	interactiveUI,  -- :: CmState -> [FilePath] -> [LibrarySpec] -> IO ()
+	LibrarySpec(..),
+	ghciWelcomeMsg
+   ) where
 
 #include "../includes/config.h"
 #include "HsVersions.h"
@@ -70,7 +74,7 @@ import Monad
 import GlaExts		( unsafeCoerce# )
 
 import Foreign		( nullPtr )
-import CString		( peekCString )
+import CString		( CString, peekCString, withCString )
 
 -----------------------------------------------------------------------------
 
@@ -993,11 +997,24 @@ ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 -- For dynamic objects only, try to find the object file in all the 
 -- directories specified in v_Library_Paths before giving up.
 
-type LibrarySpec
-   = Either FilePath String
+data LibrarySpec = Object FilePath | DLL String
 
-showLS (Left nm)  = "(static) " ++ nm
-showLS (Right nm) = "(dynamic) " ++ nm
+-- Packages that don't need loading, because the compiler shares them with
+-- the interpreted program.
+dont_load_these = [ "rts" ]
+
+-- Packages that are already linked into GHCi.  For mingw32, we only
+-- skip gmp and rts, since std and after need to load the msvcrt.dll
+-- library which std depends on.
+loaded_in_ghci
+#          ifndef mingw32_TARGET_OS
+           = [ "std", "concurrent", "posix", "text", "util" ]
+#          else
+	   = [ ]
+#          endif
+
+showLS (Object nm)  = "(static) " ++ nm
+showLS (DLL nm) = "(dynamic) " ++ nm
 
 linkPackages :: DynFlags -> [LibrarySpec] -> [PackageConfig] -> IO ()
 linkPackages dflags cmdline_lib_specs pkgs
@@ -1007,6 +1024,7 @@ linkPackages dflags cmdline_lib_specs pkgs
 	if (null cmdline_lib_specs)
 	   then return ()
 	   else do maybePutStr dflags "final link ... "
+
 		   ok <- resolveObjs
 		   if ok then maybePutStrLn dflags "done."
 	      		 else throwDyn (InstallationError 
@@ -1016,15 +1034,15 @@ linkPackages dflags cmdline_lib_specs pkgs
         preloadLib dflags lib_paths lib_spec
            = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
                 case lib_spec of
-                   Left static_ish
+                   Object static_ish
                       -> do b <- preload_static lib_paths static_ish
                             maybePutStrLn dflags (if b  then "done." 
 							else "not found")
-                   Right dll_unadorned
+                   DLL dll_unadorned
                       -> -- We add "" to the set of paths to try, so that
                          -- if none of the real paths match, we force addDLL
                          -- to look in the default dynamic-link search paths.
-                         do maybe_errstr <- preload_dynamic (lib_paths++[""]) 
+                         do maybe_errstr <- loadDynamic (lib_paths++[""]) 
                                                             dll_unadorned
                             case maybe_errstr of
                                Nothing -> return ()
@@ -1046,80 +1064,107 @@ linkPackages dflags cmdline_lib_specs pkgs
                 if not b then return False
                          else loadObj name >> return True
 
-        -- return Nothing == success, else Just error message from addDLL
-        preload_dynamic [] name
-           = return Nothing
-        preload_dynamic (path:paths) rootname
-           = do -- addDLL returns NULL on success
-                maybe_errmsg <- addDLL path rootname
-                if    maybe_errmsg == nullPtr
-                 then preload_dynamic paths rootname
-                 else do str <- peekCString maybe_errmsg
-                         return (Just str)
-
         give_up 
            = (throwDyn . CmdLineError)
                 "user specified .o/.so/.DLL could not be loaded."
-
--- Packages that don't need loading, because the compiler shares them with
--- the interpreted program.
-dont_load_these = [ "rts" ]
-
--- Packages that are already linked into GHCi.  For mingw32, we only
--- skip gmp and rts, since std and after need to load the msvcrt.dll
--- library which std depends on.
-loaded_in_ghci
-#          ifndef mingw32_TARGET_OS
-           = [ "std", "concurrent", "posix", "text", "util" ]
-#          else
-	   = [ ]
-#          endif
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()
 linkPackage dflags pkg
    | name pkg `elem` dont_load_these = return ()
    | otherwise
    = do 
-        -- For each obj, try obj.o and if that fails, obj.so.
-        -- Complication: all the .so's must be loaded before any of the .o's.  
         let dirs      =  library_dirs pkg
-        let objs      =  hs_libraries pkg ++ extra_libraries pkg
-        classifieds   <- mapM (locateOneObj dirs) objs
+        let libs      =  hs_libraries pkg ++ extra_libraries pkg
+        classifieds   <- mapM (locateOneObj dirs) libs
 
-	-- Don't load the .so libs if this is a package GHCi is already
-	-- linked against, because we'll already have the .so linked in.
-	let (so_libs, obj_libs) = partition isRight classifieds
-        let sos_first | name pkg `elem` loaded_in_ghci = obj_libs
-		      | otherwise      		       = so_libs ++ obj_libs
+        -- Complication: all the .so's must be loaded before any of the .o's.  
+	let dlls = [ dll | DLL dll <- classifieds ]
+	    objs = [ obj | Object obj <- classifieds ]
 
 	maybePutStr dflags ("Loading package " ++ name pkg ++ " ... ")
-        mapM loadClassified sos_first
+
+	-- If this package is already part of the GHCi binary, we'll already
+	-- have the right DLLs for this package loaded, so don't try to
+	-- load them again.
+	when (name pkg `notElem` loaded_in_ghci) $
+	    loadDynamics dirs dlls
+	
+	-- After loading all the DLLs, we can load the static objects.
+	mapM loadObj objs
+
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
 	if ok then maybePutStrLn dflags "done."
 	      else panic ("can't load package `" ++ name pkg ++ "'")
-     where
-        isRight (Right _) = True
-        isRight (Left _)  = False
 
-loadClassified :: LibrarySpec -> IO ()
-loadClassified (Left obj_absolute_filename)
-   = do loadObj obj_absolute_filename
-loadClassified (Right dll_unadorned)
-   = do maybe_errmsg <- addDLL "" dll_unadorned -- doesn't seem right to me
-        if    maybe_errmsg == nullPtr
-         then return ()
-         else do str <- peekCString maybe_errmsg
-                 throwDyn (CmdLineError ("can't load .so/.DLL for: " 
-                                       ++ dll_unadorned ++ " (" ++ str ++ ")" ))
+loadDynamics dirs [] = return ()
+loadDynamics dirs (dll:dlls) = do
+  r <- loadDynamic dirs dll
+  case r of
+    Nothing  -> loadDynamics dirs dlls
+    Just err -> throwDyn (CmdLineError ("can't load .so/.DLL for: " 
+                                       ++ dll ++ " (" ++ err ++ ")" ))
 
+-- Try to find an object file for a given library in the given paths.
+-- If it isn't present, we assume it's a dynamic library.
 locateOneObj :: [FilePath] -> String -> IO LibrarySpec
-locateOneObj []     obj 
-   = return (Right obj) -- we assume
-locateOneObj (d:ds) obj 
-   = do let path = d ++ '/':obj ++ ".o"
+locateOneObj [] lib
+   = return (DLL lib) -- we assume
+locateOneObj (d:ds) lib
+   = do let path = d ++ '/':lib ++ ".o"
         b <- doesFileExist path
-        if b then return (Left path) else locateOneObj ds obj
+        if b then return (Object path) else locateOneObj ds lib
+
+-- ----------------------------------------------------------------------------
+-- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
+
+#ifdef mingw32_TARGET_OS
+loadDynamic paths rootname = do
+  -- ignore paths on windows (why? --SDM)
+  maybe_errmsg <- addDLL rootname
+  if maybe_errmsg == nullPtr
+	then return Nothing
+	else do str <- peekCString maybe_errmsg
+		return (Just str)
+
+addDLL :: String -> String -> IO (Ptr CChar)
+addDLL path lib = do
+  withCString path $ \c_path -> do
+  withCString lib $ \c_lib -> do
+    maybe_errmsg <- c_addDLL c_path c_lib
+    return maybe_errmsg
+
+#else
+
+-- return Nothing == success, else Just error message from dlopen
+loadDynamic (path:paths) rootname = do
+  let dll = path ++ '/':mkSOName rootname
+  b <- doesFileExist dll
+  if not b
+     then loadDynamic paths rootname
+     else addDLL dll
+loadDynamic [] rootname = do
+	-- tried all our known library paths, let dlopen() search its
+	-- own builtin paths now.
+   addDLL (mkSOName rootname)
+
+mkSOName root = "lib" ++ root ++ ".so"
+
+addDLL :: String -> IO (Maybe String)
+addDLL str = do
+  maybe_errmsg <- withCString str $ \dll -> c_addDLL dll
+  if maybe_errmsg == nullPtr
+	then return Nothing
+	else do str <- peekCString maybe_errmsg
+		return (Just str)
+
+foreign import ccall "addDLL" unsafe  
+  c_addDLL :: CString -> IO CString
+
+foreign import ccall "dlerror" unsafe  
+  dlerror :: IO CString
+
+#endif
 
 -----------------------------------------------------------------------------
 -- timing & statistics
