@@ -17,13 +17,15 @@ import Constants	( mIN_SIZE_NonUpdHeapObject )
 import ClosureInfo	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
 
-import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
+import Foreign		( Storable(..), Word8, Word16, Word32, Word64, Ptr(..), 
 			  malloc, castPtr, plusPtr, Addr )
 import Addr		( addrToInt )
 import Bits		( Bits(..), shiftR )
 
 import PrelBase		( Int(..) )
 import PrelIOBase	( IO(..) )
+
+import Monad		( liftM )
 
 \end{code}
 
@@ -88,20 +90,11 @@ make_constr_itbls cons
                            nptrs = fromIntegral nptrs_really,
                            tipe  = fromIntegral cONSTR,
                            srtlen = fromIntegral conNo,
-                           code0 = fromIntegral code0, code1 = fromIntegral code1,
-                           code2 = fromIntegral code2, code3 = fromIntegral code3,
-                           code4 = fromIntegral code4, code5 = fromIntegral code5,
-                           code6 = fromIntegral code6, code7 = fromIntegral code7,
-                           code8 = fromIntegral code8, code9 = fromIntegral code9,
-                           codeA = fromIntegral codeA, codeB = fromIntegral codeB,
-                           codeC = fromIntegral codeC, codeD = fromIntegral codeD,
-                           codeE = fromIntegral codeE, codeF = fromIntegral codeF 
+                           code  = code
                         }
                  -- Make a piece of code to jump to "entry_label".
                  -- This is the only arch-dependent bit.
-                 [code0,code1,code2,code3,code4,code5,code6,code7,
-                  code8,code9,codeA,codeB,codeC,codeD,codeE,codeF]
-                    = mkJumpToAddr entry_addr
+                 code = mkJumpToAddr entry_addr
              in
                  do addr <- malloc
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
@@ -113,12 +106,15 @@ make_constr_itbls cons
 
 -- Make code which causes a jump to the given address.  This is the
 -- only arch-dependent bit of the itbl story.  The returned list is
--- 16 elements long, since on sparc 4 words (i.e. 4 insns) are needed.
+-- itblCodeLength elements (bytes) long.
 
 -- For sparc_TARGET_ARCH, i386_TARGET_ARCH, etc.
 #include "nativeGen/NCG.h"
 
-mkJumpToAddr :: Addr -> [Word8]
+itblCodeLength :: Int
+itblCodeLength = length (mkJumpToAddr undefined)
+
+mkJumpToAddr :: Addr -> [ItblCode]
 
 #if sparc_TARGET_ARCH
 -- After some consideration, we'll try this, where
@@ -131,26 +127,18 @@ mkJumpToAddr :: Addr -> [Word8]
 --   0008 81C0C000              jmp     %g3
 --   000c 01000000              nop
 
+type ItblCode = Word32
 mkJumpToAddr a
    = let w32 = fromIntegral (addrToInt a)
-         insn1 = 0x07000000 .|. (hi22 w32)
-         insn2 = 0x8610E000 .|. (lo10 w32)
-         insn3 = 0x81C0C000
-         insn4 = 0x01000000 
-
-         -- big-endianly ...
-         w2bytes :: Word32 -> [Word8]
-         w2bytes w
-            = map fromIntegral [byte 3 w, byte 2 w, byte 1 w, byte 0 w]
 
          hi22, lo10 :: Word32 -> Word32
          lo10 x = x .&. 0x3FF
          hi22 x = (x `shiftR` 10) .&. 0x3FFFF
-      
-         insnBytes
-            = concat (map w2bytes [insn1, insn2, insn3, insn4])
-     in
-         insnBytes
+
+     in  [ 0x07000000 .|. (hi22 w32),
+           0x8610E000 .|. (lo10 w32),
+           0x81C0C000,
+           0x01000000 ]
 #endif
 
 #if i386_TARGET_ARCH
@@ -158,26 +146,37 @@ mkJumpToAddr a
 -- Generate   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax
 -- which is
 -- B8 ZZ YY XX WW FF E0
+
+type ItblCode = Word8
 mkJumpToAddr a
    = let w32 = fromIntegral (addrToInt a)
          insnBytes :: [Word8]
          insnBytes
-            = map fromIntegral (take 16 (
-                 [0xB8, byte 0 w32, byte 1 w32, 
-                        byte 2 w32, byte 3 w32, 
-                  0xFF, 0xE0]
-                 ++ let nops = 0x90 : nops in nops
-              ))
+            = [0xB8, byte 0 w32, byte 1 w32, 
+                     byte 2 w32, byte 3 w32, 
+               0xFF, 0xE0]
      in
          insnBytes
 #endif
 
+#if alpha_TARGET_ARCH
+type ItblCode = Word32
+mkJumpToAddr a
+    = [ 0xc3800000      -- br   at, .+4
+      , 0xa79c000c      -- ldq  at, 12(at)
+      , 0x6bfc0000      -- jmp  (at)    # with zero hint -- oh well
+      , 0x47ff041f      -- nop
+      , fromIntegral (w64 .&. 0x0000FFFF)
+      , fromIntegral ((w64 `shiftR` 32) .&. 0x0000FFFF) ]
+    where w64 = fromIntegral (addrToInt a) :: Word64
+#endif
 
-byte :: Int -> Word32 -> Word32
-byte 0 w = w .&. 0xFF
-byte 1 w = (w `shiftR` 8) .&. 0xFF
-byte 2 w = (w `shiftR` 16) .&. 0xFF
-byte 3 w = (w `shiftR` 24) .&. 0xFF
+
+byte :: Int -> Word32 -> Word8
+byte 0 w = fromIntegral (w .&. 0xFF)
+byte 1 w = fromIntegral ((w `shiftR` 8) .&. 0xFF)
+byte 2 w = fromIntegral ((w `shiftR` 16) .&. 0xFF)
+byte 3 w = fromIntegral ((w `shiftR` 24) .&. 0xFF)
 
 
 vecret_entry 0 = stg_interp_constr1_entry
@@ -206,100 +205,93 @@ foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Addr
 
 
 -- Ultra-minimalist version specially for constructors
-data StgInfoTable = StgInfoTable {
-   ptrs   :: Word16,
-   nptrs  :: Word16,
-   srtlen :: Word16,
-   tipe   :: Word16,
-   code0, code1, code2, code3, code4, code5, code6, code7,
-   code8, code9, codeA, codeB, codeC, codeD, codeE, codeF :: Word8
-}
+#if SIZEOF_VOID_P == 8
+type HalfWord = Word32
+#else
+type HalfWord = Word16
+#endif
 
+data StgInfoTable = StgInfoTable {
+   ptrs   :: HalfWord,
+   nptrs  :: HalfWord,
+   tipe   :: HalfWord,
+   srtlen :: HalfWord,
+   code   :: [ItblCode]
+}
 
 instance Storable StgInfoTable where
 
    sizeOf itbl 
-      = (sum . map (\f -> f itbl))
-        [fieldSz ptrs, fieldSz nptrs, fieldSz srtlen, fieldSz tipe,
-         fieldSz code0, fieldSz code1, fieldSz code2, fieldSz code3, 
-         fieldSz code4, fieldSz code5, fieldSz code6, fieldSz code7,
-         fieldSz code8, fieldSz code9, fieldSz codeA, fieldSz codeB, 
-         fieldSz codeC, fieldSz codeD, fieldSz codeE, fieldSz codeF]
+      = sum
+        [fieldSz ptrs itbl,
+         fieldSz nptrs itbl,
+         fieldSz tipe itbl,
+         fieldSz srtlen itbl,
+         fieldSz (head.code) itbl * itblCodeLength]
 
    alignment itbl 
-      = (sum . map (\f -> f itbl))
-        [fieldAl ptrs, fieldAl nptrs, fieldAl srtlen, fieldAl tipe,
-         fieldAl code0, fieldAl code1, fieldAl code2, fieldAl code3, 
-         fieldAl code4, fieldAl code5, fieldAl code6, fieldAl code7,
-         fieldAl code8, fieldAl code9, fieldAl codeA, fieldAl codeB, 
-         fieldAl codeC, fieldAl codeD, fieldAl codeE, fieldAl codeF]
+      = SIZEOF_VOID_P
 
    poke a0 itbl
-      = do a1  <- store (ptrs   itbl) (castPtr a0)
-           a2  <- store (nptrs  itbl) a1
-           a3  <- store (tipe   itbl) a2
-           a4  <- store (srtlen itbl) a3
-           a5  <- store (code0  itbl) a4
-           a6  <- store (code1  itbl) a5
-           a7  <- store (code2  itbl) a6
-           a8  <- store (code3  itbl) a7
-           a9  <- store (code4  itbl) a8
-           aA  <- store (code5  itbl) a9
-           aB  <- store (code6  itbl) aA
-           aC  <- store (code7  itbl) aB
-           aD  <- store (code8  itbl) aC
-           aE  <- store (code9  itbl) aD
-           aF  <- store (codeA  itbl) aE
-           a10 <- store (codeB  itbl) aF
-           a11 <- store (codeC  itbl) a10
-           a12 <- store (codeD  itbl) a11
-           a13 <- store (codeE  itbl) a12
-           a14 <- store (codeF  itbl) a13
-           return ()
+      = runState (castPtr a0)
+      $ do store (ptrs   itbl)
+           store (nptrs  itbl)
+           store (tipe   itbl)
+           store (srtlen itbl)
+           sequence_ (map store (code itbl))
 
    peek a0
-      = do (a1, ptrs)   <- load (castPtr a0)
-           (a2, nptrs)  <- load a1
-           (a3, tipe)   <- load a2
-           (a4, srtlen) <- load a3
-           (a5, code0)  <- load a4
-           (a6, code1)  <- load a5
-           (a7, code2)  <- load a6
-           (a8, code3)  <- load a7
-           (a9, code4)  <- load a8
-           (aA, code5)  <- load a9
-           (aB, code6)  <- load aA
-           (aC, code7)  <- load aB
-           (aD, code8)  <- load aC
-           (aE, code9)  <- load aD
-           (aF, codeA)  <- load aE
-           (a10,codeB)  <- load aF
-           (a11,codeC)  <- load a10
-           (a12,codeD)  <- load a11
-           (a13,codeE)  <- load a12
-           (a14,codeF)  <- load a13
+      = runState (castPtr a0)
+      $ do ptrs   <- load
+           nptrs  <- load
+           tipe   <- load
+           srtlen <- load
+           code   <- sequence (replicate itblCodeLength load)
            return 
               StgInfoTable { 
-                 ptrs = ptrs, nptrs = nptrs, 
-                 srtlen = srtlen, tipe = tipe,
-                 code0 = code0, code1 = code1, code2 = code2, code3 = code3,
-                 code4 = code4, code5 = code5, code6 = code6, code7 = code7,
-                 code8 = code8, code9 = code9, codeA = codeA, codeB = codeB,
-                 codeC = codeC, codeD = codeD, codeE = codeE, codeF = codeF
+                 ptrs   = ptrs,
+                 nptrs  = nptrs, 
+                 tipe   = tipe,
+                 srtlen = srtlen,
+                 code   = code
               }
 
 fieldSz :: (Storable a, Storable b) => (a -> b) -> a -> Int
 fieldSz sel x = sizeOf (sel x)
 
-fieldAl :: (Storable a, Storable b) => (a -> b) -> a -> Int
-fieldAl sel x = alignment (sel x)
+newtype State s m a = State (s -> m (s, a))
 
-store :: Storable a => a -> Ptr a -> IO (Ptr b)
-store x addr = do poke addr x
-                  return (castPtr (addr `plusPtr` sizeOf x))
+instance Monad m => Monad (State s m) where
+  return a      = State (\s -> return (s, a))
+  State m >>= k = State (\s -> m s >>= \(s', a) -> case k a of State n -> n s')
+  fail str      = State (\s -> fail str)
 
-load :: Storable a => Ptr a -> IO (Ptr b, a)
-load addr = do x <- peek addr
-               return (castPtr (addr `plusPtr` sizeOf x), x)
+class (Monad m, Monad (t m)) => MonadT t m where
+  lift :: m a -> t m a
+
+instance Monad m => MonadT (State s) m where
+  lift m        = State (\s -> m >>= \a -> return (s, a))
+
+runState :: (Monad m) => s -> State s m a -> m a
+runState s (State m) = m s >>= return . snd
+
+type PtrIO = State (Ptr Word8) IO
+
+advance :: Storable a => PtrIO (Ptr a)
+advance = State adv where
+    adv addr = case castPtr addr of { addrCast -> return
+        (addr `plusPtr` sizeOfPointee addrCast, addrCast) }
+
+sizeOfPointee :: (Storable a) => Ptr a -> Int
+sizeOfPointee addr = sizeOf (typeHack addr)
+    where typeHack = undefined :: Ptr a -> a
+
+store :: Storable a => a -> PtrIO ()
+store x = do addr <- advance
+             lift (poke addr x)
+
+load :: Storable a => PtrIO a
+load = do addr <- advance
+          lift (peek addr)
 
 \end{code}
