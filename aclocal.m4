@@ -372,10 +372,10 @@ else
 fi;
 changequote([, ])dnl
 ])
-dnl if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Lexer.hs; then
-dnl   FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0],
-dnl   [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])[]dnl
-dnl fi
+if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Lexer.hs; then
+  FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0],
+  [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])[]dnl
+fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 ])
