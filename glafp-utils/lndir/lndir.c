@@ -82,6 +82,8 @@ int ignore_links = 0;		/* -ignorelinks */
 char *rcurdir;
 char *curdir;
 
+int force=0;
+
 void
 quit (
 #if NeedVarargsPrototypes
@@ -284,15 +286,22 @@ int rel;			/* if true, prepend "../" to fn before using */
 	}
 
 	if (symlen >= 0) {
-	    /* Link exists in new tree.  Print message if it doesn't match. */
-	    if (!equivalent (basesymlen>=0 ? basesym : buf, symbuf))
-		msg ("%s: %s", dp->d_name, symbuf);
-	} else {
-	    if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
+	  if (!equivalent (basesymlen>=0 ? basesym : buf, symbuf)) {
+	    if (force) {
+	      unlink(dp->d_name);
+	      if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
 		mperror (dp->d_name);
+	    } else {
+	      /* Link exists in new tree.  Print message if it doesn't match. */
+	      msg ("%s: %s", dp->d_name, symbuf);
+	    }
+	  }
+	} else {
+	  if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
+	    mperror (dp->d_name);
 	}
     }
-
+    
     closedir (df);
     return 0;
 }
@@ -305,7 +314,6 @@ char **av;
     char *prog_name = av[0];
     char *fn, *tn;
     struct stat fs, ts;
-    int force=0;
 
     while (++av, --ac) {
 	if (strcmp(*av, "-silent") == 0)
