@@ -11,6 +11,7 @@ test('arrowrec1', normal, compile, [''])
 
 test('arrowex1', normal, compile_and_run, [''])
 test('arrowex2', normal, compile_and_run, [''])
+test('arrowex3', normal, compile_and_run, [''])
 
 # test('mod1', normal, compile_fail, [''])
 # test('mod2', normal, compile_fail, [''])
