@@ -41,7 +41,7 @@ module Util (
 	foldl2, count,
 
 	-- comparisons
-	thenCmp, cmpList, prefixMatch, suffixMatch,
+	eqListBy, thenCmp, cmpList, prefixMatch, suffixMatch,
 
 	-- strictness
 	foldl', seqList,
@@ -639,6 +639,11 @@ count p (x:xs) | p x       = 1 + count p xs
 %************************************************************************
 
 \begin{code}
+eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool
+eqListBy eq []     []     = True
+eqListBy eq (x:xs) (y:ys) = eq x y && eqListBy eq xs ys
+eqListBy eq xs     ys     = False
+
 thenCmp :: Ordering -> Ordering -> Ordering
 {-# INLINE thenCmp #-}
 thenCmp EQ   any = any

@@ -42,6 +42,7 @@ import FunDeps		( pprFundeps )
 import Class		( FunDep, DefMeth(..) )
 import CStrings		( CLabelString )
 import Outputable	
+import Util		( eqListBy )
 import SrcLoc		( SrcLoc )
 import FastString
 \end{code}

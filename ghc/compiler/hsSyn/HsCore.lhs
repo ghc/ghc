@@ -26,7 +26,7 @@ module HsCore (
 -- friends:
 import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 			  HsTupCon(..), EqHsEnv, hsTupParens,
-			  emptyEqHsEnv, extendEqHsEnv, eqListBy, 
+			  emptyEqHsEnv, extendEqHsEnv,
 			  eq_hsType, eq_hsVars
 			)
 
@@ -48,6 +48,7 @@ import Type		( Kind, eqKind )
 import BasicTypes	( Arity )
 import FiniteMap	( lookupFM )
 import CostCentre
+import Util		( eqListBy )
 import Outputable
 \end{code}
 

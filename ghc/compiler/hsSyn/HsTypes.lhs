@@ -46,6 +46,7 @@ import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey
 			  usOnceTyConName, usManyTyConName
 			)
 import FiniteMap
+import Util		( eqListBy )
 import Outputable
 \end{code}
 
@@ -470,10 +471,4 @@ eq_hsPred env (HsClassP c1 tys1) (HsClassP c2 tys2)
 eq_hsPred env (HsIParam n1 ty1) (HsIParam n2 ty2)
   = n1 == n2 && eq_hsType env ty1 ty2
 eq_hsPred env _ _ = False
-
--------------------
-eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool
-eqListBy eq []     []     = True
-eqListBy eq (x:xs) (y:ys) = eq x y && eqListBy eq xs ys
-eqListBy eq xs     ys     = False
 \end{code}
