@@ -29,7 +29,7 @@
       definitions of variables containing paths, and suffix rules,
       respectively.
     <p>
-      One particularly nasty trick used in this hierarchy of makesfiles is the
+      One particularly nasty trick used in this hierarchy of makefiles is the
       way in which the variable <code>$(TOP)</code> is used.  AFAIK,
       <code>$(TOP)</code> always points to a directory containing an
       <code>mk/</code> subdirectory; however, it not necessarily points to the
@@ -39,12 +39,12 @@
       <em>temporarily</em> redefine <code>$(TOP)</code> to point a level
       higher (i.e., to <code>fptools/</code>) while they are including the
       toplevel boilerplate.  After that <code>$(TOP)</code> is redefined to
-      whatever value it had before including makfiles from higher up in the
+      whatever value it had before including makefiles from higher up in the
       hierarchy. 
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Wed Aug  8 19:19:54 EST 2001
+Last modified: Wed Aug 22 16:46:33 GMT Daylight Time 2001
 <!-- hhmts end -->
     </small>
   </body>
