@@ -796,7 +796,7 @@ checkSigMatch top_lvl binder_names mono_ids sigs
 
     mk_dict_tys theta = map mkPredTy theta
 
-    sig_msg id = ptext SLIT("When checking the type signature for") <+> ppr id
+    sig_msg id = ptext SLIT("When checking the type signature for") <+> quotes (ppr id)
 
 	-- Search for Main.main in the binder_names, return corresponding mono_id
     find_main NotTopLevel binder_names mono_ids = Nothing

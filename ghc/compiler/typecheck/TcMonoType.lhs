@@ -38,7 +38,7 @@ import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
-			  tyVarsOfType, tyVarsOfTypes
+			  tyVarsOfType, tyVarsOfTypes, mkForAllTys
 			)
 import PprType		( pprConstraint, pprType )
 import Subst		( mkTopTyVarSubst, substTy )
@@ -688,9 +688,7 @@ sigCtxt when sig_tyvars sig_theta sig_tau tidy_env
 	(env1, tidy_sig_tyvars)  = tidyTyVars tidy_env sig_tyvars
 	(env2, tidy_sig_rho)	 = tidyOpenType env1 (mkRhoTy sig_theta sig_tau)
 	(env3, tidy_actual_tau)  = tidyOpenType env1 actual_tau
-	forall | null sig_tyvars = empty
-	       | otherwise	 = ptext SLIT("forall") <+> hsep (map ppr tidy_sig_tyvars) <> dot
-	msg = vcat [ptext SLIT("Signature type:    ") <+> forall <+> pprType tidy_sig_rho,
+	msg = vcat [ptext SLIT("Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tyvars tidy_sig_rho),
 		    ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau,
 		    when
 		   ]
