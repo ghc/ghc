@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.62 2001/07/24 04:46:37 ken Exp $
+-- $Id: DriverFlags.hs,v 1.63 2001/07/24 04:47:06 ken Exp $
 --
 -- Driver flags
 --
@@ -505,10 +505,10 @@ machdepCCOpts
 		    )
 
    | prefixMatch "mips"    cTARGETPLATFORM
-	= return ( ["static"], [] )
+	= return ( ["-static"], [] )
 
    | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM
-	= return ( ["static"], ["-finhibit-size-directive"] )
+	= return ( ["-static"], ["-finhibit-size-directive"] )
 
    | otherwise
 	= return ( [], [] )
