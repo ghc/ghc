@@ -41,7 +41,7 @@ import NameEnv
 import Outputable
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import CmdLineOpts	( DynFlag(..) )
-				-- Warn of unused for-all'd tyvars
+import DriverPhases	( isHsBoot )
 import Maybes		( seqMaybe )
 import Maybe            ( catMaybes, isNothing )
 \end{code}
@@ -619,14 +619,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 \begin{code}
 rnConDecls :: Name -> [LConDecl RdrName] -> RnM [LConDecl Name]
 rnConDecls tycon condecls
-  = 	-- Check that there's at least one condecl,
-	-- or else we're reading an interface file, or -fglasgow-exts
-    (if null condecls then
-	doptM Opt_GlasgowExts	`thenM` \ glaExts ->
-	checkErr glaExts (emptyConDeclsErr tycon)
-     else returnM ()
-    )						`thenM_` 
-    mappM (wrapLocM rnConDecl) condecls
+  = mappM (wrapLocM rnConDecl) condecls
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
 rnConDecl (ConDecl name tvs cxt details)
@@ -683,10 +676,6 @@ checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
 
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
-
-emptyConDeclsErr tycon
-  = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
-	 nest 4 (ptext SLIT("(-fglasgow-exts permits this)"))]
 \end{code}
 
 

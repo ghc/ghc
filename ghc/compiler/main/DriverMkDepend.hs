@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.36 2005/01/18 12:18:28 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.37 2005/01/27 10:44:27 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -8,23 +8,26 @@
 -----------------------------------------------------------------------------
 
 module DriverMkDepend (
-	doMkDependHSPhase, beginMkDependHS, endMkDependHS
+	doMkDependHS
   ) where
 
 #include "HsVersions.h"
 
-import GetImports	( getImportsFromFile )
-import CmdLineOpts	( DynFlags )
-import DriverState      
-import DriverUtil
-import DriverFlags
+import CompManager	( cmInit, cmDepAnal, cmTopSort, cyclicModuleErr )
+import CmdLineOpts	( DynFlags( verbosity ) )
+import DriverState      ( getStaticOpts, v_Opt_dep )
+import DriverUtil	( escapeSpaces, splitFilename, add )
+import DriverFlags	( processArgs, OptKind(..) )
+import HscTypes		( IsBootInterface, ModSummary(..), GhciMode(..),
+			  msObjFilePath, msHsFilePath )
 import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( Module, ModLocation(..), moduleUserString)
-import Finder		( findModule, hiBootExt, hiBootVerExt,
-			  mkHomeModLocation, FindResult(..) )
-import Util             ( global, maybePrefixMatch )
+import Module		( Module, ModLocation(..), moduleUserString, addBootSuffix_maybe )
+import Digraph		( SCC(..) )
+import Finder		( findModule, FindResult(..) )
+import Util             ( global )
+import Outputable
 import Panic
 
 import DATA_IOREF	( IORef, readIORef, writeIORef )
@@ -39,60 +42,72 @@ import Maybe            ( isJust )
 import Panic		( catchJust, ioErrors )
 #endif
 
--------------------------------------------------------------------------------
--- mkdependHS
+-----------------------------------------------------------------
+--
+--		The main function
+--
+-----------------------------------------------------------------
 
-	-- flags
-GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
-GLOBAL_VAR(v_Dep_include_prelude, 	False, Bool);
-GLOBAL_VAR(v_Dep_exclude_mods,          ["GHC.Prim"], [String]);
-GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
-GLOBAL_VAR(v_Dep_warnings,		True, Bool);
+doMkDependHS :: DynFlags -> [FilePath] -> IO ()
+doMkDependHS dflags srcs
+  = do	{ 	-- Initialisation
+	  cm_state <- cmInit Batch dflags
+	; files <- beginMkDependHS
 
-	-- global vars
-GLOBAL_VAR(v_Dep_makefile_hdl,  error "dep_makefile_hdl", Maybe Handle);
-GLOBAL_VAR(v_Dep_tmp_file,      error "dep_tmp_file", String);
-GLOBAL_VAR(v_Dep_tmp_hdl,       error "dep_tmp_hdl", Handle);
+		-- Do the downsweep to find all the modules
+	; mod_summaries <- cmDepAnal cm_state srcs
 
-depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
-depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
+		-- Sort into dependency order
+		-- There should be no cycles
+	; let sorted = cmTopSort False mod_summaries
 
--- for compatibility with the old mkDependHS, we accept options of the form
--- -optdep-f -optdep.depend, etc.
-dep_opts = 
-   [ (  "s", 			SepArg (add v_Dep_suffixes) )
-   , (  "f", 			SepArg (writeIORef v_Dep_makefile) )
-   , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
-   , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) )
-   , (  "-exclude-module=",       Prefix (add v_Dep_exclude_mods) )
-   , (  "x",                      Prefix (add v_Dep_exclude_mods) )
-   ]
+		-- Print out the dependencies if wanted
+	; if verbosity dflags >= 3 then
+		hPutStrLn stderr (showSDoc (text "Module dependencies" $$ ppr sorted))
+	  else return ()
+		
+		-- Prcess them one by one, dumping results into makefile
+		-- and complaining about cycles
+	; mapM (processDeps dflags (mkd_tmp_hdl files)) sorted
 
-beginMkDependHS :: IO ()
+		-- Tidy up
+	; endMkDependHS dflags files }
+
+-----------------------------------------------------------------
+--
+--		beginMkDependHs
+--	Create a temporary file, 
+--	find the Makefile, 
+--	slurp through it, etc
+--
+-----------------------------------------------------------------
+
+data MkDepFiles 
+  = MkDep { mkd_make_file :: FilePath,		-- Name of the makefile
+	    mkd_make_hdl  :: Maybe Handle, 	-- Handle for the open makefile 
+	    mkd_tmp_file  :: FilePath,		-- Name of the temporary file
+	    mkd_tmp_hdl   :: Handle }		-- Handle of the open temporary file
+
+beginMkDependHS :: IO MkDepFiles
+	
 beginMkDependHS = do
-
   	-- slurp in the mkdependHS-style options
   flags <- getStaticOpts v_Opt_dep
   _ <- processArgs dep_opts flags []
 
      	-- open a new temp file in which to stuff the dependency info
      	-- as we go along.
-  dep_file <- newTempName "dep"
-  writeIORef v_Dep_tmp_file dep_file
-  tmp_hdl <- openFile dep_file WriteMode
-  writeIORef v_Dep_tmp_hdl tmp_hdl
+  tmp_file <- newTempName "dep"
+  tmp_hdl <- openFile tmp_file WriteMode
 
   	-- open the makefile
   makefile <- readIORef v_Dep_makefile
   exists <- doesFileExist makefile
-  if not exists
-	then do 
-	   writeIORef v_Dep_makefile_hdl Nothing
-	   return ()
-
+  mb_make_hdl <- 
+	if not exists
+	then return Nothing
 	else do
   	   makefile_hdl <- openFile makefile ReadMode
-  	   writeIORef v_Dep_makefile_hdl (Just makefile_hdl)
 
 		-- slurp through until we get the magic start string,
 		-- copying the contents into dep_makefile
@@ -115,47 +130,124 @@ beginMkDependHS = do
 	   catchJust ioErrors chuck
 		(\e -> if isEOFError e then return () else ioError e)
 
+	   return (Just makefile_hdl)
+
 
 	-- write the magic marker into the tmp file
   hPutStrLn tmp_hdl depStartMarker
 
-  return ()
+  return (MkDep { mkd_make_file = makefile, mkd_make_hdl = mb_make_hdl, 
+		  mkd_tmp_file  = tmp_file, mkd_tmp_hdl  = tmp_hdl})
 
 
-doMkDependHSPhase dflags basename suff input_fn
- = do (import_sources, import_normals, mod_name) 
-		<- getImportsFromFile dflags input_fn
-      let orig_fn = basename ++ '.':suff
-      location' <- mkHomeModLocation mod_name orig_fn
+-----------------------------------------------------------------
+--
+--		processDeps
+--
+-----------------------------------------------------------------
 
-      -- take -ohi into account if present
-      ohi <- readIORef v_Output_hi
-      let location | Just fn <- ohi = location'{ ml_hi_file = fn }
-		   | otherwise      = location'
+processDeps :: DynFlags
+	    -> Handle		-- Write dependencies to here
+	    -> SCC ModSummary
+	    -> IO ()
+-- Write suitable dependencies to handle
+-- Always:
+-- 			this.o : this.hs
+--
+-- If the dependency is on something other than a .hi file:
+--   			this.o this.p_o ... : dep
+-- otherwise
+--   			this.o ...   : dep.hi
+--   			this.p_o ... : dep.p_hi
+--   			...
+-- (where .o is $osuf, and the other suffixes come from
+-- the cmdline -s options).
+--
+-- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-      deps_sources <- mapM (findDependency dflags True  orig_fn) import_sources
-      deps_normals <- mapM (findDependency dflags False orig_fn) import_normals
-      let deps = deps_sources ++ deps_normals
+processDeps dflags hdl (CyclicSCC nodes)
+  =	-- There shouldn't be any cycles; report them	
+    throwDyn (ProgramError (showSDoc $ cyclicModuleErr nodes))
 
-      osuf <- readIORef v_Object_suf
-      extra_suffixes <- readIORef v_Dep_suffixes
-      let suffixes = map (++ ('_':osuf)) extra_suffixes
-	  obj_file = ml_obj_file location
-          objs = obj_file : map (replaceFilenameSuffix obj_file) suffixes
+processDeps dflags hdl (AcyclicSCC node)
+  = do	{ extra_suffixes <- readIORef v_Dep_suffixes
+	; let src_file  = msHsFilePath node
+	      obj_file  = msObjFilePath node
+	      obj_files = insertSuffixes obj_file extra_suffixes
 
-	-- Handle for file that accumulates dependencies 
-      hdl <- readIORef v_Dep_tmp_hdl
+	      do_imp is_boot imp_mod
+		= do { mb_hi <- findDependency dflags src_file imp_mod is_boot
+		     ; case mb_hi of {
+			   Nothing      -> return () ;
+			   Just hi_file -> do
+		     { let hi_files = insertSuffixes hi_file extra_suffixes
+			   write_dep (obj,hi) = writeDependency hdl [obj] hi
 
-	-- std dependency of the object(s) on the source file
-      hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
-		     escapeSpaces (basename ++ '.':suff))
+			-- Add one dependency for each suffix; 
+			-- e.g.		A.o   : B.hi
+			--		A.x_o : B.x_hi
+		     ; mapM_ write_dep (obj_files `zip` hi_files) }}}
 
-      let genDep (dep, False {- not an hi file -}) = 
-	     hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
-			    escapeSpaces dep)
-          genDep (dep, True  {- is an hi file -}) = do
-	     hisuf <- readIORef v_Hi_suf
-	     let 
+	     
+	  	-- Emit std dependency of the object(s) on the source file
+		-- Something like 	A.o : A.hs
+	; writeDependency hdl obj_files src_file
+
+		-- Emit a dependency for each import
+	; mapM_ (do_imp True)  (ms_srcimps node)	-- SOURCE imports
+	; mapM_ (do_imp False) (ms_imps node)		-- regular imports
+	}
+
+
+findDependency	:: DynFlags
+		-> FilePath 		-- Importing module: used only for error msg
+		-> Module		-- Imported module
+		-> IsBootInterface	-- Source import
+		-> IO (Maybe FilePath)	-- Interface file file
+findDependency dflags src imp is_boot
+  = do	{ excl_mods       <- readIORef v_Dep_exclude_mods
+	; include_prelude <- readIORef v_Dep_include_prelude
+	
+		-- Deal with the excluded modules
+	; let imp_mod = moduleUserString imp
+	; if imp_mod `elem` excl_mods 
+	  then return Nothing
+  	  else do
+	{	-- Find the module; this will be fast because
+		-- we've done it once during downsweep
+	  r <- findModule dflags imp True {-explicit-}
+	; case r of 
+	    Found loc pkg
+		-- Not in this package: we don't need a dependency
+		| ExtPackage _ <- pkg, not include_prelude
+		-> return Nothing
+
+		-- Home package: just depend on the .hi or hi-boot file
+		| otherwise
+		-> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
+
+	    _ -> throwDyn (ProgramError 
+		 (src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'"
+		  ++ if is_boot then " (SOURCE import)" else ""))
+	}}
+
+-----------------------------
+writeDependency :: Handle -> [FilePath] -> FilePath -> IO ()
+-- (writeDependency h [t1,t2] dep) writes to handle h the dependency
+--	t1 t2 : dep
+writeDependency hdl targets dep
+  = hPutStrLn hdl (unwords (map escapeSpaces targets) ++ " : "
+		   ++ escapeSpaces dep)
+
+-----------------------------
+insertSuffixes	
+	:: FilePath 	-- Original filename;	e.g. "foo.o"
+	-> [String]	-- Extra suffices	e.g. ["x","y"]
+	-> [FilePath]	-- Zapped filenames	e.g. ["foo.o", "foo.x_o", "foo.y_o"]
+	-- Note that that the extra bit gets inserted *before* the old suffix
+	-- We assume the old suffix contains no dots, so we can strip it with removeSuffix
+
+	-- NOTE: we used to have this comment
 		-- In order to construct hi files with alternate suffixes, we
 		-- now have to find the "basename" of the hi file.  This is
 		-- difficult because we can't just split the hi filename
@@ -163,114 +255,79 @@ doMkDependHSPhase dflags basename suff input_fn
 		-- check whether the hi filename ends in hisuf, and if it does,
 		-- we strip off hisuf, otherwise we strip everything after the
 		-- last dot.
-		dep_base 
-		   | Just rest <- maybePrefixMatch rev_hisuf rev_dep
-		   = reverse rest
-		   | otherwise
-		   = remove_suffix '.' dep
-		  where
-			rev_hisuf = reverse hisuf
-			rev_dep   = reverse dep
+	-- But I'm not sure we care about hisufs with dots in them. 
+	-- Lots of other things will break first!
 
-	        deps = dep : map (\suf -> dep_base ++ suf ++ '_':hisuf) 
-				extra_suffixes
-		  -- length objs should be == length deps
-	     sequence_ (zipWith (\o d -> hPutStrLn hdl (escapeSpaces o ++ " : " ++ escapeSpaces d)) objs deps)
-
-      sequence_ (map genDep [ d | Just d <- deps ])
-      return location
-
--- add the lines to dep_makefile:
-	   -- always:
-		   -- this.o : this.hs
-
-  	   -- if the dependency is on something other than a .hi file:
-   		   -- this.o this.p_o ... : dep
-   	   -- otherwise
-   		   -- if the import is {-# SOURCE #-}
-   			   -- this.o this.p_o ... : dep.hi-boot[-$vers]
-   			   
-   		   -- else
-   			   -- this.o ...   : dep.hi
-   			   -- this.p_o ... : dep.p_hi
-   			   -- ...
-   
-   	   -- (where .o is $osuf, and the other suffixes come from
-   	   -- the cmdline -s options).
-   
+insertSuffixes file_name extras
+  = file_name : [ basename ++ "." ++ extra ++ "_" ++ suffix | extra <- extras ]
+  where
+    (basename, suffix) = splitFilename file_name
 
 
-endMkDependHS :: DynFlags -> IO ()
-endMkDependHS dflags = do
-  makefile     <- readIORef v_Dep_makefile
-  makefile_hdl <- readIORef v_Dep_makefile_hdl
-  tmp_file     <- readIORef v_Dep_tmp_file
-  tmp_hdl      <- readIORef v_Dep_tmp_hdl
+-----------------------------------------------------------------
+--
+--		endMkDependHs
+--	Complete the makefile, close the tmp file etc
+--
+-----------------------------------------------------------------
 
-	-- write the magic marker into the tmp file
-  hPutStrLn tmp_hdl depEndMarker
+endMkDependHS :: DynFlags -> MkDepFiles -> IO ()
 
-  case makefile_hdl of
-     Nothing  -> return ()
-     Just hdl -> do
+endMkDependHS dflags (MkDep { mkd_make_file = make_file, mkd_make_hdl =  makefile_hdl,
+			      mkd_tmp_file  = tmp_file,  mkd_tmp_hdl  =  tmp_hdl }) 
+  = do	{ 	-- write the magic marker into the tmp file
+	  hPutStrLn tmp_hdl depEndMarker
 
+	; case makefile_hdl of
+	     Nothing  -> return ()
+	     Just hdl -> do
+	{
 	  -- slurp the rest of the original makefile and copy it into the output
-  	let slurp = do
+	  let slurp = do
 		l <- hGetLine hdl
 		hPutStrLn tmp_hdl l
 		slurp
 	 
-  	catchJust ioErrors slurp 
+ 	; catchJust ioErrors slurp 
 		(\e -> if isEOFError e then return () else ioError e)
 
-	hClose hdl
+	; hClose hdl
 
-  hClose tmp_hdl  -- make sure it's flushed
+	; hClose tmp_hdl  -- make sure it's flushed
 
-	-- Create a backup of the original makefile
-  when (isJust makefile_hdl)
-       (SysTools.copy dflags ("Backing up " ++ makefile) 
-		makefile (makefile++".bak"))
+		-- Create a backup of the original makefile
+	; when (isJust makefile_hdl)
+	       (SysTools.copy dflags ("Backing up " ++ make_file) 
+			      make_file (make_file++".bak"))
 
-  	-- Copy the new makefile in place
-  SysTools.copy dflags "Installing new makefile" tmp_file makefile
+	  	-- Copy the new makefile in place
+	; SysTools.copy dflags "Installing new makefile" tmp_file make_file
+	}}
 
 
-findDependency :: DynFlags -> Bool -> FilePath -> Module -> IO (Maybe (String, Bool))
-findDependency dflags is_source src imp = do
-   excl_mods <- readIORef v_Dep_exclude_mods
-   include_prelude <- readIORef v_Dep_include_prelude
-   let imp_mod = moduleUserString imp
-   if imp_mod `elem` excl_mods 
-      then return Nothing
-      else do
-	r <- findModule dflags imp True{-explicit-}
-	case r of 
-	   Found loc pkg
-		-- not in this package: we don't need a dependency
-		| ExtPackage _ <- pkg, not include_prelude
-		-> return Nothing
+-----------------------------------------------------------------
+--
+--		Flags
+--
+-----------------------------------------------------------------
 
-		-- normal import: just depend on the .hi file
-		| not is_source
-		-> return (Just (ml_hi_file loc, not is_source))
+	-- Flags
+GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
+GLOBAL_VAR(v_Dep_include_prelude, 	False, Bool);
+GLOBAL_VAR(v_Dep_exclude_mods,          ["GHC.Prim"], [String]);
+GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
+GLOBAL_VAR(v_Dep_warnings,		True, Bool);
 
-		-- if it's a source import, we want to generate a dependency
-		-- on the .hi-boot file, not the .hi file
-		| otherwise
-		-> let hi_file = ml_hi_file loc
-		       boot_hi_file = replaceFilenameSuffix hi_file hiBootExt 
-		       boot_ver_hi_file = replaceFilenameSuffix hi_file hiBootVerExt 
-		   in do
-		   b <- doesFileExist boot_ver_hi_file
-		   if b 
-		     then return (Just (boot_ver_hi_file, not is_source))
-		     else do
-		        b <- doesFileExist boot_hi_file
-		   	if b 
-			   then return (Just (boot_hi_file, not is_source))
-		   	   else return (Just (hi_file, not is_source))
+depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
+depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
 
-	   _ -> throwDyn (ProgramError 
-		(src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'" ++
-		 if is_source then " (SOURCE import)" else ""))
+-- for compatibility with the old mkDependHS, we accept options of the form
+-- -optdep-f -optdep.depend, etc.
+dep_opts = 
+   [ (  "s", 			SepArg (add v_Dep_suffixes) )
+   , (  "f", 			SepArg (writeIORef v_Dep_makefile) )
+   , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
+   , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) )
+   , (  "-exclude-module=",     Prefix (add v_Dep_exclude_mods) )
+   , (  "x",                    Prefix (add v_Dep_exclude_mods) )
+   ]

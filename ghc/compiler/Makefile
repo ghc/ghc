@@ -86,6 +86,10 @@ WAYS=$(GhcCompilerWays)
 #  - create a link tree.  The problem with requiring link trees is that 
 #    Windows doesn't support symbolic links.
 
+ifeq "$(stage)" ""
+stage=1
+endif
+
 boot ::
 	$(MKDIRHIER) stage$(stage)
 	for i in $(ALL_DIRS); do \
@@ -100,6 +104,8 @@ boot ::
 # PS: 'ln -s foo baz' takes 'foo' relative to the path to 'baz'
 #     whereas 'cp foo baz' treats the two paths independently.
 #     Hence the "../.." in the ln command line
+ifeq "$(stage)" "1"
+ifeq "$(ghc_ge_603)" "NO"
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 	for i in */*hi-boot*; do \
 	    cp -u -f $$i stage$(stage)/$$i; \
@@ -109,9 +115,7 @@ else
 	    $(LN_S) -f ../../$$i stage$(stage)/$$i || true ; \
 	done
 endif
-
-ifeq "$(stage)" ""
-stage=1
+endif
 endif
 
 ifeq "$(stage)" "1"

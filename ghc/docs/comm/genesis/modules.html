@@ -73,7 +73,7 @@ identifiers, expressions, rules, and their operations.</strong>
 	Literal (TysPrim, PprType) <br> 
 	DataCon (loop PprType, loop Subst.substTyWith, FieldLabel.FieldLabel)
 <p><li>
-	TysWiredIn (loop MkId.mkDataConWorkId, loop Generics.mkGenInfo, DataCon.mkDataCon)
+	TysWiredIn (loop MkId.mkDataConIds)
 <p><li>
 	TcType( lots of TysWiredIn stuff)
 <p><li>
@@ -119,8 +119,17 @@ identifiers, expressions, rules, and their operations.</strong>
 </ul></tt>
 </ul>
 
-
-
+HsSyn stuff
+<ul> 
+<li> HsPat.hs-boot
+<li> HsExpr.hs-boot (loop HsPat.LPat)
+<li> HsTypes (loop HsExpr.HsSplice)
+<li> HsBinds (HsTypes.LHsType, loop HsPat.LPat, HsExpr.pprFunBind and others)
+     HsLit (HsTypes.SyntaxName)
+<li> HsPat (HsBinds, HsLit)
+     HsDecls (HsBinds)
+<li> HsExpr (HsDecls, HsPat)
+</ul>
 
 
     <p><small>

@@ -157,6 +157,7 @@ tcHsSigType ctxt hs_ty
 	; ty <- tcHsKindedType kinded_ty
 	; checkValidType ctxt ty	
 	; returnM ty }
+
 -- Used for the deriving(...) items
 tcHsDeriv :: LHsType Name -> TcM ([TyVar], Class, [Type])
 tcHsDeriv = addLocM (tc_hs_deriv [])

@@ -1,0 +1,6 @@
+\begin{code}
+module Module where
+
+data Module
+\end{code}
+

@@ -124,7 +124,6 @@ emptyPLS dflags = PersistentLinkerState {
   where init_pkgs
 	  | ExtPackage rts_id <- rtsPackageId (pkgState dflags) = [rts_id]
 	  | otherwise = []
-
 \end{code}
 
 \begin{code}

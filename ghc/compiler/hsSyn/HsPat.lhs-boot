@@ -1,0 +1,7 @@
+\begin{code}
+module HsPat where
+import SrcLoc( Located )
+
+data Pat i
+type LPat i = Located (Pat i)
+\end{code}

@@ -20,14 +20,19 @@ module DsMonad (
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
-	dsWarn, 
-	DsWarning,
-	DsMatchContext(..)
+	-- Warnings
+	DsWarning, dsWarn, 
+
+	-- Data types
+	DsMatchContext(..),
+	EquationInfo(..), MatchResult(..), 
+	CanItFail(..), orFail
     ) where
 
 #include "HsVersions.h"
 
 import TcRnMonad
+import CoreSyn		( CoreExpr )
 import HsSyn		( HsExpr, HsMatchContext, Pat )
 import TcIface		( tcIfaceGlobal )
 import RdrName		( GlobalRdrEnv )
@@ -55,6 +60,49 @@ import DATA_IOREF	( newIORef, readIORef )
 
 infixr 9 `thenDs`
 \end{code}
+
+%************************************************************************
+%*									*
+		Data types for the desugarer
+%*									*
+%************************************************************************
+
+\begin{code}
+data DsMatchContext
+  = DsMatchContext (HsMatchContext Name) [Pat Id] SrcSpan
+  | NoMatchContext
+  deriving ()
+
+data EquationInfo
+  = EqnInfo { eqn_pats :: [Pat Id],    	-- The patterns for an eqn
+	      eqn_rhs  :: MatchResult }	-- What to do after match
+
+-- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult
+--	\fail. wrap (case vs of { pats -> rhs fail })
+-- where vs are not in the domain of wrap
+
+
+-- A MatchResult is an expression with a hole in it
+data MatchResult
+  = MatchResult
+	CanItFail	-- Tells whether the failure expression is used
+	(CoreExpr -> DsM CoreExpr)
+			-- Takes a expression to plug in at the
+			-- failure point(s). The expression should
+			-- be duplicatable!
+
+data CanItFail = CanFail | CantFail
+
+orFail CantFail CantFail = CantFail
+orFail _        _	 = CanFail
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Monad stuff
+%*									*
+%************************************************************************
 
 Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
 a @UniqueSupply@ and some annotations, which
@@ -128,6 +176,12 @@ initDs hsc_env mod rdr_env type_env thing_inside
     mk_warn :: (SrcSpan,SDoc) -> WarnMsg
     mk_warn (loc,sdoc) = mkWarnMsg loc print_unqual sdoc
 \end{code}
+
+%************************************************************************
+%*									*
+		Operations in the monad
+%*									*
+%************************************************************************
 
 And all this mysterious stuff is so we can occasionally reach out and
 grab one or more names.  @newLocalDs@ isn't exported---exported
@@ -222,15 +276,3 @@ dsExtendMetaEnv menv thing_inside
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsection{Type synonym @EquationInfo@ and access functions for its pieces}
-%*									*
-%************************************************************************
-
-\begin{code}
-data DsMatchContext
-  = DsMatchContext (HsMatchContext Name) [Pat Id] SrcSpan
-  | NoMatchContext
-  deriving ()
-\end{code}

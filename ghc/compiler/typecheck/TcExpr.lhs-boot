@@ -1,0 +1,27 @@
+\begin{code}
+module TcExpr where
+import HsSyn	( LHsExpr )
+import Name	( Name )
+import Var	( Id )
+import TcType	( TcType, Expected )
+import TcRnTypes( TcM )
+
+tcCheckSigma :: 
+	  LHsExpr Name
+       -> TcType
+       -> TcM (LHsExpr Id)
+
+tcCheckRho :: 
+  	  LHsExpr Name
+       -> TcType
+       -> TcM (LHsExpr Id)
+
+tcInferRho :: 
+  	  LHsExpr Name
+       -> TcM (LHsExpr Id, TcType)
+
+tcMonoExpr :: 
+  	  LHsExpr Name
+       -> Expected TcType
+       -> TcM (LHsExpr Id)
+\end{code}

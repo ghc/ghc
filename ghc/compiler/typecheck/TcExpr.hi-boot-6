@@ -16,5 +16,5 @@ tcInferRho ::
 
 tcMonoExpr :: 
   	  HsExpr.LHsExpr Name.Name
-       -> TcUnify.Expected TcType.TcType
+       -> TcType.Expected TcType.TcType
        -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)

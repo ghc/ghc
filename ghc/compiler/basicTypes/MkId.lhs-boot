@@ -1,0 +1,9 @@
+\begin{code}
+module MkId where
+import Name( Name )
+import DataCon( DataCon, DataConIds )
+
+mkDataConIds :: Name -> Name -> DataCon -> DataConIds
+\end{code}
+
+

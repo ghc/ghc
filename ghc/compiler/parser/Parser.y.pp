@@ -8,7 +8,7 @@
 -- ---------------------------------------------------------------------------
 
 {
-module Parser ( parseModule, parseStmt, parseIdentifier, parseIface, parseType,
+module Parser ( parseModule, parseStmt, parseIdentifier, parseType,
 		parseHeader ) where
 
 #define INCLUDE #include 
@@ -275,7 +275,6 @@ TH_TY_QUOTE	{ L _ ITtyQuote       }      -- ''T
 %name parseModule module
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
-%name parseIface iface
 %name parseType ctype
 %partial parseHeader header
 %tokentype { Located Token }
@@ -333,52 +332,6 @@ header 	:: { Located (HsModule RdrName) }
 header_body :: { [LImportDecl RdrName] }
 	:  '{'            importdecls		{ $2 }
  	|      vocurly    importdecls		{ $2 }
-
------------------------------------------------------------------------------
--- Interfaces (.hi-boot files)
-
-iface   :: { ModIface }
-	: 'module' modid 'where' ifacebody  { mkBootIface (unLoc $2) $4 }
-
-ifacebody :: { ([(Module, IsBootInterface)], [HsDecl RdrName]) }
-	:  '{'            ifacetop  '}'		{ $2 }
- 	|      vocurly    ifacetop  close	{ $2 }
-
-ifacetop :: { ([(Module, IsBootInterface)], [HsDecl RdrName]) }
-	 : ifaceimps				{ ($1,[]) }
-	 | ifaceimps ';' ifacedecls		{ ($1,$3) }
-	 | ifacedecls				{ ([],$1) }
-
-ifaceimps :: { [(Module, IsBootInterface)] }	-- Reversed, but that's ok
-	: ifaceimps ';' ifaceimp	{ $3 : $1 }
-	| ifaceimp 			{ [$1] }
-
-ifaceimp :: { (Module, IsBootInterface) }
-	: 'import' maybe_src modid 	{ (unLoc $3, $2) }
-
--- The defn of iface decls allows a trailing ';', which the lexer geneates for
---	module Foo where
---	foo :: ()
-ifacedecls :: { [HsDecl RdrName] }	-- Reversed, but doesn't matter
-	: ifacedecls ';' ifacedecl	{ $3 : $1 }
-	| ifacedecls ';'		{ $1 }
-	| ifacedecl			{ [$1] }
-
-ifacedecl :: { HsDecl RdrName }
-	: var '::' sigtype	
-                { SigD (Sig $1 $3) }
- 	| 'type' syn_hdr '=' ctype	
- 		{ let (tc,tvs) = $2 in TyClD (TySynonym tc tvs $4) }
-	| 'data' tycl_hdr constrs	-- No deriving in hi-boot
-		{ TyClD (mkTyData DataType $2 Nothing (reverse (unLoc $3)) Nothing) }
-        | 'data' tycl_hdr 'where' gadt_constrlist	
-		{ TyClD (mkTyData DataType $2 Nothing (reverse (unLoc $4)) Nothing) }
-	| 'newtype' tycl_hdr 		-- Constructor is optional
-		{ TyClD (mkTyData NewType $2 Nothing [] Nothing) }
-	| 'newtype' tycl_hdr '=' newconstr
-		{ TyClD (mkTyData NewType $2 Nothing [$4] Nothing) }
-	| 'class' tycl_hdr fds
-		{ TyClD (mkClassDecl (unLoc $2) (unLoc $3) [] emptyBag) }
 
 -----------------------------------------------------------------------------
 -- The Export List

@@ -10,7 +10,7 @@ module CmdLineOpts (
 	SimplifierSwitch(..), 
 	SimplifierMode(..), FloatOutSwitches(..),
 
-	HscLang(..),
+	HscTarget(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
 	DynFlags(..),
 	PackageFlag(..),
@@ -25,7 +25,7 @@ module CmdLineOpts (
 	dopt_set, dopt_unset,		-- DynFlags -> DynFlag -> DynFlags
 	dopt_CoreToDo,			-- DynFlags -> [CoreToDo]
 	dopt_StgToDo,			-- DynFlags -> [StgToDo]
-	dopt_HscLang,			-- DynFlags -> HscLang
+	dopt_HscTarget,			-- DynFlags -> HscTarget
 	dopt_OutName,			-- DynFlags -> String
 	getOpts,			-- (DynFlags -> [a]) -> IO [a]
 	getVerbFlag,
@@ -90,6 +90,7 @@ module CmdLineOpts (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} Packages (PackageState)
+import DriverPhases	( HscTarget(..), HscSource(..) )
 import Constants	-- Default values for some flags
 import Util
 import FastString	( FastString, mkFastString )
@@ -294,7 +295,7 @@ data DynFlag
 data DynFlags = DynFlags {
   coreToDo   		:: Maybe [CoreToDo], -- reserved for use with -Ofile
   stgToDo    		:: [StgToDo],
-  hscLang    		:: HscLang,
+  hscTarget    		:: HscTarget,
   hscOutName 		:: String,  	-- name of the output file
   hscStubHOutName	:: String,  	-- name of the .stub_h output file
   hscStubCOutName	:: String,  	-- name of the .stub_c output file
@@ -345,25 +346,16 @@ data PackageFlag
   | HidePackage    String
   | IgnorePackage  String
 
-data HscLang
-  = HscC
-  | HscAsm
-  | HscJava
-  | HscILX
-  | HscInterpreted
-  | HscNothing
-    deriving (Eq, Show)
-
-defaultHscLang
+defaultHscTarget
   | cGhcWithNativeCodeGen == "YES" && 
 	(prefixMatch "i386" cTARGETPLATFORM ||
 	 prefixMatch "sparc" cTARGETPLATFORM ||
-	 prefixMatch "powerpc" cTARGETPLATFORM)   =  HscAsm
+	 prefixMatch "powerpc" cTARGETPLATFORM) =  HscAsm
   | otherwise					=  HscC
 
 defaultDynFlags = DynFlags {
   coreToDo = Nothing, stgToDo = [], 
-  hscLang = defaultHscLang, 
+  hscTarget = defaultHscTarget, 
   hscOutName = "", 
   hscStubHOutName = "", hscStubCOutName = "",
   extCoreName = "",
@@ -440,8 +432,8 @@ dopt_StgToDo = stgToDo
 dopt_OutName :: DynFlags -> String
 dopt_OutName = hscOutName
 
-dopt_HscLang :: DynFlags -> HscLang
-dopt_HscLang = hscLang
+dopt_HscTarget :: DynFlags -> HscTarget
+dopt_HscTarget = hscTarget
 
 dopt_set :: DynFlags -> DynFlag -> DynFlags
 dopt_set dfs f = dfs{ flags = f : flags dfs }
@@ -462,7 +454,7 @@ getVerbFlag dflags
 
 updOptLevel n dfs
   = if (n >= 1)
-     then dfs2{ hscLang = HscC, optLevel = n } -- turn on -fvia-C with -O
+     then dfs2{ hscTarget = HscC, optLevel = n } -- turn on -fvia-C with -O
      else dfs2{ optLevel = n }
   where
    dfs1 = foldr (flip dopt_unset) dfs  remove_dopts
@@ -740,7 +732,6 @@ opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
 opt_DoTickyProfiling		= lookUp  FSLIT("-fticky-ticky")
 
 -- language opts
-opt_AllStrict			= lookUp  FSLIT("-fall-strict")
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
 opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
@@ -861,10 +852,4 @@ startsWith []     str = Just str
 startsWith (c:cs) (s:ss)
   = if c /= s then Nothing else startsWith cs ss
 startsWith  _	  []  = Nothing
-
-endsWith  :: String -> String -> Maybe String
-endsWith cs ss
-  = case (startsWith (reverse cs) (reverse ss)) of
-      Nothing -> Nothing
-      Just rs -> Just (reverse rs)
 \end{code}

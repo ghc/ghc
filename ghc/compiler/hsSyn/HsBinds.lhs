@@ -242,16 +242,20 @@ sigName (L _ sig) = f sig
     f (FixSig (FixitySig n _)) = Just (unLoc n)
     f other			= Nothing
 
-isFixitySig :: Sig name -> Bool
-isFixitySig (FixSig _) = True
-isFixitySig _	       = False
+isFixityLSig :: LSig name -> Bool
+isFixityLSig (L _ (FixSig _)) = True
+isFixityLSig _	              = False
 
-isPragSig :: Sig name -> Bool
+isVanillaLSig :: LSig name -> Bool
+isVanillaLSig (L _(Sig name _)) = True
+isVanillaLSig sig	        = False
+
+isPragLSig :: LSig name -> Bool
 	-- Identifies pragmas 
-isPragSig (SpecSig _ _)     = True
-isPragSig (InlineSig _ _ _) = True
-isPragSig (SpecInstSig _)   = True
-isPragSig other		    = False
+isPragLSig (L _ (SpecSig _ _))     = True
+isPragLSig (L _ (InlineSig _ _ _)) = True
+isPragLSig (L _ (SpecInstSig _))   = True
+isPragLSig other		   = False
 
 hsSigDoc (Sig        _ _) 	  = ptext SLIT("type signature")
 hsSigDoc (SpecSig    _ _) 	  = ptext SLIT("SPECIALISE pragma")

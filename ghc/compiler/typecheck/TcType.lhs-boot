@@ -1,0 +1,5 @@
+\begin{code}
+module TcType where
+
+data TcTyVarDetails 
+\end{code}

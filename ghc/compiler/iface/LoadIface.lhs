@@ -9,8 +9,7 @@ module LoadIface (
 	loadSrcInterface, loadOrphanModules, loadHiBootInterface,
 	readIface,	-- Used when reading the module's old interface
 	predInstGates, ifaceInstGates, ifaceStats, discardDeclPrags,
-	initExternalPackageState,
-	noIfaceErr,   -- used by CompManager too
+	initExternalPackageState
    ) where
 
 #include "HsVersions.h"
@@ -19,10 +18,7 @@ import {-# SOURCE #-}	TcIface( tcIfaceDecl )
 
 import Packages		( PackageState(..), PackageIdH(..), isHomePackage )
 import DriverState	( v_GhcMode, isCompManagerMode )
-import DriverUtil	( replaceFilenameSuffix )
 import CmdLineOpts	( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
-import Parser		( parseIface )
-
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
 			  IfaceConDecls(..), IfaceInst(..), IfaceRule(..),
 			  IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
@@ -55,28 +51,24 @@ import Name		( Name {-instance NamedThing-}, getOccName,
 import NameEnv
 import MkId		( seqId )
 import Module		( Module, ModLocation(ml_hi_file), emptyModuleEnv, 
+			  addBootSuffix_maybe,
 			  extendModuleEnv, lookupModuleEnv, moduleUserString
 			)
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc, mkClassDataConOcc,
 			  mkSuperDictSelOcc, mkDataConWrapperOcc, mkDataConWorkerOcc )
 import Class		( Class, className )
 import TyCon		( tyConName )
-import SrcLoc		( mkSrcLoc, importedSrcLoc )
+import SrcLoc		( importedSrcLoc )
 import Maybes		( mapCatMaybes, MaybeErr(..) )
-import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
-import ErrUtils         ( Message, mkLocMessage )
-import Finder		( findModule, findPackageModule,  FindResult(..),
-			  hiBootFilePath )
-import Lexer
+import ErrUtils         ( Message )
+import Finder		( findModule, findPackageModule,  FindResult(..), cantFindError )
 import Outputable
 import BinIface		( readBinIface )
 import Panic		( ghcError, tryMost, showException, GhcException(..) )
 import List		( nub )
 
 import DATA_IOREF	( readIORef )
-
-import Directory
 \end{code}
 
 
@@ -576,7 +568,7 @@ findAndReadIface explicit doc_str mod_name hi_boot_file
 	      Failed err -> do
 		{ traceIf (ptext SLIT("...not found"))
 		; dflags <- getDOpts
-		; returnM (Failed (noIfaceErr dflags mod_name err)) } ;
+		; returnM (Failed (cantFindError dflags mod_name err)) } ;
 
 	      Succeeded (file_path, pkg) -> do 
 
@@ -603,18 +595,17 @@ findHiFile dflags explicit mod_name hi_boot_file
 	-- and start up GHCi - it won't complain that all the modules it tries
 	-- to load are found in the home location.
 	ghci_mode <- readIORef v_GhcMode ;
-	let { home_allowed = hi_boot_file || 
-			     not (isCompManagerMode ghci_mode) } ;
+	let { home_allowed = not (isCompManagerMode ghci_mode) } ;
 	maybe_found <-	if home_allowed 
-			then findModule dflags mod_name explicit
+			then findModule        dflags mod_name explicit
 			else findPackageModule dflags mod_name explicit;
 
 	case maybe_found of
-	  Found loc pkg 
-		| hi_boot_file -> do { hi_boot_path <- hiBootFilePath loc
-				     ; return (Succeeded (hi_boot_path, pkg)) }
-		| otherwise    -> return (Succeeded (ml_hi_file loc, pkg)) ;
-	  err  		       -> return (Failed err)
+	  Found loc pkg -> return (Succeeded (path, pkg))
+			where
+			   path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc)
+
+	  err -> return (Failed err)
 	}
 \end{code}
 
@@ -626,33 +617,20 @@ readIface :: Module -> String -> IsBootInterface
 	-- Failed err    <=> file not found, or unreadable, or illegible
 	-- Succeeded iface <=> successfully found and parsed 
 
-readIface wanted_mod_name file_path is_hi_boot_file
+readIface wanted_mod file_path is_hi_boot_file
   = do	{ dflags <- getDOpts
-	; ioToIOEnv (read_iface dflags wanted_mod_name file_path is_hi_boot_file) }
-
-read_iface dflags wanted_mod file_path is_hi_boot_file
- | is_hi_boot_file		-- Read ascii
- = do { res <- tryMost (hGetStringBuffer file_path) ;
-	case res of {
-	  Left exn     -> return (Failed (text (showException exn))) ;
-	  Right buffer -> 
-        case unP parseIface (mkPState buffer loc dflags) of
-	  PFailed span err -> return (Failed (mkLocMessage span err))
-	  POk _ iface 
-	     | wanted_mod == actual_mod -> return (Succeeded iface)
-	     | otherwise		-> return (Failed err) 
-	     where
-		actual_mod = mi_module iface
-		err = hiModuleNameMismatchWarn wanted_mod actual_mod
-     }}
-
- | otherwise		-- Read binary
- = do	{ res <- tryMost (readBinIface file_path)
+	; ioToIOEnv $ do
+	{ res <- tryMost (readBinIface file_path)
 	; case res of
-	    Right iface -> return (Succeeded iface)
-	    Left exn    -> return (Failed (text (showException exn))) }
- where
-    loc  = mkSrcLoc (mkFastString file_path) 1 0
+	    Right iface 
+		| wanted_mod == actual_mod -> return (Succeeded iface)
+		| otherwise	  	   -> return (Failed err)
+		where
+		  actual_mod = mi_module iface
+		  err = hiModuleNameMismatchWarn wanted_mod actual_mod
+
+	    Left exn    -> return (Failed (text (showException exn)))
+    }}
 \end{code}
 
 
@@ -747,27 +725,6 @@ hiModuleNameMismatchWarn requested_mod read_mod =
 	 , ptext SLIT("differs from name found in the interface file")
    	 , ppr read_mod
   	 ]
-
-noIfaceErr :: DynFlags -> Module -> FindResult -> SDoc
-noIfaceErr dflags mod_name (PackageHidden pkg)
-  = ptext SLIT("Could not import") <+> quotes (ppr mod_name) <> colon
-    $$ ptext SLIT("it is a member of package") <+> ppr pkg <> comma
-	 <+> ptext SLIT("which is hidden")
-
-noIfaceErr dflags mod_name (ModuleHidden pkg)
-  = ptext SLIT("Could not import") <+> quotes (ppr mod_name) <> colon
-    $$ ptext SLIT("it is hidden") 
-	<+> parens (ptext SLIT("in package") <+> ppr pkg)
-
-noIfaceErr dflags mod_name (NotFound files)
-  = ptext SLIT("Could not find interface file for") <+> quotes (ppr mod_name)
-    $$ extra files
-  where 
-  extra files
-    | verbosity dflags < 3 = 
-        text "(use -v to see a list of the files searched for)"
-    | otherwise =
-        hang (ptext SLIT("locations searched:")) 4 (vcat (map text files))
 
 wrongIfaceModErr iface mod_name file_path 
   = sep [ptext SLIT("Interface file") <+> iface_file,

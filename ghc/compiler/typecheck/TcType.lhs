@@ -22,7 +22,7 @@ module TcType (
 
   --------------------------------
   -- MetaDetails
-  TcTyVarDetails(..),
+  Expected(..), TcRef, TcTyVarDetails(..),
   MetaDetails(Flexi, Indirect), SkolemInfo(..), pprSkolemTyVar,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isExistentialTyVar, skolemTvInfo, metaTvRef,
   isFlexi, isIndirect,
@@ -228,6 +228,10 @@ type TcRhoType      = TcType
 type TcTauType      = TcType
 type TcKind         = Kind
 type TcTyVarSet     = TyVarSet
+
+type TcRef a 	 = IORef a
+data Expected ty = Infer (TcRef ty)	-- The hole to fill in for type inference
+		 | Check ty		-- The type to check during type checking
 \end{code}
 
 

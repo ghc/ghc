@@ -4,7 +4,7 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
-module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds, tcSpecSigs ) where
+module TcBinds ( tcBindsAndThen, tcTopBinds, tcHsBootSigs, tcMonoBinds, tcSpecSigs ) where
 
 #include "HsVersions.h"
 
@@ -14,7 +14,7 @@ import {-# SOURCE #-} TcExpr  ( tcCheckSigma, tcCheckRho )
 import CmdLineOpts	( DynFlag(Opt_MonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, Sig(..),
 			  LSig, Match(..), HsBindGroup(..), IPBind(..), 
-			  HsType(..), hsLTyVarNames,
+			  HsType(..), hsLTyVarNames, isVanillaLSig,
 			  LPat, GRHSs, MatchGroup(..), emptyLHsBinds, isEmptyLHsBinds,
 			  collectHsBindBinders, collectPatBinders, pprPatBind
 			)
@@ -95,15 +95,28 @@ tcTopBinds :: [HsBindGroup Name] -> TcM (LHsBinds TcId, TcLclEnv)
 	--       want.  The bit we care about is the local bindings
 	--	 and the free type variables thereof
 tcTopBinds binds
-  = tc_binds_and_then TopLevel glue binds	$
-    getLclEnv					`thenM` \ env ->
-    returnM (emptyLHsBinds, env)
+  = tc_binds_and_then TopLevel glue binds $
+	    do  { env <- getLclEnv
+		; return (emptyLHsBinds, env) }
   where
 	-- The top level bindings are flattened into a giant 
 	-- implicitly-mutually-recursive MonoBinds
     glue (HsBindGroup binds1 _ _) (binds2, env) = (binds1 `unionBags` binds2, env)
+    glue (HsIPBinds _) 		  _		= panic "Top-level HsIpBinds"
 	-- Can't have a HsIPBinds at top level
 
+tcHsBootSigs :: [HsBindGroup Name] -> TcM (LHsBinds TcId, TcLclEnv)
+-- A hs-boot file has only one BindGroup, and it only has type
+-- signatures in it.  The renamer checked all this
+tcHsBootSigs [HsBindGroup _ sigs _]
+  = do	{ ids <- mapM (addLocM tc_sig) (filter isVanillaLSig sigs)
+	; tcExtendIdEnv ids $ do 
+	{ env <- getLclEnv
+	; return (emptyLHsBinds, env) }}
+  where
+    tc_sig (Sig (L _ name) ty)
+      = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
+	   ; return (mkLocalId name sigma_ty) }
 
 tcBindsAndThen
 	:: (HsBindGroup TcId -> thing -> thing)		-- Combinator
@@ -243,7 +256,7 @@ tcBindWithSigs	:: TopLevelFlag
 tcBindWithSigs top_lvl mbind sigs is_rec = do	
   {	-- TYPECHECK THE SIGNATURES
     tc_ty_sigs <- recoverM (returnM []) $
-		  tcTySigs [sig | sig@(L _(Sig name _)) <- sigs]
+		  tcTySigs (filter isVanillaLSig sigs)
   ; let lookup_sig = lookupSig tc_ty_sigs
 
 	-- SET UP THE MAIN RECOVERY; take advantage of any type sigs

@@ -308,12 +308,12 @@ rnExpr (RecordCon con_id rbinds)
     returnM (RecordCon conname rbinds', fvRbinds `addOneFV` unLoc conname)
 
 rnExpr (RecordUpd expr rbinds)
-  = rnLExpr expr			`thenM` \ (expr', fvExpr) ->
+  = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
     rnRbinds "update" rbinds	`thenM` \ (rbinds', fvRbinds) ->
     returnM (RecordUpd expr' rbinds', fvExpr `plusFV` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
-  = rnLExpr expr			`thenM` \ (expr', fvExpr) ->
+  = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
     rnHsTypeFVs doc pty		`thenM` \ (pty', fvTy) ->
     returnM (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy)
   where 

@@ -21,6 +21,7 @@ module HscMain (
 #ifdef GHCI
 import HsSyn		( Stmt(..), LStmt, LHsExpr, LHsType )
 import IfaceSyn		( IfaceDecl, IfaceInst )
+import Module		( Module )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
@@ -69,7 +70,7 @@ import CmmParse		( parseCmmFile )
 import CodeOutput	( codeOutput )
 
 import CmdLineOpts
-import DriverPhases     ( isExtCoreFilename )
+import DriverPhases     ( HscSource(..) )
 import ErrUtils
 import UniqSupply	( mkSplitUniqSupply )
 
@@ -79,14 +80,13 @@ import HscTypes
 import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
-import Module		( Module, ModLocation(..), showModMsg )
 import FastString
 import Maybes		( expectJust )
 import StringBuffer	( StringBuffer )
 import Bag		( unitBag, emptyBag )
 
 import Monad		( when )
-import Maybe		( isJust, fromJust )
+import Maybe		( isJust )
 import IO
 import DATA_IOREF	( newIORef, readIORef )
 \end{code}
@@ -156,35 +156,34 @@ type MessageAction = Messages -> IO ()
 
 hscMain
   :: HscEnv
-  -> MessageAction		-- what to do with errors/warnings
-  -> Module
-  -> ModLocation		-- location info
-  -> Bool			-- True <=> source unchanged
-  -> Bool			-- True <=> have an object file (for msgs only)
-  -> Maybe ModIface		-- old interface, if available
+  -> MessageAction	-- What to do with errors/warnings
+  -> ModSummary
+  -> Bool		-- True <=> source unchanged
+  -> Bool		-- True <=> have an object file (for msgs only)
+  -> Maybe ModIface	-- Old interface, if available
   -> IO HscResult
 
-hscMain hsc_env msg_act mod location 
+hscMain hsc_env msg_act mod_summary
 	source_unchanged have_object maybe_old_iface
  = do {
       (recomp_reqd, maybe_checked_iface) <- 
 		_scc_ "checkOldIface" 
-		checkOldIface hsc_env mod 
-			      (ml_hi_file location)
+		checkOldIface hsc_env mod_summary 
 			      source_unchanged maybe_old_iface;
 
       let no_old_iface = not (isJust maybe_checked_iface)
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
 
-      ; what_next hsc_env msg_act have_object 
-		  mod location maybe_checked_iface
+      ; what_next hsc_env msg_act mod_summary have_object 
+		  maybe_checked_iface
       }
 
 
+------------------------------
 -- hscNoRecomp definitely expects to have the old interface available
-hscNoRecomp hsc_env msg_act have_object 
-	    mod location (Just old_iface)
+hscNoRecomp hsc_env msg_act mod_summary 
+	    have_object (Just old_iface)
  | isOneShot (hsc_mode hsc_env)
  = do {
       compilationProgressMsg (hsc_dflags hsc_env) $
@@ -195,44 +194,133 @@ hscNoRecomp hsc_env msg_act have_object
       return (HscNoRecomp bomb bomb)
       }
  | otherwise
- = do {
-      compilationProgressMsg (hsc_dflags hsc_env) $
-	("Skipping  " ++ showModMsg have_object mod location);
+ = do	{ compilationProgressMsg (hsc_dflags hsc_env) $
+		("Skipping  " ++ showModMsg have_object mod_summary)
 
-      new_details <- _scc_ "tcRnIface"
+	; new_details <- _scc_ "tcRnIface"
 		     typecheckIface hsc_env old_iface ;
-      dumpIfaceStats hsc_env ;
+	; dumpIfaceStats hsc_env
 
-      return (HscNoRecomp new_details old_iface)
-      }
+	; return (HscNoRecomp new_details old_iface)
+    }
 
-hscRecomp hsc_env msg_act have_object 
-	  mod location maybe_checked_iface
- = do	{
-      	  -- what target are we shooting for?
-	; let one_shot  = isOneShot (hsc_mode hsc_env)
+------------------------------
+hscRecomp hsc_env msg_act mod_summary
+	  have_object maybe_checked_iface
+ = case ms_hsc_src mod_summary of
+     HsSrcFile -> do { front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
+    		     ; hscBackEnd hsc_env mod_summary maybe_checked_iface front_res }
+
+     HsBootFile -> do { front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
+		      ; hscBootBackEnd hsc_env mod_summary maybe_checked_iface front_res }
+
+     ExtCoreFile -> do { front_res <- hscCoreFrontEnd hsc_env msg_act mod_summary
+    		       ; hscBackEnd hsc_env mod_summary maybe_checked_iface front_res }
+
+hscCoreFrontEnd hsc_env msg_act mod_summary = do {
+ 	    -------------------
+ 	    -- PARSE
+ 	    -------------------
+	; inp <- readFile (expectJust "hscCoreFrontEnd" (ms_hspp_file mod_summary))
+	; case parseCore inp 1 of
+	    FailP s        -> putMsg s{-ToDo: wrong-} >> return Nothing
+	    OkP rdr_module -> do {
+    
+ 	    -------------------
+ 	    -- RENAME and TYPECHECK
+ 	    -------------------
+	; (tc_msgs, maybe_tc_result) <- _scc_ "TypeCheck" 
+			      tcRnExtCore hsc_env rdr_module
+	; msg_act tc_msgs
+	; case maybe_tc_result of
+      	     Nothing       -> return Nothing
+      	     Just mod_guts -> return (Just mod_guts)	-- No desugaring to do!
+	}}
+	 
+
+hscFileFrontEnd hsc_env msg_act mod_summary = do {
+ 	    -------------------
+ 	    -- DISPLAY PROGRESS MESSAGE
+ 	    -------------------
+	  let one_shot  = isOneShot (hsc_mode hsc_env)
       	; let dflags    = hsc_dflags hsc_env
-	; let toInterp  = dopt_HscLang dflags == HscInterpreted
-	; let toCore    = isJust (ml_hs_file location) &&
-			  isExtCoreFilename (fromJust (ml_hs_file location))
-
+	; let toInterp  = dopt_HscTarget dflags == HscInterpreted
       	; when (not one_shot) $
-		compilationProgressMsg dflags $
-		  ("Compiling " ++ showModMsg (not toInterp) mod location);
+		 compilationProgressMsg dflags $
+		 ("Compiling " ++ showModMsg (not toInterp) mod_summary)
 			
-	; let hspp_file = expectJust "hscFrontEnd:hspp" (ml_hspp_file location)
-	; front_res <- if toCore then 
-			  hscCoreFrontEnd hsc_env msg_act hspp_file
-		       else 
-			  hscFileFrontEnd hsc_env msg_act hspp_file (ml_hspp_buf location)
+ 	    -------------------
+ 	    -- PARSE
+ 	    -------------------
+	; let hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
+	      hspp_buf  = ms_hspp_buf  mod_summary
 
-	; case front_res of
-	    Left flure -> return flure;
-	    Right ds_result -> do {
+	; maybe_parsed <- myParseModule (hsc_dflags hsc_env) hspp_file hspp_buf
 
+	; case maybe_parsed of {
+      	     Left err -> do { msg_act (unitBag err, emptyBag)
+			    ; return Nothing } ;
+      	     Right rdr_module -> do {
 
-	-- OMITTED: 
-	-- ; seqList imported_modules (return ())
+ 	    -------------------
+ 	    -- RENAME and TYPECHECK
+ 	    -------------------
+	  (tc_msgs, maybe_tc_result) 
+		<- _scc_ "Typecheck-Rename" 
+		   tcRnModule hsc_env (ms_hsc_src mod_summary) rdr_module
+
+	; msg_act tc_msgs
+	; case maybe_tc_result of {
+      	     Nothing -> return Nothing ;
+      	     Just tc_result -> do {
+
+ 	    -------------------
+ 	    -- DESUGAR
+ 	    -------------------
+	; (warns, maybe_ds_result) <- _scc_ "DeSugar" 
+		 	     deSugar hsc_env tc_result
+	; msg_act (warns, emptyBag)
+	; case maybe_ds_result of
+	    Nothing        -> return Nothing
+	    Just ds_result -> return (Just ds_result)
+	}}}}}
+
+------------------------------
+hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
+-- For hs-boot files, there's no code generation to do
+
+hscBootBackEnd hsc_env mod_summary maybe_checked_iface Nothing 
+  = return HscFail
+hscBootBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
+  = do	{ final_iface <- _scc_ "MkFinalIface" 
+			 mkIface hsc_env (ms_location mod_summary)
+                         	 maybe_checked_iface ds_result
+
+	; let { final_globals = Just $! (mg_rdr_env ds_result)
+	      ; final_details = ModDetails { md_types = mg_types ds_result,
+					     md_insts = mg_insts ds_result,
+					     md_rules = mg_rules ds_result } }
+      	  -- And the answer is ...
+	; dumpIfaceStats hsc_env
+
+	; return (HscRecomp final_details
+			    final_globals
+			    final_iface
+                            False False Nothing)
+ 	}
+
+------------------------------
+hscBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
+
+hscBackEnd hsc_env mod_summary maybe_checked_iface Nothing 
+  = return HscFail
+
+hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result) 
+  = do 	{ 	-- OMITTED: 
+		-- ; seqList imported_modules (return ())
+
+	  let one_shot  = isOneShot (hsc_mode hsc_env)
+	      dflags    = hsc_dflags hsc_env
 
  	    -------------------
  	    -- FLATTENING
@@ -290,9 +378,8 @@ hscRecomp hsc_env msg_act have_object
 	    -- info has been set.  Not yet clear if it matters waiting
 	    -- until after code output
 	; new_iface <- _scc_ "MkFinalIface" 
-			mkIface hsc_env location 
+			mkIface hsc_env (ms_location mod_summary)
                          	maybe_checked_iface tidy_result
-
 
 	    -- Space leak reduction: throw away the new interface if
 	    -- we're in one-shot mode; we won't be needing it any
@@ -316,7 +403,7 @@ hscRecomp hsc_env msg_act have_object
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
 	; (stub_h_exists, stub_c_exists, maybe_bcos)
-		<- hscBackEnd dflags tidy_result
+		<- hscCodeGen dflags tidy_result
 
       	  -- And the answer is ...
 	; dumpIfaceStats hsc_env
@@ -326,62 +413,7 @@ hscRecomp hsc_env msg_act have_object
 			    final_iface
                             stub_h_exists stub_c_exists
       			    maybe_bcos)
-      	 }}
-
-hscCoreFrontEnd hsc_env msg_act hspp_file = do {
- 	    -------------------
- 	    -- PARSE
- 	    -------------------
-	; inp <- readFile hspp_file
-	; case parseCore inp 1 of
-	    FailP s        -> putMsg s{-ToDo: wrong-} >> return (Left HscFail)
-	    OkP rdr_module -> do {
-    
- 	    -------------------
- 	    -- RENAME and TYPECHECK
- 	    -------------------
-	; (tc_msgs, maybe_tc_result) <- _scc_ "TypeCheck" 
-			      tcRnExtCore hsc_env rdr_module
-	; msg_act tc_msgs
-	; case maybe_tc_result of {
-      	     Nothing       -> return (Left  HscFail);
-      	     Just mod_guts -> return (Right mod_guts)
-					-- No desugaring to do!
-	}}}
-	 
-
-hscFileFrontEnd hsc_env msg_act hspp_file hspp_buf = do {
- 	    -------------------
- 	    -- PARSE
- 	    -------------------
-	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file hspp_buf
-
-	; case maybe_parsed of {
-      	     Left err -> do { msg_act (unitBag err, emptyBag) ;
-			    ; return (Left HscFail) ;
-			    };
-      	     Right rdr_module -> do {
-
- 	    -------------------
- 	    -- RENAME and TYPECHECK
- 	    -------------------
-	; (tc_msgs, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
-				        tcRnModule hsc_env rdr_module
-	; msg_act tc_msgs
-	; case maybe_tc_result of {
-      	     Nothing -> return (Left HscFail);
-      	     Just tc_result -> do {
-
- 	    -------------------
- 	    -- DESUGAR
- 	    -------------------
-	; (warns, maybe_ds_result) <- _scc_ "DeSugar" 
-		 	     deSugar hsc_env tc_result
-	; msg_act (warns, emptyBag)
-	; case maybe_ds_result of
-	    Nothing        -> return (Left HscFail);
-	    Just ds_result -> return (Right ds_result);
-	}}}}}
+      	 }
 
 
 hscFileCheck hsc_env msg_act hspp_file = do {
@@ -415,7 +447,7 @@ hscBufferCheck hsc_env buffer msg_act = do
 
 hscBufferTypecheck hsc_env rdr_module msg_act = do
 	(tc_msgs, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
-					tcRnModule hsc_env rdr_module
+					tcRnModule hsc_env HsSrcFile rdr_module
 	msg_act tc_msgs
 	case maybe_tc_result of
 	    Nothing  -> return (HscChecked rdr_module Nothing)
@@ -423,7 +455,7 @@ hscBufferTypecheck hsc_env rdr_module msg_act = do
 	    Just r -> return (HscChecked rdr_module (Just r))
 
 
-hscBackEnd dflags 
+hscCodeGen dflags 
     ModGuts{  -- This is the last use of the ModGuts in a compilation.
 	      -- From now on, we just use the bits we need.
         mg_module   = this_mod,
@@ -439,7 +471,7 @@ hscBackEnd dflags
   prepd_binds <- _scc_ "CorePrep"
 		 corePrepPgm dflags core_binds type_env;
 
-  case dopt_HscLang dflags of
+  case dopt_HscTarget dflags of
       HscNothing -> return (False, False, Nothing)
 
       HscInterpreted ->

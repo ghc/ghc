@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.142 2005/01/18 12:18:34 simonpj Exp $
+-- $Id: Main.hs,v 1.143 2005/01/27 10:44:39 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -27,9 +27,10 @@ import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( initSysTools, cleanTempFiles, normalisePath )
 import Packages		( dumpPackages, initPackages, haskell98PackageId, PackageIdH(..) )
-import DriverPipeline	( staticLink, doMkDLL, runPipeline )
-import DriverState	( buildStgToDo,
-			  findBuildTag, unregFlags, 
+import DriverPipeline	( staticLink, doMkDLL, compileFile )
+import DriverState	( isLinkMode, isMakeMode, isInteractiveMode,
+			  isCompManagerMode, isInterpretiveMode, 
+			  buildStgToDo, findBuildTag, unregFlags, 
 			  v_GhcMode, v_GhcModeFlag, GhcMode(..),
 			  v_Keep_tmp_files, v_Ld_inputs, v_Ways, 
 			  v_Output_file, v_Output_hi, 
@@ -37,11 +38,11 @@ import DriverState	( buildStgToDo,
 			)
 import DriverFlags
 
-import DriverMkDepend	( beginMkDependHS, endMkDependHS )
+import DriverMkDepend	( doMkDependHS )
 import DriverPhases	( isSourceFilename )
 
 import DriverUtil	( add, handle, handleDyn, later, unknownFlagsErr )
-import CmdLineOpts	( DynFlags(..), HscLang(..), v_Static_hsc_opts,
+import CmdLineOpts	( DynFlags(..), HscTarget(..), v_Static_hsc_opts,
 			  defaultDynFlags )
 import BasicTypes	( failed )
 import Outputable
@@ -119,7 +120,7 @@ main =
 	-- -O and --interactive are not a good combination
 	-- ditto with any kind of way selection
    orig_ways <- readIORef v_Ways
-   when (notNull orig_ways && isInteractive mode) $
+   when (notNull orig_ways && isInterpretiveMode mode) $
       do throwDyn (UsageError 
                    "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
 
@@ -140,17 +141,17 @@ main =
 
    stg_todo  <- buildStgToDo
 
-   -- set the "global" HscLang.  The HscLang can be further adjusted on a module
+   -- set the "global" HscTarget.  The HscTarget can be further adjusted on a module
    -- by module basis, using only the -fvia-C and -fasm flags.  If the global
-   -- HscLang is not HscC or HscAsm, -fvia-C and -fasm have no effect.
+   -- HscTarget is not HscC or HscAsm, -fvia-C and -fasm have no effect.
    let dflags0 = defaultDynFlags
    let lang = case mode of 
 		 DoInteractive  -> HscInterpreted
 		 DoEval _	-> HscInterpreted
-		 _other		-> hscLang dflags0
+		 _other		-> hscTarget dflags0
 
    let dflags1 = dflags0{ stgToDo  = stg_todo,
-                  	  hscLang  = lang,
+                  	  hscTarget  = lang,
 			  -- leave out hscOutName for now
 	                  hscOutName = panic "Main.main:hscOutName not set",
 		  	  verbosity = case mode of
@@ -224,10 +225,7 @@ main =
 
    case mode of
 	DoMake 	       -> doMake dflags srcs
-			       
-	DoMkDependHS   -> do { beginMkDependHS ; 
-			       compileFiles mode dflags srcs; 
-			       endMkDependHS dflags }
+	DoMkDependHS   -> doMkDependHS dflags srcs 
 	StopBefore p   -> do { compileFiles mode dflags srcs; return () }
 	DoMkDLL	       -> do { o_files <- compileFiles mode dflags srcs; 
 			       doMkDLL dflags o_files link_pkgs }
@@ -259,28 +257,24 @@ checkOptions mode srcs objs = do
 	-- -ohi sanity check
    ohi <- readIORef v_Output_hi
    if (isJust ohi && 
-      (mode == DoMake || isInteractive mode || srcs `lengthExceeds` 1))
+      (isCompManagerMode mode || srcs `lengthExceeds` 1))
 	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
 	else do
 
 	-- -o sanity checking
    o_file <- readIORef v_Output_file
-   if (srcs `lengthExceeds` 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
+   if (srcs `lengthExceeds` 1 && isJust o_file && not (isLinkMode mode))
 	then throwDyn (UsageError "can't apply -o to multiple source files")
 	else do
 
-	-- Check that there are some input files (except in the interactive 
-	-- case)
-   if null srcs && null objs && not (isInteractive mode)
+	-- Check that there are some input files
+	-- (except in the interactive case)
+   if null srcs && null objs && not (isInterpretiveMode mode)
 	then throwDyn (UsageError "no input files")
 	else do
 
      -- Verify that output files point somewhere sensible.
    verifyOutputFiles
-
-isInteractive DoInteractive = True
-isInteractive (DoEval _)    = True
-isInteractive _             = False
 
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
@@ -289,25 +283,7 @@ compileFiles :: GhcMode
 	     -> DynFlags
 	     -> [String]	-- Source files
 	     -> IO [String]	-- Object files
-compileFiles mode dflags srcs = do
-   stop_flag <- readIORef v_GhcModeFlag
-   mapM (compileFile mode dflags stop_flag) srcs
-
-
-compileFile mode dflags stop_flag src = do
-   exists <- doesFileExist src
-   when (not exists) $ 
-   	throwDyn (CmdLineError ("file `" ++ src ++ "' does not exist"))
-   
-   o_file   <- readIORef v_Output_file
-	-- when linking, the -o argument refers to the linker's output.	
-	-- otherwise, we use it as the name for the pipeline's output.
-   let maybe_o_file
-	  | mode==DoLink || mode==DoMkDLL  = Nothing
-	  | otherwise                      = o_file
-
-   runPipeline mode dflags stop_flag True maybe_o_file src 
-		Nothing{-no ModLocation-}
+compileFiles mode dflags srcs = mapM (compileFile mode dflags) srcs
 
 
 -- ----------------------------------------------------------------------------
@@ -331,7 +307,7 @@ showBanners mode dflags static_opts = do
 
 	-- Show the GHCi banner
 #  ifdef GHCI
-   when (mode == DoInteractive && verb >= 1) $
+   when (isInteractiveMode mode && verb >= 1) $
       hPutStrLn stdout ghciWelcomeMsg
 #  endif
 

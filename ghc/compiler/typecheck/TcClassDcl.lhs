@@ -246,7 +246,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	-- default methods.  Better to make separate AbsBinds for each
     let
 	(tyvars, _, _, op_items) = classBigSig clas
-	prags 			 = filter (isPragSig.unLoc) sigs
+	prags 			 = filter isPragLSig sigs
 	tc_dm			 = tcDefMeth clas tyvars default_binds prags
 
 	dm_sel_ids		 = [sel_id | (sel_id, DefMeth) <- op_items]

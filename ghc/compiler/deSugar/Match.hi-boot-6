@@ -2,8 +2,8 @@ module Match where
 
 match 	:: [Var.Id]
         -> TcType.TcType
-	-> [DsUtils.EquationInfo]
-	-> DsMonad.DsM DsUtils.MatchResult
+	-> [DsMonad.EquationInfo]
+	-> DsMonad.DsM DsMonad.MatchResult
 
 matchWrapper
 	:: HsExpr.HsMatchContext Name.Name
@@ -23,5 +23,5 @@ matchSinglePat
 	-> DsMonad.DsMatchContext
 	-> HsPat.LPat Var.Id
         -> TcType.TcType
-	-> DsUtils.MatchResult
-	-> DsMonad.DsM DsUtils.MatchResult
+	-> DsMonad.MatchResult
+	-> DsMonad.DsM DsMonad.MatchResult

@@ -1,0 +1,26 @@
+\begin{code}
+module HsExpr where
+
+import SrcLoc	  ( Located )
+import Outputable ( SDoc, OutputableBndr )
+import {-# SOURCE #-} HsPat  ( LPat )
+	
+data HsExpr i
+data HsSplice i
+data MatchGroup a
+data GRHSs a
+
+type LHsExpr a = Located (HsExpr a)
+
+pprExpr :: (OutputableBndr i) => 
+	HsExpr i -> SDoc
+
+pprSplice :: (OutputableBndr i) => 
+	HsSplice i -> SDoc
+
+pprPatBind :: (OutputableBndr b, OutputableBndr i) => 
+	LPat b -> GRHSs i -> SDoc
+
+pprFunBind :: (OutputableBndr i) => 
+	i -> MatchGroup i -> SDoc
+\end{code}

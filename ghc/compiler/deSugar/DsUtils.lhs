@@ -187,14 +187,6 @@ The ``equation info'' used by @match@ is relatively complicated and
 worthy of a type synonym and a few handy functions.
 
 \begin{code}
-data EquationInfo
-  = EqnInfo { eqn_pats :: [Pat Id],    	-- The patterns for an eqn
-	      eqn_rhs  :: MatchResult }	-- What to do after match
-
--- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult
---	\fail. wrap (case vs of { pats -> rhs fail })
--- where vs are not in the domain of wrap
-
 firstPat :: EquationInfo -> Pat Id
 firstPat eqn = head (eqn_pats eqn)
 
@@ -206,23 +198,6 @@ shiftEqns eqns = [ eqn { eqn_pats = shiftPats (eqn_pats eqn) }
 shiftPats :: [Pat Id] -> [Pat Id]
 shiftPats (ConPatOut _ _ _ _ (PrefixCon arg_pats) _ : pats) = map unLoc arg_pats ++ pats
 shiftPats (pat_with_no_sub_pats			    : pats) = pats
-\end{code}
-
-
-\begin{code}
--- A MatchResult is an expression with a hole in it
-data MatchResult
-  = MatchResult
-	CanItFail	-- Tells whether the failure expression is used
-	(CoreExpr -> DsM CoreExpr)
-			-- Takes a expression to plug in at the
-			-- failure point(s). The expression should
-			-- be duplicatable!
-
-data CanItFail = CanFail | CantFail
-
-orFail CantFail CantFail = CantFail
-orFail _        _	 = CanFail
 \end{code}
 
 Functions on MatchResults

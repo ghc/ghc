@@ -39,7 +39,7 @@ import TcType		( TcKind, ThetaType, TcType, tyVarsOfType,
 import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
-import TyCon		( TyCon, ArgVrcs, 
+import TyCon		( TyCon, ArgVrcs, AlgTyConRhs( AbstractTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
 			  tyConStupidTheta, getSynTyConDefn, isSynTyCon, tyConName )
 import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, 
@@ -371,14 +371,29 @@ tcTyClDecl1 calc_vrcs calc_isrec
   { extra_tvs <- tcDataKindSig mb_ksig
   ; let final_tvs = tvs' ++ extra_tvs
   ; stupid_theta <- tcStupidTheta ctxt cons
-  ; want_generic <- doptM Opt_Generics
-  ; tycon <- fixM (\ tycon -> do 
-	{ unbox_strict <- doptM Opt_UnboxStrictFields
-	; gla_exts <- doptM Opt_GlasgowExts
-	; checkTc (gla_exts || h98_syntax) (badGadtDecl tc_name)
 
-	; data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data tycon final_tvs)) cons
-	; let tc_rhs = case new_or_data of
+  ; want_generic <- doptM Opt_Generics
+  ; unbox_strict <- doptM Opt_UnboxStrictFields
+  ; gla_exts     <- doptM Opt_GlasgowExts
+  ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
+
+	-- Check that we don't use GADT syntax in H98 world
+  ; checkTc (gla_exts || h98_syntax) (badGadtDecl tc_name)
+
+	-- Check that there's at least one condecl,
+	-- or else we're reading an interface file, or -fglasgow-exts
+  ; checkTc (not (null cons) || gla_exts || is_boot)
+	    (emptyConDeclsErr tc_name)
+    
+  ; tycon <- fixM (\ tycon -> do 
+	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
+						 tycon final_tvs)) 
+			     cons
+	; let tc_rhs 
+		| null cons && is_boot 	-- In a hs-boot file, empty cons means
+		= AbstractTyCon		-- "don't know"; hence Abstract
+		| otherwise
+		= case new_or_data of
 			DataType -> mkDataTyConRhs stupid_theta data_cons
 			NewType  -> ASSERT( isSingleton data_cons )
 				    mkNewTyConRhs tycon (head data_cons)
@@ -745,4 +760,8 @@ badDataConTyCon data_con
 badGadtDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow GADTs")) ]
+
+emptyConDeclsErr tycon
+  = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
+	 nest 4 (ptext SLIT("(-fglasgow-exts permits this)"))]
 \end{code}

@@ -7,15 +7,15 @@
 module Finder (
     flushFinderCache,	-- :: IO ()
     FindResult(..),
-    findModule,		-- :: ModuleName -> Bool -> IO FindResult
-    findPackageModule,  -- :: ModuleName -> Bool -> IO FindResult
-    mkHomeModLocation,	-- :: ModuleName -> FilePath -> IO ModLocation
+    findModule,			-- :: ModuleName -> Bool -> IO FindResult
+    findPackageModule,  	-- :: ModuleName -> Bool -> IO FindResult
+    mkHomeModLocation,		-- :: ModuleName -> FilePath -> IO ModLocation
+    mkHomeModLocation2,		-- :: ModuleName -> FilePath -> String -> IO ModLocation
+    addHomeModuleToFinder, 	-- :: Module -> ModLocation -> IO ()
+
     findLinkable,	-- :: ModuleName -> ModLocation -> IO (Maybe Linkable)
 
-    hiBootFilePath,	-- :: ModLocation -> IO FilePath
-    hiBootExt,		-- :: String
-    hiBootVerExt,	-- :: String
-
+    cantFindError, 	-- :: DynFlags -> Module -> FindResult -> SDoc
   ) where
 
 #include "HsVersions.h"
@@ -27,9 +27,9 @@ import Packages
 import DriverState
 import DriverUtil
 import FastString
-import Config
 import Util
 import CmdLineOpts	( DynFlags(..) )
+import Outputable
 
 import DATA_IOREF	( IORef, writeIORef, readIORef )
 
@@ -37,7 +37,12 @@ import Data.List
 import System.Directory
 import System.IO
 import Control.Monad
+import Maybes		( MaybeErr(..) )
 import Data.Maybe	( isNothing )
+
+
+type FileExt = String	-- Filename extension
+type BaseName = String	-- Basename of file
 
 -- -----------------------------------------------------------------------------
 -- The Finder
@@ -54,7 +59,7 @@ import Data.Maybe	( isNothing )
 
 GLOBAL_VAR(finder_cache, emptyModuleEnv, ModuleEnv FinderCacheEntry)
 
-type FinderCacheEntry = (ModLocation,Maybe (PackageConfig,Bool))
+type FinderCacheEntry = (ModLocation, Maybe (PackageConfig,Bool))
 
 -- remove all the home modules from the cache; package modules are
 -- assumed to not move around during a session.
@@ -98,137 +103,130 @@ data FindResult
   | NotFound [FilePath]
 	-- the module was not found, the specified places were searched.
 
+type LocalFindResult = MaybeErr [FilePath] FinderCacheEntry
+	-- LocalFindResult is used for internal functions which 
+	-- return a more informative type; it's munged into
+	-- the external FindResult by 'cached'
+
+cached :: (DynFlags -> Module -> IO LocalFindResult)
+       -> DynFlags -> Module -> Bool -> IO FindResult
+cached wrapped_fn dflags name explicit 
+  = do	{ 	-- First try the cache
+	  mb_entry <- lookupFinderCache name
+	; case mb_entry of {
+	    Just old_entry -> return (found old_entry) ;
+	    Nothing    -> do
+
+	{ 	-- Now try the wrapped function
+	  mb_entry <- wrapped_fn dflags name
+	; case mb_entry of
+	    Failed paths  	-> return (NotFound paths)
+	    Succeeded new_entry -> do { addToFinderCache name new_entry
+			      	      ; return (found new_entry) }
+	}}} 
+  where
+	-- We've found the module, so the remaining question is
+	-- whether it's visible or not
+    found :: FinderCacheEntry -> FindResult
+    found (loc, Nothing)		= Found loc HomePackage
+    found (loc, Just (pkg, exposed_mod))
+	| explicit && not exposed_mod   = ModuleHidden pkg_name
+	| explicit && not (exposed pkg) = PackageHidden pkg_name
+	| otherwise			= Found loc (ExtPackage (mkPackageId (package pkg)))
+	where
+	  pkg_name = packageConfigId pkg
+
+addHomeModuleToFinder :: Module -> ModLocation -> IO ()
+addHomeModuleToFinder mod loc = addToFinderCache mod (loc, Nothing)
+
+
+-- -----------------------------------------------------------------------------
+-- 	The two external entry points
+
+
 findModule :: DynFlags -> Module -> Bool -> IO FindResult
-findModule = cached findModule'
+findModule = cached findModule' 
   
-findModule' :: DynFlags -> Module -> Bool -> IO FindResult
-findModule' dflags name explicit = do
-    r <- findPackageModule' dflags name explicit
+findPackageModule :: DynFlags -> Module -> Bool -> IO FindResult
+findPackageModule = cached findPackageModule'
+
+-- -----------------------------------------------------------------------------
+-- 	The internal workers
+
+findModule' :: DynFlags -> Module -> IO LocalFindResult
+-- Find home or package module
+findModule' dflags name = do
+    r <- findPackageModule' dflags name
     case r of
-	NotFound pkg_files -> do
-	   j <- maybeHomeModule dflags name
+	Failed pkg_files -> do
+	   j <- findHomeModule' dflags name
 	   case j of
-		NotFound home_files -> 
-			return (NotFound (home_files ++ pkg_files))
+		Failed home_files -> 
+			return (Failed (home_files ++ pkg_files))
 		other_result
 			-> return other_result
 	other_result
 		-> return other_result
 
-cached fn dflags name explicit = do
-  m <- lookupFinderCache name
-  case m of
-    Nothing -> fn dflags name explicit
-    Just (loc,maybe_pkg)
-	| Just err <- visible explicit maybe_pkg  ->  return err
-	| otherwise -> return (Found loc (pkgInfoToId maybe_pkg))
-  
-pkgInfoToId :: Maybe (PackageConfig,Bool) -> PackageIdH
-pkgInfoToId (Just (pkg,_)) = ExtPackage (mkPackageId (package pkg))
-pkgInfoToId Nothing        = HomePackage
-
--- Is a module visible or not?  Returns Nothing if the import is ok,
--- or Just err if there's a visibility error.
-visible :: Bool -> Maybe (PackageConfig,Bool) -> Maybe FindResult
-visible explicit maybe_pkg
-   | Nothing <- maybe_pkg  =  Nothing	-- home module ==> YES
-   | not explicit          =  Nothing	-- implicit import ==> YES
-   | Just (pkg, exposed_module) <- maybe_pkg 
-    = case () of
-	_ | not exposed_module -> Just (ModuleHidden pkgname)
-	  | not (exposed pkg)  -> Just (PackageHidden pkgname)
-	  | otherwise          -> Nothing
-	  where 
-		pkgname = packageConfigId pkg
-     
-
-hiBootExt = "hi-boot"
-hiBootVerExt = "hi-boot-" ++ cHscIfaceFileVersion
-
-maybeHomeModule :: DynFlags -> Module -> IO FindResult
-maybeHomeModule dflags mod = do
+findHomeModule' :: DynFlags -> Module -> IO LocalFindResult
+findHomeModule' dflags mod = do
    let home_path = importPaths dflags
    hisuf     <- readIORef v_Hi_suf
    mode      <- readIORef v_GhcMode
 
    let
      source_exts = 
-      [ ("hs",   mkHomeModLocationSearched mod)
-      , ("lhs",  mkHomeModLocationSearched mod)
+      [ ("hs",   mkHomeModLocationSearched mod "hs")
+      , ("lhs",  mkHomeModLocationSearched mod "lhs")
       ]
      
-     hi_exts = [ (hisuf,  mkHiOnlyModLocation hisuf mod) ]
+     hi_exts = [ (hisuf,  	 	mkHiOnlyModLocation hisuf)
+	       , (addBootSuffix hisuf,	mkHiOnlyModLocation hisuf)
+	       ]
      
-     boot_exts =
-       [ (hiBootVerExt, mkHiOnlyModLocation hisuf mod)
-       , (hiBootExt,    mkHiOnlyModLocation hisuf mod)
-       ]
-
      	-- In compilation manager modes, we look for source files in the home
      	-- package because we can compile these automatically.  In one-shot
      	-- compilation mode we look for .hi and .hi-boot files only.
-     	--
-     	-- When generating dependencies, we're interested in either category.
-     	--
      exts
-         | mode == DoMkDependHS   = hi_exts ++ source_exts ++ boot_exts
+         | DoMkDependHS <- mode   = source_exts
          | isCompManagerMode mode = source_exts
-	 | otherwise {-one-shot-} = hi_exts ++ boot_exts
+	 | otherwise {-one-shot-} = hi_exts
 
    searchPathExts home_path mod exts
    	
--- -----------------------------------------------------------------------------
--- Looking for a package module
+findPackageModule' :: DynFlags -> Module -> IO LocalFindResult
+findPackageModule' dflags mod 
+  = case moduleToPackageConfig dflags mod of
+    	Nothing       -> return (Failed [])
+	Just pkg_info -> findPackageIface mod pkg_info
 
-findPackageModule :: DynFlags -> Module -> Bool -> IO FindResult
-findPackageModule = cached findPackageModule'
-
-findPackageModule' :: DynFlags -> Module -> Bool -> IO FindResult
-findPackageModule' dflags mod explicit = do
-  mode     <- readIORef v_GhcMode
-
-  case moduleToPackageConfig dflags mod of
-    Nothing -> return (NotFound [])
-    pkg_info@(Just (pkg_conf, module_exposed))
-	| Just err <- visible explicit pkg_info  ->  return err
-	| otherwise  ->  findPackageIface mode mod paths pkg_info
-      where 
-	    paths   = importDirs pkg_conf
-
-findPackageIface
-	:: GhcMode
-	-> Module
-	-> [FilePath]
-	-> Maybe (PackageConfig,Bool)
-	-> IO FindResult
-findPackageIface mode mod imp_dirs pkg_info = do
-   -- hi-suffix for packages depends on the build tag.
-  package_hisuf <-
-	do tag <- readIORef v_Build_tag
-	   if null tag
-		then return "hi"
-		else return (tag ++ "_hi")
-
+findPackageIface :: Module -> (PackageConfig,Bool) -> IO LocalFindResult
+findPackageIface mod pkg_info@(pkg_conf, _) = do
+  mode <- readIORef v_GhcMode
+  tag  <- readIORef v_Build_tag
   let
+	   -- hi-suffix for packages depends on the build tag.
+     package_hisuf | null tag  = "hi"
+		   | otherwise = tag ++ "_hi"
      hi_exts =
         [ (package_hisuf, 
-	    mkPackageModLocation pkg_info package_hisuf mod) ]
+	    mkPackageModLocation pkg_info package_hisuf) ]
 
      source_exts = 
-       [ ("hs",   mkPackageModLocation pkg_info package_hisuf mod)
-       , ("lhs",  mkPackageModLocation pkg_info package_hisuf mod)
+       [ ("hs",   mkPackageModLocation pkg_info package_hisuf)
+       , ("lhs",  mkPackageModLocation pkg_info package_hisuf)
        ]
 
      -- mkdependHS needs to look for source files in packages too, so
      -- that we can make dependencies between package before they have
      -- been built.
      exts 
-      | mode == DoMkDependHS = hi_exts ++ source_exts
-      | otherwise = hi_exts
-
+      | DoMkDependHS <- mode = hi_exts ++ source_exts
+      | otherwise 	     = hi_exts
       -- we never look for a .hi-boot file in an external package;
       -- .hi-boot files only make sense for the home package.
-  searchPathExts imp_dirs mod exts
+
+  searchPathExts (importDirs pkg_conf) mod exts
 
 -- -----------------------------------------------------------------------------
 -- General path searching
@@ -237,60 +235,59 @@ searchPathExts
   :: [FilePath]		-- paths to search
   -> Module		-- module name
   -> [ (
-	String,					     -- suffix
-	String -> String -> String -> IO FindResult  -- action
+	FileExt,				     -- suffix
+	FilePath -> BaseName -> IO FinderCacheEntry  -- action
        )
      ] 
-  -> IO FindResult
+  -> IO LocalFindResult
 
-searchPathExts path mod exts = search to_search
+searchPathExts paths mod exts 
+   = do result <- search to_search
+{-
+	hPutStrLn stderr (showSDoc $
+		vcat [text "Search" <+> ppr mod <+> sep (map (text. fst) exts)
+		    , nest 2 (vcat (map text paths))
+		    , case result of
+			Succeeded (loc, p) -> text "Found" <+> ppr loc
+			Failed fs	   -> text "not found"])
+-}	
+	return result
+
   where
     basename = dots_to_slashes (moduleUserString mod)
 
-    to_search :: [(FilePath, IO FindResult)]
-    to_search = [ (file, fn p basename ext)
-		| p <- path, 
+    to_search :: [(FilePath, IO FinderCacheEntry)]
+    to_search = [ (file, fn path basename)
+		| path <- paths, 
 		  (ext,fn) <- exts,
-		  let base | p == "."  = basename
-	     	           | otherwise = p ++ '/':basename
+		  let base | path == "." = basename
+	     	           | otherwise   = path ++ '/':basename
 	              file = base ++ '.':ext
 		]
 
-    search [] = return (NotFound (map fst to_search))
-    search ((file, result) : rest) = do
+    search [] = return (Failed (map fst to_search))
+    search ((file, mk_result) : rest) = do
       b <- doesFileExist file
       if b 
-	then result
+	then do { res <- mk_result; return (Succeeded res) }
 	else search rest
 
--- -----------------------------------------------------------------------------
--- Building ModLocations
+mkHomeModLocationSearched :: Module -> FileExt
+		          -> FilePath -> BaseName -> IO FinderCacheEntry
+mkHomeModLocationSearched mod suff path basename = do
+   loc <- mkHomeModLocation2 mod (path ++ '/':basename) suff
+   return (loc, Nothing)
 
-mkHiOnlyModLocation hisuf mod path basename _ext = do
-  -- basename == dots_to_slashes (moduleNameUserString mod)
+mkHiOnlyModLocation :: FileExt -> FilePath -> BaseName -> IO FinderCacheEntry
+mkHiOnlyModLocation hisuf path basename = do
   loc <- hiOnlyModLocation path basename hisuf
-  addToFinderCache mod (loc, Nothing)
-  return (Found loc HomePackage)
+  return (loc, Nothing)
 
-mkPackageModLocation pkg_info hisuf mod path basename _ext = do
-  -- basename == dots_to_slashes (moduleNameUserString mod)
+mkPackageModLocation :: (PackageConfig, Bool) -> FileExt
+		     -> FilePath -> BaseName -> IO FinderCacheEntry
+mkPackageModLocation pkg_info hisuf path basename = do
   loc <- hiOnlyModLocation path basename hisuf
-  addToFinderCache mod (loc, pkg_info)
-  return (Found loc (pkgInfoToId pkg_info))
-
-hiOnlyModLocation path basename hisuf 
- = do let full_basename = path++'/':basename
-      obj_fn <- mkObjPath full_basename basename
-      return ModLocation{    ml_hspp_file = Nothing,
-			     ml_hspp_buf  = Nothing,
- 	        	     ml_hs_file   = Nothing,
- 	        	     ml_hi_file   = full_basename ++ '.':hisuf,
-		 		-- Remove the .hi-boot suffix from
-		 		-- hi_file, if it had one.  We always
-		 		-- want the name of the real .hi file
-		 		-- in the ml_hi_file field.
-	   	             ml_obj_file  = obj_fn
-                  }
+  return (loc, Just pkg_info)
 
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location
@@ -325,28 +322,37 @@ hiOnlyModLocation path basename hisuf
 -- ext
 --	The filename extension of the source file (usually "hs" or "lhs").
 
+mkHomeModLocation :: Module -> FilePath -> IO ModLocation
 mkHomeModLocation mod src_filename = do
    let (basename,extension) = splitFilename src_filename
-   mkHomeModLocation' mod basename extension
+   mkHomeModLocation2 mod basename extension
 
-mkHomeModLocationSearched mod path basename ext = do
-   loc <- mkHomeModLocation' mod (path ++ '/':basename) ext
-   return (Found loc HomePackage)
-
-mkHomeModLocation' mod src_basename ext = do
+mkHomeModLocation2 :: Module	
+		   -> FilePath 	-- Of source module, without suffix
+		   -> String 	-- Suffix
+		   -> IO ModLocation
+mkHomeModLocation2 mod src_basename ext = do
    let mod_basename = dots_to_slashes (moduleUserString mod)
 
    obj_fn <- mkObjPath src_basename mod_basename
    hi_fn  <- mkHiPath  src_basename mod_basename
 
-   let loc = ModLocation{ ml_hspp_file = Nothing,
-			  ml_hspp_buf  = Nothing,
-	   		  ml_hs_file   = Just (src_basename ++ '.':ext),
-			  ml_hi_file   = hi_fn,
-			  ml_obj_file  = obj_fn }
+   return (ModLocation{ ml_hs_file   = Just (src_basename ++ '.':ext),
+			ml_hi_file   = hi_fn,
+			ml_obj_file  = obj_fn })
 
-   addToFinderCache mod (loc, Nothing)
-   return loc
+hiOnlyModLocation :: FilePath -> String -> Suffix -> IO ModLocation
+hiOnlyModLocation path basename hisuf 
+ = do let full_basename = path++'/':basename
+      obj_fn <- mkObjPath full_basename basename
+      return ModLocation{    ml_hs_file   = Nothing,
+ 	        	     ml_hi_file   = full_basename ++ '.':hisuf,
+		 		-- Remove the .hi-boot suffix from
+		 		-- hi_file, if it had one.  We always
+		 		-- want the name of the real .hi file
+		 		-- in the ml_hi_file field.
+	   	             ml_obj_file  = obj_fn
+                  }
 
 -- | Constructs the filename of a .o file for a given source file.
 -- Does /not/ check whether the .o file exists
@@ -379,18 +385,6 @@ mkHiPath basename mod_basename
         return (hi_basename ++ '.':hisuf)
 
 
---------------------
-hiBootFilePath :: ModLocation -> IO FilePath
--- Return Foo.hi-boot, or Foo.hi-boot-n, as appropriate
-hiBootFilePath (ModLocation { ml_hi_file = hi_path })
-  = do	{ hi_ver_exists <- doesFileExist hi_boot_ver_path
-	; if hi_ver_exists then return hi_boot_ver_path
-			   else return hi_boot_path }
-  where
-    hi_boot_path       = replaceFilenameSuffix hi_path hiBootExt ;
-    hi_boot_ver_path   = replaceFilenameSuffix hi_path hiBootVerExt 
-
-
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 
 -- but there's no other obvious place for it
@@ -415,4 +409,31 @@ findLinkable mod locn
 
 dots_to_slashes = map (\c -> if c == '.' then '/' else c)
 
+
+-- -----------------------------------------------------------------------------
+-- Error messages
+
+cantFindError :: DynFlags -> Module -> FindResult -> SDoc
+cantFindError dflags mod_name find_result
+  = hang (ptext SLIT("Could not find module") <+> quotes (ppr mod_name) <> colon)
+       2 more_info
+  where
+    more_info
+      = case find_result of
+	    PackageHidden pkg 
+		-> ptext SLIT("it is a member of package") <+> ppr pkg <> comma
+		   <+> ptext SLIT("which is hidden")
+
+	    ModuleHidden pkg
+		-> ptext SLIT("it is hidden") <+> parens (ptext SLIT("in package")
+		   <+> ppr pkg)
+
+	    NotFound files
+		| verbosity dflags < 3 
+		-> ptext SLIT("use -v to see a list of the files searched for")
+		| otherwise 
+		-> hang (ptext SLIT("locations searched:")) 
+		      2 (vcat (map text files))
+
+	    Found _ _ -> panic "cantFindErr"
 \end{code}

@@ -34,7 +34,7 @@ import TypeRep		( Type(..), PredType(..), TyNote(..) )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
-			  TcTyVarSet, TcThetaType, 
+			  TcTyVarSet, TcThetaType, Expected(..), 
 			  SkolemInfo( GenSkol ), MetaDetails(..), 
 			  pprSkolemTyVar, isTauTy, isSigmaTy, mkFunTys, mkTyConApp,
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
@@ -80,9 +80,6 @@ Notes on holes
 %************************************************************************
 
 \begin{code}
-data Expected ty = Infer (TcRef ty)	-- The hole to fill in for type inference
-		 | Check ty		-- The type to check during type checking
-
 newHole = newMutVar (error "Empty hole in typechecker")
 
 tcInfer :: (Expected ty -> TcM a) -> TcM (a,ty)

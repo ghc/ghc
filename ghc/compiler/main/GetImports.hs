@@ -15,6 +15,7 @@ import Parser		( parseHeader )
 import Lexer		( P(..), ParseResult(..), mkPState )
 import HsSyn		( ImportDecl(..), HsModule(..) )
 import Module		( Module, mkModule )
+import PrelNames        ( gHC_PRIM )
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import SrcLoc		( Located(..), mkSrcLoc, unLoc )
 import FastString	( mkFastString )
@@ -49,7 +50,8 @@ getImports dflags buf filename = do
 			 | otherwise           = mkModule "Main"
 	        (src_idecls, ord_idecls) = partition isSourceIdecl (map unLoc imps)
 		source_imps   = map getImpMod src_idecls	
-		ordinary_imps = map getImpMod ord_idecls	
+		ordinary_imps = filter (/= gHC_PRIM) (map getImpMod ord_idecls)
+		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
 	      in
 	      return (source_imps, ordinary_imps, mod_name)
   

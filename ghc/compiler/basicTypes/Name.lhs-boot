@@ -1,0 +1,5 @@
+\begin{code}
+module Name where
+
+data Name
+\end{code}

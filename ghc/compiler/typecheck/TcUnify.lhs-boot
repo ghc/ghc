@@ -1,0 +1,10 @@
+\begin{code}
+module TcUnify where
+import TcType	( TcTauType )
+import TcRnTypes( TcM )
+
+-- This boot file exists only to tie the knot between
+--		TcUnify and TcSimplify
+
+unifyTauTy :: TcTauType -> TcTauType -> TcM ()
+\end{code}

@@ -177,11 +177,10 @@ static_flags =
 
       ------- primary modes ------------------------------------------------
   ,  ( "M"		, PassFlag (setMode DoMkDependHS))
-  ,  ( "E"		, PassFlag (setMode (StopBefore Hsc)))
+  ,  ( "E"		, PassFlag (setMode (StopBefore anyHsc)))
   ,  ( "C"		, PassFlag (\f -> do setMode (StopBefore HCc) f
-					     setLang HscC))
+					     setTarget HscC))
   ,  ( "S"		, PassFlag (setMode (StopBefore As)))
-  ,  ( "c"		, PassFlag (setMode (StopBefore Ln)))
   ,  ( "-make"		, PassFlag (setMode DoMake))
   ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
   ,  ( "-mk-dll"	, PassFlag (setMode DoMkDLL))
@@ -189,7 +188,7 @@ static_flags =
 
 	-- -fno-code says to stop after Hsc but don't generate any code.
   ,  ( "fno-code"	, PassFlag (\f -> do setMode (StopBefore HCc) f
-				             setLang HscNothing
+				             setTarget HscNothing
 				             writeIORef v_Recomp False))
 
 	------- GHCi -------------------------------------------------------
@@ -241,8 +240,8 @@ static_flags =
   ,  ( "odir"		, HasArg (writeIORef v_Output_dir  . Just) )
   ,  ( "o"		, SepArg (writeIORef v_Output_file . Just) )
   ,  ( "osuf"		, HasArg (writeIORef v_Object_suf) )
-  ,  ( "hcsuf"		, HasArg (writeIORef v_HC_suf      . Just) )
-  ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf) )
+  ,  ( "hcsuf"		, HasArg (writeIORef v_HC_suf    ) )
+  ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf    ) )
   ,  ( "hidir"		, HasArg (writeIORef v_Hi_dir . Just) )
   ,  ( "buildtag"	, HasArg (writeIORef v_Build_tag) )
   ,  ( "tmpdir"		, HasArg setTmpDir)
@@ -298,7 +297,8 @@ static_flags =
   ,  ( "optdll"		, HasArg (add v_Opt_dll) )
 
 	----- Linker --------------------------------------------------------
-  ,  ( "no-link"	, NoArg (writeIORef v_NoLink True) )
+  ,  ( "c"		, NoArg (writeIORef v_NoLink True) )
+  ,  ( "no-link"	, NoArg (writeIORef v_NoLink True) )	-- Deprecated
   ,  ( "static" 	, NoArg (writeIORef v_Static True) )
   ,  ( "dynamic"        , NoArg (writeIORef v_Static False) )
   ,  ( "rdynamic"       , NoArg (return ()) ) -- ignored for compat w/ gcc
@@ -429,10 +429,10 @@ dynamic_flags = [
 
         ------ Compiler flags -----------------------------------------------
 
-  ,  ( "fasm",		AnySuffix (\_ -> setLang HscAsm) )
-  ,  ( "fvia-c",	NoArg (setLang HscC) )
-  ,  ( "fvia-C",	NoArg (setLang HscC) )
-  ,  ( "filx",		NoArg (setLang HscILX) )
+  ,  ( "fasm",		AnySuffix (\_ -> setTarget HscAsm) )
+  ,  ( "fvia-c",	NoArg (setTarget HscC) )
+  ,  ( "fvia-C",	NoArg (setTarget HscC) )
+  ,  ( "filx",		NoArg (setTarget HscILX) )
 
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
@@ -549,16 +549,16 @@ addImportPath p  = do
 
 -- we can only switch between HscC, HscAsmm, and HscILX with dynamic flags 
 -- (-fvia-C, -fasm, -filx respectively).
-setLang l = updDynFlags (\dfs -> case hscLang dfs of
-					HscC   -> dfs{ hscLang = l }
-					HscAsm -> dfs{ hscLang = l }
-					HscILX -> dfs{ hscLang = l }
+setTarget l = updDynFlags (\dfs -> case hscTarget dfs of
+					HscC   -> dfs{ hscTarget = l }
+					HscAsm -> dfs{ hscTarget = l }
+					HscILX -> dfs{ hscTarget = l }
 					_      -> dfs)
 
 setOptLevel :: Int -> IO ()
 setOptLevel n 
    = do dflags <- readIORef v_DynFlags
-	if hscLang dflags == HscInterpreted && n > 0
+	if hscTarget dflags == HscInterpreted && n > 0
 	  then putStr "warning: -O conflicts with --interactive; -O ignored.\n"
 	  else writeIORef v_DynFlags (updOptLevel n dflags)
 
@@ -736,8 +736,8 @@ showGhcUsage = do
   (ghc_usage_path,ghci_usage_path) <- getUsageMsgPaths
   mode <- readIORef v_GhcMode
   let usage_path 
-	| mode == DoInteractive  = ghci_usage_path
-	| otherwise		 = ghc_usage_path
+	| DoInteractive <- mode = ghci_usage_path
+	| otherwise		= ghc_usage_path
   usage <- readFile usage_path
   dump usage
   exitWith ExitSuccess

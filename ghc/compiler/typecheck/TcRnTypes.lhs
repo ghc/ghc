@@ -45,7 +45,7 @@ import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
 			  ArithSeqInfo, DictBinds, LHsBinds )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
-			  GenAvailInfo(..), AvailInfo,
+			  GenAvailInfo(..), AvailInfo, HscSource(..),
 			  availName, IsBootInterface, Deprecations )
 import Packages		( PackageId )
 import Type		( Type, TvSubstEnv, pprParendType )
@@ -129,6 +129,9 @@ data Env gbl lcl	-- Changes as we move into an expression
 data TcGblEnv
   = TcGblEnv {
 	tcg_mod     :: Module,		-- Module being compiled
+	tcg_src     :: HscSource,	-- What kind of module 
+					-- (regular Haskell, hs-boot, ext-core)
+
 	tcg_rdr_env :: GlobalRdrEnv,	-- Top level envt; used during renaming
 	tcg_default :: Maybe [Type],	-- Types used for defaulting
 					-- Nothing => no 'default' decl

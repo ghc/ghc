@@ -162,12 +162,25 @@ rnTopBinds :: LHsBinds RdrName
 -- the top level scope resolution does that
 
 rnTopBinds mbinds sigs
- =  bindPatSigTyVars (collectSigTysFromHsBinds (bagToList mbinds)) $ \ _ -> 
-	-- Hmm; by analogy with Ids, this doesn't look right
-	-- Top-level bound type vars should really scope over 
-	-- everything, but we only scope them over the other bindings
+ =  do	{ is_boot <- tcIsHsBoot
+	; if is_boot then
+		rnHsBoot mbinds sigs
+	  else  bindPatSigTyVars (collectSigTysFromHsBinds (bagToList mbinds)) $ \ _ -> 
+			-- Hmm; by analogy with Ids, this doesn't look right
+			-- Top-level bound type vars should really scope over 
+			-- everything, but we only scope them over the other bindings
+		rnBinds TopLevel mbinds sigs }
 
-    rnBinds TopLevel mbinds sigs
+rnHsBoot :: LHsBinds RdrName
+	   -> [LSig RdrName]
+	   -> RnM ([HsBindGroup Name], DefUses)
+-- A hs-boot file has no bindings. 
+-- Return a single HsBindGroup with empty binds and renamed signatures
+rnHsBoot mbinds sigs
+  = do	{ checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
+	; sigs' <- renameSigs sigs
+	; return ([HsBindGroup emptyLHsBinds sigs' NonRecursive], 
+		  usesOnly (hsSigsFVs sigs')) }
 \end{code}
 
 
@@ -482,7 +495,7 @@ checkSigs ok_sig sigs
 -- Doesn't seem worth much trouble to sort this.
 
 renameSigs :: [LSig RdrName] -> RnM [LSig Name]
-renameSigs sigs = mappM (wrapLocM renameSig) (filter (not . isFixitySig . unLoc) sigs)
+renameSigs sigs = mappM (wrapLocM renameSig) (filter (not . isFixityLSig) sigs)
 	-- Remove fixity sigs which have been dealt with already
 
 renameSig :: Sig RdrName -> RnM (Sig Name)
@@ -536,5 +549,9 @@ missingSigWarn var
 
 methodBindErr mbind
  =  hang (ptext SLIT("Pattern bindings (except simple variables) not allowed in instance declarations"))
-       4 (ppr mbind)
+       2 (ppr mbind)
+
+bindsInHsBootFile mbinds
+  = hang (ptext SLIT("Bindings in hs-boot files are not allowed"))
+       2 (ppr mbinds)
 \end{code}

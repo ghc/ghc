@@ -94,6 +94,7 @@ readBinIface hi_path = getBinFileWithDict hi_path
 instance Binary ModIface where
    put_ bh (ModIface {
 		 mi_module    = mod,
+		 mi_boot      = is_boot,
 		 mi_mod_vers  = mod_vers,
 		 mi_package   = _, -- we ignore the package on output
 		 mi_orphan    = orphan,
@@ -111,6 +112,7 @@ instance Binary ModIface where
 	build_tag <- readIORef v_Build_tag
 	put  bh build_tag
 	put_ bh mod
+	put_ bh is_boot
 	put_ bh mod_vers
 	put_ bh orphan
 	lazyPut bh deps
@@ -145,7 +147,7 @@ instance Binary ModIface where
 		++ build_tag ++ ", found " ++ check_way))
 
 	mod_name  <- get bh
-
+	is_boot   <- get bh
 	mod_vers  <- get bh
 	orphan    <- get bh
 	deps	  <- lazyGet bh
@@ -161,8 +163,8 @@ instance Binary ModIface where
 	return (ModIface {
 		 mi_package   = HomePackage, -- to be filled in properly later
 		 mi_module    = mod_name,
+		 mi_boot      = is_boot,
 		 mi_mod_vers  = mod_vers,
-		 mi_boot      = False,		-- Binary interfaces are never .hi-boot files!
 		 mi_orphan    = orphan,
 		 mi_deps      = deps,
 		 mi_usages    = usages,

@@ -309,7 +309,7 @@ registerPackage :: FilePath
 		-> IO ()
 registerPackage input defines db_stack auto_ghci_libs update force = do
   let
-	db_to_operate_on = head db_stack
+	db_to_operate_on = my_head "db" db_stack
 	db_filename	 = fst db_to_operate_on
   --
   checkConfigAccess db_filename
@@ -541,7 +541,7 @@ checkDuplicates db_stack pkg update = do
   when (not update && exposed pkg && not (null exposed_pkgs_with_same_name)) $
 	die ("trying to register " ++ showPackageId pkgid 
 		  ++ " as exposed, but "
-		  ++ showPackageId (package (head exposed_pkgs_with_same_name))
+		  ++ showPackageId (package (my_head "when" exposed_pkgs_with_same_name))
 		  ++ " is also exposed.")
 
 
@@ -633,9 +633,10 @@ updatePackageDB db_stack pkgs new_pkg = do
 	resolveDep pkgid
 	   | realVersion pkgid  = pkgid
 	   | otherwise		= lookupDep (pkgName pkgid)
-	
+--	   = pkgid
+
 	lookupDep name
-	   = head [ pid | p <- concat (map snd db_stack), 
+	   = my_head "dep" [ pid | p <- concat (map snd db_stack), 
 			  let pid = package p,
 			  pkgName pid == name ]
 
@@ -768,7 +769,7 @@ oldRunit clis = do
 
   let auto_ghci_libs = any isAuto clis 
 	 where isAuto OF_AutoGHCiLibs = True; isAuto _ = False
-      input_file = head ([ f | (OF_Input f) <- clis] ++ ["-"])
+      input_file = my_head "inp" ([ f | (OF_Input f) <- clis] ++ ["-"])
 
       force = OF_Force `elem` clis
       
@@ -785,6 +786,9 @@ oldRunit clis = do
 	| otherwise   -> mapM_ (describeField db_stack (pkgNameToId p)) fields
     _            -> do prog <- getProgramName
 		       die (usageInfo (usageHeader prog) flags)
+
+my_head s [] = error s
+my_head s (x:xs) = x
 
 -- ---------------------------------------------------------------------------
 

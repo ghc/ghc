@@ -9,6 +9,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..), DynFlags(..), dopt, opt_SccProfilingOn )
+import DriverPhases	( isHsBoot )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
 			  Dependencies(..), TypeEnv, IsBootInterface )
 import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
@@ -59,6 +60,7 @@ deSugar :: HscEnv -> TcGblEnv -> IO (Bag WarnMsg, Maybe ModGuts)
 
 deSugar hsc_env 
         tcg_env@(TcGblEnv { tcg_mod       = mod,
+			    tcg_src	  = hsc_src,
 		    	    tcg_type_env  = type_env,
 		    	    tcg_imports   = imports,
 		    	    tcg_exports   = exports,
@@ -146,6 +148,7 @@ deSugar hsc_env
 
 	     mod_guts = ModGuts {	
 		mg_module   = mod,
+		mg_boot	    = isHsBoot hsc_src,
 		mg_exports  = exports,
 		mg_deps	    = deps,
 		mg_usages   = usages,

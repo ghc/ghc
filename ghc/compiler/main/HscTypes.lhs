@@ -11,6 +11,11 @@ module HscTypes (
 	ModDetails(..),	
 	ModGuts(..), ModImports(..), ForeignStubs(..),
 
+	ModSummary(..), showModMsg,
+	msHsFilePath, msHiFilePath, msObjFilePath, 
+
+	HscSource(..), isHsBoot, hscSourceString,	-- Re-exported from DriverPhases
+	
 	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
 	hptInstances, hptRules,
 
@@ -81,7 +86,7 @@ import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
 import Packages		( PackageIdH, PackageId )
 import CmdLineOpts	( DynFlags )
-
+import DriverPhases	( HscSource(..), isHsBoot, hscSourceString )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
 
@@ -89,13 +94,14 @@ import IfaceSyn		( IfaceInst, IfaceRule, IfaceDecl(ifName) )
 
 import FiniteMap	( FiniteMap )
 import CoreSyn		( IdCoreRule )
-import Maybes		( orElse, fromJust )
+import Maybes		( orElse, fromJust, expectJust )
 import Outputable
 import SrcLoc		( SrcSpan )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 
 import DATA_IOREF	( IORef, readIORef )
+import StringBuffer	( StringBuffer )
 import Time		( ClockTime )
 \end{code}
 
@@ -324,6 +330,7 @@ data ModDetails
 data ModGuts
   = ModGuts {
         mg_module   :: !Module,
+	mg_boot     :: IsBootInterface, -- Whether it's an hs-boot module
 	mg_exports  :: !NameSet,	-- What it exports
 	mg_deps	    :: !Dependencies,	-- What is below it, directly or otherwise
 	mg_dir_imps :: ![Module],	-- Directly-imported modules; used to
@@ -865,6 +872,72 @@ addInstsToPool insts new_insts
     add (cls,new_inst) insts = extendNameEnv_C combine insts cls [new_inst]
 	where
 	  combine old_insts _ = new_inst : old_insts
+\end{code}
+
+
+%************************************************************************
+%*									*
+		The ModSummary type
+	A ModSummary is a node in the compilation manager's
+	dependency graph, and it's also passed to hscMain
+%*									*
+%************************************************************************
+
+The nodes of the module graph are
+	EITHER a regular Haskell source module
+	OR     a hi-boot source module
+
+\begin{code}
+data ModSummary
+   = ModSummary {
+        ms_mod       :: Module,			-- Name of the module
+	ms_hsc_src   :: HscSource,		-- Source is Haskell, hs-boot, external core
+        ms_location  :: ModLocation,		-- Location
+        ms_hs_date   :: ClockTime,		-- Timestamp of summarised file
+        ms_srcimps   :: [Module],		-- Source imports
+        ms_imps      :: [Module],		-- Non-source imports
+        ms_hspp_file :: Maybe FilePath,		-- Filename of preprocessed source,
+						-- once we have preprocessed it.
+	ms_hspp_buf  :: Maybe StringBuffer	-- The actual preprocessed source, maybe.
+     }
+
+-- The ModLocation contains both the original source filename and the
+-- filename of the cleaned-up source file after all preprocessing has been
+-- done.  The point is that the summariser will have to cpp/unlit/whatever
+-- all files anyway, and there's no point in doing this twice -- just 
+-- park the result in a temp file, put the name of it in the location,
+-- and let @compile@ read from that file on the way back up.
+
+-- The ModLocation is stable over successive up-sweeps in GHCi, wheres
+-- the ms_hs_date and imports can, of course, change
+
+msHsFilePath, msHiFilePath, msObjFilePath :: ModSummary -> FilePath
+msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
+msHiFilePath  ms = ml_hi_file  (ms_location ms)
+msObjFilePath ms = ml_obj_file (ms_location ms)
+
+
+instance Outputable ModSummary where
+   ppr ms
+      = sep [text "ModSummary {",
+             nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
+                          text "ms_mod =" <+> ppr (ms_mod ms) 
+				<> text (hscSourceString (ms_hsc_src ms)) <> comma,
+                          text "ms_imps =" <+> ppr (ms_imps ms),
+                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
+             char '}'
+            ]
+
+showModMsg :: Bool -> ModSummary -> String
+showModMsg use_object mod_summary
+  = showSDoc (hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
+	            char '(', text (msHsFilePath mod_summary) <> comma,
+		    if use_object then text (msObjFilePath mod_summary)
+			      else text "interpreted",
+		    char ')'])
+ where 
+    mod     = ms_mod mod_summary 
+    mod_str = moduleUserString mod ++ hscSourceString (ms_hsc_src mod_summary)
 \end{code}
 
 

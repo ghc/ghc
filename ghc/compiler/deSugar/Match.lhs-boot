@@ -1,0 +1,35 @@
+\begin{code}
+module Match where
+import Var	( Id )
+import TcType	( TcType )
+import DsMonad	( DsM, DsMatchContext, EquationInfo, MatchResult )
+import CoreSyn	( CoreExpr )
+import HsSyn	( LPat, HsMatchContext, MatchGroup )
+import Name	( Name )
+
+match 	:: [Id]
+        -> TcType
+	-> [EquationInfo]
+	-> DsM MatchResult
+
+matchWrapper
+	:: HsMatchContext Name
+        -> MatchGroup Id
+	-> DsM ([Id], CoreExpr)
+
+matchSimply
+	:: CoreExpr
+	-> HsMatchContext Name
+	-> LPat Id
+	-> CoreExpr
+	-> CoreExpr
+	-> DsM CoreExpr
+
+matchSinglePat
+	:: CoreExpr
+	-> DsMatchContext
+	-> LPat Id
+        -> TcType
+	-> MatchResult
+	-> DsM MatchResult
+\end{code}

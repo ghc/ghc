@@ -1,0 +1,9 @@
+\begin{code}
+module TyCon where
+
+data TyCon
+
+isTupleTyCon	    :: TyCon -> Bool
+isUnboxedTupleTyCon :: TyCon -> Bool
+isFunTyCon	    :: TyCon -> Bool
+\end{code}

@@ -12,9 +12,9 @@ import IOEnv		-- Re-export all
 
 import HsSyn		( emptyLHsBinds )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
-			  TyThing, TypeEnv, emptyTypeEnv,
+			  TyThing, TypeEnv, emptyTypeEnv, HscSource(..), isHsBoot,
 			  ExternalPackageState(..), HomePackageTable,
-			  Deprecs(..), FixityEnv, FixItem,
+			  Deprecs(..), FixityEnv, FixItem, 
 			  GhciMode, lookupType, unQualInScope )
 import Module		( Module, unitModuleEnv )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
@@ -62,13 +62,14 @@ ioToTcRn = ioToIOEnv
 
 \begin{code}
 initTc :: HscEnv
+       -> HscSource
        -> Module 
        -> TcM r
        -> IO (Messages, Maybe r)
 		-- Nothing => error thrown by the thing inside
 		-- (error messages should have been printed already)
 
-initTc hsc_env mod do_this
+initTc hsc_env hsc_src mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
       	tvs_var      <- newIORef emptyVarSet ;
 	type_env_var <- newIORef emptyNameEnv ;
@@ -79,6 +80,7 @@ initTc hsc_env mod do_this
       	let {
 	     gbl_env = TcGblEnv {
 		tcg_mod      = mod,
+		tcg_src	     = hsc_src,
 		tcg_rdr_env  = emptyGlobalRdrEnv,
 		tcg_fix_env  = emptyNameEnv,
 		tcg_default  = Nothing,
@@ -134,13 +136,13 @@ initTc hsc_env mod do_this
 	-- list, and there are no bindings in M, we don't bleat 
 	-- "unknown module M".
 
-initTcPrintErrors
+initTcPrintErrors	-- Used from the interactive loop only
        :: HscEnv
        -> Module 
        -> TcM r
        -> IO (Maybe r)
 initTcPrintErrors env mod todo = do
-  (msgs, res) <- initTc env mod todo
+  (msgs, res) <- initTc env HsSrcFile mod todo
   printErrorsAndWarnings msgs
   return res
 
@@ -346,6 +348,9 @@ dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv ;
 \begin{code}
 getModule :: TcRn Module
 getModule = do { env <- getGblEnv; return (tcg_mod env) }
+
+tcIsHsBoot :: TcRn Bool
+tcIsHsBoot = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }
 
 getGlobalRdrEnv :: TcRn GlobalRdrEnv
 getGlobalRdrEnv = do { env <- getGblEnv; return (tcg_rdr_env env) }

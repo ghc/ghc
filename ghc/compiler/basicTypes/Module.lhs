@@ -15,7 +15,7 @@ module Module
     , pprModule			-- :: ModuleName -> SDoc
 
     , ModLocation(..),
-    , showModMsg
+    , addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn,
 
     , moduleString		-- :: ModuleName -> EncodedString
     , moduleUserString		-- :: ModuleName -> UserString
@@ -30,7 +30,7 @@ module Module
     , delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv
     , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
     , moduleEnvElts, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv
-    , extendModuleEnv_C
+    , extendModuleEnv_C, filterModuleEnv,
 
     , ModuleSet, emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
 
@@ -40,11 +40,9 @@ module Module
 import OccName
 import Outputable
 import Unique		( Uniquable(..) )
-import Maybes		( expectJust )
 import UniqFM
 import UniqSet
 import Binary
-import StringBuffer	( StringBuffer )
 import FastString
 \end{code}
 
@@ -58,14 +56,8 @@ import FastString
 data ModLocation
    = ModLocation {
         ml_hs_file   :: Maybe FilePath,
-		-- the source file, if we have one.  Package modules
+		-- The source file, if we have one.  Package modules
 		-- probably don't have source files.
-
-        ml_hspp_file :: Maybe FilePath,
-		-- filename of preprocessed source, if we have
-		-- preprocessed it.
-	ml_hspp_buf  :: Maybe StringBuffer,
-		-- the actual preprocessed source, maybe.
 
         ml_hi_file   :: FilePath,
 		-- Where the .hi file is, whether or not it exists
@@ -81,18 +73,6 @@ data ModLocation
 
 instance Outputable ModLocation where
    ppr = text . show
-
--- Rather a gruesome function to have in Module
-
-showModMsg :: Bool -> Module -> ModLocation -> String
-showModMsg use_object mod location =
-    mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
-    ++" ( " ++ expectJust "showModMsg" (ml_hs_file location) ++ ", "
-    ++ (if use_object
-	  then ml_obj_file location
-	  else "interpreted")
-    ++ " )"
- where mod_str = moduleUserString mod
 \end{code}
 
 For a module in another package, the hs_file and obj_file
@@ -102,6 +82,23 @@ The locations specified by a ModLocation may or may not
 correspond to actual files yet: for example, even if the object
 file doesn't exist, the ModLocation still contains the path to
 where the object file will reside if/when it is created.
+
+\begin{code}
+addBootSuffix :: FilePath -> FilePath
+-- Add the "-boot" suffix to .hs, .hi and .o files
+addBootSuffix path = path ++ "-boot"
+
+addBootSuffix_maybe :: Bool -> FilePath -> FilePath
+addBootSuffix_maybe is_boot path
+ | is_boot   = addBootSuffix path
+ | otherwise = path
+
+addBootSuffixLocn :: ModLocation -> ModLocation
+addBootSuffixLocn locn
+  = locn { ml_hs_file  = fmap addBootSuffix (ml_hs_file locn)
+	 , ml_hi_file  = addBootSuffix (ml_hi_file locn)
+	 , ml_obj_file = addBootSuffix (ml_obj_file locn) }
+\end{code}
 
 
 %************************************************************************
@@ -188,7 +185,9 @@ lookupModuleEnv      :: ModuleEnv a -> Module     -> Maybe a
 lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
 elemModuleEnv        :: Module -> ModuleEnv a -> Bool
 foldModuleEnv        :: (a -> b -> b) -> b -> ModuleEnv a -> b
+filterModuleEnv      :: (a -> Bool) -> ModuleEnv a -> ModuleEnv a
 
+filterModuleEnv	    = filterUFM
 elemModuleEnv       = elemUFM
 extendModuleEnv     = addToUFM
 extendModuleEnv_C   = addToUFM_C

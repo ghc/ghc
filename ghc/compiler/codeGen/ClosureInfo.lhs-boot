@@ -1,0 +1,6 @@
+\begin{code}
+module ClosureInfo where
+
+data LambdaFormInfo
+data ClosureInfo
+\end{code}

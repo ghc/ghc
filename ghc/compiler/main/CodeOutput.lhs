@@ -80,7 +80,7 @@ codeOutput dflags this_mod foreign_stubs deps flat_abstractC
 	; showPass dflags "CodeOutput"
 	; let filenm = dopt_OutName dflags 
 	; stubs_exist <- outputForeignStubs dflags foreign_stubs
-	; case dopt_HscLang dflags of {
+	; case dopt_HscTarget dflags of {
              HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
              HscC           -> outputC dflags filenm flat_abstractC stubs_exist

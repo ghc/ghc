@@ -9,7 +9,7 @@ module IfaceType (
 	IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr,
 
-	IfaceExtName(..), mkIfaceExtName, ifaceTyConName, 
+	IfaceExtName(..), mkIfaceExtName, ifaceTyConName, ifPrintUnqual,
 
 	-- Conversion from Type -> IfaceType
 	toIfaceType, toIfacePred, toIfaceContext, 
@@ -65,6 +65,11 @@ data IfaceExtName
 
 mkIfaceExtName name = ExtPkg (nameModule name) (nameOccName name)
 	-- Local helper for wired-in names
+
+ifPrintUnqual :: PrintUnqualified -> IfaceExtName -> Bool
+ifPrintUnqual print_unqual (ExtPkg  mod occ)   = print_unqual mod occ
+ifPrintUnqual print_unqual (HomePkg mod occ _) = print_unqual mod occ
+ifPrintUnqual print_unqual other	       = True
 \end{code}
 
 

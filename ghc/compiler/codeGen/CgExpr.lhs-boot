@@ -1,0 +1,7 @@
+\begin{code}
+module CgExpr where
+import StgSyn( StgExpr )
+import CgMonad( Code )
+
+cgExpr :: StgExpr -> Code
+\end{code}

@@ -219,9 +219,18 @@ tcDeriving tycl_decls
 		-- Add the newtype-derived instances to the inst env
 		-- before tacking the "ordinary" ones
 
+	; let inst_info  = newtype_inst_info ++ ordinary_inst_info
+
+	-- If we are compiling a hs-boot file, 
+	-- don't generate any derived bindings
+	; is_boot <- tcIsHsBoot
+	; if is_boot then
+		return (inst_info, [])
+	  else do
+	{
+
 	-- Generate the generic to/from functions from each type declaration
 	; gen_binds <- mkGenericBinds tycl_decls
-	; let inst_info  = newtype_inst_info ++ ordinary_inst_info
 
 	-- Rename these extra bindings, discarding warnings about unused bindings etc
 	-- Set -fglasgow exts so that we can have type signatures in patterns,
@@ -240,7 +249,7 @@ tcDeriving tycl_decls
 	  	   (ddump_deriving inst_info rn_binds))
 
 	; returnM (inst_info, rn_binds)
-	}
+	}}
   where
     ddump_deriving :: [InstInfo] -> [HsBindGroup Name] -> SDoc
     ddump_deriving inst_infos extra_binds

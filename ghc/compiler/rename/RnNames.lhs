@@ -14,8 +14,8 @@ module RnNames (
 
 import CmdLineOpts	( DynFlag(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
-			  ForeignDecl(..), HsGroup(..),
-			  collectGroupBinders, tyClDeclNames 
+			  ForeignDecl(..), HsGroup(..), HsBindGroup(..), 
+			  Sig(..), collectGroupBinders, tyClDeclNames 
 			)
 import RnEnv
 import IfaceEnv		( lookupOrig, newGlobalBinder )
@@ -380,12 +380,21 @@ getLocalDeclBinders mod (HsGroup {hs_valds = val_decls,
 	-- an export indicator because they are all implicitly exported.
 
     mappM new_tc     tycl_decls				`thenM` \ tc_avails ->
-    mappM new_simple (for_hs_bndrs ++ val_hs_bndrs)	`thenM` \ simple_avails ->
-    returnM (tc_avails ++ simple_avails)
-  where
-    new_simple rdr_name = newTopSrcBinder mod Nothing rdr_name `thenM` \ name ->
-			  returnM (Avail name)
+	
+	-- In a hs-boot file, the value binders come from the
+	-- *signatures*, and there should be no foreign binders 
+    tcIsHsBoot						`thenM` \ is_hs_boot ->
+    let val_bndrs | is_hs_boot = sig_hs_bndrs
+		  | otherwise  = for_hs_bndrs ++ val_hs_bndrs
+    in
+    mappM new_simple val_bndrs				`thenM` \ names ->
 
+    returnM (tc_avails ++ map Avail names)
+  where
+    new_simple rdr_name = newTopSrcBinder mod Nothing rdr_name
+
+    sig_hs_bndrs = [nm | HsBindGroup _ lsigs _  <- val_decls, 
+			 L _ (Sig nm _) <- lsigs]
     val_hs_bndrs = collectGroupBinders val_decls
     for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
 

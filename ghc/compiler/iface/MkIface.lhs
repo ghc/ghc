@@ -4,7 +4,7 @@
 
 \begin{code}
 module MkIface ( 
-	showIface, 	-- Print the iface in Foo.hi
+	pprModIface, showIface, 	-- Print the iface in Foo.hi
 
 	mkUsageInfo, 	-- Construct the usage info for a module
 
@@ -189,6 +189,7 @@ import HscTypes		( ModIface(..), TyThing(..),
 			  ModGuts(..), ModGuts, IfaceExport,
 			  GhciMode(..), HscEnv(..), hscEPS,
 			  Dependencies(..), FixItem(..), 
+			  ModSummary(..), msHiFilePath, 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
 			  typeEnvElts, 
 			  GenAvailInfo(..), availName, 
@@ -258,6 +259,7 @@ mkIface :: HscEnv
 
 mkIface hsc_env location maybe_old_iface 
 	guts@ModGuts{ mg_module = this_mod,
+		      mg_boot   = is_boot,
 		      mg_usages = usages,
 		      mg_deps   = deps,
 		      mg_exports = exports,
@@ -295,7 +297,7 @@ mkIface hsc_env location maybe_old_iface
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
 			mi_package  = HomePackage,
-			mi_boot     = False,
+			mi_boot     = is_boot,
 			mi_deps     = deps,
 			mi_usages   = usages,
 			mi_exports  = mkIfaceExports exports,
@@ -340,10 +342,10 @@ mkIface hsc_env location maybe_old_iface
      r1 `le_rule` r2 = ifRuleName r1 <= ifRuleName r2
      i1 `le_inst` i2 = ifDFun     i1 <= ifDFun     i2
 
-     dflags    = hsc_dflags hsc_env
-     ghci_mode = hsc_mode hsc_env
+     dflags    	  = hsc_dflags hsc_env
+     ghci_mode 	  = hsc_mode hsc_env
+     omit_prags   = dopt Opt_OmitInterfacePragmas dflags
      hi_file_path = ml_hi_file location
-     omit_prags = dopt Opt_OmitInterfacePragmas dflags
 
 					      
 mustExposeThing :: NameSet -> TyThing -> Bool
@@ -799,21 +801,20 @@ mkIfaceExports exports
 
 \begin{code}
 checkOldIface :: HscEnv
-	      -> Module
-	      -> FilePath		-- Where the interface file is
+	      -> ModSummary
 	      -> Bool 			-- Source unchanged
 	      -> Maybe ModIface 	-- Old interface from compilation manager, if any
 	      -> IO (RecompileRequired, Maybe ModIface)
 
-checkOldIface hsc_env mod iface_path source_unchanged maybe_iface
+checkOldIface hsc_env mod_summary source_unchanged maybe_iface
   = do	{ showPass (hsc_dflags hsc_env) 
-	           ("Checking old interface for " ++ moduleUserString mod) ;
+	           ("Checking old interface for " ++ moduleUserString (ms_mod mod_summary)) ;
 
 	; initIfaceCheck hsc_env $
-	  check_old_iface mod iface_path source_unchanged maybe_iface
+	  check_old_iface mod_summary source_unchanged maybe_iface
      }
 
-check_old_iface this_mod iface_path source_unchanged maybe_iface
+check_old_iface mod_summary source_unchanged maybe_iface
  = 	-- CHECK WHETHER THE SOURCE HAS CHANGED
     ifM (not source_unchanged)
 	(traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
@@ -835,7 +836,10 @@ check_old_iface this_mod iface_path source_unchanged maybe_iface
 
 	-- Try and read the old interface for the current module
 	-- from the .hi file left from the last time we compiled it
-    readIface this_mod iface_path False		`thenM` \ read_result ->
+    let
+	iface_path = msHiFilePath mod_summary
+    in
+    readIface (ms_mod mod_summary) iface_path False	`thenM` \ read_result ->
     case read_result of {
        Failed err ->	-- Old interface file not found, or garbled; give up
 		   traceIf (text "FYI: cannot read old interface file:"
@@ -1016,8 +1020,8 @@ pprModIface :: ModIface -> SDoc
 pprModIface iface
  = vcat [ ptext SLIT("interface")
 		<+> ppr_package (mi_package iface)
-		<+> ppr (mi_module iface) <+> ppr (mi_mod_vers iface)
-		<+> pp_sub_vers
+		<+> ppr (mi_module iface) <+> pp_boot 
+		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
 		<+> int opt_HiVersion
 		<+> ptext SLIT("where")
@@ -1031,6 +1035,8 @@ pprModIface iface
 	, pprDeprecs (mi_deprecs iface)
 	]
   where
+    pp_boot | mi_boot iface = ptext SLIT("[boot]")
+	    | otherwise     = empty
     ppr_package HomePackage = empty
     ppr_package (ExtPackage id) = doubleQuotes (ppr id)
 

@@ -1,0 +1,8 @@
+\begin{code}
+module DataCon where
+import Name( Name )
+
+data DataCon
+dataConName      :: DataCon -> Name
+isVanillaDataCon :: DataCon -> Bool
+\end{code}

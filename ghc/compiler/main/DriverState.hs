@@ -43,7 +43,7 @@ data GhcMode
   | DoInteractive			-- ghc --interactive
   | DoLink				-- [ the default ]
   | DoEval String			-- ghc -e
-  deriving (Eq,Show)
+  deriving (Show)
 
 GLOBAL_VAR(v_GhcMode,     DoLink, GhcMode)
 GLOBAL_VAR(v_GhcModeFlag, "",     String)
@@ -57,6 +57,24 @@ setMode m flag = do
           ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
   writeIORef v_GhcMode m
   writeIORef v_GhcModeFlag flag
+
+isInteractiveMode, isInterpretiveMode     :: GhcMode -> Bool
+isMakeMode, isLinkMode, isCompManagerMode :: GhcMode -> Bool
+
+isInteractiveMode DoInteractive = True
+isInteractiveMode _		= False
+
+-- isInterpretiveMode: byte-code compiler involved
+isInterpretiveMode DoInteractive = True
+isInterpretiveMode (DoEval _)    = True
+isInterpretiveMode _             = False
+
+isMakeMode DoMake = True
+isMakeMode _      = False
+
+isLinkMode DoLink  = True
+isLinkMode DoMkDLL = True
+isLinkMode _       = False
 
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
@@ -157,8 +175,8 @@ verifyOutputFiles = do
                              show dir ++ " does not exist (used with " ++ 
 			     show flg ++ " option.)"))
 
-GLOBAL_VAR(v_Object_suf,  phaseInputExt Ln, String)
-GLOBAL_VAR(v_HC_suf,  	  Nothing, Maybe String)
+GLOBAL_VAR(v_Object_suf,  phaseInputExt StopLn, String)
+GLOBAL_VAR(v_HC_suf,  	  phaseInputExt HCc,    String)
 GLOBAL_VAR(v_Hi_dir,      Nothing, Maybe String)
 GLOBAL_VAR(v_Hi_suf,      "hi",	   String)
 
