@@ -31,6 +31,7 @@ module MkId (
 #include "HsVersions.h"
 
 
+import BasicTypes	( Arity )
 import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
 			  intPrimTy, realWorldStatePrimTy
 			)
@@ -151,10 +152,22 @@ mkDataConId work_name data_con
     tycon = dataConTyCon data_con
     cpr_info | isProductTyCon tycon && 
 	       isDataTyCon tycon    &&
-	       arity > 0 		= ReturnsCPR
+	       arity > 0 	    &&
+	       arity <= mAX_CPR_SIZE	= ReturnsCPR
 	     | otherwise 		= NoCPRInfo
 	-- ReturnsCPR is only true for products that are real data types;
 	-- that is, not unboxed tuples or newtypes
+
+mAX_CPR_SIZE :: Arity
+mAX_CPR_SIZE = 10
+-- We do not treat very big tuples as CPR-ish:
+--	a) for a start we get into trouble because there aren't 
+--	   "enough" unboxed tuple types (a tiresome restriction, 
+--	   but hard to fix), 
+--	b) more importantly, big unboxed tuples get returned mainly
+--	   on the stack, and are often then allocated in the heap
+--	   by the caller.  So doing CPR for them may in fact make
+--	   things worse.
 \end{code}
 
 The wrapper for a constructor is an ordinary top-level binding that evaluates
