@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.33 2001/06/14 13:29:30 simonmar Exp $
+# $Id: paths.mk,v 1.34 2001/06/27 13:16:59 rrt Exp $
 #
 # ghc project specific make variables
 #
@@ -51,7 +51,7 @@ GHC_SYSMAN_DIR 		= $(GHC_RUNTIME_DIR)/parallel
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 
-GHC_CP			= "copy /y"
+GHC_CP			= "xcopy /y"
 GHC_PERL		= perl
 GHC_TOUCHY		= touchy$(EXE_SUFFIX)
 GHC_RAWCPP		= $(subst -mwin32,,$(RAWCPP))
