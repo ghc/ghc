@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.41 2000/02/14 10:56:47 sewardj Exp $
+ * $Id: PrimOps.hc,v 1.42 2000/02/25 15:07:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -361,12 +361,16 @@ FN_(mkWeakzh_fast)
 {
   /* R1.p = key
      R2.p = value
-     R3.p = finalizer
+     R3.p = finalizer (or NULL)
   */
   StgWeak *w;
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgWeak), R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast,);
+  if (R3.cl == NULL) {
+    R3.cl = &NO_FINALIZER_closure;
+  }
+
+  HP_CHK_GEN_TICKY(sizeofW(StgWeak),R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,  // +1 is for the link field
 		  sizeofW(StgWeak)-sizeofW(StgHeader)-1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgWeak)); /* ccs prof */
@@ -376,11 +380,7 @@ FN_(mkWeakzh_fast)
 
   w->key        = R1.cl;
   w->value      = R2.cl;
-  if (R3.cl) {
-     w->finalizer  = R3.cl;
-  } else {
-     w->finalizer  = &NO_FINALIZER_closure;
-  }
+  w->finalizer  = R3.cl;
 
   w->link       = weak_ptr_list;
   weak_ptr_list = w;
