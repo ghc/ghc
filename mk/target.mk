@@ -728,26 +728,26 @@ binary-dist-pre::
 	-rm -f $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
 	@for i in $(BIN_DIST_DIRS); do 		 	 \
 	  if (test -d "$$i"); then 			 \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
+	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
+	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
+	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion); \
 	   echo $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
 			prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
 			exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion) ; \
+			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
+			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
+			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
+			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion) ; \
 	   $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
 			prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
 			exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion) ; \
+			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
+			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
+			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion) \
+			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$(ProjectNameShort)-$(ProjectVersion) ; \
 	  fi; \
 	done
 
