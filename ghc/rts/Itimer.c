@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.7 1999/12/01 14:19:36 simonmar Exp $
+ * $Id: Itimer.c,v 1.8 2000/01/13 12:40:15 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -160,8 +160,7 @@ initialize_virtual_timer(nat ms)
     se.sigev_signo = SIGVTALRM;
     se.sigev_value.sival_int = SIGVTALRM;
     if (timer_create(CLOCK_VIRTUAL, &se, &tid)) {
-	fprintf(stderr, "Can't create virtual timer.\n");
-	EXIT(EXIT_FAILURE);
+	barf("can't create virtual timer");
     }
     it.it_value.tv_sec = ms / 1000;
     it.it_value.tv_nsec = 1000000 * (ms - 1000 * it.it_value.tv_sec);

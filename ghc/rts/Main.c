@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.12 1999/11/02 15:05:58 simonmar Exp $
+ * $Id: Main.c,v 1.13 2000/01/13 12:40:15 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -40,6 +40,8 @@
 # ifndef INTERPRETER /* Hack */
 int main(int argc, char *argv[])
 {
+    int exit_status;
+
     SchedulerStatus status;
     startupHaskell(argc,argv);
 
@@ -58,17 +60,24 @@ int main(int argc, char *argv[])
     }
 #  endif /* PAR */
     switch (status) {
-    case AllBlocked:
-      barf("Scheduler stopped, all threads blocked");
     case Deadlock:
-      shutdownHaskell();
-      barf("No threads to run!  Deadlock?");
+      prog_belch("no threads to run:  infinite loop or deadlock?");
+      exit_status = EXIT_DEADLOCK;
+      break;
     case Killed:
-      belch("%s: warning: main thread killed", prog_argv[0]);
-    case Success:
+      prog_belch("main thread killed");
+      exit_status = EXIT_KILLED;
+      break;
     case Interrupted:
-      /* carry on */
+      prog_belch("interrupted");
+      exit_status = EXIT_INTERRUPTED;
+      break;
+    case Success:
+      exit_status = EXIT_SUCCESS;
+      break;
+    case NoStatus:
+      barf("main thread completed with no status");
     }
-    shutdownHaskellAndExit(EXIT_SUCCESS);
+    shutdownHaskellAndExit(exit_status);
 }
 # endif /* BATCH_MODE */

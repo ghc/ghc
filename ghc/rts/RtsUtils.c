@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.11 2000/01/12 15:15:17 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.12 2000/01/13 12:40:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -40,7 +40,7 @@ void barf(char *s, ...)
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
   fflush(stderr);
-  stg_exit(EXIT_FAILURE);
+  stg_exit(EXIT_INTERNAL_ERROR);
 }
 
 void prog_belch(char *s, ...)
@@ -73,8 +73,8 @@ stgMallocBytes (int n, char *msg)
 
     if ((space = (char *) malloc((size_t) n)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-	MallocFailHook((W_) n, msg); /*msg*/
-	stg_exit(EXIT_FAILURE);
+      MallocFailHook((W_) n, msg); /*msg*/
+      stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
 }
@@ -86,8 +86,8 @@ stgReallocBytes (void *p, int n, char *msg)
 
     if ((space = (char *) realloc(p, (size_t) n)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-	MallocFailHook((W_) n, msg); /*msg*/
-	exit(EXIT_FAILURE);
+      MallocFailHook((W_) n, msg); /*msg*/
+      stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
 }
@@ -139,7 +139,7 @@ heapOverflow(void)
   if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
-  stg_exit(EXIT_FAILURE);
+  stg_exit(EXIT_HEAPOVERFLOW);
 }
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.22 2000/01/12 15:15:17 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.23 2000/01/13 12:40:15 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -931,7 +931,6 @@ decode(const char *s)
 static void
 bad_option(const char *s)
 {
-  fflush(stdout);
-  fprintf(stderr, "initSM: Bad RTS option: %s\n", s);
+  prog_belch("bad RTS option: %s", s);
   stg_exit(EXIT_FAILURE);
-}		
+}

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.11 2000/01/12 15:15:18 simonmar Exp $
+ * $Id: Signals.c,v 1.12 2000/01/13 12:40:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,8 +48,7 @@ more_handlers(I_ sig)
 
     if (handlers == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      fprintf(stderr, "VM exhausted (in more_handlers)\n");
-      exit(EXIT_FAILURE);
+      barf("VM exhausted (in more_handlers)");
     }
     for(i = nHandlers; i <= sig; i++)
       /* Fill in the new slots with default actions */
@@ -230,9 +229,7 @@ StgInt
 sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
 {
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-  fprintf(stderr,
-	  "No signal handling support in a parallel implementation.\n");
-  exit(EXIT_FAILURE);
+  barf("no signal handling support in a parallel implementation");
 }
 
 void
@@ -266,7 +263,7 @@ shutdown_handler(int sig STG_UNUSED)
   } else
 #endif
 
-  shutdownHaskellAndExit(EXIT_FAILURE);
+  shutdownHaskellAndExit(EXIT_INTERRUPTED);
 }
 
 /*

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.6 2000/01/12 15:15:18 simonmar Exp $
+ * $Id: Select.c,v 1.7 2000/01/13 12:40:16 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -136,8 +136,7 @@ awaitEvent(rtsBool wait)
       if (errno != EINTR) {
 	/* fflush(stdout); */
 	perror("select");
-	fprintf(stderr, "awaitEvent: select failed\n");
-	stg_exit(EXIT_FAILURE);
+	barf("select failed");
       }
       ACQUIRE_LOCK(&sched_mutex);
 

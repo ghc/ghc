@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.37 2000/01/06 11:57:50 sewardj Exp $
+ * $Id: PrimOps.hc,v 1.38 2000/01/13 12:40:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -897,8 +897,7 @@ FN_(putMVarzh_fast)
 #endif
 
   if (info == &FULL_MVAR_info) {
-    fprintf(stderr, "putMVar#: MVar already full.\n");
-    stg_exit(EXIT_FAILURE);
+    barf("putMVar#: MVar already full");
   }
   
   mvar->value = R2.cl;

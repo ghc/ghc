@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.10 2000/01/12 15:15:17 simonmar Exp $
+ * $Id: Rts.h,v 1.11 2000/01/13 12:40:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,7 +16,7 @@
 #include "Stg.h"
 
 /* -----------------------------------------------------------------------------
-   Miscellaneous garbage
+   RTS Exit codes
    -------------------------------------------------------------------------- */
 
 #if ! defined(EXIT_SUCCESS) || ! defined(EXIT_FAILURE)
@@ -26,6 +26,17 @@
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 #endif
+
+/* 255 is allegedly used by dynamic linkers to report linking failure */
+#define EXIT_INTERNAL_ERROR 254
+#define EXIT_DEADLOCK       253
+#define EXIT_INTERRUPTED    252
+#define EXIT_HEAPOVERFLOW   251
+#define EXIT_KILLED         250
+
+/* -----------------------------------------------------------------------------
+   Miscellaneous garbage
+   -------------------------------------------------------------------------- */
 
 /* declarations for runtime flags/values */
 #define MAX_RTS_ARGS 32
