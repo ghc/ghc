@@ -17,6 +17,7 @@ module TcGenDeriv (
 	gen_Ord_binds,
 	gen_Read_binds,
 	gen_Show_binds,
+	gen_Data_binds,
 	gen_Typeable_binds,
 	gen_tag_n_con_monobind,
 
@@ -512,8 +513,8 @@ gen_Bounded_binds tycon
     tycon_loc = getSrcLoc tycon
 
     ----- enum-flavored: ---------------------------
-    min_bound_enum = mk_easy_FunMonoBind tycon_loc minBound_RDR [] [] (HsVar data_con_1_RDR)
-    max_bound_enum = mk_easy_FunMonoBind tycon_loc maxBound_RDR [] [] (HsVar data_con_N_RDR)
+    min_bound_enum = mkVarMonoBind tycon_loc minBound_RDR (HsVar data_con_1_RDR)
+    max_bound_enum = mkVarMonoBind tycon_loc maxBound_RDR (HsVar data_con_N_RDR)
 
     data_con_1	  = head data_cons
     data_con_N	  = last data_cons
@@ -523,9 +524,9 @@ gen_Bounded_binds tycon
     ----- single-constructor-flavored: -------------
     arity	   = dataConSourceArity data_con_1
 
-    min_bound_1con = mk_easy_FunMonoBind tycon_loc minBound_RDR [] [] $
+    min_bound_1con = mkVarMonoBind tycon_loc minBound_RDR $
 		     mkHsVarApps data_con_1_RDR (nOfThem arity minBound_RDR)
-    max_bound_1con = mk_easy_FunMonoBind tycon_loc maxBound_RDR [] [] $
+    max_bound_1con = mkVarMonoBind tycon_loc maxBound_RDR $
 		     mkHsVarApps data_con_1_RDR (nOfThem arity maxBound_RDR)
 \end{code}
 
@@ -771,17 +772,17 @@ gen_Read_binds get_fixity tycon
   where
     -----------------------------------------------------------------------
     default_binds 
-	= mk_easy_FunMonoBind loc readList_RDR     [] [] (HsVar readListDefault_RDR)
+	= mkVarMonoBind loc readList_RDR     (HsVar readListDefault_RDR)
 		`AndMonoBinds`
-	  mk_easy_FunMonoBind loc readListPrec_RDR [] [] (HsVar readListPrecDefault_RDR)
+	  mkVarMonoBind loc readListPrec_RDR (HsVar readListPrecDefault_RDR)
     -----------------------------------------------------------------------
 
     loc       = getSrcLoc tycon
     data_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullaryDataCon data_cons
     
-    read_prec = mk_easy_FunMonoBind loc readPrec_RDR [] [] 
-	 		  	    (HsApp (HsVar parens_RDR) read_cons)
+    read_prec = mkVarMonoBind loc readPrec_RDR
+	 		      (HsApp (HsVar parens_RDR) read_cons)
 
     read_cons 	          = foldr1 mk_alt (read_nullary_cons ++ read_non_nullary_cons)
     read_non_nullary_cons = map read_non_nullary_con non_nullary_cons
@@ -910,7 +911,7 @@ gen_Show_binds get_fixity tycon
   where
     tycon_loc = getSrcLoc tycon
     -----------------------------------------------------------------------
-    show_list = mk_easy_FunMonoBind tycon_loc showList_RDR [] []
+    show_list = mkVarMonoBind tycon_loc showList_RDR
 		  (HsApp (HsVar showList___RDR) (HsPar (HsApp (HsVar showsPrec_RDR) (mkHsIntLit 0))))
     -----------------------------------------------------------------------
     shows_prec = mk_FunMonoBind tycon_loc showsPrec_RDR (map pats_etc (tyConDataCons tycon))
@@ -1026,7 +1027,7 @@ Notice the use of lexically scoped type variables.
 \begin{code}
 gen_Typeable_binds :: TyCon -> RdrNameMonoBinds
 gen_Typeable_binds tycon
-  = mk_easy_FunMonoBind tycon_loc typeOf_RDR [WildPat placeHolderType] []
+  = mk_easy_FunMonoBind tycon_loc typeOf_RDR [wildPat] []
 	(mkHsApps mkTypeRep_RDR [tycon_rep, arg_reps])
   where
     tycon_loc = getSrcLoc tycon
@@ -1039,6 +1040,77 @@ gen_Typeable_binds tycon
 \end{code}
 
 
+
+%************************************************************************
+%*									*
+\subsection{Data}
+%*									*
+%************************************************************************
+
+From the data type
+
+  data T a b = T1 a b | T2
+
+we generate
+
+  instance (Data a, Data b) => Data (T a b) where
+	gfoldl k z (T1 a b) = z T `k` a `k` b
+	gfoldl k z T2	    = z T2
+	-- ToDo: add gmapT,Q,M, gfoldr
+
+	gunfold k z _ (Constr "T1") = k (k (z T1))
+	gunfold k z _ (Constr "T2") = z T2
+	gunfold _ _ e _		    = e
+
+	conOf (T1 _ _) = Constr "T1"
+	conOf T2       = Constr "T2"
+	
+	consOf _ = [Constr "T1", Constr "T2"]
+
+ToDo: generate auxiliary bindings for the Constrs?
+
+\begin{code}
+gen_Data_binds :: TyCon -> RdrNameMonoBinds
+gen_Data_binds tycon
+  = andMonoBindList [gfoldl_bind, gunfold_bind, conOf_bind, consOf_bind]
+  where
+    tycon_loc = getSrcLoc tycon
+    data_cons = tyConDataCons tycon
+
+	------------ gfoldl
+    gfoldl_bind = mk_FunMonoBind tycon_loc gfoldl_RDR (map gfoldl_eqn data_cons)
+    gfoldl_eqn con = ([VarPat k_RDR, VarPat z_RDR, mkConPat con_name as_needed], 
+		       foldl mk_k_app (HsVar z_RDR `HsApp` HsVar con_name) as_needed)
+		   where
+		     con_name :: RdrName
+		     con_name = getRdrName con
+		     as_needed = take (dataConSourceArity con) as_RDRs
+		     mk_k_app e v = HsPar (mkHsOpApp e k_RDR (HsVar v))
+
+	------------ gunfold
+    gunfold_bind = mk_FunMonoBind tycon_loc gunfold_RDR (map gunfold_eqn data_cons ++ [catch_all])
+    gunfold_eqn con = ([VarPat k_RDR, VarPat z_RDR, wildPat, 
+			ConPatIn constr_RDR (PrefixCon [LitPat (mk_constr_string con)])],
+		       apN (dataConSourceArity con)
+			   (\e -> HsVar k_RDR `HsApp` e) 
+			   (z_Expr `HsApp` HsVar (getRdrName con)))
+    catch_all = ([wildPat, wildPat, VarPat e_RDR, wildPat], HsVar e_RDR)
+    mk_constr_string con = mkHsString (occNameUserString (getOccName con))
+
+	------------ conOf
+    conOf_bind = mk_FunMonoBind tycon_loc conOf_RDR (map conOf_eqn data_cons)
+    conOf_eqn con = ([mkWildConPat con], mk_constr con)
+
+	------------ consOf
+    consOf_bind = mk_easy_FunMonoBind tycon_loc consOf_RDR [wildPat] []
+				(ExplicitList placeHolderType (map mk_constr data_cons))
+    mk_constr con = HsVar constr_RDR `HsApp` (HsLit (mk_constr_string con))
+
+
+apN :: Int -> (a -> a) -> a -> a
+apN 0 k z = z
+apN n k z = apN (n-1) k (k z)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1095,11 +1167,8 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
     lots_of_constructors = tyConFamilySize tycon > mAX_FAMILY_SIZE_FOR_VEC_RETURNS
 
     mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
-    mk_stuff var
-      = ([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
-      where
-	pat    = ConPatIn var_RDR (PrefixCon (nOfThem (dataConSourceArity var) wildPat))
-	var_RDR = getRdrName var
+    mk_stuff con = ([mkWildConPat con], 
+		    HsLit (HsIntPrim (toInteger ((dataConTag con) - fIRST_TAG))))
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
   = mk_FunMonoBind (getSrcLoc tycon) rdr_name 
@@ -1108,8 +1177,8 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
 			 (HsTyVar (getRdrName tycon)))]
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
-  = mk_easy_FunMonoBind (getSrcLoc tycon) 
-		rdr_name [] [] (HsApp (HsVar mkInt_RDR) (HsLit (HsIntPrim max_tag)))
+  = mkVarMonoBind (getSrcLoc tycon) rdr_name 
+		  (HsApp (HsVar mkInt_RDR) (HsLit (HsIntPrim max_tag)))
   where
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
@@ -1137,6 +1206,9 @@ multi-clause definitions; it generates:
 \end{verbatim}
 
 \begin{code}
+mkVarMonoBind :: SrcLoc -> RdrName -> RdrNameHsExpr -> RdrNameMonoBinds
+mkVarMonoBind loc var rhs = mk_easy_FunMonoBind loc var [] [] rhs
+
 mk_easy_FunMonoBind :: SrcLoc -> RdrName -> [RdrNamePat]
 		    -> [RdrNameMonoBinds] -> RdrNameHsExpr
 		    -> RdrNameMonoBinds
@@ -1178,6 +1250,7 @@ mkHsChar c   = HsChar   (ord c)
 
 mkConPat con vars   = ConPatIn con (PrefixCon (map VarPat vars))
 mkNullaryConPat con = ConPatIn con (PrefixCon [])
+mkWildConPat con    = ConPatIn (getRdrName con) (PrefixCon (nOfThem (dataConSourceArity con) wildPat))
 \end{code}
 
 ToDo: Better SrcLocs.
@@ -1348,6 +1421,9 @@ a_RDR		= varUnqual FSLIT("a")
 b_RDR		= varUnqual FSLIT("b")
 c_RDR		= varUnqual FSLIT("c")
 d_RDR		= varUnqual FSLIT("d")
+e_RDR		= varUnqual FSLIT("e")
+k_RDR		= varUnqual FSLIT("k")
+z_RDR		= varUnqual FSLIT("z") :: RdrName
 ah_RDR		= varUnqual FSLIT("a#")
 bh_RDR		= varUnqual FSLIT("b#")
 ch_RDR		= varUnqual FSLIT("c#")
@@ -1364,6 +1440,7 @@ a_Expr		= HsVar a_RDR
 b_Expr		= HsVar b_RDR
 c_Expr		= HsVar c_RDR
 d_Expr		= HsVar d_RDR
+z_Expr		= HsVar z_RDR
 ltTag_Expr	= HsVar ltTag_RDR
 eqTag_Expr	= HsVar eqTag_RDR
 gtTag_Expr	= HsVar gtTag_RDR

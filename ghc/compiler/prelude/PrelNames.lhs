@@ -157,7 +157,7 @@ basicKnownKeyNames
 	realFloatClassName,		-- numeric
 	cCallableClassName,		-- mentioned, ccallish
 	cReturnableClassName,		-- mentioned, ccallish
-	traverseClassName, 
+	dataClassName, 
 	typeableClassName,
 
 	-- Numeric stuff
@@ -256,7 +256,7 @@ pREL_FLOAT_Name   = mkModuleName "GHC.Float"
 pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
 sYSTEM_IO_Name	  = mkModuleName "System.IO"
 dYNAMIC_Name	  = mkModuleName "Data.Dynamic"
-tRAVERSE_Name	  = mkModuleName "Data.Traverse"
+gENERICS_Name	  = mkModuleName "Data.Generics"
 
 rEAD_PREC_Name = mkModuleName "Text.ParserCombinators.ReadPrec"
 lEX_Name       = mkModuleName "Text.Read.Lex"
@@ -427,12 +427,17 @@ typeOf_RDR     = varQual_RDR dYNAMIC_Name FSLIT("typeOf")
 mkTypeRep_RDR  = varQual_RDR dYNAMIC_Name FSLIT("mkAppTy")
 mkTyConRep_RDR = varQual_RDR dYNAMIC_Name FSLIT("mkTyCon")
 
-undefined_RDR = varQual_RDR pREL_ERR_Name FSLIT("undefined")
+constr_RDR  = dataQual_RDR gENERICS_Name FSLIT("Constr")
+gfoldl_RDR  = varQual_RDR gENERICS_Name FSLIT("gfoldl")
+gfoldr_RDR  = varQual_RDR gENERICS_Name FSLIT("gfoldr")
+gunfold_RDR = varQual_RDR gENERICS_Name FSLIT("gunfold")
+gmapT_RDR   = varQual_RDR gENERICS_Name FSLIT("gmapT")
+gmapQ_RDR   = varQual_RDR gENERICS_Name FSLIT("gmapQ")
+gmapM_RDR   = varQual_RDR gENERICS_Name FSLIT("gmapM")
+conOf_RDR   = varQual_RDR gENERICS_Name FSLIT("conOf")
+consOf_RDR  = varQual_RDR gENERICS_Name FSLIT("consOf")
 
-gmapQ_RDR  = varQual_RDR tRAVERSE_Name FSLIT("gmapQ")
-gmapT_RDR  = varQual_RDR tRAVERSE_Name FSLIT("gmapT")
-gmapM_RDR  = varQual_RDR tRAVERSE_Name FSLIT("gmapM")
-gfoldl_RDR = varQual_RDR tRAVERSE_Name FSLIT("gfoldl")
+undefined_RDR = varQual_RDR pREL_ERR_Name FSLIT("undefined")
 \end{code}
 
 
@@ -586,9 +591,9 @@ realFloatClassName = clsQual  pREL_FLOAT_Name FSLIT("RealFloat") realFloatClassK
 -- Class Ix
 ixClassName	   = clsQual pREL_ARR_Name FSLIT("Ix") ixClassKey
 
--- Class Typeable and Traverse
-typeableClassName = clsQual dYNAMIC_Name FSLIT("Typeable")  typeableClassKey
-traverseClassName = clsQual tRAVERSE_Name FSLIT("Traverse") traverseClassKey
+-- Class Typeable and Data
+typeableClassName = clsQual dYNAMIC_Name  FSLIT("Typeable") typeableClassKey
+dataClassName     = clsQual gENERICS_Name FSLIT("Data")     dataClassKey
 
 -- Enum module (Enum, Bounded)
 enumClassName 	   = clsQual pREL_ENUM_Name FSLIT("Enum") enumClassKey
@@ -744,7 +749,7 @@ floatingClassKey	= mkPreludeClassUnique 5
 fractionalClassKey	= mkPreludeClassUnique 6 
 integralClassKey	= mkPreludeClassUnique 7 
 monadClassKey		= mkPreludeClassUnique 8 
-traverseClassKey	= mkPreludeClassUnique 9
+dataClassKey		= mkPreludeClassUnique 9
 functorClassKey		= mkPreludeClassUnique 10
 numClassKey		= mkPreludeClassUnique 11
 ordClassKey		= mkPreludeClassUnique 12

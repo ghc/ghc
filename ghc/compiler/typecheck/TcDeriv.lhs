@@ -11,7 +11,7 @@ module TcDeriv ( tcDeriving ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsBinds(..), MonoBinds(..), TyClDecl(..),
-			  collectMonoBinders )
+			  andMonoBindList, collectMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl, RenamedHsPred )
 import CmdLineOpts	( DynFlag(..) )
@@ -39,6 +39,7 @@ import MkId		( mkDictFunId )
 import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( Name, getSrcLoc, nameUnique )
+import Unique		( getUnique )
 import NameSet
 import RdrName		( RdrName )
 
@@ -246,7 +247,7 @@ deriveOrdinaryStuff eqns
 
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
-	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
+	extra_mbinds     = andMonoBindList extra_mbind_list
 	mbinders	 = collectMonoBinders extra_mbinds
     in
     mappM gen_bind new_dfuns		`thenM` \ rdr_name_inst_infos ->
@@ -465,10 +466,10 @@ makeDerivEqns tycl_decls
 
 	right_arity = length tys + 1 == classArity clas
 
+		-- Never derive Read,Show,Typeable,Data this way 
+	non_iso_classes = [readClassKey, showClassKey, typeableClassKey, dataClassKey]
 	can_derive_via_isomorphism
-	   =  not (clas `hasKey` readClassKey)	-- Never derive Read,Show,Typeable this way 
-	   && not (clas `hasKey` showClassKey)
-	   && not (clas `hasKey` typeableClassKey)
+	   =  not (getUnique clas `elem` non_iso_classes)
 	   && right_arity 			-- Well kinded;
 						-- eg not: newtype T ... deriving( ST )
 						--	because ST needs *2* type params
@@ -513,7 +514,7 @@ makeDerivEqns tycl_decls
     bale_out err = addErrTc err `thenM_` returnM (Nothing, Nothing) 
 
     standard_class gla_exts clas =  key `elem` derivableClassKeys
-				 || (gla_exts && (key == typeableClassKey || key == traverseClassKey))
+				 || (gla_exts && (key == typeableClassKey || key == dataClassKey))
 	where
 	  key = classKey clas
     ------------------------------------------------------------------
@@ -708,6 +709,7 @@ gen_bind dfun
  		   ,(showClassKey,    gen_Show_binds fix_env)
  		   ,(readClassKey,    gen_Read_binds fix_env)
 		   ,(typeableClassKey,gen_Typeable_binds)
+		   ,(dataClassKey,    gen_Data_binds)
  		   ]
     in
     returnM (dfun, gen_binds_fn tycon)
