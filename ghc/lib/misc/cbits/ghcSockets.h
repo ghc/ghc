@@ -19,6 +19,9 @@
 #ifdef HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
 #endif
+#ifdef HAVE_NETINET_TCP_H
+# include <netinet/tcp.h>
+#endif
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
