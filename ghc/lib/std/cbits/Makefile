@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.29 2001/05/18 22:34:42 qrczak Exp $
+# $Id: Makefile,v 1.30 2001/07/05 13:01:16 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
 
-HSLIB = std
+PACKAGE = std
 IS_CBITS_LIB = YES
 
 SRC_CC_OPTS += -Wall -DCOMPILING_STDLIB

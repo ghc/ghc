@@ -25,14 +25,13 @@ endif
 
 HC = $(GHC_INPLACE)
 
-ifneq "$(DLLized)" "YES"
-PACKAGE = -package-name std
-else
+# *** THIS WON'T WORK ANY MORE *** (PACKAGE is now set in fptools/mk/target.mk)
+ifeq "$(DLLized)" "YES"
 # Hack by SPJ to delay if-then-else until the pattern rule when we have $*
 PACKAGE = $(subst ~, ,$(word $(words dummy $(findstring $(notdir $*), PrelMain )), -package-name~std))
 endif
 
-HSLIB = std
+PACKAGE = std
 
 BOOT_SRCS += PrelPrimopWrappers.hs
 

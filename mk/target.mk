@@ -309,9 +309,9 @@ SRC_HC_OPTS += -hisuf $(way_)hi -hcsuf $(way_)hc -osuf $(way_)o
 endif
 
 # add syslib dependencies and current package name
-SRC_HC_OPTS += $(patsubst %, -package %, $(HSLIB_DEPS))
+SRC_HC_OPTS += $(patsubst %, -package %, $(PACKAGE_DEPS))
 ifneq "$(PACKAGE)" ""
-SRC_HC_OPTS += -package-name $(HSLIB)
+SRC_HC_OPTS += -package-name $(PACKAGE)
 endif
 
 #----------------------------------------
@@ -329,7 +329,7 @@ endif
 #	Building HsLibs libraries.
 #
 # Inputs:
-#   $(HSLIB) is the name of the library to build
+#   $(PACKAGE) is the name of the library to build
 #   $(IS_CBITS_LIB) should be "YES" for a "cbits" library
 #
 # Outputs:
@@ -342,14 +342,14 @@ endif
 # on whether or not it's a "cbits" library.  But you can
 # override this by setting $(LIBOBJS) yourself
 
-ifneq "$(HSLIB)" ""
+ifneq "$(PACKAGE)" ""
 
 ifeq "$(IS_CBITS_LIB)" "YES"
 _cbits := _cbits
 endif
 
-LIBRARY      = libHS$(HSLIB)$(_cbits)$(_way).a
-GHCI_LIBRARY = HS$(HSLIB)$(_cbits)$(_way).o
+LIBRARY      = libHS$(PACKAGE)$(_cbits)$(_way).a
+GHCI_LIBRARY = HS$(PACKAGE)$(_cbits)$(_way).o
 
 ifneq "$(IS_CBITS_LIB)" "YES"
 WAYS=$(GhcLibWays)
@@ -368,12 +368,12 @@ SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR)
 
 ifeq "$(IS_CBITS_LIB)" "YES"
 override datadir:=$(libdir)/includes
-INSTALL_DATAS += Hs$(shell perl -e 'print ucfirst "$(HSLIB)"').h
+INSTALL_DATAS += Hs$(shell perl -e 'print ucfirst "$(PACKAGE)"').h
 else
 SRC_CC_OPTS += -Icbits
 endif
 
-endif # HSLIB
+endif # PACKAGE
 
 #----------------------------------------
 #	Libraries/archives
@@ -500,7 +500,7 @@ ifneq "$(GHCI_LIBRARY)" "HSstd.o"
 # So we only put in this standard rule for packages other than std
 # The rule for the Prelude is in ghc/lib/std/Makefile
 # We check for GHCI_LIBRARY being HSstd.o rather than
-# HSLIB being std, because we want to still use the boilerplate rule 
+# PACKAGE being std, because we want to still use the boilerplate rule 
 # for cbits.
 $(GHCI_LIBRARY) :: $(LIBOBJS)
 	ld -r -x -o $@ $(LIBOBJS) $(STUBOBJS)
@@ -517,13 +517,13 @@ endif # GHCI_LIBRARY
 
 ifeq "$(DLLized)" "YES"
 
-ifneq "$(HSLIB)" ""
+ifneq "$(PACKAGE)" ""
 
-SRC_BLD_DLL_OPTS += --export-all --output-def=HS$(HSLIB)$(_cbits)$(_way).def DllVersionInfo.$(way_)o
-ifneq "$(HSLIB)" "rts"
+SRC_BLD_DLL_OPTS += --export-all --output-def=HS$(PACKAGE)$(_cbits)$(_way).def DllVersionInfo.$(way_)o
+ifneq "$(PACKAGE)" "rts"
 SRC_BLD_DLL_OPTS += -lHSstd_cbits_imp -L$(GHC_LIB_DIR)/std/cbits
 SRC_BLD_DLL_OPTS += -lHSrts_$(way_)imp -L$(GHC_RUNTIME_DIR)
-ifneq "$(HSLIB)" "std"
+ifneq "$(PACKAGE)" "std"
   ifeq "$(IS_CBITS_LIB)" ""
   SRC_BLD_DLL_OPTS += -lHSstd_$(way_)imp -L$(GHC_LIB_DIR)/std 
   endif
@@ -531,15 +531,15 @@ endif
 endif
 SRC_BLD_DLL_OPTS += -lgmp -L. -L$(GHC_RUNTIME_DIR)/gmp
 ifeq "$(IS_CBITS_LIB)" ""
-SRC_BLD_DLL_OPTS += $(patsubst %,-lHS%_$(way_)imp, $(HSLIB_DEPS))
-SRC_BLD_DLL_OPTS += $(patsubst %,-L../%, $(HSLIB_DEPS))
+SRC_BLD_DLL_OPTS += $(patsubst %,-lHS%_$(way_)imp, $(PACKAGE_DEPS))
+SRC_BLD_DLL_OPTS += $(patsubst %,-L../%, $(PACKAGE_DEPS))
 endif
 ifneq "$(HAS_CBITS)" ""
-SRC_BLD_DLL_OPTS += -lHS$(HSLIB)_cbits_imp -Lcbits
+SRC_BLD_DLL_OPTS += -lHS$(PACKAGE)_cbits_imp -Lcbits
 endif
 SRC_BLD_DLL_OPTS += -lwsock32 -lwinmm
 
-endif # HSLIB != ""
+endif # PACKAGE != ""
 
 SplitObjs = NO 
 

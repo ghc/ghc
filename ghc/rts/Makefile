@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.51 2001/07/03 16:57:03 sewardj Exp $
+# $Id: Makefile,v 1.52 2001/07/05 13:01:16 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -120,7 +120,7 @@ unexport CC
 #
 #  Building DLLs is only supported on mingw32 at the moment.
 #
-HSLIB             = rts
+PACKAGE             = rts
 
 ifeq "$(DLLized)" "YES"
 SRC_BLD_DLL_OPTS += -lHS_imp_stub -lgmp_imp
