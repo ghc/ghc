@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.11 2002/08/21 22:06:03 ken Exp $
+ * $Id: TailCalls.h,v 1.12 2003/01/06 13:11:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -51,10 +51,10 @@ extern void __DISCARD__(void);
 
 #define JMP_(cont)			\
     { 					\
-      void *target;			\
+      void *__target;			\
       __DISCARD__();			\
-      target = (void *)(cont);    	\
-      goto *target; 	    	    	\
+      __target = (void *)(cont);    	\
+      goto *__target; 	    	    	\
     }
 
 #endif /* i386_TARGET_ARCH */
