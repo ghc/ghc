@@ -93,7 +93,7 @@ data TcEnv
 	tcInsts	 :: InstEnv,		-- All instances (both imported and in this module)
 
 	tcGEnv	 :: NameEnv TyThing,	-- The global type environment we've accumulated while
-					-- compiling this module:
+		    {- TypeEnv -}	-- compiling this module:
 					--	types and classes (both imported and local)
 					-- 	imported Ids
 					-- (Ids defined in this module are in the local envt)
@@ -141,12 +141,12 @@ data TcTyThing
 --	3. Then we zonk the kind variable.
 --	4. Now we know the kind for 'a', and we add (a -> ATyVar a::K) to the environment
 
-initTcEnv :: GlobalSymbolTable -> InstEnv -> IO TcEnv
+initTcEnv :: GlobalSymbolTable -> IO TcEnv
 initTcEnv gst inst_env
   = do { gtv_var <- newIORef emptyVarSet ;
 	 return (TcEnv { tcGST    = gst,
 		      	 tcGEnv   = emptyNameEnv,
-		      	 tcInsts  = inst_env,
+		      	 tcInsts  = emptyInstEnv,
 		      	 tcLEnv   = emptyNameEnv,
 		      	 tcTyVars = gtv_var
 	 })}

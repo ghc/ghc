@@ -20,7 +20,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonad
-import TcEnv		( ValueEnv, TyThing(..), TyThingDetails(..), tyThingKind,
+import TcEnv		( TcEnv, TyThing(..), TyThingDetails(..), tyThingKind,
 			  tcExtendTypeEnv, tcExtendKindEnv, tcLookupGlobal
 			)
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
@@ -61,7 +61,7 @@ import Generics         ( mkTyConGenInfo )
 The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcTyAndClassDecls :: ValueEnv		-- Knot tying stuff
+tcTyAndClassDecls :: TcEnv		-- Knot tying stuff
 		  -> [RenamedHsDecl]
 		  -> TcM TcEnv
 
@@ -111,7 +111,7 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: ValueEnv -> SCC RenamedTyClDecl -> TcM TcEnv
+tcGroup :: TcEnv -> SCC RenamedTyClDecl -> TcM TcEnv
 tcGroup unf_env scc
   = 	-- Step 1
     mapNF_Tc getInitialKind decls 				`thenNF_Tc` \ initial_kinds ->

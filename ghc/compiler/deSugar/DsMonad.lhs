@@ -50,9 +50,9 @@ presumably include source-file location information:
 \begin{code}
 type DsM result =
 	UniqSupply
-        -> ValueEnv
-	-> SrcLoc		 -- to put in pattern-matching error msgs
-	-> Module       	 -- module: for SCC profiling
+        -> (Name -> Id)		-- Lookup well-known Ids
+	-> SrcLoc		-- to put in pattern-matching error msgs
+	-> Module       	-- module: for SCC profiling
 	-> DsWarnings
 	-> (result, DsWarnings)
 
@@ -66,13 +66,28 @@ type DsWarnings = Bag WarnMsg           -- The desugarer reports matches which a
 -- initDs returns the UniqSupply out the end (not just the result)
 
 initDs  :: UniqSupply
-	-> ValueEnv
+	-> (HomeSymbolTable, PersistentCompilerState, TypeEnv)
 	-> Module   -- module name: for profiling
 	-> DsM a
 	-> (a, DsWarnings)
 
-initDs init_us genv mod action
-  = action init_us genv noSrcLoc mod emptyBag
+initDs init_us (hst,pcs,local_type_env) mod action
+  = action init_us lookup noSrcLoc mod emptyBag
+  where
+	-- This lookup is used for well-known Ids, 
+	-- such as fold, build, cons etc, so the chances are
+	-- it'll be found in the package symbol table.  That's
+	-- why we don't merge all these tables
+    pst = pcsPST pcs
+    lookup n = case lookupTypeEnv pst n of {
+		 Just (AnId v) -> v ;
+		 other -> 
+	       case lookupTypeEnv hst n of {
+		 Just (AnId v) -> v ;
+		 other -> 
+	       case lookupNameEnv local_type_env n of
+		 Just (AnId v) -> v ;
+		 other	       -> pprPanic "initDS: lookup:" (ppr n)
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b
 andDs  :: (a -> a -> a) -> DsM a -> DsM a -> DsM a
@@ -198,11 +213,13 @@ getModuleDs us genv loc mod warns = (mod, warns)
 \end{code}
 
 \begin{code}
-dsLookupGlobalValue :: Unique -> DsM Id
+dsLookupGlobalValue :: Name -> DsM Id
 dsLookupGlobalValue key us genv loc mod warns
-  = (lookupWithDefaultUFM_Directly genv def key, warns)
+  = (result, warns)
   where
-    def = pprPanic "dsLookupGlobalValue:" (ppr key)
+    result = case lookupNameEnv genv name of
+		Just (AnId v) -> v
+		Nothing       -> pprPanic "dsLookupGlobalValue:" (ppr name)
 \end{code}
 
 

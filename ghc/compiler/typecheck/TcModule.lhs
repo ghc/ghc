@@ -85,7 +85,7 @@ typecheckModule
 	-> IO (Maybe (PersistentCompilerState, TcResults))
 
 typecheckModule pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
-  = do { env <- initTcEnv global_symbol_table global_inst_env ;
+  = do { env <- initTcEnv global_symbol_table ;
 
 	 (_, (maybe_result, msgs)) <- initTc env src_loc tc_module
 		

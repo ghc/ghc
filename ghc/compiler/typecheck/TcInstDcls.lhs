@@ -28,7 +28,7 @@ import Inst		( InstOrigin(..),
 			  newDicts, newClassDicts,
 			  LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( ValueEnv, tcExtendGlobalValEnv, 
+import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
 			  tcExtendTyVarEnvForMeths, TyThing (..),
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
 			  newDFunName, tcExtendTyVarEnv
@@ -226,7 +226,7 @@ addInstDFuns dfuns infos
 \end{code} 
 
 \begin{code}
-tcInstDecl1 :: Module -> ValueEnv -> RenamedInstDecl -> NF_TcM [InstInfo]
+tcInstDecl1 :: Module -> TcEnv -> RenamedInstDecl -> NF_TcM [InstInfo]
 -- Deal with a single instance declaration
 tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location

@@ -25,7 +25,7 @@ import RnHsSyn		( RenamedTyClDecl,
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 
 import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
-import TcEnv		( TcId, ValueEnv, TyThing(..), TyThingDetails(..), tcAddImportedIdInfo,
+import TcEnv		( TcId, TcEnv, TyThing(..), TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
 			)
@@ -99,7 +99,7 @@ Death to "ExpandingDicts".
 %************************************************************************
 
 \begin{code}
-tcClassDecl1 :: ValueEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcClassDecl1 :: TcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcClassDecl1 rec_env
       	     (ClassDecl context class_name
 			tyvar_names fundeps class_sigs def_methods pragmas 
@@ -232,7 +232,7 @@ tcSuperClasses clas context sc_sel_names
     is_tyvar other	 = False
 
 
-tcClassSig :: ValueEnv			-- Knot tying only!
+tcClassSig :: TcEnv			-- Knot tying only!
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> NameEnv (DefMeth Name)	-- Info about default methods
