@@ -446,6 +446,13 @@ Then, if we are trying to resolve (C Int x), we need (a)
 if we are trying to resolve (C x [y]), we need *both* (b) and (c),
 even though T is not involved yet, so that we spot the overlap.
 
+
+NOTE: if you use an instance decl with NO type constructors
+	instance C a where ...
+and look up an Inst that only has type variables such as (C (n o))
+then GHC won't necessarily suck in the instances that overlap with this.
+
+
 \begin{code}
 loadImportedInsts :: Class -> [Type] -> TcM PackageInstEnv
 loadImportedInsts cls tys
@@ -467,7 +474,9 @@ loadImportedInsts cls tys
 
 	-- Suck in the instances
 	; let { (inst_pool', iface_insts) 
-		    = selectInsts (eps_insts eps) cls_gate tc_gates }
+		    = WARN( null tc_gates, ptext SLIT("Interesting! No tycons in Inst:") 
+						<+> pprClassPred cls tys )
+		      selectInsts (eps_insts eps) cls_gate tc_gates }
 
 	-- Empty => finish up rapidly, without writing to eps
 	; if null iface_insts then
@@ -504,16 +513,22 @@ selectInsts pool@(Pool insts n_in n_out) cls tycons
     (insts', iface_insts) 
 	= case lookupNameEnv insts cls of {
 		Nothing -> (insts, []) ;
-		Just gated_insts -> 
+		Just gated_insts ->
 	
-	  case foldl choose ([],[]) gated_insts of {
+	  case choose1 gated_insts  of {
 	    (_, []) -> (insts, []) ;	-- None picked
 	    (gated_insts', iface_insts') -> 
 
 	  (extendNameEnv insts cls gated_insts', iface_insts') }}
 
+    choose1 gated_insts
+	| null tycons 			-- Bizarre special case of C (a b); then there are no tycons
+	= ([], map snd gated_insts)	-- Just grab all the instances, no real alternative
+	| otherwise 			-- Normal case
+	= foldl choose2 ([],[]) gated_insts
+
 	-- Reverses the gated decls, but that doesn't matter
-    choose (gis, decls) (gates, decl)
+    choose2 (gis, decls) (gates, decl)
 	| any (`elem` tycons) gates = (gis, 	           decl:decls)
 	| otherwise		    = ((gates,decl) : gis, decls)
 \end{code}
