@@ -140,12 +140,12 @@ hGetChar handle = do
 
 hGetLine :: Handle -> IO String
 hGetLine h = do
-    buffer_mode <- wantWriteableHandle_ "hGetLine" h
-			(\ handle_ -> do getBuffer handle_)
+    buffer_mode <- wantReadableHandle "hGetLine" h
+			(\ handle_ -> do return (haBufferMode__ handle_))
     case buffer_mode of
-       (NoBuffering, _, _)          -> hGetLineUnBuffered h
-       (LineBuffering, buf, bsz)    -> hGetLineBuf' []
-       (BlockBuffering _, buf, bsz) -> hGetLineBuf' []
+       NoBuffering      -> hGetLineUnBuffered h
+       LineBuffering    -> hGetLineBuf' []
+       BlockBuffering _ -> hGetLineBuf' []
 
   where hGetLineBuf' xss = do
 	   (eol, xss) <- catch 
