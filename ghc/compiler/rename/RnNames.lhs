@@ -6,7 +6,7 @@
 \begin{code}
 module RnNames (
 	rnImports, importsFromLocalDecls, exportsFromAvail,
-	reportUnusedNames, mkModDeps
+	reportUnusedNames, mkModDeps, main_RDR_Unqual
     ) where
 
 #include "HsVersions.h"
@@ -40,8 +40,9 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  Deprecations(..), ModIface(..), Dependencies(..),
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE, pprNameProvenance
 			)
+import OccName		( varName )
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv, rdrEnvToList,
-			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual )
+			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual, mkUnqual )
 import Outputable
 import Maybe		( isJust, isNothing, catMaybes, fromMaybe )
 import Maybes		( orElse, expectJust )
@@ -539,11 +540,14 @@ exportsFromAvail exports
 	exports_from_avail exports rdr_env imports }
 
 exports_from_avail Nothing rdr_env
-		   (ImportAvails { imp_env = entity_avail_env })
+		   imports@(ImportAvails { imp_env = entity_avail_env })
  = do { this_mod <- getModule ;
 	if moduleName this_mod == mAIN_Name then
-	   return []
-		-- Export nothing; Main.$main is automatically exported
+	   exports_from_avail (Just [IEVar main_RDR_Unqual]) rdr_env imports
+		-- Behave just as if we'd said module Main(main)
+		-- This is particularly important if we compile module Main,
+		-- but then use ghci to call it... we jolly well expect to
+		-- see 'main'!
 	else 
 		-- Export all locally-defined things
 		-- We do this by filtering the global RdrEnv,
@@ -677,6 +681,13 @@ check_occs ie occs avail
 		     returnM occs }
       where
 	name_occ = nameOccName name
+
+----------------------------
+main_RDR_Unqual :: RdrName
+main_RDR_Unqual = mkUnqual varName FSLIT("main")
+	-- Don't get a RdrName from PrelNames.mainName, because 
+	-- nameRdrNamegets an Orig RdrName, and we want a Qual or Unqual one.  
+	-- An Unqual one will do just fine
 \end{code}
 
 %*********************************************************
