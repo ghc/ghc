@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.14 2000/05/09 10:00:35 sewardj Exp $
+ * $Id: Assembler.h,v 1.15 2000/06/15 13:18:08 daan Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -14,6 +14,18 @@
 
 /* ToDo: put this somewhere more sensible */
 extern void DEBUG_LoadSymbols( char *name );
+
+/* Make this compilable with Visual C++ */
+#ifndef HAVE_INT64
+#define HAVE_INT64
+#ifdef _MSC_VER
+typedef __int64            int64;
+typedef unsigned __int64   nat64;
+#else
+typedef long long          int64;
+typedef unsigned long long nat64;
+#endif
+#endif
 
 /* This file is supposed to be somewhat self-contained because it is one
  * of the major external interfaces to the runtime system.
@@ -29,7 +41,7 @@ extern void DEBUG_LoadSymbols( char *name );
 typedef unsigned char   AsmNat8;
 typedef unsigned int    AsmNat;
 typedef signed   int    AsmInt;
-typedef signed long long int AsmInt64;  /* ToDo: not portable!  */
+typedef int64           AsmInt64;  
 typedef unsigned int    AsmWord;
 typedef void*           AsmAddr;
 typedef unsigned char   AsmChar;
@@ -298,6 +310,34 @@ extern void   asmEndMkAP       ( AsmBCO bco, AsmVar v, AsmSp start );
 extern AsmVar asmAllocPAP      ( AsmBCO bco, AsmNat size );
 extern AsmSp  asmBeginMkPAP    ( AsmBCO bco );
 extern void   asmEndMkPAP      ( AsmBCO bco, AsmVar v, AsmSp start );
+
+#ifdef XMLAMBDA
+/*------------------------------------------------------------------------
+ XMlambda primitives.
+------------------------------------------------------------------------*/
+typedef AsmInt  AsmIndex;
+
+/* Rows */
+extern AsmVar asmAllocRow      ( AsmBCO bco, AsmNat /*number of fields*/ n );
+
+extern AsmSp  asmBeginPackRow  ( AsmBCO bco );
+extern void   asmEndPackRow    ( AsmBCO bco, AsmVar v, AsmSp start, 
+                                             AsmNat /*number of fields*/ n );
+
+extern void   asmBeginUnpackRow( AsmBCO bco );
+extern void   asmEndUnpackRow  ( AsmBCO bco );
+
+extern AsmPrim primRowRemoveAtN;
+extern AsmPrim primRowIndexAtN;
+
+/* Inj */
+extern AsmVar asmInj( AsmBCO bco, AsmVar var );
+extern AsmVar asmInjConst( AsmBCO bco, AsmIndex i );
+extern AsmVar asmUnInj( AsmBCO bco );
+extern AsmPc  asmTestInj( AsmBCO bco, AsmVar var );
+extern AsmPc  asmTestInjConst( AsmBCO, AsmIndex i );
+extern AsmVar asmConstIndex( AsmBCO bco, AsmIndex x );
+#endif
 
 /* --------------------------------------------------------------------------
  * C-call and H-call
