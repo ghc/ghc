@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgPrimFloat.c,v 1.4 1999/02/18 12:26:12 simonm Exp $
+ * $Id: StgPrimFloat.c,v 1.5 1999/02/22 10:51:18 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -51,13 +51,8 @@ __encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
     I_ i;
 
     /* Convert MP_INT to a double; knows a lot about internal rep! */
-    i = __abs(size)-1;
-    if (i < 0) {
-      r = 0.0;
-    } else {
-      for (r = arr[i], i--; i >= 0; i--)
-	r = r * GMP_BASE + arr[i];
-    }
+    for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
+	r = (r * GMP_BASE) + arr[i];
 
     /* Now raise to the exponent */
     if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
@@ -98,7 +93,7 @@ __encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e */
     I_ i;
 
     /* Convert MP_INT to a float; knows a lot about internal rep! */
-    for(r = 0.0, i = __abs(size); i >= 0; i--)
+    for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
 	r = (r * GMP_BASE) + arr[i];
 
     /* Now raise to the exponent */
