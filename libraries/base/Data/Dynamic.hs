@@ -110,6 +110,7 @@ instance Show Dynamic where
 	  showsPrec 0 t   . 
 	  showString ">>"
 
+#ifdef __GLASGOW_HASKELL__
 type Obj = forall a . a
  -- Dummy type to hold the dynamically typed value.
  --
@@ -120,6 +121,9 @@ type Obj = forall a . a
  -- the other hand, if we use a polymorphic type, GHC will use
  -- a fallback convention for evaluating it that works for all types.
  -- (using a function type here would also work).
+#else
+data Obj = Obj
+#endif
 
 -- | A concrete representation of a (monomorphic) type.  'TypeRep'
 -- supports reasonably efficient equality.
