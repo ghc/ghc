@@ -19,9 +19,9 @@
 #include "VisSupport.h"
 
 GtkWidget*
-create_GHC_Visualisation_Tool (void)
+create_GHC_Front_Panel (void)
 {
-  GtkWidget *GHC_Visualisation_Tool;
+  GtkWidget *GHC_Front_Panel;
   GtkWidget *vbox1;
   GtkWidget *hbox1;
   GtkWidget *vbox4;
@@ -94,21 +94,21 @@ create_GHC_Visualisation_Tool (void)
   GtkWidget *quit_but;
   GtkWidget *statusbar;
 
-  GHC_Visualisation_Tool = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-  gtk_object_set_data (GTK_OBJECT (GHC_Visualisation_Tool), "GHC_Visualisation_Tool", GHC_Visualisation_Tool);
-  gtk_window_set_title (GTK_WINDOW (GHC_Visualisation_Tool), "GHC Visualisation Tool");
-  gtk_window_set_default_size (GTK_WINDOW (GHC_Visualisation_Tool), 450, 600);
+  GHC_Front_Panel = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+  gtk_object_set_data (GTK_OBJECT (GHC_Front_Panel), "GHC_Front_Panel", GHC_Front_Panel);
+  gtk_window_set_title (GTK_WINDOW (GHC_Front_Panel), "GHC Front Panel");
+  gtk_window_set_default_size (GTK_WINDOW (GHC_Front_Panel), 450, 600);
 
   vbox1 = gtk_vbox_new (FALSE, 0);
   gtk_widget_ref (vbox1);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox1", vbox1,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox1", vbox1,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox1);
-  gtk_container_add (GTK_CONTAINER (GHC_Visualisation_Tool), vbox1);
+  gtk_container_add (GTK_CONTAINER (GHC_Front_Panel), vbox1);
 
   hbox1 = gtk_hbox_new (FALSE, 10);
   gtk_widget_ref (hbox1);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "hbox1", hbox1,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "hbox1", hbox1,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (hbox1);
   gtk_box_pack_start (GTK_BOX (vbox1), hbox1, TRUE, TRUE, 0);
@@ -116,35 +116,35 @@ create_GHC_Visualisation_Tool (void)
 
   vbox4 = gtk_vbox_new (FALSE, 10);
   gtk_widget_ref (vbox4);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox4", vbox4,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox4", vbox4,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox4);
   gtk_box_pack_start (GTK_BOX (hbox1), vbox4, TRUE, TRUE, 0);
 
   frame3 = gtk_frame_new ("Memory Map");
   gtk_widget_ref (frame3);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "frame3", frame3,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "frame3", frame3,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (frame3);
   gtk_box_pack_start (GTK_BOX (vbox4), frame3, TRUE, TRUE, 0);
 
   hbox3 = gtk_hbox_new (FALSE, 0);
   gtk_widget_ref (hbox3);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "hbox3", hbox3,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "hbox3", hbox3,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (hbox3);
   gtk_container_add (GTK_CONTAINER (frame3), hbox3);
 
   label40 = gtk_label_new ("Mb");
   gtk_widget_ref (label40);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label40", label40,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label40", label40,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label40);
   gtk_box_pack_start (GTK_BOX (hbox3), label40, FALSE, FALSE, 0);
 
   map_ruler = gtk_vruler_new ();
   gtk_widget_ref (map_ruler);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "map_ruler", map_ruler,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "map_ruler", map_ruler,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (map_ruler);
   gtk_box_pack_start (GTK_BOX (hbox3), map_ruler, FALSE, FALSE, 0);
@@ -152,35 +152,35 @@ create_GHC_Visualisation_Tool (void)
 
   memmap = gtk_drawing_area_new ();
   gtk_widget_ref (memmap);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "memmap", memmap,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "memmap", memmap,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (memmap);
   gtk_box_pack_start (GTK_BOX (hbox3), memmap, TRUE, TRUE, 0);
 
   frame8 = gtk_frame_new ("Generations");
   gtk_widget_ref (frame8);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "frame8", frame8,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "frame8", frame8,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (frame8);
   gtk_box_pack_start (GTK_BOX (vbox4), frame8, TRUE, TRUE, 0);
 
   vbox14 = gtk_vbox_new (FALSE, 0);
   gtk_widget_ref (vbox14);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox14", vbox14,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox14", vbox14,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox14);
   gtk_container_add (GTK_CONTAINER (frame8), vbox14);
 
   table4 = gtk_table_new (2, 3, FALSE);
   gtk_widget_ref (table4);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "table4", table4,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "table4", table4,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (table4);
   gtk_box_pack_start (GTK_BOX (vbox14), table4, TRUE, TRUE, 0);
 
   gen_ruler = gtk_vruler_new ();
   gtk_widget_ref (gen_ruler);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "gen_ruler", gen_ruler,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "gen_ruler", gen_ruler,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (gen_ruler);
   gtk_table_attach (GTK_TABLE (table4), gen_ruler, 1, 2, 0, 1,
@@ -190,7 +190,7 @@ create_GHC_Visualisation_Tool (void)
 
   gen_hbox = gtk_hbox_new (FALSE, 0);
   gtk_widget_ref (gen_hbox);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "gen_hbox", gen_hbox,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "gen_hbox", gen_hbox,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (gen_hbox);
   gtk_table_attach (GTK_TABLE (table4), gen_hbox, 2, 3, 1, 2,
@@ -199,7 +199,7 @@ create_GHC_Visualisation_Tool (void)
 
   generations = gtk_drawing_area_new ();
   gtk_widget_ref (generations);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "generations", generations,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "generations", generations,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (generations);
   gtk_table_attach (GTK_TABLE (table4), generations, 2, 3, 0, 1,
@@ -208,7 +208,7 @@ create_GHC_Visualisation_Tool (void)
 
   label39 = gtk_label_new ("Mb");
   gtk_widget_ref (label39);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label39", label39,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label39", label39,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label39);
   gtk_table_attach (GTK_TABLE (table4), label39, 0, 1, 0, 1,
@@ -217,14 +217,14 @@ create_GHC_Visualisation_Tool (void)
 
   frame7 = gtk_frame_new ("Residency");
   gtk_widget_ref (frame7);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "frame7", frame7,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "frame7", frame7,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (frame7);
   gtk_box_pack_start (GTK_BOX (vbox4), frame7, TRUE, TRUE, 0);
 
   table3 = gtk_table_new (3, 3, FALSE);
   gtk_widget_ref (table3);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "table3", table3,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "table3", table3,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (table3);
   gtk_container_add (GTK_CONTAINER (frame7), table3);
@@ -232,7 +232,7 @@ create_GHC_Visualisation_Tool (void)
 
   res_hruler = gtk_hruler_new ();
   gtk_widget_ref (res_hruler);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "res_hruler", res_hruler,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "res_hruler", res_hruler,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (res_hruler);
   gtk_table_attach (GTK_TABLE (table3), res_hruler, 2, 3, 1, 2,
@@ -242,7 +242,7 @@ create_GHC_Visualisation_Tool (void)
 
   res_vruler = gtk_vruler_new ();
   gtk_widget_ref (res_vruler);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "res_vruler", res_vruler,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "res_vruler", res_vruler,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (res_vruler);
   gtk_table_attach (GTK_TABLE (table3), res_vruler, 1, 2, 2, 3,
@@ -252,7 +252,7 @@ create_GHC_Visualisation_Tool (void)
 
   res_drawingarea = gtk_drawing_area_new ();
   gtk_widget_ref (res_drawingarea);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "res_drawingarea", res_drawingarea,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "res_drawingarea", res_drawingarea,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (res_drawingarea);
   gtk_table_attach (GTK_TABLE (table3), res_drawingarea, 2, 3, 2, 3,
@@ -261,7 +261,7 @@ create_GHC_Visualisation_Tool (void)
 
   label37 = gtk_label_new ("Secs");
   gtk_widget_ref (label37);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label37", label37,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label37", label37,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label37);
   gtk_table_attach (GTK_TABLE (table3), label37, 2, 3, 0, 1,
@@ -270,7 +270,7 @@ create_GHC_Visualisation_Tool (void)
 
   label38 = gtk_label_new ("Mb");
   gtk_widget_ref (label38);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label38", label38,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label38", label38,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label38);
   gtk_table_attach (GTK_TABLE (table3), label38, 0, 1, 2, 3,
@@ -279,21 +279,21 @@ create_GHC_Visualisation_Tool (void)
 
   vbox5 = gtk_vbox_new (FALSE, 10);
   gtk_widget_ref (vbox5);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox5", vbox5,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox5", vbox5,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox5);
   gtk_box_pack_end (GTK_BOX (hbox1), vbox5, FALSE, FALSE, 0);
 
   frame5 = gtk_frame_new ("Stats");
   gtk_widget_ref (frame5);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "frame5", frame5,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "frame5", frame5,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (frame5);
   gtk_box_pack_start (GTK_BOX (vbox5), frame5, FALSE, TRUE, 0);
 
   vbox6 = gtk_vbox_new (FALSE, 0);
   gtk_widget_ref (vbox6);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox6", vbox6,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox6", vbox6,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox6);
   gtk_container_add (GTK_CONTAINER (frame5), vbox6);
@@ -301,7 +301,7 @@ create_GHC_Visualisation_Tool (void)
 
   table1 = gtk_table_new (4, 3, FALSE);
   gtk_widget_ref (table1);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "table1", table1,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "table1", table1,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (table1);
   gtk_box_pack_start (GTK_BOX (vbox6), table1, TRUE, TRUE, 0);
@@ -309,7 +309,7 @@ create_GHC_Visualisation_Tool (void)
 
   label12 = gtk_label_new ("Allocated");
   gtk_widget_ref (label12);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label12", label12,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label12", label12,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label12);
   gtk_table_attach (GTK_TABLE (table1), label12, 0, 1, 1, 2,
@@ -320,7 +320,7 @@ create_GHC_Visualisation_Tool (void)
 
   label13 = gtk_label_new ("Live");
   gtk_widget_ref (label13);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label13", label13,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label13", label13,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label13);
   gtk_table_attach (GTK_TABLE (table1), label13, 0, 1, 0, 1,
@@ -331,7 +331,7 @@ create_GHC_Visualisation_Tool (void)
 
   label14 = gtk_label_new ("Allocation Rate");
   gtk_widget_ref (label14);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label14", label14,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label14", label14,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label14);
   gtk_table_attach (GTK_TABLE (table1), label14, 0, 1, 3, 4,
@@ -342,7 +342,7 @@ create_GHC_Visualisation_Tool (void)
 
   label15 = gtk_label_new ("\t\tFootprint");
   gtk_widget_ref (label15);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label15", label15,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label15", label15,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label15);
   gtk_table_attach (GTK_TABLE (table1), label15, 0, 1, 2, 3,
@@ -353,7 +353,7 @@ create_GHC_Visualisation_Tool (void)
 
   label16 = gtk_label_new ("M/sec");
   gtk_widget_ref (label16);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label16", label16,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label16", label16,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label16);
   gtk_table_attach (GTK_TABLE (table1), label16, 2, 3, 3, 4,
@@ -362,7 +362,7 @@ create_GHC_Visualisation_Tool (void)
 
   label17 = gtk_label_new ("M");
   gtk_widget_ref (label17);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label17", label17,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label17", label17,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label17);
   gtk_table_attach (GTK_TABLE (table1), label17, 2, 3, 2, 3,
@@ -373,7 +373,7 @@ create_GHC_Visualisation_Tool (void)
 
   label18 = gtk_label_new ("M");
   gtk_widget_ref (label18);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label18", label18,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label18", label18,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label18);
   gtk_table_attach (GTK_TABLE (table1), label18, 2, 3, 1, 2,
@@ -383,7 +383,7 @@ create_GHC_Visualisation_Tool (void)
 
   label19 = gtk_label_new ("M");
   gtk_widget_ref (label19);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label19", label19,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label19", label19,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label19);
   gtk_table_attach (GTK_TABLE (table1), label19, 2, 3, 0, 1,
@@ -393,7 +393,7 @@ create_GHC_Visualisation_Tool (void)
 
   live_label = gtk_label_new ("");
   gtk_widget_ref (live_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "live_label", live_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "live_label", live_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (live_label);
   gtk_table_attach (GTK_TABLE (table1), live_label, 1, 2, 0, 1,
@@ -404,7 +404,7 @@ create_GHC_Visualisation_Tool (void)
 
   allocated_label = gtk_label_new ("");
   gtk_widget_ref (allocated_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "allocated_label", allocated_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "allocated_label", allocated_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (allocated_label);
   gtk_table_attach (GTK_TABLE (table1), allocated_label, 1, 2, 1, 2,
@@ -415,7 +415,7 @@ create_GHC_Visualisation_Tool (void)
 
   footprint_label = gtk_label_new ("");
   gtk_widget_ref (footprint_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "footprint_label", footprint_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "footprint_label", footprint_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (footprint_label);
   gtk_table_attach (GTK_TABLE (table1), footprint_label, 1, 2, 2, 3,
@@ -426,7 +426,7 @@ create_GHC_Visualisation_Tool (void)
 
   alloc_rate_label = gtk_label_new ("");
   gtk_widget_ref (alloc_rate_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "alloc_rate_label", alloc_rate_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "alloc_rate_label", alloc_rate_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (alloc_rate_label);
   gtk_table_attach (GTK_TABLE (table1), alloc_rate_label, 1, 2, 3, 4,
@@ -437,14 +437,14 @@ create_GHC_Visualisation_Tool (void)
 
   frame9 = gtk_frame_new ("Threads");
   gtk_widget_ref (frame9);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "frame9", frame9,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "frame9", frame9,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (frame9);
   gtk_box_pack_start (GTK_BOX (vbox5), frame9, FALSE, TRUE, 0);
 
   table5 = gtk_table_new (9, 2, FALSE);
   gtk_widget_ref (table5);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "table5", table5,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "table5", table5,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (table5);
   gtk_container_add (GTK_CONTAINER (frame9), table5);
@@ -453,7 +453,7 @@ create_GHC_Visualisation_Tool (void)
 
   label20 = gtk_label_new ("Running");
   gtk_widget_ref (label20);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label20", label20,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label20", label20,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label20);
   gtk_table_attach (GTK_TABLE (table5), label20, 0, 1, 0, 1,
@@ -463,7 +463,7 @@ create_GHC_Visualisation_Tool (void)
 
   label21 = gtk_label_new ("Blocked on I/O (Read)");
   gtk_widget_ref (label21);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label21", label21,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label21", label21,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label21);
   gtk_table_attach (GTK_TABLE (table5), label21, 0, 1, 1, 2,
@@ -473,7 +473,7 @@ create_GHC_Visualisation_Tool (void)
 
   label22 = gtk_label_new ("Blocked on MVar");
   gtk_widget_ref (label22);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label22", label22,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label22", label22,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label22);
   gtk_table_attach (GTK_TABLE (table5), label22, 0, 1, 3, 4,
@@ -483,7 +483,7 @@ create_GHC_Visualisation_Tool (void)
 
   label24 = gtk_label_new ("Blocked on throwTo");
   gtk_widget_ref (label24);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label24", label24,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label24", label24,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label24);
   gtk_table_attach (GTK_TABLE (table5), label24, 0, 1, 4, 5,
@@ -493,7 +493,7 @@ create_GHC_Visualisation_Tool (void)
 
   label26 = gtk_label_new ("Blocked on Black Hole");
   gtk_widget_ref (label26);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label26", label26,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label26", label26,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label26);
   gtk_table_attach (GTK_TABLE (table5), label26, 0, 1, 5, 6,
@@ -503,7 +503,7 @@ create_GHC_Visualisation_Tool (void)
 
   label25 = gtk_label_new ("Sleeping");
   gtk_widget_ref (label25);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label25", label25,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label25", label25,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label25);
   gtk_table_attach (GTK_TABLE (table5), label25, 0, 1, 6, 7,
@@ -513,7 +513,7 @@ create_GHC_Visualisation_Tool (void)
 
   label27 = gtk_label_new ("Blocked on I/O (Write)");
   gtk_widget_ref (label27);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label27", label27,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label27", label27,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label27);
   gtk_table_attach (GTK_TABLE (table5), label27, 0, 1, 2, 3,
@@ -523,7 +523,7 @@ create_GHC_Visualisation_Tool (void)
 
   running_label = gtk_label_new ("label28");
   gtk_widget_ref (running_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "running_label", running_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "running_label", running_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (running_label);
   gtk_table_attach (GTK_TABLE (table5), running_label, 1, 2, 0, 1,
@@ -532,7 +532,7 @@ create_GHC_Visualisation_Tool (void)
 
   blockread_label = gtk_label_new ("label29");
   gtk_widget_ref (blockread_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "blockread_label", blockread_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "blockread_label", blockread_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (blockread_label);
   gtk_table_attach (GTK_TABLE (table5), blockread_label, 1, 2, 1, 2,
@@ -541,7 +541,7 @@ create_GHC_Visualisation_Tool (void)
 
   blockwrite_label = gtk_label_new ("label30");
   gtk_widget_ref (blockwrite_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "blockwrite_label", blockwrite_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "blockwrite_label", blockwrite_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (blockwrite_label);
   gtk_table_attach (GTK_TABLE (table5), blockwrite_label, 1, 2, 2, 3,
@@ -550,7 +550,7 @@ create_GHC_Visualisation_Tool (void)
 
   blockmvar_label = gtk_label_new ("label31");
   gtk_widget_ref (blockmvar_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "blockmvar_label", blockmvar_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "blockmvar_label", blockmvar_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (blockmvar_label);
   gtk_table_attach (GTK_TABLE (table5), blockmvar_label, 1, 2, 3, 4,
@@ -559,7 +559,7 @@ create_GHC_Visualisation_Tool (void)
 
   blockthrowto_label = gtk_label_new ("label32");
   gtk_widget_ref (blockthrowto_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "blockthrowto_label", blockthrowto_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "blockthrowto_label", blockthrowto_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (blockthrowto_label);
   gtk_table_attach (GTK_TABLE (table5), blockthrowto_label, 1, 2, 4, 5,
@@ -568,7 +568,7 @@ create_GHC_Visualisation_Tool (void)
 
   blockbh_label = gtk_label_new ("label33");
   gtk_widget_ref (blockbh_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "blockbh_label", blockbh_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "blockbh_label", blockbh_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (blockbh_label);
   gtk_table_attach (GTK_TABLE (table5), blockbh_label, 1, 2, 5, 6,
@@ -577,7 +577,7 @@ create_GHC_Visualisation_Tool (void)
 
   sleeping_label = gtk_label_new ("label34");
   gtk_widget_ref (sleeping_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "sleeping_label", sleeping_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "sleeping_label", sleeping_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (sleeping_label);
   gtk_table_attach (GTK_TABLE (table5), sleeping_label, 1, 2, 6, 7,
@@ -586,7 +586,7 @@ create_GHC_Visualisation_Tool (void)
 
   hseparator1 = gtk_hseparator_new ();
   gtk_widget_ref (hseparator1);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "hseparator1", hseparator1,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "hseparator1", hseparator1,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (hseparator1);
   gtk_table_attach (GTK_TABLE (table5), hseparator1, 0, 1, 7, 8,
@@ -595,7 +595,7 @@ create_GHC_Visualisation_Tool (void)
 
   hseparator2 = gtk_hseparator_new ();
   gtk_widget_ref (hseparator2);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "hseparator2", hseparator2,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "hseparator2", hseparator2,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (hseparator2);
   gtk_table_attach (GTK_TABLE (table5), hseparator2, 1, 2, 7, 8,
@@ -604,7 +604,7 @@ create_GHC_Visualisation_Tool (void)
 
   label35 = gtk_label_new ("Total");
   gtk_widget_ref (label35);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "label35", label35,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label35", label35,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (label35);
   gtk_table_attach (GTK_TABLE (table5), label35, 0, 1, 8, 9,
@@ -614,7 +614,7 @@ create_GHC_Visualisation_Tool (void)
 
   total_label = gtk_label_new ("label36");
   gtk_widget_ref (total_label);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "total_label", total_label,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "total_label", total_label,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (total_label);
   gtk_table_attach (GTK_TABLE (table5), total_label, 1, 2, 8, 9,
@@ -623,14 +623,14 @@ create_GHC_Visualisation_Tool (void)
 
   frame6 = gtk_frame_new ("Updates");
   gtk_widget_ref (frame6);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "frame6", frame6,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "frame6", frame6,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (frame6);
   gtk_box_pack_start (GTK_BOX (vbox5), frame6, FALSE, FALSE, 0);
 
   vbox7 = gtk_vbox_new (FALSE, 10);
   gtk_widget_ref (vbox7);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox7", vbox7,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox7", vbox7,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox7);
   gtk_container_add (GTK_CONTAINER (frame6), vbox7);
@@ -638,7 +638,7 @@ create_GHC_Visualisation_Tool (void)
 
   vbox9 = gtk_vbox_new (FALSE, 0);
   gtk_widget_ref (vbox9);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox9", vbox9,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox9", vbox9,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox9);
   gtk_box_pack_start (GTK_BOX (vbox7), vbox9, TRUE, TRUE, 0);
@@ -646,7 +646,7 @@ create_GHC_Visualisation_Tool (void)
   cont_radio = gtk_radio_button_new_with_label (grp1_group, "Continuous");
   grp1_group = gtk_radio_button_group (GTK_RADIO_BUTTON (cont_radio));
   gtk_widget_ref (cont_radio);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "cont_radio", cont_radio,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "cont_radio", cont_radio,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (cont_radio);
   gtk_box_pack_start (GTK_BOX (vbox9), cont_radio, FALSE, FALSE, 0);
@@ -655,7 +655,7 @@ create_GHC_Visualisation_Tool (void)
   stop_before_radio = gtk_radio_button_new_with_label (grp1_group, "Stop before GC");
   grp1_group = gtk_radio_button_group (GTK_RADIO_BUTTON (stop_before_radio));
   gtk_widget_ref (stop_before_radio);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "stop_before_radio", stop_before_radio,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "stop_before_radio", stop_before_radio,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (stop_before_radio);
   gtk_box_pack_start (GTK_BOX (vbox9), stop_before_radio, FALSE, FALSE, 0);
@@ -663,7 +663,7 @@ create_GHC_Visualisation_Tool (void)
   stop_after_radio = gtk_radio_button_new_with_label (grp1_group, "Stop after GC");
   grp1_group = gtk_radio_button_group (GTK_RADIO_BUTTON (stop_after_radio));
   gtk_widget_ref (stop_after_radio);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "stop_after_radio", stop_after_radio,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "stop_after_radio", stop_after_radio,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (stop_after_radio);
   gtk_box_pack_start (GTK_BOX (vbox9), stop_after_radio, FALSE, FALSE, 0);
@@ -671,42 +671,42 @@ create_GHC_Visualisation_Tool (void)
   stop_both_radio = gtk_radio_button_new_with_label (grp1_group, "Stop before & after GC");
   grp1_group = gtk_radio_button_group (GTK_RADIO_BUTTON (stop_both_radio));
   gtk_widget_ref (stop_both_radio);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "stop_both_radio", stop_both_radio,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "stop_both_radio", stop_both_radio,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (stop_both_radio);
   gtk_box_pack_start (GTK_BOX (vbox9), stop_both_radio, FALSE, FALSE, 0);
 
   vbox8 = gtk_vbox_new (FALSE, 0);
   gtk_widget_ref (vbox8);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "vbox8", vbox8,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "vbox8", vbox8,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (vbox8);
   gtk_box_pack_start (GTK_BOX (vbox7), vbox8, FALSE, FALSE, 0);
 
   stop_but = gtk_button_new_with_label ("Stop");
   gtk_widget_ref (stop_but);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "stop_but", stop_but,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "stop_but", stop_but,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (stop_but);
   gtk_box_pack_start (GTK_BOX (vbox8), stop_but, FALSE, FALSE, 0);
 
   continue_but = gtk_button_new_with_label ("Continue");
   gtk_widget_ref (continue_but);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "continue_but", continue_but,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "continue_but", continue_but,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (continue_but);
   gtk_box_pack_start (GTK_BOX (vbox8), continue_but, FALSE, FALSE, 0);
 
   quit_but = gtk_button_new_with_label ("Quit");
   gtk_widget_ref (quit_but);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "quit_but", quit_but,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "quit_but", quit_but,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (quit_but);
   gtk_box_pack_end (GTK_BOX (vbox5), quit_but, FALSE, FALSE, 0);
 
   statusbar = gtk_statusbar_new ();
   gtk_widget_ref (statusbar);
-  gtk_object_set_data_full (GTK_OBJECT (GHC_Visualisation_Tool), "statusbar", statusbar,
+  gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "statusbar", statusbar,
                             (GtkDestroyNotify) gtk_widget_unref);
   gtk_widget_show (statusbar);
   gtk_box_pack_start (GTK_BOX (vbox1), statusbar, FALSE, FALSE, 0);
@@ -733,6 +733,6 @@ create_GHC_Visualisation_Tool (void)
                       GTK_SIGNAL_FUNC (on_quit_but_clicked),
                       NULL);
 
-  return GHC_Visualisation_Tool;
+  return GHC_Front_Panel;
 }
 

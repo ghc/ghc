@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.1 2000/11/01 11:41:47 simonmar Exp $
+ * $Id: FrontPanel.c,v 1.2 2000/11/01 11:57:29 simonmar Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -128,7 +128,7 @@ initFrontPanel( void )
 
     gtk_init( &prog_argc, &prog_argv );
 
-    window = create_GHC_Visualisation_Tool();
+    window = create_GHC_Front_Panel();
     map_drawing_area  = lookup_widget(window, "memmap");
     gen_drawing_area  = lookup_widget(window, "generations");
     res_drawing_area  = lookup_widget(window, "res_drawingarea");
