@@ -17,14 +17,13 @@ stat_exit
 #define NON_POSIX_SOURCE /*needed for solaris2 only?*/
 #endif
 
-/* how is this to work given we have not read platform.h yet? */
-#ifdef hpux_TARGET_OS
-#define _INCLUDE_HPUX_SOURCE
-#endif
-
 #define NULL_REG_MAP
 #include "SMinternal.h"
 #include "Ticky.h"
+
+#ifdef hpux_TARGET_OS
+#define _INCLUDE_HPUX_SOURCE
+#endif
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -54,6 +53,24 @@ stat_exit
 #include <sys/syscall.h>
 #define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
 #define HAVE_GETRUSAGE
+#endif
+
+/*
+ getrusage() is not the preferred way of getting at process-specific
+ info under Solaris...at least it wasn't. It was supported via a BSD
+ compatibility library in 2.4, whereas 2.5 has it in libc.
+
+ The upshot of this change of heart is that we cannot rely on getrusage()
+ being available via libc, i.e., 2.5 binaries will not run under 2.4
+ without some extra work. Could use libucb under 2.5 as well, but
+ a simpler solution is simply to avoid the problem and stay away
+ from getrusage() for Solaris   -- SOF
+*/
+#if solaris2_TARGET_OS
+#undef __STRICT_ANSI__  /* oh, dear */
+#include <sys/fcntl.h>
+#include <sys/signal.h>
+#include <sys/procfs.h>
 #endif
 
 static StgDouble GC_start_time,  GC_tot_time = 0;  /* User GC Time */
@@ -116,22 +133,19 @@ usertime()
 
 #else /* not stumped */
 
-/* "times" is the more standard, but we prefer "getrusage"
-    (because we are old worn-out BSD hackers)
-*/
-# if defined(HAVE_GETRUSAGE) && ! irix_TARGET_OS
-    struct rusage t;
-
-    getrusage(RUSAGE_SELF, &t);
-    return(t.ru_utime.tv_sec + 1e-6*t.ru_utime.tv_usec);
-
-# else /* HAVE_TIMES */
+# if defined(HAVE_TIMES) 
     struct tms t;
 
     times(&t);
     return(((StgDouble)(t.tms_utime))/TicksPerSecond);
 
-# endif /* HAVE_TIMES */
+#else /* HAVE_GETRUSAGE */
+    struct rusage t;
+
+    getrusage(RUSAGE_SELF, &t);
+    return(t.ru_utime.tv_sec + 1e-6*t.ru_utime.tv_usec);
+
+# endif /* HAVE_GETRUSAGE */
 #endif /* not stumped */
 }
 
@@ -208,18 +222,60 @@ void end_init(STG_NO_ARGS)
     InitElapsedTime = elapsedtime();
 }
 
+#if defined(solaris2_TARGET_OS)
 static I_
 pagefaults(STG_NO_ARGS)
 {
-#if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS || cygwin32_TARGET_OS
+    int         fd;
+    char        proc[30]; /* Will break when PIDs are repr. by more than 64bits */
+    prusage_t   prusage;
+
+    /* Under Solaris, we get at the number of major page faults
+       via the process file descriptor and ioctl()ing with 
+       PIOCUSAGE to get the prusage_t structure.
+       (as per proc(4) man page and Solaris porting FAQ).
+    */
+    sprintf(proc,"/proc/%d", getpid()); /* ToDo: this string is static 
+    					   per process, optimise? */
+
+    while ((fd = open(proc, O_RDONLY)) != 0) {
+      if ( errno != EINTR ) {
+	     fflush(stdout);
+	     fprintf(stderr,"pagefaults: open() failed\n");
+	     EXIT(EXIT_FAILURE);
+	}
+    }
+    while (ioctl(fd, PIOCUSAGE, &prusage) != 0 ) {
+      if (errno != EINTR) {
+	     fflush(stdout);
+	     fprintf(stderr,"pagefaults: ioctl() failed\n");
+             EXIT(EXIT_FAILURE);
+	}
+    }
+    while ((close(fd)) != 0) {
+      if (errno != EINTR) {
+	    fflush(stdout);
+	    fprintf(stderr, "pagefaults: close() failed\n");
+	    EXIT(EXIT_FAILURE);
+      }	
+    }
+    return prusage.pr_majf;
+}
+#else 
+
+static I_
+pagefaults(STG_NO_ARGS)
+{
+# if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS || cygwin32_TARGET_OS
     return 0;
-#else
+# else
     struct rusage t;
 
     getrusage(RUSAGE_SELF, &t);
     return(t.ru_majflt);
-#endif
+# endif
 }
+#endif
 
 /* Called at the beginning of execution of the program */
 /* Writes the command line and inits stats header */
