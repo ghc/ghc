@@ -18,6 +18,9 @@ IMPORT_1_3(Char (isAlphanum,ord,chr))
 CHK_Ubiq() -- debugging consistency check
 
 import Pretty
+#if __GLASGOW_HASKELL__ >= 209
+import Addr
+#endif
 
 \end{code}
 

@@ -634,8 +634,8 @@ pprCCall sty op@(CCallOp op_str is_asm may_gc _ _) args results liveness_mask vo
     (pp_saves, pp_restores) = ppr_vol_regs sty vol_regs
     (pp_save_context, pp_restore_context) =
 	if may_gc
-	then (	text "extern StgInt inCCallGC; SaveAllStgRegs(); inCCallGC++;",
-		text "inCCallGC--; RestoreAllStgRegs();")
+	then (	text "do { extern StgInt inCCallGC; SaveAllStgRegs(); inCCallGC++;",
+		text "inCCallGC--; RestoreAllStgRegs();} while(0);")
 	else (	pp_basic_saves $$ pp_saves,
 		pp_basic_restores $$ pp_restores)
 
