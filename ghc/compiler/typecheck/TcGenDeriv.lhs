@@ -1085,16 +1085,32 @@ gen_Data_binds fix_env tycon
     to_con_eqn dc = ([nlWildConPat dc], nlHsVar (mk_constr_name dc))
     
 	------------ dataTypeOf
-    dataTypeOf_bind = mk_easy_FunBind tycon_loc dataTypeOf_RDR [wildPat] 
-					  emptyBag (nlHsVar data_type_name)
+    dataTypeOf_bind = mkVarBind
+                        tycon_loc
+                        dataTypeOf_RDR
+                        (nlHsVar data_type_name)
 
 	------------ $dT
+
+    data_type_name = mkDerivedRdrName tycon_name mkDataTOcc
+    datatype_bind  = mk_easy_FunBind
+                       tycon_loc
+                       data_type_name
+                       [a_Pat]
+                       emptyBag
+		       (           nlHsVar mkDataType_RDR 
+                         `nlHsApp` nlList constrs
+                         `nlHsApp` nlHsVar a_RDR
+                       )
+    constrs = [nlHsVar (mk_constr_name con) | con <- data_cons]
+
+{-
     data_type_name = mkDerivedRdrName tycon_name mkDataTOcc
     datatype_bind  = mkVarBind tycon_loc data_type_name
 				   (nlHsVar mkDataType_RDR `nlHsApp` 
 				    nlList constrs)
     constrs = [nlHsVar (mk_constr_name con) | con <- data_cons]
-
+-}
 
 	------------ $cT1 etc
     mk_constr_name con = mkDerivedRdrName (dataConName con) mkDataCOcc
@@ -1113,7 +1129,7 @@ gfoldl_RDR     = varQual_RDR gENERICS_Name FSLIT("gfoldl")
 fromConstr_RDR = varQual_RDR gENERICS_Name FSLIT("fromConstr")
 toConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("toConstr")
 dataTypeOf_RDR = varQual_RDR gENERICS_Name FSLIT("dataTypeOf")
-mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkConstr")
+mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkDataConstr")
 mkDataType_RDR = varQual_RDR gENERICS_Name FSLIT("mkDataType")
 conIndex_RDR   = varQual_RDR gENERICS_Name FSLIT("conIndex")
 prefix_RDR     = dataQual_RDR gENERICS_Name FSLIT("Prefix")
