@@ -17,7 +17,6 @@ module OccurAnal (
 
 #include "HsVersions.h"
 
-import BinderInfo
 import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
@@ -33,7 +32,7 @@ import VarSet
 import VarEnv
 
 import Type		( splitFunTy_maybe, splitForAllTys )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( u2i )
@@ -55,7 +54,7 @@ Here's the externally-callable interface:
 \begin{code}
 occurAnalyseExpr :: (Id -> Bool)	-- Tells if a variable is interesting
 		 -> CoreExpr
-		 -> (IdEnv BinderInfo,	-- Occ info for interesting free vars
+		 -> (IdEnv OccInfo,	-- Occ info for interesting free vars
 		     CoreExpr)
 
 occurAnalyseExpr interesting expr
@@ -527,7 +526,7 @@ occAnalRhs env id rhs
 	-- die too unless they are already referenced directly.
 
     final_usage = foldVarSet add rhs_usage (idRuleVars id)
-    add v u = addOneOcc u v noBinderInfo	-- Give a non-committal binder info
+    add v u = addOneOcc u v NoOccInfo		-- Give a non-committal binder info
 						-- (i.e manyOcc) because many copies
 						-- of the specialised thing can appear
 \end{code}
@@ -545,7 +544,7 @@ occAnal env (Type t)  = (emptyDetails, Type t)
 occAnal env (Var v) 
   = (var_uds, Var v)
   where
-    var_uds | isCandidate env v = unitVarEnv v funOccZero
+    var_uds | isCandidate env v = unitVarEnv v oneOcc
 	    | otherwise	        = emptyDetails
 
     -- At one stage, I gathered the idRuleVars for v here too,
@@ -686,7 +685,7 @@ occAnalApp env (Var fun, args)
   where
     fun_uniq = idUnique fun
 
-    fun_uds | isCandidate env fun = unitVarEnv fun funOccZero
+    fun_uds | isCandidate env fun = unitVarEnv fun oneOcc
 	    | otherwise	  	  = emptyDetails
 
     args_stuff	| fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
@@ -811,20 +810,20 @@ oneShotGroup (OccEnv ifun cands ctxt) bndrs
 zapCtxt env@(OccEnv ifun cands []) = env
 zapCtxt     (OccEnv ifun cands _ ) = OccEnv ifun cands []
 
-type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
+type UsageDetails = IdEnv OccInfo	-- A finite map from ids to their usage
 
 combineUsageDetails, combineAltsUsageDetails
 	:: UsageDetails -> UsageDetails -> UsageDetails
 
 combineUsageDetails usage1 usage2
-  = plusVarEnv_C addBinderInfo usage1 usage2
+  = plusVarEnv_C addOccInfo usage1 usage2
 
 combineAltsUsageDetails usage1 usage2
-  = plusVarEnv_C orBinderInfo usage1 usage2
+  = plusVarEnv_C orOccInfo usage1 usage2
 
-addOneOcc :: UsageDetails -> Id -> BinderInfo -> UsageDetails
+addOneOcc :: UsageDetails -> Id -> OccInfo -> UsageDetails
 addOneOcc usage id info
-  = plusVarEnv_C addBinderInfo usage (unitVarEnv id info)
+  = plusVarEnv_C addOccInfo usage (unitVarEnv id info)
 	-- ToDo: make this more efficient
 
 emptyDetails = (emptyVarEnv :: UsageDetails)
@@ -856,23 +855,56 @@ tagBinder usage binder
    in
    usage' `seq` (usage', binder')
 
-
 setBinderOcc :: UsageDetails -> CoreBndr -> CoreBndr
 setBinderOcc usage bndr
   | isTyVar bndr      = bndr
-  | isExportedId bndr 
-  = -- Don't use local usage info for visible-elsewhere things
-    -- BUT *do* erase any IAmALoopBreaker annotation, because we're
-    -- about to re-generate it and it shouldn't be "sticky"
-    case idOccInfo bndr of
-	NoOccInfo -> bndr
-	other     -> setIdOccInfo bndr NoOccInfo
+  | isExportedId bndr = case idOccInfo bndr of
+			  NoOccInfo -> bndr
+			  other     -> setIdOccInfo bndr NoOccInfo
+  	    -- Don't use local usage info for visible-elsewhere things
+	    -- BUT *do* erase any IAmALoopBreaker annotation, because we're
+	    -- about to re-generate it and it shouldn't be "sticky"
 			  
-  | otherwise         = setIdOccInfo bndr occ_info
+  | otherwise = setIdOccInfo bndr occ_info
   where
-    occ_info = case lookupVarEnv usage bndr of
-		 Nothing   -> IAmDead
-		 Just info -> binderInfoToOccInfo info
+    occ_info = lookupVarEnv usage bndr `orElse` IAmDead
+\end{code}
 
-funOccZero = funOccurrence 0
+
+%************************************************************************
+%*									*
+\subsection{Operations over OccInfo}
+%*									*
+%************************************************************************
+
+\begin{code}
+oneOcc :: OccInfo
+oneOcc = OneOcc False True
+
+markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
+
+markMany IAmDead = IAmDead
+markMany other   = NoOccInfo
+
+markInsideSCC occ = markMany occ
+
+markInsideLam (OneOcc _ one_br) = OneOcc True one_br
+markInsideLam occ		= occ
+
+addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
+
+addOccInfo IAmDead info2 = info2
+addOccInfo info1 IAmDead = info1
+addOccInfo info1 info2   = NoOccInfo
+
+-- (orOccInfo orig new) is used
+-- when combining occurrence info from branches of a case
+
+orOccInfo IAmDead info2 = info2
+orOccInfo info1 IAmDead = info1
+orOccInfo (OneOcc in_lam1 one_branch1)
+	  (OneOcc in_lam2 one_branch2)
+  = OneOcc (in_lam1 || in_lam2) (one_branch1 && one_branch2)
+
+orOccInfo info1 info2 = NoOccInfo
 \end{code}
