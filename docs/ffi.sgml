@@ -680,7 +680,7 @@ defines the mapping between Haskell and C types.
 <Entry> <Literal>HsWord8</Literal> </Entry>
 <Entry> 8 bit unsigned integral </Entry>
 <Entry> <Literal>0</Literal> ..
-<Entry> <Literal>HS&lowbar;WORD8&lowbar;MAX</Literal></Entry>
+<Literal>HS&lowbar;WORD8&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
@@ -688,7 +688,7 @@ defines the mapping between Haskell and C types.
 <Entry> <Literal>HsWord16</Literal> </Entry>
 <Entry> 16 bit unsigned integral </Entry>
 <Entry> <Literal>0</Literal> ..
-<Entry> <Literal>HS&lowbar;WORD16&lowbar;MAX</Literal></Entry>
+<Literal>HS&lowbar;WORD16&lowbar;MAX</Literal></Entry>
 </Row>
 <Row>
 <Entry>
@@ -1285,7 +1285,7 @@ contain the address of the label <Literal>freeAtLast</Literal>.
 </Sect2>
 
 </Sect1>
-
+<!-- This doesn't need to be seen in the docs
 <Sect1 id="sec-changelog">
 <Title>Change history
 </Title>
@@ -1296,14 +1296,14 @@ contain the address of the label <Literal>freeAtLast</Literal>.
 <ListItem>
 
 <Para>
-0.95 --&gt; 0.96:
+0.95 &gt; 0.96:
 
 <ItemizedList>
 <ListItem>
 
 <Para>
 changed the C representation of <Literal>Haskell&lowbar;ForeignObj</Literal> from
-<Literal>(long*)</Literal> to <Literal>(void*)</Literal> -- ANSI C guarantees that <Literal>(void*)</Literal>
+<Literal>(long*)</Literal> to <Literal>(void*)</Literal>  ANSI C guarantees that <Literal>(void*)</Literal>
 is the widest possible data pointer.
 </Para>
 </ListItem>
@@ -1328,7 +1328,7 @@ Replaced confusing uses of <Literal>stdcall</Literal> with <Literal>ccall</Liter
 <ListItem>
 
 <Para>
-0.96 --&gt; 0.97:
+0.96 &gt; 0.97:
 
 <ItemizedList>
 <ListItem>
@@ -1380,7 +1380,7 @@ FFI types rather than the longer <Literal>Haskell&lowbar;</Literal>.
 <ListItem>
 
 <Para>
-0.97 --&gt; 0.98:
+0.97 &gt; 0.98:
 
 <ItemizedList>
 <ListItem>
@@ -1412,7 +1412,7 @@ functions.
 <ListItem>
 
 <Para>
-0.98 --&gt; 0.99:
+0.98 &gt; 0.99:
 
 <ItemizedList>
 <ListItem>
@@ -1438,7 +1438,7 @@ in that section was contributed by Sven Panne.)
 <ListItem>
 
 <Para>
-0.99 --&gt; 0.99.1:
+0.99 &gt; 0.99.1:
 
 <ItemizedList>
 <ListItem>
@@ -1460,3 +1460,4 @@ in that section was contributed by Sven Panne.)
 </Para>
 
 </Sect1>
+-->
