@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.66 2000/10/11 10:17:32 rrt Exp $
+-- $Id: Main.hs,v 1.67 2000/10/11 10:21:10 rrt Exp $
 --
 -- GHC Driver program
 --
@@ -1225,10 +1225,10 @@ getToDo flags
 -- what the suffix of the intermediate files should be, etc.
 
 -- The following compilation pipeline algorithm is fairly hacky.  A
--- better way to do this would be to express the whole comilation as a
+-- better way to do this would be to express the whole compilation as a
 -- data flow DAG, where the nodes are the intermediate files and the
 -- edges are the compilation phases.  This framework would also work
--- nicely if a haskell dependency generator was included in the
+-- nicely if a Haskell dependency generator were included in the
 -- driver.
 
 -- It would also deal much more cleanly with compilation phases that
@@ -1242,7 +1242,7 @@ getToDo flags
 -- the host machine.  For example, when compiling two Haskell files
 -- where one depends on the other, the data flow graph would determine
 -- that the C compiler from the first comilation can be overlapped
--- with the hsc comilation for the second file.
+-- with the hsc compilation for the second file.
 
 data IntermediateFileType
   = Temporary
