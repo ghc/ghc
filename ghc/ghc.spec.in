@@ -122,15 +122,27 @@ make prefix=$RPM_BUILD_ROOT%{prefix}\
 # generate the file list for lib/ _excluding_ all files needed for profiling
 # only
 #
-find $RPM_BUILD_ROOT%{prefix}/lib\
-  ! -type d ! -name '*.p_hi' ! -name '*_p.a' -print >rpm-noprof-lib-files
+# * generating file lists in a BUILD_ROOT spec is a bit tricky: the file list
+#   has to contain complete paths, _but_ without the BUILD_ROOT, we also do
+#   _not_ want have directory names in the list; furthermore, we have to make
+#   sure that any leading / is removed from %{prefix}/lib, as find has to 
+#   interpret the argument as a relative path; however, we have to include the
+#   leading / again in the final file list (otherwise, rpm complains)
+# * isn't there an easier way to do all this?
+#
+dir=`pwd`
+cd $RPM_BUILD_ROOT
+libdir=`echo %{prefix}/lib | sed 's|^/||'`
+find $libdir ! -type d ! -name '*.p_hi' ! -name '*_p.a' -print | sed 's|^|/|'\
+     >$dir/rpm-noprof-lib-files
+cd $dir
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files -f rpm-noprof-lib-files
-%doc docs/ CONTRIB/
-%doc ghc/ANNOUNCE ghc/PATCHLEVEL ghc/README ghc/docs/
+%doc docs/
+%doc ghc/ANNOUNCE ghc/README ghc/docs/
 %doc hslibs/doc/
 %{prefix}/bin/*
 
