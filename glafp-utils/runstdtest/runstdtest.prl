@@ -54,6 +54,13 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $TmpPrefix ="$DEFAULT_TMPDIR";
     $ENV{'TMPDIR'} = "$DEFAULT_TMPDIR"; # set the env var as well
 }
+# If this is Cygwin, ignore eol and CR characters.
+# Perhaps required for MSYS too, although the cygpath
+# bit is hopefully unnecessary.
+if ( `uname | grep CYGWIN` ) {
+    $CONTEXT_DIFF=$CONTEXT_DIFF . " --strip-trailing-cr" ;
+    $TmpPrefix = `cygpath -m $TmpPrefix | tr -d \\\\n`;
+}
 $ScriptFile = "$TmpPrefix/run_me$$";
 $DefaultStdoutFile = "$TmpPrefix/no_stdout$$"; # can't use /dev/null (e.g. Alphas)
 $DefaultStderrFile = "$TmpPrefix/no_stderr$$";
