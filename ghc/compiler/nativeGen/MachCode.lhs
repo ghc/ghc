@@ -2497,6 +2497,9 @@ assignReg_IntCode pk reg src
     getRegister src	    	    `thenNat` \ registers ->
     getNewRegNCG IntRep    	    `thenNat` \ tmp ->
     let 
+        r_dst = registerName registerd tmp
+        r_src = registerName registers r_dst
+        c_src = registerCode registers r_dst
          
         code = c_src `snocOL` 
                MOV L (OpReg r_src) (OpReg r_dst)
