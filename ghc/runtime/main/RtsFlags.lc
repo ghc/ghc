@@ -82,13 +82,22 @@ initRtsFlagsDefaults (STG_NO_ARGS)
     RTSflags.ProfFlags.typeSelector  = NULL;
     RTSflags.ProfFlags.kindSelector  = NULL;
 #endif /* PROFILING */
+/* there really shouldn't be a threads limit for concurrent mandatory threads.
+   For now, unlimitied means less than 64k (there's a storage overhead) -- SOF
+*/
+#if defined(CONCURRENT) && !defined(GRAN)
+    RTSflags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
+    RTSflags.ConcFlags.maxThreads	= 65536;
+    RTSflags.ConcFlags.stkChunkSize	= 1024;
+    RTSflags.ConcFlags.maxLocalSparks	= 65536;
+#endif /* CONCURRENT only */
 
-#ifdef CONCURRENT
+#if GRAN
     RTSflags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
     RTSflags.ConcFlags.maxThreads	= 32;
     RTSflags.ConcFlags.stkChunkSize	= 1024;
     RTSflags.ConcFlags.maxLocalSparks	= 500;
-#endif /* CONCURRENT */
+#endif /* GRAN */
 
 #ifdef PAR
     RTSflags.ParFlags.parallelStats	= rtsFalse;
