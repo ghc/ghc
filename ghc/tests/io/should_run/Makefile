@@ -15,6 +15,7 @@ io011_HC_OPTS += -fglasgow-exts -package lang
 io018_HC_OPTS += -fglasgow-exts -package lang
 io022_HC_OPTS += -fglasgow-exts -package lang
 io032_HC_OPTS += -fglasgow-exts -package lang
+io035_HC_OPTS += -package lang
 
 io004_RUNTEST_OPTS += -x 42
 io016_RUNTEST_OPTS += io016.hs io016.out
