@@ -486,8 +486,8 @@ mkWWcpr body_ty ReturnsCPR
 	work_wild = mk_ww_local work_uniq body_ty
 	arg	  = mk_ww_local arg_uniq  con_arg_ty1
       in
-      returnUs (\ wkr_call -> Case wkr_call arg       [(DEFAULT, [], mkConApp data_con (map Type tycon_arg_tys ++ [Var arg]))],
-		\ body     -> Case body     work_wild [(DataAlt data_con, [arg], Var arg)],
+      returnUs (\ wkr_call -> Case wkr_call arg [(DEFAULT, [], mkConApp data_con (map Type tycon_arg_tys ++ [Var arg]))],
+		\ body     -> workerCase body work_wild [(DataAlt data_con, [arg], Var arg)],
 		con_arg_ty1)
 
     | otherwise		-- The general case
@@ -501,12 +501,26 @@ mkWWcpr body_ty ReturnsCPR
         con_app			       = mkConApp data_con    (map Type tycon_arg_tys ++ arg_vars)
       in
       returnUs (\ wkr_call -> Case wkr_call wrap_wild [(DataAlt ubx_tup_con, args, con_app)],
-		\ body     -> Case body     work_wild [(DataAlt data_con,    args, ubx_tup_app)],
+		\ body     -> workerCase body work_wild [(DataAlt data_con,    args, ubx_tup_app)],
 		ubx_tup_ty)
     where
       (_, tycon_arg_tys, data_con, con_arg_tys) = splitProductType "mkWWcpr" body_ty
       n_con_args  = length con_arg_tys
       con_arg_ty1 = head con_arg_tys
+
+-- If the original function looked like
+--	f = \ x -> _scc_ "foo" E
+--
+-- then we want the CPR'd worker to look like
+--	\ x -> _scc_ "foo" (case E of I# x -> x)
+-- and definitely not
+--	\ x -> case (_scc_ "foo" E) of I# x -> x)
+--
+-- This transform doesn't move work or allocation
+-- from one cost centre to another
+
+workerCase (Note (SCC cc) e) arg alts = Note (SCC cc) (Case e arg alts)
+workerCase e		     arg alts = Case e arg alts
 \end{code}
 
 
