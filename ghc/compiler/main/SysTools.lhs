@@ -189,16 +189,16 @@ All these pathnames are maintained IN THE NATIVE FORMAT OF THE HOST MACHINE.
 GLOBAL_VAR(v_Pgm_L,   	error "pgm_L",   String)	-- unlit
 GLOBAL_VAR(v_Pgm_P,   	error "pgm_P",   (String,[Option]))	-- cpp
 GLOBAL_VAR(v_Pgm_F,   	error "pgm_F",   String)	-- pp
-GLOBAL_VAR(v_Pgm_c,   	error "pgm_c",   String)	-- gcc
-GLOBAL_VAR(v_Pgm_m,   	error "pgm_m",   String)	-- asm code mangler
-GLOBAL_VAR(v_Pgm_s,   	error "pgm_s",   String)	-- asm code splitter
-GLOBAL_VAR(v_Pgm_a,   	error "pgm_a",   String)	-- as
+GLOBAL_VAR(v_Pgm_c,   	error "pgm_c",   (String,[Option])) -- gcc
+GLOBAL_VAR(v_Pgm_m,   	error "pgm_m",   (String,[Option])) -- asm code mangler
+GLOBAL_VAR(v_Pgm_s,   	error "pgm_s",   (String,[Option])) -- asm code splitter
+GLOBAL_VAR(v_Pgm_a,   	error "pgm_a",   (String,[Option])) -- as
 #ifdef ILX
 GLOBAL_VAR(v_Pgm_I,     error "pgm_I",   String)        -- ilx2il
 GLOBAL_VAR(v_Pgm_i,     error "pgm_i",   String)        -- ilasm
 #endif
-GLOBAL_VAR(v_Pgm_l,   	error "pgm_l",   String)	-- ld
-GLOBAL_VAR(v_Pgm_MkDLL, error "pgm_dll", String)	-- mkdll
+GLOBAL_VAR(v_Pgm_l,   	error "pgm_l",   (String,[Option])) -- ld
+GLOBAL_VAR(v_Pgm_MkDLL, error "pgm_dll", (String,[Option])) -- mkdll
 
 GLOBAL_VAR(v_Pgm_T,    error "pgm_T",    String)	-- touch
 GLOBAL_VAR(v_Pgm_CP,   error "pgm_CP", 	 String)	-- cp
@@ -320,16 +320,20 @@ initSysTools minusB_args
 	--	pick up whatever happens to be lying around in the path,
 	--	possibly including those from a cygwin install on the target,
 	--	which is exactly what we're trying to avoid.
-	; let gcc_path 	| am_installed = installed_bin ("gcc -B\"" ++ installed "gcc-lib/\"")
-		       	| otherwise    = cGCC
+	; let gcc_b_arg = Option ("-B" ++ installed "gcc-lib/")
+	      (gcc_prog,gcc_args)
+		| am_installed = (installed_bin "gcc", [gcc_b_arg])
+		| otherwise    = (cGCC, [])
 		-- The trailing "/" is absolutely essential; gcc seems
-		-- to construct file names simply by concatenating to this
-		-- -B path with no extra slash
-		-- We use "/" rather than "\\" because otherwise "\\\" is mangled
-		-- later on; although gcc_path is in NATIVE format, gcc can cope
+		-- to construct file names simply by concatenating to
+		-- this -B path with no extra slash We use "/" rather
+		-- than "\\" because otherwise "\\\" is mangled
+		-- later on; although gcc_args are in NATIVE format,
+		-- gcc can cope
 		--	(see comments with declarations of global variables)
 		--
-		-- The quotes round the -B argument are in case TopDir has spaces in it
+		-- The quotes round the -B argument are in case TopDir
+		-- has spaces in it
 
 	      perl_path | am_installed = installed_bin cGHC_PERL
 		        | otherwise    = cGHC_PERL
@@ -340,43 +344,49 @@ initSysTools minusB_args
 
 	-- On Win32 we don't want to rely on #!/bin/perl, so we prepend 
 	-- a call to Perl to get the invocation of split and mangle
-	; let split_path  = perl_path ++ " \"" ++ split_script ++ "\""
-	      mangle_path = perl_path ++ " \"" ++ mangle_script ++ "\""
+	; let (split_prog,  split_args)  = (perl_path, [Option split_script])
+	      (mangle_prog, mangle_args) = (perl_path, [Option mangle_script])
 
-	; let mkdll_path 
-	        | am_installed = pgmPath (installed "gcc-lib/") cMKDLL ++
-				 " --dlltool-name " ++ pgmPath (installed "gcc-lib/") "dlltool" ++
-				 " --driver-name " ++ gcc_path
-		| otherwise    = cMKDLL
+	; let (mkdll_prog, mkdll_args)
+	        | am_installed = 
+		    (pgmPath (installed "gcc-lib/") cMKDLL,
+		     [ Option "--dlltool-name",
+		       Option (pgmPath (installed "gcc-lib/") "dlltool"),
+		       Option "--driver-name",
+		       Option gcc_prog, gcc_b_arg ])
+		| otherwise    = (cMKDLL, [])
 #else
 	--		UNIX-SPECIFIC STUFF
 	-- On Unix, the "standard" tools are assumed to be
 	-- in the same place whether we are running "in-place" or "installed"
 	-- That place is wherever the build-time configure script found them.
-	; let   gcc_path   = cGCC
+	; let   gcc_prog   = cGCC
+		gcc_args   = []
 		touch_path = "touch"
-		mkdll_path = panic "Can't build DLLs on a non-Win32 system"
+		mkdll_prog = panic "Can't build DLLs on a non-Win32 system"
+		mkdll_args = []
 
 	-- On Unix, scripts are invoked using the '#!' method.  Binary
 	-- installations of GHC on Unix place the correct line on the front
 	-- of the script at installation time, so we don't want to wire-in
 	-- our knowledge of $(PERL) on the host system here.
-	; let split_path  = split_script
-	      mangle_path = mangle_script
+	; let (split_prog,  split_args)  = (split_script,  [])
+	      (mangle_prog, mangle_args) = (mangle_script, [])
 #endif
 
 	-- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
         -- Config.hs one day.
-        ; let cpp_path  = (gcc_path, (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
+        ; let cpp_path  = (gcc_prog, gcc_args ++ 
+			   (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
 
 	-- For all systems, copy and remove are provided by the host
 	-- system; architecture-specific stuff is done when building Config.hs
 	; let	cp_path = cGHC_CP
 	
 	-- Other things being equal, as and ld are simply gcc
-	; let	as_path  = gcc_path
-		ld_path  = gcc_path
+	; let	(as_prog,as_args)  = (gcc_prog,gcc_args)
+		(ld_prog,ld_args)  = (gcc_prog,gcc_args)
 
 #ifdef ILX
        -- ilx2il and ilasm are specified in Config.hs
@@ -396,16 +406,16 @@ initSysTools minusB_args
 	; writeIORef v_Pgm_L   	 	   unlit_path
 	; writeIORef v_Pgm_P   	 	   cpp_path
 	; writeIORef v_Pgm_F               ""
-	; writeIORef v_Pgm_c   	 	   gcc_path
-	; writeIORef v_Pgm_m   	 	   mangle_path
-	; writeIORef v_Pgm_s   	 	   split_path
-	; writeIORef v_Pgm_a   	 	   as_path
+	; writeIORef v_Pgm_c   	 	   (gcc_prog,gcc_args)
+	; writeIORef v_Pgm_m   	 	   (mangle_prog,mangle_args)
+	; writeIORef v_Pgm_s   	 	   (split_prog,split_args)
+	; writeIORef v_Pgm_a   	 	   (as_prog,as_args)
 #ifdef ILX
 	; writeIORef v_Pgm_I               ilx2il_path
 	; writeIORef v_Pgm_i               ilasm_path
 #endif
-	; writeIORef v_Pgm_l   	 	   ld_path
-	; writeIORef v_Pgm_MkDLL 	   mkdll_path
+	; writeIORef v_Pgm_l   	 	   (ld_prog,ld_args)
+	; writeIORef v_Pgm_MkDLL 	   (mkdll_prog,mkdll_args)
 	; writeIORef v_Pgm_T   	 	   touch_path
 	; writeIORef v_Pgm_CP  	 	   cp_path
 
@@ -430,12 +440,12 @@ setPgmL = writeIORef v_Pgm_L
 -- Config.hs should really use Option.
 setPgmP arg = let (pgm:args) = words arg in writeIORef v_Pgm_P (pgm,map Option args)
 setPgmF = writeIORef v_Pgm_F
-setPgmc = writeIORef v_Pgm_c
-setPgmm = writeIORef v_Pgm_m
-setPgms = writeIORef v_Pgm_s
-setPgma = writeIORef v_Pgm_a
-setPgml = writeIORef v_Pgm_l
-setPgmDLL = writeIORef v_Pgm_MkDLL
+setPgmc prog = writeIORef v_Pgm_c (prog,[])
+setPgmm prog = writeIORef v_Pgm_m (prog,[])
+setPgms prog = writeIORef v_Pgm_s (prog,[])
+setPgma prog = writeIORef v_Pgm_a (prog,[])
+setPgml prog = writeIORef v_Pgm_l (prog,[])
+setPgmDLL prog = writeIORef v_Pgm_MkDLL (prog,[])
 #ifdef ILX
 setPgmI = writeIORef v_Pgm_I
 setPgmi = writeIORef v_Pgm_i
@@ -537,24 +547,24 @@ runPp args =   do p <- readIORef v_Pgm_F
 		  runSomething "Haskell pre-processor" p args
 
 runCc :: [Option] -> IO ()
-runCc args =   do p <- readIORef v_Pgm_c
-	          runSomething "C Compiler" p args
+runCc args =   do (p,args0) <- readIORef v_Pgm_c
+	          runSomething "C Compiler" p (args0++args)
 
 runMangle :: [Option] -> IO ()
-runMangle args = do p <- readIORef v_Pgm_m
-		    runSomething "Mangler" p args
+runMangle args = do (p,args0) <- readIORef v_Pgm_m
+		    runSomething "Mangler" p (args0++args)
 
 runSplit :: [Option] -> IO ()
-runSplit args = do p <- readIORef v_Pgm_s
-		   runSomething "Splitter" p args
+runSplit args = do (p,args0) <- readIORef v_Pgm_s
+		   runSomething "Splitter" p (args0++args)
 
 runAs :: [Option] -> IO ()
-runAs args = do p <- readIORef v_Pgm_a
-		runSomething "Assembler" p args
+runAs args = do (p,args0) <- readIORef v_Pgm_a
+		runSomething "Assembler" p (args0++args)
 
 runLink :: [Option] -> IO ()
-runLink args = do p <- readIORef v_Pgm_l
-	          runSomething "Linker" p args
+runLink args = do (p,args0) <- readIORef v_Pgm_l
+	          runSomething "Linker" p (args0++args)
 
 #ifdef ILX
 runIlx2il :: [Option] -> IO ()
@@ -567,8 +577,8 @@ runIlasm args = do p <- readIORef v_Pgm_i
 #endif
 
 runMkDLL :: [Option] -> IO ()
-runMkDLL args = do p <- readIORef v_Pgm_MkDLL
-	           runSomething "Make DLL" p args
+runMkDLL args = do (p,args0) <- readIORef v_Pgm_MkDLL
+	           runSomething "Make DLL" p (args0++args)
 
 touch :: String -> String -> IO ()
 touch purpose arg =  do p <- readIORef v_Pgm_T
@@ -729,14 +739,8 @@ runSomething :: String		-- For -v message
 
 runSomething phase_name pgm args = do
   let real_args = filter notNull (map showOpt args)
-    -- Don't assume that 'pgm' contains the program path only,
-    -- but split it up and shift any arguments over to the arg vector.
-  let (real_pgm, argv) =
-        case toArgs pgm of
-	  []     -> (pgm, real_args) -- let rawSystem be the bearer of bad news..
-	  (x:xs) -> (x, xs ++ real_args)
-  traceCmd phase_name (unwords (real_pgm : argv)) $ do
-  exit_code <- rawSystem real_pgm argv
+  traceCmd phase_name (unwords (pgm:real_args)) $ do
+  exit_code <- rawSystem pgm real_args
   if (exit_code /= ExitSuccess)
 	then throwDyn (PhaseFailed phase_name exit_code)
 	else return ()
@@ -801,7 +805,7 @@ foreign import ccall "rawSystem" unsafe
 -- itself.
 rawSystem cmd args = do
 	-- NOTE: 'cmd' is assumed to contain the application to run _only_,
-	-- as it'll be quoted surrounded in quotes here.
+	-- as it'll be surrounded in quotes here.
   let cmdline = translate cmd ++ concat (map ((' ':) . translate) args)
   withCString cmdline $ \pcmdline -> do
     status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
@@ -810,11 +814,6 @@ rawSystem cmd args = do
        n  -> return (ExitFailure n)
 
 translate :: String -> String
-translate str@('"':_) = str -- already escaped.
-	-- ToDo: this case is wrong.  It is only here because we
-	-- abuse the system in GHC's SysTools by putting arguments into
-	-- the command name; at some point we should fix it up and remove
-	-- the case above.
 translate str = '"' : snd (foldr escape (True,"\"") str)
   where escape '"'  (b,     str) = (True,  '\\' : '"'  : str)
         escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
