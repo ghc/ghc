@@ -1,0 +1,29 @@
+THISPKG	= base
+SEARCH	=
+
+DIRS	= Data Control Debug System System/IO
+
+SRCS	= \
+	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
+	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
+	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
+	Data/Set.hs Data/Tuple.hs Data/Word.hs \
+	Control/Monad.hs \
+	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs
+
+#	Debug/Trace.hs Debug/QuickCheck.hs
+
+
+# Here are the main rules.
+include ../Makefile.common
+
+
+# Here are the dependencies.
+$(OBJDIR)/Data/FiniteMap.$O: $(OBJDIR)/Data/Maybe.$O
+$(OBJDIR)/Data/Set.$O: $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/FiniteMap.$O
+$(OBJDIR)/System/IO.$O: $(OBJDIR)/System/IO/Error.$O
+
+# C-files dependencies.
+Data/FiniteMap.$C: Data/Maybe.$C
+Data/Set.$C:       Data/Maybe.$C Data/FiniteMap.$C
+System/IO.$C:      System/IO/Error.$C
