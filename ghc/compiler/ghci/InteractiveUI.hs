@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.21 2000/12/12 10:02:57 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.22 2000/12/12 10:11:21 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -20,6 +20,7 @@ import Linker
 import Module
 import Outputable
 import Util
+import TypeRep	{- instance Outputable Type; do not delete -}
 
 import Exception
 #ifndef NO_READLINE
