@@ -40,7 +40,7 @@ import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
 			  uNFOLDING_NOREP_LIT_COST
 			)
-import BinderInfo	( BinderInfo, isOneSameSCCFunOcc,
+import BinderInfo	( BinderInfo, isOneSameSCCFunOcc, isDeadOcc,
 			  isInlinableOcc, isOneSafeFunOcc
 			)
 import CoreSyn
@@ -538,5 +538,11 @@ okToInline id _ _ _		-- Check the Id first
   | idWantsToBeINLINEd id = True
   | idMustNotBeINLINEd id = False
 
-okToInline id whnf small binder_info = isInlinableOcc whnf small binder_info
+okToInline id whnf small binder_info 
+#ifdef DEBUG
+  | isDeadOcc binder_info
+  = pprTrace "okToInline: dead" (ppr id) False
+  | otherwise
+#endif
+  = isInlinableOcc whnf small binder_info
 \end{code}

@@ -233,7 +233,7 @@ mkVanillaId name ty info
 	idInfo = info}
 
 mkIdWithNewUniq :: Id -> Unique -> Id
-mkIdWithNewUniq id uniq = id {idUnique = uniq}
+mkIdWithNewUniq id uniq = id {idUnique = uniq, idName = changeUnique (idName id) uniq}
 
 mkIdWithNewName :: Id -> Name -> Id
 mkIdWithNewName id new_name
@@ -562,7 +562,7 @@ getIdDemandInfo id = demandInfo (idInfo id)
 addIdDemandInfo :: Id -> DemandInfo -> Id
 addIdDemandInfo id@(Id {idInfo = info}) demand_info
   = id {idInfo = demand_info `setDemandInfo` info}
-\end{code}
+\end{code}p
 
 \begin{code}
 getIdUpdateInfo :: Id -> UpdateInfo

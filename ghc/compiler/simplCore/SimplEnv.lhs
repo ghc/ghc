@@ -441,8 +441,7 @@ extendEnvGivenUnfolding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subs
 	              out_id occ_info rhs_info
   = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) con_apps
   where
-    new_in_scope_ids = addToUFM_C modifyOutEnvItem in_scope_ids out_id 
-				  (out_id, occ_info, rhs_info)
+    new_in_scope_ids = addToUFM in_scope_ids out_id (out_id, occ_info, rhs_info)
 \end{code}
 
 

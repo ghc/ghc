@@ -610,12 +610,13 @@ simplDefault env (Var scrut_var) (BindDefault binder@(_,occ_info) rhs)
 	     info_from_this_case rhs_c
   = simplBinder env binder 	`thenSmpl` \ (env1, binder') ->
     let
-      env2    = extendEnvGivenUnfolding env1 binder' occ_info info_from_this_case
+      env2 = extendEnvGivenNewRhs env1 scrut_var (Var binder')
 
 	-- Add form details for the default binder
-      scrut_info = lookupUnfolding env scrut_var
-      env3       = extendEnvGivenUnfolding env2 binder' occ_info scrut_info
-      new_env    = extendEnvGivenNewRhs env3 scrut_var (Var binder')
+      scrut_unf = lookupUnfolding env scrut_var
+      new_env   = extendEnvGivenUnfolding env2 binder' noBinderInfo scrut_unf
+			-- Use noBinderInfo rather than occ_info because we've
+			-- added more occurrences by binding the scrut_var to it
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
     returnSmpl (BindDefault binder' rhs')
