@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.15 2000/04/27 16:35:30 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.16 2000/05/12 11:59:39 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -469,7 +469,7 @@ unpackArgsAndCallHaskell_x86_nocallconv_wrk ( StgStablePtr stableptr,
       sstat = rts_evalIO ( node, &nodeOut );
    } else {
       node = rts_apply ( 
-                getHugs_BCO_cptr_for("primRunST"), 
+                getHugs_BCO_cptr_for("runST"), 
                 node );
       sstat = rts_eval ( node, &nodeOut );
    }

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.41 $
- * $Date: 2000/05/10 09:00:20 $
+ * $Revision: 1.42 $
+ * $Date: 2000/05/12 11:59:38 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -451,6 +451,7 @@ extern  Void  foreignImport     ( Cell,Text,Pair,Cell,Cell );
 extern  Void  foreignExport     ( Cell,Text,Cell,Cell,Cell );
 
 extern  Void  implementForeignImport ( Name );
+extern  Text  makeTypeDescrText      ( Type );
 extern  Void  implementForeignExport ( Name );
 
 extern  List  foreignExports;            /* foreign export declarations     */

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.34 $
- * $Date: 2000/04/27 16:35:29 $
+ * $Revision: 1.35 $
+ * $Date: 2000/05/12 11:59:39 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -30,22 +30,6 @@ static StgVar     local stgText      ( Text,List );
 static StgRhs     local stgRhs       ( Cell,Int,List,StgExpr );
 static StgCaseAlt local stgCaseAlt   ( Cell,Int,List,StgExpr );
 static StgExpr    local stgExpr      ( Cell,Int,List,StgExpr );
-
-/* ---------------------------------------------------------------- */
-
-#if 0
-static StgVar local getSTGTupleVar ( Cell d )
-{
-    Pair p = cellAssoc(d,stgGlobals);
-    /* Yoiks - only the Prelude sees Tuple decls! */
-    if (isNull(p)) {
-        implementTuple(tupleOf(d));
-        p = cellAssoc(d,stgGlobals);
-    }
-    assert(nonNull(p));
-    return snd(p);
-}
-#endif
 
 /* ---------------------------------------------------------------- */
 
@@ -85,7 +69,6 @@ StgExpr failExpr; {
     case VAROPCELL:
             return stgText(textOf(e),sc);
     case TUPLE: 
-      /* return getSTGTupleVar(e); */
          return e;
     case NAME:
             return e;
@@ -886,6 +869,7 @@ Void implementForeignImport ( Name n )
 }
 
 
+
 /* Generate code:
  *
  * \ fun ->
@@ -896,22 +880,20 @@ Void implementForeignImport ( Name n )
    we require, and check that,
      fun :: prim_arg* -> IO prim_result
  */
-Void implementForeignExport ( Name n )
+Text makeTypeDescrText ( Type t )
 {
-    Type t         = name(n).type;
     List argTys    = NIL;
     List resultTys = NIL;
-    Char cc_char;
+    List tdList;
 
+#if 0
+    // I don't understand what this achieves.
     if (getHead(t)==typeArrow && argCount==2) {
        t = arg(fun(t));
     } else {
-        ERRMSG(name(n).line) "foreign export has illegal type" ETHEN
-        ERRTEXT " \"" ETHEN ERRTYPE(t);
-        ERRTEXT "\""
-        EEND;        
+        return NIL;
     }
-
+#endif
     while (getHead(t)==typeArrow && argCount==2) {
         Type ta = fullExpand(arg(fun(t)));
         Type tr = arg(t);
@@ -924,14 +906,35 @@ Void implementForeignExport ( Name n )
         assert(length(resultTys) == 1);
         resultTys = hd(resultTys);
     } else {
-        ERRMSG(name(n).line) "function to be exported doesn't return an IO type: " ETHEN
-        ERRTEXT " \"" ETHEN ERRTYPE(t);
-        ERRTEXT "\""
-        EEND;        
+        return NIL;
     }
     resultTys = fullExpand(resultTys);
 
     mapOver(foreignInboundTy,argTys);
+
+    tdList = cons(mkChar(':'),argTys);
+    if (resultTys != typeUnit)
+       tdList = cons(foreignOutboundTy(resultTys),tdList);
+
+    return findText(charListToString ( tdList ));
+}
+
+
+Void implementForeignExport ( Name n )
+{
+    Text     tdText;
+    List     args;
+    StgVar   e1, e2, e3, v;
+    StgExpr  fun;
+    Char     cc_char;
+
+    tdText = makeTypeDescrText ( name(n).type );
+    if (isNull(tdText)) {
+        ERRMSG(name(n).line) "foreign export has illegal type" ETHEN
+        ERRTEXT " \"" ETHEN ERRTYPE(name(n).type);
+        ERRTEXT "\""
+        EEND;
+    }
 
     /* ccall is the default convention, if it wasn't specified */
     if (isNull(name(n).callconv)
@@ -948,18 +951,6 @@ Void implementForeignExport ( Name n )
     else
        internal ( "implementForeignExport: unknown calling convention");
 
-    {
-    List     tdList;
-    Text     tdText;
-    List     args;
-    StgVar   e1, e2, e3, v;
-    StgExpr  fun;
-
-    tdList = cons(mkChar(':'),argTys);
-    if (resultTys != typeUnit)
-       tdList = cons(foreignOutboundTy(resultTys),tdList);
-
-    tdText = findText(charListToString ( tdList ));
     args   = makeArgs(1);
     e1     = mkStgVar(
                 mkStgCon(nameMkA,singleton(ap(STRCELL,tdText))),
@@ -989,7 +980,6 @@ Void implementForeignExport ( Name n )
     name(n).defn     = NIL;    
     name(n).closure  = v;
     addToCodeList ( currentModule, n );
-    }
 }
 
 Void implementTuple(size)

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.70 $
- * $Date: 2000/05/10 09:00:20 $
+ * $Revision: 1.71 $
+ * $Date: 2000/05/12 11:59:39 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -27,6 +27,8 @@
 #include "RtsAPI.h"
 #include "Schedule.h"
 #include "Assembler.h"                                /* DEBUG_LoadSymbols */
+#include "ForeignCall.h"                                 /* createAdjThunk */
+
 
 Bool haskell98 = TRUE;                  /* TRUE => Haskell 98 compatibility*/
 Bool initDone = FALSE;
@@ -82,6 +84,10 @@ static Void   local browseit	      ( Module,String,Bool );
 static Void   local browse	      ( Void );
 static void   local clearCurrentFile  ( void );
 
+static void loadActions ( List loadModules /* :: [CONID] */ );
+static void addActions ( List extraModules /* :: [CONID] */ );
+static Bool loadThePrelude ( void );
+
 
 /* --------------------------------------------------------------------------
  * Machine dependent code for Hugs interpreter:
@@ -130,37 +136,144 @@ static ConId currentModule_failed = NIL; /* Remember failed module from :r */
  * Hugs entry point:
  * ------------------------------------------------------------------------*/
 
-#ifndef NO_MAIN /* we omit main when building the "Hugs server" */
- 
+#ifdef DIET_HEP
+
+#include "diet_hep.h"
+
+static int diet_hep_initialised = 0;
+
+static
+void diet_hep_initialise ( void* cstackbase )
+{
+    List   modConIds; /* :: [CONID] */
+    Bool   prelOK;
+    String s;
+    String fakeargv[1] = { "diet_hep" };
+
+    if (diet_hep_initialised) return;
+    diet_hep_initialised = 1;
+
+    CStackBase = cstackbase;
+    EnableOutput(1);
+    setInstallDir ( "diet_hep" );
+
+    /* The following copied from interpreter() */
+    setBreakAction ( HugsIgnoreBreak );
+    modConIds = initialize(1,fakeargv);
+    assert(isNull(modConIds));
+    setBreakAction ( HugsIgnoreBreak );
+    prelOK    = loadThePrelude();
+
+    if (!prelOK) {
+       fprintf(stderr, "diet_hep_initialise: fatal error: "
+                       "can't load the Prelude.\n" );
+       exit(1);
+    }    
+
+    loadActions(NIL);
+
+    if (combined) everybody(POSTPREL);
+    /* we now leave, and wait for requests */
+}
+
+
+static
+HMODULE LoadLibrary_wrk ( LPCSTR modname )
+{
+   Text   t;
+   Module m;
+   t = findText(modname);
+   addActions ( singleton(mkCon(t)) );
+   m = findModule(t);
+   if (isModule(m)) return m; else return 0;
+}
+
+HMODULE LoadLibrary ( LPCSTR modname )
+{
+   int xxx;
+   HMODULE hdl;
+   diet_hep_initialise ( &xxx );
+   hdl = LoadLibrary_wrk ( modname );
+   printf ( "hdl = %d\n", hdl );
+   return hdl;
+}
+
+
+static
+void* GetProcAddr_wrk ( DHCALLCONV cconv,
+                        HMODULE    hModule,
+                        LPCSTR     lpProcName )
+{
+   Name  n;
+   Text  typedescr;
+   void* adj_thunk;
+   StgStablePtr stableptr;
+
+   if (!isModule(hModule)) return NULL;
+   setCurrModule(hModule);
+   n = findName ( findText(lpProcName) );
+   if (!isName(n)) return NULL;
+   assert(isCPtr(name(n).closure));
+
+   /* n is the function which we want to f-x-d,
+      n :: prim_arg* -> IO prim_result.
+      Assume that name(n).closure is a cptr which points to n's BCO.
+
+      Make ns a stable pointer to n.
+      Manufacture a type descriptor string for n's type.
+      use createAdjThunk to build the adj thunk.
+   */
+   typedescr = makeTypeDescrText ( name(n).type );
+   if (!isText(typedescr)) return NULL;
+   if (cconv != dh_stdcall && cconv != dh_ccall) return NULL;
+
+   stableptr = getStablePtr( cptrOf(name(n).closure) );
+   adj_thunk = createAdjThunk ( stableptr,
+                                textToStr(typedescr), 
+                                cconv==dh_stdcall ? 's' : 'c' );
+   return adj_thunk;
+}
+
+void* GetProcAddr ( DHCALLCONV cconv,
+                    HMODULE    hModule,
+                    LPCSTR     lpProcName )
+{
+   int xxx;
+   diet_hep_initialise ( &xxx );
+   return GetProcAddr_wrk ( cconv, hModule, lpProcName );
+}
+
+//---------------------------------
+//--- testing it ...
+int main ( int argc, char** argv )
+{
+   void*   proc;
+   HMODULE hdl;
+   hdl = LoadLibrary("FooBar");
+   assert(isModule(hdl));
+   proc = GetProcAddr ( dh_ccall, hdl, "wurble" );
+fprintf ( stderr, "just before calling it\n");
+   ((void(*)(int)) proc)  (33);
+   ((void(*)(int)) proc)  (34);
+   ((void(*)(int)) proc)  (35);
+   fprintf ( stderr, "exiting safely\n");
+   return 0;
+}
+
+#else
+
 Main main ( Int, String [] );       /* now every func has a prototype  */
 
 Main main(argc,argv)
 int  argc;
 char *argv[]; {
-#ifdef HAVE_CONSOLE_H /* Macintosh port */
-    _ftype = 'TEXT';
-    _fcreator = 'R*ch';       /*  // 'KAHL';      //'*TEX';       //'ttxt'; */
-
-    console_options.top = 50;
-    console_options.left = 20;
-
-    console_options.nrows = 32;
-    console_options.ncols = 80;
-
-    console_options.pause_atexit = 1;
-    console_options.title = "\pHugs";
-
-    console_options.procID = 5;
-    argc = ccommand(&argv);
-#endif
-
     CStackBase = &argc;                 /* Save stack base for use in gc   */
 
-#ifdef DEBUG
-#if 0
+#   ifdef DEBUG
+#   if 0
     checkBytecodeCount();		/* check for too many bytecodes    */
-#endif
-#endif
+#   endif
+#   endif
 
     /* If first arg is +Q or -Q, be entirely silent, and automatically run
        main after loading scripts.  Useful for running the nofib suite.    */
@@ -185,9 +298,6 @@ char *argv[]; {
     */
     setInstallDir ( argv[0] );
 
-#if SYMANTEC_C
-    Printf("   Ported to Macintosh by Hans Aberg, compiled " __DATE__ ".\n\n");
-#endif
     FlushStdout();
     interpreter(argc,argv);
     Printf("[Leaving Hugs]\n");
@@ -199,7 +309,7 @@ char *argv[]; {
     MainDone();
 }
 
-#endif
+#endif /* DIET_HEP */
 
 /* --------------------------------------------------------------------------
  * Initialization, interpret command line args and read prelude:
