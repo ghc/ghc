@@ -681,9 +681,6 @@ dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gtar tar,tar)
 
-dnl ** check for gzip/compress
-AC_PATH_PROGS(CompressCmd,gzip compress,gzip)
-
 dnl ** check for jade/openjade & determine a working catalog
 AC_PATH_PROGS(JadeCmd,openjade jade,jade)
 FPTOOLS_DOCBOOK_CATALOG(Catalog, $JadeCmd, docs/fptools-both.dsl, 
@@ -707,15 +704,6 @@ case $Catalog in
 esac   
 AC_SUBST(Catalog)
 
-compress_nm=`basename $CompressCmd`
-if test x"$compress_nm" = xgzip; then
-  CompressCmd="$CompressCmd -d"
-  CompressSuffix="gz"
-else
-  CompressSuffix="Z"
-fi
-AC_SUBST(CompressCmd)
-AC_SUBST(CompressSuffix)
 
 dnl ** check for ghc-pkg command
 changequote(, )dnl

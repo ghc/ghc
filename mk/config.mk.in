@@ -721,11 +721,6 @@ AR			= @ArCmd@
 ArSupportsInput		= @ArSupportsInput@
 # Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
 BASH                    = /usr/local/bin/bash
-#
-# Could be either gzip or compress
-#
-COMPRESS		= @CompressCmd@
-COMPRESS_SUFFIX         = @CompressSuffix@
 
 CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
