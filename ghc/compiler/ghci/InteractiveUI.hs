@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.86 2001/08/15 14:40:24 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.87 2001/08/15 14:41:49 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -101,8 +101,7 @@ helpText = "\
 \   :cd <dir>		   change directory to <dir>\n\ 
 \   :def <cmd> <expr>      define a command :<cmd>\n\ 
 \   :help, :?		   display this list of commands\n\ 
-\   :info [<name> ...]     display information about the given names, or\n\ 
-\                          about currently loaded files if no names given\n\ 
+\   :info [<name> ...]     display information about the given names\n\ 
 \   :load <filename> ...   load module(s) and their dependents\n\ 
 \   :module <mod>	   set the context for expression evaluation to <mod>\n\ 
 \   :reload		   reload the current module set\n\ 
