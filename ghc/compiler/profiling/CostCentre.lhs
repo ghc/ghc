@@ -33,7 +33,7 @@ IMP_Ubiq(){-uitous-}
 import Id		( externallyVisibleId, GenId, showId, SYN_IE(Id) )
 import CStrings		( identToC, stringToC )
 import Name		( OccName, getOccString, moduleString )
-import PprStyle		( PprStyle(..), codeStyle, ifaceStyle )
+import Outputable	( PprStyle(..), codeStyle, ifaceStyle )
 import UniqSet
 import Pretty
 import Util

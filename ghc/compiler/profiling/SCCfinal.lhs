@@ -37,12 +37,12 @@ import CmdLineOpts	( opt_AutoSccsOnIndividualCafs,
 import CostCentre	-- lots of things
 import Id		( idType, mkSysLocal, emptyIdSet, SYN_IE(Id) )
 import Maybes		( maybeToBool )
-import PprStyle		-- ToDo: rm
 import SrcLoc		( noSrcLoc )
 import Type		( splitSigmaTy, getFunTy_maybe )
 import UniqSupply	( getUnique, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
 import Util		( removeDups, assertPanic )
+import Outputable	-- ToDo: rm
 
 infixr 9 `thenMM`, `thenMM_`
 \end{code}
