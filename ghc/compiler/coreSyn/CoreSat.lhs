@@ -386,10 +386,23 @@ mkNonRec :: Id  -> RhsDemand 			-- Lhs: id with demand
 	 -> OrdList FloatingBind -> CoreExpr	-- Rhs: let binds in body
 	 -> UniqSM (OrdList FloatingBind)
 mkNonRec bndr dem floats rhs
-  | exprIsValue rhs		-- Notably constructor applications
-  = ASSERT( allLazy floats )	-- The only floats we can get out of a value are eta expansions 
-				-- e.g.  C $wJust ==> let s = \x -> $wJust x in C s
-				-- Here we want to float the s binding.
+  | exprIsValue rhs && allLazy floats		-- Notably constructor applications
+  = 	-- Why the test for allLazy? You might think that the only 
+	-- floats we can get out of a value are eta expansions 
+	-- e.g.  C $wJust ==> let s = \x -> $wJust x in C s
+	-- Here we want to float the s binding.
+	--
+	-- But if the programmer writes this:
+	--	f x = case x of { (a,b) -> \y -> a }
+	-- then the strictness analyser may say that f has strictness "S"
+	-- Later the eta expander will transform to
+	--	f x y = case x of { (a,b) -> a }
+	-- So now f has arity 2.  Now CoreSat may see
+	--	v = f E
+	-- so the E argument will turn into a FloatCase.  
+	-- Indeed we should end up with
+	--	v = case E of { r -> f r }
+	-- That is, we should not float, even though (f r) is a value
     returnUs (floats `snocOL` FloatLet (NonRec bndr rhs))
     
   |  isUnLiftedType bndr_rep_ty	|| isStrictDem dem 
