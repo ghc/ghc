@@ -79,3 +79,5 @@ clean(['readwrite002.inout'])
 
 test('hGetBuf001', compose(only_compiler_types(['ghc']),
 		expect_fail_if_windows), compile_and_run, ['-package unix'])
+
+test('hDuplicateTo001', normal, compile_and_run, [''])
