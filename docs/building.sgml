@@ -5,7 +5,7 @@
 <ArtHeader>
 
 <Title>Building and Installing the Glasgow Functional Programming Tools Suite
-Version 4.04</Title>
+Version 4.06</Title>
 <Author><OtherName>The GHC Team</OtherName></Author>
 <Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email></Address>
 <PubDate>January 2000</PubDate>
