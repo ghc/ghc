@@ -138,10 +138,10 @@ normalGE g e = do { g1 <- g; e1 <- e; return (NormalG g1, e1) }
 patG :: [StmtQ] -> GuardQ
 patG ss = do { ss' <- sequence ss; return (PatG ss') }
 
-patGE :: [StmtQ] -> Q (Guard, Exp)
-patGE ss = do { ss' <- sequence ss;
-                let {NoBindS e = last ss'};
-                return (PatG (init ss'), e) }
+patGE :: [StmtQ] -> ExpQ -> Q (Guard, Exp)
+patGE ss e = do { ss' <- sequence ss;
+		  e'  <- e;
+                  return (PatG ss', e') }
 
 -------------------------------------------------------------------------------
 --     Match and Clause
