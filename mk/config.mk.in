@@ -188,10 +188,15 @@ else
 GhcWithNativeCodeGen=NO
 endif
 
+HaveLibDL = @HaveLibDL@
+
 # Include GHCi in the compiler.  Default to NO for the time being.
 
 ifneq "$(findstring $(HostOS_CPP), linux solaris freebsd netbsd openbsd)" ""
 GhcWithInterpreter=YES
+ifeq "$(HaveLibDL)" "YES"
+SRC_HC_OPTS += -ldl
+endif
 else 
 GhcWithInterpreter=NO
 endif
