@@ -30,10 +30,10 @@ The easy way is to go to the WWW page, which should be self-explanatory:
         http://www.haskell.org/ghc/
 
 We supply binary builds in the native package format for various
-flavours of Linux and BSD, and in InstallShield form for Windows
-folks.  Binary builds for other platforms are available as a .tar.gz
-which can be installed wherever you want.  The source distribution is
-also available from the same place.
+flavours of Linux and BSD, and in Windows Installer (MSI) form
+for Windows folks.  Binary builds for other platforms are available
+as a .tar.gz which can be installed wherever you want.  The source
+distribution is also available from the same place.
 
 Packages will appear as they are built - if the package for your
 system isn't available yet, please try again later.
