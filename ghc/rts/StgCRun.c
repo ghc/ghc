@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.8 1999/11/03 15:00:21 simonmar Exp $
+ * $Id: StgCRun.c,v 1.9 1999/12/01 14:20:11 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -145,6 +145,8 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) 
 {
+    StgThreadReturnCode ret;
+
     __asm__ volatile ("stq $9,-8($30)\n\t"
                       "stq $10,-16($30)\n\t"
                       "stq $11,-24($30)\n\t"
@@ -169,6 +171,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
     __asm__ volatile (".align 3\n"
                	      ".globl " STG_RETURN "\n"
                       STG_RETURN ":\n\t"
+		      "lda %0,($14)\n\t"  /* save R1 */
                	      "lda $30,%0($30)\n\t"
                	      "ldq $9,-8($30)\n\t"
                	      "ldq $10,-16($30)\n\t"
@@ -184,11 +187,12 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
                	      "ldt $f6,-96($30)\n\t"
     	    	      "ldt $f7,-104($30)\n\t"
     	    	      "ldt $f8,-112($30)\n\t" 
-    	    	      "ldt $f9,-120($30)" : :
-                      "K" (RESERVED_C_STACK_BYTES+
+    	    	      "ldt $f9,-120($30)" 
+		      : "=r" (ret)
+		      : "K" (RESERVED_C_STACK_BYTES+
 			   8*sizeof(double)+8*sizeof(long)));
 
-    return (StgThreadReturnCode)R1.i;
+    return ret;
 }
 
 #endif /* alpha_TARGET_ARCH */
