@@ -130,6 +130,12 @@ you will screw up the layout where they are used in case expressions!
 #else
 # define IF_OS_bsdi(x,y) y
 #endif
+-- - - - - - - - - - - - - - - - - - - - - - 
+#if cygwin32_TARGET_OS
+# define IF_OS_cygwin32(x,y) x
+#else
+# define IF_OS_cygwin32(x,y) y
+#endif
 ---------------------------------------------
 #if sparc_TARGET_ARCH
 # define IF_ARCH_sparc(x,y) x
