@@ -24,7 +24,6 @@ import Distribution.Version
 import Compat.Directory 	( getAppUserDataDirectory, createDirectoryIfMissing )
 import Compat.RawSystem 	( rawSystem )
 import Control.Exception	( evaluate )
-import qualified Control.Exception as Exception
 
 import Prelude
 
@@ -172,8 +171,6 @@ substProg prog (c:xs) = c : substProg prog xs
 runit :: [Flag] -> [String] -> IO ()
 runit cli nonopts = do
   prog <- getProgramName
-  dbs <- getPkgDatabases cli
-  db_stack <- mapM readParseDatabase dbs
   let
 	force = FlagForce `elem` cli
 	auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
@@ -181,26 +178,26 @@ runit cli nonopts = do
   -- first, parse the command
   case nonopts of
     ["register", filename] -> 
-	registerPackage filename [] db_stack auto_ghci_libs False force
+	registerPackage filename [] cli auto_ghci_libs False force
     ["update", filename] -> 
-	registerPackage filename [] db_stack auto_ghci_libs True force
+	registerPackage filename [] cli auto_ghci_libs True force
     ["unregister", pkgid_str] -> do
-	pkgid <- readPkgId pkgid_str
-	unregisterPackage pkgid db_stack
+	pkgid <- readGlobPkgId pkgid_str
+	unregisterPackage pkgid cli
     ["expose", pkgid_str] -> do
-	pkgid <- readPkgId pkgid_str
-	exposePackage pkgid db_stack
+	pkgid <- readGlobPkgId pkgid_str
+	exposePackage pkgid cli
     ["hide",   pkgid_str] -> do
-	pkgid <- readPkgId pkgid_str
-	hidePackage pkgid db_stack
+	pkgid <- readGlobPkgId pkgid_str
+	hidePackage pkgid cli
     ["list"] -> do
-	listPackages db_stack
+	listPackages cli
     ["describe", pkgid_str] -> do
-	pkgid <- readPkgId pkgid_str
-	describePackage db_stack pkgid
+	pkgid <- readGlobPkgId pkgid_str
+	describePackage cli pkgid
     ["field", pkgid_str, field] -> do
-	pkgid <- readPkgId pkgid_str
-	describeField db_stack pkgid field
+	pkgid <- readGlobPkgId pkgid_str
+	describeField cli pkgid field
     [] -> do
 	die ("missing command\n" ++ 
 		usageInfo (usageHeader prog) flags)
@@ -216,6 +213,19 @@ parseCheck parser str what =
 
 readPkgId :: String -> IO PackageIdentifier
 readPkgId str = parseCheck parsePackageId str "package identifier"
+
+readGlobPkgId :: String -> IO PackageIdentifier
+readGlobPkgId str = parseCheck parseGlobPackageId str "package identifier"
+
+parseGlobPackageId :: ReadP r PackageIdentifier
+parseGlobPackageId = 
+  parsePackageId
+     +++
+  (do n <- parsePackageName; string "-*"
+      return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
+
+-- globVersion means "all versions"
+globVersion = Version{ versionBranch=[], versionTags=["*"] }
 
 -- -----------------------------------------------------------------------------
 -- Package databases
@@ -236,12 +246,8 @@ type PackageDBStack = [(PackageDBName,PackageDB)]
 	-- A stack of package databases.  Convention: head is the topmost
 	-- in the stack.  Earlier entries override later one.
 
--- The output of this function is the list of databases to act upon, with
--- the "topmost" overlapped database last.  The commands which operate on a
--- single database will use the last one.  Commands which operate on multiple
--- databases will interpret the databases as overlapping.
-getPkgDatabases :: [Flag] -> IO [PackageDBName]
-getPkgDatabases flags = do
+getPkgDatabases :: Bool -> [Flag] -> IO PackageDBStack
+getPkgDatabases modify flags = do
   -- first we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-config flag by the
@@ -269,19 +275,28 @@ getPkgDatabases flags = do
 	writeFile user_conf emptyPackageConfig
 
   let
-	databases = foldl addDB [global_conf] flags
+	-- The semantics here are slightly strange.  If we are
+	-- *modifying* the database, then the default is to modify
+	-- the global database by default, unless you say --user.
+	-- If we are not modifying (eg. list, describe etc.) then
+	-- the user database is included by default.
+	databases
+	  | modify     = foldl addDB [global_conf] flags
+	  | not modify = foldl addDB [user_conf,global_conf] flags
 
 	-- implement the following rules:
-	-- 	global database is the default
 	-- 	--user means overlap with the user database
 	-- 	--global means reset to just the global database
 	--	-f <file> means overlap with <file>
-	addDB dbs FlagUser       = user_conf : dbs
+	addDB dbs FlagUser       = if user_conf `elem` dbs 
+					then dbs 
+					else user_conf : dbs
 	addDB dbs FlagGlobal     = [global_conf]
 	addDB dbs (FlagConfig f) = f : dbs
 	addDB dbs _		 = dbs
 
-  return databases
+  db_stack <- mapM readParseDatabase databases
+  return db_stack
 
 readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
 readParseDatabase filename = do
@@ -300,12 +315,13 @@ emptyPackageConfig = "[]"
 
 registerPackage :: FilePath
 		-> [(String,String)] --  defines, ToDo: maybe remove?
-	        -> PackageDBStack
+	        -> [Flag]
 		-> Bool		-- auto_ghci_libs
 		-> Bool		-- update
 		-> Bool		-- force
 		-> IO ()
-registerPackage input defines db_stack auto_ghci_libs update force = do
+registerPackage input defines flags auto_ghci_libs update force = do
+  db_stack <- getPkgDatabases True flags
   let
 	db_to_operate_on = my_head "db" db_stack
 	db_filename	 = fst db_to_operate_on
@@ -343,39 +359,41 @@ parsePackageInfo str defines force =
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Unregistering are all similar
 
-exposePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+exposePackage :: PackageIdentifier ->  [Flag] -> IO ()
 exposePackage = modifyPackage (\p -> [p{exposed=True}])
 
-hidePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+hidePackage :: PackageIdentifier ->  [Flag] -> IO ()
 hidePackage = modifyPackage (\p -> [p{exposed=False}])
 
-unregisterPackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+unregisterPackage :: PackageIdentifier ->  [Flag] -> IO ()
 unregisterPackage = modifyPackage (\p -> [])
 
 modifyPackage
   :: (InstalledPackageInfo -> [InstalledPackageInfo])
   -> PackageIdentifier
-  -> PackageDBStack
+  -> [Flag]
   -> IO ()
-modifyPackage _ _ [] = error "modifyPackage"
-modifyPackage fn pkgid ((db_name, pkgs) : _) = do
+modifyPackage fn pkgid flags  = do
+  db_stack <- getPkgDatabases True{-modify-} flags
+  let ((db_name, pkgs) : _) = db_stack
   checkConfigAccess db_name
-  p <- findPackage [(db_name,pkgs)] pkgid
-  let pid = package p
+  ps <- findPackages [(db_name,pkgs)] pkgid
+  let pids = map package ps
   savePackageConfig db_name
   let new_config = concat (map modify pkgs)
       modify pkg
-	| package pkg == pid = fn pkg
-	| otherwise          = [pkg]
+  	  | package pkg `elem` pids = fn pkg
+  	  | otherwise               = [pkg]
   maybeRestoreOldConfig db_name $
-    writeNewConfig db_name new_config
+      writeNewConfig db_name new_config
 
 -- -----------------------------------------------------------------------------
 -- Listing packages
 
-listPackages ::  PackageDBStack -> IO ()
-listPackages db_confs = do
-  mapM_ show_pkgconf (reverse db_confs)
+listPackages ::  [Flag] -> IO ()
+listPackages flags = do
+  db_stack <- getPkgDatabases False flags
+  mapM_ show_pkgconf (reverse db_stack)
   where show_pkgconf (db_name,pkg_confs) =
 	  hPutStrLn stdout (render $
 		text (db_name ++ ":") $$ nest 4 packages
@@ -389,38 +407,48 @@ listPackages db_confs = do
 -- -----------------------------------------------------------------------------
 -- Describe
 
-describePackage :: PackageDBStack -> PackageIdentifier -> IO ()
-describePackage db_stack pkgid = do
-  p <- findPackage db_stack pkgid
-  putStrLn (showInstalledPackageInfo p)
+describePackage :: [Flag] -> PackageIdentifier -> IO ()
+describePackage flags pkgid = do
+  db_stack <- getPkgDatabases False flags
+  ps <- findPackages db_stack pkgid
+  mapM_ (putStrLn . showInstalledPackageInfo) ps
 
-findPackage :: PackageDBStack -> PackageIdentifier -> IO InstalledPackageInfo
-findPackage db_stack pkgid
+-- PackageId is can have globVersion for the version
+findPackages :: PackageDBStack -> PackageIdentifier -> IO [InstalledPackageInfo]
+findPackages db_stack pkgid
   = case [ p | p <- all_pkgs, pkgid `matches` p ] of
 	[]  -> die ("cannot find package " ++ showPackageId pkgid)
-	[p] -> return p
-	ps  -> die ("package " ++ showPackageId pkgid ++ 
+	[p] -> return [p]
+	 -- if the version is globVersion, then we are allowed to match
+	 -- multiple packages.  So eg. "Cabal-*" matches all Cabal packages,
+	 -- but "Cabal" matches just one Cabal package - if there are more,
+	 -- you get an error.
+	ps | pkgVersion pkgid == globVersion
+	   -> return ps
+	   | otherwise
+	   -> die ("package " ++ showPackageId pkgid ++ 
 			" matches multiple packages: " ++ 
 			concat (intersperse ", " (
 				 map (showPackageId.package) ps)))
   where
-	all_pkgs = concat (map snd db_stack)
+	pid `matches` pkg
+	  = (pkgName pid == pkgName p)
+	    && (pkgVersion pid == pkgVersion p || not (realVersion pid))
+	  where p = package pkg
 
-matches :: PackageIdentifier -> InstalledPackageInfo -> Bool
-pid `matches` p = 
- pid == package p || 
- not (realVersion pid) && pkgName pid == pkgName (package p)
+	all_pkgs = concat (map snd db_stack)
 
 -- -----------------------------------------------------------------------------
 -- Field
 
-describeField :: PackageDBStack -> PackageIdentifier -> String -> IO ()
-describeField db_stack pkgid field = do
+describeField :: [Flag] -> PackageIdentifier -> String -> IO ()
+describeField flags pkgid field = do
+  db_stack <- getPkgDatabases False flags
   case toField field of
     Nothing -> die ("unknown field: " ++ field)
     Just fn -> do
-	p <- findPackage db_stack pkgid 
-	putStrLn (fn p)
+	ps <- findPackages db_stack pkgid 
+	mapM_ (putStrLn.fn) ps
 
 toField :: String -> Maybe (InstalledPackageInfo -> String)
 -- backwards compatibility:
@@ -769,14 +797,13 @@ oldFlags = [
 
 oldRunit :: [OldFlag] -> IO ()
 oldRunit clis = do
-  let config_flags = [ f | Just f <- map conv clis ]
+  let new_flags = [ f | Just f <- map conv clis ]
 
       conv (OF_GlobalConfig f) = Just (FlagGlobalConfig f)
       conv (OF_Config f)       = Just (FlagConfig f)
       conv _                   = Nothing
 
-  db_names <- getPkgDatabases config_flags
-  db_stack <- mapM readParseDatabase db_names
+  
 
   let fields = [ f | OF_Field f <- clis ]
 
@@ -789,20 +816,20 @@ oldRunit clis = do
       defines = [ (nm,val) | OF_DefinedName nm val <- clis ]
 
   case [ c | c <- clis, isAction c ] of
-    [ OF_List ]      -> listPackages db_stack
-    [ OF_ListLocal ] -> listPackages db_stack
-    [ OF_Add upd ]   -> registerPackage input_file defines db_stack
-				auto_ghci_libs upd force
+    [ OF_List ]      -> listPackages new_flags
+    [ OF_ListLocal ] -> listPackages new_flags
+    [ OF_Add upd ]   -> 
+	registerPackage input_file defines new_flags auto_ghci_libs upd force
     [ OF_Remove pkgid_str ]  -> do
 	pkgid <- readPkgId pkgid_str
-	unregisterPackage pkgid db_stack
+	unregisterPackage pkgid new_flags
     [ OF_Show pkgid_str ]
 	| null fields -> do
 		pkgid <- readPkgId pkgid_str
-		describePackage db_stack pkgid
+		describePackage new_flags pkgid
 	| otherwise   -> do
 		pkgid <- readPkgId pkgid_str
-		mapM_ (describeField db_stack pkgid) fields
+		mapM_ (describeField new_flags pkgid) fields
     _ -> do 
 	prog <- getProgramName
 	die (usageInfo (usageHeader prog) flags)
