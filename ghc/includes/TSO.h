@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.11 2000/01/22 18:00:03 simonmar Exp $
+ * $Id: TSO.h,v 1.12 2000/03/17 09:53:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -144,9 +144,11 @@ typedef union {
 
 typedef struct StgTSO_ {
   StgHeader          header;
-  struct StgTSO_*    link;
-  /* SDM and HWL agree that it would be cool to have a list of all TSOs */
-  StgMutClosure *    mut_link;	/* TSO's are mutable of course! */
+
+  struct StgTSO_*    link;	     /* Links threads onto blocking queues */
+  StgMutClosure *    mut_link;	     /* TSO's are mutable of course! */
+  struct StgTSO_*    global_link;    /* Links all threads together */
+  
   StgTSOWhatNext     whatNext;
   StgTSOBlockReason  why_blocked;
   StgTSOBlockInfo    block_info;
