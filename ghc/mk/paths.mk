@@ -43,7 +43,7 @@ GHC_INCLUDE_DIR   	= $(TOP)/includes
 GHC_UTILS_DIR	 	= $(TOP)/utils
 GHC_INTERPRETER_DIR 	= $(TOP)/interpreter
 
-GHC 			= $(GHC_DRIVER_DIR)/ghc-inplace
+GHC_INPLACE		= $(GHC_DRIVER_DIR)/ghc-inplace
 GHC_HSCPP_DIR 		= $(GHC_UTILS_DIR)/hscpp
 GHC_HSCPP    		= $(GHC_HSCPP_DIR)/hscpp
 GHC_MKDEPENDHS_DIR	= $(GHC_UTILS_DIR)/mkdependHS

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.10 1999/12/04 15:17:42 panne Exp $
+# $Id: Makefile,v 1.11 1999/12/07 15:49:53 simonmar Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -36,7 +36,7 @@ SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -
 #
 # Compile the files using the Haskell compiler (ghc really).
 # 
-CC=$(GHC)
+CC=$(GHC_INPLACE)
 
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 

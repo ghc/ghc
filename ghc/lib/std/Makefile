@@ -18,7 +18,7 @@ else
 SUBDIRS=
 endif
 
-HC = $(GHC)
+HC = $(GHC_INPLACE)
 
 #-----------------------------------------------------------------------------
 # 	Setting the standard variables
