@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.13 2000/02/29 16:58:09 simonmar Exp $
+ * $Id: Profiling.c,v 1.14 2000/03/01 11:09:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -459,7 +459,6 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
   new_ccs->mem_alloc = 0;
   
   new_ccs->root = ccs->root;
-  new_ccs->emitted = 0;
 
   /* update the memoization table for the parent stack */
   if (ccs != EMPTY_STACK)
