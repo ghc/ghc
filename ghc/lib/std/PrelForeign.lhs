@@ -51,7 +51,7 @@ writeForeignObj (ForeignObj fo#) (A# datum#) = IO ( \ s# ->
 eqForeignObj mp1 mp2
   = unsafePerformIO (primEqForeignObj mp1 mp2) /= (0::Int)
 
-foreign import "eqForeignObj" unsafe primEqForeignObj :: ForeignObj -> ForeignObj -> IO Int
+foreign import "eqForeignObj" primEqForeignObj :: ForeignObj -> ForeignObj -> IO Int
 
 instance Eq ForeignObj where 
     p == q = eqForeignObj p q
