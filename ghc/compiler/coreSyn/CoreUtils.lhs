@@ -214,12 +214,7 @@ mkCoerce2 to_ty from_ty expr
 mkSCC :: CostCentre -> Expr b -> Expr b
 	-- Note: Nested SCC's *are* preserved for the benefit of
 	--       cost centre stack profiling
-	-- Note2: We throw away an SCC on a single variable.  If the
-	--	 variable is a value, then there is no work to do in
-	-- 	 evaluating it, and if it is a thunk, then it will be
-	--       attributed to its own CCS anyhow.
 mkSCC cc (Lit lit)  	    = Lit lit
-mkSCC cc (Var v)	    = Var v
 mkSCC cc (Lam x e)  	    = Lam x (mkSCC cc e)  -- Move _scc_ inside lambda
 mkSCC cc (Note (SCC cc') e) = Note (SCC cc) (Note (SCC cc') e)
 mkSCC cc (Note n e) 	    = Note n (mkSCC cc e) -- Move _scc_ inside notes
