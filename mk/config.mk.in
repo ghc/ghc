@@ -145,7 +145,7 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 # 
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 3.01	# treated as a  *string*
+GhcProjectVersion      = 3.01
 GhcProjectVersionInt   = 301	# treated as an *integer* (for cpp defines)
 GhcProjectPatchLevel   = 0
 
