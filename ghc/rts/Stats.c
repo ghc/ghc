@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.45 2002/08/16 13:29:07 simonmar Exp $
+ * $Id: Stats.c,v 1.46 2002/08/19 16:02:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -749,7 +749,8 @@ stat_exit(int alloc)
 	  fprintf(sf, "<<ghc: %llu bytes, ", GC_tot_alloc*sizeof(W_));
 	  fprintf(sf, "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
 		    total_collections,
-		    AvgResidency*sizeof(W_)/ResidencySamples, 
+		    ResidencySamples == 0 ? 0 : 
+		        AvgResidency*sizeof(W_)/ResidencySamples, 
 		    MaxResidency*sizeof(W_), 
 		    ResidencySamples,
 		    (unsigned long)(mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
