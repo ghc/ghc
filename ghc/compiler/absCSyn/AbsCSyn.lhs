@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.44 2002/01/02 12:32:19 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.45 2002/02/06 11:13:47 sewardj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -122,7 +122,7 @@ stored in a mixed type location.)
   -- NEW CASES FOR EXPANDED PRIMOPS
 
   | CMachOpStmt			-- Machine-level operation
-	(Maybe CAddrMode)	-- 0 or 1 results
+	CAddrMode		-- result
 	MachOp
 	[CAddrMode]		-- Arguments
         (Maybe [MagicId])	-- list of regs which need to be preserved
@@ -338,6 +338,10 @@ data CAddrMode
 			--	which gives the magic location itself
 			--      (NB: superceded by CReg)
 
+             -- JRS 2002-02-05: CAddr is really scummy and should be fixed.
+             -- The effect is that the semantics of CAddr depend on what the
+             -- contained RegRelative is; it is decidely non-orthogonal.
+
   | CReg MagicId	-- To replace (CAddr MagicId 0)
 
   | CTemp !Unique !PrimRep	-- Temporary locations
@@ -369,9 +373,6 @@ data CAddrMode
     	!PrimRep    	-- the kind of the result
     	CExprMacro    	-- the macro to generate a value
 	[CAddrMode]   	-- and its arguments
-
-  | CMem   PrimRep	-- A value :: PrimRep, in memory, at the 
-           CAddrMode	-- specified address
 
   | CBytesPerWord	-- Word size, in bytes, on this platform
 			-- required for: half-word loads (used in fishing tags

@@ -31,7 +31,7 @@ import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 import Literal		( Literal(..), word2IntLit )
 import Maybes	    	( maybeToBool )
 import StgSyn		( StgOp(..) )
-import MachOp		( MachOp(..), resultRepsOfMachOp )
+import MachOp		( MachOp(..), resultRepOfMachOp )
 import PrimRep	    	( isFloatingRep, is64BitRep, 
 			  PrimRep(..), getPrimRepArrayElemSize )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable,
@@ -392,39 +392,10 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
  gencode (COpStmt results (StgPrimOp op) args vols)
   = panic "AbsCStixGen.gencode: un-translated PrimOp"
 
- -- Translate out array indexing primops right here, so that
- -- individual targets don't have to deal with them
-
- gencode (CMachOpStmt (Just r1) (MO_ReadOSBI off_w rep) [base,index] vols) 
-  = returnUs (\xs ->
-       mkStAssign 
-          rep 
-          (a2stix r1) 
-          (StInd rep (StMachOp MO_Nat_Add 
-                               [StIndex rep (a2stix base) (a2stix index), 
-                                StInt (toInteger (off_w * wORD_SIZE))]))
-       : xs
-    )
-
- -- Ordinary MachOps are passed through unchanged.
- gencode (CMachOpStmt Nothing (MO_WriteOSBI off_w rep) [base,index,val] vols) 
-  = returnUs (\xs ->
-       StAssignMem 
-          rep 
-          (StMachOp MO_Nat_Add 
-                    [StIndex rep (a2stix base) (a2stix index), 
-                     StInt (toInteger (off_w * wORD_SIZE))])
-          (a2stix val)
-       : xs
-    )
-
- gencode (CMachOpStmt (Just r1) mop args vols)
-  = case resultRepsOfMachOp mop of
-       Just rep 
-          -> returnUs (\xs ->
-                mkStAssign rep (a2stix r1) 
-                               (StMachOp mop (map a2stix args))
-                : xs
+ gencode (CMachOpStmt res mop args vols)
+  = returnUs (\xs -> mkStAssign (resultRepOfMachOp mop) (a2stix res) 
+                                (StMachOp mop (map a2stix args))
+                     : xs
              )
 \end{code}
 

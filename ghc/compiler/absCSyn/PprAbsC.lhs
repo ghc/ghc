@@ -253,32 +253,7 @@ pprAbsC stmt@(COpStmt results (StgPrimOp op) args vol_regs) _
 
 -- NEW CASES FOR EXPANDED PRIMOPS
 
--- We have to deal with some of these specially
-pprAbsC (CMachOpStmt (Just res) (MO_ReadOSBI offw scaleRep)
-                     [baseAmode, indexAmode] maybe_vols) 
-        _
-  | isNothing maybe_vols
-  = hcat [ -- text " /* ReadOSBI */ ",
-           ppr_amode res, equals, 
-           ppr_array_expression offw scaleRep baseAmode indexAmode, 
-           semi ]
-  | otherwise
-  = panic "pprAbsC:MO_ReadOSBI -- out-of-line array indexing ?!?!"
-
-pprAbsC (CMachOpStmt Nothing (MO_WriteOSBI offw scaleRep)
-                     [baseAmode, indexAmode, vAmode] maybe_vols)
-        _
-  | isNothing maybe_vols
-  = hcat [ -- text " /* WriteOSBI */ ",
-           ppr_array_expression offw scaleRep baseAmode indexAmode, 
-           equals, pprAmode vAmode,
-           semi ]
-  | otherwise
-  = panic "pprAbsC:MO_WriteOSBI -- out-of-line array indexing ?!?!"
-
--- The rest generically.
-
-pprAbsC stmt@(CMachOpStmt (Just res) mop [arg1,arg2] maybe_vols) _
+pprAbsC stmt@(CMachOpStmt res mop [arg1,arg2] maybe_vols) _
   = let prefix_fn = mop `elem` [MO_Dbl_Pwr, MO_Flt_Pwr, MO_NatS_MulMayOflo]
     in
     case ppr_maybe_vol_regs maybe_vols of {(saves,restores) ->
@@ -293,7 +268,7 @@ pprAbsC stmt@(CMachOpStmt (Just res) mop [arg1,arg2] maybe_vols) _
     $$ restores
     }
 
-pprAbsC stmt@(CMachOpStmt (Just res) mop [arg1] maybe_vols) _
+pprAbsC stmt@(CMachOpStmt res mop [arg1] maybe_vols) _
   = case ppr_maybe_vol_regs maybe_vols of {(saves,restores) ->
     saves $$
     hcat [ppr_amode res, equals, 
@@ -754,24 +729,6 @@ pprMachOp_for_C MO_32U_to_NatU   = text "(StgWord32)(StgWord)"
 pprMachOp_for_C MO_8U_to_32U     = text "(StgWord32)"
 pprMachOp_for_C MO_32U_to_8U     = text "(StgWord8)"
 
-pprMachOp_for_C (MO_ReadOSBI _ _)  = panic "pprMachOp_for_C:MO_ReadOSBI"
-pprMachOp_for_C (MO_WriteOSBI _ _) = panic "pprMachOp_for_C:MO_WriteOSBI"
-
-
--- Helper for printing array expressions.
-ppr_array_expression offw scaleRep baseAmode indexAmode
-   -- create:
-   -- * (scaleRep*) (
-   --      ((char*)baseAmode) + offw*bytes_per_word + indexAmode*bytes_per_scaleRep
-   --   )
-   = let offb  = parens (int offw <> char '*' <> text "sizeof(void*)")
-         indb  = parens (parens (pprAmode indexAmode) 
-                         <> char '*' <> int (getPrimRepArrayElemSize scaleRep))
-         baseb = text "(char*)" <> parens (pprAmode baseAmode)
-         addr  = parens baseb <+> char '+' <+> offb <+> char '+' <+> indb
-     in
-         char '*' <> parens (ppr scaleRep <> char '*') <> parens addr
-
 
 ppLocalness lbl
   = if (externallyVisibleCLabel lbl) 
@@ -1178,15 +1135,15 @@ Special treatment for floats and doubles, to avoid unwanted conversions.
 
 \begin{code}
 pprAssign FloatRep dest@(CVal reg_rel _) src
-  = hcat [ ptext SLIT("ASSIGN_FLT"),char '(', ppr_amode (CAddr reg_rel), comma, pprAmode src, pp_paren_semi ]
+  = hcat [ ptext SLIT("ASSIGN_FLT((W_*)"), parens (ppr_amode (CAddr reg_rel)), comma, pprAmode src, pp_paren_semi ]
 
 pprAssign DoubleRep dest@(CVal reg_rel _) src
-  = hcat [ ptext SLIT("ASSIGN_DBL"),char '(', ppr_amode (CAddr reg_rel), comma, pprAmode src, pp_paren_semi ]
+  = hcat [ ptext SLIT("ASSIGN_DBL((W_*)"), parens (ppr_amode (CAddr reg_rel)), comma, pprAmode src, pp_paren_semi ]
 
 pprAssign Int64Rep dest@(CVal reg_rel _) src
-  = hcat [ ptext SLIT("ASSIGN_Int64"),char '(', ppr_amode (CAddr reg_rel), comma, pprAmode src, pp_paren_semi ]
+  = hcat [ ptext SLIT("ASSIGN_Int64((W_*)"), parens (ppr_amode (CAddr reg_rel)), comma, pprAmode src, pp_paren_semi ]
 pprAssign Word64Rep dest@(CVal reg_rel _) src
-  = hcat [ ptext SLIT("ASSIGN_Word64"),char '(', ppr_amode (CAddr reg_rel), comma, pprAmode src, pp_paren_semi ]
+  = hcat [ ptext SLIT("ASSIGN_Word64((W_*)"), parens (ppr_amode (CAddr reg_rel)), comma, pprAmode src, pp_paren_semi ]
 \end{code}
 
 Lastly, the question is: will the C compiler think the types of the
@@ -1255,13 +1212,13 @@ question.)
 
 \begin{code}
 pprAmode (CVal reg_rel FloatRep)
-  = hcat [ text "PK_FLT(", ppr_amode (CAddr reg_rel), rparen ]
+  = hcat [ text "PK_FLT((W_*)", parens (ppr_amode (CAddr reg_rel)), rparen ]
 pprAmode (CVal reg_rel DoubleRep)
-  = hcat [ text "PK_DBL(", ppr_amode (CAddr reg_rel), rparen ]
+  = hcat [ text "PK_DBL((W_*)", parens (ppr_amode (CAddr reg_rel)), rparen ]
 pprAmode (CVal reg_rel Int64Rep)
-  = hcat [ text "PK_Int64(", ppr_amode (CAddr reg_rel), rparen ]
+  = hcat [ text "PK_Int64((W_*)", parens (ppr_amode (CAddr reg_rel)), rparen ]
 pprAmode (CVal reg_rel Word64Rep)
-  = hcat [ text "PK_Word64(", ppr_amode (CAddr reg_rel), rparen ]
+  = hcat [ text "PK_Word64((W_*)", parens (ppr_amode (CAddr reg_rel)), rparen ]
 \end{code}
 
 Next comes the case where there is some other cast need, and the
@@ -1293,10 +1250,6 @@ amode has kind2.
 \begin{code}
 ppr_amode CBytesPerWord
   = text "(sizeof(void*))"
-
-ppr_amode (CMem rep addr)
-  = let txt_rep = pprPrimKind rep
-    in  hcat [ char '*', parens (txt_rep <> char '*'), parens (ppr_amode addr) ]
 
 ppr_amode (CVal reg_rel@(CIndex _ _ _) kind)
   = case (pprRegRelative False{-no sign wanted-} reg_rel) of
@@ -1701,7 +1654,7 @@ ppr_decls_AbsC (CInitHdr cl_info reg_rel cost_centre _)
   where
     info_lbl = infoTableLabelFromCI cl_info
 
-ppr_decls_AbsC (CMachOpStmt res	_ args _) = ppr_decls_Amodes (maybeToList res ++ args)
+ppr_decls_AbsC (CMachOpStmt res	_ args _) = ppr_decls_Amodes (res : args)
 ppr_decls_AbsC (COpStmt	results	_ args _) = ppr_decls_Amodes (results ++ args)
 
 ppr_decls_AbsC (CSimultaneous abc)  	  = ppr_decls_AbsC abc

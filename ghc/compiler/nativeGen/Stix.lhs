@@ -41,7 +41,7 @@ import AbsCUtils	( magicIdPrimRep )
 import ForeignCall	( CCallConv )
 import CLabel		( mkAsmTempLabel, CLabel, pprCLabel )
 import PrimRep          ( PrimRep(..) )
-import MachOp		( MachOp(..), pprMachOp, resultRepsOfMachOp )
+import MachOp		( MachOp(..), pprMachOp, resultRepOfMachOp )
 import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
@@ -165,10 +165,7 @@ repOfStixExpr (StReg reg)     = repOfStixReg reg
 repOfStixExpr (StIndex _ _ _) = PtrRep
 repOfStixExpr (StInd rep _)   = rep
 repOfStixExpr (StCall target conv retrep args) = retrep
-repOfStixExpr (StMachOp mop args) 
-   = case resultRepsOfMachOp mop of
-        Just rep -> rep
-        Nothing  -> pprPanic "repOfStixExpr:StMachOp" (pprMachOp mop)
+repOfStixExpr (StMachOp mop args) = resultRepOfMachOp mop
 
 
 -- used by insnFuture in RegAllocInfo.lhs

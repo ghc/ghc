@@ -3,7 +3,7 @@ module MachOp 	( MachOp(..), pprMachOp,
 		  isDefinitelyInlineMachOp, 
 		  isCommutableMachOp,
 		  isComparisonMachOp,
-                  resultRepsOfMachOp
+                  resultRepOfMachOp
                  )
 where
 
@@ -162,12 +162,6 @@ data MachOp
   | MO_8U_to_32U	-- zero extend
   | MO_32U_to_8U	-- mask out all but lowest byte
 
-  -- Reading/writing arrays
-  | MO_ReadOSBI Int PrimRep   -- args: [base_ptr, index_value]
-  | MO_WriteOSBI Int PrimRep  -- args: [base_ptr, index_value, value_to_write]
-    -- Read/write a value :: the PrimRep
-    -- at byte address 
-    --    sizeof(machine_word)*Int + base_ptr + sizeof(PrimRep)*index_value
     deriving Eq
 
 
@@ -300,11 +294,6 @@ pprMachOp MO_32U_to_NatU   = text "MO_32U_to_NatU"
 pprMachOp MO_8U_to_32U     = text "MO_8U_to_32U"
 pprMachOp MO_32U_to_8U     = text "MO_32U_to_8U"
 
-pprMachOp (MO_ReadOSBI offset rep)
-   = text "MO_ReadOSBI" <> parens (int offset <> comma <> ppr rep)
-pprMachOp (MO_WriteOSBI offset rep)
-   = text "MO_WriteOSBI" <> parens (int offset <> comma <> ppr rep)
-
 
 
 -- Non-exported helper enumeration:
@@ -338,137 +327,134 @@ isCommutableMachOp mop = comm `elem` snd (machOpProps mop)
 isComparisonMachOp :: MachOp -> Bool
 isComparisonMachOp mop = comp `elem` snd (machOpProps mop)
 
--- Find the PrimReps for the returned value(s) of the MachOp.
-resultRepsOfMachOp :: MachOp -> Maybe PrimRep
-resultRepsOfMachOp mop = fst (machOpProps mop)
+-- Find the PrimRep for the returned value of the MachOp.
+resultRepOfMachOp :: MachOp -> PrimRep
+resultRepOfMachOp mop = fst (machOpProps mop)
 
 -- This bit does the real work.
-machOpProps :: MachOp -> (Maybe PrimRep, [MO_Prop])
+machOpProps :: MachOp -> (PrimRep, [MO_Prop])
 
-machOpProps MO_Nat_Add       = (Just IntRep, [inline, comm])
-machOpProps MO_Nat_Sub       = (Just IntRep, [inline])
-machOpProps MO_Nat_Eq        = (Just IntRep, [inline, comp, comm])
-machOpProps MO_Nat_Ne        = (Just IntRep, [inline, comp, comm])
+machOpProps MO_Nat_Add       = (IntRep, [inline, comm])
+machOpProps MO_Nat_Sub       = (IntRep, [inline])
+machOpProps MO_Nat_Eq        = (IntRep, [inline, comp, comm])
+machOpProps MO_Nat_Ne        = (IntRep, [inline, comp, comm])
 
-machOpProps MO_NatS_Ge       = (Just IntRep, [inline, comp])
-machOpProps MO_NatS_Le       = (Just IntRep, [inline, comp])
-machOpProps MO_NatS_Gt       = (Just IntRep, [inline, comp])
-machOpProps MO_NatS_Lt       = (Just IntRep, [inline, comp])
+machOpProps MO_NatS_Ge       = (IntRep, [inline, comp])
+machOpProps MO_NatS_Le       = (IntRep, [inline, comp])
+machOpProps MO_NatS_Gt       = (IntRep, [inline, comp])
+machOpProps MO_NatS_Lt       = (IntRep, [inline, comp])
 
-machOpProps MO_NatU_Ge       = (Just IntRep, [inline, comp])
-machOpProps MO_NatU_Le       = (Just IntRep, [inline, comp])
-machOpProps MO_NatU_Gt       = (Just IntRep, [inline, comp])
-machOpProps MO_NatU_Lt       = (Just IntRep, [inline, comp])
+machOpProps MO_NatU_Ge       = (IntRep, [inline, comp])
+machOpProps MO_NatU_Le       = (IntRep, [inline, comp])
+machOpProps MO_NatU_Gt       = (IntRep, [inline, comp])
+machOpProps MO_NatU_Lt       = (IntRep, [inline, comp])
 
-machOpProps MO_NatS_Mul      = (Just IntRep, [inline, comm])
-machOpProps MO_NatS_MulMayOflo = (Just IntRep, [inline, comm])
-machOpProps MO_NatS_Quot     = (Just IntRep, [inline])
-machOpProps MO_NatS_Rem      = (Just IntRep, [inline])
-machOpProps MO_NatS_Neg      = (Just IntRep, [inline])
+machOpProps MO_NatS_Mul      = (IntRep, [inline, comm])
+machOpProps MO_NatS_MulMayOflo = (IntRep, [inline, comm])
+machOpProps MO_NatS_Quot     = (IntRep, [inline])
+machOpProps MO_NatS_Rem      = (IntRep, [inline])
+machOpProps MO_NatS_Neg      = (IntRep, [inline])
 
-machOpProps MO_NatU_Mul      = (Just WordRep, [inline, comm])
-machOpProps MO_NatU_Quot     = (Just WordRep, [inline])
-machOpProps MO_NatU_Rem      = (Just WordRep, [inline])
+machOpProps MO_NatU_Mul      = (WordRep, [inline, comm])
+machOpProps MO_NatU_Quot     = (WordRep, [inline])
+machOpProps MO_NatU_Rem      = (WordRep, [inline])
 
-machOpProps MO_Nat_And       = (Just IntRep, [inline, comm])
-machOpProps MO_Nat_Or        = (Just IntRep, [inline, comm])
-machOpProps MO_Nat_Xor       = (Just IntRep, [inline, comm])
-machOpProps MO_Nat_Not       = (Just IntRep, [inline])
-machOpProps MO_Nat_Shl       = (Just IntRep, [inline])
-machOpProps MO_Nat_Shr       = (Just IntRep, [inline])
-machOpProps MO_Nat_Sar       = (Just IntRep, [inline])
+machOpProps MO_Nat_And       = (IntRep, [inline, comm])
+machOpProps MO_Nat_Or        = (IntRep, [inline, comm])
+machOpProps MO_Nat_Xor       = (IntRep, [inline, comm])
+machOpProps MO_Nat_Not       = (IntRep, [inline])
+machOpProps MO_Nat_Shl       = (IntRep, [inline])
+machOpProps MO_Nat_Shr       = (IntRep, [inline])
+machOpProps MO_Nat_Sar       = (IntRep, [inline])
 
-machOpProps MO_32U_Eq        = (Just IntRep, [inline, comp, comm])
-machOpProps MO_32U_Ne        = (Just IntRep, [inline, comp, comm])
-machOpProps MO_32U_Ge        = (Just IntRep, [inline, comp])
-machOpProps MO_32U_Le        = (Just IntRep, [inline, comp])
-machOpProps MO_32U_Gt        = (Just IntRep, [inline, comp])
-machOpProps MO_32U_Lt        = (Just IntRep, [inline, comp])
+machOpProps MO_32U_Eq        = (IntRep, [inline, comp, comm])
+machOpProps MO_32U_Ne        = (IntRep, [inline, comp, comm])
+machOpProps MO_32U_Ge        = (IntRep, [inline, comp])
+machOpProps MO_32U_Le        = (IntRep, [inline, comp])
+machOpProps MO_32U_Gt        = (IntRep, [inline, comp])
+machOpProps MO_32U_Lt        = (IntRep, [inline, comp])
 
-machOpProps MO_Dbl_Eq        = (Just IntRep, [inline, comp, comm])
-machOpProps MO_Dbl_Ne        = (Just IntRep, [inline, comp, comm])
-machOpProps MO_Dbl_Ge        = (Just IntRep, [inline, comp])
-machOpProps MO_Dbl_Le        = (Just IntRep, [inline, comp])
-machOpProps MO_Dbl_Gt        = (Just IntRep, [inline, comp])
-machOpProps MO_Dbl_Lt        = (Just IntRep, [inline, comp])
+machOpProps MO_Dbl_Eq        = (IntRep, [inline, comp, comm])
+machOpProps MO_Dbl_Ne        = (IntRep, [inline, comp, comm])
+machOpProps MO_Dbl_Ge        = (IntRep, [inline, comp])
+machOpProps MO_Dbl_Le        = (IntRep, [inline, comp])
+machOpProps MO_Dbl_Gt        = (IntRep, [inline, comp])
+machOpProps MO_Dbl_Lt        = (IntRep, [inline, comp])
 
-machOpProps MO_Dbl_Add       = (Just DoubleRep, [inline, comm])
-machOpProps MO_Dbl_Sub       = (Just DoubleRep, [inline])
-machOpProps MO_Dbl_Mul       = (Just DoubleRep, [inline, comm])
-machOpProps MO_Dbl_Div       = (Just DoubleRep, [inline])
-machOpProps MO_Dbl_Pwr       = (Just DoubleRep, [])
+machOpProps MO_Dbl_Add       = (DoubleRep, [inline, comm])
+machOpProps MO_Dbl_Sub       = (DoubleRep, [inline])
+machOpProps MO_Dbl_Mul       = (DoubleRep, [inline, comm])
+machOpProps MO_Dbl_Div       = (DoubleRep, [inline])
+machOpProps MO_Dbl_Pwr       = (DoubleRep, [])
 
-machOpProps MO_Dbl_Sin       = (Just DoubleRep, [])
-machOpProps MO_Dbl_Cos       = (Just DoubleRep, [])
-machOpProps MO_Dbl_Tan       = (Just DoubleRep, [])
-machOpProps MO_Dbl_Sinh      = (Just DoubleRep, [])
-machOpProps MO_Dbl_Cosh      = (Just DoubleRep, [])
-machOpProps MO_Dbl_Tanh      = (Just DoubleRep, [])
-machOpProps MO_Dbl_Asin      = (Just DoubleRep, [])
-machOpProps MO_Dbl_Acos      = (Just DoubleRep, [])
-machOpProps MO_Dbl_Atan      = (Just DoubleRep, [])
-machOpProps MO_Dbl_Log       = (Just DoubleRep, [])
-machOpProps MO_Dbl_Exp       = (Just DoubleRep, [])
-machOpProps MO_Dbl_Sqrt      = (Just DoubleRep, [])
-machOpProps MO_Dbl_Neg       = (Just DoubleRep, [inline])
+machOpProps MO_Dbl_Sin       = (DoubleRep, [])
+machOpProps MO_Dbl_Cos       = (DoubleRep, [])
+machOpProps MO_Dbl_Tan       = (DoubleRep, [])
+machOpProps MO_Dbl_Sinh      = (DoubleRep, [])
+machOpProps MO_Dbl_Cosh      = (DoubleRep, [])
+machOpProps MO_Dbl_Tanh      = (DoubleRep, [])
+machOpProps MO_Dbl_Asin      = (DoubleRep, [])
+machOpProps MO_Dbl_Acos      = (DoubleRep, [])
+machOpProps MO_Dbl_Atan      = (DoubleRep, [])
+machOpProps MO_Dbl_Log       = (DoubleRep, [])
+machOpProps MO_Dbl_Exp       = (DoubleRep, [])
+machOpProps MO_Dbl_Sqrt      = (DoubleRep, [])
+machOpProps MO_Dbl_Neg       = (DoubleRep, [inline])
 
-machOpProps MO_Flt_Add       = (Just FloatRep, [inline, comm])
-machOpProps MO_Flt_Sub       = (Just FloatRep, [inline])
-machOpProps MO_Flt_Mul       = (Just FloatRep, [inline, comm])
-machOpProps MO_Flt_Div       = (Just FloatRep, [inline])
-machOpProps MO_Flt_Pwr       = (Just FloatRep, [])
+machOpProps MO_Flt_Add       = (FloatRep, [inline, comm])
+machOpProps MO_Flt_Sub       = (FloatRep, [inline])
+machOpProps MO_Flt_Mul       = (FloatRep, [inline, comm])
+machOpProps MO_Flt_Div       = (FloatRep, [inline])
+machOpProps MO_Flt_Pwr       = (FloatRep, [])
 
-machOpProps MO_Flt_Eq        = (Just IntRep, [inline, comp, comm])
-machOpProps MO_Flt_Ne        = (Just IntRep, [inline, comp, comm])
-machOpProps MO_Flt_Ge        = (Just IntRep, [inline, comp])
-machOpProps MO_Flt_Le        = (Just IntRep, [inline, comp])
-machOpProps MO_Flt_Gt        = (Just IntRep, [inline, comp])
-machOpProps MO_Flt_Lt        = (Just IntRep, [inline, comp])
+machOpProps MO_Flt_Eq        = (IntRep, [inline, comp, comm])
+machOpProps MO_Flt_Ne        = (IntRep, [inline, comp, comm])
+machOpProps MO_Flt_Ge        = (IntRep, [inline, comp])
+machOpProps MO_Flt_Le        = (IntRep, [inline, comp])
+machOpProps MO_Flt_Gt        = (IntRep, [inline, comp])
+machOpProps MO_Flt_Lt        = (IntRep, [inline, comp])
 
-machOpProps MO_Flt_Sin       = (Just FloatRep, [])
-machOpProps MO_Flt_Cos       = (Just FloatRep, [])
-machOpProps MO_Flt_Tan       = (Just FloatRep, [])
-machOpProps MO_Flt_Sinh      = (Just FloatRep, [])
-machOpProps MO_Flt_Cosh      = (Just FloatRep, [])
-machOpProps MO_Flt_Tanh      = (Just FloatRep, [])
-machOpProps MO_Flt_Asin      = (Just FloatRep, [])
-machOpProps MO_Flt_Acos      = (Just FloatRep, [])
-machOpProps MO_Flt_Atan      = (Just FloatRep, [])
-machOpProps MO_Flt_Log       = (Just FloatRep, [])
-machOpProps MO_Flt_Exp       = (Just FloatRep, [])
-machOpProps MO_Flt_Sqrt      = (Just FloatRep, [])
-machOpProps MO_Flt_Neg       = (Just FloatRep, [inline])
+machOpProps MO_Flt_Sin       = (FloatRep, [])
+machOpProps MO_Flt_Cos       = (FloatRep, [])
+machOpProps MO_Flt_Tan       = (FloatRep, [])
+machOpProps MO_Flt_Sinh      = (FloatRep, [])
+machOpProps MO_Flt_Cosh      = (FloatRep, [])
+machOpProps MO_Flt_Tanh      = (FloatRep, [])
+machOpProps MO_Flt_Asin      = (FloatRep, [])
+machOpProps MO_Flt_Acos      = (FloatRep, [])
+machOpProps MO_Flt_Atan      = (FloatRep, [])
+machOpProps MO_Flt_Log       = (FloatRep, [])
+machOpProps MO_Flt_Exp       = (FloatRep, [])
+machOpProps MO_Flt_Sqrt      = (FloatRep, [])
+machOpProps MO_Flt_Neg       = (FloatRep, [inline])
 
-machOpProps MO_32U_to_NatS   = (Just IntRep, [inline])
-machOpProps MO_NatS_to_32U   = (Just Word32Rep, [inline])
+machOpProps MO_32U_to_NatS   = (IntRep, [inline])
+machOpProps MO_NatS_to_32U   = (Word32Rep, [inline])
 
-machOpProps MO_NatS_to_Dbl   = (Just DoubleRep, [inline])
-machOpProps MO_Dbl_to_NatS   = (Just IntRep, [inline])
+machOpProps MO_NatS_to_Dbl   = (DoubleRep, [inline])
+machOpProps MO_Dbl_to_NatS   = (IntRep, [inline])
 
-machOpProps MO_NatS_to_Flt   = (Just FloatRep, [inline])
-machOpProps MO_Flt_to_NatS   = (Just IntRep, [inline])
+machOpProps MO_NatS_to_Flt   = (FloatRep, [inline])
+machOpProps MO_Flt_to_NatS   = (IntRep, [inline])
 
-machOpProps MO_NatS_to_NatU  = (Just WordRep, [inline])
-machOpProps MO_NatU_to_NatS  = (Just IntRep, [inline])
+machOpProps MO_NatS_to_NatU  = (WordRep, [inline])
+machOpProps MO_NatU_to_NatS  = (IntRep, [inline])
 
-machOpProps MO_NatS_to_NatP  = (Just PtrRep, [inline])
-machOpProps MO_NatP_to_NatS  = (Just IntRep, [inline])
-machOpProps MO_NatU_to_NatP  = (Just PtrRep, [inline])
-machOpProps MO_NatP_to_NatU  = (Just WordRep, [inline])
+machOpProps MO_NatS_to_NatP  = (PtrRep, [inline])
+machOpProps MO_NatP_to_NatS  = (IntRep, [inline])
+machOpProps MO_NatU_to_NatP  = (PtrRep, [inline])
+machOpProps MO_NatP_to_NatU  = (WordRep, [inline])
 
-machOpProps MO_Dbl_to_Flt    = (Just FloatRep, [inline])
-machOpProps MO_Flt_to_Dbl    = (Just DoubleRep, [inline])
+machOpProps MO_Dbl_to_Flt    = (FloatRep, [inline])
+machOpProps MO_Flt_to_Dbl    = (DoubleRep, [inline])
 
-machOpProps MO_8S_to_NatS    = (Just IntRep, [inline])
-machOpProps MO_16S_to_NatS   = (Just IntRep, [inline])
-machOpProps MO_32S_to_NatS   = (Just IntRep, [inline])
+machOpProps MO_8S_to_NatS    = (IntRep, [inline])
+machOpProps MO_16S_to_NatS   = (IntRep, [inline])
+machOpProps MO_32S_to_NatS   = (IntRep, [inline])
 
-machOpProps MO_8U_to_NatU    = (Just WordRep, [inline])
-machOpProps MO_16U_to_NatU   = (Just WordRep, [inline])
-machOpProps MO_32U_to_NatU   = (Just WordRep, [inline])
+machOpProps MO_8U_to_NatU    = (WordRep, [inline])
+machOpProps MO_16U_to_NatU   = (WordRep, [inline])
+machOpProps MO_32U_to_NatU   = (WordRep, [inline])
 
-machOpProps MO_8U_to_32U     = (Just Word32Rep, [inline])
-machOpProps MO_32U_to_8U     = (Just Word8Rep, [inline])
-
-machOpProps (MO_ReadOSBI offset rep)  = (Just rep, [inline])
-machOpProps (MO_WriteOSBI offset rep) = (Nothing, [inline])
+machOpProps MO_8U_to_32U     = (Word32Rep, [inline])
+machOpProps MO_32U_to_8U     = (Word8Rep, [inline])
