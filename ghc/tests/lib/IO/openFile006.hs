@@ -4,7 +4,7 @@ import IO
 
 main = do
   h <- openFile "openFile006.out" AppendMode
-  hPutStrLn h "hello, world"
+  hPutStr h "hello, world"
   size <- hFileSize h
   print size
   hClose h

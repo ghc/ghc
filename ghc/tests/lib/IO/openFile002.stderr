@@ -2,5 +2,5 @@
 Fail: does not exist
 Action: openFile
 Reason: No such file or directory
-File: <nonexistent>
+File: nonexistent
 
