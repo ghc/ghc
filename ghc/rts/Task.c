@@ -156,7 +156,7 @@ startTaskManager( nat maxCount,
   taskCount = 0;
 }
 
-void
+rtsBool
 startTask ( void (*taskStart)(void) )
 {
   int r;
@@ -171,13 +171,13 @@ startTask ( void (*taskStart)(void) )
 			       rts_n_waiting_tasks););
     // the task will run as soon as a capability is available,
     // so there's no need to wake it.
-    return;
+    return rtsFalse;
   }
 
   /* If the task limit has been reached, just return. */
   if (maxTasks > 0 && taskCount == maxTasks) {
     IF_DEBUG(scheduler,fprintf(stderr,"scheduler: startTask: task limit (%d) reached, not creating new one.\n",maxTasks));
-    return;
+    return rtsFalse;
   }
   
 
@@ -188,7 +188,7 @@ startTask ( void (*taskStart)(void) )
   taskCount++;
 
   IF_DEBUG(scheduler,fprintf(stderr,"scheduler: startTask: new task %ld (total_count: %d; waiting: %d)\n", tid, taskCount, rts_n_waiting_tasks););
-  return;
+  return rtsTrue;
 }
 
 

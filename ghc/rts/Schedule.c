@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.195 2004/04/13 13:43:11 simonmar Exp $
+ * $Id: Schedule.c,v 1.196 2004/05/06 12:20:04 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -276,7 +276,10 @@ startSchedulerTaskIfNecessary(void)
       // just because the last one hasn't yet reached the
       // "waiting for capability" state
       startingWorkerThread = rtsTrue;
-      startTask(taskStart);
+      if(!startTask(taskStart))
+      {
+        startingWorkerThread = rtsFalse;
+      }
     }
   }
 }

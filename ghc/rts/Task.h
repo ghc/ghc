@@ -30,7 +30,7 @@ extern void startTaskManager ( nat maxTasks, void (*taskStart)(void) );
 extern void stopTaskManager ( void );
 extern void resetTaskManagerAfterFork ( void );
 
-extern void startTask ( void (*taskStart)(void) );
+extern rtsBool startTask ( void (*taskStart)(void) );
 
 #endif /* RTS_SUPPORTS_THREADS */
 #endif /* __TASK_H__ */
