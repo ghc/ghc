@@ -2873,20 +2873,22 @@ I have not tried it yet.
 </Sect2>
 
 
-<Sect2><Title>Building GHC</Title>
+    <Sect2><Title>Building GHC</Title>
+      
+      <ItemizedList>
 
-<ItemizedList>
-
-<ListItem>
-<para>
-In the <filename>./configure</filename> output, ignore 
-"<Literal>
-checking whether #! works in shell scripts... 
-./configure: ./conftest: No such file or directory</Literal>", 
-and "<Literal>not updating unwritable cache ./config.cache</Literal>".
-Nobody knows why these happen, but they seem to be harmless.
-</para>
-</ListItem>
+	<ListItem>
+	  <para>
+	    You should give the option
+	    <option>--host=i386-unknown-mingw32</option> to
+	    <command>autoconf</command>, so that it doesn't try to
+	    build for Cygwin (unless that's what you really
+	    want). Since it's possible to get into trouble using the
+	    wrong C compiler, it's wise either to avoid installing
+	    Cygwin gcc, or to explicitly specify
+	    <option>--with-gcc=/mingw/bin/gcc</option>.
+	  </para>
+	</ListItem>
 
 <ListItem>
 <para>
@@ -2909,11 +2911,8 @@ configure: error: ./configure failed for ghc
 <ListItem>
 <para>
 You need <filename>ghc</filename> to be in your <Constant>PATH</Constant> before you run
-<Command>configure</Command>.  The default GHC InstallShield creates only
-<filename>ghc-4.08</filename>, so you may need to duplicate this file as <filename>ghc</filename>
-in the same directory, in order that <Command>configure</Command> will see it (or
-just rename <filename>ghc-4.08</filename> to <filename>ghc</filename>.
-And make sure that the directory is in your path.
+<Command>configure</Command>. The InstallShield tells you the path
+when you install it.
 </para>
 </ListItem>
 
