@@ -1166,11 +1166,9 @@ downsweep roots old_summaries
 			let old_summary = findModInSummaries old_summaries mod
 			summarise mod location old_summary
 
-		   Left _ -> 
-		        throwDyn (CmdLineError 
-                                   ("can't find module `" 
-                                     ++ showSDoc (ppr nm) ++ "' (while processing " 
-				     ++ show currentMod ++ ")"))
+		   Left files -> do
+			dflags <- getDynFlags
+			throwDyn (noModError dflags currentMod nm files)
 
         -- loop invariant: env doesn't contain package modules
         loop :: [(FilePath,ModuleName)] -> ModuleEnv ModSummary -> IO [ModSummary]
@@ -1190,6 +1188,18 @@ downsweep roots old_summaries
 						       (ms_imps m)) new_home_summaries)
                 loop new_imps (extendModuleEnvList env 
 				[ (ms_mod s, s) | s <- new_home_summaries ])
+
+-- ToDo: we don't have a proper line number for this error
+noModError dflags loc mod_nm files = ProgramError (showSDoc (
+  hang (text loc <> colon) 4 $
+    (text "Can't find module" <+> quotes (ppr mod_nm) $$ extra)
+  ))
+  where
+   extra
+    | verbosity dflags < 3 =
+        text "(use -v to see a list of the files searched for)"
+    | otherwise =
+        hang (ptext SLIT("locations searched:")) 4 (vcat (map text files))
 
 -----------------------------------------------------------------------------
 -- Summarising modules
