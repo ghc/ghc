@@ -150,7 +150,7 @@ Setters
 
 \begin{code}
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
-setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
+setSpecInfo 	  info sp = PSEQ sp (info { specInfo = sp })
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
 	-- Try to avoid spack leaks by seq'ing

@@ -179,13 +179,17 @@ import qualified FastString
 #endif
 
 #if __HASKELL1__ > 4
-#define FMAP fmap
-#define ISALPHANUM isAlphaNum
-#define IOERROR ioError
+# define FMAP fmap
+# define ISALPHANUM isAlphaNum
+# define IOERROR ioError
+# define PSEQ seq
+# define SAPPLY $!
 #else
-#define FMAP map
-#define ISALPHANUM isAlphanum
-#define IOERROR fail
+# define FMAP map
+# define ISALPHANUM isAlphanum
+# define IOERROR fail
+# define PSEQ (\x y -> y)
+# define SAPPLY $
 #endif
 
 #endif

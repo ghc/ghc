@@ -18,7 +18,7 @@ module Type (
 
 	boxedTypeKind, unboxedTypeKind, openTypeKind, 	-- Kind :: superKind
 
-	mkArrowKind, mkArrowKinds, hasMoreBoxityInfo,
+	mkArrowKind, mkArrowKinds, -- mentioned below: hasMoreBoxityInfo,
 
 	funTyCon,
 
@@ -789,14 +789,14 @@ tidyType env@(tidy_env, subst) ty
 				Just tv' -> TyVarTy tv'
     go (TyConApp tycon tys) = let args = map go tys
 			      in args `seqList` TyConApp tycon args
-    go (NoteTy note ty)     = (NoteTy $! (go_note note)) $! (go ty)
-    go (AppTy fun arg)	    = (AppTy $! (go fun)) $! (go arg)
-    go (FunTy fun arg)	    = (FunTy $! (go fun)) $! (go arg)
-    go (ForAllTy tv ty)	    = ForAllTy tv' $! (tidyType env' ty)
-			    where
-			      (env', tv') = tidyTyVar env tv
+    go (NoteTy note ty)     = (NoteTy SAPPLY (go_note note)) SAPPLY (go ty)
+    go (AppTy fun arg)	    = (AppTy SAPPLY (go fun)) SAPPLY (go arg)
+    go (FunTy fun arg)	    = (FunTy SAPPLY (go fun)) SAPPLY (go arg)
+    go (ForAllTy tv ty)	    = ForAllTy tvp SAPPLY (tidyType envp ty)
+			      where
+			        (envp, tvp) = tidyTyVar env tv
 
-    go_note (SynNote ty)        = SynNote $! (go ty)
+    go_note (SynNote ty)        = SynNote SAPPLY (go ty)
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
     go_note note@(UsgNote _)    = note  -- Usage annotation is already tidy
     go_note note@(UsgForAll _)  = note  -- Uvar binder is already tidy
@@ -805,7 +805,7 @@ tidyTypes  env tys    = map (tidyType env) tys
 \end{code}
 
 
-@tidyOpenType@ grabs the free type varibles, tidies them
+@tidyOpenType@ grabs the free type variables, tidies them
 and then uses @tidyType@ to work over the type itself
 
 \begin{code}
