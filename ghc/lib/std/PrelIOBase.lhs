@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.15 1999/11/26 16:26:32 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.16 1999/12/03 16:17:42 simonmar Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -74,10 +74,6 @@ instance  Monad IO  where
 
     m >>= k     = bindIO m k
     fail s	= error s -- not ioError?
-
-    -- not required but worth having around
-fixIO 		:: (a -> IO a) -> IO a
-fixIO m         = stToIO (fixST (ioToST . m))
 
 liftIO :: IO a -> State# RealWorld -> STret RealWorld a
 liftIO (IO m) = \s -> case m s of (# s', r #) -> STret s' r

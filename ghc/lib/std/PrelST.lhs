@@ -53,13 +53,6 @@ data STret s a = STret (State# s) a
 liftST :: ST s a -> State# s -> STret s a
 liftST (ST m) = \s -> case m s of (# s', r #) -> STret s' r
 
-fixST :: (a -> ST s a) -> ST s a
-fixST k = ST $ \ s ->
-    let ans       = liftST (k r) s
-	STret _ r = ans
-    in
-    case ans of STret s' x -> (# s', x #)
-
 {-# NOINLINE unsafeInterleaveST #-}
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST (ST m) = ST ( \ s ->
