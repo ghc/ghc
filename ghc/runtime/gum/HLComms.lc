@@ -981,9 +981,9 @@ PACKET packet;
 {
     GLOBAL_TASK_ID sender = Sender_Task(packet); 
     OPCODE opcode = Opcode(packet);
-    
+#if 0    
     fprintf(stderr,"STG_Exception: Received %s (%x), sender %x\n",GetOpName(opcode),opcode,sender); 
-
+#endif
     switch (opcode) {
 
     case PP_FINISH:

@@ -7,14 +7,16 @@
 %
 %****************************************************************************
 
-The Sysman task controls initiation, termination, global GC
-synchronisation and statistics gathering of a parallel Haskell program
-running under GUM. Based on K. Hammond's SysMan.lc in Graph for
-PVM. SysMan is unusual in that it is not part of the executable
-produced by ghc: it is a free-standing program that spawns PVM tasks
-(logical PEs) to evaluate the program.
+The Sysman task currently controls initiation, termination, of a
+parallel Haskell program running under GUM. In the future it may
+control global GC synchronisation and statistics gathering. Based on
+K. Hammond's SysMan.lc in Graph for PVM. SysMan is unusual in that it
+is not part of the executable produced by ghc: it is a free-standing
+program that spawns PVM tasks (logical PEs) to evaluate the
+program. After initialisation it runs in parallel with the PE tasks,
+awaiting messages.
 
-OK children, buckle down for some serious weirdness, it works like this.
+OK children, buckle down for some serious weirdness, it works like this ...
 
 \begin{itemize}
 \item The argument vector (argv) for SysMan has one the following 2 shapes:
@@ -68,7 +70,7 @@ The pvm-executable run by each PE-task, is initialised as follows.
 \item Receives and records the task-id of SysMan, for future use.
 \item If the PE is the main thread it sends its task-id to SysMan.
 \item Receives and records the array of task-ids of the other PEs.
-\item Begins execution
+\item Begins execution.
 \end{itemize}
 
 \end{itemize}
@@ -90,7 +92,7 @@ rtsBool IAmMainThread;
 
 
 \begin{code}
-static GLOBAL_TASK_ID gtids[MAX_PES], StatsTask = 0;
+static GLOBAL_TASK_ID gtids[MAX_PES];
 static long PEbuffer[MAX_PES];
 int nPEs = 0;
 static GLOBAL_TASK_ID sysman_id, sender_id, mainThread_id;
@@ -168,7 +170,7 @@ main(int argc, char **argv)
 	    nPEs--;
 	    /* Initialise the PE task arguments from Sysman's arguments */
 	    pargv = argv + 2;
-#if 1
+#if 0
 	    fprintf(stderr, "Spawning %d PEs(%s) ...\n", nPEs, petask);
 	    fprintf(stderr, "  args: ");
 	    for (i = 0; pargv[i]; ++i)
@@ -182,7 +184,7 @@ main(int argc, char **argv)
 	     */	    
 	    for (i = 0; i < nPEs; i++)
 		PEbuffer[i+1] = (long) gtids[i];
-#if 1
+#if 0
 	    fprintf(stderr, "Spawned /* PWT */\n");
 #endif
 	}
@@ -195,7 +197,7 @@ main(int argc, char **argv)
 	nPEs++;				/* Record that the number of PEs is increasing */
 	if (cc = fork()) {
             checkerr(cc);		/* Parent continues as SysMan */
-#if 1
+#if 0
 	    fprintf(stderr, "SysMan Task is [t%x]\n", sysman_id);
 #endif
 	    /*
@@ -208,12 +210,12 @@ main(int argc, char **argv)
 	    garbage collector manager.
   	    */
 	    checkerr(pvm_joingroup(PECTLGROUP));
-#if 1
+#if 0
 	    fprintf(stderr, "Joined PECTLGROUP /* PWT */\n");
 #endif
 	    /* Wait for all the PEs to arrive */
 	    checkerr(pvm_barrier(PECTLGROUP, nPEs + 1));
-#if 1
+#if 0
 	    fprintf(stderr, "PECTLGROUP  barrier passed /* HWL */\n");
 #endif
 	    /* Broadcast SysMan's ID, so Main Thread PE knows it */
@@ -224,14 +226,14 @@ main(int argc, char **argv)
 	    addr = WaitForPEOp(PP_MAIN_TASK, ANY_GLOBAL_TASK);
             pvm_bufinfo(addr, &nbytes, &opcode, &mainThread_id );
 	    PEbuffer[0] = mainThread_id;
-#if 1
+#if 0
     	    fprintf(stderr,"SysMan received Main Task = %x\n",mainThread_id); 
 #endif	    
   	    /* Now that we have them all, broadcast Global Task Ids of all PEs */
   	    pvm_initsend(PvmDataDefault);
 	    PutArgs(PEbuffer, nPEs);
 	    pvm_bcast(PEGROUP, PP_PETIDS);
-#if 1
+#if 0
  	    fprintf(stderr, "Sysman successfully initialized!\n");
 #endif
  	    /* Process incoming messages */
@@ -260,12 +262,10 @@ main(int argc, char **argv)
 		        break;
 
 		    case PP_FINISH:
-		        fprintf(stderr, "Finish from %x\n", sender_id);
 		        if (!Finishing) {
-		      	  long buf = (long) StatsTask;
+		          fprintf(stderr, "\nFinish from %x\n", sender_id);
 		    	  Finishing = rtsTrue;
 		  	  pvm_initsend(PvmDataDefault);
-		  	  pvm_pklong(&buf, 1, 1);
 		  	  pvm_bcast(PEGROUP, PP_FINISH);
 		      } else {
 		  	  ++PEsTerminated;

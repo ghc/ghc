@@ -538,13 +538,18 @@ NL  	    	    	[\n\r]
 <GhcPragma>"_TUP_"{D}+		{ hsnewid(yytext, yyleng); RETURN(CONID); }
 <GhcPragma>[a-z]{i}*"$"[a-z]{i}* { hsnewid(yytext, yyleng); RETURN(TYVAR_TEMPLATE_ID); }
 
-<GlaExt,GhcPragma,UserPragma>{Id}"#" { 
+%{
+/* These SHOULDNAE work in "Code" (sigh) */
+%}
+<Code,GlaExt,GhcPragma,UserPragma>{Id}"#" { 
+			 if (! (nonstandardFlag || in_interface)) {
+			    char errbuf[ERR_BUF_SIZE];
+			    sprintf(errbuf, "Non-standard identifier (trailing `#'): %s\n", yytext);
+			    hsperror(errbuf);
+			 }
     	    	    	 hsnewid(yytext, yyleng);
     	    	    	 RETURN(_isconstr(yytext) ? CONID : VARID);
 			}
-%{
-/* This SHOULDNAE work in "Code" (sigh) */
-%}
 <Code,GlaExt,GhcPragma,UserPragma>_+{Id} { 
 			 if (! (nonstandardFlag || in_interface)) {
 			    char errbuf[ERR_BUF_SIZE];

@@ -122,10 +122,10 @@ Manager's requirements.
 
 \begin{code}
 #ifdef PAR
-    if (*argv[0] == '-') {	/* Look to see whether we're the Main Thread */
+    if (*argv[0] == '-') {		/* Look to see whether we're the Main Thread */
 	IAmMainThread = rtsTrue;
-        argv++; argc--;
-	fprintf(stderr, "I am Main Thread\n");
+        argv++; argc--;			/* Strip off flag argument */
+/*	fprintf(stderr, "I am Main Thread\n"); */
     }
     /* 
      * Grab the number of PEs out of the argument vector, and

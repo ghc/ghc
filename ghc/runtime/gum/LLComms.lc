@@ -276,13 +276,16 @@ GLOBAL_TASK_ID who;
   rtsBool match;
 
   do {
+#if 0
     fprintf(stderr,"WaitForPEOp: op = %x, who = %x\n",op,who); 
+#endif
     while((p = pvm_recv(ANY_TASK,ANY_OPCODE)) < 0)
       pvm_perror("WaitForPEOp: Waiting for PEOp");
       
     pvm_bufinfo( p, &nbytes, &opcode, &sender_id );
+#if 0
     fprintf(stderr,"WaitForPEOp: received: opcode = %x, sender_id = %x\n",opcode,sender_id); 
-
+#endif
     match = (op == ANY_OPCODE || op == opcode) && (who == ANY_TASK || who == sender_id);
 
     if(match)
@@ -333,8 +336,11 @@ GLOBAL_TASK_ID *psender_id;
 
 @PEStartUp@ does the low-level comms specific startup stuff for a
 PE. It initialises the comms system, joins the appropriate groups,
-synchronises with the other PEs. Finally it receives from Control the
-array of Global Task Ids.
+synchronises with the other PEs. Receives and records in a global
+variable the task-id of SysMan. If this is the main thread (discovered
+in main.lc), identifies itself to SysMan. Finally it receives
+from SysMan an array of the Global Task Ids of each PE, which is
+returned as the value of the function.
 
 \begin{code}
 GLOBAL_TASK_ID *
@@ -349,13 +355,13 @@ unsigned nPEs;
 
     mytid = _my_gtid;		/* Initialise PVM and get task id into global var.*/
 
-    fprintf(stderr,"PEStartup, Task id = [%x], No. PEs = %d \n", mytid, nPEs); 
+/*    fprintf(stderr,"PEStartup, Task id = [%x], No. PEs = %d \n", mytid, nPEs); */
     checkComms(pvm_joingroup(PEGROUP), "PEStartup");
-    fprintf(stderr,"PEStartup, Joined PEGROUP\n"); 
+/*    fprintf(stderr,"PEStartup, Joined PEGROUP\n"); */
     checkComms(pvm_joingroup(PECTLGROUP), "PEStartup");
-    fprintf(stderr,"PEStartup, Joined PECTLGROUP\n"); 
+/*    fprintf(stderr,"PEStartup, Joined PECTLGROUP\n"); */
     checkComms(pvm_barrier(PECTLGROUP, nPEs+1), "PEStartup");
-    fprintf(stderr,"PEStartup, Passed PECTLGROUP barrier\n"); 
+/*    fprintf(stderr,"PEStartup, Passed PECTLGROUP barrier\n"); */
 
     addr = WaitForPEOp(PP_SYSMAN_TID, ANY_GLOBAL_TASK);
     SysManTask = Sender_Task(addr);
@@ -365,11 +371,12 @@ unsigned nPEs;
     } 
     addr = WaitForPEOp(PP_PETIDS, ANY_GLOBAL_TASK);
     GetArgs(buffer, nPEs);
-
+#if 0
     for (i = 0; i < nPEs; ++i) {
 	PEs[i] = (GLOBAL_TASK_ID) buffer[i];
 	fprintf(stderr,"PEs[%d] = %x \n", i, PEs[i]); 
     }
+#endif
     free(buffer);
     return PEs;
 }
