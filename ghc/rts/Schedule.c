@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.116 2002/02/04 20:56:53 sof Exp $
+ * $Id: Schedule.c,v 1.117 2002/02/05 10:06:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1452,15 +1452,18 @@ schedule( void )
    
 void deleteAllThreads ( void )
 {
-  StgTSO* t;
+  StgTSO* t, *next;
   IF_DEBUG(scheduler,sched_belch("deleting all threads"));
-  for (t = run_queue_hd; t != END_TSO_QUEUE; t = t->link) {
+  for (t = run_queue_hd; t != END_TSO_QUEUE; t = next) {
+      next = t->link;
       deleteThread(t);
   }
-  for (t = blocked_queue_hd; t != END_TSO_QUEUE; t = t->link) {
+  for (t = blocked_queue_hd; t != END_TSO_QUEUE; t = next) {
+      next = t->link;
       deleteThread(t);
   }
-  for (t = sleeping_queue; t != END_TSO_QUEUE; t = t->link) {
+  for (t = sleeping_queue; t != END_TSO_QUEUE; t = next) {
+      next = t->link;
       deleteThread(t);
   }
   run_queue_hd = run_queue_tl = END_TSO_QUEUE;
