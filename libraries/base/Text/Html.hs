@@ -440,7 +440,7 @@ frameborder         =   intAttr "FRAMEBORDER"
 height              =   intAttr "HEIGHT"
 href                =   strAttr "HREF"
 hspace              =   intAttr "HSPACE"
-httpequiv           =   strAttr "HTTPEQUIV"
+httpequiv           =   strAttr "HTTP-EQUIV"
 identifier          =   strAttr "ID"
 ismap               = emptyAttr "ISMAP"
 lang                =   strAttr "LANG"
@@ -589,7 +589,7 @@ validHtmlAttrs = [
       "HEIGHT",
       "HREF",
       "HSPACE",
-      "HTTPEQUIV",
+      "HTTP-EQUIV",
       "ID",
       "ISMAP",
       "LANG",
