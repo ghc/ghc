@@ -116,7 +116,7 @@ packString str = packNChars (length str) str
 -- | The 'packNChars' function creates a 'PackedString' out of the
 -- first @len@ elements of the given 'String'.
 packNChars :: Int -> [Char] -> PackedString
-packNChars len str = PS (array (0,len-1) (zip [0..] str))
+packNChars len str = PS (listArray (0,len-1) str)
 
 -- -----------------------------------------------------------------------------
 -- Destructor functions (taking PackedStrings apart)
@@ -332,7 +332,7 @@ hGetPS h i = do
   arr <- newArray_ (0, i-1)
   l <- hGetArray h arr i
   chars <- mapM (\i -> readArray arr i >>= return.chr.fromIntegral) [0..l-1]
-  return (packString chars)
+  return (packNChars l chars)
 
 #else	/* __NHC__ */
 
