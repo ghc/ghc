@@ -234,7 +234,7 @@ tcRnModule hsc_env hsc_src (L loc (HsModule maybe_mod export_ies
 	     } ;
 
 		-- Report unused names
- 	reportUnusedNames final_env ;
+ 	reportUnusedNames export_ies final_env ;
 
 		-- Dump output and return
 	tcDump final_env ;
