@@ -126,7 +126,6 @@ toTitle                 :: Char -> Char
 
 -- Regardless of the O/S and Library, use the functions contained in WCsubst.c
 
-type WInt = HTYPE_WINT_T
 type CInt = HTYPE_INT
 
 isAlpha    c = iswalpha (fromIntegral (ord c)) /= 0
