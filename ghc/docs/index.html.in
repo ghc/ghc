@@ -30,53 +30,10 @@
 
       <LI>
         <P>
-          <B>Hierarchical Libraries</B>
+          <B><A HREF="libraries.html">Hierarchical Libraries</A></B>
         </P>
         <P>
-          GHC comes with a large number of libraries, arranged
-          hierarchically.  The libraries are divided into <EM>packages</EM> -
-          to use a package of libraries from GHC or GHCi just add the flag
-          <TT>-package &lt;name&gt;</TT> to the command line, where
-          <TT>&lt;name&gt;</TT> is the name of the package (see the
-          section on packages in the User's Guide for more information). The
-          <TT>base</TT> and <TT>haskell98</TT> packages are always available,
-          so you don't need to use the <TT>-package</TT> flag to get these.
-        </P>
-
-	<P>
-        <UL>
-          <LI>
-            <A HREF="base/index.html"><TT>base</TT></a>:
-            the Prelude, and a large collection of useful libraries.
-          </LI>
-          <LI>
-            <A HREF="haskell98/index.html"><TT>haskell98</TT></a>:
-            Haskell 98 Standard Libraries.
-          </LI>
-          <LI>
-            <A HREF="network/index.html"><TT>network</TT></a>:
-            networking support libraries.
-          </LI>
-          <LI>
-            <A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>:
-            manipulating Haskell source code.
-          </LI>
-@HOpenGLHTMLStart@
-          <LI>
-            <A HREF="OpenGL/index.html"><TT>OpenGL</TT></a>:
-            3D rendering.
-          </LI>
-          <LI>
-            <A HREF="GLUT/index.html"><TT>GLUT</TT></a>:
-            the OpenGL utility toolkit.
-          </LI>
-@HOpenGLHTMLEnd@
-@ObjectIOHTMLStart@
-	  <LI>
-	    <A HREF="ObjectIO/index.html"><TT>ObjectIO</TT></a>: GUI library.
-          </LI>
-@ObjectIOHTMLEnd@
-        </UL>
+          Documentation for the hierarchical libraries that come with GHC.
 	</P>
       </LI>
 
