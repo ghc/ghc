@@ -30,14 +30,13 @@ module Data.Bits (
     complementBit,     -- :: a -> Int -> a
     testBit,           -- :: a -> Int -> Bool
     bitSize,           -- :: a -> Int
-    isSigned           -- :: a -> Bool
-  ),
+    isSigned,          -- :: a -> Bool
 
-  -- * Shifts and rotates
-
-  -- $shifts
-  shiftL, shiftR,      -- :: Bits a => a -> Int -> a
-  rotateL, rotateR,    -- :: Bits a => a -> Int -> a
+    -- * Shifts and rotates
+    -- $shifts
+    shiftL, shiftR,    -- :: Bits a => a -> Int -> a
+    rotateL, rotateR   -- :: Bits a => a -> Int -> a
+  )
 
   -- instance Bits Int
   -- instance Bits Integer
@@ -82,6 +81,12 @@ class Num a => Bits a where
 	Right shifts are specified by giving a negative value. -}
     shift             :: a -> Int -> a
 
+    -- An instance can define either this unified shift or shiftL+shiftR,
+    -- depending on which is more convenient for the type in question.
+    x `shift`   i | i<0  = x `shiftR` (-i)
+                  | i==0 = x
+                  | i>0  = x `shiftL` i
+
     {-| Signed rotate the argument left by the specified number of bits.
 	Right rotates are specified by giving a negative value.
 
@@ -89,6 +94,20 @@ class Num a => Bits a where
         ('bitSize' is undefined for 'Integer', for example).
     -}
     rotate            :: a -> Int -> a
+
+    {-
+    -- Rotation can be implemented in terms of two shifts, but care is
+    -- needed for negative values.  This suggested implementation assumes
+    -- 2's-complement arithmetic.  It is commented out because it would
+    -- require an extra context (Ord a) on the signature of 'rotate'.
+    x `rotate`  i | i<0 && isSigned x && x<0
+                         = let left = i+bitSize x in
+                           ((x `shift` i) .&. complement ((-1) `shift` left))
+                           .|. (x `shift` left)
+                  | i<0  = (x `shift` i) .|. (x `shift` (i+bitSize x))
+                  | i==0 = x
+                  | i>0  = (x `shift` i) .|. (x `shift` (i-bitSize x))
+    -}
 
     -- | @bit i@ is a value with the @i@th bit set
     bit               :: Int -> a
@@ -113,22 +132,22 @@ class Num a => Bits a where
         value of the argument is ignored -}
     isSigned          :: a -> Bool
 
-    bit i               = 1 `shift` i
+    bit i               = 1 `shiftL` i
     x `setBit` i        = x .|. bit i
     x `clearBit` i      = x .&. complement (bit i)
     x `complementBit` i = x `xor` bit i
     x `testBit` i       = (x .&. bit i) /= 0
 
--- $shifts
--- These functions might sometimes be more convenient than the unified
--- versions 'shift' and 'rotate'.
-
-shiftL, shiftR   :: Bits a => a -> Int -> a
-rotateL, rotateR :: Bits a => a -> Int -> a
-x `shiftL`  i = x `shift`  i
-x `shiftR`  i = x `shift`  (-i)
-x `rotateL` i = x `rotate` i
-x `rotateR` i = x `rotate` (-i)
+    -- $shifts
+    -- These functions might sometimes be more convenient than the unified
+    -- versions 'shift' and 'rotate'.
+    
+    shiftL, shiftR   :: a -> Int -> a
+    rotateL, rotateR :: a -> Int -> a
+    x `shiftL`  i = x `shift`  i
+    x `shiftR`  i = x `shift`  (-i)
+    x `rotateL` i = x `rotate` i
+    x `rotateR` i = x `rotate` (-i)
 
 #ifdef __GLASGOW_HASKELL__
 instance Bits Int where
@@ -182,3 +201,36 @@ instance Bits Integer where
    bitSize _  = error "Bits.bitSize(Integer)"
    isSigned _ = True
 #endif
+
+#ifdef __NHC__
+instance Bits Int where
+    (.&.)             = nhc_primIntAnd
+    (.|.)             = nhc_primIntOr
+    xor               = nhc_primIntXor
+    complement        = nhc_primIntCompl
+    shiftL            = nhc_primIntLsh
+    shiftR            = nhc_primIntRsh
+    bitSize _         = 32
+    isSigned _        = True
+
+foreign import ccall nhc_primIntAnd :: Int -> Int -> Int
+foreign import ccall nhc_primIntOr  :: Int -> Int -> Int
+foreign import ccall nhc_primIntXor :: Int -> Int -> Int
+foreign import ccall nhc_primIntLsh :: Int -> Int -> Int
+foreign import ccall nhc_primIntRsh :: Int -> Int -> Int
+foreign import ccall nhc_primIntCompl :: Int -> Int
+
+instance Bits Integer where
+ -- (.&.) a b          = undefined
+ -- (.|.) a b          = undefined
+ -- xor a b            = undefined
+    complement a       = (-a)
+    x `shift` i | i<0  = x `div` (2^(-i))
+                | i==0 = x
+                | i>0  = x * (2^i)
+    x `rotate` i       = x `shift` i	-- an Integer never wraps
+    bitSize _          = error "Data.Bits: bitSize :: Integer -> Int"
+    isSigned _         = True
+
+#endif
+
