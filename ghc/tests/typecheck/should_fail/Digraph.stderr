@@ -2,12 +2,12 @@
 Digraph.hs:19:
     Inferred type is less polymorphic than expected
 	Quantified type variable `v' escapes
-	It unifies with `vertex', which is mentioned in the environment
-	The following variables in the environment mention `vertex'
-	    es :: [Edge vertex]
-	    vs :: [vertex]
+	It is mentioned in the environment
+	The following variables in the environment mention `v'
+	    es :: [Edge v]
+	    vs :: [v]
     When checking the type signature
-	reversed_edges :: forall v1. {Eq v1} => [Edge v1]
+	reversed_edges :: forall v1. (Eq v1) => [Edge v1]
     In an equation for function `stronglyConnComp':
 	stronglyConnComp es vs
 			   = snd (span_tree (new_range reversed_edges)
@@ -29,8 +29,6 @@ Digraph.hs:19:
 			       swap (x, y) = (y, x)
 			       reversed_edges :: forall v. (Eq v) => [Edge v]
 			       reversed_edges = map swap es
-
-
 
 Compilation had errors
 

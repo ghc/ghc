@@ -15,7 +15,5 @@ tcfail023.hs:14:
 	Inferred type: Bool
     In the right-hand side of an equation for `op': True
 
-
-
 Compilation had errors
 

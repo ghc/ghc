@@ -1,5 +1,6 @@
 module STEx where
 import LazyST
+import Monad
 
 infixl 1 `handle`
 
@@ -13,7 +14,6 @@ infixl 1 `handle`
 {-data STEx s a-}
 
 {-instance Monad (STEx s)-}
-{-instance MonadZero (STEx s)-}
 {-instance MonadPlus (STEx s)-}
 
 -- c `handle` x, return x if c raises an exception
@@ -49,13 +49,11 @@ instance Monad (STEx s) where
                                       in z'
                             Nothing -> return Nothing
 
-instance MonadZero (STEx s) where
-	zero = liftEx zero
-
 instance MonadPlus (STEx s) where
-	(STEx x) ++ (STEx y) = STEx $ do x' <- x
-                                         y' <- y
-                                         return $ x' ++ y'
+	mzero = liftEx mzero
+	(STEx x) `mplus` (STEx y) = STEx $ do x' <- x
+                        	              y' <- y
+                                   	      return $ mplus x' y'
 liftST x = STEx $ do {z <- x ; return $ return z}
 
 liftEx x = STEx $ return x

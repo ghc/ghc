@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.11 1999/02/26 12:42:06 simonm Exp $
+# $Id: Makefile,v 1.12 1999/06/09 09:35:58 simonpj Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -11,6 +11,7 @@ packedstring001_HC_OPTS = -syslib misc
 
 exceptions001_HC_OPTS   = -fglasgow-exts -fno-warn-missing-methods
 stableptr002_HC_OPTS    = -fglasgow-exts
+stableptr003_HC_OPTS    = -fglasgow-exts
 list001_HC_OPTS         = -fglasgow-exts
 
 enum01_HC_OPTS		= -cpp -fglasgow-exts -H12m

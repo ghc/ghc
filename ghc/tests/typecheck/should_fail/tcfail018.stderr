@@ -4,7 +4,5 @@ tcfail018.hs:5:
 	in the constraint `Num [t]'
 	arising from the literal `1' at tcfail018.hs:5
 
-
-
 Compilation had errors
 

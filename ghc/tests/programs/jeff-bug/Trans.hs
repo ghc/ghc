@@ -312,7 +312,7 @@ rawHazard (preceeding,following)
 filterDst f (Trans d _ _ _) = filter f d
 
 --added 19 Nov
-filterOut f = map (filter $ not . f)
+filterOut f = fmap (filter $ not . f)
 
 fillInCells cells bypassCells
   = repCells (\x y -> (not $ isAss y) && cellHazard x y) cells bypassCells

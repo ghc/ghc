@@ -4,7 +4,5 @@ tcfail010.hs:3:
 	in the constraint `Num [t]'
 	arising from use of `+' at tcfail010.hs:3
 
-
-
 Compilation had errors
 

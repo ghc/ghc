@@ -121,7 +121,7 @@ train pats i_h_wt i_h_ch h_o_wt h_o_ch epochs s =
           out_err = vscale (vsub out_pat out_act) out_act
           hid_err = vscale (vmmul out_err h_o_wt) hid_act
 
-main = ans
+main = putStrLn (show ans)
     where (in1,out1)   = head patterns
           nin          = length in1
           nhid         = nin

@@ -1,6 +1,5 @@
 
-rnfail007.hs:3: Module `Main' must include a definition for `main'
-
+rnfail007.hs:3: Variable not in scope: `Main.main'
 
 Compilation had errors
 

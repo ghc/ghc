@@ -15,7 +15,5 @@ tcfail019.hs:19:
 		    or missing instance declaration for `B [a]'
     When checking the superclasses of an instance declaration
 
-
-
 Compilation had errors
 

@@ -49,7 +49,5 @@ tcfail068.hs:36:
     In the right-hand side of an equation for `itrapstate':
 	runST (itrapstate' i k s)
 
-
-
 Compilation had errors
 

@@ -1,5 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed A B C;
-1 type A a = B a ;
+1 type A a = B   a ;
 1 type B c = C ;
 1 type C = PrelBase.Int ;

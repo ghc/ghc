@@ -4,7 +4,5 @@ tcfail039.hs:11:
     It could refer to either `==', defined at tcfail039.hs:7
 		          or `Prelude.==', imported from Prelude at tcfail039.hs:3
 
-
-
 Compilation had errors
 

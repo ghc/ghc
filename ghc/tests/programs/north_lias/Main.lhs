@@ -17,7 +17,9 @@ used in expressions, but does not determine the characteristics.
 
 > maxInt, minInt :: Int
 > maxInt = maxBound
-> minInt = minBound
+> minInt = minBound + 1		-- NOTA BENE: this program does (minInt `rem` (-1)), and
+>				-- that gives an exception if minInt = minBound,
+>				-- because the result of the division is too big to fit
 
 > main  =  (initial_checks flp_parms . main_identities flp_parms .
 >           notification_checks flp_parms) (return ())
@@ -102,20 +104,20 @@ AN element has the form
 >     | i /= j  =  showits "Integer operation check number " .
 >                  showit test_number . showits " fails with " .
 >                  showit i . showits " ". showit j . new_line
->     | True    =  id
+>     | True    =  showits "Integer operation check number " . showit test_number . showits " ok " . new_line
 
 > equal_flp :: (RealFloat a) => (a, a, Int) -> Cont -> Cont
 > equal_flp (x, y, test_number)
 >     | x /= y  =  showits "Floating point operation check number " .
 >                  showit test_number . showits " fails" . new_line .
 >                  showit x . showits " " . showit y . new_line
->     | True    =  id
+>     | True    =  showits "Floating operation check number " . showit test_number . showits " ok " . new_line
 
 > test_true :: (Bool, Int) -> Cont -> Cont
 > test_true (b, test_number)
 >     | not b  =  showits "Predicate number " . showit test_number .
 >                 showits " fails " .  showit b . new_line
->     | True    =  id
+>     | True   =  showits "Predicate number " . showit test_number . showits " ok " . new_line
 
 > -- This procedure checks that sqrt(y*y) = y when y*y is exact 
 > check_exact_squares :: (RealFloat a) => FloatParms a -> Cont -> Cont

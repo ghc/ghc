@@ -150,7 +150,7 @@ iterateQueue q f
 
 update q n f 
   = do { x <- getQVal q n
-       ; setQVal q n $ map f x
+       ; setQVal q n $ fmap f x
        }
 
 -------------------------------------------------------------------------

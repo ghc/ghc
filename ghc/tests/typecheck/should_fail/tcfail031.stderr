@@ -6,7 +6,5 @@ tcfail031.hs:3:
     In the predicate expression: 'a'
     In the right-hand side of an equation for `f': if 'a' then 1 else 2
 
-
-
 Compilation had errors
 

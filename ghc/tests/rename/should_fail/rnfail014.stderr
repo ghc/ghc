@@ -1,34 +1,18 @@
 
 rnfail014.hs:9:
-    The constraint `Eq a' does not mention any of
-	the universally quantified type variables {}
-	of the type `Eq Bool'
-    In the type signature for an instance decl
-
-rnfail014.hs:9:
-    The constraint `Eq a'
-	mentions type variables that do not appear in the type
-	`Eq Bool'
+    None of the type variable(s) in the constraint `Eq a'
+	appears in the type `Eq Bool'
     In the type signature for an instance decl
 
 rnfail014.hs:12:
-    The constraint `Eq a' does not mention any of
-	the universally quantified type variables {}
-	of the type `Int -> Int'
-    In the type signature for `f'
-
-rnfail014.hs:12:
-    The constraint `Eq a'
-	mentions type variables that do not appear in the type
-	`Int -> Int'
+    None of the type variable(s) in the constraint `Eq a'
+	appears in the type `Int -> Int'
     In the type signature for `f'
 
 rnfail014.hs:17:
-    The constraint `Eq a' does not mention any of
-	the universally quantified type variables {}
-	of the type `a -> a'
+    None of the type variable(s) in the constraint `Eq a'
+	appears in the type `a -> a'
     In the type signature for `op'
-
 
 Compilation had errors
 

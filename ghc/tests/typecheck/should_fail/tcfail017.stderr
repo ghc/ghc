@@ -7,7 +7,5 @@ tcfail017.hs:11:
 		    or missing instance declaration for `C [a]'
     When checking the superclasses of an instance declaration
 
-
-
 Compilation had errors
 

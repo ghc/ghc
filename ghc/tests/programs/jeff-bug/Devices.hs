@@ -16,6 +16,7 @@ import LazyST
 import Instruction 
 
 import Array
+import Monad
 import StateArray
 import Ix
 
@@ -109,8 +110,8 @@ fetch (k,f,lim,memory@(range,_)) pc n
   buildPCs :: (Word w, Cell c, Register r, Instruction i) =>
             w -> (w,w) -> Trans i (c r w) -> Int -> [Trans i (c r w)]
   buildPCs k range pctrans n
-    = do p <- map getReg $ T.getDstPC pctrans
-         pc <- map getVal $ T.getDstPC pctrans
+    = do p <- fmap getReg $ T.getDstPC pctrans
+         pc <- fmap getVal $ T.getDstPC pctrans
          let pcs = filter (inRange range) $ take n [pc,pc+k .. ]
          return $ map (mkPC range) pcs
       `catchEx` []
@@ -138,7 +139,7 @@ instrsFetch n convert initContents pcs
              let x = getVal reg 
              guard $ ispc p
              return x
-           `catchEx` (error "ugh" ) --$ "getpc " ++ show t)
+           `catchEx` (error "ugh" ) -- $ "getpc " ++ show t)
       insertPCs pcs l = lift2 addPCs pcs l   
       addPCs x y = zipWith addPC x y
       addPC pc (Trans d o s l) = Trans d o s (loc pc:l)
@@ -290,7 +291,7 @@ pairRegFile bounds initVals writePorts readPorts
 
 -- I THINK THAT THIS ONE SHOULD GO...
 registers src1 src2 p
-  = unbundle2 $ map getContents arrResps
+  = unbundle2 $ fmap getContents arrResps
     where
       (writebackContents,writebackReg) = unbundle2 p
       arrResps = stateArray ((minBound,maxBound),[(minBound,maxBound,0)])

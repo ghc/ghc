@@ -3,7 +3,7 @@
 module ShouldFail where
 
 instance (Eq a) => Eq (a->a)
- 
+instance Show (a->b)
 
 instance (Num a) => Num (a->a) where
     f + g    = \x -> f x + g x

@@ -7,7 +7,5 @@ tcfail020.hs:11:
 		    or missing instance declaration for `A [a]'
     When checking the superclasses of an instance declaration
 
-
-
 Compilation had errors
 

@@ -14,7 +14,7 @@ module BoundedSet
 
 import LazyST
 import Prelude hiding (read)
-import List
+import List    hiding (insert)
 
 
 new        :: Int -> ST s (BoundedSet s a)

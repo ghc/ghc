@@ -10,5 +10,7 @@ panic! (the `impossible' happened):
 	tlist
 -}
 
+module TcFail where
+
 type State = ([Int] Bool)
 

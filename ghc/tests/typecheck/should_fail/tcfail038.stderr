@@ -7,7 +7,5 @@ tcfail038.hs:8:
     Conflicting definitions for `/='
     in the bindings in an instance declaration
 
-
-
 Compilation had errors
 

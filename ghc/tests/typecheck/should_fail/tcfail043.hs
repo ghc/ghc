@@ -12,6 +12,7 @@
 --     class "Eq_", type "a" (at a use of an overloaded identifier: eq)
 
 
+module TcFail where
 
 class Eq_ a where
  eq :: a -> a -> Bool
@@ -25,7 +26,7 @@ instance (Eq_ a) => Eq_ [a] where
         then (null ys)
         else if (null ys) 
                 then False
-                else and (eq (hd xs) (hd ys)) (eq (tl xs) (tl ys))
+                else (&&) (eq (hd xs) (hd ys)) (eq (tl xs) (tl ys))
 
 class (Eq_ a) => Ord_ a where
  gt :: a -> a -> Bool
@@ -38,8 +39,6 @@ search
                 then False 
                 else if eq a (hd bs) then True else search a (tl bs)
 
-and :: Bool -> Bool -> Bool
-and True True = True
 
 hd :: [a] -> a
 hd (a:as) = a
@@ -53,8 +52,6 @@ ordIntGt 2 3 = True
 eqIntEq :: Int -> Int -> Bool
 eqIntEq  2 3 = True
 
-null :: [a] -> Bool
-null [] = True
 
 
 

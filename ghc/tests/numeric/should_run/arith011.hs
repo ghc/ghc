@@ -10,6 +10,7 @@ main = test
 
 test :: IO ()
 test = do
+   testIntlikeNoBits "Int"    (0::Int)     
    testIntlike "Int8"   (0::Int8)     
    testIntlike "Int16"  (0::Int16)    
    testIntlike "Int32"  (0::Int32)    
@@ -17,8 +18,8 @@ test = do
    testIntlike "Word16" (0::Word16)   
    testIntlike "Word32" (0::Word32)   
 
-testIntlike :: (Bounded a, Integral a, Ix a, Read a, Bits a) => String -> a -> IO ()
-testIntlike name zero = do
+testIntlikeNoBits :: (Bounded a, Integral a, Ix a, Read a) => String -> a -> IO ()
+testIntlikeNoBits name zero = do
   putStrLn $ "--------------------------------"
   putStrLn $ "--Testing " ++ name
   putStrLn $ "--------------------------------"
@@ -30,8 +31,13 @@ testIntlike name zero = do
   testNum      zero
   testReal     zero
   testIntegral zero
+
+
+testIntlike :: (Bounded a, Integral a, Ix a, Read a, Bits a) => String -> a -> IO ()
+testIntlike name zero = do
+  testIntlikeNoBits name zero
   testBits     zero
-  putStrLn $ "--------------------------------"
+
 
 -- In all these tests, zero is a dummy element used to get
 -- the overloading to work

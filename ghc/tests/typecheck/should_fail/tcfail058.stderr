@@ -3,7 +3,5 @@ tcfail058.hs:6:
     Type constructor used as a class: Array
     When checking kinds in `Array a'
 
-
-
 Compilation had errors
 

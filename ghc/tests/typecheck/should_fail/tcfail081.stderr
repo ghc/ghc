@@ -1,10 +1,9 @@
 
-tcfail081.hs:4:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `a' is unified with `IO t'
-    When checking the type signature main :: forall a1. a1
-
-
+tcfail081.hs:2:
+    Cannot unify the type-signature variable `a' with the type `IO t'
+	Expected type: IO t
+	Inferred type: a
+    When checking that `main' has the required type
 
 Compilation had errors
 

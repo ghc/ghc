@@ -6,7 +6,5 @@ tcfail014.hs:5:
     In the first argument of `z', namely `z'
     In the right-hand side of an equation for `h': z z
 
-
-
 Compilation had errors
 

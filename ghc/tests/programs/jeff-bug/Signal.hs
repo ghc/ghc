@@ -1,4 +1,5 @@
 module Signal where
+import Monad
 import LazyST
 import List
 import Random
@@ -212,7 +213,7 @@ instance Integral a => Integral (Signal a) where
 (*>=) = lift2 (>=)
 (*&&) = lift2 (&&)
 (*||) = lift2 (||)
-(*++) = lift2 (++)
+(*++) = lift2 mplus
 (*:)  = lift2 (:)
 
 data Then = Then
@@ -241,7 +242,7 @@ newtype Signal a = List [a]
         deriving Show
 
 instance Functor Signal where
-  map f ~(List as) = List (map f as)
+  fmap f ~(List as) = List (map f as)
 
 
 at ~(List l) n = l!!n
@@ -290,9 +291,11 @@ superscalar f (List input) = List (chop lens output)
 ------------------------------------------------------------------------
 -- Non-determinism
 
-integers = List . unsafePerformIO . randomIO 
+-- integers :: (Integer,Integer) -> Signal Integer
+integers rng = List (unsafePerformIO (do { g <- newStdGen ;
+					   return (randomRs rng g) }))
 
-ints = map toInt . integers . toIntegers
+ints = fmap toInt . integers . toIntegers
     where
     toIntegers (x,y) = (toInteger x,toInteger y)
 

@@ -1,6 +1,6 @@
 module Main where
 
-import PrelStable
+import Stable
 
 -- Testing callbacks: the initial haskell thread calls out to C with
 -- the address of a Haskell callback.  The C function runs the callback

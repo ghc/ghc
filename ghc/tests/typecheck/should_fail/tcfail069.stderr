@@ -6,7 +6,5 @@ tcfail069.hs:20:
     In the scrutinee of a case expression: (list1, list2)
     In the case expression: case (list1, list2) of [] -> error "foo"
 
-
-
 Compilation had errors
 

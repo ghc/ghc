@@ -1,6 +1,6 @@
 module Main where
 
-import PrelStable
+import Stable
 
 main = do
   stable_list1 <- mapM makeStableName list

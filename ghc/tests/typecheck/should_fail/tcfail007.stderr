@@ -3,7 +3,5 @@ tcfail007.hs:3:
     No instance for `Num Bool'
 	arising from use of `+' at tcfail007.hs:3
 
-
-
 Compilation had errors
 

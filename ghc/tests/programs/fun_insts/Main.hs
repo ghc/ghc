@@ -5,6 +5,9 @@ module Main where
 instance (Eq a, Eq b) => Eq (a->b)
  
 
+instance Show (a->b) where
+  show f = "<<function>>"
+
 instance (Num a, Num b) => Num (a->b) where
     f + g    = \x -> f x + g x
     negate f = \x -> - (f x)

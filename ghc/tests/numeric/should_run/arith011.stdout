@@ -1,4 +1,909 @@
 --------------------------------
+--Testing Int
+--------------------------------
+testBounded
+(2147483647,-2147483648,-2147483647)
+(2147483646,2147483647,-2147483648)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[-3,-2,-1,0,1,2,3]
+[-3,-2,-1,0,1,2,3]
+testEq
+-3 == -3 = True
+-3 == -2 = False
+-3 == -1 = False
+-3 == 0 = False
+-3 == 1 = False
+-3 == 2 = False
+-3 == 3 = False
+ 
+-2 == -3 = False
+-2 == -2 = True
+-2 == -1 = False
+-2 == 0 = False
+-2 == 1 = False
+-2 == 2 = False
+-2 == 3 = False
+ 
+-1 == -3 = False
+-1 == -2 = False
+-1 == -1 = True
+-1 == 0 = False
+-1 == 1 = False
+-1 == 2 = False
+-1 == 3 = False
+ 
+0 == -3 = False
+0 == -2 = False
+0 == -1 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == -3 = False
+1 == -2 = False
+1 == -1 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == -3 = False
+2 == -2 = False
+2 == -1 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == -3 = False
+3 == -2 = False
+3 == -1 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+-3 /= -3 = False
+-3 /= -2 = True
+-3 /= -1 = True
+-3 /= 0 = True
+-3 /= 1 = True
+-3 /= 2 = True
+-3 /= 3 = True
+ 
+-2 /= -3 = True
+-2 /= -2 = False
+-2 /= -1 = True
+-2 /= 0 = True
+-2 /= 1 = True
+-2 /= 2 = True
+-2 /= 3 = True
+ 
+-1 /= -3 = True
+-1 /= -2 = True
+-1 /= -1 = False
+-1 /= 0 = True
+-1 /= 1 = True
+-1 /= 2 = True
+-1 /= 3 = True
+ 
+0 /= -3 = True
+0 /= -2 = True
+0 /= -1 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= -3 = True
+1 /= -2 = True
+1 /= -1 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= -3 = True
+2 /= -2 = True
+2 /= -1 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= -3 = True
+3 /= -2 = True
+3 /= -1 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+-3 <= -3 = True
+-3 <= -2 = True
+-3 <= -1 = True
+-3 <= 0 = True
+-3 <= 1 = True
+-3 <= 2 = True
+-3 <= 3 = True
+ 
+-2 <= -3 = False
+-2 <= -2 = True
+-2 <= -1 = True
+-2 <= 0 = True
+-2 <= 1 = True
+-2 <= 2 = True
+-2 <= 3 = True
+ 
+-1 <= -3 = False
+-1 <= -2 = False
+-1 <= -1 = True
+-1 <= 0 = True
+-1 <= 1 = True
+-1 <= 2 = True
+-1 <= 3 = True
+ 
+0 <= -3 = False
+0 <= -2 = False
+0 <= -1 = False
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= -3 = False
+1 <= -2 = False
+1 <= -1 = False
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= -3 = False
+2 <= -2 = False
+2 <= -1 = False
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= -3 = False
+3 <= -2 = False
+3 <= -1 = False
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+-3 <  -3 = False
+-3 <  -2 = True
+-3 <  -1 = True
+-3 <  0 = True
+-3 <  1 = True
+-3 <  2 = True
+-3 <  3 = True
+ 
+-2 <  -3 = False
+-2 <  -2 = False
+-2 <  -1 = True
+-2 <  0 = True
+-2 <  1 = True
+-2 <  2 = True
+-2 <  3 = True
+ 
+-1 <  -3 = False
+-1 <  -2 = False
+-1 <  -1 = False
+-1 <  0 = True
+-1 <  1 = True
+-1 <  2 = True
+-1 <  3 = True
+ 
+0 <  -3 = False
+0 <  -2 = False
+0 <  -1 = False
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  -3 = False
+1 <  -2 = False
+1 <  -1 = False
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  -3 = False
+2 <  -2 = False
+2 <  -1 = False
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  -3 = False
+3 <  -2 = False
+3 <  -1 = False
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+-3 >  -3 = False
+-3 >  -2 = False
+-3 >  -1 = False
+-3 >  0 = False
+-3 >  1 = False
+-3 >  2 = False
+-3 >  3 = False
+ 
+-2 >  -3 = True
+-2 >  -2 = False
+-2 >  -1 = False
+-2 >  0 = False
+-2 >  1 = False
+-2 >  2 = False
+-2 >  3 = False
+ 
+-1 >  -3 = True
+-1 >  -2 = True
+-1 >  -1 = False
+-1 >  0 = False
+-1 >  1 = False
+-1 >  2 = False
+-1 >  3 = False
+ 
+0 >  -3 = True
+0 >  -2 = True
+0 >  -1 = True
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  -3 = True
+1 >  -2 = True
+1 >  -1 = True
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  -3 = True
+2 >  -2 = True
+2 >  -1 = True
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  -3 = True
+3 >  -2 = True
+3 >  -1 = True
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+-3 >= -3 = True
+-3 >= -2 = False
+-3 >= -1 = False
+-3 >= 0 = False
+-3 >= 1 = False
+-3 >= 2 = False
+-3 >= 3 = False
+ 
+-2 >= -3 = True
+-2 >= -2 = True
+-2 >= -1 = False
+-2 >= 0 = False
+-2 >= 1 = False
+-2 >= 2 = False
+-2 >= 3 = False
+ 
+-1 >= -3 = True
+-1 >= -2 = True
+-1 >= -1 = True
+-1 >= 0 = False
+-1 >= 1 = False
+-1 >= 2 = False
+-1 >= 3 = False
+ 
+0 >= -3 = True
+0 >= -2 = True
+0 >= -1 = True
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= -3 = True
+1 >= -2 = True
+1 >= -1 = True
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= -3 = True
+2 >= -2 = True
+2 >= -1 = True
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= -3 = True
+3 >= -2 = True
+3 >= -1 = True
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+-3 `compare` -3 = EQ
+-3 `compare` -2 = LT
+-3 `compare` -1 = LT
+-3 `compare` 0 = LT
+-3 `compare` 1 = LT
+-3 `compare` 2 = LT
+-3 `compare` 3 = LT
+ 
+-2 `compare` -3 = GT
+-2 `compare` -2 = EQ
+-2 `compare` -1 = LT
+-2 `compare` 0 = LT
+-2 `compare` 1 = LT
+-2 `compare` 2 = LT
+-2 `compare` 3 = LT
+ 
+-1 `compare` -3 = GT
+-1 `compare` -2 = GT
+-1 `compare` -1 = EQ
+-1 `compare` 0 = LT
+-1 `compare` 1 = LT
+-1 `compare` 2 = LT
+-1 `compare` 3 = LT
+ 
+0 `compare` -3 = GT
+0 `compare` -2 = GT
+0 `compare` -1 = GT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` -3 = GT
+1 `compare` -2 = GT
+1 `compare` -1 = GT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` -3 = GT
+2 `compare` -2 = GT
+2 `compare` -1 = GT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` -3 = GT
+3 `compare` -2 = GT
+3 `compare` -1 = GT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+-3 + -3 = -6
+-3 + -2 = -5
+-3 + -1 = -4
+-3 + 0 = -3
+-3 + 1 = -2
+-3 + 2 = -1
+-3 + 3 = 0
+ 
+-2 + -3 = -5
+-2 + -2 = -4
+-2 + -1 = -3
+-2 + 0 = -2
+-2 + 1 = -1
+-2 + 2 = 0
+-2 + 3 = 1
+ 
+-1 + -3 = -4
+-1 + -2 = -3
+-1 + -1 = -2
+-1 + 0 = -1
+-1 + 1 = 0
+-1 + 2 = 1
+-1 + 3 = 2
+ 
+0 + -3 = -3
+0 + -2 = -2
+0 + -1 = -1
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + -3 = -2
+1 + -2 = -1
+1 + -1 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + -3 = -1
+2 + -2 = 0
+2 + -1 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + -3 = 0
+3 + -2 = 1
+3 + -1 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+-3 - -3 = 0
+-3 - -2 = -1
+-3 - -1 = -2
+-3 - 0 = -3
+-3 - 1 = -4
+-3 - 2 = -5
+-3 - 3 = -6
+ 
+-2 - -3 = 1
+-2 - -2 = 0
+-2 - -1 = -1
+-2 - 0 = -2
+-2 - 1 = -3
+-2 - 2 = -4
+-2 - 3 = -5
+ 
+-1 - -3 = 2
+-1 - -2 = 1
+-1 - -1 = 0
+-1 - 0 = -1
+-1 - 1 = -2
+-1 - 2 = -3
+-1 - 3 = -4
+ 
+0 - -3 = 3
+0 - -2 = 2
+0 - -1 = 1
+0 - 0 = 0
+0 - 1 = -1
+0 - 2 = -2
+0 - 3 = -3
+ 
+1 - -3 = 4
+1 - -2 = 3
+1 - -1 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = -1
+1 - 3 = -2
+ 
+2 - -3 = 5
+2 - -2 = 4
+2 - -1 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = -1
+ 
+3 - -3 = 6
+3 - -2 = 5
+3 - -1 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+-3 * -3 = 9
+-3 * -2 = 6
+-3 * -1 = 3
+-3 * 0 = 0
+-3 * 1 = -3
+-3 * 2 = -6
+-3 * 3 = -9
+ 
+-2 * -3 = 6
+-2 * -2 = 4
+-2 * -1 = 2
+-2 * 0 = 0
+-2 * 1 = -2
+-2 * 2 = -4
+-2 * 3 = -6
+ 
+-1 * -3 = 3
+-1 * -2 = 2
+-1 * -1 = 1
+-1 * 0 = 0
+-1 * 1 = -1
+-1 * 2 = -2
+-1 * 3 = -3
+ 
+0 * -3 = 0
+0 * -2 = 0
+0 * -1 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * -3 = -3
+1 * -2 = -2
+1 * -1 = -1
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * -3 = -6
+2 * -2 = -4
+2 * -1 = -2
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * -3 = -9
+3 * -2 = -6
+3 * -1 = -3
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate -3 = 3
+negate -2 = 2
+negate -1 = 1
+negate 0 = 0
+negate 1 = -1
+negate 2 = -2
+negate 3 = -3
+#
+testReal
+toRational -3 = -3 % 1
+toRational -2 = -2 % 1
+toRational -1 = -1 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+-3 `divMod`  -3 = (1,0)
+-3 `divMod`  -2 = (1,-1)
+-3 `divMod`  -1 = (3,0)
+-3 `divMod`  1 = (-3,0)
+-3 `divMod`  2 = (-2,1)
+-3 `divMod`  3 = (-1,0)
+ 
+-2 `divMod`  -3 = (0,-2)
+-2 `divMod`  -2 = (1,0)
+-2 `divMod`  -1 = (2,0)
+-2 `divMod`  1 = (-2,0)
+-2 `divMod`  2 = (-1,0)
+-2 `divMod`  3 = (-1,1)
+ 
+-1 `divMod`  -3 = (0,-1)
+-1 `divMod`  -2 = (0,-1)
+-1 `divMod`  -1 = (1,0)
+-1 `divMod`  1 = (-1,0)
+-1 `divMod`  2 = (-1,1)
+-1 `divMod`  3 = (-1,2)
+ 
+0 `divMod`  -3 = (0,0)
+0 `divMod`  -2 = (0,0)
+0 `divMod`  -1 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  -3 = (-1,-2)
+1 `divMod`  -2 = (-1,-1)
+1 `divMod`  -1 = (-1,0)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  -3 = (-1,-1)
+2 `divMod`  -2 = (-1,0)
+2 `divMod`  -1 = (-2,0)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  -3 = (-1,0)
+3 `divMod`  -2 = (-2,-1)
+3 `divMod`  -1 = (-3,0)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+-3 `div`     -3 = 1
+-3 `div`     -2 = 1
+-3 `div`     -1 = 3
+-3 `div`     1 = -3
+-3 `div`     2 = -2
+-3 `div`     3 = -1
+ 
+-2 `div`     -3 = 0
+-2 `div`     -2 = 1
+-2 `div`     -1 = 2
+-2 `div`     1 = -2
+-2 `div`     2 = -1
+-2 `div`     3 = -1
+ 
+-1 `div`     -3 = 0
+-1 `div`     -2 = 0
+-1 `div`     -1 = 1
+-1 `div`     1 = -1
+-1 `div`     2 = -1
+-1 `div`     3 = -1
+ 
+0 `div`     -3 = 0
+0 `div`     -2 = 0
+0 `div`     -1 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     -3 = -1
+1 `div`     -2 = -1
+1 `div`     -1 = -1
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     -3 = -1
+2 `div`     -2 = -1
+2 `div`     -1 = -2
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     -3 = -1
+3 `div`     -2 = -2
+3 `div`     -1 = -3
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+-3 `mod`     -3 = 0
+-3 `mod`     -2 = -1
+-3 `mod`     -1 = 0
+-3 `mod`     1 = 0
+-3 `mod`     2 = 1
+-3 `mod`     3 = 0
+ 
+-2 `mod`     -3 = -2
+-2 `mod`     -2 = 0
+-2 `mod`     -1 = 0
+-2 `mod`     1 = 0
+-2 `mod`     2 = 0
+-2 `mod`     3 = 1
+ 
+-1 `mod`     -3 = -1
+-1 `mod`     -2 = -1
+-1 `mod`     -1 = 0
+-1 `mod`     1 = 0
+-1 `mod`     2 = 1
+-1 `mod`     3 = 2
+ 
+0 `mod`     -3 = 0
+0 `mod`     -2 = 0
+0 `mod`     -1 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     -3 = -2
+1 `mod`     -2 = -1
+1 `mod`     -1 = 0
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     -3 = -1
+2 `mod`     -2 = 0
+2 `mod`     -1 = 0
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     -3 = 0
+3 `mod`     -2 = -1
+3 `mod`     -1 = 0
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+-3 `quotRem` -3 = (1,0)
+-3 `quotRem` -2 = (1,-1)
+-3 `quotRem` -1 = (3,0)
+-3 `quotRem` 1 = (-3,0)
+-3 `quotRem` 2 = (-1,-1)
+-3 `quotRem` 3 = (-1,0)
+ 
+-2 `quotRem` -3 = (0,-2)
+-2 `quotRem` -2 = (1,0)
+-2 `quotRem` -1 = (2,0)
+-2 `quotRem` 1 = (-2,0)
+-2 `quotRem` 2 = (-1,0)
+-2 `quotRem` 3 = (0,-2)
+ 
+-1 `quotRem` -3 = (0,-1)
+-1 `quotRem` -2 = (0,-1)
+-1 `quotRem` -1 = (1,0)
+-1 `quotRem` 1 = (-1,0)
+-1 `quotRem` 2 = (0,-1)
+-1 `quotRem` 3 = (0,-1)
+ 
+0 `quotRem` -3 = (0,0)
+0 `quotRem` -2 = (0,0)
+0 `quotRem` -1 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` -3 = (0,1)
+1 `quotRem` -2 = (0,1)
+1 `quotRem` -1 = (-1,0)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` -3 = (0,2)
+2 `quotRem` -2 = (-1,0)
+2 `quotRem` -1 = (-2,0)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` -3 = (-1,0)
+3 `quotRem` -2 = (-1,1)
+3 `quotRem` -1 = (-3,0)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+-3 `quot`    -3 = 1
+-3 `quot`    -2 = 1
+-3 `quot`    -1 = 3
+-3 `quot`    1 = -3
+-3 `quot`    2 = -1
+-3 `quot`    3 = -1
+ 
+-2 `quot`    -3 = 0
+-2 `quot`    -2 = 1
+-2 `quot`    -1 = 2
+-2 `quot`    1 = -2
+-2 `quot`    2 = -1
+-2 `quot`    3 = 0
+ 
+-1 `quot`    -3 = 0
+-1 `quot`    -2 = 0
+-1 `quot`    -1 = 1
+-1 `quot`    1 = -1
+-1 `quot`    2 = 0
+-1 `quot`    3 = 0
+ 
+0 `quot`    -3 = 0
+0 `quot`    -2 = 0
+0 `quot`    -1 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    -3 = 0
+1 `quot`    -2 = 0
+1 `quot`    -1 = -1
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    -3 = 0
+2 `quot`    -2 = -1
+2 `quot`    -1 = -2
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    -3 = -1
+3 `quot`    -2 = -1
+3 `quot`    -1 = -3
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+-3 `rem`     -3 = 0
+-3 `rem`     -2 = -1
+-3 `rem`     -1 = 0
+-3 `rem`     1 = 0
+-3 `rem`     2 = -1
+-3 `rem`     3 = 0
+ 
+-2 `rem`     -3 = -2
+-2 `rem`     -2 = 0
+-2 `rem`     -1 = 0
+-2 `rem`     1 = 0
+-2 `rem`     2 = 0
+-2 `rem`     3 = -2
+ 
+-1 `rem`     -3 = -1
+-1 `rem`     -2 = -1
+-1 `rem`     -1 = 0
+-1 `rem`     1 = 0
+-1 `rem`     2 = -1
+-1 `rem`     3 = -1
+ 
+0 `rem`     -3 = 0
+0 `rem`     -2 = 0
+0 `rem`     -1 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     -3 = 1
+1 `rem`     -2 = 1
+1 `rem`     -1 = 0
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     -3 = 2
+2 `rem`     -2 = 0
+2 `rem`     -1 = 0
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     -3 = 0
+3 `rem`     -2 = 1
+3 `rem`     -1 = 0
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+--------------------------------
 --Testing Int8
 --------------------------------
 testBounded
@@ -1356,7 +2261,6 @@ isSigned 1 = True
 isSigned 2 = True
 isSigned 3 = True
 #
---------------------------------
 --------------------------------
 --Testing Int16
 --------------------------------
@@ -2716,7 +3620,6 @@ isSigned 2 = True
 isSigned 3 = True
 #
 --------------------------------
---------------------------------
 --Testing Int32
 --------------------------------
 testBounded
@@ -4074,7 +4977,6 @@ isSigned 1 = True
 isSigned 2 = True
 isSigned 3 = True
 #
---------------------------------
 --------------------------------
 --Testing Word8
 --------------------------------
@@ -5434,7 +6336,6 @@ isSigned 2 = False
 isSigned 3 = False
 #
 --------------------------------
---------------------------------
 --Testing Word16
 --------------------------------
 testBounded
@@ -6793,7 +7694,6 @@ isSigned 2 = False
 isSigned 3 = False
 #
 --------------------------------
---------------------------------
 --Testing Word32
 --------------------------------
 testBounded
@@ -8151,4 +9051,3 @@ isSigned 1 = False
 isSigned 2 = False
 isSigned 3 = False
 #
---------------------------------

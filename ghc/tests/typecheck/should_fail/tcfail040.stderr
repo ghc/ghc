@@ -4,7 +4,5 @@ tcfail040.hs:19:
 	in the constraint `ORD a'
 	arising from use of `<<' at tcfail040.hs:19
 
-
-
 Compilation had errors
 

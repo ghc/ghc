@@ -5,7 +5,5 @@ tcfail002.hs:4:
 	Inferred type: [t]
     In the right-hand side of an equation for `c': z
 
-
-
 Compilation had errors
 

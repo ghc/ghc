@@ -8,6 +8,6 @@ instance {Eqzq PrelBase.Int} = zdfEqzqInt;
 instance __forall [a] => {Eqzq a} -> {Eqzq a} -> {Eqzq [a]} = zdfEqzqZMZN;
 1 class Eqzq a where {doubleeq :: a -> a -> PrelBase.Bool} ;
 1 class {Eqzq a}  => Ordzq a where {lt :: a -> a -> PrelBase.Bool} ;
-1 f :: __forall [t t1] => {PrelBase.Num t1} -> {Eqzq [t1]} -> [t1] -> t -> PrelBase.Bool ;
+1 f :: __forall [t t1] => {PrelNum.Num t1} -> {Eqzq [t1]} -> [t1] -> t -> PrelBase.Bool ;
 1 zdfEqzqInt :: {Eqzq PrelBase.Int} ;
 1 zdfEqzqZMZN :: __forall [a] => {Eqzq a} -> {Eqzq [a]} ;

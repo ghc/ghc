@@ -4,3 +4,4 @@ drvfail007.hs:2:
     When deriving classes for `Foo'
 
 Compilation had errors
+

@@ -4,7 +4,5 @@ tcfail080.hs:11:
 	in the constraint `Collection c a'
 	arising from use of `isempty' at tcfail080.hs:11
 
-
-
 Compilation had errors
 

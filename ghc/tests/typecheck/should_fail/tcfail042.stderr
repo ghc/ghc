@@ -6,7 +6,5 @@ tcfail042.hs:18:
     Probable cause: missing `Num a' in instance declaration context
     When checking the superclasses of an instance declaration
 
-
-
 Compilation had errors
 

@@ -39,13 +39,9 @@ tcfail035.hs:7:
     Warning: No explicit method nor default method for `+'
 	     in an instance declaration for `Num'
 
-
-
 tcfail035.hs:3:
     Duplicate or overlapping instance declarations
 	for `Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
-
-
 
 Compilation had errors
 

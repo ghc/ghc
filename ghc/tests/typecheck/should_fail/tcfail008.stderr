@@ -9,7 +9,5 @@ tcfail008.hs:3:
 	in the constraint `Num t'
 	arising from the literal `1' at tcfail008.hs:3
 
-
-
 Compilation had errors
 

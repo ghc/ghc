@@ -1,3 +1,3 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed f;
-1 f :: __forall [a] => {PrelBase.Num a} -> {PrelBase.Eq a} -> [a] -> [a] ;
+1 f :: __forall [a] => {PrelNum.Num a} -> {PrelBase.Eq a} -> [a] -> [a] ;

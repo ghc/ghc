@@ -5,7 +5,5 @@ tcfail056.hs:1:
 
 tcfail056.hs:10: Class `Eq' does not have a method `<='
 
-
-
 Compilation had errors
 

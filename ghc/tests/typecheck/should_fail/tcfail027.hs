@@ -1,4 +1,5 @@
 -- !!! tests for CycleErr in classes
+module TcFail where
 
 class (B a) => A a where
  op1 :: a -> a

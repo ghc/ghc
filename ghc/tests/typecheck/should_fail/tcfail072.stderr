@@ -9,7 +9,5 @@ tcfail072.hs:23:
 	in the constraint `Ord q'
 	arising from use of `g' at tcfail072.hs:23
 
-
-
 Compilation had errors
 

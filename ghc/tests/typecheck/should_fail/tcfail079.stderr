@@ -6,7 +6,5 @@ tcfail079.hs:9:
     When checking that `Int#' is a type
     In the data type declaration for `Unboxed'
 
-
-
 Compilation had errors
 

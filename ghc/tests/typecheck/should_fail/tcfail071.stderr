@@ -1,10 +1,16 @@
 
 tcfail071.hs:8:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `c' is unified with `a -> [t] -> [t]'
-    When checking the type signature g :: forall c1. c1 -> c1
+    Mismatched contexts
+    When matching the contexts of the signatures for `f' and `g'
+	(the signature contexts in a mutually recursive group should all be identical)
 
-
+tcfail071.hs:10:
+    Cannot unify the type-signature variable `c'
+	with the type `a -> b -> b'
+	Expected type: a -> b -> b
+	Inferred type: c
+    In the first argument of `f', namely `c'
+    In the first argument of `foldr', namely `(f c)'
 
 Compilation had errors
 

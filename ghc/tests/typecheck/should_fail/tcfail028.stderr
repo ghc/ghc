@@ -1,12 +1,10 @@
 
-tcfail028.hs:4:
+tcfail028.hs:5:
     Couldn't match `Type t' against `k -> *'
 	Expected kind: Type t
 	Inferred kind: k -> *
     When checking that `A a' is a type
     In the newtype declaration for `A'
-
-
 
 Compilation had errors
 

@@ -6,7 +6,5 @@ tcfail034.hs:17:
     Probable cause: missing `Integral a' in type signature for `test'
     When checking the type signature(s) for `test'
 
-
-
 Compilation had errors
 

@@ -18,7 +18,13 @@ instance Signal (->) where
 data {- (Physical a, Physical b) => -} SignalRep a b =
    FunctionRep (a -> b) |
    PieceContRep (PieceCont a b)
-   deriving (Eq, Show)
+
+instance Eq (SignalRep a b) where
+  (==) a b = error "No equality for SignalRep"
+
+instance Show (SignalRep a b) where
+  show sr = error "No show for SignalRep"
+
 instance Signal SignalRep where
   mapSignal (FunctionRep f) = mapSignal f
   mapSignal (PieceContRep f) = mapSignal f
@@ -64,7 +70,12 @@ data Event =
   TimeEvent Float | 
   FunctionEvent (Float -> Bool) |
   BurstEvent Int Event
-  deriving (Show)
+
+instance Show Event where
+  show (TimeEvent f) = "TimeEvent " ++ show f
+  show (FunctionEvent _) = "FunctionEvent"
+  show (BurstEvent i e)  = "BurstEvent " ++ show i ++ " " ++ show e
+
 instance Eq Event where
   (TimeEvent x) == (TimeEvent y) = x == y
   (BurstEvent i e) == (BurstEvent i' e') = (i' == i) && (e' == e)

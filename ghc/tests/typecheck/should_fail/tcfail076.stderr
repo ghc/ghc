@@ -2,16 +2,14 @@
 tcfail076.hs:18:
     Inferred type is less polymorphic than expected
 	Quantified type variable `res' escapes
-	It unifies with `res1', which is mentioned in the environment
-	The following variables in the environment mention `res1'
-	    cont :: a -> m res1
-    In an expression with expected type: forall res2.
-					 (a1 -> m res2) -> m res2
+	It is mentioned in the environment
+	The following variables in the environment mention `res'
+	    cont :: a -> m res
+    In an expression with expected type:
+	forall res1. (a1 -> m1 res1) -> m1 res1
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
     In the right-hand side of a lambda abstraction:
 	KContT (\ cont' -> cont a)
-
-
 
 Compilation had errors
 

@@ -6,7 +6,5 @@ tcfail016.hs:9:
     In the first argument of `g', namely `e1'
     In the first argument of `++', namely `(g e1)'
 
-
-
 Compilation had errors
 

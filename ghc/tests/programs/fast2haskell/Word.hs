@@ -50,8 +50,8 @@ instance Num Word where
 	Word x - Word y = case (w2i x) -# (w2i y) of z -> Word (i2w z)
 	Word x * Word y = case (w2i x) *# (w2i y) of z -> Word (i2w z)
 	negate (Word x) = case negateInt# (w2i x)  of z -> Word (i2w z)
-	fromInteger (J# a# s# d#)
-	  = case integer2Int# a# s# d# of { z# ->
+	fromInteger i
+	  = case fromInteger i of { I# z# ->
 	    Word (i2w z#) }
 
 instance Show Word where

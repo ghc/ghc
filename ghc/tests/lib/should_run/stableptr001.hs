@@ -3,6 +3,7 @@
 module Main where
 
 import Foreign
+import Stable
 
 -- simple test for building/dereferencing stable ptrs
 

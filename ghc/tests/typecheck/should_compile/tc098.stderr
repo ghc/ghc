@@ -1,6 +1,6 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Cp cpPairs m mp;
-1 cpPairs :: __forall [j a] => Cp [j] -> (a, [j]) -> (a, [j]) -> PrelBase.Ordering ;
-1 m :: __forall [a] => {PrelBase.Eq a} -> Cp a -> [a] -> a ;
-1 mp :: __forall [j i] => {PrelBase.Eq i} -> {PrelBase.Eq j} -> Cp [j] -> [(i, [j])] -> (i, [j]) ;
+1 cpPairs :: __forall [j a] => Cp  [j] -> (a, [j]) -> (a, [j]) -> PrelBase.Ordering ;
+1 m :: __forall [a] => {PrelBase.Eq a} -> Cp  a -> [a] -> a ;
+1 mp :: __forall [j i] => {PrelBase.Eq i} -> {PrelBase.Eq j} -> Cp  [j] -> [(i, [j])] -> (i, [j]) ;
 1 type Cp a = a -> a -> PrelBase.Ordering ;

@@ -5,7 +5,5 @@ tcfail033.hs:4:
 	Inferred type: t
     In a list-comprehension qualifier: return x
 
-
-
 Compilation had errors
 
