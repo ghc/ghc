@@ -55,7 +55,7 @@ Time_HC_OPTS        	 += -monly-3-regs
 # moment, but there you go..
 PrelNumExtra_HC_OPTS     += -H30m -K2m
 
-PrelPack_HC_OPTS	 += -K2m
+PrelPack_HC_OPTS	 += -K4m
 PrelBase_HC_OPTS         += -H10m
 PrelRead_HC_OPTS         += -H16m
 PrelTup_HC_OPTS          += -H12m
