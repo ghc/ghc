@@ -33,21 +33,56 @@ instance Enum     I
 instance Ix       I
 instance Bits     I
 </verb></tscreen>
-Plus
+
+Plus the coercion functions
+
 <tscreen><verb>
+int8ToInt16 :: Int8   -> Int16
+int8ToInt32 :: Int8   -> Int32
+int8ToInt64 :: Int8   -> Int64
+
+int16ToInt8  :: Int16 -> Int8
+int16ToInt32 :: Int16 -> Int32
+int16ToInt64 :: Int16 -> Int64
+
+int32ToInt8  :: Int32 -> Int8
+int32ToInt16 :: Int32 -> Int16
+int32ToInt64 :: Int32 -> Int64
+
+int64ToInt8  :: Int64 -> Int8
+int64ToInt16 :: Int64 -> Int16
+int64ToInt32 :: Int64 -> Int32
+
 int8ToInt  :: Int8  -> Int
-intToInt8  :: Int   -> Int8
 int16ToInt :: Int16 -> Int
-intToInt16 :: Int   -> Int16
 int32ToInt :: Int32 -> Int
+int64ToInt :: Int64 -> Int
+
+intToInt8  :: Int   -> Int8
+intToInt16 :: Int   -> Int16
 intToInt32 :: Int   -> Int32
+intToInt64 :: Int   -> Int64
+
+integerToInt8  :: Integer -> Int8
+integerToInt16 :: Integer -> Int16
+integerToInt32 :: Integer -> Int32
+integerToInt64 :: Integer -> Int64
+
+int64ToInteger :: Int64 -> Integer
+int32ToInteger :: Int32 -> Integer
+int16ToInteger :: Int16 -> Integer
+int8ToInteger  :: Int8  -> Integer
+
 </verb></tscreen>
 
 <itemize>
 <item>
-Hugs does not provide <tt/Int64/ at the moment.
+The rules that hold for <tt/Enum/ instances over a bounded type
+such as <tt/Int/ (see the section of the Haskell report dealing
+with arithmetic sequences) also hold for the <tt/Enum/ instances
+over the various <tt/Int/ types defined here.
 
 <item>
-ToDo: complete the set of coercion functions.
+Hugs does not provide <tt/Int64/ at the moment.
 
 </itemize>

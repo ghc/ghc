@@ -6,14 +6,17 @@ This library provides unsigned integers of various sizes.
 The types supported are as follows:
 
 <tabular ca="ll">
-type    | number of bits @
-<!-- <hline>  -->
+<!-- ToDo: figure out why the ldoc DTD doesn't allow hline's - it looks as if -->
+<!-- it should. -->
+<!-- <hline> -->
+type     | number of bits @
 Word8    | 8  @
 Word16   | 16 @
 Word32   | 32 @
 Word64   | 64 @
-<!-- <hline>  -->
+<!-- <hline> -->
 </tabular>
+
 
 For each type <it/W/ above, we provide the following functions and
 instances.  The type <it/I/ refers to the signed integer type of the
@@ -35,17 +38,35 @@ instance Bits     W
 </verb></tscreen>
 Plus
 <tscreen><verb>
-word8ToWord32  :: Word8  -> Word32
+word8ToWord16  :: Word8   -> Word16
+word8ToWord32  :: Word8   -> Word32
+word8ToWord64  :: Word8   -> Word64
+
+word16ToWord8   :: Word16  -> Word8
+word16ToWord32  :: Word16  -> Word32
+word16ToWord64  :: Word16  -> Word64
+
 word32ToWord8  :: Word32 -> Word8
-word16ToWord32 :: Word16 -> Word32
 word32ToWord16 :: Word32 -> Word16
+word32ToWord64 :: Word32 -> Word64
+
+word64ToWord8  :: Word64 -> Word8
+word64ToWord16 :: Word64 -> Word16
+word64ToWord32 :: Word64 -> Word32
 
 word8ToInt     :: Word8  -> Int
-intToWord8     :: Int    -> Word8
 word16ToInt    :: Word16 -> Int
-intToWord16    :: Int    -> Word16
 word32ToInt    :: Word32 -> Int
+word64ToInt    :: Word64 -> Int
+
+intToWord8     :: Int    -> Word8
+intToWord16    :: Int    -> Word16
 intToWord32    :: Int    -> Word32
+intToWord64    :: Int    -> Word64
+
+word64ToInteger :: Word64  -> Integer
+integerToWord64 :: Integer -> Word64
+
 </verb></tscreen>
 
 Notes: 
@@ -64,9 +85,6 @@ Likewise, <tt/iToW/ converts signed n-bit values to the
 corresponding unsigned n-bit value.
 
 <item>
-ToDo: complete the set of coercion functions.
-
-<item>
 Use <tt/Prelude.fromIntegral :: (Integral a, Num b) => a -> b/ to
 coerce between different sizes or to preserve sign when converting
 between values of the same size.
@@ -79,17 +97,16 @@ no demand for it.  Doing so would require <tt/Bits.bitSize/ to return
 <tt/Maybe Int/.
 
 <item>
-The <tt/Enum/ instances stop when they reach their upper or lower
-bound --- they don't overflow the way the <tt/Int/ and <tt/Float/
-instances do.
-
-<item>
-It would be useful to provide a function (or a family of functions?)
-which coerced between any two Word types (without going through
-Integer).
+The rules that hold for <tt/Enum/ instances over a bounded type
+such as <tt/Int/ (see the section of the Haskell report dealing
+with arithmetic sequences) also hold for the <tt/Enum/ instances
+over the various <tt/Word/ types defined here.
 
 </itemize>
 
-Hugs only provides <tt/Eq/, <tt/Ord/, <tt/Read/ and <tt/Show/
-instances for <tt/Word64/ at the moment.
+<bf/Implementation notes:/
 
+<itemize>
+<item> Hugs only provides <tt/Eq/, <tt/Ord/, <tt/Read/ and <tt/Show/
+instances for <tt/Word64/ at the moment.
+</itemize>
