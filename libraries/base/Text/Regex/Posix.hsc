@@ -13,11 +13,13 @@
 -----------------------------------------------------------------------------
 
 -- ToDo: should have an interface using PackedStrings.
+#include "config.h"
 
 module Text.Regex.Posix (
 	-- * The @Regex@ type
 	Regex,	 	-- abstract
 
+#if defined(HAVE_REGEX_H)
 	-- * Compiling a regular expression
 	regcomp, 	-- :: String -> Int -> IO Regex
 
@@ -34,19 +36,26 @@ module Text.Regex.Posix (
 	         	--		 String,     -- everything after match
 	         	-- 	 	 [String]))  -- subexpression matches
 
+#endif
   ) where
 
+#if defined(HAVE_REGEX_H)
 #include <sys/types.h>
 #include "regex.h"
+#endif
 
 import Prelude
 
 import Foreign
 import Foreign.C
 
+type CRegex    = ()
+
 -- | A compiled regular expression
 newtype Regex = Regex (ForeignPtr CRegex)
 
+#if defined(HAVE_REGEX_H) 
+-- to the end
 -- -----------------------------------------------------------------------------
 -- regcomp
 
@@ -154,7 +163,6 @@ unpack string p_match = do
 	REG_ERANGE, \
 	REG_ESPACE
 
-type CRegex    = ()
 type CRegMatch = ()
 
 foreign import ccall unsafe "regcomp"
@@ -166,3 +174,5 @@ foreign import ccall  unsafe "&regfree"
 foreign import ccall unsafe "regexec"
   c_regexec :: Ptr CRegex -> CString -> CSize
 	    -> Ptr CRegMatch -> CInt -> IO CInt
+
+#endif /* HAVE_REGEX_H */

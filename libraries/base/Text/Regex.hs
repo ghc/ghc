@@ -1,3 +1,4 @@
+{-# OPTIONS -cpp #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.Regex
@@ -12,14 +13,16 @@
 -- interface in "Text.Regex.Posix".
 --
 -----------------------------------------------------------------------------
-
+#include "config.h"
 module Text.Regex (
     -- * Regular expressions
     Regex,
+#if defined(HAVE_REGEX_H)
     mkRegex,
     mkRegexWithOpts,
     matchRegex,
     matchRegexAll
+#endif
   ) where
 
 import Prelude
@@ -27,6 +30,7 @@ import qualified Text.Regex.Posix as RE
 import Text.Regex.Posix ( Regex )
 import System.IO.Unsafe
 
+#if defined(HAVE_REGEX_H)
 -- | Makes a regular expression with the default options (multi-line,
 -- case-sensitive).  The syntax of regular expressions is
 -- otherwise that of @egrep@ (i.e. POSIX \"extended\" regular
@@ -80,3 +84,4 @@ matchRegexAll
 
 matchRegexAll p str = unsafePerformIO (RE.regexec p str)
 
+#endif
