@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.26 $
- * $Date: 2000/04/04 15:41:56 $
+ * $Revision: 1.27 $
+ * $Date: 2000/04/05 16:57:18 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -936,7 +936,7 @@ Void gcCStack() {                       /* Garbage collect elements off    */
         fatal("gcCStack");
 #endif
 
-#define Blargh markWithoutMove(*ptr);
+#define Blargh mark(*ptr);
 #if 0
                markWithoutMove((*ptr)/sizeof(Cell)); \
                markWithoutMove(( (void*)(*ptr)-(void*)heapTopFst)/sizeof(Cell));  \

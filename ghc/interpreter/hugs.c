@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.59 $
- * $Date: 2000/04/05 14:13:58 $
+ * $Revision: 1.60 $
+ * $Date: 2000/04/05 16:57:18 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -244,12 +244,17 @@ String argv[]; {
 #  endif
 
    /* Find out early on if we're in combined mode or not.
-      everybody(PREPREL) needs to know this.
+      everybody(PREPREL) needs to know this.  Also, establish the
+      heap size;
    */ 
    for (i=1; i < argc; ++i) {
       if (strcmp(argv[i], "--")==0) break;
       if (strcmp(argv[i], "-c")==0) combined = FALSE;
       if (strcmp(argv[i], "+c")==0) combined = TRUE;
+
+      if (strncmp(argv[i],"+h",2)==0 ||
+          strncmp(argv[i],"-h",2)==0)
+         setHeapSize(&(argv[i][2]));
    }
 
    everybody(PREPREL);
@@ -497,7 +502,8 @@ String s; {                             /* return FALSE if none found.     */
                        return TRUE;
 #endif
 
-            case 'h' : setHeapSize(s+1);
+            case 'h' : /* don't do anything, since pre-scan of args
+                       will have got it already */
                        return TRUE;
 
             case 'c' :  /* don't do anything, since pre-scan of args
@@ -1220,8 +1226,12 @@ static void tryLoadGroup ( Cell grp )
          assert(nonNull(m));
          if (module(m).mode == FM_SOURCE) {
             processModule ( m );
+            module(m).tree = NIL;
          } else {
             processInterfaces ( singleton(snd(grp)) );
+            m = findModule(textOf(snd(grp)));
+            assert(nonNull(m));
+            module(m).tree = NIL;
          }
          break;
       case GRP_REC:
@@ -1235,6 +1245,11 @@ static void tryLoadGroup ( Cell grp )
             }
 	 }
          processInterfaces ( snd(grp) );
+	 for (t = snd(grp); nonNull(t); t=tl(t)) {
+            m = findModule(textOf(hd(t)));
+            assert(nonNull(m));
+            module(m).tree = NIL;
+         }
          break;
       default:
          internal("tryLoadGroup");

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/22 18:17:12 $
+ * $Revision: 1.25 $
+ * $Date: 2000/04/05 16:57:18 $
  * ------------------------------------------------------------------------*/
 
 
@@ -95,13 +95,14 @@
 
 #define MINIMUMHEAP        19000
 #define MAXIMUMHEAP        0
-#define DEFAULTHEAP        1000000 /*350000*/
+#define DEFAULTHEAP        320000
 
 #define TEXT_SIZE          100000
 #define NUM_TEXTH          10
 #define NUM_TYVARS         4000
 #define NUM_STACK          16000
 #define NUM_DTUPLES        5
+#define NUM_MSTACK         2000
 
 #define MAXPOSINT          0x7fffffff
 #define MINNEGINT          (-MAXPOSINT-1)

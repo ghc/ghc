@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.62 $
- * $Date: 2000/04/05 10:25:08 $
+ * $Revision: 1.63 $
+ * $Date: 2000/04/05 16:57:18 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -469,6 +469,13 @@ Text t; {
  * tycon, class, instance and module tables.  Also, potentially, TREX Exts.
  * ------------------------------------------------------------------------*/
 
+#ifdef DEBUG_STORAGE_EXTRA
+static Bool debugStorageExtra = TRUE;
+#else
+static Bool debugStorageExtra = FALSE;
+#endif
+
+
 #define EXPANDABLE_SYMBOL_TABLE(type_name,struct_name,                  \
                                 proc_name,free_proc_name,               \
                                 free_list,tab_name,tab_size,err_msg,    \
@@ -484,9 +491,11 @@ Text t; {
          assert(TAB_BASE_ADDR <= n);                                    \
          assert(n < TAB_BASE_ADDR+tab_size);                            \
          assert(tab_name[n-TAB_BASE_ADDR].inUse);                       \
-         tab_name[n-TAB_BASE_ADDR].inUse = FALSE;                      \
-         /*tab_name[n-TAB_BASE_ADDR].nextFree = free_list; */               \
-         /*free_list = n;*/                                                 \
+         tab_name[n-TAB_BASE_ADDR].inUse = FALSE;                       \
+         if (!debugStorageExtra) {                                      \
+            tab_name[n-TAB_BASE_ADDR].nextFree = free_list;             \
+            free_list = n;                                              \
+         }                                                              \
       }                                                                 \
                                                                         \
       type_name proc_name ( void )                                      \
@@ -514,8 +523,9 @@ Text t; {
             newTab[i].inUse = FALSE;                                    \
             newTab[i].nextFree = i-1+TAB_BASE_ADDR;                     \
          }                                                              \
-         /* fprintf(stderr, "Expanding " #type_name                     \
-	    "table to size %d\n", newSz );*/                    \
+         if (debugStorageExtra)                                         \
+            fprintf(stderr, "Expanding " #type_name                     \
+                            "table to size %d\n", newSz );              \
          newTab[tab_size].nextFree = TAB_BASE_ADDR-1;                   \
          free_list = newSz-1+TAB_BASE_ADDR;                             \
          tab_size = newSz;                                              \
@@ -613,7 +623,8 @@ struct strModule* generate_module_ref ( Cell mo )
  * ------------------------------------------------------------------------*/
 
 #define TYCONHSZ 256                            /* Size of Tycon hash table*/
-     //#define tHash(x) (((x)-TEXT_BASE_ADDR)%TYCONHSZ)/* Tycon hash function     */
+static  Tycon    tyconHash[TYCONHSZ];           /* Hash table storage      */
+
 static int tHash(Text x)
 {
    int r;
@@ -625,12 +636,13 @@ static int tHash(Text x)
    assert(r<TYCONHSZ);
    return r;
 }
-static  Tycon    tyconHash[TYCONHSZ];           /* Hash table storage      */
-int RC_T ( int x ) 
+
+static int RC_T ( int x ) 
 {
    assert (x >= 0 && x < TYCONHSZ);
    return x;
 }
+
 Tycon newTycon ( Text t )               /* add new tycon to tycon table    */
 {
     Int   h                      = tHash(t);
@@ -656,7 +668,7 @@ Tycon newTycon ( Text t )               /* add new tycon to tycon table    */
 Tycon findTycon(t)                      /* locate Tycon in tycon table     */
 Text t; {
     Tycon tc = tyconHash[RC_T(tHash(t))];
-assert(isTycon(tc) || isTuple(tc) || isNull(tc));
+    assert(isTycon(tc) || isTuple(tc) || isNull(tc));
     while (nonNull(tc) && tycon(tc).text!=t)
 	tc = tycon(tc).nextTyconHash;
     return tc;
@@ -814,7 +826,8 @@ Tycon mkTuple ( Int n )
  * ------------------------------------------------------------------------*/
 
 #define NAMEHSZ  256                            /* Size of Name hash table */
-//#define nHash(x) (((x)-TEXT_BASE_ADDR)%NAMEHSZ) /* hash fn :: Text->Int    */
+static  Name     nameHash[NAMEHSZ];             /* Hash table storage      */
+
 static int nHash(Text x)
 {
    assert(isText(x) || inventedText(x));
@@ -822,12 +835,13 @@ static int nHash(Text x)
    if (x < 0) x = -x;
    return x%NAMEHSZ;
 }
-static  Name     nameHash[NAMEHSZ];             /* Hash table storage      */
+
 int RC_N ( int x ) 
 {
    assert (x >= 0 && x < NAMEHSZ);
    return x;
 }
+
 void hashSanity ( void )
 {
    Int i, j;
@@ -875,8 +889,8 @@ Name newName ( Text t, Cell parent )    /* Add new name to name table      */
 Name findName(t)                        /* Locate name in name table       */
 Text t; {
     Name n = nameHash[RC_N(nHash(t))];
-assert(isText(t));
-assert(isName(n) || isNull(n));
+    assert(isText(t) || isInventedVar(t) || isInventedDictVar(t));
+    assert(isName(n) || isNull(n));
     while (nonNull(n) && name(n).text!=t)
 	n = name(n).nextNameHash;
     return n;
@@ -1844,12 +1858,8 @@ OSectionKind lookupSection ( void* ad )
 Int     heapSize = DEFAULTHEAP;         /* number of cells in heap         */
 Heap    heapFst;                        /* array of fst component of pairs */
 Heap    heapSnd;                        /* array of snd component of pairs */
-#ifndef GLOBALfst
 Heap    heapTopFst;
-#endif
-#ifndef GLOBALsnd
 Heap    heapTopSnd;
-#endif
 Bool    consGC = TRUE;                  /* Set to FALSE to turn off gc from*/
                                         /* C stack; use with extreme care! */
 Long    numCells;
@@ -1902,7 +1912,6 @@ static Int markCount, stackRoots;
 Cell pair(l,r)                          /* Allocate pair (l, r) from       */
 Cell l, r; {                            /* heap, garbage collecting first  */
     Cell c = freeList;                  /* if necessary ...                */
-
     if (isNull(c)) {
         lsave = l;
         rsave = r;
@@ -1923,76 +1932,39 @@ Cell l, r; {                            /* heap, garbage collecting first  */
 static Int *marks;
 static Int marksSize;
 
-Cell markExpr(c)                        /* External interface to markCell  */
-Cell c; {
-    return isGenPair(c) ? markCell(c) : c;
-}
+void mark ( Cell root )
+{
+   Cell c;
+   Cell mstack[NUM_MSTACK];
+   Int  msp     = -1;
+   Int  msp_max = -1;
 
-static Cell local markCell(c)           /* Traverse part of graph marking  */
-Cell c; {                               /* cells reachable from given root */
-                                        /* markCell(c) is only called if c */
-                                        /* is a pair                       */
-    {   register int place = placeInSet(c);
-        register int mask  = maskInSet(c);
-        if (marks[place]&mask)
-            return c;
-        else {
+   mstack[++msp] = root;
+
+   while (msp >= 0) {
+      if (msp > msp_max) msp_max = msp;
+      c = mstack[msp--];
+      if (!isGenPair(c)) continue;
+      if (fst(c)==FREECELL) continue;
+      {
+         register int place = placeInSet(c);
+         register int mask  = maskInSet(c);
+         if (!(marks[place]&mask)) {
             marks[place] |= mask;
-            recordMark();
-        }
-    }
-
-    /* STACK_CHECK: Avoid stack overflows during recursive marking. */
-    if (isGenPair(fst(c))) {
-	STACK_CHECK
-        fst(c) = markCell(fst(c));
-        markSnd(c);
-    }
-    else if (isNull(fst(c)) || isTagPtr(fst(c))) {
-	STACK_CHECK
-        markSnd(c);
-    }
-
-    return c;
+            if (msp >= NUM_MSTACK-5) {
+               fprintf ( stderr, 
+                         "hugs: fatal stack overflow during GC.  "
+                         "Increase NUM_MSTACK.\n" );
+               exit(9);
+            }
+            mstack[++msp] = fst(c);
+            mstack[++msp] = snd(c);
+         }
+      }
+   }
+   //   fprintf(stderr, "%d ",msp_max);
 }
 
-static Void local markSnd(c)            /* Variant of markCell used to     */
-Cell c; {                               /* update snd component of cell    */
-    Cell t;                             /* using tail recursion            */
-
-ma: t = c;                              /* Keep pointer to original pair   */
-    c = snd(c);
-    if (!isPair(c))
-        return;
-
-    {   register int place = placeInSet(c);
-        register int mask  = maskInSet(c);
-        if (marks[place]&mask)
-            return;
-        else {
-            marks[place] |= mask;
-            recordMark();
-        }
-    }
-
-    if (isGenPair(fst(c))) {
-        fst(c) = markCell(fst(c));
-        goto ma;
-    }
-    else if (isNull(fst(c)) || isTagPtr(fst(c)))
-        goto ma;
-    return;
-}
-
-Void markWithoutMove(n)                 /* Garbage collect cell at n, as if*/
-Cell n; {                               /* it was a cell ref, but don't    */
-                                        /* move cell so we don't have      */
-                                        /* to modify the stored value of n */
-    if (isGenPair(n)) {
-        recordStackRoot();
-        markCell(n); 
-    }
-}
 
 Void garbageCollect()     {             /* Run garbage collector ...       */
                                         /* disable break checking          */
@@ -2003,11 +1975,11 @@ Void garbageCollect()     {             /* Run garbage collector ...       */
     jmp_buf  regs;                      /* save registers on stack         */
     HugsBreakAction oldBrk
        = setBreakAction ( HugsIgnoreBreak );
-fprintf ( stderr, "wa-hey!  garbage collection!  too difficult!  bye!\n" );
-exit(0);
+
     setjmp(regs);
 
     gcStarted();
+
     for (i=0; i<marksSize; ++i)         /* initialise mark set to empty    */
         marks[i] = 0;
 
@@ -2039,6 +2011,10 @@ exit(0);
     setBreakAction ( oldBrk );
 
     everybody(GCDONE);
+
+#if defined(DEBUG_STORAGE) || defined(DEBUG_STORAGE_EXTRA)
+    fprintf(stderr, "\n--- GC recovered %d\n",recovered );
+#endif
 
     /* can only return if freeList is nonempty on return. */
     if (recovered<minRecovery || isNull(freeList)) {
@@ -3144,9 +3120,9 @@ Int what; {
                             i < NAME_BASE_ADDR+tabNameSz; ++i) {
                           if (tabName[i-NAME_BASE_ADDR].inUse) {
                              mark(name(i).parent);
+                             mark(name(i).type);
                              mark(name(i).defn);
                              mark(name(i).stgVar);
-                             mark(name(i).type);
                           }
                        }
                        end("Names", nameHw-NAMEMIN);
@@ -3160,6 +3136,8 @@ Int what; {
                              mark(module(i).classes);
                              mark(module(i).exports);
                              mark(module(i).qualImports);
+                             mark(module(i).tree);
+                             mark(module(i).uses);
                              mark(module(i).objectExtraNames);
                           }
                        }
@@ -3172,9 +3150,9 @@ Int what; {
                        for (i = TYCON_BASE_ADDR; 
                             i < TYCON_BASE_ADDR+tabTyconSz; ++i) {
                           if (tabTycon[i-TYCON_BASE_ADDR].inUse) {
-                             mark(tycon(i).defn);
                              mark(tycon(i).kind);
                              mark(tycon(i).what);
+                             mark(tycon(i).defn);
                           }
                        }
                        end("Type constructors", tyconHw-TYCMIN);
@@ -3182,13 +3160,13 @@ Int what; {
                        start();
                        for (i = CCLASS_BASE_ADDR; 
                             i < CCLASS_BASE_ADDR+tabClassSz; ++i) {
-                          if (tabModule[i-MODULE_BASE_ADDR].inUse) {
-                             mark(cclass(i).head);
+                          if (tabClass[i-CCLASS_BASE_ADDR].inUse) {
                              mark(cclass(i).kinds);
 	  		     mark(cclass(i).fds);
 		  	     mark(cclass(i).xfds);
-                             mark(cclass(i).dsels);
+                             mark(cclass(i).head);
                              mark(cclass(i).supers);
+                             mark(cclass(i).dsels);
                              mark(cclass(i).members);
                              mark(cclass(i).defaults);
                              mark(cclass(i).instances);
@@ -3201,8 +3179,8 @@ Int what; {
                        for (i = INST_BASE_ADDR; 
                             i < INST_BASE_ADDR+tabInstSz; ++i) {
                           if (tabInst[i-INST_BASE_ADDR].inUse) {
-                             mark(inst(i).head);
                              mark(inst(i).kinds);
+                             mark(inst(i).head);
                              mark(inst(i).specifics);
                              mark(inst(i).implements);
                           }

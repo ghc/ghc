@@ -10,11 +10,12 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.39 $
- * $Date: 2000/04/05 10:25:08 $
+ * $Revision: 1.40 $
+ * $Date: 2000/04/05 16:57:18 $
  * ------------------------------------------------------------------------*/
 
-#define DEBUG_STORAGE
+#define DEBUG_STORAGE               /* a moderate level of sanity checking */
+#define DEBUG_STORAGE_EXTRA         /* max paranoia in sanity checks       */
 
 /* --------------------------------------------------------------------------
  * Typedefs for main data types:
@@ -159,12 +160,7 @@ extern  Int          cellsRecovered;    /* cells recovered by last gc      */
 
 extern  Pair         pair            ( Cell,Cell );
 extern  Void         garbageCollect  ( Void );
-
-extern  Void         overwrite       ( Pair,Pair );
-extern  Cell         markExpr        ( Cell );
-extern  Void         markWithoutMove ( Cell );
-
-#define mark(v)      v=markExpr(v)
+extern  Void         mark            ( Cell );
 
 #define isPair(c)    ((c)<0)
 #define isGenPair(c) ((c)<0 && -heapSize<=(c))
@@ -1068,6 +1064,7 @@ extern  StackPtr sp;
 #define pushed(n)    stack(sp-(n))
 #define topfun(f)    top()=ap((f),top())
 #define toparg(x)    top()=ap(top(),(x))
+#define getsp()      sp
 
 extern  Void hugsStackOverflow ( Void );
 
