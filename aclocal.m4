@@ -732,7 +732,7 @@ main() {
 }],AC_CV_NAME=`cat conftestval`,
 ifelse([$2], , [AC_CV_NAME=NotReallyAType; AC_CV_NAME_supported=no], AC_CV_NAME=$2),
 ifelse([$3], , [AC_CV_NAME=NotReallyATypeCross; AC_CV_NAME_supported=no], AC_CV_NAME=$3))]) dnl
-if test "$AC_CV_NAME_supported" == yes; then
+if test "$AC_CV_NAME_supported" = yes; then
   AC_MSG_RESULT($AC_CV_NAME)
   AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME)
 else
