@@ -9,7 +9,11 @@ import Monad		( when )
 import Directory	( doesFileExist )
 import System		( ExitCode(..) )
 
+#ifdef __NHC__
+import NonStdTrace(trace)
+#else
 import IOExts(trace)
+#endif
 ---------------------------------------------------------------------
 -- Hook into Meurig Sage's regexp library
 

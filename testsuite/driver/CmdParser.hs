@@ -9,7 +9,11 @@ import CmdLexer
 import Char		( isAlpha, isDigit, isSpace )
 import Directory	( doesFileExist )
 
+#ifdef __NHC__
+import NonStdTrace(trace)
+#else
 import IOExts(trace)
+#endif
 
 ---------------------------------------------------------------------
 -- Parse a string with an arbitrary parser.
