@@ -1,7 +1,7 @@
 
 read003.hs:4:26:
-    Occurs check: cannot construct the infinite type: a = (a, [a], c)
-      Expected type: (a, [a], c)
+    Occurs check: cannot construct the infinite type: a = (a, [a1], c)
+      Expected type: (a, [a1], c)
       Inferred type: a
     In the right-hand side of a pattern binding: a
     In a pattern binding:
