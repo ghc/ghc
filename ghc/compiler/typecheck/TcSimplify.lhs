@@ -1526,26 +1526,14 @@ addAmbigErr tidy_env tidy_dict
 
 warnDefault dicts default_ty
   = doptsTc Opt_WarnTypeDefaults  `thenTc` \ warn_flag ->
-    if warn_flag 
-	then mapNF_Tc warn groups  `thenNF_Tc_`  returnNF_Tc ()
-	else returnNF_Tc ()
-
+    tcAddSrcLoc (get_loc (head dicts)) (warnTc warn_flag warn_msg)
   where
 	-- Tidy them first
     (_, tidy_dicts) = tidyInsts dicts
-
-	-- Group the dictionaries by source location
-    groups      = equivClasses cmp tidy_dicts
-    i1 `cmp` i2 = get_loc i1 `compare` get_loc i2
-    get_loc i   = case instLoc i of { (_,loc,_) -> loc }
-
-    warn [dict] = tcAddSrcLoc (get_loc dict) $
-		  warnTc True (ptext SLIT("Defaulting") <+> quotes (pprInst dict) <+> 
-			       ptext SLIT("to type") <+> quotes (ppr default_ty))
-
-    warn dicts  = tcAddSrcLoc (get_loc (head dicts)) $
-		  warnTc True (vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty),
-				     pprInstsInFull dicts])
+    get_loc i = case instLoc i of { (_,loc,_) -> loc }
+    warn_msg  = vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+> 
+				quotes (ppr default_ty),
+		      pprInstsInFull tidy_dicts]
 
 -- The error message when we don't find a suitable instance
 -- is complicated by the fact that sometimes this is because
