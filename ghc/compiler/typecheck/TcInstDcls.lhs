@@ -35,11 +35,9 @@ import Inst		( InstOrigin(..),
 			  LIE, mkLIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
-			  tcExtendTyVarEnvForMeths, tcLookupId,
-			  tcAddImportedIdInfo, tcLookupClass,
+			  tcExtendTyVarEnvForMeths, tcLookupId, tcLookupClass,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
-			  simpleInstInfoTy, newDFunName,
-			  isLocalThing,
+			  simpleInstInfoTy, newDFunName
 			)
 import InstEnv		( InstEnv, extendInstEnv )
 import PprType		( pprClassPred )

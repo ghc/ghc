@@ -27,7 +27,7 @@ module TcEnv(
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	-- Random useful things
-	RecTcEnv, tcAddImportedIdInfo, tcLookupRecId, tcLookupRecId_maybe, 
+	RecTcEnv, tcLookupRecId, tcLookupRecId_maybe, 
 
 	-- New Ids
 	newLocalName, newDFunName,
@@ -207,16 +207,6 @@ type RecTcEnv = TcEnv
 -- This environment is used for getting the 'right' IdInfo 
 -- on imported things and for looking up Ids in unfoldings
 -- The environment doesn't have any local Ids in it
-
-tcAddImportedIdInfo :: RecTcEnv -> Id -> Id
-tcAddImportedIdInfo env id
-  = id `lazySetIdInfo` new_info
-	-- The Id must be returned without a data dependency on maybe_id
-  where
-    new_info = case tcLookupRecId_maybe env (idName id) of
-		  Nothing	   -> pprTrace "tcAddIdInfo" (ppr id) vanillaIdInfo
-		  Just imported_id -> idInfo imported_id
-		-- ToDo: could check that types are the same
 
 tcLookupRecId_maybe :: RecTcEnv -> Name -> Maybe Id
 tcLookupRecId_maybe env name = case lookup_global env name of
