@@ -14,7 +14,9 @@
 
 module Data.Tree(
 	Tree(..), Forest,
+	-- * Two-dimensional drawing
 	drawTree, drawForest,
+	-- * Extraction
 	flatten, levels,
     ) where
 
@@ -40,38 +42,30 @@ mapTree              :: (a -> b) -> (Tree a -> Tree b)
 mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
 
 -- | Neat 2-dimensional drawing of a tree.
-drawTree :: Show a => Tree a -> String
-drawTree  = unlines . draw . mapTree show
+drawTree :: Tree String -> String
+drawTree  = unlines . draw
 
 -- | Neat 2-dimensional drawing of a forest.
-drawForest :: Show a => Forest a -> String
+drawForest :: Forest String -> String
 drawForest  = unlines . map drawTree
 
 draw :: Tree String -> [String]
-draw (Node x ts0) = grp this (space (length this)) (stLoop ts0)
- where this          = s1 ++ x ++ " "
+draw (Node x ts0) = x : drawSubTrees ts0
+  where drawSubTrees [] = []
+	drawSubTrees [t] =
+		"|" : shift "`- " "   " (draw t)
+	drawSubTrees (t:ts) =
+		"|" : shift "+- " "|  " (draw t) ++ drawSubTrees ts
 
-       space n       = replicate n ' '
-
-       stLoop []     = [""]
-       stLoop [t]    = grp s2 "  " (draw t)
-       stLoop (t:ts) = grp s3 s4 (draw t) ++ [s4] ++ rsLoop ts
-
-       rsLoop []     = error "rsLoop:Unexpected empty list."
-       rsLoop [t]    = grp s5 "  " (draw t)
-       rsLoop (t:ts) = grp s6 s4 (draw t) ++ [s4] ++ rsLoop ts
-
-       grp fst0 rst  = zipWith (++) (fst0:repeat rst)
-
-       [s1,s2,s3,s4,s5,s6] = ["- ", "--", "-+", " |", " `", " +"]
+	shift first other = zipWith (++) (first : repeat other)
 
 -- | The elements of a tree in pre-order.
 flatten :: Tree a -> [a]
 flatten t = squish t []
- where squish (Node x ts) xs = x:foldr squish xs ts
+  where squish (Node x ts) xs = x:foldr squish xs ts
 
 -- | Lists of nodes at each level of the tree.
 levels :: Tree a -> [[a]]
 levels t = map (map root) $ takeWhile (not . null) $ iterate subforest [t]
- where root (Node x _) = x
-       subforest f     = [t | Node _ ts <- f, t <- ts]
+  where root (Node x _) = x
+	subforest f     = [t | Node _ ts <- f, t <- ts]
