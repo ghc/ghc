@@ -254,6 +254,33 @@ initSysTools minusB_args
 	      	     setTmpDir dir
 	      	     return ()
                  )
+#else
+	  -- On Win32, consult GetTempPath() for a temp dir.
+	  --  => it first tries TMP, TEMP, then finally the
+	  --   Windows directory(!). The directory is in short-path
+	  --   form and *does* have a trailing backslash.
+	; IO.try (do
+	        let len = (2048::Int)
+		buf  <- mallocArray len
+		ret  <- getTempPath len buf
+		tdir <-
+		  if ret == 0 then do
+		      -- failed, consult TEMP.
+ 	             destructArray len buf
+		     getEnv "TMP"
+		   else do
+		     s <- peekCString buf
+		     destructArray len buf
+		     return s
+		let
+	  	  -- strip the trailing slash (awful, but 
+		  -- we only do this once).
+		  tmpdir =
+	            case last tdir of
+		      '/' -> init tdir
+		      _   -> tdir
+		setTmpDir tmpdir
+		return ())
 #endif
 
 	-- Check that the package config exists
@@ -359,6 +386,10 @@ initSysTools minusB_args
 
 	; return ()
 	}
+
+#if defined(mingw32_TARGET_OS)
+foreign import stdcall "GetTempPathA" getTempPath :: Int -> CString -> IO Int32
+#endif
 \end{code}
 
 setPgm is called when a command-line option like
@@ -784,16 +815,16 @@ slash s1 s2 = s1 ++ ('/' : s2)
 
 #if defined(mingw32_TARGET_OS)
 getExecDir :: IO (Maybe String)
-getExecDir = do let len = 2048 -- plenty, PATH_MAX is 512 under Win32.
-		buf <- mallocArray (fromIntegral len)
+getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
+		buf <- mallocArray len
 		ret <- getModuleFileName nullAddr buf len
-		if ret == 0 then return Nothing
+		if ret == 0 then destructArray len buf >> return Nothing
 		            else do s <- peekCString buf
-				    destructArray (fromIntegral len) buf
+				    destructArray len buf
 				    return (Just (reverse (drop (length "/bin/ghc.exe") (reverse (unDosifyPath s)))))
 
 
-foreign import stdcall "GetModuleFileNameA" getModuleFileName :: Addr -> CString -> Int32 -> IO Int32
+foreign import stdcall "GetModuleFileNameA" getModuleFileName :: Addr -> CString -> Int -> IO Int32
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
