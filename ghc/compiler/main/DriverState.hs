@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.100 2004/02/25 11:31:24 simonmar Exp $
+-- $Id: DriverState.hs,v 1.101 2004/03/05 15:09:37 stolz Exp $
 --
 -- Settings for the driver
 --
@@ -573,7 +573,7 @@ way_details :: [ (WayName, Way) ]
 way_details =
   [ (WayThreaded, Way "thr" True "Threaded" [
 #if defined(freebsd_TARGET_OS)
-	, "-optc-pthread"
+	"-optc-pthread"
 #endif
 	] ),
 
