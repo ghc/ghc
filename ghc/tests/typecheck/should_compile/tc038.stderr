@@ -1,14 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [taCf] [d.Num_aCj] [([taCf], f{-r3f,x-}, f_aBV)]
-    d.Eq_aCh = PrelBase.scsel_NumPrelBaseEq{-aCm,p-} taCf d.Num_aCj
-    ==_aCl = PrelBase.=={-8Y,p-} taCf d.Eq_aCh
-    fromInteger_aCk = PrelBase.fromInteger{-8S,p-} taCf d.Num_aCj
-    f_aBV (x_r3d PrelBase.:{-55,w-}{i} xs_r3e)
-	  = if x_r3d ==_aCl (fromInteger_aCk 2) then
-		xs_r3e
-	    else
-		PrelBase.[]{-5i,w-}{i} taCf
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,27 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [] [] [([], $d1{-rm2,x-}, d.Ord'_alf)]
-    d.Eq'_alk = $d3{-rm5,x-}
-    AbsBinds [] [] [([], lt_am3, lt_alj)]
-	lt_alj x_r3j y_r3k = PrelBase.True{-5E,w-}{i}
-    d.Ord'_alf = ({-dict-} [d.Eq'_alk] [lt_am3])
-AbsBinds [talC] [d.Eq'_alF] [([talC], $d2{-rm6,x-}, d.Eq'_alv)]
-    AbsBinds [] [] [([], doubleeq_am7, doubleeq_alz)]
-	doubleeq_alz x_r3s y_r3t = PrelBase.True{-5E,w-}{i}
-    d.Eq'_alv = ({-dict-} [] [doubleeq_am7])
-AbsBinds [] [] [([], $d3{-rm5,x-}, d.Eq'_alM)]
-    AbsBinds [] [] [([], doubleeq_am8, doubleeq_alQ)]
-	doubleeq_alQ x_r3z y_r3A = PrelBase.True{-5E,w-}{i}
-    d.Eq'_alM = ({-dict-} [] [doubleeq_am8])
-scsel_Ord'ShouldSucceedEq'{-am4,x-} =
-    _/\_ t12 -> \ tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-lt{-r3H,x-} =
-    _/\_ t12 -> \ tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [tam0] [d.Ord'_alW] []
-doubleeq{-r3J,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [tam1] [d.Eq'_alZ] []
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

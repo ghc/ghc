@@ -1,14 +1,12 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 bitRsh{-r3h,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
 bitLsh{-r3i,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [takE] [d.Bits_akD] []
+AbsBinds [takI] [d.Bits_akH] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ Word 1
 _instance_modules_

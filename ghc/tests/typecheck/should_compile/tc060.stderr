@@ -1,23 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [] [] [([], $d1{-rlI,x-}, d.Eq2_akY)]
-    AbsBinds [] [] [([], deq_alJ, deq_al2)]
-	deq_al2 x_r3h y_r3i = PrelBase.True{-5E,w-}{i}
-    d.Eq2_akY = ({-dict-} [] [deq_alJ])
-AbsBinds [talm] [d.Eq2_aly] [([talm], $d2{-rlK,x-}, d.Eq2_alb)]
-    d.Eq2_alC = d.Eq2_aly
-    deq_alN = deq{-r3x,x-} talm d.Eq2_alC
-    deq_alM = deq_alL
-    AbsBinds [] [] [([], deq_alL, deq_alf)]
-	deq_alf (a_r3q PrelBase.:{-55,w-}{i} as_r3r)
-		(b_r3s PrelBase.:{-55,w-}{i} bs_r3t)
-		= if deq_alN a_r3q b_r3s then
-		      deq_alM as_r3r bs_r3t
-		  else
-		      PrelBase.False{-58,w-}{i}
-    d.Eq2_alb = ({-dict-} [] [deq_alL])
-deq{-r3x,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [talH] [d.Eq2_alG] []
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

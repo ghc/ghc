@@ -1,21 +1,3 @@
-==================== Typechecked ====================
-AbsBinds
-[taCf, taCi]
-[d.Num_aCq]
-[([taCi, taCf], g{-r3h,x-}, g_aCb)]
-    d.Num_aCs = d.Num_aCq
-    +_aD1 = PrelBase.+{-rfr,p-} taCf d.Num_aCs
-    d.Num_aCu = d.Num_aCq
-    -_aD0 = PrelBase.-{-817,p-} taCf d.Num_aCu
-    g_aCb b_r3l x_r3m y_r3n
-	  = if b_r3l then x_r3m +_aD1 x_r3m else x_r3m -_aD0 x_r3m
-AbsBinds [taCC] [] [([taCC], f{-r3j,x-}, f_aCw)]
-    g_aD2 = g{-r3h,x-} [taCC, PrelBase.Int{-3g,W-}] d.Num_aCH
-    f_aCw = g_aD2 PrelBase.True{-5E,w-}{i}
-AbsBinds [taCZ] [] [([taCZ], h{-r3i,x-}, h_aCJ)]
-    h_aCJ y_r3p x_r3q = f{-r3j,x-} taCZ x_r3q y_r3p
-d.Num_aCH = PrelBase.$d4{-raC,p-}
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

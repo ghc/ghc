@@ -1,11 +1,3 @@
-==================== Typechecked ====================
-Twist2{-r4,x-}{i} = \ tpl_B1 -> Twist2{-r4,x-}{i} {tpl_B1}
-Twine2{-r8,x-}{i} = \ tpl_B1 -> Twine2{-r8,x-}{i} {tpl_B1}
-AbsBinds [] [] [([], $d1{-rBi,x-}, d.Eval_aBa)]
-    d.Eval_aBa = ({-dict-} [] [])
-AbsBinds [] [] [([], $d2{-rBk,x-}, d.Eval_aBf)]
-    d.Eval_aBf = ({-dict-} [] [])
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

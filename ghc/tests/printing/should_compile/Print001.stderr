@@ -1,7 +1,4 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 BarNil{-r8,x-}{i} = _/\_ a_tr4F -> BarNil{-r8,x-}{i} {_@_ a_tr4F}
 BarCon{-r7,x-}{i} =
     _/\_ a_tr4F -> \ tpl_B1 tpl_B2 ->
@@ -10,35 +7,36 @@ MkFoo{-r4M,x-}{i} =
     _/\_ d_tr4H e_tr4I f_tr4J -> \ tpl_B1 tpl_B2 tpl_B3 ->
 	MkFoo{-r4M,x-}{i}
 	    {_@_ d_tr4H _@_ e_tr4I _@_ f_tr4J tpl_B1 tpl_B2 tpl_B3}
-AbsBinds [taYe, taYf] [] [([taYf, taYe], g{-r4w,x-}, g_aYb)]
-    g_aYb x_r4D = lit_aZr
+AbsBinds [taYm, taYn] [] [([taYn, taYm], g{-r4w,x-}, g_aYj)]
+    g_aYj x_r4D = lit_aZz
 AbsBinds
-[taYt, taYu, taYv]
-[d.Eq_aYx, d.Ord_aYy, d.Ix_aYz]
-[([taYt, taYu, taYv], f2{-r4v,x-}, f2_aYq)]
-    f2_aYq x_r4B = x_r4B
+[taYB, taYC, taYD]
+[d.Eq_aYF, d.Ord_aYG, d.Ix_aYH]
+[([taYB, taYC, taYD], f2{-r4v,x-}, f2_aYy)]
+    f2_aYy x_r4B = x_r4B
 AbsBinds
-[taYK, taYL, taYM]
-[d.Eq_aYO]
-[([taYK, taYL, taYM], f{-r4u,x-}, f_aYH)]
-    f_aYH x_r4z = x_r4z
+[taYS, taYT, taYU]
+[d.Eq_aYW]
+[([taYS, taYT, taYU], f{-r4u,x-}, f_aYP)]
+    f_aYP x_r4z = x_r4z
 AbsBinds
-[taYU, taYW, taYY]
+[taZ2, taZ4, taZ6]
 []
-[([taYU, taYW, taYY], mkFoo{-r4x,x-}, mkFoo_aYQ)]
-    mkFoo_aYQ = MkFoo{-r4M,x-}{i} [taYU, taYW, taYY]
-AbsBinds [taZg] [] [([taZg], $d1{-rZn,x-}, d.Eval_aZ4)]
-    d.Eval_aZ4 = ({-dict-} [] [])
-AbsBinds
-[taZh, taZi, taZj]
-[]
-[([taZh, taZi, taZj], $d2{-rZp,x-}, d.Eval_aZc)]
+[([taZ2, taZ4, taZ6], mkFoo{-r4x,x-}, mkFoo_aYY)]
+    mkFoo_aYY = MkFoo{-r4M,x-}{i} [taZ2, taZ4, taZ6]
+AbsBinds [taZo] [] [([taZo], $d1{-rZv,x-}, d.Eval_aZc)]
     d.Eval_aZc = ({-dict-} [] [])
-d.Fractional_aZf = PrelNum.$d23{-rES,p-}
-fromRational_aZq =
+AbsBinds
+[taZp, taZq, taZr]
+[]
+[([taZp, taZq, taZr], $d2{-rZx,x-}, d.Eval_aZk)]
+    d.Eval_aZk = ({-dict-} [] [])
+d.Fractional_aZn = PrelNum.$d23{-rES,p-}
+fromRational_aZy =
     PrelNum.fromRational{-8T,p-} PrelBase.Float{-3c,W-}
-	d.Fractional_aZf
-lit_aZr = fromRational_aZq 2.0000000000000000
+	d.Fractional_aZn
+lit_aZz = fromRational_aZy 2.0000000000000000
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ Print001 1
 _instance_modules_

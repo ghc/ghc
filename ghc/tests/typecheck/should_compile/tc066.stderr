@@ -1,18 +1,3 @@
-==================== Typechecked ====================
-MkPair{-r3n,x-}{i} =
-    _/\_ a_tr3k b_tr3l -> \ tpl_B1 tpl_B2 ->
-	MkPair{-r3n,x-}{i} {_@_ a_tr3k _@_ b_tr3l tpl_B1 tpl_B2}
-AbsBinds
-[taC8, taCb, aaCc]
-[d.Monad_aCn]
-[([taC8, taCb, aaCc], f{-r3m,x-}, f_aBU)]
-    >>=_aCD = PrelBase.>>={-811,p-} aaCc d.Monad_aCn
-    d.Monad_aCp = d.Monad_aCn
-    return_aCC = PrelBase.return{-816,p-} aaCc d.Monad_aCp
-    f_aBU x_r3f = [a_r3i | (MkPair{-r3n,x-}{i} c_r3h a_r3i) <- x_r3f]
-AbsBinds [taCA, taCB] [] [([taCA, taCB], $d1{-rCG,x-}, d.Eval_aCw)]
-    d.Eval_aCw = ({-dict-} [] [])
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

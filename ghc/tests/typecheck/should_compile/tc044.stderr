@@ -1,7 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [tarc] [] [([tarc], f{-r1,x-}, f_ar1)]
-    f_ar1 _ | PrelBase.otherwise{-818,p-} = PrelBase.(){-60,w-}{i}
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

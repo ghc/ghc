@@ -1,10 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [] [] [([], f{-r3e,x-}, f_aky)]
-    f_aky x_r3d
-	  = case x_r3d of
-	      PrelBase.True{-5E,w-}{i} -> PrelBase.True{-5E,w-}{i}
-	      PrelBase.False{-58,w-}{i} -> x_r3d
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,24 +1,3 @@
-==================== Typechecked ====================
-ONE{-r7,x-}{i} = ONE{-r7,x-}{i} {}
-TWO{-r6,x-}{i} = TWO{-r6,x-}{i} {}
-AbsBinds [] [] [([], $d1{-rCy,x-}, d.Eval_aCn)]
-    d.Eval_aCn = ({-dict-} [] [])
-scsel_EQShouldSucceedORD{-aCB,x-} =
-    _/\_ t12 -> \ tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
-	tpl_B1;}
-scsel_EQPrelBaseShow{-aCA,x-} =
-    _/\_ t12 -> \ tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
-	tpl_B2;}
-==={-r3p,x-} =
-    _/\_ t12 -> \ tpl_B1 ->
-	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
-	tpl_B3;}
-AbsBinds [taCu] [d.EQ_aCq] []
-scsel_ORDPrelBaseNum{-aCz,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taCv] [d.ORD_aCt] []
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

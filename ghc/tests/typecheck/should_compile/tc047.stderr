@@ -1,24 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [taz2, taz5] [] [([taz2, taz5], sd{-r3w,x-}, sd_ayS)]
-    sd_ayS (f_r3s, s_r3t) = s_r3t
-AbsBinds [tazu, tazy] [] [([tazu, tazy], mp{-r3x,x-}, mp_az8)]
-    mp_az8 f_r3m PrelBase.[]{-5i,w-}{i} = PrelBase.[]{-5i,w-}{i} tazy
-    mp_az8 f_r3o (x_r3p PrelBase.:{-55,w-}{i} xs_r3q)
-	   = PrelBase.:{-55,w-}{i} tazy (f_r3o x_r3p) (mp_az8 f_r3o xs_r3q)
-AbsBinds
-[taAa, taA7, taA8]
-[]
-[([taAa, taA7, taA8], f{-r3y,x-}, f_azE)]
-    f_azE x_r3g
-	  = ranOAL_r3i [taA8, taA7]
-	  where
-	      {- nonrec -}
-	      AbsBinds [tazZ, taA2] [] [([tazZ, taA2], ranOAL_r3i, ranOAL_azO)]
-		  ranOAL_azO xs_r3k
-			     = mp{-r3x,x-} [(taA2, tazZ), tazZ] sd{-r3w,x-} [taA2, tazZ] xs_r3k
-	      {- nonrec -}
-	      {- nonrec -}
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

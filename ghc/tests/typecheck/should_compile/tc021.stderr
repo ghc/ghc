@@ -1,14 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [tayz] [] [([tayz], x{-r3g,x-}, x_ayx)]
-    x_ayx = x_ayx
-AbsBinds [tayF, tayH] [] [([tayF, tayH], a{-r3h,x-}, a_ayB)]
-    a_ayB = (x{-r3g,x-} tayF, x{-r3g,x-} tayH)
-AbsBinds
-[taz1, tayX, tayZ]
-[]
-[([taz1, tayX, tayZ], f{-r3i,x-}, f_ayN)]
-    f_ayN x_r3f = a{-r3h,x-} [tayX, tayZ]
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,28 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [talh] [d.Eq1_alq] [([talh], f{-r3C,x-}, f_al1)]
-    d.Eq1_alo = $d1{-rmh,x-} talh d.Eq1_alq
-    deq_amf = deq{-r3D,x-} [talh] d.Eq1_alo
-    f_al1 x_r3f (y_r3g PrelBase.:{-55,w-}{i} ys_r3h)
-	  = deq_amf x_r3f ys_r3h
-AbsBinds [talH] [d.Eq1_alT] [([talH], $d1{-rmh,x-}, d.Eq1_alw)]
-    d.Eq1_alX = d.Eq1_alT
-    deq_amk = deq{-r3D,x-} talH d.Eq1_alX
-    deq_amj = deq_ami
-    AbsBinds [] [] [([], deq_ami, deq_alA)]
-	deq_alA (a_r3o PrelBase.:{-55,w-}{i} as_r3p)
-		(b_r3q PrelBase.:{-55,w-}{i} bs_r3r)
-		= if deq_amk a_r3o b_r3q then
-		      deq_amj as_r3p bs_r3r
-		  else
-		      PrelBase.False{-58,w-}{i}
-    d.Eq1_alw = ({-dict-} [] [deq_ami])
-AbsBinds [] [] [([], $d2{-rmg,x-}, d.Eq1_am3)]
-    AbsBinds [] [] [([], deq_aml, deq_am7)]
-	deq_am7 x_r3x y_r3y = PrelBase.True{-5E,w-}{i}
-    d.Eq1_am3 = ({-dict-} [] [deq_aml])
-deq{-r3D,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [tame] [d.Eq1_amd] []
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,22 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [tal3] [d.Eq'_als] [([tal3], $d1{-rlB,x-}, d.Eq'_akW)]
-    d.Eq'_alv = d.Eq'_als
-    deq_alE = deq{-r3u,x-} tal3 d.Eq'_alv
-    deq_alD = deq_alC
-    AbsBinds [] [] [([], deq_alC, deq_al0)]
-	deq_al0 PrelBase.[]{-5i,w-}{i} PrelBase.[]{-5i,w-}{i}
-		= PrelBase.True{-5E,w-}{i}
-	deq_al0 (x_r3k PrelBase.:{-55,w-}{i} xs_r3l)
-		(y_r3m PrelBase.:{-55,w-}{i} ys_r3n)
-		= if x_r3k deq_alE y_r3m then
-		      deq_alD xs_r3l ys_r3n
-		  else
-		      PrelBase.False{-58,w-}{i}
-	deq_al0 other1_r3p other2_r3q = PrelBase.False{-58,w-}{i}
-    d.Eq'_akW = ({-dict-} [] [deq_alC])
-deq{-r3u,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [talA] [d.Eq'_alz] []
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,13 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [takR] [] [([takR], f{-r3i,x-}, f_akB)]
-    f_akB x_r3g y_r3h = if x_r3g then y_r3h else f_akB x_r3g y_r3h
-AbsBinds [] [] [([], g{-r3j,x-}, g_akT)]
-    g_akT x_r3e
-	  = f{-r3i,x-} PrelBase.Bool{-34,W-} f{-r3i,x-}
-						 PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i}
-								       x_r3e
-					     x_r3e
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

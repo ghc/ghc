@@ -1,15 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [] [] [([], x{-r3,x-}, x_aBt)]
-    x_aBt
-	= [[PrelBase.True{-5E,w-}{i}] (PrelBase.Bool{-34,W-})] ([PrelBase.Bool{-34,W-}])
-AbsBinds [] [] [([], xs{-r2,x-}, xs_aBB)]
-    xs_aBB = [x_r3j | x_r3h <- x{-r3,x-}, x_r3j <- x_r3h]
-d.Monad_aBT = PrelBase.$d25{-rae,p-}
->>=_aC1 = PrelBase.>>={-811,p-} PrelBase.[]{-3j,W-} d.Monad_aBT
-d.Monad_aBW = d.Monad_aBT
-return_aC0 =
-    PrelBase.return{-816,p-} PrelBase.[]{-3j,W-} d.Monad_aBW
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

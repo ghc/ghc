@@ -1,17 +1,3 @@
-==================== Typechecked ====================
-AbsBinds [takV, takX] [] [([takV, takX], k{-r3l,x-}, k_akF)]
-    k_akF x_r3j y_r3k = x_r3j
-AbsBinds
-[talx, talz, talB]
-[]
-[([talx, talz, talB], s{-r3m,x-}, s_akZ)]
-    s_akZ f_r3f g_r3g x_r3h = f_r3f x_r3h g_r3g x_r3h
-AbsBinds [talJ] [] [([talJ], main{-r3n,x-}, main_alD)]
-    main_alD
-	= s{-r3m,x-} [talJ, talJ, GHC.Void{-3T,W-} -> talJ] k{-r3l,x-}
-								[GHC.Void{-3T,W-} -> talJ, talJ]
-							    k{-r3l,x-} [GHC.Void{-3T,W-}, talJ]
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

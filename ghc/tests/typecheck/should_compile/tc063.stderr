@@ -1,24 +1,3 @@
-==================== Typechecked ====================
-Tag{-r3G,x-}{i} =
-    _/\_ a_tr3C -> \ tpl_B1 -> Tag{-r3G,x-}{i} {_@_ a_tr3C tpl_B1}
-AbsBinds [taBG] [d.Reps_aBJ] [([taBG], g{-r3D,x-}, g_aBw)]
-    f_aCn = f{-r3E,x-} taBG d.Reps_aBJ
-    g_aBw x_r3h = f_aCn x_r3h x_r3h
-AbsBinds [taCl] [] [([taCl], $d3{-rCs,x-}, d.Eval_aBP)]
-    d.Eval_aBP = ({-dict-} [] [])
-AbsBinds [] [] [([], $d1{-rCp,x-}, d.Reps_aBU)]
-    AbsBinds [] [] [([], f_aCt, f_aBY)]
-	f_aBY PrelBase.True{-5E,w-}{i} PrelBase.True{-5E,w-}{i}
-	      = PrelBase.True{-5E,w-}{i}
-	f_aBY x_r3n y_r3o = PrelBase.False{-58,w-}{i}
-    d.Reps_aBU = ({-dict-} [] [f_aCt])
-AbsBinds [taCe] [] [([taCe], $d2{-rCo,x-}, d.Reps_aC7)]
-    AbsBinds [] [] [([], f_aCu, f_aCb)]
-	f_aCb x_r3v y_r3w = y_r3w
-    d.Reps_aC7 = ({-dict-} [] [f_aCu])
-f{-r3E,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taCm] [d.Reps_aCk] []
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,15 +1,3 @@
-==================== Typechecked ====================
-AbsBinds
-[taBp]
-[d.Ord_aBy]
-[([taBp], a{-r3h,x-}, a_aBn), ([taBp], b{-r3i,x-}, b_aBo)]
-    d.Ord_aBA = d.Ord_aBy
-    b_aBE = b{-r3i,x-} taBp d.Ord_aBA
-    d.Ord_aBC = d.Ord_aBy
-    a_aBD = a{-r3h,x-} taBp d.Ord_aBC
-    a_aBn = b_aBE
-    b_aBo = a_aBD
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

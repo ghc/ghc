@@ -1,63 +1,6 @@
  
 tc078.hs:7: No explicit method nor default method for `PrelBase.=='
 	    in an instance declaration for `PrelBase.Eq'
-==================== Typechecked ====================
-MkBar{-r3l,x-}{i} =
-    _/\_ a_tr3k -> \ tpl_B1 tpl_B2 ->
-	MkBar{-r3l,x-}{i} {_@_ a_tr3k tpl_B1 tpl_B2}
-AbsBinds [taDL] [] [([taDL], $d3{-rDP,x-}, d.Eval_aBP)]
-    d.Eval_aBP = ({-dict-} [] [])
-AbsBinds
-[taC3]
-[d.Ord_aCW, d.Eq_aCX]
-[([taC3], $d1{-rDR,x-}, d.Ord_aBV)]
-    d.Eq_aCY = d.Eq_aCX
-    d.Ord_aD2 = d.Ord_aBV
-    $mcompare_aE5 =
-	PrelBase.$mcompare{-rf4,p-} (Bar{-r3m,x-} taC3) d.Ord_aD2
-    d.Ord_aD4 = d.Ord_aBV
-    $m<_aE4 = PrelBase.$m<{-reZ,p-} (Bar{-r3m,x-} taC3) d.Ord_aD4
-    d.Ord_aD6 = d.Ord_aBV
-    $m<=_aE3 = PrelBase.$m<={-rf0,p-} (Bar{-r3m,x-} taC3) d.Ord_aD6
-    d.Ord_aD8 = d.Ord_aBV
-    $m>=_aE2 = PrelBase.$m>={-rf2,p-} (Bar{-r3m,x-} taC3) d.Ord_aD8
-    d.Ord_aDa = d.Ord_aBV
-    $m>_aE1 = PrelBase.$m>{-rf1,p-} (Bar{-r3m,x-} taC3) d.Ord_aDa
-    d.Ord_aDc = d.Ord_aBV
-    $mmax_aE0 = PrelBase.$mmax{-rf8,p-} (Bar{-r3m,x-} taC3) d.Ord_aDc
-    d.Ord_aDe = d.Ord_aBV
-    $mmin_aDZ = PrelBase.$mmin{-rf9,p-} (Bar{-r3m,x-} taC3) d.Ord_aDe
-    AbsBinds [] [] [([], compare_aDY, compare_aC0)]
-	compare_aC0 = $mcompare_aE5
-    AbsBinds [] [] [([], <_aDX, <_aCa)]
-	<_aCa = $m<_aE4
-    AbsBinds [] [] [([], <=_aDW, <=_aCj)]
-	<=_aCj = $m<=_aE3
-    AbsBinds [] [] [([], >=_aDV, >=_aCs)]
-	>=_aCs = $m>=_aE2
-    AbsBinds [] [] [([], >_aDU, >_aCB)]
-	>_aCB = $m>_aE1
-    AbsBinds [] [] [([], max_aDT, max_aCK)]
-	max_aCK = $mmax_aE0
-    AbsBinds [] [] [([], min_aDS, min_aCT)]
-	min_aCT = $mmin_aDZ
-    d.Ord_aBV =
-	({-dict-}
-	 [d.Eq_aCY]
-	 [compare_aDY, <_aDX, <=_aDW, >=_aDV, >_aDU, max_aDT, min_aDS])
-AbsBinds [taDw] [d.Eq_aDF] [([taDw], $d2{-rDQ,x-}, d.Eq_aDo)]
-    d.Eq_aDJ = d.Eq_aDo
-    $m/=_aE8 = PrelBase.$m/={-reY,p-} (Bar{-r3m,x-} taDw) d.Eq_aDJ
-    AbsBinds [] [] [([], ==_aE7, ==_aDt)]
-	==_aDt
-	    = GHCerr.noDefaultMethodError{-8k,w-}
-		  (Bar{-r3m,x-} taDw
-		   -> Bar{-r3m,x-} taDw
-		   -> PrelBase.Bool{-34,W-}) "<NoSrcLoc>|PrelBase.=="
-    AbsBinds [] [] [([], /=_aE6, /=_aDC)]
-	/=_aDC = $m/=_aE8
-    d.Eq_aDo = ({-dict-} [] [==_aE7, /=_aE6])
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldFail 1
 _instance_modules_

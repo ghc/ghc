@@ -1,9 +1,3 @@
-==================== Typechecked ====================
-H{-r4,x-}{i} = \ tpl_B1 -> H{-r4,x-}{i} {tpl_B1}
-M{-r3,x-}{i} = \ tpl_B1 -> M{-r3,x-}{i} {tpl_B1}
-AbsBinds [] [] [([], $d1{-rBd,x-}, d.Eval_aBa)]
-    d.Eval_aBa = ({-dict-} [] [])
-
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
