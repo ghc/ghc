@@ -399,6 +399,29 @@ package_details installing
          extra_ld_opts  = []
         }
 #endif
+
+         ,Package {
+         name           = "xlib",
+         import_dirs    = if installing
+                             then [ "$libdir/imports/xlib" ]
+                             else [ "$libdir/hslibs/xlib" ],
+         source_dirs    = [],
+         library_dirs   = if installing
+                             then [ "$libdir" ]
+                             else [ "$libdir/hslibs/xlib"
+                                  , "$libdir/hslibs/xlib/cbits" ],
+         hs_libraries      = [ "HSxlib" ],
+	 extra_libraries   = [ "HSxlib_cbits", "X11" ],
+         include_dirs   = if installing
+                             then []
+                             else [ "$libdir/hslibs/xlib/cbits" ],
+         c_includes     = [ "HsXlib.h" ],
+         package_deps   = [ "greencard" ],
+         extra_ghc_opts = [],
+         extra_cc_opts  = [],
+         extra_ld_opts  = []
+        }
+
    ]
   where
 	ghc_src_dir :: String -> String
