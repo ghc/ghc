@@ -125,7 +125,7 @@ coreTopBindsToStg (bind:binds)
        coreTopBindToStg binders fv_binds bind  `thenLne` \ (bind',  fv_bind) ->
        returnLne (
 		  (bind' : binds'),
-		  (fv_binds `unionFVInfo` fv_bind) `minusFVBinders` binders
+		  binders `minusFVBinders` (fv_binds `unionFVInfo` fv_bind)
 		 )
       )
 
@@ -271,7 +271,7 @@ coreToStgExpr expr@(Lam _ _)
     coreToStgExpr body  `thenLne` \ (body, body_fvs, body_escs) ->
     let
 	set_of_args	= mkVarSet args'
-	fvs		= body_fvs  `minusFVBinders` args'
+	fvs		= args' `minusFVBinders` body_fvs
 	escs		= body_escs `minusVarSet`    set_of_args
     in
     if null args'
@@ -330,7 +330,7 @@ coreToStgExpr (Case scrut bndr alts)
     in
     returnLne (
       StgCase scrut2 live_in_whole_case live_in_alts bndr' noSRT alts2,
-      (scrut_fvs `unionFVInfo` alts_fvs) `minusFVBinders` [bndr],
+      bndr `minusFVBinder` (scrut_fvs `unionFVInfo` alts_fvs),
       (alts_escs `minusVarSet` unitVarSet bndr) `unionVarSet` getFVSet scrut_fvs
 		-- You might think we should have scrut_escs, not (getFVSet scrut_fvs),
 		-- but actually we can't call, and then return from, a let-no-escape thing.
@@ -386,7 +386,7 @@ coreToStgExpr (Case scrut bndr alts)
 	    in
 	    returnLne (
 		(con, binders', good_use_mask, rhs2),
-		rhs_fvs	 `minusFVBinders` binders',
+		binders' `minusFVBinders` rhs_fvs,
 		rhs_escs `minusVarSet`   mkVarSet binders'
 			-- ToDo: remove the minusVarSet;
 			-- since escs won't include any of these binders
@@ -578,7 +578,7 @@ coreToStgLet let_no_escape bind body
 	-- The live variables of this binding are the ones which are live
 	-- by virtue of being accessible via the free vars of the binding (lvs_from_fvs)
 	-- together with the live_in_cont ones
-	lookupLiveVarsForSet (bind_fvs `minusFVBinders` binders)
+	lookupLiveVarsForSet (binders `minusFVBinders` bind_fvs)
 				`thenLne` \ lvs_from_fvs ->
 	let
 		bind_lvs = lvs_from_fvs `unionVarSet` live_in_cont
@@ -605,7 +605,7 @@ coreToStgLet let_no_escape bind body
 		| otherwise	= StgLet bind2 body2
 
 	free_in_whole_let
-	  = (bind_fvs `unionFVInfo` body_fvs) `minusFVBinders` binders
+	  = binders `minusFVBinders` (bind_fvs `unionFVInfo` body_fvs)
 
 	live_in_whole_let
 	  = bind_lvs `unionVarSet` (body_lvs `minusVarSet` set_of_binders)
@@ -835,7 +835,7 @@ lookupLiveVarsForSet fvs env lvs_cont
 type FreeVarsInfo = VarEnv (Var, Bool, StgBinderInfo)
 	-- If f is mapped to noBinderInfo, that means
 	-- that f *is* mentioned (else it wouldn't be in the
-	-- IdEnv at all), but only in a saturated applications.
+	-- IdEnv at all), but perhaps in an unsaturated applications.
 	--
 	-- All case/lambda-bound things are also mapped to
 	-- noBinderInfo, since we aren't interested in their
@@ -869,8 +869,15 @@ unionFVInfo fv1 fv2 = plusVarEnv_C plusFVInfo fv1 fv2
 unionFVInfos :: [FreeVarsInfo] -> FreeVarsInfo
 unionFVInfos fvs = foldr unionFVInfo emptyFVInfo fvs
 
-minusFVBinders :: FreeVarsInfo -> [Id] -> FreeVarsInfo
-minusFVBinders fv ids = fv `delVarEnvList` ids
+minusFVBinders :: [Id] -> FreeVarsInfo -> FreeVarsInfo
+minusFVBinders vs fv = foldr minusFVBinder fv vs
+
+minusFVBinder :: Id -> FreeVarsInfo -> FreeVarsInfo
+minusFVBinder v fv | isId v    = (fv `delVarEnv` v) `unionFVInfo` 
+			    	 tyvarFVInfo (tyVarsOfType (idType v))
+		   | otherwise = fv `delVarEnv` v
+	-- When removing a binder, remember to add its type variables
+	-- c.f. CoreFVs.delBinderFV
 
 elementOfFVInfo :: Id -> FreeVarsInfo -> Bool
 elementOfFVInfo id fvs = maybeToBool (lookupVarEnv fvs id)

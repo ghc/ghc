@@ -167,19 +167,6 @@ expr_fvs (Let (Rec pairs) body)
 
 
 \begin{code}
-idFreeVars :: Id -> VarSet
-idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` idFreeTyVars id
-
-idFreeTyVars :: Id -> TyVarSet
--- Only local Ids conjured up locally, can have free type variables.
--- (During type checking top-level Ids can have free tyvars)
-idFreeTyVars id = tyVarsOfType (idType id)
--- | isLocalId id = tyVarsOfType (idType id)
---		| otherwise    = emptyVarSet
-
-idRuleVars ::Id -> VarSet
-idRuleVars id = ASSERT( isId id) rulesRhsFreeVars (idSpecialisation id)
-
 rulesSomeFreeVars :: InterestingVarFun -> CoreRules -> VarSet
 rulesSomeFreeVars interesting (Rules rules _)
   = foldr (unionVarSet . ruleSomeFreeVars interesting) emptyVarSet rules
@@ -228,9 +215,13 @@ noFVs    = emptyVarSet
 aFreeVar = unitVarSet
 unionFVs = unionVarSet
 
-filters :: Var -> VarSet -> VarSet
+delBindersFV :: [Var] -> VarSet -> VarSet
+delBindersFV bs fvs = foldr delBinderFV fvs bs
 
--- (b `filters` s) removes the binder b from the free variable set s,
+delBinderFV :: Var -> VarSet -> VarSet
+-- This way round, so we can do it multiple times using foldr
+
+-- (b `delBinderFV` s) removes the binder b from the free variable set s,
 -- but *adds* to s
 --	(a) the free variables of b's type
 --	(b) the idSpecVars of b
@@ -258,8 +249,21 @@ filters :: Var -> VarSet -> VarSet
 --			  where
 --			    bottom = bottom -- Never evaluated
 
-filters b s | isId b    = (s `delVarSet` b) `unionFVs` idFreeVars b
-	    | otherwise = s `delVarSet` b
+delBinderFV b s | isId b    = (s `delVarSet` b) `unionFVs` idFreeVars b
+	        | otherwise = s `delVarSet` b
+
+idFreeVars :: Id -> VarSet
+idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` idFreeTyVars id
+
+idFreeTyVars :: Id -> TyVarSet
+-- Only local Ids conjured up locally, can have free type variables.
+-- (During type checking top-level Ids can have free tyvars)
+idFreeTyVars id = tyVarsOfType (idType id)
+-- | isLocalId id = tyVarsOfType (idType id)
+-- | otherwise    = emptyVarSet
+
+idRuleVars ::Id -> VarSet
+idRuleVars id = ASSERT( isId id) rulesRhsFreeVars (idSpecialisation id)
 \end{code}
 
 
@@ -285,7 +289,7 @@ freeVars (Var v)
 
 freeVars (Lit lit) = (noFVs, AnnLit lit)
 freeVars (Lam b body)
-  = (b `filters` freeVarsOf body', AnnLam b body')
+  = (b `delBinderFV` freeVarsOf body', AnnLam b body')
   where
     body' = freeVars body
 
@@ -296,7 +300,7 @@ freeVars (App fun arg)
     arg2 = freeVars arg
 
 freeVars (Case scrut bndr alts)
-  = ((bndr `filters` alts_fvs) `unionFVs` freeVarsOf scrut2,
+  = ((bndr `delBinderFV` alts_fvs) `unionFVs` freeVarsOf scrut2,
      AnnCase scrut2 bndr alts2)
   where
     scrut2 = freeVars scrut
@@ -304,7 +308,7 @@ freeVars (Case scrut bndr alts)
     (alts_fvs_s, alts2) = mapAndUnzip fv_alt alts
     alts_fvs 		= foldr1 unionFVs alts_fvs_s
 
-    fv_alt (con,args,rhs) = (foldr filters (freeVarsOf rhs2) args,
+    fv_alt (con,args,rhs) = (delBindersFV args (freeVarsOf rhs2),
 			     (con, args, rhs2))
 		    	  where
 			     rhs2 = freeVars rhs
@@ -315,11 +319,11 @@ freeVars (Let (NonRec binder rhs) body)
   where
     rhs2     = freeVars rhs
     body2    = freeVars body
-    body_fvs = binder `filters` freeVarsOf body2
+    body_fvs = binder `delBinderFV` freeVarsOf body2
 
 freeVars (Let (Rec binds) body)
   = (foldl delVarSet group_fvs binders,
-	-- The "filters" part may have added one of the binders
+	-- The "delBinderFV" part may have added one of the binders
 	-- via the idSpecVars part, so we must delete it again
      AnnLet (AnnRec (binders `zip` rhss2)) body2)
   where
@@ -327,7 +331,7 @@ freeVars (Let (Rec binds) body)
 
     rhss2     = map freeVars rhss
     all_fvs   = foldr (unionFVs . fst) body_fvs rhss2
-    group_fvs = foldr filters all_fvs binders
+    group_fvs = delBindersFV binders all_fvs
 
     body2     = freeVars body
     body_fvs  = freeVarsOf body2
