@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.19 1999/03/01 10:17:15 simonm Exp $
+ * $Id: PrimOps.hc,v 1.20 1999/03/03 19:11:43 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -31,13 +31,6 @@
 W_ GHC_ZCCCallable_static_info[0];
 W_ GHC_ZCCReturnable_static_info[0];
 
-#ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
-const 
-#endif 
-      StgClosure *PrelBase_Bool_closure_tbl[] = {
-    &False_closure,
-    &True_closure
-};
 
 /* -----------------------------------------------------------------------------
    Macros for Hand-written primitives.
@@ -537,7 +530,7 @@ FN_(word64ToIntegerzh_fast)
 {
    /* arguments: L1 = Word64# */
 
-   StgNat64 val; /* to avoid aliasing */
+   StgWord64 val; /* to avoid aliasing */
    StgWord hi;
    I_  s, words_needed;
    StgArrWords* p;	/* address of array result */
