@@ -68,6 +68,7 @@ import Bag
 import Outputable
 
 import Maybe 		( isNothing )
+import Monad 		( when )
 \end{code}
 
 
@@ -99,17 +100,16 @@ writeIface this_mod old_iface new_iface
     in
 
     case checkIface old_iface full_new_iface of {
-	Nothing -> do { putStrLn "Interface file unchanged" ;
-		        return () } ;	-- No need to update .hi file
+	Nothing -> when opt_D_dump_rn_trace $
+			putStrLn "Interface file unchanged" ;  -- No need to update .hi file
 
 	Just final_iface ->
 
     do  let mod_vers_unchanged = case old_iface of
 				   Just iface -> pi_vers iface == pi_vers final_iface
 				   Nothing -> False
-     	if mod_vers_unchanged 
-	   then putStrLn "Module version unchanged, but usages differ; hence need new hi file"
-	   else return ()
+     	when (mod_vers_unchanged && opt_D_dump_rn_trace) $
+	     putStrLn "Module version unchanged, but usages differ; hence need new hi file"
 
 	if_hdl <- openFile filename WriteMode
 	printForIface if_hdl (pprIface final_iface)
