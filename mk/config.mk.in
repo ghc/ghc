@@ -535,7 +535,6 @@ ifeq "$(strip $(mandir))" ""
 mandir		= $(prefix)/man
 endif
 
-
 ################################################################################
 #
 #		Utilities programs: flags
@@ -747,7 +746,6 @@ PERL 			= @PerlCmd@
 PYTHON			= @PythonCmd@
 PIC			= pic
 PREPROCESSCMD		= $(CC) -E
-PRINTER			= lpr
 RANLIB			= @RANLIB@
 RM			= rm -f
 SED			= @SedCmd@
