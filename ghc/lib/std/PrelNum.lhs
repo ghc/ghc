@@ -348,21 +348,60 @@ instance  Integral Integer where
 		   if signum r == negate (signum d) then (q - 1, r+d) else qr }
 		   -- Case-ified by WDP 94/10
 
+------------------------------------------------------------------------
 instance  Enum Integer  where
     succ x		 = x + 1
     pred x		 = x - 1
     toEnum n		 =  toInteger n
     fromEnum n		 =  toInt n
-    enumFrom n           =  n : enumFrom (n + 1)
-    enumFromThen e1 e2   =  en' e1 (e2 - e1)
-	                    where en' a b = a : en' (a + b) b
-    enumFromTo n m
-      | n <= m           =  takeWhile (<= m) (enumFrom n)
-      | otherwise        =  []
-    enumFromThenTo n m p =  takeWhile pred   (enumFromThen n m)
-	    where
-	     pred | m >= n    = (<= p)
-	          | otherwise = (>= p)
+
+    {-# INLINE enumFrom #-}
+    {-# INLINE enumFromThen #-}
+    {-# INLINE enumFromTo #-}
+    {-# INLINE enumFromThenTo #-}
+    enumFrom x             = build (\c n -> enumDeltaIntegerFB 	 c   x 1)
+    enumFromThen x y       = build (\c n -> enumDeltaIntegerFB 	 c   x (y-x))
+    enumFromTo x lim	   = build (\c n -> enumDeltaToIntegerFB c n x 1     lim)
+    enumFromThenTo x y lim = build (\c n -> enumDeltaToIntegerFB c n x (y-x) lim)
+
+enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
+enumDeltaIntegerFB c x d = x `c` enumDeltaIntegerFB c (x+d) d
+
+enumDeltaIntegerList :: Integer -> Integer -> [Integer]
+enumDeltaIntegerList x d = x : enumDeltaIntegerList (x+d) d
+
+enumDeltaToIntegerFB c n x delta lim
+  | delta >= 0 = up_fb c n x delta lim
+  | otherwise  = dn_fb c n x delta lim
+
+enumDeltaToIntegerList x delta lim
+  | delta >= 0 = up_list x delta lim
+  | otherwise  = dn_list x delta lim
+
+up_fb c n x delta lim = go (x::Integer)
+		      where
+			go x | x > lim   = n
+			     | otherwise = x `c` go (x+delta)
+dn_fb c n x delta lim = go (x::Integer)
+		      where
+			go x | x < lim   = n
+			     | otherwise = x `c` go (x+delta)
+
+up_list x delta lim = go (x::Integer)
+		    where
+			go x | x > lim   = []
+			     | otherwise = x : go (x+delta)
+dn_list x delta lim = go (x::Integer)
+		    where
+			go x | x < lim   = []
+			     | otherwise = x : go (x+delta)
+
+{-# RULES
+"enumDeltaInteger" 	enumDeltaIntegerFB   (:)    = enumDeltaIntegerList
+"enumDeltaToInteger" 	enumDeltaToIntegerFB (:) [] = enumDeltaToIntegerList
+ #-}
+
+------------------------------------------------------------------------
 
 instance  Show Integer  where
     showsPrec   x = showSignedInteger x
