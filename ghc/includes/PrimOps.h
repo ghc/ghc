@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.84 2001/10/27 22:05:48 sof Exp $
+ * $Id: PrimOps.h,v 1.85 2001/11/21 20:27:18 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -771,12 +771,12 @@ EXTFUN_RTS(makeStableNamezh_fast);
    r = RET_STGCALL1(StgStablePtr,getStablePtr,a)
 
 #define deRefStablePtrzh(r,sp) do {		\
-  ASSERT(stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].weight > 0);	\
-  r = stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].addr; \
+  ASSERT(stable_ptr_table[(StgWord)sp].ref > 0);	\
+  r = stable_ptr_table[(StgWord)sp].addr; \
 } while (0);
 
 #define eqStablePtrzh(r,sp1,sp2) \
-    (r = ((stgCast(StgWord,sp1) & ~STABLEPTR_WEIGHT_MASK) == (stgCast(StgWord,sp2) & ~STABLEPTR_WEIGHT_MASK)))
+    (r = ((StgWord)sp1 == (StgWord)sp2))
 
 /* -----------------------------------------------------------------------------
    Concurrency/Exception PrimOps.
