@@ -78,10 +78,9 @@ import PrelIOBase	( Handle__(..), IOError, IOErrorType(..),
 		  	  IOResult(..), 
 #endif
 			  IO(..),
-#if __GLASGOW_HASKELL__ >= 303
-			  Handle__Type(..),
-#endif
+#if __GLASGOW_HASKELL__ >= 301 && __GLASGOW_HASKELL__ <= 302
 		  	  constructError
+#endif
 			)
 #endif
 

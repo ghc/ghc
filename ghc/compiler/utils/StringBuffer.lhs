@@ -77,9 +77,6 @@ import Foreign
 import Char		( chr )
 import Panic		( panic )
 
--- urk!
-#include "../lib/std/cbits/stgerror.h"
-
 #if __GLASGOW_HASKELL__ >= 303
 import IO		( openFile
 #if __GLASGOW_HASKELL__ < 407
@@ -88,6 +85,9 @@ import IO		( openFile
                         )
 import PrelIOBase
 import PrelHandle
+#if __GLASGOW_HASKELL__ >= 501
+import IOExts		( slurpFile )
+#endif
 import Addr
 #else
 import IO		( openFile, hFileSize, hClose, IOMode(..) )
@@ -109,6 +109,11 @@ import PrelIOBase	( Handle, IOError(..), IOErrorType(..),
 import PrelHandle	( readHandle, writeHandle, filePtr )
 # endif
 import PrelPack		( unpackCStringBA )
+#endif
+#if __GLASGOW_HASKELL__ >= 501
+import PrelIO		( hGetcBuffered )
+import PrelCError	( throwErrnoIfMinus1RetryMayBlock )
+import PrelConc		( threadWaitRead )
 #endif
 
 #if __GLASGOW_HASKELL__ < 402
@@ -260,15 +265,19 @@ slurpFileExpandTabs fname = do
 
 trySlurp :: Handle -> Int -> Addr -> IO (Addr, Int)
 trySlurp handle sz_i chunk =
-#if __GLASGOW_HASKELL__ == 303
+#if __GLASGOW_HASKELL__ < 303
+  readHandle handle        >>= \ handle_ ->
+  let fo = filePtr handle_ in
+#elif __GLASGOW_HASKELL__ == 303
   wantReadableHandle "hGetChar" handle >>= \ handle_ ->
   let fo = haFO__ handle_ in
-#elif __GLASGOW_HASKELL__ > 303
+#elif __GLASGOW_HASKELL__ < 501
   wantReadableHandle "hGetChar" handle $ \ handle_ ->
   let fo = haFO__ handle_ in
 #else
-  readHandle handle        >>= \ handle_ ->
-  let fo = filePtr handle_ in
+  wantReadableHandle "hGetChar" handle $ \handle_ ->
+  let fd = haFD handle_
+      ref = haBuffer handle_ in
 #endif
   let
 	(I# chunk_sz) = sz_i
@@ -285,13 +294,42 @@ trySlurp handle sz_i chunk =
 	     	chunk' <- reAllocMem chunk (I# new_sz)
 	     	slurpFile c off chunk' new_sz (new_sz -# (tAB_SIZE +# 1#))
     	  slurp c off = do
+#if __GLASGOW_HASKELL__ < 501
     		intc <- mayBlock fo (_ccall_ fileGetc fo)
     		if intc == ((-1)::Int)
      		  then do errtype <- getErrType
-			  if errtype == (ERR_EOF :: Int)
+			  if errtype == (19{-ERR_EOF-} :: Int)
 			    then return (chunk, I# off)
 			    else constructErrorAndFail "slurpFile"
      		  else case chr intc of
+#else
+		buf <- readIORef ref
+		ch <- (if not (bufferEmpty buf)
+		      then hGetcBuffered fd ref buf
+		      else -- buffer is empty.
+			   case haBufferMode handle_ of
+		  LineBuffering    -> do
+		      new_buf <- fillReadBuffer fd True buf
+		      hGetcBuffered fd ref new_buf
+		  BlockBuffering _ -> do
+		      new_buf <- fillReadBuffer fd False buf
+		      hGetcBuffered fd ref new_buf
+		  NoBuffering -> do
+		      -- make use of the minimal buffer we already have
+		      let raw = bufBuf buf
+		      r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
+		              (read_off (fromIntegral fd) raw 0 1)
+		              (threadWaitRead fd)
+		      if r == 0
+		         then ioe_EOF
+		         else do (c,_) <- readCharFromBuffer raw 0
+		                 return c)
+		    `catch` \e -> if isEOFError e
+			then return '\xFFFF'
+			else ioError e
+		case ch of
+			 '\xFFFF' -> return (chunk, I# off)
+#endif
 			 '\t' -> tabIt c off
 			 ch   -> do  writeCharOffAddr chunk (I# off) ch
 				     let c' | ch == '\n' = 0#
@@ -318,9 +356,7 @@ trySlurp handle sz_i chunk =
 #if __GLASGOW_HASKELL__ < 404
   writeHandle handle handle_
 #endif
-  if rc < (0::Int)
-	then constructErrorAndFail "slurpFile"
-	else return (chunk', rc+1 {-room for sentinel-})
+  return (chunk', rc+1 {-room for sentinel-})
 
 
 reAllocMem :: Addr -> Int -> IO Addr
@@ -337,15 +373,16 @@ reAllocMem ptr sz = do
 allocMem :: Int -> IO Addr
 allocMem sz = do
    chunk <- _ccall_ malloc sz
+   if chunk == nullAddr 
 #if __GLASGOW_HASKELL__ < 303
-   if chunk == nullAddr 
       then fail (userError "allocMem")
-      else return chunk
-#else
-   if chunk == nullAddr 
+#elif __GLASGOW_HASKELL__ < 501
       then constructErrorAndFail "allocMem"
-      else return chunk
+#else
+      then ioException (IOError Nothing ResourceExhausted "malloc"
+					"out of memory" Nothing)
 #endif
+      else return chunk
 \end{code}
 
 Lookup
