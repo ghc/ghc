@@ -1000,7 +1000,10 @@ pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP op) = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
 
 pprInstr (CALL imm)
-   = hcat [ ptext SLIT("\tffree %st(0) ; call "), pprImm imm ]
+   = vcat [ ptext SLIT("\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
+            ptext SLIT("\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)"),
+            hcat [ ptext SLIT("\tcall "), pprImm imm ]
+          ]
 
 
 -- Simulating a flat register set on the x86 FP stack is tricky.
