@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.h,v 1.6 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: Sanity.h,v 1.7 2000/12/11 12:37:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,6 +10,7 @@
 #ifdef DEBUG
 /* debugging routines */
 extern void checkHeap  ( bdescr *bd, StgPtr start );
+extern void checkHeapChunk ( StgPtr start, StgPtr end );
 extern void checkChain ( bdescr *bd );
 extern void checkStack ( StgPtr sp, StgPtr stack_end, StgUpdateFrame* su );
 extern void checkTSO   ( StgTSO* tso );

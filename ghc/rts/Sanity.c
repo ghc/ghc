@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.23 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: Sanity.c,v 1.24 2000/12/11 12:37:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,6 +35,8 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "Sanity.h"
+#include "MBlock.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "StoragePriv.h"   // for END_OF_STATIC_LIST
 
@@ -231,15 +233,6 @@ checkClosure( StgClosure* p )
 
     info = get_itbl(p);
     switch (info->type) {
-    case BCO:
-	{
-	    StgBCO* bco = stgCast(StgBCO*,p);
-	    nat i;
-	    for(i=0; i < bco->n_ptrs; ++i) {
-		ASSERT(LOOKS_LIKE_PTR(bcoConstPtr(bco,i)));
-	    }
-	    return bco_sizeW(bco);
-	}
 
     case MVAR:
       { 
@@ -298,6 +291,7 @@ checkClosure( StgClosure* p )
 #endif
     case BLACKHOLE:
     case FOREIGN:
+    case BCO:
     case STABLE_NAME:
     case MUT_VAR:
     case CONSTR_INTLIKE:

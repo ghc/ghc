@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.90 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: GC.c,v 1.91 2000/12/11 12:36:59 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1015,10 +1015,6 @@ isAlive(StgClosure *p)
       /* alive! */
       return ((StgEvacuated *)p)->evacuee;
 
-    case BCO:
-      size = bco_sizeW((StgBCO*)p);
-      goto large;
-
     case ARR_WORDS:
       size = arr_words_sizeW((StgArrWords *)p);
       goto large;
@@ -1342,20 +1338,6 @@ loop:
   
   switch (info -> type) {
 
-  case BCO:
-    {
-      nat size = bco_sizeW((StgBCO*)q);
-
-      if (size >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	evacuate_large((P_)q, rtsFalse);
-	to = q;
-      } else {
-	/* just copy the block */
-	to = copy(q,size,step);
-      }
-      return to;
-    }
-
   case MUT_VAR:
     ASSERT(q->header.info != &stg_MUT_CONS_info);
   case MVAR:
@@ -1415,6 +1397,7 @@ loop:
   case WEAK:
   case FOREIGN:
   case STABLE_NAME:
+  case BCO:
     return copy(q,sizeW_fromITBL(info),step);
 
   case CAF_BLACKHOLE:
@@ -1897,17 +1880,6 @@ scavenge(step *step)
 
     switch (info -> type) {
 
-    case BCO:
-      {
-	StgBCO* bco = (StgBCO *)p;
-	nat i;
-	for (i = 0; i < bco->n_ptrs; i++) {
-	  bcoConstCPtr(bco,i) = evacuate(bcoConstCPtr(bco,i));
-	}
-	p += bco_sizeW(bco);
-	break;
-      }
-
     case MVAR:
       /* treat MVars specially, because we don't want to evacuate the
        * mut_link field in the middle of the closure.
@@ -1980,6 +1952,7 @@ scavenge(step *step)
     case WEAK:
     case FOREIGN:
     case STABLE_NAME:
+    case BCO:
       {
 	StgPtr end;
 
@@ -3038,18 +3011,6 @@ scavenge_large(step *step)
 	continue;
       }
 
-    case BCO:
-      {
-	StgBCO* bco = (StgBCO *)p;
-	nat i;
-	evac_gen = saved_evac_gen;
-	for (i = 0; i < bco->n_ptrs; i++) {
-	  bcoConstCPtr(bco,i) = evacuate(bcoConstCPtr(bco,i));
-	}
-	evac_gen = 0;
-	continue;
-      }
-
     case TSO:
 	scavengeTSO((StgTSO *)p);
 	continue;
@@ -3585,8 +3546,7 @@ maybeLarge(StgClosure *closure)
   return (info->type == MUT_ARR_PTRS ||
 	  info->type == MUT_ARR_PTRS_FROZEN ||
 	  info->type == TSO ||
-	  info->type == ARR_WORDS ||
-	  info->type == BCO);
+	  info->type == ARR_WORDS);
 }
 
   

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.52 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.53 2000/12/11 12:37:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -658,7 +658,7 @@ STGFUN(stg_WHITEHOLE_entry)
 /* -----------------------------------------------------------------------------
    The code for a BCO returns to the scheduler
    -------------------------------------------------------------------------- */
-INFO_TABLE(stg_BCO_info,stg_BCO_entry,0,0,BCO,,EF_,"BCO","BCO");
+INFO_TABLE(stg_BCO_info,stg_BCO_entry,3,0,BCO,,EF_,"BCO","BCO");
 STGFUN(stg_BCO_entry) {				
   FB_	
     Sp -= 1;

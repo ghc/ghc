@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.18 2000/12/04 12:31:22 simonmar Exp $
+ * $Id: Storage.h,v 1.19 2000/12/11 12:37:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -20,6 +20,12 @@
 
 extern void initStorage(void);
 extern void exitStorage(void);
+
+/* -----------------------------------------------------------------------------
+   Setting the heap size.
+   ------------------------------------------------------------------------- */
+
+extern void setHeapSize( HsInt size );
 
 /* -----------------------------------------------------------------------------
    Generic allocation
@@ -390,9 +396,6 @@ static __inline__ StgOffset arr_words_sizeW( StgArrWords* x )
 
 static __inline__ StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 { return sizeofW(StgMutArrPtrs) + x->ptrs; }
-
-static __inline__ StgWord bco_sizeW( StgBCO* bco )
-{ return BCO_sizeW(bco->n_ptrs,bco->n_words,bco->n_instrs); }
 
 static __inline__ StgWord tso_sizeW ( StgTSO *tso )
 { return TSO_STRUCT_SIZEW + tso->stack_size; }

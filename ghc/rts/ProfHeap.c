@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.19 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.20 2000/12/11 12:36:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -491,9 +491,6 @@ heapCensus(void)
       info = get_itbl((StgClosure *)p);
 
       switch (info->type) {
-      case BCO:
-	size = bco_sizeW((StgBCO *)p);
-	break;
 	
       case CONSTR:
 	if (((StgClosure *)p)->header.info == &stg_DEAD_WEAK_info
@@ -503,6 +500,7 @@ heapCensus(void)
 	}
 	/* else, fall through... */
 
+      case BCO:
       case FUN:
       case THUNK:
       case IND_PERM:

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.29 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.30 2000/12/11 12:36:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -191,23 +191,5 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
 
 /* constructors don't have SRTs */
 #define GET_TAG(info) (INFO_PTR_TO_STRUCT(info)->srt_len)
-
-/* -----------------------------------------------------------------------------
-   BCOs.
-   -------------------------------------------------------------------------- */
-
-#define bcoConstPtr( bco, i )    (*stgCast(StgPtr*,       ((bco)->payload+(i))))
-#define bcoConstCPtr( bco, i )   (*stgCast(StgClosurePtr*,((bco)->payload+(i))))
-#define bcoConstInfoPtr( bco, i )(*stgCast(StgInfoTable**,((bco)->payload+(bco)->n_ptrs+i)))
-#define bcoConstInt( bco, i )    (*stgCast(StgInt*,       ((bco)->payload+(bco)->n_ptrs+i)))
-#define bcoConstInt64( bco, i )  (PK_Int64(stgCast(StgWord*,(bco)->payload+(bco)->n_ptrs+i)))
-#define bcoConstWord( bco, i )   (*stgCast(StgWord*,      ((bco)->payload+(bco)->n_ptrs+i)))
-#define bcoConstAddr( bco, i )   (*stgCast(StgAddr*,      ((bco)->payload+(bco)->n_ptrs+i)))
-#define bcoConstChar( bco, i )   (*stgCast(StgChar*,      ((bco)->payload+(bco)->n_ptrs+i)))
-#define bcoConstFloat( bco, i )  (PK_FLT(stgCast(StgWord*,(bco)->payload+(bco)->n_ptrs+i)))
-#define bcoConstDouble( bco, i ) (PK_DBL(stgCast(StgWord*,(bco)->payload+(bco)->n_ptrs+i)))
-#define bcoInstr( bco, i )       (stgCast(StgWord8*,      ((bco)->payload+(bco)->n_ptrs+(bco)->n_words))[i])
-static __inline__ StgInt bcoInstr16 ( StgBCO* bco, unsigned int i )
-{ StgInt x = (bcoInstr(bco,i) << 8) + bcoInstr(bco,i+1); return x; }
 
 #endif /* CLOSUREMACROS_H */
