@@ -45,12 +45,20 @@ extern FILE *qp_file;
 #endif
 
 extern I_ context_switch;	    	    	/* Flag set by signal handler */
+#if defined(i386_TARGET_ARCH)
+extern I_ entersFromC;				/* Counter set by enterStablePtr
+						   (see comments in c-as-asm/StablePtrOps.lc) */
+#endif
 
 #define CS_MAX_FREQUENCY 100		  	/* context switches per second */
 #define CS_MIN_MILLISECS (1000/CS_MAX_FREQUENCY)/* milliseconds per slice */
 
 #ifdef __STG_GCC_REGS__
-#define OR_CONTEXT_SWITCH || context_switch
+# if defined(i386_TARGET_ARCH)
+# define OR_CONTEXT_SWITCH || (context_switch && !entersFromC)
+# else
+# define OR_CONTEXT_SWITCH || context_switch
+# endif
 #else
 #define OR_CONTEXT_SWITCH /* in miniInterpret */
 #endif
