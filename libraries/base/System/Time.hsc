@@ -102,7 +102,11 @@ module System.Time
 
 #ifdef __NHC__
 #include <time.h>
-#define HAVE_TM_ZONE 1
+#  ifdef __sun
+#    define HAVE_TZNAME 1
+#  else
+#    define HAVE_TM_ZONE 1
+#  endif
 import Ix
 #endif
 
@@ -338,7 +342,7 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x
 #   define tzname _tzname
 #  endif
 #  ifndef mingw32_TARGET_OS
-foreign import ccall unsafe "&tzname" tzname :: Ptr (Ptr CChar)
+foreign import ccall unsafe "time.h &tzname" tzname :: Ptr (Ptr CChar)
 #  else
 foreign import ccall unsafe "__hscore_timezone" timezone :: Ptr CLong
 foreign import ccall unsafe "__hscore_tzname"   tzname :: Ptr (Ptr CChar)
@@ -362,7 +366,7 @@ gmtoff x = do
 # else /* ! HAVE_DECL_ALTZONE */
 
 #if !defined(mingw32_TARGET_OS)
-foreign import ccall "&timezone" timezone :: Ptr CLong
+foreign import ccall "time.h &timezone" timezone :: Ptr CLong
 #endif
 
 -- Assume that DST offset is 1 hour ...
@@ -682,29 +686,36 @@ formatTimeDiff l fmt td@(TimeDiff year month day hour min sec _)
 type CTm = () -- struct tm
 
 #if HAVE_LOCALTIME_R
-foreign import ccall unsafe localtime_r :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+foreign import ccall unsafe "time.h localtime_r"
+    localtime_r :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
 #else
-foreign import ccall unsafe localtime   :: Ptr CTime -> IO (Ptr CTm)
+foreign import ccall unsafe "time.h localtime"
+    localtime   :: Ptr CTime -> IO (Ptr CTm)
 #endif
 #if HAVE_GMTIME_R
-foreign import ccall unsafe gmtime_r    :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
+foreign import ccall unsafe "time.h gmtime_r"
+    gmtime_r    :: Ptr CTime -> Ptr CTm -> IO (Ptr CTm)
 #else
-foreign import ccall unsafe gmtime      :: Ptr CTime -> IO (Ptr CTm)
+foreign import ccall unsafe "time.h gmtime"
+    gmtime      :: Ptr CTime -> IO (Ptr CTm)
 #endif
-foreign import ccall unsafe mktime      :: Ptr CTm   -> IO CTime
-foreign import ccall unsafe time        :: Ptr CTime -> IO CTime
+foreign import ccall unsafe "time.h mktime"
+    mktime      :: Ptr CTm   -> IO CTime
+foreign import ccall unsafe "time.h time"
+    time        :: Ptr CTime -> IO CTime
 
 #if HAVE_GETTIMEOFDAY
 type CTimeVal = ()
-foreign import ccall unsafe gettimeofday :: Ptr CTimeVal -> Ptr () -> IO CInt
+foreign import ccall unsafe "time.h gettimeofday"
+    gettimeofday :: Ptr CTimeVal -> Ptr () -> IO CInt
 #endif
 
 #if HAVE_FTIME
 type CTimeB = ()
 #ifndef mingw32_TARGET_OS
-foreign import ccall unsafe ftime :: Ptr CTimeB -> IO CInt
+foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO CInt
 #else
-foreign import ccall unsafe ftime :: Ptr CTimeB -> IO ()
+foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO ()
 #endif
 #endif
 #endif /* ! __HUGS__ */
