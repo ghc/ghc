@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.42 2002/01/24 07:50:01 sof Exp $
+ * $Id: Stats.c,v 1.43 2002/02/04 20:12:08 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -579,7 +579,7 @@ stat_endHeapCensus(void)
    stats for this thread into the task_ids struct for that thread.
    -------------------------------------------------------------------------- */
 
-#ifdef SMP
+#if defined(SMP)
 void
 stat_workerStop(void)
 {
@@ -599,7 +599,9 @@ stat_workerStop(void)
 	}
     }
 }
+#endif
 
+#if defined(RTS_SUPPORTS_THREADS)
 long int stat_getElapsedTime ()
 {
   getTimes();
