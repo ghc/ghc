@@ -249,6 +249,7 @@ substInScope (Subst in_scope _) = in_scope
 zapSubstEnv :: Subst -> Subst
 zapSubstEnv (Subst in_scope env) = Subst in_scope emptySubstEnv
 
+-- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
 extendSubst :: Subst -> Var -> SubstResult -> Subst
 extendSubst (Subst in_scope env) v r = Subst in_scope (extendSubstEnv env v r)
 
@@ -390,6 +391,7 @@ zipTyEnv tyvars tys
 #endif
   = zip_ty_env tyvars tys emptySubstEnv
 
+-- Later substitutions in the list over-ride earlier ones
 zip_ty_env []       []       env = env
 zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
 	-- There used to be a special case for when 
