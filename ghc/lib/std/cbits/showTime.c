@@ -1,0 +1,51 @@
+/* 
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ *
+ * $Id: showTime.c,v 1.1 1998/04/10 10:54:53 simonm Exp $
+ *
+ * ClockTime.showsPrec Runtime Support
+ */
+
+#include "Rts.h"
+#include "stgio.h"
+
+#if TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
+
+StgAddr
+showTime(I_ size, StgByteArray d, StgByteArray buf)
+{
+    time_t t;
+    struct tm *tm;
+
+    switch(size) {
+	default:
+            return (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: out of range");
+	case 0:
+	    t = 0;
+	    break;
+	case -1:
+	    t = - (time_t) ((StgInt *)d)[0];
+	    if (t > 0) 
+                return
+ (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: out of range");
+	    break;
+	case 1:
+	    t = (time_t) ((StgInt *)d)[0];
+	    if (t < 0) 
+               return (StgAddr) strcpy(buf, "ClockTime.show{LibTime}: out of range");
+	    break;
+	}
+    tm = localtime(&t);
+    if (tm != NULL && strftime(buf, 32 /*Magic number*/, "%a %b %d %T %Z %Y", tm) > 0)
+       return (StgAddr)buf;
+    return (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: internal error");
+}
