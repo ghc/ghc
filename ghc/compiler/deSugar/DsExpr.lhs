@@ -390,10 +390,9 @@ before printing it as
 
 
 \begin{code}
-dsExpr (RecordCon con_expr rbinds)
+dsExpr (RecordConOut con_id con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
-	con_id       = get_con con_expr'
 	(arg_tys, _) = splitFunTy (coreExprType con_expr')
 
 	mk_arg (arg_ty, lbl)
@@ -405,11 +404,6 @@ dsExpr (RecordCon con_expr rbinds)
     in
     mapDs mk_arg (zipEqual "dsExpr:RecordCon" arg_tys (dataConFieldLabels con_id)) `thenDs` \ con_args ->
     mkAppDs con_expr' (map VarArg con_args)
-  where
-	-- "con_expr'" is simply an application of the constructor Id
-	-- to types and (perhaps) dictionaries. This gets the constructor...
-    get_con (Var con)   = con
-    get_con (App fun _) = get_con fun
 \end{code}
 
 Record update is a little harder. Suppose we have the decl:
