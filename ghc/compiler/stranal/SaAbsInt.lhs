@@ -326,7 +326,9 @@ evalAbsence (WwUnpack _ demand_info) val
 	   | length vals /= length demand_info -> pprTrace "TELL SIMON: evalAbsence" (ppr demand_info $$ ppr val)
 						  True
 	   | otherwise -> or (zipWithEqual "evalAbsence" evalAbsence demand_info vals)
-	_	       -> panic "evalAbsence: other"
+	_	       -> pprTrace "TELL SIMON: evalAbsence" 
+				(ppr demand_info $$ ppr val)
+			  True
 
 evalAbsence other val = anyBot val
   -- The demand is conservative; even "Lazy" *might* evaluate the
