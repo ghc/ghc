@@ -300,7 +300,26 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
     ASSERT( isNotUsgTy ps_ty2 )
     checkTcM (not (isSigTyVar tv1))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
-    tcPutTyVar tv1 ps_ty2				`thenNF_Tc_`
+
+    tcPutTyVar tv1 non_var_ty2				`thenNF_Tc_`
+	-- This used to say "ps_ty2" instead of "non_var_ty2"
+
+	-- But that led to an infinite loop in the type checker!
+	-- Consider 
+	--	type A a = ()
+	--
+	--	f :: (A a -> a -> ()) -> ()
+	--	f = \ _ -> ()
+	--
+	-- 	x :: ()
+	-- 	x = f (\ x p -> p x)
+	--
+	-- Here, we try to match "t" with "A t", and succeed
+	-- because the unifier looks through synonyms.  The occurs
+	-- check doesn't kick in because we are "really" binding "t" to "()",
+	-- but we *actually* bind "t" to "A t" if we store ps_ty2.
+	-- That leads the typechecker into an infinite loop later.
+
     returnTc ()
   where
     occur_check ty = mapTc occur_check_tv (varSetElems (tyVarsOfType ty))	`thenTc_`
