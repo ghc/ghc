@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.49 2000/03/13 09:56:31 simonmar Exp $
+ * $Id: Schedule.c,v 1.50 2000/03/13 09:57:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1845,16 +1845,7 @@ unblockOneLocked(StgTSO *tso)
 }
 #endif
 
-#if defined(GRAN)
-inline StgTSO *
-unblockOne(StgTSO *tso, StgClosure *node)
-{
-  ACQUIRE_LOCK(&sched_mutex);
-  tso = unblockOneLocked(tso, node);
-  RELEASE_LOCK(&sched_mutex);
-  return tso;
-}
-#elif defined(PAR)
+#if defined(PAR) || defined(GRAN)
 inline StgTSO *
 unblockOne(StgTSO *tso, StgClosure *node)
 {
