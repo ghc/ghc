@@ -16,6 +16,11 @@ import TypeRep	( Type(..), funTyCon
 import Type	( typeKind, tyVarsOfType, splitAppTy_maybe
 		)
 
+import PprType	()	-- Instances
+			-- This import isn't strictly necessary, but it makes sure that
+			-- PprType is below Unify in the hierarchy, which in turn makes
+			-- fewer modules boot-import PprType
+
 import Var	( TyVar, tyVarKind )
 import VarSet
 import VarEnv	( TyVarSubstEnv, emptySubstEnv, lookupSubstEnv, extendSubstEnv, 

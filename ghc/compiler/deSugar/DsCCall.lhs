@@ -33,7 +33,6 @@ import CallConv
 import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
 			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, Type
 			)
-import PprType          ( {- instance Outputable Type -} )
 import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( unitDataConId, stringTy,

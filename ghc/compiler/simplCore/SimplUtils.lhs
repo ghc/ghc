@@ -36,7 +36,6 @@ import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType,
 			  splitTyConApp_maybe, splitAlgTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
-import PprType          ( {- instance Outputable Type -} )
 import DataCon		( dataConRepArity )
 import TysPrim		( statePrimTyCon )
 import Var		( setVarUnique )

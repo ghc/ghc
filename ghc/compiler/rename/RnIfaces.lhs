@@ -196,12 +196,10 @@ addModDeps mod mod_deps new_deps
 	--	either are dependent via a non-library module
 	--	or contain orphan rules or instance decls
 
-	-- Don't ditch a module that's already loaded
- 	-- If it isn't loaded, and together the is_boot-ness
-    combine old@(_, _, _, Just _)  new = old
-    combine old@(_, _, old_is_boot, Nothing) 
-            new@(version, has_orphans, new_is_boot, _) 
-               = (version, has_orphans, old_is_boot && new_is_boot, Nothing)
+    combine old@(_, _, old_is_boot, cts) new
+	| maybeToBool cts || not old_is_boot = old	-- Keep the old info if it's already loaded
+							-- or if it's a non-boot pending load
+	| otherwise			     = new	-- Otherwise pick new info
 
 loadExport :: ModuleName -> ExportItem -> RnM d [AvailInfo]
 loadExport this_mod (mod, entities)
@@ -761,6 +759,13 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 	-- I can't be bothered just now.
 
 	mk_version_info mod_name (version, has_orphans, is_boot, contents) so_far
+	   | mod_name == this_mod	-- Check if M appears in the set of modules 'below' M
+					-- This seems like a convenient place to check
+	   = WARN( not is_boot, ptext SLIT("Wierd:") <+> ppr this_mod <+> 
+			        ptext SLIT("imports itself (perhaps indirectly)") )
+	     so_far
+ 
+	   | otherwise
 	   = let
 		go_for_it exports = (mod_name, version, has_orphans, is_boot, exports) 
                                     : so_far
@@ -794,10 +799,6 @@ getImportVersions this_mod (ExportEnv _ _ export_all_mods)
 		     is_lib_module     = isLibModule mod
 	     
     in
-	-- A module shouldn't load its own interface
-	-- This seems like a convenient place to check
-    WARN( maybeToBool (lookupFM mod_map this_mod), 
-	  ptext SLIT("Wierd:") <+> ppr this_mod <+> ptext SLIT("loads its own interface") )
 
     returnRn (foldFM mk_version_info [] mod_map)
   where

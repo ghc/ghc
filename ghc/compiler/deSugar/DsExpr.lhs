@@ -43,7 +43,6 @@ import Type		( splitFunTys, mkTyConApp,
 			  isNotUsgTy, unUsgTy,
 			  splitAppTy, isUnLiftedType, Type
 			)
-import PprType          ( {- instance Outputable Type -} )
 import TysWiredIn	( tupleCon, unboxedTupleCon,
 			  listTyCon, mkListTy,
 			  charDataCon, charTy, stringTy,

@@ -45,7 +45,6 @@ import Type		( splitFunTys
 			, isForAllTy
 			, mkForAllTys
 			)
-import PprType          ( {- instance Outputable Type -} )
 
 import TysWiredIn	( isFFIArgumentTy, isFFIResultTy, 
 			  isFFIExternalTy, isAddrTy
