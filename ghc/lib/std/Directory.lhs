@@ -337,15 +337,14 @@ The path refers to an existing non-directory object.
 --getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
     dir <- _ccall_ openDir__ path
-    ptr <- _ccall_ malloc (``sizeof(struct dirent**)''::Int)
     if dir == ``NULL'' 
 	then constructErrorAndFail "getDirectoryContents"
-     	else loop dir ptr
+     	else loop dir
   where
-    loop :: Addr -> Addr -> IO [String]
-    loop dir dirent_ptr = do
+    loop :: Addr -> IO [String]
+    loop dir  = do
       dirent_ptr <- _ccall_ readDir__ dir
-      if dirent_ptr == ``NULL'' 
+      if (dirent_ptr::Addr) == ``NULL'' 
        then do
 	  return [] 
        else do
@@ -355,7 +354,7 @@ getDirectoryContents path = do
 	    -- calls to readdir() may overwrite it.
           len     <- _ccall_ strlen str
 	  entry   <- stToIO (unpackNBytesST str len)
-	  entries <- loop dir dirent_ptr
+	  entries <- loop dir
           return (entry:entries)
 \end{code}
 
