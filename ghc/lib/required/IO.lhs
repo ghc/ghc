@@ -20,7 +20,7 @@ module IO (
     hFileSize, hIsEOF, isEOF,
     hSetBuffering, hGetBuffering, hFlush, 
     hGetPosn, hSetPosn, hSeek, 
-    hReady, hGetChar, hLookAhead, hGetContents, 
+    hWaitForInput, hReady, hGetChar, hGetLine, hLookAhead, hGetContents, 
     hPutChar, hPutStr, hPutStrLn, hPrint,
     hIsOpen, hIsClosed, hIsReadable, hIsWritable, hIsSeekable,
 
@@ -28,7 +28,8 @@ module IO (
     isFullError, isEOFError,
     isIllegalOperation, isPermissionError, isUserError, 
     ioeGetErrorString, 
-    ioeGetHandle, ioeGetFileName
+    ioeGetHandle, ioeGetFileName,
+    try, bracket, bracket_
   ) where
 
 import Ix
@@ -39,7 +40,7 @@ import IOHandle		-- much of the real stuff is in here
 import PackedString	( nilPS, packCBytesST, unpackPS )
 import PrelBase
 import GHC
-import Foreign          ( makeForeignObj, writeForeignObj )
+import Foreign          ( ForeignObj, Addr, makeForeignObj, writeForeignObj )
 \end{code}
 
 %*********************************************************
@@ -68,6 +69,8 @@ hPutChar              :: Handle -> Char -> IO ()
 hPutStr               :: Handle -> String -> IO ()
 hPutStrLn             :: Handle -> String -> IO ()
 hReady                :: Handle -> IO Bool 
+hWaitForInput         :: Handle -> Int -> IO Bool
+
 --IOHandle:hSeek                 :: Handle -> SeekMode -> Integer -> IO () 
 --IOHandle:hSetBuffering         :: Handle -> BufferMode -> IO ()
 --IOHandle:hSetPosn              :: HandlePosn -> IO () 
@@ -86,18 +89,53 @@ hReady                :: Handle -> IO Bool
 --IOHandle:stdin, stdout, stderr :: Handle
 \end{code}
 
+Standard instances for @Handle@:
+
+\begin{code}
+instance Eq IOError where
+  (IOError h1 e1 str1) == (IOError h2 e2 str2) = 
+    e1==e2 && str1==str2 && h1==h2
+
+instance Eq Handle where
+ h1 == h2 =
+  unsafePerformPrimIO (
+    ioToPrimIO (readHandle h1)      >>= \ h1_ ->
+    ioToPrimIO (writeHandle h1 h1_) >>
+    ioToPrimIO (readHandle h2)      >>= \ h2_ ->
+    ioToPrimIO (writeHandle h2 h2_) >>
+    return (
+     case (h1_,h2_) of
+      (ErrorHandle (IOError h1 _ _), ErrorHandle (IOError h2 _ _)) -> h1 == h2
+      (ClosedHandle, ClosedHandle) -> True
+      (SemiClosedHandle v1 _, SemiClosedHandle v2 _) -> v1 == v2
+      (ReadHandle v1 _ _ ,      ReadHandle v2 _ _)   -> v1 == v2
+      (WriteHandle v1 _ _ ,     WriteHandle v2 _ _)  -> v1 == v2
+      (AppendHandle v1 _ _ ,    AppendHandle v2 _ _) -> v1 == v2
+      (ReadWriteHandle v1 _ _ , ReadWriteHandle v2 _ _) -> v1 == v2
+      _ -> False))
+
+instance Show Handle where {showsPrec p h = showString "<<Handle>>"}
+
+\end{code}
+
 %*********************************************************
 %*							*
 \subsection{Simple input operations}
 %*							*
 %*********************************************************
 
-Computation $hReady hdl$ indicates whether at least
+Computation @hReady hdl@ indicates whether at least
 one item is available for input from handle {\em hdl}.
 
+@hWaitForInput@ is the generalisation, wait for \tr{n} seconds
+before deciding whether the Handle has run dry or not.
+
 \begin{code}
---hReady :: Handle -> IO Bool 
-hReady handle = 
+--hReady :: Handle -> IO Bool
+hReady h = hWaitForInput h 0
+
+--hWaitForInput :: Handle -> Int -> IO Bool 
+hWaitForInput handle nsecs = 
     readHandle handle				    >>= \ htype ->
     case htype of 
       ErrorHandle ioError ->
@@ -116,12 +154,12 @@ hReady handle =
 	  writeHandle handle htype		    >>
 	  fail (IOError (Just handle) IllegalOperation "handle is not open for reading")
       other -> 
-	  _ccall_ inputReady (filePtr other)  	    `thenIO_Prim` \ rc ->
-	  writeHandle handle (markHandle htype)   >>
+	  _ccall_ inputReady (filePtr other) nsecs  `thenIO_Prim` \ rc ->
+	  writeHandle handle (markHandle htype)     >>
           case rc of
             0 -> return False
             1 -> return True
-            _ -> constructErrorAndFail "hReady"
+            _ -> constructErrorAndFail "hWaitForInput"
 \end{code}
 
 Computation $hGetChar hdl$ reads the next character from handle 
@@ -155,6 +193,14 @@ hGetChar handle =
               return (chr intc)
           else
               constructErrorAndFail "hGetChar"
+
+hGetLine :: Handle -> IO String
+hGetLine h = 
+ hGetChar h >>= \ c ->
+ if c == '\n' then 
+    return "" 
+ else 
+    hGetLine h >>= \ s -> return (c:s)
 \end{code}
 
 Computation $hLookahead hdl$ returns the next character from handle
@@ -545,3 +591,40 @@ hPutStrLn hndl str = do
  hPutChar hndl '\n'
 
 \end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Try and bracket}
+%*							*
+%*********************************************************
+
+The construct $try comp$ exposes errors which occur within a
+computation, and which are not fully handled.  It always succeeds.
+
+\begin{code}
+try            :: IO a -> IO (Either IOError a)
+try f          =  catch (do r <- f
+                            return (Right r))
+                        (return . Left)
+
+bracket        :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+bracket before after m = do
+        x  <- before
+        rs <- try (m x)
+        after x
+        case rs of
+           Right r -> return r
+           Left  e -> fail e
+
+-- variant of the above where middle computation doesn't want x
+bracket_        :: IO a -> (a -> IO b) -> IO c -> IO c
+bracket_ before after m = do
+         x  <- before
+         rs <- try m
+         after x
+         case rs of
+            Right r -> return r
+            Left  e -> fail e
+\end{code}
+
