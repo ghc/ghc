@@ -15,7 +15,7 @@ import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
 import CoreTidy		( tidyExpr, tidyVarOcc, tidyIdRules )
 import PprCore 		( pprIdRules )
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprArity, rhsIsNonUpd )
+import CoreUtils	( exprArity, hasNoRedexes )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
@@ -619,12 +619,12 @@ hasCafRefs p arity expr
   | otherwise 		    = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefs p expr)
-  is_caf = not (arity > 0 || rhsIsNonUpd expr)
+  is_caf = not (arity > 0 || hasNoRedexes expr)
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
   -- knows how much eta expansion is going to be done by 
   -- CorePrep later on, and we don't want to duplicate that
-  -- knowledge in rhsIsNonUpd below.
+  -- knowledge in hasNoRedexes below.
 
 cafRefs p (Var id)
 	-- imported Ids first:

@@ -17,8 +17,8 @@ module CoreUtils (
 	exprType, coreAltsType, 
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
-	exprIsConApp_maybe, exprIsAtom,
-	idAppIsBottom, idAppIsCheap, rhsIsNonUpd,
+	exprIsConApp_maybe, 
+	hasNoRedexes,
 
 	-- Arity and eta expansion
 	manifestArity, exprArity, 
@@ -31,10 +31,7 @@ module CoreUtils (
 	hashExpr,
 
 	-- Equality
-	cheapEqExpr, eqExpr, applyTypeToArgs, applyTypeToArg,
-
-	-- Cross-DLL references
-	isCrossDllConApp,
+	cheapEqExpr, eqExpr, applyTypeToArgs, applyTypeToArg
     ) where
 
 #include "HsVersions.h"
@@ -336,16 +333,6 @@ exprIsTrivial (App e arg)  = not (isRuntimeArg arg) && exprIsTrivial e
 exprIsTrivial (Note _ e)   = exprIsTrivial e
 exprIsTrivial (Lam b body) = not (isRuntimeVar b) && exprIsTrivial body
 exprIsTrivial other	   = False
-
-exprIsAtom :: CoreExpr -> Bool
--- Used to decide whether to let-binding an STG argument
--- when compiling to ILX => type applications are not allowed
-exprIsAtom (Var v)    = True	-- primOpIsDupable?
-exprIsAtom (Lit lit)  = True
-exprIsAtom (Type ty)  = True
-exprIsAtom (Note (SCC _) e) = False
-exprIsAtom (Note _ e) = exprIsAtom e
-exprIsAtom other      = False
 \end{code}
 
 
@@ -1160,7 +1147,7 @@ hashId id = hashName (idName id)
 
 %************************************************************************
 %*									*
-\subsection{Cross-DLL references}
+\subsection{Determining non-updatable right-hand-sides}
 %*									*
 %************************************************************************
 
@@ -1173,36 +1160,44 @@ statically, but they can't if
 If this happens we simply make the RHS into an updatable thunk, 
 and 'exectute' it rather than allocating it statically.
 
-We also catch lit-lit arguments here, because those cannot be used in
-static constructors either.  (litlits are deprecated, so I'm not going
-to bother cleaning up this infelicity --SDM).
-
 \begin{code}
-isCrossDllConApp :: DataCon -> [CoreExpr] -> Bool
-isCrossDllConApp con args =
-  isDllName (dataConName con) || any isCrossDllArg args
-
-isCrossDllArg :: CoreExpr -> Bool
--- True if somewhere in the expression there's a cross-DLL reference
-isCrossDllArg (Type _)    = False
-isCrossDllArg (Var v)     = isDllName (idName v)
-isCrossDllArg (Note _ e)  = isCrossDllArg e
-isCrossDllArg (Lit lit)   = isLitLitLit lit
-isCrossDllArg (App e1 e2) = isCrossDllArg e1 || isCrossDllArg e2
-				-- must be a type app
-isCrossDllArg (Lam v e)   = isCrossDllArg e
-				-- must be a type lam
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Determining non-updatable right-hand-sides}
-%*									*
-%************************************************************************
-
-\begin{code}
-rhsIsNonUpd :: CoreExpr -> Bool
--- True => Value-lambda, saturated constructor
+hasNoRedexes :: CoreExpr -> Bool
+-- This function is called only on *top-level* right-hand sides
+-- Returns True if 
+--	the expression contains any redex that 
+--	is not under a (value) lambda
+-- and
+-- 	it contains no cross-DLL references
+--
+-- The real reason: either
+--	a) the rhs *is* a redex, in which case it's a CAF
+--	   (remember the arg is always a top-level rhs)
+-- or   b) the nested redex will ultimately be floated by CorePrep
+--	   and will be a CAF, so this rhs *refers* to a CAF
+--
+-- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
+-- refers to, CAFs; and (ii) in CoreToStg to decide whether to put an
+-- update flag on it.  In case (ii), the ANF-ising of CorePrep means that
+-- (b) cannot be the case, so it must be (a)!
+--
+-- NB: we treat partial applications as redexes,
+-- because in fact we make a thunk for them that runs and builds a PAP
+-- at run-time.  The only appliations that are treated as non-redexes
+-- are saturated applications of constructors
+--
+--
+--	f = \x::Int. x+7	TRUE
+--	p = (True,False)	TRUE
+--
+--	d = (fst p, False)	FALSE because there's a redex inside
+--				(this particular one doesn't happen but...)
+--
+--	h = D# (1.0## /## 2.0##)	FALSE (redex again)
+--	n = /\a. Nil a			TRUE
+--
+--	t = /\a. (:) (case w a of ...) (Nil a)	FALSE (redex)
+--
+--
 -- This is a bit like CoreUtils.exprIsValue, with the following differences:
 --    a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
 --
@@ -1214,38 +1209,34 @@ rhsIsNonUpd :: CoreExpr -> Bool
 -- When opt_RuntimeTypes is on, we keep type lambdas and treat
 -- them as making the RHS re-entrant (non-updatable).
 --
-rhsIsNonUpd (Lam b e)          = isRuntimeVar b || rhsIsNonUpd e
-rhsIsNonUpd (Note (SCC _) e)   = False
-rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
-rhsIsNonUpd other_expr
-  = go other_expr 0 []
+hasNoRedexes (Lam b e)        = isRuntimeVar b || hasNoRedexes e
+hasNoRedexes (Note (SCC _) e) = False
+hasNoRedexes (Note _ e)       = hasNoRedexes e
+hasNoRedexes (Lit lit)        = not (isLitLitLit lit)
+	-- lit-lit arguments cannot be used in static constructors either.  
+	-- (litlits are deprecated, so I'm not going to bother cleaning up this infelicity --SDM).
+hasNoRedexes other_expr	      = go other_expr 0
   where
-    go (Var f) n_args args = idAppIsNonUpd f n_args args
-	
-    go (App f a) n_args args
-	| isTypeArg a = go f n_args args
-	| otherwise   = go f (n_args + 1) (a:args)
+    go (Var f) n_val_args
+	| not (isDllName (idName f))
+	= n_val_args == 0 || saturated_data_con f n_val_args
 
-    go (Note (SCC _) f) n_args args = False
-    go (Note _ f) n_args args       = go f n_args args
+    go (App f a) n_val_args
+	| isTypeArg a    = go f n_val_args
+	| hasNoRedexes a = go f (n_val_args + 1)
+	   -- NB. args sometimes not atomic.  eg.
+	   --   x = D# (1.0## /## 2.0##)
+	   -- can't float because /## can fail.
 
-    go other n_args args = False
+    go (Note (SCC _) f) n_val_args = False
+    go (Note _ f) n_val_args       = go f n_val_args
 
-idAppIsNonUpd :: Id -> Int -> [CoreExpr] -> Bool
-idAppIsNonUpd id n_val_args args
-  -- saturated constructors are not updatable
-  | Just con <- isDataConWorkId_maybe id,
-    n_val_args == dataConRepArity con,
-    not (isCrossDllConApp con args),
-    all exprIsAtom args
-    = True
-   -- NB. args sometimes not atomic.  eg.
-   --   x = D# (1.0## /## 2.0##)
-   -- can't float because /## can fail.
+    go other n_val_args = False
 
-  | otherwise = False
-    -- Historical note: we used to make partial applications
-    -- non-updatable, so they behaved just like PAPs, but this
-    -- doesn't work too well with eval/apply so it is disabled
-    -- now.
+    saturated_data_con f n_val_args
+	= case isDataConWorkId_maybe f of
+	    Just dc -> n_val_args == dataConRepArity dc
+	    Nothing -> False
 \end{code}
+
+
