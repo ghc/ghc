@@ -544,7 +544,11 @@ but we don't care, since it doesn't get used much.  We hope.
 	      | GSUB	      Size Reg Reg Reg -- src1, src2, dst
 	      | GMUL	      Size Reg Reg Reg -- src1, src2, dst
 
-    	      | GCMP	      Size Reg Reg -- src1, src2
+		-- FP compare.  Cond must be `elem` [EQQ, NE, LE, LTT, GE, GTT]
+		-- Compare src1 with src2; set the Zero flag iff the numbers are
+		-- comparable and the comparison is True.  Subsequent code must
+		-- test the %eflags zero flag regardless of the supplied Cond.
+    	      | GCMP	      Cond Reg Reg -- src1, src2
 
      	      | GABS	      Size Reg Reg -- src, dst
     	      | GNEG	      Size Reg Reg -- src, dst

@@ -1677,9 +1677,9 @@ Condition codes passed up the tree.
 \begin{code}
 data CondCode = CondCode Bool Cond InstrBlock
 
-condName  (CondCode _ cond _)	   = cond
+condName  (CondCode _ cond _)	  = cond
 condFloat (CondCode is_float _ _) = is_float
-condCode  (CondCode _ _ code)	   = code
+condCode  (CondCode _ _ code)	  = code
 \end{code}
 
 Set up a condition code for a conditional branch.
@@ -1870,7 +1870,8 @@ condIntCode cond x y
 
 -----------
 condFltCode cond x y
-  = getRegister x		`thenNat` \ register1 ->
+  = ASSERT(cond `elem` ([EQQ, NE, LE, LTT, GE, GTT]))
+    getRegister x		`thenNat` \ register1 ->
     getRegister y		`thenNat` \ register2 ->
     getNewRegNCG (registerRep register1)
       	    	        	`thenNat` \ tmp1 ->
@@ -1878,7 +1879,6 @@ condFltCode cond x y
      	    	        	`thenNat` \ tmp2 ->
     getNewRegNCG DoubleRep	`thenNat` \ tmp ->
     let
-    	pk1   = registerRep register1
     	code1 = registerCode register1 tmp1
     	src1  = registerName register1 tmp1
 
@@ -1888,26 +1888,17 @@ condFltCode cond x y
     	code__2 | isAny register1
                 = code1 `appOL`   -- result in tmp1
                   code2 `snocOL`
-    	    	  GCMP (primRepToSize pk1) tmp1 src2
+    	    	  GCMP cond tmp1 src2
                   
                 | otherwise
                 = code1 `snocOL` 
                   GMOV src1 tmp1 `appOL`
                   code2 `snocOL`
-    	    	  GCMP (primRepToSize pk1) tmp1 src2
-
-        {- On the 486, the flags set by FP compare are the unsigned ones!
-           (This looks like a HACK to me.  WDP 96/03)
-        -}
-        fix_FP_cond :: Cond -> Cond
-
-        fix_FP_cond GE   = GEU
-        fix_FP_cond GTT  = GU
-        fix_FP_cond LTT  = LU
-        fix_FP_cond LE   = LEU
-        fix_FP_cond any  = any
+    	    	  GCMP cond tmp1 src2
     in
-    returnNat (CondCode True (fix_FP_cond cond) code__2)
+    -- The GCMP insn does the test and sets the zero flag if comparable
+    -- and true.  Hence we always supply EQQ as the condition to test.
+    returnNat (CondCode True EQQ code__2)
 
 #endif {- i386_TARGET_ARCH -}
 

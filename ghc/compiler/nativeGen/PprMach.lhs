@@ -1030,11 +1030,74 @@ pprInstr g@(GITOD src dst)
                    text " ; ffree %st(7); fildl (%esp) ; ",
                    gpop dst 1, text " ; addl $4,%esp"])
 
-pprInstr g@(GCMP sz src1 src2) 
-   = pprG g (hcat [gtab, text "pushl %eax ; ",gpush src1 0]
-             $$
-             hcat [gtab, text "fcomp ", greg src2 1, 
-                   text "; fstsw %ax ; sahf ; popl %eax"])
+{- Gruesome swamp follows.  If you're unfortunate enough to have ventured
+   this far into the jungle AND you give a Rat's Ass (tm) what's going
+   on, here's the deal.  Generate code to do a floating point comparison
+   of src1 and src2, of kind cond, and set the Zero flag if true.
+
+   The complications are to do with handling NaNs correctly.  We want the
+   property that if either argument is NaN, then the result of the
+   comparison is False ... except if we're comparing for inequality,
+   in which case the answer is True.
+
+   Here's how the general (non-inequality) case works.  As an
+   example, consider generating the an equality test:
+
+     pushl %eax		-- we need to mess with this
+     <get src1 to top of FPU stack>
+     fcomp <src2 location in FPU stack> and pop pushed src1
+		-- Result of comparison is in FPU Status Register bits
+		-- C3 C2 and C0
+     fstsw %ax	-- Move FPU Status Reg to %ax
+     sahf	-- move C3 C2 C0 from %ax to integer flag reg
+     -- now the serious magic begins
+     setpo %ah	   -- %ah = if comparable(neither arg was NaN) then 1 else 0
+     sete  %al     -- %al = if arg1 == arg2 then 1 else 0
+     andb %ah,%al  -- %al &= %ah
+                   -- so %al == 1 iff (comparable && same); else it holds 0
+     decb %al	   -- %al == 0, ZeroFlag=1  iff (comparable && same); 
+                      else %al == 0xFF, ZeroFlag=0
+     -- the zero flag is now set as we desire.
+     popl %eax
+
+   The special case of inequality differs thusly:
+
+     setpe %ah     -- %ah = if incomparable(either arg was NaN) then 1 else 0
+     setne %al     -- %al = if arg1 /= arg2 then 1 else 0
+     orb %ah,%al   -- %al = if (incomparable || different) then 1 else 0
+     decb %al      -- if (incomparable || different) then (%al == 0, ZF=1)
+                                                     else (%al == 0xFF, ZF=0)
+-}
+pprInstr g@(GCMP cond src1 src2) 
+   | case cond of { NE -> True; other -> False }
+   = pprG g (vcat [
+        hcat [gtab, text "pushl %eax ; ",gpush src1 0],
+        hcat [gtab, text "fcomp ", greg src2 1, 
+                    text "; fstsw %ax ; sahf ;  setpe %ah"],
+        hcat [gtab, text "setne %al ;  ",
+              text "orb %ah,%al ;  decb %al ;  popl %eax"]
+    ])
+   | otherwise
+   = pprG g (vcat [
+        hcat [gtab, text "pushl %eax ; ",gpush src1 0],
+        hcat [gtab, text "fcomp ", greg src2 1, 
+                    text "; fstsw %ax ; sahf ;  setpo %ah"],
+        hcat [gtab, text "set", pprCond (fix_FP_cond cond), text " %al ;  ",
+              text "andb %ah,%al ;  decb %al ;  popl %eax"]
+    ])
+    where
+        {- On the 486, the flags set by FP compare are the unsigned ones!
+           (This looks like a HACK to me.  WDP 96/03)
+        -}
+        fix_FP_cond :: Cond -> Cond
+        fix_FP_cond GE   = GEU
+        fix_FP_cond GTT  = GU
+        fix_FP_cond LTT  = LU
+        fix_FP_cond LE   = LEU
+        fix_FP_cond EQQ  = EQQ
+        fix_FP_cond NE   = NE
+        -- there should be no others
+
 
 pprInstr g@(GABS sz src dst)
    = pprG g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
@@ -1204,7 +1267,7 @@ pprGInstr (GDTOI src dst) = pprSizeSizeRegReg SLIT("gdtoi") DF L src dst
 pprGInstr (GITOF src dst) = pprSizeSizeRegReg SLIT("gitof") L F  src dst
 pprGInstr (GITOD src dst) = pprSizeSizeRegReg SLIT("gitod") L DF src dst
 
-pprGInstr (GCMP sz src dst) = pprSizeRegReg SLIT("gcmp") sz src dst
+pprGInstr (GCMP co src dst) = pprCondRegReg SLIT("gcmp_") DF co src dst
 pprGInstr (GABS sz src dst) = pprSizeRegReg SLIT("gabs") sz src dst
 pprGInstr (GNEG sz src dst) = pprSizeRegReg SLIT("gneg") sz src dst
 pprGInstr (GSQRT sz src dst) = pprSizeRegReg SLIT("gsqrt") sz src dst
@@ -1304,6 +1367,18 @@ pprSizeRegReg name size reg1 reg2
     	char '\t',
 	ptext name,
     	pprSize size,
+	space,
+	pprReg size reg1,
+        comma,
+        pprReg size reg2
+    ]
+
+pprCondRegReg :: FAST_STRING -> Size -> Cond -> Reg -> Reg -> Doc
+pprCondRegReg name size cond reg1 reg2
+  = hcat [
+    	char '\t',
+	ptext name,
+    	pprCond cond,
 	space,
 	pprReg size reg1,
         comma,
