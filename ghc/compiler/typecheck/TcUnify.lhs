@@ -25,12 +25,12 @@ import Type	( funTyCon, Kind, unboxedTypeKind, boxedTypeKind, openTypeKind,
 	   	  tidyOpenType, tidyOpenTypes, tidyTyVar
 		)
 import TyCon	( TyCon, isTupleTyCon, tupleTyConBoxity, tyConArity )
-import Name	( hasBetterProv )
 import Var	( TyVar, tyVarKind, varName, isSigTyVar )
 import VarSet	( varSetElems )
 import TcType	( TcType, TcTauType, TcTyVar, TcKind, newBoxityVar,
 		  newTyVarTy, newTyVarTys, tcGetTyVar, tcPutTyVar, zonkTcType
 		)
+import Name	( isSystemName )
 
 -- others:
 import BasicTypes ( Arity, Boxity, isBoxed )
@@ -316,7 +316,7 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 				-- Don't unify a signature type variable if poss
 			|| k2 == openTypeKind
 				-- Try to get rid of open type variables as soon as poss
-			|| varName tv1 `hasBetterProv` varName tv2 
+			|| isSystemName (varName tv2)
 				-- Try to update sys-y type variables in preference to sig-y ones
 
 	-- Second one isn't a type variable
