@@ -405,7 +405,8 @@ solveDerivEqns inst_env_in orig_eqns
         in
 	    -- Simplify each RHS
 	tcSetInstEnv inst_env (
-	  listTc [ tcAddErrCtxt (derivCtxt tc) $
+	  listTc [ tcAddSrcLoc (getSrcLoc tc)	$
+		   tcAddErrCtxt (derivCtxt tc)	$
 		   tcSimplifyThetas deriv_rhs
 	         | (_, _,tc,_,deriv_rhs) <- orig_eqns ]  
 	)					`thenTc` \ next_solns ->
