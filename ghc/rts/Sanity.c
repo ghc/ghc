@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.13 1999/05/11 16:47:57 keithw Exp $
+ * $Id: Sanity.c,v 1.14 1999/05/21 14:37:12 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -23,7 +23,7 @@
 #include "BlockAlloc.h"
 #include "Sanity.h"
 
-#define LOOKS_LIKE_PTR(r) (IS_DATA_PTR(r) || ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1)))
+#define LOOKS_LIKE_PTR(r) (LOOKS_LIKE_STATIC_CLOSURE(r) || ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1)))
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
