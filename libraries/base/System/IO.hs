@@ -24,7 +24,9 @@ module System.IO (
     stdin, stdout, stderr,   -- :: Handle
 
     openFile,		       -- :: FilePath -> IOMode -> IO Handle
+#if !defined(__NHC__)
     openBinaryFile,	       -- :: FilePath -> IOMode -> IO Handle
+#endif
     hClose,		       -- :: Handle -> IO ()
     hFileSize,		       -- :: Handle -> IO Integer
     hIsEOF,		       -- :: Handle -> IO Bool
@@ -32,7 +34,7 @@ module System.IO (
 
     hSetBuffering,	       -- :: Handle -> BufferMode -> IO ()
     hGetBuffering,	       -- :: Handle -> IO BufferMode
-#ifndef __HUGS__
+#if !defined(__HUGS__) && !defined(__NHC__)
     hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
 #endif
     hFlush,		       -- :: Handle -> IO ()
