@@ -346,17 +346,19 @@ dnl use either is considered a Feature.
 
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
-if test "$GHC" = ""; then
-  AC_PATH_PROG(GHC,ghc)
-fi
 
 AC_ARG_WITH(ghc,
 [  --with-ghc=<haskell compiler>
         Use a command different from 'ghc' to compile GHC-specific Haskell code
 	    (including GHC itself).
 ],
-[WithGhc="$withval"],
-[WithGhc=$GHC]
+[ WithGhc="$withval" ],
+[ 
+  if test "$GHC" = ""; then
+    AC_PATH_PROG(GHC,ghc)
+  fi
+  WithGhc=$GHC
+]
 )
 AC_SUBST(WithGhc)
 
