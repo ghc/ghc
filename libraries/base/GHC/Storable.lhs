@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Storable.lhs,v 1.2 2001/07/31 13:10:01 simonmar Exp $
+% $Id: Storable.lhs,v 1.3 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -106,25 +106,25 @@ instance Storable (T) where {			\
 STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
 	 readWideCharOffPtr,writeWideCharOffPtr)
 
-STORABLE(Int,SIZEOF_LONG,ALIGNMENT_LONG,
+STORABLE(Int,SIZEOF_HSINT,ALIGNMENT_HSINT,
 	 readIntOffPtr,writeIntOffPtr)
 
-STORABLE(Word,SIZEOF_LONG,ALIGNMENT_LONG,
+STORABLE(Word,SIZEOF_HSWORD,ALIGNMENT_HSWORD,
 	 readWordOffPtr,writeWordOffPtr)
 
-STORABLE((Ptr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
+STORABLE((Ptr a),SIZEOF_HSPTR,ALIGNMENT_HSPTR,
 	 readPtrOffPtr,writePtrOffPtr)
 
-STORABLE((FunPtr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
+STORABLE((FunPtr a),SIZEOF_HSFUNPTR,ALIGNMENT_HSFUNPTR,
 	 readFunPtrOffPtr,writeFunPtrOffPtr)
 
-STORABLE((StablePtr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
+STORABLE((StablePtr a),SIZEOF_HSSTABLEPTR,ALIGNMENT_HSSTABLEPTR,
 	 readStablePtrOffPtr,writeStablePtrOffPtr)
 
-STORABLE(Float,SIZEOF_FLOAT,ALIGNMENT_FLOAT,
+STORABLE(Float,SIZEOF_HSFLOAT,ALIGNMENT_HSFLOAT,
 	 readFloatOffPtr,writeFloatOffPtr)
 
-STORABLE(Double,SIZEOF_DOUBLE,ALIGNMENT_DOUBLE,
+STORABLE(Double,SIZEOF_HSDOUBLE,ALIGNMENT_HSDOUBLE,
 	 readDoubleOffPtr,writeDoubleOffPtr)
 
 STORABLE(Word8,SIZEOF_WORD8,ALIGNMENT_WORD8,
@@ -220,30 +220,20 @@ readStablePtrOffPtr (Ptr a) (I# i)
   = IO $ \s -> case readStablePtrOffAddr# a i s of (# s2, x #) -> (# s2, StablePtr x #)
 readInt8OffPtr (Ptr a) (I# i)
   = IO $ \s -> case readInt8OffAddr# a i s      of (# s2, x #) -> (# s2, I8# x #)
-readInt16OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readInt16OffAddr# a i s     of (# s2, x #) -> (# s2, I16# x #)
-readInt32OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readInt32OffAddr# a i s     of (# s2, x #) -> (# s2, I32# x #)
-#if WORD_SIZE_IN_BYTES == 4
-readInt64OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readInt64OffAddr# a i s     of (# s2, x #) -> (# s2, I64# x #)
-#else
-readInt64OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readIntOffAddr# a i s       of (# s2, x #) -> (# s2, I64# x #)
-#endif
 readWord8OffPtr (Ptr a) (I# i)
   = IO $ \s -> case readWord8OffAddr# a i s     of (# s2, x #) -> (# s2, W8# x #)
+readInt16OffPtr (Ptr a) (I# i)
+  = IO $ \s -> case readInt16OffAddr# a i s     of (# s2, x #) -> (# s2, I16# x #)
 readWord16OffPtr (Ptr a) (I# i)
   = IO $ \s -> case readWord16OffAddr# a i s    of (# s2, x #) -> (# s2, W16# x #)
+readInt32OffPtr (Ptr a) (I# i)
+  = IO $ \s -> case readInt32OffAddr# a i s     of (# s2, x #) -> (# s2, I32# x #)
 readWord32OffPtr (Ptr a) (I# i)
   = IO $ \s -> case readWord32OffAddr# a i s    of (# s2, x #) -> (# s2, W32# x #)
-#if WORD_SIZE_IN_BYTES == 4
+readInt64OffPtr (Ptr a) (I# i)
+  = IO $ \s -> case readInt64OffAddr# a i s     of (# s2, x #) -> (# s2, I64# x #)
 readWord64OffPtr (Ptr a) (I# i)
   = IO $ \s -> case readWord64OffAddr# a i s    of (# s2, x #) -> (# s2, W64# x #)
-#else
-readWord64OffPtr (Ptr a) (I# i)
-  = IO $ \s -> case readWordOffAddr# a i s      of (# s2, x #) -> (# s2, W64# x #)
-#endif
 
 writeWideCharOffPtr  :: Ptr Char          -> Int -> Char        -> IO ()
 writeIntOffPtr       :: Ptr Int           -> Int -> Int         -> IO ()
@@ -280,30 +270,20 @@ writeStablePtrOffPtr (Ptr a) (I# i) (StablePtr x)
   = IO $ \s -> case writeStablePtrOffAddr# a i x s of s2 -> (# s2 , () #)
 writeInt8OffPtr (Ptr a) (I# i) (I8# x)
   = IO $ \s -> case writeInt8OffAddr# a i x s      of s2 -> (# s2, () #)
-writeInt16OffPtr (Ptr a) (I# i) (I16# x)
-  = IO $ \s -> case writeInt16OffAddr# a i x s     of s2 -> (# s2, () #)
-writeInt32OffPtr (Ptr a) (I# i) (I32# x)
-  = IO $ \s -> case writeInt32OffAddr# a i x s     of s2 -> (# s2, () #)
-#if WORD_SIZE_IN_BYTES == 4
-writeInt64OffPtr (Ptr a) (I# i) (I64# x)
-  = IO $ \s -> case writeInt64OffAddr# a i x s     of s2 -> (# s2, () #)
-#else
-writeInt64OffPtr (Ptr a) (I# i) (I64# x)
-  = IO $ \s -> case writeIntOffAddr# a i x s       of s2 -> (# s2, () #)
-#endif
 writeWord8OffPtr (Ptr a) (I# i) (W8# x)
   = IO $ \s -> case writeWord8OffAddr# a i x s     of s2 -> (# s2, () #)
+writeInt16OffPtr (Ptr a) (I# i) (I16# x)
+  = IO $ \s -> case writeInt16OffAddr# a i x s     of s2 -> (# s2, () #)
 writeWord16OffPtr (Ptr a) (I# i) (W16# x)
   = IO $ \s -> case writeWord16OffAddr# a i x s    of s2 -> (# s2, () #)
+writeInt32OffPtr (Ptr a) (I# i) (I32# x)
+  = IO $ \s -> case writeInt32OffAddr# a i x s     of s2 -> (# s2, () #)
 writeWord32OffPtr (Ptr a) (I# i) (W32# x)
   = IO $ \s -> case writeWord32OffAddr# a i x s    of s2 -> (# s2, () #)
-#if WORD_SIZE_IN_BYTES == 4
+writeInt64OffPtr (Ptr a) (I# i) (I64# x)
+  = IO $ \s -> case writeInt64OffAddr# a i x s     of s2 -> (# s2, () #)
 writeWord64OffPtr (Ptr a) (I# i) (W64# x)
   = IO $ \s -> case writeWord64OffAddr# a i x s    of s2 -> (# s2, () #)
-#else
-writeWord64OffPtr (Ptr a) (I# i) (W64# x)
-  = IO $ \s -> case writeWordOffAddr# a i x s      of s2 -> (# s2, () #)
-#endif
 
 #endif /* __GLASGOW_HASKELL__ */
 \end{code}

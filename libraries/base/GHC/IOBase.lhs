@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.4 2001/09/13 15:34:17 simonmar Exp $
+% $Id: IOBase.lhs,v 1.5 2001/12/21 15:07:25 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -9,7 +9,6 @@
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
-#include "config.h"
 
 module GHC.IOBase where
 
@@ -151,13 +150,16 @@ type FD = Int -- XXX ToDo: should be CInt
 
 data Handle__
   = Handle__ {
-      haFD	    :: !FD,
-      haType        :: HandleType,
-      haIsBin	    :: Bool,
-      haBufferMode  :: BufferMode,
-      haFilePath    :: FilePath,
-      haBuffer	    :: !(IORef Buffer),
-      haBuffers     :: !(IORef BufferList)
+      haFD	    :: !FD,		     -- file descriptor
+      haType        :: HandleType,	     -- type (read/write/append etc.)
+      haIsBin       :: Bool,		     -- binary mode?
+      haIsStream    :: Bool,		     -- is this a stream handle?
+      haBufferMode  :: BufferMode,	     -- buffer contains read/write data?
+      haFilePath    :: FilePath,	     -- file name, possibly
+      haBuffer	    :: !(IORef Buffer),	     -- the current buffer
+      haBuffers     :: !(IORef BufferList),  -- spare buffers
+      haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 
+					     -- duplex handle.
     }
 
 -- ---------------------------------------------------------------------------
@@ -235,11 +237,9 @@ data HandleType
  | WriteHandle
  | AppendHandle
  | ReadWriteHandle
- | ReadSideHandle  !(MVar Handle__)	-- read side of a duplex handle
 
 isReadableHandleType ReadHandle         = True
 isReadableHandleType ReadWriteHandle    = True
-isReadableHandleType (ReadSideHandle _) = True
 isReadableHandleType _	       	        = False
 
 isWritableHandleType AppendHandle    = True
@@ -326,13 +326,12 @@ instance Show HandleType where
       WriteHandle       -> showString "writable"
       AppendHandle      -> showString "writable (append)"
       ReadWriteHandle   -> showString "read-writable"
-      ReadSideHandle _  -> showString "read-writable (duplex)"
 
 instance Show Handle where 
-  showsPrec p (FileHandle   h)   = showHandle p h
-  showsPrec p (DuplexHandle h _) = showHandle p h
+  showsPrec p (FileHandle   h)   = showHandle p h False
+  showsPrec p (DuplexHandle _ h) = showHandle p h True
    
-showHandle p h =
+showHandle p h duplex =
     let
      -- (Big) SIGH: unfolded defn of takeMVar to avoid
      -- an (oh-so) unfortunate module loop with GHC.Conc.
@@ -341,14 +340,18 @@ showHandle p h =
 	     case takeMVar# h# s#   of { (# s2# , r #) -> 
 	     case putMVar# h# r s2# of { s3# ->
 	     (# s3#, r #) }}})
+
+     showType | duplex = showString "duplex (read-write)"
+	      | otherwise = showsPrec p (haType hdl_)
     in
     showChar '{' . 
     showHdl (haType hdl_) 
 	    (showString "loc=" . showString (haFilePath hdl_) . showChar ',' .
-	     showString "type=" . showsPrec p (haType hdl_) . showChar ',' .
+	     showString "type=" . showType . showChar ',' .
 	     showString "binary=" . showsPrec p (haIsBin hdl_) . showChar ',' .
 	     showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
    where
+
     showHdl :: HandleType -> ShowS -> ShowS
     showHdl ht cont = 
        case ht of
@@ -522,11 +525,14 @@ data IOErrorType
   | TimeExpired
   | ResourceVanished
   | Interrupted
-#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
-  | ComError Int           -- HRESULT
-#endif
-  deriving (Eq)
+  | DynIOError Dynamic -- cheap&cheerful extensible IO error type.
 
+instance Eq IOErrorType where
+   x == y = 
+     case x of
+       DynIOError{} -> False -- from a strictness POV, compatible with a derived Eq inst?
+       _ -> getTag# x ==# getTag# y
+ 
 instance Show IOErrorType where
   showsPrec _ e =
     showString $
@@ -549,9 +555,7 @@ instance Show IOErrorType where
       UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
       UnsupportedOperation -> "unsupported operation"
       EOF		-> "end of file"
-#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
-      ComError _	-> "COM error"
-#endif
+      DynIOError{}      -> "unknown IO error"
 
 userError       :: String  -> IOError
 userError str	=  UserError str

@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Environment.hs,v 1.2 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: Environment.hs,v 1.3 2001/12/21 15:07:26 simonmar Exp $
 --
 -- Miscellaneous information about the system environment.
 --
@@ -41,12 +41,13 @@ getArgs =
   alloca $ \ p_argc ->  
   alloca $ \ p_argv -> do
    getProgArgv p_argc p_argv
-   p    <- peek p_argc
+   p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
    peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
+
    
-   
-foreign import "getProgArgv" getProgArgv :: Ptr Int -> Ptr (Ptr CString) -> IO ()
+foreign import "getProgArgv" unsafe 
+  getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
 
 -- Computation `getProgName' returns the name of the program
 -- as it was invoked.
@@ -62,13 +63,23 @@ getProgName =
 unpackProgName	:: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do 
   s <- peekElemOff argv 0 >>= peekCString
-  return (de_slash "" s)
+  return (basename s)
   where
-    -- re-start accumulating at every '/'
-    de_slash :: String -> String -> String
-    de_slash  acc []	   = reverse acc
-    de_slash _acc ('/':xs) = de_slash []      xs
-    de_slash  acc (x:xs)   = de_slash (x:acc) xs
+   basename :: String -> String
+   basename f = go f f
+    where
+      go acc [] = acc
+      go acc (x:xs) 
+        | isPathSeparator x = go xs xs
+        | otherwise         = go acc xs
+
+   isPathSeparator :: Char -> Bool
+   isPathSeparator '/'  = True
+#ifdef mingw32_TARGET_OS 
+   isPathSeparator '\\' = True
+#endif
+   isPathSeparator _    = False
+
 
 -- Computation `getEnv var' returns the value
 -- of the environment variable {\em var}.  

@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Alloc.hs,v 1.3 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: Alloc.hs,v 1.4 2001/12/21 15:07:22 simonmar Exp $
 --
 -- Marshalling support: basic routines for memory allocation
 --
@@ -39,7 +39,6 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
-import GHC.Prim
 #endif
 
 

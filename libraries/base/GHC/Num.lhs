@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Num.lhs,v 1.2 2001/07/31 13:09:11 simonmar Exp $
+% $Id: Num.lhs,v 1.3 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -19,12 +19,12 @@ and the type
 {-# OPTIONS -fno-implicit-prelude #-}
 
 #include "MachDeps.h"
-#if WORD_SIZE_IN_BYTES == 4
+#if SIZEOF_HSWORD == 4
 #define LEFTMOST_BIT 2147483648
-#elif WORD_SIZE_IN_BYTES == 8
+#elif SIZEOF_HSWORD == 8
 #define LEFTMOST_BIT 9223372036854775808
 #else
-#error Please define LEFTMOST_BIT to be 2^(WORD_SIZE_IN_BYTES*8-1)
+#error Please define LEFTMOST_BIT to be 2^(SIZEOF_HSWORD*8-1)
 #endif
 
 module GHC.Num where
@@ -109,7 +109,13 @@ divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
 \begin{code}
 data Integer	
    = S# Int#				-- small integers
+#ifndef ILX
    | J# Int# ByteArray#			-- large integers
+#else
+   | J# Void BigInteger                 -- .NET big ints
+
+foreign type dotnet "BigInteger" BigInteger
+#endif
 \end{code}
 
 Convenient boxed Integer PrimOps. 
@@ -346,9 +352,9 @@ minusInteger i1@(J# _ _) i2@(S# _) = i1 - toBig i2
 minusInteger i1@(S# _) i2@(J# _ _) = toBig i1 - i2
 minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-timesInteger i1@(S# i) i2@(S# j)   = case mulIntC# i j of { (# r, c #) ->
-				     if c ==# 0# then S# r
-				     else toBig i1 * toBig i2 }
+timesInteger i1@(S# i) i2@(S# j)   = if   mulIntMayOflo# i j ==# 0#
+                                     then S# (i *# j)
+                                     else toBig i1 * toBig i2 
 timesInteger i1@(J# _ _) i2@(S# _) = i1 * toBig i2
 timesInteger i1@(S# _) i2@(J# _ _) = toBig i1 * i2
 timesInteger (J# s1 d1) (J# s2 d2) = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
@@ -436,7 +442,10 @@ dn_list x delta lim = go (x::Integer)
 \begin{code}
 instance Show Integer where
     showsPrec p n r
-        | n < 0 && p > 6 = '(' : jtos n (')' : r)
+        | p > 6 && n < 0 = '(' : jtos n (')' : r)
+		-- Minor point: testing p first gives better code 
+		-- in the not-uncommon case where the p argument
+		-- is a constant
         | otherwise      = jtos n r
     showList = showList__ (showsPrec 0)
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: longlong.c,v 1.1 2001/07/31 12:52:37 simonmar Exp $
+ * $Id: longlong.c,v 1.2 2001/12/21 15:07:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -74,8 +74,8 @@ StgInt64  stg_iShiftRA64 (StgInt64 a,  StgInt b)    {return a >> b;}
 StgInt64  stg_iShiftRL64 (StgInt64 a,  StgInt b)
 {return (StgInt64) ((StgWord64) a >> b);}
 
-/* Casting between longs and longer longs:
-   (the primops that cast between Integers and long longs are
+/* Casting between longs and longer longs.
+   (the primops that cast from long longs to Integers
    expressed as macros, since these may cause some heap allocation).
 */
 
@@ -85,5 +85,41 @@ StgWord64 stg_int64ToWord64 (StgInt64  i) {return (StgWord64) i;}
 StgWord64 stg_wordToWord64  (StgWord   w) {return (StgWord64) w;}
 StgWord   stg_word64ToWord  (StgWord64 w) {return (StgWord)   w;}
 StgInt64  stg_word64ToInt64 (StgWord64 w) {return (StgInt64)  w;}
+
+StgWord64 stg_integerToWord64 (I_ sa, StgByteArray /* Really: mp_limb_t* */ da)
+{ 
+  mp_limb_t* d;
+  I_ s;
+  StgWord64 res;
+  d = (mp_limb_t *)da;
+  s = sa;
+  switch (s) {
+    case  0: res = 0;     break;
+    case  1: res = d[0];  break;
+    case -1: res = -d[0]; break;
+    default:
+      res = d[0] + ((StgWord64) d[1] << (BITS_IN (mp_limb_t)));
+      if (s < 0) res = -res;
+  }
+  return res;
+}
+
+StgInt64 stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da)
+{ 
+  mp_limb_t* d;
+  I_ s;
+  StgInt64 res;
+  d = (mp_limb_t *)da;
+  s = (sa);
+  switch (s) {
+    case  0: res = 0;     break;
+    case  1: res = d[0];  break;
+    case -1: res = -d[0]; break;
+    default:
+      res = d[0] + ((StgWord64) d[1] << (BITS_IN (mp_limb_t)));
+      if (s < 0) res = -res;
+  }
+  return res;
+}
 
 #endif /* SUPPORT_LONG_LONGS */

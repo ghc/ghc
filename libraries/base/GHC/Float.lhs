@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Float.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
+% $Id: Float.lhs,v 1.3 2001/12/21 15:07:22 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -496,13 +496,15 @@ formatRealFloat fmt decs x
        mk0 ls = case ls of { "" -> "0" ; _ -> ls}
       in
       case decs of
-       Nothing ->
-         let
-	  f 0 s    rs  = mk0 (reverse s) ++ '.':mk0 rs
-	  f n s    ""  = f (n-1) ('0':s) ""
-	  f n s (r:rs) = f (n-1) (r:s) rs
-	 in
-	 f e "" ds
+       Nothing
+	  | e <= 0    -> "0." ++ replicate (-e) '0' ++ ds
+	  | otherwise ->
+	     let
+	  	f 0 s    rs  = mk0 (reverse s) ++ '.':mk0 rs
+	  	f n s    ""  = f (n-1) ('0':s) ""
+	  	f n s (r:rs) = f (n-1) (r:s) rs
+	     in
+	 	f e "" ds
        Just dec ->
         let dec' = max dec 0 in
 	if e >= 0 then
@@ -516,8 +518,8 @@ formatRealFloat fmt decs x
 	  (ei,is') = roundTo base dec' (replicate (-e) 0 ++ is)
 	  d:ds' = map intToDigit (if ei > 0 then is' else 0:is')
 	 in
-	 d : '.' : ds'
-	 
+	 d : (if null ds' then "" else '.':ds')
+
 
 roundTo :: Int -> Int -> [Int] -> (Int,[Int])
 roundTo base d is =
@@ -536,13 +538,18 @@ roundTo base d is =
        (c,ds) = f (n-1) xs
        i'     = c + i
 
---
 -- Based on "Printing Floating-Point Numbers Quickly and Accurately"
 -- by R.G. Burger and R.K. Dybvig in PLDI 96.
 -- This version uses a much slower logarithm estimator. It should be improved.
 
--- This function returns a list of digits (Ints in [0..base-1]) and an
--- exponent.
+-- floatToDigits takes a base and a non-negative RealFloat number,
+-- and returns a list of digits and an exponent. 
+-- In particular, if x>=0, and
+--	floatToDigits base x = ([d1,d2,...,dn], e)
+-- then
+--	(a) n >= 1
+--	(b) x = 0.d1d2...dn * (base**e)
+-- 	(c) 0 <= di <= base-1
 
 floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
 floatToDigits _ 0 = ([0], 0)
@@ -761,6 +768,18 @@ minusFloat  (F# x) (F# y) = F# (minusFloat# x y)
 timesFloat  (F# x) (F# y) = F# (timesFloat# x y)
 divideFloat (F# x) (F# y) = F# (divideFloat# x y)
 
+{-# RULES
+"plusFloat x 0.0"   forall x#. plusFloat#  x#   0.0# = x#
+"plusFloat 0.0 x"   forall x#. plusFloat#  0.0# x#   = x#
+"minusFloat x 0.0"  forall x#. minusFloat# x#   0.0# = x#
+"minusFloat x x"    forall x#. minusFloat# x#   x#   = 0.0#
+"timesFloat x 0.0"  forall x#. timesFloat# x#   0.0# = 0.0#
+"timesFloat0.0 x"   forall x#. timesFloat# 0.0# x#   = 0.0#
+"timesFloat x 1.0"  forall x#. timesFloat# x#   1.0# = x#
+"timesFloat 1.0 x"  forall x#. timesFloat# 1.0# x#   = x#
+"divideFloat x 1.0" forall x#. divideFloat# x#  1.0# = x#
+  #-}
+
 negateFloat :: Float -> Float
 negateFloat (F# x)        = F# (negateFloat# x)
 
@@ -806,6 +825,18 @@ plusDouble   (D# x) (D# y) = D# (x +## y)
 minusDouble  (D# x) (D# y) = D# (x -## y)
 timesDouble  (D# x) (D# y) = D# (x *## y)
 divideDouble (D# x) (D# y) = D# (x /## y)
+
+{-# RULES
+"plusDouble x 0.0"   forall x#. (+##) x#    0.0## = x#
+"plusDouble 0.0 x"   forall x#. (+##) 0.0## x#    = x#
+"minusDouble x 0.0"  forall x#. (-##) x#    0.0## = x#
+"minusDouble x x"    forall x#. (-##) x#    x#    = 0.0##
+"timesDouble x 0.0"  forall x#. (*##) x#    0.0## = 0.0##
+"timesDouble 0.0 x"  forall x#. (*##) 0.0## x#    = 0.0##
+"timesDouble x 1.0"  forall x#. (*##) x#    1.0## = x#
+"timesDouble 1.0 x"  forall x#. (*##) 1.0## x#    = x#
+"divideDouble x 1.0" forall x#. (/##) x#    1.0## = x#
+  #-}
 
 negateDouble :: Double -> Double
 negateDouble (D# x)        = D# (negateDouble# x)

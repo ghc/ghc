@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
+% $Id: Base.lhs,v 1.4 2001/12/21 15:07:22 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -85,7 +85,7 @@ module GHC.Base
   ) 
 	where
 
-import GHC.Prim
+import {-# SOURCE #-} GHC.Prim
 import {-# SOURCE #-} GHC.Err
 
 infixr 9  .
@@ -243,25 +243,26 @@ The rest of the prelude list functions are in GHC.List.
 foldr            :: (a -> b -> b) -> b -> [a] -> b
 -- foldr _ z []     =  z
 -- foldr f z (x:xs) =  f x (foldr f z xs)
-{-# INLINE foldr #-}
+{-# INLINE [0] foldr #-}
+-- Inline only in the final stage, after the foldr/cons rule has had a chance
 foldr k z xs = go xs
 	     where
 	       go []     = z
 	       go (y:ys) = y `k` go ys
 
 build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
-{-# INLINE 2 build #-}
+{-# INLINE [1] build #-}
 	-- The INLINE is important, even though build is tiny,
  	-- because it prevents [] getting inlined in the version that
 	-- appears in the interface file.  If [] *is* inlined, it
 	-- won't match with [] appearing in rules in an importing module.
 	--
-	-- The "2" says to inline in phase 2
+	-- The "1" says to inline in phase 1
 
 build g = g (:) []
 
 augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
-{-# INLINE 2 augment #-}
+{-# INLINE [1] augment #-}
 augment g xs = g (:) xs
 
 {-# RULES
@@ -274,8 +275,16 @@ augment g xs = g (:) xs
 "foldr/id"    	foldr (:) [] = \x->x
 "foldr/app"    	forall xs ys. foldr (:) ys xs = append xs ys
 
-"foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
-"foldr/nil"	forall k z.	 foldr k z []     = z 
+-- The foldr/cons rule looks nice, but it can give disastrously
+-- bloated code when commpiling
+--	array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
+-- i.e. when there are very very long literal lists
+-- So I've disabled it for now. We could have special cases
+-- for short lists, I suppose.
+-- "foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
+
+"foldr/single"	forall k z x. foldr k z [x] = k x z
+"foldr/nil"	forall k z.   foldr k z []  = z 
 
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
 		       (h::forall b. (a->b->b) -> b -> b) .
@@ -295,6 +304,7 @@ augment g xs = g (:) xs
 
 \begin{code}
 map :: (a -> b) -> [a] -> [b]
+{-# NOINLINE [1] map #-}
 map = mapList
 
 -- Note eta expanded
@@ -318,6 +328,7 @@ mapList f (x:xs) = f x : mapList f xs
 ----------------------------------------------
 \begin{code}
 (++) :: [a] -> [a] -> [a]
+{-# NOINLINE [1] (++) #-}
 (++) = append
 
 {-# RULES
@@ -449,8 +460,13 @@ String equality is used when desugaring pattern-matches against strings.
 
 \begin{code}
 eqString :: String -> String -> Bool
-eqString = (==)
+eqString []       []	   = True
+eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
+eqString cs1      cs2	   = False
+
+{-# RULES "eqString" (==) = eqString #-}
 \end{code}
+
 
 %*********************************************************
 %*							*
@@ -465,10 +481,15 @@ zeroInt, oneInt, twoInt, maxInt, minInt :: Int
 zeroInt = I# 0#
 oneInt  = I# 1#
 twoInt  = I# 2#
-#if WORD_SIZE_IN_BYTES == 4
+
+{- Seems clumsy. Should perhaps put minInt and MaxInt directly into MachDeps.h -}
+#if WORD_SIZE_IN_BITS == 31
+minInt  = I# (-0x40000000#)
+maxInt  = I# 0x3FFFFFFF#
+#elif WORD_SIZE_IN_BITS == 32
 minInt  = I# (-0x80000000#)
 maxInt  = I# 0x7FFFFFFF#
-#else
+#else 
 minInt  = I# (-0x8000000000000000#)
 maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 #endif
@@ -657,10 +678,37 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 "x# <=# x#" forall x#. x# <=# x# = True
   #-}
 
-#if WORD_SIZE_IN_BYTES == 4
+-- Wrappers for the shift operations.  The uncheckedShift# family are
+-- undefined when the amount being shifted by is greater than the size
+-- in bits of Int#, so these wrappers perform a check and return
+-- either zero or -1 appropriately.
+--
+-- Note that these wrappers still produce undefined results when the
+-- second argument (the shift amount) is negative.
+
+shiftL#, shiftRL# :: Word# -> Int# -> Word#
+
+a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
+	        | otherwise                = a `uncheckedShiftL#` b
+
+a `shiftRL#` b  | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
+	        | otherwise                = a `uncheckedShiftRL#` b
+
+iShiftL#, iShiftRA#, iShiftRL# :: Int# -> Int# -> Int#
+
+a `iShiftL#` b  | b >=# WORD_SIZE_IN_BITS# = 0#
+	        | otherwise                = a `uncheckedIShiftL#` b
+
+a `iShiftRA#` b | b >=# WORD_SIZE_IN_BITS# = if a <# 0# then (-1#) else 0#
+	        | otherwise                = a `uncheckedIShiftRA#` b
+
+a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
+	        | otherwise                = a `uncheckedIShiftRL#` b
+
+#if WORD_SIZE_IN_BITS == 32
 {-# RULES
-"intToInt32#"   forall x#. intToInt32#   x# = x#
-"wordToWord32#" forall x#. wordToWord32# x# = x#
+"narrow32Int#"  forall x#. narrow32Int#   x# = x#
+"narrow32Word#" forall x#. narrow32Word#   x# = x#
    #-}
 #endif
 
@@ -682,6 +730,7 @@ unpacking the strings of error messages.
 
 \begin{code}
 unpackCString# :: Addr# -> [Char]
+{-# NOINLINE [1] unpackCString# #-}
 unpackCString# a = unpackCStringList# a
 
 unpackCStringList# :: Addr# -> [Char]
@@ -705,6 +754,9 @@ unpackAppendCString# addr rest
 	ch = indexCharOffAddr# addr nh
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
+{-# NOINLINE [0] unpackFoldrCString# #-}
+-- Don't inline till right at the end;
+-- usually the unpack-list rule turns it into unpackCStringList
 unpackFoldrCString# addr f z 
   = unpack 0#
   where
@@ -722,18 +774,18 @@ unpackCStringUtf8# addr
       | ch `eqChar#` '\0'#   = []
       | ch `leChar#` '\x7F'# = C# ch : unpack (nh +# 1#)
       | ch `leChar#` '\xDF'# =
-          C# (chr# ((ord# ch                                  -# 0xC0#) `iShiftL#`  6# +#
+          C# (chr# ((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6# +#
                     (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#))) :
           unpack (nh +# 2#)
       | ch `leChar#` '\xEF'# =
-          C# (chr# ((ord# ch                                  -# 0xE0#) `iShiftL#` 12# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `iShiftL#`  6# +#
+          C# (chr# ((ord# ch                                  -# 0xE0#) `uncheckedIShiftL#` 12# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6# +#
                     (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#))) :
           unpack (nh +# 3#)
       | otherwise            =
-          C# (chr# ((ord# ch                                  -# 0xF0#) `iShiftL#` 18# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `iShiftL#` 12# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `iShiftL#`  6# +#
+          C# (chr# ((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6# +#
                     (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
           unpack (nh +# 4#)
       where

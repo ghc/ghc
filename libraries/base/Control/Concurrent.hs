@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Concurrent.hs,v 1.2 2001/08/07 15:25:04 simonmar Exp $
+-- $Id: Concurrent.hs,v 1.3 2001/12/21 15:07:21 simonmar Exp $
 --
 -- A common interface to a collection of useful concurrency
 -- abstractions.
@@ -53,8 +53,7 @@ import GHC.Conc
 import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase	( IO(..) )
 import GHC.IOBase	( unsafeInterleaveIO )
-import GHC.Base		( fork# )
-import GHC.Prim		( Addr#, unsafeCoerce# )
+import GHC.Base
 #endif
 
 #ifdef __HUGS__

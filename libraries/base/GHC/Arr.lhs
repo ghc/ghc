@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Arr.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Arr.lhs,v 1.2 2001/12/21 15:07:22 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -37,17 +37,38 @@ default ()
 %*********************************************************
 
 \begin{code}
-class  (Ord a) => Ix a  where
+class (Ord a) => Ix a where
     range		:: (a,a) -> [a]
     index, unsafeIndex	:: (a,a) -> a -> Int
     inRange		:: (a,a) -> a -> Bool
+    rangeSize		:: (a,a) -> Int
+    unsafeRangeSize     :: (a,a) -> Int
 
 	-- Must specify one of index, unsafeIndex
     index b i | inRange b i = unsafeIndex b i
 	      | otherwise   = error "Error in array index"
     unsafeIndex b i = index b i
+
+	-- As long as you don't override the default rangeSize, 
+	-- you can specify unsafeRangeSize as follows, to speed up
+	-- some operations:
+	--
+	--    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+	--
+    rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
+		       | otherwise   = 0
+    unsafeRangeSize b = rangeSize b
 \end{code}
 
+Note that the following is NOT right
+	rangeSize (l,h) | l <= h    = index b h + 1
+			| otherwise = 0
+
+Because it might be the case that l<h, but the range
+is nevertheless empty.  Consider
+	((1,2),(2,1))
+Here l<h, but the second index ranges from 2..1 and
+hence is empty
 
 %*********************************************************
 %*							*
@@ -80,6 +101,8 @@ instance  Ix Char  where
 
     inRange (m,n) i	=  m <= i && i <= n
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+
 ----------------------------------------------------------------------
 instance  Ix Int  where
     {-# INLINE range #-}
@@ -96,6 +119,8 @@ instance  Ix Int  where
     {-# INLINE inRange #-}
     inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+
 ----------------------------------------------------------------------
 instance  Ix Integer  where
     {-# INLINE range #-}
@@ -109,6 +134,7 @@ instance  Ix Integer  where
 
     inRange (m,n) i	=  m <= i && i <= n
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 ----------------------------------------------------------------------
 instance Ix Bool where -- as derived
@@ -123,6 +149,8 @@ instance Ix Bool where -- as derived
 
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+
 ----------------------------------------------------------------------
 instance Ix Ordering where -- as derived
     {-# INLINE range #-}
@@ -136,6 +164,8 @@ instance Ix Ordering where -- as derived
 
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+
 ----------------------------------------------------------------------
 instance Ix () where
     {-# INLINE range #-}
@@ -147,6 +177,7 @@ instance Ix () where
     {-# INLINE index #-}
     index b i = unsafeIndex b i
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 ----------------------------------------------------------------------
 instance (Ix a, Ix b) => Ix (a, b) where -- as derived
@@ -163,6 +194,8 @@ instance (Ix a, Ix b) => Ix (a, b) where -- as derived
     {- INLINE inRange #-}
     inRange ((l1,l2),(u1,u2)) (i1,i2) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2
+
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
     -- Default method for index
 
@@ -184,6 +217,8 @@ instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+
     -- Default method for index
 
 ----------------------------------------------------------------------
@@ -203,6 +238,8 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
     inRange ((l1,l2,l3,l4),(u1,u2,u3,u4)) (i1,i2,i3,i4) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3 && inRange (l4,u4) i4
+
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
     -- Default method for index
 
@@ -226,40 +263,9 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
       inRange (l3,u3) i3 && inRange (l4,u4) i4 && 
       inRange (l5,u5) i5
 
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
+
     -- Default method for index
-\end{code}
-
-
-%********************************************************
-%*							*
-\subsection{Size of @Ix@ interval}
-%*							*
-%********************************************************
-
-The @rangeSize@ operator returns the number of elements
-in the range for an @Ix@ pair.
-
-\begin{code}
-{-# SPECIALISE unsafeRangeSize :: (Int,Int) -> Int #-}
-{-# SPECIALISE unsafeRangeSize :: ((Int,Int),(Int,Int)) -> Int #-}
-unsafeRangeSize :: (Ix a) => (a,a) -> Int
-unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-
-{-# SPECIALISE rangeSize :: (Int,Int) -> Int #-}
-{-# SPECIALISE rangeSize :: ((Int,Int),(Int,Int)) -> Int #-}
-rangeSize :: (Ix a) => (a,a) -> Int
-rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
-		   | otherwise   = 0
-
--- Note that the following is NOT right
---	rangeSize (l,h) | l <= h    = index b h + 1
---			| otherwise = 0
---
--- Because it might be the case that l<h, but the range
--- is nevertheless empty.  Consider
---	((1,2),(2,1))
--- Here l<h, but the second index ranges from 2..1 and
--- hence is empty
 \end{code}
 
 %*********************************************************

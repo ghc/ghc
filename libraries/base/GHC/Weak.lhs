@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Weak.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
+% $Id: Weak.lhs,v 1.3 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
@@ -11,7 +11,6 @@
 
 module GHC.Weak where
 
-import GHC.Prim
 import GHC.Base
 import Data.Maybe
 import GHC.IOBase	( IO(..), unIO )

@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: CPUTime.hsc,v 1.4 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.5 2001/12/21 15:07:26 simonmar Exp $
 --
 -- The standard CPUTime library.
 --
@@ -17,7 +17,7 @@
 module System.CPUTime 
 	(
          getCPUTime,       -- :: IO Integer
-	 cpuTimePrecision  -- :: Integer
+	 cpuTimePrecision  -- :: Integer
         ) where
 
 import Prelude
@@ -55,10 +55,10 @@ getCPUTime = do
 
     let ru_utime = (#ptr struct rusage, ru_utime) p_rusage
     let ru_stime = (#ptr struct rusage, ru_stime) p_rusage
-    u_sec  <- (#peek struct timeval,tv_sec)  ru_utime :: IO CLong
-    u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CLong
-    s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CLong
-    s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CLong
+    u_sec  <- (#peek struct timeval,tv_sec)  ru_utime :: IO CTime
+    u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CTime
+    s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CTime
+    s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CTime
 
     return ((fromIntegral u_sec * 1000000 + fromIntegral u_usec + 
              fromIntegral s_sec * 1000000 + fromIntegral s_usec) 

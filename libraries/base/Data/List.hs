@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: List.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: List.hs,v 1.2 2001/12/21 15:07:21 simonmar Exp $
 --
 -- Operations on lists.
 --
@@ -317,13 +317,21 @@ insertBy cmp x ys@(y:ys')
      GT -> y : insertBy cmp x ys'
      _  -> x : ys
 
-maximumBy		:: (a -> a -> a) -> [a] -> a
-maximumBy _   []	=  error "List.maximumBy: empty list"
-maximumBy max xs	=  foldl1 max xs
+maximumBy		:: (a -> a -> Ordering) -> [a] -> a
+maximumBy _ []		=  error "List.maximumBy: empty list"
+maximumBy cmp xs	=  foldl1 max xs
+			where
+			   max x y = case cmp x y of
+					GT -> x
+					_  -> y
 
-minimumBy		:: (a -> a -> a) -> [a] -> a
-minimumBy _   []	=  error "List.minimumBy: empty list"
-minimumBy min xs	=  foldl1 min xs
+minimumBy		:: (a -> a -> Ordering) -> [a] -> a
+minimumBy _ []		=  error "List.minimumBy: empty list"
+minimumBy cmp xs	=  foldl1 min xs
+			where
+			   min x y = case cmp x y of
+					GT -> y
+					_  -> x
 
 genericLength           :: (Num i) => [b] -> i
 genericLength []        =  0

@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Bits.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: Bits.hs,v 1.3 2001/12/21 15:07:21 simonmar Exp $
 --
 -- Bitwise operations.
 --
@@ -92,20 +92,13 @@ instance Bits Int where
         | i# >=# 0#            = I# (x# `iShiftL#` i#)
         | otherwise            = I# (x# `iShiftRA#` negateInt# i#)
     (I# x#) `rotate` (I# i#) =
-#if WORD_SIZE_IN_BYTES == 4
         I# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                       (x'# `shiftRL#` (32# -# i'#))))
+                       (x'# `shiftRL#` (wsib -# i'#))))
         where
         x'# = int2Word# x#
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
-#else
-        I# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                       (x'# `shiftRL#` (64# -# i'#))))
-        where
-        x'# = int2Word# x#
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
-#endif
-    bitSize  _                 = WORD_SIZE_IN_BYTES * 8
+        i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+	wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
+    bitSize  _                 = WORD_SIZE_IN_BITS
     isSigned _                 = True
 
 instance Bits Integer where

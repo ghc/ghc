@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: IORef.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: IORef.hs,v 1.3 2001/12/21 15:07:21 simonmar Exp $
 --
 -- Mutable references in the IO monad.
 --
@@ -29,7 +29,7 @@ module Data.IORef
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Prim		( mkWeak# )
+import GHC.Base		( mkWeak# )
 import GHC.STRef
 import GHC.IOBase
 #if !defined(__PARALLEL_HASKELL__)

@@ -1,9 +1,9 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -#include "HsCore.h" #-}
 
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: IO.hsc,v 1.3 2001/09/14 11:25:24 simonmar Exp $
+-- $Id: IO.hs,v 1.1 2001/12/21 15:07:23 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -14,9 +14,15 @@
 -- but as it happens they also do everything required by library
 -- module IO.
 
-module GHC.IO where
-
-#include "HsCore.h"
+module GHC.IO ( 
+   putChar, putStr, putStrLn, print, getChar, getLine, getContents,
+   interact, readFile, writeFile, appendFile, readLn, readIO, hReady,
+   hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
+   hPutStrLn, hPrint,
+   commitBuffer',	-- hack, see below
+   hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
+   hGetBuf, hPutBuf, slurpFile
+ ) where
 
 import Foreign
 import Foreign.C
@@ -58,11 +64,11 @@ hWaitForInput h msecs = do
 	else do
 
   r <- throwErrnoIfMinus1Retry "hReady"
-	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs))
+	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs) (haIsStream handle_))
   return (r /= 0)
 
-foreign import "inputReady" 
-  inputReady :: CInt -> CInt -> IO CInt
+foreign import "inputReady" unsafe
+  inputReady :: CInt -> CInt -> Bool -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- hGetChar
@@ -85,16 +91,16 @@ hGetChar handle =
   -- buffer is empty.
   case haBufferMode handle_ of
     LineBuffering    -> do
-	new_buf <- fillReadBuffer fd True buf
+	new_buf <- fillReadBuffer fd True (haIsStream handle_) buf
 	hGetcBuffered fd ref new_buf
     BlockBuffering _ -> do
-	new_buf <- fillReadBuffer fd False buf
+	new_buf <- fillReadBuffer fd False (haIsStream handle_) buf
 	hGetcBuffered fd ref new_buf
     NoBuffering -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
-	        (read_off (fromIntegral fd) raw 0 1)
+	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then ioe_EOF
@@ -164,7 +170,7 @@ hGetLineBufferedLoop handle_ ref
 		   else writeIORef ref buf{ bufRPtr = off + 1 }
 	        return (concat (reverse (xs:xss)))
 	else do
-	     maybe_buf <- maybeFillReadBuffer (haFD handle_) True 
+	     maybe_buf <- maybeFillReadBuffer (haFD handle_) True (haIsStream handle_)
 				buf{ bufWPtr=0, bufRPtr=0 }
 	     case maybe_buf of
 		-- Nothing indicates we caught an EOF, and we may have a
@@ -177,9 +183,9 @@ hGetLineBufferedLoop handle_ ref
 		     hGetLineBufferedLoop handle_ ref new_buf (xs:xss)
 
 
-maybeFillReadBuffer fd is_line buf
+maybeFillReadBuffer fd is_line is_stream buf
   = catch 
-     (do buf <- fillReadBuffer fd is_line buf
+     (do buf <- fillReadBuffer fd is_line is_stream buf
 	 return (Just buf)
      )
      (\e -> do if isEOFError e 
@@ -273,9 +279,8 @@ lazyRead' h handle_ = do
      NoBuffering      -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
-	    fd  = haFD handle_
 	r <- throwErrnoIfMinus1RetryMayBlock "lazyRead"
-	        (read_off (fromIntegral fd) raw 0 1)
+	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then do handle_ <- hClose_help handle_ 
@@ -291,7 +296,7 @@ lazyRead' h handle_ = do
 -- is_line==True, which tells it to "just read what there is".
 lazyReadBuffered h handle_ fd ref buf = do
    catch 
-   	(do buf <- fillReadBuffer fd True{-is_line-} buf
+   	(do buf <- fillReadBuffer fd True{-is_line-} (haIsStream handle_) buf
 	    lazyReadHaveBuffer h handle_ fd ref buf
      	)
 	-- all I/O errors are discarded.  Additionally, we close the handle.
@@ -346,7 +351,7 @@ hPutcBuffered handle_ is_line c = do
   let new_buf = buf{ bufWPtr = w' }
   if bufferFull new_buf || is_line && c == '\n'
      then do 
-  	flushed_buf <- flushWriteBuffer (haFD handle_) new_buf
+  	flushed_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) new_buf
   	writeIORef ref flushed_buf
      else do 
   	writeIORef ref new_buf
@@ -424,13 +429,12 @@ writeLines hdl Buffer{ bufBuf=raw, bufSize=len } s =
 	return ()
    shoveString n (c:cs) = do
 	n' <- writeCharIntoBuffer raw n c
-	-- we're line-buffered, so flush the buffer if we just got a newline
-	if (c == '\n')
-	  then do
-	    new_buf <- commitBuffer hdl raw len n' True{-needs flush-} False
-	    writeLines hdl new_buf cs
-	  else do
-	    shoveString n' cs
+      if (c == '\n') 
+         then do 
+              new_buf <- commitBuffer hdl raw len n' True{-needs flush-} False
+              writeLines hdl new_buf cs
+         else 
+              shoveString n' cs
   in
   shoveString 0 s
 
@@ -476,13 +480,27 @@ commitBuffer
 	:: Handle			-- handle to commit to
 	-> RawBuffer -> Int		-- address and size (in bytes) of buffer
 	-> Int				-- number of bytes of data in buffer
-	-> Bool				-- flush the handle afterward?
+	-> Bool				-- True <=> flush the handle afterward
 	-> Bool 			-- release the buffer?
 	-> IO Buffer
 
-commitBuffer hdl raw sz count flush release = do
-  wantWritableHandle "commitAndReleaseBuffer" hdl $ 
-    \ handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } -> do
+commitBuffer hdl raw sz@(I## _) count@(I## _) flush release = do
+  wantWritableHandle "commitAndReleaseBuffer" hdl $
+     commitBuffer' hdl raw sz count flush release
+
+-- Explicitly lambda-lift this function to subvert GHC's full laziness
+-- optimisations, which otherwise tends to float out subexpressions
+-- past the \handle, which is really a pessimisation in this case because
+-- that lambda is a one-shot lambda.
+--
+-- Don't forget to export the function, to stop it being inlined too
+-- (this appears to be better than NOINLINE, because the strictness
+-- analyser still gets to worker-wrapper it).
+--
+-- This hack is a fairly big win for hPutStr performance.  --SDM 18/9/2001
+--
+commitBuffer' hdl raw sz@(I## _) count@(I## _) flush release
+  handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } = do
 
 #ifdef DEBUG_DUMP
       puts ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
@@ -509,7 +527,7 @@ commitBuffer hdl raw sz count flush release = do
 		    return (newEmptyBuffer raw WriteBuffer sz)
 
 		-- else, we have to flush
-	    else do flushed_buf <- flushWriteBuffer fd old_buf
+	    else do flushed_buf <- flushWriteBuffer fd (haIsStream handle_) old_buf
 
 		    let this_buf = 
 			    Buffer{ bufBuf=raw, bufState=WriteBuffer, 
@@ -527,7 +545,7 @@ commitBuffer hdl raw sz count flush release = do
 			-- otherwise, we have to flush the new data too,
 			-- and start with a fresh buffer
 			else do
-			  flushWriteBuffer fd this_buf
+			  flushWriteBuffer fd (haIsStream handle_) this_buf
 			  writeIORef ref flushed_buf
 			    -- if the sizes were different, then allocate
 			    -- a new buffer of the correct size.
@@ -536,13 +554,15 @@ commitBuffer hdl raw sz count flush release = do
 			     else allocateBuffer size WriteBuffer
 
       -- release the buffer if necessary
-      if release && bufSize buf_ret == size
-	 then do
+      case buf_ret of
+        Buffer{ bufSize=buf_ret_sz, bufBuf=buf_ret_raw } -> do
+          if release && buf_ret_sz == size
+	    then do
 	      spare_bufs <- readIORef spare_buf_ref
 	      writeIORef spare_buf_ref 
-		(BufferListCons (bufBuf buf_ret) spare_bufs)
+		(BufferListCons buf_ret_raw spare_bufs)
 	      return buf_ret
-	 else
+	    else
 	      return buf_ret
 
 -- ---------------------------------------------------------------------------
@@ -678,13 +698,13 @@ slurpFile fname = do
 -- ---------------------------------------------------------------------------
 -- memcpy wrappers
 
-foreign import "memcpy_wrap_src_off" unsafe 
+foreign import "__hscore_memcpy_src_off" unsafe 
    memcpy_ba_baoff :: RawBuffer -> RawBuffer -> Int -> CSize -> IO (Ptr ())
-foreign import "memcpy_wrap_src_off" unsafe 
+foreign import "__hscore_memcpy_src_off" unsafe 
    memcpy_ptr_baoff :: Ptr a -> RawBuffer -> Int -> CSize -> IO (Ptr ())
-foreign import "memcpy_wrap_dst_off" unsafe 
+foreign import "__hscore_memcpy_dst_off" unsafe 
    memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
-foreign import "memcpy_wrap_dst_off" unsafe 
+foreign import "__hscore_memcpy_dst_off" unsafe 
    memcpy_baoff_ptr :: RawBuffer -> Int -> Ptr a -> CSize -> IO (Ptr ())
 
 -----------------------------------------------------------------------------

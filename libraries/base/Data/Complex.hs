@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Complex.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Complex.hs,v 1.2 2001/12/21 15:07:21 simonmar Exp $
 --
 -- Complex numbers.
 --
@@ -58,24 +58,30 @@ realPart, imagPart :: (RealFloat a) => Complex a -> a
 realPart (x :+ _) =  x
 imagPart (_ :+ y) =  y
 
+{-# SPECIALISE conjugate :: Complex Double -> Complex Double #-}
 conjugate	 :: (RealFloat a) => Complex a -> Complex a
 conjugate (x:+y) =  x :+ (-y)
 
+{-# SPECIALISE mkPolar :: Double -> Double -> Complex Double #-}
 mkPolar		 :: (RealFloat a) => a -> a -> Complex a
 mkPolar r theta	 =  r * cos theta :+ r * sin theta
 
+{-# SPECIALISE cis :: Double -> Complex Double #-}
 cis		 :: (RealFloat a) => a -> Complex a
 cis theta	 =  cos theta :+ sin theta
 
+{-# SPECIALISE polar :: Complex Double -> (Double,Double) #-}
 polar		 :: (RealFloat a) => Complex a -> (a,a)
 polar z		 =  (magnitude z, phase z)
 
+{-# SPECIALISE magnitude :: Complex Double -> Double #-}
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
 		     (sqrt ((scaleFloat mk x)^(2::Int) + (scaleFloat mk y)^(2::Int)))
 		    where k  = max (exponent x) (exponent y)
 		          mk = - k
 
+{-# SPECIALISE phase :: Complex Double -> Double #-}
 phase :: (RealFloat a) => Complex a -> a
 phase (0 :+ 0)   = 0		-- SLPJ July 97 from John Peterson
 phase (x:+y)	 = atan2 y x

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Show.lhs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
+% $Id: Show.lhs,v 1.4 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -246,8 +246,8 @@ itos n# cs
     itos' :: Int# -> String -> String
     itos' n# cs
         | n# <# 10#  = C# (chr# (ord# '0'# +# n#)) : cs
-        | otherwise = itos' (n# `quotInt#` 10#)
-                            (C# (chr# (ord# '0'# +# (n# `remInt#` 10#))) : cs)
+        | otherwise = case chr# (ord# '0'# +# (n# `remInt#` 10#)) of { c# ->
+		      itos' (n# `quotInt#` 10#) (C# c# : cs) }
 \end{code}
 
 %*********************************************************

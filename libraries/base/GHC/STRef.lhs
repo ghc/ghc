@@ -3,7 +3,6 @@
 module GHC.STRef where
 
 import GHC.ST
-import GHC.Prim
 import GHC.Base
 
 data STRef s a = STRef (MutVar# s a)

@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Dynamic.hs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
+-- $Id: Dynamic.hs,v 1.4 2001/12/21 15:07:21 simonmar Exp $
 --
 -- The Dynamic interface provides basic support for dynamic types.
 -- 
@@ -78,8 +78,6 @@ import GHC.Dynamic
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Prim			( unsafeCoerce# )
-
 unsafeCoerce :: a -> b
 unsafeCoerce = unsafeCoerce#
 #endif

@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Ix.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Ix.hs,v 1.2 2001/12/21 15:07:21 simonmar Exp $
 --
 -- Class of index types.
 --
@@ -20,8 +20,8 @@ module Data.Ix
 	  ( range	-- :: (Ix a) => (a,a) -> [a]
 	  , index       -- :: (Ix a) => (a,a) -> a   -> Int
 	  , inRange     -- :: (Ix a) => (a,a) -> a   -> Bool
+	  , rangeSize	-- :: (Ix a) => (a,a) -> Int
 	  )
-    ,	rangeSize       -- :: (Ix a) => (a,a) -> Int
     -- Ix instances:
     --
     --  Ix Char

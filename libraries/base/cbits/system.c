@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.3 2001/08/17 12:50:34 simonmar Exp $
+ * $Id: system.c,v 1.4 2001/12/21 15:07:26 simonmar Exp $
  *
  * system Runtime Support
  */
@@ -13,6 +13,7 @@
 
 #if defined(mingw32_TARGET_OS)
 #include <windows.h>
+#include <stdlib.h>
 #endif
 
 HsInt
@@ -20,8 +21,7 @@ systemCmd(HsAddr cmd)
 {
   /* -------------------- WINDOWS VERSION --------------------- */
 #if defined(mingw32_TARGET_OS)
-  if (system(cmd) < 0) return -1;
-  return 0;
+    return system(cmd);
 #else
   /* -------------------- UNIX VERSION --------------------- */
     int pid;

@@ -1,9 +1,11 @@
 ---------------------------------------------------------------------------
--- 				PrelGHC.hi-boot
+-- 				GHC/Prim.hi-boot
 -- 
 -- 	This hand-written interface file allows you to bring into scope the 
 --	primitive operations and types that GHC knows about.
 ---------------------------------------------------------------------------
+
+#include "MachDeps.h"
 
 __interface "core" GHCziPrim 1 0 where
 
@@ -49,6 +51,9 @@ __export GHCziPrim
   tryPutMVarzh
   isEmptyMVarzh
 
+  -- Seq
+  seq		-- Defined in MkId
+
   -- Parallel
   seqzh
   parzh
@@ -85,12 +90,12 @@ __export GHCziPrim
   remIntzh
   gcdIntzh
   negateIntzh
-  iShiftLzh
-  iShiftRAzh
-  iShiftRLzh
+  uncheckedIShiftLzh
+  uncheckedIShiftRAzh
+  uncheckedIShiftRLzh
   addIntCzh
   subIntCzh
-  mulIntCzh
+  mulIntMayOflozh
 
   Wordzh
   gtWordzh
@@ -108,30 +113,43 @@ __export GHCziPrim
   orzh
   notzh
   xorzh
-  shiftLzh
-  shiftRLzh
+  uncheckedShiftLzh
+  uncheckedShiftRLzh
   int2Wordzh
   word2Intzh
 
+  narrow8Intzh
+  narrow16Intzh
+  narrow32Intzh
+  narrow8Wordzh
+  narrow16Wordzh
+  narrow32Wordzh
+
+#if WORD_SIZE_IN_BITS < 32
+  Int32zh
+  Word32zh
+#endif
+
+#if WORD_SIZE_IN_BITS < 64
   Int64zh
   Word64zh
-
-  intToInt8zh
-  intToInt16zh
-  intToInt32zh
-  wordToWord8zh
-  wordToWord16zh
-  wordToWord32zh
+#endif
 
   Addrzh
+  nullAddrzh	-- Defined in MkId
+  plusAddrzh
+  minusAddrzh
+  remAddrzh
+#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
+  addr2Intzh
+  int2Addrzh
+#endif
   gtAddrzh
   geAddrzh
   eqAddrzh
   neAddrzh
   ltAddrzh
   leAddrzh
-  int2Addrzh
-  addr2Intzh
 
   Floatzh
   gtFloatzh
@@ -193,6 +211,9 @@ __export GHCziPrim
   ztztzhzh
   decodeDoublezh
 
+-- Integer is implemented by foreign imports on .NET, so no primops
+
+#ifndef ILX
   cmpIntegerzh
   cmpIntegerIntzh
   plusIntegerzh
@@ -210,14 +231,21 @@ __export GHCziPrim
   integer2Wordzh
   int2Integerzh
   word2Integerzh
-  integerToInt64zh
-  integerToWord64zh
+#if WORD_SIZE_IN_BITS < 32
+  integerToInt32zh
+  integerToWord32zh
+  int32ToIntegerzh
+  word32ToIntegerzh
+#endif  
+#if WORD_SIZE_IN_BITS < 64
   int64ToIntegerzh
   word64ToIntegerzh
+#endif
   andIntegerzh
   orIntegerzh
   xorIntegerzh
   complementIntegerzh
+#endif
 
   Arrayzh
   ByteArrayzh
@@ -392,19 +420,19 @@ __export GHCziPrim
   eqStableNamezh
   stableNameToIntzh
 
-  reallyUnsafePtrEqualityzh
-
   newBCOzh
   BCOzh
   mkApUpd0zh
 
-  unsafeCoercezh
+  unsafeCoercezh	-- unsafeCoerce# :: forall a b. a -> b
+			-- It's defined in ghc/compiler/basicTypes/MkId.lhs
   addrToHValuezh
 ;
 
--- Export GHC.Err.error, so that others don't have to import PrelErr
+-- Export GHC.Err.error, so that others do not have to import PrelErr
 __export GHCziErr error ;
 
+infixr 0 seq ;
 
 --------------------------------------------------
 instance {CCallable Charzh} = zdfCCallableCharzh;
@@ -426,7 +454,7 @@ instance __forall s => {CCallable (StablePtrzh s)} = zdfCCallableStablePtrzh;
 
 1 assert :: __forall a => GHCziBase.Bool -> a -> a ;
 
--- These guys don't really exist:
+-- These guys do not really exist:
 --
 1 zdfCCallableCharzh :: {CCallable Charzh} ;
 1 zdfCCallableDoublezh :: {CCallable Doublezh} ;
@@ -440,3 +468,4 @@ instance __forall s => {CCallable (StablePtrzh s)} = zdfCCallableStablePtrzh;
 1 zdfCCallableMutableByteArrayzh :: __forall s => {CCallable (MutableByteArrayzh s)} ;
 1 zdfCCallableForeignObjzh :: {CCallable ForeignObjzh} ;
 1 zdfCCallableStablePtrzh :: __forall a => {CCallable (StablePtrzh a)} ;
+

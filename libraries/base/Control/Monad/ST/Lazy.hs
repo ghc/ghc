@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: Lazy.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: Lazy.hs,v 1.3 2001/12/21 15:07:21 simonmar Exp $
 --
 -- This module presents an identical interface to Control.Monad.ST,
 -- but the underlying implementation of the state thread is lazy.
@@ -47,10 +47,9 @@ import Data.Array
 import qualified Control.Monad.ST as ST
 import qualified GHC.Arr as STArray
 import qualified GHC.ST
-import GHC.Base	( ($), ()(..) )
+import GHC.Base
 import Control.Monad
 import Data.Ix
-import GHC.Prim
 #endif
 
 #ifdef __HUGS__

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: List.lhs,v 1.4 2001/07/31 13:14:01 simonmar Exp $
+% $Id: List.lhs,v 1.5 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -118,9 +118,11 @@ length l                =  len l 0#
 -- filter, applied to a predicate and a list, returns the list of those
 -- elements that satisfy the predicate; i.e.,
 -- filter p xs = [ x | x <- xs, p x]
+{-# NOINLINE [1] filter #-}
 filter :: (a -> Bool) -> [a] -> [a]
 filter = filterList
 
+{-# INLINE [0] filter #-}
 filterFB c p x r | p x       = x `c` r
 		 | otherwise = r
 
@@ -176,9 +178,9 @@ scanl f q ls            =  q : (case ls of
                                 []   -> []
                                 x:xs -> scanl f (f q x) xs)
 
-scanl1                  :: (a -> a -> a) -> [a] -> [a]
-scanl1 f (x:xs)         =  scanl f x xs
-scanl1 _ []             =  errorEmptyList "scanl1"
+scanl1			:: (a -> a -> a) -> [a] -> [a]
+scanl1 f (x:xs)		=  scanl f x xs
+scanl1 _ []		=  []
 
 -- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
 -- above functions.
@@ -194,14 +196,15 @@ scanr f q0 (x:xs)       =  f x q : qs
                            where qs@(q:_) = scanr f q0 xs 
 
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
-scanr1 _  [x]           =  [x]
-scanr1 f  (x:xs)        =  f x q : qs
+scanr1 f []		=  []
+scanr1 f [x]		=  [x]
+scanr1 f (x:xs)		=  f x q : qs
                            where qs@(q:_) = scanr1 f xs 
-scanr1 _ []             =  errorEmptyList "scanr1"
 
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
 iterate :: (a -> a) -> a -> [a]
+{-# NOINLINE [1] iterate #-}
 iterate = iterateList
 
 iterateFB c f x = x `c` iterateFB c f (f x)
@@ -216,9 +219,12 @@ iterateList f x =  x : iterateList f (f x)
 
 -- repeat x is an infinite list, with x the value of every element.
 repeat :: a -> [a]
+{-# NOINLINE [1] repeat #-}
 repeat = repeatList
 
+{-# INLINE [0] repeatFB #-}
 repeatFB c x = xs where xs = x `c` xs
+
 repeatList x = xs where xs = x :   xs
 
 {-# RULES
@@ -447,10 +453,10 @@ concat = foldr (++) []
 -- List index (subscript) operator, 0-origin
 (!!)                    :: [a] -> Int -> a
 #ifdef USE_REPORT_PRELUDE
-(x:_)  !! 0             =  x
-(_:xs) !! n | n > 0     =  xs !! (minusInt n 1)
-(_:_)  !! _             =  error "Prelude.(!!): negative index"
-[]     !! _             =  error "Prelude.(!!): index too large"
+xs     !! n | n < 0 =  error "Prelude.!!: negative index"
+[]     !! _         =  error "Prelude.!!: index too large"
+(x:_)  !! 0         =  x
+(_:xs) !! n         =  xs !! (n-1)
 #else
 -- HBC version (stolen), then unboxified
 -- The semantics is not quite the same for error conditions
@@ -514,8 +520,10 @@ tuples are in the List module.
 \begin{code}
 ----------------------------------------------
 zip :: [a] -> [b] -> [(a,b)]
+{-# NOINLINE [1] zip #-}
 zip = zipList
 
+{-# INLINE [0] zipFB #-}
 zipFB c x y r = (x,y) `c` r
 
 
@@ -548,9 +556,10 @@ zip3 _      _      _      = []
 \begin{code}
 ----------------------------------------------
 zipWith :: (a->b->c) -> [a]->[b]->[c]
+{-# NOINLINE [1] zipWith #-}
 zipWith = zipWithList
 
-
+{-# INLINE [0] zipWithFB #-}
 zipWithFB c f x y r = (x `f` y) `c` r
 
 zipWithList                 :: (a->b->c) -> [a] -> [b] -> [c]

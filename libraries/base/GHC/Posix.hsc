@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hsc,v 1.3 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: Posix.hsc,v 1.4 2001/12/21 15:07:25 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -90,6 +90,8 @@ fileType file =
       c_stat p_file p_stat
     statGetType p_stat
 
+-- NOTE: On Win32 platforms, this will only work with file descriptors
+-- referring to file handles. i.e., it'll fail for socket FDs.
 fdType :: Int -> IO FDType
 fdType fd = 
   allocaBytes (#const sizeof(struct stat)) $ \ p_stat -> do
@@ -120,6 +122,16 @@ fileTruncate file = do
  	        (c_open file_cstr (fromIntegral flags) 0o666)
     c_close fd
   return ()
+
+#ifdef mingw32_TARGET_OS
+closeFd :: Bool -> CInt -> IO CInt
+closeFd isStream fd 
+  | isStream  = c_closesocket fd
+  | otherwise = c_close fd
+
+foreign import "closesocket" unsafe
+   c_closesocket :: CInt -> IO CInt
+#endif
 
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
@@ -209,9 +221,11 @@ getEcho fd = return False
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
 		 (c_fcntl_read (fromIntegral fd) (#const F_GETFL))
-  throwErrnoIfMinus1Retry "setNonBlockingFD"
-	(c_fcntl_write (fromIntegral fd) 
-	   (#const F_SETFL) (flags .|. #const O_NONBLOCK))
+  -- An error when setting O_NONBLOCK isn't fatal: on some systems 
+  -- there are certain file handles on which this will fail (eg. /dev/null
+  -- on FreeBSD) so we throw away the return code from fcntl_write.
+  fcntl_write (fromIntegral fd) 
+	(#const F_SETFL) (flags .|. #const O_NONBLOCK)
 #else
 
 -- bogus defns for win32
@@ -355,7 +369,7 @@ foreign import ccall "fcntl" unsafe
 foreign import ccall "fork" unsafe
    c_fork :: IO CPid 
 
-foreign import ccall "sigemptyset" unsafe
+foreign import ccall "sigemptyset_wrap" unsafe
    c_sigemptyset :: Ptr CSigset -> IO ()
 
 foreign import ccall "sigaddset" unsafe

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Real.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Real.lhs,v 1.2 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -62,6 +62,7 @@ their greatest common divisor.
 
 \begin{code}
 reduce ::  (Integral a) => a -> a -> Ratio a
+{-# SPECIALISE reduce :: Integer -> Integer -> Rational #-}
 reduce _ 0		=  error "Ratio.%: zero denominator"
 reduce x y		=  (x `quot` d) :% (y `quot` d)
 			   where d = gcd x y
@@ -226,7 +227,7 @@ instance  (Integral a)	=> Num (Ratio a)  where
 instance  (Integral a)	=> Fractional (Ratio a)  where
     {-# SPECIALIZE instance Fractional Rational #-}
     (x:%y) / (x':%y')	=  (x*y') % (y*x')
-    recip (x:%y)	=  if x < 0 then (-y) :% (-x) else y :% x
+    recip (x:%y)	=  y % x
     fromRational (x:%y) =  fromInteger x :% fromInteger y
 
 instance  (Integral a)	=> Real (Ratio a)  where

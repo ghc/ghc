@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.3 2001/07/31 12:59:30 simonmar Exp $
+-- $Id: Error.hs,v 1.4 2001/12/21 15:07:22 simonmar Exp $
 --
 -- C-specific Marshalling support: Handling of C "errno" error codes
 --
@@ -120,6 +120,7 @@ import System.IO		( IOError, Handle, ioError )
 -- import of C function that gives address of errno
 -- This function exists because errno is a variable on some systems, but on
 -- Windows it is a macro for a function...
+-- [yes, global variables and thread safety don't really go hand-in-hand. -- sof]
 foreign import "ghcErrno" unsafe _errno :: Ptr CInt
 
 -- Haskell representation for "errno" values
@@ -148,108 +149,108 @@ eOK, e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN,
   eSOCKTNOSUPPORT, eSPIPE, eSRCH, eSRMNT, eSTALE, eTIME, eTIMEDOUT, 
   eTOOMANYREFS, eTXTBSY, eUSERS, eWOULDBLOCK, eXDEV		       :: Errno
 --
--- the CCONST_XXX identifiers are cpp symbols whose value is computed by
+-- the cCONST_XXX identifiers are cpp symbols whose value is computed by
 -- configure 
 --
 eOK             = Errno 0
-e2BIG           = Errno (CCONST_E2BIG)
-eACCES		= Errno (CCONST_EACCES)
-eADDRINUSE	= Errno (CCONST_EADDRINUSE)
-eADDRNOTAVAIL	= Errno (CCONST_EADDRNOTAVAIL)
-eADV		= Errno (CCONST_EADV)
-eAFNOSUPPORT	= Errno (CCONST_EAFNOSUPPORT)
-eAGAIN		= Errno (CCONST_EAGAIN)
-eALREADY	= Errno (CCONST_EALREADY)
-eBADF		= Errno (CCONST_EBADF)
-eBADMSG		= Errno (CCONST_EBADMSG)
-eBADRPC		= Errno (CCONST_EBADRPC)
-eBUSY		= Errno (CCONST_EBUSY)
-eCHILD		= Errno (CCONST_ECHILD)
-eCOMM		= Errno (CCONST_ECOMM)
-eCONNABORTED	= Errno (CCONST_ECONNABORTED)
-eCONNREFUSED	= Errno (CCONST_ECONNREFUSED)
-eCONNRESET	= Errno (CCONST_ECONNRESET)
-eDEADLK		= Errno (CCONST_EDEADLK)
-eDESTADDRREQ	= Errno (CCONST_EDESTADDRREQ)
-eDIRTY		= Errno (CCONST_EDIRTY)
-eDOM		= Errno (CCONST_EDOM)
-eDQUOT		= Errno (CCONST_EDQUOT)
-eEXIST		= Errno (CCONST_EEXIST)
-eFAULT		= Errno (CCONST_EFAULT)
-eFBIG		= Errno (CCONST_EFBIG)
-eFTYPE		= Errno (CCONST_EFTYPE)
-eHOSTDOWN	= Errno (CCONST_EHOSTDOWN)
-eHOSTUNREACH	= Errno (CCONST_EHOSTUNREACH)
-eIDRM		= Errno (CCONST_EIDRM)
-eILSEQ		= Errno (CCONST_EILSEQ)
-eINPROGRESS	= Errno (CCONST_EINPROGRESS)
-eINTR		= Errno (CCONST_EINTR)
-eINVAL		= Errno (CCONST_EINVAL)
-eIO		= Errno (CCONST_EIO)
-eISCONN		= Errno (CCONST_EISCONN)
-eISDIR		= Errno (CCONST_EISDIR)
-eLOOP		= Errno (CCONST_ELOOP)
-eMFILE		= Errno (CCONST_EMFILE)
-eMLINK		= Errno (CCONST_EMLINK)
-eMSGSIZE	= Errno (CCONST_EMSGSIZE)
-eMULTIHOP	= Errno (CCONST_EMULTIHOP)
-eNAMETOOLONG	= Errno (CCONST_ENAMETOOLONG)
-eNETDOWN	= Errno (CCONST_ENETDOWN)
-eNETRESET	= Errno (CCONST_ENETRESET)
-eNETUNREACH	= Errno (CCONST_ENETUNREACH)
-eNFILE		= Errno (CCONST_ENFILE)
-eNOBUFS		= Errno (CCONST_ENOBUFS)
-eNODATA		= Errno (CCONST_ENODATA)
-eNODEV		= Errno (CCONST_ENODEV)
-eNOENT		= Errno (CCONST_ENOENT)
-eNOEXEC		= Errno (CCONST_ENOEXEC)
-eNOLCK		= Errno (CCONST_ENOLCK)
-eNOLINK		= Errno (CCONST_ENOLINK)
-eNOMEM		= Errno (CCONST_ENOMEM)
-eNOMSG		= Errno (CCONST_ENOMSG)
-eNONET		= Errno (CCONST_ENONET)
-eNOPROTOOPT	= Errno (CCONST_ENOPROTOOPT)
-eNOSPC		= Errno (CCONST_ENOSPC)
-eNOSR		= Errno (CCONST_ENOSR)
-eNOSTR		= Errno (CCONST_ENOSTR)
-eNOSYS		= Errno (CCONST_ENOSYS)
-eNOTBLK		= Errno (CCONST_ENOTBLK)
-eNOTCONN	= Errno (CCONST_ENOTCONN)
-eNOTDIR		= Errno (CCONST_ENOTDIR)
-eNOTEMPTY	= Errno (CCONST_ENOTEMPTY)
-eNOTSOCK	= Errno (CCONST_ENOTSOCK)
-eNOTTY		= Errno (CCONST_ENOTTY)
-eNXIO		= Errno (CCONST_ENXIO)
-eOPNOTSUPP	= Errno (CCONST_EOPNOTSUPP)
-ePERM		= Errno (CCONST_EPERM)
-ePFNOSUPPORT	= Errno (CCONST_EPFNOSUPPORT)
-ePIPE		= Errno (CCONST_EPIPE)
-ePROCLIM	= Errno (CCONST_EPROCLIM)
-ePROCUNAVAIL	= Errno (CCONST_EPROCUNAVAIL)
-ePROGMISMATCH	= Errno (CCONST_EPROGMISMATCH)
-ePROGUNAVAIL	= Errno (CCONST_EPROGUNAVAIL)
-ePROTO		= Errno (CCONST_EPROTO)
-ePROTONOSUPPORT = Errno (CCONST_EPROTONOSUPPORT)
-ePROTOTYPE	= Errno (CCONST_EPROTOTYPE)
-eRANGE		= Errno (CCONST_ERANGE)
-eREMCHG		= Errno (CCONST_EREMCHG)
-eREMOTE		= Errno (CCONST_EREMOTE)
-eROFS		= Errno (CCONST_EROFS)
-eRPCMISMATCH	= Errno (CCONST_ERPCMISMATCH)
-eRREMOTE	= Errno (CCONST_ERREMOTE)
-eSHUTDOWN	= Errno (CCONST_ESHUTDOWN)
-eSOCKTNOSUPPORT = Errno (CCONST_ESOCKTNOSUPPORT)
-eSPIPE		= Errno (CCONST_ESPIPE)
-eSRCH		= Errno (CCONST_ESRCH)
-eSRMNT		= Errno (CCONST_ESRMNT)
-eSTALE		= Errno (CCONST_ESTALE)
-eTIME		= Errno (CCONST_ETIME)
-eTIMEDOUT	= Errno (CCONST_ETIMEDOUT)
-eTOOMANYREFS	= Errno (CCONST_ETOOMANYREFS)
-eTXTBSY		= Errno (CCONST_ETXTBSY)
-eUSERS		= Errno (CCONST_EUSERS)
-eWOULDBLOCK	= Errno (CCONST_EWOULDBLOCK)
-eXDEV		= Errno (CCONST_EXDEV)
+e2BIG           = Errno (cCONST_E2BIG)
+eACCES		= Errno (cCONST_EACCES)
+eADDRINUSE	= Errno (cCONST_EADDRINUSE)
+eADDRNOTAVAIL	= Errno (cCONST_EADDRNOTAVAIL)
+eADV		= Errno (cCONST_EADV)
+eAFNOSUPPORT	= Errno (cCONST_EAFNOSUPPORT)
+eAGAIN		= Errno (cCONST_EAGAIN)
+eALREADY	= Errno (cCONST_EALREADY)
+eBADF		= Errno (cCONST_EBADF)
+eBADMSG		= Errno (cCONST_EBADMSG)
+eBADRPC		= Errno (cCONST_EBADRPC)
+eBUSY		= Errno (cCONST_EBUSY)
+eCHILD		= Errno (cCONST_ECHILD)
+eCOMM		= Errno (cCONST_ECOMM)
+eCONNABORTED	= Errno (cCONST_ECONNABORTED)
+eCONNREFUSED	= Errno (cCONST_ECONNREFUSED)
+eCONNRESET	= Errno (cCONST_ECONNRESET)
+eDEADLK		= Errno (cCONST_EDEADLK)
+eDESTADDRREQ	= Errno (cCONST_EDESTADDRREQ)
+eDIRTY		= Errno (cCONST_EDIRTY)
+eDOM		= Errno (cCONST_EDOM)
+eDQUOT		= Errno (cCONST_EDQUOT)
+eEXIST		= Errno (cCONST_EEXIST)
+eFAULT		= Errno (cCONST_EFAULT)
+eFBIG		= Errno (cCONST_EFBIG)
+eFTYPE		= Errno (cCONST_EFTYPE)
+eHOSTDOWN	= Errno (cCONST_EHOSTDOWN)
+eHOSTUNREACH	= Errno (cCONST_EHOSTUNREACH)
+eIDRM		= Errno (cCONST_EIDRM)
+eILSEQ		= Errno (cCONST_EILSEQ)
+eINPROGRESS	= Errno (cCONST_EINPROGRESS)
+eINTR		= Errno (cCONST_EINTR)
+eINVAL		= Errno (cCONST_EINVAL)
+eIO		= Errno (cCONST_EIO)
+eISCONN		= Errno (cCONST_EISCONN)
+eISDIR		= Errno (cCONST_EISDIR)
+eLOOP		= Errno (cCONST_ELOOP)
+eMFILE		= Errno (cCONST_EMFILE)
+eMLINK		= Errno (cCONST_EMLINK)
+eMSGSIZE	= Errno (cCONST_EMSGSIZE)
+eMULTIHOP	= Errno (cCONST_EMULTIHOP)
+eNAMETOOLONG	= Errno (cCONST_ENAMETOOLONG)
+eNETDOWN	= Errno (cCONST_ENETDOWN)
+eNETRESET	= Errno (cCONST_ENETRESET)
+eNETUNREACH	= Errno (cCONST_ENETUNREACH)
+eNFILE		= Errno (cCONST_ENFILE)
+eNOBUFS		= Errno (cCONST_ENOBUFS)
+eNODATA		= Errno (cCONST_ENODATA)
+eNODEV		= Errno (cCONST_ENODEV)
+eNOENT		= Errno (cCONST_ENOENT)
+eNOEXEC		= Errno (cCONST_ENOEXEC)
+eNOLCK		= Errno (cCONST_ENOLCK)
+eNOLINK		= Errno (cCONST_ENOLINK)
+eNOMEM		= Errno (cCONST_ENOMEM)
+eNOMSG		= Errno (cCONST_ENOMSG)
+eNONET		= Errno (cCONST_ENONET)
+eNOPROTOOPT	= Errno (cCONST_ENOPROTOOPT)
+eNOSPC		= Errno (cCONST_ENOSPC)
+eNOSR		= Errno (cCONST_ENOSR)
+eNOSTR		= Errno (cCONST_ENOSTR)
+eNOSYS		= Errno (cCONST_ENOSYS)
+eNOTBLK		= Errno (cCONST_ENOTBLK)
+eNOTCONN	= Errno (cCONST_ENOTCONN)
+eNOTDIR		= Errno (cCONST_ENOTDIR)
+eNOTEMPTY	= Errno (cCONST_ENOTEMPTY)
+eNOTSOCK	= Errno (cCONST_ENOTSOCK)
+eNOTTY		= Errno (cCONST_ENOTTY)
+eNXIO		= Errno (cCONST_ENXIO)
+eOPNOTSUPP	= Errno (cCONST_EOPNOTSUPP)
+ePERM		= Errno (cCONST_EPERM)
+ePFNOSUPPORT	= Errno (cCONST_EPFNOSUPPORT)
+ePIPE		= Errno (cCONST_EPIPE)
+ePROCLIM	= Errno (cCONST_EPROCLIM)
+ePROCUNAVAIL	= Errno (cCONST_EPROCUNAVAIL)
+ePROGMISMATCH	= Errno (cCONST_EPROGMISMATCH)
+ePROGUNAVAIL	= Errno (cCONST_EPROGUNAVAIL)
+ePROTO		= Errno (cCONST_EPROTO)
+ePROTONOSUPPORT = Errno (cCONST_EPROTONOSUPPORT)
+ePROTOTYPE	= Errno (cCONST_EPROTOTYPE)
+eRANGE		= Errno (cCONST_ERANGE)
+eREMCHG		= Errno (cCONST_EREMCHG)
+eREMOTE		= Errno (cCONST_EREMOTE)
+eROFS		= Errno (cCONST_EROFS)
+eRPCMISMATCH	= Errno (cCONST_ERPCMISMATCH)
+eRREMOTE	= Errno (cCONST_ERREMOTE)
+eSHUTDOWN	= Errno (cCONST_ESHUTDOWN)
+eSOCKTNOSUPPORT = Errno (cCONST_ESOCKTNOSUPPORT)
+eSPIPE		= Errno (cCONST_ESPIPE)
+eSRCH		= Errno (cCONST_ESRCH)
+eSRMNT		= Errno (cCONST_ESRMNT)
+eSTALE		= Errno (cCONST_ESTALE)
+eTIME		= Errno (cCONST_ETIME)
+eTIMEDOUT	= Errno (cCONST_ETIMEDOUT)
+eTOOMANYREFS	= Errno (cCONST_ETOOMANYREFS)
+eTXTBSY		= Errno (cCONST_ETXTBSY)
+eUSERS		= Errno (cCONST_EUSERS)
+eWOULDBLOCK	= Errno (cCONST_EWOULDBLOCK)
+eXDEV		= Errno (cCONST_EXDEV)
 
 -- checks whether the given errno value is supported on the current
 -- architecture
@@ -457,7 +458,7 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
         | errno == eNFILE          = ResourceExhausted
         | errno == eNOBUFS         = ResourceExhausted
         | errno == eNODATA         = NoSuchThing
-        | errno == eNODEV          = NoSuchThing
+        | errno == eNODEV          = UnsupportedOperation
         | errno == eNOENT          = NoSuchThing
         | errno == eNOEXEC         = InvalidArgument
         | errno == eNOLCK          = ResourceExhausted
@@ -513,3 +514,106 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
 #endif
 
 foreign import unsafe strerror :: Errno -> IO (Ptr CChar)
+
+
+-- Dreadfully tedious callouts to wrappers which define  the
+-- actual values for the error codes.
+foreign import ccall "prel_error_E2BIG" unsafe cCONST_E2BIG :: CInt
+foreign import ccall "prel_error_EACCES" unsafe cCONST_EACCES :: CInt
+foreign import ccall "prel_error_EADDRINUSE" unsafe cCONST_EADDRINUSE :: CInt
+foreign import ccall "prel_error_EADDRNOTAVAIL" unsafe cCONST_EADDRNOTAVAIL :: CInt
+foreign import ccall "prel_error_EADV" unsafe cCONST_EADV :: CInt
+foreign import ccall "prel_error_EAFNOSUPPORT" unsafe cCONST_EAFNOSUPPORT :: CInt
+foreign import ccall "prel_error_EAGAIN" unsafe cCONST_EAGAIN :: CInt
+foreign import ccall "prel_error_EALREADY" unsafe cCONST_EALREADY :: CInt
+foreign import ccall "prel_error_EBADF" unsafe cCONST_EBADF :: CInt
+foreign import ccall "prel_error_EBADMSG" unsafe cCONST_EBADMSG :: CInt
+foreign import ccall "prel_error_EBADRPC" unsafe cCONST_EBADRPC :: CInt
+foreign import ccall "prel_error_EBUSY" unsafe cCONST_EBUSY :: CInt
+foreign import ccall "prel_error_ECHILD" unsafe cCONST_ECHILD :: CInt
+foreign import ccall "prel_error_ECOMM" unsafe cCONST_ECOMM :: CInt
+foreign import ccall "prel_error_ECONNABORTED" unsafe cCONST_ECONNABORTED :: CInt
+foreign import ccall "prel_error_ECONNREFUSED" unsafe cCONST_ECONNREFUSED :: CInt
+foreign import ccall "prel_error_ECONNRESET" unsafe cCONST_ECONNRESET :: CInt
+foreign import ccall "prel_error_EDEADLK" unsafe cCONST_EDEADLK :: CInt
+foreign import ccall "prel_error_EDESTADDRREQ" unsafe cCONST_EDESTADDRREQ :: CInt
+foreign import ccall "prel_error_EDIRTY" unsafe cCONST_EDIRTY :: CInt
+foreign import ccall "prel_error_EDOM" unsafe cCONST_EDOM :: CInt
+foreign import ccall "prel_error_EDQUOT" unsafe cCONST_EDQUOT :: CInt
+foreign import ccall "prel_error_EEXIST" unsafe cCONST_EEXIST :: CInt
+foreign import ccall "prel_error_EFAULT" unsafe cCONST_EFAULT :: CInt
+foreign import ccall "prel_error_EFBIG" unsafe cCONST_EFBIG :: CInt
+foreign import ccall "prel_error_EFTYPE" unsafe cCONST_EFTYPE :: CInt
+foreign import ccall "prel_error_EHOSTDOWN" unsafe cCONST_EHOSTDOWN :: CInt
+foreign import ccall "prel_error_EHOSTUNREACH" unsafe cCONST_EHOSTUNREACH :: CInt
+foreign import ccall "prel_error_EIDRM" unsafe cCONST_EIDRM :: CInt
+foreign import ccall "prel_error_EILSEQ" unsafe cCONST_EILSEQ :: CInt
+foreign import ccall "prel_error_EINPROGRESS" unsafe cCONST_EINPROGRESS :: CInt
+foreign import ccall "prel_error_EINTR" unsafe cCONST_EINTR :: CInt
+foreign import ccall "prel_error_EINVAL" unsafe cCONST_EINVAL :: CInt
+foreign import ccall "prel_error_EIO" unsafe cCONST_EIO :: CInt
+foreign import ccall "prel_error_EISCONN" unsafe cCONST_EISCONN :: CInt
+foreign import ccall "prel_error_EISDIR" unsafe cCONST_EISDIR :: CInt
+foreign import ccall "prel_error_ELOOP" unsafe cCONST_ELOOP :: CInt
+foreign import ccall "prel_error_EMFILE" unsafe cCONST_EMFILE :: CInt
+foreign import ccall "prel_error_EMLINK" unsafe cCONST_EMLINK :: CInt
+foreign import ccall "prel_error_EMSGSIZE" unsafe cCONST_EMSGSIZE :: CInt
+foreign import ccall "prel_error_EMULTIHOP" unsafe cCONST_EMULTIHOP :: CInt
+foreign import ccall "prel_error_ENAMETOOLONG" unsafe cCONST_ENAMETOOLONG :: CInt
+foreign import ccall "prel_error_ENETDOWN" unsafe cCONST_ENETDOWN :: CInt
+foreign import ccall "prel_error_ENETRESET" unsafe cCONST_ENETRESET :: CInt
+foreign import ccall "prel_error_ENETUNREACH" unsafe cCONST_ENETUNREACH :: CInt
+foreign import ccall "prel_error_ENFILE" unsafe cCONST_ENFILE :: CInt
+foreign import ccall "prel_error_ENOBUFS" unsafe cCONST_ENOBUFS :: CInt
+foreign import ccall "prel_error_ENODATA" unsafe cCONST_ENODATA :: CInt
+foreign import ccall "prel_error_ENODEV" unsafe cCONST_ENODEV :: CInt
+foreign import ccall "prel_error_ENOENT" unsafe cCONST_ENOENT :: CInt
+foreign import ccall "prel_error_ENOEXEC" unsafe cCONST_ENOEXEC :: CInt
+foreign import ccall "prel_error_ENOLCK" unsafe cCONST_ENOLCK :: CInt
+foreign import ccall "prel_error_ENOLINK" unsafe cCONST_ENOLINK :: CInt
+foreign import ccall "prel_error_ENOMEM" unsafe cCONST_ENOMEM :: CInt
+foreign import ccall "prel_error_ENOMSG" unsafe cCONST_ENOMSG :: CInt
+foreign import ccall "prel_error_ENONET" unsafe cCONST_ENONET :: CInt
+foreign import ccall "prel_error_ENOPROTOOPT" unsafe cCONST_ENOPROTOOPT :: CInt
+foreign import ccall "prel_error_ENOSPC" unsafe cCONST_ENOSPC :: CInt
+foreign import ccall "prel_error_ENOSR" unsafe cCONST_ENOSR :: CInt
+foreign import ccall "prel_error_ENOSTR" unsafe cCONST_ENOSTR :: CInt
+foreign import ccall "prel_error_ENOSYS" unsafe cCONST_ENOSYS :: CInt
+foreign import ccall "prel_error_ENOTBLK" unsafe cCONST_ENOTBLK :: CInt
+foreign import ccall "prel_error_ENOTCONN" unsafe cCONST_ENOTCONN :: CInt
+foreign import ccall "prel_error_ENOTDIR" unsafe cCONST_ENOTDIR :: CInt
+foreign import ccall "prel_error_ENOTEMPTY" unsafe cCONST_ENOTEMPTY :: CInt
+foreign import ccall "prel_error_ENOTSOCK" unsafe cCONST_ENOTSOCK :: CInt
+foreign import ccall "prel_error_ENOTTY" unsafe cCONST_ENOTTY :: CInt
+foreign import ccall "prel_error_ENXIO" unsafe cCONST_ENXIO :: CInt
+foreign import ccall "prel_error_EOPNOTSUPP" unsafe cCONST_EOPNOTSUPP :: CInt
+foreign import ccall "prel_error_EPERM" unsafe cCONST_EPERM :: CInt
+foreign import ccall "prel_error_EPFNOSUPPORT" unsafe cCONST_EPFNOSUPPORT :: CInt
+foreign import ccall "prel_error_EPIPE" unsafe cCONST_EPIPE :: CInt
+foreign import ccall "prel_error_EPROCLIM" unsafe cCONST_EPROCLIM :: CInt
+foreign import ccall "prel_error_EPROCUNAVAIL" unsafe cCONST_EPROCUNAVAIL :: CInt
+foreign import ccall "prel_error_EPROGMISMATCH" unsafe cCONST_EPROGMISMATCH :: CInt
+foreign import ccall "prel_error_EPROGUNAVAIL" unsafe cCONST_EPROGUNAVAIL :: CInt
+foreign import ccall "prel_error_EPROTO" unsafe cCONST_EPROTO :: CInt
+foreign import ccall "prel_error_EPROTONOSUPPORT" unsafe cCONST_EPROTONOSUPPORT :: CInt
+foreign import ccall "prel_error_EPROTOTYPE" unsafe cCONST_EPROTOTYPE :: CInt
+foreign import ccall "prel_error_ERANGE" unsafe cCONST_ERANGE :: CInt
+foreign import ccall "prel_error_EREMCHG" unsafe cCONST_EREMCHG :: CInt
+foreign import ccall "prel_error_EREMOTE" unsafe cCONST_EREMOTE :: CInt
+foreign import ccall "prel_error_EROFS" unsafe cCONST_EROFS :: CInt
+foreign import ccall "prel_error_ERPCMISMATCH" unsafe cCONST_ERPCMISMATCH :: CInt
+foreign import ccall "prel_error_ERREMOTE" unsafe cCONST_ERREMOTE :: CInt
+foreign import ccall "prel_error_ESHUTDOWN" unsafe cCONST_ESHUTDOWN :: CInt
+foreign import ccall "prel_error_ESOCKTNOSUPPORT" unsafe cCONST_ESOCKTNOSUPPORT :: CInt
+foreign import ccall "prel_error_ESPIPE" unsafe cCONST_ESPIPE :: CInt
+foreign import ccall "prel_error_ESRCH" unsafe cCONST_ESRCH :: CInt
+foreign import ccall "prel_error_ESRMNT" unsafe cCONST_ESRMNT :: CInt
+foreign import ccall "prel_error_ESTALE" unsafe cCONST_ESTALE :: CInt
+foreign import ccall "prel_error_ETIME" unsafe cCONST_ETIME :: CInt
+foreign import ccall "prel_error_ETIMEDOUT" unsafe cCONST_ETIMEDOUT :: CInt
+foreign import ccall "prel_error_ETOOMANYREFS" unsafe cCONST_ETOOMANYREFS :: CInt
+foreign import ccall "prel_error_ETXTBSY" unsafe cCONST_ETXTBSY :: CInt
+foreign import ccall "prel_error_EUSERS" unsafe cCONST_EUSERS :: CInt
+foreign import ccall "prel_error_EWOULDBLOCK" unsafe cCONST_EWOULDBLOCK :: CInt
+foreign import ccall "prel_error_EXDEV" unsafe cCONST_EXDEV :: CInt
+

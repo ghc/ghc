@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+ * $Id: CTypes.h,v 1.2 2001/12/21 15:07:26 simonmar Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -162,53 +162,28 @@ instance RealFloat T where { \
 
 #else /* __GLASGOW_HASKELL__ */
 
-/* On GHC, we just cast the type of each method to the underlying
- * type.  This means that GHC only needs to generate the dictionary
- * for each instance, rather than a new function for each method (the
- * simplifier currently isn't clever enough to reduce a method that
- * simply deconstructs a newtype and calls the underlying method into
- * an indirection to the underlying method, so that's what we're doing
- * here). 
+/* GHC can derive any class for a newtype, so we make use of that
+ * here...
  */
 
+#define NUMERIC_CLASSES  Eq,Ord,Num,Enum
+#define INTEGRAL_CLASSES Bounded,Real,Integral,Bits
+#define FLOATING_CLASSES Real,Fractional,Floating,RealFrac,RealFloat
+
 #define NUMERIC_TYPE(T,C,S,B) \
-newtype T = T B ; \
-INSTANCE_EQ(T,B) ; \
-INSTANCE_ORD(T,B) ; \
-INSTANCE_NUM(T,B) ; \
-INSTANCE_READ(T,B) ; \
-INSTANCE_SHOW(T,B) ; \
-INSTANCE_ENUM(T,B) 
+newtype T = T B deriving (NUMERIC_CLASSES); \
+INSTANCE_READ(T,B); \
+INSTANCE_SHOW(T,B)
 
 #define INTEGRAL_TYPE(T,C,S,B) \
-NUMERIC_TYPE(T,C,S,B) ;  \
-INSTANCE_BOUNDED(T,B) ; \
-INSTANCE_REAL(T,B) ; \
-INSTANCE_INTEGRAL(T,B) ; \
-INSTANCE_BITS(T,B)
+newtype T = T B deriving (NUMERIC_CLASSES, INTEGRAL_CLASSES); \
+INSTANCE_READ(T,B); \
+INSTANCE_SHOW(T,B)
 
 #define FLOATING_TYPE(T,C,S,B) \
-NUMERIC_TYPE(T,C,S,B) ; \
-INSTANCE_REAL(T,B) ; \
-INSTANCE_FRACTIONAL(T,B) ; \
-INSTANCE_FLOATING(T,B) ; \
-INSTANCE_REALFRAC(T) ; \
-INSTANCE_REALFLOAT(T,B)
-
-#define INSTANCE_EQ(T,B) \
-instance Eq T where { \
-   (==)	 	= unsafeCoerce# ((==) :: B -> B -> Bool); \
-   (/=)	 	= unsafeCoerce# ((/=) :: B -> B -> Bool); }
-
-#define INSTANCE_ORD(T,B) \
-instance Ord T where { \
-   compare		= unsafeCoerce# (compare :: B -> B -> Ordering); \
-   (<)			= unsafeCoerce# ((<) :: B -> B -> Bool); \
-   (<=)			= unsafeCoerce# ((<=) :: B -> B -> Bool); \
-   (>=)			= unsafeCoerce# ((>=) :: B -> B -> Bool); \
-   (>)			= unsafeCoerce# ((>) :: B -> B -> Bool); \
-   max			= unsafeCoerce# (max :: B -> B -> B); \
-   min			= unsafeCoerce# (min :: B -> B -> B); }
+newtype T = T B deriving (NUMERIC_CLASSES, FLOATING_CLASSES); \
+INSTANCE_READ(T,B); \
+INSTANCE_SHOW(T,B)
 
 #define INSTANCE_READ(T,B) \
 instance Read T where { \
@@ -220,116 +195,5 @@ instance Show T where { \
    showsPrec		= unsafeCoerce# (showsPrec :: Int -> B -> ShowS); \
    show			= unsafeCoerce# (show :: B -> String); \
    showList		= unsafeCoerce# (showList :: [B] -> ShowS); }
-
-#define INSTANCE_NUM(T,B) \
-instance Num T where { \
-   (+)			= unsafeCoerce# ((+) :: B -> B -> B); \
-   (-)			= unsafeCoerce# ((-) :: B -> B -> B); \
-   (*)			= unsafeCoerce# ((*) :: B -> B -> B); \
-   negate		= unsafeCoerce# (negate :: B -> B); \
-   abs			= unsafeCoerce# (abs :: B -> B); \
-   signum		= unsafeCoerce# (signum :: B -> B); \
-   fromInteger		= unsafeCoerce# (fromInteger :: Integer -> B); }
-
-#define INSTANCE_BOUNDED(T,B) \
-instance Bounded T where { \
-   minBound = T minBound ; \
-   maxBound = T maxBound }
-
-#define INSTANCE_ENUM(T,B) \
-instance Enum T where { \
-    succ		= unsafeCoerce# (succ :: B -> B); \
-    pred		= unsafeCoerce# (pred :: B -> B); \
-    toEnum              = unsafeCoerce# (toEnum :: Int -> B); \
-    fromEnum            = unsafeCoerce# (fromEnum :: B -> Int); \
-    enumFrom		= unsafeCoerce# (enumFrom :: B -> [B]); \
-    enumFromThen	= unsafeCoerce# (enumFromThen :: B -> B -> [B]); \
-    enumFromTo		= unsafeCoerce# (enumFromTo :: B -> B -> [B]); \
-    enumFromThenTo	= unsafeCoerce# (enumFromThenTo :: B -> B -> B -> [B]);}
-
-#define INSTANCE_REAL(T,B) \
-instance Real T where { \
-   toRational = unsafeCoerce# (toRational :: B -> Rational) }
-
-#define INSTANCE_INTEGRAL(T,B) \
-instance Integral T where { \
-    quot		= unsafeCoerce# (quot:: B -> B -> B); \
-    rem			= unsafeCoerce# (rem:: B -> B -> B); \
-    div			= unsafeCoerce# (div:: B -> B -> B); \
-    mod			= unsafeCoerce# (mod:: B -> B -> B); \
-    quotRem		= unsafeCoerce# (quotRem:: B -> B -> (B,B)); \
-    divMod		= unsafeCoerce# (divMod:: B -> B -> (B,B)); \
-    toInteger		= unsafeCoerce# (toInteger:: B -> Integer); }
-
-#define INSTANCE_BITS(T,B) \
-instance Bits T where { \
-  (.&.)			= unsafeCoerce# ((.&.) :: B -> B -> B); \
-  (.|.)			= unsafeCoerce# ((.|.) :: B -> B -> B); \
-  xor			= unsafeCoerce# (xor:: B -> B -> B); \
-  complement    	= unsafeCoerce# (complement:: B -> B); \
-  shift         	= unsafeCoerce# (shift:: B -> Int -> B); \
-  rotate        	= unsafeCoerce# (rotate:: B -> Int -> B); \
-  bit           	= unsafeCoerce# (bit:: Int -> B); \
-  setBit        	= unsafeCoerce# (setBit:: B -> Int -> B); \
-  clearBit      	= unsafeCoerce# (clearBit:: B -> Int -> B); \
-  complementBit 	= unsafeCoerce# (complementBit:: B -> Int -> B); \
-  testBit       	= unsafeCoerce# (testBit:: B -> Int -> Bool); \
-  bitSize       	= unsafeCoerce# (bitSize:: B -> Int); \
-  isSigned      	= unsafeCoerce# (isSigned:: B -> Bool); }
-
-#define INSTANCE_FRACTIONAL(T,B) \
-instance Fractional T where { \
-    (/)			= unsafeCoerce# ((/) :: B -> B -> B); \
-    recip		= unsafeCoerce# (recip :: B -> B); \
-    fromRational	= unsafeCoerce# (fromRational :: Rational -> B); }
-
-#define INSTANCE_FLOATING(T,B) \
-instance Floating T where { \
-    pi			= unsafeCoerce# (pi :: B); \
-    exp			= unsafeCoerce# (exp :: B -> B); \
-    log			= unsafeCoerce# (log :: B -> B); \
-    sqrt		= unsafeCoerce# (sqrt :: B -> B); \
-    (**) 		= unsafeCoerce# ((**) :: B -> B -> B); \
-    logBase		= unsafeCoerce# (logBase :: B -> B -> B); \
-    sin			= unsafeCoerce# (sin :: B -> B); \
-    cos			= unsafeCoerce# (cos :: B -> B); \
-    tan			= unsafeCoerce# (tan :: B -> B); \
-    asin		= unsafeCoerce# (asin :: B -> B); \
-    acos		= unsafeCoerce# (acos :: B -> B); \
-    atan		= unsafeCoerce# (atan :: B -> B); \
-    sinh		= unsafeCoerce# (sinh :: B -> B); \
-    cosh		= unsafeCoerce# (cosh :: B -> B); \
-    tanh		= unsafeCoerce# (tanh :: B -> B); \
-    asinh		= unsafeCoerce# (asinh :: B -> B); \
-    acosh		= unsafeCoerce# (acosh :: B -> B); \
-    atanh		= unsafeCoerce# (atanh :: B -> B); }
-
-/* The coerce trick doesn't work for RealFrac, these methods are
- * polymorphic and overloaded.
- */
-#define INSTANCE_REALFRAC(T) \
-instance RealFrac T where { \
-   properFraction (T x) = let (m,y) = properFraction x in (m, T y) ; \
-   truncate (T x) = truncate x ; \
-   round    (T x) = round x ; \
-   ceiling  (T x) = ceiling x ; \
-   floor    (T x) = floor x }
-
-#define INSTANCE_REALFLOAT(T,B) \
-instance RealFloat T where { \
-    floatRadix		= unsafeCoerce# (floatRadix :: B -> Integer); \
-    floatDigits		= unsafeCoerce# (floatDigits :: B -> Int); \
-    floatRange		= unsafeCoerce# (floatRange :: B -> (Int,Int)); \
-    decodeFloat		= unsafeCoerce# (decodeFloat :: B -> (Integer,Int)); \
-    encodeFloat		= unsafeCoerce# (encodeFloat :: Integer -> Int -> B); \
-    exponent		= unsafeCoerce# (exponent :: B -> Int); \
-    significand		= unsafeCoerce# (significand :: B -> B); \
-    scaleFloat		= unsafeCoerce# (scaleFloat :: Int -> B -> B); \
-    isNaN		= unsafeCoerce# (isNaN :: B -> Bool); \
-    isInfinite		= unsafeCoerce# (isInfinite :: B -> Bool); \
-    isDenormalized	= unsafeCoerce# (isDenormalized :: B -> Bool); \
-    isNegativeZero	= unsafeCoerce# (isNegativeZero :: B -> Bool); \
-    isIEEE		= unsafeCoerce# (isIEEE :: B -> Bool); \
-    atan2	        = unsafeCoerce# (atan2 :: B -> B -> B); }
 
 #endif /* __GLASGOW_HASKELL__ */

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Read.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
+% $Id: Read.lhs,v 1.3 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -373,7 +373,7 @@ instance  (Integral a, Read a)  => Read (Ratio a)  where
 				(x,s)   <- reads r
 				("%",t) <- lex s
 				(y,u)   <- reads t
-				return (x%y,u))
+				return (x % y,u))
 
 instance  (Read a) => Read [a]  where
     readsPrec _         = readList
@@ -554,23 +554,22 @@ point type to obtain the same results.
 		    ReadS Double,
 		    ReadS Float	    #-} 
 readFloat :: (RealFloat a) => ReadS a
-readFloat r = do
-    (x,t) <- readRational r
-    return (fromRational x,t)
-
-readRational :: ReadS Rational -- NB: doesn't handle leading "-"
-
-readRational r =
-   (do 
-      (n,d,s) <- readFix r
-      (k,t)   <- readExp s
-      return ((n%1)*10^^(k-d), t )) ++
+readFloat r =
+   (do
+      (x,t) <- readRational r
+      return (fromRational x,t) ) ++
    (do
       ("NaN",t) <- lex r
       return (0/0,t) ) ++
    (do
       ("Infinity",t) <- lex r
       return (1/0,t) )
+
+readRational :: ReadS Rational -- NB: doesn't handle leading "-"
+readRational r = do 
+     (n,d,s) <- readFix r
+     (k,t)   <- readExp s
+     return ((n%1)*10^^(k-d), t)
  where
      readFix r = do
 	(ds,s)  <- lexDecDigits r

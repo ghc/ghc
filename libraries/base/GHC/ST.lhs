@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: ST.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: ST.lhs,v 1.2 2001/12/21 15:07:25 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -118,9 +118,9 @@ runST :: (forall s. ST s a) -> a
 runST st = runSTRep (case st of { ST st_rep -> st_rep })
 
 -- I'm only letting runSTRep be inlined right at the end, in particular *after* full laziness
--- That's what the "INLINE 100" says.
+-- That's what the "INLINE [0]" says.
 -- 		SLPJ Apr 99
-{-# INLINE 100 runSTRep #-}
+{-# INLINE [0] runSTRep #-}
 runSTRep :: (forall s. STRep s a) -> a
 runSTRep st_rep = case st_rep realWorld# of
 	      		(# _, r #) -> r

@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Random.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Random.hs,v 1.2 2001/12/21 15:07:26 simonmar Exp $
 --
 -- Random numbers.
 --
@@ -16,7 +16,7 @@
 
 module System.Random
 	(
-	  RandomGen(next, split)
+	  RandomGen(next, split, genRange)
 	, StdGen
 	, mkStdGen
 	, Random ( random,   randomR,
@@ -53,8 +53,12 @@ import System.Time	( getClockTime, ClockTime(..) )
 #endif
 
 class RandomGen g where
-   next  :: g -> (Int, g)
-   split :: g -> (g, g)
+   next     :: g -> (Int, g)
+   split    :: g -> (g, g)
+   genRange :: g -> (Int,Int)
+
+   -- default mathod
+   genRange g = (minBound,maxBound)
 
 
 data StdGen 
