@@ -1145,7 +1145,7 @@ module A where
 
 	<para>Sometimes it is useful to be able to link to a point in
 	the documentation which doesn't correspond to a particular
-	entity.  For that purpose, we allow <emph>anchors</emph> to be
+	entity.  For that purpose, we allow <emphasis>anchors</emphasis> to be
 	included in a documentation comment.  The syntax is
 	<literal>#<replaceable>label</replaceable>#</literal>, where
 	<replaceable>label</replaceable> is the name of the anchor.
