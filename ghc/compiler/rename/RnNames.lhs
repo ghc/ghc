@@ -13,7 +13,7 @@ module RnNames (
 import CmdLineOpts	( DynFlag(..) )
 
 import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
-			  ForeignDecl(..), ForKind(..), isDynamicExtName,
+			  ForeignDecl(..), 
 			  collectLocatedHsBinders
 			)
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
@@ -244,17 +244,11 @@ getLocalDeclBinders mod (ValD binds)
     new (rdr_name, loc) = newTopBinder mod rdr_name loc 	`thenRn` \ name ->
 			  returnRn (Avail name)
 
-getLocalDeclBinders mod (ForD (ForeignDecl nm kind _ ext_nm _ loc))
-  | binds_haskell_name kind
+getLocalDeclBinders mod (ForD (ForeignImport nm _ _ loc))
   = newTopBinder mod nm loc	    `thenRn` \ name ->
     returnRn [Avail name]
-
-  | otherwise 		-- a foreign export
+getLocalDeclBinders mod (ForD _)
   = returnRn []
-  where
-    binds_haskell_name (FoImport _) = True
-    binds_haskell_name FoLabel      = True
-    binds_haskell_name FoExport     = isDynamicExtName ext_nm
 
 getLocalDeclBinders mod (FixD _)    = returnRn []
 getLocalDeclBinders mod (DeprecD _) = returnRn []

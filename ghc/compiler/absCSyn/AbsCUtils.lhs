@@ -28,7 +28,7 @@ import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
 import CmdLineOpts      ( opt_EmitCExternDecls )
-import ForeignCall	( ForeignCall(..), CCallSpec(..), isDynamicTarget )
+import ForeignCall	( ForeignCall(..), CCallSpec(..), isDynamicTarget, isCasmTarget )
 import StgSyn		( StgOp(..) )
 import Panic		( panic )
 import FastTypes
@@ -341,9 +341,9 @@ flatAbsC (CSwitch discrim alts deflt)
       = flatAbsC absC	`thenFlt` \ (alt_heres, alt_tops) ->
 	returnFlt ( (tag, alt_heres), alt_tops )
 
-flatAbsC stmt@(COpStmt results (StgFCallOp (CCall ccall@(CCallSpec target _ _ is_asm)) uniq) args _)
-  |  is_dynamic	 				-- Emit a typedef if its a dynamic call
-  || (opt_EmitCExternDecls && not is_asm)	-- or we want extern decls
+flatAbsC stmt@(COpStmt results (StgFCallOp (CCall ccall@(CCallSpec target _ _)) uniq) args _)
+  |  is_dynamic	 					 -- Emit a typedef if its a dynamic call
+  || (opt_EmitCExternDecls && not (isCasmTarget target)) -- or we want extern decls
   = returnFlt (stmt, CCallTypedef is_dynamic ccall uniq results args)
   where
     is_dynamic = isDynamicTarget target

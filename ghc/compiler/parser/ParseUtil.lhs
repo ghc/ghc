@@ -12,7 +12,7 @@ module ParseUtil (
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
 	, groupBindings
 	
-	, mkExtName             -- Maybe ExtName -> RdrName -> ExtName
+	, mkExtName             -- RdrName -> ExtName
 
 	, checkPrec 		-- String -> P String
 	, checkContext		-- HsType -> P HsContext
@@ -41,6 +41,7 @@ import PrelNames	( unitTyCon_RDR )
 import ForeignCall	( CCallConv(..) )
 import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )
+import CStrings		( CLabelString )
 import FastString	( unpackFS )
 import UniqFM		( UniqFM, listToUFM )
 import Outputable
@@ -305,10 +306,8 @@ mkRecConstrOrUpdate _ _
 -- want z-encoding (e.g. names with z's in them shouldn't be doubled)
 -- (This is why we use occNameUserString.)
 
-mkExtName :: Maybe ExtName -> RdrName -> ExtName
-mkExtName Nothing rdrNm = ExtName (_PK_ (occNameUserString (rdrNameOcc rdrNm)))
-				  Nothing
-mkExtName (Just x) _    = x
+mkExtName :: RdrName -> CLabelString
+mkExtName rdrNm = _PK_ (occNameUserString (rdrNameOcc rdrNm))
 
 -----------------------------------------------------------------------------
 -- group function bindings into equation groups

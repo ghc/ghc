@@ -312,7 +312,7 @@ showTypeCategory ty
 		|| utc == addrPrimTyConKey)		   then 'i'
 	  else if utc  == floatPrimTyConKey		   then 'f'
 	  else if utc  == doublePrimTyConKey		   then 'd'
-	  else if isPrimTyCon tycon {- array, we hope -}   then 'A'
+	  else if isPrimTyCon tycon {- array, we hope -}   then 'A'	-- Bogus
 	  else if isEnumerationTyCon tycon		   then 'E'
 	  else if isTupleTyCon tycon			   then 'T'
 	  else if maybeToBool (maybeTyConSingleCon tycon)  then 'S'

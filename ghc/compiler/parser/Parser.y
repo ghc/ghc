@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.65 2001/05/22 13:43:17 simonpj Exp $
+$Id: Parser.y,v 1.66 2001/05/24 13:59:11 simonpj Exp $
 
 Haskell grammar.
 
@@ -21,7 +21,9 @@ import RdrName
 import PrelNames	( mAIN_Name, unitTyCon_RDR, funTyCon_RDR, listTyCon_RDR,
 			  tupleTyCon_RDR, unitCon_RDR, nilCon_RDR, tupleCon_RDR
 			)
-import ForeignCall	( Safety(..), CCallConv(..), defaultCCallConv )
+import ForeignCall	( Safety(..), CExportSpec(..), CCallSpec(..), 
+			  CCallConv(..), CCallTarget(..), defaultCCallConv,
+			  DNCallSpec(..) )
 import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
@@ -31,7 +33,9 @@ import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), NewOrData(..) )
 import Panic
 
 import GlaExts
+import CStrings		( CLabelString )
 import FastString	( tailFS )
+import Maybes		( orElse )
 import Outputable
 
 #include "HsVersions.h"
@@ -102,6 +106,7 @@ Conflicts: 14 shift/reduce
  'with' 	{ ITwith }
  'stdcall'      { ITstdcallconv }
  'ccall'        { ITccallconv }
+ 'dotnet'       { ITdotnet }
  '_ccall_'	{ ITccall (False, False, PlayRisky) }
  '_ccall_GC_'	{ ITccall (False, False, PlaySafe)  }
  '_casm_'	{ ITccall (False, True,  PlayRisky) }
@@ -360,23 +365,45 @@ topdecl :: { RdrBinding }
 				(groupBindings $4)
 		  in RdrHsDecl (InstD (InstDecl $3 binds sigs Nothing $1)) }
 
-	| srcloc 'default' '(' types0 ')'
-		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
-
-	| srcloc 'foreign' 'import' callconv ext_name 
-	  unsafe_flag varid_no_unsafe '::' sigtype
-		{ RdrHsDecl (ForD (ForeignDecl $7 (FoImport $6) $9 (mkExtName $5 $7) $4 $1)) }
-
-	| srcloc 'foreign' 'export' callconv ext_name varid '::' sigtype
-		{ RdrHsDecl (ForD (ForeignDecl $6 FoExport $8 (mkExtName $5 $6) $4 $1)) }
-
-	| srcloc 'foreign' 'label' ext_name varid '::' sigtype
-		{ RdrHsDecl (ForD (ForeignDecl $5 FoLabel $7 (mkExtName $4 $5)
-					defaultCCallConv $1)) }
-
+	| srcloc 'default' '(' types0 ')'		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
+	| 'foreign' fordecl				{ RdrHsDecl $2 }
 	| '{-# DEPRECATED' deprecations '#-}'	 	{ $2 }
 	| '{-# RULES' rules '#-}'		 	{ $2 }
       	| decl						{ $1 }
+
+fordecl :: { RdrNameHsDecl }
+fordecl : srcloc 'label' ext_name varid '::' sigtype
+		{ ForD (ForeignImport $4 $6 (LblImport ($3 `orElse` mkExtName $4)) $1) }
+
+
+	----------- ccall/stdcall decls ------------
+	| srcloc 'import' ccallconv ext_name unsafe_flag varid_no_unsafe '::' sigtype
+		{ let
+		    call_spec = CCallSpec (StaticTarget ($4 `orElse` mkExtName $6)) $3 $5
+		  in
+		  ForD (ForeignImport $6 $8 (CImport call_spec) $1)
+		}
+
+	| srcloc 'import' ccallconv 'dynamic' unsafe_flag varid_no_unsafe '::' sigtype
+		{ let
+		    call_spec = CCallSpec DynamicTarget $3 $5
+		  in
+		  ForD (ForeignImport $6 $8 (CImport call_spec) $1)
+		}
+
+	| srcloc 'export' ccallconv ext_name varid '::' sigtype
+		{ ForD (ForeignExport $5 $7 (CExport (CExportStatic ($4 `orElse` mkExtName $5) $3)) $1) }
+
+	| srcloc 'export' ccallconv 'dynamic' varid '::' sigtype
+		{ ForD (ForeignImport $5 $7 (CDynImport $3) $1) } 
+
+
+	----------- .NET decls ------------
+	| srcloc 'import' 'dotnet' ext_name varid '::' sigtype
+		{ ForD (ForeignImport $5 $7 (DNImport (DNCallSpec ($4 `orElse` mkExtName $5))) $1) }
+
+	| srcloc 'import' 'dotnet' 'type' tycon
+		{ TyClD (ForeignType $5 DNType $1) }
 
 decls 	:: { [RdrBinding] }
 	: decls ';' decl		{ $3 : $1 }
@@ -462,7 +489,7 @@ deprecation :: { RdrBinding }
 -----------------------------------------------------------------------------
 -- Foreign import/export
 
-callconv :: { CCallConv }
+ccallconv :: { CCallConv }
 	: 'stdcall'		{ StdCallConv }
 	| 'ccall'               { CCallConv }
 	| {- empty -}		{ defaultCCallConv }
@@ -471,10 +498,8 @@ unsafe_flag :: { Safety }
 	: 'unsafe'		{ PlayRisky }
 	| {- empty -}		{ PlaySafe }
 
-ext_name :: { Maybe ExtName }
-	: 'dynamic'		{ Just Dynamic }
-	| STRING		{ Just (ExtName $1 Nothing)   }
-	| STRING STRING		{ Just (ExtName $2 (Just $1)) }
+ext_name :: { Maybe CLabelString }
+	: STRING		{ Just $1 }
 	| {- empty -}           { Nothing }
 
 

@@ -119,6 +119,9 @@ In all cases this is set up for interface-file declarations:
 
 \begin{code}
 tyClDeclFVs :: RenamedTyClDecl -> NameSet
+tyClDeclFVs (ForeignType {})
+  = emptyFVs
+
 tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})
   = extractHsTyNames ty			`plusFV` 
     plusFVs (map hsIdInfoFVs id_infos)

@@ -9,12 +9,13 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 \begin{code}
 module HsDecls (
 	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
-	DefaultDecl(..), ForeignDecl(..), ForKind(..),
-	ExtName(..), isDynamicExtName, extNameStatic,
+	DefaultDecl(..), 
+	ForeignDecl(..), FoImport(..), FoExport(..), FoType(..),
 	ConDecl(..), ConDetails(..), 
 	BangType(..), getBangType, getBangStrictness, unbangedType,
 	DeprecDecl(..), DeprecTxt,
-	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames, tyClDeclSysNames,
+	hsDeclName, instDeclName, 
+	tyClDeclName, tyClDeclNames, tyClDeclSysNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
 	mkClassDeclSysNames, isIfaceRuleDecl, ifaceRuleDeclName,
 	getClassDeclSysNames, conDetailsTys
@@ -33,14 +34,13 @@ import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
 import CoreSyn		( CoreRule(..) )
 import BasicTypes	( NewOrData(..) )
 import Demand		( StrictnessMark(..) )
-import ForeignCall	( CCallConv )
+import ForeignCall	( CExportSpec, CCallSpec, DNCallSpec, CCallConv )
 
 -- others:
-import ForeignCall	( Safety )
 import Name		( NamedThing )
 import FunDeps		( pprFundeps )
 import Class		( FunDep, DefMeth(..) )
-import CStrings		( CLabelString, pprCLabelString )
+import CStrings		( CLabelString )
 import Outputable	
 import SrcLoc		( SrcLoc )
 \end{code}
@@ -82,10 +82,10 @@ data HsDecl name pat
 hsDeclName :: (NamedThing name, Outputable name, Outputable pat)
 	   => HsDecl name pat -> name
 #endif
-hsDeclName (TyClD decl)				    = tyClDeclName decl
-hsDeclName (InstD   decl)			    = instDeclName decl
-hsDeclName (ForD    (ForeignDecl name _ _ _ _ _))   = name
-hsDeclName (FixD    (FixitySig name _ _))	    = name
+hsDeclName (TyClD decl)			  = tyClDeclName decl
+hsDeclName (InstD   decl)		  = instDeclName decl
+hsDeclName (ForD    decl)		  = forDeclName decl
+hsDeclName (FixD    (FixitySig name _ _)) = name
 -- Others don't make sense
 #ifdef DEBUG
 hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
@@ -249,12 +249,21 @@ Interface file code:
 
 
 \begin{code}
+-- TyClDecls are precisely the kind of declarations that can 
+-- appear in interface files; or (internally) in GHC's interface
+-- for a module.  That's why (despite the misnomer) IfaceSig and ForeignType
+-- are both in TyClDecl
+
 data TyClDecl name pat
   = IfaceSig {	tcdName :: name,		-- It may seem odd to classify an interface-file signature
-		tcdType :: HsType name,		-- as a 'TyClDecl', but it's very convenient.  These three
-		tcdIdInfo :: [HsIdInfo name],	-- are the kind that appear in interface files.
+		tcdType :: HsType name,		-- as a 'TyClDecl', but it's very convenient.  
+		tcdIdInfo :: [HsIdInfo name],
 		tcdLoc :: SrcLoc
     }
+
+  | ForeignType { tcdName   :: name,		-- See remarks about IfaceSig above
+		  tcdFoType :: FoType,
+		  tcdLoc    :: SrcLoc }
 
   | TyData {	tcdND     :: NewOrData,
 		tcdCtxt   :: HsContext name,	 -- context
@@ -321,14 +330,22 @@ tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
 -- For record fields, the first one counts as the SrcLoc
 -- We use the equality to filter out duplicate field names
 
-tyClDeclNames (TySynonym {tcdName = name, tcdLoc = loc})  = [(name,loc)]
-tyClDeclNames (IfaceSig  {tcdName = name, tcdLoc = loc})  = [(name,loc)]
+tyClDeclNames (TySynonym   {tcdName = name, tcdLoc = loc})  = [(name,loc)]
+tyClDeclNames (IfaceSig    {tcdName = name, tcdLoc = loc})  = [(name,loc)]
+tyClDeclNames (ForeignType {tcdName = name, tcdLoc = loc})  = [(name,loc)]
 
 tyClDeclNames (ClassDecl {tcdName = cls_name, tcdSigs = sigs, tcdLoc = loc})
   = (cls_name,loc) : [(n,loc) | ClassOpSig n _ _ loc <- sigs]
 
 tyClDeclNames (TyData {tcdName = tc_name, tcdCons = cons, tcdLoc = loc})
   = (tc_name,loc) : conDeclsNames cons
+
+
+tyClDeclTyVars (TySynonym {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (TyData    {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (ClassDecl {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (ForeignType {})		     = []
+tyClDeclTyVars (IfaceSig {})		     = []
 
 
 --------------------------------
@@ -372,6 +389,10 @@ instance (NamedThing name, Ord name) => Eq (TyClDecl name pat) where
       = tcdName d1 == tcdName d2 && 
 	tcdType d1 == tcdType d2 && 
 	tcdIdInfo d1 == tcdIdInfo d2
+
+  (==) d1@(ForeignType {}) d2@(ForeignType {})
+      = tcdName d1 == tcdName d2 && 
+	tcdFoType d1 == tcdFoType d2
 
   (==) d1@(TyData {}) d2@(TyData {})
       = tcdName d1 == tcdName d2 && 
@@ -432,6 +453,9 @@ instance (NamedThing name, Outputable name, Outputable pat)
 
     ppr (IfaceSig {tcdName = var, tcdType = ty, tcdIdInfo = info})
 	= hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
+
+    ppr (ForeignType {tcdName = tycon})
+	= hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
 
     ppr (TySynonym {tcdName = tycon, tcdTyVars = tyvars, tcdSynRhs = mono_ty})
       = hang (ptext SLIT("type") <+> pp_decl_head [] tycon tyvars <+> equals)
@@ -670,54 +694,45 @@ instance (Outputable name)
 %************************************************************************
 
 \begin{code}
-data ForeignDecl name = 
-   ForeignDecl 
-        name 
-	ForKind   
-	(HsType name)
-	ExtName
-	CCallConv
-	SrcLoc
+data ForeignDecl name
+  = ForeignImport name (HsType name) FoImport 	  SrcLoc
+  | ForeignExport name (HsType name) FoExport 	  SrcLoc
 
-instance (Outputable name)
-	      => Outputable (ForeignDecl name) where
+forDeclName (ForeignImport n _ _ _) = n
+forDeclName (ForeignExport n _ _ _) = n
 
-    ppr (ForeignDecl nm imp_exp ty ext_name cconv src_loc)
-      = ptext SLIT("foreign") <+> ppr_imp_exp <+> ppr cconv <+> 
-        ppr ext_name <+> ppr_unsafe <+> ppr nm <+> dcolon <+> ppr ty
-        where
-         (ppr_imp_exp, ppr_unsafe) =
-	   case imp_exp of
-	     FoLabel     -> (ptext SLIT("label"), empty)
-	     FoExport    -> (ptext SLIT("export"), empty)
-	     FoImport us -> (ptext SLIT("import"), ppr us)
+data FoImport 
+  = LblImport  CLabelString	-- foreign label
+  | CImport    CCallSpec	-- foreign import 
+  | CDynImport CCallConv	-- foreign export dynamic
+  | DNImport   DNCallSpec	-- foreign import dotnet
 
-data ForKind
- = FoLabel
- | FoExport
- | FoImport Safety
+data FoExport = CExport CExportSpec
 
-data ExtName
- = Dynamic 
- | ExtName CLabelString 	-- The external name of the foreign thing,
-	   (Maybe CLabelString)	-- and optionally its DLL or module name
-				-- Both of these are completely unencoded; 
-				-- we just print them as they are
+data FoType = DNType 		-- In due course we'll add subtype stuff
+	    deriving( Eq )	-- Used for equality instance for TyClDecl
 
-isDynamicExtName :: ExtName -> Bool
-isDynamicExtName Dynamic = True
-isDynamicExtName _	 = False
+instance Outputable name => Outputable (ForeignDecl name) where
+  ppr (ForeignImport nm ty (LblImport lbl) src_loc)
+    = ptext SLIT("foreign label") <+> ppr lbl <+> ppr nm <+> dcolon <+> ppr ty
+  ppr (ForeignImport nm ty decl src_loc)
+    = ptext SLIT("foreign import") <+> ppr decl <+> ppr nm <+> dcolon <+> ppr ty
+  ppr (ForeignExport nm ty decl src_loc)
+    = ptext SLIT("foreign export") <+> ppr decl <+> ppr nm <+> dcolon <+> ppr ty
 
-extNameStatic :: ExtName -> CLabelString
-extNameStatic (ExtName f _) = f
-extNameStatic Dynamic	    = panic "staticExtName: Dynamic - shouldn't ever happen."
+instance Outputable FoImport where
+   ppr (CImport  d)      = ppr d
+   ppr (CDynImport conv) = text "dynamic" <+> ppr conv
+   ppr (DNImport d)   	 = ptext SLIT("dotnet") <+> ppr d
+   ppr (LblImport l)  	 = ptext SLIT("label") <+> ppr l
 
-instance Outputable ExtName where
-  ppr Dynamic	   = ptext SLIT("dynamic")
-  ppr (ExtName nm mb_mod) = 
-     case mb_mod of { Nothing -> empty; Just m -> doubleQuotes (ptext m) } <+> 
-     doubleQuotes (pprCLabelString nm)
+instance Outputable FoExport where
+   ppr (CExport d) = ppr d
+
+instance Outputable FoType where
+   ppr DNType = ptext SLIT("type dotnet")
 \end{code}
+
 
 %************************************************************************
 %*									*

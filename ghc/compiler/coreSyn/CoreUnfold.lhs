@@ -49,7 +49,7 @@ import Id		( Id, idType, isId,
 import VarSet
 import Literal		( isLitLitLit, litSize )
 import PrimOp		( primOpIsDupable, primOpOutOfLine )
-import ForeignCall	( ForeignCall(..), ccallIsCasm )
+import ForeignCall	( okToExposeFCall )
 import IdInfo		( InlinePragInfo(..), OccInfo(..), GlobalIdDetails(..),
 			  isNeverInlinePrag
 			)
@@ -490,10 +490,6 @@ okToUnfoldInHiFile e = opt_UnfoldCasms || go e
 				not (any isLitLitLit [ lit | (LitAlt lit, _, _) <- alts ])
     go (Note _ body)          = go body
     go (Type _)		      = True
-
-    -- ok to unfold a PrimOp as long as it's not a _casm_
-    okToExposeFCall (CCall cc) = not (ccallIsCasm cc)
-    okToExposeFCall other      = True
 \end{code}
 
 

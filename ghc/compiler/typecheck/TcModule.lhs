@@ -340,7 +340,7 @@ tcModule :: PersistentCompilerState
 
 tcModule pcs hst get_fixity this_mod decls
   = fixTc (\ ~(unf_env, _, _) ->
-		-- Loop back the final environment, including the fully zonkec
+		-- Loop back the final environment, including the fully zonked
 		-- versions of bindings from this module.  In the presence of mutual
 		-- recursion, interface type signatures may mention variables defined
 		-- in this module, which is why the knot is so big

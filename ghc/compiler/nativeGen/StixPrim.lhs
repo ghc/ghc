@@ -70,7 +70,6 @@ calling.
 
 \begin{code}
 foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety is_asm)) rhs
-  | is_asm		  = error "ERROR: Native code generator can't handle casm"
   | not (playSafe safety) = returnUs (\xs -> ccall : xs)
 
   | otherwise
@@ -101,14 +100,13 @@ foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety is_asm)) rh
 
     ccall = case lhs of
       []    -> StCall fn cconv VoidRep args
-      [lhs] ->
-	  let lhs' = amodeToStix lhs
-	      pk   = case getAmodeRep lhs of
+      [lhs] -> StAssign pk lhs' (StCall fn cconv pk args)
+	    where
+	       lhs' = amodeToStix lhs
+	       pk   = case getAmodeRep lhs of
                         FloatRep  -> FloatRep
                         DoubleRep -> DoubleRep
                         other     -> IntRep
-	  in
-	      StAssign pk lhs' (StCall fn cconv pk args)
 
 foreignCallCode lhs call rhs
   = pprPanic "Native code generator can't handle foreign call" (ppr call)

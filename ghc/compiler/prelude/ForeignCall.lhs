@@ -8,16 +8,20 @@ module ForeignCall (
 	ForeignCall(..),
 	Safety(..), playSafe,
 
-	CCallSpec(..), ccallIsCasm,
-	CCallTarget(..), dynamicTarget, isDynamicTarget,
+	CExportSpec(..),
+	CCallSpec(..), 
+	CCallTarget(..), isDynamicTarget, isCasmTarget,
 	CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
 
-	DotNetCallSpec(..)
+	DNCallSpec(..),
+
+	okToExposeFCall
     ) where
 
 #include "HsVersions.h"
 
 import CStrings		( CLabelString, pprCLabelString )
+import FastString	( FastString )
 import Outputable
 \end{code}
 
@@ -31,7 +35,7 @@ import Outputable
 \begin{code}
 data ForeignCall
   = CCall	CCallSpec
-  | DotNetCall	DotNetCallSpec
+  | DNCall	DNCallSpec
   deriving( Eq )		-- We compare them when seeing if an interface
 				-- has changed (for versioning purposes)
 
@@ -39,7 +43,7 @@ data ForeignCall
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
   ppr (CCall cc)      = ppr cc		
-  ppr (DotNetCall dn) = ppr dn
+  ppr (DNCall dn) = ppr dn
 \end{code}
 
   
@@ -70,16 +74,16 @@ playSafe PlayRisky = False
 %************************************************************************
 
 \begin{code}
+data CExportSpec
+  = CExportStatic		-- foreign export ccall foo :: ty
+	CLabelString		-- C Name of exported function
+	CCallConv
+
 data CCallSpec
   =  CCallSpec	CCallTarget	-- What to call
 		CCallConv	-- Calling convention to use.
 		Safety
-		Bool		-- True <=> really a "casm"
   deriving( Eq )
-
-
-ccallIsCasm :: CCallSpec -> Bool
-ccallIsCasm (CCallSpec _ _ _ c_asm) = c_asm
 \end{code}
 
 The call target:
@@ -88,13 +92,15 @@ The call target:
 data CCallTarget
   = StaticTarget  CLabelString  -- An "unboxed" ccall# to `fn'.
   | DynamicTarget 		-- First argument (an Addr#) is the function pointer
+  | CasmTarget    CLabelString	-- Inline C code (now seriously deprecated)
   deriving( Eq )
 
-isDynamicTarget DynamicTarget    = True
-isDynamicTarget (StaticTarget _) = False
+isDynamicTarget, isCasmTarget :: CCallTarget -> Bool
+isDynamicTarget DynamicTarget = True
+isDynamicTarget other	      = False
 
-dynamicTarget :: CCallTarget
-dynamicTarget = DynamicTarget
+isCasmTarget (CasmTarget _) = True
+isCasmTarget other	    = False
 \end{code}
 
 
@@ -132,32 +138,21 @@ ccallConvAttribute CCallConv   = ""
 Printing into C files:
 
 \begin{code}
+instance Outputable CExportSpec where
+  ppr (CExportStatic str _) = pprCLabelString str
+
 instance Outputable CCallSpec where
-  ppr (CCallSpec fun cconv safety is_casm)
-    = hcat [ ifPprDebug callconv
-	   , text "__", ppr_dyn
-           , text before , ppr_fun , after]
+  ppr (CCallSpec fun cconv safety)
+    = hcat [ ifPprDebug callconv, ppr_fun fun ]
     where
-        callconv = text "{-" <> ppr cconv <> text "-}"
-	play_safe = playSafe safety
+      callconv = text "{-" <> ppr cconv <> text "-}"
 
-	before
-	  | is_casm && play_safe = "casm_GC ``"
-	  | is_casm	         = "casm ``"
-	  | play_safe	         = "ccall_GC "
-	  | otherwise	         = "ccall "
+      gc_suf | playSafe safety = text "_GC"
+	     | otherwise       = empty
 
-	after
-	  | is_casm   = text "''"
-	  | otherwise = empty
-	  
-	ppr_dyn = case fun of
-		    DynamicTarget -> text "dyn_"
-		    _	   	  -> empty
-
-	ppr_fun = case fun of
-		     DynamicTarget   -> text "\"\""
-		     StaticTarget fn -> pprCLabelString fn
+      ppr_fun DynamicTarget     = text "__dyn_ccall" <> gc_suf <+> text "\"\""
+      ppr_fun (StaticTarget fn) = text "__ccall"     <> gc_suf <+> pprCLabelString fn
+      ppr_fun (CasmTarget   fn) = text "__casm"      <> gc_suf <+> text "``" <> pprCLabelString fn <> text "''"
 \end{code}
 
 
@@ -168,9 +163,25 @@ instance Outputable CCallSpec where
 %************************************************************************
 
 \begin{code}
-data DotNetCallSpec = DotNetCallSpec
+data DNCallSpec = DNCallSpec FastString
 		    deriving( Eq )
 
-instance Outputable DotNetCallSpec where
-  ppr DotNetCallSpec = text "DotNet!"
+instance Outputable DNCallSpec where
+  ppr (DNCallSpec s) = text "DotNet" <+> ptext s
+\end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsubsection{Misc}
+%*									*
+%************************************************************************
+
+\begin{code}
+okToExposeFCall :: ForeignCall -> Bool
+-- OK to unfold a Foreign Call in an interface file
+-- Yes, unless it's a _casm_
+okToExposeFCall (CCall (CCallSpec target _ _)) = not (isCasmTarget target)
+okToExposeFCall other  			       = True
 \end{code}

@@ -15,8 +15,7 @@ import CoreSyn
 import DsCCall		( dsCCall, mkFCall, boxResult, unboxArg, resultWrapper )
 import DsMonad
 
-import HsSyn		( ExtName(..), ForeignDecl(..), isDynamicExtName, ForKind(..) )
-import HsDecls		( extNameStatic )
+import HsSyn		( ForeignDecl(..), FoExport(..), FoImport(..)  )
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkVanillaGlobal, mkSysLocal,
@@ -35,9 +34,10 @@ import Type		( repType, splitTyConApp_maybe,
 			)
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
 			  Safety(..), playSafe,
-			  CCallTarget(..), dynamicTarget,
+			  CExportSpec(..),
 			  CCallConv(..), ccallConvToInt
 			)
+import CStrings		( CLabelString )
 import TysWiredIn	( unitTy, addrTy, stablePtrTyCon )
 import TysPrim		( addrPrimTy )
 import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, newStablePtrName,
@@ -75,35 +75,24 @@ dsForeigns :: Module
 		  , SDoc 	      -- C stubs to use when calling
                                       -- "foreign exported" functions.
 		  )
-dsForeigns mod_name fos = foldlDs combine ([], [], empty, empty) fos
+dsForeigns mod_name fos
+  = foldlDs combine ([], [], empty, empty) fos
  where
-  combine (acc_feb, acc_f, acc_h, acc_c) fo@(ForeignDecl i imp_exp _ ext_nm cconv _) 
-    | isForeignImport =   -- foreign import (dynamic)?
-        dsFImport i (idType i) uns ext_nm cconv  `thenDs` \ bs -> 
-	returnDs (acc_feb, bs ++ acc_f, acc_h, acc_c)
-    | isForeignLabel = 
-        dsFLabel i (idType i) ext_nm `thenDs` \ b -> 
-	returnDs (acc_feb, b:acc_f, acc_h, acc_c)
-    | isDynamicExtName ext_nm =
-        dsFExportDynamic i (idType i) mod_name ext_nm cconv  `thenDs` \ (feb,bs,h,c) -> 
-	returnDs (feb:acc_feb, bs ++ acc_f, h $$ acc_h, c $$ acc_c)
+  combine (acc_feb, acc_f, acc_h, acc_c) (ForeignImport id _ spec _) 
+    = dsFImport mod_name id spec	`thenDs` \ (bs, h, c) -> 
+      returnDs (acc_feb, bs ++ acc_f, h $$ acc_h, c $$ acc_c)
 
-    | otherwise	       =  -- foreign export
-        dsFExport i (idType i) mod_name ext_nm cconv False   `thenDs` \ (feb,fe,h,c) ->
-	returnDs (feb:acc_feb, fe:acc_f, h $$ acc_h, c $$ acc_c)
-   where
-    isForeignImport = 
-	case imp_exp of
-	  FoImport _ -> True
-	  _          -> False
-
-    isForeignLabel = 
-	case imp_exp of
-	  FoLabel -> True
-	  _       -> False
-
-    FoImport uns = imp_exp
+  combine (acc_feb, acc_f, acc_h, acc_c) (ForeignExport id _ (CExport (CExportStatic ext_nm cconv)) _)
+    = dsFExport mod_name id (idType id) ext_nm cconv False	`thenDs` \ (feb, b, h, c) ->
+      returnDs (feb:acc_feb, b : acc_f, h $$ acc_h, c $$ acc_c)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Foreign import}
+%*									*
+%************************************************************************
 
 Desugaring foreign imports is just the matter of creating a binding
 that on its RHS unboxes its arguments, performs the external call
@@ -125,14 +114,33 @@ because it exposes the boxing to the call site.
 			
 
 \begin{code}
-dsFImport :: Id
-	  -> Type		-- Type of foreign import.
-	  -> Safety		-- Whether can re-enter the Haskell RTS, do GC etc
-	  -> ExtName
-	  -> CCallConv
-	  -> DsM [Binding]
-dsFImport fn_id ty safety ext_name cconv 
+dsFImport :: Module
+	  -> Id
+	  -> FoImport
+	  -> DsM ([Binding], SDoc, SDoc)
+dsFImport mod_name lbl_id (LblImport ext_nm) 
+ = ASSERT(fromJust res_ty == addrPrimTy) -- typechecker ensures this
+   returnDs ([(lbl_id, rhs)], empty, empty)
+ where
+   (res_ty, fo_rhs) = resultWrapper (idType lbl_id)
+   rhs		    = fo_rhs (mkLit (MachLabel ext_nm))
+
+dsFImport mod_name fn_id (CImport spec)     = dsFCall mod_name fn_id (CCall spec)
+dsFImport mod_name fn_id (DNImport spec)    = dsFCall mod_name fn_id (DNCall spec)
+dsFImport mod_name fn_id (CDynImport cconv) = dsFExportDynamic mod_name fn_id cconv
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Foreign calls}
+%*									*
+%************************************************************************
+
+\begin{code}
+dsFCall mod_Name fn_id fcall
   = let
+	ty		     = idType fn_id
 	(tvs, fun_ty)        = splitForAllTys ty
 	(arg_tys, io_res_ty) = splitFunTys fun_ty
     in
@@ -145,22 +153,17 @@ dsFImport fn_id ty safety ext_name cconv
 	-- These are the ids we pass to boxResult, which are used to decide
 	-- whether to touch# an argument after the call (used to keep
 	-- ForeignObj#s live across a 'safe' foreign import).
-	maybe_arg_ids | playSafe safety = work_arg_ids
-		      | otherwise	= []
+	maybe_arg_ids | unsafe_call fcall = work_arg_ids
+		      | otherwise	  = []
     in
     boxResult maybe_arg_ids io_res_ty  		`thenDs` \ (ccall_result_ty, res_wrapper) ->
 
     getUniqueDs					`thenDs` \ ccall_uniq ->
     getUniqueDs					`thenDs` \ work_uniq ->
     let
-	lbl = case ext_name of
-		Dynamic	     -> dynamicTarget
-	        ExtName fs _ -> StaticTarget fs
-
 	-- Build the worker
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
-	the_ccall     = CCall (CCallSpec lbl cconv safety False)
- 	the_ccall_app = mkFCall ccall_uniq the_ccall val_args ccall_result_ty
+ 	the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
 	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
 	work_id       = mkSysLocal SLIT("$wccall") work_uniq worker_ty
 
@@ -169,20 +172,18 @@ dsFImport fn_id ty safety ext_name cconv
 	wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkInlineMe (mkLams (tvs ++ args) wrapper_body)
     in
-    returnDs [(work_id, work_rhs), (fn_id, wrap_rhs)]
+    returnDs ([(work_id, work_rhs), (fn_id, wrap_rhs)], empty, empty)
+
+unsafe_call (CCall (CCallSpec _ _ safety)) = playSafe safety
+unsafe_call (DNCall _)			   = False
 \end{code}
 
-Foreign labels 
 
-\begin{code}
-dsFLabel :: Id -> Type -> ExtName -> DsM Binding
-dsFLabel nm ty ext_name = 
-   ASSERT(fromJust res_ty == addrPrimTy) -- typechecker ensures this
-   returnDs (nm, fo_rhs (mkLit (MachLabel enm)))
-  where
-   (res_ty, fo_rhs) = resultWrapper ty
-   enm    = extNameStatic ext_name
-\end{code}
+%************************************************************************
+%*									*
+\subsection{Foreign export}
+%*									*
+%************************************************************************
 
 The function that does most of the work for `@foreign export@' declarations.
 (see below for the boilerplate code a `@foreign export@' declaration expands
@@ -196,19 +197,21 @@ For each `@foreign export foo@' in a module M we generate:
 the user-written Haskell function `@M.foo@'.
 
 \begin{code}
-dsFExport :: Id
-	  -> Type		-- Type of foreign export.
-	  -> Module
-	  -> ExtName
+dsFExport :: Module
+	  -> Id			-- Either the exported Id, 
+				-- or the foreign-export-dynamic constructor
+	  -> Type		-- The type of the thing callable from C
+	  -> CLabelString	-- The name to export to C land
 	  -> CCallConv
-	  -> Bool		-- True => invoke IO action that's hanging off 
-				-- the first argument's stable pointer
+	  -> Bool		-- True => foreign export dynamic
+				-- 	   so invoke IO action that's hanging off 
+				-- 	   the first argument's stable pointer
 	  -> DsM ( Id		-- The foreign-exported Id
 		 , Binding
 		 , SDoc
 		 , SDoc
 		 )
-dsFExport fn_id ty mod_name ext_name cconv isDyn
+dsFExport mod_name fn_id ty ext_name cconv isDyn
   = 	-- BUILD THE returnIO WRAPPER, if necessary
 	-- Look at the result type of the exported function, orig_res_ty
 	-- If it's IO t, return		(\x.x,	        IO t, t)
@@ -282,20 +285,19 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
 
       	the_app = getFun_wrapper (return_io_wrapper (mkVarApps (Var i) (tvs ++ fe_args)))
       	the_body = mkLams (tvs ++ wrapper_args) the_app
-      	c_nm     = extNameStatic ext_name
   
       	(h_stub, c_stub) = fexportEntry (moduleUserString mod)
-      				      c_nm f_helper_glob
-                                      wrapper_arg_tys res_ty cconv isDyn
+      				      	ext_name f_helper_glob
+                                      	wrapper_arg_tys res_ty cconv isDyn
      in
      returnDs (f_helper_glob, (f_helper_glob, the_body), h_stub, c_stub)
 
   where
-   (tvs,sans_foralls)			= splitForAllTys ty
-   (fe_arg_tys', orig_res_ty)	        = splitFunTys sans_foralls
+   (tvs,sans_foralls)		= splitForAllTys ty
+   (fe_arg_tys', orig_res_ty)	= splitFunTys sans_foralls
 
-   (_, stbl_ptr_ty')			= splitForAllTys stbl_ptr_ty
-   (_, stbl_ptr_to_ty)			= splitAppTy stbl_ptr_ty'
+   (_, stbl_ptr_ty')		= splitForAllTys stbl_ptr_ty
+   (_, stbl_ptr_to_ty)		= splitAppTy stbl_ptr_ty'
 
    fe_arg_tys | isDyn	  = tail fe_arg_tys'
 	      | otherwise = fe_arg_tys'
@@ -327,23 +329,19 @@ foreign export "f_helper" f_helper :: StablePtr (Addr -> Int -> IO Int) -> Addr 
 \end{verbatim}
 
 \begin{code}
-dsFExportDynamic :: Id
-		 -> Type		-- Type of foreign export.
-		 -> Module
-		 -> ExtName
+dsFExportDynamic :: Module
+		 -> Id
 		 -> CCallConv
-		 -> DsM (Id, [Binding], SDoc, SDoc)
-dsFExportDynamic i ty mod_name ext_name cconv =
-     newSysLocalDs ty					 `thenDs` \ fe_id ->
+		 -> DsM ([Binding], SDoc, SDoc)
+dsFExportDynamic mod_name id cconv
+  =  newSysLocalDs ty					 `thenDs` \ fe_id ->
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
-       fe_nm	   = moduleUserString mod_name ++ "_" ++ toCName fe_id
-       fe_ext_name = ExtName (_PK_ fe_nm) Nothing
+       fe_nm	   = _PK_ (moduleUserString mod_name ++ "_" ++ toCName fe_id)
      in
-     dsFExport  i export_ty mod_name fe_ext_name cconv True
-     	`thenDs` \ (feb, fe, h_code, c_code) ->
-     newSysLocalDs arg_ty			`thenDs` \ cback ->
-     dsLookupGlobalValue newStablePtrName	`thenDs` \ newStablePtrId ->
+     dsFExport mod_name id export_ty fe_nm cconv True  	`thenDs` \ (feb, fe, h_code, c_code) ->
+     newSysLocalDs arg_ty				`thenDs` \ cback ->
+     dsLookupGlobalValue newStablePtrName		`thenDs` \ newStablePtrId ->
      let
 	mk_stbl_ptr_app    = mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
      in
@@ -367,7 +365,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
        -}
       adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
 		      , Var stbl_value
-		      , mkLit (MachLabel (_PK_ fe_nm))
+		      , mkLit (MachLabel fe_nm)
 		      ]
         -- name of external entry point providing these services.
 	-- (probably in the RTS.) 
@@ -382,13 +380,14 @@ dsFExportDynamic i ty mod_name ext_name cconv =
          io_app = mkLams tvs	 $
 		  mkLams [cback] $
 		  stbl_app ccall_io_adj res_ty
-	 fed = (i `setInlinePragma` neverInlinePrag, io_app)
+	 fed = (id `setInlinePragma` neverInlinePrag, io_app)
 		-- Never inline the f.e.d. function, because the litlit
 		-- might not be in scope in other modules.
      in
-     returnDs (feb, [fed, fe], h_code, c_code)
+     returnDs ([fed, fe], h_code, c_code)
 
  where
+  ty				   = idType id
   (tvs,sans_foralls)		   = splitForAllTys ty
   ([arg_ty], io_res_ty)		   = splitFunTys sans_foralls
   Just (ioTyCon, [res_ty])	   = splitTyConApp_maybe io_res_ty

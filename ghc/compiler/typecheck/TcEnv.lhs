@@ -178,6 +178,7 @@ tcInLocalScope env v = v `elemNameEnv` (tcLEnv env)
 data TyThingDetails = SynTyDetails Type
 		    | DataTyDetails ThetaType [DataCon] [Id]
 		    | ClassDetails ThetaType [Id] [ClassOpItem] DataCon
+		    | ForeignTyDetails	-- Nothing yet
 \end{code}
 
 

@@ -46,7 +46,7 @@ import Name		( NamedThing(..) )
 import DataCon		( dataConWrapId )
 import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper )
-import ForeignCall	( ForeignCall(..), isDynamicTarget )
+import ForeignCall	( ForeignCall(..) )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
@@ -284,7 +284,7 @@ pprAbsC (CCallProfCtrMacro op as) _
 pprAbsC (CCallProfCCMacro op as) _
   = hcat [ptext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
-pprAbsC stmt@(CCallTypedef is_tdef (CCallSpec op_str cconv _ _) uniq results args) _
+pprAbsC stmt@(CCallTypedef is_tdef (CCallSpec op_str cconv _) uniq results args) _
   =  hsep [ ptext (if is_tdef then SLIT("typedef") else SLIT("extern"))
 	  , ccall_res_ty
 	  , fun_nm
@@ -775,13 +775,13 @@ Amendment to the above: if we can GC, we have to:
   that the runtime check that PerformGC is being used sensibly will work.
 
 \begin{code}
-pprFCall call@(CCall (CCallSpec op_str cconv safety is_asm)) uniq args results vol_regs
+pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
   = vcat [
       char '{',
       declare_local_vars,   -- local var for *result*
       vcat local_arg_decls,
       pp_save_context,
-        process_casm local_vars pp_non_void_args casm_str,
+        process_casm local_vars pp_non_void_args call_str,
       pp_restore_context,
       assign_results,
       char '}'
@@ -814,16 +814,17 @@ pprFCall call@(CCall (CCallSpec op_str cconv safety is_asm)) uniq args results v
     (declare_local_vars, local_vars, assign_results)
       = ppr_casm_results non_void_results
 
-    casm_str = if is_asm then _UNPK_ asm_str else ccall_str
-    StaticTarget asm_str = op_str	-- Must be static if it's a casm
+    call_str = case target of
+		  CasmTarget str  -> _UNPK_ str
+		  StaticTarget fn -> mk_ccall_str (pprCLabelString fn) ccall_args
+		  DynamicTarget   -> mk_ccall_str dyn_fun	       (tail ccall_args)
+
+    ccall_args = zipWith (\ _ i -> char '%' <> int i) non_void_args [0..]
+    dyn_fun    = parens (parens (ptext SLIT("_ccall_fun_ty") <> ppr uniq) <> text "%0")
+						 
 
     -- Remainder only used for ccall
-
-    fun_name = case op_str of
-		 DynamicTarget   -> parens (parens (ptext SLIT("_ccall_fun_ty") <> ppr uniq) <> text "%0")
-		 StaticTarget st -> pprCLabelString st
-
-    ccall_str = showSDoc
+    mk_ccall_str fun_name ccall_fun_args = showSDoc
 	(hcat [
 		if null non_void_results
 		  then empty
@@ -832,11 +833,6 @@ pprFCall call@(CCall (CCallSpec op_str cconv safety is_asm)) uniq args results v
 		  hcat (punctuate comma ccall_fun_args),
 		text "));"
 	])
-
-    ccall_fun_args | isDynamicTarget op_str = tail ccall_args
-		   | otherwise 		    = ccall_args
-
-    ccall_args    = zipWith (\ _ i -> char '%' <> int i) non_void_args [0..]
 \end{code}
 
 If the argument is a heap object, we need to reach inside and pull out

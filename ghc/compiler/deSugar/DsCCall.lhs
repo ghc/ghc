@@ -26,7 +26,7 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, CC
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
 import ForeignCall	( ForeignCall, CCallTarget(..) )
 import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
-			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, 
+			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, isPrimitiveType,
 			  isNewType, repType, isUnLiftedType, mkFunTy, mkTyConApp,
 			  Type
 			)
@@ -96,7 +96,9 @@ dsCCall lbl args may_gc is_asm result_ty
     boxResult [] result_ty	`thenDs` \ (ccall_result_ty, res_wrapper) ->
     getUniqueDs			`thenDs` \ uniq ->
     let
-	the_fcall    = CCall (CCallSpec (StaticTarget lbl) CCallConv may_gc is_asm)
+	target | is_asm    = CasmTarget lbl
+	       | otherwise = StaticTarget lbl
+	the_fcall    = CCall (CCallSpec target CCallConv may_gc)
  	the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
     in
     returnDs (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
@@ -134,8 +136,8 @@ unboxArg :: CoreExpr			-- The supplied argument
 -- where W is a CoreExpr that probably mentions x#
 
 unboxArg arg
-  -- Unlifted types: nothing to unbox
-  | isUnLiftedType arg_ty
+  -- Primtive types: nothing to unbox
+  | isPrimitiveType arg_ty
   = returnDs (arg, \body -> body)
 
   -- Newtypes
@@ -293,7 +295,7 @@ resultWrapper :: Type
 		  CoreExpr -> CoreExpr)	-- Wrapper for the result 
 resultWrapper result_ty
   -- Base case 1: primitive types
-  | isUnLiftedType result_ty
+  | isPrimitiveType result_ty
   = (Just result_ty, \e -> e)
 
   -- Base case 1: the unit type ()

@@ -351,6 +351,8 @@ decl    : src_loc qvar_name '::' type maybe_idinfo
   		 	{ IfaceSig $2 $4 ($5 $2) $1 }
 	| src_loc 'type' qtc_name tv_bndrs '=' type 		       
 			{ TySynonym $3 $4 $6 $1 }
+	| src_loc 'foreign' 'type' qtc_name  		       
+			{ ForeignType $4 DNType $1 }
 	| src_loc 'data' opt_decl_context qtc_name tv_bndrs constrs 	       
 	       		{ mkTyData DataType $3 $4 $5 $6 (length $6) Nothing $1 }
 	| src_loc 'newtype' opt_decl_context qtc_name tv_bndrs newtype_constr
@@ -808,9 +810,10 @@ core_aexpr      : qvar_name				        { UfVar $1 }
                                  (is_dyn, is_casm, may_gc) = $2
 
 			         target | is_dyn    = DynamicTarget
+					| is_casm   = CasmTarget $3
 					| otherwise = StaticTarget $3
 
-	                         ccall = CCallSpec target CCallConv may_gc is_casm
+	                         ccall = CCallSpec target CCallConv may_gc
  	                     in
 			     UfFCall (CCall ccall) $4
 			   }

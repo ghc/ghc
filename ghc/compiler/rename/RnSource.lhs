@@ -49,8 +49,6 @@ import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
 import Maybes		( maybeToBool )
-import ErrUtils		( Message )
-import CStrings		( isCLabelString )
 import ListSetOps	( removeDupsEq )
 \end{code}
 
@@ -112,39 +110,44 @@ rnSourceDecl (RuleD rule)
   = rnHsRuleDecl rule		`thenRn` \ (new_rule, fvs) ->
     returnRn (RuleD new_rule, fvs)
 
+rnSourceDecl (ForD ford)
+  = rnHsForeignDecl ford		`thenRn` \ (new_ford, fvs) ->
+    returnRn (ForD new_ford, fvs)
+
 rnSourceDecl (DefD (DefaultDecl tys src_loc))
   = pushSrcLocRn src_loc $
     mapFvRn (rnHsTypeFVs doc_str) tys		`thenRn` \ (tys', fvs) ->
     returnRn (DefD (DefaultDecl tys' src_loc), fvs)
   where
     doc_str = text "a `default' declaration"
+\end{code}
 
-rnSourceDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
-  = pushSrcLocRn src_loc $
+
+%*********************************************************
+%*							*
+\subsection{Foreign declarations}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnHsForeignDecl (ForeignImport name ty spec src_loc)
+  = pushSrcLocRn src_loc 		$
     lookupOccRn name		        `thenRn` \ name' ->
-    let 
-	extra_fvs FoExport 
-	  | isDyn = lookupOrigNames [newStablePtr_RDR, deRefStablePtr_RDR,
-				     bindIO_RDR, returnIO_RDR]
-	  | otherwise =
-		lookupOrigNames [bindIO_RDR, returnIO_RDR] `thenRn` \ fvs ->
-		returnRn (addOneFV fvs name')
-	extra_fvs other = returnRn emptyFVs
-    in
-    checkRn (ok_ext_nm ext_nm) (badExtName ext_nm)	`thenRn_`
+    rnHsTypeFVs (fo_decl_msg name) ty	`thenRn` \ (ty', fvs1) ->
+    lookupOrigNames (extras spec)	`thenRn` \ fvs2 ->
+    returnRn (ForeignImport name' ty' spec src_loc, fvs1 `plusFV` fvs2)
+  where
+    extras (CDynImport _) = [newStablePtr_RDR, deRefStablePtr_RDR, bindIO_RDR, returnIO_RDR]
+    extras other	  = []
 
-    extra_fvs imp_exp					`thenRn` \ fvs1 -> 
+rnHsForeignDecl (ForeignExport name ty spec src_loc)
+  = pushSrcLocRn src_loc 			$
+    lookupOccRn name		        	`thenRn` \ name' ->
+    rnHsTypeFVs (fo_decl_msg name) ty  		`thenRn` \ (ty', fvs1) ->
+    lookupOrigNames [bindIO_RDR, returnIO_RDR]	`thenRn` \ fvs2 ->
+    returnRn (ForeignExport name' ty' spec src_loc, fvs1 `plusFV` fvs2)
 
-    rnHsTypeFVs fo_decl_msg ty	       		`thenRn` \ (ty', fvs2) ->
-    returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), 
-	      fvs1 `plusFV` fvs2)
- where
-  fo_decl_msg = ptext SLIT("The foreign declaration for") <+> ppr name
-  isDyn	      = isDynamicExtName ext_nm
-
-  ok_ext_nm Dynamic 		   = True
-  ok_ext_nm (ExtName nm (Just mb)) = isCLabelString nm && isCLabelString mb
-  ok_ext_nm (ExtName nm Nothing)   = isCLabelString nm
+fo_decl_msg name = ptext SLIT("The foreign declaration for") <+> ppr name
 \end{code}
 
 
@@ -283,6 +286,11 @@ rnTyClDecl (IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc
     returnRn (IfaceSig {tcdName = name', tcdType = ty', tcdIdInfo = id_infos', tcdLoc = loc})
   where
     doc_str = text "the interface signature for" <+> quotes (ppr name)
+
+rnTyClDecl (ForeignType {tcdName = name, tcdFoType = spec, tcdLoc = loc})
+  = pushSrcLocRn loc 			$
+    lookupTopBndrRn name		`thenRn` \ name' ->
+    returnRn (ForeignType {tcdName = name', tcdFoType = spec, tcdLoc = loc})
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
 		    tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = nconstrs,
@@ -428,7 +436,7 @@ finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- G
     meth_doc = text "the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
 
 finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
-	-- Not a class declaration
+	-- Not a class or data type declaration
 \end{code}
 
 
@@ -878,10 +886,6 @@ badRuleVar name var
   = sep [ptext SLIT("Rule") <+> doubleQuotes (ptext name) <> colon,
 	 ptext SLIT("Forall'd variable") <+> quotes (ppr var) <+> 
 		ptext SLIT("does not appear on left hand side")]
-
-badExtName :: ExtName -> Message
-badExtName ext_nm
-  = sep [quotes (ppr ext_nm) <+> ptext SLIT("is not a valid C identifier")]
 
 dupClassAssertWarn ctxt (assertion : dups)
   = sep [hsep [ptext SLIT("Duplicate class assertion"), 

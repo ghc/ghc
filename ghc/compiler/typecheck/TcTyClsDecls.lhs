@@ -13,7 +13,7 @@ module TcTyClsDecls (
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import HsSyn		( TyClDecl(..),  
 			  ConDecl(..),   Sig(..), HsPred(..), 
-			  tyClDeclName, hsTyVarNames, 
+			  tyClDeclName, hsTyVarNames, tyClDeclTyVars,
 			  isIfaceSigDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
 import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
@@ -30,11 +30,11 @@ import TcType		( TcKind, newKindVar, zonkKindEnv )
 
 import TcUnify		( unifyKind )
 import TcInstDcls	( tcAddDeclCtxt )
-import Type		( Kind, mkArrowKind, zipFunTys )
+import Type		( Kind, mkArrowKind, liftedTypeKind, zipFunTys )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
 import TyCon		( TyCon, tyConKind, ArgVrcs, AlgTyConFlavour(..), 
-			  mkSynTyCon, mkAlgTyCon, mkClassTyCon )
+			  mkSynTyCon, mkAlgTyCon, mkClassTyCon, mkForeignTyCon )
 import DataCon		( isNullaryDataCon )
 import Var		( varName )
 import FiniteMap
@@ -207,8 +207,8 @@ tcTyClDecl1 is_rec unf_env decl
 \begin{code}
 getInitialKind :: RenamedTyClDecl -> NF_TcM (Name, TcKind)
 getInitialKind decl
- = kcHsTyVars (tcdTyVars decl)	`thenNF_Tc` \ arg_kinds ->
-   newKindVar			`thenNF_Tc` \ result_kind  ->
+ = kcHsTyVars (tyClDeclTyVars decl)	`thenNF_Tc` \ arg_kinds ->
+   newKindVar				`thenNF_Tc` \ result_kind  ->
    returnNF_Tc (tcdName decl, mk_kind arg_kinds result_kind)
 
 mk_kind tvs_w_kinds res_kind = foldr (mkArrowKind . snd) res_kind tvs_w_kinds
@@ -242,6 +242,8 @@ kcTyClDecl decl@(TySynonym {tcdSynRhs = rhs})
     kcHsType rhs		`thenTc` \ rhs_kind ->
     unifyKind result_kind rhs_kind
 
+kcTyClDecl (ForeignType {}) = returnTc ()
+
 kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = context, tcdCons = con_decls})
   = kcTyClDeclBody decl			$ \ result_kind ->
     kcHsContext context			`thenTc_` 
@@ -273,7 +275,7 @@ kcTyClDeclBody decl thing_inside
 		  AThing kind	      -> kind
 		-- For some odd reason, a class doesn't include its kind
 
-	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames (tcdTyVars decl)) kind
+	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames (tyClDeclTyVars decl)) kind
     in
     tcExtendKindEnv tyvars_w_kinds (thing_inside result_kind)
 \end{code}
@@ -325,6 +327,10 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 			NewType -> NewTyCon (mkNewTyConRep tycon)
 			DataType | all isNullaryDataCon data_cons -> EnumTyCon
 				 | otherwise			  -> DataTyCon
+
+buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
+                  (ForeignType {tcdName = tycon_name})
+  = ATyCon (mkForeignTyCon tycon_name liftedTypeKind 0 [])
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
                   (ClassDecl {tcdName = class_name, tcdTyVars = tyvar_names,

@@ -13,6 +13,8 @@ module TyCon(
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
 	isRecursiveTyCon, newTyConRep,
 
+	mkForeignTyCon, isForeignTyCon,
+
 	mkAlgTyCon, --mkAlgTyCon, 
 	mkClassTyCon,
 	mkFunTyCon,
@@ -123,14 +125,18 @@ data TyCon
 	algTyConClass :: Maybe Class	-- Just cl if this tycon came from a class declaration
     }
 
-  | PrimTyCon {		-- Primitive types; cannot be defined in Haskell
-			-- NB: All of these guys are *unlifted*, but not all are *unboxed*
+  | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
+				-- Now includes foreign-imported types
 	tyConUnique  :: Unique,
 	tyConName    :: Name,
 	tyConKind    :: Kind,
 	tyConArity   :: Arity,
 	tyConArgVrcs :: ArgVrcs,
-	primTyConRep :: PrimRep
+	primTyConRep :: PrimRep,	-- Many primitive tycons are unboxed, but some are
+					-- boxed (represented by pointers). The PrimRep tells.
+
+	isUnLifted   :: Bool	-- Most primitive tycons are unlifted, 
+				-- but foreign-imported ones may not be
     }
 
   | TupleTyCon {
@@ -290,14 +296,30 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
 	genInfo = gen_info
     }
 
-mkPrimTyCon name kind arity arg_vrcs rep 
+-- Foreign-imported (.NET) type constructors are represented
+-- as primitive, but *lifted*, TyCons for now.  
+-- They  have PtrRep
+mkForeignTyCon name kind arity arg_vrcs
   = PrimTyCon {
-	tyConName = name,
-	tyConUnique = nameUnique name,
-	tyConKind = kind,
-	tyConArity = arity,
+	tyConName    = name,
+	tyConUnique  = nameUnique name,
+	tyConKind    = kind,
+	tyConArity   = arity,
         tyConArgVrcs = arg_vrcs,
-	primTyConRep = rep
+	primTyConRep = PtrRep,
+	isUnLifted   = False
+    }
+
+
+mkPrimTyCon name kind arity arg_vrcs rep
+  = PrimTyCon {
+	tyConName    = name,
+	tyConUnique  = nameUnique name,
+	tyConKind    = kind,
+	tyConArity   = arity,
+        tyConArgVrcs = arg_vrcs,
+	primTyConRep = rep,
+	isUnLifted   = True
     }
 
 mkSynTyCon name kind arity tyvars rhs argvrcs
@@ -322,9 +344,9 @@ isFunTyCon _             = False
 isPrimTyCon (PrimTyCon {}) = True
 isPrimTyCon _              = False
 
-isUnLiftedTyCon (PrimTyCon {}) = True
-isUnLiftedTyCon (TupleTyCon { tyConBoxed = boxity}) = not (isBoxed boxity)
-isUnLiftedTyCon _              = False
+isUnLiftedTyCon (PrimTyCon  {isUnLifted = is_unlifted}) = is_unlifted
+isUnLiftedTyCon (TupleTyCon {tyConBoxed = boxity})      = not (isBoxed boxity)
+isUnLiftedTyCon _    				        = False
 
 -- isBoxedTyCon should not be applied to SynTyCon, nor KindCon
 isBoxedTyCon (AlgTyCon {}) = True
@@ -383,6 +405,11 @@ tupleTyConBoxity tc = tyConBoxed tc
 
 isRecursiveTyCon (AlgTyCon {algTyConRec = Recursive}) = True
 isRecursiveTyCon other				      = False
+
+-- isForeignTyCon identifies foreign-imported type constructors
+-- For the moment, they are primitive but lifted, but that may change
+isForeignTyCon (PrimTyCon {isUnLifted = is_unlifted}) = not is_unlifted
+isForeignTyCon other				      = False
 \end{code}
 
 \begin{code}

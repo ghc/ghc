@@ -81,6 +81,9 @@ tcTyDecl1 is_rec unf_env (TyData {tcdND = new_or_data, tcdCtxt = context,
     mapTc (tcConDecl is_rec new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
     tcRecordSelectors is_rec unf_env tycon data_cons			`thenTc` \ sel_ids -> 
     returnTc (tycon_name, DataTyDetails ctxt data_cons sel_ids)
+
+tcTyDecl1 is_rec unf_env (ForeignType {tcdName = tycon_name})
+  = returnTc (tycon_name, ForeignTyDetails)
 \end{code}
 
 \begin{code}

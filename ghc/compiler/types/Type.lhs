@@ -63,7 +63,8 @@ module Type (
 	getDFunTyKey,
 
 	-- Lifting and boxity
-	isUnLiftedType, isUnboxedTupleType, isAlgType, isDataType, isNewType,
+	isUnLiftedType, isUnboxedTupleType, isAlgType, 
+	isDataType, isNewType, isPrimitiveType,
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -108,7 +109,7 @@ import TyCon	( TyCon,
 		  isFunTyCon, isDataTyCon, isNewTyCon, newTyConRep,
 		  isAlgTyCon, isSynTyCon, tyConArity,
 	          tyConKind, tyConDataCons, getSynTyConDefn,
-		  tyConPrimRep
+		  tyConPrimRep, isPrimTyCon
 		)
 
 -- others
@@ -1125,6 +1126,15 @@ isNewType :: Type -> Bool
 isNewType ty = case splitTyConApp_maybe ty of
 			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
 					      isNewTyCon tc
+			other		   -> False
+
+isPrimitiveType :: Type -> Bool
+-- Returns types that are opaque to Haskell.
+-- Most of these are unlifted, but now that we interact with .NET, we
+-- may have primtive (foreign-imported) types that are lifted
+isPrimitiveType ty = case splitTyConApp_maybe ty of
+			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
+					      isPrimTyCon tc
 			other		   -> False
 \end{code}
 

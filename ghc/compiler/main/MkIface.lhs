@@ -46,7 +46,8 @@ import NameEnv
 import NameSet
 import OccName		( pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon, tyConGenIds,
-			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize, isClassTyCon
+			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize, 
+			  isClassTyCon, isForeignTyCon
 			)
 import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
@@ -186,6 +187,11 @@ ifaceTyCls (ATyCon tycon) so_far
 			tcdDerivs = Nothing,
 		        tcdSysNames  = map getName (tyConGenIds tycon),
 			tcdLoc	     = noSrcLoc }
+
+	    | isForeignTyCon tycon
+	    = ForeignType { tcdName   = getName tycon,
+			    tcdFoType = DNType,	-- The only case at present
+			    tcdLoc    = noSrcLoc }
 
 	    | otherwise = pprPanic "ifaceTyCls" (ppr tycon)
 

@@ -32,7 +32,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  tcExtendTyVarEnvForMeths, 
 			  tcAddImportedIdInfo, tcLookupClass,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
-			  simpleInstInfoTy, newDFunName, tcExtendTyVarEnv,
+			  simpleInstInfoTy, newDFunName,
 			  isLocalThing,
 			)
 import InstEnv		( InstEnv, extendInstEnv )

@@ -122,6 +122,7 @@ data Token
   | ITwith
   | ITstdcallconv
   | ITccallconv
+  | ITdotnet
 
   | ITinterface			-- interface keywords
   | IT__export
@@ -308,6 +309,7 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "with",	ITwith ),
 	( "stdcall",    ITstdcallconv),
 	( "ccall",      ITccallconv),
+	( "dotnet",     ITdotnet),
         ("_ccall_",	ITccall (False, False, PlayRisky)),
         ("_ccall_GC_",	ITccall (False, False, PlaySafe)),
         ("_casm_",	ITccall (False, True,  PlayRisky)),
