@@ -20,6 +20,7 @@ module PrelErr
        , noMethodBindingError
        , nonExhaustiveGuardsError
        , patError
+       , recSelError
        , recConError
        , recUpdError               -- :: String -> a
 
@@ -129,6 +130,7 @@ irrefutPatError
  --, noExplicitMethodError
    , nonExhaustiveGuardsError
    , patError
+   , recSelError
    , recConError
    , recUpdError :: String -> a
 
@@ -138,6 +140,7 @@ noMethodBindingError     s = error (untangle s "No instance nor default method f
 irrefutPatError		 s = error (untangle s "Irrefutable pattern failed for pattern")
 nonExhaustiveGuardsError s = error (untangle s "Non-exhaustive guards in")
 patError 		 s = error (untangle s "Non-exhaustive patterns in")
+recSelError 		 s = error (untangle s "Missing field in record selection:")
 recConError 		 s = error (untangle s "Missing field in record construction:")
 recUpdError 		 s = error (untangle s "Record to doesn't contain field(s) to be updated")
 
