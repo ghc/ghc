@@ -28,7 +28,7 @@ import DriverState	( v_Build_tag, v_MainModIs )
 import StgSyn
 import CgMonad
 import AbsCSyn
-import PrelNames	( gHC_PRIM, dOLLAR_MAIN, mAIN_Name )
+import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN_Name )
 import CLabel		( mkSRTLabel, mkClosureLabel, 
 			  mkPlainModuleInitLabel, mkModuleInitLabel )
 import PprAbsC		( dumpRealC )
@@ -148,7 +148,7 @@ mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mo
 	register_mod_imports = map mk_import_register imported_mods
 
 	-- When compiling the module in which the 'main' function lives,
-	-- we inject an extra stg_init procedure for stg_init_zdMain, for the 
+	-- we inject an extra stg_init procedure for stg_init_ZCMain, for the 
 	-- RTS to invoke.  We must consult the -main-is flag in case the
 	-- user specified a different function to Main.main
 	main_mod_name = case mb_main_mod of
@@ -158,7 +158,7 @@ mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mo
 	  | Module.moduleName this_mod /= main_mod_name 
   	  = AbsCNop	-- The normal case
 	  | otherwise	-- this_mod contains the main function
-	  = CCodeBlock (mkPlainModuleInitLabel dOLLAR_MAIN)
+	  = CCodeBlock (mkPlainModuleInitLabel rOOT_MAIN)
 		       (CJump (CLbl (mkPlainModuleInitLabel this_mod) CodePtrRep))
 			     
     in

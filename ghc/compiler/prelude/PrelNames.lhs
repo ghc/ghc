@@ -299,9 +299,13 @@ pRELUDE		= mkBasePkgModule pRELUDE_Name
 -- MetaHaskell Extension  text2 from Meta/work/gen.hs
 mETA_META_Name   = mkModuleName "Language.Haskell.THSyntax"
 
-dOLLAR_MAIN_Name = mkModuleName "$Main"		-- Root module for initialisation 
-dOLLAR_MAIN	 = mkHomeModule dOLLAR_MAIN_Name
-iNTERACTIVE      = mkHomeModule (mkModuleName "$Interactive")
+rOOT_MAIN_Name = mkModuleName ":Main"		-- Root module for initialisation 
+rOOT_MAIN      = mkHomeModule rOOT_MAIN_Name	
+	-- The ':xxx' makes a moudle name that the user can never
+	-- use himself.  The z-encoding for ':' is "ZC", so the z-encoded
+	-- module name still starts with a capital letter, which keeps
+	-- the z-encoded version consistent.
+iNTERACTIVE    = mkHomeModule (mkModuleName ":Interactive")
 \end{code}
 
 %************************************************************************
@@ -474,8 +478,8 @@ and it's convenient to write them all down in one place.
 
 
 \begin{code}
-dollarMainName = varQual dOLLAR_MAIN_Name FSLIT("main") dollarMainKey
-runIOName      = varQual pREL_TOP_HANDLER_Name FSLIT("runIO") runMainKey
+rootMainName = varQual rOOT_MAIN_Name FSLIT("main") rootMainKey
+runIOName    = varQual pREL_TOP_HANDLER_Name FSLIT("runIO") runMainKey
 
 -- Stuff from GHC.Prim
 superKindName    = kindQual FSLIT("KX") kindConKey
@@ -978,7 +982,7 @@ otherwiseIdKey		      = mkPreludeMiscIdUnique 51
 assertIdKey		      = mkPreludeMiscIdUnique 53
 runSTRepIdKey		      = mkPreludeMiscIdUnique 54
 
-dollarMainKey		      = mkPreludeMiscIdUnique 55
+rootMainKey		      = mkPreludeMiscIdUnique 55
 runMainKey		      = mkPreludeMiscIdUnique 56
 
 andIdKey		      = mkPreludeMiscIdUnique 57

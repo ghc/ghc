@@ -40,7 +40,8 @@ import PrelNames	( mkUnboundName, intTyConName,
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, integerTyConName,
-			  bindIOName, returnIOName, failIOName, thenIOName
+			  bindIOName, returnIOName, failIOName, thenIOName,
+			  rOOT_MAIN_Name
 			)
 #ifdef GHCI	
 import DsMeta		( templateHaskellNames, qTyConName )
@@ -70,11 +71,24 @@ newTopBinder mod rdr_name loc
   | Just name <- isExact_maybe rdr_name
   = returnM name
 
-  | otherwise
-  = ASSERT( not (isOrig rdr_name) || rdrNameModule rdr_name == moduleName mod )
+  | isOrig rdr_name
+  = ASSERT( rdr_mod == moduleName mod || rdr_mod == rOOT_MAIN_Name )
 	-- When reading External Core we get Orig names as binders, 
 	-- but they should agree with the module gotten from the monad
-    newGlobalName mod (rdrNameOcc rdr_name) loc
+	--
+	-- Except for the ":Main.main = ..." definition inserted into 
+	-- the Main module
+	--
+	-- Because of this latter case, we take the module from the RdrName,
+	-- not from the environment.  In principle, it'd be fine to have an
+	-- arbitrary mixture of external core definitions in a single module,
+	-- (apart from module-initialisation issues, perhaps).
+    newGlobalName (mkHomeModule rdr_mod) (rdrNameOcc rdr_name) loc
+
+  | otherwise
+  = newGlobalName mod (rdrNameOcc rdr_name) loc
+  where
+    rdr_mod = rdrNameModule rdr_name
 
 newGlobalName :: Module -> OccName -> SrcLoc -> TcRn m Name
 newGlobalName mod occ loc

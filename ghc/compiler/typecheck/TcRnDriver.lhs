@@ -33,7 +33,7 @@ import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr,
 
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames,
 			  returnIOName, runIOName, 
-			  dollarMainName, itName, mAIN_Name, unsafeCoerceName
+			  rootMainName, itName, mAIN_Name, unsafeCoerceName
 			)
 import RdrName		( RdrName, getRdrName, mkRdrUnqual, 
 			  lookupRdrEnv, elemRdrEnv )
@@ -64,7 +64,7 @@ import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs, tcCoreBinds )
 import TcInstDcls	( tcInstDecls1, tcIfaceInstDecls, tcInstDecls2 )
-import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
+import TcSimplify	( tcSimplifyTop, tcSimplifyInteractive, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
 
 import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail, 
@@ -425,7 +425,7 @@ tc_stmts stmts
 	-- and then			let it = e
 	-- It's the simplify step that rejects the first.
 	traceTc (text "tcs 3") ;
-	const_binds <- tcSimplifyTop lie ;
+	const_binds <- tcSimplifyInteractive lie ;
 
 	-- Build result expression and zonk it
 	let { expr = mkHsLet const_binds tc_expr } ;
@@ -461,7 +461,7 @@ tcRnExpr hsc_env pcs ictxt rdr_expr
 	-- it might have a rank-2 type (e.g. :t runST)
     ((tc_expr, res_ty), lie)	   <- getLIE (tcInferRho rn_expr) ;
     ((qtvs, _, dict_ids), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
-    tcSimplifyTop lie_top ;
+    tcSimplifyInteractive lie_top ;
 
     let { all_expr_ty = mkForAllTys qtvs 		$
     		        mkFunTys (map idType dict_ids)	$
@@ -556,13 +556,13 @@ tcRnExtCore hsc_env pcs (HsModule (Just this_mod) _ _ decls _ loc)
 	-- rnSrcDecls handles fixity decls etc too, which won't occur
 	-- but that doesn't matter
    let { local_group = mkGroup decls } ;
-   (_, rn_decls, dus) <- initRn (InterfaceMode this_mod) 
-				      (rnSrcDecls local_group) ;
+   (_, rn_src_decls, dus) <- initRn (InterfaceMode this_mod) 
+				    (rnSrcDecls local_group) ;
    failIfErrsM ;
 
  	-- Get the supporting decls
    rn_imp_decls <- slurpImpDecls (duUses dus) ;
-   let { rn_decls = rn_decls `addImpDecls` rn_imp_decls } ;
+   let { rn_decls = rn_src_decls `addImpDecls` rn_imp_decls } ;
 
 	-- Dump trace of renaming part
    rnDump (ppr rn_decls) ;
@@ -1159,12 +1159,12 @@ check_main ghci_mode tcg_env main_mod main_fn
 	addErrCtxt mainCtxt		$
 	setGblEnv tcg_env 		$ do {
 	
-	-- $main :: IO () = runIO main
+	-- :Main.main :: IO () = runIO main
 	let { rhs = HsApp (HsVar runIOName) (HsVar main_name) } ;
 	(main_expr, ty) <- tcInferRho rhs ;
 
-	let { dollar_main_id = setIdLocalExported (mkLocalId dollarMainName ty) ;
-	      main_bind      = VarMonoBind dollar_main_id main_expr ;
+	let { root_main_id = setIdLocalExported (mkLocalId rootMainName ty) ;
+	      main_bind      = VarMonoBind root_main_id main_expr ;
 	      tcg_env' 	     = tcg_env { tcg_binds = tcg_binds tcg_env 
 						     `andMonoBinds` main_bind } } ;
 
