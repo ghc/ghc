@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.16 1999/06/25 09:13:37 simonmar Exp $
+ * $Id: InfoTables.h,v 1.17 1999/07/16 09:41:12 panne Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -126,22 +126,19 @@ typedef struct {
  */
 
 typedef union {
-#if SIZEOF_VOID_P == 8
   struct {
+#if SIZEOF_VOID_P == 8
     StgWord32 ptrs;		/* number of pointers     */
     StgWord32 nptrs;		/* number of non-pointers */
-  } payload;
 #else
-  struct {
     StgWord16 ptrs;		/* number of pointers     */
     StgWord16 nptrs;		/* number of non-pointers */
+#endif
   } payload;
 
   StgWord bitmap;		/* bit pattern, 1 = pointer, 0 = non-pointer */
   StgWord selector_offset;	/* used in THUNK_SELECTORs */
   StgLargeBitmap* large_bitmap;	/* pointer to large bitmap structure */
-
-#endif
   
 } StgClosureInfo;
 
