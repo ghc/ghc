@@ -215,6 +215,7 @@ main(int argc, char *argv[])
     struct_size(generation);
     struct_field(generation, mut_list);
 
+    struct_size(CostCentreStack);
     struct_field(CostCentreStack, ccsID);
     struct_field(CostCentreStack, mem_alloc);
     struct_field(CostCentreStack, scc_count);
