@@ -44,6 +44,7 @@ import GHC.IOBase
 import GHC.Num
 import GHC.Ptr	( Ptr(..) )
 import GHC.Err
+import GHC.Show
 #endif
 
 #ifdef __NHC__
@@ -82,13 +83,12 @@ data ForeignPtr a
   = ForeignPtr ForeignObj#
   | MallocPtr  (MutableByteArray# RealWorld)
 
-eqForeignPtr  :: ForeignPtr a -> ForeignPtr a -> Bool
-eqForeignPtr (ForeignPtr fo1#) (ForeignPtr fo2#) = eqForeignObj# fo1# fo2#
-eqForeignPtr (MallocPtr fo1#)  (MallocPtr fo2#)  = sameMutableByteArray# fo1# fo2#
-eqForeignPtr _ _ = False
-
 instance Eq (ForeignPtr a) where 
-    p == q = eqForeignPtr p q
+    p == q  =  foreignPtrToPtr p == foreignPtrToPtr q
+
+instance Show (ForeignPtr a) where
+    showsPrec p f = showsPrec p (foreignPtrToPtr f)
+
 
 newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign object
