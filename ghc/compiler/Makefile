@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.143 2001/03/14 21:22:48 sebc Exp $
+# $Id: Makefile,v 1.144 2001/03/16 14:36:19 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -181,7 +181,7 @@ SRC_HC_OPTS += -H16m
 # not sure if this is required --SDM
 main/Main_HC_OPTS 		= -fvia-C
 
-prelude/PrimOp_HC_OPTS 		= -no-recomp
+prelude/PrimOp_HC_OPTS 		= -no-recomp -H80m
 
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
