@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.90 2003/02/04 15:09:40 simonpj Exp $
+-- $Id: DriverState.hs,v 1.91 2003/06/12 16:50:19 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -478,7 +478,12 @@ mungePackagePaths top_dir ps = map munge_pkg ps
 -- earlier packages may depend on later ones, but not vice versa
 GLOBAL_VAR(v_ExplicitPackages, initPackageList, [PackageName])
 
-initPackageList = [rtsPackage]
+initPackageList = [basePackage, rtsPackage]
+	-- basePackage is part of this list entirely because of 
+	-- wired-in names in GHCi.  See the notes on wired-in names in
+	-- Linker.linkExpr.  By putting the base backage in initPackageList
+	-- we make sure that it'll always by linked.
+
 
 -- add a package requested from the command-line
 addPackage :: String -> IO ()

@@ -35,7 +35,7 @@ import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
 #endif
 import Finder		( findModule, findLinkable )
 import HscTypes
-import Name		( Name,  nameModule, isExternalName )
+import Name		( Name,  nameModule, isExternalName, isWiredInName )
 import NameEnv
 import NameSet		( nameSetToList )
 import Module
@@ -327,7 +327,14 @@ linkExpr hsc_env pcs root_ul_bco
      free_names = nameSetToList (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]
-     needed_mods = [ nameModule n | n <- free_names, isExternalName n ]
+     needed_mods = [ nameModule n | n <- free_names, 
+				    isExternalName n,	 	-- Names from other modules
+				    not (isWiredInName n)	-- Exclude wired-in names
+		   ]						-- (see note below)
+	-- Exclude wired-in names because we may not have read
+	-- their interface files, so getLinkDeps will fail
+	-- All wired-in names are in the base package, which we link
+	-- by default, so we can safely ignore them here.
  
 dieWith msg = throwDyn (ProgramError (showSDoc msg))
 
