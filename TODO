@@ -86,6 +86,9 @@
 
 * hiding instances?
 
+* Add a way to indicate DEPRECATED functions/types/modules?  Perhaps
+  parse the GHC DEPRECATED pragma?
+
 -----------------------------------------------------------------------------
 -- cosmetic
 
