@@ -286,6 +286,9 @@ cmp_eq _ _ = EQ
 \end{verbatim}
 \end{itemize}
 
+If there is only one constructor in the Data Type we don't need the WildCard Patern. 
+JJQC-30-Nov-1997
+
 \begin{code}
 gen_Ord_binds :: TyCon -> RdrNameMonoBinds
 
@@ -320,7 +323,10 @@ gen_Ord_binds tycon
 
     cmp_eq
       = mk_FunMonoBind tycon_loc cmp_eq_RDR (map pats_etc nonnullary_cons ++
-					     [([WildPatIn, WildPatIn], default_rhs)])
+          if ((length nonnullary_cons + length nullary_cons) == 1)
+            then []
+            else [([WildPatIn, WildPatIn], 
+          default_rhs)])
       where
 	pats_etc data_con
 	  = ([con1_pat, con2_pat],
