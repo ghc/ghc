@@ -245,9 +245,8 @@ couples of immediate subterms from the two given input terms.)
 geq x y = geq' x y
   where
     geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
-    geq' x y = and ( (toConstr x == toConstr y)
-                   : tmapQ geq' x y
-                   )
+    geq' x y =     (toConstr x == toConstr y)
+                && and (tmapQ geq' x y)
 
 
 -- | Generic zip controlled by a function with type-specific branches
