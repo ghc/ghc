@@ -1,0 +1,54 @@
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+IO PrelAddr PrelArr PrelBounded PrelCCall PrelForeign PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d10 1 $d11 1 $d12 1 $d13 1 $d15 1 $d19 1 $d2 1 $d20 1 $d21 1 $d24 1 $d25 1 $d26 1 $d27 1 $d28 1 $d29 1 $d3 1 $d30 1 $d31 1 $d33 1 $d34 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d40 1 $d41 1 $d42 1 $d43 1 $d5 1 $d6 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $menumFromThenTo 1 $menumFromTo 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 . 1 showList__ 1 showParen 1 showSpace 1 showString 1 Enum 1 Eq 1 Eval 1 Functor 1 Num 1 Ord 1 Ordering 1 Show 1 ShowS 1 String 1;
+PrelIO 1 :: print 1;
+PrelIOBase 1 :: $d2 1 $d4 1 $d7 1 IO 1;
+PrelList 1 :: drop 1;
+PrelNum 1 :: $d1 1 $d10 1 $d14 1 $d15 1 $d16 1 $d17 1 $d18 1 $d2 1 $d29 1 $d30 1 $d31 1 $d32 1 $d33 1 $d34 1 $d35 1 $d36 1 $d37 1 $d38 1 $d39 1 $d4 1 $d5 1 $d6 1 $d7 1 $d8 1 $mdiv 1 $mdivMod 1 $mmod 1 $mquot 1 $mrecip 1 $mrem 1 Fractional 1 Integral 1 Ratio 1 Rational 1 Real 1;
+PrelTup 1 :: $d13 1 $d4 1 $d49 1 $d9 1;
+_exports_
+ShouldSucceed action_0 action_1 action_2 action_3 action_4 action_5 action_6 happyAccept happyError happyFail happyGoto happyMonadReduce happyNewToken happyParse happyReduce happyReduce_1 happyReduce_2 happyReduce_3 happyReturn happyShift happySpecReduce_0 happySpecReduce_1 happySpecReduce_2 happySpecReduce_3 happyThen main myparser notHappyAtAll HappyAbsSyn(HappyTerminal HappyErrorToken HappyAbsSyn1 HappyAbsSyn2 HappyAbsSyn3) HappyState(HappyState) Token(TokenInt TokenVar TokenEq);
+_instances_
+instance _forall_ [a b] => {PrelBase.Eval (HappyState a b)} = $d1;
+instance {PrelBase.Eval Token} = $d2;
+instance _forall_ [a b c] => {PrelBase.Eval (HappyAbsSyn a b c)} = $d3;
+instance {PrelBase.Show Token} = $d4;
+_declarations_
+1 $d1 _:_ _forall_ [a b] => {PrelBase.Eval (HappyState a b)} ;;
+1 $d2 _:_ {PrelBase.Eval Token} ;;
+1 $d3 _:_ _forall_ [a b c] => {PrelBase.Eval (HappyAbsSyn a b c)} ;;
+1 $d4 _:_ {PrelBase.Show Token} ;;
+1 action_0 _:_ _forall_ [a b] {PrelBase.Num a} => a -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn (b -> PrelBase.Double) [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> b -> PrelBase.Double) -> [HappyState Token ([HappyAbsSyn (b -> PrelBase.Double) [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> b -> PrelBase.Double)] -> [HappyAbsSyn (b -> PrelBase.Double) [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> b -> PrelBase.Double ;;
+1 action_1 _:_ _forall_ [a b c d e] {PrelBase.Num a} => a -> PrelBase.Int -> b -> HappyState b ([HappyAbsSyn e c d] -> [Token] -> e) -> [HappyState b ([HappyAbsSyn e c d] -> [Token] -> e)] -> [HappyAbsSyn e c d] -> [Token] -> e ;;
+1 action_2 _:_ _forall_ [a b c d e f g h] => a -> PrelBase.Int -> b -> c -> [HappyState b ([HappyAbsSyn (d -> PrelBase.Double) [(e, d -> f)] g] -> h)] -> [HappyAbsSyn (d -> PrelBase.Double) [(e, d -> f)] g] -> h ;;
+1 action_3 _:_ _forall_ [a b c d] {PrelBase.Num a} => a -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn c [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> d) -> [HappyState Token ([HappyAbsSyn c [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> d)] -> [HappyAbsSyn c [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> d ;;
+1 action_4 _:_ _forall_ [a b c d] {PrelBase.Num a} => a -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn c [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> d) -> [HappyState Token ([HappyAbsSyn c [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> d)] -> [HappyAbsSyn c [(PrelBase.String, b -> PrelBase.Int)] (b -> PrelBase.Int)] -> [Token] -> d ;;
+1 action_5 _:_ _forall_ [a b c d e f] => a -> PrelBase.Int -> b -> c -> [HappyState b ([HappyAbsSyn d [(PrelBase.String, e)] e] -> f)] -> [HappyAbsSyn d [(PrelBase.String, e)] e] -> f ;;
+1 action_6 _:_ _forall_ [a b c d e f g] => a -> PrelBase.Int -> b -> c -> [HappyState b ([HappyAbsSyn d e (f -> PrelBase.Int)] -> g)] -> [HappyAbsSyn d e (f -> PrelBase.Int)] -> g ;;
+1 data HappyAbsSyn t1 t2 t3 = HappyTerminal Token |  HappyErrorToken PrelBase.Int |  HappyAbsSyn1 t1 |  HappyAbsSyn2 t2 |  HappyAbsSyn3 t3 ;
+1 newtype HappyState b c = HappyState (PrelBase.Int -> PrelBase.Int -> b -> HappyState b c -> [HappyState b c] -> c) ;
+1 data Token = TokenInt PrelBase.Int |  TokenVar PrelBase.String |  TokenEq ;
+1 happyAccept _:_ _forall_ [a b c d e f g h] => a -> b -> c -> d -> [HappyAbsSyn e f g] -> h -> e ;;
+1 happyError _:_ _forall_ [a] => [Token] -> a ;;
+1 happyFail _:_ _forall_ [a b c d e] => PrelBase.Int -> b -> HappyState b ([HappyAbsSyn c d e] -> [Token] -> a) -> [HappyState b ([HappyAbsSyn c d e] -> [Token] -> a)] -> [HappyAbsSyn c d e] -> [Token] -> a ;;
+1 happyGoto _:_ _forall_ [a b c] => (PrelBase.Int -> PrelBase.Int -> b -> HappyState b c -> [HappyState b c] -> c) -> PrelBase.Int -> b -> a -> [HappyState b c] -> c ;;
+1 happyMonadReduce _:_ _forall_ [a b c d] => PrelBase.Int -> PrelBase.Int -> (c -> d) -> ([d] -> c) -> PrelBase.Int -> a -> HappyState a ([d] -> [Token] -> b) -> [HappyState a ([d] -> [Token] -> b)] -> [d] -> [Token] -> b ;;
+1 happyNewToken _:_ _forall_ [a b] => (PrelBase.Int -> PrelBase.Int -> Token -> HappyState Token (a -> [Token] -> b) -> [HappyState Token (a -> [Token] -> b)] -> a -> [Token] -> b) -> [HappyState Token (a -> [Token] -> b)] -> a -> [Token] -> b ;;
+1 happyParse _:_ _forall_ [a] => [Token] -> a -> PrelBase.Double ;;
+1 happyReduce _:_ _forall_ [a b c] => PrelBase.Int -> PrelBase.Int -> (c -> c) -> PrelBase.Int -> a -> HappyState a (c -> b) -> [HappyState a (c -> b)] -> c -> b ;;
+1 happyReduce_1 _:_ _forall_ [a b c d e f g] => PrelBase.Int -> a -> b -> [HappyState a ([HappyAbsSyn (e -> PrelBase.Double) [(d, e -> f)] g] -> c)] -> [HappyAbsSyn (e -> PrelBase.Double) [(d, e -> f)] g] -> c ;;
+1 happyReduce_2 _:_ _forall_ [a b c d e] => PrelBase.Int -> a -> b -> [HappyState a ([HappyAbsSyn d [(PrelBase.String, e)] e] -> c)] -> [HappyAbsSyn d [(PrelBase.String, e)] e] -> c ;;
+1 happyReduce_3 _:_ _forall_ [a b c d e f] => PrelBase.Int -> a -> b -> [HappyState a ([HappyAbsSyn d e (f -> PrelBase.Int)] -> c)] -> [HappyAbsSyn d e (f -> PrelBase.Int)] -> c ;;
+1 happyReturn _:_ _forall_ [a b] => a -> b -> a ;;
+1 happyShift _:_ _forall_ [a b c d e] {PrelBase.Num a} => (PrelBase.Int -> PrelBase.Int -> Token -> HappyState Token ([HappyAbsSyn c d e] -> [Token] -> b) -> [HappyState Token ([HappyAbsSyn c d e] -> [Token] -> b)] -> [HappyAbsSyn c d e] -> [Token] -> b) -> a -> Token -> HappyState Token ([HappyAbsSyn c d e] -> [Token] -> b) -> [HappyState Token ([HappyAbsSyn c d e] -> [Token] -> b)] -> [HappyAbsSyn c d e] -> [Token] -> b ;;
+1 happySpecReduce_0 _:_ _forall_ [a b c] => PrelBase.Int -> c -> PrelBase.Int -> a -> HappyState a ([c] -> [Token] -> b) -> [HappyState a ([c] -> [Token] -> b)] -> [c] -> [Token] -> b ;;
+1 happySpecReduce_1 _:_ _forall_ [a b c d] => PrelBase.Int -> (c -> c) -> PrelBase.Int -> b -> a -> [HappyState b ([c] -> d)] -> [c] -> d ;;
+1 happySpecReduce_2 _:_ _forall_ [a b c d] => PrelBase.Int -> (c -> c -> c) -> PrelBase.Int -> b -> a -> [HappyState b ([c] -> d)] -> [c] -> d ;;
+1 happySpecReduce_3 _:_ _forall_ [a b c d] => PrelBase.Int -> (c -> c -> c -> c) -> PrelBase.Int -> b -> a -> [HappyState b ([c] -> d)] -> [c] -> d ;;
+1 happyThen _:_ _forall_ [a b] => a -> (a -> b) -> b ;;
+1 main _:_ PrelIOBase.IO PrelBase.() ;;
+1 myparser _:_ _forall_ [a] => [Token] -> a -> PrelBase.Double ;;
+1 notHappyAtAll _:_ _forall_ [a] => a ;;
