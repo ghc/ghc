@@ -26,19 +26,20 @@ module Foreign.ForeignPtr
 	, touchForeignPtr        -- :: ForeignPtr a -> IO ()
 	, castForeignPtr	 -- :: ForeignPtr a -> ForeignPtr b
 
-#ifdef __GLASGOW_HASKELL__
-	-- * GHC extensions
+#ifndef __NHC__
 	, mallocForeignPtr	--  :: Storable a => IO (ForeignPtr a)
 	, mallocForeignPtrBytes	--  :: Int -> IO (ForeignPtr a)
 #endif
         ) 
 	where
 
-#ifdef __GLASGOW_HASKELL__
+#ifndef __NHC__
 import Foreign.Ptr
 import Foreign.Storable
 import Data.Dynamic
+#endif
 
+#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
 import GHC.Num
@@ -59,10 +60,16 @@ import NHC.FFI
   )
 #endif
 
-#ifdef __GLASGOW_HASKELL__
+#ifdef __HUGS__
+import Hugs.ForeignPtr
+#endif
+
+#ifndef __NHC__
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
+#endif
 
+#ifdef __GLASGOW_HASKELL__
 -- |The type 'ForeignPtr' represents references to objects that are
 -- maintained in a foreign language, i.e., that are not part of the
 -- data structures usually managed by the Haskell storage manager.
