@@ -58,7 +58,7 @@ import FastTypes
 import Outputable
 
 #if __GLASGOW_HASKELL__ >= 404
-import GlaExts		( fromInt )
+import GlaExts		( fromInt, Int# )
 #endif
 \end{code}
 
@@ -132,7 +132,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 	--   but no more.
 
     in
-    case (sizeExpr bOMB_OUT_SIZE val_binders body) of
+    case (sizeExpr (iUnbox bOMB_OUT_SIZE) val_binders body) of
 
       TooBig 
 	| not inline -> UnfoldNever
@@ -176,7 +176,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 \end{code}
 
 \begin{code}
-sizeExpr :: Int 	    -- Bomb out if it gets bigger than this
+sizeExpr :: Int# 	    -- Bomb out if it gets bigger than this
 	 -> [Id]	    -- Arguments; we're interested in which of these
 			    -- get case'd
 	 -> CoreExpr
@@ -335,35 +335,27 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 	-- These addSize things have to be here because
 	-- I don't want to give them bOMB_OUT_SIZE as an argument
 
-    addSizeN TooBig          _      = TooBig
-    addSizeN (SizeIs n xs d) m
-      | n_tot ># (iUnbox bOMB_OUT_SIZE) = TooBig
-      | otherwise 		    = SizeIs n_tot xs d
-      where
-	n_tot = n +# iUnbox m
+    addSizeN TooBig          _  = TooBig
+    addSizeN (SizeIs n xs d) m 	= mkSizeIs bOMB_OUT_SIZE (n +# iUnbox m) xs d
     
-    addSize TooBig _ = TooBig
-    addSize _ TooBig = TooBig
-    addSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
-      | n_tot ># (iUnbox bOMB_OUT_SIZE) = TooBig
-      | otherwise 	       = SizeIs n_tot xys d_tot
-      where
-	n_tot = n1 +# n2
-	d_tot = d1 +# d2
-	xys   = xs `unionBags` ys
+    addSize TooBig	      _			= TooBig
+    addSize _		      TooBig		= TooBig
+    addSize (SizeIs n1 xs d1) (SizeIs n2 ys d2) 
+	= mkSizeIs bOMB_OUT_SIZE (n1 +# n2) (xs `unionBags` ys) (d1 +# d2)
 \end{code}
 
 Code for manipulating sizes
 
 \begin{code}
-
 data ExprSize = TooBig
 	      | SizeIs FastInt		-- Size found
 		       (Bag (Id,Int))	-- Arguments cased herein, and discount for each such
 		       FastInt		-- Size to subtract if result is scrutinised 
 					-- by a case expression
 
-
+mkSizeIs max n xs d | (n -# d) ># max = TooBig
+		    | otherwise	      = SizeIs n xs d
+ 
 maxSize TooBig         _ 				  = TooBig
 maxSize _              TooBig				  = TooBig
 maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
