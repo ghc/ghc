@@ -12,7 +12,7 @@
 #	    [default: anything on the cmd line this script doesn't recognise ]
 #	  the first opt not starting w/ "-" is taken to be an input
 #	  file and (if it exists) is grepped for "what's going on here"
-#	  comments (^--!!!).
+#	  comments (^-- !!!).
 #	* a file to feed to stdin ( -i<file> ) [default: /dev/null ]
 #	* a "time" command to use (-t <cmd>).
 #
@@ -139,12 +139,12 @@ exit 1 if $Status;
 
 # tidy up the pgm args:
 # (1) look for the "first input file"
-#     and grep it for "interesting" comments (--!!! )
+#     and grep it for "interesting" comments (-- !!! )
 # (2) quote any args w/ whitespace in them.
 $grep_done = 0;
 foreach $a ( @PgmArgs ) {
     if (! $grep_done && $a !~ /^-/ && -f $a) {
-	print `egrep "^--!!!" $a`;
+	print `egrep "^--[ ]?!!!" $a`;
 	$grep_done = 1;
     }
     if ($a =~ /\s/ || $a =~ /'/) {
