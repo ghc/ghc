@@ -286,7 +286,7 @@ ppr_expr (HsLam match) = pprMatch LambdaExpr match
 
 ppr_expr expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
-    (ppr_expr fun) <+> (sep (map ppr_expr args))
+    (ppr_expr fun) <+> (sep (map pprParendExpr args))
   where
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)

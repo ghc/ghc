@@ -33,7 +33,7 @@ import HsSyn		( Pat(..), HsConDetails(..), HsExpr(..), MonoBinds(..),
 			  HsBinds(..), HsType(..), HsStmtContext(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList, placeHolderType
 			)
-import RdrName		( RdrName, mkUnqual, nameRdrName, getRdrName )
+import RdrName		( RdrName, mkUnqual, mkRdrUnqual, nameRdrName, getRdrName )
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat, mkHsDo )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
 			, maxPrecedence
@@ -150,22 +150,6 @@ instance ... Eq (Foo ...) where
   produced don't get through the typechecker.
 \end{itemize}
 
-
-deriveEq :: RdrName				-- Class
-	 -> RdrName				-- Type constructor
-	 -> [ (RdrName, [RdrType]) ]	-- Constructors
-	 -> (RdrContext,		-- Context for the inst decl
-	     [RdrBind],			-- Binds in the inst decl
-	     [RdrBind])			-- Extra value bindings outside
-
-deriveEq clas tycon constrs 
-  = (context, [eq_bind, ne_bind], [])
-  where
-    context = [(clas, [ty]) | (_, tys) <- constrs, ty <- tys]
-
-    ne_bind = mkBind 
-    (nullary_cons, non_nullary_cons) = partition is_nullary constrs
-    is_nullary (_, args) = null args
 
 \begin{code}
 gen_Eq_binds :: TyCon -> RdrNameMonoBinds
@@ -624,7 +608,7 @@ gen_Ix_binds tycon
 	   in
 	   HsCase
 	     (genOpApp (HsVar dh_RDR) minusInt_RDR (HsVar ah_RDR))
-	     [mkSimpleMatch [VarPat c_RDR] rhs placeHolderType tycon_loc]
+	     [mk_triv_Match (VarPat c_RDR) rhs]
 	     tycon_loc
 	   ))
 	) {-else-} (
@@ -1059,25 +1043,33 @@ From the data type
 
 we generate
 
+  $cT1 = mkConstr 1 "T1" Prefix
+  $cT2 = mkConstr 2 "T2" Prefix
+  $dT  = mkDataType [$con_T1, $con_T2]
+
   instance (Data a, Data b) => Data (T a b) where
-	gfoldl k z (T1 a b) = z T `k` a `k` b
-	gfoldl k z T2	    = z T2
-	-- ToDo: add gmapT,Q,M, gfoldr
-
-	gunfold k z (Constr "T1") = k (k (z T1))
-	gunfold k z (Constr "T2") = z T2
-
-	conOf (T1 _ _) = Constr "T1"
-	conOf T2       = Constr "T2"
-	
-	consOf _ = [Constr "T1", Constr "T2"]
-
-ToDo: generate auxiliary bindings for the Constrs?
+    gfoldl k z (T1 a b) = z T `k` a `k` b
+    gfoldl k z T2	    = z T2
+    -- ToDo: add gmapT,Q,M, gfoldr
+    
+    fromConstr c = case conIndex c of
+    		1 -> T1 undefined undefined
+    		2 -> T2
+    
+    toConstr (T1 _ _) = $cT1
+    toConstr T2	      = $cT2
+    
+    dataTypeOf _ = $dT
 
 \begin{code}
-gen_Data_binds :: TyCon -> RdrNameMonoBinds
-gen_Data_binds tycon
-  = andMonoBindList [gfoldl_bind, gunfold_bind, conOf_bind, consOf_bind]
+gen_Data_binds :: FixityEnv
+	       -> TyCon 
+	       -> (RdrNameMonoBinds,	-- The method bindings
+		   RdrNameMonoBinds)	-- Auxiliary bindings
+gen_Data_binds fix_env tycon
+  = (andMonoBindList [gfoldl_bind, fromCon_bind, toCon_bind, dataTypeOf_bind],
+		-- Auxiliary definitions: the data type and constructors
+     datatype_bind `AndMonoBinds` andMonoBindList (map mk_con_bind data_cons))
   where
     tycon_loc = getSrcLoc tycon
     data_cons = tyConDataCons tycon
@@ -1092,23 +1084,55 @@ gen_Data_binds tycon
 		     as_needed = take (dataConSourceArity con) as_RDRs
 		     mk_k_app e v = HsPar (mkHsOpApp e k_RDR (HsVar v))
 
-	------------ gunfold
-    gunfold_bind = mk_FunMonoBind tycon_loc gunfold_RDR (map gunfold_eqn data_cons)
-    gunfold_eqn con = ([VarPat k_RDR, VarPat z_RDR,  
-			ConPatIn constr_RDR (PrefixCon [LitPat (mk_constr_string con)])],
-		       apN (dataConSourceArity con)
-			   (\e -> HsVar k_RDR `HsApp` e) 
-			   (z_Expr `HsApp` HsVar (getRdrName con)))
-    mk_constr_string con = mkHsString (occNameUserString (getOccName con))
+	------------ fromConstr
+    fromCon_bind = mk_FunMonoBind tycon_loc fromConstr_RDR [([c_Pat], from_con_rhs)]
+    from_con_rhs = HsCase (HsVar conIndex_RDR `HsApp` c_Expr) 
+			  (map from_con_alt data_cons) tycon_loc
+    from_con_alt dc = mk_triv_Match (LitPat (HsInt (toInteger (dataConTag dc))))
+				    (mkHsVarApps (getRdrName dc)
+					         (replicate (dataConSourceArity dc) undefined_RDR))
+			  
+	------------ toConstr
+    toCon_bind = mk_FunMonoBind tycon_loc toConstr_RDR (map to_con_eqn data_cons)
+    to_con_eqn dc = ([mkWildConPat dc], HsVar (mkConstrName dc))
+    
+	------------ dataTypeOf
+    dataTypeOf_bind = mk_easy_FunMonoBind tycon_loc dataTypeOf_RDR [wildPat] 
+					  [] (HsVar data_type_name)
 
-	------------ conOf
-    conOf_bind = mk_FunMonoBind tycon_loc conOf_RDR (map conOf_eqn data_cons)
-    conOf_eqn con = ([mkWildConPat con], mk_constr con)
+	------------ $dT
+    data_type_name = mkDataTypeName tycon
+    datatype_bind  = mkVarMonoBind tycon_loc data_type_name
+					     (ExplicitList placeHolderType constrs)
+    constrs = [HsVar (mkConstrName con) | con <- data_cons]
 
-	------------ consOf
-    consOf_bind = mk_easy_FunMonoBind tycon_loc consOf_RDR [wildPat] []
-				(ExplicitList placeHolderType (map mk_constr data_cons))
-    mk_constr con = HsVar constr_RDR `HsApp` (HsLit (mk_constr_string con))
+	------------ $cT1 etc
+    mk_con_bind dc = mkVarMonoBind tycon_loc (mkConstrName dc) 
+					     (mkHsApps mkConstr_RDR (constr_args dc))
+    constr_args dc = [mkHsIntLit (toInteger (dataConTag dc)),		-- Tag
+		      HsLit (mkHsString (occNameUserString dc_occ)),	-- String name
+		      HsVar fixity]					-- Fixity
+	where
+	  dc_occ   = getOccName dc
+	  is_infix = isDataSymOcc dc_occ
+	  fixity | is_infix  = infix_RDR
+		 | otherwise = prefix_RDR
+
+gfoldl_RDR     = varQual_RDR gENERICS_Name FSLIT("gfoldl")
+fromConstr_RDR = varQual_RDR gENERICS_Name FSLIT("fromConstr")
+toConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("toConstr")
+dataTypeOf_RDR = varQual_RDR gENERICS_Name FSLIT("dataTypeOf")
+mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkConstr")
+mkDataType_RDR = varQual_RDR gENERICS_Name FSLIT("mkDataType")
+conIndex_RDR   = varQual_RDR gENERICS_Name FSLIT("conIndex")
+prefix_RDR     = dataQual_RDR gENERICS_Name FSLIT("Prefix")
+infix_RDR      = dataQual_RDR gENERICS_Name FSLIT("Infix")
+
+mkDataTypeName :: TyCon -> RdrName	-- $tT
+mkDataTypeName tc = mkRdrUnqual (mkDataTOcc (getOccName tc))
+
+mkConstrName :: DataCon -> RdrName	-- $cT1
+mkConstrName con = mkRdrUnqual (mkDataCOcc (getOccName con))
 
 
 apN :: Int -> (a -> a) -> a -> a
@@ -1226,6 +1250,8 @@ mk_easy_Match loc pats binds expr
 	-- "recursive" MonoBinds, and it is its job to sort things out
 	-- from there.
 
+mk_triv_Match pat expr = mkSimpleMatch [pat] expr placeHolderType generatedSrcLoc
+
 mk_FunMonoBind	:: SrcLoc -> RdrName
 		-> [([RdrNamePat], RdrNameHsExpr)]
 		-> RdrNameMonoBinds
@@ -1278,9 +1304,9 @@ compare_gen_Case (HsVar eq_tag) a b | eq_tag == eqTag_RDR
   = HsApp (HsApp (HsVar compare_RDR) a) b	-- Simple case 
 compare_gen_Case eq a b				-- General case
   = HsCase (HsPar (HsApp (HsApp (HsVar compare_RDR) a) b)) {-of-}
-      [mkSimpleMatch [mkNullaryConPat ltTag_RDR] ltTag_Expr placeHolderType generatedSrcLoc,
-       mkSimpleMatch [mkNullaryConPat eqTag_RDR] eq placeHolderType generatedSrcLoc,
-       mkSimpleMatch [mkNullaryConPat gtTag_RDR] gtTag_Expr placeHolderType generatedSrcLoc]
+      [mk_triv_Match (mkNullaryConPat ltTag_RDR) ltTag_Expr,
+       mk_triv_Match (mkNullaryConPat eqTag_RDR) eq,
+       mk_triv_Match (mkNullaryConPat gtTag_RDR) gtTag_Expr]
       generatedSrcLoc
 
 careful_compare_Case tycon ty eq a b
@@ -1371,7 +1397,7 @@ untag_Expr :: TyCon -> [(RdrName, RdrName)] -> RdrNameHsExpr -> RdrNameHsExpr
 untag_Expr tycon [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   = HsCase (HsPar (HsApp (con2tag_Expr tycon) (HsVar untag_this))) {-of-}
-      [mkSimpleMatch [VarPat put_tag_here] (untag_Expr tycon more expr) placeHolderType generatedSrcLoc]
+      [mk_triv_Match (VarPat put_tag_here) (untag_Expr tycon more expr)]
       generatedSrcLoc
 
 cmp_tags_Expr :: RdrName 		-- Comparison op

@@ -20,7 +20,7 @@ module OccName (
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
-	mkGenOcc1, mkGenOcc2, mkLocalOcc, 
+	mkGenOcc1, mkGenOcc2, mkLocalOcc, mkDataTOcc, mkDataCOcc,
 	mkDataConWrapperOcc, mkDataConWorkerOcc,
 	
 	isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
@@ -360,8 +360,17 @@ mkDictOcc	    = mk_simple_deriv varName  "$d"
 mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
-mkGenOcc1           = mk_simple_deriv varName  "$gfrom"      -- Generics
-mkGenOcc2           = mk_simple_deriv varName  "$gto"        -- Generics
+
+-- Generic derivable classes
+mkGenOcc1           = mk_simple_deriv varName  "$gfrom"
+mkGenOcc2           = mk_simple_deriv varName  "$gto" 
+
+-- data T = MkT ... deriving( Data ) needs defintions for 
+--	$tT   :: Data.Generics.Basics.DataType
+--	$cMkT :: Data.Generics.Basics.Constr
+mkDataTOcc = mk_simple_deriv varName  "$t"
+mkDataCOcc = mk_simple_deriv varName  "$c"
+
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
 

@@ -10,7 +10,7 @@ module TcDeriv ( tcDeriving ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsBinds(..), TyClDecl(..),
+import HsSyn		( HsBinds(..), TyClDecl(..), MonoBinds(..),
 			  andMonoBindList, collectMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedTyClDecl, RenamedHsPred )
@@ -260,19 +260,33 @@ deriveOrdinaryStuff eqns
 	-- over the method bindings for the instances.
 	bindLocalsFV (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 	rnTopMonoBinds extra_mbinds []			`thenM` \ (rn_extra_binds, dus) ->
-	mapAndUnzipM rn_inst_info rdr_name_inst_infos	`thenM` \ (rn_inst_infos, fvs_s) ->
-	returnM ((rn_inst_infos, rn_extra_binds), 
-		  duUses dus `plusFV` plusFVs fvs_s)
+
+	mapAndUnzipM rn_inst_info rdr_name_inst_infos	`thenM` \ (pairs, fvs_s) ->
+
+	let
+	   (rn_inst_infos, aux_binds_s) = unzip pairs
+	   all_binds = rn_extra_binds `ThenBinds` foldr ThenBinds EmptyBinds aux_binds_s
+   	in
+	returnM ((rn_inst_infos, all_binds),
+		 duUses dus `plusFV` plusFVs fvs_s)
     )				`thenM` \ ((rn_inst_infos, rn_extra_binds), fvs) ->
    returnM (rn_inst_infos, rn_extra_binds, fvs)
 
   where
-    rn_inst_info (dfun, binds) 
-	= extendTyVarEnvFVRn (map varName tyvars)	$
+    rn_inst_info (dfun, (meth_binds, aux_binds)) 
+	= 	-- Rename the auxiliary bindings
+	  bindLocalsFV (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
+	  rnTopMonoBinds aux_binds []			`thenM` \ (rn_aux_binds, dus) ->
+
 		-- Bring the right type variables into scope
-	  rnMethodBinds (className cls) [] binds	`thenM` \ (rn_binds, fvs) ->
-	  return (InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_binds [] }, fvs)
+	  extendTyVarEnvFVRn (map varName tyvars)	$
+	  rnMethodBinds (className cls) [] meth_binds	`thenM` \ (rn_meth_binds, fvs) ->
+
+	  return ((InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_meth_binds [] }, 
+	 	   rn_aux_binds), 
+		  duUses dus `plusFV` fvs)
 	where
+	  mbinders = collectMonoBinders aux_binds
 	  (tyvars, _, cls, _) = tcSplitDFunTy (idType dfun)
 \end{code}
 
@@ -750,7 +764,7 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with DFunId, as we need that when renaming
 --  the method binds)
-gen_bind :: DFunId -> TcM (DFunId, RdrNameMonoBinds)
+gen_bind :: DFunId -> TcM (DFunId, (RdrNameMonoBinds, RdrNameMonoBinds))
 gen_bind dfun
   = getFixityEnv		`thenM` \ fix_env -> 
     let
@@ -758,16 +772,20 @@ gen_bind dfun
     	gen_binds_fn  = assoc "gen_bind:bad derived class"
  			      gen_list (getUnique clas)
     
-    	gen_list = [(eqClassKey,      gen_Eq_binds)
- 		   ,(ordClassKey,     gen_Ord_binds)
- 		   ,(enumClassKey,    gen_Enum_binds)
- 		   ,(boundedClassKey, gen_Bounded_binds)
- 		   ,(ixClassKey,      gen_Ix_binds)
- 		   ,(showClassKey,    gen_Show_binds fix_env)
- 		   ,(readClassKey,    gen_Read_binds fix_env)
-		   ,(typeableClassKey,gen_Typeable_binds)
-		   ,(dataClassKey,    gen_Data_binds)
+    	gen_list = [(eqClassKey,      no_aux_binds gen_Eq_binds)
+ 		   ,(ordClassKey,     no_aux_binds gen_Ord_binds)
+ 		   ,(enumClassKey,    no_aux_binds gen_Enum_binds)
+ 		   ,(boundedClassKey, no_aux_binds gen_Bounded_binds)
+ 		   ,(ixClassKey,      no_aux_binds gen_Ix_binds)
+ 		   ,(showClassKey,    no_aux_binds (gen_Show_binds fix_env))
+ 		   ,(readClassKey,    no_aux_binds (gen_Read_binds fix_env))
+		   ,(typeableClassKey,no_aux_binds gen_Typeable_binds)
+		   ,(dataClassKey,    gen_Data_binds fix_env)
  		   ]
+
+		-- Used for generators that don't need to produce	
+		-- any auxiliary bindings
+	no_aux_binds f tc = (f tc, EmptyMonoBinds)
     in
     returnM (dfun, gen_binds_fn tycon)
 \end{code}

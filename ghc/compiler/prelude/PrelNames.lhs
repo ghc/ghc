@@ -268,7 +268,7 @@ pREL_TOP_HANDLER_Name = mkModuleName "GHC.TopHandler"
 sYSTEM_IO_Name	  = mkModuleName "System.IO"
 dYNAMIC_Name	  = mkModuleName "Data.Dynamic"
 tYPEABLE_Name	  = mkModuleName "Data.Typeable"
-gENERICS_Name	  = mkModuleName "Data.Generics"
+gENERICS_Name	  = mkModuleName "Data.Generics.Basics"
 dOTNET_Name       = mkModuleName "GHC.Dotnet"
 
 rEAD_PREC_Name = mkModuleName "Text.ParserCombinators.ReadPrec"
@@ -448,16 +448,6 @@ showParen_RDR           = varQual_RDR pREL_SHOW_Name FSLIT("showParen")
 typeOf_RDR     = varQual_RDR tYPEABLE_Name FSLIT("typeOf")
 mkTypeRep_RDR  = varQual_RDR tYPEABLE_Name FSLIT("mkAppTy")
 mkTyConRep_RDR = varQual_RDR tYPEABLE_Name FSLIT("mkTyCon")
-
-constr_RDR  = dataQual_RDR gENERICS_Name FSLIT("Constr")
-gfoldl_RDR  = varQual_RDR gENERICS_Name FSLIT("gfoldl")
-gfoldr_RDR  = varQual_RDR gENERICS_Name FSLIT("gfoldr")
-gunfold_RDR = varQual_RDR gENERICS_Name FSLIT("gunfold")
-gmapT_RDR   = varQual_RDR gENERICS_Name FSLIT("gmapT")
-gmapQ_RDR   = varQual_RDR gENERICS_Name FSLIT("gmapQ")
-gmapM_RDR   = varQual_RDR gENERICS_Name FSLIT("gmapM")
-conOf_RDR   = varQual_RDR gENERICS_Name FSLIT("conOf")
-consOf_RDR  = varQual_RDR gENERICS_Name FSLIT("consOf")
 
 undefined_RDR = varQual_RDR pREL_ERR_Name FSLIT("undefined")
 \end{code}
