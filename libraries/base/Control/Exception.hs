@@ -223,7 +223,10 @@ handleJust p =  flip (catchJust p)
 --
 -- NOTE: @(evaluate a)@ is /not/ the same as @(a \`seq\` return a)@.
 evaluate :: a -> IO a
-evaluate a = IO $ \s -> a `seq` (# s, a #)
+evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
+	-- NB. can't write  
+	-- 	a `seq` (# s, a #)
+	-- because we can't have an unboxed tuple as a function argument
 
 -----------------------------------------------------------------------------
 -- 'try' and variations.
