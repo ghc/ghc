@@ -28,16 +28,12 @@ import ParseType        ( parseType )
 import ParseUnfolding   ( parseUnfolding )
 import Maybes
 
------------------------------------------------------------------
-
-parseIface ls = parseIToks (lexIface ls)
-
------------------------------------------------------------------
 }
 
-%name	    parseIToks
+%name	    parseIface
 %tokentype  { IfaceToken }
 %monad	    { IfM }{ thenIf }{ returnIf }
+%lexer      { lexIface } { ITeof }
 
 %token
 	INTERFACE	    { ITinterface }
@@ -85,12 +81,10 @@ parseIface ls = parseIToks (lexIface ls)
 	QVARSYM		    { ITqvarsym  $$ }
 	QCONSYM		    { ITqconsym  $$ }
 
-	IDINFO_PART     { ITidinfo $$ }
-	TYPE_PART       { ITtysig $$ }
+	TYPE_PART       { ITtysig _ _ }
 	ARITY_PART	{ ITarity }
-	STRICT_PART	{ ITstrict }
+	STRICT_PART	{ ITstrict $$ }
 	UNFOLD_PART	{ ITunfold $$ }
-	DEMAND		{ ITdemand $$ }
 	BOTTOM		{ ITbottom }
 	LAM		{ ITlam }
 	BIGLAM		{ ITbiglam }
@@ -238,16 +232,18 @@ topdecl		:  TYPE  tc_name tv_bndrs EQUAL type SEMI
 			{ TyD (TyData NewType $2 $3 $4 $5 $6 noDataPragmas mkIfaceSrcLoc) }
 		|  CLASS decl_context tc_name tv_bndr csigs SEMI
 			{ ClD (ClassDecl $2 $3 $4 $5 EmptyMonoBinds noClassPragmas mkIfaceSrcLoc) }
-		|  var_name TYPE_PART id_info
+		|  var_name TYPE_PART
 			{
-			 let
-			  (Succeeded tp) = parseType $2
-			 in
-  		 	 SigD (IfaceSig $1 tp $3 mkIfaceSrcLoc) }
-
-id_info 	:: { [HsIdInfo RdrName] }
-id_info		:				{ [] }
-		| IDINFO_PART   { let { (Succeeded id_info) = parseUnfolding $1 } in id_info}
+			 case $2 of
+			    ITtysig sig idinfo_part ->
+				let info = 
+				      case idinfo_part of
+					Nothing -> []
+					Just s  ->
+						let { (Succeeded id_info) = parseUnfolding s } in id_info
+				    (Succeeded tp) = parseType sig
+				 in
+  			 	 SigD (IfaceSig $1 tp info mkIfaceSrcLoc) }
 
 decl_context	:: { RdrNameContext }
 decl_context	:  					{ [] }
@@ -410,7 +406,7 @@ tc_name		: tc_occ			{ Unqual $1 }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
-		|  VARSYM		{ Unqual (TvOcc $1) {- Allow $t2 as a tyvar -} }
+		|  VARSYM		{ Unqual (TvOcc $1) {- Allow t2 as a tyvar -} }
 
 tv_names	:: { [RdrName] }
 		:  			{ [] }

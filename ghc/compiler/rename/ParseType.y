@@ -31,11 +31,11 @@ import Maybes           ( MaybeErr(..) )
 
 ------------------------------------------------------------------
 
-parseType :: [IfaceToken] -> MaybeErr RdrNameHsType (PprStyle -> Doc)
+parseType :: StringBuffer -> MaybeErr RdrNameHsType (PprStyle -> Doc)
 parseType ls =
   let
    res =
-    case parseT ls of
+    case parseT ls 1 of
       v@(Succeeded _) -> v
       Failed err      -> panic (show (err PprDebug))
   in
@@ -45,7 +45,8 @@ parseType ls =
 
 %name parseT
 %tokentype { IfaceToken }
-%monad	    { IfM }{ thenIf }{ returnIf }
+%monad	   { IfM }{ thenIf }{ returnIf }
+%lexer     { lexIface } { ITeof }
 
 %token
 	FORALL		    { ITforall }
@@ -128,7 +129,7 @@ akind		:: { Kind }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
-		|  VARSYM		{ Unqual (TvOcc $1) {- Allow $t2 as a tyvar -} }
+		|  VARSYM		{ Unqual (TvOcc $1) {- Allow t2 as a tyvar -} }
 
 tv_names	:: { [RdrName] }
 		:  			{ [] }

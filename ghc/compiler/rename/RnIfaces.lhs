@@ -961,7 +961,7 @@ readIface file_path
     --traceRn (hcat[ptext SLIT("Opening...."), text file_path])   `thenRn_`
     case read_result of
 	Right contents	  -> 
-             case parseIface contents of
+             case parseIface contents 1 of
 	          Failed err      ->
                      --traceRn (ptext SLIT("parse err"))      `thenRn_`
 		     failWithRn Nothing err 

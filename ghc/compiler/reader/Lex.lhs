@@ -210,14 +210,13 @@ data IfaceToken
   | ITqvarsym (FAST_STRING,FAST_STRING,IfaceFlavour)
   | ITqconsym (FAST_STRING,FAST_STRING,IfaceFlavour)
 
-  | ITidinfo [IfaceToken]  -- lazily return the stream of tokens for
-		           -- the info attached to an id.
-  | ITtysig [IfaceToken]   -- lazily return the stream of tokens for
+  | ITtysig StringBuffer (Maybe StringBuffer)
+			   -- lazily return the stream of tokens for
 		           -- the info attached to an id.
 	-- Stuff for reading unfoldings
-  | ITarity | ITstrict 
+  | ITarity 
   | ITunfold Bool		-- True <=> there's an INLINE pragma on this Id
-  | ITdemand [Demand] | ITbottom
+  | ITstrict [Demand] | ITbottom
   | ITlam | ITbiglam | ITcase | ITprim_case | ITlet | ITletrec | ITin | ITof
   | ITcoerce_in | ITcoerce_out | ITatsign
   | ITccall (Bool,Bool)		-- (is_casm, may_gc)
@@ -226,6 +225,7 @@ data IfaceToken
   | ITinteger Integer | ITdouble Double
   | ITinteger_lit | ITfloat_lit | ITrational_lit | ITaddr_lit | ITlit_lit | ITstring_lit
   | ITunknown String		-- Used when the lexer can't make sense of it
+  | ITeof				-- end of file token
   deriving Text -- debugging
 
 instance Text CostCentre -- cheat!
@@ -239,8 +239,8 @@ instance Text CostCentre -- cheat!
 %************************************************************************
 
 \begin{code}
-lexIface :: StringBuffer -> [IfaceToken]
-lexIface buf =
+lexIface :: (IfaceToken -> IfM a) -> IfM a
+lexIface cont buf =
  _scc_ "Lexer" 
 -- if bufferExhausted buf then
 --  []
@@ -248,49 +248,49 @@ lexIface buf =
 --  _trace ("Lexer: "++[C# (currentChar# buf)]) $
   case currentChar# buf of
       -- whitespace and comments, ignore.
-    ' '#  -> lexIface (stepOn buf)
-    '\t'# -> lexIface (stepOn buf)
-    '\n'# -> lexIface (stepOn buf)
+    ' '#  -> lexIface cont (stepOn buf)
+    '\t'# -> lexIface cont (stepOn buf)
+    '\n'# -> \line -> lexIface cont (stepOn buf) (line+1)
 
 -- Numbers and comments
     '-'#  ->
       case lookAhead# buf 1# of
-        '-'# -> lex_comment (stepOnBy# buf 2#)
+        '-'# -> lex_comment cont (stepOnBy# buf 2#)
         c    -> 
 	  if isDigit (C# c)
-          then lex_num (negate) (ord# c -# ord# '0'#) (incLexeme (incLexeme buf))
-	  else lex_id buf
+          then lex_num cont (negate) (ord# c -# ord# '0'#) (incLexeme (incLexeme buf))
+	  else lex_id cont buf
 
 -- Leave out nested comments for now; danger of finding { and - juxtaposed by mistake?
 --    '{' : '-' : cs -> lex_nested_comment 1{-one seen-} cs
 
     '('# -> 
 	 case prefixMatch (stepOn buf) "..)" of
-	   Just buf' ->  ITdotdot : lexIface (stepOverLexeme buf')
+	   Just buf' ->  cont ITdotdot (stepOverLexeme buf')
            Nothing ->
             case lookAhead# buf 1# of
-              ','# -> lex_tuple Nothing  (stepOnBy# buf 2#)
-              ')'# -> ITconid SLIT("()") : lexIface (stepOnBy# buf 2#)
-	      _    -> IToparen : lexIface (stepOn buf)
+              ','# -> lex_tuple cont Nothing  (stepOnBy# buf 2#)
+              ')'# -> cont (ITconid SLIT("()")) (stepOnBy# buf 2#)
+	      _    -> cont IToparen (stepOn buf)
 
-    '{'# -> ITocurly : lexIface (stepOn buf)
-    '}'# -> ITccurly : lexIface (stepOn buf)
-    ')'# -> ITcparen : lexIface (stepOn buf)
+    '{'# -> cont ITocurly (stepOn buf)
+    '}'# -> cont ITccurly (stepOn buf)
+    ')'# -> cont ITcparen (stepOn buf)
     '['# -> 
       case lookAhead# buf 1# of
-	']'# -> ITconid SLIT("[]") : lexIface (stepOnBy# buf 2#)
-        _    -> ITobrack : lexIface (stepOn buf)
-    ']'# -> ITcbrack	 : lexIface (stepOn buf)
-    ','# -> ITcomma	 : lexIface (stepOn buf)
+	']'# -> cont (ITconid SLIT("[]")) (stepOnBy# buf 2#)
+        _    -> cont ITobrack (stepOn buf)
+    ']'# -> cont ITcbrack (stepOn buf)
+    ','# -> cont ITcomma  (stepOn buf)
     ':'# -> case lookAhead# buf 1# of
-              ':'# -> ITdcolon  : lexIface (stepOnBy# buf 2#)
-              _    -> lex_id (incLexeme buf)
-    ';'#  -> ITsemi	: lexIface (stepOn buf)
+              ':'# -> cont ITdcolon (stepOnBy# buf 2#)
+              _    -> lex_id cont (incLexeme buf)
+    ';'#  -> cont ITsemi (stepOn buf)
     '\"'# -> case untilEndOfString# (stepOn buf) of
 	      buf' ->
 		  -- the string literal does *not* include the dquotes
 		case lexemeToFastString buf' of
-		 v -> ITstring v : lexIface (stepOn (stepOverLexeme buf'))
+		 v -> cont (ITstring v) (stepOn (stepOverLexeme buf'))
 
     '\''# -> --
 	     -- untilEndOfChar# extends the current lexeme until
@@ -301,46 +301,46 @@ lexIface buf =
 	     --
 	     case untilEndOfChar# (stepOn buf) of
 	       buf' -> case reads ('\'':lexemeToString (incLexeme buf')) of
-			[  (ch, rest)] -> ITchar ch : lexIface (stepOverLexeme (incLexeme buf'))
+			[  (ch, rest)] -> cont (ITchar ch) (stepOverLexeme (incLexeme buf'))
 
 -- ``thingy'' form for casm
     '`'# ->
 	    case lookAhead# buf 1# of
-	      '`'# -> lex_cstring (stepOnBy# buf 2#) -- remove the `` and go.
-	      _    -> lex_id (incLexeme buf)         -- add ` to lexeme and assume
+	      '`'# -> lex_cstring cont (stepOnBy# buf 2#) -- remove the `` and go.
+	      _    -> lex_id cont (incLexeme buf)         -- add ` to lexeme and assume
 						     -- scanning an id of some sort.
 -- Keywords
     '_'# ->
 	 case lookAhead# buf 1# of
 	   'S'# -> case lookAhead# buf 2# of
-		    '_'# -> ITstrict : 
-		            lex_demand (stepOnUntil (not . isSpace) 
-			                            (stepOnBy# buf 3#)) -- past _S_
+		    '_'# ->
+		            lex_demand cont (stepOnUntil (not . isSpace) 
+		                            (stepOnBy# buf 3#)) -- past _S_
 	   's'# -> case prefixMatch (stepOnBy# buf 2#) "cc_" of
-		     Just buf' -> lex_scc (stepOnUntil (not . isSpace) (stepOverLexeme buf'))
-		     Nothing   -> lex_keyword (stepOnBy# buf 1#) -- drop the '_' and assume
+		     Just buf' -> lex_scc cont (stepOnUntil (not . isSpace) (stepOverLexeme buf'))
+		     Nothing   -> lex_keyword cont (stepOnBy# buf 1#) -- drop the '_' and assume
 								 -- it is a keyword.
-	   _    -> lex_keyword (stepOn buf)
+	   _    -> lex_keyword cont (stepOn buf)
 
     '\NUL'# ->
 	    if bufferExhausted (stepOn buf) then
-	       []
+	       cont ITeof buf
 	    else
-	       lex_id buf
+	       lex_id cont buf
     c ->
 	if isDigit (C# c) then
-	   lex_num (id) (ord# c -# ord# '0'#) (incLexeme buf)
+	   lex_num cont (id) (ord# c -# ord# '0'#) (incLexeme buf)
         else
-	   lex_id buf
+	   lex_id cont buf
 --  where
-lex_comment buf = 
+lex_comment cont buf = 
 --   _trace ("comment: "++[C# (currentChar# buf)]) $
-   case untilChar# buf '\n'# of {buf' -> lexIface (stepOverLexeme buf')}
+   case untilChar# buf '\n'# of {buf' -> lexIface cont (stepOverLexeme buf')}
 
 ------------------
-lex_demand buf = 
+lex_demand cont buf = 
 -- _trace ("demand: "++[C# (currentChar# buf)]) $
- case read_em [] buf of { (ls,buf') -> ITdemand ls : lexIface (stepOverLexeme buf')}
+ case read_em [] buf of { (ls,buf') -> cont (ITstrict ls) (stepOverLexeme buf')}
  where
    -- code snatched from Demand.lhs
   read_em acc buf = 
@@ -363,43 +363,42 @@ lex_demand buf =
       (stuff, rest) -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
 
 ------------------
-lex_scc buf =
+lex_scc cont buf =
 -- _trace ("scc: "++[C# (currentChar# buf)]) $
  case currentChar# buf of
   '"'# ->
       -- YUCK^2
      case prefixMatch (stepOn buf) "NO_CC\"" of
-      Just buf' -> ITscc noCostCentre : lexIface (stepOverLexeme buf')
+      Just buf' -> cont (ITscc noCostCentre) (stepOverLexeme buf')
       Nothing -> 
        case prefixMatch (stepOn buf) "CURRENT_CC\"" of
-        Just buf' -> ITscc useCurrentCostCentre : lexIface (stepOverLexeme buf')
+        Just buf' -> cont (ITscc useCurrentCostCentre) (stepOverLexeme buf')
         Nothing   ->
          case prefixMatch (stepOn buf) "OVERHEAD\"" of
-         Just buf' -> ITscc overheadCostCentre : lexIface (stepOverLexeme buf')
+         Just buf' -> cont (ITscc overheadCostCentre) (stepOverLexeme buf')
          Nothing   ->
           case prefixMatch (stepOn buf) "DONT_CARE\"" of
-           Just buf' -> ITscc dontCareCostCentre : lexIface (stepOverLexeme buf')
+           Just buf' -> cont (ITscc dontCareCostCentre) (stepOverLexeme buf')
            Nothing   ->
             case prefixMatch (stepOn buf) "SUBSUMED\"" of
-             Just buf' -> ITscc subsumedCosts : lexIface (stepOverLexeme buf')
+             Just buf' -> cont (ITscc subsumedCosts) (stepOverLexeme buf')
              Nothing ->
               case prefixMatch (stepOn buf) "CAFs_in_...\"" of
-               Just buf' -> ITscc preludeCafsCostCentre : lexIface (stepOverLexeme buf')
+               Just buf' -> cont (ITscc preludeCafsCostCentre) (stepOverLexeme buf')
                Nothing ->
                 case prefixMatch (stepOn buf) "CC_CAFs_in_..." of
                  Just buf' ->
 	          case untilChar# (stepOverLexeme buf') '\"'# of
-	           buf'' -> ITscc (mkAllCafsCC ({-module-}lexemeToFastString buf'') _NIL_): 
-	                    lexIface (stepOn (stepOverLexeme buf''))
+	           buf'' -> cont (ITscc (mkAllCafsCC ({-module-}lexemeToFastString buf'') _NIL_)) (stepOn (stepOverLexeme buf''))
                  Nothing ->
                   case prefixMatch (stepOn buf) "DICTs_in_...\"" of
-                   Just buf' -> ITscc (preludeDictsCostCentre True) : lexIface (stepOverLexeme buf')
+                   Just buf' -> cont (ITscc (preludeDictsCostCentre True)) (stepOverLexeme buf')
                    Nothing ->
                     case prefixMatch (stepOn buf) "CC_DICTs_in_..." of
                      Just buf' ->
 	              case untilChar# (stepOverLexeme buf') '\"'# of
-	               buf'' -> ITscc (mkAllDictsCC (lexemeToFastString buf'') _NIL_ True): 
-	                        lexIface (stepOn (stepOverLexeme buf''))
+	               buf'' -> cont (ITscc (mkAllDictsCC (lexemeToFastString buf'') _NIL_ True)) 
+	                        (stepOn (stepOverLexeme buf''))
                      Nothing ->
 		      let
 		       match_user_cc buf =
@@ -430,16 +429,17 @@ lex_scc buf =
                       case prefixMatch (stepOn buf) "CAF:" of
                        Just buf' ->
 			 case match_user_cc (stepOverLexeme buf') of
-			  (cc, buf'') -> ITscc (cafifyCC cc) : lexIface buf''
+			  (cc, buf'') -> cont (ITscc (cafifyCC cc)) buf''
                        Nothing ->
 	                 case match_user_cc (stepOn buf) of
-			  (cc, buf'') -> ITscc cc : lexIface buf''
-  c -> ITunknown [C# c] : lexIface (stepOn buf)
+			  (cc, buf'') -> cont (ITscc cc) buf''
+  c -> cont (ITunknown [C# c]) (stepOn buf)
 
 
 -----------
-lex_num :: (Int -> Int) -> Int# -> StringBuffer -> [IfaceToken]
-lex_num minus acc# buf =
+lex_num :: (IfaceToken -> IfM a) -> 
+	(Int -> Int) -> Int# -> IfM a
+lex_num cont minus acc# buf =
 -- _trace ("lex_num: "++[C# (currentChar# buf)]) $
  case scanNumLit (I# acc#) buf of
      (acc',buf') ->
@@ -451,59 +451,60 @@ lex_num minus acc# buf =
 	    case expandWhile (isDigit) (incLexeme buf') of
               buf'' -> -- points to first non digit char
 		case reads (lexemeToString buf'') of
-	          [(v,_)] -> ITdouble v : lexIface (stepOverLexeme buf'')
-         _ -> ITinteger (fromInt (minus acc')) : lexIface (stepOverLexeme buf')
+	          [(v,_)] -> cont (ITdouble v) (stepOverLexeme buf'')
+         _ -> cont (ITinteger (fromInt (minus acc'))) (stepOverLexeme buf')
 
 --	   case reads (lexemeToString buf') of
---	     [(i,_)] -> ITinteger i : lexIface (stepOverLexeme buf')
+--	     [(i,_)] -> cont (ITinteger i) (stepOverLexeme buf')
 
 ------------
-lex_keyword buf =
+lex_keyword cont buf =
 -- _trace ("lex_keyword: "++[C# (currentChar# buf)]) $
  case currentChar# buf of
   ':'# -> case lookAhead# buf 1# of
 	    '_'# -> -- a binding, type (and other id-info) follows,
 		    -- to make the parser ever so slightly, we push
 		    -- 
-		lex_decl (stepOnBy# buf 2#)
-	    v# -> ITunknown (['_',':',C# v#]) : lexIface (stepOnBy# buf 2#)
+		lex_decl cont (stepOnBy# buf 2#)
+	    v# -> cont (ITunknown (['_',':',C# v#])) (stepOnBy# buf 2#)
   _ ->
     case expandWhile (is_kwd_char) buf of
      buf' ->
       let kw = lexemeToFastString buf' in
 --    _trace ("kw: "++lexemeToString buf') $
       case lookupUFM ifaceKeywordsFM kw of
-       Nothing -> ITunknown (_UNPK_ kw) : -- (minor) sigh 
-		  lexIface (stepOverLexeme buf')
-       Just xx -> xx : lexIface (stepOverLexeme buf')
+       Nothing -> cont (ITunknown (_UNPK_ kw)) -- (minor) sigh 
+		  (stepOverLexeme buf')
+       Just xx -> cont xx (stepOverLexeme buf')
 
-lex_decl buf =
+lex_decl cont buf =
  case doDiscard False buf of -- spin until ;; is found
    buf' ->
       {- _trace (show (lexemeToString buf')) $ -}
       case currentChar# buf' of
        '\n'# -> -- newline, no id info.
-	   ITtysig (lexIface (lexemeToBuffer (decLexeme buf'))) : 
-	   lexIface (stepOverLexeme buf')
+	   cont (ITtysig (lexemeToBuffer (decLexeme buf')) Nothing)
+		(stepOverLexeme buf')
        '\r'# -> -- just to be sure for those Win* boxes..
-	   ITtysig (lexIface (lexemeToBuffer (decLexeme buf'))) : 
-	   lexIface (stepOverLexeme buf')
+	   cont (ITtysig (lexemeToBuffer (decLexeme buf')) Nothing)
+	   	(stepOverLexeme buf')
        '\NUL'# ->
-	   ITtysig (lexIface (lexemeToBuffer (decLexeme buf'))) : 
-	   lexIface (stepOverLexeme buf')
+	   cont (ITtysig (lexemeToBuffer (decLexeme buf')) Nothing)
+	   	(stepOverLexeme buf')
        c     -> -- run all over the id info
 	 case doDiscard False (stepOverLexeme buf') of -- spin until ;; is found (outside a string!)
 	   buf'' -> 
 		    --_trace ((C# c):show (lexemeToString (decLexeme buf')))  $
 		    --_trace (show (lexemeToString (decLexeme buf''))) $
-		    ITtysig (lexIface (lexemeToBuffer (decLexeme buf'))):
-		    let ls = lexIface (stepOverLexeme buf'') in
-		    if opt_IgnoreIfacePragmas then
-		        ls
-		    else
-			let is = lexIface (lexemeToBuffer (decLexeme buf'')) in
+		    let idinfo = 
+			    if opt_IgnoreIfacePragmas then
+				Nothing
+			    else
+				Just (lexemeToBuffer (decLexeme buf''))
 		        --_trace (show is) $
-	                ITidinfo is : ls
+		    in
+                    cont (ITtysig (lexemeToBuffer (decLexeme buf')) idinfo)
+			(stepOverLexeme buf'')
 		    
 -- ToDo: hammer!
 is_kwd_char c@(C# c#) = 
@@ -518,22 +519,22 @@ is_kwd_char c@(C# c#) =
 
 
 -----------
-lex_cstring buf =
+lex_cstring cont buf =
 -- _trace ("lex_cstring: "++[C# (currentChar# buf)]) $
  case expandUntilMatch buf "\'\'" of
-   buf' -> ITstring (lexemeToFastString (setCurrentPos# buf' (negateInt# 2#))) :
-           lexIface (stepOverLexeme buf')
+   buf' -> cont (ITstring (lexemeToFastString (setCurrentPos# buf' (negateInt# 2#))))
+           (stepOverLexeme buf')
 	
 -----------
-lex_tuple module_dot buf =
+lex_tuple cont module_dot buf =
 -- _trace ("lex_tuple: "++[C# (currentChar# buf)]) $
   go 2 buf
   where
    go n buf =
     case currentChar# buf of
       ','# -> go (n+1) (stepOn buf)
-      ')'# -> end_lex_id module_dot (ITconid (mkTupNameStr n)) (stepOn buf)
-      _    -> ITunknown ("tuple " ++ show n) : lexIface buf
+      ')'# -> end_lex_id cont module_dot (ITconid (mkTupNameStr n)) (stepOn buf)
+      _    -> cont (ITunknown ("tuple " ++ show n)) buf
 
 -- Similarly ' itself is ok inside an identifier, but not at the start
 
@@ -631,56 +632,56 @@ lex_id cs =
 
 -}
 
-lex_id buf = 
+lex_id cont buf = 
 -- _trace ("lex_id: "++[C# (currentChar# buf)]) $
  case expandWhile (is_mod_char) buf of
    buf' ->
     case currentChar# buf' of
      '.'# -> munch buf' HiFile
      '!'# -> munch buf' HiBootFile
-     _    -> lex_id2 Nothing buf'
+     _    -> lex_id2 cont Nothing buf'
    where
     munch buf' hif = 
 	if not (emptyLexeme buf') then
 --	   _trace ("lex_id: "++(C# (currentChar# (stepOverLexeme buf'))):show (lexemeToFastString buf')) $ 
 	   case lexemeToFastString buf' of
-	     l@(FastString u# l# ba#) -> lex_id2 (Just (FastString u# l# ba#, hif)) 
+	     l@(FastString u# l# ba#) -> lex_id2 cont (Just (FastString u# l# ba#, hif)) 
 	     					 (stepOn (stepOverLexeme buf'))
 	else
-	   lex_id2 Nothing buf'		
+	   lex_id2 cont Nothing buf'		
 	
 
 -- Dealt with the Module.part
-lex_id2 module_dot buf =
+lex_id2 cont module_dot buf =
 -- _trace ("lex_id2: "++[C# (currentChar# buf)]) $
  case currentChar# buf of
   '['# -> 
     case lookAhead# buf 1# of
-     ']'# -> end_lex_id module_dot (ITconid SLIT("[]")) (stepOnBy# buf 2#)
-     _    -> lex_id3 module_dot buf
+     ']'# -> end_lex_id cont module_dot (ITconid SLIT("[]")) (stepOnBy# buf 2#)
+     _    -> lex_id3 cont module_dot buf
   '('# ->
     case lookAhead# buf 1# of
-     ')'# -> end_lex_id module_dot (ITconid SLIT("()")) (stepOnBy# buf 2#)
-     ','# -> lex_tuple module_dot (stepOnBy# buf 2#)
-     _    -> lex_id3 module_dot buf
-  ':'# -> lex_id3 module_dot (incLexeme buf)
-  _    -> lex_id3 module_dot buf
+     ')'# -> end_lex_id cont module_dot (ITconid SLIT("()")) (stepOnBy# buf 2#)
+     ','# -> lex_tuple cont module_dot (stepOnBy# buf 2#)
+     _    -> lex_id3 cont module_dot buf
+  ':'# -> lex_id3 cont module_dot (incLexeme buf)
+  _    -> lex_id3 cont module_dot buf
 
 
 
 -- Dealt with [], (), : special cases
 
-lex_id3 module_dot buf =
+lex_id3 cont module_dot buf =
 -- _trace ("lex_id3: "++[C# (currentChar# buf)]) $
  case expandWhile (is_id_char) buf of
   buf' ->
     case module_dot of
      Just _ ->
-       end_lex_id module_dot (mk_var_token lexeme) (stepOverLexeme buf')
+       end_lex_id cont module_dot (mk_var_token lexeme) (stepOverLexeme buf')
      Nothing ->
        case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of
-         Just kwd_token -> kwd_token           : lexIface new_buf
-	 Nothing        -> mk_var_token lexeme : lexIface new_buf
+         Just kwd_token -> cont kwd_token new_buf
+	 Nothing        -> cont (mk_var_token lexeme) new_buf
     where
      lexeme  = lexemeToFastString buf'
      new_buf = stepOverLexeme buf'
@@ -693,7 +694,6 @@ lex_id2 module_dot [] ('(': ',': cs) = lex_tuple module_dot cs
 lex_id2 module_dot [] (':' : cs)     = lex_id3 module_dot [':'] cs
 lex_id2 module_dot xs cs 	     = lex_id3 module_dot xs cs
 -}
-
 
 -- Dealt with [], (), : special cases
 
@@ -734,15 +734,15 @@ mk_var_token pk_str =
 		      n = _PK_ xs
 -}
 			    
-end_lex_id Nothing token buf  = token : lexIface buf
-end_lex_id (Just (m,hif)) token buf =
+end_lex_id cont Nothing token buf  = cont token buf
+end_lex_id cont (Just (m,hif)) token buf =
  case token of
-   ITconid n  -> ITqconid  (m,n,hif)         : lexIface buf
-   ITvarid n  -> ITqvarid  (m,n,hif)         : lexIface buf
-   ITconsym n -> ITqconsym (m,n,hif)         : lexIface buf
-   ITvarsym n -> ITqvarsym (m,n,hif)         : lexIface buf
-   ITbang     -> ITqvarsym (m,SLIT("!"),hif) : lexIface buf
-   _	      -> ITunknown (show token)      : lexIface buf
+   ITconid n  -> cont (ITqconid  (m,n,hif))         buf
+   ITvarid n  -> cont (ITqvarid  (m,n,hif))         buf
+   ITconsym n -> cont (ITqconsym (m,n,hif))         buf
+   ITvarsym n -> cont (ITqvarsym (m,n,hif))         buf
+   ITbang     -> cont (ITqvarsym (m,SLIT("!"),hif)) buf
+   _	      -> cont (ITunknown (show token))      buf
 
 ------------
 ifaceKeywordsFM :: UniqFM IfaceToken
@@ -862,21 +862,22 @@ end{code}
 %************************************************************************
 
 \begin{code}
-type IfM a = MaybeErr a Error
+type IfM a = StringBuffer -> Int -> MaybeErr a Error
 
 returnIf   :: a -> IfM a
+returnIf a s l = Succeeded a
+
 thenIf	   :: IfM a -> (a -> IfM b) -> IfM b
-happyError :: Int -> [IfaceToken] -> IfM a
+m `thenIf` k = \s l ->
+	case m s l of
+		Succeeded a -> k a s l
+		Failed err  -> Failed err
 
-returnIf a = Succeeded a
-
-thenIf (Succeeded a) k = k a
-thenIf (Failed  err) _ = Failed err
-
-happyError ln toks = Failed (ifaceParseErr ln toks)
+happyError :: IfM a
+happyError s l = Failed (ifaceParseErr l ([]::[IfaceToken]){-Todo-})
 
 -----------------------------------------------------------------
 
-ifaceParseErr ln toks sty
-  = hsep [ptext SLIT("Interface-file parse error: line"), int ln, ptext SLIT("toks="), text (show (take 10 toks))]
+ifaceParseErr l toks sty
+  = hsep [ptext SLIT("Interface-file parse error: line"), int l, ptext SLIT("toks="), text (show (take 10 toks))]
 \end{code}

@@ -92,7 +92,11 @@ data StringBuffer
 \end{code}
 
 \begin{code}
+instance Text StringBuffer where
+	showsPrec _ s = showString ""
+\end{code}
 
+\begin{code}
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname =
 --    trace ("Renamer: opening " ++ fname) $

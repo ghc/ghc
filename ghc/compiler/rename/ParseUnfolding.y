@@ -35,7 +35,7 @@ import Maybes           ( MaybeErr(..) )
 parseUnfolding ls =
   let
    res =
-    case parseUnfold ls of
+    case parseUnfold ls 1 of	-- Todo: correct line number
       v@(Succeeded _) -> v
         -- ill-formed unfolding, crash and burn.
       Failed err      -> panic (show (err PprDebug))
@@ -45,7 +45,8 @@ parseUnfolding ls =
 
 %name parseUnfold
 %tokentype { IfaceToken }
-%monad	    { IfM }{ thenIf }{ returnIf }
+%monad	   { IfM }{ thenIf }{ returnIf }
+%lexer     { lexIface } { ITeof }
 
 %token
 	PRAGMAS_PART	    { ITpragmas }
@@ -83,9 +84,8 @@ parseUnfolding ls =
 	QCONSYM		    { ITqconsym  $$ }
 
 	ARITY_PART	{ ITarity }
-	STRICT_PART	{ ITstrict }
+	DEMAND		{ ITstrict $$ }
 	UNFOLD_PART	{ ITunfold $$ }
-	DEMAND		{ ITdemand $$ }
 	BOTTOM		{ ITbottom }
 	LAM		{ ITlam }
 	BIGLAM		{ ITbiglam }
@@ -122,7 +122,7 @@ id_info		: 	 					{ [] }
 
 id_info_item	:: { HsIdInfo RdrName }
 id_info_item	: ARITY_PART arity_info			{ HsArity $2 }
-		| STRICT_PART strict_info		{ HsStrictness $2 }
+		| strict_info				{ HsStrictness $1 }
 		| BOTTOM 				{ HsStrictness HsBottom }
 		| UNFOLD_PART core_expr			{ HsUnfold $1 $2 }
 
@@ -339,7 +339,7 @@ akind		:: { Kind }
 
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
-		|  VARSYM		{ Unqual (TvOcc $1) {- Allow $t2 as a tyvar -} }
+		|  VARSYM		{ Unqual (TvOcc $1) {- Allow t2 as a tyvar -} }
 
 tv_names	:: { [RdrName] }
 		:  			{ [] }
