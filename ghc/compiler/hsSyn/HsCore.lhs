@@ -34,7 +34,7 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 import Id		( idArity, idType, isDataConId_maybe, isFCallId_maybe )
 import Var		( varType, isId )
 import IdInfo		( InlinePragInfo )
-import Name		( Name, NamedThing(..), getName, toRdrName )
+import Name		( Name, NamedThing(..), toRdrName )
 import RdrName		( RdrName, rdrNameOcc )
 import OccName		( isTvOcc )
 import CoreSyn
