@@ -292,7 +292,7 @@ AC_SUBST(GreenCardVersion)
 
 dnl
 dnl Check for Happy and version.  If we're building GHC, then we need
-dnl at least Happy version 1.13.  If there's no installed Happy, we look
+dnl at least Happy version 1.14.  If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
 dnl
 AC_DEFUN(FPTOOLS_HAPPY,
@@ -318,8 +318,8 @@ fi;
 changequote([, ])dnl
 ])
 if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Parser.hs; then
-  FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.13],
-  [AC_MSG_ERROR([Happy version 1.13 or later is required to compile GHC.])])[]dnl
+  FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.14],
+  [AC_MSG_ERROR([Happy version 1.14 or later is required to compile GHC.])])[]dnl
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
