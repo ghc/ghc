@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.h,v 1.6 1999/11/02 15:05:56 simonmar Exp $
+ * $Id: BlockAlloc.h,v 1.7 1999/11/02 17:08:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,7 +26,7 @@ extern void freeChain(bdescr *p);
 
 /* Finding the block descriptor for a given block -------------------------- */
 
-extern inline bdescr *Bdescr(StgPtr p)
+static inline bdescr *Bdescr(StgPtr p)
 {
   return (bdescr *)
     ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) 
