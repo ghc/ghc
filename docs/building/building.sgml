@@ -434,8 +434,8 @@ setsockopt IPTOS_THROUGHPUT: Invalid argument
           <xref linkend="projects">).</para>
 
 	  <para>Remember that if you do not have
-          <literal>happy</literal> installed, you need to check it out
-          as well.</para>
+          <literal>happy</literal> and/or <literal>Alex</literal>
+          installed, you need to check them out as well.</para>
 	</listitem>
       </itemizedlist>
     </sect2>
@@ -1258,6 +1258,19 @@ $ cvs checkout nofib/spectral
           started.  Happy distributions are available from <ulink
           url="http://www.haskell.org/happy/">Happy's Web
           Page</ulink>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Alex</term>
+	<indexterm><primary>Alex</primary></indexterm>
+	<listitem>
+	  <para>Alex is a lexical-analyser generator for Haskell,
+	  which GHC uses to generate its lexer.  Like Happy, Alex is
+	  written in Haskell and is a project in the CVS repository.
+	  Alex distributions are available from <ulink
+	  url="http://www.haskell.org/alex/">Alex's Web
+	  Page</ulink>.</para>
 	</listitem>
       </varlistentry>
 
@@ -2238,7 +2251,8 @@ Foo.o : Baz.hi
       build tree.</para>
 
       <para>Happy can similarly be run from the build tree, using
-      <filename>happy/src/happy-inplace</filename>.</para>
+      <filename>happy/src/happy-inplace</filename>, and similarly for
+      Alex and Haddock.</para>
     </sect2>
 
     <sect2>
@@ -4592,6 +4606,12 @@ Happy is a parser generator used to compile the Haskell grammar.  Add it in your
 </para>
 </listitem>
 
+	  <listitem>
+	    <para>Install Alex.  This can be done by building from the
+	    source distribution in the usual way.  Sources are
+	    available from <ulink
+	    url="http://www.haskell.org/alex">http://www.haskell.org/alex</ulink>.</para>
+	  </listitem>
 
 <listitem>
 <para>GHC uses the <emphasis>mingw</emphasis> C compiler to
