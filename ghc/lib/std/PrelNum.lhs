@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.37 2001/02/28 00:01:03 qrczak Exp $
+% $Id: PrelNum.lhs,v 1.38 2001/03/29 13:55:01 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -167,7 +167,7 @@ remInteger ia@(S# _) ib@(J# _ _) = remInteger (toBig ia) ib
 remInteger (J# sa a) (S# b)
   = case int2Integer# b of { (# sb, b #) ->
     case remInteger# sa a sb b of { (# sr, r #) ->
-    S# (sr *# (word2Int# (integer2Word# sr r))) }}
+    S# (integer2Int# sr r) }}
 remInteger (J# sa a) (J# sb b)
   = case remInteger# sa a sb b of (# sr, r #) -> J# sr r
 
@@ -224,7 +224,7 @@ divExact :: Integer -> Integer -> Integer
 divExact a@(S# (-2147483648#)) b = divExact (toBig a) b
 divExact (S# a) (S# b) = S# (quotInt# a b)
 divExact (S# a) (J# sb b)
-  = S# (quotInt# a (sb *# (word2Int# (integer2Word# sb b))))
+  = S# (quotInt# a (integer2Int# sb b))
 divExact (J# sa a) (S# b)
   = case int2Integer# b of
      (# sb, b #) -> case divExactInteger# sa a sb b of (# sd, d #) -> J# sd d
