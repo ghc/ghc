@@ -462,7 +462,7 @@ endef
 # Extra stuff for compiling Haskell files with $(SplitObjs):
 
 HC_SPLIT_PRE= \
- $(RM) $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
+ $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
  $(FIND) $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
 HC_SPLIT_POST  = touch $@
 
