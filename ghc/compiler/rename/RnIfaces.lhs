@@ -859,8 +859,10 @@ checkEntityUsage new_vers (name,old_vers)
 			  out_of_date (sep [ptext SLIT("No longer exported:"), ppr name])
 
 	Just new_vers 	-- It's there, but is it up to date?
-	  | new_vers == old_vers -> traceHiDiffsRn (text "Up to date" <+> ppr name <+> parens (ppr new_vers)) `thenRn_` returnRn upToDate
-	  | otherwise	 	 -> out_of_date (sep [ptext SLIT("Out of date:"), ppr name])
+	  | new_vers == old_vers -> traceHiDiffsRn (text "Up to date" <+> ppr name <+> parens (ppr new_vers)) `thenRn_`
+			  	    returnRn upToDate
+	  | otherwise	 	 -> out_of_date (sep [ptext SLIT("Out of date:"), ppr name, ppr 
+						      old_vers, ptext SLIT("->"), ppr new_vers])
 
 up_to_date  msg = traceHiDiffsRn msg `thenRn_` returnRn upToDate
 out_of_date msg = traceHiDiffsRn msg `thenRn_` returnRn outOfDate
