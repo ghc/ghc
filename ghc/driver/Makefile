@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.48 2000/12/11 10:18:51 simonmar Exp $
+# $Id: Makefile,v 1.49 2000/12/11 16:15:03 simonmar Exp $
 #
 
 TOP=..
@@ -22,6 +22,31 @@ SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
 endif
 
 SUBDIRS = mangler split stats
+
+# -----------------------------------------------------------------------------
+# Create compiler configuration
+
+CURRENT_DIR=ghc/compiler
+CONFIG_HS = Config.hs
+boot :: $(CONFIG_HS)
+
+$(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+	@$(RM) -f $(CONFIG_HS)
+	@echo -n "Creating $(CONFIG_HS) ... "
+	@echo "module Config where" >>$(CONFIG_HS)
+	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
+	@echo "cCURRENT_DIR          = \"$(CURRENT_DIR)\"" >> $(CONFIG_HS)
+	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> $(CONFIG_HS)
+	@echo "cLibsReadline         = \"$(LibsReadline)\"" >> Config.hs
+	@echo "clibdir               = \"$(libdir)\"" >> $(CONFIG_HS)
+	@echo "cGHC_LIB_DIR          = \"$(GHC_LIB_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_RUNTIME_DIR      = \"$(GHC_RUNTIME_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_UTILS_DIR        = \"$(GHC_UTILS_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_INCLUDE_DIR      = \"$(GHC_INCLUDE_DIR)\"" >> $(CONFIG_HS)
+	@echo "cFPTOOLS_TOP_ABS      = \"$(FPTOOLS_TOP_ABS)\"" >> $(CONFIG_HS)
+	@echo done.
+
+CLEAN_FILES += $(CONFIG_HS)
 
 # -----------------------------------------------------------------------------
 # package configuration files...
