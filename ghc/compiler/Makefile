@@ -514,7 +514,7 @@ include $(TOP)/mk/target.mk
 # -----------------------------------------------------------------------------
 # Dependencies
 
-MKDEPENDHS_HC_OPTS = $(shell echo $(HC_OPTS) | sed -e s@$(odir)/@@g)
+MKDEPENDHS_HC_OPTS = $(patsubst -i$(odir)/%, -i%, $(HC_OPTS))
 
 MKDEPENDHS=$(HC)
 
