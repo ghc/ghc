@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.26 2001/02/01 11:47:53 simonmar Exp $
+-- $Id: DriverState.hs,v 1.27 2001/02/20 11:04:42 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -119,43 +119,6 @@ GLOBAL_VAR(v_Hi_on_stdout, 	False,	Bool)
 GLOBAL_VAR(v_Hi_suf,          	"hi",	String)
 
 -----------------------------------------------------------------------------
--- Warnings & sanity checking
-
--- Warning packages that are controlled by -W and -Wall.  The 'standard'
--- warnings that you get all the time are
--- 	   
--- 	   -fwarn-overlapping-patterns
--- 	   -fwarn-missing-methods
---	   -fwarn-missing-fields
---	   -fwarn-deprecations
--- 	   -fwarn-duplicate-exports
--- 
--- these are turned off by -Wnot.
-
-
-standardWarnings  = [ "-fwarn-overlapping-patterns"
-		    , "-fwarn-missing-methods"
-		    , "-fwarn-missing-fields"
-		    , "-fwarn-deprecations"
-		    , "-fwarn-duplicate-exports"
-		    ]
-minusWOpts    	  = standardWarnings ++ 
-		    [ "-fwarn-unused-binds"
-		    , "-fwarn-unused-matches"
-		    , "-fwarn-incomplete-patterns"
-		    , "-fwarn-unused-imports"
-		    ]
-minusWallOpts 	  = minusWOpts ++
-		    [ "-fwarn-type-defaults"
-		    , "-fwarn-name-shadowing"
-		    , "-fwarn-missing-signatures"
-		    , "-fwarn-hi-shadowing"
-		    ]
-
-data WarningState = W_default | W_ | W_all | W_not
-GLOBAL_VAR(v_Warning_opt, W_default, WarningState)
-
------------------------------------------------------------------------------
 -- Compiler optimisation options
 
 GLOBAL_VAR(v_OptLevel, 0, Int)
@@ -190,7 +153,6 @@ hsc_minusO_flags =
 	"-ffoldr-build-on",
         "-fdo-eta-reduction",
 	"-fdo-lambda-eta-expansion",
-	"-fcase-of-case",
  	"-fcase-merge",
 	"-flet-to-case",
 	"-flet-no-escape"

@@ -35,6 +35,11 @@ module CmdLineOpts (
 	dopt_HscLang,
 	dopt_OutName,
 
+	-- sets of warning opts
+ 	standardWarnings,
+	minusWOpts,
+	minusWallOpts,
+
 	-- profiling opts
 	opt_AutoSccsOnAllToplevs,
 	opt_AutoSccsOnExportedToplevs,
@@ -66,9 +71,7 @@ module CmdLineOpts (
 	opt_SimplNoPreInlining,
 	opt_SimplDoEtaReduction,
 	opt_SimplDoLambdaEtaExpansion,
-	opt_SimplCaseOfCase,
 	opt_SimplCaseMerge,
-	opt_SimplPedanticBottoms,
 	opt_SimplExcessPrecision,
 
 	-- Unfolding control
@@ -279,8 +282,6 @@ data DynFlag
    | Opt_Generics
    | Opt_NoImplicitPrelude 
 
-   -- misc
-   | Opt_ReportCompile
    deriving (Eq)
 
 data DynFlags = DynFlags {
@@ -317,7 +318,7 @@ defaultDynFlags = DynFlags {
   opt_c			= [],
   opt_a			= [],
   opt_m			= [],
-  flags = []
+  flags = standardWarnings,
   }
 
 {- 
@@ -352,6 +353,38 @@ data HscLang
 
 dopt_HscLang :: DynFlags -> HscLang
 dopt_HscLang = hscLang
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Warnings}
+%*									*
+%************************************************************************
+
+\begin{code}
+standardWarnings
+    = [ Opt_WarnDeprecations,
+	Opt_WarnOverlappingPatterns,
+	Opt_WarnMissingFields,
+	Opt_WarnMissingMethods,
+	Opt_WarnDuplicateExports
+      ]
+
+minusWOpts
+    = standardWarnings ++ 
+      [	Opt_WarnUnusedBinds,
+	Opt_WarnUnusedMatches,
+	Opt_WarnUnusedImports,
+	Opt_WarnIncompletePatterns
+      ]
+
+minusWallOpts
+    = minusWOpts ++
+      [	Opt_WarnTypeDefaults,
+	Opt_WarnNameShadowing,
+	Opt_WarnMissingSigs,
+	Opt_WarnHiShadows
+      ]
 \end{code}
 
 %************************************************************************
@@ -476,9 +509,7 @@ opt_SimplNoPreInlining		= lookUp SLIT("-fno-pre-inlining")
 	-- get if you don't do it!
 opt_SimplDoEtaReduction		= lookUp SLIT("-fdo-eta-reduction")
 opt_SimplDoLambdaEtaExpansion	= lookUp SLIT("-fdo-lambda-eta-expansion")
-opt_SimplCaseOfCase		= lookUp SLIT("-fcase-of-case")
 opt_SimplCaseMerge		= lookUp SLIT("-fcase-merge")
-opt_SimplPedanticBottoms	= lookUp SLIT("-fpedantic-bottoms")
 opt_SimplExcessPrecision	= lookUp SLIT("-fexcess-precision")
 
 -- Unfolding control
@@ -539,12 +570,9 @@ isStaticHscFlag f =
 	"fno-pre-inlining",
 	"fdo-eta-reduction",
 	"fdo-lambda-eta-expansion",
-	"fcase-of-case",
 	"fcase-merge",
-	"fpedantic-bottoms",
 	"fexcess-precision",
 	"funfolding-update-in-place",
-	"freport-compile",
 	"fno-prune-decls",
 	"fno-prune-tydecls",
 	"static",

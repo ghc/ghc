@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.53 2001/02/14 11:36:07 sewardj Exp $
+-- $Id: Main.hs,v 1.54 2001/02/20 11:04:42 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -196,15 +196,6 @@ main =
    static_opts <- buildStaticHscOpts
    writeIORef v_Static_hsc_opts static_opts
 
-	-- warnings
-   warn_level <- readIORef v_Warning_opt
-
-   let warn_opts =  case warn_level of
-		  	W_default -> standardWarnings
-		  	W_        -> minusWOpts
-		  	W_all	  -> minusWallOpts
-		  	W_not     -> []
-
    -- build the default DynFlags (these may be adjusted on a per
    -- module basis by OPTIONS pragmas and settings in the interpreter).
 
@@ -237,8 +228,7 @@ main =
 			}
 
 	-- the rest of the arguments are "dynamic"
-   srcs <- processArgs dynamic_flags (way_non_static ++ 
-					non_static ++ warn_opts) []
+   srcs <- processArgs dynamic_flags (way_non_static ++ non_static) []
 	-- save the "initial DynFlags" away
    init_dyn_flags <- readIORef v_DynFlags
    writeIORef v_InitDynFlags init_dyn_flags

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.43 2001/01/30 15:28:25 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.44 2001/02/20 11:04:42 simonmar Exp $
 --
 -- Driver flags
 --
@@ -258,12 +258,6 @@ static_flags =
   ,  ( "optl"		, HasArg (add v_Opt_l) )
   ,  ( "optdll"		, HasArg (add v_Opt_dll) )
 
-	------ Warning opts -------------------------------------------------
-  ,  ( "W"		, NoArg (writeIORef v_Warning_opt W_) )
-  ,  ( "Wall"		, NoArg (writeIORef v_Warning_opt W_all) )
-  ,  ( "Wnot"		, NoArg (writeIORef v_Warning_opt W_not) )
-  ,  ( "w"		, NoArg (writeIORef v_Warning_opt W_not) )
-
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, NoArg (writeIORef v_Static True) )
   ,  ( "dynamic"        , NoArg (writeIORef v_Static False) )
@@ -434,6 +428,12 @@ dynamic_flags = [
   ,  ( "monly-3-regs", 	NoArg (updDynFlags (\s -> s{stolen_x86_regs = 3}) ))
   ,  ( "monly-4-regs", 	NoArg (updDynFlags (\s -> s{stolen_x86_regs = 4}) ))
 
+	------ Warning opts -------------------------------------------------
+  ,  ( "W"		, NoArg (mapM_ setDynFlag   minusWOpts)    )
+  ,  ( "Wall"		, NoArg (mapM_ setDynFlag   minusWallOpts) )
+  ,  ( "Wnot"		, NoArg (mapM_ unSetDynFlag minusWallOpts) ) /* DEPREC */
+  ,  ( "w"		, NoArg (mapM_ unSetDynFlag minusWallOpts) )
+
         ------ Compiler flags -----------------------------------------------
 
   ,  ( "fasm",		AnySuffix (\_ -> setLang HscAsm) )
@@ -468,8 +468,7 @@ fFlags = [
   ( "glasgow-exts", 		 	Opt_GlasgowExts ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
-  ( "fgenerics",  			Opt_Generics ),
-  ( "report-compile", 		 	Opt_ReportCompile )
+  ( "fgenerics",  			Opt_Generics )
   ]
 
 isFFlag f = f `elem` (map fst fFlags)
