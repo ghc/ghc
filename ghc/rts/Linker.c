@@ -3654,68 +3654,86 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
 	// count external symbols defined here
     oc->n_symbols = 0;
-    for(i=dsymLC->iextdefsym;i<dsymLC->iextdefsym+dsymLC->nextdefsym;i++)
+    if(dsymLC)
     {
-	if((nlist[i].n_type & N_TYPE) == N_SECT)
-	    oc->n_symbols++;
+        for(i = dsymLC->iextdefsym;
+            i < dsymLC->iextdefsym + dsymLC->nextdefsym;
+            i++)
+        {
+            if((nlist[i].n_type & N_TYPE) == N_SECT)
+                oc->n_symbols++;
+        }
     }
-    for(i=0;i<symLC->nsyms;i++)
+    if(symLC)
     {
-	if((nlist[i].n_type & N_TYPE) == N_UNDF
+        for(i=0;i<symLC->nsyms;i++)
+        {
+	    if((nlist[i].n_type & N_TYPE) == N_UNDF
 		&& (nlist[i].n_type & N_EXT) && (nlist[i].n_value != 0))
-	{
-	    commonSize += nlist[i].n_value;
-	    oc->n_symbols++;
-	}
+	    {
+	        commonSize += nlist[i].n_value;
+	        oc->n_symbols++;
+	    }
+        }
     }
     oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
 				   "ocGetNames_MachO(oc->symbols)");
 
-	// insert symbols into hash table
-    for(i=dsymLC->iextdefsym,curSymbol=0;i<dsymLC->iextdefsym+dsymLC->nextdefsym;i++)
+    if(dsymLC)
     {
-	if((nlist[i].n_type & N_TYPE) == N_SECT)
-	{
-	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-	    ghciInsertStrHashTable(oc->fileName, symhash, nm, image +
-		sections[nlist[i].n_sect-1].offset
-		- sections[nlist[i].n_sect-1].addr
-		+ nlist[i].n_value);
-	    oc->symbols[curSymbol++] = nm;
-	}
+        // insert symbols into hash table
+        for(i = dsymLC->iextdefsym, curSymbol = 0;
+            i < dsymLC->iextdefsym + dsymLC->nextdefsym;
+            i++)
+        {
+            if((nlist[i].n_type & N_TYPE) == N_SECT)
+            {
+                char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+                ghciInsertStrHashTable(oc->fileName, symhash, nm,
+                                        image
+                                        + sections[nlist[i].n_sect-1].offset
+                                        - sections[nlist[i].n_sect-1].addr
+                                        + nlist[i].n_value);
+                oc->symbols[curSymbol++] = nm;
+            }
+        }
+    
+        // insert local symbols into lochash
+        for(i=dsymLC->ilocalsym;i<dsymLC->ilocalsym+dsymLC->nlocalsym;i++)
+        {
+            if((nlist[i].n_type & N_TYPE) == N_SECT)
+            {
+                char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+                ghciInsertStrHashTable(oc->fileName, oc->lochash, nm,
+                                        image
+                                        + sections[nlist[i].n_sect-1].offset
+                                        - sections[nlist[i].n_sect-1].addr
+                                        + nlist[i].n_value);
+            }
+        }
     }
-
-	// insert local symbols into lochash
-    for(i=dsymLC->ilocalsym;i<dsymLC->ilocalsym+dsymLC->nlocalsym;i++)
-    {
-	if((nlist[i].n_type & N_TYPE) == N_SECT)
-	{
-	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-	    ghciInsertStrHashTable(oc->fileName, oc->lochash, nm, image +
-		sections[nlist[i].n_sect-1].offset
-		- sections[nlist[i].n_sect-1].addr
-		+ nlist[i].n_value);
-	}
-    }
-
 
     commonStorage = stgCallocBytes(1,commonSize,"ocGetNames_MachO(common symbols)");
     commonCounter = (unsigned long)commonStorage;
-    for(i=0;i<symLC->nsyms;i++)
+    if(symLC)
     {
-	if((nlist[i].n_type & N_TYPE) == N_UNDF
-		&& (nlist[i].n_type & N_EXT) && (nlist[i].n_value != 0))
-	{
-	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-	    unsigned long sz = nlist[i].n_value;
+        for(i=0;i<symLC->nsyms;i++)
+        {
+	    if((nlist[i].n_type & N_TYPE) == N_UNDF
+	            && (nlist[i].n_type & N_EXT) && (nlist[i].n_value != 0))
+	    {
+	        char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
+	        unsigned long sz = nlist[i].n_value;
 
-	    nlist[i].n_value = commonCounter;
+	        nlist[i].n_value = commonCounter;
 
-	    ghciInsertStrHashTable(oc->fileName, symhash, nm, (void*)commonCounter);
-	    oc->symbols[curSymbol++] = nm;
+	        ghciInsertStrHashTable(oc->fileName, symhash, nm,
+	                               (void*)commonCounter);
+	        oc->symbols[curSymbol++] = nm;
 
-	    commonCounter += sz;
-	}
+	        commonCounter += sz;
+	    }
+        }
     }
     return 1;
 }
@@ -3731,7 +3749,6 @@ static int ocResolve_MachO(ObjectCode* oc)
     struct symtab_command *symLC = NULL;
     struct dysymtab_command *dsymLC = NULL;
     struct nlist *nlist;
-    unsigned long *indirectSyms;
 
     for(i=0;i<header->ncmds;i++)
     {
@@ -3745,7 +3762,8 @@ static int ocResolve_MachO(ObjectCode* oc)
     }
 
     sections = (struct section*) (segLC+1);
-    nlist = (struct nlist*) (image + symLC->symoff);
+    nlist = symLC ? (struct nlist*) (image + symLC->symoff)
+                  : NULL;
 
     for(i=0;i<segLC->nsects;i++)
     {
@@ -3755,15 +3773,19 @@ static int ocResolve_MachO(ObjectCode* oc)
 	    nl_ptrs = &sections[i];
     }
 
-    indirectSyms = (unsigned long*) (image + dsymLC->indirectsymoff);
+    if(dsymLC)
+    {
+        unsigned long *indirectSyms
+            = (unsigned long*) (image + dsymLC->indirectsymoff);
 
-    if(la_ptrs)
-	if(!resolveImports(oc,image,symLC,la_ptrs,indirectSyms,nlist))
-	    return 0;
-    if(nl_ptrs)
-	if(!resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist))
-	    return 0;
-
+        if(la_ptrs)
+            if(!resolveImports(oc,image,symLC,la_ptrs,indirectSyms,nlist))
+                return 0;
+        if(nl_ptrs)
+            if(!resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist))
+                return 0;
+    }
+    
     for(i=0;i<segLC->nsects;i++)
     {
 	if(!relocateSection(oc,image,symLC,nlist,segLC->nsects,sections,&sections[i]))
