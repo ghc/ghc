@@ -164,7 +164,7 @@ tryM (TcRn thing) = TcRn (\ env -> tryJust tc_errors (thing env))
 #if __GLASGOW_HASKELL__ > 504 || __GLASGOW_HASKELL__ < 500
 	tc_errors e@(IOException ioe) | isUserError ioe = Just e
 #else
-	tc_errors e@(IOException _) | isUserError e = Just e
+	tc_errors e | isUserError e = Just e
 #endif
 	tc_errors _other = Nothing
 	-- type checker failures show up as UserErrors only
