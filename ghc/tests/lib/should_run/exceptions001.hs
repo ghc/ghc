@@ -17,7 +17,7 @@ ioTest = catchJust userErrors (ioError (userError "wibble"))
 	   (\ex -> putStr "user exception caught\n")
 
 errorTest :: IO ()
-errorTest = tryAll (1 + error "call to 'error'") >>= \r ->
+errorTest = try (evaluate (1 + error "call to 'error'")) >>= \r ->
 	    case r of
 		Left exception -> putStr "error call caught\n"
 		Right _        -> error "help!"
@@ -25,20 +25,20 @@ errorTest = tryAll (1 + error "call to 'error'") >>= \r ->
 instance (Show a, Eq a) => Num (Maybe a) where {}
 
 noMethodTest :: IO ()
-noMethodTest = tryAll (Just () + Just ()) >>= \ r ->
+noMethodTest = try (evaluate (Just () + Just ())) >>= \ r ->
 	case r of
 		Left (NoMethodError err) -> putStr "no method error\n"
 		Right _                  -> error "help!"
 
 patMatchTest :: IO ()
-patMatchTest = catchAllIO (case test1 [1..10] of () -> return ())
+patMatchTest = catch (case test1 [1..10] of () -> return ())
   (\ex -> case ex of
 		PatternMatchFail err -> putStr err
 		other 		     -> error "help!")
 		  
 test1 [] = ()
 
-guardTest = catchAllIO (case test2 of () -> return ())
+guardTest = catch (case test2 of () -> return ())
   (\ex -> case ex of
 		PatternMatchFail err -> putStr err
 		other 		     -> error "help!")
