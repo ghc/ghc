@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.15 1999/07/05 17:25:23 sof Exp $
+ * $Id: Stg.h,v 1.16 1999/07/06 09:19:47 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -103,7 +103,9 @@ void _stgAssert (char *, unsigned int);
 #include "TailCalls.h"
 
 /* RTS public interface */
+#ifndef COMPILING_RTS
 #include "RtsAPI.h"
+#endif
 
 /* these are all ANSI C headers */
 #include <stdlib.h>
