@@ -1,4 +1,5 @@
 
 drvfail007.hs:4:5:
-    No instance for `Eq (Int -> Int)'
+    No instance for (Eq (Int -> Int))
+      arising from the data type declaration at drvfail007.hs:4:5
     When deriving the `Eq' instance for type `Foo'
