@@ -6,6 +6,10 @@ include $(TOP)/mk/test.mk
 # Reference to stage2 compiler supporting interactive use
 stage2=${TOP}/../ghc/compiler/stage2/ghc-inplace
 
+# Run the infamous paradise benchmark
+tldi03:
+	gmake TEST_HC=${stage2} WAY=ghci TESTS=paradise
+
 # A tweaked main target to use a stage 2 compiler
 stage2:
 	gmake TEST_HC=${stage2}
@@ -30,15 +34,17 @@ clean:
 	find . -depth -name "*.comp.*"   -exec rm -rf \{\} \;
 	find . -depth -name "*.interp.*" -exec rm -rf \{\} \;
 	find . -depth -name "*.run.*"    -exec rm -rf \{\} \;
-	rm -f paradise/paradise
-	rm -f gshow/gshow
-	rm -f geq/geq
-	rm -f gread
 	rm -f foldTree
-	rm -f local-quantors
-	rm -f shortcut
-	rm -f where
-	rm -f gmapQ-assoc
-	rm -f strings/strings
-	rm -f gzip/gzip
 	rm -f freeNames/freeNames
+	rm -f geq/geq
+	rm -f gmapQ-assoc
+	rm -f gread
+	rm -f gshow/gshow
+	rm -f gsize
+	rm -f gzip/gzip
+	rm -f local-quantors
+	rm -f newtype
+	rm -f paradise/paradise
+	rm -f shortcut
+	rm -f strings/strings
+	rm -f where
