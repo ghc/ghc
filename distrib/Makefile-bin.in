@@ -78,7 +78,7 @@ real_libdir      = $(libdir)/$(package)-$(version)
 real_datadir     = $(datadir)/$(package)-$(version)
 
 package     = ghc
-version     = 2.08
+version     = 2.09
 PERL        = @PerlCmd@
 SH	    = /bin/sh
 RM          = rm -f

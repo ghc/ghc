@@ -1,6 +1,6 @@
 % 	Building and installing the Glasgow Functional Programming Tools Suite
 %
-%				Version 2.08
+%				Version 2.09
 %				July 1997
 			
 
@@ -8,7 +8,7 @@
 \documentstyle[11pt,literate]{article}
 \begin{document}
 \title{Building and installing the Glasgow Functional Programming Tools Suite\\
-Version~2.08}
+Version~2.09}
 \author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\
