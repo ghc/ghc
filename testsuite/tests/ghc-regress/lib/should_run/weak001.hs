@@ -1,7 +1,7 @@
-import Addr
-import Weak
+import Foreign
+import System.Mem.Weak
 
-kill:: Addr -> IO ()
+kill:: Ptr a -> IO ()
 kill a = do
     w <- mkWeakPtr a Nothing
     addFinalizer a $
@@ -9,6 +9,4 @@ kill a = do
 
 main:: IO ()
 main = sequence_ . take 10000 . repeat $
-    malloc 100 >>= kill >> return ()
-
-foreign import malloc :: Int -> IO Addr
+    mallocBytes 100 >>= kill >> return ()
