@@ -1,10 +1,14 @@
-/* 
- * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+/* -----------------------------------------------------------------------------
+ * $Id: stgerror.h,v 1.1 1999/11/26 16:25:56 simonmar Exp $
  *
- * $Id: error.h,v 1.3 1998/12/02 13:27:21 simonm Exp $
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
  * Error codes used by the IO subsystem.
- */
+ *
+ * ---------------------------------------------------------------------------*/
+
+#ifndef STGERROR_H
+#define STGERROR_H
 
 #define ERR_ALREADYEXISTS 1
 #define ERR_HARDWAREFAULT 2
@@ -139,3 +143,5 @@
 #define GHC_EVERSION -111
 #define GHC_EWOULDBLOCK -112
 #define GHC_EXDEV -113
+
+#endif /* STGERROR_H */

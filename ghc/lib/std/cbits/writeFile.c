@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.10 1999/11/25 16:54:15 simonmar Exp $
+ * $Id: writeFile.c,v 1.11 1999/11/26 16:25:57 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -116,6 +116,7 @@ writeBuf(StgForeignPtr ptr, StgAddr buf, StgInt len)
        ) {
        /* Flush buffer */
        rc = writeFileObject(ptr, fo->bufWPtr);
+       /* ToDo: undo buffer fill if we're blocking.. */
        if (rc != 0) { 
            return rc;
        }

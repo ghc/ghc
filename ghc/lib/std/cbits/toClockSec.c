@@ -1,14 +1,14 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: toClockSec.c,v 1.4 1999/09/19 19:21:22 sof Exp $
+ * $Id: toClockSec.c,v 1.5 1999/11/26 16:25:56 simonmar Exp $
  *
  * toClockSec Runtime Support
  */
 
 #include "Rts.h"
-#include "timezone.h"
 #include "stgio.h"
+#include "timezone.h"
 
 StgInt
 toClockSec(I_ year, I_ mon, I_ mday, I_ hour, I_ min, I_ sec, I_ isdst, StgByteArray res)

@@ -1,14 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.7 1999/11/23 14:38:40 simonmar Exp $
+ * $Id: fileObject.c,v 1.8 1999/11/26 16:25:56 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
-#include "fileObject.h"
 
 #include <stdio.h>
 

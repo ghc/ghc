@@ -1,14 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileGetc.c,v 1.3 1998/12/02 13:27:23 simonm Exp $
+ * $Id: fileGetc.c,v 1.4 1999/11/26 16:25:55 simonmar Exp $
  *
  * hGetChar Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
-#include "error.h"
 
 #define EOT 4
 

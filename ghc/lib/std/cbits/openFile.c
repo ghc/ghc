@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.11 1999/11/25 16:54:14 simonmar Exp $
+ * $Id: openFile.c,v 1.12 1999/11/26 16:25:56 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -11,7 +11,6 @@
 
 #include "Rts.h"
 #include "stgio.h"
-#include "fileObject.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>

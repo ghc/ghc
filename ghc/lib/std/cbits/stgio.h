@@ -1,23 +1,20 @@
-/* 
- * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+/* -----------------------------------------------------------------------------
+ * $Id: stgio.h,v 1.15 1999/11/26 16:25:56 simonmar Exp $
  *
- * $Id: stgio.h,v 1.14 1999/09/30 15:50:03 sof Exp $
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
  * Helper code for GHC's IO subsystem.
- */
+ *
+ * ---------------------------------------------------------------------------*/
 
 #ifndef STGIO_H
 #define STGIO_H
 
+#include "stgerror.h"
 #include "fileObject.h"
 
-/* Decls for routines in ghc/lib/cbits/ only used there.
- * This file is used when compiling the Haskell library
- * that _ccalls_ those routines; and when compiling those
- * routines (to check consistency).
+/* Function prototypes for the I/O subsytem...
  */
-
-#include "error.h"
 
 /* closeFile.c */
 StgAddr allocMemory__ (StgInt);

@@ -1,14 +1,14 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: toLocalTime.c,v 1.3 1998/12/02 13:28:02 simonm Exp $
+ * $Id: toLocalTime.c,v 1.4 1999/11/26 16:25:56 simonmar Exp $
  *
  * toCalendarTime Runtime Support
  */
 
 #include "Rts.h"
-#include "timezone.h"
 #include "stgio.h"
+#include "timezone.h"
 
 StgAddr
 toLocalTime(I_ size, StgByteArray d, StgByteArray res)

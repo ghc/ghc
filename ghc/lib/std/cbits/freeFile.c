@@ -1,14 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.7 1999/11/25 16:54:14 simonmar Exp $
+ * $Id: freeFile.c,v 1.8 1999/11/26 16:25:56 simonmar Exp $
  *
  * Giving up files
  */
 
 #include "Rts.h"
 #include "stgio.h"
-#include "fileObject.h"
 
 #if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
 #define USE_WINSOCK

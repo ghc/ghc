@@ -1,14 +1,14 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: toUTCTime.c,v 1.3 1998/12/02 13:28:04 simonm Exp $
+ * $Id: toUTCTime.c,v 1.4 1999/11/26 16:25:57 simonmar Exp $
  *
  * toUTCTime Runtime Support
  */
 
 #include "Rts.h"
-#include "timezone.h"
 #include "stgio.h"
+#include "timezone.h"
 
 StgAddr 
 toUTCTime(I_ size, StgByteArray d, StgByteArray res)
