@@ -45,6 +45,7 @@ $SaveStderr = 0;
 $SaveStdout = 0;
 $Status = 0;
 @PgmArgs = ();
+$PgmFail=0;
 $PgmExitStatus = 0;
 $PgmStdinFile  = '/dev/null';
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
@@ -86,8 +87,9 @@ arg: while ($_ = $ARGV[0]) {
     /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
 			$Status++,
 			print STDERR "$Pgm: bogus -i input file: $PgmStdinFile\n"
-			    if ! -f $PgmStdinFile;
+			    if $PgmStdinFile !~ /^\/dev\/.*$/ && ! -f $PgmStdinFile;
 			next arg; };
+    /^-fail/    && do { $PgmFail=1; next arg; };
     /^-x(.*)/	&& do { $PgmExitStatus = &grab_arg_arg('-x',$1);
 			$Status++ ,
 			print STDERR "$Pgm: bogus -x expected exit status: $PgmExitStatus\n"
@@ -219,7 +221,12 @@ $PreScriptLines
 $SpixifyLine1
 $TimeCmd /bin/sh -c \'$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
 progexit=\$?
-if [ \$progexit -ne $PgmExitStatus ]; then
+if [ \$progexit -eq 0 ] && [ $PgmFail -ne 0 ]; then
+    echo $ToRun @PgmArgs \\< $PgmStdinFile
+    echo "****" expected a failure, but was successful
+    myexit=1
+fi
+if [ \$progexit -ne $PgmExitStatus ] && [ $PgmFail -eq 0 ]; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
     echo "****" expected exit status $PgmExitStatus not seen \\; got \$progexit
     myexit=1
