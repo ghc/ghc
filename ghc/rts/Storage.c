@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.56 2001/11/28 14:30:32 simonmar Exp $
+ * $Id: Storage.c,v 1.57 2001/11/28 14:47:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -335,19 +335,6 @@ resetNurseries( void )
   }
 #else
   for (bd = g0s0->blocks; bd; bd = bd->link) {
-#ifdef PROFILING
-    // Reset every word in the nursery to zero when doing LDV profiling.
-    // This relieves the mutator of the burden of zeroing every new closure,
-    // which is stored in the nursery.
-    // 
-    // Todo: make it more efficient, e.g. memcpy()
-    //
-    StgPtr p;
-    if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
-      for (p = bd->start; p < bd->start + BLOCK_SIZE_W; p++)
-        *p = 0;
-    }
-#endif
     bd->free = bd->start;
     ASSERT(bd->gen_no == 0);
     ASSERT(bd->step == g0s0);
