@@ -169,12 +169,12 @@ ppBCEnv p
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
 mkProtoBCO nm instrs_ordlist origin
-   = ProtoBCO nm (id {-peep-} (fromOL instrs_ordlist)) origin
+   = ProtoBCO nm (peep (fromOL instrs_ordlist)) origin
      where
         peep (PUSH_L off1 : PUSH_L off2 : PUSH_L off3 : rest)
            = PUSH_LLL off1 (off2-1) (off3-2) : peep rest
         peep (PUSH_L off1 : PUSH_L off2 : rest)
-           = PUSH_LL off1 off2 : peep rest
+           = PUSH_LL off1 (off2-1) : peep rest
         peep (i:rest)
            = i : peep rest
         peep []
@@ -474,6 +474,7 @@ atomRep (AnnVar v)    = typePrimRep (idType v)
 atomRep (AnnLit l)    = literalPrimRep l
 atomRep (AnnNote n b) = atomRep (snd b)
 atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
+atomRep (AnnLam x e) | isTyVar x = atomRep (snd e)
 atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
 
 
@@ -667,6 +668,10 @@ pushAtom tagged d p (AnnApp f (_, AnnType _))
    = pushAtom tagged d p (snd f)
 
 pushAtom tagged d p (AnnNote note e)
+   = pushAtom tagged d p (snd e)
+
+pushAtom tagged d p (AnnLam x e) 
+   | isTyVar x 
    = pushAtom tagged d p (snd e)
 
 pushAtom tagged d p other
