@@ -21,4 +21,4 @@ increase k = everywhere (mkT (incS k))
 incS :: Float -> Salary -> Salary
 incS k (S s) = S (s * (1+k))
 
-main = print (increase 0.1 genCom)
+main = print $ increase 0.1 genCom

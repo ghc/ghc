@@ -91,4 +91,4 @@ without explicit datatype declatations ;-)
 
 -}
 
-main = print $ show (freeNames sys1)
+main = print $ freeNames sys1
