@@ -2715,6 +2715,270 @@ are evacuated and @NULL@-values are chained together to form a new free list.
 There's no need to link the stable pointer table onto the mutable
 list because we always treat it as a root.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Subsection{Garbage Collecting CAFs}{CAF}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% begin{direct quote from current paper}
+A CAF (constant applicative form) is a top-level expression with no
+arguments.  The expression may need a large, even unbounded, amount of
+storage when it is fully evaluated.
+
+CAFs are represented by closures in static memory that are updated
+with indirections to objects in the heap space once the expression is
+evaluated.  Previous version of GHC maintained a list of all evaluated
+CAFs and traversed them during GC, the result being that the storage
+allocated by a CAF would reside in the heap until the program ended.
+% end{direct quote from current paper}
+
+% begin{elaboration on why CAFs are very very bad}
+Treating CAFs this way has two problems:
+\begin{itemize}
+\item
+It can cause a very large space leak.  For example, this program
+should run in constant space but, instead, will run out of memory.
+\begin{verbatim}
+> main :: IO ()
+> main = print nats
+>
+> nats :: [Int]
+> nats = [0..maxInt]
+\end{verbatim}
+
+\item
+Expressions with no arguments have very different space behaviour
+depending on whether or not they occur at the top level.  For example, 
+if we make \verb+nats+ a local definition, the space leak goes away 
+and the resulting program runs in constant space, as expected.
+\begin{verbatim}
+> main :: IO ()
+> main = print nats
+>  where
+>   nats :: [Int]
+>   nats = [0..maxInt]
+\end{verbatim}
+
+This huge change in the operational behaviour of the program 
+is a problem for optimising compilers and for programmers.
+For example, GHC will normally flatten a set of let bindings using
+this transformation:
+\begin{verbatim}
+let x1 = let x2 = e2 in e1   ==>   let x2 = e2 in let x1 = e1
+\end{verbatim}
+but it does not do so if this would raise \verb+x2+ to the top level
+since that may create a CAF.  Many Haskell programmers avoid creating
+large CAFs by adding a dummy argument to a CAF or by moving a CAF away
+from the top level.
+
+\end{itemize}
+% end{elaboration on why CAFs are very very bad}
+
+Solving the CAF problem requires different treatment in interactive
+systems such as Hugs than in batch-mode systems such as GHC 
+\begin{itemize}
+\item
+In a batch-mode the program the runtime system is terminated
+after every execution of the runtime system.  In such systems,
+the garbage collector can completely ``destroy'' a CAF when it 
+is no longer live --- in much the same way as it ``destroys''
+normal closures when they are no longer live.
+
+\item
+In an interactive system, many expressions are evaluated without
+restarting the runtime system between each evaluation.  In such
+systems, the garbage collector cannot completely ``destroy'' a CAF
+when it is no longer live because, whilst it might not be required in
+the evaluation of the current expression, it might be required in the
+next evaluation.
+
+There are two possible behaviours we migth want:
+\begin{enumerate}
+\item
+When a CAF is no longer required for the current evaluation, the CAF
+should be reverted to its original form.  This behaviour ensures that
+the operational behaviour of the interactive system is a reasonable
+predictor of the operational behaviour of the batch-mode system.  This
+allows us to use Hugs for performance debugging (in particular, trying
+to understand and reduce the heap usage of a program) --- an area of
+increasing importance as Haskell is used more and more to solve ``real
+problems'' in ``real problem domains''.
+
+\item
+Even if a CAF is no longer required for the current evaluation, we might
+choose to hang onto it by collecting it in the normal way.  This keeps
+the space leak but might be useful in a teaching environment when
+trying to teach the difference between call by name evaluation (which
+doesn't share work) and lazy evaluation (which does share work).
+
+\end{enumerate}
+
+It turns out that it is easy to support both styles of use, so the
+runtime system provides a switch which lets us turn this on and off
+during execution.  \ToDo{What is this switch called?}  It would also
+be easy to provide a function \verb+RevertCAF+ to let the interpreter
+revert any CAF it wanted between (but not during) executions, if we so
+desired.  Running \verb+RevertCAF+ during execution would lose some sharing
+but is otherwise harmless.
+
+\end{itemize}
+
+% % begin{even more pointless observation?}
+% The simplest fix would be to remove the special treatment of 
+% top level variables.  This works but is very inefficient.
+% ToDo: say why.
+% (Note: delete this paragraph from final version.)
+% % end{even more pointless observation?}
+
+% begin{pointless observation?}
+An easy but inefficient fix to the CAF problem would be to make a
+complete copy of the heap before every evaluation and discard the copy
+after evaluation.  This works but is inefficient.
+% end{pointless observation?}
+
+An efficient way to achieve a similar effect is to revert all
+updatable thunks to their original form as they become unnecessary for
+the current evaluation.  To do this, we modify the compiler to ensure
+that the only updatable thunks generated by the compiler are CAFs and
+we modify the garbage collector to revert entered CAFs to unentered
+CAFs as their value becomes unnecessary.
+
+
+\subsubsection{New Heap Objects}
+
+We add three new kinds of heap object: unentered CAF closures, entered
+CAF objects and CAF blackholes.  We first describe how they are
+evaluated and then how they are garbage collected.
+\begin{itemize}
+\item
+Unentered CAF closures contain a pointer to closure representing the
+body of the CAF.  The ``body closure'' is not updatable.
+
+Unentered CAF closures contain two unused fields to make them the same
+size as entered CAF closures --- which allows us to perform an inplace
+update.  \ToDo{Do we have to add another kind of inplace update operation
+to the storage manager interface or do we consider this to be internal
+to the SM?}
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+\verb+CAF_unentered+ & \emph{body closure} & \emph{unused} & \emph{unused} \\ \hline
+\end{tabular}
+\end{center}
+When an unentered CAF is entered, we do the following:
+\begin{itemize}
+\item
+allocate a CAF black hole;
+
+\item
+push an update frame (to update the CAF black hole) onto the stack;
+
+\item
+overwrite the CAF with an entered CAF object (see below) with the same
+body and whose value field points to the black hole;
+
+\item
+add the CAF to a list of all entered CAFs (called ``the CAF list'');
+and
+
+\item
+the closure representing the value of the CAF is entered.
+
+\end{itemize}
+
+When evaluation of the CAF body returns a value, the update frame
+causes the CAF black hole to be updated with the value in the normal
+way.
+
+\ToDo{Add a picture}
+
+\item
+Entered CAF closures contain two pointers: a pointer to the CAF body
+(the same as for unentered CAF closures); a pointer to the CAF value
+(this is initialised with a CAF blackhole, as previously described);
+and a link to the next CAF in the CAF list 
+
+\ToDo{How is the end of the list marked?  Null pointer or sentinel value?}.
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+\verb+CAF_entered+ & \emph{body closure} & \emph{value} & \emph{link} \\ \hline
+\end{tabular}
+\end{center}
+When an entered CAF is entered, it enters its value closure.
+
+\item
+CAF blackholes are identical to normal blackholes except that they
+have a different infotable.  The only reason for having CAF blackholes
+is to allow an optimisation of lazy blackholing where we stop scanning
+the stack when we see the first {\em normal blackhole} but not
+when we see a {\em CAF blackhole.}
+\ToDo{The optimisation we want to allow should be described elsewhere
+so that all we have to do here is describe the difference.}
+
+Instead of allocating a blackhole to update with the value of the CAF,
+it might seem simpler to update the CAF directly.  This would require
+a new kind of update frame which would update the value field of the
+CAF with a pointer to the value and wouldn't catch blackholes caused
+by CAFs that depend on themselves so we chose not to do so.
+
+\end{itemize}
+
+\subsubsection{Garbage Collection}
+
+To avoid the space leak, each run of the garbage collector must revert
+the entered CAFs which are not required to complete the current
+evaluation (that is all the closures reachable from the set of
+runnable threads and the stable pointer table).
+
+It does this by performing garbage collection in three phases:
+\begin{enumerate}
+\item
+During the first phase, we ``mark'' all closures reachable from the
+scheduler state.  
+
+How we ``mark'' closures depends on the garbage collector.  For
+example, in a 2-space collector, closures are ``marked'' by copying
+them into ``to-space'', overwriting them with a forwarding node and
+``marking'' all the closures reachable from the copy.  The only
+requirements are that we can test whether a closure is marked and if a
+closure is marked then so are all closures reachable from it.
+
+\ToDo{At present we say that the scheduler state includes any state
+that Hugs may have.  This is not true anymore.}
+
+Performing this phase first provides us with a cheap test for
+execution closures: at this stage in execution, the execution closures
+are precisely the marked closures.
+
+\item
+During the second phase, we revert all unmarked CAFs on the CAF list
+and remove them from the CAF list.
+
+Since the CAF list is exactly the set of all entered CAFs, this reverts
+all entered CAFs which are not execution closures.
+
+\item
+During the third phase, we mark all top level objects (including CAFs)
+by calling \verb+MarkHugsRoots+ which will call \verb+MarkRoot+ for
+each top level object known to Hugs.
+
+\end{enumerate}
+
+To implement the second style of interactive behaviour (where we
+deliberately keep the CAF-related space leak), we simply omit the
+second phase.  Omitting the second phase causes the third phase to
+mark any unmarked CAF value closures.
+
+So far, we have been describing a pure Hugs system which contains no
+machine generated code.  The main difference in a hybrid system is
+that GHC-generated code is statically allocated in memory instead of
+being dynamically allocated on the heap.  We split both
+\verb+CAF_unentered+ and \verb+CAF_entered+ into two versions: a
+static and a dynamic version.  The static and dynamic versions of each
+CAF differ only in whether they are moved during garbage collection.
+When reverting CAFs, we revert dynamic entered CAFs to dynamic
+unentered CAFs and static entered CAFs to static unentered CAFs.
+
+
 
 
 \Section{The Bytecode Evaluator}{bytecode-evaluator}
