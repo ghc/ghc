@@ -525,6 +525,8 @@ getPrimOpResultInfo op
 			 where
 			   tc = tyConAppTyCon ty
 			-- All primops return a tycon-app result
+			-- The tycon can be an unboxed tuple, though, which
+			-- gives rise to a ReturnAlg
 \end{code}
 
 The commutable ops are those for which we will try to move constants

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.46 2001/03/22 03:51:08 hwloidl Exp $
+% $Id: CgClosure.lhs,v 1.47 2001/08/21 10:00:22 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -410,7 +410,7 @@ closureCodeBody binder_info closure_info cc all_args body
       forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)
 				`thenFC` \ slow_abs_c ->
       forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
-      moduleName			`thenFC` \ mod_name ->
+      moduleName		`thenFC` \ mod_name ->
 
 	-- Now either construct the info table, or put the fast code in alone
 	-- (We never have slow code without an info table)
