@@ -280,6 +280,8 @@ cmLoadModule cmstate1 rootname
 -- doubt say True.
 summary_indicates_source_changed :: [ModSummary] -> ModSummary -> Bool
 summary_indicates_source_changed old_summaries new_summary
+   = panic "SISC"
+#if 0
    = case [old | old <- old_summaries, 
                  name_of_summary old == name_of_summary new_summary] of
 
@@ -302,6 +304,8 @@ summary_indicates_source_changed old_summaries new_summary
                       (Just old_t, Just new_t) -> new_t > old_t
                       other                    -> True
                    )
+#endif
+
 
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
@@ -394,6 +398,21 @@ upsweep_mods ghci_mode oldUI reachable_from source_changed threaded
 
 -- Compile a single module.  Always produce a Linkable for it if 
 -- successful.  If no compilation happened, return the old Linkable.
+maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
+maybe_getFileLinkable mod_name obj_fn
+   = do obj_exist <- doesFileExist obj_fn
+        if not obj_exist 
+         then return Nothing 
+         else 
+         do let stub_fn = case splitFilename3 obj_fn of
+                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
+            stub_exist <- doesFileExist stub_fn
+            obj_time <- getModificationTime obj_fn
+            if stub_exist
+             then return (Just (LM obj_time mod_name [DotO obj_fn, DotO stub_fn]))
+             else return (Just (LM obj_time mod_name [DotO obj_fn]))
+
+
 upsweep_mod :: GhciMode 
             -> UnlinkedImage
             -> CmThreaded
@@ -408,32 +427,41 @@ upsweep_mod ghci_mode oldUI threaded1 summary1
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
 
-        -- We *have* to compile it if we're in batch mode and we can't see
-        -- a previous linkable for it on disk.  Or if we're in interpretive
-        -- and there's no old linkable in oldUI.
-        compilation_mandatory 
-           <- case ghci_mode of
-                 Batch -> case ml_obj_file (ms_location summary1) of
-                             Nothing     -> return True
-                             Just obj_fn -> do b <- doesFileExist obj_fn
-                                               return (not b)
-                 Interactive -> case findModuleLinkable_maybe oldUI mod_name of 
-                                   Nothing -> return True
-                                   Just li -> return False
-                 OneShot -> panic "upsweep_mod:compilation_mandatory"
+        let maybe_oldUI_linkable = findModuleLinkable_maybe oldUI mod_name
+        maybe_oldDisk_linkable
+           <- case ml_obj_file (ms_location summary1) of
+                 Nothing -> return Nothing
+                 Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
 
-        let compilation_might_be_needed 
-               = source_might_have_changed || compilation_mandatory
+        -- The most recent of the old UI linkable or whatever we could
+        -- find on disk.  Is returned as the linkable if compile
+        -- doesn't think we need to recompile.        
+        let maybe_old_linkable
+               = case (maybe_oldUI_linkable, maybe_oldDisk_linkable) of
+                    (Nothing, Nothing) -> Nothing
+                    (Nothing, Just di) -> Just di
+                    (Just ui, Nothing) -> Just ui
+                    (Just ui, Just di)
+                       | linkableTime ui >= linkableTime di -> Just ui
+                       | otherwise                          -> Just di
+
+        let compilation_mandatory
+               = case maybe_old_linkable of
+                    Nothing -> True
+                    Just li -> case ms_hs_date summary1 of
+                                  Nothing -> panic "compilation_mandatory:no src date"
+                                  Just src_date -> src_date >= linkableTime li
             source_unchanged
-               = not compilation_might_be_needed
+               = not compilation_mandatory
+
             (hst1_strictDC, hit1_strictDC)
                = retainInTopLevelEnvs reachable_from_here (hst1,hit1)
 
+            old_linkable 
+               = unJust "upsweep_mod:old_linkable" maybe_old_linkable
+
         compresult <- compile ghci_mode summary1 source_unchanged
                          old_iface hst1_strictDC hit1_strictDC pcs1
-
-        --putStrLn ( "UPSWEEP_MOD: smhc = " ++ show source_might_have_changed 
-        --           ++ ",  cman = " ++ show compilation_mandatory)
 
         case compresult of
 
@@ -444,15 +472,6 @@ upsweep_mod ghci_mode oldUI threaded1 summary1
               -> let hst2         = addToUFM hst1 mod_name details
                      hit2         = hit1
                      threaded2    = CmThreaded pcs2 hst2 hit2
-                     old_linkable 
-                        | ghci_mode == Interactive 
-                        = unJust "upsweep_mod(2)" 
-                                 (findModuleLinkable_maybe oldUI mod_name)
-                        | otherwise
-                        = LM mod_name
-                             [DotO (unJust "upsweep_mod(1)"
-                                           (ml_obj_file (ms_location summary1))
-                                   )]
                  in  return (threaded2, Just old_linkable)
 
            -- Compilation really did happen, and succeeded.  A new
@@ -599,10 +618,6 @@ summarise mod location
            <- case ml_hs_file location of 
                  Nothing     -> return Nothing
                  Just src_fn -> maybe_getModificationTime src_fn
-        maybe_iface_timestamp
-           <- case ml_hi_file location of 
-                 Nothing     -> return Nothing
-                 Just if_fn  -> maybe_getModificationTime if_fn
 
         -- If the module name is Main, allow it to be in a file
         -- different from Main.hs, and mash the mod and loc 
@@ -632,10 +647,10 @@ summarise mod location
         return (ModSummary mashed_mod 
                            mashed_loc{ml_hspp_file=Just hspp_fn} 
                            srcimps imps
-                           maybe_src_timestamp maybe_iface_timestamp)
+                           maybe_src_timestamp)
 
    | otherwise
-   = return (ModSummary mod location [] [] Nothing Nothing)
+   = return (ModSummary mod location [] [] Nothing)
 
    where
       maybe_getModificationTime :: FilePath -> IO (Maybe ClockTime)

@@ -6,8 +6,8 @@
 \begin{code}
 module CmTypes ( 
    Unlinked(..),  isObject, nameOfObject, isInterpretable,
-   Linkable(..),
-   ModSummary(..), name_of_summary, pprSummaryTimes
+   Linkable(..), linkableTime,
+   ModSummary(..), name_of_summary, pprSummaryTime
   ) where
 
 import Interpreter
@@ -45,12 +45,19 @@ isInterpretable (Trees _ _) = True
 isInterpretable _ = False
 
 data Linkable
-   = LM ModuleName [Unlinked]
+   = LM ClockTime ModuleName [Unlinked]
    | LP PackageName
 
 instance Outputable Linkable where
-   ppr (LM mod_nm unlinkeds) = text "LinkableM" <+> ppr mod_nm <+> ppr unlinkeds
-   ppr (LP package_nm)       = text "LinkableP" <+> ptext package_nm
+   ppr (LM when_made mod_nm unlinkeds)
+      = text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod_nm 
+                         <+> ppr unlinkeds
+   ppr (LP package_nm)
+      = text "LinkableP" <+> ptext package_nm
+
+linkableTime (LM when_made mod_nm unlinkeds) = when_made
+linkableTime (LP package_nm)                 = panic "linkableTime"
+
 
 -- The ModuleLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
@@ -64,26 +71,22 @@ data ModSummary
         ms_location :: ModuleLocation,       -- location
         ms_srcimps  :: [ModuleName],         -- source imports
         ms_imps     :: [ModuleName],         -- non-source imports
-        ms_hs_date  :: Maybe ClockTime,      -- timestamp of summarised
+        ms_hs_date  :: Maybe ClockTime       -- timestamp of summarised
                                              -- file, if home && source
-        ms_hi_date  :: Maybe ClockTime       -- timestamp of old iface,
-                                             -- if home && source
      }
 
 instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
              nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
-                          text "ms_hi_date = " <> text (show (ms_hi_date ms)),
                           text "ms_mod =" <+> ppr (ms_mod ms) <> comma,
                           text "ms_imps =" <+> ppr (ms_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'
             ]
 
-pprSummaryTimes ms
-   = sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
-          text "ms_hi_date = " <> text (show (ms_hi_date ms))]
+pprSummaryTime ms
+   = text "ms_hs_date = " <> parens (text (show (ms_hs_date ms)))
 
 name_of_summary :: ModSummary -> ModuleName
 name_of_summary = moduleName . ms_mod

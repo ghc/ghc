@@ -64,7 +64,7 @@ data LinkResult
 
 findModuleLinkable_maybe :: [Linkable] -> ModuleName -> Maybe Linkable
 findModuleLinkable_maybe lis mod 
-   = case [LM nm us | LM nm us <- lis, nm == mod] of
+   = case [LM time nm us | LM time nm us <- lis, nm == mod] of
         []   -> Nothing
         [li] -> Just li
         many -> pprPanic "findModuleLinkable" (ppr mod)
@@ -124,7 +124,7 @@ link' Batch batch_attempt_linking linkables pls1
         return (LinkOK pls1)
    where
       getOfiles (LP _)    = panic "CmLink.link(getOfiles): shouldn't get package linkables"
-      getOfiles (LM _ us) = map nameOfObject (filter isObject us)
+      getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 
 link' Interactive batch_attempt_linking linkables pls1
     = linkObjs linkables pls1
@@ -134,11 +134,11 @@ ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC
 
 
-modname_of_linkable (LM nm _) = nm
-modname_of_linkable (LP _)    = panic "modname_of_linkable: package"
+modname_of_linkable (LM _ nm _) = nm
+modname_of_linkable (LP _)      = panic "modname_of_linkable: package"
 
-is_package_linkable (LP _)   = True
-is_package_linkable (LM _ _) = False
+is_package_linkable (LP _)     = True
+is_package_linkable (LM _ _ _) = False
 
 filterModuleLinkables :: (ModuleName -> Bool) 
                       -> [Linkable] 
@@ -146,8 +146,8 @@ filterModuleLinkables :: (ModuleName -> Bool)
 filterModuleLinkables p [] = []
 filterModuleLinkables p (li:lis)
    = case li of
-        LP _       -> retain
-        LM modnm _ -> if p modnm then retain else dump
+        LP _         -> retain
+        LM _ modnm _ -> if p modnm then retain else dump
      where
         dump   = filterModuleLinkables p lis
         retain = li : dump
@@ -161,7 +161,7 @@ unload        = panic "CmLink.unload: no interpreter"
 lookupClosure = panic "CmLink.lookupClosure: no interpreter"
 #else
 linkObjs [] pls = linkFinish pls [] []
-linkObjs (l@(LM _ uls) : ls) pls
+linkObjs (l@(LM _ _ uls) : ls) pls
    | all isObject uls = do
 	mapM_ loadObj [ file | DotO file <- uls ] 
 	linkObjs ls pls
@@ -172,7 +172,7 @@ linkObjs _ pls =
 
  
 linkInterpretedCode [] mods ul_trees pls = linkFinish pls mods ul_trees
-linkInterpretedCode (LM m uls : ls) mods ul_trees pls
+linkInterpretedCode (LM _ m uls : ls) mods ul_trees pls
    | all isInterpretable uls = 
 	linkInterpretedCode ls (m:mods) (uls++ul_trees) pls
         

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.31 2000/11/20 11:39:57 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.32 2000/11/20 13:39:26 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -39,6 +39,7 @@ import CmdLineOpts
 import Config
 import Util
 
+import Time 		( getClockTime )
 import Directory
 import System
 import IOExts
@@ -816,15 +817,16 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 				  Nothing -> []
 				  Just stub_o -> [ DotO stub_o ]
 
-	   hs_unlinked <-
+	   (hs_unlinked, unlinked_time) <-
 	     case hsc_lang of
 
 		-- in interpreted mode, just return the compiled code
 		-- as our "unlinked" object.
 		HscInterpreted -> 
 		    case maybe_interpreted_code of
-			Just (code,itbl_env) -> return [Trees code itbl_env]
-			Nothing -> panic "compile: no interpreted code"
+		       Just (code,itbl_env) -> do tm <- getClockTime 
+                                                  return ([Trees code itbl_env], tm)
+		       Nothing -> panic "compile: no interpreted code"
 
 		-- we're in batch mode: finish the compilation pipeline.
 		_other -> do pipe <- genPipeline (StopBefore Ln) "" True 
@@ -833,11 +835,13 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
                              -- the base name and use it as the base of 
                              -- the output object file.
                              let (basename, suffix) = splitFilename input_fn
-			     o_file <- pipeLoop pipe output_fn False False basename suffix
-			     return [ DotO o_file ]
+			     o_file <- pipeLoop pipe output_fn False False 
+                                                basename suffix
+                             o_time <- getModificationTime o_file
+			     return ([DotO o_file], o_time)
 
-	   let linkable = LM (moduleName (ms_mod summary)) 
-				(hs_unlinked ++ stub_unlinked)
+	   let linkable = LM unlinked_time (moduleName (ms_mod summary)) 
+			     (hs_unlinked ++ stub_unlinked)
 
 	   return (CompOK details (Just (iface, linkable)) pcs)
           }
