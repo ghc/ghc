@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.78 2001/10/29 13:25:19 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.79 2001/12/03 14:49:24 sebc Exp $
 --
 -- Driver flags
 --
@@ -531,6 +531,9 @@ machdepCCOpts
 	-- For now, to suppress the gcc warning "call-clobbered
 	-- register used for global register variable", we simply
 	-- disable all warnings altogether using the -w flag. Oh well.
+
+   | prefixMatch "powerpc-apple-macosx" cTARGETPLATFORM
+       = return ( ["-no-cpp-precomp"], [""] )
 
    | prefixMatch "powerpc" cTARGETPLATFORM || prefixMatch "rs6000" cTARGETPLATFORM
 	= return ( ["-static"], ["-finhibit-size-directive"] )
