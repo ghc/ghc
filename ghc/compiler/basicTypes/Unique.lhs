@@ -374,7 +374,11 @@ iToBase62 :: Int -> SDoc
 iToBase62 n@(I# n#)
   = ASSERT(n >= 0)
     let
+#if __GLASGOW_HASKELL__ < 405
 	bytes = case chars62 of { BYTE_ARRAY bounds_who_needs_'em bytes -> bytes }
+#else
+	bytes = case chars62 of { BYTE_ARRAY _ _ bytes -> bytes }
+#endif
     in
     if n# <# 62# then
 	case (indexCharArray# bytes n#) of { c ->

@@ -144,7 +144,11 @@ getByteArray# :: FastString -> ByteArray#
 getByteArray# (FastString _ _ ba#) = ba#
 
 getByteArray :: FastString -> ByteArray Int
+#if __GLASGOW_HASKELL__ < 405
 getByteArray (FastString _ l# ba#) = ByteArray (0,I# l#) ba#
+#else
+getByteArray (FastString _ l# ba#) = ByteArray 0 (I# l#) ba#
+#endif
 
 lengthFS :: FastString -> Int
 lengthFS (FastString _ l# _) = I# l#
@@ -228,7 +232,12 @@ type FastStringTableVar = IORef FastStringTable
 string_table :: FastStringTableVar
 string_table = 
  unsafePerformIO (
-   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])		>>= \ (MutableArray _ arr#) ->
+   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])
+#if __GLASGOW_HASKELL__ < 405
+	>>= \ (MutableArray _ arr#) ->
+#else
+	>>= \ (MutableArray _ _ arr#) ->
+#endif
    newIORef (FastStringTable 0# arr#))
 
 lookupTbl :: FastStringTable -> Int# -> IO [FastString]
@@ -266,7 +275,11 @@ mkFastString# a# len# =
        -- the string into a ByteArray
        -- _trace "empty bucket" $
        case copyPrefixStr (A# a#) (I# len#) of
+#if __GLASGOW_HASKELL__ < 405
 	 (ByteArray _ barr#) ->  
+#else
+	 (ByteArray _ _ barr#) ->  
+#endif
 	   let f_str = FastString uid# len# barr# in
            updTbl string_table ft h [f_str] >>
            ({- _trace ("new: " ++ show f_str)   $ -} return f_str)
@@ -277,7 +290,11 @@ mkFastString# a# len# =
        case bucket_match ls len# a# of
 	 Nothing -> 
            case copyPrefixStr (A# a#) (I# len#) of
-  	    (ByteArray _ barr#) ->  
+#if __GLASGOW_HASKELL__ < 405
+	     (ByteArray _ barr#) ->  
+#else
+	     (ByteArray _ _ barr#) ->  
+#endif
               let f_str = FastString uid# len# barr# in
               updTbl string_table ft h (f_str:ls) >>
 	      ( {- _trace ("new: " ++ show f_str)  $ -} return f_str)
@@ -306,7 +323,11 @@ mkFastSubStringFO# fo# start# len# =
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        case copySubStrFO (_ForeignObj fo#) (I# start#) (I# len#) of
+#if __GLASGOW_HASKELL__ < 405
 	 (ByteArray _ barr#) ->  
+#else
+	 (ByteArray _ _ barr#) ->  
+#endif
 	   let f_str = FastString uid# len# barr# in
            updTbl string_table ft h [f_str]       >>
 	   return f_str
@@ -316,7 +337,11 @@ mkFastSubStringFO# fo# start# len# =
        case bucket_match ls start# len# fo# of
 	 Nothing -> 
            case copySubStrFO (_ForeignObj fo#) (I# start#) (I# len#) of
-   	     (ByteArray _ barr#) ->  
+#if __GLASGOW_HASKELL__ < 405
+	     (ByteArray _ barr#) ->  
+#else
+	     (ByteArray _ _ barr#) ->  
+#endif
               let f_str = FastString uid# len# barr# in
               updTbl string_table ft  h (f_str:ls) >>
 	      ( {- _trace ("new: " ++ show f_str) $ -} return f_str)
@@ -344,8 +369,13 @@ mkFastSubStringBA# barr# start# len# =
        -- no match, add it to table by copying out the
        -- the string into a ByteArray
        -- _trace "empty bucket(b)" $
+#if __GLASGOW_HASKELL__ < 405
        case copySubStrBA (ByteArray btm barr#) (I# start#) (I# len#) of
          (ByteArray _ ba#) ->  
+#else
+       case copySubStrBA (ByteArray btm btm barr#) (I# start#) (I# len#) of
+         (ByteArray _ _ ba#) ->  
+#endif
           let f_str = FastString uid# len# ba# in
           updTbl string_table ft h [f_str]     >>
           -- _trace ("new(b): " ++ show f_str)   $
@@ -356,8 +386,13 @@ mkFastSubStringBA# barr# start# len# =
        -- _trace ("non-empty bucket(b)"++show ls) $
        case bucket_match ls start# len# barr# of
 	 Nothing -> 
-          case copySubStrBA (ByteArray (error "") barr#) (I# start#) (I# len#) of
+#if __GLASGOW_HASKELL__ < 405
+          case copySubStrBA (ByteArray btm barr#) (I# start#) (I# len#) of
             (ByteArray _ ba#) ->  
+#else
+          case copySubStrBA (ByteArray btm btm barr#) (I# start#) (I# len#) of
+            (ByteArray _ _ ba#) ->  
+#endif
               let f_str = FastString uid# len# ba# in
               updTbl string_table ft h (f_str:ls) >>
 	      -- _trace ("new(b): " ++ show f_str)   $
@@ -392,7 +427,11 @@ mkFastCharString2 a@(A# a#) (I# len#) = CharStr a# len#
 mkFastString :: String -> FastString
 mkFastString str = 
  case packString str of
+#if __GLASGOW_HASKELL__ < 405
   (ByteArray (_,I# len#) frozen#) -> 
+#else
+  (ByteArray _ (I# len#) frozen#) -> 
+#endif
     mkFastSubStringBA# frozen# 0# len#
     {- 0-indexed array, len# == index to one beyond end of string,
        i.e., (0,1) => empty string.    -}
@@ -466,15 +505,23 @@ cmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
      EQ
   else
    unsafePerformIO (
-    _ccall_ strcmp (ByteArray bottom b1#) (ByteArray bottom b2#)	>>= \ (I# res) ->
+#if __GLASGOW_HASKELL__ < 405
+    _ccall_ strcmp (ByteArray bot b1#) (ByteArray bot b2#)	>>= \ (I# res) ->
+#else
+    _ccall_ strcmp (ByteArray bot bot b1#) (ByteArray bot bot b2#) >>= \ (I# res) ->
+#endif
     return (
     if      res <#  0# then LT
     else if res ==# 0# then EQ
     else		    GT
     ))
   where
-   bottom :: (Int,Int)
-   bottom = error "tagCmp"
+#if __GLASGOW_HASKELL__ < 405
+   bot :: (Int,Int)
+#else
+   bot :: Int
+#endif
+   bot = error "tagCmp"
 cmpFS (CharStr bs1 len1) (CharStr bs2 len2)
   = unsafePerformIO (
     _ccall_ strcmp ba1 ba2	>>= \ (I# res) ->
@@ -495,7 +542,11 @@ cmpFS (FastString _ len1 bs1) (CharStr bs2 len2)
      else		     GT
     ))
   where
+#if __GLASGOW_HASKELL__ < 405
     ba1 = ByteArray ((error "")::(Int,Int)) bs1
+#else
+    ba1 = ByteArray (error "") ((error "")::Int) bs1
+#endif
     ba2 = A# bs2
 
 cmpFS a@(CharStr _ _) b@(FastString _ _ _)
@@ -531,7 +582,11 @@ hPutFS handle (FastString _ l# ba#) =
       other -> 
           let fp = filePtr htype in
 	   -- here we go..
+#if __GLASGOW_HASKELL__ < 405
           _ccall_ writeFile (ByteArray ((error "")::(Int,Int)) ba#) fp (I# l#) >>= \rc ->
+#else
+          _ccall_ writeFile (ByteArray ((error "")::Int) ((error "")::Int) ba#) fp (I# l#) >>= \rc ->
+#endif
           if rc==0 then
               return ()
           else
@@ -569,9 +624,13 @@ hPutFS handle (CharStr a# l#) =
 #else
 hPutFS handle (FastString _ l# ba#)
   | l# ==# 0#  = return ()
-  | otherwise  = hPutBufBA handle (ByteArray bottom ba#) (I# l#)
+#if __GLASGOW_HASKELL__ < 405
+  | otherwise  = hPutBufBA handle (ByteArray bot ba#) (I# l#)
+#else
+  | otherwise  = hPutBufBA handle (ByteArray bot bot ba#) (I# l#)
+#endif
  where
-  bottom = error "hPutFS.ba"
+  bot = error "hPutFS.ba"
 
 --ToDo: avoid silly code duplic.
 
