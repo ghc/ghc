@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.55 2000/05/28 20:22:08 panne Exp $
+ * $Id: PrimOps.h,v 1.56 2000/06/04 18:27:45 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -368,15 +368,12 @@ typedef union {
   (r) = RET_PRIM_STGCALL2(I_,mpz_cmp_si,&arg,i);		\
 }
 
-/* I think mp_limb_t must be the same size as StgInt for this to work
- * properly --SDM
- */
+/* NOTE: gcdIntzh and gcdIntegerIntzh work only for positive inputs! */
+
+/* mp_limb_t must be able to hold an StgInt for this to work properly */
 #define gcdIntzh(r,a,b) \
-{ StgInt aa = a; \
-  r = (aa) ? (b) ? \
-        RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(&aa), 1, (mp_limb_t)(b)) \
-        : abs(aa) \
-      : abs(b); \
+{ mp_limb_t aa = (mp_limb_t)(a); \
+  RET_STGCALL3(StgInt, mpn_gcd_1, (mp_limb_t *)(&aa), 1, (mp_limb_t)(b)); \
 }
 
 #define gcdIntegerIntzh(r,sa,a,b) \

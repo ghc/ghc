@@ -573,11 +573,16 @@ plusInt	(I# x) (I# y) = I# (x +# y)
 minusInt(I# x) (I# y) = I# (x -# y)
 timesInt(I# x) (I# y) = I# (x *# y)
 quotInt	(I# x) (I# y) = I# (quotInt# x y)
-remInt	(I# x) (I# y) = I# (remInt# x y)
-gcdInt (I# a)  (I# b) = I# (gcdInt# a b)
+remInt	(I# x) (I# y) = I# (remInt#  x y)
+
+gcdInt  (I# 0#) (I# 0#) = error "PrelBase.gcdInt: gcd 0 0 is undefined"
+gcdInt  a       (I# 0#) = a
+gcdInt  (I# 0#) b       = b
+gcdInt  (I# a)  (I# b)  = I# (gcdInt# (absInt a) (absInt b))
+   where absInt x = if x <# 0# then negateInt# x else x
 
 negateInt :: Int -> Int
-negateInt (I# x)      = I# (negateInt# x)
+negateInt (I# x) = I# (negateInt# x)
 
 divInt, modInt :: Int -> Int -> Int
 x `divInt` y 

@@ -208,17 +208,19 @@ quotInteger (J# sa a) (J# sb b)
 
 \begin{code}
 gcdInteger :: Integer -> Integer -> Integer
+-- SUP: Do we really need the first two cases?
 gcdInteger a@(S# (-2147483648#)) b = gcdInteger (toBig a) b
 gcdInteger a b@(S# (-2147483648#)) = gcdInteger a (toBig b)
-gcdInteger (S# a) (S# b) = S# (gcdInt# a b)
-gcdInteger ia@(S# a) ib@(J# sb b)
+gcdInteger (S# a) (S# b) = case gcdInt (I# a) (I# b) of { I# c -> S# c }
+gcdInteger ia@(S# 0#) ib@(J# 0# _) = error "PrelNum.gcdInteger: gcd 0 0 is undefined"
+gcdInteger ia@(S# a)  ib@(J# sb b)
   | a  ==# 0#  = abs ib
   | sb ==# 0#  = abs ia
-  | otherwise  = S# (gcdIntegerInt# sb b a)
-gcdInteger ia@(J# sa a) ib@(S# b)
-  | sa ==# 0#  = abs ib
-  | b ==# 0#   = abs ia
-  | otherwise  = S# (gcdIntegerInt# sa a b)
+  | otherwise  = S# (gcdIntegerInt# absSb b absA)
+       where absA  = if a  <# 0# then negateInt# a  else a
+             absSb = if sb <# 0# then negateInt# sb else sb
+gcdInteger ia@(J# _ _) ib@(S# _) = gcdInteger ib ia
+gcdInteger (J# 0# _) (J# 0# _) = error "PrelNum.gcdInteger: gcd 0 0 is undefined"
 gcdInteger (J# sa a) (J# sb b)
   = case gcdInteger# sa a sb b of (# sg, g #) -> J# sg g
 
