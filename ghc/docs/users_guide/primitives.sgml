@@ -4,8 +4,9 @@
   <title>Unboxed types and primitive operations</title>
   <indexterm><primary>PrelGHC module</primary></indexterm>
 
-  <para>This module defines all the types which are primitive in
-  Glasgow Haskell, and the operations provided for them.</para>
+  <para>This chapter defines all the types which are primitive in
+  Glasgow Haskell, and the operations provided for them. You bring
+  them into scope by importing module <literal>PrelGHC</literal>.</para>
 
   <para>Note: while you really can use this stuff to write fast code,
   we generally find it a lot less painful, and more satisfying in the
