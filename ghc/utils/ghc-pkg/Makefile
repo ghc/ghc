@@ -10,16 +10,27 @@ INSTALLING=1
 # ghc-pkg.bin
 
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
-ghc_le_600 = $(shell if (test $(GhcCanonVersion) -le 600); then echo YES; else echo NO; fi)
+ghc_eq_600 = $(shell if (test $(GhcCanonVersion) -eq 600); then echo YES; else echo NO; fi)
+ghc_lt_600 = $(shell if (test $(GhcCanonVersion) -lt 600); then echo YES; else echo NO; fi)
 
 SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY
 
-# <= 6.0.x quotes all arguments when invoking utils (using double quotes), hence
+# <= 6.0.x quotes arguments when invoking utils (using double quotes), hence
 # the need to escape the double quotes. >= 6.2.x does not.
-ifeq "$(ghc_le_600)" "YES"
+# ..but apparently 5.04.x on non-win32 platforms doesn't, so catch this (and
+# assume pre-5.04 behave similarly.)
+ifeq "$(ghc_lt_600)" "YES"
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32YES"
 SRC_HC_OPTS += -D'GHC_PKG_VERSION=\"$(ProjectVersion)\"'
 else
 SRC_HC_OPTS += -D'GHC_PKG_VERSION="$(ProjectVersion)"'
+endif
+else
+ifeq "$(ghc_eq_600)" "YES"
+SRC_HC_OPTS += -D'GHC_PKG_VERSION=\"$(ProjectVersion)\"'
+else
+SRC_HC_OPTS += -D'GHC_PKG_VERSION="$(ProjectVersion)"'
+endif
 endif
 
 ifeq "$(ghc_ge_504)" "NO"
