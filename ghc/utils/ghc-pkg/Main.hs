@@ -22,11 +22,11 @@ import Distribution.Compat.ReadP
 import Distribution.ParseUtils	( showError )
 import Distribution.Package
 import Distribution.Version
-import Compat.Directory 	( getAppUserDataDirectory )
+import Compat.Directory 	( getAppUserDataDirectory, createDirectoryIfMissing )
 import Compat.RawSystem 	( rawSystem )
 import Control.Exception	( evaluate )
 import qualified Control.Exception as Exception
-import System.FilePath		( joinFileName, splitFileName )
+import System.FilePath		( joinFileName )
 
 import Prelude
 
@@ -53,7 +53,7 @@ import System	( getArgs, getProgName,
 import System.IO
 import Data.List ( isPrefixOf, isSuffixOf, intersperse )
 
-#ifdef mingw32_HOST_OS
+#ifdef mingw32_TARGET_OS
 import Foreign
 
 #if __GLASGOW_HASKELL__ >= 504
@@ -261,11 +261,12 @@ getPkgDatabases flags = do
 
   let
 	subdir = targetARCH ++ '-':targetOS ++ '-':version
-	user_conf = appdir `joinFileName` subdir `joinFileName` "package.conf"
+	archdir   = appdir `joinFileName` subdir
+	user_conf = archdir `joinFileName` "package.conf"
   b <- doesFileExist user_conf
   when (not b) $ do
 	putStrLn ("Creating user package database in " ++ user_conf)
-	createParents user_conf
+	createDirectoryIfMissing True archdir
 	writeFile user_conf emptyPackageConfig
 
   let
@@ -895,21 +896,10 @@ dieOrForce force s
   | otherwise = die s
 
 
------------------------------------------------------------------------------
--- Create a hierarchy of directories
-
-createParents :: FilePath -> IO ()
-createParents dir = do
-  let parent = directoryOf dir
-  b <- doesDirectoryExist parent
-  when (not b) $ do
-	createParents parent
-	createDirectory parent
-
 -----------------------------------------
 --	Cut and pasted from ghc/compiler/SysTools
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_TARGET_OS)
 subst a b ls = map (\ x -> if x == a then b else x) ls
 unDosifyPath xs = subst '\\' '/' xs
 
@@ -934,6 +924,3 @@ foreign import stdcall unsafe  "GetModuleFileNameA"
 getExecDir :: String -> IO (Maybe String) 
 getExecDir _ = return Nothing
 #endif
-
-directoryOf :: FilePath -> FilePath
-directoryOf = fst.splitFileName

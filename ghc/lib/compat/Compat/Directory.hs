@@ -17,7 +17,8 @@
 module Compat.Directory (
   	getAppUserDataDirectory,
   	copyFile,
-  	findExecutable
+  	findExecutable,
+  	createDirectoryIfMissing
   ) where
 
 #if __GLASGOW_HASKELL__ < 603
@@ -31,7 +32,7 @@ import System.FilePath
 import System.IO
 import Foreign
 import Foreign.C
-import System.Directory(doesFileExist, getPermissions, setPermissions)
+import System.Directory(doesFileExist, doesDirectoryExist, getPermissions, setPermissions, createDirectory)
 #if defined(__GLASGOW_HASKELL__)
 import GHC.IOBase ( IOException(..) )
 #endif
@@ -109,3 +110,14 @@ findExecutable binary = do
 	b <- doesFileExist path
 	if b then return (Just path)
              else search ds
+
+createDirectoryIfMissing :: Bool     -- ^ Create its parents too?
+		         -> FilePath -- ^ The path to the directory you want to make
+		         -> IO ()
+createDirectoryIfMissing parents file = do
+  b <- doesDirectoryExist file
+  case (b,parents, file) of 
+    (_,     _, "") -> return ()
+    (True,  _,  _) -> return ()
+    (_,  True,  _) -> mapM_ (createDirectoryIfMissing False) (tail (pathParents file))
+    (_, False,  _) -> createDirectory file
