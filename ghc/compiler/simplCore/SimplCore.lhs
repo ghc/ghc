@@ -425,13 +425,10 @@ simplifyPgm dflags rule_base
 		      ++ " out of " ++ show max_iterations)
 		     (pprSimplCount counts') ;
 
-	   if dopt Opt_D_dump_simpl_iterations dflags then
-		endPass dflags 
-                        ("Simplifier iteration " ++ show iteration_no ++ " result")
-			Opt_D_verbose_core2core
-			binds'
-	   else
-		return [] ;
+	   endPass dflags 
+                    ("Simplifier iteration " ++ show iteration_no ++ " result")
+		    Opt_D_dump_simpl_iterations
+		    binds' ;
 
 		-- Stop if we've run out of iterations
 	   if iteration_no == max_iterations then
