@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/29 18:59:23 $
+ * $Revision: 1.15 $
+ * $Date: 1999/12/07 11:55:25 $
  * ------------------------------------------------------------------------*/
 
 
@@ -118,7 +118,7 @@
 
 #define MINIMUMHEAP        Pick(7500,   19000,      19000)
 #define MAXIMUMHEAP        Pick(32765,  0,          0)
-#define DEFAULTHEAP        Pick(28000,  50000,      300000)
+#define DEFAULTHEAP        Pick(28000,  50000,      350000)
 
 #define NUM_SCRIPTS        Pick(64,     100,        100)
 #define NUM_MODULE         NUM_SCRIPTS
