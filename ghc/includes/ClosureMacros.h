@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.30 2000/12/11 12:36:59 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.31 2001/01/26 14:17:31 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,11 +14,6 @@
    case, not because of another random MS pathology, but because the static
    program may reside in a DLL
 */
-
-#undef TEXT_BEFORE_HEAP
-#ifndef mingw32_TARGET_OS
-#define TEXT_BEFORE_HEAP 1
-#endif
 
 /* -----------------------------------------------------------------------------
    Info tables are slammed up against the entry code, and the label
