@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.57 2003/03/25 17:58:48 sof Exp $
+ * $Id: Printer.c,v 1.58 2003/04/01 17:09:40 sof Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -115,154 +115,6 @@ printClosure( StgClosure *obj )
     switch ( info->type ) {
     case INVALID_OBJECT:
             barf("Invalid object");
-    case BCO:
-            disassemble( (StgBCO*)obj );
-            break;
-
-    case MUT_VAR:
-        {
-	  StgMutVar* mv = (StgMutVar*)obj;
-	  fprintf(stderr,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
-          break;
-        }
-
-    case AP_STACK:
-        {
-	    StgAP_STACK* ap = stgCast(StgAP_STACK*,obj);
-            StgWord i;
-            fprintf(stderr,"AP_STACK("); printPtr((StgPtr)ap->fun);
-            for (i = 0; i < ap->size; ++i) {
-                fprintf(stderr,", ");
-                printPtr((P_)ap->payload[i]);
-            }
-            fprintf(stderr,")\n");
-            break;
-        }
-
-    case AP:
-        {
-	    StgPAP* ap = stgCast(StgPAP*,obj);
-            StgWord i;
-            fprintf(stderr,"AP("); printPtr((StgPtr)ap->fun);
-            for (i = 0; i < ap->n_args; ++i) {
-                fprintf(stderr,", ");
-                printPtr((P_)ap->payload[i]);
-            }
-            fprintf(stderr,")\n");
-            break;
-        }
-
-    case PAP:
-        {
-	    StgPAP* pap = stgCast(StgPAP*,obj);
-            StgWord i;
-            fprintf(stderr,"PAP/%d(",pap->arity); 
-	    printPtr((StgPtr)pap->fun);
-            for (i = 0; i < pap->n_args; ++i) {
-                fprintf(stderr,", ");
-                printPtr((StgPtr)pap->payload[i]);
-            }
-            fprintf(stderr,")\n");
-            break;
-        }
-
-    case FOREIGN:
-            fprintf(stderr,"FOREIGN("); 
-            printPtr((StgPtr)( ((StgForeignObj*)obj)->data ));
-            fprintf(stderr,")\n"); 
-            break;
-
-    case IND:
-            fprintf(stderr,"IND("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
-            break;
-
-    case IND_PERM:
-            fprintf(stderr,"IND("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
-            break;
-
-    case IND_STATIC:
-            fprintf(stderr,"IND_STATIC("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
-            break;
-
-    case IND_OLDGEN:
-            fprintf(stderr,"IND_OLDGEN("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
-            break;
-
-    case CAF_BLACKHOLE:
-            fprintf(stderr,"CAF_BH("); 
-            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stderr,")\n"); 
-            break;
-
-    case SE_BLACKHOLE:
-            fprintf(stderr,"SE_BH\n"); 
-            break;
-
-    case SE_CAF_BLACKHOLE:
-            fprintf(stderr,"SE_CAF_BH\n"); 
-            break;
-
-    case BLACKHOLE:
-            fprintf(stderr,"BH\n"); 
-            break;
-
-    case BLACKHOLE_BQ:
-            fprintf(stderr,"BQ("); 
-            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stderr,")\n"); 
-            break;
-
-    case TSO:
-      fprintf(stderr,"TSO("); 
-      fprintf(stderr,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
-      fprintf(stderr,")\n"); 
-      break;
-
-#if defined(PAR)
-    case BLOCKED_FETCH:
-      fprintf(stderr,"BLOCKED_FETCH("); 
-      printGA(&(stgCast(StgBlockedFetch*,obj)->ga));
-      printPtr((StgPtr)(stgCast(StgBlockedFetch*,obj)->node));
-      fprintf(stderr,")\n"); 
-      break;
-
-    case FETCH_ME:
-      fprintf(stderr,"FETCH_ME("); 
-      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stderr,")\n"); 
-      break;
-
-#ifdef DIST      
-    case REMOTE_REF:
-      fprintf(stderr,"REMOTE_REF("); 
-      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stderr,")\n"); 
-      break;
-#endif
-  
-    case FETCH_ME_BQ:
-      fprintf(stderr,"FETCH_ME_BQ("); 
-      // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      printPtr((StgPtr)stgCast(StgFetchMeBlockingQueue*,obj)->blocking_queue);
-      fprintf(stderr,")\n"); 
-      break;
-#endif
-#if defined(GRAN) || defined(PAR)
-    case RBH:
-      fprintf(stderr,"RBH("); 
-      printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
-      fprintf(stderr,")\n"); 
-      break;
-
-#endif
 
     case CONSTR:
     case CONSTR_1_0: case CONSTR_0_1:
@@ -295,23 +147,6 @@ printClosure( StgClosure *obj )
             break;
         }
 
-#ifdef XMLAMBDA
-/* rows are mutarrays in xmlambda, maybe we should make a new type: ROW */
-    case MUT_ARR_PTRS_FROZEN:
-          {
-            StgWord i;
-            StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,obj);
-
-            fprintf(stderr,"Row<%i>(",p->ptrs);
-            for (i = 0; i < p->ptrs; ++i) {
-                if (i > 0) fprintf(stderr,", ");
-                printPtr((StgPtr)(p->payload[i]));
-            }
-            fprintf(stderr,")\n");
-            break;
-          }
-#endif  
-
     case FUN:
     case FUN_1_0: case FUN_0_1: 
     case FUN_1_1: case FUN_0_2: case FUN_2_0:
@@ -341,26 +176,89 @@ printClosure( StgClosure *obj )
 	fprintf(stderr, ", %p)\n", ((StgSelector *)obj)->selectee);
 	break;
 
-    case MUT_ARR_PTRS:
-	fprintf(stderr,"MUT_ARR_PTRS(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
-	break;
-    case MUT_ARR_PTRS_FROZEN:
-	fprintf(stderr,"MUT_ARR_PTRS_FROZEN(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
-	break;
+    case BCO:
+            disassemble( (StgBCO*)obj );
+            break;
 
-    case ARR_WORDS:
+    case AP:
         {
+	    StgPAP* ap = stgCast(StgPAP*,obj);
             StgWord i;
-            fprintf(stderr,"ARR_WORDS(\"");
-            /* ToDo: we can't safely assume that this is a string! 
-            for (i = 0; arrWordsGetChar(obj,i); ++i) {
-                putchar(arrWordsGetChar(obj,i));
-		} */
-	    for (i=0; i<((StgArrWords *)obj)->words; i++)
-	      fprintf(stderr, "%u", ((StgArrWords *)obj)->payload[i]);
-            fprintf(stderr,"\")\n");
+            fprintf(stderr,"AP("); printPtr((StgPtr)ap->fun);
+            for (i = 0; i < ap->n_args; ++i) {
+                fprintf(stderr,", ");
+                printPtr((P_)ap->payload[i]);
+            }
+            fprintf(stderr,")\n");
             break;
         }
+
+    case PAP:
+        {
+	    StgPAP* pap = stgCast(StgPAP*,obj);
+            StgWord i;
+            fprintf(stderr,"PAP/%d(",pap->arity); 
+	    printPtr((StgPtr)pap->fun);
+            for (i = 0; i < pap->n_args; ++i) {
+                fprintf(stderr,", ");
+                printPtr((StgPtr)pap->payload[i]);
+            }
+            fprintf(stderr,")\n");
+            break;
+        }
+
+    case AP_STACK:
+        {
+	    StgAP_STACK* ap = stgCast(StgAP_STACK*,obj);
+            StgWord i;
+            fprintf(stderr,"AP_STACK("); printPtr((StgPtr)ap->fun);
+            for (i = 0; i < ap->size; ++i) {
+                fprintf(stderr,", ");
+                printPtr((P_)ap->payload[i]);
+            }
+            fprintf(stderr,")\n");
+            break;
+        }
+
+    case IND:
+            fprintf(stderr,"IND("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
+            break;
+
+    case IND_OLDGEN:
+            fprintf(stderr,"IND_OLDGEN("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
+            break;
+
+    case IND_PERM:
+            fprintf(stderr,"IND("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
+            break;
+
+    case IND_OLDGEN_PERM:
+            fprintf(stderr,"IND_OLDGEN_PERM("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
+            break;
+
+    case IND_STATIC:
+            fprintf(stderr,"IND_STATIC("); 
+            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            fprintf(stderr,")\n"); 
+            break;
+
+    /* Cannot happen -- use default case.
+    case RET_BCO:
+    case RET_SMALL:
+    case RET_VEC_SMALL:
+    case RET_BIG:
+    case RET_VEC_BIG:
+    case RET_DYN:
+    case RET_FUN:
+    */
 
     case UPDATE_FRAME:
         {
@@ -392,6 +290,150 @@ printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
         }
+
+    case CAF_BLACKHOLE:
+            fprintf(stderr,"CAF_BH("); 
+            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
+            fprintf(stderr,")\n"); 
+            break;
+
+    case BLACKHOLE:
+            fprintf(stderr,"BH\n"); 
+            break;
+
+    case BLACKHOLE_BQ:
+            fprintf(stderr,"BQ("); 
+            printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
+            fprintf(stderr,")\n"); 
+            break;
+
+    case SE_BLACKHOLE:
+            fprintf(stderr,"SE_BH\n"); 
+            break;
+
+    case SE_CAF_BLACKHOLE:
+            fprintf(stderr,"SE_CAF_BH\n"); 
+            break;
+
+    case ARR_WORDS:
+        {
+            StgWord i;
+            fprintf(stderr,"ARR_WORDS(\"");
+            /* ToDo: we can't safely assume that this is a string! 
+            for (i = 0; arrWordsGetChar(obj,i); ++i) {
+                putchar(arrWordsGetChar(obj,i));
+		} */
+	    for (i=0; i<((StgArrWords *)obj)->words; i++)
+	      fprintf(stderr, "%u", ((StgArrWords *)obj)->payload[i]);
+            fprintf(stderr,"\")\n");
+            break;
+        }
+
+    case MUT_ARR_PTRS:
+	fprintf(stderr,"MUT_ARR_PTRS(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
+	break;
+
+    case MUT_ARR_PTRS_FROZEN:
+#if !defined(XMLAMBDA)
+	fprintf(stderr,"MUT_ARR_PTRS_FROZEN(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
+	break;
+#else
+          {
+            /* rows are mutarrays in xmlambda, maybe we should make a new type: ROW */
+            StgWord i;
+            StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,obj);
+
+            fprintf(stderr,"Row<%i>(",p->ptrs);
+            for (i = 0; i < p->ptrs; ++i) {
+                if (i > 0) fprintf(stderr,", ");
+                printPtr((StgPtr)(p->payload[i]));
+            }
+            fprintf(stderr,")\n");
+            break;
+          }
+#endif  
+
+    case MUT_VAR:
+        {
+	  StgMutVar* mv = (StgMutVar*)obj;
+	  fprintf(stderr,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
+          break;
+        }
+
+    case WEAK:
+            fprintf(stderr,"WEAK("); 
+	    fprintf(stderr," key=%p value=%p finalizer=%p", 
+		    (StgPtr)(((StgWeak*)obj)->key),
+		    (StgPtr)(((StgWeak*)obj)->value),
+		    (StgPtr)(((StgWeak*)obj)->finalizer));
+            fprintf(stderr,")\n"); 
+	    /* ToDo: chase 'link' ? */
+            break;
+
+    case FOREIGN:
+            fprintf(stderr,"FOREIGN("); 
+            printPtr((StgPtr)( ((StgForeignObj*)obj)->data ));
+            fprintf(stderr,")\n"); 
+            break;
+
+    case STABLE_NAME:
+            fprintf(stderr,"STABLE_NAME(%d)\n", ((StgStableName*)obj)->sn); 
+            break;
+
+    case TSO:
+      fprintf(stderr,"TSO("); 
+      fprintf(stderr,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
+      fprintf(stderr,")\n"); 
+      break;
+
+#if defined(PAR)
+    case BLOCKED_FETCH:
+      fprintf(stderr,"BLOCKED_FETCH("); 
+      printGA(&(stgCast(StgBlockedFetch*,obj)->ga));
+      printPtr((StgPtr)(stgCast(StgBlockedFetch*,obj)->node));
+      fprintf(stderr,")\n"); 
+      break;
+
+    case FETCH_ME:
+      fprintf(stderr,"FETCH_ME("); 
+      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
+      fprintf(stderr,")\n"); 
+      break;
+
+    case FETCH_ME_BQ:
+      fprintf(stderr,"FETCH_ME_BQ("); 
+      // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
+      printPtr((StgPtr)stgCast(StgFetchMeBlockingQueue*,obj)->blocking_queue);
+      fprintf(stderr,")\n"); 
+      break;
+#endif
+
+#if defined(GRAN) || defined(PAR)
+    case RBH:
+      fprintf(stderr,"RBH("); 
+      printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
+      fprintf(stderr,")\n"); 
+      break;
+
+#endif
+
+#if 0
+      /* Symptomatic of a problem elsewhere, have it fall-through & fail */
+    case EVACUATED:
+      fprintf(stderr,"EVACUATED("); 
+      printClosure((StgEvacuated*)obj->evacuee);
+      fprintf(stderr,")\n"); 
+      break;
+#endif
+
+#if defined(PAR) && defined(DIST)
+    case REMOTE_REF:
+      fprintf(stderr,"REMOTE_REF("); 
+      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
+      fprintf(stderr,")\n"); 
+      break;
+#endif
+
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
             fprintf(stderr, "*** printClosure: unknown type %d ****\n",
@@ -520,13 +562,13 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	    p += RET_DYN_SIZE;
 
 	    for (size = GET_NONPTRS(dyn); size > 0; size--) {
-		fprintf(stderr,"   stk[%ld] (%p) = ", spBottom-p, p);
-		fprintf(stderr,"Word# %ld\n", *p);
+		fprintf(stderr,"   stk[%ld] (%p) = ", (long)(spBottom-p), p);
+		fprintf(stderr,"Word# %ld\n", (long)*p);
 		p++;
 	    }
 	
 	    for (size = GET_PTRS(dyn); size > 0; size--) {
-		fprintf(stderr,"   stk[%ld] (%p) = ", spBottom-p, p);
+		fprintf(stderr,"   stk[%ld] (%p) = ", (long)(spBottom-p), p);
 		printPtr(p);
 		p++;
 	    }
@@ -603,6 +645,7 @@ static char *closure_type_names[] = {
     "BCO",
     "AP_UPD",
     "PAP",
+    "AP_STACK",
     "IND",
     "IND_OLDGEN",
     "IND_PERM",
