@@ -55,7 +55,7 @@ Other commonly-used options are:
 		     (add -auto-all for automagic cost-centres on all
 		      top-level functions)
 
-    -H14m	    Increase compiler's heap size (might make the
+    -H14m	    Increase compiler's heap size (might make compilation
 		    faster, especially on large source files).
 
     -M              Output Makefile rules recording the
