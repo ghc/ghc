@@ -1470,7 +1470,9 @@ Now the Haskell compiler, C compiler, and assembler
 	local ($hsc_out_s_stub);
 	local ($hsc_out_o_stub);
 	($ofile_s_stub_target = $ofile_c_stub_target) =~ s/\.(.*)$/\.s/;
-	($ofile_o_stub_target = $ofile_c_stub_target) =~ s/\.(.*)$/\.o/;
+	($ofile_o_stub_target = $ofile_c_stub_target) =~ s/\.(.*)$//;
+
+        $ofile_o_stub_target = &osuf_ify($ofile_o_stub_target, "o");
 	if ($do_cc) {
 	  &runGcc    (0, $ofile_c_stub_target, $ofile_s_stub_target);
           &runAs     ($ofile_o_stub_target, $ofile_s_stub_target);
