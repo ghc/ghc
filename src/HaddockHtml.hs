@@ -400,6 +400,8 @@ ifaceToHtml _ iface
 
 	-- omit the synopsis if there are no documentation annotations at all
 	synopsis
+	  | no_doc_at_all = Html.emptyTable
+	  | otherwise
 	  = (tda [theclass "section1"] << toHtml "Synopsis") </>
 	    s15 </>
             (tda [theclass "body"] << vanillaTable <<
@@ -410,15 +412,12 @@ ifaceToHtml _ iface
 	-- if the documentation doesn't begin with a section header, then
 	-- add one ("Documentation").
 	maybe_doc_hdr
-	     | no_doc_at_all  = Html.emptyTable
-	     | otherwise = 
-		case exports of
+	    = case exports of
 		   [] -> Html.emptyTable
 		   ExportGroup _ _ _ : _ -> Html.emptyTable
 		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 
-	bdy  | no_doc_at_all = []
-	     | otherwise     = map (processExport False) exports
+	bdy  = map (processExport False) exports
 
 ppModuleContents :: [ExportItem] -> HtmlTable
 ppModuleContents exports
