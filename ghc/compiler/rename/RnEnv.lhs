@@ -22,7 +22,7 @@ import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName, mkUnboundName,
-			  mkIPName, isSystemName,
+			  mkIPName, isSystemName, isWiredInName,
 			  nameOccName, setNameModule, nameModule,
 			  pprOccName, isLocallyDefined, nameUnique, nameOccName,
                           occNameUserString,
@@ -92,9 +92,15 @@ newTopBinder mod occ mk_prov
 	--
 	-- It also means that if there are two defns for the same thing
 	-- in a module, then each gets a separate SrcLoc
+	--
+	-- There's a complication for wired-in names.  We don't want to
+	-- forget that they are wired in even when compiling that module
+	-- (else we spit out redundant defns into the interface file)
+	-- So for them we just set the provenance
 
 	Just name -> let 
-			new_name  = mkGlobalName (nameUnique name) mod occ (mk_prov new_name)
+			new_name  | isWiredInName name = setNameProvenance name (mk_prov name)
+				  | otherwise	       = mkGlobalName (nameUnique name) mod occ (mk_prov name)
 			new_cache = addToFM cache key new_name
 		     in
 		     setNameSupplyRn (us, inst_ns, new_cache, ipcache)	`thenRn_`
