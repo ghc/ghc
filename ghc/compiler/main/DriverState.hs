@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.88 2002/12/18 16:29:28 simonmar Exp $
+-- $Id: DriverState.hs,v 1.89 2002/12/19 18:43:53 wolfgang Exp $
 --
 -- Settings for the driver
 --
@@ -598,7 +598,7 @@ getPackageExtraCcOpts pkgs = do
 
 #ifdef darwin_TARGET_OS
 getPackageFrameworkPath  :: [PackageName] -> IO [String]
-getPackageFrameworkPath = do
+getPackageFrameworkPath pkgs = do
   ps <- getExplicitPackagesAnd pkgs
   return (nub (filter notNull (concatMap framework_dirs ps)))
 
