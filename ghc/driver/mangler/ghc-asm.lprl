@@ -851,8 +851,8 @@ sub mangle_asm {
 		    $e =~ s/^\tj\t\$31\n//;
  		} elsif ($TargetPlatform =~ /^powerpc-apple-.*/) {
   		    $e =~ s/^\taddi r1,r1,\d+\n//;
-  		    $e =~ s/^\tcal r1,\d+\(r1\)\n//;
-  		    $e =~ s/^\tlw?z? r\d+,\d+\(r1\)\n//; 
+  		    $e =~ s/^\tlwz r\d+,\d+\(r1\)\n//; 
+  		    $e =~ s/^\tlmw r\d+,-\d+\(r1\)\n//;
  		    $e =~ s/^\tmtlr r0\n//;
   		    $e =~ s/^\tblr\n//;
   		    $e =~ s/^\tb restFP ;.*\n//;
