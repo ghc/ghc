@@ -40,6 +40,8 @@ import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
 import BasicTypes	( GhciMode(..) )
 import Util		( unJust )
+import DriverUtil	( BarfKind(..) )
+import Exception	( throwDyn )
 \end{code}
 
 
@@ -509,8 +511,10 @@ downsweep rootNm
            = do found <- findModule nm
 		case found of
 		   Just (mod, location) -> summarise preprocess mod location
-		   Nothing -> panic ("CompManager: can't find module `" ++ 
-					showSDoc (ppr nm) ++ "'")
+		   Nothing -> throwDyn (OtherError 
+                                   ("ghc --make: no signs of life for module `" 
+                                     ++ showSDoc (ppr nm) ++ "'"))
+                                 
 
         -- loop invariant: homeSummaries doesn't contain package modules
         loop :: [ModSummary] -> IO [ModSummary]
