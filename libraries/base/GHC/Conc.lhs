@@ -43,6 +43,17 @@ module GHC.Conc
 	, isEmptyMVar	-- :: MVar a -> IO Bool
 	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 
+   	-- TVars
+	, STM           -- abstract
+	, atomically    -- :: STM a -> IO a
+	, retry         -- :: STM a
+	, orElse        -- :: STM a -> STM a -> STM a
+        , catchSTM      -- :: STM a -> (Exception -> STM a) -> STM a
+	, TVar          -- abstract
+	, newTVar 	-- :: a -> STM (TVar a)
+	, readTVar	-- :: TVar a -> STM a
+	, writeTVar	-- :: a -> TVar a -> STM ()
+
 #ifdef mingw32_TARGET_OS
 	, asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 	, asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
@@ -177,6 +188,94 @@ pseq  x y = x `seq` lazy y
 {-# INLINE par  #-}
 par :: a -> b -> b
 par  x y = case (par# x) of { _ -> lazy y }
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[stm]{Transactional heap operations}
+%*									*
+%************************************************************************
+
+TVars are shared memory locations which support atomic memory
+transactions.
+
+\begin{code}
+newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #))
+
+unSTM :: STM a -> (State# RealWorld -> (# State# RealWorld, a #))
+unSTM (STM a) = a
+
+instance  Functor STM where
+   fmap f x = x >>= (return . f)
+
+instance  Monad STM  where
+    {-# INLINE return #-}
+    {-# INLINE (>>)   #-}
+    {-# INLINE (>>=)  #-}
+    m >> k      =  m >>= \_ -> k
+    return x	= returnSTM x
+    m >>= k     = bindSTM m k
+
+bindSTM :: STM a -> (a -> STM b) -> STM b
+bindSTM (STM m) k = STM ( \s ->
+  case m s of 
+    (# new_s, a #) -> unSTM (k a) new_s
+  )
+
+thenSTM :: STM a -> STM b -> STM b
+thenSTM (STM m) k = STM ( \s ->
+  case m s of 
+    (# new_s, a #) -> unSTM k new_s
+  )
+
+returnSTM :: a -> STM a
+returnSTM x = STM (\s -> (# s, x #))
+
+-- |Perform a series of STM actions atomically.
+atomically :: STM a -> IO a
+atomically (STM m) = IO (\s -> (atomically# m) s )
+
+-- |Retry execution of the current memory transaction because it has seen
+-- values in TVars which mean that it should not continue (e.g. the TVars
+-- represent a shared buffer that is now empty).  The implementation may
+-- block the thread until one of the TVars that it has read from has been
+-- udpated.
+retry :: STM a
+retry = STM $ \s# -> retry# s#
+
+-- |Compose two alternative STM actions.  If the first action completes without
+-- retrying then it forms the result of the orElse.  Otherwise, if the first
+-- action retries, then the second action is tried in its place.  If both actions
+-- retry then the orElse as a whole retries.
+orElse :: STM a -> STM a -> STM a
+orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
+
+-- |Exception handling within STM actions.
+catchSTM :: STM a -> (Exception -> STM a) -> STM a
+catchSTM (STM m) k = STM $ \s -> catchSTM# m (\ex -> unSTM (k ex)) s
+
+data TVar a = TVar (TVar# RealWorld a)
+
+instance Eq (TVar a) where
+	(TVar tvar1#) == (TVar tvar2#) = sameTVar# tvar1# tvar2#
+
+-- |Create a new TVar holding a value supplied
+newTVar :: a -> STM (TVar a)
+newTVar val = STM $ \s1# ->
+    case newTVar# val s1# of
+	 (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
+
+-- |Return the current value stored in a TVar
+readTVar :: TVar a -> STM a
+readTVar (TVar tvar#) = STM $ \s# -> readTVar# tvar# s#
+
+-- |Write the supplied value into a TVar
+writeTVar :: TVar a -> a -> STM ()
+writeTVar (TVar tvar#) val = STM $ \s1# ->
+    case writeTVar# tvar# val s1# of
+    	 s2# -> (# s2#, () #)
+  
 \end{code}
 
 %************************************************************************

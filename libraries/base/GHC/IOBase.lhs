@@ -568,6 +568,10 @@ data Exception
 	-- ^The current thread was executing a call to
 	-- 'Control.Concurrent.MVar.takeMVar' that could never return,
 	-- because there are no other references to this 'MVar'.
+  | BlockedIndefinitely
+	-- ^The current thread was waiting to retry an atomic memory transaction
+	-- that could never become possible to complete because there are no other
+	-- threads referring to any of teh TVars involved.
   | Deadlock
 	-- ^There are no runnable threads, so the program is
 	-- deadlocked.  The 'Deadlock' exception is
@@ -705,6 +709,7 @@ instance Show Exception where
   showsPrec _ (DynException _err)        = showString "unknown exception"
   showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
+  showsPrec _ (BlockedIndefinitely)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
   showsPrec _ (Deadlock)                 = showString "<<deadlock>>"
 

@@ -226,6 +226,7 @@ real_handler ex =
   case ex of
 	-- ignore thread GC and killThread exceptions:
 	BlockedOnDeadMVar            -> return ()
+	BlockedIndefinitely          -> return ()
 	AsyncException ThreadKilled  -> return ()
 
 	-- report all others:
