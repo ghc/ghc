@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.121 2003/07/30 09:21:12 wolfgang Exp $
+dnl $Id: aclocal.m4,v 1.122 2003/08/13 12:34:04 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -262,6 +262,41 @@ dnl Darn, I forgot to make Haddock print out its version number when
 dnl invoked with -v.  We could try generating some HTML and grepping
 dnl through that to find the version number, but I think we'll make
 dnl do without it for now.
+])
+
+dnl
+dnl Check for Alex and version.  If we're building GHC, then we need
+dnl at least Alex version 2.0.  If there's no installed Alex, we look
+dnl for a alex source tree and point the build system at that instead.
+dnl
+AC_DEFUN(FPTOOLS_ALEX,
+[
+if test -d $srcdir/alex; then
+   SrcTreeAlexCmd=$hardtop/alex/src/alex-inplace
+fi
+if test x"$UseSrcTreeAlex" = xYES; then
+  AlexCmd=$SrcTreeAlexCmd
+else
+  AC_PATH_PROG(AlexCmd,alex,$SrcTreeAlexCmd)
+fi
+AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
+changequote(, )dnl
+[if test x"$AlexCmd" = x"$SrcTreeAlexCmd"; then
+   fptools_cv_alex_version=`grep '^ProjectVersion[ 	]*=' $srcdir/alex/mk/version.mk | sed 's/.*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/g'`;
+elif test x"$AlexCmd" != x; then
+   fptools_cv_alex_version="`$AlexCmd -v |
+			  grep 'Alex Version' | sed -e 's/Alex Version \([^ ]*\).*/\1/g'`" ;
+else
+   fptools_cv_alex_version="";
+fi;
+changequote([, ])dnl
+])
+if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Lexer.hs; then
+  FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_alex_version],-lt,[2.0],
+  [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])dnl
+fi
+AlexVersion=$fptools_cv_alex_version;
+AC_SUBST(AlexVersion)
 ])
 
 dnl

@@ -731,7 +731,7 @@ FPTOOLS_GREENCARD(3.00)
 
 AC_ARG_ENABLE(src-tree-happy,
 [  --enable-src-tree-happy
-        Build and use source tree (fptools/happy) version of happy.
+        Build and use source tree (fptools/happy) version of Happy.
 ],
 [UseSrcTreeHappy=YES],
 [UseSrcTreeHappy=NO]
@@ -744,13 +744,26 @@ fi;
 
 AC_ARG_ENABLE(src-tree-haddock,
 [  --enable-src-tree-haddock
-        Build and use source tree (fptools/haddock) version of haddock.
+        Build and use source tree (fptools/haddock) version of Haddock.
 ],
 [UseSrcTreeHaddock=YES],
 [UseSrcTreeHaddock=NO]
 )
 dnl ** check for installed haddock
 FPTOOLS_HADDOCK
+
+AC_ARG_ENABLE(src-tree-alex,
+[  --enable-src-tree-alex
+        Build and use source tree (fptools/alex) version of Alex.
+],
+[UseSrcTreeAlex=YES],
+[UseSrcTreeAlex=NO]
+)
+dnl ** check for installed alex binary + version
+dnl    (don't do it if we're booting from .hc files though.)
+if test "$BootingFromHc" = "NO"; then
+FPTOOLS_ALEX
+fi;
 
 dnl --------------------------------------------------
 dnl ### program checking section ends here ###
