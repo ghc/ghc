@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.23 2000/12/19 14:30:17 simonmar Exp $
+ * $Id: Stats.c,v 1.24 2001/03/14 15:01:04 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -174,14 +174,14 @@ getTimes(void)
 double
 mut_user_time_during_GC(void)
 {
-    return ((double)GC_start_time - (double)GC_tot_time);
+  return TICK_TO_DBL(GC_start_time - GC_tot_time);
 }
 
 double
 mut_user_time(void)
 {
     getTimes();
-    return ((double)CurrentUserTime - (double)GC_tot_time);
+    return TICK_TO_DBL(CurrentUserTime - GC_tot_time);
 }
 
 static nat
