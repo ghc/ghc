@@ -681,9 +681,11 @@ reportUnusedNames gbl_env used_names
     	-- from which we have sucked only instance decls
    
     -- unused_imp_mods are the directly-imported modules 
-    -- that are not mentioned in minimal_imports
+    -- that are not mentioned in minimal_imports1
+    -- [Note: not 'minimal_imports', because that includes direcly-imported
+    --	      modules even if we use nothing from them; see notes above]
     unused_imp_mods = [m | m <- direct_import_mods,
-    		       not (maybeToBool (lookupFM minimal_imports m)),
+    		       not (maybeToBool (lookupFM minimal_imports1 m)),
     		       m /= pRELUDE_Name]
     
     module_unused :: Module -> Bool
@@ -708,9 +710,11 @@ printMinimalImports imps
     ppr_mod_ie (mod_name, ies) 
 	| mod_name == pRELUDE_Name 
 	= empty
+	| null ies	-- Nothing except instances comes from here
+	= ptext SLIT("import") <+> ppr mod_name <> ptext SLIT("()    -- Instances only")
 	| otherwise
 	= ptext SLIT("import") <+> ppr mod_name <> 
-			    parens (fsep (punctuate comma (map ppr ies)))
+		    parens (fsep (punctuate comma (map ppr ies)))
 
     to_ies (mod, avail_env) = mappM to_ie (availEnvElts avail_env)	`thenM` \ ies ->
 			      returnM (mod, ies)
