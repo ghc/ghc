@@ -424,7 +424,7 @@ uppCostCentre print_as_string cc
 	do_id id = getOccString id
 
     ---------------
-    do_dupd sty ADupdCC str = if (friendly_sty sty) then str ++ "/DUPD" else str
+    do_dupd sty ADupdCC str = if (debugStyle sty) then str ++ "/DUPD" else str
     do_dupd _   _       str = str
 \end{code}
 
