@@ -278,9 +278,7 @@ fdToHandle :: Ptr FD -> IOMode -> IO Handle
 fdToHandle pfd mode = do
   fd <- peek pfd
   openFd fd (Just Stream) 
-#if __GLASGOW_HASKELL__ >= 603
      False{-not a socket-}
-#endif
      ("fd:" ++ show fd) mode True{-binary-} False{-no truncate-}
 
 -- ----------------------------------------------------------------------------
