@@ -170,33 +170,6 @@ MOSTLY_CLEAN_FILES += \
  *.toc *.lot *.lof *.blg *.info *.itxi *.itex *.ihtml *.cb
 
 #------------------------------------------------------------------
-# Documentation setup.
-#
-# Documentation is not normally produced via the default target, but
-# selectively through a set of standard targets (e.g, dvi, html, etc., see
-# target.mk). Here we define the variables (and their default settings),
-# that control the operation of these standard targets.
-#
-# Documentation variables:
-#
-#  DOC_SRCS  = list of documents you want to generate various
-#              forms of documentation from.
-#  DOC_DVI   = list of DVI files to generate.
-#  DOC_HTML  = list of HTML files to generate
-#  DOC_TEXI  = list of TexInfo files to generate
-#  DOC_INFO  = list of Emacs Info files to generate
-#  DOC_TEXT  = list of simple text files to generate
-# 
-DOC_SRCS=$(wildcard    *.tex *.lit)
-DOC_DVI =$(addsuffix  .dvi,$(basename $(DOC_SRCS)))
-DOC_PS  =$(addsuffix   .ps,$(basename $(DOC_SRCS)))
-DOC_TEXI=$(addsuffix .texi,$(basename $(DOC_SRCS)))
-DOC_INFO=$(addsuffix .info,$(basename $(DOC_SRCS)))
-DOC_HTML=$(addsuffix .html,$(basename $(DOC_SRCS)))
-DOC_TEXT=$(addsuffix .txt,$(basename $(DOC_SRCS)))
-CLEAN_FILES += $(DOC_TEXT) $(DOC_HTML) $(DOC_TEXI) $(DOC_PS) $(DOC_DVI)
-
-#------------------------------------------------------------------
 #
 # Distribution setup
 # 

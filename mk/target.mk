@@ -806,76 +806,42 @@ endif
 show:
 	@echo '$(VALUE)=$($(VALUE))'
 
-#------------------------------------------------------------
-# 			Documentation
-
-.PHONY: dvi ps html info txt
-
-info:: $(DOC_INFO)
-dvi:: $(DOC_DVI)
-ps::  $(DOC_PS)
-html:: $(DOC_HTML)
-texi:: $(DOC_TEXI)
-txt:: $(DOC_TEXT)
-
-#
-# Building literate root documents requires extra treatment,
-# as the root files need to be processed different from other
-# literate files (`compile' them into .itex with the -S (standalone)
-# option) and then link together a master TeX document with
-# a -S option.
-#
-$(filter %.tex,$(patsubst %.lit,%.tex,$(DOC_SRCS))) :
-	@$(RM) $@
-	$(LIT2LATEX) -S -c $(LIT2LATEX_OPTS) -o $(patsubst %.tex,%.itex,$@) $(addsuffix .lit,$(basename $@))
-	$(LIT2LATEX) -S $(LIT2LATEX_OPTS) -o $@ $(addsuffix .itex,$(basename $@))
-	@chmod 444 $@
-#
-# Ditto for texi and html
-#
-$(filter %.texi,$(patsubst %.lit,%.texi,$(DOC_SRCS))) :
-	@$(RM) $@
-	$(LIT2TEXI) -S -c $(LIT2TEXI_OPTS) -o $(patsubst %.texi,%.itxi,$@) $(addsuffix .lit,$(basename $@))
-	$(LIT2TEXI) -S $(LIT2TEXI_OPTS) -o $@ $(addsuffix .itxi,$(basename $@))
-	@chmod 444 $@
-#
-# Rather than using lit2html, we opt for the lit-texi-html route,
-# and use texi2html as our HTML backend.
-# (Note: we need to change mkdependlit to get this really off the ground)
-#
-# If the generated html representation is split up into a myriad of files,
-# put the files in a subdirectory html/, if a monolith is created, park
-# the generated file in the same dir as the .lit file.
-#
-$(filter %.html,$(patsubst %.lit,%.html,$(DOC_SRCS))) : $(filter %.lit,$(DOC_SRCS))
-	$(RM) $@ $(patsubst %.html,%.texi,$@) $(patsubst %.html,%.itxi,$@)
-ifneq "$(filter -monolithic,$(TEXI2HTML_OPTS))" ""
-	$(LIT2TEXI) -S -c $(LIT2TEXI_OPTS) -o $(patsubst %.html,%.itxi,$@) $(addsuffix .lit,$(basename $@))
-	$(LIT2TEXI) -S $(LIT2TEXI_OPTS) -o $(patsubst %.html,%.texi,$@) $(addsuffix .itxi,$(basename $@))
-	$(TEXI2HTML) $(TEXI2HTML_OPTS) $(patsubst %.html,%.texi,$@)
-	cp $(TEXI2HTML_PREFIX)invisible.xbm .
-else
-	$(RM) html/$(basename $@)*
-	$(MKDIRHIER) html
-	$(LIT2TEXI) -S -c $(LIT2TEXI_OPTS) -o $(patsubst %.html,%.itxi,$@) $(addsuffix .lit,$(basename $@))
-	$(LIT2TEXI) -S $(LIT2TEXI_OPTS) -o html/$(patsubst %.html,%.texi,$@) $(addsuffix .itxi,$(basename $@))
-	(cd html; ../$(TEXI2HTML) $(TEXI2HTML_OPTS) $(patsubst %.html,%.texi,$@); cd ..)
-	cp $(TEXI2HTML_PREFIX)invisible.xbm html/
-	@touch $@
-endif
-
 #--------------------------------------------------------------------------
 # SGML Documentation
 #
-# This will eventually replace the literate stuff for documentation
+.PHONY: dvi ps html info txt
 
-SGML_SRCS = $(wildcard    *.sgml *.vsgml)
+ifneq "$(SGML_DOC)" ""
+
+# multi-file SGML document: main document name is specified in $(SGML_DOC),
+# sub-documents (.sgml files) listed in $(SGML_SRCS).
+
+$(SGML_DOC).sgml : $(SGML_SRCS)
+	cat $(SGML_SRCS) > $(SGML_DOC).sgml
+
+SGML_DVI  = $(SGML_DOC).dvi
+SGML_PS   = $(SGML_DOC).ps
+SGML_INFO = $(SGML_DOC).info
+SGML_HTML = $(SGML_DOC).html
+SGML_TEXT = $(SGML_DOC).txt
+
+else # no SGML_DOC
+
+VSGML_SRCS = $(wildcard *.vsgml)
+
+ifneq "$(VSGML_SRCS)" ""
+SGML_SRCS  = $(addsuffix .sgml, $(basename $(VSGML_SRCS)))
+else
+SGML_SRCS  = $(wildcard *.sgml)
+endif
+
 SGML_DVI  = $(addsuffix  .dvi, $(basename $(SGML_SRCS)))
 SGML_PS   = $(addsuffix   .ps, $(basename $(SGML_SRCS)))
-SGML_TEXI = $(addsuffix .texi, $(basename $(SGML_SRCS)))
 SGML_INFO = $(addsuffix .info, $(basename $(SGML_SRCS)))
 SGML_HTML = $(addsuffix .html, $(basename $(SGML_SRCS)))
 SGML_TEXT = $(addsuffix  .txt, $(basename $(SGML_SRCS)))
+
+endif # SGML_DOC
 
 dvi  :: $(SGML_DVI)
 info :: $(SGML_INFO)
@@ -883,9 +849,7 @@ html :: $(SGML_HTML)
 txt  :: $(SGML_TXT)
 ps   :: $(SGML_PS)
 
-CLEAN_FILES += $(SGML_TEXT) $(SGML_HTML) $(SGML_TEXI) $(SGML_PS) $(SGML_DVI)
-
-# suffix rules should handle the rest (for single-file docs at least).
+CLEAN_FILES += $(SGML_TEXT) $(SGML_HTML) $(SGML_PS) $(SGML_DVI)
 
 ###########################################
 #

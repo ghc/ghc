@@ -188,11 +188,9 @@ SRC_HC_PRE  += $(HC_PRE__)
 #-----------------------------------------------------------------------------
 # SGML suffix rules
 #
-# make sure these don't conflict with the literate rules!
-
 %.sgml : %.vsgml
 	@$(RM) $@
-	expand $*.vsgml | $(SGMLVERB) > $@
+	expand $< | $(SGMLVERB) > $@
 
 %.tex : %.sgml
 	@$(RM) $@
@@ -202,10 +200,9 @@ SRC_HC_PRE  += $(HC_PRE__)
 	@$(RM) $@
 	$(SGML2LATEX) -m --output=dvi $<
 
-# Not yet: we already have a %.ps : %.dvi rule, this one would conflict.
-#%,ps : %.sgml
-#	@$(RM) $@
-#	$(SGML2LATEX) -m --output=ps $<
+%,ps : %.sgml
+	@$(RM) $@
+	$(SGML2LATEX) -m --output=ps $<
 
 %.html : %.sgml
 	@$(RM) $@
@@ -222,138 +219,9 @@ SRC_HC_PRE  += $(HC_PRE__)
 #-----------------------------------------------------------------------------
 # Literate suffix rules
 
-# ToDo: somehow macroize this lot. (if only!)
-
-%.itxi : %.lit
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.txt : %.lit
-	@$(RM) $@
-	$(LIT2TEXT) $(LIT2TEXT_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lit
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lit
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
-#
-# Produce stand-alone TEX documents
-#
-%.tex : %.itex
-	@$(RM) $@
-	$(LIT2LATEX) -S $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.tex : %.lhs
-	@$(RM) $@
-	$(LIT2LATEX) -S $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.texi : %.lhs
-	@$(RM) $@
-	$(LIT2TEXI) -S $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.html : %.lhs
-	@$(RM) $@ 
-	$(LIT2TEXI) $(LIT2TEXI_OPTS) -o $(patsubst %.html,%.texi,$@) $<
-	$(TEXI2HTML) $(TEXI2HTML_OPTS) $(patsubst %.lhs,%.texi,$<) 
-	@touch $@
-
-%.info:: %.texi
-	@$(RM) $@
-	$(MAKEINFO) $(MAKEINFO_OPTS) $< && $(POSTMAKEINFO) $@
-
-%.hs : %.lhs
-	@$(RM) $@
-	$(LIT2PGM) $(LIT2PGM_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itxi : %.lhs
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lhs
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lhs
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.tex : %.lhs
-	$(LIT2LATEX) -S -c $(LIT2LATEX_OPTS) -o $@ $<
-	$(HC) $(HC_OPTS) -c $< -o $@
-
-
-%.itxi : %.lhc
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lhc
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lhc
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
-#
-# Temporary, until either unlit is lifted out of ghc/
-# or literate is properly set up locally -- SOF
-#
 %.prl : %.lprl
 	@$(RM) $@
 	$(UNLIT) $(UNLIT_OPTS) $< $@
-	@chmod 444 $@
-
-%.itxi : %.lprl
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lprl
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lprl
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.sh : %.lsh
-	@$(RM) $@
-	$(LIT2PGM) $(LIT2PGM_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itxi : %.lsh
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lsh
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lsh
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
 	@chmod 444 $@
 
 %.c : %.lc
@@ -361,58 +229,7 @@ SRC_HC_PRE  += $(HC_PRE__)
 	$(UNLIT) $< $@
 	@chmod 444 $@
 
-%.itxi : %.lc
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lc
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lc
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
 %.h : %.lh
 	@$(RM) $@
 	$(UNLIT) $< $@
 	@chmod 444 $@
-
-%.itxi : %.lh
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lh
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lh
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.flex : %.lflex
-	@$(RM) $@
-	$(LIT2PGM) $(LIT2PGM_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itxi : %.lflex
-	@$(RM) $@
-	$(LIT2TEXI) -c $(LIT2TEXI_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.ihtml : %.lflex
-	@$(RM) $@
-	$(LIT2HTML) -c $(LIT2HTML_OPTS) -o $@ $<
-	@chmod 444 $@
-
-%.itex : %.lflex
-	@$(RM) $@
-	$(LIT2LATEX) -c $(LIT2LATEX_OPTS) -o $@ $<
-	@chmod 444 $@
-
