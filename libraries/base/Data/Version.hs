@@ -30,8 +30,18 @@ module Data.Version (
 	showVersion, parseVersion,
   ) where
 
+#if __GLASGOW_HASKELL__ < 603
+import Distribution.Compat.ReadP
+#else
 import Text.ParserCombinators.ReadP
+#endif
+
+#if __GLASGOW_HASKELL__ < 602
+import Data.Dynamic	( Typeable(..), TyCon, mkTyCon, mkAppTy )
+#else
 import Data.Typeable 	( Typeable )
+#endif
+
 import Data.List	( intersperse )
 import Control.Monad	( liftM )
 import Data.Char	( isDigit, isAlphaNum )
@@ -79,7 +89,19 @@ data Version =
 		-- The interpretation of the list of tags is entirely dependent
 		-- on the entity that this version applies to.
 	}
-  deriving (Read,Show,Typeable)
+  deriving (Read,Show
+#if __GLASGOW_HASKELL__ >= 602
+	,Typeable
+#endif
+	)
+
+#if __GLASGOW_HASKELL__ < 602
+versionTc :: TyCon
+versionTc = mkTyCon "()"
+
+instance Typeable Version where
+  typeOf _ = mkAppTy versionTc []
+#endif
 
 instance Eq Version where
   v1 == v2  =  versionBranch v1 == versionBranch v2 
@@ -103,7 +125,11 @@ showVersion (Version branch tags)
 
 -- | A parser for versions in the format produced by 'showVersion'.
 --
+#if __GLASGOW_HASKELL__ < 602
+parseVersion :: ReadP r Version
+#else
 parseVersion :: ReadP Version
+#endif
 parseVersion = do branch <- sepBy1 (liftM read $ munch1 isDigit) (char '.')
                   tags   <- many (char '-' >> munch1 isAlphaNum)
                   return Version{versionBranch=branch, versionTags=tags}
