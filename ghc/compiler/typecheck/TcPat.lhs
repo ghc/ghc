@@ -140,7 +140,7 @@ tcPat tc_bndr (LazyPatIn pat) pat_ty
 tcPat tc_bndr pat_in@(AsPatIn name pat) pat_ty
   = tc_bndr name pat_ty			`thenTc` \ (co_fn, lie_req1, bndr_id) ->
     tcPat tc_bndr pat pat_ty		`thenTc` \ (pat', lie_req2, tvs, ids, lie_avail) ->
-    returnTc (co_fn <$> (AsPat bndr_id pat'), lie_req1 `plusLIE` lie_req1, 
+    returnTc (co_fn <$> (AsPat bndr_id pat'), lie_req1 `plusLIE` lie_req2, 
 	      tvs, (name, bndr_id) `consBag` ids, lie_avail)
 
 tcPat tc_bndr WildPatIn pat_ty
