@@ -32,10 +32,14 @@ module Char
      -- Implementation checked wrt. Haskell 98 lib report, 1/99.
     ) where
 
+#ifndef __HUGS__
 import PrelBase
 import PrelShow
 import PrelEnum
 import PrelNum
 import PrelRead (readLitChar, lexLitChar, digitToInt)
 import PrelErr  ( error )
+#else
+isLatin1 c = True
+#endif
 \end{code}

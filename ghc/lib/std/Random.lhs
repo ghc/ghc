@@ -28,6 +28,7 @@ module Random
 	, newStdGen
 	) where
 
+#ifndef __HUGS__
 import CPUTime (getCPUTime)
 import PrelST
 import PrelRead
@@ -37,9 +38,10 @@ import PrelIOBase
 import PrelNumExtra ( float2Double, double2Float )
 import PrelBase
 import PrelArr
-import Char ( isSpace, chr, ord )
 import Time (getClockTime, ClockTime(..))
-
+#else
+#endif
+import Char ( isSpace, chr, ord )
 \end{code}
 
 \begin{code}
@@ -57,11 +59,19 @@ instance RandomGen StdGen where
   next  = stdNext
   split = stdSplit
 
+#ifdef __HUGS__
+instance Show StdGen where
+  showsPrec p (StdGen s1 s2) = 
+     showsPrec p s1 . 
+     showChar ' ' .
+     showsPrec p s2
+#else
 instance Show StdGen where
   showsPrec p (StdGen s1 s2) = 
      showSignedInt p s1 . 
      showSpace          . 
      showSignedInt p s2
+#endif
 
 instance Read StdGen where
   readsPrec _p = \ r ->
@@ -157,19 +167,31 @@ instance Random Double where
   random g       = randomR (0::Double,1) g
   
 -- hah, so you thought you were saving cycles by using Float?
+
+#ifdef __HUGS__
+instance Random Float where
+  random g        = randomIvalDouble (0::Double,1) realToFrac g
+  randomR (a,b) g = randomIvalDouble (realToFrac a, realToFrac b) realToFrac g
+#else
 instance Random Float where
   randomR (a,b) g = randomIvalDouble (float2Double a, float2Double b) double2Float g
   random g        = randomIvalDouble (0::Double,1) double2Float g
+#endif
 
 \end{code}
 
 
 \begin{code}
+#ifdef __HUGS__
+mkStdRNG :: Integer -> IO StdGen
+mkStdRNG o = return (createStdGen o)
+#else
 mkStdRNG :: Integer -> IO StdGen
 mkStdRNG o = do
     ct          <- getCPUTime
     (TOD sec _) <- getClockTime
     return (createStdGen (sec * 12345 + ct + o))
+#endif
 
 randomIvalInteger :: (RandomGen g, Num a) => (Integer, Integer) -> g -> (a, g)
 randomIvalInteger (l,h) rng
@@ -220,13 +242,39 @@ stdNext (StdGen s1 s2) = (z', StdGen s1'' s2'')
 		s2'  = 40692 * (s2 - k' * 52774) - k' * 3791
 		s2'' = if s2' < 0 then s2' + 2147483399 else s2'
 
+#ifdef __HUGS__
+stdSplit            :: StdGen -> (StdGen, StdGen)
+stdSplit std@(StdGen s1 s2)
+                     = (left, right)
+                       where
+                        -- no statistical foundation for this!
+                        left    = StdGen new_s1 t2
+                        right   = StdGen t1 new_s2
+
+                        new_s1 | s1 == 2147483562 = 1
+                               | otherwise        = s1 + 1
+
+                        new_s2 | s2 == 1          = 2147483398
+                               | otherwise        = s2 - 1
+
+                        StdGen t1 t2 = snd (next std)
+#else
 stdSplit :: StdGen -> (StdGen, StdGen)
 stdSplit std@(StdGen s1 _) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
-	
+#endif	
 \end{code}
 
 
 \begin{code}
+#ifdef __HUGS__
+-- TODO: Hugs/setStdGen
+setStdGen :: StdGen -> IO ()
+setStdGen sgen = error "not currently implemented in Stg Hugs"
+
+-- TODO: Hugs/getStdGen
+getStdGen :: IO StdGen
+getStdGen = error "not currently implemented in Stg Hugs"
+#else
 global_rng :: MutableVar RealWorld StdGen
 global_rng = unsafePerformIO $ do
    rng <- mkStdRNG 0
@@ -237,6 +285,8 @@ setStdGen sgen = stToIO (writeVar global_rng sgen)
 
 getStdGen :: IO StdGen
 getStdGen = stToIO (readVar global_rng)
+#endif
+
 
 newStdGen :: IO StdGen
 newStdGen = do

@@ -29,10 +29,12 @@ module Maybe
      -- Implementation checked wrt. Haskell 98 lib report, 1/99.
    ) where
 
+#ifndef __HUGS__
 import PrelErr	( error )
 import PrelList
 import PrelMaybe
 import PrelBase
+#endif
 \end{code}
 
 

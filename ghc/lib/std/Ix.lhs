@@ -29,6 +29,7 @@ module Ix
     -- Implementation checked wrt. Haskell 98 lib report, 1/99.
     ) where
 
+#ifndef __HUGS__
 import {-# SOURCE #-} PrelErr ( error )
 import PrelTup
 import PrelBase
@@ -266,4 +267,11 @@ rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
 --	((1,2),(2,1))
 -- Here l<h, but the second index ranges from 2..1 and
 -- hence is empty
+\end{code}
+
+\begin{code}
+#else
+-- This module is empty; Ix is currently defined in the prelude, but should
+-- eventually be moved to this library file instead.
+#endif
 \end{code}

@@ -51,7 +51,7 @@ module Directory
    ) where
 
 #ifdef __HUGS__
-import PreludeBuiltin
+--import PreludeBuiltin
 #else
 import PrelBase
 import PrelIOBase

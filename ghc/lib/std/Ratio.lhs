@@ -32,6 +32,8 @@ module	Ratio
 
   ) where
 
+#ifndef __HUGS__
 import PrelNum
 import PrelNumExtra
+#endif
 \end{code}

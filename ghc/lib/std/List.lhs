@@ -7,9 +7,12 @@
 \begin{code}
 module List 
    ( 
+#ifndef __HUGS__
      []((:), [])
+   , 
+#endif
 
-   , elemIndex	       -- :: (Eq a) => a -> [a] -> Maybe Int
+      elemIndex	       -- :: (Eq a) => a -> [a] -> Maybe Int
    , elemIndices       -- :: (Eq a) => a -> [a] -> [Int]
 
    , find	       -- :: (a -> Bool) -> [a] -> Maybe a
@@ -127,12 +130,15 @@ module List
    ) where
 
 import Prelude
-import PrelShow	( lines, words, unlines, unwords )
 import Maybe	( listToMaybe )
+
+#ifndef __HUGS__
+import PrelShow	( lines, words, unlines, unwords )
 import PrelBase	( Int(..), map, (++) )
 import PrelGHC	( (+#) )
+#endif
 
-infix 5 \\
+infix 5 \\ 
 \end{code}
 
 %*********************************************************
@@ -181,12 +187,12 @@ nub                     :: (Eq a) => [a] -> [a]
 nub                     =  nubBy (==)
 #else
 -- stolen from HBC
-nub l                   = nub' l []
+nub l                   = nub' l []		-- '
   where
-    nub' [] _		= []
-    nub' (x:xs) ls	
-	| x `elem` ls   = nub' xs ls
-	| otherwise     = x : nub' xs (x:ls)
+    nub' [] _		= []			-- '
+    nub' (x:xs) ls				-- '
+	| x `elem` ls   = nub' xs ls		-- '
+	| otherwise     = x : nub' xs (x:ls)	-- '
 #endif
 
 nubBy			:: (a -> a -> Bool) -> [a] -> [a]

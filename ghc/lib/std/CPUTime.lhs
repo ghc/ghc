@@ -11,10 +11,11 @@ module CPUTime
          getCPUTime,       -- :: IO Integer
 	 cpuTimePrecision  -- :: Integer
         ) where
+\end{code}
 
-#ifdef __HUGS__
-import PreludeBuiltin
-#else
+
+#ifndef __HUGS__
+\begin{code}
 import PrelBase
 import PrelArr  	( ByteArray(..), newIntArray, unsafeFreezeByteArray )
 import PrelMaybe
@@ -22,11 +23,9 @@ import PrelNum
 import PrelNumExtra
 import PrelIOBase
 import PrelST
-#endif
 import IO		( ioError )
 import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
 import Ratio
-
 \end{code}
 
 Computation @getCPUTime@ returns the number of picoseconds CPU time
@@ -91,5 +90,15 @@ foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
 
 \end{code}
 
+#else
 
- 
+\begin{code}
+-- TODO: Hugs/getCPUTime
+getCPUTime :: IO Integer
+getCPUTime = return 0
+
+-- TODO: Hugs/cpuTimePrecision
+cpuTimePrecision :: Integer
+cpuTimePrecision = 1
+\end{code} 
+#endif
