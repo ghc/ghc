@@ -65,7 +65,6 @@ module SysTools (
 #include "HsVersions.h"
 
 import DriverUtil
-import DriverPhases     ( haskellish_user_src_file )
 import Config
 import Outputable
 import Panic		( progName, GhcException(..) )
@@ -651,15 +650,17 @@ setTmpDir dir = writeIORef v_TmpDir (canonicalise dir)
 #endif
 
 cleanTempFiles :: Int -> IO ()
-cleanTempFiles verb = do fs <- readIORef v_FilesToClean
-			 removeTmpFiles verb fs
+cleanTempFiles verb
+   = do fs <- readIORef v_FilesToClean
+	removeTmpFiles verb fs
+	writeIORef v_FilesToClean []
 
 cleanTempFilesExcept :: Int -> [FilePath] -> IO ()
 cleanTempFilesExcept verb dont_delete
-  = do fs <- readIORef v_FilesToClean
-       let leftovers = filter (`notElem` dont_delete) fs
-       removeTmpFiles verb leftovers
-       writeIORef v_FilesToClean dont_delete
+   = do files <- readIORef v_FilesToClean
+	let (to_keep, to_delete) = partition (`elem` dont_delete) files
+	removeTmpFiles verb to_delete
+	writeIORef v_FilesToClean to_keep
 
 
 -- find a temporary name that doesn't already exist.
@@ -682,25 +683,10 @@ addFilesToClean files = mapM_ (add v_FilesToClean) files
 
 removeTmpFiles :: Int -> [FilePath] -> IO ()
 removeTmpFiles verb fs
-  = warnNon $
-    traceCmd "Deleting temp files" 
-	     ("Deleting: " ++ unwords deletees)
-	     (mapM_ rm deletees)
+  = traceCmd "Deleting temp files" 
+	     ("Deleting: " ++ unwords fs)
+	     (mapM_ rm fs)
   where
-     -- Flat out refuse to delete files that are likely to be source input
-     -- files (is there a worse bug than having a compiler delete your source
-     -- files?)
-     -- 
-     -- Deleting source files is a sign of a bug elsewhere, so prominently flag
-     -- the condition.
-    warnNon act
-     | null non_deletees = act
-     | otherwise         = do
-        hPutStrLn stderr ("WARNING - NOT deleting source files: " ++ unwords non_deletees)
-	act
-
-    (non_deletees, deletees) = partition haskellish_user_src_file fs
-
     rm f = removeFile f `IO.catch` 
 		(\_ignored -> 
 		    when (verb >= 2) $
@@ -833,8 +819,12 @@ interpreted a command line 'foo\baz' as 'foobaz'.
 -----------------------------------------------------------------------------
 -- Convert filepath into platform / MSDOS form.
 
+-- platformPath does two things
+-- a) change '/' to '\'
+-- b) remove initial '/cygdrive/'
+
 normalisePath :: String -> String
--- Just changes '\' to '/'
+-- Just change '\' to '/'
 
 pgmPath :: String		-- Directory string in Unix format
 	-> String		-- Program name with no directory separators
