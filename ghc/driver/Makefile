@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.66 2001/07/24 05:05:41 ken Exp $
+# $Id: Makefile,v 1.67 2001/07/24 10:28:51 simonmar Exp $
 #
 
 TOP=..
@@ -37,7 +37,6 @@ SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
 endif
 
 SRC_HC_OPTS += -DWANT_PRETTY
-SRC_HC_OPTS += $(GhcHcOpts)
 
 all :: package.conf package.conf.inplace
 
