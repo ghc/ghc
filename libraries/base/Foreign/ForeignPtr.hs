@@ -33,6 +33,10 @@ module Foreign.ForeignPtr
 #endif
 	, withForeignPtr
 
+#ifdef __GLASGOW_HASKELL__
+	, finalizeForeignPtr
+#endif
+
 	-- ** Low-level operations
 	, unsafeForeignPtrToPtr
 	, touchForeignPtr

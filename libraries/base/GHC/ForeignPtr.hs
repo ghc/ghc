@@ -26,6 +26,7 @@ module GHC.ForeignPtr
 	castForeignPtr,
 	newConcForeignPtr,
 	addForeignPtrConcFinalizer,
+	finalizeForeignPtr
   ) where
 
 import Control.Monad 	( sequence_ )
@@ -230,3 +231,15 @@ castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- ^This function casts a 'ForeignPtr'
 -- parameterised by one type into another type.
 castForeignPtr f = unsafeCoerce# f
+
+-- | Causes a the finalizers associated with a foreign pointer to be run
+-- immediately.
+finalizeForeignPtr :: ForeignPtr a -> IO ()
+finalizeForeignPtr foreignPtr = do
+	finalizers <- readIORef refFinalizers
+	sequence_ finalizers
+	writeIORef refFinalizers []
+	where
+		refFinalizers = case foreignPtr of
+			(ForeignPtr _ ref) -> ref
+			(MallocPtr  _ ref) -> ref
