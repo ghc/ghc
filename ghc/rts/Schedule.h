@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.25 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Schedule.h,v 1.26 2002/02/04 20:40:37 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -7,6 +7,9 @@
  * (RTS internal scheduler interface)
  *
  * -------------------------------------------------------------------------*/
+#ifndef __SCHEDULE_H__
+#define __SCHEDULE_H__
+#include "OSThreads.h"
 
 //@menu
 //* Scheduler Functions::	
@@ -20,17 +23,13 @@
 
 //@cindex initScheduler
 //@cindex exitScheduler
-//@cindex startTasks
 /* initScheduler(), exitScheduler(), startTasks()
  * 
  * Called from STG :  no
  * Locks assumed   :  none
  */
-void initScheduler( void );
-void exitScheduler( void );
-#ifdef SMP
-void startTasks( void );
-#endif
+extern void initScheduler  ( void );
+extern void exitScheduler  ( void );
 
 //@cindex awakenBlockedQueue
 /* awakenBlockedQueue()
@@ -157,31 +156,13 @@ extern  StgTSO *sleeping_queue;
 /* Linked list of all threads. */
 extern  StgTSO *all_threads;
 
-#ifdef SMP
-//@cindex sched_mutex
-//@cindex thread_ready_cond
-//@cindex gc_pending_cond
-extern pthread_mutex_t sched_mutex;
-extern pthread_cond_t  thread_ready_cond;
-extern pthread_cond_t  gc_pending_cond;
+#if defined(RTS_SUPPORTS_THREADS)
+extern Mutex       sched_mutex;
+extern Condition   thread_ready_cond;
+extern Condition   gc_pending_cond;
 #endif
 
-//@cindex task_info
-#ifdef SMP
-typedef struct {
-  pthread_t id;
-  double    elapsedtimestart;
-  double    mut_time;
-  double    mut_etime;
-  double    gc_time;
-  double    gc_etime;
-} task_info;
-
-extern task_info *task_ids;
-#endif
-
-/* Needed by Hugs.
- */
+/* Called by shutdown_handler(). */
 void interruptStgRts ( void );
 
 void raiseAsync(StgTSO *tso, StgClosure *exception);
@@ -268,7 +249,7 @@ void print_bqe (StgBlockingQueueElement *bqe);
 #ifdef SMP
 #define THREAD_RUNNABLE()			\
   if (free_capabilities != NULL) {		\
-     pthread_cond_signal(&thread_ready_cond);	\
+     signalCondition(&thread_ready_cond);	\
   }						\
   context_switch = 1;
 #else
@@ -280,16 +261,16 @@ void print_bqe (StgBlockingQueueElement *bqe);
  */
 #define EMPTY_RUN_QUEUE()     (run_queue_hd == END_TSO_QUEUE)
 
+#endif /* __SCHEDULE_H__ */
+
 //@node Index,  , Some convenient macros
 //@subsection Index
 
 //@index
 //* APPEND_TO_BLOCKED_QUEUE::  @cindex\s-+APPEND_TO_BLOCKED_QUEUE
 //* APPEND_TO_RUN_QUEUE::  @cindex\s-+APPEND_TO_RUN_QUEUE
-//* Capability::  @cindex\s-+Capability
 //* POP_RUN_QUEUE    ::  @cindex\s-+POP_RUN_QUEUE    
 //* PUSH_ON_RUN_QUEUE::  @cindex\s-+PUSH_ON_RUN_QUEUE
-//* THREAD_RUNNABLE::  @cindex\s-+THREAD_RUNNABLE
 //* awaitEvent::  @cindex\s-+awaitEvent
 //* awakenBlockedQueue::  @cindex\s-+awakenBlockedQueue
 //* awaken_blocked_queue::  @cindex\s-+awaken_blocked_queue
@@ -298,9 +279,6 @@ void print_bqe (StgBlockingQueueElement *bqe);
 //* gc_pending_cond::  @cindex\s-+gc_pending_cond
 //* initScheduler::  @cindex\s-+initScheduler
 //* raiseAsync::  @cindex\s-+raiseAsync
-//* sched_mutex::  @cindex\s-+sched_mutex
 //* startTasks::  @cindex\s-+startTasks
-//* task_info::  @cindex\s-+task_info
-//* thread_ready_cond::  @cindex\s-+thread_ready_cond
 //* unblockOne::  @cindex\s-+unblockOne
 //@end index
