@@ -577,11 +577,11 @@ if test "$BootingFromHc" = "NO" -a "$WithGhc" = "" -a -d "$srcdir/ghc"; then
 AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
 fi;
 
-dnl ** Enable multi-thread friendly RTS?
+dnl ** --enable-threaded-rts (not used any more)
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(threaded-rts,
 [AC_HELP_STRING([--enable-threaded-rts],
-[Support better interop with OS threads. [default=no]])],
+[DEPRECATED (backwards compatibility only). [default=no]])],
 [ if test x"$enableval" = x"yes"; then
 	ThreadedRts=YES
   else
