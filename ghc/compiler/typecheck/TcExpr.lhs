@@ -658,17 +658,33 @@ tcApp fun args res_ty
 	split_fun_ty fun_ty (length args)
     )						`thenM` \ (expected_arg_tys, actual_result_ty) ->
 
-	-- Now typecheck the args
-    mappM (tcArg fun)
-	  (zip3 args expected_arg_tys [1..])	`thenM` \ args' ->
-
-	-- Unify with expected result after type-checking the args
-	-- so that the info from args percolates to actual_result_ty.
+	-- Unify with expected result before (was: after) type-checking the args
+	-- so that the info from res_ty (was: args) percolates to args (was actual_result_ty).
 	-- This is when we might detect a too-few args situation.
 	-- (One can think of cases when the opposite order would give
 	-- a better error message.)
+	-- [March 2003: I'm experimenting with putting this first.  Here's an 
+	--		example where it actually makes a real difference
+	--    class C t a b | t a -> b
+	--    instance C Char a Bool
+	--
+	--    data P t a = forall b. (C t a b) => MkP b
+	--    data Q t   = MkQ (forall a. P t a)
+    
+	--    f1, f2 :: Q Char;
+	--    f1 = MkQ (MkP True)
+	--    f2 = MkQ (MkP True :: forall a. P Char a)
+	--
+	-- With the change, f1 will type-check, because the 'Char' info from
+	-- the signature is propagated into MkQ's argument. With the check
+	-- in the other order, the extra signature in f2 is reqd.]
+
     addErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty)
-		  (tcSubExp res_ty actual_result_ty)	`thenM` \ co_fn ->
+		(tcSubExp res_ty actual_result_ty)	`thenM` \ co_fn ->
+
+	-- Now typecheck the args
+    mappM (tcArg fun)
+	  (zip3 args expected_arg_tys [1..])	`thenM` \ args' ->
 
     returnM (co_fn <$> foldl HsApp fun' args') 
 
