@@ -1,14 +1,17 @@
 __interface MCIzumakezuconstr 1 where
 __export MCIzumakezuconstr 
-   mcizumakezuconstrI
    mcizumakezuconstr
+   mcizumakezuconstrI
+   mcizumakezuconstr0
    mcizumakezuconstrP
    mcizumakezuconstrPP
    mcizumakezuconstrPPP ;
 
+1 mcizumakezuconstr
+     :: __forall [a] => PrelGHC.Addrzh -> a ;
 1 mcizumakezuconstrI 
      :: __forall [a] => PrelGHC.Addrzh -> PrelGHC.Intzh -> a ;
-1 mcizumakezuconstr
+1 mcizumakezuconstr0
      :: __forall [a] => PrelGHC.Addrzh -> a ;
 1 mcizumakezuconstrP 
      :: __forall [a a1] => PrelGHC.Addrzh -> a1 -> a ;

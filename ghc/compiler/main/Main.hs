@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.31 2000/11/21 16:31:51 sewardj Exp $
+-- $Id: Main.hs,v 1.32 2000/11/22 17:51:16 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -298,10 +298,11 @@ beginInteractive = throwDyn (OtherError "not build for interactive use")
 #else
 beginInteractive mods
   = do state <- cmInit Interactive
-       case mods of
-	   []    -> return ()
-	   [mod] -> do cmLoadModule state mod; return ()
-	   _     -> throwDyn (UsageError 
-				"only one module allowed with --interactive")
-       interactiveUI state
+       (state', ok, ms) 
+	  <- case mods of
+	        []    -> return (state, True, [])
+	        [mod] -> cmLoadModule state mod
+	        _     -> throwDyn (UsageError 
+				    "only one module allowed with --interactive")
+       interactiveUI state' ms
 #endif

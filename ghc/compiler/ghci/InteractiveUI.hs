@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.13 2000/11/22 15:51:48 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.14 2000/11/22 17:51:16 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -19,7 +19,6 @@ import DriverState
 import Linker
 import Module
 import Outputable
-import Panic
 import Util
 
 import Exception
@@ -71,8 +70,8 @@ helpText = "\
 \   :!<command>		run the shell command <command>\n\ 
 \"
 
-interactiveUI :: CmState -> IO ()
-interactiveUI st = do
+interactiveUI :: CmState -> [ModuleName] -> IO ()
+interactiveUI st mods = do
    hPutStrLn stdout ghciWelcomeMsg
    hFlush stdout
    hSetBuffering stdout NoBuffering
@@ -84,10 +83,14 @@ interactiveUI st = do
 #ifndef NO_READLINE
    Readline.initialize
 #endif
-   _ <- (unGHCi uiLoop) GHCiState{ modules = [],
-				   current_module = defaultCurrentModule,
-	  	                   target = Nothing,
-			           cmstate = st }
+   let this_mod = case mods of 
+			[] -> defaultCurrentModule
+			m:ms -> m
+
+   (unGHCi uiLoop) GHCiState{ modules = mods,
+			      current_module = this_mod,
+	  	              target = Nothing,
+			      cmstate = st }
    return ()
 
 uiLoop :: GHCi ()

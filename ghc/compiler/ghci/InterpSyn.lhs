@@ -72,7 +72,7 @@ data IExpr con var
    | ConAppI   con (IExpr con var)
    | ConAppP   con (IExpr con var)
    | ConAppPP  con (IExpr con var) (IExpr con var)
-   | ConAppPPP con (IExpr con var) (IExpr con var) (IExpr con var)
+   | ConAppGen con [IExpr con var]
 
    | PrimOpP PrimOp [(IExpr con var)]
    | PrimOpI PrimOp [(IExpr con var)]
@@ -165,7 +165,7 @@ showExprTag expr
         ConAppI _ _       -> "ConAppI"
         ConAppP _ _       -> "ConAppP"
         ConAppPP _ _ _    -> "ConAppPP"
-        ConAppPPP _ _ _ _ -> "ConAppPPP"
+        ConAppGen _ _     -> "ConAppGen"
 
         PrimOpP _ _       -> "PrimOpP"
         PrimOpI _ _       -> "PrimOpI"
@@ -312,7 +312,7 @@ pprIExpr (expr:: IExpr con var)
         ConAppI   i a1       -> doConApp "" i [a1]
         ConAppP   i a1       -> doConApp "" i [a1]
         ConAppPP  i a1 a2    -> doConApp "" i [a1,a2]
-        ConAppPPP i a1 a2 a3 -> doConApp "" i [a1,a2,a3]
+        ConAppGen i args     -> doConApp "" i args
 
         other     -> text "pprIExpr: unimplemented tag:" 
                      <+> text (showExprTag other)

@@ -78,7 +78,7 @@ import Class		( Class, classTyCon )
 import InterpSyn
 import StgSyn
 import Addr
-import RdrName		( RdrName, rdrNameModule, rdrNameOcc )
+import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isUnqual )
 import FiniteMap
 import Panic		( panic )
 import OccName		( occNameString )
@@ -181,9 +181,7 @@ mkConApp nm []               []         = ConApp    nm
 mkConApp nm [RepI]           [a1]       = ConAppI   nm a1
 mkConApp nm [RepP]           [a1]       = ConAppP   nm a1
 mkConApp nm [RepP,RepP]      [a1,a2]    = ConAppPP  nm a1 a2
-mkConApp nm [RepP,RepP,RepP] [a1,a2,a3] = ConAppPPP nm a1 a2 a3
-mkConApp nm reps args
-   = pprPanic "StgInterp.mkConApp: unhandled reps" (hsep (map ppr reps))
+mkConApp nm reps args  = ConAppGen nm args
 
 mkLam RepP RepP = LamPP
 mkLam RepI RepP = LamIP
@@ -325,15 +323,17 @@ stg2expr ie stgexpr
            |  repOfStgExpr scrut /= RepP
            -> mkCasePrim (repOfStgExpr stgexpr) 
                          bndr (stg2expr ie scrut) 
-                              (map doPrimAlt alts) 
-                              (def2expr def)
+                              (map (doPrimAlt ie') alts) 
+                              (def2expr ie' def)
+	   where ie' = addOneToUniqSet ie bndr
 
         StgCase scrut live liveR bndr srt (StgAlgAlts tycon alts def)
            |  repOfStgExpr scrut == RepP
            -> mkCaseAlg (repOfStgExpr stgexpr) 
                         bndr (stg2expr ie scrut) 
-                             (map doAlgAlt alts) 
-                             (def2expr def)
+                             (map (doAlgAlt ie') alts) 
+                             (def2expr ie' def)
+	   where ie' = addOneToUniqSet ie bndr
 
         StgPrimApp op args res_ty
            -> mkPrimOp (repOfStgExpr stgexpr)
@@ -359,9 +359,9 @@ stg2expr ie stgexpr
         other
            -> pprPanic "stg2expr" (ppr stgexpr)
      where
-        doPrimAlt (lit,rhs) 
+        doPrimAlt ie (lit,rhs) 
            = AltPrim (lit2expr lit) (stg2expr ie rhs)
-        doAlgAlt (dcon,vars,uses,rhs) 
+        doAlgAlt ie (dcon,vars,uses,rhs) 
            = AltAlg (dataConTag dcon - 1) 
                     (map id2VaaRep (toHeapOrder vars)) 
 			(stg2expr (addListToUniqSet ie vars) rhs)
@@ -372,8 +372,8 @@ stg2expr ie stgexpr
              in
                  rearranged
 
-        def2expr StgNoDefault         = Nothing
-        def2expr (StgBindDefault rhs) = Just (stg2expr ie rhs)
+        def2expr ie StgNoDefault         = Nothing
+        def2expr ie (StgBindDefault rhs) = Just (stg2expr ie rhs)
 
         mkAppChain ie result_rep so_far []
            = panic "mkAppChain"
@@ -464,6 +464,14 @@ linkIExpr ie ce expr = case expr of
 	CaseAlgI bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
 	   		(linkDefault ie ce dflt)
 
+   CaseAlgF  bndr expr alts dflt ->
+	CaseAlgF bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+
+   CaseAlgD  bndr expr alts dflt ->
+	CaseAlgD bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+
    CasePrimP bndr expr alts dflt ->
 	CasePrimP bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
 	   		(linkDefault ie ce dflt)
@@ -472,8 +480,16 @@ linkIExpr ie ce expr = case expr of
 	CasePrimI bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
 	   		(linkDefault ie ce dflt)
    
+   CasePrimF bndr expr alts dflt ->
+	CasePrimF bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+   
+   CasePrimD bndr expr alts dflt ->
+	CasePrimD bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+   
    ConApp con -> 
-	ConApp (lookupCon ie con)
+	lookupNullaryCon ie con
 
    ConAppI   con arg0 -> 
 	ConAppI (lookupCon ie con) (linkIExpr ie ce arg0)
@@ -483,19 +499,21 @@ linkIExpr ie ce expr = case expr of
 
    ConAppPP  con arg0 arg1 -> 
 	ConAppPP (lookupCon ie con) (linkIExpr ie ce arg0) (linkIExpr ie ce arg1)
-
-   ConAppPPP con arg0 arg1 arg2 -> 
-	ConAppPPP (lookupCon ie con) (linkIExpr ie ce arg0) 
-			(linkIExpr ie ce arg1) (linkIExpr ie ce arg2)
+   ConAppGen con args -> ConAppGen (lookupCon ie con) 
+					(map (linkIExpr ie ce) args)
    
    PrimOpI op args -> PrimOpI op (map (linkIExpr ie ce) args)
    PrimOpP op args -> PrimOpP op (map (linkIExpr ie ce) args)
    
    NonRecP bind expr  -> NonRecP (linkIBind ie ce bind) (linkIExpr ie ce expr)
-   RecP    binds expr -> RecP (linkIBinds ie ce binds) (linkIExpr ie ce expr)
-   
    NonRecI bind expr  -> NonRecI (linkIBind ie ce bind) (linkIExpr ie ce expr)
+   NonRecF bind expr  -> NonRecF (linkIBind ie ce bind) (linkIExpr ie ce expr)
+   NonRecD bind expr  -> NonRecD (linkIBind ie ce bind) (linkIExpr ie ce expr)
+
+   RecP    binds expr -> RecP (linkIBinds ie ce binds) (linkIExpr ie ce expr)
    RecI    binds expr -> RecI (linkIBinds ie ce binds) (linkIExpr ie ce expr)
+   RecF    binds expr -> RecF (linkIBinds ie ce binds) (linkIExpr ie ce expr)
+   RecD    binds expr -> RecD (linkIBinds ie ce binds) (linkIExpr ie ce expr)
    
    LitI i -> LitI i
    LitF i -> LitF i
@@ -505,17 +523,43 @@ linkIExpr ie ce expr = case expr of
    
    VarP v -> lookupVar ce VarP v
    VarI v -> lookupVar ce VarI v
+   VarF v -> lookupVar ce VarF v
+   VarD v -> lookupVar ce VarD v
    
    LamPP  bndr expr -> LamPP bndr (linkIExpr ie ce expr)
    LamPI  bndr expr -> LamPI bndr (linkIExpr ie ce expr)
+   LamPF  bndr expr -> LamPF bndr (linkIExpr ie ce expr)
+   LamPD  bndr expr -> LamPD bndr (linkIExpr ie ce expr)
    LamIP  bndr expr -> LamIP bndr (linkIExpr ie ce expr)
    LamII  bndr expr -> LamII bndr (linkIExpr ie ce expr)
+   LamIF  bndr expr -> LamIF bndr (linkIExpr ie ce expr)
+   LamID  bndr expr -> LamID bndr (linkIExpr ie ce expr)
+   LamFP  bndr expr -> LamFP bndr (linkIExpr ie ce expr)
+   LamFI  bndr expr -> LamFI bndr (linkIExpr ie ce expr)
+   LamFF  bndr expr -> LamFF bndr (linkIExpr ie ce expr)
+   LamFD  bndr expr -> LamFD bndr (linkIExpr ie ce expr)
+   LamDP  bndr expr -> LamDP bndr (linkIExpr ie ce expr)
+   LamDI  bndr expr -> LamDI bndr (linkIExpr ie ce expr)
+   LamDF  bndr expr -> LamDF bndr (linkIExpr ie ce expr)
+   LamDD  bndr expr -> LamDD bndr (linkIExpr ie ce expr)
    
    AppPP  fun arg -> AppPP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
    AppPI  fun arg -> AppPI (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppPF  fun arg -> AppPF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppPD  fun arg -> AppPD (linkIExpr ie ce fun) (linkIExpr ie ce arg)
    AppIP  fun arg -> AppIP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
    AppII  fun arg -> AppII (linkIExpr ie ce fun) (linkIExpr ie ce arg)
-
+   AppIF  fun arg -> AppIF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppID  fun arg -> AppID (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppFP  fun arg -> AppFP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppFI  fun arg -> AppFI (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppFF  fun arg -> AppFF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppFD  fun arg -> AppFD (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppDP  fun arg -> AppDP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppDI  fun arg -> AppDI (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppDF  fun arg -> AppDF (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppDD  fun arg -> AppDD (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   
 lookupCon ie con = 
   case lookupFM ie con of
     Just (Ptr addr) -> addr
@@ -525,6 +569,18 @@ lookupCon ie con =
 		unsafePerformIO (lookupSymbol (rdrNameToCLabel con "con_info")) of
 	    Just addr -> addr
 	    Nothing   -> pprPanic "linkIExpr" (ppr con)
+
+-- nullary constructors don't have normal _con_info tables.
+lookupNullaryCon ie con =
+  case lookupFM ie con of
+    Just (Ptr addr) -> ConApp addr
+    Nothing -> 
+	-- try looking up in the object files.
+	case {-HACK!!!-}
+		unsafePerformIO (lookupSymbol (rdrNameToCLabel con "closure")) of
+	    Just (A# addr) -> Native (unsafeCoerce# addr)
+	    Nothing   -> pprPanic "lookupNullaryCon" (ppr con)
+
 
 lookupNative ce var =
   case lookupFM ce var of
@@ -546,7 +602,9 @@ lookupVar ce f v =
 
 -- HACK!!!  ToDo: cleaner
 rdrNameToCLabel :: RdrName -> String{-suffix-} -> String
-rdrNameToCLabel rn suffix = 
+rdrNameToCLabel rn suffix
+  | isUnqual rn = pprPanic "rdrNameToCLabel" (ppr rn)
+  | otherwise =
   _UNPK_(moduleNameFS (rdrNameModule rn)) 
   ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
 
@@ -655,48 +713,36 @@ evalP (CasePrimP bndr expr alts def) de
    = case helper_casePrim bndr expr alts def de of
         (rhs, de') -> evalP rhs de'
 
-{-
--- ConApp can only be handled by evalP
-evalP (ConApp itbl args) se de
-   = loop args
-     where
-        -- This appalling hack suggested (gleefully) by SDM
-        -- It is not well typed (needless to say?)
-        loop :: [Expr] -> boxed
-        loop [] 
-           = trace "loop-empty" (
-             case itbl of A# addr# -> unsafeCoerce# (mci_make_constr addr#)
-             )
-        loop (a:as) 
-           = trace "loop-not-empty" (
-             case repOf a of
-                RepI -> case evalI a de of i# -> loop as i#
-                RepP -> let p = evalP a de in loop as p                
-             )
--}
+evalP (ConApp (A# itbl)) de
+   = mci_make_constr0 itbl
 
 evalP (ConAppI (A# itbl) a1) de
    = case evalI a1 de of i1 -> mci_make_constrI itbl i1
 
-evalP (ConApp (A# itbl)) de
-   = mci_make_constr itbl
-
 evalP (ConAppP (A# itbl) a1) de
-   = let p1 = evalP a1 de
-     in  mci_make_constrP itbl p1
+   = evalP (ConAppGen (A# itbl) [a1]) de
+--   = let p1 = evalP a1 de
+--     in  mci_make_constrP itbl p1
 
 evalP (ConAppPP (A# itbl) a1 a2) de
    = let p1 = evalP a1 de
          p2 = evalP a2 de
      in  mci_make_constrPP itbl p1 p2
 
-evalP (ConAppPPP (A# itbl) a1 a2 a3) de
-   = let p1 = evalP a1 de
-         p2 = evalP a2 de
-         p3 = evalP a3 de
-     in  mci_make_constrPPP itbl p1 p2 p3
-
-
+evalP (ConAppGen itbl args) de
+   = loop args
+     where
+        -- This appalling hack suggested (gleefully) by SDM
+        -- It is not well typed (needless to say?)
+        loop :: [LinkedIExpr] -> boxed
+        loop [] 
+           = case itbl of A# addr# -> unsafeCoerce# (mci_make_constr addr#)
+        loop (a:as) 
+           = case repOf a of
+                RepP -> let p = evalP a de in loop as p
+                RepI -> case evalI a de of i# -> loop as i#
+	        RepF -> case evalF a de of f# -> loop as f#
+	        RepD -> case evalD a de of d# -> loop as d#
 
 evalP other de
    = error ("evalP: unhandled case: " ++ showExprTag other)
@@ -943,7 +989,7 @@ repOf (ConApp _)       = RepP
 repOf (ConAppI _ _)    = RepP
 repOf (ConAppP _ _)    = RepP
 repOf (ConAppPP _ _ _) = RepP
-repOf (ConAppPPP _ _ _ _) = RepP
+repOf (ConAppGen _ _)  = RepP
 
 repOf (CaseAlgP _ _ _ _) = RepP
 repOf (CaseAlgI _ _ _ _) = RepI
@@ -996,11 +1042,15 @@ helper_casePrim :: Var -> LinkedIExpr -> [LinkedAltPrim] -> Maybe LinkedIExpr
                    -> (LinkedIExpr, UniqFM boxed)
 helper_casePrim bndr expr alts def de
    = case repOf expr of
-        -- Umm, can expr have any other rep?  Yes ...
-        -- CharRep, DoubleRep, FloatRep.  What about string reps?
         RepI -> case evalI expr de of 
                    i# -> (select_altPrim alts def (LitI i#), 
                           addToUFM de bndr (unsafeCoerce# (I# i#)))
+        RepF -> case evalF expr de of 
+                   f# -> (select_altPrim alts def (LitF f#), 
+                          addToUFM de bndr (unsafeCoerce# (F# f#)))
+        RepD -> case evalD expr de of 
+                   d# -> (select_altPrim alts def (LitD d#), 
+                          addToUFM de bndr (unsafeCoerce# (D# d#)))
 
 
 augment_from_constr :: UniqFM boxed -> a -> ([(Id,Rep)],Int) -> UniqFM boxed
@@ -1011,6 +1061,8 @@ augment_from_constr de con ((v,rep):vs,offset)
             = case rep of
                  RepP -> indexPtrOffClosure con offset
                  RepI -> unsafeCoerce# (I# (indexIntOffClosure con offset))
+                 RepF -> unsafeCoerce# (F# (indexFloatOffClosure con offset))
+                 RepD -> unsafeCoerce# (D# (indexDoubleOffClosure con offset))
      in
          augment_from_constr (addToUFM de v v_binding) con 
                              (vs,offset + repSizeW rep)
@@ -1062,6 +1114,9 @@ indexIntOffClosure :: a -> Int -> Int#
 indexIntOffClosure con (I# offset)
    = case wordToInt (W# (indexWordOffClosure# con offset)) of I# i# -> i#
 
+indexFloatOffClosure :: a -> Int -> Float#
+indexFloatOffClosure con (I# offset)
+   = unsafeCoerce# (indexWordOffClosure# con offset) -- eek!
 
 ------------------------------------------------------------------------
 --- Manufacturing of info tables for DataCons defined in this module ---
