@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.38 2001/08/29 17:24:25 qrczak Exp $
+ * $Id: Stg.h,v 1.39 2001/10/27 21:44:54 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -220,8 +220,6 @@ typedef StgWord64       LW_;
 /* Misc stuff without a home */
 DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */
 DLL_IMPORT_RTS extern int    prog_argc;
-
-extern char **environ;
 
 extern void stackOverflow(void);
 
