@@ -9,15 +9,21 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- C-specific Marshalling support: Handling of C \"errno\" error codes
+-- C-specific Marshalling support: Handling of C \"errno\" error codes.
 --
 -----------------------------------------------------------------------------
 
 module Foreign.C.Error (
 
-  -- Haskell representation for "errno" values
-  --
+  -- * Haskell representations of @errno@ values
+
   Errno(..),		-- instance: Eq
+
+  -- ** Common @errno@ symbols
+  -- | Different operating systems and\/or C libraries often support
+  -- different values of @errno@.  This module defines the common values,
+  -- but due to the open definition of 'Errno' users may add definitions
+  -- which are not predefined.
   eOK, e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN, 
   eALREADY, eBADF, eBADMSG, eBADRPC, eBUSY, eCHILD, eCOMM, eCONNABORTED, 
   eCONNREFUSED, eCONNRESET, eDEADLK, eDESTADDRREQ, eDIRTY, eDOM, eDQUOT, 
@@ -32,6 +38,8 @@ module Foreign.C.Error (
   eRANGE, eREMCHG, eREMOTE, eROFS, eRPCMISMATCH, eRREMOTE, eSHUTDOWN, 
   eSOCKTNOSUPPORT, eSPIPE, eSRCH, eSRMNT, eSTALE, eTIME, eTIMEDOUT, 
   eTOOMANYREFS, eTXTBSY, eUSERS, eWOULDBLOCK, eXDEV,
+
+  -- ** 'Errno' functions
                         -- :: Errno
   isValidErrno,		-- :: Errno -> Bool
 
@@ -52,8 +60,8 @@ module Foreign.C.Error (
   --
   throwErrno,           -- ::                String               -> IO a
 
-  -- guards for IO operations that may fail
-  --
+  -- ** Guards for IO operations that may fail
+
   throwErrnoIf,         -- :: (a -> Bool) -> String -> IO a       -> IO a
   throwErrnoIf_,        -- :: (a -> Bool) -> String -> IO a       -> IO ()
   throwErrnoIfRetry,    -- :: (a -> Bool) -> String -> IO a       -> IO a
@@ -123,8 +131,10 @@ import System.IO.Unsafe		( unsafePerformIO )
 -- "errno" type
 -- ------------
 
--- Haskell representation for "errno" values
---
+-- | Haskell representation for @errno@ values.
+-- The implementation is deliberately exposed, to allow users to add
+-- their own definitions of 'Errno' values.
+
 newtype Errno = Errno CInt
 
 instance Eq Errno where
@@ -256,8 +266,9 @@ eWOULDBLOCK	= Errno (CONST_EWOULDBLOCK)
 eXDEV		= Errno (CONST_EXDEV)
 #endif
 
--- checks whether the given errno value is supported on the current
--- architecture
+-- | Yield 'True' if the given 'Errno' value is valid on the system.
+-- This implies that the 'Eq' instance of 'Errno' is also system dependent
+-- as it is only defined for valid values of 'Errno'.
 --
 isValidErrno               :: Errno -> Bool
 --
@@ -269,7 +280,7 @@ isValidErrno (Errno errno)  = errno /= -1
 -- access to the current thread's "errno" value
 -- --------------------------------------------
 
--- yield the current thread's "errno" value
+-- | Get the current value of @errno@ in the current thread.
 --
 getErrno :: IO Errno
 
@@ -284,7 +295,7 @@ getErrno = do e <- get_errno; return (Errno e)
 foreign import ccall unsafe "HsBase.h __hscore_get_errno" get_errno :: IO CInt
 #endif
 
--- set the current thread's "errno" value to 0
+-- | Reset the current thread\'s @errno@ value to 'eOK'.
 --
 resetErrno :: IO ()
 
@@ -299,10 +310,10 @@ foreign import ccall unsafe "HsBase.h __hscore_set_errno" set_errno :: CInt -> I
 -- throw current "errno" value
 -- ---------------------------
 
--- the common case: throw an IO error based on a textual description
--- of the error location and the current thread's "errno" value
+-- | Throw an 'IOError' corresponding to the current value of 'getErrno'.
 --
-throwErrno     :: String -> IO a
+throwErrno     :: String	-- ^ textual description of the error location
+	       -> IO a
 throwErrno loc  =
   do
     errno <- getErrno
@@ -312,22 +323,28 @@ throwErrno loc  =
 -- guards for IO operations that may fail
 -- --------------------------------------
 
--- guard an IO operation and throw an "errno" based exception of the result
--- value of the IO operation meets the given predicate
+-- | Throw an 'IOError' corresponding to the current value of 'getErrno'
+-- if the result value of the 'IO' action meets the given predicate.
 --
-throwErrnoIf            :: (a -> Bool) -> String -> IO a -> IO a
+throwErrnoIf    :: (a -> Bool)	-- ^ predicate to apply to the result value
+				-- of the 'IO' operation
+		-> String	-- ^ textual description of the location
+		-> IO a		-- ^ the 'IO' operation to be executed
+		-> IO a
 throwErrnoIf pred loc f  = 
   do
     res <- f
     if pred res then throwErrno loc else return res
 
--- as `throwErrnoIf', but discards the result
+-- | as 'throwErrnoIf', but discards the result of the 'IO' action after
+-- error handling.
 --
-throwErrnoIf_            :: (a -> Bool) -> String -> IO a -> IO ()
+throwErrnoIf_   :: (a -> Bool) -> String -> IO a -> IO ()
 throwErrnoIf_ pred loc f  = void $ throwErrnoIf pred loc f
 
--- as `throwErrnoIf', but retries interrupted IO operations (ie, those whose
--- flag `EINTR')
+-- | as 'throwErrnoIf', but retry the 'IO' action when it yields the
+-- error code 'eINTR' - this amounts to the standard retry loop for
+-- interrupted POSIX system calls.
 --
 throwErrnoIfRetry            :: (a -> Bool) -> String -> IO a -> IO a
 throwErrnoIfRetry pred loc f  = 
@@ -341,10 +358,17 @@ throwErrnoIfRetry pred loc f  =
 	  else throwErrno loc
       else return res
 
--- as `throwErrnoIfRetry', but checks for operations that would block and
--- executes an alternative action in that case.
-
-throwErrnoIfRetryMayBlock  :: (a -> Bool) -> String -> IO a -> IO b -> IO a
+-- | as 'throwErrnoIfRetry', but checks for operations that would block and
+-- executes an alternative action before retrying in that case.
+--
+throwErrnoIfRetryMayBlock
+		:: (a -> Bool)	-- ^ predicate to apply to the result value
+				-- of the 'IO' operation
+		-> String	-- ^ textual description of the location
+		-> IO a		-- ^ the 'IO' operation to be executed
+		-> IO b		-- ^ action to execute before retrying if
+				-- an immediate retry would block
+		-> IO a
 throwErrnoIfRetryMayBlock pred loc f on_block  = 
   do
     res <- f
@@ -358,60 +382,64 @@ throwErrnoIfRetryMayBlock pred loc f on_block  =
                  else throwErrno loc
       else return res
 
--- as `throwErrnoIfRetry', but discards the result
+-- | as 'throwErrnoIfRetry', but discards the result.
 --
 throwErrnoIfRetry_            :: (a -> Bool) -> String -> IO a -> IO ()
 throwErrnoIfRetry_ pred loc f  = void $ throwErrnoIfRetry pred loc f
 
--- as `throwErrnoIfRetryMayBlock', but discards the result
+-- | as 'throwErrnoIfRetryMayBlock', but discards the result.
 --
 throwErrnoIfRetryMayBlock_ :: (a -> Bool) -> String -> IO a -> IO b -> IO ()
 throwErrnoIfRetryMayBlock_ pred loc f on_block 
   = void $ throwErrnoIfRetryMayBlock pred loc f on_block
 
--- throws "errno" if a result of "-1" is returned
+-- | Throw an 'IOError' corresponding to the current value of 'getErrno'
+-- if the 'IO' action returns a result of @-1@.
 --
 throwErrnoIfMinus1 :: Num a => String -> IO a -> IO a
 throwErrnoIfMinus1  = throwErrnoIf (== -1)
 
--- as `throwErrnoIfMinus1', but discards the result
+-- | as 'throwErrnoIfMinus1', but discards the result.
 --
 throwErrnoIfMinus1_ :: Num a => String -> IO a -> IO ()
 throwErrnoIfMinus1_  = throwErrnoIf_ (== -1)
 
--- throws "errno" if a result of "-1" is returned, but retries in case of an
--- interrupted operation
+-- | Throw an 'IOError' corresponding to the current value of 'getErrno'
+-- if the 'IO' action returns a result of @-1@, but retries in case of
+-- an interrupted operation.
 --
 throwErrnoIfMinus1Retry :: Num a => String -> IO a -> IO a
 throwErrnoIfMinus1Retry  = throwErrnoIfRetry (== -1)
 
--- as `throwErrnoIfMinus1', but discards the result
+-- | as 'throwErrnoIfMinus1', but discards the result.
 --
 throwErrnoIfMinus1Retry_ :: Num a => String -> IO a -> IO ()
 throwErrnoIfMinus1Retry_  = throwErrnoIfRetry_ (== -1)
 
--- as throwErrnoIfMinus1Retry, but checks for operations that would block
+-- | as 'throwErrnoIfMinus1Retry', but checks for operations that would block.
 --
 throwErrnoIfMinus1RetryMayBlock :: Num a => String -> IO a -> IO b -> IO a
 throwErrnoIfMinus1RetryMayBlock  = throwErrnoIfRetryMayBlock (== -1)
 
--- as `throwErrnoIfMinus1RetryMayBlock', but discards the result
+-- | as 'throwErrnoIfMinus1RetryMayBlock', but discards the result.
 --
 throwErrnoIfMinus1RetryMayBlock_ :: Num a => String -> IO a -> IO b -> IO ()
 throwErrnoIfMinus1RetryMayBlock_  = throwErrnoIfRetryMayBlock_ (== -1)
 
--- throws "errno" if a result of a NULL pointer is returned
+-- | Throw an 'IOError' corresponding to the current value of 'getErrno'
+-- if the 'IO' action returns 'nullPtr'.
 --
 throwErrnoIfNull :: String -> IO (Ptr a) -> IO (Ptr a)
 throwErrnoIfNull  = throwErrnoIf (== nullPtr)
 
--- throws "errno" if a result of a NULL pointer is returned, but retries in
--- case of an interrupted operation
+-- | Throw an 'IOError' corresponding to the current value of 'getErrno'
+-- if the 'IO' action returns 'nullPtr',
+-- but retry in case of an interrupted operation.
 --
 throwErrnoIfNullRetry :: String -> IO (Ptr a) -> IO (Ptr a)
 throwErrnoIfNullRetry  = throwErrnoIfRetry (== nullPtr)
 
--- as throwErrnoIfNullRetry, but checks for operations that would block
+-- | as 'throwErrnoIfNullRetry', but checks for operations that would block.
 --
 throwErrnoIfNullRetryMayBlock :: String -> IO (Ptr a) -> IO b -> IO (Ptr a)
 throwErrnoIfNullRetryMayBlock  = throwErrnoIfRetryMayBlock (== nullPtr)
@@ -419,10 +447,15 @@ throwErrnoIfNullRetryMayBlock  = throwErrnoIfRetryMayBlock (== nullPtr)
 -- conversion of an "errno" value into IO error
 -- --------------------------------------------
 
--- convert a location string, an "errno" value, an optional handle,
--- and an optional filename into a matching IO error
+-- | Construct a Haskell 98 I\/O error based on the given 'Errno' value.
+-- The optional information can be used to improve the accuracy of
+-- error messages.
 --
-errnoToIOError :: String -> Errno -> Maybe Handle -> Maybe String -> IOError
+errnoToIOError	:: String	-- ^ the location where the error occurred
+		-> Errno	-- ^ the error number
+		-> Maybe Handle	-- ^ optional handle associated with the error
+		-> Maybe String	-- ^ optional filename associated with the error
+		-> IOError
 errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
     str <- strerror errno >>= peekCString
 #if __GLASGOW_HASKELL__

@@ -14,24 +14,37 @@
 -----------------------------------------------------------------------------
 
 module Foreign.C.Types
+	( -- * Representations of C types
 #ifndef __NHC__
-	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
-	  -- Typeable, Storable, Bounded, Real, Integral, Bits
+	  -- $ctypes
+
+	  -- ** Integral types
+	  -- | These types are are represented as @newtype@s of types in
+	  -- "Data.Int" and "Data.Word", and are instances of
+	  -- 'Eq', 'Ord', 'Num', 'Read', 'Show', 'Enum', 'Typeable',
+	  -- 'Storable', 'Bounded', 'Real', 'Integral' and 'Bits'.
 	  CChar,  CSChar,  CUChar
 	, CShort, CUShort, CInt,   CUInt
 	, CLong,  CULong
 	, CPtrdiff, CSize, CWchar, CSigAtomic
         , CLLong, CULLong
-	  -- Numeric types, instances of: Eq, Ord, Num, Read, Show, Enum,
-	  -- Typeable, Storable
+
+	  -- ** Numeric types
+	  -- | These types are are represented as @newtype@s of basic
+	  -- foreign types, and are instances of
+	  -- 'Eq', 'Ord', 'Num', 'Read', 'Show', 'Enum', 'Typeable' and
+	  -- 'Storable'.
 	, CClock,   CTime
 
-	  -- Floating types, instances of: Eq, Ord, Num, Read, Show, Enum,
-	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac,
-	  -- RealFloat 
+	  -- ** Floating types
+	  -- | These types are are represented as @newtype@s of 'Float'
+	  -- and 'Double', and are instances of
+	  -- 'Eq', 'Ord', 'Num', 'Read', 'Show', 'Enum', 'Typeable',
+	  -- 'Storable', 'Real', 'Fractional', 'Floating', 'RealFrac'
+	  -- and 'RealFloat'.
 	, CFloat,  CDouble, CLDouble
 #else
-	( -- Exported non-abstractly in nhc98 to fix an interface file problem.
+	  -- Exported non-abstractly in nhc98 to fix an interface file problem.
 	  CChar(..),    CSChar(..),  CUChar(..)
 	, CShort(..),   CUShort(..), CInt(..),   CUInt(..)
 	, CLong(..),    CULong(..)
@@ -40,6 +53,7 @@ module Foreign.C.Types
 	, CClock(..),   CTime(..)
 	, CFloat(..),   CDouble(..), CLDouble(..)
 #endif
+	  -- ** Other types
 
           -- Instances of: Eq and Storable
 	, CFile,        CFpos,     CJmpBuf
@@ -69,20 +83,31 @@ import Foreign.Ptr
 #include "Typeable.h"
 #include "CTypes.h"
 
+-- | Haskell type representing the C @char@ type.
 INTEGRAL_TYPE(CChar,tyConCChar,"CChar",HTYPE_CHAR)
+-- | Haskell type representing the C @signed char@ type.
 INTEGRAL_TYPE(CSChar,tyConCSChar,"CSChar",HTYPE_SIGNED_CHAR)
+-- | Haskell type representing the C @unsigned char@ type.
 INTEGRAL_TYPE(CUChar,tyConCUChar,"CUChar",HTYPE_UNSIGNED_CHAR)
 
+-- | Haskell type representing the C @short@ type.
 INTEGRAL_TYPE(CShort,tyConCShort,"CShort",HTYPE_SHORT)
+-- | Haskell type representing the C @unsigned short@ type.
 INTEGRAL_TYPE(CUShort,tyConCUShort,"CUShort",HTYPE_UNSIGNED_SHORT)
 
+-- | Haskell type representing the C @int@ type.
 INTEGRAL_TYPE(CInt,tyConCInt,"CInt",HTYPE_INT)
+-- | Haskell type representing the C @unsigned int@ type.
 INTEGRAL_TYPE(CUInt,tyConCUInt,"CUInt",HTYPE_UNSIGNED_INT)
 
+-- | Haskell type representing the C @long@ type.
 INTEGRAL_TYPE(CLong,tyConCLong,"CLong",HTYPE_LONG)
+-- | Haskell type representing the C @unsigned long@ type.
 INTEGRAL_TYPE(CULong,tyConCULong,"CULong",HTYPE_UNSIGNED_LONG)
 
+-- | Haskell type representing the C @long long@ type.
 INTEGRAL_TYPE(CLLong,tyConCLLong,"CLLong",HTYPE_LONG_LONG)
+-- | Haskell type representing the C @unsigned long long@ type.
 INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
 
 {-# RULES
@@ -111,9 +136,12 @@ INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
 "fromIntegral/CULLong->a" fromIntegral = \(CULLong x) -> fromIntegral x
  #-}
 
+-- | Haskell type representing the C @float@ type.
 FLOATING_TYPE(CFloat,tyConCFloat,"CFloat",HTYPE_FLOAT)
+-- | Haskell type representing the C @double@ type.
 FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
 -- HACK: Currently no long double in the FFI, so we simply re-use double
+-- | Haskell type representing the C @long double@ type.
 FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
 
 {-# RULES
@@ -126,9 +154,13 @@ FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
 "realToFrac/CLDouble->a"  realToFrac = \(CLDouble x) -> realToFrac x
  #-}
 
+-- | Haskell type representing the C @ptrdiff_t@ type.
 INTEGRAL_TYPE(CPtrdiff,tyConCPtrdiff,"CPtrdiff",HTYPE_PTRDIFF_T)
+-- | Haskell type representing the C @size_t@ type.
 INTEGRAL_TYPE(CSize,tyConCSize,"CSize",HTYPE_SIZE_T)
+-- | Haskell type representing the C @wchar_t@ type.
 INTEGRAL_TYPE(CWchar,tyConCWchar,"CWchar",HTYPE_WCHAR_T)
+-- | Haskell type representing the C @sig_atomic_t@ type.
 INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 
 {-# RULES
@@ -143,16 +175,62 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 "fromIntegral/CSigAtomic->a" fromIntegral = \(CSigAtomic x) -> fromIntegral x
  #-}
 
+-- | Haskell type representing the C @clock_t@ type.
 ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
+-- | Haskell type representing the C @time_t@ type.
 ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
 -- FIXME: Implement and provide instances for Eq and Storable
+-- | Haskell type representing the C @FILE@ type.
 data CFile = CFile
+-- | Haskell type representing the C @fpos_t@ type.
 data CFpos = CFpos
+-- | Haskell type representing the C @jmp_buf@ type.
 data CJmpBuf = CJmpBuf
 
 -- C99 types which are still missing include:
 -- intptr_t, uintptr_t, intmax_t, uintmax_t, wint_t, wctrans_t, wctype_t
+
+{- $ctypes
+
+These types are needed to accurately represent C function prototypes,
+in order to access C library interfaces in Haskell.  The Haskell system
+is not required to represent those types exactly as C does, but the
+following guarantees are provided concerning a Haskell type @CT@
+representing a C type @t@:
+
+* If a C function prototype has @t@ as an argument or result type,
+  the use of @CT@ in the corresponding position in a foreign declaration
+  permits the Haskell program to access the full range of values encoded by
+  the C type; and conversely, any Haskell value for @CT@ has a valid
+  representation in C.
+
+* @'sizeOf' ('undefined' :: CT)@ will yield the same value as
+  @sizeof (t)@ in C.
+
+* @'alignment' ('undefined' :: CT)@ matches the alignment constraint
+  enforced by the C implementation for @t@.
+
+* The members 'peek' and 'poke' of the 'Storable' class map all values of
+  @CT@ to the corresponding value of @t@ and vice versa.
+
+* When an instance of 'Bounded' is defined for @CT@, the values of
+  'minBound' and 'maxBound' coincide with @t_MIN@ and @t_MAX@ in C.
+
+* When an instance of 'Eq' or 'Ord' is defined for @CT@, the predicates
+  defined by the type class implement the same relation as the
+  corresponding predicate in C on @t@.
+
+* When an instance of 'Num', 'Read', 'Integral', 'Fractional', 'Floating',
+  'RealFrac', or 'RealFloat' is defined for @CT@, the arithmetic
+  operations defined by the type class implement the same function as
+  the corresponding arithmetic operations (if available) in C on @t@.
+
+* When an instance of 'Bits' is defined for @CT@, the bitwise operation
+  defined by the type class implement the same function as the
+  corresponding bitwise operation in C on @t@.
+
+-}
 
 #else	/* __NHC__ */
 

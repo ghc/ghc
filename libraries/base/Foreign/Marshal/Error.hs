@@ -9,15 +9,12 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Marshalling support: Handling of common error conditions
+-- Routines for testing return values and raising a 'userError' exception
+-- in case of values indicating an error state.
 --
 -----------------------------------------------------------------------------
 
 module Foreign.Marshal.Error (
-  -- * Error utilities
-
-  -- |Throw an exception on specific return values
-  --
   throwIf,       -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO a
   throwIf_,      -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO ()
   throwIfNeg,    -- :: (Ord a, Num a) 
@@ -34,6 +31,10 @@ module Foreign.Marshal.Error (
 import Foreign.Ptr
 
 #ifdef __GLASGOW_HASKELL__
+#ifdef __HADDOCK__
+import Data.Bool
+import System.IO.Error
+#endif
 import GHC.Base
 import GHC.Num
 import GHC.IOBase
@@ -42,13 +43,15 @@ import GHC.IOBase
 -- exported functions
 -- ------------------
 
--- |Guard an 'IO' operation and throw an exception if the result meets the given
--- predicate 
+-- |Execute an 'IO' action, throwing a 'userError' if the predicate yields
+-- 'True' when applied to the result returned by the 'IO' action.
+-- If no exception is raised, return the result of the computation.
 --
--- * the second argument computes an error message from the result of the 'IO'
---   operation
---
-throwIf                 :: (a -> Bool) -> (a -> String) -> IO a -> IO a
+throwIf :: (a -> Bool)	-- ^ error condition on the result of the 'IO' action
+	-> (a -> String) -- ^ computes an error message from erroneous results
+			-- of the 'IO' action
+	-> IO a		-- ^ the 'IO' action to be executed
+	-> IO a
 throwIf pred msgfct act  = 
   do
     res <- act
