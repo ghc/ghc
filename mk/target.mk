@@ -305,7 +305,7 @@ endif
 
 # Object and interface files have suffixes tagged with their ways
 ifneq "$(way)" ""
-SRC_HC_OPTS += -hisuf $(way_)hi
+SRC_HC_OPTS += -hisuf $(way_)hi -hcsuf $(way_)hc -osuf $(way_)o
 endif
 
 #----------------------------------------

@@ -37,12 +37,12 @@ ifneq "$(BootingFromHc)" "YES"
 
 %.$(way_)o : %.hs
 	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
+	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
 
 %.$(way_)o : %.lhs	 
 	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
+	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
 
 %.$(way_)hc : %.lhs	 
@@ -55,17 +55,17 @@ ifneq "$(BootingFromHc)" "YES"
 
 %.$(way_)o : %.$(way_)hc 
 	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
+	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
 
 %.$(way_)o : %.hc 
 	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
+	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
 
 %.$(way_)s : %.$(way_)hc 
 	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -S $< -o $@ -osuf $(subst .,,$(suffix $@))
+	$(HC) $(HC_OPTS) -S $< -o $@
 	$(HC_POST_OPTS)
 
 %.$(way_)hc : %.lhc
