@@ -49,16 +49,22 @@ module TysPrim(
 
 #include "HsVersions.h"
 
-import Var		( TyVar, mkSysTyVar )
-import Name		( Name )
+import Var		( TyVar, mkTyVar )
+import Name		( Name, mkLocalName )
+import OccName		( mkVarOcc )
 import PrimRep		( PrimRep(..) )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
-			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKinds
+			  unliftedTypeKind, liftedTypeKind, openTypeKind, 
+			  Kind, mkArrowKinds
 			)
+import SrcLoc		( noSrcLoc )
 import Unique		( mkAlphaTyVarUnique )
 import PrelNames
+import FastString	( mkFastString )
 import Outputable
+
+import Char 		( ord, chr )
 \end{code}
 
 %************************************************************************
@@ -104,10 +110,22 @@ primTyCons
 %*									*
 %************************************************************************
 
+alphaTyVars is a list of type variables for use in templates: 
+	["a", "b", ..., "z", "t1", "t2", ... ]
+
 \begin{code}
+tyVarList :: Kind -> [TyVar]
+tyVarList kind = [ mkTyVar (mkLocalName (mkAlphaTyVarUnique u) 
+				(mkVarOcc (mkFastString name))
+			 	noSrcLoc) kind
+	         | u <- [2..],
+		   let name | c <= 'z'  = [c]
+		            | otherwise = 't':show u
+			    where c = chr (u-2 + ord 'a')
+	         ]
+
 alphaTyVars :: [TyVar]
-alphaTyVars = [ mkSysTyVar u liftedTypeKind
-	      | u <- map mkAlphaTyVarUnique [2..] ]
+alphaTyVars = tyVarList liftedTypeKind
 
 betaTyVars = tail alphaTyVars
 
@@ -120,12 +138,8 @@ alphaTys = mkTyVarTys alphaTyVars
 	-- openAlphaTyVar is prepared to be instantiated
 	-- to a lifted or unlifted type variable.  It's used for the 
 	-- result type for "error", so that we can have (error Int# "Help")
-openAlphaTyVar :: TyVar
-openAlphaTyVar = mkSysTyVar (mkAlphaTyVarUnique 1) openTypeKind
-
 openAlphaTyVars :: [TyVar]
-openAlphaTyVars = [ mkSysTyVar u openTypeKind
-		  | u <- map mkAlphaTyVarUnique [2..] ]
+openAlphaTyVars@(openAlphaTyVar:_) = tyVarList openTypeKind
 
 openAlphaTy = mkTyVarTy openAlphaTyVar
 
