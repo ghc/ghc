@@ -20,5 +20,24 @@ dnl These are needed by the .spec file.
 AC_SUBST(version)
 AC_SUBST(patchlevel)
 
+dnl Uncomment links to HOpenGL docs if necessary
+AC_ARG_ENABLE(hopengl,
+[  --enable-hopengl
+        Build HOpenGL, a Haskell binding for OpenGL/GLUT, too.
+        (This option is only relevant when hslibs are built.)
+],
+[
+HOpenGLHTMLStart=""
+HOpenGLHTMLEnd=""
+],
+[
+HOpenGLHTMLStart="<!--"
+HOpenGLHTMLEnd="-->"
+]
+)
+
+AC_SUBST(HOpenGLHTMLStart)
+AC_SUBST(HOpenGLHTMLEnd)
+
 dnl * Write the results...
-AC_OUTPUT(ghc.spec)
+AC_OUTPUT(ghc.spec docs/index.html)

@@ -60,6 +60,16 @@
             <A HREF="haskell-src/index.html"><TT>haskell-src</TT></a>:
             manipulating Haskell source code.
           </LI>
+@HOpenGLHTMLStart@
+          <LI>
+            <A HREF="OpenGL/index.html"><TT>OpenGL</TT></a>:
+            3D rendering.
+          </LI>
+          <LI>
+            <A HREF="GLUT/index.html"><TT>GLUT</TT></a>:
+            the OpenGL utility toolkit.
+          </LI>
+@HOpenGLHTMLEnd@
         </UL>
       </LI>
 
