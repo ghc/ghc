@@ -87,6 +87,10 @@ lookupFinderCache mod_name = do
 -- The ModLocation contains the names of all the files associated with
 -- that module: its source file, .hi file, object file, etc.
 
+-- Returns: 
+--	Right (Module, ModLocation)   if the module was found
+--	Left [FilePath]		      if the module was not found, and here
+--				 	is a list of all the places we looked
 findModule :: ModuleName -> IO (Either [FilePath] (Module, ModLocation))
 findModule name = do
   r <- lookupFinderCache name
