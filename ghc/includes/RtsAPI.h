@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.26 2002/02/15 07:23:02 sof Exp $
+ * $Id: RtsAPI.h,v 1.27 2002/06/27 15:38:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -116,7 +116,18 @@ rts_evalLazyIO ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret )
 void
 rts_checkSchedStatus ( char* site, SchedulerStatus rc);
 
-/* -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Wrapper closures
+
+   These are used by foreign export and foreign import "wrapper" stubs.
+   ----------------------------------------------------------------------- */
+
+extern DLL_IMPORT const StgClosure GHCziTopHandler_runIO_closure;
+extern DLL_IMPORT const StgClosure GHCziTopHandler_runNonIO_closure;
+#define runIO_closure		  (&GHCziTopHandler_runIO_closure)
+#define runNonIO_closure	  (&GHCziTopHandler_runNonIO_closure)
+
+/* ------------------------------------------------------------------------ */
 
 #ifdef __cplusplus
 }

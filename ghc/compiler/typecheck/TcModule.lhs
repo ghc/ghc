@@ -18,7 +18,7 @@ import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  isSourceInstDecl, mkSimpleMatch, placeHolderType, isCoreDecl
 			)
 import PrelNames	( ioTyConName, printName,
-			  returnIOName, bindIOName, failIOName, thenIOName, runMainName, 
+			  returnIOName, bindIOName, failIOName, thenIOName, runIOName, 
 			  dollarMainName, itName
 			)
 import MkId		( unsafeCoerceId )
@@ -751,10 +751,10 @@ We must check that in module Main,
 	b) Main.main :: forall a1...an. IO t,  for some type t
 
 Then we build
-	$main = PrelTopHandler.runMain Main.main
+	$main = GHC.TopHandler.runIO Main.main
 
 The function
-  PrelTopHandler :: IO a -> IO ()
+  GHC.TopHandler.runIO :: IO a -> IO a
 catches the top level exceptions.  
 It accepts a Main.main of any type (IO a).
 
@@ -770,17 +770,17 @@ tcCheckMain (Just main_name)
     newTyVarTy liftedTypeKind		`thenNF_Tc` \ ty ->
     tcMonoExpr rhs ty			`thenTc` \ (main_expr, lie) ->
     zonkTcType ty			`thenNF_Tc` \ ty ->
-    ASSERT( is_io_unit ty )
+    ASSERT( is_io ty )
     let
        dollar_main_id = setIdLocalExported (mkLocalId dollarMainName ty)
     in
     returnTc (VarMonoBind dollar_main_id main_expr, lie)
   where
-    rhs = HsApp (HsVar runMainName) (HsVar main_name)
+    rhs = HsApp (HsVar runIOName) (HsVar main_name)
 
-is_io_unit :: Type -> Bool	-- True for IO ()
-is_io_unit tau = case tcSplitTyConApp_maybe tau of
-		   Just (tc, [arg]) -> getName tc == ioTyConName && isUnitTy arg
+is_io :: Type -> Bool	-- True for IO a
+is_io tau = case tcSplitTyConApp_maybe tau of
+		   Just (tc, [_]) -> getName tc == ioTyConName
 		   other	    -> False
 
 mainCtxt = ptext SLIT("When checking the type of 'main'")

@@ -97,7 +97,7 @@ knownKeyNames
  =  [
 	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
-	runMainName,
+	runIOName,
 	orderingTyConName,
 	rationalTyConName,
 	ratioDataConName,
@@ -336,7 +336,7 @@ and it's convenient to write them all down in one place.
 
 \begin{code}
 dollarMainName = varQual mAIN_Name FSLIT("$main") dollarMainKey
-runMainName    = varQual pREL_TOP_HANDLER_Name FSLIT("runMain") runMainKey
+runIOName      = varQual pREL_TOP_HANDLER_Name FSLIT("runIO") runMainKey
 
 -- Stuff from GHC.Prim
 usOnceTyConName  = kindQual FSLIT(".") usOnceTyConKey

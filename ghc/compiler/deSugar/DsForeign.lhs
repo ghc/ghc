@@ -462,9 +462,17 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   text "SchedulerStatus rc;"
      ,   declareResult
 	  -- create the application + perform it.
-     ,   text (if is_IO_res_ty then "rc=rts_evalIO" else "rc=rts_eval")
-         <> parens (expr_to_run <+> comma <> text "&ret")
-         <> semi
+     ,   text "rc=rts_evalIO" <> parens (
+		text "rts_apply" <> parens (
+		    text "(HaskellObj)"
+	         <> text (if is_IO_res_ty 
+				then "runIO_closure" 
+				else "runNonIO_closure")
+		 <> comma
+        	 <> expr_to_run
+		) <+> comma
+	       <> text "&ret"
+	     ) <> semi
      ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ftext c_nm)
 						<> comma <> text "rc") <> semi
      ,   text "return" <> return_what <> semi

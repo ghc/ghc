@@ -43,7 +43,7 @@ import Module		( ModuleName, moduleName, mkVanillaModule,
 import PrelNames	( mkUnboundName, 
 			  derivingOccurrences,
 			  mAIN_Name, main_RDR_Unqual,
-			  runMainName, intTyConName, 
+			  runIOName, intTyConName, 
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
 			  eqStringName, printName, 
@@ -567,7 +567,7 @@ ubiquitousNames
 checkMain ghci_mode mod_name gbl_env
 	-- LOOKUP main IF WE'RE IN MODULE Main
 	-- The main point of this is to drag in the declaration for 'main',
-	-- its in another module, and for the Prelude function 'runMain',
+	-- its in another module, and for the Prelude function 'runIO',
 	-- so that the type checker will find them
 	--
 	-- We have to return the main_name separately, because it's a
@@ -582,7 +582,7 @@ checkMain ghci_mode mod_name gbl_env
 
   | otherwise
   = lookupSrcName gbl_env main_RDR_Unqual	`thenRn` \ main_name ->
-    returnRn (Just main_name, unitFV main_name, unitFV runMainName)
+    returnRn (Just main_name, unitFV main_name, unitFV runIOName)
 
   where
     complain_no_main | ghci_mode == Interactive = addWarnRn noMainMsg
