@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.114 2000/11/16 11:39:36 simonmar Exp $
+# $Id: Makefile,v 1.115 2000/11/19 18:39:53 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -83,7 +83,7 @@ $(HS_PROG) :: $(HS_SRCS)
 
 
 # -----------------------------------------------------------------------------
-# 		Set SRCS, LOOPS, HCS, OBJS
+# 		Set SRCS, HCS, OBJS
 #
 # First figure out DIRS, the source sub-directories
 # Then derive SRCS by looking in them
@@ -114,11 +114,6 @@ endif
 endif
 
 HS_SRCS = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
-
-# ToDo: not clear why this is here -- messes up linking
-#ifneq "$(GhcWithHscBuiltViaC)" "YES"
-#HS_SRCS += rename/ParseIface.hs parser/Parser.hs
-#endif
 
 HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 
@@ -440,10 +435,8 @@ INSTALL_PROGS += $(HS_PROG)
 #
 # Before doing `make depend', need to build all derived Haskell source files
 #
-depend :: $(LOOPS)
-
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
-depend :: rename/ParseIface.hs
+depend :: rename/ParseIface.hs parser/Parser.hs
 endif
 
 #-----------------------------------------------------------------------------
