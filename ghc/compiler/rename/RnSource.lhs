@@ -122,6 +122,7 @@ rnSrcDecls (HsGroup { hs_valds  = MonoBind binds sigs _,
 	   src_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
 			      src_fvs5, src_fvs6, src_fvs7] } ;
 
+	traceRn (text "rnSrcDecls" <+> ppr (nameSetToList src_fvs)) ;
 	tcg_env <- getGblEnv ;
 	return (tcg_env, rn_group, src_fvs)
     }}}
