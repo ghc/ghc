@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.8 2001/01/26 17:51:54 rrt Exp $
+-- $Id: Time.hsc,v 1.9 2001/01/30 10:59:04 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -104,10 +104,16 @@ module Time
 # include <time.h>
 #endif
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_TIMEB_H
+#include <sys/timeb.h>
+#endif
+
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
-#include <sys/types.h>
-#include <sys/timeb.h>
 #endif
 
 import Ix
