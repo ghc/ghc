@@ -66,9 +66,9 @@ prefix      = @prefix@
 exec_prefix = @exec_prefix@
 
 # default
-infodir   = $(datadir)
-htmldir   = $(datadir)
-dvidir    = $(datadir)
+infodir   = $(real_datadir)
+htmldir   = $(real_datadir)
+dvidir    = $(real_datadir)
 
 #
 # Putting the package stuff in package-specific
