@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Load symbols required from the Prelude
  *
@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:18 $
+ * $Revision: 1.3 $
+ * $Date: 1999/01/13 16:47:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -140,6 +140,7 @@ Name nameForce;
 
 /* these names are required before we've had a chance to do the right thing */
 Name nameSel;
+Name nameUnsafeUnpackCString;
 
 /* constructors used during translation and codegen */
 Name nameMkC;                           /* Char#        -> Char           */
@@ -493,6 +494,8 @@ Int what; {
                        pFun(nameForce,          "primForce","id");
                        /* implementTagToCon                     */
                        pFun(namePMFail,         "primPmFail","primPmFail");
+		       pFun(nameError,          "error","error");
+		       pFun(nameUnpackString, "primUnpackString", "primUnpackString");
 #undef pFun
 
                        break;

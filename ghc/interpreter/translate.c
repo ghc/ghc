@@ -1,4 +1,4 @@
-/* -*- mode: hugs-c; -*- */
+
 /* --------------------------------------------------------------------------
  * Translator: generates stg code from output of pattern matching
  * compiler.
@@ -8,8 +8,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:22:47 $
+ * $Revision: 1.3 $
+ * $Date: 1999/01/13 16:47:26 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -451,7 +451,7 @@ static Void ppExp( Name n, Int arity, Cell e )
 #if DEBUG_CODE
     if (debugCode) {
         Int i;
-        printf("BEFORE: %s", textToStr(name(n).text));
+        printf("%s", textToStr(name(n).text));
         for (i = arity; i > 0; i--) {
             printf(" o%d", i);
         }
@@ -467,14 +467,18 @@ Void stgDefn( Name n, Int arity, Cell e )
     List vs = NIL;
     List sc = NIL;
     Int i;
-    ppExp(n,arity,e);
+//printf("\nBEGIN --------------- stgDefn-ppExp ----------------\n" );
+//    ppExp(n,arity,e);
+//printf("\nEND ----------------- stgDefn-ppExp ----------------\n" );
     for (i = 1; i <= arity; ++i) {
         Cell nv = mkStgVar(NIL,NIL);
         vs = cons(nv,vs);
         sc = cons(pair(mkOffset(i),nv),sc);
     }
     stgVarBody(name(n).stgVar) = makeStgLambda(vs,stgExpr(e,arity,sc,namePMFail));
-    ppStg(name(n).stgVar);
+//printf("\nBEGIN --------------- stgDefn-ppStg ----------------\n" );
+//    ppStg(name(n).stgVar);
+//printf("\nEND ----------------- stgDefn-ppStg ----------------\n" );
 }
 
 static StgExpr forceArgs( List is, List args, StgExpr e );
@@ -525,14 +529,49 @@ Tycon t; {
 Void implementTagToCon(t)
 Tycon t; {                    
     if (isNull(tycon(t).tagToCon)) {
-        List   cs  = tycon(t).defn;
-        Name   nm  = newName(inventText());
-        StgVar v1  = mkStgVar(NIL,NIL);
-        StgVar v2  = mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL);
-        List alts  = singleton(mkStgPrimAlt(singleton(mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL)),namePMFail));
+        String etxt;
+        String tyconname;
+        List   cs;
+        Name   nm;
+        StgVar v1;
+        StgVar v2;
+        Cell   txt0;
+        StgVar bind1;
+        StgVar bind2;
+        StgVar bind3;
+        List   alts;
 
-        assert(namePMFail);
+        assert(nameMkA);
+        assert(nameUnpackString);
+        assert(nameError);
         assert(isTycon(t) && (tycon(t).what==DATATYPE || tycon(t).what==NEWTYPE));
+
+        tyconname  = textToStr(tycon(t).text);
+        etxt       = malloc(100+strlen(tyconname));
+        assert(etxt);
+        sprintf(etxt, 
+                "out-of-range arg for `toEnum' in (derived) `instance Enum %s'", 
+                tyconname);
+        
+        cs  = tycon(t).defn;
+        nm  = newName(inventText());
+        v1  = mkStgVar(NIL,NIL);
+        v2  = mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL);
+
+        txt0  = mkStr(findText(etxt));
+        bind1 = mkStgVar(mkStgCon(nameMkA,singleton(txt0)),NIL);
+        bind2 = mkStgVar(mkStgApp(nameUnpackString,singleton(bind1)), NIL);
+        bind3 = mkStgVar(mkStgApp(nameError,singleton(bind2)), NIL);
+
+        alts  = singleton(
+                   mkStgPrimAlt(
+                      singleton(
+                         mkStgPrimVar(NIL,mkStgRep(INT_REP),NIL)
+                      ),
+                      makeStgLet ( tripleton(bind1,bind2,bind3), bind3 )
+                   )
+                );
+
         for (; hasCfun(cs); cs=tl(cs)) {
             Name   c   = hd(cs);
             Int    num = cfunOf(c) == 0 ? 0 : cfunOf(c)-1;
@@ -550,6 +589,7 @@ Tycon t; {
         tycon(t).tagToCon = nm;
         /* hack to make it print out */
         stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
+        if (etxt) free(etxt);
     }
 }
 
