@@ -1,3 +1,5 @@
+setTestOpts(only_compiler_types(['ghc']))
+
 test('driver011', normal, run_command_ignore_output, ['$MAKE test011'])
 test('driver012', normal, run_command_ignore_output, ['$MAKE test012'])
 test('driver013', normal, run_command_ignore_output, ['$MAKE test013'])

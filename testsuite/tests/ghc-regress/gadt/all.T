@@ -1,3 +1,4 @@
+setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal']));
 
 test('gadt1', normal, compile, [''])

@@ -1,3 +1,5 @@
+setTestOpts(only_compiler_types(['ghc']))
+
 test( 'freeNames',
       normal,
       multimod_compile_and_run,

@@ -1,3 +1,5 @@
+setTestOpts(only_compiler_types(['ghc']))
+
 test('arrowapply1', normal, compile, [''])
 test('arrowapply2', normal, compile, [''])
 test('arrowapply3', normal, compile, [''])

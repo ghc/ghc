@@ -5,6 +5,7 @@
 
 # No point in doing anything except the normal way 
 setTestOpts(only_ways(['normal']));
+setTestOpts(only_compiler_types(['ghc']))
 
 test('rebindable1', normal, compile, [''])
 test('rebindable2', normal, compile_and_run, [''])

@@ -2,6 +2,7 @@ def f(opts):
   opts.extra_hc_opts = '-fth -package template-haskell'
 
 setTestOpts(f)
+setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal']));
 
 test('TH_repE1', normal, compile, [''])

@@ -1,3 +1,5 @@
+setTestOpts(only_compiler_types(['ghc']))
+
 test('newtype',          normal, compile_and_run, [''])
 test('datatype',         normal, compile_and_run, [''])
 test('encode',           omit_ways(['opt','optasm']), compile, [''])
