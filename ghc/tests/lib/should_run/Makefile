@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.12 1999/06/09 09:35:58 simonpj Exp $
+# $Id: Makefile,v 1.13 1999/08/04 10:07:50 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -28,6 +28,9 @@ memo001_HC_OPTS		= -syslib misc
 # stress the garbage collector a bit, to make sure weak pointers are being
 # finalized properly, and stable names are GC'd etc.
 memo001_RUNTEST_OPTS    = +RTS -A10k -G1
+
+memo002_HC_OPTS		= -syslib misc
+memo002_RUNTEST_OPTS	= 20
 
 SRC_MKDEPENDHS_OPTS += -syslib misc -syslib exts 
 
