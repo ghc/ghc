@@ -123,9 +123,10 @@ mkHomeModuleLocn mod_name basename source_fn = do
 
    return (Just (mkHomeModule mod_name,
                  ModuleLocation{
-		    hs_preprocd_file = source_fn,
-		    hi_file          = hifile,
-		    obj_file         = o_file
+                    ml_hspp_file = Nothing,
+		    ml_hs_file   = Just source_fn,
+		    ml_hi_file   = Just hifile,
+		    ml_obj_file  = Just o_file
 	         }
 	))
 
@@ -165,9 +166,10 @@ maybePackageModule mod_name = do
 	Just (pkg_name,path) -> 
 	    return (Just (mkModule mod_name pkg_name,
 			  ModuleLocation{ 
-				hs_preprocd_file = "error:_package_module;_no_source",
-				hi_file          = path ++ '/':hi,
-				obj_file         = "error:_package_module;_no_object"
+                                ml_hspp_file = Nothing,
+				ml_hs_file   = Nothing,
+				ml_hi_file   = Just (path ++ '/':hi),
+				ml_obj_file  = Nothing
 			   }
 		   ))
 

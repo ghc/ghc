@@ -88,9 +88,10 @@ import UniqSupply	( UniqSupply )
 \begin{code}
 data ModuleLocation
    = ModuleLocation {
-	hs_preprocd_file :: FilePath,	-- location after preprocessing
-	hi_file          :: FilePath,
-	obj_file         :: FilePath
+        ml_hs_file   :: Maybe FilePath,
+        ml_hspp_file :: Maybe FilePath,  -- path of preprocessed source
+        ml_hi_file   :: Maybe FilePath,
+        ml_obj_file  :: Maybe FilePath
      }
      deriving Show
 

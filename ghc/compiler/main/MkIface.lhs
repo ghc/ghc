@@ -605,23 +605,15 @@ diffDecls old_vers old_fixities new_fixities old new
 %************************************************************************
 
 \begin{code}
-writeIface :: Maybe ModIface -> IO ()
-writeIface Nothing
+writeIface :: FilePath -> Maybe ModIface -> IO ()
+writeIface hi_path Nothing
   = return ()
 
-writeIface (Just mod_iface)
-  = do	{ maybe_found <- findModule mod_name ;
-	; case maybe_found of {
-	    Nothing -> printErrs (text "Can't write interface file for" <+> ppr mod_name) ;
-	    Just (_, locn) ->
-
-    do	{ let filename = hi_file locn 
-	; if_hdl <- openFile filename WriteMode
+writeIface hi_path (Just mod_iface)
+  = do	{ if_hdl <- openFile hi_path WriteMode
 	; printForIface if_hdl (pprIface mod_iface)
 	; hClose if_hdl
-	}}}
-  where
-    mod_name = moduleName (mi_module mod_iface)
+	}
 	 
 pprIface :: ModIface -> SDoc
 pprIface iface

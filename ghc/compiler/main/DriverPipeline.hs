@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.12 2000/10/30 13:46:24 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.13 2000/10/30 18:13:15 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -404,8 +404,8 @@ run_phase Hsc basename suff input_fn output_fn
 	ohi    <- readIORef v_Output_hi
 	hisuf  <- readIORef v_Hi_suf
 	let hifile = case ohi of
-			   Nothing -> current_dir ++ {-ToDo: modname!!-}basename
-					++ hisuf
+			   Nothing -> current_dir ++ "/" ++ basename
+					++ "." ++ hisuf
 			   Just fn -> fn
 
   -- figure out if the source has changed, for recompilation avoidance.
@@ -434,9 +434,10 @@ run_phase Hsc basename suff input_fn output_fn
 
    -- build a bogus ModuleLocation to pass to hscMain.
         let location = ModuleLocation {
-                          hs_preprocd_file = input_fn,
-                          hi_file = hifile,
-                          obj_file = o_file
+                          ml_hs_file   = Nothing,
+                          ml_hspp_file = Just input_fn,
+                          ml_hi_file   = Just hifile,
+                          ml_obj_file  = Just o_file
                        }
 
   -- get the DynFlags
@@ -727,10 +728,9 @@ compile summary old_iface hst hit pcs = do
 
    init_dyn_flags <- readIORef v_InitDynFlags
    writeIORef v_DynFlags init_dyn_flags
-   
-   let input_fn = case ms_ppsource summary of
-			Just (ppsource, fingerprint) -> ppsource
-			Nothing -> hs_preprocd_file (ms_location summary)
+
+   let location = ms_location summary   
+   let input_fn = unJust (ml_hs_file location) "compile:hs"
 
    when verb (hPutStrLn stderr ("compile: input file " ++ input_fn))
 
@@ -748,7 +748,7 @@ compile summary old_iface hst hit pcs = do
    -- run the compiler
    hsc_result <- hscMain dyn_flags{ hscOutName = output_fn } 
 			 (panic "compile:source_unchanged")
-                         (ms_location summary) old_iface hst hit pcs
+                         location old_iface hst hit pcs
 
    case hsc_result of {
       HscFail pcs -> return (CompErrs pcs);
@@ -761,7 +761,7 @@ compile summary old_iface hst hit pcs = do
 		Nothing -> return (CompOK details Nothing pcs);
 		Just iface -> do
 
-	   let (basename, _) = splitFilename (hs_preprocd_file (ms_location summary))
+	   let (basename, _) = splitFilename input_fn
 	   maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
 	   let stub_unlinked = case maybe_stub_o of
 				  Nothing -> []

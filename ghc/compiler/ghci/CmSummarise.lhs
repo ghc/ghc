@@ -14,6 +14,7 @@ where
 
 import List 		( nub )
 import Char		( ord, isAlphaNum )
+import Util		( unJust )
 import HscTypes		( ModuleLocation(..) )
 import FastTypes
 
@@ -81,9 +82,7 @@ summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
    = if isModuleInThisPackage mod
 	then do 
-	    let source_fn = hs_preprocd_file location
-	    -- ToDo:
-	    -- ppsource_fn <- preprocess source_fn
+	    let source_fn = unJust (ml_hspp_file location) "summarise"
 	    modsrc <- readFile source_fn
             let imps = getImports modsrc
                 fp   = fingerprint modsrc

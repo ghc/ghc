@@ -41,6 +41,7 @@ import CodeOutput	( codeOutput )
 import Module		( ModuleName, moduleName, mkModuleInThisPackage )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn )
+import Util		( unJust )
 import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
@@ -93,9 +94,10 @@ hscMain
 
 hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
  = do {
+      putStrLn ( "hscMain: location =\n" ++ show location);
       putStrLn "checking old iface ...";
       (pcs_ch, check_errs, (recomp_reqd, maybe_checked_iface))
-         <- checkOldIface dflags hit hst pcs (hi_file location)
+         <- checkOldIface dflags hit hst pcs (unJust (ml_hi_file location) "hscMain")
 			  source_unchanged maybe_old_iface;
       if check_errs then
          return (HscFail pcs_ch)
@@ -156,7 +158,8 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
       ;
 --      putStrLn ("toInterp = " ++ show toInterp);
       -- PARSE
-      maybe_parsed <- myParseModule dflags (hs_preprocd_file location);
+      maybe_parsed 
+         <- myParseModule dflags (unJust (ml_hspp_file location) "hscRecomp:hspp");
       case maybe_parsed of {
          Nothing -> return (HscFail pcs_ch);
          Just rdr_module -> do {
@@ -205,7 +208,7 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
                   Just (fif, sdoc) -> Just fif; Nothing -> Nothing
       ;
       -- Write the interface file
-      writeIface maybe_final_iface
+      writeIface (unJust (ml_hi_file location) "hscRecomp:hi") maybe_final_iface
       ;
       -- do the rest of code generation/emission
       (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)

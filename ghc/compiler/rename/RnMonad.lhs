@@ -86,6 +86,12 @@ ioToRnM :: IO r -> RnM d (Either IOError r)
 ioToRnM io rn_down g_down = (io >>= \ ok -> return (Right ok)) 
 			    `catch` 
 			    (\ err -> return (Left err))
+
+ioToRnM_no_fail :: IO r -> RnM d r
+ioToRnM_no_fail io rn_down g_down 
+   = (io >>= \ ok -> return ok) 
+     `catch` 
+     (\ err -> panic "ioToRnM_no_fail: the I/O operation failed!")
 	    
 traceRn :: SDoc -> RnM d ()
 traceRn msg

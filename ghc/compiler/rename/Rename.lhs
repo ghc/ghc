@@ -17,13 +17,13 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDe
 			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
 import RnIfaces		( slurpImpDecls, mkImportInfo, 
 			  getInterfaceExports, closeDecls,
-			  RecompileRequired, recompileRequired
+			  RecompileRequired, outOfDate, recompileRequired
 			)
 import RnHiFiles	( readIface, removeContext, 
 			  loadExports, loadFixDecls, loadDeprecs )
@@ -33,7 +33,8 @@ import RnEnv		( availName,
 			  lookupOrigNames, lookupGlobalRn, newGlobalName
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
-			  moduleNameUserString, moduleName, moduleEnvElts
+			  moduleNameUserString, moduleName,
+			  mkModuleInThisPackage, mkModuleName, moduleEnvElts
 			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
 			  nameOccName, nameModule,
@@ -376,35 +377,41 @@ checkOldIface :: DynFlags
 				-- True <=> errors happened
 
 checkOldIface dflags hit hst pcs iface_path source_unchanged maybe_iface
-  = initRn dflags hit hst pcs (panic "checkOldIface: bogus mod") $
-	
-	-- Load the old interface file, if we havn't already got it
-    loadOldIface iface_path maybe_iface				`thenRn` \ maybe_iface2 ->
+  = case maybe_iface of
+       Just old_iface -> -- Use the one we already have
+                         startRn (mi_module old_iface) $ 
+                         check_versions old_iface
+       Nothing -- try and read it from a file
+          -> do read_result <- readIface do_traceRn iface_path
+                case read_result of
+                   Left err -> -- Old interface file not found, or garbled; give up
+                               return (pcs, False, (outOfDate, Nothing))
+                   Right parsed_iface
+                      -> startRn (pi_mod parsed_iface) $
+                         loadOldIface parsed_iface `thenRn` \ m_iface ->
+                         check_versions m_iface
+    where
+       check_versions :: ModIface -> RnMG (RecompileRequired, Maybe ModIface)
+       check_versions iface
+          = -- Check versions
+            recompileRequired iface_path source_unchanged iface
+	 						`thenRn` \ recompile ->
+            returnRn (recompile, Just iface)
 
-	-- Check versions
-    recompileRequired iface_path source_unchanged maybe_iface2	`thenRn` \ recompile ->
-
-    returnRn (recompile, maybe_iface2)
+       do_traceRn     = dopt Opt_D_dump_rn_trace dflags
+       ioTraceRn sdoc = if do_traceRn then printErrs sdoc else return ()
+       startRn mod     = initRn dflags hit hst pcs mod
 \end{code}
 
+I think the following function should now have a more representative name,
+but what?
 
 \begin{code}
-loadOldIface :: FilePath -> Maybe ModIface -> RnMG (Maybe ModIface)
-loadOldIface iface_path (Just iface) 
-  = returnRn (Just iface)
+loadOldIface :: ParsedIface -> RnMG ModIface
 
-loadOldIface iface_path Nothing
-  = 	-- LOAD THE OLD INTERFACE FILE
-    -- call readIface ...
-    readIface iface_path `thenRn` \ read_result ->
-    case read_result of {
-	Left err -> 	-- Old interface file not found, or garbled, so we'd better bail out
-		    traceRn (vcat [ptext SLIT("No old interface file:"), err])	`thenRn_`
-		    returnRn Nothing ;
-
-	Right iface ->
-
-	-- RENAME IT
+loadOldIface parsed_iface
+  = let iface = parsed_iface 
+    in	-- RENAME IT
     let mod = pi_mod iface
         doc_str = ptext SLIT("need usage info from") <+> ppr mod
     in
@@ -413,10 +420,11 @@ loadOldIface iface_path Nothing
 	loadHomeRules (pi_rules iface)	`thenRn` \ rules -> 
 	loadHomeInsts (pi_insts iface)	`thenRn` \ insts ->
 	returnRn (decls, rules, insts)
-    )				`thenRn` \ ((decls_vers, new_decls), (rule_vers, new_rules), new_insts) ->
+    )	
+	`thenRn` \ ((decls_vers, new_decls), (rule_vers, new_rules), new_insts) ->
 
     mapRn loadHomeUsage	(pi_usages iface)	`thenRn` \ usages ->
-    loadExports 	(pi_exports iface)	`thenRn` \ (export_vers, avails) ->
+    loadExports         (pi_exports iface)	`thenRn` \ (export_vers, avails) ->
     loadFixDecls mod	(pi_fixity iface)	`thenRn` \ fix_env ->
     loadDeprecs mod	(pi_deprecs iface)	`thenRn` \ deprec_env ->
     let
@@ -437,8 +445,7 @@ loadOldIface iface_path Nothing
 			       mi_globals = panic "No mi_globals in old interface"
 		    }
     in
-    returnRn (Just mod_iface)
-    }
+    returnRn mod_iface
 \end{code}
 
 \begin{code}

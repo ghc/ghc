@@ -787,9 +787,9 @@ outOfDate = True	-- Recompile required
 
 recompileRequired :: FilePath		-- Only needed for debug msgs
 		  -> Bool 		-- Source unchanged
-		  -> Maybe ModIface 	-- Old interface, if any
+		  -> ModIface 		-- Old interface
 		  -> RnMG RecompileRequired
-recompileRequired iface_path source_unchanged maybe_iface
+recompileRequired iface_path source_unchanged iface
   = traceRn (text "Considering whether compilation is required for" <+> text iface_path <> colon)	`thenRn_`
 
 	-- CHECK WHETHER THE SOURCE HAS CHANGED
@@ -799,12 +799,8 @@ recompileRequired iface_path source_unchanged maybe_iface
     else
 
 	-- CHECK WHETHER WE HAVE AN OLD IFACE
-    case maybe_iface of 
-	Nothing -> traceRn (nest 4 (ptext SLIT("No old interface file")))	`thenRn_`
-		   returnRn outOfDate ;
-
-	Just iface  ->    	-- Source code unchanged and no errors yet... carry on 
-			checkList [checkModUsage u | u <- mi_usages iface]
+	-- Source code unchanged and no errors yet... carry on 
+	checkList [checkModUsage u | u <- mi_usages iface]
 
 checkList :: [RnMG RecompileRequired] -> RnMG RecompileRequired
 checkList []		 = returnRn upToDate

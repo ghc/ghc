@@ -24,6 +24,9 @@ module Util (
 	-- for-loop
 	nTimes,
 
+	-- maybe-ish
+	unJust,
+
 	-- sorting
 	IF_NOT_GHC(quicksort COMMA stableSortLt COMMA mergesort COMMA)
 	sortLt,
@@ -65,8 +68,8 @@ module Util (
 
 #include "HsVersions.h"
 
-import IO		( hPutStrLn, stderr )
 import List		( zipWith4 )
+import Maybe		( Maybe(..) )
 import Panic		( panic )
 import IOExts		( IORef, newIORef, unsafePerformIO )
 import FastTypes
@@ -128,6 +131,17 @@ nTimes 1 f = f
 nTimes n f = f . nTimes (n-1) f
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Maybe-ery}
+%*									*
+%************************************************************************
+
+\begin{code}
+unJust :: Maybe a -> String -> a
+unJust (Just x) who = x
+unJust Nothing  who = panic ("unJust of Nothing, called by " ++ who)
+\end{code}
 
 %************************************************************************
 %*									*
