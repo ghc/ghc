@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.13 1999/02/17 17:35:31 simonm Exp $
+ * $Id: Storage.c,v 1.14 1999/02/23 17:18:01 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,7 +55,7 @@ initStorage (void)
 
   if (RtsFlags.GcFlags.heapSizeSuggestion > 
       RtsFlags.GcFlags.maxHeapSize) {
-    barf("Suggested heap size (-H<size>) is larger than max. heap size (-M<size>)\n");
+    RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
   }
 
   initBlockAllocator();
@@ -389,18 +389,19 @@ calcLive(void)
   if (RtsFlags.GcFlags.generations == 1) {
     live = g0s0->to_blocks * BLOCK_SIZE_W + 
       ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
+    return live;
   }
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
       /* approximate amount of live data (doesn't take into account slop
-	 * at end of each block).
-	 */
+       * at end of each block).
+       */
       if (g == 0 && s == 0) { 
 	  continue; 
       }
       step = &generations[g].steps[s];
-      live += step->n_blocks * BLOCK_SIZE_W + 
+      live += (step->n_blocks - 1) * BLOCK_SIZE_W +
 	((lnat)step->hp_bd->free -(lnat)step->hp_bd->start) / sizeof(W_);
     }
   }
