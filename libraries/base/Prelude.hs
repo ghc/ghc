@@ -28,12 +28,13 @@ module Prelude (
 	-- Restore export of (:) until we get to 5.05
     []((:), []),	-- Not legal Haskell 98;
 			-- ... available through built-in syntax
+    module Data.Tuple,	-- Includes tuple types
     ()(..),		-- Not legal Haskell 98
     (->),		-- ... available through built-in syntax
 #endif
-    
-    module Data.Tuple,
-        -- Includes tuple types + fst, snd, curry, uncurry
+#ifdef __HUGS__
+    (:),		-- Not legal Haskell 98
+#endif
     
     -- * Basic type classes
     Eq((==), (/=)),
@@ -94,13 +95,14 @@ module Prelude (
     (&&), (||), not, otherwise,
     subtract, even, odd, gcd, lcm, (^), (^^), 
     fromIntegral, realToFrac,
-    --exported by Data.Tuple: fst, snd, curry, uncurry,
+    fst, snd, curry, uncurry,
     id, const, (.), flip, ($), until,
     asTypeOf, error, undefined,
     seq, ($!)
 
   ) where
 
+#ifndef __HUGS__
 import Control.Monad
 import System.IO
 import Text.Read
@@ -110,6 +112,7 @@ import Data.Either
 import Data.Maybe
 import Data.Bool
 import Data.Tuple
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -125,6 +128,11 @@ import GHC.Conc
 import GHC.Err   ( error, undefined )
 #endif
 
+#ifdef __HUGS__
+import Hugs.Prelude
+#endif
+
+#ifndef __HUGS__
 infixr 0 $!
 
 
@@ -133,5 +141,5 @@ infixr 0 $!
 
 ($!)    :: (a -> b) -> a -> b
 f $! x  = x `seq` f x
-
+#endif
 
