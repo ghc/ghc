@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.35 2002/12/11 15:36:26 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.36 2002/12/18 16:15:43 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -154,12 +154,9 @@ heap-check code for these cases.
 
 For unboxed tuple returns, there are an arbitrary number of possibly
 unboxed return values, some of which will be in registers, and the
-others will be on the stack, with gaps left for tagging the unboxed
-objects.  If a heap check is required, we need to fill in these tags.
-
-The code below will cover all cases for the x86 architecture (where R1
-is the only VanillaReg ever used).  For other architectures, we'll
-have to do something about saving and restoring the other registers.
+others will be on the stack.  We always organise the stack-resident
+fields into pointers & non-pointers, and pass the number of each to
+the heap check code.
 
 \begin{code}
 altHeapCheck 
