@@ -130,6 +130,9 @@ instance Outputable Bool where
     ppr sty True = ptext SLIT("True")
     ppr sty False = ptext SLIT("False")
 
+instance Outputable Int where
+   ppr sty n = int n
+
 instance (Outputable a) => Outputable [a] where
     ppr sty xs = brackets (fsep (punctuate comma (map (ppr sty) xs)))
 
