@@ -346,7 +346,7 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
 	--	Void		if it has kind Lifted
 	--	:Void		otherwise
     zonk_unbound_tyvar tv
-	| kind == liftedTypeKind
+	| kind == liftedTypeKind || kind == openTypeKind
 	= tcPutTyVar tv voidTy	-- Just to avoid creating a new tycon in
 				-- this vastly common case
 	| otherwise
