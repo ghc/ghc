@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.112 2001/08/02 15:33:35 ken Exp $
+ * $Id: GC.c,v 1.113 2001/08/04 06:07:22 ken Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -3787,7 +3787,7 @@ threadSqueezeStack(StgTSO *tso)
 	  { 
 	      StgInfoTable *info = get_itbl(bh);
 	      nat np = info->layout.payload.ptrs, nw = info->layout.payload.nptrs, i;
-	      /* don't zero out slop for a THUNK_SELECTOR, because it's layout
+	      /* don't zero out slop for a THUNK_SELECTOR, because its layout
 	       * info is used for a different purpose, and it's exactly the
 	       * same size as a BLACKHOLE in any case.
 	       */
