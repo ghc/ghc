@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: setBuffering.c,v 1.3 1998/12/02 13:27:54 simonm Exp $
+ * $Id: setBuffering.c,v 1.4 1999/03/01 09:26:45 sof Exp $
  *
  * hSetBuffering Runtime Support
  */
@@ -56,6 +56,7 @@ StgInt size;
        fo->buf     = NULL;
     }
 
+#ifndef mingw32_TARGET_OS
     while ((flags = fcntl(fo->fd, F_GETFL)) < 0) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -67,11 +68,13 @@ StgInt size;
     input = flags == O_RDONLY || flags == O_RDWR;
 
     isaterm = input && isatty(fo->fd);
+#endif
 
     switch (size) {
     case SB_NB:
         fo->flags &= ~FILEOBJ_LB & ~FILEOBJ_BB;
 
+#ifndef mingw32_TARGET_OS
 	if (isaterm) {
 	    /* Switch over to canonical mode. */
 	    if (tcgetattr(fo->fd, &tio) < 0) {
@@ -88,6 +91,7 @@ StgInt size;
 		return -1;
 	    }
 	}
+#endif
 	return 0;
     case SB_LB:
         fo->flags &= ~FILEOBJ_BB;
@@ -123,6 +127,7 @@ StgInt size;
        }
        fo->bufSize = size;
     }
+#ifndef mingw32_TARGET_OS
     if (isaterm) {
 
 	/*
@@ -141,6 +146,7 @@ StgInt size;
 	    return -1;
 	}
     }
+#endif
     return 0;
 }
 
