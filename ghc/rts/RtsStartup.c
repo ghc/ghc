@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.79 2004/02/27 13:35:16 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.80 2004/03/19 23:17:06 panne Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -199,7 +199,7 @@ hs_init(int *argc, char **argv[])
 #endif
 
 #ifdef HAVE_LOCALE_H
-    setlocale(LC_ALL,"");
+    setlocale(LC_CTYPE,"");
 #endif
 
     /* Record initialization times */
