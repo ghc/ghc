@@ -1,9 +1,9 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.18 2002/10/25 13:07:41 sof Exp $
+ * $Id: HsBase.h,v 1.19 2003/02/17 11:43:21 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
- * Definitions for package `core' which are visible in Haskell land.
+ * Definitions for package `base' which are visible in Haskell land.
  *
  * ---------------------------------------------------------------------------*/
 
