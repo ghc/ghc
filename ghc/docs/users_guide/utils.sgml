@@ -215,16 +215,6 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>-s FILE</literal> or
-	  <literal>--support=FILE</literal></term>
-	  <listitem>
-	    <para>Basename of the C file and C header
-	    (with <literal>.c</literal>, <literal>.h</literal>
-	    suffixes removed).</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term><literal>--help</literal></term>
 	  <listitem>
 	    <para>Display a summary of the available flags.</para>
@@ -240,22 +230,22 @@ tags:
       </variablelist>
 
       <para>The input file should end with .hsc. Output files by
-      default get names with the <literal>*.hsc</literal> pattern
+      default get names with the <literal>.hsc</literal> suffix
       replaced:</para>
 
       <informaltable>
 	<tgroup cols=2>
 	  <tbody>
 	    <row>
-	      <entry><literal>*.hs</literal></entry>
+	      <entry><literal>.hs</literal></entry>
 	      <entry>Haskell file</entry>
 	    </row>
 	    <row>
-	      <entry><literal>Hs*.h</literal></entry>
+	      <entry><literal>_hsc.h</literal></entry>
 	      <entry>C header</entry>
 	    </row>
 	    <row>
-	      <entry><literal>Hs*.c</literal></entry>
+	      <entry><literal>_hsc.c</literal></entry>
 	      <entry>C file</entry>
 	    </row>
 	  </tbody>

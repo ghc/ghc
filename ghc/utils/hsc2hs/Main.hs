@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.28 2001/03/29 08:03:21 qrczak Exp $
+-- $Id: Main.hs,v 1.29 2001/03/29 17:56:18 qrczak Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -32,7 +32,6 @@ data Flag
     | Include   String
     | Define    String (Maybe String)
     | Output    String
-    | Support   String
 
 include :: String -> Flag
 include s@('\"':_) = Include s
@@ -53,11 +52,10 @@ options = [
     Option "I" []             (ReqArg (CompFlag . ("-I"++))
                                                  "DIR")  "passed to the C compiler",
     Option "L" ["lflag"]      (ReqArg LinkFlag   "FLAG") "flag to pass to the linker",
-    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_make.c",
+    Option ""  ["no-compile"] (NoArg  NoCompile)         "stop after writing *_hsc_make.c",
     Option "i" ["include"]    (ReqArg include    "FILE") "as if placed in the source",
     Option "D" ["define"]     (ReqArg define "NAME[=VALUE]") "as if placed in the source",
     Option "o" ["output"]     (ReqArg Output     "FILE") "name of main output file",
-    Option "s" ["support"]    (ReqArg Support    "FILE") "basename of support output files (with .h, .c removed)",
     Option ""  ["help"]       (NoArg  Help)              "display this help and exit",
     Option ""  ["version"]    (NoArg  Version)           "output version information and exit"]
 
@@ -415,35 +413,30 @@ splitExt name =
 output :: [Flag] -> String -> [Token] -> IO ()
 output flags name toks = do
     
-    let (dir,  file) = splitName name
-        (base, ext)  = splitExt  file
-    
     (outName, outDir, outBase) <- case [f | Output f <- flags] of
         []
             | not (null ext) &&
               last ext == 'c'   -> return (dir++base++init ext,  dir, base)
             | ext == ".hs"      -> return (dir++base++"_out.hs", dir, base)
             | otherwise         -> return (dir++base++".hs",     dir, base)
+            where
+            (dir,  file) = splitName name
+            (base, ext)  = splitExt  file
         [f] -> let
-            (dir',  file') = splitName f
-            (base', _)     = splitExt file'
-            in return (f, dir', base')
+            (dir,  file) = splitName f
+            (base, _)    = splitExt file
+            in return (f, dir, base)
         _ -> onlyOne "output file"
     
-    supportDirBase <- case [f | Support f <- flags] of
-        []  -> return (outDir++"Hs"++outBase)
-        [f] -> return f
-        _   -> onlyOne "support file"
-    
-    let cProgName    = outDir++outBase++"_make.c"
-        oProgName    = outDir++outBase++"_make.o"
-        progName     = outDir++outBase++"_make"
-        outHName     = supportDirBase++".h"
-        outCName     = supportDirBase++".c"
+    let cProgName    = outDir++outBase++"_hsc_make.c"
+        oProgName    = outDir++outBase++"_hsc_make.o"
+        progName     = outDir++outBase++"_hsc_make"
+        outHName     = outDir++outBase++"_hsc.h"
+        outCName     = outDir++outBase++"_hsc.c"
     
     let execProgName
-            | null dir  = "./"++progName
-            | otherwise = progName
+            | null outDir = "./"++progName
+            | otherwise   = progName
     
     let specials = [(pos, key, arg) | Special pos key arg <- toks]
     
