@@ -309,12 +309,13 @@ makeDerivEqns this_mod tycons
       = case chk_out clas tycon of
 	   Just err ->  addErrTc err				`thenNF_Tc_` 
 			returnNF_Tc Nothing
-	   Nothing  ->  newDFunName this_mod clas tyvar_tys locn `thenNF_Tc` \ dfun_name ->
+	   Nothing  ->  newDFunName this_mod clas [ty] locn `thenNF_Tc` \ dfun_name ->
 			returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints))
       where
 	clas_key  = classKey clas
-	tyvars    = tyConTyVars tycon	-- ToDo: Do we need new tyvars ???
+	tyvars    = tyConTyVars tycon
 	tyvar_tys = mkTyVarTys tyvars
+	ty	  = mkTyConApp tycon tyvar_tys
 	data_cons = tyConDataCons tycon
 	locn	  = getSrcLoc tycon
 

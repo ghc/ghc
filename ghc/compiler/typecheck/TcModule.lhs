@@ -46,7 +46,7 @@ import Module           ( Module )
 import Name		( Name, isLocallyDefined, 
 			  toRdrName, nameEnvElts, lookupNameEnv, 
 			)
-import TyCon		( tyConGenInfo, isClassTyCon )
+import TyCon		( tyConGenInfo )
 import Maybes		( thenMaybe )
 import Util
 import BasicTypes       ( EP(..), Fixity )
