@@ -647,19 +647,21 @@ documentation that comes with the <Literal>fptools</Literal> projects:
 <IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm>
 <ListItem>
 <Para>
-All our documentation is written in SGML, using the DocBook DTD and
-processed using the <ULink
+All our documentation is written in SGML, using the DocBook DTD.
+Instructions on how to install the SGML processor Jade and the DocBook DTD
+and DSSSL stylesheets follows; if you're using a system that can handle
+RedHat RPM packages, you might be able to use the <ULink
 URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
 tools</ULink>, which is the most shrink-wrapped SGML suite that we
 could find. You need all the RPMs except for psgml (i.e. docbook, jade,
-jadetex, sgmlcommon and stylesheets). Unfortunately, it's only packaged as
-RPMs. You can use it to generate HTML, DVI (and hence PDF and Postscript)
-and RTF from any DocBook source file (including this manual). N.B. The
+jadetex, sgmlcommon and stylesheets). N.B. The
 <Emphasis>Cygnus</Emphasis> version of the tools is assumed. Others, such as
 the SuSE version, may not work. Note that most of these RPMs are
-architecture neutral, so are likely to be found in a <file>noarch</file>
+architecture neutral, so are likely to be found in a
+<Filename>noarch</Filename>
 directory.
 </Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>TeX:</Term>
