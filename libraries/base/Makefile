@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.18 2002/02/17 20:05:35 panne Exp $
+# $Id: Makefile,v 1.19 2002/03/04 17:02:43 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -52,9 +52,7 @@ endif
 # Per-module flags
 
 # ESSENTIAL, for getting reasonable performance from the I/O library:
-GHC/IOBase_HC_OPTS   		= -funbox-strict-fields 
-
-Data/Array/Storable_HC_OPTS 	= -funbox-strict-fields
+SRC_HC_OPTS += -funbox-strict-fields
 
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
@@ -71,7 +69,7 @@ CLEAN_FILES += GHC/PrimopWrappers.hs
 # GHC/Prim.hi-boot
 
 GHC/Prim.$(way_)hi	: GHC/Prim.hi-boot
-	cp $< $@
+	-$(GHC_INPLACE) --compile-iface $<
 
 ALL_PRIMS = GHC/Prim.hi $(foreach way, $(WAYS), GHC/Prim.$(way)_hi)
 INSTALL_DATAS_WITH_DIRS += GHC/Prim.$(way_)hi
