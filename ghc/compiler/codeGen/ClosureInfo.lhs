@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.43 2000/07/14 08:14:53 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.44 2000/12/06 13:19:49 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -686,7 +686,7 @@ getEntryConvention name lf_info arg_kinds
 	  -> StdEntry (mkReturnPtLabel (nameUnique name))
 
 	LFLetNoEscape arity
-	  -> ASSERT(arity == length arg_kinds)
+	  -> if (arity /= length arg_kinds) then pprPanic "let-no-escape: " (ppr name <+> ppr arity) else
 	     DirectEntry (mkReturnPtLabel (nameUnique name)) arity arg_regs
 	 where
 	    (arg_regs, _) = assignRegs [] arg_kinds

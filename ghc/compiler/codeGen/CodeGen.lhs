@@ -31,7 +31,7 @@ import CLabel		( CLabel, mkSRTLabel, mkClosureLabel, mkModuleInitLabel )
 
 import PprAbsC		( dumpRealC )
 import AbsCUtils	( mkAbstractCs, flattenAbsC )
-import CgBindery	( CgIdInfo, addBindC, addBindsC )
+import CgBindery	( CgIdInfo, addBindC, addBindsC, getCAddrModeAndInfo )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )
@@ -39,7 +39,8 @@ import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
 import CostCentre       ( CostCentre, CostCentreStack )
-import Id               ( Id, idName )
+import Id               ( Id, idName, setIdName )
+import Name		( globaliseName )
 import Module           ( Module )
 import PrimRep		( PrimRep(..) )
 import TyCon            ( TyCon, isDataTyCon )
@@ -70,11 +71,11 @@ codeGen dflags mod_name imported_modules cost_centre_info fe_binders
 	; fl_uniqs <- mkSplitUniqSupply 'f'
 	; let
 	    datatype_stuff = genStaticConBits cinfo data_tycons
-	    code_stuff     = initC cinfo (cgTopBindings maybe_split stg_binds)
+	    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
 	    init_stuff     = mkModuleInit fe_binders mod_name imported_modules 
 					  cost_centre_info
 
-	    abstractC = mkAbstractCs [ maybe_split,
+	    abstractC = mkAbstractCs [ maybeSplitCode,
 				       init_stuff, 
 				       code_stuff,
 				       datatype_stuff]
@@ -90,9 +91,6 @@ codeGen dflags mod_name imported_modules cost_centre_info fe_binders
   where
     data_tycons = filter isDataTyCon tycons
 
-    maybe_split = if opt_EnsureSplittableC 
-		  then CSplitMarker 
-		  else AbsCNop
     cinfo       = MkCompInfo mod_name
 \end{code}
 
@@ -174,7 +172,7 @@ mkCostCentreStuff (local_CCs, extern_CCs, singleton_CCSs)
 %*									*
 %************************************************************************
 
-@cgTopBindings@ is only used for top-level bindings, since they need
+@cgTopBinding@ is only used for top-level bindings, since they need
 to be allocated statically (not in the heap) and need to be labelled.
 No unboxed bindings can happen at top level.
 
@@ -185,37 +183,70 @@ style, with the increasing static environment being plumbed as a state
 variable.
 
 \begin{code}
-cgTopBindings :: AbstractC -> [(StgBinding,[Id])] -> Code
-
-cgTopBindings split bindings = mapCs (cgTopBinding split) bindings
-
-cgTopBinding :: AbstractC -> (StgBinding,[Id]) -> Code
-
-cgTopBinding split ((StgNonRec name rhs), srt)
-  = absC split		  	`thenC`
-    absC (mkSRT srt_label srt) 	`thenC`
+cgTopBinding :: (StgBinding,[Id]) -> Code
+cgTopBinding (StgNonRec id rhs, srt)
+  = absC maybeSplitCode	  	`thenC`
+    maybeGlobaliseId id		`thenFC` \ id' ->
+    let
+	srt_label = mkSRTLabel (idName id')
+    in
+    mkSRT srt_label srt [] 	`thenC`
     setSRTLabel srt_label (
-    cgTopRhs name rhs	  	`thenFC` \ (name, info) ->
-    addBindC name info
+    cgTopRhs id' rhs	  	`thenFC` \ (id, info) ->
+    addBindC id info
     )
-  where
-    srt_label = mkSRTLabel (idName name)
 
-cgTopBinding split ((StgRec pairs@((name,rhs):_)), srt)
-  = absC split		  	`thenC`
-    absC (mkSRT srt_label srt) 	`thenC`
+cgTopBinding (StgRec pairs, srt)
+  = absC maybeSplitCode		  	`thenC`
+    let
+        (bndrs, rhss) = unzip pairs
+    in
+    mapFCs maybeGlobaliseId bndrs	`thenFC` \ bndrs'@(id:_) ->
+    let
+	srt_label = mkSRTLabel (idName id)
+	pairs'    = zip bndrs' rhss
+    in
+    mkSRT srt_label srt bndrs'		`thenC`
     setSRTLabel srt_label (
-    fixC (\ new_binds -> addBindsC new_binds	`thenC`
-			 mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs
-    )			  `thenFC` \ new_binds ->
-    addBindsC new_binds
+       fixC (\ new_binds -> 
+		addBindsC new_binds		`thenC`
+		mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs'
+       )  `thenFC` \ new_binds -> nopC
     )
-  where
-    srt_label = mkSRTLabel (idName name)
 
-mkSRT :: CLabel -> [Id] -> AbstractC
-mkSRT lbl []  = AbsCNop
-mkSRT lbl ids = CSRT lbl (map (mkClosureLabel . idName) ids)
+mkSRT :: CLabel -> [Id] -> [Id] -> Code
+mkSRT lbl []  these = nopC
+mkSRT lbl ids these
+  = mapFCs remap ids `thenFC` \ ids ->
+    absC (CSRT lbl (map (mkClosureLabel . idName) ids))
+  where
+	-- sigh, better map all the ids against the environment in case they've
+	-- been globalised (see maybeGlobaliseId below).
+    remap id = case filter (==id) these of
+		[] ->  getCAddrModeAndInfo id 
+				`thenFC` \ (id, _, _) -> returnFC id
+		(id':_) -> returnFC id'
+
+-- if we're splitting the object, we need to globalise all the top-level names
+-- (and then make sure we only use the globalised one in any C label we use
+-- which refers to this name).
+maybeGlobaliseId :: Id -> FCode Id
+maybeGlobaliseId id
+  = moduleName `thenFC` \ mod ->
+    let
+    	name = idName id
+
+	-- globalise the name for -split-objs, if necessary
+	real_name | opt_EnsureSplittableC = globaliseName name mod
+	          | otherwise             = name
+
+	id' = setIdName id real_name
+    in 
+    returnFC id'
+
+maybeSplitCode
+  | opt_EnsureSplittableC = CSplitMarker 
+  | otherwise             = AbsCNop
 
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the
@@ -225,7 +256,8 @@ cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along for setting up a binding...
 
 cgTopRhs bndr (StgRhsCon cc con args)
-  = forkStatics (cgTopRhsCon bndr con args)
+  = maybeGlobaliseId bndr `thenFC` \ bndr' ->
+    forkStatics (cgTopRhsCon bndr con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi srt fvs upd_flag args body)
   = ASSERT(null fvs) -- There should be no free variables
@@ -233,5 +265,6 @@ cgTopRhs bndr (StgRhsClosure cc bi srt fvs upd_flag args body)
     let lf_info = 
 	  mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args srt_label srt
     in
-    forkStatics (cgTopRhsClosure bndr cc bi args body lf_info)
+    maybeGlobaliseId bndr `thenFC` \ bndr' ->
+    forkStatics (cgTopRhsClosure bndr' cc bi args body lf_info)
 \end{code}

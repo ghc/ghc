@@ -68,7 +68,14 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> [StgArg]		-- Args
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
-  = ASSERT(not dynamic_con_or_args)	-- checks for litlit args too
+  = ASSERT(not (isDllConApp con args))	-- checks for litlit args too
+    let
+	name          = idName id
+    	closure_label = mkClosureLabel name
+	lf_info       = mkConLFInfo con
+    	cg_id_info    = stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info
+    in
+
     (
 	-- LAY IT OUT
     getArgAmodes args		`thenFC` \ amodes ->
@@ -82,22 +89,13 @@ cgTopRhsCon id con args
     absC (CStaticClosure
 	    closure_label		-- Labelled with the name on lhs of defn
 	    closure_info		-- Closure is static
-	    top_ccc
+	    (mkCCostCentreStack dontCareCCS) -- because it's static data
 	    (map fst amodes_w_offsets)) -- Sorted into ptrs first, then nonptrs
 
     ) `thenC`
 
 	-- RETURN
     returnFC (id, stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info)
-  where
-    lf_info	    = mkConLFInfo    con
-    closure_label   = mkClosureLabel name
-    name            = idName id
-
-    top_ccc = mkCCostCentreStack dontCareCCS -- because it's static data
-
-    -- stuff needed by the assert pred only.
-    dynamic_con_or_args = isDllConApp con args
 \end{code}
 
 %************************************************************************

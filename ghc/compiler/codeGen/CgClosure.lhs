@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.43 2000/11/06 08:15:21 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.44 2000/12/06 13:19:49 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -45,14 +45,14 @@ import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
 import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
 import CostCentre	
-import Id		( Id, idName, idType, idPrimRep )
-import Name		( Name, isLocalName )
+import Id		( Id, idName, idType, idPrimRep, setIdName )
+import Name		( Name, isLocalName, globaliseName )
 import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..) )
 import PprType          ( showTypeCategory )
 import Util		( isIn )
-import CmdLineOpts	( opt_SccProfilingOn )
+import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC )
 import Outputable
 
 import Name             ( nameOccName )
@@ -79,9 +79,13 @@ cgTopRhsClosure :: Id
 		-> FCode (Id, CgIdInfo)
 
 cgTopRhsClosure id ccs binder_info args body lf_info
-  = 	-- LAY OUT THE OBJECT
+  = 
+    -- LAY OUT THE OBJECT
     let
-	closure_info = layOutStaticNoFVClosure name lf_info
+    	name          = idName id
+	closure_info  = layOutStaticNoFVClosure name lf_info
+    	closure_label = mkClosureLabel name
+    	cg_id_info    = stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info
     in
 
 	-- BUILD THE OBJECT (IF NECESSARY)
@@ -113,10 +117,7 @@ cgTopRhsClosure id ccs binder_info args body lf_info
     ) `thenC`
 
     returnFC (id, cg_id_info)
-  where
-    name	  = idName id
-    closure_label = mkClosureLabel name
-    cg_id_info    = stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info
+
 \end{code}
 
 %********************************************************
@@ -190,21 +191,19 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
 			 then fvs `minusList` [binder]
 			 else fvs
     in
-    mapFCs getCAddrModeAndInfo reduced_fvs	`thenFC` \ amodes_and_info ->
+    mapFCs getCAddrModeAndInfo reduced_fvs	`thenFC` \ fvs_w_amodes_and_info ->
     let
-	fvs_w_amodes_and_info	      = reduced_fvs `zip` amodes_and_info
-
 	closure_info :: ClosureInfo
-	bind_details :: [((Id, (CAddrMode, LambdaFormInfo)), VirtualHeapOffset)]
+	bind_details :: [((Id, CAddrMode, LambdaFormInfo), VirtualHeapOffset)]
 
 	(closure_info, bind_details)
 	  = layOutDynClosure (idName binder) get_kind fvs_w_amodes_and_info lf_info
 
-	bind_fv ((id, (_, lf_info)), offset) = bindNewToNode id offset lf_info
+	bind_fv ((id, _, lf_info), offset) = bindNewToNode id offset lf_info
 
-	amodes_w_offsets = [(amode,offset) | ((_, (amode,_)), offset) <- bind_details]
+	amodes_w_offsets = [(amode,offset) | ((_,amode,_), offset) <- bind_details]
 
-	get_kind (id, amode_and_info) = idPrimRep id
+	get_kind (id, _, _) = idPrimRep id
     in
 	-- BUILD ITS INFO TABLE AND CODE
     forkClosureBody (

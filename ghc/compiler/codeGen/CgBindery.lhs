@@ -38,7 +38,7 @@ import CLabel		( mkClosureLabel,
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
 import BitSet		( mkBS, emptyBS )
 import PrimRep		( isFollowableRep, getPrimRepSize )
-import Id		( Id, idPrimRep, idType, isDataConWrapId )
+import Id		( Id, idPrimRep, idType )
 import Type		( typePrimRep )
 import VarEnv
 import VarSet		( varSetElems )
@@ -248,31 +248,19 @@ nukeVolatileBinds binds
 I {\em think} all looking-up is done through @getCAddrMode(s)@.
 
 \begin{code}
-getCAddrModeAndInfo :: Id -> FCode (CAddrMode, LambdaFormInfo)
+getCAddrModeAndInfo :: Id -> FCode (Id, CAddrMode, LambdaFormInfo)
 
 getCAddrModeAndInfo id
-  | not (isLocalName name) || isDataConWrapId id
-	-- Why the isDataConWrapId?  Because CoreToStg changes a call to 
-	-- a nullary constructor worker fn to a call to its wrapper,
-	-- which may not  be defined until later
-
-    {- 		-- OLD: the unpack stuff isn't injected now Jan 2000
-	Why the "isWiredInName"?
-	Imagine you are compiling PrelBase.hs (a module that
-	supplies some of the wired-in values).  What can
-	happen is that the compiler will inject calls to
-	(e.g.) GHCbase.unpackPS, where-ever it likes -- it
-	assumes those values are ubiquitously available.
-	The main point is: it may inject calls to them earlier
-	in GHCbase.hs than the actual definition...
-    -}
-  = returnFC (global_amode, mkLFImported id)
+  | not (isLocalName name)
+  = returnFC (id, global_amode, mkLFImported id)
+	-- deals with imported or locally defined but externally visible ids
+	-- (CoreTidy makes all these into global names).
 
   | otherwise = -- *might* be a nested defn: in any case, it's something whose
 		-- definition we will know about...
-    lookupBindC id `thenFC` \ (MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
+    lookupBindC id `thenFC` \ (MkCgIdInfo id' volatile_loc stable_loc lf_info) ->
     idInfoPiecesToAmode kind volatile_loc stable_loc `thenFC` \ amode ->
-    returnFC (amode, lf_info)
+    returnFC (id', amode, lf_info)
   where
     name = getName id
     global_amode = CLbl (mkClosureLabel name) kind
@@ -280,7 +268,7 @@ getCAddrModeAndInfo id
 
 getCAddrMode :: Id -> FCode CAddrMode
 getCAddrMode name
-  = getCAddrModeAndInfo name `thenFC` \ (amode, _) ->
+  = getCAddrModeAndInfo name `thenFC` \ (_, amode, _) ->
     returnFC amode
 \end{code}
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.50 2000/11/15 14:37:08 simonpj Exp $
+% $Id: CgCase.lhs,v 1.51 2000/12/06 13:19:49 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -27,9 +27,8 @@ import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
 import CgUpdate		( reserveSeqFrame )
 import CgBindery	( getVolatileRegs, getArgAmodes,
 			  bindNewToReg, bindNewToTemp,
-			  bindNewPrimToAmode,
-			  rebindToStack, getCAddrMode,
-			  getCAddrModeAndInfo, getCAddrModeIfVolatile,
+			  bindNewPrimToAmode, getCAddrModeAndInfo,
+			  rebindToStack, getCAddrMode, getCAddrModeIfVolatile,
 			  buildContLivenessMask, nukeDeadBindings,
 			)
 import CgCon		( bindConArgs, bindUnboxedTupleComponents )
@@ -252,13 +251,11 @@ we can reuse/trim the stack slot holding the variable (if it is in one).
 
 \begin{code}
 cgCase (StgApp fun args)
-	live_in_whole_case live_in_alts bndr srt alts 	-- @(StgAlgAlts _ _ _)
-							-- SLPJ: Surely PrimAlts is ok too?
-  =
-    getCAddrModeAndInfo fun		`thenFC` \ (fun_amode, lf_info) ->
-    getArgAmodes args			`thenFC` \ arg_amodes ->
+	live_in_whole_case live_in_alts bndr srt alts
+  = getCAddrModeAndInfo fun			`thenFC` \ (fun', fun_amode, lf_info) ->
+    getArgAmodes args				`thenFC` \ arg_amodes ->
 
-	-- Squish the environment
+       -- Squish the environment
     nukeDeadBindings live_in_alts	`thenC`
     saveVolatileVarsAndRegs live_in_alts
     	    	    	`thenFC` \ (save_assts, alts_eob_info, maybe_cc_slot) ->
@@ -271,7 +268,7 @@ cgCase (StgApp fun args)
 					 `thenFC` \ scrut_eob_info ->
 
     setEndOfBlockInfo (maybeReserveSeqFrame alts scrut_eob_info)	$
-    tailCallFun fun fun_amode lf_info arg_amodes save_assts
+    tailCallFun fun' fun_amode lf_info arg_amodes save_assts
 \end{code}
 
 Note about return addresses: we *always* push a return address, even

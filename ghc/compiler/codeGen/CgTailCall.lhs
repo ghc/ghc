@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.28 2000/11/06 08:15:21 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.29 2000/12/06 13:19:49 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -42,8 +42,7 @@ import CgUpdate		( pushSeqFrame )
 import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel, 
 			  mkBlackHoleInfoTableLabel )
 import ClosureInfo	( nodeMustPointToIt,
-			  getEntryConvention, EntryConvention(..),
-			  LambdaFormInfo
+			  getEntryConvention, EntryConvention(..), LambdaFormInfo
 			)
 import CmdLineOpts	( opt_DoSemiTagging )
 import Id		( Id, idType, idName )
@@ -322,38 +321,33 @@ returnUnboxedTuple amodes before_jump
 \end{code}
 
 \begin{code}
-performTailCall :: Id		-- Function
-		-> [StgArg]	-- Args
-		-> Code
-
+performTailCall :: Id -> [StgArg] -> Code
 performTailCall fun args
-  =	-- Get all the info we have about the function and args and go on to
-	-- the business end
-    getCAddrModeAndInfo fun	`thenFC` \ (fun_amode, lf_info) ->
-    getArgAmodes args		`thenFC` \ arg_amodes ->
+  = getCAddrModeAndInfo fun			`thenFC` \ (fun', fun_amode, lf_info) ->
+    getArgAmodes args				`thenFC` \ arg_amodes ->
+    tailCallFun fun' fun_amode lf_info arg_amodes AbsCNop{- No pending assignments -}
+\end{code}
 
-    tailCallFun
-		fun fun_amode lf_info arg_amodes
-		AbsCNop {- No pending assignments -}
+Generating code for a tail call to a function (or closure)
 
-
--- generating code for a tail call to a function (or closure)
-
-tailCallFun :: Id -> CAddrMode	-- Function and its amode
-		 -> LambdaFormInfo	-- Info about the function
-		 -> [CAddrMode]		-- Arguments
-
-		 -> AbstractC		-- Pending simultaneous assignments
-					-- *** GUARANTEED to contain only stack 
-					-- assignments.
-
+\begin{code}
+tailCallFun
+	 :: Id				-- Function
+	 -> CAddrMode
+	 -> LambdaFormInfo
+	 -> [CAddrMode]			-- Arguments
+	 -> AbstractC			-- Pending simultaneous assignments
+					  -- *** GUARANTEED to contain only stack 
+					  -- assignments.
 					-- In ptic, we don't need to look in 
 					-- here to discover all live regs
-
-		 -> Code
+	 -> Code
 
 tailCallFun fun fun_amode lf_info arg_amodes pending_assts
   = nodeMustPointToIt lf_info			`thenFC` \ node_points ->
+	-- we use the name of fun', the Id from the environment, rather than
+	-- fun from the STG tree, in case it is a top-level name that we globalised
+	-- (see cgTopRhsClosure).
     getEntryConvention (idName fun) lf_info
 	(map getAmodeRep arg_amodes)		`thenFC` \ entry_conv ->
     let
