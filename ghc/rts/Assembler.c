@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/06/15 13:23:51 $
+ * $Revision: 1.33 $
+ * $Date: 2000/10/09 11:18:46 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -693,6 +693,15 @@ static void emiti_16_16 ( AsmBCO bco, Instr opcode, int arg1, int arg2 )
    asmInstr16(bco,arg2);
 }
 
+#ifdef XMLAMBDA
+static void emiti_8_8_16 ( AsmBCO bco, Instr opcode, int arg1, int arg2, int arg3 )
+{
+   asmInstrOp(bco,opcode);
+   asmInstr8(bco,arg1);
+   asmInstr8(bco,arg2);
+   asmInstr16(bco,arg3);
+}
+#endif
 
 /* --------------------------------------------------------------------------
  * Wrappers around the above fns
@@ -813,6 +822,14 @@ static void emit_i_CONST_ADDR ( AsmBCO bco, int arg1 )
       emiti_16(bco,i_CONST_ADDR_big,arg1);
 }
 
+static void emit_i_CONST_WORD ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256)
+      emiti_8 (bco,i_CONST_WORD,    arg1); else
+      emiti_16(bco,i_CONST_WORD_big,arg1);
+}
+
 static void emit_i_CONST_CHAR ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
@@ -878,20 +895,28 @@ static void emit_i_PACK_ROW (AsmBCO bco, int var )
       emiti_16( bco, i_PACK_ROW_big, var );
 }
 
-static void emit_i_PACK_INJ (AsmBCO bco, int var )
+static void emit_i_PACK_INJ_VAR (AsmBCO bco, int var )
 {
    ASSERT(var >= 0);
    if (var < 256)
-      emiti_8 ( bco, i_PACK_INJ, var ); else
-      emiti_16( bco, i_PACK_INJ_big, var );
+      emiti_8 ( bco, i_PACK_INJ_VAR, var ); else
+      emiti_16( bco, i_PACK_INJ_VAR_big, var );
 }
 
-static void emit_i_TEST_INJ (AsmBCO bco, int var )
+static void emit_i_TEST_INJ_VAR (AsmBCO bco, int var )
 {
    ASSERT(var >= 0);
    if (var < 256)
-      emiti_8_16 ( bco, i_TEST_INJ, var, 0 ); else
-      emiti_16_16( bco, i_TEST_INJ_big, var, 0 );
+      emiti_8_16 ( bco, i_TEST_INJ_VAR, var, 0 ); else
+      emiti_16_16( bco, i_TEST_INJ_VAR_big, var, 0 );
+}
+
+static void emit_i_ADD_WORD_VAR (AsmBCO bco, int var )
+{
+   ASSERT(var >= 0);
+   if (var < 256)
+      emiti_8( bco, i_ADD_WORD_VAR, var ); else
+      emiti_16( bco, i_ADD_WORD_VAR_big, var );
 }
 #endif
 
@@ -1113,8 +1138,8 @@ void asmConstAddr( AsmBCO bco, AsmAddr x )
 
 void asmConstWord( AsmBCO bco, AsmWord x )
 {
-    emit_i_CONST_INT(bco,bco->n_words);
-    asmAddNonPtrWords(bco,AsmWord,(AsmInt)x);
+    emit_i_CONST_WORD(bco,bco->n_words);
+    asmAddNonPtrWords(bco,AsmWord,x);
     incSp(bco, repSizeW(WORD_REP));
 }
 
@@ -1450,8 +1475,8 @@ AsmPrim asmPrimOps[] = {
 
 #ifdef XMLAMBDA
     /* primitive row operations. */
-    , { "primRowInsertAt",           "XIa","X",  MONAD_Id, i_PRIMOP2, i_rowInsertAt }
-    , { "primRowRemoveAt",           "XI", "aX", MONAD_Id, i_PRIMOP2, i_rowRemoveAt }
+    , { "primRowInsertAt",           "XWa","X",  MONAD_Id, i_PRIMOP2, i_rowInsertAt }
+    , { "primRowRemoveAt",           "XW", "aX", MONAD_Id, i_PRIMOP2, i_rowRemoveAt }
 #endif
 
     /* Ref operations */
@@ -1868,11 +1893,78 @@ AsmInfo asmMkInfo( AsmNat tag, AsmNat ptrs )
 /* -----------------------------------------------------------------------
  All the XMLambda primitives.
 ------------------------------------------------------------------------*/
+static void asmConstWordOpt( AsmBCO bco, AsmWord w )
+{    
+  if (w < 256)
+  {
+    emiti_8( bco, i_CONST_WORD_8, w );
+    incSp( bco, repSizeW(WORD_REP));    /* push word */
+  }
+  else
+  {
+    asmConstWord( bco, w );
+  }
+}
+
+/* -----------------------------------------------------------------------
+ insert/remove primitives on rows  
+------------------------------------------------------------------------*/
+void asmEndPrimRowChainInsert( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ )
+{
+static AsmPrim primRowChainInsert
+   = { "primRowChainInsert", 0, 0, MONAD_Id, i_PRIMOP2, i_rowChainInsert };
+
+  nat size = bco->sp - base;
+  ASSERT(bco->sp >= base);
+  ASSERT(n*3 + 1 == size);    /* n witness/value pairs + the row */
+
+  asmConstWordOpt(bco, n);
+  asmEndPrim(bco,&primRowChainInsert,base);
+}
+
+void asmEndPrimRowChainBuild( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ )
+{
+static AsmPrim primRowChainBuild
+   = { "primRowChainBuild", 0, 0, MONAD_Id, i_PRIMOP2, i_rowChainBuild };
+
+  nat size = bco->sp - base;
+  ASSERT(bco->sp >= base);
+  ASSERT(n*3 == size);    /* n witness/value pairs */
+
+  asmConstWordOpt(bco, n);
+  asmEndPrim(bco,&primRowChainBuild,base);
+}
+
+void asmEndPrimRowChainRemove( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ )
+{
+static AsmPrim primRowChainRemove
+   = { "primRowChainRemove", 0, 0, MONAD_Id, i_PRIMOP2, i_rowChainRemove };
+
+  nat size = bco->sp - base;
+  ASSERT(bco->sp >= base);
+  ASSERT(n*2 + 1 == size);    /* n witnesses + the row */
+
+  asmConstWordOpt(bco, n);
+  asmEndPrim(bco,&primRowChainRemove,base);
+}
+
+void asmEndPrimRowChainSelect( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ )
+{
+static AsmPrim primRowChainSelect
+   = { "primRowChainSelect", 0, 0, MONAD_Id, i_PRIMOP2, i_rowChainSelect };
+
+  nat size = bco->sp - base;
+  ASSERT(bco->sp >= base);
+  ASSERT(n*2 + 1 == size);    /* n witnesses + the row */
+
+  asmConstWordOpt(bco, n);
+  asmEndPrim(bco,&primRowChainSelect,base);
+}
 
 /* -----------------------------------------------------------------------
  allocation & unpacking of rows  
 ------------------------------------------------------------------------*/
-AsmVar asmAllocRow   ( AsmBCO bco, AsmNat n /*number of fields*/ )
+AsmVar asmAllocRow   ( AsmBCO bco, AsmWord n /*number of fields*/ )
 {
     emit_i_ALLOC_ROW(bco,n);             
 
@@ -1885,7 +1977,7 @@ AsmSp asmBeginPackRow( AsmBCO bco )
     return bco->sp;
 }
 
-void asmEndPackRow( AsmBCO bco, AsmVar v, AsmSp start, AsmNat n /*#fields*/ )
+void asmEndPackRow( AsmBCO bco, AsmVar v, AsmSp start, AsmWord n /*number of fields*/ )
 {
     nat size = bco->sp - start;
     ASSERT(bco->sp >= start);
@@ -1896,7 +1988,7 @@ void asmEndPackRow( AsmBCO bco, AsmVar v, AsmSp start, AsmNat n /*#fields*/ )
     setSp(bco, start);
 }
 
-void asmBeginUnpackRow( AsmBCO bco )
+void asmBeginUnpackRow( AsmBCO bco __attribute__ ((unused)) )
 {
     /* dummy to make it look prettier */
 }
@@ -1906,61 +1998,232 @@ void asmEndUnpackRow( AsmBCO bco )
     emiti_(bco,i_UNPACK_ROW);
 }
 
-/*------------------------------------------------------------------------
- Inj primitives.
- The Inj constructor contains the value and its index: an unboxed int 
- data Inj = forall a. Inj a Int# 
- There is no "big" form for the INJ_CONST instructions. The index
- is therefore still limited to 256 values.
-------------------------------------------------------------------------*/
-AsmVar asmInj( AsmBCO bco, AsmVar index )
-{    
-    emit_i_PACK_INJ( bco, bco->sp - index );
-
-    decSp(bco, sizeofW(StgPtr));    /* pop argument value */
-    incSp(bco, sizeofW(StgPtr));    /* push Inj result    */
-    return bco->sp;
+void asmConstRowTriv( AsmBCO bco )
+{
+    emiti_(bco,i_CONST_ROW_TRIV);
+    incSp(bco,sizeofW(StgPtr));
 }
 
-AsmVar asmInjConst( AsmBCO bco, AsmIndex x )
+/*------------------------------------------------------------------------
+ Inj primitives.
+ The Inj constructor contains the value and its index: an unboxed word
+ data Inj = forall a. Inj a Int# 
+------------------------------------------------------------------------*/
+AsmVar asmInjRel( AsmBCO bco, AsmVar var, AsmWitness w )
 {
-    ASSERT( x >= 0 && x <= 255 );
-    emiti_8 (bco, i_PACK_INJ_CONST, x );
+  int offset  = bco->sp - var;
 
-    decSp(bco, sizeofW(StgPtr));   /* pop argument value */
-    incSp(bco, sizeofW(StgPtr));   /* push Inj result */
-    return bco->sp;
+  if (w == 0)
+  {
+    emit_i_PACK_INJ_VAR( bco, offset );
+  }
+  else if (w < 256 && offset < 256 && offset >= 0)
+  {
+    emiti_8_8( bco, i_PACK_INJ_REL_8, offset, w );
+  }
+  else
+  {
+    asmWitnessRel( bco, var, w );
+    emiti_( bco, i_PACK_INJ );
+    decSp(bco, repSizeW(WITNESS_REP));  /* pop witness */
+  }
+
+  decSp(bco, sizeofW(StgPtr));      /* pop argument value */
+  incSp(bco, sizeofW(StgPtr));      /* push Inj result    */
+  return bco->sp;
+}
+
+AsmVar asmInjConst( AsmBCO bco, AsmWitness w )
+{    
+  if (w < 256)
+  {
+    emiti_8 (bco, i_PACK_INJ_CONST_8, w );
+  }
+  else
+  {
+    asmWitnessConst( bco, w );
+    emiti_( bco, i_PACK_INJ );
+    decSp(bco, repSizeW(WITNESS_REP));  /* pop witness */
+  }
+
+  decSp(bco, sizeofW(StgPtr));   /* pop argument value */
+  incSp(bco, sizeofW(StgPtr));   /* push Inj result */  
+  return bco->sp;
 }
 
 /* UNPACK_INJ only returns the value; the index should be
    tested using the TEST_INJ instructions. */
 AsmVar asmUnInj( AsmBCO bco )
 {
-    emiti_(bco,i_UNPACK_INJ);
-    incSp(bco, sizeofW(StgPtr));  /* push the value */
-    return bco->sp;
+  emiti_(bco,i_UNPACK_INJ);
+  incSp(bco, sizeofW(StgPtr));  /* push the value */
+  return bco->sp;
 }
 
-AsmPc asmTestInj( AsmBCO bco, AsmVar index )
+AsmPc asmTestInjRel( AsmBCO bco, AsmVar var, AsmWitness w )
 {
-    emit_i_TEST_INJ(bco,bco->sp - index);
-    return bco->n_insns;
+  int offset  = bco->sp - var;
+
+  if (w == 0)
+  {
+    emit_i_TEST_INJ_VAR(bco,offset );
+  }
+  else if (w < 256 && offset < 256 && offset >= 0)
+  {
+    emiti_8_8_16( bco, i_TEST_INJ_REL_8, offset, w, 0 );
+  }
+  else
+  {
+    asmWitnessRel( bco, var, w );
+    emiti_16( bco, i_TEST_INJ, 0 );
+    decSp(bco, repSizeW(WITNESS_REP));  /* pop witness */
+  }
+  return bco->n_insns;
 }
 
-AsmPc asmTestInjConst( AsmBCO bco, AsmIndex x )
+AsmPc asmTestInjConst( AsmBCO bco, AsmWitness w )
 {
-    ASSERT( x >= 0 && x <= 255 );
-    emiti_8_16 (bco, i_TEST_INJ_CONST, x, 0 );
-    return bco->n_insns;
+  if (w < 256)
+  {
+    emiti_8_16( bco, i_TEST_INJ_CONST_8, w, 0 );
+  }
+  else
+  {
+    asmWitnessConst( bco, w );
+    emiti_16( bco, i_TEST_INJ, 0 );
+    decSp(bco, repSizeW(WITNESS_REP));  /* pop witness */
+  }
+  return bco->n_insns;
 }
 
-AsmVar asmConstIndex( AsmBCO bco, AsmIndex x )
+
+void asmWitnessRel( AsmBCO bco, AsmVar var, AsmWitness w )
 {
-    ASSERT( x >= 0 && x <= 65535 );
-    asmConstInt(bco,x);
-    return bco->sp;
+  int offset = bco->sp - var;
+
+  if (w == 0)
+  {
+    asmVar( bco, var, WITNESS_REP );
+  }
+  else if (w < 256 && offset < 256 && offset >= 0)
+  {
+    emiti_8_8( bco, i_ADD_WORD_VAR_8, offset, w );
+    incSp( bco, repSizeW(WITNESS_REP)); /* push result */
+  }
+  else
+  {
+    asmWitnessConst( bco, w );
+    emit_i_ADD_WORD_VAR( bco, bco->sp - var );
+    decSp( bco, repSizeW(WITNESS_REP)); /* pop witness w */
+    incSp( bco, repSizeW(WITNESS_REP)); /* push witness result */
+  }
 }
+
+void asmWitnessConst( AsmBCO bco, AsmWitness w )
+{    
+  if (w < 256)
+  {
+    emiti_8( bco, i_CONST_WORD_8, w );
+    incSp( bco, repSizeW(WITNESS_REP)); /* push witness */
+  }
+  else
+  {
+    asmConstWord( bco, w );
+  }
+}
+
 #endif
+
+
+#ifdef XMLAMBDA
+/* -----------------------------------------------------------------------
+ Calling c functions
+------------------------------------------------------------------------*/
+#include "ForeignCall.h"    /* for CallInfo definition */
+#include "Dynamic.h"        /* for loadLibrarySymbol & decorateSymbol  */
+                  
+void asmEndPrimCallIndirect( 
+                     AsmBCO bco
+                   , AsmSp  base
+                   , const char* argTypes
+                   , const char* resultTypes
+                   , CallType callType )
+{
+static AsmPrim primCCall
+   = { "ccall", 0, 0, MONAD_Id, i_PRIMOP2, i_ccall };
+  
+  CallInfo  callInfo;
+  StgWord   offset       = 0;
+  int       argCount     = argTypes ? strlen(argTypes) : 0;
+  int       resultCount  = resultTypes ? strlen(resultTypes) : 0;
+
+  if (argCount + resultCount > MAX_CALL_VALUES)
+      barf( "external call: too many arguments and/or results" );
+
+  /* initialize the callInfo structure */
+  callInfo.argCount    = argCount;
+  callInfo.resultCount = resultCount;
+  callInfo.callConv    = CCall;
+  callInfo.data[0]     = '\0';
+  callInfo.data[1]     = '\0';
+
+  switch (callType)
+  {
+  case CCall:   callInfo.callConv = CCall; break;
+  case StdCall: callInfo.callConv = StdCall; break;
+  default:      belch( "external call: unknown calling convention: \"%c\"", callType );  
+  }
+
+  if (argCount > 0)    strcpy(callInfo.data,argTypes);
+  if (resultCount > 0) strcpy(callInfo.data + argCount + 1, resultTypes);
+  
+  /* We push the offset of the CallInfo structure in this BCO's
+     non-ptr area as a Word. In the "i_ccall" primitive
+     this offset is used to retrieve the CallInfo again.  */
+  offset = bco->n_words;
+  asmAddNonPtrWords(bco,CallInfo,callInfo);
+  asmConstWord(bco,offset);
+    
+  /* emit a ccall */
+  asmEndPrim( bco, &primCCall, base );
+  return;
+}
+      
+    
+void asmEndPrimCallDynamic( 
+      AsmBCO bco
+    , AsmSp base
+    , const char* libName
+    , const char* funName
+    , const char* argTypes
+    , const char* resultTypes
+    , CallType callType
+    , int /*bool*/ decorate )
+{
+  void* funPtr;
+  ASSERT(libName); 
+  ASSERT(funName);
+
+  /* load the function pointer */
+  if (decorate)
+  {
+      char funNameBuf[MAX_SYMBOL_NAME];
+      decorateSymbol( funNameBuf, funName, MAX_SYMBOL_NAME
+                    , callType, argTypes, resultTypes );
+      funPtr = loadLibrarySymbol( libName, funNameBuf, callType );
+  }
+  else
+      funPtr = loadLibrarySymbol( libName, funName, callType );
+
+  /* push the static function pointer */
+  asmConstAddr( bco, funPtr );    
+
+  /* and call it indirectly */
+  asmEndPrimCallIndirect( bco, base, argTypes, resultTypes, callType );
+}
+      
+#endif /* XMLAMBDA */
+
 
 /*-------------------------------------------------------------------------*/
 

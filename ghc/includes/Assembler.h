@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.17 2000/08/29 13:34:21 qrczak Exp $
+ * $Id: Assembler.h,v 1.18 2000/10/09 11:21:41 daan Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -303,28 +303,38 @@ extern void   asmEndMkPAP      ( AsmBCO bco, AsmVar v, AsmSp start );
 /*------------------------------------------------------------------------
  XMlambda primitives.
 ------------------------------------------------------------------------*/
-typedef AsmInt  AsmIndex;
+typedef AsmWord      AsmWitness;
+#define WITNESS_REP  WORD_REP
 
-/* Rows */
-extern AsmVar asmAllocRow      ( AsmBCO bco, AsmNat /*number of fields*/ n );
+/* insert/remove primitives on rows */
+extern void   asmEndPrimRowChainInsert( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ );
+extern void   asmEndPrimRowChainBuild ( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ );
+extern void   asmEndPrimRowChainRemove( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ );
+extern void   asmEndPrimRowChainSelect( AsmBCO bco, AsmSp base, AsmWord n /* number of args */ );
 
+/* pack/unpack instructions for rows */
+extern AsmVar asmAllocRow      ( AsmBCO bco, AsmWord /*number of fields*/ n );
 extern AsmSp  asmBeginPackRow  ( AsmBCO bco );
 extern void   asmEndPackRow    ( AsmBCO bco, AsmVar v, AsmSp start, 
-                                             AsmNat /*number of fields*/ n );
+                                             AsmWord /*number of fields*/ n );
 
 extern void   asmBeginUnpackRow( AsmBCO bco );
 extern void   asmEndUnpackRow  ( AsmBCO bco );
 
-extern AsmPrim primRowRemoveAtN;
-extern AsmPrim primRowIndexAtN;
+extern void   asmConstRowTriv  ( AsmBCO bco );
 
-/* Inj */
-extern AsmVar asmInj( AsmBCO bco, AsmVar var );
-extern AsmVar asmInjConst( AsmBCO bco, AsmIndex i );
+/* Inj primitives */
+extern AsmVar asmInjRel( AsmBCO bco, AsmVar var, AsmWitness w );
+extern AsmVar asmInjConst( AsmBCO bco, AsmWitness w );
+
+extern AsmPc  asmTestInjRel( AsmBCO bco, AsmVar var, AsmWitness w );
+extern AsmPc  asmTestInjConst( AsmBCO, AsmWitness w );
+
+extern void   asmWitnessRel( AsmBCO bco, AsmVar var, AsmWitness w );
+extern void   asmWitnessConst( AsmBCO bco, AsmWitness w );
+
 extern AsmVar asmUnInj( AsmBCO bco );
-extern AsmPc  asmTestInj( AsmBCO bco, AsmVar var );
-extern AsmPc  asmTestInjConst( AsmBCO, AsmIndex i );
-extern AsmVar asmConstIndex( AsmBCO bco, AsmIndex x );
+
 #endif
 
 /* --------------------------------------------------------------------------
@@ -344,5 +354,41 @@ typedef struct {
 } CFunDescriptor;
 
 CFunDescriptor* mkDescriptor( char* as, char* rs );
+
+#ifdef XMLAMBDA
+
+typedef enum _CallType
+{ CCall    = 'c'  /* C calling convention */
+, StdCall  = 's'  /* Standard calling convention */
+} CallType;
+
+/* The asmEndPrimCall*** functions call external functions.
+  Just start with "asmBeginPrim", push the arguments
+  and end with one of these functions. The argument and
+  result types are given as an argument string containing
+  the character representation of AsmRep's. */
+
+/* asmEndPrimCallDynamic calls a function defined in a dynamic link library. 
+  If decorate is true, the funName will be decorated according to its
+  calling convention, for example, with CCall an underscore is prefixed */
+extern void asmEndPrimCallDynamic(  AsmBCO       bco
+                                  , AsmSp        base
+                                  , const char*  libName
+                                  , const char*  funName
+                                  , const char*  argTypes
+                                  , const char*  resultTypes
+                                  , CallType     callType
+                                  , int /*bool*/ decorate);
+
+/* asmEndPrimCallIndirect calls the function given by its first
+  argument. (ie. push the address just before calling) */
+extern void asmEndPrimCallIndirect(  AsmBCO      bco
+                                   , AsmSp       base
+                                   , const char* argTypes
+                                   , const char* resultTypes
+                                   , CallType    callType );
+
+
+#endif
 
 /*-------------------------------------------------------------------------*/

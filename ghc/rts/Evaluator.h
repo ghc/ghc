@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.h,v 1.7 2000/04/25 17:47:43 andy Exp $
+ * $Id: Evaluator.h,v 1.8 2000/10/09 11:21:18 daan Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -53,3 +53,21 @@ extern void   PushPtr        ( StgPtr );
 extern StgPtr PopPtr         ( void );
 
 extern int    numEnters;
+
+/*-------------------------------------------------------------------------*/
+#ifdef XMLAMBDA
+
+#define MAX_CALL_VALUES  100
+
+/* Self contained CallInfo structure for the i_ccall instruction */
+typedef struct _CallInfo {
+  unsigned int  argCount;
+  unsigned int  resultCount;
+  char          callConv;     /* 's'=stdcall, 'c'=ccall */
+  
+/* The strings arg_tys and result_tys reside here. 
+   This allows us to put the complete CallInfo in the nonptrwords of a BCO */
+  char          data[MAX_CALL_VALUES+2];  
+} CallInfo;
+
+#endif

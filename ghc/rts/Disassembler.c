@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.13 $
- * $Date: 2000/06/15 13:23:51 $
+ * $Revision: 1.14 $
+ * $Date: 2000/10/09 11:20:16 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -89,6 +89,16 @@ static InstrPtr disInt16PC     ( StgBCO *bco, InstrPtr pc, char* i )
     x = bcoInstr(bco,pc); pc += 2;
     y = bcoInstr16(bco,pc); pc += 2;
     fprintf(stderr,"%s %d %d",i,x,pc+y);
+    return pc;
+}
+static InstrPtr disIntIntPC     ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgInt  x,y;
+    StgWord z;
+    x = bcoInstr(bco,pc++);
+    y = bcoInstr(bco,pc++);
+    z = bcoInstr16(bco,pc); pc += 2;
+    fprintf(stderr,"%s %d %d %d",i,x,y,pc+z);
     return pc;
 }
 #endif
@@ -288,25 +298,44 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disInt(bco,pc,"PACK_ROW");    
     case i_PACK_ROW_big:
             return disInt16(bco,pc,"PACK_ROW_big");    
-
-    case i_PACK_INJ:
-            return disInt(bco,pc,"PACK_INJ");
-    case i_PACK_INJ_big:
-            return disInt16(bco,pc,"PACK_INJ_big");
-    case i_PACK_INJ_CONST:
-            return disInt(bco,pc,"PACK_INJ_CONST");
-
     case i_UNPACK_ROW:
             return disNone(bco,pc,"UNPACK_ROW");    
+    case i_CONST_ROW_TRIV:
+            return disNone(bco,pc,"CONST_ROW_TRIV");
+
+    case i_PACK_INJ_VAR:
+            return disInt(bco,pc,"PACK_INJ_VAR");
+    case i_PACK_INJ_VAR_big:
+            return disInt16(bco,pc,"PACK_INJ_VAR_big");
+    case i_PACK_INJ_CONST_8:
+            return disInt(bco,pc,"PACK_INJ_CONST_8");
+    case i_PACK_INJ_REL_8:
+            return disIntInt(bco,pc,"PACK_INJ_REL_8");
+    case i_PACK_INJ:
+            return disNone(bco,pc,"PACK_INJ");
+
     case i_UNPACK_INJ:
             return disNone(bco,pc,"UNPACK_INJ");
 
+    case i_TEST_INJ_VAR:
+            return disIntPC(bco,pc,"TEST_INJ_VAR");
+    case i_TEST_INJ_VAR_big:
+            return disInt16PC(bco,pc,"TEST_INJ_VAR_big");
+    case i_TEST_INJ_CONST_8:
+            return disIntPC(bco,pc,"TEST_INJ_CONST_8");
+    case i_TEST_INJ_REL_8:  
+            return disIntIntPC(bco,pc,"TEST_INJ_REL_8");
     case i_TEST_INJ:
-            return disIntPC(bco,pc,"TEST_INJ");
-    case i_TEST_INJ_big:
-            return disInt16PC(bco,pc,"TEST_INJ_big");
-    case i_TEST_INJ_CONST:
-            return disIntPC(bco,pc,"TEST_INJ_CONST");
+            return disPC(bco,pc,"TEST_INJ");
+    
+    case i_CONST_WORD_8:
+            return disInt(bco,pc,"CONST_WORD_8");
+    case i_ADD_WORD_VAR:
+            return disInt(bco,pc,"ADD_WORD_VAR");
+    case i_ADD_WORD_VAR_big:
+            return disInt16(bco,pc,"ADD_WORD_VAR_big");
+    case i_ADD_WORD_VAR_8:
+            return disIntInt(bco,pc,"ADD_WORD_VAR_8");
 #endif    
 
     case i_VOID:
@@ -336,6 +365,8 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disInt(bco,pc,"VAR_WORD");
     case i_CONST_WORD:
             return disConstInt(bco,pc,"CONST_WORD");
+    case i_CONST_WORD_big:
+            return disConstInt16(bco,pc,"CONST_WORD_big");
     case i_PACK_WORD:
             return disNone(bco,pc,"PACK_WORD");
     case i_UNPACK_WORD:
@@ -426,6 +457,22 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             switch (op) {
             case i_INTERNAL_ERROR2:
                     return disNone(bco,pc,"INTERNAL_ERROR2");
+#ifdef XMLAMBDA
+            case i_rowInsertAt:
+                    return disNone(bco,pc,"ROW_INSERT_1");
+            case i_rowChainInsert:
+                    return disNone(bco,pc,"ROW_INSERT");
+            case i_rowChainBuild:
+                    return disNone(bco,pc,"ROW_BUILD");
+            case i_rowRemoveAt:
+                    return disNone(bco,pc,"ROW_REMOVE_1");
+            case i_rowChainRemove:
+                    return disNone(bco,pc,"ROW_REMOVE");
+            case i_rowChainSelect:
+                    return disNone(bco,pc,"ROW_SELECT");
+            case i_ccall:
+                    return disNone(bco,pc,"ccall");
+#endif
             case i_ccall_ccall_Id:
                     return disNone(bco,pc,"ccall_ccall_Id");
             case i_ccall_ccall_IO:

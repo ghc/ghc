@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.16 2000/06/15 13:23:51 daan Exp $
+ * $Id: Bytecodes.h,v 1.17 2000/10/09 11:20:16 daan Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -33,27 +33,15 @@
     Ins(i_ALLOC_PAP),         \
     Ins(i_ALLOC_CONSTR),      \
     Ins(i_ALLOC_CONSTR_big),  \
-    Ins(i_ALLOC_ROW),         \
-    Ins(i_ALLOC_ROW_big),     \
     Ins(i_MKAP),              \
     Ins(i_MKAP_big),          \
     Ins(i_MKPAP),             \
     Ins(i_PACK),              \
     Ins(i_PACK_big),          \
-    Ins(i_PACK_ROW),          \
-    Ins(i_PACK_ROW_big),      \
-    Ins(i_PACK_INJ),          \
-    Ins(i_PACK_INJ_big),      \
-    Ins(i_PACK_INJ_CONST),    \
     Ins(i_SLIDE),             \
     Ins(i_SLIDE_big),         \
     Ins(i_TEST),              \
-    Ins(i_TEST_INJ),          \
-    Ins(i_TEST_INJ_big),      \
-    Ins(i_TEST_INJ_CONST),    \
     Ins(i_UNPACK),            \
-    Ins(i_UNPACK_ROW),        \
-    Ins(i_UNPACK_INJ),        \
     Ins(i_VAR),               \
     Ins(i_VAR_big),           \
     Ins(i_CONST),             \
@@ -62,6 +50,30 @@
     Ins(i_RETADDR),           \
     Ins(i_RETADDR_big),       \
     Ins(i_VOID),              \
+                              \
+    Ins(i_ALLOC_ROW),         \
+    Ins(i_ALLOC_ROW_big),     \
+    Ins(i_PACK_ROW),          \
+    Ins(i_PACK_ROW_big),      \
+    Ins(i_UNPACK_ROW),        \
+    Ins(i_CONST_ROW_TRIV),    \
+                              \
+    Ins(i_PACK_INJ),          \
+    Ins(i_PACK_INJ_VAR),      \
+    Ins(i_PACK_INJ_VAR_big),  \
+    Ins(i_PACK_INJ_CONST_8),  \
+    Ins(i_PACK_INJ_REL_8),    \
+    Ins(i_TEST_INJ),          \
+    Ins(i_TEST_INJ_VAR),      \
+    Ins(i_TEST_INJ_VAR_big),  \
+    Ins(i_TEST_INJ_CONST_8),  \
+    Ins(i_TEST_INJ_REL_8),    \
+    Ins(i_UNPACK_INJ),        \
+    Ins(i_CONST_WORD_8),      \
+    Ins(i_ADD_WORD_VAR),      \
+    Ins(i_ADD_WORD_VAR_big),  \
+    Ins(i_ADD_WORD_VAR_8),    \
+                              \
     Ins(i_VAR_INT),           \
     Ins(i_VAR_INT_big),       \
     Ins(i_CONST_INT),         \
@@ -74,6 +86,7 @@
     Ins(i_VAR_WORD),          \
     Ins(i_VAR_WORD_big),      \
     Ins(i_CONST_WORD),        \
+    Ins(i_CONST_WORD_big),    \
     Ins(i_PACK_WORD),         \
     Ins(i_UNPACK_WORD),       \
     Ins(i_VAR_ADDR),          \
@@ -341,7 +354,11 @@ typedef enum
 #ifdef XMLAMBDA
     /* row primitives. */
     , i_rowInsertAt
+    , i_rowChainInsert
+    , i_rowChainBuild
     , i_rowRemoveAt
+    , i_rowChainRemove
+    , i_rowChainSelect
 #endif
 
     /* Ref operations */
@@ -455,6 +472,9 @@ typedef enum
 
 
     /* CCall! */
+#ifdef XMLAMBDA
+    , i_ccall
+#endif
     , i_ccall_ccall_Id
     , i_ccall_ccall_IO
     , i_ccall_stdcall_Id
@@ -462,7 +482,7 @@ typedef enum
 
     /* If you add a new primop to this table, check you don't
      * overflow the 256 limit.  That is MAX_Primop2 <= 255.
-     * Current value (6/10/2000) = 0x44
+     * Current value (1 oct 2000) = 0x48
      */
     , MAX_Primop2 = i_ccall_stdcall_IO
 } Primop2;

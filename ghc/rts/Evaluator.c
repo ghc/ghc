@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.57 $
- * $Date: 2000/10/09 10:28:33 $
+ * $Revision: 1.58 $
+ * $Date: 2000/10/09 11:20:16 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -584,29 +584,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     xPushPtr(p);
                     Continue;
                 }
-#ifdef XMLAMBDA
-            /* allocate rows, implemented on top of Arrays */
-            Case(i_ALLOC_ROW):
-                {
-                    StgMutArrPtrs* p;
-                    int n = BCO_INSTR_8;
-                    SSS; p = stgCast(StgMutArrPtrs*,grabHpNonUpd(sizeofW(StgMutArrPtrs) + n)); LLL;
-                    SET_HDR(p,&MUT_ARR_PTRS_FROZEN_info,CCCS);
-                    p->ptrs = n;
-                    xPushPtr(p);
-                    Continue;
-                }
-            Case(i_ALLOC_ROW_big):
-                {
-                    StgMutArrPtrs* p;
-                    int n = BCO_INSTR_16;
-                    SSS; p = stgCast(StgMutArrPtrs*,grabHpNonUpd(sizeofW(StgMutArrPtrs) + n)); LLL;
-                    SET_HDR(p,&MUT_ARR_PTRS_FROZEN_info,CCCS);
-                    p->ptrs = n;
-                    xPushPtr(p);
-                    Continue;
-                }
-#endif
             Case(i_MKAP):
                 {
                     int x = BCO_INSTR_8;  /* ToDo: Word not Int! */
@@ -710,112 +687,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                              );
                     Continue;
                 }
-#ifdef XMLAMBDA
-            /* pack values into a row. */
-            Case(i_PACK_ROW):
-                {
-                    int offset       = BCO_INSTR_8;
-                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(offset));
-                    StgWord        n = p->ptrs;
-                    nat i;
-
-                    for (i=0; i<n; ++i)
-                    {
-                      p->payload[i] = xPopCPtr();
-                    }
-                    IF_DEBUG(evaluator,
-                             fprintf(stderr,"\tBuilt "); 
-                             SSS;
-                             printObj(stgCast(StgClosure*,p));
-                             LLL;
-                            );
-                    Continue;
-                }
-            Case(i_PACK_ROW_big):
-                {
-                    int offset       = BCO_INSTR_16;
-                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(offset));
-                    StgWord        n = p->ptrs;
-                    nat i;
-
-                    for (i=0; i<n; ++i)
-                    {
-                      p->payload[i] = xPopCPtr();
-                    }
-                    IF_DEBUG(evaluator,
-                             fprintf(stderr,"\tBuilt "); 
-                             SSS;
-                             printObj(stgCast(StgClosure*,p));
-                             LLL;
-                            );
-                    Continue;
-                }
-            /* pack values into an Inj */
-            Case(i_PACK_INJ):
-                {
-                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgInt));
-                    int offset  = BCO_INSTR_8;
-                    
-                    StgClosure* o;                    
-                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
-                    SET_HDR(o,Inj_con_info,??);
-                    
-                    payloadWord(o,sizeofW(StgPtr)) = xTaggedStackInt(offset);
-                    payloadPtr(o,0)                = xPopPtr();                                        
-                    
-                    IF_DEBUG(evaluator,
-                             fprintf(stderr,"\tBuilt "); 
-                             SSS;
-                             printObj(stgCast(StgClosure*,o));
-                             LLL;
-                             );
-                    xPushPtr(stgCast(StgPtr,o));
-                    Continue;
-                }
-            Case(i_PACK_INJ_big):
-                {
-                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgInt));
-                    int offset  = BCO_INSTR_16;
-                    
-                    StgClosure* o;                    
-                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
-                    SET_HDR(o,Inj_con_info,??);
-
-                    payloadWord(o,sizeofW(StgPtr)) = xTaggedStackInt(offset);
-                    payloadPtr(o,0)                = xPopPtr();                    
-
-                    IF_DEBUG(evaluator,
-                             fprintf(stderr,"\tBuilt "); 
-                             SSS;
-                             printObj(stgCast(StgClosure*,o));
-                             LLL;
-                             );
-                    xPushPtr(stgCast(StgPtr,o));
-                    Continue;
-                }
-            Case(i_PACK_INJ_CONST):
-                {
-                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgInt));
-                    int index  = BCO_INSTR_8;
-                    
-                    StgClosure* o;                    
-                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
-                    SET_HDR(o,Inj_con_info,??);
-
-                    payloadWord(o,sizeofW(StgPtr)) = index;
-                    payloadPtr(o,0)                = xPopPtr();                    
-
-                    IF_DEBUG(evaluator,
-                             fprintf(stderr,"\tBuilt "); 
-                             SSS;
-                             printObj(stgCast(StgClosure*,o));
-                             LLL;
-                             );
-                    xPushPtr(stgCast(StgPtr,o));
-                    Continue;
-                }
-
-#endif /* XMLAMBDA */
             Case(i_SLIDE):
                 {
                     int x = BCO_INSTR_8;
@@ -861,45 +732,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     }
                     Continue;
                 }
-#ifdef XMLAMBDA
-            /* Test Inj indices. */
-            Case(i_TEST_INJ):
-                {
-                    int  offset    = BCO_INSTR_8;
-                    StgWord jump   = BCO_INSTR_16;
-                    
-                    int index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
-                    if (index != xTaggedStackInt(offset) )
-                    {
-                      bciPtr += jump;
-                    }
-                    Continue;
-                }
-            Case(i_TEST_INJ_big):
-                {
-                    int  offset    = BCO_INSTR_16;
-                    StgWord jump   = BCO_INSTR_16;
-                    
-                    int index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
-                    if (index != xTaggedStackInt(offset) )
-                    {
-                      bciPtr += jump;
-                    }
-                    Continue;
-                }
-            Case(i_TEST_INJ_CONST):
-                {
-                    int  value     = BCO_INSTR_8;
-                    StgWord jump   = BCO_INSTR_16;
-                    
-                    int index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
-                    if (index != value )
-                    {
-                      bciPtr += jump;
-                    }
-                    Continue;
-                }  
-#endif /* XMLAMBDA */
             Case(i_UNPACK):
                 {
                     StgClosure* o = stgCast(StgClosure*,xStackPtr(0));
@@ -919,29 +751,6 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     }
                     Continue;
                 }
-#ifdef XMLAMBDA
-            /* extract all fields of a row */
-            Case(i_UNPACK_ROW):
-                {
-                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(0));
-                    int i = p->ptrs;
-                    while (--i >= 0)
-                    {
-                      xPushCPtr(p->payload[i]);
-                    }
-                    Continue;
-                }
-            /* extract the value of an INJ */
-            Case(i_UNPACK_INJ):
-                {
-                    StgClosure* con = stgCast(StgClosure*,xStackPtr(0));
-                    
-                    ASSERT(get_itbl(con) == Inj_con_info);
-                    
-                    xPushPtr(payloadPtr(con,0));                    
-                    Continue;
-                }
-#endif /* XMLAMBA */
             Case(i_VAR_big):
                 {
                     int n = BCO_INSTR_16;
@@ -966,6 +775,306 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     xPushPtr(stgCast(StgPtr,bcoConstPtr(bco,n)));
                     Continue;
                 }
+#ifdef XMLAMBDA
+            /* allocate rows, implemented on top of (frozen) Arrays */
+            Case(i_ALLOC_ROW):
+                {
+                    StgMutArrPtrs* p;
+                    StgWord n = BCO_INSTR_8;
+                    SSS; p = stgCast(StgMutArrPtrs*,grabHpNonUpd(sizeofW(StgMutArrPtrs) + n)); LLL;
+                    SET_HDR(p,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                    p->ptrs = n;
+                    xPushPtr(p);
+                    Continue;
+                }
+            Case(i_ALLOC_ROW_big):
+                {
+                    StgMutArrPtrs* p;
+                    StgWord n = BCO_INSTR_16;
+                    SSS; p = stgCast(StgMutArrPtrs*,grabHpNonUpd(sizeofW(StgMutArrPtrs) + n)); LLL;
+                    SET_HDR(p,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                    p->ptrs = n;
+                    xPushPtr(p);
+                    Continue;
+                }
+
+            /* pack values into a row. */
+            Case(i_PACK_ROW):
+                {
+                    StgWord offset   = BCO_INSTR_8;
+                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(offset));
+                    StgWord        n = p->ptrs;
+                    StgWord i;
+
+                    for (i=0; i<n; ++i)
+                    {
+                      p->payload[i] = xPopCPtr();
+                    }
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,p));
+                             LLL;
+                            );
+                    Continue;
+                }
+            Case(i_PACK_ROW_big):
+                {
+                    StgWord offset   = BCO_INSTR_16;
+                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(offset));
+                    StgWord        n = p->ptrs;
+                    StgWord i;
+
+                    for (i=0; i<n; ++i)
+                    {
+                      p->payload[i] = xPopCPtr();
+                    }
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,p));
+                             LLL;
+                            );
+                    Continue;
+                }
+                
+            /* extract all fields of a row */
+            Case(i_UNPACK_ROW):
+                {
+                    StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,xStackPtr(0));
+                    nat i = p->ptrs;
+                    while (i > 0)
+                    {
+                      i--;
+                      xPushCPtr(p->payload[i]);
+                    }
+                    Continue;
+                }
+      
+            /* Trivial row (unit) */
+            Case(i_CONST_ROW_TRIV):
+                {
+                    StgMutArrPtrs* p;
+                    SSS; p = stgCast(StgMutArrPtrs*,grabHpNonUpd(sizeofW(StgMutArrPtrs) + 0)); LLL;
+                    SET_HDR(p,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                    p->ptrs = 0;
+                    xPushPtr(p);
+                    Continue;
+                }
+            
+            /* pack values into an Inj */
+            Case(i_PACK_INJ_VAR):
+                {
+                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgWord));
+                    StgWord offset  = BCO_INSTR_8;
+                    
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+                    
+                    payloadWord(o,sizeofW(StgPtr)) = xTaggedStackWord(offset);
+                    payloadPtr(o,0)                = xPopPtr();                                        
+                    
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+            Case(i_PACK_INJ_VAR_big):
+                {
+                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgWord));
+                    StgWord offset  = BCO_INSTR_16;
+                    
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+
+                    payloadWord(o,sizeofW(StgPtr)) = xTaggedStackWord(offset);
+                    payloadPtr(o,0)                = xPopPtr();                    
+
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+            Case(i_PACK_INJ_CONST_8):
+                {
+                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgWord));
+                    StgWord witness = BCO_INSTR_8;
+                    
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+
+                    payloadWord(o,sizeofW(StgPtr)) = witness;
+                    payloadPtr(o,0)                = xPopPtr();                    
+
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+            Case(i_PACK_INJ_REL_8):
+                {
+                    const int size   = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgWord));
+                    StgWord offset   = BCO_INSTR_8;
+                    StgWord cwitness = BCO_INSTR_8;
+
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+                    
+                    payloadWord(o,sizeofW(StgPtr)) = xTaggedStackWord(offset) + cwitness;
+                    payloadPtr(o,0)                = xPopPtr();                                        
+                    
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+            Case(i_PACK_INJ):
+                {
+                    const int size  = CONSTR_sizeW(sizeofW(StgPtr),sizeofW(StgWord));
+                    
+                    StgClosure* o;                    
+                    SSS; o = (StgClosure*)grabHpNonUpd(size); LLL;
+                    SET_HDR(o,Inj_con_info,??);
+
+                    payloadWord(o,sizeofW(StgPtr)) = xPopTaggedWord();
+                    payloadPtr(o,0)                = xPopPtr();                    
+
+                    IF_DEBUG(evaluator,
+                             fprintf(stderr,"\tBuilt "); 
+                             SSS;
+                             printObj(stgCast(StgClosure*,o));
+                             LLL;
+                             );
+                    xPushPtr(stgCast(StgPtr,o));
+                    Continue;
+                }
+
+            /* Test Inj witnesses. */
+            Case(i_TEST_INJ_VAR):
+                {
+                    StgWord offset = BCO_INSTR_8;
+                    StgWord jump   = BCO_INSTR_16;
+                    
+                    StgWord index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (index != xTaggedStackWord(offset) )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;
+                }
+            Case(i_TEST_INJ_VAR_big):
+                {
+                    StgWord offset = BCO_INSTR_16;
+                    StgWord jump   = BCO_INSTR_16;
+                    
+                    StgWord index  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (index != xTaggedStackWord(offset) )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;
+                }
+            Case(i_TEST_INJ_CONST_8):
+                {
+                    StgWord cwitness = BCO_INSTR_8;
+                    StgWord jump     = BCO_INSTR_16;
+                    
+                    StgWord witness  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (witness != cwitness )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;
+                }  
+            Case(i_TEST_INJ_REL_8):
+                {
+                    StgWord offset    = BCO_INSTR_8;
+                    StgWord cwitness  = BCO_INSTR_8;
+                    StgWord jump      = BCO_INSTR_16;
+                    
+                    StgWord witness  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (witness != xTaggedStackWord(offset) + cwitness )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;   
+                }
+            Case(i_TEST_INJ):
+                {
+                    StgWord jump     = BCO_INSTR_16;
+                    StgWord cwitness = xPopTaggedWord();
+                    
+                    StgWord witness  = payloadWord( (StgClosure*)xStackPtr(0), sizeofW(StgPtr) );
+                    if (witness != cwitness )
+                    {
+                      bciPtr += jump;
+                    }
+                    Continue;
+                }  
+
+            /* extract the value of an INJ */
+            Case(i_UNPACK_INJ):
+                {
+                    StgClosure* con = stgCast(StgClosure*,xStackPtr(0));
+                    
+                    ASSERT(get_itbl(con) == Inj_con_info);
+                    
+                    xPushPtr(payloadPtr(con,0));                    
+                    Continue;
+                }
+
+            /* optimized witness (word) operations */
+            Case(i_CONST_WORD_8):
+                {
+                    xPushTaggedWord(BCO_INSTR_8);
+                    Continue;
+                }
+            Case(i_ADD_WORD_VAR):
+                {
+                    StgWord offset  = BCO_INSTR_8;
+                    StgWord witness = xTaggedStackWord(offset);
+                    witness += xPopTaggedWord();
+                    xPushTaggedWord(witness);
+                    Continue;
+                }
+            Case(i_ADD_WORD_VAR_big):
+                {
+                    StgWord offset  = BCO_INSTR_16;
+                    StgWord witness = xTaggedStackWord(offset);
+                    witness += xPopTaggedWord();
+                    xPushTaggedWord(witness);
+                    Continue;
+                }           
+            Case(i_ADD_WORD_VAR_8):
+                { 
+                    StgWord offset  = BCO_INSTR_8;
+                    StgWord inc     = BCO_INSTR_8;
+                    StgWord witness = xTaggedStackWord(offset);
+                    xPushTaggedWord(witness + inc);
+                    Continue;
+                }
+#endif /* XMLAMBA */
+
             Case(i_VOID):
                 {
                     SSS; PushTaggedRealWorld(); LLL;
@@ -1045,6 +1154,12 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     xPushTaggedWord(bcoConstWord(bco,BCO_INSTR_8));
                     Continue;
                 }
+            Case(i_CONST_WORD_big):
+                {
+                    StgWord n = BCO_INSTR_16;
+                    xPushTaggedWord(bcoConstWord(bco,n));
+                    Continue;
+                }    
             Case(i_PACK_WORD):
                 {
                     StgClosure* o;
@@ -2764,23 +2879,36 @@ static void* enterBCO_primop2 ( int primop2code,
             }
 #ifdef XMLAMBDA
 /*------------------------------------------------------------------------
-  Insert and Remove primitives on Rows
+  Insert and Remove primitives on Rows. This is important stuff for
+  XMlambda, these prims are called *all* the time. That's the reason
+  for all the specialized versions of the basic instructions.
+  note: A Gc might move rows around => allocate first, than pop the arguments.
+------------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------------
+  i_rowInsertAt: insert an element into a row
 ------------------------------------------------------------------------*/
         case i_rowInsertAt:
             {
-                nat j;
-                /* get: row, index and value */
-                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,PopPtr());
-                nat         i   = PopTaggedInt();     
-                StgClosure* x   = PopCPtr();
-                
-                /* allocate new row */
-                StgWord     n    = row->ptrs;                
+                StgWord j;
+                StgWord i;
+                StgWord n;
+                StgClosure* x;
+
+                /* allocate a new row before popping arguments */
+                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,stackPtr(0));
                 StgMutArrPtrs* newRow 
-                    = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + n + 1));                
+                    = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + row->ptrs + 1));                
                 SET_HDR(newRow,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                
+                /* pop row again and pop index and value */
+                row = stgCast(StgMutArrPtrs*,PopPtr());
+                n   = row->ptrs;
                 newRow->ptrs = n+1;
   
+                i   = PopTaggedWord();     
+                x   = PopCPtr();
+                
                 ASSERT(i <= n);
       
                 /* copy the fields, inserting the new value */
@@ -2797,20 +2925,150 @@ static void* enterBCO_primop2 ( int primop2code,
                 break; 
             }
 
+/*------------------------------------------------------------------------
+  i_rowChainInsert: behaves like a chain of [i_rowInsertAt] calls. This 
+  instruction is vital for XMLambda since we would otherwise allocate
+  a lot of intermediate rows.
+  It assumes that the RTS has no NULL pointers.
+  It behaves 'optimal' if the witnesses are ordered, (lowest on the
+  bottom of the stack).
+------------------------------------------------------------------------*/
+#define ROW_HOLE  0
+        case i_rowChainInsert:
+            {
+                StgWord witness, topWitness;
+                StgClosure* value;
+                StgWord j;
+                StgWord i;
+                
+                /* pop the number of arguments (=witness/value pairs) */
+                StgWord n = PopTaggedWord();
+
+                /* allocate a new row before popping boxed arguments */
+                StgMutArrPtrs* row  = stgCast(StgMutArrPtrs*,stackPtr(0));        
+                StgMutArrPtrs* newRow  
+                  = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + n + row->ptrs));                
+                SET_HDR(newRow,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                
+                /* pop the row and assign again (it may have moved during gc!) */
+                row = stgCast(StgMutArrPtrs*,PopPtr());
+                newRow->ptrs = n + row->ptrs;
+  
+                /* zero the fields */
+                for (i = 0; i < newRow->ptrs; i++)
+                {
+                  newRow->payload[i] = ROW_HOLE;
+                }
+
+                /* insert all values */
+                topWitness = 0;         /*invariant: 1 + maximal witness */
+                for (i = 0; i < n; i++)
+                {
+                  witness = PopTaggedWord();
+                  value   = PopCPtr();
+                  if (witness < topWitness)
+                  {
+                    /* shoot, unordered witnesses, we have to bump up everything */
+                    for (j = topWitness; j > witness; j--)
+                    {
+                      newRow->payload[j] = newRow->payload[j-1];
+                    }
+                    topWitness += 1;
+                  }
+                  else
+                  {
+                    topWitness = witness+1;
+                  }
+
+                  ASSERT(topWitness <= n);
+                  ASSERT(witness < n);
+                  newRow->payload[witness] = value;
+                }
+
+                /* copy the values from the old row into the holes */
+                for (j =0, i = 0; i < row->ptrs; j++,i++)
+                {
+                  while (newRow->payload[j] != ROW_HOLE) j++;
+                  ASSERT(j < n);
+                  newRow->payload[j] = row->payload[i];
+                }
+                
+                /* push the result */
+                PushPtr(stgCast(StgPtr,newRow));
+                break; 
+            }
+
+/*------------------------------------------------------------------------
+  i_rowChainBuild: exactly as [i_rowChainInsert] but builds a row from scratch.
+------------------------------------------------------------------------*/
+        case i_rowChainBuild:
+            {
+                StgWord witness, topWitness;
+                StgClosure* value;
+                StgWord j;
+                StgWord i;
+                
+                /* pop the number of arguments (=witness/value pairs) */
+                StgWord n = PopTaggedWord();
+
+                /* allocate a new row before popping boxed arguments */
+                StgMutArrPtrs* newRow  
+                  = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + n));                
+                SET_HDR(newRow,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                newRow->ptrs = n;
+  
+                /* insert all values */
+                topWitness = 0;         /*invariant: 1 + maximal witness */
+                for (i = 0; i < n; i++)
+                {
+                  witness = PopTaggedWord();
+                  value   = PopCPtr();
+                  if (witness < topWitness)
+                  {
+                    /* shoot, unordered witnesses, we have to bump up everything */
+                    for (j = topWitness; j > witness; j--)
+                    {
+                      newRow->payload[j] = newRow->payload[j-1];
+                    }
+                    topWitness += 1;
+                  }
+                  else
+                  {
+                    topWitness = witness+1;
+                  }
+
+                  ASSERT(topWitness <= n);
+                  ASSERT(witness < n);
+                  newRow->payload[witness] = value;
+                }                
+                
+                /* push the result */
+                PushPtr(stgCast(StgPtr,newRow));
+                break; 
+            }
+
+/*------------------------------------------------------------------------
+  i_rowRemoveAt: remove an element from a row
+------------------------------------------------------------------------*/
         case i_rowRemoveAt:
             {
-                nat j;
-                /* get row and index */
-                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,PopPtr());
-                nat         i   = PopTaggedInt(); /* or Word?? */
-                
-                /* allocate new row */
-                StgWord     n    = row->ptrs;                
+                StgWord j;
+                StgWord i;
+                StgWord n;
+
+                /* allocate new row before popping the arguments */
+                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,stackPtr(0));
                 StgMutArrPtrs* newRow 
-                    = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + n - 1));                
+                    = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + row->ptrs - 1));                
                 SET_HDR(newRow,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                
+                /* pop row again and pop the index */
+                row = stgCast(StgMutArrPtrs*,PopPtr());
+                n            = row->ptrs;                
                 newRow->ptrs = n-1;
-  
+                
+                i   = PopTaggedWord(); 
+                
                 ASSERT(i < n);
       
                 /* copy the fields, except for the removed value. */
@@ -2826,6 +3084,188 @@ static void* enterBCO_primop2 ( int primop2code,
                 PushPtr(stgCast(StgPtr,newRow));
                 break; 
             }
+          
+/*------------------------------------------------------------------------
+  i_rowChainRemove: behaves like a chain of [i_rowRemoveAt] calls. Again,
+  this is a vital instruction to avoid lots of intermediate rows.
+  It behaves 'optimal' if the witnessses are ordered, lowest on the
+  bottom of the stack.
+  The implementation is quite dirty, blame Daan for this :-)
+  (It overwrites witnesses on the stack with results and marks pointers
+   using their lowest bit.)
+------------------------------------------------------------------------*/
+#define MARK(p)     (stgCast(StgClosure*,(stgCast(StgWord,(p)) | 0x01)))
+#define UNMARK(p)   (stgCast(StgClosure*,(stgCast(StgWord,(p)) & ~0x01)))
+#define ISMARKED(p) ((stgCast(StgWord,(p)) & 0x01) == 0x01)
+
+        case i_rowChainRemove:
+            {
+                const nat sizeofTaggedWord = sizeofW(StgWord) + sizeofW(StackTag);
+                StgWord i;
+                StgWord j;
+                StgWord minWitness;
+                nat     base;
+                StgClosure* value;
+
+             
+                /* pop number of arguments (=witnesses) */
+                StgWord n = PopTaggedWord();
+                
+                /* allocate new row before popping boxed arguments */
+                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,stackPtr(0));
+                StgMutArrPtrs* newRow 
+                    = stgCast(StgMutArrPtrs*,allocate(sizeofW(StgMutArrPtrs) + row->ptrs - n));                
+                SET_HDR(newRow,&MUT_ARR_PTRS_FROZEN_info,CCCS);
+                
+                /* pop row and assign again (gc might have moved it) */
+                row = stgCast(StgMutArrPtrs*,PopPtr());
+                newRow->ptrs = row->ptrs - n;                
+                ASSERT( row->ptrs > n );                
+      
+                /* 'push' all elements that are removed */
+                base       = n*sizeofTaggedWord;            
+                minWitness = row->ptrs;
+                for (i = 1; i <= n; i++)
+                {
+                  StgWord witness;
+                  
+                  witness = taggedStackWord( base - i*sizeofTaggedWord );                  
+                  if (witness >= minWitness)
+                  {
+                    /* shoot, unordered witnesses, we have to search for the value */
+                    nat count;
+
+                    count   = witness - minWitness;
+                    witness = minWitness;
+                    while (1)
+                    {
+                      do{ witness++; } while (ISMARKED(row->payload[witness]));                      
+                      if (count == 0) break;
+                      count--;
+                    } 
+                  } 
+                  else
+                  {
+                    minWitness = witness;
+                  }                  
+                  ASSERT( witness < row->ptrs );
+                  ASSERT( !ISMARKED(row->payload[witness]) );
+
+                  /* mark the element */
+                  value = row->payload[witness];
+                  row->payload[witness] = MARK(value);
+
+                  /* set the value in the stack (overwriting old witnesses!) */
+                  setStackPtr( base - i*sizeofW(StgPtr), stgCast(StgPtr,value) );
+                }
+
+                /* pop the garbage from the stack */
+                gSp = gSp + base - n*sizeofW(StgPtr);
+                
+                /* copy all remaining elements and clear the marks */
+                for (j = 0, i = 0; i < newRow->ptrs; j++,i++)
+                {
+                  while (ISMARKED(row->payload[j])) 
+                  {
+                    row->payload[j] = UNMARK(row->payload[j]);
+                    j++;
+                  }
+                  newRow->payload[i] = row->payload[j];
+                }
+
+                /* unmark tail */
+                while (j < row->ptrs)
+                {
+                  value = row->payload[j];
+                  if (ISMARKED(value)) row->payload[j] = UNMARK(value);
+                  j++;
+                }
+
+#ifdef DEBUG
+                for (i = 0; i < row->ptrs; i++)
+                {
+                  ASSERT(!ISMARKED(row->payload[i]));
+                }
+#endif
+        
+                /* and push the result row */
+                PushPtr(stgCast(StgPtr,newRow));
+                break; 
+            }
+            
+/*------------------------------------------------------------------------
+  i_rowChainSelect: behaves exactly like [i_rowChainRemove] but doesn't return
+  the resulting row, only the removed elements.
+------------------------------------------------------------------------*/
+        case i_rowChainSelect:
+            {
+                const nat sizeofTaggedWord = sizeofW(StgWord) + sizeofW(StackTag);
+                StgWord i;
+                StgWord minWitness;
+                nat     base;
+                StgClosure* value;
+             
+                /* pop number of arguments (=witnesses) and row*/
+                StgWord        n   = PopTaggedWord();
+                StgMutArrPtrs* row = stgCast(StgMutArrPtrs*,PopPtr());
+                ASSERT( row->ptrs > n );                
+                                
+                /* 'push' all elements that are removed */
+                base       = n*sizeofTaggedWord;            
+                minWitness = row->ptrs;
+                for (i = 1; i <= n; i++)
+                {
+                  StgWord witness;
+                  
+                  witness = taggedStackWord( base - i*sizeofTaggedWord );                  
+                  if (witness >= minWitness)
+                  {
+                    /* shoot, unordered witnesses, we have to search for the value */
+                    nat count;
+
+                    count   = witness - minWitness;
+                    witness = minWitness;
+                    while (1)
+                    {
+                      do{ witness++; } while (ISMARKED(row->payload[witness]));                      
+                      if (count == 0) break;
+                      count--;
+                    } 
+                  } 
+                  else
+                  {
+                    minWitness = witness;
+                  }                  
+                  ASSERT( witness < row->ptrs );
+                  ASSERT( !ISMARKED(row->payload[witness]) );
+
+                  /* mark the element */
+                  value = row->payload[witness];
+                  row->payload[witness] = MARK(value);
+
+                  /* set the value in the stack (overwriting old witnesses!) */
+                  setStackPtr( base - i*sizeofW(StgPtr), stgCast(StgPtr,value) );
+                }
+
+                /* pop the garbage from the stack */
+                gSp = gSp + base - n*sizeofW(StgPtr);
+                
+                /* unmark elements */
+                for( i = 0; i < row->ptrs; i++)
+                {
+                  value = row->payload[i];
+                  if (ISMARKED(value)) row->payload[i] = UNMARK(value);
+                }
+
+#ifdef DEBUG
+                for (i = 0; i < row->ptrs; i++)
+                {
+                  ASSERT(!ISMARKED(row->payload[i]));
+                }
+#endif        
+                break; 
+            }
+
 #endif /* XMLAMBDA */
 
         case i_newRef:
@@ -3271,6 +3711,39 @@ static void* enterBCO_primop2 ( int primop2code,
                 break;
             }
 #endif /* PROVIDE_CONCURRENT */
+#ifdef XMLAMBDA
+        case i_ccall:
+            {
+                CallInfo        callInfo;
+                CFunDescriptor  descriptor;
+                void (*funPtr)(void);
+
+                StgWord offset  = PopTaggedWord();  /* offset into bco nonptr section */
+                funPtr          = PopTaggedAddr();
+
+                ASSERT(funPtr != NULL);
+
+                /* copy the complete callinfo, the bco might move during GC! */
+                callInfo    = *stgCast(CallInfo*, (*bco)->payload + (*bco)->n_ptrs + offset);
+                
+                /* copy info to a CFunDescriptor. just for compatibility. */
+                descriptor.num_args     = callInfo.argCount;
+                descriptor.arg_tys      = callInfo.data;
+                descriptor.num_results  = callInfo.resultCount;
+                descriptor.result_tys   = callInfo.data + callInfo.argCount + 1;
+
+                /* call out */
+                switch (ccall( &descriptor, funPtr, bco, callInfo.callConv, cap ))
+                {
+                case  0: break;
+                case  1: barf( "unhandled type or too many args/results in ccall"); break;
+                case  2: barf("ccall not configured correctly for this platform"); break;
+                default: barf("unknown return code from ccall"); break;
+                }
+
+                break;
+            }
+#endif
 
         case i_ccall_ccall_Id:
         case i_ccall_ccall_IO:
