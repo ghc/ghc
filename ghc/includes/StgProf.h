@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.14 2001/11/22 14:25:11 simonmar Exp $
+ * $Id: StgProf.h,v 1.15 2001/11/26 16:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -39,7 +39,6 @@ typedef struct _CostCentreStack {
 
   unsigned long time_ticks;
   unsigned long long mem_alloc;
-  unsigned long mem_resid;
 
   unsigned long inherited_ticks;
   unsigned long long inherited_alloc;
@@ -184,7 +183,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 	    scc_count 		: 0,				\
 	    time_ticks 		: 0,				\
 	    mem_alloc 		: 0,				\
-	    mem_resid 		: 0,				\
 	    inherited_ticks 	: 0,				\
 	    inherited_alloc	: 0,				\
 	    root 		: 0,				\

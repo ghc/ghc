@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.56 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.57 2001/11/26 16:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -276,26 +276,6 @@ shutdownHaskell(void)
 
   /* start timing the shutdown */
   stat_startExit();
-
-#ifdef PROFILING
-  // @LDV profiling
-  // 
-  // Note: 
-  //   We do not need to perform a major garbage collection because all the
-  //   closures created since the last census will not affect the profiling
-  //   statistics anyhow.
-  // 
-  // Note: 
-  //   We ignore any object created afterwards. 
-  //   finalizeWeakPointersNow() may corrupt the heap (because it executes 
-  //   rts_evalIO(), which adds an initial evaluation stack again).
-  //   Thus, we call LdvCensusKillAll() here, and prohibit LDV profiling
-  //   afterwards. 
-  //   Acutally, it is pointless to call LdvCensusKillAll() any later because
-  //   no object created later will be taken into account for profiling.
-  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) 
-    LdvCensusKillAll();
-#endif
 
 #if !defined(GRAN)
   /* Finalize any remaining weak pointers */

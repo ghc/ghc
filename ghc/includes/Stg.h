@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.41 2001/11/25 03:56:39 sof Exp $
+ * $Id: Stg.h,v 1.42 2001/11/26 16:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -158,7 +158,6 @@ typedef StgWord64       LW_;
 
 /* Profiling information */
 #include "StgProf.h"
-#include "StgRetainerProf.h"
 #include "StgLdvProf.h"
 
 /* Storage format definitions */

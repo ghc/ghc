@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.39 2001/11/25 16:57:38 sof Exp $
+ * $Id: RtsFlags.h,v 1.40 2001/11/26 16:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -97,22 +97,19 @@ struct PROFILING_FLAGS {
 # define HEAP_BY_MOD		2
 # define HEAP_BY_DESCR		4
 # define HEAP_BY_TYPE		5
-/* Flags for retainer and lag-drag-void profiling */
 # define HEAP_BY_RETAINER       6
 # define HEAP_BY_LDV            7
 
     rtsBool		showCCSOnException;
   
-# define CCchar    'C'
-# define MODchar   'M'
-# define DESCRchar 'D'
-# define TYPEchar  'Y'
+    nat                 maxRetainerSetSize;
 
     char*               modSelector;
     char*               descrSelector;
     char*               typeSelector;
     char*               ccSelector;
-
+    char*               retainerSelector;
+    char*               bioSelector;
 
 };
 #elif defined(DEBUG)

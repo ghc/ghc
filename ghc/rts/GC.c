@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.127 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: GC.c,v 1.128 2001/11/26 16:54:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1320,7 +1320,6 @@ copy(StgClosure *src, nat size, step *stp)
   stp->hp = to;
   upd_evacuee(src,(StgClosure *)dest);
 #ifdef PROFILING
-  // @LDV profiling
   // We store the size of the just evacuated object in the LDV word so that
   // the profiler can guess the position of the next object later.
   SET_EVACUAEE_FOR_LDV(src, size_org);
@@ -1364,7 +1363,6 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
   stp->hp += size_to_reserve;
   upd_evacuee(src,(StgClosure *)dest);
 #ifdef PROFILING
-  // @LDV profiling
   // We store the size of the just evacuated object in the LDV word so that
   // the profiler can guess the position of the next object later.
   // size_to_copy_org is wrong because the closure already occupies size_to_reserve

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.29 2001/11/22 14:25:11 simonmar Exp $
+ * $Id: Closures.h,v 1.30 2001/11/26 16:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,7 +22,7 @@
 typedef struct {
   CostCentreStack *ccs;
   union {
-    RetainerSet *rs;          // Retainer Set
+    struct _RetainerSet *rs;  // Retainer Set
     StgWord ldvw;             // Lag/Drag/Void Word
   } hp;
 } StgProfHeader;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.19 2001/11/22 14:25:13 simonmar Exp $
+ * $Id: Weak.c,v 1.20 2001/11/26 16:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -36,15 +36,6 @@ finalizeWeakPointersNow(void)
   while ((w = weak_ptr_list)) {
     weak_ptr_list = w->link;
     if (w->header.info != &stg_DEAD_WEAK_info) {
-        // @LDV profiling
-        // Even thought the info type of w changes, we DO NOT perform any
-        // LDV profiling because at this moment, LDV profiling must already
-        // have been terminated. See the comments in shutdownHaskell().
-        // At any rate, there is no need to call LDV_recordDead() because
-        // weak pointers are inherently used.
-#ifdef PROFILING
-        ASSERT(ldvTime == 0);   // LDV profiling is turned off.
-#endif
 	w->header.info = &stg_DEAD_WEAK_info;
 	IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
 	if (w->finalizer != &stg_NO_FINALIZER_closure) {

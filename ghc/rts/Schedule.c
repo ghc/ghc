@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.107 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Schedule.c,v 1.108 2001/11/26 16:54:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -99,7 +99,6 @@
 #include "Proftimer.h"
 #include "ProfHeap.h"
 #include "RetainerProfile.h"
-#include "LdvProfile.h"
 #endif
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
@@ -1278,32 +1277,8 @@ schedule( void )
 
 #ifdef PROFILING
     if (RtsFlags.ProfFlags.profileInterval==0 || performHeapProfile) {
-        if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) { 
-	    //
-	    // Note: currently retainer profiling is performed after
-	    // a major garbage collection.
-	    //
-	    GarbageCollect(GetRoots, rtsTrue);
-	    retainerProfile();
-	} else if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
-	    //
-	    // We have LdvCensus() preceded by a major garbage
-	    // collection because we don't want *genuinely* dead
-	    // closures to be involved in LDV profiling. Another good
-	    // reason is to produce consistent profiling results
-	    // regardless of the interval at which GCs are performed.
-	    // In other words, we want LDV profiling results to be
-	    // completely independent of the GC interval.
-	    //
-	    GarbageCollect(GetRoots, rtsTrue);
-	    LdvCensus();
-	} else {
-	    //
-	    // Normal creator-based heap profile
-	    //
-	    GarbageCollect(GetRoots, rtsTrue);
-	    heapCensus();
-	}
+	GarbageCollect(GetRoots, rtsTrue);
+	heapCensus();
 	performHeapProfile = rtsFalse;
 	ready_to_gc = rtsFalse;	// we already GC'd
     }

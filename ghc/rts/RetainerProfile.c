@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.1 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.2 2001/11/26 16:54:21 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -54,14 +54,8 @@ static nat timesAnyObjectVisited; // number of times any objects are visited
   pointer. See retainerSetOf().
  */
 
-// extract the retainer set field from c
-#define RSET(c)   ((c)->header.prof.hp.rs)
-
-static StgWord flip = 0;     // flip bit
+StgWord flip = 0;     // flip bit
                       // must be 0 if DEBUG_RETAINER is on (for static closures)
-
-#define isRetainerSetFieldValid(c) \
-  ((((StgWord)(c)->header.prof.hp.rs & 1) ^ flip) == 0)
 
 #define setRetainerSetToNull(c)   \
   (c)->header.prof.hp.rs = (RetainerSet *)((StgWord)NULL | flip)
@@ -870,159 +864,6 @@ maybeInitRetainerSet( StgClosure *c )
     }
 }
 
-static inline RetainerSet *
-retainerSetOf( StgClosure *c )
-{
-    ASSERT( isRetainerSetFieldValid(c) );
-    // StgWord has the same size as pointers, so the following type
-    // casting is okay.
-    return (RetainerSet *)((StgWord)RSET(c) ^ flip);
-}
-
-/* -----------------------------------------------------------------------------
- *  Returns the cost of the closure *c, e.g., the amount of heap memory
- *  allocated to *c. Static objects cost 0.
- *  The cost includes even the words allocated for profiling purpose.
- *  Cf. costPure().
- * -------------------------------------------------------------------------- */
-static inline nat
-cost( StgClosure *c )
-{
-    StgInfoTable *info;
-
-    info = get_itbl(c);
-    switch (info->type) {
-    case TSO:
-	return tso_sizeW((StgTSO *)c);
-
-    case THUNK:
-    case THUNK_1_0:
-    case THUNK_0_1:
-    case THUNK_2_0:
-    case THUNK_1_1:
-    case THUNK_0_2:
-	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
-
-	// static objects
-    case CONSTR_STATIC:
-    case FUN_STATIC:
-    case THUNK_STATIC:
-	return 0;
-
-    case MVAR:
-	return sizeofW(StgMVar);
-
-    case MUT_ARR_PTRS:
-    case MUT_ARR_PTRS_FROZEN:
-	return mut_arr_ptrs_sizeW((StgMutArrPtrs *)c);
-
-    case AP_UPD:
-    case PAP:
-	return pap_sizeW((StgPAP *)c);
-
-    case ARR_WORDS:
-	return arr_words_sizeW((StgArrWords *)c);
-
-    case CONSTR:
-    case CONSTR_1_0:
-    case CONSTR_0_1:
-    case CONSTR_2_0:
-    case CONSTR_1_1:
-    case CONSTR_0_2:
-    case FUN:
-    case FUN_1_0:
-    case FUN_0_1:
-    case FUN_2_0:
-    case FUN_1_1:
-    case FUN_0_2:
-    case WEAK:
-    case MUT_VAR:
-    case MUT_CONS:
-    case CAF_BLACKHOLE:
-    case BLACKHOLE:
-    case SE_BLACKHOLE:
-    case SE_CAF_BLACKHOLE:
-    case BLACKHOLE_BQ:
-    case IND_PERM:
-    case IND_OLDGEN:
-    case IND_OLDGEN_PERM:
-    case FOREIGN:
-    case BCO:
-    case STABLE_NAME:
-	return sizeW_fromITBL(info);
-
-    case THUNK_SELECTOR:
-	return sizeofW(StgHeader) + MIN_UPD_SIZE;
-
-	/*
-	  Error case
-	*/
-	// IND_STATIC cannot be *c, *cp, *r in the retainer profiling loop.
-    case IND_STATIC:
-	// CONSTR_INTLIKE, CONSTR_CHARLIKE, and CONSTR_NOCAF_STATIC
-	// cannot be *c, *cp, *r in the retainer profiling loop.
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
-    case CONSTR_NOCAF_STATIC:
-	// Stack objects are invalid because they are never treated as
-	// legal objects during retainer profiling.
-    case UPDATE_FRAME:
-    case CATCH_FRAME:
-    case STOP_FRAME:
-    case SEQ_FRAME:
-    case RET_DYN:
-    case RET_BCO:
-    case RET_SMALL:
-    case RET_VEC_SMALL:
-    case RET_BIG:
-    case RET_VEC_BIG:
-	// other cases
-    case IND:
-    case BLOCKED_FETCH:
-    case FETCH_ME:
-    case FETCH_ME_BQ:
-    case RBH:
-    case REMOTE_REF:
-    case EVACUATED:
-    case INVALID_OBJECT:
-    default:
-	barf("Invalid object in cost(): %d", get_itbl(c)->type);
-    }
-}
-
-/* -----------------------------------------------------------------------------
- *  Returns the pure cost of the closure *c, i.e., the size of memory
- *  allocated for this object without profiling.
- *  Note & Todo:
- *    costPure() subtracts the overhead incurred by profiling for all types
- *    of objects except TSO. Even though the overhead in the TSO object
- *    itself is taken into account, the additional costs due to larger
- *    stack objects (with unnecessary retainer profiling fields) is not
- *    considered. Still, costPure() should result in an accurate estimate
- *    of heap use because stacks in TSO objects are allocated in large blocks.
- *    If we get rid of the (currently unused) retainer profiling field in
- *    all stack objects, the result will be accurate.
- * ------------------------------------------------------------------------- */
-static inline nat
-costPure( StgClosure *c )
-{
-    nat cst;
-
-    if (!closureSatisfiesConstraints(c)) {
-	return 0;
-    }
-
-    cst = cost(c);
-
-    ASSERT(cst == 0 || cst - sizeofW(StgProfHeader) > 0);
-
-    if (cst > 0) {
-	return cst - sizeofW(StgProfHeader);
-    } else {
-	return 0;
-    }
-}
-
 /* -----------------------------------------------------------------------------
  * Returns rtsTrue if *c is a retainer.
  * -------------------------------------------------------------------------- */
@@ -1149,7 +990,7 @@ isRetainer( StgClosure *c )
  *    Depending on the definition of this function, the maintenance of retainer
  *    sets can be made easier. If most retainer sets are likely to be created
  *    again across garbage collections, refreshAllRetainerSet() in
- *    RetainerSet.c can simply set the cost field of each retainer set.
+ *    RetainerSet.c can simply do nothing.
  *    If this is not the case, we can free all the retainer sets and
  *    re-initialize the hash table.
  *    See refreshAllRetainerSet() in RetainerSet.c.
@@ -1179,19 +1020,11 @@ getRetainerFrom( StgClosure *c )
  *    s != NULL
  * -------------------------------------------------------------------------- */
 static inline void
-associate( StgClosure *c, RetainerSet *rsOfc, RetainerSet *s )
+associate( StgClosure *c, RetainerSet *s )
 {
-    nat cost_c;
-
-    cost_c = costPure(c);             // not cost(c)
-    if (rsOfc != NULL) {
-	ASSERT(rsOfc->cost >= cost_c);
-	rsOfc->cost -= cost_c;
-    }
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
     RSET(c) = (RetainerSet *)((StgWord)s | flip);
-    s->cost += cost_c;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1566,10 +1399,10 @@ inner_loop:
 	numObjectVisited++;
 
 	if (s == NULL)
-	    associate(c, NULL, singleton(R_r));
+	    associate(c, singleton(R_r));
 	else
 	    // s is actually the retainer set of *c!
-	    associate(c, NULL, s);
+	    associate(c, s);
 
 	// compute c_child_r
 	c_child_r = isRetainer(c) ? c : r;
@@ -1579,18 +1412,18 @@ inner_loop:
 	    goto loop;          // no need to process child
 
 	if (s == NULL)
-	    associate(c, retainerSetOfc, addElement(R_r, retainerSetOfc));
+	    associate(c, addElement(R_r, retainerSetOfc));
 	else {
 	    // s is not NULL and cp is not a retainer. This means that
 	    // each time *cp is visited, so is *c. Thus, if s has
 	    // exactly one more element in its retainer set than c, s
 	    // is also the new retainer set for *c.
 	    if (s->num == retainerSetOfc->num + 1) {
-		associate(c, retainerSetOfc, s);
+		associate(c, s);
 	    }
 	    // Otherwise, just add R_r to the current retainer set of *c.
 	    else {
-		associate(c, retainerSetOfc, addElement(R_r, retainerSetOfc));
+		associate(c, addElement(R_r, retainerSetOfc));
 	    }
 	}
 
@@ -1846,7 +1679,6 @@ resetStaticObjectForRetainerProfiling( void )
 void
 retainerProfile(void)
 {
-  nat allCost, numSet;
 #ifdef DEBUG_RETAINER
   nat i;
   nat totalHeapSize;        // total raw heap size (computed by linear scanning)
@@ -1923,8 +1755,6 @@ retainerProfile(void)
 #endif
   computeRetainerSet();
 
-  outputRetainerSet(hp_file, &allCost, &numSet);
-
 #ifdef DEBUG_RETAINER
   fprintf(stderr, "After traversing:\n");
   sumOfCostLinear = 0;
@@ -1978,8 +1808,7 @@ retainerProfile(void)
 #ifdef DEBUG_RETAINER
     maxCStackSize, maxStackSize,
 #endif
-    (double)timesAnyObjectVisited / numObjectVisited,
-    allCost, numSet);
+    (double)timesAnyObjectVisited / numObjectVisited);
 }
 
 /* -----------------------------------------------------------------------------

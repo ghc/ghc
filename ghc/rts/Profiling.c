@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.26 2001/11/22 16:33:06 simonmar Exp $
+ * $Id: Profiling.c,v 1.27 2001/11/26 16:54:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -194,15 +194,6 @@ initProfiling1 (void)
   /* cost centres are registered by the per-module 
    * initialisation code now... 
    */
-
-  switch (RtsFlags.ProfFlags.doHeapProfile) {
-  case HEAP_BY_RETAINER:
-      initRetainerProfiling();
-      break;
-  case HEAP_BY_LDV:
-      initLdvProfiling();
-      break;
-  }
 }
 
 void

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerSet.c,v 1.1 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: RetainerSet.c,v 1.2 2001/11/26 16:54:21 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -11,6 +11,7 @@
 #ifdef PROFILING
 
 #include "Rts.h"
+#include "RtsFlags.h"
 #include "Stats.h"
 #include "RtsUtils.h"
 #include "RetainerSet.h"
@@ -40,14 +41,11 @@ static int nextId;              // id of next retainer set
  * -------------------------------------------------------------------------- */
 RetainerSet rs_MANY = {
     num : 0,
-    cost : 0,
     hashKey : 0,
     link : NULL,
     id : 1,
     element : {}
 };
-
-nat maxRetainerSetSize = 16;
 
 /* -----------------------------------------------------------------------------
  * calculate the size of a RetainerSet structure
@@ -80,11 +78,9 @@ initializeAllRetainerSet(void)
 void
 refreshAllRetainerSet(void)
 {
+#ifdef FIRST_APPROACH
     int i;
 
-    // Choose one of the following two approaches.
-
-#ifdef FIRST_APPROACH
     // first approach: completely refresh
     arenaFree(arena);
     arena = newArena();
@@ -93,19 +89,6 @@ refreshAllRetainerSet(void)
 	hashTable[i] = NULL;
     nextId = 2;
 #endif // FIRST_APPROACH
-
-#ifdef SECOND_APPROACH
-    // second approach: leave all the retainer sets for reuse
-    RetainerSet *rs;
-    for (i = 0;i < HASH_TABLE_SIZE; i++) {
-	rs = hashTable[i];
-	while (rs != NULL) {
-	    rs->cost = 0;
-	    rs = rs->link;
-	}
-    }
-    rs_MANY.cost = 0;
-#endif // SECOND_APPROACH
 }
 
 /* -----------------------------------------------------------------------------
@@ -133,7 +116,6 @@ singleton(retainer r)
     // create it
     rs = arenaAlloc( arena, sizeofRetainerSet(1) );
     rs->num = 1;
-    rs->cost = 0;
     rs->hashKey = hk;
     rs->link = hashTable[hash(hk)];
     rs->id = nextId++;
@@ -168,9 +150,9 @@ addElement(retainer r, RetainerSet *rs)
 #endif
 
     ASSERT(rs != NULL);
-    ASSERT(rs->num <= maxRetainerSetSize);
+    ASSERT(rs->num <= RtsFlags.ProfFlags.maxRetainerSetSize);
 
-    if (rs == &rs_MANY || rs->num == maxRetainerSetSize) {
+    if (rs == &rs_MANY || rs->num == RtsFlags.ProfFlags.maxRetainerSetSize) {
 	return &rs_MANY;
     }
 
@@ -213,7 +195,6 @@ addElement(retainer r, RetainerSet *rs)
     // create a new retainer set
     nrs = arenaAlloc( arena, sizeofRetainerSet(rs->num + 1) );
     nrs->num = rs->num + 1;
-    nrs->cost = 0;
     nrs->hashKey = hk;
     nrs->link = hashTable[hash(hk)];
     nrs->id = nextId++;
@@ -447,80 +428,10 @@ printRetainerSetShort(FILE *f, retainerSet *rs)
 #endif /* SECOND_APPROACH */
 
 /* -----------------------------------------------------------------------------
- * Print the statistics.  This function is called after each
- * retainer profiling.  *allCost is set the sum of all costs retained
- * by any retainer sets.  *numSet is set to the number of all
- * retainer sets (including those with 0 cost).
- * -------------------------------------------------------------------------- */
-void
-outputRetainerSet( FILE *hp_file, nat *allCost, nat *numSet )
-{
-    nat i;
-#ifdef FIRST_APPROACH
-    nat j;
-#endif
-    RetainerSet *rs;
-    double duration;
-
-    *allCost = 0;
-    *numSet = 0;
-    duration = mut_user_time_during_RP();
-
-    fprintf(hp_file, "MARK %f\n", duration);
-    fprintf(hp_file, "BEGIN_SAMPLE %f\n", duration);
-
-    if (rs_MANY.cost > 0) {
-	fprintf(hp_file, "MANY\t%u\n", rs_MANY.cost * sizeof(StgWord));
-    }
-
-    for (i = 0; i < HASH_TABLE_SIZE; i++) {
-	for (rs = hashTable[i]; rs != NULL; rs = rs->link) {
-	    (*numSet)++;
-	    /*
-	      Note: If rs->cost is 0, it means that there exists at
-	      least one object which is retained by this retainer set
-	      *rs temporarily.  Since its new retainer set of this
-	      object (replacing *rs) is at least larger than *rs, if
-	      the cost of every object was a positive quantity, the
-	      following invariants would hold: If rs->cost == 0, there
-	      exists a retainer set rs' such that rs'->cost > 0 and
-	      rs'->num > rs->num.  However, static objects cost zero,
-	      this does not hold.  If we set the cost of each static
-	      object to a positive quantity, it should hold, which is
-	      actually the case.
-	    */
-	    if (rs->cost == 0)
-		continue;
-
-	    *allCost += rs->cost;
-
-#ifdef SECOND_APPROACH
-	    if (rs->id > 0)	// if having a positive cost for the first time?
-		rs->id = -(rs->id);     // mark as having a positive cost
-	    // Now, this retainer set has a permanent negative id.
-
-	    // report in the unit of bytes: * sizeof(StgWord)
-	    printRetainerSetShort(hp_file, rs);
-	    fprintf(hp_file, "\t%u\n", rs->cost * sizeof(StgWord));
-#endif
-
-#ifdef FIRST_APPROACH
-	    fprintf(hp_file, "{");
-	    for (j = 0; j < rs->num - 1; j++) {
-		printRetainer(hp_file, rs->element[j]);
-		fprintf(hp_file, ",");
-	    }
-	    printRetainer(hp_file, rs->element[j]);
-	    fprintf(hp_file, "}\t%u\n", rs->cost * sizeof(StgWord));
-#endif
-	}
-    }
-    fprintf(hp_file, "END_SAMPLE %f\n", duration);
-}
-
-/*
-  This function is called at the exit of the program.
- */
+ * Dump the contents of each retainer set into the log file at the end
+ * of the run, so the user can find out for a given retainer set ID
+ * the full contents of that set.
+ * --------------------------------------------------------------------------- */
 #ifdef SECOND_APPROACH
 void
 outputAllRetainerSet(FILE *prof_file)

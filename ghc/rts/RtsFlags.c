@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.52 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.53 2001/11/26 16:54:21 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -252,10 +252,13 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
     RtsFlags.ProfFlags.profileInterval    = 20;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
+    RtsFlags.ProfFlags.maxRetainerSetSize = 8;
     RtsFlags.ProfFlags.modSelector        = NULL;
     RtsFlags.ProfFlags.descrSelector      = NULL;
     RtsFlags.ProfFlags.typeSelector       = NULL;
     RtsFlags.ProfFlags.ccSelector         = NULL;
+    RtsFlags.ProfFlags.retainerSelector   = NULL;
+    RtsFlags.ProfFlags.bioSelector        = NULL;
 
 #elif defined(DEBUG)
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
@@ -414,17 +417,23 @@ usage_text[] = {
 
 # if defined(PROFILING)
 "",
-"  -hx            Heap residency profile (XML)  (output file <program>.prof)",
-"  -h<break-down> Heap residency profile (text) (output file <program>.prof)",
-"     break-down: C = cost centre stack (default), M = module",
-"                 D = closure description, Y = type description",
-"  -hR            Retainer profile (output files <program>.hp)",
-"  -hL            Lag/Drag/Void/Use profile (output files <program>.hp)",
+"  -hx            Heap residency profile (XML)   (output file <program>.prof)",
+"  -h<break-down> Heap residency profile (hp2ps) (output file <program>.hp)",
+"     break-down: c = cost centre stack (default)",
+"                 m = module",
+"                 d = closure description",
+"                 y = type description",
+"                 r = retainer",
+"                 b = biography (LAG,DRAG,VOID,USE)",
 "  A subset of closures may be selected thusly:",
-"    -hc{cc, cc ...} specific cost centre(s) (NOT STACKS!)",
+"    -hc{cc,cc ...}  specific cost centre(s) (NOT STACKS!)",
 "    -hm{mod,mod...} all cost centres from the specified modules(s)",
 "    -hd{des,des...} closures with specified closure descriptions",
 "    -hy{typ,typ...} closures with specified type descriptions",
+"    -hr{cc,cc...}   closures with specified retainers",
+"    -hb{bio,bio...} closures with specified biographies (lag,drag,void,use)",
+"",
+"  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
 "  -i<msec>       Time between heap samples (msec, default: 20)",
 "",
@@ -823,6 +832,15 @@ error = rtsTrue;
 		}
 		) break;
 
+	      case 'R':
+		  PROFILING_BUILD_ONLY(
+		      RtsFlags.ProfFlags.maxRetainerSetSize = atof(rts_argv[arg]+2);
+		      
+		      if (RtsFlags.ProfFlags.maxRetainerSetSize < 0)
+		         bad_option( rts_argv[arg] );
+		      break;
+  	          ) break;
+
 	      case 'h': /* serial heap profile */
 #if !defined(PROFILING) && defined(DEBUG)
 		switch (rts_argv[arg][2]) {
@@ -840,93 +858,104 @@ error = rtsTrue;
 #else
 		PROFILING_BUILD_ONLY(
 		switch (rts_argv[arg][2]) {
-		  case '\0':
-		  case 'C':
-		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
-			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
-			  break;
-		      } else {
-			  goto many_hps;
-		      }
-		  case 'M':
-		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+		case '\0':
+		case 'C':
+		case 'c':
+		case 'M':
+		case 'm':
+		case 'D':
+		case 'd':
+		case 'Y':
+		case 'y':
+		case 'R':
+		case 'r':
+		case 'B':
+		case 'b':
+		    if (rts_argv[arg][2] != '\0' && rts_argv[arg][3] != '\0') {
+			{
+			    char *left  = strchr(rts_argv[arg], '{');
+			    char *right = strrchr(rts_argv[arg], '}');
+			    if (! left || ! right ||
+				strrchr(rts_argv[arg], '{') != left ||
+				strchr(rts_argv[arg], '}') != right) {
+				prog_belch(
+				    "Invalid heap profiling selection bracketing\n   %s\n", 
+				    rts_argv[arg]);
+				error = rtsTrue;
+			    } else {
+				*right = '\0';
+				switch (rts_argv[arg][2]) {
+				case 'C':
+				case 'c': // cost centre label select
+				    RtsFlags.ProfFlags.ccSelector = left + 1;
+				    break;
+				case 'M':
+				case 'm': // cost centre module select
+				    RtsFlags.ProfFlags.modSelector = left + 1;
+				    break;
+				case 'D':
+				case 'd': // closure descr select 
+				    RtsFlags.ProfFlags.descrSelector = left + 1;
+				    break;
+				case 'Y':
+				case 'y': // closure type select
+				    RtsFlags.ProfFlags.typeSelector = left + 1;
+				    break;
+				case 'R':
+				case 'r': // retainer select
+				    RtsFlags.ProfFlags.retainerSelector = left + 1;
+				    break;
+				case 'B':
+				case 'b': // biography select
+				    RtsFlags.ProfFlags.bioSelector = left + 1;
+				    break;
+				}
+			    }
+			}
+			break;
+		    }
+		    
+		    if (RtsFlags.ProfFlags.doHeapProfile != 0) {
+			prog_belch("multiple heap profile options");
+			error = rtsTrue;
+			break;
+		    }
+
+		    switch (rts_argv[arg][2]) {
+		    case '\0':
+		    case 'C':
+		    case 'c':
+			RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
+			break;
+		    case 'M':
+		    case 'm':
 			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
 			  break;
-		      } else {
-			  goto many_hps;
-		      }
-		  case 'D':
-		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+		    case 'D':
+		    case 'd':
 			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
 			  break;
-		      } else {
-			  goto many_hps;
-		      }
-		  case 'Y':
-		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+		    case 'Y':
+		    case 'y':
 			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
 			  break;
-		      } else {
-			  goto many_hps;
-		      }
-		  case 'R':
-		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+		    case 'R':
+		    case 'r':
 			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_RETAINER;
 			  break;
-		      } else {
-			  goto many_hps;
-		      }
-		  case 'L':
-		      if (RtsFlags.ProfFlags.doHeapProfile == 0) {
+		    case 'B':
+		    case 'b':
 			  RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
 			  break;
-		      } else {
-			  goto many_hps;
-		      }
-		many_hps:
-		      prog_belch("multiple heap profile options");
-		      error = rtsTrue;
-		      break;
+		    }
+		    break;
 		      
-                  case 'c': /* cost centre label select */
-                  case 'm': /* cost centre module select */
-                  case 'd': /* closure descr select */
-                  case 'y': /* closure type select */
-                    {char *left  = strchr(rts_argv[arg], '{');
-                     char *right = strrchr(rts_argv[arg], '}');
-                     if (! left || ! right ||
-                          strrchr(rts_argv[arg], '{') != left ||
-                           strchr(rts_argv[arg], '}') != right) {
-                        prog_belch(
-                           "Invalid heap profiling selection bracketing\n   %s\n", 
-                           rts_argv[arg]);
-                        error = rtsTrue;
-                     } else {
-                        *right = '\0';
-                        switch (rts_argv[arg][2]) {
-                          case 'c': /* cost centre label select */
-                            RtsFlags.ProfFlags.ccSelector = left + 1;
-                            break;
-                          case 'm': /* cost centre module select */
-                            RtsFlags.ProfFlags.modSelector = left + 1;
-                            break;
-                          case 'd': /* closure descr select */
-                            RtsFlags.ProfFlags.descrSelector = left + 1;
-                            break;
-                          case 'y': /* closure type select */
-                            RtsFlags.ProfFlags.typeSelector = left + 1;
-                            break;
-                        }
-                     }
-                    }
-                    break;
-		  default:
+		default:
 		    prog_belch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		}
 		) 
-
-#endif
+#endif // PROFILING
     	    	break;
 
 #if defined(PROFILING) 
