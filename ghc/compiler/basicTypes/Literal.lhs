@@ -102,7 +102,8 @@ data Literal
     MachChar	Int             -- Char#        At least 31 bits
   | MachStr	FastString
 
-  | MachAddr	Integer	-- Whatever this machine thinks is a "pointer"
+  | MachNullAddr                -- the NULL pointer, the only pointer value
+                                -- that can be represented as a Literal.
 
   | MachInt	Integer		-- Int#		At least WORD_SIZE_IN_BITS bits
   | MachInt64	Integer		-- Int64#	At least 64 bits
@@ -137,7 +138,7 @@ arg of MachLitLit involved.
 instance Binary Literal where
     put_ bh (MachChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (MachStr ab)      = do putByte bh 1; put_ bh ab
-    put_ bh (MachAddr ac)     = do putByte bh 2; put_ bh ac
+    put_ bh (MachNullAddr)    = do putByte bh 2
     put_ bh (MachInt ad)      = do putByte bh 3; put_ bh ad
     put_ bh (MachInt64 ae)    = do putByte bh 4; put_ bh ae
     put_ bh (MachWord af)     = do putByte bh 5; put_ bh af
@@ -156,8 +157,7 @@ instance Binary Literal where
 		    ab <- get bh
 		    return (MachStr ab)
 	      2 -> do
-		    ac <- get bh
-		    return (MachAddr ac)
+		    return (MachNullAddr)
 	      3 -> do
 		    ad <- get bh
 		    return (MachInt ad)
@@ -277,7 +277,7 @@ float2DoubleLit (MachFloat  f) = MachDouble f
 double2FloatLit (MachDouble d) = MachFloat  d
 
 nullAddrLit :: Literal
-nullAddrLit = MachAddr 0
+nullAddrLit = MachNullAddr
 \end{code}
 
 	Predicates
@@ -318,7 +318,7 @@ litSize _other	      = 1
 literalType :: Literal -> Type
 literalType (MachChar _)	  = charPrimTy
 literalType (MachStr  _)	  = addrPrimTy
-literalType (MachAddr _)	  = addrPrimTy
+literalType (MachNullAddr)	  = addrPrimTy
 literalType (MachInt  _)	  = intPrimTy
 literalType (MachWord  _)	  = wordPrimTy
 literalType (MachInt64  _)	  = int64PrimTy
@@ -334,7 +334,7 @@ literalPrimRep :: Literal -> PrimRep
 
 literalPrimRep (MachChar _)	  = CharRep
 literalPrimRep (MachStr _)	  = AddrRep  -- specifically: "char *"
-literalPrimRep (MachAddr  _)	  = AddrRep
+literalPrimRep (MachNullAddr)	  = AddrRep
 literalPrimRep (MachInt _) 	  = IntRep
 literalPrimRep (MachWord _) 	  = WordRep
 literalPrimRep (MachInt64 _)	  = Int64Rep
@@ -351,7 +351,7 @@ literalPrimRep (MachLitLit _ ty)  = typePrimRep ty
 \begin{code}
 cmpLit (MachChar      a)   (MachChar	   b)   = a `compare` b
 cmpLit (MachStr       a)   (MachStr	   b)   = a `compare` b
-cmpLit (MachAddr      a)   (MachAddr	   b)   = a `compare` b
+cmpLit (MachNullAddr)      (MachNullAddr)       = EQ
 cmpLit (MachInt       a)   (MachInt	   b)   = a `compare` b
 cmpLit (MachWord      a)   (MachWord	   b)   = a `compare` b
 cmpLit (MachInt64     a)   (MachInt64	   b)   = a `compare` b
@@ -365,7 +365,7 @@ cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
 
 litTag (MachChar      _)   = _ILIT(1)
 litTag (MachStr       _)   = _ILIT(2)
-litTag (MachAddr      _)   = _ILIT(3)
+litTag (MachNullAddr)      = _ILIT(3)
 litTag (MachInt       _)   = _ILIT(4)
 litTag (MachWord      _)   = _ILIT(5)
 litTag (MachInt64     _)   = _ILIT(6)
@@ -379,7 +379,7 @@ litTag (MachLitLit  _ _)   = _ILIT(11)
 	Printing
 	~~~~~~~~
 * MachX (i.e. unboxed) things are printed unadornded (e.g. 3, 'a', "foo")
-  exceptions: MachFloat and MachAddr get an initial keyword prefix
+  exceptions: MachFloat gets an initial keyword prefix.
 
 \begin{code}
 pprLit lit
@@ -416,8 +416,8 @@ pprLit lit
       MachDouble d | code_style -> code_rational d
 		   | otherwise  -> rational d
 
-      MachAddr p | code_style -> ptext SLIT("(void*)") <> integer p
-	         | otherwise  -> ptext SLIT("__addr") <+> integer p
+      MachNullAddr | code_style -> ptext SLIT("(void*)0")
+	           | otherwise  -> ptext SLIT("__NULL")
 
       MachLabel l mb
          | code_style -> ptext SLIT("(&") <> ftext l <> char ')'
@@ -468,7 +468,7 @@ Hash values should be zero or a positive integer.  No negatives please.
 hashLiteral :: Literal -> Int
 hashLiteral (MachChar c)    	= c + 1000	-- Keep it out of range of common ints
 hashLiteral (MachStr s)     	= hashFS s
-hashLiteral (MachAddr i)    	= hashInteger i
+hashLiteral (MachNullAddr)    	= 0
 hashLiteral (MachInt i)   	= hashInteger i
 hashLiteral (MachInt64 i) 	= hashInteger i
 hashLiteral (MachWord i)   	= hashInteger i

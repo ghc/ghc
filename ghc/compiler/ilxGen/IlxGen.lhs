@@ -1120,7 +1120,7 @@ pushLit env (MachWord64 w) = text "ldc.i8" <+> integer w <+> text "conv.u8"
 pushLit env (MachFloat f)  = text "ldc.r4" <+> rational f
 pushLit env (MachDouble f) = text "ldc.r8" <+> rational f
 pushLit env (MachLitLit _ _) = trace "WARNING: Cannot compile MachLitLit to ILX in IlxGen.lhs" (text "// MachLitLit!!!  Not valid in ILX!!")
-pushLit env (MachAddr w) = text "ldc.i4" <+> integer w <+> text "conv.i"
+pushLit env (MachNullAddr)  = text "ldc.i4 0"
 pushLit env (MachLabel l _) = trace "WARNING: Cannot compile MachLabel to ILX in IlxGen.lhs" (text "// MachLabel!!!  Not valid in ILX!!")
 
 pprIlxTopVar env v

@@ -166,7 +166,7 @@ make_lit l =
     MachChar i | i <= 0xff -> C.Lchar (chr i) t
     MachChar i | otherwise -> C.Lint (toEnum i) t
     MachStr s -> C.Lstring (unpackFS s) t
-    MachAddr i -> C.Lint i t  
+    MachNullAddr -> C.Lint 0 t
     MachInt i -> C.Lint i t
     MachInt64 i -> C.Lint i t
     MachWord i -> C.Lint i t

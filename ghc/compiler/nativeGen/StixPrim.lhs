@@ -184,7 +184,7 @@ amodeToStix (CLit core)
   = case core of
       MachChar c     -> StInt (toInteger c)
       MachStr s	     -> StString s
-      MachAddr a     -> StInt a
+      MachNullAddr   -> StInt 0
       MachInt i      -> StInt i
       MachWord w     -> case word2IntLit core of MachInt iw -> StInt iw
       MachLitLit s _ -> litLitErr
