@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.10 1999/06/30 11:29:53 simonmar Exp $
+$Id: Parser.y,v 1.11 1999/07/26 16:06:28 simonpj Exp $
 
 Haskell grammar.
 
@@ -760,17 +760,20 @@ gdpat	:: { RdrNameGRHS }
 -- Statement sequences
 
 stmtlist :: { [RdrNameStmt] }
-	: '{'            	stmts '}'	{ reverse $2 }
-	|     layout_on_for_do  stmts close	{ reverse $2 }
+	: '{'            	stmts '}'	{ $2 }
+	|     layout_on_for_do  stmts close	{ $2 }
 
+-- Stmt list must end in an expression
+-- thought the H98 report doesn't currently say so in the syntax
 stmts :: { [RdrNameStmt] }
-	: ';' stmts1			{ $2 }
-	| stmts1			{ $1 }
+	: stmts1 srcloc exp		{ reverse (ExprStmt $3 $2 : $1) }
 
+-- A list of zero or more stmts, ending in semicolon
+-- Returned in *reverse* order
 stmts1 :: { [RdrNameStmt] }
-	: stmts1 ';' stmt		{ $3 : $1 }
-	| stmts1 ';'			{ $1 }
-	| stmt 				{ [$1] }
+	: stmts1 stmt ';'		{ $2 : $1 }
+	| stmts1 ';' 			{ $1 }
+	| 				{ [] }
 
 stmt  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $2 `thenP` \p ->
