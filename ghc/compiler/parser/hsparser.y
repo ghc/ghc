@@ -274,10 +274,10 @@ BOOLEAN pat_check=TRUE;
 		gcon gconk gtycon itycon qop1 qvarop1 
 		ename iname
 
-%type <ubinding>  topdecl topdecls topdecls1 letdecls
+%type <ubinding>  topdecl topdecls letdecls
 		  typed datad newtd classd instd defaultd foreignd
-		  decl decls decls1 fixdecl fix_op fix_ops valdef
- 		  maybe_where type_and_maybe_id
+		  decl decls fixdecl fix_op fix_ops valdef
+ 		  maybe_where with_where where_body type_and_maybe_id
 
 %type <uttype>    polytype
 		  conargatype conapptype
@@ -433,10 +433,9 @@ iname   :  var					{ $$ = mknoqual($1); }
 *                                                                     *
 **********************************************************************/
 
-topdecls: topdecls1 opt_semi	{ $$ = $1; }
-
-topdecls1:  topdecl
-	 |  topdecls1 SEMI topdecl
+topdecls :  topdecl
+	 |  topdecls SEMI  		{ $$ = $1; }
+	 |  topdecls SEMI topdecl
 		{
 		  if($1 != NULL)
 		    if($3 != NULL)
@@ -536,10 +535,9 @@ unsafe_flag: UNSAFE	{ $$ = 1; }
 	   | /*empty*/  { $$ = 0; }
 	   ;
 
-decls  : decls1 opt_semi { $$ = $1; }
-
-decls1	: decl
-	| decls1 SEMI decl
+decls	: decl
+	| decls SEMI		{ $$ = $1; }
+	| decls SEMI decl
 		{
 		  if(SAMEFN)
 		    {
@@ -550,10 +548,6 @@ decls1	: decl
 		    $$ = mkabind($1,$3);
 		}
 	;
-
-opt_semi : /*empty*/
-	 | SEMI	
-	 ;
 
 /*
     Note: if there is an iclasop_pragma here, then we must be
@@ -911,14 +905,18 @@ gdrhs	:  gd EQUAL get_line_no exp		{ $$ = lsing(mkpgdexp($1,$3,$4)); }
 	|  gd EQUAL get_line_no exp gdrhs	{ $$ = mklcons(mkpgdexp($1,$3,$4),$5); }
 	;
 
-maybe_where:
-	   WHERE ocurly decls ccurly		{ $$ = $3; }
-	|  WHERE vocurly decls vccurly		{ $$ = $3; }
-           /* A where containing no decls is OK */
-	|  WHERE 				{ $$ = mknullbind(); }
-	|  WHERE ocurly ccurly			{ $$ = mknullbind(); }
-	|  /* empty */				{ $$ = mknullbind(); }
-	;
+maybe_where: /* empty */			{ $$ = mknullbind(); }
+	   | WHERE with_where			{ $$ = $2; }
+	   ;
+
+with_where : /* empty */			{ $$ = mknullbind(); }
+	   | where_body				{ $$ = $1; }
+	   ;
+
+where_body : ocurly  decls ccurly		{ $$ = $2; }
+	   | vocurly decls vccurly		{ $$ = $2; }
+	   | ocurly ccurly			{ $$ = mknullbind(); }
+	   ;
 
 gd	:  VBAR quals				{ $$ = $2; }
 	;
@@ -1128,7 +1126,7 @@ list_rest : 	exp				{ $$ = lsing($1); }
 	   at it, it *will* do the wrong thing [WDP 94/06])
 	*/
 
-letdecls:  LET { pat_check = TRUE; } ocurly decls ccurly		{ $$ = $4; }
+letdecls:  LET { pat_check = TRUE; }  ocurly decls  ccurly		{ $$ = $4; }
 	|  LET { pat_check = TRUE; } vocurly decls vccurly		{ $$ = $4; }
 	;
 
