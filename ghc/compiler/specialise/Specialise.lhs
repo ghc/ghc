@@ -826,13 +826,22 @@ specDefn calls (fn, rhs)
         let
 	   (maybe_spec_tyvars, spec_tys) = unzip stuff
            spec_tyvars = catMaybes maybe_spec_tyvars
-	   spec_rhs    = mkLams spec_tyvars $
-                         mkApps rhs (map Type spec_tys ++ call_ds)
-  	   spec_id_ty  = mkForAllTys spec_tyvars (substTy ty_env tau)
-	   ty_env      = zipVarEnv tyvars spec_tys
+  	   spec_id_ty  = mkForAllTys spec_tyvars 
+				     (substTy (zipVarEnv tyvars spec_tys) tau)
+		-- NB When substituting in tau we need a ty_env mentioning tyvars
+		-- but when substituting in UDs we need a ty_evn mentioning rhs_tyvars
+	   ud_ty_env   = zipVarEnv rhs_tyvars spec_tys
+	   ud_dict_env = zipVarEnv rhs_dicts (map Done call_ds)
+
+		-- Only the overloaded tyvars should be free in the uds
+	   ty_env   = mkVarEnv [ (rhs_tyvar, ty) 
+			       | (rhs_tyvar, Just ty) <- zipEqual "specUDs1" rhs_tyvars call_ts
+			       ]
+
 	in
 
-	newIdSM fn spec_id_ty		`thenSM` \ spec_f ->
+		-- Specialise the UDs from f's RHS
+        specUDs ud_ty_env ud_dict_env bound_uds			`thenSM` \ spec_uds ->
 
 
 		-- Construct the stuff for f's spec env
@@ -844,6 +853,7 @@ specDefn calls (fn, rhs)
 		--
 		-- In fact we use the standard template locals, so that the
 		-- they don't need to be "tidied" before putting in interface files
+	newIdSM fn spec_id_ty		`thenSM` \ spec_f ->
 	let
 	   arg_ds	 = mkTemplateLocals (map coreExprType call_ds)
 	   spec_env_rhs  = mkLams arg_ds $
@@ -852,18 +862,25 @@ specDefn calls (fn, rhs)
            spec_env_info = (spec_tyvars, spec_tys, spec_env_rhs)
         in
 
-		-- Specialise the UDs from f's RHS
+		-- Finally construct f's RHS
+		-- Annoyingly, the specialised UDs may mention some of the *un* specialised
+		-- type variables.  Here's a case that came up in nofib/spectral/typech98:
+		--	f = /\m a -> \d:Monad m -> let d':Monad (T m a) = ...a... in ...
+		-- When we try to make a specialised verison of f, from a call pattern
+		--	(f Maybe ?)
+		-- where ? is the Nothing for an unspecialised position, we must get
+		--	spec_f = /\ a -> let d':Monad (T Maybe a) = ...a... in ....
+		-- If we don't do the splitUDs below, the d' binding floats out too far.
+		-- Sigh. What a mess.
 	let
-		-- Only the overloaded tyvars should be free in the uds
-	   ty_env   = mkVarEnv [ (rhs_tyvar, ty) 
-			       | (rhs_tyvar, Just ty) <- zipEqual "specUDs1" rhs_tyvars call_ts
-			       ]
-	   dict_env = zipVarEnv rhs_dicts (map Done call_ds)
-	in
-        specUDs ty_env dict_env bound_uds			`thenSM` \ spec_uds ->
+	   (float_uds, (dict_binds,_)) = splitUDs spec_tyvars spec_uds
 
+	   spec_rhs    = mkLams spec_tyvars $
+			 mkDictLets dict_binds $
+                         mkApps rhs (map Type spec_tys ++ call_ds)
+	in
         returnSM ((spec_f, spec_rhs),
-	          spec_uds,
+	          float_uds,
 		  spec_env_info
 	)
 \end{code}
