@@ -87,19 +87,15 @@ import List             ( intersperse )
 
 -- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
 -- lines on mingw32, so we disallow it now.
-#if defined(mingw32_HOST_OS) && (__GLASGOW_HASKELL__ <= 408)
-#error GHC <= 4.08 is not supported for bootstrapping GHC on i386-unknown-mingw32
+#if __GLASGOW_HASKELL__ < 500
+#error GHC >= 5.00 is required for bootstrapping GHC
 #endif
 
 #ifndef mingw32_HOST_OS
 #if __GLASGOW_HASKELL__ > 504
 import qualified System.Posix.Internals
-import System.Posix.Process ( executeFile, getProcessStatus, forkProcess, ProcessStatus(..))
-import System.Posix.Signals ( installHandler, sigCHLD, sigCONT, Handler(..) )
 #else
 import qualified Posix
-import Posix ( executeFile, getProcessStatus, forkProcess, ProcessStatus(..), installHandler,
-               sigCHLD, sigCONT, Handler(..) )
 #endif
 #else /* Must be Win32 */
 import List		( isPrefixOf )
@@ -108,12 +104,11 @@ import Foreign
 import CString		( CString, peekCString )
 #endif
 
-#ifdef mingw32_HOST_OS
-#if __GLASGOW_HASKELL__ > 504
-import System.Cmd       ( rawSystem )
+#if __GLASGOW_HASKELL__ < 601
+import Foreign		( withMany, withArray0, nullPtr, Ptr )
+import CForeign		( CString, withCString, throwErrnoIfMinus1 )
 #else
-import SystemExts       ( rawSystem )
-#endif
+import System.Cmd	( rawSystem )
 #endif
 \end{code}
 
@@ -701,51 +696,13 @@ runSomething :: String		-- For -v message
 				--	runSomething will dos-ify them
 	     -> IO ()
 
-runSomething phase_name pgm args
- = traceCmd phase_name (concat (intersperse " " (pgm:quoteargs))) $
-   do
-#ifdef mingw32_HOST_OS
-          let showOptions :: [Option] -> String
-              showOptions ls = unwords (map (quote . showOpt) ls)
-
-              quote :: String -> String
-              quote "" = ""
-              quote s  = "\"" ++ escapeDoubleQuotes s ++ "\""
-
-              escapeDoubleQuotes :: String -> String
-              escapeDoubleQuotes ""            = ""
-              escapeDoubleQuotes ('\\':'"':cs) = '\\':'"':escapeDoubleQuotes cs
-              escapeDoubleQuotes (     '"':cs) = '\\':'"':escapeDoubleQuotes cs
-              escapeDoubleQuotes (c       :cs) = c       :escapeDoubleQuotes cs
-
-          -- The pgm is already in native format (appropriate dir separators)
-          exit_code <- rawSystem (pgm ++ ' ':showOptions args)
-#else
-          mpid <- forkProcess
-          exit_code <- case mpid of
-            Nothing -> do -- Child
-	      executeFile pgm True quoteargs Nothing
-              exitWith (ExitFailure 127)
-	      -- NOT REACHED
-              return ExitSuccess
-            Just child -> do -- Parent
-#if __GLASGOW_HASKELL__ <= 504
-              -- avoid interaction with broken getProcessStatus-FFI:
-              oldHandler <- installHandler sigCONT Ignore Nothing
-#endif
-              Just (Exited res) <- getProcessStatus True False child
-#if __GLASGOW_HASKELL__ <= 504
-              -- restore handler
-              installHandler sigCONT oldHandler Nothing
-#endif
-
-              return res
-#endif
-	  when (exit_code /= ExitSuccess) $
-	     throwDyn (PhaseFailed phase_name exit_code)
-          return ()	
-  where
-    quoteargs = filter (not . null) (map showOpt args)
+runSomething phase_name pgm args = do
+  let real_args = filter notNull (map showOpt args)
+  traceCmd phase_name (concat (intersperse " " (pgm:real_args))) $ do
+  exit_code <- rawSystem pgm real_args
+  if (exit_code /= ExitSuccess)
+	then throwDyn (PhaseFailed phase_name exit_code)
+	else return ()
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -767,6 +724,54 @@ traceCmd phase_name cmd_line action
     handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")
 			     ; when (verb >= 3) (hPutStrLn stderr ("Failed: " ++ cmd_line ++ (show exn)))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
+
+-- -----------------------------------------------------------------------------
+-- rawSystem: run an external command
+
+#if __GLASGOW_HASKELL__ < 601
+
+-- This code is copied from System.Cmd on GHC 6.1.
+
+rawSystem :: FilePath -> [String] -> IO ExitCode
+
+#ifndef mingw32_TARGET_OS
+
+rawSystem cmd args =
+  withCString cmd $ \pcmd ->
+    withMany withCString (cmd:args) $ \cstrs ->
+      withArray0 nullPtr cstrs $ \arr -> do
+	status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmd arr)
+        case status of
+            0  -> return ExitSuccess
+            n  -> return (ExitFailure n)
+
+foreign import ccall unsafe "rawSystem"
+  c_rawSystem :: CString -> Ptr CString -> IO Int
+
+#else
+
+-- On Windows, the command line is passed to the operating system as
+-- a single string.  Command-line parsing is done by the executable
+-- itself.
+rawSystem cmd args = do
+  let cmdline = translate cmd ++ concat (map ((' ':) . translate) args)
+  withCString cmdline $ \pcmdline -> do
+    status <- throwErrnoIfMinus1 "rawSystem" (c_rawSystem pcmdline)
+    case status of
+       0  -> return ExitSuccess
+       n  -> return (ExitFailure n)
+
+translate :: String -> String
+translate str = '"' : foldr escape "\"" str
+  where escape '"'  str = '\\' : '"'  : str
+	escape '\\' str = '\\' : '\\' : str
+	escape c    str = c : str
+
+foreign import ccall unsafe "rawSystem"
+  c_rawSystem :: CString -> IO Int
+
+#endif
+#endif
 \end{code}
 
 
