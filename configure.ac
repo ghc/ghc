@@ -627,8 +627,8 @@ AC_ARG_ENABLE(hopengl,
         On Mac OS X, use --enable-hopengl=x11 to use X11 instead
         of the "native" libraries.
 ],
-[GhcLibsWithHOpenGL=YES],
-[GhcLibsWithHOpenGL=NO]
+[GhcLibsWithOpenGL=YES; GhcLibsWithGLUT=YES],
+[GhcLibsWithOpenGL=NO;  GhcLibsWithGLUT=NO]
 )
 UseQuartzOpenGL=NO
 if test x"$TargetOS_CPP" = x"darwin"; then
@@ -639,7 +639,8 @@ if test x"$TargetOS_CPP" = x"darwin"; then
   fi
 fi
 
-AC_SUBST(GhcLibsWithHOpenGL)
+AC_SUBST([GhcLibsWithOpenGL])
+AC_SUBST([GhcLibsWithGLUT])
 
 dnl ** .NET interop support?
 dnl --------------------------------------------------------------
@@ -999,7 +1000,7 @@ FPTOOLS_CHECK_HTYPE(rlim_t)
 FPTOOLS_CHECK_HTYPE(wint_t)
 
 dnl ** Map OpenGL data types to Haskell types
-if test $GhcLibsWithHOpenGL = YES ; then
+if test $GhcLibsWithOpenGL = YES ; then
 FPTOOLS_CHECK_HTYPE(GLboolean)
 FPTOOLS_CHECK_HTYPE(GLbyte)
 FPTOOLS_CHECK_HTYPE(GLubyte)
@@ -1196,7 +1197,7 @@ dnl ** check for X Window System
 AC_PATH_XTRA()
 
 dnl ** check for OpenGL/GLUT/GLX include paths and libraries
-if test $GhcLibsWithHOpenGL = YES ; then
+if test $GhcLibsWithOpenGL = YES ; then
   if test $UseQuartzOpenGL = YES ; then
     dnl Take a shortcut for Mac OS X native OpenGL:
     dnl It's in a non-standard location, but it's always there
