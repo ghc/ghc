@@ -379,9 +379,10 @@ splitFunTysIgnoringNewTypes ty = split ty
 		(args, res) = splitFunTys ty
 
 -- Is this the constructor for a product type (i.e. algebraic, single constructor) 
+-- NB: isProductTyCon replies 'False' for unboxed tuples
 isConProdType :: Con -> Bool
-isConProdType (DataCon con) = isProductTyCon tycon && not (isUnLiftedTyCon tycon)
-			      where
+isConProdType (DataCon con) = isProductTyCon tycon
+			    where
 			      tycon = dataConTyCon con
 isConProdType _ = False
 

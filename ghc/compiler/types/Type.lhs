@@ -597,6 +597,7 @@ repType other_ty	  		  = other_ty
 
 splitNewType_maybe :: Type -> Maybe Type
 -- Find the representation of a newtype, if it is one
+-- Looks through multiple levels of newtype
 splitNewType_maybe (NoteTy _ ty) 		     = splitNewType_maybe ty
 splitNewType_maybe (TyConApp tc tys) | isNewTyCon tc = case splitNewType_maybe rep_ty of
 								Just rep_ty' -> Just rep_ty'
