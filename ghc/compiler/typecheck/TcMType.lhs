@@ -310,8 +310,6 @@ data LookupTyVarResult	-- The result of a lookupTcTyVar call
 lookupTcTyVar :: TcTyVar -> TcM LookupTyVarResult
 -- This function is the ONLY PLACE that we consult the 
 -- type refinement carried by the monad
---
--- The boolean returned with Indirect
 lookupTcTyVar tyvar 
   = case tcTyVarDetails tyvar of
       SkolemTv _ -> do	{ type_reft <- getTypeRefinement
