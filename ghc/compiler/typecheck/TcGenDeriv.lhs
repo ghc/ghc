@@ -28,7 +28,7 @@ module TcGenDeriv (
     ) where
 
 IMP_Ubiq()
-IMPORT_1_3(List(partition))
+IMPORT_1_3(List(partition,intersperse))
 
 import HsSyn		( HsBinds(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
 			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Stmt(..), DoOrListComp(..),
@@ -38,12 +38,14 @@ import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
 			  SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat)
 			)
 import BasicTypes	( IfaceFlavour(..) )
+import FieldLabel       ( fieldLabelName )
 import Id		( GenId, isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
 			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag),
-			  SYN_IE(Id) )
+			  dataConFieldLabels, SYN_IE(Id) )
 import Maybes		( maybeToBool )
-import Name		( getOccString, getOccName, getSrcLoc, occNameString, modAndOcc, OccName, Name )
+import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
+			  modAndOcc, OccName, Name )
 
 import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
@@ -53,7 +55,17 @@ import Type		( eqTy, isPrimType, SYN_IE(Type) )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
-import Util		( mapAccumL, zipEqual, zipWith3Equal, nOfThem, panic, assertPanic )
+import Util		( mapAccumL, zipEqual, zipWithEqual,
+			  zipWith3Equal, nOfThem, panic, assertPanic )
+
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 200
+intersperse :: a -> [a] -> [a]
+intersperse s []     = []
+intersperse s [x]    = [x]
+intersperse s (x:xs) = x : s : intersperse s xs
+#endif
+
 \end{code}
 
 %************************************************************************
@@ -587,8 +599,10 @@ gen_Ix_binds tycon
 	  ) tycon_loc))))
 
     --------------------------------------------------------------
-    single_con_ixes = single_con_range `AndMonoBinds`
-    	    	single_con_index `AndMonoBinds` single_con_inRange
+    single_con_ixes 
+      = single_con_range `AndMonoBinds`
+    	single_con_index `AndMonoBinds`
+	single_con_inRange
 
     data_con
       =	case maybeTyConSingleCon tycon of -- just checking...
@@ -598,14 +612,15 @@ gen_Ix_binds tycon
 		     else
 			 dc
 
-    con_arity   = argFieldCount data_con
+    con_arity    = argFieldCount data_con
     data_con_RDR = qual_orig_name data_con
-    con_pat  xs = ConPatIn data_con_RDR (map VarPatIn xs)
-    con_expr xs = mk_easy_App data_con_RDR xs
 
     as_needed = take con_arity as_RDRs
     bs_needed = take con_arity bs_RDRs
     cs_needed = take con_arity cs_RDRs
+
+    con_pat  xs  = ConPatIn data_con_RDR (map VarPatIn xs)
+    con_expr     = mk_easy_App data_con_RDR cs_needed
 
     --------------------------------------------------------------
     single_con_range
@@ -614,7 +629,7 @@ gen_Ix_binds tycon
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 		++
-		[ReturnStmt (con_expr cs_needed)]
+		[ReturnStmt con_expr]
 
 	mk_qual a b c = BindStmt (VarPatIn c)
 				 (HsApp (HsVar range_RDR) (ExplicitTuple [HsVar a, HsVar b]))
@@ -625,6 +640,8 @@ gen_Ix_binds tycon
       = mk_easy_FunMonoBind tycon_loc index_RDR [TuplePatIn [con_pat as_needed, con_pat bs_needed], con_pat cs_needed] [range_size] (
 	foldl mk_index (HsLit (HsInt 0)) (zip3 as_needed bs_needed cs_needed))
       where
+	mk_index (HsLit (HsInt 0)) (l, u, i)  -- optim.
+	  = HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [HsVar l, HsVar u])) (HsVar i)
 	mk_index multiply_by (l, u, i)
 	  = genOpApp (
 		(HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [HsVar l, HsVar u])) (HsVar i))
@@ -683,33 +700,74 @@ gen_Read_binds tycon
 		data_con_RDR = qual_orig_name data_con
 		data_con_str= occNameString (getOccName data_con)
 		con_arity   = argFieldCount data_con
-		as_needed   = take con_arity as_RDRs
-		bs_needed   = take con_arity bs_RDRs
 		con_expr    = mk_easy_App data_con_RDR as_needed
 		nullary_con = con_arity == 0
+		labels      = dataConFieldLabels data_con
+		lab_fields  = length labels
 
+		as_needed   = take con_arity as_RDRs
+		bs_needed   
+		 | lab_fields == 0 = take con_arity bs_RDRs
+		 | otherwise       = take (4*lab_fields + 1) bs_RDRs
+				       -- (label, '=' and field)*n, (n-1)*',' + '{' + '}'
 		con_qual
-		  = BindStmt
-		      (TuplePatIn [LitPatIn (HsString data_con_str), d_Pat])
-		      (HsApp (HsVar lex_RDR) c_Expr)
-		      tycon_loc
+                  = BindStmt
+		          (TuplePatIn [LitPatIn (HsString data_con_str), d_Pat])
+		          (HsApp (HsVar lex_RDR) c_Expr)
+		          tycon_loc
 
-		field_quals = snd (mapAccumL mk_qual d_Expr (zipEqual "as_needed" as_needed bs_needed))
-		mk_qual draw_from (con_field, str_left)
+		str_qual str res draw_from
+                  = BindStmt
+		       (TuplePatIn [LitPatIn (HsString str), VarPatIn res])
+		       (HsApp (HsVar lex_RDR) draw_from)
+		       tycon_loc
+  
+		read_label f
+		  = let nm = occNameString (getOccName (fieldLabelName f))
+		    in 
+			[str_qual nm, str_qual SLIT("=")] 
+			    -- There might be spaces between the label and '='
+
+		field_quals
+		  | lab_fields == 0 =
+    		     snd (mapAccumL mk_qual 
+				    d_Expr 
+				    (zipWithEqual "as_needed" 
+						  (\ con_field draw_from -> (mk_read_qual con_field,
+									     draw_from))
+						  as_needed bs_needed))
+                  | otherwise =
+		     snd $
+		     mapAccumL mk_qual d_Expr
+			(zipEqual "bs_needed"	     
+			   ((str_qual (SLIT("{")):
+			     concat (
+			     intersperse ([str_qual SLIT(",")]) $
+			     zipWithEqual 
+				"field_quals"
+				(\ as b -> as ++ [b])
+				    -- The labels
+				(map read_label labels)
+				    -- The fields
+				(map mk_read_qual as_needed))) ++ [str_qual (SLIT("}"))])
+			    bs_needed)
+
+		mk_qual draw_from (f, str_left)
 		  = (HsVar str_left,	-- what to draw from down the line...
-			 BindStmt
-			  (TuplePatIn [VarPatIn con_field, VarPatIn str_left])
-			  (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt 10))) draw_from)
-			  tycon_loc
-		    )
+		     f str_left draw_from)
+
+		mk_read_qual con_field res draw_from =
+		  BindStmt
+		   (TuplePatIn [VarPatIn con_field, VarPatIn res])
+		   (HsApp (HsApp (HsVar readsPrec_RDR) (HsLit (HsInt 10))) draw_from)
+		   tycon_loc
 
 		result_expr = ExplicitTuple [con_expr, if null bs_needed 
 						       then d_Expr 
 						       else HsVar (last bs_needed)]
 
-		stmts = (con_qual : field_quals) ++ [ReturnStmt result_expr]
+		stmts = con_qual:field_quals ++ [ReturnStmt result_expr]
 		
-
 		read_paren_arg
 		  = if nullary_con then -- must be False (parens are surely optional)
 		       false_Expr
@@ -721,6 +779,7 @@ gen_Read_binds tycon
 		 HsLam (mk_easy_Match tycon_loc [c_Pat] [] $
 		        HsDo ListComp stmts tycon_loc)
 	      ) (HsVar b_RDR)
+
 \end{code}
 
 %************************************************************************
@@ -748,22 +807,57 @@ gen_Show_binds tycon
 	pats_etc data_con
 	  = let
 		data_con_RDR = qual_orig_name data_con
-		con_arity   = argFieldCount data_con
-		bs_needed   = take con_arity bs_RDRs
-		con_pat     = ConPatIn data_con_RDR (map VarPatIn bs_needed)
-		nullary_con = con_arity == 0
+		con_arity    = argFieldCount data_con
+		bs_needed    = take con_arity bs_RDRs
+		con_pat      = ConPatIn data_con_RDR (map VarPatIn bs_needed)
+		nullary_con  = con_arity == 0
+                labels       = dataConFieldLabels data_con
+		lab_fields   = length labels
 
 		show_con
 		  = let nm = occNameString (getOccName data_con)
-			space_maybe = if nullary_con then _NIL_ else SLIT(" ")
+			space_ocurly_maybe
+                          | nullary_con     = _NIL_
+			  | lab_fields == 0 = SLIT(" ")
+			  | otherwise       = SLIT("{")
+
 		    in
-			HsApp (HsVar showString_RDR) (HsLit (HsString (nm _APPEND_ space_maybe)))
+			mk_showString_app (nm _APPEND_ space_ocurly_maybe)
 
-		show_thingies = show_con : (spacified real_show_thingies)
+		show_all con fs
+		  = let
+                        ccurly_maybe 
+                          | lab_fields > 0  = [mk_showString_app (SLIT("}"))]
+                          | otherwise       = []
+		    in
+			con:fs ++ ccurly_maybe
 
-		real_show_thingies
-		  = [ HsApp (HsApp (HsVar showsPrec_RDR) (HsLit (HsInt 10))) (HsVar b)
-		  | b <- bs_needed ]
+		show_thingies = show_all show_con real_show_thingies_with_labs
+                
+		show_label l 
+		  = let nm = occNameString (getOccName (fieldLabelName l)) 
+		    in
+		        mk_showString_app (nm _APPEND_ SLIT("="))
+
+                mk_showString_app str = HsApp (HsVar showString_RDR)
+					      (HsLit (HsString str))
+
+		real_show_thingies =
+		     [ HsApp (HsApp (HsVar showsPrec_RDR) (HsLit (HsInt 10))) (HsVar b)
+		     | b <- bs_needed ]
+
+                real_show_thingies_with_labs
+		 | lab_fields == 0 = intersperse (HsVar showSpace_RDR) real_show_thingies
+		 | otherwise       = --Assumption: no of fields == no of labelled fields 
+				     --            (and in same order)
+		    concat $
+		    intersperse ([mk_showString_app (_CONS_ ',' _NIL_ )]) $ -- Using SLIT() is not cool here.
+		    zipWithEqual "gen_Show_binds"
+				 (\ a b -> [a,b])
+				 (map show_label labels) 
+				 real_show_thingies
+			       
+
 	    in
 	    if nullary_con then  -- skip the showParen junk...
 		ASSERT(null bs_needed)
@@ -772,10 +866,6 @@ gen_Show_binds tycon
 		([a_Pat, con_pat],
 		    showParen_Expr (HsPar (genOpApp a_Expr ge_RDR (HsLit (HsInt 10))))
 				   (HsPar (nested_compose_Expr show_thingies)))
-	  where
-	    spacified []     = []
-	    spacified [x]    = [x]
-	    spacified (x:xs) = (x : (HsVar showSpace_RDR) : spacified xs)
 \end{code}
 
 %************************************************************************
