@@ -96,8 +96,14 @@ module System.Time
 
      ) where
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 #include "HsBase.h"
+#endif
+
+#ifdef __NHC__
+#include <time.h>
+#define HAVE_TM_ZONE 1
+import Ix
 #endif
 
 import Prelude
@@ -251,7 +257,9 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
 	  cal      = toUTCTime (TOD (c_sec + sec_diff) (c_psec + psec))
                                                        -- FIXME! ^^^^
           new_mon  = fromEnum (ctMonth cal) + r_mon 
-	  (month', yr_diff)
+	  month' = fst tmp
+	  yr_diff = snd tmp
+          tmp
 	    | new_mon < 0  = (toEnum (12 + new_mon), (-1))
 	    | new_mon > 11 = (toEnum (new_mon `mod` 12), 1)
 	    | otherwise    = (toEnum new_mon, 0)
