@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.30 2001/01/19 15:26:37 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.31 2001/01/26 17:14:58 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -15,6 +15,7 @@ import CompManager
 import CmStaticInfo
 import DriverFlags
 import DriverState
+import DriverUtil
 import Linker
 import Finder
 import Module
@@ -137,15 +138,20 @@ uiLoop = do
   l_ok <- io (hGetLine stdin)
   let l = Just l_ok
 #endif
-  case l of
-    Nothing -> exitGHCi
-    Just "" -> uiLoop
-    Just l  -> do
+  case l of {
+    Nothing -> exitGHCi;
+    Just l -> 
+
+  case remove_spaces l of {
+    "" -> uiLoop;
+    l  -> do
 #ifndef NO_READLINE
           io (addHistory l)
 #endif
   	  quit <- runCommand l
           if quit then exitGHCi else uiLoop
+   }}
+
 
 exitGHCi = io $ do putStrLn "Leaving GHCi." 
 
@@ -189,7 +195,7 @@ evalExpr expr
  = do st <- getGHCiState
       dflags <- io (getDynFlags)
       (new_cmstate, maybe_stuff) <- 
-      	 io (cmGetExpr (cmstate st) dflags (current_module st) expr True)
+      	 io (cmGetExpr (cmstate st) dflags True (current_module st) expr)
       setGHCiState st{cmstate = new_cmstate}
       case maybe_stuff of
       	 Nothing -> return False
@@ -199,16 +205,8 @@ evalExpr expr
 		 io (when b (printForUser stdout unqual (text "::" <+> ppr ty)))
                  return True
 	
-{-
-  let (mod,'.':str) = break (=='.') expr
-  case cmLookupSymbol (mkOrig varName (mkModuleName mod) (_PK_ str)) (cmstate st) of
-	Nothing -> io (putStrLn "nothing.")
-	Just e  -> io (
-  return ()
--}
-
 specialCommand :: String -> GHCi Bool
-specialCommand ('!':str) = shellEscape (dropWhile isSpace str) 
+specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
   case [ (s,f) | (s,f) <- commands, prefixMatch cmd s ] of
@@ -305,8 +303,8 @@ typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do st <- getGHCiState
        dflags <- io (getDynFlags)
-       (new_cmstate, maybe_ty) <- io (cmGetExpr (cmstate st) dflags 
-				(current_module st) str False)
+       (new_cmstate, maybe_ty) <- io (cmGetExpr (cmstate st) dflags False
+					 (current_module st) str)
        setGHCiState st{cmstate = new_cmstate}
        case maybe_ty of
 	 Nothing -> return ()
