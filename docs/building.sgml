@@ -651,7 +651,14 @@ All our documentation is written in SGML, using the DocBook DTD and
 processed using the <ULink
 URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
 tools</ULink>, which is the most shrink-wrapped SGML suite that we
-could find. You need all the RPMs except for psgml (i.e. docbook, jade, jadetex, sgmlcommon and stylesheets). Unfortunately, it's only packaged as RPMs. You can use it to generate HTML, DVI (and hence PDF and Postscript) and RTF from any DocBook source file (including this manual). N.B. The <Emphasis>Cygnus</Emphasis> version of the tools is assumed. Others, such as the SuSE version, may not work.
+could find. You need all the RPMs except for psgml (i.e. docbook, jade,
+jadetex, sgmlcommon and stylesheets). Unfortunately, it's only packaged as
+RPMs. You can use it to generate HTML, DVI (and hence PDF and Postscript)
+and RTF from any DocBook source file (including this manual). N.B. The
+<Emphasis>Cygnus</Emphasis> version of the tools is assumed. Others, such as
+the SuSE version, may not work. Note that most of these RPMs are
+architecture neutral, so are likely to be found in a <file>noarch</file>
+directory.
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
