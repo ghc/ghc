@@ -78,6 +78,7 @@ data Flag
   | Flag_ReadInterface FilePath
   | Flag_SourceURL String
   | Flag_Help
+  | Flag_Verbose
   | Flag_Version
   deriving (Eq)
 
@@ -113,7 +114,9 @@ options =
     Option ['?']  ["help"]  (NoArg Flag_Help)
 	"display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
-	"output version information and exit"
+	"output version information and exit",
+    Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
+        "increase verbosity"
   ]
 
 saved_flags :: IORef [Flag]
@@ -156,6 +159,7 @@ run flags files = do
 		       | Flag_ReadInterface str <- flags ]
 
       no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
+      verbose = Flag_Verbose `elem` flags
 
   prologue <- getPrologue flags
 
@@ -178,7 +182,7 @@ run flags files = do
 	loop ifaces [] = return ifaces
 	loop ifaces ((hsmod,file):mdls)  = do 
 	   let ((mdl,iface),msgs) = runWriter $
-		   mkInterface no_implicit_prelude ifaces file hsmod
+		   mkInterface no_implicit_prelude verbose ifaces file hsmod
 	       new_ifaces = addToFM ifaces mdl iface
 	   mapM (hPutStrLn stderr) msgs
 	   loop new_ifaces mdls
@@ -282,13 +286,14 @@ getPrologue flags
 
 mkInterface
    :: Bool				-- no implicit prelude
+   -> Bool				-- verbose
    -> ModuleMap -> FilePath -> HsModule
    -> ErrMsgM (
 	       Module, 		-- the module name
 	       Interface	-- its "interface"
 	      )
 
-mkInterface no_implicit_prelude mod_map filename 
+mkInterface no_implicit_prelude verbose mod_map filename 
 	(HsModule mdl exps imps decls maybe_opts maybe_info maybe_doc) = do  
 
   -- Process the options, if available
@@ -326,7 +331,7 @@ mkInterface no_implicit_prelude mod_map filename
 
      -- build the orig_env, which maps names to *original* names (so we can
      -- find the original declarations & docs for things).
-  imported_orig_env <- buildOrigEnv mdl mod_map implicit_imps 
+  imported_orig_env <- buildOrigEnv mdl verbose mod_map implicit_imps
  
   let
      orig_env = imported_orig_env `plusFM` local_orig_env
@@ -767,16 +772,19 @@ getReExports mdl mod_map (Just exps)
 -- The orig env maps names in the current source file to
 -- fully-qualified "original" names.
 
-buildOrigEnv :: Module -> ModuleMap -> [HsImportDecl]
+buildOrigEnv :: Module -> Bool -> ModuleMap -> [HsImportDecl]
    -> ErrMsgM (FiniteMap HsQName HsQName)
-buildOrigEnv this_mdl mod_map imp_decls
+buildOrigEnv this_mdl verbose mod_map imp_decls
   = do maps <- mapM build imp_decls
        return (foldr plusFM emptyFM maps)
   where
   build imp_decl@(HsImportDecl _ mdl qual maybe_as _)
     = case lookupFM mod_map mdl of
        Nothing -> do 
-	  tell ["Warning: " ++ show this_mdl
+	  when verbose $
+	     -- only emit missing module messages when -v is on.  Otherwise
+  	     -- we get a ton of spurious messages about missing "Prelude".
+	     tell ["Warning: " ++ show this_mdl
 		   ++ ": imported module not found: " ++ show mdl]
 	  return emptyFM
        Just iface -> 

@@ -469,6 +469,22 @@
       </varlistentry>
 
       <varlistentry>
+	<term><option>-v</option></term>
+	<term><option>--verbose</option></term>
+	<indexterm><primary><option>-v</option></primary>
+	</indexterm>
+	<indexterm><primary><option>--verbose</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Increase verbosity.  Currently this will cause Haddock
+	  to emit some extra warnings, in particular about modules
+	  which were imported but it had no information about (this is
+	  often quite normal; for example when there is no information
+	  about the <literal>Prelude</literal>).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-V</option></term>
 	<term><option>--version</option></term>
 	<indexterm><primary><option>-V</option></primary></indexterm>
