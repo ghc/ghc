@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.63 2002/12/19 14:23:35 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.64 2003/01/23 12:13:12 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -250,6 +250,7 @@ void initRtsFlagsDefaults(void)
 #ifdef PROFILING
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
     RtsFlags.ProfFlags.profileInterval    = 100;
+    RtsFlags.ProfFlags.includeTSOs        = rtsFalse;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
     RtsFlags.ProfFlags.modSelector        = NULL;
@@ -437,6 +438,8 @@ usage_text[] = {
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
 "  -i<sec>        Time between heap samples (seconds, default: 0.1)",
+"",
+"  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 # endif
@@ -1121,8 +1124,15 @@ error = rtsTrue;
 
                   case 'c': /* Debugging tool: show current cost centre on an exception */
                     PROFILING_BUILD_ONLY(
-                    RtsFlags.ProfFlags.showCCSOnException = rtsTrue;
-                    ) break;
+			RtsFlags.ProfFlags.showCCSOnException = rtsTrue;
+			);
+		    break;
+
+		case 't':  /* Include memory used by TSOs in a heap profile */
+		    PROFILING_BUILD_ONLY(
+			RtsFlags.ProfFlags.includeTSOs = rtsTrue;
+			);
+		    break;
 
                   /* The option prefix '-xx' is reserved for future extension.  KSW 1999-11. */
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.44 2002/12/11 15:36:39 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.45 2003/01/23 12:13:10 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -79,6 +79,7 @@ struct PROFILING_FLAGS {
 
     nat                 profileInterval;      /* delta between samples (in ms) */
     nat                 profileIntervalTicks; /* delta between samples (in 'ticks') */
+    rtsBool             includeTSOs;
 
 
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
@@ -90,7 +91,7 @@ struct PROFILING_FLAGS {
 # define HEAP_BY_LDV            7
 
     rtsBool		showCCSOnException;
-  
+
     nat                 maxRetainerSetSize;
 
     char*               modSelector;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.40 2002/12/11 15:36:47 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.41 2003/01/23 12:13:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -894,8 +894,14 @@ heapCensusChain( Census *census, bdescr *bd )
 		
 	    case TSO:
 		prim = rtsTrue;
-		size = tso_sizeW((StgTSO *)p);
-		break;
+		if (RtsFlags.ProfFlags.includeTSOs) {
+		    size = tso_sizeW((StgTSO *)p);
+		    break;
+		} else {
+		    // Skip this TSO and move on to the next object
+		    p += tso_sizeW((StgTSO *)p);
+		    continue;
+		}
 		
 	    default:
 		barf("heapCensus");
@@ -1007,7 +1013,7 @@ heapCensus( void )
 	      heapCensusChain( census, generations[g].steps[s].blocks );
 	      // Are we interested in large objects?  might be
 	      // confusing to include the stack in a heap profile.
-	      // heapCensusChain( census, generations[g].steps[s].large_objects );
+	      heapCensusChain( census, generations[g].steps[s].large_objects );
 	  }
       }
   }
