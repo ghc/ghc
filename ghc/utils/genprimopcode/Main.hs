@@ -495,7 +495,7 @@ optdef d p
 sel12 a b = a
 sel22 a b = b
 sel23 a b c = b
-apply = liftM
+apply f p = liftM f p
 
 -- Hacks for zapping whitespace and comments, unfortunately needed
 -- because Daan won't let us have a lexer before the parser :-(
