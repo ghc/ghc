@@ -78,6 +78,10 @@ rs6000-ibm-aix*)
 	TargetPlatform=rs6000-ibm-aix;;
 powerpc-apple-darwin*)
 	TargetPlatform=powerpc-apple-darwin;;
+powerpc-*-linux*)
+	TargetPlatform=powerpc-unknown-linux;;
+powerpc64-*-linux*)
+	TargetPlatform=powerpc64-unknown-linux;;
 sparc-sun-sunos4*)
 	TargetPlatform=sparc-sun-sunos4;;
 sparc-sun-solaris2*)
