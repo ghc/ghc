@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.25 2000/11/06 08:15:21 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.26 2001/11/08 12:50:07 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -72,9 +72,7 @@ fastEntryChecks regs tags ret node_points code
      getFinalStackHW				 (\ spHw -> 
      getRealSp					 `thenFC` \ sp ->
      let stk_words = spHw - sp in
-     initHeapUsage				 (\ hp_words  ->
-
-     let hHw = if hp_words > bLOCK_SIZE_W then hpChkTooBig else hp_words in
+     initHeapUsage				 (\ hHw  ->
 
      getTickyCtrLabel `thenFC` \ ticky_ctr ->
 
@@ -112,7 +110,7 @@ fastEntryChecks regs tags ret node_points code
 
       ) `thenC`
 
-      setRealHp hp_words `thenC`
+      setRealHp hHw `thenC`
       code))
 
   where
@@ -253,9 +251,7 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
   = mkTagAssts tags `thenFC` \tag_assts1 ->
     let tag_assts = mkAbstractCs [fail_code, tag_assts1]
     in
-    initHeapUsage (\ hHw -> 
-	do_heap_chk (if hHw > bLOCK_SIZE_W then hpChkTooBig else hHw) tag_assts 
-		`thenC` code)
+    initHeapUsage (\ hHw -> do_heap_chk hHw tag_assts `thenC` code)
   where
     do_heap_chk words_required tag_assts
       = getTickyCtrLabel `thenFC` \ ctr ->
@@ -313,10 +309,7 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 -- normal algebraic and primitive case alternatives:
 
 altHeapCheck is_fun regs [] AbsCNop Nothing code
-  = initHeapUsage (\ hHw -> 
-	do_heap_chk (if hHw > bLOCK_SIZE_W then hpChkTooBig else hHw) 
-		`thenC` code)
-		      
+  = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
   where
     do_heap_chk :: HeapOffset -> Code
     do_heap_chk words_required
@@ -440,10 +433,6 @@ yield regs node_reqd =
      yield_code = 
        absC (CMacroStmt GRAN_YIELD 
                           [mkIntCLit (I# (word2Int# liveness_mask))])
-\end{code}
-
-\begin{code}
-hpChkTooBig = panic "Oversize heap check detected.  Please try compiling with -O."
 \end{code}
 
 %************************************************************************
