@@ -48,10 +48,10 @@ import TyCon		( isSynTyCon, getSynTyConDefn )
 import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
 import PrelRules	( builtinRules )
-import PrelInfo		( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
-			  ioTyCon_RDR, unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
-			  fractionalClassKeys, derivingOccurrences 
+import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
+			  ioTyCon_RDR, unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR
 			)
+import PrelInfo		( fractionalClassKeys, derivingOccurrences )
 import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( Version, initialVersion )

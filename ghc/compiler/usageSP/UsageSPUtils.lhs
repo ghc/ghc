@@ -459,8 +459,7 @@ unannotTy    (NoteTy     (UsgForAll uv) ty) = unannotTy ty
 unannotTy    (NoteTy      (UsgNote _  ) ty) = unannotTy ty
 unannotTy    (NoteTy      (SynNote sty) ty) = NoteTy (SynNote (unannotTy sty)) (unannotTy ty)
 unannotTy    (NoteTy note@(FTVNote _  ) ty) = NoteTy note (unannotTy ty)
--- IP notes need to be preserved
-unannotTy ty@(NoteTy         (IPNote _) _)  = ty
+unannotTy ty@(PredTy _)			    = ty 	-- PredTys need to be preserved
 unannotTy ty@(TyVarTy _)                    = ty
 unannotTy    (AppTy ty1 ty2)                = AppTy (unannotTy ty1) (unannotTy ty2)
 unannotTy    (TyConApp tc tys)              = TyConApp tc (map unannotTy tys)

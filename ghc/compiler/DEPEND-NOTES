@@ -5,9 +5,11 @@ The Name/Var/Type group is a bit complicated. Here's the deal
 Things in brackets are what the module *uses*.
 A 'loop' indicates a use from a module compiled later
 
+	PrelNames
+then
 	Name, PrimRep, FieldLabel (loop Type.Type)
 then
-	Var (loop CoreSyn.CoreExpr, loop IdInfo.IdInfo, 
+	Var (Name, loop CoreSyn.CoreExpr, loop IdInfo.IdInfo, 
 	     loop Type.GenType, loop Type.Kind)
 then
 	VarEnv, VarSet, ThinAir
@@ -46,5 +48,6 @@ then
 	Rules (Unfolding), Subst (Unfolding, CoreFVs), CoreTidy (noUnfolding)
 then
 	MkId (CoreUnfold.mkUnfolding, Subst)
-
+then
+	PrelInfo (MkId)
 

@@ -58,7 +58,8 @@ import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
-import Unique		( pprUnique, Unique, Uniquable(..), hasKey, unboundKey, u2i )
+import Unique		( Unique, Uniquable(..), u2i, hasKey, pprUnique )
+import PrelNames	( unboundKey )
 import Maybes		( expectJust )
 import UniqFM
 import Outputable

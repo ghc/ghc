@@ -49,7 +49,7 @@ import Type		( TauType, mkTyVarTys, mkTyConApp,
 			)
 import TysWiredIn	( voidTy )
 import Var		( TyVar )
-import Unique		-- Keys stuff
+import PrelNames
 import Bag		( bagToList )
 import Util		( zipWithEqual, sortLt, removeDups,  assoc, thenCmp )
 import Outputable

@@ -44,7 +44,7 @@ module TcType (
 -- friends:
 import TypeRep		( Type(..), Kind, TyNote(..) )  -- friend
 import Type		( ThetaType, PredType(..),
-			  getTyVar, mkAppTy, mkTyConApp,
+			  getTyVar, mkAppTy, mkTyConApp, mkPredTy,
 			  splitPredTy_maybe, splitForAllTys, isNotUsgTy,
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
 			  openTypeKind, boxedTypeKind, 
@@ -407,8 +407,8 @@ zonkType unbound_var_fn ty
     go (NoteTy (UsgForAll uv) ty2)= go ty2		`thenNF_Tc` \ ty2' ->
 				    returnNF_Tc (NoteTy (UsgForAll uv) ty2')
 
-    go (NoteTy (IPNote nm) ty2)   = go ty2		`thenNF_Tc` \ ty2' ->
-				    returnNF_Tc (NoteTy (IPNote nm) ty2')
+    go (PredTy p)		  = go_pred p		`thenNF_Tc` \ p' ->
+				    returnNF_Tc (PredTy p')
 
     go (FunTy arg res)      	  = go arg		`thenNF_Tc` \ arg' ->
 				    go res		`thenNF_Tc` \ res' ->
@@ -425,6 +425,10 @@ zonkType unbound_var_fn ty
 			     go ty			`thenNF_Tc` \ ty' ->
 			     returnNF_Tc (ForAllTy tyvar' ty')
 
+    go_pred (Class c tys) = mapNF_Tc go tys	`thenNF_Tc` \ tys' ->
+			    returnNF_Tc	(Class c tys')
+    go_pred (IParam n ty) = go ty		`thenNF_Tc` \ ty' ->
+			    returnNF_Tc (IParam n ty')
 
 zonkTyVar :: (TcTyVar -> NF_TcM s Type)		-- What to do for an unbound mutable variable
 	  -> TcTyVar -> NF_TcM s TcType

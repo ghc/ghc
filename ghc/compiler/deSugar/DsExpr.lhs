@@ -44,7 +44,7 @@ import Type		( splitFunTys,
 import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon, isIntegerTy )
 import BasicTypes	( RecFlag(..), Boxity(..) )
 import Maybes		( maybeToBool )
-import Unique		( hasKey, ratioTyConKey )
+import PrelNames	( hasKey, ratioTyConKey )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
 

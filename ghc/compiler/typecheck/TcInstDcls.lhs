@@ -54,7 +54,7 @@ import Type		( mkTyVarTys, splitSigmaTy, isTyVarTy,
 import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
 import TysWiredIn	( isFFIArgumentTy, isFFIResultTy )
-import Unique		( cCallableClassKey, cReturnableClassKey, hasKey )
+import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import Outputable
 \end{code}
 

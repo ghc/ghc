@@ -54,7 +54,7 @@ import Class 		( Class, ClassContext )
 import Var   		( TyVar )
 import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
-import Unique		( Unique, Uniquable(..), anyBoxConKey )
+import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Outputable
 \end{code}

@@ -45,7 +45,7 @@ import TysWiredIn	( isFFIArgumentTy, isFFIResultTy,
 			  isFFILabelTy
 			)
 import Type             ( Type )
-import Unique
+import PrelNames	( hasKey, ioTyConKey )
 import Outputable
 
 \end{code}

@@ -198,8 +198,11 @@ checkPat e [] = case e of
 	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPatIn)
 	ExplicitList es	   -> mapP (\e -> checkPat e []) es `thenP` \ps ->
 			      returnP (ListPatIn ps)
-	ExplicitTuple es b -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (TuplePatIn ps b)
+
+	ExplicitTuple es Boxed -> mapP (\e -> checkPat e []) es `thenP` \ps ->
+			          returnP (TuplePatIn ps Boxed)
+		-- Unboxed tuples are illegal in patterns
+
 	RecordCon c fs     -> mapP checkPatField fs `thenP` \fs ->
 			      returnP (RecPatIn c fs)
 	_ -> patFail

@@ -16,7 +16,7 @@ module TcUnify ( unifyTauTy, unifyTauTyList, unifyTauTyLists,
 
 -- friends: 
 import TcMonad
-import TypeRep	( Type(..) )  -- friend
+import TypeRep	( Type(..), PredType(..) )  -- friend
 import Type	( funTyCon, Kind, unboxedTypeKind, boxedTypeKind, openTypeKind, 
 		  superBoxity, typeCon, openKindCon, hasMoreBoxityInfo, 
 		  tyVarsOfType, typeKind,
@@ -157,6 +157,12 @@ uTys ps_ty1 (TyVarTy tyvar1) ps_ty2 ty2 = uVar False tyvar1 ps_ty2 ty2
 uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar True  tyvar2 ps_ty1 ty1
 					-- "True" means args swapped
 
+	-- Predicates
+uTys _ (PredTy (IParam n1 t1)) _ (PredTy (IParam n2 t2))
+  | n1 == n2 = uTys t1 t1 t2 t2
+uTys _ (PredTy (Class c1 tys1)) _ (PredTy (Class c2 tys2))
+  | c1 == c2 = unifyTauTyLists tys1 tys2
+
 	-- Functions; just check the two parts
 uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
   = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
@@ -171,10 +177,6 @@ uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
 	-- against a kind '*' or '#'.  Notably, CCallable :: ? -> *, and
 	-- (CCallable Int) and (CCallable Int#) are both OK
   = unifyOpenTypeKind ps_ty2
-
-  | otherwise
-  = unifyMisMatch ps_ty1 ps_ty2
-
 
 	-- Applications need a bit of care!
 	-- They can match FunTy and TyConApp, so use splitAppTy_maybe

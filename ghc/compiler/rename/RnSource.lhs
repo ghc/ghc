@@ -37,8 +37,8 @@ import Class		( FunDep )
 import Name		( Name, OccName, nameOccName, NamedThing(..) )
 import NameSet
 import FiniteMap	( elemFM )
-import PrelInfo		( derivableClassKeys, cCallishClassKeys,
-			  deRefStablePtr_RDR, makeStablePtr_RDR, 
+import PrelInfo		( derivableClassKeys, cCallishClassKeys )
+import PrelNames	( deRefStablePtr_RDR, makeStablePtr_RDR, 
 			  bindIO_RDR, returnIO_RDR
 			)
 import Bag		( bagToList )

@@ -62,7 +62,7 @@ import UsageSPUtils     ( unannotTy )
 import VarSet		( elemVarSet, mkVarSet )
 import TysWiredIn	( boolTy )
 import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
-import Unique		( cCallableClassKey, cReturnableClassKey, 
+import PrelNames	( cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
 			  thenMClassOpKey, failMClassOpKey, returnMClassOpKey, ioTyConKey
@@ -88,7 +88,7 @@ tcExpr :: RenamedHsExpr			-- Expession to type check
 
 tcExpr expr ty | isSigmaTy ty = -- Polymorphic case
 				tcPolyExpr expr ty 	`thenTc` \ (expr', lie, _, _, _) ->
-				 returnTc (expr', lie)
+				returnTc (expr', lie)
 
 	       | otherwise    = -- Monomorphic case
 				tcMonoExpr expr ty
@@ -740,7 +740,7 @@ tcApp fun args res_ty
     -- Check that the result type doesn't have any nested for-alls.
     -- For example, a "build" on its own is no good; it must be applied to something.
     checkTc (isTauTy actual_result_ty)
-	    (lurkingRank2Err fun fun_ty)	`thenTc_`
+	    (lurkingRank2Err fun actual_result_ty)	`thenTc_`
 
     returnTc (fun', args', lie_fun `plusLIE` plusLIEs lie_args_s)
 
@@ -1081,7 +1081,7 @@ appCtxt fun args
 lurkingRank2Err fun fun_ty
   = hang (hsep [ptext SLIT("Illegal use of"), quotes (ppr fun)])
 	 4 (vcat [ptext SLIT("It is applied to too few arguments"),  
-		  ptext SLIT("so that the result type has for-alls in it")])
+		  ptext SLIT("so that the result type has for-alls in it:") <+> ppr fun_ty])
 
 badFieldsUpd rbinds
   = hang (ptext SLIT("No constructor has all these fields:"))

@@ -58,7 +58,7 @@ import Util		( isIn )
 import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
-import Unique		( ioTyConKey, mainKey, hasKey )
+import PrelNames	( ioTyConKey, mainKey, hasKey )
 import Outputable
 \end{code}
 

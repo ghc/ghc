@@ -41,7 +41,7 @@ import TysWiredIn	( unitDataConId,
 			)
 import Literal		( mkMachInt )
 import CStrings		( CLabelString )
-import Unique		( Unique, hasKey, ioTyConKey )
+import PrelNames	( Unique, hasKey, ioTyConKey )
 import VarSet		( varSetElems )
 import Outputable
 \end{code}

@@ -30,7 +30,10 @@ module Type (
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
-	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, splitDictTy_maybe, isDictTy,
+
+	-- Predicates and the like
+	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, 
+	splitDictTy_maybe, isDictTy, predRepTy,
 
 	mkSynTy, isSynTy, deNoteType, 
 
@@ -77,7 +80,7 @@ import TypeRep
 -- Other imports:
 
 import {-# SOURCE #-}	DataCon( DataCon, dataConRepType )
-import {-# SOURCE #-}	PprType( pprType, pprPred )	-- Only called in debug messages
+import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
 -- friends:
@@ -103,7 +106,7 @@ import SrcLoc		( noSrcLoc )
 import Maybes		( maybeToBool )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Uniquable(..) )
-import Util		( mapAccumL, seqList )
+import Util		( mapAccumL, seqList, thenCmp )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 \end{code}
@@ -147,17 +150,20 @@ mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 getTyVar :: String -> Type -> TyVar
 getTyVar msg (TyVarTy tv) = tv
+getTyVar msg (PredTy p)   = getTyVar msg (predRepTy p)
 getTyVar msg (NoteTy _ t) = getTyVar msg t
 getTyVar msg other	  = panic ("getTyVar: " ++ msg)
 
 getTyVar_maybe :: Type -> Maybe TyVar
 getTyVar_maybe (TyVarTy tv) = Just tv
 getTyVar_maybe (NoteTy _ t) = getTyVar_maybe t
+getTyVar_maybe (PredTy p)   = getTyVar_maybe (predRepTy p)
 getTyVar_maybe other	    = Nothing
 
 isTyVarTy :: Type -> Bool
 isTyVarTy (TyVarTy tv)  = True
 isTyVarTy (NoteTy _ ty) = isTyVarTy ty
+isTyVarTy (PredTy p)    = isTyVarTy (predRepTy p)
 isTyVarTy other         = False
 \end{code}
 
@@ -170,8 +176,10 @@ invariant that a TyConApp is always visibly so.  mkAppTy maintains the
 invariant: use it.
 
 \begin{code}
-mkAppTy orig_ty1 orig_ty2 = ASSERT2( isNotUsgTy orig_ty1 && isNotUsgTy orig_ty2, pprType orig_ty1 <+> text "to" <+> pprType orig_ty2 )
-                            mk_app orig_ty1
+mkAppTy orig_ty1 orig_ty2
+  = ASSERT2( isNotUsgTy orig_ty1 && isNotUsgTy orig_ty2, pprType orig_ty1 <+> text "to" <+> pprType orig_ty2 )
+    ASSERT( not (isPredTy orig_ty1) )	-- Predicates are of kind *
+    mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
@@ -184,8 +192,10 @@ mkAppTys orig_ty1 []	    = orig_ty1
 	-- For example: mkAppTys Rational []
 	--   returns to (Ratio Integer), which has needlessly lost
 	--   the Rational part.
-mkAppTys orig_ty1 orig_tys2 = ASSERT2( isNotUsgTy orig_ty1, pprType orig_ty1 )
-                              mk_app orig_ty1
+mkAppTys orig_ty1 orig_tys2
+  = ASSERT2( isNotUsgTy orig_ty1, pprType orig_ty1 )
+    ASSERT( not (isPredTy orig_ty1) )	-- Predicates are of kind *
+    mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
@@ -196,6 +206,7 @@ splitAppTy_maybe :: Type -> Maybe (Type, Type)
 splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 splitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 splitAppTy_maybe (NoteTy _ ty)     = splitAppTy_maybe ty
+splitAppTy_maybe (PredTy p)        = splitAppTy_maybe (predRepTy p)
 splitAppTy_maybe (TyConApp tc [])  = Nothing
 splitAppTy_maybe (TyConApp tc tys) = split tys []
 			    where
@@ -214,6 +225,7 @@ splitAppTys ty = split ty ty []
   where
     split orig_ty (AppTy ty arg)        args = split ty ty (arg:args)
     split orig_ty (NoteTy _ ty)         args = split orig_ty ty args
+    split orig_ty (PredTy p)            args = split orig_ty (predRepTy p) args
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty (TyConApp tc tc_args) args = (TyConApp tc [], tc_args ++ args)
@@ -235,20 +247,20 @@ mkFunTys tys ty = foldr FunTy ty tys
 splitFunTy :: Type -> (Type, Type)
 splitFunTy (FunTy arg res) = (arg, res)
 splitFunTy (NoteTy _ ty)   = splitFunTy ty
+splitFunTy (PredTy p)      = splitFunTy (predRepTy p)
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
-splitFunTy_maybe (FunTy arg res)	= Just (arg, res)
-splitFunTy_maybe (NoteTy (IPNote _) ty)	= Nothing
-splitFunTy_maybe (NoteTy _ ty)   	= splitFunTy_maybe ty
-splitFunTy_maybe other	         	= Nothing
+splitFunTy_maybe (FunTy arg res) = Just (arg, res)
+splitFunTy_maybe (NoteTy _ ty)   = splitFunTy_maybe ty
+splitFunTy_maybe (PredTy p)    	 = splitFunTy_maybe (predRepTy p)
+splitFunTy_maybe other	         = Nothing
 
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty (FunTy arg res) = split (arg:args) res res
-    split args orig_ty (NoteTy (IPNote _) ty)
-				       = (reverse args, orig_ty)
     split args orig_ty (NoteTy _ ty)   = split args orig_ty ty
+    split args orig_ty (PredTy p)      = split args orig_ty (predRepTy p)
     split args orig_ty ty              = (reverse args, orig_ty)
 
 splitFunTysN :: String -> Int -> Type -> ([Type], Type)
@@ -257,6 +269,7 @@ splitFunTysN msg orig_n orig_ty = split orig_n [] orig_ty orig_ty
     split 0 args syn_ty ty		= (reverse args, syn_ty) 
     split n args syn_ty (FunTy arg res) = split (n-1) (arg:args) res    res
     split n args syn_ty (NoteTy _ ty)   = split n     args       syn_ty ty
+    split n args syn_ty (PredTy p)      = split n     args       syn_ty (predRepTy p)
     split n args syn_ty ty              = pprPanic ("splitFunTysN: " ++ msg) (int orig_n <+> pprType orig_ty)
 
 zipFunTys :: Outputable a => [a] -> Type -> ([(a,Type)], Type)
@@ -265,16 +278,19 @@ zipFunTys orig_xs orig_ty = split [] orig_xs orig_ty orig_ty
     split acc []     nty ty  	         = (reverse acc, nty)
     split acc (x:xs) nty (FunTy arg res) = split ((x,arg):acc) xs res res
     split acc xs     nty (NoteTy _ ty)   = split acc           xs nty ty
+    split acc xs     nty (PredTy p)      = split acc           xs nty (predRepTy p)
     split acc (x:xs) nty ty              = pprPanic "zipFunTys" (ppr orig_xs <+> pprType orig_ty)
     
 funResultTy :: Type -> Type
 funResultTy (FunTy arg res) = res
 funResultTy (NoteTy _ ty)   = funResultTy ty
+funResultTy (PredTy p)      = funResultTy (predRepTy p)
 funResultTy ty		    = pprPanic "funResultTy" (pprType ty)
 
 funArgTy :: Type -> Type
 funArgTy (FunTy arg res) = arg
 funArgTy (NoteTy _ ty)   = funArgTy ty
+funArgTy (PredTy p)      = funArgTy (predRepTy p)
 funArgTy ty		 = pprPanic "funArgTy" (pprType ty)
 \end{code}
 
@@ -303,10 +319,11 @@ mkTyConTy tycon = ASSERT( not (isSynTyCon tycon) )
 -- including functions are returned as Just ..
 
 splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
-splitTyConApp_maybe (TyConApp tc tys)	   = Just (tc, tys)
-splitTyConApp_maybe (FunTy arg res)	   = Just (funTyCon, [arg,res])
-splitTyConApp_maybe (NoteTy _ ty)	   = splitTyConApp_maybe ty
-splitTyConApp_maybe other		   = Nothing
+splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
+splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
+splitTyConApp_maybe (NoteTy _ ty)     = splitTyConApp_maybe ty
+splitTyConApp_maybe (PredTy p)	      = splitTyConApp_maybe (predRepTy p)
+splitTyConApp_maybe other	      = Nothing
 
 -- splitAlgTyConApp_maybe looks for 
 --	*saturated* applications of *algebraic* data types
@@ -317,9 +334,8 @@ splitAlgTyConApp_maybe :: Type -> Maybe (TyCon, [Type], [DataCon])
 splitAlgTyConApp_maybe (TyConApp tc tys) 
   | isAlgTyCon tc && 
     tyConArity tc == length tys      = Just (tc, tys, tyConDataCons tc)
-splitAlgTyConApp_maybe (NoteTy (IPNote _) ty)
-				     = Nothing
 splitAlgTyConApp_maybe (NoteTy _ ty) = splitAlgTyConApp_maybe ty
+splitAlgTyConApp_maybe (PredTy p)    = splitAlgTyConApp_maybe (predRepTy p)
 splitAlgTyConApp_maybe other	     = Nothing
 
 splitAlgTyConApp :: Type -> (TyCon, [Type], [DataCon])
@@ -327,53 +343,12 @@ splitAlgTyConApp :: Type -> (TyCon, [Type], [DataCon])
 splitAlgTyConApp (TyConApp tc tys) = ASSERT( isAlgTyCon tc && tyConArity tc == length tys )
 	      			     (tc, tys, tyConDataCons tc)
 splitAlgTyConApp (NoteTy _ ty)     = splitAlgTyConApp ty
+splitAlgTyConApp (PredTy p)        = splitAlgTyConApp (predRepTy p)
 #ifdef DEBUG
 splitAlgTyConApp ty = pprPanic "splitAlgTyConApp" (pprType ty)
 #endif
 \end{code}
 
-"Dictionary" types are just ordinary data types, but you can
-tell from the type constructor whether it's a dictionary or not.
-
-\begin{code}
-mkDictTy :: Class -> [Type] -> Type
-mkDictTy clas tys = TyConApp (classTyCon clas) tys
-
-mkDictTys :: ClassContext -> [Type]
-mkDictTys cxt = [mkDictTy cls tys | (cls,tys) <- cxt]
-
-mkPredTy :: PredType -> Type
-mkPredTy (Class clas tys) = TyConApp (classTyCon clas) tys
-mkPredTy (IParam n ty)    = NoteTy (IPNote n) ty
-
-splitPredTy_maybe :: Type -> Maybe PredType
-splitPredTy_maybe (TyConApp tc tys) 
-  |  maybeToBool maybe_class
-  && tyConArity tc == length tys = Just (Class clas tys)
-  where
-     maybe_class = tyConClass_maybe tc
-     Just clas   = maybe_class
-
-splitPredTy_maybe (NoteTy (IPNote n) ty)
-				= Just (IParam n ty)
-splitPredTy_maybe (NoteTy _ ty)	= splitPredTy_maybe ty
-splitPredTy_maybe other		= Nothing
-
-splitDictTy_maybe :: Type -> Maybe (Class, [Type])
-splitDictTy_maybe ty
-  = case splitPredTy_maybe ty of
-    Just p  -> getClassTys_maybe p
-    Nothing -> Nothing
-
-isDictTy :: Type -> Bool
-	-- This version is slightly more efficient than (maybeToBool . splitDictTy)
-isDictTy (TyConApp tc tys) 
-  |  maybeToBool (tyConClass_maybe tc)
-  && tyConArity tc == length tys
-  = True
-isDictTy (NoteTy _ ty)	= isDictTy ty
-isDictTy other		= False
-\end{code}
 
 ---------------------------------------------------------------------
 				SynTy
@@ -393,9 +368,10 @@ isSynTy (NoteTy (SynNote _) _) = True
 isSynTy other                  = False
 
 deNoteType :: Type -> Type
-	-- Sorry for the cute name
+	-- Remove synonyms, but not Preds
 deNoteType ty@(TyVarTy tyvar)	= ty
 deNoteType (TyConApp tycon tys) = TyConApp tycon (map deNoteType tys)
+deNoteType (PredTy p)		= PredTy p
 deNoteType (NoteTy _ ty)	= deNoteType ty
 deNoteType (AppTy fun arg)	= AppTy (deNoteType fun) (deNoteType arg)
 deNoteType (FunTy fun arg)	= FunTy (deNoteType fun) (deNoteType arg)
@@ -424,6 +400,7 @@ repType looks through
 	(a) for-alls, and
 	(b) newtypes
 	(c) synonyms
+	(d) predicates
 It's useful in the back end where we're not
 interested in newtypes anymore.
 
@@ -431,6 +408,7 @@ interested in newtypes anymore.
 repType :: Type -> Type
 repType (ForAllTy _ ty) = repType ty
 repType (NoteTy   _ ty) = repType ty
+repType (PredTy  p)     = repType (predRepTy p)
 repType ty	 	= case splitNewType_maybe ty of
 			    Just ty' -> repType ty'	-- Still re-apply repType in case of for-all
 			    Nothing  -> ty
@@ -452,9 +430,8 @@ typePrimRep ty = case repType ty of
 splitNewType_maybe :: Type -> Maybe Type
 -- Find the representation of a newtype, if it is one
 -- Looks through multiple levels of newtype, but does not look through for-alls
-splitNewType_maybe (NoteTy (IPNote _) ty)
-				     = Nothing
 splitNewType_maybe (NoteTy _ ty)     = splitNewType_maybe ty
+splitNewType_maybe (PredTy p)        = splitNewType_maybe (predRepTy p)
 splitNewType_maybe (TyConApp tc tys) = case newTyConRep tc of
 					 Just rep_ty -> ASSERT( length tys == tyConArity tc )
 						-- The assert should hold because repType should
@@ -550,23 +527,21 @@ splitUsForAllTys ty = split ty []
 
 substUsTy :: VarEnv UsageAnn -> Type -> Type
 -- assumes range is fresh uvars, so no conflicts
-substUsTy ve    (NoteTy  note@(UsgNote (UsVar u))
-                                            ty ) = NoteTy (case lookupVarEnv ve u of
-                                                             Just ua -> UsgNote ua
-                                                             Nothing -> note)
-                                                          (substUsTy ve ty)
-substUsTy ve    (NoteTy  note@(UsgNote   _) ty ) = NoteTy note (substUsTy ve ty)
-substUsTy ve    (NoteTy  note@(UsgForAll _) ty ) = NoteTy note (substUsTy ve ty)
-substUsTy ve    (NoteTy  (SynNote ty1)      ty2) = NoteTy (SynNote (substUsTy ve ty1))
-                                                          (substUsTy ve ty2)
-substUsTy ve    (NoteTy  note@(FTVNote _)   ty ) = NoteTy note (substUsTy ve ty)
-substUsTy ve ty@(TyVarTy _                     ) = ty
-substUsTy ve    (AppTy   ty1                ty2) = AppTy (substUsTy ve ty1)
-                                                         (substUsTy ve ty2)
-substUsTy ve    (FunTy   ty1                ty2) = FunTy (substUsTy ve ty1)
-                                                         (substUsTy ve ty2)
-substUsTy ve    (TyConApp tyc               tys) = TyConApp tyc (map (substUsTy ve) tys)
-substUsTy ve    (ForAllTy yv                ty ) = ForAllTy yv (substUsTy ve ty)
+substUsTy ve (NoteTy note@(UsgNote (UsVar u))
+                                         ty ) = NoteTy (case lookupVarEnv ve u of
+                                                          Just ua -> UsgNote ua
+                                                          Nothing -> note)
+                                                       (substUsTy ve ty)
+substUsTy ve (NoteTy (SynNote ty1)      ty2) = NoteTy (SynNote (substUsTy ve ty1)) (substUsTy ve ty2)
+substUsTy ve (NoteTy note ty) 		     = NoteTy note (substUsTy ve ty)
+	     
+substUsTy ve (PredTy (Class c tys)) = PredTy (Class c (map (substUsTy ve) tys))
+substUsTy ve (PredTy (IParam n ty)) = PredTy (IParam n (substUsTy ve ty))
+substUsTy ve (TyVarTy tv) 	    =  TyVarTy tv
+substUsTy ve (AppTy  ty1 ty2)       = AppTy (substUsTy ve ty1) (substUsTy ve ty2)
+substUsTy ve (FunTy  ty1 ty2)       = FunTy (substUsTy ve ty1) (substUsTy ve ty2)
+substUsTy ve (TyConApp tyc tys)     = TyConApp tyc (map (substUsTy ve) tys)
+substUsTy ve (ForAllTy yv ty )      = ForAllTy yv (substUsTy ve ty)
 \end{code}
 
 
@@ -596,8 +571,8 @@ splitForAllTy_maybe ty = case splitUsgTy_maybe ty of
 					        return (tyvar, NoteTy (UsgNote usg) ty'')
 			   Nothing        -> splitFAT_m ty
   where
-    splitFAT_m (NoteTy (IPNote _) ty)	= Nothing
     splitFAT_m (NoteTy _ ty)		= splitFAT_m ty
+    splitFAT_m (PredTy p)		= splitFAT_m (predRepTy p)
     splitFAT_m (ForAllTy tyvar ty)	= Just(tyvar, ty)
     splitFAT_m _			= Nothing
 
@@ -608,8 +583,8 @@ splitForAllTys ty = case splitUsgTy_maybe ty of
 		      Nothing        -> split ty ty []
    where
      split orig_ty (ForAllTy tv ty)	  tvs = split ty ty (tv:tvs)
-     split orig_ty (NoteTy (IPNote _) ty) tvs = (reverse tvs, orig_ty)
      split orig_ty (NoteTy _ ty)	  tvs = split orig_ty ty tvs
+     split orig_ty (PredTy p)		  tvs = split orig_ty (predRepTy p) tvs
      split orig_ty t			  tvs = (reverse tvs, orig_ty)
 \end{code}
 
@@ -621,6 +596,7 @@ Applying a for-all to its arguments
 applyTy :: Type -> Type -> Type
 applyTy (NoteTy note@(UsgNote   _) fun) arg = NoteTy note (applyTy fun arg)
 applyTy (NoteTy note@(UsgForAll _) fun) arg = NoteTy note (applyTy fun arg)
+applyTy (PredTy p) 	                arg = applyTy (predRepTy p) arg
 applyTy (NoteTy _ fun)                  arg = applyTy fun arg
 applyTy (ForAllTy tv ty)                arg = ASSERT( isNotUsgTy arg )
                                               substTy (mkTyVarSubst [tv] [arg]) ty
@@ -640,6 +616,7 @@ applyTys fun_ty arg_tys
                               args       = case split fun_ty args of
                                              (tvs, ty) -> (tvs, NoteTy note ty)
    split (NoteTy _ fun_ty)    args       = split fun_ty args
+   split (PredTy p)	      args       = split (predRepTy p) args
    split (ForAllTy tv fun_ty) (arg:args) = ASSERT2( isNotUsgTy arg, vcat (map pprType arg_tys) $$
 								    text "in application of" <+> pprType fun_ty)
 					   case split fun_ty args of
@@ -677,26 +654,46 @@ ClassPred and ClassContext are used in class and instance declarations.
 %*									*
 %************************************************************************
 
-\begin{code}
--- f :: (C a, ?x :: Int -> Int) => a -> Int
--- Here the "C a" and "?x :: Int -> Int" are Preds
-data PredType  = Class  Class [Type]
-	       | IParam Name  Type
-	       deriving( Eq, Ord )
-
-type ThetaType 	  = [PredType]
-type RhoType   	  = Type
-type TauType   	  = Type
-type SigmaType    = Type
-\end{code}
-
-\begin{code}
-instance Outputable PredType where
-    ppr = pprPred
-\end{code}
+"Dictionary" types are just ordinary data types, but you can
+tell from the type constructor whether it's a dictionary or not.
 
 \begin{code}
 mkClassPred clas tys = Class clas tys
+
+mkDictTy :: Class -> [Type] -> Type
+mkDictTy clas tys = mkPredTy (Class clas tys)
+
+mkDictTys :: ClassContext -> [Type]
+mkDictTys cxt = [mkDictTy cls tys | (cls,tys) <- cxt]
+
+mkPredTy :: PredType -> Type
+mkPredTy pred = PredTy pred
+
+predRepTy :: PredType -> Type
+-- Convert a predicate to its "representation type";
+-- the type of evidence for that predicate, which is actually passed at runtime
+predRepTy (Class clas tys) = TyConApp (classTyCon clas) tys
+predRepTy (IParam n ty)    = ty
+
+isPredTy :: Type -> Bool
+isPredTy (NoteTy _ ty) = isPredTy ty
+isPredTy (PredTy _)    = True
+isPredTy _	       = False
+
+isDictTy :: Type -> Bool
+isDictTy (NoteTy _ ty)	      = isDictTy ty
+isDictTy (PredTy (Class _ _)) = True
+isDictTy other		      = False
+
+splitPredTy_maybe :: Type -> Maybe PredType
+splitPredTy_maybe (NoteTy _ ty) = splitPredTy_maybe ty
+splitPredTy_maybe (PredTy p)    = Just p
+splitPredTy_maybe other	        = Nothing
+
+splitDictTy_maybe :: Type -> Maybe (Class, [Type])
+splitDictTy_maybe ty = case splitPredTy_maybe ty of
+			    Just p  -> getClassTys_maybe p
+			    Nothing -> Nothing
 
 getClassTys_maybe :: PredType -> Maybe ClassPred
 getClassTys_maybe (Class clas tys) = Just (clas, tys)
@@ -706,6 +703,7 @@ ipName_maybe :: PredType -> Maybe Name
 ipName_maybe (IParam n _) = Just n
 ipName_maybe _		  = Nothing
 
+classesToPreds :: ClassContext -> ThetaType
 classesToPreds cts = map (uncurry Class) cts
 
 classesOfPreds :: ThetaType -> ClassContext
@@ -716,13 +714,13 @@ classesOfPreds theta = [(clas,tys) | Class clas tys <- theta]
 
 \begin{code}
 isTauTy :: Type -> Bool
-isTauTy (TyVarTy v)		= True
-isTauTy (TyConApp _ tys)	= all isTauTy tys
-isTauTy (AppTy a b)		= isTauTy a && isTauTy b
-isTauTy (FunTy a b)		= isTauTy a && isTauTy b
-isTauTy (NoteTy (IPNote _) ty)	= False
-isTauTy (NoteTy _ ty)		= isTauTy ty
-isTauTy other			= False
+isTauTy (TyVarTy v)	 = True
+isTauTy (TyConApp _ tys) = all isTauTy tys
+isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
+isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
+isTauTy (PredTy p)	 = isTauTy (predRepTy p)
+isTauTy (NoteTy _ ty)	 = isTauTy ty
+isTauTy other		 = False
 \end{code}
 
 \begin{code}
@@ -733,27 +731,23 @@ splitRhoTy :: Type -> ([PredType], Type)
 splitRhoTy ty = split ty ty []
  where
   split orig_ty (FunTy arg res) ts = case splitPredTy_maybe arg of
-					Just p -> split res res (p:ts)
-					Nothing   -> (reverse ts, orig_ty)
-  split orig_ty (NoteTy (IPNote _) ty)	ts = (reverse ts, orig_ty)
-  split orig_ty (NoteTy _ ty)		ts = split orig_ty ty ts
-  split orig_ty ty			ts = (reverse ts, orig_ty)
+					Just p  -> split res res (p:ts)
+					Nothing -> (reverse ts, orig_ty)
+  split orig_ty (NoteTy _ ty)	ts = split orig_ty ty ts
+  split orig_ty ty		ts = (reverse ts, orig_ty)
 \end{code}
 
-
+isSigmaType returns true of any qualified type.  It doesn't *necessarily* have 
+any foralls.  E.g.
+	f :: (?x::Int) => Int -> Int
 
 \begin{code}
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkRhoTy theta tau)
 
 isSigmaTy :: Type -> Bool
-isSigmaTy (FunTy a b)		= isPredTy a
-    where isPredTy (NoteTy (IPNote _) _) = True
-	  -- JRL could be a dict ty, but that would be polymorphic,
-	  -- and thus there would have been an outer ForAllTy
-	  isPredTy _			 = False
-isSigmaTy (NoteTy (IPNote _) _) = False
-isSigmaTy (NoteTy _ ty)		= isSigmaTy ty
 isSigmaTy (ForAllTy tyvar ty)	= True
+isSigmaTy (FunTy a b)		= isPredTy a
+isSigmaTy (NoteTy _ ty)		= isSigmaTy ty
 isSigmaTy _			= False
 
 splitSigmaTy :: Type -> ([TyVar], [PredType], Type)
@@ -773,6 +767,7 @@ getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
 getDFunTyKey (NoteTy _ t)    = getDFunTyKey t
 getDFunTyKey (FunTy arg _)   = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
+-- PredTy shouldn't happen
 \end{code}
 
 
@@ -791,6 +786,8 @@ typeKind :: Type -> Kind
 typeKind (TyVarTy tyvar)	= tyVarKind tyvar
 typeKind (TyConApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
 typeKind (NoteTy _ ty)		= typeKind ty
+typeKind (PredTy _)		= boxedTypeKind		-- Predicates are always 
+							-- represented by boxed types
 typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
 
 typeKind (FunTy arg res)	= fix_up (typeKind res)
@@ -822,7 +819,7 @@ tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty1
 tyVarsOfType (NoteTy (UsgNote _) ty)	= tyVarsOfType ty
 tyVarsOfType (NoteTy (UsgForAll _) ty)	= tyVarsOfType ty
-tyVarsOfType (NoteTy (IPNote _) ty)	= tyVarsOfType ty
+tyVarsOfType (PredTy p)			= tyVarsOfPred p
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
@@ -852,6 +849,7 @@ namesOfType (TyConApp tycon tys)	= unitNameSet (getName tycon) `unionNameSets`
 					  namesOfTypes tys
 namesOfType (NoteTy (SynNote ty1) ty2)	= namesOfType ty1
 namesOfType (NoteTy other_note    ty2)	= namesOfType ty2
+namesOfType (PredTy p)			= namesOfType (predRepTy p)
 namesOfType (FunTy arg res)		= namesOfType arg `unionNameSets` namesOfType res
 namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
 namesOfType (ForAllTy tyvar ty)		= namesOfType ty `minusNameSet` unitNameSet (getName tyvar)
@@ -905,6 +903,7 @@ tidyType env@(tidy_env, subst) ty
     go (TyConApp tycon tys) = let args = map go tys
 			      in args `seqList` TyConApp tycon args
     go (NoteTy note ty)     = (NoteTy SAPPLY (go_note note)) SAPPLY (go ty)
+    go (PredTy p)	    = PredTy (go_pred p)
     go (AppTy fun arg)	    = (AppTy SAPPLY (go fun)) SAPPLY (go arg)
     go (FunTy fun arg)	    = (FunTy SAPPLY (go fun)) SAPPLY (go arg)
     go (ForAllTy tv ty)	    = ForAllTy tvp SAPPLY (tidyType envp ty)
@@ -915,9 +914,11 @@ tidyType env@(tidy_env, subst) ty
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
     go_note note@(UsgNote _)    = note  -- Usage annotation is already tidy
     go_note note@(UsgForAll _)  = note  -- Uvar binder is already tidy
-    go_note (IPNote n)		= IPNote (tidyIPName n)
 
-tidyTypes  env tys    = map (tidyType env) tys
+    go_pred (Class c tys) = Class c (tidyTypes env tys)
+    go_pred (IParam n ty) = IParam n (go ty)
+
+tidyTypes env tys = map (tidyType env) tys
 \end{code}
 
 
@@ -939,11 +940,6 @@ tidyTopType :: Type -> Type
 tidyTopType ty = tidyType emptyTidyEnv ty
 \end{code}
 
-\begin{code}
-tidyIPName :: Name -> Name
-tidyIPName name
-  = mkLocalName (getUnique name) (getOccName name) noSrcLoc
-\end{code}
 
 
 %************************************************************************
@@ -1007,6 +1003,7 @@ seqType (TyVarTy tv) 	  = tv `seq` ()
 seqType (AppTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (NoteTy note t2)  = seqNote note `seq` seqType t2
+seqType (PredTy p) 	  = seqPred p
 seqType (TyConApp tc tys) = tc `seq` seqTypes tys
 seqType (ForAllTy tv ty)  = tv `seq` seqType ty
 
@@ -1018,5 +1015,86 @@ seqNote :: TyNote -> ()
 seqNote (SynNote ty)  = seqType ty
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 seqNote (UsgNote usg) = usg `seq` ()
-seqNote (IPNote nm)   = nm `seq` ()
+
+seqPred :: PredType -> ()
+seqPred (Class c tys) = c `seq` seqTypes tys
+seqPred (IParam n ty) = n `seq` seqType ty
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Equality on types}
+%*									*
+%************************************************************************
+
+
+For the moment at least, type comparisons don't work if 
+there are embedded for-alls.
+
+\begin{code}
+instance Eq Type where
+  ty1 == ty2 = case ty1 `compare` ty2 of { EQ -> True; other -> False }
+
+instance Ord Type where
+  compare ty1 ty2 = cmpTy emptyVarEnv ty1 ty2
+
+cmpTy :: TyVarEnv TyVar -> Type -> Type -> Ordering
+  -- The "env" maps type variables in ty1 to type variables in ty2
+  -- So when comparing for-alls.. (forall tv1 . t1) (forall tv2 . t2)
+  -- we in effect substitute tv2 for tv1 in t1 before continuing
+
+    -- Get rid of NoteTy
+cmpTy env (NoteTy _ ty1) ty2 = cmpTy env ty1 ty2
+cmpTy env ty1 (NoteTy _ ty2) = cmpTy env ty1 ty2
+
+    -- Get rid of PredTy
+cmpTy env (PredTy p1) (PredTy p2) = cmpPred env p1 p2
+cmpTy env (PredTy p1) ty2	  = cmpTy env (predRepTy p1) ty2
+cmpTy env ty1         (PredTy p2) = cmpTy env ty1 (predRepTy p2)
+
+    -- Deal with equal constructors
+cmpTy env (TyVarTy tv1) (TyVarTy tv2) = case lookupVarEnv env tv1 of
+					  Just tv1a -> tv1a `compare` tv2
+					  Nothing   -> tv1  `compare` tv2
+
+cmpTy env (AppTy f1 a1) (AppTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
+cmpTy env (FunTy f1 a1) (FunTy f2 a2) = cmpTy env f1 f2 `thenCmp` cmpTy env a1 a2
+cmpTy env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmpTys env tys1 tys2)
+cmpTy env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTy (extendVarEnv env tv1 tv2) t1 t2
+    
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy
+cmpTy env (AppTy _ _) (TyVarTy _) = GT
+    
+cmpTy env (FunTy _ _) (TyVarTy _) = GT
+cmpTy env (FunTy _ _) (AppTy _ _) = GT
+    
+cmpTy env (TyConApp _ _) (TyVarTy _) = GT
+cmpTy env (TyConApp _ _) (AppTy _ _) = GT
+cmpTy env (TyConApp _ _) (FunTy _ _) = GT
+    
+cmpTy env (ForAllTy _ _) other       = GT
+    
+cmpTy env _ _		             = LT
+
+
+cmpTys env []       []	     = EQ
+cmpTys env (t:ts)   []       = GT
+cmpTys env []	    (t:ts)   = LT
+cmpTys env (t1:t1s) (t2:t2s) = cmpTy env t1 t2 `thenCmp` cmpTys env t1s t2s
+\end{code}
+
+\begin{code}
+instance Eq PredType where
+  p1 == p2 = case p1 `compare` p2 of { EQ -> True; other -> False }
+
+instance Ord PredType where
+  compare p1 p2 = cmpPred emptyVarEnv p1 p2
+
+cmpPred :: TyVarEnv TyVar -> PredType -> PredType -> Ordering
+cmpPred env (IParam n1 t)   (IParam n2 t2)  = n1 `compare` n2
+	-- Just compare the names!
+cmpPred env (Class c1 tys1) (Class c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTys env tys1 tys2)
+cmpPred env (IParam _ _)    (Class _ _)     = LT
+cmpPred env (Class _ _)     (IParam _ _)    = GT
 \end{code}

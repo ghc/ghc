@@ -19,7 +19,7 @@ import Type		( Type )
 import DsMonad
 import DsUtils
 import PrelInfo		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
-import Unique		( otherwiseIdKey, trueDataConKey, hasKey )
+import PrelNames	( otherwiseIdKey, trueDataConKey, hasKey )
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.

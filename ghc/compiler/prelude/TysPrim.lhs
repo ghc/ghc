@@ -54,9 +54,9 @@ import Type		( Type,
 			  mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unboxedTypeKind, boxedTypeKind, openTypeKind, mkArrowKinds
 			)
-import PrelNames	( pREL_GHC )
+import Unique		( mkAlphaTyVarUnique )
+import PrelNames
 import Outputable
-import Unique
 \end{code}
 
 \begin{code}

@@ -16,6 +16,7 @@ import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSs, GRHSs )
 -- friends:
 import HsTypes		( HsType )
 import CoreSyn		( CoreExpr )
+import PprCore		( {- Instances -} )
 
 --others:
 import Name		( Name, isUnboundName )

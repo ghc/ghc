@@ -50,8 +50,7 @@ import Name		( nameOccName, isLocallyDefined, isGlobalName,
 import OccName		( isSysOcc )
 import TyCon		( TyCon, tyConClass_maybe )
 import Class		( Class )
-import PrelInfo		( mAIN_Name )
-import Unique		( mainKey )
+import PrelNames	( mAIN_Name, mainKey )
 import UniqSupply       ( UniqSupply )
 import Maybes		( maybeToBool )
 import Util

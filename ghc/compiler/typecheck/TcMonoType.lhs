@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcMonoType ( tcHsType, tcHsSigType, tcHsBoxedSigType, 
-		    tcContext, tcClassContext,
+		    tcHsConSigType, tcContext, tcClassContext,
 
 			-- Kind checking
 		    kcHsTyVar, kcHsTyVars, mkTyClTyVars,
@@ -46,7 +46,7 @@ import Type		( Type, Kind, PredType(..), ThetaType, UsageAnn(..),
 			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
 			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
-			  classesOfPreds
+			  classesOfPreds, isUnboxedTupleType
 			)
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
@@ -265,6 +265,7 @@ tcHsSigType and tcHsBoxedSigType are used for type signatures written by the pro
 
   * Notice that we kind-check first, because the type-check assumes
 	that the kinds are already checked.
+
   * They are only called when there are no kind vars in the environment
   	so the kind returned is indeed a Kind not a TcKind
 
@@ -280,6 +281,14 @@ tcHsBoxedSigType ty
   = kcBoxedType ty	`thenTc_`
     tcHsType ty		`thenTc` \ ty' ->
     returnTc (hoistForAllTys ty')
+
+tcHsConSigType :: RenamedHsType -> TcM s Type
+-- Used for constructor arguments, which must not
+-- be unboxed tuples
+tcHsConSigType ty
+   = kcTypeType ty	`thenTc_`
+     tcHsArgType ty	`thenTc` \ ty' ->
+     returnTc (hoistForAllTys ty')
 \end{code}
 
 
@@ -287,6 +296,17 @@ tcHsType, the main work horse
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
+tcHsArgType :: RenamedHsType -> TcM s TcType
+-- Used the for function and constructor arguments, 
+-- which are not allowed to be unboxed tuples
+-- This is a bit ad hoc; we don't have a separate kind
+-- for unboxed tuples
+tcHsArgType ty
+  = tcHsType ty				`thenTc` \ tau_ty ->
+    checkTc (not (isUnboxedTupleType tau_ty))
+	    (unboxedTupleErr ty)	`thenTc_`
+    returnTc tau_ty
+
 tcHsType :: RenamedHsType -> TcM s Type
 tcHsType ty@(HsTyVar name)
   = tc_app ty []
@@ -300,7 +320,7 @@ tcHsType (HsTupleTy (HsTupCon _ boxity) tys)
     returnTc (mkTupleTy boxity (length tys) tau_tys)
 
 tcHsType (HsFunTy ty1 ty2)
-  = tcHsType ty1	`thenTc` \ tau_ty1 ->
+  = tcHsArgType ty1	`thenTc` \ tau_ty1 ->
     tcHsType ty2	`thenTc` \ tau_ty2 ->
     returnTc (mkFunTy tau_ty1 tau_ty2)
 
@@ -869,4 +889,7 @@ freeErr pred ty
 		   ptext SLIT("does not mention any of the universally quantified type variables"),
 	 nest 4 (ptext SLIT("in the type") <+> quotes (ppr ty))
     ]
+
+unboxedTupleErr ty
+  = sep [ptext (SLIT("Illegal unboxed tuple as a function or contructor argument:")), nest 4 (ppr ty)]
 \end{code}

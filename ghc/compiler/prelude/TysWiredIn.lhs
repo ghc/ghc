@@ -96,7 +96,8 @@ import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys,
 			  mkFunTy, mkFunTys,
 			  splitTyConApp_maybe, repType,
 			  TauType, ClassContext )
-import Unique
+import Unique		( incrUnique, mkTupleTyConUnique, mkTupleDataConUnique )
+import PrelNames
 import CmdLineOpts      ( opt_GlasgowExts )
 import Array
 

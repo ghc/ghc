@@ -31,14 +31,13 @@ import Type		( Type, Kind, PredType(..), UsageAnn(..), ClassContext,
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, tyConClass_maybe )
-import PrelInfo         ( mkTupConRdrName )
 import RdrName		( RdrName )
 import Name		( toRdrName )
 import OccName		( NameSpace )
 import Var		( TyVar, tyVarKind )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
 import BasicTypes	( Arity, Boxity(..), tupleParens )
-import Unique		( hasKey, listTyConKey, Uniquable(..) )
+import PrelNames	( mkTupConRdrName, listTyConKey, hasKey, Uniquable(..) )
 import Maybes		( maybeToBool )
 import FiniteMap
 import Outputable
@@ -289,16 +288,15 @@ toHsType' (AppTy fun arg) = HsAppTy (toHsType fun) (toHsType arg)
 toHsType' (NoteTy (SynNote ty) _) = toHsType ty		-- Use synonyms if possible!!
 toHsType' (NoteTy _ ty)		  = toHsType ty
 
+toHsType' (PredTy p)		  = HsPredTy (toHsPred p)
+
 toHsType' ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of kind *
   | not saturated	     = generic_case
   | isTupleTyCon tc	     = HsTupleTy (HsTupCon (toRdrName tc) (tupleTyConBoxity tc)) tys'
   | tc `hasKey` listTyConKey = HsListTy (head tys')
-  | maybeToBool maybe_class  = HsPredTy (HsPClass (toRdrName clas) tys')
   | otherwise		     = generic_case
   where
      generic_case = foldl HsAppTy (HsTyVar (toRdrName tc)) tys'
-     maybe_class  = tyConClass_maybe tc
-     Just clas    = maybe_class
      tys'         = map toHsType tys
      saturated    = length tys == tyConArity tc
 

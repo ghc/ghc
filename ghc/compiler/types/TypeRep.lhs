@@ -5,8 +5,10 @@
 
 \begin{code}
 module TypeRep (
-	Type(..), TyNote(..), UsageAnn(..),		-- Representation visible to friends
-	Kind, TyVarSubst,
+	Type(..), TyNote(..), PredType(..), UsageAnn(..),	-- Representation visible to friends
+	
+ 	Kind, ThetaType, RhoType, TauType, SigmaType,		-- Synonyms
+	TyVarSubst,
 
 	superKind, superBoxity,				-- KX and BX respectively
 	boxedBoxity, unboxedBoxity, 			-- :: BX
@@ -31,12 +33,13 @@ import Name	( Name, Provenance(..), ExportFlag(..),
 import TyCon	( TyCon, KindCon,
 		  mkFunTyCon, mkKindCon, mkSuperKindCon,
 		)
+import Class	( Class )
 
 -- others
 import SrcLoc		( mkBuiltinSrcLoc )
-import PrelNames	( pREL_GHC )
-import Unique		-- quite a few *Keys
-import Util		( thenCmp )
+import PrelNames	( pREL_GHC, kindConKey, boxityConKey, boxedConKey, unboxedConKey, 
+			  typeConKey, anyBoxConKey, funTyConKey
+			)
 \end{code}
 
 %************************************************************************
@@ -107,35 +110,72 @@ data Type
 	Type		-- Function is *not* a TyConApp
 	Type
 
-  | TyConApp			-- Application of a TyCon
-	TyCon			-- *Invariant* saturated appliations of FunTyCon and
-				-- 	synonyms have their own constructors, below.
+  | TyConApp		-- Application of a TyCon
+	TyCon		-- *Invariant* saturated appliations of FunTyCon and
+			-- 	synonyms have their own constructors, below.
 	[Type]		-- Might not be saturated.
 
-  | FunTy			-- Special case of TyConApp: TyConApp FunTyCon [t1,t2]
+  | FunTy		-- Special case of TyConApp: TyConApp FunTyCon [t1,t2]
 	Type
 	Type
 
-  | NoteTy 			-- Saturated application of a type synonym
+  | ForAllTy		-- A polymorphic type
+	TyVar
+	Type	
+
+  | PredTy		-- A Haskell predicate
+	PredType
+
+  | NoteTy 		-- A type with a note attached
 	TyNote
 	Type		-- The expanded version
-
-  | ForAllTy
-	TyVar
-	Type		-- TypeKind
 
 data TyNote
   = SynNote Type	-- The unexpanded version of the type synonym; always a TyConApp
   | FTVNote TyVarSet	-- The free type variables of the noted expression
   | UsgNote UsageAnn    -- The usage annotation at this node
   | UsgForAll UVar      -- Annotation variable binder
-  | IPNote Name		-- It's an implicit parameter
 
 data UsageAnn
   = UsOnce		-- Used at most once
   | UsMany		-- Used possibly many times (no info; this annotation can be omitted)
   | UsVar    UVar	-- Annotation is variable (unbound OK only inside analysis)
+
+
+type ThetaType 	  = [PredType]
+type RhoType   	  = Type
+type TauType   	  = Type
+type SigmaType    = Type
 \end{code}
+
+
+-------------------------------------
+ 		Predicates
+
+Consider these examples:
+	f :: (Eq a) => a -> Int
+	g :: (?x :: Int -> Int) => a -> Int
+	h :: (r\l) => {r} => {l::Int | r}
+
+Here the "Eq a" and "?x :: Int -> Int" and "r\l" are all called *predicates*
+Predicates are represented inside GHC by PredType:
+
+\begin{code}
+data PredType  = Class  Class [Type]
+	       | IParam Name  Type
+\end{code}
+
+(We don't support TREX records yet, but the setup is designed
+to expand to allow them.)
+
+A Haskell qualified type, such as that for f,g,h above, is
+represented using 
+	* a FunTy for the double arrow
+	* with a PredTy as the function argument
+
+The predicate really does turn into a real extra argument to the
+function.  If the argument has type (PredTy p) then the predicate p is
+represented by evidence (a dictionary, for example, of type (predRepTy p).
 
 
 %************************************************************************
@@ -261,62 +301,4 @@ funTyConName = mkWiredInTyConName funTyConKey pREL_GHC SLIT("(->)") funTyCon
 funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] boxedTypeKind)
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{Equality on types}
-%*									*
-%************************************************************************
-
-For the moment at least, type comparisons don't work if 
-there are embedded for-alls.
-
-\begin{code}
-instance Eq Type where
-  ty1 == ty2 = case ty1 `cmpTy` ty2 of { EQ -> True; other -> False }
-
-instance Ord Type where
-  compare ty1 ty2 = cmpTy ty1 ty2
-
-cmpTy :: Type -> Type -> Ordering
-cmpTy ty1 ty2
-  = cmp emptyVarEnv ty1 ty2
-  where
-  -- The "env" maps type variables in ty1 to type variables in ty2
-  -- So when comparing for-alls.. (forall tv1 . t1) (forall tv2 . t2)
-  -- we in effect substitute tv2 for tv1 in t1 before continuing
-    lookup env tv1 = case lookupVarEnv env tv1 of
-			  Just tv2 -> tv2
-			  Nothing  -> tv1
-
-    -- Get rid of NoteTy
-    cmp env (NoteTy _ ty1) ty2 = cmp env ty1 ty2
-    cmp env ty1 (NoteTy _ ty2) = cmp env ty1 ty2
-    
-    -- Deal with equal constructors
-    cmp env (TyVarTy tv1) (TyVarTy tv2) = lookup env tv1 `compare` tv2
-    cmp env (AppTy f1 a1) (AppTy f2 a2) = cmp env f1 f2 `thenCmp` cmp env a1 a2
-    cmp env (FunTy f1 a1) (FunTy f2 a2) = cmp env f1 f2 `thenCmp` cmp env a1 a2
-    cmp env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` (cmps env tys1 tys2)
-    cmp env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmp (extendVarEnv env tv1 tv2) t1 t2
-    
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy
-    cmp env (AppTy _ _) (TyVarTy _) = GT
-    
-    cmp env (FunTy _ _) (TyVarTy _) = GT
-    cmp env (FunTy _ _) (AppTy _ _) = GT
-    
-    cmp env (TyConApp _ _) (TyVarTy _) = GT
-    cmp env (TyConApp _ _) (AppTy _ _) = GT
-    cmp env (TyConApp _ _) (FunTy _ _) = GT
-    
-    cmp env (ForAllTy _ _) other       = GT
-    
-    cmp env _ _		               = LT
-
-    cmps env []     [] = EQ
-    cmps env (t:ts) [] = GT
-    cmps env [] (t:ts) = LT
-    cmps env (t1:t1s) (t2:t2s) = cmp env t1 t2 `thenCmp` cmps env t1s t2s
-\end{code}
 

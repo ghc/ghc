@@ -63,7 +63,7 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			)
 import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
-import Unique		( unpackCStringIdKey, unpackCStringUtf8IdKey, 
+import PrelNames	( unpackCStringIdKey, unpackCStringUtf8IdKey, 
 			  plusIntegerIdKey, timesIntegerIdKey )
 import Outputable
 import UnicodeUtil      ( stringToUtf8 )

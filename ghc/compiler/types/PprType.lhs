@@ -25,7 +25,7 @@ import Type		( PredType(..), ThetaType,
 			  splitPredTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
 			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
-                          splitUsForAllTys
+                          splitUsForAllTys, predRepTy
 			)
 import Var		( TyVar, tyVarKind,
 			  tyVarName, setTyVarName
@@ -42,7 +42,7 @@ import Name		( getOccString, NamedThing(..) )
 import Outputable
 import PprEnv
 import Unique		( Uniquable(..) )
-import Unique		-- quite a few *Keys
+import PrelNames		-- quite a few *Keys
 \end{code}
 
 %************************************************************************
@@ -78,6 +78,9 @@ pprTheta theta = parens (hsep (punctuate comma (map pprPred theta)))
 
 instance Outputable Type where
     ppr ty = pprType ty
+
+instance Outputable PredType where
+    ppr = pprPred
 \end{code}
 
 
@@ -212,8 +215,7 @@ ppr_ty env ctxt_prec (NoteTy (UsgNote u) ty)
   = maybeParen ctxt_prec tYCON_PREC $
     ptext SLIT("__u") <+> ppr u <+> ppr_ty env tYCON_PREC ty
 
-ppr_ty env ctxt_prec (NoteTy (IPNote nm) ty)
-  = braces (ppr_pred env (IParam nm ty))
+ppr_ty env ctxt_prec (PredTy p) = braces (ppr_pred env p)
 
 ppr_theta env []    = empty
 ppr_theta env theta = braces (hsep (punctuate comma (map (ppr_pred env) theta)))
@@ -284,6 +286,7 @@ getTyDescription ty
       NoteTy (FTVNote _) ty  -> getTyDescription ty
       NoteTy (SynNote ty1) _ -> getTyDescription ty1
       NoteTy (UsgNote _) ty  -> getTyDescription ty
+      PredTy p		     -> getTyDescription (predRepTy p)
       ForAllTy _ ty    -> getTyDescription ty
     }
   where

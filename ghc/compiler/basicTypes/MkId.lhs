@@ -89,7 +89,7 @@ import FieldLabel	( FieldLabel, FieldLabelTag, mkFieldLabel, fieldLabelName,
 			)
 import CoreSyn
 import Maybes
-import Unique
+import PrelNames
 import Maybe            ( isJust )
 import Outputable
 import Util		( assoc )

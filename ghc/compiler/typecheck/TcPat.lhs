@@ -37,7 +37,7 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, stringTy, intTy, integerTy )
-import Unique		( eqClassOpKey, geClassOpKey, 
+import PrelNames	( eqClassOpKey, geClassOpKey, 
 			  cCallableClassKey, eqStringIdKey,
 			)
 import BasicTypes	( isBoxed )

@@ -18,7 +18,7 @@ import TcSimplify	( tcSimplifyCheckThetas )
 
 import TysWiredIn	( integerTy, doubleTy )
 import Type             ( Type )
-import Unique		( numClassKey )
+import PrelNames	( numClassKey )
 import Outputable
 \end{code}
 

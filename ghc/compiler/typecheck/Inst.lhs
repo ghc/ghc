@@ -75,7 +75,7 @@ import TysWiredIn ( isIntTy,
 		    doubleDataCon, isDoubleTy,
 		    isIntegerTy, voidTy
 		  ) 
-import Unique	( Unique, hasKey, fromIntClassOpKey, fromIntegerClassOpKey )
+import PrelNames( Unique, hasKey, fromIntClassOpKey, fromIntegerClassOpKey )
 import Maybe	( catMaybes )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Outputable

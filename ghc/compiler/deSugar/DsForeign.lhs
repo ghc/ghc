@@ -40,10 +40,10 @@ import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
 			  addrDataCon
 			)
 import TysPrim		( addrPrimTy )
-import Unique		( Uniquable(..), hasKey,
+import PrelNames	( Uniquable(..), hasKey,
 			  ioTyConKey, deRefStablePtrIdKey, returnIOIdKey, 
 			  bindIOIdKey, makeStablePtrIdKey
-		)
+			)
 import Outputable
 
 import Maybe 		( fromJust )

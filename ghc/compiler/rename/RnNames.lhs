@@ -25,7 +25,7 @@ import RnEnv
 import RnMonad
 
 import FiniteMap
-import PrelInfo ( pRELUDE_Name, mAIN_Name, main_RDR )
+import PrelNames ( pRELUDE_Name, mAIN_Name, main_RDR )
 import UniqFM	( lookupUFM )
 import Bag	( bagToList )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )

@@ -24,7 +24,7 @@ import Type		( splitAlgTyConApp, mkTyVarTys, splitTyConApp_maybe )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           mkListTy, mkTupleTy, tupleCon
 			)
-import Unique		( unboundKey )
+import PrelNames	( unboundKey )
 import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( noSrcLoc )

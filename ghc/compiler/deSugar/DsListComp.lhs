@@ -26,7 +26,7 @@ import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type )
 import TysPrim		( alphaTyVar )
 import TysWiredIn	( nilDataCon, consDataCon )
 import Match		( matchSimply )
-import Unique		( foldrIdKey, buildIdKey )
+import PrelNames	( foldrIdKey, buildIdKey )
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''

@@ -54,7 +54,7 @@ import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), 
 			  insideLam, workerExists, isNeverInlinePrag
 			)
 import Type		( splitFunTy_maybe, isUnLiftedType )
-import Unique		( Unique, buildIdKey, augmentIdKey, hasKey )
+import PrelNames	( hasKey, buildIdKey, augmentIdKey )
 import Bag
 import Outputable
 

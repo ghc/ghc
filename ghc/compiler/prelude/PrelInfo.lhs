@@ -13,9 +13,6 @@ module PrelInfo (
 			-- if it's used at all then it's Name will be just as
 			-- it is here, unique and all.  Includes all the 
 
-	derivingOccurrences, 	-- For a given class C, this tells what other 
-	derivableClassKeys,	-- things are needed as a result of a 
-				-- deriving(C) clause
 
 
 	
@@ -27,9 +24,10 @@ module PrelInfo (
 
 	-- Random other things
 	maybeCharLikeCon, maybeIntLikeCon,
-	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, 
-	isNoDictClass, isNumericClass, isStandardClass, isCcallishClass, 
-	isCreturnableClass, numericTyKeys, fractionalClassKeys,
+
+	-- Class categories
+	isCcallishClass, isCreturnableClass, isNoDictClass, 
+	isNumericClass, isStandardClass
 
     ) where
 
@@ -47,13 +45,11 @@ import TysWiredIn
 -- others:
 import RdrName		( RdrName )
 import Name		( Name, mkKnownKeyGlobal, getName )
-import Class		( Class, classKey )
 import TyCon		( tyConDataConsIfAvailable, TyCon )
+import Class	 	( Class, classKey )
 import Type		( funTyCon )
 import Bag
 import BasicTypes	( Boxity(..) )
-import Unique		-- *Key stuff
-import UniqFM		( UniqFM, listToUFM )
 import Util		( isIn )
 \end{code}
 
@@ -80,7 +76,7 @@ builtinNames
 	, listToBag (map (getName . mkPrimOpId) allThePrimOps)
 
 		-- Other names with magic keys
-	, listToBag knownKeyNames
+	, listToBag (map mkKnownKeyGlobal knownKeyRdrNames)
 	]
 \end{code}
 
@@ -191,108 +187,6 @@ data_tycons
 %*									*
 %************************************************************************
 
-Ids, Synonyms, Classes and ClassOps with builtin keys. 
-
-\begin{code}
-knownKeyNames :: [Name]
-knownKeyNames
-  = map mkKnownKeyGlobal
-    [
-	-- Type constructors (synonyms especially)
-      (ioTyCon_RDR,		ioTyConKey)
-    , (main_RDR,		mainKey)
-    , (orderingTyCon_RDR,  	orderingTyConKey)
-    , (rationalTyCon_RDR,  	rationalTyConKey)
-    , (ratioDataCon_RDR,   	ratioDataConKey)
-    , (ratioTyCon_RDR,     	ratioTyConKey)
-    , (byteArrayTyCon_RDR, 	byteArrayTyConKey)
-    , (mutableByteArrayTyCon_RDR, mutableByteArrayTyConKey)
-    , (foreignObjTyCon_RDR, 	foreignObjTyConKey)
-    , (bcoPrimTyCon_RDR, 	bcoPrimTyConKey)
-    , (stablePtrTyCon_RDR, 	stablePtrTyConKey)
-    , (stablePtrDataCon_RDR,    stablePtrDataConKey)
-
-	--  Classes.  *Must* include:
-	--  	classes that are grabbed by key (e.g., eqClassKey)
-	--  	classes in "Class.standardClassKeys" (quite a few)
-    , (eqClass_RDR,		eqClassKey)		-- mentioned, derivable
-    , (ordClass_RDR,		ordClassKey)		-- derivable
-    , (boundedClass_RDR, 	boundedClassKey)	-- derivable
-    , (numClass_RDR, 		numClassKey)		-- mentioned, numeric
-    , (enumClass_RDR,		enumClassKey)		-- derivable
-    , (monadClass_RDR,		monadClassKey)
-    , (monadPlusClass_RDR,	monadPlusClassKey)
-    , (functorClass_RDR,	functorClassKey)
-    , (showClass_RDR, 		showClassKey)		-- derivable
-    , (realClass_RDR, 		realClassKey)		-- numeric
-    , (integralClass_RDR,	integralClassKey)	-- numeric
-    , (fractionalClass_RDR,	fractionalClassKey)	-- numeric
-    , (floatingClass_RDR,	floatingClassKey)	-- numeric
-    , (realFracClass_RDR,	realFracClassKey)	-- numeric
-    , (realFloatClass_RDR,	realFloatClassKey)	-- numeric
-    , (readClass_RDR,		readClassKey)		-- derivable
-    , (ixClass_RDR,		ixClassKey)		-- derivable (but it isn't Prelude.Ix; hmmm)
-    , (ccallableClass_RDR, 	cCallableClassKey)	-- mentioned, ccallish
-    , (creturnableClass_RDR, 	cReturnableClassKey)	-- mentioned, ccallish
-
-	-- ClassOps 
-    , (fromInt_RDR,		fromIntClassOpKey)
-    , (fromInteger_RDR,		fromIntegerClassOpKey)
-    , (ge_RDR,			geClassOpKey) 
-    , (minus_RDR,		minusClassOpKey)
-    , (enumFrom_RDR,		enumFromClassOpKey)
-    , (enumFromThen_RDR,	enumFromThenClassOpKey)
-    , (enumFromTo_RDR,		enumFromToClassOpKey)
-    , (enumFromThenTo_RDR,	enumFromThenToClassOpKey)
-    , (fromEnum_RDR,		fromEnumClassOpKey)
-    , (toEnum_RDR,		toEnumClassOpKey)
-    , (eq_RDR,			eqClassOpKey)
-    , (thenM_RDR,		thenMClassOpKey)
-    , (returnM_RDR,		returnMClassOpKey)
-    , (failM_RDR,		failMClassOpKey)
-    , (fromRational_RDR,	fromRationalClassOpKey)
-    
-    , (deRefStablePtr_RDR,	deRefStablePtrIdKey)
-    , (makeStablePtr_RDR,	makeStablePtrIdKey)
-    , (bindIO_RDR,		bindIOIdKey)
-    , (returnIO_RDR,		returnIOIdKey)
-
-	-- Strings and lists
-    , (map_RDR,			mapIdKey)
-    , (append_RDR,		appendIdKey)
-    , (unpackCString_RDR, 	unpackCStringIdKey)
-    , (unpackCStringAppend_RDR,	unpackCStringAppendIdKey)
-    , (unpackCStringFoldr_RDR,	unpackCStringFoldrIdKey)
-    , (unpackCStringUtf8_RDR,  	unpackCStringUtf8IdKey)
-
-	-- List operations
-    , (concat_RDR,		concatIdKey)
-    , (filter_RDR,		filterIdKey)
-    , (zip_RDR,			zipIdKey)
-    , (foldr_RDR,		foldrIdKey)
-    , (build_RDR,		buildIdKey)
-    , (augment_RDR,		augmentIdKey)
-
-	-- FFI primitive types that are not wired-in.
-    , (int8TyCon_RDR,           int8TyConKey)
-    , (int16TyCon_RDR,          int16TyConKey)
-    , (int32TyCon_RDR,          int32TyConKey)
-    , (int64TyCon_RDR,          int64TyConKey)
-    , (word8TyCon_RDR,          word8TyConKey)
-    , (word16TyCon_RDR,         word16TyConKey)
-    , (word32TyCon_RDR,         word32TyConKey)
-    , (word64TyCon_RDR,         word64TyConKey)
-
-	-- Others
-    , (otherwiseId_RDR,		otherwiseIdKey)
-    , (plusInteger_RDR,		plusIntegerIdKey)
-    , (timesInteger_RDR,	timesIntegerIdKey)
-    , (eqString_RDR,		eqStringIdKey)
-    , (assert_RDR,		assertIdKey)
-    , (runSTRep_RDR,		runSTRepIdKey)
-    ]
-\end{code}
-
 ToDo: make it do the ``like'' part properly (as in 0.26 and before).
 
 \begin{code}
@@ -301,69 +195,12 @@ maybeCharLikeCon con = con `hasKey` charDataConKey
 maybeIntLikeCon  con = con `hasKey` intDataConKey
 \end{code}
 
+
 %************************************************************************
 %*									*
-\subsection[Class-std-groups]{Standard groups of Prelude classes}
+\subsection{Class predicates}
 %*									*
 %************************************************************************
-
-@derivableClassKeys@ is also used in checking \tr{deriving} constructs
-(@TcDeriv@).
-
-@derivingOccurrences@ maps a class name to a list of the (qualified) occurrences
-that will be mentioned by  the derived code for the class when it is later generated.
-We don't need to put in things that are WiredIn (because they are already mapped to their
-correct name by the @NameSupply@.  The class itself, and all its class ops, is
-already flagged as an occurrence so we don't need to mention that either.
-
-@derivingOccurrences@ has an item for every derivable class, even if that item is empty,
-because we treat lookup failure as indicating that the class is illegal in a deriving clause.
-
-\begin{code}
-derivingOccurrences :: UniqFM [RdrName]
-derivingOccurrences = listToUFM deriving_occ_info
-
-derivableClassKeys  = map fst deriving_occ_info
-
-deriving_occ_info
-  = [ (eqClassKey, 	[intTyCon_RDR, and_RDR, not_RDR])
-    , (ordClassKey, 	[intTyCon_RDR, compose_RDR, eqTag_RDR])
-				-- EQ (from Ordering) is needed to force in the constructors
-				-- as well as the type constructor.
-    , (enumClassKey, 	[intTyCon_RDR, eq_RDR, ge_RDR, and_RDR, map_RDR, plus_RDR, showsPrec_RDR, append_RDR]) 
-				-- The last two Enum deps are only used to produce better
-				-- error msgs for derived toEnum methods.
-    , (boundedClassKey,	[intTyCon_RDR])
-    , (showClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
-			 showParen_RDR, showSpace_RDR, showList___RDR])
-    , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR,
-                         foldr_RDR, build_RDR,
-                             -- foldr and build required for list comprehension
-                             -- KSW 2000-06
-			 lex_RDR, readParen_RDR, readList___RDR, thenM_RDR])
-			     -- returnM (and the rest of the Monad class decl) 
-			     -- will be forced in as result of depending
-			     -- on thenM.   -- SOF 1/99
-    , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR,
-                         foldr_RDR, build_RDR,
-                             -- foldr and build required for list comprehension used
-                             -- with single constructor types  -- KSW 2000-06
-			 returnM_RDR, failM_RDR])
-			     -- the last two are needed to force returnM, thenM and failM
-			     -- in before typechecking the list(monad) comprehension
-			     -- generated for derived Ix instances (range method)
-			     -- of single constructor types.  -- SOF 8/97
-    ]
-	-- intTyCon: Practically any deriving needs Int, either for index calculations, 
-	--		or for taggery.
-	-- ordClass: really it's the methods that are actually used.
-	-- numClass: for Int literals
-\end{code}
-
-
-NOTE: @Eq@ and @Text@ do need to appear in @standardClasses@
-even though every numeric class has these two as a superclass,
-because the list of ambiguous dictionaries hasn't been simplified.
 
 \begin{code}
 isCcallishClass, isCreturnableClass, isNoDictClass, 
@@ -375,72 +212,4 @@ isCcallishClass	   clas = classKey clas `is_elem` cCallishClassKeys
 isCreturnableClass clas = classKey clas == cReturnableClassKey
 isNoDictClass      clas = classKey clas `is_elem` noDictClassKeys
 is_elem = isIn "is_X_Class"
-
-numericClassKeys =
-	[ numClassKey
-    	, realClassKey
-    	, integralClassKey
-	]
-	++ fractionalClassKeys
-
-fractionalClassKeys = 
-    	[ fractionalClassKey
-    	, floatingClassKey
-    	, realFracClassKey
-    	, realFloatClassKey
-    	]
-
-	-- the strictness analyser needs to know about numeric types
-	-- (see SaAbsInt.lhs)
-numericTyKeys = 
-	[ addrTyConKey
-	, wordTyConKey
-	, intTyConKey
-	, integerTyConKey
-	, doubleTyConKey
-	, floatTyConKey
-	]
-
-needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
-  	[ readClassKey
-    	]
-
-cCallishClassKeys = 
-	[ cCallableClassKey
-	, cReturnableClassKey
-	]
-
-	-- Renamer always imports these data decls replete with constructors
-	-- so that desugarer can always see their constructors.  Ugh!
-cCallishTyKeys = 
-	[ addrTyConKey
-	, wordTyConKey
-	, byteArrayTyConKey
-	, mutableByteArrayTyConKey
-	, foreignObjTyConKey
-	, stablePtrTyConKey
-	, int8TyConKey
-	, int16TyConKey
-	, int32TyConKey
-	, int64TyConKey
-	, word8TyConKey
-	, word16TyConKey
-	, word32TyConKey
-	, word64TyConKey
-	]
-
-standardClassKeys
-  = derivableClassKeys ++ numericClassKeys ++ cCallishClassKeys
-    --
-    -- We have to have "CCallable" and "CReturnable" in the standard
-    -- classes, so that if you go...
-    --
-    --	    _ccall_ foo ... 93{-numeric literal-} ...
-    --
-    -- ... it can do The Right Thing on the 93.
-
-noDictClassKeys 	-- These classes are used only for type annotations;
-			-- they are not implemented by dictionaries, ever.
-  = cCallishClassKeys
 \end{code}
-

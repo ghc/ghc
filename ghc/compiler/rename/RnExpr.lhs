@@ -29,12 +29,12 @@ import RnIfaces		( lookupFixityRn )
 import CmdLineOpts	( opt_GlasgowExts, opt_IgnoreAsserts )
 import Literal		( inIntRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
-import PrelInfo		( eqClass_RDR, 
+import PrelNames	( hasKey, assertIdKey,
+			  eqClass_RDR, foldr_RDR, build_RDR, eqString_RDR,
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
-			  ioDataCon_RDR, plusInteger_RDR, timesInteger_RDR,
-			  foldr_RDR, build_RDR
+			  ioDataCon_RDR, plusInteger_RDR, timesInteger_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
@@ -45,7 +45,6 @@ import NameSet
 import UniqFM		( isNullUFM )
 import FiniteMap	( elemFM )
 import UniqSet		( emptyUniqSet )
-import Unique		( hasKey, assertIdKey )
 import Util		( removeDups )
 import ListSetOps	( unionLists )
 import Maybes		( maybeToBool )
@@ -80,6 +79,10 @@ rnPat (SigPatIn pat ty)
   where
     doc = text "a pattern type-signature"
     
+rnPat (LitPatIn s@(HsString _)) 
+  = lookupOrigName eqString_RDR		`thenRn` \ eq ->
+    returnRn (LitPatIn s, unitFV eq)
+
 rnPat (LitPatIn lit) 
   = litFVs lit		`thenRn` \ fvs ->
     returnRn (LitPatIn lit, fvs) 

@@ -159,8 +159,11 @@ tcGroup unf_env scc
 tcTyClDecl1  :: ValueEnv -> RenamedTyClDecl -> TcM s (Name, TyThingDetails)
 
 tcTyClDecl1 unf_env decl
-  | isClassDecl decl = tcClassDecl1 unf_env decl
-  | otherwise	     = tcTyDecl1 decl
+  = tcAddDeclCtxt decl			$
+    if isClassDecl decl then
+	tcClassDecl1 unf_env decl
+    else
+	tcTyDecl1 decl
 \end{code}
 
 
@@ -473,8 +476,8 @@ tcAddDeclCtxt decl thing_inside
 	= case decl of
 	    (ClassDecl _ name _ _ _ _ _ _ _ _ _ loc) -> (name, loc, "class")
 	    (TySynonym name _ _ loc)	             -> (name, loc, "type synonym")
-	    (TyData NewType  _ name _ _ _ _ _ loc)   -> (name, loc, "data type")
-	    (TyData DataType _ name _ _ _ _ _ loc)   -> (name, loc, "newtype")
+	    (TyData NewType  _ name _ _ _ _ _ loc)   -> (name, loc, "newtype")
+	    (TyData DataType _ name _ _ _ _ _ loc)   -> (name, loc, "data type")
 
      ctxt = hsep [ptext SLIT("In the"), text thing, 
 		  ptext SLIT("declaration for"), quotes (ppr name)]
@@ -497,4 +500,5 @@ pp_cycle str decls
       = hsep [quotes (ppr name), ptext SLIT("at"), ppr (getSrcLoc name)]
      where
         name = tyClDeclName decl
+
 \end{code}
