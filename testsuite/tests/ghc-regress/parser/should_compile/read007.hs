@@ -1,6 +1,6 @@
 module ShouldCompile where
 
-import MyList
+import Read006
 
 myLength :: MyList a -> Int
 myLength Empty = 0

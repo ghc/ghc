@@ -7,20 +7,20 @@ read014.hs:8: Warning: Defined but not used: x
 
 read014.hs:6:
     Warning: No explicit method nor default method for `*'
-	     in an instance declaration for `Num'
+	     In the instance declaration for `Num (a, b)'
 
 read014.hs:6:
     Warning: No explicit method nor default method for `+'
-	     in an instance declaration for `Num'
+	     In the instance declaration for `Num (a, b)'
 
 read014.hs:6:
     Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
+	     In the instance declaration for `Num (a, b)'
 
 read014.hs:6:
     Warning: No explicit method nor default method for `abs'
-	     in an instance declaration for `Num'
+	     In the instance declaration for `Num (a, b)'
 
 read014.hs:6:
     Warning: No explicit method nor default method for `fromInteger'
-	     in an instance declaration for `Num'
+	     In the instance declaration for `Num (a, b)'

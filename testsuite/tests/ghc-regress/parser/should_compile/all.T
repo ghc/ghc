@@ -1,21 +1,25 @@
 
 include ($confdir ++ "/../vanilla-test.T")
 
--- Args to vtc are: extra compile flags
-
 test "read001" { vtc("") }
 test "read002" { vtc("") }
 test "read003" { vtc("") }
 test "read004" { vtc("") }
 test "read005" { vtc("") }
+
+-- these two are really a multi-module test, order is important
 test "read006" { vtc("") }
 test "read007" { vtc("") }
+
 test "read008" { vtc("") }
 test "read009" { vtc("") }
 test "read010" { vtc("") }
 test "read011" { vtc("") }
-test "read012" { vtc("-O -funfold-casms-in-hi-file -fglasgow-exts -ohi T1.hi") }
-test "read013" { vtc("-O -funfold-casms-in-hi-file -fglasgow-exts") }
+
+-- these two are really a multi-module test, order is important
+test "read012" { vtc("-fvia-C -O -funfold-casms-in-hi-file -fglasgow-exts") }
+test "read013" { vtc("-O -fglasgow-exts") }
+
 test "read014" { vtc("-Wall") }
 test "read015" { vtc("") }
 test "read016" { vtc("") }

@@ -1,26 +1,20 @@
 
 include ($confdir ++ "/../vanilla-test.T")
 
--- Args to vtcf are: extra compile flags
-
-def myvtcf ( $extra_compile_args )
-{
-   vtcf ( $extra_compile_args ++ " -ddump-parsed ")
-}
-
-test "read001" { myvtcf("") }
-test "read002" { myvtcf("") }
-test "read003" { myvtcf("") }
-test "read004" { myvtcf("") }
-test "read005" { myvtcf("") }
-test "read006" { myvtcf("") }
-test "read007" { myvtcf("") }
-test "read008" { myvtcf("") }
-test "read009" { myvtcf("") }
-test "read011" { myvtcf("") }
-test "read012" { myvtcf("") }
-test "read013" { myvtcf("-fglasgow-exts") }
-test "read014" { myvtcf("") }
-test "read015" { myvtcf("") }
-test "read016" { myvtcf("") }
-test "read017" { myvtcf("") }
+test "read001" { vtcf("") }
+test "read002" { vtcf("") }
+test "read003" { vtcf("") }
+test "read004" { vtcf("") }
+test "read005" { vtcf("") }
+test "read006" { vtcf("") }
+test "read007" { vtcf("") }
+test "read008" { vtcf("") }
+test "read009" { vtcf("") }
+--test "read010" { vtcf("") }
+test "read011" { vtcf("") }
+test "read012" { vtcf("") }
+test "read013" { vtcf("-fglasgow-exts") }
+test "read014" { vtcf("") }
+test "read015" { vtcf("") }
+test "read016" { vtcf("") }
+test "read017" { vtcf("") }

@@ -2,4 +2,8 @@
 read007.hs:6:
     `+' is not a data constructor
     In the pattern: 2 + 2
-    in a `do' expression pattern binding: (2 + 2) <- 2
+    In a 'do' expression pattern binding: (2 + 2) <- 2
+    In the definition of `f':
+	do
+	  (2 + 2) <- 2
+	  return x
