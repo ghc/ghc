@@ -9,9 +9,13 @@
 
 module PrelAddr (
 	  Addr(..)
-	, nullAddr			-- :: Addr
-	, plusAddr			-- :: Addr -> Int -> Addr
-	, indexAddrOffAddr	        -- :: Addr -> Int -> Addr
+	, AddrOff(..)
+	, nullAddr		-- :: Addr
+	, alignAddr		-- :: Addr -> Int -> Addr
+	, plusAddr		-- :: Addr -> AddrOff -> Addr
+	, minusAddr		-- :: Addr -> Addr -> AddrOff
+
+	, indexAddrOffAddr	-- :: Addr -> Int -> Addr
 
 	, Word(..)
 	, wordToInt
@@ -24,18 +28,30 @@ module PrelAddr (
 import PrelGHC
 import PrelBase
 
-infixl 5 `plusAddr`
+infixl 5 `plusAddr`, `minusAddr`
 \end{code}
 
 \begin{code}
 data Addr = A# Addr# 	deriving (Eq, Ord)
 data Word = W# Word# 	deriving (Eq, Ord)
 
+newtype AddrOff = AddrOff# Int
+
 nullAddr :: Addr
 nullAddr = A# (int2Addr# 0#)
 
-plusAddr :: Addr -> Int -> Addr
-plusAddr (A# addr) (I# off) = A# (int2Addr# (addr2Int# addr +# off))
+alignAddr :: Addr -> Int -> Addr
+alignAddr addr@(A# a) (I# i)
+  = case addr2Int# a	of { ai ->
+    case remInt# ai i	of {
+      0# -> addr;
+      n  -> A# (int2Addr# (ai +# (i -# n))) }}
+
+plusAddr :: Addr -> AddrOff -> Addr
+plusAddr (A# addr) (AddrOff# (I# off)) = A# (int2Addr# (addr2Int# addr +# off))
+
+minusAddr :: Addr -> Addr -> AddrOff
+minusAddr (A# a1) (A# a2) = AddrOff# (I# (addr2Int# a1 -# addr2Int# a2))
 
 instance CCallable Addr
 instance CReturnable Addr
