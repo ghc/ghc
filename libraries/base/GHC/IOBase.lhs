@@ -123,6 +123,11 @@ unsafeInterleaveIO (IO m)
 -- Handle type
 
 data MVar a = MVar (MVar# RealWorld a)
+{- ^
+An 'MVar' (pronounced \"em-var\") is a synchronising variable, used
+for communication between concurrent threads.  It can be thought of
+as a a box, which may be empty or full.
+-}
 
 -- pull in Eq (Mvar a) too, to avoid GHC.Conc being an orphan-instance module
 instance Eq (MVar a) where

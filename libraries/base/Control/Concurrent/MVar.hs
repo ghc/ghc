@@ -6,14 +6,16 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (concurrency)
 --
--- MVars: Synchronising variables
+-- Synchronising variables
 --
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.MVar
-	( MVar		-- abstract
+	( 
+	  -- * @MVar@s
+	  MVar		-- abstract
 	, newEmptyMVar  -- :: IO (MVar a)
 	, newMVar 	-- :: a -> IO (MVar a)
 	, takeMVar 	-- :: MVar a -> IO a
@@ -52,6 +54,10 @@ throw = throwIO
 #endif
 
 #ifdef __GLASGOW_HASKELL__
+{-|
+  This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value
+  from the 'MVar', puts it back, and also returns it.
+-}
 readMVar :: MVar a -> IO a
 readMVar m =
   block $ do
@@ -59,11 +65,17 @@ readMVar m =
     putMVar m a
     return a
 
+-- |Swap the contents of an 'MVar' for a new value.
 swapMVar :: MVar a -> a -> IO a
 swapMVar mvar new = modifyMVar mvar (\old -> return (new,old))
 #endif
 
--- put back the same value, return something
+{-|
+  'withMVar' is a safe wrapper for operating on the contents of an
+  'MVar'.  This operation is exception-safe: it will replace the
+  original contents of the 'MVar' if an exception is raised (see
+  "Control.Exception").
+-}
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io = 
   block $ do
@@ -73,7 +85,11 @@ withMVar m io =
     putMVar m a
     return b
 
--- put back a new value, return ()
+{-|
+  A safe wrapper for modifying the contents of an 'MVar'.  Like 'withMVar', 
+  'modifyMVar' will replace the original contents of the 'MVar' if an
+  exception is raised during the operation.
+-}
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
 modifyMVar_ m io = 
   block $ do
@@ -82,7 +98,10 @@ modifyMVar_ m io =
       	    (\e -> do putMVar m a; throw e)
     putMVar m a'
 
--- put back a new value, return something
+{-|
+  A slight variation on 'modifyMVar_' that allows a value to be
+  returned (@b@) in addition to the modified value of the 'MVar'.
+-}
 modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
 modifyMVar m io = 
   block $ do

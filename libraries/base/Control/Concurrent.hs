@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (concurrency)
 --
 -- A common interface to a collection of useful concurrency
 -- abstractions.
@@ -14,32 +14,61 @@
 -----------------------------------------------------------------------------
 
 module Control.Concurrent (
-	module Control.Concurrent.Chan,
-	module Control.Concurrent.CVar,
-	module Control.Concurrent.MVar,
-	module Control.Concurrent.QSem,
-	module Control.Concurrent.QSemN,
-	module Control.Concurrent.SampleVar,
+	-- * Concurrent Haskell
 
-	forkIO,			-- :: IO () -> IO ()
+	-- $conc_intro
+
+	-- * Basic concurrency operations
+
+        ThreadId,
+	myThreadId,
+
+	forkIO,
+	killThread,
+	throwTo,
+
+	-- * Scheduling
+
+	-- $conc_scheduling	
 	yield,         		-- :: IO ()
 
+	-- ** Blocking
+	
+	-- $blocking
+
 #ifdef __GLASGOW_HASKELL__
-        ThreadId,
-
-	-- Forking and suchlike
-	myThreadId, 		-- :: IO ThreadId
-	killThread,		-- :: ThreadId -> IO ()
-	throwTo,		-- :: ThreadId -> Exception -> IO ()
-
+	-- ** Waiting
 	threadDelay,		-- :: Int -> IO ()
 	threadWaitRead,		-- :: Int -> IO ()
 	threadWaitWrite,	-- :: Int -> IO ()
 #endif
 
-	 -- merging of streams
+	-- * Communication abstractions
+
+	module Control.Concurrent.MVar,
+	module Control.Concurrent.Chan,
+	module Control.Concurrent.QSem,
+	module Control.Concurrent.QSemN,
+	module Control.Concurrent.SampleVar,
+
+	-- * Merging of streams
 	mergeIO,		-- :: [a]   -> [a] -> IO [a]
-	nmergeIO		-- :: [[a]] -> IO [a]
+	nmergeIO,		-- :: [[a]] -> IO [a]
+	-- $merge
+
+	-- * GHC\'s implementation of concurrency
+
+	-- |This section describes features specific to GHC\'s
+	-- implementation of Concurrent Haskell.
+	
+	-- ** Terminating the program
+
+	-- $termination
+
+	-- ** Pre-emption
+
+	-- $preemption
+
     ) where
 
 import Prelude
@@ -60,11 +89,56 @@ import ConcBase
 #endif
 
 import Control.Concurrent.MVar
-import Control.Concurrent.CVar
 import Control.Concurrent.Chan
 import Control.Concurrent.QSem
 import Control.Concurrent.QSemN
 import Control.Concurrent.SampleVar
+
+{- $conc_intro
+
+The concurrency extension for Haskell is described in the paper
+/Concurrent Haskell/
+<http://www.haskell.org/ghc/docs/papers/concurrent-haskell.ps.gz>.
+
+Concurrency is \"lightweight\", which means that both thread creation
+and context switching overheads are extremely low.  Scheduling of
+Haskell threads is done internally in the Haskell runtime system, and
+doesn\'t make use of any operating system-supplied thread packages.
+
+Haskell threads can communicate via 'MVar's, a kind of synchronised
+mutable variable (see "Control.Concurrent.MVar").  Several common
+concurrency abstractions can be built from 'MVar's, and these are
+provided by the "Concurrent" library.  Threads may also communicate
+via exceptions. 
+-}
+
+{- $conc_scheduling
+
+    Scheduling may be either pre-emptive or co-operative,
+    depending on the implementation of Concurrent Haskell (see below
+    for imformation related to specific compilers).  In a co-operative
+    system, context switches only occur when you use one of the
+    primitives defined in this module.  This means that programs such
+    as:
+
+
+>   main = forkIO (write \'a\') >> write \'b\'
+>     where write c = putChar c >> write c
+
+    will print either @aaaaaaaaaaaaaa...@ or @bbbbbbbbbbbb...@,
+    instead of some random interleaving of @a@s and @b@s.  In
+    practice, cooperative multitasking is sufficient for writing
+    simple graphical user interfaces.  
+-}
+
+{- $blocking
+Calling a foreign C procedure (such as @getchar@) that blocks waiting
+for input will block /all/ threads, unless the @threadsafe@ attribute
+is used on the foreign call (and your compiler \/ operating system
+supports it).  GHC\'s I\/O system uses non-blocking I\/O internally to
+implement thread-friendly I\/O, so calling standard Haskell I\/O
+functions blocks only the thead making the call.
+-}
 
 -- Thread Ids, specifically the instances of Eq and Ord for these things.
 -- The ThreadId type itself is defined in std/PrelConc.lhs.
@@ -99,6 +173,11 @@ instance Show ThreadId where
    	showString "ThreadId " . 
         showsPrec d (getThreadId (unsafeCoerce# t))
 
+{- |
+This sparks off a new thread to run the 'IO' computation passed as the
+first argument, and returns the 'ThreadId' of the newly created
+thread.
+-}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s -> 
    case (fork# action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
@@ -128,6 +207,14 @@ max_buff_size = 1
 
 mergeIO :: [a] -> [a] -> IO [a]
 nmergeIO :: [[a]] -> IO [a]
+
+-- $merge
+-- The 'mergeIO' and 'nmergeIO' functions fork one thread for each
+-- input list that concurrently evaluates that list; the results are
+-- merged into a single output list.  
+--
+-- Note: Hugs does not provide these functions, since they require
+-- preemptive multitasking.
 
 mergeIO ls rs
  = newEmptyMVar		       >>= \ tail_node ->
@@ -186,3 +273,96 @@ nmergeIO lss
     return val
   where
     mapIO f xs = sequence (map f xs)
+
+-- ---------------------------------------------------------------------------
+-- More docs
+
+{- $termination
+
+      In a standalone GHC program, only the main thread is
+      required to terminate in order for the process to terminate.
+      Thus all other forked threads will simply terminate at the same
+      time as the main thread (the terminology for this kind of
+      behaviour is \"daemonic threads\").
+
+      If you want the program to wait for child threads to
+      finish before exiting, you need to program this yourself.  A
+      simple mechanism is to have each child thread write to an
+      'MVar' when it completes, and have the main
+      thread wait on all the 'MVar's before
+      exiting:
+
+>   myForkIO :: IO () -> IO (MVar ())
+>   myForkIO io = do
+>     mvar \<- newEmptyMVar
+>     forkIO (io \`finally\` putMVar mvar ())
+>     return mvar
+
+      Note that we use 'finally' from the
+      "Exception" module to make sure that the
+      'MVar' is written to even if the thread dies or
+      is killed for some reason.
+
+      A better method is to keep a global list of all child
+      threads which we should wait for at the end of the program:
+
+>     children :: MVar [MVar ()]
+>     children = unsafePerformIO (newMVar [])
+>     
+>     waitForChildren :: IO ()
+>     waitForChildren = do
+>     	(mvar:mvars) \<- takeMVar children
+>     	putMVar children mvars
+>     	takeMVar mvar
+>     	waitForChildren
+>     
+>     forkChild :: IO () -> IO ()
+>     forkChild io = do
+>     	 mvar \<- newEmptyMVar
+>     	 forkIO (p \`finally\` putMVar mvar ())
+>     	 childs \<- takeMVar children
+>     	 putMVar children (mvar:childs)
+>     
+>     later = flip finally
+>     
+>     main =
+>     	later waitForChildren $
+>     	...
+
+      The main thread principle also applies to calls to Haskell from
+      outside, using @foreign export@.  When the @foreign export@ed
+      function is invoked, it starts a new main thread, and it returns
+      when this main thread terminates.  If the call causes new
+      threads to be forked, they may remain in the system after the
+      @foreign export@ed function has returned.
+-}
+
+{- $preemption
+
+      GHC implements pre-emptive multitasking: the execution of
+      threads are interleaved in a random fashion.  More specifically,
+      a thread may be pre-empted whenever it allocates some memory,
+      which unfortunately means that tight loops which do no
+      allocation tend to lock out other threads (this only seems to
+      happen with pathalogical benchmark-style code, however).
+
+      The rescheduling timer runs on a 20ms granularity by
+      default, but this may be altered using the
+      @-i<n>@ RTS option.  After a rescheduling
+      \"tick\" the running thread is pre-empted as soon as
+      possible.
+
+      One final note: the
+      @aaaa@ @bbbb@ example may not
+      work too well on GHC (see Scheduling, above), due
+      to the locking on a 'Handle'.  Only one thread
+      may hold the lock on a 'Handle' at any one
+      time, so if a reschedule happens while a thread is holding the
+      lock, the other thread won\'t be able to run.  The upshot is that
+      the switch from @aaaa@ to
+      @bbbbb@ happens infrequently.  It can be
+      improved by lowering the reschedule tick period.  We also have a
+      patch that causes a reschedule whenever a thread waiting on a
+      lock is woken up, but haven\'t found it to be useful for anything
+      other than this example :-)
+-}

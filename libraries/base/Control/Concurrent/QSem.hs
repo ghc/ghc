@@ -6,14 +6,15 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (concurrency)
 --
--- General semaphores
+-- Simple quantity semaphores.
 --
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.QSem
-	( QSem,		-- abstract
+	( -- * Simple Quantity Semaphores
+	  QSem,		-- abstract
 	  newQSem,	-- :: Int  -> IO QSem
 	  waitQSem,	-- :: QSem -> IO ()
 	  signalQSem	-- :: QSem -> IO ()
@@ -29,13 +30,17 @@ import Control.Concurrent.MVar
 -- representing threads currently waiting. The counter is a shared
 -- variable, ensuring the mutual exclusion on its access.
 
+-- |A 'QSem' is a simple quantity semaphore, in which the available
+-- \"quantity\" is always dealt with in units of one.
 newtype QSem = QSem (MVar (Int, [MVar ()]))
 
+-- |Build a new 'QSem'
 newQSem :: Int -> IO QSem
 newQSem init = do
    sem <- newMVar (init,[])
    return (QSem sem)
 
+-- |Wait for a unit to become available
 waitQSem :: QSem -> IO ()
 waitQSem (QSem sem) = do
    (avail,blocked) <- takeMVar sem  -- gain ex. access
@@ -55,6 +60,7 @@ waitQSem (QSem sem) = do
      putMVar sem (0, blocked++[block])
      takeMVar block
 
+-- |Signal that a unit of the 'QSem' is available
 signalQSem :: QSem -> IO ()
 signalQSem (QSem sem) = do
    (avail,blocked) <- takeMVar sem

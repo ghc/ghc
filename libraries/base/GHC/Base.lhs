@@ -777,10 +777,7 @@ unpacking the strings of error messages.
 \begin{code}
 unpackCString# :: Addr# -> [Char]
 {-# NOINLINE [1] unpackCString# #-}
-unpackCString# a = unpackCStringList# a
-
-unpackCStringList# :: Addr# -> [Char]
-unpackCStringList# addr 
+unpackCString# addr 
   = unpack 0#
   where
     unpack nh
@@ -849,10 +846,10 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
 
 {-# RULES
 "unpack"       [~1] forall a   . unpackCString# a		   = build (unpackFoldrCString# a)
-"unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCStringList# a
+"unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
--- There's a built-in rule (in GHC.Rules.lhs) for
+-- There's a built-in rule (in PrelRules.lhs) for
 -- 	unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}

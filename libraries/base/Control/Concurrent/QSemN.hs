@@ -6,14 +6,16 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (concurrency)
 --
--- Quantity semaphores
+-- Quantity semaphores in which each thread may wait for an arbitrary
+-- \"amount\".
 --
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.QSemN
-	( QSemN,	-- abstract
+	(  -- * General Quantity Semaphores
+	  QSemN,	-- abstract
 	  newQSemN,	-- :: Int   -> IO QSemN
 	  waitQSemN,	-- :: QSemN -> Int -> IO ()
 	  signalQSemN	-- :: QSemN -> Int -> IO ()
@@ -23,13 +25,17 @@ import Prelude
 
 import Control.Concurrent.MVar
 
+-- |A 'QSemN' is a quantity semaphore, in which the available
+-- \"quantity\" may be signalled or waited for in arbitrary amounts.
 newtype QSemN = QSemN (MVar (Int,[(Int,MVar ())]))
 
+-- |Build a new 'QSemN' with a supplied initial quantity.
 newQSemN :: Int -> IO QSemN 
 newQSemN init = do
    sem <- newMVar (init,[])
    return (QSemN sem)
 
+-- |Wait for the specified quantity to become available
 waitQSemN :: QSemN -> Int -> IO ()
 waitQSemN (QSemN sem) sz = do
   (avail,blocked) <- takeMVar sem   -- gain ex. access
@@ -42,6 +48,7 @@ waitQSemN (QSemN sem) sz = do
      putMVar sem (avail, blocked++[(sz,block)])
      takeMVar block
 
+-- |Signal that a given quantity is now available from the 'QSemN'.
 signalQSemN :: QSemN -> Int  -> IO ()
 signalQSemN (QSemN sem) n = do
    (avail,blocked)   <- takeMVar sem

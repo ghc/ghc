@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (concurrency)
 --
 -- Sample variables
 --
@@ -14,6 +14,7 @@
 
 module Control.Concurrent.SampleVar
        (
+	 -- * Sample Variables
          SampleVar,         -- :: type _ =
  
 	 newEmptySampleVar, -- :: IO (SampleVar a)
@@ -28,20 +29,21 @@ import Prelude
 
 import Control.Concurrent.MVar
 
--- Sample variables are slightly different from a normal MVar:
+-- |
+-- Sample variables are slightly different from a normal 'MVar':
 -- 
---  * Reading an empty SampleVar causes the reader to block.
---    (same as takeMVar on empty MVar)
+--  * Reading an empty 'SampleVar' causes the reader to block.
+--    (same as 'takeMVar' on empty 'MVar')
 -- 
---  * Reading a filled SampleVar empties it and returns value.
---    (same as takeMVar)
+--  * Reading a filled 'SampleVar' empties it and returns value.
+--    (same as 'takeMVar')
 -- 
---  * Writing to an empty SampleVar fills it with a value, and
---    potentially, wakes up a blocked reader (same as for putMVar on
---    empty MVar).
+--  * Writing to an empty 'SampleVar' fills it with a value, and
+--    potentially, wakes up a blocked reader (same as for 'putMVar' on
+--    empty 'MVar').
 --
---  * Writing to a filled SampleVar overwrites the current value.
---    (different from putMVar on full MVar.)
+--  * Writing to a filled 'SampleVar' overwrites the current value.
+--    (different from 'putMVar' on full 'MVar'.)
 
 type SampleVar a
  = MVar (Int,		-- 1  == full
@@ -49,19 +51,20 @@ type SampleVar a
 			-- <0 no of readers blocked
           MVar a)
 
--- Initally, a SampleVar is empty/unfilled.
-
+-- |Build a new, empty, 'SampleVar'
 newEmptySampleVar :: IO (SampleVar a)
 newEmptySampleVar = do
    v <- newEmptyMVar
    newMVar (0,v)
 
+-- |Build a 'SampleVar' with an initial value.
 newSampleVar :: a -> IO (SampleVar a)
 newSampleVar a = do
    v <- newEmptyMVar
    putMVar v a
    newMVar (1,v)
 
+-- |If the SampleVar is full, leave it empty.  Otherwise, do nothing.
 emptySampleVar :: SampleVar a -> IO ()
 emptySampleVar v = do
    (readers, var) <- takeMVar v
@@ -70,22 +73,25 @@ emptySampleVar v = do
     else
      putMVar v (readers,var)
 
+-- |Wait for a value to become available, then take it and return.
+readSampleVar :: SampleVar a -> IO a
+readSampleVar svar = do
 --
 -- filled => make empty and grab sample
 -- not filled => try to grab value, empty when read val.
 --
-readSampleVar :: SampleVar a -> IO a
-readSampleVar svar = do
    (readers,val) <- takeMVar svar
    putMVar svar (readers-1,val)
    takeMVar val
 
+-- |Write a value into the 'SampleVar', overwriting any previous value that
+-- was there.
+writeSampleVar :: SampleVar a -> a -> IO ()
+writeSampleVar svar v = do
 --
 -- filled => overwrite
 -- not filled => fill, write val
 --
-writeSampleVar :: SampleVar a -> a -> IO ()
-writeSampleVar svar v = do
    (readers,val) <- takeMVar svar
    case readers of
      1 -> 

@@ -14,26 +14,26 @@
 module Text.ParserCombinators.ReadP
   ( 
   -- * The 'ReadP' type
-    ReadP      -- :: * -> *; instance Functor, Monad, MonadPlus
+  ReadP,      -- :: * -> *; instance Functor, Monad, MonadPlus
   
   -- * Primitive operations
-  , get        -- :: ReadP Char
-  , look       -- :: ReadP String
-  , (+++)      -- :: ReadP a -> ReadP a -> ReadP a
+  get,        -- :: ReadP Char
+  look,       -- :: ReadP String
+  (+++),      -- :: ReadP a -> ReadP a -> ReadP a
   
   -- * Other operations
-  , pfail      -- :: ReadP a
-  , satisfy    -- :: (Char -> Bool) -> ReadP Char
-  , char       -- :: Char -> ReadP Char
-  , string     -- :: String -> ReadP String
-  , munch      -- :: (Char -> Bool) -> ReadP String
-  , munch1     -- :: (Char -> Bool) -> ReadP String
-  , skipSpaces -- :: ReadP ()
-  , choice     -- :: [ReadP a] -> ReadP a
+  pfail,      -- :: ReadP a
+  satisfy,    -- :: (Char -> Bool) -> ReadP Char
+  char,       -- :: Char -> ReadP Char
+  string,     -- :: String -> ReadP String
+  munch,      -- :: (Char -> Bool) -> ReadP String
+  munch1,     -- :: (Char -> Bool) -> ReadP String
+  skipSpaces, -- :: ReadP ()
+  choice,     -- :: [ReadP a] -> ReadP a
   
   -- * Conversions
-  , readP_to_S -- :: ReadP a -> ReadS a
-  , readS_to_P -- :: ReadS a -> ReadP a
+  readP_to_S, -- :: ReadP a -> ReadS a
+  readS_to_P, -- :: ReadS a -> ReadP a
   )
  where
 

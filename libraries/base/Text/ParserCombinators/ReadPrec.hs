@@ -12,30 +12,31 @@
 -----------------------------------------------------------------------------
 
 module Text.ParserCombinators.ReadPrec
-  ( ReadPrec      -- :: * -> *; instance Functor, Monad, MonadPlus
+  ( 
+  ReadPrec,      -- :: * -> *; instance Functor, Monad, MonadPlus
   
   -- * Precedences
-  , Prec          -- :: *; = Int
-  , minPrec       -- :: Prec; = 0
+  Prec,          -- :: *; = Int
+  minPrec,       -- :: Prec; = 0
 
   -- * Primitive operations
-  , lift          -- :: ReadP a -> ReadPrec a
-  , prec          -- :: Prec -> ReadPrec a -> ReadPrec a
-  , step          -- :: ReadPrec a -> ReadPrec a
-  , reset         -- :: ReadPrec a -> ReadPrec a
+  lift,          -- :: ReadP a -> ReadPrec a
+  prec,          -- :: Prec -> ReadPrec a -> ReadPrec a
+  step,          -- :: ReadPrec a -> ReadPrec a
+  reset,         -- :: ReadPrec a -> ReadPrec a
 
   -- * Other operations
-  , get           -- :: ReadPrec Char
-  , look          -- :: ReadPrec String
-  , (+++)         -- :: ReadPrec a -> ReadPrec a -> ReadPrec a
-  , pfail         -- :: ReadPrec a
-  , choice        -- :: [ReadPrec a] -> ReadPrec a
+  get,           -- :: ReadPrec Char
+  look,          -- :: ReadPrec String
+  (+++),         -- :: ReadPrec a -> ReadPrec a -> ReadPrec a
+  pfail,         -- :: ReadPrec a
+  choice,        -- :: [ReadPrec a] -> ReadPrec a
 
   -- converters
-  , readPrec_to_P -- :: ReadPrec a       -> (Int -> ReadP a)
-  , readP_to_Prec -- :: (Int -> ReadP a) -> ReadPrec a
-  , readPrec_to_S -- :: ReadPrec a       -> (Int -> ReadS a)
-  , readS_to_Prec -- :: (Int -> ReadS a) -> ReadPrec a
+  readPrec_to_P, -- :: ReadPrec a       -> (Int -> ReadP a)
+  readP_to_Prec, -- :: (Int -> ReadP a) -> ReadPrec a
+  readPrec_to_S, -- :: ReadPrec a       -> (Int -> ReadS a)
+  readS_to_Prec, -- :: (Int -> ReadS a) -> ReadPrec a
   )
  where
 
