@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.12 1999/11/18 12:10:25 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.13 1999/12/07 11:49:10 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,6 +32,7 @@
     Ins(i_ALLOC_AP),          \
     Ins(i_ALLOC_PAP),         \
     Ins(i_ALLOC_CONSTR),      \
+    Ins(i_ALLOC_CONSTR_big),  \
     Ins(i_MKAP),              \
     Ins(i_MKAP_big),          \
     Ins(i_MKPAP),             \

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.30 $
- * $Date: 1999/11/29 18:59:42 $
+ * $Revision: 1.31 $
+ * $Date: 1999/12/07 11:49:11 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -693,6 +693,16 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 {
                     StgPtr p;
                     StgInfoTable* info = bcoConstAddr(bco,BCO_INSTR_8);
+                    SSS; p = grabHpNonUpd(sizeW_fromITBL(info)); LLL;
+                    SET_HDR((StgClosure*)p,info,??);
+                    xPushPtr(p);
+                    Continue;
+                }
+            Case(i_ALLOC_CONSTR_big):
+                {
+                    StgPtr p;
+                    int x = BCO_INSTR_16;
+                    StgInfoTable* info = bcoConstAddr(bco,x);
                     SSS; p = grabHpNonUpd(sizeW_fromITBL(info)); LLL;
                     SET_HDR((StgClosure*)p,info,??);
                     xPushPtr(p);

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/16 17:39:10 $
+ * $Revision: 1.12 $
+ * $Date: 1999/12/07 11:49:11 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -91,6 +91,17 @@ static InstrPtr disPC        ( StgBCO *bco, InstrPtr pc, char* i )
 static InstrPtr disInfo   ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgInfoTable* info = bcoConstInfoPtr(bco,bcoInstr(bco,pc++));
+    /* ToDo: print contents of infotable */
+    fprintf(stderr,"%s ",i);
+    printPtr(stgCast(StgPtr,info));
+    return pc;
+}
+
+static InstrPtr disInfo16 ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgWord x = bcoInstr16(bco,pc); 
+    StgInfoTable* info = bcoConstInfoPtr(bco,x);
+    pc+=2;
     /* ToDo: print contents of infotable */
     fprintf(stderr,"%s ",i);
     printPtr(stgCast(StgPtr,info));
@@ -215,6 +226,8 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disInt(bco,pc,"ALLOC_PAP");
     case i_ALLOC_CONSTR:
             return disInfo(bco,pc,"ALLOC_CONSTR");
+    case i_ALLOC_CONSTR_big:
+            return disInfo16(bco,pc,"ALLOC_CONSTR_big");
     case i_MKAP:
             return disIntInt(bco,pc,"MKAP");
     case i_MKAP_big:

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.21 $
- * $Date: 1999/12/07 11:22:56 $
+ * $Revision: 1.22 $
+ * $Date: 1999/12/07 11:49:09 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -751,6 +751,14 @@ static void emit_i_RETADDR ( AsmBCO bco, int arg1 )
    if (arg1 < 256)
       emiti_8 (bco,i_RETADDR,    arg1); else
       emiti_16(bco,i_RETADDR_big,arg1);
+}
+
+static void emit_i_ALLOC_CONSTR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256)
+      emiti_8 (bco,i_ALLOC_CONSTR,    arg1); else
+      emiti_16(bco,i_ALLOC_CONSTR_big,arg1);
 }
 
 
@@ -1548,10 +1556,10 @@ AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info )
     i = asmFindInNonPtrs ( bco, (StgWord)info );
 
     if (i == -1) {
-       emiti_8(bco,i_ALLOC_CONSTR,bco->nps.len);
+       emit_i_ALLOC_CONSTR(bco,bco->nps.len);
        asmWords(bco,AsmInfo,info);
     } else {
-       emiti_8(bco,i_ALLOC_CONSTR,i);
+       emit_i_ALLOC_CONSTR(bco,i);
     }
 
     incSp(bco, sizeofW(StgClosurePtr));
