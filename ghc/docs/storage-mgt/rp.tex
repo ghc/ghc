@@ -23,7 +23,7 @@
 
 \begin{document}
 \title{Implementation of Retainer Profiling}
-\author{Sungwoo Park}
+\author{Sungwoo Park and Simon Peyton-Jones}
 
 \makeatactive
 \maketitle
@@ -63,10 +63,9 @@ graph.
 Figure~\ref{fig-retaineralgorithm} shows the algorithm for retainer
 profiling. The traversal begins at every root, and proceeds 
 in a depth first manner (or a breadth first manner).
-The function @R()@ returns the identity of a given retainer such
-as its memory address, its information table address, or 
-the name of the module 
-which creates it.
+The function @R()@ returns the \emph{identity} of a given retainer such
+as its information table address or
+the name of the module which creates it.
 Notice that the retainer identity function does not need to be a 
 one-to-one mapping:
 multiple objects can share the same identity.
@@ -81,9 +80,15 @@ and all the other retainers can be ignored.
 Thus, the more coarse the function @R()@ is, the less
 it costs to traverse the graph for retainer profiling.
 The function @isRetainer()@ tells whether a given object is a retainer or not.
-Hence, the behavior of the retainer profiling algorithm is determined 
-uniquely by: 1) the set of roots; 2) the function @R()@; 3) the function
+Hence, the behavior of the retainer profiling algorithm is parameterized
+over: 1) the set of roots; 2) the function @R()@; 3) the function
 @isRetainer()@.
+
+One important invariant on the function @R()@ is that its return value
+must be consistent for a given retainer. In other words, @R()@ must return
+the same value for a given retainer no matter it is invoked.
+For this reason, the memory address of a retainer, for instance, cannot be used as
+its retainer identity because its location may change during garbage collections.
 
 \begin{figure}[ht]
 \begin{center}
@@ -122,11 +127,19 @@ To be specific, given the two functions @isRetainer()@ and @R()@,
 the retainer set of every object is computed as the least fixed point
 solution of the following equations:
 \begin{itemize}
-\item For every root @r@, @R(r)@ $\in$ @r.retainerSet@.
-\item For every object @c@, 
+\item For every root @r@, 
+\begin{center}
+  @R(r)@ $\in$ @r.retainerSet@.
+\end{center}
+\item For every reachable object @c@, 
+\begin{center}
 $\bigcup_{\mathit{each\ ancestor\ @a@\ of\ @c@}}$ @from(a)@ $\subseteq$ 
-@c.retainerSet@.
-\item @from(a)@ = if @isRetainer(a)@ then @a.retainerSet@ else $\{@a@\}$.
+@c.retainerSet@ 
+\end{center}
+where @from(a)@ returns retainer(s) obtainable from @a@:
+\begin{center}
+@from(a)@ = if @isRetainer(a)@ then $\{@a@\}$ else @a.retainerSet@.
+\end{center}
 \end{itemize}
 
 This document describes the implementation of retainer profiling on
@@ -135,7 +148,7 @@ It explains every detail of the development so that it can be (hopefully)
 a complete maintenance guide.
 A secondary goal is to help (hopefully) those who wish to extend the system 
 to implement another profiling scheme.\footnote{Unless otherwise mentioned,
-all identifiers are defined in @RetainerProfile.c@}
+all identifiers are defined in @RetainerProfile.c@ or @RetainerSet.c@.}
 
 \section{Installing the GHC}
 
@@ -145,7 +158,8 @@ Installing the GHC is done as follows:
 \item Get the source code from the CVS repository.
 \begin{code}
 ./              cvs checkout fpconfig
-./              cvs checkout fptools
+./fptools/      cvs update -d CONTRIB common-rts distrib docs ghc glafp-utils 
+                    hslibs literate mhms mk nofib testsuite
 \end{code}
 
 \item Set up the basic configuration.
@@ -160,7 +174,6 @@ Installing the GHC is done as follows:
 ./fptools/mk    vi build.mk
     GhcHcOpts = -O -fasm -Rghc-timing
     SplitObjs = NO
-    GhcLibWays = p
     GhcRtsHcOpts = 
     GhcRtsCcOpts = -g
     STRIP =:
@@ -176,7 +189,6 @@ they can be examined with @gdb@.
 
 \item Remove unnecessary files if needed and build everything.
 \begin{code}
-./fptools/      rm dll green-card haggis happy hdirect hood libraries
 ./fptools/      make
 \end{code}
 \end{enumerate}
@@ -185,7 +197,7 @@ they can be examined with @gdb@.
 
 Since every Haskell closure now needs to store its retainer set at runtime, 
 it must be augmented with a new field,
-namely, a emph{retainer set field}.
+namely, a \emph{retainer set field}.
 This section explains how to add such a field to Haskell closures.
 It should be clear how to generalize the idea for adding 
 any number of new fields.\footnote{The GHC provides two 
@@ -243,9 +255,9 @@ of certain types of closures and their layout.
 When building the runtime system, the @gcc@ compiler correctly figures out
 the size of every structure on its own.
 However, 
-the GHC simply reads @includes/Constants.h@ to to determine the size of 
+GHC simply reads @includes/Constants.h@ to to determine the size of 
 closures assumed by the runtime system.
-Thus, we change the constants used by the GHC itself (as opposed to
+Thus, we must change the constants used by the GHC itself (as opposed to
 the runtime system). They are all found in @includes/Constants.h@.
 We increase each of them by 1 to reflect the retainer set field which is one 
 word long:
@@ -261,13 +273,10 @@ is now two words long.
 @StgUpdateFrame@ and @StgSeqFrame@ (in @includes/Closures.h@) in
 words.
 
-Since these constants are used when building the GHC (by another compiler), 
-we must rebuild the GHC. In other words, when executed, the code generated by 
-the GHC must now allocate one more word for the retainer set field than before,
-and hence it is inevitable to rebuild the GHC, which is done as follows:
+Now we must rebuild the GHC so that, when executed, the code generated by 
+the GHC must now allocate one more word for the retainer set field than before.
 
 \begin{code}
-./fptools/ghc/  make clean
 ./fptools/ghc/  make boot
 ./fptools/ghc/  make
 \end{code}
@@ -316,13 +325,16 @@ However, there are six closures types which are not affected by
 If you want a new field to be added to these closures, you may
 have to modify their corresponding structures.
 
-\textbf{To do:} Currently the above changes introduce a new bug in the 
-runtime system. For instance, @nofib/real/symalg@ ends up with a division-by-zero
+\textbf{To do:} Presently the above changes introduce two bug in the 
+runtime system. 
+First, @nofib/real/symalg@ ends up with a division-by-zero
 exception if we add a new field. 
+Second, the runtime system option @-auto-all@ clashes in some test files
+in the @nofib@ testing suite (e.g., @spectral/expert@).
 
 \subsection{Initialization code}
 
-When a new closure is created, its retainer set field may have to be 
+When a new closure is allocated, its retainer set field may have to be 
 initialized according to the way that retainer profiling is implemented.
 For instance, we could use as an initial value a pointer to an empty retainer 
 set. 
@@ -331,9 +343,8 @@ set has not been computed yet, which we adopt in our implementation.
 In either case, we have to visit the new closure and execute some initialization
 code on it so that its retainer set field is set to an appropriate value.
 
-There are four parts in the source code which need to be modified.
+There are three parts in the source code which need to be modified.
 dynamic closure initialization, static closure initialization,  
-closure creation through C function invocation,
 and update frame initialization.
 The first is accomplished by modifying the macro @SET_PROF_HDR()@ (in 
 @include/ClosureMacros.h@). When a closure  @c@ is created at runtime, 
@@ -357,48 +368,41 @@ is initialized, which is rewritten as follows:
         prof : { ccs : ccs_, rs : NULL },
 \end{code}
 
-There is another way of creating dynamic closures through explicit C 
-function invocations at runtime. 
-Such functions are all defined in @RtsAPI.c@: @rts_mkChar()@, @rts_mkInt()@,
-@rts_mkWord()@, and so forth.
-Each function allocates memory for a new closure, 
-initializes it, and returns its address. 
-Therefore, we can simply insert in each function another initialization code 
-for retainer set fields.
-To this end, we define a macro @setRetainerField()@ and insert it 
-in each function:
+\textbf{Obsolete:} Dynamic closures created through explicit C function invocations
+(in @RtsAPI.c@) are now initialized by @SET_HDR()@.
 
-\begin{code}
-#define setRetainerField(p)             \
-  (p)->header.prof.rs = NULL
-\end{code}
-
-For instance, @rts_mkChar()@ is now defined as follows:
-
-\begin{code}
-/* RtsAPI.c */
-HaskellObj
-rts_mkChar (HsChar c)
-{
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
-  ...
-  setRetainerField(p);
-  return p;
-}
-\end{code}
+%There is another way of creating dynamic closures through explicit C 
+%function invocations at runtime. 
+%Such functions are all defined in @RtsAPI.c@: @rts_mkChar()@, @rts_mkInt()@,
+%@rts_mkWord()@, and so forth.
+%Each function allocates memory for a new closure, 
+%initializes it, and returns its address. 
+%Therefore, we can simply insert in each function another initialization code 
+%for retainer set fields.
+%To this end, we define a macro @setRetainerField()@ and insert it 
+%in each function:
+%
+%\begin{code}
+%#define setRetainerField(p)             \
+%  (p)->header.prof.rs = NULL
+%\end{code}
+%
+%For instance, @rts_mkChar()@ is now defined as follows:
+%
+%\begin{code}
+%/* RtsAPI.c */
+%HaskellObj
+%rts_mkChar (HsChar c)
+%{
+%  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+%  ...
+%  setRetainerField(p);
+%  return p;
+%}
+%\end{code}
 
 Finally we may need to initialize the retainer set field of an update frame 
-(stack closure) when it is pushed onto the stack for the first 
-time.\footnote{In our implementation of
-retainer profiling, the retainer set field is not used for any stack closure.
-Hence, the following modification is entirely unnecessary.
-Also, update frames are the only exception to the standard way of creating
-stack closures: all the other types of stack closures with a retainer set 
-field are eventually initialized by
-the macro @SET\_HDR()@ (in @includes/ClosureMacros.h@), which in turn
-invokes @SET\_PROF\_HDR()@. This is not the case for update frames.
-Compare @PUSH\_UPD\_FRAME()@ (in @includes/Updates.h@) and  
-@PUSH\_SEQ\_FRAME()@ (in @includes/StgMacros.h@) for clarification.}
+(stack closure) when it is pushed onto the stack for the first time. 
 For instance, if we want to initialize the retainer set field of update
 frames to a null pointer, we can rewrite the macro @PUSH_STD_CCCS()@ 
 (in @includes/Updates.h@) as follows:
@@ -408,6 +412,17 @@ frames to a null pointer, we can rewrite the macro @PUSH_STD_CCCS()@
 #define PUSH_STD_CCCS(frame)            \
   (frame->header.prof.ccs = CCCS, frame->header.prof.rs = NULL)
 \end{code}
+
+In our implementation of retainer profiling, however, the retainer set field is not 
+used for any stack closure.
+Hence, the above modification is entirely unnecessary.
+Also, update frames are the only exception to the standard way of creating
+stack closures: all the other types of stack closures with a retainer set 
+field are eventually initialized by
+the macro @SET\_HDR()@ (in @includes/ClosureMacros.h@), which in turn
+invokes @SET\_PROF\_HDR()@. This is not the case for update frames.
+Compare @PUSH\_UPD\_FRAME()@ (in @includes/Updates.h@) and  
+@PUSH\_SEQ\_FRAME()@ (in @includes/StgMacros.h@) for clarification.
 
 \section{Retainer Sets}
 
@@ -478,7 +493,34 @@ retainer in the retainer set and none else,
 the cost of @c@ is added to the field @cost@. 
 The field @id@ gives a unique identification number for the retainer set.
 
-We define a \emph{cost function}, which returns the cost of a given closure, 
+The interface to @retainerSet@ is as follows 
+(see @RetainerSet.h@):
+
+\begin{description}
+\item[@void initializeAllRetainerSet(void)@] initializes the store for retainer sets.
+\item[@void refreshAllRetainerSet(void)@] refreshes each retainer set by setting
+its @cost@ field to zero. This function does destroy any retainer set.
+\item[@void closeAllRetainerSet(void)@] destroys all retainer sets and closes
+the store for retainer sets.
+\item[@retainerSet *singleton(retainer r)@] returns a singleton retainer set
+consisting of @r@ alone. If such a retainer set already exists, no new retainer
+set is created. Otherwise, a new retainer set is created.
+\item[@retainerSet *addElement(retainer r, retainerSet *rs)@] returns a retainer set
+@rs@ augmented with @r@. If such a retainer set already exists, no new retainer set
+is created. Otherwise, a new retainer set is created.
+\item[@rtsBool isMember(retainer r, retainerSet *rs)@] returns a boolean value
+indicating whether @r@ is a member of @rs@.
+\item[@void traverseAllRetainerSet(void (*f)(retainerSet *))@] invokes the function
+@f@ on every retainer set created.
+\item[@void printRetainerSetShort(FILE *, retainerSet *)@] prints a single retainer
+set.
+\item[@void outputRetainerSet(FILE *, nat *allCost, nat *numSet)@] prints all 
+retainer sets. Stores the sum of all their costs in @*allCost@ and the number
+of them in @*numSet@.
+\item[@void outputAllRetainerSet(FILE *)@] prints all retainer sets.
+\end{description}
+
+We also define a \emph{cost function}, which returns the cost of a given closure, 
 in order to compute the field @cost@. 
 The cost function can be defined in several ways.
 A typical definition is on the size of a closure, which results in
@@ -751,6 +793,22 @@ live static closure to a correct null value before its destruction.
 This is done by invoking the function 
 @resetStaticObjectForRetainerProfiling()@.
 
+\textbf{To do:} In the current implemenation, if a static closure has no child
+(e.g., @CONSTR_NOCAF_STATIC@, @THUNK_STATIC@ with an empty SRT, and
+@FUN_STATIC@ with an empty SRT), we do not compute its retainer set (because
+there is no need to do). This slight optimization allows us to render 
+retainer profiling no longer dependent on garbage collection due to the
+following propoerty: 
+
+\begin{center}
+A static closure can alternately appear and disappear in the set of live 
+closures across multiple executions of retainer profiling if and only if
+it has an empty SRT and no child.
+\end{center}
+
+Then we can completely eliminate the function 
+@resetStaticObjectForRetainerProfiling()@. 
+
 \subsection{Traversal}
 
 The traversal proceeds in a depth first manner and is implemented
@@ -771,6 +829,16 @@ When it encounters a closure holding a stack chunk, it invokes @retainerStack()@
 on that closure. 
 Hence,
 the traversal is triggered simply by invoking @retainerClosure()@ on every root.
+
+\textbf{To do:} 
+The correctness of retainer profiling is subject to the correctness
+of the two macros @IS_ARG_TAG()@ and @LOOKS_LIKE_GHC_INFO()@
+(see @retainStack()@). Since
+@LOOKS_LIKE_GHC_INFO()@ is a bit precarious macro, so I believe that
+the current implementation may not be quite safe. Also, @scavenge_stack()@
+in @GC.c@ also exploits this macro in order to identify shallow pointers.
+This can be a serious problem if a stack chunk contains some
+word which looks like a pointer but is actually not a pointer.
 
 \subsection{Sanity check}
 
@@ -843,6 +911,10 @@ void printRetainer(FILE *f, retainer cc)
   fprintf(f,"%s[%s]", cc->label, cc->module);
 }
 \end{code}
+
+\textbf{To do:} All the closures created by @rts_mk...()@ in @RtsAPI.c@ are given 
+@CCS_SYSTEM@ as their cost centre stacks. This may not be accurate indeed,
+and, for instance, @CCCS@ may be a better choice than @CCS_SYSTEM@. 
 
 \section{Usage}
 
@@ -969,7 +1041,7 @@ Only three files (@includes/StgRetainerProf.h@, @RetainerProfile.c@, and
 @\includes@ directory:
 
 \begin{description}
-\item[StgRetainerProf.h] defines types @retainer@ and @retainerSet@.
+\item[StgRetainerProf.h] defines types @retainer@ and @retainerSet@. 
 \item[Stg.h] includes the header file @StgRetainerProf.h@.
 \item[Closures.h] changes structure @StgProfHeader@.
 \item[Constants.h] changes constants @PROF_HDR_SIZE@, @SCC_UF_SIZE@, and
@@ -988,6 +1060,8 @@ Only three files (@includes/StgRetainerProf.h@, @RetainerProfile.c@, and
 \item[Updates.hc] changes constant @UPD_FRAME_BITMAP@.
 \item[RetainerProfile.c] implements the retainer profiling engine.
 \item[RetainerProfile.h] is the header for @RetainerProfile.c@.
+\item[RetainerSet.c] implements the abstract datatype @retainerSet@.
+\item[RetainerSet.h] defines the interface for @retainerSet@.
 \item[GC.c] invokes @resetStaticObjectForRetainerProfiling()@ in 
   @GarbageCollect()@.
 \item[Itimer.c] changes @handle_tick()@.
@@ -996,8 +1070,9 @@ Only three files (@includes/StgRetainerProf.h@, @RetainerProfile.c@, and
   @report_ccs_profiling()@.
 \item[Proftimer.c] declares @ticks_to_retainer_profiling@, 
   @performRetainerProfiling@, and @doContextSwitch@.
-\item[Proftimer.h] is the header for @Proftimer.c@.
-\item[RtsAPI.c] implements @setRetainerField()@.
+\item[Proftimer.h] is the header for @Proftimer.c@. Defines @PROFILING_MIN_PERIOD@,
+  which specifies the minimum profiling period and the default profiling period.
+%\item[RtsAPI.c] implements @setRetainerField()@.
 \item[RtsFlags.c] 
   sets @RtsFlags.ProfFlags.doHeapProfile@ and
   adds a string to  @usage_text[]@ in @setupRtsFlags()@.      
