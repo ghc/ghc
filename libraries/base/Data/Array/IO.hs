@@ -164,7 +164,7 @@ hGetArray handle (IOUArray (STUArray l u ptr)) count
 		let remaining = count - copied
 		if remaining > 0 
 		   then do rest <- readChunk fd is_stream ptr copied remaining
-			   return (rest + count)
+			   return (rest + copied)
 		   else return count
 
 readChunk :: FD -> Bool -> RawBuffer -> Int -> Int -> IO Int
