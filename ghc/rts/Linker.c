@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.51 2001/07/20 00:44:33 sof Exp $
+ * $Id: Linker.c,v 1.52 2001/07/20 01:05:11 sof Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -502,6 +502,15 @@ lookupSymbol( char *lbl )
         void* sym;
         for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
            /* fprintf(stderr, "look in %s for %s\n", o_dll->name, lbl); */
+	   if (lbl[0] == '_') {
+	     /* HACK: if the name has an initial underscore, try stripping
+		it off & look that up first. I've yet to verify whether there's
+		a Rule that governs whether an initial '_' *should always* be
+		stripped off when mapping from import lib name to the DLL name.
+	     */
+	     sym = GetProcAddress(o_dll->instance, (lbl+1));
+	     if (sym != NULL) return sym;
+	   }
            sym = GetProcAddress(o_dll->instance, lbl);
            if (sym != NULL) return sym;
         }
