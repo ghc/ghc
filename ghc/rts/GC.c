@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.66 1999/11/09 15:46:49 simonmar Exp $
+ * $Id: GC.c,v 1.67 1999/11/18 16:02:21 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2655,7 +2655,7 @@ void revert_dead_CAFs(void)
            new->link = enteredCAFs;
            enteredCAFs = new;
         } else {
-           ASSERT(0);
+           /* ASSERT(0); */
            SET_INFO(caf,&CAF_UNENTERED_info);
            caf->value = (StgClosure*)0xdeadbeef;
            caf->link  = (StgCAF*)0xdeadbeef;

@@ -1818,12 +1818,15 @@ instance Monad (ST s) where
 -- used when Hugs invokes top level function
 primRunIO :: IO () -> ()
 primRunIO m
-   = protect (fst (unST m realWorld))
+   = protect 5 (fst (unST m realWorld))
      where
         realWorld = error "primRunIO: entered the RealWorld"
-        protect :: () -> ()
-        protect comp 
-           = primCatch comp (\e -> fst (unST (putStr (show e ++ "\n")) realWorld))
+        protect :: Int -> () -> ()
+        protect 0 comp
+           = comp
+        protect n comp
+           = primCatch (protect (n-1) comp)
+                       (\e -> fst (unST (putStr (show e ++ "\n")) realWorld))
 
 trace, trace_quiet :: String -> a -> a
 trace s x

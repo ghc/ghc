@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.28 $
- * $Date: 1999/11/18 12:10:26 $
+ * $Revision: 1.29 $
+ * $Date: 1999/11/18 16:02:18 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1326,14 +1326,10 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
     case CAF_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
         {
-	    /*was StgBlackHole* */
-            StgBlockingQueue* bh = (StgBlockingQueue*)obj;
-            /* Put ourselves on the blocking queue for this black hole and block */
-            cap->rCurrentTSO->link = bh->blocking_queue;
-            bh->blocking_queue = cap->rCurrentTSO;
-            xPushCPtr(obj); /* code to restart with */
-            barf("enter: CAF_BLACKHOLE unexpected!");
-            RETURN(ThreadBlocked);
+            /* Let the scheduler figure out what to do :-) */
+            cap->rCurrentTSO->whatNext = ThreadEnterGHC;
+            xPushCPtr(obj);
+            RETURN(ThreadYielding);
         }
     case AP_UPD:
         {
