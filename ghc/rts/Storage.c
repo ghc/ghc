@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.30 2000/12/11 12:37:00 simonmar Exp $
+ * $Id: Storage.c,v 1.31 2000/12/19 12:51:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -194,21 +194,6 @@ void
 exitStorage (void)
 {
     stat_exit(calcAllocated());
-}
-
-/* -----------------------------------------------------------------------------
-   Setting the heap size.  This function is callable from Haskell (GHC
-   uses it to implement the -H<size> option).
-   -------------------------------------------------------------------------- */
-
-void
-setHeapSize( HsInt size )
-{
-    RtsFlags.GcFlags.heapSizeSuggestion = size / BLOCK_SIZE;
-    if (RtsFlags.GcFlags.heapSizeSuggestion > 
-	RtsFlags.GcFlags.maxHeapSize) {
-	RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
-    }
 }
 
 /* -----------------------------------------------------------------------------
