@@ -386,14 +386,6 @@ initIfaceRnMS mod thing_inside
   = initRnMS emptyRdrEnv emptyNameEnv InterfaceMode $
     setModuleRn mod thing_inside
 
-builtins :: FiniteMap (ModuleName,OccName) Name
-builtins = listToFM wired_in `plusFM` listToFM known_key
-	 where
-	   wired_in = [ ((moduleName (nameModule name), nameOccName name), name)
-		      | name <- wiredInNames ]
-
-	   known_key = [ ((rdrNameModule rdr_name, rdrNameOcc rdr_name), mkKnownKeyGlobal rdr_name uniq) 
-		       | (rdr_name, uniq) <- knownKeyRdrNames ]
 \end{code}
 
 @renameSourceCode@ is used to rename stuff ``out-of-line'';

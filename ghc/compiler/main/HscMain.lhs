@@ -49,6 +49,13 @@ import NativeInfo       ( os, arch )
 import StgInterp	( runStgI )
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{The main compiler pipeline}
+%*									*
+%************************************************************************
+
 \begin{code}
 hscMain
   :: DynFlags	
@@ -223,7 +230,50 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
       = if opt_D_show_passes
 	then \ what -> hPutStr stderr ("*** "++what++":\n")
 	else \ what -> return ()
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Initial persistent state}
+%*									*
+%************************************************************************
+
+\begin{code}
+initPersistentCompilerState :: PersistentCompilerState
+initPersistentCompilerState 
+  = PCS { pcsPST   = initPackageDetails,
+	  pcsInsts = emptyInstEnv,
+	  pcsRules = emptyRuleEnv,
+	  pcsPRS   = initPersistentRenamerState }
+
+initPackageDetails :: PackageSymbolTable
+initPackageDetails = extendTypeEnv emptyModuleEnv (map ATyCon wiredInTyCons)
+
+initPersistentRenamerState :: PersistentRenamerState
+  = PRS { prsNS    = NS { nsNames  = initRenamerNames,
+			  nsIParam = emptyFM },
+	  prsDecls = emptyNameEnv,
+	  prsInsts = emptyBag,
+	  prsRules = emptyBag
+    }
+
+initRenamerNames :: FiniteMap (ModuleName,OccName) Name
+initRenamerNames = grag wiredIn_in `plusFM` listToFM known_key
+	 where
+	   wired_in = [ ((moduleName (nameModule name), nameOccName name), name)
+		      | name <- wiredInNames ]
+
+	   known_key = [ ((rdrNameModule rdr_name, rdrNameOcc rdr_name), mkKnownKeyGlobal rdr_name uniq) 
+		       | (rdr_name, uniq) <- knownKeyRdrNames ]
+
+%************************************************************************
+%*									*
+\subsection{Statistics}
+%*									*
+%************************************************************************
+
+\begin{code}
 ppSourceStats short (HsModule name version exports imports decls _ src_loc)
  = (if short then hcat else vcat)
         (map pp_val

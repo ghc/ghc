@@ -68,6 +68,8 @@ Outside-world interface:
 -- Convenient type synonyms first:
 data TcResults
   = TcResults {
+	tc_prs	   :: PersistentCompilerState,	-- Augmented with imported information,
+						-- (but not stuff from this module)
 	tc_binds   :: TypecheckedMonoBinds,
 	tc_tycons  :: [TyCon],
 	tc_classes :: [Class],
@@ -87,7 +89,7 @@ typecheckModule
 typecheckModule pcs hst mod
   = do { us <- mkSplitUniqSupply 'a' ;
 
-	 env <- initTcEnv gst inst_env ;
+	 env <- initTcEnv global_symbol_table global_inst_env ;
 
 	 (maybe_result, warns, errs) <- initTc us env (tcModule (pcsPRS pcs) mod)
 		
@@ -106,6 +108,10 @@ typecheckModule pcs hst mod
     }
   where
     global_symbol_table = pcsPST pcs `plusModuleEnv` hst
+
+    global_inst_env	= foldModuleEnv (plusInstEnv . instEnv) (pcsInsts pcs) gst
+	-- For now, make the total instance envt by simply
+	-- folding together all the instances we can find anywhere
 \end{code}
 
 The internal monster:
@@ -118,15 +124,15 @@ tcModule prs (HsModule mod_name _ _ _ decls _ src_loc)
   = tcAddSrcLoc src_loc $	-- record where we're starting
 
     fixTc (\ ~(unf_env ,_) ->
-	-- unf_env is used for type-checking interface pragmas
+	-- (unf_env :: TcEnv) is used for type-checking interface pragmas
 	-- which is done lazily [ie failure just drops the pragma
 	-- without having any global-failure effect].
 	-- 
-	-- unf_env is also used to get the pragam info
+	-- unf_env is also used to get the pragama info
 	-- for imported dfuns and default methods
 
 		 -- Type-check the type and class decls
-	tcTyAndClassDecls unf_env decls	`thenTc` \ env ->
+	tcTyAndClassDecls unf_env decls		`thenTc` \ env ->
 	tcSetEnv env $
 
     		 -- Typecheck the instance decls, includes deriving
@@ -183,7 +189,7 @@ tcModule prs (HsModule mod_name _ _ _ decls _ src_loc)
     	tcExtendGlobalValEnv cls_ids		$
 
 	    -- foreign import declarations next.
-	tcForeignImports decls		`thenTc`    \ (fo_ids, foi_decls) ->
+	tcForeignImports decls			`thenTc`    \ (fo_ids, foi_decls) ->
 	tcExtendGlobalValEnv fo_ids		$
 
 	-- Value declarations next.
@@ -192,7 +198,6 @@ tcModule prs (HsModule mod_name _ _ _ decls _ src_loc)
 	    (\ is_rec binds1 (binds2, thing) -> (binds1 `AndMonoBinds` binds2, thing))
 	    (get_val_decls decls `ThenBinds` deriv_binds)
 	    (	tcGetEnv				`thenNF_Tc` \ env ->
-		tcGetUnique				`thenNF_Tc` \ uniq ->
 		returnTc ((EmptyMonoBinds, env), emptyLIE)
 	    )				`thenTc` \ ((val_binds, final_env), lie_valdecls) ->
 	tcSetEnv final_env $
@@ -245,6 +250,8 @@ tcModule prs (HsModule mod_name _ _ _ decls _ src_loc)
 	in
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', really_final_env)  ->
 	tcSetEnv really_final_env	$
+		-- zonkTopBinds puts all the top-level Ids into the tcGEnv
+
 	zonkForeignExports foe_decls    `thenNF_Tc` \ foe_decls' ->
 	zonkRules rules			`thenNF_Tc` \ rules' ->
 

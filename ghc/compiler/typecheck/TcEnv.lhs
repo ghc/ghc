@@ -87,7 +87,7 @@ data TcEnv
   = TcEnv {
 	tcGST  	 :: GlobalSymbolTable,	-- The symbol table at the moment we began this compilation
 
-	tcInst 	 :: InstEnv,		-- All instances (both imported and in this module)
+	tcInsts	 :: InstEnv,		-- All instances (both imported and in this module)
 
 	tcGEnv	 :: NameEnv TyThing	-- The global type environment we've accumulated while
 					-- compiling this module:
@@ -141,10 +141,10 @@ data TcTyThing
 initTcEnv :: GlobalSymbolTable -> InstEnv -> IO TcEnv
 initTcEnv gst inst_env
   = do { gtv_var <- newIORef emptyVarSet
-	 return (TcEnv { tcGST = gst,
-		      	 tcGEnv = emptyNameEnv, 
-		      	 tcInst = inst_env,
-		      	 tcLEnv = emptyNameEnv,
+	 return (TcEnv { tcGST    = gst,
+		      	 tcGEnv   = emptyNameEnv,
+		      	 tcInsts  = inst_env,
+		      	 tcLEnv   = emptyNameEnv,
 		      	 tcTyVars = gtv_var
 	 })}
 
@@ -469,12 +469,12 @@ tcGetGlobalTyVars
 \begin{code}
 tcGetInstEnv :: NF_TcM InstEnv
 tcGetInstEnv = tcGetEnv 	`thenNF_Tc` \ env -> 
-	       returnNF_Tc (tcInst env)
+	       returnNF_Tc (tcInsts env)
 
 tcSetInstEnv :: InstEnv -> TcM a -> TcM a
 tcSetInstEnv ie thing_inside
   = tcGetEnv 	`thenNF_Tc` \ env ->
-    tcSetEnv (env {tcInst = ie}) thing_inside
+    tcSetEnv (env {tcInsts = ie}) thing_inside
 \end{code}    
 
 

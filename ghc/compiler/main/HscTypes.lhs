@@ -22,16 +22,29 @@ A @ModDetails@ summarises everything we know about a compiled module
 \begin{code}
 data ModDetails
    = ModDetails {
+	moduleId      :: Module,
         moduleExports :: Avails,		-- What it exports
         moduleEnv     :: GlobalRdrEnv,		-- Its top level environment
 
         fixityEnv     :: NameEnv Fixity,
 	deprecEnv     :: NameEnv DeprecTxt,
-        typeEnv       :: NameEnv TyThing,	-- TyThing is in TcEnv.lhs
+        typeEnv       :: TypeEnv,
 
         instEnv       :: InstEnv,
-        ruleEnv       :: IdEnv [CoreRule]	-- Domain includes Ids from other modules
+        ruleEnv       :: RuleEnv		-- Domain may include Id from other modules
      }
+
+emptyModDetails :: Module -> ModuleDetails
+emptyModDetails mod
+  = ModDetails { moduleId      = mod,
+		 moduleExports = [],
+		 moduleEnv     = emptyRdrEnv,
+		 fixityEnv     = emptyNameEnv,
+		 deptecEnv     = emptyNameEnv,
+		 typeEnv       = emptyNameEnv,
+		 instEnv       = emptyInstEnv,
+    }		 ruleEnv       = emptyRuleEnv
+		
 \end{code}
 
 Symbol tables map modules to ModDetails:
@@ -55,12 +68,60 @@ lookupFixityEnv tbl name
 	Just details -> case lookupNameEnv (fixityEnv details) name of
 				Just fixity -> fixity
 				Nothing	    -> defaultFixity
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Type environment stuff}
+%*									*
+%************************************************************************
+
+\begin{code}
+type TypeEnv = NameEnv TyThing
+
+data TyThing = AnId   Id
+	     | ATyCon TyCon
+	     | AClass Class
+
+instance NamedThing TyThing where
+  getName (AnId id)   = getName id
+  getName (ATyCon tc) = getName tc
+  getName (AClass cl) = getName cl
+\end{code}
+
+
+\begin{code}
 lookupTypeEnv :: SymbolTable -> Name -> Maybe TyThing
 lookupTypeEnv tbl name
   = case lookupModuleEnv tbl (nameModule name) of
 	Just details -> lookupNameEnv (typeEnv details) name
 	Nothing	     -> Nothing
+
+
+groupTyThings :: [TyThing] -> [(Module, TypeEnv)]
+groupTyThings things
+  = fmToList (foldl add emptyFM things)
+  where
+    add :: FiniteMap Module TypeEnv -> TyThing -> FiniteMap Module TypeEnv
+    add tbl thing = addToFM tbl mod new_env
+		  where
+		    name    = getName thing
+		    mod     = nameModule name
+		    new_env = case lookupFM tbl mod of
+				Nothing  -> unitNameEnv name thing
+				Just env -> extendNameEnv env name thing
+		
+extendTypeEnv :: SymbolTable -> [TyThing] -> SymbolTable
+extendTypeEnv tbl things
+  = foldl add tbl (groupTyThings things)
+  where
+    add tbl (mod,type_env)
+	= extendModuleEnv mod new_details
+	where
+	  new_details = case lookupModuleEnv tbl mod of
+			    Nothing      -> emptyModDetails mod {typeEnv = type_env}
+			    Just details -> details {typeEnv = typeEnv details `plusNameEnv` type_env})
 \end{code}
 
 
@@ -74,10 +135,6 @@ These types are defined here because they are mentioned in ModDetails,
 but they are mostly elaborated elsewhere
 
 \begin{code}
-data TyThing = AnId   Id
-	     | ATyCon TyCon
-	     | AClass Class
-
 type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
 
 type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
@@ -86,6 +143,8 @@ type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name c
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
 type ClsInstEnv = [(TyVarSet, [Type], Id)]	-- The instances for a particular class
+
+type RuleEnv    = IdEnv [CoreRule]
 \end{code}
 
 
@@ -143,6 +202,11 @@ data ModIFace
 data PersistentCompilerState 
    = PCS {
         pcsPST :: PackageSymbolTable,		-- Domain = non-home-package modules
+						--   except that the InstEnv components is empty
+	pcsInsts :: InstEnv			-- The total InstEnv accumulated from all
+						--   the non-home-package modules
+	pcsRules :: RuleEnv			-- Ditto RuleEnv
+
         pcsPRS :: PersistentRenamerState
      }
 \end{code}
@@ -151,10 +215,19 @@ The @PersistentRenamerState@ persists across successive calls to the
 compiler.
 
 It contains:
-  * a name supply, which deals with allocating unique names to
+  * A name supply, which deals with allocating unique names to
     (Module,OccName) original names, 
  
-  * a "holding pen" for declarations that have been read out of
+  * An accumulated InstEnv from all the modules in pcsPST
+    The point is that we don't want to keep recreating it whenever
+    we compile a new module.  The InstEnv component of pcPST is empty.
+    (This means we might "see" instances that we shouldn't "really" see;
+    but the Haskell Report is vague on what is meant to be visible, 
+    so we just take the easy road here.)
+
+  * Ditto for rules
+
+  * A "holding pen" for declarations that have been read out of
     interface files but not yet sucked in, renamed, and typechecked
 
 \begin{code}
@@ -166,8 +239,7 @@ data PersistentRenamerState
     }
 
 data NameSupply
- = NS { nsUniqs  :: UniqSupply,
-	nsNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
+ = NS { nsNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
 	nsIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
    }
 
