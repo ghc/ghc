@@ -18,7 +18,6 @@
 -----------------------------------------------------------------------------
 
 module Data.Bits ( 
-  -- * The 'Bits' class
   Bits(
     (.&.), (.|.), xor, -- :: a -> a -> a
     complement,        -- :: a -> a
@@ -31,11 +30,8 @@ module Data.Bits (
     testBit,           -- :: a -> Int -> Bool
     bitSize,           -- :: a -> Int
     isSigned,          -- :: a -> Bool
-
-    -- * Shifts and rotates
-    -- $shifts
-    shiftL, shiftR,    -- :: Bits a => a -> Int -> a
-    rotateL, rotateR   -- :: Bits a => a -> Int -> a
+    shiftL, shiftR,    -- :: a -> Int -> a
+    rotateL, rotateR   -- :: a -> Int -> a
   )
 
   -- instance Bits Int
@@ -77,23 +73,32 @@ class Num a => Bits a where
     {-| Reverse all the bits in the argument -}
     complement        :: a -> a
 
-    {-| Signed shift the argument left by the specified number of bits.
-	Right shifts are specified by giving a negative value. -}
+    {-| Shift the argument left by the specified number of bits.
+	Right shifts (signed) are specified by giving a negative value.
+
+	An instance can define either this unified 'shift' or 'shiftL' and
+	'shiftR', depending on which is more convenient for the type in
+	question. -}
     shift             :: a -> Int -> a
 
-    -- An instance can define either this unified shift or shiftL+shiftR,
-    -- depending on which is more convenient for the type in question.
     x `shift`   i | i<0  = x `shiftR` (-i)
                   | i==0 = x
                   | i>0  = x `shiftL` i
 
-    {-| Signed rotate the argument left by the specified number of bits.
+    {-| Rotate the argument left by the specified number of bits.
 	Right rotates are specified by giving a negative value.
 
         'rotate' is well defined only if 'bitSize' is also well defined
         ('bitSize' is undefined for 'Integer', for example).
-    -}
+
+	An instance can define either this unified 'rotate' or 'rotateL' and
+	'rotateR', depending on which is more convenient for the type in
+	question. -}
     rotate            :: a -> Int -> a
+
+    x `rotate`  i | i<0  = x `rotateR` (-i)
+                  | i==0 = x
+                  | i>0  = x `rotateL` i
 
     {-
     -- Rotation can be implemented in terms of two shifts, but care is
@@ -138,15 +143,40 @@ class Num a => Bits a where
     x `complementBit` i = x `xor` bit i
     x `testBit` i       = (x .&. bit i) /= 0
 
-    -- $shifts
-    -- These functions might sometimes be more convenient than the unified
-    -- versions 'shift' and 'rotate'.
-    
-    shiftL, shiftR   :: a -> Int -> a
-    rotateL, rotateR :: a -> Int -> a
+    {-| Shift the argument left by the specified number of bits
+	(which must be non-negative).
+
+	An instance can define either this and 'shiftR' or the unified
+	'shift', depending on which is more convenient for the type in
+	question. -}
+    shiftL            :: a -> Int -> a
     x `shiftL`  i = x `shift`  i
+
+    {-| Shift the argument right (signed) by the specified number of bits
+	(which must be non-negative).
+
+	An instance can define either this and 'shiftL' or the unified
+	'shift', depending on which is more convenient for the type in
+	question. -}
+    shiftR            :: a -> Int -> a
     x `shiftR`  i = x `shift`  (-i)
+
+    {-| Rotate the argument left by the specified number of bits
+	(which must be non-negative).
+
+	An instance can define either this and 'rotateR' or the unified
+	'rotate', depending on which is more convenient for the type in
+	question. -}
+    rotateL           :: a -> Int -> a
     x `rotateL` i = x `rotate` i
+
+    {-| Rotate the argument right by the specified number of bits
+	(which must be non-negative).
+
+	An instance can define either this and 'rotateL' or the unified
+	'rotate', depending on which is more convenient for the type in
+	question. -}
+    rotateR           :: a -> Int -> a
     x `rotateR` i = x `rotate` (-i)
 
 #ifdef __GLASGOW_HASKELL__
