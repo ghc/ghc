@@ -1219,7 +1219,11 @@ knownCon :: OutExpr -> AltCon -> [OutExpr]
 	 -> SimplM OutExprStuff
 
 knownCon expr con args bndr alts se cont
-  = tick (KnownBranch bndr)	`thenSmpl_`
+  = 	-- Arguments should be atomic;
+	-- yell if not
+    WARN( not (all exprIsTrivial args), 
+	  text "knownCon" <+> ppr expr )
+    tick (KnownBranch bndr)	`thenSmpl_`
     setSubstEnv se		(
     simplBinder bndr		$ \ bndr' ->
     completeBinding bndr bndr' False False expr $
