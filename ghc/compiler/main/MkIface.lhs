@@ -89,15 +89,18 @@ mkFinalIface :: GhciMode
 --	a) completes the interface
 --	b) writes it out to a file if necessary
 
-mkFinalIface ghci_mode dflags location 
-	     maybe_old_iface new_iface new_details
+mkFinalIface ghci_mode dflags location maybe_old_iface 
+	new_iface@ModIface{ mi_module=mod }
+	new_details@ModDetails{ md_insts=insts, 
+				md_rules=rules,
+				md_types=types }
   = do	{ 
 		-- Add the new declarations, and the is-orphan flag
 	  let iface_w_decls = new_iface { mi_decls = new_decls,
 					  mi_orphan = orphan_mod }
 
 		-- Add version information
-	; let (final_iface, maybe_diffs) = addVersionInfo maybe_old_iface iface_w_decls
+	; let (final_iface, maybe_diffs) = _scc_ "versioninfo" addVersionInfo maybe_old_iface iface_w_decls
 
 		-- Write the interface file, if necessary
 	; when (must_write_hi_file maybe_diffs)
@@ -106,7 +109,8 @@ mkFinalIface ghci_mode dflags location
 		-- Debug printing
 	; write_diffs dflags final_iface maybe_diffs
 
-	; return final_iface }
+	; orphan_mod `seq`
+	  return final_iface }
 
   where
      must_write_hi_file Nothing       = False
@@ -119,10 +123,10 @@ mkFinalIface ghci_mode dflags location
 
      hi_file_path = ml_hi_file location
      new_decls    = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
-     inst_dcls    = map ifaceInstance (md_insts new_details)
-     ty_cls_dcls  = foldNameEnv ifaceTyThing_acc [] (md_types new_details)
-     rule_dcls    = map ifaceRule (md_rules new_details)
-     orphan_mod   = isOrphanModule (mi_module new_iface) new_details
+     inst_dcls    = map ifaceInstance insts
+     ty_cls_dcls  = foldNameEnv ifaceTyThing_acc [] types
+     rule_dcls    = map ifaceRule rules
+     orphan_mod   = isOrphanModule mod new_details
 
 write_diffs :: DynFlags -> ModIface -> Maybe SDoc -> IO ()
 write_diffs dflags new_iface Nothing
