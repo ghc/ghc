@@ -14,7 +14,7 @@ import StgSyn		( SRT(..) )
 import ClosureInfo	( closurePtrsSize,
 			  closureNonHdrSize, closureSMRep,
 			  infoTableLabelFromCI,
-			  infoTblNeedsSRT, getSRTInfo
+			  infoTblNeedsSRT, getSRTInfo, closureSemiTag
 			)
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..), getSMRepClosureTypeInt )
@@ -22,6 +22,7 @@ import Stix		-- all of it
 import UniqSupply	( returnUs, UniqSM )
 import Outputable	( int )
 import BitSet		( intBS )
+import Maybes		( maybeToBool )
 
 import Bits
 import Word
@@ -68,6 +69,8 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 	srt = getSRTInfo cl_info	     
 
 	(srt_label,srt_len)
+           | is_constr
+           = (StInt 0, tag)
            | needs_srt
 	   = case srt of
 		(lbl, SRT off len) -> 
@@ -75,6 +78,10 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
 				(StInt (toInteger off)), len)
            | otherwise
            = (StInt 0, 0)
+
+        maybe_tag = closureSemiTag cl_info
+        is_constr = maybeToBool maybe_tag
+        (Just tag) = maybe_tag
 
 	layout_info :: Word32
 #ifdef WORDS_BIGENDIAN
