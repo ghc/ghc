@@ -8,23 +8,19 @@
   <body BGCOLOR="FFFFFF">
     <h1>The GHC Commentary - The Native Code Generator</h1>
     <p>
-      On x86 and sparc platforms, GHC can generate assembly code
+      On some platforms (currently x86 and PowerPC, with bitrotted
+      support for Sparc and Alpha), GHC can generate assembly code
       directly, without having to go via C.  This can sometimes almost
       halve compilation time, and avoids the fragility and
-      horribleness of the mangler.  The NCG is enabled by default for
-      non-optimising compilation on x86 and sparc.  For most programs
-      it generates code which runs only about 1% slower than that
+      horribleness of the <a href="mangler.html">mangler</a>.  The NCG
+      is enabled by default for
+      non-optimising compilation on supported platforms.  For most programs
+      it generates code which runs only 1-3% slower
+      (depending on platform and type of code) than that
       created by gcc on x86s, so it is well worth using even with
       optimised compilation.  FP-intensive x86 programs see a bigger
-      slowdown, and all sparc code runs about 5% slower due to
+      slowdown, and all Sparc code runs about 5% slower due to
       us not filling branch delay slots.
-    <p>
-      In the distant past
-      the NCG could also generate Alpha code, and that machinery
-      is still there, but will need extensive refurbishment to
-      get it going again, due to underlying infrastructural changes.
-      Budding hackers thinking of doing a PowerPC port would do well
-      to use the sparc bits as a starting point.
     <p>
       The NCG has always been something of a second-class citizen
       inside GHC, an unloved child, rather.  This means that its
@@ -33,8 +29,11 @@
       proper is fairly cleanly designed, as target-independent as it
       reasonably can be, and so should not be difficult to retarget.
     <p>
-      The following details are correct as per the CVS head of end-Jan
-      2002.
+      <b>NOTE!</b> The native code generator was largely rewritten as part
+      of the C-- backend changes, around May 2004.  Unfortunately the
+      rest of this document still refers to the old version, and was written
+      with relation to the CVS head as of end-Jan 2002.  Some of it is relevant,
+      some of it isn't.
 
     <h2>Overview</h2>
       The top-level code generator fn is
