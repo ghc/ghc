@@ -33,4 +33,6 @@ test('TH_bracket1', normal, compile, [''])
 test('TH_bracket2', normal, compile, [''])
 test('TH_bracket3', normal, compile, [''])
 
+test('TH_class1', normal, compile, [''])
+
 test('TH_where', normal, compile_and_run, [''])
