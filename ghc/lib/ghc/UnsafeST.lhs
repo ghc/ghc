@@ -26,11 +26,11 @@ import GHC
 
 
 unsafeInterleaveST :: ST s a -> ST s a
-unsafeInterleaveST (ST m) = ST $ \ s ->
+unsafeInterleaveST (ST m) = ST ( \ s ->
     let
 	(r, new_s) = m s
     in
-    (r, s)
+    (r, s))
 
 unsafePerformPrimIO	:: PrimIO a -> a
 	-- We give a fresh definition here.  There are no
