@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.136 2003/10/08 09:42:34 wolfgang Exp $
+ * $Id: Linker.c,v 1.137 2003/10/08 10:37:25 wolfgang Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -3049,7 +3049,7 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
             if(nundefsym > 0)
             {
 #ifdef USE_MMAP
-                #error ocAllocateJumpIslands_MachO doesn't want USE_MMAP to be defined
+                #error ocAllocateJumpIslands_MachO doesnt want USE_MMAP to be defined
 #else
                 oc->image = stgReallocBytes(
                     image, oc->fileSize + islandSize * nundefsym,
@@ -3467,6 +3467,23 @@ static int ocResolve_MachO(ObjectCode* oc)
     /* Free the local symbol table; we won't need it again. */
     freeHashTable(oc->lochash, NULL);
     oc->lochash = NULL;
+    
+    /*
+        Flush the data & instruction caches.
+        Because the PPC has split data/instruction caches, we have to
+        do that whenever we modify code at runtime.
+    */
+    {
+        int n = (oc->fileSize + islandSize * oc->n_islands) / 4;
+        unsigned long *p = (unsigned long*)oc->image;
+        while(n--)
+        {
+            __asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
+                                : : "r" (p));
+            p++;
+        }
+        __asm__ volatile ("sync\n\tisync");
+    }
     return 1;
 }
 
