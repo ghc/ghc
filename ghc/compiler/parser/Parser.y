@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.31 2000/05/25 12:41:17 simonpj Exp $
+$Id: Parser.y,v 1.32 2000/06/01 08:51:46 simonmar Exp $
 
 Haskell grammar.
 
@@ -607,6 +607,7 @@ scontype :: { (RdrName, [RdrNameBangType]) }
 scontype1 :: { (RdrName, [RdrNameBangType]) }
 	: btype '!' atype		{% splitForConApp $1 [Banged $3] }
 	| scontype1 satype		{ (fst $1, snd $1 ++ [$2] ) }
+        | '(' consym ')' 		{ ($2,[]) }
 
 satype :: { RdrNameBangType }
 	: atype				{ Unbanged $1 }
