@@ -2,7 +2,15 @@
 # Only the first word on each line counts; the rest can be explanation.
 #
 Control.Parallel.Strategies	unused by GHC too
-Data.Generics			foralls in type synonyms
+Data.Generics			imports Data.Generics.*
+Data.Generics.Aliases		imports Data.Generics.Basics
+Data.Generics.Basics		deriving Typeable
+Data.Generics.Counts		imports Data.Generics.Basics
+Data.Generics.Schemes		imports Data.Generics.Basics
+Data.Generics.Shortcuts		imports Data.Generics.Basics
+Data.Generics.Strings		imports Data.Generics.Basics
+Data.Generics.Twins		imports Data.Generics.Basics
+Data.Generics.Types		imports Data.Generics.Basics
 Debug.QuickCheck.Batch		needs pre-emptive concurrency
 Foreign.Concurrent		Haskell finalizers
 System.Posix.Signals
