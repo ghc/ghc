@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.81 2001/06/25 01:35:07 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.82 2001/06/26 16:30:50 rrt Exp $
 --
 -- GHC Driver
 --
@@ -342,7 +342,7 @@ run_phase Cpp basename suff input_fn output_fn
 			    ++ md_c_flags
 			    ++ [ "-x", "c", input_fn, "-o", output_fn ])
 
-	-- ToDo: switch away from using 'echo' alltogether (but need
+	-- ToDo: switch away from using 'echo' altogether (but need
 	-- a faster alternative than what's done below).
 #if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
 	  else (do

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.12 2001/06/14 12:50:06 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.13 2001/06/26 16:30:50 rrt Exp $
 --
 -- GHC Driver
 --
@@ -146,7 +146,7 @@ endMkDependHS = do
      Nothing  -> return ()
      Just hdl -> do
 
-	  -- slurp the rest of the orignal makefile and copy it into the output
+	  -- slurp the rest of the original makefile and copy it into the output
   	let slurp = do
 		l <- hGetLine hdl
 		hPutStrLn tmp_hdl l
@@ -172,7 +172,7 @@ findDependency is_source src imp = do
    dir_contents <- readIORef v_Dep_dir_contents
    ignore_dirs  <- readIORef v_Dep_ignore_dirs
    excl_mods    <- readIORef v_Dep_exclude_mods
-   hisuf <- readIORef v_Hi_suf
+   hisuf        <- readIORef v_Hi_suf
 
    let
      imp_mod      = moduleNameUserString imp
