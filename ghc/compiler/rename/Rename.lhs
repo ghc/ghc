@@ -891,7 +891,7 @@ warnDeprec :: (Name, DeprecTxt) -> RnM d ()
 warnDeprec (name, txt)
   = pushSrcLocRn (getSrcLoc name)	$
     addWarnRn				$
-    sep [ text (occNameFlavour (nameOccName name)) <+> ppr name <+>
+    sep [ text (occNameFlavour (nameOccName name)) <+> quotes (ppr name) <+>
           text "is deprecated:", nest 4 (ppr txt) ]
 
 

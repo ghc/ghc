@@ -529,6 +529,8 @@ isStaticHscFlag f =
 	"fignore-interface-pragmas",
 	"fno-hi-version-check",
 	"dno-black-holing",
+	"fno-method-sharing",
+        "fno-monomorphism-restriction",
 	"fomit-interface-pragmas",
 	"fno-pre-inlining",
 	"fdo-eta-reduction",
