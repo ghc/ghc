@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.29 2002/09/17 12:11:45 simonmar Exp $
+ * $Id: Signals.c,v 1.30 2002/12/05 14:20:55 stolz Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -228,9 +228,13 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
     	break;
 
     case STG_SIG_HAN:
+    case STG_SIG_RST:
     	handlers[sig] = (StgInt)*handler;
 	sigaddset(&userSignals, sig);
     	action.sa_handler = generic_handler;
+	if (spi == STG_SIG_RST) {
+	    action.sa_flags = SA_RESETHAND;
+	}
 	n_haskell_handlers++;
     	break;
 
@@ -243,7 +247,7 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
     else
 	sigemptyset(&action.sa_mask);
 
-    action.sa_flags = sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
+    action.sa_flags |= sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
 
     if (sigaction(sig, &action, NULL) || 
 	sigprocmask(SIG_SETMASK, &osignals, NULL)) 
