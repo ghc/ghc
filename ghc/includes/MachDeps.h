@@ -13,7 +13,7 @@
 #define MACHDEPS_H
 
 /* Sizes of C types come from here... */
-#include "ghcconfig.h"
+#include "ghcautoconf.h"
 
 /* Sizes of Haskell types follow.  These sizes correspond to:
  *   - the number of bytes in the primitive type (eg. Int#)
