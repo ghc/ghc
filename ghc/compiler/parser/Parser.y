@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.103 2002/09/19 12:31:09 simonmar Exp $
+$Id: Parser.y,v 1.104 2002/09/25 12:47:42 simonmar Exp $
 
 Haskell grammar.
 
@@ -746,8 +746,8 @@ safety1 :: { Safety }
 	  -- only needed to avoid conflicts with the DEPRECATED rules
 
 fspec :: { (FastString, RdrName, RdrNameHsType) }
-       : STRING varid '::' sigtype      { ($1      , $2, $4) }
-       |        varid '::' sigtype      { (nilFS, $1, $3) }
+       : STRING var '::' sigtype      { ($1      , $2, $4) }
+       |        var '::' sigtype      { (nilFS, $1, $3) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
