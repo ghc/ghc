@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.12 1999/05/10 08:23:56 sof Exp $
+ * $Id: RtsStartup.c,v 1.13 1999/05/21 14:28:32 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,10 +35,11 @@
  */
 struct RTS_FLAGS RtsFlags;
 
+static int rts_has_started_up = 0;
+
 void
 startupHaskell(int argc, char *argv[])
 {
-    static int rts_has_started_up = 0;
     int i;
 
     /* To avoid repeated initialisations of the RTS */
@@ -139,6 +140,9 @@ startupHaskell(int argc, char *argv[])
 void
 shutdownHaskell(void)
 {
+  if (!rts_has_started_up)
+     return;
+
   /* Finalize any remaining weak pointers */
   finalizeWeakPointersNow();
 
@@ -177,6 +181,8 @@ shutdownHaskell(void)
     The fflush avoids this sad possibility.
    */
   fflush(stdout);
+
+  rts_has_started_up=0;
 }
 
 
