@@ -965,10 +965,10 @@ mkCallUDs f args
 plusUDs :: UsageDetails -> UsageDetails -> UsageDetails
 plusUDs (MkUD {dict_binds = db1, calls = calls1})
 	(MkUD {dict_binds = db2, calls = calls2})
-  = MkUD {dict_binds, calls}
+  = MkUD {dict_binds = d, calls = c}
   where
-    dict_binds = db1    `unionBags`   db2 
-    calls      = calls1 `unionCalls`  calls2
+    d = db1    `unionBags`   db2 
+    c = calls1 `unionCalls`  calls2
 
 plusUDList = foldr plusUDs emptyUDs
 

@@ -178,4 +178,14 @@ import qualified FastString
 # define _CONCAT_     concat
 #endif
 
+#if __HASKELL1__ > 4
+#define FMAP fmap
+#define ISALPHANUM isAlphaNum
+#define IOERROR ioError
+#else
+#define FMAP map
+#define ISALPHANUM isAlphanum
+#define IOERROR fail
+#endif
+
 #endif

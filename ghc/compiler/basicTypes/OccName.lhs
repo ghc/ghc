@@ -38,12 +38,6 @@ module OccName (
 
 #include "HsVersions.h"
 
-#if __HASKELL1__ > 4
-#define ISALPHANUM isAlphaNum
-#else
-#define ISALPHANUM isAlphanum
-#endif
-
 import Char	( isAlpha, isUpper, isLower, ISALPHANUM, ord )
 import Util	( thenCmp )
 import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )

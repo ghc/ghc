@@ -1402,14 +1402,14 @@ catch :: a  -> (b -> a) -> a
 \begin{code}
 primOpInfo CatchOp   
   = let
-	a = alphaTy; a_tv = alphaTyVar;
+	a = alphaTy; a_tv = alphaTyVar
 	b = betaTy;  b_tv = betaTyVar;
     in
     mkGenPrimOp SLIT("catch#") [a_tv, b_tv] [a, mkFunTy b a] a
 
 primOpInfo RaiseOp
   = let
-	a = alphaTy; a_tv = alphaTyVar;
+	a = alphaTy; a_tv = alphaTyVar
 	b = betaTy;  b_tv = betaTyVar;
     in
     mkGenPrimOp SLIT("raise#") [a_tv, b_tv] [a] b

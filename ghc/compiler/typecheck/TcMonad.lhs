@@ -281,7 +281,7 @@ failTc :: TcM s a
 failTc down env = give_up
 
 give_up :: IO a
-give_up = fail (userError "Typecheck failed")
+give_up = IOERROR (userError "Typecheck failed")
 
 failWithTc :: Message -> TcM s a			-- Add an error message and fail
 failWithTc err_msg = failWithTcM (emptyTidyEnv, err_msg)

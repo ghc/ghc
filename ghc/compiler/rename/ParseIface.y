@@ -33,6 +33,10 @@ import Maybes
 import Outputable
 
 import GlaExts
+
+#if __HASKELL1__ > 4
+import Ratio ( (%) )
+#endif
 }
 
 %name	    parseIface

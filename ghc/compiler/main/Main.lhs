@@ -435,7 +435,7 @@ motherShip :: IO SockAddr
 motherShip = do
   he <- getHostByName "laysan.dcs.gla.ac.uk"
   case (hostAddresses he) of
-    []    -> fail (userError "No address!")
+    []    -> IOERROR (userError "No address!")
     (x:_) -> return (SockAddrInet motherShipPort x)
 
 --magick

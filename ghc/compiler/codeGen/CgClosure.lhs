@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.21 1998/12/18 17:40:49 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.22 1999/01/15 15:57:36 simonm Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -438,9 +438,9 @@ Node is guaranteed to point to it, if profiling and not inherited.
 
 \begin{code}
 data IsThunk = IsThunk | IsFunction -- Bool-like, local
---#ifdef DEBUG
+-- #ifdef DEBUG
 	deriving Eq
---#endif
+-- #endif
 
 enterCostCentreCode :: ClosureInfo -> CostCentreStack -> IsThunk -> Code
 

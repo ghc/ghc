@@ -38,7 +38,6 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
 import Util		( removeDups )
 import List		( nub )
-import Char	        ( isAlphanum )
 \end{code}
 
 

@@ -72,6 +72,8 @@ import Bag
 import Maybes
 import IO		( hPutStr, stderr )
 import Outputable
+
+import Ratio 		( numerator, denominator )
 \end{code}
 
 \begin{code}

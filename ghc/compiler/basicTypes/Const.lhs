@@ -37,9 +37,7 @@ import CStrings		( stringToC, charToC, charToEasyHaskell )
 import Outputable
 import Util		( thenCmp )
 
-#if __HASKELL1__ > 4
-import Ratio (numerator, denominator)
-#endif
+import Ratio 		( numerator, denominator )
 \end{code}
 
 

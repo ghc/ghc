@@ -436,13 +436,13 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
    hi_boot_xiffus = "toob-ih." -- .hi-boot reversed.
 
    addModules his@(hi_env, hib_env) nm = fromMaybe his $ 
-        map (\ (mod_nm,v) -> (addToFM_C addNewOne hi_env mod_nm v, hib_env))
+        FMAP (\ (mod_nm,v) -> (addToFM_C addNewOne hi_env mod_nm v, hib_env))
 	    (go xiffus rev_nm)		       `seqMaybe`
 
-        map (\ (mod_nm,v) -> (hi_env, addToFM_C overrideNew hib_env mod_nm v))
+        FMAP (\ (mod_nm,v) -> (hi_env, addToFM_C overrideNew hib_env mod_nm v))
 	    (go hi_boot_version_xiffus rev_nm) `seqMaybe`
 
-	map (\ (mod_nm,v) -> (hi_env, addToFM_C addNewOne hib_env mod_nm v))
+	FMAP (\ (mod_nm,v) -> (hi_env, addToFM_C addNewOne hib_env mod_nm v))
 	    (go hi_boot_xiffus rev_nm)
     where
      rev_nm  = reverse nm
