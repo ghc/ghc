@@ -70,11 +70,12 @@ ghc/Unsafe_HC_OPTS           += -Onot
 
 ghc/PrelBase_HC_OPTS         += -H12m
 ghc/PrelRead_HC_OPTS         += -H12m
-ghc/PrelTup_HC_OPTS          += -H8m
+ghc/PrelTup_HC_OPTS          += -H12m
 ghc/ArrBase_HC_OPTS          += -H8m
 ghc/IOHandle_HC_OPTS         += -H12m
 required/Time_HC_OPTS        += -H8m
 required/Complex_HC_OPTS     += -H10m
+required/IO_HC_OPTS	     += -H12m
 glaExts/Int_HC_OPTS          += -H8m
 glaExts/Word_HC_OPTS         += -H8m
 
