@@ -48,10 +48,15 @@ class  Enum a	where
 
 -- Default methods for bounded enumerations
 enumFromBounded :: (Enum a, Bounded a) => a -> [a]
-enumFromBounded n	  = enumFromTo n maxBound
+enumFromBounded n = map toEnum [fromEnum n .. fromEnum (maxBound `asTypeOf` n)]
 
 enumFromThenBounded :: (Enum a, Bounded a) => a -> a -> [a]
-enumFromThenBounded n1 n2 = enumFromThenTo n1 n2 maxBound
+enumFromThenBounded n1 n2 
+  | i_n2 >= i_n1  = map toEnum [i_n1, i_n2 .. fromEnum (maxBound `asTypeOf` n1)]
+  | otherwise     = map toEnum [i_n1, i_n2 .. fromEnum (minBound `asTypeOf` n1)]
+  where
+    i_n1 = fromEnum n1
+    i_n2 = fromEnum n2
 \end{code}
 
 
@@ -189,7 +194,7 @@ instance  Enum Char  where
     enumFromTo (C# x) (C# y) = build (\ c n -> eftCharFB c n (ord# x) (ord# y))
 
     {-# INLINE enumFromThen #-}
-    enumFromThen (C# x1) (C# x2) = build (\ c n -> efdtCharFB c n (ord# x1) (ord# x2) 255#)
+    enumFromThen (C# x1) (C# x2) = build (\ c n -> efdCharFB c n (ord# x1) (ord# x2))
 
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (C# x1) (C# x2) (C# y) = build (\ c n -> efdtCharFB c n (ord# x1) (ord# x2) (ord# y))
@@ -207,29 +212,58 @@ eftCharList x y | x ># y    = []
 
 
 -- For enumFromThenTo we give up on inlining
-efdtCharFB c n x1 x2 y
-  | delta >=# 0# = go_up x1
-  | otherwise    = go_dn x1
+efdCharFB c n x1 x2
+  | delta >=# 0# = go_up_char_fb c n x1 delta 255#
+  | otherwise    = go_dn_char_fb c n x1 delta 0#
   where
     delta = x2 -# x1
-    go_up x | x ># y    = n
+
+efdCharList x1 x2
+  | delta >=# 0# = go_up_char_list x1 delta 255#
+  | otherwise    = go_dn_char_list x1 delta 0#
+  where
+    delta = x2 -# x1
+
+efdtCharFB c n x1 x2 lim
+  | delta >=# 0# = go_up_char_fb c n x1 delta lim
+  | otherwise    = go_dn_char_fb c n x1 delta lim
+  where
+    delta = x2 -# x1
+
+efdtCharList x1 x2 lim
+  | delta >=# 0# = go_up_char_list x1 delta lim
+  | otherwise    = go_dn_char_list x1 delta lim
+  where
+    delta = x2 -# x1
+
+go_up_char_fb c n x delta lim
+  = go_up x
+  where
+    go_up x | x ># lim  = n
 	    | otherwise	= C# (chr# x) `c` go_up (x +# delta)
-    go_dn x | x <# y    = n
+
+go_dn_char_fb c n x delta lim
+  = go_dn x
+  where
+    go_dn x | x <# lim  = n
 	    | otherwise	= C# (chr# x) `c` go_dn (x +# delta)
 
-efdtCharList x1 x2 y
-  | delta >=# 0# = go_up x1
-  | otherwise    = go_dn x1
+go_up_char_list x delta lim
+  = go_up x
   where
-    delta = x2 -# x1
-    go_up x | x ># y    = []
+    go_up x | x ># lim  = []
 	    | otherwise	= C# (chr# x) : go_up (x +# delta)
-    go_dn x | x <# y    = []
+
+go_dn_char_list x delta lim
+  = go_dn x
+  where
+    go_dn x | x <# lim  = []
 	    | otherwise	= C# (chr# x) : go_dn (x +# delta)
 
 
 {-# RULES
 "eftCharList"	eftCharFB  (:) [] = eftCharList
+"efdCharList"	efdCharFB  (:) [] = efdCharList
 "efdtCharList"	efdtCharFB (:) [] = efdtCharList
  #-}
 \end{code}
@@ -241,6 +275,13 @@ efdtCharList x1 x2 y
 %*							*
 %*********************************************************
 
+Be careful about these instances.  
+	(a) remember that you have to count down as well as up e.g. [13,12..0]
+	(b) be careful of Int overflow
+	(c) remember that Int is bounded, so [1..] terminates at maxInt
+
+Also NB that the Num class isn't available in this module.
+	
 \begin{code}
 instance  Bounded Int where
     minBound =  minInt
@@ -289,44 +330,56 @@ eftIntList x y | x ># y    = []
 -- For enumFromThenTo we give up on inlining; so we don't worry
 -- about duplicating occurrences of "c"
 efdtIntFB c n x1 x2 y
-  | delta >=# 0# = if x1 ># y then n else go_up x1
-  | otherwise    = if x1 <# y then n else go_dn x1
+  | delta >=# 0# = if x1 ># y then n else go_up_int_fb c n x1 delta lim
+  | otherwise    = if x1 <# y then n else go_dn_int_fb c n x1 delta lim 
   where
     delta = x2 -# x1
-    go_up x | y -# x <# delta = I# x `c` n
-	    | otherwise	      = I# x `c` go_up (x +# delta)
-    go_dn x | y -# x ># delta = I# x `c` n
-	    | otherwise	      = I# x `c` go_dn (x +# delta)
+    lim   = y -# delta
 
 efdtIntList x1 x2 y
-  | delta >=# 0# = if x1 ># y then [] else go_up x1
-  | otherwise    = if x1 <# y then [] else go_dn x1
+  | delta >=# 0# = if x1 ># y then [] else go_up_int_list x1 delta lim
+  | otherwise    = if x1 <# y then [] else go_dn_int_list x1 delta lim
   where
     delta = x2 -# x1
-    go_up x | y -# x <# delta = [I# x]
-	    | otherwise	      = I# x : go_up (x +# delta)
-    go_dn x | y -# x ># delta = [I# x]
-	    | otherwise	      = I# x : go_dn (x +# delta)
+    lim   = y -# delta
 
 efdIntFB c n x1 x2
-  | delta >=# 0# = go_up x1
-  | otherwise    = go_dn x1
+  | delta >=# 0# = go_up_int_fb c n x1 delta (  2147483647#  -# delta)
+  | otherwise    = go_dn_int_fb c n x1 delta ((-2147483648#) -# delta)
   where
     delta = x2 -# x1
-    go_up x | 2147483647#    -# x <# delta = I# x `c` n
-	    | otherwise	     		   = I# x `c` go_up (x +# delta)
-    go_dn x | (-2147483648#) -# x ># delta = I# x `c` n
-	    | otherwise	     		   = I# x `c` go_dn (x +# delta)
 
 efdIntList x1 x2
-  | delta >=# 0# = go_up x1
-  | otherwise    = go_dn x1
+  | delta >=# 0# = go_up_int_list x1 delta (  2147483647#  -# delta)
+  | otherwise    = go_dn_int_list x1 delta ((-2147483648#) -# delta)
   where
     delta = x2 -# x1
-    go_up x | 2147483647#    -# x <# delta = [I# x]
-	    | otherwise	                   = I# x : go_up (x +# delta)
-    go_dn x | (-2147483648#) -# x ># delta = [I# x]
-	    | otherwise	     		   = I# x : go_dn (x +# delta)
+
+-- In all of these, the (x +# delta) is guaranteed not to overflow
+
+go_up_int_fb c n x delta lim
+  = go_up x
+  where
+    go_up x | x ># lim  = I# x `c` n
+	    | otherwise = I# x `c` go_up (x +# delta)
+
+go_dn_int_fb c n x delta lim 
+  = go_dn x
+  where
+    go_dn x | x <# lim  = I# x `c` n
+	    | otherwise = I# x `c` go_dn (x +# delta)
+
+go_up_int_list x delta lim
+  = go_up x
+  where
+    go_up x | x ># lim  = [I# x]
+	    | otherwise = I# x : go_up (x +# delta)
+
+go_dn_int_list x delta lim 
+  = go_dn x
+  where
+    go_dn x | x <# lim  = [I# x]
+	    | otherwise = I# x : go_dn (x +# delta)
 
 
 {-# RULES
