@@ -14,7 +14,7 @@ module Linker (
    loadObj,      -- :: String -> IO ()
    unloadObj,    -- :: String -> IO ()
    lookupSymbol, -- :: String -> IO (Maybe (Ptr a))
-   resolveObjs,  -- :: IO ()
+   resolveObjs,  -- :: IO Bool
    addDLL	 -- :: String -> IO (Ptr CChar)
   )  where
 
@@ -53,9 +53,7 @@ unloadObj str = do
 
 resolveObjs = do
    r <- c_resolveObjs
-   if (r == 0)
-	then panic "resolveObjs: failed"
-	else return ()
+   return (r /= 0)  -- returns True <=> success
 
 addDLL path lib = do
    maybe_errmsg <- c_addDLL (packString path) (packString lib)
@@ -80,5 +78,4 @@ foreign import "initLinker" unsafe
 
 foreign import "addDLL" unsafe 
    c_addDLL :: PackedString -> PackedString -> IO (Ptr CChar)
-
 \end{code}
