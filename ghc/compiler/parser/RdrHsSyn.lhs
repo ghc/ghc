@@ -208,6 +208,8 @@ name of the class itself.  This saves recording the names in the interface
 file (which would be equally good).
 
 Similarly for mkConDecl, mkClassOpSig and default-method names.
+
+	*** See "THE NAMING STORY" in HsDecls ****
   
 \begin{code}
 mkClassDecl cxt cname tyvars fds sigs mbinds loc

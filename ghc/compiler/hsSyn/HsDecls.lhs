@@ -116,10 +116,15 @@ instance (NamedThing name, Outputable name, Outputable pat)
 %*									*
 %************************************************************************
 
-Type and class declarations carry 'implicit names'.  In particular:
+		--------------------------------
+			THE NAMING STORY
+		--------------------------------
 
-Type A.  
-~~~~~~~
+Here is the story about the implicit names that go with type, class, and instance
+decls.  It's a bit tricky, so pay attention!
+
+"Implicit" (or "system") binders
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Each data type decl defines 
 	a worker name for each constructor
 	to-T and from-T convertors
@@ -138,25 +143,108 @@ relevant type or class decl.
 
 Plan of attack:
  - Make up their occurrence names immediately
+   This is done in RdrHsSyn.mkClassDecl, mkTyDecl, mkConDecl
 
  - Ensure they "point to" the parent data/class decl 
    when loading that decl from an interface file
+   (See RnHiFiles.getTyClDeclSysNames)
 
  - When renaming the decl look them up in the name cache,
    ensure correct module and provenance is set
 
-Type B: Default methods and dictionary functions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Have their own binding in an interface file.
+Default methods
+~~~~~~~~~~~~~~~
+ - Occurrence name is derived uniquely from the method name
+   E.g. $dmmax
 
-Default methods : occurrence name is derived uniquely from the class decl.
-Dict functions  : occurrence name is derived from the instance decl, plus a unique number.
+ - If there is a default method name at all, it's recorded in
+   the ClassOpSig (in HsBinds), in the DefMeth field.
+   (DefMeth is defined in Class.lhs)
 
-Plan of attack: 
-  - Do *not* make them point to the parent class decl
-  - Interface-file decls: treat just like Type A
-  - Source-file decls:    the names aren't in the decl at all; 
-			  instead the typechecker makes them up
+Source-code class decls and interface-code class decls are treated subtly
+differently, which has given me a great deal of confusion over the years.
+Here's the deal.  (We distinguish the two cases because source-code decls
+have (Just binds) in the tcdMeths field, whereas interface decls have Nothing.
+
+In *source-code* class declarations:
+ - When parsing, every ClassOpSig gets a DefMeth with a suitable RdrName
+   This is done by RdrHsSyn.mkClassOpSigDM
+
+ - The renamer renames it to a Name
+
+ - During typechecking, we generate a binding for each $dm for 
+   which there's a programmer-supplied default method:
+	class Foo a where
+	  op1 :: <type>
+	  op2 :: <type>
+	  op1 = ...
+   We generate a binding for $dmop1 but not for $dmop2.
+   The Class for Foo has a NoDefMeth for op2 and a DefMeth for op1.
+   The Name for $dmop2 is simply discarded.
+
+In *interface-file* class declarations:
+  - When parsing, we see if there's an explicit programmer-supplied default method
+    because there's an '=' sign to indicate it:
+	class Foo a where
+	  op1 = :: <type>	-- NB the '='
+  	  op2   :: <type>
+    We use this info to generate a DefMeth with a suitable RdrName for op1,
+    and a NoDefMeth for op2
+  - The interface file has a separate definition for $dmop1, with unfolding etc.
+  - The renamer renames it to a Name.
+  - The renamer treats $dmop1 as a free variable of the declaration, so that
+    the binding for $dmop1 will be sucked in.  (See RnHsSyn.tyClDeclFVs)  
+    This doesn't happen for source code class decls, because they *bind* the default method.
+
+Dictionary functions
+~~~~~~~~~~~~~~~~~~~~
+Each instance declaration gives rise to one dictionary function binding.
+
+The type checker makes up new source-code instance declarations
+(e.g. from 'deriving' or generic default methods --- see
+TcInstDcls.tcInstDecls1).  So we can't generate the names for
+dictionary functions in advance (we don't know how many we need).
+
+On the other hand for interface-file instance declarations, the decl
+specifies the name of the dictionary function, and it has a binding elsewhere
+in the interface file:
+	instance {Eq Int} = dEqInt
+	dEqInt :: {Eq Int} <pragma info>
+
+So again we treat source code and interface file code slightly differently.
+
+Source code:
+  - Source code instance decls have a Nothing in the (Maybe name) field
+    (see data InstDecl below)
+
+  - The typechecker makes up a Local name for the dict fun for any source-code
+    instance decl, whether it comes from a source-code instance decl, or whether
+    the instance decl is derived from some other construct (e.g. 'deriving').
+
+  - The occurrence name it chooses is derived from the instance decl (just for 
+    documentation really) --- e.g. dNumInt.  Two dict funs may share a common
+    occurrence name, but will have different uniques.  E.g.
+	instance Foo [Int]  where ...
+	instance Foo [Bool] where ...
+    These might both be dFooList
+
+  - The CoreTidy phase globalises the name, and ensures the occurrence name is
+    unique (this isn't special to dict funs).  So we'd get dFooList and dFooList1.
+
+  - We can take this relaxed approach (changing the occurrence name later) 
+    because dict fun Ids are not captured in a TyCon or Class (unlike default
+    methods, say).  Instead, they are kept separately in the InstEnv.  This
+    makes it easy to adjust them after compiling a module.  (Once we've finished
+    compiling that module, they don't change any more.)
+
+
+Interface file code:
+  - The instance decl gives the dict fun name, so the InstDecl has a (Just name)
+    in the (Maybe name) field.
+
+  - RnHsSyn.instDeclFVs treats the dict fun name as free in the decl, so that we
+    suck in the dfun binding
+
 
 \begin{code}
 data TyClDecl name pat

@@ -432,6 +432,9 @@ It's used for both source code (from @availsFromDecl@) and interface files
 It doesn't deal with source-code specific things: @ValD@, @DefD@.  They
 are handled by the sourc-code specific stuff in @RnNames@.
 
+	*** See "THE NAMING STORY" in HsDecls ****
+
+
 \begin{code}
 getTyClDeclBinders
 	:: Module

@@ -241,11 +241,8 @@ data Sig name
 		SrcLoc
 
   | ClassOpSig	name		-- Selector name
-                (DefMeth name)	-- (Just dm_name) for source-file class signatures
-				-- 	The name may not be used, if there isn't a
-				--	generic default method, but it's there if we
-				--	need it
-				-- Gives DefMeth info for interface files sigs
+                (DefMeth name)	-- Default-method info
+				-- See "THE NAMING STORY" in HsDecls
 		(HsType name)
 		SrcLoc
 

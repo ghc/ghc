@@ -117,6 +117,8 @@ In all cases this is set up for interface-file declarations:
 	- for instance decls likewise, plus the pragmas
 	- for rule decls, we ignore HsRules
 
+	*** See "THE NAMING STORY" in HsDecls ****
+
 \begin{code}
 tyClDeclFVs :: RenamedTyClDecl -> NameSet
 tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})

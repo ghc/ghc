@@ -48,6 +48,7 @@ import SrcLoc		( SrcLoc )
 import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
+import Maybes		( maybeToBool )
 import ErrUtils		( Message )
 import CStrings		( isCLabelString )
 import ListSetOps	( removeDupsEq )
@@ -71,7 +72,7 @@ Checks the @(..)@ etc constraints in the export list.
 
 %*********************************************************
 %*							*
-\subsection{Value declarations}
+\subsection{Source code declarations}
 %*							*
 %*********************************************************
 
@@ -90,17 +91,8 @@ rnSourceDecls gbl_env local_fixity_env decls
     go fvs ds' (DeprecD _:ds) = go fvs ds' ds
     go fvs ds' (d:ds)         = rnSourceDecl d	`thenRn` \(d', fvs') ->
 			        go (fvs `plusFV` fvs') (d':ds') ds
-\end{code}
 
 
-%*********************************************************
-%*							*
-\subsection{Value declarations}
-%*							*
-%*********************************************************
-
-\begin{code}
--- rnSourceDecl does all the work
 rnSourceDecl :: RdrNameHsDecl -> RnMS (RenamedHsDecl, FreeVars)
 
 rnSourceDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
@@ -164,6 +156,7 @@ rnSourceDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 
 \begin{code}
 rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
+	-- Used for both source and interface file decls
   = pushSrcLocRn src_loc $
     rnHsSigType (text "an instance decl") inst_ty	`thenRn` \ inst_ty' ->
 
@@ -177,9 +170,11 @@ rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
     returnRn (InstDecl inst_ty' EmptyMonoBinds [] maybe_dfun_name src_loc)
 
 -- Compare rnClassBinds
-rnInstBinds (InstDecl _       mbinds uprags _                   _      )
-	    (InstDecl inst_ty _      _      maybe_dfun_rdr_name src_loc)
-  = let
+rnInstBinds (InstDecl _       mbinds uprags _               _      )
+	    (InstDecl inst_ty _      _      maybe_dfun_name src_loc)
+	-- Used for both source decls only
+  = ASSERT( not (maybeToBool maybe_dfun_name) )	-- Source decl!
+    let
 	meth_doc    = text "the bindings in an instance declaration"
 	meth_names  = collectLocatedMonoBinders mbinds
 	inst_tyvars = case inst_ty of
@@ -210,7 +205,7 @@ rnInstBinds (InstDecl _       mbinds uprags _                   _      )
        renameSigsFVs (okInstDclSig binder_set) uprags
     )							`thenRn` \ (uprags', prag_fvs) ->
 
-    returnRn (InstDecl inst_ty mbinds' uprags' maybe_dfun_rdr_name src_loc,
+    returnRn (InstDecl inst_ty mbinds' uprags' maybe_dfun_name src_loc,
 	      meth_fvs `plusFV` prag_fvs)
 \end{code}
 
@@ -326,6 +321,7 @@ rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLo
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname, 
 		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
 		       tcdSysNames = names, tcdLoc = src_loc})
+	-- Used for both source and interface file decls
   = pushSrcLocRn src_loc $
 
     lookupTopBndrRn cname			`thenRn` \ cname' ->
@@ -395,6 +391,7 @@ rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op dm_stuff ty locn)
     returnRn (ClassOpSig op_name dm_stuff' new_ty locn)
 
 rnClassBinds :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
+	-- Used for source file decls only
 rnClassBinds (ClassDecl {tcdMeths = Just mbinds})		-- Get mbinds from here
  rn_cls_decl@(ClassDecl {tcdTyVars = tyvars, tcdLoc = src_loc})	-- Everything else is here
   -- There are some default-method bindings (abeit possibly empty) so 
