@@ -1,4 +1,4 @@
--- Test that 'hiding' only hides the unqualified name
+-- Test that 'hiding' hides the qualified name too
 
 module Main where
 import Prelude hiding (head)
