@@ -66,7 +66,7 @@ The arguments to 'Option' are:
 
 * list of short option characters
 
-* list of long option strings (without "--")
+* list of long option strings (without \"--\")
 
 * argument descriptor
 
@@ -262,7 +262,7 @@ test order cmdline = case getOpt order options cmdline of
 
 {- $example
 
-To hopefully illuminate the role of the different "GetOpt" data
+To hopefully illuminate the role of the different data
 structures, here\'s the command-line options for a (very simple)
 compiler:
 

@@ -123,7 +123,7 @@ ioToST (IO m) = (ST m)
 -- Unsafe IO operations
 
 {-|
-This is the "back door" into the 'IO' monad, allowing
+This is the \"back door\" into the 'IO' monad, allowing
 'IO' computation to be performed at any time.  For
 this to be safe, the 'IO' computation should be
 free of side effects and independent of its environment.

@@ -236,7 +236,7 @@ evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
 -- 'mapException'
 
 -- | This function maps one exception into another as proposed in the
--- paper "A semantics for imprecise exceptions".
+-- paper \"A semantics for imprecise exceptions\".
 
 -- Notice that the usage of 'unsafePerformIO' is safe here.
 

@@ -113,8 +113,8 @@ doesn't make use of any operating system-supplied thread packages.
 Haskell threads can communicate via 'MVar's, a kind of synchronised
 mutable variable (see "Control.Concurrent.MVar").  Several common
 concurrency abstractions can be built from 'MVar's, and these are
-provided by the "Concurrent" library.  Threads may also communicate
-via exceptions. 
+provided by the "Control.Concurrent" library.  Threads may also
+communicate via exceptions. 
 -}
 
 {- $conc_scheduling
@@ -308,7 +308,7 @@ nmergeIO lss
 >     return mvar
 
       Note that we use 'finally' from the
-      "Exception" module to make sure that the
+      "Control.Exception" module to make sure that the
       'MVar' is written to even if the thread dies or
       is killed for some reason.
 
@@ -357,7 +357,7 @@ nmergeIO lss
 
       The rescheduling timer runs on a 20ms granularity by
       default, but this may be altered using the
-      @-i<n>@ RTS option.  After a rescheduling
+      @-i\<n\>@ RTS option.  After a rescheduling
       \"tick\" the running thread is pre-empted as soon as
       possible.
 

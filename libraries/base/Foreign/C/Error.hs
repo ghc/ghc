@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- C-specific Marshalling support: Handling of C "errno" error codes
+-- C-specific Marshalling support: Handling of C \"errno\" error codes
 --
 -----------------------------------------------------------------------------
 

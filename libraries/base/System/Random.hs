@@ -72,7 +72,7 @@ getClockTime = do t <- readtime nullPtr;  return (TOD (toInteger t) ())
 
 {- $intro
 
-The "Random" library deals with the common task of pseudo-random
+This library deals with the common task of pseudo-random
 number generation. The library makes it possible to generate
 repeatable results, by starting with a specified initial random
 number generator; or to get different results on each run by using the 
@@ -121,8 +121,8 @@ class RandomGen g where
    -- default mathod
    genRange g = (minBound,maxBound)
 
-{- |The "Random" library provides one instance of 'RandomGen', the abstract data
-type 'StdGen'.
+{- |The "System.Random" library provides one instance of 'RandomGen', the
+abstract data type 'StdGen'.
 
 The result of repeatedly using next should be at least as statistically robust
 as the /Minimal Standard Random Number Generator/ described by

@@ -10,9 +10,9 @@
 --
 -- Class of index types.
 --
--- The "Ix" class is used to map a continuous subrange of values in a type onto
+-- The 'Ix' class is used to map a continuous subrange of values in a type onto
 -- integers. It is used primarily for array indexing (see Section 6
--- <http://www.haskell.org/onlinelibrary/array.html#arrays>). The "Ix"
+-- <http://www.haskell.org/onlinelibrary/array.html#arrays>). The 'Ix'
 -- class contains the methods range, index, and inRange. The 'index' operation
 -- maps a bounding pair, which defines the lower and upper bounds of the range,
 -- and a subscript, to an integer. The 'range' operation enumerates all

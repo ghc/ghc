@@ -177,17 +177,17 @@ lexP :: ReadPrec L.Lexeme
 lexP = lift L.lex
 
 paren :: ReadPrec a -> ReadPrec a
--- ^ @(paren p)@ parses "(P0)"
---	where @p@ parses "P0" in precedence context zero
+-- ^ @(paren p)@ parses \"(P0)\"
+--	where @p@ parses \"P0\" in precedence context zero
 paren p = do L.Punc "(" <- lexP
 	     x          <- reset p
 	     L.Punc ")" <- lexP
 	     return x
 
 parens :: ReadPrec a -> ReadPrec a
--- ^ @(parens p)@ parses "P", "(P0)", "((P0))", etc, 
---	where @p@ parses "P"  in the current precedence context
---	        parses "P0" in precedence context zero
+-- ^ @(parens p)@ parses \"P\", \"(P0)\", \"((P0))\", etc, 
+--	where @p@ parses \"P\"  in the current precedence context
+--	        parses \"P0\" in precedence context zero
 parens p = optional
  where
   optional  = p +++ mandatory
@@ -217,7 +217,7 @@ list readx =
 choose :: [(String, ReadPrec a)] -> ReadPrec a
 -- ^ Parse the specified lexeme and continue as specified.
 -- Esp useful for nullary constructors; e.g.
---    @choose [("A", return A), ("B", return B)]@
+--    @choose [(\"A\", return A), (\"B\", return B)]@
 choose sps = foldr ((+++) . try_one) pfail sps
 	   where
 	     try_one (s,p) = do { L.Ident s' <- lexP ;

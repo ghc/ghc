@@ -86,8 +86,8 @@ memory blocks.  The class 'Storable' facilitates this manipulation on
 all types for which it is instantiated, which are the standard basic
 types of Haskell, the fixed size @Int@ types ('Int8', 'Int16',
 'Int32', 'Int64'), the fixed size @Word@ types ('Word8', 'Word16',
-'Word32', 'Word64'), 'StablePtr', all types from "CTypes" and
-"CTypesISO", as well as 'Ptr'.
+'Word32', 'Word64'), 'StablePtr', all types from "Foreign.C.Types",
+as well as 'Ptr'.
 
 Minimal complete definition: 'sizeOf', 'alignment', one of 'peek',
 'peekElemOff' and 'peekByteOff', and one of 'poke', 'pokeElemOff' and

@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- The "Ptr" module provides typed pointers to foreign data.  It is part
+-- This module provides typed pointers to foreign data.  It is part
 -- of the Foreign Function Interface (FFI) and will normally be
 -- imported via the "Foreign" module.
 --
