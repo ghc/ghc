@@ -9,18 +9,16 @@ HS_PROG = haddock.bin
 HsParser_HC_OPTS += -Onot
 HaddockVersion_HC_OPTS = -DHADDOCK_VERSION=$(ProjectVersion)
 
-CSS_FILE = haddock.css
-
 ifeq "$(INSTALLING)" "1"
 ifeq "$(BIN_DIST)"   "1"
-HADDOCKCSS=$$\"\"libdir/haddock/$(CSS_FILE)
+HADDOCKLIB=$$\"\"libdir/haddock
 HADDOCKBIN=$$\"\"libexecdir/$(HS_PROG)
 else
-HADDOCKCSS=$(libdir)/haddock/$(CSS_FILE)
+HADDOCKLIB=$(libdir)/haddock
 HADDOCKBIN=$(libexecdir)/$(HS_PROG)
 endif # BIN_DIST
 else
-HADDOCKCSS=$(FPTOOLS_TOP_ABS)/haddock/html/$(CSS_FILE)
+HADDOCKLIB=$(FPTOOLS_TOP_ABS)/haddock/html
 HADDOCKBIN=$(FPTOOLS_TOP_ABS)/haddock/src/$(HS_PROG)
 endif
 
@@ -40,7 +38,7 @@ SCRIPT_OBJS=haddock.sh
 
 INTERP=$(SHELL)
 
-SCRIPT_SUBST_VARS = HADDOCKCSS HADDOCKBIN
+SCRIPT_SUBST_VARS = HADDOCKLIB HADDOCKBIN
 
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
 INSTALL_LIBEXECS = $(HS_PROG)

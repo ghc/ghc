@@ -1,10 +1,7 @@
 # Mini-driver for Haddock
 
 # needs the following variables:
-#	HADDOCKCSS
+#	HADDOCKLIB
 #	HADDOCKBIN
 
-case $* in
-*--css*) $HADDOCKBIN ${1+"$@"};;
-*)       $HADDOCKBIN --css $HADDOCKCSS ${1+"$@"};;
-esac
+$HADDOCKBIN --lib $HADDOCKLIB ${1+"$@"}

@@ -50,6 +50,7 @@ data Flag
   | Flag_Heading String
   | Flag_SourceURL String
   | Flag_CSS String
+  | Flag_Lib String
   | Flag_OutputDir FilePath
   deriving (Eq)
 
@@ -68,7 +69,9 @@ options =
     Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
 	"be verbose",
     Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
-	"The CSS file to use for HTML output"
+	"The CSS file to use for HTML output",
+    Option []  ["lib"]         (ReqArg Flag_Lib "DIR") 
+	"Directory containing Haddock's auxiliary files"
   ]
 
 saved_flags :: IORef [Flag]
@@ -83,9 +86,13 @@ run flags files = do
 			[] -> Nothing
 			(t:ts) -> Just t
 
-  css_file <- case [str | Flag_CSS str <- flags] of
-		[] -> dieMsg "no --css option"
+  libdir <- case [str | Flag_Lib str <- flags] of
+		[] -> dieMsg "no --lib option"
 		fs -> return (last fs)
+
+  let css_file = case [str | Flag_CSS str <- flags] of
+			[] -> Nothing
+			fs -> Just (last fs)
 
   odir <- case [str | Flag_OutputDir str <- flags] of
 		[] -> return "."
@@ -107,7 +114,7 @@ run flags files = do
     putStr (ppDocBook odir mod_ifaces)
 
   when (Flag_Html `elem` flags) $
-    ppHtml title source_url mod_ifaces odir css_file
+    ppHtml title source_url mod_ifaces odir css_file libdir
 
 
 parse_file file = do
@@ -292,6 +299,15 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 	= [ ExportGroup lev "" doc ]
 	where (doc, _names) = formatDocHeading (lookupForDoc env) str
 	-- ToDo: report the unresolved names
+    lookupExport (HsEDoc str)
+	= [ ExportDoc doc ]
+	where (doc, _names) = formatDocString (lookupForDoc env) str
+	-- ToDo: report the unresolved names
+    lookupExport (HsEDocNamed str)
+	| Just found <- findNamedDoc str decls
+	= let (doc, _names) = formatDocString (lookupForDoc env) found in
+	  [ ExportDoc doc ]
+	
     lookupExport _ = [] -- didn't find it?
 
     fullContentsOf m
@@ -552,3 +568,20 @@ moduleHeaderRE = mkRegexWithOpts
 	-- rest of the module documentation - we might want to revist
 	-- this at some point (perhaps have a separator between the 
 	-- portability field and the module documentation?).
+
+-- -----------------------------------------------------------------------------
+-- Named documentation
+
+findNamedDoc :: String -> [HsDecl] -> Maybe String
+findNamedDoc str decls = 
+  case matchRegex docNameRE str of
+     Just (name:_) -> search decls
+	where search [] = Nothing
+	      search (HsDocCommentNamed str : rest) = 
+		case matchRegexAll docNameRE str of
+		   Nothing -> search rest
+		   Just (_, _, after, _, _) -> Just after
+	      search (_other_decl : rest) = search rest
+     _other -> Nothing
+
+docNameRE = mkRegex "[ \t]*([A-Za-z0-9_]*)"

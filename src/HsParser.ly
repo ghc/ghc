@@ -1,5 +1,5 @@
 q-----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.3 2002/04/24 15:57:47 simonmar Exp $
+$Id: HsParser.ly,v 1.4 2002/04/25 14:40:05 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -69,6 +69,7 @@ Docs
 
 >	DOCNEXT    { DocCommentNext $$ }
 >	DOCPREV    { DocCommentPrev $$ }
+>	DOCNAMED   { DocCommentNamed $$ }
 >	DOCGROUP   { DocSection _ _ }
 
 Symbols
@@ -185,6 +186,8 @@ The Export List
 > exportlist :: { [HsExportSpec] }
 >	:  export ',' exportlist		{ $1 : $3 }
 >	|  docgroup exportlist			{ $1 : $2 }
+>	|  DOCNAMED exportlist			{ HsEDocNamed $1 : $2 }
+>	|  DOCNEXT  exportlist			{ HsEDoc $1 : $2 }
 > 	|  ',' exportlist			{ $2 }
 >	|  export				{ [$1] }
 > 	|  {- empty -}				{ [] }
@@ -324,6 +327,7 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| valdef			{ $1 }
 >	| DOCNEXT			{ HsDocCommentNext $1 }
 >	| DOCPREV			{ HsDocCommentPrev $1 }
+>	| DOCNAMED			{ HsDocCommentNamed $1 }
 >	| DOCGROUP			{ case $1 of { DocSection i s -> 
 >							HsDocGroup i s } }
 

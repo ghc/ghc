@@ -69,6 +69,9 @@ renameExportList spec = mapM renameExport spec
 	     lookupRn (\x' -> HsEThingWith x' cs') x
     renameExport (HsEModuleContents m) = return (HsEModuleContents m)
     renameExport (HsEGroup lev str) = return (HsEGroup lev str)
+    renameExport (HsEDoc str) = return (HsEDoc str)
+    renameExport (HsEDocNamed str) = return (HsEDocNamed str)
+
 
 renameDecl :: HsDecl -> RnM HsDecl
 renameDecl decl
@@ -197,3 +200,6 @@ renameExportItems items = mapM rn items
 	rn (ExportDecl decl)
 	   = do decl <- renameDecl decl
 		return (ExportDecl decl)
+	rn (ExportDoc doc)
+	   = do doc <- renameDoc doc
+		return (ExportDoc doc)

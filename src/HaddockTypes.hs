@@ -72,6 +72,9 @@ data ExportItem
 	String		-- section "id" (for hyperlinks)
 	Doc		-- section heading text
 
+  | ExportDoc		-- some documentation
+	Doc
+
 type ModuleMap = FiniteMap Module Interface
 
 -- -----------------------------------------------------------------------------

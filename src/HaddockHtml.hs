@@ -22,26 +22,39 @@ import Html
 import qualified Html
 
 -- -----------------------------------------------------------------------------
+-- Files we need to copy from our $libdir
+
+cssFile  = "haddock.css"
+iconFile = "haskell_icon.gif"
+
+-- -----------------------------------------------------------------------------
 -- Generating HTML documentation
 
 ppHtml	:: String
 	-> Maybe String
 	-> [(Module, Interface)]
 	-> FilePath			-- destination directory
-	-> String			-- CSS file
+	-> Maybe String			-- CSS file
+	-> String			-- $libdir
 	-> IO ()
-ppHtml title source_url ifaces odir css_file =  do
+ppHtml title source_url ifaces odir maybe_css libdir =  do
   let 
-	(_css_dir, css_basename, css_suff) = splitFilename3 css_file
-	css_filename = css_basename ++ '.':css_suff
-	css_destination = odir ++ pathSeparator:css_filename
+	css_file = case maybe_css of
+			Nothing -> libdir ++ pathSeparator:cssFile
+			Just f  -> f
+	css_destination = odir ++ pathSeparator:cssFile
+
+	icon_file        = libdir ++ pathSeparator:iconFile
+	icon_destination = odir   ++ pathSeparator:iconFile
 
   css_contents <- readFile css_file
   writeFile css_destination css_contents
+  icon_contents <- readFile icon_file
+  writeFile icon_destination icon_contents
 
-  ppHtmlContents odir css_filename title source_url (map fst ifaces)
-  ppHtmlIndex odir css_filename title ifaces
-  mapM_ (ppHtmlModule odir css_filename title source_url) ifaces
+  ppHtmlContents odir title source_url (map fst ifaces)
+  ppHtmlIndex odir title ifaces
+  mapM_ (ppHtmlModule odir title source_url) ifaces
 
 moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mod = mod ++ ".html" -- ToDo: Z-encode filename?
@@ -134,13 +147,13 @@ moduleInfo iface
 -- ---------------------------------------------------------------------------
 -- Generate the module contents
 
-ppHtmlContents :: FilePath -> String -> String -> Maybe String -> [Module]
+ppHtmlContents :: FilePath -> String -> Maybe String -> [Module]
    -> IO ()
-ppHtmlContents odir css_filename title source_url mods = do
+ppHtmlContents odir title source_url mods = do
   let tree = mkModuleTree mods  
       html = 
 	header (thetitle (toHtml title) +++
-		thelink ! [href css_filename, 
+		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -195,11 +208,11 @@ splitModule (Module mod) = split mod
 -- ---------------------------------------------------------------------------
 -- Generate the index
 
-ppHtmlIndex :: FilePath -> String -> String -> [(Module,Interface)] -> IO ()
-ppHtmlIndex odir css_filename title ifaces = do
+ppHtmlIndex :: FilePath -> String -> [(Module,Interface)] -> IO ()
+ppHtmlIndex odir title ifaces = do
   let html = 
 	header (thetitle (toHtml (title ++ " (Index)")) +++
-		thelink ! [href css_filename, 
+		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -235,7 +248,7 @@ ppHtmlIndex odir css_filename title ifaces = do
 	(renderHtml html)
     where 
       html = header (thetitle (toHtml (title ++ " (" ++ descr ++ "Index)")) +++
-		thelink ! [href css_filename, 
+		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
              body <<  
 	      table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -285,12 +298,12 @@ idBeginsWith (HsSpecial s) c = head s `elem` [toLower c, toUpper c]
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
 
-ppHtmlModule :: FilePath -> String -> String -> Maybe String
+ppHtmlModule :: FilePath -> String -> Maybe String
 	-> (Module,Interface) -> IO ()
-ppHtmlModule odir css_filename title source_url (Module mod,iface) = do
+ppHtmlModule odir title source_url (Module mod,iface) = do
   let html = 
 	header (thetitle (toHtml mod) +++
-		thelink ! [href css_filename,
+		thelink ! [href cssFile,
 		  rel "stylesheet", thetype "text/css"]) +++
         body <<  
 	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
@@ -352,6 +365,7 @@ ppModuleContents exports
   process :: Int -> [ExportItem] -> ([Html],[ExportItem])
   process n [] = ([], [])
   process n (ExportDecl _ : rest) = process n rest
+  process n (ExportDoc _ : rest) = process n rest
   process n items@(ExportGroup lev id doc : rest) 
     | lev <= n  = ( [], items )
     | otherwise = ( html:sections, rest2 )
@@ -380,6 +394,9 @@ processExport doc_map summary (ExportGroup lev id doc)
   | otherwise = ppDocGroup lev (anchor ! [name id] << markup htmlMarkup doc)
 processExport doc_map summary (ExportDecl decl)
   = doDecl doc_map summary decl
+processExport doc_map summary (ExportDoc doc)
+  | summary = Html.emptyTable
+  | otherwise = docBox (markup htmlMarkup doc)
 
 ppDocGroup lev doc
   | lev == 1  = tda [ theclass "section1" ] << doc

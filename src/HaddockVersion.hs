@@ -4,7 +4,9 @@
 -- (c) Simon Marlow 2002
 --
 
-module HaddockVersion ( projectName, projectVersion, projectUrl ) where
+module HaddockVersion ( 
+	projectName, projectVersion, projectUrl
+   ) where
 
 projectName = "Haddock"
 projectUrl = "http://www.haskell.org/haddock"

@@ -3,8 +3,6 @@ For 1.0:
 * IDoc compatibility, as far as possible
 	- bird-tracks for code blocks
 
-* named chunks of documentation?
-
 * Do the unlitting/CPPing from Haddock itself
 
 * facilities for saving interfaces so that you can run Haddock against

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.3 2002/04/24 15:57:48 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.4 2002/04/25 14:40:05 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -80,6 +80,8 @@ data HsExportSpec
 	 | HsEThingWith HsQName [HsQName]	-- T(C_1,...,C_n)
 	 | HsEModuleContents Module		-- module M   (not for imports)
 	 | HsEGroup Int String			-- a doc section heading
+	 | HsEDoc String			-- some documentation
+	 | HsEDocNamed String			-- a reference to named doc
   deriving (Eq,Show)
 
 data HsImportDecl
@@ -127,6 +129,7 @@ data HsDecl
 	 | HsForeignExport SrcLoc HsCallConv String HsName HsType
 	 | HsDocCommentNext String	-- a documentation annotation
 	 | HsDocCommentPrev String	-- a documentation annotation
+	 | HsDocCommentNamed String	-- a documentation annotation
 	 | HsDocGroup    Int String	-- a documentation group
   deriving (Eq,Show)
 

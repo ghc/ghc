@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.3 2002/04/24 15:12:41 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.4 2002/04/25 14:40:05 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -66,7 +66,7 @@ data Token
 
 	| DocCommentNext String		-- something beginning '-- |'
 	| DocCommentPrev String		-- something beginning '-- ^'
-	| DocCommentNamed String	-- something beginning '-- @'
+	| DocCommentNamed String	-- something beginning '-- $'
 	| DocSection Int String		-- a section heading
 
 -- Reserved operators
@@ -222,6 +222,7 @@ lexer cont input (SrcLoc _ x) y col =
 	doc (' ':'/':_) = True
 	doc (' ':'^':_) = True
 	doc (' ':'*':_) = True
+	doc (' ':'$':_) = True
 	doc _ = False
 
 nextTab x = x + (tAB_LENGTH - (x-1) `mod` tAB_LENGTH)
@@ -280,6 +281,7 @@ lexToken cont s loc y x =
 	'-':'-':' ':'|':s -> docComment DocCommentNext cont s loc y x
 	'-':'-':' ':'/':s -> docComment DocCommentNext cont s loc y x
 	'-':'-':' ':'^':s -> docComment DocCommentPrev cont s loc y x
+	'-':'-':' ':'$':s -> docComment DocCommentNamed cont s loc y x
 	'-':'-':' ':'*':s -> docSection cont ('*':s) loc y x
 
         '\'':s -> lexChar cont s loc y (x+1)
