@@ -492,24 +492,33 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs tidy_rhs
 -- 	of Ids, and rules, right at the top, but that would be a pain.
 
 tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
-  | opt_OmitInterfacePragmas || not is_external
-	-- Only basic info if the Id isn't external, or if we don't have -O
-  = basic_info
+  | opt_OmitInterfacePragmas	-- If the interface file has no pragma info
+  = vanillaIdInfo		-- then discard all info right here
+	-- This is not so important for *this* module, but it's
+	-- vital for ghc --make:
+	--   subsequent compilations must not see (e.g.) the arity if
+	--   the interface file does not contain arity
+	-- If they do, they'll exploit the arity; then the arity might
+	-- change, but the iface file doesn't change => recompilation
+	-- does not happen => disaster
 
-  | otherwise	-- Add extra optimisation info
-  = basic_info
+  | not is_external	-- For internal Ids (not externally visible)
+  = vanillaIdInfo	-- we only need enough info for code generation
+			-- Arity and strictness info are enough;
+			--	c.f. CoreTidy.tidyLetBndr
+	`setArityInfo`	       arity
+	`setAllStrictnessInfo` newStrictnessInfo idinfo
+
+  | otherwise		-- Externally-visible Ids get the whole lot
+  = vanillaIdInfo
+	`setCgInfo` 	       cg_info
+	`setArityInfo`	       arity
+	`setAllStrictnessInfo` newStrictnessInfo idinfo
 	`setInlinePragInfo`    inlinePragInfo idinfo
 	`setUnfoldingInfo`     unfold_info
 	`setWorkerInfo`	       tidyWorker tidy_env (workerInfo idinfo)
 		-- NB: we throw away the Rules
 		-- They have already been extracted by findExternalRules
-  
-  where
-	-- baasic_info is attached to every top-level binder
-    basic_info = vanillaIdInfo 
-			`setCgInfo` 	       cg_info
-			`setArityInfo`	       arity
-			`setAllStrictnessInfo` newStrictnessInfo idinfo
 
 -- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name
