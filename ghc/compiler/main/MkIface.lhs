@@ -484,10 +484,10 @@ diffDecls old_vers old_fixities new_fixities old new
 	  new_vers' = extendNameEnv new_vers nd_name 
 				    (bumpVersion False (lookupNameEnv_NF old_vers od_name))
 
-    only_old d   = ptext SLIT("Only in old iface:") <+> ppr d
-    only_new d   = ptext SLIT("Only in new iface:") <+> ppr d
-    changed d nd = ptext SLIT("Changed in iface: ") <+> ((ptext SLIT("Old:") <+> ppr d) $$ 
-							 (ptext SLIT("New:") <+> ppr nd))
+    only_old d    = ptext SLIT("Only in old iface:") <+> ppr d
+    only_new d    = ptext SLIT("Only in new iface:") <+> ppr d
+    changed od nd = ptext SLIT("Changed in iface: ") <+> ((ptext SLIT("Old:") <+> ppr od) $$ 
+							 (ptext SLIT("New:")  <+> ppr nd))
 \end{code}
 
 
