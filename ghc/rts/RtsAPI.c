@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.7 1999/05/21 14:46:19 sof Exp $
+ * $Id: RtsAPI.c,v 1.8 1999/07/06 09:42:38 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,6 +10,7 @@
 #include "Rts.h"
 #include "Storage.h"
 #include "RtsAPI.h"
+#include "SchedAPI.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 

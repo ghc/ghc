@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.6 1999/07/03 18:39:41 sof Exp $
+ * $Id: RtsAPI.h,v 1.7 1999/07/06 09:42:39 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,8 +10,17 @@
 #ifndef RTSAPI_H
 #define RTSAPI_H
 
-#include "SchedAPI.h"  /* for SchedulerStatus */
-
+/*
+ * Running the scheduler
+ */
+typedef enum {
+    Success,      
+    Killed,	 /* another thread killed us                           */
+    Interrupted, /* stopped in response to a call to interruptStgRts   */
+    Deadlock,   
+    AllBlocked,  /* subtly different from Deadlock                     */
+} SchedulerStatus;
+      
 typedef StgClosure *HaskellObj;
 
 /* ----------------------------------------------------------------------------
