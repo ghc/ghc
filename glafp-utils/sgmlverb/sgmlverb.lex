@@ -14,6 +14,7 @@
 %START  NORM  VERB  VERBENV
 sp			[ \t]*
 nl			{sp}\n{sp}
+comment                 \%.*$
 miranda			([0-9]+(\-([0-9]+)?)?)?>
 %{
 #define PUSH		states[top++] =
@@ -27,6 +28,7 @@ miranda			([0-9]+(\-([0-9]+)?)?)?>
 			top = 0;
 <NORM>@@		{ printf ("@"); }
 <NORM>@			{ printf ("<tt>"); PUSH NORM;  BEGIN VERB; }
+<NORM>{comment}         { }
 <VERB>@			{ printf ("</tt>");  POP; }
 <VERB>@@		{ printf ("@"); }
 <VERB>\>		{ printf ("&gt;"); }
