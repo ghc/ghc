@@ -210,10 +210,6 @@ showSimplCount (SimplCount _ stuff (_, unf1, unf2))
     shw ((t,n):tns) | n /= 0	= show t ++ ('\t' : show n) ++ ('\n' : shw tns)
 		    | otherwise = shw tns
 
-	-- ToDo: move to Outputable
-instance Outputable Int where
-   ppr sty n = int n
-
 zeroSimplCount :: SimplCount
 zeroSimplCount
   = SimplCount ILIT(0) stuff (0, [], [])
