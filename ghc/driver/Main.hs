@@ -684,7 +684,9 @@ getPackageLibraries = do
   ps' <- getPackageDetails ps
   tag <- readIORef build_tag
   let suffix = if null tag then "" else '_':tag
-  return (concat (map libraries ps'))
+  return (concat (
+	map (\p -> map (++suffix) (hs_libraries p) ++ extra_libraries p) ps'
+     ))
 
 getPackageExtraGhcOpts :: IO [String]
 getPackageExtraGhcOpts = do
@@ -802,18 +804,21 @@ way_details =
   [ (WayProf, Way  "p" "Profiling"  
 	[ "-fscc-profiling"
 	, "-DPROFILING"
-	, "-optc-DPROFILING" ]),
+	, "-optc-DPROFILING"
+	, "-fvia-C" ]),
 
     (WayTicky, Way  "t" "Ticky-ticky Profiling"  
 	[ "-fticky-ticky"
 	, "-DTICKY_TICKY"
-	, "-optc-DTICKY_TICKY" ]),
+	, "-optc-DTICKY_TICKY"
+	, "-fvia-C" ]),
 
     (WayUnreg, Way  "u" "Unregisterised" 
 	[ "-optc-DNO_REGS"
 	, "-optc-DUSE_MINIINTERPRETER"
 	, "-fno-asm-mangling"
-	, "-funregisterised" ]),
+	, "-funregisterised"
+	, "-fvia-C" ]),
 
     (WayDll, Way  "dll" "DLLized"
         [ ]),
@@ -823,20 +828,23 @@ way_details =
 	, "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
-	, "-package concurrent" ]),
+	, "-package concurrent"
+	, "-fvia-C" ]),
 
     (WayGran, Way  "mg" "Gransim" 
 	[ "-fstack-check"
 	, "-fgransim"
 	, "-D__GRANSIM__"
 	, "-optc-DGRAN"
-	, "-package concurrent" ]),
+	, "-package concurrent"
+	, "-fvia-C" ]),
 
-    (WaySMP, Way  "s" "SMP"  
+    (WaySMP, Way  "s" "SMP"
 	[ "-fsmp"
 	, "-optc-pthread"
 	, "-optl-pthread"
-	, "-optc-DSMP" ]),
+	, "-optc-DSMP"
+	, "-fvia-C" ]),
 
     (WayUser_a,  Way  "a"  "User way 'a'"  ["$WAY_a_REAL_OPTS"]),	
     (WayUser_b,  Way  "b"  "User way 'b'"  ["$WAY_b_REAL_OPTS"]),	
@@ -1655,7 +1663,7 @@ do_link o_files unknown_srcs = do
     let lib_path_opts = map ("-L"++) lib_paths
 
     pkg_libs <- getPackageLibraries
-    let pkg_lib_opts = map ("-l"++) pkg_libs
+    let pkg_lib_opts = map (\lib -> "-l"++lib) pkg_libs
 
     libs <- readIORef cmdline_libraries
     let lib_opts = map ("-l"++) (reverse libs)
