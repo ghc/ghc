@@ -199,6 +199,7 @@ PrelGHC
   newFloatArray#
   newDoubleArray#
   newAddrArray#
+  newStablePtrArray#
   
   indexArray#
   indexCharArray#
@@ -207,6 +208,7 @@ PrelGHC
   indexFloatArray#
   indexDoubleArray#
   indexAddrArray#
+  indexStablePtrArray#
   indexInt64Array#
   indexWord64Array#
   
@@ -217,6 +219,7 @@ indexWordOffAddr#
 indexAddrOffAddr#
 indexFloatOffAddr#
 indexDoubleOffAddr#
+indexStablePtrOffAddr#
 indexInt64OffAddr#
 indexWord64OffAddr#
 
@@ -224,8 +227,10 @@ writeCharOffAddr#
 writeIntOffAddr#
 writeWordOffAddr#
 writeAddrOffAddr#
+writeForeignObjOffAddr#
 writeFloatOffAddr#
 writeDoubleOffAddr#
+writeStablePtrOffAddr#
 writeInt64OffAddr#
 writeWord64OffAddr#
 
@@ -236,6 +241,7 @@ indexWordOffForeignObj#
 indexAddrOffForeignObj#
 indexFloatOffForeignObj#
 indexDoubleOffForeignObj#
+indexStablePtrOffForeignObj#
 indexInt64OffForeignObj#
 indexWord64OffForeignObj#
   
@@ -246,6 +252,7 @@ indexWord64OffForeignObj#
   writeFloatArray#
   writeDoubleArray#
   writeAddrArray#
+  writeStablePtrArray#
   writeInt64Array#
   writeWord64Array#
   
@@ -256,6 +263,7 @@ indexWord64OffForeignObj#
   readFloatArray#
   readDoubleArray#
   readAddrArray#
+  readStablePtrArray#
   readInt64Array#
   readWord64Array#
   
