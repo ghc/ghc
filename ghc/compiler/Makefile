@@ -361,10 +361,11 @@ MAINTAINER_CLEAN_FILES += $(wildcard */*.hc)
 
 
 #-----------------------------------------------------------------------------
-# 		TAGS
+# 		TAGS setup
 
 SRC_HSTAGS_OPTS += -fglasgow-exts -cpp
-
+TAGS_HS_SRCS=$(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs))
+TAGS_C_SRCS=$(strip $(foreach f,$(foreach dir,$(DIRS),$(wildcard $(dir)/*.c)),$(shell if [ -w $(f) ]; then echo $(f); else echo ''; fi)))
 
 #-----------------------------------------------------------------------------
 # 		Include target-rule boilerplate
