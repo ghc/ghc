@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.16 2004/08/13 13:09:18 simonmar Exp $
+ * $Id: MachRegs.h,v 1.17 2004/11/21 22:25:24 desrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -396,7 +396,7 @@
    I think we can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
-#if powerpc_TARGET_ARCH || rs6000_TARGET_ARCH
+#if powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH
 
 #define REG(x) __asm__(#x)
 

@@ -289,7 +289,7 @@ arrPtrsHdrSize    = fixedHdrSize*wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
 \begin{code}
 -- IA64 mangler doesn't place tables next to code
 tablesNextToCode :: Bool
-#ifdef ia64_TARGET_ARCH
+#if defined(ia64_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
 tablesNextToCode = False
 #else
 tablesNextToCode = not opt_Unregisterised

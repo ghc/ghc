@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.16 2004/08/13 13:09:41 simonmar Exp $
+ * $Id: TailCalls.h,v 1.17 2004/11/21 22:25:24 desrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -202,6 +202,10 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
 */
 
 #endif /* powerpc_TARGET_ARCH */
+
+#ifdef powerpc64_TARGET_ARCH
+#define JMP_(cont) ((F_) (cont))()
+#endif
 
 /* -----------------------------------------------------------------------------
    Tail calling on IA64
