@@ -13,7 +13,12 @@
 -----------------------------------------------------------------------------
 
 -- ToDo: should have an interface using PackedStrings.
+#ifndef __NHC__
 #include "ghcconfig.h"
+#else
+#define HAVE_REGEX_H 1
+#define HAVE_REGCOMP 1
+#endif
 
 module Text.Regex.Posix (
 	-- * The @Regex@ type
@@ -106,13 +111,13 @@ regexec (Regex regex_fptr) str = do
 
         if (r /= 0) then return Nothing else do 
 
-        (before,match,after) <- matched_parts str p_match
+          (before,match,after) <- matched_parts str p_match
 
-        sub_strs <- 
-	  mapM (unpack str) $ take nsub_int $ tail $
-	     iterate (`plusPtr` (#const sizeof(regmatch_t))) p_match
+          sub_strs <- 
+	    mapM (unpack str) $ take nsub_int $ tail $
+	       iterate (`plusPtr` (#const sizeof(regmatch_t))) p_match
 
-        return (Just (before, match, after, sub_strs))
+          return (Just (before, match, after, sub_strs))
 
 matched_parts :: String -> Ptr CRegMatch -> IO (String, String, String)
 matched_parts string p_match = do
@@ -130,7 +135,7 @@ unpack string p_match = do
   -- the subexpression may not have matched at all, perhaps because it
   -- was optional.  In this case, the offsets are set to -1.
   if (start == -1) then return "" else do
-  return (take (fromIntegral (end-start)) (drop (fromIntegral start) string))
+    return (take (fromIntegral (end-start)) (drop (fromIntegral start) string))
 
 -- -----------------------------------------------------------------------------
 -- The POSIX regex C interface
@@ -169,12 +174,12 @@ unpack string p_match = do
 
 type CRegMatch = ()
 
-foreign import ccall unsafe "regcomp"
+foreign import ccall unsafe "regex.h regcomp"
   c_regcomp :: Ptr CRegex -> CString -> CInt -> IO CInt
 
-foreign import ccall  unsafe "&regfree"
+foreign import ccall  unsafe "regex.h &regfree"
   ptr_regfree :: FunPtr (Ptr CRegex -> IO ())
 
-foreign import ccall unsafe "regexec"
+foreign import ccall unsafe "regex.h regexec"
   c_regexec :: Ptr CRegex -> CString -> CSize
 	    -> Ptr CRegMatch -> CInt -> IO CInt
