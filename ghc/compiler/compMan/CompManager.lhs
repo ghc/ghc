@@ -85,8 +85,7 @@ cmGetExpr cmstate dflags wrap_io mod expr
 
    -- ToDo: check that the module we passed in is sane/exists?
    where
-       CmState{ pcs=pcs, pcms=pcms, pls=pls } = cmstate
-       PersistentCMState{ hst=hst, hit=hit } = pcms
+       CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls } = cmstate
 
 -- The HValue should represent a value of type IO () (Perhaps IO a?)
 cmRunExpr :: HValue -> IO ()
@@ -95,43 +94,33 @@ cmRunExpr hval
 	-- putStrLn "done."
 #endif
 
--- Persistent state just for CM, excluding link & compile subsystems
-data PersistentCMState
-   = PersistentCMState {
-        hst   :: HomeSymbolTable,    -- home symbol table
-        hit   :: HomeIfaceTable,     -- home interface table
-        ui    :: UnlinkedImage,      -- the unlinked images
-        mg    :: ModuleGraph,        -- the module graph
-        gmode :: GhciMode            -- NEVER CHANGES
-     }
-
-emptyPCMS :: GhciMode -> PersistentCMState
-emptyPCMS gmode
-  = PersistentCMState { hst = emptyHST, hit = emptyHIT,
-                        ui  = emptyUI,  mg  = emptyMG, 
-                        gmode = gmode }
-
 emptyHIT :: HomeIfaceTable
 emptyHIT = emptyUFM
 emptyHST :: HomeSymbolTable
 emptyHST = emptyUFM
 
-
-
 -- Persistent state for the entire system
 data CmState
    = CmState {
-        pcms   :: PersistentCMState,       -- CM's persistent state
+        hst   :: HomeSymbolTable,    -- home symbol table
+        hit   :: HomeIfaceTable,     -- home interface table
+        ui    :: UnlinkedImage,      -- the unlinked images
+        mg    :: ModuleGraph,        -- the module graph
+        gmode :: GhciMode,           -- NEVER CHANGES
+
         pcs    :: PersistentCompilerState, -- compile's persistent state
         pls    :: PersistentLinkerState    -- link's persistent state
      }
 
 emptyCmState :: GhciMode -> IO CmState
 emptyCmState gmode
-    = do let pcms = emptyPCMS gmode
-         pcs     <- initPersistentCompilerState
+    = do pcs     <- initPersistentCompilerState
          pls     <- emptyPLS
-         return (CmState { pcms   = pcms,
+         return (CmState { hst = emptyHST,
+                           hit = emptyHIT,
+                           ui  = emptyUI,
+                           mg  = emptyMG, 
+                           gmode = gmode,
                            pcs    = pcs,
                            pls    = pls })
 
@@ -155,10 +144,9 @@ cmUnload state
  = do -- Throw away the old home dir cache
       emptyHomeDirCache
       -- Throw away the HIT and the HST
-      return state{ pcms=pcms{ hst=new_hst, hit=new_hit } }
+      return state{ hst=new_hst, hit=new_hit }
    where
-     CmState{ pcms=pcms } = state
-     PersistentCMState{ hst=hst, hit=hit } = pcms
+     CmState{ hst=hst, hit=hit } = state
      (new_hst, new_hit) = retainInTopLevelEnvs [] (hst,hit)
 \end{code}
 
@@ -175,19 +163,15 @@ cmLoadModule :: CmState
 
 cmLoadModule cmstate1 rootname
    = do -- version 1's are the original, before downsweep
-        let pcms1     = pcms   cmstate1
         let pls1      = pls    cmstate1
         let pcs1      = pcs    cmstate1
-	-- mg1 is the complete (home) set of summaries from the
-        -- previous pass of cmLoadModule, if there was one.
-        let mg1       = mg     pcms1
-        let hst1      = hst    pcms1
-        let hit1      = hit    pcms1
+        let hst1      = hst    cmstate1
+        let hit1      = hit    cmstate1
 	-- similarly, ui1 is the (complete) set of linkables from
 	-- the previous pass, if any.
-        let ui1       = ui     pcms1
+        let ui1       = ui     cmstate1
    
-        let ghci_mode = gmode pcms1 -- this never changes
+        let ghci_mode = gmode cmstate1 -- this never changes
 
         -- Do the downsweep to reestablish the module graph
         -- then generate version 2's by retaining in HIT,HST,UI a
@@ -206,7 +190,7 @@ cmLoadModule cmstate1 rootname
         -- reachable_from follows source as well as normal imports
         let reachable_from :: ModuleName -> [ModuleName]
             reachable_from = downwards_closure_of_module mg2unsorted
-
+ 
         -- should be cycle free; ignores 'import source's
         let mg2 = topological_sort False mg2unsorted
         -- ... whereas this takes them into account.  Used for
@@ -305,11 +289,11 @@ cmLoadModule cmstate1 rootname
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
                  LinkOK pls3 
-                    -> do let pcms3 = PersistentCMState { hst=hst3, hit=hit3, 
-                                                          ui=ui3, mg=modsDone, 
-                                                          gmode=ghci_mode }
-                          let cmstate3 
-                                 = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
+                    -> do let cmstate3 
+                                 = CmState { hst=hst3, hit=hit3, 
+                                             ui=ui3, mg=modsDone, 
+                                             gmode=ghci_mode,
+					     pcs=pcs3, pls=pls3 }
                           return (cmstate3, True, 
                                   map ms_mod modsDone)
 
@@ -341,11 +325,10 @@ cmLoadModule cmstate1 rootname
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (2)"
                  LinkOK pls4
-                    -> do let pcms4 = PersistentCMState { hst=hst4, hit=hit4, 
-                                                          ui=ui4, mg=mods_to_keep,
-                                                          gmode=ghci_mode }
-                          let cmstate4 
-                                 = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
+                    -> do let cmstate4 
+                                 = CmState { hst=hst4, hit=hit4, 
+                                             ui=ui4, mg=mods_to_keep,
+                                             gmode=ghci_mode, pcs=pcs3, pls=pls4 }
                           return (cmstate4, False, 
                                   map ms_mod mods_to_keep)
 
