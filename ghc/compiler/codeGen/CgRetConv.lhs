@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.17 1999/01/18 14:31:51 sof Exp $
+% $Id: CgRetConv.lhs,v 1.18 1999/01/22 10:45:21 simonm Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -182,16 +182,19 @@ that are guaranteed to map to machine registers.
 
 \begin{code}
 vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: [Int]
-vanillaRegNos	 = [1 .. mAX_Real_Vanilla_REG]
-floatRegNos	 = [1 .. mAX_Real_Float_REG]
-doubleRegNos	 = [1 .. mAX_Real_Double_REG]
-longRegNos       = [1 .. mAX_Real_Long_REG]
+vanillaRegNos	 = regList mAX_Real_Vanilla_REG
+floatRegNos	 = regList mAX_Real_Float_REG
+doubleRegNos	 = regList mAX_Real_Double_REG
+longRegNos       = regList mAX_Real_Long_REG
 
 allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
-allVanillaRegNos = [1 .. mAX_Vanilla_REG]
-allFloatRegNos	 = [1 .. mAX_Float_REG]
-allDoubleRegNos	 = [1 .. mAX_Double_REG]
-allLongRegNos	 = [1 .. mAX_Long_REG]
+allVanillaRegNos = regList mAX_Vanilla_REG
+allFloatRegNos	 = regList mAX_Float_REG
+allDoubleRegNos	 = regList mAX_Double_REG
+allLongRegNos	 = regList mAX_Long_REG
+
+regList 0 = []
+regList n = [1 .. n]
 
 type AvailRegs = ( [Int]   -- available vanilla regs.
 		 , [Int]   -- floats
