@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile.libHSrts,v 1.2 1996/11/21 16:48:19 simonm Exp $
+# $Id: Makefile.libHSrts,v 1.3 1997/01/07 13:18:15 simonm Exp $
 
 # The is the makefile for libHSrts, invoked once for each different build.
 
@@ -177,27 +177,20 @@ endif
 # creating and installing libHSrts.a (in its many flavors)
 
 ifeq ($(suffix), norm)
-RTS_LIB = libHSrts.a 		# this one is special
+ARCHIVE = libHSrts.a 		# this one is special
 else
-RTS_LIB = libHSrts_$(suffix).a
+ARCHIVE = libHSrts_$(suffix).a
 endif 
 
-RTS_OBJS = $(RTS_LC:.lc=.$(suffix)_o)  $(RTS_LHC:.lhc=.$(suffix)_o)
+LIBOBJS = $(RTS_LC:.lc=.$(suffix)_o)  $(RTS_LHC:.lhc=.$(suffix)_o)
+DESTDIR = $(INSTLIBDIR_GHC)
 
-all :: $(RTS_LIB) 
+MKDEPENDC_OPTS= -I$(GHC_INCLUDES)
+C_DEP_SRCS = $(RTS_LC) $(RTS_LHC) $(CLIB_LC)
 
-install :: $(RTS_LIB)
-	$(INSTALL) $(INSTLIBFLAGS) $(RTS_LIB) $(INSTLIBDIR_GHC)/$(RTS_LIB)
-	$(RANLIB) $(INSTLIBDIR_GHC)/$(RTS_LIB)
+include $(TOP)/mk/lib.mk
 
-cleanobj ::
-	$(RM) $(RTS_OBJS)
-	$(RM) $(RTS_LIB)
-
-$(RTS_LIB) :: $(H_FILES) $(RTS_OBJS)
-	$(RM) $@
-	$(AR) $@ $(RTS_OBJS)
-	$(RANLIB) $@
+#-----------------------------------------------------------------------------
 
 c-as-asm/PerformIO_flags 	= -optc-DIN_GHC_RTS=1
 gum/FetchMe_flags	 	= -optc-DIN_GHC_RTS=1
@@ -210,11 +203,3 @@ storage/SMmark_flags		= -optc-DIN_GHC_RTS=1 -optc-DMARK_REG_MAP
 # /* this is not the way we should do this [WDP [lazy] 94/09] */
 # CTagsTarget( $(RTS_LC) $($RTS_LHC) $(CLIB_LC) )
 # CTagsTarget( gmp/[a-z]*.c )
-
-#-----------------------------------------------------------------------------
-# Do dependencies
-
-MKDEPENDC_OPTS= -I$(GHC_INCLUDES)
-
-C_DEP_SRCS = $(RTS_LC) $(RTS_LHC) $(CLIB_LC)
-include $(TOP)/mk/cdepend.mk
