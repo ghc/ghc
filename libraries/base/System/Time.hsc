@@ -348,6 +348,12 @@ foreign import ccall unsafe "timezone" timezone :: Ptr CLong
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
   tz  <- peek timezone
+#if defined(mingw32_TARGET_OS)
+   -- According to the MSVC documentation for _tzset, _timezone is > 0
+   -- for locations west of the Prime Meridian. Code elsewhere in this
+   -- module assume that >0 gmt offsets means east, so flip the sign.
+  tz  <- return (-tz)
+#endif
   if dst then return (fromIntegral tz - 3600) else return tz
 # endif /* ! HAVE_ALTZONE */
 #endif  /* ! HAVE_TM_ZONE */
