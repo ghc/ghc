@@ -40,6 +40,10 @@ data Interface
 	iface_exports :: [ExportItem],
 		-- ^ the exports used to construct the documentation 
 
+	iface_orig_exports :: [ExportItem],
+		-- ^ the exports used to construct the documentation
+		-- (with orig names, not import names)
+
 	iface_decls :: FiniteMap HsName HsDecl,
 		-- ^ decls from this module (only)
 		-- restricted to only those bits exported.
@@ -158,6 +162,10 @@ data GenDoc id
 type Doc = GenDoc HsQName
 type ParsedDoc = GenDoc String
 
+-- | DocMarkup is a set of instructions for marking up documentation.
+-- In fact, it's really just a mapping from 'GenDoc' to some other
+-- type [a], where [a] is usually the type of the output (HTML, say).
+
 data DocMarkup id a = Markup {
   markupEmpty         :: a,
   markupString        :: String -> a,
@@ -172,6 +180,22 @@ data DocMarkup id a = Markup {
   markupCodeBlock     :: a -> a
   }
 
+markup :: DocMarkup id a -> GenDoc id -> a
+markup m DocEmpty		= markupEmpty m
+markup m (DocAppend d1 d2)	= markupAppend m (markup m d1) (markup m d2)
+markup m (DocString s)		= markupString m s
+markup m (DocParagraph d)	= markupParagraph m (markup m d)
+markup m (DocIdentifier i)	= markupIdentifier m i
+markup m (DocModule mod)	= markupModule m mod
+markup m (DocEmphasis d)	= markupEmphasis m (markup m d)
+markup m (DocMonospaced d)	= markupMonospaced m (markup m d)
+markup m (DocUnorderedList ds)	= markupUnorderedList m (map (markup m) ds)
+markup m (DocOrderedList ds)	= markupOrderedList m (map (markup m) ds)
+markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
+
+-- | Since marking up is just a matter of mapping 'Doc' into some
+-- other type, we can \'rename\' documentation by marking up 'Doc' into
+-- the same thing, modifying only the identifiers embedded in it.
 mapIdent f = Markup {
   markupEmpty         = DocEmpty,
   markupString        = DocString,
@@ -185,19 +209,6 @@ mapIdent f = Markup {
   markupOrderedList   = DocOrderedList,
   markupCodeBlock     = DocCodeBlock
   }
-
-markup :: DocMarkup id a -> GenDoc id -> a
-markup m DocEmpty		= markupEmpty m
-markup m (DocAppend d1 d2)	= markupAppend m (markup m d1) (markup m d2)
-markup m (DocString s)		= markupString m s
-markup m (DocParagraph d)	= markupParagraph m (markup m d)
-markup m (DocIdentifier i)	= markupIdentifier m i
-markup m (DocModule mod)	= markupModule m mod
-markup m (DocEmphasis d)	= markupEmphasis m (markup m d)
-markup m (DocMonospaced d)	= markupMonospaced m (markup m d)
-markup m (DocUnorderedList ds)	= markupUnorderedList m (map (markup m) ds)
-markup m (DocOrderedList ds)	= markupOrderedList m (map (markup m) ds)
-markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
 
 -- -----------------------------------------------------------------------------
 -- ** Smart constructors

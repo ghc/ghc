@@ -103,19 +103,13 @@ parse_file file = do
 -----------------------------------------------------------------------------
 -- Figuring out the definitions that are exported from a module
 
--- we want to 
---
---    (a) build a list of definitions that are exported from this module
---
---    (b) resolve any references in these declarations to qualified names
---        (qualified by the module imported from, not the original module).
-
 mkInterface :: ModuleMap -> FilePath -> HsModule -> (Module,Interface)
 mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
   = (mod, Interface { 
 	   iface_filename = filename,
 	   iface_env = name_env,
-	   iface_exports = export_list,
+	   iface_exports = renamed_export_list,
+	   iface_orig_exports = orig_export_list,
 	   iface_decls =  decl_map,
 	   iface_portability = "portable",
 	   iface_maintainer  = "libraries@haskell.org",
@@ -136,33 +130,24 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
 
   -- build the orig_env, which maps names to *original* names (so we can
   -- find the original declarations & docs for things).
-  external_env = foldr plusFM emptyFM (map (getOrigEnv mod_map) imps)
-  orig_env     = external_env `plusFM` local_env
+  (ext_orig_envs, ext_import_envs) 
+	= unzip (map (buildEnv mod_map mod exported_names) imps)
+  orig_env   = foldr plusFM local_env ext_orig_envs  
+  import_env = foldr plusFM local_env ext_import_envs  
 
-  -- resolve the names in the export list to original names
-  renamed_exports = fmap (renameExportList orig_env) exps
+  -- convert names in source code to original, fully qualified, names
+  orig_exports = fmap (renameExportList orig_env) exps
+  orig_decls   = map (renameDecl orig_env) decls
 
-  unrenamed_decl_map :: FiniteMap HsName HsDecl
-  unrenamed_decl_map = listToFM [ (n,d) | d <- renamed_decls,
-					  n <- declBinders d ]
+  orig_decl_map :: FiniteMap HsName HsDecl
+  orig_decl_map = listToFM [ (n,d) | d <- orig_decls, n <- declBinders d ]
 
-  -- gather up a list of entities that are exported
-  exported_names = exportedNames mod mod_map renamed_decls
-			locally_defined_names renamed_exports
-			unrenamed_decl_map
+  -- gather up a list of entities that are exported (original names)
+  exported_names = exportedNames mod mod_map orig_decls
+			locally_defined_names orig_exports
+			orig_decl_map
 
-  -- Now build the environment we'll use for renaming the source: it maps
-  -- names to *imported* names (not original names).  The imported name is
-  -- a name qualified by the closest module which exports it (including
-  -- the current module).
-  import_env = local_env `plusFM`
-		foldr plusFM emptyFM 
-		  (map (getImportEnv mod mod_map exported_names) imps)
-
-  -- convert names to original, fully qualified, names
-  renamed_decls = map (renameDecl import_env) decls
-
-  final_decls = concat (map expandDecl renamed_decls)
+  final_decls = concat (map expandDecl orig_decls)
 
   -- match documentation to names, and resolve identifiers in the documentation
   local_docs :: [(HsName,Doc)]
@@ -170,36 +155,54 @@ mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
 	       | (n, doc) <- collectDoc final_decls
 	       ]
 
+  -- get the documentation associated with entities exported from this module
+  -- ToDo: we should really store the documentation in both orig and imported
+  -- forms, like the export items.
   doc_map :: FiniteMap HsName Doc
-  doc_map = listToFM [ (nameOfQName n, doc)
-		     | n <- exported_names,
-		       Just doc <- [lookupDoc mod_map mod local_docs n] ]
+  doc_map = listToFM 
+    [ (nameOfQName n, doc)
+    | n <- exported_names,
+      Just doc <- [lookupDoc mod_map mod local_docs import_env n] ]
 
   decl_map :: FiniteMap HsName HsDecl
   decl_map = listToFM [ (n,d) | d <- final_decls, n <- declBinders d ]
 
   -- make the "export items", which will be converted into docs later
-  export_list = mkExportItems mod_map mod import_env
-			decl_map final_decls renamed_exports 
+  orig_export_list = mkExportItems mod_map mod import_env
+			decl_map final_decls orig_exports 
+
+  -- rename names in the exported declarations to point to things that
+  -- are closer, or maybe even exported by, the current module.
+  renamed_export_list = renameExportItems import_env orig_export_list
 
   name_env = listToFM [ (nameOfQName n, n) | n <- exported_names ]
 
+-- -----------------------------------------------------------------------------
+-- Find the documentation for a particular name, and rename the
+-- original identifiers embedded in it to imported names.
 
-lookupDoc :: ModuleMap -> Module -> [(HsName,Doc)] -> HsQName -> Maybe Doc
-lookupDoc mod_map this_mod local_doc name 
+lookupDoc :: ModuleMap -> Module -> [(HsName,Doc)]
+	-> FiniteMap HsQName HsQName -> HsQName -> Maybe Doc
+lookupDoc mod_map this_mod local_doc env name
   = case name of
 	UnQual n -> Nothing
-	Qual mod n | mod == this_mod -> lookup n local_doc
-		   | otherwise       -> 
-			case lookupFM mod_map mod of
-			   Nothing -> Nothing
-			   Just iface -> lookupFM (iface_name_docs iface) n
+	Qual mod n
+	  | mod == this_mod -> fmap (renameDoc env) (lookup n local_doc)
+	  | otherwise       -> 
+		case lookupFM mod_map mod of
+		   Nothing -> Nothing
+		   Just iface -> fmap (renameDoc env)
+				  (lookupFM (iface_name_docs iface) n)
 
+-- -----------------------------------------------------------------------------
+-- Build the list of items that will become the documentation, from the
+-- export list.  At the same time we rename *original* names in the declarations
+-- to *imported* names.
 
 mkExportItems :: ModuleMap -> Module
-	-> FiniteMap HsQName HsQName
-	-> FiniteMap HsName HsDecl
-	-> [HsDecl]
+	-> FiniteMap HsQName HsQName	-- maps orig to imported names
+	-> FiniteMap HsName HsDecl	-- maps local names to declarations
+	-> [HsDecl]			-- decls in the current module
 	-> Maybe [HsExportSpec]
 	-> [ExportItem]
 mkExportItems mod_map mod env decl_map decls Nothing
@@ -234,22 +237,32 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 	| m == mod  = fullContentsOfThisModule decls env
 	| otherwise = 
 	   case lookupFM mod_map m of
-	     Just iface -> iface_exports iface
+	     Just iface -> iface_orig_exports iface
 	     Nothing    -> trace ("Warning: module not found: " ++ show m) []
 
     findDecl :: HsQName -> Maybe HsDecl
-    findDecl (UnQual n) = trace ("Warning(mkExportItems): UnQual! " ++ show n) $ Nothing
+    findDecl (UnQual n)
+	= trace ("Warning(mkExportItems): UnQual! " ++ show n) $ Nothing
     findDecl (Qual m n)
 	| m == mod  = lookupFM decl_map n
-	| otherwise = case lookupFM mod_map m of
-			Just iface -> lookupFM (iface_decls iface) n
-			Nothing    -> trace ("Warning: module not found: " ++ show m) Nothing
+	| otherwise = 
+	   case lookupFM mod_map m of
+		Just iface -> lookupFM (iface_decls iface) n
+		Nothing -> 
+		   trace ("Warning: module not found: " ++ show m) Nothing
+
+renameExportItems env items = map rn items
+  where
+ 	rn (ExportGroup lev doc) 
+	   = ExportGroup lev (renameDoc env doc)
+	rn (ExportDecl decl)
+	   = ExportDecl (renameDecl env decl)
 
 fullContentsOfThisModule decls env = 
   [ mkExportItem decl | decl <- decls, keepDecl decl ]
   where mkExportItem (HsDocGroup lev str) =
 	   ExportGroup lev (formatDocHeading (lookupForDoc env) str)
-	mkExportItem decl = ExportDecl decl
+	mkExportItem decl = ExportDecl (renameDecl env decl)
 
 
 keepDecl HsTypeSig{}     = True
@@ -260,6 +273,8 @@ keepDecl HsClassDecl{}   = True
 keepDecl HsDocGroup{}	 = True
 keepDecl _ = False
 
+-- -----------------------------------------------------------------------------
+-- Gather a list of original names exported from this module
 
 exportedNames :: Module -> ModuleMap -> [HsDecl] -> [HsName]
 	-> Maybe [HsExportSpec]
@@ -300,42 +315,29 @@ exportedNames mod mod_scope decls local_names (Just expspecs) decl_map
 -- -----------------------------------------------------------------------------
 -- Building name environments
 
--- (1) Build an environment mapping names to *original* names
-
-getOrigEnv :: ModuleMap -> HsImportDecl -> FiniteMap HsQName HsQName
-getOrigEnv mod_scopes (HsImportDecl _ mod qual _ _)
-   = case lookupFM mod_scopes mod of
-       Just iface -> listToFM (concat (map fn (fmToList (iface_env iface))))
-       Nothing    -> trace ("Warning: module not found: " ++ show mod) emptyFM
+buildEnv :: ModuleMap -> Module -> [HsQName] -> HsImportDecl
+   -> ( FiniteMap HsQName HsQName, 	-- source name ==> orig name
+        FiniteMap HsQName HsQName	-- orig name ==> import name
+      )
+buildEnv mod_map this_mod exported_names (HsImportDecl _ mod qual _ _)
+   = case lookupFM mod_map mod of
+       Nothing    -> trace ("Warning: module not found: " ++ show mod) 
+			(emptyFM, emptyFM)
+       Just iface -> 
+	  let env = fmToList (iface_env iface) in
+	  ( listToFM (concat (map orig_map env))
+	  , listToFM (map import_map env)
+  	  )
   where
 	-- bring both qualified and unqualified names into scope, unless
 	-- the import was 'qualified'.
-     fn (nm,qnm)
+     orig_map (nm,qnm)
 	| qual      = [ (Qual mod nm, qnm) ]
 	| otherwise = [ (UnQual nm, qnm), (Qual mod nm, qnm) ]
 
--- (2) Build an environment mapping names to *imported* names
-
-getImportEnv :: Module -> ModuleMap -> [HsQName] -> HsImportDecl
-	-> FiniteMap HsQName HsQName
-getImportEnv this_mod mod_scopes exported_names (HsImportDecl _ mod qual _ _)
-   = case lookupFM mod_scopes mod of
-       Just iface -> 
-	 listToFM (concat (map (fn mod) (fmToList (iface_env iface))))
-       Nothing ->
-	 trace ("Warning: module not found: " ++ show mod) emptyFM
-  where
-	-- bring both qualified and unqualified names into scope, unless
-	-- the import was 'qualified'.
-     fn mod (nm,qnm)
-	| qual      = [ (Qual mod nm, maps_to) ]
-	| otherwise = [ (UnQual nm, maps_to), (Qual mod nm, maps_to) ]
+     import_map (nm,qnm) = (qnm, maps_to)
 	where maps_to | qnm `elem` exported_names = Qual this_mod nm
 		      | otherwise = Qual mod nm
-		-- if this name is also exported, then pretend that the
-		-- local module defines it for the purposes of hyperlinking
-		-- (since we're going to include its documentation in the
-		-- documentation for this module).
 
 -- -----------------------------------------------------------------------------
 -- Expand multiple type signatures
@@ -361,9 +363,7 @@ renameExportList env spec = map renameExport spec
     renameExport (HsEModuleContents m) = HsEModuleContents m
     renameExport (HsEGroup lev str) = HsEGroup lev str
 
-renameDecl
-  :: FiniteMap HsQName HsQName
-  -> HsDecl -> HsDecl
+renameDecl :: FiniteMap HsQName HsQName -> HsDecl -> HsDecl
 renameDecl scope decl
   = case decl of
 	HsTypeDecl loc t args ty -> 
@@ -416,6 +416,9 @@ rnLookupName s nm
   = case lookupFM s nm of
 	Just n -> n
 	Nothing -> trace ("Warning: unknown name: " ++ show nm) nm
+
+renameDoc env = markup (mapIdent ident)
+  where ident id = DocIdentifier (rnLookupName env id)
 
 -----------------------------------------------------------------------------
 -- Collecting documentation and associating it with declarations
