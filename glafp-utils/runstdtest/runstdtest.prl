@@ -62,6 +62,9 @@ $DefaultStderrFile = "$TmpPrefix/no_stderr$$";
 $PreScript = '';
 $PostScript = '';
 $TimeCmd = '';
+$Heimdall = 0;
+$HeimdallPrefix = '';
+$HeimdallStats = "heimdall.summary";
 $StatsFile = "$TmpPrefix/stats$$";
 $CacheProfStats = "cacheprof.out.summary";
 $SysSpecificTiming = '';
@@ -114,6 +117,10 @@ arg: while ($_ = $ARGV[0]) {
     /^-cacheprof$/ && do { $SysSpecificTiming = 'ghc-instrs';
 			   $CacheProf = 'yes'; 
 			   next arg };
+    /^-heimdall$/ && do { $HeimdallPrefix = 'heimdall_cp ';  # must have trailing space!
+                          $SysSpecificTiming = 'ghc-instrs';
+                          $Heimdall = 1;
+                          next arg; };
     /^-t(.*)/	&& do { $TimeCmd = &grab_arg_arg('-t', $1); next arg; };
 
     # anything else is taken to be a pgm arg
@@ -192,7 +199,7 @@ cat /dev/null > $DefaultStdoutFile
 cat /dev/null > $DefaultStderrFile
 $PreScriptLines
 $SpixifyLine1
-$TimeCmd /bin/sh -c \'$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
+$TimeCmd /bin/sh -c \'$HeimdallPrefix$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
 progexit=\$?
 if [ \$progexit -eq 0 ] && [ $PgmFail -ne 0 ]; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
@@ -231,6 +238,9 @@ else
     fi
 fi
 egrep -v '^ld\.so:.*has older revision than expected' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
+mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
+egrep '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $HeimdallStats
+egrep -v '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
 mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
 
 hit='NO'
@@ -280,10 +290,11 @@ if ( $SysSpecificTiming eq '' ) {
 
 &process_stats_file();
 &process_cacheprof_files() if $CacheProf eq 'yes';
+&process_heimdall_file() if $Heimdall;
 
 # print out what we found
 print STDERR "<<$SysSpecificTiming: ";
-if ( $CacheProf ne 'yes' ) {
+if ( $CacheProf ne 'yes' && !$Heimdall) {
 	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)";
 } else {
 	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $TotInstrs instructions, $TotReads memory reads, $TotWrites memory writes";
@@ -450,3 +461,22 @@ sub process_cacheprof_files {
   }
   close(STATS);
 }
+
+sub process_heimdall_file {
+
+    open(STATS, "< $HeimdallStats") || die("Can't open $HeimdallStats\n");
+
+    # instruction counts from Julian Seward's HEIMDALL:
+    #
+    # === HEIMDALL: instruction counts: 815000 instrs, 230040 reads, 138692 writes
+    while (<STATS>) {
+       /^=== HEIMDALL: instruction counts: ([0-9]+) instrs, ([0-9]+) reads, ([0-9]+) writes/
+           && do {
+	   $TotInstrs = $1;
+	   $TotReads  = $2;
+	   $TotWrites = $3;
+      }
+  }
+  close(STATS);
+}
+
