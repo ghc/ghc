@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/11/17 16:57:41 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/23 18:08:18 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -653,7 +653,7 @@ Bool findFilesForModule (
    Int    nPath;
    Bool   literate;
    String peStart, peEnd;
-   String augdPath;       /* .:defaultLibDir:hugsPath */
+   String augdPath;       /* .:hugsPath:defaultLibDir */
 
    *path = *sExt = NULL;
    *sAvail = *iAvail = *oAvail = FALSE;
@@ -665,10 +665,10 @@ Bool findFilesForModule (
    augdPath[0] = '.';
    augdPath[1] = PATHSEP;
    augdPath[2] = 0;
-   strcat ( augdPath, defaultLibDir );
-   augdPath[2+strlen(defaultLibDir)] = PATHSEP;
-   augdPath[3+strlen(defaultLibDir)] = 0;
-   strcat(augdPath,hugsPath);
+   strcat ( augdPath, hugsPath );
+   augdPath[2+strlen(hugsPath)] = PATHSEP;
+   augdPath[3+strlen(hugsPath)] = 0;
+   strcat(augdPath,defaultLibDir);
 
    peEnd = augdPath-1;
    while (1) {

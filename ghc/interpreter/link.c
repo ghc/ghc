@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/11/23 15:12:08 $
+ * $Revision: 1.18 $
+ * $Date: 1999/11/23 18:08:17 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -494,6 +494,10 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         namePmInt          = linkName("primPmInt");
         namePmInteger      = linkName("primPmInteger");
         namePmDouble       = linkName("primPmDouble");
+ 
+        namePmFromInteger = linkName("primPmFromInteger");
+        namePmSubtract    = linkName("primPmSubtract");
+        namePmLe          = linkName("primPmLe");
     }
 }
 

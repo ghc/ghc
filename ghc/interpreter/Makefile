@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.20 1999/11/22 16:44:32 sewardj Exp $                      #
+# $Id: Makefile,v 1.21 1999/11/23 18:08:17 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -20,7 +20,7 @@ LIB_DL=-ldl
 endif
 
 ifeq "$(HaveLibReadline)$" "YES"
-LIB_READLINE=-lreadline
+LIB_READLINE=-lreadline -ltermcap
 else
 LIB_READLINE=
 endif

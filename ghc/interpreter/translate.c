@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/11/23 09:48:46 $
+ * $Revision: 1.19 $
+ * $Date: 1999/11/23 18:08:19 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -211,6 +211,7 @@ StgExpr failExpr;
             Cell   scrut = stgOffset(o,sc);
             Cell   h     = getHead(discr);
             Int    da    = discrArity(discr);
+            char   str[30];
 
 #if NPLUSK
             if (whatIs(h) == ADDPAT && argCount == 1) {
@@ -233,8 +234,10 @@ StgExpr failExpr;
                     dIntegral = mkStgVar(dIntegral,NIL);
                     binds = cons(dIntegral,binds);
                 }
+
                 /* box number */
-                n = mkStgVar(mkStgCon(nameMkInteger,singleton(n)),NIL);
+                sprintf(str, "%d", n);
+                n = mkStgVar(mkStgCon(nameMkInteger,singleton(stringToBignum(str))),NIL);
                 binds = cons(n,binds);
 
                 /* coerce number to right type (using Integral dict) */

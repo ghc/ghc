@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/11/12 17:32:40 $
+ * $Revision: 1.8 $
+ * $Date: 1999/11/23 18:08:17 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -174,6 +174,11 @@ List liftBinds( List binds )
 
     for(bs=binds; nonNull(bs); bs=tl(bs)) {
         StgVar bind = hd(bs);
+#if 0
+        fprintf(stderr, "\n");
+        if (lastModule() != modulePrelude) ppStg(hd(bs));
+        fprintf(stderr, "\n");
+#endif
         freeVarsBind(NIL,bind);
         stgVarInfo(bind) = NONE; /* mark as top level */
     }
