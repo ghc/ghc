@@ -365,6 +365,7 @@ C_SRCS += $(wildcard ../*_hsc.c)
 # Make .hsc.h include files from the directory above visible
 # (and the cbits/ library too).
 SRC_CC_OPTS += -I.. -I.
+SRC_HSC2HS_OPTS += -I.. -I.
 endif
 
 ifneq "$(way)" "i"
