@@ -1,0 +1,5 @@
+_interface_ TyCon 1
+_exports_
+TyCon TyCon;
+_declarations_
+1 data TyCon;

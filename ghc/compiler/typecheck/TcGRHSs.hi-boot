@@ -1,0 +1,6 @@
+_interface_ TcGRHSs 1
+_exports_
+TcGRHSs tcGRHSsAndBinds;
+_declarations_
+1 tcGRHSsAndBinds _:_ _forall_ [a] => HsMatches.GRHSsAndBinds HsSyn.Fake HsSyn.Fake Name.Name (HsPat.InPat Name.Name) -> TcMonad.TcDown a -> TcEnv.TcEnv a -> GHC.State# a -> SST.FSST_R a (HsMatches.GRHSsAndBinds (TyVar.GenTyVar (ArrBase.MutableArray a PrelBase.Int (TcType.TcMaybe a))) Unique.Unique (TcHsSyn.TcIdOcc a) (HsPat.OutPat (TyVar.GenTyVar (ArrBase.MutableArray a PrelBase.Int (TcType.TcMaybe a))) Unique.Unique (TcHsSyn.TcIdOcc a)), Bag.Bag (Inst.Inst a), Type.GenType (TyVar.GenTyVar (ArrBase.MutableArray a PrelBase.Int (TcType.TcMaybe a))) Unique.Unique) PrelBase.() ;;
+

@@ -1,0 +1,5 @@
+_interface_ UniqFM 1
+_exports_
+UniqFM Uniquable(uniqueOf);
+_declarations_
+1 class Uniquable a where {uniqueOf :: a -> Unique.Unique};

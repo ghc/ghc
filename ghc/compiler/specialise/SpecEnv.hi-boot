@@ -1,0 +1,7 @@
+_interface_ SpecEnv 1
+_exports_
+SpecEnv SpecEnv nullSpecEnv isNullSpecEnv;
+_declarations_
+1 data SpecEnv;
+1 isNullSpecEnv _:_ SpecEnv.SpecEnv -> PrelBase.Bool ;;
+1 nullSpecEnv _:_ SpecEnv.SpecEnv ;;

@@ -1,0 +1,9 @@
+_interface_ Class 1
+_exports_
+Class Class GenClass;
+_instances_
+instance {PrelBase.Eq Class.Class} = $d1;
+_declarations_
+1 $d1 _:_ {PrelBase.Eq Class.Class} ;;
+1 type Class = Class.GenClass TyVar.TyVar Usage.UVar;
+1 data GenClass a b;

@@ -1,0 +1,6 @@
+_interface_ TcType 1
+_exports_
+TcType TcMaybe;
+_declarations_
+1 data TcMaybe a;
+
