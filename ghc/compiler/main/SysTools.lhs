@@ -81,6 +81,7 @@ import IO		( try, catch,
 			  openFile, hPutChar, hPutStrLn, hPutStr, hClose, hFlush, IOMode(..),
 			  stderr )
 import Directory	( doesFileExist, removeFile )
+import List             ( intersperse )
 
 #include "../includes/config.h"
 
@@ -93,8 +94,12 @@ import Directory	( doesFileExist, removeFile )
 #ifndef mingw32_HOST_OS
 #if __GLASGOW_HASKELL__ > 504
 import qualified System.Posix.Internals
+import System.Posix.Process ( executeFile, getProcessStatus, forkProcess, ProcessStatus(..))
+import System.Posix.Signals ( installHandler, sigCHLD, sigCONT, Handler(..) )
 #else
 import qualified Posix
+import Posix ( executeFile, getProcessStatus, forkProcess, ProcessStatus(..), installHandler,
+               sigCHLD, sigCONT, Handler(..) )
 #endif
 #else /* Must be Win32 */
 import List		( isPrefixOf )
@@ -190,7 +195,7 @@ All these pathnames are maintained IN THE NATIVE FORMAT OF THE HOST MACHINE.
 
 \begin{code}
 GLOBAL_VAR(v_Pgm_L,   	error "pgm_L",   String)	-- unlit
-GLOBAL_VAR(v_Pgm_P,   	error "pgm_P",   String)	-- cpp
+GLOBAL_VAR(v_Pgm_P,   	error "pgm_P",   (String,[Option]))	-- cpp
 GLOBAL_VAR(v_Pgm_F,   	error "pgm_F",   String)	-- pp
 GLOBAL_VAR(v_Pgm_c,   	error "pgm_c",   String)	-- gcc
 GLOBAL_VAR(v_Pgm_m,   	error "pgm_m",   String)	-- asm code mangler
@@ -374,7 +379,9 @@ initSysTools minusB_args
 #endif
 
 	-- cpp is derived from gcc on all platforms
-        ; let cpp_path  = gcc_path ++ " -E " ++ cRAWCPP_FLAGS
+        -- HACK, see setPgmP below. We keep 'words' here to remember to fix
+        -- Config.hs one day.
+        ; let cpp_path  = (gcc_path, (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
 
 	-- For all systems, copy and remove are provided by the host
 	-- system; architecture-specific stuff is done when building Config.hs
@@ -431,7 +438,9 @@ is used to override a particular program with a new one
 
 \begin{code}
 setPgmL = writeIORef v_Pgm_L
-setPgmP = writeIORef v_Pgm_P
+-- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
+-- Config.hs should really use Option.
+setPgmP arg = let (pgm:args) = words arg in writeIORef v_Pgm_P (pgm,map Option args)
 setPgmF = writeIORef v_Pgm_F
 setPgmc = writeIORef v_Pgm_c
 setPgmm = writeIORef v_Pgm_m
@@ -513,9 +522,10 @@ data Option
  
 showOptions :: [Option] -> String
 showOptions ls = unwords (map (quote.showOpt) ls)
- where
-   showOpt (FileOption pre f) = pre ++ dosifyPath f
-   showOpt (Option s)     = s
+
+showOpt (FileOption pre f) = pre ++ dosifyPath f
+showOpt (Option "") = ""
+showOpt (Option s)  = s
 
 \end{code}
 
@@ -533,8 +543,8 @@ runUnlit args = do p <- readIORef v_Pgm_L
 		   runSomething "Literate pre-processor" p args
 
 runCpp :: [Option] -> IO ()
-runCpp args =   do p <- readIORef v_Pgm_P
-		   runSomething "C pre-processor" p args
+runCpp args =   do (p,baseArgs) <- readIORef v_Pgm_P
+		   runSomething "C pre-processor" p (baseArgs ++ args)
 
 runPp :: [Option] -> IO ()
 runPp args =   do p <- readIORef v_Pgm_F
@@ -699,21 +709,33 @@ runSomething :: String		-- For -v message
 	     -> IO ()
 
 runSomething phase_name pgm args
- = traceCmd phase_name cmd_line $
-   do   {
+ = traceCmd phase_name (concat (intersperse " " (pgm:quoteargs))) $
+   do
 #ifndef mingw32_HOST_OS
-	  exit_code <- system cmd_line
+          installHandler sigCHLD Ignore Nothing
+          -- avoid strange interaction with waitpid():
+          installHandler sigCONT Ignore Nothing
+          mpid <- forkProcess
+          exit_code <- case mpid of
+            Nothing -> do -- Child
+	      executeFile pgm True quoteargs Nothing
+              exitWith (ExitFailure 127)
+	      -- NOT REACHED
+              return ExitSuccess
+            Just child -> do -- Parent
+              Just (Exited res) <- getProcessStatus True True child
+              return res
 #else
           exit_code <- rawSystem cmd_line
 #endif
-	; if exit_code /= ExitSuccess
-	  then throwDyn (PhaseFailed phase_name exit_code)
-  	  else return ()
-	}
+	  when (exit_code /= ExitSuccess)
+	    $ throwDyn (PhaseFailed phase_name exit_code)
+          return ()	
   where
 	-- The pgm is already in native format (appropriate dir separators)
-    cmd_line = pgm ++ ' ':showOptions args 
+    cmd_line = pgm ++ ' ':showOptions args
                 -- unwords (pgm : dosifyPaths (map quote args))
+    quoteargs = filter (not.null) (map showOpt args)
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -733,7 +755,7 @@ traceCmd phase_name cmd_line action
 	}}
   where
     handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")
-			     ; when (verb >= 3) (hPutStrLn stderr ("Failed: " ++ cmd_line))
+			     ; when (verb >= 3) (hPutStrLn stderr ("Failed: " ++ cmd_line ++ (show exn)))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 
