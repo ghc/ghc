@@ -483,7 +483,7 @@ unifyMisMatch ty1 ty2
 	 4 (sep [quotes (ppr ty1), ptext SLIT("against"), quotes (ppr ty2)])
 
 unifyKindErr tyvar ty
-  = hang (ptext SLIT("Compiler bug: kind mis-match between"))
+  = hang (ptext SLIT("Kind mis-match between"))
 	 4 (sep [quotes (hsep [ppr tyvar, ptext SLIT("::"), ppr (tyVarKind tyvar)]),
 		 ptext SLIT("and"), 
 		 quotes (hsep [ppr ty, ptext SLIT("::"), ppr (typeKind ty)])])
