@@ -1,4 +1,4 @@
--- $Id: arith003.hs,v 1.4 2000/01/20 13:38:42 simonmar Exp $
+-- $Id: arith003.hs,v 1.5 2000/03/23 09:32:36 simonmar Exp $
 --
 -- !!! test Int/Integer arithmetic operations from the Prelude.
 --
@@ -31,6 +31,8 @@ large_operands :: [ Integer ]
 large_operands = operands ++ 
    [ fromIntegral minInt - 1,
      fromIntegral maxInt + 1,
+     fromIntegral minInt * 2,
+     fromIntegral maxInt * 2,
      fromIntegral minInt ^ 2, 
      fromIntegral maxInt ^ 2
    ]
