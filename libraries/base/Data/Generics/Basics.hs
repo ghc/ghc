@@ -572,6 +572,26 @@ instance (Data a, Data b) => Data (a,b) where
                    1 -> (undefined,undefined)
   dataTypeOf _ = productDataType
 
+--
+-- Yet another polymorphic datatype constructor.
+-- No surprises.
+--
+
+
+leftConstr     = mkConstr 1 "Left"  Prefix
+rightConstr    = mkConstr 2 "Right" Prefix
+eitherDataType = mkDataType [leftConstr,rightConstr]
+
+instance (Data a, Data b) => Data (Either a b) where
+  gfoldl f z (Left a)   = z Left  `f` a
+  gfoldl f z (Right a)  = z Right `f` a
+  toConstr (Left _)  = leftConstr
+  toConstr (Right _) = rightConstr
+  fromConstr c = case conIndex c of
+                   1 -> Left undefined
+                   2 -> Right undefined
+  dataTypeOf _ = eitherDataType
+
 
 {-
 
