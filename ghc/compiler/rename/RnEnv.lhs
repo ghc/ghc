@@ -452,7 +452,14 @@ lookupBndrRn rdr_name
 		case lookupRdrEnv global_env (qualifyRdrName mod rdr_name) of
 		  Just (name:rest) -> ASSERT( null rest )
 				      returnRn name 
-		  Nothing	   -> pprPanic "lookupBndrRn" (ppr mod <+> ppr rdr_name)
+		  Nothing	   -> 	-- Almost always this case is a compiler bug.
+					-- But consider a type signature that doesn't have 
+					-- a corresponding binder: 
+					--	module M where { f :: Int->Int }
+					-- We use lookupSigOccRn, which uses lookupBndrRn (for good reasons)
+					-- and we don't want to panic.  So we report an out-of-scope error
+					failWithRn (mkUnboundName rdr_name)
+						   (unknownNameErr rdr_name)
     }
 
 -- lookupOccRn looks up an occurrence of a RdrName

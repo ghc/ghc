@@ -165,9 +165,6 @@ rnTopBinds (MonoBind bind sigs _) 	  = rnTopMonoBinds bind sigs
   -- The parser doesn't produce other forms
 
 
-rnTopMonoBinds EmptyMonoBinds sigs 
-  = returnRn (EmptyBinds, emptyFVs)
-
 rnTopMonoBinds mbinds sigs
  =  mapRn lookupBndrRn binder_rdr_names		`thenRn` \ binder_names ->
     let
@@ -217,8 +214,6 @@ rnMonoBinds :: RdrNameMonoBinds
             -> [RdrNameSig]
 	    -> (RenamedHsBinds -> RnMS (result, FreeVars))
 	    -> RnMS (result, FreeVars)
-
-rnMonoBinds EmptyMonoBinds sigs thing_inside = thing_inside EmptyBinds
 
 rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
   =	-- Extract all the binders in this group,
@@ -284,7 +279,7 @@ rn_mono_binds siglist mbinds
     let 
         edges	    = mkEdges (mbinds_info `zip` [(0::Int)..])
 	scc_result  = stronglyConnComp edges
-	final_binds = foldr1 ThenBinds (map reconstructCycle scc_result)
+	final_binds = foldr (ThenBinds . reconstructCycle) EmptyBinds scc_result
 
 	 -- Deal with bound and free-var calculation
 	rhs_fvs = plusFVs [fvs | (_,fvs,_,_) <- mbinds_info]
