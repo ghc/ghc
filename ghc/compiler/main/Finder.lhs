@@ -34,9 +34,13 @@ import Monad
 \end{code}
 
 The Finder provides a thin filesystem abstraction to the rest of the
-compiler.  For a given module, it knows (a) which package the module
-lives in, so it can make a Module from a ModuleName, and (b) where the
-source, interface, and object files for a module live.
+compiler.  For a given module, it knows (a) whether the module lives
+in the home package or in another package, so it can make a Module
+from a ModuleName, and (b) where the source, interface, and object
+files for a module live.
+
+It does *not* know which particular package a module lives in, because
+that information is only contained in the interface file.
 
 \begin{code}
 initFinder :: [PackageConfig] -> IO ()
@@ -76,10 +80,10 @@ maybeHomeModule mod_name is_source = do
 	-- When generating dependencies, we're interested in either category.
 	--
        source_exts = 
-        	 [ ("hs",   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
-		 , ("lhs",  \ _ fName path -> mkHomeModuleLocn mod_name path fName)
-	         ]
-       hi_exts = [ (hisuf,  \ _ fName path -> mkHiOnlyModuleLocn mod_name fName) ]
+             [ ("hs",   \ fName path -> mkHomeModuleLocn mod_name path fName)
+	     , ("lhs",  \ fName path -> mkHomeModuleLocn mod_name path fName)
+	     ]
+       hi_exts = [ (hisuf,  \ fName path -> mkHiOnlyModuleLocn mod_name fName) ]
 
        std_exts
          | mode == DoMkDependHS   = hi_exts ++ source_exts
@@ -90,13 +94,11 @@ maybeHomeModule mod_name is_source = do
        hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion
 
        boot_exts = 
-       	[ (hi_boot_ver, \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
-	, ("hi-boot",   \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
+       	[ (hi_boot_ver, \ fName path -> mkHiOnlyModuleLocn mod_name fName)
+	, ("hi-boot",   \ fName path -> mkHiOnlyModuleLocn mod_name fName)
 	]
 
-   searchPathExts  
-   	(map ((,) undefined) home_path)
-	basename
+   searchPathExts home_path basename
 	(if is_source then (boot_exts++std_exts) else std_exts ++ boot_exts)
 			-- for SOURCE imports, check the hi-boot extensions
 			-- before the source/iface ones, to avoid
@@ -155,12 +157,12 @@ findPackageMod mod_name hiOnly = do
 	   if null tag
 		then return "hi"
 		else return (tag ++ "_hi")
-  let imp_dirs = concatMap (\ pkg -> map ((,) pkg) (import_dirs pkg)) pkgs
+  let imp_dirs = concatMap import_dirs pkgs
       mod_str  = moduleNameUserString mod_name 
       basename = map (\c -> if c == '.' then '/' else c) mod_str
 
-      mkPackageModule mod_name pkg mbFName path =
-        return ( mkModule mod_name (mkFastString (name pkg))
+      retPackageModule mod_name mbFName path =
+        return ( mkPackageModule mod_name
                , ModuleLocation{ ml_hspp_file = Nothing
 		 	       , ml_hs_file   = mbFName
 			       , ml_hi_file   = path ++ '.':package_hisuf
@@ -169,20 +171,20 @@ findPackageMod mod_name hiOnly = do
 
   searchPathExts
   	imp_dirs basename
-        ((package_hisuf,\ pkg fName path -> mkPackageModule mod_name pkg Nothing path) :
+        ((package_hisuf,\ fName path -> retPackageModule mod_name Nothing path) :
       	  -- can packages contain hi-boots?
 	 (if hiOnly then [] else
-	  [ ("hs",  \ pkg fName path -> mkPackageModule mod_name pkg (Just fName) path)
-	  , ("lhs", \ pkg fName path -> mkPackageModule mod_name pkg (Just fName) path)
+	  [ ("hs",  \ fName path -> retPackageModule mod_name (Just fName) path)
+	  , ("lhs", \ fName path -> retPackageModule mod_name (Just fName) path)
 	  ]))
  where
 
 findPackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 findPackageModule mod_name = findPackageMod mod_name True
 
-searchPathExts :: [(a, FilePath)]
+searchPathExts :: [FilePath]
 	       -> String
-	       -> [(String, a -> FilePath -> String -> IO (Module, ModuleLocation))] 
+	       -> [(String, FilePath -> String -> IO (Module, ModuleLocation))] 
 	       -> IO (Maybe (Module, ModuleLocation))
 searchPathExts path basename exts = search exts
   where
@@ -192,17 +194,17 @@ searchPathExts path basename exts = search exts
         found <- findOnPath path fName
         case found of
    	    -- special case to avoid getting "./foo.<ext>" all the time
-	  Just (v,".")  -> fmap Just (f v fName basename)
-	  Just (v,path) -> fmap Just (f v (path ++ '/':fName)
+	  Just "."  -> fmap Just (f fName basename)
+	  Just path -> fmap Just (f (path ++ '/':fName)
 	  		                  (path ++ '/':basename))
 	  Nothing   -> search xs
 
-findOnPath :: [(a,String)] -> String -> IO (Maybe (a, FilePath))
+findOnPath :: [String] -> String -> IO (Maybe FilePath)
 findOnPath path s = loop path
  where
   loop [] = return Nothing
-  loop ((a,d):ds) = do
+  loop (d:ds) = do
     let file = d ++ '/':s
     b <- doesFileExist file
-    if b then return (Just (a,d)) else loop ds
+    if b then return (Just d) else loop ds
 \end{code}

@@ -1,10 +1,28 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-2002
 %
-\section[Module]{The @Module@ module.}
 
-Representing modules and their flavours.
+ModuleName
+~~~~~~~~~~
+Simply the name of a module, represented as a Z-encoded FastString.
+These are Uniquable, hence we can build FiniteMaps with ModuleNames as
+the keys.
 
+Module
+~~~~~~
+
+A ModuleName with some additional information, namely whether the
+module resides in the Home package or in a different package.  We need
+to know this for two reasons: 
+  
+  * generating cross-DLL calls is different from intra-DLL calls 
+    (see below).
+  * we don't record version information in interface files for entities
+    in a different package.
+
+The unique of a Module is identical to the unique of a ModuleName, so
+it is safe to look up in a Module map using a ModuleName and vice
+versa.
 
 Notes on DLLs
 ~~~~~~~~~~~~~
@@ -24,8 +42,7 @@ module Module
       Module, 		   	-- Abstract, instance of Eq, Ord, Outputable
 
     , PackageName		-- = FastString; instance of Outputable, Uniquable
-    , modulePackage		-- :: Module -> PackageName
-    , preludePackage		-- :: PackageName	name of Standard Prelude package
+    , preludePackage		-- :: PackageName
 
     , ModuleName
     , pprModuleName		-- :: ModuleName -> SDoc
@@ -42,10 +59,10 @@ module Module
     , mkVanillaModule	        -- :: ModuleName -> Module
     , isVanillaModule		-- :: Module -> Bool
     , mkPrelModule		-- :: UserString -> Module
-    , isPrelModule		-- :: Module -> Bool
     , mkModule			-- :: ModuleName -> PackageName -> Module
     , mkHomeModule		-- :: ModuleName -> Module
     , isHomeModule		-- :: Module -> Bool
+    , mkPackageModule		-- :: ModuleName -> Module
 
     , mkModuleName		-- :: UserString -> ModuleName
     , mkModuleNameFS		-- :: UserFS    -> ModuleName
@@ -98,12 +115,12 @@ module that's hiding in a DLL is explained elsewhere (ToDo: give
 renamer href here.)
 
 \begin{code}
-data Module = Module ModuleName PackageInfo
+data Module = Module ModuleName !PackageInfo
 
 data PackageInfo
   = ThisPackage				-- A module from the same package 
 					-- as the one being compiled
-  | AnotherPackage PackageName		-- A module from a different package
+  | AnotherPackage			-- A module from a different package
 
   | DunnoYet	-- This is used when we don't yet know
 		-- Main case: we've come across Foo.x in an interface file
@@ -119,7 +136,7 @@ preludePackage = SLIT("std")
 packageInfoPackage :: PackageInfo -> PackageName
 packageInfoPackage ThisPackage        = opt_InPackage
 packageInfoPackage DunnoYet	      = SLIT("<?>")
-packageInfoPackage (AnotherPackage p) = p
+packageInfoPackage AnotherPackage     = SLIT("<pkg>")
 
 instance Outputable PackageInfo where
 	-- Just used in debug prints of lex tokens and in debug modde
@@ -242,7 +259,7 @@ mkModule mod_nm pack_name
   = Module mod_nm pack_info
   where
     pack_info | pack_name == opt_InPackage = ThisPackage
-	      | otherwise		   = AnotherPackage pack_name
+	      | otherwise		   = AnotherPackage
 
 mkHomeModule :: ModuleName -> Module
 mkHomeModule mod_nm = Module mod_nm ThisPackage
@@ -250,6 +267,9 @@ mkHomeModule mod_nm = Module mod_nm ThisPackage
 isHomeModule :: Module -> Bool
 isHomeModule (Module nm ThisPackage) = True
 isHomeModule _                       = False
+
+mkPackageModule :: ModuleName -> Module
+mkPackageModule mod_nm = Module mod_nm AnotherPackage
 
 -- Used temporarily when we first come across Foo.x in an interface
 -- file, but before we've opened Foo.hi.
@@ -264,18 +284,11 @@ isVanillaModule _                       = False
 mkPrelModule :: ModuleName -> Module
 mkPrelModule name = mkModule name preludePackage
 
-isPrelModule :: Module -> Bool
-isPrelModule (Module nm (AnotherPackage p)) | p == preludePackage = True
-isPrelModule _                       = False
-
 moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = _UNPK_ fs
 
 moduleName :: Module -> ModuleName
 moduleName (Module mod pkg_info) = mod
-
-modulePackage :: Module -> PackageName
-modulePackage (Module mod pkg_info) = packageInfoPackage pkg_info
 
 moduleUserString :: Module -> UserString
 moduleUserString (Module mod _) = moduleNameUserString mod

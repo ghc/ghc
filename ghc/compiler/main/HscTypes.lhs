@@ -58,10 +58,7 @@ import RdrName		( RdrName, RdrNameEnv, addListToRdrEnv, emptyRdrEnv,
 import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameSrcLoc )
 import NameEnv
 import OccName		( OccName )
-import Module		( Module, ModuleName, ModuleEnv,
-			  lookupModuleEnv, lookupModuleEnvByName, 
-			  emptyModuleEnv, moduleUserString
-			)
+import Module
 import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
@@ -158,7 +155,8 @@ the declarations into a single indexed map in the @PersistentRenamerState@.
 \begin{code}
 data ModIface 
    = ModIface {
-        mi_module   :: !Module,		    -- Complete with package info
+        mi_module   :: !Module,
+	mi_package  :: !PackageName,	    -- Which package the module comes from
         mi_version  :: !VersionInfo,	    -- Module version number
 
         mi_orphan   :: WhetherHasOrphans,   -- Whether this module has orphans
@@ -249,6 +247,7 @@ data ModDetails
 emptyModIface :: Module -> ModIface
 emptyModIface mod
   = ModIface { mi_module   = mod,
+	       mi_package  = preludePackage, -- XXX fully bogus
 	       mi_version  = initialVersionInfo,
 	       mi_usages   = [],
 	       mi_orphan   = False,

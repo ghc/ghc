@@ -209,7 +209,8 @@ iface		: '__interface' package mod_name
 		  rules_and_deprecs_part
 		  { let (rules,deprecs) = $14 () in
 		    ParsedIface {
-			pi_mod  = mkModule $3 $2,	-- Module itself
+			pi_mod  = $3,			-- Module name
+			pi_pkg = $2,			-- Package name
 			pi_vers = $4, 			-- Module version
 			pi_orphan  = $6,
 			pi_exports = (fst $5, $9),    	-- Exports

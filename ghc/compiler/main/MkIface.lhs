@@ -518,7 +518,7 @@ writeIface hi_path mod_iface
 pprIface :: ModIface -> SDoc
 pprIface iface
  = vcat [ ptext SLIT("__interface")
-		<+> doubleQuotes (ptext opt_InPackage)
+		<+> doubleQuotes (ptext (mi_package iface))
 		<+> ppr (mi_module iface) <+> ppr (vers_module version_info)
 		<+> pp_sub_vers
 		<+> (if mi_orphan iface then char '!' else empty)

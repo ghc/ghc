@@ -59,7 +59,7 @@ import Name		( Name, OccName, NamedThing(..),
 			  decode, mkLocalName, mkKnownKeyGlobal
 			)
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, extendNameEnvList )
-import Module		( Module, ModuleName, ModuleSet, emptyModuleSet )
+import Module		( Module, ModuleName, ModuleSet, emptyModuleSet,				    PackageName )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc, noSrcLoc )
@@ -216,7 +216,8 @@ type IfaceDeprecs = Maybe (Either DeprecTxt [(RdrName,DeprecTxt)])
 
 data ParsedIface
   = ParsedIface {
-      pi_mod	   :: Module,				-- Complete with package info
+      pi_mod	   :: ModuleName,
+      pi_pkg       :: PackageName,
       pi_vers	   :: Version,		 		-- Module version number
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages

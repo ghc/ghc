@@ -21,7 +21,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDe
 			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import CmdLineOpts	( DynFlags, DynFlag(..), opt_InPackage )
 import RnMonad
 import RnExpr		( rnStmt )
 import RnNames		( getGlobalNames, exportsFromAvail )
@@ -403,6 +403,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 	final_decls = rn_local_decls ++ rn_imp_decls
 
 	mod_iface = ModIface {	mi_module   = this_module,
+			        mi_package  = opt_InPackage,
 				mi_version  = initialVersionInfo,
 				mi_usages   = my_usages,
 				mi_boot	    = False,
@@ -511,13 +512,14 @@ checkOldIface :: GhciMode
               -> DynFlags
 	      -> HomeIfaceTable -> HomeSymbolTable
 	      -> PersistentCompilerState
+	      -> Module
 	      -> FilePath
 	      -> Bool 			-- Source unchanged
 	      -> Maybe ModIface 	-- Old interface from compilation manager, if any
 	      -> IO (PersistentCompilerState, Bool, (RecompileRequired, Maybe ModIface))
 				-- True <=> errors happened
 
-checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_iface
+checkOldIface ghci_mode dflags hit hst pcs mod iface_path source_unchanged maybe_iface
     = runRn dflags hit hst pcs (panic "Bogus module") $
 
 	-- CHECK WHETHER THE SOURCE HAS CHANGED
@@ -531,9 +533,10 @@ checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_ifa
          returnRn (outOfDate, maybe_iface)
     else
 
+    setModuleRn mod $
     case maybe_iface of
        Just old_iface -> -- Use the one we already have
-                         setModuleRn (mi_module old_iface) (check_versions old_iface)
+                         check_versions old_iface
 
        Nothing -- try and read it from a file
           -> readIface iface_path	`thenRn` \ read_result ->
@@ -544,9 +547,18 @@ checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_ifa
 			   	   $$ nest 4 err) `thenRn_`
 	                   returnRn (outOfDate, Nothing)
 
-               Right parsed_iface
-                      -> setModuleRn (pi_mod parsed_iface) $
-                         loadOldIface parsed_iface `thenRn` \ m_iface ->
+               Right parsed_iface ->
+		      let read_mod_name = pi_mod parsed_iface
+			  wanted_mod_name = moduleName mod
+		      in
+		      if (wanted_mod_name /= read_mod_name) then
+			 traceHiDiffsRn (
+			    text "Existing interface file has wrong module name: "
+				 <> quotes (ppr read_mod_name)
+			   	) `thenRn_`
+	                 returnRn (outOfDate, Nothing)
+		      else
+                         loadOldIface mod parsed_iface `thenRn` \ m_iface ->
                          check_versions m_iface
     where
        check_versions :: ModIface -> RnMG (RecompileRequired, Maybe ModIface)
@@ -563,11 +575,10 @@ I think the following function should now have a more representative name,
 but what?
 
 \begin{code}
-loadOldIface :: ParsedIface -> RnMG ModIface
+loadOldIface :: Module -> ParsedIface -> RnMG ModIface
 
-loadOldIface parsed_iface
+loadOldIface mod parsed_iface
   = let iface = parsed_iface 
-        mod = pi_mod iface
     in
     initIfaceRnMS mod (
 	loadHomeDecls (pi_decls iface)	`thenRn` \ decls ->
@@ -589,7 +600,8 @@ loadOldIface parsed_iface
 
 	decls = mkIfaceDecls new_decls new_rules new_insts
 
- 	mod_iface = ModIface { mi_module = mod, mi_version = version,
+ 	mod_iface = ModIface { mi_module = mod, mi_package = pi_pkg parsed_iface,
+			       mi_version = version,
 			       mi_exports = avails, mi_usages  = usages,
 			       mi_boot = False, mi_orphan = pi_orphan iface, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,

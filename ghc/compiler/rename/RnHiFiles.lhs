@@ -221,7 +221,8 @@ tryLoadInterface doc_str mod_name from
 	-- Now add info about this module to the PIT
 	has_orphans = pi_orphan iface
 	new_pit   = extendModuleEnv pit mod mod_iface
- 	mod_iface = ModIface { mi_module = mod, mi_version = version,
+ 	mod_iface = ModIface { mi_module = mod, mi_package = pi_pkg iface,
+			       mi_version = version,
 			       mi_orphan = has_orphans, mi_boot = hi_boot_file,
 			       mi_exports = avails, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
@@ -511,18 +512,14 @@ findAndReadIface doc_str mod_name hi_boot_file
 	   readIface file `thenRn` \ read_result ->
 	   case read_result of
                 Left bad -> returnRn (Left bad)
-                Right iface 
-                   -> let read_mod = pi_mod iface
-		      in -- check that the module names agree
-			 checkRn
-			   (wanted_mod == read_mod)
-		   	   (hiModuleNameMismatchWarn wanted_mod read_mod)
+                Right iface ->  -- check that the module names agree
+		      let read_mod_name = pi_mod iface
+			  wanted_mod_name = moduleName wanted_mod
+		      in
+		      checkRn
+			  (wanted_mod_name == read_mod_name)
+		   	  (hiModuleNameMismatchWarn wanted_mod_name read_mod_name)
 					`thenRn_`
-			 -- check that the package names agree
-			 warnCheckRn 
-			   (modulePackage wanted_mod == modulePackage read_mod)
-		   	   (packageNameMismatchWarn wanted_mod read_mod)
-					 `thenRn_`
 		         returnRn (Right (wanted_mod, iface))
 	-- Can't find it
       other   -> traceRn (ptext SLIT("...not found"))	`thenRn_`
@@ -644,22 +641,13 @@ badIfaceFile file err
   = vcat [ptext SLIT("Bad interface file:") <+> text file, 
 	  nest 4 err]
 
-hiModuleNameMismatchWarn :: Module -> Module  -> Message
+hiModuleNameMismatchWarn :: ModuleName -> ModuleName -> Message
 hiModuleNameMismatchWarn requested_mod read_mod = 
     hsep [ ptext SLIT("Something is amiss; requested module name")
-	 , ppr (moduleName requested_mod)
+	 , ppr requested_mod
 	 , ptext SLIT("differs from name found in the interface file")
    	 , ppr read_mod
   	 ]
-
-packageNameMismatchWarn :: Module -> Module  -> Message
-packageNameMismatchWarn requested_mod read_mod = 
-    fsep [ ptext SLIT("Module"), quotes (ppr requested_mod), 
-	  ptext SLIT("is located in package"), 
-	  quotes (ptext (modulePackage requested_mod)),
-	  ptext SLIT("but its interface file claims it is part of package"),
-	  quotes (ptext (modulePackage read_mod))
-	]
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
