@@ -19,8 +19,6 @@ module PprAbsC (
 #include "HsVersions.h"
 
 import IO	( Handle )
--- import Char	( Char, isDigit, isPrint )
--- import GlaExts	( Addr(..) )
 
 import AbsCSyn
 import ClosureInfo

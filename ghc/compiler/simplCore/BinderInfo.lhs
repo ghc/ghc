@@ -47,19 +47,19 @@ data BinderInfo
 
   | ManyOcc	-- Everything else besides DeadCode and OneOccs
 
-	Int	-- number of arguments on stack when called; this is a minimum guarantee
+	!Int	-- number of arguments on stack when called; this is a minimum guarantee
 
 
   | OneOcc	-- Just one occurrence (or one each in
 		-- mutually-exclusive case alts).
 
-      FunOrArg	-- How it occurs
+      !FunOrArg	-- How it occurs
 
-      DuplicationDanger
+      !DuplicationDanger
 
-      InsideSCC
+      !InsideSCC
 
-      Int	-- Number of mutually-exclusive case alternatives
+      !Int	-- Number of mutually-exclusive case alternatives
 		-- in which it occurs
 
 		-- Note that we only worry about the case-alt counts
@@ -67,7 +67,7 @@ data BinderInfo
 		-- time we *use* the info; we could be more clever for
 		-- other cases if we really had to. (WDP/PS)
 
-      Int	-- number of arguments on stack when called; minimum guarantee
+      !Int	-- number of arguments on stack when called; minimum guarantee
 
 -- In general, we are feel free to substitute unless
 -- (a) is in an argument position (ArgOcc)
@@ -188,73 +188,52 @@ addBinderInfo, orBinderInfo
 addBinderInfo DeadCode info2 = info2
 addBinderInfo info1 DeadCode = info1
 addBinderInfo info1 info2
- = case (min (getBinderInfoArity info1) (getBinderInfoArity info2)) of
-     (I# i#) -> ManyOcc (I# i#)
-      -- ManyOcc min (getBinderInfoArity info1) (getBinderInfoArity info2))
+ = ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
 
--- (orBinderInfo orig new) is used when combining occurrence 
--- info from branches of a case
+-- (orBinderInfo orig new) is used in two situations:
+-- First, when a variable whose occurrence info
+--   is currently "orig" is bound to a variable whose occurrence info is "new"
+--	eg  (\new -> e) orig
+--   What we want to do is to *worsen* orig's info to take account of new's
+--
+-- Second, when combining occurrence info from branches of a case
 
 orBinderInfo DeadCode info2 = info2
 orBinderInfo info1 DeadCode = info1
 orBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
 	     (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
   = let
-      -- Seriously maligned in order to make it stricter,
-      -- let's hope it is worth it..
      posn = combine_posns posn1 posn2
      scc  = combine_sccs  scc1  scc2
      dup  = combine_dups  dup1  dup2
      alts = n_alts1 + n_alts2
      ar   = min ar_1 ar_2
+   in
+   OneOcc posn dup scc alts ar
 
-      -- No CSE, please!
-     cont1 = case scc  of { InsideSCC -> cont2; _ -> cont2 }
-     cont2 = case dup  of { DupDanger -> cont3; _ -> cont3 }
-     cont3 = case alts of { (I# 0#)   -> cont4; _ -> cont4 }
-     cont4 = case ar   of { (I# 0#)   -> cont5; _ -> cont5 }
-     cont5 = OneOcc posn dup scc alts ar
-    in
-    case posn of { FunOcc -> cont1; _ -> cont1 }
 orBinderInfo info1 info2
- = case (min (getBinderInfoArity info1) (getBinderInfoArity info2)) of
-     (I# i#) -> ManyOcc (I# i#)
+ = ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
 
--- (andBinderInfo orig new) is used in two situations:
--- First, when a variable whose occurrence info
---   is currently "orig" is bound to a variable whose occurrence info is "new"
---	eg  (\new -> e) orig
---   What we want to do is to *worsen* orig's info to take account of new's
---
--- second, when completing a let-binding
+-- (andBinderInfo orig new) is used 
+-- when completing a let-binding
 --	let new = ...orig...
--- we compute the way orig occurs in (...orig...), and then use orBinderInfo
+-- we compute the way orig occurs in (...orig...), and then use andBinderInfo
 -- to worsen this info by the way new occurs in the let body; then we use
 -- that to worsen orig's currently recorded occurrence info.
 
 andBinderInfo DeadCode info2 = DeadCode
 andBinderInfo info1 DeadCode = DeadCode
-andBinderInfo (OneOcc posn1 dup1 scc1 (I# n_alts1#) (I# ar_1#))
-	      (OneOcc posn2 dup2 scc2 (I# n_alts2#) ar_2)
+andBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
+	      (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
   = let
-      -- Perversly maligned in order to make it stricter.
-     posn = combine_posns posn1 posn2
-     scc  = combine_sccs  scc1  scc2
-     dup  = combine_dups  dup1  dup2
-     alts = I# (n_alts1# +# n_alts2#)
-
-      -- No CSE, please!
-     cont1 = case scc  of { InsideSCC -> cont2; _ -> cont2 }
-     cont2 = case dup  of { DupDanger -> cont3; _ -> cont3 }
-     cont3 = case alts of { (I# 0#) -> cont4;   _ -> cont4 }
-     cont4 = OneOcc posn dup scc alts (I# ar_1#)
+       posn = combine_posns posn1 posn2
+       scc  = combine_sccs  scc1  scc2
+       dup  = combine_dups  dup1  dup2
+       alts = n_alts1 + n_alts2
     in
-    case posn of {FunOcc -> cont1; _ -> cont1}
+    OneOcc posn dup scc alts ar_1
 
-andBinderInfo info1 info2 = 
- case getBinderInfoArity info1 of
-   (I# i#) -> ManyOcc (I# i#)
-               --ManyOcc (getBinderInfoArity info1)
+andBinderInfo info1 info2 = ManyOcc (getBinderInfoArity info1)
 
 
 combine_posns FunOcc FunOcc = FunOcc -- see comment at FunOrArg defn
@@ -262,7 +241,7 @@ combine_posns _  	 _  = ArgOcc
 
 combine_dups DupDanger _ = DupDanger	-- Too paranoid?? ToDo
 combine_dups _ DupDanger = DupDanger
-combine_dups _ _	     = NoDupDanger
+combine_dups _ _	 = NoDupDanger
 
 combine_sccs InsideSCC _ = InsideSCC	-- Too paranoid?? ToDo
 combine_sccs _ InsideSCC = InsideSCC

@@ -5,19 +5,19 @@
 
 \begin{code}
 module SimplEnv (
-	nullSimplEnv, combineSimplEnv,
-	pprSimplEnv, -- debugging only
+	nullSimplEnv, 
+	getEnvs, setTyEnv, setIdEnv, notInScope, setSubstEnvs,
 
 	bindTyVar, bindTyVars, simplTy,
 
-	lookupId, bindIdToAtom,
+	lookupIdSubst, lookupOutIdEnv, 
 
-	getSubstEnvs, setTyEnv, setIdEnv, notInScope,
+	bindIdToAtom, bindIdToExpr,
 
 	markDangerousOccs,
-	lookupRhsInfo, lookupOutIdEnv, isEvaluated,
+	lookupRhsInfo, isEvaluated,
 	extendEnvGivenBinding, extendEnvGivenNewRhs,
-	extendEnvGivenRhsInfo, extendEnvGivenInlining,
+	extendEnvGivenRhsInfo,
 
 	lookForConstructor,
 
@@ -29,7 +29,6 @@ module SimplEnv (
 	-- Types
 	SwitchChecker,
 	SimplEnv, 
-	InIdEnv, InTypeEnv,
 	UnfoldConApp,
 	RhsInfo(..),
 
@@ -43,8 +42,8 @@ module SimplEnv (
 #include "HsVersions.h"
 
 import BinderInfo	( orBinderInfo, andBinderInfo, noBinderInfo, isOneOcc,
-			  okToInline, 
-			  BinderInfo {-instances, too-}
+			  okToInline, isOneFunOcc,
+			  BinderInfo
 			)
 import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
 			  SimplifierSwitch(..), SwitchResult(..)
@@ -54,7 +53,7 @@ import CoreUnfold	( mkFormSummary, couldBeSmallEnoughToInline, whnfOrBottom,
 			  Unfolding(..), SimpleUnfolding(..), FormSummary(..),
 			  calcUnfoldingGuidance	)
 import CoreUtils	( coreExprCc )
-import CostCentre	( CostCentre, subsumedCosts, noCostCentreAttached )
+import CostCentre	( CostCentre, subsumedCosts, costsAreSubsumed, noCostCentreAttached )
 import FiniteMap	-- lots of things
 import Id		( getInlinePragma,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, delOneFromIdEnv,
@@ -70,7 +69,7 @@ import TyVar		( TyVarEnv, emptyTyVarEnv, plusTyVarEnv, addToTyVarEnv, growTyVarE
 			  TyVar
 			)
 import Unique		( Unique{-instance Outputable-}, Uniquable(..) )
-import UniqFM		( addToUFM, addToUFM_C, ufmToList )
+import UniqFM		( addToUFM, addToUFM_C, ufmToList, mapUFM )
 import Util		( Eager, returnEager, zipEqual, thenCmp, cmpList )
 import Outputable
 \end{code}
@@ -125,54 +124,85 @@ Id.  Unfoldings in the Id itself are used only for imported things
 inside the Ids, etc.).
 
 \begin{code}
-type InTypeEnv = (TyVarSet,		-- In-scope tyvars (in result)
-		  TyVarEnv Type)	-- Type substitution
+data SimplEnv
+  = SimplEnv
+	SwitchChecker
+	CostCentre		-- The enclosing cost-centre (when profiling)
+	SimplTypeEnv		-- Maps old type variables to new clones
+	SimplValEnv		-- Maps locally-bound Ids to new clones
+	ConAppMap		-- Maps constructor applications back to OutIds
+
+type SimplTypeEnv = (TyVarSet,		-- In-scope tyvars (in result)
+		     TyVarEnv Type)	-- Type substitution
 	-- If t is in the in-scope set, it certainly won't be
 	-- in the domain of the substitution, and vice versa
 
-type InIdEnv = (IdEnv Id,		-- In-scope Ids (in result)
-		IdEnv OutArg)		-- Id substitution
-	-- The in-scope set is represented by an IdEnv, because
-	-- we use it to propagate pragma info etc from binding
-	-- site to occurrences.
+type SimplValEnv = (IdEnv StuffAboutId,	-- Domain includes *all* in-scope 
+					-- Ids (in result), range gives info about them
+		    IdEnv SubstInfo)	-- Id substitution
+	-- The first envt tells what Ids are in scope; it
+	-- corresponds to the TyVarSet in SimplTypeEnv
 
 	-- The substitution usually maps an Id to its clone,
 	-- but if the orig defn is a let-binding, and
 	-- the RHS of the let simplifies to an atom,
 	-- we just add the binding to the substitution and elide the let.
+	-- 
+	-- Ids in the domain of the substitution are *not* in scope;
+	-- they *must* be substituted for the given OutArg
 
-data SimplEnv
-  = SimplEnv
-	SwitchChecker
-	CostCentre		-- The enclosing cost-centre (when profiling)
-	InTypeEnv		-- Maps old type variables to new clones
-	InIdEnv			-- Maps locally-bound Ids to new clones
-	OutIdEnv		-- Info about the values of OutIds
-	ConAppMap		-- Maps constructor applications back to OutIds
+data SubstInfo 
+  = SubstArg OutArg	-- The Id maps to an already-substituted atom
+  | SubstExpr 			-- Id maps to an as-yet-unsimplified expression
+	(TyVarEnv Type) 	-- ...hence we need to capture the substitution
+	(IdEnv SubstInfo)	--    environments too
+	SimplifiableCoreExpr
+	
+type StuffAboutId = (OutId, 		-- Always has the same unique as the
+					-- Id that maps to it; but may have better
+					-- IdInfo, and a correctly-substituted type,
+					-- than the occurrences of the Id.  So use
+					-- this to replace occurrences
+
+		     BinderInfo,	-- How it occurs
+					-- We keep this info so we can modify it when 
+					-- something changes. 
+
+		     RhsInfo)		-- Info about what it is bound to
+\end{code}
+
+The @RhsInfo@ part tells about the value to which the @OutId@ is bound.
+
+\begin{code}
+data RhsInfo = NoRhsInfo
+	     | OtherLit [Literal]		-- It ain't one of these
+	     | OtherCon [Id]			-- It ain't one of these
+	     | OutUnfolding CostCentre
+			    SimpleUnfolding	-- Already-simplified unfolding
+\end{code}
 
 
+\begin{code}
 nullSimplEnv :: SwitchChecker -> SimplEnv
 
 nullSimplEnv sw_chkr
-  = SimplEnv sw_chkr subsumedCosts (emptyTyVarSet, emptyTyVarEnv) (nullIdEnv, nullIdEnv) nullIdEnv nullConApps
+  = SimplEnv sw_chkr subsumedCosts (emptyTyVarSet, emptyTyVarEnv) (nullIdEnv, nullIdEnv) nullConApps
 
-combineSimplEnv :: SimplEnv -> SimplEnv -> SimplEnv
-combineSimplEnv env@(SimplEnv chkr _       _      _         out_id_env con_apps)
-	    new_env@(SimplEnv _    encl_cc ty_env in_id_env _          _       )
-  = SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps
+getEnvs :: SimplEnv -> (SimplTypeEnv, SimplValEnv)
+getEnvs (SimplEnv _ _ ty_env id_env _) = (ty_env, id_env)
 
-pprSimplEnv (SimplEnv _ _ ty_env in_id_env out_id_env con_apps) = panic "pprSimplEnv"
+setTyEnv :: SimplEnv -> SimplTypeEnv -> SimplEnv
+setTyEnv (SimplEnv chkr encl_cc _ in_id_env con_apps) ty_env
+  = SimplEnv chkr encl_cc ty_env in_id_env con_apps
 
-getSubstEnvs :: SimplEnv -> (InTypeEnv, InIdEnv)
-getSubstEnvs (SimplEnv _ _ ty_env in_id_env _ _) = (ty_env, in_id_env)
+setIdEnv :: SimplEnv -> SimplValEnv -> SimplEnv
+setIdEnv (SimplEnv chkr encl_cc ty_env _ con_apps) id_env
+  = SimplEnv chkr encl_cc ty_env id_env con_apps
 
-setTyEnv :: SimplEnv -> InTypeEnv -> SimplEnv
-setTyEnv (SimplEnv chkr encl_cc _ in_id_env out_id_env con_apps) ty_env
-  = SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps
-
-setIdEnv :: SimplEnv -> InIdEnv -> SimplEnv
-setIdEnv (SimplEnv chkr encl_cc ty_env _ out_id_env con_apps) id_env
-  = SimplEnv chkr encl_cc ty_env id_env out_id_env con_apps
+setSubstEnvs :: SimplEnv -> TyVarEnv Type -> IdEnv SubstInfo -> SimplEnv
+setSubstEnvs (SimplEnv chkr encl_cc (in_scope_tyvars, _) (in_scope_ids, _) con_apps)
+	     ty_subst id_subst
+  = SimplEnv chkr encl_cc (in_scope_tyvars, ty_subst) (in_scope_ids, id_subst) con_apps
 \end{code}
 
 
@@ -184,10 +214,10 @@ setIdEnv (SimplEnv chkr encl_cc ty_env _ out_id_env con_apps) id_env
 
 \begin{code}
 getSwitchChecker :: SimplEnv -> SwitchChecker
-getSwitchChecker (SimplEnv chkr _ _ _ _ _) = chkr
+getSwitchChecker (SimplEnv chkr _ _ _ _) = chkr
 
 switchIsSet :: SimplEnv -> SimplifierSwitch -> Bool
-switchIsSet (SimplEnv chkr _ _ _ _ _) switch
+switchIsSet (SimplEnv chkr _ _ _ _) switch
   = switchIsOn chkr switch
 
 getSimplIntSwitch :: SwitchChecker -> (Int-> SimplifierSwitch) -> Int
@@ -196,8 +226,8 @@ getSimplIntSwitch chkr switch
 
 	-- Crude, but simple
 setCaseScrutinee :: SimplEnv -> SimplEnv
-setCaseScrutinee (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
-  = SimplEnv chkr' encl_cc ty_env in_id_env out_id_env con_apps
+setCaseScrutinee (SimplEnv chkr encl_cc ty_env id_env con_apps)
+  = SimplEnv chkr' encl_cc ty_env id_env con_apps
   where
     chkr' SimplCaseScrutinee = SwBool True
     chkr' other		     = chkr other
@@ -230,16 +260,19 @@ and 	(b) Consider the following example
 	then we won't get deforestation at all.
 	We havn't solved this problem yet!
 
-We prepare the envt by simply discarding the out_id_env, which has
+We prepare the envt by simply modifying the id_env, which has
 all the unfolding info. At one point we did it by modifying the chkr so
 that it said "EssentialUnfoldingsOnly", but that prevented legitmate, and important,
 simplifications happening in the body of the RHS.
 
 \begin{code}
 switchOffInlining :: SimplEnv -> SimplEnv
-switchOffInlining (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
-  = SimplEnv chkr encl_cc ty_env in_id_env nullIdEnv nullConApps
+switchOffInlining (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
+  = SimplEnv chkr encl_cc ty_env (mapUFM forget in_scope_ids, id_subst) nullConApps
+  where
+    forget (id, binder_info, rhs_info) = (id, noBinderInfo, NoRhsInfo)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -250,11 +283,14 @@ switchOffInlining (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
 \begin{code}
 setEnclosingCC :: SimplEnv -> CostCentre -> SimplEnv
 
-setEnclosingCC (SimplEnv chkr _ ty_env in_id_env out_id_env con_apps) encl_cc
-  = SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps
+setEnclosingCC env@(SimplEnv chkr _ ty_env id_env con_apps) encl_cc
+  | costsAreSubsumed encl_cc
+  = env
+  | otherwise
+  = SimplEnv chkr encl_cc ty_env id_env con_apps
 
 getEnclosingCC :: SimplEnv -> CostCentre
-getEnclosingCC (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) = encl_cc
+getEnclosingCC (SimplEnv chkr encl_cc ty_env id_env con_apps) = encl_cc
 \end{code}
 
 %************************************************************************
@@ -268,20 +304,20 @@ They don't affect what tyvars are in scope.
 
 \begin{code}
 bindTyVar :: SimplEnv -> TyVar -> Type -> SimplEnv
-bindTyVar (SimplEnv chkr encl_cc (tyvars, ty_subst) in_id_env out_id_env con_apps) tyvar ty
-  = SimplEnv chkr encl_cc (tyvars, new_ty_subst) in_id_env out_id_env con_apps
+bindTyVar (SimplEnv chkr encl_cc (tyvars, ty_subst) id_env con_apps) tyvar ty
+  = SimplEnv chkr encl_cc (tyvars, new_ty_subst) id_env con_apps
   where
     new_ty_subst = addToTyVarEnv ty_subst tyvar ty
 
 bindTyVars :: SimplEnv -> TyVarEnv Type -> SimplEnv
-bindTyVars (SimplEnv chkr encl_cc (tyvars, ty_subst) in_id_env out_id_env con_apps) extra_subst
-  = SimplEnv chkr encl_cc (tyvars, new_ty_subst) in_id_env out_id_env con_apps
+bindTyVars (SimplEnv chkr encl_cc (tyvars, ty_subst) id_env con_apps) extra_subst
+  = SimplEnv chkr encl_cc (tyvars, new_ty_subst) id_env con_apps
   where
     new_ty_subst = ty_subst `plusTyVarEnv` extra_subst
 \end{code}
 
 \begin{code}
-simplTy (SimplEnv _ _ (_, ty_subst) _ _ _) ty = returnEager (instantiateTy ty_subst ty)
+simplTy (SimplEnv _ _ (_, ty_subst) _ _) ty = returnEager (instantiateTy ty_subst ty)
 \end{code}
 
 %************************************************************************
@@ -290,25 +326,14 @@ simplTy (SimplEnv _ _ (_, ty_subst) _ _ _) ty = returnEager (instantiateTy ty_su
 %*									*
 %************************************************************************
 
-\begin{code}
-lookupId :: SimplEnv -> Id -> Eager ans OutArg
-
-lookupId (SimplEnv _ _ _ (in_scope_ids, id_subst) _ _) id
-  = case lookupIdEnv id_subst id of
-      Just atom -> returnEager atom
-      Nothing   -> case lookupIdEnv in_scope_ids id of
-			Just id' -> returnEager (VarArg id')
-			Nothing  -> returnEager (VarArg id)
-\end{code}
-
 notInScope forgets that the specified binder is in scope.
 It is used when we decide to bind a let(rec) bound thing to
 an atom, *after* the Id has been added to the in-scope mapping by simplBinder. 
 
 \begin{code}
 notInScope :: SimplEnv -> OutBinder -> SimplEnv
-notInScope (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) out_id_env con_apps) id
-  = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) out_id_env con_apps
+notInScope (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps) id
+  = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) con_apps
   where
     new_in_scope_ids = delOneFromIdEnv in_scope_ids id
 \end{code}
@@ -321,15 +346,28 @@ bindIdToAtom :: SimplEnv
              -> OutArg 	-- Val args only, please
 	     -> SimplEnv
 
-bindIdToAtom (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) out_id_env con_apps)
-		    (in_id,occ_info) atom
-  = case atom of
-     LitArg _      -> SimplEnv chkr encl_cc ty_env new_in_id_env out_id_env con_apps
-     VarArg out_id -> SimplEnv chkr encl_cc ty_env new_in_id_env 
-			       (modifyOccInfo out_id_env (uniqueOf out_id, occ_info))
-			       con_apps
+bindIdToAtom (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
+	     (in_id,occ_info) atom
+  = SimplEnv chkr encl_cc ty_env (in_scope_ids', id_subst') con_apps
   where
-    new_in_id_env  = (in_scope_ids, addOneToIdEnv id_subst in_id atom)
+    id_subst'     = addOneToIdEnv id_subst in_id (SubstArg atom)
+    in_scope_ids' =  case atom of
+			LitArg _      -> in_scope_ids
+			VarArg out_id -> modifyOccInfo in_scope_ids (uniqueOf out_id) occ_info
+
+bindIdToExpr :: SimplEnv
+	     -> InBinder
+             -> SimplifiableCoreExpr
+	     -> SimplEnv
+
+bindIdToExpr (SimplEnv chkr encl_cc ty_env@(_, ty_subst) (in_scope_ids, id_subst) con_apps)
+	     (in_id,occ_info) expr
+  = ASSERT( isOneFunOcc occ_info )	-- Binder occurs just once, safely, so no
+					-- need to adjust occurrence info for RHS, 
+					-- unlike bindIdToAtom
+    SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst') con_apps
+  where
+    id_subst' = addOneToIdEnv id_subst in_id (SubstExpr ty_subst id_subst expr)
 \end{code}
 
 
@@ -339,39 +377,12 @@ bindIdToAtom (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) out_id_env c
 %*									*
 %************************************************************************
 
-
-The domain of @OutIdInfo@ is some, but not necessarily all, in-scope @OutId@s;
-both locally-bound ones, and perhaps some imported ones too.
-
 \begin{code}
-type OutIdEnv = IdEnv (OutId, BinderInfo, RhsInfo)
-\end{code}
-
-The "Id" part is just so that we can recover the domain of the mapping, which
-IdEnvs don't allow directly.
-
-The @BinderInfo@ tells about the occurrences of the @OutId@.
-Anything that isn't in here should be assumed to occur many times.
-We keep this info so we can modify it when something changes.
-
-The @RhsInfo@ part tells about the value to which the @OutId@ is bound.
-
-\begin{code}
-data RhsInfo = NoRhsInfo
-	     | OtherLit [Literal]		-- It ain't one of these
-	     | OtherCon [Id]			-- It ain't one of these
-
-		-- InUnfolding is used for let(rec) bindings that
-		-- are *definitely* going to be inlined.
-		-- We record the un-simplified RHS and drop the binding
-	     | InUnfolding SimplEnv		-- Un-simplified unfolding
-			   SimplifiableCoreExpr	-- (need to snag envts therefore)
-
-	     | OutUnfolding CostCentre
-			    SimpleUnfolding	-- Already-simplified unfolding
+lookupIdSubst :: SimplEnv -> InId -> Maybe SubstInfo
+lookupIdSubst (SimplEnv _ _ _ (_, id_subst) _) id = lookupIdEnv id_subst id
 
 lookupOutIdEnv :: SimplEnv -> OutId -> Maybe (OutId,BinderInfo,RhsInfo)
-lookupOutIdEnv (SimplEnv _ _ _ _ out_id_env _) id = lookupIdEnv out_id_env id
+lookupOutIdEnv (SimplEnv _ _ _ (in_scope_ids, _) _) id = lookupIdEnv in_scope_ids id
 
 lookupRhsInfo :: SimplEnv -> OutId -> RhsInfo
 lookupRhsInfo env id
@@ -406,36 +417,26 @@ mkSimplUnfoldingGuidance chkr out_id rhs
   = calcUnfoldingGuidance (getInlinePragma out_id) opt_UnfoldingCreationThreshold rhs
 
 extendEnvGivenRhsInfo :: SimplEnv -> OutId -> BinderInfo -> RhsInfo -> SimplEnv
-extendEnvGivenRhsInfo env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
+extendEnvGivenRhsInfo env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
 	              out_id occ_info rhs_info
-  = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
+  = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) con_apps
   where
-    new_out_id_env = addToUFM_C modifyOutEnvItem out_id_env out_id 
-				(out_id, occ_info, rhs_info)
+    new_in_scope_ids = addToUFM_C modifyOutEnvItem in_scope_ids out_id 
+				  (out_id, occ_info, rhs_info)
 \end{code}
 
 
 \begin{code}
-modifyOccInfo out_id_env (uniq, new_occ)
-  = modifyIdEnv_Directly modify_fn out_id_env uniq
+modifyOccInfo in_scope_ids uniq new_occ
+  = modifyIdEnv_Directly modify_fn in_scope_ids uniq
   where
     modify_fn (id,occ,rhs) = (id, orBinderInfo occ new_occ, rhs)
 
-markDangerousOccs (SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps) atoms
-  = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
+markDangerousOccs (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps) atoms
+  = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) con_apps
   where
-    new_out_id_env = foldl (modifyIdEnv modify_fn) out_id_env [v | VarArg v <- atoms]
+    new_in_scope_ids = foldl (modifyIdEnv modify_fn) in_scope_ids [v | VarArg v <- atoms]
     modify_fn (id,occ,rhs) = (id, noBinderInfo, rhs)
-\end{code}
-
-
-\begin{code}
-extendEnvGivenInlining :: SimplEnv -> Id -> BinderInfo -> InExpr -> SimplEnv
-extendEnvGivenInlining env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
-		       id occ_info rhs
-  = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env con_apps
-  where
-    new_out_id_env = addToUFM out_id_env id (id, occ_info, InUnfolding env rhs)
 \end{code}
 
 
@@ -472,7 +473,7 @@ extendConApps con_apps id other_rhs = con_apps
 \end{code}
 
 \begin{code}
-lookForConstructor env@(SimplEnv _ _ _ _ _ con_apps) (Con con args)
+lookForConstructor env@(SimplEnv _ _ _ _ con_apps) (Con con args)
   | switchIsSet env SimplReuseCon
   = case lookupFM con_apps (UCA con val_args) of
 	Nothing     -> Nothing
@@ -587,47 +588,42 @@ extendEnvGivenNewRhs env out_id rhs
   = extendEnvGivenBinding env noBinderInfo out_id rhs
 
 extendEnvGivenBinding :: SimplEnv -> BinderInfo -> OutId -> OutExpr -> SimplEnv
-extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con_apps)
+extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
 	              occ_info out_id rhs
-  = SimplEnv chkr encl_cc ty_env in_id_env new_out_id_env new_con_apps 
+  = SimplEnv chkr encl_cc ty_env (new_in_scope_ids, id_subst) new_con_apps 
   where
-    new_out_id_env | okToInline (whnfOrBottom form) 
-				(couldBeSmallEnoughToInline out_id guidance) 
-				occ_info 
-		   = out_id_env_with_unfolding
-		   | otherwise
-		   = out_id_env
-	-- Don't bother to extend the OutIdEnv unless there is some possibility
+    new_in_scope_ids | okToInline (whnfOrBottom form) 
+				  (couldBeSmallEnoughToInline out_id guidance) 
+				  occ_info 
+		     = env_with_unfolding
+		     | otherwise
+		     = in_scope_ids
+	-- Don't bother to munge the OutIdEnv unless there is some possibility
 	-- that the thing might be inlined.  We check this by calling okToInline suitably.
 
     new_con_apps = _scc_ "eegnr.conapps" 
 		   extendConApps con_apps out_id rhs
 
 	-- Modify the occ info for rhs's interesting free variables.
-    out_id_env_with_unfolding = _scc_ "eegnr.modify_occ" 
-			        foldl modifyOccInfo env1 full_fv_occ_info
-		-- NB: full_fv_occ_info *combines* the occurrence of the current binder
-		-- with the occurrences of its RHS's free variables.  That's to take
-		-- account of:
-		--		let a = \x -> BIG in
-		--		let b = \f -> f a
-		--		in ...b...b...b...
-		-- Here "a" occurs exactly once. "b" simplifies to a small value.
-		-- So "b" will be inlined at each call site, and there's a good chance
-		-- that "a" will too.  So we'd better modify "a"s occurrence info to
-		-- record the fact that it can now occur many times by virtue that "b" can.
+	-- That's to take account of:
+	--		let a = \x -> BIG in
+	--		let b = \f -> f a
+	--		in ...b...b...b...
+	-- Here "a" occurs exactly once. "b" simplifies to a small value.
+	-- So "b" will be inlined at each call site, and there's a good chance
+	-- that "a" will too.  So we'd better modify "a"s occurrence info to
+	-- record the fact that it can now occur many times by virtue that "b" can.
+    env_with_unfolding = _scc_ "eegnr.modify_occ" 
+			 foldl zap env1 (ufmToList fv_occ_info)
+    zap env (uniq,_)   = modifyOccInfo env uniq occ_info
 
-    full_fv_occ_info	      = _scc_ "eegnr.full_fv" 
-			  	[ (uniq, fv_occ `andBinderInfo` occ_info) 
-				| (uniq, fv_occ) <- ufmToList fv_occ_info
-				]
 
 	-- Add an unfolding and rhs_info for the new Id.
-	-- If the out_id is already in the OutIdEnv (which can happen if
-	-- the call to extendEnvGivenBinding is from extendEnvGivenNewRhs)
+	-- If the out_id is already in the OutIdEnv (which should be the
+	-- case because it was put there by simplBinder)
 	-- then just replace the unfolding, leaving occurrence info alone.
     env1 		      =	_scc_ "eegnr.modify_out" 
-				addToUFM_C modifyOutEnvItem out_id_env out_id 
+				addToUFM_C modifyOutEnvItem in_scope_ids out_id 
 					   (out_id, occ_info, rhs_info)
 
 	-- Occurrence-analyse the RHS
@@ -637,7 +633,7 @@ extendEnvGivenBinding env@(SimplEnv chkr encl_cc ty_env in_id_env out_id_env con
 			      occurAnalyseExpr is_interesting rhs
 
     is_interesting v        = _scc_ "eegnr.mkidset" 
-			      case lookupIdEnv out_id_env v of
+			      case lookupIdEnv in_scope_ids v of
 				Just (_, occ, _) -> isOneOcc occ
 				other	         -> False
 

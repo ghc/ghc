@@ -246,17 +246,21 @@ Check if there's a macro-expansion, and if so rattle on.  Otherwise do
 the more sophisticated stuff.
 
 \begin{code}
-simplExpr env (Var v) args result_ty
-  = case (runEager $ lookupId env v) of
-      LitArg lit		-- A boring old literal
+simplExpr env (Var var) args result_ty
+  = case (runEager $ lookupIdSubst env var) of
+  
+      Just (SubstExpr ty_subst id_subst expr)
+	-> simplExpr (setSubstEnvs env ty_subst id_subst) expr args result_ty
+
+      Just (SubstArg (LitArg lit))		-- A boring old literal
 	-> ASSERT( null args )
 	   returnSmpl (Lit lit)
 
-      VarArg var 	-- More interesting!  An id!
-	-> completeVar env var args result_ty
-	 			-- Either Id is in the local envt, or it's a global.
-				-- In either case we don't need to apply the type
-				-- environment to it.
+      Just (SubstArg (VarArg var')) 	-- More interesting!  An id!
+	-> completeVar env var' args result_ty
+
+      Nothing  -- Not in the substitution; hand off to completeVar
+	-> completeVar env var args result_ty 
 \end{code}
 
 Literals
@@ -370,7 +374,7 @@ simplExpr env expr@(Lam (ValBinder binder) body) orig_args result_ty
  	-- on the arguments we've already beta-reduced into the body of the lambda
       = ASSERT( null args )	-- Value lambda must match value argument!
         let
-	    new_env = markDangerousOccs env (take n orig_args)
+	    new_env = markDangerousOccs env orig_args
         in
         simplValLam new_env expr 0 {- Guaranteed applied to at least 0 args! -} result_ty 
 				`thenSmpl` \ (expr', arity) ->
@@ -884,11 +888,11 @@ Notice that let to case occurs only if x is used strictly in its body
 \begin{code}
 -- Dead code is now discarded by the occurrence analyser,
 
-simplNonRec env binder@(id,occ_info) rhs body_c body_ty
-  | inlineUnconditionally ok_to_dup id occ_info
+simplNonRec env binder@(id,_) rhs body_c body_ty
+  | inlineUnconditionally ok_to_dup binder
   = 	-- The binder is used in definitely-inline way in the body
 	-- So add it to the environment, drop the binding, and continue
-    body_c (extendEnvGivenInlining env id occ_info rhs)
+    body_c (bindIdToExpr env binder rhs)
 
   | idWantsToBeINLINEd id
   = complete_bind env rhs	-- Don't mess about with floating or let-to-case on
@@ -1191,8 +1195,8 @@ simplRec env pairs body_c body_ty
 simplRecursiveGroup env new_ids []
   = returnSmpl ([], env)
 
-simplRecursiveGroup env (new_id : new_ids) ((binder@(id, occ_info), rhs) : pairs)
-  | inlineUnconditionally ok_to_dup id occ_info
+simplRecursiveGroup env (new_id : new_ids) ((binder, rhs) : pairs)
+  | inlineUnconditionally ok_to_dup binder
   = 	-- Single occurrence, so drop binding and extend env with the inlining
 	-- This is a little delicate, because what if the unique occurrence
 	-- is *before* this binding?  This'll never happen, because
@@ -1202,7 +1206,7 @@ simplRecursiveGroup env (new_id : new_ids) ((binder@(id, occ_info), rhs) : pairs
 	-- If these claims aren't right Core Lint will spot an unbound
 	-- variable.  A quick fix is to delete this clause for simplRecursiveGroup
     let
-	new_env = extendEnvGivenInlining env new_id occ_info rhs
+	new_env = bindIdToExpr env binder rhs
     in
     simplRecursiveGroup new_env new_ids pairs
 
@@ -1324,7 +1328,13 @@ simplArg :: SimplEnv -> InArg -> Eager ans OutArg
 simplArg env (LitArg lit) = returnEager (LitArg lit)
 simplArg env (TyArg  ty)  = simplTy env ty 	`appEager` \ ty' -> 
 			    returnEager (TyArg ty')
-simplArg env (VarArg id)  = lookupId env id
+simplArg env arg@(VarArg id)
+  = case lookupIdSubst env id of
+	Just (SubstArg arg') -> returnEager arg'
+	Just (SubstExpr _)   -> panic "simplArg"
+	Nothing		     -> case lookupOutIdEnv env id of
+				  Just (id', _, _) -> returnEager (VarArg id')
+				  Nothing          -> returnEager arg
 \end{code}
 
 %************************************************************************

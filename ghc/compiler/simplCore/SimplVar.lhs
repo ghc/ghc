@@ -69,16 +69,8 @@ completeVar env var args result_ty
 	      remaining_args
 	      result_ty
 
-	-- If there's an InUnfolding it means that there's no
-	-- let-binding left for the thing, so we'd better inline it!
-  | must_unfold
-  = let
-	Just (_, _, InUnfolding rhs_env rhs) = info_from_env
-    in
-    unfold var rhs_env rhs args result_ty
 
-
-	-- Conditional unfolding. There's a binding for the
+	-- Look for an unfolding. There's a binding for the
 	-- thing, but perhaps we want to inline it anyway
   | (  maybeToBool maybe_unfolding_info
     && (not essential_unfoldings_only || idMustBeINLINEd var)
@@ -93,10 +85,14 @@ completeVar env var args result_ty
 
 
   | otherwise
-  = returnSmpl (mkGenApp (Var var) args)
+  = returnSmpl (mkGenApp (Var var') args)
 
   where
-    info_from_env     = lookupOutIdEnv env var
+   info_from_env = lookupOutIdEnv env var
+   var'		 = case info_from_env of
+			Just (var', _, _) -> var'
+			Nothing           -> var
+
     unfolding_from_id = getIdUnfolding var
 
 	---------- Magic unfolding stuff
@@ -104,12 +100,7 @@ completeVar env var args result_ty
 				MagicUnfolding _ magic_fn -> applyMagicUnfoldingFun magic_fn 
 										    env args
 			        other 			  -> Nothing
-    (Just magic_result)	= maybe_magic_result
-
-	---------- Unfolding stuff
-    must_unfold = case info_from_env of
-			Just (_, _, InUnfolding _ _) -> True
-			other			     -> False
+    Just magic_result = maybe_magic_result
 
     maybe_unfolding_info 
 	= case (info_from_env, unfolding_from_id) of
@@ -230,7 +221,7 @@ simplBinder env (id, _)
 	returnSmpl (env', id3)
     )
   where
-    ((in_scope_tyvars, ty_subst), (in_scope_ids, id_subst)) = getSubstEnvs env
+    ((in_scope_tyvars, ty_subst), (in_scope_ids, id_subst)) = getEnvs env
     empty_ty_subst   = isEmptyTyVarEnv ty_subst
     not_in_scope     = not (id `elemIdEnv` in_scope_ids)
 
@@ -262,7 +253,7 @@ simplTyBinder env tyvar
     in
     returnSmpl (env', tyvar')
   where
-    ((tyvars, ty_subst), (ids, id_subst)) = getSubstEnvs env
+    ((tyvars, ty_subst), (ids, id_subst)) = getEnvs env
 
 simplTyBinders :: SimplEnv -> [TyVar] -> SmplM (SimplEnv, [TyVar])
 simplTyBinders env binders = mapAccumLSmpl simplTyBinder env binders

@@ -518,9 +518,9 @@ certain that every use can be inlined.  So, notably, any ArgOccs
 rule this out.  Since ManyOcc doesn't record FunOcc/ArgOcc 
 
 \begin{code}
-inlineUnconditionally :: Bool -> Id -> BinderInfo -> Bool
+inlineUnconditionally :: Bool -> (Id,BinderInfo) -> Bool
 
-inlineUnconditionally ok_to_dup id occ_info
+inlineUnconditionally ok_to_dup (id, occ_info)
   |  idMustNotBeINLINEd id = False
 
   |  isOneFunOcc occ_info
