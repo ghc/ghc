@@ -43,7 +43,8 @@ module JavaGen( javaGen ) where
 import Java
 
 import Literal	( Literal(..) )
-import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder, idPrimRep )
+import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder, idPrimRep
+		, isPrimOpId_maybe )
 import Name	( NamedThing(..), getOccString, isGlobalName 
 		, nameModule )
 import PrimRep  ( PrimRep(..) )
@@ -54,10 +55,14 @@ import qualified CoreSyn
 import CoreSyn	( CoreBind, CoreExpr, CoreAlt, CoreBndr,
 		  Bind(..), Alt, AltCon(..), collectBinders, isValArg
 		)
+import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import qualified CoreUtils
 import Module	( Module, moduleString )
 import TyCon	( TyCon, isDataTyCon, tyConDataCons )
 import Outputable
+
+import Maybe
+import PrimOp
 
 #include "HsVersions.h"
 
@@ -216,7 +221,8 @@ javaVar v | isGlobalName (idName v) = mkNew (javaIdType v) []
 
 javaLit :: Literal.Literal -> Expr
 javaLit (MachInt i)  = Literal (IntLit (fromInteger i))
-javaLit (MachChar c) = Literal (CharLit c)             
+javaLit (MachChar c) = Literal (CharLit c)
+javaLit (MachStr fs) = Literal (StringLit (_UNPK_ fs))
 javaLit other	     = pprPanic "javaLit" (ppr other)
 
 -- Pass in the 'shape' of the result.
@@ -245,13 +251,28 @@ javaCase :: (Expr -> Statement) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
 --	} else return null
 
 javaCase r e x alts
-  -- TODO: This will need to map prims to "haskell.runtime.Value".
-  =  javaArg Nothing e ++
+  | isIfThenElse && isPrimCmp = 
+       javaIfThenElse r (fromJust maybePrim) tExpr fExpr
+  | otherwise =
+       javaArg Nothing e ++
      [ var [Final] (javaName x)
 	           (whnf primRep (vmPOP (primRepToType primRep)))
      , IfThenElse (map mk_alt alts) (Just (Return javaNull))
      ]
   where
+     isIfThenElse = CoreUtils.exprType e == boolTy
+		    -- also need to check that x is not free in
+		    -- any of the branches.
+     maybePrim    = findCmpPrim e []
+     isPrimCmp    = isJust maybePrim
+     tExpr        = matches trueDataCon alts
+     fExpr        = matches falseDataCon alts
+
+     matches con [] = error "no match for true or false branch of if/then/else"
+     matches con ((DataAlt d,[],rhs):rest) | con == d = rhs
+     matches con ((DEFAULT,[],rhs):_)                 = rhs
+     matches con (other:rest)                         = matches con rest
+
      primRep = idPrimRep x
      whnf PtrRep = vmWHNF	-- needs evaluation
      whnf _      = id
@@ -264,6 +285,7 @@ javaCase r e x alts
 
 
      eqLit (MachInt n) = Op (Literal (IntLit n))
+
 			    "=="
 			    (Var (javaName x))
      eqLit (MachChar n) = Op (Literal (CharLit n))
@@ -278,6 +300,23 @@ javaCase r e x alts
 		      | (b,f) <- filter isId bs `zip` (constrToFields d)
 		      , not (isDeadBinder b)
 		      ]
+
+javaIfThenElse r cmp tExpr fExpr 
+{-
+ - Now what we need to do is generate code for the if/then/else.
+ - [all arguments are already check for simpleness (Var or Lit).]
+ - 
+ - if (<prim> arg1 arg2 arg3 ...) {
+ -	trueCode
+ -  } else {
+ -	falseCode
+ - }
+ -}
+ = [IfThenElse [(cmp,j_tExpr)] (Just j_fExpr)]
+ where
+   j_tExpr, j_fExpr :: Statement
+   j_tExpr = Block (javaExpr r tExpr)
+   j_fExpr = Block (javaExpr r fExpr)
 
 javaBind (NonRec x rhs)
 {-
@@ -355,6 +394,7 @@ javaApp r (CoreSyn.Var f) as
 				(javaPops as)
 				Nothing)]
     ; other ->   -- Not a saturated constructor
+	-- TODO: case isPrimOpId_maybe 
 	java_apply r (CoreSyn.Var f) as
     }
 	
@@ -384,14 +424,16 @@ javaPops args = [ vmPOP (primRepToType (Type.typePrimRep (CoreUtils.exprType a))
 -- pushing onto the stack (via one of the VM.PUSH* commands)
 -- the argument, perhaps thunked.
 
--- Later: this might take an argument that allows assignment
--- into a variable rather than pushing onto the stack.
-
 javaArg :: Maybe Name -> CoreExpr -> [Statement]
 javaArg _ (CoreSyn.Type t) = pprPanic "javaArg" (ppr t)
 javaArg ret e 
-   | isPrim primty && CoreUtils.exprIsTrivial e = javaExpr push e
-   | isPrim primty = 
+   | isPrimCall = [push (fromJust maybePrim)]
+	-- This is a shortcut, 
+	-- basic names and literals do not need a code block
+	-- to compute the value.
+	-- (Perhaps String literals might??)
+   | isPrim primty && exprIsTrivial e = javaExpr push e
+   | isPrim primty =
  	  let expr  = javaExpr vmRETURN e
 	      code  = access (vmWHNF (newCode expr)) (primRepToType primty)
 	  in [push code]
@@ -399,22 +441,32 @@ javaArg ret e
  	  let expr  = javaExpr vmRETURN e
 	      code  = newCode expr
 	      code' = if CoreUtils.exprIsValue e 
-		      || CoreUtils.exprIsTrivial e 
+		      || exprIsTrivial e 
 		      || isPrim primty
 		      then code
 		      else newThunk code
 	  in [push code']
    where
+	maybePrim  = findFnPrim e []
+	isPrimCall = isJust maybePrim
+
 	push e = case ret of
 		  Just name -> var [Final] name e
 		  Nothing -> vmPUSH e
 	corety = CoreUtils.exprType e
 	primty = Type.typePrimRep corety
-	isPrim PtrRep  = False
-	isPrim IntRep  = True
-	isPrim CharRep = True
+	isPrim PtrRep  = False	-- only this needs updated
+	isPrim _       = True
 
 coreTypeToType = primRepToType . Type.typePrimRep . CoreUtils.exprType
+
+-- The GOO version of this function
+exprIsTrivial (CoreSyn.Var v)
+  | Just op <- isPrimOpId_maybe v         = primOpIsDupable op
+  | otherwise                             = True
+exprIsTrivial (CoreSyn.Lit (MachInt _))   = True
+exprIsTrivial (CoreSyn.Lit (MachChar _))  = True
+exprIsTrivial other	      	          = False
 \end{code}
 
 %************************************************************************
@@ -487,6 +539,70 @@ newThunk e = New thunkType [e] Nothing
 
 vmArg :: Parameter
 vmArg = Parameter [Final] vmName
+
+{-
+data HaskPrim
+  = FunPrimOp Int 			-- number of arguments expected
+	   ([Expr] -> Expr)	-- mapping from arguments
+  | CmpPrimOp			-- to prim call
+    	    
+getPrimTrans ::
+-}
+
+-- This is called with boolean compares, checking 
+-- to see if we can do an obvious shortcut.
+-- If there is, we return a (GOO) function for doing this,
+
+-- so if, we have case (#< x y) of { True -> e1; False -> e2 },
+-- we will call splitCmpFn with (#< x y)
+-- This return Right (Op x "<" y)
+
+findCmpPrim :: CoreExpr -> [Expr] -> Maybe Expr
+findCmpPrim (CoreSyn.App f a) as =
+     case a of
+	CoreSyn.Var v -> findCmpPrim f (javaVar v:as)
+	CoreSyn.Lit l -> findCmpPrim f (javaLit l:as)
+	_ -> Nothing
+findCmpPrim (CoreSyn.Var p)   as = 
+	case isPrimOpId_maybe p of
+	  Just prim -> find_cmp_prim prim as
+	  Nothing   -> Nothing
+findCmpPrim _                 as = Nothing
+
+find_cmp_prim cmpPrim args@[a,b] = 
+   case cmpPrim of
+     IntGtOp -> fn ">"
+     IntGeOp -> fn ">="
+     IntEqOp -> fn "=="
+     IntNeOp -> fn "/="
+     IntLtOp -> fn "<"
+     IntLeOp -> fn "<="
+     _ -> Nothing
+  where
+	fn op = Just (Op a op b)
+find_cmp_prim _ _ = Nothing
+
+findFnPrim :: CoreExpr -> [Expr] -> Maybe Expr
+findFnPrim (CoreSyn.App f a) as =
+     case a of
+	CoreSyn.Var v -> findFnPrim f (javaVar v:as)
+	CoreSyn.Lit l -> findFnPrim f (javaLit l:as)
+	_ -> Nothing
+findFnPrim (CoreSyn.Var p)   as = 
+	case isPrimOpId_maybe p of
+	  Just prim -> find_fn_prim prim as
+	  Nothing   -> Nothing
+findFnPrim _                 as = Nothing
+
+find_fn_prim cmpPrim args@[a,b] = 
+   case cmpPrim of
+     IntAddOp -> fn "+"
+     IntSubOp -> fn "-"
+     IntMulOp -> fn "*"
+     _ -> Nothing
+  where
+	fn op = Just (Op a op b)
+find_fn_prim _ _ = Nothing
 \end{code}
 
 %************************************************************************
@@ -501,11 +617,15 @@ exprType (Literal lit)    = litType lit
 exprType (Cast t _)       = t
 exprType (New t _ _)      = t
 exprType (Call _ (Name _ t) _) = t
+exprType (Op _ op _) | op `elem` ["==","/=","<","<=","=>",">"]
+		     = PrimType PrimBoolean
+exprType (Op x op _) | op `elem` ["+","-","*"]
+		     = exprType x
 exprType expr = error ("can't figure out an expression type: " ++ show expr)
 
 litType (IntLit i)    = PrimType PrimInt
 litType (CharLit i)   = PrimType PrimChar
-litType (StringLit i) = error "<string?>"
+litType (StringLit i) = stringType
 \end{code}
 
 %************************************************************************
@@ -626,6 +746,8 @@ primRepToType ::PrimRep -> Type
 primRepToType PtrRep  = objectType
 primRepToType IntRep  = inttype
 primRepToType CharRep = chartype
+primRepToType AddrRep = objectType
+primRepToType other   = pprPanic "primRepToType" (ppr other)
 
 -- The function that makes the constructor name
 javaConstrWkrType :: DataCon -> Type
