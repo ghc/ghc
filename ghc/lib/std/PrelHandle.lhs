@@ -1180,17 +1180,6 @@ mayBlock fo act = do
 	CCALL(setNonBlockingIOFlag__) fo      -- reset file object.
 	CCALL(setConnNonBlockingIOFlag__) fo  -- reset (connected) file object.
         return rc
-
--- #ifdef __HUGS__
-threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()
-
--- Hugs does actually have the primops needed to implement these
--- but the primops don't actually do anything...
-threadDelay     (I# ms) = IO $ \s -> case delay# ms s     of s -> (# s, () #)
-threadWaitRead  (I# fd) = IO $ \s -> case waitRead# fd s  of s -> (# s, () #)
-threadWaitWrite (I# fd) = IO $ \s -> case waitWrite# fd s of s -> (# s, () #)
--- #endif
-
 \end{code}
 
 

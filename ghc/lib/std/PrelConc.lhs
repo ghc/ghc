@@ -194,19 +194,9 @@ specified file descriptor is available for reading (just like select).
 @threadWaitWrite@ is similar, but for writing on a file descriptor.
 
 \begin{code}
-{- Not yet -- SDM 
 threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()
 
-threadDelay (I# x#) = IO $ \ s# ->
-    case delay# x# s# of
-      s2# -> (# s2#, () #)
-
-threadWaitRead (I# x#) = IO $ \ s# -> 
-    case waitRead# x# s# of
-      s2# -> (# s2#, () #)
-
-threadWaitWrite (I# x#) = IO $ \ s# ->
-    case waitWrite# x# s# of
-      s2# -> (# s2#, () #)
--}
+threadDelay     (I# ms) = IO $ \s -> case delay# ms s     of s -> (# s, () #)
+threadWaitRead  (I# fd) = IO $ \s -> case waitRead# fd s  of s -> (# s, () #)
+threadWaitWrite (I# fd) = IO $ \s -> case waitWrite# fd s of s -> (# s, () #)
 \end{code}
