@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.10 1999/03/03 19:04:56 sof Exp $
+ * $Id: MBlock.c,v 1.11 1999/03/11 11:21:47 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -60,6 +60,10 @@
 /* guess */
 #define ASK_FOR_MEM_AT 0x50000000
 
+#elif hpux_TARGET_OS
+/* guess */
+#define ASK_FOR_MEM_AT 0x50000000
+
 #elif _WIN32
 /* doesn't matter, we use a reserve/commit algorithm */
 
@@ -91,6 +95,9 @@ getMBlocks(nat n)
 		 MAP_FIXED | MAP_PRIVATE, fd, 0);
       close(fd);
   }
+#elif hpux_TARGET_OS
+ ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
+	     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #else
   ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
 	     MAP_ANON | MAP_PRIVATE, -1, 0);

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.7 1999/03/03 19:27:23 sof Exp $
+ * $Id: ClosureMacros.h,v 1.8 1999/03/11 11:21:45 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -98,8 +98,9 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
  * _end } end of read-write data space 
  */
 extern StgFun start;
-extern StgFun TEXT_SECTION_END_MARKER_DECL;
-extern StgFun DATA_SECTION_END_MARKER_DECL;
+
+extern StgWord TEXT_SECTION_END_MARKER_DECL[];
+extern StgWord DATA_SECTION_END_MARKER_DECL[];
 
 #define IS_CODE_PTR(p) ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER)
 #define IS_DATA_PTR(p) ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && (P_)(p) < (P_)&DATA_SECTION_END_MARKER)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.4 1999/03/01 17:42:11 simonm Exp $
+ * $Id: StgCRun.c,v 1.5 1999/03/11 11:21:47 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -149,7 +149,7 @@ StgRun(StgFunPtr f)
     return (StgThreadReturnCode)R1.i;
 }
 
-#endif /* sparc_TARGET_ARCH */
+#endif /* alpha_TARGET_ARCH */
 
 /* -----------------------------------------------------------------------------
    HP-PA architecture
@@ -161,6 +161,8 @@ StgThreadReturnCode
 StgRun(StgFunPtr f) 
 {
     StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];
+    StgThredReturnCode ret;
+
     __asm__ volatile ("ldo %0(%%r30),%%r19\n"
 		      "\tstw %%r3, 0(0,%%r19)\n"
                       "\tstw %%r4, 4(0,%%r19)\n"
@@ -201,7 +203,8 @@ StgRun(StgFunPtr f)
 		      "\t.EXPORT " STG_RETURN ",ENTRY,PRIV_LEV=3\n"
                       STG_RETURN "\n"
                       /* "\tldo %0(%%r3),%%r19\n" */
-                      "\tldo %0(%%r30),%%r19\n"
+                      "\tldo %1(%%r30),%%r19\n"
+                      "\tcopy %%r11, %0\n"  /* save R1 */
 		      "\tldw  0(0,%%r19),%%r3\n"
                       "\tldw  4(0,%%r19),%%r4\n"
                       "\tldw  8(0,%%r19),%%r5\n"
@@ -230,11 +233,13 @@ StgRun(StgFunPtr f)
 		      "\tfldds   8(0,%%r19),%%fr19\n"
 		      "\tldo 32(%%r19),%%r19\n"
 		      "\tfldds -16(0,%%r19),%%fr20\n"
-		      "\tfldds  -8(0,%%r19),%%fr21\n" : :
-                      "n" (-(116 * sizeof(long) + 10 * sizeof(double))) : "%r19"
+		      "\tfldds  -8(0,%%r19),%%fr21\n" 
+		      : "=r" (ret) /* result */
+                      : "n" (-(116 * sizeof(long) + 10 * sizeof(double))) 
+		      : "%r19"
 		      );
 
-    return (StgThreadReturnCode)R1.i;
+    return ret;
 }
 
 #endif /* hppa1_1_TARGET_ARCH */
