@@ -19,8 +19,6 @@
 
 * For a module with no documentation section, include a "synopsis" header?
 
-* Parent button should be removed if there isn't a parent.
-
 * derived instance support isn't quite right (doing it properly is 
   hard, though).
 
@@ -32,8 +30,6 @@
 
 -----------------------------------------------------------------------------
 -- features
-
-* Generating a single index from many .haddock files should be possible.
 
 * nested itemized and enumerated lists.
 
