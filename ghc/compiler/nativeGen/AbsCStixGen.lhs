@@ -221,9 +221,9 @@ Here we handle top-level things, like @CCodeBlock@s and
        = StData (promote_to_word (getAmodeRep amode)) [a2stix amode]
 
     -- We need to promote any item smaller than a word to a word
-    promote_to_word Int8Rep = IntRep
-    promote_to_word CharRep = IntRep
-    promote_to_word other   = other
+    promote_to_word pk 
+       | sizeOf pk >= sizeOf IntRep  = pk
+       | otherwise                   = IntRep
 
     upd_reqd = closureUpdReqd cl_info
 

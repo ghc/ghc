@@ -156,14 +156,17 @@ mangleIndexTree (StIndex pk base off)
   = StPrim IntAddOp [
        base,
        let s = shift pk
-       in  ASSERT(toInteger s == expectJust "MachCode" (exactLog2 (sizeOf pk)))
-           if s == 0 then off else StPrim SllOp [off, StInt s]
+       in  if s == 0 then off else StPrim SllOp [off, StInt (toInteger s)]
       ]
   where
-    shift DoubleRep 	= 3::Integer
-    shift CharRep       = 2::Integer
-    shift Int8Rep       = 0::Integer
-    shift _ 	       	= IF_ARCH_alpha(3,2)
+    shift :: PrimRep -> Int
+    shift rep = case (fromInteger (sizeOf rep) :: Int) of
+                   1 -> 0
+                   2 -> 1
+                   4 -> 2
+                   8 -> 3
+                   other -> pprPanic "MachCode.mangleIndexTree.shift: unhandled rep size" 
+                                     (int other)
 \end{code}
 
 \begin{code}

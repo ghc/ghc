@@ -232,6 +232,7 @@ primCode ls IndexOffForeignObjOp_StablePtr rs = primCode_IndexOffForeignObjOp St
 primCode ls IndexOffForeignObjOp_Int64     rs = primCode_IndexOffForeignObjOp Int64Rep     ls rs
 primCode ls IndexOffForeignObjOp_Word64    rs = primCode_IndexOffForeignObjOp Word64Rep    ls rs
 
+primCode ls WriteOffAddrOp_Word8     rs = primCode_WriteOffAddrOp Word8Rep     ls rs
 primCode ls WriteOffAddrOp_Char      rs = primCode_WriteOffAddrOp Word8Rep     ls rs
 primCode ls WriteOffAddrOp_Int       rs = primCode_WriteOffAddrOp IntRep       ls rs
 primCode ls WriteOffAddrOp_Word      rs = primCode_WriteOffAddrOp WordRep      ls rs
