@@ -136,9 +136,7 @@ override datadir:=$(libdir)/imports/std
 INSTALL_LIBS  += $(LIBRARY)
 ifeq "$(way)" "dll"
 INSTALL_PROGS += $(DLL_NAME)
-INSTALL_LIBS  += PrelMain.dll_o
-else
-INSTALL_LIBS  += $(patsubst %.a,%_imp.a, $(LIBRARY))
+INSTALL_LIBS  += PrelMain.dll_o $(patsubst %.a,%_imp.a, $(LIBRARY))
 endif
 INSTALL_DATAS += $(HS_IFACES) PrelGHC.$(way_)hi
 ifeq "$(way)" "dll"
