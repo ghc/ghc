@@ -399,10 +399,10 @@ not			:: Bool -> Bool
 not True		=  False
 not False		=  True
 
--- |'otherwise' is defined as the value 'True'; it helps to make
+-- |'otherwise' is defined as the value 'True'.  It helps to make
 -- guards more readable.  eg.
 --
--- >  f x | x \< 0     = ...
+-- >  f x | x < 0     = ...
 -- >      | otherwise = ...
 otherwise		:: Bool
 otherwise 		=  True
