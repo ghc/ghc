@@ -101,3 +101,6 @@ test('conc048', compose(only_compiler_types(['ghc']),
                         omit_ways(['threaded','ghci'])), compile_and_run, [''])
 
 test('conc049', only_compiler_types(['ghc']), compile_and_run, ['-package stm'])
+
+test('conc050', compose(only_compiler_types(['ghc']),
+			extra_run_opts('10000')), compile_and_run, ['-package stm'])
