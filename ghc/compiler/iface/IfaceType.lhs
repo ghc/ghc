@@ -256,7 +256,7 @@ pprIfaceType :: Int -> IfaceType -> SDoc
 	-- Simple cases
 pprIfaceType ctxt_prec (IfaceTyVar tyvar)     = ppr tyvar
 pprIfaceType ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
-pprIfaceType ctxt_prec (IfacePredTy st)     = braces (ppr st)
+pprIfaceType ctxt_prec (IfacePredTy st)       = braces (ppr st)
 
 	-- Function types
 pprIfaceType ctxt_prec (IfaceFunTy ty1 ty2)

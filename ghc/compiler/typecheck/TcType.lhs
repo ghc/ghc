@@ -241,6 +241,10 @@ data TyVarDetails
 
    | InstTv	-- Ditto, but instance decl
 
+   | PatSigTv	-- Scoped type variable, introduced by a pattern
+		-- type signature
+		--	\ x::a -> e
+
    | VanillaTv	-- Everything else
 
 isUserTyVar :: TcTyVar -> Bool	-- Avoid unifying these if possible
@@ -266,6 +270,7 @@ tyVarBindingInfo tv
     details SigTv     = ptext SLIT("type signature")
     details ClsTv     = ptext SLIT("class declaration")
     details InstTv    = ptext SLIT("instance declaration")
+    details PatSigTv  = ptext SLIT("pattern type signature")
     details VanillaTv = ptext SLIT("//vanilla//")	-- Ditto
 \end{code}
 

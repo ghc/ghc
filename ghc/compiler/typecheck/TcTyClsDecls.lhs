@@ -27,7 +27,7 @@ import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsSigType, kcCheckHsType, 
 			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext )
 import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
-			  UserTypeCtxt(..), SourceTyCtxt(..), pprUserTypeCtxt ) 
+			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcUnify		( unifyKind )
 import TcType		( TcKind, ThetaType, TcType,
 			  mkArrowKind, liftedTypeKind, 
@@ -433,8 +433,7 @@ checkValidTyCl decl
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc
   | isSynTyCon tc 
-  = addErrCtxt (checkTypeCtxt syn_ctxt syn_rhs) $
-    checkValidType syn_ctxt syn_rhs
+  = checkValidType syn_ctxt syn_rhs
   | otherwise
   = 	-- Check the context on the data decl
     checkValidTheta (DataTyCtxt name) (tyConTheta tc)	`thenM_` 
@@ -529,23 +528,6 @@ checkValidClass cls
 ---------------------------------------------------------------------
 fieldTypeMisMatch field_name
   = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
-
-checkTypeCtxt ctxt ty
-  = vcat [ptext SLIT("In the type:") <+> ppr_ty,
-	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
-  where
-	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
-	-- something strange like {Eq k} -> k -> k, because there is no
-	-- ForAll at the top of the type.  Since this is going to the user
-	-- we want it to look like a proper Haskell type even then; hence the hack
-	-- 
-	-- This shows up in the complaint about
-	--	case C a where
-	--	  op :: Eq a => a -> a
-    ppr_ty | null forall_tvs = pprThetaArrow theta <+> ppr tau
-           | otherwise	     = ppr ty
-
-    (forall_tvs, theta, tau) = tcSplitSigmaTy ty
 
 dataConCtxt con = sep [ptext SLIT("When checking the data constructor:"),
 		       nest 2 (ex_part <+> pprThetaArrow ex_theta <+> ppr con <+> arg_part)]

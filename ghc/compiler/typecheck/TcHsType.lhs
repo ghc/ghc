@@ -34,7 +34,7 @@ import TcEnv		( tcExtendTyVarEnv, tcExtendTyVarKindEnv,
 			)
 import TcMType		( newKindVar, tcInstType, newMutTyVar,
 			  zonkTcType, zonkTcKindToKind,
-			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
+			  checkValidType, UserTypeCtxt(..), pprHsSigCtxt
 			)
 import TcUnify		( unifyKind, unifyFunKind, unifyTypeKind )
 import TcType		( Type, PredType(..), ThetaType, TyVarDetails(..),
@@ -152,7 +152,7 @@ the TyCon being defined.
 tcHsSigType :: UserTypeCtxt -> RenamedHsType -> TcM Type
   -- Do kind checking, and hoist for-alls to the top
 tcHsSigType ctxt hs_ty 
-  = addErrCtxt (checkHsTypeCtxt ctxt hs_ty) $
+  = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
     do	{ kinded_ty <- kcTypeType hs_ty
 	; ty <- tcHsKindedType kinded_ty
 	; checkValidType ctxt ty	
@@ -164,11 +164,6 @@ tcHsPred pred
   = do { (kinded_pred,_) <- kc_pred pred	-- kc_pred rather than kcHsPred
 						-- to avoid the partial application check
        ; dsHsPred kinded_pred }
-
-
-checkHsTypeCtxt ctxt hs_ty
-  = vcat [ptext SLIT("In the type signature:") <+> ppr hs_ty,
-	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
 \end{code}
 
 	These functions are used during knot-tying in
@@ -642,12 +637,19 @@ tcAddScopedTyVars sig_tys thing_inside
 	-- Zonk the mutable kinds and bring the tyvars into scope
 	-- Rather like tcTyVarBndrs, except that it brings *mutable* 
 	-- tyvars into scope, not immutable ones
+	--
+	-- Furthermore, the tyvars are PatSigTvs, which means that we get better
+	-- error messages when type variables escape:
+	--      Inferred type is less polymorphic than expected
+	--   	Quantified type variable `t' escapes
+	--   	It is mentioned in the environment:
+	--	t is bound by the pattern type signature at tcfail103.hs:6
     mapM zonk kinded_tvs	`thenM` \ tyvars ->
     tcExtendTyVarEnv tyvars thing_inside
 
   where
     zonk (KindedTyVar name kind) = zonkTcKindToKind kind	`thenM` \ kind' ->
-				   newMutTyVar name kind' VanillaTv 
+				   newMutTyVar name kind' PatSigTv
     zonk (UserTyVar name) = pprTrace "BAD: Un-kinded tyvar" (ppr name) $
 			    returnM (mkTyVar name liftedTypeKind)
 \end{code}

@@ -24,7 +24,7 @@ module TcMType (
 
   --------------------------------
   -- Checking type validity
-  Rank, UserTypeCtxt(..), checkValidType, pprUserTypeCtxt,
+  Rank, UserTypeCtxt(..), checkValidType, pprHsSigCtxt,
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, instTypeErr, checkAmbiguity,
   arityErr, 
@@ -43,6 +43,7 @@ module TcMType (
 
 
 -- friends:
+import HsSyn		( HsType )
 import TypeRep		( Type(..), PredType(..), TyNote(..),	 -- Friend; can see representation
 			  Kind, ThetaType
 			) 
@@ -62,6 +63,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tyVarsOfType, tyVarsOfTypes, 
 			  eqKind, isTypeKind, 
 			)
+import PprType		( pprThetaArrow )
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( Class, classArity, className )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
@@ -526,16 +528,22 @@ data UserTypeCtxt
 -- With gla-exts that's right, but for H98 we should complain. 
 
 
-pprUserTypeCtxt (FunSigCtxt n) 	= ptext SLIT("the type signature for") <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt    	= ptext SLIT("an expression type signature")
-pprUserTypeCtxt (ConArgCtxt c) 	= ptext SLIT("the type of constructor") <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)  	= ptext SLIT("the RHS of a type synonym declaration") <+> quotes (ppr c)
-pprUserTypeCtxt GenPatCtxt     	= ptext SLIT("the type pattern of a generic definition")
-pprUserTypeCtxt PatSigCtxt     	= ptext SLIT("a pattern type signature")
-pprUserTypeCtxt ResSigCtxt     	= ptext SLIT("a result type signature")
-pprUserTypeCtxt (ForSigCtxt n) 	= ptext SLIT("the foreign signature for") <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n) = ptext SLIT("the type signature on") <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt = ptext SLIT("a `default' declaration")
+pprHsSigCtxt :: UserTypeCtxt -> HsType Name -> SDoc
+pprHsSigCtxt ctxt hs_ty = pprUserTypeCtxt hs_ty ctxt
+
+pprUserTypeCtxt ty (FunSigCtxt n)  = sep [ptext SLIT("In the type signature:"), pp_sig n ty]
+pprUserTypeCtxt ty ExprSigCtxt     = sep [ptext SLIT("In an expression type signature:"), nest 2 (ppr ty)]
+pprUserTypeCtxt ty (ConArgCtxt c)  = sep [ptext SLIT("In the type of the constructor"), pp_sig c ty]
+pprUserTypeCtxt ty (TySynCtxt c)   = sep [ptext SLIT("In the RHS of the type synonym") <+> quotes (ppr c) <> comma,
+				          nest 2 (ptext SLIT(", namely") <+> ppr ty)]
+pprUserTypeCtxt ty GenPatCtxt      = sep [ptext SLIT("In the type pattern of a generic definition:"), nest 2 (ppr ty)]
+pprUserTypeCtxt ty PatSigCtxt      = sep [ptext SLIT("In a pattern type signature:"), nest 2 (ppr ty)]
+pprUserTypeCtxt ty ResSigCtxt      = sep [ptext SLIT("In a result type signature:"), nest 2 (ppr ty)]
+pprUserTypeCtxt ty (ForSigCtxt n)  = sep [ptext SLIT("In the foreign declaration:"), pp_sig n ty]
+pprUserTypeCtxt ty (RuleSigCtxt n) = sep [ptext SLIT("In the type signature:"), pp_sig n ty]
+pprUserTypeCtxt ty DefaultDeclCtxt = sep [ptext SLIT("In a type in a `default' declaration:"), nest 2 (ppr ty)]
+
+pp_sig n ty = nest 2 (ppr n <+> dcolon <+> ppr ty)
 \end{code}
 
 \begin{code}

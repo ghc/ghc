@@ -227,19 +227,7 @@ pprHsTyVarBndr name kind | kind `eqKind` liftedTypeKind = ppr name
 			 | otherwise 	  	        = hsep [ppr name, dcolon, pprParendKind kind]
 
 pprHsForAll []  []  = empty
-pprHsForAll tvs cxt 
-	-- This printer is used for both interface files and
-	-- printing user types in error messages; and alas the
-	-- two use slightly different syntax.  Ah well.
-  = getPprStyle $ \ sty ->
-    if userStyle sty then
-	ptext SLIT("forall") <+> interppSP tvs <> dot <+> 
-              -- **! ToDo: want to hide uvars from user, but not enough info
-              -- in a HsTyVarBndr name (see PprType).  KSW 2000-10.
-	pprHsContext cxt
-    else	-- Used in interfaces
-	ptext SLIT("__forall") <+> interppSP tvs <+> 
-	ppr_hs_context cxt <+> ptext SLIT("=>")
+pprHsForAll tvs cxt = ptext SLIT("forall") <+> interppSP tvs <+> pprHsContext cxt
 
 pprHsContext :: (Outputable name) => HsContext name -> SDoc
 pprHsContext []	 = empty
@@ -268,16 +256,20 @@ maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
 
 pprHsType, pprParendHsType :: (Outputable name) => HsType name -> SDoc
 
-pprHsType ty       = ppr_mono_ty pREC_TOP (de_paren ty)
+pprHsType ty       = getPprStyle $ \sty -> ppr_mono_ty pREC_TOP (prepare sty ty)
 pprParendHsType ty = ppr_mono_ty pREC_CON ty
 
--- Remove outermost HsParTy parens before printing a type
-de_paren (HsParTy ty) = de_paren ty
-de_paren ty	      = ty
+-- Before printing a type
+-- (a) Remove outermost HsParTy parens
+-- (b) Drop top-level for-all type variables in user style
+--     since they are implicit in Haskell
+prepare sty (HsParTy ty)	  = prepare sty ty
+prepare sty (HsForAllTy _ cxt ty) | userStyle sty = (HsForAllTy Nothing cxt ty)
+prepare sty ty			  = ty
 
 ppr_mono_ty ctxt_prec (HsForAllTy maybe_tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
-    sep [pp_header, pprHsType ty]
+    sep [pp_header, ppr_mono_ty pREC_TOP ty]
   where
     pp_header = case maybe_tvs of
 		  Just tvs -> pprHsForAll tvs ctxt
