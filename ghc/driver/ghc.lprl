@@ -3167,6 +3167,9 @@ arg: while($_ = $Args[0]) {
     /^-fno-let-from-(case|app|strict-let)$/ # experimental, really (WDP 95/10)
 		    && do { push(@HsC_flags, $_); next arg; };
 
+    /^-funbox-strict-fields$/
+		   && do { push(@HsC_flags, $_); next arg; };
+
     # --------------- Warnings etc. ------
 
     /^-fwarn-(.*)$/      && do { push(@HsC_flags, $_); next arg; };
