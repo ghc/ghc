@@ -27,7 +27,7 @@ module Data.IORef
 #endif
 	) where
 
-import Prelude
+import Prelude	-- Explicit dependency helps 'make depend' do the right thing
 
 #ifdef __HUGS__
 import Hugs.IORef
@@ -53,7 +53,7 @@ import NHC.IOExtras
 #endif
 
 #ifndef __NHC__
-import Data.Dynamic
+-- import Data.Dynamic
 #endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)

@@ -406,6 +406,42 @@ writeIORef  :: IORef a -> a -> IO ()
 writeIORef (IORef var) v = stToIO (writeSTRef var v)
 
 -- ---------------------------------------------------------------------------
+-- | An 'IOArray' is a mutable, boxed, non-strict array in the 'IO' monad.  
+-- The type arguments are as follows:
+--
+--  * @i@: the index type of the array (should be an instance of @Ix@)
+--
+--  * @e@: the element type of the array.
+--
+-- 
+
+newtype IOArray i e = IOArray (STArray RealWorld i e) deriving Eq
+
+-- |Build a new 'IOArray'
+newIOArray :: Ix i => (i,i) -> e -> IO (IOArray i e)
+{-# INLINE newIOArray #-}
+newIOArray lu init  = stToIO $ do {marr <- newSTArray lu init; return (IOArray marr)}
+
+-- | Read a value from an 'IOArray'
+unsafeReadIOArray  :: Ix i => IOArray i e -> Int -> IO e
+{-# INLINE unsafeReadIOArray #-}
+unsafeReadIOArray (IOArray marr) i = stToIO (unsafeReadSTArray marr i)
+
+-- | Write a new value into an 'IOArray'
+unsafeWriteIOArray :: Ix i => IOArray i e -> Int -> e -> IO ()
+{-# INLINE unsafeWriteIOArray #-}
+unsafeWriteIOArray (IOArray marr) i e = stToIO (unsafeWriteSTArray marr i e)
+
+-- | Read a value from an 'IOArray'
+readIOArray  :: Ix i => IOArray i e -> i -> IO e
+readIOArray (IOArray marr) i = stToIO (readSTArray marr i)
+
+-- | Write a new value into an 'IOArray'
+writeIOArray :: Ix i => IOArray i e -> i -> e -> IO ()
+writeIOArray (IOArray marr) i e = stToIO (writeSTArray marr i e)
+
+
+-- ---------------------------------------------------------------------------
 -- Show instance for Handles
 
 -- handle types are 'show'n when printing error msgs, so

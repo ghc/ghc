@@ -38,6 +38,7 @@ module Data.Dynamic
 	-- instances of 'Typeable'.
 
 	Typeable( typeOf ),	-- :: a -> TypeRep
+	cast,			-- :: (Typeable a, Typeable b) => a -> Maybe b
 
 	-- ** Building concrete type representations
 	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
@@ -61,12 +62,12 @@ module Data.Dynamic
 	) where
 
 
+import qualified Data.HashTable as HT
 import Data.Maybe
 import Data.Either
 import Data.Int
 import Data.Word
-import Foreign.Ptr
-import Foreign.StablePtr
+import Data.List( foldl )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -74,8 +75,10 @@ import GHC.Show
 import GHC.Err
 import GHC.Num
 import GHC.Float
+import GHC.Real( rem )
 import GHC.IOBase
-import GHC.List( lookup, foldl )
+import GHC.Ptr		-- So we can give Typeable instance for Ptr
+import GHC.Stable	-- So we can give Typeable instance for StablePtr
 #endif
 
 #ifdef __HUGS__
@@ -213,26 +216,42 @@ instance Eq TyCon where
   (TyCon t1 _) == (TyCon t2 _) = t1 == t2
 #endif
 
-instance Show TypeRep where
-  showsPrec p (TypeRep _ tycon tys) =
-    case tys of
-      [] -> showsPrec p tycon
-      [x]   | tycon == listTc -> showChar '[' . shows x . showChar ']'
-      [a,r] | tycon == funTc  -> showParen (p > 8) $
-			         showsPrec 9 a . showString " -> " . showsPrec 8 r
-      xs | isTupleTyCon tycon -> showTuple tycon xs
-	 | otherwise	     ->
-	    showParen (p > 9) $
-   	    showsPrec p tycon . 
-	    showChar ' '      . 
-	    showArgs tys
+----------------- Type-safe cast ------------------
 
-instance Show TyCon where
-  showsPrec _ (TyCon _ s) = showString s
+-- | The type-safe cast operation
+cast :: (Typeable a, Typeable b) => a -> Maybe b
+cast x = r
+       where
+	 r = if typeOf x == typeOf (fromJust r) then
+			Just (unsafeCoerce x)
+	     else
+			Nothing
 
-isTupleTyCon :: TyCon -> Bool
-isTupleTyCon (TyCon _ (',':_)) = True
-isTupleTyCon _		       = False
+----------------- Construction --------------------
+
+-- | Applies a type constructor to a sequence of types
+mkAppTy  :: TyCon -> [TypeRep] -> TypeRep
+mkAppTy tc@(TyCon tc_k _) args 
+  = TypeRep (appKeys tc_k arg_ks) tc args
+  where
+    arg_ks = [k | TypeRep k _ _ <- args]
+
+funTc :: TyCon
+funTc = mkTyCon "->"
+
+-- | A special case of 'mkAppTy', which applies the function 
+-- type constructor to a pair of types.
+mkFunTy  :: TypeRep -> TypeRep -> TypeRep
+mkFunTy f a = mkAppTy funTc [f,a]
+
+-- | Applies a type to a function type.  Returns: @'Just' u@ if the
+-- first argument represents a function of type @t -> u@ and the
+-- second argument represents a function of type @t@.  Otherwise,
+-- returns 'Nothing'.
+applyTy :: TypeRep -> TypeRep -> Maybe TypeRep
+applyTy (TypeRep _ tc [t1,t2]) t3
+  | tc == funTc && t1 == t3	= Just t2
+applyTy _ _     		= Nothing
 
 -- If we enforce the restriction that there is only one
 -- @TyCon@ for a type & it is shared among all its uses,
@@ -262,6 +281,30 @@ mkTyCon :: String	-- ^ the name of the type constructor (should be unique
 	-> TyCon	-- ^ A unique 'TyCon' object
 mkTyCon str = TyCon (mkTyConKey str) str
 
+
+----------------- Showing TypeReps --------------------
+
+instance Show TypeRep where
+  showsPrec p (TypeRep _ tycon tys) =
+    case tys of
+      [] -> showsPrec p tycon
+      [x]   | tycon == listTc -> showChar '[' . shows x . showChar ']'
+      [a,r] | tycon == funTc  -> showParen (p > 8) $
+			         showsPrec 9 a . showString " -> " . showsPrec 8 r
+      xs | isTupleTyCon tycon -> showTuple tycon xs
+	 | otherwise	     ->
+	    showParen (p > 9) $
+   	    showsPrec p tycon . 
+	    showChar ' '      . 
+	    showArgs tys
+
+instance Show TyCon where
+  showsPrec _ (TyCon _ s) = showString s
+
+isTupleTyCon :: TyCon -> Bool
+isTupleTyCon (TyCon _ (',':_)) = True
+isTupleTyCon _		       = False
+
 -- Some (Show.TypeRep) helpers:
 
 showArgs :: Show a => [a] -> ShowS
@@ -277,32 +320,6 @@ showTuple (TyCon _ str) args = showChar '(' . go str args
   go (',':xs) (a:as) = showsPrec 10 a . showChar ',' . go xs as
   go _ _   = showChar ')'
 
-
--- | Applies a type constructor to a sequence of types
-mkAppTy  :: TyCon -> [TypeRep] -> TypeRep
-mkAppTy tc@(TyCon tc_k _) args 
-  = TypeRep (appKeys tc_k arg_ks) tc args
-  where
-    arg_ks = [k | TypeRep k _ _ <- args]
-
-funTc :: TyCon
-funTc = mkTyCon "->"
-
--- | A special case of 'mkAppTy', which applies the function type constructor to
--- a pair of types.
-mkFunTy  :: TypeRep -> TypeRep   -> TypeRep
-mkFunTy f a = mkAppTy funTc [f,a]
-
--- Auxillary functions
-
--- | Applies a type to a function type.  Returns: @'Just' u@ if the
--- first argument represents a function of type @t -> u@ and the
--- second argument represents a function of type @t@.  Otherwise,
--- returns 'Nothing'.
-applyTy :: TypeRep -> TypeRep -> Maybe TypeRep
-applyTy (TypeRep _ tc [t1,t2]) t3
-  | tc == funTc && t1 == t3	= Just t2
-applyTy _ _     		= Nothing
 
 
 -------------------------------------------------------------
@@ -406,7 +423,7 @@ INSTANCE_TYPEABLE0(Word16,word16Tc,"Word16")
 INSTANCE_TYPEABLE0(Word32,word32Tc,"Word32")
 INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 
-INSTANCE_TYPEABLE0(TyCon,tyconTc,  "TyCon")
+INSTANCE_TYPEABLE0(TyCon,tyconTc,    "TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 INSTANCE_TYPEABLE0(Dynamic,dynamicTc,"Dynamic")
 
@@ -422,28 +439,58 @@ INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
 
 newtype Key = Key Int deriving( Eq )
 
+data KeyPr = KeyPr !Key !Key deriving( Eq )
+
+hashKP :: KeyPr -> Int32
+hashKP (KeyPr (Key k1) (Key k2)) = (HT.hashInt k1 + HT.hashInt k2) `rem` HT.prime
+
+data Cache = Cache { next_key :: !(IORef Key),
+		     tc_tbl   :: !(HT.HashTable String Key),
+		     ap_tbl   :: !(HT.HashTable KeyPr Key) }
+
+{-# NOINLINE cache #-}
+cache :: Cache
+cache = unsafePerformIO $ do
+		empty_tc_tbl <- HT.new (==) HT.hashString
+		empty_ap_tbl <- HT.new (==) hashKP
+		key_loc      <- newIORef (Key 1) 
+		return (Cache { next_key = key_loc,
+				tc_tbl = empty_tc_tbl, 
+				ap_tbl = empty_ap_tbl })
+
+newKey :: IORef Key -> IO Key
+newKey kloc = do { k@(Key i) <- readIORef kloc ;
+		   writeIORef kloc (Key (i+1)) ;
+		   return k }
+
+mkTyConKey :: String -> Key
+mkTyConKey str 
+  = unsafePerformIO $ do
+	let Cache {next_key = kloc, tc_tbl = tbl} = cache
+	mb_k <- HT.lookup tbl str
+	case mb_k of
+	  Just k  -> return k
+	  Nothing -> do { k <- newKey kloc ;
+			  HT.insert tbl str k ;
+			  return k }
+
+appKey :: Key -> Key -> Key
+appKey k1 k2
+  = unsafePerformIO $ do
+	let Cache {next_key = kloc, ap_tbl = tbl} = cache
+	mb_k <- HT.lookup tbl kpr
+	case mb_k of
+	  Just k  -> return k
+	  Nothing -> do { k <- newKey kloc ;
+			  HT.insert tbl kpr k ;
+			  return k }
+  where
+    kpr = KeyPr k1 k2
+
 appKeys :: Key -> [Key] -> Key
 appKeys k ks = foldl appKey k ks
 
-appKey :: Key -> Key -> Key
-appKey (Key k1) (Key k2)
-  = unsafePerformIO $ do
-	(v, cache) <- readIORef memo
-	case lookup (k1,k2) cache of
-	  Just k  -> return (Key k)
-	  Nothing -> do writeIORef memo (v+1, ((k1,k2),v) : cache)
-			return (Key v)
 
-memo :: IORef (Int, [((Int,Int),Int)])
-memo = unsafePerformIO (newIORef (1000, []))
-	-- 1000, yuk!
 
-mkTyConKey :: String -> Key
-mkTyConKey str = unsafePerformIO $ do
-		   v <- readIORef uni
-		   writeIORef uni (v+1)
-		   return (str `seq` Key v)
 
-{-# NOINLINE uni #-}
-uni :: IORef Int
-uni = unsafePerformIO ( newIORef 0 )
+

@@ -1,3 +1,5 @@
+{-# OPTIONS -fno-implicit-prelude #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.HashTable
@@ -23,29 +25,38 @@ module Data.HashTable (
 	-- * Hash functions
 	-- $hash_functions
 	hashInt, hashString,
+	prime,
 	-- * Diagnostics
 	longestChain
  ) where
 
-import Data.Char	( ord )
-import Data.Int  	( Int32 )
-import Data.Array.IO
-import Data.Array.Base
-import Data.List	( maximumBy )
-import Data.IORef
-import Data.Bits
-import Control.Monad	( when )
-import Prelude 		hiding (lookup)
---import Debug.Trace
+-- This module is imported by Data.Dynamic, which is pretty low down in the
+-- module hierarchy, so don't import "high-level" modules
 
+import GHC.Base
+import Data.Tuple	( fst )
+import Data.Bits
+import Data.Maybe
+import Data.List	( maximumBy, filter, length, concat )
+
+import GHC.Num
+import GHC.Int  	( Int32 )
+import GHC.Real		( Integral(..), fromIntegral )
+
+import GHC.IOBase	( IO, IOArray, newIOArray, readIOArray, writeIOArray, unsafeReadIOArray, unsafeWriteIOArray,
+			  IORef, newIORef, readIORef, writeIORef )
+import GHC.Err		( undefined )
+import Control.Monad	( when, mapM, sequence_ )
+
+-----------------------------------------------------------------------
 myReadArray  :: IOArray Int32 a -> Int32 -> IO a
 myWriteArray :: IOArray Int32 a -> Int32 -> a -> IO ()
 #ifdef DEBUG
-myReadArray  = readArray
-myWriteArray = writeArray
+myReadArray  = readIOArray
+myWriteArray = writeIOArray
 #else
-myReadArray arr i = unsafeRead arr (fromIntegral i)
-myWriteArray arr i x = unsafeWrite arr (fromIntegral i) x
+myReadArray arr i = unsafeReadIOArray arr (fromIntegral i)
+myWriteArray arr i x = unsafeWriteIOArray arr (fromIntegral i) x
 #endif
 
 -- | A hash table mapping keys of type @key@ to values of type @val@.
@@ -128,7 +139,7 @@ hashString :: String -> Int32
 hashString = fromIntegral . foldr f 0
   where f c m = ord c + (m * 128) `rem` fromIntegral prime
 
--- a prime larger than the maximum hash table size
+-- | A prime larger than the maximum hash table size
 prime = 1500007 :: Int32
 
 -- -----------------------------------------------------------------------------
@@ -154,8 +165,8 @@ new
 
 new cmp hash_fn = do
   -- make a new hash table with a single, empty, segment
-  dir     <- newArray (0,dIR_SIZE) undefined
-  segment <- newArray (0,sEGMENT_SIZE-1) []
+  dir     <- newIOArray (0,dIR_SIZE) undefined
+  segment <- newIOArray (0,sEGMENT_SIZE-1) []
   myWriteArray dir 0 segment
 
   let
@@ -231,7 +242,7 @@ expandHashTable
       newindex   = newbucket .&. sEGMENT_MASK
   --
   when (newindex == 0) $
-	do segment <- newArray (0,sEGMENT_SIZE-1) []
+	do segment <- newIOArray (0,sEGMENT_SIZE-1) []
 	   myWriteArray dir newsegment segment
   --
   let table' =

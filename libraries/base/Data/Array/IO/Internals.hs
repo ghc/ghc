@@ -64,30 +64,17 @@ instance (Typeable a, Typeable b) => Typeable (IOArray a b) where
 -- GHC only to the end of file
 
 -----------------------------------------------------------------------------
--- | Mutable, boxed, non-strict arrays in the 'IO' monad.  The type
--- arguments are as follows:
---
---  * @i@: the index type of the array (should be an instance of @Ix@)
---
---  * @e@: the element type of the array.
---
-newtype IOArray i e = IOArray (STArray RealWorld i e) deriving Eq
+-- | Instance declarations for 'IOArray's
 
 instance HasBounds IOArray where
     {-# INLINE bounds #-}
     bounds (IOArray marr) = bounds marr
 
 instance MArray IOArray e IO where
-    {-# INLINE newArray #-}
-    newArray lu init = stToIO $ do
-        marr <- newArray lu init; return (IOArray marr)
-    {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOArray marr)
-    {-# INLINE unsafeRead #-}
-    unsafeRead (IOArray marr) i = stToIO (unsafeRead marr i)
-    {-# INLINE unsafeWrite #-}
-    unsafeWrite (IOArray marr) i e = stToIO (unsafeWrite marr i e)
+    newArray    = newIOArray
+    unsafeRead  = unsafeReadIOArray
+    unsafeWrite = unsafeWriteIOArray
+
 
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (IO monad)
