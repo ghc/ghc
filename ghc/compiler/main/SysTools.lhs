@@ -64,6 +64,8 @@ import System		( ExitCode(..) )
 
 #if !defined(mingw32_TARGET_OS)
 import qualified Posix
+#else
+import Ptr              ( nullPtr )
 #endif
 
 #include "HsVersions.h"
@@ -601,14 +603,22 @@ slash s1 s2 = s1 ++ ('/' : s2)
 #endif
 
 -----------------------------------------------------------------------------
--- Convert filepath into MSDOS form.
--- 
 -- Define	myGetProcessId :: IO Int
 
 #ifdef mingw32_TARGET_OS
-foreign import "_getpid" getProcessID :: IO Int 
+foreign import "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
+foreign import stdcall "GetCurrentDirectoryA" getCurrentDirectory :: Int32 -> CString -> IO Int32
+getExecDir :: IO (Maybe String)
+getExecDir = do len <- getCurrentDirectory 0 nullPtr
+		buf <- mallocArray (fromIntegral len)
+		ret <- getCurrentDirectory len buf
+		if ret == 0 then return Nothing
+		            else do s <- peekCString buf
+				    destructArray (fromIntegral len) buf
+				    return (Just s)
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
+getExecDir :: IO (Maybe String) = do return Nothing
 #endif
 \end{code}
