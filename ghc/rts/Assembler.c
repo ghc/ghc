@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/01 14:47:02 $
+ * $Revision: 1.6 $
+ * $Date: 1999/03/02 19:52:24 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -86,7 +86,7 @@ typedef struct {
 #define NonPtrsChunkSize 10
 
 #define Queue Instrs
-#define Type  StgNat8
+#define Type  StgWord8
 #include "QueueTemplate.h"
 #undef Type
 #undef Queue
@@ -413,7 +413,7 @@ void asmEndBCO( AsmBCO bco )
         bcoInstr(o,j++) = i_HP_CHECK;
         bcoInstr(o,j++) = bco->max_hp;
 #endif
-        mapQueue(Instrs,  StgNat8,   bco->is,   bcoInstr(o,j++) = x);
+        mapQueue(Instrs,  StgWord8,   bco->is,   bcoInstr(o,j++) = x);
         ASSERT(j == is);
     }
     asmEndObject(&bco->object,c);
