@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/28 22:37:27 $
+ * $Revision: 1.10 $
+ * $Date: 1999/11/09 00:41:19 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -50,6 +50,7 @@ static Void local putApType      Args((Type,Int,Int));
 
 static Void local putKind        Args((Kind));
 static Void local putKinds       Args((Kinds));
+
 
 /* --------------------------------------------------------------------------
  * Basic output routines:
@@ -919,6 +920,12 @@ Kinds ks; {
 /* --------------------------------------------------------------------------
  * Main drivers:
  * ------------------------------------------------------------------------*/
+
+extern FILE *mystdout Args((Void));
+FILE *mystdout() {
+  /* We use this from the gdb command line when debugging */
+  return stdout;
+}
 
 Void printExp(fp,e)                     /* print expr on specified stream  */
 FILE *fp;
