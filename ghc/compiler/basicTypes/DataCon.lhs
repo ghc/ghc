@@ -265,8 +265,8 @@ maybe_unpack_field set ty strict
 
 maybe_unpack_fields :: UniqSet TyCon -> [(Type,StrictnessMark)] -> Maybe [Type]
 maybe_unpack_fields set tys
-  | any isNothing unpacked_fields = Nothing
-  | otherwise = Just (concat (catMaybes unpacked_fields))
+  | all isJust unpacked_fields = Just (concat (catMaybes unpacked_fields))
+  | otherwise = Nothing
   where unpacked_fields = map (\(ty,str) -> maybe_unpack_field set ty str) tys
 \end{code}
 
