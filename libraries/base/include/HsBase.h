@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.9 2002/07/04 13:33:25 simonmar Exp $
+ * $Id: HsBase.h,v 1.10 2002/07/17 09:22:20 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
