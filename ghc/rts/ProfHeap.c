@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.47 2003/08/22 22:24:12 sof Exp $
+ * $Id: ProfHeap.c,v 1.48 2003/09/23 15:38:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -825,6 +825,15 @@ heapCensusChain( Census *census, bdescr *bd )
     rtsBool prim;
 
     for (; bd != NULL; bd = bd->link) {
+
+	// HACK: ignore pinned blocks, because they contain gaps.
+	// It's not clear exactly what we'd like to do here, since we
+	// can't tell which objects in the block are actually alive.
+	// Perhaps the whole block should be counted as SYSTEM memory.
+	if (bd->flags & BF_PINNED) {
+	    continue;
+	}
+
 	p = bd->start;
 	while (p < bd->free) {
 	    info = get_itbl((StgClosure *)p);

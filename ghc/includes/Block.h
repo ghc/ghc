@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.13 2003/03/28 15:13:52 sof Exp $
+ * $Id: Block.h,v 1.14 2003/09/23 15:38:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -78,6 +78,7 @@ typedef struct _bdescr {
 
 #define BF_EVACUATED 1
 #define BF_LARGE     2
+#define BF_PINNED    4
 
 /* Finding the block descriptor for a given block -------------------------- */
 

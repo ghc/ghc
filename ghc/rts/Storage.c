@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.79 2003/03/26 18:59:34 sof Exp $
+ * $Id: Storage.c,v 1.80 2003/09/23 15:38:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -588,7 +588,7 @@ allocatePinned( nat n )
 	dbl_link_onto(bd, &g0s0->large_objects);
 	bd->gen_no = 0;
 	bd->step   = g0s0;
-	bd->flags  = BF_LARGE;
+	bd->flags  = BF_PINNED | BF_LARGE;
 	bd->free   = bd->start;
 	alloc_blocks++;
     }
