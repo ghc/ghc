@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.23 2001/10/03 13:57:42 simonmar Exp $
+ * $Id: InfoTables.h,v 1.24 2001/12/18 19:42:41 sebc Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -206,7 +206,14 @@ typedef union {
 
 typedef StgClosure* StgSRT[];
 
+/*
+ * The entry code pointer must be the first word of an info table.
+ * See the comment in ghc/rts/Storage.h (Plan C) for details.
+ */
 typedef struct _StgInfoTable {
+#ifndef TABLES_NEXT_TO_CODE
+    StgFunPtr       entry;
+#endif
     StgSRT         *srt;	/* pointer to the SRT table */
 #if defined(PAR) || defined(GRAN)
     struct _StgInfoTable    *rbh_infoptr;
@@ -231,7 +238,6 @@ typedef struct _StgInfoTable {
 #ifdef TABLES_NEXT_TO_CODE
     StgCode         code[FLEXIBLE_ARRAY];
 #else
-    StgFunPtr       entry;
     StgFunPtr       vector[FLEXIBLE_ARRAY];
 #endif
 } StgInfoTable;
