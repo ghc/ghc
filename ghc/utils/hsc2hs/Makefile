@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 2000/11/07 15:28:36 simonmar Exp $
+# $Id: Makefile,v 1.3 2000/12/22 19:51:09 qrczak Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -28,7 +28,7 @@ HSC2HS_DIR=$$\"\"libdir
 HSC2HS_EXTRA=
 else
 HSC2HS_DIR=$(libdir)
-HSC2HS_EXTRA=
+HSC2HS_EXTRA=--cc=$(bindir)/ghc-$(ProjectVersion)
 endif # BIN_DIST
 else
 HSC2HS_DIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
@@ -36,6 +36,7 @@ HSC2HS_EXTRA=--cc=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)/$(GHC_INPLACE)
 endif
 
 $(SCRIPT_PROG) : Makefile
+$(INSTALLED_SCRIPT_PROG) : $(TOP)/mk/config.mk
 
 SCRIPT_SUBST_VARS = HSC2HS_DIR HS_PROG HSC2HS_EXTRA
 
