@@ -646,6 +646,7 @@ sepX x (p:ps) = sep1 x (reduceDoc p) 0 ps
 --                              `union` x $$ nest k (vcat ys)
 
 sep1 :: Bool -> RDoc -> Int -> [Doc] -> RDoc
+sep1 g _                   k ys | k == 0 && False = undefined
 sep1 g NoDoc               k ys = NoDoc
 sep1 g (p `Union` q)       k ys = sep1 g p k ys
                                   `union_`
@@ -696,6 +697,7 @@ fill g (p:ps) = fill1 g (reduceDoc p) 0 ps
 
 
 fill1 :: Bool -> RDoc -> Int -> [Doc] -> Doc
+fill1 g _                   k ys | k == 0 && False = undefined
 fill1 g NoDoc               k ys = NoDoc
 fill1 g (p `Union` q)       k ys = fill1 g p k ys
                                    `union_`
@@ -707,6 +709,7 @@ fill1 g (Nest n p)          k ys = nest_ n (fill1 g p (k - n) ys)
 fill1 g (NilAbove p)        k ys = nilAbove_ (aboveNest p False k (fill g ys))
 fill1 g (TextBeside s sl p) k ys = textBeside_ s sl (fillNB g p (k - sl) ys)
 
+fillNB g _           k ys | k == 0 && False = undefined
 fillNB g (Nest _ p)  k ys  = fillNB g p k ys
 fillNB g Empty k []        = Empty
 fillNB g Empty k (y:ys)    = nilBeside g (fill1 g (oneLiner (reduceDoc y)) k1 ys)
@@ -748,6 +751,7 @@ best mode w r p
   where
     get :: Int          -- (Remaining) width of line
         -> Doc -> Doc
+    get w _ | w==0 && False   = undefined
     get w Empty               = Empty
     get w NoDoc               = NoDoc
     get w (NilAbove p)        = nilAbove_ (get w p)
@@ -760,6 +764,7 @@ best mode w r p
          -> Doc         -- This is an argument to TextBeside => eat Nests
          -> Doc         -- No unions in here!
 
+    get1 w _ _ | w==0 && False = undefined
     get1 w sl Empty               = Empty
     get1 w sl NoDoc               = NoDoc
     get1 w sl (NilAbove p)        = nilAbove_ (get (w - sl) p)
@@ -780,7 +785,7 @@ fits n p    | n < 0 = False
 fits n NoDoc               = False
 fits n Empty               = True
 fits n (NilAbove _)        = True
-fits n (TextBeside _ sl p) = fits (n - sl) p
+fits n (TextBeside _ sl p) = (fits $! (n - sl)) p
 
 minn x y | x < y    = x
          | otherwise = y
