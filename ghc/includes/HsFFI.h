@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.16 2001/11/07 19:11:43 sof Exp $
+ * $Id: HsFFI.h,v 1.17 2002/11/17 15:27:07 panne Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -147,6 +147,15 @@ typedef void*			HsForeignObj;   /* DEPRECATED */
 #define HS_DOUBLE_MAX		DBL_MAX
 #define HS_DOUBLE_MAX_EXP	DBL_MAX_EXP
 #define HS_DOUBLE_MAX_10_EXP	DBL_MAX_10_EXP
+
+extern void hs_init     (int *argc, char **argv[]);
+extern void hs_exit     (void);
+extern void hs_set_argv (int argc, char *argv[]);
+
+extern void hs_perform_gc (void);
+
+extern void hs_free_stable_ptr (HsStablePtr *sp);
+extern void hs_free_fun_ptr    (HsFunPtr *fp);
 
 /* -------------------------------------------------------------------------- */
 
