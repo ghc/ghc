@@ -47,8 +47,9 @@ fields  :: { PackageConfig -> PackageConfig }
 
 field	:: { PackageConfig -> PackageConfig }
 	: VARID '=' STRING		
-		{\p -> case unpackFS $1 of
-		        "name" -> p{name = unpackFS $3} }
+                 {% case unpackFS $1 of { 
+		   "name" -> returnP (\ p -> p{name = unpackFS $3});
+		   _      -> happyError } }
 			
 	| VARID '=' strlist		
 		{\p -> case unpackFS $1 of
