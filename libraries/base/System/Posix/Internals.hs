@@ -46,7 +46,6 @@ import System.IO
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 
 {-# CFILES cbits/PrelIOUtils.c cbits/dirUtils.c cbits/consUtils.c #-}
-ioException = ioError
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -250,7 +249,7 @@ setCooked :: Int -> Bool -> IO ()
 setCooked fd cooked = do
   x <- set_console_buffering (fromIntegral fd) (if cooked then 1 else 0)
   if (x /= 0)
-   then ioException (ioe_unk_error "setCooked" "failed to set buffering")
+   then ioError (ioe_unk_error "setCooked" "failed to set buffering")
    else return ()
 
 ioe_unk_error loc msg 
@@ -262,14 +261,14 @@ setEcho :: Int -> Bool -> IO ()
 setEcho fd on = do
   x <- set_console_echo (fromIntegral fd) (if on then 1 else 0)
   if (x /= 0)
-   then ioException (ioe_unk_error "setEcho" "failed to set echoing")
+   then ioError (ioe_unk_error "setEcho" "failed to set echoing")
    else return ()
 
 getEcho :: Int -> IO Bool
 getEcho fd = do
   r <- get_console_echo (fromIntegral fd)
   if (r == (-1))
-   then ioException (ioe_unk_error "getEcho" "failed to get echoing")
+   then ioError (ioe_unk_error "getEcho" "failed to get echoing")
    else return (r == 1)
 
 foreign import ccall unsafe "consUtils.h set_console_buffering__"
