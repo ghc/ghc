@@ -76,13 +76,11 @@ mkQ :: (Typeable a, Typeable b) => r -> (b -> r) -> a -> r
 --   resort to return otherwise
 --
 mkM :: ( Monad m,
-         Typeable a, 
-         Typeable b,
-         Typeable (m a),
-         Typeable (m b)
+         Typeable a,
+         Typeable b
        )
     => (b -> m b) -> a -> m a
-mkM f = case cast f of
+mkM f = case castarr f of
               Just g  -> g
               Nothing -> return
 
@@ -101,12 +99,10 @@ use a point-free style whenever possible.
 --
 mkMp :: ( MonadPlus m,
           Typeable a,
-          Typeable b,
-          Typeable (m a),
-          Typeable (m b)
+          Typeable b
         )
-    => (b -> m b) -> a -> m a
-mkMp = maybe (const mzero) id . cast
+     => (b -> m b) -> a -> m a
+mkMp = maybe (const mzero) id . castarr
 
 
 -- | Make a generic builder;
@@ -115,12 +111,10 @@ mkMp = maybe (const mzero) id . cast
 --
 mkB :: ( MonadPlus m,
          Typeable a,
-         Typeable b,
-         Typeable (m a),
-         Typeable (m b)
+         Typeable b
        )
     => m b -> m a
-mkB = maybe mzero id . cast
+mkB = maybe mzero id . castss
 
 
 -- | Extend a generic transformation by a type-specific case
@@ -134,34 +128,31 @@ extQ f g a = maybe (f a) g (cast a)
 
 
 -- | Extend a generic monadic transformation by a type-specific case
-extM :: (Typeable a, Typeable b,
-         Typeable (m a), Typeable (m b), 
-         Monad m)
+extM :: ( Monad m,
+          Typeable a,
+          Typeable b
+        )
      => (a -> m a) -> (b -> m b) -> a -> m a
-extM f = maybe f id . cast
+extM f = maybe f id . castarr
 
 
 -- | Extend a generic MonadPlus transformation by a type-specific case
 extMp :: ( MonadPlus m,
            Typeable a,
-           Typeable b,
-           Typeable (m a),
-           Typeable (m b)
+           Typeable b
          )
-     => (a -> m a) -> (b -> m b) -> a -> m a
+      => (a -> m a) -> (b -> m b) -> a -> m a
 extMp = extM
 
 
 
 -- | Extend a generic builder by a type-specific case
-extB :: ( Monad m,
-          Typeable a,
-          Typeable b,
-          Typeable (m a),
-          Typeable (m b)
+extB :: (Monad m,
+         Typeable a,
+         Typeable b
         )
      => m a -> m b -> m a
-extB f = maybe f id . cast
+extB f = maybe f id . castss
 
 
 ------------------------------------------------------------------------------

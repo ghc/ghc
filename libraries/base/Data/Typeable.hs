@@ -26,9 +26,10 @@ module Data.Typeable
 	-- * The Typeable class
 	Typeable( typeOf ),	-- :: a -> TypeRep
 
-	-- * Type-safe cast and other clients
+	-- * Type-safe cast
 	cast,			-- :: (Typeable a, Typeable b) => a -> Maybe b
-	sameType,		-- two type values are the same
+	castss,			-- a cast for kind "* -> *"
+	castarr,		-- another convenient variation
 
 	-- * Type representations
 	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
@@ -38,18 +39,7 @@ module Data.Typeable
 	mkTyCon,	-- :: String  -> TyCon
 	mkAppTy,	-- :: TyCon   -> [TypeRep] -> TypeRep
 	mkFunTy,	-- :: TypeRep -> TypeRep   -> TypeRep
-	applyTy,	-- :: TypeRep -> TypeRep   -> Maybe TypeRep
-
-	-- * Types as values
-	TypeVal,		-- view type "a" as "a -> ()"
-	typeVal,		-- :: TypeVal a
-	typeValOf,		-- :: a -> TypeVal a
-	undefinedType,		-- :: TypeVal a -> a
-	withType,		-- :: a -> TypeVal a -> a
-	argType,		-- :: (a -> b) -> TypeVal a
-	resType,		-- :: (a -> b) -> TypeVal b
-	paraType,		-- :: t a -> TypeVal a
-	TypeFun			-- functions on types
+	applyTy		-- :: TypeRep -> TypeRep   -> Maybe TypeRep
 
   ) where
 
@@ -238,7 +228,7 @@ class Typeable a where
 
 -------------------------------------------------------------
 --
---		Type-safe cast and other clients
+--		Type-safe cast
 --
 -------------------------------------------------------------
 
@@ -246,16 +236,44 @@ class Typeable a where
 cast :: (Typeable a, Typeable b) => a -> Maybe b
 cast x = r
        where
-	 r = if typeOf x == typeOf (fromJust r) then
-			Just (unsafeCoerce x)
-	     else
-			Nothing
+	 r = if typeOf x == typeOf (fromJust r)
+               then Just $ unsafeCoerce x
+	       else Nothing
 
 
--- | Test for type equivalence
-sameType :: (Typeable a, Typeable b) => TypeVal a -> TypeVal b -> Bool
-sameType tva tvb = typeOf (undefinedType tva) ==
-                   typeOf (undefinedType tvb)
+-- | A convenient variation for kind "* -> *"
+castss :: (Typeable a, Typeable b) => t a -> Maybe (t b)
+castss x = r
+       where
+	 r = if typeOf (get x) == typeOf (get (fromJust r))
+               then Just $ unsafeCoerce x
+	       else Nothing
+         get :: t c -> c
+	 get = undefined
+
+
+-- | Another variation
+castarr :: (Typeable a, Typeable b, Typeable c, Typeable d)
+        => (a -> t b) -> Maybe (c -> t d)
+castarr x = r
+       where
+	 r = if typeOf (get x) == typeOf (get (fromJust r))
+               then Just $ unsafeCoerce x
+	       else Nothing
+         get :: (e -> t f) -> (e, f)
+	 get = undefined
+
+{-
+
+The variations castss and castarr are arguably not really needed.
+Let's discuss castss in some detail. To get rid of castss, we can
+require "Typeable (t a)" and "Typeable (t b)" rather than just
+"Typeable a" and "Typeable b". In that case, the ordinary cast would
+work. Eventually, all kinds of library instances should become
+Typeable. (There is another potential use of variations as those given
+above. It allows quantification on type constructors.
+
+-}
 
 
 -------------------------------------------------------------
@@ -325,69 +343,6 @@ instance (Typeable a, Typeable b) => Typeable (a -> b) where
 		     (typeOf ((undefined :: (a -> b) -> b) f))
 
 
--------------------------------------------------------------
---
---	Types as values
---
--------------------------------------------------------------
-
-{- 
-
-This group provides a style of encoding types as values and using
-them. This style is seen as an alternative to the pragmatic style used
-in Data.Typeable.typeOf and elsewhere, i.e., simply use an "undefined"
-to denote a type argument. This pragmatic style suffers from lack
-of robustness: one feels tempted to pattern match on undefineds.
-Maybe Data.Typeable.typeOf etc. should be rewritten accordingly.
-
--}
-
-
--- | Type as values to stipulate use of undefineds
-type TypeVal a = a -> ()
-
-
--- | The value that denotes a type
-typeVal :: TypeVal a
-typeVal = const ()
-
-
--- | Map a value to its type
-typeValOf :: a -> TypeVal a
-typeValOf _ = typeVal
-
-
--- | Stipulate this idiom!
-undefinedType :: TypeVal a -> a
-undefinedType _ = undefined
-
-
--- | Constrain a type
-withType :: a -> TypeVal a -> a
-withType x _ = x
-
-
--- | The argument type of a function
-argType :: (a -> b) -> TypeVal a
-argType _ = typeVal
-
-
--- | The result type of a function
-resType :: (a -> b) -> TypeVal b
-resType _ = typeVal
-
-
--- | The parameter type of type constructor
-paraType :: t a -> TypeVal a
-paraType _ = typeVal
-
-
--- Type functions,
--- i.e., functions mapping types to values
---
-type TypeFun a r = TypeVal a -> r
-
-
 
 -------------------------------------------------------
 --
@@ -426,6 +381,7 @@ INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")
 
 INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
 #endif
+
 
 
 ---------------------------------------------

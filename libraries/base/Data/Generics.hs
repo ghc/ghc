@@ -15,19 +15,21 @@
 
 module Data.Generics ( 
 
-	-- * Re-export all relevant modules
-	module Data.Generics.Basics,
-	module Data.Generics.Aliases,
-	module Data.Generics.Schemes,
-	module Data.Generics.Twins,
-	module Data.Generics.Strings,
-	module Data.Generics.Counts,
-	module Data.Generics.Types
+  -- * To scrap your boilerplate it is sufficient to import this module.
+  --   This module does nothing more than import all themes of the
+  --   Data.Generics library.
+  --
+  module Data.Generics.Basics,	-- primitives
+  module Data.Generics.Aliases,	-- aliases for type case, generic types
+  module Data.Generics.Schemes,	-- traversal schemes (everywhere etc.)
+  module Data.Generics.Text,	-- generic read and show
+  module Data.Generics.Twins,	-- twin traversal, e.g., generic eq
+  module Data.Generics.Reify	-- experimental reification stuff
 
 #ifndef __HADDOCK__
 	,
 	-- Data types for the sum-of-products type encoding;
-        -- included for backwards compatibility; maybe obsolete
+        -- included for backwards compatibility; maybe obsolete.
 	(:*:)(..), (:+:)(..), Unit(..)
 #endif
 
@@ -39,6 +41,8 @@ import Prelude	-- So that 'make depend' works
 
 #ifdef __GLASGOW_HASKELL__
 #ifndef __HADDOCK__
+	-- Data types for the sum-of-products type encoding;
+        -- included for backwards compatibility; maybe obsolete.
 import GHC.Base ( (:*:)(..), (:+:)(..), Unit(..) )
 #endif
 #endif
@@ -46,7 +50,6 @@ import GHC.Base ( (:*:)(..), (:+:)(..), Unit(..) )
 import Data.Generics.Basics
 import Data.Generics.Aliases
 import Data.Generics.Schemes
+import Data.Generics.Text
 import Data.Generics.Twins
-import Data.Generics.Strings
-import Data.Generics.Counts
-import Data.Generics.Types
+import Data.Generics.Reify

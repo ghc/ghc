@@ -509,8 +509,8 @@ instance Data a => Data [a] where
 --
   gmapT  f   []     = []
   gmapT  f   (x:xs) = (f x:f xs)
---  gmapL  f   []     = []
---  gmapL  f   (x:xs) = [f x,f xs]
+  gmapQ  f   []     = []
+  gmapQ  f   (x:xs) = [f x,f xs]
   gmapM  f   []     = return []
   gmapM  f   (x:xs) = f x >>= \x' -> f xs >>= \xs' -> return (x':xs')
 
