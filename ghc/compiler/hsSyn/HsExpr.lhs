@@ -195,7 +195,7 @@ data HsExpr id
 			-- False => left-to-right (arg >- f)
 	SrcLoc
 
-  | HsArrForm	-- Command formation,  (| e |) cmd1 .. cmdn
+  | HsArrForm	-- Command formation,  (| e cmd1 .. cmdn |)
 	(HsExpr id)	-- the operator
 			-- after type-checking, a type abstraction to be
 			-- applied to the type of the local environment tuple
@@ -447,8 +447,8 @@ ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp False _)
 ppr_expr (HsArrForm (HsVar v) (Just _) [arg1, arg2] _)
   = sep [pprCmdArg arg1, hsep [pprInfix v, pprCmdArg arg2]]
 ppr_expr (HsArrForm op _ args _)
-  = hang (ptext SLIT("(|") <> pprExpr op <> ptext SLIT("|)"))
-	 4 (sep (map pprCmdArg args))
+  = hang (ptext SLIT("(|") <> pprExpr op)
+	 4 (sep (map pprCmdArg args) <> ptext SLIT("|)"))
 
 pprCmdArg :: OutputableBndr id => HsCmdTop id -> SDoc
 pprCmdArg (HsCmdTop cmd@(HsArrForm _ Nothing [] _) _ _ _) = pprExpr cmd
@@ -508,6 +508,9 @@ The legal constructors for commands are:
   = HsArrApp ...		-- as above
 
   | HsArrForm ...		-- as above
+
+  | HsApp	(HsCmd id)
+		(HsExpr id)
 
   | HsLam	(Match  id)	-- kappa
 

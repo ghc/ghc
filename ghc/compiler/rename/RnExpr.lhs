@@ -485,6 +485,8 @@ rnCmdTop (HsCmdTop cmd _ _ _)
 
 convertOpFormsCmd :: HsCmd id -> HsCmd id
 
+convertOpFormsCmd (HsApp c e) = HsApp (convertOpFormsCmd c) e
+
 convertOpFormsCmd (HsLam match) = HsLam (convertOpFormsMatch match)
 
 convertOpFormsCmd (OpApp c1 op fixity c2)
@@ -556,6 +558,8 @@ methodNamesCmd (HsIf p c1 c2 loc)
 methodNamesCmd (HsLet b c) = methodNamesCmd c
 
 methodNamesCmd (HsDo sc stmts rbs ty loc) = methodNamesStmts stmts
+
+methodNamesCmd (HsApp c e) = methodNamesCmd c
 
 methodNamesCmd (HsLam match) = methodNamesMatch match
 

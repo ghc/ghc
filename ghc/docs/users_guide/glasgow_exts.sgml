@@ -3409,8 +3409,9 @@ cmd   ::= exp1 -&lt;  exp2
        |  if exp then cmd1 else cmd2
        |  case exp of { calts }
        |  cmd1 qop cmd2
-       |  (| exp |) cmd1 .. cmdn
+       |  (| aexp cmd1 .. cmdn |)
        |  \ pat1 .. patn -> cmd
+       |  cmd aexp
        |  ( cmd )
 
 cstmt ::= let decls
@@ -3657,9 +3658,14 @@ there is also a more general syntax involving special brackets:
 <screen>
 proc x -> do
         y &lt;- f -&lt; x+1
-        (|untilA|) (increment -&lt; x+y) (within 0.5 -&lt; x)
+        (|untilA (increment -&lt; x+y) (within 0.5 -&lt; x)|)
 </screen>
 </para>
+
+</sect2>
+
+<sect2>
+<title>Primitive constructs</title>
 
 <para>
 Some operators will need to pass additional inputs to their subcommands.
@@ -3699,7 +3705,7 @@ should have the form
 <screen>
 a (...(e,t1), ... tn) t
 </screen>
-where <replaceable>e</replaceable> is the polymorphic variable
+where <replaceable>e</replaceable> is a polymorphic variable
 (representing the environment)
 and <replaceable>ti</replaceable> are the types of the values on the stack,
 with <replaceable>t1</replaceable> being the <quote>top</quote>.
@@ -3713,21 +3719,37 @@ bracketA :: ... => a e b -> a (e,b) c -> a (e,c) d -> a e d
 runReader :: ... => a e c -> a' (e,State) c
 runState :: ... => a e c -> a' (e,State) (c,State)
 </screen>
-How can we supply the extra input required by the last two?
-We can define yet another operator, a counterpart of the monadic
-<literal>>>=</literal> operator:
+We can supply the extra input required by commands built with the last two
+by applying them to ordinary expressions, as in
+<screen>
+proc x -> do
+        s &lt;- ...
+        (|runReader (do { ... })|) s
+</screen>
+which adds <literal>s</literal> to the stack of inputs to the command
+built using <literal>runReader</literal>.
+</para>
+
+<para>
+The command versions of lambda abstraction and application are analogous to
+the expression versions.
+In particular, the beta and eta rules describe equivalences of commands.
+These three features (operators, lambda abstraction and application)
+are the core of the notation; everything else can be built using them,
+though the results would be somewhat clumsy.
+For example, we could simulate <literal>do</literal>-notation by defining
 <programlisting>
 bind :: Arrow a => a e b -> a (e,b) c -> a e c
 u `bind` f = returnA &&& u >>> f
+
+bind_ :: Arrow a => a e b -> a e c -> a e c
+u `bind_` f = u `bind` (arr fst >>> f)
 </programlisting>
-and then build commands like
-<screen>
-proc x ->
-        (mkState -< x) `bind` (|runReader|) (do { ... })
-</screen>
-which uses the arrow <literal>mkState</literal> to create a state,
-and then provides this as an extra input to the command built using
-<literal>runReader</literal>.
+We could simulate <literal>do</literal> by defining
+<programlisting>
+cond :: ArrowChoice a => a e b -> a e b -> a (e,Bool) b
+cond f g = arr (\ (e,b) -> if b then Left e else Right e) >>> f ||| g
+</programlisting>
 </para>
 
 </sect2>

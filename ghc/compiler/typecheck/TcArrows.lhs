@@ -133,6 +133,18 @@ tcCmd env cmd@(HsArrApp fun arg _ ho_app lr src_loc) (cmd_stk, res_ty)
 	HsHigherOrderApp -> tc
 	HsFirstOrderApp  -> popArrowBinders tc
 
+-------------------------------------------
+-- 		Command application
+
+tcCmd env cmd@(HsApp fun arg) (cmd_stk, res_ty)
+  = addErrCtxt (cmdCtxt cmd)	$
+    do  { arg_ty <- newTyVarTy openTypeKind
+
+	; fun' <- tcCmd env fun (arg_ty:cmd_stk, res_ty)
+
+	; arg' <- tcCheckRho arg arg_ty
+
+	; return (HsApp fun' arg') }
 
 -------------------------------------------
 -- 		Lambda

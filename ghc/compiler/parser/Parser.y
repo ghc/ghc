@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.120 2003/06/24 07:58:22 simonpj Exp $
+$Id: Parser.y,v 1.121 2003/07/16 08:49:05 ross Exp $
 
 Haskell grammar.
 
@@ -974,8 +974,6 @@ exp10 :: { RdrNameHsExpr }
 			{% checkPattern $2 $3 `thenP` \ p -> 
 			   returnP (HsProc p (HsCmdTop $6 [] placeHolderType undefined) $5) }
 
-	| srcloc operator cmdargs		{ HsArrForm $2 Nothing (reverse $3) $1 }
-
         | '{-# CORE' STRING '#-}' exp           { HsCoreAnn $2 $4 }    -- hdaume: core annotation
 
 	| reifyexp				{ HsReify $1 }
@@ -1044,16 +1042,16 @@ aexp2	:: { RdrNameHsExpr }
 					   returnP (HsBracket (PatBr p) $1) }
 	| srcloc '[d|' cvtopbody '|]'	{ HsBracket (DecBr (mkGroup $3)) $1 }
 
+	-- arrow notation extension
+	| srcloc '(|' aexp2 cmdargs '|)'
+					{ HsArrForm $3 Nothing (reverse $4) $1 }
+
 cmdargs	:: { [RdrNameHsCmdTop] }
-	: cmdargs acmd			{ HsCmdTop $2 [] placeHolderType undefined : $1 }
+	: cmdargs acmd			{ $2 : $1 }
   	| {- empty -}			{ [] }
 
-acmd	:: { RdrNameHsExpr }
-	: '(' exp ')'			{ HsPar $2 }
-	| srcloc operator		{ HsArrForm $2 Nothing [] $1 }
-
-operator :: { RdrNameHsExpr }
-	: '(|' exp '|)'			{ $2 }
+acmd	:: { RdrNameHsCmdTop }
+	: aexp2				{ HsCmdTop $1 [] placeHolderType undefined }
 
 cvtopbody :: { [RdrNameHsDecl] }
 	:  '{'            cvtopdecls '}'		{ $2 }
@@ -1103,8 +1101,8 @@ pquals1 :: { [[RdrNameStmt]] }
 	| '|' quals			{ [$2] }
 
 quals :: { [RdrNameStmt] }
-	: quals ',' stmt		{ $3 : $1 }
-	| stmt				{ [$1] }
+	: quals ',' qual		{ $3 : $1 }
+	| qual				{ [$1] }
 
 -----------------------------------------------------------------------------
 -- Parallel array expressions
@@ -1189,11 +1187,16 @@ maybe_stmt :: { Maybe RdrNameStmt }
 	| {- nothing -}			{ Nothing }
 
 stmt  :: { RdrNameStmt }
+	: qual				{ $1 }
+	| srcloc infixexp '->' exp	{% checkPattern $1 $4 `thenP` \p ->
+					   returnP (BindStmt p $2 $1) }
+  	| srcloc 'rec' stmtlist		{ RecStmt $3 undefined undefined undefined }
+
+qual  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $1 $2 `thenP` \p ->
 					   returnP (BindStmt p $4 $1) }
 	| srcloc exp			{ ExprStmt $2 placeHolderType $1 }
   	| srcloc 'let' binds		{ LetStmt $3 }
-  	| srcloc 'rec' stmtlist		{ RecStmt $3 undefined undefined undefined }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction

@@ -42,7 +42,7 @@ import TcType		( Type, tcSplitAppTy )
 import Type		( mkTyConApp )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( mkIfThenElse, bindNonRec )
+import CoreUtils	( mkIfThenElse, bindNonRec, exprType )
 
 import Id		( Id, idType )
 import PrelInfo		( pAT_ERROR_ID )
@@ -343,6 +343,40 @@ dsCmd ids local_vars env_ids [] res_ty
 	      (exprFreeVars core_arrow `unionVarSet` exprFreeVars core_arg)
 		`intersectVarSet` local_vars)
 
+--	A | ys |- c :: [t:ts] t'
+--	A, xs  |- e :: t
+--	------------------------
+--	A | xs |- c e :: [ts] t'
+--
+--		---> arr (\ ((xs)*ts) -> let z = e in (((ys),z)*ts)) >>> c
+
+dsCmd ids local_vars env_ids stack res_ty (HsApp cmd arg)
+  = dsExpr arg			`thenDs` \ core_arg ->
+    let
+	arg_ty = exprType core_arg
+	stack' = arg_ty:stack
+    in
+    dsfixCmd ids local_vars stack' res_ty cmd
+				`thenDs` \ (core_cmd, free_vars, env_ids') ->
+    mapDs newSysLocalDs stack	`thenDs` \ stack_ids ->
+    newSysLocalDs arg_ty	`thenDs` \ arg_id ->
+    -- push the argument expression onto the stack
+    let
+	core_body = bindNonRec arg_id core_arg
+			(buildEnvStack env_ids' (arg_id:stack_ids))
+    in
+    -- match the environment and stack against the input
+    matchEnvStack env_ids stack_ids core_body
+				`thenDs` \ core_map ->
+    returnDs (do_map_arrow ids
+			(envStackType env_ids stack)
+			(envStackType env_ids' stack')
+			res_ty
+			core_map
+			core_cmd,
+	(exprFreeVars core_arg `intersectVarSet` local_vars)
+		`unionVarSet` free_vars)
+
 --	A | ys |- c :: [ts] t'
 --	-----------------------------------------------
 --	A | xs |- \ p1 ... pk -> c :: [t1:...:tk:ts] t'
@@ -505,7 +539,7 @@ dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts _ _ _loc)
 --	A |- e :: forall e. a1 (e*ts1) t1 -> ... an (e*tsn) tn -> a (e*ts) t
 --	A | xs |- ci :: [tsi] ti
 --	-----------------------------------
---	A | xs |- (|e|) c1 ... cn :: [ts] t	---> e [t_xs] c1 ... cn
+--	A | xs |- (|e c1 ... cn|) :: [ts] t	---> e [t_xs] c1 ... cn
 
 dsCmd _ids local_vars env_ids _stack _res_ty (HsArrForm op _ args _)
   = let
