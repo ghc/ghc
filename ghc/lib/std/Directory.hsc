@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.2 2001/01/12 15:48:56 simonmar Exp $
+-- $Id: Directory.hsc,v 1.3 2001/01/12 17:45:30 qrczak Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -345,6 +345,7 @@ getDirectoryContents path = do
   where
     loop :: Ptr CDir -> IO [String]
     loop dir = do
+      resetErrno
       p <- readdir dir
       if (p /= nullPtr)
 	 then do entry   <- peekCString ((#ptr struct dirent,d_name) p)

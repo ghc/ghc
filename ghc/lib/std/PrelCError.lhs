@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelCError.lhs,v 1.2 2001/01/12 17:45:30 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -39,6 +39,7 @@ module PrelCError (
   -- access to the current thread's "errno" value
   --
   getErrno,             -- :: IO Errno
+  resetErrno,           -- :: IO ()
 
   -- conversion of an "errno" value into IO error
   --
@@ -279,6 +280,12 @@ isValidErrno (Errno errno)  = errno /= 0
 --
 getErrno :: IO Errno
 getErrno  = liftM Errno (peek _errno)
+
+
+-- set the current thread's "errno" value to 0
+--
+resetErrno :: IO ()
+resetErrno  = poke _errno 0
 
 
 -- throw current "errno" value
