@@ -5,7 +5,7 @@
 --	for PrelException.hi.
 ---------------------------------------------------------------------------
  
-__interface PrelException 1 where
+__interface PrelException 1 0 where
 __export ! PrelException ioError catch;
 1 ioError :: __forall [a] => PrelIOBase.IOError -> PrelIOBase.IO a ;
 1 catch :: __forall [a] => PrelIOBase.IO a -> (PrelIOBase.IOError -> PrelIOBase.IO a) -> PrelIOBase.IO a ;
