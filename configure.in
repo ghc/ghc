@@ -1,17 +1,18 @@
 dnl == autoconf source for the Glasgow FP tools ==
-dnl (grep for '^dnl' to see the outline of this file)
+dnl (run "grep '^dnl \*' configure.in | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
+dnl  (or some such) to see the outline of this file)
 dnl
-dnl * INITIAL SETUP, CHOICE OF PLATFORM(S)
-#!/bin/sh
 #
-# (c) The AQUA Project, Glasgow University, 1994-1997
+# (c) The AQUA Project, Glasgow University, 1994-1998
 #
-# Configure script for the Glasgow functional programming tools
-# (created automagically by autoconf...do not edit by hand)
+# Configure script template for the Glasgow functional programming tools
 #
-# Do "./configure --help" to see what flags are available.
-# (Better yet, read the documentation!)
+# Process with 'autoconf' to get a working configure script.
 #
+# For the generated configure script, do "./configure --help" to
+# see what flags are available. (Better yet, read the documentation!)
+#
+
 # First off, a distrib sanity check..
 AC_INIT(mk/config.mk.in)
 
@@ -21,7 +22,7 @@ AC_INIT(mk/config.mk.in)
 #
 AC_CONFIG_HEADER(mk/config.h)
 
-# No, we don't do `--srcdir'...
+# No, semi-sadly, we don't do `--srcdir'...
 if test x"$srcdir" != 'x.' ; then
     echo "This configuration does not support the \`--srcdir' option.."
     exit 1
@@ -29,7 +30,7 @@ fi
 
 #
 # Remove common automounter nonsense + convert from UNC to DOS style paths
-# (cygwin32-beta18 for UNC isn't quite there yet.)
+# (UNC awareness isn't quite there yet for cygwin32-beta18 and consituent tools.)
 #
 hardtop=`pwd`
 hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|' | sed 's|^//\(.\)/|\1:/|' `
@@ -38,27 +39,19 @@ echo ''
 echo "*** The top of your build tree is: $hardtop"
 AC_SUBST(hardtop)
 
-####--------------------------------------------------------------------
-dnl ** choose host(/target/build) platform
-#
-# Guess host/target/build platform(s) if necessary.
-#
+dnl--------------------------------------------------------------------
+dnl * Choose host(/target/build) platform
+dnl--------------------------------------------------------------------
+
+dnl Guess host/target/build platform(s) if necessary.
 AC_CANONICAL_SYSTEM
 
 # "$host" defaults to "$target"
 if test "x$host" = xNONE ; then
     host=$target
 fi
-# "$build" defaults to "$host"
-#if test "x$build" = xNONE ; then
-#    build=$host
-#else
-#    echo "This configuration does not support the \`--build' option."
-#    exit 1
-#fi
 
 dnl ** canonicalize platform names
-# Canonicali[sz]e those babies
 BuildPlatform=`/bin/sh $srcdir/config.sub $build` || exit 1
 HostPlatform=`/bin/sh $srcdir/config.sub $host` || exit 1
 TargetPlatform=`/bin/sh $srcdir/config.sub $target` || exit 1
@@ -281,8 +274,40 @@ dnl AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 
-dnl * Booting from .hc files?
-#--------------------------------------------------------------
+dnl --------------------------------------------------------------
+dnl * Project specific configuration options
+dnl --------------------------------------------------------------
+dnl What follows is a bunch of options that can either be configured
+dnl through command line options to the configure script or by
+dnl supplying defns in the build tree's mk/build.mk. Having the option to
+dnl use either is considered a Feature.
+
+dnl ** What command to use to compile compiler sources ?
+dnl --------------------------------------------------------------
+AC_ARG_WITH(ghc-hc,
+[  --with-ghc-hc=<haskell compiler>
+        Use a command different from 'ghc-2.10' to compile up the GHC compiler sources.
+         (no claims currently made that this will work with a compiler other than a
+          recent version of GHC, but you could always try...)
+],
+[WithGhcHc="$withval"],
+[WithGhcHc="ghc-2.10"]
+)
+AC_SUBST(WithGhcHc)
+
+dnl ** Which gcc to use?
+dnl --------------------------------------------------------------
+AC_ARG_WITH(gcc,
+[  --with-gcc=<gcc command>
+        Use a different command instead of 'gcc' for the GNU C compiler.
+],
+[WhatGccIsCalled="$withval"],
+[WhatGccIsCalled="gcc"]
+)
+AC_SUBST(WhatGccIsCalled)
+
+dnl ** Booting from .hc files?
+dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot,
 [  --enable-hc-boot
         Boot the Glasgow Haskell Compiler from intermediate .hc files.
@@ -293,27 +318,20 @@ AC_ARG_ENABLE(hc-boot,
 )
 AC_SUBST(BootingFromHc)
 
-AC_ARG_WITH(gcc,
-[  --with-gcc=<gcc command>
-        Use a different command instead of 'gcc' for the GNU C compiler.
-],
-[WhatGccIsCalled="$withval"],
-[WhatGccIsCalled="gcc"]
-)
-AC_SUBST(WhatGccIsCalled)
 
-# -------------------------------------------------------------------------
-dnl
-dnl * _GENERAL_ CONFIGURATION CHECKS
-#
+dnl --------------------------------------------------------------
+dnl End of configure script option section
+dnl --------------------------------------------------------------
 
-#
+
+dnl --------------------------------------------------------------
+dnl * General configuration checks
+dnl --------------------------------------------------------------
+
 dnl ** does #! work?
-#
 AC_SYS_INTERPRETER()
-#
+
 dnl ** look for `perl', but watch out for version 4.035
-#
 AC_PATH_PROG(PerlCmd,perl)
 if test -z "$PerlCmd"; then
    echo "You must install perl before you can continue"
@@ -323,75 +341,59 @@ else
 FPTOOLS_CHECK_PERL_VERSION
 fi
 
-#
-dnl ** does #!.../perl work? (sometimes it's too long...)
-#
+dnl ** does #! path/to/perl work? (sometimes it's too long...)
 FPTOOLS_SHEBANG_PERL
 
-#
+
 dnl ** look for GCC and find out which version
-# Figure out which C compiler to use.  Gcc is preferred.
-# If gcc, make sure it's at least 2.1
-#
+dnl     Figure out which C compiler to use.  Gcc is preferred.
+dnl     If gcc, make sure it's at least 2.1
+dnl
 AC_PROG_CC
 FPTOOLS_HAVE_GCC
 
-#
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
-#
 AC_PROG_CPP
 FPTOOLS_PROG_GNUCPP
 
-#
 dnl ** figure out how to do context diffs
-#
 FPTOOLS_PROG_DIFF
 
-#
+
 dnl ** look for a decent parser generator (bison preferred)
-#
-# (FPTOOLS_PROG_YACCY is AC_PROG_YACC, but with some extra testing 
-# on the suitability of the 'yacc' returned.)
+dnl (FPTOOLS_PROG_YACCY is AC_PROG_YACC, but with some extra testing 
+dnl  on the suitability of the 'yacc' returned.)
 FPTOOLS_PROG_YACCY
 
-#
 dnl ** Find lex command (lex or flex) and library (-ll or -lfl)
-#
+dnl     ( not that we care about the latter, see mk/config.mk.in )
 AC_PROG_LEX
 
-#
+
 dnl ** figure out how to do a BSD-ish install
-#
 AC_PROG_INSTALL
-#
+
 dnl ** how to invoke `ar' and `ranlib'
-#
 FPTOOLS_PROG_AR_AND_RANLIB
 
-#
-#
+
 dnl ** Check to see whether ln -s works
-#
 AC_PROG_LN_S
 
-#
-dnl ** Find the path to sed **
-#
+
+dnl ** Find the path to sed
 AC_PATH_PROG(SedCmd,sed)
 
-#
-dnl ** check for time command **
+
+dnl ** check for time command
 AC_PATH_PROG(TimeCmd,time)
 
-#
-dnl ** check for tar **
-#
-# if GNU tar is named gtar, look for it first.
-#
+
+dnl ** check for tar
+dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gtar tar,tar)
 
-#
-dnl ** check for gzip/compress **
+dnl ** check for gzip/compress
 AC_PATH_PROGS(CompressCmd,gzip compress,gzip)
 
 compress_nm=`basename $CompressCmd`
@@ -404,47 +406,39 @@ fi
 AC_SUBST(CompressCmd)
 AC_SUBST(CompressSuffix)
 
-dnl
 dnl ** check for installed happy binary + version
 dnl    (don't do it if we're booting from .hc files though.)
 if (test "$BootingFromHc" = "NO"); then
 FPTOOLS_HAPPY
 fi;
 
-#### program checking section ends here ####
+dnl --------------------------------------------------
+dnl ### program checking section ends here ###
+dnl --------------------------------------------------
 
-####--------------------------------------------------
-#### checking the state of the local header files and syscalls ####
+dnl --------------------------------------------------
+dnl * Platform header file and syscall feature tests
+dnl ### checking the state of the local header files and syscalls ###
 
-#
 dnl ** check for full ANSI header (.h) files
-#
 AC_HEADER_STDC
 
-#
 dnl ** check for specific header (.h) files that we are interested in
-#
 AC_CHECK_HEADERS(dirent.h fcntl.h grp.h malloc.h memory.h nlist.h pwd.h siginfo.h signal.h stdlib.h string.h sys/fault.h sys/file.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termios.h time.h types.h unistd.h utime.h vfork.h readline/readline.h bfd.h)
 
-#
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
-#
 AC_HEADER_TIME
-#
+
 dnl ** how do we get a timezone name, and UTC offset ?
-#
 AC_STRUCT_TIMEZONE
 
-# 
 dnl ** what's the type of timezone?
 FPTOOLS_TYPE_TIMEZONE
 
-#
 dnl ** do we have altzone?
 FPTOOLS_ALTZONE
 
 dnl ** does struct stat contain st_blksize?
-#
 AC_STRUCT_ST_BLKSIZE
 
 dnl ** what are the sizes of various types
@@ -467,42 +461,39 @@ FPTOOLS_C_LONG_LONG
 dnl ** can we open files in binary mode?
 FPTOOLS_O_BINARY
 
-#
 dnl ** check for specific library functions that we are interested in
-#
 AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect setitimer stat sysconf timelocal times vadvise vfork)
 
-#
-dnl ** check whether this machine has GMP 2.0 installed
-#
+dnl ** check whether this machine has gmp2 installed
 AC_CHECK_LIB(gmp,  mpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
   AC_CHECK_LIB(gmp2, mpz_fdiv_qr,  HaveLibGmp=YES; LibGmp=gmp2,
     HaveLibGmp=No; LibGmp=not-installed))
 AC_SUBST(HaveLibGmp)
 AC_SUBST(LibGmp)
 
-#
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
-dnl ** the order of these tests matters: bfd needs liberty
-#
+dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
 
-#
-# Misc
-#
+
+dnl --------------------------------------------------
+dnl * Miscellaneous feature tests
+dnl --------------------------------------------------
+
 dnl ** can we get alloca?
 AC_FUNC_ALLOCA
+
 dnl ** determine whether or not const works
 AC_C_CONST
+
 dnl ** are we big endian?
 AC_C_BIGENDIAN
-dnl ** determine the type of signal()
+
+dnl ** determine the return type of signal()
 AC_TYPE_SIGNAL
 
-#
 dnl ** check for leading underscores in symbol names
-#
 FPTOOLS_UNDERSCORE
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
