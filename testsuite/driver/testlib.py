@@ -767,6 +767,10 @@ def check_stdout_ok( name ):
        actual_stdout = ''
        actual_stdout_file = ''
 
+   # On Windows, remove '\r' characters from the output
+   if config.platform == 'i386-unknown-mingw32':
+       actual_stdout = re.sub('\r', '', actual_stdout)
+
    if actual_stdout != expected_stdout:
        return outputs_differ( 'stdout', expected_stdout_file, actual_stdout_file )
    else:
@@ -787,6 +791,10 @@ def check_stderr_ok( name ):
    else:
        actual_stderr = ''
        actual_stderr_file = ''
+
+   # On Windows, remove '\r' characters from the output
+   if config.platform == 'i386-unknown-mingw32':
+       actual_stderr = re.sub('\r', '', actual_stderr)
 
    if actual_stderr != expected_stderr:
        return outputs_differ( 'stderr', expected_stderr_file, actual_stderr_file )
