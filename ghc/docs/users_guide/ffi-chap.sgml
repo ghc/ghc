@@ -3,7 +3,8 @@
 <Chapter id="ffi">
 <Title>Foreign function interface</Title>
 
-  <para>The foreign interface consists of the following components:</para>
+  <para>The foreign function interface consists of the following
+  components:</para>
 
   <itemizedlist>
     <listitem>
@@ -16,44 +17,11 @@
     </listitem>
 
     <listitem>
-      <para>The <literal>Foreign</literal> module (see <xref
-      linkend="sec-Foreign">) collects together several interfaces
-      which are useful in specifying foreign language interfaces,
-      including the following:</para>
-
-      <itemizedlist>
-	<listitem>
-	  <para>The <literal>ForeignObj</literal> module (see <xref
-          linkend="sec-ForeignObj">), for managing pointers from
-          Haskell into the outside world.</para>
-	</listitem>
-	
-	<listitem>
-	  <para>The <literal>StablePtr</literal> module (see <xref
-          linkend="sec-stable-pointers">), for managing pointers into
-          Haskell from the outside world.</para>
-	</listitem>
-      
-	<listitem>
-	  <para>The <literal>CTypes</literal> module (see <xref
-          linkend="sec-CTypes">) gives Haskell equivalents for the
-          standard C datatypes, for use in making Haskell bindings to
-          existing C libraries.</para>
-	</listitem>
-      
-	<listitem>
-	  <para>The <literal>CTypesISO</literal> module (see <xref
-          linkend="sec-CTypesISO">) gives Haskell equivalents for C
-          types defined by the ISO C standard.</para>
-	</listitem>
-	
-	<listitem>
-	  <para>The <literal>Storable</literal> library, for primitive
-	  marshalling of data types between Haskell and the foreign
-	  language.</para>
-	</listitem>
-      </itemizedlist>
-      
+      <para>Several library modules which provide access to types used
+      by foreign languages and utilties for marshalling values to and
+      from foreign functions, and for converting errors in the foreign
+      language into Haskell IO errors.  See <xref linkend="sec-Foreign"> for
+      more details.  </para>
     </listitem>
   </itemizedlist>
 
