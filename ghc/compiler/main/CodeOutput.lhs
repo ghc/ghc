@@ -188,7 +188,7 @@ outputForeignStubs dflags c_code h_code
 
 	stub_h_file_exists
            <- outputForeignStubs_help (hscStubHOutName dflags) stub_h_output_w
-		"#include \"HsFFI.h\"\n"
+		("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
 
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
@@ -199,7 +199,9 @@ outputForeignStubs dflags c_code h_code
            <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
 		("#define IN_STG_CODE 0\n" ++ 
 		 hc_header ++
-		 "#include \"RtsAPI.h\"\n")
+		 "#include \"RtsAPI.h\"\n" ++
+		 cplusplus_hdr)
+		 cplusplus_ftr
 	   -- we're adding the default hc_header to the stub file, but this
 	   -- isn't really HC code, so we need to define IN_STG_CODE==0 to
 	   -- avoid the register variables etc. being enabled.
@@ -214,13 +216,15 @@ outputForeignStubs dflags c_code h_code
     stub_h_output_d = pprCode CStyle h_code
     stub_h_output_w = showSDoc stub_h_output_d
 
+cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
+cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"
 
 -- Don't use doOutput for dumping the f. export stubs
 -- since it is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
-outputForeignStubs_help fname "" injects     = return False
-outputForeignStubs_help fname doc_str injects
-   = do writeFile fname (injects ++ doc_str ++ "\n")
+outputForeignStubs_help fname ""      header footer = return False
+outputForeignStubs_help fname doc_str header footer
+   = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
 \end{code}
 
