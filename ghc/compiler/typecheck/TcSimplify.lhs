@@ -2007,43 +2007,39 @@ tcSimplifyDeriv tyvars theta
     doptM Opt_AllowUndecidableInstances		`thenM` \ undecidable_ok ->
     let
  	tv_set      = mkVarSet tvs
-	simpl_theta = map dictPred irreds	-- reduceMe squashes all non-dicts
 
-	check_pred pred
-	  | isEmptyVarSet pred_tyvars	-- Things like (Eq T) should be rejected
-	  = addErrTc (noInstErr pred)
-
-	  | not undecidable_ok && not (isTyVarClassPred pred)
-	  -- Check that the returned dictionaries are all of form (C a b)
-	  -- 	(where a, b are type variables).  
-	  -- We allow this if we had -fallow-undecidable-instances,
-	  -- but note that risks non-termination in the 'deriving' context-inference
-	  -- fixpoint loop.   It is useful for situations like
-	  --	data Min h a = E | M a (h a)
-	  -- which gives the instance decl
-	  --	instance (Eq a, Eq (h a)) => Eq (Min h a)
-          = addErrTc (noInstErr pred)
+ 	(bad_insts, ok_insts) = partition is_bad_inst irreds
+	is_bad_inst dict 
+	   = let pred = dictPred dict	-- reduceMe squashes all non-dicts
+	     in isEmptyVarSet (tyVarsOfPred pred)
+		  -- Things like (Eq T) are bad
+	     || (not undecidable_ok && not (isTyVarClassPred pred))
+		  -- The returned dictionaries should be of form (C a b)
+		  -- 	(where a, b are type variables).  
+		  -- We allow non-tyvar dicts if we had -fallow-undecidable-instances,
+		  -- but note that risks non-termination in the 'deriving' context-inference
+		  -- fixpoint loop.   It is useful for situations like
+		  --	data Min h a = E | M a (h a)
+		  -- which gives the instance decl
+		  --	instance (Eq a, Eq (h a)) => Eq (Min h a)
   
-	  | not (pred_tyvars `subVarSet` tv_set) 
+	simpl_theta = map dictPred ok_insts
+	weird_preds = [pred | pred <- simpl_theta
+			    , not (tyVarsOfPred pred `subVarSet` tv_set)]  
 	  -- Check for a bizarre corner case, when the derived instance decl should
 	  -- have form 	instance C a b => D (T a) where ...
 	  -- Note that 'b' isn't a parameter of T.  This gives rise to all sorts
 	  -- of problems; in particular, it's hard to compare solutions for
 	  -- equality when finding the fixpoint.  So I just rule it out for now.
-	  = addErrTc (badDerivedPred pred)
   
-	  | otherwise
-	  = returnM ()
-	  where
-	    pred_tyvars = tyVarsOfPred pred
-
 	rev_env = mkTopTyVarSubst tvs (mkTyVarTys tyvars)
 		-- This reverse-mapping is a Royal Pain, 
 		-- but the result should mention TyVars not TcTyVars
     in
    
-    mappM check_pred simpl_theta		`thenM_`
-    checkAmbiguity tvs simpl_theta tv_set	`thenM_`
+    addNoInstanceErrs Nothing [] bad_insts		`thenM_`
+    mapM_ (addErrTc . badDerivedPred) weird_preds	`thenM_`
+    checkAmbiguity tvs simpl_theta tv_set		`thenM_`
     returnM (substTheta rev_env simpl_theta)
   where
     doc    = ptext SLIT("deriving classes for a data type")
@@ -2061,7 +2057,7 @@ tcSimplifyDefault theta
   = newDicts DataDeclOrigin theta		`thenM` \ wanteds ->
     simpleReduceLoop doc reduceMe wanteds	`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )	-- try_me never returns Free
-    mappM (addErrTc . noInstErr) irreds 	`thenM_`
+    addNoInstanceErrs Nothing []  irreds 	`thenM_`
     if null irreds then
 	returnM ()
     else
@@ -2253,8 +2249,6 @@ warnDefault dicts default_ty
 		      pprInstsInFull tidy_dicts]
 
 -- Used for the ...Thetas variants; all top level
-noInstErr pred = ptext SLIT("No instance for") <+> quotes (ppr pred)
-
 badDerivedPred pred
   = vcat [ptext SLIT("Can't derive instances where the instance context mentions"),
 	  ptext SLIT("type variables that are not data type parameters"),
