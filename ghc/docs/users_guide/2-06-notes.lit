@@ -8,10 +8,10 @@ Here's a list of the changes made since GHC 2.05:
 
 \item Tidied up @nofib/parallel@
 
-\item Changed @Show@ (and @Read@) code for constructors with labelled
-fields.
+\item Changed derived @Show@ (and @Read@) code for constructors
+with labelled fields to bring them into line with the Report.
 
-\item Fixed @ghc-0.29 -O@ booting problem (needed extra imports).
+\item Fixed @ghc-0.29 -O@ booting problem (codeGen/ClosureInfo not closed.)
 
 \item Improved error messages for illegal derivings of @Ix@, @Enum@
 and @Bounded@.
@@ -21,6 +21,8 @@ return and zero)
 
 \item New module: @PackBase@ - minimum pack/unpack code.
 
+\item Moved @PackedString@ to ghc system library
+
 \item Added export of @unionBy@ and @intersectBy@ to @List@ (plus
 commented out unused functions).
 
@@ -29,10 +31,6 @@ commented out unused functions).
 \item Added @ForeignObj@ support to NCG
 
 \item Added @index*OffForeignObj#@ primops (for completeness, mostly)
-
-\item Moved @PackedString@ to ghc system library
-
-\item New module: @ListExts@ - overflow List utils. (in ghc syslib)
 
 \item Removed: @Util.mapAccumL@ and @Util.mapAccumR@ (now via List)
 
@@ -52,18 +50,18 @@ commented out unused functions).
 \item Removed @glafp-utils/msub@
 
 \item Fixed misleading error message for guards (used to
-mention list comprehensions) (SLPJ)
+mention list comprehensions)
 
 \item Fixed incorrect handling of default methods (used to
-complain about differing contexts) (SLPJ)
+complain about differing contexts)
 
 \item Fixed missing @tidyPrimOp@ in @simplCore/SimplCore@
-	(Sven Panne bug report.) (SLPJ)
+	(Sven Panne bug report.)
 
 \item Fixed desugaring of record construction for overloaded
-constructors. (Dave Barton bug report.) (SLPJ)
+constructors. (Dave Barton bug report.)
 
-\item Fixed rank-2 polymorphism bug (Ralf Hinze bug report.) (SLPJ)
+\item Fixed rank-2 polymorphism bug (Ralf Hinze bug report.)
 
 \item Fixed interface-file parser error on @GHC.->@
 
@@ -97,7 +95,7 @@ to handle @NULL@ pointer arg gracefully.
 
 \item Change @mkWrapper@ in @WwLib.lhs@ to call
   @splitForAllTyExpandingDicts@ instead of @splitForALlTy@ to fix
- @absApply@ crash. (Jon Mountjoy bug report.) (SLPJ)
+ @absApply@ crash. (Jon Mountjoy bug report.)
 
 \item GHC's interface file parser now uses the latest version of
 Happy.
