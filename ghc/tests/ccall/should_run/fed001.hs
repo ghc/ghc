@@ -1,6 +1,15 @@
 import Foreign
 import Monad
 import Addr
+import System
+import IO
+
+import IOExts
+global :: a -> IORef a
+global a = unsafePerformIO (newIORef a)
+{-# NOINLINE global #-}
+v_NumCmps = global 0 :: IORef Int
+{-# NOINLINE v_NumCmps #-}
 
 newtype XPtr a = XPtr Addr
 unXPtr (XPtr (A# x)) = x
@@ -18,9 +27,17 @@ foreign import
 
 compareInts :: XPtr Int -> XPtr Int -> IO CInt
 compareInts a1 a2 = do
-   i1 <- peek (Ptr (unXPtr a1))
-   i2 <- peek (Ptr (unXPtr a2))
-   return (fromIntegral (i1 - i2 :: Int))
+   num_cmps <- readIORef v_NumCmps
+   if num_cmps < 100
+    then 
+     do writeIORef v_NumCmps (num_cmps+1)
+        i1 <- peek (Ptr (unXPtr a1))
+        i2 <- peek (Ptr (unXPtr a2))
+        return (fromIntegral (i1 - i2 :: Int))
+    else
+     do hPutStrLn stderr 
+                  "compareInts: 100 comparisons exceeded; something's wrong"
+        exitWith (ExitFailure 1)
 
 main :: IO ()
 main = do
