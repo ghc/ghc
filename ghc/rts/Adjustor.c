@@ -40,8 +40,15 @@ Haskell side.
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-
 #include <stdlib.h>
+
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
+#if defined(i386_TARGET_ARCH)
+static rtsBool execPage (void* addr, int writable);
+#endif
 
 /* Heavily arch-specific, I'm afraid.. */
 
@@ -146,6 +153,11 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 
 	adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
 	adj_code[0x0d] = (unsigned char)0xe0;
+	
+#if 0
+	/* not yet */
+	execPage(adjustor,rtsTrue);
+#endif
     }
 #endif
     break;
@@ -190,6 +202,11 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
+
+#if 0
+	/* not yet */
+	execPage(adjustor,rtsTrue);
+#endif
     }
 #elif defined(sparc_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of the following
@@ -527,3 +544,51 @@ freeHaskellFunctionPtr(void* ptr)
  stgFree(ptr);
 }
 
+#if defined(i386_TARGET_ARCH)
+/*
+ * Function: execPage()
+ *
+ * Set the executable bit on page containin
+ */
+static
+rtsBool
+execPage (void* addr, int writable)
+{
+#if defined(_WIN32)
+    SYSTEM_INFO sInfo;
+    DWORD dwOldProtect = 0;
+
+    /* doesn't return a result, so presumably it can't fail... */
+    GetSystemInfo(&sInfo);
+    
+    if ( VirtualProtect ( (void*)((unsigned long)addr & (sInfo.dwPageSize - 1)),
+			  sInfo.dwPageSize,
+			  ( writable ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ),
+			  &dwOldProtect) == 0 ) {
+# if 1
+	DWORD rc = GetLastError();
+	fprintf(stderr, "execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
+# endif
+	return rtsFalse;
+    }
+    return rtsTrue;
+#else
+    return rtsTrue;
+#endif
+}
+#endif
+
+/*
+ * Function: initAdjustor()
+ *
+ * Perform initialisation of adjustor thunk layer (if needed.)
+ */
+rtsBool
+initAdjustor(void)
+{
+#if defined(i386_TARGET_ARCH) && defined(_WIN32)
+    return execPage(__obscure_ccall_ret_code, rtsFalse);
+#else
+    return rtsTrue;
+#endif
+}
