@@ -475,12 +475,36 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>-framework</option> <replaceable>name</replaceable></term>
+	  <indexterm><primary><option>-framework</option></primary></indexterm>
+	  <listitem>
+	    <para>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
+	    This option corresponds to the <option>-framework</option> option for Apple's Linker.
+	    Please note that frameworks and packages are two different things - frameworks don't
+	    contain any haskell code. Rather, they are Apple's way of packaging shared libraries.
+	    To link to Apple's &ldquo;Carbon&qdquo; API, for example, you'd use
+	    <option>-framework Carbon</option>.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>-L</option><replaceable>dir</replaceable></term>
 	  <indexterm><primary><option>-L</option></primary></indexterm>
 	  <listitem>
 	    <para>Where to find user-supplied libraries&hellip;
             Prepend the directory <replaceable>dir</replaceable> to
             the library directories path.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-framework-path</option><replaceable>dir</replaceable></term>
+	  <indexterm><primary><option>-framework-path</option></primary></indexterm>
+	  <listitem>
+	    <para>On Darwin/MacOS X only, prepend the directory <replaceable>dir</replaceable> to
+            the framework directories path. This option corresponds to the <option>-F</option>
+	    option for Apple's Linker (<option>-F</option> already means something else for GHC).</para>
 	  </listitem>
 	</varlistentry>
 

@@ -1092,6 +1092,21 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-framework</option> <replaceable>name</replaceable></endtry>
+	      <entry>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
+		This option corresponds to the <option>-framework</option> option for Apple's Linker.
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-framework-path</option> <replaceable>name</replaceable></endtry>
+	      <entry>On Darwin/MacOS X only, add <replaceable>dir</replaceable> to the list of
+	        directories searched for frameworks.
+		This option corresponds to the <option>-F</option> option for Apple's Linker.
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-split-objs</option></entry>
 	      <entry>Split objects (for libraries)</entry>
 	      <entry>static</entry>

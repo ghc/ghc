@@ -527,6 +527,28 @@
 	    (for linking) when this package is being used.</para>
 	  </listitem>
 	</varlistentry>
+	
+	<varlistentry>
+	  <term><literal>framework_dirs</literal></term>
+	  <indexterm><primary><literal>framework_dirs</literal></primary>
+	    <secondary>package specification</secondary></indexterm>
+	  <listitem>
+	    <para>On Darwin/MacOS X, a list of directories containing frameworks for this
+	    package. This corresponds to the <option>-framework-path</options> option.
+	    It is ignored on all other platforms.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>extra_frameworks</literal></term>
+	  <indexterm><primary><literal>extra_frameworks</literal></primary>
+	    <secondary>package specification</secondary></indexterm>
+	  <listitem>
+	    <para>On Darwin/MacOS X, a list of frameworks to link to. This corresponds to the
+	    <option>-framework</option> option. Take a look at Apple's developer documentation
+	    to find out what frameworks actually are. This entry is ignored on all other platforms.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
       
       <para>
