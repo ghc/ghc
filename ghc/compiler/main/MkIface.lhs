@@ -26,7 +26,7 @@ import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			  ModuleLocation(..), GhciMode(..),
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  TyThing(..), DFunId, Avails,
+			  TyThing(..), DFunId, Avails, TypeEnv,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
 			  lookupVersion, typeEnvIds
@@ -38,7 +38,8 @@ import Id		( idType, idInfo, isImplicitId, idCgInfo,
 			)
 import DataCon		( dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
-import CoreSyn		( CoreRule(..) )
+import Var              ( Var )
+import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import PprCore		( pprIdCoreRule )
@@ -61,7 +62,8 @@ import Module		( ModuleName )
 import Util		( sortLt )
 import ErrUtils		( dumpIfSet_dyn )
 
-import Monad		( when )
+import Monad		( when, mplus )
+import Maybe		( maybeToList )
 import IO		( IOMode(..), openFile, hClose )
 \end{code}
 
@@ -107,8 +109,8 @@ mkFinalIface ghci_mode dflags location
 	; return final_iface }
 
   where
-     must_write_hi_file Nothing      = False
-     must_write_hi_file (Just diffs) = ghci_mode /= Interactive
+     must_write_hi_file Nothing       = False
+     must_write_hi_file (Just _diffs) = ghci_mode /= Interactive
 		-- We must write a new .hi file if there are some changes
 		-- and we're not in interactive mode
 		-- maybe_diffs = 'Nothing' means that even the usages havn't changed, 
@@ -122,6 +124,7 @@ mkFinalIface ghci_mode dflags location
      rule_dcls    = map ifaceRule (md_rules new_details)
      orphan_mod   = isOrphanModule (mi_module new_iface) new_details
 
+write_diffs :: DynFlags -> ModIface -> Maybe SDoc -> IO ()
 write_diffs dflags new_iface Nothing
   = do when (dopt Opt_D_dump_hi_diffs dflags) (printDump (text "INTERFACE UNCHANGED"))
        dumpIfSet_dyn dflags Opt_D_dump_hi "UNCHANGED FINAL INTERFACE" (pprIface new_iface)
@@ -132,6 +135,7 @@ write_diffs dflags new_iface (Just sdoc_diffs)
 \end{code}
 
 \begin{code}
+isOrphanModule :: Module -> ModDetails -> Bool
 isOrphanModule this_mod (ModDetails {md_insts = insts, md_rules = rules})
   = any orphan_inst insts || any orphan_rule rules
   where
@@ -202,9 +206,10 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 			tcdLoc	     = noSrcLoc }
 
 	    | isForeignTyCon tycon
-	    = ForeignType { tcdName   = getName tycon,
-			    tcdFoType = DNType,	-- The only case at present
-			    tcdLoc    = noSrcLoc }
+	    = ForeignType { tcdName    = getName tycon,
+	    		    tcdExtName = Nothing,
+			    tcdFoType  = DNType,	-- The only case at present
+			    tcdLoc     = noSrcLoc }
 
 	    | isPrimTyCon tycon
 		-- needed in GHCi for ':info Int#', for example
@@ -260,31 +265,35 @@ ifaceTyThing (AnId id) = iface_sig
     caf_info   = cgCafInfo cg_info
 
     hs_idinfo | opt_OmitInterfacePragmas = []
- 	      | otherwise		 = arity_hsinfo  ++ caf_hsinfo  ++ 
-					   strict_hsinfo ++ wrkr_hsinfo ++ unfold_hsinfo
+ 	      | otherwise		 = maybeToList $
+		      				   arity_hsinfo  `mplus`
+		      				   caf_hsinfo    `mplus`
+						   strict_hsinfo `mplus`
+						   wrkr_hsinfo   `mplus`
+						   unfold_hsinfo 
 
     ------------  Arity  --------------
-    arity_hsinfo | arity_info == 0 = []
-		 | otherwise       = [HsArity arity_info]
+    arity_hsinfo | arity_info == 0 = Nothing
+		 | otherwise       = Just (HsArity arity_info)
 
     ------------ Caf Info --------------
     caf_hsinfo = case caf_info of
-		   NoCafRefs -> [HsNoCafRefs]
-		   otherwise -> []
+		   NoCafRefs -> Just HsNoCafRefs
+		   _other    -> Nothing
 
     ------------  Strictness  --------------
 	-- No point in explicitly exporting TopSig
     strict_hsinfo = case newStrictnessInfo id_info of
-			Just sig | not (isTopSig sig) -> [HsStrictness sig]
-			other			      -> []
+			Just sig | not (isTopSig sig) -> Just (HsStrictness sig)
+			_other			      -> Nothing
 
     ------------  Worker  --------------
     work_info   = workerInfo id_info
     has_worker  = case work_info of { HasWorker _ _ -> True; other -> False }
     wrkr_hsinfo = case work_info of
 		    HasWorker work_id wrap_arity -> 
-			[HsWorker (getName work_id) wrap_arity]
-		    NoWorker -> []
+			Just (HsWorker (getName work_id) wrap_arity)
+		    NoWorker -> Nothing
 
     ------------  Unfolding  --------------
 	-- The unfolding is redundant if there is a worker
@@ -292,8 +301,8 @@ ifaceTyThing (AnId id) = iface_sig
     inline_prag = inlinePragInfo id_info
     rhs		= unfoldingTemplate unfold_info
     unfold_hsinfo |  neverUnfold unfold_info 
-		  || has_worker = []
-		  | otherwise	= [HsUnfold inline_prag (toUfExpr rhs)]
+		  || has_worker = Nothing
+		  | otherwise	= Just (HsUnfold inline_prag (toUfExpr rhs))
 \end{code}
 
 \begin{code}
@@ -312,6 +321,7 @@ ifaceInstance dfun_id
 		-- and this instance decl wouldn't get imported into a module
 		-- that mentioned T but not Tibble.
 
+ifaceRule :: IdCoreRule -> RuleDecl Name pat
 ifaceRule (id, BuiltinRule _ _)
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule id)
 
@@ -319,6 +329,7 @@ ifaceRule (id, Rule name act bndrs args rhs)
   = IfaceRule name act (map toUfBndr bndrs) (getName id)
 	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
 
+bogusIfaceRule :: (NamedThing a) => a -> RuleDecl Name pat
 bogusIfaceRule id
   = IfaceRule SLIT("bogus") NeverActive [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
@@ -449,6 +460,7 @@ pprModDetails (ModDetails { md_types = type_env, md_insts = dfun_ids, md_rules =
 	 , dump_insts dfun_ids
 	 , dump_rules rules]
 	  
+dump_types :: [Var] -> TypeEnv -> SDoc
 dump_types dfun_ids type_env
   = text "TYPE SIGNATURES" $$ nest 4 (dump_sigs ids)
   where
@@ -462,9 +474,11 @@ dump_types dfun_ids type_env
 	-- that the type checker has invented.  User-defined things have
 	-- Global names.
 
+dump_insts :: [Var] -> SDoc
 dump_insts []       = empty
 dump_insts dfun_ids = text "INSTANCES" $$ nest 4 (dump_sigs dfun_ids)
 
+dump_sigs :: [Var] -> SDoc
 dump_sigs ids
 	-- Print type signatures
    	-- Convert to HsType so that we get source-language style printing
@@ -476,6 +490,7 @@ dump_sigs ids
     lt_sig (n1,_) (n2,_) = n1 < n2
     ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
 
+dump_rules :: [IdCoreRule] -> SDoc
 dump_rules [] = empty
 dump_rules rs = vcat [ptext SLIT("{-# RULES"),
 		      nest 4 (vcat (map pprIdCoreRule rs)),
@@ -540,7 +555,7 @@ pprExport (mod, items)
   where
     pp_avail :: AvailInfo -> SDoc
     pp_avail (Avail name)    		     = pprOcc name
-    pp_avail (AvailTC n [])		     = empty
+    pp_avail (AvailTC _ [])		     = empty
     pp_avail (AvailTC n (n':ns)) | n==n'     = pprOcc n		    <> pp_export ns
 				 | otherwise = pprOcc n <> char '|' <> pp_export (n':ns)
     
@@ -576,6 +591,7 @@ pprUsage (m, has_orphans, is_boot, whats_imported)
 \end{code}
 
 \begin{code}
+pprIfaceDecls :: NameEnv Int -> IfaceDecls -> SDoc
 pprIfaceDecls version_map decls
   = vcat [ vcat [ppr i <+> semi | i <- dcl_insts decls]
 	 , vcat (map ppr_decl (dcl_tycl decls))
@@ -590,6 +606,10 @@ pprIfaceDecls version_map decls
 \end{code}
 
 \begin{code}
+pprFixities :: (Outputable a)
+	    => NameEnv a
+	    -> [TyClDecl Name pat]
+	    -> SDoc
 pprFixities fixity_map decls
   = hsep [ ppr fix <+> ppr n 
 	 | d <- decls, 
@@ -598,6 +618,7 @@ pprFixities fixity_map decls
 
 -- Disgusting to print these two together, but that's 
 -- the way the interface parser currently expects them.
+pprRulesAndDeprecs :: (Outputable a) => [a] -> Deprecations -> SDoc
 pprRulesAndDeprecs [] NoDeprecs = empty
 pprRulesAndDeprecs rules deprecs
   = ptext SLIT("{-##") <+> (pp_rules rules $$ pp_deprecs deprecs) <+> ptext SLIT("##-}")
@@ -612,6 +633,7 @@ pprRulesAndDeprecs rules deprecs
 					DeprecAll txt  -> doubleQuotes (ptext txt)
 					DeprecSome env -> ppr_deprec_env env
 
+ppr_deprec_env :: NameEnv (Name, FAST_STRING) -> SDoc
 ppr_deprec_env env = vcat (punctuate semi (map pp_deprec (nameEnvElts env)))
 	           where
    	 	     pp_deprec (name, txt) = pprOcc name <+> doubleQuotes (ptext txt)
