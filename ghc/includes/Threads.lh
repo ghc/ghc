@@ -82,7 +82,9 @@ extern I_ SparkLimit[SPARK_POOLS];
 extern P_ RunnableThreadsHd, RunnableThreadsTl;
 extern P_ WaitingThreadsHd, WaitingThreadsTl;
 
-extern I_ sparksIgnored;
+#if defined(PAR) 
+extern I_ sparksIgnored, sparksCreated;
+#endif
 
 IF_RTS(extern void AwaitEvent(I_);)
 
