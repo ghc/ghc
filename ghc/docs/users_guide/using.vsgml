@@ -484,7 +484,7 @@ directories'' list.
 
 <tag>@-i@</tag> resets the ``import directories'' list back to nothing.
 
-<tag>@-fno-implicit-prelude@
+<tag>@-fno-implicit-prelude@</tag>
 <nidx>-fno-implicit-prelude option</nidx>
 GHC normally imports @Prelude.hi@ files for you.  If you'd rather it
 didn't, then give it a @-fno-implicit-prelude@ option.  You are
@@ -508,6 +508,8 @@ wish to specify where GHC tells the C compiler to look for @.h@ files.
 (Or, if you are using the @-cpp@ option<nidx>-cpp option</nidx>, where
 it tells the C pre-processor to look...)  For this purpose, use a @-I@
 option in the usual C-ish way.
+
+</descrip>
 
 %************************************************************************
 %*                                                                      *
@@ -746,7 +748,7 @@ of the standard @.hi@ file, use the following syntax in the importing module:
 
 <tscreen> <verb>
 import {-# SOURCE #-} A
-</verb> <tscreen>
+</verb> </tscreen>
 
 The hand-written interface need only contain the bare minimum of
 information needed to get the bootstrapping process started.  For
