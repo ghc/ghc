@@ -46,7 +46,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmd
   if (strlen(lpszCmdParam) == 0) die("no parameters given");
   warn("cwd: %s\n", buf);
   warn("runexing >>>%s<<<\n", lpszCmdParam);
-  if (!CreateProcess(NULL, lpszCmdParam, NULL, NULL, FALSE, 0, NULL, NULL, &sInfo, &pInfo))
+  if (!CreateProcess(NULL, lpszCmdParam, NULL, NULL, TRUE, 0, NULL, NULL, &sInfo, &pInfo))
     die("could not create process");
 
   WaitForSingleObject(pInfo.hProcess, INFINITE);
