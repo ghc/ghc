@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.27 2000/12/19 13:07:07 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.28 2000/12/19 13:16:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,16 +21,15 @@ STGFUN(stg_IND_OLDGEN_entry);
 STGFUN(stg_IND_OLDGEN_PERM_entry);
 STGFUN(stg_CAF_UNENTERED_entry);
 STGFUN(stg_CAF_ENTERED_entry);
+STGFUN(stg_CAF_BLACKHOLE_entry);
 STGFUN(stg_BLACKHOLE_entry);
-STGFUN(stg_BLACKHOLE_STATIC_entry);
 STGFUN(stg_BLACKHOLE_BQ_entry);
-STGFUN(stg_BLACKHOLE_BQ_STATIC_entry);
 #ifdef SMP
 STGFUN(stg_WHITEHOLE_entry);
 #endif
 #ifdef TICKY_TICKY
 STGFUN(stg_SE_BLACKHOLE_entry);
-STGFUN(stg_SE_BLACKHOLE_STATIC_entry);
+STGFUN(stg_SE_CAF_BLACKHOLE_entry);
 #endif
 #if defined(PAR) || defined(GRAN)
 STGFUN(stg_RBH_entry);
@@ -89,16 +88,15 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_IND_OLDGEN_PERM_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_UNENTERED_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_ENTERED_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_CAF_BLACKHOLE_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_STATIC_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_BQ_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_BLACKHOLE_BQ_STATIC_info;
 #ifdef SMP
 extern DLL_IMPORT_RTS const StgInfoTable stg_WHITEHOLE_info;
 #endif
 #ifdef TICKY_TICKY
 extern DLL_IMPORT_RTS const StgInfoTable stg_SE_BLACKHOLE_info;
-extern DLL_IMPORT_RTS const StgInfoTable stg_SE_BLACKHOLE_STATIC_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_SE_CAF_BLACKHOLE_info;
 #endif
 #if defined(PAR) || defined(GRAN)
 extern DLL_IMPORT_RTS const StgInfoTable stg_RBH_info;
