@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.3 1999/02/05 16:03:02 simonm Exp $
+ * $Id: Ticky.c,v 1.4 1999/03/05 12:02:33 kw217 Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -455,6 +455,7 @@ PrintTickyInfo(void)
   PR_CTR(UPD_SQUEEZED_ctr);
   PR_CTR(UPD_CON_IN_NEW_ctr);
   PR_CTR(UPD_PAP_IN_NEW_ctr);
+  PR_CTR(UPD_PAP_IN_PLACE_ctr);
 
   PR_HST(UPD_CON_IN_NEW_hst,0);
   PR_HST(UPD_CON_IN_NEW_hst,1);
