@@ -62,7 +62,7 @@ OutOfHeapHook (unsigned long request_size/* always zero these days */,
 	       unsigned long heap_size)
     /* both in bytes */
 {
-    fprintf(stderr, "GHC's heap exhausted: current limit is %lu bytes;\nUse the `-H<size>' option to increase the total heap size.\n",
+    fprintf(stderr, "GHC's heap exhausted: current limit is %lu bytes;\nUse the `-M<size>' option to increase the total heap size.\n",
 	heap_size);
 }
 
