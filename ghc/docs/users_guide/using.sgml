@@ -275,12 +275,15 @@ over your Haskell source file before continuing.
 </Para>
 
 <Para>
-The option <Option>-E</Option><IndexTerm><Primary>-E option</Primary></IndexTerm> runs just the pre-processing
-passes of the compiler, outputting the result on stdout before
-stopping. If used in conjunction with -cpp, the output is the
+The option <Option>-E</Option><IndexTerm><Primary>-E
+option</Primary></IndexTerm> runs just the pre-processing passes of
+the compiler, dumping the result in a file.  Note that this differs
+from all GHCs prior to version 4.11, in which the result was dumped to the
+standard output.  If used in conjunction with -cpp, the output is the
 code blocks of the original (literal) source after having put it
-through the grinder that is the C pre-processor. Sans <Option>-cpp</Option>, the
-output is the de-litted version of the original source.
+through the grinder that is the C pre-processor. Sans
+<Option>-cpp</Option>, the output is the de-litted version of the
+original source.
 </Para>
 
 <Para>
