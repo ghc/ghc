@@ -333,9 +333,9 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
       whereby it emits bogus PE object files that have more than
       0xffff relocations. When GHCi tries to load a package affected by this
       bug, you get an error message of the form
-<programlisting>
-  Loading package javavm ... linking ... Overflown relocs: 4
-</programlisting>
+<screen>
+Loading package javavm ... linking ... WARNING: Overflown relocation field (# relocs found: 30765)
+</screen>
       The last time we looked, this bug still
       wasn't fixed in the BFD codebase, and there wasn't any
       noticeable interest in fixing it when we reported the bug
