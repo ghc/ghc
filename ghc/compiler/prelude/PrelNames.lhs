@@ -104,8 +104,6 @@ knownKeyNames
 	ratioTyConName,
 	byteArrayTyConName,
 	mutableByteArrayTyConName,
-	foreignObjTyConName,
-	foreignPtrTyConName,
 	bcoPrimTyConName,
 	stablePtrTyConName,
 	stablePtrDataConName,
@@ -245,7 +243,6 @@ pREL_IO_BASE_Name = mkModuleName "GHC.IOBase"
 pREL_ST_Name	  = mkModuleName "GHC.ST"
 pREL_ARR_Name     = mkModuleName "GHC.Arr"
 pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
-fOREIGN_PTR_Name  = mkModuleName "Foreign.ForeignPtr"
 pREL_STABLE_Name  = mkModuleName "GHC.Stable"
 pREL_ADDR_Name    = mkModuleName "GHC.Addr"
 pREL_PTR_Name     = mkModuleName "GHC.Ptr"
@@ -262,7 +259,6 @@ mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "GHC.Int"
 pREL_WORD_Name	  = mkModuleName "GHC.Word"
 
-fOREIGNOBJ_Name	  = mkModuleName "ForeignObj"
 aDDR_Name	  = mkModuleName "Addr"
 
 gLA_EXTS_Name   = mkModuleName "GHC.Exts"
@@ -556,10 +552,6 @@ byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  FSLIT("ByteArray") byteArrayTyC
 mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  FSLIT("MutableByteArray") mutableByteArrayTyConKey
 
 -- Foreign objects and weak pointers
-foreignObjTyConName   = tcQual   fOREIGNOBJ_Name FSLIT("ForeignObj") foreignObjTyConKey
-foreignObjDataConName = dataQual fOREIGNOBJ_Name FSLIT("ForeignObj") foreignObjDataConKey
-foreignPtrTyConName   = tcQual   fOREIGN_PTR_Name FSLIT("ForeignPtr") foreignPtrTyConKey
-foreignPtrDataConName = dataQual fOREIGN_PTR_Name FSLIT("ForeignPtr") foreignPtrDataConKey
 stablePtrTyConName    = tcQual   pREL_STABLE_Name FSLIT("StablePtr") stablePtrTyConKey
 stablePtrDataConName  = dataQual pREL_STABLE_Name FSLIT("StablePtr") stablePtrDataConKey
 deRefStablePtrName    = varQual  pREL_STABLE_Name FSLIT("deRefStablePtr") deRefStablePtrIdKey
@@ -793,8 +785,6 @@ int64TyConKey				= mkPreludeTyConUnique 21
 integerTyConKey				= mkPreludeTyConUnique 22
 listTyConKey				= mkPreludeTyConUnique 23
 foreignObjPrimTyConKey			= mkPreludeTyConUnique 24
-foreignObjTyConKey			= mkPreludeTyConUnique 25
-foreignPtrTyConKey			= mkPreludeTyConUnique 26
 weakPrimTyConKey			= mkPreludeTyConUnique 27
 mutableArrayPrimTyConKey		= mkPreludeTyConUnique 28
 mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 29
@@ -863,8 +853,6 @@ floatDataConKey				= mkPreludeDataConUnique  5
 intDataConKey				= mkPreludeDataConUnique  6
 smallIntegerDataConKey			= mkPreludeDataConUnique  7
 largeIntegerDataConKey			= mkPreludeDataConUnique  8
-foreignObjDataConKey			= mkPreludeDataConUnique  9
-foreignPtrDataConKey			= mkPreludeDataConUnique 10
 nilDataConKey				= mkPreludeDataConUnique 11
 ratioDataConKey				= mkPreludeDataConUnique 12
 stablePtrDataConKey			= mkPreludeDataConUnique 13
@@ -1020,8 +1008,6 @@ cCallishTyKeys =
 	, wordTyConKey
 	, byteArrayTyConKey
 	, mutableByteArrayTyConKey
-	, foreignObjTyConKey
-	, foreignPtrTyConKey
 	, stablePtrTyConKey
 	, int8TyConKey
 	, int16TyConKey
