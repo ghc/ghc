@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.12 2000/04/14 16:47:43 panne Exp $
+ * $Id: Exception.hc,v 1.13 2000/04/26 09:44:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -192,7 +192,7 @@ FN_(killThreadzh_fast)
 	SaveThreadState();	/* inline! */
 	STGCALL2(raiseAsync, R1.t, R2.cl);
 	if (CurrentTSO->what_next == ThreadKilled) {
-		R1.w = ThreadYielding;
+		R1.w = ThreadFinished;
 		JMP_(StgReturn);
 	}
 	LoadThreadState();
@@ -344,7 +344,7 @@ FN_(raisezh_fast)
   StgUpdateFrame *p;
   StgClosure *raise_closure;
   FB_
-    /* args : R1 = error */
+    /* args : R1 = exception */
 
 
 #if defined(PROFILING)
@@ -389,8 +389,15 @@ FN_(raisezh_fast)
 	break;
 
       case STOP_FRAME:
-	barf("raisezh_fast: STOP_FRAME");
-
+	/* We've stripped the entire stack, the thread is now dead. */
+	Sp = CurrentTSO->stack + CurrentTSO->stack_size - 1;
+	Sp[0] = R1.w;		/* save the exception */
+	Su = (StgUpdateFrame *)(Sp+1);
+	CurrentTSO->what_next = ThreadKilled;
+	SaveThreadState();	/* inline! */
+	R1.w = ThreadFinished;
+	JMP_(StgReturn);
+      
       default:
 	barf("raisezh_fast: weird activation record");
       }

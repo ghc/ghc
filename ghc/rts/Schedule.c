@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.68 2000/04/14 16:47:43 panne Exp $
+ * $Id: Schedule.c,v 1.69 2000/04/26 09:44:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -971,7 +971,9 @@ schedule( void )
 			 t->id, t, whatNext_strs[t->what_next]);
                }
                );
+
       threadPaused(t);
+
       IF_DEBUG(sanity,
 	       //belch("&& Doing sanity check on yielding TSO %ld.", t->id);
 	       checkTSO(t));
@@ -1054,8 +1056,10 @@ schedule( void )
        * more main threads, we probably need to stop all the tasks until
        * we get a new one.
        */
+      /* We also end up here if the thread kills itself with an
+       * uncaught exception, see Exception.hc.
+       */
       IF_DEBUG(scheduler,belch("--++ thread %d (%p) finished", t->id, t));
-      t->what_next = ThreadComplete;
 #if defined(GRAN)
       endThread(t, CurrentProc); // clean-up the thread
 #elif defined(PAR)

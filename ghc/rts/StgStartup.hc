@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.11 2000/04/03 16:28:08 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.12 2000/04/26 09:44:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -81,6 +81,8 @@ STGFUN(stg_stop_thread_entry)
      */
     Su = (StgUpdateFrame *)(Sp+1);  
     Sp[0] = R1.w;
+
+    CurrentTSO->what_next = ThreadComplete;
 
     SaveThreadState();	/* inline! */
 
