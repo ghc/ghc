@@ -1,7 +1,0 @@
-interface ShouldSucceed where {
-class Eq' a where { deq }
-instance <Eq' Int>
-instance Eq' a => <Eq' [a]>
-dand  ::  Bool -> Bool -> Bool
-f  ::  Eq' t93 => t93 -> t93 -> Bool
-}

@@ -1,9 +1,0 @@
- 
-tcfail062.hs:33:
-    Type variable not in scope: `behaviouralExpression'
- 
-tcfail062.hs:33:
-    Type variable not in scope: `behaviouralExpression'
-
-
-Compilation had errors

@@ -1,9 +1,0 @@
- 
-tcfail020.hs:12: No instance for:
-		     `A [a{-aGH-}]'
-    tcfail020.hs:12:
-	in an instance declaration
-    When checking superclass constraints of an instance declaration
-
-
-Compilation had errors

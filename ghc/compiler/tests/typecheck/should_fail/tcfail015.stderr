@@ -1,8 +1,0 @@
- 
-tcfail015.hs:7: No instance for:
-		    `PrelBase.Num PrelBase.Bool'
-    tcfail015.hs:7:
-	at an overloaded literal: 2
-
-
-Compilation had errors

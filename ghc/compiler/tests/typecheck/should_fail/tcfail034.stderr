@@ -1,8 +1,0 @@
- 
-tcfail034.hs:13: tcfail034.hs:17: Context required by inferred type, but missing on a type signature:
-		     at a use of an overloaded identifier: `PrelNum.mod'
-		     `PrelNum.Integral' `a{-aZO-}'
-    When checking signature(s) for: `test'
-
-
-Compilation had errors

@@ -1,5 +1,0 @@
- 
-tcfail024.hs:2: Module Main must include a definition for `Main.main'
-
-
-Compilation had errors

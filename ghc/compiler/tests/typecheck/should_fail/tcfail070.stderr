@@ -1,9 +1,0 @@
- 
-tcfail070.hs:13: Couldn't match the kind
-		     * against * -> ka2141
-    When unifying two kinds
-	* and * -> ka2141
-    In the type declaration for `State'
-
-
-Compilation had errors

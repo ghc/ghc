@@ -1,8 +1,0 @@
- 
-tcfail022.hs:2:
-    Conflicting exports for local name:  f
-	module Main
-	module Main
-
-
-Compilation had errors

@@ -1,2 +1,0 @@
-
-data B = C A

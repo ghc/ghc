@@ -1,8 +1,0 @@
- 
-tcfail029.hs:6: No instance for:
-		    `PrelBase.Ord Foo'
-    tcfail029.hs:6:
-	at a use of an overloaded identifier: `PrelBase.>'
-
-
-Compilation had errors

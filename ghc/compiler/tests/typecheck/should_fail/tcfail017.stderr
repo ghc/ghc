@@ -1,9 +1,0 @@
- 
-tcfail017.hs:11: No instance for:
-		     `C [a{-anj-}]'
-    tcfail017.hs:11:
-	in an instance declaration
-    When checking superclass constraints of an instance declaration
-
-
-Compilation had errors

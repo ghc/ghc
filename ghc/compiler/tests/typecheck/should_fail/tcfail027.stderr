@@ -1,7 +1,0 @@
- 
-tcfail027.hs:3: Cycle in class declarations ...
-		    `A' tcfail027.hs:4
-		    `B' tcfail027.hs:7
-
-
-Compilation had errors

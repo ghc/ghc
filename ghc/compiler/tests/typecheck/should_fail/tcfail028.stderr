@@ -1,9 +1,0 @@
- 
-tcfail028.hs:4: Couldn't match the kind
-		    ka2865 -> * against *
-    When unifying two kinds
-	ka2865 -> * and *
-    In the data declaration for `A'
-
-
-Compilation had errors

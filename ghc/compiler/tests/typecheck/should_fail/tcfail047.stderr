@@ -1,7 +1,0 @@
- 
-tcfail047.hs:6: The type ``(a{-r3e-}, (b{-r3f-}, c{-r3g-}))'' cannot be used as an instance type.
- 
-tcfail047.hs:2: Module Main must include a definition for `Main.main'
-
-
-Compilation had errors

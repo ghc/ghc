@@ -1,8 +1,0 @@
- 
-tcfail003.hs:3: No instance for:
-		    `PrelBase.Num PrelBase.Char'
-    tcfail003.hs:3:
-	at an overloaded literal: 1
-
-
-Compilation had errors

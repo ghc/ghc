@@ -1,6 +1,0 @@
- 
-tcfail051.hs:4:
-    Type constructor or class not in scope: `B'
-
-
-Compilation had errors
