@@ -13,14 +13,49 @@
       <em>Evil Driver (ED),</em> which was a Perl script that served the same
       purpose and was in use until version 4.08.1 of GHC.  Simon Marlow
       eventually slayed the ED and instated the GD.
+    </p>
     <p>
       The GD has been substantially extended for GHCi, i.e., the interactive
       variant of GHC that integrates the compiler with a (meta-circular)
       interpreter since version 5.00.
+    </p>
 
+    <h2>Linking the <code>RTS</code> and <code>libHSstd</code></h2>
+    <p>
+      Since the RTS and HSstd refer to each other, there is a Cunning
+      Hack to avoid putting them each on the command-line twice or
+      thrice (aside: try asking for `plaice and chips thrice' in a
+      fish and chip shop; bet you only get two lots), namely to add
+      the symbols that the RTS needs from libHSstd, such as
+      <code>PrelWeak_runFinalizzerBatch_closure</code> and
+      <code>__init_Prelude</code> to the link line with the
+      <code>-u</code> flag. The standard library appears before the
+      RTS on the link line (why? might it be better the other way
+      around? [SPJ]), and these options cause the corresponding
+      symbols to be picked up even if they haven't been already, so
+      that when the RTS is also scanned, they are resolved. This
+      avoids the linker having to read the standard library and RTS
+      multiple times.
+    </p>
+    <p>
+      This does, however, lead to a complication. Normal Haskell
+      programs do not have a <code>main</code> function, so this is
+      supplied by the RTS. It calls <code>startupHaskell</code>, which
+      itself calls <code>__init_PrelMain</code>, which is therefore,
+      since it occurs in the standard library, one of the symbols
+      passed to the linker. However, when the <code>main</code>
+      function is provided by the programmer (e.g. when there is no
+      main module, but a C module instead),
+      <code>__init_PrelMain</code> had better not be linked in,
+      because it tries to call <code>__init_Main</code>, which won't
+      exist. This case is coped with by the <code>-no-hs-main</code>
+      flag, although in some versions of the compiler (e.g. 5.00.2) it
+      didn't work.
+    </p>
+    
     <p><small>
 <!-- hhmts start -->
-Last modified: Wed Aug  8 19:22:14 EST 2001
+Last modified: Wed Aug 22 17:01:33 GMT Daylight Time 2001
 <!-- hhmts end -->
     </small>
   </body>
