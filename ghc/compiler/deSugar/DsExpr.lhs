@@ -454,7 +454,7 @@ dictionaries.
 dsExpr (RecordUpdOut record_expr record_in_ty record_out_ty dicts [])
   = dsExpr record_expr
 
-dsExpr (RecordUpdOut record_expr record_in_ty record_out_ty dicts rbinds)
+dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty dicts rbinds)
   = getSrcLocDs			`thenDs` \ src_loc ->
     dsExpr record_expr	 	`thenDs` \ record_expr' ->
 
@@ -488,7 +488,9 @@ dsExpr (RecordUpdOut record_expr record_in_ty record_out_ty dicts rbinds)
 				    src_loc)
     in
 	-- Record stuff doesn't work for existentials
-    ASSERT( all (not . isExistentialDataCon) data_cons )
+	-- The type checker checks for this, but we need 
+	-- worry only about the constructors that are to be updated
+    ASSERT2( all (not . isExistentialDataCon) cons_to_upd, ppr expr )
 
 	-- It's important to generate the match with matchWrapper,
 	-- and the right hand sides with applications of the wrapper Id
