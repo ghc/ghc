@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.71 2001/06/06 14:02:50 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.72 2001/06/06 14:33:13 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -680,7 +680,10 @@ linkPackages cmdline_lib_specs pkgs
                       -> do b <- preload_static lib_paths static_ish
                             putStrLn (if b then "done" else "not found")
                    Right dll_unadorned
-                      -> do b <- preload_dynamic lib_paths dll_unadorned
+                      -> -- We add "" to the set of paths to try, so that
+                         -- if none of the real paths match, we force addDLL
+                         -- to look in the default dynamic-link search paths.
+                         do b <- preload_dynamic (lib_paths++[""]) dll_unadorned
                             when (not b) (cantFind lib_paths lib_spec)
                             putStrLn "done"
 
