@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.2 2000/10/11 11:54:58 simonmar Exp $
+-- $Id: Main.hs,v 1.3 2000/10/11 14:08:52 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -196,32 +196,8 @@ makeHiMap
   where
      add_dir hisuf dir str = dir ++ "%." ++ hisuf ++ split_marker : str
 
-
-getOptionsFromSource 
-	:: String		-- input file
-	-> IO [String]		-- options, if any
-getOptionsFromSource file
-  = do h <- openFile file ReadMode
-       catchJust ioErrors (look h)
-	  (\e -> if isEOFError e then return [] else ioError e)
-  where
-	look h = do
-	    l <- hGetLine h
-	    case () of
-		() | null l -> look h
-		   | prefixMatch "#" l -> look h
-		   | prefixMatch "{-# LINE" l -> look h   -- -}
-		   | Just (opts:_) <- matchRegex optionRegex l
-			-> return (words opts)
-		   | otherwise -> return []
-
-optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
-
 -----------------------------------------------------------------------------
 -- Main loop
-
-get_source_files :: [String] -> ([String],[String])
-get_source_files = partition (('-' /=) . head)
 
 main =
   -- all error messages are propagated as exceptions
@@ -259,9 +235,41 @@ main =
 
 	-- grab any -B options from the command line first
    argv'  <- setTopDir argv
+   top_dir <- readIORef topDir
+
+   let installed s = top_dir ++ s
+       inplace s   = top_dir ++ '/':cCURRENT_DIR ++ '/':s
+
+       installed_pkgconfig = installed ("package.conf")
+       inplace_pkgconfig   = inplace (cGHC_DRIVER_DIR ++ "/package.conf.inplace")
+
+	-- discover whether we're running in a build tree or in an installation,
+	-- by looking for the package configuration file.
+   am_installed <- doesFileExist installed_pkgconfig
+
+   if am_installed
+	then writeIORef path_pkgconfig installed_pkgconfig
+	else do am_inplace <- doesFileExist inplace_pkgconfig
+	        if am_inplace
+		    then writeIORef path_pkgconfig inplace_pkgconfig
+		    else throw (OtherError "can't find package.conf")
+
+	-- set the location of our various files
+   if am_installed
+	then do writeIORef path_usage (installed "ghc-usage.txt")
+		writeIORef pgm_L (installed "unlit")
+		writeIORef pgm_C (installed "hsc")
+		writeIORef pgm_m (installed "ghc-asm")
+		writeIORef pgm_s (installed "ghc-split")
+
+	else do writeIORef path_usage (inplace (cGHC_DRIVER_DIR ++ '/':usage_file))
+		writeIORef pgm_L (inplace cGHC_UNLIT)
+		writeIORef pgm_C (inplace cGHC_HSC)
+		writeIORef pgm_m (inplace cGHC_MANGLER)
+		writeIORef pgm_s (inplace cGHC_SPLIT)
 
 	-- read the package configuration
-   conf_file <- readIORef package_config
+   conf_file <- readIORef path_pkgconfig
    contents <- readFile conf_file
    writeIORef package_details (read contents)
 
@@ -292,13 +300,15 @@ main =
    when verb (do hPutStr stderr "Glasgow Haskell Compiler, Version "
  	         hPutStr stderr version_str
 	         hPutStr stderr ", for Haskell 98, compiled by GHC version "
-	         hPutStr stderr booter_version
-	         hPutStr stderr "\n")
+	         hPutStrLn stderr booter_version)
 
    when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
 	-- mkdependHS is special
    when (todo == DoMkDependHS) beginMkDependHS
+
+	-- make is special
+   when (todo == DoMake) beginMake
 
 	-- for each source file, find which phases to run
    pipelines <- mapM (genPipeline todo stop_flag) srcs
@@ -328,34 +338,46 @@ main =
 
    when (todo == DoLink) (do_link o_files)
 
+	-- grab the last -B option on the command line, and
+	-- set topDir to its value.
+setTopDir :: [String] -> IO [String]
+setTopDir args = do
+  let (minusbs, others) = partition (prefixMatch "-B") args
+  (case minusbs of
+    []   -> writeIORef topDir clibdir
+    some -> writeIORef topDir (drop 2 (last some)))
+  return others
 
 -----------------------------------------------------------------------------
 -- Which phase to stop at
 
-data ToDo = DoMkDependHS | DoMkDLL | StopBefore Phase | DoLink
+data ToDo = DoMkDependHS | DoMkDLL | StopBefore Phase | DoLink | DoInteractive
   deriving (Eq)
 
 GLOBAL_VAR(v_todo, error "todo", ToDo)
 
 todoFlag :: String -> Maybe ToDo
-todoFlag "-M" = Just $ DoMkDependHS
-todoFlag "-E" = Just $ StopBefore Hsc
-todoFlag "-C" = Just $ StopBefore HCc
-todoFlag "-S" = Just $ StopBefore As
-todoFlag "-c" = Just $ StopBefore Ln
-todoFlag _    = Nothing
+todoFlag "-M" 		 = Just $ DoMkDependHS
+todoFlag "-E" 		 = Just $ StopBefore Hsc
+todoFlag "-C" 		 = Just $ StopBefore HCc
+todoFlag "-S" 		 = Just $ StopBefore As
+todoFlag "-c" 		 = Just $ StopBefore Ln
+todoFlag "--make"        = Just $ DoMake
+todoFlag "--interactive" = Just $ DoInteractive
+todoFlag _               = Nothing
 
 getToDo :: [String]
 	 -> IO ( [String]   -- rest of command line
-	       , ToDo	    -- phase to stop at
-	       , String	    -- "stop at" flag
+	       , ToDo
+	       , String	    -- "ToDo" flag
 	       )
 getToDo flags 
   = case my_partition todoFlag flags of
 	([]   , rest) -> return (rest, DoLink,  "") -- default is to do linking
 	([(flag,one)], rest) -> return (rest, one, flag)
 	(_    , _   ) -> 
-	  throwDyn (OtherError "only one of the flags -M, -E, -C, -S, -c is allowed")
+	  throwDyn (OtherError 
+		"only one of the flags -M, -E, -C, -S, -c, --make is allowed")
 
 -----------------------------------------------------------------------------
 -- genPipeline

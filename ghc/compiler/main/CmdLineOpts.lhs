@@ -160,7 +160,7 @@ import Array	( array, (//) )
 import GlaExts
 import Argv
 import Constants	-- Default values for some flags
-import DriverUtil
+import Util
 
 import Maybes		( firstJust )
 import Panic		( panic )

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.1 2000/10/11 11:54:58 simonmar Exp $
+-- $Id: DriverState.hs,v 1.2 2000/10/11 14:08:52 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -93,6 +93,10 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 
 -----------------------------------------------------------------------------
 -- Global compilation flags
+
+-- location of compiler-related files
+GLOBAL_VAR(topDir,  clibdir, String)
+GLOBAL_VAR(inplace, False,   Bool)
 
 -- Cpp-related flags
 hs_source_cpp_opts = global
@@ -412,7 +416,7 @@ addToDirList ref path
 -----------------------------------------------------------------------------
 -- Packages
 
-GLOBAL_VAR(package_config, (findFile "package.conf" (cGHC_DRIVER_DIR++"/package.conf.inplace")), String)
+GLOBAL_VAR(path_package_config, error "path_package_config", String)
 
 -- package list is maintained in dependency order
 packages = global ["std", "rts", "gmp"] :: IORef [String]
@@ -652,14 +656,14 @@ way_details =
 -----------------------------------------------------------------------------
 -- Programs for particular phases
 
-GLOBAL_VAR(pgm_L,   findFile "unlit"      cGHC_UNLIT,      String)
-GLOBAL_VAR(pgm_P,   cRAWCPP,				   String)
-GLOBAL_VAR(pgm_C,   findFile "hsc"        cGHC_HSC,        String)
-GLOBAL_VAR(pgm_c,   cGCC,	      	     	      	   String)
-GLOBAL_VAR(pgm_m,   findFile "ghc-asm"    cGHC_MANGLER,    String)
-GLOBAL_VAR(pgm_s,   findFile "ghc-split"  cGHC_SPLIT,      String)
-GLOBAL_VAR(pgm_a,   cGCC,	      	     	           String)
-GLOBAL_VAR(pgm_l,   cGCC,       	     	           String)
+GLOBAL_VAR(pgm_L,   error "pgm_L", String)
+GLOBAL_VAR(pgm_P,   cRAWCPP,       String)
+GLOBAL_VAR(pgm_C,   error "pgm_L", String)
+GLOBAL_VAR(pgm_c,   cGCC,          String)
+GLOBAL_VAR(pgm_m,   error "pgm_m", String)
+GLOBAL_VAR(pgm_s,   error "pgm_s", String)
+GLOBAL_VAR(pgm_a,   cGCC,          String)
+GLOBAL_VAR(pgm_l,   cGCC,          String)
 
 GLOBAL_VAR(opt_dep,    [], [String])
 GLOBAL_VAR(anti_opt_C, [], [String])

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.1 2000/10/11 11:54:58 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.2 2000/10/11 14:08:52 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -17,6 +17,7 @@ import Util
 import IOExts
 import Exception
 import Dynamic
+import RegexString
 
 import IO
 import System
@@ -30,9 +31,10 @@ import Monad
 
 short_usage = "Usage: For basic information, try the `--help' option."
    
+GLOBAL_VAR(path_usage,  "",  String)
+
 long_usage = do
-  let usage_file = "ghc-usage.txt"
-      usage_path = findFile usage_file (cGHC_DRIVER_DIR ++ '/':usage_file)
+  usage_path <- readIORef path_usage
   usage <- readFile usage_path
   dump usage
   exitWith ExitSuccess
@@ -70,28 +72,27 @@ instance Typeable BarfKind where
   typeOf _ = mkAppTy barfKindTc []
 
 -----------------------------------------------------------------------------
--- Finding files in the installation
+-- Reading OPTIONS pragmas
 
-GLOBAL_VAR(topDir, clibdir, String)
+getOptionsFromSource 
+	:: String		-- input file
+	-> IO [String]		-- options, if any
+getOptionsFromSource file
+  = do h <- openFile file ReadMode
+       catchJust ioErrors (look h)
+	  (\e -> if isEOFError e then return [] else ioError e)
+  where
+	look h = do
+	    l <- hGetLine h
+	    case () of
+		() | null l -> look h
+		   | prefixMatch "#" l -> look h
+		   | prefixMatch "{-# LINE" l -> look h   -- -}
+		   | Just (opts:_) <- matchRegex optionRegex l
+			-> return (words opts)
+		   | otherwise -> return []
 
-	-- grab the last -B option on the command line, and
-	-- set topDir to its value.
-setTopDir :: [String] -> IO [String]
-setTopDir args = do
-  let (minusbs, others) = partition (prefixMatch "-B") args
-  (case minusbs of
-    []   -> writeIORef topDir clibdir
-    some -> writeIORef topDir (drop 2 (last some)))
-  return others
-
-findFile name alt_path = unsafePerformIO (do
-  top_dir <- readIORef topDir
-  let installed_file = top_dir ++ '/':name
-  let inplace_file   = top_dir ++ '/':cCURRENT_DIR ++ '/':alt_path
-  b <- doesFileExist inplace_file
-  if b  then return inplace_file
-	else return installed_file
- )
+optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
 
 -----------------------------------------------------------------------------
 -- Utils
@@ -110,15 +111,6 @@ my_prefix_match (_:_) [] = Nothing
 my_prefix_match (p:pat) (r:rest)
   | p == r    = my_prefix_match pat rest
   | otherwise = Nothing
-
-prefixMatch :: Eq a => [a] -> [a] -> Bool
-prefixMatch [] _str = True
-prefixMatch _pat [] = False
-prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
-			  | otherwise = False
-
-postfixMatch :: String -> String -> Bool
-postfixMatch pat str = prefixMatch (reverse pat) (reverse str)
 
 later = flip finally
 
