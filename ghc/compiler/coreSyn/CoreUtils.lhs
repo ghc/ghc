@@ -52,7 +52,7 @@ import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
 			  primOpIsDupable )
 import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo, 
-			  mkWildId, idArity, idName, idUnfolding, idInfo, 
+			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
 			  isDataConId_maybe, isPrimOpId_maybe, mkSysLocal, hasNoBinding
 			)
 import IdInfo		( LBVarInfo(..),  
@@ -644,30 +644,59 @@ exprEtaExpandArity :: CoreExpr -> (Int, Bool)
 --	case x of p -> \s -> ...
 -- because for I/O ish things we really want to get that \s to the top.
 -- We are prepared to evaluate x each time round the loop in order to get that
--- Hence "generous" arity
+--
+-- Consider	let x = expensive in \y z -> E
+-- We want this to have arity 2 if the \y-abstraction is a 1-shot lambda
+-- Hence the extra Bool returned by go1
+--	NB: this is particularly important/useful for IO state 
+--	transformers, where we often get
+--		let x = E in \ s -> ...
+--	and the \s is a real-world state token abstraction.  Such 
+-- 	abstractions are almost invariably 1-shot, so we want to
+--	pull the \s out, past the let x=E.  
+-- 	The hack is in Id.isOneShotLambda
 
 exprEtaExpandArity e
   = go 0 e
   where
+    go :: Int -> CoreExpr -> (Int,Bool)
     go ar (Lam x e)  | isId x   	= go (ar+1) e
 		     | otherwise 	= go ar e
     go ar (Note n e) | ok_note n	= go ar e
     go ar other 	     		= (ar + ar', ar' == 0)
 					where
-					  ar' = go1 other `max` 0
+					  ar' = length (go1 other)
 
-    go1 (Var v)				= idArity v
-    go1 (Lam x e)  | isId x   		= go1 e + 1
-		   | otherwise 		= go1 e
-    go1 (Note n e) | ok_note n		= go1 e
-    go1 (App f (Type _))			= go1 f
-    go1 (App f a)  | exprIsCheap a	= go1 f - 1
-    go1 (Case scrut _ alts)
-      | exprIsCheap scrut		= min_zero [go1 rhs | (_,_,rhs) <- alts]
-    go1 (Let b e) 	
-      | all exprIsCheap (rhssOfBind b)	= go1 e
-    
-    go1 other 				= 0
+    go1 :: CoreExpr -> [Bool]
+	-- (go1 e) = [b1,..,bn]
+	-- means expression can be rewritten \x_b1 -> ... \x_bn -> body
+	-- where bi is True <=> the lambda is one-shot
+
+    go1 (Note n e) | ok_note n	= go1 e
+    go1 (Var v)			= replicate (idArity v) False	-- When the type of the Id
+								-- encodes one-shot-ness, use
+								-- th iinfo here
+
+	-- Lambdas; increase arity
+    go1 (Lam x e)  | isId x     = isOneShotLambda x : go1 e
+		   | otherwise	= go1 e
+
+	-- Applications; decrease arity
+    go1 (App f (Type _))	= go1 f
+    go1 (App f a)  		= case go1 f of
+				    (one_shot : xs) | one_shot || exprIsCheap a -> xs
+				    other					-> []
+							   
+	-- Case/Let; keep arity if either the expression is cheap
+	-- or it's a 1-shot lambda
+    go1 (Case scrut _ alts) = case foldr1 (zipWith (&&)) [go1 rhs | (_,_,rhs) <- alts] of
+				xs@(one_shot : _) | one_shot || exprIsCheap scrut -> xs
+				other						  -> []
+    go1 (Let b e) = case go1 e of
+		      xs@(one_shot : _) | one_shot || all exprIsCheap (rhssOfBind b) -> xs
+		      other							     -> []
+
+    go1 other = []
     
     ok_note (Coerce _ _) = True
     ok_note InlineCall   = True
