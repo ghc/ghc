@@ -683,7 +683,7 @@ hoistForAllTys ty
 	--	if t2 is a for-all type, push t1 inside it
 	--	if t2 is (pred -> t3), check for duplicates
     mk_fun_ty ty1 ty2
-	| not (isOverloadedTy ty2) 	-- No forall's, or context => 
+	| not (isSigmaTy ty2)	 	-- No forall's, or context => 
 	= FunTy ty1 ty2 	
 	| PredTy p1 <- ty1		-- ty1 is a predicate
 	= if p1 `elem` theta then 	-- so check for duplicates
