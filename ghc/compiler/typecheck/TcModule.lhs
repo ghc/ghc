@@ -254,7 +254,7 @@ tcModule rn_name_supply
 	in
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', really_final_env)  ->
 	tcSetValueEnv really_final_env	$
-	zonkForeignExports foe_decls	`thenNF_Tc` \ foe_decls' ->
+	zonkForeignExports foe_decls    `thenNF_Tc` \ foe_decls' ->
 
 	let
 	   thin_air_ids = map (explicitLookupValueByKey really_final_env . nameUnique) thinAirIdNames
@@ -264,7 +264,7 @@ tcModule rn_name_supply
 	in
 	returnTc (really_final_env, 
 		  (all_binds', local_tycons, local_classes, inst_info,
-		   foi_decls ++ foe_decls',
+		   (foi_decls ++ foe_decls'),
 		   really_final_env,
 		   thin_air_ids))
 	)
