@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.12 1999/11/11 11:47:22 simonmar Exp $
+ * $Id: Storage.h,v 1.13 1999/11/11 11:49:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -150,7 +150,7 @@ recordOldToNewPtrs(StgMutClosure *p)
 
 #if defined(TICKY_TICKY) || defined(PROFILING)
 static inline void
-updateWithPermIndirection(StgInfoTable *info, StgClosure *p1, StgClosure *p2) 
+updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *p2) 
 {
   bdescr *bd;
 
