@@ -14,39 +14,39 @@ def myvt ( $args_c, $args_r, $ret_res )
 --conc009_RUNTEST_OPTS = -x 1
 --conc021_RUNTEST_OPTS = -x 250 -o2 conc021.stderr-mingw
 
-test "conc001" { myvt("", "", "") }
-test "conc002" { myvt("", "", "") }
-test "conc003" { myvt("", "", "") }
-test "conc004" { myvt("", "", "") }
-test "conc005" { myvt("", "", "") }
-test "conc006" { myvt("", "", "") }
-test "conc007" { myvt("", "+RTS -H128M -RTS", "") }
-test "conc008" { myvt("", "", "") }
-test "conc009" { myvt("", "", "") }
-test "conc010" { myvt("", "", "") }
-test "conc012" { myvt("", "", "") }
-test "conc013" { myvt("", "", "") }
-test "conc014" { myvt("", "", "") }
-test "conc015" { myvt("", "", "") }
-test "conc016" { myvt("", "", "") }
-test "conc017" { myvt("", "", "") }
-test "conc018" { myvt("", "", "") }
-test "conc019" { myvt("", "", "") }
+test "conc001" { myvtr("", "", "") }
+test "conc002" { myvtr("", "", "") }
+test "conc003" { myvtr("", "", "") }
+test "conc004" { myvtr("", "", "") }
+test "conc005" { myvtr("", "", "") }
+test "conc006" { myvtr("", "", "") }
+test "conc007" { myvtr("", "+RTS -H128M -RTS", "") }
+test "conc008" { myvtr("", "", "") }
+test "conc009" { myvtr("", "", "") }
+test "conc010" { myvtr("", "", "") }
+test "conc012" { myvtr("", "", "") }
+test "conc013" { myvtr("", "", "") }
+test "conc014" { myvtr("", "", "") }
+test "conc015" { myvtr("", "", "") }
+test "conc016" { myvtr("", "", "") }
+test "conc017" { myvtr("", "", "") }
+test "conc018" { myvtr("", "", "") }
+test "conc019" { myvtr("", "", "") }
 
 --# conc020 *should* work on mingw32
 test "conc020" { skip when $platform == "i386-unknown-mingw32"
-                 myvt("", "", "") }
+                 myvtr("", "", "") }
 
 test "conc021" { skip when $platform == "i386-unknown-mingw32"
-                 myvt("", "", "") }
+                 myvtr("", "", "") }
 
-test "conc022" { myvt("", "", "") }
-test "conc023" { myvt("", "", "") }
-test "conc024" { myvt("", "", "") }
-test "conc025" { myvt("", "", "") }
-test "conc026" { myvt("", "", "") }
-test "conc027" { myvt("", "", "") }
-test "conc028" { myvt("", "", "") }
-test "conc029" { myvt("", "", "") }
-test "conc030" { myvt("", "", "") }
-test "conc031" { myvt("", "", "") }
+test "conc022" { myvtr("", "", "") }
+test "conc023" { myvtr("", "", "") }
+test "conc024" { myvtr("", "", "") }
+test "conc025" { myvtr("", "", "") }
+test "conc026" { myvtr("", "", "") }
+test "conc027" { myvtr("", "", "") }
+test "conc028" { myvtr("", "", "") }
+test "conc029" { myvtr("", "", "") }
+test "conc030" { myvtr("", "", "") }
+test "conc031" { myvtr("", "", "") }

@@ -1,14 +1,14 @@
 
 include ($confdir ++ "/../vanilla-test.T")
 
--- Args to vtf are: extra compile flags
+-- Args to vtcf are: extra compile flags
 
-def myvtf ( $args )
+def myvtcf ( $args )
 {
-   vtf ( " -package lang " ++ $args)
+   vtcf ( " -package lang " ++ $args)
 }
 
-test "cc001" { myvtf("") }
-test "cc002" { myvtf("") }
-test "cc004" { myvtf("") }
-test "cc005" { myvtf("") }
+test "cc001" { myvtcf("") }
+test "cc002" { myvtcf("") }
+test "cc004" { myvtcf("") }
+test "cc005" { myvtcf("") }

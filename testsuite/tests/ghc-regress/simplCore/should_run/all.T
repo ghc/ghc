@@ -5,5 +5,5 @@ include ($confdir ++ "/../vanilla-test.T")
 --                 extra run flags
 --                 expected process return value, if not zero
 
-test "simplrun001" { vt("-O", "", "") }
-test "simplrun002" { vt("-O", "", "") }
+test "simplrun001" { vtr("-O", "", "") }
+test "simplrun002" { vtr("-O", "", "") }

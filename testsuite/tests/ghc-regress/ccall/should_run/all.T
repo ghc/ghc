@@ -5,9 +5,9 @@ include ($confdir ++ "/../vanilla-test.T")
 --                 extra run flags
 --                 expected process return value, if not zero
 
-test "callback" { vt("-fglasgow-exts -package lang -fvia-C callback_stub.o", 
+test "callback" { vtr("-fglasgow-exts -package lang -fvia-C callback_stub.o", 
                      "", "") }
-test "fed001"   { vt("-fglasgow-exts -package lang", 
+test "fed001"   { vtr("-fglasgow-exts -package lang", 
                      "", "") }
-test "ffi001"   { vt("-fglasgow-exts -package lang", 
+test "ffi001"   { vtr("-fglasgow-exts -package lang", 
                      "", "") }

@@ -5,10 +5,10 @@ include ($confdir ++ "/../vanilla-test.T")
 --                 extra run flags
 --                 expected process return value, if not zero
 
-test "dsrun001" { vt("", "", "") }
-test "dsrun002" { vt("", "", "") }
-test "dsrun003" { vt("", "", "") }
-test "dsrun004" { vt("", "", "") }
-test "dsrun005" { vt("", "", "1") }
-test "dsrun006" { vt("", "", "") }
-test "dsrun007" { vt("", "", "1") }
+test "dsrun001" { vtr("", "", "") }
+test "dsrun002" { vtr("", "", "") }
+test "dsrun003" { vtr("", "", "") }
+test "dsrun004" { vtr("", "", "") }
+test "dsrun005" { vtr("", "", "1") }
+test "dsrun006" { vtr("", "", "") }
+test "dsrun007" { vtr("", "", "1") }

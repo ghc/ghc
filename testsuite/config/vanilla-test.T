@@ -244,9 +244,9 @@ def check_stderr_ok()
 
 -- Compile and run (should_run) style test
 
-def vanilla-test-actions ( $extra_compile_args, 
-                           $extra_run_args, 
-                           $allowable_nonzero_exit_code )
+def vanilla-run-test-actions ( $extra_compile_args, 
+                               $extra_run_args, 
+                               $allowable_nonzero_exit_code )
 {
    pretest_cleanup()
    simple_build_Main( $extra_compile_args )
@@ -265,7 +265,7 @@ def vanilla-test-actions ( $extra_compile_args,
 -- succeeded if the compiler returned zero AND (testname.comp.stderr
 -- matches testname.stderr, if it exists, or is empty).
 
-def vanilla-comp-test-actions ( $extra_compile_args )
+def vanilla-compok-test-actions ( $extra_compile_args )
 {
    pretest_cleanup()
    $res = simple_build_Main_WRK ( $extra_compile_args, True )
@@ -344,14 +344,14 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
 -- top-level
 -- Compile and run (should_run) style test
 
-def vt ( $extra_compile_args, 
-         $extra_run_args, 
-         $allowable_nonzero_exit_code )
+def vtr ( $extra_compile_args, 
+          $extra_run_args, 
+          $allowable_nonzero_exit_code )
 {
    $test_passed 
-      = vanilla-test-actions ( $extra_compile_args, 
-                               $extra_run_args, 
-                               $allowable_nonzero_exit_code )
+      = vanilla-run-test-actions ( $extra_compile_args, 
+                                   $extra_run_args, 
+                                   $allowable_nonzero_exit_code )
    expect pass
    pass when $test_passed
    fail when otherwise
@@ -363,7 +363,7 @@ def vt ( $extra_compile_args,
 def vtc ( $extra_compile_args )
 {
    $test_passed 
-      = vanilla-comp-test-actions ( $extra_compile_args )
+      = vanilla-compok-test-actions ( $extra_compile_args )
    expect pass
    pass when $test_passed
    fail when otherwise
@@ -372,7 +372,7 @@ def vtc ( $extra_compile_args )
 
 -- Compile only, and expect failure (should_fail) style test
 
-def vtf ( $extra_compile_args )
+def vtcf ( $extra_compile_args )
 {
    $test_passed 
       = vanilla-compfail-test-actions ( $extra_compile_args )

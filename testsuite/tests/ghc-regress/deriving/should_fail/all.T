@@ -1,8 +1,8 @@
 
 include ($confdir ++ "/../vanilla-test.T")
 
--- Args to vtf are: extra compile flags
+-- Args to vtcf are: extra compile flags
 
-test "drvfail001" { vtf("") }
-test "drvfail004" { vtf("") }
-test "drvfail007" { vtf("") }
+test "drvfail001" { vtcf("") }
+test "drvfail004" { vtcf("") }
+test "drvfail007" { vtcf("") }

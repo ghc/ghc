@@ -5,16 +5,16 @@ include ($confdir ++ "/../vanilla-test.T")
 --                 extra run flags
 --                 expected process return value, if not zero
 
-test "tcrun001" { vt("", "", "") }
-test "tcrun002" { vt("", "", "") }
-test "tcrun003" { vt("-fglasgow-exts", "", "") }
-test "tcrun004" { vt("-fglasgow-exts", "", "") }
-test "tcrun005" { vt("", "", "") }
-test "tcrun006" { vt("", "", "") }
-test "tcrun007" { vt("", "", "") }
-test "tcrun008" { vt("", "", "") }
-test "tcrun009" { vt("", "", "") }
-test "tcrun010" { vt("", "", "") }
-test "tcrun011" { vt("", "", "") }
-test "tcrun012" { vt("", "", "") }
-test "tcrun013" { vt("", "", "") }
+test "tcrun001" { vtr("", "", "") }
+test "tcrun002" { vtr("", "", "") }
+test "tcrun003" { vtr("-fglasgow-exts", "", "") }
+test "tcrun004" { vtr("-fglasgow-exts", "", "") }
+test "tcrun005" { vtr("", "", "") }
+test "tcrun006" { vtr("", "", "") }
+test "tcrun007" { vtr("", "", "") }
+test "tcrun008" { vtr("", "", "") }
+test "tcrun009" { vtr("", "", "") }
+test "tcrun010" { vtr("", "", "") }
+test "tcrun011" { vtr("", "", "") }
+test "tcrun012" { vtr("", "", "") }
+test "tcrun013" { vtr("", "", "") }

@@ -27,4 +27,8 @@ simpleCore/should_compile
 deSugar/should_compile
    cvh-ds-unboxed/ not done
 
+specialise/
+   none of these are run in the old framework, so not included
+   in new.
+
 
