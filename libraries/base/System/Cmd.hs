@@ -14,7 +14,9 @@
 
 module System.Cmd
     ( system,        -- :: String -> IO ExitCode
+#ifndef __HUGS__
       rawSystem,     -- :: String -> IO ExitCode
+#endif
     ) where
 
 import Prelude
@@ -66,7 +68,6 @@ system cmd =
         n  -> return (ExitFailure n)
 
 foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int
-#endif  /* __HUGS__ */
 
 {- | 
 The same as 'system', but bypasses the shell.  Will behave more portably between
@@ -84,3 +85,4 @@ rawSystem cmd =
 
 foreign import ccall unsafe "rawSystemCmd" primRawSystem :: CString -> IO Int
 
+#endif  /* __HUGS__ */

@@ -17,8 +17,10 @@ module System.Environment
       getArgs,	     -- :: IO [String]
       getProgName,   -- :: IO String
       getEnv,        -- :: String -> IO String
+#ifndef __HUGS__
       withArgs,
       withProgName,
+#endif
   ) where
 
 import Prelude
@@ -114,7 +116,6 @@ getEnv name =
 
 foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
-#endif  /* __HUGS__ */
 
 {-|
 @withArgs args act@ - while executing action @act@, have 'System.getArgs'
@@ -155,3 +156,4 @@ setArgs argv = do
 
 foreign import ccall unsafe "setProgArgv" 
   setArgsPrim  :: Int -> Ptr CString -> IO ()
+#endif  /* __HUGS__ */
