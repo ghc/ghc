@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.184 2003/12/18 12:24:59 simonmar Exp $
+ * $Id: Schedule.c,v 1.185 2004/02/25 17:35:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -1986,6 +1986,8 @@ void scheduleThread(StgTSO* tso)
   RELEASE_LOCK(&sched_mutex);
 }
 
+static Condition bound_cond_cache = NULL;
+
 SchedulerStatus
 scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
 		   Capability *initialCapability)
@@ -1998,7 +2000,15 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
     m->ret = ret;
     m->stat = NoStatus;
 #if defined(RTS_SUPPORTS_THREADS)
-    initCondition(&m->bound_thread_cond);
+    // Allocating a new condition for each thread is expensive, so we
+    // cache one.  This is a pretty feeble hack, but it helps speed up
+    // consecutive call-ins quite a bit.
+    if (bound_cond_cache != NULL) {
+	m->bound_thread_cond = bound_cond_cache;
+	bound_cond_cache = NULL;
+    } else {
+	initCondition(&m->bound_thread_cond);
+    }
 #endif
 
     /* Put the thread on the main-threads list prior to scheduling the TSO.
@@ -2136,7 +2146,12 @@ waitThread_(StgMainThread* m, Capability *initialCapability)
   stat = m->stat;
 
 #if defined(RTS_SUPPORTS_THREADS)
-  closeCondition(&m->bound_thread_cond);
+  // Free the condition variable, returning it to the cache if possible.
+  if (bound_cond_cache == NULL) {
+      bound_cond_cache = m->bound_thread_cond;
+  } else {
+      closeCondition(&m->bound_thread_cond);
+  }
 #endif
 
   IF_DEBUG(scheduler, sched_belch("main thread (%d) finished", m->tso->id));
