@@ -30,12 +30,18 @@ module TysWiredIn (
 	floatTy,
 	floatTyCon,
 	getStatePairingConInfo,
+
 	intDataCon,
 	intTy,
 	intTyCon,
+	isIntTy,
+	inIntRange,
+
 	integerTy,
 	integerTyCon,
 	integerDataCon,
+	isIntegerTy,
+
 	liftDataCon,
 	liftTyCon,
 	listTyCon,
@@ -109,9 +115,9 @@ import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 			)
 import BasicTypes	( SYN_IE(Module), NewOrData(..) )
 import Type		( SYN_IE(Type), mkTyConTy, applyTyCon, mkSigmaTy, mkTyVarTys, 
-			  mkFunTy, mkFunTys, maybeAppTyCon,
+			  mkFunTy, mkFunTys, maybeAppTyCon, maybeAppDataTyCon,
 			  GenType(..), SYN_IE(ThetaType), SYN_IE(TauType) )
-import TyVar		( SYN_IE(TyVar), tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
+import TyVar		( GenTyVar, SYN_IE(TyVar), tyVarKind, alphaTyVars, alphaTyVar, betaTyVar )
 import Lex		( mkTupNameStr )
 import Unique
 import Util		( assoc, panic )
@@ -224,6 +230,19 @@ intTy = mkTyConTy intTyCon
 
 intTyCon = pcDataTyCon intTyConKey pREL_BASE SLIT("Int") [] [intDataCon]
 intDataCon = pcDataCon intDataConKey pREL_BASE SLIT("I#") [] [] [intPrimTy] intTyCon nullSpecEnv
+
+isIntTy :: GenType (GenTyVar flexi) uvar -> Bool
+isIntTy ty
+  = case (maybeAppDataTyCon ty) of
+	Just (tycon, [], _) -> uniqueOf tycon == intTyConKey
+	_		    -> False
+
+inIntRange :: Integer -> Bool	-- Tells if an integer lies in the legal range of Ints
+inIntRange i = (min_int <= i) && (i <= max_int)
+
+max_int, min_int :: Integer
+max_int = toInteger maxInt  
+min_int = toInteger minInt
 \end{code}
 
 \begin{code}
@@ -299,6 +318,12 @@ integerTyCon = pcDataTyCon integerTyConKey pREL_BASE SLIT("Integer") [] [integer
 
 integerDataCon = pcDataCon integerDataConKey pREL_BASE SLIT("J#")
 		[] [] [intPrimTy, intPrimTy, byteArrayPrimTy] integerTyCon nullSpecEnv
+
+isIntegerTy :: GenType (GenTyVar flexi) uvar -> Bool
+isIntegerTy ty
+  = case (maybeAppDataTyCon ty) of
+	Just (tycon, [], _) -> uniqueOf tycon == integerTyConKey
+	_		    -> False
 \end{code}
 
 And the other pairing types:
