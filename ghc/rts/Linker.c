@@ -58,12 +58,12 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(ia64_HOST_ARCH) || defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
+#if defined(ia64_HOST_ARCH) || defined(openbsd_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
 #define USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#if defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
+#if defined(openbsd_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
