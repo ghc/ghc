@@ -1,5 +1,3 @@
-dnl $Id: aclocal.m4,v 1.125 2003/08/18 09:23:09 dons Exp $
-dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
 dnl To be a good autoconf citizen, names of local macros have
