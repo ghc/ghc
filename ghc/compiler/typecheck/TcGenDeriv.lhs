@@ -640,8 +640,6 @@ gen_Ix_binds tycon
       = mk_easy_FunMonoBind tycon_loc index_RDR [TuplePatIn [con_pat as_needed, con_pat bs_needed], con_pat cs_needed] [range_size] (
 	foldl mk_index (HsLit (HsInt 0)) (zip3 as_needed bs_needed cs_needed))
       where
-	mk_index (HsLit (HsInt 0)) (l, u, i)  -- optim.
-	  = HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [HsVar l, HsVar u])) (HsVar i)
 	mk_index multiply_by (l, u, i)
 	  = genOpApp (
 		(HsApp (HsApp (HsVar index_RDR) (ExplicitTuple [HsVar l, HsVar u])) (HsVar i))
@@ -742,7 +740,7 @@ gen_Read_binds tycon
 			(zipEqual "bs_needed"	     
 			   ((str_qual (SLIT("{")):
 			     concat (
-			     intersperse ([str_qual SLIT(",")]) $
+			     intersperse ([str_qual (_CONS_ ',' _NIL_)]) $
 			     zipWithEqual 
 				"field_quals"
 				(\ as b -> as ++ [b])
