@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Derived.h,v 1.1 2001/07/26 03:08:39 ken Exp $
+ * $Id: Derived.h,v 1.2 2001/08/04 06:09:24 ken Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -20,6 +20,13 @@
  */
 #if HAVE_LONG_LONG && SIZEOF_VOID_P < 8
 #define SUPPORT_LONG_LONGS 1
+#endif
+
+/*
+ * Whether the runtime system will use libbfd for debugging purposes.
+ */
+#if defined(DEBUG) && defined(HAVE_BFD_H) && !defined(_WIN32) && !defined(PAR) && !defined(GRAN)
+#define USING_LIBBFD 1
 #endif
 
 #endif /* DERIVED_H */

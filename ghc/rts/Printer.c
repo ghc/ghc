@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.42 2001/07/24 06:31:36 ken Exp $
+ * $Id: Printer.c,v 1.43 2001/08/04 06:09:24 ken Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -818,7 +818,7 @@ static void printZcoded( const char *raw )
 /* Causing linking trouble on Win32 plats, so I'm
    disabling this for now. 
 */
-#if defined(HAVE_BFD_H) && !defined(_WIN32) && !defined(PAR) && !defined(GRAN)
+#ifdef USING_LIBBFD
 
 #include <bfd.h>
 

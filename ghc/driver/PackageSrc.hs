@@ -1,4 +1,5 @@
 #include "../includes/config.h"
+#include "../includes/Derived.h"
 
 module Main (main) where
 
@@ -64,11 +65,16 @@ package_details installing
                             then [ "$libdir" ]
                             else [ ghc_src_dir cGHC_RUNTIME_DIR ],
         hs_libraries      = [ "HSrts" ],
-#ifndef mingw32_TARGET_OS
-	extra_libraries   = [ "m" ], -- libm, that is, for ldexp()
-#else
-        extra_libraries   = [ "winmm", "wsock32" ], -- winmm for the threadDelay timer, wsock32 for the linker
+	extra_libraries   =
+			      "m":		-- for ldexp()
+#ifdef mingw32_TARGET_OS
+			      "winmm":		-- for the threadDelay timer
+			      "wsock32":	-- for the linker
 #endif
+#ifdef USING_LIBBFD
+			      "bfd": "iberty":	-- for debugging
+#endif
+			    [],
         include_dirs   = if installing
                             then [ "$libdir/include"
 #ifdef mingw32_TARGET_OS
