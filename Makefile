@@ -307,11 +307,11 @@ hc-file-bundle : project-check
 	$(RM) -r $(ProjectNameShort)-$(ProjectVersion)
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
 	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
-	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
+	     $(ProjectNameShort)-$(ProjectVersion)/ghc/utils \
 	     $(ProjectNameShort)-$(ProjectVersion)/libraries \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
-	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/driver $(ProjectNameShort)-$(ProjectVersion)/libraries $(ProjectNameShort)-$(ProjectVersion)/hslibs -name "*.hsc" -print` ""; do \
+	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/utils $(ProjectNameShort)-$(ProjectVersion)/libraries $(ProjectNameShort)-$(ProjectVersion)/hslibs -name "*.hsc" -print` ""; do \
 	     if test "x$$f" != "x" && test -e `echo "$$f" | sed 's/hsc$$/hs/g'`; then \
 	        echo `echo "$$f" | sed 's/hsc$$/hs/g' ` >> hc-files-to-go ; \
 	     fi; \
