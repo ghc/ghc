@@ -2703,18 +2703,6 @@ genCCall fn cconv kind args
 
 #if i386_TARGET_ARCH
 
-genCCall fn cconv ret_rep [StInt i]
-  | isLeft fn && unLeft fn == SLIT ("PerformGC_wrapper")
-  = let call = toOL [
-                  MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
-	          CALL (Left (ImmLit (ptext (if   underscorePrefix 
-                                       then (SLIT ("_PerformGC_wrapper"))
-                                       else (SLIT ("PerformGC_wrapper"))))))
-               ]
-    in
-    returnNat call
-
-
 genCCall fn cconv ret_rep args
   = mapNat push_arg
            (reverse args)  	`thenNat` \ sizes_n_codes ->
