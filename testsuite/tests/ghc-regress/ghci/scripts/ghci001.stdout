@@ -1,2 +1,2 @@
-(+) :: forall a. (Num a) => a -> a -> a
-enumFromTo :: forall a. (Enum a) => a -> a -> [a]
+(+) :: (Num a) => a -> a -> a
+enumFromTo :: (Enum a) => a -> a -> [a]
