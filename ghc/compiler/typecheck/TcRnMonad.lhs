@@ -169,8 +169,8 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
 	eps' <- readIORef eps_var ;
 	nc'  <- readIORef nc_var ;
 	let { pcs' = PCS { pcs_EPS = eps', pcs_nc = nc' } ;
-	      final_res | errorsFound msgs = Nothing
-			| otherwise	   = maybe_res } ;
+	      final_res | errorsFound dflags msgs = Nothing
+			| otherwise	   	  = maybe_res } ;
 
 	return (pcs', final_res)
     }
@@ -400,11 +400,13 @@ tryTc m
 
 	new_errs <- readMutVar errs_var ;
 
+	dflags <- getDOpts ;
+
 	return (new_errs, 
 		case mb_r of
-		  Left exn  			 -> Nothing
-		  Right r | errorsFound new_errs -> Nothing
-			  | otherwise		 -> Just r) 
+		  Left exn  			 	-> Nothing
+		  Right r | errorsFound dflags new_errs -> Nothing
+			  | otherwise		        -> Just r) 
    }
 
 tryTcLIE :: TcM a -> TcM (Messages, Maybe a)
@@ -448,7 +450,8 @@ ifErrsM :: TcRn m r -> TcRn m r -> TcRn m r
 ifErrsM bale_out normal
  = do { errs_var <- getErrsVar ;
 	msgs <- readMutVar errs_var ;
-	if errorsFound msgs then
+	dflags <- getDOpts ;
+	if errorsFound dflags msgs then
 	   bale_out
 	else	
 	   normal }

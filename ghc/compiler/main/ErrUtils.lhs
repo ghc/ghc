@@ -6,7 +6,7 @@
 \begin{code}
 module ErrUtils (
 	ErrMsg, WarnMsg, Message, 
-	Messages, errorsFound, warningsFound, emptyMessages,
+	Messages, errorsFound, emptyMessages,
 
 	addShortErrLocLine, addShortWarnLocLine,
 	addErrLocHdrLine, addWarnLocHdrLine, dontAddErrLoc,
@@ -95,11 +95,12 @@ type Messages = (Bag WarnMsg, Bag ErrMsg)
 emptyMessages :: Messages
 emptyMessages = (emptyBag, emptyBag)
 
-errorsFound :: Messages -> Bool
-errorsFound (warns, errs) = not (isEmptyBag errs)
-
-warningsFound :: Messages -> Bool
-warningsFound (warns, errs) = not (isEmptyBag warns)
+errorsFound :: DynFlags -> Messages -> Bool
+-- The dyn-flags are used to see if the user has specified
+-- -Werorr, which says that warnings should be fatal
+errorsFound dflags (warns, errs) 
+  | dopt Opt_WarnIsError dflags = not (isEmptyBag errs) || not (isEmptyBag warns)
+  | otherwise  		        = not (isEmptyBag errs)
 
 printErrorsAndWarnings :: Messages -> IO ()
 	-- Don't print any warnings if there are errors

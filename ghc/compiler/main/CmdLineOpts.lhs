@@ -271,6 +271,7 @@ data DynFlag
    | Opt_DoStgLinting
    | Opt_DoUSPLinting
 
+   | Opt_WarnIsError		-- -Werror; makes warnings fatal
    | Opt_WarnDuplicateExports
    | Opt_WarnHiShadows
    | Opt_WarnIncompletePatterns

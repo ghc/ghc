@@ -529,6 +529,12 @@
 	    <entry>dynamic</entry>
 	    <entry><option>-w</option></entry>
 	  </row>
+	  <row>
+	    <entry><option>-Werror</option></entry>
+	    <entry>make warnings fatal</entry>
+	    <entry>dynamic</entry>
+	    <entry></entry>
+	  </row>
 
 	  <row>
 	    <entry><option>-fwarn-deprecations</option></entry>

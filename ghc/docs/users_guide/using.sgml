@@ -864,6 +864,15 @@ ghc &ndash;&ndash;make Main.hs
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term><option>-Werror</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-Werror</option></primary></indexterm>
+	  <para>Makes any warning into a fatal error. Useful so that you don't 
+	    miss warnings when doing batch compilation. </para>
+	</listitem>
+      </varlistentry>
+
     </variablelist>
 
     <para>The full set of warning options is described below.  To turn

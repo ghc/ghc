@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.105 2002/10/17 14:26:17 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.106 2002/11/20 09:37:48 simonpj Exp $
 --
 -- Driver flags
 --
@@ -424,6 +424,7 @@ dynamic_flags = [
 
 	------ Warning opts -------------------------------------------------
   ,  ( "W"		, NoArg (mapM_ setDynFlag   minusWOpts)    )
+  ,  ( "Werror"		, NoArg (setDynFlag   	    Opt_WarnIsError) )
   ,  ( "Wall"		, NoArg (mapM_ setDynFlag   minusWallOpts) )
   ,  ( "Wnot"		, NoArg (mapM_ unSetDynFlag minusWallOpts) ) /* DEPREC */
   ,  ( "w"		, NoArg (mapM_ unSetDynFlag minusWallOpts) )
