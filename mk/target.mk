@@ -249,8 +249,8 @@ boot :: depend
 #      directories where files are installed, and their parent
 #      directories. There is a script called `mkinstalldirs' which is
 #      convenient for this; find it in the Texinfo package.
-#      (FPTOOLS: we don't use the suggested script, but rather the
-#       mkdirhier script in glafp_utils -- SOF)
+#      (FPTOOLS: we use a close relative of the suggested script, situated
+#       in glafp-utils/mkdirhier -- SOF)
 
 
 
@@ -444,7 +444,10 @@ install:: $(INSTALL_PROGS)
 	done
 endif
 
-
+#
+# Just like INSTALL_PROGS, but prefix with install sites bin/lib/data and
+# install without stripping.
+#
 ifneq "$(INSTALL_SCRIPTS)" ""
 install:: $(INSTALL_SCRIPTS)
 ifeq "$(INTERP)" "perl"
@@ -458,7 +461,7 @@ ifneq "$(BIN_DIST)" "1"
 	   echo $$"datadir='$(real_datadir)';"                     >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
 	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir) ;    \
-	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(bindir)/$$i ; \
+	   $(INSTALL_PROGRAM) $(filter-out -s,,$(INSTALL_BIN_OPTS)) $$i.tmp $(bindir)/$$i ; \
 	   $(RM) $$i.tmp; \
 	done
 else
@@ -621,7 +624,7 @@ endif
 #  $ find yes -exec echo oh,{}! \;
 #    oh,yes!
 #
-# Of course, the above is not impossible toi achieve with other finds,
+# Of course, the above is not impossible to achieve with other finds,
 # just that GNU find does the Patently Right Thing here :)
 #
 # ====> if you're using these dist rules, get hold of GNU findutils.
@@ -630,27 +633,35 @@ endif
 #
 .PHONY: dist dist-pre dist-post
 
+#
+# The dist rules leaves out CVS, SRC (from mkshadowdir) and tests
+# directories when creating shadow source distrib tree
+#
 dist-pre::
 	-rm -rf $(SRC_DIST_DIR)
 	-rm -f $(SRC_DIST_NAME).tar.gz
-	(cd $(FPTOOLS_TOP_ABS); find $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -exec $(MKDIRHIER) $(SRC_DIST_DIR)/{} \; \) ; )
-	(cd $(FPTOOLS_TOP_ABS); find $(SRC_DIST_DIRS) -name CVS -prune -o -name SRC -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -type l -exec $(LN_S) $(FPTOOLS_TOP_ABS)/{} $(SRC_DIST_DIR)/{} \; )
+	(cd $(FPTOOLS_TOP_ABS); find $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -exec $(MKDIRHIER) $(SRC_DIST_DIR)/{} \; \) ; )
+	(cd $(FPTOOLS_TOP_ABS); find $(SRC_DIST_DIRS) -name CVS -prune -o -name SRC -prune -o -name tests -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -type l -exec $(LN_S) $(FPTOOLS_TOP_ABS)/{} $(SRC_DIST_DIR)/{} \; )
 
 #
 # After having created a shadow distribution tree and copied/linked
 # all the necessary files to it, `dist-post' makes sure the permissions
-# are set right and packages up the tree.
+# are set right and then package up the tree. Empty directories are also removed.
 #
 # For now, we make the packaging a separate rule, so as to allow
 # the inspection of the dist tree before eventually packaging it up.
 #
 dist-post::
+	@echo Deleting the following empty directories..
+	( cd $(SRC_DIST_DIR) ; cd .. ; find $(SRC_DIST_NAME) -type d -exec sh -c 'test x`ls $$0 | wc -l | sed -e "s/ //g"` = x0' {} \; -print -exec rm -rf {} \; -prune )
 	( cd $(SRC_DIST_DIR) ; cd .. ; chmod -R a+rw $(SRC_DIST_NAME) ) 
 
 dist-package::
 	cd $(SRC_DIST_DIR); cd ..; $(TAR) chzf $(SRC_DIST_NAME).tar.gz $(SRC_DIST_NAME)
 
 #
+
+
 # The default dist rule:
 #
 # copy/link the contents of $(SRC_DIST_FILES) into the
@@ -914,9 +925,11 @@ WAY_TARGETS     = $(foreach way,$(WAYS),$(foreach suffix, $(FPTOOLS_SUFFIXES), %
 LIB_WAY_TARGETS = $(foreach way,$(WAYS),%_$(way).a %_$(way))
 
 # $@ will be something like Foo.p_o
-# $(suffix $@) will be .p_o
-# The sed script extracts the "p" part.
-
+# $(suffix $@)     returns .p_o
+# $(subst .,.p_o)  returns p_o
+# $(subst _,.,p_o) returns p.o   (clever)
+# $(basename p.o)  returns p
+# 
 $(WAY_TARGETS) :
 	$(MAKE) way=$(basename $(subst _,.,$(subst .,,$(suffix $@)))) $@
 
@@ -1012,7 +1025,7 @@ all docs runtests TAGS clean veryclean maintainer-clean install ::
 	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
 	done
 	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Finished recusrively making \`$@' for ways: $(WAYS) ..."
+	@echo "===fptools== Finished recursively making \`$@' for ways: $(WAYS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 
