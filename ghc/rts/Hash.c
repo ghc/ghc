@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.c,v 1.4 2001/06/25 09:49:59 rrt Exp $
+ * $Id: Hash.c,v 1.5 2001/06/27 11:29:10 sewardj Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1995-1998
  * (c) The GHC Team, 1999
@@ -243,8 +243,8 @@ insertHashTable(HashTable *table, StgWord key, void *data)
     HashList *hl;
 
     /* We want no duplicates */
-    //    ASSERT(lookupHashTable(table, key) == NULL);
-    
+    ASSERT(lookupHashTable(table, key) == NULL);
+
     /* When the average load gets too high, we expand the table */
     if (++table->kcount >= HLOAD * table->bcount)
 	expand(table);
