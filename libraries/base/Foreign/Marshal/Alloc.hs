@@ -42,7 +42,7 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
-#elsif defined(__HUGS__)
+#elif defined(__HUGS__)
 import Control.Exception	( bracket )
 #else
 import System.IO		( bracket )
