@@ -76,7 +76,9 @@ much pain.
 # ifndef LINUX_VERSION_CODE
 #  include <linux/version.h>
 # endif
-# if (LINUX_VERSION_CODE < 0x020000)
+/* Snaffled from drivers/scsi/eata.c in 2.0.30 sources */
+#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
+# if ( LINUX_VERSION_CODE < LinuxVersionCode(2,0,0) )
 #  include <asm/signal.h>
 # else
 #  include <asm/sigcontext.h>
@@ -133,7 +135,21 @@ segv_handler(int sig,
 #    if defined(aix_TARGET_OS)
 	int code, struct sigcontext *scp)
 #    else /* linux */
+     /* sigcontext_struct has been renamed to sigcontext. If
+        compiling this code elicits a bunch of warnings about
+	"struct sigcontext_struct" being undeclared, check to
+	see whether you've got "struct sigcontext" in <asm/sigcontext.h>.
+	or not.
+
+	If you do, lower the version number below to fit the version
+	you're running (and pass us a note saying that you had to - thx!)
+     */
+#     if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,51)
+           /* sigcontext_struct has been renamed to sigcontext */
+	struct sigcontext scp)
+#     else
 	struct sigcontext_struct scp)
+#     endif
 #    endif 
 #  endif
 {
