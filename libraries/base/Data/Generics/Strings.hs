@@ -89,28 +89,35 @@ gread = unGRead gread'
 
  where
 
-  gread' :: GenericB GRead
+  gread' :: Data a => GRead a
   gread' = gdefault `extB` scase
 
    where
 
     -- a specific case for strings
+    scase :: GRead String
     scase = GRead ( \s -> case reads s of
                             [x::(String,String)] -> Just x
                             _ -> Nothing
                   ) 
 
     -- the generic default for gread
+    gdefault :: Data a => GRead a
     gdefault = 
       do 
-  	trafo $  dropWhile ((==) ' ')
-	query $  not . (==) ""
-	query $  (==) '(' . head
-	trafo $  tail
-	trafo $  dropWhile ((==) ' ')                
-	str   <- parseConstr
-        con   <- str2con str
-        x     <- gunfoldM con gread'
+		-- Drop "    (   "
+  	trafo $  dropWhile ((==) ' ')		-- Discard leading space
+	query $  not . (==) ""			-- Check result is not empty
+	query $  (==) '(' . head		-- ...and that it begins with (
+	trafo $  tail				-- Discard the '('
+	trafo $  dropWhile ((==) ' ')           -- ...and following white space
+
+		-- Do the real work
+	str   <- parseConstr			-- Get a lexeme for the constructor
+        con   <- str2con str			-- Convert it to a Constr (may fail)
+        x     <- gunfoldM con gread'		-- Read the children
+
+		-- Drop "    )"
 	trafo $  dropWhile ((==) ' ')
 	query $  not . (==) ""
 	query $  (==) ')' . head
@@ -118,15 +125,14 @@ gread = unGRead gread'
         return x
 
      where
-       -- Turn string into constructor driven by gdefault's type
-       str2con = maybe mzero return
-               .
-	         (    stringCon		-- look up constructor at hand
-                    $ dataTypeOf	-- get handle on all constructurs
-                    $ undefinedType	-- turn type value into undefined
-                    $ paraType		-- get a handle on a in m a
-                    $ gdefault		-- use as type argument
-                 )
+       get_data_type :: GRead a -> DataType
+       get_data_type (thing :: GRead a) = dataTypeOf (typeVal::a)
+
+       str2con :: String -> GRead Constr	
+	-- Turn string into constructor driven by gdefault's type,
+	-- failing in the monad if it isn't a constructor of this data type
+       str2con = maybe mzero return . stringCon (get_data_type gdefault)
+
 {-
   foo = 
     do s' <- return $ dropWhile ((==) ' ') s
