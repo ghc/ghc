@@ -458,7 +458,7 @@ data RuleBase = RuleBase
 				-- Held as a set, so that it can simply be the initial
 				-- in-scope set in the simplifier
 
-		     IdSet	-- Ids (whether local or imported) mentioned on 
+		    IdSet	-- Ids (whether local or imported) mentioned on 
 				-- LHS of some rule; these should be black listed
 
 	-- This representation is a bit cute, and I wonder if we should
