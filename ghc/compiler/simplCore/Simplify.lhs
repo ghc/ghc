@@ -45,6 +45,7 @@ import Util		( Eager, appEager, returnEager, runEager, mapEager,
 			  isSingleton, zipEqual, zipWithEqual, mapAndUnzip
 			)
 import Outputable	
+
 \end{code}
 
 The controlling flags, and what they do
@@ -195,11 +196,11 @@ simplTopBinds env binds
 
     simpl_top_binds env (NonRec binder@(in_id,occ_info) rhs : binds)
       =		--- No cloning necessary at top level
-        simplBinder env binder						`thenSmpl` \ (env1, out_id) ->
-        simplRhsExpr env binder rhs out_id				`thenSmpl` \ (rhs',arity) ->
-        completeNonRec env1 binder (out_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds1') ->
-        simpl_top_binds new_env binds					`thenSmpl` \ binds2' ->
-        returnSmpl (binds1' ++ binds2')
+        simplBinder env binder					     `thenSmpl` \ (env1, out_id) ->
+        simplRhsExpr env binder rhs out_id			     `thenSmpl` \ (rhs',arity) ->
+        completeNonRec env1 binder (out_id `withArity` arity) rhs'   `thenSmpl` \ (new_env, binds1) ->
+        simpl_top_binds new_env binds				     `thenSmpl` \ binds2 ->
+        returnSmpl (binds1 ++ binds2)
 
     simpl_top_binds env (Rec pairs : binds)
       =		-- No cloning necessary at top level, but we nevertheless
@@ -1006,11 +1007,11 @@ simplNonRec env binder@(id,_) rhs body_c body_ty
     simpl_bind env rhs = complete_bind env rhs
  
     complete_bind env rhs
-      = simplBinder env binder			`thenSmpl` \ (env_w_clone, new_id) ->
-	simplRhsExpr env binder rhs new_id	`thenSmpl` \ (rhs',arity) ->
+      = simplBinder env binder			 `thenSmpl` \ (env_w_clone, new_id) ->
+	simplRhsExpr env binder rhs new_id	 `thenSmpl` \ (rhs',arity) ->
 	completeNonRec env_w_clone binder 
-		(new_id `withArity` arity) rhs'	`thenSmpl` \ (new_env, binds) ->
-        body_c new_env				`thenSmpl` \ body' ->
+		(new_id `withArity` arity) rhs'  `thenSmpl` \ (new_env, binds) ->
+        body_c new_env				 `thenSmpl` \ body' ->
         returnSmpl (mkCoLetsAny binds body')
 
 
@@ -1081,8 +1082,10 @@ completeBind :: SimplEnv
 	     -> (SimplEnv, [(OutId, OutExpr)])		-- Final envt and binding(s)
 
 completeBind env binder@(old_id,occ_info) new_id new_rhs
-  |  atomic_rhs			-- If rhs (after eta reduction) is atomic
+  |  not (idMustNotBeINLINEd new_id)
+  && atomic_rhs			-- If rhs (after eta reduction) is atomic
   && not (isExported new_id)	-- and binder isn't exported
+
   = 	-- Drop the binding completely
     let
         env1 = notInScope env new_id
@@ -1107,6 +1110,7 @@ completeBind env binder@(old_id,occ_info) new_id new_rhs
 	     | otherwise			-- Can inline it
 	     = extendEnvGivenBinding env occ_info id_w_specenv new_rhs
 
+        new_binds  = [(id_w_specenv, new_rhs)]
     in
     (env1, new_binds)
 	     
@@ -1115,7 +1119,6 @@ completeBind env binder@(old_id,occ_info) new_id new_rhs
     spec_env'        	= substSpecEnv ty_subst (substSpecEnvRhs ty_subst id_subst) spec_env
     (ty_subst,id_subst) = getSubstEnvs env
 
-    new_binds  = [(new_id, new_rhs)]
     atomic_rhs = is_atomic eta'd_rhs
     eta'd_rhs  = case lookForConstructor env new_rhs of 
 		   Just v -> Var v
@@ -1248,6 +1251,7 @@ simplRecursiveGroup env new_ids []
   = returnSmpl ([], env)
 
 simplRecursiveGroup env (new_id : new_ids) ((binder, rhs) : pairs)
+{-
   | inlineUnconditionally binder
   = 	-- Single occurrence, so drop binding and extend env with the inlining
 	-- This is a little delicate, because what if the unique occurrence
@@ -1261,11 +1265,11 @@ simplRecursiveGroup env (new_id : new_ids) ((binder, rhs) : pairs)
 	new_env = bindIdToExpr env binder rhs
     in
     simplRecursiveGroup new_env new_ids pairs
-
+-}
   | otherwise
   = simplRhsExpr env binder rhs new_id		`thenSmpl` \ (new_rhs, arity) ->
     let
-	new_id'   = new_id `withArity` arity
+	new_id'               = new_id `withArity` arity
         (new_env, new_binds') = completeBind env binder new_id' new_rhs
     in
     simplRecursiveGroup new_env new_ids pairs	`thenSmpl` \ (new_pairs, final_env) ->
