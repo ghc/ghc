@@ -29,9 +29,10 @@ import Usage(GenUsage)
 
 data MagicUnfoldingFun
 data SimplCount 
+data SimplEnv
 
 simplIdWantsToBeINLINEd :: GenId (GenType (GenTyVar (GenUsage Unique)) Unique) -> SimplEnv -> Bool
 
 simplBind :: SimplEnv -> GenCoreBinding (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> (SimplEnv -> UniqSupply -> SimplCount -> (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique, SimplCount)) -> GenType (GenTyVar (GenUsage Unique)) Unique -> UniqSupply -> SimplCount -> (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique, SimplCount)
-simplExpr :: SimplEnv -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> [GenCoreArg (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique] -> UniqSupply -> SimplCount -> (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique, SimplCount)
+simplExpr :: SimplEnv -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> [GenCoreArg (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique] -> GenType (GenTyVar (GenUsage Unique)) Unique -> UniqSupply -> SimplCount -> (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique, SimplCount)
 \end{code}
