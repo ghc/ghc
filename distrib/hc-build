@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 
 # Manuel M. T. Chakravarty <chak@acm.org>, June 2000
 #
