@@ -9,6 +9,7 @@ module PosixUtil where
 import ST
 import PrelST   -- ST representation
 import PrelIOBase  -- IOError representation
+import Addr
 import Foreign
 import CCall
 import PrelBase
