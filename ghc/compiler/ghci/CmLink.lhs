@@ -59,7 +59,7 @@ instance Outputable Unlinked where
    ppr (DotO path)   = text "DotO" <+> text path
    ppr (DotA path)   = text "DotA" <+> text path
    ppr (DotDLL path) = text "DotDLL" <+> text path
-   ppr (Trees binds) = text "Trees" <+> ppr (map binder binds)
+   ppr (Trees binds _) = text "Trees" <+> ppr (map binder binds)
 
 
 isObject (DotO _) = True
@@ -67,7 +67,7 @@ isObject (DotA _) = True
 isObject (DotDLL _) = True
 isObject _ = False
 
-isInterpretable (Trees _) = True
+isInterpretable (Trees _ _) = True
 isInterpretable _ = False
 
 data Linkable
