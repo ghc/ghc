@@ -1180,11 +1180,12 @@ emacs mk/build.mk
 
 </OrderedList>
 
-You can make subsequent changes to <filename>mk/build.mk</filename> as often 
-as you like.  You do not have to run any further configuration 
-programs to make these changes take effect.
-In theory you should, however, say <Command>gmake clean</Command>, <Command>gmake all</Command>,
-because configuration option changes could affect anything&mdash;but in practice you are likely to know what's affected.
+You can make subsequent changes to <filename>mk/build.mk</filename> as often
+as you like.  You do not have to run any further configuration programs to
+make these changes take effect. In theory you should, however, say
+<Command>gmake clean</Command>, <Command>gmake all</Command>, because
+configuration option changes could affect anything&mdash;but in practice you
+are likely to know what's affected.
 </para>
 
 </Sect2>
@@ -2650,11 +2651,23 @@ guide) before continuing to read these notes.
 </para>
 
 <para>
-Before you start, make sure you've installed Cygwin (from <ULink
-URL="http://cygwin.org/">cygwin.org</ULink>). You also need to make
-sure that the user environment variable <Constant>MAKE_MODE</Constant>
-is set to <Literal>UNIX</Literal>.  If you don't do this you get very
-weird messages when you type <Command>make</Command>, such as:
+Because of various hard-wired infelicities, you need to copy
+<Filename>bash.exe</Filename> (from GHC's <Filename>extra-bin</Filename>
+directory) and <Filename>perl.exe</Filename> (from GHC's
+<Filename>bin</Filename> directory) to <Filename>/bin</Filename> (discover
+where your Cygwin root directory is by typign <Command>mount</Command>). If
+you want to use bash as the shell in Emacs, you need to set the
+<Constant>SHELL</Constant> environment variable to point to
+<Filename>bash.exe</Filename>; similarly, if you want to use CVS, then
+<Constant>CVS_RSH</Constant> must point to <Filename>ssh.exe</Filename>,
+which is also in GHC's <Filename>extra-bin</Filename> directory.
+</para>
+
+<para>
+Before you start, you need to make sure that the user environment variable
+<Constant>MAKE_MODE</Constant> is set to <Literal>UNIX</Literal>. If you
+don't do this you get very weird messages when you type
+<Command>make</Command>, such as:
 </para>
 <Screen>
 /c: /c: No such file or directory</Screen>
@@ -2788,7 +2801,8 @@ optional.
 <para>
 Try doing <Command>cvs co fpconfig</Command>. All being well, bytes should
 start to trickle through, leaving a directory <filename>fptools</filename>
-in your current directory.  (You can <Command>rm</Command> it if you don't want to keep it.)  The following messages appear to be harmless:
+in your current directory.  (You can <Command>rm</Command> it if you don't
+want to keep it.) The following messages appear to be harmless:
 </para>
 
 <Screen>
@@ -2798,10 +2812,10 @@ setsockopt IPTOS_THROUGHPUT: Invalid argument
 
 <para>
 At this point I found that CVS tried to invoke a little dialogue with
-me (along the lines of `do you want to talk to this host'), but
-somehow bombed out.  This was from a bash shell running in emacs.
+me (along the lines of `do you want to talk to this host?'), but
+for some reason bombed out.  This was from a bash shell running in Emacs.
 I solved this by invoking a Cygnus shell, and running CVS from there.
-Once things are dialogue free, it seems to work OK from within emacs.
+Once things are dialogue free, it seems to work OK from within Emacs.
 </para>
 </ListItem>
 
