@@ -2078,6 +2078,53 @@ rank-2 types as applied to data constructors.
 
 </Sect2>
 
+
+<Sect2 id="hoist">
+<Title>Type synonyms and hoisting
+</Title>
+
+<Para>
+GHC also allows you to write a <Literal>forall</Literal> in a type synonym, thus:
+<ProgramListing>
+  type Discard a = forall b. a -> b -> a
+
+  f :: Discard a
+  f x y = x
+</ProgramListing>
+However, it is often convenient to use these sort of synonyms at the right hand
+end of an arrow, thus:
+<ProgramListing>
+  type Discard a = forall b. a -> b -> a
+
+  g :: Int -> Discard Int
+  g x y z = x+y
+</ProgramListing>
+Simply expanding the type synonym would give
+<ProgramListing>
+  g :: Int -> (forall b. Int -> b -> Int)
+</ProgramListing>
+but GHC "hoists" the <Literal>forall</Literal> to give the isomorphic type
+<ProgramListing>
+  g :: forall b. Int -> Int -> b -> Int
+</ProgramListing>
+In general, the rule is this: <Emphasis>to determine the type specified by any explicit
+user-written type (e.g. in a type signature), GHC expands type synonyms and then repeatedly
+performs the transformation:</Emphasis>
+<ProgramListing>
+  <Emphasis>type1</Emphasis> -> forall a. <Emphasis>type2</Emphasis>
+==>
+  forall a. <Emphasis>type1</Emphasis> -> <Emphasis>type2</Emphasis>
+</ProgramListing>
+(In fact, GHC tries to retain as much synonym information as possible for use in
+error messages, but that is a usability issue.)  This rule applies, of course, whether
+or not the <Literal>forall</Literal> comes from a synonym. For example, here is another
+valid way to write <Literal>g</Literal>'s type signature:
+<ProgramListing>
+  g :: Int -> Int -> forall b. b -> Int
+</ProgramListing>
+</Para>
+</Sect2>
+
 </Sect1>
 
 <Sect1 id="existential-quantification">
