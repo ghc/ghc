@@ -221,6 +221,8 @@ static void     schedule          ( StgMainThread *mainThread, Capability *initi
 static void     detectBlackHoles  ( void );
 #endif
 
+static void     raiseAsync_(StgTSO *tso, StgClosure *exception, rtsBool stop_at_atomically);
+
 #if defined(RTS_SUPPORTS_THREADS)
 /* ToDo: carefully document the invariants that go together
  *       with these synchronisation objects.
@@ -1200,6 +1202,7 @@ run_thread:
        * previously, or it's blocked on an MVar or Blackhole, in which
        * case it'll be on the relevant queue already.
        */
+      ASSERT(t->why_blocked != NotBlocked);
       IF_DEBUG(scheduler,
 	       debugBelch("--<< thread %d (%s) stopped: ", 
 		       t->id, whatNext_strs[t->what_next]);
@@ -1333,44 +1336,14 @@ run_thread:
       for (t = all_threads; t != END_TSO_QUEUE; t = t -> link) {
         if (t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
           if (!stmValidateTransaction (t -> trec)) {
-            StgRetInfoTable *info;
-            StgPtr sp = t -> sp;
-
             IF_DEBUG(stm, sched_belch("trec %p found wasting its time", t));
 
-            if (sp[0] == (W_)&stg_enter_info) {
-              sp++;
-            } else {
-              sp--;
-              sp[0] = (W_)&stg_dummy_ret_closure;
-            }
-
-            // Look up the stack for its atomically frame
-            StgPtr frame;
-            frame = sp + 1;
-            info = get_ret_itbl((StgClosure *)frame);
-              
-            while (info->i.type != ATOMICALLY_FRAME &&
-                   info->i.type != STOP_FRAME &&
-                   info->i.type != UPDATE_FRAME) {
-              if (info -> i.type == CATCH_RETRY_FRAME) {
-                IF_DEBUG(stm, sched_belch("Aborting transaction in catch-retry frame"));
-                stmAbortTransaction(t -> trec);
-                t -> trec = stmGetEnclosingTRec(t -> trec);
-              }
-              frame += stack_frame_sizeW((StgClosure *)frame);
-              info = get_ret_itbl((StgClosure *)frame);
-            }
+	    // strip the stack back to the ATOMICALLY_FRAME, aborting
+	    // the (nested) transaction, and saving the stack of any
+	    // partially-evaluated thunks on the heap.
+	    raiseAsync_(t, NULL, rtsTrue);
             
-            if (!info -> i.type == ATOMICALLY_FRAME) {
-              barf("Could not find ATOMICALLY_FRAME for unvalidatable thread");
-            }
-
-            // Cause the thread to enter its atomically frame again when
-            // scheduled -- this will attempt stmCommitTransaction or stmReWait
-            // which will fail triggering re-rexecution.
-            t->sp = frame;
-            t->what_next = ThreadRunGHC;
+	    ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
           }
         }
       }
@@ -3051,6 +3024,12 @@ raiseAsyncWithLock(StgTSO *tso, StgClosure *exception)
 void
 raiseAsync(StgTSO *tso, StgClosure *exception)
 {
+    raiseAsync_(tso, exception, rtsFalse);
+}
+
+static void
+raiseAsync_(StgTSO *tso, StgClosure *exception, rtsBool stop_at_atomically)
+{
     StgRetInfoTable *info;
     StgPtr sp;
   
@@ -3106,8 +3085,10 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	
 	while (info->i.type != UPDATE_FRAME
 	       && (info->i.type != CATCH_FRAME || exception == NULL)
-	       && info->i.type != STOP_FRAME) {
-            if (info->i.type == ATOMICALLY_FRAME) {
+	       && info->i.type != STOP_FRAME
+	       && (info->i.type != ATOMICALLY_FRAME || stop_at_atomically == rtsFalse))
+	{
+            if (info->i.type == CATCH_RETRY_FRAME || info->i.type == ATOMICALLY_FRAME) {
               // IF we find an ATOMICALLY_FRAME then we abort the
               // current transaction and propagate the exception.  In
               // this case (unlike ordinary exceptions) we do not care
@@ -3125,6 +3106,14 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	
 	switch (info->i.type) {
 	    
+	case ATOMICALLY_FRAME:
+	    ASSERT(stop_at_atomically);
+	    ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
+	    stmCondemnTransaction(tso -> trec);
+	    tso->sp = frame;
+	    tso->what_next = ThreadRunGHC;
+	    return;
+
 	case CATCH_FRAME:
 	    // If we find a CATCH_FRAME, and we've got an exception to raise,
 	    // then build the THUNK raise(exception), and leave it on

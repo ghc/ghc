@@ -115,6 +115,7 @@ static StgTRecChunk *cached_trec_chunks = END_STM_CHUNK_LIST;
 static StgTVarWaitQueue *cached_tvar_wait_queues = END_STM_WAIT_QUEUE;
 
 static void recycle_tvar_wait_queue(StgTVarWaitQueue *q) {
+#if 0
   if (shake()) {
     TRACE("Shake: not re-using wait queue %p\n", q);
     return;
@@ -122,9 +123,11 @@ static void recycle_tvar_wait_queue(StgTVarWaitQueue *q) {
 
   q -> next_queue_entry = cached_tvar_wait_queues;
   cached_tvar_wait_queues = q;
+#endif
 }
 
 static void recycle_closures_from_trec (StgTRecHeader *t) {
+#if 0
   if (shake()) {
     TRACE("Shake: not re-using closures from %p\n", t);
     return;
@@ -140,6 +143,7 @@ static void recycle_closures_from_trec (StgTRecHeader *t) {
     c -> prev_chunk = cached_trec_chunks;
     cached_trec_chunks = c;
   }
+#endif
 }
 
 /*......................................................................*/
@@ -278,7 +282,8 @@ static void start_tso_waiting_on_trec(StgTSO *tso, StgTRecHeader *trec) {
 static void stop_tsos_waiting_on_trec(StgTRecHeader *trec) {
   ASSERT(trec != NO_TREC);
   ASSERT(trec -> enclosing_trec == NO_TREC);
-  ASSERT(trec -> state == TREC_WAITING);
+  ASSERT(trec -> state == TREC_WAITING ||
+         trec -> state == TREC_MUST_ABORT);
   TRACE("stop_tsos_waiting in state=%d\n", trec -> state);
   FOR_EACH_ENTRY(trec, e, {
     StgTVar *s;
@@ -509,6 +514,27 @@ void stmAbortTransaction(StgTRecHeader *trec) {
 
 /*......................................................................*/
 
+void stmCondemnTransaction(StgTRecHeader *trec) {
+  TRACE("stmCondemnTransaction trec=%p\n", trec);
+  ASSERT (trec != NO_TREC);
+  ASSERT ((trec -> state == TREC_ACTIVE) || 
+          (trec -> state == TREC_MUST_ABORT) ||
+          (trec -> state == TREC_WAITING) ||
+          (trec -> state == TREC_CANNOT_COMMIT));
+
+  if (trec -> state == TREC_WAITING) {
+    ASSERT (trec -> enclosing_trec == NO_TREC);
+    TRACE("stmCondemnTransaction condemning waiting transaction\n");
+    stop_tsos_waiting_on_trec(trec);
+  } 
+
+  trec -> state = TREC_MUST_ABORT;
+
+  TRACE("stmCondemnTransaction trec=%p done\n", trec);
+}
+
+/*......................................................................*/
+
 StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec) {
   StgTRecHeader *outer;
   TRACE("stmGetEnclosingTRec trec=%p\n", trec);
@@ -671,12 +697,15 @@ StgBool stmWait(StgTSO *tso, StgTRecHeader *trec) {
 
 /*......................................................................*/
 
-StgBool stmReWait(StgTRecHeader *trec) {
+StgBool stmReWait(StgTSO *tso) {
   int result;
+  StgTRecHeader *trec = tso->trec;
+
   TRACE("stmReWait trec=%p\n", trec);
   ASSERT (trec != NO_TREC);
   ASSERT (trec -> enclosing_trec == NO_TREC);
-  ASSERT (trec -> state == TREC_WAITING);
+  ASSERT ((trec -> state == TREC_WAITING) || 
+          (trec -> state == TREC_MUST_ABORT));
 
   lock_stm();
   result = transaction_is_valid(trec);
@@ -685,13 +714,17 @@ StgBool stmReWait(StgTRecHeader *trec) {
     // The transaction remains valid -- do nothing because it is already on
     // the wait queues
     ASSERT (trec -> state == TREC_WAITING);
+    park_tso(tso);
   } else {
     // The transcation has become invalid.  We can now remove it from the wait
     // queues.
-    stop_tsos_waiting_on_trec (trec);
+    if (trec -> state != TREC_MUST_ABORT) {
+	  stop_tsos_waiting_on_trec (trec);
 
-    // Outcome now reflected by status field; no need for log
-    recycle_closures_from_trec(trec);
+	  // Outcome now reflected by status field; no need for log
+	  recycle_closures_from_trec(trec);
+    }
+
   }
   unlock_stm();
 

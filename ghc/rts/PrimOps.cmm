@@ -996,7 +996,7 @@ CATCH_RETRY_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
       trec = StgTSO_trec(CurrentTSO);                                                    \
       if (StgAtomicallyFrame_waiting(frame)) {                                           \
         /* The TSO is currently waiting: should we stop waiting? */                      \
-        valid = foreign "C" stmReWait(trec "ptr");                                       \
+        valid = foreign "C" stmReWait(CurrentTSO "ptr");                                 \
         if (valid) {                                                                     \
           /* Previous attempt is still valid: no point trying again yet */               \
           IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)                                       \
@@ -1240,9 +1240,11 @@ retry_pop_stack:
       other_trec = StgCatchRetryFrame_first_code_trec(frame);
       r = foreign "C" stmMergeForWaiting(trec "ptr", other_trec "ptr");
       if (r) {
+        r = foreign "C" stmCommitTransaction(trec "ptr");
+      }
+      if (r) {
         // Merge between siblings succeeded: commit it back to enclosing transaction
         // and then propagate the retry
-        r = foreign "C" stmCommitTransaction(trec "ptr");
         StgTSO_trec(CurrentTSO) = outer;
         Sp = Sp + SIZEOF_StgCatchRetryFrame;
         goto retry_pop_stack;

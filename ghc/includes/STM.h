@@ -96,6 +96,15 @@ extern StgTRecHeader *stmStartTransaction(StgTRecHeader *outer);
 
 extern void stmAbortTransaction(StgTRecHeader *trec);
 
+// Ensure that a subsequent commit / validation will fail.  We use this 
+// in our current handling of transactions that may have become invalid
+// and started looping.  We strip their stack back to the ATOMICALLY_FRAME,
+// and, when the thread is next scheduled, discover it to be invalid and
+// re-execute it.  However, we need to force the transaction to stay invalid
+// in case other threads' updates make it valid in the mean time.
+
+extern void stmCondemnTransaction(StgTRecHeader *trec);
+
 // Return the trec within which the specified trec was created (not
 // valid if trec==NO_TREC).
 
@@ -164,7 +173,7 @@ extern StgBool stmWait(StgTSO *tso, StgTRecHeader *trec);
 // and leave it as unblocked.  It is an error to call stmReWait if the
 // thread is not waiting.
 
-extern StgBool stmReWait(StgTRecHeader *trec);
+extern StgBool stmReWait(StgTSO *tso);
 
 // Merge the accesses made so far in the second trec into the first trec.
 // Note that the resulting trec is only intended to be used in wait operations.
