@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.15 2002/03/01 18:11:20 keithw Exp $
+ * $Id: Ticky.c,v 1.16 2002/03/04 10:35:43 keithw Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -536,10 +536,10 @@ PrintTickyInfo(void)
 
   PR_CTR(UPD_NEW_IND_ctr);
   /* see comment on ENT_PERM_IND_ctr */
-  COND_PR_CTR(UPD_NEW_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue,"U!PD_NEW_PERM_IND_ctr requires +RTS -Z");
+  COND_PR_CTR(UPD_NEW_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsFalse,"U!PD_NEW_PERM_IND_ctr requires +RTS -Z");
   PR_CTR(UPD_OLD_IND_ctr);
   /* see comment on ENT_PERM_IND_ctr */
-  COND_PR_CTR(UPD_OLD_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue,"U!PD_OLD_PERM_IND_ctr requires +RTS -Z");
+  COND_PR_CTR(UPD_OLD_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsFalse,"U!PD_OLD_PERM_IND_ctr requires +RTS -Z");
 
   PR_CTR(GC_SEL_ABANDONED_ctr);
   PR_CTR(GC_SEL_MINOR_ctr);
