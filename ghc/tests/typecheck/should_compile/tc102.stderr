@@ -1,0 +1,3 @@
+ghc: module version changed to 1; reason: no old .hi file
+__export ShouldCompile p;
+1 p :: __forall [a] => a -> a ;
