@@ -79,10 +79,18 @@ mkSplitUniqSupply (C# c#)
 		return (MkSplitUniqSupply uniq s1 s2)
 	    )
 
-	mk_unique = _ccall_ genSymZh		>>= \ (W# u#) ->
+	mk_unique =
+#if __GLASGOW_HASKELL__ < 603
+		    _ccall_
+#endif
+		    genSymZh		>>= \ (W# u#) ->
 		    return (I# (w2i (mask# `or#` u#)))
     in
     mk_supply#
+
+#if __GLASGOW_HASKELL__ >= 603
+foreign import ccall unsafe "genSymZh" genSymZh :: IO Word
+#endif
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
