@@ -290,6 +290,11 @@ PerformReschedule(liveness, always_reenter_node)
 {
     rtsBool need_to_reschedule;
 
+#if 0 && defined(DEBUG)
+    fprintf(stderr,"PerfReS:liveness=0x%lx,reenter=%lx,,context_switch=%ld\n",
+	liveness, always_reenter_node, context_switch);
+#endif
+
     /* Reset the global NeedToReSchedule -- 
        this is used only to communicate the fact that we should schedule
        a new thread rather than the existing one following a fetch.
