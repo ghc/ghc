@@ -12,6 +12,30 @@
       values, RULES pragmas, and so on) to make the heavily used Prelude code
       as fast as possible.
 
+    <hr>
+    <h4>Par, seq, and lazy</h4>
+
+    In GHC.Conc you will dinf
+<blockquote><pre>
+  pseq a b = a `seq` lazy b
+</pre></blockquote>
+   What's this "lazy" thing.  Well, <tt>pseq</tt> is a <tt>seq</tt> for a parallel setting.
+   We really mean "evaluate a, then b".  But if the strictness analyser sees that pseq is strict
+   in b, then b might be evaluated <em>before</em> a, which is all wrong. 
+<p>
+Solution: wrap the 'b' in a call to <tt>GHC.Base.lazy</tt>.  This function is just the identity function,
+except that it's put into the built-in environment in MkId.lhs.  That is, the MkId.lhs defn over-rides the
+inlining and strictness information that comes in from GHC.Base.hi.  And that makes <tt>lazy</tt> look
+lazy, and have no inlining.  So the strictness analyser gets no traction.
+<p>
+In the worker/wrapper phase, after strictness analysis, <tt>lazy</tt> is "manually" inlined (see WorkWrap.lhs),
+so we get all the efficiency back.
+<p>
+This supersedes an earlier scheme involving an even grosser hack in which par# and seq# returned an
+Int#.  Now there is no seq# operator at all.
+
+
+    <hr>
     <h4>fold/build</h4>
     <p>
       There is a lot of magic in <a
