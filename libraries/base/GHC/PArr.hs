@@ -71,7 +71,6 @@
 --  * We might want to add bounds checks that can be deactivated.
 --
 
--- #hide
 module GHC.PArr (
   -- [::],		-- Built-in syntax
 
