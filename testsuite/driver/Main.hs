@@ -65,10 +65,16 @@ scrub (c:cs)           = c : scrub cs
 
 
 usage
-   = "usage:\n" ++
-     "runtests --tool=<compiler-to-test>\n" ++   	-- "
-     "         --config=<path_to_config_file>\n" ++ 	-- "
-     "         path_to_root_of_tests_directory"
+   = "\nusage:\n" ++
+     "runtests --tool=<compiler-to-test>\n" ++   		   -- "
+     "         --config=<path_to_config_file>\n" ++ 		   -- "
+     "         --rootdir=<path_to_root_of_tests_directory>\n" ++   -- "
+     "         [--$var=literal-value]\n" ++			   -- "
+     "         [names of tests to run, if you don't want all]\n" ++
+     "\n" ++
+     "         You may not set any of the following vars from the\n" ++
+     "         command line:\n" ++
+     concatMap (\w -> "            $" ++ w ++ "\n") special_var_names
 
 
 main
@@ -76,24 +82,36 @@ main
 imain arg_str
    = main_really (words arg_str)
 test
-   = imain "--tool=ghc --config=../config/msrc/cam-02-unx.T ../tests/codeGen"
+   = imain ("--tool=ghc --config=../config/msrc/cam-02-unx.T " 
+            ++ "--rootdir=../tests/codeGen")
 
 main_really arg_ws0
    = do { let (arg_ws1, maybe_tool) = fish arg_ws0 "--tool="
         ; let (arg_ws2, maybe_conf) = fish arg_ws1 "--config="
-        ; if (length arg_ws2 /= 1 || isNothing maybe_tool 
-                                  || isNothing maybe_conf) 
+        ; let (arg_ws3, maybe_root) = fish arg_ws2 "--rootdir="
+        ; let (arg_ws4, cmd_binds)  = getBinds arg_ws3
+        ; let invalid_binds
+                 = filter (`elem` special_var_names) 
+                          (map fst cmd_binds)
+        ; if (isNothing maybe_tool 
+              || isNothing maybe_conf
+              || isNothing maybe_root
+              || not (null invalid_binds)) 
            then do officialMsg usage
                    exitWith (ExitFailure 1)
            else 
 
      do { let tool = unJust maybe_tool
               conf = unJust maybe_conf
+              root = unJust maybe_root
               (confdir, conffile) = splitPathname conf
-              root_dir = head arg_ws2
               base_genv = [("tool", tool), 
                            ("confdir", confdir), 
                            ("conffilename", conffile)]
+
+              tests_to_run
+                 = if null arg_ws4 then Nothing{-all of them-}
+                                   else Just arg_ws4{-just these-}
 
         ; conf_ok <- doesFileExist conf
         ; if    not conf_ok
@@ -102,7 +120,7 @@ main_really arg_ws0
            else 
 
      do { -- Find all the .T files
-        ; all_tfiles <- findTFiles root_dir
+        ; all_tfiles <- findTFiles root
         ; putStr "\n"
         ; officialMsg ("Found " ++ show (length all_tfiles) 
                        ++ " test description files:")
@@ -122,6 +140,7 @@ main_really arg_ws0
         -- Run all the tests in each successfully-parsed .T file.
         ; resultss 
              <- mapM ( \ (path,topdefs) -> processParsedTFile 
+                                              tests_to_run
                                               path
                                               (addTVars base_genv path)
                                               topdefs) 
@@ -240,6 +259,28 @@ splitPathname full
          p_r    = drop (1 + length f_r) full_r
      in  if null p_r then (".", reverse f_r)
                      else (reverse p_r, reverse f_r)
+
+-- Extract all the   --$var=value  binds from a bunch of cmd line opts.
+getBinds :: [String] -> ([String], [(Var,String)])
+getBinds cmd_line_opts
+   = f [] [] cmd_line_opts 
+     where
+        f acc_n acc_y []
+           = (reverse acc_n, reverse acc_y)
+        f acc_n acc_y (str:strs)
+           | take 3 str /= "--$" || '=' `notElem` drop 3 str
+           = f (str:acc_n) acc_y strs
+           | otherwise
+           = let varname = takeWhile (/= '=') (drop 3 str)
+                 value   = drop (4 + length varname) str
+             in 
+                 f acc_n ((varname,value):acc_y) strs
+
+-- These vars have special meanings and may not be set from the
+-- command line.
+special_var_names
+   = ["testfilename", "testdir", "conffilename", "confdir", 
+      "tool", "testname"]
 
 
 -- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy", "ext")

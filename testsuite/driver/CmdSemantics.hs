@@ -199,28 +199,38 @@ initialEnv global_env macro_env
 ---------------------------------------------------------------------
 -- Run all the tests defined in a parsed .T file.
 
-processParsedTFile :: FilePath
+processParsedTFile :: Maybe [String]	-- which tests to run
+                   -> FilePath
                    -> [(Var,String)]
                    -> [TopDef]
                    -> IO [(TestID, Maybe (Result, Result))]
 
-processParsedTFile tfilepath initial_global_env topdefs
-   = do putStr "\n"   
-        officialMsg ("=== running tests in: " ++ tfilepath ++ " ===")
-        let tests     = filter isTTest     topdefs
-        let macs      = filter isTMacroDef topdefs
-        let incls     = filter isTInclude  topdefs -- should be []
-        let topbinds  = [(var,expr) | TAssign var expr <- topdefs]
-        let macro_env = map (\(TMacroDef mnm mrhs) -> (mnm,mrhs)) macs
-        ei_global_env <- evalTopBinds initial_global_env topbinds
-        case ei_global_env of
-           Left barfage
-              -> do officialMsg barfage
-                    return [(TestID tfilepath tname, Nothing)
-                            | TTest tname trhs <- tests]
-           Right global_env
-              -> do all_done <- mapM (doOne global_env macro_env) tests
-                    return all_done
+processParsedTFile test_filter tfilepath initial_global_env topdefs
+   = do { let raw_tests = filter isTTest topdefs
+        ; when (null raw_tests) 
+               (officialMsg ("=== WARNING: no tests defined in: " ++ tfilepath))
+        ; let tests = getApplicableTests test_filter raw_tests
+        ; if null tests
+           then return []
+           else
+
+     do { putStr "\n"   
+        ; officialMsg ("=== running tests in: " ++ tfilepath ++ " ===")
+
+        ; let macs      = filter isTMacroDef topdefs
+        ; let incls     = filter isTInclude  topdefs -- should be []
+        ; let topbinds  = [(var,expr) | TAssign var expr <- topdefs]
+        ; let macro_env = map (\(TMacroDef mnm mrhs) -> (mnm,mrhs)) macs
+        ; ei_global_env <- evalTopBinds initial_global_env topbinds
+        ; case ei_global_env of
+             Left barfage
+                -> do officialMsg barfage
+                      return [(TestID tfilepath tname, Nothing)
+                              | TTest tname trhs <- tests]
+             Right global_env
+                -> do all_done <- mapM (doOne global_env macro_env) tests
+                      return all_done
+     }}
      where
         doOne global_env macro_env (TTest tname stmts)
            = do putStr "\n"
@@ -232,6 +242,14 @@ processParsedTFile tfilepath initial_global_env topdefs
                    Left barfage -> do officialMsg barfage
                                       return (test_id, Nothing)
                    Right res -> return (test_id, Just res)
+
+
+getApplicableTests :: Maybe [String] -> [TopDef] -> [TopDef]
+
+getApplicableTests Nothing{-no filter-} topdefs
+   = filter isTTest topdefs
+getApplicableTests (Just these) topdefs
+   = [ TTest tname stmts | TTest tname stmts <- topdefs, tname `elem` these]
 
 
 evalTopBinds :: [(Var, String)]		-- pre-set global bindings
