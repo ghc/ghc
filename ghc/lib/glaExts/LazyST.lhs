@@ -12,6 +12,7 @@ module LazyST (
 
 	ST,
 
+	runST,
 	unsafeInterleaveST,
 
         -- ST is one, so you'll likely need some Monad bits
@@ -35,6 +36,7 @@ import qualified UnsafeST   ( unsafeInterleaveST )
 import PrelBase	( Eq(..), Int, Bool, ($), ()(..) )
 import Monad
 import Ix
+import GHC
 
 newtype ST s a = ST (STBase.State s -> (a,STBase.State s))
 
@@ -50,6 +52,10 @@ instance Monad (ST s) where
              ST k_a = k r
            in
            k_a new_s
+
+-- ToDo: un-inline this, it could cause problems...
+runST :: (All s => ST s a) -> a
+runST st = case st of ST st -> let (r,_) = st (STBase.S# realWorld#) in r
 \end{code}
 
 %*********************************************************
