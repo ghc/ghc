@@ -183,7 +183,7 @@ i[[3456]]86-*-solaris2*)
         HostVendor_CPP='unknown'
         HostOS_CPP='solaris2'
         ;;
-i[[3456]]86-*-cygwin32*)
+i[[3456]]86-*-cygwin*)
 	HostPlatform=i386-unknown-cygwin32 # hack again
 	TargetPlatform=i386-unknown-cygwin32
 	BuildPlatform=i386-unknown-cygwin32
@@ -838,6 +838,30 @@ dnl ################################################################
 FPTOOLS_CHECK_LIB_NOWARN(dl, dlopen)
 FPTOOLS_CHECK_LIB_NOWARN(dld, shl_load)
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
+
+dnl --------------------------------------------------
+dnl * test for GTK+
+dnl --------------------------------------------------
+
+AC_PATH_PROGS(GTK_CONFIG, gtk-config gtk12-config)
+if test "$GTK_CONFIG" != ""; then
+   AC_CACHE_CHECK([for version of GTK+], fptools_cv_gtk_version, [
+	fptools_cv_gtk_version=`$GTK_CONFIG --version`
+    ])
+    GTK_VERSION=$fptools_cv_gtk_version
+else
+    GTK_VERSION=
+fi
+
+case $fptools_cv_gtk_version in
+  1.[[23]].*) ;;
+  *) AC_MSG_WARN([GTK+ not usable; need at least version 1.2])
+     GTK_CONFIG=
+     ;;
+esac
+
+AC_SUBST(GTK_CONFIG)
+AC_SUBST(GTK_VERSION)
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests

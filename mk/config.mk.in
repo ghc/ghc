@@ -218,8 +218,8 @@ GhcLibHcOpts=-O
 
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 # Don't split object files for libs if we're building DLLs
-EnableWin32DLLs=@EnableWin32DLLs@
-ifeq "$(EnableWin32DLLs)" "YES"
+DLLized=@EnableWin32DLLs@
+ifeq "$(DLLized)" "YES"
 SplitObjs=NO
 else
 SplitObjs=YES
@@ -246,6 +246,9 @@ StripLibraries=NO
 GhcRtsHcOpts=-O2
 GhcRtsCcOpts=-O2 -optc-fomit-frame-pointer
 
+# Include the front panel code?  Needs GTK+.
+GhcRtsWithFrontPanel = NO
+
 ################################################################################
 #
 #		hslibs project
@@ -261,7 +264,7 @@ GhcRtsCcOpts=-O2 -optc-fomit-frame-pointer
 HsLibsFor	= ghc
 
 # hslibs for GHC also uses the following variables (defined above):
-#   GhcLibWays, GhcLibHcOpts, GhcLibToolsHcOpts, EnableWin32DLLs, StripLibraries
+#   GhcLibWays, GhcLibHcOpts, GhcLibToolsHcOpts, DLLized, StripLibraries
 
 # Haskell compiler options for tools in hslibs
 GhcLibToolsHcOpts=-O
@@ -430,7 +433,7 @@ endif
 ifeq "$(strip $(mandir))" ""
 mandir		= $(prefix)/man
 endif
- 
+
 
 ################################################################################
 #
@@ -555,6 +558,12 @@ LibGmp		= @LibGmp@
 # (if present in libc use that one, otherwise use the one in the tree)
 #
 HaveRegex	= @HaveRegex@
+
+#-----------------------------------------------------------------------------
+# GTK+
+
+GTK_CONFIG		= @GTK_CONFIG@
+GTK_VERSION		= @GTK_VERSION@
 
 #-----------------------------------------------------------------------------
 # Flex
@@ -788,10 +797,6 @@ WAY_mp_HC_OPTS=-parallel
 # Way `mg': 
 WAY_mg_NAME=GranSim
 WAY_mg_HC_OPTS=-gransim
-
-# Way `dll': 
-WAY_dll_NAME=Win32 DLLs
-WAY_dll_HC_OPTS=-dll
 
 #
 # Add user-way configurations here:

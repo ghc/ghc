@@ -50,7 +50,7 @@
 #
 # (b) when SUBDIRS is empty,
 #     for each "multi-way-target" <t>
-#     calls "make -way=w <t>" for each w in $(WAYS)
+#     calls "make way=w <t>" for each w in $(WAYS)
 #
 #     This has the effect of making the standard target
 #     in each of the specified ways (as well as in the normal way
@@ -304,9 +304,29 @@ endif
 #----------------------------------------
 #	Libraries/archives
 
+ifeq "$(IS_CBITS_LIB)" "YES"
+_cbits := _cbits
+endif
+
+ifneq "$(HSLIB)" ""
+LIBRARY = libHS$(HSLIB)$(_cbits)$(_way).a
+ifeq "$(LIBOBJS)" ""
+  ifneq "$(IS_CBITS_LIB)" "YES"
+  LIBOBJS = $(HS_OBJS)
+  else
+  LIBOBJS = $(C_OBJS)
+  endif
+endif
+ifneq "$(IS_CBITS_LIB)" ""
+CC = $(HC)
+override datadir:=$(libdir)/includes
+INSTALL_DATAS += Hs$(shell perl -e 'print ucfirst "$(HSLIB)"').h
+SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR)
+endif
+endif
+
 ifneq "$(LIBRARY)" ""
 all :: $(LIBRARY)
-
 
 define BUILD_LIB
 $(RM) $@
@@ -383,10 +403,41 @@ endif
 #----------------------------------------
 #	Building Win32 DLLs
 #
-ifeq "$(way)" "dll"
+
+ifeq "$(DLLized)" "YES"
+
+ifneq "$(HSLIB)" ""
+
+SRC_BLD_DLL_OPTS += --export-all --output-def=HS$(HSLIB)$(_cbits)$(_way).def DllVersionInfo.$(way_)o
+ifneq "$(HSLIB)" "rts"
+SRC_BLD_DLL_OPTS += -lHSstd_cbits_imp -L$(GHC_LIB_DIR)/std/cbits
+SRC_BLD_DLL_OPTS += -lHSrts_$(way_)imp -L$(GHC_RUNTIME_DIR)
+ifneq "$(HSLIB)" "std"
+  ifeq "$(IS_CBITS_LIB)" ""
+  SRC_BLD_DLL_OPTS += -lHSstd_$(way_)imp -L$(GHC_LIB_DIR)/std 
+  endif
+endif
+endif
+SRC_BLD_DLL_OPTS += -lgmp -L. -L$(GHC_RUNTIME_DIR)/gmp
+ifeq "$(IS_CBITS_LIB)" ""
+SRC_BLD_DLL_OPTS += $(patsubst %,-lHS%_$(way_)imp, $(HSLIB_DEPS))
+SRC_BLD_DLL_OPTS += $(patsubst %,-L../%, $(HSLIB_DEPS))
+endif
+ifneq "$(HAS_CBITS)" ""
+SRC_BLD_DLL_OPTS += -lHS$(HSLIB)_cbits_imp -Lcbits
+endif
+SRC_BLD_DLL_OPTS += -lwsock32 -lwinmm
+
+endif # HSLIB != ""
+
+SplitObjs = NO 
+
+ifneq "$(LIBRARY)" ""
+
+all :: DllVersionInfo.$(way_)o
 
 ifeq "$(DLL_NAME)" ""
-DLL_NAME = $(patsubst %.a, %.dll, $(subst lib,,$(LIBRARY)))
+DLL_NAME = $(patsubst %.a,%.dll,$(subst lib,,$(LIBRARY)))
 endif
 
 ifneq "$(DLL_NAME)" ""
@@ -396,12 +447,14 @@ endif
 all :: $(DLL_NAME)
 
 ifeq "$(DLL_IMPLIB_NAME)" ""
-DLL_IMPLIB_NAME = $(patsubst %.a, %_imp.a, $(LIBRARY))
+DLL_IMPLIB_NAME = $(patsubst %.a,%_imp.a,$(LIBRARY))
 endif
 
 $(DLL_NAME) :: $(LIBRARY)
 	$(BLD_DLL) --output-lib $(DLL_IMPLIB_NAME) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS)
-endif
+endif # LIBRARY != ""
+
+endif # DLLized
 
 #
 # Version information is baked into a DLL by having the DLL include DllVersionInfo.o.
@@ -409,7 +462,7 @@ endif
 # (both are given sensible defaults though.)
 #
 # Note: this will not work as expected with Cygwin B20.1; you need a more recent
-#       snapshot of binutils (to pick up windres bugfixes.)
+#       version of binutils (to pick up windres bugfixes.)
 
 ifndef DLL_VERSION
 DLL_VERSION=$(ProjectVersion)
@@ -439,14 +492,14 @@ endif
 # Little bit of lo-fi mangling to get at the right set of settings depending
 # on whether we're generating the VERSIONINFO for a DLL or EXE
 # 
-DLL_OR_EXE=$(subst VersionInfo.rc,,$@)
+DLL_OR_EXE=$(subst VersionInfo.$(way_)rc,,$@)
 VERSION_FT=$(subst Dll, 0x2L, $(subst Exe, 0x1L, $(DLL_OR_EXE)))
 VERSION_RES_NAME=$(subst Exe,$(EXE_VERSION_NAME), $(subst Dll, $(DLL_VERSION_NAME),$(DLL_OR_EXE)))
 VERSION_RES=$(subst Exe,$(EXE_VERSION), $(subst Dll, $(DLL_VERSION),$(DLL_OR_EXE)))
 VERSION_DESC=$(subst Exe,$(EXE_DESCRIPTION), $(subst Dll, $(DLL_DESCRIPTION),$(DLL_OR_EXE)))
 
-DllVersionInfo.rc ExeVersionInfo.rc:
-	$(RM) DllVersionInfo.rc
+DllVersionInfo.$(way_)rc ExeVersionInfo.$(way_)rc:
+	$(RM) DllVersionInfo.$(way_)rc
 	echo "1 VERSIONINFO"  		    > $@
 	echo "FILEVERSION 1,0,0,1"         >> $@
 	echo "PRODUCTVERSION 1,0,0,1"      >> $@
@@ -525,7 +578,7 @@ all :: $(SCRIPT_PROG)
 # platforms, we prepend #!$(INTERP)  -- SOF 6/97
 # 
 
-$(SCRIPT_PROG) :: $(SCRIPT_OBJS)
+$(SCRIPT_PROG) : $(SCRIPT_OBJS)
 	$(RM) $@
 	@echo Creating $@...
 ifeq "$(INTERP)" "perl"
@@ -618,6 +671,19 @@ install-dirs ::
 # within the various install targets instead.
 #install:: install-dirs
 
+# Install libraries automatically
+ifneq "$(LIBRARY)" ""
+INSTALL_LIBS  += $(LIBRARY)
+ifeq "$(DLLized)" "YES"
+INSTALL_PROGS += $(DLL_NAME)
+else
+ifeq "$(DLLized)" "YES"
+INSTALL_LIBS += $(patsubst %.a,%_imp.a, $(LIBRARY))
+endif
+endif
+INSTALL_DATAS += $(HS_IFACES)
+endif
+
 ifneq "$(INSTALL_PROGS)" ""
 
 #
@@ -630,10 +696,10 @@ ifneq "$(INSTALL_PROGS)" ""
 # $(exeext).
 # 
 # This is bit of a pain to express since GNU make doesn't have
-# something like $(if ...), but possible using $(subst ..)
-# [Aside: I added support for $(if ..) to my local copy of GNU
+# something like $(if ...), but possible using $(subst ...)
+# [Aside: I added support for $(if ...) to my local copy of GNU
 # make at one stage, perhaps I should propagate the patch to
-# the GNU make maintainers..] 
+# the GNU make maintainers...] 
 #
 INSTALL_PROGS := $(foreach p, $(INSTALL_PROGS), $(addsuffix $(subst _,,$(subst __,$(exeext),_$(suffix $(p))_)), $(basename $(p))))
 

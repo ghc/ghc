@@ -34,20 +34,20 @@ endif
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
 	$(HC_POST_OPTS)
-			 
+
 %.$(way_)o : %.lhs	 
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
 	$(HC_POST_OPTS)
-			 
+
 %.$(way_)hc : %.lhs	 
 	$(RM) $@
 	$(HC) $(HC_OPTS) -C $< -o $@
-			 
+
 %.$(way_)hc : %.hs	 
 	$(RM) $@
 	$(HC) $(HC_OPTS) -C $< -o $@
-			 
+
 %.$(way_)o : %.$(way_)hc 
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
@@ -238,6 +238,6 @@ endif
 # The default is to use the GNU resource compiler.
 #
 
-%.o : %.rc
+%.$(way_)o : %.$(way_)rc
 	@$(RM) $@
 	windres $< $@

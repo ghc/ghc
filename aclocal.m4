@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.58 2000/11/02 14:27:01 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.59 2000/11/07 10:20:03 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -436,7 +436,7 @@ main()
 {
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
-  fprintf(f, "%d\n", offsetof(struct { char c; $1 ty;},ty));
+  fprintf(f, "%d", offsetof(struct { char c; $1 ty;},ty));
   exit(0);
 }],
 AC_CV_NAME=`cat conftestval`,
@@ -820,7 +820,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.58 2000/11/02 14:27:01 simonmar Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.59 2000/11/07 10:20:03 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -908,7 +908,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.58 2000/11/02 14:27:01 simonmar Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.59 2000/11/07 10:20:03 simonmar Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,
