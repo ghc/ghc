@@ -107,7 +107,7 @@
     remember is that most mistakes can be undone, but if there's
     anything you're not sure about feel free to bug the local CVS
     meister (namely Jeff Lewis
-    <email>jlewis@galconn.com</email>). </para>
+    <email>jlewis@galois.com</email>). </para>
 
     <sect2 id="cvs-access">
       <title>Getting access to the CVS Repository</title>
@@ -255,7 +255,7 @@
 	  <listitem>
 	    <para>Send a message to to the CVS repository
             administrator (currently Jeff Lewis
-            <email>jeff@galconn.com</email>), containing:</para>
+            <email>jeff@galois.com</email>), containing:</para>
 	    <itemizedlist>
 	      <listitem>
 		<para>Your desired user-name.</para>
