@@ -18,10 +18,11 @@ main = do
              exitWith (ExitFailure 1)
 
 -- The compiler automatically replaces the string "$libdir" at the
--- beginning of a path with the appropriate directory: either the
--- wired-in libdir or the one passed to the compiler via the -B<dir>
--- flag.  This is how we make package.conf independent of GHC's
--- installation location.
+-- beginning of a path with the directory passed to the compiler via
+-- the -B<dir> flag.  Absolute path names will be unchanged.
+--
+-- This is how we make package.conf independent of GHC's installation
+-- location.
 
 package_details :: Bool -> [String] -> [PackageConfig]
 package_details installing
