@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.37 2000/12/12 12:10:08 simonmar Exp $
+-- $Id: Main.hs,v 1.38 2000/12/12 14:35:08 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -91,16 +91,16 @@ import Maybe
 -- Main loop
 
 main =
-  -- top-level exception handler: any unrecognised exception is a compiler bug.
-  handle (\exception -> panic (show exception)) $ do
-
   -- all error messages are propagated as exceptions
   handleDyn (\dyn -> case dyn of
 			  PhaseFailed _phase code -> exitWith code
 			  Interrupted -> exitWith (ExitFailure 1)
-			  _ -> do hPutStrLn stderr (show (dyn :: BarfKind))
+			  _ -> do hPutStrLn stderr (show (dyn :: GhcException))
 			          exitWith (ExitFailure 1)
 	      ) $ do
+
+  -- top-level exception handler: any unrecognised exception is a compiler bug.
+  handle (\exception -> panic (show exception)) $ do
 
    -- make sure we clean up after ourselves
    later (do  forget_it <- readIORef v_Keep_tmp_files

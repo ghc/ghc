@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.33 2000/12/11 15:26:00 sewardj Exp $
+-- $Id: DriverFlags.hs,v 1.34 2000/12/12 14:35:08 simonmar Exp $
 --
 -- Driver flags
 --
@@ -16,13 +16,15 @@ import DriverState
 import DriverUtil
 import TmpFiles 	( v_TmpDir )
 import CmdLineOpts
+import TmpFiles	 	( newTempName )
 import Config
 import Util
-import TmpFiles	 ( newTempName )
-import Directory ( removeFile )
+import Panic
+
 import Exception
 import IOExts
 
+import Directory 	( removeFile )
 import IO
 import Maybe
 import Monad

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.6 2000/11/21 14:34:47 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.7 2000/12/12 14:35:08 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -18,6 +18,7 @@ import TmpFiles
 import Module
 import Config
 import Util
+import Panic
 
 import IOExts
 import Exception

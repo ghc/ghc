@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PackageMaintenance.hs,v 1.4 2000/12/11 12:30:58 rrt Exp $
+-- $Id: PackageMaintenance.hs,v 1.5 2000/12/12 14:35:08 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -7,11 +7,14 @@
 --
 -----------------------------------------------------------------------------
 
-module PackageMaintenance where
+module PackageMaintenance 
+     ( listPackages, newPackage, deletePackage 
+     ) where
 
 import CmStaticInfo
 import DriverState
 import DriverUtil
+import Panic
 
 import Exception
 import IOExts

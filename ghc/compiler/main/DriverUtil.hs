@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.14 2000/12/12 12:10:08 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.15 2000/12/12 14:35:08 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -13,6 +13,7 @@ module DriverUtil where
 #include "HsVersions.h"
 
 import Util
+import Panic
 
 import IOExts
 import Exception
@@ -29,8 +30,6 @@ import Monad
 -----------------------------------------------------------------------------
 -- Errors
 
-short_usage = "Usage: For basic information, try the `--help' option."
-   
 GLOBAL_VAR(v_Path_usage,  "",  String)
 
 long_usage = do
@@ -40,37 +39,8 @@ long_usage = do
   exitWith ExitSuccess
   where
      dump "" = return ()
-     dump ('$':'$':s) = hPutStr stderr prog_name >> dump s
+     dump ('$':'$':s) = hPutStr stderr progName >> dump s
      dump (c:s) = hPutChar stderr c >> dump s
-
-data BarfKind
-  = PhaseFailed String ExitCode
-  | Interrupted
-  | UsageError String			-- prints the short usage msg after the error
-  | OtherError String			-- just prints the error message
-  deriving Eq
-
-prog_name = unsafePerformIO (getProgName)
-{-# NOINLINE prog_name #-}
-
-instance Show BarfKind where
-  showsPrec _ e = showString prog_name . showString ": " . showBarf e
-
-showBarf (UsageError str)
-   = showString str . showChar '\n' . showString short_usage
-showBarf (OtherError str)
-   = showString str
-showBarf (PhaseFailed phase code)
-   = showString phase . showString " failed, code = " . shows code
-showBarf (Interrupted)
-   = showString "interrupted"
-
-unknownFlagErr f = throwDyn (UsageError ("unrecognised flag: " ++ f))
-
-barfKindTc = mkTyCon "BarfKind"
-{-# NOINLINE barfKindTc #-}
-instance Typeable BarfKind where
-  typeOf _ = mkAppTy barfKindTc []
 
 -----------------------------------------------------------------------------
 -- Reading OPTIONS pragmas
@@ -97,6 +67,9 @@ optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
 
 -----------------------------------------------------------------------------
 -- Utils
+
+unknownFlagErr :: String -> a
+unknownFlagErr f = throwDyn (UsageError ("unrecognised flag: " ++ f))
 
 my_partition :: (a -> Maybe b) -> [a] -> ([(a,b)],[a])
 my_partition _ [] = ([],[])

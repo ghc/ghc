@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.40 2000/12/07 16:39:40 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.41 2000/12/12 14:35:08 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -38,6 +38,7 @@ import Module
 import ErrUtils
 import CmdLineOpts
 import Config
+import Panic
 import Util
 
 import Time 		( getClockTime )

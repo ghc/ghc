@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.19 2000/12/08 12:32:15 simonpj Exp $
+-- $Id: DriverState.hs,v 1.20 2000/12/12 14:35:08 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -22,6 +22,7 @@ import IOExts
 import TmpFiles	( newTempName )
 import Directory ( removeFile )
 #endif
+import Panic
 
 import List
 import Char  

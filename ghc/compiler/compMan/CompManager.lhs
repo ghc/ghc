@@ -36,12 +36,12 @@ import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
 import DriverFlags	( getDynFlags )
 import DriverPhases
-import DriverUtil	( BarfKind(..), splitFilename3 )
+import DriverUtil	( splitFilename3 )
 import ErrUtils		( showPass )
 import Util
 import DriverUtil
 import Outputable
-import Panic		( panic )
+import Panic
 import CmdLineOpts	( DynFlags(..) )
 
 #ifdef GHCI
@@ -200,7 +200,7 @@ cmLoadModule cmstate1 rootname
 
 	showPass dflags "Chasing dependencies"
         when (verb >= 1 && ghci_mode == Batch) $
-           hPutStrLn stderr (prog_name ++ ": chasing modules from: " ++ rootname)
+           hPutStrLn stderr (progName ++ ": chasing modules from: " ++ rootname)
 
         (mg2unsorted, a_root_is_Main) <- downsweep [rootname]
         let mg2unsorted_names = map name_of_summary mg2unsorted
@@ -567,7 +567,7 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
 
         when (verb == 1) $
 	   if (ghci_mode == Batch)
-		then hPutStr stderr (prog_name ++ ": module " 
+		then hPutStr stderr (progName ++ ": module " 
                        	++ moduleNameUserString mod_name
 			++ ": ")
 		else hPutStr stderr ("Compiling "
