@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.100 2000/10/27 16:24:31 simonmar Exp $
+# $Id: Makefile,v 1.101 2000/10/27 16:30:02 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -18,10 +18,12 @@ WAYS=$(GhcCompilerWays)
 # equivalent of `env' if it doesn't exist locally).
 #
 ifneq "$(way)" "dll"
-HS_PROG=ghc$(_way)
+HS_PROG=ghc$(_way)-$(ProjectVersion)
 else
-HS_PROG=ghc
+HS_PROG=ghc-$(ProjectVersion)
 endif
+
+LINK = ghc
 
 # -----------------------------------------------------------------------------
 # Create compiler configuration
@@ -384,6 +386,35 @@ ghc-inplace : ghc
 	chmod 755 $@
 
 CLEAN_FILES += ghc-inplace
+
+# -----------------------------------------------------------------------------
+# Create link to from ghc-x.xx to ghc...
+
+all :: $(LINK)
+
+$(LINK) : $(HS_PROG)
+	@if ( $(PERL) -e '$$fn="$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK)"; \
+	   $(RM) $(LINK); \
+	   $(LN_S) $(HS_PROG) $(LINK); \
+	 else \
+	   echo "Creating a symbolic link from $(HS_PROG) to $(LINK) failed: \`$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(LINK)' manually?"; \
+	   exit 1; \
+	 fi;
+
+CLEAN_FILES += $(LINK)
+
+install ::
+	@if ( $(PERL) -e '$$fn="$(bindir)/$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbol link from $(HS_PROG) to $(LINK) in $(bindir)"; \
+	   $(RM) $(bindir)/$(LINK); \
+	   $(LN_S) $(HS_PROG) $(bindir)/$(LINK); \
+	 else \
+	   echo "Creating a symbol link from $(HS_PROG) to $(LINK) in $(bindir) failed: \`$(bindir)/$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(bindir)/$(LINK)' manually?"; \
+	   exit 1; \
+	 fi;
 
 #-----------------------------------------------------------------------------
 # 		install
