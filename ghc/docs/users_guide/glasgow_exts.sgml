@@ -2296,8 +2296,8 @@ the <literal>forall</literal> is on the left of a function arrrow.  As <literal>
 shows, the polymorphic type on the left of the function arrow can be overloaded.
 </para>
 <para>
-The functions <literal>f3</literal> and <literal>g3</literal> have rank-3 types;
-they have rank-2 types on the left of a function arrow.
+The function <literal>f3</literal> has a rank-3 type;
+it has rank-2 types on the left of a function arrow.
 </para>
 <para>
 GHC allows types of arbitrary rank; you can nest <literal>forall</literal>s
@@ -2309,7 +2309,7 @@ including an operational type class context, is legal:
 <listitem> <para> On the left of a function arrow </para> </listitem>
 <listitem> <para> On the right of a function arrow (see <xref linkend="hoist">) </para> </listitem>
 <listitem> <para> As the argument of a constructor, or type of a field, in a data type declaration. For
-example, any of the <literal>f1,f2,f3,g1,g2,g3</literal> above would be valid
+example, any of the <literal>f1,f2,f3,g1,g2</literal> above would be valid
 field type signatures.</para> </listitem>
 <listitem> <para> As the type of an implicit parameter </para> </listitem>
 <listitem> <para> In a pattern type signature (see <xref linkend="scoped-type-variables">) </para> </listitem>
