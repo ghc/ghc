@@ -335,7 +335,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
     returnTc (mkCoercion co_fn, result, free_lie)
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
-    sig_msg  = ptext SLIT("When generalising the type of an expression")
+    sig_msg  = ptext SLIT("type of an expression")
 \end{code}    
 
     
