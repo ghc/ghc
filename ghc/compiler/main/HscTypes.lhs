@@ -63,11 +63,11 @@ emptyModDetails mod
 		 moduleExports = [],
 		 moduleEnv     = emptyRdrEnv,
 		 fixityEnv     = emptyNameEnv,
-		 deptecEnv     = emptyNameEnv,
+		 deprecEnv     = emptyNameEnv,
 		 typeEnv       = emptyNameEnv,
 		 instEnv       = emptyInstEnv,
-    }		 ruleEnv       = emptyRuleEnv
-		
+    		 ruleEnv       = emptyRuleEnv
+    }		
 \end{code}
 
 Symbol tables map modules to ModDetails:
@@ -121,9 +121,10 @@ lookupTypeEnv tbl name
 	Nothing	     -> Nothing
 
 
-groupTyThings :: [TyThing] -> [(Module, TypeEnv)]
+groupTyThings :: [TyThing] -> FiniteMap Module TypeEnv
+  -- Finite map because we want the range too
 groupTyThings things
-  = fmToList (foldl add emptyFM things)
+  = foldl add emptyFM things
   where
     add :: FiniteMap Module TypeEnv -> TyThing -> FiniteMap Module TypeEnv
     add tbl thing = addToFM tbl mod new_env
@@ -134,11 +135,11 @@ groupTyThings things
 				Nothing  -> unitNameEnv name thing
 				Just env -> extendNameEnv env name thing
 		
-extendTypeEnv :: SymbolTable -> [TyThing] -> SymbolTable
+extendTypeEnv :: SymbolTable -> FiniteMap Module TypeEnv -> SymbolTable
 extendTypeEnv tbl things
-  = foldl add tbl (groupTyThings things)
+  = foldFM add tbl things
   where
-    add tbl (mod,type_env)
+    add mod type_env tbl
 	= extendModuleEnv mod new_details
 	where
 	  new_details = case lookupModuleEnv tbl mod of

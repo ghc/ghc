@@ -62,7 +62,7 @@ import Name	( Name, OccName, Provenance(..), ExportFlag(..), NamedThing(..),
 import OccName	( mkDFunOcc, mkDefaultMethodOcc, occNameString )
 import Module	( Module )
 import Unify	( unifyTyListsX, matchTys )
-import HscTypes	( ModDetails(..), lookupTypeEnv )
+import HscTypes	( ModDetails(..), InstEnv, lookupTypeEnv )
 import Unique	( pprUnique10, Unique, Uniquable(..) )
 import UniqFM
 import Unique	( Uniquable(..) )

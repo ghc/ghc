@@ -68,15 +68,13 @@ Outside-world interface:
 -- Convenient type synonyms first:
 data TcResults
   = TcResults {
-	tc_prs	   :: PersistentCompilerState,	-- Augmented with imported information,
+	tc_pcs	   :: PersistentCompilerState,	-- Augmented with imported information,
 						-- (but not stuff from this module)
+	tc_env	   :: TypeEnv,			-- The TypeEnv just for the stuff from this module
 	tc_binds   :: TypecheckedMonoBinds,
-	tc_tycons  :: [TyCon],
-	tc_classes :: [Class],
-	tc_insts   :: Bag InstInfo,		-- Instance declaration information
+	tc_insts   :: InstEnv,			-- Instances, just for this module
 	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
 	tc_rules   :: [TypecheckedRuleDecl],	-- Transformation rules
-	tc_env	   :: ValueEnv
     }
 
 ---------------
@@ -84,7 +82,7 @@ typecheckModule
 	:: PersistentCompilerState
 	-> HomeSymbolTable
 	-> RenamedHsModule
-	-> IO (Maybe TcResults)
+	-> IO (Maybe (PersistentCompilerState, TcResults))
 
 typecheckModule pcs hst mod
   = do { us <- mkSplitUniqSupply 'a' ;
@@ -95,17 +93,29 @@ typecheckModule pcs hst mod
 		
 	 printErrorsAndWarnings errs warns ;
 	
-	 (case maybe_result of
-		Nothing -> return ()
-		Just results -> do { dumpIfSet opt_D_dump_types "Type signatures" (dump_sigs results)
-				     dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results)
-	 }) ;
+	 case maybe_result of {
+	    Nothing      -> return Nothing ;
+	    Just results -> do { 
+
+	 dumpIfSet opt_D_dump_types "Type signatures" (dump_sigs results) ;
+         dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results) ;
 			
-	return (if isEmptyBag errs then 
-			maybe_result 
-		else 
-			Nothing)
-    }
+	 if isEmptyBag errs then 
+	    return Nothing 
+	 else
+
+	 let	groups :: FiniteMap Module TypeEnv
+		groups = groupTyThings (nameEnvElts (tc_env results))
+
+		local_type_env :: TypeEnv
+		local_type_env = lookupWithDefaultFM groups this_mod emptyNameEnv
+
+		new_pst :: PackageSymbolTable
+		new_pst = extendTypeEnv (pcsPST pcs) (delFromFM groups this_mod)
+	   ;
+	 return (Just (pcs {pcsPST = new_pst}, 
+		       results {tc_env = local_type_env}))
+    }}}
   where
     global_symbol_table = pcsPST pcs `plusModuleEnv` hst
 
@@ -256,13 +266,11 @@ tcModule prs (HsModule mod_name _ _ _ decls _ src_loc)
 	zonkRules rules			`thenNF_Tc` \ rules' ->
 
 	returnTc (really_final_env, 
-		  (TcResults {	tc_binds   = all_binds', 
-				tc_tycons  = local_tycons,
-				tc_classes = local_classes,
+		  (TcResults {	tc_env     = tcGEnv really_final_env,
+				tc_binds   = all_binds', 
 				tc_insts   = inst_info,
 				tc_fords   = foi_decls ++ foe_decls',
-				tc_rules   = rules',
-				tc_env     = really_final_env
+				tc_rules   = rules'
 		 }))
 
     -- End of outer fix loop
