@@ -2,44 +2,32 @@
 
 interface HsLoop where
 
-import HsExpr	( HsExpr, Stmt )
-import HsBinds	( HsBinds, MonoBinds, Sig, nullBinds, nullMonoBinds )
+import HsMatches( Match, GRHSsAndBinds, pprMatch, pprMatches, pprGRHSsAndBinds )
+import HsExpr	( HsExpr, pprExpr )
 import HsDecls	( ConDecl )
 import Name	( NamedThing )
-import Outputable ( Outputable )
+import Outputable ( Outputable, PprStyle )
+import Pretty	( Doc )
+
+-- HsMatches outputs
+data Match        tyvar uvar id pat
+data GRHSsAndBinds tyvar uvar id pat
+
+pprGRHSsAndBinds :: (NamedThing id, Outputable id, Outputable pat,
+	            Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
+		PprStyle -> Bool -> GRHSsAndBinds tyvar uvar id pat -> Doc
+
+pprMatches :: (NamedThing id, Outputable id, Outputable pat,
+	       Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
+		PprStyle -> (Bool, Doc) -> [Match tyvar uvar id pat] -> Doc
+
+pprMatch :: (NamedThing id, Outputable id, Outputable pat,
+	       Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
+	PprStyle -> Bool -> Match tyvar uvar id pat -> Doc
 
 -- HsExpr outputs
 data HsExpr tyvar uvar id pat
-data Stmt   tyvar uvar id pat
+pprExpr :: (NamedThing c, Outputable c, Outputable d, Eq a, Outputable a, Eq b, Outputable b)
+        => PprStyle -> HsExpr a b c d -> Doc
 
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-  => Outputable (HsExpr tyvar uvar id pat)
-
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
-  => Outputable (Stmt tyvar uvar id pat)
-
-
--- HsBinds outputs
-data Sig id
-instance (NamedThing name, Outputable name) => Outputable (Sig name)
-
-data HsBinds tyvar uvar id pat
-
-instance (Outputable pat, NamedThing id, Outputable id,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (HsBinds tyvar uvar id pat)
-
-data MonoBinds tyvar uvar id pat
-
-instance (NamedThing id, Outputable id, Outputable pat,
-	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
-		Outputable (MonoBinds tyvar uvar id pat)
-
-nullBinds     :: HsBinds tyvar uvar id pat -> Bool
-nullMonoBinds :: MonoBinds tyvar uvar id pat -> Bool
-
--- HsDecls outputs
-data ConDecl name
 \end{code}
