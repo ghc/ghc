@@ -219,9 +219,9 @@ compilationPassMsg :: DynFlags -> String -> IO ()
 compilationPassMsg dflags msg
   = ifVerbose dflags 2 (putMsg msg)
 
-debugTraceMsg :: DynFlags -> String -> IO ()
-debugTraceMsg dflags msg
-  = ifVerbose dflags 2 (putMsg msg)
+debugTraceMsg :: DynFlags -> Int -> String -> IO ()
+debugTraceMsg dflags val msg
+  = ifVerbose dflags val (putMsg msg)
 
 GLOBAL_VAR(msgHandler, hPutStrLn stderr, (String -> IO ()))
 

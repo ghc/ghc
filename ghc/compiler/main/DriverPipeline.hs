@@ -114,12 +114,11 @@ compile hsc_env mod_summary maybe_old_linkable old_iface = do
 
    showPass dflags0 ("Compiling " ++ showModMsg have_object mod_summary)
 
-   let verb	  = verbosity dflags0
    let location	  = ms_location mod_summary
    let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
    let input_fnpp = expectJust "compile:hspp" (ms_hspp_file mod_summary)
 
-   when (verb >= 2) (putMsg ("compile: input file " ++ input_fnpp))
+   debugTraceMsg dflags0 2 ("compile: input file " ++ input_fnpp)
 
    -- Add in the OPTIONS from the source file
    -- This is nasty: we've done this once already, in the compilation manager
@@ -265,19 +264,16 @@ link BatchCompile dflags batch_attempt_linking hpt
 	    -- the linkables to link
 	    linkables = map (fromJust.hm_linkable) home_mod_infos
 
-        when (verb >= 3) $ do
-	     hPutStrLn stderr "link: linkables are ..."
-             hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
+        debugTraceMsg dflags 3 "link: linkables are ..."
+        debugTraceMsg dflags 3 (showSDoc (vcat (map ppr linkables)))
 
 	-- check for the -no-link flag
 	if isNoLink (ghcLink dflags)
-	  then do when (verb >= 3) $
-		    hPutStrLn stderr "link(batch): linking omitted (-c flag given)."
+	  then do debugTraceMsg dflags 3 "link(batch): linking omitted (-c flag given)."
 	          return Succeeded
 	  else do
 
-	when (verb >= 1) $
-             hPutStrLn stderr "Linking ..."
+	debugTraceMsg dflags 1 "Linking ..."
 
 	let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 	    obj_files = concatMap getOfiles linkables
@@ -285,18 +281,15 @@ link BatchCompile dflags batch_attempt_linking hpt
 	-- Don't showPass in Batch mode; doLink will do that for us.
         staticLink dflags obj_files pkg_deps
 
-        when (verb >= 3) (hPutStrLn stderr "link: done")
+        debugTraceMsg dflags 3 "link: done"
 
 	-- staticLink only returns if it succeeds
         return Succeeded
 
    | otherwise
-   = do when (verb >= 3) $ do
-	    hPutStrLn stderr "link(batch): upsweep (partially) failed OR"
-            hPutStrLn stderr "   Main.main not exported; not linking."
+   = do debugTraceMsg dflags 3 "link(batch): upsweep (partially) failed OR"
+        debugTraceMsg dflags 3 "   Main.main not exported; not linking."
         return Succeeded
-   where
-      verb = verbosity dflags
       
 
 -- -----------------------------------------------------------------------------

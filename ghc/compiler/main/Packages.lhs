@@ -60,7 +60,6 @@ import Compat.Directory	( getAppUserDataDirectory )
 import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
-import System.IO	( hPutStrLn, stderr )
 import Data.Maybe	( isNothing )
 import System.Directory	( doesFileExist )
 import Control.Monad	( when, foldM )
@@ -73,6 +72,7 @@ import Data.List	( isPrefixOf )
 import FastString
 import DATA_IOREF
 import EXCEPTION	( throwDyn )
+import ErrUtils         ( debugTraceMsg, putMsg )
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -225,9 +225,7 @@ readPackageConfigs dflags = do
 readPackageConfig
    :: DynFlags -> PackageConfigMap -> FilePath -> IO PackageConfigMap
 readPackageConfig dflags pkg_map conf_file = do
-  when (verbosity dflags >= 2) $
-	hPutStrLn stderr ("Using package config file: "
-			 ++ conf_file)
+  debugTraceMsg dflags 2 ("Using package config file: " ++ conf_file)
   proto_pkg_configs <- loadPackageConfig conf_file
   top_dir 	    <- getTopDir
   let pkg_configs = mungePackagePaths top_dir proto_pkg_configs
@@ -566,6 +564,6 @@ dumpPackages :: DynFlags -> IO ()
 -- Show package info on console, if verbosity is >= 3
 dumpPackages dflags
   = do  let pkg_map = pkgIdMap (pkgState dflags)
-	hPutStrLn stderr $ showSDoc $
+	putMsg $ showSDoc $
 	      vcat (map (text.showInstalledPackageInfo) (eltsUFM pkg_map))
 \end{code}

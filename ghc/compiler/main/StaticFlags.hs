@@ -87,7 +87,6 @@ import DATA_IOREF
 import UNSAFE_IO	( unsafePerformIO )
 import Monad		( when )
 import Char		( isDigit )
-import IO		( hPutStrLn, stderr ) -- ToDo: should use errorMsg
 import List		( sort, intersperse )
 
 -----------------------------------------------------------------------------

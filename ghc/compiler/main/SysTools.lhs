@@ -47,7 +47,7 @@ module SysTools (
 import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
-import ErrUtils		( putMsg )
+import ErrUtils		( putMsg, debugTraceMsg )
 import Panic		( GhcException(..) )
 import Util		( Suffix, global, notNull, consIORef,
 			  normalisePath, pgmPath, platformPath )
@@ -61,7 +61,7 @@ import DATA_INT
 import Monad		( when, unless )
 import System		( ExitCode(..), getEnv, system )
 import IO		( try, catch,
-			  openFile, hPutStrLn, hPutStr, hClose, hFlush, IOMode(..),
+			  openFile, hPutStr, hClose, hFlush, IOMode(..),
 			  stderr )
 import Directory	( doesFileExist, removeFile )
 import List             ( partition )
@@ -490,7 +490,7 @@ touch dflags purpose arg =  do
 
 copy :: DynFlags -> String -> String -> String -> IO ()
 copy dflags purpose from to = do
-  when (verbosity dflags >= 2) $ hPutStrLn stderr ("*** " ++ purpose)
+  debugTraceMsg dflags 2 ("*** " ++ purpose)
 
   h <- openFile to WriteMode
   ls <- readFile from -- inefficient, but it'll do for now.
@@ -562,8 +562,6 @@ removeTmpFiles dflags fs
 	     ("Deleting: " ++ unwords deletees)
 	     (mapM_ rm deletees)
   where
-    verb = verbosity dflags
-
      -- Flat out refuse to delete files that are likely to be source input
      -- files (is there a worse bug than having a compiler delete your source
      -- files?)
@@ -573,15 +571,14 @@ removeTmpFiles dflags fs
     warnNon act
      | null non_deletees = act
      | otherwise         = do
-        hPutStrLn stderr ("WARNING - NOT deleting source files: " ++ unwords non_deletees)
+        putMsg ("WARNING - NOT deleting source files: " ++ unwords non_deletees)
 	act
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
     rm f = removeFile f `IO.catch` 
 		(\_ignored -> 
-		    when (verb >= 2) $
-		      hPutStrLn stderr ("Warning: deleting non-existent " ++ f)
+		    debugTraceMsg dflags 2 ("Warning: deleting non-existent " ++ f)
 		)
 
 
@@ -622,8 +619,8 @@ traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
 -- b) don't do it at all if dry-run is set
 traceCmd dflags phase_name cmd_line action
  = do	{ let verb = verbosity dflags
-	; when (verb >= 2) $ putMsg ("*** " ++ phase_name)
-	; when (verb >= 3) $ putMsg cmd_line
+	; debugTraceMsg dflags 2 ("*** " ++ phase_name)
+	; debugTraceMsg dflags 3 cmd_line
 	; hFlush stderr
 	
 	   -- Test for -n flag
@@ -633,8 +630,8 @@ traceCmd dflags phase_name cmd_line action
 	; action `IO.catch` handle_exn verb
 	}}
   where
-    handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")
-			     ; when (verb >= 3) (hPutStrLn stderr ("Failed: " ++ cmd_line ++ (show exn)))
+    handle_exn verb exn = do { debugTraceMsg dflags 2 "\n"
+			     ; debugTraceMsg dflags 2 ("Failed: " ++ cmd_line ++ (show exn))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 

@@ -40,6 +40,7 @@ import Maybe            ( isJust )
 #if __GLASGOW_HASKELL__ <= 408
 import Panic		( catchJust, ioErrors )
 #endif
+import ErrUtils         ( debugTraceMsg )
 
 -----------------------------------------------------------------
 --
@@ -65,9 +66,7 @@ doMkDependHS session srcs
 	; let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
 
 		-- Print out the dependencies if wanted
-	; if verbosity dflags >= 2 then
-		hPutStrLn stderr (showSDoc (text "Module dependencies" $$ ppr sorted))
-	  else return ()
+	; debugTraceMsg dflags 2 (showSDoc (text "Module dependencies" $$ ppr sorted))
 		
 		-- Prcess them one by one, dumping results into makefile
 		-- and complaining about cycles

@@ -68,6 +68,9 @@ module GHC (
 	-- used by DriverMkDepend:
 	sessionHscEnv,
 	cyclicModuleErr,
+	
+	-- Exceptions
+	GhcException(..)
   ) where
 
 {-
@@ -123,7 +126,7 @@ import Module
 import FiniteMap
 import Panic
 import Digraph
-import ErrUtils		( showPass, Messages, putMsg )
+import ErrUtils		( showPass, Messages, putMsg, debugTraceMsg )
 import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
@@ -159,10 +162,10 @@ defaultErrorHandler inner =
   	   hFlush stdout
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
-		IOException _ ->  hPutStrLn stderr (show exception)
+		IOException _ ->  putMsg (show exception)
 		AsyncException StackOverflow ->
-			hPutStrLn stderr "stack overflow: use +RTS -K<size> to increase it"
-		_other ->  hPutStr stderr (show (Panic (show exception)))
+			putMsg "stack overflow: use +RTS -K<size> to increase it"
+		_other ->  putMsg (show (Panic (show exception)))
 	   exitWith (ExitFailure 1)
          ) $
 
@@ -172,7 +175,7 @@ defaultErrorHandler inner =
   		case dyn of
 		     PhaseFailed _ code -> exitWith code
 		     Interrupted -> exitWith (ExitFailure 1)
-		     _ -> do hPutStrLn stderr (show (dyn :: GhcException))
+		     _ -> do putMsg (show (dyn :: GhcException))
 			     exitWith (ExitFailure 1)
 	    ) $
   inner
@@ -321,8 +324,8 @@ depanal (Session ref) excluded_mods = do
 	 old_graph = hsc_mod_graph hsc_env
 	
   showPass dflags "Chasing dependencies"
-  when (verbosity dflags >= 1 && gmode == BatchCompile) $
-	       hPutStrLn stderr (showSDoc (hcat [
+  when (gmode == BatchCompile) $
+	debugTraceMsg dflags 1 (showSDoc (hcat [
 		     text "Chasing modules from: ",
 	     		hcat (punctuate comma (map pprTarget targets))]))
 
@@ -401,8 +404,7 @@ load s@(Session ref) how_much
 
 	evaluate pruned_hpt
 
-	when (verb >= 2) $
-            putStrLn (showSDoc (text "Stable obj:" <+> ppr stable_obj $$
+	debugTraceMsg dflags 2 (showSDoc (text "Stable obj:" <+> ppr stable_obj $$
 				text "Stable BCO:" <+> ppr stable_bco))
 
 	-- Unload any modules which are going to be re-linked this time around.
@@ -480,7 +482,7 @@ load s@(Session ref) how_much
 
          then 
            -- Easy; just relink it all.
-           do when (verb >= 2) $ putMsg "Upsweep completely successful."
+           do debugTraceMsg dflags 2 "Upsweep completely successful."
 
 	      -- Clean up after ourselves
 	      cleanTempFilesExcept dflags (ppFilesFromSummaries modsDone)
@@ -501,9 +503,8 @@ load s@(Session ref) how_much
                     	  mod_graph
 		do_linking = a_root_is_Main || no_hs_main
 
-	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking
-		     && verb > 0) $
-	         	putMsg ("Warning: output was redirected with -o, " ++
+	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking) $
+	        debugTraceMsg dflags 1 ("Warning: output was redirected with -o, " ++
 				   "but no output will be generated\n" ++
 				   "because there is no " ++ main_mod ++ " module.")
 
@@ -516,7 +517,7 @@ load s@(Session ref) how_much
            -- Tricky.  We need to back out the effects of compiling any
            -- half-done cycles, both so as to clean up the top level envs
            -- and to avoid telling the interactive linker to link them.
-           do when (verb >= 2) $ putMsg "Upsweep partially successful."
+           do debugTraceMsg dflags 2 "Upsweep partially successful."
 
               let modsDone_names
                      = map ms_mod modsDone
@@ -814,7 +815,7 @@ upsweep hsc_env old_hpt stable_mods cleanup
 
 upsweep hsc_env old_hpt stable_mods cleanup
      (CyclicSCC ms:_)
-   = do hPutStrLn stderr (showSDoc (cyclicModuleErr ms))
+   = do putMsg (showSDoc (cyclicModuleErr ms))
         return (Failed, hsc_env, [])
 
 upsweep hsc_env old_hpt stable_mods cleanup

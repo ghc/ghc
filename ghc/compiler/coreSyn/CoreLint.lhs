@@ -66,7 +66,7 @@ endPass dflags pass_name dump_flag binds
   = do 
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
-	debugTraceMsg dflags $
+	debugTraceMsg dflags 2 $
 		"    Result size = " ++ show (coreBindsSize binds)
 
 	-- Report verbosely, if required
