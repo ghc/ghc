@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.9 2000/07/11 15:26:33 sewardj Exp $
+ * $Id: MachRegs.h,v 1.10 2001/01/18 11:28:50 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -416,7 +416,7 @@
    being the better part of valor, we also don't take %g4.
 
    The paired nature of the floating point registers causes complications for
-   the native code genertor.  For convenience, we pretend that the first 22
+   the native code generator.  For convenience, we pretend that the first 22
    fp regs %f0 .. %f21 are actually 11 double regs, and the remaining 10 are
    float (single) regs.  The NCG acts accordingly.  That means that the 
    following FP assignment is rather fragile, and should only be changed
