@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.68 2001/10/01 13:10:53 simonmar Exp $
+ * $Id: Linker.c,v 1.69 2001/10/19 09:45:26 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -1251,12 +1251,17 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       start = ((UChar*)(oc->image)) + sectab_i->PointerToRawData;
       end   = start + sz - 1;
 
-      if (kind == SECTIONKIND_OTHER) {
+      if (kind == SECTIONKIND_OTHER
+          /* Ignore sections called which contain stabs debugging
+             information. */
+          && 0 != strcmp(".stab", sectab_i->Name)
+          && 0 != strcmp(".stabstr", sectab_i->Name)
+         ) {
          belch("Unknown PEi386 section name `%s'", sectab_i->Name);
          return 0;
       }
 
-      if (end >= start) {
+      if (kind != SECTIONKIND_OTHER && end >= start) {
          addSection(oc, kind, start, end);
          addProddableBlock(oc, start, end - start + 1);
       }
@@ -1389,6 +1394,13 @@ ocResolve_PEi386 ( ObjectCode* oc )
          = (COFF_reloc*) (
               ((UChar*)(oc->image)) + sectab_i->PointerToRelocations
            );
+
+      /* Ignore sections called which contain stabs debugging
+         information. */
+      if (0 == strcmp(".stab", sectab_i->Name)
+          || 0 == strcmp(".stabstr", sectab_i->Name))
+         continue;
+
       for (j = 0; j < sectab_i->NumberOfRelocations; j++) {
          COFF_symbol* sym;
          COFF_reloc* reltab_j 
@@ -1504,12 +1516,18 @@ findElfSection ( void* objImage, Elf32_Word sh_type )
 {
    int i;
    char* ehdrC = (char*)objImage;
-   Elf32_Ehdr* ehdr = ( Elf32_Ehdr*)ehdrC;
-   Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
+   Elf32_Ehdr* ehdr = (Elf32_Ehdr*)ehdrC;
+   Elf32_Shdr* shdr = (Elf32_Shdr*)(ehdrC + ehdr->e_shoff);
+   char* sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
    char* ptr = NULL;
    for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == sh_type &&
-          i !=  ehdr->e_shstrndx) {
+      if (shdr[i].sh_type == sh_type
+          /* Ignore the section header's string table. */
+          && i != ehdr->e_shstrndx
+	  /* Ignore string tables named .stabstr, as they contain
+             debugging info. */
+          && 0 != strcmp(".stabstr", sh_strtab + shdr[i].sh_name)
+         ) {
          ptr = ehdrC + shdr[i].sh_offset;
          break;
       }
@@ -1613,9 +1631,14 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    strtab = NULL;
    nstrtab = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == SHT_STRTAB &&
-          i !=  ehdr->e_shstrndx) {
-	  IF_DEBUG(linker,belch("   section %d is a normal string table", i ));
+      if (shdr[i].sh_type == SHT_STRTAB
+          /* Ignore the section header's string table. */
+          && i != ehdr->e_shstrndx
+	  /* Ignore string tables named .stabstr, as they contain
+             debugging info. */
+          && 0 != strcmp(".stabstr", sh_strtab + shdr[i].sh_name)
+         ) {
+         IF_DEBUG(linker,belch("   section %d is a normal string table", i ));
          strtab = ehdrC + shdr[i].sh_offset;
          nstrtab++;
       }
@@ -2028,6 +2051,7 @@ ocResolve_ELF ( ObjectCode* oc )
    char*       ehdrC = (char*)(oc->image);
    Elf32_Ehdr* ehdr = (Elf32_Ehdr*) ehdrC;
    Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
+   char* sh_strtab  = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
 
    /* first find "the" symbol table */
    stab = (Elf32_Sym*) findElfSection ( ehdrC, SHT_SYMTAB );
@@ -2042,6 +2066,14 @@ ocResolve_ELF ( ObjectCode* oc )
 
    /* Process the relocation sections. */
    for (shnum = 0; shnum < ehdr->e_shnum; shnum++) {
+
+      /* Skip sections called ".rel.stab".  These appear to contain
+         relocation entries that, when done, make the stabs debugging
+         info point at the right places.  We ain't interested in all
+         dat jazz, mun. */
+      if (0 == strcmp(".rel.stab", sh_strtab + shdr[shnum].sh_name))
+         continue;
+
       if (shdr[shnum].sh_type == SHT_REL ) {
          ok = do_Elf32_Rel_relocations ( oc, ehdrC, shdr, 
                                          shnum, stab, strtab );
@@ -2053,6 +2085,7 @@ ocResolve_ELF ( ObjectCode* oc )
                                           shnum, stab, strtab );
          if (!ok) return ok;
       }
+
    }
 
    /* Free the local symbol table; we won't need it again. */
