@@ -340,15 +340,25 @@ exposed-modules: Network.BSD,
     
     <para>The <literal>ghc-pkg</literal> tool allows packages to be
       added or removed from a package database.  By default,
-      the system-wide package database is used, but alternatively
+      the system-wide package database is modified, but alternatively
       the user's local package database or another specified
       file can be used.</para>
 
-    <para>The <literal>ghc-pkg</literal> program may be run in the following
-      ways.  Where a package name is required, the package can be named either
-      in full including the version number
+    <para>Commands which only inspect the database (<literal>list</literal>,
+      <literal>describe</literal>, <literal>field</literal>) will take into
+      account the user's local package database too, unless the
+      <literal>--global</literal> option is given.  This matches the behaviour
+      of GHC, which automatically reads the user's local database if it is
+      available.</para>
+
+    <para>The <literal>ghc-pkg</literal> program may be run in the ways listed
+      below.  Where a package name is required, the package can be named in
+      full including the version number 
       (e.g. <literal>network-1.0</literal>), or without the version number if
-      that is unambiguous.</para>
+      there is only a single version of that package installed.  Additionally,
+      the version may be given as <literal>*</literal>, which means &ldquo;all
+      versions&rdquo;.  For example, <literal>ghc-pkg hide network-*</literal>
+      would hide all versions of the network package.</para>
 
     <variablelist>
       <varlistentry>
@@ -473,18 +483,12 @@ exposed-modules: Network.BSD,
 	</term>
 	<listitem>
 	  <para>Operate on the package database in
-	    <replaceable>file</replaceable>.
-	    This flag affects the <literal>register</literal>,
-	    <literal>update</literal>, <literal>unregister</literal>,
-	    <literal>expose</literal>, and <literal>hide</literal>
-	    commands.</para>
+	    <replaceable>file</replaceable>.</para>
 
 	  <para>When multiple <option>-f</option> options are given, or
 	    <option>-f</option> is used in conjunction with
 	    <option>--user</option> or <option>--global</option>, the last
-	    one on the command-line takes precedence.  When listing packages
-	    with <literal>ghc-pkg list</literal>, the contents of all the
-	    databases specified on the command-line are listed.</para>
+	    one on the command-line is the one that will be modified.</para>
 	</listitem>
       </varlistentry>
 
