@@ -70,6 +70,8 @@ import Hugs.Char
 import Prelude
 import Prelude(Char,String)
 import Char
+import NHC.FFI (CInt)
+foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> Int
 #endif
 
 -- | Convert a single digit 'Char' to the corresponding 'Int'.  
@@ -89,7 +91,6 @@ isAsciiLower c          =  c >= 'a' && c <= 'z'
 isAsciiUpper c          =  c >= 'A' && c <= 'Z'
 #endif
 
-#ifndef __NHC__
 -- | Unicode General Categories (column 2 of the UnicodeData table)
 -- in the order they are listed in the Unicode standard.
 
@@ -128,7 +129,7 @@ data GeneralCategory
 
 -- | Retrieves the general Unicode category of the character.
 generalCategory :: Char -> GeneralCategory
-#ifdef __GLASGOW_HASKELL__
+#if defined(__GLASGOW_HASKELL__) || defined(__NHC__)
 generalCategory c = toEnum (wgencat (fromIntegral (ord c)))
 #endif
 #ifdef __HUGS__
@@ -185,7 +186,6 @@ isSeparator c = case generalCategory c of
         LineSeparator           -> True
         ParagraphSeparator      -> True
         _                       -> False
-#endif /* !__NHC__ */
 
 #ifdef __NHC__
 -- dummy implementation

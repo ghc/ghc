@@ -31,7 +31,8 @@ SRCS	= \
 	Text/Html/BlockTable.hs Text/Html.hs Text/Printf.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
-	Text/Regex/Posix.hsc Text/Regex.hs
+	Text/Regex/Posix.hsc Text/Regex.hs \
+	WCsubst.c
 
 
 #	Text/ParserCombinators/ReadPrec.hs
