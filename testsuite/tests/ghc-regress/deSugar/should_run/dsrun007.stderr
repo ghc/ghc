@@ -1,3 +1,3 @@
-Fail: dsrun007.hs:5:22-24: Missing field in record construction 
+dsrun007: dsrun007.hs:5:22-24: Missing field in record construction 
 
 

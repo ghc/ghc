@@ -1,3 +1,3 @@
-Fail: dsrun005.hs:42:0-17: Non-exhaustive patterns in function f
+dsrun005: dsrun005.hs:42:0-17: Non-exhaustive patterns in function f
 
 

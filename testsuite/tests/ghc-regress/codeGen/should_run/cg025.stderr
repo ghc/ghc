@@ -25,4 +25,4 @@ main = do
     trace "hello, trace" $
       catch (getEnv "__WURBLE__" >> return ()) (\ e -> error "hello, error")
 hello, trace
-Fail: hello, error
+cg025: hello, error
