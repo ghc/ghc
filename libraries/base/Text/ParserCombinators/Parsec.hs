@@ -8,10 +8,9 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Parsec, the Fast Monadic Parser combinator library. 
--- <http://www.cs.uu.nl/people/daan/parsec.html>
+-- Parsec, the Fast Monadic Parser combinator library, see
+-- <http://www.cs.uu.nl/people/daan/parsec.html>.
 --
--- This helper module exports elements from the basic libraries.
 -- Inspired by:
 --
 -- * Graham Hutton and Erik Meijer:
@@ -23,6 +22,8 @@
 -- * Andrew Partridge, David Wright: 
 --   Predictive parser combinators need four values to report errors.
 --   Journal of Functional Programming 6(2): 355-364, 1996
+--
+-- This helper module exports elements from the basic libraries.
 --
 -----------------------------------------------------------------------------
 
