@@ -85,7 +85,7 @@ newHandle hc  = newMVar	hc 	>>= \ h ->
   -- exception occur while performing said op.
 withHandle (Handle h) act = do
    h_ <- takeMVar h
-   v  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
+   v  <- catchNonIO (act h_) (\ ex -> putMVar h h_ >> throw ex)
    return v
    
 writeHandle (Handle h) hc = putMVar h hc

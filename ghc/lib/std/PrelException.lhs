@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.5 1999/03/17 13:19:20 simonm Exp $
+% $Id: PrelException.lhs,v 1.6 1999/05/10 16:52:10 sof Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -115,6 +115,11 @@ catch           :: IO a -> (IOError -> IO a) -> IO a
 catch m k	=  catchException m handler
   where handler (IOException err) = k err
 	handler other             = throw other
+
+catchNonIO      :: IO a -> (Exception -> IO a) -> IO a 
+catchNonIO m k	=  catchException m handler
+  where handler (IOException err) = ioError err
+	handler other             = k other
 \end{code}
 
 Why is this stuff here?  To avoid recursive module dependencies of
