@@ -126,4 +126,7 @@ data StateAndWord#   s     = StateAndWord#   (State# s) Word#
 data StateAndFloat#  s     = StateAndFloat#  (State# s) Float# 
 data StateAndDouble# s     = StateAndDouble# (State# s) Double#  
 data StateAndAddr#   s     = StateAndAddr#   (State# s) Addr#
+
+data StateAndInt64#  s     = StateAndInt64#  (State# s) Int64#
+data StateAndWord64# s     = StateAndWord64# (State# s) Word64#
 \end{code}
