@@ -477,9 +477,7 @@ ETAGS_PREFIX		= $(GLAFP_UTILS)/etags/
 MSUB_PREFIX		= $(GLAFP_UTILS)/msub/
 LNDIR_PREFIX		= $(GLAFP_UTILS)/lndir/
 MKDIRHIER_PREFIX	= $(GLAFP_UTILS)/mkdirhier/
-
-# Still used?
-LITERATE	    	= $(FPTOOLS_TOP)/literate
+DOCBOOK_PREFIX		= $(GLAFP_UTILS)/docbook/
 
 LITERATE_PREFIX    	= $(FPTOOLS_TOP)/literate/
 
@@ -598,7 +596,7 @@ SHELL			= /bin/sh
 # We do not use SHELL to execute long commands, as `make' will more than likely
 # override whatever setting you have in your environment while executing. 
 
-# By default, REAL_SHELL is set equal SHELL, which is not really a smart move
+# By default, REAL_SHELL is set equal to SHELL, which is not really a smart move
 # as it is SHELL that will show up the bogosity in the first place, but setting
 # it to anything else isn't really portable.
 #
@@ -613,7 +611,7 @@ TAR			= @TarCmd@
 ZIP			= zip
 
 #
-# Under cygwin32, we have to deal with .exe suffixes
+# Under Windows, we have to deal with .exe suffixes
 #
 EXE_SUFFIX=@ExeSuffix@
 
@@ -633,12 +631,13 @@ UNAME			= uname
 YACC			= @YaccCmd@
 
 #-----------------------------------------------------------------------------
-# SGML stuff (currently not configured - we assume you have it)
+# SGML stuff
 
-SGML2DVI		= db2dvi
-SGML2HTML		= db2html
-SGML2PS			= db2ps
-SGML2RTF		= db2rtf
+SGML2DVI		= $(DOCBOOK_PREFIX)db2dvi
+SGML2HTML		= $(DOCBOOK_PREFIX)db2html
+SGML2PS			= $(DOCBOOK_PREFIX)db2ps
+SGML2PDF		= $(DOCBOOK_PREFIX)db2pdf
+SGML2RTF		= $(DOCBOOK_PREFIX)db2rtf
 
 SGMLSTYLESHEET          = $(FPTOOLS_TOP_ABS)/docs/fptools-both.dsl
 
