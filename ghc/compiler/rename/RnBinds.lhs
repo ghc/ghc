@@ -32,7 +32,7 @@ import RnEnv		( bindLocatedLocalsRn, lookupBndrRn,
 			)
 import CmdLineOpts	( DynFlag(..) )
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( OccName, Name, nameOccName )
+import Name		( OccName, Name, nameOccName, nameSrcLoc )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc )
 import BasicTypes	( RecFlag(..) )
@@ -176,7 +176,7 @@ rnTopMonoBinds mbinds sigs
                                                           bndr_name_set type_sig_vars)
 			| otherwise   = []
     in
-    mapRn_ (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
+    mapRn_ missingSigWarn un_sigd_binders	`thenRn_`
 
     rn_mono_binds siglist mbinds		   `thenRn` \ (final_binds, bind_fvs) ->
     returnRn (final_binds, bind_fvs `plusFV` sig_fvs)
@@ -594,7 +594,8 @@ unknownSigErr sig
     (what_it_is, loc) = hsSigDoc sig
 
 missingSigWarn var
-  = sep [ptext SLIT("definition but no type signature for"), quotes (ppr var)]
+  = pushSrcLocRn (nameSrcLoc var) $
+    addWarnRn (sep [ptext SLIT("Definition but no type signature for"), quotes (ppr var)])
 
 methodBindErr mbind
  =  hang (ptext SLIT("Can't handle multiple methods defined by one pattern binding"))
