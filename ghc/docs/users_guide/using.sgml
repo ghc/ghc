@@ -1147,65 +1147,200 @@ a rule to do so; one of the preceding suffix rules does the job
 nicely.
 </Para>
 
-<Para>
-Putting inter-dependencies of the form <Literal>Foo.o : Bar.hi</Literal> into your
-<Filename>Makefile</Filename> by hand is rather error-prone.  Don't worry&mdash;never fear,
-<Command>mkdependHS</Command> is here! (and is distributed as part of GHC) Add the
-following to your <Filename>Makefile</Filename>:
-</Para>
+    </sect2>
 
-<Para>
+    <sect2><title>Dependency generation</title>
+      <indexterm><primary>dependencies in Makefiles</primary></indexterm>
+      <indexterm><primary>Makefile dependencies</primary></indexterm>
+
+      <para>Putting inter-dependencies of the form <Literal>Foo.o :
+      Bar.hi</Literal> into your <Filename>Makefile</Filename> by hand
+      is rather error-prone.  Don't worry, GHC has support for
+      automatically generating the required dependencies.  Add the
+      following to your <Filename>Makefile</Filename>:</para>
 
 <ProgramListing>
 depend :
-        mkdependHS -- $(HC_OPTS) -- $(SRCS)
+        ghc -M $(HC_OPTS) $(SRCS)
 </ProgramListing>
 
-</Para>
+      <para>Now, before you start compiling, and any time you change
+      the <Literal>imports</Literal> in your program, do <Command>make
+      depend</Command> before you do <Command>make
+      cool&lowbar;pgm</Command>.  <Command>GHC</Command> will append
+      the needed dependencies to your
+      <Filename>Makefile</Filename>.</Para>
 
-<Para>
-Now, before you start compiling, and any time you change the <Literal>imports</Literal>
-in your program, do <Command>make depend</Command> before you do <Command>make cool&lowbar;pgm</Command>.
-<Command>mkdependHS</Command> will append the needed dependencies to your <Filename>Makefile</Filename>.
-<Command>mkdependHS</Command> is fully described in <XRef LinkEnd="mkdependHS">.
-</Para>
+      <para>In general, if module <Literal>A</Literal> contains the
+      line
 
-<Para>
-A few caveats about this simple scheme:
-</Para>
+<programlisting>
+import B ...blah...
+</programlisting>
 
-<Para>
+       then <command>mkdependHS</command> will generate a dependency
+       line of the form:
 
-<ItemizedList>
-<ListItem>
+<programlisting>
+A.o : B.hi
+</programlisting>
 
-<Para>
- You may need to compile some modules explicitly to create their
-interfaces in the first place (e.g., <Command>make Bar.o</Command> to create <Filename>Bar.hi</Filename>).
+       If module <literal>A</literal> contains the line 
 
-</Para>
-</ListItem>
-<ListItem>
+<programlisting>
+import {-# SOURCE #-} B ...blah...
+</programlisting>
 
-<Para>
- You may have to type <Command>make</Command> more than once for the dependencies
-to have full effect.  However, a <Command>make</Command> run that does nothing
-<Emphasis>does</Emphasis> mean &ldquo;everything's up-to-date.&rdquo;
+       then <command>mkdependHS</command> will generate a dependency
+       line of the form:
 
-</Para>
-</ListItem>
-<ListItem>
+<programlisting>
+A.o : B.hi-boot
+</programlisting>
 
-<Para>
- This scheme will work with mutually-recursive modules but,
-again, it may take multiple iterations to &ldquo;settle.&rdquo;
+       (See <xref linkend="hi-files"> for details of interface files.)
+       If <literal>A</literal> imports multiple modules, then there
+       will be multiple lines with <filename>A.o</filename> as the
+       target.</para>
 
-</Para>
-</ListItem>
+      <para>By default, <Command>GHC</Command> generates all the
+      dependencies, and then concatenates them onto the end of
+      <Filename>makefile</Filename> (or <Filename>Makefile</Filename>
+      if <Filename>makefile</Filename> doesn't exist) bracketed by the
+      lines "<Literal>&num; DO NOT DELETE: Beginning of Haskell
+      dependencies</Literal>" and "<Literal>&num; DO NOT DELETE: End
+      of Haskell dependencies</Literal>".  If these lines already
+      exist in the <Filename>makefile</Filename>, then the old
+      dependencies are deleted first.</para>
 
-</ItemizedList>
+      <para>Internally, GHC uses a script to generate the
+      dependencies, called <command>mkdependHS</command>.  This script
+      has some options of its own, which you might find useful.
+      Options can be passed directly to <command>mkdependHS</command>
+      with GHC's <literal>-optdep</literal> option.  For example, to
+      generate the dependencies into a file called
+      <literal>.depend</literal> instead of
+      <literal>Makefile</literal>:</para>
 
-</Para>
+<screen>
+ghc -M -optdep-f optdep.depend ...
+</screen>
+      
+      <para>The full list of options accepted by
+      <command>mkdependHS</command> is:</para>
+
+      <variablelist>
+
+	<varlistentry>
+	  <term><option>-w</option></term>
+	  <listitem>
+	    <para>Turn off warnings about interface file shadowing.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-f blah</option></term>
+	  <listitem>
+	    <para>Use <Filename>blah</Filename> as the makefile,
+            rather than <Filename>makefile</Filename> or
+            <Filename>Makefile</Filename>.  If
+            <Filename>blah</Filename> doesn't exist,
+            <Command>mkdependHS</Command> creates it.  We often use
+            <Option>-f .depend</Option> to put the dependencies in
+            <Filename>.depend</Filename> and then
+            <Command>include</Command> the file
+            <Filename>.depend</Filename> into
+            <Filename>Makefile</Filename>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-o &lt;osuf&gt;</option></term>
+	  <listitem>
+	    <para>Use <Filename>.&lt;osuf&gt;</Filename> as the
+            "target file" suffix ( default: <Literal>o</Literal>).
+            Multiple <Option>-o</Option> flags are permitted (GHC2.05
+            onwards).  Thus "<Option>-o hc -o o</Option>" will
+            generate dependencies for <Filename>.hc</Filename> and
+            <Filename>.o</Filename> files.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-s &lt;suf&gt;</option></term>
+	  <listitem>
+	    <para>Make extra dependencies that declare that files with
+            suffix
+            <Filename>.&lt;suf&gt;&lowbar;&lt;osuf&gt;</Filename>
+            depend on interface files with suffix
+            <Filename>.&lt;suf&gt;&lowbar;hi</Filename>, or (for
+            <Literal>&lcub;-&num; SOURCE &num;-&rcub;</Literal>
+            imports) on <Filename>.hi-boot</Filename>.  Multiple
+            <Option>-s</Option> flags are permitted.  For example,
+            <Option>-o hc -s a -s b</Option> will make dependencies
+            for <Filename>.hc</Filename> on <Filename>.hi</Filename>,
+            <Filename>.a&lowbar;hc</Filename> on
+            <Filename>.a&lowbar;hi</Filename>, and
+            <Filename>.b&lowbar;hc</Filename> on
+            <Filename>.b&lowbar;hi</Filename>.  (Useful in conjunction
+            with NoFib "ways".)</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--exclude-module=&lt;file&gt;</option></term>
+	  <listitem>
+	    <para>Regard <Filename>&lt;file&gt;</Filename> as
+            "stable"; i.e., exclude it from having dependencies on
+            it.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-x</option></term>
+	  <listitem>
+	    <para>same as <option>--exclude-module</option></para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--exclude-directory=&lt;dirs&gt;</option></term>
+	  <listitem>
+	    <para>Regard the colon-separated list of directories
+            <Filename>&lt;dirs&gt;</Filename> as containing stable,
+            don't generate any dependencies on modules therein.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-xdirs</option></term>
+	  <listitem>
+	    <para>same as <Option>--exclude-directory</Option>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--include-module=&lt;file&gt;</option></term>
+	  <listitem>
+	    <para>Regard <Filename>&lt;file&gt;</Filename> as not
+            "stable"; i.e., generate dependencies on it (if any). This
+            option is normally used in conjunction with the
+            <Option>--exclude-directory</Option> option.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--include-prelude</option></term>
+	  <listitem>
+	    <para>Regard prelude libraries as unstable, i.e., generate
+            dependencies on the prelude modules used (including
+            <Literal>Prelude</Literal>).  This option is normally only
+            used by the various system libraries. If a
+            <Option>-syslib</Option> option is used, dependencies will
+            also be generated on the library's interfaces.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
 </Sect2>
 
