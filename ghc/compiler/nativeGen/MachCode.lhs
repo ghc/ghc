@@ -843,8 +843,8 @@ getRegister (StInd pk mem)
 		      if   pk == DoubleRep || pk == FloatRep
 		      then GLD size src dst
 		      else case size of
-                             L -> MOV L    (OpAddr src) (OpReg dst)
-                             B -> MOVZxL B (OpAddr src) (OpReg dst)
+                             L  -> MOV L     (OpAddr src) (OpReg dst)
+                             BU -> MOVZxL BU (OpAddr src) (OpReg dst)
     in
     	returnNat (Any pk code__2)
 
@@ -1725,7 +1725,7 @@ assignIntCode pk dst (StInd pks src)
     	c_dst = registerCode reg_dst tmp  -- should be empty
     	r_dst = registerName reg_dst tmp
     	szs   = primRepToSize pks
-        opc   = case szs of L -> MOV L ; B -> MOVZxL B
+        opc   = case szs of L -> MOV L ; BU -> MOVZxL BU
 
     	code  | isNilOL c_dst
               = c_addr `snocOL`

@@ -182,7 +182,7 @@ primCode [] WriteForeignObjOp [obj, v]
     returnUs (\xs -> assign : xs)
 
 -- NB: indexing in "pk" units, *not* in bytes (WDP 95/09)
-primCode ls IndexByteArrayOp_Char      rs = primCode_ReadByteArrayOp Int8Rep      ls rs
+primCode ls IndexByteArrayOp_Char      rs = primCode_ReadByteArrayOp Word8Rep     ls rs
 primCode ls IndexByteArrayOp_Int       rs = primCode_ReadByteArrayOp IntRep       ls rs
 primCode ls IndexByteArrayOp_Word      rs = primCode_ReadByteArrayOp WordRep      ls rs
 primCode ls IndexByteArrayOp_Addr      rs = primCode_ReadByteArrayOp AddrRep      ls rs
@@ -192,7 +192,7 @@ primCode ls IndexByteArrayOp_StablePtr rs = primCode_ReadByteArrayOp StablePtrRe
 primCode ls IndexByteArrayOp_Int64     rs = primCode_ReadByteArrayOp Int64Rep     ls rs
 primCode ls IndexByteArrayOp_Word64    rs = primCode_ReadByteArrayOp Word64Rep    ls rs
 
-primCode ls ReadByteArrayOp_Char      rs = primCode_ReadByteArrayOp Int8Rep      ls rs
+primCode ls ReadByteArrayOp_Char      rs = primCode_ReadByteArrayOp Word8Rep     ls rs
 primCode ls ReadByteArrayOp_Int       rs = primCode_ReadByteArrayOp IntRep       ls rs
 primCode ls ReadByteArrayOp_Word      rs = primCode_ReadByteArrayOp WordRep      ls rs
 primCode ls ReadByteArrayOp_Addr      rs = primCode_ReadByteArrayOp AddrRep      ls rs
@@ -202,7 +202,7 @@ primCode ls ReadByteArrayOp_StablePtr rs = primCode_ReadByteArrayOp StablePtrRep
 primCode ls ReadByteArrayOp_Int64     rs = primCode_ReadByteArrayOp Int64Rep     ls rs
 primCode ls ReadByteArrayOp_Word64    rs = primCode_ReadByteArrayOp Word64Rep    ls rs
 
-primCode ls ReadOffAddrOp_Char      rs = primCode_IndexOffAddrOp Int8Rep      ls rs
+primCode ls ReadOffAddrOp_Char      rs = primCode_IndexOffAddrOp Word8Rep     ls rs
 primCode ls ReadOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
 primCode ls ReadOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
 primCode ls ReadOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
@@ -212,7 +212,7 @@ primCode ls ReadOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep ls
 primCode ls ReadOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
 primCode ls ReadOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
 
-primCode ls IndexOffAddrOp_Char      rs = primCode_IndexOffAddrOp Int8Rep      ls rs
+primCode ls IndexOffAddrOp_Char      rs = primCode_IndexOffAddrOp Word8Rep     ls rs
 primCode ls IndexOffAddrOp_Int       rs = primCode_IndexOffAddrOp IntRep       ls rs
 primCode ls IndexOffAddrOp_Word      rs = primCode_IndexOffAddrOp WordRep      ls rs
 primCode ls IndexOffAddrOp_Addr      rs = primCode_IndexOffAddrOp AddrRep      ls rs
@@ -222,7 +222,7 @@ primCode ls IndexOffAddrOp_StablePtr rs = primCode_IndexOffAddrOp StablePtrRep l
 primCode ls IndexOffAddrOp_Int64     rs = primCode_IndexOffAddrOp Int64Rep     ls rs
 primCode ls IndexOffAddrOp_Word64    rs = primCode_IndexOffAddrOp Word64Rep    ls rs
 
-primCode ls IndexOffForeignObjOp_Char      rs = primCode_IndexOffForeignObjOp Int8Rep      ls rs
+primCode ls IndexOffForeignObjOp_Char      rs = primCode_IndexOffForeignObjOp Word8Rep     ls rs
 primCode ls IndexOffForeignObjOp_Int       rs = primCode_IndexOffForeignObjOp IntRep       ls rs
 primCode ls IndexOffForeignObjOp_Word      rs = primCode_IndexOffForeignObjOp WordRep      ls rs
 primCode ls IndexOffForeignObjOp_Addr      rs = primCode_IndexOffForeignObjOp AddrRep      ls rs
@@ -232,7 +232,7 @@ primCode ls IndexOffForeignObjOp_StablePtr rs = primCode_IndexOffForeignObjOp St
 primCode ls IndexOffForeignObjOp_Int64     rs = primCode_IndexOffForeignObjOp Int64Rep     ls rs
 primCode ls IndexOffForeignObjOp_Word64    rs = primCode_IndexOffForeignObjOp Word64Rep    ls rs
 
-primCode ls WriteOffAddrOp_Char      rs = primCode_WriteOffAddrOp Int8Rep      ls rs
+primCode ls WriteOffAddrOp_Char      rs = primCode_WriteOffAddrOp Word8Rep     ls rs
 primCode ls WriteOffAddrOp_Int       rs = primCode_WriteOffAddrOp IntRep       ls rs
 primCode ls WriteOffAddrOp_Word      rs = primCode_WriteOffAddrOp WordRep      ls rs
 primCode ls WriteOffAddrOp_Addr      rs = primCode_WriteOffAddrOp AddrRep      ls rs
@@ -242,7 +242,7 @@ primCode ls WriteOffAddrOp_StablePtr rs = primCode_WriteOffAddrOp StablePtrRep l
 primCode ls WriteOffAddrOp_Int64     rs = primCode_WriteOffAddrOp Int64Rep     ls rs
 primCode ls WriteOffAddrOp_Word64    rs = primCode_WriteOffAddrOp Word64Rep    ls rs
 
-primCode ls WriteByteArrayOp_Char      rs = primCode_WriteByteArrayOp Int8Rep      ls rs
+primCode ls WriteByteArrayOp_Char      rs = primCode_WriteByteArrayOp Word8Rep     ls rs
 primCode ls WriteByteArrayOp_Int       rs = primCode_WriteByteArrayOp IntRep       ls rs
 primCode ls WriteByteArrayOp_Word      rs = primCode_WriteByteArrayOp WordRep      ls rs
 primCode ls WriteByteArrayOp_Addr      rs = primCode_WriteByteArrayOp AddrRep      ls rs
@@ -503,7 +503,7 @@ amodeToStix (CLbl      lbl _) = StCLbl lbl
  -- For CharLike and IntLike, we attempt some trivial constant-folding here.
 
 amodeToStix (CCharLike (CLit (MachChar c)))
-  = StIndex Int8Rep cHARLIKE_closure (StInt (toInteger off))
+  = StIndex Word8Rep cHARLIKE_closure (StInt (toInteger off))
   where
     off = charLikeSize * (c - mIN_CHARLIKE)
 
@@ -511,7 +511,7 @@ amodeToStix (CCharLike x)
   = panic "CCharLike"
 
 amodeToStix (CIntLike (CLit (MachInt i)))
-  = StIndex Int8Rep iNTLIKE_closure (StInt (toInteger off))
+  = StIndex Word8Rep iNTLIKE_closure (StInt (toInteger off))
   where
     off = intLikeSize * (fromInteger (i - mIN_INTLIKE))
 

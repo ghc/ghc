@@ -46,7 +46,6 @@ data PrimRep
   | CostCentreRep	-- Pointer to a cost centre
 
   | CharRep		-- Machine characters
-  | Int8Rep             --         8 bit integers
   | IntRep		--	   integers (same size as ptr on this arch)
   | WordRep		--	   ditto (but *unsigned*)
   | AddrRep		--	   addresses ("C pointers")
@@ -54,12 +53,22 @@ data PrimRep
   | DoubleRep		--	   doubles
   | Word64Rep	        --    guaranteed to be 64 bits (no more, no less.)
   | Int64Rep	        --    guaranteed to be 64 bits (no more, no less.)
+
+    -- These are not expected to appear in the front end.  They are
+    -- only here to help the native code generator, and should appear
+    -- nowhere else.
+  | Int8Rep             --         8  bit signed   integers
+  | Word8Rep            --         8  bit unsigned integers
+  | Int16Rep            --         16 bit signed   integers
+  | Word16Rep           --         16 bit unsigned integers
+  | Int32Rep            --         32 bit signed   integers
+  | Word32Rep           --         32 bit unsigned integers
   
   -- Perhaps all sized integers and words should be primitive types.
   
-  -- Int8Rep is currently used to simulate some old CharRep usages
+  -- Word8Rep is currently used to simulate some old CharRep usages
   -- when Char changed size from 8 to 31 bits. It does not correspond
-  -- to a Haskell unboxed type, in particular it's not used by Int8.
+  -- to a Haskell unboxed type, in particular it's not used by Word8.
   
   | WeakPtrRep
   | ForeignObjRep	
@@ -184,8 +193,14 @@ retPrimRepSize = getPrimRepSize RetRep
 getPrimRepSizeInBytes :: PrimRep -> Int
 getPrimRepSizeInBytes pr =
  case pr of
-    CharRep        ->    4
     Int8Rep        ->    1
+    Word8Rep       ->    1
+    Int16Rep       ->    2
+    Word16Rep      ->    2
+    Int32Rep       ->    4
+    Word32Rep      ->    4
+
+    CharRep        ->    4
     IntRep         ->    wORD_SIZE
     AddrRep        ->    wORD_SIZE
     FloatRep       ->    wORD_SIZE
@@ -222,6 +237,11 @@ showPrimRep RetRep         = "P_"
 showPrimRep CostCentreRep  = "CostCentre"
 showPrimRep CharRep	   = "C_"
 showPrimRep Int8Rep	   = "StgInt8"
+showPrimRep Int16Rep	   = "StgInt16"
+showPrimRep Int32Rep	   = "StgInt32"
+showPrimRep Word8Rep	   = "StgWord8"
+showPrimRep Word16Rep	   = "StgWord16"
+showPrimRep Word32Rep	   = "StgWord32"
 showPrimRep IntRep	   = "I_"	-- short for StgInt
 showPrimRep WordRep	   = "W_"	-- short for StgWord
 showPrimRep Int64Rep       = "LI_"       -- short for StgLongInt

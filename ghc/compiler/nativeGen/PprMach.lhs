@@ -173,9 +173,7 @@ pprSize x = ptext (case x of
 	 TF -> SLIT("t")
 #endif
 #if i386_TARGET_ARCH
-	B   -> SLIT("b")
---	HB  -> SLIT("b") UNUSED
---	S   -> SLIT("w") UNUSED
+	BU  -> SLIT("b")
 	L   -> SLIT("l")
 	F   -> SLIT("s")
 	DF  -> SLIT("l")
@@ -184,22 +182,16 @@ pprSize x = ptext (case x of
 #if sparc_TARGET_ARCH
 	B   -> SLIT("sb")
 	BU  -> SLIT("ub")
---	HW  -> SLIT("hw") UNUSED
---	HWU -> SLIT("uhw") UNUSED
 	W   -> SLIT("")
 	F   -> SLIT("")
---	D   -> SLIT("d") UNUSED
 	DF  -> SLIT("d")
     )
 pprStSize :: Size -> SDoc
 pprStSize x = ptext (case x of
 	B   -> SLIT("b")
 	BU  -> SLIT("b")
---	HW  -> SLIT("hw") UNUSED
---	HWU -> SLIT("uhw") UNUSED
 	W   -> SLIT("")
 	F   -> SLIT("")
---	D   -> SLIT("d") UNUSED
 	DF  -> SLIT("d")
 #endif
     )

@@ -102,8 +102,8 @@ sizeOf :: PrimRep -> Integer{-in bytes-}
 
 sizeOf pr = case (primRepToSize pr) of
   IF_ARCH_alpha({B -> 1; BU -> 1; {-W -> 2; WU -> 2;-} L -> 4; {-SF -> 4;-} _ -> 8},)
-  IF_ARCH_sparc({B -> 1; BU -> 1; {-HW -> 2; HWU -> 2;-} W -> 4; {-D -> 8;-} F -> 4; DF -> 8},)
-  IF_ARCH_i386( {B -> 1; {-S -> 2;-} L -> 4; F -> 4; DF -> 8 },)
+  IF_ARCH_sparc({B -> 1; BU -> 1; W -> 4; F -> 4; DF -> 8},)
+  IF_ARCH_i386( {B -> 1; BU -> 1; L -> 4; F -> 4; DF -> 8 },)
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -249,10 +249,9 @@ data Size
     | TF    -- IEEE double-precision floating pt
 #endif
 #if i386_TARGET_ARCH
-    = B	    -- byte (lower)
---  | HB    -- higher byte **UNUSED**
---  | S	    -- : UNUSED
-    | L
+    = B	    -- byte (signed, JRS:??lower??)
+    | BU    -- byte, unsigned
+    | L     -- word32
     | F	    -- IEEE single-precision floating pt
     | DF    -- IEEE single-precision floating pt
     | F80   -- Intel 80-bit internal FP format; only used for spilling
@@ -260,10 +259,7 @@ data Size
 #if sparc_TARGET_ARCH
     = B     -- byte (signed)
     | BU    -- byte (unsigned)
---  | HW    -- halfword, 2 bytes (signed): UNUSED
---  | HWU   -- halfword, 2 bytes (unsigned): UNUSED
     | W	    -- word, 4 bytes
---  | D	    -- doubleword, 8 bytes: UNUSED
     | F	    -- IEEE single-precision floating pt
     | DF    -- IEEE single-precision floating pt
 #endif
@@ -276,7 +272,10 @@ primRepToSize DataPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc(
 primRepToSize RetRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize CostCentreRep = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize CharRep	    = IF_ARCH_alpha( L,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+
 primRepToSize Int8Rep	    = IF_ARCH_alpha( B,  IF_ARCH_i386( B, IF_ARCH_sparc( B ,)))
+primRepToSize Word8Rep	    = IF_ARCH_alpha( B,  IF_ARCH_i386( B, IF_ARCH_sparc( BU,)))
+
 primRepToSize IntRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize WordRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize AddrRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
