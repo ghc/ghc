@@ -1027,6 +1027,12 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
     &lsquo;<literal>+</literal>&rdquo; and &ldquo;command-line&rdquo;
     options, which begin with &lsquo;-&rsquo;.  </para>
 
+    <para>NOTE: at the moment, the <literal>:set</literal> command
+    doesn't support any kind of quoting in its arguments: quotes will
+    not be removed and cannot be used to group words together.  For
+    example, <literal>:set -DFOO='BAR BAZ'</literal> will not do what
+    you expect.</para>
+
     <sect2>
       <title>GHCi options</title>
       <indexterm><primary>options</primary><secondary>GHCi</secondary>
