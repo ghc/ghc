@@ -515,8 +515,8 @@ otherwise, wrap with @addr2Integer@.
 litToRep (NoRepInteger i integer_ty)
   = returnPM (integer_ty, rhs)
   where
-    rhs | i > tARGET_MIN_INT &&		-- Small enough, so start from an Int
-	  i < tARGET_MAX_INT
+    rhs | i >= tARGET_MIN_INT &&	-- Small enough, so start from an Int
+	  i <= tARGET_MAX_INT
 	= Con (DataCon smallIntegerDataCon) [Con (Literal (mkMachInt i)) []]
   
   	| otherwise 			-- Big, so start from a string
