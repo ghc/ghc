@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.5 2002/05/08 11:21:56 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.6 2002/05/08 13:39:56 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -208,23 +208,36 @@ lexer cont input (SrcLoc _ x) y col =
         	tab y (nextTab x) bol s
         tab y x bol ('\n':s) =
                 newLine cont s y
-        tab y x bol ('-':'-':s) | not (doc s) =
+
+	-- single-line comments
+        tab y x bol s@('-':'-':' ':c:_) | doc c = 
+	 	is_a_token bol s y x
+        tab y x bol ('-':'-':s) =
         	newLine cont (drop 1 (dropWhile (/= '\n') s)) y
+
+	-- multi-line nested comments
+	tab y x bol s@('{':'-':c:_) | doc c && c /= '#' = 
+		is_a_token bol s y x
+	tab y x bol s@('{':'-':' ':c:_) | doc c = 
+		is_a_token bol s y x
         tab y x bol ('{':'-':s) = nestedComment tab y x bol s
+
         tab y x bol (c:s)
         	| isWhite c = tab y (x+1) bol s
-        	| otherwise = 
-        		if bol 	then lexBOL   cont (c:s) (SrcLoc y x) y x
-        			else lexToken cont (c:s) (SrcLoc y x) y x
+        	| otherwise = is_a_token bol (c:s) y x
+
+ 	is_a_token bol s y x
+	   | bol       = lexBOL   cont s (SrcLoc y x) y x
+	   | otherwise = lexToken cont s (SrcLoc y x) y x
 
 	newLine cont s y =  tab (y+1) 1 True s
 
-	doc (' ':'|':_) = True
-	doc (' ':'/':_) = True
-	doc (' ':'^':_) = True
-	doc (' ':'*':_) = True
-	doc (' ':'$':_) = True
-	doc (' ':'#':_) = True
+	doc '|' = True
+	doc '/' = True
+	doc '^' = True
+	doc '*' = True
+	doc '$' = True
+	doc '#' = True
 	doc _ = False
 
 nextTab x = x + (tAB_LENGTH - (x-1) `mod` tAB_LENGTH)
@@ -261,10 +274,17 @@ lexBOL cont s loc y x context =
         			    Layout n -> x == n
 
 lexToken :: (Token -> P a) -> P a
+lexToken cont [] loc y x = error "Internal error: empty input in lexToken"
 lexToken cont s loc y x =
    -- trace ("lexer: y="++show y++" x="++show x++"\n") $ 
    case s of
-        -- First the special symbols
+	-- First the doc comments
+	'-':'-':' ':s -> do_doc s docComment
+
+	'{':'-':' ':s -> do_doc s nestedDocComment
+	'{':'-':s     -> do_doc s nestedDocComment
+
+        -- Next the special symbols
         '(':'#':s -> forward 2 LeftUT s
 	'(':s 	  -> forward 1 LeftParen s
 	'#':')':s -> forward 2 RightUT s
@@ -279,13 +299,6 @@ lexToken cont s loc y x =
                               (_:ctxt) -> forward 1 RightCurly s ctxt
 						-- pop context on '}'
                               []       -> error "Internal error: empty context in lexToken"
-
-	'-':'-':' ':'|':s -> docComment DocCommentNext cont s loc y x
-	'-':'-':' ':'/':s -> docComment DocCommentNext cont s loc y x
-	'-':'-':' ':'^':s -> docComment DocCommentPrev cont s loc y x
-	'-':'-':' ':'$':s -> docComment DocCommentNamed cont s loc y x
-	'-':'-':' ':'*':s -> docSection cont ('*':s) loc y x
-	'-':'-':' ':'#':s -> docComment DocOptions cont s loc y x
 
         '\'':s -> lexChar cont s loc y (x+1)
         '\"':s{-"-} -> lexString cont s loc y (x+1)
@@ -330,9 +343,18 @@ lexToken cont s loc y x =
         	parseError ("illegal character \'" ++ show c ++ "\'\n") 
         		  s loc y x
 
- where forward n t s = cont t s loc y (x+n)
+  where forward n t s = cont t s loc y (x+n)
 
-lexToken _ _ _ _ _ = error "Internal error: empty input in lexToken"
+	do_doc ('|':s) f = f DocCommentNext  cont s loc y x
+	do_doc ('/':s) f = f DocCommentNext  cont s loc y x
+	do_doc ('^':s) f = f DocCommentPrev  cont s loc y x
+	do_doc ('$':s) f = f DocCommentNamed cont s loc y x
+	do_doc ('#':s) f = f DocOptions      cont s loc y x
+	do_doc ('*':s) f = section 1 s
+	  where section n ('*':s) = section (n+1) s
+		section n _ = f (DocSection n) cont s loc y x
+	do_doc _ _ = error "Internal error: HsLexer.do_doc"
+
 
 afterNum cont i ('#':s) loc y x = cont (PrimInt i) s loc y (x+1)
 afterNum cont i s loc y x = cont (IntTok i) s loc y x
@@ -558,6 +580,19 @@ nestedComment cont y x bol s =
       []        -> error "Internal error: nestedComment"
 
 
+nestedDocComment f cont s loc y x = go f cont "" y x s
+ where
+  go f cont acc y x s = 
+   case s of
+      '-':'}':s -> cont (f (reverse acc)) s loc y (x+2)
+      '{':'-':s -> nestedComment (\y x bol s -> go f cont acc y x s) 
+			y (x+2) False s
+      '\t':s    -> go f cont ('\t':acc) y (nextTab x) s
+      '\n':s    -> go f cont ('\n':acc) (y+1) 1 s
+      c:s       -> go f cont (c:acc) y (x+1) s
+      []        -> error "Internal error: nestedComment"
+
+
 docComment f cont s loc y x 
   = let (s', comment, y') = slurpExtraCommentLines s [] y in
     cont (f comment) s' loc y' x  -- continue with the newline char
@@ -579,10 +614,4 @@ slurpExtraCommentLines s lines y
 	finished = concat (reverse (line:lines))
 
 nonNewlineSpace c = isSpace c && c /= '\n'
-
-docSection cont s loc y x
-  = let (stars, rest') = break (/= '*') s
-        (line,  rest) = break (== '\n') rest'
-    in
-    cont (DocSection (length stars) line) rest loc y x
 \end{code}
