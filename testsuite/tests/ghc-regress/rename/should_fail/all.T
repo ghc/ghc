@@ -30,7 +30,7 @@ test('rnfail030', normal, compile_fail, [''])
 test('rnfail031', normal, compile_fail, [''])
 test('rnfail032', normal, compile_fail, [''])
 test('rnfail033', normal, compile_fail, [''])
-test('rnfail034', expect_fail, compile_fail, [''])
+test('rnfail034', normal, compile_fail, [''])
 test('rnfail035', normal, compile_fail, [''])
 
 # these two are really a single multi-module test
