@@ -353,10 +353,12 @@ isGlobalId var = case varDetails var of
 		   GlobalId _ -> True
 		   other      -> False
 
+-- isExportedId means "don't throw this away"
 isExportedId var = case varDetails var of
-			LocalId Exported -> True
-			GlobalId _	 -> True
-			other		 -> False
+			LocalId Exported   -> True
+			LocalId SpecPragma -> True
+			GlobalId _	   -> True
+			other		   -> False
 
 isSpecPragmaId var = case varDetails var of
 			LocalId SpecPragma -> True
