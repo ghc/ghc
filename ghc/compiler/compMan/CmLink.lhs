@@ -109,6 +109,7 @@ updateClosureEnv pls new_bindings
 --
 --	* otherwise, we unload it.
 --
+--      * we also implicitly unload all temporary bindings at this point.
 
 unload :: GhciMode
        -> DynFlags

@@ -110,10 +110,13 @@ instance Outputable UnlinkedBCO where
 type ClosureEnv = FiniteMap Name HValue
 data HValue     = HValue  -- dummy type, actually a pointer to some Real Code.
 
--- remove all entries for a given set of modules from the environment
+-- remove all entries for a given set of modules from the environment;
+-- note that this removes all local names too (ie. temporary bindings from
+-- the command line).
 filterNameMap :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
 filterNameMap mods env 
-   = filterFM (\n _ -> moduleName (nameModule n) `elem` mods) env
+   = filterFM (\n _ -> isGlobalName n && 
+			moduleName (nameModule n) `elem` mods) env
 \end{code}
 
 %************************************************************************
