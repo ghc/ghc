@@ -28,7 +28,8 @@ import List(break)
 %%
 
 pkgconf :: { [ PackageConfig ] }
-	: '[' pkgs ']'			{ reverse $2 }
+	: '[' ']'			{ [] }
+	| '[' pkgs ']'			{ reverse $2 }
 
 pkgs 	:: { [ PackageConfig ] }
 	: pkg 				{ [ $1 ] }
@@ -45,7 +46,7 @@ field	:: { PackageConfig -> PackageConfig }
 	: VARID '=' STRING		
                  {\p -> case $1 of
 		   "name" -> p{name = $3}
-		   _      -> error "unkown key in config file" }
+		   _      -> error "unknown key in config file" }
 			
 	| VARID '=' strlist		
 		{\p -> case $1 of

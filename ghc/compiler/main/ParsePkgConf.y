@@ -32,7 +32,8 @@ import Exception ( throwDyn )
 %%
 
 pkgconf :: { [ PackageConfig ] }
-	: '[' pkgs ']'			{ reverse $2 }
+	: '[' ']'			{ [] }
+	| '[' pkgs ']'			{ reverse $2 }
 
 pkgs 	:: { [ PackageConfig ] }
 	: pkg 				{ [ $1 ] }
