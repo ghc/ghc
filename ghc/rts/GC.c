@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.45 1999/02/26 17:46:08 simonm Exp $
+ * $Id: GC.c,v 1.46 1999/03/03 17:22:11 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1224,11 +1224,11 @@ loop:
       case CONSTR_0_2:
       case CONSTR_STATIC:
 	{ 
-	  StgNat32 offset = info->layout.selector_offset;
+	  StgWord32 offset = info->layout.selector_offset;
 
 	  /* check that the size is in range */
 	  ASSERT(offset < 
-		 (StgNat32)(selectee_info->layout.payload.ptrs + 
+		 (StgWord32)(selectee_info->layout.payload.ptrs + 
 		            selectee_info->layout.payload.nptrs));
 
 	  /* perform the selection! */
@@ -2225,7 +2225,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 {
   StgPtr q;
   const StgInfoTable* info;
-  StgNat32 bitmap;
+  StgWord32 bitmap;
 
   /* 
    * Each time around this loop, we are looking at a chunk of stack
