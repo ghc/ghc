@@ -140,7 +140,7 @@ SaveAllStgContext(STG_NO_ARGS)
 {
     SaveAllStgRegs(); 
 #ifdef CONCURRENT
-# ifdef PAR
+# if defined(PROFILING) || defined(PAR)
     TSO_CCC(CurrentTSO) = CCC;
     CCC = (CostCentre)STATIC_CC_REF(CC_MAIN);
 # endif
@@ -279,8 +279,10 @@ RestoreAllStgRegs (STG_NO_ARGS)
     StkStubReg = STK_STUB_closure;
 #endif
 
-#ifdef PAR
+#if CONCURRENT
+# if defined(PROFILING) || defined(PAR)
     CCC = TSO_CCC(CurrentTSO);
+# endif
 #endif
 }
 
