@@ -501,7 +501,8 @@ readIface :: String -> RnM d (Either Message ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 readIface file_path
-  = traceRn (ptext SLIT("readIFace") <+> text file_path) 	`thenRn_` 
+  = --ioToRnM (putStrLn ("reading iface " ++ file_path)) `thenRn_`
+    traceRn (ptext SLIT("readIFace") <+> text file_path) 	`thenRn_` 
 
     ioToRnM (hGetStringBuffer False file_path)			`thenRn` \ read_result ->
     case read_result of {

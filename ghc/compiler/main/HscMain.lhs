@@ -118,7 +118,7 @@ hscMain ghci_mode dflags source_unchanged location maybe_old_iface hst hit pcs
                 	++ ", hspp = " ++ show (ml_hspp_file location));
 
       (pcs_ch, errs_found, (recomp_reqd, maybe_checked_iface))
-         <- checkOldIface dflags hit hst pcs 
+         <- checkOldIface ghci_mode dflags hit hst pcs 
 		(unJust "hscMain" (ml_hi_file location))
 		source_unchanged maybe_old_iface;
 

@@ -74,6 +74,7 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  Provenance(..), ImportReason(..), initialVersionInfo,
 			  Deprecations(..), lookupDeprec, lookupIface
 			 )
+import CmStaticInfo	( GhciMode(..) )
 import List		( partition, nub )
 \end{code}
 
@@ -452,7 +453,8 @@ rnDeprecs gbl_env Nothing decls
 %************************************************************************
 
 \begin{code}
-checkOldIface :: DynFlags
+checkOldIface :: GhciMode
+              -> DynFlags
 	      -> HomeIfaceTable -> HomeSymbolTable
 	      -> PersistentCompilerState
 	      -> FilePath
@@ -461,7 +463,14 @@ checkOldIface :: DynFlags
 	      -> IO (PersistentCompilerState, Bool, (RecompileRequired, Maybe ModIface))
 				-- True <=> errors happened
 
-checkOldIface dflags hit hst pcs iface_path source_unchanged maybe_iface
+checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_iface
+
+  -- If the source has changed and we're in interactive mode, avoid reading
+  -- an interface; just return the one we might have been supplied with.
+  | ghci_mode == Interactive && not source_unchanged
+  = return (pcs, False, (outOfDate, maybe_iface))
+
+  | otherwise
   = runRn dflags hit hst pcs (panic "Bogus module") $
     case maybe_iface of
        Just old_iface -> -- Use the one we already have
