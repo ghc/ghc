@@ -694,8 +694,6 @@ cmpString (x:xs) (y:ys) = if	  x == y then cmpString xs ys
 			  else		      GT
 cmpString []     ys	= LT
 cmpString xs     []	= GT
-
-cmpString _ _ = panic "cmpString"
 \end{code}
 
 
