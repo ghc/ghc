@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.39 2001/04/24 15:49:19 qrczak Exp $
+ * $Id: Linker.c,v 1.40 2001/05/15 15:29:03 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -32,6 +32,7 @@
 #  define OBJFORMAT_ELF
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
 #  define OBJFORMAT_PEi386
+#  include <windows.h>
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -70,12 +71,62 @@ typedef struct _RtsSymbolVal {
 #endif
 
 #if !defined (mingw32_TARGET_OS)
+
 #define RTS_POSIX_ONLY_SYMBOLS                  \
       SymX(stg_sig_install)			\
       Sym(nocldstop)
+#define RTS_MINGW_ONLY_SYMBOLS /**/
+
 #else
+
 #define RTS_POSIX_ONLY_SYMBOLS
+#define RTS_MINGW_ONLY_SYMBOLS                  \
+      Sym(mktime)                               \
+      Sym(gmtime)                               \
+      Sym(strftime)                             \
+      Sym(localtime)                            \
+      SymX(getenv)                              \
+      SymX(rename)                              \
+      Sym(opendir)                              \
+      Sym(readdir)                              \
+      Sym(closedir)                             \
+      Sym(PrelHandle_stderr_closure)            \
+      Sym(Main_main_closure)                    \
+      Sym(__init_Main)                          \
+      SymX(pow)                                 \
+      SymX(tanh)                                \
+      SymX(cosh)                                \
+      SymX(sinh)                                \
+      SymX(atan)                                \
+      SymX(acos)                                \
+      SymX(asin)                                \
+      SymX(tan)                                 \
+      SymX(cos)                                 \
+      SymX(sin)                                 \
+      SymX(exp)                                 \
+      SymX(log)                                 \
+      SymX(sqrt)                                \
+      SymX(Sleep)                               \
+      SymX(system)                              \
+      SymX(memchr)                              \
+      SymX(memcpy)                              \
+      SymX(memmove)                             \
+      SymX(fprintf)                             \
+      Sym(_imp___iob)                           \
+      Sym(_imp___tzname)                        \
+      Sym(_imp___timezone)                      \
+      Sym(__udivdi3)                            \
+      SymX(GetProcessTimes)                     \
+      SymX(GetCurrentProcess)                   \
+      SymX(send)                                \
+      SymX(recv)                                \
+      SymX(malloc)                              \
+      SymX(free)                                \
+      SymX(realloc)                             \
+      SymX(_errno)                              \
+      SymX(closesocket)
 #endif
+
 
 #define RTS_SYMBOLS				\
       SymX(MainRegTable)			\
@@ -295,7 +346,9 @@ typedef struct _RtsSymbolVal {
 #define Sym(vvv)  extern void (vvv);
 #define SymX(vvv) /**/
 RTS_SYMBOLS
+RTS_LONG_LONG_SYMS
 RTS_POSIX_ONLY_SYMBOLS
+RTS_MINGW_ONLY_SYMBOLS
 #undef Sym
 #undef SymX
 
@@ -313,6 +366,7 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
       RTS_LONG_LONG_SYMS
       RTS_POSIX_ONLY_SYMBOLS
+      RTS_MINGW_ONLY_SYMBOLS
       { 0, 0 } /* sentinel */
 };
 
@@ -344,8 +398,29 @@ initLinker( void )
  * do RTLD_GLOBAL-style add, so no further messing around needs to
  * happen in order that symbols in the loaded .so are findable --
  * lookupSymbol() will subsequently see them by dlsym on the program's
- * dl-handle.  Returns 0 if fail, 1 if success.
+ * dl-handle.  Returns NULL if success, otherwise ptr to an err msg.
+ *
+ * In the PEi386 case, open the DLLs and put handles to them in a 
+ * linked list.  When looking for a symbol, try all handles in the
+ * list.
  */
+
+#if defined(OBJFORMAT_PEi386)
+/* A record for storing handles into DLLs. */
+
+typedef
+   struct _OpenedDLL {
+      struct _OpenedDLL* next;
+      HINSTANCE instance;
+   } 
+   OpenedDLL;
+
+/* A list thereof. */
+static OpenedDLL* opened_dlls = NULL;
+#endif
+
+
+
 char*
 addDLL ( char* dll_name )
 {
@@ -368,8 +443,29 @@ addDLL ( char* dll_name )
    }
    ASSERT(0); /*NOTREACHED*/
 #  elif defined(OBJFORMAT_PEi386)
-   barf("addDLL: not implemented on PEi386 yet");
-   return 0;
+
+   HINSTANCE instance;
+   char* buf;
+   char* errmsg;
+   OpenedDLL* o_dll;
+
+   /* fprintf(stderr, "addDLL %s\n", dll_name ); */
+   buf = stgMallocBytes(strlen(dll_name) + 10, "addDll");
+   sprintf(buf, "%s.DLL", dll_name);
+   instance = LoadLibrary(buf);
+   free(buf);
+   if (instance == NULL) {
+     /* LoadLibrary failed; return a ptr to the error msg. */
+     errmsg = "addDLL: unknown error";
+     return errmsg;
+   }
+
+   o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
+   o_dll->instance = instance;
+   o_dll->next = opened_dlls;
+   opened_dlls = o_dll;
+
+   return NULL;
 #  else
    barf("addDLL: not implemented on this platform");
 #  endif
@@ -389,7 +485,13 @@ lookupSymbol( char *lbl )
 #       if defined(OBJFORMAT_ELF)
 	return dlsym(dl_prog_handle, lbl);
 #       elif defined(OBJFORMAT_PEi386)
+        OpenedDLL* o_dll;
+        void* sym;
         ASSERT(2+2 == 5);
+        for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
+           sym = GetProcAddress(o_dll->instance, lbl);
+           if (sym != NULL) return sym;
+        }
         return NULL;
 #       endif
     } else {
@@ -425,6 +527,7 @@ loadObj( char *path )
    int r, n;
    FILE *f;
 
+   /* fprintf(stderr, "loadObj %s\n", path ); */
 #  ifdef DEBUG
    /* assert that we haven't already loaded this object */
    { 
@@ -658,26 +761,29 @@ typedef
 
 
 /* From PE spec doc, section 3.3.2 */
-#define IMAGE_FILE_RELOCS_STRIPPED     0x0001
-#define IMAGE_FILE_EXECUTABLE_IMAGE    0x0002
-#define IMAGE_FILE_DLL                 0x2000
-#define IMAGE_FILE_SYSTEM              0x1000
-#define IMAGE_FILE_BYTES_REVERSED_HI   0x8000
-#define IMAGE_FILE_BYTES_REVERSED_LO   0x0080
-#define IMAGE_FILE_32BIT_MACHINE       0x0100
+/* Note use of MYIMAGE_* since IMAGE_* are already defined in
+   windows.h -- for the same purpose, but I want to know what I'm
+   getting, here. */
+#define MYIMAGE_FILE_RELOCS_STRIPPED     0x0001
+#define MYIMAGE_FILE_EXECUTABLE_IMAGE    0x0002
+#define MYIMAGE_FILE_DLL                 0x2000
+#define MYIMAGE_FILE_SYSTEM              0x1000
+#define MYIMAGE_FILE_BYTES_REVERSED_HI   0x8000
+#define MYIMAGE_FILE_BYTES_REVERSED_LO   0x0080
+#define MYIMAGE_FILE_32BIT_MACHINE       0x0100
 
 /* From PE spec doc, section 5.4.2 and 5.4.4 */
-#define IMAGE_SYM_CLASS_EXTERNAL       2
-#define IMAGE_SYM_CLASS_STATIC         3
-#define IMAGE_SYM_UNDEFINED            0
+#define MYIMAGE_SYM_CLASS_EXTERNAL       2
+#define MYIMAGE_SYM_CLASS_STATIC         3
+#define MYIMAGE_SYM_UNDEFINED            0
 
 /* From PE spec doc, section 4.1 */
-#define IMAGE_SCN_CNT_CODE             0x00000020
-#define IMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040
+#define MYIMAGE_SCN_CNT_CODE             0x00000020
+#define MYIMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040
 
 /* From PE spec doc, section 5.2.1 */
-#define IMAGE_REL_I386_DIR32           0x0006
-#define IMAGE_REL_I386_REL32           0x0014
+#define MYIMAGE_REL_I386_DIR32           0x0006
+#define MYIMAGE_REL_I386_REL32           0x0014
 
 
 /* We use myindex to calculate array addresses, rather than
@@ -822,8 +928,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
                ((UChar*)(oc->image))
                + hdr->PointerToSymbolTable 
             );
-   strtab = ((UChar*)(oc->image))
-            + hdr->PointerToSymbolTable
+   strtab = ((UChar*)symtab)
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
    if (hdr->Machine != 0x14c) {
@@ -834,16 +939,22 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       belch("PEi386 with nonempty optional header");
       return 0;
    }
-   if ( /* (hdr->Characteristics & IMAGE_FILE_RELOCS_STRIPPED) || */
-        (hdr->Characteristics & IMAGE_FILE_EXECUTABLE_IMAGE) ||
-        (hdr->Characteristics & IMAGE_FILE_DLL) ||
-        (hdr->Characteristics & IMAGE_FILE_SYSTEM) ) {
+   if ( /* (hdr->Characteristics & MYIMAGE_FILE_RELOCS_STRIPPED) || */
+        (hdr->Characteristics & MYIMAGE_FILE_EXECUTABLE_IMAGE) ||
+        (hdr->Characteristics & MYIMAGE_FILE_DLL) ||
+        (hdr->Characteristics & MYIMAGE_FILE_SYSTEM) ) {
       belch("Not a PEi386 object file");
       return 0;
    }
-   if ( (hdr->Characteristics & IMAGE_FILE_BYTES_REVERSED_HI) ||
-        !(hdr->Characteristics & IMAGE_FILE_32BIT_MACHINE) ) {
-      belch("Invalid PEi386 word size or endiannness");
+   if ( (hdr->Characteristics & MYIMAGE_FILE_BYTES_REVERSED_HI)
+        /* || !(hdr->Characteristics & MYIMAGE_FILE_32BIT_MACHINE) */ ) {
+      belch("Invalid PEi386 word size or endiannness: %d", 
+            (int)(hdr->Characteristics));
+      return 0;
+   }
+   /* fprintf(stderr, "strtab size %d\n", * (UInt32*)strtab); */
+   if (* (UInt32*)strtab > 510000) {
+      belch("PEi386 object has suspiciously large string table; > 64k relocs?");
       return 0;
    }
 
@@ -875,16 +986,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    fprintf ( stderr,
              "characteristics:   0x%x\n", (UInt32)(hdr->Characteristics) );
 
-   fprintf ( stderr, "\n" );
-   fprintf ( stderr, "string table has size 0x%x\n", * (UInt32*)strtab );
-   fprintf ( stderr, "---START of string table---\n");
-   for (i = 4; i < *(Int32*)strtab; i++) {
-      if (strtab[i] == 0) 
-         fprintf ( stderr, "\n"); else 
-         fprintf( stderr, "%c", strtab[i] );
-   }
-   fprintf ( stderr, "--- END  of string table---\n");
-
+   /* Print the section table. */
    fprintf ( stderr, "\n" );
    for (i = 0; i < hdr->NumberOfSections; i++) {
       COFF_reloc* reltab;
@@ -916,6 +1018,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       reltab = (COFF_reloc*) (
                   ((UChar*)(oc->image)) + sectab_i->PointerToRelocations
                );
+
       for (j = 0; j < sectab_i->NumberOfRelocations; j++) {
          COFF_symbol* sym;
          COFF_reloc* rel = (COFF_reloc*)
@@ -926,12 +1029,21 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
                    rel->VirtualAddress );
          sym = (COFF_symbol*)
                myindex ( sizeof_COFF_symbol, symtab, rel->SymbolTableIndex );
-         printName ( sym->Name, strtab );
+         printName ( sym->Name, strtab -10 );
          fprintf ( stderr, "'\n" );
       }
       fprintf ( stderr, "\n" );
    }
 
+   fprintf ( stderr, "\n" );
+   fprintf ( stderr, "string table has size 0x%x\n", * (UInt32*)strtab );
+   fprintf ( stderr, "---START of string table---\n");
+   for (i = 4; i < *(Int32*)strtab; i++) {
+      if (strtab[i] == 0) 
+         fprintf ( stderr, "\n"); else 
+         fprintf( stderr, "%c", strtab[i] );
+   }
+   fprintf ( stderr, "--- END  of string table---\n");
 
    fprintf ( stderr, "\n" );
    i = 0;
@@ -964,7 +1076,6 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    }
 
    fprintf ( stderr, "\n" );
-
    return 1;
 }
 
@@ -1010,8 +1121,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       symtab_i = (COFF_symbol*)
                  myindex ( sizeof_COFF_symbol, symtab, i );
 
-      if (symtab_i->StorageClass == IMAGE_SYM_CLASS_EXTERNAL &&
-          symtab_i->SectionNumber != IMAGE_SYM_UNDEFINED) {
+      if (symtab_i->StorageClass == MYIMAGE_SYM_CLASS_EXTERNAL &&
+          symtab_i->SectionNumber != MYIMAGE_SYM_UNDEFINED) {
 
          /* This symbol is global and defined, viz, exported */
          COFF_section* sectabent;
@@ -1019,8 +1130,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          /* cstring_from_COFF_symbol_name always succeeds. */
          sname = cstring_from_COFF_symbol_name ( symtab_i->Name, strtab );
 
-         /* for IMAGE_SYMCLASS_EXTERNAL 
-                && !IMAGE_SYM_UNDEFINED,
+         /* for MYIMAGE_SYMCLASS_EXTERNAL 
+                && !MYIMAGE_SYM_UNDEFINED,
             the address of the symbol is: 
                 address of relevant section + offset in section
          */
@@ -1062,8 +1173,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          alternative of testing the sectab_i->Name field seems to
          work ok with Cygwin.
       */
-      if (sectab_i->Characteristics & IMAGE_SCN_CNT_CODE || 
-          sectab_i->Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA)
+      if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_CODE || 
+          sectab_i->Characteristics & MYIMAGE_SCN_CNT_INITIALIZED_DATA)
          kind = SECTIONKIND_CODE_OR_RODATA;
 #endif
 
@@ -1109,7 +1220,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
    /* ToDo: should be variable-sized?  But is at least safe in the
       sense of buffer-overrun-proof. */
    char symbol[1000];
-   
+   /* fprintf(stderr, "resolving for %s\n", oc->fileName); */
+
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
                ((UChar*)(oc->image)) 
@@ -1141,7 +1253,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
          pP = (UInt32*)(
                  ((UChar*)(oc->image)) 
                  + (sectab_i->PointerToRawData 
-                    + reltab_j->VirtualAddress)
+                    + reltab_j->VirtualAddress
+                    - sectab_i->VirtualAddress )
               );
          /* the existing contents of pP */
          A = *pP;
@@ -1159,7 +1272,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                             printName ( sym->Name, strtab );
                             fprintf ( stderr, "'\n" ));
 
-         if (sym->StorageClass == IMAGE_SYM_CLASS_STATIC) {
+         if (sym->StorageClass == MYIMAGE_SYM_CLASS_STATIC) {
             COFF_section* section_sym 
                = findPEi386SectionCalled ( oc, sym->Name );
             if (!section_sym) {
@@ -1171,7 +1284,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                 + (section_sym->PointerToRawData
                    + sym->Value);
          } else {
-            copyName ( sym->Name, strtab, symbol, 1000 );
+            copyName ( sym->Name, strtab, symbol, 1000-1 );
             zapTrailingAtSign ( symbol );
             (void*)S = lookupLocalSymbol( oc, symbol );
             if ((void*)S == NULL)
@@ -1184,10 +1297,10 @@ ocResolve_PEi386 ( ObjectCode* oc )
          }
 
          switch (reltab_j->Type) {
-            case IMAGE_REL_I386_DIR32: 
+            case MYIMAGE_REL_I386_DIR32: 
                *pP = A + S; 
                break;
-            case IMAGE_REL_I386_REL32:
+            case MYIMAGE_REL_I386_REL32:
                /* Tricky.  We have to insert a displacement at
                   pP which, when added to the PC for the _next_
                   insn, gives the address of the target (S).
@@ -1213,6 +1326,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
       }
    }
    
+   /* fprintf(stderr, "completed     %s\n", oc->fileName); */
    return 1;
 }
 
