@@ -464,14 +464,15 @@ to compete with it, but link with it.
 </Para>
 </ListItem>
 </VarListEntry>
+
 <VarListEntry>
 <Term>Don't use <Literal>Float</Literal>s:</Term>
 <ListItem>
 <Para>
-We don't provide specialisations of Prelude functions for <Literal>Float</Literal>
-(but we do for <Literal>Double</Literal>).  If you end up executing overloaded
-code, you will lose on performance, perhaps badly.
-</Para>
+If you're using <literal>Complex</literal>, definitely use
+<literal>Complex Double</literal> rather than <literal>Complex
+Float</literal> (the former is specialised heavily, but the latter
+isn't).</para>
 
 <Para>
 <Literal>Floats</Literal> (probably 32-bits) are almost always a bad idea, anyway,
