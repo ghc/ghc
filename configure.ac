@@ -938,11 +938,12 @@ dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([Files.h arpa/inet.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h limits.h locale.h malloc.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stddef.h stdarg.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netdb.h netinet/in.h netinet/tcp.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/un.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h utime.h values.h bfd.h winsock.h pthread.h sys/uio.h])
-AC_CHECK_HEADER(unistd.h,[AC_CHECK_FUNCS(lchown)])
+AC_CHECK_HEADERS([arpa/inet.h bfd.h ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h netdb.h netinet/in.h netinet/tcp.h nlist.h pthread.h pwd.h signal.h sys/mman.h sys/resource.h sys/socket.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/uio.h sys/un.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h])
 
-AC_CHECK_HEADER(readline/readline.h, [HaveReadlineReadlineH=YES], [HaveReadlineReadlineH=NO])
-AC_CHECK_HEADER(readline/history.h, [HaveReadlineHistoryH=YES], [HaveReadlineHistoryH=NO])
+AC_CHECK_HEADER([unistd.h], [AC_CHECK_FUNCS(lchown)])
+
+AC_CHECK_HEADER([readline/readline.h], [HaveReadlineReadlineH=YES], [HaveReadlineReadlineH=NO])
+AC_CHECK_HEADER([readline/history.h], [HaveReadlineHistoryH=YES], [HaveReadlineHistoryH=NO])
 
 if test $HaveReadlineReadlineH = YES && test $HaveReadlineHistoryH = YES ; then
   GhcLibsWithReadline=YES
@@ -952,12 +953,6 @@ else
   AC_DEFINE([HAVE_READLINE_HEADERS], [0], [Define to 1 if readline/readline.h and readline/history.h exist.])
 fi
 AC_SUBST(GhcLibsWithReadline)
-
-dnl ** check for DOS include files
-AC_CHECK_HEADERS(dos.h conio.h io.h std.h) 
-
-dnl ** check for Windows include files
-AC_CHECK_HEADERS(windows.h)
 
 dnl ** check for OpenGL/GLUT include paths and libraries
 FP_CHECK_GLUT
@@ -989,12 +984,9 @@ CPPFLAGS="$fp_save_cppflags"
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
 
-dnl dynamic loading include files
-AC_CHECK_HEADERS(dlfcn.h dl.h) 
-
 dnl ** check for POSIX regex
 HavePosixRegex=NO
-AC_CHECK_HEADERS(regex.h,[AC_CHECK_FUNCS(regcomp, [HavePosixRegex=YES])])
+AC_CHECK_HEADERS([regex.h], [AC_CHECK_FUNCS(regcomp, [HavePosixRegex=YES])])
 AC_SUBST(HavePosixRegex)
 
 dnl ** how do we get a timezone name, and UTC offset ?
@@ -1206,9 +1198,7 @@ AC_CHECK_LIB(bfd,    bfd_init)
 dnl ** check for wide-char classifications
 dnl FreeBSD has an emtpy wctype.h, so test one of the affected
 dnl functions if it's really there.
-AC_CHECK_HEADERS(wctype.h,
-  [AC_CHECK_FUNCS(iswspace)]
-)
+AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
 
 dnl ** check for readline, for Hugs and hslibs' Readline
 dnl ncurses supersedes termcap and curses, but for compatibility,
