@@ -208,26 +208,33 @@ zapSpecPragInfo   info = case flavourInfo info of
 
 \begin{code}
 vanillaIdInfo :: IdInfo
-vanillaIdInfo = mkIdInfo VanillaId
+	-- Used for locally-defined Ids
+	-- We are going to calculate correct CAF information at the end
+vanillaIdInfo = mkIdInfo VanillaId NoCafRefs
 
 constantIdInfo :: IdInfo
-constantIdInfo = mkIdInfo ConstantId
+	-- Used for imported Ids
+	-- The default is that they *do* have CAFs; an interface-file pragma
+	-- may say "oh no it doesn't", but in the absence of such a pragma
+	-- we'd better assume it does
+constantIdInfo = mkIdInfo ConstantId MayHaveCafRefs
 
 mkIdInfo :: IdFlavour -> IdInfo
-mkIdInfo flv = IdInfo {
-		    flavourInfo		= flv,
-		    arityInfo		= UnknownArity,
-		    demandInfo		= wwLazy,
-		    specInfo		= emptyCoreRules,
-                    tyGenInfo		= noTyGenInfo,
-		    workerInfo		= NoWorker,
-		    strictnessInfo	= NoStrictnessInfo,
-		    unfoldingInfo	= noUnfolding,
-		    cafInfo		= NoCafRefs,
-		    cprInfo		= NoCPRInfo,
-		    lbvarInfo		= NoLBVarInfo,
-		    inlinePragInfo 	= NoInlinePragInfo,
-		    occInfo		= NoOccInfo
+mkIdInfo flv caf 
+  = IdInfo {
+	    flavourInfo		= flv,
+	    arityInfo		= UnknownArity,
+	    demandInfo		= wwLazy,
+	    specInfo		= emptyCoreRules,
+            tyGenInfo		= noTyGenInfo,
+	    workerInfo		= NoWorker,
+	    strictnessInfo	= NoStrictnessInfo,
+	    unfoldingInfo	= noUnfolding,
+	    cafInfo		= caf
+	    cprInfo		= NoCPRInfo,
+	    lbvarInfo		= NoLBVarInfo,
+	    inlinePragInfo 	= NoInlinePragInfo,
+	    occInfo		= NoOccInfo
 	   }
 \end{code}
 

@@ -280,15 +280,6 @@ file, even if it's mentioned in some other interface unfolding.
 \begin{code}
 isImplicitId :: Id -> Bool
 isImplicitId id
-  = ASSERT2( not (omit && nameIsLocallyDefined (idName id)
-                       && idTyGenInfo id /= TyGenNever),
-             ppr id )
-    -- mustn't omit type signature for a name whose type might change!
-    omit
-  where
-    omit = isImplicitId' id
-
-isImplicitId' id
   = case idFlavour id of
 	RecordSelId _   -> True	-- Includes dictionary selectors
         PrimOpId _      -> True
@@ -298,13 +289,7 @@ isImplicitId' id
 		-- remember that all type and class decls appear in the interface file.
 		-- The dfun id must *not* be omitted, because it carries version info for
 		-- the instance decl
-
-	ConstantId -> False	-- Ordinary Ids
-	DictFunId  -> False
-	
-	ExportedId   -> False	-- I don't think these happen
-	VanillaId    -> False	-- ditto
-	SpecPragmaId -> False 	-- ditto
+	other		-> False
 \end{code}
 
 \begin{code}

@@ -94,10 +94,19 @@ binder
     that all Ids are unique, rather than the weaker guarantee of
     no clashes which the simplifier provides.
 
-  - Give the Id its final IdInfo; in ptic, 
+  - Give each dynamic CCall occurrence a fresh unique; this is
+    rather like the cloning step above.
+
+  - Give the Id its UTTERLY FINAL IdInfo; in ptic, 
 	* Its flavour becomes ConstantId, reflecting the fact that
 	  from now on we regard it as a constant, not local, Id
+
   	* its unfolding, if it should have one
+	
+	* its arity, computed from the number of visible lambdas
+
+	* its CAF info, computed from what is free in its RHS
+
 		
 Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in

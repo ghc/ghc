@@ -206,7 +206,7 @@ tcAddImportedIdInfo env id
 	-- The Id must be returned without a data dependency on maybe_id
   where
     new_info = case tcLookupRecId_maybe env (idName id) of
-		  Nothing	   -> constantIdInfo
+		  Nothing	   -> pprTrace "tcAddIdInfo" (ppr id) constantIdInfo
 		  Just imported_id -> idInfo imported_id
 		-- ToDo: could check that types are the same
 
