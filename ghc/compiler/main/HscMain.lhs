@@ -1,6 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-2000
 %
+
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}

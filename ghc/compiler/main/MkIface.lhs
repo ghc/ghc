@@ -1,6 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
+
 \section[MkIface]{Print an interface for a module}
 
 \begin{code}
