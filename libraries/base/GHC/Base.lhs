@@ -872,19 +872,19 @@ unpackCStringUtf8# addr
       | ch `eqChar#` '\0'#   = []
       | ch `leChar#` '\x7F'# = C# ch : unpack (nh +# 1#)
       | ch `leChar#` '\xDF'# =
-          C# (chr# ((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#))) :
+          C# (chr# (((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6#) +#
+                     (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#))) :
           unpack (nh +# 2#)
       | ch `leChar#` '\xEF'# =
-          C# (chr# ((ord# ch                                  -# 0xE0#) `uncheckedIShiftL#` 12# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#))) :
+          C# (chr# (((ord# ch                                  -# 0xE0#) `uncheckedIShiftL#` 12#) +#
+                    ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
+                     (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#))) :
           unpack (nh +# 3#)
       | otherwise            =
-          C# (chr# ((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
+          C# (chr# (((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18#) +#
+                    ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12#) +#
+                    ((ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
+                     (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
           unpack (nh +# 4#)
       where
 	ch = indexCharOffAddr# addr nh
