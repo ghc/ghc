@@ -911,7 +911,7 @@ completeCall env var occ_info cont
 						  (not (null arg_infos))
 						  call_cont
 
-    	active_inline = activeInline env var
+    	active_inline = activeInline env var occ_info
 	maybe_inline  = callSiteInline dflags active_inline inline_call occ_info
 				       var arg_infos interesting_cont
     in

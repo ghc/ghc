@@ -856,15 +856,26 @@ because they don't have bindings, so we must inline them no matter how
 gentle we are being.
 
 \begin{code}
-activeInline :: SimplEnv -> OutId -> Bool
-activeInline env id
+activeInline :: SimplEnv -> OutId -> OccInfo -> Bool
+activeInline env id occ
   = case getMode env of
-	SimplGently -> isDataConWrapId id
+	SimplGently -> isDataConWrapId id || isOneOcc occ
 		-- No inlining at all when doing gentle stuff,
-		-- except (hack alert) for data con wrappers
-		-- We want to inline data con wrappers even in gentle mode
-		-- because rule LHSs match better then
+		-- except (a) things that occur once
+		-- and (b) (hack alert) data con wrappers
+		-- 	   We want to inline data con wrappers even 
+		--	   in gentle mode because rule LHSs match better then
+-- The reason for (a) is that too little clean-up happens if you 
+-- don't inline use-once things.   Also a bit of inlining is *good* for
+-- full laziness; it can expose constant sub-expressions.
+-- Example in spectral/mandel/Mandel.hs, where the mandelset 
+-- function gets a useful let-float if you inline windowToViewport
+
 	SimplPhase n -> isActive n (idInlinePragma id)
+
+-- Belongs in BasicTypes; this frag occurs in OccurAnal too
+isOneOcc (OneOcc _ _) = True
+isOneOcc other	      = False
 
 activeRule :: SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all
