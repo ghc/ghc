@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Base.hs,v 1.2 2001/07/31 13:28:58 simonmar Exp $
+-- $Id: Base.hs,v 1.3 2001/07/31 13:38:10 simonmar Exp $
 --
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.
@@ -479,7 +479,12 @@ instance IArray UArray Int64 where
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
     {-# INLINE unsafeAt #-}
-    unsafeAt (UArray _ _ arr#) (I# i#) = I64# (indexInt64Array# arr# i#)
+    unsafeAt (UArray _ _ arr#) (I# i#) =
+#if WORD_SIZE_IN_BYTES == 4
+        I64# (indexInt64Array# arr# i#)
+#else
+        I64# (indexIntArray# arr# i#)
+#endif
     {-# INLINE unsafeReplace #-}
     unsafeReplace arr ies = runST (unsafeReplaceUArray arr ies)
     {-# INLINE unsafeAccum #-}
@@ -527,7 +532,12 @@ instance IArray UArray Word64 where
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
     {-# INLINE unsafeAt #-}
-    unsafeAt (UArray _ _ arr#) (I# i#) = W64# (indexWord64Array# arr# i#)
+    unsafeAt (UArray _ _ arr#) (I# i#) =
+#if WORD_SIZE_IN_BYTES == 4
+        W64# (indexWord64Array# arr# i#)
+#else
+        W64# (indexWordArray# arr# i#)
+#endif
     {-# INLINE unsafeReplace #-}
     unsafeReplace arr ies = runST (unsafeReplaceUArray arr ies)
     {-# INLINE unsafeAccum #-}
@@ -1005,11 +1015,19 @@ instance MArray (STUArray s) Int64 (ST s) where
         (# s2#, STUArray l u marr# #) }}
     {-# INLINE unsafeRead #-}
     unsafeRead (STUArray _ _ marr#) (I# i#) = ST $ \s1# ->
+#if WORD_SIZE_IN_BYTES == 4
         case readInt64Array# marr# i# s1# of { (# s2#, e# #) ->
+#else
+        case readIntArray# marr# i# s1# of { (# s2#, e# #) ->
+#endif
         (# s2#, I64# e# #) }
     {-# INLINE unsafeWrite #-}
     unsafeWrite (STUArray _ _ marr#) (I# i#) (I64# e#) = ST $ \s1# ->
+#if WORD_SIZE_IN_BYTES == 4
         case writeInt64Array# marr# i# e# s1# of { s2# ->
+#else
+        case writeIntArray# marr# i# e# s1# of { s2# ->
+#endif
         (# s2#, () #) }
 
 instance MArray (STUArray s) Word8 (ST s) where
@@ -1065,38 +1083,44 @@ instance MArray (STUArray s) Word64 (ST s) where
         (# s2#, STUArray l u marr# #) }}
     {-# INLINE unsafeRead #-}
     unsafeRead (STUArray _ _ marr#) (I# i#) = ST $ \s1# ->
+#if WORD_SIZE_IN_BYTES == 4
         case readWord64Array# marr# i# s1# of { (# s2#, e# #) ->
+#else
+        case readWordArray# marr# i# s1# of { (# s2#, e# #) ->
+#endif
         (# s2#, W64# e# #) }
     {-# INLINE unsafeWrite #-}
     unsafeWrite (STUArray _ _ marr#) (I# i#) (W64# e#) = ST $ \s1# ->
+#if WORD_SIZE_IN_BYTES == 4
         case writeWord64Array# marr# i# e# s1# of { s2# ->
+#else
+        case writeWordArray# marr# i# e# s1# of { s2# ->
+#endif
         (# s2#, () #) }
 
 -----------------------------------------------------------------------------
 -- Translation between elements and bytes
 
-#include "config.h"
-
 bOOL_SCALE, bOOL_WORD_SCALE,
   wORD_SCALE, dOUBLE_SCALE, fLOAT_SCALE :: Int# -> Int#
 bOOL_SCALE n# = (n# +# last#) `iShiftRA#` 3#
-  where I# last# = SIZEOF_VOID_P * 8 - 1
+  where I# last# = WORD_SIZE_IN_BYTES * 8 - 1
 bOOL_WORD_SCALE n# = bOOL_INDEX (n# +# last#)
-  where I# last# = SIZEOF_VOID_P * 8 - 1
-wORD_SCALE   n# = scale# *# n# where I# scale# = SIZEOF_VOID_P
-dOUBLE_SCALE n# = scale# *# n# where I# scale# = SIZEOF_DOUBLE
-fLOAT_SCALE  n# = scale# *# n# where I# scale# = SIZEOF_FLOAT
+  where I# last# = WORD_SIZE_IN_BYTES * 8 - 1
+wORD_SCALE   n# = scale# *# n# where I# scale# = WORD_SIZE_IN_BYTES
+dOUBLE_SCALE n# = scale# *# n# where I# scale# = DOUBLE_SIZE_IN_BYTES
+fLOAT_SCALE  n# = scale# *# n# where I# scale# = FLOAT_SIZE_IN_BYTES
 
 bOOL_INDEX :: Int# -> Int#
-#if SIZEOF_VOID_P == 4
+#if WORD_SIZE_IN_BYTES == 4
 bOOL_INDEX i# = i# `iShiftRA#` 5#
-#else
+#elif WORD_SIZE_IN_BYTES == 8
 bOOL_INDEX i# = i# `iShiftRA#` 6#
 #endif
 
 bOOL_BIT, bOOL_NOT_BIT :: Int# -> Word#
 bOOL_BIT     n# = int2Word# 1# `shiftL#` (word2Int# (int2Word# n# `and#` mask#))
-  where W# mask# = SIZEOF_VOID_P * 8 - 1
+  where W# mask# = WORD_SIZE_IN_BYTES * 8 - 1
 bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb# where W# mb# = maxBound
 
 -----------------------------------------------------------------------------
