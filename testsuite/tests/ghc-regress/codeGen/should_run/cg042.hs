@@ -6,7 +6,6 @@ import GHC.Exts
 import ByteArray
 import MutableArray
 import ST
-import Int( fromInt )
 
 import Ratio   -- 1.3
 import Array   -- 1.3
@@ -40,7 +39,7 @@ test_doubles
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then return ()
-	else writeDoubleArray arr_in# (I# first#) ((fromInt (I# first#)) * pi) >>
+	else writeDoubleArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
     lookup_range :: ByteArray Int -> Int# -> Int# -> [Double]

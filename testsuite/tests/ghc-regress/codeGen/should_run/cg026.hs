@@ -10,7 +10,6 @@ import ST
 import ST
 import MutableArray
 import ByteArray
-import Int( fromInt )
 	
 import Ratio
 import Array
@@ -167,11 +166,11 @@ test_floats
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then return ()
-{-	else let e = ((fromInt (I# first#)) * pi)
+{-	else let e = ((fromIntegral (I# first#)) * pi)
 	     in trace (show e) $ writeFloatArray arr_in# (I# first#) e >>
 	     fill_in arr_in# (first# +# 1#) last#
 -}
-	else writeFloatArray arr_in# (I# first#) ((fromInt (I# first#)) * pi) >>
+	else writeFloatArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
     lookup_range :: ByteArray Int -> Int# -> Int# -> [Float]
@@ -208,7 +207,7 @@ test_doubles
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then return ()
-	else writeDoubleArray arr_in# (I# first#) ((fromInt (I# first#)) * pi) >>
+	else writeDoubleArray arr_in# (I# first#) ((fromIntegral (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 
     lookup_range :: ByteArray Int -> Int# -> Int# -> [Double]
@@ -242,7 +241,7 @@ test_ptrs
     fill_in arr_in# first last
       = if (first > last)
 	then return ()
-	else writeSTArray arr_in# first (fromInt (first * first)) >>
+	else writeSTArray arr_in# first (fromIntegral (first * first)) >>
 	     fill_in  arr_in# (first + 1) last
 
     lookup_range :: Array Int (Ratio Int) -> Int -> Int -> [Ratio Int]
