@@ -177,6 +177,8 @@ type TcKind         = TcType
 
 TyVarDetails gives extra info about type variables, used during type
 checking.  It's attached to mutable type variables only.
+It's knot-tied back to Var.lhs.  There is no reason in principle
+why Var.lhs shouldn't actually have the definition, but it "belongs" here.
 
 \begin{code}
 data TyVarDetails

@@ -1,0 +1,3 @@
+__interface TcType 1 0 where
+__export TcType TyVarDetails;
+1 data TyVarDetails ;

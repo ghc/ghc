@@ -1,0 +1,5 @@
+_interface_ TcType 1
+_exports_
+TcType TyVarDetails;
+_declarations_
+1 data TyVarDetails;
