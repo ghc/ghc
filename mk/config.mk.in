@@ -694,6 +694,7 @@ INSTALL			:= $(subst .././install-sh,$(FPTOOLS_TOP_ABS)/install-sh,$(INSTALL))
 LATEX			= latex
 HEVEA			= hevea
 HACHA			= hacha
+LD			= ld
 LN_S			= @LN_S@
 MANMACROS		= -man
 MSMACROS 		= -ms
