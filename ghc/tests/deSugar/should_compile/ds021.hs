@@ -1,6 +1,6 @@
 -- !!! ds021 -- hairier uses of guards
 
-module Test where
+module ShouldCompile where
 
 f x y z | x == y     = []
 	| x /= z     = []

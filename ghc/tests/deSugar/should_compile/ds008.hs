@@ -2,7 +2,7 @@
 --
 -- these tests involve way-cool TyApps
 
-module Test where
+module ShouldCompile where
 
 f x = []
 

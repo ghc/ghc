@@ -1,5 +1,5 @@
 -- !!! Checking that lazy name clashing works
-module ShouldSucceed where
+module ShouldCompile where
 
 import List ( sort )
 
@@ -7,7 +7,7 @@ sort :: Int
 sort = 3
 
 foo :: Int
-foo = ShouldSucceed.sort
+foo = ShouldCompile.sort
 
 baz :: (Ord a) => [a] -> [a]
 baz = List.sort

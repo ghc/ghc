@@ -1,6 +1,6 @@
 -- !!! ds011 -- uses of "error"
 
-module Tests where
+module ShouldCompile where
 
 f = error []
 

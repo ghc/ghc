@@ -1,6 +1,6 @@
 -- !!! ds015 -- lambdas
 --
-module Tests where
+module ShouldCompile where
 
 f x = ( \ x -> x ) x
 

@@ -1,6 +1,6 @@
 -- !!! ds028: failable pats in top row
 
-module ShouldSucceed where
+module ShouldCompile where
 
 
 -- when the first row of pats doesn't have convenient

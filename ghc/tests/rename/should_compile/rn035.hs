@@ -1,5 +1,5 @@
 -- !!! Checking what's legal in the body of a class declaration.
-module ShouldSucceed where
+module ShouldCompile where
 
 class Foo a where {
   (--<>--) :: a -> a -> Int  ;

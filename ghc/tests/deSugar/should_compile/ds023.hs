@@ -1,6 +1,6 @@
 -- !!! ds023 -- overloading eg from section 9.2
 --
-module Tests where
+module ShouldCompile where
 
 f x	= g (x == x) x
 g b x	= abs (f x)

@@ -1,5 +1,5 @@
 -- !!! Testing layout rule
-module Layout where
+module ShouldCompile where
 
 l1 :: IO ()
 l1 = do

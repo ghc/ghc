@@ -1,6 +1,6 @@
 -- !!! ds026 -- classes -- incl. polymorphic method
 
-module ShouldSucceed where
+module ShouldCompile where
 
 class Foo a where
   op :: a -> a

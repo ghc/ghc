@@ -1,6 +1,6 @@
 -- !!! Checking that an imported module may still have
 -- !!! a local alias without having used 'qualified'.
-module ShouldSucceed where
+module ShouldCompile where
 
 import List  as X
 import Maybe as X

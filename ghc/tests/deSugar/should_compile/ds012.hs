@@ -1,6 +1,6 @@
 -- !!! ds012 -- simple Integer arithmetic
 --
-module Tests where
+module ShouldCompile where
 
 f x = 1 + 2 - 3 + 4 * 5
 

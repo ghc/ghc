@@ -5,7 +5,7 @@
 -- To: glasgow-haskell-bugs@majordomo.haskell.org
 -- Subject: compiler-bug
 
-module Test where
+module ShouldCompile where
 
 erroR :: Int
 erroR = n where

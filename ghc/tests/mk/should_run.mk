@@ -17,4 +17,4 @@ all :: $(RUNTESTS)
 %.bin : %.o
 	$(HC) $(HC_OPTS) $($*_LD_OPTS) $< -o $@
 
-CLEAN_FILES += $(BINS)
+CLEAN_FILES += $(BINS) Main.hi

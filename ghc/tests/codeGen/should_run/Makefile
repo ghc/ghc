@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.14 2000/08/22 14:05:05 sewardj Exp $
+# $Id: Makefile,v 1.15 2000/11/03 16:23:37 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -39,7 +39,6 @@ SRC_MKDEPENDHS_OPTS += -fglasgow-exts
 
 .PRECIOUS: %.bin %.o
 
-clean ::
-	rm -f *.bin *.o
+CLEAN_FILES += PrelMain.hi
 
 include $(TOP)/mk/target.mk

@@ -27,4 +27,6 @@ io028_RUNTEST_OPTS += -i io028.hs
 
 .PRECIOUS: %.o %.bin
 
+CLEAN_FILES += *.out *.inout
+
 include $(TOP)/mk/target.mk

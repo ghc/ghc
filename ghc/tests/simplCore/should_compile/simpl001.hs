@@ -3,7 +3,7 @@
 -- only tickled by the simplifier
 
 -- type Foo a b = a -> (b -> a) -> b
-module Test where
+module ShouldCompile where
 
 (++++) :: (a -> (b -> a) -> b) -> (a -> (b -> a) -> b) -> a -> (b -> a) -> b
 x ++++ y = y

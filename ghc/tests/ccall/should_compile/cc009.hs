@@ -1,5 +1,5 @@
 -- !!! cc009 -- foreign label returning newtype of Addr
-module Test where
+module ShouldCompile where
 
 import Addr
 

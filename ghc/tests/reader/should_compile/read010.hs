@@ -1,4 +1,4 @@
 -- !!! Infix record constructor.
-module ShouldSucceed where
+module ShouldCompile where
 
 data Rec = (:<-:) { a :: Int, b :: Float }

@@ -1,7 +1,7 @@
 -- !!! ds014 -- character and string literals
 -- !!!   really should add ALL weird forms...
 
-module Tests where
+module ShouldCompile where
 
 a = 'a'
 b = "b"

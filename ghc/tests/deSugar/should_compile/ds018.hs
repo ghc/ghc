@@ -1,6 +1,6 @@
 -- !!! ds018 -- explicit lists and tuples
 --
-module Tests where
+module ShouldCompile where
 
 -- exprs
 

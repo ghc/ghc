@@ -1,6 +1,6 @@
 -- !!! cc006 -- ccall with non-standard boxed arguments and results
 
-module Test where
+module ShouldCompile where
 
 import Foreign
 import CCall

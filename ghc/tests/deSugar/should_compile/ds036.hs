@@ -13,7 +13,7 @@ error in the code below which disappears when the last line is
 commented out
 -}
 
-module Test2 where
+module ShouldCompile where
 
 --brack :: (Eq a) => a -> a -> [a] -> ([a],[a])
 --brack open close = brack' open close (1 :: Int)

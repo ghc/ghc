@@ -1,4 +1,4 @@
-module ShouldFail where
+module ShouldCompile where
 
 {-
 From: Kevin Hammond <kh>

@@ -1,3 +1,3 @@
-module ShouldSucceed where
+module ShouldCompile where
 
 x@_ = x

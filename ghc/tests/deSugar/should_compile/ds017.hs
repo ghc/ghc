@@ -1,6 +1,6 @@
 -- !!! ds017 -- let expressions
 --
-module Tests where
+module ShouldCompile where
 
 f x y z
   = let

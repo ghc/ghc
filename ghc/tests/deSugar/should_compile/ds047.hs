@@ -1,6 +1,6 @@
 -- !!! Nullary rec-pats for constructors that hasn't got any labelled
 -- !!! fields is legal Haskell, and requires extra care in the desugarer.
-module Test where
+module ShouldCompile where
 
 data X = X Int [Int]
 

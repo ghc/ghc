@@ -1,5 +1,5 @@
 -- !!! newtypes with a labelled field.
-module ShouldSucceed where
+module ShouldCompile where
 
 newtype Foo = Foo { x :: Int } deriving (Eq)
 

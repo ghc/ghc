@@ -1,4 +1,4 @@
-module Test where
+module ShouldCompile where
 
 -- Strict field unpacking tests: compile with -O -funbox-strict-fields.
 

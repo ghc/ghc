@@ -1,6 +1,6 @@
 -- !!! getting top-level dependencies right
 --
-module Test where
+module ShouldCompile where
 
 f1 x = g1 x
 g1 y = y

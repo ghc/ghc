@@ -1,6 +1,6 @@
 -- !!! Empty export list
 
-module Reader() where
+module ShouldCompile() where
 
 instance Show (a->b) where
   show f = "<<function>>"

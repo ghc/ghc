@@ -2,7 +2,7 @@
 --
 -- this simply tests a "typical" example
 
-module MapPairs where
+module ShouldCompile where
 
 -- from SLPJ, p 78
 mappairs f []     ys     = []

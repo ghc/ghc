@@ -7,7 +7,7 @@
 	   the constructor properly.
 -}
 
-module Bug where
+module ShouldCompile where
 
 data Eq a => Foo a = Foo { x :: a }
 

@@ -1,5 +1,5 @@
 -- !!! Checking that empty contexts are permitted.
-module ShouldSucceed where
+module ShouldCompile where
 
 data () => Foo a = Foo a
 

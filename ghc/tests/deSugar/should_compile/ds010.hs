@@ -1,6 +1,6 @@
 -- !!! ds010 -- deeply-nested list comprehensions
 
-module Test where
+module ShouldCompile where
 
 z = [ (a,b,c,d,e,f,g,h,i,j) | a <- "12",
 			      b <- "12",

@@ -1,6 +1,6 @@
 -- !!! Checking that both import lists and 'hiding' lists might
 -- !!! be empty.
-module ShouldSucceed where
+module ShouldCompile where
 
 import List  ()
 import List  hiding ()

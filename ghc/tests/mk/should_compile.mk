@@ -1,4 +1,5 @@
 #-----------------------------------------------------------------------------
+# $Id: should_compile.mk,v 1.4 2000/11/03 16:23:38 simonmar Exp $
 # template for should_compile tests.
 
 HS_SRCS = $(wildcard *.hs)
@@ -9,7 +10,10 @@ SRC_RUNTEST_OPTS += -x 0 \
 
 %.o : %.hs
 	@echo ---- Testing for successful compilation of $<
-	@$(RUNTEST) $(HC) $(RUNTEST_OPTS) -- $(HC_OPTS) -c $< -o $@
+	$(RUNTEST) $(HC) $(RUNTEST_OPTS) -- $(HC_OPTS) -c $< -o $@
 
 all :: $(HS_OBJS)
 
+# Most single-module tests are declared to be module ShouldCompile, so we
+# can clean the .hi files in one go:
+CLEAN_FILES += ShouldCompile.hi

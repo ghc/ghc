@@ -1,4 +1,4 @@
-module User where
+module ShouldCompile where
 
 import MyList
 

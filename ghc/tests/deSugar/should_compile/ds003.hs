@@ -1,6 +1,6 @@
 -- !!! ds003 -- list, tuple, lazy, as patterns
 --
-module Test where
+module ShouldCompile where
 
 f []		y	 True  = []
 f x		a@(y,ys) ~z    = []

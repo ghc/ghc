@@ -1,6 +1,6 @@
 -- !!! ds016 -- case expressions
 --
-module Tests where
+module ShouldCompile where
 
 f x y z =
     case ( x ++ x ++ x ++ x ++ x ) of

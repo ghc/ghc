@@ -1,6 +1,6 @@
 -- !!! ds020 -- lazy patterns (in detail)
 --
-module Test where
+module ShouldCompile where
 
 a ~([],[],[])    = []
 a ~(~[],~[],~[]) = []

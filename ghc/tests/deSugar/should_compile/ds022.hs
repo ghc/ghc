@@ -1,6 +1,6 @@
 -- !!! ds022 -- literal patterns (wimp version)
 --
-module Tests where
+module ShouldCompile where
 
 f 1 1.1 = []
 f 2 2.2 = []

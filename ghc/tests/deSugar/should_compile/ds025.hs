@@ -1,6 +1,6 @@
 -- !!! ds025 -- overloaded assoc -- AbsBinds
 
-module Util where
+module ShouldCompile where
 
 ehead xs loc | null xs = error ("4"++loc)
              | True = head xs

@@ -1,6 +1,6 @@
 -- !!! recursive funs tangled in an AbsBind
 
-module ShouldSucceed where
+module ShouldCompile where
 
 
 flatten :: Int		-- Indentation

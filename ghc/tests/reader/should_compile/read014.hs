@@ -1,5 +1,5 @@
 -- !!! Empty export lists are legal (and useful.)
-module T () where
+module ShouldCompile () where
 
 ng1 x y = negate y
 

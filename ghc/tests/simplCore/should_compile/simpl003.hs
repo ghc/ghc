@@ -5,7 +5,7 @@ From: Julian Seward (DRL PhD) <sewardj@computer-science.manchester.ac.uk>
 Message-Id: <9412081138.AA16652@rdf009.cs.man.ac.uk>
 To: partain@dcs.gla.ac.uk
 -}
-module ShouldFail where
+module ShouldCompile where
 
 type IMonad a
    = IMonadState -> IMonadReturn a

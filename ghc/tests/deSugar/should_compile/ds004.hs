@@ -1,6 +1,6 @@
 -- !!! ds004 -- nodups from SLPJ p 79
 --
-module Test where
+module ShouldCompile where
 
 -- SLPJ, p 79
 nodups []                   = []

@@ -1,4 +1,5 @@
 #-----------------------------------------------------------------------------
+# $Id: should_fail.mk,v 1.4 2000/11/03 16:23:38 simonmar Exp $
 # template for should_fail tests
 
 HS_SRCS = $(wildcard *.hs)
@@ -12,3 +13,6 @@ SRC_RUNTEST_OPTS += -x 1 \
 	@$(RUNTEST) $(HC) $(RUNTEST_OPTS) -- $(HC_OPTS) -c $< -o $@
 
 all :: $(HS_OBJS)
+
+# occasionally a test goes wrong and compiles by mistake, so...
+CLEAN_FILES += ShouldFail.hi

@@ -1,6 +1,6 @@
 -- !!! ds013 -- simple Rational arithmetic
 
-module Tests where
+module ShouldCompile where
 
 f = 1.5 + 2.0 - 3.14159265 + 4.2 * 5.111111111111111111111111111
 

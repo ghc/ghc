@@ -1,5 +1,5 @@
 -- !!! Checking that you can hide a constructor
-module ShouldSucceed where
+module ShouldCompile where
 
 import Rn037Help hiding( C )
 	-- C is the constructor, but we should

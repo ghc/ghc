@@ -1,5 +1,5 @@
 -- !!! Checking that empty declarations are permitted.
-module ShouldSucceed where
+module ShouldCompile where
 
 
 class Foo a where

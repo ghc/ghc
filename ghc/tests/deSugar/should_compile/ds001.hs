@@ -2,7 +2,7 @@
 --
 -- this tests ultra-simple function and pattern bindings (no patterns)
 
-module Test where
+module ShouldCompile where
 
 -- simple function bindings
 

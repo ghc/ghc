@@ -2,7 +2,7 @@
 --
 -- this tests "overlapping" variables and guards
 
-module Test where
+module ShouldCompile where
 
 f x = x
 f y = y

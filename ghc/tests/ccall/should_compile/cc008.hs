@@ -1,5 +1,5 @@
 -- !!! cc008 -- foreign export dynamic returning newtype of Addr
-module Test where
+module ShouldCompile where
 
 import Addr
 

@@ -10,4 +10,6 @@ read014_HC_OPTS += -Wall
 read022_HC_OPTS = -fglasgow-exts
 read024_HC_OPTS = -fglasgow-exts
 
+CLEAN_FILES += T1.hi T2.hi MyList.hi
+
 include $(TOP)/mk/target.mk

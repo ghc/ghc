@@ -1,5 +1,5 @@
 -- !!! Checking that qualified method names are legal in instance body.
-module ShouldSucceed where
+module ShouldCompile where
 
 import Prelude hiding (Eq, (==))
 import Prelude as P (Eq,(==))

@@ -1,5 +1,5 @@
 -- !!! tests fixity reading and printing
-module Reader where
+module ShouldCompile where
 
 infixl 1 `f`
 infixr 2 \\\

@@ -1,6 +1,6 @@
 -- !!! mutually-recursive methods in an instance declaration
 --
-module Test where
+module ShouldCompile where
 
 class Foo a where
     op1 :: a -> a 

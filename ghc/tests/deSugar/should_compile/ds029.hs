@@ -1,7 +1,7 @@
 -- !!! ds029: pattern binding with guards (dubious but valid)
 --
 
-module Test where
+module ShouldCompile where
 
 f x = y
     where (y,z) | y < z     = (0,1)

@@ -1,6 +1,6 @@
 -- !!! ds009 -- simple list comprehensions
 
-module SimpleListComp where
+module ShouldCompile where
 
 f xs = [ x | x <- xs ]
 

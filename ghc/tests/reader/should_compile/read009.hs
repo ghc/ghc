@@ -1,5 +1,5 @@
 -- !!! combining undeclared infix operators
-module ShouldSucceed where
+module ShouldCompile where
 
 -- should default to 'infixl 9'
 

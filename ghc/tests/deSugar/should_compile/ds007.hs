@@ -1,6 +1,6 @@
 -- !!! ds007 -- simple local bindings
 
-module ShouldSucceed where
+module ShouldCompile where
 
 w = a where a = y
             y = []

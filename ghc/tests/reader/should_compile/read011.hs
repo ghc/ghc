@@ -1,5 +1,5 @@
 -- !!! do & where interaction
-module ShouldSucceed where
+module ShouldCompile where
 
 f1 :: IO a -> IO [a]
 f1 x = do

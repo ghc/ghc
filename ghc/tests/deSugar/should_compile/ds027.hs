@@ -1,6 +1,6 @@
 -- !!! ds027 -- simple instances
 --
-module Test where
+module ShouldCompile where
 
 data Foo = Bar | Baz
 

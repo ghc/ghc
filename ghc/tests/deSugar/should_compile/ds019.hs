@@ -1,6 +1,6 @@
 -- !!! ds019 -- mixed var and uni-constructor pats
 
-module Test where
+module ShouldCompile where
 
 f (a,b,c) i     o = []
 f d       (j,k) p = []
