@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.151 2003/04/23 10:42:36 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.152 2003/05/07 08:29:48 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -501,8 +501,8 @@ info s = do
 	| fix == defaultFixity = empty
 	| otherwise            = ppr fix <+> 
 				 (if isSymOcc (nameOccName name)
-					then ppr name
-					else char '`' <> ppr name <> char '`')
+				  then ppr name
+				  else char '`' <> ppr name <> char '`')
 
     showTyThing (AClass cl)
        = hcat [ppr cl, text " is a class", showSrcLoc (className cl)]

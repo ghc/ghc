@@ -151,6 +151,12 @@ So now I've taken the stupid context out.  I simply deal with it
 separately in the type checker on occurrences of a constructor, either
 in an expression or in a pattern.
 
+[May 2003: actually I think this decision could evasily be reversed now,
+and probably should be.  Generics could be disabled for types with 
+a stupid context; record updates now (H98) needs the context too; etc.
+It's an unforced change, so I'm leaving it for now --- but it does seem
+odd that the wrapper doesn't include the stupid context.]
+
 
 
 %************************************************************************

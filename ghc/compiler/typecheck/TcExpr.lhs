@@ -877,7 +877,8 @@ tcId name	-- Look up the Id and instantiate its type
 
 	-- We treat data constructors differently, because we have to generate
 	-- constraints for their silly theta, which no longer appears in
-	-- the type of dataConWrapId.  It's dual to TcPat.tcConstructor
+	-- the type of dataConWrapId (see note on "stupid context" in DataCon.lhs
+	-- It's dual to TcPat.tcConstructor
     inst_data_con data_con
       = tcInstDataCon orig data_con	`thenM` \ (ty_args, ex_dicts, arg_tys, result_ty, _) ->
 	extendLIEs ex_dicts		`thenM_`
