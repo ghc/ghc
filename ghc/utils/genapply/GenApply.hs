@@ -441,7 +441,7 @@ genStackApply args =
 --
 -- These code fragments are used to save registers on the stack at a heap
 -- check failure in the entry code for a function.  We also have to save R1
--- and the return address (stg_gen_ap_info) on the stack.  See stg_fun_gc_gen
+-- and the return address (stg_gc_fun_info) on the stack.  See stg_gc_fun_gen
 -- in HeapStackCheck.hc for more details.
 
 mkStackSaveEntryLabel :: [ArgRep] -> Doc
