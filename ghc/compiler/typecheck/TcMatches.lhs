@@ -18,7 +18,7 @@ import {-# SOURCE #-}	TcExpr( tcCheckRho, tcInferRho, tcMonoExpr )
 import HsSyn		( HsExpr(..), LHsExpr, MatchGroup(..),
 			  Match(..), LMatch, GRHSs(..), GRHS(..), 
 			  Stmt(..), LStmt, HsMatchContext(..), HsStmtContext(..),
-			  ReboundNames, LPat,
+			  ReboundNames, LPat, HsBindGroup(..),
 			  pprMatch, isDoExpr,
 			  pprMatchContext, pprStmtContext, pprStmtResultContext,
 			  collectPatsBinders, glueBindsOnGRHSs
@@ -40,11 +40,13 @@ import TcUnify		( Expected(..), zapExpectedType, readExpectedType,
 			  unifyTauTy, subFunTys, unifyListTy, unifyTyConApp,
 			  checkSigTyVarsWrt, zapExpectedBranches, tcSubExp, tcGen,
 			  unifyAppTy )
+import TcSimplify	( bindInstsOfLocalFuns )
 import Name		( Name )
 import TysWiredIn	( boolTy, parrTyCon, listTyCon )
 import Id		( idType, mkLocalId )
 import CoreFVs		( idFreeTyVars )
 import VarSet
+import BasicTypes	( RecFlag(..) )
 import Util		( isSingleton, notNull )
 import Outputable
 import SrcLoc		( Located(..), noLoc )
@@ -486,7 +488,6 @@ tcStmtAndThen combine ctxt (L src_loc (ParStmt bndr_stmts_s)) thing_inside
 
 	-- RecStmt
 tcStmtAndThen combine ctxt (L src_loc (RecStmt stmts laterNames recNames _)) thing_inside
--- gaw 2004
   = newTyFlexiVarTys (length recNames) liftedTypeKind		`thenM` \ recTys ->
     let
 	rec_ids = zipWith mkLocalId recNames recTys
@@ -500,10 +501,15 @@ tcStmtAndThen combine ctxt (L src_loc (RecStmt stmts laterNames recNames _)) thi
 
     tcExtendIdEnv later_ids		$
 	-- NB:	The rec_ids for the recursive things 
-	-- 	already scope over this part
-    thing_inside				`thenM` \ thing ->
+	-- 	already scope over this part. This binding may shadow
+	--	some of them with polymorphic things with the same Name
+	--	(see note [RecStmt] in HsExpr)
+    getLIE thing_inside				`thenM` \ (thing, lie) ->
+    bindInstsOfLocalFuns lie later_ids		`thenM` \ lie_binds ->
   
-    returnM (combine (L src_loc (RecStmt stmts' later_ids rec_ids rec_rets)) thing)
+    returnM (combine (L src_loc (RecStmt stmts' later_ids rec_ids rec_rets))     $
+	     combine (L src_loc (LetStmt [HsBindGroup lie_binds  [] Recursive])) $
+	     thing)
   where 
     combine_rec stmt (stmts, thing) = (stmt:stmts, thing)
 

@@ -34,8 +34,8 @@ import TcHsSyn		( hsPatType )
 -- Sigh.  This is a pain.
 
 import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppTyCon, tcTyConAppArgs,
-			  tcTyConAppArgs, isUnLiftedType, Type, mkAppTy )
-import Type		( mkFunTys, funArgTy, splitFunTys, isUnboxedTupleType, mkFunTy )
+			  tcTyConAppArgs, isUnLiftedType, Type, mkAppTy, tcEqType )
+import Type		( funArgTy, splitFunTys, isUnboxedTupleType, mkFunTy )
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
@@ -640,32 +640,57 @@ dsRecStmt :: Type		-- Monad type constructor :: * -> *
   	  -> [Id] -> [Id] -> [LHsExpr Id]
 	  -> Stmt Id
 dsRecStmt m_ty ds_meths stmts later_vars rec_vars rec_rets
-  = ASSERT( length vars == length rets )
-    BindStmt tup_pat mfix_app
+  = ASSERT( length rec_vars > 0 )
+    ASSERT( length rec_vars == length rec_rets )
+    BindStmt (mk_tup_pat later_pats) mfix_app
   where 
-	vars@(var1:rest) = later_vars           ++ rec_vars		-- Always at least one
-	rets@(ret1:_)    = map nlHsVar later_vars ++ rec_rets
-	one_var          = null rest
+	-- Remove any vars from later_vars that already in rec_vars
+	-- NB that having the same name is not enough; they must  have
+	--    the same type.  See Note [RecStmt] in HsExpr.
+	trimmed_laters = filter not_in_rec later_vars
+	not_in_rec lv  = null [ v | let lv_type = idType lv
+			 	  , v <- rec_vars
+				  , v == lv
+				  , lv_type `tcEqType` idType v ]
 
 	mfix_app = nlHsApp (noLoc $ TyApp (nlHsVar mfix_id) [tup_ty]) mfix_arg
-	mfix_arg = noLoc $ HsLam (MatchGroup [mkSimpleMatch [tup_pat] body]
+	mfix_arg = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
 					     (mkFunTy tup_ty body_ty))
 
-	tup_expr | one_var   = ret1
-		 | otherwise = noLoc $ ExplicitTuple rets Boxed
-	var_tys		     = map idType vars
-	tup_ty   	     = mkCoreTupTy var_tys  -- Deals with singleton case
-	tup_pat  | one_var   = nlVarPat var1
-		 | otherwise = noLoc $ LazyPat (noLoc $ TuplePat (map nlVarPat vars) Boxed)
+	-- The rec_tup_pat must bind the rec_vars only; remember that the 
+	-- 	trimmed_laters may share the same Names
+	-- Meanwhile, the later_pats must bind the later_vars
+	rec_tup_pats = map mk_wild_pat trimmed_laters ++ map nlVarPat rec_vars
+	later_pats   = map nlVarPat trimmed_laters    ++ map mk_later_pat rec_vars
+	rets         = map nlHsVar trimmed_laters     ++ rec_rets
 
-	body = noLoc $ HsDo DoExpr (stmts ++ [return_stmt]) 
-			   [(n, HsVar id) | (n,id) <- ds_meths]	-- A bit of a hack
-			   body_ty
+	mfix_pat = noLoc $ LazyPat $ mk_tup_pat rec_tup_pats
+	body     = noLoc $ HsDo DoExpr (stmts ++ [return_stmt]) 
+			   	[(n, HsVar id) | (n,id) <- ds_meths]	-- A bit of a hack
+			   	body_ty
 	body_ty = mkAppTy m_ty tup_ty
+	tup_ty  = mkCoreTupTy (map idType (trimmed_laters ++ rec_vars))
+		  -- mkCoreTupTy deals with singleton case
 
   	Var return_id = lookupReboundName ds_meths returnMName
 	Var mfix_id   = lookupReboundName ds_meths mfixName
 
 	return_stmt = noLoc $ ResultStmt return_app
-	return_app  = nlHsApp (noLoc $ TyApp (nlHsVar return_id) [tup_ty]) tup_expr
+	return_app  = nlHsApp (noLoc $ TyApp (nlHsVar return_id) [tup_ty]) 
+			      (mk_ret_tup rets)
+
+	mk_wild_pat :: Id -> LPat Id 
+   	mk_wild_pat v = noLoc $ WildPat $ idType v
+
+	mk_later_pat :: Id -> LPat Id
+	mk_later_pat v | v `elem` trimmed_laters = mk_wild_pat v
+		       | otherwise		 = nlVarPat v
+
+ 	mk_tup_pat :: [LPat Id] -> LPat Id
+  	mk_tup_pat [p] = p
+	mk_tup_pat ps  = noLoc $ TuplePat ps Boxed
+
+	mk_ret_tup :: [LHsExpr Id] -> LHsExpr Id
+	mk_ret_tup [r] = r
+	mk_ret_tup rs  = noLoc $ ExplicitTuple rs Boxed
 \end{code}

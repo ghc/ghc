@@ -701,7 +701,7 @@ data Stmt id
   | ParStmt	[([LStmt id], [id])]	-- After remaing, the ids are the binders
 					-- bound by the stmts and used subsequently
 
-	-- Recursive statement
+	-- Recursive statement (see Note [RecStmt] below)
   | RecStmt  [LStmt id] 
 		--- The next two fields are only valid after renaming
 	     [id] 	-- The ids are a subset of the variables bound by the stmts
@@ -755,6 +755,30 @@ depends on the context.  Consider the following contexts:
 	  Translation: E
 
 Array comprehensions are handled like list comprehensions -=chak
+
+Note [RecStmt]
+~~~~~~~~~~~~~~
+Example:
+	HsDo [ BindStmt x ex
+
+	     , RecStmt [a::forall a. a -> a, b] 
+		       [a::Int -> Int,       c] 
+		       [ BindStmt b (return x)
+		       , LetStmt a = ea
+		       , BindStmt c ec ]
+
+	     , return (a b) ]
+
+Here, the RecStmt binds a,b,c; but 
+  - Only a,b are used in the stmts *following* the RecStmt, 
+	This 'a' is *polymorphic'
+  - Only a,c are used in the stmts *inside* the RecStmt
+	*before* their bindings
+	This 'a' is monomorphic
+
+Nota Bene: the two a's have different types, even though they
+have the same Name.
+
 
 \begin{code}
 instance OutputableBndr id => Outputable (Stmt id) where
