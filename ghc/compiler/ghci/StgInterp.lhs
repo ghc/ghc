@@ -8,7 +8,7 @@
 module StgInterp ( 
 
     ClosureEnv, ItblEnv, 
-    filterNameEnv,      -- :: [ModuleName] -> FiniteMap Name a 
+    filterNameMap,      -- :: [ModuleName] -> FiniteMap Name a 
 			-- -> FiniteMap Name a
 
     linkIModules, 	-- :: ItblEnv -> ClosureEnv
@@ -103,8 +103,8 @@ type ClosureEnv = FiniteMap Name HValue
 emptyClosureEnv = emptyFM
 
 -- remove all entries for a given set of modules from the environment
-filterNameEnv :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
-filterNameEnv mods env 
+filterNameMap :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
+filterNameMap mods env 
    = filterFM (\n _ -> moduleName (nameModule n) `notElem` mods) env
 
 -- ---------------------------------------------------------------------------
