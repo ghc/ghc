@@ -49,7 +49,8 @@ import TyVar	( GenTyVarSet, TyVarEnv, GenTyVar, TyVar,
 		  unitTyVarSet, lookupTyVarEnv, delFromTyVarEnv, zipTyVarEnv, mkTyVarEnv,
 		  emptyTyVarEnv, isEmptyTyVarEnv, addToTyVarEnv )
 import Name	( NamedThing(..), 
-		  NameSet(..), unionNameSets, emptyNameSet, unitNameSet, minusNameSet
+		  NameSet, 
+		    unionNameSets, emptyNameSet, unitNameSet, minusNameSet
 		)
 
 -- others
