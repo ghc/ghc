@@ -1080,6 +1080,7 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelPack_unpackCString_closure"
           ,'-u', "${uscore}PrelException_stackOverflow_closure"
           ,'-u', "${uscore}PrelException_heapOverflow_closure"
+          ,'-u', "${uscore}PrelException_NonTermination_static_closure"
 	));
   if (!$NoHaskellMain) {
    unshift (@Ld_flags,'-u', "${uscore}PrelMain_mainIO_closure");
