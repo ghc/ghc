@@ -3501,7 +3501,7 @@ module Printf where
 -- you intend to use it.
 
 -- Import some Template Haskell syntax
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH
 
 -- Describe a format string
 data Format = D | S | L String
