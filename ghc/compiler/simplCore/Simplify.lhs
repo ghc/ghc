@@ -40,7 +40,7 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiType, findAlt, 
 			  exprType, coreAltsType, exprIsValue, 
 			  exprOkForSpeculation, exprArity, findDefault,
-			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
+			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr, applyTypeToArg
 			)
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
@@ -1552,10 +1552,14 @@ mkDupableCont env ty (ApplyTo _ arg se cont)
 	--	==>
 	--		let a = ...arg... 
 	--		in [...hole...] a
-    mkDupableCont env (funResultTy ty) cont 		`thenSmpl` \ (floats, cont') ->
+    simplExpr (setInScope se env) arg			`thenSmpl` \ arg' ->
+
+    mkDupableCont env (applyTypeToArg ty arg') cont	`thenSmpl` \ (floats, cont') ->
+	-- It's possible (albeit unusual) that arg is a type 
+	-- argument, if the alternatives have a for-all type; 
+	-- hence the applyTypeToArg
     addFloats env floats				$ \ env ->
 
-    simplExpr (setInScope se env) arg			`thenSmpl` \ arg' ->
     if exprIsDupable arg' then
 	returnSmpl (emptyFloats env, ApplyTo OkToDup arg' (zapSubstEnv se) cont')
     else

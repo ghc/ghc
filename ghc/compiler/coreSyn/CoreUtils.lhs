@@ -32,7 +32,7 @@ module CoreUtils (
 	hashExpr,
 
 	-- Equality
-	cheapEqExpr, eqExpr, applyTypeToArgs
+	cheapEqExpr, eqExpr, applyTypeToArgs, applyTypeToArg
     ) where
 
 #include "HsVersions.h"
@@ -59,7 +59,8 @@ import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, splitFunTy,
 			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, 
-			  splitTyConApp_maybe, eqType, funResultTy, applyTy
+			  splitTyConApp_maybe, eqType, funResultTy, applyTy,
+			  funResultTy, applyTy
 			)
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
@@ -113,17 +114,24 @@ mkPiType v ty | isId v    = (case idLBVarInfo v of
 \end{code}
 
 \begin{code}
--- The first argument is just for debugging
+applyTypeToArg :: Type -> CoreExpr -> Type
+applyTypeToArg fun_ty (Type arg_ty) = applyTy fun_ty arg_ty
+applyTypeToArg fun_ty other_arg     = funResultTy fun_ty
+
 applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
+-- A more efficient version of applyTypeToArg 
+-- when we have several args
+-- The first argument is just for debugging
 applyTypeToArgs e op_ty [] = op_ty
 
 applyTypeToArgs e op_ty (Type ty : args)
   =	-- Accumulate type arguments so we can instantiate all at once
-    applyTypeToArgs e (applyTys op_ty tys) rest_args
+    go [ty] args
   where
-    (tys, rest_args)        = go [ty] args
-    go tys (Type ty : args) = go (ty:tys) args
-    go tys rest_args	    = (reverse tys, rest_args)
+    go rev_tys (Type ty : args) = go (ty:rev_tys) args
+    go rev_tys rest_args        = applyTypeToArgs e op_ty' rest_args
+			 	where
+				  op_ty' = applyTys op_ty (reverse rev_tys)
 
 applyTypeToArgs e op_ty (other_arg : args)
   = case (splitFunTy_maybe op_ty) of
