@@ -27,7 +27,6 @@ module CgBindery (
     ) where
 
 IMP_Ubiq(){-uitous-}
---IMPORT_DELOOPER(CgLoop1)		-- here for paranoia-checking
 
 import AbsCSyn
 import CgMonad

@@ -47,9 +47,15 @@ module CgMonad (
 	CompilationInfo(..)
     ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_DELOOPER(CgLoop1)		-- stuff from CgBindery and CgUsages
 IMPORT_1_3(List(nub))
+IMP_Ubiq(){-uitous-}
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(CgLoop1)		-- stuff from CgBindery and CgUsages
+#else
+import {-# SOURCE #-} CgBindery 
+import {-# SOURCE #-} CgUsages
+#endif
 
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )

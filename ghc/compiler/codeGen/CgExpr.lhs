@@ -13,7 +13,9 @@
 module CgExpr ( cgExpr, getPrimOpArgAmodes ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(CgLoop2)	-- here for paranoia-checking
+#endif
 
 import Constants	( mAX_SPEC_SELECTEE_SIZE )
 import StgSyn

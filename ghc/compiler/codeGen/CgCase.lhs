@@ -13,7 +13,11 @@
 module CgCase (	cgCase, saveVolatileVarsAndRegs ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(CgLoop2)		( cgExpr, getPrimOpArgAmodes )
+#else
+import {-# SOURCE #-} CgExpr
+#endif
 
 import CgMonad
 import StgSyn

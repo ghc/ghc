@@ -13,7 +13,11 @@
 module CgLetNoEscape ( cgLetNoEscapeClosure ) where
 
 IMP_Ubiq(){-uitious-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(CgLoop2)		( cgExpr )
+#else
+import {-# SOURCE #-} CgExpr ( cgExpr )
+#endif
 
 import StgSyn
 import CgMonad
