@@ -538,8 +538,10 @@ MKDEPENDHS_HC_OPTS = $(patsubst -i$(odir)/%, -i%, $(HC_OPTS))
 
 MKDEPENDHS=$(HC)
 
+depend :: .depend-$(stage)
+
 # Must do this *after* including target.mk, because $(HS_SRCS) isn't set yet.
-depend :: $(HS_SRCS) $(C_SRCS)
+.depend-$(stage) : $(HS_SRCS) $(C_SRCS)
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
 	$(MKDEPENDC) -f .depend-BASE $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(C_SRCS) 
 	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g' <.depend-BASE >.depend-$(stage)
