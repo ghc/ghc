@@ -1,13 +1,4 @@
 
-==================== Parser ====================
-module ShouldFail where
-f :: {- implicit forall -} Int -> IO Int
-f x = do
-	(2 + 2) <- 2
-	return x
-
-
-
 read007.hs:6:
     `+' is not a data constructor
     In the pattern: 2 + 2

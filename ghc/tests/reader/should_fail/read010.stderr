@@ -1,12 +1,4 @@
 
-==================== Parser ====================
-module ShouldFail where
-import qualified List as  L (intersperse)
-y = intersperse
-x = L.intersperse
-
-
-
 read010.hs:8: Variable not in scope: `intersperse'
 
 Compilation had errors

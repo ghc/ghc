@@ -1,11 +1,4 @@
 
-==================== Parser ====================
-module ShouldFail where
-h x = x
-foo = do let foo = True
-
-
-
 read009.hs:5:
     `do' statements must end in expression: do let foo = True
 
