@@ -457,7 +457,7 @@ showBanner cli_mode dflags = do
    let verb = verbosity dflags
 	-- Show the GHCi banner
 #  ifdef GHCI
-   when (isInteractiveMode mode && verb >= 1) $
+   when (isInteractiveMode cli_mode && verb >= 1) $
       hPutStrLn stdout ghciWelcomeMsg
 #  endif
 

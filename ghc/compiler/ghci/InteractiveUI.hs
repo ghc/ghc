@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.194 2005/03/18 13:38:31 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.195 2005/03/18 17:16:03 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -15,23 +15,23 @@ module InteractiveUI (
 #include "HsVersions.h"
 
 import CompManager
-import HscTypes		( GhciMode(..) )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 			  IfaceConDecl(..), IfaceType,
 		   	  pprIfaceDeclHead, pprParendIfaceType,
 			  pprIfaceForAllPart, pprIfaceType )
 import FunDeps		( pprFundeps )
-import Util		( removeSpaces )
+import Util		( removeSpaces, handle )
 import Linker		( showLinkerState, linkPackages )
 import Util
 import Name		( Name, NamedThing(..) )
 import OccName		( OccName, parenSymOcc, occNameUserString )
 import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
 import Outputable
-import DynFlags	( DynFlags(..), DynFlag(..), dopt )
+import DynFlags
 import Panic 		hiding ( showException )
 import Config
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
+import StaticFlags	( opt_IgnoreDotGhci )
 
 #ifndef mingw32_HOST_OS
 import Util		( handle )
@@ -154,7 +154,7 @@ helpText =
 interactiveUI :: DynFlags -> [FilePath] -> Maybe String -> IO ()
 interactiveUI dflags srcs maybe_expr = do
 
-   cmstate <- cmInit Interactive dflags;
+   cmstate <- cmInit dflags;
 
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
@@ -200,7 +200,7 @@ interactiveUI dflags srcs maybe_expr = do
 
 runGHCi :: [FilePath] -> DynFlags -> Maybe String -> GHCi ()
 runGHCi paths dflags maybe_expr = do
-  read_dot_files <- io (readIORef v_Read_DotGHCi)
+  let read_dot_files = not opt_IgnoreDotGhci
 
   when (read_dot_files) $ do
     -- Read in ./.ghci.
@@ -284,7 +284,7 @@ checkPerms name =
 #ifdef mingw32_HOST_OS
   return True
 #else
-  DriverUtil.handle (\_ -> return False) $ do
+  Util.handle (\_ -> return False) $ do
      st <- getFileStatus name
      me <- getRealUserID
      if fileOwner st /= me then do
@@ -317,7 +317,7 @@ fileLoop hdl prompt = do
 		-- perhaps did getContents which closes stdin at
 		-- EOF.
 	Right l -> 
-	  case remove_spaces l of
+	  case removeSpaces l of
 	    "" -> fileLoop hdl prompt
 	    l  -> do quit <- runCommand l
           	     if quit then return () else fileLoop hdl prompt
@@ -325,7 +325,7 @@ fileLoop hdl prompt = do
 stringLoop :: [String] -> GHCi ()
 stringLoop [] = return ()
 stringLoop (s:ss) = do
-   case remove_spaces s of
+   case removeSpaces s of
 	"" -> stringLoop ss
 	l  -> do quit <- runCommand l
                  if quit then return () else stringLoop ss
@@ -346,7 +346,7 @@ readlineLoop = do
    case l of
 	Nothing -> return ()
 	Just l  ->
-	  case remove_spaces l of
+	  case removeSpaces l of
 	    "" -> readlineLoop
 	    l  -> do
         	  io (addHistory l)
@@ -916,12 +916,9 @@ setOptions wds =
       let (plus_opts, minus_opts)  = partition isPlus wds
       mapM_ setOpt plus_opts
 
-      -- now, the GHC flags
-      leftovers <- io $ processStaticFlags minus_opts
-
       -- then, dynamic flags
       dflags <- getDynFlags
-      (dflags',leftovers) <- io $ processDynamicFlags leftovers dflags
+      (dflags',leftovers) <- io $ parseDynamicFlags dflags minus_opts
       setDynFlags dflags'
 
         -- update things if the users wants more packages

@@ -37,11 +37,12 @@ import NameEnv
 import NameSet		( nameSetToList )
 import Module
 import ListSetOps	( minusList )
-import DynFlags	( DynFlags(..) )
+import DynFlags		( DynFlags(..), getOpts )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )
 import Util             ( zipLazy, global )
+import StaticFlags	( v_Ld_inputs )
 
 -- Standard libraries
 import Control.Monad	( when, filterM, foldM )
@@ -202,11 +203,11 @@ reallyInitDynLinker dflags
 	; linkPackages dflags (explicitPackages (pkgState dflags))
 
 	   	-- (c) Link libraries from the command-line
-	; opt_l  <- getStaticOpts v_Opt_l
-	; let minus_ls = [ lib | '-':'l':lib <- opt_l ]
+	; let optl = getOpts dflags opt_l
+	; let minus_ls = [ lib | '-':'l':lib <- optl ]
 
 	   	-- (d) Link .o files from the command-line
-	; lib_paths <- readIORef v_Library_paths
+	; let lib_paths = libraryPaths dflags
 	; cmdline_ld_inputs <- readIORef v_Ld_inputs
 
 	; classified_ld_inputs <- mapM classifyLdInput cmdline_ld_inputs

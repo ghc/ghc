@@ -26,6 +26,7 @@ import Foreign.C
 import Foreign		( Ptr, nullPtr )
 import Panic		( panic )
 import BasicTypes	( SuccessFlag, successIf )
+import Config		( cLeadingUnderscore )
 import Outputable
 
 -- ---------------------------------------------------------------------------
