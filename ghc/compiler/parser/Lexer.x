@@ -30,6 +30,7 @@ module Lexer (
 
 #include "HsVersions.h"
 
+import ForeignCall	( Safety(..) )
 import ErrUtils		( Message )
 import Outputable
 import StringBuffer
@@ -44,7 +45,7 @@ import Util		( maybePrefixMatch )
 import DATA_BITS
 import Char
 import Ratio
---import TRACE
+import TRACE
 }
 
 $whitechar   = [\ \t\n\r\f\v\xa0]
@@ -297,7 +298,7 @@ unsafeAt arr i = arr ! i
 -- -----------------------------------------------------------------------------
 -- The token type
 
-data Token = T SrcSpan Token__
+data Token = T SrcLoc{-start-} SrcLoc{-end-} Token__
 
 data Token__
   = ITas  			-- Haskell keywords
@@ -541,39 +542,39 @@ reservedSymsFM = listToUFM $
 -- -----------------------------------------------------------------------------
 -- Lexer actions
 
-type Action = SrcSpan -> StringBuffer -> Int -> P Token
+type Action = SrcLoc -> SrcLoc -> StringBuffer -> Int -> P Token
 
 special :: Token__ -> Action
-special tok span _buf len = return (T span tok)
+special tok loc end _buf len = return (T loc end tok)
 
 token, layout_token :: Token__ -> Action
-token t span buf len = return (T span t)
-layout_token t span buf len = pushLexState layout >> return (T span t)
+token t loc end buf len = return (T loc end t)
+layout_token t loc end buf len = pushLexState layout >> return (T loc end t)
 
 idtoken :: (StringBuffer -> Int -> Token__) -> Action
-idtoken f span buf len = return (T span $! (f buf len))
+idtoken f loc end buf len = return (T loc end $! (f buf len))
 
 skip_one_varid :: (FastString -> Token__) -> Action
-skip_one_varid f span buf len 
-  = return (T span $! f (lexemeToFastString (stepOn buf) (len-1)))
+skip_one_varid f loc end buf len 
+  = return (T loc end $! f (lexemeToFastString (stepOn buf) (len-1)))
 
 strtoken :: (String -> Token__) -> Action
-strtoken f span buf len = 
-  return (T span $! (f $! lexemeToString buf len))
+strtoken f loc end buf len = 
+  return (T loc end $! (f $! lexemeToString buf len))
 
 init_strtoken :: Int -> (String -> Token__) -> Action
 -- like strtoken, but drops the last N character(s)
-init_strtoken drop f span buf len = 
-  return (T span $! (f $! lexemeToString buf (len-drop)))
+init_strtoken drop f loc end buf len = 
+  return (T loc end $! (f $! lexemeToString buf (len-drop)))
 
 begin :: Int -> Action
-begin code _span _str _len = do pushLexState code; lexToken
+begin code _loc _end _str _len = do pushLexState code; lexToken
 
 pop :: Action
-pop _span _buf _len = do popLexState; lexToken
+pop _loc _end _buf _len = do popLexState; lexToken
 
 pop_and :: Action -> Action
-pop_and act span buf len = do popLexState; act span buf len
+pop_and act loc end buf len = do popLexState; act loc end buf len
 
 notFollowedBy char _ _ _ (_,buf) = atEnd buf || currentChar buf /= char
 
@@ -587,7 +588,7 @@ ifExtension pred bits _ _ _ = pred bits
   using regular expressions.
 -}
 nested_comment :: Action
-nested_comment span _str _len = do
+nested_comment loc _end _str _len = do
   input <- getInput
   go 1 input
   where go 0 input = do setInput input; lexToken
@@ -608,21 +609,21 @@ nested_comment span _str _len = do
 		    Just (c,input)    -> go n input
 	    	c -> go n input
 
-        err input = do failLocMsgP (srcSpanStart span) (fst input) "unterminated `{-'"
+        err input = do failLocMsgP loc (fst input) "unterminated `{-'"
 
 open_brace, close_brace :: Action
-open_brace  span _str _len = do 
+open_brace  loc end _str _len = do 
   ctx <- getContext
   setContext (NoLayout:ctx)
-  return (T span ITocurly)
-close_brace span _str _len = do 
+  return (T loc end ITocurly)
+close_brace loc end _str _len = do 
   popContext
-  return (T span ITccurly)
+  return (T loc end ITccurly)
 
 -- We have to be careful not to count M.<varid> as a qualified name
 -- when <varid> is a keyword.  We hack around this by catching 
 -- the offending tokens afterward, and re-lexing in a different state.
-check_qvarid span buf len = do
+check_qvarid loc end buf len = do
   case lookupUFM reservedWordsFM var of
 	Just (keyword,exts)
 	  | not (isSpecial keyword) ->
@@ -635,10 +636,10 @@ check_qvarid span buf len = do
 	_other -> return token
   where
 	(mod,var) = splitQualName buf len
-	token     = T span (ITqvarid (mod,var))
+	token     = T loc end (ITqvarid (mod,var))
 
 	try_again = do
-		setInput (srcSpanStart span,buf)
+		setInput (loc,buf)
 		pushLexState bad_qvarid
 		lexToken
 
@@ -667,17 +668,17 @@ splitQualName orig_buf len = split orig_buf 0 0
 	(lexemeToFastString orig_buf dot_off, 
 	 lexemeToFastString (stepOnBy (dot_off+1) orig_buf) (len - dot_off -1))
 
-varid span buf len = 
+varid loc end buf len = 
   case lookupUFM reservedWordsFM fs of
 	Just (keyword,0)    -> do
 		maybe_layout keyword
-		return (T span keyword)
+		return (T loc end keyword)
 	Just (keyword,exts) -> do
 		b <- extension (\i -> exts .&. i /= 0)
 		if b then do maybe_layout keyword
-			     return (T span keyword)
-		     else return (T span (ITvarid fs))
-	_other -> return (T span (ITvarid fs))
+			     return (T loc end keyword)
+		     else return (T loc end (ITvarid fs))
+	_other -> return (T loc end (ITvarid fs))
   where
 	fs = lexemeToFastString buf len
 
@@ -690,34 +691,34 @@ qconsym buf len = ITqconsym $! splitQualName buf len
 varsym = sym ITvarsym
 consym = sym ITconsym
 
-sym con span buf len = 
+sym con loc end buf len = 
   case lookupUFM reservedSymsFM fs of
-	Just (keyword,0)    -> return (T span keyword)
+	Just (keyword,0)    -> return (T loc end keyword)
 	Just (keyword,exts) -> do
 		b <- extension (\i -> exts .&. i /= 0)
-		if b then return (T span keyword)
-		     else return (T span $! con fs)
-	_other -> return (T span $! con fs)
+		if b then return (T loc end keyword)
+		     else return (T loc end $! con fs)
+	_other -> return (T loc end $! con fs)
   where
 	fs = lexemeToFastString buf len
 
-tok_decimal span buf len 
-  = return (T span (ITinteger  $! parseInteger buf len 10 oct_or_dec))
+tok_decimal loc end buf len 
+  = return (T loc end (ITinteger  $! parseInteger buf len 10 oct_or_dec))
 
-tok_octal span buf len 
-  = return (T span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 8 oct_or_dec))
+tok_octal loc end buf len 
+  = return (T loc end (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 8 oct_or_dec))
 
-tok_hexadecimal span buf len 
-  = return (T span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 16 hex))
+tok_hexadecimal loc end buf len 
+  = return (T loc end (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 16 hex))
 
-prim_decimal span buf len 
-  = return (T span (ITprimint  $! parseInteger buf (len-1) 10 oct_or_dec))
+prim_decimal loc end buf len 
+  = return (T loc end (ITprimint  $! parseInteger buf (len-1) 10 oct_or_dec))
 
-prim_octal span buf len 
-  = return (T span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 8 oct_or_dec))
+prim_octal loc end buf len 
+  = return (T loc end (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 8 oct_or_dec))
 
-prim_hexadecimal span buf len 
-  = return (T span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 16 hex))
+prim_hexadecimal loc end buf len 
+  = return (T loc end (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 16 hex))
 
 tok_float        str = ITrational $! readRational__ str
 prim_float       str = ITprimfloat  $! readRational__ str
@@ -734,18 +735,18 @@ parseInteger buf len radix to_int
 
 -- we're at the first token on a line, insert layout tokens if necessary
 do_bol :: Action
-do_bol span _str _len = do
-	pos <- getOffside (srcSpanEndCol span)
+do_bol loc end _str _len = do
+	pos <- getOffside end
 	case pos of
 	    LT -> do
                 --trace "layout: inserting '}'" $ do
 		popContext
 		-- do NOT pop the lex state, we might have a ';' to insert
-		return (T span ITvccurly)
+		return (T loc end ITvccurly)
 	    EQ -> do
                 --trace "layout: inserting ';'" $ do
 		popLexState
-		return (T span ITsemi)
+		return (T loc end ITsemi)
 	    GT -> do
 		popLexState
 		lexToken
@@ -769,9 +770,9 @@ maybe_layout _	        = return ()
 -- by a 'do', then we allow the new context to be at the same indentation as
 -- the previous context.  This is what the 'strict' argument is for.
 --
-new_layout_context strict span _buf _len = do
+new_layout_context strict loc end _buf _len = do
     popLexState
-    let offset = srcSpanStartCol span
+    let offset = srcLocCol loc
     ctx <- getContext
     case ctx of
 	Layout prev_off : _  | 
@@ -780,32 +781,32 @@ new_layout_context strict span _buf _len = do
 		-- token is indented to the left of the previous context.
 		-- we must generate a {} sequence now.
 		pushLexState layout_left
-		return (T span ITvocurly)
+		return (T loc end ITvocurly)
 	other -> do
 		setContext (Layout offset : ctx)
-		return (T span ITvocurly)
+		return (T loc end ITvocurly)
 
-do_layout_left span _buf _len = do
+do_layout_left loc end _buf _len = do
     popLexState
     pushLexState bol  -- we must be at the start of a line
-    return (T span ITvccurly)
+    return (T loc end ITvccurly)
 
 -- -----------------------------------------------------------------------------
 -- LINE pragmas
 
 set_line :: Int -> Action
-set_line code span buf len = do
+set_line code loc end buf len = do
   let line = parseInteger buf len 10 oct_or_dec
-  setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 0)
+  setSrcLoc (mkSrcLoc (srcLocFile end) (fromIntegral line - 1) 0)
 	-- subtract one: the line number refers to the *following* line
   popLexState
   pushLexState code
   lexToken
 
 set_file :: Int -> Action
-set_file code span buf len = do
+set_file code loc end buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
-  setSrcLoc (mkSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
+  setSrcLoc (mkSrcLoc file (srcLocLine end) (srcLocCol end))
   popLexState
   pushLexState code
   lexToken
@@ -816,10 +817,10 @@ set_file code span buf len = do
 -- This stuff is horrible.  I hates it.
 
 lex_string_tok :: Action
-lex_string_tok span buf len = do
+lex_string_tok loc end buf len = do
   tok <- lex_string ""
   end <- getSrcLoc 
-  return (T (mkSrcSpan (srcSpanStart span) end) tok)
+  return (T loc end tok)
 
 lex_string :: String -> P Token__
 lex_string s = do
@@ -857,6 +858,14 @@ lex_string s = do
 	c <- lex_char
 	lex_string (c:s)
 
+lex_char :: P Char
+lex_char = do
+  mc <- getCharOrFail
+  case mc of
+      '\\' -> lex_escape
+      c | is_any c -> return c
+      _other -> lit_error
+
 lex_stringgap s = do
   c <- getCharOrFail
   case c of
@@ -872,9 +881,8 @@ lex_char_tok :: Action
 -- but WIHTOUT CONSUMING the x or T part  (the parser does that).
 -- So we have to do two characters of lookahead: when we see 'x we need to
 -- see if there's a trailing quote
-lex_char_tok span buf len = do	-- We've seen '
+lex_char_tok loc _end buf len = do	-- We've seen '
    i1 <- getInput	-- Look ahead to first character
-   let loc = srcSpanStart span
    case alexGetChar i1 of
 	Nothing -> lit_error 
 
@@ -882,7 +890,7 @@ lex_char_tok span buf len = do	-- We've seen '
 		  th_exts <- extension thEnabled
 		  if th_exts then do
 			setInput i2
-			return (T (mkSrcSpan loc end2)  ITtyQuote)
+			return (T loc end2 ITtyQuote)
 		   else lit_error
 
 	Just ('\\', i2@(end2,_)) -> do 	-- We've seen 'backslash 
@@ -905,7 +913,7 @@ lex_char_tok span buf len = do	-- We've seen '
 		_other -> do 		-- We've seen 'x not followed by quote
 					-- If TH is on, just parse the quote only
 			th_exts <- extension thEnabled	
-			if th_exts then return (T (mkSrcSpan loc (fst i1)) ITvarQuote)
+			if th_exts then return (T loc (fst i1) ITvarQuote)
 				   else lit_error
 
 finish_char_tok :: SrcLoc -> Char -> P Token
@@ -917,20 +925,11 @@ finish_char_tok loc ch	-- We've already seen the closing quote
 		case alexGetChar i of
 			Just ('#',i@(end,_)) -> do
 				setInput i
-				return (T (mkSrcSpan loc end) (ITprimchar ch))
+				return (T loc end (ITprimchar ch))
 			_other ->
-				return (T (mkSrcSpan loc end) (ITchar ch))
-	        else do
-		   end <- getSrcLoc
-		   return (T (mkSrcSpan loc end) (ITchar ch))
-
-lex_char :: P Char
-lex_char = do
-  mc <- getCharOrFail
-  case mc of
-      '\\' -> lex_escape
-      c | is_any c -> return c
-      _other -> lit_error
+					return (T loc end (ITchar ch))
+	  else do end <- getSrcLoc
+		  return (T loc end (ITchar ch))
 
 lex_escape :: P Char
 lex_escape = do
@@ -1114,26 +1113,24 @@ data LayoutContext
 data ParseResult a
   = POk PState a
   | PFailed 
-	SrcSpan		-- The spam the error.  Might be used in environments
-			-- which can show this span, e.g. by highlighting it.
+	SrcLoc SrcLoc	-- The start and end of the text span related to
+			-- the error.  Might be used in environments which can 
+			-- show this span, e.g. by highlighting it.
 	Message		-- The error message
 
-showPFailed span err = hcat [ppr span, text ": ", err]
+showPFailed loc1 loc2 err = hcat [ppr loc1, text ": ", err]
 
 data PState = PState { 
 	buffer	   :: StringBuffer,
-        last_span  :: SrcSpan,		-- span of previous token
-	last_len   :: !Int,
+        last_loc   :: SrcLoc,		-- pos of previous token
+	last_len   :: !Int,		-- len of previous token
         loc        :: SrcLoc,   -- current loc (end of prev token + 1)
 	extsBitmap :: !Int,	-- bitmap that determines permitted extensions
 	context	   :: [LayoutContext],
 	lex_state  :: [Int]
      }
-	-- last_span is used when generating error messages,
+	-- last_loc and last_len are used when generating error messages,
 	-- and in pushCurrentContext only.
-	-- last_len is used when generating error messages, and is
-	-- needed because we need to back up the buffer pointer by that
-	-- number of characters for outputing the token in the error message.
 
 newtype P a = P { unP :: PState -> ParseResult a }
 
@@ -1148,17 +1145,17 @@ returnP a = P $ \s -> POk s a
 thenP :: P a -> (a -> P b) -> P b
 (P m) `thenP` k = P $ \ s ->
 	case m s of
-		POk s1 a         -> (unP (k a)) s1
-		PFailed span err -> PFailed span err
+		POk s1 a          -> (unP (k a)) s1
+		PFailed l1 l2 err -> PFailed l1 l2 err
 
 failP :: String -> P a
-failP msg = P $ \s -> PFailed (last_span s) (text msg)
+failP msg = P $ \s -> PFailed (last_loc s) (loc s) (text msg)
 
 failMsgP :: String -> P a
-failMsgP msg = P $ \s -> PFailed (last_span s) (text msg)
+failMsgP msg = P $ \s -> PFailed (last_loc s) (loc s) (text msg)
 
 failLocMsgP :: SrcLoc -> SrcLoc -> String -> P a
-failLocMsgP loc1 loc2 str = P $ \s -> PFailed (mkSrcSpan loc1 loc2) (text str)
+failLocMsgP loc1 loc2 str = P $ \s -> PFailed loc1 loc2 (text str)
 
 extension :: (Int -> Bool) -> P Bool
 extension p = P $ \s -> POk s (p $! extsBitmap s)
@@ -1174,14 +1171,14 @@ setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
 setSrcLocFor :: SrcLoc -> P a -> P a
 setSrcLocFor new_loc scope = P $ \s@PState{ loc = old_loc } -> 
   case unP scope s{loc=new_loc} of
-	PFailed span msg -> PFailed span msg
+	PFailed l1 l2 msg -> PFailed l1 l2 msg
 	POk _ r -> POk s r
 
 getSrcLoc :: P SrcLoc
 getSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 
-setLastToken :: SrcSpan -> Int -> P ()
-setLastToken span len = P $ \s -> POk s{ last_span=span, last_len=len } ()
+setLastToken :: SrcLoc -> Int -> P ()
+setLastToken loc len = P $ \s -> POk s{ last_loc=loc, last_len=len } ()
 
 type AlexInput = (SrcLoc,StringBuffer)
 
@@ -1237,7 +1234,7 @@ mkPState :: StringBuffer -> SrcLoc -> DynFlags -> PState
 mkPState buf loc flags  = 
   PState {
       buffer	 = buf,
-      last_span  = mkSrcSpan loc loc,
+      last_loc   = loc,
       last_len   = 0,
       loc        = loc,
       extsBitmap = fromIntegral bitmap,
@@ -1265,24 +1262,24 @@ setContext ctx = P $ \s -> POk s{context=ctx} ()
 
 popContext :: P ()
 popContext = P $ \ s@(PState{ buffer = buf, context = ctx, 
-			  loc = loc, last_len = len, last_span = last_span }) ->
+			   loc = loc, last_len = len, last_loc = last_loc }) ->
   case ctx of
 	(_:tl) -> POk s{ context = tl } ()
-	[]     -> PFailed last_span (srcParseErr buf len)
+	[]     -> PFailed last_loc loc (srcParseErr buf len)
 
 -- Push a new layout context at the indentation of the last token read.
 -- This is only used at the outer level of a module when the 'module'
 -- keyword is missing.
 pushCurrentContext :: P ()
-pushCurrentContext = P $ \ s@PState{ last_span=span, context=ctx } ->
-  POk s{ context = Layout (srcSpanStartCol span) : ctx} ()
+pushCurrentContext = P $ \ s@PState{ last_loc=loc, context=ctx } ->
+  POk s{ context = Layout (srcLocCol loc) : ctx} ()
 
-getOffside :: Int -> P Ordering
-getOffside col = P $ \s@PState{context=stk} ->
+getOffside :: SrcLoc -> P Ordering
+getOffside loc = P $ \s@PState{context=stk} ->
 		let ord = case stk of
-			(Layout n:_) -> compare col n
+			(Layout n:_) -> compare (srcLocCol loc) n
 			_            -> GT
-		in POk s $! ord
+		in POk s ord
 
 -- ---------------------------------------------------------------------------
 -- Construct a parse error
@@ -1304,8 +1301,8 @@ srcParseErr buf len
 -- detected during parsing.
 srcParseFail :: P a
 srcParseFail = P $ \PState{ buffer = buf, last_len = len, 	
-				last_span = last_span, loc = loc } ->
-    PFailed last_span (srcParseErr buf len)
+				last_loc = last_loc, loc = loc } ->
+    PFailed last_loc loc (srcParseErr buf len)
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.  TODO: this is slightly wrong, because we record
@@ -1322,7 +1319,7 @@ lexError str = do
 
 lexer :: (Token -> P a) -> P a
 lexer cont = do
-  tok@(T _ tok__) <- lexToken
+  tok@(T _ _ tok__) <- lexToken
   --trace ("token: " ++ show tok__) $ do
   cont tok
 
@@ -1332,16 +1329,14 @@ lexToken = do
   sc <- getLexState
   exts <- getExts
   case alexScanUser exts inp sc of
-    AlexEOF -> do let span = mkSrcSpan loc1 loc1
-		  setLastToken span 0
-		  return (T span ITeof)
+    AlexEOF -> do setLastToken loc1 0
+		  return (T loc1 loc1 ITeof)
     AlexError (loc2,_) -> do failLocMsgP loc1 loc2 "lexical error"
     AlexSkip inp2 _ -> do
 	setInput inp2
 	lexToken
     AlexToken inp2@(end,buf2) len t -> do
 	setInput inp2
-	let span = mkSrcSpan loc1 end
-	(setLastToken $! span) $! len
-	t span buf len
+	setLastToken loc1 len
+	t loc1 end buf len
 }
