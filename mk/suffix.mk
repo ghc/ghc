@@ -159,7 +159,7 @@ ifeq "$(UseGhcForCc)" "YES"
 
 %.$(way_)s : %.c
 	@$(RM) $@
-	$(HC) $(GHC_CC_OPTS) -c $< -o $@
+	$(HC) $(GHC_CC_OPTS) -S $< -o $@
 
 else
 
