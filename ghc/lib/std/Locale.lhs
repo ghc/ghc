@@ -7,6 +7,8 @@
 \begin{code}
 module Locale(TimeLocale(..), defaultTimeLocale) where
 
+import Prelude  -- so as to force recompilations when reqd.
+
 data TimeLocale = TimeLocale {
         wDays  :: [(String, String)],   -- full and abbreviated week days
         months :: [(String, String)],   -- full and abbreviated months
