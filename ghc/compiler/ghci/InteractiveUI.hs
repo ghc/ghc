@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.66 2001/05/04 16:36:38 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.67 2001/05/21 13:57:49 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -54,7 +54,7 @@ import CString		( peekCString )
 ghciWelcomeMsg = "\ 
 \   ___         ___ _\n\ 
 \  / _ \\ /\\  /\\/ __(_)\n\ 
-\ / /_\\// /_/ / /  | |      GHC Interactive, version " ++ cProjectVersion ++ ", For Haskell 98.\n\ 
+\ / /_\\// /_/ / /  | |      GHC Interactive, version " ++ cProjectVersion ++ ", for Haskell 98.\n\ 
 \/ /_\\\\/ __  / /___| |      http://www.haskell.org/ghc/\n\ 
 \\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
 
@@ -85,19 +85,19 @@ shortHelpText = "use :? for help.\n"
 helpText = "\ 
 \ Commands available from the prompt:\n\ 
 \\  
-\   <stmt>		evaluate/run <stmt>\n\ 
-\   :cd <dir>		change directory to <dir>\n\ 
-\   :def <cmd> <expr>   define a command :<cmd>\n\ 
-\   :help, :?		display this list of commands\n\ 
-\   :load <filename>    load a module (and it dependents)\n\ 
-\   :module <mod>	set the context for expression evaluation to <mod>\n\ 
-\   :reload		reload the current module set\n\ 
-\   :set <option> ...	set options\n\ 
-\   :undef <name> 	undefine user-defined command :<name>\n\ 
-\   :type <expr>	show the type of <expr>\n\ 
-\   :unset <option> ...	unset options\n\ 
-\   :quit		exit GHCi\n\ 
-\   :!<command>		run the shell command <command>\n\ 
+\   <stmt>		   evaluate/run <stmt>\n\ 
+\   :cd <dir>		   change directory to <dir>\n\ 
+\   :def <cmd> <expr>      define a command :<cmd>\n\ 
+\   :help, :?		   display this list of commands\n\ 
+\   :load <filename>       load a module (and its dependents)\n\ 
+\   :module <mod>	   set the context for expression evaluation to <mod>\n\ 
+\   :reload		   reload the current module set\n\ 
+\   :set <option> ...	   set options\n\ 
+\   :undef <cmd> 	   undefine user-defined command :<cmd>\n\ 
+\   :type <expr>	   show the type of <expr>\n\ 
+\   :unset <option> ...	   unset options\n\ 
+\   :quit		   exit GHCi\n\ 
+\   :!<command>		   run the shell command <command>\n\ 
 \\ 
 \ Options for `:set' and `:unset':\n\ 
 \\ 
