@@ -230,6 +230,7 @@ boot ::
 
 # Slight cheatage here to pass host as target, but x-compilation isn't supported by ghc.
 
+ifeq "$(way)" ""
 all :: gmp/libgmp.a
 
 ifeq "$(DLLized)" "YES"
@@ -238,6 +239,7 @@ all :: $(DLL_PEN)/gmp.dll
 $(DLL_PEN)/gmp.dll:
 	$(MAKE) -C gmp gmp.dll
 	$(MV) gmp/gmp.dll $(DLL_PEN)
+endif
 endif
 
 install :: gmp/libgmp.a
