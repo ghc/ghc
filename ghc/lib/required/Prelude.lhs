@@ -8,6 +8,7 @@ module Prelude (
     module PrelTup,
 
 	-- From PrelBase
+    (->),
     Eq(..), 
     Ord(..), Ordering(..), 
     Bounded(..), 
