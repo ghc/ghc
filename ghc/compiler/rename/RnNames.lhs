@@ -128,19 +128,18 @@ checkEarlyExit mod
 	returnRn True
     else
     traceRn (text "Considering whether compilation is required...")	`thenRn_`
-    (if not opt_SourceUnchanged then
+    if not opt_SourceUnchanged then
 	-- Source code changed and no errors yet... carry on 
 	traceRn (nest 4 (text "source file changed or recompilation check turned off"))	`thenRn_` 
 	returnRn False
-     else
+    else
 	-- Unchanged source, and no errors yet; see if usage info
 	-- up to date, and exit if so
-	checkUpToDate mod
-    )									`thenRn` \ up_to_date ->
-    traceRn (text "Hence, compilation" <+> 
-	     text (if up_to_date then "IS NOT" else "IS") <+>
-	     text "required")						`thenRn_`
-    returnRn up_to_date
+	checkUpToDate mod						`thenRn` \ up_to_date ->
+	putDocRn (text "Compilation" <+> 
+	     	  text (if up_to_date then "IS NOT" else "IS") <+>
+		  text "required")					`thenRn_`
+	returnRn up_to_date
 \end{code}
 	
 
