@@ -212,3 +212,8 @@ SRC_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
 #
 
 
+# Directory in which DLLs are dumped so as not to get picked up by running
+# programs (e.g. ghc or hsc) that run in the build tree
+
+DLL_PEN = $(FPTOOLS_TOP)/dll
+
