@@ -475,6 +475,11 @@ it's easier to write and easier to grep for. YMMV.
 #define stgCast(ty,e) ((ty)(e))
 </pre>
 
+<li> Please keep to 80 columns: the line has to be drawn somewhere,
+and by keeping it to 80 columns we can ensure that code looks OK on
+everyone's screen.  Long lines are hard to read, and a sign that the
+code needs to be restructured anyway.
+
 <li> We don't care too much about your indentation style but, if
 you're modifying a function, please try to use the same style as the
 rest of the function (or file).  
