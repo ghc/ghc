@@ -634,6 +634,14 @@ checkValidType ctxt ty
 			GenPatCtxt   -> actual_kind_is_lifted
 			ForSigCtxt _ -> actual_kind_is_lifted
 			other	     -> isTypeKind actual_kind
+	
+	ubx_tup | not gla_exts = UT_NotOk
+		| otherwise    = case ctxt of
+				   TySynCtxt _ -> UT_Ok
+				   other       -> UT_NotOk
+		-- Unboxed tuples ok in function results,
+		-- but for type synonyms we allow them even at
+		-- top level
     in
     tcAddErrCtxt (checkTypeCtxt ctxt ty)	$
 
@@ -641,7 +649,7 @@ checkValidType ctxt ty
     checkTc kind_ok (kindErr actual_kind)	`thenTc_`
 
 	-- Check the internal validity of the type itself
-    check_poly_type rank ty
+    check_poly_type rank ubx_tup ty
 
 
 checkTypeCtxt ctxt ty
@@ -670,16 +678,21 @@ decRank :: Rank -> Rank
 decRank Arbitrary = Arbitrary
 decRank (Rank n)  = Rank (n-1)
 
-check_poly_type :: Rank -> Type -> TcM ()
-check_poly_type (Rank 0) ty 
-  = check_tau_type (Rank 0) False ty
+----------------------------------------
+data UbxTupFlag = UT_Ok	| UT_NotOk
+	-- The "Ok" version means "ok if -fglasgow-exts is on"
 
-check_poly_type rank ty 
+----------------------------------------
+check_poly_type :: Rank -> UbxTupFlag -> Type -> TcM ()
+check_poly_type (Rank 0) ubx_tup ty 
+  = check_tau_type (Rank 0) ubx_tup ty
+
+check_poly_type rank ubx_tup ty 
   = let
 	(tvs, theta, tau) = tcSplitSigmaTy ty
     in
     check_valid_theta SigmaCtxt theta		`thenTc_`
-    check_tau_type (decRank rank) False tau	`thenTc_`
+    check_tau_type (decRank rank) ubx_tup tau	`thenTc_`
     checkFreeness tvs theta 			`thenTc_`
     checkAmbiguity tvs theta (tyVarsOfType tau)
 
@@ -700,49 +713,58 @@ check_arg_type :: Type -> TcM ()
 -- NB: unboxed tuples can have polymorphic or unboxed args.
 --     This happens in the workers for functions returning
 --     product types with polymorphic components.
---     But not in user code
--- 
--- Question: what about nested unboxed tuples?
--- 	     Currently rejected.
+--     But not in user code.
+-- Anyway, they are dealt with by a special case in check_tau_type
+
 check_arg_type ty 
-  = check_tau_type (Rank 0) False ty	`thenTc_` 
+  = check_tau_type (Rank 0) UT_NotOk ty		`thenTc_` 
     checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty)
 
 ----------------------------------------
-check_tau_type :: Rank -> Bool -> Type -> TcM ()
+check_tau_type :: Rank -> UbxTupFlag -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- No foralls otherwise
--- Bool is True iff unboxed tuple are allowed here
 
-check_tau_type rank ubx_tup_ok ty@(UsageTy _ _)  = failWithTc (usageTyErr ty)
-check_tau_type rank ubx_tup_ok ty@(ForAllTy _ _) = failWithTc (forAllTyErr ty)
-check_tau_type rank ubx_tup_ok (SourceTy sty)    = getDOptsTc		`thenNF_Tc` \ dflags ->
-						   check_source_ty dflags TypeCtxt sty
-check_tau_type rank ubx_tup_ok (TyVarTy _)       = returnTc ()
-check_tau_type rank ubx_tup_ok ty@(FunTy arg_ty res_ty)
-  = check_poly_type rank      arg_ty	`thenTc_`
-    check_tau_type  rank True res_ty
+check_tau_type rank ubx_tup ty@(UsageTy _ _)  = failWithTc (usageTyErr ty)
+check_tau_type rank ubx_tup ty@(ForAllTy _ _) = failWithTc (forAllTyErr ty)
+check_tau_type rank ubx_tup (SourceTy sty)    = getDOptsTc		`thenNF_Tc` \ dflags ->
+						check_source_ty dflags TypeCtxt sty
+check_tau_type rank ubx_tup (TyVarTy _)       = returnTc ()
+check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
+  = check_poly_type rank UT_NotOk arg_ty	`thenTc_`
+    check_tau_type  rank UT_Ok    res_ty
 
-check_tau_type rank ubx_tup_ok (AppTy ty1 ty2)
+check_tau_type rank ubx_tup (AppTy ty1 ty2)
   = check_arg_type ty1 `thenTc_` check_arg_type ty2
 
-check_tau_type rank ubx_tup_ok (NoteTy note ty)
-  = check_note note `thenTc_` check_tau_type rank ubx_tup_ok ty
+check_tau_type rank ubx_tup (NoteTy note ty)
+  = check_tau_type rank ubx_tup ty
+	-- Synonym notes are built only when the synonym is 
+	-- saturated (see Type.mkSynTy)
+	-- Not checking the 'note' part allows us to instantiate a synonym
+	-- defn with a for-all type, but that seems OK too
 
-check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
-  | isSynTyCon tc
-  = checkTc syn_arity_ok arity_msg	`thenTc_`
+check_tau_type rank ubx_tup ty@(TyConApp tc tys)
+  | isSynTyCon tc	
+  = 	-- NB: Type.mkSynTy builds a TyConApp (not a NoteTy) for an unsaturated
+	-- synonym application, leaving it to checkValidType (i.e. right here
+	-- to find the error
+    checkTc syn_arity_ok arity_msg	`thenTc_`
     mapTc_ check_arg_type tys
     
   | isUnboxedTupleTyCon tc
-  = checkTc ubx_tup_ok ubx_tup_msg	`thenTc_`
-    mapTc_ (check_tau_type (Rank 0) True) tys	-- Args are allowed to be unlifted, or
-						-- more unboxed tuples, so can't use check_arg_ty
+  = doptsTc Opt_GlasgowExts			`thenNF_Tc` \ gla_exts ->
+    checkTc (ubx_tup_ok gla_exts) ubx_tup_msg	`thenTc_`
+    mapTc_ (check_tau_type (Rank 0) UT_Ok) tys	
+			-- Args are allowed to be unlifted, or
+			-- more unboxed tuples, so can't use check_arg_ty
 
   | otherwise
   = mapTc_ check_arg_type tys
 
   where
+    ubx_tup_ok gla_exts = case ubx_tup of { UT_Ok -> gla_exts; other -> False }
+
     syn_arity_ok = tc_arity <= n_args
 		-- It's OK to have an *over-applied* type synonym
 		--	data Tree a b = ...
@@ -753,10 +775,6 @@ check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
 
     arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
     ubx_tup_msg = ubxArgTyErr ty
-
-----------------------------------------
-check_note (FTVNote _)  = returnTc ()
-check_note (SynNote ty) = check_tau_type (Rank 0) False ty
 
 ----------------------------------------
 forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr_ty ty
@@ -879,7 +897,7 @@ check_valid_theta ctxt theta
 -------------------------
 check_source_ty dflags ctxt pred@(ClassP cls tys)
   = 	-- Class predicates are valid in all contexts
-    mapTc_ check_arg_type tys			`thenTc_`
+    mapTc_ check_arg_type tys		`thenTc_`
     checkTc (arity == n_tys) arity_err		`thenTc_`
     checkTc (all tyvar_head tys || arby_preds_ok)
 	    (predTyVarErr pred $$ how_to_allow)

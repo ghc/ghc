@@ -711,19 +711,29 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
 
 \begin{code}
 hoistForAllTys :: Type -> Type
-	-- Move all the foralls to the top
-	-- e.g.  T -> forall a. a  ==>   forall a. T -> a
-        -- Careful: LOSES USAGE ANNOTATIONS!
+-- Used for user-written type signatures only
+-- Move all the foralls and constraints to the top
+-- e.g.  T -> forall a. a        ==>   forall a. T -> a
+--	 T -> (?x::Int) -> Int   ==>   (?x::Int) -> T -> Int
+--
+-- We want to 'look through' type synonyms when doing this
+-- so it's better done on the Type than the HsType
+
 hoistForAllTys ty
-  = case hoist ty of { (tvs, body) -> mkForAllTys tvs body }
+  = case hoist ty ty of 
+	(tvs, theta, body) -> mkForAllTys tvs (mkFunTys theta body)
   where
-    hoist :: Type -> ([TyVar], Type)
-    hoist ty = case tcSplitFunTys    ty  of { (args, res) -> 
-	       case tcSplitForAllTys res of {
-		  ([], body)  -> ([], ty) ;
-		  (tvs1, body1) -> case hoist body1 of { (tvs2,body2) ->
-				   (tvs1 ++ tvs2, mkFunTys args body2)
-	       }}}
+    hoist orig_ty (ForAllTy tv ty) = case hoist ty ty of
+					(tvs,theta,tau) -> (tv:tvs,theta,tau)
+    hoist orig_ty (FunTy arg res)
+	| isPredTy arg		   = case hoist res res of
+					(tvs,theta,tau) -> (tvs,arg:theta,tau)
+	| otherwise		   = case hoist res res of
+					(tvs,theta,tau) -> (tvs,theta,mkFunTy arg tau)
+
+    hoist orig_ty (NoteTy _ ty)    = hoist orig_ty ty
+    hoist orig_ty (UsageTy _ ty)   = hoist orig_ty ty
+    hoist orig_ty ty		   = ([], [], orig_ty)
 \end{code}
 
 
