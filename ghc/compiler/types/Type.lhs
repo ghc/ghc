@@ -835,9 +835,16 @@ isUnboxedType :: Type -> Bool
 isUnboxedType ty = not (isFollowableRep (typePrimRep ty))
 
 isUnLiftedType :: Type -> Bool
-isUnLiftedType ty = case splitTyConApp_maybe ty of
-			   Just (tc, ty_args) -> isUnLiftedTyCon tc
-			   other	      -> False
+	-- isUnLiftedType returns True for forall'd unlifted types:
+	--	x :: forall a. Int#
+	-- I found bindings like these were getting floated to the top level.
+	-- They are pretty bogus types, mind you.  It would be better never to
+	-- construct them
+
+isUnLiftedType (ForAllTy tv ty) = isUnLiftedType ty
+isUnLiftedType (NoteTy _ ty)	= isUnLiftedType ty
+isUnLiftedType (TyConApp tc _)  = isUnLiftedTyCon tc
+isUnLiftedType other		= False
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty = case splitTyConApp_maybe ty of
