@@ -35,9 +35,11 @@ module PrelErr
 import PrelBase
 import PrelIOBase
 import PrelAddr
-import PrelForeign  ( StablePtr, deRefStablePtr )
 import PrelList     ( span )
 
+#ifndef __PARALLEL_HASKELL__
+import PrelForeign  ( StablePtr, deRefStablePtr )
+#endif
 
 ---------------------------------------------------------------
 -- HACK: Magic unfoldings not implemented for unboxed lists
