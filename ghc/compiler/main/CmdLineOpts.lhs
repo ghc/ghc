@@ -56,7 +56,6 @@ module CmdLineOpts (
 	opt_ForConcurrent,
 	opt_GlasgowExts,
 	opt_GranMacros,
-	opt_Haskell_1_3,
 	opt_HiMap,
 	opt_IgnoreIfacePragmas,
 	opt_IgnoreStrictnessPragmas,
@@ -312,7 +311,7 @@ opt_FoldrBuildTrace		= lookUp  SLIT("-ffoldr-build-trace")
 opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
-opt_Haskell_1_3			= lookUp  SLIT("-fhaskell-1.3")
+--UNUSED:opt_Haskell_1_3	= lookUp  SLIT("-fhaskell-1.3")
 opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
@@ -442,12 +441,12 @@ classifyOpts = sep argv [] [] -- accumulators...
       = panic "simpl_sep []"
 #endif
 
-	-- The SimplifierSwitches should be delimited by "(" and ")".
+	-- The SimplifierSwitches should be delimited by "[" and "]".
 
     simpl_sep (opt1:opts) simpl_sw core_td stg_td
       = case (_UNPK_ opt1) of
-	  "(" -> simpl_sep opts simpl_sw core_td stg_td
-	  ")" -> let
+	  "[" -> simpl_sep opts simpl_sw core_td stg_td
+	  "]" -> let
 		    this_simpl = CoreDoSimplify (isAmongSimpl simpl_sw)
 		 in
 		 sep opts (this_simpl : core_td) stg_td
