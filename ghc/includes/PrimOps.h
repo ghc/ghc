@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.63 2000/09/26 16:45:34 simonpj Exp $
+ * $Id: PrimOps.h,v 1.64 2000/10/12 15:49:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -41,15 +41,7 @@
         r = ((P_ *)tmp)[i];                                             \
    } while (0)
 
-
-#else
-
-/* These are the original definitions.  They don't chase indirections. */
-#define indexWordOffClosurezh(r,a,i)   	r= ((W_ *)(a))[i]
-#define indexPtrOffClosurezh(r,a,i)   	r= ((P_ *)(a))[i]
-
 #endif
-
 
 /* -----------------------------------------------------------------------------
    Comparison PrimOps.
