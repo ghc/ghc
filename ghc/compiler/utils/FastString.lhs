@@ -96,7 +96,7 @@ import IOExts		( hPutBufFull, hPutBufBAFull )
 
 -- ForeignObj is now exported abstractly.
 #if __GLASGOW_HASKELL__ >= 303
-import qualified PrelForeign as Foreign  ( ForeignObj(..) )
+import PrelForeign      ( ForeignObj(..) )
 #else
 import Foreign		( ForeignObj(..) )
 #endif
