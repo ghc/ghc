@@ -434,6 +434,8 @@ AC_PROG_CPP
 dnl ** figure out how to do context diffs
 FPTOOLS_PROG_DIFF
 
+dnl ** Find find command (for Win32's benefit)
+AC_PATH_PROG(FindCmd, find)
 
 dnl ** look for a decent parser generator (bison preferred)
 dnl (FPTOOLS_PROG_YACCY is AC_PROG_YACC, but with some extra testing 

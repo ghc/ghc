@@ -557,6 +557,7 @@ CP			= cp
 CPP			= @CPP@
 CTAGS 			= $(ETAGS)
 RAWCPP                  = $(CPP) -undef -traditional
+FIND			= @FindCmd@
 INSTALL			= @INSTALL@
 #
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
