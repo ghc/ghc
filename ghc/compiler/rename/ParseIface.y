@@ -592,9 +592,10 @@ tatype		:  qtc_name 			  	{ HsTyVar $1 }
 
 package		:: { PackageName }
 		:  STRING		{ $1 }
-		| {- empty -}		{ opt_InPackage }	-- Useful for .hi-boot files,
-								-- which can omit the package Id
-								-- Module loops are always within a package
+		| {- empty -}		{ opt_InPackage }
+				-- Useful for .hi-boot files,
+				-- which can omit the package Id
+				-- Module loops are always within a package
 
 mod_name	:: { ModuleName }
 		:  CONID		{ mkSysModuleNameFS $1 }
@@ -616,10 +617,6 @@ var_fs          :: { EncodedFS }
 		| 'ccall' 		{ SLIT("ccall") }
 		| 'stdcall' 		{ SLIT("stdcall") }
 
-qvar_fs		:: { (EncodedFS, EncodedFS) }
-		:  QVARID		{ $1 }
-		|  QVARSYM		{ $1 }
-
 var_occ	        :: { OccName }
 		:  var_fs		{ mkSysOccFS varName $1 }
 
@@ -628,7 +625,7 @@ var_name	:  var_occ		{ mkRdrUnqual $1 }
 
 qvar_name	:: { RdrName }
 qvar_name	:  var_name		{ $1 }
-		|  qvar_fs      	{ mkIfaceOrig varName $1 }
+		|  QVARID	      	{ mkIfaceOrig varName $1 }
 
 ipvar_name	:: { RdrName }
 		:  IPVARID		{ mkRdrUnqual (mkSysOccFS varName (tailFS $1)) }
@@ -645,51 +642,30 @@ var_names1	:: { [RdrName] }
 var_names1	: var_name var_names	{ $1 : $2 }
 
 ---------------------------------------------------
--- For some bizarre reason, 
---      (,,,)      is dealt with by the parser
---      Foo.(,,,)  is dealt with by the lexer
--- Sigh
-
-data_fs	        :: { EncodedFS }
-		:  CONID		{ $1 }
-		|  CONSYM		{ $1 }
-
-qdata_fs	:: { (EncodedFS, EncodedFS) }
-                :  QCONID		{ $1 }
-                |  QCONSYM		{ $1 }
 
 data_occ	:: { OccName }
-		:  data_fs		{ mkSysOccFS dataName $1 }
-
-data_name	:: { RdrName }
-                :  data_occ             { mkRdrUnqual $1 }
+		:  CONID		{ mkSysOccFS dataName $1 }
 
 qdata_name	:: { RdrName }
-qdata_name	:  data_name		{ $1 }
-		|  qdata_fs 	        { mkIfaceOrig dataName $1 }
+		:  data_occ             { mkRdrUnqual $1 }
+		|  QCONID 	        { mkIfaceOrig dataName $1 }
 				
 var_or_data_name :: { RdrName }
-                  : qvar_name                    { $1 }
-                  | qdata_name                   { $1 }
+                  : qvar_name		{ $1 }
+                  | qdata_name		{ $1 }
 
 ---------------------------------------------------
 tc_occ	        :: { OccName }
-		:  data_fs 		{ mkSysOccFS tcName $1 }
-
-tc_name		:: { RdrName }
-                :  tc_occ		{ mkRdrUnqual $1 }
+		:  CONID 		{ mkSysOccFS tcName $1 }
 
 qtc_name	:: { RdrName }
-                : tc_name		{ $1 }
-		| qdata_fs		{ mkIfaceOrig tcName $1 }
+                : tc_occ		{ mkRdrUnqual $1 }
+		| QCONID		{ mkIfaceOrig tcName $1 }
 
 ---------------------------------------------------
-cls_name	:: { RdrName }
-        	:  data_fs		{ mkRdrUnqual (mkSysOccFS clsName $1) }
-
 qcls_name	:: { RdrName }
-         	: cls_name		{ $1 }
-		| qdata_fs		{ mkIfaceOrig clsName $1 }
+         	: CONID			{ mkRdrUnqual (mkSysOccFS clsName $1) }
+		| QCONID		{ mkIfaceOrig clsName $1 }
 
 ---------------------------------------------------
 tv_name		:: { RdrName }
