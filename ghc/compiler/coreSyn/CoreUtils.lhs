@@ -315,6 +315,7 @@ exprIsAtom :: CoreExpr -> Bool
 exprIsAtom (Var v)    = True	-- primOpIsDupable?
 exprIsAtom (Lit lit)  = True
 exprIsAtom (Type ty)  = True
+exprIsAtom (Note (SCC _) e) = False
 exprIsAtom (Note _ e) = exprIsAtom e
 exprIsAtom other      = False
 \end{code}
