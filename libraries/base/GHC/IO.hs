@@ -779,9 +779,9 @@ bufRead fd ref is_stream ptr so_far count =
 	 	else do mb_buf <- maybeFillReadBuffer fd True is_stream buf
 			case mb_buf of
 		          Nothing -> return so_far -- got nothing, we're done
-		          Just new_buf -> do 
-			    writeIORef ref new_buf
-		   	    bufRead fd ref is_stream ptr so_far count
+		          Just buf' -> do
+			   	writeIORef ref buf'
+				bufRead fd ref is_stream ptr so_far count
      else do 
   	let avail = w - r
 	if (count == avail)
@@ -797,6 +797,8 @@ bufRead fd ref is_stream ptr so_far count =
 		return (so_far + count)
 	   else do
   
+	memcpy_ptr_baoff ptr raw r (fromIntegral avail)
+	writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
 	let remaining = count - avail
 	    so_far' = so_far + avail
 	    ptr' = ptr `plusPtr` avail
@@ -878,6 +880,8 @@ bufReadNonBlocking fd ref is_stream ptr so_far count =
 		return (so_far + count)
 	   else do
 
+	memcpy_ptr_baoff ptr raw r (fromIntegral avail)
+	writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
 	let remaining = count - avail
 	    so_far' = so_far + avail
 	    ptr' = ptr `plusPtr` avail
