@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.78 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: Schedule.c,v 1.79 2000/10/10 09:12:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3030,34 +3030,34 @@ printThreadBlockage(StgTSO *tso)
 {
   switch (tso->why_blocked) {
   case BlockedOnRead:
-    fprintf(stderr,"blocked on read from fd %d", tso->block_info.fd);
+    fprintf(stderr,"is blocked on read from fd %d", tso->block_info.fd);
     break;
   case BlockedOnWrite:
-    fprintf(stderr,"blocked on write to fd %d", tso->block_info.fd);
+    fprintf(stderr,"is blocked on write to fd %d", tso->block_info.fd);
     break;
   case BlockedOnDelay:
-    fprintf(stderr,"blocked until %d", tso->block_info.target);
+    fprintf(stderr,"is blocked until %d", tso->block_info.target);
     break;
   case BlockedOnMVar:
-    fprintf(stderr,"blocked on an MVar");
+    fprintf(stderr,"is blocked on an MVar");
     break;
   case BlockedOnException:
-    fprintf(stderr,"blocked on delivering an exception to thread %d",
+    fprintf(stderr,"is blocked on delivering an exception to thread %d",
 	    tso->block_info.tso->id);
     break;
   case BlockedOnBlackHole:
-    fprintf(stderr,"blocked on a black hole");
+    fprintf(stderr,"is blocked on a black hole");
     break;
   case NotBlocked:
-    fprintf(stderr,"not blocked");
+    fprintf(stderr,"is not blocked");
     break;
 #if defined(PAR)
   case BlockedOnGA:
-    fprintf(stderr,"blocked on global address; local FM_BQ is %p (%s)",
+    fprintf(stderr,"is blocked on global address; local FM_BQ is %p (%s)",
 	    tso->block_info.closure, info_type(tso->block_info.closure));
     break;
   case BlockedOnGA_NoSend:
-    fprintf(stderr,"blocked on global address (no send); local FM_BQ is %p (%s)",
+    fprintf(stderr,"is blocked on global address (no send); local FM_BQ is %p (%s)",
 	    tso->block_info.closure, info_type(tso->block_info.closure));
     break;
 #endif
@@ -3089,7 +3089,7 @@ printAllThreads(void)
 
   sched_belch("all threads:");
   for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
-    fprintf(stderr, "\tthread %d is ", t->id);
+    fprintf(stderr, "\tthread %d ", t->id);
     printThreadStatus(t);
     fprintf(stderr,"\n");
   }
