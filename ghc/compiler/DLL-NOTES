@@ -1,0 +1,58 @@
+                              The DLL story
+                              -------------
+
+***
+
+This file is intended to be a focal point for notes on how DLLs work. Please
+add cross-references to source and other docs, especially when you don't
+find something here that you need.
+
+***
+
+
+Introduction
+------------
+
+On Windows, DLLs are synonymous with packages (since 4.07; this change
+simplified a rather horrible mess). Hence whenever a module is to be
+compiled to go in a DLL, it must be compiled with -package-name dll-name.
+Typically, failing to do this gives Windows error message boxes of the form
+"The instruction at address <x> tried to read memory at address <x>".
+
+
+Dependencies
+------------
+
+Because references in DLLs must be fully resolved when the DLL is compiled
+(except for references to other DLLs), it is not possible for DLLs to call
+the main program. This means that the parts of the RTS and standard package
+which call the main program cannot be compiled into the relevant DLLs, and
+must instead be compiled as standalone object files and linked in to each
+executable. This gives the following picture of dependencies within a program:
+
+            ___________         ___________
+           |           |------>|           |   GHC-land  |  Application-land
+DLL-land   | HSrts.dll |       | HSstd.dll |             |
+           |___________|<------|___________|             |
+                 |                   ^                   |
+-----------------|-------------------|-------------------|
+            _____v_____         _____|______             |
+.o-land    |           |       |            |            |
+           |  Main.o   |       | PrelMain.o |-----------------------
+	   |___________|       |____________|            |          |
+                 |                                       |    ______v______
+                 |                                       |   |             |
+                  ------------------------------------------>|   Main.o    |
+                                                         |   |_____________|
+
+(The application's dependencies are not shown.)
+
+
+Bits of the compiler that deal with DLLs
+----------------------------------------
+
+basicTypes/Module.lhs is the most important place, as it deals with which
+modules identifiers are in.
+
+basicTypes/name.lhs, other bits of basicTypes/, nativeGen/, codeGen/,
+abcCSyn/, and even profiling/ have other references.
