@@ -31,10 +31,6 @@ type hpragma;
 			      gprag_dfun_const : hpragma; /* gen pragma: of dfun */
 			      gprag_constms    : list; /* (name, gen pragma) pairs */ >;
 
-	iinst_spec_pragma:  < gprag_imod_spec  : stringId;
-			      gprag_dfun_spec  : hpragma; /* gen pragma: of dfun */
-			      gprag_inst_specs : list; /* (type, inst_pragma) pairs */ >;
-
 	igen_pragma:	    < gprag_arity      : hpragma; /* arity */
 			      gprag_update     : hpragma; /* update info */
 			      gprag_deforest   : hpragma; /* deforest info */
@@ -63,11 +59,7 @@ type hpragma;
 	itype_pragma_pr:    < gprag_type_pr1	: list;   /* of maybe types */
 			      gprag_type_pr2	: numId; /* # dicts to ignore */
 			      gprag_type_pr3	: hpragma; >;
-	iinst_pragma_3s:    < gprag_inst_pt1	: list; /* of maybe types */
-			      gprag_inst_pt2	: numId;
-			      gprag_inst_pt3	: hpragma;
-			      gprag_inst_pt4	: list; >;
-	
+
 	idata_pragma_4s:    < gprag_data_spec	: list; /* of maybe types */ >;
 
 end;

@@ -11,6 +11,8 @@ import List		( (++), foldr )
 import Prel		( (&&), (.) )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 instance (Eq a, Eq b, Eq c) => Eq (a, b, c) where
     (a1,a2,a3) == (b1,b2,b3) = a1 == b1 && a2 == b2 && a3 == b3
@@ -58,16 +60,23 @@ instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
 instance (Text a, Text b, Text c) => Text (a, b, c) where
     readsPrec p = readParen False
 			(\a -> [((x,y,z), h) | ("(",b) <- lex a,
-					       (x,c)   <- reads b,
+					       (x,c)   <- readsPrec 0 b,
 					       (",",d) <- lex c,
-					       (y,e)   <- reads d,
+					       (y,e)   <- readsPrec 0 d,
 					       (",",f) <- lex e,
-					       (z,g)   <- reads f,
+					       (z,g)   <- readsPrec 0 f,
 					       (")",h) <- lex g ] )
 
-    showsPrec p (x,y,z) = showChar '(' . shows x . showString ", " .
-					 shows y . showString ", " .
-					 shows z . showChar ')'
+    showsPrec p (x,y,z) = showChar '(' . showsPrec 0 x . showString ", " .
+					 showsPrec 0 y . showString ", " .
+					 showsPrec 0 z . showChar ')'
+
+    readList	= _readList (readsPrec 0)
+    showList	= _showList (showsPrec 0) 
+
+{-# SPECIALIZE instance Eq   (Int,Int,Int) #-}
+{-# SPECIALIZE instance Ord  (Int,Int,Int) #-}
+{-# SPECIALIZE instance Text (Int,Int,Int) #-}
 
 #if defined(__UNBOXED_INSTANCES__)
 

@@ -30,7 +30,8 @@ module AbsPrel (
 	-- *odd* values that need to be reached out and grabbed:
 	eRROR_ID, pAT_ERROR_ID, aBSENT_ERROR_ID,
 	unpackCStringId, unpackCString2Id, packStringForCId, unpackCStringAppendId,
-	integerZeroId, integerPlusOneId, integerMinusOneId,
+	integerZeroId, integerPlusOneId,
+	integerPlusTwoId, integerMinusOneId,
 
 #ifdef DPH
 	-- ProcessorClass
@@ -239,6 +240,7 @@ min_nonprim_tycon_list -- used w/ HideMostBuiltinNames
       doubleTyCon,
       integerTyCon,
       ratioTyCon,
+      liftTyCon,
       return2GMPsTyCon,	-- ADR asked for these last two (WDP 94/11)
       returnIntAndGMPTyCon ]
 

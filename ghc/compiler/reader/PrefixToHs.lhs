@@ -68,9 +68,10 @@ cvClassOpSig (RdrTySig vars poly_ty pragmas src_loc)
     cvt_pragmas RdrNoPragma	       = NoClassOpPragmas
     cvt_pragmas (RdrClassOpPragmas ps) = ps
 
-cvInstDeclSig (RdrInlineValSig      sig) = [ sig ]
-cvInstDeclSig (RdrDeforestSig	    sig) = [ sig ]
-cvInstDeclSig (RdrMagicUnfoldingSig sig) = [ sig ]
+cvInstDeclSig (RdrSpecValSig        sigs) = sigs
+cvInstDeclSig (RdrInlineValSig      sig)  = [ sig ]
+cvInstDeclSig (RdrDeforestSig	    sig)  = [ sig ]
+cvInstDeclSig (RdrMagicUnfoldingSig sig)  = [ sig ]
 \end{code}
 
 %************************************************************************
@@ -342,6 +343,7 @@ sepDeclsIntoSigsAndBinds binding
     }
   where
     sep_stuff s@(RdrTySig _ _ _ _)       (sigs,defs) = (s:sigs,defs)
+    sep_stuff s@(RdrSpecValSig _)        (sigs,defs) = (s:sigs,defs)
     sep_stuff s@(RdrInlineValSig _)      (sigs,defs) = (s:sigs,defs)
     sep_stuff s@(RdrDeforestSig  _)      (sigs,defs) = (s:sigs,defs)
     sep_stuff s@(RdrMagicUnfoldingSig _) (sigs,defs) = (s:sigs,defs)

@@ -72,6 +72,8 @@ import PreludeGlaST
 
 import Regex
 
+import Core	-- alas ...
+
 \end{code}
 
 _tailPS and _dropPS in PS.lhs are not to my liking, use

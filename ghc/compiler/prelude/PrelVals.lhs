@@ -139,14 +139,16 @@ packStringForCId
 \end{code}
 
 OK, this is Will's idea: we should have magic values for Integers 0,
-+1, and -1 (go ahead, fire me):
++1, +2, and -1 (go ahead, fire me):
 \begin{code}
 integerZeroId
-  = pcMiscPrelId integerZeroIdKey     pRELUDE_CORE SLIT("_integer_0")  integerTy noIdInfo
+  = pcMiscPrelId integerZeroIdKey     pRELUDE_CORE SLIT("__integer0")  integerTy noIdInfo
 integerPlusOneId
-  = pcMiscPrelId integerPlusOneIdKey  pRELUDE_CORE SLIT("_integer_1")  integerTy noIdInfo
+  = pcMiscPrelId integerPlusOneIdKey  pRELUDE_CORE SLIT("__integer1")  integerTy noIdInfo
+integerPlusTwoId
+  = pcMiscPrelId integerPlusTwoIdKey  pRELUDE_CORE SLIT("__integer2")  integerTy noIdInfo
 integerMinusOneId
-  = pcMiscPrelId integerMinusOneIdKey pRELUDE_CORE SLIT("_integer_m1") integerTy noIdInfo
+  = pcMiscPrelId integerMinusOneIdKey pRELUDE_CORE SLIT("__integerm1") integerTy noIdInfo
 \end{code}
 
 %************************************************************************
@@ -569,10 +571,11 @@ realWorldPrimId
 \begin{code}
 buildId
   = pcMiscPrelId buildIdKey pRELUDE_CORE SLIT("_build") buildTy
-	(((noIdInfo 
+	((((noIdInfo 
 		`addInfo_UF` mkMagicUnfolding SLIT("build"))
 		`addInfo` mkStrictnessInfo [WwStrict] Nothing)
 		`addInfo` mkArgUsageInfo [ArgUsage 2])
+	        `addInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
 	-- cheating, but since _build never actually exists ...
   where
     -- The type of this strange object is:
@@ -624,11 +627,12 @@ foldrId = pcMiscPrelId foldrIdKey pRELUDE_FB{-not "List"-} SLIT("foldr")
 		`UniFun` ((mkListTy alpha)
 		`UniFun` beta)))
 
-	idInfo = ((((noIdInfo 
+	idInfo = (((((noIdInfo 
 			`addInfo_UF` mkMagicUnfolding SLIT("foldr"))
 			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
 			`addInfo` mkArityInfo 3)
 			`addInfo` mkUpdateInfo [2,2,1])
+	        	`addInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
 
 mkFoldr a b f z xs = foldl CoApp
 			   (mkCoTyApps (CoVar foldrId) [a, b]) 
@@ -644,11 +648,12 @@ foldlId = pcMiscPrelId foldlIdKey pRELUDE_FB{-not "List"-} SLIT("foldl")
 		`UniFun` ((mkListTy beta)
 		`UniFun` alpha)))
 
-	idInfo = ((((noIdInfo 
+	idInfo = (((((noIdInfo 
 			`addInfo_UF` mkMagicUnfolding SLIT("foldl"))
 			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
 			`addInfo` mkArityInfo 3)
 			`addInfo` mkUpdateInfo [2,2,1])
+	        	`addInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
 
 mkFoldl a b f z xs = foldl CoApp
 			   (mkCoTyApps (CoVar foldlId) [a, b]) 

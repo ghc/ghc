@@ -719,11 +719,6 @@ ppragma(p)
 				ppragma(gprag_dfun_const(p));
 				plist(ppragma, gprag_constms(p));
 				break;
-      case iinst_spec_pragma:	PUTTAGSTR("PiS");
-				pid(gprag_imod_spec(p));
-				ppragma(gprag_dfun_spec(p));
-				plist(ppragma, gprag_inst_specs(p));
-				break;
 
       case igen_pragma:		PUTTAGSTR("Pg");
 				ppragma(gprag_arity(p));
@@ -771,12 +766,6 @@ ppragma(p)
 				plist(pttype, gprag_type_pr1(p));
 				pid(gprag_type_pr2(p));
 				ppragma(gprag_type_pr3(p));
-				break;
-      case iinst_pragma_3s:	PUTTAGSTR("P3");
-				plist(pttype, gprag_inst_pt1(p));
-				pid(gprag_inst_pt2(p));
-				ppragma(gprag_inst_pt3(p));
-				plist(ppragma,gprag_inst_pt4(p));
 				break;
 
       case idata_pragma_4s:	PUTTAGSTR("P4");

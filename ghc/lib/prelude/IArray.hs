@@ -21,6 +21,7 @@ import Cls
 import Core
 import IChar
 import IInt		-- instances
+import IDouble
 import IList
 import ITup2
 import List		( (++), zipWith, foldr )
@@ -28,6 +29,7 @@ import Prel		( (&&), (.) )
 import PS		( _PackedString, _unpackPS )
 import Text
 import TyArray   	( Array(..), Assoc(..) )
+import TyComplex
 import PreludeGlaST
 
 -- Hey! This isn't wimp Haskell-report code!  This is
@@ -72,6 +74,9 @@ instance (Text a, Text b) => Text (Assoc a b) where
     showsPrec d (a := b)
       = showParen (d > 1)
 	  (showsPrec 2 a . showString " := " . showsPrec 2 b)
+
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0)
 
 -- ToDo: *** Binary
 
@@ -228,17 +233,24 @@ instance (Ix a, Ord b) => Ord (Array a b) where
 instance  (Ix a, Text a, Text b) => Text (Array a b)  where
     showsPrec p a = showParen (p > 9) (
 		    showString "array " .
-		    shows (bounds a) . showChar ' ' .
-		    shows (assocs a) )
+		    showsPrec 0 (bounds a) . showChar ' ' .
+		    showList (assocs a) )
 
     readsPrec p = readParen (p > 9)
 	   (\r -> [(array b as, u) | ("array",s) <- lex r,
-				     (b,t)	 <- reads s,
-				     (as,u)	 <- reads t   ]
+				     (b,t)	 <- readsPrec 0 s,
+				     (as,u)	 <- readList t ]
 		  ++
 		  [(listArray b xs, u) | ("listArray",s) <- lex r,
-					 (b,t)		 <- reads s,
-					 (xs,u)		 <- reads t ])
+					 (b,t)		 <- readsPrec 0 s,
+					 (xs,u)		 <- readList t ])
+
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0)
+
+
+{-# SPECIALIZE instance Text (Array Int Double) #-}
+{-# SPECIALIZE instance Text (Array (Int,Int) Double) #-}
 
 {- **** OMITTED **** (ToDo)
 instance  (Ix a, Binary a, Binary b) => Binary (Array a b)  where
@@ -268,12 +280,6 @@ instance  (Ix a, Binary a, Binary b) => Binary (Array a b)  where
 -- {-# GENERATE_SPECS instance a{Int#} b{Int#,Double#} :: Eq (Array a b) #-}
 -- {-# GENERATE_SPECS instance a{Int#} b{Int#,Double#} :: Ord (Array a b) #-}
 -- {-# GENERATE_SPECS instance a{Int#} b{Int#,Double#} :: Text (Array a b) #-}
-
-
--- {-# GENERATE_SPECS instance a{Int}  b{} 	       :: Eq (Array a b) #-}
-This raises the question of ambiguous specialised instances:
-Which instance would be chosen for  Array Int Int#  ?
-Array Int b  or  Array a Int#  ?
 
 -- {-# GENERATE_SPECS instance a{Int#} b{Int#,Double#} :: Eq (Assoc a b) #-}
 -- {-# GENERATE_SPECS instance a{Int#} b{Int#,Double#} :: Ord (Assoc a b) #-}

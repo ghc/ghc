@@ -54,6 +54,8 @@ instance Text ClockTime where
             _ccall_ strlen str			    `thenPrimIO` \ len ->
             _packCBytesST len str		    `thenStrictlyST` \ ps ->
             returnPrimIO (_unpackPS ps)))
+
+    showList = _showList (showsPrec 0)
 \end{code}
 
 

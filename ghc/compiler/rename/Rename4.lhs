@@ -28,7 +28,7 @@ import AbsUniType	( derivableClassKeys )
 import Errors
 import HsCore		-- ****** NEED TO SEE CONSTRUCTORS ******
 import HsPragmas	-- ****** NEED TO SEE CONSTRUCTORS ******
-import Maybes		( catMaybes, Maybe(..) )
+import Maybes		( catMaybes, maybeToBool, Maybe(..) )
 import ProtoName	( eqProtoName, elemProtoNames )
 import RenameBinds4	( rnTopBinds4, rnMethodBinds4 )
 import RenameMonad4
@@ -253,7 +253,7 @@ rnInstDecl4 (InstDecl context cname ty mbinds from_here modname imod uprags prag
     rnMonoType4 False{-no invisibles-} tv_env ty
 					`thenRn4` \ ty' ->
     rnMethodBinds4 cname' mbinds	`thenRn4` \ mbinds' ->
-    mapRn4 rn_uprag uprags		`thenRn4` \ new_uprags ->
+    mapRn4 (rn_uprag cname') uprags	`thenRn4` \ new_uprags ->
     recoverQuietlyRn4 NoInstancePragmas (
 	rnInstancePragmas4 cname' tv_env pragmas
     )					`thenRn4` \ new_pragmas ->
@@ -261,20 +261,27 @@ rnInstDecl4 (InstDecl context cname ty mbinds from_here modname imod uprags prag
 			from_here modname imod new_uprags new_pragmas src_loc)
     )
   where
-    rn_uprag (InlineSig var guide locn)
-      = pushSrcLocRn4 locn	      (
-	lookupValue var	    `thenRn4` \ new_var ->
-	returnRn4 (InlineSig new_var guide locn)
+    rn_uprag class_name (SpecSig op ty using locn)
+      = ASSERT(not (maybeToBool using))	-- ToDo: SPEC method with explicit spec_id
+	pushSrcLocRn4 src_loc 				(
+	lookupClassOp class_name op			`thenRn4` \ op_name ->
+        rnPolyType4 False True nullTyVarNamesEnv ty	`thenRn4` \ new_ty ->
+	returnRn4 (SpecSig op_name new_ty Nothing locn)
 	)
-    rn_uprag (DeforestSig var locn)
-      = pushSrcLocRn4 locn            (
-        lookupValue var            `thenRn4` \ new_var ->
-	returnRn4 (DeforestSig new_var locn)
+    rn_uprag class_name (InlineSig op guide locn)
+      = pushSrcLocRn4 locn	      	(
+	lookupClassOp class_name op	`thenRn4` \ op_name ->
+	returnRn4 (InlineSig op_name guide locn)
 	)
-    rn_uprag (MagicUnfoldingSig var str locn)
-      = pushSrcLocRn4 locn		  (
-	lookupValue var	    `thenRn4` \ new_var ->
-	returnRn4 (MagicUnfoldingSig new_var str locn)
+    rn_uprag class_name (DeforestSig op locn)
+      = pushSrcLocRn4 locn            	(
+	lookupClassOp class_name op	`thenRn4` \ op_name ->
+	returnRn4 (DeforestSig op_name locn)
+	)
+    rn_uprag class_name (MagicUnfoldingSig op str locn)
+      = pushSrcLocRn4 locn		(
+	lookupClassOp class_name op	`thenRn4` \ op_name ->
+	returnRn4 (MagicUnfoldingSig op_name str locn)
 	)
 \end{code}
 

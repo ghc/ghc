@@ -93,15 +93,16 @@ getIdStrictness :: Id -> StrictnessInfo
 getIdUnfolding :: Id -> UnfoldingDetails
 getIdUniType :: Id -> UniType
 getIdUpdateInfo :: Id -> UpdateInfo
+getInstIdModule :: Id -> _PackedString
 getInstNamePieces :: Bool -> Inst -> [_PackedString]
 getInstantiatedDataConSig :: Id -> [UniType] -> ([UniType], [UniType], UniType)
 getMentionedTyConsAndClassesFromId :: Id -> (Bag TyCon, Bag Class)
 idWantsToBeINLINEd :: Id -> Bool
 isBottomingId :: Id -> Bool
 isClassOpId :: Id -> Bool
-isConstMethodId :: Id -> Bool
+isConstMethodId_maybe :: Id -> Labda (Class, UniType, ClassOp)
 isDataCon :: Id -> Bool
-isDefaultMethodId :: Id -> Bool
+isDefaultMethodId_maybe :: Id -> Labda (Class, ClassOp, Bool)
 isDictFunId :: Id -> Bool
 isImportedId :: Id -> Bool
 isInstId_maybe :: Id -> Labda Inst
@@ -116,10 +117,10 @@ isWorkerId :: Id -> Bool
 isWrapperId :: Id -> Bool
 localiseId :: Id -> Id
 mkClassOpId :: Unique -> Class -> ClassOp -> UniType -> IdInfo -> Id
-mkConstMethodId :: Unique -> Class -> ClassOp -> UniType -> UniType -> Bool -> IdInfo -> Id
+mkConstMethodId :: Unique -> Class -> ClassOp -> UniType -> UniType -> Bool -> _PackedString -> IdInfo -> Id
 mkDataCon :: Unique -> FullName -> [TyVarTemplate] -> [(Class, UniType)] -> [UniType] -> TyCon -> SpecEnv -> Id
 mkDefaultMethodId :: Unique -> Class -> ClassOp -> Bool -> UniType -> IdInfo -> Id
-mkDictFunId :: Unique -> Class -> UniType -> UniType -> Bool -> IdInfo -> Id
+mkDictFunId :: Unique -> Class -> UniType -> UniType -> Bool -> _PackedString -> IdInfo -> Id
 mkId :: Name -> UniType -> IdInfo -> Id
 mkIdWithNewUniq :: Id -> Unique -> Id
 mkImported :: Unique -> FullName -> UniType -> IdInfo -> Id
@@ -138,6 +139,7 @@ myWrapperMaybe :: Id -> Labda Id
 nullSpecEnv :: SpecEnv
 pprIdInUnfolding :: UniqFM Id -> Id -> Int -> Bool -> PrettyRep
 replaceIdInfo :: Id -> IdInfo -> Id
+selectIdInfoForSpecId :: Id -> IdInfo
 showId :: PprStyle -> Id -> [Char]
 toplevelishId :: Id -> Bool
 unfoldingUnfriendlyId :: Id -> Bool

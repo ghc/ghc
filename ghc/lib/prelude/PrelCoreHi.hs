@@ -21,9 +21,13 @@ module PreludeCore (
 
 	ReadS(..), ShowS(..),
 
---	IOResult, -- has to be here because wired into compiler
+	-- IOResult has to be here because wired into compiler
 	Dialogue(..), Request(..), Response(..), SigAct(..), IOError(..),
-	SuccCont(..), StrCont(..), StrListCont(..), BinCont(..), FailCont(..)
+	SuccCont(..), StrCont(..), StrListCont(..), BinCont(..), FailCont(..),
+
+	-- for unfoldings ...
+	_fromRational, __i0, __i1, __i2, __im1, __i8, __i10, __i16, __rhalf,
+	__integer0, __integer1, __integer2, __integerm1
     ) where
 
 -- few *Ty(s) imports

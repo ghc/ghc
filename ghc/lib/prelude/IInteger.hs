@@ -1,7 +1,9 @@
 module PreludeCore (
 	Integer(..),
-	int2Integer,
-	_integer_0, _integer_1, _integer_m1
+	__integer0,	-- These names must match those in PrelVals.hs
+	__integer1,
+	__integer2,
+	__integerm1
     ) where
 
 import Cls
@@ -9,25 +11,22 @@ import Core
 import IInt
 import IRatio		( (%) )
 import ITup2		-- instances
-import List		( (++), foldr )
+import List		( (++), foldr, takeWhile )
 import Prel		( not, otherwise, (&&) )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 ------------------------------------------------------
--- a magical Integer-ish function that
--- the compiler inserts references to
+-- useful constants
 
-int2Integer :: Int -> Integer
-int2Integer (I# i#) = int2Integer# i#
+__integer0, __integer1, __integer2, __integerm1 :: Integer
 
-------------------------------------------------------
--- some *very* heavily-used constants
-
-_integer_0, _integer_1, _integer_m1 :: Integer
-_integer_0  = 0
-_integer_1  = 1
-_integer_m1 = (-1)
+__integer0  = fromInt 0
+__integer1  = fromInt 1
+__integer2  = fromInt 2
+__integerm1 = fromInt (-1)
 
 ------------------------------------------------------
 
@@ -78,7 +77,7 @@ instance  Num Integer  where
     -- ORIG: abs n = if n >= 0 then n else -n
 
     abs n@(J# a1 s1 d1)
-      = case _integer_0 of { J# a2 s2 d2 ->
+      = case __integer0 of { J# a2 s2 d2 ->
 	if (cmpInteger# a1 s1 d1 a2 s2 d2) >=# 0#
 	then n
 	else negateInteger# a1 s1 d1
@@ -91,13 +90,13 @@ instance  Num Integer  where
     -}
 
     signum n@(J# a1 s1 d1)
-      = case _integer_0	of { J# a2 s2 d2 ->
+      = case __integer0 of { J# a2 s2 d2 ->
 	let
 	    cmp = cmpInteger# a1 s1 d1 a2 s2 d2
 	in
-	if      cmp >#  0# then _integer_1
-	else if cmp ==# 0# then _integer_0
-	else			_integer_m1
+	if      cmp >#  0# then __integer1
+	else if cmp ==# 0# then __integer0
+	else			__integerm1
 	}
 
     fromInteger	x	=  x
@@ -105,7 +104,7 @@ instance  Num Integer  where
     fromInt (I# n#)	=  int2Integer# n# -- gives back a full-blown Integer
 
 instance  Real Integer  where
-    toRational x	=  x % 1
+    toRational x	=  x :% __integer1
 
 instance  Integral Integer where
     quotRem (J# a1 s1 d1) (J# a2 s2 d2)
@@ -132,11 +131,11 @@ instance  Integral Integer where
     n `mod` d	=  r  where (q,r) = divMod n d
 
     divMod n d 	=  case (quotRem n d) of { qr@(q,r) ->
-		   if signum r == - signum d then (q-1, r+d) else qr }
+		   if signum r == - signum d then (q - __integer1, r+d) else qr }
 		   -- Case-ified by WDP 94/10
 
-    even x = (==) (rem x 2) 0
-    odd x  = (/=) (rem x 2) 0
+    even x = (==) (rem x __integer2) __integer0
+    odd x  = (/=) (rem x __integer2) __integer0
 
 instance  Ix Integer  where
     range (m,n)		=  [m..n]
@@ -148,15 +147,15 @@ instance  Ix Integer  where
     inRange (m,n) i	=  m <= i && i <= n
 
 instance  Enum Integer  where
-{- RAW PRELUDE ************************
-    enumFrom		=  numericEnumFrom
-    enumFromThen	=  numericEnumFromThen
--}
-    enumFrom n = n : enumFrom (n + 1)
-    enumFromThen m n = en' m (n - m)
-	    where en' m n = m : en' (m + n) n
-
+    enumFrom n           =  n : enumFrom (n + __integer1)
+    enumFromThen m n     =  en' m (n - m)
+	                    where en' m n = m : en' (m + n) n
+    enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
+    enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
+				      (enumFromThen n m)
 
 instance  Text Integer  where
     readsPrec p x = readSigned readDec x
     showsPrec   x = showSigned showInt x
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0) 

@@ -78,6 +78,8 @@ import List		( (++) )
 import PS
 import Prel		( (.) )
 import Text
+import TyArray
+import TyComplex
 
 import PreludeGlaST
 import PreludePrimIO	( _MVar )

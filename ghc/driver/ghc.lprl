@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 % *** MSUB does some substitutions here ***
 % *** grep for $( ***
@@ -160,6 +160,7 @@ $HsCpp	 = # but this is re-set to "cat" (after options) if -cpp not seen
 	   ( $(INSTALLING) ) ? "$InstLibDirGhc/hscpp"
 			     : "$TopPwd/$(CURRENT_DIR)/$(GHC_HSCPP)";
 @HsCpp_flags	= ();
+$genSPECS_flag	= '';		# See ../utils/hscpp/hscpp.prl
 
 $HsP	 = ( $(INSTALLING) ) ? "$InstLibDirGhc/hsp"
 			     : "$TopPwd/$(CURRENT_DIR)/$(GHC_HSP)";
@@ -206,6 +207,7 @@ $Oopt_AddAutoSccs		= '';
 $Oopt_FinalStgProfilingMassage	= '';
 $Oopt_StgStats			= '';
 $Oopt_SpecialiseUnboxed		= '';
+$Oopt_DoSpecialise		= '-fspecialise';
 $Oopt_FoldrBuild		= 1; # On by default!
 $Oopt_FB_Support		= '-fdo-new-occur-anal -fdo-arity-expand';
 #$Oopt_FoldrBuildWW		= 0; # Off by default
@@ -372,7 +374,6 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 			    # GranSim
 		   '_mg',   '$StkChkByPageFaultOK = 0;
 			     push(@HsC_flags,  \'-fconcurrent\');
-#????????????		     push(@HsCpp_flags,\'-D__PARALLEL_HASKELL__\',   \'-DPAR\');
 			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DGRAN\');',
 
 		   '_2s',   'push (@CcBoth_flags, \'-DGC2s\');',
@@ -534,6 +535,39 @@ $Cc_consist_options  = '';    # we record, in this order:
 
 Now slurp through the arguments.
 \begin{code}
+
+#---------- user defined prelude ---------------------------------------
+
+if (grep(/^-user-prelude$/, @ARGV)) {
+
+    # If ARGV contains -user-prelude we are compiling a piece of 
+    # prelude for the user, probably with additional specialise pragmas
+
+    # We strip out the -O -f and -user-prelude flags provided on
+    # the command line and add the ones used to compile the prelude
+    # ToDo: get these options from a common definition in mkworld
+
+    # We also enable any options forced through with -user-prelude-force
+
+    # Hey, Check out this grep statement ;-)  (PS)
+
+    @ARGV = grep((!/^-O/ && !/^-f/ && !/^-user-prelude$/) || s/^-user-prelude-force//,
+		 @ARGV);
+
+    unshift(@ARGV,
+	'-prelude',
+        '-O',
+        '-fshow-pragma-name-errs',
+        '-fshow-import-specs',
+        '-fomit-reexported-instances',
+        '-fglasgow-exts',
+        '-genSPECS',
+        '-DUSE_FOLDR_BUILD',
+	'-dcore-lint');
+
+    print STDERR "ghc: -user-prelude options:\n", "@ARGV", "\n";
+}
+
 # can't use getopt(s); what we want is too complicated
 arg: while($_ = $ARGV[0]) {
     shift(@ARGV);
@@ -828,6 +862,10 @@ arg: while($_ = $ARGV[0]) {
     /^-D(.*)/	    && do { push(@HsCpp_flags, "'-D".&grab_arg_arg('-D',$1)."'"); next arg; };
     /^-U(.*)/	    && do { push(@HsCpp_flags, "'-U".&grab_arg_arg('-U',$1)."'"); next arg; };
 
+    /^-genSPECS/   && do { $Cpp_flag_set = 1;
+			   $genSPECS_flag = $_;
+			    next arg; };
+
     #---------- Haskell parser (hsp) ---------------------------------------
     /^-ddump-parser$/ && do { $Dump_parser_output = 1; next arg; };
 
@@ -869,12 +907,18 @@ arg: while($_ = $ARGV[0]) {
     /^-prelude$/		&& do { $CompilingPrelude = 1;
 					push(@HsC_flags, $_); next arg; };
 
+    /^-user-prelude-force/	&& do { # ignore if not -user-prelude
+				        next arg; };
+
     /^-split-objs(.*)/	&& do {
 			local($sname) = &grab_arg_arg('-split-objs', $1);
 			$sname =~ s/ //g; # no spaces
 
 			if ( $TargetPlatform =~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|sparc)-/ ) {
 			    $SplitObjFiles = 1;
+    			    $ProduceS = '';
+			    $ProduceC = 1;
+
 			    push(@HsC_flags, "-fglobalise-toplev-names$sname"); 
 			    push(@CcBoth_flags, '-DUSE_SPLIT_MARKERS');
 
@@ -885,8 +929,6 @@ arg: while($_ = $ARGV[0]) {
 			    print STDERR "WARNING: don't know how to split objects on this platform: $TargetPlatform\n`-split-objs' option ignored\n";
 			}
 			next arg; };
-
-    /^-fglobalise-toplev-names$/&& do { push(@HsC_flags, $_); next arg; };
 
     /^-f(hide-builtin-names|min-builtin-names)$/
 		&& do { push(@HsC_flags, $_);
@@ -905,9 +947,17 @@ arg: while($_ = $ARGV[0]) {
 			}
 			next arg; };
 
-    /^-fspecialise-unboxed$/
-		&& do { $Oopt_SpecialiseUnboxed	= '-fspecialise-unboxed';
+    /^-fspeciali[sz]e-unboxed$/
+		&& do { $Oopt_DoSpecialise	= '-fspecialise';
+			$Oopt_SpecialiseUnboxed	= '-fspecialise-unboxed';
 			next arg; };
+    /^-fspeciali[sz]e$/
+		&& do { $Oopt_DoSpecialise	= '-fspecialise';
+			next arg; };
+    /^-fno-speciali[sz]e$/
+		&& do { $Oopt_DoSpecialise	= '';
+			next arg; };
+
 
 # Now the foldr/build options, which are *on* by default (for -O).
 
@@ -918,7 +968,7 @@ arg: while($_ = $ARGV[0]) {
 
     /^-fno-foldr-build-rule$/
 		    && do { $Oopt_FoldrBuild = 0; 
-			       next arg; };
+			    next arg; };
 
     /^-fno-enable-tech$/
 		    && do { $Oopt_FB_Support = ''; 
@@ -1023,6 +1073,8 @@ arg: while($_ = $ARGV[0]) {
 
     /^-d(dump|ppr)-/         && do { push(@HsC_flags, $_); next arg; };
     /^-dverbose-(simpl|stg)/ && do { push(@HsC_flags, $_); next arg; };
+    /^-dshow-passes/	     && do { push(@HsC_flags, $_); next arg; };
+    /^-dsource-stats/        && do { push(@HsC_flags, $_); next arg; };
     /^-dsimplifier-stats/    && do { push(@HsC_flags, $_); next arg; };
     /^-dstg-stats/	     && do { $Oopt_StgStats = $_; next arg; };
 
@@ -1150,10 +1202,17 @@ arg: while($_ = $ARGV[0]) {
 		close(OFILE);
 		next arg; };
 
-    /^-debug$/	    && do { # all this does is mark a .hc/.o as "debugging"
-			    # in the consistency info
-			    $DEBUGging = 'd';
-			    next arg; };
+    /^-debug$/	&& do { # all this does is mark a .hc/.o as "debugging"
+			# in the consistency info
+			$DEBUGging = 'd';
+			next arg; };
+
+    #---------- linking .a file --------------------------------------------
+
+    /^-Main(.*)/ && do {
+		# specifies main or mainPrimIO to be linked
+		$Ld_main = $1;
+		next arg; }; 
 
     #---------- catch unrecognized flags -----------------------------------
 
@@ -1163,8 +1222,8 @@ arg: while($_ = $ARGV[0]) {
 	next arg; };
 
     #---------- anything else is considered an input file ------------------
-    # (well, .o files are immediately queued up as linker fodder..)
-    if (/\.o$/) {
+    # (well, .o and .a files are immediately queued up as linker fodder..)
+    if (/\.[oa]$/) {
 	push(@Link_file, $_);
     } else {
 	push(@Input_file, $_);
@@ -1330,26 +1389,27 @@ It really really wants to be the last STG-to-STG pass that is run.
 
 @HsC_minusO_flags # NOTE: used for *both* -O and -O2 (some conditional bits)
   = (
-      # core2core passes
-	# initial simplify: mk specialiser happy: minimum effort please
+	# initial simplify: mk specialiser and autoscc happy: minimum effort please
 	'-fsimplify',
 	  '\(', 
 	  "$Oopt_FB_Support",
-	  '-fkeep-spec-pragma-ids',
+	  '-fkeep-spec-pragma-ids',	# required before specialisation
 	  '-fsimpl-uf-use-threshold0',
 	  '-fessential-unfoldings-only',
 	  '-fmax-simplifier-iterations1',
 	  "$Oopt_PedanticBottoms",
 	  '\)',
 
-	$Oopt_AddAutoSccs, # dangerous to do with *no* simplification...
+	$Oopt_AddAutoSccs,		# need some basic simplification first
 
-	'-fspecialise-overloaded',
-	$Oopt_SpecialiseUnboxed,
-	'-fspecialise',
+	($Oopt_DoSpecialise) ? (
+	  '-fspecialise-overloaded',
+	  $Oopt_SpecialiseUnboxed,
+	  $Oopt_DoSpecialise,
+	) : (),
 
-	'-fsimplify', # need tossing before calc-i...
-	  '\(', 
+	'-fsimplify', 			# need dependency anal after specialiser ...
+	  '\(', 			# need tossing before calc-inlinings ...
 	  "$Oopt_FB_Support",
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
@@ -1358,7 +1418,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
-#	  '-flet-to-case',	# no point, before strictness analysis
 	  "$Oopt_PedanticBottoms",
 	  "$Oopt_MonadEtaExpansion",
 	  "$Oopt_UnfoldingUseThreshold",
@@ -1380,7 +1439,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 #		  '-fdo-eta-reduction',
 #		  '-fdo-lambda-eta-expansion',
 #		  '-freuse-con',
-##		  '-flet-to-case',	# no point, before strictness analysis
 #		  "$Oopt_PedanticBottoms",
 #		  "$Oopt_MonadEtaExpansion",
 #		  "$Oopt_UnfoldingUseThreshold",
@@ -1393,6 +1451,8 @@ It really really wants to be the last STG-to-STG pass that is run.
 	'-ffull-laziness',
 
 	($Oopt_FoldrBuild) ? (
+	  '-ffoldr-build-on',		# desugar list comprehensions for foldr/build
+
 	  '-fsimplify', 
 	    '\(', 
 	    '-fignore-inline-pragma',	# **** NB!
@@ -1405,7 +1465,6 @@ It really really wants to be the last STG-to-STG pass that is run.
 	    '-fdo-eta-reduction',
 	    '-fdo-lambda-eta-expansion',
 	    '-freuse-con',
-  #	  '-flet-to-case',	# no point, before strictness analysis
 	    "$Oopt_PedanticBottoms",
 	    "$Oopt_MonadEtaExpansion",
 	    "$Oopt_UnfoldingUseThreshold",
@@ -1425,9 +1484,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
-#	  '-flet-to-case',	# no point, before strictness analysis
-  	  '-fdo-inline-foldr-build',
- 				# you need to inline foldr!
+  	  '-fdo-inline-foldr-build',	# foldr/build done so inline
 	  "$Oopt_PedanticBottoms",
 	  "$Oopt_MonadEtaExpansion",
 	  "$Oopt_UnfoldingUseThreshold",
@@ -1446,7 +1503,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  '-fdo-eta-reduction',
 	  '-fdo-lambda-eta-expansion',
 	  '-freuse-con',
-	  '-flet-to-case',	# Aha!
+	  '-flet-to-case',		# Aha! Only done after strictness analysis
 	  "$Oopt_PedanticBottoms",
 	  "$Oopt_MonadEtaExpansion",
 	  "$Oopt_UnfoldingUseThreshold",
@@ -1483,7 +1540,8 @@ It really really wants to be the last STG-to-STG pass that is run.
 	  "$Oopt_MaxSimplifierIterations",
 	  '\)',
 
-#	'-fstatic-args',
+      #	'-fstatic-args',
+
 	'-fcalc-inlinings2',
 
       # stg2stg passes
@@ -1495,11 +1553,10 @@ It really really wants to be the last STG-to-STG pass that is run.
       # flags for stg2stg
 	'-flet-no-escape',
 
-      # how do we desugar list comprehensions ?
-	(($Oopt_FoldrBuild) ? '-ffoldr-build-on' : '' ), 
-
       # SPECIAL FLAGS for -O2
-	(($OptLevel == 2) ? '-fsemi-tagging' : '')
+	($OptLevel == 2) ? (
+	  '-fsemi-tagging',
+	) : (),
     );
 \end{code}
 
@@ -1715,7 +1772,10 @@ unshift(@Ld_flags,
      || $TargetPlatform =~ /^powerpc-/
      || $TargetPlatform =~ /-solaris/
     )
-    ? ('-u', 'unsafePerformPrimIO_fast1',
+    ? (($Ld_main) ? (
+        '-u', 'Main_' . $Ld_main . '_closure',
+       ) : (),
+       '-u', 'unsafePerformPrimIO_fast1',
        '-u', 'Nil_closure',
        '-u', 'IZh_static_info',
        '-u', 'False_inregs_info',
@@ -1724,7 +1784,10 @@ unshift(@Ld_flags,
        '-u', 'DEBUG_REGS') # just for fun, now...
 
     # nice friendly a.out machines...
-    : ('-u', '_unsafePerformPrimIO_fast1',
+    : (($Ld_main) ? (
+        '-u', '_Main_' . $Ld_main . '_closure',
+       ) : (),
+       '-u', '_unsafePerformPrimIO_fast1',
        '-u', '_Nil_closure',
        '-u', '_IZh_static_info',
        '-u', '_False_inregs_info',
@@ -1871,7 +1934,7 @@ if ($Do_lnkr) {
     local($lnkr) = ( $Lnkr ) ? $Lnkr : ($RegisteriseC ? $CcRegd : $CcUnregd );
 
     local($output)= ($Specific_output_file ne '') ? "-o $Specific_output_file" : '';
-    @Files_to_tidy = ( ($Specific_output_file ne '') ? "$Specific_output_file" : 'a.out' );
+    @Files_to_tidy = ($Specific_output_file ne '') ? "$Specific_output_file" : 'a.out';
 
     local($to_do) = "$lnkr $Verbose @Ld_flags $output @Link_file $TopClosureFile $libdirs @UserLibrary @SysLibrary";
     &run_something($to_do, 'Linker');
@@ -2113,7 +2176,7 @@ it fails.
 	} else {
 	    local($includes) = '-I' . join(' -I',@Include_dir);
 	    local($to_do) = "echo '#line 1 \"$in_lit2pgm\"' > $hscpp_hsp; ".
-			    "$HsCpp $Verbose @HsCpp_flags -D__HASKELL1__=$haskell1_version -D__GLASGOW_HASKELL__=$ghc_version_info $includes $lit2pgm_hscpp >> $hscpp_hsp";
+			    "$HsCpp $Verbose $genSPECS_flag @HsCpp_flags -D__HASKELL1__=$haskell1_version -D__GLASGOW_HASKELL__=$ghc_version_info $includes $lit2pgm_hscpp >> $hscpp_hsp";
 	    @Files_to_tidy = ( $hscpp_hsp );
 	    &run_something($to_do, 'Haskellised C pre-processor');
 	}

@@ -86,16 +86,17 @@ lintCoreBindings sty whodunnit spec_done binds
 We use this to check all unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise):
 \begin{code}
-lintUnfolding :: SrcLoc -> PlainCoreExpr -> PlainCoreExpr
+lintUnfolding :: SrcLoc -> PlainCoreExpr -> Maybe PlainCoreExpr
 
 lintUnfolding locn expr
   = case (initL (addLoc (ImportedUnfolding locn) (lintCoreExpr expr)) True{-pretend spec done-}) of
-      Nothing  -> expr
-      Just msg -> error ("ERROR: Type-incorrect unfolding from an interface:\n"++
-			(ppShow 80 (ppAboves [msg PprForUser,
-					ppStr "*** Bad unfolding ***",
-					ppr PprDebug expr,
-					ppStr "*** End of bad unfolding ***"]))) 
+      Nothing  -> Just expr
+      Just msg -> pprTrace "WARNING: Discarded bad unfolding from interface:\n"
+			   (ppAboves [msg PprForUser,
+				      ppStr "*** Bad unfolding ***",
+				      ppr PprDebug expr,
+				      ppStr "*** End unfolding ***"])
+		  Nothing
 \end{code}
 
 \begin{code}
@@ -135,8 +136,8 @@ lint_binds_help (binder,rhs)
 	)			`thenL_` 
 
 	-- Check not isPrimType
-	checkL (not (isPrimType (getIdUniType binder)))
-	       (mkRhsPrimMsg binder rhs)
+	checkIfSpecDoneL (not (isPrimType (getIdUniType binder)))
+	       		 (mkRhsPrimMsg binder rhs)
 				`thenL_`
 
 	-- Check unfolding, if any
@@ -177,10 +178,9 @@ lintCoreExpr (CoLet binds body)
     ))
 
 lintCoreExpr e@(CoCon con tys args)
-  = checkTyApp con_ty tys (mkTyAppMsg e)    `thenMaybeL` \ con_tau_ty ->
-    -- Note: no call to checkSpecTyApp;
-    -- we allow CoCons applied to unboxed types to sail through
-    mapMaybeL lintCoreAtom args			    `thenL` \ maybe_arg_tys ->
+  = checkTyApp con_ty tys (mkTyAppMsg e)    	`thenMaybeL` \ con_tau_ty ->
+    -- Note: no call to checkSpecTyApp for constructor type args
+    mapMaybeL lintCoreAtom args			`thenL` \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp con_tau_ty arg_tys (mkFunAppMsg con_tau_ty arg_tys e)
@@ -189,7 +189,7 @@ lintCoreExpr e@(CoCon con tys args)
 
 lintCoreExpr e@(CoPrim op tys args)
   = checkTyApp op_ty tys (mkTyAppMsg e)		`thenMaybeL` \ op_tau_ty ->
-    -- checkSpecTyApp e tys (mkSpecTyAppMsg e)	`thenMaybeL_`
+    -- ToDo: checkSpecTyApp e tys (mkSpecTyAppMsg e)	`thenMaybeL_`
     mapMaybeL lintCoreAtom args			`thenL` \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing -> returnL Nothing
@@ -422,6 +422,11 @@ mapMaybeL f (x:xs)
 checkL :: Bool -> ErrMsg -> LintM ()
 checkL True  msg spec loc scope errs = ((), errs)
 checkL False msg spec loc scope errs = ((), addErr errs msg loc)
+
+checkIfSpecDoneL :: Bool -> ErrMsg -> LintM ()
+checkIfSpecDoneL True  msg spec  loc scope errs = ((), errs)
+checkIfSpecDoneL False msg True  loc scope errs = ((), addErr errs msg loc)
+checkIfSpecDoneL False msg False loc scope errs = ((), errs)
 
 addErrL :: ErrMsg -> LintM ()
 addErrL msg spec loc scope errs = ((), addErr errs msg loc)

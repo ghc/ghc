@@ -82,7 +82,7 @@ data CoreToDo		-- These are diff core-to-core passes,
 			-- Each run of the simplifier can take a different
 			-- set of simplifier-specific flags.
 
-  | CoreDoArityAnalysis -- UNUSED right now
+  | Core_Unused_Flag_1
   | CoreDoCalcInlinings1
   | CoreDoCalcInlinings2
   | CoreDoFloatInwards
@@ -128,7 +128,6 @@ data GlobalSwitch
   = ProduceC	String	-- generate C output into this file
   | ProduceS	String	-- generate native-code assembler into this file
   | ProduceHi	String	-- generate .hi interface  into this file
---UNUSED:  | ProduceHu	String	-- generate .hu usage-info into this file
 
   | AsmTarget	String  -- architecture we are generating code for
   | ForConcurrent
@@ -167,7 +166,6 @@ data GlobalSwitch
   | AutoSccsOnExportedToplevs
   | AutoSccsOnAllToplevs
   | AutoSccsOnIndividualCafs
---UNUSED:  | AutoSccsOnIndividualDicts
   | SccGroup String	-- name of "group" for this cost centres in this module
 
   | DoTickyProfiling
@@ -182,7 +180,7 @@ data GlobalSwitch
 
   | SpecialiseImports	   -- Treat non-essential spec requests as errors
   | ShowImportSpecs	   -- Output spec requests for non-essential specs
-  | OmitUnspecialisedCode  -- ToDo? (Patrick)
+  | OmitDefaultInstanceMethods
   | SpecialiseOverloaded
   | SpecialiseUnboxed
   | SpecialiseAll
@@ -190,7 +188,6 @@ data GlobalSwitch
 
   -- this batch of flags is for particular experiments;
   -- v unlikely to be used in any other circumstance
---UNUSED:  | OmitStkChecks
   | OmitBlackHoling
   | StgDoLetNoEscapes
   | IgnoreStrictnessPragmas -- ToDo: still useful?
@@ -203,8 +200,6 @@ data GlobalSwitch
 
   | ReturnInRegsThreshold   Int
   | VectoredReturnThreshold Int -- very likely UNUSED
-
--- NOT REALLY USED:  | D_dump_type_info	-- for Robin Popplestone stuff
 
   | D_dump_rif2hs	-- debugging: print out various things
   | D_dump_rn4
@@ -221,24 +216,13 @@ data GlobalSwitch
   | D_dump_flatC
   | D_dump_realC
   | D_dump_asm
-  | D_dump_core_passes		-- A Gill-ism
-  | D_dump_core_passes_info	-- Yet another Gill-ism
+  | D_show_passes
+--ANDY:  | D_dump_core_passes_info	-- A Gill-ism
 
   | D_verbose_core2core
   | D_verbose_stg2stg
   | D_simplifier_stats
-
-{- ????
-  | Extra__Flag1
-  | Extra__Flag2
-  | Extra__Flag3
-  | Extra__Flag4
-  | Extra__Flag5
-  | Extra__Flag6
-  | Extra__Flag7
-  | Extra__Flag8
-  | Extra__Flag9
--}
+  | D_source_stats
 
 #ifdef DPH
   | PodizeIntelligent
@@ -261,7 +245,6 @@ data SimplifierSwitch
   | SimplReuseCon
   | SimplCaseOfCase
   | SimplLetToCase
---UNUSED:  | SimplOkToInlineInLambdas
   | SimplMayDeleteConjurableIds
   | SimplPedanticBottoms -- see Simplifier for an explanation
   | SimplDoArityExpand	 -- expand arity of bindings
@@ -274,8 +257,6 @@ data SimplifierSwitch
 
   | IgnoreINLINEPragma
   | SimplDoLambdaEtaExpansion
---UNUSED:  | SimplDoMonadEtaExpansion
-
   | SimplDoEtaReduction
 
   | EssentialUnfoldingsOnly -- never mind the thresholds, only
@@ -433,22 +414,22 @@ classifyOpts opts
 	  "-ddump-spec"    -> GLOBAL_SW(D_dump_spec)
 	  "-ddump-simpl"   -> GLOBAL_SW(D_dump_simpl)
 	  "-ddump-occur-anal" -> GLOBAL_SW(D_dump_occur_anal)
--- NOT REALLY USED:	  "-ddump-type-info"  -> GLOBAL_SW(D_dump_type_info)
 #ifdef DPH
-	  "-ddump-pod"   ->   GLOBAL_SW(D_dump_pod)
-	  "-ddump-psimpl"->   GLOBAL_SW(D_dump_psimpl)
-	  "-ddump-nextC" ->   GLOBAL_SW(D_dump_nextC)
+	  "-ddump-pod"    ->  GLOBAL_SW(D_dump_pod)
+	  "-ddump-psimpl" ->  GLOBAL_SW(D_dump_psimpl)
+	  "-ddump-nextC"  ->  GLOBAL_SW(D_dump_nextC)
 #endif {- Data Parallel Haskell -}
 
-	  "-ddump-stg"	->    GLOBAL_SW(D_dump_stg)
-	  "-ddump-absC"	->    GLOBAL_SW(D_dump_absC)
-	  "-ddump-flatC"->    GLOBAL_SW(D_dump_flatC)
-	  "-ddump-realC"->    GLOBAL_SW(D_dump_realC)
-          "-ddump-asm"  ->    GLOBAL_SW(D_dump_asm)
+	  "-ddump-stg"	  ->  GLOBAL_SW(D_dump_stg)
+	  "-ddump-absC"	  ->  GLOBAL_SW(D_dump_absC)
+	  "-ddump-flatC"  ->  GLOBAL_SW(D_dump_flatC)
+	  "-ddump-realC"  ->  GLOBAL_SW(D_dump_realC)
+          "-ddump-asm"    ->  GLOBAL_SW(D_dump_asm)
+          "-dshow-passes" ->  GLOBAL_SW(D_show_passes)
 
-          "-ddump-core-passes"      -> GLOBAL_SW(D_dump_core_passes)
 -- ANDY:  "-ddump-haskell"	    -> GLOBAL_SW(D_dump_core_passes_info)
 	  "-dsimplifier-stats"	    -> GLOBAL_SW(D_simplifier_stats)
+	  "-dsource-stats"	    -> GLOBAL_SW(D_source_stats)
 
 	  "-dverbose-simpl" ->GLOBAL_SW(D_verbose_core2core)
 	  "-dverbose-stg" ->  GLOBAL_SW(D_verbose_stg2stg)
@@ -470,7 +451,6 @@ classifyOpts opts
 	  "-fsimplify"       -> -- gather up SimplifierSwitches specially...
 				simpl_sep opts [] glob_sw core_td stg_td
 
---UNUSED: "-farity-analysis" -> CORE_TD(CoreDoArityAnalysis)
 	  "-fcalc-inlinings1"-> CORE_TD(CoreDoCalcInlinings1)
 	  "-fcalc-inlinings2"-> CORE_TD(CoreDoCalcInlinings2)
 	  "-ffloat-inwards"  -> CORE_TD(CoreDoFloatInwards)
@@ -486,7 +466,7 @@ classifyOpts opts
 	  "-ffoldr-build-ww-anal"  -> CORE_TD(CoreDoFoldrBuildWWAnal)
 --ANDY:   "-fprint-haskell-core" -> CORE_TD(CoreDoHaskPrint)
 --        "-fprint-haskell-letless-core" -> CORE_TD(CoreDoHaskLetlessPrint)
-
+	  "-fomit-default-instance-methods" -> GLOBAL_SW(OmitDefaultInstanceMethods)
 	  "-fspecialise-overloaded" -> GLOBAL_SW(SpecialiseOverloaded)
 	  "-fspecialise-unboxed"    -> GLOBAL_SW(SpecialiseUnboxed)
 	  "-fspecialise-all" 	    -> GLOBAL_SW(SpecialiseAll)
@@ -529,7 +509,6 @@ classifyOpts opts
 	  "-fauto-sccs-on-exported-toplevs" -> GLOBAL_SW(AutoSccsOnExportedToplevs)
 	  "-fauto-sccs-on-all-toplevs"	    -> GLOBAL_SW(AutoSccsOnAllToplevs)
 	  "-fauto-sccs-on-individual-cafs"  -> GLOBAL_SW(AutoSccsOnIndividualCafs)
---UNUSED: "-fauto-sccs-on-individual-dicts" -> GLOBAL_SW(AutoSccsOnIndividualDicts)
 
 	  "-fticky-ticky"  -> GLOBAL_SW(DoTickyProfiling)
 
@@ -542,13 +521,11 @@ classifyOpts opts
 
 	  "-fconcurrent"	    -> GLOBAL_SW(ForConcurrent)
 
-	  "-fomit-unspecialised-code" -> GLOBAL_SW(OmitUnspecialisedCode)
 	  "-fshow-pragma-name-errs" -> GLOBAL_SW(ShowPragmaNameErrs)
 	  "-fname-shadowing-not-ok" -> GLOBAL_SW(NameShadowingNotOK)
 	  "-fsignatures-required"   -> GLOBAL_SW(SigsRequired)
 	  "-fomit-reexported-instances" -> GLOBAL_SW(OmitReexportedInstances)
 	  "-darity-checks"  -> GLOBAL_SW(EmitArityChecks)
---UNUSED:	  "-dno-stk-chks"   -> GLOBAL_SW(OmitStkChecks)
 	  "-dno-black-holing"-> GLOBAL_SW(OmitBlackHoling)
 
 	  _ | starts_with_fasm -> GLOBAL_SW(AsmTarget after_fasm)
@@ -631,7 +608,6 @@ classifyOpts opts
 	  "-fdo-case-elim" -> GLOBAL_SIMPL_SW(SimplDoCaseElim)
 	  "-fdo-eta-reduction" -> GLOBAL_SIMPL_SW(SimplDoEtaReduction)
 	  "-fdo-lambda-eta-expansion" -> GLOBAL_SIMPL_SW(SimplDoLambdaEtaExpansion)
---UNUSED:	  "-fdo-monad-eta-expansion" -> GLOBAL_SIMPL_SW(SimplDoMonadEtaExpansion)
 	  "-fdo-foldr-build"  -> GLOBAL_SIMPL_SW(SimplDoFoldrBuild)
 	  "-fdo-new-occur-anal"  -> GLOBAL_SIMPL_SW(SimplDoNewOccurAnal)
 	  "-fdo-arity-expand"  -> GLOBAL_SIMPL_SW(SimplDoArityExpand)
@@ -642,7 +618,6 @@ classifyOpts opts
 	  "-fpedantic-bottoms" -> GLOBAL_SIMPL_SW(SimplPedanticBottoms)
 	  "-fkeep-spec-pragma-ids" -> GLOBAL_SIMPL_SW(KeepSpecPragmaIds)
 	  "-fkeep-unused-bindings" -> GLOBAL_SIMPL_SW(KeepUnusedBindings)
---UNUSED:	  "-finline-in-lambdas-ok" -> GLOBAL_SIMPL_SW(SimplOkToInlineInLambdas)
 	  "-fmay-delete-conjurable-ids" -> GLOBAL_SIMPL_SW(SimplMayDeleteConjurableIds)
 	  "-fessential-unfoldings-only" -> GLOBAL_SIMPL_SW(EssentialUnfoldingsOnly) 
 	  "-fignore-inline-pragma"  -> GLOBAL_SIMPL_SW(IgnoreINLINEPragma)
@@ -686,11 +661,8 @@ instance Ord SimplifierSwitch where
 tagOf_Switch (ProduceC _)		=(ILIT(0) :: FAST_INT)
 tagOf_Switch (ProduceS _)		= ILIT(1)
 tagOf_Switch (ProduceHi	_)		= ILIT(2)
---UNUSED:tagOf_Switch (ProduceHu	_)		= ILIT(3)
 tagOf_Switch (AsmTarget _)              = ILIT(4)
---UNUSED:tagOf_Switch ForParallel		= ILIT(5)
 tagOf_Switch ForConcurrent		= ILIT(6)
---UNUSED:tagOf_Switch ForGRIP			= ILIT(7)
 tagOf_Switch Haskell_1_3		= ILIT(8)
 tagOf_Switch GlasgowExts		= ILIT(9)
 tagOf_Switch CompilingPrelude		= ILIT(10)
@@ -718,7 +690,6 @@ tagOf_Switch SccProfilingOn		= ILIT(31)
 tagOf_Switch AutoSccsOnExportedToplevs	= ILIT(32)
 tagOf_Switch AutoSccsOnAllToplevs	= ILIT(33)
 tagOf_Switch AutoSccsOnIndividualCafs	= ILIT(34)
---UNUSED:tagOf_Switch AutoSccsOnIndividualDicts	= ILIT(35)
 tagOf_Switch (SccGroup _)		= ILIT(36)
 tagOf_Switch DoTickyProfiling		= ILIT(37)
 tagOf_Switch DoSemiTagging		= ILIT(38)
@@ -726,12 +697,12 @@ tagOf_Switch FoldrBuildOn		= ILIT(39)
 tagOf_Switch FoldrBuildTrace		= ILIT(40)
 tagOf_Switch SpecialiseImports		= ILIT(41)
 tagOf_Switch ShowImportSpecs		= ILIT(42)
-tagOf_Switch OmitUnspecialisedCode	= ILIT(43)
+tagOf_Switch OmitDefaultInstanceMethods	= ILIT(43)
 tagOf_Switch SpecialiseOverloaded	= ILIT(44)
 tagOf_Switch SpecialiseUnboxed		= ILIT(45)
 tagOf_Switch SpecialiseAll		= ILIT(46)
 tagOf_Switch SpecialiseTrace		= ILIT(47)
---UNUSED:tagOf_Switch OmitStkChecks		= ILIT(48)
+
 tagOf_Switch OmitBlackHoling		= ILIT(49)
 tagOf_Switch StgDoLetNoEscapes		= ILIT(50)
 tagOf_Switch IgnoreStrictnessPragmas	= ILIT(51)
@@ -740,7 +711,7 @@ tagOf_Switch IrrefutableEverything	= ILIT(53)
 tagOf_Switch AllStrict			= ILIT(54)
 tagOf_Switch NumbersStrict		= ILIT(55)
 tagOf_Switch AllDemanded		= ILIT(56)
--- NOT REALLY USED: tagOf_Switch D_dump_type_info		= ILIT(56)
+
 tagOf_Switch (ReturnInRegsThreshold _)	= ILIT(57)
 tagOf_Switch (VectoredReturnThreshold _)= ILIT(58)
 tagOf_Switch D_dump_rif2hs		= ILIT(59)
@@ -757,29 +728,18 @@ tagOf_Switch D_dump_absC		= ILIT(69)
 tagOf_Switch D_dump_flatC		= ILIT(70)
 tagOf_Switch D_dump_realC		= ILIT(71)
 tagOf_Switch D_dump_asm			= ILIT(72)
-tagOf_Switch D_dump_core_passes		= ILIT(73)
-tagOf_Switch D_dump_core_passes_info	= ILIT(74)
-tagOf_Switch D_verbose_core2core	= ILIT(75)
-tagOf_Switch D_verbose_stg2stg		= ILIT(76)
-tagOf_Switch D_simplifier_stats		= ILIT(77) {-see note below!-}
-
-{-
-tagOf_Switch Extra__Flag1		= ILIT(76)
-tagOf_Switch Extra__Flag2		= ILIT(77)
-tagOf_Switch Extra__Flag3		= ILIT(78)
-tagOf_Switch Extra__Flag4		= ILIT(79)
-tagOf_Switch Extra__Flag5		= ILIT(80)
-tagOf_Switch Extra__Flag6		= ILIT(81)
-tagOf_Switch Extra__Flag7		= ILIT(82)
-tagOf_Switch Extra__Flag8		= ILIT(83)
-tagOf_Switch Extra__Flag9		= ILIT(84)
--}
+tagOf_Switch D_show_passes		= ILIT(73)
+--ANDY:tagOf_Switch D_dump_core_passes_info	= ILIT(??)
+tagOf_Switch D_verbose_core2core	= ILIT(74)
+tagOf_Switch D_verbose_stg2stg		= ILIT(75)
+tagOf_Switch D_simplifier_stats		= ILIT(76)
+tagOf_Switch D_source_stats		= ILIT(77) {-see note below!-}
 
 #ifndef DPH
 tagOf_Switch _ = case (panic "tagOf_Switch") of -- BUG avoidance
 		   s -> tagOf_Switch s
 
-lAST_SWITCH_TAG = IBOX(tagOf_Switch D_simplifier_stats)
+lAST_SWITCH_TAG = IBOX(tagOf_Switch D_source_stats)
 
 #else {- Data Parallel Haskell -}
 
@@ -811,7 +771,6 @@ tagOf_SimplSwitch SimplDoCaseElim		= ILIT(4)
 tagOf_SimplSwitch SimplReuseCon			= ILIT(5)
 tagOf_SimplSwitch SimplCaseOfCase		= ILIT(6)
 tagOf_SimplSwitch SimplLetToCase		= ILIT(7)
---UNUSED:tagOf_SimplSwitch SimplOkToInlineInLambdas	= ILIT(8)
 tagOf_SimplSwitch SimplMayDeleteConjurableIds	= ILIT(9)
 tagOf_SimplSwitch SimplPedanticBottoms		= ILIT(10)
 tagOf_SimplSwitch SimplDoArityExpand		= ILIT(11)
@@ -820,7 +779,6 @@ tagOf_SimplSwitch SimplDoNewOccurAnal		= ILIT(13)
 tagOf_SimplSwitch SimplDoInlineFoldrBuild	= ILIT(14)
 tagOf_SimplSwitch IgnoreINLINEPragma 		= ILIT(15)
 tagOf_SimplSwitch SimplDoLambdaEtaExpansion	= ILIT(16)
---UNUSED:tagOf_SimplSwitch SimplDoMonadEtaExpansion	= ILIT(17)
 tagOf_SimplSwitch SimplDoEtaReduction		= ILIT(18)
 tagOf_SimplSwitch EssentialUnfoldingsOnly	= ILIT(19)
 tagOf_SimplSwitch ShowSimplifierProgress	= ILIT(20)

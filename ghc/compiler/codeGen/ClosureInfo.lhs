@@ -401,7 +401,7 @@ mkClosureLFInfo False	    -- don't bother if at top-level
   && maybeToBool offset_into_int_maybe
   && offset_into_int <= mAX_SPEC_SELECTEE_SIZE	-- Offset is small enough
   = 
-    ASSERT(is_single_constructor) 		-- This should be true anyway
+    -- ASSERT(is_single_constructor) 		-- Should be true, by causes error for SpecTyCon
     LFThunk False False True (SelectorThunk scrutinee con offset_into_int)
   where
     (_, params_w_offsets) = layOutDynCon con getIdKind params

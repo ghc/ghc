@@ -355,7 +355,7 @@ we can pass them all to @mkCoTyLamTryingEta@.
 
 \begin{code} 
 simplExpr env (CoTyLam tyvar body) (TypeArg ty : args)
-  = ASSERT(not (isPrimType ty))
+  = -- ASSERT(not (isPrimType ty))
     let
 	new_env = extendTyEnv env tyvar ty
     in

@@ -83,7 +83,7 @@ mkInterface :: (GlobalSwitch -> Bool)
 	    -> (FAST_STRING -> Bool,  -- is something in export list, explicitly?
 		FAST_STRING -> Bool)  -- is a module among the "dotdot" exported modules?
 	    -> IdEnv UnfoldingDetails
-	    -> FiniteMap TyCon [[Maybe UniType]]
+	    -> FiniteMap TyCon [(Bool, [Maybe UniType])]
 	    -> ([RenamedFixityDecl],  -- interface info from the typecheck
 	        [Id],
 	        CE,
@@ -177,7 +177,7 @@ mkInterface sw_chkr modname export_list_fns inline_env tycon_specs
     else
 --  trace ("mkIface:Ids:"++(ppShow 80 (ppr PprDebug global_ids))) (
     ppAboves
-       [ppPStr SLIT("{-# GHC_PRAGMA INTERFACE VERSION 5 #-}"),
+       [ppPStr SLIT("{-# GHC_PRAGMA INTERFACE VERSION 6 #-}"),
 	ppCat [ppPStr SLIT("interface"), ppPStr modname, ppPStr SLIT("where")],
 
 	do_import_decls sw_chkr modname
@@ -393,12 +393,12 @@ do_fixity sw_chkr fixity_decl
 %************************************************************************
 
 \begin{code}
-do_tycon :: (GlobalSwitch -> Bool) -> FiniteMap TyCon [[Maybe UniType]] -> TyCon -> Pretty
+do_tycon :: (GlobalSwitch -> Bool) -> FiniteMap TyCon [(Bool, [Maybe UniType])] -> TyCon -> Pretty
 
 do_tycon sw_chkr tycon_specs_map tycon
   = pprTyCon (PprInterface sw_chkr) tycon tycon_specs
   where
-    tycon_specs = lookupWithDefaultFM tycon_specs_map [] tycon 
+    tycon_specs = map snd (lookupWithDefaultFM tycon_specs_map [] tycon)
 \end{code}
 
 %************************************************************************
@@ -441,7 +441,7 @@ do_value sw_chkr better_id_fn inline_env val
 	    || boringIdInfo id_info
 	    then ppNil
 	    else ppCat [ppPStr SLIT("\t{-# GHC_PRAGMA"),
-			ppIdInfo sty better_val True{-specs, absolutely-}
+			ppIdInfo sty better_val True{-yes specs-}
 			    better_id_fn inline_env id_info,
 			ppPStr SLIT("#-}")]
     in
@@ -501,9 +501,11 @@ do_instance sw_chkr better_id_fn inline_env
 
 	name_pragma_pairs
 	  = pp_the_list [ ppCat [ppChar '\t', ppr_non_op op, ppEquals,
-				ppIdInfo sty constm True{-YES, specs-}
+				 ppChar '{' ,
+				 ppIdInfo sty constm True{-YES, specs-}
 				  better_id_fn inline_env
-				  (getIdInfo constm)]
+				  (getIdInfo constm),
+				 ppChar '}' ]
 			| (op, constm) <- class_op_strs `zip` better_constms ]
 
 #ifdef DEBUG
@@ -524,7 +526,6 @@ do_instance sw_chkr better_id_fn inline_env
 	     if null better_constms
 	     then ppCat [pragma_begin, pragma_end]
 	     else ppAbove pragma_begin (ppCat [name_pragma_pairs, pragma_end])
-	    -- ToDo: specialised instances
 	  )
 \end{code}
 

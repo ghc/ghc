@@ -75,6 +75,7 @@ import List		( length, (++), map, filter, foldl, foldr,
 			  lines, words, reverse, null, foldr1
 			)
 import TyArray		( Array(..) )
+import TyComplex
 import Text
 \end{code}
 
@@ -534,6 +535,10 @@ instance Ord _PackedString where
     a <	 b = case _tagCmpPS a b of { _LT -> True;  _EQ -> False; _GT -> False }
     a >= b = case _tagCmpPS a b of { _LT -> False; _EQ -> True;  _GT -> True  }
     a >	 b = case _tagCmpPS a b of { _LT -> False; _EQ -> False; _GT -> True  }
+    max x y | x >= y	=  x
+            | otherwise	=  y
+    min x y | x <= y	=  x
+            | otherwise	=  y
     _tagCmp a b = _tagCmpPS a b
 \end{code}
 
@@ -609,8 +614,10 @@ _tagCmpPS ps1 ps2 -- slow catch-all case (esp for "has_null" True)
 				     else _GT
 
 instance Text _PackedString where
-  readsPrec p = error "readsPrec: _PackedString: ToDo"
-  showsPrec p ps r = showsPrec p (_unpackPS ps) r
+    readsPrec p = error "readsPrec: _PackedString: ToDo"
+    showsPrec p ps r = showsPrec p (_unpackPS ps) r
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0) 
 \end{code}
 
 %************************************************************************

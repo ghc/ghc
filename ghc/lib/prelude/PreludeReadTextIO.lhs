@@ -24,6 +24,8 @@ import IList
 import List		( (++) )
 import Prel		( chr )
 import Text
+import TyArray
+import TyComplex
 
 import PreludeIOError
 import PreludeMonadicIO

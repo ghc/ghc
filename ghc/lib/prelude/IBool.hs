@@ -6,9 +6,11 @@ import Cls
 import IChar
 import IInt
 import IList
-import List		( (++), map, foldr )
+import List		( (++), map, foldr, takeWhile )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 ----------------------------------------------------------------------
 instance Eq Bool where
@@ -59,6 +61,10 @@ instance Enum Bool where
     enumFromThen True  False  = [True, False]
     enumFromThen b     _      = bs where bs = b : bs
 
+    enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
+    enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
+				      (enumFromThen n m)
+
 ----------------------------------------------------------------------
 instance Text Bool where
     readsPrec p r
@@ -66,5 +72,8 @@ instance Text Bool where
      ++ readParen False (\ b -> [ (True,  c) | ("True",  c) <- lex b ]) r
 
     showsPrec d p = showString (if p then "True" else "False")
+
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0) 
 
 -- ToDo: Binary

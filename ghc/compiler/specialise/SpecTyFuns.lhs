@@ -9,6 +9,7 @@
 module SpecTyFuns (
 	specialiseCallTys,
 	ConstraintVector(..),
+	getIdOverloading,
 	mkConstraintVector,
 	isUnboxedSpecialisation,
 
@@ -25,21 +26,17 @@ module SpecTyFuns (
 import AbsUniType
 import Bag		( Bag, isEmptyBag, bagToList )
 import FiniteMap	( FiniteMap, emptyFM, addListToFM_C,
-			  keysFM, lookupWithDefaultFM
+			  plusFM_C, keysFM, lookupWithDefaultFM
 			)
 import Id		( mkSameSpecCon, getIdUniType,
-			  isDictFunId, isConstMethodId, Id )
+			  isDictFunId, isConstMethodId_maybe,
+			  isDefaultMethodId_maybe,
+			  getInstIdModule, Id )
 import Maybes	
 import Outputable
 import Pretty
 import Util
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[@specialiseTys@]{Determine specialising types}
-%*									*
-%************************************************************************
 
 @specialiseCallTys@ works out which type args don't need to be specialised on,
 based on flags, the overloading constraint vector, and the types.
@@ -62,16 +59,56 @@ specialiseCallTys False spec_unboxed spec_overloading cvec tys
 		         = Just ty
 		       | otherwise
                          = Nothing
+\end{code}
 
+@getIdOverloading@ grabs the type of an Id, and returns a 
+list of its polymorphic variables, and the initial segment of
+its ThetaType, in which the classes constrain only type variables.
+For example, if the Id's type is
+
+	forall a,b,c. Eq a -> Ord [a] -> tau
+
+we'll return
+
+	([a,b,c], [(Eq,a)])
+
+This seems curious at first.  For a start, the type above looks odd,
+because we usually only have dictionary args whose types are of
+the form (C a) where a is a type variable.  But this doesn't hold for
+the functions arising from instance decls, which sometimes get 
+arguements with types of form (C (T a)) for some type constructor T.
+
+Should we specialise wrt this compound-type dictionary?  This is
+a heuristic judgement, as indeed is the fact that we specialise wrt
+only dictionaries.  We choose *not* to specialise wrt compound dictionaries
+because at the moment the only place they show up is in instance decls,
+where they are simply plugged into a returned dictionary.  So nothing is
+gained by specialising wrt them.
+
+\begin{code}
+getIdOverloading :: Id
+		 -> ([TyVarTemplate], [(Class,TyVarTemplate)])
+getIdOverloading id
+  = (tyvars, tyvar_part_of theta)
+  where
+    (tyvars, theta, _) = splitType (getIdUniType id)
+
+    tyvar_part_of [] 		      = []
+    tyvar_part_of ((clas,ty) : theta) = case getTyVarTemplateMaybe ty of
+					    Nothing    -> []
+					    Just tyvar -> (clas, tyvar) : tyvar_part_of theta
+\end{code}
+
+\begin{code}
 type ConstraintVector = [Bool]	-- True for constrained tyvar, false otherwise
 
-mkConstraintVector :: [TyVarTemplate] 
-		   -> [(Class,TyVarTemplate)]
+mkConstraintVector :: Id 
 	           -> ConstraintVector
 
-mkConstraintVector tyvars class_tyvar_pairs
+mkConstraintVector id
   = [tyvar `elem` constrained_tyvars | tyvar <- tyvars]
   where
+    (tyvars, class_tyvar_pairs) = getIdOverloading id
     constrained_tyvars   = map snd class_tyvar_pairs 	-- May contain dups
 \end{code}
 
@@ -138,125 +175,107 @@ argTysMatchSpecTys_error spec_tys arg_tys
 about imported specialisations which do not exist.
 
 \begin{code}
-pprSpecErrs :: PprStyle
+pprSpecErrs :: FAST_STRING			-- module name
 	    -> (Bag (Id,[Maybe UniType]))	-- errors
 	    -> (Bag (Id,[Maybe UniType]))	-- warnings
 	    -> (Bag (TyCon,[Maybe UniType]))	-- errors
 	    -> Pretty
 
-pprSpecErrs sty spec_errs spec_warn spec_tyerrs
+pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
   | not any_errs && not any_warn
   = ppNil
 
   | otherwise
-  = ppAboves [if any_errs then ppAboves [
- 		  ppStr "SPECIALISATION ERRORS (Essential):",
-		  ppAboves (map pp_module_errs use_modules),
-		  ppStr "***"
-                  ]
-	      else
-		  ppNil,
-	      if any_warn then ppAboves [
- 		  ppStr "SPECIALISATION MESSAGES (Desirable):",
-		  ppAboves (map pp_module_warn use_modules),
-		  ppStr "***"
-                  ]
-	      else
-		  ppNil
-	     ]
+  = ppAboves [
+	ppStr "SPECIALISATION MESSAGES:",
+	ppAboves (map pp_module_specs use_modules)
+        ]
   where
-    any_errs = not (isEmptyBag spec_errs) || not (isEmptyBag spec_tyerrs)
+    any_errs = not (isEmptyBag spec_errs && isEmptyBag spec_tyerrs)
     any_warn = not (isEmptyBag spec_warn)
 
-    mk_module_fm errs_bag
+    mk_module_fm get_mod_data errs_bag
       = addListToFM_C (++) emptyFM errs_list
       where
-        errs_list = map add_name (bagToList errs_bag)
+        errs_list = map get_mod_data (bagToList errs_bag)
 
-    add_name (id, tys) = (mod, [(name, id, tys)])
-		       where
-			 (mod,name) = getOrigName id
+    tyspecs_fm = mk_module_fm get_ty_data spec_tyerrs
 
-    tyerrs_fm = mk_module_fm spec_tyerrs
-    errs_fm   = mk_module_fm spec_errs
-    warn_fm   = mk_module_fm spec_warn
+    iderrs_fm  = mk_module_fm (get_id_data True) spec_errs
+    idwarn_fm  = mk_module_fm (get_id_data False) spec_warn
+    idspecs_fm = plusFM_C (++) idwarn_fm iderrs_fm
 
-    module_names   = concat [keysFM errs_fm, keysFM warn_fm, keysFM tyerrs_fm]
-    sorted_modules = map head (equivClasses _CMP_STRING_ module_names)
+    get_id_data is_err (id, tys)
+      = (mod_name, [(id_name, id, tys, is_err)])
+      where
+	(mod_name, id_name) = get_id_name id
 
-	-- Ensure any dfun instance specialisations (module _NIL_) are printed last
-	-- ToDo: Print instance specialisations with the instance module
-	--       This requires the module which defined the instance to be known:
-	--	 add_name could then extract the instance module for a dfun id
-	--	 and pp_dfun made a special case of pp_err
-    use_modules = if (head sorted_modules == _NIL_)
-		  then tail sorted_modules ++ [_NIL_]
-		  else sorted_modules
+    get_id_name id
+      | maybeToBool (isDefaultMethodId_maybe id)
+      = (this_mod, _NIL_)
 
+      | isDictFunId id || maybeToBool (isConstMethodId_maybe id)
+      = let get_mod = getInstIdModule id
+	    use_mod = if from_prelude get_mod
+		      then SLIT("Prelude")
+		      else get_mod
+	in (use_mod, _NIL_)
 
-    pp_module_errs :: FAST_STRING -> Pretty
-    pp_module_errs mod
-      | have_errs && mod == _NIL_ 
-	-- A _NIL_ module string corresponds to internal Ids
-	-- The only ones for which call instances should arise are
-	--   dfuns which correspond to instance specialisations
-      = ASSERT (null mod_tyerrs)
-        ppAboves [
-	    ppStr "*** INSTANCES",
-	    ppAboves (map (pp_dfun sty) mod_errs)
-            ]
+      | otherwise
+      = getOrigName id
 
-      | have_errs
+    get_ty_data (ty, tys)
+      = (mod_name, [(ty_name, ty, tys)])
+      where
+	(mod_name,ty_name) = getOrigName ty
+
+    from_prelude mod
+      = SLIT("Prelude") == (_SUBSTR_ mod 0 6)
+ 
+    module_names    = concat [keysFM idspecs_fm, keysFM tyspecs_fm]
+    mods            = map head (equivClasses _CMP_STRING_ module_names)
+
+    (unks, known)   = if null mods
+		      then ([], [])
+		      else case _CMP_STRING_ (head mods) _NIL_ of
+			    EQ_   -> ([_NIL_], tail mods)
+			    other -> ([], mods)
+				   
+    (prels, others) = partition from_prelude known
+    use_modules     = unks ++ prels ++ others
+
+    pp_module_specs :: FAST_STRING -> Pretty
+    pp_module_specs mod
+      | mod == _NIL_
+      = ASSERT (null mod_tyspecs)
+	ppAboves (map (pp_idspec ty_sty (ppStr "UNKNOWN:")) mod_idspecs)
+
+      | have_specs
       = ppAboves [
-	    pp_module mod,
-	    ppAboves (map (pp_err sty) mod_errs),
-	    ppAboves (map (pp_tyerr sty) mod_tyerrs)
+	    ppAboves (map (pp_tyspec ty_sty (pp_module mod)) mod_tyspecs),
+	    ppAboves (map (pp_idspec ty_sty (pp_module mod)) mod_idspecs)
 	    ]
 
       | otherwise
       = ppNil
 
       where
-        mod_tyerrs = lookupWithDefaultFM tyerrs_fm [] mod
-        mod_errs   = lookupWithDefaultFM errs_fm [] mod
-	have_errs  = not (null mod_tyerrs) || not (null mod_errs)
-
-
-    pp_module_warn :: FAST_STRING -> Pretty
-    pp_module_warn mod
-      | have_warn && mod == _NIL_
-	-- A _NIL_ module string corresponds to internal Ids
-	-- The only ones for which call instances should arise are
-	--   dfuns which correspond to instance specialisations
-      = ppAboves [
-	    ppStr "*** INSTANCES",
-	    ppAboves (map (pp_dfun sty) mod_warn)
-            ]
-
-      | have_warn
-      = ppAboves [
-	    pp_module mod,
-	    ppAboves (map (pp_err sty) mod_warn)
-            ]
-
-      | otherwise
-      = ppNil
-
-      where
-        mod_warn  = lookupWithDefaultFM warn_fm [] mod
-        have_warn = not (null mod_warn)
-
+        mod_tyspecs = lookupWithDefaultFM tyspecs_fm [] mod
+        mod_idspecs = lookupWithDefaultFM idspecs_fm [] mod
+	have_specs  = not (null mod_tyspecs && null mod_idspecs)
+	ty_sty = PprInterface (error "SpecTyFuns:PprInterface:sw_chkr")
 
 pp_module mod
-  = ppCat [ppStr "*** module", ppPStr mod, ppStr "***"]
+  = ppBesides [ppPStr mod, ppStr ":"]
 
+pp_tyspec :: PprStyle -> Pretty -> (FAST_STRING, TyCon, [Maybe UniType]) -> Pretty
 
-pp_tyerr :: PprStyle -> (FAST_STRING, TyCon, [Maybe UniType]) -> Pretty
-
-pp_tyerr sty (_, tycon, tys)
-  = ppCat [ppStr "{-# SPECIALIZE data",
-	   pprNonOp sty tycon, ppCat (map (pprParendUniType sty) spec_tys),
-	   ppStr "#-}" ]
+pp_tyspec sty pp_mod (_, tycon, tys)
+  = ppCat [pp_mod,
+	   ppStr "{-# SPECIALIZE", ppStr "data",
+	   pprNonOp PprForUser tycon, ppCat (map (pprParendUniType sty) spec_tys),
+	   ppStr "#-}", ppStr "{- Essential -}"
+           ]
   where
     tvs = getTyConTyVarTemplates tycon
     (spec_args, tv_maybes) = unzip (map choose_ty (tvs `zip` tys))
@@ -265,29 +284,63 @@ pp_tyerr sty (_, tycon, tys)
     choose_ty (tv, Nothing) = (mkTyVarTemplateTy tv, Just tv)
     choose_ty (tv, Just ty) = (ty, Nothing)
 
-pp_err sty (_, id, tys)
-  = ppCat [ppStr "{-# SPECIALIZE",
-	   pprNonOp sty id, ppStr "::",
-	   pprUniType sty spec_ty,
-	   ppStr "#-}" ]
-  where
-    spec_ty = specialiseTy (getIdUniType id) tys 100   -- HACK to drop all dicts!!!
+pp_idspec :: PprStyle -> Pretty -> (FAST_STRING, Id, [Maybe UniType], Bool) -> Pretty
 
-pp_dfun sty (_, id, tys)
+pp_idspec sty pp_mod (_, id, tys, is_err)
   | isDictFunId id
-  = ppCat [ppStr "{-# SPECIALIZE instance",
+  = ppCat [pp_mod,
+	   ppStr "{-# SPECIALIZE",
+	   ppStr "instance",
 	   pprUniType sty spec_ty,
-	   ppStr "#-}" ]
-  | isConstMethodId id
-  = pp_comment sty "OVERLOADED METHOD" id spec_ty
+	   ppStr "#-}", pp_essential ]
+
+  | is_const_method_id
+  = let
+	Just (cls, clsty, clsop) = const_method_maybe
+    	(_, cls_str) = getOrigName cls
+	clsop_str    = getClassOpString clsop
+    in
+    ppCat [pp_mod,
+	   ppStr "{-# SPECIALIZE",
+	   pp_clsop clsop_str, ppStr "::",
+	   pprUniType sty spec_ty,
+	   ppStr "#-} {- IN instance",
+	   ppPStr cls_str, pprParendUniType sty clsty,
+	   ppStr "-}", pp_essential ]
+
+  | is_default_method_id
+  = let
+	Just (cls, clsop, _) = default_method_maybe
+    	(_, cls_str) = getOrigName cls
+	clsop_str    = getClassOpString clsop
+    in
+    ppCat [pp_mod,
+	   ppStr "{- instance",
+	   ppPStr cls_str,
+	   ppStr "EXPLICIT METHOD REQUIRED",
+	   pp_clsop clsop_str, ppStr "::",
+	   pprUniType sty spec_ty,
+	   ppStr "-}", pp_essential ]
+
   | otherwise
-  = pp_comment sty "HELP ..." id spec_ty
+  = ppCat [pp_mod,
+	   ppStr "{-# SPECIALIZE",
+	   pprNonOp PprForUser id, ppStr "::",
+	   pprUniType sty spec_ty,
+	   ppStr "#-}", pp_essential ]
   where
     spec_ty = specialiseTy (getIdUniType id) tys 100   -- HACK to drop all dicts!!!
+    pp_essential = if is_err then ppStr "{- Essential -}" else ppNil
 
-pp_comment sty msg id spec_ty
-  = ppCat [ppStr "{-", ppStr msg,
-	   pprNonOp sty id, ppStr "::",
-	   pprUniType sty spec_ty,
-	   ppStr "-}" ]
+    const_method_maybe = isConstMethodId_maybe id
+    is_const_method_id = maybeToBool const_method_maybe
+
+    default_method_maybe = isDefaultMethodId_maybe id
+    is_default_method_id = maybeToBool default_method_maybe
+
+    pp_clsop str | isAvarop str
+    	         = ppBesides [ppLparen, ppPStr str, ppRparen]
+    	         | otherwise
+		 = ppPStr str
+
 \end{code}

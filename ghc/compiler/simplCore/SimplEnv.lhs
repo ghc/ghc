@@ -505,6 +505,12 @@ data UnfoldingGuidance
 				-- be possible).
 			Int	-- The "size" of the unfolding; to be elaborated
 				-- later. ToDo
+
+  | BadUnfolding		-- This is used by TcPragmas if the *lazy*
+				-- lintUnfolding test fails
+				-- It will never escape from the IdInfo as
+				-- it is caught by getInfo_UF and converted
+				-- to NoUnfoldingDetails
 \end{code}
 
 \begin{code}

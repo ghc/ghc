@@ -15,6 +15,7 @@ module Id (
 	mkSysLocal, mkUserLocal,
 	mkSpecPragmaId,
 	mkSpecId, mkSameSpecCon,
+	selectIdInfoForSpecId,
 	mkTemplateLocals,
 	mkImported, mkPreludeId,
 	mkDataCon, mkTupleCon,
@@ -34,7 +35,7 @@ module Id (
 	-- DESTRUCTION
 	getIdUniType,
 	getInstNamePieces, getIdInfo, replaceIdInfo,
-	getIdKind,
+	getIdKind, getInstIdModule,
 	getMentionedTyConsAndClassesFromId,
 	getDataConTag,
 	getDataConSig, getInstantiatedDataConSig,
@@ -50,8 +51,8 @@ module Id (
 	isTopLevId, isWorkerId, isWrapperId,
 	isImportedId, isSysLocalId,
 	isBottomingId,
-	isClassOpId, isConstMethodId, isDefaultMethodId,
-	isDictFunId, isInstId_maybe, isSuperDictSelId_maybe,
+	isClassOpId, isDefaultMethodId_maybe, isSuperDictSelId_maybe,
+	isDictFunId, isInstId_maybe, isConstMethodId_maybe, 
 #ifdef DPH
 	isInventedTopLevId,
 	isProcessorCon,
@@ -128,9 +129,9 @@ import NameTypes
 import Outputable
 import Pretty		-- for pretty-printing
 import SrcLoc
-import Subst		( applySubstToTy )      -- PRETTY GRIMY TO LOOK IN HERE
+import Subst		( applySubstToTy )       -- PRETTY GRIMY TO LOOK IN HERE
 import PlainCore
-import PrelFuns		( pcGenerateDataSpecs ) -- PRETTY GRIMY TO LOOK IN HERE
+import PrelFuns		( pcGenerateTupleSpecs ) -- PRETTY GRIMY TO LOOK IN HERE
 import UniqFM
 import UniqSet
 import Unique
@@ -263,6 +264,7 @@ The type variables in the name are irrelevant; we print them as stars.
 				-- actually do comparisons that way, we kindly supply
 				-- a Unique for that purpose.
 		Bool		-- True <=> from an instance decl in this mod
+		FAST_STRING	-- module where instance came from
 \end{code}
 
 Constant method ids are generated from instance decls where
@@ -298,6 +300,7 @@ The type variables in the type are irrelevant.
 		UniType		-- (class, type, classop) triple
 		ClassOp
 		Bool		-- True <=> from an instance decl in this mod
+		FAST_STRING	-- module where instance came from
 
   | InstId	Inst		-- An instance of a dictionary, class operation,
 				-- or overloaded value
@@ -518,8 +521,8 @@ toplevelishId (Id _ _ _ details)
     chk (SuperDictSelId _ _)	= True
     chk (ClassOpId _ _)		= True
     chk (DefaultMethodId _ _ _) = True
-    chk (DictFunId     _ _ _)	= True
-    chk (ConstMethodId _ _ _ _) = True
+    chk (DictFunId     _ _ _ _)	= True
+    chk (ConstMethodId _ _ _ _ _) = True
     chk (SpecId unspec _ _)	= toplevelishId unspec
 				  -- depends what the unspecialised thing is
     chk (WorkerId unwrkr)	= toplevelishId unwrkr
@@ -543,8 +546,8 @@ idHasNoFreeTyVars (Id _ _ info details)
     chk (SuperDictSelId _ _)	= True
     chk (ClassOpId _ _)		= True
     chk (DefaultMethodId _ _ _) = True
-    chk (DictFunId     _ _ _)	= True
-    chk (ConstMethodId _ _ _ _) = True
+    chk (DictFunId     _ _ _ _)	= True
+    chk (ConstMethodId _ _ _ _ _) = True
     chk (WorkerId unwrkr)	= idHasNoFreeTyVars unwrkr
     chk (InstId _)		      = False	-- these are local
     chk (SpecId _     _   no_free_tvs) = no_free_tvs
@@ -606,23 +609,23 @@ isSpecPragmaId other		= False
 isClassOpId (Id _ _ _ (ClassOpId _ _)) = True
 isClassOpId _ = False
 
-isDefaultMethodId (Id _ _ _ (DefaultMethodId _ _ _)) = True
+isDefaultMethodId_maybe (Id _ _ _ (DefaultMethodId cls clsop err)) = Just (cls, clsop, err)
 #ifdef DPH
-isDefaultMethodId (PodId _ _ id)	= isDefaultMethodId id
+isDefaultMethodId_maybe (PodId _ _ id)	= isDefaultMethodId_maybe id
 #endif {- Data Parallel Haskell -}
-isDefaultMethodId other			= False
+isDefaultMethodId_maybe other		= Nothing
 
-isDictFunId (Id _ _ _ (DictFunId _ _ _)) = True
+isDictFunId (Id _ _ _ (DictFunId _ _ _ _)) = True
 #ifdef DPH
-isDictFunId (PodId _ _ id)	    	 = isDictFunId id
+isDictFunId (PodId _ _ id)	    	= isDictFunId id
 #endif {- Data Parallel Haskell -}
-isDictFunId other		    	 = False
+isDictFunId other		    	= False
 
-isConstMethodId (Id _ _ _ (ConstMethodId _ _ _ _)) = True
+isConstMethodId_maybe (Id _ _ _ (ConstMethodId cls ty clsop _ _)) = Just (cls, ty, clsop)
 #ifdef DPH
-isConstMethodId (PodId _ _ id)	    = isConstMethodId id
+isConstMethodId_maybe (PodId _ _ id)	= isConstMethodId_maybe id
 #endif {- Data Parallel Haskell -}
-isConstMethodId other		    = False
+isConstMethodId_maybe other		= Nothing
 
 isInstId_maybe (Id _ _ _ (InstId inst)) = Just inst
 #ifdef DPH
@@ -686,9 +689,9 @@ pprIdInUnfolding in_scopes v
 
 	    -- instance-ish things: should we try to figure out
 	    -- *exactly* which extra instances have to be exported? (ToDo)
-	  DictFunId  c t _
+	  DictFunId  c t _ _
 	    -> ppCat [ppPStr SLIT("_DFUN_"), pp_class c, pp_type t]
-	  ConstMethodId c t o _
+	  ConstMethodId c t o _ _
 	    -> ppCat [ppPStr SLIT("_CONSTM_"), pp_class c, pp_class_op o, pp_type t]
 
 	  -- specialisations and workers
@@ -823,7 +826,7 @@ unfoldingUnfriendlyId (Id _ _ _ (WorkerId wrapper))
     class_thing (Id _ _ _ (DefaultMethodId _ _ _)) = True
     class_thing other				   = False
 
-unfoldingUnfriendlyId (Id _ _ _ (SpecId d@(Id _ _ _ dfun@(DictFunId _ t _)) _ _))
+unfoldingUnfriendlyId (Id _ _ _ (SpecId d@(Id _ _ _ dfun@(DictFunId _ t _ _)) _ _))
     -- a SPEC of a DictFunId can end up w/ gratuitous
     -- TyVar(Templates) in the i/face; only a problem
     -- if -fshow-pragma-name-errs; but we can do without the pain.
@@ -832,7 +835,7 @@ unfoldingUnfriendlyId (Id _ _ _ (SpecId d@(Id _ _ _ dfun@(DictFunId _ t _)) _ _)
     naughty_DictFunId dfun
     --)
 
-unfoldingUnfriendlyId d@(Id _ _ _ dfun@(DictFunId _ t _))
+unfoldingUnfriendlyId d@(Id _ _ _ dfun@(DictFunId _ t _ _))
   = --pprTrace "unfriendly2:" (ppCat [ppr PprDebug d, ppr PprDebug t]) (
     naughty_DictFunId dfun -- similar deal...
     --)
@@ -842,8 +845,8 @@ unfoldingUnfriendlyId other_id   = False -- is friendly in all other cases
 naughty_DictFunId :: IdDetails -> Bool
     -- True <=> has a TyVar(Template) in the "type" part of its "name"
 
-naughty_DictFunId (DictFunId _ _ False) = False -- came from outside; must be OK
-naughty_DictFunId (DictFunId _ ty _)
+naughty_DictFunId (DictFunId _ _ False _) = False -- came from outside; must be OK
+naughty_DictFunId (DictFunId _ ty _ _)
   = not (isGroundTy ty)
 \end{code}
 
@@ -1112,7 +1115,7 @@ getIdNamePieces show_uniqs (Id u ty info details)
 	then [SLIT("defm"), op_name]
 	else [SLIT("defm"), c_mod, c_name, op_name] }}
 
-      DictFunId c ty _ ->
+      DictFunId c ty _ _ ->
 	case (getOrigName c)	    of { (c_mod, c_name) ->
 	let
 	    c_bits = if fromPreludeCore c
@@ -1124,7 +1127,7 @@ getIdNamePieces show_uniqs (Id u ty info details)
 	[SLIT("dfun")] ++ c_bits ++ ty_bits }
 
 
-      ConstMethodId c ty o _ ->
+      ConstMethodId c ty o _ _ ->
 	case (getOrigName c)	    of { (c_mod, c_name) ->
 	case (getTypeString ty)	    of { ty_bits ->
 	case (getClassOpString o)   of { o_name ->
@@ -1237,6 +1240,13 @@ getIdKind i = kindFromType (getIdUniType i)
 \end{code}
 
 \begin{code}
+getInstIdModule (Id _ _ _ (DictFunId _ _ _ mod)) = mod
+getInstIdModule (Id _ _ _ (ConstMethodId _ _ _ _ mod)) = mod
+getInstIdModule other = panic "Id:getInstIdModule"
+\end{code}
+
+
+\begin{code}
 {- NOT USED 
 getIdTauType :: Id -> TauType
 getIdTauType i = expandTySyn (getTauType (getIdUniType i))
@@ -1260,11 +1270,11 @@ mkSuperDictSelId  u c sc     ty info = Id u ty info (SuperDictSelId c sc)
 mkClassOpId       u c op     ty info = Id u ty info (ClassOpId c op)
 mkDefaultMethodId u c op gen ty info = Id u ty info (DefaultMethodId c op gen)
 
-mkDictFunId u c ity full_ty from_here info
-  = Id u full_ty info (DictFunId c ity from_here)
+mkDictFunId u c ity full_ty from_here modname info
+  = Id u full_ty info (DictFunId c ity from_here modname)
 
-mkConstMethodId	u c op ity full_ty from_here info
-  = Id u full_ty info (ConstMethodId c ity op from_here)
+mkConstMethodId	u c op ity full_ty from_here modname info
+  = Id u full_ty info (ConstMethodId c ity op from_here modname)
 
 mkWorkerId u unwrkr ty info = Id u ty info (WorkerId unwrkr)
 
@@ -1313,7 +1323,7 @@ mkSysLocal str uniq ty loc
 mkUserLocal str uniq ty loc
   = Id uniq ty noIdInfo (LocalId (mkShortName str loc) (no_free_tvs ty))
 
--- for an SpecPragmaId being created by the compiler out of thin air...
+-- for a SpecPragmaId being created by the compiler out of thin air...
 mkSpecPragmaId :: FAST_STRING -> Unique -> UniType -> Maybe SpecInfo -> SrcLoc -> Id
 mkSpecPragmaId str uniq ty specinfo loc
   = Id uniq ty noIdInfo (SpecPragmaId (mkShortName str loc) specinfo (no_free_tvs ty))
@@ -1397,6 +1407,11 @@ replaceIdInfo (Id u ty _ details) info = Id u ty info details
 #ifdef DPH
 replaceIdInfo (PodId dim ity id) info = PodId dim ity (replaceIdInfo id info)
 #endif {- Data Parallel Haskell -}
+
+selectIdInfoForSpecId :: Id -> IdInfo
+selectIdInfoForSpecId unspec
+  = ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
+    noIdInfo `addInfo_UF` getIdUnfolding unspec
 \end{code}
 
 %************************************************************************
@@ -1531,13 +1546,7 @@ mkTupleCon arity = data_con
     tuplecon_info
       = noIdInfo `addInfo_UF` unfolding
 		 `addInfo` mkArityInfo arity
-		 `addInfo` tuplecon_specenv
-
-    tuplecon_specenv
-      = if arity == 2 then
-	    pcGenerateDataSpecs ty
-        else
-            nullSpecEnv
+		 `addInfo` pcGenerateTupleSpecs arity ty
 
     unfolding
       = -- if arity == 0
@@ -2081,8 +2090,8 @@ instance NamedThing Id where
 	get (SuperDictSelId c _)    = getExportFlag c
 	get (ClassOpId  c _)	    = getExportFlag c
 	get (DefaultMethodId c _ _) = getExportFlag c
-	get (DictFunId  c ty from_here) = instance_export_flag c ty from_here
-	get (ConstMethodId c ty _ from_here) = instance_export_flag c ty from_here
+	get (DictFunId  c ty from_here _) = instance_export_flag c ty from_here
+	get (ConstMethodId c ty _ from_here _) = instance_export_flag c ty from_here
 	get (SpecId unspec _ _)     = getExportFlag unspec
 	get (WorkerId unwrkr)	    = getExportFlag unwrkr
 	get (InstId _)		    = NotExported
@@ -2105,12 +2114,12 @@ instance NamedThing Id where
 	get (SuperDictSelId c _)    = isLocallyDefined c
 	get (ClassOpId c _) 	    = isLocallyDefined c
 	get (DefaultMethodId c _ _) = isLocallyDefined c
-	get (DictFunId c tyc from_here) = from_here
+	get (DictFunId c tyc from_here _) = from_here
 	    -- For DictFunId and ConstMethodId things, you really have to
 	    -- know whether it came from an imported instance or one
 	    -- really here; no matter where the tycon and class came from.
 
-	get (ConstMethodId c tyc _ from_here) = from_here
+	get (ConstMethodId c tyc _ from_here _) = from_here
 	get (SpecId unspec _ _)	    = isLocallyDefined unspec
 	get (WorkerId unwrkr) 	    = isLocallyDefined unwrkr
 	get (InstId  _)		    = True
@@ -2242,8 +2251,8 @@ instance NamedThing Id where
 	get (SuperDictSelId c _)    = fromPreludeCore c
 	get (ClassOpId c _)	    = fromPreludeCore c
 	get (DefaultMethodId c _ _) = fromPreludeCore c
-	get (DictFunId	c t _)	    = fromPreludeCore c && is_prelude_core_ty t
-	get (ConstMethodId c t _ _) = fromPreludeCore c && is_prelude_core_ty t
+	get (DictFunId	c t _ _)    = fromPreludeCore c && is_prelude_core_ty t
+	get (ConstMethodId c t _ _ _) = fromPreludeCore c && is_prelude_core_ty t
 	get (SpecId unspec _ _)	    = fromPreludeCore unspec
 	get (WorkerId unwrkr)	    = fromPreludeCore unwrkr
 	get (InstId   _)	    = False

@@ -427,12 +427,17 @@ generated locally: locally defined tycons and big tuple tycons.
 
 \begin{code}
 isLocalSpecTyCon :: Bool -> TyCon -> Bool
+isLocalGenTyCon  :: TyCon -> Bool
 
 isLocalSpecTyCon compiling_prelude tc
-  = isLocallyDefined tc || (fromPreludeCore tc && not compiling_prelude)
+  = isLocallyDefined tc -- || (fromPreludeCore tc && not compiling_prelude)
+			-- Not for now ... need to be local
+			-- This will cause problem with splitting
 
-isLocalGenTyCon (SpecTyCon tc tys) = isLocalGenTyCon tc
-isLocalGenTyCon tc		   = isBigTupleTyCon tc || isLocallyDefined tc
+isLocalGenTyCon tc
+  = isLocallyDefined tc -- || isBigTupleTyCon tc
+			-- Not for now ... need to be local
+			-- This will cause problem with splitting
 
 isBigTupleTyCon (TupleTyCon arity) = arity > 32
 					-- Tuple0 to Tuple32 declared in prelude

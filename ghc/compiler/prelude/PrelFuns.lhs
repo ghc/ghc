@@ -20,7 +20,7 @@ module PrelFuns (
 
 	pcDataTyCon, pcPrimTyCon,
 	pcDataCon, pcMiscPrelId,
-	pcGenerateSpecs, pcGenerateDataSpecs,
+	pcGenerateSpecs, pcGenerateDataSpecs, pcGenerateTupleSpecs,
 
 	-- mkBuild, mkListFilter,
 
@@ -189,13 +189,16 @@ pcMiscPrelId key mod name ty info
 The specialisations which exist for the builtin values must be recorded in
 their IdInfos.
 
+NOTE: THE USES OF THE pcGenerate... FUNCTIONS MUST CORRESPOND
+      TO THE SPECIALISATIONS DECLARED IN THE PRELUDE !!!
+
 HACK: We currently use the same unique for the specialised Ids.
 
 The list @specing_types@ determines the types for which specialised
 versions are created. Note: This should correspond with the
-@SpecingTypes@ in hscpp.prl.
+types passed to the pre-processor with the -genSPECS arg (see ghc.lprl).
 
-ToDo: Automatic generation of required specialised versions.
+ToDo: Create single mkworld definition which is grabbed here and in ghc.lprl
 
 \begin{code}
 pcGenerateSpecs :: Unique -> Id -> IdInfo -> UniType -> SpecEnv
@@ -208,29 +211,47 @@ pcGenerateDataSpecs ty
   where
     err = panic "PrelFuns:GenerateDataSpecs"
 
+pcGenerateTupleSpecs :: Int -> UniType -> SpecEnv
+pcGenerateTupleSpecs arity ty
+  = if arity < 5 then
+	pcGenerateDataSpecs ty
+    else if arity == 5 then
+	let
+	    tup5_spec jty = SpecInfo (take 5 (repeat jty))
+	 			     0 (panic "SpecData:SpecInfo:SpecId")
+	in
+	mkSpecEnv (map tup5_spec (tail specing_types))
+    else if arity == 19 then
+	mkSpecEnv [SpecInfo (Nothing : Just doublePrimTy : take 17 (repeat Nothing))
+			    0 (panic "SpecData:SpecInfo:SpecId")]
+    else
+        nullSpecEnv
 
 pc_gen_specs is_id key id info ty
  = mkSpecEnv spec_infos
  where
-   spec_infos = [ let spec_ty = specialiseTy ty ty_maybes 0
+   spec_infos = [ let spec_ty = specialiseTy ty spec_tys 0
 		      spec_id = if is_id 
 			        then mkSpecId key {- HACK WARNING: same unique! -}
-				              id ty_maybes spec_ty info
+				              id spec_tys spec_ty info
 				else panic "SpecData:SpecInfo:SpecId"
 		  in
-		  SpecInfo ty_maybes (length ctxts) spec_id
-		| ty_maybes <- tail (cross_product (length tyvars) specing_types) ]
+		  SpecInfo spec_tys (length ctxts) spec_id
+		| spec_tys <- specialisations ]
+
+   (tyvars, ctxts, _) = splitType ty
+   no_tyvars	      = length tyvars
+
+   specialisations    = if no_tyvars == 0
+			then []
+		        else tail (cross_product no_tyvars specing_types)
 
 			-- N.B. tail removes fully polymorphic specialisation
 
-   (tyvars, ctxts, _) = splitType ty
+cross_product 0 tys = []
+cross_product 1 tys = map (:[]) tys
+cross_product n tys = concat [map (:cp) tys | cp <- cross_product (n-1) tys]
 
-   cross_product 0 tys = panic "PrelFuns:cross_product"
-   cross_product 1 tys = map (:[]) tys
-   cross_product n tys = concat [map (:cp) tys | cp <- cross_product (n-1) tys]
-
-
--- Note: The Just types should correspond to SpecingTypes in hscpp.prl
 
 specing_types = [Nothing,	
 		 Just charPrimTy,

@@ -387,6 +387,14 @@ NL  	    	    	[\n\r]
 			      PUSH_STATE(UserPragma);
 			      RETURN(ABSTRACT_UPRAGMA);
 			    }
+<Code,GlaExt>"{-#"{WS}*[A-Z_]+ {
+    	    	    	      fprintf(stderr, "Warning: \"%s\", line %d: Unrecognised pragma '",
+    	    	    	        input_filename, hsplineno);
+    	    	    	      format_string(stderr, (unsigned char *) yytext, yyleng);
+    	    	    	      fputs("'\n", stderr);
+			      nested_comments = 1;
+			      PUSH_STATE(Comment);
+			    }
 <UserPragma>"#-}"	    { POP_STATE; RETURN(END_UPRAGMA); }
 
 %{

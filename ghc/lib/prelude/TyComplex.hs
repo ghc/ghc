@@ -7,4 +7,4 @@ data {- (RealFloat a) => -} Complex a = a :+ a  deriving () -- (Eq,{-ToDo:Binary
 --  (NB: compiler's builtin idea of "data Complex ..." must also
 --	omit the context!)
 
--- {-# SPECIALIZE data Complex Double# #-}
+{-# SPECIALIZE data Complex Double# #-}

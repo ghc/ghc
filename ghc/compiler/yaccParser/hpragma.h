@@ -19,7 +19,6 @@ typedef enum {
 	iclasop_pragma,
 	iinst_simpl_pragma,
 	iinst_const_pragma,
-	iinst_spec_pragma,
 	igen_pragma,
 	iarity_pragma,
 	iupdate_pragma,
@@ -31,7 +30,6 @@ typedef enum {
 	iunfold_if_args,
 	iname_pragma_pr,
 	itype_pragma_pr,
-	iinst_pragma_3s,
 	idata_pragma_4s
 } Thpragma;
 
@@ -83,13 +81,6 @@ struct Siinst_const_pragma {
 	stringId Xgprag_imod_const;
 	hpragma Xgprag_dfun_const;
 	list Xgprag_constms;
-};
-
-struct Siinst_spec_pragma {
-	Thpragma tag;
-	stringId Xgprag_imod_spec;
-	hpragma Xgprag_dfun_spec;
-	list Xgprag_inst_specs;
 };
 
 struct Sigen_pragma {
@@ -156,14 +147,6 @@ struct Sitype_pragma_pr {
 	list Xgprag_type_pr1;
 	numId Xgprag_type_pr2;
 	hpragma Xgprag_type_pr3;
-};
-
-struct Siinst_pragma_3s {
-	Thpragma tag;
-	list Xgprag_inst_pt1;
-	numId Xgprag_inst_pt2;
-	hpragma Xgprag_inst_pt3;
-	list Xgprag_inst_pt4;
 };
 
 struct Sidata_pragma_4s {
@@ -354,59 +337,6 @@ extern list *Rgprag_constms PROTO((struct Siinst_const_pragma *));
 #endif /* ! __GNUC__ */
 
 #define gprag_constms(xyzxyz) (*Rgprag_constms((struct Siinst_const_pragma *) (xyzxyz)))
-
-extern hpragma mkiinst_spec_pragma PROTO((stringId, hpragma, list));
-#ifdef __GNUC__
-
-stringId *Rgprag_imod_spec PROTO((struct Siinst_spec_pragma *));
-
-extern __inline__ stringId *Rgprag_imod_spec(struct Siinst_spec_pragma *t)
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_spec_pragma)
-		fprintf(stderr,"gprag_imod_spec: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_imod_spec);
-}
-#else  /* ! __GNUC__ */
-extern stringId *Rgprag_imod_spec PROTO((struct Siinst_spec_pragma *));
-#endif /* ! __GNUC__ */
-
-#define gprag_imod_spec(xyzxyz) (*Rgprag_imod_spec((struct Siinst_spec_pragma *) (xyzxyz)))
-#ifdef __GNUC__
-
-hpragma *Rgprag_dfun_spec PROTO((struct Siinst_spec_pragma *));
-
-extern __inline__ hpragma *Rgprag_dfun_spec(struct Siinst_spec_pragma *t)
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_spec_pragma)
-		fprintf(stderr,"gprag_dfun_spec: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_dfun_spec);
-}
-#else  /* ! __GNUC__ */
-extern hpragma *Rgprag_dfun_spec PROTO((struct Siinst_spec_pragma *));
-#endif /* ! __GNUC__ */
-
-#define gprag_dfun_spec(xyzxyz) (*Rgprag_dfun_spec((struct Siinst_spec_pragma *) (xyzxyz)))
-#ifdef __GNUC__
-
-list *Rgprag_inst_specs PROTO((struct Siinst_spec_pragma *));
-
-extern __inline__ list *Rgprag_inst_specs(struct Siinst_spec_pragma *t)
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_spec_pragma)
-		fprintf(stderr,"gprag_inst_specs: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_specs);
-}
-#else  /* ! __GNUC__ */
-extern list *Rgprag_inst_specs PROTO((struct Siinst_spec_pragma *));
-#endif /* ! __GNUC__ */
-
-#define gprag_inst_specs(xyzxyz) (*Rgprag_inst_specs((struct Siinst_spec_pragma *) (xyzxyz)))
 
 extern hpragma mkigen_pragma PROTO((hpragma, hpragma, hpragma, hpragma, hpragma, list));
 #ifdef __GNUC__
@@ -803,76 +733,6 @@ extern hpragma *Rgprag_type_pr3 PROTO((struct Sitype_pragma_pr *));
 #endif /* ! __GNUC__ */
 
 #define gprag_type_pr3(xyzxyz) (*Rgprag_type_pr3((struct Sitype_pragma_pr *) (xyzxyz)))
-
-extern hpragma mkiinst_pragma_3s PROTO((list, numId, hpragma, list));
-#ifdef __GNUC__
-
-list *Rgprag_inst_pt1 PROTO((struct Siinst_pragma_3s *));
-
-extern __inline__ list *Rgprag_inst_pt1(struct Siinst_pragma_3s *t)
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt1: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt1);
-}
-#else  /* ! __GNUC__ */
-extern list *Rgprag_inst_pt1 PROTO((struct Siinst_pragma_3s *));
-#endif /* ! __GNUC__ */
-
-#define gprag_inst_pt1(xyzxyz) (*Rgprag_inst_pt1((struct Siinst_pragma_3s *) (xyzxyz)))
-#ifdef __GNUC__
-
-numId *Rgprag_inst_pt2 PROTO((struct Siinst_pragma_3s *));
-
-extern __inline__ numId *Rgprag_inst_pt2(struct Siinst_pragma_3s *t)
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt2: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt2);
-}
-#else  /* ! __GNUC__ */
-extern numId *Rgprag_inst_pt2 PROTO((struct Siinst_pragma_3s *));
-#endif /* ! __GNUC__ */
-
-#define gprag_inst_pt2(xyzxyz) (*Rgprag_inst_pt2((struct Siinst_pragma_3s *) (xyzxyz)))
-#ifdef __GNUC__
-
-hpragma *Rgprag_inst_pt3 PROTO((struct Siinst_pragma_3s *));
-
-extern __inline__ hpragma *Rgprag_inst_pt3(struct Siinst_pragma_3s *t)
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt3: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt3);
-}
-#else  /* ! __GNUC__ */
-extern hpragma *Rgprag_inst_pt3 PROTO((struct Siinst_pragma_3s *));
-#endif /* ! __GNUC__ */
-
-#define gprag_inst_pt3(xyzxyz) (*Rgprag_inst_pt3((struct Siinst_pragma_3s *) (xyzxyz)))
-#ifdef __GNUC__
-
-list *Rgprag_inst_pt4 PROTO((struct Siinst_pragma_3s *));
-
-extern __inline__ list *Rgprag_inst_pt4(struct Siinst_pragma_3s *t)
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt4: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt4);
-}
-#else  /* ! __GNUC__ */
-extern list *Rgprag_inst_pt4 PROTO((struct Siinst_pragma_3s *));
-#endif /* ! __GNUC__ */
-
-#define gprag_inst_pt4(xyzxyz) (*Rgprag_inst_pt4((struct Siinst_pragma_3s *) (xyzxyz)))
 
 extern hpragma mkidata_pragma_4s PROTO((list));
 #ifdef __GNUC__

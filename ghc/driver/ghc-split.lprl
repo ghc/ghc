@@ -24,10 +24,14 @@ sub inject_split_markers {
 	$_ = <TMPI>;
     }
     print TMPO "__STG_SPLIT_MARKER(1)\n";
-    print TMPO $_ if ! /\/\* SPLIT \*\//;
+    print TMPO $_ if ! /^\s*\/\* SPLIT \*\/\s*$/;
+
+	# Have to be a bit careful detecting /* SPLIT */ comments
+	# since a progam may use a string containing "/* SPLIT */"
+	# We check that there is nothing else on the line
 
     while (<TMPI>) {
-	if (/\/\* SPLIT \*\//) {
+	if (/^\s*\/\* SPLIT \*\/\s*$/) {
 	    $marker_no++;
 	    print TMPO "__STG_SPLIT_MARKER($marker_no)\n";
  	    next;
@@ -195,7 +199,7 @@ sub process_asm_block_sparc {
     $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/g; # HACK HACK
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\t\.align .\n(LC\d+):\n\t\.ascii.*\n)/ ) {
+    while ( $str =~ /(\t\.align .\n(LC\d+):\n(\t\.ascii.*\n)+)/ ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -204,7 +208,7 @@ sub process_asm_block_sparc {
 
 	$LocalConstant{$label} = $body;
 	
-	$str =~ s/\t\.align .\nLC\d+:\n\t\.ascii.*\n//;
+	$str =~ s/\t\.align .\nLC\d+:\n(\t\.ascii.*\n)+//;
     }
 
     # inject definitions for any local constants now used herein

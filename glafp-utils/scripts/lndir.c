@@ -137,6 +137,8 @@ int rel;			/* if true, prepend "../" to fn before using */
 		    (dp->d_name[1] == '\0' || (dp->d_name[1] == '.' &&
 					       dp->d_name[2] == '\0')))
 		    continue;
+		if (!strcmp (dp->d_name, "CVS")) /* partain */
+		    continue;
 		if (!strcmp (dp->d_name, "RCS"))
 		    continue;
 		if (!strcmp (dp->d_name, "SCCS"))

@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeArray where
 import PreludeBuiltin(Tuple2)
 import PreludeCore(_CCallable(..))

@@ -76,7 +76,7 @@ tcModule :: E				-- initial typechecker environment
 		  TCE,
 		  Bag InstInfo),
 
-		 FiniteMap TyCon [[Maybe UniType]],
+		 FiniteMap TyCon [(Bool, [Maybe UniType])],
 					-- source tycon specialisation requests
 
 --UNUSED:	 E,			-- environment of total accumulated info
@@ -173,11 +173,11 @@ tcModule e1 renamer_name_funs
 		inst_info = deriv_inst_info `unionBags` decl_inst_info 
 	    in
 		    -- Handle specialise instance pragmas
---	    getSwitchCheckerTc			`thenNF_Tc` \ sw_chkr ->
---	    (if sw_chkr GlasgowExts then
+	    getSwitchCheckerTc			`thenNF_Tc` \ sw_chkr ->
+	    (if sw_chkr SpecialiseOverloaded then
 	         tcSpecInstSigs e3 ce3 tce3 inst_info specinst_sigs
---	     else
---		 returnTc emptyBag)
+	     else
+		 returnTc emptyBag)
 		    				`thenTc` \ spec_inst_info ->
 	    let
 		full_inst_info = inst_info `unionBags` spec_inst_info 

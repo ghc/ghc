@@ -34,8 +34,11 @@ module PreludeCore (
 	HandlePosn(..),
 	IO(..),
 	_Handle,
-	_MVar
+	_MVar,
 
+	-- for unfoldings ...
+	_fromRational, __i0, __i1, __i2, __im1, __i8, __i10, __i16, __rhalf,
+	__integer0, __integer1, __integer2, __integerm1
     ) where
 
 -- few *Ty(s) imports

@@ -42,13 +42,7 @@ instance Hashable a => Hashable [a] where
 	      f [] r = r
 	      f (c:cs) r = f cs (3*r + hash c)
 
-#if defined(__OVERLAPPING_INSTANCES__)
-instance Hashable [Char] where
-    hash l = f l 0
-	where f :: String -> Int -> Int
-	      f [] r = r
-	      f (c:cs) r = f cs (3*r + ord c)
-#endif
+{-# SPECIALISE instance Hashable [Char] #-}
 
 instance (Hashable a, Hashable b) => Hashable (a,b) where
     hash (a,b) = hash a + 3 * hash b

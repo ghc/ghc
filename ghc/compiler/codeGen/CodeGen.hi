@@ -20,5 +20,5 @@ data FiniteMap a b
 data Id 
 data StgBinding a b 
 data UniqFM a 
-codeGen :: _PackedString -> ([CostCentre], [CostCentre]) -> [_PackedString] -> (GlobalSwitch -> SwitchResult) -> [TyCon] -> FiniteMap TyCon [[Labda UniType]] -> [StgBinding Id Id] -> AbstractC
+codeGen :: _PackedString -> ([CostCentre], [CostCentre]) -> [_PackedString] -> (GlobalSwitch -> SwitchResult) -> [TyCon] -> FiniteMap TyCon [(Bool, [Labda UniType])] -> [StgBinding Id Id] -> AbstractC
 

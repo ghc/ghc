@@ -4,6 +4,9 @@ module  PreludeArray (
 
 import Cls
 import Core
+import TyComplex
+import PS		( _PackedString, _unpackPS )
+
 
 data  Assoc a b =  a := b  deriving ()
 

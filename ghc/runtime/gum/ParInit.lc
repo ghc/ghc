@@ -134,8 +134,7 @@ initParallelSystem(STG_NO_ARGS)
 }
 \end{code}
 
-@SynchroniseSystem@ synchronises the reduction task with the system manager,
-and gathers information about which PEs are actually in use.
+@SynchroniseSystem@ synchronises the reduction task with the system manager.
 
 \begin{code}
 GLOBAL_TASK_ID *PEs;

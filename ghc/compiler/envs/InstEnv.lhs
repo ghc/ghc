@@ -18,15 +18,16 @@ module InstEnv (
 	lookupInst,
 	lookupClassInstAtSimpleType,
 	lookupNoBindInst,
+	mkInstSpecEnv,
 
 	MatchEnv(..),	-- mk more abstract (??? ToDo)
 	nullMEnv,
---	mkMEnv, lookupMEnv, insertMEnv, -- no need to export
+--	mkMEnv, lookupMEnv, matchMEnv, insertMEnv, -- no need to export
 
 	-- and to make the interface self-sufficient...
 	Class, ClassOp, CoreExpr, Expr, TypecheckedPat, Id,
 	Inst, InstOrigin, Maybe, MaybeErr, TyVarTemplate, TyCon,
-	UniType, SplitUniqSupply, SpecInfo
+	UniType, SplitUniqSupply, SpecInfo, SpecEnv
     ) where
 
 IMPORT_Trace		-- ToDo: rm (debugging)
@@ -61,8 +62,8 @@ import Util
 type InstanceMapper
   = Class -> (ClassInstEnv, ClassOp -> SpecEnv)
 
-type ClassInstEnv = MatchEnv UniType   InstTemplate -- Instances of dicts
---OLD: type IdInstEnv = MatchEnv [UniType] InstTemplate -- Instances of ids
+type ClassInstEnv
+  = MatchEnv UniType InstTemplate	-- Instances of dicts
 
 data InstTemplate
   = MkInstTemplate
@@ -412,9 +413,9 @@ lookupInst uniqs (LitInst u (OverloadedFractional f from_rational) ty orig)
     float_lit      = App (Var floatDataCon)  (Lit (FloatPrimLit  fD))
 \end{code}
 
-There is a second, simpler interface, when you want an instance
-of a class at a given nullary type constructor.	 It just returns
-the appropriate dictionary if it exists.  It is used only when resolving
+There is a second, simpler interface, when you want an instance of a
+class at a given nullary type constructor.  It just returns the
+appropriate dictionary if it exists.  It is used only when resolving
 ambiguous dictionaries.
 
 \begin{code}
@@ -456,6 +457,25 @@ lookupNoBindInst uniqs (Dict _ clas ty orig)
     inst_env = getClassInstEnv clas
 \end{code}
 
+\begin{code}
+mkInstSpecEnv :: Class			-- class
+	      -> UniType		-- instance type
+	      -> [TyVarTemplate]	-- instance tyvars
+	      -> ThetaType		-- superclasses dicts
+	      -> SpecEnv		-- specenv for dfun of instance
+
+mkInstSpecEnv clas inst_ty inst_tvs inst_theta
+  = mkSpecEnv (catMaybes (map maybe_spec_info matches))
+  where
+    matches = matchMEnv matchTy (getClassInstEnv clas) inst_ty
+
+    maybe_spec_info (_, match_info, MkInstTemplate dfun _ [])
+      = Just (SpecInfo (map (assocMaybe match_info) inst_tvs) (length inst_theta) dfun)
+    maybe_spec_info (_, match_info, _)
+      = Nothing
+
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection[MatchEnv]{Matching environments}
@@ -483,8 +503,7 @@ mkMEnv stuff = stuff
 \end{code}
 
 @lookupMEnv@ looks up in a @MatchEnv@.
-It
-simply takes the first match, should be the most specific.
+It simply takes the first match, should be the most specific.
 
 \begin{code}
 lookupMEnv :: (key {- template -} ->	-- Matching function
@@ -504,6 +523,31 @@ lookupMEnv key_match alist key
       = case key_match tpl key of
 	  Nothing	  -> find rest
 	  Just match_info -> Just (tpl, match_info, val)
+\end{code}
+
+@matchEnv@ returns all more specidfic matches in a @MatchEnv@,
+most specific first.
+
+\begin{code}
+matchMEnv :: (key {- template -} ->	-- Matching function
+	      key {- instance -} ->
+	      Maybe match_info)
+	  -> MatchEnv key value		-- The envt
+	  -> key			-- Key
+	  -> [(key,
+	       match_info,		-- Match info returned by matching fn
+	       value)]			-- Value
+
+matchMEnv key_match alist key
+  = match alist
+  where
+    match [] = []
+    match ((tpl, val) : rest)
+      = case key_match tpl key of
+	  Nothing -> case key_match key tpl of
+		       Nothing         -> match rest
+		       Just match_info -> (tpl, match_info, val) : match rest 
+	  Just _  -> []
 \end{code}
 
 @insertMEnv@ extends a match environment, checking for overlaps.

@@ -701,8 +701,8 @@ We can steal some, but we might have to save/restore around ccalls.
 %*									*
 %************************************************************************
 
-\tr{r13}--\tr{r31} are wonderful callee-save registers.
-\tr{r4}--\tr{r8}, \tr{r10}, and \tr{r11} are caller-save registers.
+\tr{r14}--\tr{r31} are wonderful callee-save registers.
+\tr{r0}--\tr{r13} are caller-save registers.
 
 \tr{%fr14}--\tr{%fr31} are callee-save floating-point registers.
 
@@ -711,26 +711,26 @@ I think we can do the Whole Business with callee-save registers only!
 \begin{code}
 #if powerpc_TARGET_ARCH
 
-#define REG(x) __asm__("%" #x)
+#define REG(x) __asm__(#x)
 
 #if defined(MARK_REG_MAP)
-#define REG_Mark  	r13
-#define REG_MStack  	r14
-#define REG_MRoot	r15
-#define REG_BitArray    r16
-#define REG_HeapBase	r17
-#define REG_HeapLim 	r18
+#define REG_Mark  	r14
+#define REG_MStack  	r15
+#define REG_MRoot	r16
+#define REG_BitArray    r17
+#define REG_HeapBase	r18
+#define REG_HeapLim 	r19
 #else
 #if defined(SCAN_REG_MAP)
-#define REG_Scan  	r13
-#define REG_New  	r14
-#define REG_LinkLim	r15
+#define REG_Scan  	r14
+#define REG_New  	r15
+#define REG_LinkLim	r16
 #else
 #if defined(SCAV_REG_MAP)
-#define REG_Scav  	r13
-#define REG_ToHp  	r14
+#define REG_Scav  	r14
+#define REG_ToHp  	r15
 #if defined(GCap) || defined(GCgn)
-#define REG_OldGen	r15
+#define REG_OldGen	r16
 #endif	/* GCap || GCgn */
 #else	/* default: MAIN_REG_MAP */
 
@@ -759,14 +759,14 @@ I think we can do the Whole Business with callee-save registers only!
 #define CALLEE_SAVES_R7
 #define CALLEE_SAVES_R8
 
-#define REG_R1		r13
-#define REG_R2    	r14
-#define REG_R3    	r15
-#define REG_R4    	r16
-#define REG_R5    	r17
-#define REG_R6    	r18
-#define REG_R7    	r19
-#define REG_R8    	r20
+#define REG_R1		r14
+#define REG_R2    	r15
+#define REG_R3    	r16
+#define REG_R4    	r17
+#define REG_R5    	r18
+#define REG_R6    	r19
+#define REG_R7    	r20
+#define REG_R8    	r21
 
 #define REG_Flt1	fr14
 #define REG_Flt2	fr15
@@ -776,17 +776,17 @@ I think we can do the Whole Business with callee-save registers only!
 #define REG_Dbl1	fr18
 #define REG_Dbl2	fr19
 
-#define REG_SpA    	r21
-#define REG_SuA    	r22
-#define REG_SpB    	r23
-#define REG_SuB    	r24
+#define REG_SpA    	r22
+#define REG_SuA    	r23
+#define REG_SpB    	r24
+#define REG_SuB    	r25
 
-#define REG_Hp	    	r25
-#define REG_HpLim	r26
+#define REG_Hp	    	r26
+#define REG_HpLim	r27
 
-#define REG_Ret	    	r27
+#define REG_Ret	    	r28
 
-#define REG_StkStub 	r28
+#define REG_StkStub 	r29
 
 #endif	/* SCAV_REG_MAP */
 #endif	/* SCAN_REG_MAP */

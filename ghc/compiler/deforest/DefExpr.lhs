@@ -22,7 +22,7 @@
 >			)
 > import CmdLineOpts	( SwitchResult, switchIsOn )
 > import CoreFuns	( mkCoLam, unTagBinders, typeOfCoreExpr )
-> import Id		( applyTypeEnvToId, getIdInfo, isTopLevId, Id,
+> import Id		( applyTypeEnvToId, getIdUnfolding, isTopLevId, Id,
 > 			  isInstId_maybe
 >			)
 > import Inst		-- Inst(..)
@@ -290,7 +290,7 @@ should an unfolding be required.
 >	  if (not . deforestable) id
 >	  	then  no_unfold
 >					
->		else case (getInfo_UF (getIdInfo id)) of
+>		else case (getIdUnfolding id) of
 >			GeneralForm _ _ expr guidance ->
 >			  panic "DefExpr:GeneralForm has changed a little; needs mod here"
 >			  -- SLPJ March 95

@@ -5,9 +5,11 @@ import Cls
 import Core
 import IInt
 import IList
-import List		( map, (++), foldr )
+import List		( (++), map, takeWhile )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 gtChar	(C# x) (C# y) = gtChar# x y
 geChar	(C# x) (C# y) = geChar# x y
@@ -44,9 +46,12 @@ instance  Ix Char  where
 			   where i = ord ci
 
 instance  Enum Char  where
-    enumFrom c		=  map chr [ord c .. ord maxChar]
-    enumFromThen c c'	=  map chr [ord c, ord c' .. ord lastChar]
-			   where lastChar = if c' < c then minChar else maxChar
+    enumFrom c		 =  map chr [ord c .. ord maxChar]
+    enumFromThen c c'	 =  map chr [ord c, ord c' .. ord lastChar]
+			    where lastChar = if c' < c then minChar else maxChar
+    enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
+    enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
+				      (enumFromThen n m)
 
 instance  Text Char  where
     readsPrec p      = readParen False
@@ -105,7 +110,6 @@ instance  Enum Char#  where
     enumFrom c		 =  map chr# [ord# c .. ord# '\255'#]
     enumFromThen c c'	 =  map chr# [ord# c, ord# c' .. ord# lastChar#]
 			    where lastChar# = if c' < c then '\0'# else '\255'#
-    -- default methods not specialised!
     enumFromTo n m	 =  takeWhile (<= m) (enumFrom n)
     enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
 				      (enumFromThen n m)
@@ -114,8 +118,8 @@ instance  Enum Char#  where
 instance  Text Char#  where
     readsPrec p s = map (\ (C# c#, s) -> (c#, s)) (readsPrec p s)
     showsPrec p c = showsPrec p (C# c)
-    readList s = map (\ (x, s) -> (map (\ (C# c#) -> c#) x, s)) (readList s)
-    showList l = showList (map C# l)
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0)
 
 instance _CCallable   Char#
 instance _CReturnable Char#

@@ -19,5 +19,5 @@ data AbstractC
 data CompilationInfo 
 type TCE = UniqFM TyCon
 data UniqFM a 
-genStaticConBits :: CompilationInfo -> [TyCon] -> FiniteMap TyCon [[Labda UniType]] -> AbstractC
+genStaticConBits :: CompilationInfo -> [TyCon] -> FiniteMap TyCon [(Bool, [Labda UniType])] -> AbstractC
 

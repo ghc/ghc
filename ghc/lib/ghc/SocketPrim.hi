@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface SocketPrim where
 import PreludeGlaST(_MutableArray, _MutableByteArray)
 import PreludeIOError(IOError13)
@@ -72,54 +72,54 @@ writeSocket :: Socket -> [Char] -> _State _RealWorld -> (Either IOError13 Int, _
 	{-# GHC_PRAGMA _A_ 0 _U_ 122 _N_ _N_ _N_ _N_ #-}
 instance Eq Family
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Family -> Family -> Bool), (Family -> Family -> Bool)] [_CONSTM_ Eq (==) (Family), _CONSTM_ Eq (/=) (Family)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ } #-}
 instance Eq SockAddr
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(SockAddr -> SockAddr -> Bool), (SockAddr -> SockAddr -> Bool)] [_CONSTM_ Eq (==) (SockAddr), _CONSTM_ Eq (/=) (SockAddr)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ } #-}
 instance Eq SocketType
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool)] [_CONSTM_ Eq (==) (SocketType), _CONSTM_ Eq (/=) (SocketType)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ } #-}
 instance Ix Family
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord Family}}, ((Family, Family) -> [Family]), ((Family, Family) -> Family -> Int), ((Family, Family) -> Family -> Bool)] [_DFUN_ Ord (Family), _CONSTM_ Ix range (Family), _CONSTM_ Ix index (Family), _CONSTM_ Ix inRange (Family)] _N_
-	 range = _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
-	 index = _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_,
-	 inRange = _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	 range = { _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 index = { _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 inRange = { _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 instance Ix SocketType
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [{{Ord SocketType}}, ((SocketType, SocketType) -> [SocketType]), ((SocketType, SocketType) -> SocketType -> Int), ((SocketType, SocketType) -> SocketType -> Bool)] [_DFUN_ Ord (SocketType), _CONSTM_ Ix range (SocketType), _CONSTM_ Ix index (SocketType), _CONSTM_ Ix inRange (SocketType)] _N_
-	 range = _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_,
-	 index = _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_,
-	 inRange = _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	 range = { _A_ 1 _U_ 1 _N_ _S_ "U(EE)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 index = { _A_ 2 _U_ 12 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 inRange = { _A_ 2 _U_ 11 _N_ _S_ "U(EE)E" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 instance Ord Family
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Family}}, (Family -> Family -> Bool), (Family -> Family -> Bool), (Family -> Family -> Bool), (Family -> Family -> Bool), (Family -> Family -> Family), (Family -> Family -> Family), (Family -> Family -> _CMP_TAG)] [_DFUN_ Eq (Family), _CONSTM_ Ord (<) (Family), _CONSTM_ Ord (<=) (Family), _CONSTM_ Ord (>=) (Family), _CONSTM_ Ord (>) (Family), _CONSTM_ Ord max (Family), _CONSTM_ Ord min (Family), _CONSTM_ Ord _tagCmp (Family)] _N_
-	 (<) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (>) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+	 (<) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (<=) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (>=) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (>) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 max = { _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_ },
+	 min = { _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_ },
+	 _tagCmp = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ } #-}
 instance Ord SocketType
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq SocketType}}, (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> Bool), (SocketType -> SocketType -> SocketType), (SocketType -> SocketType -> SocketType), (SocketType -> SocketType -> _CMP_TAG)] [_DFUN_ Eq (SocketType), _CONSTM_ Ord (<) (SocketType), _CONSTM_ Ord (<=) (SocketType), _CONSTM_ Ord (>=) (SocketType), _CONSTM_ Ord (>) (SocketType), _CONSTM_ Ord max (SocketType), _CONSTM_ Ord min (SocketType), _CONSTM_ Ord _tagCmp (SocketType)] _N_
-	 (<) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 (>) = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
+	 (<) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (<=) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (>=) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 (>) = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ },
+	 max = { _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_ },
+	 min = { _A_ 2 _U_ 22 _N_ _S_ "EE" _N_ _N_ },
+	 _tagCmp = { _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ } #-}
 instance Text Family
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Family, [Char])]), (Int -> Family -> [Char] -> [Char]), ([Char] -> [([Family], [Char])]), ([Family] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Family), _CONSTM_ Text showsPrec (Family), _CONSTM_ Text readList (Family), _CONSTM_ Text showList (Family)] _N_
-	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
-	 showsPrec = _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+	 readsPrec = { _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 showsPrec = { _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: [Family]) -> _APP_  _TYAPP_  _ORIG_ PreludeCore _showList { Family } [ _WRKR_ _CONSTM_ Text showsPrec (Family), u0 ] _N_ } #-}
 instance Text SocketType
 	{-# GHC_PRAGMA _M_ SocketPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(SocketType, [Char])]), (Int -> SocketType -> [Char] -> [Char]), ([Char] -> [([SocketType], [Char])]), ([SocketType] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (SocketType), _CONSTM_ Text showsPrec (SocketType), _CONSTM_ Text readList (SocketType), _CONSTM_ Text showList (SocketType)] _N_
-	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
-	 showsPrec = _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+	 readsPrec = { _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 showsPrec = { _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: [SocketType]) -> _APP_  _TYAPP_  _ORIG_ PreludeCore _showList { SocketType } [ _WRKR_ _CONSTM_ Text showsPrec (SocketType), u0 ] _N_ } #-}
 

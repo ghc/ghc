@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludePS where
 import PreludeArray(_ByteArray)
 import PreludeBuiltin(Char(..), Int(..), List(..), Tuple0, Tuple2, _Addr(..), _RealWorld(..), _State(..))
@@ -88,21 +88,21 @@ unpackPS2# :: Addr# -> Int# -> [Char]
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "PP" _N_ _N_ #-}
 instance Eq _PackedString
 	{-# GHC_PRAGMA _M_ PreludePS {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(_PackedString -> _PackedString -> Bool), (_PackedString -> _PackedString -> Bool)] [_CONSTM_ Eq (==) (_PackedString), _CONSTM_ Eq (/=) (_PackedString)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ } #-}
 instance Ord _PackedString
 	{-# GHC_PRAGMA _M_ PreludePS {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq _PackedString}}, (_PackedString -> _PackedString -> Bool), (_PackedString -> _PackedString -> Bool), (_PackedString -> _PackedString -> Bool), (_PackedString -> _PackedString -> Bool), (_PackedString -> _PackedString -> _PackedString), (_PackedString -> _PackedString -> _PackedString), (_PackedString -> _PackedString -> _CMP_TAG)] [_DFUN_ Eq (_PackedString), _CONSTM_ Ord (<) (_PackedString), _CONSTM_ Ord (<=) (_PackedString), _CONSTM_ Ord (>=) (_PackedString), _CONSTM_ Ord (>) (_PackedString), _CONSTM_ Ord max (_PackedString), _CONSTM_ Ord min (_PackedString), _CONSTM_ Ord _tagCmp (_PackedString)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+	 (<) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (<=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (>=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (>) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 max = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 min = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 _tagCmp = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ } #-}
 instance Text _PackedString
 	{-# GHC_PRAGMA _M_ PreludePS {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(_PackedString, [Char])]), (Int -> _PackedString -> [Char] -> [Char]), ([Char] -> [([_PackedString], [Char])]), ([_PackedString] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (_PackedString), _CONSTM_ Text showsPrec (_PackedString), _CONSTM_ Text readList (_PackedString), _CONSTM_ Text showList (_PackedString)] _N_
-	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  error { ([Char] -> [(_PackedString, [Char])]) } [ _NOREP_S_ "readsPrec: _PackedString: ToDo", u1 ] _N_,
-	 showsPrec = _A_ 3 _U_ 012 _N_ _S_ "ALL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 3 XXX 6 \ (u0 :: Int) (u1 :: _PackedString) (u2 :: [Char]) -> let {(u3 :: [Char]) = _APP_  _ORIG_ PreludePS _unpackPS [ u1 ]} in _APP_  _CONSTM_ Text showList (Char) [ u3, u2 ] _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+	 readsPrec = { _A_ 2 _U_ 02 _N_ _S_ _!_ _N_ _N_ },
+	 showsPrec = { _A_ 3 _U_ 012 _N_ _S_ "ALL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 3 XXX 6 \ (u0 :: Int) (u1 :: _PackedString) (u2 :: [Char]) -> let {(u3 :: [Char]) = _APP_  _ORIG_ PreludePS _unpackPS [ u1 ]} in _APP_  _CONSTM_ Text showList (Char) [ u3, u2 ] _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: [_PackedString]) -> _APP_  _TYAPP_  _ORIG_ PreludeCore _showList { _PackedString } [ _WRKR_ _CONSTM_ Text showsPrec (_PackedString), u0 ] _N_ } #-}
 

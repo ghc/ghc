@@ -8,7 +8,7 @@ import U_coresyn
 import U_list
 import U_literal	( U_literal )	-- ditto
 import U_ttype		( U_ttype )	-- interface only
-data U_hpragma = U_no_pragma | U_idata_pragma U_list U_list | U_itype_pragma | U_iclas_pragma U_list | U_iclasop_pragma U_hpragma U_hpragma | U_iinst_simpl_pragma U_stringId U_hpragma | U_iinst_const_pragma U_stringId U_hpragma U_list | U_iinst_spec_pragma U_stringId U_hpragma U_list | U_igen_pragma U_hpragma U_hpragma U_hpragma U_hpragma U_hpragma U_list | U_iarity_pragma U_numId | U_iupdate_pragma U_stringId | U_ideforest_pragma | U_istrictness_pragma U_hstring U_hpragma | U_imagic_unfolding_pragma U_stringId | U_iunfolding_pragma U_hpragma U_coresyn | U_iunfold_always | U_iunfold_if_args U_numId U_numId U_stringId U_numId | U_iname_pragma_pr U_unkId U_hpragma | U_itype_pragma_pr U_list U_numId U_hpragma | U_iinst_pragma_3s U_list U_numId U_hpragma U_list | U_idata_pragma_4s U_list 
+data U_hpragma = U_no_pragma | U_idata_pragma U_list U_list | U_itype_pragma | U_iclas_pragma U_list | U_iclasop_pragma U_hpragma U_hpragma | U_iinst_simpl_pragma U_stringId U_hpragma | U_iinst_const_pragma U_stringId U_hpragma U_list | U_igen_pragma U_hpragma U_hpragma U_hpragma U_hpragma U_hpragma U_list | U_iarity_pragma U_numId | U_iupdate_pragma U_stringId | U_ideforest_pragma | U_istrictness_pragma U_hstring U_hpragma | U_imagic_unfolding_pragma U_stringId | U_iunfolding_pragma U_hpragma U_coresyn | U_iunfold_always | U_iunfold_if_args U_numId U_numId U_stringId U_numId | U_iname_pragma_pr U_unkId U_hpragma | U_itype_pragma_pr U_list U_numId U_hpragma | U_idata_pragma_4s U_list 
 
 rdU_hpragma :: _Addr -> UgnM U_hpragma
 rdU_hpragma t
@@ -47,14 +47,6 @@ rdU_hpragma t
 	ioToUgnM (_ccall_ gprag_constms t) `thenUgn` \ x_gprag_constms ->
 	rdU_list x_gprag_constms `thenUgn` \ y_gprag_constms ->
 	returnUgn (U_iinst_const_pragma y_gprag_imod_const y_gprag_dfun_const y_gprag_constms)
-    else if tag == ``iinst_spec_pragma'' then
-	ioToUgnM (_ccall_ gprag_imod_spec t) `thenUgn` \ x_gprag_imod_spec ->
-	rdU_stringId x_gprag_imod_spec `thenUgn` \ y_gprag_imod_spec ->
-	ioToUgnM (_ccall_ gprag_dfun_spec t) `thenUgn` \ x_gprag_dfun_spec ->
-	rdU_hpragma x_gprag_dfun_spec `thenUgn` \ y_gprag_dfun_spec ->
-	ioToUgnM (_ccall_ gprag_inst_specs t) `thenUgn` \ x_gprag_inst_specs ->
-	rdU_list x_gprag_inst_specs `thenUgn` \ y_gprag_inst_specs ->
-	returnUgn (U_iinst_spec_pragma y_gprag_imod_spec y_gprag_dfun_spec y_gprag_inst_specs)
     else if tag == ``igen_pragma'' then
 	ioToUgnM (_ccall_ gprag_arity t) `thenUgn` \ x_gprag_arity ->
 	rdU_hpragma x_gprag_arity `thenUgn` \ y_gprag_arity ->
@@ -121,16 +113,6 @@ rdU_hpragma t
 	ioToUgnM (_ccall_ gprag_type_pr3 t) `thenUgn` \ x_gprag_type_pr3 ->
 	rdU_hpragma x_gprag_type_pr3 `thenUgn` \ y_gprag_type_pr3 ->
 	returnUgn (U_itype_pragma_pr y_gprag_type_pr1 y_gprag_type_pr2 y_gprag_type_pr3)
-    else if tag == ``iinst_pragma_3s'' then
-	ioToUgnM (_ccall_ gprag_inst_pt1 t) `thenUgn` \ x_gprag_inst_pt1 ->
-	rdU_list x_gprag_inst_pt1 `thenUgn` \ y_gprag_inst_pt1 ->
-	ioToUgnM (_ccall_ gprag_inst_pt2 t) `thenUgn` \ x_gprag_inst_pt2 ->
-	rdU_numId x_gprag_inst_pt2 `thenUgn` \ y_gprag_inst_pt2 ->
-	ioToUgnM (_ccall_ gprag_inst_pt3 t) `thenUgn` \ x_gprag_inst_pt3 ->
-	rdU_hpragma x_gprag_inst_pt3 `thenUgn` \ y_gprag_inst_pt3 ->
-	ioToUgnM (_ccall_ gprag_inst_pt4 t) `thenUgn` \ x_gprag_inst_pt4 ->
-	rdU_list x_gprag_inst_pt4 `thenUgn` \ y_gprag_inst_pt4 ->
-	returnUgn (U_iinst_pragma_3s y_gprag_inst_pt1 y_gprag_inst_pt2 y_gprag_inst_pt3 y_gprag_inst_pt4)
     else if tag == ``idata_pragma_4s'' then
 	ioToUgnM (_ccall_ gprag_data_spec t) `thenUgn` \ x_gprag_data_spec ->
 	rdU_list x_gprag_data_spec `thenUgn` \ y_gprag_data_spec ->

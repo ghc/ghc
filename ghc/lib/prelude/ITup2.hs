@@ -4,16 +4,21 @@ module PreludeBuiltin where
 
 import Cls
 import Core
+import IChar
+import IDouble
 import IInt
 import IInteger
 import IList
 import List	( (++), foldr )
-import Prel	( (&&), (.) )
+import Prel	( (&&), (||), (.) )
 import PS	( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 instance (Eq a, Eq b) => Eq (a, b) where
     (a,b) == (c,d) = a == c && b == d
+    (a,b) /= (c,d) = a /= c || b /= d
 
 instance (Ord a, Ord b) => Ord (a, b) where
     a <  b  = case _tagCmp a b of { _LT -> True;  _EQ -> False; _GT -> False }
@@ -40,13 +45,16 @@ instance (Ix a, Ix b) => Ix (a, b) where
 instance (Text a, Text b) => Text (a, b) where
     readsPrec p = readParen False
     	    	    	    (\r -> [((x,y), w) | ("(",s) <- lex r,
-						 (x,t)   <- reads s,
+						 (x,t)   <- readsPrec 0 s,
 						 (",",u) <- lex t,
-						 (y,v)   <- reads u,
+						 (y,v)   <- readsPrec 0 u,
 						 (")",w) <- lex v ] )
 
-    showsPrec p (x,y) = showChar '(' . shows x . showString ", " .
-    	    	    	    	       shows y . showChar ')'
+    showsPrec p (x,y) = showChar '(' . showsPrec 0 x . showString ", " .
+    	    	    	    	       showsPrec 0 y . showChar ')'
+
+    readList	= _readList (readsPrec 0)
+    showList	= _showList (showsPrec 0) 
 
 {-# SPECIALIZE instance Eq  	(Int, Int) #-}
 {-# SPECIALIZE instance Ord 	(Int, Int) #-}
@@ -54,6 +62,13 @@ instance (Text a, Text b) => Text (a, b) where
 {-# SPECIALIZE instance Text	(Int, Int) #-}
 
 {-# SPECIALIZE instance Text	(Integer, Integer) #-}
+{-# SPECIALIZE instance Text	((Int,Int),(Int,Int)) #-}
+
+{-# SPECIALIZE instance Eq  	([Char], [Char]) #-}
+{-# SPECIALIZE instance Ord 	([Char], [Char]) #-}
+
+{-# SPECIALIZE instance Eq  	([Int], [Int]) #-}
+{-# SPECIALIZE instance Ord 	([Int], [Int]) #-}
 
 {-# SPECIALIZE instance Eq  	(_PackedString, _PackedString) #-}
 {-# SPECIALIZE instance Ord 	(_PackedString, _PackedString) #-}
@@ -65,5 +80,11 @@ instance (Text a, Text b) => Text (a, b) where
 {-# GENERATE_SPECS instance a b :: Ord (a,b) #-}
 {-# GENERATE_SPECS instance a{Char#,Int#} b{Char#,Int#} :: Ix (a,b) #-}
 {-# GENERATE_SPECS instance a b :: Text (a,b) #-}
+
+{-# SPECIALIZE instance Eq  	([Char#], [Char#]) #-}
+{-# SPECIALIZE instance Ord 	([Char#], [Char#]) #-}
+
+{-# SPECIALIZE instance Eq  	([Int#], [Int#]) #-}
+{-# SPECIALIZE instance Ord 	([Int#], [Int#]) #-}
 
 #endif {-UNBOXED INSTANCES-}

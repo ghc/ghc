@@ -170,7 +170,7 @@ considerUnfolding env var args txt_occ form_summary template guidance
 	      dont_go_for_it
 
 	   else if n_vals_wanted == 0
-		&& looks_like_a_data_val_to_me then
+		&& rhs_looks_like_a_CoCon then
 	      -- we are very keen on inlining data values
 	      -- (see comments elsewhere); we ignore any size issues!
 	      go_for_it
@@ -201,7 +201,7 @@ considerUnfolding env var args txt_occ form_summary template guidance
     no_tyargs  = length tyargs
     no_valargs = length valargs
 
-    looks_like_a_data_val_to_me
+    rhs_looks_like_a_CoCon
       = let
 	    (_,val_binders,body) = digForLambdas template
     	in

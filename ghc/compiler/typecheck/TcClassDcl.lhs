@@ -92,7 +92,6 @@ tcClassDecls1 e rec_inst_mapper (cd:cds)
   where
     rec_ce  = getE_CE  e
     rec_tce = getE_TCE e
---FAKE:    fake_E  = mkE rec_tce rec_ce
 
     tc_clas1 (ClassDecl context class_name
 			tyvar_name class_sigs def_methods pragmas src_loc)
@@ -142,7 +141,7 @@ tcClassDecls1 e rec_inst_mapper (cd:cds)
 	    -- suitable Ids for selectors and default methods.
 	  babyTcMtoTcM
 	    (tcClassSigs e tve rec_clas rec_class_op_inst_fn
-			       clas_tyvar class_sigs)
+			       clas_tyvar defm_names class_sigs)
 		   `thenTc` \ (ops, ops_gve, op_sel_ids, defm_ids) ->
 
 	     -- Make the class object itself, producing clas::Class
@@ -166,6 +165,8 @@ tcClassDecls1 e rec_inst_mapper (cd:cds)
 		  ops_gve
     	))
       where
+	defm_names = collectMonoBinders def_methods
+
 	-----------
 	mk_super_id clas (super_clas, uniq, ty) id_info
 	  = mkSuperDictSelId uniq clas super_clas ty id_info

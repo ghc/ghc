@@ -62,12 +62,8 @@ import Pretty
 
 import AbsSyn		-- the stuff being typechecked
 
-import AbsPrel		{-( trueDataCon, falseDataCon, intDataCon, eRROR_ID,
-			  ltPrimDataCon, eqPrimDataCon, gtPrimDataCon,
-			  charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
-			  floatPrimTy, doublePrimTy
-			)-}
-import PrimOps		-- *********** ditto
+import AbsPrel
+import PrimOps
 
 import AbsUniType	( getTyConDataCons, isEnumerationTyCon,
 			  maybeSingleConstructorTyCon, --UNUSED: preludeClassDerivedFor,
@@ -639,8 +635,6 @@ used---but we're supposed to generate massive amounts of code for it
 anyway.  We provide a command-line flag to say ``Don't bother''
 (@OmitDerivedRead@).
 
-We just use the default methods for @showList@ and @readList@.
-
 Also: ignoring all the infix-ery mumbo jumbo (ToDo)
 
 The part of the Haskell report that deals with this (pages~147--151,
@@ -653,9 +647,18 @@ gen_Text_binds :: [RenamedFixityDecl] -> Bool -> TyCon -> ProtoNameMonoBinds
 
 gen_Text_binds fixities omit_derived_read tycon
   = if omit_derived_read
-    then shows_prec
-    else shows_prec `AndMonoBinds` reads_prec
+    then shows_prec `AndMonoBinds` show_list
+    else shows_prec `AndMonoBinds` show_list
+	   `AndMonoBinds`
+	 reads_prec `AndMonoBinds` read_list
   where
+    -----------------------------------------------------------------------
+    show_list = mk_easy_FunMonoBind showList_PN [] []
+		  (App (Var _showList_PN) (App (Var showsPrec_PN) (Lit (IntLit 0))))
+
+    read_list = mk_easy_FunMonoBind readList_PN [] []
+		  (App (Var _readList_PN) (App (Var readsPrec_PN) (Lit (IntLit 0))))
+
     -----------------------------------------------------------------------
     shows_prec
       = mk_FunMonoBind showsPrec_PN (map pats_etc (getTyConDataCons tycon))
@@ -1018,6 +1021,8 @@ index_PN	 = prelude_method SLIT("Ix")   SLIT("index")
 inRange_PN	 = prelude_method SLIT("Ix")   SLIT("inRange")
 readsPrec_PN	 = prelude_method SLIT("Text") SLIT("readsPrec")
 showsPrec_PN	 = prelude_method SLIT("Text") SLIT("showsPrec")
+readList_PN	 = prelude_method SLIT("Text") SLIT("readList")
+showList_PN	 = prelude_method SLIT("Text") SLIT("showList")
 plus_PN		 = prelude_method SLIT("Num")  SLIT("+")
 times_PN	 = prelude_method SLIT("Num")  SLIT("*")
 
@@ -1040,6 +1045,8 @@ showString_PN	= prelude_val pRELUDE_TEXT SLIT("showString")
 showParen_PN	= prelude_val pRELUDE_TEXT SLIT("showParen")
 readParen_PN	= prelude_val pRELUDE_TEXT SLIT("readParen")
 lex_PN		= prelude_val pRELUDE_TEXT SLIT("lex")
+_showList_PN    = prelude_val pRELUDE_CORE SLIT("_showList")
+_readList_PN    = prelude_val pRELUDE_CORE SLIT("_readList")
 
 prelude_val    m s = Imp m s [m] s
 prelude_method c o = Imp pRELUDE_CORE o [pRELUDE_CORE] o -- class not used...

@@ -140,6 +140,7 @@ data _CMP_TAG = _LT | _EQ | _GT -- for derived comparisons
 ----------------------------------------------------
 
 data List a = Nil | a : (List a)
+{-# GENERATE_SPECS data a :: List a #-}
 
 ----------------------------------------------------
 
@@ -192,6 +193,18 @@ data Tuple31 a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_
 data Tuple32 a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_
  = Tup32 a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_
 
+{-# GENERATE_SPECS data a b :: Tuple2 a b #-}
+{-# GENERATE_SPECS data a b c :: Tuple3 a b c #-}
+{-# GENERATE_SPECS data a b c d :: Tuple4 a b c d #-}
+
+{-# SPECIALIZE data Tuple5 Int# Int# Int# Int# Int# #-}
+{-# SPECIALIZE data Tuple5 Char# Char# Char# Char# Char# #-}
+{-# SPECIALIZE data Tuple5 Double# Double# Double# Double# Double# #-}
+
+-- Check this out ... We need this for instance Floating Double# ...
+
+{-# SPECIALIZE data Tuple19 a Double# b c d e f g h i j k l m n o p q r #-}
+
 ----------------------------------------------------
 -- Ratio: in PreludeRatio
 
@@ -199,6 +212,5 @@ data Bin = Bin_____________ -- placeholder only
 
 -- IO things: in PreludeIO
 
---{-# SPECIALIZE data _Lift (State# _RealWorld) #-}
-
 data _Lift a = _Lift a
+{-# GENERATE_SPECS data a :: _Lift a #-}

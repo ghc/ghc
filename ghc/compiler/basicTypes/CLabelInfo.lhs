@@ -63,11 +63,14 @@ import AbsUniType	( showTyCon, cmpTyCon, isBigTupleTyCon,
 			  TyCon, Unique
 			)
 import Id		( externallyVisibleId, cmpId_withSpecDataCon,
-			  DataCon(..), Id, fIRST_TAG, ConTag(..)
+			  isDataCon, isDictFunId, isConstMethodId_maybe,
+			  isClassOpId, isDefaultMethodId_maybe, isSuperDictSelId_maybe,
+			  Id, Class, ClassOp, DataCon(..), ConTag(..), fIRST_TAG
 #ifdef DPH
 			 ,isInventedTopLevId
 #endif {- Data Parallel Haskell -}
 			)
+import Maybes
 import Outputable
 import Pretty		( ppNil, ppChar, ppStr, ppPStr, ppDouble, ppInt,
 			  ppInteger, ppBeside, ppIntersperse, prettyToUn
@@ -317,17 +320,25 @@ isAsmTemp _ 	    	   = False
 
 C ``static'' or not...
 \begin{code}
-externallyVisibleCLabel (TyConLabel tc _) = not (isBigTupleTyCon tc)
-					    -- i.e. not generated for
-					    -- purely-local use...
+externallyVisibleCLabel (TyConLabel tc _) = True
 externallyVisibleCLabel (CaseLabel _ _)	  = False
 externallyVisibleCLabel (AsmTempLabel _)  = False
 externallyVisibleCLabel (RtsLabel _)	  = True
 
 #ifndef DPH
 
-externallyVisibleCLabel (IdLabel (CLabelId id) _)   = externallyVisibleId id
-
+externallyVisibleCLabel (IdLabel (CLabelId id) _)
+  | isDataCon id 	  = True
+  | is_ConstMethodId id   = True  -- These are here to ensure splitting works
+  | isDictFunId id 	  = True  -- when these values have not been exported
+  | isClassOpId id	  = True
+  | is_DefaultMethodId id = True
+  | is_SuperDictSelId id  = True
+  | otherwise    	  = externallyVisibleId id
+  where
+    is_ConstMethodId id   = maybeToBool (isConstMethodId_maybe id)
+    is_DefaultMethodId id = maybeToBool (isDefaultMethodId_maybe id)
+    is_SuperDictSelId id  = maybeToBool (isSuperDictSelId_maybe id)
 #else
 -- DPH pays a big price for exported identifiers. For example with
 -- a statically allocated closure, if it is local to a file it will

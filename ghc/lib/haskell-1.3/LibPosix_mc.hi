@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface LibPosix where
 import LibDirectory(getCurrentDirectory, removeDirectory, setCurrentDirectory)
 import LibPosixDB(GroupEntry(..), UserEntry(..), getGroupEntryForID, getGroupEntryForName, getUserEntryForID, getUserEntryForName, groupID, groupMembers, groupName, homeDirectory, userGroupID, userID, userName, userShell)
@@ -632,40 +632,40 @@ withoutMode :: _ByteArray () -> TerminalMode -> _ByteArray ()
 	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(AP)E" {_A_ 2 _U_ 21 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Eq ProcessStatus
 	{-# GHC_PRAGMA _M_ LibPosixProcPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool)] [_CONSTM_ Eq (==) (ProcessStatus), _CONSTM_ Eq (/=) (ProcessStatus)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ } #-}
 instance Eq ExitCode
 	{-# GHC_PRAGMA _M_ LibSystem {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool)] [_CONSTM_ Eq (==) (ExitCode), _CONSTM_ Eq (/=) (ExitCode)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (/=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ } #-}
 instance Ord ProcessStatus
 	{-# GHC_PRAGMA _M_ LibPosixProcPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq ProcessStatus}}, (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> Bool), (ProcessStatus -> ProcessStatus -> ProcessStatus), (ProcessStatus -> ProcessStatus -> ProcessStatus), (ProcessStatus -> ProcessStatus -> _CMP_TAG)] [_DFUN_ Eq (ProcessStatus), _CONSTM_ Ord (<) (ProcessStatus), _CONSTM_ Ord (<=) (ProcessStatus), _CONSTM_ Ord (>=) (ProcessStatus), _CONSTM_ Ord (>) (ProcessStatus), _CONSTM_ Ord max (ProcessStatus), _CONSTM_ Ord min (ProcessStatus), _CONSTM_ Ord _tagCmp (ProcessStatus)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+	 (<) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (<=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (>=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (>) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 max = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 min = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 _tagCmp = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ } #-}
 instance Ord ExitCode
 	{-# GHC_PRAGMA _M_ LibSystem {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq ExitCode}}, (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> Bool), (ExitCode -> ExitCode -> ExitCode), (ExitCode -> ExitCode -> ExitCode), (ExitCode -> ExitCode -> _CMP_TAG)] [_DFUN_ Eq (ExitCode), _CONSTM_ Ord (<) (ExitCode), _CONSTM_ Ord (<=) (ExitCode), _CONSTM_ Ord (>=) (ExitCode), _CONSTM_ Ord (>) (ExitCode), _CONSTM_ Ord max (ExitCode), _CONSTM_ Ord min (ExitCode), _CONSTM_ Ord _tagCmp (ExitCode)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
+	 (<) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (<=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (>=) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 (>) = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 max = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 min = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ },
+	 _tagCmp = { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ } #-}
 instance Text ProcessStatus
 	{-# GHC_PRAGMA _M_ LibPosixProcPrim {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(ProcessStatus, [Char])]), (Int -> ProcessStatus -> [Char] -> [Char]), ([Char] -> [([ProcessStatus], [Char])]), ([ProcessStatus] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (ProcessStatus), _CONSTM_ Text showsPrec (ProcessStatus), _CONSTM_ Text readList (ProcessStatus), _CONSTM_ Text showList (ProcessStatus)] _N_
-	 readsPrec = _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
-	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LS" _N_ _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+	 readsPrec = { _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 showsPrec = { _A_ 2 _U_ 112 _N_ _S_ "LS" _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ } #-}
 instance Text ExitCode
 	{-# GHC_PRAGMA _M_ LibSystem {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(ExitCode, [Char])]), (Int -> ExitCode -> [Char] -> [Char]), ([Char] -> [([ExitCode], [Char])]), ([ExitCode] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (ExitCode), _CONSTM_ Text showsPrec (ExitCode), _CONSTM_ Text readList (ExitCode), _CONSTM_ Text showList (ExitCode)] _N_
-	 readsPrec = _A_ 2 _U_ 12 _N_ _N_ _N_ _N_,
-	 showsPrec = _A_ 2 _U_ 112 _N_ _S_ "LS" _N_ _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
+	 readsPrec = { _A_ 2 _U_ 12 _N_ _N_ _N_ _N_ },
+	 showsPrec = { _A_ 2 _U_ 112 _N_ _S_ "LS" _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ } #-}
 

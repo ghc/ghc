@@ -44,10 +44,10 @@ tcTyDecls :: E
 	  -> (Name -> [RenamedDataTypeSig])	-- given Name, get specialisation pragmas
 	  -> [RenamedTyDecl]
 	  -> Baby_TcM (TCE, GVE, 
-		       FiniteMap TyCon [[Maybe UniType]])
+		       FiniteMap TyCon [(Bool, [Maybe UniType])])
 						-- specialisations:
-						--   local data types: requsted by source pragmas
-						--   imported data types: from interface file
+						--   True  => imported data types i.e. from interface file
+						--   False => local data types i.e. requsted by source pragmas
 
 tcTyDecls e _ _ [] = returnB_Tc (nullTCE, nullGVE, emptyFM)
 
@@ -128,12 +128,12 @@ Real work for @data@ declarations:
 		    then (pragma_con_decls, recoverIgnoreErrorsB_Tc nullGVE)
 		    else panic "tcTyDecls:data: user and pragma condecls!"
 
-	    specinfos_to_use
+	    (imported_specs, specinfos_to_use)
 	      = if null pragma_spec_infos then
-		    user_spec_infos
+		    (False, user_spec_infos)
 		else
 		    if null user_spec_infos
-		    then pragma_spec_infos
+		    then (True, pragma_spec_infos)
 		    else panic "tcTyDecls:data: user and pragma specinfos!"
 
 	    specenv_to_use = mkSpecEnv specinfos_to_use
@@ -154,7 +154,7 @@ Real work for @data@ declarations:
 			    -- if constrs are from pragma we are *abstract*
 
 	    spec_list
-	      = map (\ (SpecInfo maybe_tys _ _) -> maybe_tys) specinfos_to_use
+	      = [(imported_specs, maybe_tys) | (SpecInfo maybe_tys _ _) <- specinfos_to_use]
 
 	    spec_map
 	      = if null spec_list then

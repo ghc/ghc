@@ -36,7 +36,8 @@ import TcMonad		-- the underlying monadery
 import AbsSyn
 
 import AbsUniType
-import Id		( mkId, mkUserLocal, mkSpecPragmaId, mkSpecId, Id, DictVar(..) )
+import Id		( mkId, mkUserLocal, mkSpecPragmaId, mkSpecId,
+			  selectIdInfoForSpecId, Id, DictVar(..) )
 import IdInfo
 import Inst		( mkDict, mkMethod, mkLitInst,
 			  Inst(..), -- .. for pragmas
@@ -195,7 +196,7 @@ newSpecPragmaId name ty specinfo
 newSpecId :: Id -> [Maybe UniType] -> UniType -> NF_TcM Id
 newSpecId unspec spec_tys ty
   = getUniqueTc 	`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkSpecId uniq unspec spec_tys ty noIdInfo)
+    returnNF_Tc (mkSpecId uniq unspec spec_tys ty (selectIdInfoForSpecId unspec))
 \end{code}
 
 ToDo: This @newClassOpLocals@ is used only to make new ClassOps.  Pretty yukky.

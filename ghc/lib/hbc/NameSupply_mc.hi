@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface NameSupply where
 type Name = Int
 data NameSupply 	{-# GHC_PRAGMA NameSupply Int NameSupply NameSupply #-}

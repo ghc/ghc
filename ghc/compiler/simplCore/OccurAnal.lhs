@@ -83,7 +83,7 @@ import AbsUniType
 import BinderInfo
 import CmdLineOpts	( GlobalSwitch(..), SimplifierSwitch(..) )
 import Digraph		( stronglyConnComp )
-import Id		( eqId, idWantsToBeINLINEd, isConstMethodId,
+import Id		( eqId, idWantsToBeINLINEd, isConstMethodId_maybe,
 			  isSpecPragmaId_maybe, SpecInfo )
 import IdEnv
 import Maybes
@@ -143,7 +143,7 @@ keepBecauseConjurable :: OccEnv -> Id -> Bool
 keepBecauseConjurable (OccEnv _ _ keep_conjurable _ _) binder
   = keep_conjurable && is_conjurable
   where
-    is_conjurable = isConstMethodId binder
+    is_conjurable = maybeToBool (isConstMethodId_maybe binder)
 
 type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
 

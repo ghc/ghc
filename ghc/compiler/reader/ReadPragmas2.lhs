@@ -97,32 +97,6 @@ wlkInstPragma pragma
 	wlkList rd_constm constm_stuff `thenUgn` \ constm_pragmas ->
 	returnUgn (Just modname, ConstantInstancePragma gen_pragma constm_pragmas)
 
-      U_iinst_spec_pragma modname dfun_gen spec_stuff ->
-	wlkGenPragma	dfun_gen    `thenUgn` \ gen_pragma   ->
-	wlkList rd_spec	spec_stuff  `thenUgn` \ spec_pragmas ->
-	returnUgn (Just modname, SpecialisedInstancePragma gen_pragma spec_pragmas)
-  where
-    rd_spec pt
-      = rdU_hpragma pt `thenUgn` \ stuff ->
-	case stuff of { U_iinst_pragma_3s maybe_tys num_dicts gen consts  ->
-
-	wlkList rdMonoTypeMaybe maybe_tys `thenUgn` \ mono_tys_maybe ->
-	wlkGenPragma            gen	 `thenUgn` \ gen_prag	    ->
-	wlkList rd_constm       consts	 `thenUgn` \ constms	    ->
-	let
-	    inst_prag
-	      = if null constms then
-		   if null_gen_prag gen_prag
-		   then NoInstancePragmas
-		   else SimpleInstancePragma gen_prag
-		else -- some constms...
-		   ConstantInstancePragma gen_prag constms
-	in
-	returnUgn (mono_tys_maybe, num_dicts, inst_prag) }
-      where
-	null_gen_prag NoGenPragmas = True
-	null_gen_prag _		   = False
-
 rd_constm pt
   = rdU_hpragma pt  `thenUgn` \ stuff ->
     case stuff of { U_iname_pragma_pr name gen ->

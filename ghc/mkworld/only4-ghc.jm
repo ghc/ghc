@@ -1,4 +1,4 @@
-# line 8 "only4-ghc.ljm"
+# line 8 "mkworld/only4-ghc.ljm"
 /* Project identification - name and version */
 
 #ifndef ProjectName
@@ -16,7 +16,7 @@
 #ifndef GhcBuildeeVersion
 #define GhcBuildeeVersion  27
 #endif
-# line 29 "only4-ghc.ljm"
+# line 29 "mkworld/only4-ghc.ljm"
 /* state of the source world */
 GHC_DRIVERSRC    = $(TOP)/ghc/driver
 GHC_COMPILERSRC  = $(TOP)/ghc/compiler
@@ -25,12 +25,12 @@ GHC_LIBSRC	 = $(TOP)/ghc/lib
 GHC_INCLUDESRC   = $(TOP)/ghc/includes
 GHC_UTILSRC	 = $(TOP)/ghc/utils
 GHC_BOOKSRC	 = $(TOP)/ghc/book
-# line 41 "only4-ghc.ljm"
+# line 41 "mkworld/only4-ghc.ljm"
 #ifndef GhcIncludesDir
 #define GhcIncludesDir $(GHC_INCLUDESRC)
 #endif
 GHC_INCLUDES = GhcIncludesDir
-# line 51 "only4-ghc.ljm"
+# line 51 "mkworld/only4-ghc.ljm"
 #ifndef AllProjectsGhcOpts
 #define AllProjectsGhcOpts /*none*/
 #endif
@@ -60,7 +60,7 @@ GHC_RTS_STYLE = 'ghc'
 GenerateOptionsMakeVars(GHC,OPTS,AllProjectsGhcOpts,PlatformGhcOpts,ProjectGhcOpts,SetupGhcOpts)
 
 GHCFLAGS=$(GLUED_CPP_DEFINES) $(GLUED_GHC_OPTS)
-# line 95 "only4-ghc.ljm"
+# line 95 "mkworld/only4-ghc.ljm"
 /* build York interpreter as well as Glasgow compiler
 */
 #ifndef BuildYorkInterpreter
@@ -73,13 +73,13 @@ GHCFLAGS=$(GLUED_CPP_DEFINES) $(GLUED_GHC_OPTS)
 #ifndef UseSemantiqueStrictnessAnalyser
 #define UseSemantiqueStrictnessAnalyser NO
 #endif
-# line 116 "only4-ghc.ljm"
+# line 116 "mkworld/only4-ghc.ljm"
 /* defaults for which pieces should be installed */
 /* ToDo: possibly obsolete */
 #ifndef DoInstallGHCSystem
 #define DoInstallGHCSystem	YES
 #endif /* DoInstallGHCSystem */
-# line 124 "only4-ghc.ljm"
+# line 124 "mkworld/only4-ghc.ljm"
 /* ------------------------------------------------------------------ */
 /* compiler-proper subsystem:
     the lib/data bits are installed w/ a version number as well
@@ -114,12 +114,12 @@ INSTBINDIR_GHC    = InstBinDir_GHC
 INSTSCRIPTDIR_GHC = InstScriptDir_GHC
 INSTLIBDIR_GHC    = InstLibDir_GHC
 INSTDATADIR_GHC   = InstDataDir_GHC
-# line 183 "only4-ghc.ljm"
+# line 183 "mkworld/only4-ghc.ljm"
 #ifndef GhcDriverInstallName
 #define GhcDriverInstallName ghc
 #endif /* ! GhcDriverInstallName */
 GHC_DRIVER_INST_NAME = GhcDriverInstallName
-# line 197 "only4-ghc.ljm"
+# line 197 "mkworld/only4-ghc.ljm"
 /* ghc: std driver for compilation system */
 #ifndef GhcDriverCmd
 #define GhcDriverCmd $(GHC_DRIVERSRC)/ghc
@@ -133,7 +133,7 @@ __SomeUtilNeededHere(target,$(GHC),$(GHC_DRIVERSRC),all)
 
 /* could be GHC_DRIVER, but GHC is its common name */
 GHC = GhcDriverCmd
-# line 218 "only4-ghc.ljm"
+# line 218 "mkworld/only4-ghc.ljm"
 #ifndef HsCppCmd
 #define HsCppCmd $(GHC_HSCPPSRC)/hscpp
 #endif
@@ -145,7 +145,7 @@ __SomeUtilNeededHere(target,$(GHC_HSCPP),$(GHC_HSCPPSRC),hscpp)
 
 GHC_HSCPP    = HsCppCmd $(ALLPROJ_CPP_DEFINES)
 GHC_HSCPPSRC = $(GHC_UTILSRC)/hscpp
-# line 233 "only4-ghc.ljm"
+# line 233 "mkworld/only4-ghc.ljm"
 #ifndef HsParserCmd
 #define HsParserCmd $(GHC_HSPSRC)/hsp
 #endif
@@ -157,7 +157,7 @@ __SomeUtilNeededHere(target,$(GHC_HSP),$(GHC_HSPSRC),hsp)
 
 GHC_HSP    = HsParserCmd
 GHC_HSPSRC = $(GHC_HSCSRC)
-# line 248 "only4-ghc.ljm"
+# line 248 "mkworld/only4-ghc.ljm"
 #ifndef HsCompilerCmd
 #define HsCompilerCmd $(GHC_HSCSRC)/hsc
 #endif
@@ -169,7 +169,7 @@ __SomeUtilNeededHere(target,$(GHC_HSC),$(GHC_HSCSRC),hsc)
 
 GHC_HSC    = HsCompilerCmd
 GHC_HSCSRC = $(GHC_COMPILERSRC)
-# line 263 "only4-ghc.ljm"
+# line 263 "mkworld/only4-ghc.ljm"
 #ifndef SysManCmd
 #define SysManCmd $(GHC_RUNTIMESRC)/gum/SysMan
 #endif
@@ -181,7 +181,7 @@ __SomeUtilNeededHere(target,$(GHC_SYSMAN),$(GHC_SYSMANSRC),gum/SysMan)
 
 GHC_SYSMAN    = SysManCmd
 GHC_SYSMANSRC = $(GHC_RUNTIMESRC)
-# line 318 "only4-ghc.ljm"
+# line 318 "mkworld/only4-ghc.ljm"
 /*  NON-OPTIMISING C COMPILATION: ==================================
 
     We can use GCC 2.n for the non-optimising (normal) .hc C
@@ -203,7 +203,7 @@ GHC_SYSMANSRC = $(GHC_RUNTIMESRC)
 #endif /* ! gcc */
 #endif /* GhcDebuggingHighLevelAsmCmd */
 GHC_DEBUG_HILEV_ASM = GhcDebuggingHighLevelAsmCmd
-# line 342 "only4-ghc.ljm"
+# line 342 "mkworld/only4-ghc.ljm"
 /*  OPTIMISING C COMPILATION (regs, etc): ==========================
 
     Must use GCC 2.n for this

@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface LibDirectory where
 import PreludeIOError(IOError13)
 import PreludeMonadicIO(Either)

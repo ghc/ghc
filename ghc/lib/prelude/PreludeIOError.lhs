@@ -24,6 +24,8 @@ import PS
 import Prel		( (.), not )
 import PreludeGlaST
 import Text
+import TyArray
+import TyComplex
 
 data IOError13 = AlreadyExists String
              | HardwareFault String
@@ -47,6 +49,8 @@ data IOError13 = AlreadyExists String
 	     -- not really OK: deriving (Text)
 
 instance Text IOError13 where -- NB: not interested in reading
+    readsPrec p = error "readsPrec: IOError13"
+
     showsPrec p (AlreadyExists s)	= show2 "AlreadyExists: "	s
     showsPrec p (HardwareFault s)	= show2 "HardwareFault: "	s
     showsPrec p (IllegalOperation s)	= show2 "IllegalOperation: "	s
@@ -66,6 +70,9 @@ instance Text IOError13 where -- NB: not interested in reading
     showsPrec p (UnsupportedOperation s)= show2 "UnsupportedOperation: " s
     showsPrec p (UserError s)		= showString s
     showsPrec p EOF			= showString "EOF"
+
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0)
 
 show2 x y = showString x . showString y
 

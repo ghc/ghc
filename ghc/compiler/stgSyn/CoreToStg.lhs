@@ -30,7 +30,8 @@ import Unique		-- the UniqueSupply monadery used herein
 import AbsPrel		( unpackCStringId, unpackCString2Id, stringTy,
 			  integerTy, rationalTy, ratioDataCon,
 			  PrimOp(..),		-- For Int2IntegerOp etc
-			  integerZeroId, integerPlusOneId, integerMinusOneId
+			  integerZeroId, integerPlusOneId,
+			  integerPlusTwoId, integerMinusOneId
 			  IF_ATTACK_PRAGMAS(COMMA mkListTy COMMA charTy)
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
@@ -316,6 +317,7 @@ litToStgAtom (NoRepInteger i)
   -- Integer literals!
   | i == 0    = returnSUs (StgVarAtom integerZeroId,     emptyBag)
   | i == 1    = returnSUs (StgVarAtom integerPlusOneId,  emptyBag)
+  | i == 2    = returnSUs (StgVarAtom integerPlusTwoId,  emptyBag)
   | i == (-1) = returnSUs (StgVarAtom integerMinusOneId, emptyBag)
 
   | otherwise

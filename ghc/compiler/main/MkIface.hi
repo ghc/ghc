@@ -36,5 +36,5 @@ data StgBinding a b
 type TCE = UniqFM TyCon
 data InstInfo 
 data UniqFM a 
-mkInterface :: (GlobalSwitch -> Bool) -> _PackedString -> (_PackedString -> Bool, _PackedString -> Bool) -> UniqFM UnfoldingDetails -> FiniteMap TyCon [[Labda UniType]] -> ([FixityDecl Name], [Id], UniqFM Class, UniqFM TyCon, Bag InstInfo) -> [StgBinding Id Id] -> Int -> Bool -> PrettyRep
+mkInterface :: (GlobalSwitch -> Bool) -> _PackedString -> (_PackedString -> Bool, _PackedString -> Bool) -> UniqFM UnfoldingDetails -> FiniteMap TyCon [(Bool, [Labda UniType])] -> ([FixityDecl Name], [Id], UniqFM Class, UniqFM TyCon, Bag InstInfo) -> [StgBinding Id Id] -> Int -> Bool -> PrettyRep
 

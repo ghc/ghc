@@ -19,6 +19,7 @@ data SplitUniqSupply
 data Unique 
 applyBindUnlifts :: [CoreExpr Id Id -> CoreExpr Id Id] -> CoreExpr Id Id -> CoreExpr Id Id
 bindUnlift :: Id -> Id -> CoreExpr Id Id -> CoreExpr Id Id
+isUnboxedButNotState :: UniType -> Bool
 liftCoreBindings :: SplitUniqSupply -> [CoreBinding Id Id] -> [CoreBinding Id Id]
 liftExpr :: Id -> CoreExpr Id Id -> CoreExpr Id Id
 mkLiftedId :: Id -> Unique -> (Id, Id)

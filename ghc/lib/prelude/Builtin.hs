@@ -21,6 +21,7 @@ import PreludeGlaMisc	( deRefStablePtr )
 import PS		( _PackedString, _unpackPS )
 import Stdio		( _FILE )
 import Text
+import TyComplex
 
 ---------------------------------------------------------------
 {- OLD:
@@ -89,6 +90,7 @@ patError# encoded_msg
 	      = case next of
 	      	  '%' -> "%"
 		  'D' -> "No default method for \""
+		  'E' -> "No explicit method for \""
 		  'N' -> ": non-exhaustive guards"
 		  'F' -> "incomplete pattern(s) to match in function \""
 		  'L' -> "pattern-matching failed in lambda"
@@ -104,13 +106,13 @@ patError# encoded_msg
 ---------------------------------------------------------------
 -- ******** defn of `_trace' using Glasgow IO *******
 
---{-# GENERATE_SPECS _trace a #-}
+{-# GENERATE_SPECS _trace a #-}
 _trace :: String -> a -> a
 
 _trace string expr
   = unsafePerformPrimIO (
 	((_ccall_ PreTraceHook sTDERR{-msg-})::PrimIO ())	`seqPrimIO`
-	appendChan# sTDERR string		`seqPrimIO`
+	appendChan# sTDERR string				`seqPrimIO`
 	((_ccall_ PostTraceHook sTDERR{-msg-})::PrimIO ())	`seqPrimIO`
 	returnPrimIO expr )
   where

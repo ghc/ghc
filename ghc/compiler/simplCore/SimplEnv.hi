@@ -70,7 +70,7 @@ data UnfoldConApp
 data UnfoldEnv 
 data UnfoldItem 
 data UnfoldingDetails   = NoUnfoldingDetails | LiteralForm BasicLit | OtherLiteralForm [BasicLit] | ConstructorForm Id [UniType] [CoreAtom Id] | OtherConstructorForm [Id] | GeneralForm Bool FormSummary (CoreExpr (Id, BinderInfo) Id) UnfoldingGuidance | MagicForm _PackedString MagicUnfoldingFun | IWantToBeINLINEd UnfoldingGuidance
-data UnfoldingGuidance   = UnfoldNever | UnfoldAlways | EssentialUnfolding | UnfoldIfGoodArgs Int Int [Bool] Int
+data UnfoldingGuidance   = UnfoldNever | UnfoldAlways | EssentialUnfolding | UnfoldIfGoodArgs Int Int [Bool] Int | BadUnfolding
 data UniType 
 data UniqFM a 
 data Unique 

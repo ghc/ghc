@@ -3,6 +3,7 @@ interface CoreLint where
 import CmdLineOpts(GlobalSwitch)
 import CoreSyn(CoreBinding, CoreExpr)
 import Id(Id)
+import Maybes(Labda)
 import PlainCore(PlainCoreBinding(..))
 import Pretty(PprStyle)
 import SrcLoc(SrcLoc)
@@ -11,5 +12,5 @@ data Id
 type PlainCoreBinding = CoreBinding Id Id
 data PprStyle 
 lintCoreBindings :: PprStyle -> [Char] -> Bool -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-lintUnfolding :: SrcLoc -> CoreExpr Id Id -> CoreExpr Id Id
+lintUnfolding :: SrcLoc -> CoreExpr Id Id -> Labda (CoreExpr Id Id)
 

@@ -48,11 +48,8 @@ module IdInfo (
 	UnfoldingDetails(..),	-- non-abstract! re-exported
 	UnfoldingGuidance(..),	-- non-abstract; ditto
 	mkUnfolding,
---OLD:	mkUnfolding_NoGuideGiven,	-- a convenient interface; for imported things only
 	iWantToBeINLINEd, mkMagicUnfolding,
---UNUSED: haveUnfolding,
 	noInfo_UF, getInfo_UF, addInfo_UF, -- to avoid instance virus
---UNUSED: clearInfo_UF,
 
 	UpdateInfo,
 	mkUpdateInfo,
@@ -96,8 +93,8 @@ import AbsPrel		( mkFunTy, nilDataCon{-HACK-}
 import AbsUniType
 import Bag		( emptyBag, Bag )
 import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( getIdUniType, getDataConSig,
-			  getInstantiatedDataConSig, getIdInfo,
+import Id		( getIdUniType, getIdInfo,
+			  getDataConSig, getInstantiatedDataConSig,
 			  externallyVisibleId, isDataCon,
 			  unfoldingUnfriendlyId, isWorkerId,
 			  isWrapperId, DataCon(..)
@@ -282,9 +279,14 @@ ppIdInfo sty for_this_id specs_please better_id_fn inline_env
 		    ppInfo sty better_id_fn arity,
 		    ppInfo sty better_id_fn update,
 		    ppInfo sty better_id_fn deforest,
+
 		    pp_strictness sty (Just for_this_id)
-						  better_id_fn inline_env strictness,
-		    pp_unfolding  sty for_this_id inline_env unfold,
+				  better_id_fn inline_env strictness,
+
+		    if bottomIsGuaranteed strictness
+		    then pp_NONE
+		    else pp_unfolding sty for_this_id inline_env unfold,
+
 		    if specs_please
 		    then pp_specs sty (not (isDataCon for_this_id))
 			          better_id_fn inline_env specialise
@@ -456,11 +458,12 @@ mkSpecEnv = SpecEnv
 nullSpecEnv = SpecEnv []
 addOneToSpecEnv (SpecEnv xs) x = SpecEnv (x : xs)
 
-lookupConstMethodId :: SpecEnv -> UniType -> Maybe Id
+lookupConstMethodId :: Id -> UniType -> Maybe Id
     -- slight variant on "lookupSpecEnv" below
 
-lookupConstMethodId (SpecEnv spec_infos) spec_ty
-  = firstJust (map try spec_infos)
+lookupConstMethodId sel_id spec_ty
+  = case (getInfo (getIdInfo sel_id)) of
+      SpecEnv spec_infos -> firstJust (map try spec_infos)
   where
     try (SpecInfo (Just ty:nothings) _ const_meth_id)
       = ASSERT(all nothing_is_nothing nothings)
@@ -469,14 +472,14 @@ lookupConstMethodId (SpecEnv spec_infos) spec_ty
 	  _   -> Nothing
 
     nothing_is_nothing Nothing = True  -- debugging only
-    nothing_is_nothing _ = panic "nothing_is_nothing!"
+    nothing_is_nothing _       = panic "nothing_is_nothing!"
 
 lookupSpecId :: Id		-- *un*specialised Id
 	     -> [Maybe UniType]	-- types to which it is to be specialised
 	     -> Id		-- specialised Id
 
 lookupSpecId unspec_id ty_maybes
-  = case (getInfo (getIdInfo unspec_id))  of { SpecEnv spec_infos ->
+  = case (getInfo (getIdInfo unspec_id)) of { SpecEnv spec_infos ->
 
     case (firstJust (map try spec_infos)) of
       Just id -> id
@@ -715,7 +718,7 @@ getWorkerId :: StrictnessInfo -> Id
 
 getWorkerId (StrictnessInfo _ (Just worker_id)) = worker_id
 #ifdef DEBUG
-getWorkerId junk = pprPanic "getWorkerId: Nothing" (ppInfo PprDebug (\x->x) junk)
+getWorkerId junk = pprPanic "getWorkerId: " (ppInfo PprDebug (\x->x) junk)
 #endif
 \end{code}
 
@@ -933,7 +936,7 @@ iWantToBeINLINEd :: UnfoldingGuidance -> UnfoldingDetails
 mkMagicUnfolding :: FAST_STRING -> UnfoldingDetails
 
 mkUnfolding guide expr
-  = GeneralForm False (mkFormSummary NoStrictnessInfo{-NB:lying-} expr) 
+  = GeneralForm False (mkFormSummary NoStrictnessInfo expr) 
 	(BSCC("OccurExpr") occurAnalyseGlobalExpr expr ESCC)
 	guide
 \end{code}
@@ -943,22 +946,24 @@ iWantToBeINLINEd guide = IWantToBeINLINEd guide
 
 mkMagicUnfolding tag  = MagicForm tag (mkMagicUnfoldingFun tag)
 
-{- UNUSED:
-haveUnfolding NoUnfoldingDetails   = False
-haveUnfolding (IWantToBeINLINEd _) = False   -- don't have the unfolding *YET*
-haveUnfolding _	    	           = True
--}
 \end{code}
 
 \begin{code}
 noInfo_UF = NoUnfoldingDetails
 
-getInfo_UF (IdInfo _ _ _ _ unfolding _ _ _ _ _) = unfolding
+getInfo_UF (IdInfo _ _ _ _ unfolding _ _ _ _ _)
+  = case unfolding of
+      NoUnfoldingDetails 	     -> NoUnfoldingDetails
+      GeneralForm _ _ _ BadUnfolding -> NoUnfoldingDetails
+      unfold_ok 		     -> unfold_ok
+
+-- getInfo_UF ensures that any BadUnfoldings are never returned
+-- We had to delay the test required in TcPragmas until now due
+-- to strictness constraints in TcPragmas
 
 addInfo_UF id_info@(IdInfo a b c d e f g h i j) NoUnfoldingDetails = id_info
-addInfo_UF   (IdInfo a b d e xxx f g h i j) uf = IdInfo a b d e uf        f g h i j
+addInfo_UF (IdInfo a b d e xxx f g h i j) uf = IdInfo a b d e uf f g h i j
 
---UNUSED:clearInfo_UF (IdInfo a b d e xxx f g h i j)    = IdInfo a b d e noInfo_UF f g h i j
 \end{code}
 
 \begin{code}
@@ -976,6 +981,8 @@ pp_unfolding sty for_this_id inline_env uf_details
 
     pp (MagicForm tag _)
       = ppCat [ppPStr SLIT("_MF_"), ppPStr tag]
+
+    pp (GeneralForm _ _ _ BadUnfolding) = pp_NONE
 
     pp (GeneralForm _ _ template guide)
       = let
@@ -1104,8 +1111,8 @@ instance OptIdInfo ArgUsageInfo where
     addInfo id_info NoArgUsageInfo = id_info
     addInfo (IdInfo a b d e f g h _ i j) au_info = IdInfo a b d e f g h au_info i j
 
-    ppInfo sty better_id_fn NoArgUsageInfo		= ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn (SomeArgUsageInfo [])	= ifPprInterface sty pp_NONE
+    ppInfo sty better_id_fn NoArgUsageInfo	  = ifPprInterface sty pp_NONE
+    ppInfo sty better_id_fn (SomeArgUsageInfo []) = ifPprInterface sty pp_NONE
     ppInfo sty better_id_fn (SomeArgUsageInfo aut)
       = ppBeside (ppPStr SLIT("_L_ ")) (ppArgUsageType aut)
 

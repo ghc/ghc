@@ -19,6 +19,7 @@ import AbsSyn
 import TcMonad
 
 import CmdLineOpts	( GlobalSwitch(..) )
+import CoreLift		( isUnboxedButNotState )
 import Errors		( unifyErr, UnifyErrInfo(..), UnifyErrContext  )
 import Id		( Id, DataCon(..), Inst )
 import Maybes		( Maybe(..) )
@@ -350,11 +351,11 @@ uVar tv1 ps_ty2 ty2 err_ctxt
     tyvar1 `bindTo` ty2 
 	= extendSubstTc tyvar1 ty2 err_ctxt
 
-    tyvar1 `bindToUnboxed` ty2
+    tyvar1 `bindToUnboxed` ty2 
 	= getSwitchCheckerTc 	`thenNF_Tc` \ sw_chkr ->
-	  if sw_chkr SpecialiseUnboxed then
+	  if sw_chkr SpecialiseUnboxed && isUnboxedButNotState ty2 then
 	      extendSubstTc tyvar1 ty2 err_ctxt
 	  else
 	      getSrcLocTc 	`thenNF_Tc` \ src_loc ->
-              failTc (unifyErr (UnifyMisMatch ty1 ps_ty2) err_ctxt src_loc)
+              failTc (unifyErr (UnifyUnboxedMisMatch ty1 ps_ty2) err_ctxt src_loc)
 \end{code}

@@ -99,33 +99,6 @@ rdInstPragma ('P' : 'i' : 'c' : xs)
     RETN (Just modname, ConstantInstancePragma gen_pragma constm_pragmas, xs3)
     BEND BEND BEND
 
-rdInstPragma ('P' : 'i' : 'S' : xs)
-  = BIND (rdIdString	 xs)  _TO_ (modname,      xs1) ->
-    BIND (rdGenPragma	 xs1) _TO_ (gen_pragma,   xs2) ->
-    BIND (rdList rd_spec xs2) _TO_ (spec_pragmas, xs3) ->
-    RETN (Just modname, SpecialisedInstancePragma gen_pragma spec_pragmas, xs3)
-    BEND BEND BEND
-  where
-    rd_spec ('P' : '3' : xs)
-      = BIND (rdList rdMonoTypeMaybe xs) _TO_ (mono_tys_maybe,  xs1) ->
-	BIND (rdIdString       xs1)	 _TO_ (num_dicts,	xs2) ->
-	BIND (rdGenPragma      xs2) 	 _TO_ (gen_prag, 	xs3) ->
-	BIND (rdList rd_constm xs3) 	 _TO_ (constms,  	xs4) ->
-	let
-	    inst_prag
-	      = if null constms then
-		   if null_gen_prag gen_prag
-		   then NoInstancePragmas
-		   else SimpleInstancePragma gen_prag
-		else -- some constms...
-		   ConstantInstancePragma gen_prag constms
-	in
-	RETN ((mono_tys_maybe, ((read (_UNPK_ num_dicts)) :: Int), inst_prag), xs4)
-	BEND BEND BEND BEND
-      where
-	null_gen_prag NoGenPragmas = True
-	null_gen_prag _		   = False
-
 rd_constm ('P' : '1' : xs)
   = BIND (rdId	xs)  _TO_ (name, xs1) ->
     BIND (rdGenPragma  xs1) _TO_ (prag, xs2) ->

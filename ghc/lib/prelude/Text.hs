@@ -23,20 +23,24 @@ module PreludeText (
 	_showHex, _showRadix, _showDigit, -- non-std
 	
 	showSpace__, -- non-std
---	lexToss__,   -- non-std
 	readOct, readHex
     ) where
 
 import Cls
 import Core
-import IChar		-- instances
+import IArray
+import IBool		-- instances
+import IChar
+import IComplex
 import IDouble
 import IFloat
 import IInt
 import IInteger
 import IList
 import IRatio
+import ITup0
 import ITup2
+import ITup3
 import List
 import Prel
 import PS		( _PackedString, _unpackPS )
@@ -47,53 +51,42 @@ import TyComplex	-- for pragmas
 type  ReadS a = String -> [(a,String)]
 type  ShowS   = String -> String
 
+#if defined(__UNBOXED_INSTANCES__)
+{-# SPECIALIZE shows      :: Int# -> String -> String = shows_Int# #-}
+{-# SPECIALIZE show       :: Int# -> String           = itos# #-}
+{-# SPECIALIZE showSigned :: (Int# -> ShowS) -> Int -> Int# -> ShowS = showSigned_Int# #-}
+#endif
+
 -- *** instances omitted ***
 
-
-{-# SPECIALIZE reads :: ReadS Int,
-			ReadS Integer,
-			ReadS Float,
-			ReadS Double #-}
-{-# SPECIALIZE shows :: Int     -> String -> String = shows_Int,
-			Integer -> String -> String = shows_Integer,
-			Float   -> String -> String,
-			Double  -> String -> String #-}
-{-# SPECIALIZE show  :: Char    -> String,
-			Int     -> String = itos,
-			Integer -> String = jtos,
-			Float   -> String,
-			Double  -> String,
-			_PackedString  -> String,
-			String  -> String,
-			(Int,Int) -> String,
-			(Integer,Integer) -> String #-}
-{-# SPECIALIZE read  :: String  -> Int,
-			String  -> Integer,
-			String  -> Float,
-			String  -> Double #-}
-
---{-# GENERATE_SPECS reads a #-}
 reads 	        :: (Text a) => ReadS a
 reads		=  readsPrec 0
 
---{-# GENERATE_SPECS read a #-}
+{-# GENERATE_SPECS read a{+,Int,Integer,(),Bool,Char,Double,Rational,Ratio(Integer),Complex(Double#),Complex(Double),_PackedString,[Bool],[Char],[Int],[Double],[Float],[Integer],[Complex(Double)],[[Int]],[[Char]],(Int,Int),(Int,Int,Int),(Integer,Integer),Array(Int)(Double),Array(Int,Int)(Double)} #-}
 read 	    	:: (Text a) => String -> a
 read s 	    	=  case [x | (x,t) <- reads s, ("","") <- lex t] of
 			[x] -> x
 			[]  -> error ("read{PreludeText}: no parse:"++s++"\n")
 			_   -> error ("read{PreludeText}: ambiguous parse:"++s++"\n")
 
---{-# GENERATE_SPECS shows a{+,Int} #-}
+{-# SPECIALIZE shows :: Int     -> String -> String = shows_Int,
+			Integer -> String -> String = shows_Integer #-}
+
 shows 	    	:: (Text a) => a -> ShowS
 shows		=  showsPrec 0
 
+shows_Int#    	:: Int# -> ShowS
+shows_Int# n r	= itos# n ++ r		--  showsPrec 0 n r
+
 shows_Int    	:: Int -> ShowS
-shows_Int n r	= itos n ++ r	--  showsPrec 0 n r
+shows_Int n r	= itos n ++ r		--  showsPrec 0 n r
 
 shows_Integer	:: Integer -> ShowS
-shows_Integer n r = jtos n ++ r	--  showsPrec 0 n r
+shows_Integer n r = jtos n ++ r		--  showsPrec 0 n r
 
---{-# GENERATE_SPECS show a{+,Int} #-}
+{-# SPECIALIZE show  :: Int     -> String = itos,
+			Integer -> String = jtos #-}
+{-# GENERATE_SPECS show a{Char#,Double#,(),Bool,Char,Double,Rational,Ratio(Integer),Complex(Double#),Complex(Double),_PackedString,[Bool],[Char],[Int],[Double],[Integer],[Complex(Double)],[[Int]],[[Char]],(Int,Int),(Int,Int,Int),(Integer,Integer),Array(Int)(Double),Array(Int,Int)(Double)} #-}
 show 	    	:: (Text a) => a -> String
 show x 	    	=  shows x ""
 
@@ -129,7 +122,7 @@ lex ('{':'-':s)		= lexNest lex s
 			  where
 			  lexNest f ('-':'}':s) = f s
 			  lexNest f ('{':'-':s) = lexNest (lexNest f) s
-			  lexNest f (c:s)	      = lexNest f s
+			  lexNest f (c:s)	= lexNest f s
 			  lexNest _ ""		= [] -- unterminated
 						     -- nested comment
 
@@ -258,52 +251,49 @@ protectEsc p f		   = f . cont
 			     where cont s@(c:_) | p c = "\\&" ++ s
 				   cont s	      = s
 
-{-# SPECIALIZE readDec :: ReadS Int, ReadS Integer #-}
--- specialisations of readInt should happen automagically
-{-# SPECIALIZE showInt :: Int -> ShowS, Integer -> ShowS #-}
+{-# GENERATE_SPECS readDec a{Int#,Int,Integer} #-}
+readDec :: (Integral a) => ReadS a
+readDec = readInt __i10 isDigit (\d -> ord d - ord_0)
 
-readDec, readOct, readHex :: (Integral a) => ReadS a
-readDec = readInt 10 isDigit (\d -> ord d - i_ord_0)
-readOct = readInt  8 isOctDigit (\d -> ord d - i_ord_0)
-readHex = readInt 16 isHexDigit hex
-	    where hex d = ord d - (if isDigit d then i_ord_0
-				   else ord (if isUpper d then 'A' else 'a')
-					- 10)
+{-# GENERATE_SPECS readOct a{Int#,Int,Integer} #-}
+readOct :: (Integral a) => ReadS a
+readOct = readInt __i8 isOctDigit (\d -> ord d - ord_0)
 
+{-# GENERATE_SPECS readHex a{Int#,Int,Integer} #-}
+readHex :: (Integral a) => ReadS a
+readHex = readInt __i16 isHexDigit hex
+	    where hex d = ord d - (if isDigit d then ord_0
+				   else ord (if isUpper d then 'A' else 'a') - 10)
+
+{-# GENERATE_SPECS readInt a{Int#,Int,Integer} #-}
 readInt :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
 readInt radix isDig digToInt s =
-    [(foldl1 (\n d -> n * radix + d) (map (fromIntegral . digToInt) ds), r)
+    [(foldl1 (\n d -> n * radix + d) (map (fromInt . digToInt) ds), r)
 	| (ds,r) <- nonnull isDig s ]
 
+
+{-# GENERATE_SPECS showInt a{Int#,Int,Integer} #-}
 showInt	:: (Integral a) => a -> ShowS
+
 {- USE_REPORT_PRELUDE
 showInt n r = let (n',d) = quotRem n 10
-		  r' = chr (i_ord_0 + fromIntegral d) : r
+		  r' = chr (ord_0 + fromIntegral d) : r
 	      in if n' == 0 then r' else showInt n' r'
 -}
 
 showInt n r
   = case quotRem n 10 of		     { (n', d) ->
-    case (chr (i_ord_0 + fromIntegral d)) of { C# c# -> -- stricter than necessary
+    case (chr (ord_0 + fromIntegral d)) of { C# c# -> -- stricter than necessary
     let
 	r' = C# c# : r
     in
     if n' == 0 then r' else showInt n' r'
     }}
 
--- #endif /* ! USE_REPORT_PRELUDE */
+-- ******************************************************************
 
-{-# SPECIALIZE readSigned :: ReadS Int     -> ReadS Int,
-			     ReadS Integer -> ReadS Integer,
-			     ReadS Double  -> ReadS Double #-}
-{-# SPECIALIZE showSigned :: (Int     -> ShowS) -> Int -> Int     -> ShowS = showSigned_Int,
-			     (Integer -> ShowS) -> Int -> Integer -> ShowS = showSigned_Integer,
-			     (Double  -> ShowS) -> Int -> Double  -> ShowS #-}
-{-# SPECIALIZE readFloat  :: ReadS Float,
-			     ReadS Double #-}
-{-# SPECIALIZE showFloat  :: Float -> ShowS, Double -> ShowS #-}
-
-readSigned:: (Real a) => ReadS a -> ReadS a
+{-# GENERATE_SPECS readSigned a{Int#,Double#,Int,Integer,Double} #-}
+readSigned :: (Real a) => ReadS a -> ReadS a
 readSigned readPos = readParen False read'
 		     where read' r  = read'' r ++
 				      [(-x,t) | ("-",s) <- lex r,
@@ -311,12 +301,19 @@ readSigned readPos = readParen False read'
 			   read'' r = [(n,s)  | (str,s) <- lex r,
 		      				(n,"")  <- readPos str]
 
--- ******************************************************************
 
-showSigned:: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
+{-# SPECIALIZE showSigned :: (Int     -> ShowS) -> Int -> Int     -> ShowS = showSigned_Int,
+			     (Integer -> ShowS) -> Int -> Integer -> ShowS = showSigned_Integer #-}
+{-# GENERATE_SPECS showSigned a{Double#,Double} #-}
+showSigned :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
 showSigned showPos p x = if x < 0 then showParen (p > 6)
 						 (showChar '-' . showPos (-x))
 				  else showPos x
+
+showSigned_Int# :: (Int# -> ShowS) -> Int -> Int# -> ShowS
+showSigned_Int# _ p n r
+  = -- from HBC version; support code follows
+    if n `ltInt#` 0# && p > 6 then '(':itos# n++(')':r) else itos# n ++ r
 
 showSigned_Int :: (Int -> ShowS) -> Int -> Int -> ShowS
 showSigned_Int _ p n r
@@ -328,46 +325,47 @@ showSigned_Integer _ p n r
   = -- from HBC version; support code follows
     if n < 0 && p > 6 then '(':jtos n++(')':r) else jtos n ++ r
 
-itos :: Int -> String
-itos n = 
-    if n < 0 then
-	if -n < 0 then
+
+-- ******************************************************************
+
+itos# :: Int# -> String
+itos# n =
+    if n `ltInt#` 0# then
+	if negateInt# n `ltInt#` 0# then
 	    -- n is minInt, a difficult number
-	    itos (n `quot` 10) ++ itos' (-(n `rem` 10)) []
+	    itos# (n `quotInt#` 10#) ++ itos' (negateInt# (n `remInt#` 10#)) []
 	else
-	    '-':itos' (-n) []
+	    '-':itos' (negateInt# n) []
     else 
 	itos' n []
   where
-    itos' :: Int -> String -> String
+    itos' :: Int# -> String -> String
     itos' n cs = 
-	if n < 10 then
-	    chr (n + i_ord_0) : cs
+	if n `ltInt#` 10# then
+	    fromChar# (chr# (n `plusInt#` ord# '0'#)) : cs
 	else 
-	    itos' (n `quot` 10) (chr (n `rem` 10+i_ord_0) : cs)
+	    itos' (n `quotInt#` 10#) (fromChar# (chr# (n `remInt#` 10# `plusInt#` ord# '0'#)) : cs)
 
-i_ord_0 :: Int
-j_ord_0 :: Integer
-i_ord_0 = ord '0'
-j_ord_0 = toInteger (ord '0')
+itos :: Int -> String
+itos (I# n) = itos# n
 
 jtos :: Integer -> String
-jtos n = 
-    if n < 0 then
-	if -n < 0 then
-	    -- n is minInt, a difficult number
-	    jtos (n `quot` 10) ++ jtos' (-(n `rem` 10)) []
-	else
-	    '-':jtos' (-n) []
+jtos n 
+  = if n < __i0 then
+        '-' : jtos' (-n) []
     else 
 	jtos' n []
-  where
-    jtos' :: Integer -> String -> String
-    jtos' n cs = 
-	if n < 10 then
-	    chr (fromInteger (n + j_ord_0)) : cs
-	else 
-	    jtos' (n `quot` 10) (chr (fromInteger (n `rem` 10+j_ord_0)) : cs)
+
+jtos' :: Integer -> String -> String
+jtos' n cs
+  = if n < __i10 then
+	chr (fromInteger (n + ord_0)) : cs
+    else 
+	jtos' (n `quot` __i10) (chr (fromInteger (n `rem` __i10 + ord_0)) : cs)
+
+ord_0 :: Num a => a
+ord_0 = fromInt (ord '0')
+
 
 -- ******************************************************************
 
@@ -376,6 +374,7 @@ jtos n =
 -- decimal.  It is often possible to use a higher-precision floating-
 -- point type to obtain the same results.
 
+{-# GENERATE_SPECS readFloat a{Double#,Double} #-}
 readFloat :: (RealFloat a) => ReadS a
 readFloat r = [(fromRational x, t) | (x, t) <- readRational r]
 
@@ -416,6 +415,7 @@ _readRational top_s
  
 zeros = repeat '0'
 
+{-# GENERATE_SPECS showFloat a{Double#,Double} #-}
 showFloat:: (RealFloat a) => a -> ShowS
 showFloat x =
     if x == 0 then showString ("0." ++ take (m-1) zeros)
@@ -428,15 +428,15 @@ showFloat x =
     		  where (d:frac) = show sig
     (m, sig, e) = if b == 10 then (w,  	s,   n+w-1)
 		  	     else (m', sig', e'   )
-    m'		= _ceiling
-		      ((fromIntegral w * log (fromInteger b)) / log 10 :: Double)
+    m'		= ceiling
+		      ((fromInt w * log (fromInteger b)) / log 10 :: Double)
 		  + 1
-    (sig', e')	= if	  sig1 >= 10^m'     then (_round (t/10), e1+1)
-		  else if sig1 <  10^(m'-1) then (_round (t*10), e1-1)
+    (sig', e')	= if	  sig1 >= 10^m'     then (round (t/10), e1+1)
+		  else if sig1 <  10^(m'-1) then (round (t*10), e1-1)
 		  			    else (sig1,		 e1  )
-    sig1	= _round t
+    sig1	= round t
     t		= s%1 * (b%1)^^n * 10^^(m'-e1-1)
-    e1		= _floor (logBase 10 x)
+    e1		= floor (logBase 10 x)
     (s, n)	= decodeFloat x
     b		= floatRadix x
     w		= floatDigits x
@@ -457,5 +457,5 @@ _showRadix radix n r =
   if n' == 0 then r' else _showRadix radix n' r'
 
 _showDigit :: Int -> Char
-_showDigit d | d < 10    = chr (i_ord_0 + d) 
+_showDigit d | d < 10    = chr (ord_0 + d) 
              | otherwise = chr (ord 'a' + (d - 10))

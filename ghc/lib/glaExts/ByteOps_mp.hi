@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface ByteOps where
 import PreludeBuiltin(Char(..), Double(..), Float(..), Int(..), List(..), Tuple2)
 bytesToDouble :: [Char] -> (Double, [Char])

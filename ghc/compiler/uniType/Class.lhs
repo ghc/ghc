@@ -154,7 +154,7 @@ getConstMethodId (MkClass _ _ _ _ _ ops op_ids _ _ _) op ty
     let
 	sel_id = op_ids !! (getClassOpTag op - 1)
     in
-    case (lookupConstMethodId (getIdSpecialisation sel_id) ty) of
+    case (lookupConstMethodId sel_id ty) of
       Just xx -> xx
       Nothing -> error (ppShow 80 (ppAboves [
 	ppCat [ppStr "ERROR: getConstMethodId:", ppr PprDebug op, ppr PprDebug ty, ppr PprDebug ops, ppr PprDebug op_ids, ppr PprDebug sel_id],

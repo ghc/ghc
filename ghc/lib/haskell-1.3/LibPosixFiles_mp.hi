@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface LibPosixFiles where
 import LibDirectory(removeDirectory)
 import PreludeArray(_ByteArray)

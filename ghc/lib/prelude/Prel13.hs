@@ -32,6 +32,7 @@ module Prelude (
 
 #if defined(__UNBOXED_INSTANCES__)
 	minInt#, maxInt#,
+	toInt#, fromInt#,
 	minChar#, maxChar#,
 	toChar#, fromChar#,
 	isAscii#, isControl#, isPrint#, isSpace#, 
@@ -57,7 +58,7 @@ module Prelude (
 	readParen, showParen, readLitChar, showLitChar, readSigned,
 	showSigned, showSpace__, readDec, showInt, readFloat, showFloat,
 	_showHex, _showRadix, _showDigit, -- non-std
-	_readList, _showList, _truncate, _round, _ceiling, _floor,
+	_readList, _showList,
 
 	_readRational, _showRational, -- extras!
 
@@ -165,7 +166,7 @@ ioToPrimIO io
   = io		`thenPrimIO` \ r ->
     case r of
       Right a -> returnPrimIO a
-      Left  e -> error ("I/O Error (ioToPrimIO): " ++ shows e "\n")
+      Left  e -> error ("I/O Error (ioToPrimIO): " ++ showsPrec 0 e "\n")
 
 
 -- 1.3 extra functions

@@ -64,7 +64,7 @@ type OutAtom = CoreAtom Id
 type OutExpr = CoreExpr Id Id
 type OutId = Id
 data UnfoldingDetails   = NoUnfoldingDetails | LiteralForm BasicLit | OtherLiteralForm [BasicLit] | ConstructorForm Id [UniType] [CoreAtom Id] | OtherConstructorForm [Id] | GeneralForm Bool FormSummary (CoreExpr (Id, BinderInfo) Id) UnfoldingGuidance | MagicForm _PackedString MagicUnfoldingFun | IWantToBeINLINEd UnfoldingGuidance
-data UnfoldingGuidance   = UnfoldNever | UnfoldAlways | EssentialUnfolding | UnfoldIfGoodArgs Int Int [Bool] Int
+data UnfoldingGuidance   = UnfoldNever | UnfoldAlways | EssentialUnfolding | UnfoldIfGoodArgs Int Int [Bool] Int | BadUnfolding
 data SrcLoc 
 data Subst 
 type SimplifiableBinder = (Id, BinderInfo)
@@ -94,7 +94,7 @@ getWorkerId :: StrictnessInfo -> Id
 getWrapperArgTypeCategories :: UniType -> StrictnessInfo -> Labda [Char]
 iWantToBeINLINEd :: UnfoldingGuidance -> UnfoldingDetails
 indicatesWorker :: [Demand] -> Bool
-lookupConstMethodId :: SpecEnv -> UniType -> Labda Id
+lookupConstMethodId :: Id -> UniType -> Labda Id
 lookupSpecEnv :: SpecEnv -> [UniType] -> Labda (Id, [UniType], Int)
 lookupSpecId :: Id -> [Labda UniType] -> Id
 mkArgUsageInfo :: [ArgUsage] -> ArgUsageInfo

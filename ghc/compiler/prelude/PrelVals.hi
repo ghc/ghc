@@ -15,6 +15,7 @@ foldrId :: Id
 forkId :: Id
 integerMinusOneId :: Id
 integerPlusOneId :: Id
+integerPlusTwoId :: Id
 integerZeroId :: Id
 mkBuild :: UniType -> TyVar -> Id -> Id -> Id -> CoreExpr Id Id -> CoreExpr Id Id
 mkFoldl :: UniType -> UniType -> Id -> Id -> Id -> CoreExpr a Id

@@ -29,6 +29,7 @@ import List		( splitAt, (++) )
 import Prel		( ord, (.), otherwise )
 import Text
 import TyArray		-- instance _CCallable (_ByteArray a)
+import TyComplex
 
 import PreludeIOError
 import PreludeMonadicIO

@@ -115,6 +115,7 @@ import PS		( _PackedString, _unpackPS )
 import Prel		( otherwise, not, (.) )
 import Text
 import TyArray		-- instance _CCallable (_ByteArray a)
+import TyComplex
 
 import PreludeIOError
 import PreludeMonadicIO

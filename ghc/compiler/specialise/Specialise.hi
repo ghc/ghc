@@ -11,7 +11,7 @@ import TyCon(TyCon)
 import UniType(UniType)
 data Bag a 
 data FiniteMap a b 
-data SpecialiseData   = SpecData Bool Bool [TyCon] [TyCon] (FiniteMap TyCon [[Labda UniType]]) (Bag (Id, [Labda UniType])) (Bag (Id, [Labda UniType])) (Bag (TyCon, [Labda UniType]))
-initSpecData :: [TyCon] -> FiniteMap TyCon [[Labda UniType]] -> SpecialiseData
+data SpecialiseData   = SpecData Bool Bool [TyCon] [TyCon] (FiniteMap TyCon [(Bool, [Labda UniType])]) (Bag (Id, [Labda UniType])) (Bag (Id, [Labda UniType])) (Bag (TyCon, [Labda UniType]))
+initSpecData :: [TyCon] -> FiniteMap TyCon [(Bool, [Labda UniType])] -> SpecialiseData
 specProgram :: (GlobalSwitch -> Bool) -> SplitUniqSupply -> [CoreBinding Id Id] -> SpecialiseData -> ([CoreBinding Id Id], SpecialiseData)
 

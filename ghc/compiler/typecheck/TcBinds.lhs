@@ -7,7 +7,8 @@
 #include "HsVersions.h"
 
 module TcBinds (
-	tcTopBindsAndThen, tcLocalBindsAndThen
+	tcTopBindsAndThen, tcLocalBindsAndThen,
+	tcSigs, doSpecPragma
     ) where
 
 --IMPORT_Trace		-- ToDo:rm (debugging)
@@ -272,7 +273,8 @@ tcBind_help top_level e bind sigs
     genBinds top_level e bind' lie lve sig_info	`thenTc` \ (binds', lie, lve) ->
 
 	-- Add bindings corresponding to SPECIALIZE pragmas in the code
-    mapAndUnzipTc (doSpecPragma e lve) (get_spec_pragmas sig_info)
+    mapAndUnzipTc (doSpecPragma e (assoc "doSpecPragma" lve))
+		  (get_spec_pragmas sig_info)
 			`thenTc` \ (spec_binds_s, spec_lie_s) ->
 
     returnTc (binds' `ThenBinds` (SingleBind (NonRecBind (
@@ -315,14 +317,14 @@ We generate:
 \end{verbatim}
 
 \begin{code}
-doSpecPragma :: E -> LVE
+doSpecPragma :: E
+	     -> (Name -> Id)
 	     -> SignatureInfo
 	     -> TcM (TypecheckedMonoBinds, LIE)
 
-doSpecPragma e lve (ValSpecInfo name spec_ty using src_loc)
+doSpecPragma e name_to_id (ValSpecInfo name spec_ty using src_loc)
   = let
-	main_id = assoc "doSpecPragma" lve name
-	    -- Get the parent Id; it should exist (renamer promises...).
+	main_id = name_to_id name    -- Get the parent Id
 
 	main_id_ty = getIdUniType main_id
 	main_id_free_tyvars = extractTyVarsFromTy main_id_ty

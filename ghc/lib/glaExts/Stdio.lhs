@@ -15,6 +15,7 @@ import PS		-- ( _PackedString )
 import TyArray
 import PreludeGlaST
 import Text
+import TyComplex
 
 data _FILE = _FILE Addr#
 instance _CCallable   _FILE

@@ -33,6 +33,8 @@ import List		( (++) )
 import Prel		( (.), not )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 import PreludeGlaST
 import PreludeIOError

@@ -29,6 +29,7 @@ import List		( (++), foldr )
 import Prel		( chr )
 import PS		( _PackedString, _unpackPS )
 import TyArray		( Array(..) )
+import TyComplex
 import PreludeGlaST
 import Text
 \end{code}

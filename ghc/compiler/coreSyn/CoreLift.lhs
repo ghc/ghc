@@ -13,6 +13,7 @@ module CoreLift (
 	liftExpr,
 	bindUnlift,
 	applyBindUnlifts,
+	isUnboxedButNotState,
 	
 	CoreBinding, PlainCoreBinding(..),
 	CoreExpr, PlainCoreExpr(..),
@@ -20,6 +21,7 @@ module CoreLift (
     ) where
 
 IMPORT_Trace
+import Pretty
 
 import AbsPrel		( liftDataCon, mkLiftTy )
 import TysPrim		( statePrimTyCon ) -- ToDo: get from AbsPrel
@@ -52,7 +54,7 @@ liftCoreBindings us binds
   = initL (lift_top_binds binds) us
   where
     lift_top_binds (b:bs)
-      = liftBindAndScope True (is_rec b) b (
+      = liftBindAndScope True b (
           lift_top_binds bs `thenL` \ bs ->
 	  returnL (ItsABinds bs)
         ) 			`thenL` \ (b, ItsABinds bs) ->
@@ -61,24 +63,19 @@ liftCoreBindings us binds
     lift_top_binds []
       = returnL []
     
-is_rec (CoNonRec _ _) = False
-is_rec _	      = True
+liftBindAndScope :: Bool			-- top level ?
+		 -> PlainCoreBinding		-- As yet unprocessed
+		 -> LiftM BindsOrExpr		-- Do the scope of the bindings
+		 -> LiftM (PlainCoreBinding,	-- Processed
+		 	   BindsOrExpr)
 
-liftBindAndScope :: Bool		-- True <=> a top level group
-	-> Bool				-- True <=> a recursive group
-	-> PlainCoreBinding		-- As yet unprocessed
-	-> LiftM BindsOrExpr		-- Do the scope of the bindings
-	-> LiftM (PlainCoreBinding,	-- Processed
-		  BindsOrExpr)
-
-liftBindAndScope toplev is_rec bind scopeM
-  = liftBinders toplev is_rec binders (
+liftBindAndScope top_lev bind scopeM
+  = liftBinders top_lev bind (
       liftCoreBind bind	`thenL` \ bind ->
       scopeM 		`thenL` \ bindsorexpr ->
       returnL (bind, bindsorexpr)
     )
-  where
-    binders = bindersOf bind
+
 
 liftCoreAtom :: PlainCoreAtom -> LiftM (PlainCoreAtom, PlainCoreExpr -> PlainCoreExpr)
 
@@ -130,13 +127,13 @@ liftCoreExpr (CoSCC label expr)
   = liftCoreExpr expr		`thenL` \ expr ->
     returnL (CoSCC label expr)
 
-liftCoreExpr (CoLet (CoNonRec binder rhs) body)	-- special case: for speed
-  = liftCoreExpr rhs	`thenL` \ rhs2 ->
-    liftCoreExpr body	`thenL` \ body2 ->
-    returnL (mkCoLetUnboxedToCase (CoNonRec binder rhs2) body2)
+liftCoreExpr (CoLet (CoNonRec binder rhs) body)		-- special case: no lifting
+  = liftCoreExpr rhs	`thenL` \ rhs ->
+    liftCoreExpr body	`thenL` \ body ->
+    returnL (mkCoLetUnboxedToCase (CoNonRec binder rhs) body)
 
 liftCoreExpr (CoLet bind body)	-- general case
-  = liftBindAndScope False{-not top-level-} (is_rec bind) bind (
+  = liftBindAndScope False bind (
       liftCoreExpr body	`thenL` \ body ->
       returnL (ItsAnExpr body)
     )				`thenL` \ (bind, ItsAnExpr body) ->
@@ -253,29 +250,34 @@ mapAndUnzipL f (x:xs)
     mapAndUnzipL f xs	`thenL` \ (rs1,rs2) ->
     returnL ((r1:rs1),(r2:rs2))
 
+-- liftBinders is only called for top-level or recusive case
+liftBinders :: Bool -> PlainCoreBinding -> LiftM thing -> LiftM thing
 
-liftBinders :: Bool -> Bool -> [Id] -> LiftM thing -> LiftM thing
-liftBinders toplev is_rec ids liftM idenv s0
+liftBinders False (CoNonRec _ _) liftM idenv s0
+  = error "CoreLift:liftBinders"	-- should be caught by special case above
 
---ToDo  | toplev || is_rec -- *must* play the lifting game
+liftBinders top_lev bind liftM idenv s0
   = liftM (growIdEnvList idenv lift_map) s1
   where
-    lift_ids = [ id | id <- ids, is_unboxed_but_not_state (getIdUniType id) ]
+    lift_ids = [ id | id <- bindersOf bind, isUnboxedButNotState (getIdUniType id) ]
     (lift_uniqs, s1) = getSUniquesAndDepleted (length lift_ids) s0
     lift_map = zip lift_ids (zipWith mkLiftedId lift_ids lift_uniqs)
+
+    -- ToDo: Give warning for recursive bindings involving unboxed values ???
+
 
 isLiftedId :: Id -> LiftM (Maybe (Id, Id))
 isLiftedId id idenv us
   | isLocallyDefined id 
      = lookupIdEnv idenv id
   | otherwise	-- ensure all imported ids are lifted
-     = if is_unboxed_but_not_state (getIdUniType id)
+     = if isUnboxedButNotState (getIdUniType id)
        then Just (mkLiftedId id (getSUnique us))
        else Nothing
 
 mkLiftedId :: Id -> Unique -> (Id,Id)
 mkLiftedId id u
-  = ASSERT (is_unboxed_but_not_state unlifted_ty)
+  = ASSERT (isUnboxedButNotState unlifted_ty)
     (lifted_id, unlifted_id)
   where
     id_name     = getOccurrenceName id
@@ -287,7 +289,8 @@ mkLiftedId id u
 
 bindUnlift :: Id -> Id -> PlainCoreExpr -> PlainCoreExpr
 bindUnlift vlift vunlift expr
-  = ASSERT (is_unboxed_but_not_state unlift_ty && lift_ty == mkLiftTy unlift_ty)
+  = ASSERT (isUnboxedButNotState unlift_ty)
+    ASSERT (lift_ty == mkLiftTy unlift_ty)
     CoCase (CoVar vlift)
 	   (CoAlgAlts [(liftDataCon, [vunlift], expr)] CoNoDefault)
   where
@@ -296,7 +299,8 @@ bindUnlift vlift vunlift expr
 
 liftExpr :: Id -> PlainCoreExpr -> PlainCoreExpr
 liftExpr vunlift rhs
-  = ASSERT (is_unboxed_but_not_state unlift_ty && rhs_ty == unlift_ty)
+  = ASSERT (isUnboxedButNotState unlift_ty)
+    ASSERT (rhs_ty == unlift_ty)
     CoCase rhs (CoPrimAlts [] (CoBindDefault vunlift 
 			      (CoCon liftDataCon [unlift_ty] [CoVarAtom vunlift])))
   where
@@ -308,7 +312,7 @@ applyBindUnlifts :: [PlainCoreExpr -> PlainCoreExpr] -> PlainCoreExpr -> PlainCo
 applyBindUnlifts []     expr = expr
 applyBindUnlifts (f:fs) expr = f (applyBindUnlifts fs expr)
 
-is_unboxed_but_not_state ty
+isUnboxedButNotState ty
   = case (getUniDataTyCon_maybe ty) of
       Nothing -> False
       Just (tycon, _, _) ->

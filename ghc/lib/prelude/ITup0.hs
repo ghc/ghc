@@ -9,6 +9,8 @@ import IList
 import List		( (++), foldr )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 instance Eq () where
     () == () = True
@@ -28,6 +30,8 @@ instance Text () where
     	    	    	    (\r -> [((),t) | ("(",s) <- lex r,
 					     (")",t) <- lex s ] )
     showsPrec p () = showString "()"
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0) 
 
 instance Ix () where
     range   ((), ())    = [()]

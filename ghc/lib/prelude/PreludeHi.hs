@@ -26,6 +26,7 @@ module Prelude (
 
 #if defined(__UNBOXED_INSTANCES__)
 	minInt#, maxInt#,
+	toInt#, fromInt#,
 	minChar#, maxChar#,
 	toChar#, fromChar#,
 	isAscii#, isControl#, isPrint#, isSpace#, 
@@ -51,7 +52,7 @@ module Prelude (
 	readParen, showParen, readLitChar, showLitChar, readSigned,
 	showSigned, showSpace__, readDec, showInt, readFloat, showFloat,
 	_showHex, _showRadix, _showDigit, -- non-std
-	_readList, _showList, _truncate, _round, _ceiling, _floor,
+	_readList, _showList,
 
 	_readRational, _showRational, -- extras!
 

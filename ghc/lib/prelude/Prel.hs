@@ -42,22 +42,23 @@ module Prelude (
 	toLower,
 	toUpper,
 	until,
-	(||)
+	(||),
 
-#if defined(__UNBOXED_INSTANCES__)
-	, minInt#, maxInt#
-	, minChar#, maxChar#
-	, toChar#, fromChar#
-	, isAscii#, isControl#, isPrint#, isSpace#
-	, isUpper#, isLower#, isAlpha#, isDigit#, isAlphanum#
-	, toUpper#, toLower#
-#endif
+	minInt#, maxInt#,
+	toInt#, fromInt#,
+	minChar#, maxChar#,
+	toChar#, fromChar#,
+	isAscii#, isControl#, isPrint#, isSpace#,
+	isUpper#, isLower#, isAlpha#, isDigit#, isAlphanum#,
+	toUpper#, toLower#
+
     ) where
 
 import UTypes		( Bin ) -- so we don't get any data constructors!
 
 import Cls
 import Core
+import TyArray
 import TyComplex
 import IChar
 import IComplex
@@ -85,7 +86,6 @@ nullBin	    	    	:: Bin
 isNullBin    	    	:: Bin -> Bool
 appendBin		:: Bin -> Bin -> Bin
 
--- *
 nullBin			= error "nullBin{Prelude}\n"
 isNullBin		= error "isNullBin{Prelude}\n"
 appendBin		= error "appendBin{Prelude}\n"
@@ -155,10 +155,15 @@ toUpper c | isLower c	= chr ((ord c - ord 'a') + ord 'A')
 toLower c | isUpper c	= chr ((ord c - ord 'A') + ord 'a')
 	  | otherwise	= c
 
-#if defined(__UNBOXED_INSTANCES__)
 ---------------------------------------------------------------
 -- Int# functions
 ---------------------------------------------------------------
+
+toInt# 		:: Int  -> Int#
+toInt# (I# i#) 	= i#
+
+fromInt# 	:: Int# -> Int
+fromInt# i#	= I# i#
 
 -- ToDo: Preferable to overload minInt and maxInt
 --       minInt, maxInt	:: Num a => a
@@ -181,39 +186,35 @@ fromChar# c#	= C# c#
 -- ord# and chr# are builtin
 
 minChar#, maxChar#	:: Char#
-minChar#		= '\0'#
-maxChar#		= '\255'#
+minChar#	= '\0'#
+maxChar#	= '\255'#
 
 isAscii#, isControl#, isPrint#, isSpace#		:: Char# -> Bool
 isUpper#, isLower#, isAlpha#, isDigit#, isAlphanum#	:: Char# -> Bool
 
-isAscii# c	 	=  ord# c < 128#
-isControl# c		=  c < ' '# || c == '\DEL'#
-isPrint# c		=  c >= ' '# && c <= '~'#
-isSpace# c		=  c == ' '# || c == '\t'# || c == '\n'# || 
-			   c == '\r'# || c == '\f'# || c == '\v'#
-isUpper# c		=  c >= 'A'# && c <= 'Z'#
-isLower# c		=  c >= 'a'# && c <= 'z'#
-isAlpha# c		=  isUpper# c || isLower# c
-isDigit# c		=  c >= '0'# && c <= '9'#
-isAlphanum# c		=  isAlpha# c || isDigit# c
+isAscii# c	=  ord# c `ltInt#` 128#
+isControl# c	=  c `ltChar#` ' '# || c `eqChar#` '\DEL'#
+isPrint# c	=  c `geChar#` ' '# && c `leChar#` '~'#
+isSpace# c	=  c `eqChar#` ' '# || c `eqChar#` '\t'# || c `eqChar#` '\n'# || 
+		   c `eqChar#` '\r'# || c `eqChar#` '\f'# || c `eqChar#` '\v'#
+isUpper# c	=  c `geChar#` 'A'# && c `leChar#` 'Z'#
+isLower# c	=  c `geChar#` 'a'# && c `leChar#` 'z'#
+isAlpha# c	=  isUpper# c || isLower# c
+isDigit# c	=  c `geChar#` '0'# && c `leChar#` '9'#
+isAlphanum# c	=  isAlpha# c || isDigit# c
 
 
 toUpper#, toLower#	:: Char# -> Char#
-toUpper# c | isLower# c	= chr# ((ord# c - ord# 'a'#) + ord# 'A'#)
+toUpper# c | isLower# c	= chr# ((ord# c `minusInt#` ord# 'a'#) `plusInt#` ord# 'A'#)
 	   | otherwise	= c
-
-toLower# c | isUpper# c	= chr# ((ord# c - ord# 'A'#) + ord# 'a'#)
+toLower# c | isUpper# c	= chr# ((ord# c `minusInt#` ord# 'A'#) `plusInt#` ord# 'a'#)
 	   | otherwise	= c
-
-#endif {-UNBOXED INSTANCES-}
 
 ---------------------------------------------------------------
 -- Numeric functions
 ---------------------------------------------------------------
 
---{-# GENERATE_SPECS subtract a{Int#,Double#} #-}
-{-# GENERATE_SPECS subtract a{~,Int,Double} #-}
+{-# GENERATE_SPECS subtract a{Int#,Double#,Int,Double,Complex(Double#),Complex(Double)} #-}
 subtract	:: (Num a) => a -> a -> a
 #ifdef USE_REPORT_PRELUDE
 subtract	=  flip (-)
@@ -221,39 +222,50 @@ subtract	=  flip (-)
 subtract x y	=  y - x
 #endif /* ! USE_REPORT_PRELUDE */
 
---{-# GENERATE_SPECS gcd a{Int#,Int,Integer} #-}
-{-# GENERATE_SPECS gcd a{~,Int,Integer} #-}
+{-# GENERATE_SPECS gcd a{Int#,Int,Integer} #-}
 gcd		:: (Integral a) => a -> a -> a
-gcd 0 0		=  error "gcd{Prelude}: gcd 0 0 is undefined\n"
-gcd x y		=  gcd' (abs x) (abs y)
-		   where gcd' x 0  =  x
-			 gcd' x y  =  gcd' y (x `rem` y)
+gcd x y | x == __i0 && y == __i0
+	=  error "gcd{Prelude}: gcd 0 0 is undefined\n"
+	| otherwise
+	=  gcd' (abs x) (abs y)
+		   where gcd' x y | y == __i0
+				  =  x
+			          | otherwise
+				  =  gcd' y (x `rem` y)
 
---{-# GENERATE_SPECS lcm a{Int#,Int,Integer} #-}
-{-# GENERATE_SPECS lcm a{~,Int,Integer} #-}
+{-# GENERATE_SPECS lcm a{Int#,Int,Integer} #-}
 lcm		:: (Integral a) => a -> a -> a
-lcm _ 0		=  0
-lcm 0 _		=  0
-lcm x y		=  abs ((x `quot` (gcd x y)) * y)
+lcm x y | y == __i0
+	= __i0
+	| x == __i0
+	= __i0
+	| otherwise
+	= abs ((x `quot` (gcd x y)) * y)
 
---{-# GENERATE_SPECS (^) a{~,Int#,Double#,Int,Integer,Double,Complex(Double#),Complex(Double)} b{~,Int#,Int} #-}
-{-# GENERATE_SPECS (^) a{~,Int,Integer,Double,Rational,Complex(Double)} b{~,Int} #-}
+{-# SPECIALIZE (^) :: Integer -> Integer -> Integer #-}
+{-# GENERATE_SPECS (^) a{~,Int#,Double#,Int,Integer,Double,Rational,Complex(Double#),Complex(Double)} b{~,Int#,Int} #-}
 (^)		:: (Num a, Integral b) => a -> b -> a
-x ^ 0		=  1
-x ^ (n+1)	=  f x n x
-		   where f _ 0 y = y
-		         f x n y = g x n  where
-			           g x n | odd n = f x (n-1) (x*y)
-				         | otherwise  = g (x*x) (n `div` 2)
-_ ^ _		= error "(^){Prelude}: negative exponent\n"
+x ^ n | n == __i0
+      = __i1
+      | n > __i0
+      = f x (n - __i1) x
+      | otherwise
+      = error "(^){Prelude}: negative exponent\n"
+  where
+    f x n y | n == __i0
+	    = y
+	    | otherwise
+	    = g x n y
+    g x n y | odd n
+	    = f x (n - __i1) (x*y)
+	    | otherwise
+	    = g (x*x) (n `div` __i2) y
 
---{-# GENERATE_SPECS (^^) a{~,Double#,Double,Complex(Double#),Complex(Double)} b{~,Int#,Int} #-}
-{-# GENERATE_SPECS (^^) a{~,Double,Rational} b{~,Int} #-}
+{-# GENERATE_SPECS (^^) a{~,Double#,Double,Rational,Complex(Double#),Complex(Double)} b{~,Int#,Int} #-}
 (^^)		:: (Fractional a, Integral b) => a -> b -> a
 x ^^ n		=  if n >= 0 then x^n else recip (x^(-n))
 
---{-# GENERATE_SPECS atan2 a{Double#,Double} #-}
-{-# GENERATE_SPECS atan2 a{~,Double} #-}
+{-# GENERATE_SPECS atan2 a{Double#,Double} #-}
 atan2		:: (RealFloat a) => a -> a -> a
 #if USE_REPORT_PRELUDE
 atan2 y x	=  case (signum y, signum x) of
@@ -287,43 +299,43 @@ atan2 y x =
 ---------------------------------------------------------------
 
 -- component projections for pairs:
---{-# GENERATE_SPECS fst a b #-}
+{-# GENERATE_SPECS fst a b #-}
 fst			:: (a,b) -> a
 fst (x,y)		=  x
 
---{-# GENERATE_SPECS snd a b #-}
+{-# GENERATE_SPECS snd a b #-}
 snd			:: (a,b) -> b
 snd (x,y)		=  y
 
 -- identity function
---{-# GENERATE_SPECS id a #-}
+{-# GENERATE_SPECS id a #-}
 id			:: a -> a
 id x			=  x
 
 -- constant function
---{-# GENERATE_SPECS const a b #-}
+{-# GENERATE_SPECS const a b #-}
 const			:: a -> b -> a
 const x _		=  x
 
 -- function composition
 {-# INLINE (.) #-}
---{-# GENERATE_SPECS (.) a b c #-}
+{-# GENERATE_SPECS (.) a b c #-}
 (.)			:: (b -> c) -> (a -> b) -> a -> c
 (f . g) x		=  f (g x)
 
 -- flip f  takes its (first) two arguments in the reverse order of f.
---{-# GENERATE_SPECS flip a b c #-}
+{-# GENERATE_SPECS flip a b c #-}
 flip			:: (a -> b -> c) -> b -> a -> c
 flip f x y		=  f y x
 
 -- right-associating infix application operator (useful in continuation-
 -- passing style)
---{-# GENERATE_SPECS ($) a b #-}
+{-# GENERATE_SPECS ($) a b #-}
 ($)			:: (a -> b) -> a -> b
 f $ x			=  f x
 
 -- until p f  yields the result of applying f until p holds.
---{-# GENERATE_SPECS until a #-}
+{-# GENERATE_SPECS until a #-}
 until			:: (a -> Bool) -> (a -> a) -> a -> a
 until p f x | p x	=  x
 	    | otherwise =  until p f (f x)
@@ -331,7 +343,7 @@ until p f x | p x	=  x
 -- asTypeOf is a type-restricted version of const.  It is usually used
 -- as an infix operator, and its typing forces its first argument
 -- (which is usually overloaded) to have the same type as the second.
---{-# GENERATE_SPECS asTypeOf a #-}
+{-# GENERATE_SPECS asTypeOf a #-}
 asTypeOf		:: a -> a -> a
 asTypeOf		=  const
 
@@ -339,40 +351,44 @@ asTypeOf		=  const
 -- fromIntegral and fromRealFrac with explicit specialisations
 ---------------------------------------------------------------
 
-{- LATER:
 {-# SPECIALIZE fromIntegral ::
+    Int		-> Rational,
+    Integer	-> Rational,
+    Int  	-> Int		= id,
+    Int 	-> Integer	= i2Integer,
+    Int		-> Float	= i2F,
+    Int		-> Double	= i2D,
+    Integer  	-> Int		= integer2I,
+    Integer 	-> Integer  	= id,
+    Integer	-> Float	= integer2F,
+    Integer	-> Double	= integer2D #-}
+
+#if defined(__UNBOXED_INSTANCES__)
+{-# SPECIALIZE fromIntegral ::
+    Int#	-> Rational,
     Int# 	-> Int#		= id,
-    Int#	-> Double#	= int2Double#,
+    Int#	-> Double#	= i2d#,
     Int#	-> Int		= i2I#,
-    Int#	-> Integer	= int2Integer#,
+    Int#	-> Integer	= i2Integer#,
+    Int#	-> Float	= i2F#,
     Int#	-> Double	= i2D#,
     Int		-> Int#		= i2i,
     Int		-> Double#	= i2d,
-    Int  	-> Int		= id,
-    Int 	-> Integer	= i2Integer,
-    Int		-> Double	= i2D,
     Integer	-> Int#		= integer2i,
-    Integer	-> Double#	= integer2d,
-    Integer  	-> Int		= integer2I,
-    Integer 	-> Integer  	= id,
-    Integer	-> Double	= integer2D 	#-}
--}
+    Integer	-> Double#	= integer2d #-}
+#endif
 
-{-# SPECIALIZE fromIntegral ::
-    Int  	-> Int		= id,
-    Int 	-> Integer	= i2Integer,
-    Int		-> Double	= i2D,
-    Integer  	-> Int		= integer2I,
-    Integer 	-> Integer  	= id,
-    Integer	-> Double	= integer2D 	#-}
-
+i2d# i# = int2Double# i#
 i2I# i# = I# i#
+i2Integer# i# = int2Integer# i#
+i2F# i# = F# (int2Float# i#)
 i2D# i# = D# (int2Double# i#)
 
 i2i (I# i#) = i#
 i2d (I# i#) = int2Double# i#
-i2D (I# i#) = D# (int2Double# i#)
 i2Integer (I# i#) = int2Integer# i#
+i2F (I# i#) = F# (int2Float# i#)
+i2D (I# i#) = D# (int2Double# i#)
 
 integer2i (J# a# s# d#) = integer2Int# a# s# d#
 integer2d (J# a# s# d#) = encodeDouble# a# s# d# 0#
@@ -383,19 +399,27 @@ integer2D (J# a# s# d#) = D# (encodeDouble# a# s# d# 0#)
 fromIntegral	:: (Integral a, Num b) => a -> b
 fromIntegral	=  fromInteger . toInteger
 
-{- LATER:
 {-# SPECIALIZE fromRealFrac ::
+    Double	-> Rational, 
+    Rational	-> Double,
+    Float	-> Rational,
+    Rational	-> Float,
+    Rational	-> Rational	= id,
+    Double	-> Double	= id,
+    Double	-> Float	= d2F,
+    Float	-> Float	= id,
+    Float	-> Double	= f2D #-}
+
+#if defined(__UNBOXED_INSTANCES__)
+{-# SPECIALIZE fromRealFrac ::
+    Double#	-> Rational,
+    Rational	-> Double#,
     Double# 	-> Double#	= id,
+    Double#	-> Float	= d2F#,
     Double#	-> Double	= d2D#,
     Double 	-> Double#	= d2d,
-    Double	-> Double	= id #-}
--}
-
-{-# SPECIALIZE fromRealFrac ::
-    Float	-> Float	= id,
-    Float	-> Double	= f2D,
-    Double	-> Float	= d2F,
-    Double	-> Double	= id #-}
+    Float	-> Double#	= f2d #-}
+#endif
 
 d2F# d# = F# (double2Float# d#)
 d2D# d# = D# d#

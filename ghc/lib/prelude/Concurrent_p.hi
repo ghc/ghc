@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface Concurrent where
 import Channel(Chan(..), dupChan, getChan, getChanContents, newChan, putChan, putList2Chan, unGetChan)
 import ChannelVar(CVar(..), getCVar, newCVar, putCVar)

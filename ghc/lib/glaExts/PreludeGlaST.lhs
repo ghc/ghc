@@ -73,6 +73,7 @@ import ITup2
 import List		( map, null, foldr, (++) )
 import PS		( _PackedString, _unpackPS )
 import TyArray		( Array(..), _ByteArray(..) )
+import TyComplex
 import Text
 
 infixr 9 `thenST`, `thenStrictlyST`, `seqST`, `seqStrictlyST`
@@ -96,32 +97,27 @@ type ST s a = _ST s a	-- so you don't need -fglasgow-exts
 {-# INLINE thenStrictlyST #-}
 {-# INLINE seqStrictlyST #-}
 
-returnST, returnStrictlyST :: a -> _ST s a
+returnST :: a -> _ST s a
 returnST a s = (a, s)
 
-thenST, thenStrictlyST :: _ST s a -> (a -> _ST s b) -> _ST s b
+thenST :: _ST s a -> (a -> _ST s b) -> _ST s b
 thenST m k s = let (r,new_s) = m s
                in
                k r new_s
 
-fixST :: (a -> _ST s a) -> _ST s a
-fixST k s = let ans = k r s
-                (r,new_s) = ans
-            in
-            ans
-
--- BUILT-IN: _runST (see Builtin.hs)
-
-unsafeInterleaveST :: _ST s a -> _ST s a    -- ToDo: put in state-interface.tex
-
-unsafeInterleaveST m s
-  = let
-	(r, new_s) = m s
-    in
-    (r, s)
-
-seqST, seqStrictlyST :: _ST s a -> _ST s b -> _ST s b
+seqST :: _ST s a -> _ST s b -> _ST s b
 seqST m1 m2 = m1 `thenST` (\ _ -> m2)
+
+
+{-# GENERATE_SPECS returnStrictlyST a #-}
+returnStrictlyST :: a -> _ST s a
+
+{-# GENERATE_SPECS thenStrictlyST a b #-}
+thenStrictlyST :: _ST s a -> (a -> _ST s b) -> _ST s b
+
+{-# GENERATE_SPECS seqStrictlyST a b #-}
+seqStrictlyST :: _ST s a -> _ST s b -> _ST s b
+
 
 returnStrictlyST a s@(S# _) = (a, s)
 
@@ -133,8 +129,24 @@ seqStrictlyST m k s	-- @(S# _)   Omitted SLPJ [May95] no need to evaluate the st
   = case (m s) of { (_, new_s) ->
     k new_s }
 
-listST :: [_ST s a] -> _ST s [a]
 
+-- BUILT-IN: _runST (see Builtin.hs)
+
+unsafeInterleaveST :: _ST s a -> _ST s a    -- ToDo: put in state-interface.tex
+unsafeInterleaveST m s
+  = let
+	(r, new_s) = m s
+    in
+    (r, s)
+
+
+fixST :: (a -> _ST s a) -> _ST s a
+fixST k s = let ans = k r s
+                (r,new_s) = ans
+            in
+            ans
+
+listST :: [_ST s a] -> _ST s [a]
 listST []     = returnST []
 listST (m:ms) = m		`thenST` \ x  ->
 		listST ms	`thenST` \ xs ->
@@ -150,24 +162,23 @@ mapAndUnzipST f (m:ms)
     mapAndUnzipST f ms	`thenST` \ (rs1, rs2) ->
     returnST (r1:rs1, r2:rs2)
 
--- not exported
-forkST :: ST s () -> ST s ()
+forkST :: ST s a -> ST s a
 
 #ifndef __CONCURRENT_HASKELL__
 forkST x = x
 #else
 
 forkST action s
-  = let
-	(_, new_s) = action s
-    in
-    new_s `_fork_` ((), s)
+ = let
+    (r, new_s) = action s
+   in
+    new_s `_fork_` (r, s)
  where
     _fork_ x y = case (fork# x) of { 0# -> parError#; _ -> y }
 
-#endif {- __CONCURRENT_HASKELL__ -}
+#endif {- concurrent -}
 
-forkPrimIO :: PrimIO () -> PrimIO ()
+forkPrimIO :: PrimIO a -> PrimIO a
 forkPrimIO = forkST
 \end{code}
 
@@ -208,7 +219,7 @@ newCharArray, newIntArray, newAddrArray, newFloatArray, newDoubleArray
 {-# SPECIALIZE newCharArray   :: IPr -> _ST s (_MutableByteArray s Int) #-}
 {-# SPECIALIZE newIntArray    :: IPr -> _ST s (_MutableByteArray s Int) #-}
 {-# SPECIALIZE newAddrArray   :: IPr -> _ST s (_MutableByteArray s Int) #-}
---NO:{-# SPECIALIZE newFloatArray  :: IPr -> _ST s (_MutableByteArray s Int) #-}
+{-# SPECIALIZE newFloatArray  :: IPr -> _ST s (_MutableByteArray s Int) #-}
 {-# SPECIALIZE newDoubleArray :: IPr -> _ST s (_MutableByteArray s Int) #-}
 
 newArray ixs@(ix_start, ix_end) init (S# s#)
@@ -280,7 +291,7 @@ readArray   	:: Ix ix => _MutableArray s ix elt -> ix -> _ST s elt
 readCharArray   :: Ix ix => _MutableByteArray s ix -> ix -> _ST s Char 
 readIntArray    :: Ix ix => _MutableByteArray s ix -> ix -> _ST s Int
 readAddrArray   :: Ix ix => _MutableByteArray s ix -> ix -> _ST s _Addr
---NO:readFloatArray  :: Ix ix => _MutableByteArray s ix -> ix -> _ST s Float
+readFloatArray  :: Ix ix => _MutableByteArray s ix -> ix -> _ST s Float
 readDoubleArray :: Ix ix => _MutableByteArray s ix -> ix -> _ST s Double
 
 {-# SPECIALIZE readArray       :: _MutableArray s Int elt -> Int -> _ST s elt,

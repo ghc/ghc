@@ -39,6 +39,7 @@ type MatchEnv a b = [(a, b)]
 data MaybeErr a b 
 type MethodInstInfo = (Id, [UniType], InstTemplate)
 data TypecheckedPat 
+data SpecEnv 
 data SpecInfo 
 data SplitUniqSupply 
 data TyCon 
@@ -48,5 +49,6 @@ addClassInst :: Class -> [(UniType, InstTemplate)] -> UniType -> Id -> [TyVarTem
 lookupClassInstAtSimpleType :: Class -> UniType -> Labda Id
 lookupInst :: SplitUniqSupply -> Inst -> Labda (Expr Id TypecheckedPat, [Inst])
 lookupNoBindInst :: SplitUniqSupply -> Inst -> Labda [Inst]
+mkInstSpecEnv :: Class -> UniType -> [TyVarTemplate] -> [(Class, UniType)] -> SpecEnv
 nullMEnv :: [(a, b)]
 

@@ -94,7 +94,6 @@ extern BOOLEAN implicitPrelude;		/*  True when we should read the Prelude if not
 extern BOOLEAN haskell1_3Flag;		/*  True if we are attempting (proto)Haskell 1.3 */
 
 extern int thisIfacePragmaVersion;
-
 %}
 
 %union {
@@ -244,7 +243,7 @@ extern int thisIfacePragmaVersion;
 %type <ulist>   alt alts altrest quals vars varsrest cons
   		tyvars constrs dtypes types atypes
 		types_and_maybe_ids
-  		list_exps pats context context_list atype_list
+  		list_exps pats context context_list tyvar_list
 		maybeexports export_list
   		impspec maybeimpspec import_list
  		impdecls maybeimpdecls impdecl
@@ -257,9 +256,7 @@ extern int thisIfacePragmaVersion;
 		idata_pragma_specs idata_pragma_specslist
 		gen_pragma_list type_pragma_pairs
 		type_pragma_pairs_maybe name_pragma_pairs
-		maybe_name_pragma_pairs type_instpragma_pairs
 		type_maybes
-		restof_iinst_spec
 		howto_inline_maybe
 		core_binders core_tyvars core_tv_templates
 		core_types core_type_list
@@ -293,8 +290,9 @@ extern int thisIfacePragmaVersion;
   		  impdecl_rest
 		  type_and_maybe_id
 
-%type <uttype>    simple simple_long type atype btype ttype ntatype inst class
-		  tyvar	core_type type_maybe core_type_maybe
+%type <uttype>    simple type atype btype ttype ntatype
+		  class restrict_inst general_inst tyvar type_maybe
+		  core_type core_type_maybe
 
 %type <uatype>	  constr
 
@@ -309,7 +307,7 @@ extern int thisIfacePragmaVersion;
 		  update_pragma strictness_pragma worker_info
 		  deforest_pragma
 		  unfolding_pragma unfolding_guidance type_pragma_pair
-		  type_instpragma_pair name_pragma_pair
+		  name_pragma_pair
 
 %type <ucoresyn>  core_expr core_case_alts core_id core_binder core_atom
 		  core_alg_alt core_prim_alt core_default corec_bind
@@ -483,9 +481,6 @@ iinst_pragma:
 	|  GHC_PRAGMA modname_pragma gen_pragma name_pragma_pairs END_PRAGMA
 		{ $$ = mkiinst_const_pragma($2, $3, $4); }
 
-	|  GHC_PRAGMA modname_pragma gen_pragma restof_iinst_spec END_PRAGMA
-		{ $$ = mkiinst_spec_pragma($2, $3, $4); }
-
 	|  /* empty */
 		{ $$ = mkno_pragma(); }
 	;
@@ -495,9 +490,6 @@ modname_pragma:
 		{ $$ = $2; }
 	| /* empty */
 		{ $$ = install_literal(""); }
-	;
-
-restof_iinst_spec: SPECIALISE_PRAGMA type_instpragma_pairs { $$ = $2; }
 	;
 
 ival_pragma:
@@ -577,16 +569,6 @@ type_pragma_pair:
 		{ $$ = mkitype_pragma_pr($2, $4, $5); }
 	;
 
-type_instpragma_pairs:
-	   type_instpragma_pair			    	    { $$ = lsing($1); }
-	|  type_instpragma_pairs COMMA type_instpragma_pair { $$ = lapp($1,$3); }
-	;
-
-type_instpragma_pair:
-	   OBRACK type_maybes CBRACK INTEGER worker_info maybe_name_pragma_pairs
-		{ $$ = mkiinst_pragma_3s($2, $4, $5, $6); }
-	;
-
 type_maybes:
 	   type_maybe			{ $$ = lsing($1); }
 	|  type_maybes COMMA type_maybe	{ $$ = lapp($1, $3); }
@@ -597,19 +579,26 @@ type_maybe:
     	|  type				{ $$ = mkty_maybe_just($1); }
 	;
 
-maybe_name_pragma_pairs:
-	   /* empty */		{ $$ = Lnil; }
-	|  name_pragma_pairs	{ $$ = $1; }
-	;
-
 name_pragma_pairs:
 	   name_pragma_pair			    { $$ = lsing($1); }
 	|  name_pragma_pairs COMMA name_pragma_pair { $$ = lapp($1, $3); }
 	;
 
 name_pragma_pair:
-	   var EQUAL gen_pragma
+	   /* if the gen_pragma concludes with a *comma*- */
+	   /* separated SPECs list, we get a parse error; */
+	   /* we have to bracket the gen_pragma           */
+
+	   var EQUAL OCURLY gen_pragma CCURLY
+		{ $$ = mkiname_pragma_pr($1, $4); }
+
+	   /* we keep the old form for backwards compatability */
+	   /* ToDo: rm */
+
+	|  var EQUAL gen_pragma
 		{ $$ = mkiname_pragma_pr($1, $3); }
+
+	   /* need bracketed form when we have spec pragmas to avoid list confusion */
 	;
 
 /* -- end of interface pragma stuff ------------------------------- */
@@ -1045,8 +1034,8 @@ cbody	:  /* empty */				{ $$ = mknullbind(); }
 	|  WHERE vocurly decls vccurly		{ checkorder($3); $$ =$3; }
 	;
 
-instd	:  instkey context DARROW tycls inst rinst	{ $$ = mkibind($2,$4,$5,$6,startlineno,mkno_pragma()); }
-	|  instkey tycls inst rinst		 	{ $$ = mkibind(Lnil,$2,$3,$4,startlineno,mkno_pragma()); }
+instd	:  instkey context DARROW tycls restrict_inst rinst	{ $$ = mkibind($2,$4,$5,$6,startlineno,mkno_pragma()); }
+	|  instkey tycls general_inst rinst		 	{ $$ = mkibind(Lnil,$2,$3,$4,startlineno,mkno_pragma()); }
 	;
 
 rinst	:  /* empty */			  { $$ = mknullbind(); }
@@ -1054,13 +1043,20 @@ rinst	:  /* empty */			  { $$ = mknullbind(); }
 	|  WHERE vocurly instdefs vccurly { $$ = $3; }
 	;
 
-inst	:  tycon				{ $$ = mktname($1,Lnil); }
-	|  OPAREN simple_long CPAREN		{ $$ = $2; }
-    /* partain?: "simple" requires k >= 0, not k > 0 (hence "simple_long" hack) */
-	|  OPAREN atype_list CPAREN		{ $$ = mkttuple($2); }
+restrict_inst : tycon				{ $$ = mktname($1,Lnil); }
+	|  OPAREN tycon tyvars	CPAREN		{ $$ = mktname($2,$3); }
+	|  OPAREN tyvar COMMA tyvar_list CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
 	|  OPAREN CPAREN			{ $$ = mkttuple(Lnil); }
-	|  OBRACK atype CBRACK			{ $$ = mktllist($2); }
-	|  OPAREN atype RARROW atype CPAREN	{ $$ = mktfun($2,$4); }
+	|  OBRACK tyvar CBRACK			{ $$ = mktllist($2); }
+	|  OPAREN tyvar RARROW tyvar CPAREN	{ $$ = mktfun($2,$4); }
+	;
+
+general_inst : tycon				{ $$ = mktname($1,Lnil); }
+	|  OPAREN tycon atypes CPAREN		{ $$ = mktname($2,$3); }
+	|  OPAREN type COMMA types CPAREN	{ $$ = mkttuple(mklcons($2,$4)); }
+	|  OPAREN CPAREN			{ $$ = mkttuple(Lnil); }
+	|  OBRACK type CBRACK			{ $$ = mktllist($2); }
+	|  OPAREN btype RARROW type CPAREN	{ $$ = mktfun($2,$4); }
 	;
 
 defaultd:  defaultkey dtypes { $$ = mkdbind($2,startlineno); }
@@ -1128,7 +1124,7 @@ decl	:  vars DCOLON type DARROW type iclasop_pragma
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
 
-	|  SPECIALISE_UPRAGMA INSTANCE CONID inst END_UPRAGMA
+	|  SPECIALISE_UPRAGMA INSTANCE CONID general_inst END_UPRAGMA
 		{
 		  $$ = mkispec_uprag($3, $4, startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
@@ -1226,9 +1222,9 @@ iclassd	:  classkey context DARROW class iclas_pragma cbody
 		{ $$ = mkcbind(Lnil,$2,$4,startlineno,$3); }
 	;
 
-iinstd	:  instkey context DARROW tycls inst iinst_pragma
+iinstd	:  instkey context DARROW tycls general_inst iinst_pragma
 		{ $$ = mkibind($2,$4,$5,mknullbind(),startlineno,$6); }
-	|  instkey tycls inst iinst_pragma
+	|  instkey tycls general_inst iinst_pragma
 		{ $$ = mkibind(Lnil,$2,$3,mknullbind(),startlineno,$4); }
 	;
 
@@ -1283,13 +1279,6 @@ simple	:  tycon		{ $$ = mktname($1,Lnil); }
 	|  tycon tyvars		{ $$ = mktname($1,$2); }
 	;
 
-
-simple_long : tycon atypes	{ $$ = mktname($1,$2); }
-	; /* partain: see comment in "inst" */
-	  /* partain: "atypes" should be "tyvars" if you want to
-	     avoid "extended instances" by syntactic means. */
-
-
 constrs	:  constr		{ $$ = lsing($1); }
 	|  constrs VBAR constr	{ $$ = lapp($1,$3); }
 	;
@@ -1335,7 +1324,13 @@ instdefs : /* empty */				{ $$ = mknullbind(); }
 
 /* instdef: same as valdef, except certain user-pragmas may appear */
 instdef :
-	   INLINE_UPRAGMA vark howto_inline_maybe END_UPRAGMA
+	   SPECIALISE_UPRAGMA vark DCOLON types_and_maybe_ids END_UPRAGMA
+		{
+		  $$ = mkvspec_uprag($2, $4, startlineno);
+		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		}
+
+	|  INLINE_UPRAGMA vark howto_inline_maybe END_UPRAGMA
 		{
 		  $$ = mkinline_uprag($2, $3, startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
@@ -1353,7 +1348,6 @@ instdef :
 
 vars	:  vark COMMA varsrest			{ $$ = mklcons($1,$3); }
 	|  vark					{ $$ = lsing($1); }
-	/* right recursion ? WDP */
 	;
 
 varsrest:  var					{ $$ = lsing($1); }
@@ -1428,7 +1422,8 @@ gd	:  VBAR oexp				{ $$ = $2; }
 
 lampats	:  apat lampats				{ $$ = mklcons($1,$2); }
 	|  apat					{ $$ = lsing($1); }
-	;  /* right recursion? (WDP) */
+	/* right recursion? (WDP) */
+	;
 
 
 /*
@@ -1946,17 +1941,15 @@ ccallid	:  VARID
 	|  CONID
 	;
 
-/* partain: "atype_list" must be at least 2 elements long (defn of "inst") */
-atype_list: atype COMMA atype			{ $$ = mklcons($1,lsing($3)); }
-	|  atype COMMA atype_list 		{ $$ = mklcons($1,$3); }
-	/* right recursion? WDP */
+tyvar_list: tyvar			{ $$ = lsing($1); }
+	|  tyvar_list COMMA tyvar 	{ $$ = lapp($1,$3); }
 	;
 
-tyvars	:  tyvar				{ $$ = lsing($1); }
-	|  tyvars tyvar				{ $$ = lapp($1, $2); }
+tyvars	:  tyvar			{ $$ = lsing($1); }
+	|  tyvars tyvar			{ $$ = lapp($1, $2); }
 	;
 
-tyvar	:  VARID				{ $$ = mknamedtvar($1); }
+tyvar	:  VARID			{ $$ = mknamedtvar($1); }
 	;
 
 tycls	:  tycon

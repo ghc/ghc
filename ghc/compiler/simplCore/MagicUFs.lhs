@@ -353,7 +353,7 @@ isInterestingArg env (CoVarAtom v) =
 isInterestingArg env _ = False
 
 foldl_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list:rest_args)
- | do_fb_red && isNilForm env arg_list
+  | do_fb_red && isNilForm env arg_list
   =     -- foldl f z [] = z
 	-- again another short cut, helps with unroling of constant lists
     tick Foldr_Nil	`thenSmpl_`

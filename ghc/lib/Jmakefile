@@ -72,11 +72,21 @@ EtagsNeededHere(tags)
 /* The driver will give warnings if -split-objs,
    but that's cool...
 */
-GHC_OPTS=-iprelude:glaExts -dcore-lint \
-	-fshow-pragma-name-errs -fshow-import-specs \
-	-optP-genSPECS0 -cpp -fglasgow-exts \
-	-DUSE_FOLDR_BUILD -D__OVERLAPPING_INSTANCES__ \
-	HcMaxHeapFlag $(EXTRA_HC_OPTS)
+GHC_OPTS=-iprelude:glaExts 		 \
+	 -dcore-lint 			 \
+	 -fshow-pragma-name-errs 	 \
+	 -fshow-import-specs 		 \
+	 -fomit-default-instance-methods \
+	 -cpp -fglasgow-exts -genSPECS 	 \
+	 -DUSE_FOLDR_BUILD -D__OVERLAPPING_INSTANCES__ \
+	 HcMaxHeapFlag $(EXTRA_HC_OPTS)
+
+/* For building with unboxed stuff add:
+
+	-fspecialise-unboxed -genSPECSunboxed -D__UNBOXED_INSTANCES__ -D__UNBOXED_SPECS__
+
+   This is currently done using -user-way-b = -unboxed-specialisation
+*/
 
 /* For the "Prelude" bits: mostly we do not want it to pick
     up interface information from anywhere except *here*.
@@ -614,7 +624,7 @@ GHCLIB_HIs  = ghc/Bag.hi			\
 	      ghc/MatchPS.hi			\
 	      ghc/Pretty.hi			\
 	      ghc/Set.hi			\
-	      ghc/Util.hi __readline_hi __sockets_hi
+	      ghc/Util.hi
 
 ONE3_HIs    = haskell-1.3/LibSystem.hi		\
 	      haskell-1.3/LibCPUTime.hi		\
@@ -1034,7 +1044,7 @@ CompilePreludishly(prelude/TyComplex,hs,$(PREL_OPTS) -split-objs TyComplex -ohi 
 CompilePreludishly(prelude/TyIO,hs,	$(PREL_OPTS) -split-objs TyIO -fmin-builtin-names -ohi prelude/TyIO.hi)
 CompilePreludishly(prelude/TyRatio,hs,	$(PREL_OPTS) -split-objs TyRatio -fmin-builtin-names -nohi)
 
-CompilePreludishly(prelude/IArray,hs,	$(PREL_OPTS) -split-objs IArray -H14m -ohi prelude/IArray.hi)
+CompilePreludishly(prelude/IArray,hs,	$(PREL_OPTS) -split-objs IArray -H18m -ohi prelude/IArray.hi)
 CompilePreludishly(prelude/IBool,hs,	$(PREL_OPTS) -split-objs IBool -ohi prelude/IBool.hi)
 CompilePreludishly(prelude/IChar,hs,	$(PREL_OPTS) -split-objs IChar -ohi prelude/IChar.hi)
 CompilePreludishly(prelude/IComplex,hs,	$(PREL_OPTS) -split-objs IComplex -H16m -ohi prelude/IComplex.hi)
@@ -1042,10 +1052,10 @@ CompilePreludishly(prelude/IDouble,hs,	$(PREL_OPTS) -split-objs IDouble -ohi pre
 CompilePreludishly(prelude/IFloat,hs,	$(PREL_OPTS) -split-objs IFloat -ohi prelude/IFloat.hi)
 CompilePreludishly(prelude/IInt,hs,	$(PREL_OPTS) -split-objs IInt -ohi prelude/IInt.hi -monly-4-regs)
 CompilePreludishly(prelude/IInteger,hs,	$(PREL_OPTS) -split-objs IInteger -ohi prelude/IInteger.hi)
-CompilePreludishly(prelude/IList,hs,	$(PREL_OPTS) -split-objs IList -ohi prelude/IList.hi)
+CompilePreludishly(prelude/IList,hs,	$(PREL_OPTS) -split-objs IList -H12m -ohi prelude/IList.hi)
 CompilePreludishly(prelude/IRatio,hs,	$(PREL_OPTS) -split-objs IRatio -H16m -ohi prelude/IRatio.hi)
 CompilePreludishly(prelude/ITup0,hs,	$(PREL_OPTS) -split-objs ITup0 -ohi prelude/ITup0.hi)
-CompilePreludishly(prelude/ITup2,hs,	$(PREL_OPTS) -split-objs ITup2 -ohi prelude/ITup2.hi)
+CompilePreludishly(prelude/ITup2,hs,	$(PREL_OPTS) -split-objs ITup2 -H40m -K2m -ohi prelude/ITup2.hi)
 CompilePreludishly(prelude/ITup3,hs,	$(PREL_OPTS) -split-objs ITup3 -ohi prelude/ITup3.hi)
 CompilePreludishly(prelude/ITup4,hs,	$(PREL_OPTS) -split-objs ITup4 -H16m -ohi prelude/ITup4.hi)
 CompilePreludishly(prelude/ITup5,hs,	$(PREL_OPTS) -split-objs ITup5 -H24m -ohi prelude/ITup5.hi)
@@ -1053,12 +1063,12 @@ CompilePreludishly(prelude/ITup5,hs,	$(PREL_OPTS) -split-objs ITup5 -H24m -ohi p
 CompilePreludishly(prelude/Cls,hs,	$(PREL_OPTS) -split-objs Cls -H24m -fmin-builtin-names -ohi prelude/Cls.hi)
 
 CompilePreludishly(prelude/Builtin,hs,	$(PREL_OPTS) -split-objs Builtin -ohi prelude/Builtin.hi)
-CompilePreludishly(prelude/Core,hs,	$(PREL_OPTS) -split-objs Core -ohi prelude/Core.hi)
+CompilePreludishly(prelude/Core,hs,	$(PREL_OPTS) -split-objs Core -H24m -ohi prelude/Core.hi)
 CompilePreludishly(prelude/IO,hs,	$(PREL_OPTS) -split-objs IO -ohi prelude/IO.hi)
-CompilePreludishly(prelude/List,hs,	$(PREL_OPTS) -split-objs List -H14m -ohi prelude/List.hi)
+CompilePreludishly(prelude/List,hs,	$(PREL_OPTS) -split-objs List -H24m -ohi prelude/List.hi)
 CompilePreludishly(prelude/PS,lhs,	$(PREL_OPTS) -split-objs PS -ohi prelude/PS.hi -monly-2-regs)
 CompilePreludishly(prelude/Prel,hs,	$(PREL_OPTS) -split-objs Prel -H14m -ohi prelude/Prel.hi -monly-2-regs)
-CompilePreludishly(prelude/Text,hs,	$(PREL_OPTS) -split-objs Text -H14m -ohi prelude/Text.hi -monly-4-regs)
+CompilePreludishly(prelude/Text,hs,	$(PREL_OPTS) -split-objs Text -H30m -ohi prelude/Text.hi -monly-4-regs)
 CompilePreludishly(prelude/FoldrBuild,hs, $(PREL_OPTS) -split-objs FoldrBuild -nohi)
 
 /* --- 1.3 I/O support --- */
@@ -1075,7 +1085,7 @@ CompilePreludishly(prelude/PreludeReadTextIO,lhs,	$(PREL_OPTS) -split-objs ReadT
 CompilePreludishly(haskell-1.3/LibSystem,lhs,	  -fhaskell-1.3 -split-objs LibSystem '-#include"stgio.h"')
 CompilePreludishly(haskell-1.3/LibCPUTime,lhs,    -fhaskell-1.3 -split-objs LibCPUTime '-#include"stgio.h"')
 CompilePreludishly(haskell-1.3/LibDirectory,lhs,  -fhaskell-1.3 -split-objs LibDirectory '-#include"stgio.h"' -monly-3-regs)
-CompilePreludishly(haskell-1.3/LibTime,lhs,       -fhaskell-1.3 -split-objs LibTime '-#include"stgio.h"' '-#include"timezone.h"' -H12m -monly-3-regs -optcO-DNON_POSIX_SOURCE)
+CompilePreludishly(haskell-1.3/LibTime,lhs,       -fhaskell-1.3 -split-objs LibTime '-#include"stgio.h"' '-#include"timezone.h"' -H12m -K2m -monly-3-regs)
 
 CompilePreludishly(haskell-1.3/LibPosix,lhs,      -fhaskell-1.3 -split-objs LibPosix '-#include"stgio.h"' '-#include"libposix.h"')
 CompilePreludishly(haskell-1.3/LibPosixDB,lhs,      -fhaskell-1.3 -split-objs LibPosixDB '-#include"stgio.h"' '-#include"libposix.h"')
@@ -1122,7 +1132,7 @@ CompilePreludishly(ghc/BSD,lhs,		-ighc -fhaskell-1.3 -optcO-DNON_POSIX_SOURCE '-
 CompilePreludishly(ghc/CError,lhs,	-ighc -fhaskell-1.3 -K2m -fomit-derived-read)
 #endif
 CompilePreludishly(ghc/Set,lhs,		-ighc -fhaskell-1.3)
-CompilePreludishly(ghc/Util,lhs,	-ighc -fhaskell-1.3)
+CompilePreludishly(ghc/Util,lhs,	-H12m -ighc -fhaskell-1.3)
 
 /* --- HBC-compatibility library --- */
 
@@ -1131,18 +1141,18 @@ CompilePreludishly(hbc/Hash,hs,		)
 CompilePreludishly(hbc/ListUtil,hs,	-ihbc -fhaskell-1.3)
 CompilePreludishly(hbc/Miranda,hs,	-ihbc)
 CompilePreludishly(hbc/NameSupply,hs,	)
-CompilePreludishly(hbc/Native,hs,	-ihbc -fhaskell-1.3)
-CompilePreludishly(hbc/Number,hs,	)
-CompilePreludishly(hbc/Parse,hs,	-ihbc -fhaskell-1.3)
+CompilePreludishly(hbc/Native,hs,	-H12m -ihbc -fhaskell-1.3 -fno-omit-default-instance-methods)
+CompilePreludishly(hbc/Number,hs,	-H12m -K2m  -fno-omit-default-instance-methods)
+CompilePreludishly(hbc/Parse,hs,	-H12m -ihbc -fhaskell-1.3)
 CompilePreludishly(hbc/Polynomial,hs,	-ihbc) /* this code could not ever have worked */
 CompilePreludishly(hbc/Pretty,hs,	)
-CompilePreludishly(hbc/Printf,hs,	)
+CompilePreludishly(hbc/Printf,hs,	-H12m)
 CompilePreludishly(hbc/QSort,hs,	)
 CompilePreludishly(hbc/Random,hs,	-monly-4-regs)
 CompilePreludishly(hbc/SimpleLex,hs,	)
-CompilePreludishly(hbc/Time,hs,		)
+CompilePreludishly(hbc/Time,hs,		-H12m)
 CompilePreludishly(hbc/Trace,hs,	-fglasgow-exts)
-CompilePreludishly(hbc/Word,hs,		-K2m -monly-4-regs)
+CompilePreludishly(hbc/Word,hs,		-H12m -K2m -monly-4-regs)
 
 /****************************************************************
 *								*

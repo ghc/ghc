@@ -112,10 +112,7 @@ simplifyPgm binds g_sw_chkr s_sw_chkr simpl_stats us
 			    False)
 	in
 	if stop_now then
-	    (if global_switch_is_on D_verbose_core2core
-	     then show_status
-	     else id) 
-	    (returnSmpl (new_pgm, iterations, dr))
+	    returnSmpl (new_pgm, iterations, dr)
 	else
 	    simpl_pgm r (iterations + 1) new_pgm
 	)

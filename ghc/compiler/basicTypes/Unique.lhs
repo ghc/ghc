@@ -152,7 +152,8 @@ module Unique (
 	trueDataConKey,
 	unpackCStringIdKey, unpackCString2IdKey, unpackCStringAppendIdKey,
 	packCStringIdKey,
-	integerZeroIdKey, integerPlusOneIdKey, integerMinusOneIdKey,
+	integerZeroIdKey, integerPlusOneIdKey,
+	integerPlusTwoIdKey, integerMinusOneIdKey,
 	voidPrimIdKey,
 	cCallableClassKey,
 	cReturnableClassKey,
@@ -619,7 +620,7 @@ int2IntegerIdKey	= mkPreludeMiscIdUnique	 7
 integerMinusOneIdKey	= mkPreludeMiscIdUnique	 8
 integerPlusOneIdKey	= mkPreludeMiscIdUnique	 9
 integerZeroIdKey	= mkPreludeMiscIdUnique	10
---UNUSED:lexIdKey		= mkPreludeMiscIdUnique 11
+integerPlusTwoIdKey	= mkPreludeMiscIdUnique	11
 packCStringIdKey	= mkPreludeMiscIdUnique	12
 parIdKey		= mkPreludeMiscIdUnique	13
 parErrorIdKey		= mkPreludeMiscIdUnique	14

@@ -5,10 +5,12 @@ import Core
 import IInteger		-- instances
 import IRatio		( (%) )
 import ITup2
-import List		( (++), foldr )
+import List		( (++), map, takeWhile )
 import Prel		( otherwise, (&&), (||), chr, ord )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 -- definitions of the boxed PrimOps; these will be
 -- used in the case of partial applications, etc.
@@ -107,26 +109,27 @@ instance  Ix Int  where
     inRange (I# m, I# n) (I# i) =  m <=# i && i <=# n
 
 instance  Enum Int  where
-{- RAW PRELUDE ************************
-    enumFrom		=  numericEnumFrom
-    enumFromThen	=  numericEnumFromThen
--}
 #ifndef USE_FOLDR_BUILD
-    enumFrom x = x : enumFrom (x `plusInt` 1)
+    enumFrom x           =  x : enumFrom (x `plusInt` 1)
+    enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
 #else
-    {-# INLINE enumFromTo #-}
     {-# INLINE enumFrom #-}
-    enumFromTo x y	 = _build (\ c n ->
-	let g x = if x <= y then x `c` g (x `plusInt` 1) else n in g x)
+    {-# INLINE enumFromTo #-}
     enumFrom x           = _build (\ c _ -> 
 	let g x = x `c` g (x `plusInt` 1) in g x)
+    enumFromTo x y	 = _build (\ c n ->
+	let g x = if x <= y then x `c` g (x `plusInt` 1) else n in g x)
 #endif
-    enumFromThen m n = en' m (n `minusInt` m)
-	    where en' m n = m : en' (m `plusInt` n) n
+    enumFromThen m n     =  en' m (n `minusInt` m)
+	                    where en' m n = m : en' (m `plusInt` n) n
+    enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
+				      (enumFromThen n m)
 
 instance  Text Int  where
     readsPrec p x = readSigned readDec x
     showsPrec x   = showSigned showInt x
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0) 
 
 ---------------------------------------------------------------
 instance _CCallable   Int
@@ -209,11 +212,19 @@ instance  Ix Int#  where
     inRange (m, n) i    =  m <=# i && i <=# n
 
 instance  Enum Int#  where
-    enumFrom x           =  x : enumFrom (x `plusInt#` 1)
+#ifndef USE_FOLDR_BUILD
+    enumFrom x = x : enumFrom (x `plusInt#` 1)
+    enumFromTo n m = takeWhile (<= m) (enumFrom n)
+#else
+    {-# INLINE enumFrom #-}
+    {-# INLINE enumFromTo #-}
+    enumFrom x           = _build (\ c _ -> 
+	let g x = x `c` g (x `plusInt#` 1) in g x)
+    enumFromTo x y	 = _build (\ c n ->
+	let g x = if x <= y then x `c` g (x `plusInt#` 1) else n in g x)
+#endif
     enumFromThen m n     =  en' m (n `minusInt#` m)
 	                    where en' m n = m : en' (m `plusInt#` n) n
-    -- default methods not specialised!
-    enumFromTo n m	 =  takeWhile (<= m) (enumFrom n)
     enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
 				      (enumFromThen n m)
 
@@ -221,8 +232,8 @@ instance  Enum Int#  where
 instance  Text Int#  where
     readsPrec p s = map (\ (I# i#, s) -> (i#, s)) (readsPrec p s)
     showsPrec p x = showsPrec p (I# x)
-    readList s = map (\ (x, s) -> (map (\ (I# i#) -> i#) x, s)) (readList s)
-    showList l = showList (map I# l)
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0)
 
 instance _CCallable   Int#
 instance _CReturnable Int#
@@ -235,17 +246,14 @@ instance _CReturnable Int#
 
 instance _CCallable _Addr
 instance _CCallable _Word
+instance _CCallable (_StablePtr a)
 instance _CCallable _MallocPtr
 
 instance _CReturnable _Addr
 instance _CReturnable _Word
 instance _CReturnable ()
-instance _CReturnable _MallocPtr
-
-#ifndef __PARALLEL_HASKELL__
-instance _CCallable (_StablePtr a)
 instance _CReturnable (_StablePtr a)
-#endif
+instance _CReturnable _MallocPtr
 
 ---------------------------------------------------------------
 gtAddr	(A# x) (A# y) = gtAddr# x y

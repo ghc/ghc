@@ -50,7 +50,7 @@ codeGen :: FAST_STRING		-- module name
 	-> (GlobalSwitch -> SwitchResult)
 				-- global switch lookup function
 	-> [TyCon]		-- tycons with data constructors to convert
-	-> FiniteMap TyCon [[Maybe UniType]]
+	-> FiniteMap TyCon [(Bool, [Maybe UniType])]
 				-- tycon specialisation info
 	-> PlainStgProgram	-- bindings to convert
 	-> AbstractC		-- output
@@ -61,7 +61,9 @@ codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons ty
 	int_switch_set	  = intSwitchSet sw_lookup_fn
 	doing_profiling   = switch_is_on SccProfilingOn
 	compiling_prelude = switch_is_on CompilingPrelude
-	splitting         = switch_is_on (EnsureSplittableC (panic "codeGen:esc"))
+	maybe_split       = if (switch_is_on (EnsureSplittableC (panic "codeGen:esc")))
+			    then CSplitMarker
+			    else AbsCNop
 
 	cinfo = MkCompInfo switch_is_on int_switch_set mod_name
     in
@@ -89,7 +91,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons ty
     if not doing_profiling then
 	mkAbstractCs [
 	    genStaticConBits cinfo gen_tycons tycon_specs,
-	    initC cinfo (cgTopBindings splitting stg_pgm) ]
+	    initC cinfo (cgTopBindings maybe_split stg_pgm) ]
 
     else -- yes, cost-centre profiling:
 	 -- Besides the usual stuff, we must produce:
@@ -111,7 +113,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons ty
 				   mkCcRegister local_CCs import_names],
 
 		genStaticConBits cinfo gen_tycons tycon_specs,
-		initC cinfo (cgTopBindings splitting stg_pgm) ]
+		initC cinfo (cgTopBindings maybe_split stg_pgm) ]
   where
     -----------------
     grp_name  = case (stringSwitchSet sw_lookup_fn SccGroup) of
@@ -155,27 +157,23 @@ style, with the increasing static environment being plumbed as a state
 variable.
 
 \begin{code}
-cgTopBindings :: Bool -> PlainStgProgram -> Code
+cgTopBindings :: AbstractC -> PlainStgProgram -> Code
 
-cgTopBindings splitting bindings = mapCs (cgTopBinding splitting) bindings
+cgTopBindings split bindings = mapCs (cgTopBinding split) bindings
   
-cgTopBinding :: Bool -> PlainStgBinding -> Code
+cgTopBinding :: AbstractC -> PlainStgBinding -> Code
 
-cgTopBinding splitting (StgNonRec name rhs) 
-  = absC maybe_split	`thenC`
+cgTopBinding split (StgNonRec name rhs) 
+  = absC split		`thenC`
     cgTopRhs name rhs	`thenFC` \ (name, info) ->
     addBindC name info
-  where
-    maybe_split = if splitting then CSplitMarker else AbsCNop
 
-cgTopBinding splitting (StgRec pairs) 
-  = absC maybe_split	`thenC`
+cgTopBinding split (StgRec pairs) 
+  = absC split		`thenC`
     fixC (\ new_binds -> addBindsC new_binds	`thenC`
 			 mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs
     )			`thenFC` \ new_binds ->
     addBindsC new_binds
-  where
-    maybe_split = if splitting then CSplitMarker else AbsCNop
 
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the

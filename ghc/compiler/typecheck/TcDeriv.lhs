@@ -556,6 +556,7 @@ gen_inst_info modname fixities deriver_name_funs
 			-- These two are only needed if there are pragmas to typecheck;
 			-- but there ain't since we are generating the code right here.
 		True {-yes, from_here-}
+		modname
 		NoInstancePragmas
 		mkGeneratedSrcLoc
 		clas

@@ -21,9 +21,12 @@ import IFloat
 import IInt
 import IInteger
 import IList
-import Prel		( otherwise, isSpace, (&&), (||), atan2, (.), flip, (^) )
+import ITup2
+import Prel		( otherwise, isSpace, (&&), (||), atan2, (.), flip, (^),
+			  id, maxInt, maxInt# )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
 import TyComplex
 
 --infixl 9  !!
@@ -36,7 +39,7 @@ import TyComplex
 -- are the dual functions working from the end of a finite list,
 -- rather than the beginning.
 
---{-# GENERATE_SPECS head a #-}
+{-# GENERATE_SPECS head a #-}
 head			:: [a] -> a
 #ifndef USE_FOLDR_BUILD
 head (x:_)		=  x
@@ -47,25 +50,25 @@ head 			=  foldr (\ x _ -> x)
 				 (error "head{PreludeList}: head []\n") 
 #endif
 
---{-# GENERATE_SPECS last a #-}
+{-# GENERATE_SPECS last a #-}
 last			:: [a] -> a
 last []			=  error "last{PreludeList}: last []\n"
 last [x]		=  x
 last (_:xs)		=  last xs
 
---{-# GENERATE_SPECS tail a #-}
+{-# GENERATE_SPECS tail a #-}
 tail			:: [a] -> [a]
 tail (_:xs)		=  xs
 tail []			=  error "tail{PreludeList}: tail []\n"
 
---{-# GENERATE_SPECS init a #-}
+{-# GENERATE_SPECS init a #-}
 init			:: [a] -> [a]
 init []			=  error "init{PreludeList}: init []\n"
 init [x]		=  []
 init (x:xs)		=  x : init xs
 
 -- null determines if a list is empty.
---{-# GENERATE_SPECS null a #-}
+{-# GENERATE_SPECS null a #-}
 null			:: [a] -> Bool
 #ifndef USE_FOLDR_BUILD
 null []			= True
@@ -76,7 +79,7 @@ null x			= foldr (\ _ _ -> False) True x
 #endif
 
 -- list concatenation (right-associative)
---{-# GENERATE_SPECS (++) a #-}
+{-# GENERATE_SPECS (++) a #-}
 (++)			:: [a] -> [a] -> [a]
 
 #ifdef USE_REPORT_PRELUDE
@@ -94,7 +97,7 @@ xs ++ ys		= foldr (:) ys xs
 -- list difference (non-associative).  In the result of xs \\ ys,
 -- the first occurrence of each element of ys in turn (if any)
 -- has been removed from xs.  Thus, (xs ++ ys) \\ xs == ys.
---{-# GENERATE_SPECS (\\) a{+,Int} #-}
+{-# GENERATE_SPECS (\\) a{+,Int,[Char]} #-}
 (\\)			:: (Eq a) => [a] -> [a] -> [a]
 (\\) xs ys		=  foldl del xs ys
 			   where [] `del` _	    = []
@@ -106,11 +109,11 @@ xs ++ ys		= foldr (:) ys xs
 -- of the more general genericLength, the result type of which may be
 -- any kind of number.
 
---{-# GENERATE_SPECS genericLength a{~,Int#,Double#,Int} b #-}
+{-# GENERATE_SPECS genericLength a{~,Int#,Double#,Int,Integer} b #-}
 genericLength		:: (Num a) => [b] -> a
-genericLength xs	=  foldl (\n _ -> n+1) 0 xs
+genericLength xs	=  foldl (\n _ -> n+__i1) __i0 xs
 
---{-# GENERATE_SPECS length a #-}
+{-# GENERATE_SPECS length a #-}
 length			:: [a] -> Int
 #ifdef USE_REPORT_PRELUDE
 length			=  genericLength
@@ -131,8 +134,7 @@ length l = foldl (\ n _ -> n+I# 1#) (I# 0#) l
 
 -- List index (subscript) operator, 0-origin
 
-{-# SPECIALIZE (!!) :: [b] -> Int -> b, [b] -> Integer -> b #-}
---{-# GENERATE_SPECS (!!) a{~,Int#,Int,Integer} b #-}
+{-# GENERATE_SPECS (!!) a{~,Int#,Int,Integer} b #-}
 (!!)			:: (Integral a) => [b] -> a -> b
 #ifdef USE_REPORT_PRELUDE
 (x:_)  !! 0		=  x
@@ -145,17 +147,17 @@ length l = foldl (\ n _ -> n+I# 1#) (I# 0#) l
 -- in the more efficient version.
 -- (Not to mention if "n" won't fit in an Int :-)
 
-_      !! n | n < 0     =  error "(!!){PreludeList}: negative index\n"
+_      !! n | n < __i0  =  error "(!!){PreludeList}: negative index\n"
 xs     !! n             =  sub xs (case (toInt n) of { I# n# -> n# })
                            where sub :: [a] -> Int# -> a
-                                 sub []     _ = error "(!!){PreludeList}: index too large\n"
+                                 sub []      _ = error "(!!){PreludeList}: index too large\n"
                                  sub (x:xs) n# = if n# ==# 0#
 						 then x
 						 else sub xs (n# `minusInt#` 1#)
 #endif /* ! USE_REPORT_PRELUDE */
 
 -- map f xs applies f to each element of xs; i.e., map f xs == [f x | x <- xs].
---{-# GENERATE_SPECS map a b #-}
+{-# GENERATE_SPECS map a b #-}
 map			:: (a -> b) -> [a] -> [b]
 #ifndef USE_FOLDR_BUILD
 map f []		=  []
@@ -168,7 +170,7 @@ map f xs		= _build (\ c n -> foldr (c.f) n xs)
 -- filter, applied to a predicate and a list, returns the list of those
 -- elements that satisfy the predicate; i.e.,
 -- filter p xs == [x | x <- xs, p x].
---{-# GENERATE_SPECS filter a #-}
+{-# GENERATE_SPECS filter a #-}
 filter			:: (a -> Bool) -> [a] -> [a]
 #ifdef USE_REPORT_PRELUDE
 filter p		=  foldr (\x xs -> if p x then x:xs else xs) []
@@ -190,7 +192,7 @@ filter f xs = _build (\ c n -> foldr (\ a b -> if f a then c a b else b) n xs)
 #ifdef USE_FOLDR_BUILD
 {-# INLINE partition #-}
 #endif
---{-# GENERATE_SPECS partition a #-}
+{-# GENERATE_SPECS partition a #-}
 partition		:: (a -> Bool) -> [a] -> ([a],[a])
 partition p xs		=  foldr select ([],[]) xs
 			   where select x (ts,fs) | p x	      = (x:ts,fs)
@@ -208,18 +210,18 @@ partition p xs		=  foldr select ([],[]) xs
 -- scanl1 is similar, again without the starting element:
 --	scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
---{-# GENERATE_SPECS foldl1 a #-}
+{-# GENERATE_SPECS foldl1 a #-}
 foldl1			:: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)		=  foldl f x xs
 foldl1 _ []		=  error "foldl1{PreludeList}: empty list\n"
 
---{-# GENERATE_SPECS scanl a b#-}
+{-# GENERATE_SPECS scanl a b#-}
 scanl			:: (a -> b -> a) -> a -> [b] -> [a]
 scanl f q xs		=  q : (case xs of
 				[]   -> []
 				x:xs -> scanl f (f q x) xs)
 
---{-# GENERATE_SPECS scanl1 a #-}
+{-# GENERATE_SPECS scanl1 a #-}
 scanl1			:: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)		=  scanl f x xs
 scanl1 _ []		=  error "scanl1{PreludeList}: empty list\n"
@@ -227,19 +229,19 @@ scanl1 _ []		=  error "scanl1{PreludeList}: empty list\n"
 -- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
 -- above functions.
 
---{-# GENERATE_SPECS foldr1 a #-}
+{-# GENERATE_SPECS foldr1 a #-}
 foldr1			:: (a -> a -> a) -> [a] -> a
 foldr1 f [x]		=  x
 foldr1 f (x:xs)		=  f x (foldr1 f xs)
 foldr1 _ []		=  error "foldr1{PreludeList}: empty list\n"
 
---{-# GENERATE_SPECS scanr a b #-}
+{-# GENERATE_SPECS scanr a b #-}
 scanr			:: (a -> b -> b) -> b -> [a] -> [b]
 scanr f q0 []		=  [q0]
 scanr f q0 (x:xs)	=  f x q : qs
 			   where qs@(q:_) = scanr f q0 xs 
 
---{-# GENERATE_SPECS scanr1 a #-}
+{-# GENERATE_SPECS scanr1 a #-}
 scanr1			:: (a -> a -> a) -> [a] -> [a]
 scanr1 f  [x]		=  [x]
 scanr1 f  (x:xs)	=  f x q : qs
@@ -248,7 +250,7 @@ scanr1 _ []		=  error "scanr1{PreludeList}: empty list\n"
 
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
---{-# GENERATE_SPECS iterate a #-}
+{-# GENERATE_SPECS iterate a #-}
 iterate			:: (a -> a) -> a -> [a]
 #ifndef USE_FOLDR_BUILD
 iterate f x		=  x : iterate f (f x)
@@ -263,7 +265,7 @@ iterate f x		= _build (\ c n ->
 
 
 -- repeat x is an infinite list, with x the value of every element.
---{-# GENERATE_SPECS repeat a #-}
+{-# GENERATE_SPECS repeat a #-}
 repeat			:: a -> [a]
 #ifndef USE_FOLDR_BUILD
 repeat x		=  xs where xs = x:xs
@@ -280,7 +282,7 @@ repeat x		=  _build (\ c n ->
 -- the infinite repetition of the original list.  It is the identity
 -- on infinite lists.
 
---{-# GENERATE_SPECS cycle a #-}
+{-# GENERATE_SPECS cycle a #-}
 cycle			:: [a] -> [a]
 #ifndef USE_FOLDR_BUILD
 cycle xs		=  xs' where xs' = xs ++ xs'
@@ -317,52 +319,99 @@ splitAt (n+1) (x:xs)	=  (x:xs',xs'') where (xs',xs'') = splitAt n xs
 
 #else /* hack away */
 
--- ToDo: massive Patrick hack not included yet
 
+{-# GENERATE_SPECS take a{~,Integer} b #-}
 take	:: (Integral a) => a -> [b] -> [b]
-drop	:: (Integral a) => a -> [b] -> [b]
-splitAt	:: (Integral a) => a -> [b] -> ([b], [b])
 
-{-# SPECIALIZE take :: Int -> [b] -> [b], Integer -> [b] -> [b] #-}
-{-# SPECIALIZE drop :: Int -> [b] -> [b], Integer -> [b] -> [b] #-}
-{-# SPECIALIZE splitAt :: Int -> [b] -> ([b], [b]), Integer -> [b] -> ([b], [b]) #-}
+{-# SPECIALIZE take :: Int -> [b] -> [b] = _takeInt #-}
 
-take n xs = takeInt (toInt n) xs
+#if defined(__UNBOXED_INSTANCES__)
+{-# SPECIALIZE take :: 
+    Int# -> [b] -> [b] 			= _takeUInt,
+    Int# -> [Int#] -> [Int#] 		= _takeUInti,
+    Int# -> [Char#] -> [Char#] 		= _takeUIntc,
+    Int# -> [Double#] -> [Double#] 	= _takeUIntd,
+    Int -> [Int#] -> [Int#] 		= _takeInti,
+    Int -> [Char#] -> [Char#] 		= _takeIntc,
+    Int -> [Double#] -> [Double#] 	= _takeIntd #-}
 
-takeInt			:: Int -> [b] -> [b]
-takeInt (I# n#) xs
-  | n# <# 0#	=  error "take{PreludeList}: negative index"
-  | otherwise 	=  takeInt# n# xs
-    where
-	takeInt# :: Int# -> [a] -> [a]
-	takeInt# 0# _       = []
-	takeInt# _  []	    = []
-	takeInt# m# (x:xs)  = x : takeInt# (m# `minusInt#` 1#) xs
+{-# INLINE _takeUInti #-}
+{-# INLINE _takeUIntc #-}
+{-# INLINE _takeUIntd #-}
+{-# INLINE _takeInti  #-}
+{-# INLINE _takeIntc  #-}
+{-# INLINE _takeIntd  #-}
 
-{- NEW, from Kevin Hammond (kh)
-   ToDo: needs the < 0 checking
+_takeUInti :: Int# -> [Int#] -> [Int#]
+_takeUInti n xs = _takeUInt n xs
+_takeUIntc :: Int# -> [Char#] -> [Char#] 
+_takeUIntc n xs = _takeUInt n xs
+_takeUIntd :: Int# -> [Double#] -> [Double#]
+_takeUIntd n xs = _takeUInt n xs
+_takeInti :: Int -> [Int#] -> [Int#]
+_takeInti n xs = _takeInt n xs
+_takeIntc :: Int -> [Char#] -> [Char#] 
+_takeIntc n xs = _takeInt n xs
+_takeIntd :: Int -> [Double#] -> [Double#]
+_takeIntd n xs = _takeInt n xs
 
-take n | n >= 0 =
-        if n <= fromIntegral maxInt then take' 0 else take'' n
-	where
-	      take' :: Int -> [a] -> [a]
-	      take' _  []            =  []
-	      take' m   _  | m == n' =  []
-	      take' m (x:xs)         =  x : take' (m+1) xs
+#endif
 
-	      take'' :: (Integral a) => a -> [b] -> [b]
-	      tale'' 0   -           =  []
-	      take'' _  []           =  []
-	      take'' n (x:xs)        =  x : take'' (n-1) xs
+-- The general code for take, below, checks n <= maxInt
+-- No need to check for maxInt overflow when specialised
+-- at type Int or Int# since the Int must be <= maxInt
 
-	      n' = fromIntegral n
+_takeUInt :: Int# -> [b] -> [b]
+_takeUInt n xs
+  | n `geInt#` 0# =  _take_unsafe_UInt n xs
+  | otherwise 	  =  error "take{PreludeList}: negative index"
+
+{-# INLINE _takeInt   #-}
+_takeInt :: Int -> [b] -> [b]
+_takeInt (I# n#) xs = _takeUInt n# xs 
+
+_take_unsafe_UInt 0# _     = []
+_take_unsafe_UInt _  []	   = []
+_take_unsafe_UInt m (x:xs) = x : _take_unsafe_UInt (m `minusInt#` 1#) xs
+
+-- For an index n between maxInt and maxInt^2 we use a function
+-- with two indexes m and r where n = m * maxInt + r
+
+_take_unsafe_UIntUInt _  _   []    = []
+_take_unsafe_UIntUInt 1# 0#  xs    = _take_unsafe_UInt maxInt# xs
+_take_unsafe_UIntUInt m  0#  xs    = _take_unsafe_UIntUInt (m `minusInt#` 1#) maxInt# xs
+_take_unsafe_UIntUInt m  r  (x:xs) = x : _take_unsafe_UIntUInt m (r `minusInt#` 1#) xs
+
+_take_unsafe_Integral :: (Integral a) => a -> [b] -> [b]
+_take_unsafe_Integral _  []    =  []
+_take_unsafe_Integral 0  _     =  []
+_take_unsafe_Integral n (x:xs) =  x : _take_unsafe_Integral (n-1) xs
+
+__max :: Num a => a
+__max = fromInt maxInt
+
+take n | n < __i0
+       = error "take{PreludeList}: negative index"
+       | n <= __max
+       = let n# = i2i# (toInt n)
+	 in \xs -> _take_unsafe_UInt n# xs
+       | n <= __max * __max
+       = let m# = i2i# (toInt m)
+	     r# = i2i# (toInt r)
+	 in \xs -> _take_unsafe_UIntUInt m# r# xs
+       | otherwise
+       = \xs -> _take_unsafe_Integral n xs
+       where
+	 (m,r) = n `quotRem` __max
+	 i2i# (I# i#) = i#
 
 -- Test
 -- main = print (head (take (123456789123456789::Integer) [1..]))
--}
 
 -- ToDo: NEW drop and splitAt, too (WDP)
 
+{-# GENERATE_SPECS drop a{~,Int#,Int,Integer} b #-}
+drop	:: (Integral a) => a -> [b] -> [b]
 drop n xs = dropInt (toInt n) xs
 
 dropInt			:: Int -> [b] -> [b]
@@ -375,6 +424,8 @@ dropInt (I# n#) xs
 	dropInt# _  []	    = []
 	dropInt# m# (_:xs)  = dropInt# (m# `minusInt#` 1#) xs
 
+{-# GENERATE_SPECS splitAt a{~,Int#,Int,Integer} b #-}
+splitAt	:: (Integral a) => a -> [b] -> ([b], [b])
 splitAt  n  xs | n >= 0 = splitAtInt (toInt n) xs
 
 splitAtInt		:: Int -> [b] -> ([b], [b])
@@ -396,7 +447,7 @@ splitAtInt (I# n#) xs
 -- returns the remaining suffix.  Span p xs is equivalent to
 -- (takeWhile p xs, dropWhile p xs), while break p uses the negation of p.
 
---{-# GENERATE_SPECS takeWhile a #-}
+{-# GENERATE_SPECS takeWhile a #-}
 takeWhile		:: (a -> Bool) -> [a] -> [a]
 #ifndef USE_FOLDR_BUILD
 takeWhile p []		=  []
@@ -414,21 +465,21 @@ takeWhile p xs		= _build (\ c n ->
 	foldr fn n xs)
 #endif /* USE_FOLDR_BUILD */
 
---{-# GENERATE_SPECS dropWhile a #-}
+{-# GENERATE_SPECS dropWhile a #-}
 dropWhile		:: (a -> Bool) -> [a] -> [a]
 dropWhile p []		=  []
 dropWhile p xs@(x:xs')
 	    | p x       =  dropWhile p xs'
 	    | otherwise =  xs
 
---{-# GENERATE_SPECS span a #-}
+{-# GENERATE_SPECS span a #-}
 span			:: (a -> Bool) -> [a] -> ([a],[a])
 span p []		=  ([],[])
 span p xs@(x:xs')
 	   | p x	=  let (ys,zs) = span p xs' in (x:ys,zs)
 	   | otherwise	=  ([],xs)
 
---{-# GENERATE_SPECS break a #-}
+{-# GENERATE_SPECS break a #-}
 break		:: (a -> Bool) -> [a] -> ([a],[a])
 #ifdef USE_REPORT_PRELUDE
 break p			= span (not . p)
@@ -490,7 +541,7 @@ unwords (w:ws)		= w ++ ' ' : unwords ws
 #endif /* ! USE_REPORT_PRELUDE */
 
 -- nub (meaning "essence") removes duplicate elements from its list argument.
---{-# GENERATE_SPECS nub a{+,Int} #-}
+{-# GENERATE_SPECS nub a{+,Int,[Int],[Char]} #-}
 nub			:: (Eq a) => [a] -> [a]
 #ifdef USE_REPORT_PRELUDE
 nub []			=  []
@@ -504,7 +555,7 @@ nub l                   = nub' l []
 #endif /* ! USE_REPORT_PRELUDE */
 
 -- reverse xs returns the elements of xs in reverse order.  xs must be finite.
---{-# GENERATE_SPECS reverse a #-}
+{-# GENERATE_SPECS reverse a #-}
 reverse			:: [a] -> [a]
 #ifdef USE_REPORT_PRELUDE
 reverse			=  foldl (flip (:)) []
@@ -544,9 +595,9 @@ or			=  foldr (||) False
 
 -- Applied to a predicate and a list, any determines if any element
 -- of the list satisfies the predicate.  Similarly, for all.
---{-# GENERATE_SPECS any a #-}
+{-# GENERATE_SPECS any a #-}
 any			:: (a -> Bool) -> [a] -> Bool
---{-# GENERATE_SPECS all a #-}
+{-# GENERATE_SPECS all a #-}
 all			:: (a -> Bool) -> [a] -> Bool
 #ifdef USE_REPORT_PRELUDE
 any p			= or . map p
@@ -569,13 +620,10 @@ all p xs		=  foldr (\ x r -> p x && r) True xs
 
 -- elem is the list membership predicate, usually written in infix form,
 -- e.g., x `elem` xs.  notElem is the negation.
---{-# GENERATE_SPECS elem a{+,Int,Char,String} #-}
+{-# GENERATE_SPECS elem a{+,Int,Integer,Char,String,(Int,Int)} #-}
 elem			:: (Eq a) => a -> [a] -> Bool
---{-# GENERATE_SPECS notElem a{+,Int,Char,String} #-}
+{-# GENERATE_SPECS notElem a{+,Int,Integer,Char,String,(Int,Int)} #-}
 notElem			:: (Eq a) => a -> [a] -> Bool
-
-{-# SPECIALIZE elem :: Int -> [Int] -> Bool, Char -> [Char] -> Bool, String -> [String] -> Bool #-}
-{-# SPECIALIZE notElem :: Int -> [Int] -> Bool, Char -> [Char] -> Bool, String -> [String] -> Bool #-}
 
 #ifdef USE_REPORT_PRELUDE
 elem			=  any . (==)
@@ -600,11 +648,9 @@ notElem	x ys		=  all (\ y -> x /= y) ys
 #endif /* ! USE_REPORT_PRELUDE */
 
 -- sum and product compute the sum or product of a finite list of numbers.
-{-# SPECIALIZE sum :: [Int] -> Int, [Integer] -> Integer, [Double] -> Double, [Complex Double] -> Complex Double #-}
---{-# GENERATE_SPECS sum a{Int#,Double#,Int,Integer,Double} #-}
+{-# GENERATE_SPECS sum a{Int#,Double#,Int,Integer,Double,Complex(Double#),Complex(Double)} #-}
 sum			:: (Num a) => [a] -> a
-{-# SPECIALIZE product :: [Int] -> Int, [Integer] -> Integer, [Double] -> Double #-}
---{-# GENERATE_SPECS product a{Int#,Double#,Int,Integer,Double} #-}
+{-# GENERATE_SPECS product a{Int#,Double#,Int,Integer,Double,Complex(Double#),Complex(Double)} #-}
 product			:: (Num a) => [a] -> a
 
 #ifdef USE_REPORT_PRELUDE
@@ -633,18 +679,18 @@ product xs		=  foldl (*) lit1 xs
 
 -- sums and products give a list of running sums or products from
 -- a list of numbers.  For example,  sums [1,2,3] == [0,1,3,6].
---{-# GENERATE_SPECS sums a{Int#,Double#,Int,Integer,Double} #-}
+{-# GENERATE_SPECS sums a{Int#,Double#,Int,Integer,Double,Complex(Double#),Complex(Double)} #-}
 sums			:: (Num a) => [a] -> [a]
-sums xs			=  scanl (+) 0 xs
---{-# GENERATE_SPECS products a{Int#,Double#,Int,Integer,Double} #-}
+sums xs			=  scanl (+) __i0 xs
+{-# GENERATE_SPECS products a{Int#,Double#,Int,Integer,Double,Complex(Double#),Complex(Double)} #-}
 products		:: (Num a) => [a] -> [a]
-products xs		=  scanl (*) 1 xs
+products xs		=  scanl (*) __i1 xs
 
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
---{-# GENERATE_SPECS maximum a{+,Int,Integer,Double} #-}
+{-# GENERATE_SPECS maximum a{+,Int,Integer,Double} #-}
 maximum			:: (Ord a) => [a] -> a
---{-# GENERATE_SPECS minimum a{+,Int,Integer,Double} #-}
+{-# GENERATE_SPECS minimum a{+,Int,Integer,Double} #-}
 minimum			:: (Ord a) => [a] -> a
 #ifdef USE_REPORT_PRELUDE
 maximum			=  foldl1 max
@@ -657,7 +703,7 @@ minimum (x:xs)	= min x (minimum xs)
 #endif /* ! USE_REPORT_PRELUDE */
 
 -- concat, applied to a list of lists, returns their flattened concatenation.
---{-# GENERATE_SPECS concat a #-}
+{-# GENERATE_SPECS concat a #-}
 concat			:: [[a]] -> [a]
 #ifdef USE_REPORT_PRELUDE
 concat			=  foldr (++) []
@@ -681,7 +727,7 @@ concat xs = _build (\ c n -> foldr (\ x y -> foldr c y x) n xs)
 -- than the previous one; any elements outside of the "triangular"
 -- transposable region are lost.  The input can be infinite in either
 -- dimension or both.
---{-# GENERATE_SPECS transpose a #-}
+{-# GENERATE_SPECS transpose a #-}
 transpose		:: [[a]] -> [[a]]
 transpose xs		=  foldr 
 			     (\xs xss -> zipWith (:) xs (xss ++ repeat []))
@@ -695,7 +741,7 @@ transpose xs		=  foldr
 #ifdef USE_FOLDR_BUILD
 {-# INLINE zip #-}
 #endif
---{-# GENERATE_SPECS zip a b #-}
+{-# GENERATE_SPECS zip a b #-}
 zip			:: [a] -> [b] -> [(a,b)]
 zip as bs		=  zipWith (\a b -> (a,b)) as bs
 
@@ -721,7 +767,7 @@ zip7 as bs cs ds es fs gs =  zipWith7 (\a b c d e f g -> (a,b,c,d,e,f,g)) as bs 
 -- For example, zipWith (+) is applied to two lists to produce the list
 -- of corresponding sums.
 
---{-# GENERATE_SPECS zipWith a b c #-}
+{-# GENERATE_SPECS zipWith a b c #-}
 zipWith			:: (a->b->c) -> [a]->[b]->[c]
 #ifndef USE_FOLDR_BUILD
 zipWith z (a:as) (b:bs)	=  z a b : zipWith z as bs
@@ -770,7 +816,7 @@ zipWith7 _ _ _ _ _ _ _ _ =  []
 -- unzip transforms a list of pairs into a pair of lists.  As with zip,
 -- a family of such functions up to septuplets is provided.
 
---{-# GENERATE_SPECS unzip a b #-}
+{-# GENERATE_SPECS unzip a b #-}
 unzip			:: [(a,b)] -> ([a],[b])
 unzip xs		=  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[]) xs
 

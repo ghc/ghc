@@ -558,10 +558,13 @@ Here are the things that can go wrong during unification:
 \begin{code}
 data UnifyErrInfo
   = UnifyMisMatch	UniType UniType
-  | TypeRec		TyVar   TauType -- Occurs check failure
+  | TypeRec		TyVar   TauType		-- Occurs check failure
 
-  | UnifyListMisMatch	[TauType] [TauType]   -- Args to unifyList: diff lengths
-					      -- produces system error
+  | UnifyListMisMatch	[TauType] [TauType]   	-- Args to unifyList: diff lengths
+					      	-- produces system error
+
+  | UnifyUnboxedMisMatch UniType UniType	-- No unboxed specialisation
+
 \end{code}
 
 @UnifyErrContext@ gives some context for unification
@@ -638,7 +641,7 @@ ppUnifyErr head rest = ppSep [head, {-if you want a blank line: ppSP,-} rest]
 
 pprUnifyErrInfo sty (UnifyMisMatch mt1 mt2) err_ctxt
  = ppUnifyErr (ppSep [ppBesides [ppStr "Couldn't match the type `", ppr sty mt1, ppStr "'"],
-		      ppBesides [ppStr "against `", ppr sty mt2, ppStr "'."]])
+		       ppBesides [ppStr "against `", ppr sty mt2, ppStr "'."]])
 	      (pprUnifyErrContext sty err_ctxt)
 
 pprUnifyErrInfo sty (TypeRec tyvar ty) err_ctxt
@@ -649,6 +652,12 @@ pprUnifyErrInfo sty (TypeRec tyvar ty) err_ctxt
 
 pprUnifyErrInfo sty (UnifyListMisMatch tys1 tys2) err_ctxt
  = panic "pprUnifyErrInfo: unifying lists of types of different lengths"
+
+pprUnifyErrInfo sty (UnifyUnboxedMisMatch mt1 mt2) err_ctxt
+ = ppUnifyErr (ppSep [ppBesides [ppStr "Couldn't match the type variable `", ppr sty mt1, ppStr "'"],
+		      ppBesides [ppStr "against unboxed type `", ppr sty mt2, ppStr "'."],
+		      ppStr "Try using  -fspecialise-unboxed  ..." ])
+	      (pprUnifyErrContext sty err_ctxt)
 \end{code}
 
 %************************************************************************

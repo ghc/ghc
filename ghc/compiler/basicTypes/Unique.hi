@@ -62,6 +62,7 @@ intTyConKey :: Unique
 integerDataConKey :: Unique
 integerMinusOneIdKey :: Unique
 integerPlusOneIdKey :: Unique
+integerPlusTwoIdKey :: Unique
 integerTyConKey :: Unique
 integerZeroIdKey :: Unique
 integralClassKey :: Unique

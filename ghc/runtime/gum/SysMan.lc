@@ -19,13 +19,13 @@ in Graph for PVM.
 \end{code}
 
 \begin{code}
-static GLOBAL_TASK_ID gtids[MAX_PES], IOTask =  0, StatsTask = 0;
+static GLOBAL_TASK_ID gtids[MAX_PES], StatsTask = 0;
 static long PEbuffer[MAX_PES];
 static int nPEs = 0;
 \end{code}
 
 \begin{code}
-static GLOBAL_TASK_ID sysman_id, sender_id;
+static GLOBAL_TASK_ID sysman_id, sender_id, mainThread_id;
 
 GLOBAL_TASK_ID mytid;
 
@@ -57,13 +57,10 @@ main(int argc, char **argv)
     int rbufid;
     int opcode, nbytes;
     char **pargv;
-    int i;
-#if 0
-    int status;
-#endif
+    int i, cc;
     int spawn_flag = PvmTaskDefault;
 
-    char *petask;
+    char *petask, *pvmExecutable;
 
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
@@ -74,15 +71,15 @@ main(int argc, char **argv)
 	    argv[1] = argv[0];
 	    argv++; argc--;
 	}
-	sysman_id = pvm_mytid();/* This must be the first PVM call */
-	checkerr(sysman_id);
+	mainThread_id = pvm_mytid();/* This must be the first PVM call */
+	checkerr(mainThread_id);
 
 	nPEs = atoi(argv[1]);
 
 	if ((petask = getenv(PETASK)) == NULL)
 	    petask = PETASK;
 
-#if 1
+#if 0
 	fprintf(stderr, "nPEs (%s) = %d\n", petask, nPEs);
 #endif
 
@@ -91,22 +88,31 @@ main(int argc, char **argv)
 	    fprintf(stderr, "No more than %d PEs allowed (%d requested)\n", MAX_PES, nPEs);
 	    EXIT(EXIT_FAILURE);
 	}
+	/* 
+	Get the full path and filename of the pvm executable (stashed in some
+	PVM directory.
+	*/
+	pvmExecutable = argv[2];
+        
 	/* Create the PE Tasks */
 	if (nPEs > 0) {
-	    /* Initialise the PE task arguments from Sysman's arguments */
-	    pargv = argv + 1;
-#if 0
+	    /*  Spawn nPEs-1 pvm threads: the Main Thread (starts execution and performs
+		IO is created by forking SysMan */
+	    nPEs--;
+#if 1
 	    fprintf(stderr, "Spawning %d PEs(%s) ...\n", nPEs, petask);
 	    fprintf(stderr, "  args: ");
 	    for (i = 0; pargv[i]; ++i)
 		fprintf(stderr, "%s, ", pargv[i]);
 	    fprintf(stderr, "\n");
 #endif
-
+	    /* Initialise the PE task arguments from Sysman's arguments */
+	    pargv = argv + 2;
 	    checkerr(pvm_spawn(petask, pargv, spawn_flag, "", nPEs, gtids));
+	    PEbuffer[0] = mainThread_id;
 	    for (i = 0; i < nPEs; i++)
-		PEbuffer[i] = (long) gtids[i];
-#if 0
+		PEbuffer[i++] = (long) gtids[i];
+#if 1
 	    fprintf(stderr, "Spawned /* PWT */\n");
 #endif
 
@@ -128,66 +134,68 @@ main(int argc, char **argv)
 	   (Phil Trinder, 95/10)
 	*/
 	checkerr(pvm_joingroup(PECTLGROUP));
-#if 0
+#if 1
 	fprintf(stderr, "Joined PECTLGROUP /* PWT */\n");
 #endif
 
 	/* Wait for all the PEs and IMUs to arrive */
 	checkerr(pvm_barrier(PECTLGROUP, nPEs + 1));
 
-#if 0
+#if 1
 	fprintf(stderr, "PECTLGROUP  barrier passed /* HWL */\n");
 #endif
+	/* 
+	Create the MainThread PE by forking SysMan. This arcane coding 
+	is required to allow MainThread to read stdin and write to stdout.
+	PWT 18/1/96 
+	*/
+	if (cc = fork()) {
+          checkerr(cc);
+	  exec($some path$/petask)		/* Parent task become Main Thread PE */
+        } else {
+					/* Child continues as SysMan */
+          pvmendtask();			/* Disconnect from PVM to avoid confusion */
+	  sysman_id = pvm_mytid();	/* Reconnect to PVM to get new task id */
 
-	/* Broadcast Global Task Ids of all PEs */
+  	  /* Broadcast Global Task Ids of all PEs */
 
-	pvm_initsend(PvmDataDefault);
-	PutArgs(PEbuffer, nPEs);
-	pvm_bcast(PEGROUP, PP_PETIDS);
+	  pvm_initsend(PvmDataDefault);
+	  PutArgs(PEbuffer, nPEs);
+	  pvm_bcast(PEGROUP, PP_PETIDS);
 
-#if 0
-	/* Find an IO task */
-	for (i = 0; IOTask <= 0 || status != PvmOk; ++i) {
-	    IOTask = pvm_gettid(PEGROUP, i);
-	    status = pvm_pstat(IOTask);
-	    fprintf(stderr, "Task %x, Status %x\n", IOTask, status);
-	}
+#if 1
+	  fprintf(stderr, "Main Thread Task is [t%x]\n", mainThread_id);
 #endif
 
-	IOTask = gtids[0];
-#if 0
-	fprintf(stderr, "IO Task is [t%x]\n", IOTask);
-#endif
+	  pvm_initsend(PvmDataDefault);
+	  pvm_send(mainThread_id, PP_IO_INIT);
 
-	pvm_initsend(PvmDataDefault);
-	pvm_send(IOTask, PP_IO_INIT);
-
-	pvm_initsend(PvmDataDefault);
-	pvm_bcast(PEGROUP, PP_INIT);
-#if 0
-	fprintf(stderr, "Broadcast PP_INIT to all PEs\n");
+	  pvm_initsend(PvmDataDefault);
+	  pvm_bcast(PEGROUP, PP_INIT);
+#if 1
+	  fprintf(stderr, "Broadcast PP_INIT to all PEs\n");
 #endif
 
 	/* HWL-DEBUG */
-#if 0
-	fprintf(stderr, "Sysman successfully initialized!\n");
+#if 1
+	  fprintf(stderr, "Sysman successfully initialized!\n");
 #endif
 
 	/* Process incoming messages */
-	while (1) {
-	    if ((rbufid = pvm_recv(ANY_TASK, ANY_OPCODE)) < 0)
-		pvm_perror("Sysman: Receiving Message");
+	  while (1) {
+	      if ((rbufid = pvm_recv(ANY_TASK, ANY_OPCODE)) < 0)
+	  	  pvm_perror("Sysman: Receiving Message");
 
-	    else {
-		pvm_bufinfo(rbufid, &nbytes, &opcode, &sender_id);
+	      else {
+	  	  pvm_bufinfo(rbufid, &nbytes, &opcode, &sender_id);
 
 #if 0
-		fprintf(stderr, "HWL-DBG(SysMan; main loop): rbufid=%x, nbytes = %d, opcode = %x, sender_id = %x\n",
-		  rbufid, nbytes, opcode, sender_id);
+	  	  fprintf(stderr, "HWL-DBG(SysMan; main loop): rbufid=%x, nbytes = %d, opcode = %x, sender_id = %x\n",
+	  	    rbufid, nbytes, opcode, sender_id);
 #endif
 
-		switch (opcode) {
-		case PP_GC_INIT:
+	  	  switch (opcode) {
+		  case PP_GC_INIT:
 		    /* This Function not yet implemented for GUM */
 		    fprintf(stderr, "Global GC from %x Not yet implemented for GUM!\n", sender_id);
 		    sync(PECTLGROUP, PP_FULL_SYSTEM);
@@ -196,52 +204,52 @@ main(int argc, char **argv)
 		    broadcast(PEGROUP, PP_INIT);
 		    break;
 
-		case PP_STATS_ON:
-		case PP_STATS_OFF:
-		    /* This Function not yet implemented for GUM */
-		    break;
+		  case PP_STATS_ON:
+		  case PP_STATS_OFF:
+		      /* This Function not yet implemented for GUM */
+		      break;
 
-		case PP_FINISH:
-		    fprintf(stderr, "Finish from %x\n", sender_id);
-		    if (!Finishing) {
-			long buf = (long) StatsTask;
-			Finishing = rtsTrue;
-			pvm_initsend(PvmDataDefault);
-			pvm_pklong(&buf, 1, 1);
-			pvm_bcast(PEGROUP, PP_FINISH);
-		    } else {
-			++PEsTerminated;
-		    }
+		  case PP_FINISH:
+		      fprintf(stderr, "Finish from %x\n", sender_id);
+		      if (!Finishing) {
+		  	long buf = (long) StatsTask;
+		  	Finishing = rtsTrue;
+		  	pvm_initsend(PvmDataDefault);
+		  	pvm_pklong(&buf, 1, 1);
+		  	pvm_bcast(PEGROUP, PP_FINISH);
+		      } else {
+		  	++PEsTerminated;
+		      }
 
-		    if (PEsTerminated >= nPEs) {
-			broadcast(PEGROUP, PP_FINISH);
-			broadcast(MGRGROUP, PP_FINISH);
-			pvm_lvgroup(PEGROUP);
-			pvm_lvgroup(PECTLGROUP);
-			pvm_lvgroup(MGRGROUP);
-			pvm_exit();
-			EXIT(EXIT_SUCCESS);
-		    }
-		    break;
+		      if (PEsTerminated >= nPEs) {
+		  	broadcast(PEGROUP, PP_FINISH);
+		  	broadcast(MGRGROUP, PP_FINISH);
+		  	pvm_lvgroup(PEGROUP);
+		  	pvm_lvgroup(PECTLGROUP);
+		  	pvm_lvgroup(MGRGROUP);
+		  	pvm_exit();
+		  	EXIT(EXIT_SUCCESS);
+		      }
+		      break;
 
-		case PP_FAIL:
-		    fprintf(stderr, "Fail from %x\n", sender_id);
-		    if (!Finishing) {
-			Finishing = rtsTrue;
-			broadcast(PEGROUP, PP_FAIL);
-		    }
-		    break;
+		  case PP_FAIL:
+		      fprintf(stderr, "Fail from %x\n", sender_id);
+		      if (!Finishing) {
+		  	Finishing = rtsTrue;
+		  	broadcast(PEGROUP, PP_FAIL);
+		      }
+		      break;
 
-		default:
-		    {
-/*		      char *opname = GetOpName(opcode);
-		      fprintf(stderr,"Sysman: Unrecognised opcode %s (%x)\n",
+		  default:
+		      {
+/*		        char *opname = GetOpName(opcode);
+		        fprintf(stderr,"Sysman: Unrecognised opcode %s (%x)\n",
                                      opname,opcode);	*/
-			fprintf(stderr, "Sysman: Unrecognised opcode (%x)\n",
-			  opcode);
-		    }
-		    break;
-		}
+		  	fprintf(stderr, "Sysman: Unrecognised opcode (%x)\n",
+		  	  opcode);
+		      }
+		      break;
+		  }
 	    }
 	}
     }

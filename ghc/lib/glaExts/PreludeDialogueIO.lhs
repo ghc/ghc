@@ -27,6 +27,7 @@ import Prel		( chr, flip )
 import Stdio		( fopen, fclose, fflush, _FILE )
 import Text
 import TyArray		( Array(..) )
+import TyComplex
 import TyIO
 \end{code}
 

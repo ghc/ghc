@@ -52,6 +52,8 @@ import Cls
 import Core
 import List		( (++), map )
 import PreludeDialogueIO ( processIORequest )
+import PS		( _PackedString, _unpackPS )
+import TyComplex
 import TyIO
 import Stdio
 
@@ -73,9 +75,15 @@ type PrimIO a     = _ST _RealWorld a
 
 The usual business:
 \begin{code}
+{-# GENERATE_SPECS returnPrimIO a #-}
 returnPrimIO    :: a -> PrimIO a
+
+{-# GENERATE_SPECS thenPrimIO b #-}
 thenPrimIO      :: PrimIO a -> (a -> PrimIO b) -> PrimIO b
+
+{-# GENERATE_SPECS seqPrimIO b #-}
 seqPrimIO	:: PrimIO a -> PrimIO b -> PrimIO b
+
 fixPrimIO	:: (a -> PrimIO a) -> PrimIO a
 listPrimIO	:: [PrimIO a] -> PrimIO [a]
 mapPrimIO	:: (a -> PrimIO b) -> [a] -> PrimIO [b]
@@ -111,7 +119,9 @@ mapAndUnzipPrimIO f (m:ms)
 \end{code}
 
 \begin{code}
+{-# GENERATE_SPECS unsafePerformPrimIO a #-}
 unsafePerformPrimIO    :: PrimIO a -> a
+
 unsafeInterleavePrimIO :: PrimIO a -> PrimIO a
 
 unsafePerformPrimIO k = case (k (S# realWorld#)) of (r, _) -> r

@@ -13,6 +13,7 @@ import List		( (++) )
 import PreludeGlaST
 import PS		( _PackedString, _unpackPS )
 import TyArray		( Array(..) )
+import TyComplex
 import Text
 \end{code}
 

@@ -20,8 +20,7 @@ import AbsCSyn
 import CgMonad
 
 import AbsUniType	( getTyConDataCons, kindFromType,
-    	    	    	  maybeIntLikeTyCon,
-			  mkSpecTyCon, isLocalSpecTyCon,
+    	    	    	  maybeIntLikeTyCon, mkSpecTyCon,
 			  TyVarTemplate, TyCon, Class,
 			  TauType(..), UniType, ThetaType(..)
 			  IF_ATTACK_PRAGMAS(COMMA cmpTyCon COMMA cmpClass)
@@ -113,7 +112,7 @@ closures predeclared.
 \begin{code}
 genStaticConBits :: CompilationInfo 	-- global info about the compilation
 		 -> [TyCon]		-- tycons to generate
-	  	 -> FiniteMap TyCon [[Maybe UniType]]
+	  	 -> FiniteMap TyCon [(Bool, [Maybe UniType])]
 					-- tycon specialisation info
 		 -> AbstractC		-- output
 
@@ -128,20 +127,22 @@ genStaticConBits comp_info gen_tycons tycon_specs
     -- ToDo: for tycons and specialisations which are not
     --       declared in this module we must ensure that the
     --       C labels are local to this module i.e. static
+    --	     since they may be duplicated in other modules
 
     mkAbstractCs [ gen_for_tycon tc | tc <- gen_tycons ]
       `mkAbsCStmts`
     mkAbstractCs [ mkAbstractCs [ gen_for_spec_tycon tc spec 
-		                | spec <- specs ]
-	         | (tc, specs) <- fmToList tycon_specs,
-		   isLocalSpecTyCon (sw_chkr CompilingPrelude) tc
-		 ]
+		                | (imported_spec, spec) <- specs,
+			          -- no code generated if spec is imported
+			          not imported_spec 
+			        ]		     
+	         | (tc, specs) <- fmToList tycon_specs ]
   where
     gen_for_tycon :: TyCon -> AbstractC
     gen_for_tycon tycon
       = mkAbstractCs (map (genConInfo comp_info tycon) data_cons)
-    	            `mkAbsCStmts` maybe_tycon_vtbl
-
+	  `mkAbsCStmts`
+	maybe_tycon_vtbl
       where
     	data_cons   	= getTyConDataCons tycon
     	tycon_upd_label = mkStdUpdVecTblLabel tycon
@@ -151,13 +152,13 @@ genStaticConBits comp_info gen_tycons tycon_specs
     	    UnvectoredReturn 1 -> CRetUnVector tycon_upd_label
 					(mk_upd_label tycon (head data_cons))
     	    UnvectoredReturn _ -> AbsCNop
-    	    VectoredReturn _ -> CFlatRetVector tycon_upd_label
+    	    VectoredReturn   _ -> CFlatRetVector tycon_upd_label
     	    	    	    	    	(map (mk_upd_label tycon) data_cons)
     ------------------
     gen_for_spec_tycon :: TyCon -> [Maybe UniType] -> AbstractC
 
     gen_for_spec_tycon tycon ty_maybes
-      = mkAbstractCs (map (genConInfo comp_info tycon) spec_data_cons)
+      = mkAbstractCs (map (genConInfo comp_info spec_tycon) spec_data_cons)
 	  `mkAbsCStmts`
         maybe_spec_tycon_vtbl 
       where

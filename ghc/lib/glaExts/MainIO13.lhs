@@ -17,6 +17,8 @@ import List		( (++) )
 import Prel		( (.), not )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyComplex
+import TyArray
 
 mainPrimIO13 :: PrimIO ()
 
@@ -24,7 +26,7 @@ mainPrimIO13 s
   = case (main s) of { (result, s2@(S# _)) ->
     case result   of
       Right ()  -> ( (), s2 )
-      Left  err -> error ("I/O error: "++shows err "\n")
+      Left  err -> error ("I/O error: "++showsPrec 0 err "\n")
     }
 \end{code}
 

@@ -66,37 +66,6 @@ collectTopLevelBinders (BindWith b _) = collectBinders b
 collectTopLevelBinders (ThenBinds b1 b2) 
  = (collectTopLevelBinders b1) ++ (collectTopLevelBinders b2)
 
-{- --------- DO THIS WHEN VarMonoBind binds a "name" rather than a "Id"
-
-collectBinders :: Bind name (InPat name) -> [name]
-collectBinders = collectGenericBinders collectPatBinders
-collectTypedBinders :: TypecheckedBind -> TypecheckedPat -> [name]
-collectTypedBinders = collectGenericBinders collectTypedPatBinders
-
-collectGenericBinders :: (pat -> [name]) -> Bind name pat -> [name]
-collectGenericBinders pat_fn EmptyBind = []
-collectGenericBinders pat_fn (NonRecBind monobinds)	
- = collectGenericMonoBinders pat_fn monobinds
-collectGenericBinders pat_fn (RecBind monobinds)	
- = collectGenericMonoBinders pat_fn monobinds
-
-collectMonoBinders :: MonoBinds name (InPat name) -> [name]
-collectMonoBinders = collectGenericMonoBinders collectPatBinders
-
-
-collectGenericMonoBinders :: (pat -> [name]) -> MonoBinds name pat -> [name]
-collectGenericMonoBinders pat_fn EmptyMonoBinds = []
-collectGenericMonoBinders pat_fn (AndMonoBinds bs1 bs2)
- = (collectGenericMonoBinders pat_fn bs1) ++ (collectGenericMonoBinders pat_fn bs2)
-collectGenericMonoBinders pat_fn (PatMonoBind pat grhss_w_binds locn) 
- = pat_fn pat
-collectGenericMonoBinders pat_fn (FunMonoBind f matches locn) = [f]
-collectGenericMonoBinders pat_fn (VarMonoBind v expr) = [v]
-
------------------- -}
-
--- ------- UNTIL THEN, WE DUPLICATE CODE -----------}
-
 collectBinders :: Bind name (InPat name) -> [name]
 collectBinders EmptyBind 	      = []
 collectBinders (NonRecBind monobinds) = collectMonoBinders monobinds
@@ -122,8 +91,6 @@ collectTypedMonoBinders (FunMonoBind f matches _)	  = [f]
 collectTypedMonoBinders (VarMonoBind v expr) 	          = [v]
 collectTypedMonoBinders (AndMonoBinds bs1 bs2)
  = (collectTypedMonoBinders bs1) ++ (collectTypedMonoBinders bs2)
-
--- ---------- END OF DUPLICATED CODE
 
 -- We'd like the binders -- and where they came from --
 -- so we can make new ones with equally-useful origin info.

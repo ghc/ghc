@@ -24,13 +24,13 @@ import TcMonadFns	( newDicts, newMethod, newLocalWithGivenTy,
 			  applyTcSubstAndCollectTyVars
 			)
 import AbsSyn		-- the stuff being typechecked
-
+import AbsPrel		( pAT_ERROR_ID )
 import AbsUniType
 import BackSubst	( applyTcSubstToBinds )
 import Bag		( emptyBag, unitBag, unionBags, bagToList )
 import CE		( lookupCE, CE(..) )
 import CmdLineOpts	( GlobalSwitch(..) )
-import GenSpecEtc	( checkSigTyVars )
+import GenSpecEtc	( checkSigTyVars, SignatureInfo )
 import E		( mkE, getE_CE, getE_TCE, growE_LVE, tvOfE, LVE(..), E )
 import Errors		( dupInstErr, derivingWhenInstanceExistsErr,
 			  preludeInstanceErr, nonBoxedPrimCCallErr,
@@ -45,12 +45,14 @@ import InstEnv
 import Maybes		( catMaybes, mkLookupFun, maybeToBool, Maybe(..) )
 import Name		( getTagFromClassOpName )
 import NameTypes	( fromPrelude )
+import PlainCore	( escErrorMsg )
 import LIE		( nullLIE, mkLIE, unMkLIE, plusLIE, LIE )
 import ListSetOps	( minusList )
 import TCE		( TCE(..), UniqFM )
 import TVE		( mkTVE, TVE(..) )
 import Spec		( specTy )
 import TcContext	( tcContext )
+import TcBinds		( tcSigs, doSpecPragma )
 import TcGRHSs		( tcGRHSsAndBinds )
 import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcInstanceType )
@@ -93,7 +95,7 @@ data InstInfo
       FAST_STRING	-- Name of module where this instance was
 			-- defined.
       SrcLoc		-- Source location assoc'd with this instance's defn
-      [RenamedSig]	-- User pragmas recorded for generating specilaised instances
+      [RenamedSig]	-- User pragmas recorded for generating specialised methods
 \end{code}
 
 
@@ -249,7 +251,7 @@ tcInstDecls1 e ce tce (inst_decl : rest)
 	else
 		-- Make the dfun id and constant-method ids
 	    mkInstanceRelatedIds e
-			from_here pragmas src_loc
+			from_here modname pragmas src_loc
 			clas inst_tyvars inst_ty theta uprags
 				`thenTc` \ (dfun_id, dfun_theta, const_meth_ids) ->
 
@@ -265,7 +267,7 @@ tcInstDecls1 e ce tce (inst_decl : rest)
 Common bit of code shared with @tcDeriving@:
 \begin{code}
 mkInstanceRelatedIds e
-		from_here inst_pragmas locn
+		from_here modname inst_pragmas locn
 		clas 
 		inst_tyvars inst_ty inst_decl_theta uprags
   = getUniqueTc 			`thenNF_Tc` \ uniq -> 
@@ -290,9 +292,12 @@ mkInstanceRelatedIds e
     fixNF_Tc ( \ rec_dfun_id ->
 	babyTcMtoNF_TcM (
 	    tcDictFunPragmas e dfun_ty rec_dfun_id inst_pragmas
-	)			`thenNF_Tc` \ dfun_id_info ->
-
-	returnNF_Tc (mkDictFunId uniq clas inst_ty dfun_ty from_here dfun_id_info)
+	)			`thenNF_Tc` \ dfun_pragma_info ->
+	let
+	    dfun_specenv = mkInstSpecEnv clas inst_ty inst_tyvars dfun_theta
+	    dfun_info = dfun_pragma_info `addInfo` dfun_specenv
+	in
+	returnNF_Tc (mkDictFunId uniq clas inst_ty dfun_ty from_here modname dfun_info)
     ) `thenNF_Tc` \ dfun_id ->
 
 	-- Make the constant-method ids, if there are no type variables involved
@@ -307,7 +312,7 @@ mkInstanceRelatedIds e
               = mkConstMethodId 
                         uniq
                         clas op inst_ty
-                        meth_ty from_here info
+                        meth_ty from_here modname info
               where
 		is_elem = isIn "mkInstanceRelatedIds"
 
@@ -329,7 +334,7 @@ mkInstanceRelatedIds e
 				`thenNF_Tc` \ id_info ->
 
 		    returnNF_Tc (mkConstMethodId u clas op inst_ty meth_ty
-					from_here id_info)
+					from_here modname id_info)
 		)
 	      where
 		tenv    = [(class_tyvar, inst_ty)]
@@ -422,16 +427,30 @@ addClassInstance
 addClassInstance
     (class_inst_env, op_spec_envs) 
     (InstInfo clas inst_tyvars inst_ty inst_decl_theta dfun_theta dfun_id const_meth_ids _ _ _ src_loc _)
-  = 	-- Insert into the class_inst_env first
-    checkMaybeErrTc (addClassInst clas class_inst_env inst_ty dfun_id inst_tyvars dfun_theta src_loc)
-		    dupInstErr		`thenTc` \ class_inst_env' ->
-    let 
-	 -- Adding the classop instances can't fail if the class instance itself didn't
-	 op_spec_envs' = case const_meth_ids of
-			   []    -> op_spec_envs
-			   other -> zipWith add_const_meth op_spec_envs const_meth_ids
-    in
-    returnTc (class_inst_env', op_spec_envs')
+  = getSwitchCheckerTc		`thenNF_Tc` \ sw_chkr ->
+	-- We anly add specialised/overlapped instances
+	-- if we are specialising the overloading
+--
+-- ToDo ... This causes getConstMethodId errors!
+--
+--    if is_plain_instance inst_ty || sw_chkr SpecialiseOverloaded
+--    then
+
+	-- Insert into the class_inst_env first
+	checkMaybeErrTc (addClassInst clas class_inst_env inst_ty dfun_id inst_tyvars dfun_theta src_loc)
+		        dupInstErr		`thenTc` \ class_inst_env' ->
+	let 
+		-- Adding the classop instances can't fail if the class instance itself didn't
+	    op_spec_envs' = case const_meth_ids of
+			      []    -> op_spec_envs
+			      other -> zipWith add_const_meth op_spec_envs const_meth_ids
+    	in
+    	returnTc (class_inst_env', op_spec_envs')
+
+--    else
+--	-- Drop this specialised/overlapped instance
+--	returnTc (class_inst_env, op_spec_envs) 
+
   where
     add_const_meth spec_env meth_id
       = addOneToSpecEnv spec_env (SpecInfo (Just inst_ty:nothings) 1 meth_id)
@@ -444,8 +463,8 @@ addClassInstance
 	--					op x = ...
 	-- then the constant method will be polymorphic in a,b,c, and
 	-- the SpecInfo will need to be elaborated.
-\end{code}
 
+\end{code}
 
 %************************************************************************
 %*									*
@@ -544,7 +563,7 @@ is the @dfun_theta@ below.
 tcInstDecl2
     e free_tyvars 
     (InstInfo clas template_tyvars inst_ty_tmpl inst_decl_theta dfun_theta
-	      dfun_id const_meth_ids monobinds True{-from here-} _ locn _)
+	      dfun_id const_meth_ids monobinds True{-from here-} inst_mod locn uprags)
   = let
 	origin = InstanceDeclOrigin locn
     in
@@ -573,7 +592,7 @@ tcInstDecl2
     newDicts origin dfun_theta'			`thenNF_Tc` \ dfun_arg_dicts' ->
     newDicts origin inst_decl_theta'		`thenNF_Tc` \ inst_decl_dicts' ->
     let
-	sc_dicts'_ids        = map mkInstId sc_dicts'
+	sc_dicts'_ids       = map mkInstId sc_dicts'
 	dfun_arg_dicts'_ids = map mkInstId dfun_arg_dicts'
     in
 	-- Instantiate the dictionary being constructed 
@@ -597,15 +616,24 @@ tcInstDecl2
 	    method_insts	++
 	    dfun_arg_dicts'
     in
-    processInstBinds e free_tyvars
-	 (makeInstanceDeclDefaultMethodExpr origin this_dict_id class_ops defm_ids inst_ty)
-	 inst_tyvars avail_insts method_ids monobinds
+    getSwitchCheckerTc			`thenNF_Tc` \ sw_chkr ->
+    let
+	mk_method_expr
+	  = if sw_chkr OmitDefaultInstanceMethods then
+		makeInstanceDeclNoDefaultExpr origin clas method_ids defm_ids inst_mod inst_ty
+	    else
+		makeInstanceDeclDefaultMethodExpr origin this_dict_id class_ops defm_ids inst_ty
+    in
+    processInstBinds e free_tyvars mk_method_expr
+	inst_tyvars avail_insts method_ids monobinds
 					 `thenTc` \ (insts_needed, method_mbinds) ->
-	 -- Complete the binding group
-    let this_dict_bind
+    let
+	-- Create the dict and method binds
+	dict_bind
 	    = VarMonoBind this_dict_id (Dictionary sc_dicts'_ids method_ids)
+
 	dict_and_method_binds
-	    = this_dict_bind `AndMonoBinds` method_mbinds
+	    = dict_bind `AndMonoBinds` method_mbinds
     in
 	-- Check the overloading constraints of the methods and superclasses
 	-- The global tyvars must be a fixed point of the substitution
@@ -633,9 +661,24 @@ tcInstDecl2
 						 `thenTc_`
 						-- Ignore the result; we're only doing
 						-- this to make sure it can be done.
-   
-	-- Create the dictionary function binding itself
-    let inst_binds
+
+	-- Now process any SPECIALIZE pragmas for the methods
+    let
+	spec_sigs = [ s | s@(SpecSig _ _ _ _) <- uprags ]
+
+	get_const_method_id name
+	  = const_meth_ids !! ((getTagFromClassOpName name) - 1)
+    in
+    tcSigs e [] spec_sigs		`thenTc` \ sig_info ->
+
+    mapAndUnzipTc (doSpecPragma e get_const_method_id) sig_info
+					`thenTc` \ (spec_binds_s, spec_lie_s) ->
+    let 
+	spec_lie   = foldr plusLIE nullLIE spec_lie_s
+	spec_binds = foldr AndMonoBinds EmptyMonoBinds spec_binds_s
+
+	-- Complete the binding group, adding any spec_binds
+        inst_binds
 	  = AbsBinds 
 		 inst_tyvars
 		 dfun_arg_dicts'_ids
@@ -643,12 +686,15 @@ tcInstDecl2
 			-- const_meth_ids will often be empty
 		 super_binds
 		 (RecBind dict_and_method_binds)
+	    
+	    `ThenBinds`
+	    SingleBind (NonRecBind spec_binds)
     in
-
 	 -- Back-substitute
     applyTcSubstToBinds inst_binds `thenNF_Tc` \ final_inst_binds ->
 
-    returnTc (mkLIE const_insts, final_inst_binds)
+    returnTc (mkLIE const_insts `plusLIE` spec_lie,
+	      final_inst_binds)
     )))
 \end{code}
 
@@ -740,6 +786,49 @@ makeInstanceDeclDefaultMethodExpr origin this_dict_id class_ops defm_ids inst_ty
     idx	     = tag - 1
     class_op = class_ops !! idx
     defm_id  = defm_ids  !! idx
+
+
+makeInstanceDeclNoDefaultExpr
+	:: InstOrigin
+	-> Class
+	-> [Id]
+	-> [Id]
+	-> FAST_STRING
+	-> UniType
+	-> Int
+	-> NF_TcM TypecheckedExpr
+	
+makeInstanceDeclNoDefaultExpr origin clas method_ids defm_ids inst_mod inst_ty tag
+  = specTy origin (getIdUniType method_id) `thenNF_Tc` \ (tyvars, dicts, tau) ->
+
+    (if not err_defm then
+	 pprTrace "Warning: "
+	 (ppCat [ppStr "Omitted default method for",
+		 ppr PprForUser clas_op, ppStr "in instance",
+		 ppPStr clas_name, pprParendUniType PprForUser inst_ty])
+    else id) (
+
+    returnNF_Tc (mkTyLam tyvars (
+		 mkDictLam (map mkInstId dicts) (
+		 App (mkTyApp (Var pAT_ERROR_ID) [tau])
+		     (Lit (StringLit (_PK_ error_msg))))))
+    )
+  where
+    idx	      = tag - 1
+    clas_op   = (getClassOps clas) !! idx
+    method_id = method_ids  !! idx
+    defm_id   = defm_ids  !! idx
+
+    Just (_, _, err_defm) = isDefaultMethodId_maybe defm_id
+
+    error_msg = "%E" 	-- => No explicit method for \"
+	     	++ escErrorMsg error_str
+
+    error_str = _UNPK_ inst_mod ++ "." ++ _UNPK_ clas_name ++ "."
+	     	++ (ppShow 80 (ppr PprForUser inst_ty)) ++ "."
+	     	++ (ppShow 80 (ppr PprForUser clas_op))	++ "\""
+
+    (_, clas_name) = getOrigName clas
 \end{code}
 
 
@@ -1006,11 +1095,11 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (InstSpecSig class_name ty src_loc
     babyTcMtoTcM (tcInstanceType ce tce tmpl_e True src_loc ty)
 				`thenTc` \ inst_ty ->
     let
-	tycon = case getUniDataTyCon_maybe inst_ty of 
-		     Just (tc,_,_) -> tc
-		     Nothing 	   -> panic "tcSpecInstSig:inst_tycon"
+	maybe_tycon = case getUniDataTyCon_maybe inst_ty of 
+		         Just (tc,_,_) -> Just tc
+		         Nothing       -> Nothing
 
-	maybe_unspec_inst = lookup_unspec_inst clas tycon inst_infos 
+	maybe_unspec_inst = lookup_unspec_inst clas maybe_tycon inst_infos 
     in
 	-- Check that we have a local instance declaration to specialise
     checkMaybeTc maybe_unspec_inst
@@ -1040,23 +1129,23 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (InstSpecSig class_name ty src_loc
 	tv_tmpl_map = inst_tv_tys `zipEqual` inst_tmpl_tys
 	tv_to_tmpl tv = assoc "tcSpecInstSig" tv_tmpl_map tv
     in
-    mkInstanceRelatedIds e True{-from here-} NoInstancePragmas src_loc
+    mkInstanceRelatedIds e True{-from here-} mod NoInstancePragmas src_loc
 			 clas inst_tmpls inst_ty simpl_theta uprag
 				`thenTc` \ (dfun_id, dfun_theta, const_meth_ids) ->
 
     getSwitchCheckerTc		`thenNF_Tc` \ sw_chkr ->
     (if sw_chkr SpecialiseTrace then
 	pprTrace "Specialised Instance: "
-	         (ppAboves [ppCat [if null simpl_theta then ppNil else ppr PprDebug simpl_theta,
-				   if null simpl_theta then ppNil else ppStr "=>",
-				   ppr PprDebug clas,
-				   pprParendUniType PprDebug inst_ty],
-			    ppCat [ppStr "        derived from:",
-				   if null unspec_theta then ppNil else ppr PprDebug unspec_theta,
-				   if null unspec_theta then ppNil else ppStr "=>",
-				   ppr PprDebug clas,
-				   pprParendUniType PprDebug unspec_inst_ty]])
-     else id) (
+	(ppAboves [ppCat [if null simpl_theta then ppNil else ppr PprDebug simpl_theta,
+			  if null simpl_theta then ppNil else ppStr "=>",
+			  ppr PprDebug clas,
+			  pprParendUniType PprDebug inst_ty],
+		   ppCat [ppStr "        derived from:",
+			  if null unspec_theta then ppNil else ppr PprDebug unspec_theta,
+			  if null unspec_theta then ppNil else ppStr "=>",
+			  ppr PprDebug clas,
+			  pprParendUniType PprDebug unspec_inst_ty]])
+    else id) (
 
     returnTc (unitBag (InstInfo clas inst_tmpls inst_ty simpl_theta
 			        dfun_theta dfun_id const_meth_ids
@@ -1064,16 +1153,30 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (InstSpecSig class_name ty src_loc
     )))
 
 
-lookup_unspec_inst clas tycon inst_infos
-  = case filter match_info (bagToList inst_infos) of
+lookup_unspec_inst clas maybe_tycon inst_infos
+  = case filter (match_info match_inst_ty) (bagToList inst_infos) of
 	[]       -> Nothing
 	(info:_) -> Just info
   where
-    match_info (InstInfo inst_clas _ inst_ty _ _ _ _ _ from_here _ _ _)
-      = from_here && clas == inst_clas && inst_ty_matches_tycon
-      where
-        inst_ty_matches_tycon = case (getUniDataTyCon_maybe inst_ty) of
-	  Just (inst_tc,tys,_) -> tycon == inst_tc && all isTyVarTemplateTy tys
-	  Nothing              -> False
+    match_info match_ty (InstInfo inst_clas _ inst_ty _ _ _ _ _ from_here _ _ _)
+      = from_here && clas == inst_clas &&
+        match_ty inst_ty && is_plain_instance inst_ty
 
+    match_inst_ty = case maybe_tycon of
+		      Just tycon -> match_tycon tycon
+		      Nothing    -> match_fun
+
+    match_tycon tycon inst_ty = case (getUniDataTyCon_maybe inst_ty) of
+	  Just (inst_tc,_,_) -> tycon == inst_tc
+	  Nothing            -> False
+
+    match_fun inst_ty = isFunType inst_ty
+
+
+is_plain_instance inst_ty
+  = case (getUniDataTyCon_maybe inst_ty) of
+      Just (_,tys,_) -> all isTyVarTemplateTy tys
+      Nothing	     -> case maybeUnpackFunTy inst_ty of
+			  Just (arg, res) -> isTyVarTemplateTy arg && isTyVarTemplateTy res
+			  Nothing	  -> error "TcInstDecls:is_plain_instance"
 \end{code}

@@ -1,6 +1,6 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeArray where
-import PreludeBuiltin(List(..), Tuple2)
+import PreludeBuiltin(Double(..), Int(..), List(..), Tuple2)
 import PreludeCore(Eq(..), Ix(..), Ord(..), Text(..))
 data Array a b 	{-# GHC_PRAGMA _Array (a, a) (Array# b) #-}
 data Assoc a b 	{-# GHC_PRAGMA (:=) a b #-}
@@ -38,8 +38,20 @@ instance (Ix a, Ord b) => Ord (Array a b)
 	{-# GHC_PRAGMA _M_ PreludeArray {-dfun-} _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 instance (Ord a, Ord b) => Ord (Assoc a b)
 	{-# GHC_PRAGMA _M_ PreludeArray {-dfun-} _A_ 3 _U_ 112 _N_ _N_ _N_ _N_ #-}
+instance Text (Array (Int, Int) Double)
+	{-# GHC_PRAGMA _M_ PreludeArray {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Array (Int, Int) Double, [Char])]), (Int -> Array (Int, Int) Double -> [Char] -> [Char]), ([Char] -> [([Array (Int, Int) Double], [Char])]), ([Array (Int, Int) Double] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Array (Int, Int) Double), _CONSTM_ Text showsPrec (Array (Int, Int) Double), _CONSTM_ Text readList (Array (Int, Int) Double), _CONSTM_ Text showList (Array (Int, Int) Double)] _N_
+	 readsPrec = { _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 showsPrec = { _A_ 2 _U_ 122 _N_ _N_ _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ } #-}
 instance (Ix a, Text a, Text b) => Text (Array a b)
 	{-# GHC_PRAGMA _M_ PreludeArray {-dfun-} _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
+instance Text (Array Int Double)
+	{-# GHC_PRAGMA _M_ PreludeArray {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Array Int Double, [Char])]), (Int -> Array Int Double -> [Char] -> [Char]), ([Char] -> [([Array Int Double], [Char])]), ([Array Int Double] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Array Int Double), _CONSTM_ Text showsPrec (Array Int Double), _CONSTM_ Text readList (Array Int Double), _CONSTM_ Text showList (Array Int Double)] _N_
+	 readsPrec = { _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ },
+	 showsPrec = { _A_ 2 _U_ 122 _N_ _N_ _N_ _N_ },
+	 readList = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ },
+	 showList = { _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ } #-}
 instance (Text a, Text b) => Text (Assoc a b)
 	{-# GHC_PRAGMA _M_ PreludeArray {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 

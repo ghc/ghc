@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeComplex where
-data Complex a   = (:+) a a
+data Complex a   = (:+) a a 	{-# GHC_PRAGMA _SPECIALISE_ [ Double# ] #-}
 

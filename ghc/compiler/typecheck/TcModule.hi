@@ -61,5 +61,5 @@ type TCE = UniqFM TyCon
 data InstInfo 
 data TcResult a 
 data UniqFM a 
-tcModule :: E -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> Module Name (InPat Name) -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ((Binds Id TypecheckedPat, Binds Id TypecheckedPat, Binds Id TypecheckedPat, [(Inst, Expr Id TypecheckedPat)]), ([FixityDecl Name], [Id], UniqFM Class, UniqFM TyCon, Bag InstInfo), FiniteMap TyCon [[Labda UniType]], E, PprStyle -> Int -> Bool -> PrettyRep)
+tcModule :: E -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> Module Name (InPat Name) -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ((Binds Id TypecheckedPat, Binds Id TypecheckedPat, Binds Id TypecheckedPat, [(Inst, Expr Id TypecheckedPat)]), ([FixityDecl Name], [Id], UniqFM Class, UniqFM TyCon, Bag InstInfo), FiniteMap TyCon [(Bool, [Labda UniType])], E, PprStyle -> Int -> Bool -> PrettyRep)
 

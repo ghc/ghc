@@ -22,7 +22,7 @@ import AbsSyn
 import Errors		( dupNamesErr, Error(..) )
 import HsCore		-- ****** NEED TO SEE CONSTRUCTORS ******
 import HsPragmas	-- ****** NEED TO SEE CONSTRUCTORS ******
-import HsTypes		( pprParendMonoType )
+import HsTypes		( cmpMonoType, pprParendMonoType )
 import IdInfo		( DeforestInfo(..) )
 import Maybes		( Maybe(..) )
 import ProtoName
@@ -247,10 +247,14 @@ chooser_TyData wout pragmas1 locn1 td1@(TyData _ name1 _ cons1 _ _ _)
     -- ToDo: Should we use selByBetterName ???
     -- ToDo: Report errors properly and recover quietly ???
 
+    -- ToDo: Should we merge specialisations ???
+
     eq_data_specs [] [] = True
     eq_data_specs (spec1:specs1) (spec2:specs2)
       = eq_spec spec1 spec2 && eq_data_specs specs1 specs2
     eq_data_specs _  _  = False
+
+    eq_spec spec1 spec2 = case cmp_spec spec1 spec2 of { EQ_ -> True; _ -> False}
 
     ppr_data_specs specs
       = ppBesides [ppStr "_SPECIALISE_ ", pp_the_list [
@@ -656,6 +660,9 @@ selNamePragmaPairs ((name1, prags1) : pairs1) loc1
 	returnRn12 ( (name1, new_prags) : rest )
 \end{code}
 
+For specialisations we merge the lists from each Sig. This allows the user to
+declare specialised prelude functions in their own PreludeSpec module.
+
 \begin{code}
 selSpecialisations
 	:: [([Maybe ProtoNameMonoType], Int, ProtoNameGenPragmas)] -> SrcLoc
@@ -666,24 +673,33 @@ selSpecialisations [] _ [] _ = returnRn12 []
 selSpecialisations [] _ bs _ = returnRn12 bs -- arguable ... ToDo?
 selSpecialisations as _ [] _ = returnRn12 as -- ditto
 
-selSpecialisations ((spec1, dicts1, prags1) : specs1) loc1
-		   ((spec2, dicts2, prags2) : specs2) loc2
+selSpecialisations all_specs1@((spec1, dicts1, prags1) : rest_specs1) loc1
+		   all_specs2@((spec2, dicts2, prags2) : rest_specs2) loc2
 
-  = if not (eq_spec spec1 spec2) || dicts1 /= dicts2 then
-	-- msg of any kind??? ToDo
-	pRAGMA_ERROR "specialisation pragmas" specs1
-    else
-	recoverQuietlyRn12 NoGenPragmas (
-	    selGenPragmas prags1 loc1 prags2 loc2
-	)				`thenRn12` \ new_prags ->
-    	selSpecialisations specs1 loc1 specs2 loc2
+  = case (cmp_spec spec1 spec2) of
+	 LT_ -> selSpecialisations rest_specs1 loc1 all_specs2 loc2
 					`thenRn12` \ rest ->
-    	returnRn12 ( (spec1, dicts1, new_prags) : rest )
+    		returnRn12 ( (spec1, dicts1, prags1) : rest )
 
-eq_spec [] []			  = True
-eq_spec (Nothing:xs) (Nothing:ys) = eq_spec xs ys
-eq_spec (Just t1:xs) (Just t2:ys) = eqMonoType t1 t2 && eq_spec xs ys
-eq_spec _  _ 		 	  = False
+	 EQ_ -> ASSERT(dicts1 == dicts2)
+	       	recoverQuietlyRn12 NoGenPragmas (
+	    	    selGenPragmas prags1 loc1 prags2 loc2
+	        )			`thenRn12` \ new_prags ->
+    	        selSpecialisations rest_specs1 loc1 rest_specs2 loc2
+					`thenRn12` \ rest ->
+    		returnRn12 ( (spec1, dicts1, new_prags) : rest )
+
+	 GT_ -> selSpecialisations all_specs1 loc1 rest_specs2 loc2
+					`thenRn12` \ rest ->
+    		returnRn12 ( (spec2, dicts2, prags2) : rest )
+
+cmp_spec [] []			   = EQ_
+cmp_spec (Nothing:xs) (Nothing:ys) = cmp_spec xs ys
+cmp_spec (Just t1:xs) (Just t2:ys) = case cmpMonoType cmpProtoName t1 t2 of
+					EQ_ -> cmp_spec xs ys
+					xxx -> xxx
+cmp_spec (Nothing:xs) (Just t2:ys) = LT_
+cmp_spec (Just t1:xs) (Nothing:ys) = GT_
 \end{code}
 
 %************************************************************************

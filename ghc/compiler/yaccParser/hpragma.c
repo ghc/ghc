@@ -200,52 +200,6 @@ list *Rgprag_constms(t)
 	return(& t -> Xgprag_constms);
 }
 
-/************** iinst_spec_pragma ******************/
-
-hpragma mkiinst_spec_pragma(PPgprag_imod_spec, PPgprag_dfun_spec, PPgprag_inst_specs)
- stringId PPgprag_imod_spec;
- hpragma PPgprag_dfun_spec;
- list PPgprag_inst_specs;
-{
-	register struct Siinst_spec_pragma *pp =
-		(struct Siinst_spec_pragma *) malloc(sizeof(struct Siinst_spec_pragma));
-	pp -> tag = iinst_spec_pragma;
-	pp -> Xgprag_imod_spec = PPgprag_imod_spec;
-	pp -> Xgprag_dfun_spec = PPgprag_dfun_spec;
-	pp -> Xgprag_inst_specs = PPgprag_inst_specs;
-	return((hpragma)pp);
-}
-
-stringId *Rgprag_imod_spec(t)
- struct Siinst_spec_pragma *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_spec_pragma)
-		fprintf(stderr,"gprag_imod_spec: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_imod_spec);
-}
-
-hpragma *Rgprag_dfun_spec(t)
- struct Siinst_spec_pragma *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_spec_pragma)
-		fprintf(stderr,"gprag_dfun_spec: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_dfun_spec);
-}
-
-list *Rgprag_inst_specs(t)
- struct Siinst_spec_pragma *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_spec_pragma)
-		fprintf(stderr,"gprag_inst_specs: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_specs);
-}
-
 /************** igen_pragma ******************/
 
 hpragma mkigen_pragma(PPgprag_arity, PPgprag_update, PPgprag_deforest, PPgprag_strictness, PPgprag_unfolding, PPgprag_specs)
@@ -618,64 +572,6 @@ hpragma *Rgprag_type_pr3(t)
 		fprintf(stderr,"gprag_type_pr3: illegal selection; was %d\n", t -> tag);
 #endif /* UGEN_DEBUG */
 	return(& t -> Xgprag_type_pr3);
-}
-
-/************** iinst_pragma_3s ******************/
-
-hpragma mkiinst_pragma_3s(PPgprag_inst_pt1, PPgprag_inst_pt2, PPgprag_inst_pt3, PPgprag_inst_pt4)
- list PPgprag_inst_pt1;
- numId PPgprag_inst_pt2;
- hpragma PPgprag_inst_pt3;
- list PPgprag_inst_pt4;
-{
-	register struct Siinst_pragma_3s *pp =
-		(struct Siinst_pragma_3s *) malloc(sizeof(struct Siinst_pragma_3s));
-	pp -> tag = iinst_pragma_3s;
-	pp -> Xgprag_inst_pt1 = PPgprag_inst_pt1;
-	pp -> Xgprag_inst_pt2 = PPgprag_inst_pt2;
-	pp -> Xgprag_inst_pt3 = PPgprag_inst_pt3;
-	pp -> Xgprag_inst_pt4 = PPgprag_inst_pt4;
-	return((hpragma)pp);
-}
-
-list *Rgprag_inst_pt1(t)
- struct Siinst_pragma_3s *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt1: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt1);
-}
-
-numId *Rgprag_inst_pt2(t)
- struct Siinst_pragma_3s *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt2: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt2);
-}
-
-hpragma *Rgprag_inst_pt3(t)
- struct Siinst_pragma_3s *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt3: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt3);
-}
-
-list *Rgprag_inst_pt4(t)
- struct Siinst_pragma_3s *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != iinst_pragma_3s)
-		fprintf(stderr,"gprag_inst_pt4: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgprag_inst_pt4);
 }
 
 /************** idata_pragma_4s ******************/

@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeGlaMisc where
 import PreludeBuiltin(Int(..), Tuple0, Tuple2, _Addr(..), _RealWorld(..), _State(..))
 import PreludeCore(Bool(..), Eq(..))
@@ -18,6 +18,6 @@ performGC :: _State _RealWorld -> ((), _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _ALWAYS_ \ (u0 :: _State _RealWorld) -> case u0 of { _ALG_ S# (u1 :: State# _RealWorld) -> case _#_ (_ccall_GC_ StgPerformGarbageCollection { [(State# _RealWorld)] (_State _RealWorld) }) [] [u1] of { _ALG_ S# (u2 :: State# _RealWorld) -> let {(u3 :: _State _RealWorld) = _!_ S# [_RealWorld] [u2]} in _!_ _TUP_2 [(), (_State _RealWorld)] [_TUP_0, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
 instance Eq _MallocPtr
 	{-# GHC_PRAGMA _M_ PreludeGlaMisc {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(_MallocPtr -> _MallocPtr -> Bool), (_MallocPtr -> _MallocPtr -> Bool)] [_ORIG_ PreludeGlaMisc eqMallocPtr, _CONSTM_ Eq (/=) (_MallocPtr)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeGlaMisc eqMallocPtr _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	 (==) = { _A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeGlaMisc eqMallocPtr _N_ },
+	 (/=) = { _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 

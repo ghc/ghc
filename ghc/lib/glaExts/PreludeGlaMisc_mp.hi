@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeGlaMisc where
 import PreludeBuiltin(Int(..), _Addr(..))
 addr2Int :: _Addr -> Int

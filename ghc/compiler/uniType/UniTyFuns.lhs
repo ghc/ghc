@@ -1440,10 +1440,10 @@ ppr_tau_ty sty@(PprInterface _) lookup_fn ctxt_prec (UniDict clas ty)
   = ppCat [ppr PprForUser clas, ppr_ty sty lookup_fn tYCON_PREC ty]
 
 ppr_tau_ty sty lookup_fn ctxt_prec (UniSyn _ _ expansion)
+  -- Expand type synonyms unless PprForUser
+  -- NB: it is important that synonyms are expanded with PprInterface
   | case sty of { PprForUser -> False; _ -> True }
- = ppr_tau_ty sty lookup_fn ctxt_prec expansion -- always expand types in an interface
-
--- .....................
+  = ppr_tau_ty sty lookup_fn ctxt_prec expansion 
 
 ppr_tau_ty sty lookup_fn ctxt_prec (UniTyVarTemplate tyvar) = lookup_fn tyvar
 
@@ -1626,7 +1626,7 @@ pprTyCon sty@(PprInterface sw_chkr) this_tycon@(DataTyCon k n a vs cons deriving
 	  | ty_maybes <- specs ]]
          
     pp_the_list [p]    = p
-    pp_the_list (p:ps) = ppAbove (ppBeside p ppComma) (pp_the_list ps)
+    pp_the_list (p:ps) = ppCat [ppBeside p ppComma, pp_the_list ps]
 
     pp_maybe Nothing   = pp_NONE
     pp_maybe (Just ty) = pprParendUniType sty ty

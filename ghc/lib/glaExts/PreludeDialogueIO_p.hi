@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeDialogueIO where
 import PreludeBuiltin(Char(..), Int(..), List(..), Tuple0, Tuple2, _Addr(..), _RealWorld(..), _State(..))
 import PreludeCore(Bool(..))

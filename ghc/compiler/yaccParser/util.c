@@ -10,11 +10,7 @@
 #include "constants.h"
 #include "utils.h"
 
-#ifndef DPH
-#define PARSER_VERSION "0.26"
-#else
-#define PARSER_VERSION "0.26 -- for Data Parallel Haskell"
-#endif
+#define PARSER_VERSION "0.27"
 
 tree root; 		/* The root of the built syntax tree. */
 list Lnil;
@@ -53,7 +49,7 @@ BOOLEAN ignorePragmas = FALSE;    /* Set if we want to ignore pragmas		   */
    version 0.
 */
 int minAcceptablePragmaVersion = 5;  /* 0.26 or greater ONLY */
-int maxAcceptablePragmaVersion = 5;  /* 0.26+ */
+int maxAcceptablePragmaVersion = 6;  /* 0.28+ */
 int thisIfacePragmaVersion = 0;
 
 static char *input_file_dir; /* The directory where the input file is. */

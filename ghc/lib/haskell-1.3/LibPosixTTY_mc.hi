@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface LibPosixTTY where
 import PreludeArray(_ByteArray)
 import PreludeIOError(IOError13)

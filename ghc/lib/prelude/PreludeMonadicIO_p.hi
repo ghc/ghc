@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeMonadicIO where
 import PreludeBuiltin(Char(..), List(..), Tuple0, Tuple2, _RealWorld(..), _State(..))
 import PreludeCore(Eq(..), Ord(..), Text(..))

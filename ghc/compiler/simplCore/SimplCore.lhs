@@ -78,7 +78,7 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	  -> PprStyle			-- printing style (for debugging only)
 	  -> SplitUniqSupply		-- a name supply
 	  -> [TyCon]			-- local data tycons and tycon specialisations
-	  -> FiniteMap TyCon [[Maybe UniType]]
+	  -> FiniteMap TyCon [(Bool, [Maybe UniType])]
 	  -> [PlainCoreBinding]		-- input...
 	  -> MainIO
 	      ([PlainCoreBinding],	-- results: program, plus...
@@ -104,21 +104,14 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 		`thenMn` \ (processed_binds, _, inline_env, spec_data, simpl_stats) ->
 
         (if  switch_is_on D_simplifier_stats
-         then trace ("Simplifier Stats:\n" ++ showSimplCount simpl_stats) (returnMn ())
+         then writeMn stderr ("\nSimplifier Stats:\n")
+		`thenMn_`
+	      writeMn stderr (showSimplCount simpl_stats)
+		`thenMn_`
+	      writeMn stderr "\n"
          else returnMn ()
-        ) 	`thenMn_`
+        ) `thenMn_`
 
-{- LATER:
-	(if do_dump_core_passes
-	 then trace (unlines (
-		     (nOfThem 78 '-'
-		      : "Core2Core" 
-		      : "+------------------------------+"
-		      : reverse [ " " ++ take (30::Int) (what ++ repeat ' ') ++ "|"
-				       | what <- simpl_whats ])
-		      ++ ["+------------------------------+"]))
-	  else \x -> x)  -- to the end
--}
 	returnMn (processed_binds, inline_env, spec_data)
     ESCC
   where
@@ -126,10 +119,9 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 
     switch_is_on = switchIsOn sw_chkr
 
-    do_dump_core_passes  = switch_is_on D_dump_core_passes -- an Andy flag
     do_verbose_core2core = switch_is_on D_verbose_core2core
 
-    lib_case_threshold -- ToDo: HACK HACK HACK : FIX ME FIX ME FIX ME
+    lib_case_threshold	-- ToDo: HACK HACK HACK : FIX ME FIX ME FIX ME
 			-- Use 4x a known threshold
       = case (intSwitchSet sw_chkr UnfoldingOverrideThreshold) of
 	  Nothing -> 4 * uNFOLDING_USE_THRESHOLD
@@ -148,9 +140,14 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
     	case to_do of
 	  CoreDoSimplify simpl_sw_chkr
 	    -> BSCC("CoreSimplify")
+	       begin_pass ("Simplify" ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
+				         then " (foldr/build)" else "") `thenMn_`
 	       case (simplifyPgm binds sw_chkr simpl_sw_chkr simpl_stats us1) of
 		 (p, it_cnt, simpl_stats2)
-		   -> end_pass us2 p inline_env spec_data simpl_stats2 ("Simplify (" ++ show it_cnt ++ ")")
+		   -> end_pass False us2 p inline_env spec_data simpl_stats2
+			       ("Simplify (" ++ show it_cnt ++ ")" 
+				 ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
+				    then " foldr/build" else "")
 	       ESCC
 
 	  CoreDoFoldrBuildWorkerWrapper
@@ -158,8 +155,10 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	    -> error "ERROR: CoreDoFoldrBuildWorkerWrapper: not built into compiler\n"
 #else
 	    -> BSCC("CoreDoFoldrBuildWorkerWrapper")
-	       end_pass us2 (mkFoldrBuildWW switch_is_on us1 binds) inline_env spec_data simpl_stats "FBWW"
-	       ESCC
+	       begin_pass "FBWW" `thenMn_`
+	       case (mkFoldrBuildWW switch_is_on us1 binds) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FBWW"
+	       } ESCC
 #endif
 
 	  CoreDoFoldrBuildWWAnal
@@ -167,75 +166,67 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	    -> error "ERROR: CoreDoFoldrBuildWWAnal: not built into compiler\n"
 #else
 	    -> BSCC("CoreDoFoldrBuildWWAnal")
-	       end_pass us2 (analFBWW switch_is_on binds) inline_env spec_data simpl_stats "AnalFBWW"
-	       ESCC
+	       begin_pass "AnalFBWW" `thenMn_`
+	       case (analFBWW switch_is_on binds) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AnalFBWW"
+	       } ESCC
 #endif
 
 	  CoreLiberateCase
 	    -> BSCC("LiberateCase")
+	       begin_pass "LiberateCase" `thenMn_`
 	       case (liberateCase lib_case_threshold binds) of { binds2 ->
-		end_pass us2 binds2 inline_env spec_data simpl_stats "LiberateCase"
-	       }
-	       ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "LiberateCase"
+	       } ESCC
 
 	  CoreDoCalcInlinings1	-- avoid inlinings w/ cost-centres
 	    -> BSCC("CoreInlinings1")
+	       begin_pass "CalcInlinings" `thenMn_`
 	       case (calcInlinings False sw_chkr inline_env binds) of { inline_env2 ->
-	       end_pass us2 binds inline_env2 spec_data simpl_stats "Calc Inlinings"
+	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings"
 	       } ESCC
 
 	  CoreDoCalcInlinings2  -- allow inlinings w/ cost-centres
 	    -> BSCC("CoreInlinings2")
+	       begin_pass "CalcInlinings" `thenMn_`
 	       case (calcInlinings True sw_chkr inline_env binds) of { inline_env2 ->
-	       end_pass us2 binds inline_env2 spec_data simpl_stats "Calc Inlinings"
+	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings"
 	       } ESCC
 
 	  CoreDoFloatInwards
 	    -> BSCC("FloatInwards")
-	       end_pass us2 (floatInwards binds) inline_env spec_data simpl_stats "FloatIn"
-	       ESCC
+	       begin_pass "FloatIn" `thenMn_`
+	       case (floatInwards binds) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatIn"
+               } ESCC
 
 	  CoreDoFullLaziness
 	    -> BSCC("CoreFloating")
-	       case (floatOutwards switch_is_on us1 binds) of { p ->
-	       end_pass us2 p inline_env spec_data simpl_stats "FloatOut"
+	       begin_pass "FloatOut" `thenMn_`
+	       case (floatOutwards switch_is_on us1 binds) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatOut"
 	       } ESCC
-
-          CoreDoPrintCore -> 
-            let
-		printed = ppShow 80 (ppr ppr_style binds)
-                strict []     a = a
-                strict (s:ss) a | ord s == 0 = error "0 in output string"
-                                | otherwise = strict ss a
-            in
-	    end_pass us2 (strict printed (trace ("PrintCore:\n" ++ printed) binds)) inline_env spec_data simpl_stats "Print"
-
-{- ANDY:
-          CoreDoHaskPrint -> 
-            let
-		printed = coreToHaskell binds
-                strict []     a = a
-                strict (s:ss) a | ord s == 0 = error "0 in output string"
-                                | otherwise = strict ss a
-            in
-	    strict printed (trace ("PrintCore:\n" ++ printed) binds), inline_env, spec_data, simpl_stats, "PrintHask"
--}
 
 	  CoreDoStaticArgs
 	    -> BSCC("CoreStaticArgs")
-	       end_pass us2 (doStaticArgs binds us1) inline_env spec_data simpl_stats "SAT"
+	       begin_pass "StaticArgs" `thenMn_`
+	       case (doStaticArgs binds us1) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StaticArgs"
 		-- Binds really should be dependency-analysed for static-
 		-- arg transformation... Not to worry, they probably are.
 		-- (I don't think it *dies* if they aren't [WDP 94/04/15])
-	       ESCC
+	       } ESCC
 
 	  CoreDoStrictness
 	    -> BSCC("CoreStranal")
-	       end_pass us2 (saWwTopBinds us1 switch_is_on binds) inline_env spec_data simpl_stats "StrAnal"
-	       ESCC
+	       begin_pass "StrAnal" `thenMn_`
+	       case (saWwTopBinds us1 switch_is_on binds) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StrAnal"
+	       } ESCC
 
 	  CoreDoSpecialising
 	    -> BSCC("Specialise")
+	       begin_pass "Specialise" `thenMn_`
 	       case (specProgram switch_is_on us1 binds spec_data) of {
 		 (p, spec_data2@(SpecData _ spec_noerrs _ _ _
 					  spec_errs spec_warn spec_tyerrs)) ->
@@ -244,7 +235,7 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 		   (if not spec_noerrs || 
 		       (switch_is_on ShowImportSpecs && not (isEmptyBag spec_warn)) then
 			writeMn stderr (ppShow 1000 {-pprCols-}
-			    (pprSpecErrs PprForUser spec_errs spec_warn spec_tyerrs))
+			    (pprSpecErrs module_name spec_errs spec_warn spec_tyerrs))
 			`thenMn_` writeMn stderr "\n"
 		    else
 			returnMn ()) `thenMn_`
@@ -254,7 +245,7 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 		   else
 			returnMn ()) `thenMn_`
 
-		   end_pass us2 p inline_env spec_data2 simpl_stats "Specialise"
+		   end_pass False us2 p inline_env spec_data2 simpl_stats "Specialise"
 	       }
 	       ESCC
 
@@ -263,24 +254,39 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	    -> error "ERROR: CoreDoDeforest: not built into compiler\n"
 #else
             -> BSCC("Deforestation")
-               case (deforestProgram sw_chkr binds us1) of { binds ->
-	       end_pass us2 binds inline_env spec_data simpl_stats "Deforestation"
+               begin_pass "Deforestation" `thenMn_`
+	       case (deforestProgram sw_chkr binds us1) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "Deforestation"
                }
                ESCC
 #endif
  
 	  CoreDoAutoCostCentres
 	    -> BSCC("AutoSCCs")
-	       end_pass us2 (addAutoCostCentres sw_chkr module_name binds) inline_env spec_data simpl_stats "AutoSCCs"
+	       begin_pass "AutoSCCs" `thenMn_`
+	       case (addAutoCostCentres sw_chkr module_name binds) of { binds2 ->
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AutoSCCs"
+	       }
 	       ESCC
+
+          CoreDoPrintCore	-- print result of last pass
+	    -> end_pass True us2 binds inline_env spec_data simpl_stats "Print"
+
 
     -------------------------------------------------
 
-    end_pass us2 binds2 inline_env2
+    begin_pass
+      = if switch_is_on D_show_passes
+	then \ what -> writeMn stderr ("*** Core2Core: "++what++"\n")
+	else \ what -> returnMn ()
+
+    end_pass print us2 binds2 inline_env2
 	     spec_data2@(SpecData spec_done _ _ _ _ _ _ _)
 	     simpl_stats2 what
       = -- report verbosely, if required
-	(if do_verbose_core2core then
+	(if (do_verbose_core2core && not print) ||
+	    (print && not do_verbose_core2core) 
+         then
 	    writeMn stderr ("\n*** "++what++":\n")
 		`thenMn_`
 	    writeMn stderr (ppShow 1000 
@@ -387,18 +393,20 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 
       | rhs_mentions_an_unmentionable
       || (not explicit_INLINE_requested
-          && (guidance_says_don't || guidance_size_just_too_big))
+          && (rhs_looks_like_a_caf || guidance_says_don't || guidance_size_too_big))
       = let
 	    my_my_trace
 	      = if explicit_INLINE_requested
 		&& not (isWrapperId binder) -- these always claim to be INLINEd
 		&& not have_inlining_already
-		then trace  	-- we'd better have a look...
+		then trace  		    -- we'd better have a look...
 		else my_trace
 
 	    which = if scc_s_OK then " (late):" else " (early):"
     	in
-	--pprTrace "giving up on size:" (ppCat [ppr PprDebug binder, ppr PprDebug [rhs_mentions_an_unmentionable, explicit_INLINE_requested, guidance_says_don't, guidance_size_just_too_big]]) (
+	--pprTrace "giving up on size:" (ppCat [ppr PprDebug binder, ppr PprDebug 
+	--	[rhs_mentions_an_unmentionable, explicit_INLINE_requested,
+	--	 rhs_looks_like_a_caf, guidance_says_don't, guidance_size_too_big]]) (
 	my_my_trace ("unfolding disallowed for"++which++(ppShow 80 (ppr PprDebug binder))) (
 	ignominious_defeat
 	)
@@ -425,7 +433,7 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
       = glorious_success UnfoldAlways
 #endif      
 
-      | is_recursive && not rhs_looks_like_a_data_val_to_me
+      | is_recursive && not rhs_looks_like_a_data_val
 	-- The only recursive defns we are prepared to tolerate at the
 	-- moment is top-level very-obviously-a-data-value ones.
 	-- We *need* these for dictionaries to be exported!
@@ -454,31 +462,29 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 				then 100000 -- you asked for it, you got it
 				else unfolding_creation_threshold
 
-	guidance_says_don't = case guidance of { UnfoldNever -> True; _ -> False }
-
 	guidance_size
 	  = case guidance of
 	      UnfoldAlways  	    	  -> 0 -- *extremely* small
 	      EssentialUnfolding    	  -> 0 -- ditto
 	      UnfoldIfGoodArgs _ _ _ size -> size
 
-	guidance_size_just_too_big
+	guidance_says_don't = case guidance of { UnfoldNever -> True; _ -> False }
+
+	guidance_size_too_big
 	    -- Does the guidance suggest that this unfolding will
 	    -- be of no use *no matter* the arguments given to it?
 	    -- Could be more sophisticated...
 	  = case guidance of
-	      UnfoldNever   	 -> False -- debugging only (ToDo:rm)
 	      UnfoldAlways  	 -> False
 	      EssentialUnfolding -> False
 	      UnfoldIfGoodArgs _ no_val_args arg_info_vec size
 
 	        -> if explicit_creation_threshold then
-		      False -- user set threshold; don't second-guess...
+		      False 	-- user set threshold; don't second-guess...
 
-		   else if no_val_args == 0 && rhs_looks_like_a_data_val_to_me then
-		      False -- probably a data value; we'd like the
-		      	    -- other guy to see the value, even if
-			    -- s/he doesn't unfold it.
+		   else if no_val_args == 0 && rhs_looks_like_a_data_val then
+		      False	-- we'd like a top-level data constr to be
+				-- visible even if it is never unfolded
 		   else
 		      let
 			  cost
@@ -490,19 +496,16 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 --		      )
 		        
 
-	rhs_arg_tys
-	  = let
-		(_, val_binders, _) = digForLambdas rhs
-	    in
-	    map getIdUniType val_binders
+	rhs_looks_like_a_caf = not (manifestlyWHNF rhs)
 
-	rhs_looks_like_a_data_val_to_me
-	  = let
-		(_,val_binders,body) = digForLambdas rhs
-	    in
-	    case (val_binders, body) of
-	      ([], CoCon _ _ _) -> True
-	      other -> False
+	rhs_looks_like_a_data_val
+	  = case digForLambdas rhs of
+	      (_, [], CoCon _ _ _) -> True
+	      other 		   -> False
+
+	rhs_arg_tys
+	  = case digForLambdas rhs of
+	      (_, val_binders, _) -> map getIdUniType val_binders
 
 	(mentioned_ids, _, _, mentions_litlit)
 	  = mentionedInUnfolding (\x -> x) rhs

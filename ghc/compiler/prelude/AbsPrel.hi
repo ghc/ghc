@@ -11,7 +11,7 @@ import NameTypes(FullName, ShortName)
 import Outputable(NamedThing, Outputable)
 import PlainCore(PlainCoreExpr(..))
 import PrelFuns(gLASGOW_MISC, gLASGOW_ST, pRELUDE, pRELUDE_BUILTIN, pRELUDE_CORE, pRELUDE_IO, pRELUDE_LIST, pRELUDE_PRIMIO, pRELUDE_PS, pRELUDE_RATIO, pRELUDE_TEXT)
-import PrelVals(aBSENT_ERROR_ID, buildId, eRROR_ID, foldlId, foldrId, integerMinusOneId, integerPlusOneId, integerZeroId, mkBuild, mkFoldl, mkFoldr, pAT_ERROR_ID, packStringForCId, realWorldPrimId, unpackCString2Id, unpackCStringAppendId, unpackCStringId, voidPrimId)
+import PrelVals(aBSENT_ERROR_ID, buildId, eRROR_ID, foldlId, foldrId, integerMinusOneId, integerPlusOneId, integerPlusTwoId, integerZeroId, mkBuild, mkFoldl, mkFoldr, pAT_ERROR_ID, packStringForCId, realWorldPrimId, unpackCString2Id, unpackCStringAppendId, unpackCStringId, voidPrimId)
 import PreludePS(_PackedString)
 import Pretty(PprStyle, PrettyRep)
 import PrimKind(PrimKind)
@@ -57,6 +57,7 @@ foldlId :: Id
 foldrId :: Id
 integerMinusOneId :: Id
 integerPlusOneId :: Id
+integerPlusTwoId :: Id
 integerZeroId :: Id
 mkBuild :: UniType -> TyVar -> Id -> Id -> Id -> CoreExpr Id Id -> CoreExpr Id Id
 mkFoldl :: UniType -> UniType -> Id -> Id -> Id -> CoreExpr a Id

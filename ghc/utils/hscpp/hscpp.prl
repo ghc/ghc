@@ -45,21 +45,25 @@ eval "exec perl -S $0 $*"
 #
 # Note: There must be no white space between { }s
 #       Use ( )s around type names when separation is required
-#
 
 $Verbose = 0;
+
+$DoGenSpecs = 0;
+$DoGenSpecsUnboxed = 0;
+@SpecingTypes = ();
+
 while ($#ARGV >= 0 && $ARGV[0] eq '-v' || $ARGV[0] =~ /^-genSPECS/) {
     if ($ARGV[0] eq '-v') {
 	$Verbose = 1;
-    } elsif ( $ARGV[0] eq '-genSPECS0' ) { # do it, but no SpecingString
-	$SpecingString = '';
-	@SpecingTypes = ();
+    } elsif ($ARGV[0] eq '-genSPECS') {
 	$DoGenSpecs = 1;
-    } else {
-	shift(@ARGV);
-	$SpecingString = $ARGV[0];
+    } elsif ($ARGV[0] eq '-genSPECSunboxed') {
+	$DoGenSpecs = 1;
+	$DoGenSpecsUnboxed = 1;
+	$SpecingString = "Char#,Int#,Double#";
 	@SpecingTypes = split(/,/, $SpecingString);
-	$DoGenSpecs = 1;
+    } else {
+	die "hscpp: unrecognised argument: $$ARGV[0]\n";
     }
     shift(@ARGV);
 }
@@ -98,9 +102,11 @@ while (<INPIPE>) {
 # genSPEC processing:
     if ( /^\s*\{-#\s*GENERATE_SPECS/ ) {
 	if ( $DoGenSpecs ) {
+	    $line = $_;
 	    $data_or_inst = 0;
 	    $data_inst_str = "";
 	    $remove_poly = 1;
+            $space = "";
 
 	    if ( /^\s*\{-#\s*GENERATE_SPECS\s+(data)\s+(\S.*)\s*::(.*)#-\}\s*$/ ) {
 		$data_or_inst = 1;
@@ -112,10 +118,10 @@ while (<INPIPE>) {
 		$data_inst_str = $1;
 		$vars = $2;
 		$type = $3;
-	    } elsif ( /^\s*\{-#\s*GENERATE_SPECS\s+(\S+)\s+(.*)\s*#-\}\s*$/ ) {
-	        $line = $_;
-	        $fun  = $1;
-	        $vars = $2;
+	    } elsif ( /^(\s*)\{-#\s*GENERATE_SPECS\s+(\S+)\s+(.*)\s*#-\}\s*$/ ) {
+		$space = $1;
+	        $fun  = $2;
+	        $vars = $3;
 
 	        $tysig = <INPIPE>;
 	        while ( $tysig =~ /^\s*$/ ) {
@@ -138,7 +144,7 @@ while (<INPIPE>) {
 
 		if ( $var =~ /^(\w+)\{(.*)\}$/ ) {
 		    $var = $1;
-		    @specing_types = split(/,/, $2);
+		    @specing_types = &split_types($2);
 		    if ($specing_types[0] eq '~') {
 			shift(@specing_types);
 			@tospec = ();		# remove specs polymorphic in this tyvar
@@ -151,6 +157,11 @@ while (<INPIPE>) {
 		} else {
 		    @specing_types = @SpecingTypes;
 		}
+
+		# If not $DoGenSpecsUnboxed we remove any unboxed types
+		# (i.e. types containing a #) from the specing_types
+
+		@specing_types = grep(!/#/, @specing_types) if ! $DoGenSpecsUnboxed;
 		
 	        foreach $uty (@specing_types) {
 		    @speced = @specing;
@@ -164,14 +175,15 @@ while (<INPIPE>) {
 
             if ($#tospec >= 0) {
 	        $specty = shift(@tospec);
-	        print ($data_or_inst ? "{-# SPECIALIZE $data_inst_str $specty #-}" : "{-# SPECIALIZE $fun :: $specty");
+	        print ($data_or_inst ? "{-# SPECIALIZE $data_inst_str $specty #-}" : "$space{-# SPECIALIZE $fun :: $specty");
 	        while ($#tospec >= 0) {
 	            $specty = shift(@tospec);
 	            print ($data_or_inst ? "; {-# SPECIALIZE $data_inst_str $specty #-}" : ", $specty");
 	        }
 	        print ($data_or_inst ? "\n" : " #-}\n");
 	    } else {
-		print "{-# NO_SPECS_GENERATED ", $data_or_inst ? $specty : $fun, " #-}\n";
+		print "{- NO_SPECS_GENERATED ", $data_or_inst ? $specty : $fun, " -}\n";
+	    	print STDERR "Warning: No specs for GENERATE_SPECS pre-processing pragma:\n  $_";
 	    }
 	    print $tysig if ! $data_or_inst;
 	} else {
@@ -184,3 +196,43 @@ while (<INPIPE>) {
 }
 
 close(INPIPE) || exit(1); # exit is so we reflect any errors.
+
+exit(0);
+
+
+# splits a list of types seperated by ,s but allowing ,s within ()s
+
+
+sub split_types {
+    local($type_str) = @_;
+
+    local(@chars) = split(//,$type_str);
+    local($depth) = 0;
+    local($start) = 0;
+    local($cur) = 0;
+    local($char);
+
+    local(@types) = ();
+
+    while ($char = $chars[$cur]) {
+	if ($char eq ',' && $depth == 0) {
+            push(@types, join('', @chars[$start .. $cur-1])) if ($start < $cur);
+	    $start = $cur+1;
+	} elsif ($char eq '(') {
+	    $depth++;
+	} elsif ($char eq ')') {
+	    $depth--;
+        }
+	$cur++;
+    }
+    if ($depth == 0) {
+	push(@types, join('', @chars[$start .. $cur-1])) if ($start < $cur);
+    } else {
+	print STDERR "Error: GENERATE_SPECS pre-processing pragma has unbalanced ( )s\n$line\n";
+	exit(1);
+    }
+    return(@types);
+}
+
+
+    

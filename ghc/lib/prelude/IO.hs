@@ -6,9 +6,18 @@ module PreludeIO  where
 
 import Cls
 import Core
+import IBool
+import IChar
+import IDouble
+import IInt
+import IInteger
+import IList
+import ITup0
 import List		( (++), foldr )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 import TyIO
 
 -- File and channel names:
@@ -127,8 +136,11 @@ exit err	= appendChan stderr (msg ++ "\n") abort done
 		      			  OtherError s  -> s
 					  EOD		-> "EOD"
 
+{-# GENERATE_SPECS print a{+,(),Bool,Char,Int,Integer,Double,_PackedString,[Char],[Int],[[Char]],[[Int]]} #-} 
 print		:: (Text a) => a -> Dialogue
 print x		=  appendChan stdout (show x) exit done
+
+{-# GENERATE_SPECS prints a{+,(),Bool,Char,Int,Integer,Double,_PackedString,[Char],[Int],[[Char]],[[Int]]} #-} 
 prints          :: (Text a) => a -> String -> Dialogue
 prints x s	=  appendChan stdout (shows x s) exit done
 

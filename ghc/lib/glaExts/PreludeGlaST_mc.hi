@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface PreludeGlaST where
 import PreludeArray(Array(..), _ByteArray(..))
 import PreludeBuiltin(Char(..), Double(..), Float(..), Int(..), List(..), Tuple0, Tuple2, _Addr(..), _RealWorld(..), _State(..))
@@ -30,9 +30,9 @@ fixPrimIO :: (a -> _State _RealWorld -> (a, _State _RealWorld)) -> _State _RealW
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 fixST :: (b -> _State a -> (b, _State a)) -> _State a -> (b, _State a)
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
-forkPrimIO :: (_State _RealWorld -> ((), _State _RealWorld)) -> _State _RealWorld -> ((), _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _TYAPP_  _ORIG_ PreludeGlaST forkST { _RealWorld } _N_ #-}
-forkST :: (_State a -> ((), _State a)) -> _State a -> ((), _State a)
+forkPrimIO :: (_State _RealWorld -> (a, _State _RealWorld)) -> _State _RealWorld -> (a, _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _TYAPP_  _TYAPP_  _ORIG_ PreludeGlaST forkST { _RealWorld } { u0 } _N_ #-}
+forkST :: (_State a -> (b, _State a)) -> _State a -> (b, _State a)
 	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _N_ _N_ _N_ #-}
 freezeAddrArray :: Ix b => _MutableByteArray a b -> _State a -> (_ByteArray b, _State a)
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(U(LL)P)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
@@ -89,7 +89,7 @@ newCharArray :: Ix b => (b, b) -> _State a -> (_MutableByteArray a b, _State a)
 newDoubleArray :: Ix b => (b, b) -> _State a -> (_MutableByteArray a b, _State a)
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(LL)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)U(P))U(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 newFloatArray :: Ix b => (b, b) -> _State a -> (_MutableByteArray a b, _State a)
-	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(LL)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(LL)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)U(P))U(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 newIntArray :: Ix b => (b, b) -> _State a -> (_MutableByteArray a b, _State a)
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(ASLA)U(LL)U(P)" {_A_ 5 _U_ 11222 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ _N_, Int ] 1 { _A_ 2 _U_ 11 _N_ _S_ "U(U(P)U(P))U(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 newVar :: b -> _State a -> (_MutableArray a Int b, _State a)
@@ -174,8 +174,8 @@ writeVar :: _MutableArray b Int a -> a -> _State b -> ((), _State b)
 	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(AP)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Eq _FILE
 	{-# GHC_PRAGMA _M_ Stdio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(_FILE -> _FILE -> Bool), (_FILE -> _FILE -> Bool)] [_CONSTM_ Eq (==) (_FILE), _CONSTM_ Eq (/=) (_FILE)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Addr#) (u1 :: Addr#) -> _#_ eqAddr# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: _FILE) (u1 :: _FILE) -> case u0 of { _ALG_ _ORIG_ Stdio _FILE (u2 :: Addr#) -> case u1 of { _ALG_ _ORIG_ Stdio _FILE (u3 :: Addr#) -> _#_ eqAddr# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Addr#) (u1 :: Addr#) -> case _#_ eqAddr# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 7 \ (u0 :: _FILE) (u1 :: _FILE) -> case u0 of { _ALG_ _ORIG_ Stdio _FILE (u2 :: Addr#) -> case u1 of { _ALG_ _ORIG_ Stdio _FILE (u3 :: Addr#) -> case _#_ eqAddr# [] [u2, u3] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
+	 (==) = { _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: Addr#) (u1 :: Addr#) -> _#_ eqAddr# [] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CC 3 \ (u0 :: _FILE) (u1 :: _FILE) -> case u0 of { _ALG_ _ORIG_ Stdio _FILE (u2 :: Addr#) -> case u1 of { _ALG_ _ORIG_ Stdio _FILE (u3 :: Addr#) -> _#_ eqAddr# [] [u2, u3]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ },
+	 (/=) = { _A_ 2 _U_ 11 _N_ _S_ "U(P)U(P)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Addr#) (u1 :: Addr#) -> case _#_ eqAddr# [] [u0, u1] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 0 2 CC 7 \ (u0 :: _FILE) (u1 :: _FILE) -> case u0 of { _ALG_ _ORIG_ Stdio _FILE (u2 :: Addr#) -> case u1 of { _ALG_ _ORIG_ Stdio _FILE (u3 :: Addr#) -> case _#_ eqAddr# [] [u2, u3] of { _ALG_ True  -> _!_ False [] []; False  -> _!_ True [] []; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ } #-}
 instance _CCallable _FILE
 	{-# GHC_PRAGMA _M_ Stdio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _TUP_0 [] [] _N_ #-}
 instance _CCallable (_ByteArray a)

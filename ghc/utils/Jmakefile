@@ -1,7 +1,6 @@
 #define IHaveSubdirs
 
-SUBDIRS = heap-view	\
-	  hp2ps		\
+SUBDIRS = hp2ps		\
 	  hscpp		\
 	  hstags	\
 	  mkdependHS	\
@@ -9,3 +8,9 @@ SUBDIRS = heap-view	\
 	  stat2resid	\
 	  ugen		\
 	  unlit
+
+/* "heap-view" is not in the list because (a) it requires
+   a Haskell compiler (which you may not have yet), and (b) you are
+   unlikely to want it desperately.  It is easy to build once you have
+   a Haskell compiler and if you want it.
+*/

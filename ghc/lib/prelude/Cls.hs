@@ -9,12 +9,15 @@ module PreludeCore (
 import UTypes
 
 import Core
+import IChar
 import IInt		( Int )
-import IInteger 	( int2Integer, Integer )
+import IInteger 	( __integer1, Integer )
 import List		( takeWhile, (++), foldr )
 import Prel		( (&&), (.), otherwise )
 import PS		( _PackedString, _unpackPS )
 import Text
+import TyArray
+import TyComplex
 
 {- We have to do something unpleasant about overloaded constants
    herein.  Those constants are automagically wrapped in applications
@@ -24,10 +27,8 @@ import Text
    (The builtin class information is "turned off" for compiling this
    file, but that does not help w/ the from{Integer,Rational} Ids,
    which are reached-out-and-grabbed from thin air.
-   
-   We can subvert this process by wrapping the constants in explicit
-   from{Integer,Rational} calls (the ones defined herein).  I have put
-   in a little CPPery, just to reduce typing.
+
+   Instead the overloaded constants are declared in Core.hs
 -}
 
 -- class declarations from PreludeCore
@@ -63,6 +64,8 @@ class  (Eq a, Text a) => Num a  where
 
     x - y 		= x + negate y
     fromInt i		= fromInteger (int2Integer i)
+			where
+			  int2Integer (I# i#) = int2Integer# i#
 					-- Go via the standard class-op if the
 					-- non-standard one ain't provided
 
@@ -89,17 +92,17 @@ class  (Real a, Ix a) => Integral a  where
     n `rem` d	=  r  where (q,r) = quotRem n d
     n `div` d	=  q  where (q,r) = divMod n d
     n `mod` d	=  r  where (q,r) = divMod n d
-    divMod n d 	=  if signum r == - signum d then (q - i1__, r+d) else qr
+    divMod n d 	=  if signum r == - signum d then (q - __i1, r+d) else qr
 			   where qr@(q,r) = quotRem n d
-    even n	=  n `rem` i2__ == i0__
-    odd	 n	=  n `rem` i2__ /= i0__
+    even n	=  n `rem` __i2 == __i0
+    odd	 n	=  n `rem` __i2 /= __i0
 
 class  (Num a) => Fractional a  where
     (/)			:: a -> a -> a
     recip		:: a -> a
     fromRational	:: Rational -> a
 
-    recip x		=  r1__ / x
+    recip x		=  __i1 / x
 
 class  (Fractional a) => Floating a  where
     pi			:: a
@@ -112,7 +115,7 @@ class  (Fractional a) => Floating a  where
 
     x ** y		=  exp (log x * y)
     logBase x y		=  log y / log x
-    sqrt x		=  x ** rhalf__
+    sqrt x		=  x ** __rhalf
     tan  x		=  sin  x / cos  x
     tanh x		=  sinh x / cosh x
 
@@ -121,11 +124,25 @@ class  (Real a, Fractional a) => RealFrac a  where
     truncate, round	:: (Integral b) => a -> b
     ceiling, floor	:: (Integral b) => a -> b
 
-    -- just call the versions in Core.hs
-    truncate x	=  _truncate x
-    round x	=  _round x
-    ceiling x	=  _ceiling x
-    floor x	=  _floor x
+    truncate x	= case properFraction x of
+		     (n,_) -> n
+
+    round x	= case properFraction x of
+		     (n,r) -> let
+			      	m         = if r < __i0 then n - __i1 else n + __i1
+		  	      	half_down = abs r - __rhalf
+    		   	      in
+    		   	      case (_tagCmp half_down __i0) of
+      		     		_LT -> n
+      		     		_EQ -> if even n then n else m
+      		     		_GT -> m
+
+    ceiling x   = case properFraction x of
+		    (n,r) -> if r > __i0 then n + __i1 else n
+
+    floor x	= case properFraction x of
+		    (n,r) -> if r < __i0 then n - __i1 else n
+
 
 class  (RealFrac a, Floating a) => RealFloat a  where
     floatRadix		:: a -> Integer
@@ -137,7 +154,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     significand		:: a -> a
     scaleFloat		:: Int -> a -> a
 
-    exponent x		=  if m == i0__ then i0__ else n + floatDigits x
+    exponent x		=  if m == __i0 then __i0 else n + floatDigits x
 			   where (m,n) = decodeFloat x
 
     significand x	=  encodeFloat m (- (floatDigits x))
@@ -167,30 +184,16 @@ class  Text a  where
     readList  :: ReadS [a]
     showList  :: [a] -> ShowS
 
-    readList	= _readList
-    showList	= _showList
-{-MOVED to Core.hs:
-    readList    = readParen False (\r -> [pr | ("[",s)	<- lex r,
-					       pr	<- readl s])
-		  where readl  s = [([],t)   | ("]",t)  <- lex s] ++
-				   [(x:xs,u) | (x,t)    <- reads s,
-					       (xs,u)   <- readl2 t]
-			readl2 s = [([],t)   | ("]",t)  <- lex s] ++
-				   [(x:xs,v) | (",",t)  <- lex s,
-					       (x,u)    <- reads t,
-					       (xs,v)   <- readl2 u]
-    showList []	= showString "[]"
-    showList (x:xs)
-		= showChar '[' . shows x . showl xs
-		  where showl []     = showChar ']'
-			showl (x:xs) = showString ", " . shows x . showl xs
--}
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0)
 
 -- Well, we've got to put it somewhere...
 
 instance  Text (a -> b)  where
     readsPrec p s  =  error "readsPrec{PreludeCore}: Cannot read functions."
     showsPrec p f  =  showString "<<function>>"
+    readList	   =  _readList (readsPrec 0)
+    showList	   =  _showList (showsPrec 0) 
 
 class  Binary a  where
     readBin		:: Bin -> (a,Bin)

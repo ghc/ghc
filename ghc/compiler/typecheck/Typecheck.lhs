@@ -63,7 +63,7 @@ typecheckModule ::
 	 TCE,
 	 Bag InstInfo),
 
-	FiniteMap TyCon [[Maybe UniType]],
+	FiniteMap TyCon [(Bool, [Maybe UniType])],
 				-- source tycon specialisation requests
 
 --UNUSED:	E,			-- new cumulative E (with everything)

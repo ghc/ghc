@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 6 #-}
 interface Hash where
 import PreludeArray(Array, Assoc)
 import PreludeComplex(Complex)
@@ -7,12 +7,12 @@ import PreludeRatio(Ratio(..))
 class Hashable a where
 	hash :: a -> Int
 	 {-# GHC_PRAGMA {-meth-} _A_ 1 _U_ 12 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 X 1 _/\_ u0 -> \ (u1 :: u0 -> Int) -> u1 _N_
-		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: {{Hashable u0}}) (u2 :: u0) -> _APP_  _TYAPP_  patError# { (u0 -> Int) } [ _NOREP_S_ "%DHash.Hashable.hash\"", u2 ] _N_ #-}
+		{-defm-} _A_ 2 _U_ 02 _N_ _S_ _!_ _N_ _N_ #-}
 hashToMax :: Hashable a => Int -> a -> Int
 	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ #-}
 instance Hashable ()
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (()) _N_
-	 hash = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: ()) -> _!_ I# [] [0#] _N_ #-}
+	 hash = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: ()) -> _!_ I# [] [0#] _N_ } #-}
 instance (Hashable a, Hashable b) => Hashable (a, b)
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 3 _U_ 22 _N_ _S_ "SSS" _N_ _N_ #-}
 instance (Hashable a, Hashable b, Hashable c) => Hashable (a, b, c)
@@ -29,41 +29,41 @@ instance (Hashable a, Hashable b) => Hashable (Assoc a b)
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 3 _U_ 22 _N_ _S_ "SSS" _N_ _N_ #-}
 instance Hashable Bin
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Bin) _N_
-	 hash = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Bin) -> _!_ I# [] [0#] _N_ #-}
+	 hash = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Bin) -> _!_ I# [] [0#] _N_ } #-}
 instance Hashable Bool
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Bool) _N_
-	 hash = _A_ 1 _U_ 1 _N_ _S_ "E" _F_ _IF_ARGS_ 0 1 C 6 \ (u0 :: Bool) -> case u0 of { _ALG_ False  -> _!_ I# [] [0#]; True  -> _!_ I# [] [1#]; _NO_DEFLT_ } _N_ #-}
+	 hash = { _A_ 1 _U_ 1 _N_ _S_ "E" _F_ _IF_ARGS_ 0 1 C 6 \ (u0 :: Bool) -> case u0 of { _ALG_ False  -> _!_ I# [] [0#]; True  -> _!_ I# [] [1#]; _NO_DEFLT_ } _N_ } #-}
 instance Hashable Char
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Char) _N_
-	 hash = _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Char#) -> case _#_ ord# [] [u0] of { _PRIM_ (u1 :: Int#) -> _!_ I# [] [u1] } _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: Char) -> case u0 of { _ALG_ C# (u1 :: Char#) -> case _#_ ord# [] [u1] of { _PRIM_ (u2 :: Int#) -> _!_ I# [] [u2] }; _NO_DEFLT_ } _N_ #-}
+	 hash = { _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Char#) -> case _#_ ord# [] [u0] of { _PRIM_ (u1 :: Int#) -> _!_ I# [] [u1] } _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: Char) -> case u0 of { _ALG_ C# (u1 :: Char#) -> case _#_ ord# [] [u1] of { _PRIM_ (u2 :: Int#) -> _!_ I# [] [u2] }; _NO_DEFLT_ } _N_ } #-}
 instance (RealFloat a, Hashable a) => Hashable (Complex a)
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 3 _U_ 22 _N_ _S_ "LSS" _N_ _N_ #-}
 instance Hashable Double
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 0 _N_ _N_ _N_ _N_ _N_
-	 hash = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
+	 hash = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ } #-}
 instance Hashable Float
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 0 _N_ _N_ _N_ _N_ _N_
-	 hash = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
+	 hash = { _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ } #-}
 instance Hashable IOError
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (IOError) _N_
-	 hash = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: IOError) -> _!_ I# [] [0#] _N_ #-}
+	 hash = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: IOError) -> _!_ I# [] [0#] _N_ } #-}
 instance Hashable Int
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Int) _N_
-	 hash = _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int#) -> _!_ I# [] [u0] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Int) -> u0 _N_ #-}
+	 hash = { _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int#) -> _!_ I# [] [u0] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Int) -> u0 _N_ } #-}
 instance Hashable Integer
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Integer) _N_
-	 hash = _A_ 1 _U_ 1 _N_ _S_ "U(PPP)" {_A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 0 3 XXX 3 \ (u0 :: Int#) (u1 :: Int#) (u2 :: ByteArray#) -> case _#_ integer2Int# [] [u0, u1, u2] of { _PRIM_ (u3 :: Int#) -> _!_ I# [] [u3] } _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: Integer) -> case u0 of { _ALG_ J# (u1 :: Int#) (u2 :: Int#) (u3 :: ByteArray#) -> case _#_ integer2Int# [] [u1, u2, u3] of { _PRIM_ (u4 :: Int#) -> _!_ I# [] [u4] }; _NO_DEFLT_ } _N_ #-}
+	 hash = { _A_ 1 _U_ 1 _N_ _S_ "U(PPP)" {_A_ 3 _U_ 222 _N_ _N_ _F_ _IF_ARGS_ 0 3 XXX 3 \ (u0 :: Int#) (u1 :: Int#) (u2 :: ByteArray#) -> case _#_ integer2Int# [] [u0, u1, u2] of { _PRIM_ (u3 :: Int#) -> _!_ I# [] [u3] } _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: Integer) -> case u0 of { _ALG_ J# (u1 :: Int#) (u2 :: Int#) (u3 :: ByteArray#) -> case _#_ integer2Int# [] [u1, u2, u3] of { _PRIM_ (u4 :: Int#) -> _!_ I# [] [u4] }; _NO_DEFLT_ } _N_ } #-}
 instance (Integral a, Hashable a) => Hashable (Ratio a)
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 3 _U_ 22 _N_ _S_ "LSL" _N_ _N_ #-}
 instance Hashable Request
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Request) _N_
-	 hash = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Request) -> _!_ I# [] [0#] _N_ #-}
+	 hash = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Request) -> _!_ I# [] [0#] _N_ } #-}
 instance Hashable Response
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash (Response) _N_
-	 hash = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Response) -> _!_ I# [] [0#] _N_ #-}
+	 hash = { _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_} _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Response) -> _!_ I# [] [0#] _N_ } #-}
 instance Hashable a => Hashable [a]
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 2 _U_ 2 _N_ _S_ "LS" _N_ _N_ #-}
 instance Hashable [Char]
 	{-# GHC_PRAGMA _M_ Hash {-dfun-} _A_ 1 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Hashable hash ([Char]) _N_
-	 hash = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
+	 hash = { _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ } #-}
 

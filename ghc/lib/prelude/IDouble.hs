@@ -7,11 +7,12 @@ import Core
 import IInt
 import IInteger
 import IRatio
-import List		( (++) )
+import List		( (++), map, takeWhile )
 import Prel		( (^), (^^), otherwise )
 import PS		( _PackedString, _unpackPS )
 import Text
-import TyComplex    -- for pragmas only
+import TyArray
+import TyComplex
 
 -- definitions of the boxed PrimOps; these will be
 -- used in the case of partial applications, etc.
@@ -73,23 +74,23 @@ instance  Num Double  where
     (-)		x y 	=  minusDouble x y
     negate	x  	=  negateDouble x
     (*)		x y 	=  timesDouble x y
-    abs x | x >= 0	=  x
+    abs x | x >= 0.0	=  x
 	  | otherwise	=  negateDouble x
-    signum x | x == 0	 =  0
-	     | x > 0	 =  1
+    signum x | x == 0.0	 =  0
+	     | x > 0.0	 =  1
 	     | otherwise = -1
     fromInteger n	=  encodeFloat n 0
     fromInt (I# n#)	=  case (int2Double# n#) of { d# -> D# d# }
 
 instance  Real Double  where
-    toRational x	=  (m%1)*(b%1)^^n -- i.e., realFloatToRational x
+    toRational x	=  (m%__i1)*(b%__i1)^^n
 			   where (m,n) = decodeFloat x
 				 b     = floatRadix  x
 
 instance  Fractional Double  where
     (/) x y		=  divideDouble x y
-    fromRational x	=  fromRationalX x --ORIG: rationalToRealFloat x
-    recip x		=  1 / x
+    fromRational x	=  _fromRational x
+    recip x		=  1.0 / x
 
 instance  Floating Double  where
     pi			=  3.141592653589793238
@@ -108,32 +109,61 @@ instance  Floating Double  where
     (**) x y		=  powerDouble x y
     logBase x y		=  log y / log x
 
-{- WAS: but not all machines have these in their math library:
-    asinh		=  asinhDouble
-    acosh		=  acoshDouble
-    atanh		=  atanhDouble
--}
-    asinh x = log (x + sqrt (1+x*x))
-    acosh x = log (x + (x+1) * sqrt ((x-1)/(x+1)))
-    atanh x = log ((x+1) / sqrt (1 - x*x))
-
+    asinh x = log (x + sqrt (1.0+x*x))
+    acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
+    atanh x = log ((x+1.0) / sqrt (1.0-x*x))
 
 instance  RealFrac Double  where
-    properFraction x = _properFraction x
 
-    -- just call the versions in Core.hs
-    truncate x	=  _truncate x
-    round x	=  _round x
-    ceiling x	=  _ceiling x
-    floor x	=  _floor x
-{- OLD:
+    {-# SPECIALIZE properFraction :: Double -> (Int, Double) #-}
+    {-# SPECIALIZE truncate :: Double -> Int #-}
+    {-# SPECIALIZE round    :: Double -> Int #-}
+    {-# SPECIALIZE ceiling  :: Double -> Int #-}
+    {-# SPECIALIZE floor    :: Double -> Int #-}
+
+    {-# SPECIALIZE properFraction :: Double -> (Integer, Double) #-}
+    {-# SPECIALIZE truncate :: Double -> Integer #-}
+    {-# SPECIALIZE round    :: Double -> Integer #-}
+    {-# SPECIALIZE ceiling  :: Double -> Integer #-}
+    {-# SPECIALIZE floor    :: Double -> Integer #-}
+
+#if defined(__UNBOXED_INSTANCES__)
+    {-# SPECIALIZE properFraction :: Double -> (Int#, Double) #-}
+    {-# SPECIALIZE truncate :: Double -> Int# #-}
+    {-# SPECIALIZE round    :: Double -> Int# #-}
+    {-# SPECIALIZE ceiling  :: Double -> Int# #-}
+    {-# SPECIALIZE floor    :: Double -> Int# #-}
+#endif
+
     properFraction x
-	| n >= 0	=  (fromInteger m * fromInteger b ^ n, 0)
-	| otherwise	=  (fromInteger w, encodeFloat r n)
-			where (m,n) = decodeFloat x
-			      b	    = floatRadix x
-			      (w,r) = quotRem m (b^(-n))
--}
+      = case (decodeFloat x)      of { (m,n) ->
+    	let  b = floatRadix x     in
+    	if n >= 0 then
+	    (fromInteger m * fromInteger b ^ n, 0.0)
+    	else
+	    case (quotRem m (b^(-n))) of { (w,r) ->
+	    (fromInteger w, encodeFloat r n)
+	    }
+        }
+
+    truncate x	= case properFraction x of
+		     (n,_) -> n
+
+    round x	= case properFraction x of
+		     (n,r) -> let
+			      	m         = if r < 0.0 then n - __i1 else n + __i1
+		  	      	half_down = abs r - 0.5
+    		   	      in
+    		   	      case (_tagCmp half_down 0.0) of
+      		     		_LT -> n
+      		     		_EQ -> if even n then n else m
+      		     		_GT -> m
+
+    ceiling x   = case properFraction x of
+		    (n,r) -> if r > 0.0 then n + __i1 else n
+
+    floor x	= case properFraction x of
+		    (n,r) -> if r < 0.0 then n - __i1 else n
 
 instance  RealFloat Double  where
     floatRadix _	=  FLT_RADIX	    -- from float.h
@@ -148,18 +178,28 @@ instance  RealFloat Double  where
     encodeFloat (J# a# s# d#) (I# e#)
       = case encodeDouble# a# s# d# e#	of { dbl# -> D# dbl# }
 
+    exponent x		= case decodeFloat x of
+			    (m,n) -> if m == __i0 then 0 else n + floatDigits x
+
+    significand x	= case decodeFloat x of
+			    (m,_) -> encodeFloat m (- (floatDigits x))
+
+    scaleFloat k x	= case decodeFloat x of
+			    (m,n) -> encodeFloat m (n+k)
+
 instance  Enum Double  where
-{- *** RAW PRELUDE ***
-    enumFrom		=  numericEnumFrom
-    enumFromThen	=  numericEnumFromThen
--}
-    enumFrom x = x : enumFrom (x `plusDouble` 1.0)
-    enumFromThen m n = en' m (n `minusDouble` m)
-	    where en' m n = m : en' (m `plusDouble` n) n
+    enumFrom x           =  x : enumFrom (x `plusDouble` 1.0)
+    enumFromThen m n     =  en' m (n `minusDouble` m)
+	                    where en' m n = m : en' (m `plusDouble` n) n
+    enumFromTo n m       =  takeWhile (<= m) (enumFrom n)
+    enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
+				     (enumFromThen n m)
 
 instance  Text Double  where
     readsPrec p x = readSigned readFloat x
     showsPrec   x = showSigned showFloat x
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0) 
 
 instance _CCallable   Double
 instance _CReturnable Double
@@ -191,23 +231,23 @@ instance  Num Double#  where
     (-)		x y 	=  minusDouble# x y
     negate	x  	=  negateDouble# x
     (*)		x y 	=  timesDouble# x y
-    abs x | x >= 0	=  x
+    abs x | x >= 0.0	=  x
 	  | otherwise	=  negateDouble# x
-    signum x | x == 0	 =  0
-	     | x > 0	 =  1
+    signum x | x == 0.0	 =  0
+	     | x > 0.0	 =  1
 	     | otherwise = -1
     fromInteger n	=  encodeFloat n 0
     fromInt (I# n#)	=  int2Double# n#
 
 instance  Real Double#  where
-    toRational x	=  (m%1)*(b%1)^^n -- i.e., realFloatToRational x
+    toRational x	=  (m%__i1)*(b%__i1)^^n
 			   where (m,n) = decodeFloat x
 				 b     = floatRadix  x
 
 instance  Fractional Double#  where
     (/) x y		=  divideDouble# x y
-    fromRational x	=  _fromRational x --ORIG: rationalToRealFloat x
-    recip x		=  1 / x
+    fromRational x	=  _fromRational x
+    recip x		=  1.0 / x
 
 instance  Floating Double#  where
     pi			=  3.141592653589793238##
@@ -226,33 +266,61 @@ instance  Floating Double#  where
     (**) x y		=  powerDouble# x y
     logBase x y		=  log y / log x
 
-{- WAS: but not all machines have these in their math library:
-    asinh		=  asinhDouble#
-    acosh		=  acoshDouble#
-    atanh		=  atanhDouble#
--}
-    asinh x = log (x + sqrt (1+x*x))
-    acosh x = log (x + (x+1) * sqrt ((x-1)/(x+1)))
-    atanh x = log ((x+1) / sqrt (1 - x*x))
+    asinh x = log (x + sqrt (1.0+x*x))
+    acosh x = log (x + (x+1) * sqrt ((x-1.0)/(x+1.0)))
+    atanh x = log ((x+1.0) / sqrt (1.0-x*x))
 
 
 instance  RealFrac Double#  where
-    -- REPORT:
-    -- properFraction = floatProperFraction
+
+    {-# SPECIALIZE properFraction :: Double# -> (Int, Double#) #-}
+    {-# SPECIALIZE truncate :: Double# -> Int #-}
+    {-# SPECIALIZE round    :: Double# -> Int #-}
+    {-# SPECIALIZE ceiling  :: Double# -> Int #-}
+    {-# SPECIALIZE floor    :: Double# -> Int #-}
+
+    {-# SPECIALIZE properFraction :: Double# -> (Integer, Double#) #-}
+    {-# SPECIALIZE truncate :: Double# -> Integer #-}
+    {-# SPECIALIZE round    :: Double# -> Integer #-}
+    {-# SPECIALIZE ceiling  :: Double# -> Integer #-}
+    {-# SPECIALIZE floor    :: Double# -> Integer #-}
+
+    {-# SPECIALIZE properFraction :: Double# -> (Int#, Double#) #-}
+    {-# SPECIALIZE truncate :: Double# -> Int# #-}
+    {-# SPECIALIZE round    :: Double# -> Int# #-}
+    {-# SPECIALIZE ceiling  :: Double# -> Int# #-}
+    {-# SPECIALIZE floor    :: Double# -> Int# #-}
 
     properFraction x
-	| n >= 0	=  (fromInteger m * fromInteger b ^ n, 0)
-	| otherwise	=  (fromInteger w, encodeFloat r n)
-			where (m,n) = decodeFloat x
-			      b	    = floatRadix x
-			      (w,r) = quotRem m (b^(-n))
+      = case (decodeFloat x)      of { (m,n) ->
+    	let  b = floatRadix x     in
+    	if n >= 0 then
+	    (fromInteger m * fromInteger b ^ n, 0.0)
+    	else
+	    case (quotRem m (b^(-n))) of { (w,r) ->
+	    (fromInteger w, encodeFloat r n)
+	    }
+        }
 
-    -- No default methods for unboxed values ...
-    -- just call the versions in Core.hs
-    truncate x	=  _truncate x
-    round x	=  _round x
-    ceiling x	=  _ceiling x
-    floor x	=  _floor x
+    truncate x	= case properFraction x of
+		     (n,_) -> n
+
+    round x	= case properFraction x of
+		     (n,r) -> let
+			      	m         = if r < 0.0 then n - __i1 else n + __i1
+		  	      	half_down = abs r - 0.5
+    		   	      in
+    		   	      case (_tagCmp half_down 0.0) of
+      		     		_LT -> n
+      		     		_EQ -> if even n then n else m
+      		     		_GT -> m
+
+    ceiling x   = case properFraction x of
+		    (n,r) -> if r > 0.0 then n + __i1 else n
+
+    floor x	= case properFraction x of
+		    (n,r) -> if r < 0.0 then n - __i1 else n
+
 
 instance  RealFloat Double#  where
     floatRadix _	=  FLT_RADIX	    -- from float.h
@@ -267,21 +335,19 @@ instance  RealFloat Double#  where
     encodeFloat (J# a# s# d#) (I# e#)
       = encodeDouble# a# s# d# e#
 
-    -- No default methods for unboxed values ...
-    exponent x		=  if m == 0 then 0 else n + floatDigits x
-			   where (m,n) = decodeFloat x
+    exponent x		= case decodeFloat x of
+			    (m,n) -> if m == __i0 then 0 else n + floatDigits x
 
-    significand x	=  encodeFloat m (- (floatDigits x))
-			   where (m,_) = decodeFloat x
+    significand x	= case decodeFloat x of
+			    (m,_) -> encodeFloat m (- (floatDigits x))
 
-    scaleFloat k x	=  encodeFloat m (n+k)
-			   where (m,n) = decodeFloat x
+    scaleFloat k x	= case decodeFloat x of
+			    (m,n) -> encodeFloat m (n+k)
 
 instance  Enum Double#  where
-    enumFrom x           =  x : enumFrom (x `plusDouble#` 1.0##)
+    enumFrom x           =  x : enumFrom (x `plusDouble#` 1.0)
     enumFromThen m n     =  en' m (n `minusDouble#` m)
 	                    where en' m n = m : en' (m `plusDouble#` n) n
-    -- default methods not specialised!
     enumFromTo n m	 =  takeWhile (<= m) (enumFrom n)
     enumFromThenTo n m p =  takeWhile (if m >= n then (<= p) else (>= p))
 				      (enumFromThen n m)
@@ -290,8 +356,8 @@ instance  Enum Double#  where
 instance  Text Double#  where
     readsPrec p s = map (\ (D# d#, s) -> (d#, s)) (readsPrec p s)
     showsPrec p x = showsPrec p (D# x)
-    readList s = map (\ (x, s) -> (map (\ (D# d#) -> d#) x, s)) (readList s)
-    showList l = showList (map D# l)
+    readList = _readList (readsPrec 0)
+    showList = _showList (showsPrec 0)
 
 instance _CCallable   Double#
 instance _CReturnable Double#

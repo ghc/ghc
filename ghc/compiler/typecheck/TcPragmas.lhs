@@ -150,15 +150,14 @@ tcGenPragmas e ty_maybe rec_final_id
 	arity_info  = get_arity  arity_maybe
 	upd_info    = get_upd    upd_maybe
     in
+    tc_strictness e ty_maybe rec_final_id strictness
+				`thenB_Tc` \ (strict_info, wrapper_unfold_info) ->
 
 	-- If the unfolding fails to look consistent, we don't
 	-- want to junk *all* the IdInfo
     recoverIgnoreErrorsB_Tc noInfo_UF (
 	tc_unfolding e unfold
     )				`thenB_Tc` \ unfold_info ->
-
-    tc_strictness e ty_maybe rec_final_id strictness
-				`thenB_Tc` \ (strict_info, wrapper_unfold_info) ->
 
 	-- Same as unfolding; if we fail, don't junk all IdInfo
     recoverIgnoreErrorsB_Tc nullSpecEnv (
@@ -370,14 +369,26 @@ tc_unfolding e (ImpMagicUnfolding tag) = returnB_Tc (mkMagicUnfolding tag)
 tc_unfolding e (ImpUnfolding guidance uf_core)
   = tc_uf_core nullLVE nullTVE uf_core	`thenB_Tc` \ core_expr ->
     getSrcLocB_Tc			`thenB_Tc` \ locn ->
-    returnB_Tc (mkUnfolding guidance (lintUnfolding locn core_expr))
-    -- type-incorrect unfoldings are so painful that we
-    -- always lint-check them; such unfoldings can arise
-    -- because of by-hand mix-and-match jiggery-pokery with
-    -- interface files (WDP 95/05)
+    let
+    	-- Bad unfoldings are so painful that we always lint-check them,
+	-- marking them with BadUnfolding if lintUnfolding fails
+	-- NB: We cant check the lint result and return noInfo_UF if
+	--     lintUnfolding failed as this is too strict
+	--     Instead getInfo_UF tests for BadUnfolding and converts
+	--     to NoUnfoldingDetails when the unfolding is accessed
+
+	maybe_lint_expr = lintUnfolding locn core_expr
+
+	(lint_guidance, lint_expr) = case maybe_lint_expr of
+	  Just lint_expr -> (guidance, lint_expr)
+          Nothing        -> (BadUnfolding, panic_expr) 
+    in
+    returnB_Tc (mkUnfolding lint_guidance lint_expr)
   where
     rec_ce  = getE_CE  e
     rec_tce = getE_TCE e
+
+    panic_expr = panic "TcPragmas: BadUnfolding should not be touched"
 
     tc_uf_core :: LVE	    -- lookup table for local binders
 			    -- (others: we hope we can figure them out)
@@ -561,10 +572,11 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	  Just xx -> returnB_Tc xx
 	  Nothing -> case (lookupE_ValueQuietly e v) of
 		       Just xx -> returnB_Tc xx
-		       Nothing -> --pprTrace "lookup_Quietly: " (ppr PprDebug v) (
-				  failB_Tc (panic "tc_uf_Id: no lookup")
-				  --)
-				  -- should be recover'd from
+		       Nothing -> -- pprTrace "WARNING: Discarded bad unfolding from interface:\n"
+		     		  --	   (ppCat [ppStr "Failed lookup for BoringUfId:",
+			     	  --	           ppr PprDebug v])
+				  (failB_Tc (panic "tc_uf_Id:BoringUfId: no lookup"))
+				  -- will be recover'd from
 				  -- ToDo: shouldn't the renamer have handled this? [wdp 94/04/29]
 
     tc_uf_Id lve (SuperDictSelUfId c sc)
@@ -621,10 +633,21 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 
     tc_uf_Id lve (WorkerUfId unwrkr)
       = tc_uf_Id lve unwrkr 	`thenB_Tc` \ unwrkr_id ->
-	let
+        let
 	    strictness_info = getIdStrictness unwrkr_id
-	in
-    	returnB_Tc (getWorkerId strictness_info)
+ 	in
+	if isLocallyDefined unwrkr_id
+	then
+	    -- A locally defined value will not have any strictness info (yet),
+	    -- so we can't extract the locally defined worker Id from it :-(
+
+            pprTrace "WARNING: Discarded bad unfolding from interface:\n"
+		     (ppCat [ppStr "Worker Id in unfolding is defined locally:",
+			     ppr PprDebug unwrkr_id])
+	    (failB_Tc (panic "tc_uf_Id:WorkerUfId: locally defined"))
+	    -- will be recover'd from
+	else
+    	    returnB_Tc (getWorkerId strictness_info)
 
     ---------------
     lookup_class_op clas (ClassOpName _ _ _ tag)

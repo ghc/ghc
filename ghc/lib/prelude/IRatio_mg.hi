@@ -66,12 +66,6 @@ instance Real (Ratio Integer)
 instance Integral a => RealFrac (Ratio a)
 	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 instance RealFrac (Ratio Integer)
-	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 8 _!_ _TUP_7 [{{Real (Ratio Integer)}}, {{Fractional (Ratio Integer)}}, _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> (a$z1, Ratio Integer)), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1), _forall_ a$z1 =>{{Integral a$z1}} -> (Ratio Integer -> a$z1)] [_DFUN_ Real (Ratio Integer), _DFUN_ Fractional (Ratio Integer), _CONSTM_ RealFrac properFraction (Ratio Integer), _CONSTM_ RealFrac truncate (Ratio Integer), _CONSTM_ RealFrac round (Ratio Integer), _CONSTM_ RealFrac ceiling (Ratio Integer), _CONSTM_ RealFrac floor (Ratio Integer)] _N_
-	 properFraction = _A_ 2 _U_ 11 _N_ _S_ "LU(LL)" {_A_ 3 _U_ 112 _N_ _N_ _N_ _N_} _N_ _N_,
-	 truncate = _A_ 1 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 3 _/\_ u0 -> \ (u1 :: {{Integral u0}}) -> _APP_  _TYAPP_  _TYAPP_  _WRKR_ _ORIG_ PreludeCore _truncate { (Ratio Integer) } { u0 } [ _CONSTM_ RealFrac properFraction (Ratio Integer), u1 ] _N_,
-	 round = _A_ 1 _U_ 22 _N_ _N_ _N_ _N_,
-	 ceiling = _A_ 1 _U_ 22 _N_ _N_ _N_ _N_,
-	 floor = _A_ 1 _U_ 22 _N_ _N_ _N_ _N_ #-}
 instance Integral a => Text (Ratio a)
 	{-# GHC_PRAGMA _M_ PreludeRatio {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Text (Ratio Integer)
