@@ -237,8 +237,6 @@ else
 	cp $TmpPrefix/runtest$$.1 $PgmStdoutFile[0]
     fi
 fi
-egrep -v '^ld\.so:.*has older revision than expected' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
-mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
 if [ "$Heimdall" = "1" ]; then
   egrep '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $HeimdallStats
 fi
