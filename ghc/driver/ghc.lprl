@@ -498,6 +498,7 @@ $Keep_hc_file_too = 0;
 $Keep_s_file_too = 0;
 $UseGhcInternals = 0; # if 1, may use GHC* modules
 $SplitObjFiles = 0;
+$DoAsmMangling = 1; # on by default, off by -fno-asm-mangling
 $NoOfSplitFiles = 0;
 $Dump_parser_output = 0;
 $Dump_raw_asm = 0;
@@ -2084,7 +2085,7 @@ sub runGcc {
     local($cc_help_s) = "ghc$$.s";
 
     $cc       = $CcRegd;
-    $s_output = ($is_hc_file || $TargetPlatform =~ /^(powerpc|rs6000|hppa)/) ? $cc_as_o : $cc_as;
+    $s_output = (($is_hc_file && $DoAsmMangling) || $TargetPlatform =~ /^(powerpc|rs6000|hppa)/) ? $cc_as_o : $cc_as;
     $c_flags .= " @CcRegd_flags";
     $c_flags .= ($is_hc_file) ? " @CcRegd_flags_hc"  : " @CcRegd_flags_c";
 
@@ -2130,15 +2131,12 @@ EOINCL
 sub runMangler {
     local($is_hc_file, $cc_as_o, $cc_as, $ifile_root) = @_;
 
-    if ( $is_hc_file ) {
-	# dynamically load assembler-fiddling code, which we are about to use:
-	require('ghc-asm.prl')
-	|| &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm.prl!\n");
-    }
-
     print STDERR `cat $cc_as_o` if $Dump_raw_asm; # to stderr, before mangling
 
-    if ($is_hc_file) {
+    if ($is_hc_file && $DoAsmMangling) {
+	# dynamically load assembler-fiddling code, which we are about to use:
+	require('ghc-asm.prl')
+	     || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm.prl!\n");
 	# post-process the assembler [.hc files only]
 	&mangle_asm($cc_as_o, $cc_as);
 
@@ -3050,6 +3048,8 @@ arg: while($_ = $Args[0]) {
 			     || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-split.prl!\n");
 			}
 			next arg; };
+
+    /^-fno-asm-mangling$/ && do { $DoAsmMangling = 0; next arg; };
 
     /^-fallow-overlapping-instances$/ && do { push(@HsC_flags, $_); next arg; };
     /^-fallow-undecidable-instances$/ && do { push(@HsC_flags, $_); next arg; };
