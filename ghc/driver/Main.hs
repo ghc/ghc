@@ -1629,13 +1629,13 @@ opts =
   ,  ( "no-recomp"  	, NoArg (writeIORef recomp False) )
 
 	------- ways --------------------------------------------------------
-  ,  ( "prof"		, NoArg (add ways WayProf) )
-  ,  ( "unreg"		, NoArg (add ways WayUnreg) )
-  ,  ( "ticky"		, NoArg (add ways WayTicky) )
-  ,  ( "parallel"	, NoArg (add ways WayPar) )
-  ,  ( "gransim"	, NoArg (add ways WayGran) )
-  ,  ( "smp"		, NoArg (add ways WaySMP) )
-  ,  ( "debug"		, NoArg (add ways WayDebug) )
+  ,  ( "prof"		, NoArg (addNoDups ways	WayProf) )
+  ,  ( "unreg"		, NoArg (addNoDups ways	WayUnreg) )
+  ,  ( "ticky"		, NoArg (addNoDups ways	WayTicky) )
+  ,  ( "parallel"	, NoArg (addNoDups ways	WayPar) )
+  ,  ( "gransim"	, NoArg (addNoDups ways	WayGran) )
+  ,  ( "smp"		, NoArg (addNoDups ways	WaySMP) )
+  ,  ( "debug"		, NoArg (addNoDups ways	WayDebug) )
  	-- ToDo: user ways
 
 	------- Interface files ---------------------------------------------
@@ -1946,6 +1946,11 @@ add :: IORef [a] -> a -> IO ()
 add var x = do
   xs <- readIORef var
   writeIORef var (x:xs)
+
+addNoDups :: Eq a => IORef [a] -> a -> IO ()
+addNoDups var x = do
+  xs <- readIORef var
+  if x `elem` xs then return () else writeIORef var (x:xs)
 
 remove_suffix :: String -> Char -> String
 remove_suffix s c 
