@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.48 2005/02/10 13:38:35 simonmar Exp $
+# $Id: package.mk,v 1.49 2005/03/03 21:01:49 wolfgang Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -327,7 +327,7 @@ $(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
 	$(CC) -shared -o $@ $(STUBOBJS) $(LIBOBJS)
 endif
 
-ifneq "$(PACKAGE)" ""
+ifneq "$(NO_INSTALL_LIBRARY)" "YES"
 INSTALL_LIBS += $(DYLD_LIBRARY)
 endif
 
