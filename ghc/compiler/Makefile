@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.89 2000/08/21 13:35:46 simonmar Exp $
+# $Id: Makefile,v 1.90 2000/08/22 09:48:49 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -246,7 +246,7 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-usage.hs-incl  \
             primop-primop-info.hs-incl
 
-prelude/PrimOp.o: $(PRIMOP_BITS)
+prelude/PrimOp.lhs: $(PRIMOP_BITS)
 
 primop-data-decl.hs-incl: prelude/primops.txt
 	$(GENPOC) --data-decl          < $< > $@
