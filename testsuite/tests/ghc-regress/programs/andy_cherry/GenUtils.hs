@@ -41,7 +41,7 @@ module GenUtils (
 import Array	-- 1.3
 import Ix	-- 1.3
 
-import IOExts( trace )
+import Debug.Trace ( trace )
 
 
 -- -------------------------------------------------------------------------
