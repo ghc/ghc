@@ -55,7 +55,7 @@
             CLOSE_NURSERY();					\
             CurrentNursery = bdescr_link(CurrentNursery);	\
             OPEN_NURSERY();					\
-            if (CInt[context_switch] != 0) {			\
+            if (CInt[context_switch] != 0 :: CInt) {		\
                 R1 = ThreadYielding;				\
                 goto sched;					\
             } else {						\

@@ -46,7 +46,7 @@
  * When era reaches max_era, the profiling stops because a closure can
  * store only up to (max_era - 1) as its creation or last use time.
  * -------------------------------------------------------------------------- */
-nat era;
+unsigned int era;
 static nat max_era;
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.37 2004/11/08 12:26:57 simonmar Exp $
+ * $Id: TSO.h,v 1.38 2004/11/10 02:13:12 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -97,11 +97,11 @@ typedef struct {
 typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
-  int fd;
+  StgInt fd;	// StgInt instead of int, so that it's the same size as the ptrs
 #if defined(mingw32_TARGET_OS)
   StgAsyncIOResult* async_result;
 #endif
-  unsigned int target;
+  StgWord target;
 } StgTSOBlockInfo;
 
 /*

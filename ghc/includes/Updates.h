@@ -238,7 +238,7 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
   inf = %GET_STD_INFO(p);			\
   np = TO_W_(%INFO_PTRS(inf));			\
   nw = TO_W_(%INFO_NPTRS(inf));			\
-  if (%INFO_TYPE(inf) != THUNK_SELECTOR::I16) {	\
+  if (%INFO_TYPE(inf) != HALF_W_(THUNK_SELECTOR)) {	\
     i = 0;					\
     for:					\
       if (i < np + nw) {			\
@@ -285,7 +285,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
 /*    ASSERT( p1 != p2 && !closure_IND(p1) );			\
  */ LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
     bd = Bdescr(p1);						\
-    if (bdescr_gen_no(bd) == 0) {				\
+    if (bdescr_gen_no(bd) == 0 :: CInt) {			\
       StgInd_indirectee(p1) = p2;				\
       SET_INFO(p1, ind_info);					\
       LDV_RECORD_CREATE(p1);					\
@@ -295,7 +295,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
       if (info != stg_BLACKHOLE_BQ_info) {			\
         DEBUG_FILL_SLOP(p1);					\
         W_ __mut_once_list;					\
-        __mut_once_list = generation(bdescr_gen_no(bd)) +	\
+        __mut_once_list = generation(TO_W_(bdescr_gen_no(bd))) +	\
                              OFFSET_generation_mut_once_list;	\
         StgMutClosure_mut_link(p1) = W_[__mut_once_list];	\
         W_[__mut_once_list] = p1;				\

@@ -97,7 +97,7 @@
 
 #if SIZEOF_INT == 4
 #define CInt bits32
-#elif SIZEOF_INT = 8
+#elif SIZEOF_INT == 8
 #define CInt bits64
 #else
 #error Unknown int size
@@ -105,7 +105,7 @@
 
 #if SIZEOF_LONG == 4
 #define CLong bits32
-#elif SIZEOF_LONG = 8
+#elif SIZEOF_LONG == 8
 #define CLong bits64
 #else
 #error Unknown long size
@@ -161,6 +161,12 @@
 #elif SIZEOF_W == 8
 #define TO_W_(x) %sx64(x)
 #define HALF_W_(x) %lobits32(x)
+#endif
+
+#if SIZEOF_INT == 4 && SIZEOF_W == 8
+#define W_TO_INT(x) %lobits32(x)
+#elif SIZEOF_INT == SIZEOF_W
+#define W_TO_INT(x) (x)
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -307,7 +313,7 @@
    TICK_ALLOC_HEAP_NOCTR(alloc);
 
 #define MAYBE_GC(liveness,reentry)			\
-   if (CInt[alloc_blocks] >= CInt[alloc_blocks_lim]) {	\
+   if (W_[alloc_blocks] >= W_[alloc_blocks_lim]) {	\
 	R9  = liveness;					\
         R10 = reentry;					\
         jump stg_gc_gen_hp;				\

@@ -538,20 +538,21 @@ section "bss" {
 #define GMP_TAKE2_RET1(name,mp_fun)			\
 name							\
 {							\
-  W_ s1, s2, d1, d2;					\
+  CInt s1, s2;						\
+  W_ d1, d2;						\
 							\
   /* call doYouWantToGC() */				\
   MAYBE_GC(R2_PTR & R4_PTR, name);			\
 							\
-  s1 = R1;						\
+  s1 = W_TO_INT(R1);					\
   d1 = R2;						\
-  s2 = R3;						\
+  s2 = W_TO_INT(R3);					\
   d2 = R4;						\
 							\
-  MP_INT__mp_alloc(mp_tmp1) = StgArrWords_words(d1);	\
+  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(StgArrWords_words(d1));	\
   MP_INT__mp_size(mp_tmp1)  = (s1);			\
   MP_INT__mp_d(mp_tmp1)	    = BYTE_ARR_CTS(d1);		\
-  MP_INT__mp_alloc(mp_tmp2) = StgArrWords_words(d2);	\
+  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(StgArrWords_words(d2));	\
   MP_INT__mp_size(mp_tmp2)  = (s2);			\
   MP_INT__mp_d(mp_tmp2)	    = BYTE_ARR_CTS(d2);		\
 							\
@@ -560,22 +561,23 @@ name							\
   /* Perform the operation */				\
   foreign "C" mp_fun(result1,mp_tmp1,mp_tmp2);		\
 							\
-  RET_NP(MP_INT__mp_size(result1),			\
+  RET_NP(TO_W_(MP_INT__mp_size(result1)),		\
          MP_INT__mp_d(result1) - SIZEOF_StgArrWords);	\
 }
 
 #define GMP_TAKE1_RET1(name,mp_fun)				\
 name								\
 {								\
-  W_ s1, d1;							\
+  CInt s1;							\
+  W_ d1;							\
 								\
   /* call doYouWantToGC() */					\
   MAYBE_GC(R2_PTR, name);					\
 								\
   d1 = R2;							\
-  s1 = R1;							\
+  s1 = W_TO_INT(R1);						\
 								\
-  MP_INT__mp_alloc(mp_tmp1)	= StgArrWords_words(d1);	\
+  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));	\
   MP_INT__mp_size(mp_tmp1)	= (s1);				\
   MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);		\
 								\
@@ -584,27 +586,28 @@ name								\
   /* Perform the operation */					\
   foreign "C" mp_fun(result1,mp_tmp1);				\
 								\
-  RET_NP(MP_INT__mp_size(result1),				\
+  RET_NP(TO_W_(MP_INT__mp_size(result1)),			\
          MP_INT__mp_d(result1) - SIZEOF_StgArrWords);		\
 }
 
 #define GMP_TAKE2_RET2(name,mp_fun)				\
 name								\
 {								\
-  W_ s1, s2, d1, d2;						\
+  CInt s1, s2;							\
+  W_ d1, d2;							\
 								\
   /* call doYouWantToGC() */					\
   MAYBE_GC(R2_PTR & R4_PTR, name);				\
 								\
-  s1 = R1;							\
+  s1 = W_TO_INT(R1);						\
   d1 = R2;							\
-  s2 = R3;							\
+  s2 = W_TO_INT(R3);						\
   d2 = R4;							\
 								\
-  MP_INT__mp_alloc(mp_tmp1)	= StgArrWords_words(d1);	\
+  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));	\
   MP_INT__mp_size(mp_tmp1)	= (s1);				\
   MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);		\
-  MP_INT__mp_alloc(mp_tmp2)	= StgArrWords_words(d2);	\
+  MP_INT__mp_alloc(mp_tmp2)	= W_TO_INT(StgArrWords_words(d2));	\
   MP_INT__mp_size(mp_tmp2)	= (s2);				\
   MP_INT__mp_d(mp_tmp2)		= BYTE_ARR_CTS(d2);		\
 								\
@@ -614,9 +617,9 @@ name								\
   /* Perform the operation */					\
   foreign "C" mp_fun(result1,result2,mp_tmp1,mp_tmp2);		\
 								\
-  RET_NPNP(MP_INT__mp_size(result1),				\
+  RET_NPNP(TO_W_(MP_INT__mp_size(result1)),			\
            MP_INT__mp_d(result1) - SIZEOF_StgArrWords,		\
-	   MP_INT__mp_size(result2),				\
+	   TO_W_(MP_INT__mp_size(result2)),			\
            MP_INT__mp_d(result2) - SIZEOF_StgArrWords);		\
 }
 
@@ -739,12 +742,12 @@ cmpIntegerzh_fast
 
     cmp = foreign "C" mpn_cmp(up "ptr", vp "ptr", size);
 
-    if (cmp == 0) {
+    if (cmp == 0 :: CInt) {
 	R1 = 0; 
 	jump %ENTRY_CODE(Sp(0));
     }
 
-    if (%lt(cmp,0) == %lt(usize,0)) {
+    if (%lt(cmp,0 :: CInt) == %lt(usize,0)) {
 	R1 = 1;
     } else {
 	R1 = (-1); 
@@ -816,7 +819,7 @@ decodeFloatzh_fast
     foreign "C" __decodeFloat(mp_tmp1,exponent,arg);
     
     /* returns: (Int# (expn), Int#, ByteArray#) */
-    RET_NNP(W_[exponent], MP_INT__mp_size(mp_tmp1), p);
+    RET_NNP(W_[exponent], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
 }
 
 #define DOUBLE_MANTISSA_SIZE SIZEOF_DOUBLE
@@ -843,7 +846,7 @@ decodeDoublezh_fast
     foreign "C" __decodeDouble(mp_tmp1,exponent,arg);
     
     /* returns: (Int# (expn), Int#, ByteArray#) */
-    RET_NNP(W_[exponent], MP_INT__mp_size(mp_tmp1), p);
+    RET_NNP(W_[exponent], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
 }
 
 /* -----------------------------------------------------------------------------
@@ -862,7 +865,7 @@ forkzh_fast
   foreign "C" scheduleThread(R1 "ptr");
 
   // switch at the earliest opportunity
-  CInt[context_switch] = 1;
+  CInt[context_switch] = 1 :: CInt;
   
   RET_P(R1);
 }
@@ -1307,8 +1310,8 @@ mkApUpd0zh_fast
     // This function is *only* used to wrap zero-arity BCOs in an
     // updatable wrapper (see ByteCodeLink.lhs).  An AP thunk is always
     // saturated and always points directly to a FUN or BCO.
-    ASSERT(%INFO_TYPE(%GET_STD_INFO(R1)) == BCO::I16 &&
-	   StgBCO_arity(R1) == 0::I16);
+    ASSERT(%INFO_TYPE(%GET_STD_INFO(R1)) == HALF_W_(BCO) &&
+	   StgBCO_arity(R1) == HALF_W_(0));
 
     HP_CHK_GEN_TICKY(SIZEOF_StgAP, R1_PTR, mkApUpd0zh_fast);
     TICK_ALLOC_UP_THK(0, 0);
@@ -1317,7 +1320,7 @@ mkApUpd0zh_fast
     ap = Hp - SIZEOF_StgAP + WDS(1);
     SET_HDR(ap, stg_AP_info, W_[CCCS]);
     
-    StgAP_n_args(ap) = 0::I16;
+    StgAP_n_args(ap) = HALF_W_(0);
     StgAP_fun(ap) = R1;
     
     RET_P(ap);
@@ -1411,9 +1414,9 @@ delayzh_fast
 
 #else
 
-    CInt time;
+    W_ time;
     time = foreign "C" getourtimeofday();
-    target = (R1 / (TICK_MILLISECS*1000)) + TO_W_(time);
+    target = (R1 / (TICK_MILLISECS*1000)) + time;
     StgTSO_block_info(CurrentTSO) = target;
 
     /* Insert the new thread in the sleeping queue. */

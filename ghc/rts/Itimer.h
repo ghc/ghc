@@ -11,7 +11,7 @@
 extern int startTicker( nat ms, TickProc handle_tick);
 extern int stopTicker ( void );
 
-extern unsigned int getourtimeofday   ( void );
+extern nat getourtimeofday   ( void );
 #if 0
 /* unused */
 extern void block_vtalrm_signal       ( void );
