@@ -129,7 +129,7 @@ else
     fi
 fi
 rm -f conftest1 conftest2
-]),
+])
 ContextDiffCmd=$ac_cv_context_diffs
 AC_SUBST(ContextDiffCmd)
 ])
