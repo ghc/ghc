@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.20 2002/08/09 21:28:10 sof Exp $
+# $Id: bootstrap.mk,v 1.21 2002/08/12 14:40:25 sof Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -72,9 +72,13 @@ else
 UNDERSCORE=
 endif
 
+ifeq "$(HaveLibGmp)" "NO"
+DASH_L_GHC_RTS_GMP_DIR=-L$(FPTOOLS_TOP_ABS)/ghc/rts/gmp
+endif
 
 HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
+   $(DASH_L_GHC_RTS_GMP_DIR)                    \
    -L$(FPTOOLS_TOP_ABS)/libraries/base		\
    -L$(FPTOOLS_TOP_ABS)/libraries/base/cbits	\
    -L$(FPTOOLS_TOP_ABS)/libraries/haskell98	\
@@ -88,38 +92,37 @@ HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/hslibs/util/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/text		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/text/cbits	\
-   -u "$(UNDERSCORE)PrelBase_Izh_static_info"		\
-   -u "$(UNDERSCORE)PrelBase_Czh_static_info"		\
-   -u "$(UNDERSCORE)PrelFloat_Fzh_static_info"		\
-   -u "$(UNDERSCORE)PrelFloat_Dzh_static_info"		\
-   -u "$(UNDERSCORE)PrelPtr_Ptr_static_info"		\
-   -u "$(UNDERSCORE)PrelWord_Wzh_static_info"		\
-   -u "$(UNDERSCORE)PrelInt_I8zh_static_info"		\
-   -u "$(UNDERSCORE)PrelInt_I16zh_static_info"		\
-   -u "$(UNDERSCORE)PrelInt_I32zh_static_info"		\
-   -u "$(UNDERSCORE)PrelInt_I64zh_static_info"		\
-   -u "$(UNDERSCORE)PrelWord_W8zh_static_info"		\
-   -u "$(UNDERSCORE)PrelWord_W16zh_static_info"		\
-   -u "$(UNDERSCORE)PrelWord_W32zh_static_info"		\
-   -u "$(UNDERSCORE)PrelWord_W64zh_static_info"		\
-   -u "$(UNDERSCORE)PrelStable_StablePtr_static_info"	\
-   -u "$(UNDERSCORE)PrelBase_Izh_con_info"		\
-   -u "$(UNDERSCORE)PrelBase_Czh_con_info"		\
-   -u "$(UNDERSCORE)PrelFloat_Fzh_con_info"		\
-   -u "$(UNDERSCORE)PrelFloat_Dzh_con_info"		\
-   -u "$(UNDERSCORE)PrelPtr_Ptr_con_info"		\
-   -u "$(UNDERSCORE)PrelStable_StablePtr_con_info"	\
-   -u "$(UNDERSCORE)PrelBase_False_closure"		\
-   -u "$(UNDERSCORE)PrelBase_True_closure"		\
-   -u "$(UNDERSCORE)PrelPack_unpackCString_closure"	\
-   -u "$(UNDERSCORE)PrelIOBase_stackOverflow_closure"	\
-   -u "$(UNDERSCORE)PrelIOBase_heapOverflow_closure"	\
-   -u "$(UNDERSCORE)PrelIOBase_NonTermination_closure"	\
-   -u "$(UNDERSCORE)PrelIOBase_BlockedOnDeadMVar_closure"	\
-   -u "$(UNDERSCORE)PrelWeak_runFinalizzerBatch_closure"	\
-   -u "$(UNDERSCORE)__stginit_Prelude"				\
-   -u "$(UNDERSCORE)PrelMain_mainIO_closure"			\
-   -u "$(UNDERSCORE)__stginit_PrelMain"
+   -u "$(UNDERSCORE)GHCziBase_Izh_static_info" \
+   -u "$(UNDERSCORE)GHCziBase_Czh_static_info" \
+   -u "$(UNDERSCORE)GHCziFloat_Fzh_static_info" \
+   -u "$(UNDERSCORE)GHCziFloat_Dzh_static_info" \
+   -u "$(UNDERSCORE)GHCziPtr_Ptr_static_info" \
+   -u "$(UNDERSCORE)GHCziWord_Wzh_static_info" \
+   -u "$(UNDERSCORE)GHCziInt_I8zh_static_info" \
+   -u "$(UNDERSCORE)GHCziInt_I16zh_static_info" \
+   -u "$(UNDERSCORE)GHCziInt_I32zh_static_info" \
+   -u "$(UNDERSCORE)GHCziInt_I64zh_static_info" \
+   -u "$(UNDERSCORE)GHCziWord_W8zh_static_info" \
+   -u "$(UNDERSCORE)GHCziWord_W16zh_static_info" \
+   -u "$(UNDERSCORE)GHCziWord_W32zh_static_info" \
+   -u "$(UNDERSCORE)GHCziWord_W64zh_static_info" \
+   -u "$(UNDERSCORE)GHCziStable_StablePtr_static_info" \
+   -u "$(UNDERSCORE)GHCziBase_Izh_con_info" \
+   -u "$(UNDERSCORE)GHCziBase_Czh_con_info" \
+   -u "$(UNDERSCORE)GHCziFloat_Fzh_con_info" \
+   -u "$(UNDERSCORE)GHCziFloat_Dzh_con_info" \
+   -u "$(UNDERSCORE)GHCziPtr_Ptr_con_info" \
+   -u "$(UNDERSCORE)GHCziStable_StablePtr_con_info" \
+   -u "$(UNDERSCORE)GHCziBase_False_closure" \
+   -u "$(UNDERSCORE)GHCziBase_True_closure" \
+   -u "$(UNDERSCORE)GHCziPack_unpackCString_closure" \
+   -u "$(UNDERSCORE)GHCziIOBase_stackOverflow_closure" \
+   -u "$(UNDERSCORE)GHCziIOBase_heapOverflow_closure" \
+   -u "$(UNDERSCORE)GHCziIOBase_NonTermination_closure" \
+   -u "$(UNDERSCORE)GHCziIOBase_BlockedOnDeadMVar_closure" \
+   -u "$(UNDERSCORE)GHCziIOBase_Deadlock_closure" \
+   -u "$(UNDERSCORE)GHCziWeak_runFinalizzerBatch_closure" \
+   -u "$(UNDERSCORE)__stginit_Prelude"
 
 HC_BOOT_LIBS = -lHStext -lHStext_cbits -lHSutil -lHSposix -lHSposix_cbits -lHSconcurrent -lHSlang -lHSlang_cbits -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 
