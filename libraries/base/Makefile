@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.30 2002/06/04 19:12:53 sof Exp $
+# $Id: Makefile,v 1.31 2002/06/08 13:11:27 panne Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -92,7 +92,7 @@ DONT_WANT_STD_GHCI_LIB_RULE=YES
 
 GHCI_LIBOBJS = $(HS_OBJS)
 
-INSTALL_LIBS += HSbase1.o HSbase2.o
+INSTALL_LIBS += HSbase1.o HSbase2.o HSbase3.o
 
 endif # OBJECT_FILEFORMAT = PEi
 
