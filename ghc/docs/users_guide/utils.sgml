@@ -243,7 +243,7 @@ tags:
       <literal>() [] {} '' "" /* */</literal>. Any character may be
       preceded by a backslash and will not be treated specially.</para>
 
-      <para<In addition <literal>#{stuff}</literal> is equivalent
+      <para>In addition <literal>#{stuff}</literal> is equivalent
       to <literal>#stuff</literal> except that it's self-delimited
       and thus needs not to be placed at the end of line or in some
       brackets.</para>
