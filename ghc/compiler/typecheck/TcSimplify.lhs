@@ -36,7 +36,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  getDictClassTys, isTyVarDict,
 			  instLoc, zonkInst, tidyInsts, tidyMoreInsts,
 			  Inst, pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
-			  isIPDict, isInheritableInst, pprDFuns, pprDictsTheta
+			  isInheritableInst, pprDFuns, pprDictsTheta
 			)
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals )
 import InstEnv		( lookupInstEnv, classInstances )
@@ -1930,15 +1930,18 @@ tc_simplify_top is_interactive wanteds
 	non_std_tyvars		= unionVarSets (map tyVarsOfInst non_stds)
 
 		-- Collect together all the bad guys
-	bad_guys 	       = non_stds ++ concat std_bads
-    	(bad_ips, non_ips)     = partition isIPDict bad_guys
-    	(no_insts, ambigs)     = partition no_inst non_ips
-    	no_inst d              = not (isTyVarDict d) 
-	-- Previously, there was a more elaborate no_inst definition:
+	bad_guys 	   = non_stds ++ concat std_bads
+    	(non_ips, bad_ips) = partition isClassDict bad_guys
+    	(ambigs, no_insts) = partition is_ambig non_ips
+    	is_ambig d         = not (isEmptyVarSet (tyVarsOfInst d))
+	-- If the dict has free type variables, it's almost certainly ambiguous,
+	-- and that's the first thing to fix
+	-- Otherwise, addNoInstanceErrs does the right thing
+	-- [ Previously, there was a different no_inst definition:
 	--	no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
 	--	fixed_tvs = oclose (fdPredsOfInsts tidy_dicts) emptyVarSet
-	-- But that seems over-elaborate to me; it only bites for class decls with
-	-- fundeps like this:		class C a b | -> b where ...
+	--   But that seems over-elaborate to me; it only bites for class decls with
+	--   fundeps like this:		class C a b | -> b where ...]
     in
 
 	-- Report definite errors
@@ -2259,7 +2262,6 @@ addNoInstanceErrs mb_what givens []
 addNoInstanceErrs mb_what givens dicts
   =	-- Some of the dicts are here because there is no instances
 	-- and some because there are too many instances (overlap)
-	-- The first thing we do is separate them
     getDOpts		`thenM` \ dflags ->
     tcGetInstEnvs	`thenM` \ inst_envs ->
     let
@@ -2275,7 +2277,8 @@ addNoInstanceErrs mb_what givens dicts
 	  | otherwise
 	  = case lookupInstEnv dflags inst_envs clas tys of
 		-- The case of exactly one match and no unifiers means
-		-- a successful lookup.  That can't happen here.
+		-- a successful lookup.  That can't happen here, becuase
+		-- dicts only end up here if they didn't match in Inst.lookupInst
 #ifdef DEBUG
 		([m],[]) -> pprPanic "addNoInstanceErrs" (ppr dict)
 #endif
@@ -2286,7 +2289,7 @@ addNoInstanceErrs mb_what givens dicts
     in
 	
 	-- Now generate a good message for the no-instance bunch
-    mk_probable_fix tidy_env2 mb_what no_inst_dicts	`thenM` \ (tidy_env3, probable_fix) ->
+    mk_probable_fix tidy_env2 no_inst_dicts	`thenM` \ (tidy_env3, probable_fix) ->
     let
     	no_inst_doc | null no_inst_dicts = empty
 		    | otherwise = vcat [addInstLoc no_inst_dicts heading, probable_fix]
@@ -2315,21 +2318,26 @@ addNoInstanceErrs mb_what givens dicts
       where
     	dfuns = [df | (_, (_,_,df)) <- matches]
 
-    mk_probable_fix tidy_env Nothing dicts	-- Top level
-      = mkMonomorphismMsg tidy_env dicts
-    mk_probable_fix tidy_env (Just what) dicts	-- Nested (type signatures, instance decls)
-      = returnM (tidy_env, sep [ptext SLIT("Probable fix:"), nest 2 fix1, nest 2 fix2])
+    mk_probable_fix tidy_env dicts	
+      = returnM (tidy_env, sep [ptext SLIT("Probable fix:"), nest 2 (vcat fixes)])
       where
-    	fix1 = sep [ptext SLIT("Add") <+> pprDictsTheta dicts,
-		    ptext SLIT("to the") <+> what]
+	fixes = add_ors (fix1 ++ fix2)
 
-    	fix2 | null instance_dicts = empty
-	     | otherwise	   = ptext SLIT("Or add an instance declaration for")
-				     <+> pprDictsTheta instance_dicts
+    	fix1 = case mb_what of
+		 Nothing   -> []	-- Top level
+		 Just what -> -- Nested (type signatures, instance decls)
+			      [ sep [ ptext SLIT("add") <+> pprDictsTheta dicts,
+			        ptext SLIT("to the") <+> what] ]
+
+    	fix2 | null instance_dicts = []
+	     | otherwise	   = [ ptext SLIT("add an instance declaration for")
+				       <+> pprDictsTheta instance_dicts ]
 	instance_dicts = [d | d <- dicts, isClassDict d, not (isTyVarDict d)]
 		-- Insts for which it is worth suggesting an adding an instance declaration
 		-- Exclude implicit parameters, and tyvar dicts
 
+	add_ors :: [SDoc] -> [SDoc]
+	add_ors (f1:fs) = f1 : map (ptext SLIT("or") <+>) fs
 
 addTopAmbigErrs dicts
 -- Divide into groups that share a common set of ambiguous tyvars
@@ -2343,37 +2351,31 @@ addTopAmbigErrs dicts
     
     report :: [(Inst,[TcTyVar])] -> TcM ()
     report pairs@((inst,tvs) : _)	-- The pairs share a common set of ambiguous tyvars
-	= mkMonomorphismMsg tidy_env dicts	`thenM` \ (tidy_env, mono_msg) ->
+	= mkMonomorphismMsg tidy_env tvs	`thenM` \ (tidy_env, mono_msg) ->
 	  setSrcSpan (instLocSrcSpan (instLoc inst)) $
 		-- the location of the first one will do for the err message
 	  addErrTcM (tidy_env, msg $$ mono_msg)
 	where
 	  dicts = map fst pairs
 	  msg = sep [text "Ambiguous type variable" <> plural tvs <+> 
-			     pprQuotedList tvs <+> in_msg,
+			  pprQuotedList tvs <+> in_msg,
 		     nest 2 (pprDictsInFull dicts)]
-	  in_msg | isSingleton dicts = text "in the top-level constraint:"
-		 | otherwise         = text "in these top-level constraints:"
+	  in_msg = text "in the constraint" <> plural dicts <> colon
 
 
-mkMonomorphismMsg :: TidyEnv -> [Inst] -> TcM (TidyEnv, Message)
+mkMonomorphismMsg :: TidyEnv -> [TcTyVar] -> TcM (TidyEnv, Message)
 -- There's an error with these Insts; if they have free type variables
 -- it's probably caused by the monomorphism restriction. 
 -- Try to identify the offending variable
 -- ASSUMPTION: the Insts are fully zonked
-mkMonomorphismMsg tidy_env insts
-  | isEmptyVarSet inst_tvs
-  = returnM (tidy_env, empty)
-  | otherwise
-  = findGlobals inst_tvs tidy_env	`thenM` \ (tidy_env, docs) ->
+mkMonomorphismMsg tidy_env inst_tvs
+  = findGlobals (mkVarSet inst_tvs) tidy_env	`thenM` \ (tidy_env, docs) ->
     returnM (tidy_env, mk_msg docs)
-
   where
-    inst_tvs = tyVarsOfInsts insts
-
-    mk_msg []   = empty		-- This happens in things like
-				--	f x = show (read "foo")
-				-- whre monomorphism doesn't play any role
+    mk_msg []   = ptext SLIT("Probable fix: add a type signature that fixes these type variable(s)")
+			-- This happens in things like
+			--	f x = show (read "foo")
+			-- whre monomorphism doesn't play any role
     mk_msg docs = vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
 			nest 2 (vcat docs),
 			ptext SLIT("Probable fix: give these definition(s) an explicit type signature")]
