@@ -30,7 +30,7 @@ import TcHsType		( tcHsSigType, UserTypeCtxt(..), tcAddLetBoundTyVars,
 			)
 import TcPat		( tcPat, PatCtxt(..) )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcMType		( newTyFlexiVarTy, tcSkolType, zonkQuantifiedTyVar )
+import TcMType		( newTyFlexiVarTy, tcSkolType, zonkQuantifiedTyVar, zonkTcTypes )
 import TcType		( TcTyVar, SkolemInfo(SigSkol), 
 			  TcTauType, TcSigmaType, 
 			  TvSubstEnv, mkTvSubst, substTheta, substTy, 
@@ -237,6 +237,7 @@ tcBindWithSigs	:: TopLevelFlag
 		-> [LSig Name]
 		-> RecFlag
 		-> TcM (LHsBinds TcId, [TcId])
+	-- The returned TcIds are guaranteed zonked
 
 tcBindWithSigs top_lvl mbind sigs is_rec = do	
   {	-- TYPECHECK THE SIGNATURES
@@ -254,8 +255,23 @@ tcBindWithSigs top_lvl mbind sigs is_rec = do
   ; ((mbind', mono_bind_infos), lie_req) 
 	<- getLIE (tcMonoBinds mbind lookup_sig is_rec)
 
-	-- GENERALISE
-  ; is_unres <- isUnRestrictedGroup mbind tc_ty_sigs
+	-- CHECK FOR UNLIFTED BINDINGS
+	-- These must be non-recursive etc, and are not generalised
+	-- They desugar to a case expression in the end
+  ; zonked_mono_tys <- zonkTcTypes (map getMonoType mono_bind_infos)
+  ; if any isUnLiftedType zonked_mono_tys then
+    do	{ 	-- Unlifted bindings
+	  checkUnliftedBinds top_lvl is_rec mbind
+	; extendLIEs lie_req
+	; let exports  = zipWith mk_export mono_bind_infos zonked_mono_tys
+	      mk_export (name, Nothing,  mono_id) mono_ty = ([], mkLocalId name mono_ty, mono_id)
+	      mk_export (name, Just sig, mono_id) mono_ty = ([], sig_id sig,             mono_id)
+
+	; return ( unitBag $ noLoc $ AbsBinds [] [] exports emptyNameSet mbind',
+		   [poly_id | (_, poly_id, _) <- exports]) }	-- Guaranteed zonked
+
+    else do	-- The normal lifted case: GENERALISE
+  { is_unres <- isUnRestrictedGroup mbind tc_ty_sigs
   ; (tyvars_to_gen, dict_binds, dict_ids)
 	<- setSrcSpan (getLoc (head (bagToList mbind)))	    $
 		-- TODO: location a bit awkward, but the mbinds have been
@@ -303,28 +319,16 @@ tcBindWithSigs top_lvl mbind sigs is_rec = do
   ; traceTc (text "binding:" <+> ppr ((dict_ids, dict_binds),
 				      exports, map idType zonked_poly_ids))
 
-	-- Check for an unlifted, non-overloaded group
-	-- In that case we must make extra checks
-  ; if any (isUnLiftedType . idType) zonked_poly_ids
-    then	-- Some bindings are unlifted
-	do { checkUnliftedBinds top_lvl is_rec tyvars_to_gen' mbind
-	   ; return (
-		    unitBag $ noLoc $
-		    AbsBinds [] [] exports inlines mbind',
-			-- Do not generate even any x=y bindings
-		    zonked_poly_ids )}
-
-    else	-- The normal case
-	return (
+  ; return (
 	    unitBag $ noLoc $
 	    AbsBinds tyvars_to_gen'
-		 dict_ids
-		 exports
-		 inlines
-		 (dict_binds `unionBags` mbind'),
+		     dict_ids
+		     exports
+		     inlines
+		     (dict_binds `unionBags` mbind'),
 	    zonked_poly_ids
         )
-  } }
+  } } }
 
 -- If typechecking the binds fails, then return with each
 -- signature-less binder given type (forall a.a), to minimise 
@@ -348,26 +352,15 @@ attachInlinePhase inline_phases bndr
 -- Check that non-overloaded unlifted bindings are
 -- 	a) non-recursive,
 --	b) not top level, 
---	c) non-polymorphic
---	d) not a multiple-binding group (more or less implied by (a))
+--	c) not a multiple-binding group (more or less implied by (a))
 
-checkUnliftedBinds top_lvl is_rec tyvars_to_gen mbind
-  = ASSERT( not (any (isUnliftedTypeKind . tyVarKind) tyvars_to_gen) )
-		-- The instCantBeGeneralised stuff in tcSimplify should have
-		-- already raised an error if we're trying to generalise an 
-		-- unboxed tyvar (NB: unboxed tyvars are always introduced 
-		-- along with a class constraint) and it's better done there 
-		-- because we have more precise origin information.
-		-- That's why we just use an ASSERT here.
-
-    checkTc (isNotTopLevel top_lvl)
+checkUnliftedBinds top_lvl is_rec mbind
+  = checkTc (isNotTopLevel top_lvl)
 	    (unliftedBindErr "Top-level" mbind)		`thenM_`
     checkTc (isNonRec is_rec)
 	    (unliftedBindErr "Recursive" mbind)		`thenM_`
     checkTc (isSingletonBag mbind)
-    	    (unliftedBindErr "Multiple" mbind)		`thenM_`
-    checkTc (null tyvars_to_gen)
-    	    (unliftedBindErr "Polymorphic" mbind)
+    	    (unliftedBindErr "Multiple" mbind)
 \end{code}
 
 
