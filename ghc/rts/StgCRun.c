@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.9 1999/12/01 14:20:11 simonmar Exp $
+ * $Id: StgCRun.c,v 1.10 2000/02/14 11:01:27 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -38,7 +38,7 @@
 
 static jmp_buf jmp_environment;
 
-#if 0
+#if 1
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
@@ -68,33 +68,100 @@ EXTFUN(StgReturn)
 
 #else
 
+static void scanStackSeg ( W_* ptr, int nwords )
+{
+   W_ w;
+   int nwords0 = nwords;
+   while (nwords > 0) {
+      w = *ptr;
+      if (IS_ARG_TAG(w)) {
+         fprintf ( stderr, "%d",w ); nwords--; ptr++;
+	 while (w) { fprintf(stderr, "_"); w--; nwords--; ptr++; }
+      }
+      else {
+         fprintf(stderr, "p"); 
+         nwords--; ptr++;
+      }
+   }
+   if (nwords < 0) fprintf(stderr, "erk: nwords < 0\n");
+   checkStackChunk ( ptr, ptr-nwords0 );
+}
+
+
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     char* nm;
-    while ( f ) {
+    while (1) {
 
-#if 0
-      //IF_DEBUG(evaluator,
-                fprintf(stderr,"Jumping to ");
-                nm = nameOfObjSym ( f );
-                if (nm)
-                   fprintf(stderr, "%s (%p)", nm, f); else
-                   printPtr((P_)f);
-                fprintf(stderr,"\n");
-		//         );
-if (0&& MainRegTable.rSp) {
+#define STACK_DETAILS 0
+
+#if STACK_DETAILS
+   {
    int i;
-   StgWord* p = MainRegTable.rSp;
-fprintf(stderr, "SP = %p\n", p);
-   p += (8-1);
-   for (i = 0; i < 8; i++, p--)
-      fprintf (stderr, "-- %p: %p\n", p, *p );
-}    
+   StgWord* sp  = basereg->rSp;
+   StgWord* su  = basereg->rSu;
+   StgTSO*  tso = basereg->rCurrentTSO;
+   StgWord* sb  = tso->stack + tso->stack_size;
+   int ws;
+
+   fprintf(stderr, "== SP = %p   SU = %p\n", sp,su);
+
+   if (su >= sb) goto postloop;
+   if (!sp || !su) goto postloop;
+
+   //printStack ( sp, sb, su);
+
+   while (1) {
+      ws = su - sp;
+      switch (get_itbl((StgClosure*)su)->type) {
+         case STOP_FRAME: 
+            scanStackSeg(sp,ws);
+            fprintf(stderr, "S%d ",ws); 
+            fprintf(stderr, "\n");
+            goto postloop;
+         case UPDATE_FRAME: 
+            scanStackSeg(sp,ws);
+            fprintf(stderr,"U%d ",ws); 
+            sp = su + sizeofW(StgUpdateFrame);
+            su = ((StgUpdateFrame*)su)->link;
+            break;
+         case SEQ_FRAME: 
+            scanStackSeg(sp,ws);
+            fprintf(stderr,"Q%d ",ws); 
+            sp = su + sizeofW(StgSeqFrame);
+            su = ((StgSeqFrame*)su)->link;
+            break;
+         case CATCH_FRAME: 
+            scanStackSeg(sp,ws);
+            fprintf(stderr,"C%d ",ws); 
+            sp = su + sizeofW(StgCatchFrame);
+            su = ((StgCatchFrame*)su)->link;
+            break;
+         default:
+            fprintf(stderr, "?\nweird record on stack\n");
+            goto postloop;
+      }
+   }
+   postloop:
+   }
 #endif    
 
+#if STACK_DETAILS
+       fprintf(stderr,"\n");
+#endif
+       fprintf(stderr,"-- enter: ");
+       nm = nameFromOPtr ( f );
+       if (nm)
+            fprintf(stderr, "%s (%p)", nm, f); else
+            printPtr((P_)f);
+       fprintf ( stderr, "\n");
+#if STACK_DETAILS
+       fprintf(stderr,"\n");
+#endif
        f = (StgFunPtr) (f)();
+       if (!f) break;
     }
-
+    fprintf (stderr, "miniInterpreter: bye!\n\n" );
     return (StgThreadReturnCode)R1.i;
 }
 
