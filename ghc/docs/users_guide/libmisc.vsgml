@@ -556,7 +556,7 @@ unzipWith   :: (a -> b -> c) -> [(a, b)] -> [c]
 %*                                                                      *
 %************************************************************************
 
-The GHC system library (@-syslib ghc@) also provides interfaces to
+The GHC system library (@-syslib misc@) also provides interfaces to
 several useful C libraries, mostly from the GNU project.
 
 %************************************************************************
@@ -600,8 +600,8 @@ will see in the GNU readline documentation.)
 
 %************************************************************************
 %*                                                                      *
-<sect2>The @Regexp@ and @MatchPS@ interfaces
-<label id="Regexp">
+<sect2>The @Regex@ and @MatchPS@ interfaces
+<label id="Regex">
 <p>
 <nidx>Regex library (GHC syslib)</nidx>
 <nidx>MatchPS library (GHC syslib)</nidx>
@@ -612,9 +612,10 @@ will see in the GNU readline documentation.)
 (Sigbjorn Finne supplied the regular-expressions interface.)
 
 The @Regex@ library provides quite direct interface to the GNU
-regular-expression library, for doing manipulation on
-@PackedString@s.  You probably need to see the GNU documentation
-if you are operating at this level.
+regular-expression library, for doing manipulation on @PackedString@s.
+You probably need to see the GNU documentation if you are operating at
+this level.  Alternatively, you can use the simpler and higher-level
+@RegexString@ interface.
 
 The datatypes and functions that @Regex@ provides are:
 <tscreen><verb>
@@ -740,6 +741,36 @@ chopPS :: PackedString -> PackedString
 -- from the beginning of strB (handy when matching fancy literals in
 -- parsers):
 matchPrefixPS :: PackedString -> PackedString -> Int
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
+<sect2>The @RegexString@ interface
+<label id="RegexString">
+<p>
+<nidx>RegexString library (GHC syslib)</nidx>
+<nidx>regular-expressions library</nidx>
+%*                                                                      *
+%************************************************************************
+
+(Simon Marlow supplied the String Regex wrapper.)
+
+For simple regular expression operations, the @Regex@ library is a
+little heavyweight.  @RegexString@ permits regex matching on ordinary
+Haskell @String@s.
+
+The datatypes and functions that @RegexString@ provides are:
+<tscreen><verb>
+data Regex              -- a compiled regular expression
+
+mkRegEx
+        :: String       -- regexp to compile
+        -> Regex        -- compiled regexp
+
+matchRegex
+        :: Regex        -- compiled regexp
+        -> String       -- string to match
+        -> Maybe [String] -- text of $1, $2, ... (if matched)
 </verb></tscreen>
 
 %************************************************************************
