@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.6 2001/06/22 12:36:33 rrt Exp $
+-- $Id: CPUTime.hsc,v 1.7 2001/06/28 16:44:18 rrt Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -89,14 +89,14 @@ foreign import unsafe times :: Ptr CTms -> CClock
     pid <- getCurrentProcess
     ok <- getProcessTimes pid p_creationTime p_exitTime p_kernelTime p_userTime
     if toBool ok then do
-      ut <- ft2usecs p_userTime
-      kt <- ft2usecs p_kernelTime
+      ut <- ft2psecs p_userTime
+      kt <- ft2psecs p_kernelTime
       return (fromIntegral (ut + kt))
      else return 0
-  where ft2usecs ft = do
+  where ft2psecs ft = do
           high <- (#peek FILETIME,dwHighDateTime) ft :: IO CLong
           low <- (#peek FILETIME,dwLowDateTime) ft :: IO CLong
-          return (high * (2^32) + low)
+          return (((fromIntegral high) * (2^32) + (fromIntegral low)) * 100000)
 
     -- ToDo: pin down elapsed times to just the OS thread(s) that
     -- are evaluating/managing Haskell code.
