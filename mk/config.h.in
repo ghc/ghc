@@ -629,6 +629,9 @@
 /* Define if you have the access function.  */
 #undef HAVE_ACCESS
 
+/* Define if you have the <arpa/inet.h> header file.  */
+#undef HAVE_ARPA_INET_H
+
 /* Define if you have the dlopen function.  */
 #undef HAVE_DLOPEN
 
@@ -791,6 +794,12 @@
 /* Define if you have the <memory.h> header file.  */
 #undef HAVE_MEMORY_H
 
+/* Define if you have the <netdb.h> header file.  */
+#undef HAVE_NETDB_H
+
+/* Define if you have the <netinet/in.h> header file.  */
+#undef HAVE_NETINET_IN_H
+
 /* Define if you have the <netinet/tcp.h> header file.  */
 #undef HAVE_NETINET_TCP_H
 
@@ -880,6 +889,9 @@
 
 /* Define if you have the <sys/types.h> header file.  */
 #undef HAVE_SYS_TYPES_H
+
+/* Define if you have the <sys/un.h> header file.  */
+#undef HAVE_SYS_UN_H
 
 /* Define if you have the <sys/utsname.h> header file.  */
 #undef HAVE_SYS_UTSNAME_H
