@@ -70,6 +70,8 @@ $(OBJDIR)/Foreign/Marshal/Utils.$O:  $(OBJDIR)/Data/Maybe.$O \
 $(OBJDIR)/Foreign/Marshal/Error.$O: $(OBJDIR)/Foreign/Ptr.$O
 $(OBJDIR)/Foreign/C/String.$O: $(OBJDIR)/Data/Word.$O $(OBJDIR)/Foreign/Ptr.$O \
 	$(OBJDIR)/Foreign/Marshal/Array.$O $(OBJDIR)/Foreign/C/Types.$O 
+$(OBJDIR)/Foreign/C.$O: $(OBJDIR)/Foreign/C/Types.$O \
+	$(OBJDIR)/Foreign/C/Error.$O $(OBJDIR)/Foreign/C/String.$O
 
 # C-files dependencies.
 Data/FiniteMap.$C: Data/Maybe.$C
@@ -93,4 +95,5 @@ Foreign/Marshal/Utils.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
 Foreign/Marshal/Error.$C:  Foreign/Ptr.$C
 Foreign/C/String.$C:       Data/Word.$C Foreign/Ptr.$C Foreign/C/Types.$C \
 	Foreign/Marshal/Array.$C
+Foreign/C.$C:      Foreign/C/Types.$C Foreign/C/Error.$C Foreign/C/String/$C
 
