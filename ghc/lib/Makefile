@@ -14,9 +14,6 @@ WAYS=$(GhcLibWays)
 
 ifeq "$(way)" ""
 SUBDIRS = cbits
-ifeq ($(IncludeTestDirsInBuild),YES)
-  SUBDIRS += tests
-endif
 else
 SUBDIRS=
 endif
