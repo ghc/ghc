@@ -12,25 +12,35 @@
 
 set -e
 
-long='-optc-DNO_REGS -optc-DUSE_MINIINTERPRETER -fno-asm-mangling -funregisterised -fvia-C'
-
 base=`pwd`
+
+# set this to the location of your source tree
+fptools_dir=$HOME/fptools
 
 if [ ! -f b1-stamp ]; then
   mkdir b1
   cd b1
-  lndir ../fptools
+  lndir $fptools_dir
   cd ..
 
-  mkdir b1-obj
-
   cd b1
-   ./configure --prefix=$base/b1-obj
-   echo "GhcLibHcOpts = -O -H24m -keep-hc-files-too $long" >> mk/config.mk
-   echo "GhcRtsHcOpts = -O $long" >> mk/config.mk
-   make boot
-   make all
-   make install
+   ./configure
+
+   # For cross-compilation, at this stage you may want to set up a source
+   # tree on the target machine, run the configure script there, and bring
+   # the resulting mk/config.h file back into this tree before building
+   # the libraries.
+
+   echo "GhcUnregisterised = YES" >> mk/config.mk
+   echo "GhcLibHcOpts = -O -H32m -fvia-C -keep-hc-files" >> mk/config.mk
+   echo "GhcLibWays =" >> mk/config.mk
+   echo "SplitObjs = NO" >> mk/config.mk
+
+   # We could optimise slightly by not building hslibs here.  Also, building
+   # the RTS is not necessary (and might not be desirable if we're using
+   # a config.h from the target system).
+   make stage1
+
   cd ..
 
   touch b1-stamp
@@ -41,18 +51,19 @@ fi
 if [ ! -f b2-stamp ]; then
   mkdir b2
   cd b2
-  lndir ../fptools
+  lndir $fptools_dir
   cd ..
 
-  mkdir b2-obj
   cd b2
-   ./configure --prefix=$base/b2-obj --with-hc=$base/b1-obj/bin/ghc
-   echo "WithGhcHc = $base/b1-obj/bin/ghc" >> mk/config.mk
-   echo "GhcHcOpts = -O -H24m -keep-hc-files-too $long" >> mk/config.mk
-   echo "GhcWithNativeCodeGen=NO" >> mk/config.mk
-   make boot
-   make all
-   make install
+   ./configure --with-ghc=$base/b1/ghc/compiler/stage1/ghc-inplace
+
+   echo "GhcHcOpts = -O -H32m -fvia-C -keep-hc-files" >> mk/config.mk
+   echo "GhcWithNativeCodeGen = NO" >> mk/config.mk
+
+   # we just need to build the compiler...
+   (cd glafp-utils && make boot && make)
+   (cd ghc && make boot)
+   (cd ghc/compiler && make stage=1)
   cd ..
 
   touch b2-stamp
