@@ -99,7 +99,7 @@ StgAddr buf;
 StgInt len;
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    int count=0,rc=0,orig_len;
+    int count=0,rc=0, total_count;
     int fd;
     char* p;
 
@@ -148,20 +148,17 @@ StgInt len;
     if (len - count <= 0)
        return count;
 
-    orig_len = len;
     len -= count;
     p = buf;
     p += count;
+    total_count = count;
 
     if ( fo->flags & FILEOBJ_NONBLOCKING_IO && inputReady (ptr,0) != 1 )
       return FILEOBJ_BLOCKED_READ;
 
     while ((count = read(fd, p, len)) < len) {
-	if ( count == 0 ) {
-            FILEOBJ_SET_EOF(fo);
-	    ghc_errtype = ERR_EOF;
-	    ghc_errstr = "";
-	    return -1;
+	if ( count == 0 ) { /* EOF */
+	    return total_count;
 	} else if ( count == -1 && errno == EAGAIN) {
 	    errno = 0;
 	    return FILEOBJ_BLOCKED_READ;
@@ -170,13 +167,14 @@ StgInt len;
 	    stdErrno();
 	    return -1;
 	}
+        total_count += count;
 	len -= count;
 	p += count;
     }
 
-    fo->bufWPtr = orig_len;
+    fo->bufWPtr = total_count;
     fo->bufRPtr = 0;
-    return count;
+    return total_count;
 }
 
 /*
