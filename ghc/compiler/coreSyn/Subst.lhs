@@ -386,8 +386,8 @@ zipTyEnv tyvars tys
   | length tyvars /= length tys
   = pprTrace "mkTopTyVarSubst" (ppr tyvars $$ ppr tys) emptySubstEnv
   | otherwise
-  = zip_ty_env tyvars tys emptySubstEnv
 #endif
+  = zip_ty_env tyvars tys emptySubstEnv
 
 zip_ty_env []       []       env = env
 zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
