@@ -1,10 +1,14 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getClockTime.c,v 1.7 1999/10/20 10:08:33 sof Exp $
+ * $Id: getClockTime.c,v 1.8 1999/10/26 09:34:09 sof Exp $
  *
  * getClockTime Runtime Support
  */
+
+#ifndef _AIX
+#define NON_POSIX_SOURCE    /* gettimeofday */
+#endif
 
 #include "Rts.h"
 #include "stgio.h"
