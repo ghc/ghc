@@ -1,10 +1,11 @@
 -- -----------------------------------------------------------------------------
--- $Id: System.lhs,v 1.35 2001/09/21 13:24:37 simonmar Exp $
+-- $Id: System.lhs,v 1.36 2001/10/13 16:02:47 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
 
 \begin{code}
+#include "config.h"
 module System 
     ( 
       ExitCode(ExitSuccess,ExitFailure)
@@ -120,11 +121,21 @@ exitFailure = exitWith (ExitFailure 1)
 unpackProgName	:: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do 
   s <- peekElemOff argv 0 >>= peekCString
-  return (de_slash "" s)
+  return (basename s)
   where
-    -- re-start accumulating at every '/'
-    de_slash :: String -> String -> String
-    de_slash  acc []	   = reverse acc
-    de_slash _acc ('/':xs) = de_slash []      xs
-    de_slash  acc (x:xs)   = de_slash (x:acc) xs
+   basename :: String -> String
+   basename f = go f f
+    where
+      go acc [] = acc
+      go acc (x:xs) 
+        | isPathSeparator x = go xs xs
+        | otherwise         = go acc xs
+
+   isPathSeparator :: Char -> Bool
+   isPathSeparator '/'  = True
+#ifdef mingw32_TARGET_OS 
+   isPathSeparator '\\' = True
+#endif
+   isPathSeparator _    = False
+
 \end{code}
