@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.24 2003/05/21 12:46:19 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.25 2003/06/04 15:47:59 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -11,6 +11,7 @@
 
 module DriverPhases (
    Phase(..),
+   happensBefore,
    startPhase,		-- :: String -> Phase
    phaseInputExt, 	-- :: Phase -> String
 
@@ -40,8 +41,7 @@ import DriverUtil
 -}
 
 data Phase 
-	= MkDependHS	-- haskell dependency generation
-	| Unlit
+	= Unlit
 	| Cpp
 	| HsPp
 	| Hsc
@@ -57,6 +57,17 @@ data Phase
 	| Ilasm
 #endif
   deriving (Eq, Show)
+
+-- Partial ordering on phases: we want to know which phases will occur before 
+-- which others.  This is used for sanity checking, to ensure that the
+-- pipeline will stop at some point (see DriverPipeline.runPipeline).
+x `happensBefore` y 
+	| x `elem` haskell_pipe = y `elem` tail (dropWhile (/= x) haskell_pipe)
+	| x `elem` c_pipe       = y `elem` tail (dropWhile (/= x) c_pipe)
+	| otherwise = False
+
+haskell_pipe = [Unlit,Cpp,HsPp,Hsc,HCc,Mangle,As,Ln]
+c_pipe       = [Cc,As,Ln]
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.
@@ -90,7 +101,6 @@ phaseInputExt SplitMangle = "split_s"	-- not really generated
 phaseInputExt As          = "s"
 phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
-phaseInputExt MkDependHS  = "dep"
 #ifdef ILX
 phaseInputExt Ilx2Il      = "ilx"
 phaseInputExt Ilasm       = "il"

@@ -11,7 +11,7 @@
 module DriverPipeline (
 
 	-- Interfaces for the batch-mode driver
-   genPipeline, runPipeline, pipeLoop, staticLink,
+   runPipeline, staticLink,
 
 	-- Interfaces for the compilation manager (interpreted/batch-mode)
    preprocess, 
@@ -71,12 +71,10 @@ preprocess :: FilePath -> IO FilePath
 preprocess filename =
   ASSERT(haskellish_src_file filename) 
   do restoreDynFlags	-- Restore to state of last save
-     let fInfo = (filename, getFileSuffix filename)
-     pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
-			     defaultHscLang fInfo
-     (fn,_)   <- runPipeline pipeline fInfo
-     	                     False{-no linking-} False{-no -o flag-}
-     return fn
+     runPipeline (StopBefore Hsc) ("preprocess") 
+	False{-temporary output file-}
+	Nothing{-no specific output file-}
+	filename
 
 -- ---------------------------------------------------------------------------
 -- Compile
@@ -202,18 +200,18 @@ compile ghci_mode this_mod location
 		       Nothing -> panic "compile: no interpreted code"
 
 		-- we're in batch mode: finish the compilation pipeline.
-		_other -> do pipe <- genPipeline (StopBefore Ln) "" True 
-					hsc_lang (output_fn, getFileSuffix output_fn)
-                             -- runPipeline takes input_fn so it can split off 
-                             -- the base name and use it as the base of 
-                             -- the output object file.
-                             let (basename, suffix) = splitFilename input_fn
-			     (o_file,_) <- 
-			         pipeLoop pipe (output_fn, getFileSuffix output_fn)
-			     		       False False 
-                                               basename suffix
-                             o_time <- getModificationTime o_file
-			     return ([DotO o_file], o_time)
+		_other -> do
+		   let object_filename = ml_obj_file location
+		       object_dir = directoryOf object_filename
+
+		   -- create the object dir if it doesn't exist
+		   createDirectoryHierarchy object_dir
+
+		   runPipeline (StopBefore Ln) ""
+			True (Just object_filename) output_fn
+
+		   o_time <- getModificationTime object_filename
+		   return ([DotO object_filename], o_time)
 
 	   let linkable = LM unlinked_time mod_name
 			     (hs_unlinked ++ stub_unlinked)
@@ -228,9 +226,10 @@ compileStub dflags stub_c_exists
   | stub_c_exists = do
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
-	pipeline   <- genPipeline (StopBefore Ln) "" True defaultHscLang (stub_c,"c")
-	(stub_o,_) <- runPipeline pipeline (stub_c,"c") False{-no linking-} 
-			          False{-no -o option-}
+	stub_o <- runPipeline (StopBefore Ln) "stub-compile"
+			True{-persistent output-} 
+			Nothing{-no specific output file-}
+			stub_c
 	return (Just stub_o)
 
 
@@ -302,57 +301,86 @@ link Batch dflags batch_attempt_linking hpt
    where
       verb = verbosity dflags
       
+-- ---------------------------------------------------------------------------
+-- Run a compilation pipeline, consisting of multiple phases.
+
+runPipeline
+  :: GhcMode		-- when to stop
+  -> String		-- "stop after" flag
+  -> Bool		-- final output is persistent?
+  -> Maybe FilePath	-- where to put the output, optionally
+  -> FilePath 		-- input filename
+  -> IO FilePath	-- output filename
+
+runPipeline todo stop_flag keep_output maybe_output_filename input_fn
+  = do
+  split <- readIORef v_Split_object_files
+  let (basename, suffix) = splitFilename input_fn
+      start_phase = startPhase suffix
+
+      stop_phase = case todo of 
+			StopBefore As | split -> SplitAs
+			StopBefore phase      -> phase
+			DoMkDependHS	      -> Ln
+			DoLink                -> Ln
+			DoMkDLL               -> Ln
+
+  -- We want to catch cases of "you can't get there from here" before
+  -- we start the pipeline, because otherwise it will just run off the
+  -- end.
+  --
+  -- There is a partial ordering on phases, where A < B iff A occurs
+  -- before B in a normal compilation pipeline.
+  --
+  when (not (start_phase `happensBefore` stop_phase)) $
+	throwDyn (UsageError 
+		    ("flag `" ++ stop_flag
+		     ++ "' is incompatible with source file `"
+		     ++ input_fn ++ "'"))
+
+  -- generate a function which will be used to calculate output file names
+  -- as we go along.
+  get_output_fn <- genOutputFilenameFunc keep_output maybe_output_filename
+			stop_phase basename
+
+  -- and execute the pipeline...
+  output_fn <- pipeLoop start_phase stop_phase input_fn basename suffix 
+		 get_output_fn
+
+  -- sometimes, a compilation phase doesn't actually generate any output
+  -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
+  -- stage, but we wanted to keep the output, then we have to explicitly
+  -- copy the file.
+  if keep_output
+	then do final_fn <- get_output_fn stop_phase
+	        when (final_fn /= output_fn) $
+	 	  copy ("Copying `" ++ output_fn ++ "' to `" ++ final_fn
+			++ "'") output_fn final_fn
+	        return final_fn
+	else
+	     return output_fn
 
 
+pipeLoop :: Phase -> Phase -> FilePath -> String -> Suffix
+  -> (Phase -> IO FilePath) -> IO FilePath
+pipeLoop phase stop_phase input_fn orig_basename orig_suff get_output_fn
+  | phase == stop_phase  =  return input_fn  -- all done
+  | otherwise = do
+	maybe_next_phase <- runPhase phase orig_basename orig_suff input_fn
+				get_output_fn
+	case maybe_next_phase of
+	  (Nothing, output_fn) -> return output_fn
+	  (Just next_phase, output_fn) -> 
+		pipeLoop next_phase stop_phase output_fn
+			orig_basename orig_suff get_output_fn
 
--- --------------------------------------------------------------------------
--- genPipeline: Pipeline construction
-
--- Herein is all the magic about which phases to run in which order, whether
--- the intermediate files should be in TMPDIR or in the current directory,
--- what the suffix of the intermediate files should be, etc.
-
--- The following compilation pipeline algorithm is fairly hacky.  A
--- better way to do this would be to express the whole compilation as a
--- data flow DAG, where the nodes are the intermediate files and the
--- edges are the compilation phases.  This framework would also work
--- nicely if a haskell dependency generator was included in the
--- driver.
-
--- It would also deal much more cleanly with compilation phases that
--- generate multiple intermediates, (eg. hsc generates .hc, .hi, and
--- possibly stub files), where some of the output files need to be
--- processed further (eg. the stub files need to be compiled by the C
--- compiler).
-
--- A cool thing to do would then be to execute the data flow graph
--- concurrently, automatically taking advantage of extra processors on
--- the host machine.  For example, when compiling two Haskell files
--- where one depends on the other, the data flow graph would determine
--- that the C compiler from the first compilation can be overlapped
--- with the hsc compilation for the second file.
-
-data IntermediateFileType
-  = Temporary
-  | Persistent
-  deriving (Eq, Show)
-
-genPipeline
-   :: GhcMode		 -- when to stop
-   -> String		 -- "stop after" flag (for error messages)
-   -> Bool		 -- True => output is persistent
-   -> HscLang		 -- preferred output language for hsc
-   -> (FilePath, String) -- original filename & its suffix 
-   -> IO [ 		-- list of phases to run for this file
-	     (Phase,
-	      IntermediateFileType,  -- keep the output from this phase?
-	      String)   	     -- output file suffix
-         ]	
-
-genPipeline todo stop_flag persistent_output lang (filename,suffix)
+  
+genOutputFilenameFunc :: Bool -> Maybe FilePath -> Phase -> String
+  -> IO (Phase{-next phase-} -> IO FilePath)
+genOutputFilenameFunc keep_output maybe_output_filename stop_phase basename
  = do
-   split      <- readIORef v_Split_object_files
-   mangle     <- readIORef v_Do_asm_mangling
+   hcsuf      <- readIORef v_HC_suf
+   osuf       <- readIORef v_Object_suf
    keep_hc    <- readIORef v_Keep_hc_files
 #ifdef ILX
    keep_il    <- readIORef v_Keep_il_files
@@ -360,241 +388,71 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 #endif
    keep_raw_s <- readIORef v_Keep_raw_s_files
    keep_s     <- readIORef v_Keep_s_files
-   osuf       <- readIORef v_Object_suf
-   hcsuf      <- readIORef v_HC_suf
-
    let
-   ----------- -----  ----   ---   --   --  -  -  -
-    start = startPhase suffix
+        myPhaseInputExt HCc | Just s <- hcsuf = s
+        myPhaseInputExt Ln    = osuf
+        myPhaseInputExt other = phaseInputExt other
 
-      -- special case for mkdependHS: .hspp files go through MkDependHS
-    start_phase | todo == DoMkDependHS && start == Hsc  = MkDependHS
-	        | otherwise = start
-
-    haskellish = haskellish_suffix suffix
-    cish = cish_suffix suffix
-
-       -- for a .hc file we need to force lang to HscC
-    real_lang | start_phase == HCc || start_phase == Mangle = HscC
-	      | otherwise                                   = lang
-
-   let
-   ----------- -----  ----   ---   --   --  -  -  -
-    pipeline = preprocess ++ compile
-
-    preprocess
-	| haskellish = [ Unlit, Cpp, HsPp ]
-	| otherwise  = [ ]
-
-    compile
-      | todo == DoMkDependHS = [ MkDependHS ]
-
-      | cish = [ Cc, As ]
-
-      | haskellish = 
-       case real_lang of
-	HscC    | split && mangle -> [ Hsc, HCc, Mangle, SplitMangle, SplitAs ]
-	        | mangle          -> [ Hsc, HCc, Mangle, As ]
-	        | split	       	  -> not_valid
-	        | otherwise       -> [ Hsc, HCc, As ]
-
-	HscAsm  | split           -> [ Hsc, SplitMangle, SplitAs ]
-	        | otherwise       -> [ Hsc, As ]
-
-	HscJava	| split	          -> not_valid
-		| otherwise       -> error "not implemented: compiling via Java"
-#ifdef ILX
-	HscILX  | split           -> not_valid
-		| otherwise       -> [ Hsc, Ilx2Il, Ilasm ]
-#endif
-	HscNothing		  -> [ Hsc, HCc ] -- HCc is a dummy stop phase
-
-      | otherwise = [ ]  -- just pass this file through to the linker
-
-	-- ToDo: this is somewhat cryptic
-    not_valid = throwDyn (UsageError ("invalid option combination"))
-
-    stop_phase = case todo of 
-			StopBefore As | split -> SplitAs
-#ifdef ILX
-                                      | real_lang == HscILX -> Ilasm
-#endif
-			StopBefore phase      -> phase
-			DoMkDependHS	      -> Ln
-			DoLink                -> Ln
-			DoMkDLL               -> Ln
-   ----------- -----  ----   ---   --   --  -  -  -
-
-	-- this shouldn't happen.
-   when (start_phase /= Ln && start_phase `notElem` pipeline)
-	(throwDyn (CmdLineError ("can't find starting phase for "
-			         ++ filename)))
-	-- if we can't find the phase we're supposed to stop before,
-	-- something has gone wrong.  This test carefully avoids the
-	-- case where we aren't supposed to do any compilation, because the file
-	-- is already in linkable form (for example).
---   hPutStrLn stderr (show ((start_phase `elem` pipeline,stop_phase /= Ln,stop_phase `notElem` pipeline), start_phase, stop_phase, pipeline,todo))
---   hFlush stderr
-   when (start_phase `elem` pipeline && 
-   	 (stop_phase /= Ln && stop_phase `notElem` pipeline))
-        (do
-	  throwDyn (UsageError 
-		    ("flag `" ++ stop_flag
-		     ++ "' is incompatible with source file `"
-		     ++ filename ++ "'" ++ show pipeline ++ show stop_phase)))
-   let
-	-- .o and .hc suffixes can be overriden by command-line options:
-      myPhaseInputExt HCc | Just s <- hcsuf = s
-      myPhaseInputExt Ln    = osuf
-      myPhaseInputExt other = phaseInputExt other
-
-      annotatePipeline
-	 :: [Phase]		-- raw pipeline
-	 -> Phase		-- phase to stop before
-     	 -> [(Phase, IntermediateFileType, String{-file extension-})]
-      annotatePipeline []     _    = []
-      annotatePipeline (Ln:_) _    = []
-      annotatePipeline (phase:next_phase:ps) stop = 
-     	  (phase, keep_this_output, myPhaseInputExt next_phase)
-	     : annotatePipeline (next_phase:ps) stop
-     	  where
-     		keep_this_output
-     		     | next_phase == stop 
-                     = if persistent_output then Persistent else Temporary
-     		     | otherwise
+	func next_phase
+     		| next_phase == stop_phase
+                     = case maybe_output_filename of
+			     Just file -> return file
+			     Nothing | keep_output -> return persistent
+				     | otherwise   -> newTempName suffix
+			-- sometimes, we keep output from intermediate stages
+     		| otherwise
      		     = case next_phase of
-     			     Ln -> Persistent
-     			     Mangle | keep_raw_s -> Persistent
-     			     As     | keep_s     -> Persistent
-     			     HCc    | keep_hc    -> Persistent
-#ifdef ILX
-			     Ilx2Il | keep_ilx   -> Persistent
-			     Ilasm  | keep_il    -> Persistent
-#endif
-     			     _other              -> Temporary
+     			     Ln                  -> return persistent
+     			     Mangle | keep_raw_s -> return persistent
+     			     As     | keep_s     -> return persistent
+     			     HCc    | keep_hc    -> return persistent
+     			     _other              -> newTempName suffix
+	   where
+		suffix = myPhaseInputExt next_phase
+		persistent = basename ++ '.':suffix
 
-	-- add information about output files to the pipeline
-	-- the suffix on an output file is determined by the next phase
-	-- in the pipeline, so we add linking to the end of the pipeline
-	-- to force the output from the final phase to be a .o file.
-
-      annotated_pipeline = annotatePipeline (pipeline ++ [Ln]) stop_phase
-
-      phase_ne p (p1,_,_) = (p1 /= p)
-   ----------- -----  ----   ---   --   --  -  -  -
-
-   return (
-     takeWhile (phase_ne stop_phase ) $
-     dropWhile (phase_ne start_phase) $
-     annotated_pipeline
-    )
+   return func
 
 
-runPipeline
-  :: [ (Phase, IntermediateFileType, String) ] -- phases to run
-  -> (String,String)		-- input file
-  -> Bool			-- doing linking afterward?
-  -> Bool			-- take into account -o when generating output?
-  -> IO (String, String)	-- return final filename
+-- -----------------------------------------------------------------------------
+-- Each phase in the pipeline returns the next phase to execute, and the
+-- name of the file in which the output was placed.
+--
+-- We must do things dynamically this way, because we often don't know
+-- what the rest of the phases will be until part-way through the
+-- compilation: for example, an {-# OPTIONS -fasm #-} at the beginning
+-- of a source file can change the latter stages of the pipeline from
+-- taking the via-C route to using the native code generator.
 
-runPipeline pipeline (input_fn,suffix) do_linking use_ofile
-  = pipeLoop pipeline (input_fn,suffix) do_linking use_ofile basename suffix
-  where (basename, _) = splitFilename input_fn
+runPhase :: Phase
+	  -> String	-- basename of original input source
+	  -> String	-- its extension
+	  -> FilePath	-- name of file which contains the input to this phase.
+	  -> (Phase -> IO FilePath)	-- how to calculate the output filename
+	  -> IO (Maybe Phase,   -- next phase
+		 FilePath)	-- output filename
 
-pipeLoop [] input_fn _ _ _ _ = return input_fn
-pipeLoop (all_phases@((phase, keep, o_suffix):phases))
-	(input_fn,real_suff) do_linking use_ofile orig_basename orig_suffix
-  = do
-
-     output_fn <- outputFileName (null phases) keep o_suffix
-
-     mbCarryOn <- run_phase phase orig_basename orig_suffix
-     			    input_fn output_fn 
-	-- sometimes we bail out early, eg. when the compiler's recompilation
-	-- checker has determined that recompilation isn't necessary.
-     case mbCarryOn of
-       Nothing -> do
-	      let (_,keep,final_suffix) = last all_phases
-	      ofile <- outputFileName True keep final_suffix
-	      return (ofile, final_suffix)
-          -- carry on ...
-       Just fn -> do
-		{-
-		  Check to see whether we've reached the end of the
-		  pipeline, but did so with an ineffective last stage.
-		  (i.e., it returned the input_fn as the output filename).
-		  
-		  If we did and the output is persistent, copy the contents
-		  of input_fn into the file where the pipeline's output is
-		  expected to end up.
-		-}
-	      atEnd <- finalStage (null phases)
-	      when (atEnd && fn == input_fn)
-	      	   (copy "Saving away compilation pipeline's output"
-		   	 input_fn
-			 output_fn)
-              {-
-	       Notice that in order to keep the invariant that we can
-	       determine a compilation pipeline's 'start phase' just
-	       by looking at the input filename, the input filename
-	       to the next stage/phase is associated here with the suffix
-	       of the output file, *even* if it does not have that
-	       suffix in reality.
-	       
-	       Why is this important? Because we may run a compilation
-	       pipeline in stages (cf. Main.main.compileFile's two stages),
-	       so when generating the next stage we need to be precise
-	       about what kind of file (=> suffix) is given as input.
-
-	       [Not having to generate a pipeline in stages seems like
-	        the right way to go, but I've punted on this for now --sof]
-	       
-	      -}
-              pipeLoop phases (fn, o_suffix) do_linking use_ofile
-       			orig_basename orig_suffix
-  where
-     finalStage lastPhase = do
-       o_file <- readIORef v_Output_file
-       return (lastPhase && not do_linking && use_ofile && isJust o_file)
-
-     outputFileName last_phase keep suffix
-  	= do o_file <- readIORef v_Output_file
-	     atEnd  <- finalStage last_phase
-   	     if atEnd
-   	       then case o_file of 
-   		       Just s  -> return s
-   		       Nothing -> error "outputFileName"
-   	       else if keep == Persistent
-   			   then odir_ify (orig_basename ++ '.':suffix)
-   			   else newTempName suffix
-
-run_phase :: Phase
-	  -> String                -- basename of original input source
-	  -> String		   -- its extension
-	  -> FilePath		   -- name of file which contains the input to this phase.
-	  -> FilePath              -- where to stick the result.
-	  -> IO (Maybe FilePath)
-	  	  -- Nothing => stop the compilation pipeline
-		  -- Just fn => the result of this phase can be found in 'fn'
-		  --            (this can either be 'input_fn' or 'output_fn').
 -------------------------------------------------------------------------------
 -- Unlit phase 
 
-run_phase Unlit _basename _suff input_fn output_fn
+runPhase Unlit _basename _suff input_fn get_output_fn
   = do unlit_flags <- getOpts opt_L
        -- The -h option passes the file name for unlit to put in a #line directive
+       output_fn <- get_output_fn Cpp
+
        SysTools.runUnlit (map SysTools.Option unlit_flags ++
        			  [ SysTools.Option     "-h"
  			  , SysTools.Option     input_fn
 			  , SysTools.FileOption "" input_fn
 			  , SysTools.FileOption "" output_fn
 			  ])
-       return (Just output_fn)
+
+       return (Just Cpp, output_fn)
 
 -------------------------------------------------------------------------------
 -- Cpp phase 
 
-run_phase Cpp basename suff input_fn output_fn
+runPhase Cpp basename suff input_fn get_output_fn
   = do src_opts <- getOptionsFromSource input_fn
        unhandled_flags <- processArgs dynamic_flags src_opts []
        checkProcessArgsResult unhandled_flags basename suff
@@ -603,7 +461,7 @@ run_phase Cpp basename suff input_fn output_fn
        if not do_cpp then
            -- no need to preprocess CPP, just pass input file along
 	   -- to the next phase of the pipeline.
-          return (Just input_fn)
+          return (Just HsPp, input_fn)
 	else do
 	    hscpp_opts	    <- getOpts opt_P
        	    hs_src_cpp_opts <- readIORef v_Hs_source_cpp_opts
@@ -616,6 +474,8 @@ run_phase Cpp basename suff input_fn output_fn
 
 	    verb <- getVerbFlag
 	    (md_c_flags, _) <- machdepCCOpts
+
+	    output_fn <- get_output_fn HsPp
 
 	    SysTools.runCpp ([SysTools.Option verb]
 			    ++ map SysTools.Option include_paths
@@ -636,21 +496,23 @@ run_phase Cpp basename suff input_fn output_fn
 			       , SysTools.Option     "-o"
 			       , SysTools.FileOption "" output_fn
 			       ])
-	    return (Just output_fn)
+
+	    return (Just HsPp, output_fn)
 
 -------------------------------------------------------------------------------
 -- HsPp phase 
 
-run_phase HsPp basename suff input_fn output_fn
-  = do let orig_fn = basename ++ '.':suff
-       do_pp   <- dynFlag ppFlag
+runPhase HsPp basename suff input_fn get_output_fn
+  = do do_pp   <- dynFlag ppFlag
        if not do_pp then
            -- no need to preprocess, just pass input file along
 	   -- to the next phase of the pipeline.
-          return (Just input_fn)
+          return (Just Hsc, input_fn)
 	else do
 	    hspp_opts	   <- getOpts opt_F
        	    hs_src_pp_opts <- readIORef v_Hs_source_pp_opts
+	    let orig_fn = basename ++ '.':suff
+	    output_fn <- get_output_fn Hsc
 	    SysTools.runPp ( [ SysTools.Option     orig_fn
 			     , SysTools.Option     input_fn
 			     , SysTools.FileOption "" output_fn
@@ -658,75 +520,22 @@ run_phase HsPp basename suff input_fn output_fn
 			     map SysTools.Option hs_src_pp_opts ++
 			     map SysTools.Option hspp_opts
 			   )
-	    return (Just output_fn)
-
------------------------------------------------------------------------------
--- MkDependHS phase
-
-run_phase MkDependHS basename suff input_fn output_fn 
- = do src <- readFile input_fn
-      let (import_sources, import_normals, _) = getImports src
-      let orig_fn = basename ++ '.':suff
-      deps_sources <- mapM (findDependency True  orig_fn) import_sources
-      deps_normals <- mapM (findDependency False orig_fn) import_normals
-      let deps = deps_sources ++ deps_normals
-
-      osuf <- readIORef v_Object_suf
-
-      extra_suffixes <- readIORef v_Dep_suffixes
-      let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
-          ofiles = map (\suf -> basename ++ '.':suf) suffixes
-
-      objs <- mapM odir_ify ofiles
-
-	-- Handle for file that accumulates dependencies 
-      hdl <- readIORef v_Dep_tmp_hdl
-
-	-- std dependency of the object(s) on the source file
-      hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
-		     escapeSpaces (basename ++ '.':suff))
-
-      let genDep (dep, False {- not an hi file -}) = 
-	     hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
-			    escapeSpaces dep)
-          genDep (dep, True  {- is an hi file -}) = do
-	     hisuf <- readIORef v_Hi_suf
-	     let dep_base = remove_suffix '.' dep
-	         deps = (dep_base ++ hisuf)
-		        : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
-		  -- length objs should be == length deps
-	     sequence_ (zipWith (\o d -> hPutStrLn hdl (escapeSpaces o ++ " : " ++ escapeSpaces d)) objs deps)
-
-      sequence_ (map genDep [ d | Just d <- deps ])
-      return (Just output_fn)
-
--- add the lines to dep_makefile:
-	   -- always:
-		   -- this.o : this.hs
-
-  	   -- if the dependency is on something other than a .hi file:
-   		   -- this.o this.p_o ... : dep
-   	   -- otherwise
-   		   -- if the import is {-# SOURCE #-}
-   			   -- this.o this.p_o ... : dep.hi-boot[-$vers]
-   			   
-   		   -- else
-   			   -- this.o ...   : dep.hi
-   			   -- this.p_o ... : dep.p_hi
-   			   -- ...
-   
-   	   -- (where .o is $osuf, and the other suffixes come from
-   	   -- the cmdline -s options).
-   
+	    return (Just Hsc, output_fn)
 
 -----------------------------------------------------------------------------
 -- Hsc phase
 
 -- Compilation of a single module, in "legacy" mode (_not_ under
 -- the direction of the compilation manager).
-run_phase Hsc basename suff input_fn output_fn
-  = do
-	
+runPhase Hsc basename suff input_fn get_output_fn = do
+  todo <- readIORef v_GhcMode
+  if todo == DoMkDependHS then do
+       doMkDependHSPhase basename suff input_fn
+       return (Nothing, input_fn)  -- Ln is a dummy stop phase 
+
+   else do
+      -- normal Hsc mode, not mkdependHS
+
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the import path, since this is
   -- what gcc does, and it's probably what you want.
@@ -764,7 +573,6 @@ run_phase Hsc basename suff input_fn output_fn
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp   <- readIORef v_Recomp
-	todo        <- readIORef v_GhcMode
 	expl_o_file <- readIORef v_Output_file
 
 	let o_file -- if the -o option is given and IT IS THE OBJECT FILE FOR
@@ -787,6 +595,16 @@ run_phase Hsc basename suff input_fn output_fn
 
   -- get the DynFlags
         dyn_flags <- getDynFlags
+	let hsc_lang = hscLang dyn_flags
+	split <- readIORef v_Split_object_files
+
+	let next_phase = case hsc_lang of
+				HscC -> HCc
+				HscAsm | split -> SplitMangle
+				       | otherwise -> As
+				HscNothing -> HCc
+
+	output_fn <- get_output_fn next_phase
 
         let dyn_flags' = dyn_flags { hscOutName = output_fn,
 		   		     hscStubCOutName = basename ++ "_stub.c",
@@ -805,25 +623,25 @@ run_phase Hsc basename suff input_fn output_fn
 			  False
 			  Nothing	 -- no iface
 
-	case result of {
+	case result of
 
-	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1));
+	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
 
-            HscNoRecomp pcs details iface -> do { SysTools.touch "Touching object file" o_file
-						; return Nothing } ;
+            HscNoRecomp pcs details iface -> do
+		SysTools.touch "Touching object file" o_file
+		return (Nothing, output_fn)
 
 	    HscRecomp _pcs _details _iface stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 
-			    -- deal with stubs
-			    maybe_stub_o <- compileStub dyn_flags' stub_c_exists
-		  	    case maybe_stub_o of
-		 	      Nothing -> return ()
-		 	      Just stub_o -> add v_Ld_inputs stub_o
-			    case hscLang dyn_flags of
-                              HscNothing -> return Nothing
-			      _ -> return (Just output_fn)
-    }
+		-- deal with stubs
+		maybe_stub_o <- compileStub dyn_flags' stub_c_exists
+		case maybe_stub_o of
+		      Nothing -> return ()
+		      Just stub_o -> add v_Ld_inputs stub_o
+		case hscLang dyn_flags of
+                      HscNothing -> return (Nothing, output_fn)
+		      _ -> return (Just next_phase, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cc phase
@@ -831,12 +649,21 @@ run_phase Hsc basename suff input_fn output_fn
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-run_phase cc_phase basename suff input_fn output_fn
+runPhase cc_phase basename suff input_fn get_output_fn
    | cc_phase == Cc || cc_phase == HCc
-   = do	cc_opts		     <- getOpts opt_c
+   = do	cc_opts <- getOpts opt_c
        	cmdline_include_paths <- readIORef v_Include_paths
 
+	split  <- readIORef v_Split_object_files
+	mangle <- readIORef v_Do_asm_mangling
+
         let hcc = cc_phase == HCc
+
+	    next_phase
+		| hcc && mangle     = Mangle
+		| otherwise         = As
+
+	output_fn <- get_output_fn next_phase
 
 	-- HC files have the dependent packages stamped into them
 	pkgs <- if hcc then getHCFilePackages input_fn else return []
@@ -889,31 +716,39 @@ run_phase cc_phase basename suff input_fn output_fn
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
 		       ))
-	return (Just output_fn)
+
+	return (Just next_phase, output_fn)
 
 	-- ToDo: postprocess the output from gcc
 
 -----------------------------------------------------------------------------
 -- Mangle phase
 
-run_phase Mangle _basename _suff input_fn output_fn
-  = do mangler_opts <- getOpts opt_m
-       machdep_opts <- if (prefixMatch "i386" cTARGETPLATFORM)
-		       then do n_regs <- dynFlag stolen_x86_regs
-			       return [ show n_regs ]
-		       else return []
+runPhase Mangle _basename _suff input_fn get_output_fn
+   = do mangler_opts <- getOpts opt_m
+        machdep_opts <- if (prefixMatch "i386" cTARGETPLATFORM)
+			  then do n_regs <- dynFlag stolen_x86_regs
+			          return [ show n_regs ]
+		          else return []
 
-       SysTools.runMangle (map SysTools.Option mangler_opts
+	split <- readIORef v_Split_object_files
+	let next_phase
+		| split = SplitMangle
+		| otherwise = As
+	output_fn <- get_output_fn next_phase
+
+	SysTools.runMangle (map SysTools.Option mangler_opts
 		          ++ [ SysTools.FileOption "" input_fn
 			     , SysTools.FileOption "" output_fn
 			     ]
 			  ++ map SysTools.Option machdep_opts)
-       return (Just output_fn)
+
+	return (Just next_phase, output_fn)
 
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-run_phase SplitMangle _basename _suff input_fn output_fn
+runPhase SplitMangle _basename _suff input_fn get_output_fn
   = do  -- tmp_pfx is the prefix used for the split .s files
 	-- We also use it as the file to contain the no. of split .s files (sigh)
 	split_s_prefix <- SysTools.newTempName "split"
@@ -933,14 +768,16 @@ run_phase SplitMangle _basename _suff input_fn output_fn
 	addFilesToClean [ split_s_prefix ++ "__" ++ show n ++ ".s"
 			| n <- [1..n_files]]
 
-	return (Just output_fn)
+	return (Just SplitAs, "**splitmangle**")  -- we don't use the filename
 
 -----------------------------------------------------------------------------
 -- As phase
 
-run_phase As _basename _suff input_fn output_fn
+runPhase As _basename _suff input_fn get_output_fn
   = do	as_opts		      <- getOpts opt_a
         cmdline_include_paths <- readIORef v_Include_paths
+
+	output_fn <- get_output_fn Ln
 
 	SysTools.runAs (map SysTools.Option as_opts
 		       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
@@ -949,9 +786,11 @@ run_phase As _basename _suff input_fn output_fn
 			  , SysTools.Option "-o"
 			  , SysTools.FileOption "" output_fn
 			  ])
-	return (Just output_fn)
 
-run_phase SplitAs basename _suff _input_fn output_fn
+	return (Just Ln, output_fn)
+
+
+runPhase SplitAs basename _suff _input_fn get_output_fn
   = do  as_opts <- getOpts opt_a
 
 	(split_s_prefix, n) <- readIORef v_Split_info
@@ -975,14 +814,15 @@ run_phase SplitAs basename _suff _input_fn output_fn
 				    ])
 	
 	mapM_ assemble_file [1..n]
-	return (Just output_fn)
+
+	return (Just Ln, "**split_as**") -- we don't use the output file
 
 #ifdef ILX
 -----------------------------------------------------------------------------
 -- Ilx2Il phase
 -- Run ilx2il over the ILX output, getting an IL file
 
-run_phase Ilx2Il _basename _suff input_fn output_fn
+runPhase Ilx2Il _basename _suff input_fn get_output_fn
   = do	ilx2il_opts <- getOpts opt_I
         SysTools.runIlx2il (map SysTools.Option ilx2il_opts
                            ++ [ SysTools.Option "--no-add-suffix-to-assembly",
@@ -990,20 +830,20 @@ run_phase Ilx2Il _basename _suff input_fn output_fn
 				SysTools.Option "-o",
 				SysTools.FileOption "" output_fn,
 				SysTools.FileOption "" input_fn ])
-	return (Just output_fn)
+	return True
 
 -----------------------------------------------------------------------------
 -- Ilasm phase
 -- Run ilasm over the IL, getting a DLL
 
-run_phase Ilasm _basename _suff input_fn output_fn
+runPhase Ilasm _basename _suff input_fn get_output_fn
   = do	ilasm_opts <- getOpts opt_i
         SysTools.runIlasm (map SysTools.Option ilasm_opts
 		           ++ [ SysTools.Option "/QUIET",
 				SysTools.Option "/DLL",
 				SysTools.FileOption "/OUT=" output_fn,
 				SysTools.FileOption "" input_fn ])
-	return (Just output_fn)
+	return True
 
 #endif /* ILX */
 
@@ -1018,7 +858,7 @@ run_phase Ilasm _basename _suff input_fn output_fn
 -- we don't need the generality of a phase (MoveBinary is always
 -- done after linking and makes only sense in a parallel setup)   -- HWL
 
-run_phase_MoveBinary input_fn
+runPhase_MoveBinary input_fn
   = do	
         sysMan   <- getSysMan
         pvm_root <- getEnv "PVM_ROOT"
@@ -1205,7 +1045,7 @@ staticLink o_files dep_packages = do
     -- parallel only: move binary to another dir -- HWL
     ways_ <- readIORef v_Ways
     when (WayPar `elem` ways_)
-	 (do success <- run_phase_MoveBinary output_fn
+	 (do success <- runPhase_MoveBinary output_fn
              if success then return ()
                         else throwDyn (InstallationError ("cannot move binary to PVM dir")))
 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.27 2003/01/08 15:28:05 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.28 2003/06/04 15:47:58 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -11,8 +11,9 @@ module DriverMkDepend where
 
 #include "HsVersions.h"
 
+import GetImports	( getImports )
 import DriverState      
-import DriverUtil       ( add, softGetDirectoryContents, replaceFilenameSuffix )
+import DriverUtil
 import DriverFlags
 import SysTools		( newTempName )
 import qualified SysTools
@@ -126,6 +127,63 @@ beginMkDependHS = do
   	 zip pkg_import_dirs pkg_import_dir_contents)
 
   return ()
+
+
+doMkDependHSPhase basename suff input_fn
+ = do src <- readFile input_fn
+      let (import_sources, import_normals, _) = getImports src
+      let orig_fn = basename ++ '.':suff
+      deps_sources <- mapM (findDependency True  orig_fn) import_sources
+      deps_normals <- mapM (findDependency False orig_fn) import_normals
+      let deps = deps_sources ++ deps_normals
+
+      osuf <- readIORef v_Object_suf
+
+      extra_suffixes <- readIORef v_Dep_suffixes
+      let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
+          ofiles = map (\suf -> basename ++ '.':suf) suffixes
+
+      objs <- mapM odir_ify ofiles
+
+	-- Handle for file that accumulates dependencies 
+      hdl <- readIORef v_Dep_tmp_hdl
+
+	-- std dependency of the object(s) on the source file
+      hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
+		     escapeSpaces (basename ++ '.':suff))
+
+      let genDep (dep, False {- not an hi file -}) = 
+	     hPutStrLn hdl (unwords (map escapeSpaces objs) ++ " : " ++
+			    escapeSpaces dep)
+          genDep (dep, True  {- is an hi file -}) = do
+	     hisuf <- readIORef v_Hi_suf
+	     let dep_base = remove_suffix '.' dep
+	         deps = (dep_base ++ hisuf)
+		        : map (\suf -> dep_base ++ suf ++ '_':hisuf) extra_suffixes
+		  -- length objs should be == length deps
+	     sequence_ (zipWith (\o d -> hPutStrLn hdl (escapeSpaces o ++ " : " ++ escapeSpaces d)) objs deps)
+
+      sequence_ (map genDep [ d | Just d <- deps ])
+      return True
+
+-- add the lines to dep_makefile:
+	   -- always:
+		   -- this.o : this.hs
+
+  	   -- if the dependency is on something other than a .hi file:
+   		   -- this.o this.p_o ... : dep
+   	   -- otherwise
+   		   -- if the import is {-# SOURCE #-}
+   			   -- this.o this.p_o ... : dep.hi-boot[-$vers]
+   			   
+   		   -- else
+   			   -- this.o ...   : dep.hi
+   			   -- this.p_o ... : dep.p_hi
+   			   -- ...
+   
+   	   -- (where .o is $osuf, and the other suffixes come from
+   	   -- the cmdline -s options).
+   
 
 
 endMkDependHS :: IO ()

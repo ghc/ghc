@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.123 2003/05/21 13:05:49 simonmar Exp $
+-- $Id: Main.hs,v 1.124 2003/06/04 15:47:59 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -29,7 +29,7 @@ import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
 import Packages		( showPackages, getPackageConfigMap, basePackage,
 			  haskell98Package
 			)
-import DriverPipeline	( staticLink, doMkDLL, genPipeline, pipeLoop )
+import DriverPipeline	( staticLink, doMkDLL, runPipeline )
 import DriverState	( buildCoreToDo, buildStgToDo,
 			  findBuildTag, 
 			  getPackageExtraGhcOpts, unregFlags, 
@@ -43,14 +43,12 @@ import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
-import DriverPhases	( Phase(HsPp, Hsc), haskellish_src_file, objish_file, isSourceFile )
+import DriverPhases	( isSourceFile )
 
-import DriverUtil	( add, handle, handleDyn, later, splitFilename,
-			  unknownFlagsErr, getFileSuffix )
+import DriverUtil	( add, handle, handleDyn, later, unknownFlagsErr )
 import CmdLineOpts	( dynFlag, restoreDynFlags,
 			  saveDynFlags, setDynFlags, getDynFlags, dynFlag,
-			  DynFlags(..), HscLang(..), v_Static_hsc_opts,
-			  defaultHscLang
+			  DynFlags(..), HscLang(..), v_Static_hsc_opts
 			)
 import BasicTypes	( failed )
 import Outputable
@@ -307,27 +305,14 @@ compileFile mode stop_flag src = do
    when (not exists) $ 
    	throwDyn (CmdLineError ("file `" ++ src ++ "' does not exist"))
    
-   -- We compile in two stages, because the file may have an
-   -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
-   let (basename, suffix) = splitFilename src
+   o_file   <- readIORef v_Output_file
+	-- when linking, the -o argument refers to the linker's output.	
+	-- otherwise, we use it as the name for the pipeline's output.
+   let maybe_o_file
+	  | mode==DoLink || mode==DoMkDLL  = Nothing
+	  | otherwise                      = o_file
 
-   -- just preprocess (Haskell source only)
-   let src_and_suff = (src, getFileSuffix src)
-   let not_hs_file  = not (haskellish_src_file src)
-   pp <- if not_hs_file || mode == StopBefore Hsc || mode == StopBefore HsPp
-   		then return src_and_suff else do
-   	phases <- genPipeline (StopBefore Hsc) stop_flag
-   			      False{-not persistent-} defaultHscLang
-   			      src_and_suff
-   	pipeLoop phases src_and_suff False{-no linking-} False{-no -o flag-}
-   		basename suffix
-   
-   -- rest of compilation
-   hsc_lang <- dynFlag hscLang
-   phases   <- genPipeline mode stop_flag True hsc_lang pp
-   (r,_)    <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL)
-   			      True{-use -o flag-} basename suffix
-   return r
+   runPipeline mode stop_flag True maybe_o_file src
 
 
 -- ----------------------------------------------------------------------------

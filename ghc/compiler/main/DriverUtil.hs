@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.37 2003/03/04 11:12:11 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.38 2003/06/04 15:47:59 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -21,7 +21,7 @@ import qualified EXCEPTION as Exception
 import DYNAMIC
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 
-import Directory	( getDirectoryContents, doesDirectoryExist )
+import Directory
 import IO
 import List
 import Char
@@ -68,6 +68,16 @@ softGetDirectoryContents d
 		          ("WARNING: error while reading directory " ++ d)
 		    return []
 	  )
+
+-----------------------------------------------------------------------------
+-- Create a hierarchy of directories
+
+createDirectoryHierarchy :: FilePath -> IO ()
+createDirectoryHierarchy dir = do
+  b <- doesDirectoryExist dir
+  when (not b) $ do
+	createDirectoryHierarchy (directoryOf dir)
+	createDirectory dir
 
 -----------------------------------------------------------------------------
 -- Verify that the 'dirname' portion of a FilePath exists.
