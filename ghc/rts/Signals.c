@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.23 2002/03/12 13:57:14 simonmar Exp $
+ * $Id: Signals.c,v 1.24 2002/03/26 23:51:27 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -350,7 +350,9 @@ initDefaultHandlers()
 	prog_belch("warning: failed to install SIGINT handler");
     }
 
+#ifndef cygwin32_TARGET_OS
     siginterrupt(SIGINT, 1);	// isn't this the default? --SDM
+#endif
 
     // install the SIGCONT handler
     action.sa_handler = cont_handler;
