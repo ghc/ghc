@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.64 2003/01/23 12:13:12 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.65 2003/01/28 16:23:53 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -45,9 +45,9 @@ extern struct RTS_FLAGS RtsFlags;
 /*
  * Split argument lists
  */
-int     prog_argc; /* an "int" so as to match normal "argc" */
+int     prog_argc = 0; /* an "int" so as to match normal "argc" */
 char  **prog_argv = NULL;
-int     rts_argc;  /* ditto */
+int     rts_argc = 0;  /* ditto */
 char   *rts_argv[MAX_RTS_ARGS];
 
 //@node Constants, Static function decls, Includes
