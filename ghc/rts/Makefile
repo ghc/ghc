@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.49 2001/05/22 15:58:57 simonmar Exp $
+# $Id: Makefile,v 1.50 2001/06/06 10:35:39 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -155,6 +155,8 @@ boot ::
 	cd gmp && ./configure --enable-shared=no \
 		--host=`echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g'`
 else
+# Pass --target to configure of GMP, so that building for mingwin under
+# cygwin works properly (when the host is not the same as the target)
 boot ::
 	cd gmp && ./configure --enable-shared=no --target=$(HOSTPLATFORM)
 endif
