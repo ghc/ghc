@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.h,v 1.5 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: Exception.h,v 1.6 2003/07/12 00:11:20 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -22,6 +22,9 @@ interruptible(StgTSO *t)
   case BlockedOnException:
   case BlockedOnRead:
   case BlockedOnWrite:
+#if defined(mingw32_TARGET_OS)
+  case BlockedOnDoProc:
+#endif
   case BlockedOnDelay:
     return 1;
   default:
