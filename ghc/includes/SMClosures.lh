@@ -1067,7 +1067,11 @@ closures indexed by literal characters.  As with @CONST@ closures,
 #define CHARLIKE_CLOSURE_NoNONPTRS(closure)	(1L)
 
 /* Array of static charlike closures */
+#ifndef aix_TARGET_OS /* AIX gives link errors with consts in this file (RO assembler section) */
 extern const W_ CHARLIKE_closures[];
+#else
+extern W_ CHARLIKE_closures[];
+#endif
 
 /* Macro to retrieve static charlike closure */
 #define CHARLIKE_CLOSURE(the_char) \

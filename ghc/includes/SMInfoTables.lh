@@ -1746,7 +1746,11 @@ during a return.
 
 /* Declare the phantom info table vectors (just Bool at the moment) */
 #ifndef COMPILING_GHC
+#ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
 EXTDATA_RO(PrelBase_Bool_itblvtbl);
+#else
+extern W_ PrelBase_Bool_itblvtbl[];
+#endif
 #endif
 
 \end{code}
