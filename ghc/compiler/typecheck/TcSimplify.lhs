@@ -44,8 +44,7 @@ import Id		( GenId )
 import PrelInfo		( isNumericClass, isStandardClass, isCcallishClass )
 
 import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool )
-import Outputable	( Outputable(..){-instance * []-} )
-import PprStyle
+import Outputable	( PprStyle, Outputable(..){-instance * []-} )
 import PprType		( GenType, GenTyVar )
 import Pretty
 import SrcLoc		( noSrcLoc )
@@ -719,7 +718,8 @@ genCantGenErr insts sty	-- Can't generalise these Insts
 
 \begin{code}
 ambigErr insts sty
-  = vcat (map (pprInst sty "Ambiguous overloading") insts)
+  = hang (ptext SLIT("Ambiguous overloading"))
+       4 (vcat (map (pprInst sty) insts))
 \end{code}
 
 @reduceErr@ complains if we can't express required dictionaries in
@@ -727,8 +727,8 @@ terms of the signature.
 
 \begin{code}
 reduceErr insts sty
-  = vcat (map (pprInst sty "Context required by inferred type, but missing on a type signature")
-	          (bagToList insts))
+  = hang (ptext (SLIT("Context required by inferred type, but missing on a type signature")))
+       4 (vcat (map (pprInst sty) (bagToList insts)))
 \end{code}
 
 
