@@ -53,6 +53,7 @@ module GHC.Conc
 	, newTVar 	-- :: a -> STM (TVar a)
 	, readTVar	-- :: TVar a -> STM a
 	, writeTVar	-- :: a -> TVar a -> STM ()
+	, unsafeIOToSTM	-- :: IO a -> STM a
 
 #ifdef mingw32_TARGET_OS
 	, asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
@@ -79,7 +80,6 @@ import GHC.Base		( Int(..) )
 import GHC.Exception    ( Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
-import GHC.STRef
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -213,7 +213,7 @@ instance  Monad STM  where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    m >> k      =  m >>= \_ -> k
+    m >> k      = thenSTM m k
     return x	= returnSTM x
     m >>= k     = bindSTM m k
 
@@ -231,6 +231,10 @@ thenSTM (STM m) k = STM ( \s ->
 
 returnSTM :: a -> STM a
 returnSTM x = STM (\s -> (# s, x #))
+
+-- | Unsafely performs IO in the STM monad.
+unsafeIOToSTM :: IO a -> STM a
+unsafeIOToSTM (IO m) = STM m
 
 -- |Perform a series of STM actions atomically.
 atomically :: STM a -> IO a
