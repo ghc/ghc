@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.96 2002/04/29 14:03:57 simonmar Exp $
+$Id: Parser.y,v 1.97 2002/05/10 13:34:18 simonpj Exp $
 
 Haskell grammar.
 
@@ -1006,10 +1006,15 @@ aexp	:: { RdrNameHsExpr }
 	| aexp1				{ $1 }
 
 aexp1	:: { RdrNameHsExpr }
-        : var_or_con '{|' gentype '|}'          { (HsApp $1 (HsType $3)) }
-  	| aexp1 '{' fbinds '}' 			{% (mkRecConstrOrUpdate $1 
+        : aexp1 '{' fbinds '}' 			{% (mkRecConstrOrUpdate $1 
 							(reverse $3)) }
   	| aexp2					{ $1 }
+
+-- Here was the syntax for type applications that I was planning
+-- but there are difficulties (e.g. what order for type args)
+-- so it's not enabled yet.
+-- 	| var_or_con '{|' gentype '|}'          { (HsApp $1 (HsType $3)) }
+
 
 var_or_con :: { RdrNameHsExpr }
         : qvar                          { HsVar $1 }
