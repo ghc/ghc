@@ -273,8 +273,8 @@ AC_DEFUN(AC_PROG_GNUCPP,
 [if test "$HaveGcc" = "YES"; then
 	echo > conftest.c
 	gcc -v -E conftest.c >/dev/null 2>conftest.out
-	echo '/(\S+(\/|\\)cpp)/ && print "[$]1";' > conftest.pl
-	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out | tr '\\\' / `"
+	echo '/(\S+(\/|\\)cpp)/ && ([$]foo = [$]1) =~ tr/\\/\// && print "[$]foo";' > conftest.pl
+	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
 	rm -fr conftest*
  else
 	# We need to be able to invoke CPP directly, preferably
