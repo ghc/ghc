@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.15 2000/04/10 13:18:13 simonpj Exp $
+% $Id: PrelException.lhs,v 1.16 2000/04/10 13:35:45 simonmar Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -12,6 +12,7 @@ Exceptions and exception-handling functions.
 #ifndef __HUGS__
 module PrelException where
 
+import PrelList
 import PrelBase
 import PrelMaybe
 import PrelShow
@@ -32,6 +33,7 @@ import PrelGHC
 data Exception
   = IOException 	IOError		-- IO exceptions (from 'ioError')
   | ArithException  	ArithException	-- Arithmetic exceptions
+  | ArrayException	ArrayException  -- Array-related exceptions
   | ErrorCall		String		-- Calls to 'error'
   | NoMethodError       String		-- A non-existent method was invoked
   | PatternMatchFail	String		-- A pattern match failed
@@ -60,6 +62,10 @@ data AsyncException
   | ThreadKilled
   deriving (Eq, Ord)
 
+data ArrayException
+  = IndexOutOfBounds  	String		-- out-of-range array access
+  | UndefinedElement	String		-- evaluating an undefined element
+
 stackOverflow, heapOverflow :: Exception -- for the RTS
 stackOverflow = AsyncException StackOverflow
 heapOverflow  = AsyncException HeapOverflow
@@ -76,9 +82,20 @@ instance Show AsyncException where
   showsPrec _ HeapOverflow    = showString "heap overflow"
   showsPrec _ ThreadKilled    = showString "thread killed"
 
+instance Show ArrayException where
+  showsPrec _ (IndexOutOfBounds s)
+	= showString "array index out of range"
+	. (if not (null s) then showString ": " . showString s
+			   else id)
+  showsPrec _ (UndefinedElement s)
+	= showString "undefined array element"
+	. (if not (null s) then showString ": " . showString s
+			   else id)
+
 instance Show Exception where
   showsPrec _ (IOException err)	         = shows err
   showsPrec _ (ArithException err)       = shows err
+  showsPrec _ (ArrayException err)       = shows err
   showsPrec _ (ErrorCall err)	         = showString err
   showsPrec _ (NoMethodError err)        = showString err
   showsPrec _ (PatternMatchFail err)     = showString err
@@ -93,7 +110,6 @@ instance Show Exception where
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
 \end{code}
-
 
 %*********************************************************
 %*							*
