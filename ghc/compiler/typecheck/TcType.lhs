@@ -508,7 +508,7 @@ allDistinctTyVars (ty:tys) acc
 tcSplitPredTy_maybe :: Type -> Maybe PredType
    -- Returns Just for predicates only
 tcSplitPredTy_maybe (NoteTy _ ty) = tcSplitPredTy_maybe ty
-tcSplitPredTy_maybe (PredTy p)  = Just p
+tcSplitPredTy_maybe (PredTy p)    = Just p
 tcSplitPredTy_maybe other	  = Nothing
 	
 predTyUnique :: PredType -> Unique

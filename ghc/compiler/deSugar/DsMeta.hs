@@ -288,7 +288,7 @@ repBangTy (L _ (BangType str ty)) = do
 -- 			Deriving clause
 -------------------------------------------------------
 
-repDerivs :: Maybe (LHsContext Name) -> DsM (Core [TH.Name])
+repDerivs :: Maybe [LHsType Name] -> DsM (Core [TH.Name])
 repDerivs Nothing = coreList nameTyConName []
 repDerivs (Just (L _ ctxt))
   = do { strs <- mapM rep_deriv ctxt ; 
@@ -296,8 +296,8 @@ repDerivs (Just (L _ ctxt))
   where
     rep_deriv :: LHsPred Name -> DsM (Core TH.Name)
 	-- Deriving clauses must have the simple H98 form
-    rep_deriv (L _ (HsClassP cls [])) = lookupOcc cls
-    rep_deriv other		      = panic "rep_deriv"
+    rep_deriv (L _ (HsPredTy (L _ (HsClassP cls [])))) = lookupOcc cls
+    rep_deriv other		  		       = panic "rep_deriv"
 
 
 -------------------------------------------------------

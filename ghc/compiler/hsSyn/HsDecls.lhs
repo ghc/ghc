@@ -306,9 +306,13 @@ data TyClDecl name
 		tcdLName  :: Located name,	 	-- Type constructor
 		tcdTyVars :: [LHsTyVarBndr name], 	-- Type variables
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
-		tcdDerivs :: Maybe (LHsContext name)	
+		tcdDerivs :: Maybe [LHsType name]
 			-- Derivings; Nothing => not specified
 			-- 	      Just [] => derive exactly what is asked
+			-- These "types" must be of form
+			--	forall ab. C ty1 ty2
+			-- Typically the foralls and ty args are empty, but they
+			-- are non-empty for the newtype-deriving case
     }
 
   | TySynonym {	tcdLName  :: Located name,	        -- type constructor
@@ -433,8 +437,7 @@ pp_tydecl pp_head pp_decl_rhs derivings
 	pp_decl_rhs,
 	case derivings of
 	  Nothing 	   -> empty
-	  Just ds	   -> hsep [ptext SLIT("deriving"), 
-					ppr_hs_context (unLoc ds)]
+	  Just ds	   -> hsep [ptext SLIT("deriving"), parens (interpp'SP ds)]
     ])
 
 instance Outputable NewOrData where

@@ -123,7 +123,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 
     data_info (TyData {tcdCons = cs, tcdDerivs = derivs})
 	= (length cs, case derivs of Nothing -> 0
-				     Just ds -> length (unLoc ds))
+				     Just ds -> length ds)
     data_info other = (0,0)
 
     class_info decl@(ClassDecl {})

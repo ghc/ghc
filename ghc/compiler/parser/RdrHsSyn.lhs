@@ -636,7 +636,7 @@ checkPred (L spn ty)
 checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
 checkDictTy (L spn ty) = check ty []
   where
-  check (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
+  check (HsTyVar t) args | not (isRdrTyVar t) 
   	= return (L spn (HsPredTy (L spn (HsClassP t args))))
   check (HsAppTy l r) args = check (unLoc l) (r:args)
   check (HsParTy t)   args = check (unLoc t) args

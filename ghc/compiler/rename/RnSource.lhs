@@ -17,7 +17,7 @@ import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, elemLocalRdrEnv )
 import RdrHsSyn		( extractGenericPatTyVars )
 import RnHsSyn
 import RnExpr		( rnLExpr, checkTH )
-import RnTypes		( rnLHsType, rnHsSigType, rnHsTypeFVs, rnContext )
+import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBinds, rnBinds, rnMethodBinds, 
 			  rnBindsAndThen, renameSigs, checkSigs )
 import RnEnv		( lookupTopBndrRn, lookupTopFixSigNames,
@@ -506,8 +506,8 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
     con_names = [ n | L _ (ConDecl n _ _ _) <- condecls ]
 
     rn_derivs Nothing   = returnM (Nothing, emptyFVs)
-    rn_derivs (Just ds) = rnContext data_doc ds	`thenM` \ ds' -> 
-			  returnM (Just ds', extractHsCtxtTyNames ds')
+    rn_derivs (Just ds) = rnLHsTypes data_doc ds	`thenM` \ ds' -> 
+			  returnM (Just ds', extractHsTyNames_s ds')
     
 rnTyClDecl (TySynonym {tcdLName = name, tcdTyVars = tyvars, tcdSynRhs = ty})
   = lookupLocatedTopBndrRn name			`thenM` \ name' ->

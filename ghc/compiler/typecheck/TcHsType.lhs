@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcHsType (
-	tcHsSigType, tcHsPred,
+	tcHsSigType, tcHsDeriv,
 	UserTypeCtxt(..), 
 
 		-- Kind checking
@@ -50,7 +50,7 @@ import Inst		( Inst, InstOrigin(..), newMethod, instToId )
 import Id		( mkLocalId, idName, idType )
 import Var		( TyVar, mkTyVar, tyVarKind )
 import TyCon		( TyCon, tyConKind )
-import Class		( classTyCon )
+import Class		( Class, classTyCon )
 import Name		( Name )
 import NameSet
 import PrelNames	( genUnitTyConName )
@@ -155,12 +155,27 @@ tcHsSigType ctxt hs_ty
 	; checkValidType ctxt ty	
 	; returnM ty }
 
--- tcHsPred is happy with a partial application, e.g. (ST s)
--- Used from TcDeriv
-tcHsPred pred 
-  = do { (kinded_pred,_) <- wrapLocFstM kc_pred pred	-- kc_pred rather than kcHsPred
-							-- to avoid the partial application check
-       ; dsHsPred kinded_pred }
+-- Used for the deriving(...) items
+tcHsDeriv :: LHsType Name -> TcM ([TyVar], Class, [Type])
+tcHsDeriv = addLocM (tc_hs_deriv [])
+
+tc_hs_deriv tv_names (HsPredTy (L _ (HsClassP cls_name hs_tys)))
+  = kcHsTyVars tv_names 		$ \ tv_names' ->
+    do	{ cls_kind <- kcClass cls_name
+	; (tys, res_kind) <- kcApps cls_kind (ppr cls_name) hs_tys
+	; tcTyVarBndrs tv_names'	$ \ tyvars ->
+    do	{ arg_tys <- dsHsTypes tys
+	; cls <- tcLookupClass cls_name
+	; return (tyvars, cls, arg_tys) }}
+
+tc_hs_deriv tv_names1 (HsForAllTy _ tv_names2 (L _ []) (L _ ty))
+  = 	-- Funny newtype deriving form
+	-- 	forall a. C [a]
+	-- where C has arity 2.  Hence can't use regular functions
+    tc_hs_deriv (tv_names1 ++ tv_names2) ty
+
+tc_hs_deriv _ other
+  = failWithTc (ptext SLIT("Illegal deriving item") <+> ppr other)
 \end{code}
 
 	These functions are used during knot-tying in
@@ -299,18 +314,19 @@ kc_hs_type (HsPredTy pred)
 kc_hs_type (HsForAllTy exp tv_names context ty)
   = kcHsTyVars tv_names		$ \ tv_names' ->
     kcHsContext context		`thenM`	\ ctxt' ->
-    kcLiftedType ty		`thenM` \ ty' ->
-	-- The body of a forall must be a type, but in principle
+    kcHsType ty			`thenM` \ (ty', kind) ->
+	-- The body of a forall is usually a type, but in principle
 	-- there's no reason to prohibit *unlifted* types.
 	-- In fact, GHC can itself construct a function with an
 	-- unboxed tuple inside a for-all (via CPR analyis; see 
 	-- typecheck/should_compile/tc170)
 	--
-	-- Still, that's only for internal interfaces, which aren't
-	-- kind-checked, and it's a bit inconvenient to use kcTypeType
-	-- here (because it doesn't return the result kind), so I'm 
-	-- leaving it as lifted types for now.
-    returnM (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind)
+	-- Furthermore, in newtype deriving we allow
+	--	deriving( forall a. C [a] )
+	-- where C :: *->*->*, so it's awkward to prohibit higher-kinded
+	-- bodies.  In any case, if there is a higher-kinded body
+	-- and we propagate that up, the caller will find any bugs.
+    returnM (HsForAllTy exp tv_names' ctxt' ty', kind)
 
 ---------------------------
 kcApps :: TcKind			-- Function kind

@@ -723,9 +723,9 @@ opt_asig :: { Maybe (LHsType RdrName) }
 	: {- empty -}			{ Nothing }
 	| '::' atype			{ Just $2 }
 
-sigtypes :: { [LHsType RdrName] }
+sigtypes1 :: { [LHsType RdrName] }
 	: sigtype			{ [ $1 ] }
-	| sigtypes ',' sigtype		{ $3 : $1 }
+	| sigtype ',' sigtypes1		{ $1 : $3 }
 
 sigtype :: { LHsType RdrName }
 	: ctype				{ L1 (mkImplicitHsForAllTy (noLoc []) $1) }
@@ -784,6 +784,10 @@ atype :: { LHsType RdrName }
 -- hand corner, for convenience.
 inst_type :: { LHsType RdrName }
 	: ctype				{% checkInstType $1 }
+
+inst_types1 :: { [LHsType RdrName] }
+	: inst_type			{ [$1] }
+	| inst_type ',' inst_types1	{ $1 : $3 }
 
 comma_types0  :: { [LHsType RdrName] }
 	: comma_types1			{ $1 }
@@ -894,9 +898,10 @@ strict_mark :: { Located HsBang }
 	: '!'				{ L1 HsStrict }
 	| '{-# UNPACK' '#-}' '!'	{ LL HsUnbox }
 
-deriving :: { Located (Maybe (LHsContext RdrName)) }
-	: {- empty -}			{ noLoc Nothing }
-	| 'deriving' context		{ LL (Just $2) }
+deriving :: { Located (Maybe [LHsType RdrName]) }
+	: {- empty -}				{ noLoc Nothing }
+	| 'deriving' '(' ')'	 		{ LL (Just []) }
+	| 'deriving' '(' inst_types1 ')' 	{ LL (Just $3) }
              -- Glasgow extension: allow partial 
              -- applications in derivings
 
@@ -953,7 +958,7 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 				{ LL $ unitOL (LL $ SigD (InlineSig True  $3 $2)) }
 	| '{-# NOINLINE' inverse_activation qvar '#-}' 
 				{ LL $ unitOL (LL $ SigD (InlineSig False $3 $2)) }
-	| '{-# SPECIALISE' qvar '::' sigtypes '#-}'
+	| '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
 			 	{ LL $ toOL [ LL $ SigD (SpecSig $2 t)
 					    | t <- $4] }
 	| '{-# SPECIALISE' 'instance' inst_type '#-}'

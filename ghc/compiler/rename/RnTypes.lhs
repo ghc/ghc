@@ -4,7 +4,7 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnTypes ( rnHsType, rnLHsType, rnContext,
+module RnTypes ( rnHsType, rnLHsType, rnLHsTypes, rnContext,
 		 rnHsSigType, rnHsTypeFVs,
 		 rnLPat, rnPat, rnPatsAndThen,		-- Here because it's not part 
 		 rnLit, rnOverLit, 			-- of any mutual recursion	
@@ -174,7 +174,7 @@ rnForAll :: SDoc -> HsExplicitForAll -> [LHsTyVarBndr RdrName] -> LHsContext Rdr
 
 rnForAll doc exp [] (L _ []) (L _ ty) = rnHsType doc ty
 	-- One reason for this case is that a type like Int#
-	-- starts of as (HsForAllTy Nothing [] Int), in case
+	-- starts off as (HsForAllTy Nothing [] Int), in case
 	-- there is some quantification.  Now that we have quantified
 	-- and discovered there are no type variables, it's nicer to turn
 	-- it into plain Int.  If it were Int# instead of Int, we'd actually
