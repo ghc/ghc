@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.19 2002/02/11 13:59:01 simonmar Exp $
+# $Id: Makefile,v 1.20 2002/03/02 17:49:42 sof Exp $
 #
 
 TOP = ..
@@ -9,6 +9,13 @@ include $(TOP)/mk/boilerplate.mk
 # All header files
 #
 H_FILES = $(filter-out gmp.h,$(wildcard *.h)) gmp.h
+
+#
+# Options -- if we're building unregisterised, add a couple of -D's
+#
+ifeq "$(GhcUnregisterised)" "YES"
+SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+endif
 
 #
 # Header file built from the configure script's findings
