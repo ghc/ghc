@@ -62,7 +62,7 @@ mk_con con = L loc0 $ case con of
         = (noLoc (vName i), noLoc $ BangType HsNoBang (cvtType ty))
 
 mk_derivs [] = Nothing
-mk_derivs cs = Just (noLoc [noLoc $ HsClassP (tconName c) [] | c <- cs])
+mk_derivs cs = Just [noLoc $ HsPredTy $ noLoc $ HsClassP (tconName c) [] | c <- cs]
 
 cvt_ltop  :: TH.Dec -> Either (LHsDecl RdrName) Message
 cvt_ltop d = case cvt_top d of
