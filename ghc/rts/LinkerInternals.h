@@ -36,6 +36,18 @@ typedef
    }
    ProddableBlock;
 
+/* Jump Islands are sniplets of machine code required for relative
+ * address relocations on the PowerPC.
+ */
+#ifdef powerpc_TARGET_ARCH
+typedef struct {
+    short lis_r12, hi_addr;
+    short ori_r12_r12, lo_addr;
+    long mtctr_r12;
+    long bctr;
+} ppcJumpIsland;
+#endif
+
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
  */
@@ -76,8 +88,8 @@ typedef struct _ObjectCode {
     unsigned int pltIndex;
 #endif
 
-#ifdef darwin_TARGET_OS
-    char*           jump_islands;
+#ifdef powerpc_TARGET_ARCH
+    ppcJumpIsland   *jump_islands;
     unsigned long   island_start_symbol;
     unsigned long   n_islands;
 #endif

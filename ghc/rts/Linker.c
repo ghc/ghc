@@ -96,6 +96,9 @@ ObjectCode *objects = NULL;	/* initially empty */
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
 static int ocGetNames_ELF       ( ObjectCode* oc );
 static int ocResolve_ELF        ( ObjectCode* oc );
+#if defined(powerpc_TARGET_ARCH)
+static int ocAllocateJumpIslands_ELF ( ObjectCode* oc );
+#endif
 #elif defined(OBJFORMAT_PEi386)
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
@@ -1097,6 +1100,9 @@ loadObj( char *path )
 #  if defined(OBJFORMAT_MACHO)
    r = ocAllocateJumpIslands_MachO ( oc );
    if (!r) { return r; }
+#  elif defined(OBJFORMAT_ELF) && defined(powerpc_TARGET_ARCH)
+   r = ocAllocateJumpIslands_ELF ( oc );
+   if (!r) { return r; }
 #endif
 
    /* verify the in-memory image */
@@ -1264,6 +1270,112 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
 }
 
 
+/* --------------------------------------------------------------------------
+ * PowerPC specifics (jump islands)
+ * ------------------------------------------------------------------------*/
+
+#if defined(powerpc_TARGET_ARCH)
+
+/*
+  ocAllocateJumpIslands
+  
+  Allocate additional space at the end of the object file image to make room
+  for jump islands.
+  
+  PowerPC relative branch instructions have a 24 bit displacement field.
+  As PPC code is always 4-byte-aligned, this yields a +-32MB range.
+  If a particular imported symbol is outside this range, we have to redirect
+  the jump to a short piece of new code that just loads the 32bit absolute
+  address and jumps there.
+  This function just allocates space for one 16 byte ppcJumpIsland for every
+  undefined symbol in the object file. The code for the islands is filled in by
+  makeJumpIsland below.
+*/
+
+static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
+{
+  int aligned;
+
+  if( count > 0 )
+  {
+#ifdef USE_MMAP
+    #error ocAllocateJumpIslands doesnt want USE_MMAP to be defined
+#endif
+    // round up to the nearest 4
+    aligned = (oc->fileSize + 3) & ~3;
+
+    oc->image = stgReallocBytes( oc->image,
+                                 aligned + sizeof( ppcJumpIsland ) * count,
+                                 "ocAllocateJumpIslands" );
+    oc->jump_islands = (ppcJumpIsland *) (((char *) oc->image) + aligned);
+    memset( oc->jump_islands, 0, sizeof( ppcJumpIsland ) * count );
+  }
+  else
+    oc->jump_islands = NULL;
+
+  oc->island_start_symbol = first;
+  oc->n_islands = count;
+
+  return 1;
+}
+
+static unsigned long makeJumpIsland( ObjectCode* oc,
+                                     unsigned long symbolNumber,
+                                     unsigned long target )
+{
+  ppcJumpIsland *island;
+
+  if( symbolNumber < oc->island_start_symbol ||
+      symbolNumber - oc->island_start_symbol > oc->n_islands)
+    return 0;
+
+  island = &oc->jump_islands[symbolNumber - oc->island_start_symbol];
+
+  // lis r12, hi16(target)
+  island->lis_r12     = 0x3d80;
+  island->hi_addr     = target >> 16;
+
+  // ori r12, r12, lo16(target)
+  island->ori_r12_r12 = 0x618c;
+  island->lo_addr     = target & 0xffff;
+
+  // mtctr r12
+  island->mtctr_r12   = 0x7d8903a6;
+
+  // bctr
+  island->bctr        = 0x4e800420;
+    
+  return (unsigned long) island;
+}
+
+/*
+   ocFlushInstructionCache
+
+   Flush the data & instruction caches.
+   Because the PPC has split data/instruction caches, we have to
+   do that whenever we modify code at runtime.
+ */
+
+static void ocFlushInstructionCache( ObjectCode *oc )
+{
+    int n = (oc->fileSize + sizeof( ppcJumpIsland ) * oc->n_islands + 3) / 4;
+    unsigned long *p = (unsigned long *) oc->image;
+
+    while( n-- )
+    {
+        __asm__ volatile ( "dcbf 0,%0\n\t"
+                           "sync\n\t"
+                           "icbi 0,%0"
+                           :
+                           : "r" (p)
+                         );
+        p++;
+    }
+    __asm__ volatile ( "sync\n\t"
+                       "isync"
+                     );
+}
+#endif
 
 /* --------------------------------------------------------------------------
  * PEi386 specifics (Win32 targets)
@@ -2351,6 +2463,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 #ifdef EM_IA_64
       case EM_IA_64: IF_DEBUG(linker,debugBelch( "ia64" )); break;
 #endif
+      case EM_PPC:   IF_DEBUG(linker,debugBelch( "powerpc32" )); break;
       default:       IF_DEBUG(linker,debugBelch( "unknown" ));
                      errorBelch("%s: unknown architecture", oc->fileName);
                      return 0;
@@ -2748,7 +2861,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
-#if defined(DEBUG) || defined(sparc_TARGET_ARCH) || defined(ia64_TARGET_ARCH)
+#if defined(DEBUG) || defined(sparc_TARGET_ARCH) || defined(ia64_TARGET_ARCH) || defined(powerpc_TARGET_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
       Elf_Addr  P      = targ + offset;
@@ -2764,6 +2877,8 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #     elif defined(ia64_TARGET_ARCH)
       Elf64_Xword *pP = (Elf64_Xword *)P;
       Elf_Addr addr;
+#     elif defined(powerpc_TARGET_ARCH)
+      Elf_Sword delta;
 #     endif
 
       IF_DEBUG(linker,debugBelch( "Rel entry %3d is raw(%6p %6p %6p)   ",
@@ -2881,6 +2996,46 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	    /* This goes with R_IA64_LTOFF22X and points to the load to
 	     * convert into a move.  We don't implement relaxation. */
 	    break;
+#        elif defined(powerpc_TARGET_ARCH)
+         case R_PPC_ADDR16_LO:
+            *(Elf32_Half*) P = value;
+            break;
+
+         case R_PPC_ADDR16_HI:
+            *(Elf32_Half*) P = value >> 16;
+            break;
+ 
+         case R_PPC_ADDR16_HA:
+            *(Elf32_Half*) P = (value + 0x8000) >> 16;
+            break;
+
+         case R_PPC_ADDR32:
+            *(Elf32_Word *) P = value;
+            break;
+
+         case R_PPC_REL32:
+            *(Elf32_Word *) P = value - P;
+            break;
+
+         case R_PPC_REL24:
+            delta = value - P;
+
+            if( delta << 6 >> 6 != delta )
+            {
+               value = makeJumpIsland( oc, ELF_R_SYM(info), value );
+               delta = value - P;
+
+               if( value == 0 || delta << 6 >> 6 != delta )
+               {
+                  barf( "Unable to make ppcJumpIsland for #%d",
+                        ELF_R_SYM(info) );
+                  return 0;
+               }
+            }
+
+            *(Elf_Word *) P = (*(Elf_Word *) P & 0xfc000003)
+                                          | (delta & 0x3fffffc);
+            break;
 #        endif
          default:
             errorBelch("%s: unhandled ELF relocation(RelA) type %d\n",
@@ -2940,6 +3095,10 @@ ocResolve_ELF ( ObjectCode* oc )
    /* Free the local symbol table; we won't need it again. */
    freeHashTable(oc->lochash, NULL);
    oc->lochash = NULL;
+
+#if defined(powerpc_TARGET_ARCH)
+   ocFlushInstructionCache( oc );
+#endif
 
    return 1;
 }
@@ -3036,6 +3195,44 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
 
 #endif /* ia64 */
 
+/*
+ * PowerPC ELF specifics
+ */
+
+#ifdef powerpc_TARGET_ARCH
+
+static int ocAllocateJumpIslands_ELF( ObjectCode *oc )
+{
+  Elf_Ehdr *ehdr;
+  Elf_Shdr* shdr;
+  int i;
+
+  ehdr = (Elf_Ehdr *) oc->image;
+  shdr = (Elf_Shdr *) ( ((char *)oc->image) + ehdr->e_shoff );
+
+  for( i = 0; i < ehdr->e_shnum; i++ )
+    if( shdr[i].sh_type == SHT_SYMTAB )
+      break;
+
+  if( i == ehdr->e_shnum )
+  {
+    errorBelch( "This ELF file contains no symtab" );
+    return 0;
+  }
+
+  if( shdr[i].sh_entsize != sizeof( Elf_Sym ) )
+  {
+    errorBelch( "The entry size (%d) of the symtab isn't %d\n",
+      shdr[i].sh_entsize, sizeof( Elf_Sym ) );
+    
+    return 0;
+  }
+
+  return ocAllocateJumpIslands( oc, shdr[i].sh_size / sizeof( Elf_Sym ), 0 );
+}
+
+#endif /* powerpc */
+
 #endif /* ELF */
 
 /* --------------------------------------------------------------------------
@@ -3054,57 +3251,25 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
   *) add still more sanity checks.
 */
 
-
-/*
-  ocAllocateJumpIslands_MachO
-
-  Allocate additional space at the end of the object file image to make room
-  for jump islands.
-
-  PowerPC relative branch instructions have a 24 bit displacement field.
-  As PPC code is always 4-byte-aligned, this yields a +-32MB range.
-  If a particular imported symbol is outside this range, we have to redirect
-  the jump to a short piece of new code that just loads the 32bit absolute
-  address and jumps there.
-  This function just allocates space for one 16 byte jump island for every
-  undefined symbol in the object file. The code for the islands is filled in by
-  makeJumpIsland below.
-*/
-
-static const int islandSize = 16;
-
 static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
 {
-    char *image = (char*) oc->image;
-    struct mach_header *header = (struct mach_header*) image;
-    struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
+    struct mach_header *header = (struct mach_header *) oc->image;
+    struct load_command *lc = (struct load_command *) (header + 1);
     unsigned i;
 
-    for(i=0;i<header->ncmds;i++)
+    for( i = 0; i < header->ncmds; i++ )
     {
-	if(lc->cmd == LC_DYSYMTAB)
+        if( lc->cmd == LC_DYSYMTAB )
         {
-	    struct dysymtab_command *dsymLC = (struct dysymtab_command*) lc;
-            unsigned long nundefsym = dsymLC->nundefsym;
-            oc->island_start_symbol = dsymLC->iundefsym;
-            oc->n_islands = nundefsym;
+            struct dysymtab_command *dsymLC = (struct dysymtab_command *) lc;
 
-            if(nundefsym > 0)
-            {
-#ifdef USE_MMAP
-                #error ocAllocateJumpIslands_MachO doesnt want USE_MMAP to be defined
-#else
-                oc->image = stgReallocBytes(
-                    image, oc->fileSize + islandSize * nundefsym,
-                    "ocAllocateJumpIslands_MachO");
-#endif
-                oc->jump_islands = oc->image + oc->fileSize;
-                memset(oc->jump_islands, 0, islandSize * nundefsym);
-            }
+            if( !ocAllocateJumpIslands( oc, dsymLC->nundefsym,
+                                            dsymLC->iundefsym ) )
+              return 0;
 
             break;  // there can be only one LC_DSYMTAB
         }
-	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
+        lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
     }
     return 1;
 }
@@ -3150,31 +3315,6 @@ static int resolveImports(
     }
 
     return 1;
-}
-
-static void* makeJumpIsland(
-    ObjectCode* oc,
-    unsigned long symbolNumber,
-    void* target)
-{
-    if(symbolNumber < oc->island_start_symbol ||
-        symbolNumber - oc->island_start_symbol > oc->n_islands)
-        return NULL;
-    symbolNumber -= oc->island_start_symbol;
-
-    void *island = (void*) ((char*)oc->jump_islands + islandSize * symbolNumber);
-    unsigned long *p = (unsigned long*) island;
-
-        // lis r12, hi16(target)
-    *p++ = 0x3d800000 | ( ((unsigned long) target) >> 16 );
-        // ori r12, r12, lo16(target)
-    *p++ = 0x618c0000 | ( ((unsigned long) target) & 0xFFFF );
-        // mtctr r12
-    *p++ = 0x7d8903a6;
-        // bctr
-    *p++ = 0x4e800420;
-
-    return (void*) island;
 }
 
 static char* relocateAddress(
@@ -3380,7 +3520,7 @@ static int relocateSection(
                     {  
                         ASSERT(word == 0);
                         word = symbolAddress;
-                        jumpIsland = (long) makeJumpIsland(oc,reloc->r_symbolnum,(void*)word);
+                        jumpIsland = makeJumpIsland(oc,reloc->r_symbolnum,word);
 			word -= ((long)image) + sect->offset + reloc->r_address;
                         if(jumpIsland != 0)
                         {
@@ -3626,22 +3766,10 @@ static int ocResolve_MachO(ObjectCode* oc)
     freeHashTable(oc->lochash, NULL);
     oc->lochash = NULL;
 
-    /*
-        Flush the data & instruction caches.
-        Because the PPC has split data/instruction caches, we have to
-        do that whenever we modify code at runtime.
-    */
-    {
-        int n = (oc->fileSize + islandSize * oc->n_islands) / 4;
-        unsigned long *p = (unsigned long*)oc->image;
-        while(n--)
-        {
-            __asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
-                                : : "r" (p));
-            p++;
-        }
-        __asm__ volatile ("sync\n\tisync");
-    }
+#if defined (powerpc_TARGET_ARCH)
+    ocFlushInstructionCache( oc );
+#endif
+
     return 1;
 }
 
