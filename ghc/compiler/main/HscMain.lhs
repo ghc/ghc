@@ -638,7 +638,7 @@ compileExpr :: HscEnv
 	    -> TypecheckedHsExpr
 	    -> IO HValue
 
-compileExpr hsc_env pcs this_mod type_env rdr_env tc_expr
+compileExpr hsc_env pcs this_mod rdr_env type_env tc_expr
   = do	{ let dflags = hsc_dflags hsc_env
 
 	 	-- Desugar it
