@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.21 $
- * $Date: 1999/12/03 17:01:26 $
+ * $Revision: 1.22 $
+ * $Date: 1999/12/06 16:25:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1006,7 +1006,6 @@ Void implementForeignExport ( Name n )
     }
 }
 
-// ToDo: figure out how to set inlineMe for these (non-Name) things
 Void implementTuple(size)
 Int size; {
     if (size > 0) {

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.21 $
- * $Date: 1999/12/03 17:01:23 $
+ * $Revision: 1.22 $
+ * $Date: 1999/12/06 16:25:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -466,6 +466,7 @@ Text t; {
     tycon(tyconHw).what          = NIL;
     tycon(tyconHw).conToTag      = NIL;
     tycon(tyconHw).tagToCon      = NIL;
+    tycon(tyconHw).tuple         = -1;
     tycon(tyconHw).mod           = currentModule;
     module(currentModule).tycons = cons(tyconHw,module(currentModule).tycons);
     tycon(tyconHw).nextTyconHash = tyconHash[h];
@@ -496,7 +497,7 @@ Tycon tc; {
 
 static Void local hashTycon(tc)         /* Insert Tycon into hash table    */
 Tycon tc; {
-   assert(isTycon(tc));
+   assert(isTycon(tc) || isTuple(tc));
    if (1) {
      Text  t = tycon(tc).text;
      Int   h = tHash(t);
@@ -588,6 +589,35 @@ Tycon tup; {
     buf[i] = ')';
     buf[i+1] = 0;
     return findText(buf);
+}
+
+Tycon mkTuple ( Int n )
+{
+   Int i;
+   if (n >= NUM_TUPLES)
+      internal("mkTuple: request for tuple of unsupported size");
+   for (i = TYCMIN; i < tyconHw; i++)
+      if (tycon(i).tuple == n) return i;
+   internal("mkTuple: request for non-existent tuple");
+}
+
+Void allocTupleTycon ( Int n )
+{
+   Int   i;
+   char  buf[20];
+   Kind  k;
+   Tycon t;
+   for (i = TYCMIN; i < tyconHw; i++)
+      if (tycon(i).tuple == n) return;
+   sprintf(buf,"Tuple%d",n);
+   //t = addPrimTycon(findText(buf),simpleKind(n),n, DATATYPE,NIL);
+
+   k = STAR;
+   for (i = 0; i < n; i++) k = ap(STAR,k);
+   t = newTycon(findText(buf));
+   tycon(t).kind = k;
+   tycon(t).tuple = n;
+   tycon(t).what = DATATYPE;
 }
 
 /* --------------------------------------------------------------------------
@@ -1818,7 +1848,7 @@ register Cell c; {
                                         else            return CLASS;}
                     else                if (c>=INSTMIN) return INSTANCE;
                                         else            return NAME;}
-    else            if (c>=MODMIN)     {if (c>=TYCMIN)  return TYCON;
+    else            if (c>=MODMIN)     {if (c>=TYCMIN)  return isTuple(c) ? TUPLE : TYCON;
                                         else            return MODULE;}
                     else                if (c>=OFFMIN)  return OFFSET;
 #if TREX

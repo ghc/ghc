@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/12/03 17:56:04 $
+ * $Revision: 1.20 $
+ * $Date: 1999/12/06 16:25:25 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -474,6 +474,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
 
 Void linkControl(what)
 Int what; {
+    Int i;
     switch (what) {
         case RESET   :
         case MARK    : 
@@ -483,6 +484,10 @@ Int what; {
 
                        modulePrelude = newModule(textPrelude);
                        setCurrModule(modulePrelude);
+
+                       for(i=0; i<NUM_TUPLES; ++i) {
+                           allocTupleTycon(i);
+                       }
 
                        typeArrow = addPrimTycon(findText("(->)"),
                                                 pair(STAR,pair(STAR,STAR)),

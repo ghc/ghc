@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/11/29 18:59:34 $
+ * $Revision: 1.18 $
+ * $Date: 1999/12/06 16:25:28 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2765,7 +2765,7 @@ Void typeChecker(what)
 Int what; {
     switch (what) {
         case RESET   : tcMode       = EXPRESSION;
-+ 		       daSccs	    = NIL;
+ 		       daSccs	    = NIL;
                        preds        = NIL;
                        pendingBtyvs = NIL;
                        daSccs       = NIL;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.28 $
- * $Date: 1999/12/03 17:01:20 $
+ * $Revision: 1.29 $
+ * $Date: 1999/12/06 16:25:24 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -306,7 +306,20 @@ String argv[]; {
 
    namesUpto = numScripts = 0;
 
-   for (i=1; i<argc; ++i) {            /* process command line arguments  */
+   /* Pre-scan flags to see if -c or +c is present.  This needs to
+      precede adding the stack entry for Prelude.  On the other hand,
+      that stack entry needs to be made before the cmd line args are
+      properly examined.  Hence the following pre-scan of them.
+   */
+   for (i=1; i < argc; ++i) {
+      if (strcmp(argv[i], "--")==0) break;
+      if (strcmp(argv[i], "-c")==0) combined = FALSE;
+      if (strcmp(argv[i], "+c")==0) combined = TRUE;
+   }
+
+   addStackEntry("Prelude");
+
+   for (i=1; i < argc; ++i) {            /* process command line arguments  */
         if (strcmp(argv[i], "--")==0) break;
         if (strcmp(argv[i],"+")==0 && i+1<argc) {
             if (proj) {
@@ -320,8 +333,6 @@ String argv[]; {
             addStackEntry(argv[i]);
         }
     }
-
-   addStackEntry("Prelude");
 
 #if DEBUG
     { 
@@ -586,7 +597,8 @@ String s; {                             /* return FALSE if none found.     */
                                   "You can't enable/disable combined"
                                   " operation inside Hugs\n" );
                        } else {
-                          combined = state;
+ 		          /* don't do anything, since pre-scan of args
+                             will have got it already */
                        }
                        return TRUE;
 

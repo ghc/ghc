@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/29 18:59:25 $
+ * $Revision: 1.13 $
+ * $Date: 1999/12/06 16:25:23 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -476,14 +476,12 @@ static Void alloc( AsmBCO bco, StgVar v )
                    itblNames[nItblNames++] = textToStr(name(con).text);
                 } else
                 if (isTuple(con)) {
-                   char* cc = malloc(10);
-                   assert(cc);
+                   char cc[20];
                    sprintf(cc, "Tuple%d", tupleOf(con) );
                    itblNames[nItblNames++] = vv;
                    itblNames[nItblNames++] = cc;
                 } else
                 assert ( /* cant identify constructor name */ 0 );
-
                 setPos(v,asmAllocCONSTR(bco, vv));
             }
             break;
@@ -745,7 +743,7 @@ Void cgBinds( List binds )
     }
 
     for (b=binds,i=0; nonNull(b); b=tl(b),i++) {
-      //printf("endTop %s\n", maybeName(hd(b)));
+       //printStg( stdout, hd(b) ); printf( "\n\n");
        endTop(hd(b));
     }
 

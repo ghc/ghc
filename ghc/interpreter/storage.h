@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.16 $
- * $Date: 1999/12/03 17:01:25 $
+ * $Revision: 1.17 $
+ * $Date: 1999/12/06 16:25:27 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -355,6 +355,9 @@ extern  Ptr             cptrOf          Args((Cell));
  * ------------------------------------------------------------------------*/
 
 #define TUPMIN       201
+
+#if 0
+#error xyzzy
 #if TREX
 #define isTuple(c)   (TUPMIN<=(c) && (c)<EXTMIN)
 #else
@@ -362,6 +365,8 @@ extern  Ptr             cptrOf          Args((Cell));
 #endif
 #define mkTuple(n)   (TUPMIN+(n))
 #define tupleOf(n)   ((Int)((n)-TUPMIN))
+#endif
+
 extern Text ghcTupleText Args((Tycon));
 
 
@@ -483,14 +488,20 @@ extern DLSect    lookupDLSect Args((void*));
  * ------------------------------------------------------------------------*/
 
 #define TYCMIN       (MODMIN+NUM_MODULE)
-#define isTycon(c)   (TYCMIN<=(c) && (c)<NAMEMIN)
-#define mkTycon(n)   (TCMIN+(n))
+#define isTycon(c)   (TYCMIN<=(c) && (c)<NAMEMIN && tabTycon[(c)-TYCMIN].tuple==-1)
 #define tycon(n)     tabTycon[(n)-TYCMIN]
+
+#define isTuple(c)   (TYCMIN<=(c) && (c)<NAMEMIN && tabTycon[(c)-TYCMIN].tuple>=0)
+#define tupleOf(n)   (tabTycon[(n)-TYCMIN].tuple)
+extern Tycon mkTuple ( Int );
+extern Void allocTupleTycon ( Int );
+
 
 struct strTycon {
     Text   text;
     Int    line;
     Module mod;                         /* module that defines it          */
+    Int    tuple;                      /* tuple number, or -1 if not tuple */
     Int    arity;
     Kind   kind;                        /* kind (includes arity) of Tycon  */
     Cell   what;                        /* DATATYPE/SYNONYM/RESTRICTSYN... */
