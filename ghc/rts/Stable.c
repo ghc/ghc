@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.11 2000/04/24 22:05:08 panne Exp $
+ * $Id: Stable.c,v 1.12 2000/09/04 15:08:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -230,7 +230,7 @@ getStablePtr(StgPtr p)
   if (weight == 0) {
     weight = (StgWord)1 << (BITS_IN(StgWord)-1);
     stable_ptr_table[sn].weight = weight;
-    return (StgStablePtr)(sn + ((BITS_IN(StgWord)-1) << STABLEPTR_WEIGHT_SHIFT));
+    return (StgStablePtr)(sn + (BITS_IN(StgWord) << STABLEPTR_WEIGHT_SHIFT));
   } 
   else if (weight == 1) {
     barf("getStablePtr: too light");
@@ -241,7 +241,7 @@ getStablePtr(StgPtr p)
     for (weight_2 = 1; weight != 1; weight_2++) {
       weight >>= 1;
     }
-    stable_ptr_table[sn].weight -= 2^weight_2;
+    stable_ptr_table[sn].weight -= 1 << (weight_2 - 1);
     return (StgStablePtr)(sn + (weight_2 << STABLEPTR_WEIGHT_SHIFT));
   }
 }
