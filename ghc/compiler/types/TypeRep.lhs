@@ -351,6 +351,9 @@ ppr_type p (TyConApp tc tys) = ppr_tc_app p tc tys
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
 			   pprType t1 <+> ppr_type TyConPrec t2
 
+ppr_type p ty@(ForAllTy _ _)       = ppr_forall_type p ty
+ppr_type p ty@(FunTy (PredTy _) _) = ppr_forall_type p ty
+
 ppr_type p (FunTy ty1 ty2)
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen p FunPrec $
@@ -359,7 +362,8 @@ ppr_type p (FunTy ty1 ty2)
     ppr_fun_tail (FunTy ty1 ty2) = (arrow <+> ppr_type FunPrec ty1) : ppr_fun_tail ty2
     ppr_fun_tail other_ty        = [arrow <+> pprType other_ty]
 
-ppr_type p ty@(ForAllTy _ _)  
+ppr_forall_type :: Prec -> Type -> SDoc
+ppr_forall_type p ty
   = maybeParen p FunPrec $
     sep [pprForAll tvs, pprThetaArrow ctxt, pprType tau]
   where
@@ -398,6 +402,7 @@ ppr_tc tc
   | otherwise = ppr tc
 			       
 -------------------
+pprForAll []  = empty
 pprForAll tvs = ptext SLIT("forall") <+> sep (map pprTvBndr tvs) <> dot
 
 pprTvBndr tv | isLiftedTypeKind kind = ppr tv
