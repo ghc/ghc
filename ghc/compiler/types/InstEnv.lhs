@@ -31,8 +31,8 @@ import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc )
 import SrcLoc		( SrcLoc )
 import Type		( Type, ThetaType, splitTyConApp_maybe, 
-			  splitSigmaTy, splitDictTy,
-			  tyVarsOfTypes )
+			  splitSigmaTy, splitDFunTy, tyVarsOfTypes
+			)
 import PprType		( )
 import Class		( classTyCon )
 import DataCon		( DataCon )
@@ -99,9 +99,8 @@ simpleDFunClassTyCon :: DFunId -> (Class, TyCon)
 simpleDFunClassTyCon dfun
   = (clas, tycon)
   where
-    (_,_,dict_ty) = splitSigmaTy (idType dfun)
-    (clas, [ty])  = splitDictTy  dict_ty
-    tycon   	  = case splitTyConApp_maybe ty of
+    (_,_,clas,[ty]) = splitDFunTy (idType dfun)
+    tycon   	    = case splitTyConApp_maybe ty of
 			Just (tycon,_) -> tycon
 
 classDataCon :: Class -> DataCon
@@ -354,8 +353,7 @@ addToInstEnv dflags inst_env dfun_id
 	Succeeded new_env -> Succeeded (addToUFM inst_env clas new_env)
 	
   where
-    (ins_tvs, _, dict_ty) = splitSigmaTy (idType dfun_id)
-    (clas, ins_tys)	  = splitDictTy dict_ty
+    (ins_tvs, _, clas, ins_tys) = splitDFunTy (idType dfun_id)
 
     ins_tv_set = mkVarSet ins_tvs
     ins_item = (ins_tv_set, ins_tys, dfun_id)

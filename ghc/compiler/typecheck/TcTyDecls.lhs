@@ -78,7 +78,7 @@ tcTyDecl1 (TySynonym tycon_name tyvar_names rhs src_loc)
 
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
-tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings _ src_loc name1 name2)
+tcTyDecl1 (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc name1 name2)
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     let
 	tyvars = tyConTyVars tycon

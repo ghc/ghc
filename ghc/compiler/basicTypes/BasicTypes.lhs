@@ -83,8 +83,10 @@ type Version = Int
 bogusVersion :: Version	-- Shouldn't look at these
 bogusVersion = error "bogusVersion"
 
-bumpVersion :: Version -> Version 
-bumpVersion v = v+1
+bumpVersion :: Bool -> Version -> Version 
+-- Bump if the predicate (typically equality between old and new) is false
+bumpVersion False v = v+1
+bumpVersion True  v = v+1
 
 initialVersion :: Version
 initialVersion = 1

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.41 2000/10/12 11:47:26 sewardj Exp $
+$Id: Parser.y,v 1.42 2000/10/24 07:35:01 simonpj Exp $
 
 Haskell grammar.
 
@@ -451,7 +451,7 @@ deprecations :: { RdrBinding }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { RdrBinding }
-	: srcloc exportlist STRING
+	: srcloc depreclist STRING
 		{ foldr RdrAndBindings RdrNullBind 
 			[ RdrHsDecl (DeprecD (Deprecation n $3 $1)) | n <- $2 ] }
 
@@ -875,6 +875,14 @@ dbind	: ipvar '=' exp			{ ($1, $3) }
 
 -----------------------------------------------------------------------------
 -- Variables, Constructors and Operators.
+
+depreclist :: { [RdrName] }
+depreclist : deprec_var			{ [$1] }
+	   | deprec_var ',' depreclist	{ $1 : $2 }
+
+deprec_var :: { RdrName }
+deprec_var : var			{ $1 }
+	   | tycon			{ $1 }
 
 gtycon 	:: { RdrName }
 	: qtycon			{ $1 }

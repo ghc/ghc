@@ -10,7 +10,7 @@ therefore, is almost nothing but re-exporting.
 \begin{code}
 module HsSyn (
 
-	-- NB: don't reexport HsCore or HsPragmas;
+	-- NB: don't reexport HsCore
 	-- this module tells about "real Haskell"
 
 	module HsSyn,

@@ -14,7 +14,7 @@ import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  HsExpr(..), HsLit(..), HsType(..), HsPred(..),
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
 			  isClassDecl, isClassOpSig, isPragSig,
-			  fromClassDeclNameList, tyClDeclName
+			  getClassDeclSysNames, tyClDeclName
 			)
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, 
@@ -103,7 +103,7 @@ Death to "ExpandingDicts".
 tcClassDecl1 :: TcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
 tcClassDecl1 rec_env
       	     (ClassDecl context class_name
-			tyvar_names fundeps class_sigs def_methods pragmas 
+			tyvar_names fundeps class_sigs def_methods
 			sys_names src_loc)
   = 	-- CHECK ARITY 1 FOR HASKELL 1.4
     doptsTc Opt_GlasgowExts				`thenTc` \ glaExts ->
@@ -116,7 +116,7 @@ tcClassDecl1 rec_env
 	tyvars   = classTyVars clas
 	op_sigs  = filter isClassOpSig class_sigs
 	op_names = [n | ClassOpSig n _ _ _ <- op_sigs]
-	(_, datacon_name, datacon_wkr_name, sc_sel_names) = fromClassDeclNameList sys_names
+	(_, datacon_name, datacon_wkr_name, sc_sel_names) = getClassDeclSysNames sys_names
     in
     tcExtendTyVarEnv tyvars				$ 
 
@@ -400,7 +400,7 @@ tcClassDecl2 :: RenamedTyClDecl		-- The class declaration
 	     -> NF_TcM (LIE, TcMonoBinds)
 
 tcClassDecl2 (ClassDecl context class_name
-			tyvar_names _ sigs default_binds pragmas _ src_loc)
+			tyvar_names _ sigs default_binds _ src_loc)
   = 	-- A locally defined class
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds)) $ 
     tcAddSrcLoc src_loc		     		          $

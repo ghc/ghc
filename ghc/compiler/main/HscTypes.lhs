@@ -11,7 +11,9 @@ module HscTypes (
 	HomeSymbolTable, PackageSymbolTable,
 	HomeIfaceTable, PackageIfaceTable,
 
-	VersionInfo(..),
+	IfaceDecls(..), 
+
+	VersionInfo(..), initialVersionInfo,
 
 	TyThing(..), groupTyThings,
 
@@ -50,16 +52,16 @@ import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
 			  lookupModuleEnv )
 import VarSet		( TyVarSet )
-import VarEnv		( IdEnv, emptyVarEnv )
+import VarEnv		( emptyVarEnv )
 import Id		( Id )
 import Class		( Class )
 import TyCon		( TyCon )
 
-import BasicTypes	( Version, Fixity )
+import BasicTypes	( Version, initialVersion, Fixity )
 
 import HsSyn		( DeprecTxt )
 import RdrHsSyn		( RdrNameHsDecl )
-import RnHsSyn		( RenamedHsDecl )
+import RnHsSyn		( RenamedTyClDecl, RenamedIfaceSig, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( CoreRule )
 import Type		( Type )
@@ -116,9 +118,10 @@ data ModIface
         mi_version  :: VersionInfo,		-- Module version number
         mi_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
 
-        mi_usages   :: [ImportVersion Name],	-- Usages
+        mi_usages   :: [ImportVersion Name],	-- Usages; kept sorted
 
-        mi_exports  :: Avails,			-- What it exports; kept sorted by (mod,occ),
+        mi_exports  :: Avails,			-- What it exports
+						-- Kept sorted by (mod,occ),
 						-- to make version comparisons easier
 
         mi_globals  :: GlobalRdrEnv,		-- Its top level environment
@@ -126,9 +129,13 @@ data ModIface
         mi_fixities :: NameEnv Fixity,		-- Fixities
 	mi_deprecs  :: Deprecations,		-- Deprecations
 
-	mi_decls    :: [RenamedHsDecl]		-- types, classes 
-						-- inst decls, rules, iface sigs
+	mi_decls    :: IfaceDecls		-- The RnDecls form of ModDetails
      }
+
+data IfaceDecls = IfaceDecls { dcl_tycl  :: [RenamedTyClDecl],	-- Sorted
+			       dcl_sigs  :: [RenamedIfaceSig],	-- Sorted
+			       dcl_rules :: [RenamedRuleDecl],	-- Sorted
+			       dcl_insts :: [RenamedInstDecl] }	-- Unsorted
 
 -- typechecker should only look at this, not ModIface
 -- Should be able to construct ModDetails from mi_decls in ModIface
@@ -262,6 +269,12 @@ data VersionInfo
 		-- Ditto data constructors, class operations, except that the version of
 		-- the parent class/tycon changes
     }
+
+initialVersionInfo :: VersionInfo
+initialVersionInfo = VersionInfo { vers_module  = initialVersion,
+				   vers_exports = initialVersion,
+				   vers_rules   = initialVersion,
+				   vers_decls   = emptyNameEnv }
 
 data Deprecations = NoDeprecs
 	 	  | DeprecAll DeprecTxt			-- Whole module deprecated

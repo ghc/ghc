@@ -10,7 +10,7 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_NoImplicitPrelude )
+import CmdLineOpts	( DynFlag(..), opt_NoImplicitPrelude )
 
 import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
 			  collectTopBinders
@@ -19,7 +19,7 @@ import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
 			  RdrNameHsModule, RdrNameHsDecl
 			)
 import RnIfaces		( getInterfaceExports, getDeclBinders, 
-			  recordLocalSlurps, findAndReadIface )
+			  recordLocalSlurps )
 import RnEnv
 import RnMonad
 
@@ -33,8 +33,7 @@ import Name		( Name, nameSrcLoc,
 			  setLocalNameSort, nameOccName,  nameEnvElts )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv )
-import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, 
-			  isQual, isUnqual )
+import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isUnqual )
 import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
 import Outputable

@@ -10,7 +10,6 @@ module RnSource ( rnDecl, rnSourceDecls, rnHsType, rnHsSigType ) where
 
 import RnExpr
 import HsSyn
-import HsPragmas
 import HsTypes		( hsTyVarNames, pprHsContext )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, mkRdrNameWkr )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
@@ -36,22 +35,20 @@ import FunDeps		( oclose )
 import Class		( FunDep, DefMeth (..) )
 import Name		( Name, OccName, nameOccName, NamedThing(..) )
 import NameSet
-import OccName		( mkDefaultMethodOcc, isTvOcc )
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys )
 import PrelNames	( deRefStablePtr_RDR, makeStablePtr_RDR,
 			  bindIO_RDR, returnIO_RDR
 			)
-import Bag		( bagToList )
 import List		( partition, nub )
 import Outputable
 import SrcLoc		( SrcLoc )
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
 import ErrUtils		( Message )
 import CStrings		( isCLabelString )
-import ListSetOps	( minusList, removeDupsEq )
+import ListSetOps	( removeDupsEq )
 \end{code}
 
 @rnDecl@ `renames' declarations.
@@ -136,7 +133,7 @@ and then go over it again to rename the tyvars!
 However, we can also do some scoping checks at the same time.
 
 \begin{code}
-rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivings pragmas src_loc gen_name1 gen_name2))
+rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivings src_loc gen_name1 gen_name2))
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
     bindTyVarsFVRn data_doc tyvars		$ \ tyvars' ->
@@ -146,9 +143,8 @@ rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivin
     lookupSysBinder gen_name1	                `thenRn` \ name1' ->
     lookupSysBinder gen_name2		        `thenRn` \ name2' ->
     rnDerivs derivings				`thenRn` \ (derivings', deriv_fvs) ->
-    ASSERT(isNoDataPragmas pragmas)
     returnRn (TyClD (TyData new_or_data context' tycon' tyvars' condecls' nconstrs
-                     derivings' noDataPragmas src_loc name1' name2'),
+                     derivings' src_loc name1' name2'),
 	      cxt_fvs `plusFV` con_fvs `plusFV` deriv_fvs)
   where
     data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
@@ -169,8 +165,7 @@ rnDecl (TyClD (TySynonym name tyvars ty src_loc))
     unquantify glaExts (HsForAllTy Nothing ctxt ty) | glaExts = ty
     unquantify glaExys ty			     	      = ty
 
-rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
-               names src_loc))
+rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds names src_loc))
   = pushSrcLocRn src_loc $
 
     lookupTopBndrRn cname			`thenRn` \ cname' ->
@@ -232,9 +227,8 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 	-- The renamer *could* check this for class decls, but can't
 	-- for instance decls.
 
-    ASSERT(isNoClassPragmas pragmas)
     returnRn (TyClD (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') mbinds'
-			       NoClassPragmas names' src_loc),
+			       names' src_loc),
 	      sig_fvs	`plusFV`
 
 	      fix_fvs	`plusFV`

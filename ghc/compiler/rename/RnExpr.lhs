@@ -39,7 +39,7 @@ import PrelNames	( hasKey, assertIdKey,
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
 			)
-import TysWiredIn	( intTyCon, integerTyCon )
+import TysWiredIn	( intTyCon )
 import Name		( NamedThing(..), mkSysLocalName, nameSrcLoc )
 import NameSet
 import UniqFM		( isNullUFM )

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.14 2000/01/14 11:45:21 hwloidl Exp $
+% $Id: CgStackery.lhs,v 1.15 2000/10/24 07:35:00 simonpj Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -23,7 +23,7 @@ import CgMonad
 import AbsCSyn
 
 import CgUsages		( getRealSp )
-import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
+import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import Panic		( panic )

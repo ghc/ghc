@@ -65,7 +65,6 @@ import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
 import Module		( Module )
 import HscTypes		( InstEnv, lookupTypeEnv, TyThing(..),
 			  GlobalSymbolTable )
-import UniqFM
 import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
 import Outputable

@@ -9,8 +9,6 @@ module RnHsSyn where
 #include "HsVersions.h"
 
 import HsSyn
-import HsPragmas	( InstancePragmas, GenPragmas, DataPragmas, ClassPragmas, ClassOpPragmas )
-
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
@@ -27,7 +25,6 @@ type RenamedContext		= HsContext 		Name
 type RenamedHsDecl		= HsDecl		Name RenamedPat
 type RenamedRuleDecl		= RuleDecl		Name RenamedPat
 type RenamedTyClDecl		= TyClDecl		Name RenamedPat
-type RenamedSpecDataSig		= SpecDataSig		Name
 type RenamedDefaultDecl		= DefaultDecl		Name
 type RenamedForeignDecl		= ForeignDecl		Name
 type RenamedGRHS		= GRHS			Name RenamedPat
@@ -47,12 +44,7 @@ type RenamedStmt		= Stmt			Name RenamedPat
 type RenamedFixitySig		= FixitySig		Name
 type RenamedDeprecation		= DeprecDecl		Name
 type RenamedHsOverLit		= HsOverLit		Name
-
-type RenamedClassOpPragmas	= ClassOpPragmas	Name
-type RenamedClassPragmas	= ClassPragmas		Name
-type RenamedDataPragmas		= DataPragmas		Name
-type RenamedGenPragmas		= GenPragmas		Name
-type RenamedInstancePragmas	= InstancePragmas	Name
+type RenamedIfaceSig		= IfaceSig		Name
 \end{code}
 
 %************************************************************************

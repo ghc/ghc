@@ -14,7 +14,6 @@ module RdrHsSyn (
 	RdrNameConDecl,
 	RdrNameConDetails,
 	RdrNameContext,
-	RdrNameSpecDataSig,
 	RdrNameDefaultDecl,
 	RdrNameForeignDecl,
 	RdrNameGRHS,
@@ -44,11 +43,6 @@ module RdrHsSyn (
 	RdrMatch(..),
 	SigConverter,
 
-	RdrNameClassOpPragmas,
-	RdrNameClassPragmas,
-	RdrNameDataPragmas,
-	RdrNameGenPragmas,
-	RdrNameInstancePragmas,
 	extractHsTyRdrNames, 
 	extractHsTyRdrTyVars, extractHsTysRdrTyVars,
 	extractPatsTyVars, 
@@ -84,7 +78,6 @@ import PrelNames	( pRELUDE_Name, mkTupNameStr )
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
 			  mkUnqual, mkPreludeQual
 			)
-import HsPragmas	
 import List		( nub )
 import BasicTypes	( Boxity(..), RecFlag(..) )
 import Class            ( DefMeth (..) )
@@ -105,7 +98,6 @@ type RdrNameConDecl		= ConDecl		RdrName
 type RdrNameConDetails		= ConDetails		RdrName
 type RdrNameContext		= HsContext 		RdrName
 type RdrNameHsDecl		= HsDecl		RdrName RdrNamePat
-type RdrNameSpecDataSig		= SpecDataSig		RdrName
 type RdrNameDefaultDecl		= DefaultDecl		RdrName
 type RdrNameForeignDecl		= ForeignDecl		RdrName
 type RdrNameGRHS		= GRHS			RdrName RdrNamePat
@@ -130,12 +122,6 @@ type RdrNameDeprecation         = DeprecDecl            RdrName
 type RdrNameFixitySig		= FixitySig		RdrName
 
 type RdrNameHsRecordBinds	= HsRecordBinds		RdrName RdrNamePat
-
-type RdrNameClassOpPragmas	= ClassOpPragmas	RdrName
-type RdrNameClassPragmas	= ClassPragmas		RdrName
-type RdrNameDataPragmas		= DataPragmas		RdrName
-type RdrNameGenPragmas		= GenPragmas		RdrName
-type RdrNameInstancePragmas	= InstancePragmas	RdrName
 \end{code}
 
 
@@ -233,8 +219,8 @@ file (which would be equally good).
 Similarly for mkConDecl, mkClassOpSig and default-method names.
   
 \begin{code}
-mkClassDecl cxt cname tyvars fds sigs mbinds prags loc
-  = ClassDecl cxt cname tyvars fds sigs mbinds prags new_names loc
+mkClassDecl cxt cname tyvars fds sigs mbinds loc
+  = ClassDecl cxt cname tyvars fds sigs mbinds new_names loc
   where
     cls_occ  = rdrNameOcc cname
     data_occ = mkClassDataConOcc cls_occ
@@ -250,15 +236,15 @@ mkClassDecl cxt cname tyvars fds sigs mbinds prags loc
       --      D_sc1, D_sc2
       -- (We used to call them D_C, but now we can have two different
       --  superclasses both called C!)
-    new_names = toClassDeclNameList (tname, dname, dwname, sc_sel_names)
+    new_names = mkClassDeclSysNames (tname, dname, dwname, sc_sel_names)
 
 -- mkTyData :: ??
-mkTyData new_or_data context tname list_var list_con i maybe pragmas src =
-    let t_occ  = rdrNameOcc tname
+mkTyData new_or_data context tname list_var list_con i maybe src
+  = let t_occ  = rdrNameOcc tname
         name1 = mkRdrUnqual (mkGenOcc1 t_occ) 
 	name2 = mkRdrUnqual (mkGenOcc2 t_occ) 
     in TyData new_or_data context 
-         tname list_var list_con i maybe pragmas src name1 name2
+              tname list_var list_con i maybe src name1 name2
 
 mkClassOpSig (DefMeth x) op ty loc
   = ClassOpSig op (Just (DefMeth dm_rn)) ty loc

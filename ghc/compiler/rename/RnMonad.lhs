@@ -51,7 +51,7 @@ import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			)
 import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			  RdrNameEnv, emptyRdrEnv, extendRdrEnv, 
-			  lookupRdrEnv, addListToRdrEnv, rdrEnvToList, rdrEnvElts
+			  addListToRdrEnv, rdrEnvToList, rdrEnvElts
 			)
 import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  isLocallyDefinedName, nameModule, nameOccName,
@@ -193,7 +193,11 @@ type ExportAvails = (FiniteMap ModuleName Avails,
 %===================================================
 
 \begin{code}
-type ExportItem = (ModuleName, [RdrAvailInfo])
+type ExportItem   = (ModuleName, [RdrAvailInfo])
+type IfaceDeprecs = Maybe (Either DeprecTxt [(RdrName,DeprecTxt)])
+	-- Nothing	  => NoDeprecs
+	-- Just (Left t)  => DeprecAll
+	-- Just (Right p) => DeprecSome
 
 data ParsedIface
   = ParsedIface {
@@ -202,11 +206,11 @@ data ParsedIface
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages
       pi_exports   :: (Version, [ExportItem]),		-- Exports
-      pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
       pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
       pi_fixity	   :: [RdrNameFixitySig],		-- Local fixity declarations,
+      pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
       pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
-      pi_deprecs   :: [RdrNameDeprecation]		-- Deprecations
+      pi_deprecs   :: IfaceDeprecs			-- Deprecations
     }
 \end{code}
 

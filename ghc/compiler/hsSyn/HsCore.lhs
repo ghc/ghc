@@ -15,7 +15,7 @@ module HsCore (
 	UfExpr(..), UfAlt, UfBinder(..), UfNote(..),
 	UfBinding(..), UfConAlt(..),
 	HsIdInfo(..), 
-	IfaceSig(..),
+	IfaceSig(..), ifaceSigName,
 
 	eq_ufExpr, eq_ufBinders, pprUfExpr,
 
@@ -37,8 +37,7 @@ import Var		( varType, isId )
 import IdInfo		( ArityInfo, InlinePragInfo, 
 			  pprInlinePragInfo, ppArityInfo, ppStrictnessInfo
 			)
-import RdrName		( RdrName )
-import Name		( toRdrName )
+import Name		( Name, getName )
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import PrimOp		( PrimOp(CCallOp) )
@@ -104,7 +103,7 @@ data UfBinder name
 %************************************************************************
 
 \begin{code}
-toUfExpr :: CoreExpr -> UfExpr RdrName
+toUfExpr :: CoreExpr -> UfExpr Name
 toUfExpr (Var v) = toUfVar v
 toUfExpr (Lit l) = case maybeLitLit l of
 			Just (s,ty) -> UfLitLit s (toHsType ty)
@@ -112,7 +111,7 @@ toUfExpr (Lit l) = case maybeLitLit l of
 toUfExpr (Type ty) = UfType (toHsType ty)
 toUfExpr (Lam x b) = UfLam (toUfBndr x) (toUfExpr b)
 toUfExpr (App f a) = toUfApp f [a]
-toUfExpr (Case s x as) = UfCase (toUfExpr s) (toRdrName x) (map toUfAlt as)
+toUfExpr (Case s x as) = UfCase (toUfExpr s) (getName x) (map toUfAlt as)
 toUfExpr (Let b e)     = UfLet (toUfBind b) (toUfExpr e)
 toUfExpr (Note n e)    = UfNote (toUfNote n) (toUfExpr e)
 
@@ -127,11 +126,11 @@ toUfBind (NonRec b r) = UfNonRec (toUfBndr b) (toUfExpr r)
 toUfBind (Rec prs)    = UfRec [(toUfBndr b, toUfExpr r) | (b,r) <- prs]
 
 ---------------------
-toUfAlt (c,bs,r) = (toUfCon c, map toRdrName bs, toUfExpr r)
+toUfAlt (c,bs,r) = (toUfCon c, map getName bs, toUfExpr r)
 
 ---------------------
-toUfCon (DataAlt dc) | isTupleTyCon tc = UfTupleAlt (HsTupCon (toRdrName dc) (tupleTyConBoxity tc))
-		     | otherwise       = UfDataAlt (toRdrName dc)
+toUfCon (DataAlt dc) | isTupleTyCon tc = UfTupleAlt (HsTupCon (getName dc) (tupleTyConBoxity tc))
+		     | otherwise       = UfDataAlt (getName dc)
 		     where
 		       tc = dataConTyCon dc
 
@@ -141,15 +140,15 @@ toUfCon (LitAlt l)   = case maybeLitLit l of
 toUfCon DEFAULT	     = UfDefault
 
 ---------------------
-toUfBndr x | isId x    = UfValBinder (toRdrName x) (toHsType (varType x))
-	   | otherwise = UfTyBinder  (toRdrName x) (varType x)
+toUfBndr x | isId x    = UfValBinder (getName x) (toHsType (varType x))
+	   | otherwise = UfTyBinder  (getName x) (varType x)
 
 ---------------------
 toUfApp (App f a) as = toUfApp f (a:as)
 toUfApp (Var v) as
   = case isDataConId_maybe v of
 	-- We convert the *worker* for tuples into UfTuples
-	Just dc | isTupleTyCon tc && saturated -> UfTuple (HsTupCon (toRdrName dc) (tupleTyConBoxity tc)) tup_args
+	Just dc | isTupleTyCon tc && saturated -> UfTuple (HsTupCon (getName dc) (tupleTyConBoxity tc)) tup_args
 	  where
 	    val_args  = dropWhile isTypeArg as
 	    saturated = length val_args == idArity v
@@ -167,7 +166,7 @@ mkUfApps = foldl (\f a -> UfApp f (toUfExpr a))
 toUfVar v = case isPrimOpId_maybe v of
 		-- Ccalls has special syntax
 		Just (CCallOp cc) -> UfCCall cc (toHsType (idType v))
-		other		  -> UfVar (toRdrName v)
+		other		  -> UfVar (getName v)
 \end{code}
 
 
@@ -330,6 +329,9 @@ instance Ord name => Eq (IfaceSig name) where
 
 instance (Outputable name) => Outputable (IfaceSig name) where
     ppr (IfaceSig var ty info _) = hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
+
+ifaceSigName :: IfaceSig name -> name
+ifaceSigName (IfaceSig name _ _ _) = name
 \end{code}
 
 

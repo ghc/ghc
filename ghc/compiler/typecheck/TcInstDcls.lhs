@@ -56,8 +56,8 @@ import NameSet		( emptyNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint, pprPred )
 import TyCon		( TyCon, isSynTyCon, tyConDerivings )
-import Type		( mkTyVarTys, splitSigmaTy, isTyVarTy,
-			  splitTyConApp_maybe, splitDictTy_maybe,
+import Type		( mkTyVarTys, splitDFunTy, isTyVarTy,
+			  splitTyConApp_maybe, splitDictTy,
 			  splitAlgTyConApp_maybe, classesToPreds, classesOfPreds,
 			  unUsgTy, tyVarsOfTypes, mkClassPred, mkTyVarTy,
 			  getClassTys_maybe
@@ -247,10 +247,7 @@ tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
 	-- Type-check all the stuff before the "where"
     tcHsSigType poly_ty			`thenTc` \ poly_ty' ->
     let
-	(tyvars, theta, dict_ty) = splitSigmaTy poly_ty'
-	(clas, inst_tys)	 = case splitDictTy_maybe dict_ty of
-				     Just ct -> ct
-				     Nothing -> pprPanic "tcInstDecl1" (ppr poly_ty)
+	(tyvars, theta, clas, inst_tys) = splitDFunTy poly_ty'
     in
 
     (case maybe_dfun_name of
@@ -324,7 +321,7 @@ getGenericInstances mod class_decls
     returnTc gen_inst_info
 
 get_generics mod decl@(ClassDecl context class_name tyvar_names 
-	 			 fundeps class_sigs def_methods pragmas 
+	 			 fundeps class_sigs def_methods
 				 name_list loc)
   | null groups		
   = returnTc [] -- The comon case: 
@@ -521,7 +518,7 @@ tcInstDecl2 (InstInfo { iClass = clas, iTyVars = inst_tyvars, iTys = inst_tys,
 	-- Instantiate the instance decl with tc-style type variables
     tcInstId dfun_id		`thenNF_Tc` \ (inst_tyvars', dfun_theta', dict_ty') ->
     let
-	(clas, inst_tys') = expectJust "tcInstDecl2" (splitDictTy_maybe dict_ty')
+	(clas, inst_tys') = splitDictTy dict_ty'
 	origin		  = InstanceDeclOrigin
 
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
@@ -777,10 +774,10 @@ tcAddDeclCtxt decl thing_inside
   where
      (name, loc, thing)
 	= case decl of
-	    (ClassDecl _ name _ _ _ _ _ _ loc)	       -> (name, loc, "class")
-	    (TySynonym name _ _ loc)	               -> (name, loc, "type synonym")
-	    (TyData NewType  _ name _ _ _ _ _ loc _ _) -> (name, loc, "newtype")
-	    (TyData DataType _ name _ _ _ _ _ loc _ _) -> (name, loc, "data type")
+	    (ClassDecl _ name _ _ _ _ _ loc)	     -> (name, loc, "class")
+	    (TySynonym name _ _ loc)	             -> (name, loc, "type synonym")
+	    (TyData NewType  _ name _ _ _ _ loc _ _) -> (name, loc, "newtype")
+	    (TyData DataType _ name _ _ _ _ loc _ _) -> (name, loc, "data type")
 
      ctxt = hsep [ptext SLIT("In the"), text thing, 
 		  ptext SLIT("declaration for"), quotes (ppr name)]

@@ -33,7 +33,7 @@ module Type (
 
 	-- Predicates and the like
 	mkDictTy, mkDictTys, mkPredTy, splitPredTy_maybe, 
-	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy,
+	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy, splitDFunTy,
 
 	mkSynTy, isSynTy, deNoteType, 
 
@@ -79,13 +79,13 @@ import TypeRep
 
 -- Other imports:
 
-import {-# SOURCE #-}	DataCon( DataCon, dataConRepType )
+import {-# SOURCE #-}	DataCon( DataCon )
 import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
 -- friends:
-import Var	( TyVar, Var, UVar,
-		  tyVarKind, tyVarName, setTyVarName, isId, idType,
+import Var	( TyVar, UVar,
+		  tyVarKind, tyVarName, setTyVarName, 
 		)
 import VarEnv
 import VarSet
@@ -697,6 +697,13 @@ splitDictTy_maybe :: Type -> Maybe (Class, [Type])
 splitDictTy_maybe (NoteTy _ ty) = Just (splitDictTy ty)
 splitDictTy_maybe (PredTy (Class clas tys)) = Just (clas, tys)
 splitDictTy_maybe other			    = Nothing
+
+splitDFunTy :: Type -> ([TyVar], [PredType], Class, [Type])
+-- Split the type of a dictionary function
+splitDFunTy ty 
+  = case splitSigmaTy ty of { (tvs, theta, tau) -> 
+    case splitDictTy tau of { (clas, tys) ->
+    (tvs, theta, clas, tys) }}
 
 getClassTys_maybe :: PredType -> Maybe ClassPred
 getClassTys_maybe (Class clas tys) = Just (clas, tys)

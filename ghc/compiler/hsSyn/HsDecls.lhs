@@ -13,12 +13,12 @@ module HsDecls (
 	ExtName(..), isDynamicExtName, extNameStatic,
 	ConDecl(..), ConDetails(..), 
 	BangType(..), getBangType,
-	IfaceSig(..),  SpecDataSig(..), 
+	IfaceSig(..),  
 	DeprecDecl(..), DeprecTxt,
-	hsDeclName, instDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule,
-	toClassDeclNameList, 
-	fromClassDeclNameList
-
+	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames,
+	isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule,
+	mkClassDeclSysNames,
+	getClassDeclSysNames
     ) where
 
 #include "HsVersions.h"
@@ -26,15 +26,15 @@ module HsDecls (
 -- friends:
 import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig(..) )
 import HsExpr		( HsExpr )
-import HsPragmas	( DataPragmas, ClassPragmas )
-import HsImpExp		( IE(..) )
 import HsTypes
 import PprCore		( pprCoreRule )
-import HsCore		( UfExpr(UfVar), UfBinder, IfaceSig(..), eq_ufBinders, eq_ufExpr, pprUfExpr, toUfExpr, toUfBndr )
+import HsCore		( UfExpr(UfVar), UfBinder, IfaceSig(..), ifaceSigName,
+			  eq_ufBinders, eq_ufExpr, pprUfExpr, toUfExpr, toUfBndr
+			)
 import CoreSyn		( CoreRule(..) )
 import BasicTypes	( NewOrData(..) )
 import CallConv		( CallConv, pprCallConv )
-import Name		( toRdrName )
+import Name		( getName )
 
 -- others:
 import FunDeps		( pprFundeps )
@@ -84,7 +84,7 @@ hsDeclName :: (Outputable name, Outputable pat)
 #endif
 hsDeclName (TyClD decl)				    = tyClDeclName decl
 hsDeclName (InstD   decl)			    = instDeclName decl
-hsDeclName (SigD    (IfaceSig name _ _ _))	    = name
+hsDeclName (SigD    decl)			    = ifaceSigName decl
 hsDeclName (ForD    (ForeignDecl name _ _ _ _ _))   = name
 hsDeclName (FixD    (FixitySig name _ _))	    = name
 -- Others don't make sense
@@ -92,11 +92,6 @@ hsDeclName (FixD    (FixitySig name _ _))	    = name
 hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
 #endif
 
-
-tyClDeclName :: TyClDecl name pat -> name
-tyClDeclName (TyData _ _ name _ _ _ _ _ _ _ _)      = name
-tyClDeclName (TySynonym name _ _ _)                 = name
-tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ )      = name
 
 instDeclName :: InstDecl name pat -> name
 instDeclName (InstDecl _ _ _ (Just name) _) = name
@@ -188,7 +183,6 @@ data TyClDecl name pat
 				 -- (i.e., derive default); Just [] => derive
 				 -- *nothing*; Just <list> => as you would
 				 -- expect...
-		(DataPragmas name)
 		SrcLoc
 		name             -- generic converter functions
 		name             -- generic converter functions
@@ -204,30 +198,62 @@ data TyClDecl name pat
 		[FunDep name]		-- functional dependencies
 		[Sig name]		-- methods' signatures
 		(MonoBinds name pat)	-- default methods
-		(ClassPragmas name)
-		[name]	                -- The names of the tycon, datacon 
-					-- wrapper, datacon worker,
-					-- and superclass selectors for this 
-					-- class (the first 3 are at the front 
-					-- of the list in this order)
-					-- These are filled in as the 
-					-- ClassDecl is made.
+		(ClassDeclSysNames name)
 		SrcLoc
 
--- Put type signatures in and explain further!!
-                -- The names of the tycon, datacon 
-					-- wrapper, datacon worker,
-					-- and superclass selectors for this 
-					-- class (the first 3 are at the front 
-					-- of the list in this order)
-					-- These are filled in as the 
-toClassDeclNameList (a,b,c,ds) = a:b:c:ds
-fromClassDeclNameList (a:b:c:ds) = (a,b,c,ds)
+tyClDeclName :: TyClDecl name pat -> name
+tyClDeclName (TyData _ _ name _ _ _ _ _ _ _) = name
+tyClDeclName (TySynonym name _ _ _)          = name
+tyClDeclName (ClassDecl _ name _ _ _ _ _ _)  = name
 
+
+tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
+-- Returns all the binding names of the decl, along with their SrcLocs
+-- The first one is guaranteed to be the name of the decl
+-- For record fields, the first one counts as the SrcLoc
+-- We use the equality to filter out duplicate field names
+
+tyClDeclNames (TySynonym name _ _ loc)
+  = [(name,loc)]
+
+tyClDeclNames (ClassDecl _ name _ _ sigs _ _ loc)
+  = (name,loc) : [(name,loc) | ClassOpSig n _ _ loc <- sigs]
+
+tyClDeclNames (TyData _ _ name _ cons _ _ loc _ _)
+  = (name,loc) : conDeclsNames cons
+
+
+type ClassDeclSysNames name = [name]
+	-- 	[tycon, datacon wrapper, datacon worker, 
+	--	 superclass selector 1, ..., superclass selector n]
+	-- They are kept in a list rather than a tuple to make the
+	-- renamer easier.
+
+mkClassDeclSysNames  :: (name, name, name, [name]) -> [name]
+getClassDeclSysNames :: [name] -> (name, name, name, [name])
+mkClassDeclSysNames  (a,b,c,ds) = a:b:c:ds
+getClassDeclSysNames (a:b:c:ds) = (a,b,c,ds)
+\end{code}
+
+
+\begin{code}
+isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
+
+isSynDecl (TySynonym _ _ _ _) = True
+isSynDecl other		      = False
+
+isDataDecl (TyData _ _ _ _ _ _ _ _ _ _) = True
+isDataDecl other		        = False
+
+isClassDecl (ClassDecl _ _ _ _ _ _ _ _ ) = True
+isClassDecl other		 	 = False
+\end{code}
+
+\begin{code}
 instance Ord name => Eq (TyClDecl name pat) where
 	-- Used only when building interface files
-  (==) (TyData nd1 cxt1 n1 tvs1 cons1 _ _ _ _ _ _)
-       (TyData nd2 cxt2 n2 tvs2 cons2 _ _ _ _ _ _)
+  (==) (TyData nd1 cxt1 n1 tvs1 cons1 _ _ _ _ _)
+       (TyData nd2 cxt2 n2 tvs2 cons2 _ _ _ _ _)
     = n1 == n2 &&
       nd1 == nd2 &&
       eqWithHsTyVars tvs1 tvs2 (\ env -> 
@@ -240,8 +266,8 @@ instance Ord name => Eq (TyClDecl name pat) where
     =  n1 == n2 &&
        eqWithHsTyVars tvs1 tvs2 (\ env -> eq_hsType env ty1 ty2)
 
-  (==) (ClassDecl cxt1 n1 tvs1 fds1 sigs1 _ _ _ _ )
-       (ClassDecl cxt2 n2 tvs2 fds2 sigs2 _ _ _ _ )
+  (==) (ClassDecl cxt1 n1 tvs1 fds1 sigs1 _ _ _ )
+       (ClassDecl cxt2 n2 tvs2 fds2 sigs2 _ _ _ )
     =  n1 == n2 &&
        eqWithHsTyVars tvs1 tvs2 (\ env -> 
 	  eq_hsContext env cxt1 cxt2 &&
@@ -271,21 +297,10 @@ eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
 countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
- = (length [() | ClassDecl _ _ _ _ _ _ _ _ _  <- decls],
-    length [() | TyData DataType _ _ _ _ _ _ _ _ _ _  <- decls],
-    length [() | TyData NewType  _ _ _ _ _ _ _ _ _ _  <- decls],
+ = (length [() | ClassDecl _ _ _ _ _ _ _ _	   <- decls],
+    length [() | TyData DataType _ _ _ _ _ _ _ _ _ <- decls],
+    length [() | TyData NewType  _ _ _ _ _ _ _ _ _ <- decls],
     length [() | TySynonym _ _ _ _	           <- decls])
-
-isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
-
-isSynDecl (TySynonym _ _ _ _) = True
-isSynDecl other		      = False
-
-isDataDecl (TyData _ _ _ _ _ _ _ _ _ _ _) = True
-isDataDecl other		          = False
-
-isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ ) = True
-isClassDecl other		 	        = False
 \end{code}
 
 \begin{code}
@@ -296,7 +311,8 @@ instance (Outputable name, Outputable pat)
       = hang (ptext SLIT("type") <+> pp_decl_head [] tycon tyvars <+> equals)
 	     4 (ppr mono_ty)
 
-    ppr (TyData new_or_data context tycon tyvars condecls ncons derivings pragmas src_loc gen_conv1 gen_conv2) -- The generic names are not printed out ATM
+    ppr (TyData new_or_data context tycon tyvars condecls ncons 
+		derivings src_loc gen_conv1 gen_conv2) -- The generic names are not printed out ATM
       = pp_tydecl
 		  (ptext keyword <+> pp_decl_head context tycon tyvars <+> equals)
 		  (pp_condecls condecls ncons)
@@ -306,7 +322,7 @@ instance (Outputable name, Outputable pat)
 			NewType  -> SLIT("newtype")
 			DataType -> SLIT("data")
 
-    ppr (ClassDecl context clas tyvars fds sigs methods pragmas _ src_loc)
+    ppr (ClassDecl context clas tyvars fds sigs methods _ src_loc)
       | null sigs	-- No "where" part
       = top_matter
 
@@ -319,7 +335,6 @@ instance (Outputable name, Outputable pat)
 	pp_methods = getPprStyle $ \ sty ->
         	     if ifaceStyle sty then empty else ppr methods
         
-
 pp_decl_head :: Outputable name => HsContext name -> name -> [HsTyVarBndr name] -> SDoc
 pp_decl_head context thing tyvars = hsep [pprHsContext context, ppr thing, interppSP tyvars]
 
@@ -335,22 +350,6 @@ pp_tydecl pp_head pp_decl_rhs derivings
     ])
 \end{code}
 
-A type for recording what types a datatype should be specialised to.
-It's called a ``Sig'' because it's sort of like a ``type signature''
-for an datatype declaration.
-
-\begin{code}
-data SpecDataSig name
-  = SpecDataSig name		-- tycon to specialise
-		(HsType name)
-		SrcLoc
-
-instance (Outputable name)
-	      => Outputable (SpecDataSig name) where
-
-    ppr (SpecDataSig tycon ty _)
-      = hsep [text "{-# SPECIALIZE data", ppr ty, text "#-}"]
-\end{code}
 
 %************************************************************************
 %*									*
@@ -383,7 +382,30 @@ data ConDetails name
 
   | RecCon			-- record-style con decl
 		[([name], BangType name)]	-- list of "fields"
+\end{code}
 
+\begin{code}
+conDeclsNames :: Eq name => [ConDecl name] -> [(name,SrcLoc)]
+  -- See tyClDeclNames for what this does
+  -- The function is boringly complicated because of the records
+  -- And since we only have equality, we have to be a little careful
+conDeclsNames cons
+  = snd (foldl do_one ([], []) cons)
+  where
+    do_one (flds_seen, acc) (ConDecl name _ _ _ details loc)
+	= do_details ((name,loc):acc) details
+	where
+	  do_details acc (RecCon flds) = foldl do_fld (flds_seen, acc) flds
+	  do_details acc other	       = (flds_seen, acc)
+
+	  do_fld acc (flds, _) = foldl do_fld1 acc flds
+
+	  do_fld1 (flds_seen, acc) fld
+		| fld `elem` flds_seen = (flds_seen,acc)
+		| otherwise	       = (fld:flds_seen, (fld,loc):acc)
+\end{code}
+
+\begin{code}
 eq_ConDecl env (ConDecl n1 _ tvs1 cxt1 cds1 _)
 	       (ConDecl n2 _ tvs2 cxt2 cds2 _)
   = n1 == n2 &&
@@ -400,8 +422,9 @@ eq_ConDetails env (RecCon fs1) (RecCon fs2)
 eq_ConDetails env _ _ = False
 
 eq_fld env (ns1,bt1) (ns2, bt2) = ns1==ns2 && eq_btype env bt1 bt2
-
+\end{code}
   
+\begin{code}
 data BangType name
   = Banged   (HsType name)	-- HsType: to allow Haskell extensions
   | Unbanged (HsType name)	-- (MonoType only needed for straight Haskell)
@@ -642,11 +665,11 @@ toHsRule id (BuiltinRule _)
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule id)
 
 toHsRule id (Rule name bndrs args rhs)
-  = IfaceRule name (map toUfBndr bndrs) (toRdrName id)
+  = IfaceRule name (map toUfBndr bndrs) (getName id)
 	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
 
 bogusIfaceRule id
-  = IfaceRule SLIT("bogus") [] (toRdrName id) [] (UfVar (toRdrName id)) noSrcLoc
+  = IfaceRule SLIT("bogus") [] (getName id) [] (UfVar (getName id)) noSrcLoc
 \end{code}
 
 
@@ -656,17 +679,14 @@ bogusIfaceRule id
 %*									*
 %************************************************************************
 
-We use exported entities for things to deprecate. Cunning trick (hack?):
-`IEModuleContents undefined' is used for module deprecation.
+We use exported entities for things to deprecate.
 
 \begin{code}
-data DeprecDecl name = Deprecation (IE name) DeprecTxt SrcLoc
+data DeprecDecl name = Deprecation name DeprecTxt SrcLoc
 
 type DeprecTxt = FAST_STRING	-- reason/explanation for deprecation
 
 instance Outputable name => Outputable (DeprecDecl name) where
-   ppr (Deprecation (IEModuleContents _) txt _)
-      = hsep [text "{-# DEPRECATED",            doubleQuotes (ppr txt), text "#-}"]
-   ppr (Deprecation thing txt _)
+    ppr (Deprecation thing txt _)
       = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
 \end{code}

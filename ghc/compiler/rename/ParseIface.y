@@ -43,13 +43,12 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import CallConv         ( cCallConv )
-import HsPragmas	( noDataPragmas, noClassPragmas )
 import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
 import IdInfo           ( exactArity, InlinePragInfo(..) )
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
 
-import RnMonad		( ParsedIface(..), ExportItem ) 
+import RnMonad		( ParsedIface(..), ExportItem, IfaceDeprecs ) 
 import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..), 
                           ImportVersion, WhatsImported(..),
                           RdrAvailInfo )
@@ -207,9 +206,7 @@ iface_stuff :: { IfaceStuff }
 iface_stuff : iface		{ PIface   $1 }
       	    | type		{ PType    $1 }
       	    | id_info		{ PIdInfo  $1 }
-	    | '__R' rules	{ PRules   $2 }
-	    | '__D' deprecs	{ PDeprecs $2 }
-
+	    | rules_and_deprecs	{ PRulesAndDeprecs $1 }
 
 iface		:: { ParsedIface }
 iface		: '__interface' package mod_name 
@@ -220,7 +217,7 @@ iface		: '__interface' package mod_name
 		  fix_decl_part
 		  instance_decl_part
 		  decls_part
-		  rules_and_deprecs
+		  rules_and_deprecs_part
 		  { ParsedIface {
 			pi_mod  = mkModule $3 $2,	-- Module itself
 			pi_vers = $4, 			-- Module version
@@ -369,12 +366,11 @@ decl    : src_loc var_name '::' type maybe_idinfo
 	| src_loc 'type' tc_name tv_bndrs '=' type 		       
 			{ TyClD (TySynonym $3 $4 $6 $1) }
 	| src_loc 'data' opt_decl_context tc_name tv_bndrs constrs 	       
-	       		{ TyClD (mkTyData DataType $3 $4 $5 $6 (length $6) Nothing noDataPragmas $1) }
+	       		{ TyClD (mkTyData DataType $3 $4 $5 $6 (length $6) Nothing $1) }
 	| src_loc 'newtype' opt_decl_context tc_name tv_bndrs newtype_constr
-			{ TyClD (mkTyData NewType $3 $4 $5 $6 1 Nothing noDataPragmas $1) }
+			{ TyClD (mkTyData NewType $3 $4 $5 $6 1 Nothing $1) }
 	| src_loc 'class' opt_decl_context tc_name tv_bndrs fds csigs
-			{ TyClD (mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds 
-					noClassPragmas $1) }
+			{ TyClD (mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds $1) }
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
@@ -394,25 +390,22 @@ pragma	: src_loc PRAGMA	{ parseIface $2 PState{ bol = 0#, atbol = 1#,
 
 -----------------------------------------------------------------------------
 
-rules_and_deprecs :: { ([RdrNameRuleDecl], [RdrNameDeprecation]) }
-rules_and_deprecs : {- empty -}	{ ([], []) }
-		  | rules_and_deprecs rule_or_deprec
-				{ let
-				     append2 (xs1,ys1) (xs2,ys2) =
-					(xs1 `app` xs2, ys1 `app` ys2)
-				     xs `app` [] = xs -- performance paranoia
-				     xs `app` ys = xs ++ ys
-				  in append2 $1 $2
-				}
+rules_and_deprecs_part :: { ([RdrNameRuleDecl], IfaceDeprecs) }
+rules_and_deprecs_part : {- empty -}	{ ([], Nothing) }
+		       | pragma		{ case $1 of
+					     POk _ (PRulesAndDeprecs rds) -> rds
+					     PFailed err -> pprPanic "Rules/Deprecations parse failed" err
+					}
 
-rule_or_deprec :: { ([RdrNameRuleDecl], [RdrNameDeprecation]) }
-rule_or_deprec : pragma	{ case $1 of
-			     POk _ (PRules   rules)   -> (rules,[])
-			     POk _ (PDeprecs deprecs) -> ([],deprecs)
-			     PFailed err -> pprPanic "Rules/Deprecations parse failed" err
-			}
+rules_and_deprecs :: { ([RdrNameRuleDecl], IfaceDeprecs) }
+rules_and_deprecs : rule_prag deprec_prag	{ ($1, $2) }
 
+ 
 -----------------------------------------------------------------------------
+
+rule_prag :: { [RdrNameRuleDecl] }
+rule_prag : {- empty -}			{ [] }
+	  | '__R' rules			{ $2 }
 
 rules	   :: { [RdrNameRuleDecl] }
 	   : {- empty -}	{ [] }
@@ -427,18 +420,24 @@ rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
 		  
 -----------------------------------------------------------------------------
 
-deprecs 	:: { [RdrNameDeprecation] }
-deprecs		: {- empty -}		{ [] }
-		| deprec ';' deprecs	{ $1 : $3 }
+deprec_prag	:: { IfaceDeprecs }
+deprec_prag	: {- empty -}		{ Nothing }
+		| '__D' deprecs		{ Just $2 } 
 
-deprec		:: { RdrNameDeprecation }
-deprec		: src_loc STRING		{ Deprecation (IEModuleContents undefined) $2 $1 }
-		| src_loc deprec_name STRING	{ Deprecation $2 $3 $1 }
+deprecs 	:: { Either DeprecTxt [(RdrName,DeprecTxt)] }
+deprecs		: STRING		{ Left $1 }
+		| deprec_list		{ Right $1 }
 
--- SUP: TEMPORARY HACK
-deprec_name	:: { RdrNameIE }
-		: var_name		{ IEVar      $1 }
-		| data_name		{ IEThingAbs $1 }
+deprec_list	:: { [(RdrName,DeprecTxt)] }
+deprec_list	: deprec			{ [$1] }
+		| deprec ';' deprec_list	{ $1 : $3 }
+
+deprec		:: { (RdrName,DeprecTxt) }
+deprec		: deprec_name STRING	{ ($1, $2) }
+
+deprec_name	:: { RdrName }
+		: var_name		{ $1 }
+		| tc_name		{ $1 }
 
 -----------------------------------------------------------------------------
 
@@ -925,11 +924,10 @@ checkVersion :: { () }
 happyError :: P a
 happyError buf PState{ loc = loc } = PFailed (ifaceParseErr buf loc)
 
-data IfaceStuff = PIface 	ParsedIface
-		| PIdInfo	[HsIdInfo RdrName]
-		| PType		RdrNameHsType
-		| PRules	[RdrNameRuleDecl]
-		| PDeprecs	[RdrNameDeprecation]
+data IfaceStuff = PIface 	   ParsedIface
+		| PIdInfo	   [HsIdInfo RdrName]
+		| PType		   RdrNameHsType
+		| PRulesAndDeprecs ([RdrNameRuleDecl], IfaceDeprecs)
 
 mk_con_decl name (ex_tvs, ex_ctxt) details loc = mkConDecl name ex_tvs ex_ctxt details loc
 }

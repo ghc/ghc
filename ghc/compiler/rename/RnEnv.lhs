@@ -11,7 +11,7 @@ module RnEnv where		-- Export everything
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
-			  mkRdrUnqual, qualifyRdrName
+			  mkRdrUnqual, qualifyRdrName, lookupRdrEnv
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
@@ -223,6 +223,15 @@ lookupGlobalOccRn rdr_name
 			failWithRn (mkUnboundName rdr_name)
 				   (unknownNameErr rdr_name)
     }
+
+lookupGlobalRn :: GlobalRdrEnv -> RdrName -> RnM d (Maybe Name)
+  -- Checks that there is exactly one
+lookupGlobalRn global_env rdr_name
+  = case lookupRdrEnv global_env rdr_name of
+	Just [(name,_)]		-> returnRn (Just name)
+	Just stuff@((name,_):_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
+		       		   returnRn (Just name)
+	Nothing			-> returnRn Nothing
 \end{code}
 %
 

@@ -4,29 +4,26 @@
 \section[MkIface]{Print an interface for a module}
 
 \begin{code}
-module MkIface ( writeIface  ) where
+module MkIface ( completeIface ) where
 
 #include "HsVersions.h"
 
-import IO		( openFile, hClose, IOMode(..) )
-
 import HsSyn
-import HsCore		( HsIdInfo(..), toUfExpr )
-import RdrHsSyn		( RdrNameRuleDecl, mkTyData )
-import HsPragmas	( DataPragmas(..), ClassPragmas(..) )
+import HsCore		( HsIdInfo(..), toUfExpr, ifaceSigName )
 import HsTypes		( toHsTyVars )
 import BasicTypes	( Fixity(..), NewOrData(..),
-			  Version, bumpVersion, initialVersion, isLoopBreaker
+			  Version, bumpVersion, isLoopBreaker
 			)
 import RnMonad
-
-import InstEnv	( InstInfo(..) )
+import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedIfaceSig )
+import HscTypes		( VersionInfo(..), IfaceDecls(..), ModIface(..), ModDetails(..),
+			  TyThing(..), DFunId )
 
 import CmdLineOpts
 import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId, hasNoBinding,
 			  idSpecialisation
 			)
-import Var		( isId, varName )
+import Var		( isId )
 import VarSet
 import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..), 
@@ -40,33 +37,26 @@ import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..),
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), isBuiltinRule, rulesRules, rulesRhsFreeVars )
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
 import CoreUnfold	( okToUnfoldInHiFile, couldBeSmallEnoughToInline )
-import Module		( pprModuleName, moduleUserString )
-import Name		( isLocallyDefined, isWiredInName, toRdrName, nameModule,
-			  Name, NamedThing(..)
+import Name		( isLocallyDefined, getName, nameModule,
+			  Name, NamedThing(..),
+			  plusNameEnv, lookupNameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv_NF, nameEnvElts
 			)
-import OccName		( OccName, pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize
 			)
 import Class		( classExtraBigSig, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
-import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
-			  deNoteType, classesToPreds
-		        )
+import Type		( splitSigmaTy, tidyTopType, deNoteType )
 
 import Rules		( ProtoCoreRule(..) )
 
 import Bag		( bagToList )
 import UniqFM		( lookupUFM, listToUFM )
-import Util		( sortLt )
 import SrcLoc		( noSrcLoc )
 import Bag
 import Outputable
-import ErrUtils		( dumpIfSet )
 
-import Maybe 		( isNothing )
 import List		( partition )
-import Monad 		( when )
 \end{code}
 
 
@@ -77,253 +67,43 @@ import Monad 		( when )
 %************************************************************************
 
 \begin{code}
-writeIface this_mod old_iface new_iface
-	   local_tycons local_classes inst_info
-	   final_ids tidy_binds tidy_orphan_rules
-  = 
-    if isNothing opt_HiDir && isNothing opt_HiFile
-	then return ()  -- not producing any .hi file
-	else 
+completeIface :: Maybe ModIface		-- The old interface, if we have it
+	      -> ModIface		-- The new one, minus the decls and versions
 
-    let 
-	hi_suf = case opt_HiSuf of { Nothing -> "hi"; Just suf -> suf }
-	filename = case opt_HiFile of {
-			Just f  -> f;
-			Nothing -> 
-		   case opt_HiDir of {
-			Just dir -> dir ++ '/':moduleUserString this_mod 
-					++ '.':hi_suf;
-			Nothing  -> panic "writeIface"
-		}}
+	      -> ModDetails		-- The ModDetails for this module
+	      -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
+					-- code generator; they have authoritative arity info
+	      -> [ProtoCoreRule]	-- Tidy orphan rules
+
+	      -> Maybe (ModIface, SDoc)	-- The new one, complete with decls and versions
+					-- The SDoc is a debug document giving differences
+					-- Nothing => no change
+
+	-- NB: 'Nothing' means that even the usages havn't changed, so there's no
+	--     need to write a new interface file.  But even if the usages have
+	--     changed, the module version may not have.
+	--
+	-- The IO in the type is solely for debug output
+	-- In particular, dumping a record of what has changed
+completeIface maybe_old_iface new_iface mod_details 
+	      tidy_binds final_ids tidy_orphan_rules
+  = let
+	new_decls = declsFromDetails mod_details tidy_binds final_ids tidy_orphan_rules
     in
+    addVersionInfo maybe_old_iface (new_iface { mi_decls = new_decls })
 
-    do maybe_final_iface <- checkIface old_iface full_new_iface 	
-       case maybe_final_iface of {
-	  Nothing -> when opt_D_dump_rn_trace $
-		     putStrLn "Interface file unchanged" ;  -- No need to update .hi file
-
-	  Just final_iface ->
-
-       do  let mod_vers_unchanged = case old_iface of
-				      Just iface -> pi_vers iface == pi_vers final_iface
-				      Nothing -> False
-     	   when (mod_vers_unchanged && opt_D_dump_rn_trace) $
-	        putStrLn "Module version unchanged, but usages differ; hence need new hi file"
-
-	   if_hdl <- openFile filename WriteMode
-	   printForIface if_hdl (pprIface final_iface)
-	   hClose if_hdl
-    }   
-  where
-    full_new_iface = completeIface new_iface local_tycons local_classes
-				   	     inst_info final_ids tidy_binds
-					     tidy_orphan_rules
-\end{code}
-
-
-%************************************************************************
-%*				 					*
-\subsection{Checking if the new interface is up to date
-%*				 					*
-%************************************************************************
-
-\begin{code}
-checkIface :: Maybe ParsedIface		-- The old interface, read from M.hi
-	   -> ParsedIface		-- The new interface; but with all version numbers = 1
-	   -> IO (Maybe ParsedIface)	-- Nothing => no change; no need to write new Iface
-					-- Just pi => Here is the new interface to write
-					-- 	      with correct version numbers
-		-- The I/O part is just so it can print differences
-
--- NB: the fixities, declarations, rules are all assumed
--- to be sorted by increasing order of hsDeclName, so that 
--- we can compare for equality
-
-checkIface Nothing new_iface
--- No old interface, so definitely write a new one!
-  = return (Just new_iface)
-
-checkIface (Just iface) new_iface
-  | no_output_change && no_usage_change
-  = return Nothing
-
-  | otherwise		-- Add updated version numbers
-  = do { dumpIfSet opt_D_dump_hi_diffs "Interface file changes" pp_diffs ;
-	 return (Just final_iface )}
-	
-  where
-    final_iface = new_iface { pi_vers = new_mod_vers,
-		      	      pi_fixity = (new_fixity_vers, new_fixities),
-		      	      pi_rules  = (new_rules_vers,  new_rules),
-		      	      pi_decls  = final_decls }
-
-    no_usage_change = pi_usages iface == pi_usages new_iface
-
-    no_output_change = no_decl_changed && 
-	               new_fixity_vers == fixity_vers && 
-	               new_rules_vers == rules_vers &&
-	               no_export_change
-
-    no_export_change = pi_exports iface == pi_exports new_iface
-
-    new_mod_vers | no_output_change = mod_vers
-		 | otherwise  	    = bumpVersion mod_vers
-
-    mod_vers = pi_vers iface
-
-    (fixity_vers, fixities) = pi_fixity iface
-    (_,       new_fixities) = pi_fixity new_iface
-    new_fixity_vers | fixities == new_fixities = fixity_vers
-		    | otherwise		       = bumpVersion fixity_vers
-
-    (rules_vers, rules) = pi_rules iface
-    (_,      new_rules) = pi_rules new_iface
-    new_rules_vers  | rules == new_rules = rules_vers
-		    | otherwise		 = bumpVersion rules_vers
-
-    (no_decl_changed, pp_diffs, final_decls) = merge_decls True empty [] (pi_decls iface) (pi_decls new_iface)
-
-	-- Fill in the version number on the new declarations
-	-- by looking at the old declarations.
-	-- Set the flag if anything changes. 
-	-- Assumes that the decls are sorted by hsDeclName
-    merge_decls ok_so_far pp acc []  []        = (ok_so_far, pp, reverse acc)
-    merge_decls ok_so_far pp acc old []        = (False,     pp, reverse acc)
-    merge_decls ok_so_far pp acc [] (nvd:nvds) = merge_decls False (pp $$ only_new nvd) (nvd:acc) [] nvds
-    merge_decls ok_so_far pp acc (vd@(v,d):vds) (nvd@(_,nd):nvds)
-	= case d_name `compare` nd_name of
-		LT -> merge_decls False (pp $$ only_old vd)  acc       vds      (nvd:nvds)
-		GT -> merge_decls False (pp $$ only_new nvd) (nvd:acc) (vd:vds) nvds
-		EQ | d == nd   -> merge_decls ok_so_far pp 		     (vd:acc) 		       vds nvds
-		   | otherwise -> merge_decls False	(pp $$ changed d nd) ((bumpVersion v, nd):acc) vds nvds
-	where
- 	  d_name  = hsDeclName d
- 	  nd_name = hsDeclName nd
-
-    only_old (_,d) = ptext SLIT("Only in old iface:") <+> ppr d
-    only_new (_,d) = ptext SLIT("Only in new iface:") <+> ppr d
-    changed d nd   = ptext SLIT("Changed in iface: ") <+> ((ptext SLIT("Old:") <+> ppr d) $$ 
-							   (ptext SLIT("New:") <+> ppr nd))
-\end{code}
-
-
-
-%************************************************************************
-%*				 					*
-\subsection{Printing the interface}
-%*				 					*
-%************************************************************************
-
-\begin{code}
-pprIface (ParsedIface { pi_mod = mod, pi_vers = mod_vers, pi_orphan = orphan,
-			pi_usages = usages, pi_exports = exports, 
-			pi_fixity = (fix_vers, fixities),
-			pi_insts = insts, pi_decls = decls, 
-			pi_rules = (rule_vers, rules), pi_deprecs = deprecs })
- = vcat [ ptext SLIT("__interface")
-		<+> doubleQuotes (ptext opt_InPackage)
-		<+> ppr mod <+> ppr mod_vers <+> pp_sub_vers
-		<+> (if orphan then char '!' else empty)
-		<+> int opt_HiVersion
-		<+> ptext SLIT("where")
-	, vcat (map pprExport exports)
-	, vcat (map pprUsage usages)
-	, pprFixities fixities
-	, vcat [ppr i <+> semi | i <- insts]
-	, vcat [ppr_vers v <+> ppr d <> semi | (v,d) <- decls]
-	, pprRules rules
-	, pprDeprecs deprecs
-	]
-  where
-    ppr_vers v | v == initialVersion = empty
-	       | otherwise	     = int v
-    pp_sub_vers 
-	| fix_vers == initialVersion && rule_vers == initialVersion = empty
-	| otherwise = brackets (ppr fix_vers <+> ppr rule_vers)
-\end{code}
-
-When printing export lists, we print like this:
-	Avail   f		f
-	AvailTC C [C, x, y]	C(x,y)
-	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
-
-\begin{code}
-pprExport :: ExportItem -> SDoc
-pprExport (mod, items)
- = hsep [ ptext SLIT("__export "), ppr mod, hsep (map upp_avail items) ] <> semi
-  where
-    upp_avail :: RdrAvailInfo -> SDoc
-    upp_avail (Avail name)      = pprOccName name
-    upp_avail (AvailTC name []) = empty
-    upp_avail (AvailTC name ns) = hcat [pprOccName name, bang, upp_export ns']
-				where
-				  bang | name `elem` ns = empty
-				       | otherwise	= char '|'
-				  ns' = filter (/= name) ns
-    
-    upp_export []    = empty
-    upp_export names = braces (hsep (map pprOccName names))
-\end{code}
-
-
-\begin{code}
-pprUsage :: ImportVersion OccName -> SDoc
-pprUsage (m, has_orphans, is_boot, whats_imported)
-  = hsep [ptext SLIT("import"), pprModuleName m, 
-	  pp_orphan, pp_boot,
-	  upp_import_versions whats_imported
-    ] <> semi
-  where
-    pp_orphan | has_orphans = char '!'
-	      | otherwise   = empty
-    pp_boot   | is_boot     = char '@'
-              | otherwise   = empty
-
-	-- Importing the whole module is indicated by an empty list
-    upp_import_versions NothingAtAll   = empty
-    upp_import_versions (Everything v) = dcolon <+> int v
-    upp_import_versions (Specifically vm vf vr nvs)
-      = dcolon <+> int vm <+> int vf <+> int vr <+> hsep [ ppr n <+> int v | (n,v) <- nvs ]
-\end{code}
-
-
-\begin{code}
-pprFixities []    = empty
-pprFixities fixes = hsep (map ppr fixes) <> semi
-
-pprRules []    = empty
-pprRules rules = hsep [ptext SLIT("{-## __R"), hsep (map ppr rules), ptext SLIT("##-}")]
-
-pprDeprecs []   = empty
-pprDeprecs deps = hsep [ ptext SLIT("{-## __D"), guts, ptext SLIT("##-}")]
-		where
-		  guts = hsep [ ppr ie <+> doubleQuotes (ppr txt) <> semi 
-			      | Deprecation ie txt _ <- deps ]
-\end{code}
-
-
-%************************************************************************
-%*				 					*
-\subsection{Completing the new interface}
-%*				 					*
-%************************************************************************
-
-\begin{code}
-completeIface new_iface local_tycons local_classes
-		        inst_info final_ids tidy_binds
-			tidy_orphan_rules
-  = new_iface { pi_decls = [(initialVersion,d) | d <- sortLt lt_decl all_decls],
-		pi_insts = sortLt lt_inst_decl inst_dcls,
-		pi_rules = (initialVersion, rule_dcls)
-    }
-  where
-     all_decls = cls_dcls ++ ty_dcls ++ bagToList val_dcls
-     (inst_dcls, inst_ids) = ifaceInstances inst_info
-     cls_dcls = map ifaceClass local_classes
+declsFromDetails :: ModDetails -> [CoreBind] -> [Id] -> [ProtoCoreRule] -> IfaceDecls
+declsFromDetails details tidy_binds final_ids tidy_orphan_rules
+   = IfaceDecls { dcl_tycl  = ty_cls_dcls,
+		  dcl_insts = inst_dcls,
+		  dcl_sigs  = bagToList val_dcls,
+		  dcl_rules = rule_dcls }
+   where
+     dfun_ids	 = md_insts details
+     inst_dcls   = map ifaceInstance dfun_ids
+     ty_cls_dcls = map ifaceTyCls (filter emitTyCls (nameEnvElts (md_types details)))
   
-     ty_dcls  = map ifaceTyCon (filter (not . isWiredInName . getName) local_tycons)
-
-     (val_dcls, emitted_ids) = ifaceBinds (inst_ids `unionVarSet` orphan_rule_ids)
+     (val_dcls, emitted_ids) = ifaceBinds (mkVarSet dfun_ids `unionVarSet` orphan_rule_ids)
 					  final_ids tidy_binds
 
      rule_dcls | opt_OmitInterfacePragmas = []
@@ -332,20 +112,115 @@ completeIface new_iface local_tycons local_classes
      orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
 				    | ProtoCoreRule _ _ rule <- tidy_orphan_rules]
 
-lt_decl      d1 d2 = hsDeclName   d1 < hsDeclName d2
-lt_inst_decl d1 d2 = instDeclName d1 < instDeclName d2
-	-- Even instance decls have names, namely the dfun name
+\end{code}
+
+%************************************************************************
+%*				 					*
+\subsection{Types and classes}
+%*				 					*
+%************************************************************************
+
+\begin{code}
+emitTyCls :: TyThing -> Bool
+emitTyCls (ATyCon tc) = True	-- Could filter out wired in ones, but it's not
+				-- strictly necessary, and it costs extra time
+emitTyCls (AClass cl) = True
+emitTyCls (AnId   _)  = False
+
+
+ifaceTyCls :: TyThing -> RenamedTyClDecl
+ifaceTyCls (AClass clas)
+  = ClassDecl (toHsContext sc_theta)
+	      (getName clas)
+	      (toHsTyVars clas_tyvars)
+	      (toHsFDs clas_fds)
+	      (map toClassOpSig op_stuff)
+	      EmptyMonoBinds
+	      [] noSrcLoc
+  where
+     (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
+
+     toClassOpSig (sel_id, def_meth)
+	= ASSERT(sel_tyvars == clas_tyvars)
+	  ClassOpSig (getName sel_id) (Just def_meth') (toHsType op_ty) noSrcLoc
+	where
+	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
+	  def_meth' = case def_meth of
+			 NoDefMeth  -> NoDefMeth
+			 GenDefMeth -> GenDefMeth
+			 DefMeth id -> DefMeth (getName id)
+
+ifaceTyCls (ATyCon tycon)
+  | isSynTyCon tycon
+  = TySynonym (getName tycon)(toHsTyVars tyvars) (toHsType ty) noSrcLoc
+  where
+    (tyvars, ty) = getSynTyConDefn tycon
+
+ifaceTyCls (ATyCon tycon)
+  | isAlgTyCon tycon
+  = TyData new_or_data (toHsContext (tyConTheta tycon))
+	   (getName tycon)
+	   (toHsTyVars tyvars)
+	   (map ifaceConDecl (tyConDataCons tycon))
+	   (tyConFamilySize tycon)
+	   Nothing noSrcLoc (panic "gen1") (panic "gen2")
+  where
+    tyvars = tyConTyVars tycon
+    new_or_data | isNewTyCon tycon = NewType
+	        | otherwise	   = DataType
+
+    ifaceConDecl data_con 
+	= ConDecl (getName data_con) (error "ifaceConDecl")
+		  (toHsTyVars ex_tyvars)
+		  (toHsContext ex_theta)
+		  details noSrcLoc
+	where
+	  (tyvars1, _, ex_tyvars, ex_theta, arg_tys, tycon1) = dataConSig data_con
+          field_labels   = dataConFieldLabels data_con
+          strict_marks   = dataConStrictMarks data_con
+	  details | null field_labels
+	    	  = ASSERT( tycon == tycon1 && tyvars == tyvars1 )
+	    	    VanillaCon (zipWith mk_bang_ty strict_marks arg_tys)
+
+    	    	  | otherwise
+	    	  = RecCon (zipWith mk_field strict_marks field_labels)
+
+    mk_bang_ty NotMarkedStrict     ty = Unbanged (toHsType ty)
+    mk_bang_ty (MarkedUnboxed _ _) ty = Unpacked (toHsType ty)
+    mk_bang_ty MarkedStrict        ty = Banged   (toHsType ty)
+
+    mk_field strict_mark field_label
+	= ([getName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
+
+ifaceTyCls (ATyCon tycon) = pprPanic "ifaceTyCls" (ppr tycon)
 \end{code}
 
 
 %************************************************************************
 %*				 					*
-\subsection{Completion stuff}
+\subsection{Instances and rules}
 %*				 					*
 %************************************************************************
 
+\begin{code}			 
+ifaceInstance :: DFunId -> RenamedInstDecl
+ifaceInstance dfun_id
+  = InstDecl (toHsType tidy_ty) EmptyMonoBinds [] (Just (getName dfun_id)) noSrcLoc			 
+  where
+    tidy_ty = tidyTopType (deNoteType (idType dfun_id))
+		-- The deNoteType is very important.   It removes all type
+		-- synonyms from the instance type in interface files.
+		-- That in turn makes sure that when reading in instance decls
+		-- from interface files that the 'gating' mechanism works properly.
+		-- Otherwise you could have
+		--	type Tibble = T Int
+		--	instance Foo Tibble where ...
+		-- and this instance decl wouldn't get imported into a module
+		-- that mentioned T but not Tibble.
+\end{code}
+
 \begin{code}
-ifaceRules :: [ProtoCoreRule] -> IdSet -> [RdrNameRuleDecl]
+ifaceRules :: [ProtoCoreRule] -> IdSet -> [RenamedRuleDecl]
 ifaceRules rules emitted
   = orphan_rules ++ local_rules
   where
@@ -359,115 +234,12 @@ ifaceRules rules emitted
 				-- will have access to them anyway
 
 			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
-			-- from coming out, and to make it work properly we need to add 
-			     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
+			-- from coming out, and to make it work properly we need to add ????
+			--	(put it back in for now)
+		     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
 				-- Spit out a rule only if all its lhs free vars are emitted
 				-- This is a good reason not to do it when we emit the Id itself
 		   ]
-\end{code}
-
-\begin{code}			 
-ifaceInstances :: Bag InstInfo -> ([RdrNameInstDecl], IdSet)
-		   -- The IdSet is the needed dfuns
-
-ifaceInstances inst_infos
-  = (decls, needed_ids)
-  where			
-    decls       = map to_decl togo_insts
-    togo_insts	= filter is_togo_inst (bagToList inst_infos)
-    needed_ids  = mkVarSet [dfun_id | InstInfo _ _ _ _ dfun_id _ _ _ <- togo_insts]
-    is_togo_inst (InstInfo _ _ _ _ dfun_id _ _ _) = isLocallyDefined dfun_id
-				 
-    -------			 
-    to_decl (InstInfo clas tvs tys theta dfun_id _ _ _)
-      = let			 
-		-- The deNoteType is very important.   It removes all type
-		-- synonyms from the instance type in interface files.
-		-- That in turn makes sure that when reading in instance decls
-		-- from interface files that the 'gating' mechanism works properly.
-		-- Otherwise you could have
-		--	type Tibble = T Int
-		--	instance Foo Tibble where ...
-		-- and this instance decl wouldn't get imported into a module
-		-- that mentioned T but not Tibble.
-	    forall_ty     = mkSigmaTy tvs theta (deNoteType (mkDictTy clas tys))
-	    tidy_ty = tidyTopType forall_ty
-	in			 
-	InstDecl (toHsType tidy_ty) EmptyMonoBinds [] (Just (toRdrName dfun_id)) noSrcLoc 
-\end{code}
-
-\begin{code}
-ifaceTyCon :: TyCon -> RdrNameHsDecl
-ifaceTyCon tycon
-  | isSynTyCon tycon
-  = TyClD (TySynonym (toRdrName tycon)
-		     (toHsTyVars tyvars) (toHsType ty)
-		     noSrcLoc)
-  where
-    (tyvars, ty) = getSynTyConDefn tycon
-
-ifaceTyCon tycon
-  | isAlgTyCon tycon
-  = TyClD (mkTyData new_or_data (toHsContext (tyConTheta tycon))
-		  (toRdrName tycon)
-		  (toHsTyVars tyvars)
-		  (map ifaceConDecl (tyConDataCons tycon))
-		  (tyConFamilySize tycon)
-		  Nothing NoDataPragmas noSrcLoc)
-  where
-    tyvars = tyConTyVars tycon
-    new_or_data | isNewTyCon tycon = NewType
-	        | otherwise	   = DataType
-
-    ifaceConDecl data_con 
-	= ConDecl (toRdrName data_con) (error "ifaceConDecl")
-		  (toHsTyVars ex_tyvars)
-		  (toHsContext ex_theta)
-		  details noSrcLoc
-	where
-	  (tyvars1, _, ex_tyvars, ex_theta, arg_tys, tycon1) = dataConSig data_con
-          field_labels   = dataConFieldLabels data_con
-          strict_marks   = dataConStrictMarks data_con
-	  details
-	    | null field_labels
-	    = ASSERT( tycon == tycon1 && tyvars == tyvars1 )
-	      VanillaCon (zipWith mk_bang_ty strict_marks arg_tys)
-
-    	    | otherwise
-	    = RecCon (zipWith mk_field strict_marks field_labels)
-
-    mk_bang_ty NotMarkedStrict     ty = Unbanged (toHsType ty)
-    mk_bang_ty (MarkedUnboxed _ _) ty = Unpacked (toHsType ty)
-    mk_bang_ty MarkedStrict        ty = Banged   (toHsType ty)
-
-    mk_field strict_mark field_label
-	= ([toRdrName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
-
-ifaceTyCon tycon
-  = pprPanic "pprIfaceTyDecl" (ppr tycon)
-
-ifaceClass clas
-  = TyClD (ClassDecl (toHsContext sc_theta)
-		     (toRdrName clas)
-		     (toHsTyVars clas_tyvars)
-		     (toHsFDs clas_fds)
-		     (map toClassOpSig op_stuff)
-		     EmptyMonoBinds NoClassPragmas
-		     [] noSrcLoc
-    )
-  where
-     bogus = error "ifaceClass"
-     (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
-
-     toClassOpSig (sel_id, def_meth) = 
-	ASSERT(sel_tyvars == clas_tyvars)
-	  ClassOpSig (toRdrName sel_id) (Just def_meth') (toHsType op_ty) noSrcLoc
-	where
-	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
-	  def_meth' = case def_meth of
-			 NoDefMeth  -> NoDefMeth
-			 GenDefMeth -> GenDefMeth
-			 DefMeth id -> DefMeth (toRdrName id)
 \end{code}
 
 
@@ -481,7 +253,7 @@ ifaceClass clas
 ifaceBinds :: IdSet		-- These Ids are needed already
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
 	   -> [CoreBind]	-- In dependency order, later depend on earlier
-	   -> (Bag RdrNameHsDecl, IdSet)		-- Set of Ids actually spat out
+	   -> (Bag RenamedIfaceSig, IdSet)		-- Set of Ids actually spat out
 
 ifaceBinds needed_ids final_ids binds
   = go needed_ids (reverse binds) emptyBag emptyVarSet 
@@ -532,7 +304,7 @@ ifaceBinds needed_ids final_ids binds
 	  needed'  = (needed `unionVarSet` extras) `minusVarSet` mkVarSet (map fst pairs) 
 	  emitted' = emitted `unionVarSet` new_emitted
 
-    go_rec :: IdSet -> [(Id,CoreExpr)] -> (Bag RdrNameHsDecl, IdSet, IdSet)
+    go_rec :: IdSet -> [(Id,CoreExpr)] -> (Bag RenamedIfaceSig, IdSet, IdSet)
     go_rec needed pairs
 	| null decls = (emptyBag, emptyVarSet, emptyVarSet)
 	| otherwise  = (more_decls   `unionBags`   listToBag decls, 
@@ -554,10 +326,10 @@ ifaceId :: (Id -> IdInfo)	-- This function "knows" the extra info added
 	-> Bool			-- True <=> recursive, so don't print unfolding
 	-> Id
 	-> CoreExpr		-- The Id's right hand side
-	-> (RdrNameHsDecl, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
+	-> (RenamedIfaceSig, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
 
 ifaceId get_idinfo is_rec id rhs
-  = (SigD (IfaceSig (toRdrName id) (toHsType id_type) hs_idinfo noSrcLoc),  new_needed_ids)
+  = (IfaceSig (getName id) (toHsType id_type) hs_idinfo noSrcLoc,  new_needed_ids)
   where
     id_type     = idType id
     core_idinfo = idInfo id
@@ -625,7 +397,7 @@ ifaceId get_idinfo is_rec id rhs
 							  
 		  other			     -> False
 
-    wrkr_hsinfo | has_worker = [HsWorker (toRdrName work_id)]
+    wrkr_hsinfo | has_worker = [HsWorker (getName work_id)]
 		| otherwise  = []
 
     ------------  Unfolding  --------------
@@ -671,3 +443,98 @@ ifaceId get_idinfo is_rec id rhs
 interestingId id = isId id && isLocallyDefined id && not (hasNoBinding id)
 \end{code}
 
+
+%************************************************************************
+%*				 					*
+\subsection{Checking if the new interface is up to date
+%*				 					*
+%************************************************************************
+
+\begin{code}
+addVersionInfo :: Maybe ModIface		-- The old interface, read from M.hi
+	       -> ModIface			-- The new interface decls
+	       -> Maybe (ModIface, SDoc)	-- Nothing => no change; no need to write new Iface
+						-- Just mi => Here is the new interface to write
+						-- 	      with correct version numbers
+
+-- NB: the fixities, declarations, rules are all assumed
+-- to be sorted by increasing order of hsDeclName, so that 
+-- we can compare for equality
+
+addVersionInfo Nothing new_iface
+-- No old interface, so definitely write a new one!
+  = Just (new_iface, text "No old interface available")
+
+addVersionInfo (Just old_iface@(ModIface { mi_version = old_version, 
+				       	   mi_decls   = old_decls,
+				       	   mi_fixities = old_fixities }))
+	       new_iface@(ModIface { mi_decls = new_decls,
+				     mi_fixities = new_fixities })
+
+  | no_output_change && no_usage_change
+  = Nothing
+
+  | otherwise		-- Add updated version numbers
+  = Just (final_iface, pp_tc_diffs $$ pp_sig_diffs)
+	
+  where
+    final_iface = new_iface { mi_version = new_version }
+    new_version = VersionInfo { vers_module  = bumpVersion no_output_change (vers_module  old_version),
+				vers_exports = bumpVersion no_export_change (vers_exports old_version),
+				vers_rules   = bumpVersion no_rule_change   (vers_rules   old_version),
+				vers_decls   = sig_vers `plusNameEnv` tc_vers }
+
+    no_output_change = no_sig_change && no_tc_change && no_rule_change && no_export_change
+    no_usage_change  = mi_usages old_iface == mi_usages new_iface
+
+    no_export_change = mi_exports old_iface == mi_exports new_iface		-- Kept sorted
+    no_rule_change   = dcl_rules old_decls  == dcl_rules  new_decls		-- Ditto
+
+	-- Fill in the version number on the new declarations by looking at the old declarations.
+	-- Set the flag if anything changes. 
+	-- Assumes that the decls are sorted by hsDeclName.
+    old_vers_decls = vers_decls old_version
+    (no_sig_change, pp_sig_diffs, sig_vers) = diffDecls ifaceSigName eq_sig old_vers_decls
+							(dcl_sigs old_decls) (dcl_sigs new_decls)
+    (no_tc_change,  pp_tc_diffs,  tc_vers)  = diffDecls tyClDeclName eq_tc old_vers_decls
+							(dcl_tycl old_decls) (dcl_tycl new_decls)
+
+	-- When seeing if two decls are the same, 
+	-- remember to check whether any relevant fixity has changed
+    eq_sig i1 i2 = i1 == i2 && same_fixity (ifaceSigName i1)
+    eq_tc  d1 d2 = d1 == d2 && all (same_fixity . fst) (tyClDeclNames d1)
+    same_fixity n = lookupNameEnv old_fixities n == lookupNameEnv new_fixities n
+
+
+diffDecls :: (Outputable decl)
+	  => (decl->Name)
+	  -> (decl->decl->Bool)	-- True if no change
+	  -> NameEnv Version	-- Old version map
+	  -> [decl] -> [decl]	-- Old and new decls
+	  -> (Bool,		-- True <=> no change
+	      SDoc,		-- Record of differences
+	      NameEnv Version)	-- New version
+
+diffDecls get_name eq old_vers old new
+  = diff True empty emptyNameEnv old new
+  where
+    diff ok_so_far pp new_vers []  []      = (ok_so_far, pp, new_vers)
+    diff ok_so_far pp new_vers old []      = (False,     pp, new_vers)
+    diff ok_so_far pp new_vers [] (nd:nds) = diff False (pp $$ only_new nd) new_vers [] nds
+    diff ok_so_far pp new_vers (od:ods) (nd:nds)
+	= case od_name `compare` nd_name of
+		LT -> diff False (pp $$ only_old od) new_vers ods      (nd:nds)
+		GT -> diff False (pp $$ only_new nd) new_vers (od:ods) nds
+		EQ | od `eq` nd -> diff ok_so_far pp 		         new_vers  ods nds
+		   | otherwise  -> diff False	   (pp $$ changed od nd) new_vers' ods nds
+	where
+ 	  od_name = get_name od
+ 	  nd_name = get_name nd
+	  new_vers' = extendNameEnv new_vers nd_name 
+				    (bumpVersion True (lookupNameEnv_NF old_vers od_name))
+
+    only_old d   = ptext SLIT("Only in old iface:") <+> ppr d
+    only_new d   = ptext SLIT("Only in new iface:") <+> ppr d
+    changed d nd = ptext SLIT("Changed in iface: ") <+> ((ptext SLIT("Old:") <+> ppr d) $$ 
+							 (ptext SLIT("New:") <+> ppr nd))
+\end{code}

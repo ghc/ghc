@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.26 2000/09/27 14:03:12 simonpj Exp $
+% $Id: Costs.lhs,v 1.27 2000/10/24 07:35:00 simonpj Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -71,9 +71,6 @@ data CostRes = Cost (Int, Int, Int, Int, Int)
 
 nullCosts    = Cost (0, 0, 0, 0, 0) :: CostRes
 initHdrCosts = Cost (2, 0, 0, 1, 0) :: CostRes
-errorCosts   = Cost (-1, -1, -1, -1, -1)  -- just for debugging
-
-oneArithm = Cost (1, 0, 0, 0, 0) :: CostRes
 
 instance Eq CostRes where
  (==) t1 t2 = i && b && l && s && f
@@ -366,9 +363,6 @@ gmpOps	=
     , Integer2IntOp  , Int2IntegerOp
   ]
 
-
-abs_costs = nullCosts   -- NB:  This is normal STG code with costs already 
-			--	included; no need to add costs again.
 
 umul_costs = Cost (21,4,0,0,0)	   -- due to spy counts
 rem_costs =  Cost (30,15,0,0,0)	   -- due to spy counts

@@ -32,7 +32,7 @@ import Type		( Type, Kind, PredType(..), ClassContext,
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity )
 import RdrName		( RdrName )
-import Name		( toRdrName )
+import Name		( Name, getName )
 import OccName		( NameSpace )
 import Var		( TyVar, tyVarKind )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
@@ -272,19 +272,19 @@ user-friendly as possible.  Notably, it uses synonyms where possible, and
 expresses overloaded functions using the '=>' context part of a HsForAllTy.
 
 \begin{code}
-toHsTyVar :: TyVar -> HsTyVarBndr RdrName
-toHsTyVar tv = IfaceTyVar (toRdrName tv) (tyVarKind tv)
+toHsTyVar :: TyVar -> HsTyVarBndr Name
+toHsTyVar tv = IfaceTyVar (getName tv) (tyVarKind tv)
 
 toHsTyVars tvs = map toHsTyVar tvs
 
-toHsType :: Type -> HsType RdrName
+toHsType :: Type -> HsType Name
 toHsType ty = toHsType' (unUsgTy ty)
 	-- For now we just discard the usage
 	
-toHsType' :: Type -> HsType RdrName
+toHsType' :: Type -> HsType Name
 -- Called after the usage is stripped off
 -- This function knows the representation of types
-toHsType' (TyVarTy tv)    = HsTyVar (toRdrName tv)
+toHsType' (TyVarTy tv)    = HsTyVar (getName tv)
 toHsType' (FunTy arg res) = HsFunTy (toHsType arg) (toHsType res)
 toHsType' (AppTy fun arg) = HsAppTy (toHsType fun) (toHsType arg) 
 
@@ -295,11 +295,11 @@ toHsType' (PredTy p)		  = HsPredTy (toHsPred p)
 
 toHsType' ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of kind *
   | not saturated	     = generic_case
-  | isTupleTyCon tc	     = HsTupleTy (HsTupCon (toRdrName tc) (tupleTyConBoxity tc)) tys'
+  | isTupleTyCon tc	     = HsTupleTy (HsTupCon (getName tc) (tupleTyConBoxity tc)) tys'
   | tc `hasKey` listTyConKey = HsListTy (head tys')
   | otherwise		     = generic_case
   where
-     generic_case = foldl HsAppTy (HsTyVar (toRdrName tc)) tys'
+     generic_case = foldl HsAppTy (HsTyVar (getName tc)) tys'
      tys'         = map toHsType tys
      saturated    = length tys == tyConArity tc
 
@@ -309,14 +309,14 @@ toHsType' ty@(ForAllTy _ _) = case splitSigmaTy ty of
 						                (toHsType tau)
 
 
-toHsPred (Class cls tys) = HsPClass (toRdrName cls) (map toHsType tys)
-toHsPred (IParam n ty)	 = HsPIParam (toRdrName n)  (toHsType ty)
+toHsPred (Class cls tys) = HsPClass (getName cls) (map toHsType tys)
+toHsPred (IParam n ty)	 = HsPIParam (getName n)  (toHsType ty)
 
-toHsContext :: ClassContext -> HsContext RdrName
-toHsContext cxt = [HsPClass (toRdrName cls) (map toHsType tys) | (cls,tys) <- cxt]
+toHsContext :: ClassContext -> HsContext Name
+toHsContext cxt = [HsPClass (getName cls) (map toHsType tys) | (cls,tys) <- cxt]
 
-toHsFDs :: [FunDep TyVar] -> [FunDep RdrName]
-toHsFDs fds = [(map toRdrName ns, map toRdrName ms) | (ns,ms) <- fds]
+toHsFDs :: [FunDep TyVar] -> [FunDep Name]
+toHsFDs fds = [(map getName ns, map getName ms) | (ns,ms) <- fds]
 \end{code}
 
 

@@ -282,3 +282,145 @@ initRules = foldl add emptyVarEnv builtinRules
 	    add env (name,rule) = extendNameEnv_C add1 env name [rule]
 	    add1 rules _	= rule : rules
 \end{code}
+
+
+
+\begin{code}
+writeIface this_mod old_iface new_iface
+	   local_tycons local_classes inst_info
+	   final_ids tidy_binds tidy_orphan_rules
+  = 
+    if isNothing opt_HiDir && isNothing opt_HiFile
+	then return ()  -- not producing any .hi file
+	else 
+
+    let 
+	hi_suf = case opt_HiSuf of { Nothing -> "hi"; Just suf -> suf }
+	filename = case opt_HiFile of {
+			Just f  -> f;
+			Nothing -> 
+		   case opt_HiDir of {
+			Just dir -> dir ++ '/':moduleUserString this_mod 
+					++ '.':hi_suf;
+			Nothing  -> panic "writeIface"
+		}}
+    in
+
+    do maybe_final_iface <- checkIface old_iface full_new_iface 	
+       case maybe_final_iface of {
+	  Nothing -> when opt_D_dump_rn_trace $
+		     putStrLn "Interface file unchanged" ;  -- No need to update .hi file
+
+	  Just final_iface ->
+
+       do  let mod_vers_unchanged = case old_iface of
+				      Just iface -> pi_vers iface == pi_vers final_iface
+				      Nothing -> False
+     	   when (mod_vers_unchanged && opt_D_dump_rn_trace) $
+	        putStrLn "Module version unchanged, but usages differ; hence need new hi file"
+
+	   if_hdl <- openFile filename WriteMode
+	   printForIface if_hdl (pprIface final_iface)
+	   hClose if_hdl
+    }   
+  where
+    full_new_iface = completeIface new_iface local_tycons local_classes
+				   	     inst_info final_ids tidy_binds
+					     tidy_orphan_rules
+\end{code}
+
+
+%************************************************************************
+%*				 					*
+\subsection{Printing the interface}
+%*				 					*
+%************************************************************************
+
+\begin{code}
+pprIface (ParsedIface { pi_mod = mod, pi_vers = mod_vers, pi_orphan = orphan,
+			pi_usages = usages, pi_exports = exports, 
+			pi_fixity = (fix_vers, fixities),
+			pi_insts = insts, pi_decls = decls, 
+			pi_rules = (rule_vers, rules), pi_deprecs = deprecs })
+ = vcat [ ptext SLIT("__interface")
+		<+> doubleQuotes (ptext opt_InPackage)
+		<+> ppr mod <+> ppr mod_vers <+> pp_sub_vers
+		<+> (if orphan then char '!' else empty)
+		<+> int opt_HiVersion
+		<+> ptext SLIT("where")
+	, vcat (map pprExport exports)
+	, vcat (map pprUsage usages)
+	, pprFixities fixities
+	, vcat [ppr i <+> semi | i <- insts]
+	, vcat [ppr_vers v <+> ppr d <> semi | (v,d) <- decls]
+	, pprRules rules
+	, pprDeprecs deprecs
+	]
+  where
+    ppr_vers v | v == initialVersion = empty
+	       | otherwise	     = int v
+    pp_sub_vers 
+	| fix_vers == initialVersion && rule_vers == initialVersion = empty
+	| otherwise = brackets (ppr fix_vers <+> ppr rule_vers)
+\end{code}
+
+When printing export lists, we print like this:
+	Avail   f		f
+	AvailTC C [C, x, y]	C(x,y)
+	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
+
+\begin{code}
+pprExport :: ExportItem -> SDoc
+pprExport (mod, items)
+ = hsep [ ptext SLIT("__export "), ppr mod, hsep (map upp_avail items) ] <> semi
+  where
+    upp_avail :: RdrAvailInfo -> SDoc
+    upp_avail (Avail name)      = pprOccName name
+    upp_avail (AvailTC name []) = empty
+    upp_avail (AvailTC name ns) = hcat [pprOccName name, bang, upp_export ns']
+				where
+				  bang | name `elem` ns = empty
+				       | otherwise	= char '|'
+				  ns' = filter (/= name) ns
+    
+    upp_export []    = empty
+    upp_export names = braces (hsep (map pprOccName names))
+\end{code}
+
+
+\begin{code}
+pprUsage :: ImportVersion OccName -> SDoc
+pprUsage (m, has_orphans, is_boot, whats_imported)
+  = hsep [ptext SLIT("import"), pprModuleName m, 
+	  pp_orphan, pp_boot,
+	  upp_import_versions whats_imported
+    ] <> semi
+  where
+    pp_orphan | has_orphans = char '!'
+	      | otherwise   = empty
+    pp_boot   | is_boot     = char '@'
+              | otherwise   = empty
+
+	-- Importing the whole module is indicated by an empty list
+    upp_import_versions NothingAtAll   = empty
+    upp_import_versions (Everything v) = dcolon <+> int v
+    upp_import_versions (Specifically vm vf vr nvs)
+      = dcolon <+> int vm <+> int vf <+> int vr <+> hsep [ ppr n <+> int v | (n,v) <- nvs ]
+\end{code}
+
+
+\begin{code}
+pprFixities []    = empty
+pprFixities fixes = hsep (map ppr fixes) <> semi
+
+pprRules []    = empty
+pprRules rules = hsep [ptext SLIT("{-## __R"), hsep (map ppr rules), ptext SLIT("##-}")]
+
+pprDeprecs []   = empty
+pprDeprecs deps = hsep [ ptext SLIT("{-## __D"), guts, ptext SLIT("##-}")]
+		where
+		  guts = hsep [ ppr ie <+> doubleQuotes (ppr txt) <> semi 
+			      | Deprecation ie txt _ <- deps ]
+\end{code}
+
+

@@ -38,9 +38,8 @@ import NameSet
 import RdrName		( RdrName, rdrNameOcc )
 import BasicTypes	( RecFlag(..) )
 import List		( partition )
-import Bag		( bagToList )
 import Outputable
-import PrelNames	( mkUnboundName, isUnboundName )
+import PrelNames	( isUnboundName )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper

@@ -8,7 +8,6 @@ module HscStats ( ppSourceStats ) where
 
 #include "HsVersions.h"
 
-import IO		( hPutStr, stderr )
 import HsSyn
 import Outputable
 import Char		( isSpace )
@@ -124,11 +123,11 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     spec_info (Just (False, _)) = (0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,1)
 
-    data_info (TyData _ _ _ _ _ nconstrs derivs _ _ _ _)
+    data_info (TyData _ _ _ _ _ nconstrs derivs _ _ _)
 	= (nconstrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
-    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ _ )
+    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ )
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))

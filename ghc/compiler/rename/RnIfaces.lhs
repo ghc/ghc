@@ -22,17 +22,16 @@ where
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_NoPruneDecls, opt_NoPruneTyDecls, opt_IgnoreIfacePragmas )
+import HscTypes
 import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
-			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
+			  HsType(..), ConDecl(..), 
 			  ForeignDecl(..), ForKind(..), isDynamicExtName,
 			  FixitySig(..), RuleDecl(..),
-			  isClassOpSig, DeprecDecl(..)
+			  tyClDeclNames
 			)
-import HsImpExp		( ImportDecl(..), ieNames )
-import CoreSyn		( CoreRule )
+import HsImpExp		( ImportDecl(..) )
 import BasicTypes	( Version, defaultFixity )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameRuleDecl,
-			  RdrNameDeprecation, RdrNameIE,
 			  extractHsTyRdrNames 
 			)
 import RnEnv
@@ -47,23 +46,21 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 import Module		( Module, ModuleEnv,
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
-			  emptyModuleEnv, extendModuleEnv, lookupModuleEnv, lookupModuleEnvByName,
+			  emptyModuleEnv, extendModuleEnv, lookupModuleEnvByName,
 			  extendModuleEnv_C, lookupWithDefaultModuleEnv
 			)
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
 import SrcLoc		( mkSrcLoc, SrcLoc )
-import PrelInfo		( cCallishTyKeys, wiredInThingEnv )
+import PrelInfo		( wiredInThingEnv )
 import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
-import Util		( sortLt )
 import Lex
 import FiniteMap
 import Outputable
 import Bag
-import HscTypes
 
 import List		( nub )
 \end{code}
@@ -436,16 +433,16 @@ loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
 --	Loading Deprecations
 -----------------------------------------------------
 
-loadDeprecs :: Module -> [RdrNameDeprecation] -> RnM d Deprecations
-loadDeprecs m []				       = returnRn NoDeprecs
-loadDeprecs m [Deprecation (IEModuleContents _) txt _] = returnRn (DeprecAll txt)
-loadDeprecs m deprecs				       = setModuleRn m 		$
-    							 foldlRn loadDeprec emptyNameEnv deprecs	`thenRn` \ env ->
-							 returnRn (DeprecSome env)
-loadDeprec deprec_env (Deprecation ie txt _)
-  = mapRn lookupOrigName (ieNames ie)		`thenRn` \ names ->
-    traceRn (text "Loaded deprecation(s) for" <+> hcat (punctuate comma (map ppr names)) <> colon <+> ppr txt) `thenRn_`
-    returnRn (extendNameEnvList deprec_env (zip names (repeat txt)))
+loadDeprecs :: Module -> IfaceDeprecs -> RnM d Deprecations
+loadDeprecs m Nothing				       = returnRn NoDeprecs
+loadDeprecs m (Just (Left txt)) = returnRn (DeprecAll txt)
+loadDeprecs m (Just (Right prs)) = setModuleRn m 				$
+    				   foldlRn loadDeprec emptyNameEnv prs	`thenRn` \ env ->
+				   returnRn (DeprecSome env)
+loadDeprec deprec_env (n, txt)
+  = lookupOrigName n 		`thenRn` \ name ->
+    traceRn (text "Loaded deprecation(s) for" <+> ppr name <> colon <+> ppr txt) `thenRn_`
+    returnRn (extendNameEnv deprec_env name txt)
 \end{code}
 
 
@@ -501,7 +498,7 @@ getNonWiredInDecl needed_name
     case lookupNameEnv (iDecls ifaces) needed_name of
 
 {- 		OMIT DEFERRED STUFF FOR NOW, TILL GHCI WORKS
-      Just (version, avail, is_tycon_name, decl@(_, TyClD (TyData DataType _ _ _ _ ncons _ _ _ _ _)))
+      Just (version, avail, is_tycon_name, decl@(_, TyClD (TyData DataType _ _ _ _ ncons _ _ _ _)))
 	-- This case deals with deferred import of algebraic data types
 
 	|  not opt_NoPruneTyDecls
@@ -914,35 +911,15 @@ getDeclBinders :: (RdrName -> SrcLoc -> RnM d Name)	-- New-name function
 		-> RdrNameHsDecl
 		-> RnM d (Maybe AvailInfo)
 
-getDeclBinders new_name (TyClD (TyData _ _ tycon _ condecls _ _ _ src_loc _ _))
-  = new_name tycon src_loc			`thenRn` \ tycon_name ->
-    getConFieldNames new_name condecls		`thenRn` \ sub_names ->
-    returnRn (Just (AvailTC tycon_name (tycon_name : nub sub_names)))
-	-- The "nub" is because getConFieldNames can legitimately return duplicates,
-	-- when a record declaration has the same field in multiple constructors
-
-getDeclBinders new_name (TyClD (TySynonym tycon _ _ src_loc))
-  = new_name tycon src_loc		`thenRn` \ tycon_name ->
-    returnRn (Just (AvailTC tycon_name [tycon_name]))
-
-getDeclBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ _ src_loc))
-  = new_name cname src_loc			`thenRn` \ class_name ->
-
-	-- Record the names for the class ops
-    let
-	-- just want class-op sigs
-	op_sigs = filter isClassOpSig sigs
-    in
-    mapRn (getClassOpNames new_name) op_sigs	`thenRn` \ sub_names ->
-
-    returnRn (Just (AvailTC class_name (class_name : sub_names)))
+getDeclBinders new_name (TyClD tycl_decl)
+  = mapRn do_one (tyClDeclNames tycl_decl)	`thenRn` \ (main_name:sub_names) ->
+    returnRn (Just (AvailTC main_name (main_name : sub_names)))
+  where
+    do_one (name,loc) = new_name name loc
 
 getDeclBinders new_name (SigD (IfaceSig var ty prags src_loc))
   = new_name var src_loc			`thenRn` \ var_name ->
     returnRn (Just (Avail var_name))
-
-getDeclBinders new_name (FixD _)    = returnRn Nothing
-getDeclBinders new_name (DeprecD _) = returnRn Nothing
 
     -- foreign declarations
 getDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
@@ -954,30 +931,15 @@ getDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
   = lookupOrigName nm `thenRn_` 
     returnRn Nothing
 
-getDeclBinders new_name (DefD _)  = returnRn Nothing
-getDeclBinders new_name (InstD _) = returnRn Nothing
-getDeclBinders new_name (RuleD _) = returnRn Nothing
+getDeclBinders new_name (FixD _)    = returnRn Nothing
+getDeclBinders new_name (DeprecD _) = returnRn Nothing
+getDeclBinders new_name (DefD _)    = returnRn Nothing
+getDeclBinders new_name (InstD _)   = returnRn Nothing
+getDeclBinders new_name (RuleD _)   = returnRn Nothing
 
 binds_haskell_name (FoImport _) _   = True
 binds_haskell_name FoLabel      _   = True
 binds_haskell_name FoExport  ext_nm = isDynamicExtName ext_nm
-
-----------------
-getConFieldNames new_name (ConDecl con _ _ _ (RecCon fielddecls) src_loc : rest)
-  = mapRn (\n -> new_name n src_loc) (con:fields)	`thenRn` \ cfs ->
-    getConFieldNames new_name rest			`thenRn` \ ns  -> 
-    returnRn (cfs ++ ns)
-  where
-    fields = concat (map fst fielddecls)
-
-getConFieldNames new_name (ConDecl con _ _ _ condecl src_loc : rest)
-  = new_name con src_loc		`thenRn` \ n ->
-    getConFieldNames new_name rest	`thenRn` \ ns -> 
-    returnRn (n : ns)
-
-getConFieldNames new_name [] = returnRn []
-
-getClassOpNames new_name (ClassOpSig op _ _ src_loc) = new_name op src_loc
 \end{code}
 
 @getDeclSysBinders@ gets the implicit binders introduced by a decl.
@@ -990,11 +952,10 @@ and the dict fun of an instance decl, because both of these have
 bindings of their own elsewhere.
 
 \begin{code}
-getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ names 
-				   src_loc))
+getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ names src_loc))
   = sequenceRn [new_name n src_loc | n <- names]
 
-getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _ _ _ _))
+getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _ _ _))
   = sequenceRn [new_name wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
 
 getDeclSysBinders new_name other_decl

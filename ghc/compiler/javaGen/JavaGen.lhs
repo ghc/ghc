@@ -53,11 +53,10 @@ import Name	( NamedThing(..), getOccString, isGlobalName, isLocalName
 		, nameModule )
 import PrimRep  ( PrimRep(..) )
 import DataCon	( DataCon, dataConRepArity, dataConRepArgTys, dataConId )
-import qualified TypeRep
 import qualified Type
 import qualified CoreSyn
 import CoreSyn	( CoreBind, CoreExpr, CoreAlt, CoreBndr,
-		  Bind(..), Alt, AltCon(..), collectBinders, isValArg
+		  Bind(..), AltCon(..), collectBinders, isValArg
 		)
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import qualified CoreUtils

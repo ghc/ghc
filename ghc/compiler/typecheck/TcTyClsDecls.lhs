@@ -47,7 +47,7 @@ import UniqSet		( emptyUniqSet, unitUniqSet, unionUniqSets,
 			  unionManyUniqSets, uniqSetToList ) 
 import ErrUtils		( Message )
 import Unique		( Unique, Uniquable(..) )
-import HsDecls          ( fromClassDeclNameList )
+import HsDecls          ( getClassDeclSysNames )
 import Generics         ( mkTyConGenInfo )
 import CmdLineOpts	( DynFlags )
 \end{code}
@@ -183,11 +183,11 @@ getInitialKind (TySynonym name tyvars _ _)
    newKindVar		`thenNF_Tc` \ result_kind  ->
    returnNF_Tc (name, mk_kind arg_kinds result_kind)
 
-getInitialKind (TyData _ _ name tyvars _ _ _ _ _ _ _)
+getInitialKind (TyData _ _ name tyvars _ _ _ _ _ _)
  = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
    returnNF_Tc (name, mk_kind arg_kinds boxedTypeKind)
 
-getInitialKind (ClassDecl _ name tyvars _ _ _ _ _ _ )
+getInitialKind (ClassDecl _ name tyvars _ _ _ _ _ )
  = kcHsTyVars tyvars	`thenNF_Tc` \ arg_kinds ->
    returnNF_Tc (name, mk_kind arg_kinds boxedTypeKind)
 
@@ -223,7 +223,7 @@ kcTyClDecl decl@(TySynonym tycon_name hs_tyvars rhs loc)
     kcHsType rhs			`thenTc` \ rhs_kind ->
     unifyKind result_kind rhs_kind
 
-kcTyClDecl decl@(TyData _ context tycon_name hs_tyvars con_decls _ _ _ loc _ _)
+kcTyClDecl decl@(TyData _ context tycon_name hs_tyvars con_decls _ _ loc _ _)
   = tcAddDeclCtxt decl			$
     kcTyClDeclBody tycon_name hs_tyvars	$ \ result_kind ->
     kcHsContext context			`thenTc_` 
@@ -237,7 +237,7 @@ kcTyClDecl decl@(TyData _ context tycon_name hs_tyvars con_decls _ _ _ loc _ _)
 
 kcTyClDecl decl@(ClassDecl context class_name
 			   hs_tyvars fundeps class_sigs
-		      	   _ _ _ loc)
+		      	   _ _ loc)
   = tcAddDeclCtxt decl			$
     kcTyClDeclBody class_name hs_tyvars	$ \ result_kind ->
     kcHsContext context			`thenTc_`
@@ -292,7 +292,7 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs rec_details
         argvrcs		    = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
-	          (TyData data_or_new context tycon_name tyvar_names _ nconstrs _ _ src_loc name1 name2)
+	          (TyData data_or_new context tycon_name tyvar_names _ nconstrs _ src_loc name1 name2)
   = (tycon_name, ATyCon tycon)
   where
 	tycon = mkAlgTyConRep tycon_name tycon_kind tyvars ctxt argvrcs
@@ -314,11 +314,11 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
                   (ClassDecl context class_name
-		             tyvar_names fundeps class_sigs def_methods pragmas
+		             tyvar_names fundeps class_sigs def_methods
 		             name_list src_loc)
   = (class_name, AClass clas)
   where
-        (tycon_name, _, _, _) = fromClassDeclNameList name_list
+        (tycon_name, _, _, _) = getClassDeclSysNames name_list
  	clas = mkClass class_name tyvars fds
 		       sc_theta sc_sel_ids op_items
 		       tycon
@@ -397,7 +397,7 @@ Edges in Type/Class decls
 
 mk_cls_edges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Unique, [Unique])
 
-mk_cls_edges decl@(ClassDecl ctxt name _ _ _ _ _ _ _)
+mk_cls_edges decl@(ClassDecl ctxt name _ _ _ _ _ _)
   = Just (decl, getUnique name, map getUnique (catMaybes (map get_clas ctxt)))
 mk_cls_edges other_decl
   = Nothing
@@ -405,7 +405,7 @@ mk_cls_edges other_decl
 ----------------------------------------------------
 mk_edges :: RenamedTyClDecl -> (RenamedTyClDecl, Unique, [Unique])
 
-mk_edges decl@(TyData _ ctxt name _ condecls _ derivs _ _ _ _)
+mk_edges decl@(TyData _ ctxt name _ condecls _ derivs _ _ _)
   = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
 					 get_cons condecls `unionUniqSets`
 					 get_deriv derivs))
@@ -413,7 +413,7 @@ mk_edges decl@(TyData _ ctxt name _ condecls _ derivs _ _ _ _)
 mk_edges decl@(TySynonym name _ rhs _)
   = (decl, getUnique name, uniqSetToList (get_ty rhs))
 
-mk_edges decl@(ClassDecl ctxt name _ _ sigs _ _ _ _)
+mk_edges decl@(ClassDecl ctxt name _ _ sigs _ _ _)
   = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
 				         get_sigs sigs))
 

@@ -46,7 +46,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  isEnumerationTyCon, isAlgTyCon, TyCon
 			)
 import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp,
-			  mkSigmaTy, splitSigmaTy, splitDictTy, mkDictTy, 
+			  mkSigmaTy, splitDFunTy, mkDictTy, 
 			  isUnboxedType, splitAlgTyConApp, classesToPreds
 			)
 import TysWiredIn	( voidTy )
@@ -258,8 +258,7 @@ tcDeriving prs mod inst_env_in get_fixity local_tycons
 		   iBinds = binds,
 		   iLoc = getSrcLoc dfun, iPrags = [] }
         where
-	 (tyvars, theta, tau) = splitSigmaTy (idType dfun)
-	 (clas, tys)	      = splitDictTy tau
+	 (tyvars, theta, tau, clas, tys) = splitDFunTy (idType dfun)
 
     rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'
 	-- Ignore the free vars returned
