@@ -8,5 +8,6 @@ end of the last line:
 -}
 
 module Main where
+main :: IO ()
 main = return ()
 -- random comment
