@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.15 2001/06/29 11:35:14 simonpj Exp $
+ * $Id: system.c,v 1.16 2001/06/29 11:40:48 simonpj Exp $
  *
  * system Runtime Support
  */
@@ -32,7 +32,13 @@ systemCmd(HsAddr cmd)
   sInfo.lpTitle         = NULL;
   sInfo.dwFlags         = 0;
 
-  if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &sInfo, &pInfo))
+  if (!CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &sInfo, &pInfo))
+    /* The 'TRUE' says that the created process should share
+       handles with the current process.  This is vital to ensure
+       that error messages sent to stderr actually appear on the screen.
+       Since we are going to wait for the process to terminate anyway,
+       there is no problem with such sharing. */
+
     return -1;
   WaitForSingleObject(pInfo.hProcess, INFINITE);
   if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) return -1;
