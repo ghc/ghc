@@ -168,6 +168,7 @@ PrelGHC
   timesInteger#
   quotRemInteger#
   integer2Int#
+  integer2Word#
   int2Integer#
   word2Integer#
   
