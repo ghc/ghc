@@ -50,16 +50,11 @@ import HscMain		( initPersistentCompilerState, hscThing )
 import HscMain		( initPersistentCompilerState )
 #endif
 import HscTypes
-import RnEnv		( unQualInScope )
-import Id		( idType, idName )
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
 			  isHomePackageName )
-import NameEnv
 import RdrName		( lookupRdrEnv, emptyRdrEnv )
 import Module
 import GetImports
-import Type		( tidyType )
-import VarEnv		( emptyTidyEnv )
 import UniqFM
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
@@ -67,23 +62,29 @@ import ErrUtils		( showPass )
 import SysTools		( cleanTempFilesExcept )
 import Util
 import Outputable
-import BasicTypes	( Fixity, defaultFixity )
 import Panic
 import CmdLineOpts	( DynFlags(..) )
 
 import IOExts
 
 #ifdef GHCI
+import Id		( idType, idName )
+import NameEnv
+import Type		( tidyType )
+import VarEnv		( emptyTidyEnv )
+import RnEnv		( unQualInScope )
+import BasicTypes	( Fixity, defaultFixity )
 import Interpreter	( HValue )
 import HscMain		( hscStmt )
 import PrelGHC		( unsafeCoerce# )
 
--- lang
 import Foreign
 import CForeign
+import Exception	( Exception, try )
 #endif
 
-import Exception	( Exception, try, throwDyn )
+-- lang
+import Exception	( throwDyn )
 
 -- std
 import Directory        ( getModificationTime, doesFileExist )
@@ -331,7 +332,6 @@ cmTypeOfExpr cmstate dflags expr
 		tidy_ty = tidyType emptyTidyEnv ty
    where
        CmState{ hst=hst, hit=hit, pcs=pcs, ic=ic } = cmstate
-#endif
 
 getUnqual pcs hit ic
    = case lookupIfaceByModName hit pit modname of
@@ -340,6 +340,7 @@ getUnqual pcs hit ic
  where
     pit = pcs_PIT pcs
     modname = moduleName (ic_module ic)
+#endif
 
 -----------------------------------------------------------------------------
 -- cmTypeOfName: returns a string representing the type of a name.
@@ -394,21 +395,6 @@ cmCompileExpr cmstate dflags expr
 #endif
 
 -----------------------------------------------------------------------------
--- cmInfo: return "info" about an expression.  The info might be:
---
---	* its type, for an expression,
---	* the class definition, for a class
---	* the datatype definition, for a tycon (or synonym)
---	* the export list, for a module
---
--- Can be used to find the type of the last expression compiled, by looking
--- for "it".
-
-cmInfo :: CmState -> String -> IO (Maybe String)
-cmInfo cmstate str 
- = do error "cmInfo not implemented yet"
-
------------------------------------------------------------------------------
 -- Unload the compilation manager's state: everything it knows about the
 -- current collection of modules in the Home package.
 
@@ -445,7 +431,6 @@ cmLoadModule cmstate1 rootnames
 	-- the previous pass, if any.
         let ui1       = ui     cmstate1
    	let mg1       = mg     cmstate1
-   	let ic1       = ic     cmstate1
 
         let ghci_mode = gmode cmstate1 -- this never changes
 
@@ -829,7 +814,9 @@ findInSummaries old_summaries mod_name
 
 findModInSummaries :: [ModSummary] -> Module -> Maybe ModSummary
 findModInSummaries old_summaries mod
-   = listToMaybe [s | s <- old_summaries, ms_mod s == mod]
+   = case [s | s <- old_summaries, ms_mod s == mod] of
+	 [] -> Nothing
+	 (s:_) -> Just s
 
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
@@ -847,7 +834,7 @@ findPartiallyCompletedCycles modsDone theGraph
                  chewed_rest = chew rest
              in 
              if   not (null mods_in_this_cycle) 
-                  && compareLength mods_in_this_cycle names_in_this_cycle == LT
+                  && length mods_in_this_cycle < length names_in_this_cycle
              then mods_in_this_cycle ++ chewed_rest
              else chewed_rest
 
@@ -930,7 +917,6 @@ upsweep_mod :: GhciMode
 upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_inc_me
    = do 
         let mod_name = name_of_summary summary1
-	let verb = verbosity dflags
 
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 mod_name
@@ -1017,7 +1003,7 @@ simple_transitive_closure graph set
    = let set2      = nub (concatMap dsts set ++ set)
          dsts node = fromMaybe [] (lookup node graph)
      in
-         if   equalLength set set2
+         if   length set == length set2
          then set
          else simple_transitive_closure graph set2
 
@@ -1070,28 +1056,21 @@ downsweep rootNm old_summaries
 	getRootSummary file
 	   | haskellish_src_file file
 	   = do exists <- doesFileExist file
-		when (not exists)
-		     (throwDyn (CmdLineError ("can't find file `" ++ file ++ "'")))
-		summariseFile file
+		if exists then summariseFile file else do
+		throwDyn (CmdLineError ("can't find file `" ++ file ++ "'"))	
 	   | otherwise
- 	   = do mb_file <- findFile [hs_file, lhs_file]
-	        case mb_file of
-		  Just x  -> summariseFile x
-		  Nothing -> do
-		     let mod_name = mkModuleName file
-	 	     maybe_summary <- getSummary mod_name
-		     case maybe_summary of
-		       Nothing -> packageModErr mod_name
-		       Just s  -> return s
+ 	   = do exists <- doesFileExist hs_file
+		if exists then summariseFile hs_file else do
+		exists <- doesFileExist lhs_file
+		if exists then summariseFile lhs_file else do
+		let mod_name = mkModuleName file
+		maybe_summary <- getSummary mod_name
+		case maybe_summary of
+		   Nothing -> packageModErr mod_name
+		   Just s  -> return s
            where 
 		 hs_file = file ++ ".hs"
 		 lhs_file = file ++ ".lhs"
-
-        findFile :: [FilePath] -> IO (Maybe FilePath)
-	findFile [] = return Nothing
-	findFile (x:xs) = do
-	    flg <- doesFileExist x
-	    if flg then return (Just x) else findFile xs
 
         getSummary :: ModuleName -> IO (Maybe ModSummary)
         getSummary nm
@@ -1141,7 +1120,7 @@ summariseFile file
    = do hspp_fn <- preprocess file
         (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 
-        let (path, basename, ext) = splitFilename3 file
+        let (path, basename, _ext) = splitFilename3 file
 
 	(mod, location)
 	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
