@@ -39,6 +39,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import Unique		( mkPseudoUnique3 )
 import FastString	( FastString(..) )
+import Panic		( GhcException(..) )
 import PprType		( pprType )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
 import ByteCodeItbls	( ItblEnv, mkITbls )
@@ -50,6 +51,7 @@ import List		( intersperse, sortBy )
 import Foreign		( Ptr(..), mallocBytes )
 import Addr		( Addr(..), addrToInt, writeCharOffAddr )
 import CTypes		( CInt )
+import Exception	( throwDyn )
 
 import PrelBase		( Int(..) )
 import PrelGHC		( ByteArray# )
@@ -373,8 +375,12 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
              schemeE d' s p' rhs	`thenBc` \ rhs_code ->
              returnBc (my_discr alt, rhs_code)
 
-        my_discr (DEFAULT, binds, rhs)  = NoDiscr
-        my_discr (DataAlt dc, binds, rhs) = DiscrP (dataConTag dc - fIRST_TAG)
+        my_discr (DEFAULT, binds, rhs) = NoDiscr
+        my_discr (DataAlt dc, binds, rhs) 
+           | isUnboxedTupleCon dc
+           = unboxedTupleException
+           | otherwise
+           = DiscrP (dataConTag dc - fIRST_TAG)
         my_discr (LitAlt l, binds, rhs)
            = case l of MachInt i     -> DiscrI (fromInteger i)
                        MachFloat r   -> DiscrF (fromRational r)
@@ -442,8 +448,7 @@ schemeT d s p app
    -- Cases 2 and 3
    | otherwise
    = if   is_con_call && isUnboxedTupleCon con
-     then pprPanic "Bytecode generator can't handle unboxed tuple constructor"
-                   (ppr con)
+     then unboxedTupleException
      else code
 
      where
@@ -871,6 +876,10 @@ untaggedSizeW pr
 taggedIdSizeW, untaggedIdSizeW :: Id -> Int
 taggedIdSizeW   = taggedSizeW   . typePrimRep . idType
 untaggedIdSizeW = untaggedSizeW . typePrimRep . idType
+
+unboxedTupleException :: a
+unboxedTupleException 
+   = throwDyn (Panic "bytecode generator can't handle unboxed tuples")
 
 \end{code}
 
