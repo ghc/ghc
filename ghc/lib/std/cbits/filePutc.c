@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePutc.c,v 1.6 1999/07/03 18:45:04 sof Exp $
+ * $Id: filePutc.c,v 1.7 1999/07/12 10:43:13 sof Exp $
  *
  * hPutChar Runtime Support
  */
@@ -10,7 +10,7 @@
 #include "stgio.h"
 #include "error.h"
 
-#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
 #define USE_WINSOCK
 #endif
 

@@ -5,7 +5,7 @@
 #include "stgio.h"
 
 
-#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
 #define USE_WINSOCK
 #endif
 

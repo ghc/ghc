@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileObject.c,v 1.4 1999/07/03 18:45:04 sof Exp $
+ * $Id: fileObject.c,v 1.5 1999/07/12 10:43:12 sof Exp $
  *
  * hPutStr Runtime Support
  */
@@ -12,7 +12,7 @@
 
 #include <stdio.h>
 
-#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
 #define USE_WINSOCK
 #endif
 

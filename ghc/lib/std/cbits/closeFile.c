@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: closeFile.c,v 1.5 1999/07/03 18:45:04 sof Exp $
+ * $Id: closeFile.c,v 1.6 1999/07/12 10:43:12 sof Exp $
  *
  * hClose Runtime Support
  */
@@ -9,7 +9,7 @@
 #include "Rts.h"
 #include "stgio.h"
 
-#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
 #define USE_WINSOCK
 #endif
 

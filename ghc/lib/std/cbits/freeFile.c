@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.5 1999/07/03 18:45:04 sof Exp $
+ * $Id: freeFile.c,v 1.6 1999/07/12 10:43:13 sof Exp $
  *
  * Giving up files
  */
@@ -10,7 +10,7 @@
 #include "stgio.h"
 #include "fileObject.h"
 
-#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
 #define USE_WINSOCK
 #endif
 
