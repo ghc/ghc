@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
 %
-\section[SCCfinal]{Modify and collect code generation for final StgProgram}
+\section[SCCfinal]{Modify and collect code generation for final STG program}
 
 This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 
@@ -29,20 +29,16 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 import Pretty		-- ToDo: rm (debugging only)
 
-import AbsUniType	( isDictTy, getUniDataTyCon_maybe,
-			  isTupleTyCon, isFunType, getTauType,
-			  splitType -- pragmas
-			)
+import Type		( isFunType, getTauType )
 import CmdLineOpts
 import CostCentre
-import Id		( mkSysLocal, getIdUniType )
+import Id		( mkSysLocal, idType )
 import SrcLoc		( mkUnknownSrcLoc )
 import StgSyn
-import SplitUniq
+import UniqSupply
 import UniqSet		( emptyUniqSet
 			  IF_ATTACK_PRAGMAS(COMMA emptyUFM)
 			)
-import Unique
 import Util
 
 infixr 9 `thenMM`, `thenMM_`
@@ -54,10 +50,10 @@ type CollectedCCs = ([CostCentre],  	    -- locally defined ones
 
 stgMassageForProfiling
 	:: FAST_STRING -> FAST_STRING	    -- module name, group name
-	-> SplitUniqSupply		    -- unique supply
+	-> UniqSupply		    -- unique supply
 	-> (GlobalSwitch -> Bool)	    -- command-line opts checker
-	-> [PlainStgBinding]		    -- input
-	-> (CollectedCCs, [PlainStgBinding])
+	-> [StgBinding]		    -- input
+	-> (CollectedCCs, [StgBinding])
 
 stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
   = let
@@ -76,7 +72,6 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
     ((fixed_ccs ++ local_ccs_no_dups, extern_ccs_no_dups), stg_binds2)
   where
     do_auto_sccs_on_cafs  = sw_chkr AutoSccsOnIndividualCafs  -- only use!
---UNUSED:    do_auto_sccs_on_dicts = sw_chkr AutoSccsOnIndividualDicts -- only use! ** UNUSED really **
     doing_prelude	  = sw_chkr CompilingPrelude
 
     all_cafs_cc = if doing_prelude
@@ -84,9 +79,9 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 		  else mkAllCafsCC mod_name grp_name
 
     ----------
-    do_top_binding :: PlainStgBinding -> MassageM PlainStgBinding
+    do_top_binding :: StgBinding -> MassageM StgBinding
 
-    do_top_binding (StgNonRec b rhs) 
+    do_top_binding (StgNonRec b rhs)
       = do_top_rhs b rhs 		`thenMM` \ rhs' ->
 	returnMM (StgNonRec b rhs')
 
@@ -94,25 +89,22 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
       = mapMM do_pair pairs		`thenMM` \ pairs2 ->
 	returnMM (StgRec pairs2)
       where
-	do_pair (b, rhs) 
+	do_pair (b, rhs)
 	   = do_top_rhs b rhs	`thenMM` \ rhs2 ->
 	     returnMM (b, rhs2)
 
     ----------
-    do_top_rhs :: Id -> PlainStgRhs -> MassageM PlainStgRhs
+    do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
-    do_top_rhs binder (StgRhsClosure rhs_cc bi fv u [] (StgSCC ty cc (StgConApp con args lvs)))
+    do_top_rhs binder (StgRhsClosure rhs_cc bi fv u [] (StgSCC ty cc (StgCon con args lvs)))
 	-- top-level _scc_ around nothing but static data; toss it -- it's pointless
       = returnMM (StgRhsCon dontCareCostCentre con args)
 
     do_top_rhs binder (StgRhsClosure rhs_cc bi fv u [] (StgSCC ty cc expr))
--- OLD:
---    | noCostCentreAttached rhs_cc || currentOrSubsumedCosts rhs_cc
---	-- doubtful guard... ToDo?
 	-- Top level CAF with explicit scc expression.  Attach CAF
 	-- cost centre to StgRhsClosure and collect.
       = let
-           calved_cc = cafifyCC cc
+	   calved_cc = cafifyCC cc
 	in
 	collectCC calved_cc	`thenMM_`
 	set_prevailing_cc calved_cc (
@@ -137,7 +129,7 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 	set_prevailing_cc cc2 (
 	    do_expr body
 	)			`thenMM`  \body2 ->
-        returnMM (StgRhsClosure cc2 bi fv u [] body2)
+	returnMM (StgRhsClosure cc2 bi fv u [] body2)
 
     do_top_rhs binder (StgRhsClosure _ bi fv u args body@(StgSCC ty cc expr))
 	-- We blindly use the cc off the _scc_
@@ -151,7 +143,7 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 	    cc2 = if noCostCentreAttached cc
 		  then subsumedCosts -- it's not a thunk; it is top-level & arity > 0
 		  else cc
-        in
+	in
 	set_prevailing_cc cc2 (
 	    do_expr body
 	)		`thenMM` \ body' ->
@@ -164,16 +156,16 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 	-- just slam in dontCareCostCentre
 
     ------
-    do_expr :: PlainStgExpr -> MassageM PlainStgExpr
+    do_expr :: StgExpr -> MassageM StgExpr
 
     do_expr (StgApp fn args lvs)
       = boxHigherOrderArgs (StgApp fn) args lvs
 
-    do_expr (StgConApp con args lvs)
-      = boxHigherOrderArgs (StgConApp con) args lvs
+    do_expr (StgCon con args lvs)
+      = boxHigherOrderArgs (StgCon con) args lvs
 
-    do_expr (StgPrimApp op args lvs)
-      = boxHigherOrderArgs (StgPrimApp op) args lvs
+    do_expr (StgPrim op args lvs)
+      = boxHigherOrderArgs (StgPrim op) args lvs
 
     do_expr (StgSCC ty cc expr)	-- Ha, we found a cost centre!
       = collectCC cc		`thenMM_`
@@ -187,7 +179,7 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 	do_alts alts		`thenMM` \ alts' ->
 	returnMM (StgCase expr' fv1 fv2 uniq alts')
       where
-	do_alts (StgAlgAlts ty alts def) 
+	do_alts (StgAlgAlts ty alts def)
 	  = mapMM do_alt alts 	`thenMM` \ alts' ->
 	    do_deflt def	`thenMM` \ def' ->
 	    returnMM (StgAlgAlts ty alts' def')
@@ -196,7 +188,7 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 	      = do_expr e `thenMM` \ e' ->
 		returnMM (id, bs, use_mask, e')
 
-	do_alts (StgPrimAlts ty alts def) 
+	do_alts (StgPrimAlts ty alts def)
 	  = mapMM do_alt alts	`thenMM` \ alts' ->
 	    do_deflt def	`thenMM` \ def' ->
 	    returnMM (StgPrimAlts ty alts' def')
@@ -206,7 +198,7 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 		returnMM (l,e')
 
 	do_deflt StgNoDefault = returnMM StgNoDefault
-	do_deflt (StgBindDefault b is_used e) 
+	do_deflt (StgBindDefault b is_used e)
 	  = do_expr e			`thenMM` \ e' ->
 	    returnMM (StgBindDefault b is_used e')
 
@@ -223,9 +215,9 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 	returnMM (StgLetNoEscape lvs1 lvs2 rhs' body') )
 
     ----------
-    do_binding :: PlainStgBinding -> MassageM PlainStgBinding
+    do_binding :: StgBinding -> MassageM StgBinding
 
-    do_binding (StgNonRec b rhs) 
+    do_binding (StgNonRec b rhs)
       = do_rhs rhs 			`thenMM` \ rhs' ->
 	returnMM (StgNonRec b rhs')
 
@@ -237,13 +229,13 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 	  = do_rhs rhs	`thenMM` \ rhs' ->
 	    returnMM (b, rhs')
 
-    do_rhs :: PlainStgRhs -> MassageM PlainStgRhs
+    do_rhs :: StgRhs -> MassageM StgRhs
 	-- We play much the same game as we did in do_top_rhs above;
 	-- but we don't have to worry about cafifying, etc.
 	-- (ToDo: consolidate??)
 
 {- Patrick says NO: it will mess up our counts (WDP 95/07)
-    do_rhs (StgRhsClosure _ bi fv u [] (StgSCC _ cc (StgConApp con args lvs)))
+    do_rhs (StgRhsClosure _ bi fv u [] (StgSCC _ cc (StgCon con args lvs)))
       = collectCC cc `thenMM_`
 	returnMM (StgRhsCon cc con args)
 -}
@@ -263,7 +255,7 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 
     do_rhs (StgRhsCon cc con args)
       = use_prevailing_cc_maybe cc  `thenMM` \ cc2 ->
-        returnMM (StgRhsCon cc2 con args)
+	returnMM (StgRhsCon cc2 con args)
       -- ToDo: Box args (if lex) Pass back let binding???
       -- Nope: maybe later? WDP 94/06
 \end{code}
@@ -276,13 +268,13 @@ stgMassageForProfiling mod_name grp_name us sw_chkr stg_binds
 
 \begin{code}
 boxHigherOrderArgs
-    :: ([PlainStgAtom] -> PlainStgLiveVars -> PlainStgExpr)
+    :: ([StgArg] -> StgLiveVars -> StgExpr)
 	-- An application lacking its arguments and live-var info
-    -> [PlainStgAtom]	-- arguments which we might box
-    -> PlainStgLiveVars	-- live var info, which we do *not* try
+    -> [StgArg]	-- arguments which we might box
+    -> StgLiveVars	-- live var info, which we do *not* try
 			-- to maintain/update (setStgVarInfo will
 			-- do that)
-    -> MassageM PlainStgExpr
+    -> MassageM StgExpr
 
 boxHigherOrderArgs almost_expr args live_vars
   = mapAccumMM do_arg [] args	`thenMM` \ (let_bindings, new_args) ->
@@ -290,11 +282,11 @@ boxHigherOrderArgs almost_expr args live_vars
     returnMM (foldr (mk_stg_let cc) (almost_expr new_args live_vars) let_bindings)
   where
     ---------------
-    do_arg bindings atom@(StgLitAtom _) = returnMM (bindings, atom)
+    do_arg bindings atom@(StgLitArg _) = returnMM (bindings, atom)
 
-    do_arg bindings atom@(StgVarAtom old_var)
+    do_arg bindings atom@(StgVarArg old_var)
       = let
-	    var_type = getIdUniType old_var
+	    var_type = idType old_var
 	in
 	if not (is_fun_type var_type) then
 	    returnMM (bindings, atom) -- easy
@@ -304,21 +296,21 @@ boxHigherOrderArgs almost_expr args live_vars
 	    let
 		new_var = mkSysLocal SLIT("ho") uniq var_type mkUnknownSrcLoc
 	    in
-	    returnMM ( (new_var, old_var) : bindings, StgVarAtom new_var )
+	    returnMM ( (new_var, old_var) : bindings, StgVarArg new_var )
       where
 	is_fun_type ty = isFunType (getTauType ty)
 
     ---------------
-    mk_stg_let :: CostCentre -> (Id, Id) -> PlainStgExpr -> PlainStgExpr
+    mk_stg_let :: CostCentre -> (Id, Id) -> StgExpr -> StgExpr
 
     mk_stg_let cc (new_var, old_var) body
       = let
-	    rhs_body = StgApp (StgVarAtom old_var) [{-no args-}] bOGUS_LVs
+	    rhs_body = StgApp (StgVarArg old_var) [{-no args-}] bOGUS_LVs
 
 	    rhs = StgRhsClosure cc
 			stgArgOcc -- safe...
 			[{-junk-}] Updatable [{-no args-}] rhs_body
-        in
+	in
 	StgLet (StgNonRec new_var rhs) body
       where
 	bOGUS_LVs = emptyUniqSet -- easier to print than: panic "mk_stg_let: LVs"
@@ -336,14 +328,14 @@ type MassageM result
   -> CostCentre		-- prevailing CostCentre
 			-- if none, subsumedCosts at top-level
 			-- useCurrentCostCentre at nested levels
-  -> SplitUniqSupply
+  -> UniqSupply
   -> CollectedCCs
   -> (CollectedCCs, result)
 
 -- the initUs function also returns the final UniqueSupply and CollectedCCs
 
 initMM :: FAST_STRING	-- module name, which we may consult
-       -> SplitUniqSupply
+       -> UniqSupply
        -> MassageM a
        -> (CollectedCCs, a)
 
@@ -385,7 +377,7 @@ mapAccumMM f b (m:ms)
     returnMM (b3, r:rs)
 
 getUniqueMM :: MassageM Unique
-getUniqueMM mod scope_cc us ccs = (ccs, getSUnique us)
+getUniqueMM mod scope_cc us ccs = (ccs, getUnique us)
 \end{code}
 
 \begin{code}
@@ -420,7 +412,7 @@ use_prevailing_cc_maybe cc_to_try mod scope_cc us ccs
 	cc_to_use
 	  = if not (noCostCentreAttached   cc_to_try
 		 || currentOrSubsumedCosts cc_to_try) then
-	        cc_to_try
+		cc_to_try
 	    else
 		uncalved_scope_cc
 		-- carry on as before, but be sure it

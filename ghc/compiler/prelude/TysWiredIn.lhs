@@ -21,19 +21,17 @@ module TysWiredIn (
 	charDataCon,
 	charTy,
 	charTyCon,
-	cmpTagTy,
-	cmpTagTyCon,
 	consDataCon,
 	doubleDataCon,
 	doubleTy,
 	doubleTyCon,
-	eqPrimDataCon,
+	eqDataCon,
 	falseDataCon,
 	floatDataCon,
 	floatTy,
 	floatTyCon,
 	getStatePairingConInfo,
-	gtPrimDataCon,
+	gtDataCon,
 	intDataCon,
 	intTy,
 	intTyCon,
@@ -43,7 +41,7 @@ module TysWiredIn (
 	liftDataCon,
 	liftTyCon,
 	listTyCon,
-	ltPrimDataCon,
+	ltDataCon,
 	mallocPtrTyCon,
 	mkLiftTy,
 	mkListTy,
@@ -51,6 +49,8 @@ module TysWiredIn (
 	mkStateTransformerTy,
 	mkTupleTy,
 	nilDataCon,
+	orderingTy,
+	orderingTyCon,
 	primIoTyCon,
 	ratioDataCon,
 	ratioTyCon,
@@ -84,22 +84,56 @@ module TysWiredIn (
 	wordDataCon,
 	wordTy,
 	wordTyCon
+
     ) where
 
-import Pretty		--ToDo:rm debugging only
+import Ubiq
+import TyLoop		( mkDataCon, StrictnessMark(..) )
 
-import PrelFuns		-- help functions, types and things
+-- friends:
+import PrelMods
 import TysPrim
 
-import AbsUniType	( applyTyCon, mkTupleTyCon, mkSynonymTyCon,
-			  getUniDataTyCon_maybe, mkSigmaTy, TyCon
-			  , pprUniType --ToDo: rm debugging only
-			  IF_ATTACK_PRAGMAS(COMMA cmpTyCon)
-			)
-import IdInfo
-import Maybes		( Maybe(..) )
+-- others:
+import SpecEnv		( SpecEnv(..) )
+import NameTypes	( mkPreludeCoreName, mkShortName )
+import Kind		( mkBoxedTypeKind, mkArrowKind )
+import SrcLoc		( mkBuiltinSrcLoc )
+import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
+			  ConsVisible(..), NewOrData(..), TyCon	)
+import Type		( mkTyConTy, applyTyCon, mkSynTy, mkSigmaTy,
+			  mkFunTys, maybeAppDataTyCon,
+			  GenType(..), ThetaType(..), TauType(..) )
+import TyVar		( getTyVarKind, alphaTyVar, betaTyVar )
 import Unique
-import Util
+import Util		( assoc, panic )
+
+nullSpecEnv =  error "TysWiredIn:nullSpecEnv =  "
+addOneToSpecEnv =  error "TysWiredIn:addOneToSpecEnv =  "
+pc_gen_specs = error "TysWiredIn:pc_gen_specs  "
+mkSpecInfo = error "TysWiredIn:SpecInfo"
+
+pcDataTyCon :: Unique{-TyConKey-} -> FAST_STRING -> FAST_STRING -> [TyVar] -> [Id] -> TyCon
+pcDataTyCon key mod name tyvars cons
+  = mkDataTyCon key tycon_kind full_name tyvars
+		[{-no context-}] cons [{-no derivings-}]
+		ConsVisible DataType
+  where
+    full_name = mkPreludeCoreName mod name
+    tycon_kind = foldr (mkArrowKind . getTyVarKind) mkBoxedTypeKind tyvars
+
+pcDataCon :: Unique{-DataConKey-} -> FAST_STRING -> FAST_STRING -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> SpecEnv -> Id
+pcDataCon key mod name tyvars context arg_tys tycon specenv
+  = mkDataCon key (mkPreludeCoreName mod name)
+	[ NotMarkedStrict | a <- arg_tys ]
+	tyvars context arg_tys tycon
+	-- specenv
+
+pcGenerateDataSpecs :: Type -> SpecEnv
+pcGenerateDataSpecs ty
+  = pc_gen_specs False err err err ty
+  where
+    err = panic "PrelUtils:GenerateDataSpecs"
 \end{code}
 
 %************************************************************************
@@ -109,42 +143,42 @@ import Util
 %************************************************************************
 
 \begin{code}
-charTy = UniData charTyCon []
+charTy = mkTyConTy charTyCon
 
 charTyCon = pcDataTyCon charTyConKey pRELUDE_BUILTIN SLIT("Char") [] [charDataCon]
 charDataCon = pcDataCon charDataConKey pRELUDE_BUILTIN SLIT("C#") [] [] [charPrimTy] charTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
-intTy = UniData intTyCon []
+intTy = mkTyConTy intTyCon 
 
 intTyCon = pcDataTyCon intTyConKey pRELUDE_BUILTIN SLIT("Int") [] [intDataCon]
-intDataCon = pcDataCon intDataConKey pRELUDE_BUILTIN SLIT("I#") [] [] [intPrimTy] intTyCon nullSpecEnv 
+intDataCon = pcDataCon intDataConKey pRELUDE_BUILTIN SLIT("I#") [] [] [intPrimTy] intTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
-wordTy = UniData wordTyCon []
+wordTy = mkTyConTy wordTyCon
 
 wordTyCon = pcDataTyCon wordTyConKey pRELUDE_BUILTIN SLIT("_Word") [] [wordDataCon]
 wordDataCon = pcDataCon wordDataConKey pRELUDE_BUILTIN SLIT("W#") [] [] [wordPrimTy] wordTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
-addrTy = UniData addrTyCon []
+addrTy = mkTyConTy addrTyCon
 
 addrTyCon = pcDataTyCon addrTyConKey pRELUDE_BUILTIN SLIT("_Addr") [] [addrDataCon]
 addrDataCon = pcDataCon addrDataConKey pRELUDE_BUILTIN SLIT("A#") [] [] [addrPrimTy] addrTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
-floatTy	= UniData floatTyCon []
+floatTy	= mkTyConTy floatTyCon
 
 floatTyCon = pcDataTyCon floatTyConKey pRELUDE_BUILTIN SLIT("Float") [] [floatDataCon]
 floatDataCon = pcDataCon floatDataConKey pRELUDE_BUILTIN SLIT("F#") [] [] [floatPrimTy] floatTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
-doubleTy = UniData doubleTyCon []
+doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon = pcDataTyCon doubleTyConKey pRELUDE_BUILTIN SLIT("Double") [] [doubleDataCon]
 doubleDataCon = pcDataCon doubleDataConKey pRELUDE_BUILTIN SLIT("D#") [] [] [doublePrimTy] doubleTyCon nullSpecEnv
@@ -154,62 +188,20 @@ doubleDataCon = pcDataCon doubleDataConKey pRELUDE_BUILTIN SLIT("D#") [] [] [dou
 mkStateTy ty	 = applyTyCon stateTyCon [ty]
 realWorldStateTy = mkStateTy realWorldTy -- a common use
 
-stateTyCon = pcDataTyCon stateTyConKey pRELUDE_BUILTIN SLIT("_State") [alpha_tv] [stateDataCon]
+stateTyCon = pcDataTyCon stateTyConKey pRELUDE_BUILTIN SLIT("_State") [alphaTyVar] [stateDataCon]
 stateDataCon
   = pcDataCon stateDataConKey pRELUDE_BUILTIN SLIT("S#")
-	[alpha_tv] [] [mkStatePrimTy alpha] stateTyCon nullSpecEnv
-\end{code}
-
-\begin{code}
-{- OLD:
-byteArrayTyCon
-  = pcDataTyCon byteArrayTyConKey pRELUDE_ARRAY SLIT("_ByteArray")
-	[alpha_tv] [byteArrayDataCon]
-
-byteArrayDataCon
-  = pcDataCon byteArrayDataConKey pRELUDE_ARRAY SLIT("_ByteArray")
-	[alpha_tv] []
-	[mkTupleTy 2 [alpha, alpha], byteArrayPrimTy]
-	byteArrayTyCon nullSpecEnv
--}
-\end{code}
-
-\begin{code}
-{- OLD:
-mutableArrayTyCon
-  = pcDataTyCon mutableArrayTyConKey gLASGOW_ST SLIT("_MutableArray")
-	[alpha_tv, beta_tv, gamma_tv] [mutableArrayDataCon]
-  where
-    mutableArrayDataCon
-      = pcDataCon mutableArrayDataConKey gLASGOW_ST SLIT("_MutableArray")
-	    [alpha_tv, beta_tv, gamma_tv] []
-	    [mkTupleTy 2 [beta, beta], applyTyCon mutableArrayPrimTyCon [alpha, gamma]]
-	    mutableArrayTyCon nullSpecEnv
--}
-\end{code}
-
-\begin{code}
-{-
-mutableByteArrayTyCon
-  = pcDataTyCon mutableByteArrayTyConKey gLASGOW_ST SLIT("_MutableByteArray")
-	[alpha_tv, beta_tv] [mutableByteArrayDataCon]
-
-mutableByteArrayDataCon
-  = pcDataCon mutableByteArrayDataConKey gLASGOW_ST SLIT("_MutableByteArray")
-	[alpha_tv, beta_tv] []
-	[mkTupleTy 2 [beta, beta], mkMutableByteArrayPrimTy alpha]
-	mutableByteArrayTyCon nullSpecEnv
--}
+	[alphaTyVar] [] [mkStatePrimTy alphaTy] stateTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
 stablePtrTyCon
   = pcDataTyCon stablePtrTyConKey gLASGOW_MISC SLIT("_StablePtr")
-	[alpha_tv] [stablePtrDataCon]
+	[alphaTyVar] [stablePtrDataCon]
   where
     stablePtrDataCon
       = pcDataCon stablePtrDataConKey gLASGOW_MISC SLIT("_StablePtr")
-	    [alpha_tv] [] [applyTyCon stablePtrPrimTyCon [alpha]] stablePtrTyCon nullSpecEnv
+	    [alphaTyVar] [] [applyTyCon stablePtrPrimTyCon [alphaTy]] stablePtrTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
@@ -230,19 +222,13 @@ mallocPtrTyCon
 
 @Integer@ and its pals are not really primitive.  @Integer@ itself, first:
 \begin{code}
-integerTy :: UniType
-integerTy    = UniData integerTyCon []
+integerTy :: GenType t u
+integerTy    = mkTyConTy integerTyCon
 
 integerTyCon = pcDataTyCon integerTyConKey pRELUDE_BUILTIN SLIT("Integer") [] [integerDataCon]
 
-#ifndef DPH
 integerDataCon = pcDataCon integerDataConKey pRELUDE_BUILTIN SLIT("J#")
 		[] [] [intPrimTy, intPrimTy, byteArrayPrimTy] integerTyCon nullSpecEnv
-#else
--- DPH: For the time being we implement Integers in the same way as Ints.
-integerDataCon = pcDataCon integerDataConKey pRELUDE_BUILTIN SLIT("J#")
-		[] [] [intPrimTy] integerTyCon nullSpecEnv
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 And the other pairing types:
@@ -279,118 +265,118 @@ We fish one of these \tr{StateAnd<blah>#} things with
 \begin{code}
 stateAndPtrPrimTyCon
   = pcDataTyCon stateAndPtrPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndPtr#")
-		[alpha_tv, beta_tv] [stateAndPtrPrimDataCon]
+		[alphaTyVar, betaTyVar] [stateAndPtrPrimDataCon]
 stateAndPtrPrimDataCon
   = pcDataCon stateAndPtrPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndPtr#")
-		[alpha_tv, beta_tv] [] [mkStatePrimTy alpha, beta]
+		[alphaTyVar, betaTyVar] [] [mkStatePrimTy alphaTy, betaTy]
 		stateAndPtrPrimTyCon nullSpecEnv
 
 stateAndCharPrimTyCon
   = pcDataTyCon stateAndCharPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndChar#")
-		[alpha_tv] [stateAndCharPrimDataCon]
+		[alphaTyVar] [stateAndCharPrimDataCon]
 stateAndCharPrimDataCon
   = pcDataCon stateAndCharPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndChar#")
-		[alpha_tv] [] [mkStatePrimTy alpha, charPrimTy]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, charPrimTy]
 		stateAndCharPrimTyCon nullSpecEnv
 
 stateAndIntPrimTyCon
   = pcDataTyCon stateAndIntPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndInt#")
-		[alpha_tv] [stateAndIntPrimDataCon]
+		[alphaTyVar] [stateAndIntPrimDataCon]
 stateAndIntPrimDataCon
   = pcDataCon stateAndIntPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndInt#")
-		[alpha_tv] [] [mkStatePrimTy alpha, intPrimTy]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, intPrimTy]
 		stateAndIntPrimTyCon nullSpecEnv
 
 stateAndWordPrimTyCon
   = pcDataTyCon stateAndWordPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndWord#")
-		[alpha_tv] [stateAndWordPrimDataCon]
+		[alphaTyVar] [stateAndWordPrimDataCon]
 stateAndWordPrimDataCon
   = pcDataCon stateAndWordPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndWord#")
-		[alpha_tv] [] [mkStatePrimTy alpha, wordPrimTy]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, wordPrimTy]
 		stateAndWordPrimTyCon nullSpecEnv
 
 stateAndAddrPrimTyCon
   = pcDataTyCon stateAndAddrPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndAddr#")
-		[alpha_tv] [stateAndAddrPrimDataCon]
+		[alphaTyVar] [stateAndAddrPrimDataCon]
 stateAndAddrPrimDataCon
   = pcDataCon stateAndAddrPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndAddr#")
-		[alpha_tv] [] [mkStatePrimTy alpha, addrPrimTy]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, addrPrimTy]
 		stateAndAddrPrimTyCon nullSpecEnv
 
 stateAndStablePtrPrimTyCon
   = pcDataTyCon stateAndStablePtrPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndStablePtr#")
-		[alpha_tv, beta_tv] [stateAndStablePtrPrimDataCon]
+		[alphaTyVar, betaTyVar] [stateAndStablePtrPrimDataCon]
 stateAndStablePtrPrimDataCon
   = pcDataCon stateAndStablePtrPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndStablePtr#")
-		[alpha_tv, beta_tv] []
-		[mkStatePrimTy alpha, applyTyCon stablePtrPrimTyCon [beta]]
+		[alphaTyVar, betaTyVar] []
+		[mkStatePrimTy alphaTy, applyTyCon stablePtrPrimTyCon [betaTy]]
 		stateAndStablePtrPrimTyCon nullSpecEnv
 
 stateAndMallocPtrPrimTyCon
   = pcDataTyCon stateAndMallocPtrPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndMallocPtr#")
-		[alpha_tv] [stateAndMallocPtrPrimDataCon]
+		[alphaTyVar] [stateAndMallocPtrPrimDataCon]
 stateAndMallocPtrPrimDataCon
   = pcDataCon stateAndMallocPtrPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndMallocPtr#")
-		[alpha_tv] []
-		[mkStatePrimTy alpha, applyTyCon mallocPtrPrimTyCon []]
+		[alphaTyVar] []
+		[mkStatePrimTy alphaTy, applyTyCon mallocPtrPrimTyCon []]
 		stateAndMallocPtrPrimTyCon nullSpecEnv
 
 stateAndFloatPrimTyCon
   = pcDataTyCon stateAndFloatPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndFloat#")
-		[alpha_tv] [stateAndFloatPrimDataCon]
+		[alphaTyVar] [stateAndFloatPrimDataCon]
 stateAndFloatPrimDataCon
   = pcDataCon stateAndFloatPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndFloat#")
-		[alpha_tv] [] [mkStatePrimTy alpha, floatPrimTy]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, floatPrimTy]
 		stateAndFloatPrimTyCon nullSpecEnv
 
 stateAndDoublePrimTyCon
   = pcDataTyCon stateAndDoublePrimTyConKey pRELUDE_BUILTIN SLIT("StateAndDouble#")
-		[alpha_tv] [stateAndDoublePrimDataCon]
+		[alphaTyVar] [stateAndDoublePrimDataCon]
 stateAndDoublePrimDataCon
   = pcDataCon stateAndDoublePrimDataConKey pRELUDE_BUILTIN SLIT("StateAndDouble#")
-		[alpha_tv] [] [mkStatePrimTy alpha, doublePrimTy]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, doublePrimTy]
 		stateAndDoublePrimTyCon nullSpecEnv
 \end{code}
 
 \begin{code}
 stateAndArrayPrimTyCon
   = pcDataTyCon stateAndArrayPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndArray#")
-		[alpha_tv, beta_tv] [stateAndArrayPrimDataCon]
+		[alphaTyVar, betaTyVar] [stateAndArrayPrimDataCon]
 stateAndArrayPrimDataCon
   = pcDataCon stateAndArrayPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndArray#")
-		[alpha_tv, beta_tv] [] [mkStatePrimTy alpha, mkArrayPrimTy beta]
+		[alphaTyVar, betaTyVar] [] [mkStatePrimTy alphaTy, mkArrayPrimTy betaTy]
 		stateAndArrayPrimTyCon nullSpecEnv
 
 stateAndMutableArrayPrimTyCon
   = pcDataTyCon stateAndMutableArrayPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndMutableArray#")
-		[alpha_tv, beta_tv] [stateAndMutableArrayPrimDataCon]
+		[alphaTyVar, betaTyVar] [stateAndMutableArrayPrimDataCon]
 stateAndMutableArrayPrimDataCon
   = pcDataCon stateAndMutableArrayPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndMutableArray#")
-		[alpha_tv, beta_tv] [] [mkStatePrimTy alpha, mkMutableArrayPrimTy alpha beta]
+		[alphaTyVar, betaTyVar] [] [mkStatePrimTy alphaTy, mkMutableArrayPrimTy alphaTy betaTy]
 		stateAndMutableArrayPrimTyCon nullSpecEnv
 
 stateAndByteArrayPrimTyCon
   = pcDataTyCon stateAndByteArrayPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndByteArray#")
-		[alpha_tv] [stateAndByteArrayPrimDataCon]
+		[alphaTyVar] [stateAndByteArrayPrimDataCon]
 stateAndByteArrayPrimDataCon
   = pcDataCon stateAndByteArrayPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndByteArray#")
-		[alpha_tv] [] [mkStatePrimTy alpha, byteArrayPrimTy]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, byteArrayPrimTy]
 		stateAndByteArrayPrimTyCon nullSpecEnv
 
 stateAndMutableByteArrayPrimTyCon
   = pcDataTyCon stateAndMutableByteArrayPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndMutableByteArray#")
-		[alpha_tv] [stateAndMutableByteArrayPrimDataCon]
+		[alphaTyVar] [stateAndMutableByteArrayPrimDataCon]
 stateAndMutableByteArrayPrimDataCon
   = pcDataCon stateAndMutableByteArrayPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndMutableByteArray#")
-		[alpha_tv] [] [mkStatePrimTy alpha, applyTyCon mutableByteArrayPrimTyCon [alpha]]
+		[alphaTyVar] [] [mkStatePrimTy alphaTy, applyTyCon mutableByteArrayPrimTyCon [alphaTy]]
 		stateAndMutableByteArrayPrimTyCon nullSpecEnv
 
 stateAndSynchVarPrimTyCon
   = pcDataTyCon stateAndSynchVarPrimTyConKey pRELUDE_BUILTIN SLIT("StateAndSynchVar#")
-		[alpha_tv, beta_tv] [stateAndSynchVarPrimDataCon]
+		[alphaTyVar, betaTyVar] [stateAndSynchVarPrimDataCon]
 stateAndSynchVarPrimDataCon
   = pcDataCon stateAndSynchVarPrimDataConKey pRELUDE_BUILTIN SLIT("StateAndSynchVar#")
-		[alpha_tv, beta_tv] [] [mkStatePrimTy alpha, mkSynchVarPrimTy alpha beta]
+		[alphaTyVar, betaTyVar] [] [mkStatePrimTy alphaTy, mkSynchVarPrimTy alphaTy betaTy]
 		stateAndSynchVarPrimTyCon nullSpecEnv
 \end{code}
 
@@ -400,12 +386,12 @@ how many types to drop from \tr{tys_applied}.
 
 \begin{code}
 getStatePairingConInfo
-	:: UniType	-- primitive type
+	:: Type	-- primitive type
 	-> (Id,		-- state pair constructor for prim type
-	    UniType)	-- type of state pair
+	    Type)	-- type of state pair
 
 getStatePairingConInfo prim_ty
-  = case (getUniDataTyCon_maybe prim_ty) of
+  = case (maybeAppDataTyCon prim_ty) of
       Nothing -> panic "getStatePairingConInfo:1"
       Just (prim_tycon, tys_applied, _) ->
 	let
@@ -441,16 +427,16 @@ getStatePairingConInfo prim_ty
 This is really just an ordinary synonym, except it is ABSTRACT.
 
 \begin{code}
-mkStateTransformerTy s a = applyTyCon stTyCon [s, a]
+mkStateTransformerTy s a = mkSynTy stTyCon [s, a]
 
 stTyCon
-  = mkSynonymTyCon
+  = mkSynTyCon
      stTyConKey
      (mkPreludeCoreName gLASGOW_ST SLIT("_ST"))
+     (panic "TysWiredIn.stTyCon:Kind")
      2
-     [alpha_tv, beta_tv]
-     (mkStateTy alpha `UniFun` mkTupleTy 2 [beta, mkStateTy alpha])
-     True -- ToDo: make... *** ABSTRACT ***
+     [alphaTyVar, betaTyVar]
+     (mkFunTys [mkStateTy alphaTy] (mkTupleTy 2 [betaTy, mkStateTy alphaTy]))
 \end{code}
 
 %************************************************************************
@@ -459,19 +445,19 @@ stTyCon
 %*									*
 %************************************************************************
 
-@PrimIO@ and @IO@ really are just a plain synonyms.
+@PrimIO@ and @IO@ really are just plain synonyms.
 
 \begin{code}
-mkPrimIoTy a = applyTyCon primIoTyCon [a]
+mkPrimIoTy a = mkSynTy primIoTyCon [a]
 
 primIoTyCon
-  = mkSynonymTyCon
+  = mkSynTyCon
      primIoTyConKey
      (mkPreludeCoreName pRELUDE_PRIMIO SLIT("PrimIO"))
+     (panic "TysWiredIn.primIoTyCon:Kind")
      1
-     [alpha_tv]
-     (mkStateTransformerTy realWorldTy alpha)
-     True -- need not be abstract
+     [alphaTyVar]
+     (mkStateTransformerTy realWorldTy alphaTy)
 \end{code}
 
 %************************************************************************
@@ -523,7 +509,7 @@ primitive counterpart.
 {\em END IDLE SPECULATION BY SIMON}
 
 \begin{code}
-boolTy = UniData boolTyCon []
+boolTy = mkTyConTy boolTyCon
 
 boolTyCon = pcDataTyCon boolTyConKey pRELUDE_CORE SLIT("Bool") [] [falseDataCon, trueDataCon]
 
@@ -533,23 +519,23 @@ trueDataCon  = pcDataCon trueDataConKey	 pRELUDE_CORE SLIT("True")  [] [] [] boo
 
 %************************************************************************
 %*									*
-\subsection[TysWiredIn-CMP-TAG]{The @CMP_TAG#@ type (for fast `derived' comparisons)}
+\subsection[TysWiredIn-Ordering]{The @Ordering@ type}
 %*									*
 %************************************************************************
 
 \begin{code}
 ---------------------------------------------
--- data _CMP_TAG = _LT | _EQ | _GT deriving ()
+-- data Ordering = LT | EQ | GT deriving ()
 ---------------------------------------------
 
-cmpTagTy = UniData cmpTagTyCon []
+orderingTy = mkTyConTy orderingTyCon
 
-cmpTagTyCon = pcDataTyCon cmpTagTyConKey pRELUDE_BUILTIN SLIT("_CMP_TAG") []
-		[ltPrimDataCon, eqPrimDataCon, gtPrimDataCon]
+orderingTyCon = pcDataTyCon orderingTyConKey pRELUDE_BUILTIN SLIT("Ordering") []
+		            [ltDataCon, eqDataCon, gtDataCon]
 
-ltPrimDataCon  = pcDataCon ltTagDataConKey pRELUDE_BUILTIN SLIT("_LT") [] [] [] cmpTagTyCon nullSpecEnv
-eqPrimDataCon  = pcDataCon eqTagDataConKey pRELUDE_BUILTIN SLIT("_EQ") [] [] [] cmpTagTyCon nullSpecEnv
-gtPrimDataCon  = pcDataCon gtTagDataConKey pRELUDE_BUILTIN SLIT("_GT") [] [] [] cmpTagTyCon nullSpecEnv
+ltDataCon  = pcDataCon ltDataConKey pRELUDE_BUILTIN SLIT("LT") [] [] [] orderingTyCon nullSpecEnv
+eqDataCon  = pcDataCon eqDataConKey pRELUDE_BUILTIN SLIT("EQ") [] [] [] orderingTyCon nullSpecEnv
+gtDataCon  = pcDataCon gtDataConKey pRELUDE_BUILTIN SLIT("GT") [] [] [] orderingTyCon nullSpecEnv
 \end{code}
 
 %************************************************************************
@@ -562,35 +548,28 @@ Special syntax, deeply wired in, but otherwise an ordinary algebraic
 data type:
 \begin{verbatim}
 data List a = Nil | a : (List a)
+ToDo: data [] a = [] | a : (List a)
+ToDo: data () = ()
+      data (,,) a b c = (,,) a b c
 \end{verbatim}
 
 \begin{code}
-mkListTy :: UniType -> UniType
-mkListTy ty = UniData listTyCon [ty]
+mkListTy :: GenType t u -> GenType t u
+mkListTy ty = applyTyCon listTyCon [ty]
 
-alphaListTy = mkSigmaTy [alpha_tv] [] (mkListTy alpha)
+alphaListTy = mkSigmaTy [alphaTyVar] [] (applyTyCon listTyCon [alphaTy])
 
-listTyCon = pcDataTyCon listTyConKey pRELUDE_BUILTIN SLIT("List") [alpha_tv] [nilDataCon, consDataCon]
+listTyCon = pcDataTyCon listTyConKey pRELUDE_BUILTIN SLIT("[]") 
+			[alphaTyVar] [nilDataCon, consDataCon]
 
-nilDataCon  = pcDataCon nilDataConKey  pRELUDE_BUILTIN SLIT("Nil") [alpha_tv] [] [] listTyCon
+nilDataCon  = pcDataCon nilDataConKey  pRELUDE_BUILTIN SLIT("[]") [alphaTyVar] [] [] listTyCon
 		(pcGenerateDataSpecs alphaListTy)
 consDataCon = pcDataCon consDataConKey pRELUDE_BUILTIN SLIT(":")
-		[alpha_tv] [] [alpha, mkListTy alpha] listTyCon
+		[alphaTyVar] [] [alphaTy, applyTyCon listTyCon [alphaTy]] listTyCon
 		(pcGenerateDataSpecs alphaListTy)
-\end{code}
-
-This is the @_Build@ data constructor, it does {\em not} appear inside
-listTyCon.  It has this type: \tr{((a -> b -> b) -> b -> b) -> [a]}.
-\begin{code}
-{- NOT USED:
-buildDataCon
-  = pcDataCon buildDataConKey  pRELUDE_BUILTIN "Build"
-	[alpha_tv] [] [
-		mkSigmaTy [beta_tv] []
-			((alpha `UniFun` (beta `UniFun` beta))
-			`UniFun` (beta
-			`UniFun` beta))] listTyCon nullSpecEnv
--}
+-- Interesting: polymorphic recursion would help here.
+-- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
+-- gets the over-specific type (Type -> Type)
 \end{code}
 
 %************************************************************************
@@ -604,14 +583,12 @@ family.
 
 \begin{itemize}
 \item
-They have a special family of type constructors, of type
-@TyCon@\srcloc{uniType/TyCon.lhs}.
+They have a special family of type constructors, of type @TyCon@
 These contain the tycon arity, but don't require a Unique.
 
 \item
 They have a special family of constructors, of type
-@Id@\srcloc{basicTypes/Id.lhs}.	 Again these contain their arity but
-don't need a Unique.
+@Id@. Again these contain their arity but don't need a Unique.
 
 \item
 There should be a magic way of generating the info tables and
@@ -642,11 +619,11 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 \end{itemize}
 
 \begin{code}
-mkTupleTy :: Int -> [UniType] -> UniType
+mkTupleTy :: Int -> [GenType t u] -> GenType t u
 
 mkTupleTy arity tys = applyTyCon (mkTupleTyCon arity) tys
 
-unitTy = mkTupleTy 0 []
+unitTy    = mkTupleTy 0 []
 \end{code}
 
 %************************************************************************
@@ -658,25 +635,25 @@ unitTy = mkTupleTy 0 []
 ToDo: make this (mostly) go away.
 
 \begin{code}
-rationalTy :: UniType
+rationalTy :: GenType t u
 
-mkRatioTy ty = UniData ratioTyCon [ty]
+mkRatioTy ty = applyTyCon ratioTyCon [ty]
 rationalTy   = mkRatioTy integerTy
 
-ratioTyCon = pcDataTyCon ratioTyConKey pRELUDE_RATIO SLIT("Ratio") [alpha_tv] [ratioDataCon]
+ratioTyCon = pcDataTyCon ratioTyConKey pRELUDE_RATIO SLIT("Ratio") [alphaTyVar] [ratioDataCon]
 
 ratioDataCon = pcDataCon ratioDataConKey pRELUDE_RATIO SLIT(":%")
-		[alpha_tv] [{-(integralClass,alpha)-}] [alpha, alpha] ratioTyCon nullSpecEnv
+		[alphaTyVar] [{-(integralClass,alphaTy)-}] [alphaTy, alphaTy] ratioTyCon nullSpecEnv
 	-- context omitted to match lib/prelude/ defn of "data Ratio ..."
 
 rationalTyCon
-  = mkSynonymTyCon
+  = mkSynTyCon
       rationalTyConKey
       (mkPreludeCoreName pRELUDE_RATIO SLIT("Rational"))
+      mkBoxedTypeKind
       0	 -- arity
       [] -- tyvars
       rationalTy -- == mkRatioTy integerTy
-      True -- unabstract
 \end{code}
 
 %************************************************************************
@@ -692,29 +669,29 @@ mkLiftTy ty = applyTyCon liftTyCon [ty]
 
 {-
 mkLiftTy ty
-  = mkSigmaTy tvs theta (UniData liftTyCon [tau])
+  = mkSigmaTy tvs theta (applyTyCon liftTyCon [tau])
   where
-    (tvs, theta, tau) = splitType ty
+    (tvs, theta, tau) = splitSigmaTy ty
 
 isLiftTy ty
-  = case getUniDataTyCon_maybe tau of
+  = case maybeAppDataTyCon tau of
       Just (tycon, tys, _) -> tycon == liftTyCon
       Nothing -> False
   where
-    (tvs, theta, tau) = splitType ty
+    (tvs, theta, tau) = splitSigmaTy ty
 -}
 
 
-alphaLiftTy = mkSigmaTy [alpha_tv] [] (UniData liftTyCon [alpha])
+alphaLiftTy = mkSigmaTy [alphaTyVar] [] (applyTyCon liftTyCon [alphaTy])
 
 liftTyCon
-  = pcDataTyCon liftTyConKey pRELUDE_BUILTIN SLIT("_Lift") [alpha_tv] [liftDataCon]
+  = pcDataTyCon liftTyConKey pRELUDE_BUILTIN SLIT("_Lift") [alphaTyVar] [liftDataCon]
 
 liftDataCon
   = pcDataCon liftDataConKey pRELUDE_BUILTIN SLIT("_Lift")
-		[alpha_tv] [] [alpha] liftTyCon 
+		[alphaTyVar] [] [alphaTy] liftTyCon
 		((pcGenerateDataSpecs alphaLiftTy) `addOneToSpecEnv`
-		 (SpecInfo [Just realWorldStatePrimTy] 0 bottom))
+		 (mkSpecInfo [Just realWorldStatePrimTy] 0 bottom))
   where
     bottom = panic "liftDataCon:State# _RealWorld"
 \end{code}
@@ -730,29 +707,11 @@ liftDataCon
 stringTy = mkListTy charTy
 
 stringTyCon
- = mkSynonymTyCon
+ = mkSynTyCon
      stringTyConKey
      (mkPreludeCoreName pRELUDE_CORE SLIT("String"))
+     mkBoxedTypeKind
      0
      []   -- type variables
      stringTy
-     True -- unabstract
-\end{code}
-
-\begin{code}
-{- UNUSED:
-packedStringTy = applyTyCon packedStringTyCon []
-
-packedStringTyCon
-  = pcDataTyCon packedStringTyConKey pRELUDE_PS SLIT("_PackedString") []
-	[psDataCon, cpsDataCon]
-
-psDataCon
-  = pcDataCon psDataConKey pRELUDE_PS SLIT("_PS")
-		[] [] [intPrimTy, byteArrayPrimTy] packedStringTyCon
-
-cpsDataCon
-  = pcDataCon cpsDataConKey pRELUDE_PS SLIT("_CPS")
-		[] [] [addrPrimTy] packedStringTyCon
--}
 \end{code}

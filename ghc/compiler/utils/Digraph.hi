@@ -1,8 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface Digraph where
-import Maybes(MaybeErr)
-data MaybeErr a b 
-dfs :: (a -> a -> Bool) -> (a -> [a]) -> ([a], [a]) -> [a] -> ([a], [a])
-stronglyConnComp :: (a -> a -> Bool) -> [(a, a)] -> [a] -> [[a]]
-topologicalSort :: (a -> a -> Bool) -> [(a, a)] -> [a] -> MaybeErr [a] [[a]]
-

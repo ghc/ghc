@@ -33,51 +33,47 @@ they will eventually be removed in later stages of the compiler,
 therefore there is no penalty in keeping them.
 
 Experimental Evidence: Heap: +/- 7%
-                       Instrs: Always improves for 2 or more Static Args.
+		       Instrs: Always improves for 2 or more Static Args.
 
 \begin{code}
 #include "HsVersions.h"
 
 module SAT (
-	doStaticArgs,
+	doStaticArgs
 
 	-- and to make the interface self-sufficient...
-	PlainCoreProgram(..), CoreExpr, CoreBinding, Id
     ) where
 
-import IdEnv
 import Maybes		( Maybe(..) )
-import PlainCore
 import SATMonad
-import SplitUniq
 import Util
 \end{code}
 
 \begin{code}
-doStaticArgs :: PlainCoreProgram -> SplitUniqSupply -> PlainCoreProgram
+doStaticArgs :: [CoreBinding] -> UniqSupply -> [CoreBinding]
 
 doStaticArgs binds
   = initSAT (mapSAT sat_bind binds)
   where
-    sat_bind (CoNonRec binder expr)
+    sat_bind (NonRec binder expr)
       = emptyEnvSAT  `thenSAT_`
 	satExpr expr `thenSAT` (\ expr' ->
-	returnSAT (CoNonRec binder expr') )
-    sat_bind (CoRec [(binder,rhs)])
+	returnSAT (NonRec binder expr') )
+    sat_bind (Rec [(binder,rhs)])
       = emptyEnvSAT			  `thenSAT_`
 	insSAEnv binder (getArgLists rhs) `thenSAT_`
 	satExpr rhs			  `thenSAT` (\ rhs' ->
 	saTransform binder rhs')
-    sat_bind (CoRec pairs)
+    sat_bind (Rec pairs)
       = emptyEnvSAT		`thenSAT_`
 	mapSAT satExpr rhss	`thenSAT` \ rhss' ->
-	returnSAT (CoRec (binders `zip` rhss'))
+	returnSAT (Rec (binders `zip` rhss'))
       where
 	(binders, rhss)	= unzip pairs
 \end{code}
 
 \begin{code}
-satAtom (CoVarAtom v)
+satAtom (VarArg v)
   = updSAEnv (Just (v,([],[]))) `thenSAT_`
     returnSAT ()
 
@@ -85,102 +81,100 @@ satAtom _ = returnSAT ()
 \end{code}
 
 \begin{code}
-satExpr :: PlainCoreExpr -> SatM PlainCoreExpr
+satExpr :: CoreExpr -> SatM CoreExpr
 
-satExpr var@(CoVar v)
+satExpr var@(Var v)
   = updSAEnv (Just (v,([],[]))) `thenSAT_`
     returnSAT var
 
-satExpr lit@(CoLit _) = returnSAT lit
+satExpr lit@(Lit _) = returnSAT lit
 
-satExpr e@(CoCon con types args)
+satExpr e@(Con con types args)
   = mapSAT satAtom args	    `thenSAT_`
     returnSAT e
 
-satExpr e@(CoPrim prim ty args)
+satExpr e@(Prim prim ty args)
   = mapSAT satAtom args	    `thenSAT_`
     returnSAT e
 
-satExpr (CoLam binders body)
+satExpr (Lam binders body)
   = satExpr body		`thenSAT` \ body' ->
-    returnSAT (CoLam binders body')
+    returnSAT (Lam binders body')
 
 satExpr (CoTyLam tyvar body)
   = satExpr body	   `thenSAT` (\ body' ->
     returnSAT (CoTyLam tyvar body') )
 
-satExpr app@(CoApp _ _)
+satExpr app@(App _ _)
   = getAppArgs app
 
 satExpr app@(CoTyApp _ _)
   = getAppArgs app
 
-satExpr (CoCase expr alts)
+satExpr (Case expr alts)
   = satExpr expr	`thenSAT` \ expr' ->
     sat_alts alts	`thenSAT` \ alts' ->
-    returnSAT (CoCase expr' alts')
+    returnSAT (Case expr' alts')
   where
-    sat_alts (CoAlgAlts alts deflt)
+    sat_alts (AlgAlts alts deflt)
       = mapSAT satAlgAlt alts	    `thenSAT` \ alts' ->
 	sat_default deflt	    `thenSAT` \ deflt' ->
-	returnSAT (CoAlgAlts alts' deflt')
+	returnSAT (AlgAlts alts' deflt')
       where
 	satAlgAlt (con, params, rhs)
 	  = satExpr rhs		 `thenSAT` \ rhs' ->
 	    returnSAT (con, params, rhs')
 
-    sat_alts (CoPrimAlts alts deflt)
+    sat_alts (PrimAlts alts deflt)
       = mapSAT satPrimAlt alts	    `thenSAT` \ alts' ->
 	sat_default deflt	    `thenSAT` \ deflt' ->
-	returnSAT (CoPrimAlts alts' deflt')
+	returnSAT (PrimAlts alts' deflt')
       where
 	satPrimAlt (lit, rhs)
 	  = satExpr rhs `thenSAT` \ rhs' ->
 	    returnSAT (lit, rhs')
 
-    sat_default CoNoDefault
-      = returnSAT CoNoDefault
-    sat_default (CoBindDefault binder rhs)
+    sat_default NoDefault
+      = returnSAT NoDefault
+    sat_default (BindDefault binder rhs)
       = satExpr rhs		     `thenSAT` \ rhs' ->
-	returnSAT (CoBindDefault binder rhs')
+	returnSAT (BindDefault binder rhs')
 
-satExpr (CoLet (CoNonRec binder rhs) body)
+satExpr (Let (NonRec binder rhs) body)
   = satExpr body		`thenSAT` \ body' ->
     satExpr rhs			`thenSAT` \ rhs' ->
-    returnSAT (CoLet (CoNonRec binder rhs') body')
+    returnSAT (Let (NonRec binder rhs') body')
 
-satExpr (CoLet (CoRec [(binder,rhs)]) body)
+satExpr (Let (Rec [(binder,rhs)]) body)
   = satExpr body		      `thenSAT` \ body' ->
     insSAEnv binder (getArgLists rhs) `thenSAT_`
     satExpr rhs			      `thenSAT` \ rhs' ->
     saTransform binder rhs'	      `thenSAT` \ binding ->
-    returnSAT (CoLet binding body')
+    returnSAT (Let binding body')
 
-satExpr (CoLet (CoRec binds) body)
+satExpr (Let (Rec binds) body)
   = let
 	(binders, rhss) = unzip binds
     in
     satExpr body		    `thenSAT` \ body' ->
     mapSAT satExpr rhss		    `thenSAT` \ rhss' ->
-    returnSAT (CoLet (CoRec (binders `zip` rhss')) body')
+    returnSAT (Let (Rec (binders `zip` rhss')) body')
 
-satExpr (CoSCC cc expr)
+satExpr (SCC cc expr)
   = satExpr expr		    `thenSAT` \ expr2 ->
-    returnSAT (CoSCC cc expr2)
-
--- ToDo: DPH stuff
+    returnSAT (SCC cc expr2)
 \end{code}
 
 \begin{code}
-getAppArgs :: PlainCoreExpr -> SatM PlainCoreExpr
+getAppArgs :: CoreExpr -> SatM CoreExpr
 
 getAppArgs app
   = get app		`thenSAT` \ (app',result) ->
     updSAEnv result	`thenSAT_`
     returnSAT app'
   where
-    get :: PlainCoreExpr
-	-> SatM (PlainCoreExpr, Maybe (Id, SATInfo))
+    get :: CoreExpr
+	-> SatM (CoreExpr, Maybe (Id, SATInfo))
 
     get (CoTyApp e ty)
       = get e		`thenSAT` \ (e',result) ->
@@ -191,21 +185,21 @@ getAppArgs app
 	    Just (v,(tv,lv)) -> Just (v,(tv++[Static ty],lv))
 	)
 
-    get (CoApp e a)
+    get (App e a)
       = get e		`thenSAT` \ (e', result) ->
 	satAtom a	`thenSAT_`
 	let si = case a of
-		   (CoVarAtom v) -> Static v
+		   (VarArg v) -> Static v
 		   _	         -> NotStatic
 	in
 	  returnSAT (
-	    CoApp e' a,
+	    App e' a,
 	    case result of
 		Just (v,(tv,lv)) -> Just (v,(tv,lv++[si]))
 		Nothing	    	 -> Nothing
 	  )
 
-    get var@(CoVar v)
+    get var@(Var v)
       = returnSAT (var, Just (v,([],[])))
 
     get e

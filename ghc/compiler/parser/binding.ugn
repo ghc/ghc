@@ -1,0 +1,103 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_binding where
+import Ubiq --  debugging consistency check
+import UgenUtil
+
+import U_constr
+import U_coresyn	( U_coresyn ) -- for interfaces only
+import U_hpragma
+import U_list
+import U_literal	( U_literal ) -- for interfaces only
+import U_maybe
+import U_qid
+import U_ttype
+%}}
+type binding;
+	tbind	: < gtbindc	: list;	 	/* [context entries] */
+		    gtbindid	: ttype; 	/* applied tycon */
+		    gtbindl	: list;  	/* [constr] */
+		    gtbindd	: maybe; 	/* Maybe [deriving] */
+		    gtline	: long;
+		    gtpragma	: hpragma; >;
+	ntbind	: < gntbindc	: list;	 	/* [context entries] */
+		    gntbindid	: ttype; 	/* applied tycon */
+		    gntbindcty	: list;  	/* [constr]  (only 1 constrnew) */ 
+		    gntbindd	: maybe; 	/* Maybe [deriving] */
+		    gntline	: long;
+		    gntpragma	: hpragma; >;
+	nbind	: < gnbindid	: ttype;
+		    gnbindas	: ttype;
+		    gnline	: long; >;
+	pbind	: < gpbindl	: list;
+		    gpline	: long; >;
+	fbind	: < gfbindl	: list;
+		    gfline	: long; >;
+	abind	: < gabindfst	: binding;
+		    gabindsnd	: binding; >;
+	ibind	: < gibindsrc   : long;		/* 1 => source; 0 => interface */
+		    gibindmod   : stringId;	/* the original module */
+		    gibindc	: list;
+		    gibindid	: qid;
+		    gibindi	: ttype;
+		    gibindw	: binding;
+		    giline	: long;
+		    gipragma	: hpragma; >;
+	dbind	: < gdbindts	: list;
+		    gdline	: long; >;
+	cbind	: < gcbindc	: list;
+		    gcbindid	: ttype;
+		    gcbindw	: binding;
+		    gcline	: long;
+		    gcpragma	: hpragma; >;
+	sbind	: < gsbindids	: list;
+		    gsbindid	: ttype;
+		    gsline	: long;
+		    gspragma	: hpragma; >;
+
+	mbind	: < gmbindmodn	: stringId;	/* import (in an interface) <mod> <entities> */
+		    gmbindimp	: list;		/* [entity] */
+		    gmline	: long; >;
+	mfbind	: < gmfixes     : list; >;	/* fixites in an import: [fixop] */
+
+	nullbind : < >;
+
+	import	: < gibindiface : stringId;
+		    gibindfile	: stringId;
+		    gibinddef	: binding;
+		    gibindimod	: stringId;
+		    gibindqual	: long;
+		    gibindas	: maybe;
+		    gibindspec	: maybe;
+		    gibindline	: long; >;
+
+	/* user-specified pragmas:XXXX */
+
+	vspec_uprag : <	gvspec_id   : qid;
+			gvspec_tys  : list;
+			gvspec_line : long; >;
+
+	vspec_ty_and_id : < gvspec_ty : ttype;
+			gvspec_tyid : maybe; /* nil or singleton */ >;
+
+	ispec_uprag : <	gispec_clas : qid;
+			gispec_ty   : ttype;
+			gispec_line : long; >;
+
+	inline_uprag: <	ginline_id   : qid;
+			ginline_line : long; >;
+
+	deforest_uprag: < gdeforest_id : qid;
+			gdeforest_line : long; >;
+
+	magicuf_uprag:< gmagicuf_id   : qid;
+			gmagicuf_str  : stringId;
+			gmagicuf_line : long; >;
+
+	dspec_uprag : <	gdspec_id   : qid;
+			gdspec_tys  : list;
+			gdspec_line : long; >;
+
+end;

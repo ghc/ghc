@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[FloatOut]{Float bindings outwards (towards the top level)}
 
@@ -10,20 +10,13 @@
 
 module FloatOut ( floatOutwards ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
-import Pretty
-import Outputable
-
-import PlainCore
-
-import BasicLit		( BasicLit(..), PrimKind )
+import Literal		( Literal(..) )
 import CmdLineOpts	( GlobalSwitch(..) )
 import CostCentre	( dupifyCC, CostCentre )
 import SetLevels
 import Id		( eqId )
-import IdEnv
 import Maybes		( Maybe(..), catMaybes, maybeToBool )
-import SplitUniq
+import UniqSupply
 import Util
 \end{code}
 
@@ -59,14 +52,14 @@ Well, maybe.  We don't do this at the moment.
 
 
 \begin{code}
-type LevelledExpr  = CoreExpr	 (Id, Level) Id
-type LevelledBind  = CoreBinding (Id, Level) Id
+type LevelledExpr  = GenCoreExpr	 (Id, Level) Id
+type LevelledBind  = GenCoreBinding (Id, Level) Id
 type FloatingBind  = (Level, Floater)
 type FloatingBinds = [FloatingBind]
 
-data Floater = LetFloater     PlainCoreBinding
+data Floater = LetFloater     CoreBinding
 
-	     | CaseFloater   (PlainCoreExpr -> PlainCoreExpr)
+	     | CaseFloater   (CoreExpr -> CoreExpr)
 				-- Give me a right-hand side of the
 				-- (usually single) alternative, and
 				-- I'll build the case
@@ -80,9 +73,9 @@ data Floater = LetFloater     PlainCoreBinding
 
 \begin{code}
 floatOutwards :: (GlobalSwitch -> Bool)	 -- access to all global cmd-line opts
-	      -> SplitUniqSupply
-	      -> PlainCoreProgram 
-	      -> PlainCoreProgram
+	      -> UniqSupply
+	      -> [CoreBinding]
+	      -> [CoreBinding]
 
 floatOutwards sw_chker us pgm
   = case (setLevels pgm sw_chker us) of { annotated_w_levels ->
@@ -108,16 +101,16 @@ floatOutwards sw_chker us pgm
     concat final_toplev_binds_s
     }}
 
-floatTopBind sw bind@(CoNonRec _ _)
+floatTopBind sw bind@(NonRec _ _)
   = case (floatBind sw nullIdEnv tOP_LEVEL bind) of { (fs, floats, bind', _) ->
     (fs, floatsToBinds floats ++ [bind'])
     }
 
-floatTopBind sw bind@(CoRec _)
-  = case (floatBind sw nullIdEnv tOP_LEVEL bind) of { (fs, floats, CoRec pairs', _) ->
+floatTopBind sw bind@(Rec _)
+  = case (floatBind sw nullIdEnv tOP_LEVEL bind) of { (fs, floats, Rec pairs', _) ->
 	-- Actually floats will be empty
     --false:ASSERT(null floats)
-    (fs, [CoRec (floatsToBindPairs floats ++ pairs')])
+    (fs, [Rec (floatsToBindPairs floats ++ pairs')])
     }
 \end{code}
 
@@ -129,30 +122,30 @@ floatTopBind sw bind@(CoRec _)
 
 
 \begin{code}
-floatBind :: (GlobalSwitch -> Bool) 
+floatBind :: (GlobalSwitch -> Bool)
 	  -> IdEnv Level
 	  -> Level
 	  -> LevelledBind
-	  -> (FloatStats, FloatingBinds, PlainCoreBinding, IdEnv Level)
+	  -> (FloatStats, FloatingBinds, CoreBinding, IdEnv Level)
 
-floatBind sw env lvl (CoNonRec (name,level) rhs)
+floatBind sw env lvl (NonRec (name,level) rhs)
   = case (floatExpr sw env level rhs) of { (fs, rhs_floats, rhs') ->
 
 	-- A good dumping point
     case (partitionByMajorLevel level rhs_floats)	of { (rhs_floats', heres) ->
 
-    (fs, rhs_floats',CoNonRec name (install heres rhs'), addOneToIdEnv env name level)
+    (fs, rhs_floats',NonRec name (install heres rhs'), addOneToIdEnv env name level)
     }}
-    
-floatBind sw env lvl bind@(CoRec pairs)
+
+floatBind sw env lvl bind@(Rec pairs)
   = case (unzip3 (map do_pair pairs)) of { (fss, rhss_floats, new_pairs) ->
 
     if not (isTopLvl bind_level) then
 	-- Standard case
-	(sum_stats fss, concat rhss_floats, CoRec new_pairs, new_env)
+	(sum_stats fss, concat rhss_floats, Rec new_pairs, new_env)
     else
-	{- In a recursive binding, destined for the top level (only), 
-	   the rhs floats may contain 
+	{- In a recursive binding, destined for the top level (only),
+	   the rhs floats may contain
 	   references to the bound things.  For example
 
 		f = ...(let v = ...f... in b) ...
@@ -162,13 +155,13 @@ floatBind sw env lvl bind@(CoRec pairs)
 		v = ...f...
 		f = ... b ...
 
-	   and hence we must (pessimistically) make all the floats recursive 
+	   and hence we must (pessimistically) make all the floats recursive
 	   with the top binding.  Later dependency analysis will unravel it.
 	-}
 
 	(sum_stats fss,
-	 [], 
-	 CoRec (new_pairs ++ floatsToBindPairs (concat rhss_floats)),
+	 [],
+	 Rec (new_pairs ++ floatsToBindPairs (concat rhss_floats)),
 	 new_env)
 
     }
@@ -194,23 +187,23 @@ floatBind sw env lvl bind@(CoRec pairs)
 %************************************************************************
 
 \begin{code}
-floatExpr :: (GlobalSwitch -> Bool) 
+floatExpr :: (GlobalSwitch -> Bool)
 	  -> IdEnv Level
-	  -> Level 
+	  -> Level
 	  -> LevelledExpr
-	  -> (FloatStats, FloatingBinds, PlainCoreExpr)
+	  -> (FloatStats, FloatingBinds, CoreExpr)
 
-floatExpr sw env _ (CoVar v)	     = (zero_stats, [], CoVar v)
+floatExpr sw env _ (Var v)	     = (zero_stats, [], Var v)
 
-floatExpr sw env _ (CoLit l)     = (zero_stats, [], CoLit l)
+floatExpr sw env _ (Lit l)     = (zero_stats, [], Lit l)
 
-floatExpr sw env _ (CoPrim op ty as) = (zero_stats, [], CoPrim op ty as)
-floatExpr sw env _ (CoCon con ty as) = (zero_stats, [], CoCon con ty as)
+floatExpr sw env _ (Prim op ty as) = (zero_stats, [], Prim op ty as)
+floatExpr sw env _ (Con con ty as) = (zero_stats, [], Con con ty as)
 
-floatExpr sw env lvl (CoApp e a)
+floatExpr sw env lvl (App e a)
   = case (floatExpr sw env lvl e) of { (fs, floating_defns, e') ->
-    (fs, floating_defns, CoApp e' a) }
-    
+    (fs, floating_defns, App e' a) }
+
 floatExpr sw env lvl (CoTyApp e ty)
   = case (floatExpr sw env lvl e) of { (fs, floating_defns, e') ->
     (fs, floating_defns, CoTyApp e' ty) }
@@ -227,10 +220,9 @@ floatExpr sw env lvl (CoTyLam tv e)
     (fs, floats', CoTyLam tv (install heres e'))
     }}
 
-floatExpr sw env lvl (CoLam args@((_,incd_lvl):_) rhs)
+floatExpr sw env lvl (Lam (arg,incd_lvl) rhs)
   = let
-	args'	 = map fst args
-	new_env  = growIdEnvList env args
+	new_env  = addOneToIdEnv env arg incd_lvl
     in
     case (floatExpr sw new_env incd_lvl rhs) of { (fs, floats, rhs') ->
 
@@ -239,10 +231,10 @@ floatExpr sw env lvl (CoLam args@((_,incd_lvl):_) rhs)
 
     (add_to_stats fs floats',
      floats',
-     mkCoLam args' (install heres rhs'))
+     Lam args' (install heres rhs'))
     }}
 
-floatExpr sw env lvl (CoSCC cc expr)
+floatExpr sw env lvl (SCC cc expr)
   = case (floatExpr sw env lvl expr)    of { (fs, floating_defns, expr') ->
     let
 	-- annotate bindings floated outwards past an scc expression
@@ -250,30 +242,30 @@ floatExpr sw env lvl (CoSCC cc expr)
 
 	annotated_defns = annotate (dupifyCC cc) floating_defns
     in
-    (fs, annotated_defns, CoSCC cc expr') }
+    (fs, annotated_defns, SCC cc expr') }
   where
     annotate :: CostCentre -> FloatingBinds -> FloatingBinds
 
     annotate dupd_cc defn_groups
       = [ (level, ann_bind floater) | (level, floater) <- defn_groups ]
       where
-	ann_bind (LetFloater (CoNonRec binder rhs)) 
-	  = LetFloater (CoNonRec binder (ann_rhs rhs))
+	ann_bind (LetFloater (NonRec binder rhs))
+	  = LetFloater (NonRec binder (ann_rhs rhs))
 
-	ann_bind (LetFloater (CoRec pairs))
-	  = LetFloater (CoRec [(binder, ann_rhs rhs) | (binder, rhs) <- pairs])
+	ann_bind (LetFloater (Rec pairs))
+	  = LetFloater (Rec [(binder, ann_rhs rhs) | (binder, rhs) <- pairs])
 
-	ann_bind (CaseFloater fn) = CaseFloater ( \ rhs -> CoSCC dupd_cc (fn rhs) )
+	ann_bind (CaseFloater fn) = CaseFloater ( \ rhs -> SCC dupd_cc (fn rhs) )
 
-	ann_rhs (CoLam	 args e) = CoLam   args (ann_rhs e)
-	ann_rhs (CoTyLam tv   e) = CoTyLam tv	(ann_rhs e)
-	ann_rhs rhs@(CoCon _ _ _)= rhs	-- no point in scc'ing WHNF data
-	ann_rhs rhs		 = CoSCC dupd_cc rhs
+	ann_rhs (Lam	 arg e)  = Lam   arg (ann_rhs e)
+	ann_rhs (CoTyLam tv  e)  = CoTyLam tv  (ann_rhs e)
+	ann_rhs rhs@(Con _ _ _)= rhs	-- no point in scc'ing WHNF data
+	ann_rhs rhs		 = SCC dupd_cc rhs
 
 	-- Note: Nested SCC's are preserved for the benefit of
 	--       cost centre stack profiling (Durham)
 
-floatExpr sw env lvl (CoLet bind body)
+floatExpr sw env lvl (Let bind body)
   = case (floatBind sw env     lvl bind) of { (fsb, rhs_floats, bind', new_env) ->
     case (floatExpr sw new_env lvl body) of { (fse, body_floats, body') ->
     (add_stats fsb fse,
@@ -283,14 +275,14 @@ floatExpr sw env lvl (CoLet bind body)
   where
     bind_lvl = getBindLevel bind
 
-floatExpr sw env lvl (CoCase scrut alts)
+floatExpr sw env lvl (Case scrut alts)
   = case (floatExpr sw env lvl scrut) of { (fse, fde, scrut') ->
 
-    case (scrut', float_alts alts) of 
+    case (scrut', float_alts alts) of
 
 {-	CASE-FLOATING DROPPED FOR NOW.  (SLPJ 7/2/94)
 
-	(CoVar scrut_var, (fda, CoAlgAlts [(con,bs,rhs')] CoNoDefault)) 
+	(Var scrut_var, (fda, AlgAlts [(con,bs,rhs')] NoDefault))
 	 	| scrut_var_lvl `ltMajLvl` lvl ->
 
 		-- Candidate for case floater; scrutinising a variable; it can
@@ -299,16 +291,16 @@ floatExpr sw env lvl (CoCase scrut alts)
 
 		where
 		case_floater = (scrut_var_lvl, CaseFloater fn)
-		fn body = CoCase scrut' (CoAlgAlts [(con,bs,body)] CoNoDefault)
+		fn body = Case scrut' (AlgAlts [(con,bs,body)] NoDefault)
 		scrut_var_lvl = case lookupIdEnv env scrut_var of
 				  Nothing  -> Level 0 0
 				  Just lvl -> unTopify lvl
 
  END OF CASE FLOATING DROPPED  	-}
 
-	(_, (fsa, fda, alts')) -> 
+	(_, (fsa, fda, alts')) ->
 
-		(add_stats fse fsa, fda ++ fde, CoCase scrut' alts') 
+		(add_stats fse fsa, fda ++ fde, Case scrut' alts')
     }
   where
       incd_lvl = incMinorLvl lvl
@@ -318,36 +310,36 @@ floatExpr sw env lvl (CoCase scrut alts)
 {-	OMITTED
 	We don't want to be too keen about floating lets out of case alternatives
 	because they may benefit from seeing the evaluation done by the case.
-	
+
 	The main reason for doing this is to allocate in fewer larger blocks
 	but that's really an STG-level issue.
 
 			case alts of
 				-- Just one alternative, then dump only
 				-- what *has* to be dumped
-			CoAlgAlts  [_] CoNoDefault	   -> partitionByLevel
-			CoAlgAlts  []  (CoBindDefault _ _) -> partitionByLevel
-			CoPrimAlts [_] CoNoDefault	   -> partitionByLevel
-			CoPrimAlts []  (CoBindDefault _ _) -> partitionByLevel
+			AlgAlts  [_] NoDefault	   -> partitionByLevel
+			AlgAlts  []  (BindDefault _ _) -> partitionByLevel
+			PrimAlts [_] NoDefault	   -> partitionByLevel
+			PrimAlts []  (BindDefault _ _) -> partitionByLevel
 
 				-- If there's more than one alternative, then
 				-- this is a dumping point
 			other				   -> partitionByMajorLevel
 -}
 
-      float_alts (CoAlgAlts alts deflt)
+      float_alts (AlgAlts alts deflt)
 	= case (float_deflt  deflt)		 of { (fsd,  fdd,  deflt') ->
 	  case (unzip3 (map float_alg_alt alts)) of { (fsas, fdas, alts') ->
 	  (foldr add_stats fsd fsas,
 	   concat fdas ++ fdd,
-	   CoAlgAlts alts' deflt') }}
+	   AlgAlts alts' deflt') }}
 
-      float_alts (CoPrimAlts alts deflt)
+      float_alts (PrimAlts alts deflt)
 	= case (float_deflt deflt)		  of { (fsd,   fdd, deflt') ->
 	  case (unzip3 (map float_prim_alt alts)) of { (fsas, fdas, alts') ->
 	  (foldr add_stats fsd fsas,
 	   concat fdas ++ fdd,
-	   CoPrimAlts alts' deflt') }}
+	   PrimAlts alts' deflt') }}
 
       -------------
       float_alg_alt (con, bs, rhs)
@@ -366,14 +358,14 @@ floatExpr sw env lvl (CoCase scrut alts)
 	  (fs, rhs_floats', (lit, install heres rhs')) }}
 
       --------------
-      float_deflt CoNoDefault = (zero_stats, [], CoNoDefault)
+      float_deflt NoDefault = (zero_stats, [], NoDefault)
 
-      float_deflt (CoBindDefault (b,lvl) rhs)
+      float_deflt (BindDefault (b,lvl) rhs)
 	= case (floatExpr sw new_env lvl rhs)		of { (fs, rhs_floats, rhs') ->
 	  case (partition_fn incd_lvl rhs_floats)	of { (rhs_floats', heres) ->
-	  (fs, rhs_floats', CoBindDefault b (install heres rhs')) }}
+	  (fs, rhs_floats', BindDefault b (install heres rhs')) }}
 	where
-	  new_env = addOneToIdEnv env b lvl        
+	  new_env = addOneToIdEnv env b lvl
 \end{code}
 
 %************************************************************************
@@ -415,8 +407,8 @@ add_to_stats (FlS a b c) floats
 %************************************************************************
 
 \begin{code}
-getBindLevel (CoNonRec (_, lvl) _)      = lvl
-getBindLevel (CoRec (((_,lvl), _) : _)) = lvl
+getBindLevel (NonRec (_, lvl) _)      = lvl
+getBindLevel (Rec (((_,lvl), _) : _)) = lvl
 \end{code}
 
 \begin{code}
@@ -429,7 +421,7 @@ partitionByMajorLevel, partitionByLevel
 	    FloatingBinds)	-- The rest
 
 
-partitionByMajorLevel ctxt_lvl defns 
+partitionByMajorLevel ctxt_lvl defns
   = partition float_further defns
   where
     float_further (my_lvl, _) = my_lvl `ltMajLvl` ctxt_lvl ||
@@ -442,25 +434,25 @@ partitionByLevel ctxt_lvl defns
 \end{code}
 
 \begin{code}
-floatsToBinds :: FloatingBinds -> [PlainCoreBinding]
+floatsToBinds :: FloatingBinds -> [CoreBinding]
 floatsToBinds floats = map get_bind floats
 		     where
 		       get_bind (_, LetFloater bind) = bind
 		       get_bind (_, CaseFloater _)   = panic "floatsToBinds"
 
-floatsToBindPairs :: FloatingBinds -> [(Id,PlainCoreExpr)]
+floatsToBindPairs :: FloatingBinds -> [(Id,CoreExpr)]
 
 floatsToBindPairs floats = concat (map mk_pairs floats)
   where
-   mk_pairs (_, LetFloater (CoRec pairs))         = pairs
-   mk_pairs (_, LetFloater (CoNonRec binder rhs)) = [(binder,rhs)]
+   mk_pairs (_, LetFloater (Rec pairs))         = pairs
+   mk_pairs (_, LetFloater (NonRec binder rhs)) = [(binder,rhs)]
    mk_pairs (_, CaseFloater _) 			  = panic "floatsToBindPairs"
 
-install :: FloatingBinds -> PlainCoreExpr -> PlainCoreExpr
+install :: FloatingBinds -> CoreExpr -> CoreExpr
 
 install defn_groups expr
   = foldr install_group expr defn_groups
   where
-    install_group (_, LetFloater defns) body = CoLet defns body
+    install_group (_, LetFloater defns) body = Let defns body
     install_group (_, CaseFloater fn)   body = fn body
 \end{code}

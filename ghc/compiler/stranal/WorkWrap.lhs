@@ -12,13 +12,12 @@ IMPORT_Trace
 import Outputable
 import Pretty
 
-import Id		( getIdUniType, addIdStrictness, getIdStrictness,
+import Id		( idType, addIdStrictness, getIdStrictness,
 			  getIdUnfolding, mkWorkerId,
 			  replaceIdInfo, getIdInfo, idWantsToBeINLINEd
 			)
 import IdInfo		-- bits and pieces
 import Maybes		( maybeToBool, Maybe(..) )
-import PlainCore
 import SaLib
 import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
 import Util
@@ -38,7 +37,7 @@ info for exported values).
 \end{enumerate}
 
 \begin{code}
-workersAndWrappers :: [PlainCoreBinding] -> WwM [PlainCoreBinding]
+workersAndWrappers :: [CoreBinding] -> WwM [CoreBinding]
 
 workersAndWrappers top_binds
   = mapWw (wwBind True{-top-level-}) top_binds `thenWw` \ top_binds2 ->
@@ -47,7 +46,7 @@ workersAndWrappers top_binds
     in
     returnWw (concat top_binds3)
   where
-    make_top_binding :: WwBinding -> [PlainCoreBinding]
+    make_top_binding :: WwBinding -> [CoreBinding]
 
     make_top_binding (WwLet binds) = binds
 \end{code}
@@ -63,23 +62,23 @@ turn.  Non-recursive case first, then recursive...
 
 \begin{code}
 wwBind	:: Bool			-- True <=> top-level binding
-	-> PlainCoreBinding
+	-> CoreBinding
 	-> WwM WwBinding	-- returns a WwBinding intermediate form;
 				-- the caller will convert to Expr/Binding,
 				-- as appropriate.
 
-wwBind top_level (CoNonRec binder rhs)
+wwBind top_level (NonRec binder rhs)
   = wwExpr rhs			`thenWw` \ new_rhs ->
     tryWW binder new_rhs 	`thenWw` \ new_pairs ->
-    returnWw (WwLet [CoNonRec b e | (b,e) <- new_pairs])
+    returnWw (WwLet [NonRec b e | (b,e) <- new_pairs])
       -- Generated bindings must be non-recursive
       -- because the original binding was.
 
 ------------------------------
 
-wwBind top_level (CoRec pairs)
+wwBind top_level (Rec pairs)
   = mapWw do_one pairs		`thenWw` \ new_pairs ->
-    returnWw (WwLet [CoRec (concat new_pairs)])
+    returnWw (WwLet [Rec (concat new_pairs)])
   where
     do_one (binder, rhs) = wwExpr rhs 	`thenWw` \ new_rhs ->
 			   tryWW binder new_rhs
@@ -92,34 +91,34 @@ matching by looking for strict arguments of the correct type.
 ???????????????? ToDo
 
 \begin{code}
-wwExpr :: PlainCoreExpr -> WwM PlainCoreExpr
+wwExpr :: CoreExpr -> WwM CoreExpr
 
-wwExpr e@(CoVar _)	= returnWw e
-wwExpr e@(CoLit _)	= returnWw e
-wwExpr e@(CoCon  _ _ _) = returnWw e
-wwExpr e@(CoPrim _ _ _) = returnWw e
+wwExpr e@(Var _)	= returnWw e
+wwExpr e@(Lit _)	= returnWw e
+wwExpr e@(Con  _ _ _) = returnWw e
+wwExpr e@(Prim _ _ _) = returnWw e
 
-wwExpr (CoLam binders expr)
+wwExpr (Lam binders expr)
   = wwExpr expr			`thenWw` \ new_expr ->
-    returnWw (CoLam binders new_expr)
+    returnWw (Lam binders new_expr)
 
 wwExpr (CoTyLam ty expr)
   = wwExpr expr			`thenWw` \ new_expr ->
     returnWw (CoTyLam ty new_expr)
 
-wwExpr (CoApp e1 e2)
+wwExpr (App e1 e2)
   = wwExpr e1			`thenWw` \ new_e1 ->
-    returnWw (CoApp new_e1 e2)
+    returnWw (App new_e1 e2)
 
 wwExpr (CoTyApp expr ty)
   = wwExpr expr			`thenWw` \ new_expr ->
     returnWw (CoTyApp new_expr ty)
 
-wwExpr (CoSCC cc expr)
+wwExpr (SCC cc expr)
   = wwExpr expr			`thenWw` \ new_expr ->
-    returnWw (CoSCC cc new_expr)
+    returnWw (SCC cc new_expr)
 
-wwExpr (CoLet bind expr)
+wwExpr (Let bind expr)
   = wwBind False{-not top-level-} bind	`thenWw` \ intermediate_bind ->
     wwExpr expr				`thenWw` \ new_expr ->
     returnWw (mash_ww_bind intermediate_bind new_expr)
@@ -127,20 +126,20 @@ wwExpr (CoLet bind expr)
     mash_ww_bind (WwLet  binds)   body = mkCoLetsNoUnboxed binds body
     mash_ww_bind (WwCase case_fn) body = case_fn body
 
-wwExpr (CoCase expr alts)
+wwExpr (Case expr alts)
   = wwExpr expr				`thenWw` \ new_expr ->
     ww_alts alts			`thenWw` \ new_alts ->
-    returnWw (CoCase new_expr new_alts)
+    returnWw (Case new_expr new_alts)
   where
-    ww_alts (CoAlgAlts alts deflt)
+    ww_alts (AlgAlts alts deflt)
       = mapWw ww_alg_alt alts		`thenWw` \ new_alts ->
 	ww_deflt deflt			`thenWw` \ new_deflt ->
-	returnWw (CoAlgAlts new_alts new_deflt)
+	returnWw (AlgAlts new_alts new_deflt)
 
-    ww_alts (CoPrimAlts alts deflt)
+    ww_alts (PrimAlts alts deflt)
       = mapWw ww_prim_alt alts		`thenWw` \ new_alts ->
 	ww_deflt deflt			`thenWw` \ new_deflt ->
-	returnWw (CoPrimAlts new_alts new_deflt)
+	returnWw (PrimAlts new_alts new_deflt)
 
     ww_alg_alt (con, binders, rhs)
       =	wwExpr rhs			`thenWw` \ new_rhs ->
@@ -150,12 +149,12 @@ wwExpr (CoCase expr alts)
       = wwExpr rhs			`thenWw` \ new_rhs ->
 	returnWw (lit, new_rhs)
 
-    ww_deflt CoNoDefault
-      = returnWw CoNoDefault
+    ww_deflt NoDefault
+      = returnWw NoDefault
 
-    ww_deflt (CoBindDefault binder rhs)
+    ww_deflt (BindDefault binder rhs)
       = wwExpr rhs			`thenWw` \ new_rhs ->
-	returnWw (CoBindDefault binder new_rhs)
+	returnWw (BindDefault binder new_rhs)
 \end{code}
 
 %************************************************************************
@@ -178,9 +177,9 @@ The only reason this is monadised is for the unique supply.
 
 \begin{code}
 tryWW	:: Id				-- the fn binder
-	-> PlainCoreExpr		-- the bound rhs; its innards
+	-> CoreExpr		-- the bound rhs; its innards
 					--   are already ww'd
-	-> WwM [(Id, PlainCoreExpr)]	-- either *one* or *two* pairs;
+	-> WwM [(Id, CoreExpr)]	-- either *one* or *two* pairs;
 					-- if one, then no worker (only
 					-- the orig "wrapper" lives on);
 					-- if two, then a worker and a
@@ -207,16 +206,16 @@ tryWW fn_id rhs
 
 	-- OK, it looks as if a worker is worth a try
 	let
-	     (tyvars, args, body) = digForLambdas rhs
-	     body_ty		  = typeOfCoreExpr body
+	     (uvars, tyvars, args, body) = digForLambdas rhs
+	     body_ty			 = coreExprType body
 	in
 	uniqSMtoWwM (mkWwBodies body_ty tyvars args args_info) `thenWw` \ result ->
 	case result of
 
-	  Nothing -> 	-- Very peculiar. This can only happen if we hit an 
+	  Nothing -> 	-- Very peculiar. This can only happen if we hit an
 			-- abstract type, which we shouldn't have since we've
 			-- constructed the args_info in this module!
-			
+
 			-- False. We might hit the all-args-absent-and-the-
 			-- body-is-unboxed case.  A Nothing is legit. (WDP 94/10)
 			do_nothing
@@ -240,7 +239,7 @@ tryWW fn_id rhs
 		    -- worker Id:
 		    mkStrictnessInfo args_info (Just worker_id)
 
-	        wrapper_id  = fn_id `replaceIdInfo`
+		wrapper_id  = fn_id `replaceIdInfo`
 			      (getIdInfo fn_id		`addInfo`
 			       revised_strictness_info	`addInfo_UF`
 			       iWantToBeINLINEd UnfoldAlways)

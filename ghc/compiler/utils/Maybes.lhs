@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Maybes]{The `Maybe' types and associated utility functions}
 
@@ -9,17 +9,22 @@
 #endif
 
 module Maybes (
-	Maybe(..), MaybeErr(..),
+--	Maybe(..), -- no, it's in 1.3
+	MaybeErr(..),
 
 	allMaybes,	-- GHCI only
-	assocMaybe,
 	catMaybes,
+	firstJust,
+	expectJust,
+	maybeToBool,
+
+	assocMaybe,
+	mkLookupFun, mkLookupFunDef,
+
 	failMaB,
 	failMaybe,
-	firstJust,
+	seqMaybe,
 	mapMaybe,	-- GHCI only
-	maybeToBool,
-	mkLookupFun,
 	returnMaB,
 	returnMaybe,	-- GHCI only
 	thenMaB,
@@ -33,11 +38,9 @@ module Maybes (
     ) where
 
 #if defined(COMPILING_GHC)
-import AbsUniType
-import Id
-import IdInfo
-import Name
-import Outputable
+
+CHK_Ubiq() -- debugging consistency check
+
 #if USE_ATTACK_PRAGMAS
 import Util
 #endif
@@ -65,7 +68,7 @@ maybeToBool Nothing  = False
 maybeToBool (Just x) = True
 \end{code}
 
-@catMaybes@ takes a list of @Maybe@s and returns a list of 
+@catMaybes@ takes a list of @Maybe@s and returns a list of
 the contents of all the @Just@s in it.	@allMaybes@ collects
 a list of @Justs@ into a single @Just@, returning @Nothing@ if there
 are any @Nothings@.
@@ -102,6 +105,43 @@ findJust f (a:as) = case f a of
 		      b	 -> b
 \end{code}
 
+\begin{code}
+expectJust :: String -> Maybe a -> a
+{-# INLINE expectJust #-}
+expectJust err (Just x) = x
+expectJust err Nothing  = error ("expectJust " ++ err)
+\end{code}
+
+The Maybe monad
+~~~~~~~~~~~~~~~
+\begin{code}
+#if __HASKELL1__ < 3
+thenMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
+m `thenMaybe` k = case m of
+		  Nothing -> Nothing
+		  Just a  -> k a
+#endif
+
+seqMaybe :: Maybe a -> Maybe a -> Maybe a
+seqMaybe (Just x) _  = Just x
+seqMaybe Nothing  my = my
+
+returnMaybe :: a -> Maybe a
+returnMaybe = Just
+
+failMaybe :: Maybe a
+failMaybe = Nothing
+
+mapMaybe :: (a -> Maybe b) -> [a] -> Maybe [b]
+mapMaybe f []	  = returnMaybe []
+mapMaybe f (x:xs) = f x			`thenMaybe` \ x' ->
+		    mapMaybe f xs	`thenMaybe` \ xs' ->
+		    returnMaybe (x':xs')
+\end{code}
+
+Lookup functions
+~~~~~~~~~~~~~~~~
+
 @assocMaybe@ looks up in an assocation list, returning
 @Nothing@ if it fails.
 
@@ -115,7 +155,7 @@ assocMaybe alist key
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
 
 #if defined(COMPILING_GHC)
-{-# SPECIALIZE assocMaybe
+{-? SPECIALIZE assocMaybe
 	:: [(String,        b)] -> String        -> Maybe b,
 	   [(Id,            b)] -> Id            -> Maybe b,
 	   [(Class,         b)] -> Class         -> Maybe b,
@@ -127,8 +167,10 @@ assocMaybe alist key
 #endif
 \end{code}
 
-@mkLookupFun alist s@ is a function which looks up
-@s@ in the association list @alist@, returning a Maybe type.
+@mkLookupFun eq alist@ is a function which looks up
+its argument in the association list @alist@, returning a Maybe type.
+@mkLookupFunDef@ is similar except that it is given a value to return
+on failure.
 
 \begin{code}
 mkLookupFun :: (key -> key -> Bool)	-- Equality predicate
@@ -140,26 +182,17 @@ mkLookupFun eq alist s
   = case [a | (s',a) <- alist, s' `eq` s] of
       []    -> Nothing
       (a:_) -> Just a
-\end{code}
 
-\begin{code}
-#if __HASKELL1__ < 3
-thenMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
-m `thenMaybe` k = case m of
-		  Nothing -> Nothing
-		  Just a  -> k a
-#endif
-returnMaybe :: a -> Maybe a
-returnMaybe = Just 
+mkLookupFunDef :: (key -> key -> Bool)	-- Equality predicate
+	       -> [(key,val)] 		-- The assoc list
+	       -> val 			-- Value to return on failure
+	       -> key 			-- The key
+	       -> val			-- The corresponding value
 
-failMaybe :: Maybe a
-failMaybe = Nothing
-
-mapMaybe :: (a -> Maybe b) -> [a] -> Maybe [b]
-mapMaybe f []	  = returnMaybe []
-mapMaybe f (x:xs) = f x				`thenMaybe` (\ x' ->
-		    mapMaybe f xs		`thenMaybe` (\ xs' ->
-		    returnMaybe (x':xs')		     ))
+mkLookupFunDef eq alist deflt s
+  = case [a | (s',a) <- alist, s' `eq` s] of
+      []    -> deflt
+      (a:_) -> a
 \end{code}
 
 %************************************************************************
@@ -194,7 +227,7 @@ a @Succeeded@ of a list of their values.  If any fail, it returns a
 \begin{code}
 listMaybeErrs :: [MaybeErr val err] -> MaybeErr [val] [err]
 listMaybeErrs
-  = foldr combine (Succeeded []) 
+  = foldr combine (Succeeded [])
   where
     combine (Succeeded v) (Succeeded vs) = Succeeded (v:vs)
     combine (Failed err)  (Succeeded _)	 = Failed [err]

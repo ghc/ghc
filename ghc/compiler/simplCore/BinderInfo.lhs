@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %************************************************************************
 %*									*
@@ -8,7 +8,6 @@
 %************************************************************************
 
 \begin{code}
-
 #include "HsVersions.h"
 
 module BinderInfo (
@@ -23,16 +22,14 @@ module BinderInfo (
 	markMany, markDangerousToDup, markInsideSCC,
 	getBinderInfoArity,
 	setBinderInfoArityToZero,
-	
+
 	isFun, isDupDanger -- for Simon Marlow deforestation
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
+import Ubiq{-uitous-}
 
-import PlainCore
-import Outputable
 import Pretty
-import Util		-- for pragmas only
+import Util		( panic )
 \end{code}
 
 The @BinderInfo@ describes how a variable is used in a given scope.
@@ -86,7 +83,7 @@ data FunOrArg
     -- When combining branches of a case, only report FunOcc if
     -- both branches are FunOccs
 
-data DuplicationDanger 
+data DuplicationDanger
   = DupDanger	-- Inside a non-linear lambda (that is, a lambda which
 		-- is sure to be instantiated only once), or inside
 		-- the rhs of an INLINE-pragma'd thing.  Either way,
@@ -114,12 +111,12 @@ oneTextualOcc ok_to_dup (OneOcc _ _ _ n_alts _) = n_alts <= 1 || ok_to_dup
 oneTextualOcc _         other		        = False
 \end{code}
 
-@safeSingleOcc@ detects single occurences of values that are safe to 
+@safeSingleOcc@ detects single occurences of values that are safe to
 inline, {\em including} ones in an argument position.
 
 \begin{code}
 oneSafeOcc :: Bool -> BinderInfo -> Bool
-oneSafeOcc ok_to_dup (OneOcc _ NoDupDanger NotInsideSCC n_alts _) 
+oneSafeOcc ok_to_dup (OneOcc _ NoDupDanger NotInsideSCC n_alts _)
 						     = n_alts <= 1 || ok_to_dup
 oneSafeOcc _         other			     = False
 \end{code}
@@ -173,12 +170,12 @@ markInsideSCC (OneOcc posn dup_danger _ n_alts ar)
   = OneOcc posn dup_danger InsideSCC n_alts ar
 markInsideSCC other = other
 
-combineBinderInfo, combineAltsBinderInfo 
+combineBinderInfo, combineAltsBinderInfo
 	:: BinderInfo -> BinderInfo -> BinderInfo
 
 combineBinderInfo DeadCode info2 = info2
 combineBinderInfo info1 DeadCode = info1
-combineBinderInfo info1 info2	 
+combineBinderInfo info1 info2
 	= ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
 
 combineAltsBinderInfo DeadCode info2 = info2

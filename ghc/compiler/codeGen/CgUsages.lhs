@@ -9,12 +9,11 @@ modify (\tr{set*} functions) the stacks and heap usage information.
 \begin{code}
 module CgUsages (
 	initHeapUsage, setVirtHp, getVirtAndRealHp, setRealHp,
-	setRealAndVirtualSps, 
+	setRealAndVirtualSps,
 
 	getVirtSps,
 
 	getHpRelOffset,	getSpARelOffset, getSpBRelOffset,
---UNUSED: getVirtSpRelOffsets,
 
 	freeBStkSlot,
 
@@ -131,22 +130,11 @@ getSpBRelOffset virtual_offset info_down state@(MkCgState _ _ (_,(_,_,realSpB,_)
   = (SpBRel realSpB virtual_offset, state)
 \end{code}
 
-
-\begin{code}
-{- UNUSED:
-getVirtSpRelOffsets :: FCode (RegRelative, RegRelative)
-getVirtSpRelOffsets info_down
-	state@(MkCgState absC binds ((virtSpA,_,realSpA,_), (virtSpB,_,realSpB,_), _))
-  = ((SpARel realSpA virtSpA, SpBRel realSpB virtSpB), state)
--}
-\end{code}
-
 \begin{code}
 freeBStkSlot :: VirtualSpBOffset -> Code
 freeBStkSlot b_slot info_down
 	state@(MkCgState absC binds (spa_usage, (virtSpB,free_b,realSpB,hwSpB), heap_usage))
- = MkCgState absC binds (spa_usage, (virtSpB,new_free_b,realSpB,hwSpB), heap_usage)
- where
- new_free_b = addFreeBSlots free_b [b_slot]
-
+  = MkCgState absC binds (spa_usage, (virtSpB,new_free_b,realSpB,hwSpB), heap_usage)
+  where
+    new_free_b = addFreeBSlots free_b [b_slot]
 \end{code}

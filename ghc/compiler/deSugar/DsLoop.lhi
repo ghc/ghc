@@ -1,0 +1,31 @@
+Break the loop between Match and DsUtils and the loops
+between DsExpr/DsBinds and various things.
+
+\begin{code}
+interface DsLoop where
+
+import CoreSyn	( CoreBinding(..), CoreExpr(..) )
+import DsMonad	( DsM(..) )
+import DsBinds	( dsBinds )
+import DsExpr	( dsExpr )
+import DsUtils	( EquationInfo, MatchResult )
+import Id	( Id(..) )
+import Match	( match, matchSimply )
+import TcHsSyn	( TypecheckedHsBinds(..), TypecheckedHsExpr(..), TypecheckedPat(..) )
+import Type	( Type(..) )
+
+match :: [Id]		  -- Variables rep'ing the exprs we're matching with
+      -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
+      -> [EquationInfo]	  -- Potentially shadowing equations above this one
+      -> DsM MatchResult  -- Desugared result!
+
+matchSimply :: CoreExpr			-- Scrutinee
+	    -> TypecheckedPat		-- Pattern it should match
+	    -> Type			-- Type of result
+	    -> CoreExpr			-- Return this if it matches
+	    -> CoreExpr			-- Return this if it does
+	    -> DsM CoreExpr
+
+dsBinds :: TypecheckedHsBinds -> DsM [CoreBinding]
+dsExpr  :: TypecheckedHsExpr  -> DsM CoreExpr
+\end{code}

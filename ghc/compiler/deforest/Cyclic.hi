@@ -1,9 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
-interface Cyclic where
-import CoreSyn(CoreExpr)
-import DefSyn(DefBindee)
-import Id(Id)
-import SplitUniq(SplitUniqSupply)
-fixupFreeVars :: [Id] -> Id -> CoreExpr Id DefBindee -> ((Id, CoreExpr Id DefBindee), [(Id, CoreExpr Id DefBindee)])
-mkLoops :: CoreExpr Id DefBindee -> SplitUniqSupply -> ([(Id, CoreExpr Id DefBindee)], CoreExpr Id DefBindee)
-

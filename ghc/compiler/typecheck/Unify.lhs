@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Unify]{Unifier}
 
@@ -11,44 +11,24 @@ updatable substitution).
 
 module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging only)
-import Outputable
-import Pretty
+import Ubiq
 
-import AbsSyn
+-- friends: 
 import TcMonad
-
-import CmdLineOpts	( GlobalSwitch(..) )
-import CoreLift		( isUnboxedButNotState )
-import Errors		( unifyErr, UnifyErrInfo(..), UnifyErrContext  )
-import Id		( Id, DataCon(..), Inst )
-import Maybes		( Maybe(..) )
-import Subst		( extendSubst, SubstResult(..), Subst )
-#if USE_ATTACK_PRAGMAS
-import Class		( Class(..), cmpClass ) -- .. for pragmas only
-import TyCon		( TyCon(..), isBoxedTyCon, isVisibleSynTyCon, cmpTyCon )
-			-- .. on TyCon is for pragmas only
-import TyVar		-- make all visible for pragmas
-import UniTyFuns	( pprUniType, pprTyCon ) 
-#else
-import Class		( Class )
-import TyVar		( TyVar(..), TyVarTemplate )
-import TyCon		( TyCon, isBoxedTyCon, isVisibleSynTyCon )
-#endif
-import UniType		( UniType(..), TauType(..)
-			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
-			)
+import Type	( GenType(..), getTypeKind )
+import TyCon	( TyCon(..), ConsVisible, NewOrData )
+import TyVar	( GenTyVar(..), TyVar(..) )
+import TcType	( TcType(..), TcMaybe(..), TcTauType(..), TcTyVar(..),
+		  tcReadTyVar, tcWriteTyVar
+		)
+-- others:
+import Kind	( Kind, isSubKindOf )
+import PprType	( GenTyVar, GenType )	-- instances
+import Pretty
+import Unique	( Unique )		-- instances
 import Util
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[Unify-spec]{Specification}
-%*									*
-%************************************************************************
-
-CLAIM: the unifier works correctly even if the types to be unified are not
-fixed points of the substitution.
 
 %************************************************************************
 %*									*
@@ -62,18 +42,23 @@ non-exported generic functions.
 Unify two @TauType@s.  Dead straightforward.
 
 \begin{code}
-unifyTauTy :: TauType -> TauType -> UnifyErrContext -> TcM ()
-
-unifyTauTy ty1 ty2 err_ctxt = uTys ty1 ty1 ty2 ty2 err_ctxt
+unifyTauTy :: TcTauType s -> TcTauType s -> TcM s ()
+unifyTauTy ty1 ty2 
+  = tcAddErrCtxt (unifyCtxt ty1 ty2) $
+    uTys ty1 ty1 ty2 ty2
 \end{code}
 
-@unifyTauTyLists@ unifies corresponding elements of its two list
-arguments.  The lists should be of equal length.
+@unifyTauTyList@ unifies corresponding elements of two lists of
+@TauType@s.  It uses @uTys@ to do the real work.  The lists should be
+of equal length.  We charge down the list explicitly so that we can
+complain if their lengths differ.
 
 \begin{code}
-unifyTauTyLists :: [TauType] -> [TauType] -> UnifyErrContext -> TcM ()
-
-unifyTauTyLists tys1 tys2 err_ctxt = uList tys1 tys2 err_ctxt
+unifyTauTyLists :: [TcTauType s] -> [TcTauType s] ->  TcM s ()
+unifyTauTyLists [] 	     []	        = returnTc ()
+unifyTauTyLists (ty1:tys1) (ty2:tys2) = uTys ty1 ty1 ty2 ty2   `thenTc_`
+					unifyTauTyLists tys1 tys2
+unifyTauTypeLists ty1s ty2s = panic "Unify.unifyTauTypeLists: mismatched type lists!"
 \end{code}
 
 @unifyTauTyList@ takes a single list of @TauType@s and unifies them
@@ -81,38 +66,11 @@ all together.  It is used, for example, when typechecking explicit
 lists, when all the elts should be of the same type.
 
 \begin{code}
-unifyTauTyList :: [TauType] -> UnifyErrContext -> TcM ()
-
-unifyTauTyList []   _ = returnTc ()
-unifyTauTyList [ty] _ = returnTc ()
-
-unifyTauTyList (ty1:tys@(ty2:_)) err_ctxt
-  = unifyTauTy ty1 ty2 err_ctxt	`thenTc_`
-    unifyTauTyList tys err_ctxt
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Unify-lists-of-types]{@uList@}
-%*									*
-%************************************************************************
-
-@uList@ unifies corresponding elements of two lists of @TauType@s.  It
-uses @uTys@ to do the real work.  We charge down the list explicitly
-so that we can complain if their lengths differ.
-
-\begin{code}
-uList :: [TauType] -> [TauType]
-      -> UnifyErrContext
-      -> TcM ()
-
-uList [] [] _ = returnTc ()
-
-uList (ty1:tys1) (ty2:tys2) err_ctxt
-  = uTys ty1 ty1 ty2 ty2 err_ctxt   `thenTc_`
-    uList tys1 tys2 err_ctxt
-
-uList ty1s ty2s _ = panic "Unify.uList: mismatched type lists!"
+unifyTauTyList :: [TcTauType s] -> TcM s ()
+unifyTauTyList []		 = returnTc ()
+unifyTauTyList [ty]		 = returnTc ()
+unifyTauTyList (ty1:tys@(ty2:_)) = unifyTauTy ty1 ty2	`thenTc_`
+				   unifyTauTyList tys
 \end{code}
 
 %************************************************************************
@@ -130,96 +88,126 @@ de-synonym'd version.  This way we get better error messages.
 We call the first one \tr{ps_ty1}, \tr{ps_ty2} for ``possible synomym''.
 
 \begin{code}
-uTys :: TauType -> TauType	-- Error reporting ty1 and real ty1
-     -> TauType -> TauType	-- Error reporting ty2 and real ty2
-     -> UnifyErrContext
-     -> TcM ()
+uTys :: TcTauType s -> TcTauType s	-- Error reporting ty1 and real ty1
+     -> TcTauType s -> TcTauType s	-- Error reporting ty2 and real ty2
+     -> TcM s ()
+
+	-- Variables; go for uVar
+uTys ps_ty1 (TyVarTy tyvar1) ps_ty2 ty2 = uVar tyvar1 ps_ty2 ty2
+uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar tyvar2 ps_ty1 ty1
+
+	-- Applications and functions; just check the two parts
+uTys _ (FunTy fun1 arg1 _) _ (FunTy fun2 arg2 _)
+  = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
+uTys _ (AppTy fun1 arg1) _ (AppTy fun2 arg2)
+  = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
+
+	-- Type constructors must match
+uTys ps_ty1 (TyConTy con1 _) ps_ty2 (TyConTy con2 _)
+  = checkTc (con1 == con2) (unifyMisMatch ps_ty1 ps_ty2)
+
+	-- Always expand synonyms (see notes at end)
+uTys ps_ty1 (SynTy con1 args1 ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
+uTys ps_ty1 ty1 ps_ty2 (SynTy con2 args2 ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
+
+	-- Special case: converts  (->) a b  to  a -> b
+uTys ps_ty1 (AppTy (AppTy (TyConTy FunTyCon u) fun) arg) ps_ty2 ty2
+  = uTys ps_ty1 (FunTy fun arg u) ps_ty2 ty2
+uTys ps_ty1 ty1 ps_ty2 (AppTy (AppTy (TyConTy FunTyCon u) fun) arg)
+  = uTys ps_ty1 ty1 ps_ty2 (FunTy fun arg u)
+
+	-- Anything else fails
+uTys ps_ty1 ty1 ps_ty2 ty2  = failTc (unifyMisMatch ps_ty1 ps_ty2)
 \end{code}
 
-%********************************************************
-%*							*
-Sanity check: should never find a UniTyVarTemplate
-%*							*
-%********************************************************
+%************************************************************************
+%*									*
+\subsection[Unify-uVar]{@uVar@: unifying with a type variable}
+%*									*
+%************************************************************************
+
+@uVar@ is called when at least one of the types being unified is a
+variable.  It does {\em not} assume that the variable is a fixed point
+of the substitution; rather, notice that @bindTo@ (defined below) nips
+back into @uTys@ if it turns out that the variable is already bound.
+
+There is a slight worry that one might try to @bindTo@ a (say) Poly
+tyvar (as tv1) with an Open tyvar (as ty2) which is already unified to
+an unboxed type.  In fact this can't happen, because the Open ones are
+always the ones which are unified away.
 
 \begin{code}
-#ifdef DEBUG
+uVar :: TcTyVar s
+     -> TcTauType s -> TcTauType s	-- printing and real versions
+     -> TcM s ()
 
-uTys ps_ty1 ty1@(UniTyVarTemplate tv1) ps_ty2 ty2 err_ctxt
-  = pprPanic "Unify:uTys:unifying w/ UniTyVarTemplate(1):" (ppCat [ppr PprDebug tv1, ppr PprDebug ty2])
+uVar tv1 ps_ty2 ty2
+  = tcReadTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
+    case maybe_ty1 of
+	BoundTo ty1 -> uTys ty1 ty1 ps_ty2 ty2
+	UnBound  -> uUnboundVar tv1 ps_ty2 ty2
 
-uTys ps_ty1 ty1 ps_ty2 ty2@(UniTyVarTemplate tv2) err_ctxt
-  = pprPanic "Unify:uTys:unifying w/ UniTyVarTemplate(2):" (ppCat [ppr PprDebug ty1, ppr PprDebug tv2])
+	-- Expand synonyms
+uUnboundVar tv1 ps_ty2 (SynTy _ _ ty2) = uUnboundVar tv1 ps_ty2 ty2
 
-#endif {-DEBUG-}
+
+	-- The both-type-variable case
+uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
+	    ps_ty2
+	    ty2@(TyVarTy tv2@(TyVar uniq2 kind2 name2 box2))
+
+	-- Same type variable => no-op
+  | uniq1 == uniq2
+  = returnTc ()
+
+	-- Distinct type variables
+  | otherwise
+  = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
+    case maybe_ty2 of
+	BoundTo ty2' -> uUnboundVar tv1 ty2' ty2'
+	UnBound   -> if kind2 `isSubKindOf` kind1 then
+			tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
+		     else if kind1 `isSubKindOf` kind2 then
+			tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
+		     else
+			failTc (unifyKindErr tv1 ps_ty2)
+
+	-- Second one isn't a type variable
+uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1) ps_ty2 non_var_ty2
+  = occur_check non_var_ty2			`thenTc_`
+    checkTc (getTypeKind non_var_ty2 `isSubKindOf` kind1)
+	    (unifyKindErr tv1 ps_ty2)		`thenTc_`
+    tcWriteTyVar tv1 non_var_ty2		`thenNF_Tc_`
+    returnTc ()
+  where
+    occur_check (TyVarTy tv2@(TyVar uniq2 _ _ box2))
+       | uniq1 == uniq2		-- Same tyvar; fail
+       = failTc (unifyOccurCheck tv1 ps_ty2)
+
+       | otherwise		-- A different tyvar
+       = tcReadTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
+	 case maybe_ty2 of
+		BoundTo ty2' -> occur_check ty2'
+		UnBound   -> returnTc ()
+
+    occur_check (AppTy fun arg)   = occur_check fun `thenTc_` occur_check arg
+    occur_check (FunTy fun arg _) = occur_check fun `thenTc_` occur_check arg
+    occur_check (TyConTy _ _)	  = returnTc ()
+    occur_check (SynTy _ _ ty2)   = occur_check ty2
+    occur_check other		  = panic "Unexpected Dict or ForAll in occurCheck"
 \end{code}
 
-%********************************************************
-%*							*
-Both variables:
-%*							*
-%********************************************************
-
-\begin{code}
-uTys ps_ty1 (UniTyVar tyvar1) ps_ty2 ty2 err_ctxt = uVar tyvar1 ps_ty2 ty2 err_ctxt
-uTys ps_ty1 ty1 ps_ty2 (UniTyVar tyvar2) err_ctxt = uVar tyvar2 ps_ty1 ty1 err_ctxt
-\end{code}
-
-%********************************************************
-%*							*
-Both function constructors:
-%*							*
-%********************************************************
-
-\begin{code}
-uTys _ (UniFun fun1 arg1) _ (UniFun fun2 arg2) err_ctxt
-  = uList [fun1, arg1] [fun2, arg2] err_ctxt
-\end{code}
-
-%********************************************************
-%*							*
-Both datatype constructors:
-%*							*
-%********************************************************
-
-\begin{code}
-uTys ps_ty1 ty1@(UniData con1 args1) ps_ty2 ty2@(UniData con2 args2) err_ctxt
-  = if (con1 == con2) then
-	-- Same constructors, just unify the arguments
-	uList args1 args2 err_ctxt
-    else
-	-- Different constructors: disaster
-	getSrcLocTc		`thenNF_Tc` \ src_loc ->
-	failTc (unifyErr (UnifyMisMatch ps_ty1 ps_ty2) err_ctxt src_loc)
-\end{code}
-
-%********************************************************
-%*							*
-Type synonyms:
-%*							*
-%********************************************************
-
-If just one or the other is a synonym, just expand it.
-
-\begin{code}
-uTys ps_ty1 (UniSyn con1 args1 ty1) ps_ty2 ty2 err_ctxt
- | isVisibleSynTyCon con1
- = uTys ps_ty1 ty1 ps_ty2 ty2 err_ctxt
-
-uTys ps_ty1 ty1 ps_ty2 (UniSyn con2 args2 ty2) err_ctxt
- | isVisibleSynTyCon con2
- = uTys ps_ty1 ty1 ps_ty2 ty2 err_ctxt
-\end{code}
-
+Notes on synonyms
+~~~~~~~~~~~~~~~~~
 If you are tempted to make a short cut on synonyms, as in this
 pseudocode...
 
 \begin{verbatim}
-uTys (UniSyn con1 args1 ty1) (UniSyn con2 args2 ty2)
+uTys (SynTy con1 args1 ty1) (SynTy con2 args2 ty2)
   = if (con1 == con2) then
 	-- Good news!  Same synonym constructors, so we can shortcut
 	-- by unifying their arguments and ignoring their expansions.
-	uList args1 args2
+	unifyTauTypeLists args1 args2
     else
 	-- Never mind.  Just expand them and try again
 	uTys ty1 ty2
@@ -260,102 +248,27 @@ somehow as needing expansion, perhaps also issuing a warning to the
 user.
 \end{quotation}
 
-Still, if the synonym is abstract, we can only just go ahead and try!
+
+Errors
+~~~~~~
 
 \begin{code}
-uTys ps_ty1 (UniSyn con1 args1 ty1) ps_ty2 (UniSyn con2 args2 ty2) err_ctxt
-  -- Both must be abstract (i.e., non "visible" -- not done yet)
-  = if (con1 == con2) then
-	-- Good news!  Same synonym constructors, so we can shortcut
-	-- by unifying their arguments and ignoring their expansions.
-	uList args1 args2 err_ctxt
-    else
-	-- Bad news; mis-matched type constructors
-	getSrcLocTc		`thenNF_Tc` \ src_loc ->
-	failTc (unifyErr (UnifyMisMatch ps_ty1 ps_ty2) err_ctxt src_loc)
+unifyCtxt ty1 ty2 sty
+  = ppAboves [
+	ppCat [ppStr "Expected:", ppr sty ty1],
+	ppCat [ppStr "  Actual:", ppr sty ty2]
+    ]
+
+unifyMisMatch ty1 ty2 sty
+  = ppHang (ppStr "Couldn't match the type")
+	 4 (ppSep [ppr sty ty1, ppStr "against", ppr sty ty2])
+
+unifyKindErr tyvar ty sty
+  = ppHang (ppStr "Kind mis-match between")
+	 4 (ppSep [ppr sty tyvar, ppStr "and", ppr sty ty])
+
+unifyOccurCheck tyvar ty sty
+  = ppHang (ppStr "Occur check: cannot construct the infinite type")
+	 4 (ppSep [ppr sty tyvar, ppStr "=", ppr sty ty])
 \end{code}
 
-%********************************************************
-%*							*
-Catch-all case---just fails:
-%*							*
-%********************************************************
-
-Anything else fails. For example, matching a @UniFun@ against
-a @UniData@.
-\begin{code}
-uTys ps_ty1 ty1 ps_ty2 ty2 err_ctxt
-  = getSrcLocTc		`thenNF_Tc` \ src_loc ->
-    failTc (unifyErr (UnifyMisMatch ps_ty1 ps_ty2) err_ctxt src_loc)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Unify-uVar]{@uVar@: unifying with a type variable}
-%*									*
-%************************************************************************
-
-@uVar@ is called when at least one of the types being unified is a
-variable.  It does {\em not} assume that the variable is a fixed point
-of the substitution; rather, notice that @bindTo@ (defined below) nips
-back into @uTys@ if it turns out that the variable is already bound.
-
-There is a slight worry that one might try to @bindTo@ a (say) Poly
-tyvar (as tv1) with an Open tyvar (as ty2) which is already unified to
-an unboxed type.  In fact this can't happen, because the Open ones are
-always the ones which are unified away.
-
-\begin{code}
-uVar :: TyVar
-     -> UniType -> UniType	-- printing and real versions
-     -> UnifyErrContext
-     -> TcM ()
-
-uVar tv1 ps_ty2 ty2 err_ctxt
-  = do tv1 ty2
-  where
-	-- Expand synonyms
-    do _ (UniSyn _ _ ty2) = do tv1 ty2
-
-	-- Commit any open type variable
-    do (OpenSysTyVar _) ty2				    = tv1 `bindTo` ps_ty2
-    do _ 	        ty2@(UniTyVar tv2@(OpenSysTyVar _)) = tv2 `bindTo` ty1
-
-	-- Eliminate Poly in favour of User
-    do (PolySysTyVar _) ty2@(UniTyVar (UserTyVar _ _))      = tv1 `bindTo` ps_ty2
-    do (PolySysTyVar _) ty2@(UniTyVar (PolySysTyVar _))     = tv1 `bindTo` ps_ty2
-    do (UserTyVar _ _)  ty2@(UniTyVar tv2@(PolySysTyVar _)) = tv2 `bindTo` ty1
-    do (UserTyVar _ _)  ty2@(UniTyVar (UserTyVar _ _))      = tv1 `bindTo` ps_ty2
-
-    	-- Matching for boxed data types
-    do (PolySysTyVar _) ty2@(UniData con _) | isBoxedTyCon con  = tv1 `bindTo` ps_ty2
-    do (UserTyVar _ _)  ty2@(UniData con _) | isBoxedTyCon con  = tv1 `bindTo` ps_ty2
-
-	-- Matching for unboxed data types:
-	--   requires specialisation w.r.t. the unboxed type
-    do (PolySysTyVar _) ty2@(UniData con _)  = tv1 `bindToUnboxed` ps_ty2
-    do (UserTyVar _ _)  ty2@(UniData con _)  = tv1 `bindToUnboxed` ps_ty2
-
-	-- Matching for function types
-    do (PolySysTyVar _) ty2@(UniFun _ _)     = tv1 `bindTo` ps_ty2
-    do (UserTyVar _ _)  ty2@(UniFun _ _)     = tv1 `bindTo` ps_ty2
-
-	-- Default
-    do _ _ = getSrcLocTc `thenNF_Tc` \ src_loc ->
-             failTc (unifyErr (UnifyMisMatch ty1 ps_ty2) err_ctxt src_loc)
-
-	----------- END OF CASES ---------------
-
-    ty1 = UniTyVar tv1
-
-    tyvar1 `bindTo` ty2 
-	= extendSubstTc tyvar1 ty2 err_ctxt
-
-    tyvar1 `bindToUnboxed` ty2 
-	= getSwitchCheckerTc 	`thenNF_Tc` \ sw_chkr ->
-	  if sw_chkr SpecialiseUnboxed && isUnboxedButNotState ty2 then
-	      extendSubstTc tyvar1 ty2 err_ctxt
-	  else
-	      getSrcLocTc 	`thenNF_Tc` \ src_loc ->
-              failTc (unifyErr (UnifyUnboxedMisMatch ty1 ps_ty2) err_ctxt src_loc)
-\end{code}

@@ -1,0 +1,22 @@
+Breaks the RnPass4/RnExpr4/RnBind4 loops.
+
+\begin{code}
+interface RnLoop where
+
+import Name		( Name )
+import RdrHsSyn		( ProtoNameHsBinds(..), ProtoNamePolyType(..), ProtoNameGenPragmas(..) )
+import RnHsSyn		( RenamedHsBinds(..), RenamedPolyType(..), RenamedGenPragmas(..) )
+import RnBinds4		( rnBinds, FreeVars(..) )
+import RnMonad4		( TyVarNamesEnv(..), Rn4M(..) )
+import RnPass4		( rnPolyType, rnGenPragmas )
+import UniqSet		( UniqSet(..) )
+
+rnBinds :: ProtoNameHsBinds -> Rn4M (RenamedHsBinds, FreeVars, [Name])
+rnGenPragmas :: ProtoNameGenPragmas -> Rn4M RenamedGenPragmas
+rnPolyType :: Bool
+	    -> TyVarNamesEnv
+	    -> ProtoNamePolyType
+	    -> Rn4M RenamedPolyType
+
+type FreeVars = UniqSet Name
+\end{code}

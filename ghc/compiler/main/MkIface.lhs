@@ -6,24 +6,14 @@
 \begin{code}
 #include "HsVersions.h"
 
-module MkIface (
-	mkInterface,
+module MkIface ( mkInterface ) where
 
-	-- and to make the interface self-sufficient...
-	Bag, CE(..), GlobalSwitch, FixityDecl, Id,
-	Name, PrettyRep, StgBinding, TCE(..), UniqFM, InstInfo
-    ) where
-
-IMPORT_Trace		-- ToDo: rm (debugging)
-
-import AbsPrel		( mkLiftTy, pRELUDE_CORE, pRELUDE_BUILTIN )
-import AbsSyn		( FixityDecl(..), RenamedFixityDecl(..), MonoBinds,
+import PrelInfo		( mkLiftTy, pRELUDE_CORE, pRELUDE_BUILTIN )
+import HsSyn		( FixityDecl(..), RenamedFixityDecl(..), MonoBinds,
 			  RenamedMonoBinds(..), Name, RenamedPat(..), Sig
 			)
-import AbsUniType
+import Type
 import Bag
-import CE
-import CmdLineOpts	-- ( GlobalSwitch(..) )
 import FiniteMap
 import Id
 import IdInfo		-- plenty from here
@@ -31,7 +21,6 @@ import Maybes		( catMaybes, Maybe(..) )
 import Outputable
 import Pretty
 import StgSyn
-import TCE
 import TcInstDcls	( InstInfo(..) )
 import Util
 \end{code}
@@ -56,7 +45,7 @@ those particular \tr{Ids} {\em do not have} the best @IdInfos@!!!
 Those @IdInfos@ were figured out long after the \tr{InstInfo} was
 created.
 
-That's why we actually look at the final \tr{PlainStgBindings} that go
+That's why we actually look at the final \tr{StgBindings} that go
 into the code-generator: they have the best @IdInfos@ on them.
 Whenever, we are about to print info about an @Id@, we look in the
 Ids-from-STG-bindings list to see if we have an ``equivalent'' @Id@
@@ -78,21 +67,20 @@ to \tr{make}.
 \end{enumerate}
 
 \begin{code}
-mkInterface :: (GlobalSwitch -> Bool)
-	    -> FAST_STRING
+mkInterface :: FAST_STRING
 	    -> (FAST_STRING -> Bool,  -- is something in export list, explicitly?
 		FAST_STRING -> Bool)  -- is a module among the "dotdot" exported modules?
 	    -> IdEnv UnfoldingDetails
-	    -> FiniteMap TyCon [(Bool, [Maybe UniType])]
+	    -> FiniteMap TyCon [(Bool, [Maybe Type])]
 	    -> ([RenamedFixityDecl],  -- interface info from the typecheck
-	        [Id],
-	        CE,
-	        TCE,
-	        Bag InstInfo)
-	    -> [PlainStgBinding]
+		[Id],
+		CE,
+		TCE,
+		Bag InstInfo)
+	    -> [StgBinding]
 	    -> Pretty
 
-mkInterface sw_chkr modname export_list_fns inline_env tycon_specs
+mkInterface modname export_list_fns inline_env tycon_specs
 	    (fixity_decls, global_ids, ce, tce, inst_infos)
 	    stg_binds
   = let
@@ -100,12 +88,12 @@ mkInterface sw_chkr modname export_list_fns inline_env tycon_specs
 
 	exported_tycons  = [ tc | tc <- rngTCE tce,
 			   isExported tc,
-			   is_exportable_tycon_or_class sw_chkr export_list_fns tc ]
+			   is_exportable_tycon_or_class export_list_fns tc ]
 	exported_classes = [  c |  c <- rngCE  ce,
 			   isExported  c,
-			   is_exportable_tycon_or_class sw_chkr export_list_fns  c ]
+			   is_exportable_tycon_or_class export_list_fns  c ]
 	exported_inst_infos = [ i | i <- bagToList inst_infos,
-			   is_exported_inst_info sw_chkr export_list_fns i ]
+			   is_exported_inst_info export_list_fns i ]
 	exported_vals
     	  = [ v | v <- global_ids,
 	      isExported v && not (isDataCon v) && not (isClassOpId v) ]
@@ -119,20 +107,20 @@ mkInterface sw_chkr modname export_list_fns inline_env tycon_specs
 	  = foldr ( \ (tcs1, cls1) (tcs2, cls2)
 		      -> (tcs1 `unionBags` tcs2, cls1 `unionBags` cls2) )
 		  (emptyBag, emptyBag)
-		  (map getMentionedTyConsAndClassesFromClass exported_classes  ++ 
+		  (map getMentionedTyConsAndClassesFromClass exported_classes  ++
 		   map getMentionedTyConsAndClassesFromTyCon exported_tycons   ++
 		   map getMentionedTyConsAndClassesFromId    exported_vals     ++
 		   map getMentionedTyConsAndClassesFromInstInfo exported_inst_infos)
 
 	mentionable_classes
-	  = filter (is_mentionable sw_chkr) (bagToList mentioned_classes)
+	  = filter is_mentionable (bagToList mentioned_classes)
 	mentionable_tycons
 	  = [ tc | tc <- bagToList mentioned_tycons,
-		   is_mentionable sw_chkr tc,
+		   is_mentionable tc,
 		   not (isPrimTyCon tc) ]
 
-	nondup_mentioned_tycons  = fst (removeDups cmpTyCon mentionable_tycons)
-	nondup_mentioned_classes = fst (removeDups cmpClass mentionable_classes)
+	nondup_mentioned_tycons  = fst (removeDups cmp mentionable_tycons)
+	nondup_mentioned_classes = fst (removeDups cmp mentionable_classes)
 
 	-- Next: as discussed in the notes, we want the top-level
 	-- Ids straight from the final STG code, so we can use
@@ -177,22 +165,21 @@ mkInterface sw_chkr modname export_list_fns inline_env tycon_specs
     else
 --  trace ("mkIface:Ids:"++(ppShow 80 (ppr PprDebug global_ids))) (
     ppAboves
-       [ppPStr SLIT("{-# GHC_PRAGMA INTERFACE VERSION 6 #-}"),
+       [ppPStr SLIT("{-# GHC_PRAGMA INTERFACE VERSION 7 #-}"),
 	ppCat [ppPStr SLIT("interface"), ppPStr modname, ppPStr SLIT("where")],
 
-	do_import_decls sw_chkr modname
+	do_import_decls modname
 		sorted_vals sorted_mentioned_classes sorted_mentioned_tycons,
 		-- Mustn't give the data constructors to do_import_decls,
 		-- because they aren't explicitly imported; their tycon is.
-		-- ToDo: modify if we ever add renaming properly.
 
-	ppAboves (map (do_fixity sw_chkr)		              fixity_decls),
-	ppAboves (map (pprIfaceClass sw_chkr better_id_fn inline_env) sorted_classes),
-	ppAboves (map (do_tycon    sw_chkr tycon_specs)	              sorted_tycons),
-	ppAboves (map (do_value    sw_chkr better_id_fn inline_env)   sorted_vals),
-	ppAboves (map (do_instance sw_chkr better_id_fn inline_env)   sorted_inst_infos),
+	ppAboves (map do_fixity					fixity_decls),
+	ppAboves (map (pprIfaceClass better_id_fn inline_env)	sorted_classes),
+	ppAboves (map (do_tycon      tycon_specs)		sorted_tycons),
+	ppAboves (map (do_value      better_id_fn inline_env)   sorted_vals),
+	ppAboves (map (do_instance   better_id_fn inline_env)   sorted_inst_infos),
 
-        ppChar '\n'
+	ppChar '\n'
        ]
 --  )
   where
@@ -205,7 +192,7 @@ mkInterface sw_chkr modname export_list_fns inline_env tycon_specs
 	      Just xs -> naughty_trace cl xs
 
 	bad_id id
-	  = case (maybePurelyLocalType (getIdUniType id)) of
+	  = case (maybePurelyLocalType (idType id)) of
 	      Nothing -> False
 	      Just xs -> naughty_trace id xs
 
@@ -229,8 +216,6 @@ mkInterface sw_chkr modname export_list_fns inline_env tycon_specs
 %*									*
 %************************************************************************
 
-Not handling renaming yet (ToDo)
-
 We gather up lots of (module, name) pairs for which we might print an
 import declaration.  We sort them, for the usual canonicalisation
 reasons.  NB: We {\em assume} the lists passed in don't have duplicates in
@@ -240,22 +225,21 @@ All rather horribly turgid (WDP).
 
 \begin{code}
 do_import_decls
-	:: (GlobalSwitch -> Bool)
-	-> FAST_STRING
+	:: FAST_STRING
 	-> [Id] -> [Class] -> [TyCon]
 	-> Pretty
 
-do_import_decls sw_chkr mod_name vals classes tycons
+do_import_decls mod_name vals classes tycons
   = let
-	-- Conjure up (module, name, maybe_renaming) triples for all
+	-- Conjure up (module, name) pairs for all
 	-- the potentially import-decls things:
 
 	vals_names, classes_names, tycons_names :: [(FAST_STRING, FAST_STRING, [Maybe FAST_STRING])]
-	vals_names	= map get_val_triple   vals
-	classes_names	= map get_class_triple classes
-	tycons_names	= map get_tycon_triple tycons
+	vals_names	= map get_val_pair   vals
+	classes_names	= map get_class_pair classes
+	tycons_names	= map get_tycon_pair tycons
 
-	-- sort the (module, name, renaming) triples and chop
+	-- sort the (module, name) pairs and chop
 	-- them into per-module groups:
 
 	ie_list = sortLt lt (tycons_names ++ classes_names ++ vals_names)
@@ -264,15 +248,15 @@ do_import_decls sw_chkr mod_name vals classes tycons
     in
     ppAboves (map print_a_decl per_module_groups)
   where
-    lt, same_module :: (FAST_STRING, FAST_STRING, [Maybe FAST_STRING])
-		    -> (FAST_STRING, FAST_STRING, [Maybe FAST_STRING]) -> Bool 
+    lt, same_module :: (FAST_STRING, FAST_STRING)
+		    -> (FAST_STRING, FAST_STRING) -> Bool
 
-    lt (m1, ie1, _) (m2, ie2, _)
-      = case _CMP_STRING_ m1 m2 of { LT_ -> True; EQ_ -> ie1 < ie2; GT__ -> False }
+    lt (m1, ie1, ie2)
+      = case (_CMP_STRING_ m1 m2) of { LT_ -> True; EQ_ -> ie1 < ie2; GT__ -> False }
 
     same_module (m1, _, _) (m2, _, _) = m1 == m2
-   
-    compiling_the_prelude = sw_chkr CompilingPrelude
+
+    compiling_the_prelude = opt_CompilingPrelude
 
     print_a_decl :: [(FAST_STRING, FAST_STRING, [Maybe FAST_STRING])] -> Pretty
     {-
@@ -287,18 +271,15 @@ do_import_decls sw_chkr mod_name vals classes tycons
 	try to do it as "normally" as possible.
     -}
     print_a_decl (ielist@((m,_,_) : _))
-      |  m == mod_name 
+      |  m == mod_name
       || (not compiling_the_prelude &&
 	  (m == pRELUDE_CORE || m == pRELUDE_BUILTIN))
       = ppNil
 
       | otherwise
-      = ppBesides [ppPStr SLIT("import "), ppPStr m, ppLparen, 
+      = ppBesides [ppPStr SLIT("import "), ppPStr m, ppLparen,
 		   ppIntersperse pp'SP{-'-} (map pp_str [n | (_,n,_) <- ielist]),
-		   ppRparen,
-		   case (grab_non_Nothings [rns | (_,_,rns) <- ielist]) of
-		     []	       -> ppNil
-		     renamings -> pp_renamings renamings
+		   ppRparen
 		  ]
       where
 	isnt_tycon_ish :: FAST_STRING -> Bool
@@ -313,38 +294,28 @@ do_import_decls sw_chkr mod_name vals classes tycons
 	  = if isAvarop pstr then ppStr ("("++str++")") else ppPStr pstr
 	  where
 	    str = _UNPK_ pstr
-
-	pp_renamings strs
-	  = ppBesides [ ppPStr SLIT(" renaming "), ppLparen, ppIntersperse pp'SP{-'-} (map ppPStr strs), ppRparen ]
 \end{code}
 
-Most of the huff and puff here is to ferret out renaming strings.
-
 \begin{code}
-get_val_triple   :: Id    -> (FAST_STRING, FAST_STRING, [Maybe FAST_STRING])
-get_class_triple :: Class -> (FAST_STRING, FAST_STRING, [Maybe FAST_STRING])
-get_tycon_triple :: TyCon -> (FAST_STRING, FAST_STRING, [Maybe FAST_STRING])
+get_val_pair   :: Id    -> (FAST_STRING, FAST_STRING)
+get_class_pair :: Class -> (FAST_STRING, FAST_STRING)
+get_tycon_pair :: TyCon -> (FAST_STRING, FAST_STRING)
 
-get_val_triple id
-  = case (generic_triple id) of { (a,b,rn) ->
-    (a,b,[rn]) }
+get_val_pair id
+  = generic_pair id
 
-get_class_triple clas
-  = case (generic_triple clas) of { (orig_mod, orig_nm, clas_rn) ->
+get_class_pair clas
+  = case (generic_pair clas) of { (orig_mod, orig_nm) ->
     let
 	nm_to_print = case (getExportFlag clas) of
 			ExportAll   -> orig_nm _APPEND_ SLIT("(..)") -- nothing like a good HACK!
 			ExportAbs   -> orig_nm
 			NotExported -> orig_nm
-
--- Ops don't have renaming info (bug) ToDo
---	ops	    = getClassOps clas
---	ops_rns	    = [ rn | (_,_,rn) <- map generic_triple ops ]
     in
-    (orig_mod, nm_to_print, [clas_rn]) }
+    (orig_mod, nm_to_print) }
 
-get_tycon_triple tycon
-  = case (generic_triple tycon) of { (orig_mod, orig_nm, tycon_rn) ->
+get_tycon_pair tycon
+  = case (generic_pair tycon) of { (orig_mod, orig_nm) ->
     let
 	nm_to_print = case (getExportFlag tycon) of
 			ExportAll   -> orig_nm _APPEND_ SLIT("(..)") -- nothing like a good HACK!
@@ -352,18 +323,13 @@ get_tycon_triple tycon
 			NotExported -> orig_nm
 
 	cons	    = getTyConDataCons tycon
-	cons_rns    = [ rn | (_,_,rn) <- map generic_triple cons ]
     in
-    (orig_mod, nm_to_print, tycon_rn : cons_rns) }
+    (orig_mod, nm_to_print) }
 
-generic_triple thing
+generic_pair thing
   = case (getOrigName       thing) of { (orig_mod, orig_nm) ->
     case (getOccurrenceName thing) of { occur_name ->
-    (orig_mod, orig_nm,
-     if orig_nm == occur_name
-     then Nothing
-     else Just (orig_nm _APPEND_ SLIT(" to ") _APPEND_ occur_name)
-    )}}
+    (orig_mod, orig_nm) }}
 \end{code}
 
 %************************************************************************
@@ -374,11 +340,11 @@ generic_triple thing
 
 
 \begin{code}
-do_fixity :: (GlobalSwitch -> Bool) -> RenamedFixityDecl -> Pretty
+do_fixity :: -> RenamedFixityDecl -> Pretty
 
-do_fixity sw_chkr fixity_decl
+do_fixity fixity_decl
   = case (getExportFlag (get_name fixity_decl)) of
-      ExportAll -> ppr (PprInterface sw_chkr) fixity_decl
+      ExportAll -> ppr PprInterface fixity_decl
       _	    	-> ppNil
   where
      get_name (InfixL n _) = n
@@ -393,10 +359,10 @@ do_fixity sw_chkr fixity_decl
 %************************************************************************
 
 \begin{code}
-do_tycon :: (GlobalSwitch -> Bool) -> FiniteMap TyCon [(Bool, [Maybe UniType])] -> TyCon -> Pretty
+do_tycon :: FiniteMap TyCon [(Bool, [Maybe Type])] -> TyCon -> Pretty
 
-do_tycon sw_chkr tycon_specs_map tycon
-  = pprTyCon (PprInterface sw_chkr) tycon tycon_specs
+do_tycon tycon_specs_map tycon
+  = pprTyCon PprInterface tycon tycon_specs
   where
     tycon_specs = map snd (lookupWithDefaultFM tycon_specs_map [] tycon)
 \end{code}
@@ -408,23 +374,22 @@ do_tycon sw_chkr tycon_specs_map tycon
 %************************************************************************
 
 \begin{code}
-do_value :: (GlobalSwitch -> Bool)
-	 -> (Id -> Id)
+do_value :: (Id -> Id)
 	 -> IdEnv UnfoldingDetails
 	 -> Id
 	 -> Pretty
 
-do_value sw_chkr better_id_fn inline_env val
+do_value better_id_fn inline_env val
   = let
-	sty 	    = PprInterface sw_chkr
+	sty 	    = PprInterface
 	better_val  = better_id_fn val
 	name_str    = getOccurrenceName better_val -- NB: not orig name!
 
 	id_info	    = getIdInfo better_val
 
-	val_ty	    = let 
-			 orig_ty  = getIdUniType val
-			 final_ty = getIdUniType better_val
+	val_ty	    = let
+			 orig_ty  = idType val
+			 final_ty = idType better_val
 		      in
 --		      ASSERT (orig_ty == final_ty || mkLiftTy orig_ty == final_ty)
 		      ASSERT (if (orig_ty == final_ty || mkLiftTy orig_ty == final_ty) then True else pprTrace "do_value:" (ppCat [ppr PprDebug val, ppr PprDebug better_val]) False)
@@ -437,7 +402,7 @@ do_value sw_chkr better_id_fn inline_env val
 	-- The importing module must lift the Id before using the imported id_info
 
 	pp_id_info
-	  = if sw_chkr OmitInterfacePragmas
+	  = if opt_OmitInterfacePragmas
 	    || boringIdInfo id_info
 	    then ppNil
 	    else ppCat [ppPStr SLIT("\t{-# GHC_PRAGMA"),
@@ -446,7 +411,7 @@ do_value sw_chkr better_id_fn inline_env val
 			ppPStr SLIT("#-}")]
     in
     ppAbove (ppCat [ppr_non_op name_str,
-		    ppPStr SLIT("::"), pprUniType sty val_ty])
+		    ppPStr SLIT("::"), pprType sty val_ty])
 	    pp_id_info
 
 -- sadly duplicates Outputable.pprNonOp (ToDo)
@@ -471,16 +436,15 @@ dictionary information.  (It can be reconsituted on the other end,
 from instance and class decls).
 
 \begin{code}
-do_instance :: (GlobalSwitch -> Bool)
-	    -> (Id -> Id)
+do_instance :: (Id -> Id)
 	    -> IdEnv UnfoldingDetails
 	    -> InstInfo
 	    -> Pretty
 
-do_instance sw_chkr better_id_fn inline_env
+do_instance better_id_fn inline_env
     (InstInfo clas tv_tmpls ty inst_decl_theta dfun_theta dfun_id constm_ids _ from_here modname _ _)
   = let
-	sty = PprInterface sw_chkr
+	sty = PprInterface
 
 	better_dfun 	 = better_id_fn dfun_id
 	better_dfun_info = getIdInfo better_dfun
@@ -514,11 +478,11 @@ do_instance sw_chkr better_id_fn inline_env
 	pp_the_list [p]    = p
 	pp_the_list (p:ps) = ppAbove (ppBeside p ppComma) (pp_the_list ps)
 
-	real_stuff 
+	real_stuff
 	  = ppCat [ppPStr SLIT("instance"),
 		   ppr sty (mkSigmaTy tv_tmpls inst_decl_theta (mkDictTy clas ty))]
     in
-    if sw_chkr OmitInterfacePragmas
+    if opt_OmitInterfacePragmas
     || boringIdInfo better_dfun_info
     then real_stuff
     else ppAbove real_stuff
@@ -542,12 +506,12 @@ Classes/TyCons are ``known,'' more-or-less.  Prelude TyCons are
 Classes usually don't need to be mentioned in interfaces, but if we're
 compiling the prelude, then we treat them without special favours.
 \begin{code}
-is_exportable_tycon_or_class sw_chkr export_list_fns tc
+is_exportable_tycon_or_class export_list_fns tc
   = if not (fromPreludeCore tc) then
 	True
     else
 	in_export_list_or_among_dotdot_modules
-	    (sw_chkr CompilingPrelude) -- ignore M.. stuff if compiling prelude
+	    opt_CompilingPrelude -- ignore M.. stuff if compiling prelude
 	    export_list_fns tc
 
 in_export_list_or_among_dotdot_modules ignore_Mdotdots (in_export_list, among_dotdot_modules) tc
@@ -561,8 +525,8 @@ in_export_list_or_among_dotdot_modules ignore_Mdotdots (in_export_list, among_do
 	any among_dotdot_modules (getInformingModules tc)
 --  )
 
-is_mentionable sw_chkr tc
-  = not (from_PreludeCore_or_Builtin tc) || (sw_chkr CompilingPrelude)
+is_mentionable tc
+  = not (from_PreludeCore_or_Builtin tc) || opt_CompilingPrelude
   where
     from_PreludeCore_or_Builtin thing
       = let
@@ -570,28 +534,24 @@ is_mentionable sw_chkr tc
 	in
 	mod_name == pRELUDE_CORE || mod_name == pRELUDE_BUILTIN
 
-is_exported_inst_info sw_chkr export_list_fns
+is_exported_inst_info export_list_fns
 	(InstInfo clas _ ty _ _ _ _ _ from_here _ _ _)
   = let
-	is_fun_tycon = isFunType ty
-
     	seems_exported = instanceIsExported clas ty from_here
-
-	(tycon, _, _) = getUniDataTyCon ty
+	(tycon, _, _) = getAppTyCon ty
     in
-    if (sw_chkr OmitReexportedInstances && not from_here) then
+    if (opt_OmitReexportedInstances && not from_here) then
 	False -- Flag says to violate Haskell rules, blatantly
 
-    else if not (sw_chkr CompilingPrelude)
-         || not (is_fun_tycon || fromPreludeCore tycon)
-         || not (fromPreludeCore clas) then
+    else if not opt_CompilingPrelude
+	 || not (isFunTyCon tycon || fromPreludeCore tycon)
+	 || not (fromPreludeCore clas) then
 	seems_exported -- take what we got
 
     else -- compiling Prelude & tycon/class are Prelude things...
 	from_here
 	|| in_export_list_or_among_dotdot_modules True{-ignore M..s-} export_list_fns clas
-	|| (not is_fun_tycon
-	    && in_export_list_or_among_dotdot_modules True{-ignore M..s-} export_list_fns tycon)
+	|| in_export_list_or_among_dotdot_modules True{-ignore M..s-} export_list_fns tycon
 \end{code}
 
 \begin{code}
@@ -601,7 +561,7 @@ lt_lexical_inst_info (InstInfo _ _ _ _ _ dfun1 _ _ _ _ _ _) (InstInfo _ _ _ _ _ 
 
 \begin{code}
 getMentionedTyConsAndClassesFromInstInfo (InstInfo clas _ ty _ dfun_theta _ _ _ _ _ _ _)
-  = case (getMentionedTyConsAndClassesFromUniType ty) of { (ts, cs) ->
+  = case (getMentionedTyConsAndClassesFromType ty) of { (ts, cs) ->
     case [ c | (c, _) <- dfun_theta ]  	    	      of { theta_classes ->
     (ts, (cs `unionBags` listToBag theta_classes) `snocBag` clas)
     }}

@@ -1,0 +1,10 @@
+Breaks the loop between SimplEnv and MagicUFs, by telling SimplEnv all
+it needs to know about MagicUFs (not much).
+
+\begin{code}
+interface SmplLoop where
+
+import MagicUFs (MagicUnfoldingFun )
+
+data MagicUnfoldingFun
+\end{code}

@@ -12,16 +12,16 @@
 This is exactly the same as core, except that the argument to
 application can be an arbitrary expression.
 
-> type DefProgram 		= [CoreBinding 	Id DefBindee]
-> type DefBinding 		= CoreBinding  	Id DefBindee
-> type DefExpr    		= CoreExpr     	Id DefBindee
-> type DefAtom    		= CoreAtom	DefBindee
-> type DefCaseAlternatives	= CoreCaseAlternatives Id DefBindee
-> type DefCaseDefault		= CoreCaseDefault Id DefBindee
+> type DefProgram 		= [GenCoreBinding 	Id DefBindee]
+> type DefBinding 		= GenCoreBinding  	Id DefBindee
+> type DefExpr    		= GenCoreExpr     	Id DefBindee
+> type DefAtom    		= GenCoreAtom	DefBindee
+> type DefCaseAlternatives	= GenCoreCaseAlts Id DefBindee
+> type DefCaseDefault		= GenCoreCaseDefault Id DefBindee
 
-> type DefCoreArg = CoreArg DefBindee
+> type DefCoreArg = GenCoreArg DefBindee
 
-> data DefBindee 
+> data DefBindee
 > 	= DefArgExpr DefExpr		-- arbitrary expressions as argumemts
 >	| DefArgVar  Id			-- or just ids
 >	| Label DefExpr DefExpr		-- labels for detecting cycles
@@ -44,16 +44,16 @@ invariants that will be adhered to during the transformation.  The
 following are alternative representations for certain expressions.
 The forms on the left are disallowed:
 
-CoVar (DefArgExpr e)	==  e
-CoVarAtom (Label l e)	==  CoVarAtom (DefArgExpr (CoVar (Label l e)))
+Var (DefArgExpr e)	==  e
+VarArg (Label l e)	==  VarArg (DefArgExpr (Var (Label l e)))
 
 For completeness, we should also have:
 
-CoVarAtom (DefArgVar v) == CoVarAtom (DefArgExpr (CoVar (DefArgVar v)))
-CoLitAtom l		== CoVarAtom (DefArgExpr (CoLit l))
+VarArg (DefArgVar v) == VarArg (DefArgExpr (Var (DefArgVar v)))
+LitArg l		== VarArg (DefArgExpr (Lit l))
 
-In other words, atoms must all be of the form (CoVarAtom (DefArgExpr
-_)) and the argument to a CoVar can only be Label or DefArgVar.
+In other words, atoms must all be of the form (VarArg (DefArgExpr
+_)) and the argument to a Var can only be Label or DefArgVar.
 
 > mkLabel :: DefExpr -> DefExpr -> DefExpr
-> mkLabel l e = CoVar (Label l e)
+> mkLabel l e = Var (Label l e)

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Util]{Highly random utility functions}
 
@@ -37,16 +37,15 @@ module Util (
 #endif
 	-- general list processing
 	IF_NOT_GHC(forall COMMA exists COMMA)
-	zipEqual, nOfThem, lengthExceeds, isSingleton,
+	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
+        zipLazy,
+	nOfThem, lengthExceeds, isSingleton,
 #if defined(COMPILING_GHC)
 	isIn, isn'tIn,
 #endif
 
 	-- association lists
 	assoc,
-#ifdef USE_SEMANTIQUE_STRANAL
-	clookup, clookrepl, elemIndex, (\\\),
-#endif
 
 	-- duplicate handling
 	hasNoDups, equivClasses, runs, removeDups,
@@ -64,6 +63,7 @@ module Util (
 	mapAccumL, mapAccumR, mapAccumB,
 
 	-- comparisons
+	Ord3(..), thenCmp, cmpList,
 	IF_NOT_GHC(cmpString COMMA)
 #ifdef USE_FAST_STRINGS
 	cmpPString,
@@ -77,7 +77,7 @@ module Util (
 
 	-- error handling
 #if defined(COMPILING_GHC)
-	, panic, pprPanic, pprTrace
+	, panic, panic#, pprPanic, pprPanic#, pprTrace
 # ifdef DEBUG
 	, assertPanic
 # endif
@@ -92,272 +92,16 @@ module Util (
 # endif
 #endif
 
-#ifdef USE_ATTACK_PRAGMAS
-	-- as more-or-less of a *HACK*, Util exports
-	-- many types abstractly, so that pragmas will be
-	-- able to see them (given that most modules
-	-- import Util).
-	,
-	AbstractC,
-	ArgUsage,
-	ArgUsageInfo,
-	ArithSeqInfo,
-	ArityInfo,
-	Bag,
-	BasicLit,
-	Bind,
-	BinderInfo,
-	Binds,
-	CAddrMode,
-	CExprMacro,
-	CLabel,
-	CSeq,
-	CStmtMacro,
-	CcKind,
-	Class,
-	ClassDecl,
-	ClassOp,
-	ClassOpPragmas,
-	ClassPragmas,
-	ClosureInfo,
-	ConDecl,
-	CoreArg,
-	CoreAtom,
-	CoreBinding,
-	CoreCaseAlternatives,
-	CoreCaseDefault,
-	CoreExpr,
-	CostCentre,
-	DataPragmas,
-	DataTypeSig,
-	DefaultDecl,
-	DeforestInfo,
-	Delay,
-	Demand,
-	DemandInfo,
-	DuplicationDanger,
-	EnclosingCcDetails,
-	EndOfBlockInfo,
-	ExportFlag,
-	Expr,
-	FBConsum,
-	FBProd,
-	FBType,
-	FBTypeInfo,
-	FiniteMap,
-	FixityDecl,
-	FormSummary,
-	FullName,
-	FunOrArg,
-	GRHS,
-	GRHSsAndBinds,
-	GenPragmas,
-	GlobalSwitch,
-	HeapOffset,
-	IE,
-	Id,
-	IdDetails,
-	IdEnv(..), -- UGH
-	IdInfo,
-	IdVal,
-	IfaceImportDecl,
-	ImpStrictness,
-	ImpUnfolding,
-	ImportedInterface,
-	InPat,
-	InsideSCC,
-	Inst,
-	InstDecl,
-	InstOrigin,
-	InstTemplate,
-	InstTy,
-	InstancePragmas,
-	Interface,
-	IsDupdCC, IsCafCC,
-	LambdaFormInfo,
-	Literal,
-	MagicId,
-	MagicUnfoldingFun,
-	Match,
-	Module,
-	MonoBinds,
-	MonoType,
-	Name,
-	NamedThing(..), -- SIGH
-	OptIdInfo(..), -- SIGH
-	OrdList,
-	Outputable(..), -- SIGH
-	OverloadedLit,
-	PolyType,
-	PprStyle,
-	PrimKind,
-	PrimOp,
-	ProtoName,
-	Provenance,
-	Qual,
-	RegRelative,
-	Renaming,
-	ReturnInfo,
-	SMRep,
-	SMSpecRepKind,
-	SMUpdateKind,
-	Sequel,
-	ShortName,
-	Sig,
-	SimplCount,
-	SimplEnv,
-	SimplifierSwitch,
-	SpecEnv,
-	SpecInfo,
-	SpecialisedInstanceSig,
-	SplitUniqSupply,
-	SrcLoc,
-	StableLoc,
-	StandardFormInfo,
-	StgAtom,
-	StgBinderInfo,
-	StgBinding,
-	StgCaseAlternatives,
-	StgCaseDefault,
-	StgExpr,
-	StgRhs,
-	StrictnessInfo,
-	StubFlag,
-	SwitchResult,
-	TickType,
-	TyCon,
-	TyDecl,
-	TyVar,
-	TyVarEnv(..),
-	TyVarTemplate,
-	TypePragmas,
-	TypecheckedPat,
-	UfCostCentre,
-	UfId,
-	UnfoldEnv,
-	UnfoldItem,
-	UnfoldConApp,
-	UnfoldingCoreAlts,
-	UnfoldingCoreAtom,
-	UnfoldingCoreBinding,
-	UnfoldingCoreDefault,
-	UnfoldingCoreExpr,
-	UnfoldingDetails,
-	UnfoldingGuidance,
-	UnfoldingPrimOp,
-	UniType,
-	UniqFM,
-	Unique,
-	UniqueSupply,
-	UpdateFlag,
-	UpdateInfo,
-	VolatileLoc,
-
-#if ! OMIT_NATIVE_CODEGEN
-	Reg,
-	CodeSegment,
-	RegLoc,
-	StixReg,
-	StixTree,
-#endif
-
-	getIdUniType, typeOfBasicLit, typeOfPat,
-	getIdKind, kindOfBasicLit,
-	kindFromType,
-
-	eqId, cmpId,
-	eqName, cmpName,
-	cmpProtoName, eqProtoName,
-	cmpByLocalName, eqByLocalName,
-	eqUnique, cmpUnique,
-	showUnique,
-
-	switchIsOn,
-
-	ppNil, ppStr, ppInt, ppInteger, ppDouble,
-#if __GLASGOW_HASKELL__ >= 23
-	ppRational, --- ???
-#endif
-	cNil, cStr, cAppend, cCh, cShow,
-#if __GLASGOW_HASKELL__ >= 23
-	cPStr,
-#endif
-
---	mkBlackHoleCLabel,
-
-	emptyBag, snocBag,
-	emptyFM,
---OLD:	emptySet,
-	nullSpecEnv,
-	
-	mkUnknownSrcLoc,
-	
-	pprCoreBinding, pprCoreExpr, pprTyCon, pprUniType,
-
-	tagOf_PrimOp,
-	pprPrimOp
-
-#endif {-USE_ATTACK_PRAGMAS-}
     ) where
 
 #if defined(COMPILING_GHC)
-IMPORT_Trace
+
+CHK_Ubiq() -- debugging consistency check
+
 import Pretty
 #endif
 #if __HASKELL1__ < 3
 import Maybes		( Maybe(..) )
-#endif
-
-#if defined(COMPILING_GHC)
-import Id
-import IdInfo
-import Outputable
-
-# ifdef USE_ATTACK_PRAGMAS
-
-import AbsCSyn
-import AbsSyn
-import AbsUniType
-import Bag
-import BasicLit
-import BinderInfo
-import CLabelInfo
-import CgBindery
-import CgMonad
-import CharSeq
-import ClosureInfo
-import CmdLineOpts
-import CoreSyn
-import FiniteMap
-import HsCore
-import HsPragmas
-import Inst
-import InstEnv
-import Name
-import NameTypes
-import OrdList
-import PlainCore
-import PrimOps
-import ProtoName
-import CostCentre
-import SMRep
-import SimplEnv
-import SimplMonad
-import SplitUniq
-import SrcLoc
-import StgSyn
-import TyVarEnv
-import UniqFM
-import Unique
-
-#  if ! OMIT_NATIVE_CODEGEN
-import AsmRegAlloc	( Reg )
-import MachDesc
-import Stix
-#  endif
-
-# endif {-USE_ATTACK_PRAGMAS-}
-
 #endif
 \end{code}
 
@@ -395,20 +139,48 @@ exists pred []     = False
 exists pred (x:xs) = pred x || exists pred xs
 \end{code}
 
-A paranoid @zip@ that checks the lists are of equal length.
-Alastair Reid thinks this should only happen if DEBUGging on;
-hey, why not?
+A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
+are of equal length.  Alastair Reid thinks this should only happen if
+DEBUGging on; hey, why not?
 
 \begin{code}
-zipEqual :: [a] -> [b] -> [(a,b)]
+zipEqual	:: [a] -> [b] -> [(a,b)]
+zipWithEqual	:: (a->b->c) -> [a]->[b]->[c]
+zipWith3Equal	:: (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith4Equal	:: (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
 #ifndef DEBUG
-zipEqual a b = zip a b
+zipEqual      = zip
+zipWithEqual  = zipWith
+zipWith3Equal = zipWith3
+zipWith4Equal = zipWith4
 #else
 zipEqual []     []     = []
 zipEqual (a:as) (b:bs) = (a,b) : zipEqual as bs
 zipEqual as     bs     = panic "zipEqual: unequal lists"
+
+zipWithEqual z (a:as) (b:bs)	=  z a b : zipWithEqual z as bs
+zipWithEqual _ [] []		=  []
+zipWithEqual _ _ _		=  panic "zipWithEqual: unequal lists"
+
+zipWith3Equal z (a:as) (b:bs) (c:cs)
+				=  z a b c : zipWith3Equal z as bs cs
+zipWith3Equal _ [] []  []	=  []
+zipWith3Equal _ _  _   _	=  panic "zipWith3Equal: unequal lists"
+
+zipWith4Equal z (a:as) (b:bs) (c:cs) (d:ds)
+				=  z a b c d : zipWith4Equal z as bs cs ds
+zipWith4Equal _ [] [] [] []	=  []
+zipWith4Equal _ _  _  _  _	=  panic "zipWith4Equal: unequal lists"
 #endif
+\end{code}
+
+\begin{code}
+-- zipLazy is lazy in the second list (observe the ~)
+
+zipLazy :: [a] -> [b] -> [(a,b)]
+zipLazy [] ys = []
+zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
 \end{code}
 
 \begin{code}
@@ -462,7 +234,7 @@ isn'tIn msg x ys
 # endif {- DEBUG -}
 
 # ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE isIn :: String -> BasicLit -> [BasicLit] -> Bool #-}
+{-# SPECIALIZE isIn :: String -> Literal -> [Literal] -> Bool #-}
 {-# SPECIALIZE isIn :: String -> Class -> [Class] -> Bool #-}
 {-# SPECIALIZE isIn :: String -> Id -> [Id] -> Bool #-}
 {-# SPECIALIZE isIn :: String -> Int -> [Int] -> Bool #-}
@@ -507,66 +279,13 @@ assoc crash_msg lst key
 {-# SPECIALIZE assoc :: String -> [(Id,            a)] -> Id		-> a #-}
 {-# SPECIALIZE assoc :: String -> [(Class,         a)] -> Class		-> a #-}
 {-# SPECIALIZE assoc :: String -> [(Name,          a)] -> Name		-> a #-}
-{-# SPECIALIZE assoc :: String -> [(PrimKind,      a)] -> PrimKind	-> a #-}
+{-# SPECIALIZE assoc :: String -> [(PrimRep,      a)] -> PrimRep	-> a #-}
 {-# SPECIALIZE assoc :: String -> [(String,        a)] -> String        -> a #-}
 {-# SPECIALIZE assoc :: String -> [(TyCon,         a)] -> TyCon		-> a #-}
 {-# SPECIALIZE assoc :: String -> [(TyVar,         a)] -> TyVar		-> a #-}
 {-# SPECIALIZE assoc :: String -> [(TyVarTemplate, a)] -> TyVarTemplate -> a #-}
-{-# SPECIALIZE assoc :: String -> [(UniType,       a)] -> UniType	-> a #-}
+{-# SPECIALIZE assoc :: String -> [(Type,          a)] -> Type		-> a #-}
 {-# SPECIALIZE assoc :: String -> [(_PackedString, a)] -> _PackedString -> a #-}
-# endif
-#endif
-\end{code}
-
-Given a list of associations one wants to look for the most recent
-association for a given key. A couple of functions follow that cover
-the simple lookup, the lookup with a default value when the key not
-found, and two corresponding functions operating on unzipped lists
-of associations.
-
-\begin{code}
-#ifdef USE_SEMANTIQUE_STRANAL
-
-clookup :: (Eq a) => [a] -> [b] -> a -> b
-clookup = clookupElse (panic "clookup")
-  where
-   -- clookupElse :: (Eq a) => b -> [a] -> [b] -> a -> b
-   clookupElse d [] [] a = d
-   clookupElse d (x:xs) (y:ys) a
-                | a==x = y
-                | True = clookupElse d xs ys a
-#endif
-\end{code}
-
-The following routine given a curried environment replaces the entry
-labelled with a given name with a new value given. The new value is
-given in the form of a function that allows to transform the old entry.
-
-Assumption is that the list of labels contains the given one and that
-the two lists of the curried environment are of equal lengths.
-
-\begin{code}
-#ifdef USE_SEMANTIQUE_STRANAL
-clookrepl :: Eq a => [a] -> [b] -> a -> (b -> b) -> [b]
-clookrepl (a:as) (b:bs) x f
-   = if x == a then  (f b:bs)  else  (b:clookrepl as bs x f)
-#endif
-\end{code}
-
-The following returns the index of an element in a list.
-
-\begin{code}
-#ifdef USE_SEMANTIQUE_STRANAL
-
-elemIndex :: Eq a => [a] -> a -> Int
-elemIndex as x = indx as x 0
-   where
-     indx :: Eq a => [a] -> a -> Int -> Int
-     indx (a:as) x n = if a==x then n else indx as x ((n+1)::Int)
-# if defined(COMPILING_GHC)
-     indx [] x n     = pprPanic "element not in list in elemIndex" ppNil
-# else
-     indx [] x n     = error "element not in list in elemIndex"
 # endif
 #endif
 \end{code}
@@ -577,29 +296,9 @@ elemIndex as x = indx as x 0
 %*									*
 %************************************************************************
 
-List difference (non-associative). In the result of @xs \\\ ys@, the
-first occurrence of each element of ys in turn (if any) has been
-removed from xs.  Thus, @(xs ++ ys) \\\ xs == ys@.  This function is
-a copy of @\\@ from report 1.1 and is added to overshade the buggy
-version from the 1.0 version of Haskell.
-
-This routine can be removed after the compiler bootstraps itself and
-a proper @\\@ is can be applied.
-
-\begin{code}
-#ifdef USE_SEMANTIQUE_STRANAL
-(\\\) :: (Eq a) => [a] -> [a] -> [a]
-(\\\) =  foldl del
-   where
-    []     `del` _ = []
-    (x:xs) `del` y
-	| x == y    = xs
-	| otherwise = x : xs `del` y
-#endif
-\end{code}
-
 \begin{code}
 hasNoDups :: (Eq a) => [a] -> Bool
+
 hasNoDups xs = f [] xs
   where
     f seen_so_far []     = True
@@ -622,7 +321,7 @@ hasNoDups xs = f [] xs
 
 \begin{code}
 equivClasses :: (a -> a -> TAG_) 	-- Comparison
-	     -> [a] 
+	     -> [a]
 	     -> [[a]]
 
 equivClasses cmp stuff@[]     = []
@@ -642,8 +341,8 @@ identical elements of the input list. It is passed a predicate @p@ which
 tells when two elements are equal.
 
 \begin{code}
-runs :: (a -> a -> Bool) 	-- Equality 
-     -> [a] 
+runs :: (a -> a -> Bool) 	-- Equality
+     -> [a]
      -> [[a]]
 
 runs p []     = []
@@ -718,7 +417,7 @@ qsort lt [x]    r = x:r
 qsort lt (x:xs) r = qpart lt x xs [] [] r
 
 -- qpart partitions and sorts the sublists
--- rlt contains things less than x, 
+-- rlt contains things less than x,
 -- rge contains the ones greater than or equal to x.
 -- Both have equal elements reversed with respect to the original list.
 
@@ -731,7 +430,7 @@ qpart lt x (y:ys) rlt rge r =
     if lt y x then
 	-- y < x
 	qpart lt x ys (y:rlt) rge r
-    else	
+    else
 	-- y >= x
 	qpart lt x ys rlt (y:rge) r
 
@@ -797,15 +496,15 @@ From: Carsten Kehler Holst <kehler@cs.chalmers.se>
 To: partain@dcs.gla.ac.uk
 Subject: natural merge sort beats quick sort [ and it is prettier ]
 
-Here a piece of Haskell code that I'm rather fond of. See it as an
+Here is a piece of Haskell code that I'm rather fond of. See it as an
 attempt to get rid of the ridiculous quick-sort routine. group is
 quite useful by itself I think it was John's idea originally though I
 believe the lazy version is due to me [surprisingly complicated].
 gamma [used to be called] is called gamma because I got inspired by
 the Gamma calculus. It is not very close to the calculus but does
-behave less sequentially than both foldr and foldl. One could imagine a
-version of gamma that took a unit element as well thereby avoiding the
-problem with empty lists.
+behave less sequentially than both foldr and foldl. One could imagine
+a version of gamma that took a unit element as well thereby avoiding
+the problem with empty lists.
 
 I've tried this code against
 
@@ -822,26 +521,46 @@ consumption of merge sort is a bit worse than Lennart's quick sort
 approx a factor of 2. And a lot worse if Sparud's bug-fix [see his
 fpca article ] isn't used because of group.
 
-have fun 
+have fun
 Carsten
 \end{display}
 
 \begin{code}
 group :: (a -> a -> Bool) -> [a] -> [[a]]
 
+{-
+Date: Mon, 12 Feb 1996 15:09:41 +0000
+From: Andy Gill <andy@dcs.gla.ac.uk>
+
+Here is a `better' definition of group.
+-}
+group p []     = []
+group p (x:xs) = group' xs x x (x :)
+  where
+    group' []     _     _     s  = [s []]
+    group' (x:xs) x_min x_max s 
+	| not (x `p` x_max) = group' xs x_min x (s . (x :)) 
+	| x `p` x_min       = group' xs x x_max ((x :) . s) 
+	| otherwise         = s [] : group' xs x x (x :) 
+
+-- This one works forwards *and* backwards, as well as also being
+-- faster that the one in Util.lhs.
+
+{- ORIG:
 group p [] = [[]]
-group p (x:xs) = 
+group p (x:xs) =
    let ((h1:t1):tt1) = group p xs
        (t,tt) = if null xs then ([],[]) else
-                if x `p` h1 then (h1:t1,tt1) else 
-                   ([], (h1:t1):tt1)
+		if x `p` h1 then (h1:t1,tt1) else
+		   ([], (h1:t1):tt1)
    in ((x:t):tt)
+-}
 
 generalMerge :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 generalMerge p xs [] = xs
 generalMerge p [] ys = ys
 generalMerge p (x:xs) (y:ys) | x `p` y   = x : generalMerge p xs (y:ys)
-                             | otherwise = y : generalMerge p (x:xs) ys
+			     | otherwise = y : generalMerge p (x:xs) ys
 
 -- gamma is now called balancedFold
 
@@ -880,7 +599,7 @@ This algorithm for transitive closure is straightforward, albeit quadratic.
 \begin{code}
 transitiveClosure :: (a -> [a])		-- Successor function
 		  -> (a -> a -> Bool)	-- Equality predicate
-		  -> [a] 
+		  -> [a]
 		  -> [a]		-- The transitive closure
 
 transitiveClosure succ eq xs
@@ -945,10 +664,10 @@ mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
       				-- Function of elt of input list
       				-- and accumulator, returning new
       				-- accumulator and elt of result list
-          -> accl 			-- Initial accumulator from left
-          -> accr 			-- Initial accumulator from right
-          -> [x] 			-- Input list
-          -> (accl, accr, [y])	-- Final accumulators and result list
+	  -> accl 			-- Initial accumulator from left
+	  -> accr 			-- Initial accumulator from right
+	  -> [x] 			-- Input list
+	  -> (accl, accr, [y])	-- Final accumulators and result list
 
 mapAccumB f a b []     = (a,b,[])
 mapAccumB f a b (x:xs) = (a'',b'',y:ys)
@@ -965,6 +684,46 @@ mapAccumB f a b (x:xs) = (a'',b'',y:ys)
 
 See also @tagCmp_@ near the versions-compatibility section.
 
+The Ord3 class will be subsumed into Ord in Haskell 1.3.
+
+\begin{code}
+class Ord3 a where
+  cmp :: a -> a -> TAG_
+
+thenCmp :: TAG_ -> TAG_ -> TAG_
+{-# INLINE thenCmp #-}
+thenCmp EQ_   any = any
+thenCmp other any = other
+
+cmpList :: (a -> a -> TAG_) -> [a] -> [a] -> TAG_
+    -- `cmpList' uses a user-specified comparer
+
+cmpList cmp []     [] = EQ_
+cmpList cmp []     _  = LT_
+cmpList cmp _      [] = GT_
+cmpList cmp (a:as) (b:bs)
+  = case cmp a b of { EQ_ -> cmpList cmp as bs; xxx -> xxx }
+\end{code}
+
+\begin{code}
+instance Ord3 a => Ord3 [a] where
+  cmp []     []     = EQ_
+  cmp (x:xs) []     = GT_
+  cmp []     (y:ys) = LT_
+  cmp (x:xs) (y:ys) = (x `cmp` y) `thenCmp` (xs `cmp` ys)
+
+instance Ord3 a => Ord3 (Maybe a) where
+  cmp Nothing  Nothing  = EQ_
+  cmp Nothing  (Just y) = LT_
+  cmp (Just x) Nothing  = GT_
+  cmp (Just x) (Just y) = x `cmp` y
+
+instance Ord3 Int where
+  cmp a b | a < b     = LT_
+ 	  | a > b     = GT_
+	  | otherwise = EQ_
+\end{code}
+
 \begin{code}
 cmpString :: String -> String -> TAG_
 
@@ -975,9 +734,7 @@ cmpString (x:xs) (y:ys) = if	  x == y then cmpString xs ys
 cmpString []     ys	= LT_
 cmpString xs     []	= GT_
 
-cmpString _ _ = case (panic "cmpString") of { s -> -- BUG avoidance: never get here
-		cmpString s "" -- will never get here
-		}
+cmpString _ _ = panic# "cmpString"
 \end{code}
 
 \begin{code}
@@ -1028,7 +785,7 @@ applyToSnd f (x,y) = (x,f y)
 foldPair :: (a->a->a,b->b->b) -> (a,b) -> [(a,b)] -> (a,b)
 foldPair fg ab [] = ab
 foldPair fg@(f,g) ab ((a,b):abs) = (f a u,g b v)
-                       where (u,v) = foldPair fg ab abs
+		       where (u,v) = foldPair fg ab abs
 \end{code}
 
 \begin{code}
@@ -1050,8 +807,16 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ "to glasgow-haskell-bugs@dcs.glasgow.ac.uk.\n\n" )
 
 pprPanic heading pretty_msg = panic (heading++(ppShow 80 pretty_msg))
-
 pprTrace heading pretty_msg = trace (heading++(ppShow 80 pretty_msg))
+
+-- #-versions because panic can't return an unboxed int, and that's
+-- what TAG_ is with GHC at the moment.  Ugh. (Simon)
+-- No, man -- Too Beautiful! (Will)
+
+panic# :: String -> TAG_
+panic# s = case (panic s) of () -> EQ_
+
+pprPanic# heading pretty_msg = panic# (heading++(ppShow 80 pretty_msg))
 
 # ifdef DEBUG
 assertPanic :: String -> Int -> a

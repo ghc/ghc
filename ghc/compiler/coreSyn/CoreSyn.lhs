@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CoreSyn]{A data type for the Haskell compiler midsection}
 
@@ -7,29 +7,63 @@
 #include "HsVersions.h"
 
 module CoreSyn (
-	GenCoreBinding(..), GenCoreExpr(..), GenCoreAtom(..),
-	GenCoreCaseAlternatives(..), GenCoreCaseDefault(..),
-	pprCoreBinding, pprCoreExpr,
+	GenCoreBinding(..), GenCoreExpr(..),
+	GenCoreArg(..),GenCoreBinder(..), GenCoreCaseAlts(..),
+	GenCoreCaseDefault(..),
 
-	GenCoreArg(..), applyToArgs, decomposeArgs, collectArgs,
+	bindersOf, pairsFromCoreBinds, rhssOfBind,
+
+	mkGenApp, mkValApp, mkTyApp, mkUseApp,
+	mkApp, mkCon, mkPrim,
+	mkValLam, mkTyLam, mkUseLam,
+	mkLam,
+	digForLambdas,
+	
+	collectArgs, isValArg,
+
+	mkCoLetAny, mkCoLetNoUnboxed, mkCoLetUnboxedToCase,
+	mkCoLetsAny, mkCoLetsNoUnboxed, mkCoLetsUnboxedToCase,
+	mkCoLetrecAny, mkCoLetrecNoUnboxed,
+
+	rhssOfAlts,
+
+	-- Common type instantiation...
+	CoreBinding(..),
+	CoreExpr(..),
+	CoreBinder(..),
+	CoreArg(..),
+	CoreCaseAlts(..),
+	CoreCaseDefault(..),
+
+	-- And not-so-common type instantiations...
+	TaggedCoreBinding(..),
+	TaggedCoreExpr(..),
+	TaggedCoreBinder(..),
+	TaggedCoreArg(..),
+	TaggedCoreCaseAlts(..),
+	TaggedCoreCaseDefault(..),
+
+	SimplifiableCoreBinding(..),
+	SimplifiableCoreExpr(..),
+	SimplifiableCoreBinder(..),
+	SimplifiableCoreArg(..),
+	SimplifiableCoreCaseAlts(..),
+	SimplifiableCoreCaseDefault(..)
 
 	-- and to make the interface self-sufficient ...
+
     ) where
 
-import PrelInfo		( PrimOp, PrimRep
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Type		( isPrimType, pprParendUniType, TyVar, TyCon, Type
-			)
-import Literal		( Literal )
-import Id		( getIdUniType, isBottomingId, Id
-			  IF_ATTACK_PRAGMAS(COMMA bottomIsGuaranteed)
-			)
-import Outputable
-import Pretty
+import Ubiq{-uitous-}
+
 import CostCentre	( showCostCentre, CostCentre )
-import Util
+import Id		( idType )
+import Usage		( UVar(..) )
+import Util		( panic, assertPanic )
+
+isUnboxedDataType = panic "CoreSyn.isUnboxedDataType"
+--eqId :: Id -> Id -> Bool
+eqId = panic "CoreSyn.eqId"
 \end{code}
 
 %************************************************************************
@@ -52,6 +86,25 @@ data GenCoreBinding val_bdr val_occ tyvar uvar
   | Rec		[(val_bdr, GenCoreExpr val_bdr val_occ tyvar uvar)]
 \end{code}
 
+\begin{code}
+bindersOf :: GenCoreBinding val_bdr val_occ tyvar uvar -> [val_bdr]
+
+pairsFromCoreBinds ::
+  [GenCoreBinding val_bdr val_occ tyvar uvar] ->
+  [(val_bdr, GenCoreExpr val_bdr val_occ tyvar uvar)]
+
+rhssOfBind :: GenCoreBinding val_bdr val_occ tyvar uvar -> [GenCoreExpr val_bdr val_occ tyvar uvar]
+
+bindersOf (NonRec binder _) = [binder]
+bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
+
+pairsFromCoreBinds []		       = []
+pairsFromCoreBinds ((NonRec b e) : bs) = (b,e) :  pairsFromCoreBinds bs
+pairsFromCoreBinds ((Rec  pairs) : bs) = pairs ++ pairsFromCoreBinds bs
+
+rhssOfBind (NonRec _ rhs) = [rhs]
+rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
+\end{code}
 
 %************************************************************************
 %*									*
@@ -74,22 +127,17 @@ simplifier (and by the desugarer when it knows what it's doing).  The
 desugarer sets up constructors as applications of global @Vars@s.
 
 \begin{code}
-     | Con	Id (GenType tyvar) [GenCoreArg val_occ tyvar uvar]
+     | Con	Id [GenCoreArg val_occ tyvar uvar]
 		-- Saturated constructor application:
 		-- The constructor is a function of the form:
 		--	/\ a1 -> ... /\ am -> \ b1 -> ... \ bn ->
 		-- <expr> where "/\" is a type lambda and "\" the
 		-- regular kind; there will be "m" Types and
 		-- "n" bindees in the Con args.
-		--
-		-- The type given is the result type of the application;
-		-- you can figure out the argument types from it if you want.
 
-     | Prim	PrimOp Type [GenCoreArg val_occ tyvar uvar]
+     | Prim	PrimOp [GenCoreArg val_occ tyvar uvar]
 		-- saturated primitive operation;
 		-- comment on Cons applies here, too.
-		-- The types work the same way
-		-- (PrimitiveOps may be polymorphic).
 \end{code}
 
 Ye olde abstraction and application operators.
@@ -104,10 +152,10 @@ Ye olde abstraction and application operators.
 Case expressions (\tr{case <expr> of <List of alternatives>}): there
 are really two flavours masquerading here---those for scrutinising
 {\em algebraic} types and those for {\em primitive} types.  Please see
-under @GenCoreCaseAlternatives@.
+under @GenCoreCaseAlts@.
 \begin{code}
      | Case	(GenCoreExpr val_bdr val_occ tyvar uvar)
-		(GenCoreCaseAlternatives val_bdr val_occ tyvar uvar)
+		(GenCoreCaseAlts val_bdr val_occ tyvar uvar)
 \end{code}
 
 A Core case expression \tr{case e of v -> ...} implies evaluation of
@@ -119,7 +167,7 @@ doesn't buy you much, and it is an easy way to mess up variable
 scoping.
 \begin{code}
      | Let	(GenCoreBinding val_bdr val_occ tyvar uvar)
-		(GenCoreExpr binder val_occ tyvar uvar)
+		(GenCoreExpr val_bdr val_occ tyvar uvar)
 		-- both recursive and non-.
 		-- The "GenCoreBinding" records that information
 \end{code}
@@ -133,6 +181,102 @@ transformations of which we are unaware.
 		(GenCoreExpr val_bdr val_occ tyvar uvar)    -- scc expression
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Core-constructing functions with checking}
+%*									*
+%************************************************************************
+
+When making @Lets@, we may want to take evasive action if the thing
+being bound has unboxed type. We have different variants ...
+
+@mkCoLet(s|rec)Any@ 		let-binds any binding, regardless of type
+@mkCoLet(s|rec)NoUnboxed@ 	prohibits unboxed bindings
+@mkCoLet(s)UnboxedToCase@ 	converts an unboxed binding to a case
+				(unboxed bindings in a letrec are still prohibited)
+
+\begin{code}
+mkCoLetAny :: GenCoreBinding val_bdr val_occ tyvar uvar
+	   -> GenCoreExpr    val_bdr val_occ tyvar uvar
+	   -> GenCoreExpr    val_bdr val_occ tyvar uvar
+mkCoLetsAny :: [GenCoreBinding val_bdr val_occ tyvar uvar] ->
+		GenCoreExpr val_bdr val_occ tyvar uvar ->
+		GenCoreExpr val_bdr val_occ tyvar uvar
+mkCoLetrecAny :: [(val_bdr, GenCoreExpr val_bdr val_occ tyvar uvar)]
+	      -> GenCoreExpr val_bdr val_occ tyvar uvar
+	      -> GenCoreExpr val_bdr val_occ tyvar uvar
+
+mkCoLetrecAny []    body = body
+mkCoLetrecAny binds body = Let (Rec binds) body
+
+mkCoLetsAny []    expr = expr
+mkCoLetsAny binds expr = foldr mkCoLetAny expr binds
+
+mkCoLetAny bind@(Rec binds) body = mkCoLetrecAny binds body
+mkCoLetAny bind@(NonRec binder rhs) body
+  = case body of
+      Var binder2 | binder `eqId` binder2
+	 -> rhs   -- hey, I have the rhs
+      other
+	 -> Let bind body
+\end{code}
+
+\begin{code}
+--mkCoLetNoUnboxed ::
+--  GenCoreBinding val_bdr val_occ tyvar uvar ->
+--  GenCoreExpr val_bdr val_occ tyvar uvar ->
+--  GenCoreExpr val_bdr val_occ tyvar uvar
+
+mkCoLetNoUnboxed bind@(Rec binds) body
+  = mkCoLetrecNoUnboxed binds body
+mkCoLetNoUnboxed bind@(NonRec binder rhs) body
+  = --ASSERT (not (isUnboxedDataType (idType binder)))
+    case body of
+      Var binder2 | binder `eqId` binder2
+	 -> rhs   -- hey, I have the rhs
+      other
+	 -> Let bind body
+
+mkCoLetsNoUnboxed []    expr = expr
+mkCoLetsNoUnboxed binds expr = foldr mkCoLetNoUnboxed expr binds
+
+--mkCoLetrecNoUnboxed :: [(Id, CoreExpr)]	-- bindings
+--  	            -> CoreExpr		-- body
+--		    -> CoreExpr 		-- result
+
+mkCoLetrecNoUnboxed []    body = body
+mkCoLetrecNoUnboxed binds body
+  = ASSERT (all is_boxed_bind binds)
+    Let (Rec binds) body
+  where
+    is_boxed_bind (binder, rhs)
+      = (not . isUnboxedDataType . idType) binder
+\end{code}
+
+\begin{code}
+--mkCoLetUnboxedToCase ::
+--  GenCoreBinding val_bdr val_occ tyvar uvar ->
+--  GenCoreExpr val_bdr val_occ tyvar uvar ->
+--  GenCoreExpr val_bdr val_occ tyvar uvar
+
+mkCoLetUnboxedToCase bind@(Rec binds) body
+  = mkCoLetrecNoUnboxed binds body
+mkCoLetUnboxedToCase bind@(NonRec binder rhs) body
+  = case body of
+      Var binder2 | binder `eqId` binder2
+	 -> rhs   -- hey, I have the rhs
+      other
+	 -> if (not (isUnboxedDataType (idType binder))) then
+		Let bind body		 -- boxed...
+	    else
+		Case rhs		  -- unboxed...
+	    	  (PrimAlts []
+		    (BindDefault binder body))
+
+mkCoLetsUnboxedToCase []    expr = expr
+mkCoLetsUnboxedToCase binds expr = foldr mkCoLetUnboxedToCase expr binds
+\end{code}
 
 %************************************************************************
 %*									*
@@ -157,8 +301,7 @@ Case e [ BindDefaultAlt x -> b ]
 \end{verbatim}
 
 \begin{code}
-data GenCoreCaseAlternatives val_bdr val_occ tyvar uvar
-
+data GenCoreCaseAlts val_bdr val_occ tyvar uvar
   = AlgAlts	[(Id,				-- alts: data constructor,
 		  [val_bdr],			-- constructor's parameters,
 		  GenCoreExpr val_bdr val_occ tyvar uvar)]	-- rhs.
@@ -179,300 +322,228 @@ data GenCoreCaseDefault val_bdr val_occ tyvar uvar
 						-- be used in RHS.
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[CoreSyn-arguments]{Core ``argument'' wrapper type}
-%*									*
-%************************************************************************
-
 \begin{code}
-data GenCoreAtom val_occ tyvar uvar
-  = LitAtom	Literal
-  | VarAtom	val_occ
-  | TyAtom	(GenType tyvar)
-  | UsageAtom	(Usage uvar)
+rhssOfAlts (AlgAlts alts deflt)  = rhssOfDeflt deflt ++ [rhs | (_,_,rhs) <- alts]
+rhssOfAlts (PrimAlts alts deflt) = rhssOfDeflt deflt ++ [rhs | (_,rhs)   <- alts]
 
-
-===+*** fix from here down ****===
-=================================
-
-instance Outputable bindee => Outputable (GenCoreArg bindee) where
-  ppr sty (ValArg atom) = ppr sty atom
-  ppr sty (TypeArg ty)  = ppr sty ty
+rhssOfDeflt NoDefault		= []
+rhssOfDeflt (BindDefault _ rhs) = [rhs]
 \end{code}
 
-\begin{code}
-applyToArgs :: GenCoreExpr val_bdr bindee
-	    -> [GenCoreArg bindee]
-	    -> GenCoreExpr val_bdr bindee
+%************************************************************************
+%*									*
+\subsection{Core binders}
+%*									*
+%************************************************************************
 
-applyToArgs fun []		    = fun
-applyToArgs fun (ValArg val : args) = applyToArgs (App  fun val) args
-applyToArgs fun (TypeArg ty : args) = applyToArgs (CoTyApp fun ty) args
+\begin{code}
+data GenCoreBinder val_bdr tyvar uvar
+  = ValBinder	val_bdr
+  | TyBinder	tyvar
+  | UsageBinder	uvar
 \end{code}
 
-@decomposeArgs@ just pulls of the contiguous TypeArg-then-ValArg block
-on the front of the args.  Pretty common.
+Clump Lams together if possible.
 
 \begin{code}
-decomposeArgs :: [GenCoreArg bindee]
-	      -> ([Type], [GenCoreAtom bindee], [GenCoreArg bindee])
+mkValLam :: [val_bdr]
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkTyLam  :: [tyvar]
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkUseLam :: [uvar]
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
 
-decomposeArgs [] = ([],[],[])
+mkValLam binders body = foldr (Lam . ValBinder)   body binders
+mkTyLam  binders body = foldr (Lam . TyBinder)    body binders
+mkUseLam binders body = foldr (Lam . UsageBinder) body binders
 
-decomposeArgs (TypeArg ty : args)
-  = case (decomposeArgs args) of { (tys, vals, rest) ->
-    (ty:tys, vals, rest) }
+mkLam :: [tyvar] -> [val_bdr] -- ToDo: could add a [uvar] arg...
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
 
-decomposeArgs (ValArg val : args)
-  = case (do_vals args) of { (vals, rest) ->
-    ([], val:vals, rest) }
+mkLam tyvars valvars body
+  = mkTyLam tyvars (mkValLam valvars body)
+\end{code}
+
+We often want to strip off leading lambdas before getting down to
+business.  @digForLambdas@ is your friend.
+
+We expect (by convention) usage-, type-, and value- lambdas in that
+order.
+
+\begin{code}
+digForLambdas ::
+  GenCoreExpr val_bdr val_occ tyvar uvar ->
+  ([uvar], [tyvar], [val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
+
+digForLambdas (Lam (UsageBinder u) body)
+  = let
+	(uvars, tyvars, args, final_body) = digForLambdas body
+    in
+    (u:uvars, tyvars, args, final_body)
+
+digForLambdas other
+  = let
+	(tyvars, args, body) = dig_for_tyvars other
+    in
+    ([], tyvars, args, body)
   where
-    do_vals (ValArg val : args)
-      = case (do_vals args) of { (vals, rest) ->
-    	(val:vals, rest) }
+    dig_for_tyvars (Lam (TyBinder tv) body)
+      = let
+	    (tyvars, args, body2) = dig_for_tyvars body
+	in
+	(tv : tyvars, args, body2)
 
-    do_vals args = ([], args)
+    dig_for_tyvars body
+      = ASSERT(not (usage_lambda body))
+	let
+	    (args, body2) = dig_for_valvars body
+	in
+	([], args, body2)
+
+    ---------------------------------------
+    dig_for_valvars (Lam (ValBinder v) body)
+      = let
+	    (args, body2) = dig_for_valvars body
+	in
+	(v : args, body2)
+
+    dig_for_valvars body
+      = ASSERT(not (usage_lambda body))
+	ASSERT(not (tyvar_lambda body))
+	([], body)
+
+    ---------------------------------------
+    usage_lambda (Lam (UsageBinder _) _) = True
+    usage_lambda _			 = False
+
+    tyvar_lambda (Lam (TyBinder _) _)    = True
+    tyvar_lambda _			 = False
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Core arguments (atoms)}
+%*									*
+%************************************************************************
+
+\begin{code}
+data GenCoreArg val_occ tyvar uvar
+  = LitArg	Literal
+  | VarArg	val_occ
+  | TyArg	(GenType tyvar uvar)
+  | UsageArg	(GenUsage uvar)
+\end{code}
+
+General and specific forms:
+\begin{code}
+mkGenApp :: GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> [GenCoreArg val_occ tyvar uvar]
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkTyApp  :: GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> [GenType tyvar uvar]
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkUseApp :: GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> [GenUsage uvar]
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+mkValApp :: GenCoreExpr val_bdr val_occ tyvar uvar
+	 -> [GenCoreArg val_occ tyvar uvar] -- but we ASSERT they are LitArg or VarArg
+	 -> GenCoreExpr val_bdr val_occ tyvar uvar
+
+mkGenApp f args = foldl App		  		   f args
+mkTyApp  f args = foldl (\ e a -> App e (TyArg a))	   f args
+mkUseApp f args = foldl (\ e a -> App e (UsageArg a))	   f args
+mkValApp f args = foldl (\ e a -> App e (is_Lit_or_Var a)) f args
+
+#ifndef DEBUG
+is_Lit_or_Var a = a
+#else
+is_Lit_or_Var a
+  = if isValArg a then a else panic "CoreSyn.mkValApps:not LitArg or VarArg"
+#endif
+
+isValArg (LitArg _) = True  -- often used for sanity-checking
+isValArg (VarArg _) = True
+isValArg _	    = False
+\end{code}
+
+\begin{code}
+mkApp  fun = mk_thing (mkGenApp fun)
+mkCon  con = mk_thing (Con      con)
+mkPrim op  = mk_thing (Prim     op)
+
+mk_thing thing uses tys vals
+  = thing (map UsageArg uses ++ map TyArg tys ++ map is_Lit_or_Var vals)
 \end{code}
 
 @collectArgs@ takes an application expression, returning the function
 and the arguments to which it is applied.
 
 \begin{code}
-collectArgs :: GenCoreExpr val_bdr bindee
-	    -> (GenCoreExpr val_bdr bindee, [GenCoreArg bindee])
+collectArgs :: GenCoreExpr val_bdr val_occ tyvar uvar
+	    -> (GenCoreExpr val_bdr val_occ tyvar uvar,
+	        [GenCoreArg val_occ tyvar uvar])
 
 collectArgs expr
   = collect expr []
   where
-    collect (App fun arg)  args = collect fun (ValArg arg : args)
-    collect (CoTyApp fun ty) args = collect fun (TypeArg ty : args)
-    collect other_expr args 	  = (other_expr, args)
+    collect (App fun arg) args = collect fun (arg : args)
+    collect fun		  args = (fun, args)
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[CoreSyn-output]{Instance declarations for output}
+\subsection{The main @Core*@ instantiation of the @GenCore*@ types}
 %*									*
 %************************************************************************
 
-@pprCoreBinding@ and @pprCoreExpr@ let you give special printing
-function for ``major'' val_bdrs (those next to equal signs :-),
-``minor'' ones (lambda-bound, case-bound), and bindees.  They would
-usually be called through some intermediary.
-
 \begin{code}
-pprCoreBinding
-	:: PprStyle
-	-> (PprStyle -> bndr -> Pretty)	-- to print "major" val_bdrs
-	-> (PprStyle -> bndr -> Pretty) -- to print "minor" val_bdrs
-	-> (PprStyle -> bdee -> Pretty) -- to print bindees
-	-> GenCoreBinding bndr bdee
-	-> Pretty
+type CoreBinding = GenCoreBinding  Id Id TyVar UVar
+type CoreExpr    = GenCoreExpr     Id Id TyVar UVar
+type CoreBinder	 = GenCoreBinder   Id    TyVar UVar
+type CoreArg     = GenCoreArg         Id TyVar UVar
 
-pprCoreBinding sty pbdr1 pbdr2 pbdee (NonRec val_bdr expr)
-  = ppHang (ppCat [pbdr1 sty val_bdr, ppEquals])
-	 4 (pprCoreExpr sty pbdr1 pbdr2 pbdee expr)
-
-pprCoreBinding sty pbdr1 pbdr2 pbdee (Rec binds)
-  = ppAboves [ifPprDebug sty (ppStr "{- Rec -}"),
-	      ppAboves (map ppr_bind binds),
-	      ifPprDebug sty (ppStr "{- end Rec -}")]
-  where
-    ppr_bind (val_bdr, expr)
-      = ppHang (ppCat [pbdr1 sty val_bdr, ppEquals])
-	     4 (pprCoreExpr sty pbdr1 pbdr2 pbdee expr)
+type CoreCaseAlts    = GenCoreCaseAlts    Id Id TyVar UVar
+type CoreCaseDefault = GenCoreCaseDefault Id Id TyVar UVar
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{The @TaggedCore*@ instantiation of the @GenCore*@ types}
+%*									*
+%************************************************************************
+
+Binders are ``tagged'' with a \tr{t}:
 \begin{code}
-instance (Outputable bndr, Outputable bdee)
-		=> Outputable (GenCoreBinding bndr bdee) where
-    ppr sty bind = pprCoreBinding sty ppr ppr ppr bind
+type Tagged t = (Id, t)
 
-instance (Outputable bndr, Outputable bdee)
-		=> Outputable (GenCoreExpr bndr bdee) where
-    ppr sty expr = pprCoreExpr sty ppr ppr ppr expr
+type TaggedCoreBinding t = GenCoreBinding (Tagged t) Id TyVar UVar
+type TaggedCoreExpr    t = GenCoreExpr    (Tagged t) Id TyVar UVar
+type TaggedCoreBinder  t = GenCoreBinder  (Tagged t)    TyVar UVar
+type TaggedCoreArg     t = GenCoreArg                Id TyVar UVar
 
-instance Outputable bdee => Outputable (GenCoreAtom bdee) where
-    ppr sty atom = pprCoreAtom sty ppr atom
+type TaggedCoreCaseAlts    t = GenCoreCaseAlts    (Tagged t) Id TyVar UVar
+type TaggedCoreCaseDefault t = GenCoreCaseDefault (Tagged t) Id TyVar UVar
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{The @SimplifiableCore*@ instantiation of the @GenCore*@ types}
+%*									*
+%************************************************************************
+
+Binders are tagged with @BinderInfo@:
 \begin{code}
-pprCoreAtom
-	:: PprStyle
-	-> (PprStyle -> bdee -> Pretty) -- to print bindees
-	-> GenCoreAtom bdee
-	-> Pretty
+type Simplifiable = (Id, BinderInfo)
 
-pprCoreAtom sty pbdee (LitAtom lit) = ppr sty lit
-pprCoreAtom sty pbdee (VarAtom v)   = pbdee sty v
-\end{code}
+type SimplifiableCoreBinding = GenCoreBinding Simplifiable Id TyVar UVar
+type SimplifiableCoreExpr    = GenCoreExpr    Simplifiable Id TyVar UVar
+type SimplifiableCoreBinder  = GenCoreBinder  Simplifiable    TyVar UVar
+type SimplifiableCoreArg     = GenCoreArg                  Id TyVar UVar
 
-\begin{code}
-pprCoreExpr, pprParendCoreExpr
-	:: PprStyle
-	-> (PprStyle -> bndr -> Pretty)	-- to print "major" val_bdrs
-	-> (PprStyle -> bndr -> Pretty) -- to print "minor" val_bdrs
-	-> (PprStyle -> bdee -> Pretty) -- to print bindees
-	-> GenCoreExpr bndr bdee
-	-> Pretty
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Var name) = pbdee sty name
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Lit literal) = ppr sty literal
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Con con [] []) = ppr sty con
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Con con types args)
-  = ppHang (ppBesides [ppr sty con, ppChar '!'])
-	 4 (ppSep (  (map (pprParendUniType sty) types)
-		  ++ (map (pprCoreAtom sty pbdee) args)))
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Prim prim tys args)
-  = ppHang (ppBesides [ppr sty prim, ppChar '!'])
-	 4 (ppSep (  (map (pprParendUniType sty) tys)
-		  ++ (map (pprCoreAtom sty pbdee) args) ))
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Lam val_bdr expr)
-  = ppHang (ppCat [ppStr "\\", pbdr2 sty val_bdr, ppStr "->"])
-	 4 (pprCoreExpr sty pbdr1 pbdr2 pbdee expr)
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (CoTyLam tyvar expr)
-  = ppHang (ppCat [ppStr "/\\", interppSP sty (tyvar:tyvars),
-		   ppStr "->", pp_varss var_lists])
-	   4 (pprCoreExpr sty pbdr1 pbdr2 pbdee expr_after)
-  where
-    (tyvars, var_lists, expr_after) = collect_tyvars expr
-
-    collect_tyvars (CoTyLam tyv e) = ( tyv:tyvs, vs, e_after )
-      where (tyvs, vs, e_after) = collect_tyvars e
-    collect_tyvars e@(Lam _ _)   = ( [], vss, e_after )
-      where (vss, e_after) = collect_vars e
-    collect_tyvars other_e	   = ( [], [], other_e )
-
-    collect_vars (Lam var e) = ([var]:varss, e_after)
-      where (varss, e_after) = collect_vars e
-    collect_vars other_e	   = ( [], other_e )
-
-    pp_varss [] = ppNil
-    pp_varss (vars:varss)
-      = ppCat [ppStr "\\", ppInterleave ppSP (map (pbdr2 sty) vars),
-	       ppStr "->", pp_varss varss]
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee expr@(App fun_expr atom)
-  = let
-	(fun, args) = collect_args expr []
-    in
-    ppHang (pprParendCoreExpr sty pbdr1 pbdr2 pbdee fun)
-	 4 (ppSep (map (pprCoreAtom sty pbdee) args))
-  where
-    collect_args (App fun arg) args = collect_args fun (arg:args)
-    collect_args fun		 args = (fun, args)
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (CoTyApp expr ty)
-  = ppHang (ppBeside pp_note (pprParendCoreExpr sty pbdr1 pbdr2 pbdee expr))
-	 4 (pprParendUniType sty ty)
-  where
-    pp_note = ifPprShowAll sty (ppStr "{-CoTyApp-} ")
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Case expr alts)
-  = ppSep [ppSep [ppStr "case", ppNest 4 (pprParendCoreExpr sty pbdr1 pbdr2 pbdee expr),
-		     ppStr "of {"],
-	   ppNest 2 (pprCoreCaseAlts sty pbdr1 pbdr2 pbdee alts),
-	   ppStr "}"]
-
--- special cases: let ... in let ...
--- ("disgusting" SLPJ)
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
-  = ppAboves [
-      ppCat [ppStr "let {", pbdr1 sty val_bdr, ppEquals],
-      ppNest 2 (pprCoreExpr sty pbdr1 pbdr2 pbdee rhs),
-      ppStr "} in",
-      pprCoreExpr sty pbdr1 pbdr2 pbdee body ]
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
-  = ppAbove
-      (ppHang (ppStr "let {")
-	    2 (ppCat [ppHang (ppCat [pbdr1 sty val_bdr, ppEquals])
-			   4 (pprCoreExpr sty pbdr1 pbdr2 pbdee rhs),
-       ppStr "} in"]))
-      (pprCoreExpr sty pbdr1 pbdr2 pbdee expr)
-
--- general case (recursive case, too)
-pprCoreExpr sty pbdr1 pbdr2 pbdee (Let bind expr)
-  = ppSep [ppHang (ppStr "let {") 2 (pprCoreBinding sty pbdr1 pbdr2 pbdee bind),
-	   ppHang (ppStr "} in ") 2 (pprCoreExpr    sty pbdr1 pbdr2 pbdee expr)]
-
-pprCoreExpr sty pbdr1 pbdr2 pbdee (SCC cc expr)
-  = ppSep [ ppCat [ppStr "_scc_", ppStr (showCostCentre sty True{-as string-} cc)],
-	    pprParendCoreExpr sty pbdr1 pbdr2 pbdee expr ]
-\end{code}
-
-\begin{code}
-pprParendCoreExpr sty pbdr1 pbdr2 pbdee e@(Var _) = pprCoreExpr sty pbdr1 pbdr2 pbdee e
-pprParendCoreExpr sty pbdr1 pbdr2 pbdee e@(Lit _) = pprCoreExpr sty pbdr1 pbdr2 pbdee e
-pprParendCoreExpr sty pbdr1 pbdr2 pbdee other_e
-  = ppBesides [ppLparen, pprCoreExpr sty pbdr1 pbdr2 pbdee other_e, ppRparen]
-\end{code}
-
-\begin{code}
-instance (Outputable bndr, Outputable bdee)
-		=> Outputable (GenCoreCaseAlternatives bndr bdee) where
-    ppr sty alts = pprCoreCaseAlts sty ppr ppr ppr alts
-\end{code}
-
-\begin{code}
-pprCoreCaseAlts
-	:: PprStyle
-	-> (PprStyle -> bndr -> Pretty)	-- to print "major" val_bdrs
-	-> (PprStyle -> bndr -> Pretty) -- to print "minor" val_bdrs
-	-> (PprStyle -> bdee -> Pretty) -- to print bindees
-	-> GenCoreCaseAlternatives bndr bdee
-	-> Pretty
-
-pprCoreCaseAlts sty pbdr1 pbdr2 pbdee (AlgAlts alts deflt)
-  = ppAboves [ ppAboves (map ppr_alt alts),
-	       pprCoreCaseDefault sty pbdr1 pbdr2 pbdee deflt ]
-  where
-    ppr_alt (con, params, expr)
-      = ppHang (ppCat [ppr_con con,
-		       ppInterleave ppSP (map (pbdr2 sty) params),
-		       ppStr "->"])
-		4 (pprCoreExpr sty pbdr1 pbdr2 pbdee expr)
-      where
-    	ppr_con con
-    	  = if isOpLexeme con
-	    then ppBesides [ppLparen, ppr sty con, ppRparen]
-	    else ppr sty con
-
-pprCoreCaseAlts sty pbdr1 pbdr2 pbdee (PrimAlts alts deflt)
-  = ppAboves [ ppAboves (map ppr_alt alts),
-	       pprCoreCaseDefault sty pbdr1 pbdr2 pbdee deflt ]
-  where
-    ppr_alt (lit, expr)
-      = ppHang (ppCat [ppr sty lit, ppStr "->"])
-	     4 (pprCoreExpr sty pbdr1 pbdr2 pbdee expr)
-\end{code}
-
-\begin{code}
-instance (Outputable bndr, Outputable bdee)
-		=> Outputable (GenCoreCaseDefault bndr bdee) where
-    ppr sty deflt  = pprCoreCaseDefault sty ppr ppr ppr deflt
-\end{code}
-
-\begin{code}
-pprCoreCaseDefault
-	:: PprStyle
-	-> (PprStyle -> bndr -> Pretty)	-- to print "major" val_bdrs
-	-> (PprStyle -> bndr -> Pretty) -- to print "minor" val_bdrs
-	-> (PprStyle -> bdee -> Pretty) -- to print bindees
-	-> GenCoreCaseDefault bndr bdee
-	-> Pretty
-
-pprCoreCaseDefault sty pbdr1 pbdr2 pbdee NoDefault = ppNil
-
-pprCoreCaseDefault sty pbdr1 pbdr2 pbdee (BindDefault val_bdr expr)
-  = ppHang (ppCat [pbdr2 sty val_bdr, ppStr "->"])
-	 4 (pprCoreExpr sty pbdr1 pbdr2 pbdee expr)
+type SimplifiableCoreCaseAlts    = GenCoreCaseAlts    Simplifiable Id TyVar UVar
+type SimplifiableCoreCaseDefault = GenCoreCaseDefault Simplifiable Id TyVar UVar
 \end{code}

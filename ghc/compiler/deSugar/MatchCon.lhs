@@ -1,42 +1,30 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[MatchCon]{Pattern-matching constructors}
 
 \begin{code}
 #include "HsVersions.h"
 
-module MatchCon (
-    matchConFamily
-) where
+module MatchCon ( matchConFamily ) where
 
-import AbsSyn		-- the stuff being desugared
-import PlainCore	-- the output of desugaring;
-			-- importing this module also gets all the
-			-- CoreSyn utility functions
-import DsMonad		-- the monadery used in the desugarer
+import Ubiq
+import DsLoop		( match )	-- break match-ish loop
 
-import AbsUniType	( mkTyVarTy, splitType, TyVar, TyVarTemplate,
-			  getTyConDataCons,
-			  instantiateTauTy, TyCon, Class, UniType,
-			  TauType(..), InstTyEnv(..)
-			  IF_ATTACK_PRAGMAS(COMMA instantiateTy)
-			)
+import HsSyn		( OutPat(..), HsLit, HsExpr )
+import DsHsSyn		( outPatType )
+
+import DsMonad
 import DsUtils
-import Id		( eqId, getInstantiatedDataConSig,
-			  getIdUniType, isDataCon, DataCon(..)
-			)
-import Maybes		( Maybe(..) )
-import Match		( match )
-import Util
-\end{code}
 
-\subsection[matchConFamily]{Making alternatives for a constructor family}
+import Id		( isDataCon, GenId{-instances-} )
+import Util		( panic, assertPanic )
+\end{code}
 
 We are confronted with the first column of patterns in a set of
 equations, all beginning with constructors from one ``family'' (e.g.,
 @[]@ and @:@ make up the @List@ ``family'').  We want to generate the
-alternatives for a @CoCase@ expression.  There are several choices:
+alternatives for a @Case@ expression.  There are several choices:
 \begin{enumerate}
 \item
 Generate an alternative for every constructor in the family, whether
@@ -44,13 +32,12 @@ they are used in this set of equations or not; this is what the Wadler
 chapter does.
 \begin{description}
 \item[Advantages:]
-(a)~Simple.  (b)~It may also be that large sparsely-used constructor families are mainly
-handled by the code for literals.
+(a)~Simple.  (b)~It may also be that large sparsely-used constructor
+families are mainly handled by the code for literals.
 \item[Disadvantages:]
-(a)~Not practical for large sparsely-used constructor families, e.g., the
-ASCII character set.  (b)~Have to look up (in the TDE environment) a
-list of what constructors make up the whole family.  So far, this is
-the only part of desugaring that needs information from the environments.
+(a)~Not practical for large sparsely-used constructor families, e.g.,
+the ASCII character set.  (b)~Have to look up a list of what
+constructors make up the whole family.
 \end{description}
 
 \item
@@ -77,12 +64,12 @@ which should be amenable to optimisation.  Tuples are a common example.
 \end{description}
 \end{enumerate}
 
-We are implementing the ``do-it-right'' option for now.
-The arguments to @matchConFamily@ are the same as to @match@; the extra
-@Int@ returned is the number of constructors in the family.
+We are implementing the ``do-it-right'' option for now.  The arguments
+to @matchConFamily@ are the same as to @match@; the extra @Int@
+returned is the number of constructors in the family.
 
 The function @matchConFamily@ is concerned with this
-have-we-used-all-the-constructors question; the local function
+have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
 \begin{code}
 matchConFamily :: [Id]
@@ -95,8 +82,9 @@ matchConFamily (var:vars) eqns_info shadows
     mkCoAlgCaseMatchResult var alts
 \end{code}
 
-And here is the local function that does all the work.  It is more-or-less the
-@matchCon@/@matchClause@ functions on page~94 in Wadler's chapter in SLPJ.
+And here is the local function that does all the work.  It is
+more-or-less the @matchCon@/@matchClause@ functions on page~94 in
+Wadler's chapter in SLPJ.
 \begin{code}
 match_cons_used _ [{- no more eqns -}] _ = returnDs []
 
@@ -114,8 +102,8 @@ match_cons_used vars eqns_info@(EqnInfo (ConPat data_con _ arg_pats : ps1) _ : e
     selectMatchVars arg_pats						`thenDs` \ new_vars ->
 
     -- Now do the business to make the alt for _this_ ConPat ...
-    match (new_vars++vars) 
-	  (map shift_con_pat eqns_for_this_con)	
+    match (new_vars++vars)
+	  (map shift_con_pat eqns_for_this_con)
 	  (map shift_con_pat shadows_for_this_con)			`thenDs` \ match_result ->
 
     returnDs (
@@ -125,13 +113,13 @@ match_cons_used vars eqns_info@(EqnInfo (ConPat data_con _ arg_pats : ps1) _ : e
   where
     splitByCon :: [EquationInfo] -> ([EquationInfo], [EquationInfo])
     splitByCon [] = ([],[])
-    splitByCon (info@(EqnInfo (pat : _) _) : rest) 
+    splitByCon (info@(EqnInfo (pat : _) _) : rest)
 	= case pat of
-		ConPat n _ _ | n `eqId` data_con -> (info:rest_yes, rest_no)
-		WildPat _			 -> (info:rest_yes, info:rest_no)
-			-- WildPats will be in the shadows only, 
+		ConPat n _ _ | n == data_con -> (info:rest_yes, rest_no)
+		WildPat _		     -> (info:rest_yes, info:rest_no)
+			-- WildPats will be in the shadows only,
 			-- and they go into both groups
-		other_pat			 -> (rest_yes,      info:rest_no)
+		other_pat		     -> (rest_yes,      info:rest_no)
 	where
 	  (rest_yes, rest_no) = splitByCon rest
 
@@ -139,7 +127,7 @@ match_cons_used vars eqns_info@(EqnInfo (ConPat data_con _ arg_pats : ps1) _ : e
     shift_con_pat (EqnInfo (ConPat _ _ pats': pats) match_result)
       = EqnInfo (pats' ++ pats) match_result
     shift_con_pat (EqnInfo (WildPat _: pats) match_result)	-- Will only happen in shadow
-      = EqnInfo ([WildPat (typeOfPat arg_pat) | arg_pat <- arg_pats] ++ pats) match_result
+      = EqnInfo ([WildPat (outPatType arg_pat) | arg_pat <- arg_pats] ++ pats) match_result
     shift_con_pat other = panic "matchConFamily:match_cons_used:shift_con_pat"
 \end{code}
 

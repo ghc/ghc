@@ -1,18 +1,26 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Digraph]{An implementation of directed graphs}
 
 \begin{code}
+#include "HsVersions.h"
+
 module Digraph (
 	 stronglyConnComp,
---OLD:	 whichCycle, -- MOVED: isCyclic,
 	 topologicalSort,
-	 dfs, -- deforester
-	 MaybeErr
+	 dfs,
+	 MaybeErr,
+
+	 -- alternative interface
+	 findSCCs, SCC(..), Bag
     ) where
 
-import Maybes		( MaybeErr(..) )
+CHK_Ubiq() -- debugging consistency check
+
+import Maybes		( Maybe, MaybeErr(..), maybeToBool )
+import Bag		( Bag, filterBag, bagToList, listToBag )
+import FiniteMap	( FiniteMap, listToFM, lookupFM, lookupWithDefaultFM )
 import Util
 \end{code}
 
@@ -42,12 +50,12 @@ stronglyConnComp :: (vertex->vertex->Bool) -> [Edge vertex] -> [vertex] -> [[ver
 stronglyConnComp eq edges vertices
   = snd (span_tree (new_range reversed_edges)
 		    ([],[])
-                   ( snd (dfs (new_range edges) ([],[]) vertices) )
+		   ( snd (dfs (new_range edges) ([],[]) vertices) )
 	)
   where
     reversed_edges = map swap edges
 
-    swap (x,y) = (y, x)
+    swap (x,y) = (y,x)
 
     -- new_range :: Eq v => [Edge v] -> v -> [v]
 
@@ -61,20 +69,20 @@ stronglyConnComp eq edges vertices
     elem x (y:ys) = x `eq` y || x `elem` ys
 
 {-  span_tree :: Eq v => (v -> [v])
-		       -> ([v], [[v]])
-		       -> [v]
-		       -> ([v], [[v]])
+		      -> ([v], [[v]])
+		      -> [v]
+		      -> ([v], [[v]])
 -}
     span_tree r (vs,ns) []   = (vs,ns)
     span_tree r (vs,ns) (x:xs)
 	 | x `elem` vs = span_tree r (vs,ns) xs
 	 | True	       = case (dfs r (x:vs,[]) (r x)) of { (vs',ns') ->
 			 span_tree r (vs',(x:ns'):ns) xs }
-	     
+
 {-  dfs :: Eq v => (v -> [v])
-		 -> ([v], [v])
-		 -> [v]
-		 -> ([v], [v])
+		-> ([v], [v])
+		-> [v]
+		-> ([v], [v])
 -}
     dfs r (vs,ns)   []   = (vs,ns)
     dfs r (vs,ns) (x:xs) | x `elem` vs = dfs r (vs,ns) xs
@@ -90,41 +98,56 @@ dfs :: (v -> v -> Bool)
     -> ([v], [v])
 
 dfs eq r (vs,ns)   []   = (vs,ns)
-dfs eq r (vs,ns) (x:xs) 
+dfs eq r (vs,ns) (x:xs)
     	| any (eq x) vs = dfs eq r (vs,ns) xs
-	| True          = case (dfs eq r (x:vs,[]) (r x)) of 
+	| True          = case (dfs eq r (x:vs,[]) (r x)) of
 				(vs',ns') -> dfs eq r (vs',(x:ns')++ns) xs
-
 \end{code}
-  
-
-@isCyclic@ expects to be applied to an element of the result of a
-stronglyConnComp; it tells whether such an element is a cycle.  The
-answer is True if it is not a singleton, of course, but if it is a
-singleton we have to look up in the edges to see if it refers to
-itself.
 
 \begin{code}
-{- MOVED TO POINT OF SINGLE USE: RenameBinds4 (WDP 95/02)
+findSCCs :: Ord key
+	 => (vertex -> (key, Bag key))	-- Give key of vertex, and keys of thing's
+					-- immediate neighbours.  It's ok for the
+					-- list to contain keys which don't correspond
+					-- to any vertex; they are ignored.
+	 -> Bag vertex		-- Stuff to be SCC'd
+	 -> [SCC vertex]	-- The union of all these is the original bag
 
-isCyclic :: Eq vertex => [Edge vertex] -> [vertex] -> Bool
+data SCC thing = AcyclicSCC thing
+	       | CyclicSCC  (Bag thing)
 
-isCyclic edges [] = panic "isCyclic: empty component"
-isCyclic edges [v] = (v,v) `is_elem` edges where { is_elem = isIn "isCyclic" }
-isCyclic edges vs = True
--}
+findSCCs v_info vs
+  = let
+        (keys, keys_of, edgess) = unzip3 (map do_vertex (bagToList vs))
+	key_map = listToFM keys_of
+	edges   = concat edgess
+
+	do_vertex v = (k, (k, (v, ok_ns)), ok_edges)
+	  where
+	    (k, ns)  = v_info v
+	    ok_ns    = filter key_in_graph (bagToList ns)
+	    ok_edges = map (\n->(k,n)) ok_ns
+
+	key_in_graph n = maybeToBool (lookupFM key_map n)
+
+	the_sccs = stronglyConnComp (==) edges keys 
+
+	cnv_sccs = map cnv_scc the_sccs 
+
+	cnv_scc []  = panic "findSCCs: empty component"
+	cnv_scc [k] | singlecycle k
+		    = AcyclicSCC (get_vertex k)
+        cnv_scc ks  = CyclicSCC (listToBag (map get_vertex ks))
+
+	singlecycle k = not (isIn "cycle" k (get_neighs k))
+
+	get_vertex k = fst (lookupWithDefaultFM key_map vpanic k)
+	get_neighs k = snd (lookupWithDefaultFM key_map vpanic k)
+
+	vpanic = panic "Digraph: vertix not found from key"
+    in
+    cnv_sccs
 \end{code}
-
-OLD: The following @whichCycle@ should be called only when the given
-@vertex@ is known to be in one of the cycles. This isn't difficult to
-achieve if the call follows the creation of the list of components by
-@cycles@ (NB: strictness analyser) with all vertices of interest in
-them.
-
->{- UNUSED:
->whichCycle :: Eq vertex => [Cycle vertex] -> vertex -> (Cycle vertex)
->whichCycle vss v = head [vs | vs <-vss, v `is_elem` vs] where { is_elem = isIn "whichCycle" }
->-}
 
 %************************************************************************
 %*									*

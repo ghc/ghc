@@ -8,21 +8,28 @@
 
 module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
+import Ubiq
+import DsLoop		-- break dsExpr/dsBinds-ish loop
 
-import AbsSyn		-- the stuff being desugared
-import PlainCore	-- the output of desugaring;
-			-- importing this module also gets all the
-			-- CoreSyn utility functions
-import DsMonad		-- the monadery used in the desugarer
+import HsSyn		( GRHSsAndBinds(..), GRHS(..),
+			  HsExpr, HsBinds )
+import TcHsSyn		( TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
+			  TypecheckedPat(..), TypecheckedHsBinds(..),
+			  TypecheckedHsExpr(..)	)
+import CoreSyn		( CoreBinding(..), CoreExpr(..) )
 
-import AbsPrel		( stringTy
-			  IF_ATTACK_PRAGMAS(COMMA mkListTy COMMA charTy)
-			)
-import DsBinds		( dsBinds )
-import DsExpr		( dsExpr )
+import DsMonad
 import DsUtils
-import Pretty
-import Util
+
+import CoreUtils	( escErrorMsg, mkErrorApp )
+import PrelInfo		( stringTy )
+import PprStyle		( PprStyle(..) )
+import Pretty		( ppShow )
+import SrcLoc		( SrcLoc{-instance-} )
+import Util		( panic )
+
+mkCoLetsAny = panic "DsGRHSs.mkCoLetsAny"
+mkCoreIfThenElse = panic "DsGRHSs.mkCoreIfThenElse"
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
@@ -39,7 +46,7 @@ necessary.  The type argument gives the type of the ei.
 \begin{code}
 dsGuarded :: TypecheckedGRHSsAndBinds
 	  -> SrcLoc
-	  -> DsM PlainCoreExpr
+	  -> DsM CoreExpr
 
 dsGuarded (GRHSsAndBindsOut grhss binds err_ty) err_loc
   = dsBinds binds				`thenDs` \ core_binds ->
@@ -51,8 +58,8 @@ dsGuarded (GRHSsAndBindsOut grhss binds err_ty) err_loc
   where
     unencoded_part_of_msg = escErrorMsg (ppShow 80 (ppr PprForUser err_loc))
 
-    error_expr :: Id -> PlainCoreExpr
-    error_expr str_var = mkErrorCoApp err_ty str_var
+    error_expr :: Id -> CoreExpr
+    error_expr str_var = mkErrorApp err_ty str_var
 			  (unencoded_part_of_msg
 			  ++ "%N") --> ": non-exhaustive guards"
 \end{code}
@@ -65,11 +72,11 @@ p | g1 = e1
   ...
   | gm = em
 \end{verbatim}
-We supply a @PlainCoreExpr@ for the case in which all of
+We supply a @CoreExpr@ for the case in which all of
 the guards fail.
 
 \begin{code}
-dsGRHSs :: UniType				-- Type of RHSs
+dsGRHSs :: Type				-- Type of RHSs
 	-> DsMatchKind -> [TypecheckedPat]	-- These are to build a MatchContext from
 	-> [TypecheckedGRHS]			-- Guarded RHSs
 	-> DsM MatchResult

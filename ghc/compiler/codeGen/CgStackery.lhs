@@ -12,10 +12,9 @@ Stack-twiddling operations, which are pretty low-down and grimy.
 module CgStackery (
 	allocAStack, allocBStack, allocUpdateFrame,
 	adjustRealSps, getFinalStackHW,
-	mkVirtStkOffsets, mkStkAmodes,
+	mkVirtStkOffsets, mkStkAmodes
 
 	-- and to make the interface self-sufficient...
-	AbstractC, CAddrMode, CgState, PrimKind
     ) where
 
 import StgSyn
@@ -24,7 +23,7 @@ import AbsCSyn
 
 import CgUsages		( getSpBRelOffset )
 import Maybes		( Maybe(..) )
-import PrimKind		( getKindSize, retKindSize, separateByPtrFollowness )
+import PrimRep		( getPrimRepSize, retPrimRepSize, separateByPtrFollowness )
 import Util
 \end{code}
 
@@ -41,7 +40,7 @@ increase towards the top of stack).
 \begin{code}
 mkVirtStkOffsets :: VirtualSpAOffset 	-- Offset of the last allocated thing
 	  -> VirtualSpBOffset		-- ditto
-	  -> (a -> PrimKind)	-- to be able to grab kinds
+	  -> (a -> PrimRep)	-- to be able to grab kinds
 	  -> [a]			-- things to make offsets for
 	  -> (VirtualSpAOffset,		-- OUTPUTS: Topmost allocated word
 	      VirtualSpBOffset,		-- ditto
@@ -59,7 +58,7 @@ mkVirtStkOffsets init_SpA_offset init_SpB_offset kind_fun things
 	(last_SpA_offset, last_SpB_offset, boxd_w_offsets, ubxd_w_offsets)
   where
     computeOffset offset thing
-      = (offset + (getKindSize . kind_fun) thing, (thing, offset+(1::Int)))
+      = (offset + (getPrimRepSize . kind_fun) thing, (thing, offset+(1::Int)))
 \end{code}
 
 @mkStackAmodes@ is a higher-level version of @mkStackOffsets@.
@@ -75,7 +74,7 @@ mkStkAmodes :: VirtualSpAOffset	    	    -- Tail call positions
 	    -> [CAddrMode]		    -- things to make offsets for
 	    -> FCode (VirtualSpAOffset,	    -- OUTPUTS: Topmost allocated word
 		      VirtualSpBOffset,	    -- ditto
-	              AbstractC)	    -- Assignments to appropriate stk slots
+		      AbstractC)	    -- Assignments to appropriate stk slots
 
 mkStkAmodes tail_spa tail_spb things
 	    info_down (MkCgState absC binds usage)
@@ -84,14 +83,14 @@ mkStkAmodes tail_spa tail_spb things
     result = (last_SpA_offset, last_SpB_offset, mkAbstractCs abs_cs)
 
     (last_SpA_offset, last_SpB_offset, ptrs_w_offsets, non_ptrs_w_offsets)
-    	= mkVirtStkOffsets tail_spa tail_spb getAmodeKind things
+    	= mkVirtStkOffsets tail_spa tail_spb getAmodeRep things
 
     abs_cs
-	= [ CAssign (CVal (SpARel realSpA offset) PtrKind) thing
+	= [ CAssign (CVal (SpARel realSpA offset) PtrRep) thing
 	  | (thing, offset) <- ptrs_w_offsets
 	  ]
 	  ++
-	  [ CAssign (CVal (SpBRel realSpB offset) (getAmodeKind thing)) thing
+	  [ CAssign (CVal (SpBRel realSpB offset) (getAmodeRep thing)) thing
 	  | (thing, offset) <- non_ptrs_w_offsets
 	  ]
 
@@ -178,7 +177,7 @@ This is all a bit disgusting.
 allocUpdateFrame :: Int			-- Size of frame
 		 -> CAddrMode		-- Return address which is to be the
 					-- top word of frame
-		 -> ((VirtualSpAOffset, VirtualSpBOffset, VirtualSpBOffset) -> Code) 	
+		 -> ((VirtualSpAOffset, VirtualSpBOffset, VirtualSpBOffset) -> Code)
 						-- Scope of update
 		 -> Code
 
@@ -249,7 +248,7 @@ adjustRealSpB newRealSpB info_down (MkCgState absC binds
   = MkCgState (mkAbsCStmts absC move_instrB) binds new_usage
     where
     move_instrB = if (newRealSpB == realSpB) then AbsCNop
-		 else (CAssign {-PtrKind-}
+		 else (CAssign {-PtrRep-}
 			    (CReg SpB)
 			    (CAddr (SpBRel realSpB newRealSpB)))
     new_usage = (a_usage,

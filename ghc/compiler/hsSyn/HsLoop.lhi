@@ -1,0 +1,41 @@
+\begin{code}
+
+interface HsLoop where
+
+import HsExpr( HsExpr )
+import Outputable( NamedThing, Outputable )
+import HsBinds ( Bind, HsBinds, MonoBinds, Sig, nullBinds, nullMonoBinds )
+import HsDecls ( ConDecl )
+
+-- HsExpr outputs
+data HsExpr tyvar uvar id pat
+
+instance (NamedThing id, Outputable id, Outputable pat,
+	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
+  => Outputable (HsExpr tyvar uvar id pat)
+
+
+-- HsBinds outputs
+data Sig id
+instance (NamedThing name, Outputable name) => Outputable (Sig name)
+
+data Bind tyvar uvar id pat
+
+data HsBinds tyvar uvar id pat
+
+instance (Outputable pat, NamedThing id, Outputable id,
+	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
+		Outputable (HsBinds tyvar uvar id pat)
+
+data MonoBinds tyvar uvar id pat
+
+instance (NamedThing id, Outputable id, Outputable pat,
+	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
+		Outputable (MonoBinds tyvar uvar id pat)
+
+nullBinds     :: HsBinds tyvar uvar id pat -> Bool
+nullMonoBinds :: MonoBinds tyvar uvar id pat -> Bool
+
+-- HsDecls outputs
+data ConDecl name
+\end{code}

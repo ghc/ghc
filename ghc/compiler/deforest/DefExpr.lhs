@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[DefExpr]{Transformation Algorithm for Expressions}
 
@@ -8,7 +8,7 @@
 > module DefExpr (
 > 	tran
 >	) where
-> 
+>
 > import DefSyn
 > import CoreSyn
 > import DefUtils
@@ -16,23 +16,21 @@
 > import TreelessForm
 > import Cyclic
 
-> import AbsUniType	( applyTypeEnvToTy, isPrimType,
->			  SigmaType(..), UniType
+> import Type		( applyTypeEnvToTy, isPrimType,
+>			  SigmaType(..), Type
 >			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
 >			)
 > import CmdLineOpts	( SwitchResult, switchIsOn )
-> import CoreFuns	( mkCoLam, unTagBinders, typeOfCoreExpr )
+> import CoreUnfold	( UnfoldingDetails(..) )
+> import CoreUtils	( mkValLam, unTagBinders, coreExprType )
 > import Id		( applyTypeEnvToId, getIdUnfolding, isTopLevId, Id,
 > 			  isInstId_maybe
 >			)
 > import Inst		-- Inst(..)
-> import IdEnv
 > import IdInfo
 > import Maybes		( Maybe(..) )
 > import Outputable
-> import SimplEnv	( SwitchChecker(..), UnfoldingDetails(..) )
-> import SplitUniq
-> import TyVarEnv
+> import UniqSupply
 > import Util
 
 > -- tmp
@@ -51,47 +49,47 @@ This is extended by one rule only: reduction of a type application.
 >	-> TypeEnv			-- Type environment
 >	-> DefExpr			-- input expression
 >	-> [DefCoreArg]			-- args
->	-> SUniqSM DefExpr
+>	-> UniqSM DefExpr
 
-> tran sw p t e@(CoVar (DefArgVar id)) as =
+> tran sw p t e@(Var (DefArgVar id)) as =
 > 	tranVar sw p id
 >    		(
->		 mapArgs (\e -> tran sw p t e []) as  `thenSUs` \as ->
->		 returnSUs (applyToArgs (CoVar (DefArgVar new_id)) as)
+>		 mapArgs (\e -> tran sw p t e []) as  `thenUs` \as ->
+>		 returnUs (mkGenApp (Var (DefArgVar new_id)) as)
 >		)
 >		(
->		 \e -> 
->		   tran sw p t e as	`thenSUs` \e ->
->		   returnSUs (mkLabel (applyToArgs (CoVar (DefArgVar new_id)) 
->		   			(map (substTyArg t) as)) 
+>		 \e ->
+>		   tran sw p t e as	`thenUs` \e ->
+>		   returnUs (mkLabel (mkGenApp (Var (DefArgVar new_id))
+>		   			(map (substTyArg t) as))
 >				      e)
 >		)
 >	where new_id = applyTypeEnvToId t id
 
-> tran sw p t e@(CoLit l) [] =
-> 	returnSUs e
->	
-> tran sw p t (CoCon c ts es) [] =
-> 	mapSUs (tranAtom sw p t) es 		`thenSUs` \es ->
->	returnSUs (CoCon c (map (applyTypeEnvToTy t) ts) es)
->	
-> tran sw p t (CoPrim op ts es) [] =	-- XXX constant folding?
-> 	mapSUs (tranAtom sw p t) es	`thenSUs` \es ->
->	returnSUs (CoPrim op (map (applyTypeEnvToTy t) ts) es)
+> tran sw p t e@(Lit l) [] =
+> 	returnUs e
 >
-> tran sw p t (CoLam vs e) [] =
-> 	tran sw p t e []			`thenSUs` \e ->
->	returnSUs (mkCoLam (map (applyTypeEnvToId t) vs) e)
+> tran sw p t (Con c ts es) [] =
+> 	mapUs (tranAtom sw p t) es 		`thenUs` \es ->
+>	returnUs (Con c (map (applyTypeEnvToTy t) ts) es)
 >
-> tran sw p t (CoLam vs e) as =
-> 	subst s e				`thenSUs` \e ->
-> 	tran sw p t (mkCoLam rvs e) ras
+> tran sw p t (Prim op ts es) [] =	-- XXX constant folding?
+> 	mapUs (tranAtom sw p t) es	`thenUs` \es ->
+>	returnUs (Prim op (map (applyTypeEnvToTy t) ts) es)
+>
+> tran sw p t (Lam vs e) [] =
+> 	tran sw p t e []			`thenUs` \e ->
+>	returnUs (mkValLam (map (applyTypeEnvToId t) vs) e)
+>
+> tran sw p t (Lam vs e) as =
+> 	subst s e				`thenUs` \e ->
+> 	tran sw p t (mkValLam rvs e) ras
 >   where
 >   	(rvs,ras,s) = mkSubst vs as []
 
 > tran sw p t (CoTyLam alpha e) [] =
-> 	tran sw p t e []			`thenSUs` \e ->
->	returnSUs (CoTyLam alpha e)
+> 	tran sw p t e []			`thenUs` \e ->
+>	returnUs (CoTyLam alpha e)
 >
 
 	ToDo: use the environment rather than doing explicit substitution
@@ -100,8 +98,8 @@ This is extended by one rule only: reduction of a type application.
 > tran sw p t (CoTyLam alpha e) (TypeArg ty : as) =
 > 	tran sw p t (applyTypeEnvToExpr (mkTyVarEnv [(alpha,ty)]) e) as
 
-> tran sw p t (CoApp e v) as =
-> 	maybeJumbleApp e v			`thenSUs` \j ->
+> tran sw p t (App e v) as =
+> 	maybeJumbleApp e v			`thenUs` \j ->
 >	case j of
 >		Nothing -> tran sw p t e (ValArg v : as)
 >		Just e' -> tran sw p t e' as
@@ -109,31 +107,31 @@ This is extended by one rule only: reduction of a type application.
 > tran sw p t (CoTyApp e ty) as =
 >	tran sw p t e (TypeArg (applyTypeEnvToTy t ty) : as)
 >
-> tran sw p t (CoLet (CoNonRec v e) e') as =
-> 	tran sw p t e []			`thenSUs` \e  ->
+> tran sw p t (Let (NonRec v e) e') as =
+> 	tran sw p t e []			`thenUs` \e  ->
 >	if isConstant e then
 >		trace "yippee!!" $
->		subst [(v,removeLabels e)] e'		`thenSUs` \e' ->
+>		subst [(v,removeLabels e)] e'		`thenUs` \e' ->
 >		tran sw p t e' as
 >	else
->		tran sw p t e' as		`thenSUs` \e' ->
->		returnSUs (CoLet (CoNonRec (applyTypeEnvToId t v) e) e')
+>		tran sw p t e' as		`thenUs` \e' ->
+>		returnUs (Let (NonRec (applyTypeEnvToId t v) e) e')
 >
-> tran sw p t (CoLet (CoRec bs) e) as =
-> 	tranRecBinds sw p t bs e		`thenSUs` \(p',resid,e) ->
->	tran sw p' t e as			`thenSUs` \e ->
->	returnSUs (mkDefLetrec resid e)
->	
-> tran sw p t (CoSCC l e) as =
-> 	tran sw p t e []			`thenSUs` \e ->
->	mapArgs (\e -> tran sw p t e []) as	`thenSUs` \as ->
->	returnSUs (applyToArgs (CoSCC l e) as)
->	
-> tran sw p t (CoCase e ps) as =
+> tran sw p t (Let (Rec bs) e) as =
+> 	tranRecBinds sw p t bs e		`thenUs` \(p',resid,e) ->
+>	tran sw p' t e as			`thenUs` \e ->
+>	returnUs (mkDefLetrec resid e)
+>
+> tran sw p t (SCC l e) as =
+> 	tran sw p t e []			`thenUs` \e ->
+>	mapArgs (\e -> tran sw p t e []) as	`thenUs` \as ->
+>	returnUs (mkGenApp (SCC l e) as)
+>
+> tran sw p t (Case e ps) as =
 > 	tranCase sw p t e [] ps as
->	
-> tran _ _ _ e as = 
-> 	defPanic "DefExpr" "tran" (applyToArgs e as)
+>
+> tran _ _ _ e as =
+> 	defPanic "DefExpr" "tran" (mkGenApp e as)
 
 -----------------------------------------------------------------------------
 Transformation for case expressions of the form (case e1..en of {..})
@@ -146,62 +144,62 @@ Transformation for case expressions of the form (case e1..en of {..})
 >	-> [DefCoreArg]
 >	-> DefCaseAlternatives
 >	-> [DefCoreArg]
->	-> SUniqSM DefExpr
+>	-> UniqSM DefExpr
 
 > tranCase sw p t e bs ps as = case e of
->	
->	CoVar (DefArgVar id) ->
+>
+>	Var (DefArgVar id) ->
 >	   	tranVar sw p id
 >		   (
->		     tranAlts sw p t ps as	`thenSUs` \ps ->
->		     mapArgs (\e -> tran sw p t e []) bs  `thenSUs` \bs ->
->		     returnSUs 
->			  (CoCase 
->		           (applyToArgs (CoVar (DefArgVar 
->			   			  (applyTypeEnvToId t id))) 
+>		     tranAlts sw p t ps as	`thenUs` \ps ->
+>		     mapArgs (\e -> tran sw p t e []) bs  `thenUs` \bs ->
+>		     returnUs
+>			  (Case
+>		           (mkGenApp (Var (DefArgVar
+>			   			  (applyTypeEnvToId t id)))
 >			   	  bs)
 >			   ps)
 >		   )
 >		   (
 >		     \e ->
->		     tranCase sw p t e bs ps as	`thenSUs` \e ->
->		     returnSUs 
->		       (mkLabel 
->		           (applyToArgs 
->			      (CoCase (applyToArgs (CoVar (DefArgVar id)) 
+>		     tranCase sw p t e bs ps as	`thenUs` \e ->
+>		     returnUs
+>		       (mkLabel
+>		           (mkGenApp
+>			      (Case (mkGenApp (Var (DefArgVar id))
 >			      		(map (substTyArg t) bs))
 >				      ps)
 >			      (map (substTyArg t) as))
 >			   e)
 >		   )
 >
->	CoLit l ->
+>	Lit l ->
 >		case bs of
->		  [] -> tranAlts sw p t ps as		`thenSUs` \ps ->
->		  	returnSUs (CoCase e ps)
+>		  [] -> tranAlts sw p t ps as		`thenUs` \ps ->
+>		  	returnUs (Case e ps)
 >		  _ -> die_horribly
->		
->	CoPrim op ts es -> 
+>
+>	Prim op ts es ->
 >		case bs of
->		  [] -> tranAlts sw p t ps as 		`thenSUs` \ps ->
->			mapSUs (tranAtom sw p t) es	`thenSUs` \es ->
->			returnSUs (CoCase (CoPrim op 
+>		  [] -> tranAlts sw p t ps as 		`thenUs` \ps ->
+>			mapUs (tranAtom sw p t) es	`thenUs` \es ->
+>			returnUs (Case (Prim op
 >					(map (applyTypeEnvToTy t) ts) es) ps)
 >		  _ -> die_horribly
->		  
->	CoCon c ts es ->
+>
+>	Con c ts es ->
 >		case bs of
 >		  [] -> case ps of
->			  CoAlgAlts alts def -> 
+>			  AlgAlts alts def ->
 >				reduceCase sw p c ts es alts def as
->			  CoPrimAlts alts def -> die_horribly
+>			  PrimAlts alts def -> die_horribly
 >		  _ -> die_horribly
->	
->	CoLam vs e ->
+>
+>	Lam vs e ->
 >		case bs of
 >			[] -> die_horribly
 >			(TypeArg _ : _) -> die_horribly
->			_ -> subst s e		`thenSUs` \e ->
+>			_ -> subst s e		`thenUs` \e ->
 >			     tranCase sw p t e rbs ps as
 >	   where
 >	   	(rvs,rbs,s) = mkSubst vs bs []
@@ -211,73 +209,73 @@ Transformation for case expressions of the form (case e1..en of {..})
 >		  TypeArg ty : bs' -> tranCase sw p t e' bs' ps as
 >		     where e' = applyTypeEnvToExpr (mkTyVarEnv [(alpha,ty)]) e
 >		  _ -> die_horribly
->			
->	CoApp e v ->
->		maybeJumbleApp e v	 		`thenSUs` \j ->
+>
+>	App e v ->
+>		maybeJumbleApp e v	 		`thenUs` \j ->
 >		case j of
 >			Nothing -> tranCase sw p t e (ValArg v : bs) ps as
 >			Just e' -> tranCase sw p t e' bs ps as
->		
+>
 >	CoTyApp e ty ->
 >		tranCase sw p t e (TypeArg (applyTypeEnvToTy t ty) : bs)
 >			ps as
->	
->	CoLet (CoNonRec v e) e' ->
-> 		tran sw p t e []			`thenSUs` \e  ->
+>
+>	Let (NonRec v e) e' ->
+> 		tran sw p t e []			`thenUs` \e  ->
 >		if isConstant e then
 >			trace "yippee2!!" $
->			subst [(v,removeLabels e)] e'	`thenSUs` \e' ->
+>			subst [(v,removeLabels e)] e'	`thenUs` \e' ->
 >			tranCase sw p t e' bs ps as
 >		else
->			tranCase sw p t e' bs ps as	`thenSUs` \e' ->
->			returnSUs (CoLet (CoNonRec 
+>			tranCase sw p t e' bs ps as	`thenUs` \e' ->
+>			returnUs (Let (NonRec
 >						(applyTypeEnvToId t v) e) e')
 >
->	CoLet (CoRec binds) e ->
-> 		tranRecBinds sw p t binds e	`thenSUs` \(p',resid,e) ->
->		tranCase sw p' t e bs ps as		`thenSUs` \e ->
->		returnSUs (mkDefLetrec resid e)
->		
+>	Let (Rec binds) e ->
+> 		tranRecBinds sw p t binds e	`thenUs` \(p',resid,e) ->
+>		tranCase sw p' t e bs ps as		`thenUs` \e ->
+>		returnUs (mkDefLetrec resid e)
+>
 >	-- ToDo: sort out cost centres.  Currently they act as a barrier
 >	-- to optimisation.
->	CoSCC l e ->
->	   	tran sw p t e []			`thenSUs` \e ->
+>	SCC l e ->
+>	   	tran sw p t e []			`thenUs` \e ->
 >		mapArgs (\e -> tran sw p t e []) bs
->							`thenSUs` \bs ->
->		tranAlts sw p t ps as			`thenSUs` \ps ->
->		returnSUs (CoCase (applyToArgs (CoSCC l e) bs)
+>							`thenUs` \bs ->
+>		tranAlts sw p t ps as			`thenUs` \ps ->
+>		returnUs (Case (mkGenApp (SCC l e) bs)
 >				  ps)
->		
->	CoCase e ps' ->
+>
+>	Case e ps' ->
 >		tranCase sw p t e []
->		     (mapAlts (\e -> applyToArgs (CoCase e ps) bs) ps') as
->		
+>		     (mapAlts (\e -> mkGenApp (Case e ps) bs) ps') as
+>
 >	_ -> die_horribly
->	
->    where die_horribly = defPanic "DefExpr" "tranCase" 
->    			(applyToArgs (CoCase (applyToArgs e bs) ps) as)
+>
+>    where die_horribly = defPanic "DefExpr" "tranCase"
+>    			(mkGenApp (Case (mkGenApp e bs) ps) as)
 
 -----------------------------------------------------------------------------
-Deciding whether or not to replace a function variable with it's 
+Deciding whether or not to replace a function variable with it's
 definition.  The tranVar function is passed four arguments: the
 environment, the Id itself, the expression to return if no
 unfolding takes place, and a function to apply to the unfolded expression
 should an unfolding be required.
 
-> tranVar 
+> tranVar
 > 	:: SwitchChecker who_knows
 >	-> IdEnv DefExpr
 >	-> Id
->	-> SUniqSM DefExpr
->	-> (DefExpr -> SUniqSM DefExpr)
->	-> SUniqSM DefExpr
->	
+>	-> UniqSM DefExpr
+>	-> (DefExpr -> UniqSM DefExpr)
+>	-> UniqSM DefExpr
+>
 > tranVar sw p id no_unfold unfold_with =
-> 	
+>
 >   case lookupIdEnv p id of
 >	Just e' ->
->		rebindExpr e' 	`thenSUs` \e' ->
->		if deforestable id 
+>		rebindExpr e' 	`thenUs` \e' ->
+>		if deforestable id
 >	   	   then unfold_with e'
 >		   else panic "DefExpr(tran): not deforestable id in env"
 
@@ -286,18 +284,18 @@ should an unfolding be required.
 	in which case it will have an unfolding inside the Id
 	itself.
 
->	Nothing -> 
+>	Nothing ->
 >	  if (not . deforestable) id
 >	  	then  no_unfold
->					
+>
 >		else case (getIdUnfolding id) of
->			GeneralForm _ _ expr guidance ->
->			  panic "DefExpr:GeneralForm has changed a little; needs mod here"
+>			GenForm _ _ expr guidance ->
+>			  panic "DefExpr:GenForm has changed a little; needs mod here"
 >			  -- SLPJ March 95
 >
 >--???			  -- ToDo: too much overhead here.
 >--???		          let e' = c2d nullIdEnv expr in
->--???			  convertToTreelessForm sw e'	`thenSUs` \e'' ->
+>--???			  convertToTreelessForm sw e'	`thenUs` \e'' ->
 >--???			  unfold_with e''
 >		      	_ -> no_unfold
 
@@ -309,65 +307,65 @@ should an unfolding be required.
 
 >			{- panic
 >		       		("DefExpr(tran): Deforestable id `"
->		     		++ ppShow 80 (ppr PprDebug id) 
+>		     		++ ppShow 80 (ppr PprDebug id)
 >				++ "' doesn't have an unfolding.") -}
 
 -----------------------------------------------------------------------------
 Transform a set of case alternatives.
 
-> tranAlts 
+> tranAlts
 > 	:: SwitchChecker who_knows
 >	-> IdEnv DefExpr
 >	-> TypeEnv
 >	-> DefCaseAlternatives
 >	-> [DefCoreArg]
->	-> SUniqSM DefCaseAlternatives
+>	-> UniqSM DefCaseAlternatives
 
-> tranAlts sw p t (CoAlgAlts alts def) as =
-> 	mapSUs (tranAlgAlt sw p t as) alts	`thenSUs` \alts ->
->	tranDefault sw p t def as		`thenSUs` \def ->
->	returnSUs (CoAlgAlts alts def)
-> tranAlts sw p t (CoPrimAlts alts def) as =
-> 	mapSUs (tranPrimAlt sw p t as) alts	`thenSUs` \alts ->
->	tranDefault sw p t def as		`thenSUs` \def ->
->	returnSUs (CoPrimAlts alts def)
+> tranAlts sw p t (AlgAlts alts def) as =
+> 	mapUs (tranAlgAlt sw p t as) alts	`thenUs` \alts ->
+>	tranDefault sw p t def as		`thenUs` \def ->
+>	returnUs (AlgAlts alts def)
+> tranAlts sw p t (PrimAlts alts def) as =
+> 	mapUs (tranPrimAlt sw p t as) alts	`thenUs` \alts ->
+>	tranDefault sw p t def as		`thenUs` \def ->
+>	returnUs (PrimAlts alts def)
 
 > tranAlgAlt sw p t as (c, vs, e) =
-> 	tran sw p t e as			`thenSUs` \e ->
->	returnSUs (c, map (applyTypeEnvToId t) vs, e)
+> 	tran sw p t e as			`thenUs` \e ->
+>	returnUs (c, map (applyTypeEnvToId t) vs, e)
 > tranPrimAlt sw p t as (l, e) =
-> 	tran sw p t e as			`thenSUs` \e ->
->	returnSUs (l, e)
->	
-> tranDefault sw p t CoNoDefault as = returnSUs CoNoDefault
-> tranDefault sw p t (CoBindDefault v e) as =
-> 	tran sw p t e as			`thenSUs` \e ->
->	returnSUs (CoBindDefault (applyTypeEnvToId t v) e)
+> 	tran sw p t e as			`thenUs` \e ->
+>	returnUs (l, e)
+>
+> tranDefault sw p t NoDefault as = returnUs NoDefault
+> tranDefault sw p t (BindDefault v e) as =
+> 	tran sw p t e as			`thenUs` \e ->
+>	returnUs (BindDefault (applyTypeEnvToId t v) e)
 
 -----------------------------------------------------------------------------
 Transform an atom.
 
-> tranAtom 
+> tranAtom
 > 	:: SwitchChecker who_knows
->	-> IdEnv DefExpr 
->	-> TypeEnv 
->	-> DefAtom 
->	-> SUniqSM DefAtom
+>	-> IdEnv DefExpr
+>	-> TypeEnv
+>	-> DefAtom
+>	-> UniqSM DefAtom
 
-> tranAtom sw p t (CoVarAtom v) =
-> 	tranArg sw p t v			`thenSUs` \v ->
->	returnSUs (CoVarAtom v)
-> tranAtom sw p t e@(CoLitAtom l) =	-- XXX
-> 	returnSUs e
+> tranAtom sw p t (VarArg v) =
+> 	tranArg sw p t v			`thenUs` \v ->
+>	returnUs (VarArg v)
+> tranAtom sw p t e@(LitArg l) =	-- XXX
+> 	returnUs e
 
 > tranArg sw p t (DefArgExpr e) =
-> 	tran sw p t e []			`thenSUs` \e ->
->	returnSUs (DefArgExpr e)
+> 	tran sw p t e []			`thenUs` \e ->
+>	returnUs (DefArgExpr e)
 > tranArg sw p t e@(Label _ _) =
-> 	defPanic "DefExpr" "tranArg" (CoVar e)
+> 	defPanic "DefExpr" "tranArg" (Var e)
 > tranArg sw p t (DefArgVar v) =
-> 	tran sw p t (CoVar (DefArgVar v)) []	`thenSUs` \e -> 
->	returnSUs (DefArgExpr e) 	-- XXX remove this case
+> 	tran sw p t (Var (DefArgVar v)) []	`thenUs` \e ->
+>	returnUs (DefArgExpr e) 	-- XXX remove this case
 
 -----------------------------------------------------------------------------
 Translating recursive definition groups.
@@ -391,21 +389,21 @@ fvs.  Expand the argument list of each function by
 and substitute the new function calls throughout the function set.
 
 
->	let 
+>	let
 >	    (unfold,resid) = partition (deforestable . fst) bs
 >	in
 
-> 	mapSUs (tranRecBind sw p t) unfold	`thenSUs` \unfold ->
-> 	mapSUs (tranRecBind sw p t) resid	`thenSUs` \resid ->
+> 	mapUs (tranRecBind sw p t) unfold	`thenUs` \unfold ->
+> 	mapUs (tranRecBind sw p t) resid	`thenUs` \resid ->
 
-	Tie knots in the deforestable right-hand sides, and convert the 
-	results to treeless form. Then extract any nested deforestable 
-	recursive functions, and place everything we've got in the new 
+	Tie knots in the deforestable right-hand sides, and convert the
+	results to treeless form. Then extract any nested deforestable
+	recursive functions, and place everything we've got in the new
 	environment.
 
 > 	let (vs,es) = unzip unfold in
->	mapSUs mkLoops es			`thenSUs` \res ->
->	let 
+>	mapUs mkLoops es			`thenUs` \res ->
+>	let
 >		(extracted,new_rhss) = unzip res
 >		new_binds = zip vs new_rhss ++ concat extracted
 >	in
@@ -415,9 +413,9 @@ and substitute the new function calls throughout the function set.
 	bound in this letrec are about to change status from not
 	unfolded to unfolded).
 
->	mapSUs (\(v,e) -> 
->		convertToTreelessForm sw e 	`thenSUs` \e ->
->		returnSUs (v,e)) new_binds	`thenSUs` \fs ->
+>	mapUs (\(v,e) ->
+>		convertToTreelessForm sw e 	`thenUs` \e ->
+>		returnUs (v,e)) new_binds	`thenUs` \fs ->
 
 	Now find the total set of free variables of this function set.
 
@@ -432,82 +430,82 @@ and substitute the new function calls throughout the function set.
 >	    stuff          = [ fixupFreeVars fvs id e | (id,e) <- fs ]
 >	    fs'	   	   = map fst stuff
 >	    s 		   = concat (map snd stuff)
->	    subIt (id,e)   = subst s e `thenSUs` \e -> returnSUs (id,e)
+>	    subIt (id,e)   = subst s e `thenUs` \e -> returnUs (id,e)
 >	in
->	subst s e				`thenSUs` \e  ->
->	mapSUs subIt resid			`thenSUs` \resid ->
->	mapSUs subIt fs'			`thenSUs` \fs ->
+>	subst s e				`thenUs` \e  ->
+>	mapUs subIt resid			`thenUs` \resid ->
+>	mapUs subIt fs'			`thenUs` \fs ->
 
->	let res = returnSUs (growIdEnvList p fs, resid, e) in
+>	let res = returnUs (growIdEnvList p fs, resid, e) in
 >	case unzip fs of
->		(evs,ees) -> mapSUs d2c ees `thenSUs` \ees ->
+>		(evs,ees) -> mapUs d2c ees `thenUs` \ees ->
 >			   let (vs',es') = unzip bs in
->			   mapSUs d2c es' `thenSUs` \es' ->
->		      trace ("extraction " 
->		      		++ showIds (map fst bs) 
+>			   mapUs d2c es' `thenUs` \es' ->
+>		      trace ("extraction "
+>		      		++ showIds (map fst bs)
 >		      		++ showIds evs
 >				++ "\n{ input:\n" ++ (concat (map showBind (zip vs' es'))) ++ "}\n"
 >				++ "{ result:\n" ++ (concat  (map showBind (zip evs ees))) ++ "}\n") res
 >		   where showBind (v,e) = ppShow 80 (ppr PprDebug v) ++ "=\n" ++ ppShow 80 (ppr PprDebug e) ++ "\n"
 
 > tranRecBind sw p t (id,e) =
->	tran sw p t e []			`thenSUs` \e ->
->	returnSUs (applyTypeEnvToId t id,e)
+>	tran sw p t e []			`thenUs` \e ->
+>	returnUs (applyTypeEnvToId t id,e)
 
 > showIds :: [Id] -> String
-> showIds ids = "(" ++ concat (map ((' ' :) . ppShow 80 . ppr PprDebug) ids) 
+> showIds ids = "(" ++ concat (map ((' ' :) . ppShow 80 . ppr PprDebug) ids)
 > 	++ " )"
 
 -----------------------------------------------------------------------------
 
-> reduceCase sw p c ts es alts def as = 
+> reduceCase sw p c ts es alts def as =
 > 	case [ a | a@(c',vs,e) <- alts, c' == c ] of
 >		[(c,vs,e)] ->
->			subst (zip vs (map atom2expr es)) e `thenSUs` \e ->
+>			subst (zip vs (map atom2expr es)) e `thenUs` \e ->
 >			tran sw p nullTyVarEnv e as
 >		[] -> case def of
->			CoNoDefault -> 
+>			NoDefault ->
 >				panic "DefExpr(reduceCase): no match"
->			CoBindDefault v e ->
->				subst [(v,CoCon c ts es)] e `thenSUs` \e ->
+>			BindDefault v e ->
+>				subst [(v,Con c ts es)] e `thenUs` \e ->
 >				tran sw p nullTyVarEnv e as
 >		_ -> panic "DefExpr(reduceCase): multiple matches"
 
 -----------------------------------------------------------------------------
 Type Substitutions.
 
-> applyTypeEnvToExpr 
+> applyTypeEnvToExpr
 > 	:: TypeEnv
 > 	-> DefExpr
 >	-> DefExpr
 
 > applyTypeEnvToExpr p e = substTy e
->   where 
+>   where
 >     substTy e' = case e' of
-> 	CoVar (DefArgExpr e) -> panic "DefExpr(substTy): CoVar (DefArgExpr _)"
->	CoVar (Label l e)    -> panic "DefExpr(substTy): CoVar (Label _ _)"
->       CoVar (DefArgVar id) -> CoVar (DefArgVar (applyTypeEnvToId p id))
->       CoLit l              -> e'
->       CoCon c ts es        -> 
->		CoCon c (map (applyTypeEnvToTy p) ts) (map substTyAtom es)
->       CoPrim op ts es      -> 
->		CoPrim op (map (applyTypeEnvToTy p) ts) (map substTyAtom es)
->       CoLam vs e           -> CoLam (map (applyTypeEnvToId p) vs) (substTy e)
+> 	Var (DefArgExpr e) -> panic "DefExpr(substTy): Var (DefArgExpr _)"
+>	Var (Label l e)    -> panic "DefExpr(substTy): Var (Label _ _)"
+>       Var (DefArgVar id) -> Var (DefArgVar (applyTypeEnvToId p id))
+>       Lit l              -> e'
+>       Con c ts es        ->
+>		Con c (map (applyTypeEnvToTy p) ts) (map substTyAtom es)
+>       Prim op ts es      ->
+>		Prim op (map (applyTypeEnvToTy p) ts) (map substTyAtom es)
+>       Lam vs e           -> Lam (map (applyTypeEnvToId p) vs) (substTy e)
 >       CoTyLam alpha e      -> CoTyLam alpha (substTy e)
->       CoApp e v            -> CoApp (substTy e) (substTyAtom v)
->       CoTyApp e t          -> mkCoTyApp (substTy e) (applyTypeEnvToTy p t)
->       CoCase e ps          -> CoCase (substTy e) (substTyCaseAlts ps)
->       CoLet (CoNonRec id e) e' -> 
->		CoLet (CoNonRec (applyTypeEnvToId p id) (substTy e)) 
+>       App e v            -> App (substTy e) (substTyAtom v)
+>       CoTyApp e t          -> CoTyApp (substTy e) (applyTypeEnvToTy p t)
+>       Case e ps          -> Case (substTy e) (substTyCaseAlts ps)
+>       Let (NonRec id e) e' ->
+>		Let (NonRec (applyTypeEnvToId p id) (substTy e))
 >			(substTy e')
->       CoLet (CoRec bs) e   -> 
->		CoLet (CoRec (map substTyRecBind bs)) (substTy e)
+>       Let (Rec bs) e   ->
+>		Let (Rec (map substTyRecBind bs)) (substTy e)
 >		where substTyRecBind (v,e) = (applyTypeEnvToId p v, substTy e)
->       CoSCC l e            -> CoSCC l (substTy e)
+>       SCC l e            -> SCC l (substTy e)
 
 >     substTyAtom :: DefAtom -> DefAtom
->     substTyAtom (CoVarAtom v) = CoVarAtom (substTyArg v)
->     substTyAtom (CoLitAtom l) = CoLitAtom l -- XXX
+>     substTyAtom (VarArg v) = VarArg (substTyArg v)
+>     substTyAtom (LitArg l) = LitArg l -- XXX
 
 >     substTyArg :: DefBindee -> DefBindee
 >     substTyArg (DefArgExpr e) = DefArgExpr (substTy e)
@@ -515,51 +513,51 @@ Type Substitutions.
 >     substTyArg e@(DefArgVar id)  =	-- XXX
 >		DefArgVar (applyTypeEnvToId p id)
 
->     substTyCaseAlts (CoAlgAlts as def) 
-> 	= CoAlgAlts (map substTyAlgAlt as) (substTyDefault def)
->     substTyCaseAlts (CoPrimAlts as def) 
-> 	= CoPrimAlts (map substTyPrimAlt as) (substTyDefault def)
+>     substTyCaseAlts (AlgAlts as def)
+> 	= AlgAlts (map substTyAlgAlt as) (substTyDefault def)
+>     substTyCaseAlts (PrimAlts as def)
+> 	= PrimAlts (map substTyPrimAlt as) (substTyDefault def)
 
 >     substTyAlgAlt  (c, vs, e) = (c, map (applyTypeEnvToId p) vs, substTy e)
 >     substTyPrimAlt (l, e) = (l, substTy e)
 
->     substTyDefault CoNoDefault = CoNoDefault
->     substTyDefault (CoBindDefault id e) = 
->     		CoBindDefault (applyTypeEnvToId p id) (substTy e)
+>     substTyDefault NoDefault = NoDefault
+>     substTyDefault (BindDefault id e) =
+>     		BindDefault (applyTypeEnvToId p id) (substTy e)
 
-> substTyArg t (ValArg e)   = 
-> 	ValArg (CoVarAtom (DefArgExpr (applyTypeEnvToExpr t (atom2expr e))))
+> substTyArg t (ValArg e)   =
+> 	ValArg (VarArg (DefArgExpr (applyTypeEnvToExpr t (atom2expr e))))
 > substTyArg t (TypeArg ty) = TypeArg ty
 
 -----------------------------------------------------------------------------
 
 > mapAlts f ps = case ps of
->	CoAlgAlts alts def -> 
->	   CoAlgAlts (map (\(c,vs,e) -> (c,vs,f e)) alts) (mapDef f def)
->	CoPrimAlts alts def ->
->	   CoPrimAlts (map (\(l,e) -> (l, f e)) alts) (mapDef f def)
->				
-> mapDef f CoNoDefault 		= CoNoDefault
-> mapDef f (CoBindDefault v e)  = CoBindDefault v (f e)
+>	AlgAlts alts def ->
+>	   AlgAlts (map (\(c,vs,e) -> (c,vs,f e)) alts) (mapDef f def)
+>	PrimAlts alts def ->
+>	   PrimAlts (map (\(l,e) -> (l, f e)) alts) (mapDef f def)
+>
+> mapDef f NoDefault 		= NoDefault
+> mapDef f (BindDefault v e)  = BindDefault v (f e)
 
 -----------------------------------------------------------------------------
 Apply a function to all the ValArgs in an Args list.
 
-> mapArgs 
-> 	:: (DefExpr -> SUniqSM DefExpr) 
->	-> [DefCoreArg] 
->	-> SUniqSM [DefCoreArg]
->	
-> mapArgs f [] = 
-> 	returnSUs []
-> mapArgs f (a@(TypeArg ty) : as) = 
-> 	mapArgs f as			`thenSUs` \as ->
->	returnSUs (a:as)
+> mapArgs
+> 	:: (DefExpr -> UniqSM DefExpr)
+>	-> [DefCoreArg]
+>	-> UniqSM [DefCoreArg]
+>
+> mapArgs f [] =
+> 	returnUs []
+> mapArgs f (a@(TypeArg ty) : as) =
+> 	mapArgs f as			`thenUs` \as ->
+>	returnUs (a:as)
 > mapArgs f (ValArg v : as) =
-> 	f (atom2expr v)			`thenSUs` \e ->
->	mapArgs f as			`thenSUs` \as ->
->	returnSUs (ValArg (CoVarAtom (DefArgExpr e)) : as)
-> 	
+> 	f (atom2expr v)			`thenUs` \e ->
+>	mapArgs f as			`thenUs` \as ->
+>	returnUs (ValArg (VarArg (DefArgExpr e)) : as)
+>
 
 > mkSubst [] as s = ([],as,s)
 > mkSubst vs [] s = (vs,[],s)
@@ -580,7 +578,7 @@ earlier, and avoids the need to do matching instead of renaming.
 We also pull out lets from function arguments, and primitive case
 expressions (which can't fail anyway).
 
-Think: 
+Think:
 
 	(t (case u of x -> v))
 	====>
@@ -591,55 +589,55 @@ has an unboxed type.
 
 ToDo: sort this mess out - could be more efficient.
 
-> maybeJumbleApp :: DefExpr -> DefAtom -> SUniqSM (Maybe DefExpr)
-> maybeJumbleApp e (CoLitAtom _) = returnSUs Nothing -- ToDo remove
-> maybeJumbleApp e (CoVarAtom (DefArgExpr (CoVar (DefArgVar _))))
-> 	= returnSUs Nothing
-> maybeJumbleApp e (CoVarAtom (DefArgExpr t))
+> maybeJumbleApp :: DefExpr -> DefAtom -> UniqSM (Maybe DefExpr)
+> maybeJumbleApp e (LitArg _) = returnUs Nothing -- ToDo remove
+> maybeJumbleApp e (VarArg (DefArgExpr (Var (DefArgVar _))))
+> 	= returnUs Nothing
+> maybeJumbleApp e (VarArg (DefArgExpr t))
 >	= let t' = pull_out t [] in
 >	  case t' of
->		CoLet _ _ -> returnSUs (Just t')
->		CoCase (CoPrim _ _ _) (CoPrimAlts [] _) -> returnSUs (Just t')
+>		Let _ _ -> returnUs (Just t')
+>		Case (Prim _ _ _) (PrimAlts [] _) -> returnUs (Just t')
 >		_ -> if isBoringExpr t then
 >			rebind_with_let t
 >		     else
->		     	returnSUs Nothing
+>		     	returnUs Nothing
 
->	where isBoringExpr (CoVar (DefArgVar z)) = (not . deforestable) z
->	      isBoringExpr (CoPrim op ts es) = True
->	      isBoringExpr (CoCase e ps) = isBoringExpr e 
+>	where isBoringExpr (Var (DefArgVar z)) = (not . deforestable) z
+>	      isBoringExpr (Prim op ts es) = True
+>	      isBoringExpr (Case e ps) = isBoringExpr e
 >	      			&& boringCaseAlternatives ps
->	      isBoringExpr (CoApp l r) = isBoringExpr l
+>	      isBoringExpr (App l r) = isBoringExpr l
 >	      isBoringExpr (CoTyApp l t) = isBoringExpr l
 >	      isBoringExpr _ = False
 >
->	      boringCaseAlternatives (CoAlgAlts as d) =
+>	      boringCaseAlternatives (AlgAlts as d) =
 >	      	all boringAlgAlt as && boringDefault d
->	      boringCaseAlternatives (CoPrimAlts as d) =
+>	      boringCaseAlternatives (PrimAlts as d) =
 >	      	all boringPrimAlt as && boringDefault d
->		
+>
 >	      boringAlgAlt  (c,xs,e) = isBoringExpr e
 >	      boringPrimAlt (l,e)    = isBoringExpr e
->	      
->	      boringDefault CoNoDefault = True
->	      boringDefault (CoBindDefault x e) = isBoringExpr e
+>
+>	      boringDefault NoDefault = True
+>	      boringDefault (BindDefault x e) = isBoringExpr e
 
->	      pull_out (CoLet b t) as = CoLet b (pull_out t as)
->	      pull_out (CoApp l r) as = pull_out l (r:as)
->	      pull_out (CoCase prim@(CoPrim _ _ _) 
->	    		(CoPrimAlts [] (CoBindDefault x u))) as
->		= CoCase prim (CoPrimAlts [] (CoBindDefault x 
+>	      pull_out (Let b t) as = Let b (pull_out t as)
+>	      pull_out (App l r) as = pull_out l (r:as)
+>	      pull_out (Case prim@(Prim _ _ _)
+>	    		(PrimAlts [] (BindDefault x u))) as
+>		= Case prim (PrimAlts [] (BindDefault x
 >			(pull_out u as)))
->	      pull_out t as 
->	      	= CoApp e (CoVarAtom (DefArgExpr (foldl CoApp t as)))
->	      
->	      rebind_with_let t = 
->			d2c t	`thenSUs`  \core_t ->
->			newDefId (typeOfCoreExpr core_t) `thenSUs` \x ->
+>	      pull_out t as
+>	      	= App e (VarArg (DefArgExpr (foldl App t as)))
+>
+>	      rebind_with_let t =
+>			d2c t	`thenUs`  \core_t ->
+>			newDefId (coreExprType core_t) `thenUs` \x ->
 >			trace "boring epxr found!" $
->			returnSUs (Just (CoLet (CoNonRec x t)
->				     (CoApp e (CoVarAtom (
->					DefArgExpr (CoVar (
+>			returnUs (Just (Let (NonRec x t)
+>				     (App e (VarArg (
+>					DefArgExpr (Var (
 >					   DefArgVar x)))))))
 
 -----------------------------------------------------------------------------
@@ -648,10 +646,10 @@ ToDo: sort this mess out - could be more efficient.
 >		Just (LitInst _ _ _ _) -> True
 >		_ -> False
 
-> isConstant (CoCon c [] []) = True
-> isConstant (CoLit l)       = True
-> isConstant (CoVar (Label l e)) = isConstant e
+> isConstant (Con c [] []) = True
+> isConstant (Lit l)       = True
+> isConstant (Var (Label l e)) = isConstant e
 > isConstant _               = False
 
-> removeLabels (CoVar (Label l e)) = removeLabels e
+> removeLabels (Var (Label l e)) = removeLabels e
 > removeLabels e = e

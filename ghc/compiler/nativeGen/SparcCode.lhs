@@ -11,7 +11,7 @@
 module SparcCode (
 	Addr(..),Cond(..),Imm(..),RI(..),Size(..),
 	SparcCode(..),SparcInstr(..),SparcRegs,
-	strImmLit, --UNUSED: strImmLab,
+	strImmLit,
 
     	printLabeledCodes,
 
@@ -23,11 +23,9 @@ module SparcCode (
 
     	g0, o0, f0, fp, sp, argRegs,
 
-    	freeRegs, reservedRegs,
+    	freeRegs, reservedRegs
 
 	-- and, for self-sufficiency ...
-	CLabel, CodeSegment, OrdList, PrimKind, Reg, UniqSet(..),
-	UniqFM, FiniteMap, Unique, MagicId, CSeq, BitSet
     ) where
 
 IMPORT_Trace
@@ -36,14 +34,13 @@ import AbsCSyn	    	( MagicId(..) )
 import AsmRegAlloc  	( MachineCode(..), MachineRegisters(..), FutureLive(..),
     	    	    	  Reg(..), RegUsage(..), RegLiveness(..)
     	    	    	)
-import BitSet	 
+import BitSet
 import CgCompInfo   	( mAX_Double_REG, mAX_Float_REG, mAX_Vanilla_REG )
-import CLabelInfo   	( CLabel, pprCLabel, externallyVisibleCLabel, charToC )
-import FiniteMap    
+import CLabel   	( CLabel, pprCLabel, externallyVisibleCLabel, charToC )
+import FiniteMap
 import Maybes	    	( Maybe(..), maybeToBool )
 import OrdList	    	( OrdList, mkUnitList, flattenOrdList )
-import Outputable    
-import PrimKind	    	( PrimKind(..) )
+import Outputable
 import UniqSet
 import Stix
 import Unpretty
@@ -108,7 +105,6 @@ data Imm = ImmInt Int
 	 | HI Imm
 	 deriving ()
 
---UNUSED:strImmLab s = ImmLab (uppStr s)
 strImmLit s = ImmLit (uppStr s)
 
 data Addr = AddrRegReg Reg Reg
@@ -241,37 +237,37 @@ pprReg other = uppStr (show other)   -- should only happen when debugging
 pprSparcReg :: FAST_INT -> Unpretty
 pprSparcReg i = uppPStr
     (case i of {
-        ILIT( 0) -> SLIT("%g0");  ILIT( 1) -> SLIT("%g1");
+	ILIT( 0) -> SLIT("%g0");  ILIT( 1) -> SLIT("%g1");
 	ILIT( 2) -> SLIT("%g2");  ILIT( 3) -> SLIT("%g3");
-        ILIT( 4) -> SLIT("%g4");  ILIT( 5) -> SLIT("%g5");
+	ILIT( 4) -> SLIT("%g4");  ILIT( 5) -> SLIT("%g5");
 	ILIT( 6) -> SLIT("%g6");  ILIT( 7) -> SLIT("%g7");
-        ILIT( 8) -> SLIT("%o0");  ILIT( 9) -> SLIT("%o1");
+	ILIT( 8) -> SLIT("%o0");  ILIT( 9) -> SLIT("%o1");
 	ILIT(10) -> SLIT("%o2");  ILIT(11) -> SLIT("%o3");
-        ILIT(12) -> SLIT("%o4");  ILIT(13) -> SLIT("%o5");
+	ILIT(12) -> SLIT("%o4");  ILIT(13) -> SLIT("%o5");
 	ILIT(14) -> SLIT("%o6");  ILIT(15) -> SLIT("%o7");
-        ILIT(16) -> SLIT("%l0");  ILIT(17) -> SLIT("%l1");
+	ILIT(16) -> SLIT("%l0");  ILIT(17) -> SLIT("%l1");
 	ILIT(18) -> SLIT("%l2");  ILIT(19) -> SLIT("%l3");
-        ILIT(20) -> SLIT("%l4");  ILIT(21) -> SLIT("%l5");
+	ILIT(20) -> SLIT("%l4");  ILIT(21) -> SLIT("%l5");
 	ILIT(22) -> SLIT("%l6");  ILIT(23) -> SLIT("%l7");
-        ILIT(24) -> SLIT("%i0");  ILIT(25) -> SLIT("%i1");
+	ILIT(24) -> SLIT("%i0");  ILIT(25) -> SLIT("%i1");
 	ILIT(26) -> SLIT("%i2");  ILIT(27) -> SLIT("%i3");
-        ILIT(28) -> SLIT("%i4");  ILIT(29) -> SLIT("%i5");
+	ILIT(28) -> SLIT("%i4");  ILIT(29) -> SLIT("%i5");
 	ILIT(30) -> SLIT("%i6");  ILIT(31) -> SLIT("%i7");
-        ILIT(32) -> SLIT("%f0");  ILIT(33) -> SLIT("%f1");
+	ILIT(32) -> SLIT("%f0");  ILIT(33) -> SLIT("%f1");
 	ILIT(34) -> SLIT("%f2");  ILIT(35) -> SLIT("%f3");
-        ILIT(36) -> SLIT("%f4");  ILIT(37) -> SLIT("%f5");
+	ILIT(36) -> SLIT("%f4");  ILIT(37) -> SLIT("%f5");
 	ILIT(38) -> SLIT("%f6");  ILIT(39) -> SLIT("%f7");
-        ILIT(40) -> SLIT("%f8");  ILIT(41) -> SLIT("%f9");
+	ILIT(40) -> SLIT("%f8");  ILIT(41) -> SLIT("%f9");
 	ILIT(42) -> SLIT("%f10"); ILIT(43) -> SLIT("%f11");
-        ILIT(44) -> SLIT("%f12"); ILIT(45) -> SLIT("%f13");
+	ILIT(44) -> SLIT("%f12"); ILIT(45) -> SLIT("%f13");
 	ILIT(46) -> SLIT("%f14"); ILIT(47) -> SLIT("%f15");
-        ILIT(48) -> SLIT("%f16"); ILIT(49) -> SLIT("%f17");
+	ILIT(48) -> SLIT("%f16"); ILIT(49) -> SLIT("%f17");
 	ILIT(50) -> SLIT("%f18"); ILIT(51) -> SLIT("%f19");
-        ILIT(52) -> SLIT("%f20"); ILIT(53) -> SLIT("%f21");
+	ILIT(52) -> SLIT("%f20"); ILIT(53) -> SLIT("%f21");
 	ILIT(54) -> SLIT("%f22"); ILIT(55) -> SLIT("%f23");
-        ILIT(56) -> SLIT("%f24"); ILIT(57) -> SLIT("%f25");
+	ILIT(56) -> SLIT("%f24"); ILIT(57) -> SLIT("%f25");
 	ILIT(58) -> SLIT("%f26"); ILIT(59) -> SLIT("%f27");
-        ILIT(60) -> SLIT("%f28"); ILIT(61) -> SLIT("%f29");
+	ILIT(60) -> SLIT("%f28"); ILIT(61) -> SLIT("%f29");
 	ILIT(62) -> SLIT("%f30"); ILIT(63) -> SLIT("%f31");
 	_ -> SLIT("very naughty sparc register")
     })
@@ -675,9 +671,9 @@ pprSparcInstr sty (ASCII True str) = uppBeside (uppStr "\t.ascii \"") (asciify s
     	asciify :: String -> Int -> Unpretty
     	asciify [] _ = uppStr ("\\0\"")
     	asciify s n | n <= 0 = uppBeside (uppStr "\"\n\t.ascii \"") (asciify s 60)
-        asciify ('\\':cs) n = uppBeside (uppStr "\\\\") (asciify cs (n-1))
-        asciify ('\"':cs) n = uppBeside (uppStr "\\\"") (asciify cs (n-1))
-        asciify (c:cs) n | isPrint c = uppBeside (uppChar c) (asciify cs (n-1))
+	asciify ('\\':cs) n = uppBeside (uppStr "\\\\") (asciify cs (n-1))
+	asciify ('\"':cs) n = uppBeside (uppStr "\\\"") (asciify cs (n-1))
+	asciify (c:cs) n | isPrint c = uppBeside (uppChar c) (asciify cs (n-1))
     	asciify [c] _ = uppBeside (uppStr (charToC c)) (uppStr ("\\0\""))
     	asciify (c:(cs@(d:_))) n | isDigit d =
     	    	    	    	    	uppBeside (uppStr (charToC c)) (asciify cs 0)
@@ -701,7 +697,7 @@ pprSparcInstr sty (DATA s xs) = uppInterleave (uppChar '\n') (map pp_item xs)
 
 Getting the conflicts right is a bit tedious for doubles.  We'd have to
 add a conflict function to the MachineRegisters class, and we'd have to
-put a PrimKind in the MappedReg datatype, or use some kludge (e.g. register
+put a PrimRep in the MappedReg datatype, or use some kludge (e.g. register
 64 + n is really the same as 32 + n, except that it's used for a double,
 so it also conflicts with 33 + n) to deal with it.  It's just not worth the
 bother, so we just partition the free floating point registers into two
@@ -718,10 +714,10 @@ instance MachineRegisters SparcRegs where
     	(ints, floats) = partition (< 32) xs
     	(singles, doubles) = partition (< 48) floats
     	singles' = map (subtract 32) singles
-        doubles' = map (subtract 32) (filter even doubles)
+	doubles' = map (subtract 32) (filter even doubles)
 
-    possibleMRegs FloatKind (SRegs _ singles _) = [ x + 32 | x <- listBS singles]
-    possibleMRegs DoubleKind (SRegs _ _ doubles) = [ x + 32 | x <- listBS doubles]
+    possibleMRegs FloatRep (SRegs _ singles _) = [ x + 32 | x <- listBS singles]
+    possibleMRegs DoubleRep (SRegs _ _ doubles) = [ x + 32 | x <- listBS doubles]
     possibleMRegs _ (SRegs ints _ _) = listBS ints
 
     useMReg (SRegs ints singles doubles) n =
@@ -734,7 +730,7 @@ instance MachineRegisters SparcRegs where
     	      (singles `minusBS` singles')
     	      (doubles `minusBS` doubles')
       where
-        SRegs ints' singles' doubles' = mkMRegs xs
+	SRegs ints' singles' doubles' = mkMRegs xs
 
     freeMReg (SRegs ints singles doubles) n =
     	if n _LT_ ILIT(32) then SRegs (ints `unionBS` singletonBS IBOX(n)) singles doubles
@@ -742,17 +738,13 @@ instance MachineRegisters SparcRegs where
     	else SRegs ints singles (doubles `unionBS` singletonBS (IBOX(n _SUB_ ILIT(32))))
 
     freeMRegs (SRegs ints singles doubles) xs =
-        SRegs (ints `unionBS` ints')
+	SRegs (ints `unionBS` ints')
     	      (singles `unionBS` singles')
     	      (doubles `unionBS` doubles')
       where
-        SRegs ints' singles' doubles' = mkMRegs xs
+	SRegs ints' singles' doubles' = mkMRegs xs
 
 instance MachineCode SparcInstr where
-    -- Alas, we don't do anything clever with our OrdLists
---OLD:
---  flatten = flattenOrdList
-
     regUsage = sparcRegUsage
     regLiveness = sparcRegLiveness
     patchRegs = sparcPatchRegs
@@ -765,23 +757,22 @@ instance MachineCode SparcInstr where
 fpRel :: Int -> Addr
 fpRel n = AddrRegImm fp (ImmInt (n * 4))
 
-kindToSize :: PrimKind -> Size
-kindToSize PtrKind	    = W
-kindToSize CodePtrKind	    = W
-kindToSize DataPtrKind	    = W
-kindToSize RetKind	    = W
-kindToSize InfoPtrKind	    = W
-kindToSize CostCentreKind   = W
-kindToSize CharKind	    = UB
-kindToSize IntKind	    = W
-kindToSize WordKind	    = W
-kindToSize AddrKind	    = W
-kindToSize FloatKind	    = F
-kindToSize DoubleKind	    = DF
-kindToSize ArrayKind	    = W
-kindToSize ByteArrayKind    = W
-kindToSize StablePtrKind    = W
-kindToSize MallocPtrKind    = W
+kindToSize :: PrimRep -> Size
+kindToSize PtrRep	    = W
+kindToSize CodePtrRep	    = W
+kindToSize DataPtrRep	    = W
+kindToSize RetRep	    = W
+kindToSize CostCentreRep   = W
+kindToSize CharRep	    = UB
+kindToSize IntRep	    = W
+kindToSize WordRep	    = W
+kindToSize AddrRep	    = W
+kindToSize FloatRep	    = F
+kindToSize DoubleRep	    = DF
+kindToSize ArrayRep	    = W
+kindToSize ByteArrayRep    = W
+kindToSize StablePtrRep    = W
+kindToSize MallocPtrRep    = W
 
 \end{code}
 
@@ -912,7 +903,7 @@ sparcRegLiveness instr info@(RL live future@(FL all env)) = case instr of
     lookup lbl = case lookupFM env lbl of
 	Just regs -> regs
 	Nothing -> trace ("Missing " ++ (uppShow 80 (pprCLabel (PprForAsm (\_->False) False id) lbl)) ++
-                          " in future?") emptyUniqSet
+			  " in future?") emptyUniqSet
 
 \end{code}
 
@@ -962,17 +953,12 @@ Sometimes, we want to be able to modify addresses at compile time.
 (Okay, just for chrCode of a fetch.)
 
 \begin{code}
-
-#ifdef __GLASGOW_HASKELL__
-
 {-# SPECIALIZE
     is13Bits :: Int -> Bool
   #-}
 {-# SPECIALIZE
     is13Bits :: Integer -> Bool
   #-}
-
-#endif
 
 is13Bits :: Integral a => a -> Bool
 is13Bits x = x >= -4096 && x < 4096

@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface StgStats where
-import Id(Id)
-import StgSyn(StgBinding)
-showStgStats :: [StgBinding Id Id] -> [Char]
-

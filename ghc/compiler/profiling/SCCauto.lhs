@@ -1,13 +1,13 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[SCCauto]{Automated SCC annotations}
 
 Automatic insertion of \tr{_scc_} annotations for top-level bindings.
 
 Automatic insertion of \tr{_scc_} annotations on CAFs is better left
-until STG land.  We do DICT annotations there, too, but maybe
-that will turn out to be a bummer...  (WDP 94/06)
+until STG land.  We do DICT annotations there, too, but maybe that
+will turn out to be a bummer...  (WDP 94/06)
 
 This is a Core-to-Core pass (usually run {\em last}).
 
@@ -16,22 +16,25 @@ This is a Core-to-Core pass (usually run {\em last}).
 
 module SCCauto ( addAutoCostCentres ) where
 
-import CmdLineOpts
-import Id		( isTopLevId )
-import PlainCore
+import Ubiq{-uitous-}
+
+import CmdLineOpts	( opt_AutoSccsOnAllToplevs,
+			  opt_AutoSccsOnExportedToplevs,
+			  opt_SccGroup
+			)
+import CoreSyn
+import Id		( isTopLevId, GenId{-instances-} )
 import Outputable	( isExported )
-import CostCentre	-- ( mkAutoCC )
-import Util		-- for pragmas only
+import CostCentre	( mkAutoCC, IsCafCC(..) )
 \end{code}
 
 \begin{code}
 addAutoCostCentres
-	:: (GlobalSwitch -> SwitchResult)	-- cmd-line switches
-	-> FAST_STRING				-- module name
-	-> [PlainCoreBinding]			-- input
-	-> [PlainCoreBinding]			-- output
+	:: FAST_STRING				-- module name
+	-> [CoreBinding]			-- input
+	-> [CoreBinding]			-- output
 
-addAutoCostCentres sw_chkr mod_name binds
+addAutoCostCentres mod_name binds
   = if not doing_something then
 	binds -- now *that* was quick...
     else
@@ -39,19 +42,20 @@ addAutoCostCentres sw_chkr mod_name binds
   where
     doing_something = auto_all_switch_on || auto_exported_switch_on
 
-    auto_all_switch_on	    = switchIsOn sw_chkr AutoSccsOnAllToplevs -- only use!
-    auto_exported_switch_on = switchIsOn sw_chkr AutoSccsOnExportedToplevs -- only use!
+    auto_all_switch_on	    = opt_AutoSccsOnAllToplevs -- only use!
+    auto_exported_switch_on = opt_AutoSccsOnExportedToplevs -- only use!
 
-    grp_name  = case (stringSwitchSet sw_chkr SccGroup) of
-		  Just xx -> _PK_ xx
-		  Nothing -> mod_name	-- default: module name
+    grp_name
+      = case opt_SccGroup of
+	  Just xx -> xx
+	  Nothing -> mod_name	-- default: module name
 
     -----------------------------
-    scc_top_bind (CoNonRec binder rhs)
-      = CoNonRec binder (scc_auto binder rhs)
+    scc_top_bind (NonRec binder rhs)
+      = NonRec binder (scc_auto binder rhs)
 
-    scc_top_bind (CoRec pairs)
-      = CoRec (map scc_pair pairs)
+    scc_top_bind (Rec pairs)
+      = Rec (map scc_pair pairs)
       where
 	scc_pair (binder, rhs) = (binder, scc_auto binder rhs)
 
@@ -61,7 +65,7 @@ addAutoCostCentres sw_chkr mod_name binds
     scc_auto binder rhs
       = if isTopLevId binder
 	&& (auto_all_switch_on || isExported binder)
-        then scc_rhs rhs
+	then scc_rhs rhs
 	else rhs
       where
 	-- park auto SCC inside lambdas; don't put one there
@@ -69,12 +73,11 @@ addAutoCostCentres sw_chkr mod_name binds
 
 	scc_rhs rhs
 	  = let
-		(tyvars, vars, body) = digForLambdas rhs
+		(usevars, tyvars, vars, body) = digForLambdas rhs
 	    in
 	    case body of
-	      CoSCC _ _ -> rhs -- leave it
-	      CoCon _ _ _ --??? | null vars
-		-> rhs
-	      _ -> mkFunction tyvars vars
-			(CoSCC (mkAutoCC binder mod_name grp_name IsNotCafCC) body)
+	      SCC _ _ -> rhs -- leave it
+	      Con _ _ -> rhs
+	      _ -> mkUseLam usevars (mkLam tyvars vars
+			(SCC (mkAutoCC binder mod_name grp_name IsNotCafCC) body))
 \end{code}

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[WwLib]{A library for the ``worker/wrapper'' back-end to the strictness analyser}
 
@@ -14,40 +14,33 @@ module WwLib (
 	-- our friendly worker/wrapper monad:
 	WwM(..),
 	returnWw, thenWw, mapWw,
-	getUniqueWw, uniqSMtoWwM,
+	getUniqueWw, uniqSMtoWwM
 
 	-- and to make the interface self-sufficient...
-	GlobalSwitch, CoreBinding, CoreExpr, PlainCoreBinding(..),
-	PlainCoreExpr(..), Id, Demand, MaybeErr,
-	TyVar, UniType, Unique, SplitUniqSupply, SUniqSM(..)
-
-	IF_ATTACK_PRAGMAS(COMMA splitUniqSupply COMMA getSUnique)
-	IF_ATTACK_PRAGMAS(COMMA mkUniqueGrimily)
     ) where
 
-IMPORT_Trace
-import Outputable	-- ToDo: rm (debugging)
-import Pretty
+import Ubiq{-uitous-}
 
-import AbsPrel		( aBSENT_ERROR_ID, mkFunTy )
-import AbsUniType	( mkTyVarTy, isPrimType, getUniDataTyCon_maybe,
-			  quantifyTy, TyVarTemplate
-			)
-import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( mkWorkerId, mkSysLocal, getIdUniType,
+import PrelInfo		( aBSENT_ERROR_ID )
+{-
+import Id		( mkWorkerId, mkSysLocal, idType,
 			  getInstantiatedDataConSig, getIdInfo,
 			  replaceIdInfo, addIdStrictness, DataCon(..)
 			)
 import IdInfo		-- lots of things
 import Maybes		( maybeToBool, Maybe(..), MaybeErr )
-import PlainCore
 import SaLib
 import SrcLoc		( mkUnknownSrcLoc )
-import SplitUniq
-import Unique
-import Util
+import Type		( mkTyVarTy, mkFunTys, isPrimType,
+			  maybeDataTyCon, quantifyTy
+			)
+import UniqSupply
+-}
+import Util		( panic )
 
 infixr 9 `thenWw`
+
+quantifyTy = panic "WwLib.quantifyTy"
 \end{code}
 
 %************************************************************************
@@ -62,8 +55,8 @@ an ``intermediate form'' that can later be turned into a \tr{let} or
 
 \begin{code}
 data WwBinding
-  = WwLet  [PlainCoreBinding]
-  | WwCase (PlainCoreExpr -> PlainCoreExpr)
+  = WwLet  [CoreBinding]
+  | WwCase (CoreExpr -> CoreExpr)
 		-- the "case" will be a "strict let" of the form:
 		--
 		--  case rhs of
@@ -203,56 +196,54 @@ Lambdas are added on the front later.)
 
 \begin{code}
 mkWwBodies
-	:: UniType		-- Type of the *body* of the orig
+	:: Type		-- Type of the *body* of the orig
 				-- function; i.e. /\ tyvars -> \ vars -> body
 	-> [TyVar] 		-- Type lambda vars of original function
 	-> [Id]			-- Args of original function
 	-> [Demand]		-- Strictness info for those args
 
-	-> SUniqSM (Maybe 	-- Nothing iff (a) no interesting split possible
+	-> UniqSM (Maybe 	-- Nothing iff (a) no interesting split possible
 				-- 	       (b) any unpack on abstract type
-		     (Id -> PlainCoreExpr,		-- Wrapper expr w/ 
+		     (Id -> CoreExpr,		-- Wrapper expr w/
 							--   hole for worker id
-		      PlainCoreExpr -> PlainCoreExpr,	-- Worker expr w/ hole 
+		      CoreExpr -> CoreExpr,	-- Worker expr w/ hole
 	   						--   for original fn body
 		      StrictnessInfo,			-- Worker strictness info
-		      UniType -> UniType)		-- Worker type w/ hole
+		      Type -> Type)		-- Worker type w/ hole
 	   )						--   for type of original fn body
-		  
+
 
 mkWwBodies body_ty tyvars args arg_infos
   = ASSERT(length args == length arg_infos)
     -- or you can get disastrous user/definer-module mismatches
     if (all_absent_args_and_unboxed_value body_ty arg_infos)
-    then returnSUs Nothing
+    then returnUs Nothing
 
     else -- the rest...
     mk_ww_arg_processing args arg_infos (mAX_WORKER_ARGS - nonAbsentArgs arg_infos)
 		`thenUsMaybe` \ (wrap_frag, work_args_info, work_frag) ->
-    let 
+    let
 	(work_args, wrkr_demands) = unzip work_args_info
 
 	wrkr_strictness = mkStrictnessInfo wrkr_demands Nothing -- no worker-of-worker...
 
 	wrapper_w_hole = \ worker_id ->
-				mkCoTyLam tyvars (
-				mkCoLam args (
+				mkLam tyvars args (
 				wrap_frag (
-				mkCoTyApps (CoVar worker_id) (map mkTyVarTy tyvars)
-			 )))
+				mkCoTyApps (Var worker_id) (map mkTyVarTy tyvars)
+			 ))
 
 	worker_w_hole = \ orig_body ->
-				mkCoTyLam tyvars (
-				mkCoLam work_args (
+				mkLam tyvars work_args (
 				work_frag orig_body
-			))
+			)
 
 	worker_ty_w_hole = \ body_ty ->
 				snd (quantifyTy tyvars (
-				foldr mkFunTy body_ty (map getIdUniType work_args)
+				mkFunTys (map idType work_args) body_ty
 			   ))
     in
-    returnSUs (Just (wrapper_w_hole, worker_w_hole, wrkr_strictness, worker_ty_w_hole))
+    returnUs (Just (wrapper_w_hole, worker_w_hole, wrkr_strictness, worker_ty_w_hole))
   where
     -- "all_absent_args_and_unboxed_value":
     -- check for the obscure case of "\ x y z ... -> body" where
@@ -290,23 +281,23 @@ mk_ww_arg_processing
 				-- This prevents over-eager unpacking, leading
 				-- to huge-arity functions.
 
-	-> SUniqSM (Maybe 	-- Nothing iff any unpack on abstract type
-		     (PlainCoreExpr -> PlainCoreExpr,	-- Wrapper expr w/ 
+	-> UniqSM (Maybe 	-- Nothing iff any unpack on abstract type
+		     (CoreExpr -> CoreExpr,	-- Wrapper expr w/
 							--   hole for worker id
 							--   applied to types
 		      [(Id,Demand)],			-- Worker's args
-							-- and their strictness info	
-		      PlainCoreExpr -> PlainCoreExpr)	-- Worker body expr w/ hole 
+							-- and their strictness info
+		      CoreExpr -> CoreExpr)	-- Worker body expr w/ hole
 	   )						--   for original fn body
 
-mk_ww_arg_processing [] _ _ = returnSUs (Just (id, [], id))
+mk_ww_arg_processing [] _ _ = returnUs (Just (id, [], id))
 
 mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
   =  	-- Absent argument
 	-- So, finish args to the right...
     --pprTrace "Absent; num_wrkr_args=" (ppInt num_wrkr_args) (
     let
-	arg_ty = getIdUniType arg
+	arg_ty = idType arg
     in
     mk_ww_arg_processing args infos max_extra_args
 				    -- we've already discounted for absent args,
@@ -314,7 +305,7 @@ mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
 		   `thenUsMaybe` \ (wrap_rest, work_args_info, work_rest) ->
 
        		-- wrapper doesn't pass this arg to worker:
-    returnSUs (Just (
+    returnUs (Just (
 		 -- wrapper:
 		 \ hole -> wrap_rest hole,
 
@@ -326,8 +317,7 @@ mk_ww_arg_processing (arg : args) (WwLazy True : infos) max_extra_args
   where
     mk_absent_let arg arg_ty body
       = if not (isPrimType arg_ty) then
-	    CoLet (CoNonRec arg (mkCoTyApp (CoVar aBSENT_ERROR_ID) arg_ty))
-		  body
+	    Let (NonRec arg (mkCoTyApp (Var aBSENT_ERROR_ID) arg_ty)) body
 	else -- quite horrible
 	    panic "WwLib: haven't done mk_absent_let for primitives yet"
 
@@ -336,35 +326,37 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
   | new_max_extra_args > 0	-- Check that we are prepared to add arguments
   = 	-- this is the complicated one.
     --pprTrace "Unpack; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr "; new_max=", ppInt new_num_wrkr_args, ppStr "; arg=", ppr PprDebug arg, ppr PprDebug (WwUnpack cmpnt_infos)]) (
-    case getUniDataTyCon_maybe arg_ty of
+    case maybeDataTyCon arg_ty of
 
 	  Nothing 	  -> 	   -- Not a data type
 				   panic "mk_ww_arg_processing: not datatype"
 
 	  Just (_, _, []) ->	   -- An abstract type
 				   -- We have to give up on the whole idea
-				   returnSUs Nothing
+				   returnUs Nothing
 	  Just (_, _, (_:_:_)) ->  -- Two or more constructors; that's odd
 				   panic "mk_ww_arg_processing: multi-constr"
 
-	  Just (arg_tycon, tycon_arg_tys, [data_con]) -> 
+	  Just (arg_tycon, tycon_arg_tys, [data_con]) ->
 			-- The main event: a single-constructor data type
 
 	    let
 		(_,inst_con_arg_tys,_)
-	          = getInstantiatedDataConSig data_con tycon_arg_tys
+		  = getInstantiatedDataConSig data_con tycon_arg_tys
 	    in
-	    getSUniques (length inst_con_arg_tys)    `thenSUs` \ uniqs ->
+	    getUniques (length inst_con_arg_tys)    `thenUs` \ uniqs ->
 
-	    let unpk_args = zipWith (\ u t -> mkSysLocal SLIT("upk") u t mkUnknownSrcLoc)
-				    uniqs inst_con_arg_tys
+	    let
+		unpk_args = zipWithEqual
+			     (\ u t -> mkSysLocal SLIT("upk") u t mkUnknownSrcLoc)
+			     uniqs inst_con_arg_tys
 	    in
 		-- In processing the rest, push the sub-component args
 		-- and infos on the front of the current bunch
 	    mk_ww_arg_processing (unpk_args ++ args) (cmpnt_infos ++ infos) new_max_extra_args
 			`thenUsMaybe` \ (wrap_rest, work_args_info, work_rest) ->
 
-	    returnSUs (Just (
+	    returnUs (Just (
 	      -- wrapper: unpack the value
 	      \ hole -> mk_unpk_case arg unpk_args
 			    data_con arg_tycon
@@ -377,21 +369,21 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
 	    ))
     --)
   where
-    arg_ty = getIdUniType arg
+    arg_ty = idType arg
 
     new_max_extra_args
-      = max_extra_args 
+      = max_extra_args
 	+ 1			    -- We won't pass the original arg now
 	- nonAbsentArgs cmpnt_infos -- But we will pass an arg for each cmpt
 
     mk_unpk_case arg unpk_args boxing_con boxing_tycon body
-      = CoCase (CoVar arg) (
-	  CoAlgAlts [(boxing_con, unpk_args, body)]
-	  CoNoDefault
+      = Case (Var arg) (
+	  AlgAlts [(boxing_con, unpk_args, body)]
+	  NoDefault
 	)
 
     mk_pk_let arg boxing_con con_tys unpk_args body
-      = CoLet (CoNonRec arg (CoCon boxing_con con_tys [CoVarAtom a | a <- unpk_args]))
+      = Let (NonRec arg (Con boxing_con con_tys [VarArg a | a <- unpk_args]))
 	      body
 
 mk_ww_arg_processing (arg : args) (arg_demand : infos) max_extra_args
@@ -399,19 +391,19 @@ mk_ww_arg_processing (arg : args) (arg_demand : infos) max_extra_args
   = 	-- For all others at the moment, we just
 	-- pass them to the worker unchanged.
     --pprTrace "Other; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr ";arg=", ppr PprDebug arg, ppr PprDebug arg_demand]) (
-    
+
 	-- Finish args to the right...
     mk_ww_arg_processing args infos max_extra_args
 			`thenUsMaybe` \ (wrap_rest, work_args_info, work_rest) ->
-    
-    returnSUs (Just (
+
+    returnUs (Just (
 	      -- wrapper:
-	      \ hole -> wrap_rest (CoApp hole (CoVarAtom arg)),
-    
+	      \ hole -> wrap_rest (App hole (VarArg arg)),
+
 	      -- worker:
 	      (arg, arg_demand) : work_args_info,
 	      \ hole -> work_rest hole
-    )) 
+    ))
     --)
 \end{code}
 
@@ -426,14 +418,12 @@ In this monad, we thread a @UniqueSupply@, and we carry a
 
 \begin{code}
 type WwM result
-  =  SplitUniqSupply
+  =  UniqSupply
   -> (GlobalSwitch -> Bool)
   -> result
 
-#ifdef __GLASGOW_HASKELL__
 {-# INLINE thenWw #-}
 {-# INLINE returnWw #-}
-#endif
 
 returnWw :: a -> WwM a
 thenWw	 :: WwM a -> (a -> WwM b) -> WwM b
@@ -455,16 +445,16 @@ mapWw f (x:xs)
 
 \begin{code}
 getUniqueWw :: WwM Unique
-uniqSMtoWwM :: SUniqSM a -> WwM a
+uniqSMtoWwM :: UniqSM a -> WwM a
 
-getUniqueWw us sw_chk = getSUnique us
+getUniqueWw us sw_chk = getUnique us
 
 uniqSMtoWwM u_obj us sw_chk = u_obj us
 
-thenUsMaybe :: SUniqSM (Maybe a) -> (a -> SUniqSM (Maybe b)) -> SUniqSM (Maybe b)
+thenUsMaybe :: UniqSM (Maybe a) -> (a -> UniqSM (Maybe b)) -> UniqSM (Maybe b)
 thenUsMaybe m k
-  = m	`thenSUs` \ result ->
+  = m	`thenUs` \ result ->
     case result of
-      Nothing -> returnSUs Nothing
+      Nothing -> returnUs Nothing
       Just x  -> k x
 \end{code}

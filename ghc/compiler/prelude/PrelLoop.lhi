@@ -1,0 +1,25 @@
+Breaks the PrelVal loop and the PrelInfo loop caused by primOpNameInfo.
+
+\begin{code}
+interface PrelLoop where
+
+import PreludePS	( _PackedString )
+
+import Class		( GenClass )
+import CoreUnfold	( mkMagicUnfolding, UnfoldingDetails )
+import IdUtils		( primOpNameInfo )
+import Name		( Name )
+import NameTypes	( mkPreludeCoreName, FullName )
+import PrimOp		( PrimOp )
+import Type		( mkSigmaTy, mkFunTys, GenType )
+import TyVar		( GenTyVar )
+import Unique		( Unique )
+import Usage		( GenUsage )
+
+mkMagicUnfolding :: Unique -> UnfoldingDetails
+mkPreludeCoreName :: _PackedString -> _PackedString -> FullName
+mkSigmaTy :: [a] -> [(GenClass (GenTyVar (GenUsage Unique)) Unique, GenType a b)] -> GenType a b -> GenType a b
+mkFunTys :: [GenType a b] -> GenType a b -> GenType a b
+
+primOpNameInfo	:: PrimOp -> (_PackedString, Name)
+\end{code}

@@ -8,19 +8,17 @@
 #include "../../includes/GhcConstants.h"
 
 module AsmCodeGen (
-#ifdef __GLASGOW_HASKELL__
 	writeRealAsm,
-#endif
 	dumpRealAsm,
 
 	-- And, I guess we need these...
 	AbstractC, GlobalSwitch, SwitchResult,
-	SplitUniqSupply, SUniqSM(..)
+	UniqSupply, UniqSM(..)
     ) where
 
 import AbsCSyn	    ( AbstractC )
 import AbsCStixGen  ( genCodeAbstractC )
-import AbsPrel	    ( PrimKind, PrimOp(..)
+import PrelInfo	    ( PrimRep, PrimOp(..)
 		      IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 		    )
@@ -38,14 +36,9 @@ import I386Desc	    ( mkI386 )
 import SparcDesc    ( mkSparc )
 #endif
 import Stix
-import SplitUniq
-import Unique
+import UniqSupply
 import Unpretty
 import Util
-#if defined(__HBC__)
-import
-       Word
-#endif
 \end{code}
 
 This is a generic assembly language generator for the Glasgow Haskell
@@ -73,7 +66,7 @@ There are two main components to the code generator.
 	with a Twig-like system handling each statement in turn.
 \item A scheduler turns the tree of assembly language orderings
       into a sequence suitable for input to an assembler.
-\end{itemize} 
+\end{itemize}
 The @codeGenerate@ function returns the final assembly language output
 (as a String).	We can return a string, because there is only one way
 of printing the output suitable for assembler consumption. It also
@@ -86,13 +79,13 @@ instructions.  The generic algorithm is heavily inspired by Twig
 (ref), but also draws concepts from (ref).  The basic idea is to
 (dynamically) walk the Abstract C syntax tree, annotating it with
 possible code matches.	For example, on the Sparc, a possible match
-(with its translation) could be 
-@ 
-   := 
-   / \ 
-  i   r2	=> ST r2,[r1] 
+(with its translation) could be
+@
+   :=
+   / \
+  i   r2	=> ST r2,[r1]
   |
-  r1 
+  r1
 @
 where @r1,r2@ are registers, and @i@ is an indirection.	 The Twig
 bit twiddling algorithm for tree matching has been abandoned. It is
@@ -120,27 +113,20 @@ The flag that needs to be added is -fasm-<platform> where platform is one of
 the choices below.
 
 \begin{code}
-
-#ifdef __GLASGOW_HASKELL__
-# if __GLASGOW_HASKELL__ < 23
-# define _FILE _Addr
-# endif
-writeRealAsm :: (GlobalSwitch -> SwitchResult) -> _FILE -> AbstractC -> SplitUniqSupply -> PrimIO ()
+writeRealAsm :: (GlobalSwitch -> SwitchResult) -> _FILE -> AbstractC -> UniqSupply -> PrimIO ()
 
 writeRealAsm flags file absC uniq_supply
   = uppAppendFile file 80 (runNCG (code flags absC) uniq_supply)
 
-#endif
-
-dumpRealAsm :: (GlobalSwitch -> SwitchResult) -> AbstractC -> SplitUniqSupply -> String
+dumpRealAsm :: (GlobalSwitch -> SwitchResult) -> AbstractC -> UniqSupply -> String
 
 dumpRealAsm flags absC uniq_supply = uppShow 80 (runNCG (code flags absC) uniq_supply)
 
 runNCG m uniq_supply = m uniq_supply
 
 code flags absC =
-    genCodeAbstractC target absC		    `thenSUs` \ treelists ->
-    let 
+    genCodeAbstractC target absC		    `thenUs` \ treelists ->
+    let
 	stix = map (map (genericOpt target)) treelists
     in
     codeGen {-target-} sty stix
@@ -163,7 +149,7 @@ code flags absC =
     	Just _ {-???"sparc-sun-solaris2"-} -> mkSparc False flags
 # endif
 #endif
-        _ -> error
+	_ -> error
 	     ("ERROR:Trying to generate assembly language for an unsupported architecture\n"++
 	      "(or one for which this build is not configured).")
 
@@ -186,9 +172,9 @@ introduced some new opportunities for constant-folding wrt address manipulations
 
 \begin{code}
 
-genericOpt 
-    :: Target 
-    -> StixTree 
+genericOpt
+    :: Target
+    -> StixTree
     -> StixTree
 
 \end{code}
@@ -222,11 +208,11 @@ Fold indices together when the types match.
 
 genericOpt target (StIndex pk (StIndex pk' base off) off')
   | pk == pk' =
-    StIndex pk (genericOpt target base) 
+    StIndex pk (genericOpt target base)
     	       (genericOpt target (StPrim IntAddOp [off, off']))
 
 genericOpt target (StIndex pk base off) =
-    StIndex pk (genericOpt target base) 
+    StIndex pk (genericOpt target base)
     	       (genericOpt target off)
 
 \end{code}
@@ -246,8 +232,8 @@ Replace register leaves with appropriate StixTrees for the given target.
 
 \begin{code}
 
-genericOpt target leaf@(StReg (StixMagicId id)) = 
-    case stgReg target id of 
+genericOpt target leaf@(StReg (StixMagicId id)) =
+    case stgReg target id of
     	Always tree -> genericOpt target tree
     	Save _     -> leaf
 
@@ -271,7 +257,7 @@ primOpt op arg@[StInt x] =
     	IntAbsOp -> StInt (abs x)
     	_ -> StPrim op arg
 
-primOpt op args@[StInt x, StInt y] = 
+primOpt op args@[StInt x, StInt y] =
     case op of
     	CharGtOp -> StInt (if x > y then 1 else 0)
     	CharGeOp -> StInt (if x >= y then 1 else 0)
@@ -299,18 +285,13 @@ can match for strength reductions.  Note that the code generator will
 also assume that constants have been shifted to the right when possible.
 
 \begin{code}
-
-primOpt op [x@(StInt _), y]    | commutableOp op = primOpt op [y, x]
---OLD:
---primOpt op [x@(StDouble _), y] | commutableOp op = primOpt op [y, x]
-
+primOpt op [x@(StInt _), y] | commutableOp op = primOpt op [y, x]
 \end{code}
 
 We can often do something with constants of 0 and 1 ...
 
 \begin{code}
-
-primOpt op args@[x, y@(StInt 0)] = 
+primOpt op args@[x, y@(StInt 0)] =
     case op of
     	IntAddOp -> x
     	IntSubOp -> x
@@ -325,73 +306,40 @@ primOpt op args@[x, y@(StInt 0)] =
     	ISrlOp -> x
     	_ -> StPrim op args
 
-primOpt op args@[x, y@(StInt 1)] = 
+primOpt op args@[x, y@(StInt 1)] =
     case op of
     	IntMulOp -> x
     	IntQuotOp -> x
     	IntRemOp -> StInt 0
     	_ -> StPrim op args
-
--- The following code tweaks a bug in early versions of GHC (pre-0.21)
-
-{- OLD: (death to constant folding in ncg)
-primOpt op args@[x, y@(StDouble 0.0)] = 
-    case op of
-    	FloatAddOp -> x
-    	FloatSubOp -> x
-    	FloatMulOp -> y
-    	DoubleAddOp -> x
-    	DoubleSubOp -> x
-    	DoubleMulOp -> y
-    	_ -> StPrim op args
-
-primOpt op args@[x, y@(StDouble 1.0)] = 
-    case op of
-    	FloatMulOp -> x
-    	FloatDivOp -> x
-    	DoubleMulOp -> x
-    	DoubleDivOp -> x
-    	_ -> StPrim op args
-
-primOpt op args@[x, y@(StDouble 2.0)] =
-    case op of
-    	FloatMulOp -> StPrim FloatAddOp [x, x]
-    	DoubleMulOp -> StPrim DoubleAddOp [x, x]
-    	_ -> StPrim op args
--}
-
 \end{code}
 
 Now look for multiplication/division by powers of 2 (integers).
 
 \begin{code}
-
-primOpt op args@[x, y@(StInt n)] = 
+primOpt op args@[x, y@(StInt n)] =
     case op of
     	IntMulOp -> case exact_log2 n of
-            Nothing -> StPrim op args
+	    Nothing -> StPrim op args
     	    Just p -> StPrim SllOp [x, StInt p]
     	IntQuotOp -> case exact_log2 n of
-            Nothing -> StPrim op args
+	    Nothing -> StPrim op args
     	    Just p -> StPrim SraOp [x, StInt p]
     	_ -> StPrim op args
-
 \end{code}
 
 Anything else is just too hard.
 
 \begin{code}
-
 primOpt op args = StPrim op args
-
 \end{code}
 
-The commutable ops are those for which we will try to move constants to the
-right hand side for strength reduction.
+The commutable ops are those for which we will try to move constants
+to the right hand side for strength reduction.
 
 \begin{code}
-
 commutableOp :: PrimOp -> Bool
+
 commutableOp CharEqOp = True
 commutableOp CharNeOp = True
 commutableOp IntAddOp = True
@@ -411,50 +359,26 @@ commutableOp DoubleMulOp = True
 commutableOp DoubleEqOp = True
 commutableOp DoubleNeOp = True
 commutableOp _ = False
-
 \end{code}
 
-This algorithm for determining the $\log_2$ of exact powers of 2 comes from gcc.  It
-requires bit manipulation primitives, so we have a ghc version and an hbc version.
-Other Haskell compilers are on their own.
+This algorithm for determining the $\log_2$ of exact powers of 2 comes
+from gcc.  It requires bit manipulation primitives, so we have a ghc
+version and an hbc version.  Other Haskell compilers are on their own.
 
 \begin{code}
-
-#ifdef __GLASGOW_HASKELL__
-
 w2i x = word2Int# x
 i2w x = int2Word# x
 i2w_s x = (x::Int#)
 
 exact_log2 :: Integer -> Maybe Integer
-exact_log2 x 
+exact_log2 x
     | x <= 0 || x >= 2147483648 = Nothing
     | otherwise = case fromInteger x of
-        I# x# -> if (w2i ((i2w x#) `and#` (i2w (0# -# x#))) /=# x#) then Nothing
+	I# x# -> if (w2i ((i2w x#) `and#` (i2w (0# -# x#))) /=# x#) then Nothing
     	         else Just (toInteger (I# (pow2 x#)))
 
     	    where pow2 x# | x# ==# 1# = 0#
     	    	    	  | otherwise = 1# +# pow2 (w2i (i2w x# `shiftr` i2w_s 1#))
 
-# if __GLASGOW_HASKELL__ >= 23
 		  shiftr x y = shiftRA# x y
-# else
-		  shiftr x y = shiftR#  x y
-# endif
-
-#else {-probably HBC-}
-
-exact_log2 :: Integer -> Maybe Integer
-exact_log2 x 
-    | x <= 0 || x >= 2147483648 = Nothing
-    | otherwise =
-    	if x' `bitAnd` (-x') /= x' then Nothing
-    	else Just (toInteger (pow2 x'))
-
-            where x' = ((fromInteger x) :: Word)
-    	    	  pow2 x | x == bit0 = 0 :: Int
-    	                 | otherwise = 1 + pow2 (x `bitRsh` 1)
-
-#endif {-probably HBC-}
-
 \end{code}

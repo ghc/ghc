@@ -8,34 +8,38 @@
 
 module PrelVals where
 
-import PrelFuns		-- help functions, types and things
-import BasicLit		( mkMachInt, BasicLit(..), PrimKind )
+import Ubiq
+import IdLoop		( UnfoldingGuidance(..) )
+import PrelLoop
+
+-- friends:
+import PrelMods
 import TysPrim
 import TysWiredIn
-#ifdef DPH
-import TyPod		( mkPodNTy ,mkPodTy )
-import TyProcs		( mkProcessorTy )
-#endif {- Data Parallel Haskell -}
 
-#ifndef DPH
-import AbsUniType
-import Id		( mkTemplateLocals, mkTupleCon, getIdUniType,
-			  mkSpecId
-			)
-#else
-import AbsUniType	( mkSigmaTy, mkDictTy, mkTyVarTy , SigmaType(..),
-			  applyTyCon, splitType, specialiseTy
-			)
-import Id		( mkTemplateLocals, mkTupleCon, getIdUniType,
-			  mkSpecId, mkProcessorCon
-			)
-#endif {- Data Parallel Haskell -}
-import IdInfo
+-- others:
+import CoreSyn		-- quite a bit
+--import CoreUnfold	( UnfoldingGuidance(..), mkMagicUnfolding )
+import IdInfo		-- quite a bit
+import Literal		( mkMachInt )
+--import NameTypes	( mkPreludeCoreName )
+import PrimOp		( PrimOp(..) )
+import SpecEnv		( SpecEnv(..), nullSpecEnv )
+--import Type		( mkSigmaTy, mkFunTys, GenType(..) )
+import TyVar		( alphaTyVar, betaTyVar )
+import Unique		-- lots of *Keys
+import Util		( panic )
 
-import Maybes		( Maybe(..) )
-import PlainCore	-- to make unfolding templates
-import Unique		-- *Key things
-import Util
+-- only used herein:
+mkPreludeId = panic "PrelVals:Id.mkPreludeId"
+mkSpecId = panic "PrelVals:Id.mkSpecId"
+mkTemplateLocals = panic "PrelVals:Id.mkTemplateLocals"
+specialiseTy = panic "PrelVals:specialiseTy"
+
+pcMiscPrelId :: Unique{-IdKey-} -> FAST_STRING -> FAST_STRING -> Type -> IdInfo -> Id
+
+pcMiscPrelId key mod name ty info
+ = mkPreludeId	key (mkPreludeCoreName mod name) ty info
 \end{code}
 
 %************************************************************************
@@ -73,14 +77,14 @@ pAT_ERROR_ID
 
 aBSENT_ERROR_ID
   = pc_bottoming_Id absentErrorIdKey pRELUDE_BUILTIN SLIT("absent#")
-	(mkSigmaTy [alpha_tv] [] alpha)
+	(mkSigmaTy [alphaTyVar] [] alphaTy)
 
 pAR_ERROR_ID
   = pcMiscPrelId parErrorIdKey pRELUDE_BUILTIN SLIT("parError#")
-    (mkSigmaTy [alpha_tv] [] alpha) noIdInfo
+    (mkSigmaTy [alphaTyVar] [] alphaTy) noIdInfo
 
-errorTy  :: UniType
-errorTy  = mkSigmaTy [alpha_tv] [] (UniFun (mkListTy charTy) alpha)
+errorTy  :: Type
+errorTy  = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy] alphaTy)
 \end{code}
 
 We want \tr{_trace} (NB: name not in user namespace) to be wired in
@@ -95,7 +99,7 @@ tRACE_ID
   = pcMiscPrelId traceIdKey pRELUDE_BUILTIN SLIT("_trace") traceTy
 	(noIdInfo `addInfo` pcGenerateSpecs traceIdKey tRACE_ID noIdInfo traceTy)
   where
-    traceTy = mkSigmaTy [alpha_tv] [] (UniFun (mkListTy charTy) (UniFun alpha alpha))
+    traceTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy, alphaTy] alphaTy)
 \end{code}
 
 %************************************************************************
@@ -105,53 +109,42 @@ tRACE_ID
 %************************************************************************
 
 \begin{code}
-{- OLD:
-int2IntegerId
-  = pcMiscPrelId int2IntegerIdKey pRELUDE_BUILTIN SLIT("_int2Integer")
-	(UniFun intTy integerTy)
-	noIdInfo
--}
-
---------------------------------------------------------------------
-
 packStringForCId
   = pcMiscPrelId packCStringIdKey{-ToDo:rename-} pRELUDE_PS SLIT("_packStringForC")
-	(UniFun stringTy byteArrayPrimTy) noIdInfo
+	(mkFunTys [stringTy] byteArrayPrimTy) noIdInfo
 
 --------------------------------------------------------------------
 
 unpackCStringId
   = pcMiscPrelId unpackCStringIdKey pRELUDE_BUILTIN SLIT("unpackPS#")
-		 (addrPrimTy{-a char *-} `UniFun` stringTy) noIdInfo
+		 (mkFunTys [addrPrimTy{-a char *-}] stringTy) noIdInfo
 -- Andy says:
---	(UniFun addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` mkArityInfo 1)
+--	(FunTy addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` mkArityInfo 1)
 -- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
   = pcMiscPrelId unpackCString2IdKey pRELUDE_BUILTIN SLIT("unpackPS2#")
-		 (addrPrimTy{-a char *-}
-	`UniFun` (intPrimTy -- length
-	`UniFun` stringTy)) noIdInfo
-
+		 (mkFunTys [addrPrimTy{-a char *-}, intPrimTy{-length-}] stringTy)
+		 noIdInfo
 
 --------------------------------------------------------------------
 unpackCStringAppendId
   = pcMiscPrelId unpackCStringAppendIdKey pRELUDE_BUILTIN SLIT("unpackAppendPS#")
-				(addrPrimTy{-a "char *" pointer-} 
-		`UniFun`	(stringTy
-		`UniFun`	stringTy)) ((noIdInfo 
-				`addInfo_UF` mkMagicUnfolding SLIT("unpackAppendPS#"))
-				`addInfo` mkArityInfo 2)
-  
+		(mkFunTys [addrPrimTy{-a "char *" pointer-},stringTy] stringTy)
+		((noIdInfo
+		 `addInfo_UF` mkMagicUnfolding unpackCStringAppendIdKey)
+		 `addInfo` mkArityInfo 2)
+
 unpackCStringFoldrId
   = pcMiscPrelId unpackCStringFoldrIdKey pRELUDE_BUILTIN SLIT("unpackFoldrPS#")
-		(mkSigmaTy [alpha_tv] [] 
-			   (addrPrimTy{-a "char *" pointer-} 
-		`UniFun`   ((charTy `UniFun` (alpha `UniFun` alpha))
-		`UniFun`   (alpha
-		`UniFun`   alpha)))) ((noIdInfo 
-				`addInfo_UF` mkMagicUnfolding SLIT("unpackFoldrPS#"))
-				`addInfo` mkArityInfo 3)
+		(mkSigmaTy [alphaTyVar] []
+		(mkFunTys [addrPrimTy{-a "char *" pointer-},
+			   mkFunTys [charTy, alphaTy] alphaTy,
+			   alphaTy]
+			  alphaTy))
+		((noIdInfo
+		 `addInfo_UF` mkMagicUnfolding unpackCStringFoldrIdKey)
+		 `addInfo` mkArityInfo 3)
 \end{code}
 
 OK, this is Will's idea: we should have magic values for Integers 0,
@@ -173,13 +166,6 @@ integerMinusOneId
 %*									*
 %************************************************************************
 
-In the definitions that follow, we use the @TyVar@-based
-alpha/beta/gamma types---not the usual @TyVarTemplate@ ones.
-
-This is so the @TyVars@ in the @CoTyLams@ (@alpha_tyvar@, etc) match
-up with those in the types of the {\em lambda-bound} template-locals
-we create (using types @alpha_ty@, etc.).
-
 \begin{code}
 --------------------------------------------------------------------
 -- seqId :: "_seq_", used w/ GRIP, etc., is really quite similar to
@@ -197,25 +183,23 @@ we create (using types @alpha_ty@, etc.).
 -}
 
 seqId = pcMiscPrelId seqIdKey pRELUDE_BUILTIN SLIT("_seq_")
-		  (mkSigmaTy [alpha_tv, beta_tv] []
-		    (alpha `UniFun` (beta `UniFun` beta)))
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding seq_template))
   where
     [x, y, z]
       = mkTemplateLocals [
-    	{-x-} alpha_ty,
-    	{-y-} beta_ty,
-        {-z-} intPrimTy
+    	{-x-} alphaTy,
+    	{-y-} betaTy,
+	{-z-} intPrimTy
     	]
 
     seq_template
-      = CoTyLam alpha_tyvar
-    	  (CoTyLam beta_tyvar
-	     (mkCoLam [x, y] (
-		CoCase (CoPrim SeqOp [alpha_ty] [CoVarAtom x]) (
-		  CoPrimAlts
-		    [(mkMachInt 0, CoTyApp (CoVar pAR_ERROR_ID) beta_ty)]
-		    (CoBindDefault z (CoVar y))))))
+      = mkLam [alphaTyVar, betaTyVar] [x, y] (
+		Case (Prim SeqOp [TyArg alphaTy, VarArg x]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
 
 --------------------------------------------------------------------
 -- parId :: "_par_", also used w/ GRIP, etc.
@@ -234,50 +218,46 @@ seqId = pcMiscPrelId seqIdKey pRELUDE_BUILTIN SLIT("_seq_")
 
 -}
 parId = pcMiscPrelId parIdKey pRELUDE_BUILTIN SLIT("_par_")
-		  (mkSigmaTy [alpha_tv, beta_tv] []
-		    (alpha `UniFun` (beta `UniFun` beta)))
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding par_template))
   where
     [x, y, z]
       = mkTemplateLocals [
-    	{-x-} alpha_ty,
-    	{-y-} beta_ty,
-        {-z-} intPrimTy
+    	{-x-} alphaTy,
+    	{-y-} betaTy,
+	{-z-} intPrimTy
     	]
 
     par_template
-      = CoTyLam alpha_tyvar
-    	  (CoTyLam beta_tyvar
-	     (mkCoLam [x, y] (
-		CoCase (CoPrim ParOp [alpha_ty] [CoVarAtom x]) (
-		  CoPrimAlts
-		    [(mkMachInt 0, CoTyApp (CoVar pAR_ERROR_ID) beta_ty)]
-		    (CoBindDefault z (CoVar y))))))
+      = mkLam [alphaTyVar, betaTyVar] [x, y] (
+		Case (Prim ParOp [TyArg alphaTy, VarArg x]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
 
 -- forkId :: "_fork_", for *required* concurrent threads
 {-
    _fork_ = /\ a b -> \ x::a y::b -> case fork# x of { 0# -> parError#; _ -> y; }
 -}
 forkId = pcMiscPrelId forkIdKey pRELUDE_BUILTIN SLIT("_fork_")
-		  (mkSigmaTy [alpha_tv, beta_tv] []
-		    (alpha `UniFun` (beta `UniFun` beta)))
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding fork_template))
   where
     [x, y, z]
       = mkTemplateLocals [
-    	{-x-} alpha_ty,
-    	{-y-} beta_ty,
-        {-z-} intPrimTy
+    	{-x-} alphaTy,
+    	{-y-} betaTy,
+	{-z-} intPrimTy
     	]
 
     fork_template
-      = CoTyLam alpha_tyvar
-    	  (CoTyLam beta_tyvar
-	     (mkCoLam [x, y] (
-		CoCase (CoPrim ForkOp [alpha_ty] [CoVarAtom x]) (
-		  CoPrimAlts
-		    [(mkMachInt 0, CoTyApp (CoVar pAR_ERROR_ID) beta_ty)]
-		    (CoBindDefault z (CoVar y))))))
+      = mkLam [alphaTyVar, betaTyVar] [x, y] (
+		Case (Prim ForkOp [TyArg alphaTy, VarArg x]) (
+		  PrimAlts
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    (BindDefault z (Var y))))
 
 \end{code}
 
@@ -285,139 +265,46 @@ forkId = pcMiscPrelId forkIdKey pRELUDE_BUILTIN SLIT("_fork_")
 #ifdef GRAN
 
 parLocalId = pcMiscPrelId parLocalIdKey pRELUDE_BUILTIN SLIT("_parLocal_")
-		  (mkSigmaTy [alpha_tv, beta_tv] []
-		    (intPrimTy `UniFun` (alpha `UniFun` (beta `UniFun` beta))))
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [intPrimTy, alphaTy, betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parLocal_template))
   where
     [w, x, y, z]
       = mkTemplateLocals [
 	{-w-} intPrimTy,
-    	{-x-} alpha_ty,
-    	{-y-} beta_ty,
-	{-z-} beta_ty
+    	{-x-} alphaTy,
+    	{-y-} betaTy,
+	{-z-} betaTy
     	]
 
     parLocal_template
-      = CoTyLam alpha_tyvar
-    	  (CoTyLam beta_tyvar
-	     (mkCoLam [w, x, y] (
-		CoCase (CoPrim ParLocalOp [alpha_ty, beta_ty] [CoVarAtom x, CoVarAtom w, CoVarAtom y]) (
-		  CoAlgAlts
-		    [(liftDataCon, [z], CoVar z)]
-		    (CoNoDefault)))))
+      = mkLam [alphaTyVar, betaTyVar] [w, x, y] (
+		Case (Prim ParLocalOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg w, VarArg y]) (
+		  AlgAlts
+		    [(liftDataCon, [z], Var z)]
+		    (NoDefault)))
 
 parGlobalId = pcMiscPrelId parGlobalIdKey pRELUDE_BUILTIN SLIT("_parGlobal_")
-		  (mkSigmaTy [alpha_tv, beta_tv] []
-		    (intPrimTy `UniFun` (alpha `UniFun` (beta `UniFun` beta))))
+		  (mkSigmaTy [alphaTyVar, betaTyVar] []
+		    (mkFunTys [intPrimTy,alphaTy,betaTy] betaTy))
 		  (noIdInfo `addInfo_UF` (mkUnfolding EssentialUnfolding parGlobal_template))
   where
     [w, x, y, z]
       = mkTemplateLocals [
     	{-w-} intPrimTy,
-    	{-x-} alpha_ty,
-    	{-y-} beta_ty,
-	{-z-} beta_ty
+    	{-x-} alphaTy,
+    	{-y-} betaTy,
+	{-z-} betaTy
     	]
 
     parGlobal_template
-      = CoTyLam alpha_tyvar
-    	  (CoTyLam beta_tyvar
-	     (mkCoLam [w, x, y] (
-		CoCase (CoPrim ParGlobalOp [alpha_ty, beta_ty] [CoVarAtom x, CoVarAtom w, CoVarAtom y]) (
-		  CoAlgAlts
-		    [(liftDataCon, [z], CoVar z)]
-		    (CoNoDefault)))))
+      = mkLam [alphaTyVar, betaTyVar] [w, x, y] (
+		Case (Prim ParGlobalOp [TyArg alphaTy, TyArg betaTy, VarArg x, VarArg w, VarArg y]) (
+		  AlgAlts
+		    [(liftDataCon, [z], Var z)]
+		    (NoDefault)))
 
 #endif {-GRAN-}
-\end{code}
-
-\begin{code}
-#ifdef DPH
-vectorMapId = pcChooseToKnowId vectorMapU pRELUDE "vectorMap"
-              (mkSigmaTy [alpha_tv, beta_tv , gamma_tv]
-			 [(pidClass,alpha)]
-	      ((beta `UniFun` gamma) 			 `UniFun`
-	         ((mkPodTy (mkProcessorTy [alpha] beta)) `UniFun`
-		    (mkPodTy (mkProcessorTy [alpha] gamma)))))
-	      (panic "vectorMap:unfolding")--ToDo:DPH: (mkUnfoldTemplate vector_map_template)
-	      [(2,"","")]
- where
-{-
-vectorMap fn vec = << (|x;fn y|) | (|x;y|) <<- vec >>
-
-Simplified :
-vectorMap :: for all a.83, b.82, c.86. <Pid a.83>
-	  -> (b.82 -> c.86)
-	  -> <<a.83;b.82>>
-	  -> <<a.83;c.86>>
-vectorMap =
-    /\ t83 t82 o86 -> \ dict.127 ->
-        let
-          vecMap.128 =
-              \ fn.129 vec.130 ->
-                  << let si.133 = fn.129 ds.132 in
-                     let
-                       si.134 =
-                           (fromDomain t82)
-                               dict.127 ((toDomain t82) dict.127 ds.131)
-                     in  MkProcessor1! Integer o86 si.134 si.133 |
-                      (| ds.131 ; ds.132 |) <<- vec.130 >>
-        in  vecMap.128
-
- NOTE : no need to bother with overloading in class Pid; because the result
-	PID (si.133) is wrapped in fromDomain.toDomain == id . Therefore we
-	use the simplification below.
-
-Simplified:
-vectorMap ::
-    for all d.83, e.82, f.86.
-        <Pid e.82> -> (d.83 -> f.86) -> <<e.82;d.83>> -> <<e.82;f.86>>
-vectorMap =
-    /\ t83 t82 o86 -> \ dict.127 fn.129 vec.130 ->
-    << MkProcessor1! Integer o86 ds.131 (fn.129 ds.132) |
-                      (| ds.131 ; ds.132 |) <<- vec.130 >>
--}
-
-    vector_map_template
-      = let
-	   [dict,fn,vec,ds131,ds132]
-	     = mkTemplateLocals
-		    [mkDictTy pidClass alpha_ty,
-		     beta_ty `UniFun` gamma_ty,
-		     mkPodTy (mkProcessorTy [alpha_ty] beta_ty),
-		     integerTy,
-		     beta_ty]
-	in
-	  CoTyLam alpha_tyvar
-	    (CoTyLam beta_tyvar
-              (CoTyLam gamma_tyvar
-	        (mkCoLam [dict,fn,vec]
-	          (CoZfExpr
-		    (CoCon (mkProcessorCon 1)
-			   [integerTy,mkTyVarTy gamma_tyvar]
-			   [CoVar ds131,
-			    (CoApp (CoVar fn) (CoVar ds132))])
-		    (CoDrawnGen [ds131] ds132 (CoVar vec)) ))))
-
-#endif {- Data Parallel Haskell -}
-\end{code}
-
-\begin{code}
-#ifdef DPH
--- A function used during podization that produces an index POD for a given
--- POD as argument.
-
-primIfromPodNSelectorId :: Int -> Int -> Id
-primIfromPodNSelectorId i n
-   = pcMiscPrelId
-	podSelectorIdKey
-	pRELUDE_BUILTIN
-        ("prim"++ show i ++ "fromPod" ++ show n ++ "Selector")
-        (UniFun
-	   (mkPodNTy n alpha)
-	   (mkPodNTy n alpha))
-	noIdInfo
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 %************************************************************************
@@ -437,39 +324,6 @@ showParen	:: Bool -> ShowS -> ShowS
 (++)		:: [a] -> [a] -> [a]
 readParen	:: Bool -> ReadS a -> ReadS a
 lex		:: ReadS String
-
-\begin{code}
-{- OLD:
-readS_ty :: UniType -> UniType
-readS_ty ty
-  = UniFun stringTy (mkListTy (mkTupleTy 2 [ty, stringTy]))
-
-showS_ty :: UniType
-showS_ty = UniFun stringTy stringTy
--}
-\end{code}
-
-\begin{code}
-{- OLD:
-showSpaceId = pcMiscPrelId showSpaceIdKey pRELUDE_TEXT SLIT("_showSpace")
-				showS_ty
-				noIdInfo
-
-showParenId = pcMiscPrelId showParenIdKey pRELUDE_TEXT SLIT("showParen")
-				(boolTy `UniFun` (showS_ty `UniFun` showS_ty))
-				noIdInfo
-
-readParenId = pcMiscPrelId readParenIdKey pRELUDE_TEXT SLIT("readParen")
-				(mkSigmaTy [alpha_tv] [] (
-				 boolTy `UniFun` (
-				 (readS_ty alpha) `UniFun` (readS_ty alpha))))
-				noIdInfo
-
-lexId = pcMiscPrelId lexIdKey pRELUDE_TEXT SLIT("lex")
-				(readS_ty (mkListTy charTy))
-				noIdInfo
--}
-\end{code}
 
 %************************************************************************
 %*									*
@@ -498,46 +352,45 @@ voidPrimId
 --	     forall a. (forall s. (_State s -> (a, _State s))) -> a
 
 _runST a m = case m _RealWorld (S# _RealWorld realWorld#) of
-               (r :: a, wild :: _State _RealWorld) -> r
+	       (r :: a, wild :: _State _RealWorld) -> r
 \end{verbatim}
 We unfold always, just for simplicity:
 \begin{code}
 runSTId
   = pcMiscPrelId runSTIdKey pRELUDE_BUILTIN SLIT("_runST") run_ST_ty id_info
   where
-    s_tv = beta_tv
-    s	 = beta
+    s_tv = betaTyVar
+    s	 = betaTy
 
     st_ty a = mkSigmaTy [s_tv] [] (mkStateTransformerTy s a)
 
     run_ST_ty
-      = mkSigmaTy [alpha_tv] [] (st_ty alpha `UniFun` alpha)
+      = mkSigmaTy [alphaTyVar] [] (mkFunTys [st_ty alphaTy] alphaTy)
 	    -- NB: rank-2 polymorphism! (forall inside the st_ty...)
 
     id_info
       = noIdInfo
 	`addInfo` mkArityInfo 1
-        `addInfo` mkStrictnessInfo [WwStrict] Nothing
+	`addInfo` mkStrictnessInfo [WwStrict] Nothing
 	`addInfo` mkArgUsageInfo [ArgUsage 1]
 	-- ABSOLUTELY NO UNFOLDING, e.g.: (mkUnfolding EssentialUnfolding run_ST_template)
 	-- see example below
 {- OUT:
     [m, t, r, wild]
       = mkTemplateLocals [
-	{-m-} st_ty alpha_ty,
+	{-m-} st_ty alphaTy,
 	{-t-} realWorldStateTy,
-	{-r-} alpha_ty,
+	{-r-} alphaTy,
 	{-_-} realWorldStateTy
 	]
 
     run_ST_template
-      = CoTyLam alpha_tyvar
-	 (mkCoLam [m] (
-	    CoLet (CoNonRec t (CoCon stateDataCon [realWorldTy] [CoVarAtom realWorldPrimId])) (
-	      CoCase (CoApp (mkCoTyApp (CoVar m) realWorldTy) (CoVarAtom t)) (
-		CoAlgAlts
-		  [(mkTupleCon 2, [r, wild], CoVar r)]
-		  CoNoDefault))))
+      = mkLam [alphaTyVar] [m] (
+	    Let (NonRec t (Con stateDataCon [TyArg realWorldTy, VarArg realWorldPrimId])) (
+	      Case (App (mkTyApp (Var m) [realWorldTy]) (VarArg t)) (
+		AlgAlts
+		  [(mkTupleCon 2, [r, wild], Var r)]
+		  NoDefault)))
 -}
 \end{code}
 
@@ -571,7 +424,7 @@ f = let
 All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 
 @realWorld#@ used to be a magic literal, \tr{void#}.  If things get
-nasty as-is, change it back to a literal (@BasicLit@).
+nasty as-is, change it back to a literal (@Literal@).
 \begin{code}
 realWorldPrimId
   = pcMiscPrelId realWorldPrimIdKey pRELUDE_BUILTIN SLIT("realWorld#")
@@ -586,40 +439,22 @@ realWorldPrimId
 %************************************************************************
 
 \begin{code}
-{- NO:
-rangeComplaint_Ix_IntId
- = pcMiscPrelId rangeComplaintIdKey pRELUDE_BUILTIN SLIT("_rangeComplaint_Ix_Int") my_ty id_info
-  where
-    my_ty
-      = mkSigmaTy [alpha_tv] [] (
-			intPrimTy `UniFun` (
-			intPrimTy `UniFun` (
-			intPrimTy `UniFun` alpha)))
-    id_info
-      = noIdInfo
-	`addInfo` mkArityInfo 3
-        `addInfo` mkBottomStrictnessInfo
--}
-\end{code}
-
-\begin{code}
 buildId
   = pcMiscPrelId buildIdKey pRELUDE_CORE SLIT("_build") buildTy
-	((((noIdInfo 
-		`addInfo_UF` mkMagicUnfolding SLIT("build"))
+	((((noIdInfo
+		`addInfo_UF` mkMagicUnfolding buildIdKey)
 		`addInfo` mkStrictnessInfo [WwStrict] Nothing)
 		`addInfo` mkArgUsageInfo [ArgUsage 2])
-	        `addInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
+		`addInfo` pcGenerateSpecs buildIdKey buildId noIdInfo{-ToDo-} buildTy)
 	-- cheating, but since _build never actually exists ...
   where
     -- The type of this strange object is:
     --  \/ a . (\/ b . (a -> b -> b) -> b -> b) -> [a]
 
-    buildTy = mkSigmaTy [alpha_tv] [] (buildUniTy `UniFun` (mkListTy alpha))
+    buildTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [build_ty] (mkListTy alphaTy))
 	where
-	    buildUniTy = mkSigmaTy [beta_tv] []
-		    ((alpha `UniFun` (beta `UniFun` beta))
-			    `UniFun` (beta `UniFun` beta))
+	    build_ty = mkSigmaTy [betaTyVar] []
+			(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, betaTy] betaTy)
 \end{code}
 
 @mkBuild@ is sugar for building a build!
@@ -635,83 +470,65 @@ buildId
 @e@ is the object right inside the @build@
 
 \begin{code}
-mkBuild :: UniType
+mkBuild :: Type
 	-> TyVar
 	-> Id
 	-> Id
 	-> Id
-	-> PlainCoreExpr -- template
-	-> PlainCoreExpr -- template
+	-> CoreExpr -- template
+	-> CoreExpr -- template
 
 mkBuild ty tv c n g expr
- = CoLet (CoNonRec g (CoTyLam tv (mkCoLam [c,n] expr)))
-	 (CoApp (mkCoTyApp (CoVar buildId) ty) (CoVarAtom g))
+  = Let (NonRec g (mkLam [tv] [c,n] expr))
+	(App (mkTyApp (Var buildId) [ty]) (VarArg g))
 \end{code}
 
 \begin{code}
 augmentId
-  = pcMiscPrelId buildIdKey pRELUDE_CORE SLIT("_augment") augmentTy
-	(((noIdInfo 
-		`addInfo_UF` mkMagicUnfolding SLIT("augment"))
+  = pcMiscPrelId augmentIdKey pRELUDE_CORE SLIT("_augment") augmentTy
+	(((noIdInfo
+		`addInfo_UF` mkMagicUnfolding augmentIdKey)
 		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
 		`addInfo` mkArgUsageInfo [ArgUsage 2,UnknownArgUsage])
-	-- cheating, but since _build never actually exists ...
+	-- cheating, but since _augment never actually exists ...
   where
     -- The type of this strange object is:
     --  \/ a . (\/ b . (a -> b -> b) -> b -> b) -> [a] -> [a]
 
-    augmentTy = mkSigmaTy [alpha_tv] [] (buildUniTy `UniFun` 
-					(mkListTy alpha `UniFun` mkListTy alpha))
+    augmentTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [aug_ty, mkListTy alphaTy] (mkListTy alphaTy))
 	where
-	    buildUniTy = mkSigmaTy [beta_tv] []
-		    ((alpha `UniFun` (beta `UniFun` beta))
-			    `UniFun` (beta `UniFun` beta))
+	    aug_ty = mkSigmaTy [betaTyVar] []
+			(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, betaTy] betaTy)
 \end{code}
-
-mkFoldr ty_a ty_b [x,y...] => foldr ty_a ty_b x y ..
 
 \begin{code}
 foldrId = pcMiscPrelId foldrIdKey pRELUDE_FB{-not "List"-} SLIT("foldr")
 		 foldrTy idInfo
   where
 	foldrTy =
-	  mkSigmaTy [alpha_tv, beta_tv] []
-		((alpha `UniFun` (beta `UniFun` beta))
-		`UniFun` (beta
-		`UniFun` ((mkListTy alpha)
-		`UniFun` beta)))
+	  mkSigmaTy [alphaTyVar, betaTyVar] []
+		(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, betaTy, mkListTy alphaTy] betaTy)
 
-	idInfo = (((((noIdInfo 
-			`addInfo_UF` mkMagicUnfolding SLIT("foldr"))
+	idInfo = (((((noIdInfo
+			`addInfo_UF` mkMagicUnfolding foldrIdKey)
 			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
 			`addInfo` mkArityInfo 3)
 			`addInfo` mkUpdateInfo [2,2,1])
-	        	`addInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
-
-mkFoldr a b f z xs = foldl CoApp
-			   (mkCoTyApps (CoVar foldrId) [a, b]) 
-			   [CoVarAtom f,CoVarAtom z,CoVarAtom xs]
+			`addInfo` pcGenerateSpecs foldrIdKey foldrId noIdInfo{-ToDo-} foldrTy)
 
 foldlId = pcMiscPrelId foldlIdKey pRELUDE_FB{-not "List"-} SLIT("foldl")
 		 foldlTy idInfo
   where
 	foldlTy =
-	  mkSigmaTy [alpha_tv, beta_tv] []
-		((alpha `UniFun` (beta `UniFun` alpha))
-		`UniFun` (alpha
-		`UniFun` ((mkListTy beta)
-		`UniFun` alpha)))
+	  mkSigmaTy [alphaTyVar, betaTyVar] []
+		(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, alphaTy, mkListTy betaTy] alphaTy)
 
-	idInfo = (((((noIdInfo 
-			`addInfo_UF` mkMagicUnfolding SLIT("foldl"))
+	idInfo = (((((noIdInfo
+			`addInfo_UF` mkMagicUnfolding foldlIdKey)
 			`addInfo` mkStrictnessInfo [WwLazy False,WwLazy False,WwStrict] Nothing)
 			`addInfo` mkArityInfo 3)
 			`addInfo` mkUpdateInfo [2,2,1])
-	        	`addInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
-
-mkFoldl a b f z xs = foldl CoApp
-			   (mkCoTyApps (CoVar foldlId) [a, b]) 
-			   [CoVarAtom f,CoVarAtom z,CoVarAtom xs]
+			`addInfo` pcGenerateSpecs foldlIdKey foldlId noIdInfo{-ToDo-} foldlTy)
 
 -- A bit of magic goes no here. We translate appendId into ++,
 -- you have to be carefull when you actually compile append:
@@ -719,7 +536,7 @@ mkFoldl a b f z xs = foldl CoApp
 --		 {- unfold augment -}
 --		 = foldr (:) ys xs
 --		 {- fold foldr to append -}
---		 = ys `appendId` xs		
+--		 = ys `appendId` xs
 --		 = ys ++ xs		-- ugg!
 -- *BUT* you want (++) and not _append in your interfaces.
 --
@@ -731,12 +548,72 @@ appendId
   = pcMiscPrelId appendIdKey pRELUDE_LIST SLIT("++") appendTy idInfo
   where
     appendTy =
-      (mkSigmaTy [alpha_tv] []
-	    ((mkListTy alpha) `UniFun` ((mkListTy alpha) `UniFun` (mkListTy alpha))))
-    idInfo = (((noIdInfo 
+      (mkSigmaTy [alphaTyVar] []
+	    (mkFunTys [mkListTy alphaTy, mkListTy alphaTy] (mkListTy alphaTy)))
+    idInfo = (((noIdInfo
 		`addInfo` mkStrictnessInfo [WwStrict,WwLazy False] Nothing)
 		`addInfo` mkArityInfo 2)
 		`addInfo` mkUpdateInfo [1,2])
+\end{code}
 
-pRELUDE_FB = SLIT("PreludeFoldrBuild")
+%************************************************************************
+%*									*
+\subsection[PrelUtils-specialisations]{Specialisations for builtin values}
+%*									*
+%************************************************************************
+
+The specialisations which exist for the builtin values must be recorded in
+their IdInfos.
+
+NOTE: THE USES OF THE pcGenerate... FUNCTIONS MUST CORRESPOND
+      TO THE SPECIALISATIONS DECLARED IN THE PRELUDE !!!
+
+HACK: We currently use the same unique for the specialised Ids.
+
+The list @specing_types@ determines the types for which specialised
+versions are created. Note: This should correspond with the
+types passed to the pre-processor with the -genSPECS arg (see ghc.lprl).
+
+ToDo: Create single mkworld definition which is grabbed here and in ghc.lprl
+
+\begin{code}
+pcGenerateSpecs :: Unique -> Id -> IdInfo -> Type -> SpecEnv
+pcGenerateSpecs key id info ty
+  = nullSpecEnv
+
+{- LATER:
+
+pc_gen_specs True key id info ty
+
+pc_gen_specs is_id key id info ty
+ = mkSpecEnv spec_infos
+ where
+   spec_infos = [ let spec_ty = specialiseTy ty spec_tys 0
+		      spec_id = if is_id
+				then mkSpecId key {- HACK WARNING: same unique! -}
+					      id spec_tys spec_ty info
+				else panic "SpecData:SpecInfo:SpecId"
+		  in
+		  SpecInfo spec_tys (length ctxts) spec_id
+		| spec_tys <- specialisations ]
+
+   (tyvars, ctxts, _) = splitSigmaTy ty
+   no_tyvars	      = length tyvars
+
+   specialisations    = if no_tyvars == 0
+			then []
+			else tail (cross_product no_tyvars specing_types)
+
+			-- N.B. tail removes fully polymorphic specialisation
+
+cross_product 0 tys = []
+cross_product 1 tys = map (:[]) tys
+cross_product n tys = concat [map (:cp) tys | cp <- cross_product (n-1) tys]
+
+
+specing_types = [Nothing,
+		 Just charPrimTy,
+		 Just doublePrimTy,
+		 Just intPrimTy ]
+-}
 \end{code}

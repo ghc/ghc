@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %************************************************************************
 %*									*
@@ -31,26 +31,20 @@ useless as map' will be transformed back to what map was.
 \begin{code}
 #include "HsVersions.h"
 
-module StgSAT (
-	doStaticArgs,
+module StgSAT (	doStaticArgs ) where
 
-	-- and to make the interface self-sufficient...
-	PlainStgProgram(..), StgExpr, StgBinding, Id
-    ) where
-
-import IdEnv
 import Maybes		( Maybe(..) )
 import StgSyn
 import SATMonad		( SATEnv(..), SATInfo(..), Arg(..), updSAEnv, insSAEnv,
-                          SatM(..), initSAT, thenSAT, thenSAT_,
-                          emptyEnvSAT, returnSAT, mapSAT )
+			  SatM(..), initSAT, thenSAT, thenSAT_,
+			  emptyEnvSAT, returnSAT, mapSAT )
 import StgSATMonad
-import SplitUniq
+import UniqSupply
 import Util
 \end{code}
 
 \begin{code}
-doStaticArgs :: PlainStgProgram -> SplitUniqSupply -> PlainStgProgram
+doStaticArgs :: [StgBinding] -> UniqSupply -> [StgBinding]
 
 doStaticArgs binds
   = initSAT (mapSAT sat_bind binds)
@@ -73,7 +67,7 @@ doStaticArgs binds
 \end{code}
 
 \begin{code}
-satAtom (StgVarAtom v)
+satAtom (StgVarArg v)
   = updSAEnv (Just (v,([],[]))) `thenSAT_`
     returnSAT ()
 
@@ -81,27 +75,27 @@ satAtom _ = returnSAT ()
 \end{code}
 
 \begin{code}
-satExpr :: PlainStgExpr -> SatM PlainStgExpr
+satExpr :: StgExpr -> SatM StgExpr
 
-satExpr e@(StgConApp con args lvs)
+satExpr e@(StgCon con args lvs)
   = mapSAT satAtom args	    `thenSAT_`
     returnSAT e
 
-satExpr e@(StgPrimApp op args lvs)
+satExpr e@(StgPrim op args lvs)
   = mapSAT satAtom args	    `thenSAT_`
     returnSAT e
 
-satExpr e@(StgApp (StgLitAtom _) _ _)
+satExpr e@(StgApp (StgLitArg _) _ _)
   = returnSAT e
 
-satExpr e@(StgApp (StgVarAtom v) args _)
+satExpr e@(StgApp (StgVarArg v) args _)
   = updSAEnv (Just (v,([],map tagArg args)))	`thenSAT_`
     mapSAT satAtom args				`thenSAT_`
     returnSAT e
-  where 
-    tagArg (StgVarAtom v) = Static v
+  where
+    tagArg (StgVarArg v) = Static v
     tagArg _              = NotStatic
-    
+
 satExpr (StgCase expr lv1 lv2 uniq alts)
   = satExpr expr	`thenSAT` \ expr' ->
     sat_alts alts	`thenSAT` \ alts' ->
@@ -172,15 +166,13 @@ satExpr (StgLet (StgRec binds) body)
 satExpr (StgSCC ty cc expr)
   = satExpr expr		    `thenSAT` \ expr' ->
     returnSAT (StgSCC ty cc expr')
-
--- ToDo: DPH stuff
 \end{code}
 
 \begin{code}
 satRhs rhs@(StgRhsCon cc v args) = returnSAT rhs
-satRhs (StgRhsClosure cc bi fvs upd args body) 
+
+satRhs (StgRhsClosure cc bi fvs upd args body)
   = satExpr body		`thenSAT` \ body' ->
     returnSAT (StgRhsClosure cc bi fvs upd args body')
-
 \end{code}
 

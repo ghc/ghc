@@ -15,20 +15,14 @@ module SaLib (
 	StrAnalFlags(..), getStrAnalFlags,
 	nullAbsValEnv, addOneToAbsValEnv, growAbsValEnvList,
 	lookupAbsValEnv,
-	absValFromStrictness,
+	absValFromStrictness
 
 	-- and to make the interface self-sufficient...
-	CoreExpr, Id, IdEnv(..), UniqFM, Unique,
-	Demand, PlainCoreExpr(..)
     ) where
 
-import IdEnv
 import IdInfo
---import FiniteMap	-- debugging only
 import Outputable
-import PlainCore
 import Pretty
-import Util		-- for pragmas only
 \end{code}
 
 %************************************************************************
@@ -64,7 +58,7 @@ data AbsVal
 
   | AbsFun	    	    -- An abstract function, with the given:
 	    [Id]	    -- arguments
-	    PlainCoreExpr   -- body
+	    CoreExpr   -- body
 	    AbsValEnv	    -- and environment
 
   | AbsApproxFun	    -- This is used to represent a coarse
@@ -73,7 +67,7 @@ data AbsVal
 			    -- argument if the i'th element of the Demand
 			    -- list so indicates.
 			    -- The list of arguments is always non-empty.
-			    -- In effect, AbsApproxFun [] = AbsTop 
+			    -- In effect, AbsApproxFun [] = AbsTop
 
 instance Outputable AbsVal where
     ppr sty AbsTop = ppStr "AbsTop"
@@ -91,7 +85,7 @@ instance Outputable AbsVal where
 
 An @AbsValEnv@ maps @Ids@ to @AbsVals@.  Any unbound @Ids@ are
 implicitly bound to @AbsTop@, the completely uninformative,
-pessimistic value---see @absEval@ of a @CoVar@.
+pessimistic value---see @absEval@ of a @Var@.
 
 \begin{code}
 data AbsValEnv = AbsValEnv StrAnalFlags (IdEnv AbsVal)

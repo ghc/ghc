@@ -16,7 +16,7 @@ module ListSetOps (
 #if defined(COMPILING_GHC)
 import Util
 # ifdef USE_ATTACK_PRAGMAS
-import AbsUniType
+import Type
 import Id		( Id )
 # endif
 #endif

@@ -15,7 +15,7 @@ module AlphaGen (
 IMPORT_Trace
 
 import AbsCSyn	    ( AbstractC, MagicId(..), kindFromMagicId )
-import AbsPrel	    ( PrimOp(..)
+import PrelInfo	    ( PrimOp(..)
 		      IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 		    )
@@ -23,17 +23,15 @@ import AsmRegAlloc  ( runRegAllocate, extractMappedRegNos, mkReg,
 		      Reg(..), RegLiveness(..), RegUsage(..), FutureLive(..),
 		      MachineRegisters(..), MachineCode(..)
     	    	    )
-import CLabelInfo   ( CLabel, isAsmTemp )
+import CLabel   ( CLabel, isAsmTemp )
 import AlphaCode    {- everything -}
 import MachDesc
 import Maybes	    ( maybeToBool, Maybe(..) )
 import OrdList	    -- ( mkEmptyList, mkUnitList, mkSeqList, mkParList, OrdList )
 import Outputable
-import PrimKind	    ( PrimKind(..), isFloatingKind )
 import AlphaDesc
 import Stix
-import SplitUniq
-import Unique
+import UniqSupply
 import Pretty
 import Unpretty
 import Util
@@ -52,14 +50,14 @@ This is the top-level code-generation function for the Alpha.
 
 \begin{code}
 
-alphaCodeGen :: PprStyle -> [[StixTree]] -> SUniqSM Unpretty
-alphaCodeGen sty trees = 
-    mapSUs genAlphaCode trees	    	`thenSUs` \ dynamicCodes ->
+alphaCodeGen :: PprStyle -> [[StixTree]] -> UniqSM Unpretty
+alphaCodeGen sty trees =
+    mapUs genAlphaCode trees	    	`thenUs` \ dynamicCodes ->
     let
     	staticCodes = scheduleAlphaCode dynamicCodes
     	pretty = printLabeledCodes sty staticCodes
     in
-    	returnSUs pretty
+    	returnUs pretty
 
 \end{code}
 
@@ -84,9 +82,9 @@ register to put it in.
 
 \begin{code}
 
-data Register 
-  = Fixed Reg PrimKind (CodeBlock AlphaInstr) 
-  | Any PrimKind (Reg -> (CodeBlock AlphaInstr))
+data Register
+  = Fixed Reg PrimRep (CodeBlock AlphaInstr)
+  | Any PrimRep (Reg -> (CodeBlock AlphaInstr))
 
 registerCode :: Register -> Reg -> CodeBlock AlphaInstr
 registerCode (Fixed _ _ code) reg = code
@@ -96,7 +94,7 @@ registerName :: Register -> Reg -> Reg
 registerName (Fixed reg _ _) _ = reg
 registerName (Any _ _) reg = reg
 
-registerKind :: Register -> PrimKind
+registerKind :: Register -> PrimRep
 registerKind (Fixed _ pk _) = pk
 registerKind (Any pk _) = pk
 
@@ -133,14 +131,14 @@ asmSeq is = foldr (mkSeqList . asmInstr) asmVoid is
 asmParThen :: [AlphaCode] -> CodeBlock AlphaInstr
 asmParThen others code = mkSeqList (foldr mkParList mkEmptyList others) code
 
-returnInstr :: AlphaInstr -> SUniqSM (CodeBlock AlphaInstr)
-returnInstr instr = returnSUs (\xs -> mkSeqList (asmInstr instr) xs)
+returnInstr :: AlphaInstr -> UniqSM (CodeBlock AlphaInstr)
+returnInstr instr = returnUs (\xs -> mkSeqList (asmInstr instr) xs)
 
-returnInstrs :: [AlphaInstr] -> SUniqSM (CodeBlock AlphaInstr)
-returnInstrs instrs = returnSUs (\xs -> mkSeqList (asmSeq instrs) xs)
+returnInstrs :: [AlphaInstr] -> UniqSM (CodeBlock AlphaInstr)
+returnInstrs instrs = returnUs (\xs -> mkSeqList (asmSeq instrs) xs)
 
-returnSeq :: (CodeBlock AlphaInstr) -> [AlphaInstr] -> SUniqSM (CodeBlock AlphaInstr)
-returnSeq code instrs = returnSUs (\xs -> code (mkSeqList (asmSeq instrs) xs))
+returnSeq :: (CodeBlock AlphaInstr) -> [AlphaInstr] -> UniqSM (CodeBlock AlphaInstr)
+returnSeq code instrs = returnUs (\xs -> code (mkSeqList (asmSeq instrs) xs))
 
 mkSeqInstr :: AlphaInstr -> (CodeBlock AlphaInstr)
 mkSeqInstr instr code = mkSeqList (asmInstr instr) code
@@ -154,11 +152,11 @@ Top level alpha code generator for a chunk of stix code.
 
 \begin{code}
 
-genAlphaCode :: [StixTree] -> SUniqSM (AlphaCode)
+genAlphaCode :: [StixTree] -> UniqSM (AlphaCode)
 
 genAlphaCode trees =
-    mapSUs getCode trees    	    	`thenSUs` \ blocks ->
-    returnSUs (foldr (.) id blocks asmVoid)
+    mapUs getCode trees    	    	`thenUs` \ blocks ->
+    returnUs (foldr (.) id blocks asmVoid)
 
 \end{code}
 
@@ -166,14 +164,14 @@ Code extractor for an entire stix tree---stix statement level.
 
 \begin{code}
 
-getCode 
+getCode
     :: StixTree     -- a stix statement
-    -> SUniqSM (CodeBlock AlphaInstr)
+    -> UniqSM (CodeBlock AlphaInstr)
 
 getCode (StSegment seg) = returnInstr (SEGMENT seg)
 
 getCode (StAssign pk dst src)
-  | isFloatingKind pk = assignFltCode pk dst src
+  | isFloatingRep pk = assignFltCode pk dst src
   | otherwise = assignIntCode pk dst src
 
 getCode (StLabel lab) = returnInstr (LABEL lab)
@@ -190,27 +188,22 @@ getCode (StFallThrough lbl) = returnInstr (LDA pv (AddrImm (ImmCLbl lbl)))
 
 getCode (StCondJump lbl arg) = genCondJump lbl arg
 
-getCode (StData kind args) = 
-    mapAndUnzipSUs getData args		    `thenSUs` \ (codes, imms) ->
-    returnSUs (\xs -> mkSeqList (asmInstr (DATA (kindToSize kind) imms))
-                                (foldr1 (.) codes xs))
+getCode (StData kind args) =
+    mapAndUnzipUs getData args		    `thenUs` \ (codes, imms) ->
+    returnUs (\xs -> mkSeqList (asmInstr (DATA (kindToSize kind) imms))
+				(foldr1 (.) codes xs))
   where
-    getData :: StixTree -> SUniqSM (CodeBlock AlphaInstr, Imm)
-    getData (StInt i) = returnSUs (id, ImmInteger i)
-#if __GLASGOW_HASKELL__ >= 23
---  getData (StDouble d) = returnSUs (id, strImmLab (_showRational 30 d))
-    getData (StDouble d) = returnSUs (id, ImmLab (prettyToUn (ppRational d)))
-#else
-    getData (StDouble d) = returnSUs (id, strImmLab (show d))
-#endif
-    getData (StLitLbl s) = returnSUs (id, ImmLab s)
-    getData (StLitLit s) = returnSUs (id, strImmLab (cvtLitLit (_UNPK_ s)))
-    getData (StString s) = 
-        getUniqLabelNCG 	    	    `thenSUs` \ lbl ->
-	returnSUs (mkSeqInstrs [LABEL lbl, ASCII True (_UNPK_ s)], ImmCLbl lbl)
-    getData (StCLbl l)   = returnSUs (id, ImmCLbl l)
+    getData :: StixTree -> UniqSM (CodeBlock AlphaInstr, Imm)
+    getData (StInt i) = returnUs (id, ImmInteger i)
+    getData (StDouble d) = returnUs (id, ImmLab (prettyToUn (ppRational d)))
+    getData (StLitLbl s) = returnUs (id, ImmLab s)
+    getData (StLitLit s) = returnUs (id, strImmLab (cvtLitLit (_UNPK_ s)))
+    getData (StString s) =
+	getUniqLabelNCG 	    	    `thenUs` \ lbl ->
+	returnUs (mkSeqInstrs [LABEL lbl, ASCII True (_UNPK_ s)], ImmCLbl lbl)
+    getData (StCLbl l)   = returnUs (id, ImmCLbl l)
 
-getCode (StCall fn VoidKind args) = genCCall fn VoidKind args
+getCode (StCall fn VoidRep args) = genCCall fn VoidRep args
 
 getCode (StComment s) = returnInstr (COMMENT s)
 
@@ -220,35 +213,30 @@ Generate code to get a subtree into a register.
 
 \begin{code}
 
-getReg :: StixTree -> SUniqSM Register
+getReg :: StixTree -> UniqSM Register
 
 getReg (StReg (StixMagicId stgreg)) =
     case stgRegMap stgreg of
-    	Just reg -> returnSUs (Fixed reg (kindFromMagicId stgreg) id)
+    	Just reg -> returnUs (Fixed reg (kindFromMagicId stgreg) id)
     	-- cannae be Nothing
 
-getReg (StReg (StixTemp u pk)) = returnSUs (Fixed (UnmappedReg u pk) pk id)
+getReg (StReg (StixTemp u pk)) = returnUs (Fixed (UnmappedReg u pk) pk id)
 
 getReg (StDouble d) =
-    getUniqLabelNCG 	    	    `thenSUs` \ lbl ->
-    getNewRegNCG PtrKind    	    `thenSUs` \ tmp ->
+    getUniqLabelNCG 	    	    `thenUs` \ lbl ->
+    getNewRegNCG PtrRep    	    `thenUs` \ tmp ->
     let code dst = mkSeqInstrs [
     	    SEGMENT DataSegment,
 	    LABEL lbl,
-#if __GLASGOW_HASKELL__ >= 23
---	    DATA TF [strImmLab (_showRational 30 d)],
 	    DATA TF [ImmLab (prettyToUn (ppRational d))],
-#else
-	    DATA TF [strImmLab (show d)],
-#endif
 	    SEGMENT TextSegment,
 	    LDA tmp (AddrImm (ImmCLbl lbl)),
 	    LD TF dst (AddrReg tmp)]
     in
-    	returnSUs (Any DoubleKind code)
+    	returnUs (Any DoubleRep code)
 
 getReg (StString s) =
-    getUniqLabelNCG 	    	    `thenSUs` \ lbl ->
+    getUniqLabelNCG 	    	    `thenUs` \ lbl ->
     let code dst = mkSeqInstrs [
 	    SEGMENT DataSegment,
 	    LABEL lbl,
@@ -256,10 +244,10 @@ getReg (StString s) =
 	    SEGMENT TextSegment,
 	    LDA dst (AddrImm (ImmCLbl lbl))]
     in
-    	returnSUs (Any PtrKind code)
+    	returnUs (Any PtrRep code)
 
 getReg (StLitLit s) | _HEAD_ s == '"' && last xs == '"' =
-    getUniqLabelNCG 	    	    `thenSUs` \ lbl ->
+    getUniqLabelNCG 	    	    `thenUs` \ lbl ->
     let code dst = mkSeqInstrs [
 	    SEGMENT DataSegment,
 	    LABEL lbl,
@@ -267,19 +255,19 @@ getReg (StLitLit s) | _HEAD_ s == '"' && last xs == '"' =
 	    SEGMENT TextSegment,
 	    LDA dst (AddrImm (ImmCLbl lbl))]
     in
-    	returnSUs (Any PtrKind code)
+    	returnUs (Any PtrRep code)
   where
     xs = _UNPK_ (_TAIL_ s)
 
 getReg tree@(StIndex _ _ _) = getReg (mangleIndexTree tree)
 
-getReg (StCall fn kind args) = 
-    genCCall fn kind args   	    `thenSUs` \ call ->
-    returnSUs (Fixed reg kind call)
+getReg (StCall fn kind args) =
+    genCCall fn kind args   	    `thenUs` \ call ->
+    returnUs (Fixed reg kind call)
   where
-    reg = if isFloatingKind kind then f0 else v0
+    reg = if isFloatingRep kind then f0 else v0
 
-getReg (StPrim primop args) = 
+getReg (StPrim primop args) =
     case primop of
 
     	CharGtOp -> case args of [x,y] -> trivialCode (CMP LT) [y,x]
@@ -297,7 +285,7 @@ getReg (StPrim primop args) =
     	IntRemOp -> trivialCode (REM Q False) args
     	IntNegOp -> trivialUCode (NEG Q False) args
     	IntAbsOp -> trivialUCode (ABS Q) args
-   
+
     	AndOp -> trivialCode AND args
     	OrOp  -> trivialCode OR args
     	NotOp -> trivialUCode NOT args
@@ -307,7 +295,7 @@ getReg (StPrim primop args) =
     	ISllOp -> panic "AlphaGen:isll"
     	ISraOp -> panic "AlphaGen:isra"
     	ISrlOp -> panic "AlphaGen:isrl"
-   
+
     	IntGtOp -> case args of [x,y] -> trivialCode (CMP LT) [y,x]
     	IntGeOp -> case args of [x,y] -> trivialCode (CMP LE) [y,x]
     	IntEqOp -> trivialCode (CMP EQ) args
@@ -342,30 +330,30 @@ getReg (StPrim primop args) =
     	FloatLtOp -> cmpFCode (FCMP TF LT) NE args
     	FloatLeOp -> cmpFCode (FCMP TF LE) NE args
 
-    	FloatExpOp -> call SLIT("exp") DoubleKind
-    	FloatLogOp -> call SLIT("log") DoubleKind
-    	FloatSqrtOp -> call SLIT("sqrt") DoubleKind
-       
-    	FloatSinOp -> call SLIT("sin") DoubleKind
-    	FloatCosOp -> call SLIT("cos") DoubleKind
-    	FloatTanOp -> call SLIT("tan") DoubleKind
-       
-    	FloatAsinOp -> call SLIT("asin") DoubleKind
-    	FloatAcosOp -> call SLIT("acos") DoubleKind
-    	FloatAtanOp -> call SLIT("atan") DoubleKind
-       
-    	FloatSinhOp -> call SLIT("sinh") DoubleKind
-    	FloatCoshOp -> call SLIT("cosh") DoubleKind
-    	FloatTanhOp -> call SLIT("tanh") DoubleKind
-       
-    	FloatPowerOp -> call SLIT("pow") DoubleKind
+    	FloatExpOp -> call SLIT("exp") DoubleRep
+    	FloatLogOp -> call SLIT("log") DoubleRep
+    	FloatSqrtOp -> call SLIT("sqrt") DoubleRep
+
+    	FloatSinOp -> call SLIT("sin") DoubleRep
+    	FloatCosOp -> call SLIT("cos") DoubleRep
+    	FloatTanOp -> call SLIT("tan") DoubleRep
+
+    	FloatAsinOp -> call SLIT("asin") DoubleRep
+    	FloatAcosOp -> call SLIT("acos") DoubleRep
+    	FloatAtanOp -> call SLIT("atan") DoubleRep
+
+    	FloatSinhOp -> call SLIT("sinh") DoubleRep
+    	FloatCoshOp -> call SLIT("cosh") DoubleRep
+    	FloatTanhOp -> call SLIT("tanh") DoubleRep
+
+    	FloatPowerOp -> call SLIT("pow") DoubleRep
 
     	DoubleAddOp -> trivialFCode (FADD TF) args
     	DoubleSubOp -> trivialFCode (FSUB TF) args
     	DoubleMulOp -> trivialFCode (FMUL TF) args
    	DoubleDivOp -> trivialFCode (FDIV TF) args
     	DoubleNegOp -> trivialUFCode (FNEG TF) args
-   
+
     	DoubleGtOp -> cmpFCode (FCMP TF LE) EQ args
     	DoubleGeOp -> cmpFCode (FCMP TF LT) EQ args
     	DoubleEqOp -> cmpFCode (FCMP TF EQ) NE args
@@ -373,32 +361,32 @@ getReg (StPrim primop args) =
     	DoubleLtOp -> cmpFCode (FCMP TF LT) NE args
     	DoubleLeOp -> cmpFCode (FCMP TF LE) NE args
 
-    	DoubleExpOp -> call SLIT("exp") DoubleKind
-    	DoubleLogOp -> call SLIT("log") DoubleKind
-    	DoubleSqrtOp -> call SLIT("sqrt") DoubleKind
+    	DoubleExpOp -> call SLIT("exp") DoubleRep
+    	DoubleLogOp -> call SLIT("log") DoubleRep
+    	DoubleSqrtOp -> call SLIT("sqrt") DoubleRep
 
-    	DoubleSinOp -> call SLIT("sin") DoubleKind
-    	DoubleCosOp -> call SLIT("cos") DoubleKind
-    	DoubleTanOp -> call SLIT("tan") DoubleKind
-       
-    	DoubleAsinOp -> call SLIT("asin") DoubleKind
-    	DoubleAcosOp -> call SLIT("acos") DoubleKind
-    	DoubleAtanOp -> call SLIT("atan") DoubleKind
-       
-    	DoubleSinhOp -> call SLIT("sinh") DoubleKind
-    	DoubleCoshOp -> call SLIT("cosh") DoubleKind
-    	DoubleTanhOp -> call SLIT("tanh") DoubleKind
-       
-    	DoublePowerOp -> call SLIT("pow") DoubleKind
+    	DoubleSinOp -> call SLIT("sin") DoubleRep
+    	DoubleCosOp -> call SLIT("cos") DoubleRep
+    	DoubleTanOp -> call SLIT("tan") DoubleRep
 
-    	OrdOp -> coerceIntCode IntKind args
+    	DoubleAsinOp -> call SLIT("asin") DoubleRep
+    	DoubleAcosOp -> call SLIT("acos") DoubleRep
+    	DoubleAtanOp -> call SLIT("atan") DoubleRep
+
+    	DoubleSinhOp -> call SLIT("sinh") DoubleRep
+    	DoubleCoshOp -> call SLIT("cosh") DoubleRep
+    	DoubleTanhOp -> call SLIT("tanh") DoubleRep
+
+    	DoublePowerOp -> call SLIT("pow") DoubleRep
+
+    	OrdOp -> coerceIntCode IntRep args
     	ChrOp -> chrCode args
-       
+
     	Float2IntOp -> coerceFP2Int args
     	Int2FloatOp -> coerceInt2FP args
     	Double2IntOp -> coerceFP2Int args
     	Int2DoubleOp -> coerceInt2FP args
-       
+
     	Double2FloatOp -> coerceFltCode args
     	Float2DoubleOp -> coerceFltCode args
 
@@ -406,26 +394,26 @@ getReg (StPrim primop args) =
     call fn pk = getReg (StCall fn pk args)
 
 getReg (StInd pk mem) =
-    getAmode mem    	    	    `thenSUs` \ amode ->
-    let 
+    getAmode mem    	    	    `thenUs` \ amode ->
+    let
     	code = amodeCode amode
     	src   = amodeAddr amode
     	size = kindToSize pk
     	code__2 dst = code . mkSeqInstr (LD size dst src)
     in
-    	returnSUs (Any pk code__2)
+    	returnUs (Any pk code__2)
 
 getReg (StInt i)
   | is8Bits i =
     let
     	code dst = mkSeqInstr (OR zero (RIImm src) dst)
     in
-    	returnSUs (Any IntKind code)
+    	returnUs (Any IntRep code)
   | otherwise =
     let
     	code dst = mkSeqInstr (LDI Q dst src)
     in
-    	returnSUs (Any IntKind code)
+    	returnUs (Any IntRep code)
   where
     src = ImmInt (fromInteger i)
 
@@ -434,7 +422,7 @@ getReg leaf
     let
     	code dst = mkSeqInstr (LDA dst (AddrImm imm__2))
     in
-    	returnSUs (Any PtrKind code)
+    	returnUs (Any PtrRep code)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
@@ -446,46 +434,46 @@ produce a suitable addressing mode.
 
 \begin{code}
 
-getAmode :: StixTree -> SUniqSM Amode
+getAmode :: StixTree -> UniqSM Amode
 
 getAmode tree@(StIndex _ _ _) = getAmode (mangleIndexTree tree)
 
 getAmode (StPrim IntSubOp [x, StInt i]) =
-    getNewRegNCG PtrKind    	    `thenSUs` \ tmp ->
-    getReg x    	    	    `thenSUs` \ register ->
+    getNewRegNCG PtrRep    	    `thenUs` \ tmp ->
+    getReg x    	    	    `thenUs` \ register ->
     let
     	code = registerCode register tmp
     	reg  = registerName register tmp
     	off  = ImmInt (-(fromInteger i))
     in
-    	returnSUs (Amode (AddrRegImm reg off) code)
+    	returnUs (Amode (AddrRegImm reg off) code)
 
 
 getAmode (StPrim IntAddOp [x, StInt i]) =
-    getNewRegNCG PtrKind    	    `thenSUs` \ tmp ->
-    getReg x    	    	    `thenSUs` \ register ->
+    getNewRegNCG PtrRep    	    `thenUs` \ tmp ->
+    getReg x    	    	    `thenUs` \ register ->
     let
     	code = registerCode register tmp
     	reg  = registerName register tmp
     	off  = ImmInt (fromInteger i)
     in
-    	returnSUs (Amode (AddrRegImm reg off) code)
+    	returnUs (Amode (AddrRegImm reg off) code)
 
 getAmode leaf
   | maybeToBool imm =
-    	returnSUs (Amode (AddrImm imm__2) id)
+    	returnUs (Amode (AddrImm imm__2) id)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
 
 getAmode other =
-    getNewRegNCG PtrKind    	    `thenSUs` \ tmp ->
-    getReg other    	    	    `thenSUs` \ register ->
+    getNewRegNCG PtrRep    	    `thenUs` \ tmp ->
+    getReg other    	    	    `thenUs` \ register ->
     let
     	code = registerCode register tmp
     	reg  = registerName register tmp
     in
-    	returnSUs (Amode (AddrReg reg) code)
+    	returnUs (Amode (AddrReg reg) code)
 
 \end{code}
 
@@ -500,44 +488,44 @@ can be applied to all of a call's arguments using @mapAccumL@.
 
 \begin{code}
 
-getCallArg 
+getCallArg
     :: ([(Reg,Reg)],Int)    -- Argument registers and stack offset (accumulator)
     -> StixTree 	    -- Current argument
-    -> SUniqSM (([(Reg,Reg)],Int), CodeBlock AlphaInstr) -- Updated accumulator and code
+    -> UniqSM (([(Reg,Reg)],Int), CodeBlock AlphaInstr) -- Updated accumulator and code
 
 -- We have to use up all of our argument registers first.
 
-getCallArg ((iDst,fDst):dsts, offset) arg = 
-    getReg arg	    	    	    `thenSUs` \ register ->
+getCallArg ((iDst,fDst):dsts, offset) arg =
+    getReg arg	    	    	    `thenUs` \ register ->
     let
-    	reg = if isFloatingKind pk then fDst else iDst
+    	reg = if isFloatingRep pk then fDst else iDst
     	code = registerCode register reg
     	src = registerName register reg
     	pk = registerKind register
     in
-    	returnSUs (
-            if isFloatingKind pk then
-    	        ((dsts, offset), if isFixed register then 
+    	returnUs (
+	    if isFloatingRep pk then
+    	        ((dsts, offset), if isFixed register then
     	    	    code . mkSeqInstr (FMOV src fDst)
     	    	    else code)
-    	    else 
-                ((dsts, offset), if isFixed register then 
+    	    else
+		((dsts, offset), if isFixed register then
     	    	    code . mkSeqInstr (OR src (RIReg src) iDst)
     	    	    else code))
 
 -- Once we have run out of argument registers, we move to the stack
 
-getCallArg ([], offset) arg = 
-    getReg arg	    	    	    `thenSUs` \ register ->
+getCallArg ([], offset) arg =
+    getReg arg	    	    	    `thenUs` \ register ->
     getNewRegNCG (registerKind register)
-    	    	        	    `thenSUs` \ tmp ->
-    let 
+    	    	        	    `thenUs` \ tmp ->
+    let
     	code = registerCode register tmp
     	src = registerName register tmp
     	pk = registerKind register
     	sz = kindToSize pk
     in
-    	returnSUs (([], offset + 1), code . mkSeqInstr (ST sz src (spRel offset)))
+    	returnUs (([], offset + 1), code . mkSeqInstr (ST sz src (spRel offset)))
 
 \end{code}
 
@@ -547,17 +535,17 @@ correspond to loads, stores, or register transfers.  If we're really lucky,
 some of the register transfers will go away, because we can use the destination
 register to complete the code generation for the right hand side.  This only
 fails when the right hand side is forced into a fixed register (e.g. the result
-of a call).  
+of a call).
 
 \begin{code}
 
-assignIntCode :: PrimKind -> StixTree -> StixTree -> SUniqSM (CodeBlock AlphaInstr)
+assignIntCode :: PrimRep -> StixTree -> StixTree -> UniqSM (CodeBlock AlphaInstr)
 
 assignIntCode pk (StInd _ dst) src =
-    getNewRegNCG IntKind    	    `thenSUs` \ tmp ->
-    getAmode dst    	    	    `thenSUs` \ amode ->
-    getReg src	    	    	    `thenSUs` \ register ->
-    let 
+    getNewRegNCG IntRep    	    `thenUs` \ tmp ->
+    getAmode dst    	    	    `thenUs` \ amode ->
+    getReg src	    	    	    `thenUs` \ register ->
+    let
     	code1 = amodeCode amode asmVoid
     	dst__2  = amodeAddr amode
     	code2 = registerCode register tmp asmVoid
@@ -565,28 +553,28 @@ assignIntCode pk (StInd _ dst) src =
     	sz    = kindToSize pk
     	code__2 = asmParThen [code1, code2] . mkSeqInstr (ST sz src__2 dst__2)
     in
-    	returnSUs code__2
+    	returnUs code__2
 
 assignIntCode pk dst src =
-    getReg dst	    	    	    `thenSUs` \ register1 ->
-    getReg src	    	    	    `thenSUs` \ register2 ->
-    let 
+    getReg dst	    	    	    `thenUs` \ register1 ->
+    getReg src	    	    	    `thenUs` \ register2 ->
+    let
     	dst__2 = registerName register1 zero
     	code = registerCode register2 dst__2
     	src__2 = registerName register2 dst__2
-    	code__2 = if isFixed register2 then 
+    	code__2 = if isFixed register2 then
     	    	    code . mkSeqInstr (OR src__2 (RIReg src__2) dst__2)
     	    	else code
     in
-    	returnSUs code__2
+    	returnUs code__2
 
-assignFltCode :: PrimKind -> StixTree -> StixTree -> SUniqSM (CodeBlock AlphaInstr)
+assignFltCode :: PrimRep -> StixTree -> StixTree -> UniqSM (CodeBlock AlphaInstr)
 
 assignFltCode pk (StInd _ dst) src =
-    getNewRegNCG pk        	    `thenSUs` \ tmp ->
-    getAmode dst    	    	    `thenSUs` \ amode ->
-    getReg src	    	    	    `thenSUs` \ register ->
-    let 
+    getNewRegNCG pk        	    `thenUs` \ tmp ->
+    getAmode dst    	    	    `thenUs` \ amode ->
+    getReg src	    	    	    `thenUs` \ register ->
+    let
     	code1 = amodeCode amode asmVoid
     	dst__2  = amodeAddr amode
     	code2 = registerCode register tmp asmVoid
@@ -594,22 +582,22 @@ assignFltCode pk (StInd _ dst) src =
     	sz    = kindToSize pk
     	code__2 = asmParThen [code1, code2] . mkSeqInstr (ST sz src__2 dst__2)
     in
-        returnSUs code__2
+	returnUs code__2
 
 assignFltCode pk dst src =
-    getReg dst	    	    	    `thenSUs` \ register1 ->
-    getReg src	    	    	    `thenSUs` \ register2 ->
-    let 
+    getReg dst	    	    	    `thenUs` \ register1 ->
+    getReg src	    	    	    `thenUs` \ register2 ->
+    let
     	dst__2 = registerName register1 zero
     	code = registerCode register2 dst__2
     	src__2 = registerName register2 dst__2
-    	code__2 = if isFixed register2 then 
+    	code__2 = if isFixed register2 then
     	    	    code . mkSeqInstr (FMOV src__2 dst__2)
     	    	else code
     in
-    	returnSUs code__2
+    	returnUs code__2
 
-\end{code} 
+\end{code}
 
 Generating an unconditional branch.  We accept two types of targets:
 an immediate CLabel or a tree that gets evaluated into a register.
@@ -619,19 +607,19 @@ are assumed to be far away, so we use jmp.
 
 \begin{code}
 
-genJump 
+genJump
     :: StixTree     -- the branch target
-    -> SUniqSM (CodeBlock AlphaInstr)
+    -> UniqSM (CodeBlock AlphaInstr)
 
-genJump (StCLbl lbl) 
+genJump (StCLbl lbl)
   | isAsmTemp lbl = returnInstr (BR target)
   | otherwise     = returnInstrs [LDA pv (AddrImm target), JMP zero (AddrReg pv) 0]
   where
     target = ImmCLbl lbl
 
 genJump tree =
-    getReg tree	    	    	    `thenSUs` \ register ->
-    getNewRegNCG PtrKind    	    `thenSUs` \ tmp ->
+    getReg tree	    	    	    `thenUs` \ register ->
+    getNewRegNCG PtrRep    	    `thenUs` \ tmp ->
     let
     	dst = registerName register pv
     	code = registerCode register pv
@@ -640,31 +628,31 @@ genJump tree =
     	if isFixed register then
     	    returnSeq code [OR dst (RIReg dst) pv, JMP zero (AddrReg pv) 0]
     	else
-    	    returnSUs (code . mkSeqInstr (JMP zero (AddrReg pv) 0))
+    	    returnUs (code . mkSeqInstr (JMP zero (AddrReg pv) 0))
 
 \end{code}
 
 Conditional jumps are always to local labels, so we can use
-branch instructions.  We peek at the arguments to decide what kind 
-of comparison to do.  For comparisons with 0, we're laughing, because 
-we can just do the desired conditional branch.  
+branch instructions.  We peek at the arguments to decide what kind
+of comparison to do.  For comparisons with 0, we're laughing, because
+we can just do the desired conditional branch.
 
 \begin{code}
 
-genCondJump 
+genCondJump
     :: CLabel	    -- the branch target
     -> StixTree     -- the condition on which to branch
-    -> SUniqSM (CodeBlock AlphaInstr)
+    -> UniqSM (CodeBlock AlphaInstr)
 
 genCondJump lbl (StPrim op [x, StInt 0]) =
-    getReg x	  	    	    `thenSUs` \ register ->
+    getReg x	  	    	    `thenUs` \ register ->
     getNewRegNCG (registerKind register)
-    	    	        	    `thenSUs` \ tmp ->
+    	    	        	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	value = registerName register tmp
     	pk = registerKind register
-        target = ImmCLbl lbl    
+	target = ImmCLbl lbl
     in
     	    returnSeq code [BI (cmpOp op) value target]
   where
@@ -694,16 +682,16 @@ genCondJump lbl (StPrim op [x, StInt 0]) =
     cmpOp AddrLeOp = EQ
 
 genCondJump lbl (StPrim op [x, StDouble 0.0]) =
-    getReg x	  	    	    `thenSUs` \ register ->
+    getReg x	  	    	    `thenUs` \ register ->
     getNewRegNCG (registerKind register)
-    	    	        	    `thenSUs` \ tmp ->
+    	    	        	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	value = registerName register tmp
     	pk = registerKind register
-        target = ImmCLbl lbl    
+	target = ImmCLbl lbl
     in
-    	    returnSUs (code . mkSeqInstr (BF (cmpOp op) value target))
+    	    returnUs (code . mkSeqInstr (BF (cmpOp op) value target))
   where
     cmpOp FloatGtOp = GT
     cmpOp FloatGeOp = GE
@@ -718,80 +706,80 @@ genCondJump lbl (StPrim op [x, StDouble 0.0]) =
     cmpOp DoubleLtOp = LT
     cmpOp DoubleLeOp = LE
 
-genCondJump lbl (StPrim op args) 
+genCondJump lbl (StPrim op args)
   | fltCmpOp op =
-    trivialFCode instr args    	    `thenSUs` \ register ->
-    getNewRegNCG DoubleKind    	    `thenSUs` \ tmp ->
+    trivialFCode instr args    	    `thenUs` \ register ->
+    getNewRegNCG DoubleRep    	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	result = registerName register tmp
-        target = ImmCLbl lbl    
+	target = ImmCLbl lbl
     in
-        returnSUs (code . mkSeqInstr (BF cond result target))
+	returnUs (code . mkSeqInstr (BF cond result target))
   where
     fltCmpOp op = case op of
-        FloatGtOp -> True
-        FloatGeOp -> True
-        FloatEqOp -> True
-        FloatNeOp -> True
-        FloatLtOp -> True
-        FloatLeOp -> True
-        DoubleGtOp -> True
-        DoubleGeOp -> True
-        DoubleEqOp -> True
-        DoubleNeOp -> True
-        DoubleLtOp -> True
-        DoubleLeOp -> True
-        _ -> False
+	FloatGtOp -> True
+	FloatGeOp -> True
+	FloatEqOp -> True
+	FloatNeOp -> True
+	FloatLtOp -> True
+	FloatLeOp -> True
+	DoubleGtOp -> True
+	DoubleGeOp -> True
+	DoubleEqOp -> True
+	DoubleNeOp -> True
+	DoubleLtOp -> True
+	DoubleLeOp -> True
+	_ -> False
     (instr, cond) = case op of
-        FloatGtOp -> (FCMP TF LE, EQ)
-        FloatGeOp -> (FCMP TF LT, EQ)
-        FloatEqOp -> (FCMP TF EQ, NE)
-        FloatNeOp -> (FCMP TF EQ, EQ)
-        FloatLtOp -> (FCMP TF LT, NE)
-        FloatLeOp -> (FCMP TF LE, NE)
-        DoubleGtOp -> (FCMP TF LE, EQ)
-        DoubleGeOp -> (FCMP TF LT, EQ)
-        DoubleEqOp -> (FCMP TF EQ, NE)
-        DoubleNeOp -> (FCMP TF EQ, EQ)
-        DoubleLtOp -> (FCMP TF LT, NE)
-        DoubleLeOp -> (FCMP TF LE, NE)
+	FloatGtOp -> (FCMP TF LE, EQ)
+	FloatGeOp -> (FCMP TF LT, EQ)
+	FloatEqOp -> (FCMP TF EQ, NE)
+	FloatNeOp -> (FCMP TF EQ, EQ)
+	FloatLtOp -> (FCMP TF LT, NE)
+	FloatLeOp -> (FCMP TF LE, NE)
+	DoubleGtOp -> (FCMP TF LE, EQ)
+	DoubleGeOp -> (FCMP TF LT, EQ)
+	DoubleEqOp -> (FCMP TF EQ, NE)
+	DoubleNeOp -> (FCMP TF EQ, EQ)
+	DoubleLtOp -> (FCMP TF LT, NE)
+	DoubleLeOp -> (FCMP TF LE, NE)
 
 genCondJump lbl (StPrim op args) =
-    trivialCode instr args    	    `thenSUs` \ register ->
-    getNewRegNCG IntKind    	    `thenSUs` \ tmp ->
+    trivialCode instr args    	    `thenUs` \ register ->
+    getNewRegNCG IntRep    	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	result = registerName register tmp
-        target = ImmCLbl lbl    
+	target = ImmCLbl lbl
     in
-        returnSUs (code . mkSeqInstr (BI cond result target))
+	returnUs (code . mkSeqInstr (BI cond result target))
   where
     (instr, cond) = case op of
-        CharGtOp -> (CMP LE, EQ)
-        CharGeOp -> (CMP LT, EQ)
-        CharEqOp -> (CMP EQ, NE)
-        CharNeOp -> (CMP EQ, EQ)
-        CharLtOp -> (CMP LT, NE)
-        CharLeOp -> (CMP LE, NE)
-        IntGtOp -> (CMP LE, EQ)
-        IntGeOp -> (CMP LT, EQ)
-        IntEqOp -> (CMP EQ, NE)
-        IntNeOp -> (CMP EQ, EQ)
-        IntLtOp -> (CMP LT, NE)
-        IntLeOp -> (CMP LE, NE)
-        WordGtOp -> (CMP ULE, EQ)
-        WordGeOp -> (CMP ULT, EQ)
-        WordEqOp -> (CMP EQ, NE)
-        WordNeOp -> (CMP EQ, EQ)
-        WordLtOp -> (CMP ULT, NE)
-        WordLeOp -> (CMP ULE, NE)
-        AddrGtOp -> (CMP ULE, EQ)
-        AddrGeOp -> (CMP ULT, EQ)
-        AddrEqOp -> (CMP EQ, NE)
-        AddrNeOp -> (CMP EQ, EQ)
-        AddrLtOp -> (CMP ULT, NE)
-        AddrLeOp -> (CMP ULE, NE)
+	CharGtOp -> (CMP LE, EQ)
+	CharGeOp -> (CMP LT, EQ)
+	CharEqOp -> (CMP EQ, NE)
+	CharNeOp -> (CMP EQ, EQ)
+	CharLtOp -> (CMP LT, NE)
+	CharLeOp -> (CMP LE, NE)
+	IntGtOp -> (CMP LE, EQ)
+	IntGeOp -> (CMP LT, EQ)
+	IntEqOp -> (CMP EQ, NE)
+	IntNeOp -> (CMP EQ, EQ)
+	IntLtOp -> (CMP LT, NE)
+	IntLeOp -> (CMP LE, NE)
+	WordGtOp -> (CMP ULE, EQ)
+	WordGeOp -> (CMP ULT, EQ)
+	WordEqOp -> (CMP EQ, NE)
+	WordNeOp -> (CMP EQ, EQ)
+	WordLtOp -> (CMP ULT, NE)
+	WordLeOp -> (CMP ULE, NE)
+	AddrGtOp -> (CMP ULE, EQ)
+	AddrGeOp -> (CMP ULT, EQ)
+	AddrEqOp -> (CMP EQ, NE)
+	AddrNeOp -> (CMP EQ, EQ)
+	AddrLtOp -> (CMP ULT, NE)
+	AddrLeOp -> (CMP ULE, NE)
 
 \end{code}
 
@@ -803,27 +791,27 @@ locations.  Apart from that, the code is easy.
 
 genCCall
     :: FAST_STRING    -- function to call
-    -> PrimKind	    -- type of the result
+    -> PrimRep	    -- type of the result
     -> [StixTree]   -- arguments (of mixed type)
-    -> SUniqSM (CodeBlock AlphaInstr)
+    -> UniqSM (CodeBlock AlphaInstr)
 
 genCCall fn kind args =
-    mapAccumLNCG getCallArg (argRegs,stackArgLoc) args 
-    	    	    	    	    `thenSUs` \ ((unused,_), argCode) ->
+    mapAccumLNCG getCallArg (argRegs,stackArgLoc) args
+    	    	    	    	    `thenUs` \ ((unused,_), argCode) ->
     let
     	nRegs = length argRegs - length unused
     	code = asmParThen (map ($ asmVoid) argCode)
     in
     	returnSeq code [
     	    LDA pv (AddrImm (ImmLab (uppPStr fn))),
-    	    JSR ra (AddrReg pv) nRegs, 
+    	    JSR ra (AddrReg pv) nRegs,
     	    LDGP gp (AddrReg ra)]
   where
-    mapAccumLNCG f b []     = returnSUs (b, [])
-    mapAccumLNCG f b (x:xs) = 
-    	f b x   	        	    `thenSUs` \ (b__2, x__2) ->
-    	mapAccumLNCG f b__2 xs   	    `thenSUs` \ (b__3, xs__2) ->
-    	returnSUs (b__3, x__2:xs__2)
+    mapAccumLNCG f b []     = returnUs (b, [])
+    mapAccumLNCG f b (x:xs) =
+    	f b x   	        	    `thenUs` \ (b__2, x__2) ->
+    	mapAccumLNCG f b__2 xs   	    `thenUs` \ (b__3, xs__2) ->
+    	returnUs (b__3, x__2:xs__2)
 
 \end{code}
 
@@ -832,28 +820,28 @@ side, because that's where the generic optimizer will have put them.
 
 \begin{code}
 
-trivialCode 
-    :: (Reg -> RI -> Reg -> AlphaInstr) 
+trivialCode
+    :: (Reg -> RI -> Reg -> AlphaInstr)
     -> [StixTree]
-    -> SUniqSM Register
+    -> UniqSM Register
 
 trivialCode instr [x, StInt y]
   | is8Bits y =
-    getReg x	    	    	    `thenSUs` \ register ->
-    getNewRegNCG IntKind    	    `thenSUs` \ tmp ->
+    getReg x	    	    	    `thenUs` \ register ->
+    getNewRegNCG IntRep    	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	src1 = registerName register tmp
     	src2 = ImmInt (fromInteger y)
     	code__2 dst = code . mkSeqInstr (instr src1 (RIImm src2) dst)
     in
-    	returnSUs (Any IntKind code__2)
+    	returnUs (Any IntRep code__2)
 
 trivialCode instr [x, y] =
-    getReg x	    	    	    `thenSUs` \ register1 ->
-    getReg y	    	    	    `thenSUs` \ register2 ->
-    getNewRegNCG IntKind    	    `thenSUs` \ tmp1 ->
-    getNewRegNCG IntKind    	    `thenSUs` \ tmp2 ->
+    getReg x	    	    	    `thenUs` \ register1 ->
+    getReg y	    	    	    `thenUs` \ register2 ->
+    getNewRegNCG IntRep    	    `thenUs` \ tmp1 ->
+    getNewRegNCG IntRep    	    `thenUs` \ tmp2 ->
     let
     	code1 = registerCode register1 tmp1 asmVoid
     	src1  = registerName register1 tmp1
@@ -862,18 +850,18 @@ trivialCode instr [x, y] =
     	code__2 dst = asmParThen [code1, code2] .
     	    	     mkSeqInstr (instr src1 (RIReg src2) dst)
     in
-    	returnSUs (Any IntKind code__2)
+    	returnUs (Any IntRep code__2)
 
-trivialFCode 
-    :: (Reg -> Reg -> Reg -> AlphaInstr) 
-    -> [StixTree] 
-    -> SUniqSM Register
+trivialFCode
+    :: (Reg -> Reg -> Reg -> AlphaInstr)
+    -> [StixTree]
+    -> UniqSM Register
 
 trivialFCode instr [x, y] =
-    getReg x	    	    	    `thenSUs` \ register1 ->
-    getReg y	    	    	    `thenSUs` \ register2 ->
-    getNewRegNCG DoubleKind   	    `thenSUs` \ tmp1 ->
-    getNewRegNCG DoubleKind   	    `thenSUs` \ tmp2 ->
+    getReg x	    	    	    `thenUs` \ register1 ->
+    getReg y	    	    	    `thenUs` \ register2 ->
+    getNewRegNCG DoubleRep   	    `thenUs` \ tmp1 ->
+    getNewRegNCG DoubleRep   	    `thenUs` \ tmp2 ->
     let
     	code1 = registerCode register1 tmp1
     	src1  = registerName register1 tmp1
@@ -884,41 +872,41 @@ trivialFCode instr [x, y] =
     	code__2 dst = asmParThen [code1 asmVoid, code2 asmVoid] .
     	    	      mkSeqInstr (instr src1 src2 dst)
     in
-    	returnSUs (Any DoubleKind code__2)
+    	returnUs (Any DoubleRep code__2)
 
 \end{code}
 
 Some bizarre special code for getting condition codes into registers.
 Integer non-equality is a test for equality followed by an XOR with 1.
 (Integer comparisons always set the result register to 0 or 1.)  Floating
-point comparisons of any kind leave the result in a floating point register, 
+point comparisons of any kind leave the result in a floating point register,
 so we need to wrangle an integer register out of things.
 
 \begin{code}
 intNECode
     :: [StixTree]
-    -> SUniqSM Register
+    -> UniqSM Register
 
 intNECode args =
-    trivialCode (CMP EQ) args  	    `thenSUs` \ register ->
-    getNewRegNCG IntKind    	    `thenSUs` \ tmp ->
+    trivialCode (CMP EQ) args  	    `thenUs` \ register ->
+    getNewRegNCG IntRep    	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	src  = registerName register tmp
     	code__2 dst = code . mkSeqInstr (XOR src (RIImm (ImmInt 1)) dst)
     in
-    	returnSUs (Any IntKind code__2)
+    	returnUs (Any IntRep code__2)
 
-cmpFCode 
-    :: (Reg -> Reg -> Reg -> AlphaInstr) 
+cmpFCode
+    :: (Reg -> Reg -> Reg -> AlphaInstr)
     -> Cond
-    -> [StixTree] 
-    -> SUniqSM Register
+    -> [StixTree]
+    -> UniqSM Register
 
 cmpFCode instr cond args =
-    trivialFCode instr args    	    `thenSUs` \ register ->
-    getNewRegNCG DoubleKind    	    `thenSUs` \ tmp ->
-    getUniqLabelNCG 	    	    `thenSUs` \ lbl ->
+    trivialFCode instr args    	    `thenUs` \ register ->
+    getNewRegNCG DoubleRep    	    `thenUs` \ tmp ->
+    getUniqLabelNCG 	    	    `thenUs` \ lbl ->
     let
     	code = registerCode register tmp
     	result  = registerName register tmp
@@ -927,9 +915,9 @@ cmpFCode instr cond args =
     	    OR zero (RIImm (ImmInt 1)) dst,
     	    BF cond result (ImmCLbl lbl),
     	    OR zero (RIReg zero) dst,
-            LABEL lbl]
+	    LABEL lbl]
     in
-    	returnSUs (Any IntKind code__2)
+    	returnUs (Any IntRep code__2)
 
 \end{code}
 
@@ -939,35 +927,35 @@ have handled the constant-folding.
 
 \begin{code}
 
-trivialUCode 
-    :: (RI -> Reg -> AlphaInstr) 
+trivialUCode
+    :: (RI -> Reg -> AlphaInstr)
     -> [StixTree]
-    -> SUniqSM Register
+    -> UniqSM Register
 
 trivialUCode instr [x] =
-    getReg x	    	    	    `thenSUs` \ register ->
-    getNewRegNCG IntKind    	    `thenSUs` \ tmp ->
+    getReg x	    	    	    `thenUs` \ register ->
+    getNewRegNCG IntRep    	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	src  = registerName register tmp
     	code__2 dst = code . mkSeqInstr (instr (RIReg src) dst)
     in
-    	returnSUs (Any IntKind code__2)
+    	returnUs (Any IntRep code__2)
 
-trivialUFCode 
-    :: (Reg -> Reg -> AlphaInstr) 
+trivialUFCode
+    :: (Reg -> Reg -> AlphaInstr)
     -> [StixTree]
-    -> SUniqSM Register
+    -> UniqSM Register
 
 trivialUFCode instr [x] =
-    getReg x	    	    	    `thenSUs` \ register ->
-    getNewRegNCG DoubleKind    	    `thenSUs` \ tmp ->
+    getReg x	    	    	    `thenUs` \ register ->
+    getNewRegNCG DoubleRep    	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	src  = registerName register tmp
     	code__2 dst = code . mkSeqInstr (instr src dst)
     in
-    	returnSUs (Any DoubleKind code__2)
+    	returnUs (Any DoubleRep code__2)
 
 \end{code}
 
@@ -976,35 +964,35 @@ Here we just change the type on the register passed on up
 
 \begin{code}
 
-coerceIntCode :: PrimKind -> [StixTree] -> SUniqSM Register
+coerceIntCode :: PrimRep -> [StixTree] -> UniqSM Register
 coerceIntCode pk [x] =
-    getReg x	    	    	    `thenSUs` \ register ->
+    getReg x	    	    	    `thenUs` \ register ->
     case register of
-    	Fixed reg _ code -> returnSUs (Fixed reg pk code)
-    	Any _ code       -> returnSUs (Any pk code)
+    	Fixed reg _ code -> returnUs (Fixed reg pk code)
+    	Any _ code       -> returnUs (Any pk code)
 
-coerceFltCode :: [StixTree] -> SUniqSM Register
+coerceFltCode :: [StixTree] -> UniqSM Register
 coerceFltCode [x] =
-    getReg x	    	    	    `thenSUs` \ register ->
+    getReg x	    	    	    `thenUs` \ register ->
     case register of
-    	Fixed reg _ code -> returnSUs (Fixed reg DoubleKind code)
-    	Any _ code       -> returnSUs (Any DoubleKind code)
+    	Fixed reg _ code -> returnUs (Fixed reg DoubleRep code)
+    	Any _ code       -> returnUs (Any DoubleRep code)
 
 \end{code}
 
-Integer to character conversion.  
+Integer to character conversion.
 
 \begin{code}
 
 chrCode [x] =
-    getReg x	    	    	    `thenSUs` \ register ->
-    getNewRegNCG IntKind    	    `thenSUs` \ reg ->
+    getReg x	    	    	    `thenUs` \ register ->
+    getNewRegNCG IntRep    	    `thenUs` \ reg ->
     let
     	code = registerCode register reg
     	src  = registerName register reg
     	code__2 dst = code . mkSeqInstr (ZAPNOT src (RIImm (ImmInt 1)) dst)
     in
-    	returnSUs (Any IntKind code__2)
+    	returnUs (Any IntRep code__2)
 
 \end{code}
 
@@ -1014,10 +1002,10 @@ point register sets.
 
 \begin{code}
 
-coerceInt2FP :: [StixTree] -> SUniqSM Register
-coerceInt2FP [x] = 
-    getReg x	    	    	    `thenSUs` \ register ->
-    getNewRegNCG IntKind      	    `thenSUs` \ reg ->
+coerceInt2FP :: [StixTree] -> UniqSM Register
+coerceInt2FP [x] =
+    getReg x	    	    	    `thenUs` \ register ->
+    getNewRegNCG IntRep      	    `thenUs` \ reg ->
     let
     	code = registerCode register reg
     	src  = registerName register reg
@@ -1027,12 +1015,12 @@ coerceInt2FP [x] =
     	    LD TF dst (spRel 0),
     	    CVTxy Q TF dst dst]
     in
-    	returnSUs (Any DoubleKind code__2)
+    	returnUs (Any DoubleRep code__2)
 
-coerceFP2Int :: [StixTree] -> SUniqSM Register
+coerceFP2Int :: [StixTree] -> UniqSM Register
 coerceFP2Int [x] =
-    getReg x	    	    	    `thenSUs` \ register ->
-    getNewRegNCG DoubleKind    	    `thenSUs` \ tmp ->
+    getReg x	    	    	    `thenUs` \ register ->
+    getNewRegNCG DoubleRep    	    `thenUs` \ tmp ->
     let
     	code = registerCode register tmp
     	src  = registerName register tmp
@@ -1042,7 +1030,7 @@ coerceFP2Int [x] =
     	    ST TF tmp (spRel 0),
     	    LD Q dst (spRel 0)]
     in
-    	returnSUs (Any IntKind code__2)
+    	returnUs (Any IntRep code__2)
 
 \end{code}
 
@@ -1054,7 +1042,7 @@ is8Bits :: Integer -> Bool
 is8Bits i = i >= -256 && i < 256
 
 maybeImm :: StixTree -> Maybe Imm
-maybeImm (StInt i) 
+maybeImm (StInt i)
   | i >= toInteger minInt && i <= toInteger maxInt = Just (ImmInt (fromInteger i))
   | otherwise = Just (ImmInteger i)
 maybeImm (StLitLbl s)  = Just (ImmLab s)
@@ -1064,17 +1052,17 @@ maybeImm _          = Nothing
 
 mangleIndexTree :: StixTree -> StixTree
 
-mangleIndexTree (StIndex pk base (StInt i)) = 
+mangleIndexTree (StIndex pk base (StInt i)) =
     StPrim IntAddOp [base, off]
   where
     off = StInt (i * size pk)
-    size :: PrimKind -> Integer
+    size :: PrimRep -> Integer
     size pk = case kindToSize pk of
     	{B -> 1; BU -> 1; W -> 2; WU -> 2; L -> 4; FF -> 4; SF -> 4; _ -> 8}
 
-mangleIndexTree (StIndex pk base off) = 
+mangleIndexTree (StIndex pk base off) =
     case pk of
-    	CharKind -> StPrim IntAddOp [base, off]
+    	CharRep -> StPrim IntAddOp [base, off]
     	_   	 -> StPrim IntAddOp [base, off__2]
   where
     off__2 = StPrim SllOp [off, StInt 3]
@@ -1083,10 +1071,10 @@ cvtLitLit :: String -> String
 cvtLitLit "stdin" = "_iob+0"   -- This one is probably okay...
 cvtLitLit "stdout" = "_iob+56" -- but these next two are dodgy at best
 cvtLitLit "stderr" = "_iob+112"
-cvtLitLit s 
+cvtLitLit s
   | isHex s = s
   | otherwise = error ("Native code generator can't handle ``" ++ s ++ "''")
-  where 
+  where
     isHex ('0':'x':xs) = all isHexDigit xs
     isHex _ = False
     -- Now, where have I seen this before?
@@ -1100,7 +1088,7 @@ and for excess call arguments.
 
 \begin{code}
 
-spRel 
+spRel
     :: Int  	-- desired stack offset in words, positive or negative
     -> Addr
 spRel n = AddrRegImm sp (ImmInt (n * 8))
@@ -1111,9 +1099,9 @@ stackArgLoc = 0 :: Int	    -- where to stack extra call arguments (beyond 6)
 
 \begin{code}
 
-getNewRegNCG :: PrimKind -> SUniqSM Reg
-getNewRegNCG pk = 
-      getSUnique          `thenSUs` \ u ->
-      returnSUs (mkReg u pk)
+getNewRegNCG :: PrimRep -> UniqSM Reg
+getNewRegNCG pk =
+      getUnique          `thenUs` \ u ->
+      returnUs (mkReg u pk)
 
 \end{code}

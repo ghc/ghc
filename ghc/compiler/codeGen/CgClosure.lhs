@@ -10,31 +10,18 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 \begin{code}
 #include "HsVersions.h"
 
-module CgClosure (
-	cgTopRhsClosure, cgRhsClosure,
-
-	-- and to make the interface self-sufficient...
-	StgExpr, Id, CgState, Maybe, HeapOffset,
-	CgInfoDownwards, CgIdInfo, CompilationInfo,
-	UpdateFlag
-    ) where
-
-IMPORT_Trace		-- ToDo: rm (debugging)
-import Outputable
-import Pretty	-- NB: see below
+module CgClosure ( cgTopRhsClosure, cgRhsClosure ) where
 
 import StgSyn
 import CgMonad
 import AbsCSyn
 
-import AbsPrel		( PrimOp(..), primOpNameInfo, Name
+import PrelInfo		( PrimOp(..), Name
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( isPrimType, isPrimTyCon,
+import Type		( isPrimType, isPrimTyCon,
 			  getTauType, showTypeCategory, getTyConDataCons
-			  IF_ATTACK_PRAGMAS(COMMA splitType)
-			  IF_ATTACK_PRAGMAS(COMMA splitTyArgs)
 			)
 import CgBindery	( getCAddrMode, getAtomAmodes,
 			  getCAddrModeAndInfo,
@@ -48,7 +35,7 @@ import CgHeapery	( allocDynClosure, heapCheck
 #ifdef GRAN
 			  , heapCheckOnly, fetchAndReschedule  -- HWL
 #endif  {- GRAN -}
-	                )
+			)
 import CgRetConv	( ctrlReturnConvAlg, dataReturnConvAlg, mkLiveRegsBitMask,
 			  CtrlReturnConvention(..), DataReturnConvention(..)
 			)
@@ -59,18 +46,17 @@ import CgUsages		( getVirtSps, setRealAndVirtualSps,
 			  getSpARelOffset, getSpBRelOffset,
 			  getHpRelOffset
 			)
-import CLabelInfo
+import CLabel
 import ClosureInfo	-- lots and lots of stuff
-import CmdLineOpts	( GlobalSwitch(..) )
 import CostCentre
-import Id		( getIdUniType, getIdKind, isSysLocalId, myWrapperMaybe,
+import Id		( idType, getIdPrimRep, isSysLocalId, myWrapperMaybe,
 			  showId, getIdInfo, getIdStrictness,
     	    	    	  getDataConTag
 			)
 import IdInfo
 import ListSetOps	( minusList )
 import Maybes		( Maybe(..), maybeToBool )
-import PrimKind		( isFollowableKind )
+import PrimRep		( isFollowableRep )
 import UniqSet
 import Unpretty
 import Util
@@ -90,50 +76,18 @@ cgTopRhsClosure :: Id
 		-> CostCentre	-- Optional cost centre annotation
 		-> StgBinderInfo
 		-> [Id]		-- Args
-		-> PlainStgExpr
+		-> StgExpr
 		-> LambdaFormInfo
 		-> FCode (Id, CgIdInfo)
-\end{code}
 
-\begin{code}
-{- NOT USED:
-cgTopRhsClosure name cc binder_info args body lf_info
-  | maybeToBool maybe_std_thunk		-- AHA!  A STANDARD-FORM THUNK
-  = (	
-	-- LAY OUT THE OBJECT
-    getAtomAmodes std_thunk_payload		`thenFC` \ amodes ->
-    let
-	(closure_info, amodes_w_offsets) = layOutStaticClosure name getAmodeKind amodes lf_info
-    in
-     
-	-- BUILD THE OBJECT
-    chooseStaticCostCentre cc lf_info		`thenFC` \ cost_centre ->
-    absC (CStaticClosure 
-		closure_label			-- Labelled with the name on lhs of defn
-		closure_info
-	    	cost_centre 
-		(map fst amodes_w_offsets))	-- They are in the correct order
-    ) `thenC`
-
-    returnFC (name, stableAmodeIdInfo name (CLbl closure_label PtrKind) lf_info)
-  where
-    maybe_std_thunk        = getStandardFormThunkInfo lf_info
-    Just std_thunk_payload = maybe_std_thunk
-
-    closure_label = mkClosureLabel name
--}
-\end{code}
-
-The general case:
-\begin{code}
 cgTopRhsClosure name cc binder_info args body lf_info
   = 	-- LAY OUT THE OBJECT
     let
 	closure_info = layOutStaticNoFVClosure name lf_info
     in
-     
+
 	-- GENERATE THE INFO TABLE (IF NECESSARY)
-    forkClosureBody (closureCodeBody binder_info closure_info 
+    forkClosureBody (closureCodeBody binder_info closure_info
 					 cc args body)
     							`thenC`
 
@@ -146,7 +100,7 @@ cgTopRhsClosure name cc binder_info args body lf_info
     else
 	let
 	    bind_the_fun = addBindC name cg_id_info	-- It's global!
-        in
+	in
 	cgVapInfoTables True {- Top level -} bind_the_fun binder_info name args lf_info
     ) `thenC`
 
@@ -156,10 +110,10 @@ cgTopRhsClosure name cc binder_info args body lf_info
 	let
 	    cost_centre = mkCCostCentre cc
 	in
-	absC (CStaticClosure 
+	absC (CStaticClosure
 		closure_label	-- Labelled with the name on lhs of defn
 		closure_info
-	    	cost_centre 
+	    	cost_centre
 		[])		-- No fields
      else
 	nopC
@@ -168,7 +122,7 @@ cgTopRhsClosure name cc binder_info args body lf_info
     returnFC (name, cg_id_info)
   where
     closure_label = mkClosureLabel name
-    cg_id_info    = stableAmodeIdInfo name (CLbl closure_label PtrKind) lf_info
+    cg_id_info    = stableAmodeIdInfo name (CLbl closure_label PtrRep) lf_info
 \end{code}
 
 %********************************************************
@@ -184,7 +138,7 @@ For closures with free vars, allocate in heap.
 -- Closures which (a) have no fvs and (b) have some args (i.e.
 -- combinator functions), are allocated statically, just as if they
 -- were top-level closures.  We can't get a space leak that way
--- (because they are HNFs) and it saves allocation. 
+-- (because they are HNFs) and it saves allocation.
 
 -- Lexical Scoping: Problem
 -- These top level function closures will be inherited, possibly
@@ -208,7 +162,7 @@ cgRhsClosure	:: Id
 		-> StgBinderInfo
 		-> [Id]		-- Free vars
 		-> [Id]		-- Args
-		-> PlainStgExpr
+		-> StgExpr
 		-> LambdaFormInfo
 		-> FCode (Id, CgIdInfo)
 
@@ -220,13 +174,13 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
     getAtomAmodes std_thunk_payload		`thenFC` \ amodes ->
     let
 	(closure_info, amodes_w_offsets)
-	  = layOutDynClosure binder getAmodeKind amodes lf_info
+	  = layOutDynClosure binder getAmodeRep amodes lf_info
 
 	(use_cc, blame_cc) = chooseDynCostCentres cc args fvs body
     in
 	-- BUILD THE OBJECT
     allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
-    )		
+    )
 		`thenFC` \ heap_offset ->
 
 	-- RETURN
@@ -253,10 +207,10 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
     let
 	is_elem	       = isIn "cgRhsClosure"
 
-	binder_is_a_fv = binder `is_elem` fvs 
-        reduced_fvs    = if binder_is_a_fv 
-		         then fvs `minusList` [binder]
-		         else fvs
+	binder_is_a_fv = binder `is_elem` fvs
+	reduced_fvs    = if binder_is_a_fv
+			 then fvs `minusList` [binder]
+			 else fvs
     in
     mapFCs getCAddrModeAndInfo reduced_fvs	`thenFC` \ amodes_and_info ->
     let
@@ -272,7 +226,7 @@ cgRhsClosure binder cc binder_info fvs args body lf_info
 
 	amodes_w_offsets = [(amode,offset) | ((_, (amode,_)), offset) <- bind_details]
 
-	get_kind (id, amode_and_info) = getIdKind id
+	get_kind (id, amode_and_info) = getIdPrimRep id
     in
 	-- BUILD ITS INFO TABLE AND CODE
     forkClosureBody (
@@ -347,33 +301,33 @@ cgVapInfoTable perhaps_bind_the_fun upd_flag fun args fun_in_payload fun_lf_info
 	--
 	-- If f is not top-level, then f is one of the free variables too,
 	-- hence "payload_ids" isn't the same as "arg_ids".
-	-- 
-	vap_entry_rhs = StgApp (StgVarAtom fun) (map StgVarAtom args) emptyUniqSet	
+	--
+	vap_entry_rhs = StgApp (StgVarArg fun) (map StgVarArg args) emptyUniqSet
 									-- Empty live vars
 
 	arg_ids_w_info = [(name,mkLFArgument) | name <- args]
 	payload_ids_w_info | fun_in_payload = (fun,fun_lf_info) : arg_ids_w_info
-		           | otherwise	    = arg_ids_w_info
+			   | otherwise	    = arg_ids_w_info
 
 	payload_ids | fun_in_payload = fun : args		-- Sigh; needed for mkClosureLFInfo
 		    | otherwise	     = args
 
 	vap_lf_info   = mkClosureLFInfo False {-not top level-} payload_ids
-				        upd_flag [] vap_entry_rhs
+					upd_flag [] vap_entry_rhs
 		-- It's not top level, even if we're currently compiling a top-level
-		-- function, because any VAP *use* of this function will be for a 
+		-- function, because any VAP *use* of this function will be for a
 		-- local thunk, thus
 		--		let x = f p q	-- x isn't top level!
 		--		in ...
 
-	get_kind (id, info) = getIdKind id
+	get_kind (id, info) = getIdPrimRep id
 
 	payload_bind_details :: [((Id, LambdaFormInfo), VirtualHeapOffset)]
-	(closure_info, payload_bind_details) = layOutDynClosure 
-							fun 
-							get_kind payload_ids_w_info 
+	(closure_info, payload_bind_details) = layOutDynClosure
+							fun
+							get_kind payload_ids_w_info
 							vap_lf_info
-		-- The dodgy thing is that we use the "fun" as the 
+		-- The dodgy thing is that we use the "fun" as the
 		-- Id to give to layOutDynClosure.  This Id gets embedded in
 		-- the closure_info it returns.  But of course, the function doesn't
 		-- have the right type to match the Vap closure.  Never mind,
@@ -410,7 +364,7 @@ closureCodeBody :: StgBinderInfo
 		-> ClosureInfo	-- Lots of information about this closure
 		-> CostCentre	-- Optional cost centre attached to closure
 		-> [Id]
-		-> PlainStgExpr
+		-> StgExpr
 		-> Code
 \end{code}
 
@@ -444,12 +398,12 @@ closureCodeBody binder_info closure_info cc [] body
   where
     cl_descr mod_name = closureDescription mod_name (closureId closure_info) [] body
 
-    body_addr   = CLbl (entryLabelFromCI closure_info) CodePtrKind
+    body_addr   = CLbl (entryLabelFromCI closure_info) CodePtrRep
     body_code   = profCtrC SLIT("ENT_THK") [] 			`thenC`
 		  enterCostCentreCode closure_info cc IsThunk	`thenC`
 		  thunkWrapper closure_info (cgSccExpr body)
 
-    stdUpd      = CLbl mkErrorStdEntryLabel CodePtrKind
+    stdUpd      = CLbl mkErrorStdEntryLabel CodePtrRep
 \end{code}
 
 If there is {\em at least one argument}, then this closure is in
@@ -464,7 +418,7 @@ Node points to closure is available. -- HWL
 \begin{code}
 closureCodeBody binder_info closure_info cc all_args body
   = getEntryConvention id lf_info
-		       (map getIdKind all_args)		`thenFC` \ entry_conv ->
+		       (map getIdPrimRep all_args)		`thenFC` \ entry_conv ->
 
     isSwitchSetC EmitArityChecks			`thenFC` \ do_arity_chks ->
 
@@ -477,12 +431,12 @@ closureCodeBody binder_info closure_info cc all_args body
 
 	-- Arg mapping for standard (slow) entry point; all args on stack
     	(spA_all_args, spB_all_args, all_bxd_w_offsets, all_ubxd_w_offsets)
-	   = mkVirtStkOffsets 
+	   = mkVirtStkOffsets
 		0 0 		-- Initial virtual SpA, SpB
-		getIdKind 
+		getIdPrimRep
 		all_args
 
-	-- Arg mapping for the fast entry point; as many args as poss in 
+	-- Arg mapping for the fast entry point; as many args as poss in
 	-- registers; the rest on the stack
     	-- 	arg_regs are the registers used for arg passing
 	-- 	stk_args are the args which are passed on the stack
@@ -494,21 +448,21 @@ closureCodeBody binder_info closure_info cc all_args body
 
     	stk_args = drop (length arg_regs) all_args
     	(spA_stk_args, spB_stk_args, stk_bxd_w_offsets, stk_ubxd_w_offsets)
-	  = mkVirtStkOffsets 
+	  = mkVirtStkOffsets
 		0 0 		-- Initial virtual SpA, SpB
-		getIdKind 
+		getIdPrimRep
 		stk_args
 
 	-- HWL; Note: empty list of live regs in slow entry code
 	-- Old version (reschedule combined with heap check);
 	-- see argSatisfactionCheck for new version
 	--slow_entry_code = forceHeapCheck [node] True slow_entry_code'
-	--		  where node = VanillaReg PtrKind 1
+	--		  where node = VanillaReg PtrRep 1
 	--slow_entry_code = forceHeapCheck [] True slow_entry_code'
 
     	slow_entry_code
       	  = profCtrC SLIT("ENT_FUN_STD") []		    `thenC`
-	
+
 		-- Bind args, and record expected position of stk ptrs
 	    mapCs bindNewToAStack all_bxd_w_offsets	    `thenC`
 	    mapCs bindNewToBStack all_ubxd_w_offsets	    `thenC`
@@ -516,9 +470,11 @@ closureCodeBody binder_info closure_info cc all_args body
 
 	    argSatisfactionCheck closure_info all_args	    `thenC`
 
-	    -- OK, so there are enough args.  Now we need to stuff as 
-	    -- many of them in registers as the fast-entry code expects
-	    -- Note that the zipWith will give up when it hits the end of arg_regs
+	    -- OK, so there are enough args.  Now we need to stuff as
+	    -- many of them in registers as the fast-entry code
+	    -- expects Note that the zipWith will give up when it hits
+	    -- the end of arg_regs.
+
 	    mapFCs getCAddrMode all_args		    `thenFC` \ stk_amodes ->
 	    absC (mkAbstractCs (zipWith assign_to_reg arg_regs stk_amodes)) `thenC`
 
@@ -531,13 +487,7 @@ closureCodeBody binder_info closure_info cc all_args body
 		then CMacroStmt SET_ARITY [mkIntCLit stg_arity]
 		else AbsCNop
 	    )							`thenC`
-
-#ifndef DPH
-    	    absC (CFallThrough (CLbl fast_label CodePtrKind))
-#else
-	    -- Fall through to the fast entry point
-	    absC (AbsCNop)
-#endif {- Data Parallel Haskell -}
+    	    absC (CFallThrough (CLbl fast_label CodePtrRep))
 
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
 
@@ -546,14 +496,14 @@ closureCodeBody binder_info closure_info cc all_args body
 	-- see argSatisfactionCheck for new version
 	-- fast_entry_code = forceHeapCheck [] True fast_entry_code'
 
-        fast_entry_code	
-          = profCtrC SLIT("ENT_FUN_DIRECT") [
-		    CLbl (mkRednCountsLabel id) PtrKind,
+	fast_entry_code
+	  = profCtrC SLIT("ENT_FUN_DIRECT") [
+		    CLbl (mkRednCountsLabel id) PtrRep,
 		    CString (_PK_ (showId PprDebug id)),
 		    mkIntCLit stg_arity,	-- total # of args
 		    mkIntCLit spA_stk_args,	-- # passed on A stk
 		    mkIntCLit spB_stk_args,	-- B stk (rest in regs)
-		    CString (_PK_ (map (showTypeCategory . getIdUniType) all_args)),
+		    CString (_PK_ (map (showTypeCategory . idType) all_args)),
 		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
 		    CString (_PK_ (show_wrapper_arg_kinds wrapper_maybe))
 		]			`thenC`
@@ -577,20 +527,20 @@ closureCodeBody binder_info closure_info cc all_args body
 	    funWrapper closure_info arg_regs (cgExpr body)
     in
  	-- Make a labelled code-block for the slow and fast entry code
-    forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)  		
+    forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)
 				`thenFC` \ slow_abs_c ->
     forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
     moduleName			`thenFC` \ mod_name ->
     getIntSwitchChkrC		`thenFC` \ isw_chkr ->
-    
+
 	-- Now either construct the info table, or put the fast code in alone
 	-- (We never have slow code without an info table)
     absC (
       if info_table_needed then
-        CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
+	CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
 			stdUpd (cl_descr mod_name)
 			(dataConLiveness isw_chkr closure_info)
-      else 
+      else
 	CCodeBlock fast_label fast_abs_c
     )
   where
@@ -604,10 +554,10 @@ closureCodeBody binder_info closure_info cc all_args body
 
 	-- Manufacture labels
     id	       = closureId closure_info
-				
+
     fast_label = fastLabelFromCI closure_info
 
-    stdUpd = CLbl mkErrorStdEntryLabel CodePtrKind
+    stdUpd = CLbl mkErrorStdEntryLabel CodePtrRep
 
     wrapper_maybe = get_ultimate_wrapper Nothing id
       where
@@ -621,7 +571,7 @@ closureCodeBody binder_info closure_info cc all_args body
 
     show_wrapper_arg_kinds Nothing   = ""
     show_wrapper_arg_kinds (Just xx)
-      = case (getWrapperArgTypeCategories (getIdUniType xx) (getIdStrictness xx)) of
+      = case (getWrapperArgTypeCategories (idType xx) (getIdStrictness xx)) of
 	  Nothing  -> ""
 	  Just str -> str
 \end{code}
@@ -653,7 +603,7 @@ enterCostCentreCode closure_info cc is_thunk
 				      -- NB: chk defn of "is_current_CC"
 				      -- if you go to change this! (WDP 94/12)
 	    costCentresC
-		(case is_thunk of 
+		(case is_thunk of
 		   IsThunk    -> SLIT("ENTER_CC_TCL")
 		   IsFunction -> SLIT("ENTER_CC_FCL"))
 		[CReg node]
@@ -665,14 +615,14 @@ enterCostCentreCode closure_info cc is_thunk
 
 	else -- we've got a "real" cost centre right here in our hands...
 	    costCentresC
-		(case is_thunk of 
+		(case is_thunk of
 		   IsThunk    -> SLIT("ENTER_CC_T")
 		   IsFunction -> SLIT("ENTER_CC_F"))
 		[mkCCostCentre cc]
   where
     is_current_CC cc
       = currentOrSubsumedCosts cc
-        -- but we've already ruled out "subsumed", so it must be "current"!
+	-- but we've already ruled out "subsumed", so it must be "current"!
 \end{code}
 
 %************************************************************************
@@ -697,8 +647,8 @@ argSatisfactionCheck closure_info [] = nopC
 argSatisfactionCheck closure_info args
   = -- safest way to determine which stack last arg will be on:
     -- look up CAddrMode that last arg is bound to;
-    -- getAmodeKind;
-    -- check isFollowableKind.
+    -- getAmodeRep;
+    -- check isFollowableRep.
 
     nodeMustPointToIt (closureLFInfo closure_info) 	`thenFC` \ node_points ->
 
@@ -706,20 +656,20 @@ argSatisfactionCheck closure_info args
     -- HWL:
     -- absC (CMacroStmt GRAN_FETCH []) 			`thenC`
     -- forceHeapCheck [] node_points (absC AbsCNop)	`thenC`
-    (if node_points 
+    (if node_points
 	then fetchAndReschedule  [] node_points
 	else absC AbsCNop)				`thenC`
 #endif  {- GRAN -}
 
     getCAddrMode (last args) 				`thenFC` \ last_amode ->
 
-    if (isFollowableKind (getAmodeKind last_amode)) then
-	getSpARelOffset 0 	`thenFC` \ a_rel_offset ->
+    if (isFollowableRep (getAmodeRep last_amode)) then
+	getSpARelOffset 0 	`thenFC` \ (SpARel spA off) ->
 	if node_points then
-	    absC (CMacroStmt ARGS_CHK_A [mkIntCLit (spARelToInt a_rel_offset)])
+	    absC (CMacroStmt ARGS_CHK_A [mkIntCLit (spARelToInt spA off)])
 	else
 	    absC (CMacroStmt ARGS_CHK_A_LOAD_NODE
-				[mkIntCLit (spARelToInt a_rel_offset), set_Node_to_this])
+				[mkIntCLit (spARelToInt spA off), set_Node_to_this])
     else
 	getSpBRelOffset 0 	`thenFC` \ b_rel_offset ->
 	if node_points then
@@ -732,7 +682,7 @@ argSatisfactionCheck closure_info args
     -- the closure or not.  If it isn't so pointing, then we give to
     -- the macro the (static) address of the closure.
 
-    set_Node_to_this = CLbl (closureLabelFromCI closure_info) PtrKind
+    set_Node_to_this = CLbl (closureLabelFromCI closure_info) PtrRep
 \end{code}
 
 %************************************************************************
@@ -749,8 +699,8 @@ thunkWrapper closure_info thunk_code
 
 #ifdef GRAN
     -- HWL insert macros for GrAnSim if node is live here
-    (if node_points 
-       then fetchAndReschedule [] node_points 
+    (if node_points
+       then fetchAndReschedule [] node_points
        else absC AbsCNop)              			`thenC`
 #endif  {- GRAN -}
 
@@ -768,17 +718,7 @@ thunkWrapper closure_info thunk_code
 
 	-- Push update frame if necessary
     setupUpdate closure_info (		-- setupUpdate *encloses* the rest
-
-	-- Evaluation scoping -- load current cost centre from closure
-	-- Must be done after the update frame is pushed
-	-- Node is guaranteed to point to it, if profiling
--- OLD:
---  (if isStaticClosure closure_info
---   then evalCostCentreC "SET_CAFCC_CL" [CReg node]
---   else evalCostCentreC "ENTER_CC_TCL"  [CReg node])	`thenC`
-
-	-- Finally, do the business
-    thunk_code
+	thunk_code
     )))
 
 funWrapper :: ClosureInfo 	-- Closure whose code body this is
@@ -808,15 +748,15 @@ funWrapper closure_info arg_regs fun_body
 Assumption: virtual and real stack pointers are currently exactly aligned.
 
 \begin{code}
-stackCheck :: ClosureInfo 
+stackCheck :: ClosureInfo
 	   -> [MagicId] 		-- Live registers
 	   -> Bool 			-- Node required to point after check?
-	   -> Code 
+	   -> Code
 	   -> Code
 
 stackCheck closure_info regs node_reqd code
   = getFinalStackHW (\ aHw -> \ bHw ->	-- Both virtual stack offsets
-    
+
     getVirtSps		`thenFC` \ (vSpA, vSpB) ->
 
     let a_headroom_reqd = aHw - vSpA	-- Virtual offsets are positive integers
@@ -829,7 +769,7 @@ stackCheck closure_info regs node_reqd code
 		CMacroStmt STK_CHK [mkIntCLit liveness_mask,
 				    mkIntCLit a_headroom_reqd,
 				    mkIntCLit b_headroom_reqd,
-				    mkIntCLit vSpA, 
+				    mkIntCLit vSpA,
 				    mkIntCLit vSpB,
 				    mkIntCLit (if returns_prim_type then 1 else 0),
 				    mkIntCLit (if node_reqd         then 1 else 0)]
@@ -880,14 +820,8 @@ setupUpdate closure_info code
 	getIntSwitchChkrC	`thenFC` \ isw_chkr ->
     	pushUpdateFrame update_closure (vector isw_chkr) code
    else
-	-- Non-updatable thunks still need a resume-cost-centre "update"
-	-- frame to be pushed if we are doing evaluation profiling.
-
---OLD:	evalPushRCCFrame False {-never primitive-} (
-	profCtrC SLIT("UPDF_OMITTED") []
-						`thenC`
+	profCtrC SLIT("UPDF_OMITTED") [] `thenC`
 	code
---	)
  where
    link_caf_if_needed :: FCode CAddrMode	-- Returns amode for closure to be updated
    link_caf_if_needed
@@ -901,12 +835,12 @@ setupUpdate closure_info code
 		-- Alloc black hole specifying CC_HDR(Node) as the cost centre
 		--   Hack Warning: Using a CLitLit to get CAddrMode !
 	  let
-	      use_cc   = CLitLit SLIT("CC_HDR(R1.p)") PtrKind
+	      use_cc   = CLitLit SLIT("CC_HDR(R1.p)") PtrRep
 	      blame_cc = use_cc
 	  in
 	  allocDynClosure (blackHoleClosureInfo closure_info) use_cc blame_cc []
 							`thenFC` \ heap_offset ->
-	  getHpRelOffset heap_offset			`thenFC` \ hp_rel -> 
+	  getHpRelOffset heap_offset			`thenFC` \ hp_rel ->
 	  let  amode = CAddr hp_rel
 	  in
 	  absC (CMacroStmt UPD_CAF [CReg node, amode])
@@ -920,10 +854,10 @@ setupUpdate closure_info code
     	Nothing -> CReg StdUpdRetVecReg
     	Just (spec_tycon, _, spec_datacons) ->
 	    case (ctrlReturnConvAlg spec_tycon) of
-    	      UnvectoredReturn 1 -> 
+    	      UnvectoredReturn 1 ->
        	    	let
 		    spec_data_con = head spec_datacons
-                    only_tag = getDataConTag spec_data_con
+		    only_tag = getDataConTag spec_data_con
 
     	    	    direct = case (dataReturnConvAlg isw_chkr spec_data_con) of
     	    	        ReturnInRegs _ -> mkConUpdCodePtrVecLabel spec_tycon only_tag
@@ -934,7 +868,7 @@ setupUpdate closure_info code
     	    	    CUnVecLbl direct vectored
 
 	      UnvectoredReturn _ -> CReg StdUpdRetVecReg
-	      VectoredReturn _   -> CLbl (mkStdUpdVecTblLabel spec_tycon) DataPtrKind
+	      VectoredReturn _   -> CLbl (mkStdUpdVecTblLabel spec_tycon) DataPtrRep
 \end{code}
 
 %************************************************************************
@@ -953,7 +887,7 @@ binding information.
 closureDescription :: FAST_STRING	-- Module
 		   -> Id		-- Id of closure binding
 		   -> [Id]		-- Args
-		   -> PlainStgExpr	-- Body
+		   -> StgExpr	-- Body
 		   -> String
 
 	-- Not called for StgRhsCon which have global info tables built in
@@ -961,11 +895,11 @@ closureDescription :: FAST_STRING	-- Module
 
 closureDescription mod_name name args body =
     uppShow 0 (prettyToUn (
-	ppBesides [ppChar '<', 
-                   ppPStr mod_name, 
-                   ppChar '.', 
-                   ppr PprDebug name, 
-                   ppChar '>']))
+	ppBesides [ppChar '<',
+		   ppPStr mod_name,
+		   ppChar '.',
+		   ppr PprDebug name,
+		   ppChar '>']))
 \end{code}
 
 \begin{code}
@@ -978,9 +912,9 @@ chooseDynCostCentres cc args fvs body
 
 	blame_cc -- cost-centre on whom we blame the allocation
 	  = case (args, fvs, body) of
-	      ([], [just1], StgApp (StgVarAtom fun) [{-no args-}] _)
-	        | just1 == fun
-	        -> mkCCostCentre overheadCostCentre
+	      ([], [just1], StgApp (StgVarArg fun) [{-no args-}] _)
+		| just1 == fun
+		-> mkCCostCentre overheadCostCentre
 	      _ -> use_cc
 	    -- if it's an utterly trivial RHS, then it must be
 	    -- one introduced by boxHigherOrderArgs for profiling,

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[TcModule]{Typechecking a whole module}
 
@@ -7,232 +7,155 @@
 #include "HsVersions.h"
 
 module TcModule (
-	tcModule,
-
-	-- to make the interface self-sufficient...
-	Module, Bag, CE(..), E, Binds, FixityDecl, Expr, InPat,
-	RenamedPat(..), TypecheckedPat, Id, Inst, Maybe, TcResult,
-	Name, ProtoName, SrcLoc, Subst, TCE(..), UniqFM,
-	Error(..), Pretty(..), PprStyle, PrettyRep, InstInfo
+	tcModule
     ) where
 
-import TcMonad		-- typechecking monad machinery
-import AbsSyn		-- the stuff being typechecked
+import Ubiq
 
--- OLD:
---import AbsPrel	( stringTy,
---			  eqStringId, neStringId, ltStringId,
---			  leStringId, geStringId, gtStringId,
---			  maxStringId, minStringId, tagCmpStringId,
---			  dfunEqStringId, dfunOrdStringId,
---			  pRELUDE_CORE
---			  IF_ATTACK_PRAGMAS(COMMA mkListTy COMMA charTy)
---			)
---#if USE_ATTACK_PRAGMAS
---import PrelVals	( string_cmp_id ) -- shouldn't even be visible, really
---#endif
-import BackSubst	( applyTcSubstToBinds )
-import Bag		( unionBags, bagToList, emptyBag, listToBag )
-import CE		( nullCE, checkClassCycles, lookupCE, CE(..) )
-import CmdLineOpts	( GlobalSwitch(..) )
-import E
-import HsCore		-- ****** NEED TO SEE CONSTRUCTORS ******
-import HsPragmas	-- ****** NEED TO SEE CONSTRUCTORS ******
-import InstEnv
-import LIE		( unMkLIE, plusLIE, LIE )
-import Name		( Name(..) )
-import RenameAuxFuns	( GlobalNameFuns(..), GlobalNameFun(..), ProtoName, Maybe )
-import SrcLoc		( mkBuiltinSrcLoc, SrcLoc )
-import TCE		( checkTypeCycles, TCE(..), UniqFM )
-import TcBinds		( tcTopBindsAndThen )
-import TcClassDcl	( tcClassDecls1, tcClassDecls2, ClassInfo )
+import HsSyn		( HsModule(..), HsBinds(..), Bind, HsExpr,
+			  TyDecl, SpecDataSig, ClassDecl, InstDecl,
+			  SpecInstSig, DefaultDecl, Sig, Fake, InPat,
+ 			  FixityDecl, IE, ImportedInterface )
+import RnHsSyn		( RenamedHsModule(..), RenamedFixityDecl(..) )
+import TcHsSyn		( TypecheckedHsBinds(..), TypecheckedHsExpr(..),
+			  TcIdOcc(..), zonkBinds, zonkInst, zonkId )
+
+import TcMonad
+import Inst		( Inst, plusLIE )
+import TcBinds		( tcBindsAndThen )
+import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
-import TcDeriv		( tcDeriving )
+import TcEnv		( tcExtendGlobalValEnv, getEnv_LocalIds,
+			  getEnv_TyCons, getEnv_Classes)
 import TcIfaceSig	( tcInterfaceSigs )
-import TcInstDcls	( tcInstDecls1, tcInstDecls2, tcSpecInstSigs, buildInstanceEnvs, InstInfo(..) )
+import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
+import TcInstUtil	( buildInstanceEnvs, InstInfo )
 import TcSimplify	( tcSimplifyTop )
-import TcTyDecls	( tcTyDecls )
-import Unique		-- some ClassKey stuff
-import UniqFM		( emptyUFM ) -- profiling, pragmas only
+import TcTyClsDecls	( tcTyAndClassDecls1 )
+
+import Bag		( listToBag )
+import Class		( GenClass )
+import Id		( GenId, isDataCon, isMethodSelId, idType )
+import Maybes		( catMaybes )
+import Name		( Name(..) )
+import Outputable	( isExported )
+import PrelInfo		( unitTy, mkPrimIoTy )
+import Pretty
+import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
+import TyCon		( TyCon )
+import Type		( applyTyCon )
+import Unify		( unifyTauTy )
+import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
+		          filterUFM, eltsUFM )
+import Unique		( iOTyConKey, mainIdKey, mainPrimIOIdKey )
 import Util
 
-import Pretty		-- Debugging
+
+import FiniteMap	( emptyFM )
+tycon_specs = emptyFM
+
+
 \end{code}
 
 \begin{code}
-tcModule :: E				-- initial typechecker environment
-	 -> GlobalNameFuns		-- final renamer info (to do derivings)
-	 -> RenamedModule		-- input
-	 -> TcM ((TypecheckedBinds,	-- binds from class decls; does NOT
+tcModule :: GlobalNameMappers		-- final renamer info for derivings
+	 -> RenamedHsModule		-- input
+	 -> TcM s ((TypecheckedHsBinds,	-- binds from class decls; does NOT
 					-- include default-methods bindings
-		  TypecheckedBinds,	-- binds from instance decls; INCLUDES
+		    TypecheckedHsBinds,	-- binds from instance decls; INCLUDES
 					-- class default-methods binds
-		  TypecheckedBinds,	-- binds from value decls
-		  [(Inst, TypecheckedExpr)]),
+		    TypecheckedHsBinds,	-- binds from value decls
 
-		 ([RenamedFixityDecl],	-- things for the interface generator
-		  [Id],			-- to look at...
-		  CE,
-		  TCE,
-		  Bag InstInfo),
+		    [(Id, TypecheckedHsExpr)]), -- constant instance binds
 
-		 FiniteMap TyCon [(Bool, [Maybe UniType])],
+		   ([RenamedFixityDecl], [Id], UniqFM TyCon, UniqFM Class, Bag InstInfo),
+					-- things for the interface generator
+
+		   (UniqFM TyCon, UniqFM Class),
+					-- environments of info from this module only
+
+		   FiniteMap TyCon [(Bool, [Maybe Type])],
 					-- source tycon specialisation requests
 
---UNUSED:	 E,			-- environment of total accumulated info
-		 E,			-- environment of info due to this module only
-		 PprStyle -> Pretty)	-- -ddump-deriving info (passed upwards)
+		   PprStyle -> Pretty)	-- -ddump-deriving info
 
-tcModule e1 renamer_name_funs
-	(Module mod_name exports imports_should_be_empty fixities
-	     tydecls ty_sigs classdecls instdecls specinst_sigs
-	     default_decls valdecls sigs src_loc)
+tcModule renamer_name_funs
+	(HsModule mod_name exports imports fixities
+		  ty_decls specdata_sigs cls_decls inst_decls specinst_sigs
+		  default_decls val_decls sigs src_loc)
 
-  = addSrcLocTc src_loc (	-- record where we're starting
+  = ASSERT(null imports)
+
+    tcAddSrcLoc src_loc $	-- record where we're starting
 
 	-- Tie the knot for inteface-file value declaration signatures
 	-- This info is only used inside the knot for type-checking the
 	-- pragmas, which is done lazily [ie failure just drops the pragma
 	-- without having any global-failure effect].
 
-    fixTc (\ ~(rec_gve_sigs, _, _, _, _, _, _, _, _, _) ->
-    let
-	e2 = plusE_GVE e1 rec_gve_sigs
-    in
+    fixTc (\ ~(_, _, _, _, _, sig_ids) ->
+	tcExtendGlobalValEnv sig_ids (
 
 	-- The knot for instance information.  This isn't used at all
-	-- till we type-check value declarations.
-	fixTc ( \ ~(rec_inst_mapper, _, _, _, _, _, _, _, _) ->
+	-- till we type-check value declarations
+	fixTc ( \ ~(rec_inst_mapper, _, _, _, _) ->
 
-	     -- The knot for TyCons and Classes
-	    fixTc ( \ ~(_, rec_tce, rec_ce, rec_datacons_gve, rec_ops_gve, _, _) ->
-		let
-		    e3 = e2
-			 `plusE_GVE` rec_datacons_gve
-			 `plusE_GVE` rec_ops_gve
-			 `plusE_TCE` rec_tce
-			 `plusE_CE`  rec_ce
-		in
-		    -- DO THE TYPE DECLS
-		    -- Including the pragmas: {-# ABSTRACT TypeSyn #-}
-		    --			      {-# SPECIALIZE data DataType ... #-}
-		let
-		    (absty_sigs, specdata_sigs) = partition is_absty_sig ty_sigs
-		    is_absty_sig (AbstractTypeSig _ _) = True
-		    is_absty_sig (SpecDataSig _ _ _)   = False
+	     -- Type-check the type and class decls
+	    trace "tcTyAndClassDecls:"	$
+	    tcTyAndClassDecls1 rec_inst_mapper ty_decls_bag cls_decls_bag
+					`thenTc` \ env ->
 
-		    is_abs_syn :: Name -> Bool  -- a lookup fn for abs synonyms
-		    is_abs_syn n
-		      = n `is_elem` [ tc | (AbstractTypeSig tc _) <- absty_sigs ]
-		      where
-		        is_elem = isIn "tcModule"
+		-- Typecheck the instance decls, includes deriving
+	    tcSetEnv env (
+	    trace "tcInstDecls:"	$
+	    tcInstDecls1 inst_decls_bag specinst_sigs
+			 mod_name renamer_name_funs fixities 
+	    )				`thenTc` \ (inst_info, deriv_binds, ddump_deriv) ->
 
-		    get_spec_sigs :: Name -> [RenamedDataTypeSig]
-		    get_spec_sigs n
-		      = [ sig | sig@(SpecDataSig tc _ _) <- specdata_sigs, n == tc]
-		in
-		babyTcMtoTcM (tcTyDecls e3 is_abs_syn get_spec_sigs tydecls)
-			`thenTc` \ (tce, datacons_gve, tycon_specs) ->
+	    buildInstanceEnvs inst_info	`thenTc` \ inst_mapper ->
 
-		    -- DO THE CLASS DECLS
-		tcClassDecls1 e3 rec_inst_mapper classdecls
-			`thenTc` \ (class_info, ce, ops_gve) ->
+	    returnTc (inst_mapper, env, inst_info, deriv_binds, ddump_deriv)
 
-		    -- End of TyCon/Class knot
-		    -- Augment whatever TCE/GVE/CE stuff was in orig_e
-		returnTc (e3, tce, ce, datacons_gve, ops_gve, class_info, tycon_specs)
+	) `thenTc` \ (_, env, inst_info, deriv_binds, ddump_deriv) ->
+	tcSetEnv env (
 
-		   -- End of inner fixTc
-	    )   `thenTc` ( \ (e3, tce_here, ce_here, _, _, class_info, tycon_specs) ->
-			     -- The "here" things are the extra decls defined in this
-			     -- module or its imports; but not including whatever was
-			     -- in the incoming e.
+	    -- Default declarations
+	tcDefaults default_decls	`thenTc` \ defaulting_tys ->
+	tcSetDefaultTys defaulting_tys 	( -- for the iface sigs...
 
-		    -- Grab completed tce/ce and check for type/class cycles
-		    -- The tce/ce are now stable and lookable-at, with the
-		    -- exception of the instance information inside classes
-	    let
-		ce3  = getE_CE e3
-		tce3 = getE_TCE e3
-	    in
-	    checkMaybeErrTc (checkTypeCycles tce3) id    `thenTc_`
-	    checkMaybeErrTc (checkClassCycles ce3) id    `thenTc_`
+	    -- Interface type signatures
+	    -- We tie a knot so that the Ids read out of interfaces are in scope
+	    --   when we read their pragmas.
+	    -- What we rely on is that pragmas are typechecked lazily; if
+	    --   any type errors are found (ie there's an inconsistency)
+	    --   we silently discard the pragma
+	tcInterfaceSigs sigs		`thenTc` \ sig_ids ->
 
-		    -- Now instance declarations
-	    tcInstDecls1 e3 ce3 tce3 instdecls		`thenNF_Tc` \ decl_inst_info ->
+	returnTc (env, inst_info, deriv_binds, ddump_deriv, defaulting_tys, sig_ids)
 
-		    -- Handle "derived" instances; note that we only do derivings
-		    -- for things in this module; we ignore deriving decls from
-		    -- interfaces! We pass fixities, because they may be used in
-		    -- doing Text.
+    )))) `thenTc` \ (env, inst_info, deriv_binds, ddump_deriv, defaulting_tys, _) ->
 
-	    tcDeriving mod_name renamer_name_funs decl_inst_info tce3 fixities
-		    `thenTc` \ (deriv_inst_info, extra_deriv_binds, ddump_deriv) ->
-
-	    let
-		inst_info = deriv_inst_info `unionBags` decl_inst_info 
-	    in
-		    -- Handle specialise instance pragmas
-	    getSwitchCheckerTc			`thenNF_Tc` \ sw_chkr ->
-	    (if sw_chkr SpecialiseOverloaded then
-	         tcSpecInstSigs e3 ce3 tce3 inst_info specinst_sigs
-	     else
-		 returnTc emptyBag)
-		    				`thenTc` \ spec_inst_info ->
-	    let
-		full_inst_info = inst_info `unionBags` spec_inst_info 
-	    in
-		    -- OK, now do the inst-mapper stuff
-	    buildInstanceEnvs full_inst_info	`thenTc` \ all_insts_mapper ->
-
-	    returnTc (all_insts_mapper, e3, ce_here, tce_here, class_info, tycon_specs,
-		      full_inst_info, extra_deriv_binds, ddump_deriv)
-
-		    -- End of outer fixTc
-	)) `thenTc` ( \ (_, e3, ce_here, tce_here, class_info, tycon_specs,
-			full_inst_info, extra_deriv_binds, ddump_deriv) ->
-
-    -- Default declarations
-    tcDefaults e3 default_decls	`thenTc` \ defaulting_tys ->
-    setDefaultingTys defaulting_tys ( -- for the iface sigs...
-
-    -- Interface type signatures
-
-    -- We tie a knot so that the Ids read out of interfaces are in scope
-    --   when we read their pragmas.
-    -- What we rely on is that pragmas are typechecked lazily; if
-    --   any type errors are found (ie there's an inconsistency) 
-    --   we silently discard the pragma
-
-    babyTcMtoTcM (tcInterfaceSigs e3 sigs)	`thenTc` \ gve_sigs ->
-
-    returnTc (gve_sigs, e3, ce_here, tce_here, class_info, tycon_specs, defaulting_tys,
-  	      full_inst_info, extra_deriv_binds, ddump_deriv)
-
-    -- End of extremely outer fixTc
-    )))	`thenTc` \ (_, e3, ce_here, tce_here, class_info, tycon_specs, defaulting_tys,
-		    full_inst_info, extra_deriv_binds, ddump_deriv) ->
-
-    setDefaultingTys defaulting_tys ( -- to the end...
+    tcSetEnv env (				-- to the end...
+    tcSetDefaultTys defaulting_tys (		-- ditto
 
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
-	-- Nota bene
-    tcTopBindsAndThen
-	e3
+    trace "tcBinds:"			$
+    tcBindsAndThen
 	(\ binds1 (binds2, thing) -> (binds1 `ThenBinds` binds2, thing))
-	(valdecls `ThenBinds` extra_deriv_binds)
-	(\ e4 ->
-		-- Second pass over instance declarations,
+	(val_decls `ThenBinds` deriv_binds)
+	(	-- Second pass over instance declarations,
 		-- to compile the bindings themselves.
-	    tcInstDecls2  e4 full_inst_info `thenNF_Tc` \ (lie_instdecls, inst_binds) ->
-	    tcClassDecls2 e4 class_info	    `thenNF_Tc` \ (lie_clasdecls, class_binds) ->
-	    returnTc ( (EmptyBinds, (inst_binds, class_binds, e4)),
+	    tcInstDecls2  inst_info	`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
+	    tcClassDecls2 cls_decls_bag	`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
+	    tcGetEnv			`thenNF_Tc` \ env ->
+	    returnTc ( (EmptyBinds, (inst_binds, cls_binds, env)),
 		       lie_instdecls `plusLIE` lie_clasdecls,
-		       () )
-	)
+		       () ))
 
-	`thenTc` \ ((val_binds, (inst_binds, class_binds, e4)), lie_alldecls, _) ->
+	`thenTc` \ ((val_binds, (inst_binds, cls_binds, final_env)), lie_alldecls, _) ->
+
+    checkTopLevelIds mod_name final_env	`thenTc_`
 
 	-- Deal with constant or ambiguous InstIds.  How could
 	-- there be ambiguous ones?  They can only arise if a
@@ -240,40 +163,95 @@ tcModule e1 renamer_name_funs
 	-- restriction, and no subsequent decl instantiates its
 	-- type.  (Usually, ambiguous type variables are resolved
 	-- during the generalisation step.)
+    tcSimplifyTop lie_alldecls			`thenTc` \ const_insts ->
+    let
+        localids = getEnv_LocalIds final_env
+	tycons   = getEnv_TyCons final_env
+	classes  = getEnv_Classes final_env
 
-    tcSimplifyTop (unMkLIE lie_alldecls)    `thenTc` \ const_inst_binds ->
+	local_tycons  = filterUFM isLocallyDefined tycons
+	local_classes = filterUFM isLocallyDefined classes
 
+	exported_ids = [v | v <- eltsUFM localids,
+		        isExported v && not (isDataCon v) && not (isMethodSelId v)]
+    in
 	-- Backsubstitution.  Monomorphic top-level decls may have
 	-- been instantiated by subsequent decls, and the final
 	-- simplification step may have instantiated some
 	-- ambiguous types.  So, sadly, we need to back-substitute
 	-- over the whole bunch of bindings.
-
-    applyTcSubstToBinds val_binds	    `thenNF_Tc` \ val_binds' ->
-    applyTcSubstToBinds inst_binds	    `thenNF_Tc` \ inst_binds' ->
-    applyTcSubstToBinds class_binds	    `thenNF_Tc` \ class_binds' ->
-
-	-- ToDo: probably need to back-substitute over all
-	-- stuff in 'e4'; we do so here over the Ids,
-	-- which is probably enough.  WDP 95/06
-    mapNF_Tc applyTcSubstToId (getE_GlobalVals e4)
-					    `thenNF_Tc` \ if_global_ids ->
+    zonkBinds val_binds		 	`thenNF_Tc` \ val_binds' ->
+    zonkBinds inst_binds	 	`thenNF_Tc` \ inst_binds' ->
+    zonkBinds cls_binds	 		`thenNF_Tc` \ cls_binds' ->
+    mapNF_Tc zonkInst const_insts 	`thenNF_Tc` \ const_insts' ->
+    mapNF_Tc (zonkId.TcId) exported_ids	`thenNF_Tc` \ exported_ids' ->
 
 	-- FINISHED AT LAST
     returnTc (
-	(class_binds', inst_binds', val_binds', const_inst_binds),
+	(cls_binds', inst_binds', val_binds', const_insts'),
 
 	     -- the next collection is just for mkInterface
-	(fixities, if_global_ids, ce_here, tce_here, full_inst_info),
+	(fixities, exported_ids', tycons, classes, inst_info),
+
+	(local_tycons, local_classes),
 
 	tycon_specs,
 
---UNUSED: e4,
-
-	  -- and... TCE needed for code generation; rest needed for interpreter.
-	  -- ToDo: still wrong: needs isLocallyDeclared run over everything
-	mkE tce_here {-gve_here lve-} ce_here,
-	     -- NB: interpreter would probably need the gve_here stuff
 	ddump_deriv
     )))
+  where
+    ty_decls_bag   = listToBag ty_decls
+    cls_decls_bag  = listToBag cls_decls
+    inst_decls_bag = listToBag inst_decls
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Error checking code}
+%*									*
+%************************************************************************
+
+
+checkTopLevelIds checks that Main.main or Main.mainPrimIO has correct type.
+
+\begin{code}
+checkTopLevelIds :: FAST_STRING -> TcEnv s -> TcM s ()
+checkTopLevelIds mod final_env
+  = if (mod /= SLIT("Main")) then
+	returnTc ()
+    else
+	case (lookupUFM_Directly localids mainIdKey,
+	      lookupUFM_Directly localids mainPrimIOIdKey) of 
+	  (Just main, Nothing) -> tcAddErrCtxt mainCtxt $
+		                  unifyTauTy ty_main (idType main)
+	  (Nothing, Just prim) -> tcAddErrCtxt primCtxt $
+		                  unifyTauTy ty_prim (idType prim)
+	  (Just _ , Just _ )   -> failTc mainBothIdErr
+	  (Nothing, Nothing)   -> failTc mainNoneIdErr
+    where
+      localids = getEnv_LocalIds final_env
+      tycons   = getEnv_TyCons final_env
+
+      io_tc    = lookupWithDefaultUFM_Directly tycons io_panic iOTyConKey
+      io_panic = panic "TcModule: type IO not in scope"
+
+      ty_main  = applyTyCon io_tc [unitTy]
+      ty_prim  = mkPrimIoTy unitTy
+
+
+mainCtxt sty
+  = ppStr "main should have type IO ()"
+
+primCtxt sty
+  = ppStr "mainPrimIO should have type PrimIO ()"
+
+mainBothIdErr sty
+  = ppStr "module Main contains definitions for both main and mainPrimIO"
+
+mainNoneIdErr sty
+  = panic "ToDo: sort out mainIdKey"
+ -- ppStr "module Main does not contain a definition for main (or mainPrimIO)"
+
 \end{code}

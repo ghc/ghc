@@ -1,4 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface LiftMonad where
-bogusLiftMonadThing :: Bool
-

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[FiniteMap]{An implementation of finite maps}
 
@@ -18,7 +18,7 @@ The code is SPECIALIZEd to various highly-desirable types (e.g., Id)
 near the end (only \tr{#ifdef COMPILING_GHC}).
 
 \begin{code}
-#if defined(COMPILING_GHC)
+#ifdef COMPILING_GHC
 #include "HsVersions.h"
 #define IF_NOT_GHC(a) {--}
 #else
@@ -52,10 +52,10 @@ module FiniteMap (
 
 	IF_NOT_GHC(sizeFM COMMA)
 	isEmptyFM, elemFM, lookupFM, lookupWithDefaultFM,
-	
+
 	fmToList, keysFM, eltsFM{-used in GHCI-}
 
-#if defined(COMPILING_GHC)
+#ifdef COMPILING_GHC
 	, FiniteSet(..), emptySet, mkSet, isEmptySet
 	, elementOf, setToList, union, minusSet{-exported for GHCI-}
 #endif
@@ -68,14 +68,12 @@ module FiniteMap (
 
 import Maybes
 
-#if defined(COMPILING_GHC)
-import AbsUniType
+#ifdef COMPILING_GHC
+import Ubiq{-uitous-}
+# ifdef DEBUG
 import Pretty
-import Outputable
-import Util
-import CLabelInfo	( CLabel )  -- for specialising
+# endif
 #if ! OMIT_NATIVE_CODEGEN
-import AsmRegAlloc	( Reg )	    -- ditto
 #define IF_NCG(a) a
 #else
 #define IF_NCG(a) {--}
@@ -113,10 +111,10 @@ addListToFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> [(key,elt)] -> F
 
 		   -- Combines with previous binding
 addToFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
-			   -> FiniteMap key elt -> key -> elt  
+			   -> FiniteMap key elt -> key -> elt
 			   -> FiniteMap key elt
 addListToFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
-			   -> FiniteMap key elt -> [(key,elt)] 
+			   -> FiniteMap key elt -> [(key,elt)]
 			   -> FiniteMap key elt
 
 		   -- Deletion doesn't complain if you try to delete something
@@ -130,20 +128,20 @@ plusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt
 			   -> FiniteMap key elt
 
 		   -- Combines bindings for the same thing with the given function
-plusFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt) 
+plusFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
 			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
 minusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 		   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
 
-intersectFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
+intersectFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 intersectFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
-			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt 
+			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
 --	MAPPING, FOLDING, FILTERING
 foldFM		:: (key -> elt -> a -> a) -> a -> FiniteMap key elt -> a
 mapFM		:: (key -> elt1 -> elt2) -> FiniteMap key elt1 -> FiniteMap key elt2
-filterFM	:: (Ord key OUTPUTABLE_key) => (key -> elt -> Bool) 
+filterFM	:: (Ord key OUTPUTABLE_key) => (key -> elt -> Bool)
 			   -> FiniteMap key elt -> FiniteMap key elt
 
 --	INTERROGATING
@@ -185,7 +183,7 @@ factor of at most \tr{sIZE_RATIO}
 
 \begin{code}
 data FiniteMap key elt
-  = EmptyFM 
+  = EmptyFM
   | Branch key elt	    	-- Key and elt stored here
     IF_GHC(Int#,Int{-STRICT-})	-- Size >= 1
     (FiniteMap key elt)	    	-- Children
@@ -246,7 +244,7 @@ delFromFM (Branch key elt size fm_l fm_r) del_key
 	_GT -> mkBalBranch key elt fm_l (delFromFM fm_r del_key)
 	_LT -> mkBalBranch key elt (delFromFM fm_l del_key) fm_r
 	_EQ -> glueBal fm_l fm_r
-#else	
+#else
   | del_key > key
   = mkBalBranch key elt fm_l (delFromFM fm_r del_key)
 
@@ -270,7 +268,7 @@ delListFromFM fm keys = foldl delFromFM fm keys
 plusFM_C combiner EmptyFM fm2 = fm2
 plusFM_C combiner fm1 EmptyFM = fm1
 plusFM_C combiner fm1 (Branch split_key elt2 _ left right)
-  = mkVBalBranch split_key new_elt 
+  = mkVBalBranch split_key new_elt
 		 (plusFM_C combiner lts left)
 		 (plusFM_C combiner gts right)
   where
@@ -308,7 +306,7 @@ intersectFM_C combiner fm1 (Branch split_key elt2 _ left right)
 
   | maybeToBool maybe_elt1	-- split_elt *is* in intersection
   = mkVBalBranch split_key (combiner elt1 elt2) (intersectFM_C combiner lts left)
-					        (intersectFM_C combiner gts right)
+						(intersectFM_C combiner gts right)
 
   | otherwise			-- split_elt is *not* in intersection
   = glueVBal (intersectFM_C combiner lts left) (intersectFM_C combiner gts right)
@@ -333,7 +331,7 @@ foldFM k z (Branch key elt _ fm_l fm_r)
   = foldFM k (k key elt (foldFM k z fm_r)) fm_l
 
 mapFM f EmptyFM = emptyFM
-mapFM f (Branch key elt size fm_l fm_r) 
+mapFM f (Branch key elt size fm_l fm_r)
   = Branch key (f key elt) size (mapFM f fm_l) (mapFM f fm_r)
 
 filterFM p EmptyFM = emptyFM
@@ -364,7 +362,7 @@ lookupFM (Branch key elt _ fm_l fm_r) key_to_find
   = case _tagCmp key_to_find key of
 	_LT -> lookupFM fm_l key_to_find
 	_GT -> lookupFM fm_r key_to_find
-        _EQ -> Just elt
+	_EQ -> Just elt
 #else
   | key_to_find < key = lookupFM fm_l key_to_find
   | key_to_find > key = lookupFM fm_r key_to_find
@@ -414,7 +412,7 @@ sIZE_RATIO = 5
 
 mkBranch :: (Ord key OUTPUTABLE_key) 		-- Used for the assertion checking only
 	 => Int
-	 -> key -> elt 
+	 -> key -> elt
 	 -> FiniteMap key elt -> FiniteMap key elt
 	 -> FiniteMap key elt
 
@@ -486,41 +484,41 @@ out of whack.
 
 \begin{code}
 mkBalBranch :: (Ord key OUTPUTABLE_key)
-	    => key -> elt 
+	    => key -> elt
 	    -> FiniteMap key elt -> FiniteMap key elt
 	    -> FiniteMap key elt
 
 mkBalBranch key elt fm_L fm_R
 
-  | size_l + size_r < 2 
+  | size_l + size_r < 2
   = mkBranch 1{-which-} key elt fm_L fm_R
 
   | size_r > sIZE_RATIO * size_l	-- Right tree too big
   = case fm_R of
-	Branch _ _ _ fm_rl fm_rr 
+	Branch _ _ _ fm_rl fm_rr
 		| sizeFM fm_rl < 2 * sizeFM fm_rr -> single_L fm_L fm_R
 		| otherwise	   	          -> double_L fm_L fm_R
 	-- Other case impossible
 
   | size_l > sIZE_RATIO * size_r	-- Left tree too big
   = case fm_L of
-	Branch _ _ _ fm_ll fm_lr 
+	Branch _ _ _ fm_ll fm_lr
 		| sizeFM fm_lr < 2 * sizeFM fm_ll -> single_R fm_L fm_R
 		| otherwise		          -> double_R fm_L fm_R
 	-- Other case impossible
 
   | otherwise				-- No imbalance
   = mkBranch 2{-which-} key elt fm_L fm_R
-  
+
   where
     size_l   = sizeFM fm_L
     size_r   = sizeFM fm_R
 
-    single_L fm_l (Branch key_r elt_r _ fm_rl fm_rr) 
+    single_L fm_l (Branch key_r elt_r _ fm_rl fm_rr)
 	= mkBranch 3{-which-} key_r elt_r (mkBranch 4{-which-} key elt fm_l fm_rl) fm_rr
 
     double_L fm_l (Branch key_r elt_r _ (Branch key_rl elt_rl _ fm_rll fm_rlr) fm_rr)
-	= mkBranch 5{-which-} key_rl elt_rl (mkBranch 6{-which-} key   elt   fm_l   fm_rll) 
+	= mkBranch 5{-which-} key_rl elt_rl (mkBranch 6{-which-} key   elt   fm_l   fm_rll)
 				 (mkBranch 7{-which-} key_r elt_r fm_rlr fm_rr)
 
     single_R (Branch key_l elt_l _ fm_ll fm_lr) fm_r
@@ -534,7 +532,7 @@ mkBalBranch key elt fm_L fm_R
 
 \begin{code}
 mkVBalBranch :: (Ord key OUTPUTABLE_key)
-	     => key -> elt 
+	     => key -> elt
 	     -> FiniteMap key elt -> FiniteMap key elt
 	     -> FiniteMap key elt
 
@@ -557,7 +555,7 @@ mkVBalBranch key elt fm_l@(Branch key_l elt_l _ fm_ll fm_lr)
   | otherwise
   = mkBranch 13{-which-} key elt fm_l fm_r
 
-  where 
+  where
     size_l = sizeFM fm_l
     size_r = sizeFM fm_r
 \end{code}
@@ -579,13 +577,13 @@ glueBal :: (Ord key OUTPUTABLE_key)
 
 glueBal EmptyFM fm2 = fm2
 glueBal fm1 EmptyFM = fm1
-glueBal fm1 fm2 
+glueBal fm1 fm2
 	-- The case analysis here (absent in Adams' program) is really to deal
 	-- with the case where fm2 is a singleton. Then deleting the minimum means
 	-- we pass an empty tree to mkBalBranch, which breaks its invariant.
   | sizeFM fm2 > sizeFM fm1
   = mkBalBranch mid_key2 mid_elt2 fm1 (deleteMin fm2)
-	
+
   | otherwise
   = mkBalBranch mid_key1 mid_elt1 (deleteMax fm1) fm2
   where
@@ -604,7 +602,7 @@ glueVBal :: (Ord key OUTPUTABLE_key)
 glueVBal EmptyFM fm2 = fm2
 glueVBal fm1 EmptyFM = fm1
 glueVBal fm_l@(Branch key_l elt_l _ fm_ll fm_lr)
-         fm_r@(Branch key_r elt_r _ fm_rl fm_rr)
+	 fm_r@(Branch key_r elt_r _ fm_rl fm_rr)
   | sIZE_RATIO * size_l < size_r
   = mkBalBranch key_r elt_r (glueVBal fm_l fm_rl) fm_rr
 
@@ -630,7 +628,6 @@ glueVBal fm_l@(Branch key_l elt_l _ fm_ll fm_lr)
 splitLT, splitGT :: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key -> FiniteMap key elt
 
 -- splitLT fm split_key  =  fm restricted to keys <  split_key
--- splitGE fm split_key  =  fm restricted to keys >= split_key (UNUSED)
 -- splitGT fm split_key  =  fm restricted to keys >  split_key
 
 splitLT EmptyFM split_key = emptyFM
@@ -645,21 +642,6 @@ splitLT (Branch key elt _ fm_l fm_r) split_key
   | split_key > key = mkVBalBranch key elt fm_l (splitLT fm_r split_key)
   | otherwise	    = fm_l
 #endif
-
-{- UNUSED:
-splitGE EmptyFM split_key = emptyFM
-splitGE (Branch key elt _ fm_l fm_r) split_key
-#ifdef __GLASGOW_HASKELL__
-  = case _tagCmp split_key key of
-	_GT -> splitGE fm_r split_key
-	_LT -> mkVBalBranch key elt (splitGE fm_l split_key) fm_r
-	_EQ -> mkVBalBranch key elt emptyFM fm_r
-#else
-  | split_key > key = splitGE fm_r split_key
-  | split_key < key = mkVBalBranch key elt (splitGE fm_l split_key) fm_r
-  | otherwise	    = mkVBalBranch key elt emptyFM fm_r
-#endif
--}
 
 splitGT EmptyFM split_key = emptyFM
 splitGT (Branch key elt _ fm_l fm_r) split_key
@@ -698,14 +680,8 @@ deleteMax (Branch key elt _ fm_l    fm_r) = mkBalBranch key elt fm_l (deleteMax 
 %************************************************************************
 
 \begin{code}
-#if defined(COMPILING_GHC)
+#if defined(COMPILING_GHC) && defined(DEBUG_FINITEMAPS)
 
-{- this is the real one actually...
-instance (Outputable key, Outputable elt) => Outputable (FiniteMap key elt) where
-    ppr sty fm = ppr sty (fmToList fm)
--}
-
--- temp debugging (ToDo: rm)
 instance (Outputable key) => Outputable (FiniteMap key elt) where
     ppr sty fm = pprX sty fm
 
@@ -716,15 +692,15 @@ pprX sty (Branch key elt sz fm_l fm_r)
 	      pprX sty fm_r, ppRparen]
 #endif
 
-#if !defined(COMPILING_GHC)
+#ifndef COMPILING_GHC
 instance (Eq key, Eq elt) => Eq (FiniteMap key elt) where
   fm_1 == fm_2 = (sizeFM   fm_1 == sizeFM   fm_2) &&   -- quick test
-                 (fmToList fm_1 == fmToList fm_2)
+		 (fmToList fm_1 == fmToList fm_2)
 
 {- NO: not clear what The Right Thing to do is:
 instance (Ord key, Ord elt) => Ord (FiniteMap key elt) where
   fm_1 <= fm_2 = (sizeFM   fm_1 <= sizeFM   fm_2) &&   -- quick test
-                 (fmToList fm_1 <= fmToList fm_2)
+		 (fmToList fm_1 <= fmToList fm_2)
 -}
 #endif
 \end{code}
@@ -736,7 +712,7 @@ instance (Ord key, Ord elt) => Ord (FiniteMap key elt) where
 %************************************************************************
 
 \begin{code}
-#if defined(COMPILING_GHC)
+#ifdef COMPILING_GHC
 
 type FiniteSet key = FiniteMap key ()
 emptySet	:: FiniteSet key
@@ -768,8 +744,8 @@ When the FiniteMap module is used in GHC, we specialise it for
 \tr{Uniques}, for dastardly efficiency reasons.
 
 \begin{code}
+#if 0
 #if defined(COMPILING_GHC) && __GLASGOW_HASKELL__
-    -- the __GLASGOW_HASKELL__ chk avoids an hbc 0.999.7 bug
 
 {-# SPECIALIZE listToFM
 		:: [(Int,elt)] -> FiniteMap Int elt,
@@ -860,4 +836,5 @@ When the FiniteMap module is used in GHC, we specialise it for
     #-}
 
 #endif {- compiling for GHC -}
+#endif {- 0 -}
 \end{code}

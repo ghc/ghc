@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[TcClassSig]{Typecheck a class signature}
 
@@ -9,18 +9,12 @@
 module TcClassSig ( tcClassSigs ) where
 
 import TcMonad		-- typechecking monadic machinery
-import AbsSyn		-- the stuff being typechecked
+import HsSyn		-- the stuff being typechecked
 
-import AbsUniType
-import CE		( CE(..) )
-import E		( mkE, getE_TCE, getE_CE, nullGVE, unitGVE, plusGVE, GVE(..), E )
-import Errors		( methodTypeLacksTyVarErr, confusedNameErr )
+import Type
 import Id		( mkDefaultMethodId, mkClassOpId, IdInfo )
 import IdInfo
-import InstEnv		( InstTemplate )
-import TCE		( TCE(..), UniqFM )
-import TVE		( TVE(..) )
-import TcPolyType	( tcPolyType )
+import TcMonoType	( tcPolyType )
 import TcPragmas	( tcClassOpPragmas )
 import Util
 \end{code}
@@ -32,9 +26,9 @@ tcClassSigs :: E -> TVE -> Class    	-- Knot tying only!
 	    -> [Name]			-- Names with default methods
 	    -> [RenamedClassOpSig]
 	    -> Baby_TcM ([ClassOp],	-- class ops
-		         GVE,		-- env for looking up the class ops
-		         [Id],		-- selector ids
-		         [Id])		-- default-method ids
+			 GVE,		-- env for looking up the class ops
+			 [Id],		-- selector ids
+			 [Id])		-- default-method ids
 
 tcClassSigs e tve rec_clas rec_classop_spec_fn clas_tyvar defm_names sigs
   = mapB_Tc tc_sig sigs	`thenB_Tc` \ stuff ->
@@ -45,12 +39,13 @@ tcClassSigs e tve rec_clas rec_classop_spec_fn clas_tyvar defm_names sigs
   where
     rec_ce  = getE_CE  e
     rec_tce = getE_TCE e
+--FAKE:    fake_E  = mkE rec_tce rec_ce
 
-    tc_sig (ClassOpSig name@(ClassOpName op_uniq clas_name op_name tag) poly_ty pragmas src_loc)
+    tc_sig (ClassOpSig name@(ClassOpName op_uniq _ op_name tag) poly_ty pragmas src_loc)
       = addSrcLocB_Tc src_loc				 (
 	tcPolyType rec_ce rec_tce tve poly_ty	`thenB_Tc` \ local_ty ->
 	let
-	    (local_tyvar_tmpls, theta, tau) = splitType local_ty
+	    (local_tyvar_tmpls, theta, tau) = splitSigmaTy local_ty
 	    full_theta       = (rec_clas, (mkTyVarTemplateTy clas_tyvar)) : theta
 	    full_tyvar_tmpls = clas_tyvar : local_tyvar_tmpls
 	    global_ty        = mkForallTy full_tyvar_tmpls (mkRhoTy full_theta tau)
@@ -77,8 +72,8 @@ tcClassSigs e tve rec_clas rec_classop_spec_fn clas_tyvar defm_names sigs
 		-- default method code or the imported default method is bottoming.
 
 		error_defm = if isLocallyDefined clas_name then
-				 name `notElem` defm_names 
-			     else 
+				 name `notElem` defm_names
+			     else
 				 bottomIsGuaranteed (getInfo defm_info)
 	    in
 	    returnB_Tc (

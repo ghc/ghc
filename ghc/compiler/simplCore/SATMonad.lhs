@@ -16,24 +16,19 @@ module SATMonad (
 	returnSAT, thenSAT, thenSAT_, mapSAT, getSATInfo, newSATName,
 	getArgLists, Arg(..), insSAEnv, saTransform,
 
-	SATEnv(..), isStatic, dropStatics,
-
-	Id, UniType, SplitUniqSupply, PlainCoreExpr(..)
+	SATEnv(..), isStatic, dropStatics
     ) where
 
-import AbsUniType	( mkTyVarTy, mkSigmaTy, TyVarTemplate,
-			  extractTyVarsFromTy, splitType, splitTyArgs,
+import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
+			  extractTyVarsFromTy, splitSigmaTy, splitTyArgs,
 			  glueTyArgs, instantiateTy, TauType(..),
 			  Class, ThetaType(..), SigmaType(..),
 			  InstTyEnv(..)
 			)
-import IdEnv
-import Id		( mkSysLocal, getIdUniType )
+import Id		( mkSysLocal, idType )
 import Maybes		( Maybe(..) )
-import PlainCore
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
-import SplitUniq
-import Unique
+import UniqSupply
 import Util
 
 infixr 9 `thenSAT`, `thenSAT_`
@@ -48,7 +43,7 @@ infixr 9 `thenSAT`, `thenSAT_`
 \begin{code}
 type SATEnv = IdEnv SATInfo
 
-type SATInfo = ([Arg UniType],[Arg Id])
+type SATInfo = ([Arg Type],[Arg Id])
 
 data Arg a = Static a | NotStatic
     deriving Eq
@@ -91,9 +86,9 @@ Two items of state to thread around: a UniqueSupply and a SATEnv.
 
 \begin{code}
 type SatM result
-  =  SplitUniqSupply -> SATEnv -> (result, SATEnv)
+  =  UniqSupply -> SATEnv -> (result, SATEnv)
 
-initSAT :: SatM a -> SplitUniqSupply -> a
+initSAT :: SatM a -> UniqSupply -> a
 
 initSAT f us = fst (f us nullIdEnv)
 
@@ -130,59 +125,58 @@ getSATInfo :: Id -> SatM (Maybe SATInfo)
 getSATInfo var us env
   = (lookupIdEnv env var, env)
 
-newSATName :: Id -> UniType -> SatM Id
+newSATName :: Id -> Type -> SatM Id
 newSATName id ty us env
-  = case (getSUnique us) of { unique ->
+  = case (getUnique us) of { unique ->
     (mkSysLocal new_str unique ty mkUnknownSrcLoc, env) }
   where
     new_str = getOccurrenceName id _APPEND_ SLIT("_sat")
 
-getArgLists :: PlainCoreExpr -> ([Arg UniType],[Arg Id])
+getArgLists :: CoreExpr -> ([Arg Type],[Arg Id])
 getArgLists expr
   = let
-	(tvs, lambda_bounds, body) = digForLambdas expr
+	(uvs, tvs, lambda_bounds, body) = digForLambdas expr
     in
     ([ Static (mkTyVarTy tv) | tv <- tvs ],
      [ Static v		     | v <- lambda_bounds ])
 
-dropArgs :: PlainCoreExpr -> PlainCoreExpr
-dropArgs (CoLam v e)	= dropArgs e
-dropArgs (CoTyLam ty e) = dropArgs e
+dropArgs :: CoreExpr -> CoreExpr
+dropArgs (Lam   _ e)	= dropArgs e
+dropArgs (CoTyLam _ e)	= dropArgs e
 dropArgs e		= e
-
 \end{code}
 
 We implement saTransform using shadowing of binders, that is
 we transform
 map = \f as -> case as of
-                 [] -> []
-                 (a':as') -> let x = f a'
-                                 y = map f as'
-                             in x:y
+		 [] -> []
+		 (a':as') -> let x = f a'
+				 y = map f as'
+			     in x:y
 to
 map = \f as -> let map = \f as -> map' as
-               in let rec map' = \as -> case as of
-                                          [] -> []
-                                          (a':as') -> let x = f a'
-                                                          y = map f as'
-                                                      in x:y
-                  in map' as
+	       in let rec map' = \as -> case as of
+					  [] -> []
+					  (a':as') -> let x = f a'
+							  y = map f as'
+						      in x:y
+		  in map' as
 
 the inner map should get inlined and eliminated.
 \begin{code}
-saTransform :: Id -> PlainCoreExpr -> SatM PlainCoreBinding
+saTransform :: Id -> CoreExpr -> SatM CoreBinding
 saTransform binder rhs
   = getSATInfo binder `thenSAT` \ r ->
     case r of
       -- [Andre] test: do it only if we have more than one static argument.
-      --Just (tyargs,args) | any isStatic args 
+      --Just (tyargs,args) | any isStatic args
       Just (tyargs,args) | length (filter isStatic args) > 1
 	-> newSATName binder (new_ty tyargs args)  `thenSAT` \ binder' ->
 	   mkNewRhs binder binder' tyargs args rhs `thenSAT` \ new_rhs ->
 	   trace ("SAT "++ show (length (filter isStatic args))) (
-           returnSAT (CoNonRec binder new_rhs)
-           )
-      _ -> returnSAT (CoRec [(binder, rhs)])
+	   returnSAT (NonRec binder new_rhs)
+	   )
+      _ -> returnSAT (Rec [(binder, rhs)])
   where
     mkNewRhs binder binder' tyargs args rhs
       = let
@@ -196,12 +190,12 @@ saTransform binder rhs
 		 get_nsa (NotStatic:args) (Static v:as) = v:get_nsa args as
 		 get_nsa (_:args)	  (_:as)	=   get_nsa args as
 
-	    local_body = foldl CoApp (CoVar binder')
-				[CoVarAtom a | a <- non_static_args]
+	    local_body = foldl App (Var binder')
+				[VarArg a | a <- non_static_args]
 
 	    nonrec_rhs = origLams local_body
 
-	    -- HACK! The following is a fake SysLocal binder with 
+	    -- HACK! The following is a fake SysLocal binder with
 	    -- *the same* unique as binder.
 	    -- the reason for this is the following:
 	    -- this binder *will* get inlined but if it happen to be
@@ -210,31 +204,31 @@ saTransform binder rhs
 	    -- top-level or exported somehow.
 	    -- A better fix is to use binder directly but with the TopLevel
 	    -- tag (or Exported tag) modified.
-            fake_binder = mkSysLocal 
-                            (getOccurrenceName binder _APPEND_ SLIT("_fsat")) 
-                            (getTheUnique binder)
-                            (getIdUniType binder) 
-                            mkUnknownSrcLoc
-	    rec_body = mkCoLam non_static_args 
-	                       ( CoLet (CoNonRec fake_binder nonrec_rhs)
-	                         {-in-} (dropArgs rhs))
+	    fake_binder = mkSysLocal
+			    (getOccurrenceName binder _APPEND_ SLIT("_fsat"))
+			    (getItsUnique binder)
+			    (idType binder)
+			    mkUnknownSrcLoc
+	    rec_body = mkValLam non_static_args
+			       ( Let (NonRec fake_binder nonrec_rhs)
+				 {-in-} (dropArgs rhs))
 	in
 	returnSAT (
-	    origLams (CoLet (CoRec [(binder',rec_body)]) {-in-} local_body)
+	    origLams (Let (Rec [(binder',rec_body)]) {-in-} local_body)
 	)
       where
 	origLams = origLams' rhs
-	         where 
-	           origLams' (CoLam v e)     e' = mkCoLam v  (origLams' e e')
-	           origLams' (CoTyLam ty e)  e' = CoTyLam ty (origLams' e e')
-	           origLams' _		     e' = e'
+		 where
+		   origLams' (Lam v e)     e' = Lam   v  (origLams' e e')
+		   origLams' (CoTyLam ty e)  e' = CoTyLam ty (origLams' e e')
+		   origLams' _		     e' = e'
 
     new_ty tyargs args
-      = instantiateTy (mk_inst_tyenv tyargs tv_tmpl) 
+      = instantiateTy (mk_inst_tyenv tyargs tv_tmpl)
 		      (mkSigmaTy tv_tmpl' dict_tys' tau_ty')
       where
 	-- get type info for the local function:
-	(tv_tmpl, dict_tys, tau_ty) = (splitType . getIdUniType) binder
+	(tv_tmpl, dict_tys, tau_ty) = (splitSigmaTy . idType) binder
 	(reg_arg_tys, res_type)	    = splitTyArgs tau_ty
 
 	-- now, we drop the ones that are

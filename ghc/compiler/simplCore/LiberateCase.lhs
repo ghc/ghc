@@ -9,15 +9,11 @@
 
 module LiberateCase ( liberateCase ) where
 
-IMPORT_Trace
-
+import CoreUnfold	( UnfoldingGuidance(..) )
 import Id		( localiseId, toplevelishId{-debugging-} )
-import IdEnv
 import Maybes
 import Outputable
-import PlainCore
 import Pretty
-import SimplEnv		( UnfoldingGuidance(..) )
 import Util
 \end{code}
 
@@ -30,7 +26,7 @@ Example
 
 \begin{verbatim}
 f = \ t -> case v of
-	       V a b -> a : f t 
+	       V a b -> a : f t
 \end{verbatim}
 
 => the inner f is replaced.
@@ -39,8 +35,8 @@ f = \ t -> case v of
 f = \ t -> case v of
 	       V a b -> a : (letrec
 				f =  \ t -> case v of
-					       V a b -> a : f t 
-			     in f) t 
+					       V a b -> a : f t
+			     in f) t
 \end{verbatim}
 (note the NEED for shadowing)
 
@@ -48,7 +44,7 @@ f = \ t -> case v of
 \begin{verbatim}
 f = \ t -> case v of
 	       V a b -> a : (letrec
-				f = \ t -> a : f t 
+				f = \ t -> a : f t
 			     in f t)
 \begin{verbatim}
 Better code, because 'a' is  free inside the inner letrec, rather
@@ -80,18 +76,18 @@ scope.  For example:
 	let h = ...
 	in ...
 \end{verbatim}
-Here, the level of @f@ is zero, the level of @g@ is one, 
+Here, the level of @f@ is zero, the level of @g@ is one,
 and the level of @h@ is zero (NB not one).
 
 \begin{code}
-type LibCaseLevel = Int		
+type LibCaseLevel = Int
 
 topLevel :: LibCaseLevel
 topLevel = 0
 \end{code}
 
 \begin{code}
-data LibCaseEnv 
+data LibCaseEnv
   = LibCaseEnv
 	Int			-- Bomb-out size for deciding if
 				-- potential liberatees are too big.
@@ -103,7 +99,7 @@ data LibCaseEnv
 				-- (top-level and imported things have
 				-- a level of zero)
 
-	(IdEnv PlainCoreBinding)-- Binds *only* recursively defined
+	(IdEnv CoreBinding)-- Binds *only* recursively defined
 				-- Ids, to their own binding group,
 				-- and *only* in their own RHSs
 
@@ -126,7 +122,7 @@ bombOutSize (LibCaseEnv bomb_size _ _ _ _) = bomb_size
 Programs
 ~~~~~~~~
 \begin{code}
-liberateCase :: Int -> [PlainCoreBinding] -> [PlainCoreBinding]
+liberateCase :: Int -> [CoreBinding] -> [CoreBinding]
 liberateCase bomb_size prog
   = do_prog (initEnv bomb_size) prog
   where
@@ -140,13 +136,13 @@ Bindings
 ~~~~~~~~
 
 \begin{code}
-libCaseBind :: LibCaseEnv -> PlainCoreBinding -> (LibCaseEnv, PlainCoreBinding)
+libCaseBind :: LibCaseEnv -> CoreBinding -> (LibCaseEnv, CoreBinding)
 
-libCaseBind env (CoNonRec binder rhs)
-  = (addBinders env [binder], CoNonRec binder (libCase env rhs))
+libCaseBind env (NonRec binder rhs)
+  = (addBinders env [binder], NonRec binder (libCase env rhs))
 
-libCaseBind env (CoRec pairs)
-  = (env_body, CoRec pairs') 
+libCaseBind env (Rec pairs)
+  = (env_body, Rec pairs')
   where
     (binders, rhss) = unzip pairs
 
@@ -168,7 +164,7 @@ libCaseBind env (CoRec pairs)
 	-- copy of the original binding.  In particular, the original
 	-- binding might have been for a TopLevId, and this copy clearly
 	-- will not be top-level!
-	
+
 	-- It is enough to change just the binder, because subsequent
 	-- simplification will propagate the right info from the binder.
 
@@ -190,33 +186,31 @@ Expressions
 
 \begin{code}
 libCase :: LibCaseEnv
-	-> PlainCoreExpr
-	-> PlainCoreExpr
+	-> CoreExpr
+	-> CoreExpr
 
-libCase env (CoLit lit)		 = CoLit lit
-libCase env (CoVar v)		 = mkCoLetsNoUnboxed (libCaseId env v) (CoVar v)
-libCase env (CoApp fun arg)      = mkCoLetsNoUnboxed (libCaseAtom env arg) (CoApp (libCase env fun) arg)
+libCase env (Lit lit)		 = Lit lit
+libCase env (Var v)		 = mkCoLetsNoUnboxed (libCaseId env v) (Var v)
+libCase env (App fun arg)      = mkCoLetsNoUnboxed (libCaseAtom env arg) (App (libCase env fun) arg)
 libCase env (CoTyApp fun ty)     = CoTyApp (libCase env fun) ty
-libCase env (CoCon con tys args) = mkCoLetsNoUnboxed (libCaseAtoms env args) (CoCon con tys args)
-libCase env (CoPrim op tys args) = mkCoLetsNoUnboxed (libCaseAtoms env args) (CoPrim op tys args)
+libCase env (Con con tys args) = mkCoLetsNoUnboxed (libCaseAtoms env args) (Con con tys args)
+libCase env (Prim op tys args) = mkCoLetsNoUnboxed (libCaseAtoms env args) (Prim op tys args)
 libCase env (CoTyLam tyvar body) = CoTyLam tyvar (libCase env body)
-libCase env (CoSCC cc body)      = CoSCC cc (libCase env body)
+libCase env (SCC cc body)      = SCC cc (libCase env body)
 
-libCase env (CoLam binders body)
-  = CoLam binders (libCase env' body)
-  where
-    env' = addBinders env binders
+libCase env (Lam binder body)
+  = Lam binder (libCase (addBinders env [binder]) body)
 
-libCase env (CoLet bind body) 
-  = CoLet bind' (libCase env_body body)
+libCase env (Let bind body)
+  = Let bind' (libCase env_body body)
   where
     (env_body, bind') = libCaseBind env bind
 
-libCase env (CoCase scrut alts)
-  = CoCase (libCase env scrut) (libCaseAlts env_alts alts)
+libCase env (Case scrut alts)
+  = Case (libCase env scrut) (libCaseAlts env_alts alts)
   where
     env_alts = case scrut of
-		  CoVar scrut_var -> addScrutedVar env scrut_var
+		  Var scrut_var -> addScrutedVar env scrut_var
 		  other		  -> env
 \end{code}
 
@@ -225,33 +219,33 @@ Case alternatives
 ~~~~~~~~~~~~~~~~~
 
 \begin{code}
-libCaseAlts env (CoAlgAlts alts deflt)
-  = CoAlgAlts (map do_alt alts) (libCaseDeflt env deflt)
+libCaseAlts env (AlgAlts alts deflt)
+  = AlgAlts (map do_alt alts) (libCaseDeflt env deflt)
   where
     do_alt (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
 
-libCaseAlts env (CoPrimAlts alts deflt)
-  = CoPrimAlts (map do_alt alts) (libCaseDeflt env deflt) 
+libCaseAlts env (PrimAlts alts deflt)
+  = PrimAlts (map do_alt alts) (libCaseDeflt env deflt)
   where
     do_alt (lit,rhs) = (lit, libCase env rhs)
 
-libCaseDeflt env CoNoDefault 
-   = CoNoDefault
-libCaseDeflt env (CoBindDefault binder rhs) 
-   = CoBindDefault binder (libCase (addBinders env [binder]) rhs)
+libCaseDeflt env NoDefault
+   = NoDefault
+libCaseDeflt env (BindDefault binder rhs)
+   = BindDefault binder (libCase (addBinders env [binder]) rhs)
 \end{code}
 
 Atoms and Ids
 ~~~~~~~~~~~~~
 \begin{code}
-libCaseAtoms :: LibCaseEnv -> [PlainCoreAtom] -> [PlainCoreBinding]
+libCaseAtoms :: LibCaseEnv -> [CoreArg] -> [CoreBinding]
 libCaseAtoms env atoms = concat [libCaseAtom env atom | atom <- atoms]
 
-libCaseAtom :: LibCaseEnv -> PlainCoreAtom -> [PlainCoreBinding]
-libCaseAtom env (CoVarAtom arg_id) = libCaseId env arg_id
-libCaseAtom env (CoLitAtom lit)    = []
+libCaseAtom :: LibCaseEnv -> CoreArg -> [CoreBinding]
+libCaseAtom env (VarArg arg_id) = libCaseId env arg_id
+libCaseAtom env (LitArg lit)    = []
 
-libCaseId :: LibCaseEnv -> Id -> [PlainCoreBinding]
+libCaseId :: LibCaseEnv -> Id -> [CoreBinding]
 libCaseId env v
   | maybeToBool maybe_rec_bind &&	-- It's a use of a recursive thing
     there_are_free_scruts		-- with free vars scrutinised in RHS
@@ -261,14 +255,14 @@ libCaseId env v
   = []
 
   where
-    maybe_rec_bind :: Maybe PlainCoreBinding	-- The binding of the recursive thingy
+    maybe_rec_bind :: Maybe CoreBinding	-- The binding of the recursive thingy
     maybe_rec_bind = lookupRecId env v
     Just the_bind = maybe_rec_bind
 
     rec_id_level = lookupLevel env v
 
     there_are_free_scruts = freeScruts env rec_id_level
-\end{code}			
+\end{code}
 
 
 
@@ -281,23 +275,23 @@ addBinders (LibCaseEnv bomb lvl lvl_env rec_env scruts) binders
   where
     lvl_env' = growIdEnvList lvl_env (binders `zip` repeat lvl)
 
-addRecBinds :: LibCaseEnv -> [(Id,PlainCoreExpr)] -> LibCaseEnv
+addRecBinds :: LibCaseEnv -> [(Id,CoreExpr)] -> LibCaseEnv
 addRecBinds (LibCaseEnv bomb lvl lvl_env rec_env scruts) pairs
   = LibCaseEnv bomb lvl' lvl_env' rec_env' scruts
   where
     lvl'     = lvl + 1
     lvl_env' = growIdEnvList lvl_env [(binder,lvl) | (binder,_) <- pairs]
-    rec_env' = growIdEnvList rec_env [(binder, CoRec pairs) | (binder,_) <- pairs]
+    rec_env' = growIdEnvList rec_env [(binder, Rec pairs) | (binder,_) <- pairs]
 
-addScrutedVar :: LibCaseEnv 
+addScrutedVar :: LibCaseEnv
 	      -> Id		-- This Id is being scrutinised by a case expression
-	      -> LibCaseEnv	
+	      -> LibCaseEnv
 
 addScrutedVar env@(LibCaseEnv bomb lvl lvl_env rec_env scruts) scrut_var
   | bind_lvl < lvl
   = LibCaseEnv bomb lvl lvl_env rec_env scruts'
 	-- Add to scruts iff the scrut_var is being scrutinised at
-	-- a deeper level than its defn 
+	-- a deeper level than its defn
 
   | otherwise = env
   where
@@ -307,7 +301,7 @@ addScrutedVar env@(LibCaseEnv bomb lvl lvl_env rec_env scruts) scrut_var
 		 Nothing  -> --false: ASSERT(toplevelishId scrut_var)
 			     topLevel
 
-lookupRecId :: LibCaseEnv -> Id -> Maybe PlainCoreBinding
+lookupRecId :: LibCaseEnv -> Id -> Maybe CoreBinding
 lookupRecId (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
 #ifndef DEBUG
   = lookupIdEnv rec_env id
@@ -325,7 +319,7 @@ lookupLevel (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
       Nothing  -> ASSERT(toplevelishId id)
 		  topLevel
 
-freeScruts :: LibCaseEnv 
+freeScruts :: LibCaseEnv
 	   -> LibCaseLevel 	-- Level of the recursive Id
 	   -> Bool		-- True <=> there is an enclosing case of a variable
 				-- bound outside (ie level <=) the recursive Id.
@@ -333,4 +327,4 @@ freeScruts (LibCaseEnv bomb lvl lvl_env rec_env scruts) rec_bind_lvl
   = not (null free_scruts)
   where
     free_scruts = [v | (v,lvl) <- scruts, lvl > rec_bind_lvl]
-\end{code} 
+\end{code}

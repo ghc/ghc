@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 
@@ -15,31 +15,23 @@ module Specialise (
 
     ) where
 
-import PlainCore
-import SpecTyFuns
+import SpecUtils
 
-IMPORT_Trace
-import Outputable	-- ToDo: these may be removable...
-import Pretty
-
-import AbsPrel		( liftDataCon, PrimOp(..), PrimKind -- for CCallOp
+import PrelInfo		( liftDataCon, PrimOp(..), PrimRep -- for CCallOp
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType
+import Type
 import Bag
 import CmdLineOpts	( GlobalSwitch(..) )
 import CoreLift		( mkLiftedId, liftExpr, bindUnlift, applyBindUnlifts )
 import FiniteMap
 import Id
-import IdEnv
 import IdInfo 		-- All of it
-import InstEnv		( lookupClassInstAtSimpleType )
 import Maybes		( catMaybes, firstJust, maybeToBool, Maybe(..) )
-import TyVarEnv		-- ( growTyVarEnvList, nullTyVarEnv, TyVarEnv, TypeEnv(..) )
 import UniqSet		-- All of it
 import Util
-import SplitUniq
+import UniqSupply
 
 infixr 9 `thenSM`
 \end{code}
@@ -78,7 +70,7 @@ Suppose we have
 	let f = <f_rhs>
 	in <body>
 
-and suppose f is overloaded.  
+and suppose f is overloaded.
 
 STEP 1: CALL-INSTANCE COLLECTION
 
@@ -93,11 +85,11 @@ then I think it's unlikely.  In any case, we simply don't accumulate such
 partial applications.)
 
 There's a choice of whether to collect details of all *polymorphic* functions
-or simply all *overloaded* ones.  How to sort this out? 
+or simply all *overloaded* ones.  How to sort this out?
   Pass in a predicate on the function to say if it is "interesting"?
   This is dependent on the user flags: SpecialiseOverloaded
 				       SpecialiseUnboxed
-			               SpecialiseAll
+				       SpecialiseAll
 
 STEP 2: EQUIVALENCES
 
@@ -134,7 +126,7 @@ it might arise from user SPECIALIZE pragmas.)
 
 Recursion
 ~~~~~~~~~
-Wait a minute!  What if f is recursive?  Then we can't just plug in 
+Wait a minute!  What if f is recursive?  Then we can't just plug in
 its right-hand side, can we?
 
 But it's ok.  The type checker *always* creates non-recursive definitions
@@ -144,10 +136,10 @@ for overloaded recursive functions.  For example:
 
 becomes
 
-	f a (d::Num a) = let p = +.sel a d 
+	f a (d::Num a) = let p = +.sel a d
 			 in
 			 letrec fl (y::a) = fl (p y y)
-			 in 
+			 in
 			 fl
 
 We still have recusion for non-overloadd functions which we
@@ -173,25 +165,25 @@ example is as follows.  Here's the Haskell:
 After typechecking we have
 
 	g a (d::Num a) (y::a) = let f b (d'::Num b) (x::b) = +.sel b d' x x
-			        in +.sel a d (f a d y) (f a d y)
+				in +.sel a d (f a d y) (f a d y)
 
 Notice that the call to f is at type type "a"; a non-constant type.
 Both calls to f are at the same type, so we can specialise to give:
 
 	g a (d::Num a) (y::a) = let f@a (x::a) = +.sel a d x x
-			        in +.sel a d (f@a y) (f@a y)
+				in +.sel a d (f@a y) (f@a y)
 
 
 (b) The other case is when the type variables in the instance types
 are *not* in scope at the definition point of f.  The example we are
 working with above is a good case.  There are two instances of (+.sel a d),
-but "a" is not in scope at the definition of +.sel.  Can we do anything?  
+but "a" is not in scope at the definition of +.sel.  Can we do anything?
 Yes, we can "common them up", a sort of limited common sub-expression deal.
 This would give:
 
 	g a (d::Num a) (y::a) = let +.sel@a = +.sel a d
 				    f@a (x::a) = +.sel@a x x
-			        in +.sel@a (f@a y) (f@a y)
+				in +.sel@a (f@a y) (f@a y)
 
 This can save work, and can't be spotted by the type checker, because
 the two instances of +.sel weren't originally at the same type.
@@ -210,7 +202,7 @@ that will duplicate code.  Just commoning up the call is the point.
 
 * Don't bother unless the equivalence class has more than one item!
 
-Not clear whether this is all worth it.  It is of course OK to 
+Not clear whether this is all worth it.  It is of course OK to
 simply discard call-instances when passing a big lambda.
 
 Polymorphism 2 -- Overloading
@@ -227,7 +219,7 @@ b types.
 
 That suggests that we should identify which of g's type variables
 are constrained (like "a") and which are unconstrained (like "b").
-Then when taking equivalence classes in STEP 2, we ignore the type args 
+Then when taking equivalence classes in STEP 2, we ignore the type args
 corresponding to unconstrained type variable.  In STEP 3 we make
 polymorphic versions.  Thus:
 
@@ -262,18 +254,18 @@ Before specialisation, leaving out type abstractions we have
 	f df x = let g :: Eq a => a -> a -> Bool
 		     g dg p q = == dg p q
 		     h :: Num a => a -> a -> (a, Bool)
-		     h dh r s = let deq = eqFromNum dh 
+		     h dh r s = let deq = eqFromNum dh
 				in (+ dh r s, g deq r s)
 	      in
 	      h df x x
 
 After specialising h we get a specialised version of h, like this:
 
-		    h' r s = let deq = eqFromNum df 
+		    h' r s = let deq = eqFromNum df
 			     in (+ df r s, g deq r s)
 
 But we can't naively make an instance for g from this, because deq is not in scope
-at the defn of g.  Instead, we have to float out the (new) defn of deq 
+at the defn of g.  Instead, we have to float out the (new) defn of deq
 to widen its scope.  Notice that this floating can't be done in advance -- it only
 shows up when specialisation is done.
 
@@ -292,7 +284,7 @@ by adding extra definitions along with that of f, in the same way as before
 Indeed the pragmas *have* to be dealt with by the type checker, because
 only it knows how to build the dictionaries d1 and d2!  For example
 
-	g :: Ord a => [a] -> [a] 
+	g :: Ord a => [a] -> [a]
 	{-# SPECIALIZE f :: [Tree Int] -> [Tree Int] #-}
 
 Here, the specialised version of g is an application of g's rhs to the
@@ -320,13 +312,13 @@ Again, the pragma should permit polymorphism in unconstrained variables:
 
 We *insist* that all overloaded type variables are specialised to ground types,
 (and hence there can be no context inside a SPECIALIZE pragma).
-We *permit* unconstrained type variables to be specialised to 
+We *permit* unconstrained type variables to be specialised to
 	- a ground type
 	- or left as a polymorphic type variable
 but nothing in between.  So
 
 	{-# SPECIALIZE h :: [Int] -> [c] -> [c] #-}
-	
+
 is *illegal*.  (It can be handled, but it adds complication, and gains the
 programmer nothing.)
 
@@ -357,7 +349,7 @@ In fact, matters are a little bit more complicated than this.
 When we make one of these specialised instances, we are defining
 a constant dictionary, and so we want immediate access to its constant
 methods and superclasses.  Indeed, these constant methods and superclasses
-must be in the IdInfo for the class selectors!  We need help from the 
+must be in the IdInfo for the class selectors!  We need help from the
 typechecker to sort this out, perhaps by generating a separate IdInfo
 for each.
 
@@ -375,10 +367,10 @@ so we'll want to compile enough to get those specialisations done.
 
 Lastly, there's no such thing as a local instance decl, so we can
 survive solely by spitting out *usage* information, and then reading that
-back in as a pragma when next compiling the file.  So for now, 
+back in as a pragma when next compiling the file.  So for now,
 we only specialise instance decls in response to pragmas.
 
-That means that even if an instance decl ain't otherwise exported it 
+That means that even if an instance decl ain't otherwise exported it
 needs to be spat out as with a SPECIALIZE pragma.  Furthermore, it needs
 something to say which module defined the instance, so the usage info
 can be fed into the right reqts info file.  Blegh.
@@ -394,7 +386,7 @@ type arguments.
 In addition to normal call instances we gather TyCon call instances at
 unboxed types, determine equivalence classes for the locally defined
 TyCons and build speciailised data constructor Ids for each TyCon and
-substitute these in the CoCon calls.
+substitute these in the Con calls.
 
 We need the list of local TyCons to partition the TyCon instance info.
 We pass out a FiniteMap from local TyCons to Specialised Instances to
@@ -483,11 +475,11 @@ What does the specialisation IdInfo look like?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 	SpecInfo
-		[Maybe UniType] -- Instance types
+		[Maybe Type] -- Instance types
 		Int		-- No of dicts to eat
 		Id		-- Specialised version
 
-For example, if f has this SpecInfo: 
+For example, if f has this SpecInfo:
 
 	SpecInfo [Just t1, Nothing, Just t3] 2 f'
 
@@ -505,11 +497,11 @@ Eq a from a dictionary for Eq [a].  So if we find
 
 	==.sel [t] d
 
-we can't transform to 
+we can't transform to
 
 	eqList (==.sel t d')
 
-where 
+where
 	eqList :: (a->a->Bool) -> [a] -> [a] -> Bool
 
 Of course, we currently have no way to automatically derive
@@ -525,7 +517,7 @@ Mutter mutter
 ~~~~~~~~~~~~~
 What about types/classes mentioned in SPECIALIZE pragmas spat out,
 but not otherwise exported.  Even if they are exported, what about
-their original names.  
+their original names.
 
 Suggestion: use qualified names in pragmas, omitting module for
 prelude and "this module".
@@ -552,13 +544,13 @@ What should we do when a value is specialised to a *strict* unboxed value?
 
 	map_*_* f (x:xs) = let h = f x
 			       t = map f xs
-		           in h:t
+			   in h:t
 
 Could convert let to case:
 
 	map_*_Int# f (x:xs) = case f x of h# ->
-		              let t = map f xs
-		              in h#:t
+			      let t = map f xs
+			      in h#:t
 
 This may be undesirable since it forces evaluation here, but the value
 may not be used in all branches of the body. In the general case this
@@ -572,8 +564,8 @@ Solution: Lift the binding of the unboxed value and extract it when it
 is used:
 
 	map_*_Int# f (x:xs) = let h = case (f x) of h# -> _Lift h#
-		                  t = map f xs
-		              in case h of
+				  t = map f xs
+			      in case h of
 				 _Lift h# -> h#:t
 
 Now give it to the simplifier and the _Lifting will be optimised away.
@@ -590,14 +582,14 @@ value is bound. For example:
 	filtermap_*_* p f (x:xs)
 	  = let h = f x
 		t = ...
-            in case p x of
+	    in case p x of
 		True  -> h:t
 		False -> t
    ==>
 	filtermap_*_Int# p f (x:xs)
 	  = let h = case (f x) of h# -> _Lift h#
 		t = ...
-            in case p x of
+	    in case p x of
 		True  -> case h of _Lift h#
 			   -> h#:t
 		False -> t
@@ -625,13 +617,13 @@ strictness analyser deems the lifted binding strict.
 type FreeVarsSet   = UniqSet Id
 type FreeTyVarsSet = UniqSet TyVar
 
-data CallInstance 
-  = CallInstance 
+data CallInstance
+  = CallInstance
 		Id 			-- This Id; *new* ie *cloned* id
-		[Maybe UniType]		-- Specialised at these types (*new*, cloned)
+		[Maybe Type]		-- Specialised at these types (*new*, cloned)
 					-- Nothing => no specialisation on this type arg
 					--	      is required (flag dependent).
-		[PlainCoreArg]		-- And these dictionaries; all ValArgs
+		[CoreArg]		-- And these dictionaries; all ValArgs
 		FreeVarsSet		-- Free vars of the dict-args in terms of *new* ids
 		(Maybe SpecInfo)	-- For specialisation with explicit SpecId
 \end{code}
@@ -643,7 +635,7 @@ pprCI (CallInstance id spec_tys dicts _ maybe_specinfo)
 	 4 (ppAboves [ppCat (ppStr "types" : [pprMaybeTy PprDebug ty | ty <- spec_tys]),
 		      case maybe_specinfo of
 			Nothing -> ppCat (ppStr "dicts" : [ppr PprDebug dict | dict <- dicts])
-		        Just (SpecInfo _ _ spec_id)
+			Just (SpecInfo _ _ spec_id)
 				-> ppCat [ppStr "Explicit SpecId", ppr PprDebug spec_id]
 		     ])
 
@@ -663,8 +655,8 @@ Comparisons are based on the {\em types}, ignoring the dictionary args:
 \begin{code}
 
 cmpCI :: CallInstance -> CallInstance -> TAG_
-cmpCI (CallInstance id1 tys1 _ _ _) (CallInstance id2 tys2 _ _ _) 
-  = case cmpId id1 id2 of { EQ_ -> cmpUniTypeMaybeList tys1 tys2; other -> other }
+cmpCI (CallInstance id1 tys1 _ _ _) (CallInstance id2 tys2 _ _ _)
+  = case (id1 `cmp` id2) of { EQ_ -> cmpUniTypeMaybeList tys1 tys2; other -> other }
 
 cmpCI_tys :: CallInstance -> CallInstance -> TAG_
 cmpCI_tys (CallInstance _ tys1 _ _ _) (CallInstance _ tys2 _ _ _)
@@ -678,14 +670,14 @@ isCIofTheseIds :: [Id] -> CallInstance -> Bool
 isCIofTheseIds ids (CallInstance ci_id _ _ _ _)
   = any (eqId ci_id) ids
 
-singleCI :: Id -> [Maybe UniType] -> [PlainCoreArg] -> UsageDetails
+singleCI :: Id -> [Maybe Type] -> [CoreArg] -> UsageDetails
 singleCI id tys dicts
   = UsageDetails (unitBag (CallInstance id tys dicts fv_set Nothing))
 		 emptyBag [] emptyUniqSet 0 0
   where
-    fv_set = mkUniqSet (id : [dict | ValArg (CoVarAtom dict) <- dicts])
+    fv_set = mkUniqSet (id : [dict | ValArg (VarArg dict) <- dicts])
 
-explicitCI :: Id -> [Maybe UniType] -> SpecInfo -> UsageDetails
+explicitCI :: Id -> [Maybe Type] -> SpecInfo -> UsageDetails
 explicitCI id tys specinfo
   = UsageDetails (unitBag call_inst) emptyBag [] emptyUniqSet 0 0
   where
@@ -702,7 +694,7 @@ getCIids True ids = filter not_dict_or_defm ids
 getCIids _    ids = ids
 
 not_dict_or_defm id
-  = not (isDictTy (getIdUniType id) || maybeToBool (isDefaultMethodId_maybe id))
+  = not (isDictTy (idType id) || maybeToBool (isDefaultMethodId_maybe id))
 
 getCIs :: Bool -> [Id] -> UsageDetails -> ([CallInstance], UsageDetails)
 getCIs top_lev ids (UsageDetails cis tycon_cis dbs fvs c i)
@@ -718,18 +710,18 @@ getCIs top_lev ids (UsageDetails cis tycon_cis dbs fvs c i)
 dumpCIs :: Bag CallInstance	-- The call instances
 	-> Bool			-- True <=> top level bound Ids
 	-> Bool			-- True <=> dict bindings to be floated (specBind only)
-        -> [CallInstance]	-- Call insts for bound ids (instBind only)
+	-> [CallInstance]	-- Call insts for bound ids (instBind only)
 	-> [Id]			-- Bound ids *new*
 	-> [Id]			-- Full bound ids: includes dumped dicts
 	-> Bag CallInstance	-- Kept call instances
 
-   	-- CIs are dumped if: 
+   	-- CIs are dumped if:
 	--   1) they are a CI for one of the bound ids, or
 	--   2) they mention any of the dicts in a local unfloated binding
 	--
 	-- For top-level bindings we allow the call instances to
 	-- float past a dict bind and place all the top-level binds
-	-- in a *global* CoRec.
+	-- in a *global* Rec.
 	-- We leave it to the simplifier will sort it all out ...
 
 dumpCIs cis top_lev floating inst_cis bound_ids full_ids
@@ -737,9 +729,9 @@ dumpCIs cis top_lev floating inst_cis bound_ids full_ids
        not (isEmptyBag cis_of_bound_id_without_inst_cis)
     then
        pprTrace ("dumpCIs: dumping CI which was not instantiated ... \n" ++
-	         "         (may be a non-HM recursive call)\n")
+		 "         (may be a non-HM recursive call)\n")
        (ppHang (ppBesides [ppStr "{", ppr PprDebug bound_ids, ppStr "}"])
-             4 (ppAboves [ppStr "Dumping CIs:",
+	     4 (ppAboves [ppStr "Dumping CIs:",
 			  ppAboves (map pprCI (bagToList cis_of_bound_id)),
 			  ppStr "Instantiating CIs:",
 			  ppAboves (map pprCI inst_cis)]))
@@ -749,7 +741,7 @@ dumpCIs cis top_lev floating inst_cis bound_ids full_ids
    else
        (if not (isEmptyBag cis_dump_unboxed)
 	then pprTrace "dumpCIs: bound dictionary arg ... WITH UNBOXED TYPES!\n"
-             (ppHang (ppBesides [ppStr "{", ppr PprDebug full_ids, ppStr "}"])
+	     (ppHang (ppBesides [ppStr "{", ppr PprDebug full_ids, ppStr "}"])
 		   4 (ppAboves (map pprCI (bagToList cis_dump))))
 	else id)
        cis_keep_not_bound_id
@@ -761,7 +753,7 @@ dumpCIs cis top_lev floating inst_cis bound_ids full_ids
    (cis_dump, cis_keep_not_bound_id)
       = partitionBag ok_to_dump_ci cis_not_bound_id
 
-   ok_to_dump_ci (CallInstance _ _ _ fv_set _) 
+   ok_to_dump_ci (CallInstance _ _ _ fv_set _)
 	= or [i `elementOfUniqSet` fv_set | i <- full_ids]
 
    (_, cis_of_bound_id_without_inst_cis) = partitionBag have_inst_ci cis_of_bound_id
@@ -779,7 +771,7 @@ recursive calls should be at the same instance as the parent instance.
 Here, the type, t, at which f is used in its own RHS should be
 just "a"; that is, the recursive call is at the same type as
 the original call. That means that when specialising f at some
-type, say Int#, we shouldn't find any *new* instances of f 
+type, say Int#, we shouldn't find any *new* instances of f
 arising from specialising f's RHS.  The only instance we'll find
 is another call of (f Int#).
 
@@ -799,18 +791,18 @@ contain unboxed types.
 \begin{code}
 data TyConInstance
   = TyConInstance TyCon			-- Type Constructor
-		  [Maybe UniType]	-- Applied to these specialising types
+		  [Maybe Type]	-- Applied to these specialising types
 
 cmpTyConI :: TyConInstance -> TyConInstance -> TAG_
-cmpTyConI (TyConInstance tc1 tys1) (TyConInstance tc2 tys2) 
-  = case cmpTyCon tc1 tc2 of { EQ_ -> cmpUniTypeMaybeList tys1 tys2; other -> other }
+cmpTyConI (TyConInstance tc1 tys1) (TyConInstance tc2 tys2)
+  = case (cmp tc1 tc2) of { EQ_ -> cmpUniTypeMaybeList tys1 tys2; other -> other }
 
 cmpTyConI_tys :: TyConInstance -> TyConInstance -> TAG_
-cmpTyConI_tys (TyConInstance _ tys1) (TyConInstance _ tys2) 
+cmpTyConI_tys (TyConInstance _ tys1) (TyConInstance _ tys2)
   = cmpUniTypeMaybeList tys1 tys2
 
-singleTyConI :: TyCon -> [Maybe UniType] -> UsageDetails
-singleTyConI ty_con spec_tys 
+singleTyConI :: TyCon -> [Maybe Type] -> UsageDetails
+singleTyConI ty_con spec_tys
   = UsageDetails emptyBag (unitBag (TyConInstance ty_con spec_tys)) [] emptyUniqSet 0 0
 
 isTyConIofThisTyCon :: TyCon -> TyConInstance -> Bool
@@ -838,7 +830,7 @@ getLocalSpecTyConIs comp_prel (UsageDetails cis tycon_cis dbs fvs c i)
 
 \begin{code}
 data UsageDetails
-  = UsageDetails 
+  = UsageDetails
 	(Bag CallInstance) 	-- The collection of call-instances
 	(Bag TyConInstance) 	-- Constructor call-instances
 	[DictBindDetails]	-- Dictionary bindings in data-dependence order!
@@ -855,10 +847,10 @@ will *include* the binders of the DictBind details.
 A @DictBindDetails@ contains bindings for dictionaries *only*.
 
 \begin{code}
-data DictBindDetails 
-  = DictBindDetails 
+data DictBindDetails
+  = DictBindDetails
 	[Id]			-- Main binders, originally visible in scope of binding (cloned)
-	PlainCoreBinding	-- Fully processed
+	CoreBinding	-- Fully processed
 	FreeVarsSet		-- Free in binding group (cloned)
 	FreeTyVarsSet		-- Free in binding group
 \end{code}
@@ -879,27 +871,27 @@ tickSpecInsts (UsageDetails cis ty_cis dbs fvs c i)
 
 emptyUDs = UsageDetails emptyBag emptyBag [] emptyUniqSet 0 0
 
-unionUDs (UsageDetails cis1 tycon_cis1 dbs1 fvs1 c1 i1) (UsageDetails cis2 tycon_cis2 dbs2 fvs2 c2 i2) 
+unionUDs (UsageDetails cis1 tycon_cis1 dbs1 fvs1 c1 i1) (UsageDetails cis2 tycon_cis2 dbs2 fvs2 c2 i2)
  = UsageDetails (unionBags cis1 cis2) (unionBags tycon_cis1 tycon_cis2)
-	        (dbs1 ++ dbs2) (fvs1 `unionUniqSets` fvs2) (c1+c2) (i1+i2)
+		(dbs1 ++ dbs2) (fvs1 `unionUniqSets` fvs2) (c1+c2) (i1+i2)
 	-- The append here is really redundant, since the bindings don't
 	-- scope over each other.  ToDo.
 
 unionUDList = foldr unionUDs emptyUDs
 
-singleFvUDs (CoVarAtom v) | not (isImportedId v)
+singleFvUDs (VarArg v) | not (isImportedId v)
  = UsageDetails emptyBag emptyBag [] (singletonUniqSet v) 0 0
 singleFvUDs other
  = emptyUDs
 
 singleConUDs con = UsageDetails emptyBag emptyBag [] (singletonUniqSet con) 0 0
 
-dumpDBs :: [DictBindDetails] 
+dumpDBs :: [DictBindDetails]
 	-> Bool			-- True <=> top level bound Ids
 	-> [TyVar]		-- TyVars being bound (cloned)
 	-> [Id]			-- Ids being bound (cloned)
 	-> FreeVarsSet		-- Fvs of body
-	-> ([PlainCoreBinding],	-- These ones have to go here
+	-> ([CoreBinding],	-- These ones have to go here
 	    [DictBindDetails],	-- These can float further
 	    [Id],		-- Incoming list + names of dicts bound here
 	    FreeVarsSet		-- Incoming fvs + fvs of dicts bound here
@@ -910,13 +902,13 @@ dumpDBs :: [DictBindDetails]
 	-- auxillary derived instance defns and user instance
 	-- defns all getting in the way.
 	-- So we dump all dbinds as soon as we get to the top
-	-- level and place them in a *global* CoRec.
+	-- level and place them in a *global* Rec.
 	-- We leave it to the simplifier will sort it all out ...
 
 dumpDBs [] top_lev bound_tyvars bound_ids fvs
   = ([], [], bound_ids, fvs)
 
-dumpDBs ((db@(DictBindDetails dbinders dbind db_fvs db_ftv)):dbs) 
+dumpDBs ((db@(DictBindDetails dbinders dbind db_fvs db_ftv)):dbs)
 	top_lev bound_tyvars bound_ids fvs
   | top_lev
     || or [i `elementOfUniqSet` db_fvs  | i <- bound_ids]
@@ -935,14 +927,14 @@ dumpDBs ((db@(DictBindDetails dbinders dbind db_fvs db_ftv)):dbs)
     (dbinds_here, db : dbs_outer, full_bound_ids, full_fvs)
 
 
-     
+
 dumpUDs :: UsageDetails
 	-> Bool			-- True <=> top level bound Ids
 	-> Bool			-- True <=> dict bindings to be floated (specBind only)
 	-> [CallInstance]	-- Call insts for bound Ids (instBind only)
 	-> [Id]			-- Ids which are just being bound; *new*
 	-> [TyVar]		-- TyVars which are just being bound
-	-> ([PlainCoreBinding],	-- Bindings from UsageDetails which mention the ids
+	-> ([CoreBinding],	-- Bindings from UsageDetails which mention the ids
 	    UsageDetails)	-- The above bindings removed, and
 				-- any call-instances which mention the ids dumped too
 
@@ -957,23 +949,23 @@ dumpUDs (UsageDetails cis tycon_cis dbs fvs c i) top_lev floating inst_cis bound
 \end{code}
 
 \begin{code}
-addDictBinds :: [Id] -> PlainCoreBinding -> UsageDetails	-- Dict binding and RHS usage
+addDictBinds :: [Id] -> CoreBinding -> UsageDetails	-- Dict binding and RHS usage
 	     -> UsageDetails	 				-- The usage to augment
 	     -> UsageDetails
 addDictBinds dbinders dbind (UsageDetails db_cis db_tycon_cis db_dbs db_fvs db_c db_i)
 	 	            (UsageDetails cis    tycon_cis    dbs    fvs    c    i)
   = UsageDetails (db_cis `unionBags` cis)
 		 (db_tycon_cis `unionBags` tycon_cis)
-		 (db_dbs ++ [DictBindDetails dbinders dbind db_fvs db_ftvs] ++ dbs) 
+		 (db_dbs ++ [DictBindDetails dbinders dbind db_fvs db_ftvs] ++ dbs)
 		 fvs c i
 		 -- NB: We ignore counts from dictbinds since it is not user code
   where
 	-- The free tyvars of the dictionary bindings should really be
 	-- gotten from the RHSs, but I'm pretty sure it's good enough just
-	-- to look at the type of the dictionary itself.  
+	-- to look at the type of the dictionary itself.
 	-- Doing the proper job would entail keeping track of free tyvars as
 	-- well as free vars, which would be a bore.
-    db_ftvs = mkUniqSet (extractTyVarsFromTys (map getIdUniType dbinders))
+    db_ftvs = mkUniqSet (extractTyVarsFromTys (map idType dbinders))
 \end{code}
 
 %************************************************************************
@@ -984,9 +976,9 @@ addDictBinds dbinders dbind (UsageDetails db_cis db_tycon_cis db_dbs db_fvs db_c
 
 @SpecIdEnv@ maps old Ids to their new "clone". There are three cases:
 
-1) (NoLift CoLitAtom l) : an Id which is bound to a literal
+1) (NoLift LitArg l) : an Id which is bound to a literal
 
-2) (NoLift CoLitAtom l) : an Id bound to a "new" Id	      
+2) (NoLift LitArg l) : an Id bound to a "new" Id
    The new Id is a possibly-type-specialised clone of the original
 
 3) Lifted lifted_id unlifted_id :
@@ -1007,7 +999,7 @@ addDictBinds dbinders dbind (UsageDetails db_cis db_tycon_cis db_dbs db_fvs db_c
 type SpecIdEnv = IdEnv CloneInfo
 
 data CloneInfo
- = NoLift PlainCoreAtom	-- refers to cloned id or literal
+ = NoLift CoreArg	-- refers to cloned id or literal
 
  | Lifted Id		-- lifted, cloned id
 	  Id		-- unlifted, cloned id
@@ -1033,11 +1025,11 @@ data SpecialiseData
 	    [TyCon]
 		-- Those in-scope data types for which we want to
 		-- generate code for their constructors.
-		-- Namely: data types declared in this module + 
+		-- Namely: data types declared in this module +
 		-- 	   any big tuples used in this module
 		-- The initial (and default) value is the local tycons
 
-	    (FiniteMap TyCon [(Bool, [Maybe UniType])])
+	    (FiniteMap TyCon [(Bool, [Maybe Type])])
 		-- TyCon specialisations to be generated
 		-- We generate specialialised code (Bool=True) for data types
 		-- defined in this module and any tuples used in this module
@@ -1045,11 +1037,11 @@ data SpecialiseData
 		-- requested by source-level SPECIALIZE data pragmas (Bool=True)
 		-- and _SPECIALISE_ pragmas (Bool=False) in the interface files
 
-	    (Bag (Id,[Maybe UniType]))
+	    (Bag (Id,[Maybe Type]))
 		-- Imported specialisation errors
-	    (Bag (Id,[Maybe UniType]))
+	    (Bag (Id,[Maybe Type]))
 		-- Imported specialisation warnings
-	    (Bag (TyCon,[Maybe UniType]))
+	    (Bag (TyCon,[Maybe Type]))
 		-- Imported TyCon specialisation errors
 
 initSpecData local_tycons tycon_specs
@@ -1066,16 +1058,16 @@ ToDo[sansom]: Transformation data to process specialisation requests.
 
 \begin{code}
 specProgram :: (GlobalSwitch -> Bool)
-	    -> SplitUniqSupply
-	    -> [PlainCoreBinding]	-- input ...
+	    -> UniqSupply
+	    -> [CoreBinding]	-- input ...
 	    -> SpecialiseData
-	    -> ([PlainCoreBinding],	-- main result
+	    -> ([CoreBinding],	-- main result
 		SpecialiseData)		-- result specialise data
 
 specProgram sw_chker uniqs binds
 	   (SpecData False _ local_tycons _ init_specs init_errs init_warn init_tyerrs)
   = case (initSM (specTyConsAndScope (specTopBinds binds)) sw_chker uniqs) of
-      (final_binds, tycon_specs_list, 
+      (final_binds, tycon_specs_list,
 	UsageDetails import_cis import_tycis _ fvs spec_calls spec_insts)
 	 -> let
 		used_conids   = filter isDataCon (uniqSetToList fvs)
@@ -1084,10 +1076,10 @@ specProgram sw_chker uniqs binds
 		gen_tycons    = setToList (mkSet local_tycons `union` mkSet used_gen)
 
 		result_specs  = addListToFM_C (++) init_specs tycon_specs_list
- 
+
 		uniq_cis      = map head (equivClasses cmpCI (bagToList import_cis))
 		cis_list      = [(id, tys) | CallInstance id tys _ _ _ <- uniq_cis]
-	        (cis_unboxed, cis_other) = partition (isUnboxedSpecialisation . snd) cis_list
+		(cis_unboxed, cis_other) = partition (isUnboxedSpecialisation . snd) cis_list
 		cis_warn      = init_warn `unionBags` listToBag cis_other
 		cis_errs      = init_errs `unionBags` listToBag cis_unboxed
 
@@ -1101,18 +1093,18 @@ specProgram sw_chker uniqs binds
 	    (if sw_chker D_simplifier_stats then
 		pprTrace "\nSpecialiser Stats:\n" (ppAboves [
 					ppBesides [ppStr "SpecCalls  ", ppInt spec_calls],
-				        ppBesides [ppStr "SpecInsts  ", ppInt spec_insts],
+					ppBesides [ppStr "SpecInsts  ", ppInt spec_insts],
 					ppSP])
 	     else id)
 
 	    (final_binds,
 	     SpecData True no_errs local_tycons gen_tycons result_specs
-			           cis_errs cis_warn tycis_errs)
+				   cis_errs cis_warn tycis_errs)
 
 specProgram sw_chker uniqs binds (SpecData True _ _ _ _ _ _ _)
   = panic "Specialise:specProgram: specialiser called more than once"
 
--- It may be possible safely to call the specialiser more than once, 
+-- It may be possible safely to call the specialiser more than once,
 -- but I am not sure there is any benefit in doing so (Patrick)
 
 -- ToDo: What about unfoldings performed after specialisation ???
@@ -1131,22 +1123,22 @@ Core. These are only introduced when we convert to StgSyn.
 ToDo: Perhaps this collection should be done in CoreToStg to ensure no inconsistencies!
 
 \begin{code}
-specTyConsAndScope :: SpecM ([PlainCoreBinding], UsageDetails)
-           	   -> SpecM ([PlainCoreBinding], [(TyCon,[(Bool,[Maybe UniType])])], UsageDetails)
+specTyConsAndScope :: SpecM ([CoreBinding], UsageDetails)
+	   	   -> SpecM ([CoreBinding], [(TyCon,[(Bool,[Maybe Type])])], UsageDetails)
 
 specTyConsAndScope scopeM
   = scopeM			`thenSM` \ (binds, scope_uds) ->
     getSwitchCheckerSM		`thenSM` \ sw_chkr ->
     let
        (tycons_cis, gotci_scope_uds)
-         = getLocalSpecTyConIs (sw_chkr CompilingPrelude) scope_uds
+	 = getLocalSpecTyConIs (sw_chkr CompilingPrelude) scope_uds
 
        tycon_specs_list = collectTyConSpecs tycons_cis
     in
     (if sw_chkr SpecialiseTrace && not (null tycon_specs_list) then
 	 pprTrace "Specialising TyCons:\n"
 	 (ppAboves [ if not (null specs) then
-		         ppHang (ppCat [(ppr PprDebug tycon), ppStr "at types"])
+			 ppHang (ppCat [(ppr PprDebug tycon), ppStr "at types"])
 			      4 (ppAboves (map pp_specs specs))
 		     else ppNil
 		   | (tycon, specs) <- tycon_specs_list])
@@ -1159,14 +1151,14 @@ specTyConsAndScope scopeM
     collectTyConSpecs tycons_cis@(TyConInstance tycon _ : _)
       = (tycon, tycon_specs) : collectTyConSpecs other_tycons_cis
       where
-        (tycon_cis, other_tycons_cis) = partition (isTyConIofThisTyCon tycon) tycons_cis
-        uniq_cis = map head (equivClasses cmpTyConI_tys tycon_cis)
+	(tycon_cis, other_tycons_cis) = partition (isTyConIofThisTyCon tycon) tycons_cis
+	uniq_cis = map head (equivClasses cmpTyConI_tys tycon_cis)
 	tycon_specs = [(False, spec_tys) | TyConInstance _ spec_tys <- uniq_cis]
 
     pp_specs (False, spec_tys) = ppInterleave ppNil [pprMaybeTy PprDebug spec_ty | spec_ty <- spec_tys]
 
 \end{code}
-    
+
 %************************************************************************
 %*									*
 \subsection[specTopBinds]{Specialising top-level bindings}
@@ -1174,8 +1166,8 @@ specTyConsAndScope scopeM
 %************************************************************************
 
 \begin{code}
-specTopBinds :: [PlainCoreBinding] 
-	     -> SpecM ([PlainCoreBinding], UsageDetails)
+specTopBinds :: [CoreBinding]
+	     -> SpecM ([CoreBinding], UsageDetails)
 
 specTopBinds binds
   = spec_top_binds binds    `thenSM`  \ (binds, UsageDetails cis tycis dbind_details fvs c i) ->
@@ -1192,19 +1184,19 @@ specTopBinds binds
 	fvs_outer = full_fvs `minusUniqSet` (mkUniqSet (concat dbinders_s))
 
  	-- It is just to complex to try to sort out top-level dependencies
-	-- So we just place all the top-level binds in a *global* CoRec and
+	-- So we just place all the top-level binds in a *global* Rec and
 	-- leave it to the simplifier to sort it all out ...
     in
     ASSERT(null dbinds)
-    returnSM ([CoRec (pairsFromCoreBinds binds)], UsageDetails cis tycis [] fvs_outer c i)
+    returnSM ([Rec (pairsFromCoreBinds binds)], UsageDetails cis tycis [] fvs_outer c i)
 
   where
     spec_top_binds (first_bind:rest_binds)
       = specBindAndScope True first_bind (
 	    spec_top_binds rest_binds `thenSM` \ (rest_binds, rest_uds) ->
 	    returnSM (ItsABinds rest_binds, rest_uds)
-        ) 			`thenSM` \ (first_binds, ItsABinds rest_binds, all_uds) ->
-        returnSM (first_binds ++ rest_binds, all_uds)
+	) 			`thenSM` \ (first_binds, ItsABinds rest_binds, all_uds) ->
+	returnSM (first_binds ++ rest_binds, all_uds)
 
     spec_top_binds []
       = returnSM ([], emptyUDs)
@@ -1217,25 +1209,25 @@ specTopBinds binds
 %************************************************************************
 
 \begin{code}
-specExpr :: PlainCoreExpr 
-	 -> [PlainCoreArg]		-- The arguments: 
+specExpr :: CoreExpr
+	 -> [CoreArg]		-- The arguments:
 					--    TypeArgs are speced
 					--    ValArgs are unprocessed
-	 -> SpecM (PlainCoreExpr, 	-- Result expression with specialised versions installed
+	 -> SpecM (CoreExpr, 	-- Result expression with specialised versions installed
 		   UsageDetails)	-- Details of usage of enclosing binders in the result
 					-- expression.
 
-specExpr (CoVar v) args
-  = lookupId v			`thenSM` \ vlookup -> 
+specExpr (Var v) args
+  = lookupId v			`thenSM` \ vlookup ->
     case vlookup of
        Lifted vl vu
 	     -> -- Binding has been lifted, need to extract un-lifted value
 		-- NB: a function binding will never be lifted => args always null
 		--     i.e. no call instance required or call to be constructed
 		ASSERT (null args)
-		returnSM (bindUnlift vl vu (CoVar vu), singleFvUDs (CoVarAtom vl))
+		returnSM (bindUnlift vl vu (Var vu), singleFvUDs (VarArg vl))
 
-       NoLift vatom@(CoVarAtom new_v)
+       NoLift vatom@(VarArg new_v)
 	     -> mapSM specArg args			`thenSM` \ arg_info ->
 		mkCallInstance v new_v arg_info		`thenSM` \ call_uds ->
     		mkCall new_v arg_info			`thenSM` \ ~(speced, call) ->
@@ -1247,41 +1239,41 @@ specExpr (CoVar v) args
 		in
     		returnSM (call, tickSpecCall speced uds)
 
-specExpr expr@(CoLit _) null_args
+specExpr expr@(Lit _) null_args
   = ASSERT (null null_args)
     returnSM (expr, emptyUDs)
 
-specExpr (CoCon con tys args) null_args
+specExpr (Con con tys args) null_args
   = ASSERT (null null_args)
     mapSM specTy tys 			`thenSM` \ tys ->
     mapAndUnzip3SM specAtom args	`thenSM` \ (args, args_uds_s, unlifts) ->
     mkTyConInstance con tys		`thenSM` \ con_uds ->
-    returnSM (applyBindUnlifts unlifts (CoCon con tys args),
+    returnSM (applyBindUnlifts unlifts (Con con tys args),
 	      unionUDList args_uds_s `unionUDs` con_uds)
 
-specExpr (CoPrim op@(CCallOp str is_asm may_gc arg_tys res_ty) tys args) null_args
+specExpr (Prim op@(CCallOp str is_asm may_gc arg_tys res_ty) tys args) null_args
   = ASSERT (null null_args)
     ASSERT (null tys)
     mapSM specTy arg_tys		`thenSM` \ arg_tys ->
     specTy res_ty			`thenSM` \ res_ty ->
     mapAndUnzip3SM specAtom args	`thenSM` \ (args, args_uds_s, unlifts) ->
-    returnSM (applyBindUnlifts unlifts (CoPrim (CCallOp str is_asm may_gc arg_tys res_ty) tys args), 
+    returnSM (applyBindUnlifts unlifts (Prim (CCallOp str is_asm may_gc arg_tys res_ty) tys args),
 	      unionUDList args_uds_s)
 
-specExpr (CoPrim prim tys args) null_args
+specExpr (Prim prim tys args) null_args
   = ASSERT (null null_args)
     mapSM specTy tys	 		`thenSM` \ tys ->
     mapAndUnzip3SM specAtom args	`thenSM` \ (args, args_uds_s, unlifts) ->
     -- specPrimOp prim tys		`thenSM` \ (prim, tys, prim_uds) ->
-    returnSM (applyBindUnlifts unlifts (CoPrim prim tys args),
+    returnSM (applyBindUnlifts unlifts (Prim prim tys args),
 	      unionUDList args_uds_s {-`unionUDs` prim_uds-} )
 
 {- ToDo: specPrimOp
 
 specPrimOp :: PrimOp
-	   -> [UniType]
+	   -> [Type]
 	   -> SpecM (PrimOp,
-		     [UniType],
+		     [Type],
 	 	     UsageDetails)
 
 -- Checks that PrimOp can handle (possibly unboxed) tys passed
@@ -1289,11 +1281,11 @@ specPrimOp :: PrimOp
 -- Errors are dealt with by returning a PrimOp call instance
 --   which will result in a cis_errs message
 
--- ToDo: Deal with checkSpecTyApp for CoPrim in CoreLint
+-- ToDo: Deal with checkSpecTyApp for Prim in CoreLint
 -}
 
 
-specExpr (CoApp fun arg) args
+specExpr (App fun arg) args
   = 	-- Arg is passed on unprocessed
     specExpr fun (ValArg arg : args)	`thenSM` \ (expr,uds) ->
     returnSM (expr, uds)
@@ -1303,8 +1295,16 @@ specExpr (CoTyApp fun ty) args
     specTy ty 				`thenSM` \ ty ->
     specExpr fun (TypeArg ty : args)
 
-specExpr (CoLam bound_ids body)	args
-  = specLam bound_ids body args
+specExpr (Lam binder body) (ValArg arg : args)
+  = lookup_arg arg `thenSM` \ arg ->
+    bindId binder arg (specExpr body args)
+  where
+    lookup_arg (LitArg l) = returnSM (NoLift (LitArg l))
+    lookup_arg (VarArg v) = lookupId v
+
+specExpr (Lam binder body) []
+  = specLambdaOrCaseBody [binder] body [] `thenSM` \ ([binder], body, uds) ->
+    returnSM (Lam binder body, uds)
 
 specExpr (CoTyLam tyvar body) (TypeArg ty : args)
   =	-- Type lambda with argument; argument already spec'd
@@ -1319,40 +1319,38 @@ specExpr (CoTyLam tyvar body) []
 	specExpr body []	`thenSM` \ (body, body_uds) ->
 	let
 	    (binds_here, final_uds) = dumpUDs body_uds False False [] [] [new_tyvar]
-        in
+	in
 	returnSM (CoTyLam new_tyvar (mkCoLetsNoUnboxed binds_here body), final_uds)
     )
 
-specExpr (CoCase scrutinee alts) args
+specExpr (Case scrutinee alts) args
   = specExpr scrutinee []		`thenSM` \ (scrutinee, scrut_uds) ->
     specAlts alts scrutinee_type args	`thenSM` \ (alts, alts_uds) ->
-    returnSM (CoCase scrutinee alts, scrut_uds `unionUDs`  alts_uds)
+    returnSM (Case scrutinee alts, scrut_uds `unionUDs`  alts_uds)
   where
-    scrutinee_type = typeOfCoreExpr scrutinee
+    scrutinee_type = coreExprType scrutinee
 
 
-specExpr (CoLet bind body) args
+specExpr (Let bind body) args
   = specBindAndScope False bind (
 	specExpr body args 	`thenSM` \ (body, body_uds) ->
 	returnSM (ItsAnExpr body, body_uds)
     )				`thenSM` \ (binds, ItsAnExpr body, all_uds) ->
     returnSM (mkCoLetsUnboxedToCase binds body, all_uds)
 
-specExpr (CoSCC cc expr) args
+specExpr (SCC cc expr) args
   = specExpr expr []		`thenSM` \ (expr, expr_uds) ->
-    mapAndUnzip3SM specArg args	`thenSM` \ (args, args_uds_s, unlifts) -> 
+    mapAndUnzip3SM specArg args	`thenSM` \ (args, args_uds_s, unlifts) ->
     let
 	scc_expr
 	  = if squashableDictishCcExpr cc expr -- can toss the _scc_
 	    then expr
-	    else CoSCC cc expr
+	    else SCC cc expr
     in
-    returnSM (applyBindUnlifts unlifts (applyToArgs scc_expr args),
+    returnSM (applyBindUnlifts unlifts (mkGenApp scc_expr args),
 	      unionUDList args_uds_s `unionUDs` expr_uds)
 
--- ToDo: This may leave some unspeced dictionaries !!
-
--- ToDo: DPH: add stuff here!
+-- ToDo: This may leave some unspec'd dictionaries!!
 \end{code}
 
 %************************************************************************
@@ -1362,35 +1360,11 @@ specExpr (CoSCC cc expr) args
 %************************************************************************
 
 \begin{code}
-specLam :: [Id] -> PlainCoreExpr -> [PlainCoreArg]
-	-> SpecM (PlainCoreExpr, UsageDetails)
-
-specLam [] body args 
-  = 	-- All lambdas saturated
-    specExpr body args
-
-specLam (binder:binders) body (ValArg arg : args)
-  = 	-- Lambda with an unprocessed argument
-    lookup_arg arg				`thenSM` \ arg ->
-    bindId binder arg (
-	specLam binders body args
-    )
-  where
-    lookup_arg (CoLitAtom l) = returnSM (NoLift (CoLitAtom l))
-    lookup_arg (CoVarAtom v) = lookupId v
-
-specLam bound_ids body []
-  = 	-- Lambda with no arguments
-    specLambdaOrCaseBody bound_ids body [] 	`thenSM` \ (bound_ids, body, uds) ->
-    returnSM (CoLam bound_ids body, uds)
-\end{code}
-
-\begin{code}
 specLambdaOrCaseBody :: [Id]			-- The binders
-		     -> PlainCoreExpr		-- The body
-		     -> [PlainCoreArg]		-- Its args
+		     -> CoreExpr		-- The body
+		     -> [CoreArg]		-- Its args
 		     -> SpecM ([Id],		-- New binders
-			       PlainCoreExpr,	-- New body
+			       CoreExpr,	-- New body
 			       UsageDetails)
 
 specLambdaOrCaseBody bound_ids body args
@@ -1400,7 +1374,7 @@ specLambdaOrCaseBody bound_ids body args
 	specExpr body args	`thenSM` \ (body, body_uds) ->
 
 	let
-	    -- Dump any dictionary bindings (and call instances) 
+	    -- Dump any dictionary bindings (and call instances)
 	    -- from the scope which mention things bound here
  	    (binds_here, final_uds) = dumpUDs body_uds False False [] new_ids []
 	in
@@ -1436,7 +1410,7 @@ d.Foo.Int :: ( \/b . Int -> b -> Int, \/c . Int -> c -> Int )
 d.Foo.Int = (op1_Int, op2_Int)
 
 op1 = /\ a b -> \ dFoo -> case dFoo of (meth1, _) -> meth1 b
-  
+
 ... op1 {Int Int#} d.Foo.Int 1 3# ...
 \end{verbatim}
 
@@ -1455,7 +1429,7 @@ op1_Int_Int# = case d.Foo.Int of (meth1, _) -> meth1 {Int#}
 Though this is still invalid, after further simplification we get:
 
 op1_Int_Int# = opInt1 {Int#}
-  
+
 Another round of specialisation will result in the specialised
 version of op1Int being called directly.
 
@@ -1475,36 +1449,36 @@ ToDo: Implement and test second round of specialisation.
 
 
 \begin{code}
-specAlts (CoAlgAlts alts deflt) scrutinee_ty args
+specAlts (AlgAlts alts deflt) scrutinee_ty args
   = mapSM specTy ty_args 			`thenSM` \ ty_args ->
     mapAndUnzipSM (specAlgAlt ty_args) alts	`thenSM` \ (alts, alts_uds_s) ->
     specDeflt deflt args			`thenSM` \ (deflt, deflt_uds) ->
-    returnSM (CoAlgAlts alts deflt, 
+    returnSM (AlgAlts alts deflt,
 	      unionUDList alts_uds_s `unionUDs` deflt_uds)
 
   where
     -- We use ty_args of scrutinee type to identify specialisation of alternatives
-    (_, ty_args, _) = getUniDataTyCon scrutinee_ty
+    (_, ty_args, _) = getAppDataTyCon scrutinee_ty
 
-    specAlgAlt ty_args (con,binders,rhs) 
+    specAlgAlt ty_args (con,binders,rhs)
       = specLambdaOrCaseBody binders rhs args	`thenSM` \ (binders, rhs, rhs_uds) ->
 	mkTyConInstance con ty_args    		`thenSM` \ con_uds ->
 	returnSM ((con,binders,rhs), rhs_uds `unionUDs` con_uds)
 
-specAlts (CoPrimAlts alts deflt) scrutinee_ty args
+specAlts (PrimAlts alts deflt) scrutinee_ty args
   = mapAndUnzipSM specPrimAlt alts	`thenSM` \ (alts, alts_uds_s) ->
     specDeflt deflt args		`thenSM` \ (deflt, deflt_uds) ->
-    returnSM (CoPrimAlts alts deflt, 
+    returnSM (PrimAlts alts deflt,
 	      unionUDList alts_uds_s `unionUDs` deflt_uds)
   where
     specPrimAlt (lit,rhs) = specExpr rhs args	`thenSM` \ (rhs, uds) ->
 			    returnSM ((lit,rhs), uds)
 
 
-specDeflt CoNoDefault args = returnSM (CoNoDefault, emptyUDs)
-specDeflt (CoBindDefault binder rhs) args 
+specDeflt NoDefault args = returnSM (NoDefault, emptyUDs)
+specDeflt (BindDefault binder rhs) args
  = specLambdaOrCaseBody [binder] rhs args	`thenSM` \ ([binder], rhs, uds) ->
-   returnSM (CoBindDefault binder rhs, uds)
+   returnSM (BindDefault binder rhs, uds)
 \end{code}
 
 
@@ -1515,24 +1489,24 @@ specDeflt (CoBindDefault binder rhs) args
 %************************************************************************
 
 \begin{code}
-specAtom :: PlainCoreAtom -> SpecM (PlainCoreAtom, UsageDetails,
-				    PlainCoreExpr -> PlainCoreExpr)
+specAtom :: CoreArg -> SpecM (CoreArg, UsageDetails,
+				    CoreExpr -> CoreExpr)
 
-specAtom (CoLitAtom lit)
-  = returnSM (CoLitAtom lit, emptyUDs, id)
+specAtom (LitArg lit)
+  = returnSM (LitArg lit, emptyUDs, id)
 
-specAtom (CoVarAtom v)
+specAtom (VarArg v)
   = lookupId v		`thenSM` \ vlookup ->
-    case vlookup of 
+    case vlookup of
       Lifted vl vu
-	 -> returnSM (CoVarAtom vu, singleFvUDs (CoVarAtom vl), bindUnlift vl vu)
+	 -> returnSM (VarArg vu, singleFvUDs (VarArg vl), bindUnlift vl vu)
 
       NoLift vatom
 	 -> returnSM (vatom, singleFvUDs vatom, id)
 
 
-specArg :: PlainCoreArg -> SpecM (PlainCoreArg, UsageDetails,
-				  PlainCoreExpr -> PlainCoreExpr)
+specArg :: CoreArg -> SpecM (CoreArg, UsageDetails,
+				  CoreExpr -> CoreExpr)
 
 specArg (ValArg arg)	-- unprocessed; spec the atom
   = specAtom arg	`thenSM` \ (arg, uds, unlift) ->
@@ -1552,20 +1526,20 @@ specArg (TypeArg ty)	-- already speced; no action
 A classic case of when having a polymorphic recursive function would help!
 
 \begin{code}
-data BindsOrExpr = ItsABinds [PlainCoreBinding]
-		 | ItsAnExpr PlainCoreExpr
+data BindsOrExpr = ItsABinds [CoreBinding]
+		 | ItsAnExpr CoreExpr
 \end{code}
 
 \begin{code}
-specBindAndScope 
+specBindAndScope
 	:: Bool					-- True <=> a top level group
-	-> PlainCoreBinding			-- As yet unprocessed
+	-> CoreBinding			-- As yet unprocessed
 	-> SpecM (BindsOrExpr, UsageDetails)	-- Something to do the scope of the bindings
-	-> SpecM ([PlainCoreBinding],		-- Processed
+	-> SpecM ([CoreBinding],		-- Processed
 		  BindsOrExpr, 			-- Combined result
 		  UsageDetails)			-- Usage details of the whole lot
 
-specBindAndScope top_lev bind scopeM 
+specBindAndScope top_lev bind scopeM
   = cloneLetBinders top_lev (is_rec bind) binders
 				`thenSM` \ (new_binders, clone_infos) ->
 
@@ -1574,7 +1548,7 @@ specBindAndScope top_lev bind scopeM
 	-- in which case we see if they correspond to any call-instances
 	-- we have from processing the scope
 
-    if not top_lev && all (isDictTy . getIdUniType) binders
+    if not top_lev && all (isDictTy . idType) binders
     then
 	-- Ha! A group of local dictionary bindings
 
@@ -1585,7 +1559,7 @@ specBindAndScope top_lev bind scopeM
 
 		-- Process their scope
 	scopeM					`thenSM` \ (thing, scope_uds) ->
-	let 
+	let
 		-- Add the bindings to the current stuff
 	    final_uds = addDictBinds new_binders bind rhs_uds scope_uds
 	in
@@ -1596,7 +1570,7 @@ specBindAndScope top_lev bind scopeM
 
       fixSM (\ ~(_, _, _, rec_spec_infos) ->
 
-        bindSpecIds binders clone_infos rec_spec_infos (
+	bindSpecIds binders clone_infos rec_spec_infos (
 		-- It's ok to have new binders in scope in
 		-- non-recursive decls too, cos name shadowing is gone by now
 
@@ -1605,8 +1579,8 @@ specBindAndScope top_lev bind scopeM
 	  let
 	     (call_insts, gotci_scope_uds) = getCIs top_lev new_binders scope_uds
 
-             equiv_ciss = equivClasses cmpCI_tys call_insts
-             inst_cis   = map head equiv_ciss
+	     equiv_ciss = equivClasses cmpCI_tys call_insts
+	     inst_cis   = map head equiv_ciss
 	  in
 
 		-- Do the bindings themselves
@@ -1615,7 +1589,7 @@ specBindAndScope top_lev bind scopeM
 
 		-- Create any necessary instances
 	  instBind top_lev new_binders bind equiv_ciss inst_cis
-						`thenSM` \ (inst_binds, inst_uds, spec_infos) -> 
+						`thenSM` \ (inst_binds, inst_uds, spec_infos) ->
 
 	  let
 		-- NB: dumpUDs only worries about new_binders since the free var
@@ -1645,48 +1619,48 @@ specBindAndScope top_lev bind scopeM
 			-- have already been dumped by specBind and instBind
 			let
 			    (scope_dict_binds, final_scope_uds)
-		  	      = dumpUDs gotci_scope_uds False False [] new_binders [] 
+		  	      = dumpUDs gotci_scope_uds False False [] new_binders []
 			in
 			([spec_bind] ++ inst_binds ++ scope_dict_binds,
 			 spec_uds `unionUDs` final_scope_uds `unionUDs` inst_uds)
 
 		-- inst_uds comes last, because there may be dict bindings
-		-- floating outward in scope_uds which are mentioned 
+		-- floating outward in scope_uds which are mentioned
 		-- in the call-instances, and hence in spec_uds.
 		-- This ordering makes sure that the precedence order
 		-- among the dict bindings finally floated out is maintained.
 	  in
 	  returnSM (final_binds, thing, final_uds, spec_infos)
-        )
+	)
       )			`thenSM` 	\ (binds, thing, final_uds, spec_infos) ->
       returnSM (binds, thing, final_uds)
   where
     binders = bindersOf bind
 
-    is_rec (CoNonRec _ _) = False
+    is_rec (NonRec _ _) = False
     is_rec _	          = True
 \end{code}
 
 \begin{code}
 specBind :: Bool -> Bool -> [Id] -> [CallInstance]
-	 -> PlainCoreBinding
-	 -> SpecM (PlainCoreBinding, UsageDetails)
+	 -> CoreBinding
+	 -> SpecM (CoreBinding, UsageDetails)
 	-- The UsageDetails returned has already had stuff to do with this group
 	-- of binders deleted; that's why new_binders is passed in.
-specBind top_lev floating new_binders inst_cis (CoNonRec binder rhs) 
+specBind top_lev floating new_binders inst_cis (NonRec binder rhs)
   = specOneBinding top_lev floating new_binders inst_cis (binder,rhs)
 							`thenSM` \ ((binder,rhs), rhs_uds) ->
-    returnSM (CoNonRec binder rhs, rhs_uds)
+    returnSM (NonRec binder rhs, rhs_uds)
 
-specBind top_lev floating new_binders inst_cis (CoRec pairs)
+specBind top_lev floating new_binders inst_cis (Rec pairs)
   = mapAndUnzipSM (specOneBinding top_lev floating new_binders inst_cis) pairs
 							`thenSM` \ (pairs, rhs_uds_s) ->
-    returnSM (CoRec pairs, unionUDList rhs_uds_s)
+    returnSM (Rec pairs, unionUDList rhs_uds_s)
 
 
 specOneBinding :: Bool -> Bool -> [Id] -> [CallInstance]
-	       -> (Id,PlainCoreExpr)
-	       -> SpecM ((Id,PlainCoreExpr), UsageDetails)
+	       -> (Id,CoreExpr)
+	       -> SpecM ((Id,CoreExpr), UsageDetails)
 
 specOneBinding top_lev floating new_binders inst_cis (binder, rhs)
   = lookupId binder		`thenSM` \ blookup ->
@@ -1696,7 +1670,7 @@ specOneBinding top_lev floating new_binders inst_cis (binder, rhs)
 	is_specid           = maybeToBool specid_maybe_maybe
 	Just specinfo_maybe = specid_maybe_maybe
 	specid_with_info    = maybeToBool specinfo_maybe
-        Just spec_info      = specinfo_maybe
+	Just spec_info      = specinfo_maybe
 
 	-- If we have a SpecInfo stored in a SpecPragmaId binder
 	-- it will contain a SpecInfo with an explicit SpecId
@@ -1713,9 +1687,9 @@ specOneBinding top_lev floating new_binders inst_cis (binder, rhs)
 		ASSERT(toplevelishId orig_id)     -- must not be cloned!
 		explicitCI orig_id spec_tys spec_info
 	    else
-	        emptyUDs
+		emptyUDs
 
-	-- For a local binding we dump the usage details, creating 
+	-- For a local binding we dump the usage details, creating
 	-- any local dict bindings required
 	-- At the top-level the uds will be dumped in specBindAndScope
 	-- and the dict bindings made *global*
@@ -1727,16 +1701,16 @@ specOneBinding top_lev floating new_binders inst_cis (binder, rhs)
 		([], rhs_uds)
     in
     case blookup of
-	Lifted lift_binder unlift_binder 
-	  -> 	-- We may need to record an unboxed instance of 
+	Lifted lift_binder unlift_binder
+	  -> 	-- We may need to record an unboxed instance of
 		-- the _Lift data type in the usage details
-	     mkTyConInstance liftDataCon [getIdUniType unlift_binder]
+	     mkTyConInstance liftDataCon [idType unlift_binder]
 						`thenSM` \ lift_uds ->
 	     returnSM ((lift_binder,
-		        mkCoLetsNoUnboxed local_dict_binds (liftExpr unlift_binder rhs)),
+			mkCoLetsNoUnboxed local_dict_binds (liftExpr unlift_binder rhs)),
 		       final_uds `unionUDs` pragma_uds `unionUDs` lift_uds)
 
-	NoLift (CoVarAtom binder)
+	NoLift (VarArg binder)
 	  -> returnSM ((binder, mkCoLetsNoUnboxed local_dict_binds rhs),
 		       final_uds `unionUDs` pragma_uds)
 \end{code}
@@ -1755,11 +1729,11 @@ instBind top_lev new_ids@(first_binder:other_binders) bind equiv_ciss inst_cis
 
  | all same_overloading other_binders
  = 	-- For each call_inst, build an instance
-   mapAndUnzip3SM do_this_class equiv_ciss 
+   mapAndUnzip3SM do_this_class equiv_ciss
 	`thenSM` \ (inst_binds, inst_uds_s, spec_infos) ->
 
 	-- Add in the remaining UDs
-   returnSM (catMaybes inst_binds, 
+   returnSM (catMaybes inst_binds,
    	     unionUDList inst_uds_s,
 	     spec_infos
 	    )
@@ -1771,7 +1745,7 @@ instBind top_lev new_ids@(first_binder:other_binders) bind equiv_ciss inst_cis
     then pprTrace "dumpCIs: not same overloading ... top level \n"
     else (\ x y -> y)
    ) (ppHang (ppBesides [ppStr "{", ppr PprDebug new_ids, ppStr "}"])
-   	   4 (ppAboves [ppAboves (map (pprUniType PprDebug . getIdUniType) new_ids),
+   	   4 (ppAboves [ppAboves (map (pprType PprDebug . idType) new_ids),
 			ppAboves (map pprCI (concat equiv_ciss))]))
    (returnSM ([], emptyUDs, []))
 
@@ -1789,7 +1763,7 @@ instBind top_lev new_ids@(first_binder:other_binders) bind equiv_ciss inst_cis
 	do_cis = head (normal_cis ++ explicit_cis)
 	-- must choose a normal_cis in preference since dict_args will
 	-- not be defined for an explicit_cis
-		 
+
 	-- same_overloading tests whether the types of all the binders
 	-- are "compatible"; ie have the same type and dictionary abstractions
 	-- Almost always this is the case, because a recursive group is abstracted
@@ -1810,17 +1784,19 @@ instBind top_lev new_ids@(first_binder:other_binders) bind equiv_ciss inst_cis
 	-- mutually recursive!
 
     same_overloading :: Id -> Bool
-    same_overloading id 
-      = no_of_tyvars == length this_id_tyvars 					-- Same no of tyvars
-	&&
-	no_of_dicts == length this_id_class_tyvar_pairs				-- Same no of vdicts
-	&&
-	and (zipWith same_ov class_tyvar_pairs this_id_class_tyvar_pairs)	-- Same overloading
+    same_overloading id
+      = no_of_tyvars == length this_id_tyvars
+	-- Same no of tyvars
+	&& no_of_dicts == length this_id_class_tyvar_pairs
+	-- Same no of vdicts
+	&& and (zipWith same_ov class_tyvar_pairs this_id_class_tyvar_pairs)
+	&& length class_tyvar_pairs == length this_id_class_tyvar_pairs
+	-- Same overloading
       where
 	(this_id_tyvars, this_id_class_tyvar_pairs) = getIdOverloading id
   	tyvar_pairs = this_id_tyvars `zip` tyvar_tmpls
 
-	same_ov (clas1,tyvar1) (clas2,tyvar2) 
+	same_ov (clas1,tyvar1) (clas2,tyvar2)
 	  = clas1  == clas2 &&
 	    tyvar1 == assoc "same_overloading" tyvar_pairs tyvar2
 \end{code}
@@ -1838,7 +1814,7 @@ We return a new definition
 
 The SpecInfo for f will be (the "2" indicates 2 dictionaries to eat)
 
-	SpecInfo [Just t1, Nothing, Just t3] 2 f@t1//t3 
+	SpecInfo [Just t1, Nothing, Just t3] 2 f@t1//t3
 
 Based on this SpecInfo, a call instance of f
 
@@ -1857,8 +1833,8 @@ mkOneInst :: CallInstance
 	  -> Bool				-- Top level binders?
 	  -> [CallInstance]			-- Instantiated call insts for binders
 	  -> [Id]				-- New binders
-	  -> PlainCoreBinding			-- Unprocessed
-	  -> SpecM (Maybe PlainCoreBinding,	-- Instantiated version of input
+	  -> CoreBinding			-- Unprocessed
+	  -> SpecM (Maybe CoreBinding,	-- Instantiated version of input
 		    UsageDetails,
 		    [Maybe SpecInfo]		-- One for each id in the original binding
 		   )
@@ -1872,34 +1848,34 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
     let
 	-- arg_tys is spec_tys with tyvars instead of the Nothing spec_tys
 	-- which correspond to unspeciailsed args
-	arg_tys  :: [UniType]
+	arg_tys  :: [Type]
 	(_,arg_tys) = mapAccumL do_the_wotsit poly_tyvars spec_tys
 
-	args :: [PlainCoreArg]
+	args :: [CoreArg]
 	args = map TypeArg arg_tys ++ dict_args
 
 	(new_id:_) = new_ids
 	(spec_id:_) = spec_ids
 
-	do_bind (CoNonRec orig_id rhs) 
+	do_bind (NonRec orig_id rhs)
 	  = do_one_rhs (spec_id, new_id, (orig_id,rhs))
 					`thenSM` \ (maybe_spec, rhs_uds, spec_info) ->
 	    case maybe_spec of
-		Just (spec_id, rhs) -> returnSM (Just (CoNonRec spec_id rhs), rhs_uds, [spec_info])
+		Just (spec_id, rhs) -> returnSM (Just (NonRec spec_id rhs), rhs_uds, [spec_info])
 		Nothing 	    -> returnSM (Nothing, rhs_uds, [spec_info])
 
-	do_bind (CoRec pairs)
+	do_bind (Rec pairs)
 	  = mapAndUnzip3SM do_one_rhs (zip3 spec_ids new_ids pairs)
 					`thenSM` \ (maybe_pairs, rhss_uds_s, spec_infos) ->
-	    returnSM (Just (CoRec (catMaybes maybe_pairs)),
+	    returnSM (Just (Rec (catMaybes maybe_pairs)),
 		      unionUDList rhss_uds_s, spec_infos)
 
 	do_one_rhs (spec_id, new_id, (orig_id, orig_rhs))
 
 		-- Avoid duplicating a spec which has already been created ...
-		-- This can arise in a CoRec involving a dfun for which a
+		-- This can arise in a Rec involving a dfun for which a
 		-- a specialised instance has been created but specialisation
-		-- "required" by one of the other Ids in the CoRec
+		-- "required" by one of the other Ids in the Rec
 	  | top_lev && maybeToBool lookup_orig_spec
 	  = (if sw_chkr SpecialiseTrace
 	     then trace_nospec "  Exists: " exists_id
@@ -1914,7 +1890,7 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
 	    (if sw_chkr SpecialiseTrace
 	     then trace_nospec "  Explicit: " explicit_id
 	     else id) (
-	    
+
 	    returnSM (Nothing, tickSpecInsts emptyUDs, Just explicit_spec_info)
 	    )
 
@@ -1922,32 +1898,32 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
 	  | otherwise
 	  = ASSERT (no_of_dicts_to_specialise == length dict_args)
 	    specExpr orig_rhs args	`thenSM` \ (inst_rhs, inst_uds) ->
-	    let 
-	        -- For a local binding we dump the usage details, creating 
-	        -- any local dict bindings required
-	        -- At the top-level the uds will be dumped in specBindAndScope
-	        -- and the dict bindings made *global*
-	    
-	        (local_dict_binds, final_uds)
-	          = if not top_lev then
+	    let
+		-- For a local binding we dump the usage details, creating
+		-- any local dict bindings required
+		-- At the top-level the uds will be dumped in specBindAndScope
+		-- and the dict bindings made *global*
+
+		(local_dict_binds, final_uds)
+		  = if not top_lev then
 	    	        dumpUDs inst_uds False False inst_cis new_ids []
-	            else
+		    else
 	    	        ([], inst_uds)
-	    
-	        spec_info = Just (SpecInfo spec_tys no_of_dicts_to_specialise spec_id)
+
+		spec_info = Just (SpecInfo spec_tys no_of_dicts_to_specialise spec_id)
 	    in
-	    if isUnboxedDataType (getIdUniType spec_id) then
-	        ASSERT (null poly_tyvars)
-	        liftId spec_id		`thenSM` \ (lift_spec_id, unlift_spec_id) ->
-	        mkTyConInstance liftDataCon [getIdUniType unlift_spec_id]
+	    if isUnboxedDataType (idType spec_id) then
+		ASSERT (null poly_tyvars)
+		liftId spec_id		`thenSM` \ (lift_spec_id, unlift_spec_id) ->
+		mkTyConInstance liftDataCon [idType unlift_spec_id]
 	    				`thenSM` \ lift_uds ->
-	        returnSM (Just (lift_spec_id,
-	                        mkCoLetsNoUnboxed local_dict_binds (liftExpr unlift_spec_id inst_rhs)),
-	                  tickSpecInsts (final_uds `unionUDs` lift_uds), spec_info)
+		returnSM (Just (lift_spec_id,
+				mkCoLetsNoUnboxed local_dict_binds (liftExpr unlift_spec_id inst_rhs)),
+			  tickSpecInsts (final_uds `unionUDs` lift_uds), spec_info)
 	    else
-	        returnSM (Just (spec_id,
+		returnSM (Just (spec_id,
 	    	                mkCoLetsNoUnboxed local_dict_binds (mkCoTyLam poly_tyvars inst_rhs)),
-	                  tickSpecInsts final_uds, spec_info)
+			  tickSpecInsts final_uds, spec_info)
 	  where
 	    lookup_orig_spec = lookupSpecEnv (getIdSpecialisation orig_id) arg_tys
 	    Just (exists_id, _, _) = lookup_orig_spec
@@ -1963,21 +1939,21 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
     in
     (if sw_chkr SpecialiseTrace then
 	pprTrace "Specialising:"
-        (ppHang (ppBesides [ppStr "{", ppr PprDebug new_ids, ppStr "}"])
+	(ppHang (ppBesides [ppStr "{", ppr PprDebug new_ids, ppStr "}"])
 	      4 (ppAboves [
-	         ppBesides [ppStr "types: ", ppInterleave ppNil (map pp_ty arg_tys)],
+		 ppBesides [ppStr "types: ", ppInterleave ppNil (map pp_ty arg_tys)],
 		 if isExplicitCI do_cis then ppNil else
 		 ppBesides [ppStr "dicts: ", ppInterleave ppNil (map pp_dict dict_args)],
-	         ppBesides [ppStr "specs: ", ppr PprDebug spec_ids]]))
+		 ppBesides [ppStr "specs: ", ppr PprDebug spec_ids]]))
      else id) (
-	   
+
     do_bind orig_bind		`thenSM` \ (maybe_inst_bind, inst_uds, spec_infos) ->
 
     returnSM (maybe_inst_bind, inst_uds, spec_infos)
     )
   where
     pp_dict (ValArg d) = ppr PprDebug d
-    pp_ty t = pprParendUniType PprDebug t
+    pp_ty t = pprParendType PprDebug t
 
     do_the_wotsit (tyvar:tyvars) Nothing   = (tyvars, mkTyVarTy tyvar)
     do_the_wotsit tyvars         (Just ty) = (tyvars, ty)
@@ -1991,9 +1967,9 @@ mkOneInst do_cis@(CallInstance _ spec_tys dict_args _ _) explicit_cis
 %************************************************************************
 
 \begin{code}
-mkCallInstance :: Id 
+mkCallInstance :: Id
 	       -> Id
-	       -> [(PlainCoreArg, UsageDetails, PlainCoreExpr -> PlainCoreExpr)]
+	       -> [(CoreArg, UsageDetails, CoreExpr -> CoreExpr)]
 	       -> SpecM UsageDetails
 
 mkCallInstance id new_id []
@@ -2020,9 +1996,9 @@ mkCallInstance id new_id args
   | otherwise
   = getSwitchCheckerSM		`thenSM` \ sw_chkr ->
     let
-        spec_overloading = sw_chkr SpecialiseOverloaded
-        spec_unboxed     = sw_chkr SpecialiseUnboxed
-        spec_all	 = sw_chkr SpecialiseAll
+	spec_overloading = sw_chkr SpecialiseOverloaded
+	spec_unboxed     = sw_chkr SpecialiseUnboxed
+	spec_all	 = sw_chkr SpecialiseAll
 
 	(tyvars, class_tyvar_pairs) = getIdOverloading id
 
@@ -2035,7 +2011,7 @@ mkCallInstance id new_id args
 	  = (record, lookup, spec_tys)
 	  where
 	    spec_tys = specialiseCallTys spec_all spec_unboxed spec_overloading
-		                         (mkConstraintVector id) tys
+					 (mkConstraintVector id) tys
 
 	    record = any (not . isTyVarTy) (catMaybes spec_tys)
 
@@ -2043,11 +2019,11 @@ mkCallInstance id new_id args
     in
     if (not enough_args) then
 	pprPanic "Specialise:recordCallInst: Unsaturated Type & Dict Application:\n\t"
-		 (ppCat [ppr PprDebug id, ppr PprDebug [arg | (arg,_,_) <- args] ]) 
+		 (ppCat [ppr PprDebug id, ppr PprDebug [arg | (arg,_,_) <- args] ])
     else
     case record_spec id tys of
 	(False, _, _)
-	     -> -- pprTrace "CallInst:NotReqd\n" 
+	     -> -- pprTrace "CallInst:NotReqd\n"
 	   	-- (ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)])
 		(returnSM emptyUDs)
 
@@ -2056,7 +2032,7 @@ mkCallInstance id new_id args
 		    returnSM emptyUDs
 		else
 		    -- pprTrace "CallInst:Reqd\n"
-	            -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
+		    -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
 		    --	          ppCat [ppStr "CI", ppCat (map (pprMaybeTy PprDebug) spec_tys),
 	   	    --		                     ppCat (map (ppr PprDebug) dicts)]])
 		    (returnSM (singleCI new_id spec_tys dicts))
@@ -2067,15 +2043,15 @@ mkCallInstance id new_id args
 			-- NB: const method is top-level so spec_id will not be cloned
 		    case record_spec spec_id tys_left of
 		      (False, _, _)
-		    	-> -- pprTrace "CallInst:Exists\n" 
-	            	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
+		    	-> -- pprTrace "CallInst:Exists\n"
+		    	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
 		    	   --	         ppCat [ppStr "->", ppr PprDebug spec_id,
 		    	   --		        ppr PprDebug (tys_left ++ drop toss dicts)]])
 			   (returnSM emptyUDs)
 
 		      (True, Nothing, spec_tys)
 			-> -- pprTrace "CallInst:Exists:Reqd\n"
-	            	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
+		    	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
 		    	   --	         ppCat [ppStr "->", ppr PprDebug spec_id,
 		    	   --		        ppr PprDebug (tys_left ++ drop toss dicts)],
 			   --	         ppCat [ppStr "CI", ppCat (map (pprMaybeTy PprDebug) spec_tys),
@@ -2083,8 +2059,8 @@ mkCallInstance id new_id args
 			   (returnSM (singleCI spec_id spec_tys (drop toss dicts)))
 
 		      (True, Just (spec_spec_id, tys_left_left, toss_toss), _)
-			-> -- pprTrace "CallInst:Exists:Exists\n" 
-	            	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
+			-> -- pprTrace "CallInst:Exists:Exists\n"
+		    	   -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
 		    	   --	         ppCat [ppStr "->", ppr PprDebug spec_id,
 		    	   --		        ppr PprDebug (tys_left ++ drop toss dicts)],
 		    	   --	         ppCat [ppStr "->", ppr PprDebug spec_spec_id,
@@ -2092,25 +2068,25 @@ mkCallInstance id new_id args
 			   (returnSM emptyUDs)
 
 		else
-		    -- pprTrace "CallInst:Exists\n" 
-	            -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
+		    -- pprTrace "CallInst:Exists\n"
+		    -- (ppAboves [ppCat [ppr PprDebug id, ppCat (map (ppr PprDebug) args)],
 		    --	          ppCat [ppStr "->", ppr PprDebug spec_id,
 		    --		         ppr PprDebug (tys_left ++ drop toss dicts)]])
 		    (returnSM emptyUDs)
 
 
-take_type_args (_:tyvars) class_tyvar_pairs ((TypeArg ty,_,_):args) 
+take_type_args (_:tyvars) class_tyvar_pairs ((TypeArg ty,_,_):args)
 	= case take_type_args tyvars class_tyvar_pairs args of
 		Nothing 	          -> Nothing
 		Just (tys, dicts, others) -> Just (ty:tys, dicts, others)
 take_type_args (_:tyvars) class_tyvar_pairs []
 	= Nothing
-take_type_args [] class_tyvar_pairs args 
+take_type_args [] class_tyvar_pairs args
 	= case take_dict_args class_tyvar_pairs args of
 		Nothing              -> Nothing
 		Just (dicts, others) -> Just ([], dicts, others)
 
-take_dict_args (_:class_tyvar_pairs) ((dict@(ValArg _),_,_):args) 
+take_dict_args (_:class_tyvar_pairs) ((dict@(ValArg _),_,_):args)
 	= case take_dict_args class_tyvar_pairs args of
 		Nothing              -> Nothing
 		Just (dicts, others) -> Just (dict:dicts, others)
@@ -2122,8 +2098,8 @@ take_dict_args [] args
 
 \begin{code}
 mkCall :: Id
-       -> [(PlainCoreArg, UsageDetails, PlainCoreExpr -> PlainCoreExpr)]
-       -> SpecM (Bool, PlainCoreExpr)
+       -> [(CoreArg, UsageDetails, CoreExpr -> CoreExpr)]
+       -> SpecM (Bool, CoreExpr)
 
 mkCall new_id args
   | maybeToBool (isSuperDictSelId_maybe new_id)
@@ -2135,11 +2111,11 @@ mkCall new_id args
 	--     have been specialised. We only do this to keep core-lint happy.
     = let
 	 Just (_, super_class) = isSuperDictSelId_maybe new_id
-         super_dict_id = case lookupClassInstAtSimpleType super_class (head ty_args) of
+	 super_dict_id = case lookupClassInstAtSimpleType super_class (head ty_args) of
 			 Nothing -> panic "Specialise:mkCall:SuperDictId"
 			 Just id -> id
       in
-      returnSM (False, CoVar super_dict_id)
+      returnSM (False, Var super_dict_id)
 
   | otherwise
     = case lookupSpecEnv (getIdSpecialisation new_id) ty_args of
@@ -2147,7 +2123,7 @@ mkCall new_id args
 		   returnSM (False, unspec_call)
 		   )
 
-	Just spec_1_details@(spec_id_1, tys_left_1, dicts_to_toss_1) 
+	Just spec_1_details@(spec_id_1, tys_left_1, dicts_to_toss_1)
 		-> let
 			-- It may be necessary to specialsie a constant method spec_id again
 		       (spec_id, tys_left, dicts_to_toss) =
@@ -2157,7 +2133,7 @@ mkCall new_id args
 				 (True, Nothing) -> spec_1_details
 				 (True, Just (spec_id_2, tys_left_2, dicts_to_toss_2))
 						 -> (spec_id_2, tys_left_2, dicts_to_toss_1 + dicts_to_toss_2)
-				
+
 		       args_left = toss_dicts dicts_to_toss val_args
 		   in
 		   checkSpecOK new_id ty_args spec_id tys_left (
@@ -2173,29 +2149,29 @@ mkCall new_id args
 			-- These top level defns should have been lifted.
 			-- We must add code to unlift such a spec_id.
 
-		   if isUnboxedDataType (getIdUniType spec_id) then
+		   if isUnboxedDataType (idType spec_id) then
 		       ASSERT (null tys_left && null args_left)
 		       if toplevelishId spec_id then
 		 	   liftId spec_id 	`thenSM` \ (lift_spec_id, unlift_spec_id) ->
 			   returnSM (True, bindUnlift lift_spec_id unlift_spec_id
-						      (CoVar unlift_spec_id))
+						      (Var unlift_spec_id))
 		       else
 			   pprPanic "Specialise:mkCall: unboxed spec_id not top-level ...\n"
 				    (ppCat [ppr PprDebug new_id,
-				            ppInterleave ppNil (map (pprParendUniType PprDebug) ty_args),
+					    ppInterleave ppNil (map (pprParendType PprDebug) ty_args),
 					    ppStr "==>",
 					    ppr PprDebug spec_id])
 		   else
 		   let
 		       (vals_left, _, unlifts_left) = unzip3 args_left
-		       applied_tys  = mkCoTyApps (CoVar spec_id) tys_left
-		       applied_vals = applyToArgs applied_tys vals_left
+		       applied_tys  = mkCoTyApps (Var spec_id) tys_left
+		       applied_vals = mkGenApp applied_tys vals_left
 		   in
 		   returnSM (True, applyBindUnlifts unlifts_left applied_vals)
 		   )
   where
     (tys_and_vals, _, unlifts) = unzip3 args
-    unspec_call = applyBindUnlifts unlifts (applyToArgs (CoVar new_id) tys_and_vals)
+    unspec_call = applyBindUnlifts unlifts (mkGenApp (Var new_id) tys_and_vals)
 
 
 	-- ty_args is the types at the front of the arg list
@@ -2214,34 +2190,34 @@ mkCall new_id args
 \end{code}
 
 \begin{code}
-checkUnspecOK :: Id -> [UniType] -> a -> a
+checkUnspecOK :: Id -> [Type] -> a -> a
 checkUnspecOK check_id tys
   = if isLocallyDefined check_id && any isUnboxedDataType tys
     then pprPanic "Specialise:checkUnspecOK: unboxed instance for local id not found\n"
 		  (ppCat [ppr PprDebug check_id,
-			  ppInterleave ppNil (map (pprParendUniType PprDebug) tys)])
+			  ppInterleave ppNil (map (pprParendType PprDebug) tys)])
     else id
 
-checkSpecOK :: Id -> [UniType] -> Id -> [UniType] -> a -> a
+checkSpecOK :: Id -> [Type] -> Id -> [Type] -> a -> a
 checkSpecOK check_id tys spec_id tys_left
   = if any isUnboxedDataType tys_left
     then pprPanic "Specialise:checkSpecOK: unboxed type args in specialised application\n"
 		  (ppAboves [ppCat [ppr PprDebug check_id,
-				    ppInterleave ppNil (map (pprParendUniType PprDebug) tys)],
+				    ppInterleave ppNil (map (pprParendType PprDebug) tys)],
 			     ppCat [ppr PprDebug spec_id,
-				    ppInterleave ppNil (map (pprParendUniType PprDebug) tys_left)]])
+				    ppInterleave ppNil (map (pprParendType PprDebug) tys_left)]])
     else id
 \end{code}
 
 \begin{code}
 mkTyConInstance :: Id
-		-> [UniType]
+		-> [Type]
    		-> SpecM UsageDetails
 mkTyConInstance con tys
   = recordTyConInst con tys	`thenSM` \ record_inst ->
     case record_inst of
       Nothing				-- No TyCon instance
-        -> -- pprTrace "NoTyConInst:" 
+	-> -- pprTrace "NoTyConInst:"
 	   -- (ppCat [ppr PprDebug tycon, ppStr "at",
 	   --	      ppr PprDebug con, ppCat (map (ppr PprDebug) tys)])
 	   (returnSM (singleConUDs con))
@@ -2250,7 +2226,7 @@ mkTyConInstance con tys
 	-> -- pprTrace "TyConInst:"
 	   -- (ppCat [ppr PprDebug tycon, ppStr "at",
 	   --	      ppr PprDebug con, ppCat (map (ppr PprDebug) tys),
-	   --	      ppBesides [ppStr "(", 
+	   --	      ppBesides [ppStr "(",
 	   --			 ppCat [pprMaybeTy PprDebug ty | ty <- spec_tys],
 	   --			 ppStr ")"]])
 	   (returnSM (singleTyConI tycon spec_tys `unionUDs` singleConUDs con))
@@ -2260,17 +2236,17 @@ mkTyConInstance con tys
 
 \begin{code}
 recordTyConInst :: Id
-		-> [UniType]
-		-> SpecM (Maybe [Maybe UniType])
+		-> [Type]
+		-> SpecM (Maybe [Maybe Type])
 
 recordTyConInst con tys
   = let
-        spec_tys = specialiseConstrTys tys
+	spec_tys = specialiseConstrTys tys
 
 	do_tycon_spec = maybeToBool (firstJust spec_tys)
 
-        spec_exists = maybeToBool (lookupSpecEnv 
-				      (getIdSpecialisation con) 
+	spec_exists = maybeToBool (lookupSpecEnv
+				      (getIdSpecialisation con)
 				      tys)
     in
     -- pprTrace "ConSpecExists?: "
@@ -2292,9 +2268,9 @@ Monad has:
  inherited: control flags and
 	    recordInst functions with flags cached
 
-	    environment mapping tyvars to types 
+	    environment mapping tyvars to types
 	    environment mapping Ids to Atoms
- 
+
  threaded in and out: unique supply
 
 \begin{code}
@@ -2302,7 +2278,7 @@ type SpecM result
   =  (GlobalSwitch -> Bool)
   -> TypeEnv
   -> SpecIdEnv
-  -> SplitUniqSupply
+  -> UniqSupply
   -> result
 
 initSM m sw_chker uniqs
@@ -2333,7 +2309,7 @@ The only interesting bit is figuring out the type of the SpecId!
 
 \begin{code}
 newSpecIds :: [Id]		-- The id of which to make a specialised version
-	   -> [Maybe UniType]	-- Specialise to these types
+	   -> [Maybe Type]	-- Specialise to these types
 	   -> Int		-- No of dicts to specialise
 	   -> SpecM [Id]
 
@@ -2341,14 +2317,14 @@ newSpecIds new_ids maybe_tys dicts_to_ignore sw_chkr tvenv idenv us
   = [ mkSpecId uniq id maybe_tys (spec_id_ty id) (selectIdInfoForSpecId id)
       | (id,uniq) <- new_ids `zip` uniqs ]
   where
-    uniqs = getSUniques (length new_ids) us
-    spec_id_ty id = specialiseTy (getIdUniType id) maybe_tys dicts_to_ignore
+    uniqs = getUniques (length new_ids) us
+    spec_id_ty id = specialiseTy (idType id) maybe_tys dicts_to_ignore
 
 newTyVars :: Int -> SpecM [TyVar]
 newTyVars n sw_chkr tvenv idenv us
  = map mkPolySysTyVar uniqs
  where
-   uniqs = getSUniques n us
+   uniqs = getUniques n us
 \end{code}
 
 @cloneLambdaOrCaseBinders@ and @cloneLetBinders@ take a bunch of
@@ -2362,19 +2338,19 @@ originals in three ways:
 
 As well as returning the list of cloned @Id@s they also return a list of
 @CloneInfo@s which the original binders should be bound to.
-	    
+
 \begin{code}
 cloneLambdaOrCaseBinders :: [Id] 			-- Old binders
 			 -> SpecM ([Id], [CloneInfo])	-- New ones
 
 cloneLambdaOrCaseBinders old_ids sw_chkr tvenv idenv us
   = let
-	uniqs = getSUniques (length old_ids) us
+	uniqs = getUniques (length old_ids) us
     in
-    unzip (zipWith clone_it old_ids uniqs)
+    unzip (zipWithEqual clone_it old_ids uniqs)
   where
     clone_it old_id uniq
-      = (new_id, NoLift (CoVarAtom new_id))
+      = (new_id, NoLift (VarArg new_id))
       where
 	new_id = applyTypeEnvToId tvenv (mkIdWithNewUniq old_id uniq)
 
@@ -2385,7 +2361,7 @@ cloneLetBinders :: Bool 			-- Top level ?
 
 cloneLetBinders top_lev is_rec old_ids sw_chkr tvenv idenv us
   = let
-	uniqs = getSUniques (2 * length old_ids) us
+	uniqs = getUniques (2 * length old_ids) us
     in
     unzip (clone_them old_ids uniqs)
   where
@@ -2394,10 +2370,10 @@ cloneLetBinders top_lev is_rec old_ids sw_chkr tvenv idenv us
     clone_them (old_id:olds) (u1:u2:uniqs)
       | top_lev
 	= (old_id,
-	   NoLift (CoVarAtom old_id)) : clone_rest
+	   NoLift (VarArg old_id)) : clone_rest
 
 	 -- Don't clone if it is a top-level thing. Why not?
-	 -- (a) we don't want to change the uniques 
+	 -- (a) we don't want to change the uniques
 	 --     on such things (see TopLevId in Id.lhs)
 	 -- (b) we don't have to be paranoid about name capture
 	 -- (c) the thing is polymorphic so no need to subst
@@ -2407,14 +2383,14 @@ cloneLetBinders top_lev is_rec old_ids sw_chkr tvenv idenv us
 	  then (lifted_id,
 		Lifted lifted_id unlifted_id) : clone_rest
 	  else (new_id,
-		NoLift (CoVarAtom new_id)) : clone_rest
+		NoLift (VarArg new_id)) : clone_rest
 
-      where 
+      where
 	clone_rest = clone_them olds uniqs
 
 	new_id = applyTypeEnvToId tvenv (mkIdWithNewUniq old_id u1)
-	new_ty = getIdUniType new_id
-	old_ty = getIdUniType old_id
+	new_ty = idType new_id
+	old_ty = idType old_id
 
 	(lifted_id, unlifted_id) = mkLiftedId new_id u2
 
@@ -2423,7 +2399,7 @@ cloneTyVarSM :: TyVar -> SpecM TyVar
 
 cloneTyVarSM old_tyvar sw_chkr tvenv idenv us
   = let
-	uniq = getSUnique us
+	uniq = getUnique us
     in
     cloneTyVar old_tyvar uniq -- new_tyvar
 
@@ -2442,7 +2418,7 @@ bindSpecIds :: [Id]			-- Old
 	    -> [[Maybe SpecInfo]]	-- Corresponding specialisations
 					-- Each sub-list corresponds to a different type,
 					-- and contains one Maybe spec_info for each id
-	    -> SpecM thing 
+	    -> SpecM thing
 	    -> SpecM thing
 
 bindSpecIds olds clones spec_infos specm sw_chkr tvenv idenv us
@@ -2453,12 +2429,12 @@ bindSpecIds olds clones spec_infos specm sw_chkr tvenv idenv us
    -- The important thing here is that we are *lazy* in spec_infos
    mk_old_to_clone [] [] _ = []
    mk_old_to_clone (old:rest_olds) (clone:rest_clones) spec_infos
-     = (old, add_spec_info clone) : 
+     = (old, add_spec_info clone) :
        mk_old_to_clone rest_olds rest_clones spec_infos_rest
      where
-       add_spec_info (NoLift (CoVarAtom new))
-	 = NoLift (CoVarAtom (new `addIdSpecialisation`
-			          (mkSpecEnv spec_infos_this_id)))
+       add_spec_info (NoLift (VarArg new))
+	 = NoLift (VarArg (new `addIdSpecialisation`
+				  (mkSpecEnv spec_infos_this_id)))
        add_spec_info lifted
 	 = lifted		-- no specialised instances for unboxed lifted values
 
@@ -2466,7 +2442,7 @@ bindSpecIds olds clones spec_infos specm sw_chkr tvenv idenv us
        spec_infos_rest    = map tail spec_infos
 
 
-bindTyVar :: TyVar -> UniType -> SpecM thing -> SpecM thing
+bindTyVar :: TyVar -> Type -> SpecM thing -> SpecM thing
 
 bindTyVar tyvar ty specm sw_chkr tvenv idenv us
  = specm sw_chkr (growTyVarEnvList tvenv [(tyvar,ty)]) idenv us
@@ -2475,16 +2451,16 @@ bindTyVar tyvar ty specm sw_chkr tvenv idenv us
 \begin{code}
 lookupId :: Id -> SpecM CloneInfo
 
-lookupId id sw_chkr tvenv idenv us 
+lookupId id sw_chkr tvenv idenv us
   = case lookupIdEnv idenv id of
-      Nothing   -> NoLift (CoVarAtom id)
+      Nothing   -> NoLift (VarArg id)
       Just info -> info
 \end{code}
 
 \begin{code}
-specTy :: UniType -> SpecM UniType	-- Apply the current type envt to the type
+specTy :: Type -> SpecM Type	-- Apply the current type envt to the type
 
-specTy ty sw_chkr tvenv idenv us 
+specTy ty sw_chkr tvenv idenv us
   = applyTypeEnvToTy tvenv ty
 \end{code}
 
@@ -2492,7 +2468,7 @@ specTy ty sw_chkr tvenv idenv us
 liftId :: Id -> SpecM (Id, Id)
 liftId id sw_chkr tvenv idenv us
   = let
-	uniq = getSUnique us
+	uniq = getUnique us
     in
     mkLiftedId id uniq
 \end{code}

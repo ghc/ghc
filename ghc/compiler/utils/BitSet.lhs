@@ -30,7 +30,7 @@ module BitSet (
 #elif defined(__YALE_HASKELL__)
 {-hide import from mkdependHS-}
 import
-        LogOpPrims
+	LogOpPrims
 #else
 {-hide import from mkdependHS-}
 import
@@ -41,7 +41,7 @@ import
 
 data BitSet = MkBS Word#
 
-emptyBS :: BitSet 
+emptyBS :: BitSet
 emptyBS = MkBS (int2Word# 0#)
 
 mkBS :: [Int] -> BitSet
@@ -60,7 +60,7 @@ minusBS (MkBS x#) (MkBS y#) = MkBS (x# `and#` (not# y#))
 #if ! defined(COMPILING_GHC)
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
-isEmptyBS (MkBS s#) = 
+isEmptyBS (MkBS s#) =
     case word2Int# s# of
     	0# -> True
     	_  -> False
@@ -77,7 +77,7 @@ elementBS x (MkBS s#) = case x of
 
 listBS :: BitSet -> [Int]
 listBS s = listify s 0
-    where listify (MkBS s#) n = 
+    where listify (MkBS s#) n =
     	    case word2Int# s# of
     	        0# -> []
     	        _  -> let s' = (MkBS (s# `shiftr` 1#))
@@ -85,17 +85,13 @@ listBS s = listify s 0
     	    	      in case word2Int# (s# `and#` (int2Word# 1#)) of
     	    	    	  0# -> more
     	    	    	  _  -> n : more
-# if __GLASGOW_HASKELL__ >= 23
 	  shiftr x y = shiftRL# x y
-# else
-	  shiftr x y = shiftR#  x y
-# endif
 
 #elif defined(__YALE_HASKELL__)
 
 data BitSet = MkBS Int
 
-emptyBS :: BitSet 
+emptyBS :: BitSet
 emptyBS = MkBS 0
 
 mkBS :: [Int] -> BitSet
@@ -110,7 +106,7 @@ unionBS (MkBS x) (MkBS y) = MkBS (x `logiorInt` y)
 #if ! defined(COMPILING_GHC)
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
-isEmptyBS (MkBS s) = 
+isEmptyBS (MkBS s) =
     case s of
     	0 -> True
     	_ -> False
@@ -119,7 +115,7 @@ intersectBS :: BitSet -> BitSet -> BitSet
 intersectBS (MkBS x) (MkBS y) = MkBS (x `logandInt` y)
 
 elementBS :: Int -> BitSet -> Bool
-elementBS x (MkBS s) = 
+elementBS x (MkBS s) =
     case logbitpInt x s of
     	0 -> False
     	_ -> True
@@ -128,23 +124,23 @@ elementBS x (MkBS s) =
 minusBS :: BitSet -> BitSet -> BitSet
 minusBS (MkBS x) (MkBS y) = MkBS (x `logandc2Int` y)
 
--- rewritten to avoid right shifts (which would give nonsense on negative 
+-- rewritten to avoid right shifts (which would give nonsense on negative
 -- values.
 listBS :: BitSet -> [Int]
 listBS (MkBS s) = listify s 0 1
-    where listify s n m = 
+    where listify s n m =
     	    case s of
     	        0 -> []
     	        _ -> let n' = n+1; m' = m+m in
-                     case logbitpInt s m of
+		     case logbitpInt s m of
 		     0 -> listify s n' m'
 		     _ -> n : listify (s `logandc2Int` m) n' m'
 
-#else	/* HBC, perhaps? */    
+#else	/* HBC, perhaps? */
 
 data BitSet = MkBS Word
 
-emptyBS :: BitSet 
+emptyBS :: BitSet
 emptyBS = MkBS 0
 
 mkBS :: [Int] -> BitSet
@@ -159,7 +155,7 @@ unionBS (MkBS x) (MkBS y) = MkBS (x `bitOr` y)
 #if ! defined(COMPILING_GHC)
 -- not used in GHC
 isEmptyBS :: BitSet -> Bool
-isEmptyBS (MkBS s) = 
+isEmptyBS (MkBS s) =
     case s of
     	0 -> True
     	_ -> False
@@ -168,7 +164,7 @@ intersectBS :: BitSet -> BitSet -> BitSet
 intersectBS (MkBS x) (MkBS y) = MkBS (x `bitAnd` y)
 
 elementBS :: Int -> BitSet -> Bool
-elementBS x (MkBS s) = 
+elementBS x (MkBS s) =
     case (1 `bitLsh` x) `bitAnd` s of
     	0 -> False
     	_ -> True
@@ -179,7 +175,7 @@ minusBS (MkBS x) (MkBS y) = MkBS (x `bitAnd` (bitCompl y))
 
 listBS :: BitSet -> [Int]
 listBS (MkBS s) = listify s 0
-    where listify s n = 
+    where listify s n =
     	    case s of
     	        0 -> []
     	        _ -> let s' = s `bitRsh` 1

@@ -1,8 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface FloatOut where
-import CmdLineOpts(GlobalSwitch)
-import CoreSyn(CoreBinding)
-import Id(Id)
-import SplitUniq(SplitUniqSupply)
-floatOutwards :: (GlobalSwitch -> Bool) -> SplitUniqSupply -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-

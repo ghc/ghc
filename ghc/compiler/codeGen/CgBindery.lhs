@@ -19,33 +19,22 @@ module CgBindery (
 
 	bindNewToAStack, bindNewToBStack,
 	bindNewToNode, bindNewToReg, bindArgsToRegs,
---UNUSED: bindNewToSameAsOther,
 	bindNewToTemp, bindNewPrimToAmode,
 	getAtomAmode, getAtomAmodes,
 	getCAddrModeAndInfo, getCAddrMode,
 	getCAddrModeIfVolatile, getVolatileRegs,
-	rebindToAStack, rebindToBStack,
---UNUSED:	rebindToTemp,
+	rebindToAStack, rebindToBStack
 
 	-- and to make a self-sufficient interface...
-	AbstractC, CAddrMode, HeapOffset, MagicId, CLabel, CgState,
-	BasicLit, IdEnv(..), UniqFM,
-	Id, Maybe, Unique, StgAtom, UniqSet(..)
     ) where
-
-IMPORT_Trace		-- ToDo: rm (debugging only)
-import Outputable
-import Unpretty
-import PprAbsC
 
 import AbsCSyn
 import CgMonad
 
 import CgUsages		( getHpRelOffset, getSpARelOffset, getSpBRelOffset )
-import CLabelInfo	( mkClosureLabel, CLabel )
+import CLabel	( mkClosureLabel, CLabel )
 import ClosureInfo
-import Id		( getIdKind, toplevelishId, isDataCon, Id )
-import IdEnv		-- used to build CgBindings
+import Id		( getIdPrimRep, toplevelishId, isDataCon, Id )
 import Maybes		( catMaybes, Maybe(..) )
 import UniqSet		-- ( setToList )
 import StgSyn
@@ -92,7 +81,7 @@ data StableLoc
   = NoStableLoc
   | VirAStkLoc		VirtualSpAOffset
   | VirBStkLoc		VirtualSpBOffset
-  | LitLoc		BasicLit
+  | LitLoc		Literal
   | StableAmodeLoc	CAddrMode
 
 -- these are so StableLoc can be abstract:
@@ -123,8 +112,8 @@ newTempAmodeAndIdInfo :: Id -> LambdaFormInfo -> (CAddrMode, CgIdInfo)
 newTempAmodeAndIdInfo name lf_info
   = (temp_amode, temp_idinfo)
   where
-    uniq       	= getTheUnique name
-    temp_amode	= CTemp uniq (getIdKind name)
+    uniq       	= getItsUnique name
+    temp_amode	= CTemp uniq (getIdPrimRep name)
     temp_idinfo = tempIdInfo name uniq lf_info
 
 idInfoToAmode :: PrimKind -> CgIdInfo -> FCode CAddrMode
@@ -156,7 +145,9 @@ idInfoPiecesToAmode kind NoVolatileLoc (VirBStkLoc i)
   = getSpBRelOffset i `thenFC` \ rel_spB ->
     returnFC (CVal rel_spB kind)
 
+#ifdef DEBUG
 idInfoPiecesToAmode kind NoVolatileLoc NoStableLoc = panic "idInfoPiecesToAmode: no loc"
+#endif
 \end{code}
 
 %************************************************************************
@@ -204,7 +195,7 @@ getCAddrModeAndInfo name
     returnFC (amode, lf_info)
   where
     global_amode = CLbl (mkClosureLabel name) kind
-    kind = getIdKind name
+    kind = getIdPrimRep name
 
 getCAddrMode :: Id -> FCode CAddrMode
 getCAddrMode name
@@ -220,7 +211,7 @@ getCAddrModeIfVolatile name
   = lookupBindC name `thenFC` \ ~(MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
     case stable_loc of
 	NoStableLoc ->	-- Aha!  So it is volatile!
-	    idInfoPiecesToAmode (getIdKind name) volatile_loc NoStableLoc `thenFC` \ amode ->
+	    idInfoPiecesToAmode (getIdPrimRep name) volatile_loc NoStableLoc `thenFC` \ amode ->
 	    returnFC (Just amode)
 
 	a_stable_loc -> returnFC Nothing
@@ -234,7 +225,7 @@ stable one (notably, on the stack), we modify the current bindings to
 forget the volatile one.
 
 \begin{code}
-getVolatileRegs :: PlainStgLiveVars -> FCode [MagicId]
+getVolatileRegs :: StgLiveVars -> FCode [MagicId]
 
 getVolatileRegs vars
   = mapFCs snaffle_it (uniqSetToList vars) `thenFC` \ stuff ->
@@ -245,7 +236,7 @@ getVolatileRegs vars
 	let
 	    -- commoned-up code...
 	    consider_reg reg
-	      =	if not (isVolatileReg reg) then 
+	      =	if not (isVolatileReg reg) then
 			-- Potentially dies across C calls
 			-- For now, that's everything; we leave
 			-- it to the save-macros to decide which
@@ -254,7 +245,7 @@ getVolatileRegs vars
 		else
 		    case stable_loc of
 		      NoStableLoc -> returnFC (Just reg) -- got one!
-		      is_a_stable_loc -> 
+		      is_a_stable_loc ->
 			-- has both volatile & stable locations;
 			-- force it to rely on the stable location
 			modifyBindC var nuke_vol_bind `thenC`
@@ -271,17 +262,17 @@ getVolatileRegs vars
 \end{code}
 
 \begin{code}
-getAtomAmodes :: [PlainStgAtom] -> FCode [CAddrMode]
+getAtomAmodes :: [StgArg] -> FCode [CAddrMode]
 getAtomAmodes [] = returnFC []
 getAtomAmodes (atom:atoms)
   = getAtomAmode  atom  `thenFC` \ amode ->
     getAtomAmodes atoms `thenFC` \ amodes ->
     returnFC ( amode : amodes )
 
-getAtomAmode :: PlainStgAtom -> FCode CAddrMode
+getAtomAmode :: StgArg -> FCode CAddrMode
 
-getAtomAmode (StgVarAtom var) = getCAddrMode var
-getAtomAmode (StgLitAtom lit) = returnFC (CLit lit)
+getAtomAmode (StgVarArg var) = getCAddrMode var
+getAtomAmode (StgLitArg lit) = returnFC (CLit lit)
 \end{code}
 
 %************************************************************************
@@ -336,25 +327,9 @@ bindNewToLit name lit
 
 bindArgsToRegs :: [Id] -> [MagicId] -> Code
 bindArgsToRegs args regs
- = listCs (zipWith bind args regs)
- where
-   arg `bind` reg = bindNewToReg arg reg mkLFArgument
-
-{- UNUSED:
-bindNewToSameAsOther :: Id -> PlainStgAtom -> Code
-bindNewToSameAsOther name (StgVarAtom old_name)
-#ifdef DEBUG
-  | toplevelishId old_name = panic "bindNewToSameAsOther: global old name"
-  | otherwise
-#endif
-  = lookupBindC old_name	`thenFC` \ old_stuff ->
-    addBindC name old_stuff
-
-bindNewToSameAsOther name (StgLitAtom lit)
-  = addBindC name info
+  = listCs (zipWithEqual bind args regs)
   where
-    info = MkCgIdInfo name NoVolatileLoc (LitLoc lit) (panic "bindNewToSameAsOther")
--}
+    arg `bind` reg = bindNewToReg arg reg mkLFArgument
 \end{code}
 
 @bindNewPrimToAmode@ works only for certain addressing modes, because
@@ -371,10 +346,10 @@ bindNewPrimToAmode name (CTemp uniq kind)
 
 bindNewPrimToAmode name (CLit lit) = bindNewToLit name lit
 
-bindNewPrimToAmode name (CVal (SpBRel _ offset) _) 
+bindNewPrimToAmode name (CVal (SpBRel _ offset) _)
   = bindNewToBStack (name, offset)
 
-bindNewPrimToAmode name (CVal (NodeRel offset) _) 
+bindNewPrimToAmode name (CVal (NodeRel offset) _)
   = bindNewToNode name offset (panic "bindNewPrimToAmode node")
   -- See comment on idInfoPiecesToAmode for VirNodeLoc
 
@@ -398,19 +373,5 @@ rebindToBStack name offset
   where
     replace_stable_fn (MkCgIdInfo i vol stab einfo)
       = MkCgIdInfo i vol (VirBStkLoc offset) einfo
-
-{- UNUSED:
-rebindToTemp :: Id -> FCode CAddrMode
-rebindToTemp name
-  = let
-	(temp_amode, MkCgIdInfo _ new_vol _ _ {-LF info discarded-})
-	  = newTempAmodeAndIdInfo name (panic "rebindToTemp")
-    in
-    modifyBindC name (replace_volatile_fn new_vol) `thenC`
-    returnFC temp_amode
-  where
-    replace_volatile_fn new_vol (MkCgIdInfo i vol stab einfo)
-      = MkCgIdInfo i new_vol stab einfo
--}
 \end{code}
 

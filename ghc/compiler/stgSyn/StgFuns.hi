@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface StgFuns where
-import Id(Id)
-import StgSyn(StgRhs)
-mapStgBindeesRhs :: (Id -> Id) -> StgRhs Id Id -> StgRhs Id Id
-

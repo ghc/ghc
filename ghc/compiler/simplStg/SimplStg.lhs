@@ -11,7 +11,7 @@ module SimplStg ( stg2stg ) where
 IMPORT_Trace
 
 import StgSyn
-import StgFuns
+import StgUtils
 
 import LambdaLift	( liftProgram )
 import SCCfinal		( stgMassageForProfiling )
@@ -22,16 +22,14 @@ import UpdAnal		( updateAnalyse )
 
 import CmdLineOpts
 import Id		( unlocaliseId )
-import IdEnv
 import MainMonad
 import Maybes		( maybeToBool, Maybe(..) )
 import Outputable
 import Pretty
-import SplitUniq
 import StgLint		( lintStgBindings )
 import StgSAT		( doStaticArgs )
 import UniqSet
-import Unique
+import UniqSupply
 import Util
 \end{code}
 
@@ -40,10 +38,10 @@ stg2stg :: [StgToDo]			-- spec of what stg-to-stg passes to do
 	-> (GlobalSwitch -> SwitchResult)-- access to all global cmd-line opts
 	-> FAST_STRING			-- module name (profiling only)
 	-> PprStyle			-- printing style (for debugging only)
-	-> SplitUniqSupply		-- a name supply
-	-> [PlainStgBinding]		-- input...
+	-> UniqSupply		-- a name supply
+	-> [StgBinding]		-- input...
 	-> MainIO
-	    ([PlainStgBinding],		-- output program...
+	    ([StgBinding],		-- output program...
 	     ([CostCentre],		-- local cost-centres that need to be decl'd
 	      [CostCentre]))		-- "extern" cost-centres
 
@@ -53,7 +51,7 @@ stg2stg stg_todos sw_chkr module_name ppr_style us binds
 
     (if do_verbose_stg2stg then
 	writeMn stderr "VERBOSE STG-TO-STG:\n" `thenMn_`
-	writeMn stderr (ppShow 1000 
+	writeMn stderr (ppShow 1000
 	(ppAbove (ppStr ("*** Core2Stg:"))
 		 (ppAboves (map (ppr ppr_style) (setStgVarInfo False binds)))
 	))
@@ -88,7 +86,7 @@ stg2stg stg_todos sw_chkr module_name ppr_style us binds
 	-- info.  Also, setStgVarInfo decides about let-no-escape
 	-- things, which in turn do a better job if arities are
 	-- correct, which is done by satStgRhs.
-	--	
+	--
     let
 		-- ToDo: provide proper flag control!
 	binds_to_mangle
@@ -168,7 +166,7 @@ stg2stg stg_todos sw_chkr module_name ppr_style us binds
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
 	(if do_verbose_stg2stg then
-	    writeMn stderr (ppShow 1000 
+	    writeMn stderr (ppShow 1000
 	    (ppAbove (ppStr ("*** "++what++":"))
 		     (ppAboves (map (ppr ppr_style) binds2))
 	    ))
@@ -217,7 +215,7 @@ lookup_uenv env id =  case lookupIdEnv env id of
 			Nothing     -> id
 			Just new_id -> new_id
 
-unlocaliseStgBinds :: FAST_STRING -> UnlocalEnv -> [PlainStgBinding] -> (UnlocalEnv, [PlainStgBinding])
+unlocaliseStgBinds :: FAST_STRING -> UnlocalEnv -> [StgBinding] -> (UnlocalEnv, [StgBinding])
 
 unlocaliseStgBinds mod uenv [] = (uenv, [])
 
@@ -229,7 +227,7 @@ unlocaliseStgBinds mod uenv (b : bs)
 
 ------------------
 
-unlocal_top_bind :: FAST_STRING -> UnlocalEnv -> PlainStgBinding -> (UnlocalEnv, PlainStgBinding)
+unlocal_top_bind :: FAST_STRING -> UnlocalEnv -> StgBinding -> (UnlocalEnv, StgBinding)
 
 unlocal_top_bind mod uenv bind@(StgNonRec binder _)
   = let new_uenv = case unlocaliseId mod binder of
@@ -240,7 +238,7 @@ unlocal_top_bind mod uenv bind@(StgNonRec binder _)
 
 unlocal_top_bind mod uenv bind@(StgRec pairs)
   = let maybe_unlocaliseds  = [ (b, unlocaliseId mod b) | (b, _) <- pairs ]
-	new_uenv	    = growIdEnvList uenv [ (b,new_b) 
+	new_uenv	    = growIdEnvList uenv [ (b,new_b)
 						 | (b, Just new_b) <- maybe_unlocaliseds]
     in
     (new_uenv, renameTopStgBind (lookup_uenv new_uenv) bind)
@@ -303,7 +301,7 @@ Strategy: first collect the info; then make a \tr{Id -> Id} mapping.
 Then blast the whole program (LHSs as well as RHSs) with it.
 
 \begin{code}
-elimIndirections :: [PlainStgBinding] -> [PlainStgBinding]
+elimIndirections :: [StgBinding] -> [StgBinding]
 
 elimIndirections binds_in
   = if isNullIdEnv blast_env then
@@ -317,12 +315,12 @@ elimIndirections binds_in
 
     (blast_env, reduced_binds) = mapAccumL try_bind nullIdEnv binds_in
 
-    try_bind :: IdEnv Id -> PlainStgBinding -> (IdEnv Id, Maybe PlainStgBinding)
-    try_bind env_so_far 
-	     (StgNonRec exported_binder 
-		       (StgRhsClosure _ _ _ _ 
+    try_bind :: IdEnv Id -> StgBinding -> (IdEnv Id, Maybe StgBinding)
+    try_bind env_so_far
+	     (StgNonRec exported_binder
+		       (StgRhsClosure _ _ _ _
 				lambda_args
-				(StgApp (StgVarAtom local_binder) fun_args _)
+				(StgApp (StgVarArg local_binder) fun_args _)
 	     ))
 	| isExported exported_binder &&	    -- Only if this is exported
 	  not (isExported local_binder) &&  -- Only if this one is defined in this
@@ -333,12 +331,12 @@ elimIndirections binds_in
 
 	= (addOneToIdEnv env_so_far local_binder exported_binder,
 	   Nothing)
-        where
+	where
 	  args_match [] [] = True
-	  args_match (la:las) (StgVarAtom fa:fas) = la == fa && args_match las fas
+	  args_match (la:las) (StgVarArg fa:fas) = la == fa && args_match las fas
 	  args_match _  _  = False
 
-    try_bind env_so_far bind 
+    try_bind env_so_far bind
 	= (env_so_far, Just bind)
 
     in_dom env id = maybeToBool (lookupIdEnv env id)
@@ -347,7 +345,7 @@ elimIndirections binds_in
 @renameTopStgBind@ renames top level binders and all occurrences thereof.
 
 \begin{code}
-renameTopStgBind :: (Id -> Id) -> PlainStgBinding -> PlainStgBinding
+renameTopStgBind :: (Id -> Id) -> StgBinding -> StgBinding
 
 renameTopStgBind fn (StgNonRec b rhs) = StgNonRec (fn b) (mapStgBindeesRhs fn rhs)
 renameTopStgBind fn (StgRec pairs)    = StgRec [ (fn b, mapStgBindeesRhs fn r) | (b, r) <- pairs ]

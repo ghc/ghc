@@ -1,76 +1,48 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[TcBinds]{TcBinds}
 
 \begin{code}
 #include "HsVersions.h"
 
-module TcBinds (
-	tcTopBindsAndThen, tcLocalBindsAndThen,
-	tcSigs, doSpecPragma
-    ) where
+module TcBinds ( tcBindsAndThen, tcPragmaSigs ) where
 
---IMPORT_Trace		-- ToDo:rm (debugging)
+import Ubiq
 
-import TcMonad		-- typechecking monad machinery
-import TcMonadFns	( newLocalsWithOpenTyVarTys,
-			  newLocalsWithPolyTyVarTys,
-			  newSpecPragmaId, newSpecId,
-			  applyTcSubstAndCollectTyVars
-			)
-import AbsSyn		-- the stuff being typechecked
+import HsSyn		( HsBinds(..), Bind(..), Sig(..), MonoBinds(..), 
+			  HsExpr, Match, PolyType, InPat, OutPat,
+			  GRHSsAndBinds, ArithSeqInfo, HsLit, Fake,
+			  collectBinders )
+import RnHsSyn		( RenamedHsBinds(..), RenamedBind(..), RenamedSig(..), 
+			  RenamedMonoBinds(..) )
+import TcHsSyn		( TcHsBinds(..), TcBind(..), TcMonoBinds(..),
+			  TcIdOcc(..), TcIdBndr(..) )
 
-import AbsUniType	( isTyVarTy, isGroundTy, isUnboxedDataType,
-			  isGroundOrTyVarTy, extractTyVarsFromTy,
-			  UniType
-			)
-import BackSubst	( applyTcSubstToBinds )
-import E
-import Errors		( topLevelUnboxedDeclErr, specGroundnessErr,
-			  specCtxtGroundnessErr, Error(..), UnifyErrContext(..)
-			)
-import GenSpecEtc	( checkSigTyVars, genBinds, SignatureInfo(..) )
-import Id		( getIdUniType, mkInstId )
-import IdInfo		( SpecInfo(..) )
-import Inst
-import LIE		( nullLIE, mkLIE, plusLIE, LIE )
-import Maybes		( assocMaybe, catMaybes, Maybe(..) )
-import Spec		( specTy )
-import TVE		( nullTVE, TVE(..), UniqFM )
-import TcMonoBnds	( tcMonoBinds )
-import TcPolyType	( tcPolyType )
+import TcMonad	
+import GenSpecEtc	( checkSigTyVars, genBinds, TcSigInfo(..) )
+import Inst		( Inst, LIE(..), emptyLIE, plusLIE, InstOrigin(..) )
+import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newMonoIds )
+import TcLoop		( tcGRHSsAndBinds )
+import TcMatches	( tcMatchesFun )
+import TcMonoType	( tcPolyType )
+import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
+import TcType		( newTcTyVar, tcInstType )
 import Unify		( unifyTauTy )
-import UniqFM		( emptyUFM ) -- profiling, pragmas only
-import Util
+
+import Kind		( mkBoxedTypeKind, mkTypeKind )
+import Id		( GenId, idType, mkUserId )
+import IdInfo		( noIdInfo )
+import Name		( Name )	-- instances
+import Maybes		( assocMaybe, catMaybes, Maybe(..) )
+import Outputable	( pprNonOp )
+import PragmaInfo	( PragmaInfo(..) )
+import Pretty
+import Type		( mkTyVarTy, isTyVarTy, mkSigmaTy, splitSigmaTy,
+			  splitRhoTy, mkForAllTy, splitForAllTy )
+import Util		( panic )
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection{Type-checking top-level bindings}
-%*									*
-%************************************************************************
-
-@tcBindsAndThen@ takes a boolean which indicates whether the binding
-group is at top level or not.  The difference from inner bindings is
-that
-\begin{enumerate}
-\item
-we zero the substitution before each group
-\item
-we back-substitute after each group.
-\end{enumerate}
-We still return an LIE, but it is sure to contain nothing but constant
-dictionaries, which we resolve at the module level.
-
-@tcTopBinds@ returns an LVE, not, as you might expect, a GVE.  Why?
-Because the monomorphism restriction means that is might return some
-monomorphic things, with free type variables.  Hence it must be an LVE.
-
-The LIE returned by @tcTopBinds@ may constrain some type variables,
-but they are guaranteed to be a subset of those free in the
-corresponding returned LVE.
 
 %************************************************************************
 %*									*
@@ -78,7 +50,7 @@ corresponding returned LVE.
 %*									*
 %************************************************************************
 
-@tcBindsAndThen@ typechecks a @Binds@.  The "and then" part is because
+@tcBindsAndThen@ typechecks a @HsBinds@.  The "and then" part is because
 it needs to know something about the {\em usage} of the things bound,
 so that it can create specialisations of them.  So @tcBindsAndThen@
 takes a function which, given an extended environment, E, typechecks
@@ -100,55 +72,28 @@ to the LVE for the following reason.  When each individual binding is
 checked the type of its LHS is unified with that of its RHS; and
 type-checking the LHS of course requires that the binder is in scope.
 
-\begin{code}
-tcBindsAndThen 
-	:: Bool
-	-> E 
-	-> (TypecheckedBinds -> thing -> thing)		-- Combinator
-	-> RenamedBinds
-	-> (E -> TcM (thing, LIE, thing_ty))
-	-> TcM (thing, LIE, thing_ty)
+At the top-level the LIE is sure to contain nothing but constant
+dictionaries, which we resolve at the module level.
 
-tcBindsAndThen top_level e combiner EmptyBinds do_next
-  = do_next e		`thenTc` \ (thing, lie, thing_ty) ->
+\begin{code}
+tcBindsAndThen
+	:: (TcHsBinds s -> thing -> thing)		-- Combinator
+	-> RenamedHsBinds
+	-> TcM s (thing, LIE s, thing_ty)
+	-> TcM s (thing, LIE s, thing_ty)
+
+tcBindsAndThen combiner EmptyBinds do_next
+  = do_next 	`thenTc` \ (thing, lie, thing_ty) ->
     returnTc (combiner EmptyBinds thing, lie, thing_ty)
 
-tcBindsAndThen top_level e combiner (SingleBind bind) do_next
-  = tcBindAndThen top_level e combiner bind [] do_next
+tcBindsAndThen combiner (SingleBind bind) do_next
+  = tcBindAndThen combiner bind [] do_next
 
-tcBindsAndThen top_level e combiner (BindWith bind sigs) do_next
-  = tcBindAndThen top_level e combiner bind sigs do_next
+tcBindsAndThen combiner (BindWith bind sigs) do_next
+  = tcBindAndThen combiner bind sigs do_next
 
-tcBindsAndThen top_level e combiner (ThenBinds binds1 binds2) do_next
-  = tcBindsAndThen top_level e combiner binds1 new_after
-  where
-    -- new_after :: E -> TcM (thing, LIE, thing_ty)
-    -- Can't write this signature, cos it's monomorphic in thing and
-    -- thing_ty.
-    new_after e = tcBindsAndThen top_level e combiner binds2 do_next
-\end{code}
-
-Simple wrappers for export:
-\begin{code}
-tcTopBindsAndThen
-	:: E
-	-> (TypecheckedBinds -> thing -> thing)		-- Combinator
-	-> RenamedBinds 
-	-> (E -> TcM (thing, LIE, anything))
-	-> TcM (thing, LIE, anything)
-
-tcTopBindsAndThen e combiner binds do_next
-  = tcBindsAndThen True e combiner binds do_next
-
-tcLocalBindsAndThen
-	:: E 
-	-> (TypecheckedBinds -> thing -> thing)		-- Combinator
-	-> RenamedBinds 
-	-> (E -> TcM (thing, LIE, thing_ty))
-	-> TcM (thing, LIE, thing_ty)
-
-tcLocalBindsAndThen e combiner binds do_next
-  = tcBindsAndThen False e combiner  binds do_next
+tcBindsAndThen combiner (ThenBinds binds1 binds2) do_next
+  = tcBindsAndThen combiner binds1 (tcBindsAndThen combiner binds2 do_next)
 \end{code}
 
 An aside.  The original version of @tcBindsAndThen@ which lacks a
@@ -158,31 +103,26 @@ at a different type to the definition itself.  There aren't too many
 examples of this, which is why I thought it worth preserving! [SLPJ]
 
 \begin{pseudocode}
-tcBindsAndThen 
-	:: Bool -> E -> RenamedBinds
-	-> (E -> TcM (thing, LIE, thing_ty))
-	-> TcM ((TypecheckedBinds, thing), LIE, thing_ty)
+tcBindsAndThen
+	:: RenamedHsBinds
+	-> TcM s (thing, LIE s, thing_ty))
+	-> TcM s ((TcHsBinds s, thing), LIE s, thing_ty)
 
-tcBindsAndThen top_level e EmptyBinds do_next
-  = do_next e		`thenTc` \ (thing, lie, thing_ty) ->
+tcBindsAndThen EmptyBinds do_next
+  = do_next 		`thenTc` \ (thing, lie, thing_ty) ->
     returnTc ((EmptyBinds, thing), lie, thing_ty)
 
-tcBindsAndThen top_level e (SingleBind bind) do_next
-  = tcBindAndThen top_level e bind [] do_next
+tcBindsAndThen (SingleBind bind) do_next
+  = tcBindAndThen bind [] do_next
 
-tcBindsAndThen top_level e (BindWith bind sigs) do_next
-  = tcBindAndThen top_level e bind sigs do_next
+tcBindsAndThen (BindWith bind sigs) do_next
+  = tcBindAndThen bind sigs do_next
 
-tcBindsAndThen top_level e (ThenBinds binds1 binds2) do_next
-  = tcBindsAndThen top_level e binds1 new_after
+tcBindsAndThen (ThenBinds binds1 binds2) do_next
+  = tcBindsAndThen binds1 (tcBindsAndThen binds2 do_next)
 	`thenTc` \ ((binds1', (binds2', thing')), lie1, thing_ty) ->
 
     returnTc ((binds1' `ThenBinds` binds2', thing'), lie1, thing_ty)
-
-  where
-    -- new_after :: E -> TcM ((TypecheckedBinds, thing), LIE, thing_ty)
-    -- Can't write this signature, cos it's monomorphic in thing and thing_ty
-    new_after e = tcBindsAndThen top_level e binds2 do_next
 \end{pseudocode}
 
 %************************************************************************
@@ -193,291 +133,124 @@ tcBindsAndThen top_level e (ThenBinds binds1 binds2) do_next
 
 \begin{code}
 tcBindAndThen
-	:: Bool						  -- At top level
-	-> E 
-	-> (TypecheckedBinds -> thing -> thing)		  -- Combinator
+	:: (TcHsBinds s -> thing -> thing)		  -- Combinator
 	-> RenamedBind					  -- The Bind to typecheck
 	-> [RenamedSig]					  -- ...and its signatures
-	-> (E -> TcM (thing, LIE, thing_ty))		  -- Thing to type check in
+	-> TcM s (thing, LIE s, thing_ty)		  -- Thing to type check in
 							  -- augmented envt
-	-> TcM (thing, LIE, thing_ty) 			  -- Results, incl the 
+	-> TcM s (thing, LIE s, thing_ty)		  -- Results, incl the
 
-tcBindAndThen top_level e combiner bind sigs do_next
-  = 	-- Deal with the bind
-    tcBind top_level e bind sigs    `thenTc` \ (poly_binds, poly_lie, poly_lve) ->
+tcBindAndThen combiner bind sigs do_next
+  = fixTc (\ ~(prag_info_fn, _) ->
+	-- This is the usual prag_info fix; the PragmaInfo field of an Id
+	-- is not inspected till ages later in the compiler, so there
+	-- should be no black-hole problems here.
+    
+    tcBindAndSigs binder_names bind 
+		  sigs prag_info_fn	`thenTc` \ (poly_binds, poly_lie, poly_ids) ->
+
+	-- Extend the environment to bind the new polymorphic Ids
+    tcExtendLocalValEnv binder_names poly_ids $
+
+	-- Build bindings and IdInfos corresponding to user pragmas
+    tcPragmaSigs sigs			`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
 
 	-- Now do whatever happens next, in the augmented envt
-    do_next (growE_LVE e poly_lve)  `thenTc` \ (thing, thing_lie, thing_ty) ->
-    let
-	bound_ids = map snd poly_lve
-    in
-	-- Create specialisations
-    specialiseBinds bound_ids thing_lie poly_binds poly_lie
-				    `thenNF_Tc` \ (final_binds, final_lie) ->
+    do_next				`thenTc` \ (thing, thing_lie, thing_ty) ->
+
+	-- Create specialisations of functions bound here
+    bindInstsOfLocalFuns (prag_lie `plusLIE` thing_lie)
+			  poly_ids	`thenTc` \ (lie2, inst_mbinds) ->
+
 	-- All done
-    returnTc (combiner final_binds thing, final_lie, thing_ty)
-\end{code}
-
-\begin{code}
-tcBind :: Bool -> E 
-       -> RenamedBind -> [RenamedSig]
-       -> TcM (TypecheckedBinds, LIE, LVE)	-- LIE is a fixed point of substitution
-
-tcBind False e bind sigs  			-- Not top level
-  = tcBind_help False e bind sigs
-
-tcBind True  e bind sigs			-- Top level!
-  = pruneSubstTc (tvOfE e) (
-
-	 -- DO THE WORK
-    tcBind_help True e bind sigs	`thenTc` \ (new_binds, lie, lve) ->
-
-{-  Top-level unboxed values are now allowed
-    They will be lifted by the Desugarer (see CoreLift.lhs)
-
-	-- CHECK FOR PRIMITIVE TOP-LEVEL BINDS
-	listTc [ checkTc (isUnboxedDataType (getIdUniType id))
-			 (topLevelUnboxedDeclErr id (getSrcLoc id))
-	       | (_,id) <- lve ]	`thenTc_`
--}
-
-    -- Back-substitute over the binds, since we are about to discard
-    -- a good chunk of the substitution.
-    applyTcSubstToBinds new_binds	`thenNF_Tc` \ final_binds ->
-
-    -- The lie is already a fixed point of the substitution; it just turns out
-    -- that almost always this happens automatically, and so we made it part of
-    -- the specification of genBinds.
-    returnTc (final_binds, lie, lve)
-    )
-\end{code}
-
-\begin{code}
-tcBind_help top_level e bind sigs
-  = 	-- Create an LVE binding each identifier to an appropriate type variable
-    new_locals binders		`thenNF_Tc` \ bound_ids ->
-    let  lve = binders `zip` bound_ids  in
-
-	-- Now deal with type signatures, if any
-    tcSigs e lve sigs		`thenTc`    \ sig_info ->
-
-	-- Check the bindings: this is the point at which we can use
-	-- error recovery.  If checking the bind fails we just
-	-- return the empty bindings.  The variables will still be in
-	-- scope, but bound to completely free type variables, which
-	-- is just what we want to minimise subsequent error messages.
-    recoverTc (NonRecBind EmptyMonoBinds, nullLIE)
-	      (tc_bind (growE_LVE e lve) bind)	`thenNF_Tc` \ (bind', lie) ->
-
-	-- Notice that genBinds gets the old (non-extended) environment
-    genBinds top_level e bind' lie lve sig_info	`thenTc` \ (binds', lie, lve) ->
-
-	-- Add bindings corresponding to SPECIALIZE pragmas in the code
-    mapAndUnzipTc (doSpecPragma e (assoc "doSpecPragma" lve))
-		  (get_spec_pragmas sig_info)
-			`thenTc` \ (spec_binds_s, spec_lie_s) ->
-
-    returnTc (binds' `ThenBinds` (SingleBind (NonRecBind (
-		foldr AndMonoBinds EmptyMonoBinds spec_binds_s))),
-	      lie `plusLIE` (foldr plusLIE nullLIE spec_lie_s),
-	      lve)
-  where
-    binders = collectBinders bind
-
-    new_locals binders
-      = case bind of
-	  NonRecBind _ -> -- Recursive, so no unboxed types
-			  newLocalsWithOpenTyVarTys binders
-
-	  RecBind _    -> -- Non-recursive, so we permit unboxed types
-			  newLocalsWithPolyTyVarTys binders
-
-    get_spec_pragmas sig_info
-      = catMaybes (map get_pragma_maybe sig_info)
-      where
-	get_pragma_maybe s@(ValSpecInfo _ _ _ _) = Just s
-	get_pragma_maybe _  	    	         = Nothing
-\end{code}
-
-\begin{verbatim}
-	f :: Ord a => [a] -> b -> b
-	{-# SPECIALIZE f :: [Int] -> b -> b #-}
-\end{verbatim}
-We generate:
-\begin{verbatim}
-	f@Int = /\ b -> let d1 = ...
-			in f Int b d1
-
-
-	h :: Ord a => [a] -> b -> b
-	{-# SPECIALIZE h :: [Int] -> b -> b #-}
-
-	spec_h = /\b -> h [Int] b dListOfInt
-			^^^^^^^^^^^^^^^^^^^^ This bit created by specId
-\end{verbatim}
-
-\begin{code}
-doSpecPragma :: E
-	     -> (Name -> Id)
-	     -> SignatureInfo
-	     -> TcM (TypecheckedMonoBinds, LIE)
-
-doSpecPragma e name_to_id (ValSpecInfo name spec_ty using src_loc)
-  = let
-	main_id = name_to_id name    -- Get the parent Id
-
-	main_id_ty = getIdUniType main_id
-	main_id_free_tyvars = extractTyVarsFromTy main_id_ty
-	origin = ValSpecOrigin name src_loc
-    	err_ctxt = ValSpecSigCtxt name spec_ty src_loc
+    let
+ 	final_lie   = lie2 `plusLIE` poly_lie
+	final_binds = poly_binds `ThenBinds`
+		      SingleBind (NonRecBind inst_mbinds) `ThenBinds`
+		      prag_binds
     in
-    addSrcLocTc src_loc		 (
-    specTy origin spec_ty `thenNF_Tc` \ (spec_tyvars, spec_dicts, spec_tau) ->
+    returnTc (prag_info_fn, (combiner final_binds thing, final_lie, thing_ty))
+    )					`thenTc` \ (_, result) ->
+    returnTc result
+  where
+    binder_names = collectBinders bind
 
-	-- Check that the SPECIALIZE pragma had an empty context
-    checkTc (not (null spec_dicts))
-	    (panic "SPECIALIZE non-empty context (ToDo: msg)") `thenTc_`
 
-	-- Make an instance of this id
-    specTy origin main_id_ty `thenNF_Tc` \ (main_tyvars, main_dicts, main_tau) ->
-
-	-- Check that the specialised type is indeed an instance of
-	-- the inferred type.
-	-- The unification should leave all type vars which are
-	-- currently free in the environment still free, and likewise
-	-- the signature type vars.
-	-- The only way type vars free in the envt could possibly be affected
-	-- is if main_id_ty has free type variables.  So we just extract them,
-	-- and check that they are not constrained in any way by the unification.
-    applyTcSubstAndCollectTyVars main_id_free_tyvars  `thenNF_Tc` \ free_tyvars' ->
-    unifyTauTy spec_tau main_tau err_ctxt   `thenTc_`
-    checkSigTyVars [] (spec_tyvars ++ free_tyvars')
-		   spec_tau main_tau err_ctxt `thenTc_`
-
-	-- Check that the type variables of the polymorphic function are
-	-- either left polymorphic, or instantiate to ground type.
-	-- Also check that the overloaded type variables are instantiated to
-	-- ground type; or equivalently that all dictionaries have ground type
-    applyTcSubstToTyVars main_tyvars	`thenNF_Tc` \ main_arg_tys ->
-    applyTcSubstToInsts  main_dicts	`thenNF_Tc` \ main_dicts' ->
-
-    checkTc (not (all isGroundOrTyVarTy main_arg_tys))
-	    (specGroundnessErr err_ctxt main_arg_tys)
-				    	`thenTc_`
-
-    checkTc (not (and [isGroundTy ty | (_,ty) <- map getDictClassAndType main_dicts']))
-	    (specCtxtGroundnessErr err_ctxt main_dicts')
-					`thenTc_`
-
-	-- Build a suitable binding; depending on whether we were given
-	-- a value (Maybe Name) to be used as the specialisation.
-    case using of
-      Nothing ->
-
-	    -- Make a specPragmaId to which to bind the new call-instance
-	newSpecPragmaId name spec_ty Nothing
-					`thenNF_Tc` \ pseudo_spec_id ->
+tcBindAndSigs binder_names bind sigs prag_info_fn
+  = recoverTc (
+	-- If typechecking the binds fails, then return with each
+	-- binder given type (forall a.a), to minimise subsequent
+	-- error messages
+	newTcTyVar Nothing mkBoxedTypeKind		`thenNF_Tc` \ alpha_tv ->
 	let
-	    pseudo_bind = VarMonoBind pseudo_spec_id pseudo_rhs
-	    pseudo_rhs  = mkTyLam spec_tyvars (mkDictApp (mkTyApp (Var main_id) main_arg_tys)
-						         (map mkInstId main_dicts'))
+	  forall_a_a = mkForAllTy alpha_tv (mkTyVarTy alpha_tv)
+	  poly_ids   = [ mkUserId name forall_a_a (prag_info_fn name)
+		       | name <- binder_names]
 	in
-	returnTc (pseudo_bind, mkLIE main_dicts')
+	returnTc (EmptyBinds, emptyLIE, poly_ids)
+    ) $
 
-      Just spec_name -> -- use spec_name as the specialisation value ...
-	let
-	    spec_id      = lookupE_Value e spec_name
-	    spec_id_ty   = getIdUniType spec_id
-
-	    spec_id_free_tyvars = extractTyVarsFromTy spec_id_ty
-	    spec_id_ctxt = ValSpecSpecIdCtxt name spec_ty spec_name src_loc
-
-	    spec_tys    = map maybe_ty main_arg_tys
-            maybe_ty ty | isTyVarTy ty = Nothing
-			| otherwise    = Just ty
-	in
-	    -- Make an instance of the spec_id
-	specTy origin spec_id_ty `thenNF_Tc` \ (spec_id_tyvars, spec_id_dicts, spec_id_tau) ->
-
-	    -- Check that the specialised type is indeed an instance of
-	    -- the type inferred for spec_id
-	    -- The unification should leave all type vars which are
-	    -- currently free in the environment still free, and likewise
-	    -- the signature type vars.
-	    -- The only way type vars free in the envt could possibly be affected
-	    -- is if spec_id_ty has free type variables.  So we just extract them,
-	    -- and check that they are not constrained in any way by the unification.
-        applyTcSubstAndCollectTyVars spec_id_free_tyvars  `thenNF_Tc` \ spec_id_free_tyvars' ->
-        unifyTauTy spec_tau spec_id_tau spec_id_ctxt   	  `thenTc_`
-        checkSigTyVars [] (spec_tyvars ++ spec_id_free_tyvars')
-		       spec_tau spec_id_tau spec_id_ctxt  `thenTc_`
-
-	    -- Check that the type variables of the explicit spec_id are
-	    -- either left polymorphic, or instantiate to ground type.
-	    -- Also check that the overloaded type variables are instantiated to
-	    -- ground type; or equivalently that all dictionaries have ground type
-    	applyTcSubstToTyVars spec_id_tyvars	`thenNF_Tc` \ spec_id_arg_tys ->
-    	applyTcSubstToInsts  spec_id_dicts	`thenNF_Tc` \ spec_id_dicts' ->
-
-    	checkTc (not (all isGroundOrTyVarTy spec_id_arg_tys))
-		(specGroundnessErr spec_id_ctxt spec_id_arg_tys)
-				    		`thenTc_`
-
-    	checkTc (not (and [isGroundTy ty | (_,ty) <- map getDictClassAndType spec_id_dicts']))
-	    	(specCtxtGroundnessErr spec_id_ctxt spec_id_dicts')
-						`thenTc_`
-
-	    -- Make a local SpecId to bind to applied spec_id
-	newSpecId main_id spec_tys spec_ty	`thenNF_Tc` \ local_spec_id ->
-
-	    -- Make a specPragmaId id with a spec_info for local_spec_id
-	    -- This is bound to local_spec_id
-	    -- The SpecInfo will be extracted by the specialiser and
-	    -- used to create a call instance for main_id (which is
-	    -- extracted from the spec_id)
-	    -- NB: the pseudo_local_id must stay in the scope of main_id !!!
-	let
-	    spec_info = SpecInfo spec_tys (length main_dicts') local_spec_id
-	in
-	newSpecPragmaId name spec_ty (Just spec_info)	`thenNF_Tc` \ pseudo_spec_id ->
-	let
-	    spec_bind   = VarMonoBind local_spec_id spec_rhs
-	    spec_rhs    = mkTyLam spec_tyvars (mkDictApp (mkTyApp (Var spec_id) spec_id_arg_tys)
-						         (map mkInstId spec_id_dicts'))
-	    pseudo_bind = VarMonoBind pseudo_spec_id (Var local_spec_id)
-	in
-	returnTc (spec_bind `AndMonoBinds` pseudo_bind, mkLIE spec_id_dicts')
+	-- Create a new identifier for each binder, with each being given
+	-- a type-variable type.
+    newMonoIds binder_names kind (\ mono_ids ->
+	    tcTySigs sigs		`thenTc` \ sig_info ->
+	    tc_bind bind		`thenTc` \ (bind', lie) ->
+	    returnTc (mono_ids, bind', lie, sig_info)
     )
+	    `thenTc` \ (mono_ids, bind', lie, sig_info) ->
+
+	    -- Notice that genBinds gets the old (non-extended) environment
+    genBinds binder_names mono_ids bind' lie sig_info prag_info_fn
+  where
+    kind = case bind of
+	  	NonRecBind _ -> mkBoxedTypeKind	-- Recursive, so no unboxed types
+		RecBind _    -> mkTypeKind	-- Non-recursive, so we permit unboxed types
 \end{code}
 
 \begin{code}
-tc_bind :: E
-	-> RenamedBind
-	-> TcM (TypecheckedBind, LIE)
+tc_bind :: RenamedBind -> TcM s (TcBind s, LIE s)
 
-tc_bind e (NonRecBind mono_binds)
-  = tcMonoBinds e mono_binds	`thenTc` \ (mono_binds2, lie) ->
+tc_bind (NonRecBind mono_binds)
+  = tcMonoBinds mono_binds	`thenTc` \ (mono_binds2, lie) ->
     returnTc  (NonRecBind mono_binds2, lie)
 
-tc_bind e (RecBind mono_binds)
-  = tcMonoBinds e mono_binds	`thenTc` \ (mono_binds2, lie) ->
+tc_bind (RecBind mono_binds)
+  = tcMonoBinds mono_binds	`thenTc` \ (mono_binds2, lie) ->
     returnTc  (RecBind mono_binds2, lie)
 \end{code}
 
 \begin{code}
-specialiseBinds
-	:: [Id] 		-- Ids bound in this group
-	-> LIE			-- LIE of scope of these bindings
-	-> TypecheckedBinds
-	-> LIE
-	-> NF_TcM (TypecheckedBinds, LIE)
+tcMonoBinds :: RenamedMonoBinds -> TcM s (TcMonoBinds s, LIE s)
 
-specialiseBinds bound_ids lie_of_scope poly_binds poly_lie
-  = bindInstsOfLocalFuns lie_of_scope bound_ids
-					`thenNF_Tc` \ (lie2, inst_mbinds) ->
+tcMonoBinds EmptyMonoBinds = returnTc (EmptyMonoBinds, emptyLIE)
 
-    returnNF_Tc (poly_binds `ThenBinds` (SingleBind (NonRecBind inst_mbinds)),
-		 lie2 `plusLIE` poly_lie)
+tcMonoBinds (AndMonoBinds mb1 mb2)
+  = tcMonoBinds mb1		`thenTc` \ (mb1a, lie1) ->
+    tcMonoBinds mb2		`thenTc` \ (mb2a, lie2) ->
+    returnTc (AndMonoBinds mb1a mb2a, lie1 `plusLIE` lie2)
+
+tcMonoBinds bind@(PatMonoBind pat grhss_and_binds locn)
+  = tcAddSrcLoc locn		 $
+
+	-- LEFT HAND SIDE
+    tcPat pat	     			`thenTc` \ (pat2, lie_pat, pat_ty) ->
+
+	-- BINDINGS AND GRHSS
+    tcGRHSsAndBinds grhss_and_binds	`thenTc` \ (grhss_and_binds2, lie, grhss_ty) ->
+
+	-- Unify the two sides
+    tcAddErrCtxt (patMonoBindsCtxt bind) $
+	unifyTauTy pat_ty grhss_ty			`thenTc_`
+
+	-- RETURN
+    returnTc (PatMonoBind pat2 grhss_and_binds2 locn,
+	      plusLIE lie_pat lie)
+
+tcMonoBinds (FunMonoBind name matches locn)
+  = tcAddSrcLoc locn				$
+    tcLookupLocalValueOK "tcMonoBinds" name	`thenNF_Tc` \ id ->
+    tcMatchesFun name (idType id) matches	`thenTc` \ (matches', lie) ->
+    returnTc (FunMonoBind (TcId id) matches' locn, lie)
 \end{code}
 
 %************************************************************************
@@ -488,56 +261,244 @@ specialiseBinds bound_ids lie_of_scope poly_binds poly_lie
 
 @tcSigs@ checks the signatures for validity, and returns a list of
 {\em freshly-instantiated} signatures.  That is, the types are already
-split up, and have fresh type variables (not @TyVarTemplate@s)
-installed.
+split up, and have fresh type variables installed.  All non-type-signature
+"RenamedSigs" are ignored.
 
 \begin{code}
-tcSigs :: E -> LVE
-       -> [RenamedSig] 
-       -> TcM [SignatureInfo]
+tcTySigs :: [RenamedSig] -> TcM s [TcSigInfo s]
 
-tcSigs e lve [] = returnTc []
+tcTySigs (Sig v ty _ src_loc : other_sigs)
+ = tcAddSrcLoc src_loc (
+	tcPolyType ty			`thenTc` \ sigma_ty ->
+	tcInstType [] sigma_ty		`thenNF_Tc` \ tc_sigma_ty ->
+	let
+	    (tyvars, theta, tau_ty) = splitSigmaTy tc_sigma_ty
+	in
+	tcLookupLocalValueOK "tcSig1" v	`thenNF_Tc` \ val ->
+	unifyTauTy (idType val) tau_ty	`thenTc_`
+	returnTc (TySigInfo val tyvars theta tau_ty src_loc)
+   )		`thenTc` \ sig_info1 ->
 
-tcSigs e lve (s:ss)
-  = tc_sig  	 s	`thenTc` \ sig_info1 ->
-    tcSigs e lve ss	`thenTc` \ sig_info2 ->
-    returnTc (sig_info1 : sig_info2)
-  where
-    tc_sig (Sig v ty _ src_loc)	-- no interesting pragmas on non-iface sigs
-      = addSrcLocTc src_loc (
+   tcTySigs other_sigs	`thenTc` \ sig_infos ->
+   returnTc (sig_info1 : sig_infos)
 
-	babyTcMtoTcM
-	  (tcPolyType (getE_CE e) (getE_TCE e) nullTVE ty) `thenTc` \ sigma_ty ->
-
-	let  val = assoc "tcSigs" lve v  in
-	    -- (The renamer/dependency-analyser should have ensured
-	    -- that there are only signatures for which there is a
-	    -- corresponding binding.)
-
-	    -- Instantiate the type, and unify with the type variable
-	    -- found in the Id.
-	specTy SignatureOrigin sigma_ty	`thenNF_Tc` \ (tyvars, dicts, tau_ty) ->
-	unifyTauTy (getIdUniType val) tau_ty
-		   (panic "ToDo: unifyTauTy(tcSigs)") `thenTc_`
-
-	returnTc (TySigInfo val tyvars dicts tau_ty src_loc)
-	)
-
-    tc_sig (SpecSig v ty using src_loc)
-      = addSrcLocTc src_loc (
-
-	babyTcMtoTcM
-	  (tcPolyType (getE_CE e) (getE_TCE e) nullTVE ty) `thenTc` \ sigma_ty ->
-
-	returnTc (ValSpecInfo v sigma_ty using src_loc)
-	)
-
-    tc_sig (InlineSig v guide locn)
-      = returnTc (ValInlineInfo v guide locn)
-
-    tc_sig (DeforestSig v locn)
-      = returnTc (ValDeforestInfo v locn)
-
-    tc_sig (MagicUnfoldingSig v str locn)
-      = returnTc (ValMagicUnfoldingInfo v str locn)
+tcTySigs (other : sigs) = tcTySigs sigs
+tcTySigs []		= returnTc []
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{SPECIALIZE pragmas}
+%*									*
+%************************************************************************
+
+
+@tcPragmaSigs@ munches up the "signatures" that arise through *user*
+pragmas.  It is convenient for them to appear in the @[RenamedSig]@
+part of a binding because then the same machinery can be used for
+moving them into place as is done for type signatures.
+
+\begin{code}
+tcPragmaSigs :: [RenamedSig]			-- The pragma signatures
+	     -> TcM s (Name -> PragmaInfo,	-- Maps name to the appropriate PragmaInfo
+		       TcHsBinds s,
+		       LIE s)
+
+tcPragmaSigs sigs = returnTc ( \name -> NoPragmaInfo, EmptyBinds, emptyLIE )
+
+{- 
+tcPragmaSigs sigs
+  = mapAndUnzip3Tc tcPragmaSig sigs	`thenTc` \ (names_w_id_infos, binds, lies) ->
+    let
+	name_to_info name = foldr ($) noIdInfo
+				  [info_fn | (n,info_fn) <- names_w_id_infos, n==name]
+    in
+    returnTc (name_to_info,
+	      foldr ThenBinds EmptyBinds binds,
+	      foldr plusLIE emptyLIE lies)
+\end{code}
+
+Here are the easy cases for tcPragmaSigs
+
+\begin{code}
+tcPragmaSig (DeforestSig name loc)
+  = returnTc ((name, addInfo DoDeforest),EmptyBinds,emptyLIE)
+tcPragmaSig (InlineSig name loc)
+  = returnTc ((name, addInfo_UF (iWantToBeINLINEd UnfoldAlways)), EmptyBinds, emptyLIE)
+tcPragmaSig (MagicUnfoldingSig name string loc)
+  = returnTc ((name, addInfo_UF (mkMagicUnfolding string)), EmptyBinds, emptyLIE)
+\end{code}
+
+The interesting case is for SPECIALISE pragmas.  There are two forms.
+Here's the first form:
+\begin{verbatim}
+	f :: Ord a => [a] -> b -> b
+	{-# SPECIALIZE f :: [Int] -> b -> b #-}
+\end{verbatim}
+
+For this we generate:
+\begin{verbatim}
+	f* = /\ b -> let d1 = ...
+		     in f Int b d1
+\end{verbatim}
+
+where f* is a SpecPragmaId.  The **sole** purpose of SpecPragmaIds is to
+retain a right-hand-side that the simplifier will otherwise discard as
+dead code... the simplifier has a flag that tells it not to discard
+SpecPragmaId bindings.
+
+In this case the f* retains a call-instance of the overloaded
+function, f, (including appropriate dictionaries) so that the
+specialiser will subsequently discover that there's a call of @f@ at
+Int, and will create a specialisation for @f@.  After that, the
+binding for @f*@ can be discarded.
+
+The second form is this:
+\begin{verbatim}
+	f :: Ord a => [a] -> b -> b
+	{-# SPECIALIZE f :: [Int] -> b -> b = g #-}
+\end{verbatim}
+
+Here @g@ is specified as a function that implements the specialised
+version of @f@.  Suppose that g has type (a->b->b); that is, g's type
+is more general than that required.  For this we generate
+\begin{verbatim}
+	f@Int = /\b -> g Int b
+	f* = f@Int
+\end{verbatim}
+
+Here @f@@Int@ is a SpecId, the specialised version of @f@.  It inherits
+f's export status etc.  @f*@ is a SpecPragmaId, as before, which just serves
+to prevent @f@@Int@ from being discarded prematurely.  After specialisation,
+if @f@@Int@ is going to be used at all it will be used explicitly, so the simplifier can
+discard the f* binding.
+
+Actually, there is really only point in giving a SPECIALISE pragma on exported things,
+and the simplifer won't discard SpecIds for exporte things anyway, so maybe this is
+a bit of overkill.
+
+\begin{code}
+tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
+  = tcAddSrcLoc src_loc		 		$
+    tcAddErrCtxt (valSpecSigCtxt name spec_ty)	$
+
+	-- Get and instantiate its alleged specialised type
+    tcPolyType poly_ty				`thenTc` \ sig_sigma ->
+    tcInstType [] (idType sig_sigma)		`thenNF_Tc` \ sig_ty ->
+    let
+	(sig_tyvars, sig_theta, sig_tau) = splitSigmaTy sig_ty
+	origin = ValSpecOrigin name
+    in
+
+	-- Check that the SPECIALIZE pragma had an empty context
+    checkTc (null sig_theta)
+	    (panic "SPECIALIZE non-empty context (ToDo: msg)") `thenTc_`
+
+	-- Get and instantiate the type of the id mentioned
+    tcLookupLocalValueOK "tcPragmaSig" name	`thenNF_Tc` \ main_id ->
+    tcInstType [] (idType main_id)		`thenNF_Tc` \ main_ty ->
+    let
+	(main_tyvars, main_rho) = splitForAllTy main_ty
+	(main_theta,main_tau)   = splitRhoTy main_rho
+	main_arg_tys	        = map mkTyVarTy main_tyvars
+    in
+
+	-- Check that the specialised type is indeed an instance of
+	-- the type of the main function.
+    unifyTauTy sig_tau main_tau			`thenTc_`
+    checkSigTyVars sig_tyvars sig_tau main_tau	`thenTc_`
+
+	-- Check that the type variables of the polymorphic function are
+	-- either left polymorphic, or instantiate to ground type.
+	-- Also check that the overloaded type variables are instantiated to
+	-- ground type; or equivalently that all dictionaries have ground type
+    mapTc zonkTcType main_arg_tys	`thenNF_Tc` \ main_arg_tys' ->
+    zonkTcThetaType main_theta		`thenNF_Tc` \ main_theta' ->
+    tcAddErrCtxt (specGroundnessCtxt main_arg_tys')
+	      (checkTc (all isGroundOrTyVarTy main_arg_tys'))      	`thenTc_`
+    tcAddErrCtxt (specContextGroundnessCtxt main_theta')
+	      (checkTc (and [isGroundTy ty | (_,ty) <- theta']))	`thenTc_`
+
+	-- Build the SpecPragmaId; it is the thing that makes sure we
+	-- don't prematurely dead-code-eliminate the binding we are really interested in.
+    newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_pragma_id ->
+
+	-- Build a suitable binding; depending on whether we were given
+	-- a value (Maybe Name) to be used as the specialisation.
+    case using of
+      Nothing ->		-- No implementation function specified
+
+		-- Make a Method inst for the occurrence of the overloaded function
+	newMethodWithGivenTy (OccurrenceOf name)
+		  (TcId main_id) main_arg_tys main_rho	`thenNF_Tc` \ (lie, meth_id) ->
+
+	let
+	    pseudo_bind = VarMonoBind spec_pragma_id pseudo_rhs
+	    pseudo_rhs  = mkHsTyLam sig_tyvars (HsVar (TcId meth_id))
+	in
+	returnTc (pseudo_bind, lie, \ info -> info)
+
+      Just spec_name ->		-- Use spec_name as the specialisation value ...
+
+		-- Type check a simple occurrence of the specialised Id
+	tcId spec_name		`thenTc` \ (spec_body, spec_lie, spec_tau) ->
+
+		-- Check that it has the correct type, and doesn't constrain the
+		-- signature variables at all
+	unifyTauTy sig_tau spec_tau   	  		`thenTc_`
+	checkSigTyVars sig_tyvars sig_tau spec_tau	`thenTc_`
+
+	    -- Make a local SpecId to bind to applied spec_id
+	newSpecId main_id main_arg_tys sig_ty	`thenNF_Tc` \ local_spec_id ->
+
+	let
+	    spec_rhs   = mkHsTyLam sig_tyvars spec_body
+	    spec_binds = VarMonoBind local_spec_id spec_rhs
+			   `AndMonoBinds`
+	   		 VarMonoBind spec_pragma_id (HsVar (TcId local_spec_id))
+	    spec_info  = SpecInfo spec_tys (length main_theta) local_spec_id
+	in
+	returnTc ((name, addInfo spec_info), spec_binds, spec_lie)
+-}
+\end{code}
+
+
+Error contexts and messages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+patMonoBindsCtxt bind sty
+  = ppHang (ppPStr SLIT("In a pattern binding:")) 4 (ppr sty bind)
+
+--------------------------------------------
+specContextGroundnessCtxt -- err_ctxt dicts sty
+  = panic "specContextGroundnessCtxt"
+{-
+  = ppHang (
+    	ppSep [ppBesides [ppStr "In the SPECIALIZE pragma for `", ppr sty name, ppStr "'"],
+	       ppBesides [ppStr " specialised to the type `", ppr sty spec_ty,  ppStr "'"],
+	       pp_spec_id sty,
+	       ppStr "... not all overloaded type variables were instantiated",
+	       ppStr "to ground types:"])
+      4 (ppAboves [ppCat [ppr sty c, ppr sty t]
+		  | (c,t) <- map getDictClassAndType dicts])
+  where
+    (name, spec_ty, locn, pp_spec_id)
+      = case err_ctxt of
+	  ValSpecSigCtxt    n ty loc      -> (n, ty, loc, \ x -> ppNil)
+	  ValSpecSpecIdCtxt n ty spec loc ->
+	    (n, ty, loc,
+	     \ sty -> ppBesides [ppStr "... type of explicit id `", ppr sty spec, ppStr "'"])
+-}
+
+-----------------------------------------------
+specGroundnessCtxt
+  = panic "specGroundnessCtxt"
+
+
+valSpecSigCtxt v ty sty
+  = ppHang (ppPStr SLIT("In a SPECIALIZE pragma for a value:"))
+	 4 (ppSep [ppBeside (pprNonOp sty v) (ppPStr SLIT(" ::")),
+		  ppr sty ty])
+\end{code}
+

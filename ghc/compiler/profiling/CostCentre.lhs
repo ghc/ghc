@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CostCentre]{The @CostCentre@ data type}
 
@@ -24,22 +24,21 @@ module CostCentre (
 
 	uppCostCentre, uppCostCentreDecl, showCostCentre, -- printing
 
-	cmpCostCentre,	-- used for removing dups in a list
-
-	Id, Maybe, Unpretty(..), CSeq
+	cmpCostCentre	-- used for removing dups in a list
     ) where
 
-import CmdLineOpts	( GlobalSwitch(..) )
-import CLabelInfo	( identToC, stringToC )
-import Id		( cmpId, showId, pprIdInUnfolding,
-			  externallyVisibleId, Id
-			)
+import Id		( externallyVisibleId, GenId, Id(..) )
+import CStrings		( identToC, stringToC )
 import Maybes		( Maybe(..) )
 import Outputable
 import Pretty		( ppShow, prettyToUn )
+import PprStyle		( PprStyle(..) )
 import UniqSet
 import Unpretty
 import Util
+import Ubiq
+showId = panic "Whoops"
+pprIdInUnfolding = panic "Whoops"
 \end{code}
 
 \begin{code}
@@ -161,7 +160,7 @@ currentOrSubsumedCosts _		= False
 
 mkUserCC :: FAST_STRING -> FAST_STRING -> FAST_STRING -> CostCentre
 
-mkUserCC cc_name module_name group_name 
+mkUserCC cc_name module_name group_name
   = NormalCC (UserCC cc_name) module_name group_name
 	     AnOriginalCC IsNotCafCC{-might be changed-}
 
@@ -291,14 +290,14 @@ cmpCostCentre other_1 other_2
     tag_CC DontCareCC	      	= ILIT(7)
 
     -- some BUG avoidance here...
-    tag_CC NoCostCentre  = case (panic "tag_CC:NoCostCentre")  of { c -> tag_CC c }
-    tag_CC SubsumedCosts = case (panic "tag_CC:SubsumedCosts") of { c -> tag_CC c }
-    tag_CC CurrentCC	 = case (panic "tag_CC:SubsumedCosts") of { c -> tag_CC c }
+    tag_CC NoCostCentre  = panic# "tag_CC:NoCostCentre"
+    tag_CC SubsumedCosts = panic# "tag_CC:SubsumedCosts"
+    tag_CC CurrentCC	 = panic# "tag_CC:SubsumedCosts"
 
 
 cmp_kind (UserCC n1) (UserCC n2) = _CMP_STRING_ n1 n2
-cmp_kind (AutoCC i1) (AutoCC i2) = cmpId i1 i2
-cmp_kind (DictCC i1) (DictCC i2) = cmpId i1 i2
+cmp_kind (AutoCC i1) (AutoCC i2) = cmp i1 i2
+cmp_kind (DictCC i1) (DictCC i2) = cmp i1 i2
 cmp_kind other_1     other_2
   = let
 	tag1 = tag_CcKind other_1
@@ -316,7 +315,7 @@ showCostCentre    :: PprStyle -> Bool -> CostCentre -> String
 uppCostCentre	  :: PprStyle -> Bool -> CostCentre -> Unpretty
 uppCostCentreDecl :: PprStyle -> Bool -> CostCentre -> Unpretty
 
-showCostCentre (PprUnfolding _) print_as_string cc
+showCostCentre PprUnfolding print_as_string cc
   = ASSERT(not print_as_string) -- we never "print as string w/ Unfolding"
     ASSERT(not (noCostCentreAttached cc))
     ASSERT(not (currentOrSubsumedCosts cc))
@@ -421,7 +420,7 @@ friendly_style sty -- i.e., probably for human consumption
 
 Printing unfoldings is sufficiently weird that we do it separately.
 This should only apply to CostCentres that can be ``set to'' (cf
-@setToAbleCostCentre@).  That excludes CAFs and 
+@setToAbleCostCentre@).  That excludes CAFs and
 `overhead'---which are added at the very end---but includes dictionaries.
 Dict \tr{_scc_}s may cross module boundaries to show ``scope'' info;
 even if we won't ultimately do a \tr{SET_CCC} from it.

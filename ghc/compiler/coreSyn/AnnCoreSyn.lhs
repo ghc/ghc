@@ -13,29 +13,18 @@ really is} just like @CoreSyntax@.)
 module AnnCoreSyn (
 	AnnCoreBinding(..), AnnCoreExpr(..),
 	AnnCoreExpr'(..),	-- v sad that this must be exported
-	AnnCoreCaseAlternatives(..), AnnCoreCaseDefault(..),
-#ifdef DPH
-	AnnCoreParQuals(..),
-        AnnCoreParCommunicate(..),
-#endif {- Data Parallel Haskell -}
+	AnnCoreCaseAlts(..), AnnCoreCaseDefault(..),
 
-	deAnnotate, -- we may eventually export some of the other deAnners
+	deAnnotate -- we may eventually export some of the other deAnners
 
 	-- and to make the interface self-sufficient
-	BasicLit, Id, PrimOp, TyCon, TyVar, UniType, CostCentre
-	IF_ATTACK_PRAGMAS(COMMA cmpTyCon COMMA cmpTyVar)
-	IF_ATTACK_PRAGMAS(COMMA cmpUniType)
     ) where
 
-import AbsPrel		( PrimOp(..), PrimKind
+import PrelInfo		( PrimOp(..), PrimRep
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( Id, TyVar, TyCon, UniType
-			  IF_ATTACK_PRAGMAS(COMMA cmpTyCon COMMA cmpTyVar)
-			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
-			)
-import BasicLit		( BasicLit )
+import Literal		( Literal )
 import CoreSyn
 import Outputable
 import CostCentre	( CostCentre )
@@ -55,84 +44,41 @@ type AnnCoreExpr binder bindee annot = (annot, AnnCoreExpr' binder bindee annot)
 
 data AnnCoreExpr' binder bindee annot
   = AnnCoVar	 bindee
-  | AnnCoLit BasicLit
+  | AnnCoLit Literal
 
-  | AnnCoCon	 Id [UniType] [CoreAtom bindee]
+  | AnnCoCon	 Id [Type] [GenCoreAtom bindee]
 
-  | AnnCoPrim    PrimOp [UniType] [CoreAtom bindee]
+  | AnnCoPrim    PrimOp [Type] [GenCoreAtom bindee]
 
-  | AnnCoLam	 [binder]
+  | AnnCoLam	 binder
 		 (AnnCoreExpr binder bindee annot)
   | AnnCoTyLam   TyVar
 		 (AnnCoreExpr binder bindee annot)
 
   | AnnCoApp	 (AnnCoreExpr binder bindee annot)
-		 (CoreAtom    bindee)
+		 (GenCoreAtom    bindee)
   | AnnCoTyApp   (AnnCoreExpr binder bindee annot)
-		 UniType
+		 Type
 
   | AnnCoCase    (AnnCoreExpr binder bindee annot)
-		 (AnnCoreCaseAlternatives binder bindee annot)
+		 (AnnCoreCaseAlts binder bindee annot)
 
   | AnnCoLet	 (AnnCoreBinding binder bindee annot)
 		 (AnnCoreExpr binder bindee annot)
 
   | AnnCoSCC	 CostCentre
 		 (AnnCoreExpr binder bindee annot)
-#ifdef DPH
-  | AnnCoZfExpr  (AnnCoreExpr binder bindee annot) 
-	         (AnnCoreParQuals binder bindee annot)
-
-  | AnnCoParCon	 Id Int [UniType] [AnnCoreExpr binder bindee annot]
-
-  | AnnCoParComm
- 		     Int
-		    (AnnCoreExpr binder bindee annot)
-		    (AnnCoreParCommunicate binder bindee annot)
-  | AnnCoParZipWith
-		     Int 
-		     (AnnCoreExpr binder bindee annot)
-		     [AnnCoreExpr binder bindee annot]
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 \begin{code}
-#ifdef DPH
-data AnnCoreParQuals binder bindee annot
-   = AnnCoAndQuals  (AnnCoreParQuals binder bindee annot)
-		    (AnnCoreParQuals binder bindee annot)
-   | AnnCoParFilter (AnnCoreExpr binder bindee annot)
-   | AnnCoDrawnGen  [binder]
-		    (binder)
-		    (AnnCoreExpr binder bindee annot)	
-   | AnnCoIndexGen  [AnnCoreExpr binder bindee annot]
-   		    (binder)
-		    (AnnCoreExpr binder bindee annot)	
-#endif {- Data Parallel Haskell -}
-\end{code}
-
-\begin{code}
-data AnnCoreCaseAlternatives binder bindee annot
+data AnnCoreCaseAlts binder bindee annot
   = AnnCoAlgAlts	[(Id,
 		  	 [binder],
 		  	 AnnCoreExpr binder bindee annot)]
 			(AnnCoreCaseDefault binder bindee annot)
-  | AnnCoPrimAlts	[(BasicLit,
+  | AnnCoPrimAlts	[(Literal,
 			  AnnCoreExpr binder bindee annot)]
 			(AnnCoreCaseDefault binder bindee annot)
-#ifdef DPH
-  | AnnCoParAlgAlts	TyCon	
-		        Int
-			[binder]
-			[(Id,
-		  	 AnnCoreExpr binder bindee annot)]
-			(AnnCoreCaseDefault binder bindee annot)
-  | AnnCoParPrimAlts	TyCon	
-			Int
-			[(BasicLit,
-			  AnnCoreExpr binder bindee annot)]
-			(AnnCoreCaseDefault binder bindee annot)
-#endif {- Data Parallel Haskell -}
 
 data AnnCoreCaseDefault binder bindee annot
   = AnnCoNoDefault
@@ -141,45 +87,35 @@ data AnnCoreCaseDefault binder bindee annot
 \end{code}
 
 \begin{code}
-#ifdef DPH
-data AnnCoreParCommunicate binder bindee annot
-  = AnnCoParSend	[AnnCoreExpr binder bindee annot]     
-  | AnnCoParFetch  	[AnnCoreExpr binder bindee annot]     
-  | AnnCoToPodized
-  | AnnCoFromPodized
-#endif {- Data Parallel Haskell -}
-\end{code}
+deAnnotate :: AnnCoreExpr bndr bdee ann -> GenCoreExpr bndr bdee
 
-\begin{code}
-deAnnotate :: AnnCoreExpr bndr bdee ann -> CoreExpr bndr bdee
-
-deAnnotate (_, AnnCoVar v)            = CoVar v
-deAnnotate (_, AnnCoLit lit)      = CoLit lit
-deAnnotate (_, AnnCoCon	con tys args) = CoCon con tys args
-deAnnotate (_, AnnCoPrim op tys args) = CoPrim op tys args
-deAnnotate (_, AnnCoLam	binders body) = CoLam binders (deAnnotate body)
+deAnnotate (_, AnnCoVar v)            = Var v
+deAnnotate (_, AnnCoLit lit)      = Lit lit
+deAnnotate (_, AnnCoCon	con tys args) = Con con tys args
+deAnnotate (_, AnnCoPrim op tys args) = Prim op tys args
+deAnnotate (_, AnnCoLam	binder body)  = Lam binder (deAnnotate body)
 deAnnotate (_, AnnCoTyLam tyvar body) = CoTyLam tyvar (deAnnotate body)
-deAnnotate (_, AnnCoApp	fun arg)      = CoApp (deAnnotate fun) arg
+deAnnotate (_, AnnCoApp	fun arg)      = App (deAnnotate fun) arg
 deAnnotate (_, AnnCoTyApp fun ty)     = CoTyApp (deAnnotate fun) ty
-deAnnotate (_, AnnCoSCC	lbl body)     = CoSCC lbl (deAnnotate body) 
+deAnnotate (_, AnnCoSCC	lbl body)     = SCC lbl (deAnnotate body)
 
 deAnnotate (_, AnnCoLet	bind body)
-  = CoLet (deAnnBind bind) (deAnnotate body)
+  = Let (deAnnBind bind) (deAnnotate body)
   where
-    deAnnBind (AnnCoNonRec var rhs) = CoNonRec var (deAnnotate rhs)
-    deAnnBind (AnnCoRec pairs) = CoRec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
+    deAnnBind (AnnCoNonRec var rhs) = NonRec var (deAnnotate rhs)
+    deAnnBind (AnnCoRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
 deAnnotate (_, AnnCoCase scrut alts)
-  = CoCase (deAnnotate scrut) (deAnnAlts alts)
+  = Case (deAnnotate scrut) (deAnnAlts alts)
   where
-    deAnnAlts (AnnCoAlgAlts alts deflt)  
-      = CoAlgAlts [(con,args,deAnnotate rhs) | (con,args,rhs) <- alts]
+    deAnnAlts (AnnCoAlgAlts alts deflt)
+      = AlgAlts [(con,args,deAnnotate rhs) | (con,args,rhs) <- alts]
 		 (deAnnDeflt deflt)
 
-    deAnnAlts (AnnCoPrimAlts alts deflt) 
-      = CoPrimAlts [(lit,deAnnotate rhs) | (lit,rhs) <- alts]
+    deAnnAlts (AnnCoPrimAlts alts deflt)
+      = PrimAlts [(lit,deAnnotate rhs) | (lit,rhs) <- alts]
 		   (deAnnDeflt deflt)
 
-    deAnnDeflt AnnCoNoDefault 	      = CoNoDefault
-    deAnnDeflt (AnnCoBindDefault var rhs) = CoBindDefault var (deAnnotate rhs)
+    deAnnDeflt AnnCoNoDefault 	      = NoDefault
+    deAnnDeflt (AnnCoBindDefault var rhs) = BindDefault var (deAnnotate rhs)
 \end{code}

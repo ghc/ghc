@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Pretty]{Pretty-printing data type}
 
@@ -15,42 +15,45 @@ module Pretty (
 	Pretty(..),
 
 #if defined(COMPILING_GHC)
-	PprStyle(..),
 	prettyToUn,
-	codeStyle, -- UNUSED: stySwitch,
 #endif
 	ppNil, ppStr, ppPStr, ppChar, ppInt, ppInteger,
 	ppFloat, ppDouble,
-#if __GLASGOW_HASKELL__ >= 23
+#if __GLASGOW_HASKELL__
 	-- may be able to *replace* ppDouble
 	ppRational,
 #endif
 	ppSP, pp'SP, ppLbrack, ppRbrack, ppLparen, ppRparen,
 	ppSemi, ppComma, ppEquals,
+	ppBracket, ppParens,
 
 	ppCat, ppBeside, ppBesides, ppAbove, ppAboves,
 	ppNest, ppSep, ppHang, ppInterleave, ppIntersperse,
-	ppShow,
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 22
+	ppShow, speakNth,
+
+#if defined(COMPILING_GHC)
 	ppAppendFile,
 #endif
 
 	-- abstract type, to complete the interface...
 	PrettyRep(..), CSeq, Delay
 #if defined(COMPILING_GHC)
-	, GlobalSwitch, Unpretty(..)
+	, Unpretty(..)
 #endif
    ) where
 
-import CharSeq
 #if defined(COMPILING_GHC)
+
+CHK_Ubiq() -- debugging consistency check
+
 import Unpretty		( Unpretty(..) )
-import CmdLineOpts	( GlobalSwitch )
 #endif
+
+import CharSeq
 \end{code}
 
-Based on John Hughes's pretty-printing library.  For now, that code
-and notes for it are in files \tr{pp-rjmh*} (ToDo: rm).
+Based on John Hughes's pretty-printing library.  Loosely.  Very
+loosely.
 
 %************************************************
 %*						*
@@ -69,9 +72,10 @@ ppInt		:: Int	   -> Pretty
 ppInteger	:: Integer -> Pretty
 ppDouble	:: Double  -> Pretty
 ppFloat		:: Float   -> Pretty
-#if __GLASGOW_HASKELL__ >= 23
 ppRational	:: Rational -> Pretty
-#endif
+
+ppBracket	:: Pretty -> Pretty -- put brackets around it
+ppParens	:: Pretty -> Pretty -- put parens   around it
 
 ppBeside	:: Pretty -> Pretty -> Pretty
 ppBesides	:: [Pretty] -> Pretty
@@ -89,10 +93,7 @@ ppNest		:: Int -> Pretty -> Pretty
 
 ppShow		:: Int -> Pretty -> [Char]
 
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 22
-# if __GLASGOW_HASKELL__ < 23
-#  define _FILE _Addr
-# endif
+#if defined(COMPILING_GHC)
 ppAppendFile	:: _FILE -> Int -> Pretty -> PrimIO ()
 #endif
 \end{code}
@@ -127,7 +128,7 @@ ppShow width p
   = case (p width False) of
       MkPrettyRep seq ll emp sl -> cShow seq
 
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 22
+#if defined(COMPILING_GHC)
 ppAppendFile f width p
   = case (p width False) of
       MkPrettyRep seq ll emp sl -> cAppendFile f seq
@@ -149,10 +150,7 @@ ppInt  n width is_vert = MkPrettyRep (cStr s) (MkDelay ls) False (width >= ls)
 ppInteger n  = ppStr (show n)
 ppDouble  n  = ppStr (show n)
 ppFloat   n  = ppStr (show n)
-#if __GLASGOW_HASKELL__ >= 23
---ppRational n = ppStr (_showRational 30 n)
 ppRational n = ppStr (show (fromRationalX n)) -- _showRational 30 n)
-#endif
 
 ppSP	  = ppChar ' '
 pp'SP	  = ppStr ", "
@@ -163,6 +161,9 @@ ppRparen  = ppChar ')'
 ppSemi    = ppChar ';'
 ppComma   = ppChar ','
 ppEquals  = ppChar '='
+
+ppBracket p = ppBeside ppLbrack (ppBeside p ppRbrack)
+ppParens  p = ppBeside ppLparen (ppBeside p ppRparen)
 
 ppInterleave sep ps = ppSep (pi ps)
   where
@@ -272,7 +273,7 @@ ppHang p1 n p2 width is_vert	-- This is a little bit stricter than it could
       MkPrettyRep seq1 (MkDelay ll1) emp1 sl1 ->
 	  if emp1 then
 	      p2 width is_vert
-	  else 
+	  else
 	  if (ll1 <= n) || sl2 then	-- very ppBesideSP'ish
 	      -- Hang it if p1 shorter than indent or if it doesn't fit
 	      MkPrettyRep (seq1 `cAppend` ((cCh ' ') `cAppend` (cIndent (ll1+1) seq2)))
@@ -312,64 +313,40 @@ ppSep ps  width is_vert
 	   ppAboves ps width is_vert	-- Takes several lines
 \end{code}
 
+
+@speakNth@ converts an integer to a verbal index; eg 1 maps to
+``first'' etc.
+
+\begin{code}
+speakNth :: Int -> Pretty
+
+speakNth 1 = ppStr "first"
+speakNth 2 = ppStr "second"
+speakNth 3 = ppStr "third"
+speakNth 4 = ppStr "fourth"
+speakNth 5 = ppStr "fifth"
+speakNth 6 = ppStr "sixth"
+speakNth n = ppBesides [ ppInt n, ppStr st_nd_rd_th ]
+  where
+    st_nd_rd_th | n_rem_10 == 1 = "st"
+		| n_rem_10 == 2 = "nd"
+		| n_rem_10 == 3 = "rd"
+		| otherwise     = "th"
+
+    n_rem_10 = n `rem` 10
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection[Outputable-print]{Pretty-printing stuff}
 %*									*
 %************************************************************************
 
-ToDo: this is here for no-original-name reasons (mv?).
-
-There is no clearly definitive list of @PprStyles@; I suggest the
-following:
-
 \begin{code}
 #if defined(COMPILING_GHC)
     -- to the end of file
 
-data PprStyle
-  = PprForUser	 		-- Pretty-print in a way that will
-				-- make sense to the ordinary user;
-				-- must be very close to Haskell
-				-- syntax, etc.  ToDo: how diff is
-				-- this from what pprInterface must
-				-- do?
-  | PprDebug			-- Standard debugging output
-  | PprShowAll			-- Debugging output which leaves
-				-- nothing to the imagination
-  | PprInterface		-- Interface generation
-	(GlobalSwitch -> Bool)	--  (we can look at cmd-line flags)
-  | PprForC			-- must print out C-acceptable names
-	(GlobalSwitch -> Bool)	--  (ditto)
-  | PprUnfolding		-- for non-interface intermodule info
-	(GlobalSwitch -> Bool)	-- the compiler writes/reads
-  | PprForAsm			-- must print out assembler-acceptable names
-	(GlobalSwitch -> Bool)	--  (ditto)
-        Bool	        	-- prefix CLabel with underscore?
-        (String -> String)    	-- format AsmTempLabel
-\end{code}
-
-The following test decides whether or not we are actually generating
-code (either C or assembly).
-\begin{code}
-codeStyle :: PprStyle -> Bool
-codeStyle (PprForC _) = True
-codeStyle (PprForAsm _ _ _) = True
-codeStyle _ = False
-
-{- UNUSED:
-stySwitch :: PprStyle -> GlobalSwitch -> Bool
-stySwitch (PprInterface sw) = sw
-stySwitch (PprForC sw) = sw
-stySwitch (PprForAsm sw _ _) = sw
--}
-\end{code}
-
-Orthogonal to these printing styles are (possibly) some command-line
-flags that affect printing (often carried with the style).  The most
-likely ones are variations on how much type info is shown.
-
-\begin{code}
 prettyToUn :: Pretty -> Unpretty
 
 prettyToUn p
@@ -385,14 +362,14 @@ prettyToUn p
 fromRationalX :: (RealFloat a) => Rational -> a
 
 fromRationalX r =
-	let 
+	let
 	    h = ceiling (huge `asTypeOf` x)
 	    b = toInteger (floatRadix x)
 	    x = fromRat 0 r
 	    fromRat e0 r' =
 		let d = denominator r'
 		    n = numerator r'
-	        in  if d > h then
+		in  if d > h then
 		       let e = integerLogBase b (d `div` h) + 1
 		       in  fromRat (e0-e) (n % (d `div` (b^e)))
 		    else if abs n > h then
@@ -408,10 +385,10 @@ fromRationalX r =
 integerLogBase :: Integer -> Integer -> Int
 integerLogBase b i =
      if i < b then
-        0
+	0
      else
 	-- Try squaring the base first to cut down the number of divisions.
-        let l = 2 * integerLogBase (b*b) i
+	let l = 2 * integerLogBase (b*b) i
 
 	    doDiv :: Integer -> Int -> Int
 	    doDiv j k = if j < b then k else doDiv (j `div` b) (k+1)

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1996
 %
 \section[SimplMonad]{The simplifier Monad}
 
@@ -10,43 +10,39 @@ module SimplMonad (
 	SmplM(..),
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
 	mapSmpl, mapAndUnzipSmpl,
-	
+
 	-- Counting
 	SimplCount{-abstract-}, TickType(..), tick, tickN,
 	simplCount, detailedSimplCount,
 	zeroSimplCount, showSimplCount, combineSimplCounts,
 
 	-- Cloning
-	cloneId, cloneIds, cloneTyVarSmpl, newIds, newId,
+	cloneId, cloneIds, cloneTyVarSmpl, newIds, newId
 
 	-- and to make the interface self-sufficient...
-	BinderInfo, CoreExpr, Id, PrimOp, TyVar, UniType,
-	SplitUniqSupply
-
-	IF_ATTACK_PRAGMAS(COMMA splitUniqSupply)
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
+import Ubiq{-uitous-}
 
-import TaggedCore
-import PlainCore
+import SmplLoop		-- well, cheating sort of
 
-import AbsUniType	( cloneTyVar )
-import CmdLineOpts
-import Id		( mkIdWithNewUniq, mkSysLocal )
-import IdInfo
+import Id		( mkSysLocal )
 import SimplEnv
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
-import SplitUniq
-import Unique
-import Util
+import SrcLoc		( mkUnknownSrcLoc )
+import UniqSupply	( getUnique, getUniques, splitUniqSupply,
+			  UniqSupply
+			)
+import Util		( zipWithEqual, panic )
 
 infixr 9  `thenSmpl`, `thenSmpl_`
+
+cloneTyVar = panic "cloneTyVar (SimplMonad)"
+mkIdWithNewUniq = panic "mkIdWithNewUniq (SimplMonad)"
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[Monad]{Monad plumbing}
+\subsection{Monad plumbing}
 %*									*
 %************************************************************************
 
@@ -55,23 +51,21 @@ For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 
 \begin{code}
 type SmplM result
-  = SplitUniqSupply
+  = UniqSupply
   -> SimplCount    -- things being threaded
   -> (result, SimplCount)
 \end{code}
 
 \begin{code}
-initSmpl :: SplitUniqSupply -- no init count; set to 0
+initSmpl :: UniqSupply -- no init count; set to 0
 	  -> SmplM a
 	  -> (a, SimplCount)
 
 initSmpl us m = m us zeroSimplCount
 
-#ifdef __GLASGOW_HASKELL__
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
 {-# INLINE returnSmpl #-}
-#endif
 
 returnSmpl :: a -> SmplM a
 returnSmpl e us sc = (e, sc)
@@ -108,7 +102,7 @@ mapAndUnzipSmpl f (x:xs)
 
 %************************************************************************
 %*									*
-\subsection[SimplCount]{Counting up what we've done}
+\subsection{Counting up what we've done}
 %*									*
 %************************************************************************
 
@@ -137,15 +131,15 @@ data TickType
   | BetaReduction
   {- BEGIN F/B ENTRIES -}
   -- the 8 rules
-  | FoldrBuild	     	-- foldr f z (build g) ==>     
-  | FoldrAugment	-- foldr f z (augment g z) ==> 
-  | Foldr_Nil		-- foldr f z [] ==>            
-  | Foldr_List		-- foldr f z (x:...) ==>       
+  | FoldrBuild	     	-- foldr f z (build g) ==>
+  | FoldrAugment	-- foldr f z (augment g z) ==>
+  | Foldr_Nil		-- foldr f z [] ==>
+  | Foldr_List		-- foldr f z (x:...) ==>
 
-  | FoldlBuild	        -- foldl f z (build g) ==>     
-  | FoldlAugment	-- foldl f z (augment g z) ==> 
-  | Foldl_Nil		-- foldl f z [] ==>            
-  | Foldl_List		-- foldl f z (x:...) ==>       
+  | FoldlBuild	        -- foldl f z (build g) ==>
+  | FoldlAugment	-- foldl f z (augment g z) ==>
+  | Foldl_Nil		-- foldl f z [] ==>
+  | Foldl_List		-- foldl f z (x:...) ==>
 
   | Foldr_Cons_Nil	-- foldr (:) [] => id
   | Foldr_Cons		-- foldr (:) => flip (++)
@@ -233,11 +227,11 @@ zeroSimplCount
 	(Foldr_Cons_Nil, 0),
 	(Foldr_Cons, 0),
 
-        (Str_FoldrStr, 0),
-        (Str_UnpackCons, 0),
-        (Str_UnpackNil, 0) ]
+	(Str_FoldrStr, 0),
+	(Str_UnpackCons, 0),
+	(Str_UnpackNil, 0) ]
 --
---= array (con2tag_TickType UnfoldingDone, con2tag_TickType FoldrInline) 
+--= array (con2tag_TickType UnfoldingDone, con2tag_TickType FoldrInline)
 --        [ i := 0 | i <- indices zeroSimplCount ]
 \end{code}
 
@@ -261,7 +255,7 @@ tick tick_type us (SimplCount n stuff)
 		incd = cnt + 1
 	    in
 	    (ttype, incd) : xs
-        else
+	else
 	    x : inc_tick xs
 
 tickN :: TickType -> Int -> SmplM ()
@@ -282,7 +276,7 @@ tickN tick_type IBOX(increment) us (SimplCount n stuff)
 		incd = cnt + IBOX(increment)
 	    in
 	    (ttype, incd) : xs
-        else
+	else
 	    x : inc_tick xs
 
 simplCount :: SmplM Int
@@ -300,7 +294,7 @@ combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
 #else
 combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
   = SimplCount (n1 _ADD_ n2)
-	       (zipWith (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2)
+	       (zipWithEqual (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2)
 #endif
 \end{code}
 
@@ -311,17 +305,17 @@ combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
 %************************************************************************
 
 \begin{code}
-newId :: UniType -> SmplM Id
+newId :: Type -> SmplM Id
 newId ty us sc
   = (mkSysLocal SLIT("s") uniq ty mkUnknownSrcLoc, sc)
   where
-    uniq = getSUnique us
+    uniq = getUnique us
 
-newIds :: [UniType] -> SmplM [Id]
+newIds :: [Type] -> SmplM [Id]
 newIds tys us sc
-  = (zipWith mk_id tys uniqs, sc)
+  = (zipWithEqual mk_id tys uniqs, sc)
   where
-    uniqs  = getSUniques (length tys) us
+    uniqs  = getUniques (length tys) us
     mk_id ty uniq = mkSysLocal SLIT("s") uniq ty mkUnknownSrcLoc
 
 cloneTyVarSmpl :: TyVar -> SmplM TyVar
@@ -329,7 +323,7 @@ cloneTyVarSmpl :: TyVar -> SmplM TyVar
 cloneTyVarSmpl tyvar us sc
   = (new_tyvar, sc)
   where
-   uniq = getSUnique us
+   uniq = getUnique us
    new_tyvar = cloneTyVar tyvar uniq
 
 cloneId :: SimplEnv -> InBinder -> SmplM OutId
@@ -337,7 +331,7 @@ cloneId env (id,_) us sc
   = (mkIdWithNewUniq id_with_new_ty uniq, sc)
   where
     id_with_new_ty = simplTyInId env id
-    uniq = getSUnique us
+    uniq = getUnique us
 
 cloneIds :: SimplEnv -> [InBinder] -> SmplM [OutId]
 cloneIds env binders = mapSmpl (cloneId env) binders

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[PrefixSyn]{``Prefix-form'' syntax}
 
@@ -23,15 +23,16 @@ module PrefixSyn (
 	readInteger
     ) where
 
-import AbsSyn
-import ProtoName	( ProtoName(..) ) -- .. is for pragmas only
-import Outputable
-import Util		-- pragmas only
+import Ubiq{-uitous-}
+
+import HsSyn
+import RdrHsSyn
+import Util		( panic )
 
 type RdrId   = ProtoName
 type SrcLine = Int
 type SrcFile = FAST_STRING
-type SrcFun  = FAST_STRING
+type SrcFun  = ProtoName
 \end{code}
 
 \begin{code}
@@ -39,17 +40,14 @@ data RdrBinding
   = RdrNullBind
   | RdrAndBindings	RdrBinding RdrBinding
 
-  | RdrTyData		ProtoNameTyDecl
-  | RdrTySynonym	ProtoNameTyDecl
+  | RdrTyDecl		ProtoNameTyDecl
   | RdrFunctionBinding	SrcLine [RdrMatch]
   | RdrPatternBinding	SrcLine [RdrMatch]
   | RdrClassDecl 	ProtoNameClassDecl
-  | RdrInstDecl 	( FAST_STRING{-original  module's name-} ->
-			  FAST_STRING{-informant module's name-} ->
-			  Bool{-from here?-} ->
-			  ProtoNameInstDecl )
+  | RdrInstDecl 	ProtoNameInstDecl
   | RdrDefaultDecl	ProtoNameDefaultDecl
-  | RdrIfaceImportDecl	IfaceImportDecl
+  | RdrIfaceImportDecl	(IfaceImportDecl ProtoName)
+  | RdrIfaceFixities	[ProtoNameFixityDecl]
 
 			-- signatures are mysterious; we can't
 			-- tell if its a Sig or a ClassOpSig,
@@ -64,9 +62,8 @@ data RdrBinding
   | RdrInlineValSig 	ProtoNameSig
   | RdrDeforestSig 	ProtoNameSig
   | RdrMagicUnfoldingSig ProtoNameSig
-  | RdrSpecInstSig  	ProtoNameSpecialisedInstanceSig
-  | RdrAbstractTypeSig  ProtoNameDataTypeSig
-  | RdrSpecDataSig   	ProtoNameDataTypeSig
+  | RdrSpecInstSig  	ProtoNameSpecInstSig
+  | RdrSpecDataSig   	ProtoNameSpecDataSig
 
 data RdrTySigPragmas
   = RdrNoPragma
@@ -78,8 +75,18 @@ type SigConverter = RdrBinding {- a RdrTySig... -} -> [ProtoNameSig]
 
 \begin{code}
 data RdrMatch
-  = RdrMatch SrcLine SrcFun ProtoNamePat [(ProtoNameExpr, ProtoNameExpr)] RdrBinding
-				       -- (guard,         expr)
+  = RdrMatch_NoGuard
+	     SrcLine SrcFun
+	     ProtoNamePat
+	     ProtoNameHsExpr
+	     RdrBinding
+
+  | RdrMatch_Guards
+	     SrcLine SrcFun
+	     ProtoNamePat
+	     [(ProtoNameHsExpr, ProtoNameHsExpr)]
+	     -- (guard,         expr)
+	     RdrBinding
 \end{code}
 
 Unscramble strings representing oct/dec/hex integer literals:

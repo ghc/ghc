@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface CgUpdate where
-import AbsCSyn(CAddrMode)
-import CgMonad(CgInfoDownwards, CgState)
-pushUpdateFrame :: CAddrMode -> CAddrMode -> (CgInfoDownwards -> CgState -> CgState) -> CgInfoDownwards -> CgState -> CgState
-

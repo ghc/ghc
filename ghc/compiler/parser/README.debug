@@ -1,0 +1,12 @@
+If you want to debug...
+
+* the lexer:
+
+    run "flex" with the -d flag; compile as normal thereafter
+
+* the parser:
+
+    compile hsparser.tab.c and main.c with EXTRA_CC_OPTS=-DHSP_DEBUG
+
+    run hsp with -D; it's dumping the output into *stdout*,
+    so you have to do something weird to look at it.

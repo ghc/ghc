@@ -9,27 +9,26 @@ module AbsCStixGen (
 	genCodeAbstractC,
 
 	-- and, of course, that's not enough...
-	AbstractC, Target, StixTree, SplitUniqSupply, SUniqSM(..)
+	AbstractC, Target, StixTree, UniqSupply, UniqSM(..)
     ) where
 
 import AbsCSyn
-import AbsPrel		( PrimOp(..), primOpNeedsWrapper, isCompareOp
+import PrelInfo		( PrimOp(..), primOpNeedsWrapper, isCompareOp
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
 import CgCompInfo   	( mIN_UPD_SIZE )
-import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI, fastLabelFromCI, 
+import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI, fastLabelFromCI,
 			  closureUpdReqd
 			)
-import MachDesc	    
+import MachDesc
 import Maybes	    	( Maybe(..), maybeToBool )
-import Outputable     
-import PrimKind	    	( isFloatingKind )
+import Outputable
+import PrimRep	    	( isFloatingRep )
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
-import Stix	
+import Stix
 import StixInfo	    	( genCodeInfoTable )
-import SplitUniq
-import Unique
+import UniqSupply
 import Util
 \end{code}
 
@@ -41,14 +40,14 @@ separated so that register allocation can be performed locally within the chunk.
 -- hacking with Uncle Will:
 #define target_STRICT target@(Target _ _ _ _ _ _ _ _)
 
-genCodeAbstractC 
-    :: Target 
+genCodeAbstractC
+    :: Target
     -> AbstractC
-    -> SUniqSM [[StixTree]]
+    -> UniqSM [[StixTree]]
 
-genCodeAbstractC target_STRICT absC = 
-    mapSUs gentopcode (mkAbsCStmtList absC) `thenSUs` \ trees ->
-    returnSUs ([StComment SLIT("Native Code")] : trees)
+genCodeAbstractC target_STRICT absC =
+    mapUs gentopcode (mkAbsCStmtList absC) `thenUs` \ trees ->
+    returnUs ([StComment SLIT("Native Code")] : trees)
  where
  -- "target" munging things... ---
  a2stix  = amodeToStix  target
@@ -66,56 +65,56 @@ Here we handle top-level things, like @CCodeBlock@s and
 
 \begin{code}
  {-
- genCodeTopAbsC 
-    :: Target 
+ genCodeTopAbsC
+    :: Target
     -> AbstractC
-    -> SUniqSM [StixTree]
+    -> UniqSM [StixTree]
  -}
 
  gentopcode (CCodeBlock label absC) =
-    gencode absC				`thenSUs` \ code ->
-    returnSUs (StSegment TextSegment : StFunBegin label : code [StFunEnd label])
+    gencode absC				`thenUs` \ code ->
+    returnUs (StSegment TextSegment : StFunBegin label : code [StFunEnd label])
 
- gentopcode stmt@(CStaticClosure label _ _ _) = 
-    genCodeStaticClosure stmt			`thenSUs` \ code ->
-    returnSUs (StSegment DataSegment : StLabel label : code [])
+ gentopcode stmt@(CStaticClosure label _ _ _) =
+    genCodeStaticClosure stmt			`thenUs` \ code ->
+    returnUs (StSegment DataSegment : StLabel label : code [])
 
- gentopcode stmt@(CRetUnVector _ _) = returnSUs []
+ gentopcode stmt@(CRetUnVector _ _) = returnUs []
 
  gentopcode stmt@(CFlatRetVector label _) =
-    genCodeVecTbl stmt				`thenSUs` \ code ->
-    returnSUs (StSegment TextSegment : code [StLabel label])
+    genCodeVecTbl stmt				`thenUs` \ code ->
+    returnUs (StSegment TextSegment : code [StLabel label])
 
  gentopcode stmt@(CClosureInfoAndCode cl_info slow Nothing _ _ _)
 
   | slow_is_empty
-  = genCodeInfoTable hp_rel a2stix stmt		`thenSUs` \ itbl ->
-    returnSUs (StSegment TextSegment : itbl [])
+  = genCodeInfoTable hp_rel a2stix stmt		`thenUs` \ itbl ->
+    returnUs (StSegment TextSegment : itbl [])
 
   | otherwise
-  = genCodeInfoTable hp_rel a2stix stmt		`thenSUs` \ itbl ->
-    gencode slow				`thenSUs` \ slow_code ->
-    returnSUs (StSegment TextSegment : itbl (StFunBegin slow_lbl : 
-              slow_code [StFunEnd slow_lbl]))
+  = genCodeInfoTable hp_rel a2stix stmt		`thenUs` \ itbl ->
+    gencode slow				`thenUs` \ slow_code ->
+    returnUs (StSegment TextSegment : itbl (StFunBegin slow_lbl :
+	      slow_code [StFunEnd slow_lbl]))
   where
     slow_is_empty = not (maybeToBool (nonemptyAbsC slow))
     slow_lbl = entryLabelFromCI cl_info
 
  gentopcode stmt@(CClosureInfoAndCode cl_info slow (Just fast) _ _ _) =
  -- ToDo: what if this is empty? ------------------------^^^^
-    genCodeInfoTable hp_rel a2stix stmt		`thenSUs` \ itbl ->
-    gencode slow				`thenSUs` \ slow_code ->
-    gencode fast				`thenSUs` \ fast_code ->
-    returnSUs (StSegment TextSegment : itbl (StFunBegin slow_lbl : 
-              slow_code (StFunEnd slow_lbl : StFunBegin fast_lbl :
-              fast_code [StFunEnd fast_lbl])))
+    genCodeInfoTable hp_rel a2stix stmt		`thenUs` \ itbl ->
+    gencode slow				`thenUs` \ slow_code ->
+    gencode fast				`thenUs` \ fast_code ->
+    returnUs (StSegment TextSegment : itbl (StFunBegin slow_lbl :
+	      slow_code (StFunEnd slow_lbl : StFunBegin fast_lbl :
+	      fast_code [StFunEnd fast_lbl])))
   where
     slow_lbl = entryLabelFromCI cl_info
     fast_lbl = fastLabelFromCI cl_info
 
  gentopcode absC =
-    gencode absC				`thenSUs` \ code ->
-    returnSUs (StSegment TextSegment : code [])
+    gencode absC				`thenUs` \ code ->
+    returnUs (StSegment TextSegment : code [])
 
 \end{code}
 
@@ -123,15 +122,15 @@ Vector tables are trivial!
 
 \begin{code}
  {-
- genCodeVecTbl 
-    :: Target 
+ genCodeVecTbl
+    :: Target
     -> AbstractC
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
  -}
  genCodeVecTbl (CFlatRetVector label amodes) =
-    returnSUs (\xs -> vectbl : xs)
+    returnUs (\xs -> vectbl : xs)
   where
-    vectbl = StData PtrKind (reverse (map a2stix amodes))
+    vectbl = StData PtrRep (reverse (map a2stix amodes))
 
 \end{code}
 
@@ -139,18 +138,18 @@ Static closures are not so hard either.
 
 \begin{code}
  {-
- genCodeStaticClosure 
-    :: Target 
+ genCodeStaticClosure
+    :: Target
     -> AbstractC
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
  -}
  genCodeStaticClosure (CStaticClosure _ cl_info cost_centre amodes) =
-    returnSUs (\xs -> table : xs)
+    returnUs (\xs -> table : xs)
   where
-    table = StData PtrKind (StCLbl info_lbl : body)
+    table = StData PtrRep (StCLbl info_lbl : body)
     info_lbl = infoTableLabelFromCI cl_info
 
-    body = if closureUpdReqd cl_info then 
+    body = if closureUpdReqd cl_info then
     	    	take (max mIN_UPD_SIZE (length amodes')) (amodes' ++ zeros)
     	   else
     	    	amodes'
@@ -160,8 +159,8 @@ Static closures are not so hard either.
     amodes' = map amodeZeroVoid amodes
 
     	-- Watch out for VoidKinds...cf. PprAbsC
-    amodeZeroVoid item 
-      | getAmodeKind item == VoidKind = StInt 0
+    amodeZeroVoid item
+      | getAmodeRep item == VoidRep = StInt 0
       | otherwise = a2stix item
 
 \end{code}
@@ -171,9 +170,9 @@ Now the individual AbstractC statements.
 \begin{code}
  {-
  gencode
-    :: Target 
+    :: Target
     -> AbstractC
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
  -}
 \end{code}
 
@@ -181,15 +180,7 @@ Now the individual AbstractC statements.
 
 \begin{code}
 
- gencode AbsCNop = returnSUs id
-
-\end{code}
-
-OLD:@CComment@s are passed through as the corresponding @StComment@s.
-
-\begin{code}
-
- --UNUSED:gencode (CComment s) = returnSUs (\xs -> StComment s : xs)
+ gencode AbsCNop = returnUs id
 
 \end{code}
 
@@ -197,7 +188,7 @@ Split markers are a NOP in this land.
 
 \begin{code}
 
- gencode CSplitMarker = returnSUs id
+ gencode CSplitMarker = returnUs id
 
 \end{code}
 
@@ -207,9 +198,9 @@ resulting StixTreeLists are joined together.
 \begin{code}
 
  gencode (AbsCStmts c1 c2) =
-    gencode c1				`thenSUs` \ b1 ->
-    gencode c2				`thenSUs` \ b2 ->
-    returnSUs (b1 . b2)
+    gencode c1				`thenUs` \ b1 ->
+    gencode c2				`thenUs` \ b2 ->
+    returnUs (b1 . b2)
 
 \end{code}
 
@@ -223,10 +214,10 @@ addresses, etc.)
 
  gencode (CInitHdr cl_info reg_rel _ _) =
     let
-	lhs = a2stix (CVal reg_rel PtrKind)
+	lhs = a2stix (CVal reg_rel PtrRep)
     	lbl = infoTableLabelFromCI cl_info
     in
-	returnSUs (\xs -> StAssign PtrKind lhs (StCLbl lbl) : xs)
+	returnUs (\xs -> StAssign PtrRep lhs (StCLbl lbl) : xs)
 
 \end{code}
 
@@ -234,20 +225,20 @@ Assignment, the curse of von Neumann, is the center of the code we
 produce.  In most cases, the type of the assignment is determined
 by the type of the destination.  However, when the destination can
 have mixed types, the type of the assignment is ``StgWord'' (we use
-PtrKind for lack of anything better).  Think:  do we also want a cast
+PtrRep for lack of anything better).  Think:  do we also want a cast
 of the source?  Be careful about floats/doubles.
 
 \begin{code}
 
  gencode (CAssign lhs rhs)
-  | getAmodeKind lhs == VoidKind = returnSUs id
+  | getAmodeRep lhs == VoidRep = returnUs id
   | otherwise =
-    let pk = getAmodeKind lhs
-    	pk' = if mixedTypeLocn lhs && not (isFloatingKind pk) then IntKind else pk
+    let pk = getAmodeRep lhs
+    	pk' = if mixedTypeLocn lhs && not (isFloatingRep pk) then IntRep else pk
     	lhs' = a2stix lhs
     	rhs' = a2stix' rhs
     in
-        returnSUs (\xs -> StAssign pk' lhs' rhs' : xs)
+	returnUs (\xs -> StAssign pk' lhs' rhs' : xs)
 
 \end{code}
 
@@ -258,24 +249,24 @@ with the address of the info table before jumping to the entry code for Node.
 \begin{code}
 
  gencode (CJump dest) =
-    returnSUs (\xs -> StJump (a2stix dest) : xs)
+    returnUs (\xs -> StJump (a2stix dest) : xs)
 
  gencode (CFallThrough (CLbl lbl _)) =
-    returnSUs (\xs -> StFallThrough lbl : xs)
+    returnUs (\xs -> StFallThrough lbl : xs)
 
  gencode (CReturn dest DirectReturn) =
-    returnSUs (\xs -> StJump (a2stix dest) : xs)
+    returnUs (\xs -> StJump (a2stix dest) : xs)
 
  gencode (CReturn table (StaticVectoredReturn n)) =
-    returnSUs (\xs -> StJump dest : xs)
-  where 
-    dest = StInd PtrKind (StIndex PtrKind (a2stix table)
+    returnUs (\xs -> StJump dest : xs)
+  where
+    dest = StInd PtrRep (StIndex PtrRep (a2stix table)
     	    	    	    	    	  (StInt (toInteger (-n-1))))
 
  gencode (CReturn table (DynamicVectoredReturn am)) =
-    returnSUs (\xs -> StJump dest : xs)
-  where 
-    dest = StInd PtrKind (StIndex PtrKind (a2stix table) dyn_off)
+    returnUs (\xs -> StJump dest : xs)
+  where
+    dest = StInd PtrRep (StIndex PtrRep (a2stix table) dyn_off)
     dyn_off = StPrim IntSubOp [StPrim IntNegOp [a2stix am], StInt 1]
 
 \end{code}
@@ -288,16 +279,16 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
   -- ToDo (ADR?): use that liveness mask
   | primOpNeedsWrapper op =
     let
-        saves = volsaves vols
+	saves = volsaves vols
     	restores = volrestores vols
     in
     	p2stix (nonVoid results) op (nonVoid args)
-    	    	    	    		    	      	`thenSUs` \ code ->
-    	returnSUs (\xs -> saves ++ code (restores ++ xs))
+    	    	    	    		    	      	`thenUs` \ code ->
+    	returnUs (\xs -> saves ++ code (restores ++ xs))
 
   | otherwise = p2stix (nonVoid results) op (nonVoid args)
     where
-        nonVoid = filter ((/= VoidKind) . getAmodeKind)
+	nonVoid = filter ((/= VoidRep) . getAmodeRep)
 
 \end{code}
 
@@ -306,11 +297,11 @@ Now the dreaded conditional jump.
 Now the if statement.  Almost *all* flow of control are of this form.
 @
 	if (am==lit) { absC } else { absCdef }
-@ 
+@
 	=>
 @
 	IF am = lit GOTO l1:
-	absC 
+	absC
 	jump l2:
    l1:
 	absCdef
@@ -319,29 +310,29 @@ Now the if statement.  Almost *all* flow of control are of this form.
 
 \begin{code}
 
- gencode (CSwitch discrim alts deflt) 
+ gencode (CSwitch discrim alts deflt)
   = case alts of
       [] -> gencode deflt
 
       [(tag,alt_code)] -> case maybe_empty_deflt of
 				Nothing -> gencode alt_code
-			        Just dc -> mkIfThenElse discrim tag alt_code dc
+				Just dc -> mkIfThenElse discrim tag alt_code dc
 
       [(tag1@(MachInt i1 _), alt_code1),
-       (tag2@(MachInt i2 _), alt_code2)] 
+       (tag2@(MachInt i2 _), alt_code2)]
 	| deflt_is_empty && i1 == 0 && i2 == 1
 	-> mkIfThenElse discrim tag1 alt_code1 alt_code2
 	| deflt_is_empty && i1 == 1 && i2 == 0
 	-> mkIfThenElse discrim tag2 alt_code2 alt_code1
- 
+
 	-- If the @discrim@ is simple, then this unfolding is safe.
       other | simple_discrim -> mkSimpleSwitches discrim alts deflt
 
 	-- Otherwise, we need to do a bit of work.
-      other ->  getSUnique		      	  `thenSUs` \ u ->
+      other ->  getUnique		      	  `thenUs` \ u ->
 		gencode (AbsCStmts
-	        (CAssign (CTemp u pk) discrim)
-	        (CSwitch (CTemp u pk) alts deflt))
+		(CAssign (CTemp u pk) discrim)
+		(CSwitch (CTemp u pk) alts deflt))
 
   where
     maybe_empty_deflt = nonemptyAbsC deflt
@@ -349,7 +340,7 @@ Now the if statement.  Almost *all* flow of control are of this form.
 			Nothing -> True
 			Just _  -> False
 
-    pk = getAmodeKind discrim
+    pk = getAmodeRep discrim
 
     simple_discrim = case discrim of
 			CReg _    -> True
@@ -366,10 +357,10 @@ Finally, all of the disgusting AbstractC macros.
  gencode (CMacroStmt macro args) = macro_code macro args
 
  gencode (CCallProfCtrMacro macro _) =
-    returnSUs (\xs -> StComment macro : xs)
+    returnUs (\xs -> StComment macro : xs)
 
  gencode (CCallProfCCMacro macro _) =
-    returnSUs (\xs -> StComment macro : xs)
+    returnUs (\xs -> StComment macro : xs)
 
 \end{code}
 
@@ -379,26 +370,26 @@ comparison tree.  (Perhaps this could be tuned.)
 
 \begin{code}
 
- intTag :: BasicLit -> Integer
+ intTag :: Literal -> Integer
  intTag (MachChar c) = toInteger (ord c)
  intTag (MachInt i _) = i
  intTag _ = panic "intTag"
 
- fltTag :: BasicLit -> Rational
+ fltTag :: Literal -> Rational
 
  fltTag (MachFloat f) = f
  fltTag (MachDouble d) = d
  fltTag _ = panic "fltTag"
 
  {-
- mkSimpleSwitches 
-    :: Target 
-    -> CAddrMode -> [(BasicLit,AbstractC)] -> AbstractC
-    -> SUniqSM StixTreeList
+ mkSimpleSwitches
+    :: Target
+    -> CAddrMode -> [(Literal,AbstractC)] -> AbstractC
+    -> UniqSM StixTreeList
  -}
  mkSimpleSwitches am alts absC =
-    getUniqLabelNCG 	    	    	    	    	`thenSUs` \ udlbl ->
-    getUniqLabelNCG 	    	    	    	    	`thenSUs` \ ujlbl ->
+    getUniqLabelNCG 	    	    	    	    	`thenUs` \ udlbl ->
+    getUniqLabelNCG 	    	    	    	    	`thenUs` \ ujlbl ->
     let am' = a2stix am
     	joinedAlts = map (\ (tag,code) -> (tag, mkJoin code ujlbl)) alts
     	sortedAlts = naturalMergeSortLe leAlt joinedAlts
@@ -425,13 +416,13 @@ comparison tree.  (Perhaps this could be tuned.)
     	else
     	    mkBinaryTree am' floating sortedAlts choices lowest highest udlbl
     	)
-    	    	    	    	    	    	    	`thenSUs` \ alt_code ->
-        gencode absC				`thenSUs` \ dflt_code ->
+    	    	    	    	    	    	    	`thenUs` \ alt_code ->
+	gencode absC				`thenUs` \ dflt_code ->
 
-    	returnSUs (\xs -> alt_code (StLabel udlbl : dflt_code (StLabel ujlbl : xs)))
+    	returnUs (\xs -> alt_code (StLabel udlbl : dflt_code (StLabel ujlbl : xs)))
 
     where
-    	floating = isFloatingKind (getAmodeKind am)
+    	floating = isFloatingRep (getAmodeRep am)
     	choices = length alts
 
     	(x@(MachChar _),_)  `leAlt` (y,_) = intTag x <= intTag y
@@ -442,7 +433,7 @@ comparison tree.  (Perhaps this could be tuned.)
 
 We use jump tables when doing an integer switch on a relatively dense list of
 alternatives.  We expect to be given a list of alternatives, sorted by tag,
-and a range of values for which we are to generate a table.  Of course, the tags of 
+and a range of values for which we are to generate a table.  Of course, the tags of
 the alternatives should lie within the indicated range.  The alternatives need
 not cover the range; a default target is provided for the missing alternatives.
 
@@ -452,39 +443,39 @@ with a jump to the join point.
 \begin{code}
  {-
  mkJumpTable
-    :: Target 
+    :: Target
     -> StixTree  	    	-- discriminant
-    -> [(BasicLit, AbstractC)] 	-- alternatives
+    -> [(Literal, AbstractC)] 	-- alternatives
     -> Integer 	    	    	-- low tag
     -> Integer 	    	    	-- high tag
     -> CLabel	    	    	-- default label
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
  -}
 
  mkJumpTable am alts lowTag highTag dflt =
-    getUniqLabelNCG 	    	    	    	    	`thenSUs` \ utlbl ->
-    mapSUs genLabel alts 	  	    	    	`thenSUs` \ branches ->
+    getUniqLabelNCG 	    	    	    	    	`thenUs` \ utlbl ->
+    mapUs genLabel alts 	  	    	    	`thenUs` \ branches ->
     let	cjmpLo = StCondJump dflt (StPrim IntLtOp [am, StInt lowTag])
     	cjmpHi = StCondJump dflt (StPrim IntGtOp [am, StInt highTag])
 
     	offset = StPrim IntSubOp [am, StInt lowTag]
-    	jump = StJump (StInd PtrKind (StIndex PtrKind (StCLbl utlbl) offset))
+    	jump = StJump (StInd PtrRep (StIndex PtrRep (StCLbl utlbl) offset))
 
     	tlbl = StLabel utlbl
-    	table = StData PtrKind (mkTable branches [lowTag..highTag] [])
-    in    
-    	mapSUs mkBranch branches       	    	    	`thenSUs` \ alts ->
+    	table = StData PtrRep (mkTable branches [lowTag..highTag] [])
+    in
+    	mapUs mkBranch branches       	    	    	`thenUs` \ alts ->
 
-        returnSUs (\xs -> cjmpLo : cjmpHi : jump : 
-                         StSegment DataSegment : tlbl : table : 
-                         StSegment TextSegment : foldr1 (.) alts xs)
+	returnUs (\xs -> cjmpLo : cjmpHi : jump :
+			 StSegment DataSegment : tlbl : table :
+			 StSegment TextSegment : foldr1 (.) alts xs)
 
     where
-    	genLabel x = getUniqLabelNCG `thenSUs` \ lbl -> returnSUs (lbl, x)
+    	genLabel x = getUniqLabelNCG `thenUs` \ lbl -> returnUs (lbl, x)
 
     	mkBranch (lbl,(_,alt)) =
-            gencode alt  	    		`thenSUs` \ alt_code ->
-    	    returnSUs (\xs -> StLabel lbl : alt_code xs)
+	    gencode alt  	    		`thenUs` \ alt_code ->
+    	    returnUs (\xs -> StLabel lbl : alt_code xs)
 
     	mkTable _  []     tbl = reverse tbl
     	mkTable [] (x:xs) tbl = mkTable [] xs (StCLbl dflt : tbl)
@@ -503,51 +494,51 @@ is longer.)  We can handle either integer or floating kind alternatives,
 so long as they are not mixed.  (We assume that the type of the discriminant
 determines the type of the alternatives.)
 
-As with the jump table approach, if a join is necessary after the switch, the 
+As with the jump table approach, if a join is necessary after the switch, the
 alternatives should already finish with a jump to the join point.
 
 \begin{code}
  {-
- mkBinaryTree 
-    :: Target 
+ mkBinaryTree
+    :: Target
     -> StixTree  	    	-- discriminant
     -> Bool 	    	    	-- floating point?
-    -> [(BasicLit, AbstractC)] 	-- alternatives
+    -> [(Literal, AbstractC)] 	-- alternatives
     -> Int  	    	    	-- number of choices
-    -> BasicLit     	    	-- low tag
-    -> BasicLit     	    	-- high tag
+    -> Literal     	    	-- low tag
+    -> Literal     	    	-- high tag
     -> CLabel	    	    	-- default code label
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
  -}
 
- mkBinaryTree am floating [(tag,alt)] _ lowTag highTag udlbl 
+ mkBinaryTree am floating [(tag,alt)] _ lowTag highTag udlbl
   | rangeOfOne = gencode alt
-  | otherwise = 
+  | otherwise =
     let	tag' = a2stix (CLit tag)
     	cmpOp = if floating then DoubleNeOp else IntNeOp
     	test = StPrim cmpOp [am, tag']
     	cjmp = StCondJump udlbl test
     in
-    	gencode alt 	    	    	    	`thenSUs` \ alt_code ->
-        returnSUs (\xs -> cjmp : alt_code xs)
+    	gencode alt 	    	    	    	`thenUs` \ alt_code ->
+	returnUs (\xs -> cjmp : alt_code xs)
 
-    where 
+    where
     	rangeOfOne = not floating && intTag lowTag + 1 >= intTag highTag
     	-- When there is only one possible tag left in range, we skip the comparison
 
  mkBinaryTree am floating alts choices lowTag highTag udlbl =
-    getUniqLabelNCG					`thenSUs` \ uhlbl ->
+    getUniqLabelNCG					`thenUs` \ uhlbl ->
     let tag' = a2stix (CLit splitTag)
     	cmpOp = if floating then DoubleGeOp else IntGeOp
     	test = StPrim cmpOp [am, tag']
     	cjmp = StCondJump uhlbl test
     in
     	mkBinaryTree am floating alts_lo half lowTag splitTag udlbl
-    	    	    	    	    	    	  	`thenSUs` \ lo_code ->
+    	    	    	    	    	    	  	`thenUs` \ lo_code ->
     	mkBinaryTree am floating alts_hi (choices - half) splitTag highTag udlbl
-    	    	    	    	    		    	`thenSUs` \ hi_code ->
+    	    	    	    	    		    	`thenUs` \ hi_code ->
 
-        returnSUs (\xs -> cjmp : lo_code (StLabel uhlbl : hi_code xs))
+	returnUs (\xs -> cjmp : lo_code (StLabel uhlbl : hi_code xs))
 
     where
     	half = choices `div` 2
@@ -558,34 +549,34 @@ alternatives should already finish with a jump to the join point.
 
 \begin{code}
  {-
- mkIfThenElse 
-    :: Target 
+ mkIfThenElse
+    :: Target
     -> CAddrMode    	    -- discriminant
-    -> BasicLit     	    -- tag
+    -> Literal     	    -- tag
     -> AbstractC    	    -- if-part
     -> AbstractC    	    -- else-part
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
  -}
 
  mkIfThenElse discrim tag alt deflt =
-    getUniqLabelNCG					`thenSUs` \ ujlbl ->
-    getUniqLabelNCG					`thenSUs` \ utlbl ->
+    getUniqLabelNCG					`thenUs` \ ujlbl ->
+    getUniqLabelNCG					`thenUs` \ utlbl ->
     let discrim' = a2stix discrim
     	tag' = a2stix (CLit tag)
-    	cmpOp = if (isFloatingKind (getAmodeKind discrim)) then DoubleNeOp else IntNeOp
+    	cmpOp = if (isFloatingRep (getAmodeRep discrim)) then DoubleNeOp else IntNeOp
     	test = StPrim cmpOp [discrim', tag']
     	cjmp = StCondJump utlbl test
     	dest = StLabel utlbl
     	join = StLabel ujlbl
     in
-        gencode (mkJoin alt ujlbl)		`thenSUs` \ alt_code ->
-        gencode deflt				`thenSUs` \ dflt_code ->
-        returnSUs (\xs -> cjmp : alt_code (dest : dflt_code (join : xs)))
+	gencode (mkJoin alt ujlbl)		`thenUs` \ alt_code ->
+	gencode deflt				`thenUs` \ dflt_code ->
+	returnUs (\xs -> cjmp : alt_code (dest : dflt_code (join : xs)))
 
 mkJoin :: AbstractC -> CLabel -> AbstractC
 
-mkJoin code lbl 
-  | mightFallThrough code = mkAbsCStmts code (CJump (CLbl lbl PtrKind))
+mkJoin code lbl
+  | mightFallThrough code = mkAbsCStmts code (CJump (CLbl lbl PtrRep))
   | otherwise = code
 \end{code}
 
@@ -605,7 +596,7 @@ mightFallThrough absC = ft absC True
 
   ft (CJump _)       if_empty = False
   ft (CReturn _ _)   if_empty = False
-  ft (CSwitch _ alts deflt) if_empty 
+  ft (CSwitch _ alts deflt) if_empty
 	= ft deflt if_empty ||
 	  or [ft alt if_empty | (_,alt) <- alts]
 

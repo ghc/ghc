@@ -12,28 +12,23 @@
 
 module CgCase (
 	cgCase,
-    	saveVolatileVarsAndRegs,
+    	saveVolatileVarsAndRegs
 
 	-- and to make the interface self-sufficient...
-	StgExpr, Id, StgCaseAlternatives, CgState
     ) where
-
-IMPORT_Trace		-- ToDo: rm (debugging)
-import Outputable
-import Pretty
 
 import StgSyn
 import CgMonad
 import AbsCSyn
 
-import AbsPrel		( PrimOp(..), primOpCanTriggerGC
+import PrelInfo		( PrimOp(..), primOpCanTriggerGC
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( kindFromType, getTyConDataCons,
+import Type		( primRepFromType, getTyConDataCons,
 			  getUniDataSpecTyCon, getUniDataSpecTyCon_maybe,
 			  isEnumerationTyCon,
-			  UniType
+			  Type
 			)
 import CgBindery	-- all of it
 import CgCon		( buildDynCon, bindConArgs )
@@ -43,19 +38,18 @@ import CgRetConv	-- lots of stuff
 import CgStackery	-- plenty
 import CgTailCall	( tailCallBusiness, performReturn )
 import CgUsages		-- and even more
-import CLabelInfo	-- bunches of things...
+import CLabel	-- bunches of things...
 import ClosureInfo	{-( blackHoleClosureInfo, mkConLFInfo, mkLFArgument,
 			  layOutDynCon
 			)-}
-import CmdLineOpts	( GlobalSwitch(..) )
 import CostCentre	( useCurrentCostCentre, CostCentre )
-import BasicLit		( kindOfBasicLit )
-import Id		( getDataConTag, getIdKind, fIRST_TAG, isDataCon,
+import Literal		( literalPrimRep )
+import Id		( getDataConTag, getIdPrimRep, fIRST_TAG, isDataCon,
 			  toplevelishId, getInstantiatedDataConSig,
 			  ConTag(..), DataCon(..)
 			)
 import Maybes		( catMaybes, Maybe(..) )
-import PrimKind		( getKindSize, isFollowableKind, retKindSize, PrimKind(..) )
+import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize, PrimRep(..) )
 import UniqSet		-- ( uniqSetToList, UniqSet(..) )
 import Util
 \end{code}
@@ -73,7 +67,7 @@ data GCFlag
 It is quite interesting to decide whether to put a heap-check
 at the start of each alternative.  Of course we certainly have
 to do so if the case forces an evaluation, or if there is a primitive
-op which can trigger GC.  
+op which can trigger GC.
 
 A more interesting situation is this:
 
@@ -93,7 +87,7 @@ In favour of omitting \tr{!B!}, \tr{!C!}:
 
 \begin{itemize}
 \item
-{\em May} save a heap overflow test, 
+{\em May} save a heap overflow test,
 	if ...A... allocates anything.  The other advantage
 	of this is that we can use relative addressing
 	from a single Hp to get at all the closures so allocated.
@@ -102,7 +96,7 @@ In favour of omitting \tr{!B!}, \tr{!C!}:
 \end{itemize}
 
 Against:
-	
+
 \begin{itemize}
 \item
    May do more allocation than reqd.  This sometimes bites us
@@ -122,11 +116,11 @@ If these things are done, then the heap checks can be done at \tr{!B!} and
 \tr{!C!} without a full save-volatile-vars sequence.
 
 \begin{code}
-cgCase	:: PlainStgExpr
-	-> PlainStgLiveVars
-	-> PlainStgLiveVars
+cgCase	:: StgExpr
+	-> StgLiveVars
+	-> StgLiveVars
 	-> Unique
-	-> PlainStgCaseAlternatives
+	-> StgCaseAlts
 	-> Code
 \end{code}
 
@@ -158,7 +152,7 @@ we just bomb out at the moment. It never happens in practice.
 **** END OF TO DO TO DO
 
 \begin{code}
-cgCase scrut@(StgPrimApp op args _) live_in_whole_case live_in_alts uniq 
+cgCase scrut@(StgPrim op args _) live_in_whole_case live_in_alts uniq
        (StgAlgAlts _ alts (StgBindDefault id _ deflt_rhs))
   = if not (null alts) then
     	panic "cgCase: case on PrimOp with default *and* alts\n"
@@ -172,17 +166,17 @@ cgCase scrut@(StgPrimApp op args _) live_in_whole_case live_in_alts uniq
   where
     scrut_rhs       = StgRhsClosure useCurrentCostCentre stgArgOcc{-safe-} scrut_free_vars
 				Updatable [] scrut
-    scrut_free_vars = [ fv | StgVarAtom fv <- args, not (toplevelishId fv) ]
+    scrut_free_vars = [ fv | StgVarArg fv <- args, not (toplevelishId fv) ]
 			-- Hack, hack
 \end{code}
 
 
 \begin{code}
-cgCase (StgPrimApp op args _) live_in_whole_case live_in_alts uniq alts
+cgCase (StgPrim op args _) live_in_whole_case live_in_alts uniq alts
   | not (primOpCanTriggerGC op)
   =
 	-- Get amodes for the arguments and results
-    getPrimOpArgAmodes op args			`thenFC` \ arg_amodes -> 
+    getPrimOpArgAmodes op args			`thenFC` \ arg_amodes ->
     let
 	result_amodes = getPrimAppResultAmodes uniq alts
 	liveness_mask = panic "cgCase: liveness of non-GC-ing primop touched\n"
@@ -209,7 +203,7 @@ cgCase (StgPrimApp op args _) live_in_whole_case live_in_alts uniq alts
 
     	op_result_amodes = map CReg op_result_regs
 
-	(op_arg_amodes, liveness_mask, arg_assts) 
+	(op_arg_amodes, liveness_mask, arg_assts)
 	  = makePrimOpArgsRobust {-NO:isw_chkr-} op arg_amodes
 
 	liveness_arg  = mkIntCLit liveness_mask
@@ -224,33 +218,33 @@ cgCase (StgPrimApp op args _) live_in_whole_case live_in_alts uniq alts
     saveVolatileVars live_in_alts	`thenFC` \ volatile_var_save_assts ->
 
     getEndOfBlockInfo                 	`thenFC` \ eob_info ->
-    forkEval eob_info nopC 
+    forkEval eob_info nopC
 	     (getAbsC (cgInlineAlts GCMayHappen uniq alts) `thenFC` \ abs_c ->
-              absC (CRetUnVector vtbl_label (CLabelledCode return_label abs_c))
+	      absC (CRetUnVector vtbl_label (CLabelledCode return_label abs_c))
     	    	    	    	    	`thenC`
-	      returnFC (CaseAlts (CUnVecLbl return_label vtbl_label) 
-                                 Nothing{-no semi-tagging-}))
+	      returnFC (CaseAlts (CUnVecLbl return_label vtbl_label)
+				 Nothing{-no semi-tagging-}))
 	    `thenFC` \ new_eob_info ->
 
 	-- Record the continuation info
     setEndOfBlockInfo new_eob_info (
 
-	-- Now "return" to the inline alternatives; this will get 
+	-- Now "return" to the inline alternatives; this will get
 	-- compiled to a fall-through.
     let
 	simultaneous_assts = arg_assts `mkAbsCStmts` volatile_var_save_assts
-	
+
 	-- do_op_and_continue will be passed an amode for the continuation
 	do_op_and_continue sequel
-          = absC (COpStmt op_result_amodes
+	  = absC (COpStmt op_result_amodes
 			  op
 			  (pin_liveness op liveness_arg op_arg_amodes)
 			  liveness_mask
 			  [{-no vol_regs-}])
     	    	    	    	    	`thenC`
 
-            sequelToAmode sequel        `thenFC` \ dest_amode ->
-            absC (CReturn dest_amode DirectReturn)
+	    sequelToAmode sequel        `thenFC` \ dest_amode ->
+	    absC (CReturn dest_amode DirectReturn)
 
 		-- Note: we CJump even for algebraic data types,
 		-- because cgInlineAlts always generates code, never a
@@ -290,15 +284,15 @@ This can be done a little better than the general case, because
 we can reuse/trim the stack slot holding the variable (if it is in one).
 
 \begin{code}
-cgCase (StgApp (StgVarAtom fun) args _ {-lvs must be same as live_in_alts-}) 
-        live_in_whole_case live_in_alts uniq alts@(StgAlgAlts _ _ _)
+cgCase (StgApp (StgVarArg fun) args _ {-lvs must be same as live_in_alts-})
+	live_in_whole_case live_in_alts uniq alts@(StgAlgAlts _ _ _)
   =
     getCAddrModeAndInfo fun		`thenFC` \ (fun_amode, lf_info) ->
     getAtomAmodes args			`thenFC` \ arg_amodes ->
 
 	-- Squish the environment
     nukeDeadBindings live_in_alts	`thenC`
-    saveVolatileVarsAndRegs live_in_alts 
+    saveVolatileVarsAndRegs live_in_alts
     	    	    	`thenFC` \ (save_assts, alts_eob_info, maybe_cc_slot) ->
 
     forkEval alts_eob_info
@@ -318,10 +312,10 @@ cgCase expr live_in_whole_case live_in_alts uniq alts
     saveVolatileVarsAndRegs live_in_alts
     	    	    	`thenFC` \ (save_assts, alts_eob_info, maybe_cc_slot) ->
 
-	-- Save those variables right now!	
+	-- Save those variables right now!
     absC save_assts 	    	    	`thenC`
 
-    forkEval alts_eob_info 
+    forkEval alts_eob_info
     	(nukeDeadBindings live_in_alts)
 	(cgEvalAlts maybe_cc_slot uniq alts) `thenFC` \ scrut_eob_info ->
 
@@ -347,7 +341,7 @@ invented by CgAlgAlts.
 \begin{code}
 getPrimAppResultAmodes
 	:: Unique
-	-> PlainStgCaseAlternatives
+	-> StgCaseAlts
 	-> [CAddrMode]
 \end{code}
 
@@ -373,7 +367,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts (StgBindDefault _ True {- used -
   where
     -- A temporary variable to hold the tag; this is unaffected by GC because
     -- the heap-checks in the branches occur after the switch
-    tag_amode     = CTemp uniq IntKind
+    tag_amode     = CTemp uniq IntRep
     (spec_tycon, _, _) = getUniDataSpecTyCon ty
 
 getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
@@ -384,7 +378,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
   where
     -- A temporary variable to hold the tag; this is unaffected by GC because
     -- the heap-checks in the branches occur after the switch
-    tag_amode = CTemp uniq IntKind
+    tag_amode = CTemp uniq IntRep
 
     -- Sort alternatives into canonical order; there must be a complete
     -- set because there's no default case.
@@ -396,7 +390,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts other_default)
     -- Turn them into amodes
     arg_amodes = concat (map mk_amodes sorted_alts)
     mk_amodes (con, args, use_mask, rhs)
-      = [ CTemp (getTheUnique arg) (getIdKind arg) | arg <- args ]
+      = [ CTemp (getItsUnique arg) (getIdPrimRep arg) | arg <- args ]
 \end{code}
 
 The situation is simpler for primitive
@@ -406,7 +400,7 @@ results, because there is only one!
 getPrimAppResultAmodes uniq (StgPrimAlts ty _ _)
   = [CTemp uniq kind]
   where
-    kind = kindFromType ty
+    kind = primRepFromType ty
 \end{code}
 
 
@@ -423,7 +417,7 @@ is some evaluation to be done.
 \begin{code}
 cgEvalAlts :: Maybe VirtualSpBOffset	-- Offset of cost-centre to be restored, if any
 	   -> Unique
-	   -> PlainStgCaseAlternatives
+	   -> StgCaseAlts
 	   -> FCode Sequel		-- Any addr modes inside are guaranteed to be a label
 					-- so that we can duplicate it without risk of
 					-- duplicating code
@@ -445,7 +439,7 @@ cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
     let
 	(spec_tycon, _, _) = getUniDataSpecTyCon ty
 
-	use_labelled_alts 
+	use_labelled_alts
 	  = case ctrlReturnConvAlg spec_tycon of
 	      VectoredReturn _ -> True
 	      _	    	       -> False
@@ -471,8 +465,8 @@ cgEvalAlts cc_slot uniq (StgPrimAlts ty alts deflt)
     getAbsC (cgPrimAlts GCMayHappen uniq ty alts deflt)  `thenFC` \ abs_c ->
 
 	-- Generate the labelled block, starting with restore-cost-centre
-    absC (CRetUnVector vtbl_label 
-         (CLabelledCode return_label (cc_restore `mkAbsCStmts` abs_c)))
+    absC (CRetUnVector vtbl_label
+	 (CLabelledCode return_label (cc_restore `mkAbsCStmts` abs_c)))
     	    	    	    	    	    	    	 `thenC`
 	-- Return an amode for the block
     returnFC (CaseAlts (CUnVecLbl return_label vtbl_label) Nothing{-no semi-tagging-})
@@ -484,7 +478,7 @@ cgEvalAlts cc_slot uniq (StgPrimAlts ty alts deflt)
 
 \begin{code}
 cgInlineAlts :: GCFlag -> Unique
-    	     -> PlainStgCaseAlternatives
+    	     -> StgCaseAlts
     	     -> Code
 \end{code}
 
@@ -511,22 +505,7 @@ cgInlineAlts gc_flag uniq (StgAlgAlts ty alts deflt)
  where
     -- A temporary variable to hold the tag; this is unaffected by GC because
     -- the heap-checks in the branches occur after the switch
-    tag_amode = CTemp uniq IntKind
-\end{code}
-
-=========== OLD: we *can* now handle this case ================
-
-Next, a case we can't deal with: an algebraic case with no evaluation
-required (so it is in-line), and a default case as well.  In this case
-we require all the alternatives written out, so that we can invent
-suitable binders to pass to the PrimOp. A default case defeats this.
-Could be fixed, but probably isn't worth it.
-
-\begin{code}
-{- ============= OLD
-cgInlineAlts gc_flag uniq (StgAlgAlts ty alts other_default)
-  = panic "cgInlineAlts: alg alts with default"
-================= END OF OLD -}
+    tag_amode = CTemp uniq IntRep
 \end{code}
 
 Third (real) case: primitive result type.
@@ -551,9 +530,9 @@ cgAlgAlts :: GCFlag
 	  -> Unique
 	  -> AbstractC				-- Restore-cost-centre instruction
 	  -> Bool				-- True <=> branches must be labelled
-	  -> UniType	    	    	    	-- From the case statement
-	  -> [(Id, [Id], [Bool], PlainStgExpr)]	-- The alternatives
-	  -> PlainStgCaseDefault		-- The default
+	  -> Type	    	    	    	-- From the case statement
+	  -> [(Id, [Id], [Bool], StgExpr)]	-- The alternatives
+	  -> StgCaseDefault		-- The default
 	  -> FCode ([(ConTag, AbstractC)],	-- The branches
 		    AbstractC			-- The default case
 	     )
@@ -566,7 +545,7 @@ them explicitly in the heap, and jump to a join point for the default
 case.
 
 OLD:  All of this only works if a heap-check is required anyway, because
-otherwise it isn't safe to allocate. 
+otherwise it isn't safe to allocate.
 
 NEW (July 94): now false!  It should work regardless of gc_flag,
 because of the extra_branches argument now added to forkAlts.
@@ -594,7 +573,7 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
   where
 
     default_join_lbl = mkDefaultLabel uniq
-    jump_instruction = CJump (CLbl default_join_lbl CodePtrKind)
+    jump_instruction = CJump (CLbl default_join_lbl CodePtrRep)
 
     (spec_tycon, _, spec_cons)
       = -- trace ("cgCase:tycon:"++(ppShow 80 (ppAboves [
@@ -608,7 +587,7 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
     alt_cons = [ con | (con,_,_,_) <- alts ]
 
     default_cons  = [ spec_con | spec_con <- spec_cons,	-- In this type
-			         spec_con `not_elem` alt_cons ]	-- Not handled explicitly
+				 spec_con `not_elem` alt_cons ]	-- Not handled explicitly
 	where
 	  not_elem = isn'tIn "cgAlgAlts"
 
@@ -640,19 +619,19 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
 		buildDynCon binder useCurrentCostCentre con
 				(map CReg regs) (all zero_size regs)
 						`thenFC` \ idinfo ->
-		idInfoToAmode PtrKind idinfo	`thenFC` \ amode ->
+		idInfoToAmode PtrRep idinfo	`thenFC` \ amode ->
 
 		absC (CAssign (CReg node) amode) `thenC`
 		absC jump_instruction
 	    )
 	  where
-	    zero_size reg = getKindSize (kindFromMagicId reg) == 0
+	    zero_size reg = getPrimRepSize (kindFromMagicId reg) == 0
 \end{code}
 
 Now comes the general case
 
 \begin{code}
-cgAlgAlts gc_flag uniq restore_cc must_label_branches ty alts deflt 
+cgAlgAlts gc_flag uniq restore_cc must_label_branches ty alts deflt
 	{- The deflt is either StgNoDefault or a BindDefault which doesn't use the binder -}
   = forkAlts (map (cgAlgAlt gc_flag uniq restore_cc must_label_branches) alts)
 	     [{- No "extra branches" -}]
@@ -662,7 +641,7 @@ cgAlgAlts gc_flag uniq restore_cc must_label_branches ty alts deflt
 \begin{code}
 cgAlgDefault :: GCFlag
 	     -> Unique -> AbstractC -> Bool -- turgid state...
-	     -> PlainStgCaseDefault	    -- input
+	     -> StgCaseDefault	    -- input
 	     -> FCode AbstractC		    -- output
 
 cgAlgDefault gc_flag uniq restore_cc must_label_branch
@@ -707,12 +686,12 @@ cgAlgDefault gc_flag uniq restore_cc must_label_branch
 
 cgAlgAlt :: GCFlag
 	 -> Unique -> AbstractC -> Bool		-- turgid state
-	 -> (Id, [Id], [Bool], PlainStgExpr)
+	 -> (Id, [Id], [Bool], StgExpr)
 	 -> FCode (ConTag, AbstractC)
 
 cgAlgAlt gc_flag uniq restore_cc must_label_branch (con, args, use_mask, rhs)
   = getAbsC (absC restore_cc `thenC`
-	     cgAlgAltRhs gc_flag con args use_mask rhs) `thenFC` \ abs_c -> 
+	     cgAlgAltRhs gc_flag con args use_mask rhs) `thenFC` \ abs_c ->
     let
 	final_abs_c | must_label_branch = CJump (CLabelledCode lbl abs_c)
 		    | otherwise	        = abs_c
@@ -722,7 +701,7 @@ cgAlgAlt gc_flag uniq restore_cc must_label_branch (con, args, use_mask, rhs)
     tag	= getDataConTag con
     lbl = mkAltLabel uniq tag
 
-cgAlgAltRhs :: GCFlag -> Id -> [Id] -> [Bool] -> PlainStgExpr -> Code
+cgAlgAltRhs :: GCFlag -> Id -> [Id] -> [Bool] -> StgExpr -> Code
 
 cgAlgAltRhs gc_flag con args use_mask rhs
   = getIntSwitchChkrC	`thenFC` \ isw_chkr ->
@@ -738,11 +717,11 @@ cgAlgAltRhs gc_flag con args use_mask rhs
     in
     possibleHeapCheck gc_flag live_regs node_reqd (
     (case gc_flag of
-        NoGC   	    -> mapFCs bindNewToTemp args `thenFC` \ _ ->
+	NoGC   	    -> mapFCs bindNewToTemp args `thenFC` \ _ ->
 		       nopC
     	GCMayHappen -> bindConArgs con args
     )	`thenC`
-    cgExpr rhs 
+    cgExpr rhs
     )
 \end{code}
 
@@ -758,8 +737,8 @@ algebraic case alternatives for semi-tagging.
 \begin{code}
 cgSemiTaggedAlts :: IntSwitchChecker
 		 -> Unique
-		 -> [(Id, [Id], [Bool], PlainStgExpr)]
-		 -> StgCaseDefault Id Id
+		 -> [(Id, [Id], [Bool], StgExpr)]
+		 -> GenStgCaseDefault Id Id
 		 -> SemiTaggingStuff
 
 cgSemiTaggedAlts isw_chkr uniq alts deflt
@@ -792,7 +771,7 @@ cgSemiTaggedAlts isw_chkr uniq alts deflt
 
 		used_regs = selectByMask use_mask regs
 
-		used_regs_w_offsets = [ ro | ro@(reg,offset) <- regs_w_offsets, 
+		used_regs_w_offsets = [ ro | ro@(reg,offset) <- regs_w_offsets,
 					     reg `is_elem` used_regs]
 
 		is_elem = isIn "cgSemiTaggedAlts"
@@ -829,9 +808,9 @@ As usual, no binders in the alternatives are yet bound.
 \begin{code}
 cgPrimAlts :: GCFlag
 	   -> Unique
-    	   -> UniType	
-	   -> [(BasicLit, PlainStgExpr)]	-- Alternatives
-	   -> PlainStgCaseDefault		-- Default
+    	   -> Type
+	   -> [(Literal, StgExpr)]	-- Alternatives
+	   -> StgCaseDefault		-- Default
 	   -> Code
 
 cgPrimAlts gc_flag uniq ty alts deflt
@@ -842,7 +821,7 @@ cgPrimAlts gc_flag uniq ty alts deflt
 		     NoGC	 -> CTemp uniq kind
 		     GCMayHappen -> CReg (dataReturnConvPrim kind)
 
-    kind = kindFromType ty
+    kind = primRepFromType ty
 
 
 cgPrimAltsGivenScrutinee gc_flag scrutinee alts deflt
@@ -854,8 +833,8 @@ cgPrimAltsGivenScrutinee gc_flag scrutinee alts deflt
 
 
 cgPrimAlt :: GCFlag
-	  -> (BasicLit, PlainStgExpr)    -- The alternative
-	  -> FCode (BasicLit, AbstractC) -- Its compiled form
+	  -> (Literal, StgExpr)    -- The alternative
+	  -> FCode (Literal, AbstractC) -- Its compiled form
 
 cgPrimAlt gc_flag (lit, rhs)
   = getAbsC rhs_code	 `thenFC` \ absC ->
@@ -865,7 +844,7 @@ cgPrimAlt gc_flag (lit, rhs)
 
 cgPrimDefault :: GCFlag
 	      -> CAddrMode		-- Scrutinee
-	      -> PlainStgCaseDefault
+	      -> StgCaseDefault
 	      -> FCode AbstractC
 
 cgPrimDefault gc_flag scrutinee StgNoDefault
@@ -877,7 +856,7 @@ cgPrimDefault gc_flag scrutinee (StgBindDefault _ False{-binder not used-} rhs)
 cgPrimDefault gc_flag scrutinee (StgBindDefault binder True{-used-} rhs)
   = getAbsC (possibleHeapCheck gc_flag regs False rhs_code)
   where
-    regs = if isFollowableKind (getAmodeKind scrutinee) then
+    regs = if isFollowableRep (getAmodeRep scrutinee) then
 	      [node] else []
 
     rhs_code = bindNewPrimToAmode binder scrutinee `thenC`
@@ -893,10 +872,10 @@ cgPrimDefault gc_flag scrutinee (StgBindDefault binder True{-used-} rhs)
 
 \begin{code}
 saveVolatileVarsAndRegs
-    :: PlainStgLiveVars               -- Vars which should be made safe
+    :: StgLiveVars               -- Vars which should be made safe
     -> FCode (AbstractC,              -- Assignments to do the saves
        EndOfBlockInfo,                -- New sequel, recording where the return
-                                      -- address now is
+				      -- address now is
        Maybe VirtualSpBOffset)        -- Slot for current cost centre
 
 
@@ -905,11 +884,11 @@ saveVolatileVarsAndRegs vars
     saveCurrentCostCentre     `thenFC` \ (maybe_cc_slot, cc_save) ->
     saveReturnAddress         `thenFC` \ (new_eob_info, ret_save) ->
     returnFC (mkAbstractCs [var_saves, cc_save, ret_save],
-              new_eob_info,
-              maybe_cc_slot)
+	      new_eob_info,
+	      maybe_cc_slot)
 
 
-saveVolatileVars :: PlainStgLiveVars	-- Vars which should be made safe
+saveVolatileVars :: StgLiveVars	-- Vars which should be made safe
 		 -> FCode AbstractC	-- Assignments to to the saves
 
 saveVolatileVars vars
@@ -921,7 +900,7 @@ saveVolatileVars vars
       = getCAddrModeIfVolatile var `thenFC` \ v ->
 	case v of
 	    Nothing	    -> save_em vars -- Non-volatile, so carry on
-			       
+
 
 	    Just vol_amode  ->	-- Aha! It's volatile
 			       save_var var vol_amode 	`thenFC` \ abs_c ->
@@ -929,31 +908,31 @@ saveVolatileVars vars
 			       returnFC (abs_c `mkAbsCStmts` abs_cs)
 
     save_var var vol_amode
-      | isFollowableKind kind
+      | isFollowableRep kind
       = allocAStack 			`thenFC` \ a_slot ->
 	rebindToAStack var a_slot 	`thenC`
 	getSpARelOffset a_slot		`thenFC` \ spa_rel ->
 	returnFC (CAssign (CVal spa_rel kind) vol_amode)
       | otherwise
-      = allocBStack (getKindSize kind) 	`thenFC` \ b_slot ->
+      = allocBStack (getPrimRepSize kind) 	`thenFC` \ b_slot ->
 	rebindToBStack var b_slot 	`thenC`
 	getSpBRelOffset b_slot		`thenFC` \ spb_rel ->
 	returnFC (CAssign (CVal spb_rel kind) vol_amode)
       where
-        kind = getAmodeKind vol_amode
+	kind = getAmodeRep vol_amode
 
 saveReturnAddress :: FCode (EndOfBlockInfo, AbstractC)
-saveReturnAddress 
+saveReturnAddress
   = getEndOfBlockInfo                `thenFC` \ eob_info@(EndOfBlockInfo vA vB sequel) ->
 
       -- See if it is volatile
     case sequel of
       InRetReg ->     -- Yes, it's volatile
-                   allocBStack retKindSize    `thenFC` \ b_slot ->
-                   getSpBRelOffset b_slot      `thenFC` \ spb_rel ->
+		   allocBStack retPrimRepSize    `thenFC` \ b_slot ->
+		   getSpBRelOffset b_slot      `thenFC` \ spb_rel ->
 
-                   returnFC (EndOfBlockInfo vA vB (OnStack b_slot),
-                             CAssign (CVal spb_rel RetKind) (CReg RetReg))
+		   returnFC (EndOfBlockInfo vA vB (OnStack b_slot),
+			     CAssign (CVal spb_rel RetRep) (CReg RetReg))
 
       UpdateCode _ ->   -- It's non-volatile all right, but we still need
 			-- to allocate a B-stack slot for it, *solely* to make
@@ -961,11 +940,11 @@ saveReturnAddress
 			-- appear adjacent on the B stack. This makes sure
 			-- that B-stack squeezing works ok.
 			-- See note below
-                   allocBStack retKindSize    `thenFC` \ b_slot ->
-	           returnFC (eob_info, AbsCNop)
+		   allocBStack retPrimRepSize    `thenFC` \ b_slot ->
+		   returnFC (eob_info, AbsCNop)
 
       other ->     	 -- No, it's non-volatile, so do nothing
-                   returnFC (eob_info, AbsCNop)
+		   returnFC (eob_info, AbsCNop)
 \end{code}
 
 Note about B-stack squeezing.  Consider the following:`
@@ -992,7 +971,7 @@ virtual offset of the location, to pass on to the alternatives, and
 (b)~the assignment to do the save (just as for @saveVolatileVars@).
 
 \begin{code}
-saveCurrentCostCentre :: 
+saveCurrentCostCentre ::
 	FCode (Maybe VirtualSpBOffset,	-- Where we decide to store it
 					--   Nothing if not lexical CCs
 	       AbstractC)		-- Assignment to save it
@@ -1003,19 +982,19 @@ saveCurrentCostCentre
     if not doing_profiling then
 	returnFC (Nothing, AbsCNop)
     else
-	allocBStack (getKindSize CostCentreKind) `thenFC` \ b_slot ->
+	allocBStack (getPrimRepSize CostCentreRep) `thenFC` \ b_slot ->
 	getSpBRelOffset b_slot		     	 `thenFC` \ spb_rel ->
 	returnFC (Just b_slot,
-		  CAssign (CVal spb_rel CostCentreKind) (CReg CurCostCentre))
+		  CAssign (CVal spb_rel CostCentreRep) (CReg CurCostCentre))
 
 restoreCurrentCostCentre :: Maybe VirtualSpBOffset -> FCode AbstractC
 
-restoreCurrentCostCentre Nothing 
+restoreCurrentCostCentre Nothing
  = returnFC AbsCNop
-restoreCurrentCostCentre (Just b_slot) 
+restoreCurrentCostCentre (Just b_slot)
  = getSpBRelOffset b_slot			 `thenFC` \ spb_rel ->
    freeBStkSlot b_slot				 `thenC`
-   returnFC (CCallProfCCMacro SLIT("RESTORE_CCC") [CVal spb_rel CostCentreKind])
+   returnFC (CCallProfCCMacro SLIT("RESTORE_CCC") [CVal spb_rel CostCentreRep])
     -- we use the RESTORE_CCC macro, rather than just
     -- assigning into CurCostCentre, in case RESTORE_CCC
     -- has some sanity-checking in it.
@@ -1033,7 +1012,7 @@ mode for it.
 
 \begin{code}
 mkReturnVector :: Unique
-	       -> UniType
+	       -> Type
 	       -> [(ConTag, AbstractC)] -- Branch codes
 	       -> AbstractC		-- Default case
 	       -> FCode CAddrMode
@@ -1045,15 +1024,15 @@ mkReturnVector uniq ty tagged_alt_absCs deflt_absC
       UnvectoredReturn _ ->
     	(CUnVecLbl ret_label vtbl_label,
 	 absC (CRetUnVector vtbl_label
-	                    (CLabelledCode ret_label
-    	    	    	    	    	   (mkAlgAltsCSwitch (CReg TagReg) 
-    	    	    	    	    	    	    	     tagged_alt_absCs 
-                                                             deflt_absC))));
+			    (CLabelledCode ret_label
+    	    	    	    	    	   (mkAlgAltsCSwitch (CReg TagReg)
+    	    	    	    	    	    	    	     tagged_alt_absCs
+							     deflt_absC))));
       VectoredReturn table_size ->
-    	(CLbl vtbl_label DataPtrKind,
+    	(CLbl vtbl_label DataPtrRep,
 	 absC (CRetVector vtbl_label
 			-- must restore cc before each alt, if required
-	                  (map mk_vector_entry [fIRST_TAG .. (table_size+fIRST_TAG-1)])
+			  (map mk_vector_entry [fIRST_TAG .. (table_size+fIRST_TAG-1)])
 			  deflt_absC))
 
 -- Leave nops and comments in for now; they are eliminated

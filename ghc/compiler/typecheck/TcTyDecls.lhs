@@ -1,280 +1,211 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The AQUA Project, Glasgow University, 1996
 %
-\section[TcTyDecls]{Typecheck algebraic datatypes and type synonyms}
+\section[TcTyDecls]{Typecheck type declarations}
 
 \begin{code}
 #include "HsVersions.h"
 
-module TcTyDecls ( tcTyDecls ) where
+module TcTyDecls (
+	tcTyDecl,
+	tcConDecl
+    ) where
 
-import TcMonad		-- typechecking monad machinery
-import AbsSyn		-- the stuff being typechecked
+import Ubiq{-uitous-}
 
-import AbsUniType	( applyTyCon, mkDataTyCon, mkSynonymTyCon,
-			  getUniDataTyCon, isUnboxedDataType,
-			  isTyVarTemplateTy, cmpUniTypeMaybeList,
-			  pprMaybeTy
-			)
-import CE		( lookupCE, CE(..) )
-import CmdLineOpts	( GlobalSwitch(..) )
-import E		( getE_TCE, getE_CE, plusGVE, nullGVE, GVE(..), E )
-import ErrUtils		( addShortErrLocLine )
-import Errors		( confusedNameErr, specDataNoSpecErr, specDataUnboxedErr )
-import FiniteMap	( FiniteMap, emptyFM, plusFM, singletonFM )
-import IdInfo		( SpecEnv, mkSpecEnv, SpecInfo(..) )
+import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), MonoType )
+import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..) )
+
+import TcMonoType	( tcMonoTypeKind, tcMonoType, tcContext )
+import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass )
+import TcMonad
+import TcKind		( TcKind, unifyKind, mkTcArrowKind, mkTcTypeKind )
+
+import Id		( mkDataCon, StrictnessMark(..) )
+import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
+import SpecEnv		( SpecEnv(..), nullSpecEnv )
+import Name		( getNameFullName, Name(..) )
 import Pretty
-import SpecTyFuns	( specialiseConstrTys )
-import TCE		-- ( nullTCE, unitTCE, lookupTCE, plusTCE, TCE(..), UniqFM )
-import TVE		( mkTVE, TVE(..) )
-import TcConDecls	( tcConDecls )
-import TcMonoType	( tcMonoType )
-import TcPragmas	( tcDataPragmas, tcTypePragmas )
-import Util
+import TyCon		( TyCon, ConsVisible(..), NewOrData(..), mkSynTyCon, mkDataTyCon )
+import Type		( getTypeKind )
+import TyVar		( getTyVarKind )
+import Util		( panic )
+
 \end{code}
 
-We consult the @CE@/@TCE@ arguments {\em only} to build knots!
+\begin{code}
+tcTyDecl :: RenamedTyDecl -> TcM s TyCon
+\end{code}
 
-The resulting @TCE@ has info about the type constructors in it; the
-@GVE@ has info about their data constructors.
+Type synonym decls
+~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tcTyDecls :: E
-	  -> (Name -> Bool)			-- given Name, is it an abstract synonym?
-	  -> (Name -> [RenamedDataTypeSig])	-- given Name, get specialisation pragmas
-	  -> [RenamedTyDecl]
-	  -> Baby_TcM (TCE, GVE, 
-		       FiniteMap TyCon [(Bool, [Maybe UniType])])
-						-- specialisations:
-						--   True  => imported data types i.e. from interface file
-						--   False => local data types i.e. requsted by source pragmas
+tcTyDecl (TySynonym tycon_name tyvar_names rhs src_loc)
+  = tcAddSrcLoc src_loc $
+    tcAddErrCtxt (tySynCtxt tycon_name) $
 
-tcTyDecls e _ _ [] = returnB_Tc (nullTCE, nullGVE, emptyFM)
+	-- Look up the pieces
+    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind,  rec_tycon) ->
+    mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
 
-tcTyDecls e is_abs_syn get_spec_sigs (tyd: tyds)
-  = tc_decl   tyd	    `thenB_Tc` \ (tce1, gve1, specs1) ->
-    tcTyDecls e is_abs_syn get_spec_sigs tyds
-			    `thenB_Tc` \ (tce2, gve2, specs2) ->
+	-- Look at the rhs
+    tcMonoTypeKind rhs				`thenTc` \ (rhs_kind, rhs_ty) ->
+
+	-- Unify tycon kind with (k1->...->kn->rhs)
+    unifyKind tycon_kind
+	(foldr mkTcArrowKind rhs_kind tyvar_kinds)
+						`thenTc_`
     let
-	tce3   = tce1 `plusTCE` tce2
-	gve3   = gve1 `plusGVE` gve2
-	specs3 = specs1 `plusFM` specs2
+	-- Construct the tycon
+	result_kind, final_tycon_kind :: Kind 	-- NB not TcKind!
+	result_kind      = getTypeKind rhs_ty
+	final_tycon_kind = foldr (mkArrowKind . getTyVarKind) result_kind rec_tyvars
+
+	tycon = mkSynTyCon (getItsUnique tycon_name)
+			   (getNameFullName tycon_name)
+			   final_tycon_kind
+			   (length tyvar_names)
+			   rec_tyvars
+			   rhs_ty
     in
-    returnB_Tc (tce3, gve3, specs3)
-  where
-    rec_ce  = getE_CE  e
-    rec_tce = getE_TCE e
-
-    -- continued...
+    returnTc tycon
 \end{code}
 
-We don't need to substitute here, because the @TCE@s
-(which are at the top level) cannot contain free type variables.
+Algebraic data and newtype decls
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Gather relevant info:
 \begin{code}
-    tc_decl (TyData context name@(PreludeTyCon uniq full_name arity True{-"data"-})
-		    tyvars con_decls derivings pragmas src_loc)
-			    -- ToDo: context
-      = tc_data_decl uniq name full_name arity tyvars con_decls
-		     derivings pragmas src_loc
+tcTyDecl (TyData context tycon_name tyvar_names con_decls derivings pragmas src_loc)
+  = tcTyDataOrNew DataType context tycon_name tyvar_names con_decls derivings pragmas src_loc
 
-    tc_decl (TyData context name@(OtherTyCon uniq full_name arity True{-"data"-} _)
-		    tyvars con_decls derivings pragmas src_loc)
-			    -- ToDo: context
-      = tc_data_decl uniq name full_name arity tyvars con_decls
-		     derivings pragmas src_loc
+tcTyDecl (TyNew context tycon_name tyvar_names con_decl derivings pragmas src_loc)
+  = tcTyDataOrNew NewType  context tycon_name tyvar_names con_decl  derivings pragmas src_loc
 
-    tc_decl (TyData _ bad_name _ _ _ _ src_loc)
-      = failB_Tc (confusedNameErr "Bad name on a datatype constructor (a Prelude name?)"
-		    bad_name src_loc)
 
-    tc_decl (TySynonym name@(PreludeTyCon uniq full_name arity False{-"type"-})
-			tyvars mono_ty pragmas src_loc)
-      = tc_syn_decl uniq name full_name arity tyvars mono_ty pragmas src_loc
+tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc
+  = tcAddSrcLoc src_loc $
+    tcAddErrCtxt (tyDataCtxt tycon_name) $
 
-    tc_decl (TySynonym name@(OtherTyCon uniq full_name arity False{-"type"-} _)
-			tyvars mono_ty pragmas src_loc)
-      = tc_syn_decl uniq name full_name arity tyvars mono_ty pragmas src_loc
+	-- Lookup the pieces
+    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind,  rec_tycon) ->
+    mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
+    tc_derivs derivings				`thenNF_Tc` \ derived_classes ->
 
-    tc_decl (TySynonym bad_name _ _ _ src_loc)
-      = failB_Tc (confusedNameErr "Bad name on a type-synonym constructor (a Prelude name?)"
-		    bad_name src_loc)
-\end{code}
+	-- Typecheck the context
+    tcContext context				`thenTc` \ ctxt ->
 
-Real work for @data@ declarations:
-\begin{code}
-    tc_data_decl uniq name full_name arity tyvars con_decls derivings pragmas src_loc
-      = addSrcLocB_Tc src_loc (
-	let
-	    (tve, new_tyvars, _) = mkTVE tyvars
-	    rec_tycon		 = lookupTCE rec_tce name
-		-- We know the lookup will succeed, because we are just
-		-- about to put it in the outgoing TCE!
+	-- Unify tycon kind with (k1->...->kn->Type)
+    unifyKind tycon_kind
+	(foldr mkTcArrowKind mkTcTypeKind tyvar_kinds)
+						`thenTc_`
+	-- Walk the condecls
+    mapTc (tcConDecl rec_tycon rec_tyvars ctxt) con_decls
+						`thenTc` \ con_ids ->
+    let
+	-- Construct the tycon
+	final_tycon_kind :: Kind 		-- NB not TcKind!
+	final_tycon_kind = foldr (mkArrowKind . getTyVarKind) mkBoxedTypeKind rec_tyvars
 
-	    spec_sigs = get_spec_sigs name
-	in
-	tcSpecDataSigs rec_tce spec_sigs []	`thenB_Tc` \ user_spec_infos ->
-
-	recoverIgnoreErrorsB_Tc ([], []) (
-	    tcDataPragmas rec_tce tve rec_tycon new_tyvars pragmas
-	)		`thenB_Tc` \ (pragma_con_decls, pragma_spec_infos) ->
-	let
-	    (condecls_to_use, ignore_condecl_errors_if_pragma)
-	      = if null pragma_con_decls then
-	            (con_decls, id)
-	        else
-		    if null con_decls
-		    then (pragma_con_decls, recoverIgnoreErrorsB_Tc nullGVE)
-		    else panic "tcTyDecls:data: user and pragma condecls!"
-
-	    (imported_specs, specinfos_to_use)
-	      = if null pragma_spec_infos then
-		    (False, user_spec_infos)
-		else
-		    if null user_spec_infos
-		    then (True, pragma_spec_infos)
-		    else panic "tcTyDecls:data: user and pragma specinfos!"
-
-	    specenv_to_use = mkSpecEnv specinfos_to_use
-	in
-	ignore_condecl_errors_if_pragma
-	(tcConDecls rec_tce tve rec_tycon new_tyvars specenv_to_use condecls_to_use)
-							`thenB_Tc` \ gve ->
-	let
-	    condecls = map snd gve
-
-	    derived_classes = map (lookupCE rec_ce) derivings
-
-	    new_tycon
-	      = mkDataTyCon uniq
-			    full_name arity new_tyvars condecls
+	tycon = mkDataTyCon (getItsUnique tycon_name)
+			    final_tycon_kind
+			    (getNameFullName tycon_name)
+			    rec_tyvars
+			    ctxt
+			    con_ids
 			    derived_classes
-			    (null pragma_con_decls)
-			    -- if constrs are from pragma we are *abstract*
+			    ConsVisible		-- For now; if constrs are from pragma we are *abstract*
+			    data_or_new
+    in
+    returnTc tycon
+  where
+    tc_derivs Nothing   = returnNF_Tc []
+    tc_derivs (Just ds) = mapNF_Tc tc_deriv ds
 
-	    spec_list
-	      = [(imported_specs, maybe_tys) | (SpecInfo maybe_tys _ _) <- specinfos_to_use]
-
-	    spec_map
-	      = if null spec_list then
-		    emptyFM
-		else
-		    singletonFM rec_tycon spec_list
-	in
-	returnB_Tc (unitTCE uniq new_tycon, gve, spec_map)
-	    -- It's OK to return pragma condecls in gve, even
-	    -- though some of those names should be "invisible",
-	    -- because the *renamer* is supposed to have dealt with
-	    -- naming/scope issues already.
-	)
+    tc_deriv name
+      = tcLookupClass name `thenNF_Tc` \ (_, clas) ->
+	returnNF_Tc clas
 \end{code}
 
-Real work for @type@ (synonym) declarations:
+
+Constructors
+~~~~~~~~~~~~
 \begin{code}
-    tc_syn_decl uniq name full_name arity tyvars mono_ty pragmas src_loc
-      = addSrcLocB_Tc src_loc (
+tcConDecl :: TyCon -> [TyVar] -> [(Class,Type)] -> RenamedConDecl -> TcM s Id
 
-	let (tve, new_tyvars, _) = mkTVE tyvars
-	in
-	tcMonoType rec_ce rec_tce tve mono_ty	`thenB_Tc` \ expansion ->
-	let
-	    -- abstractness info either comes from the interface pragmas
-	    -- (tcTypePragmas) or from a user-pragma in this module
-	    -- (is_abs_syn)
-	    abstract = tcTypePragmas pragmas
-		    || is_abs_syn name
+tcConDecl tycon tyvars ctxt (ConDecl name btys src_loc)
+  = tcAddSrcLoc src_loc	$
+    let
+	(stricts, tys) = sep_bangs btys
+    in
+    mapTc tcMonoType tys `thenTc` \ arg_tys ->
+    let
+      data_con = mkDataCon (getItsUnique name)
+			   (getNameFullName name)
+			   stricts
+		      	   tyvars
+		      	   [] -- ToDo: ctxt; limited to tyvars in arg_tys
+		      	   arg_tys
+		      	   tycon
+			-- nullSpecEnv
+    in
+    returnTc data_con
 
-	    new_tycon = mkSynonymTyCon uniq full_name
-			    arity new_tyvars expansion (not abstract)
-	in
-	returnB_Tc (unitTCE uniq new_tycon, nullGVE, emptyFM)
-	)
+tcConDecl tycon tyvars ctxt (ConOpDecl bty1 op bty2 src_loc)
+  = tcAddSrcLoc src_loc	$
+    let
+	(stricts, tys) = sep_bangs [bty1, bty2]
+    in
+    mapTc tcMonoType tys `thenTc` \ arg_tys ->
+    let
+      data_con = mkDataCon (getItsUnique op)
+			   (getNameFullName op)
+			   stricts
+		      	   tyvars
+		      	   [] -- ToDo: ctxt
+		      	   arg_tys
+		      	   tycon
+			-- nullSpecEnv
+    in
+    returnTc data_con
+
+tcConDecl tycon tyvars ctxt (NewConDecl name ty src_loc)
+  = tcAddSrcLoc src_loc	$
+    tcMonoType ty `thenTc` \ arg_ty ->
+    let
+      data_con = mkDataCon (getItsUnique name)
+			   (getNameFullName name)
+			   [NotMarkedStrict]
+		      	   tyvars
+		      	   [] -- ToDo: ctxt
+		      	   [arg_ty]
+		      	   tycon
+			-- nullSpecEnv
+    in
+    returnTc data_con
+
+tcConDecl tycon tyvars ctxt (RecConDecl con fields src_loc)
+  = panic "tcConDecls:RecConDecl"
+
+
+sep_bangs btys
+  = unzip (map sep_bang btys)
+  where 
+    sep_bang (Banged ty)   = (MarkedStrict, ty)
+    sep_bang (Unbanged ty) = (NotMarkedStrict, ty)
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Specialisation Signatures for Data Type declarations}
-%*									*
-%************************************************************************
 
-@tcSpecDataSigs@ checks data type specialisation signatures for
-validity, and returns the list of specialisation requests.
 
+Errors and contexts
+~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcSpecDataSigs :: TCE
-	       -> [RenamedDataTypeSig]
-	       -> [(RenamedDataTypeSig,SpecInfo)]
-	       -> Baby_TcM [SpecInfo]
+tySynCtxt tycon_name sty
+  = ppCat [ppStr "In the type declaration for", ppr sty tycon_name]
 
-tcSpecDataSigs tce (s:ss) accum
-  = tc_sig s			`thenB_Tc` \ info  ->
-    tcSpecDataSigs tce ss ((s,info):accum)
-  where
-    tc_sig (SpecDataSig n ty src_loc)
-      = addSrcLocB_Tc src_loc (
-	let 
-	    ty_names  = extractMonoTyNames (==) ty
-	    (tve,_,_) = mkTVE ty_names
-	    fake_CE   = panic "tcSpecDataSigs:CE"
-	in
-	    -- Typecheck specialising type (includes arity check)
-	tcMonoType fake_CE tce tve ty			`thenB_Tc` \ tau_ty ->
-	let
-	    (_,ty_args,_) = getUniDataTyCon tau_ty
-	    is_unboxed_or_tyvar ty = isUnboxedDataType ty || isTyVarTemplateTy ty
-	in
-	    -- Check at least one unboxed type in specialisation
-	checkB_Tc (not (any isUnboxedDataType ty_args))
-		  (specDataNoSpecErr n ty_args src_loc) `thenB_Tc_`
+tyDataCtxt tycon_name sty
+  = ppCat [ppStr "In the data declaration for", ppr sty tycon_name]
 
-	    -- Check all types are unboxed or tyvars
-	    -- (specific boxed types are redundant)
-	checkB_Tc (not (all is_unboxed_or_tyvar ty_args))
-		  (specDataUnboxedErr n ty_args src_loc) `thenB_Tc_`
-
-	let
-	    maybe_tys     = specialiseConstrTys ty_args
-	in
-	returnB_Tc (SpecInfo maybe_tys 0 (panic "SpecData:SpecInfo:SpecId"))
-	)
-
-tcSpecDataSigs tce [] accum
-  = -- Remove any duplicates from accumulated specinfos
-    getSwitchCheckerB_Tc		`thenB_Tc` \ sw_chkr ->
-    
-    (if sw_chkr SpecialiseTrace && not (null duplicates) then
-	 pprTrace "Duplicate SPECIALIZE data pragmas:\n"
-	          (ppAboves (map specmsg sep_dups))
-     else id)(
-
-    (if sw_chkr SpecialiseTrace && not (null spec_infos) then
-	 pprTrace "Specialising "
-	          (ppHang (ppCat [ppr PprDebug name, ppStr "at types:"])
-			4 (ppAboves (map pp_spec spec_infos)))
-
-    else id) (
-
-    returnB_Tc (spec_infos)
-    ))
-  where
-    spec_infos = map (snd . head) equiv
-
-    equiv      = equivClasses cmp_info accum
-    duplicates = filter (not . singleton) equiv
-
-    cmp_info (_, SpecInfo tys1 _ _) (_, SpecInfo tys2 _ _)
-      = cmpUniTypeMaybeList tys1 tys2
-
-    singleton [_] = True
-    singleton _   = False
-
-    sep_dups = tail (concat (map ((:) Nothing . map Just) duplicates))
-    specmsg (Just (SpecDataSig _ ty locn, _))
-      = addShortErrLocLine locn ( \ sty -> ppr sty ty ) PprDebug
-    specmsg Nothing
-      = ppStr "***"
-
-    ((SpecDataSig name _ _, _):_) = accum    
-    pp_spec (SpecInfo tys _ _) = ppInterleave ppNil [pprMaybeTy PprDebug ty | ty <- tys]
+tyNewCtxt tycon_name sty
+  = ppCat [ppStr "In the newtype declaration for", ppr sty tycon_name]
 \end{code}

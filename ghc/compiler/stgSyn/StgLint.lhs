@@ -6,25 +6,17 @@
 \begin{code}
 #include "HsVersions.h"
 
-module StgLint (
-	lintStgBindings,
-	
-	PprStyle, StgBinding, PlainStgBinding(..), Id
-    ) where
+module StgLint ( lintStgBindings ) where
 
-IMPORT_Trace
-
-import AbsPrel		( typeOfPrimOp, mkFunTy, PrimOp(..), PrimKind
+import PrelInfo		( primOpType, mkFunTy, PrimOp(..), PrimRep
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType
+import Type
 import Bag
-import BasicLit		( typeOfBasicLit, BasicLit )
-import Id		( getIdUniType, isNullaryDataCon, isDataCon,
-			  isBottomingId,
-			  getInstantiatedDataConSig, Id
-			  IF_ATTACK_PRAGMAS(COMMA bottomIsGuaranteed)
+import Literal		( literalType, Literal )
+import Id		( idType, isDataCon,
+			  getInstantiatedDataConSig
 			)
 import Maybes
 import Outputable
@@ -37,7 +29,7 @@ import Util
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
 \end{code}
 
-Checks for 
+Checks for
 	(a) *some* type errors
 	(b) locally-defined variables used but not defined
 
@@ -50,7 +42,7 @@ Checks for
 @lintStgBindings@ is the top-level interface function.
 
 \begin{code}
-lintStgBindings :: PprStyle -> String -> [PlainStgBinding] -> [PlainStgBinding]
+lintStgBindings :: PprStyle -> String -> [StgBinding] -> [StgBinding]
 
 lintStgBindings sty whodunnit binds
   = BSCC("StgLint")
@@ -64,10 +56,10 @@ lintStgBindings sty whodunnit binds
 			ppStr "*** End of Offense ***"])
     ESCC
   where
-    lint_binds :: [PlainStgBinding] -> LintM ()
+    lint_binds :: [StgBinding] -> LintM ()
 
     lint_binds [] = returnL ()
-    lint_binds (bind:binds) 
+    lint_binds (bind:binds)
       = lintStgBinds bind 		`thenL` \ binders ->
 	addInScopeVars binders (
 	    lint_binds binds
@@ -76,21 +68,21 @@ lintStgBindings sty whodunnit binds
 
 
 \begin{code}
-lintStgAtom :: PlainStgAtom -> LintM (Maybe UniType)
+lintStgArg :: StgArg -> LintM (Maybe Type)
 
-lintStgAtom (StgLitAtom lit)       = returnL (Just (typeOfBasicLit lit))
-lintStgAtom a@(StgVarAtom v)
+lintStgArg (StgLitArg lit)       = returnL (Just (literalType lit))
+lintStgArg a@(StgVarArg v)
   = checkInScope v	`thenL_`
-    returnL (Just (getIdUniType v))
+    returnL (Just (idType v))
 \end{code}
 
 \begin{code}
-lintStgBinds :: PlainStgBinding -> LintM [Id]		-- Returns the binders
+lintStgBinds :: StgBinding -> LintM [Id]		-- Returns the binders
 lintStgBinds (StgNonRec binder rhs)
   = lint_binds_help (binder,rhs) 	`thenL_`
     returnL [binder]
 
-lintStgBinds (StgRec pairs) 
+lintStgBinds (StgRec pairs)
   = addInScopeVars binders (
 	mapL lint_binds_help pairs `thenL_`
 	returnL binders
@@ -106,68 +98,68 @@ lint_binds_help (binder, rhs)
 	-- Check match to RHS type
 	(case maybe_rhs_ty of
 	  Nothing     -> returnL ()
-	  Just rhs_ty -> checkTys (getIdUniType binder) 
-				   rhs_ty 
+	  Just rhs_ty -> checkTys (idType binder)
+				   rhs_ty
 				   (mkRhsMsg binder rhs_ty)
-	)			`thenL_` 
+	)			`thenL_`
 
 	returnL ()
     )
 \end{code}
 
 \begin{code}
-lintStgRhs :: PlainStgRhs -> LintM (Maybe UniType)
+lintStgRhs :: StgRhs -> LintM (Maybe Type)
 
 lintStgRhs (StgRhsClosure _ _ _ _ binders expr)
   = addLoc (LambdaBodyOf binders) (
     addInScopeVars binders (
 	lintStgExpr expr   `thenMaybeL` \ body_ty ->
-	returnL (Just (foldr (mkFunTy . getIdUniType) body_ty binders))
+	returnL (Just (foldr (mkFunTy . idType) body_ty binders))
     ))
 
 lintStgRhs (StgRhsCon _ con args)
-  = mapMaybeL lintStgAtom args	`thenL` \ maybe_arg_tys ->
+  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
   where
-    con_ty = getIdUniType con
+    con_ty = idType con
 \end{code}
 
 \begin{code}
-lintStgExpr :: PlainStgExpr -> LintM (Maybe UniType)	-- Nothing if error found
+lintStgExpr :: StgExpr -> LintM (Maybe Type)	-- Nothing if error found
 
 lintStgExpr e@(StgApp fun args _)
-  = lintStgAtom fun		`thenMaybeL` \ fun_ty  ->
-    mapMaybeL lintStgAtom args	`thenL`      \ maybe_arg_tys ->
+  = lintStgArg fun		`thenMaybeL` \ fun_ty  ->
+    mapMaybeL lintStgArg args	`thenL`      \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp fun_ty arg_tys (mkFunAppMsg fun_ty arg_tys e)
 
-lintStgExpr e@(StgConApp con args _)
-  = mapMaybeL lintStgAtom args	`thenL` \ maybe_arg_tys ->
+lintStgExpr e@(StgCon con args _)
+  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp con_ty arg_tys (mkFunAppMsg con_ty arg_tys e)
   where
-    con_ty = getIdUniType con
+    con_ty = idType con
 
-lintStgExpr e@(StgPrimApp op args _)
-  = mapMaybeL lintStgAtom args	`thenL` \ maybe_arg_tys ->
+lintStgExpr e@(StgPrim op args _)
+  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing      -> returnL Nothing
       Just arg_tys -> checkFunApp op_ty arg_tys (mkFunAppMsg op_ty arg_tys e)
   where
-    op_ty = typeOfPrimOp op
+    op_ty = primOpType op
 
-lintStgExpr (StgLet binds body)	
+lintStgExpr (StgLet binds body)
   = lintStgBinds binds		`thenL` \ binders ->
     addLoc (BodyOfLetRec binders) (
     addInScopeVars binders (
 	lintStgExpr body
     ))
 
-lintStgExpr (StgLetNoEscape _ _ binds body)	
+lintStgExpr (StgLetNoEscape _ _ binds body)
   = lintStgBinds binds		`thenL` \ binders ->
     addLoc (BodyOfLetRec binders) (
     addInScopeVars binders (
@@ -180,7 +172,7 @@ lintStgExpr e@(StgCase scrut _ _ _ alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
 
 	-- Check that it is a data type
-    case getUniDataTyCon_maybe scrut_ty of
+    case maybeDataTyCon scrut_ty of
       Nothing -> addErrL (mkCaseDataConMsg e)	`thenL_`
 		 returnL Nothing
       Just (tycon, _, _)
@@ -193,20 +185,20 @@ lintStgExpr e@(StgCase scrut _ _ _ alts)
 \end{code}
 
 \begin{code}
-lintStgAlts :: PlainStgCaseAlternatives
-	     -> UniType 		-- Type of scrutinee
+lintStgAlts :: StgCaseAlts
+	     -> Type 		-- Type of scrutinee
 	     -> TyCon			-- TyCon pinned on the case
-	     -> LintM (Maybe UniType)	-- Type of alternatives
+	     -> LintM (Maybe Type)	-- Type of alternatives
 
 lintStgAlts alts scrut_ty case_tycon
   = (case alts of
-	 StgAlgAlts _ alg_alts deflt ->  
+	 StgAlgAlts _ alg_alts deflt ->
 	   chk_non_abstract_type case_tycon	`thenL_`
 	   mapL (lintAlgAlt scrut_ty) alg_alts 	`thenL` \ maybe_alt_tys ->
 	   lintDeflt deflt scrut_ty		`thenL` \ maybe_deflt_ty ->
 	   returnL (maybe_deflt_ty : maybe_alt_tys)
 
-	 StgPrimAlts _ prim_alts deflt -> 
+	 StgPrimAlts _ prim_alts deflt ->
 	   mapL (lintPrimAlt scrut_ty) prim_alts `thenL` \ maybe_alt_tys ->
 	   lintDeflt deflt scrut_ty		 `thenL` \ maybe_deflt_ty ->
 	   returnL (maybe_deflt_ty : maybe_alt_tys)
@@ -226,15 +218,15 @@ lintStgAlts alts scrut_ty case_tycon
 	  Just  _ -> returnL () -- that's cool
 
 lintAlgAlt scrut_ty (con, args, _, rhs)
-  = (case getUniDataTyCon_maybe scrut_ty of
-      Nothing -> 
+  = (case maybeDataTyCon scrut_ty of
+      Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->
 	 let
 	   (_, arg_tys, _) = getInstantiatedDataConSig con tys_applied
 	 in
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`
-	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)	
+	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)
 								 `thenL_`
 	 mapL check (arg_tys `zipEqual` args)			 `thenL_`
 	 returnL ()
@@ -243,7 +235,7 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
 	 lintStgExpr rhs
     )
   where
-    check (ty, arg) = checkTys ty (getIdUniType arg) (mkAlgAltMsg4 ty arg)
+    check (ty, arg) = checkTys ty (idType arg) (mkAlgAltMsg4 ty arg)
 
     -- elem: yes, the elem-list here can sometimes be long-ish,
     -- but as it's use-once, probably not worth doing anything different
@@ -252,12 +244,12 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
     elem x (y:ys)   = x==y || elem x ys
 
 lintPrimAlt scrut_ty alt@(lit,rhs)
- = checkTys (typeOfBasicLit lit) scrut_ty (mkPrimAltMsg alt)	`thenL_`
+ = checkTys (literalType lit) scrut_ty (mkPrimAltMsg alt)	`thenL_`
    lintStgExpr rhs
-   
+
 lintDeflt StgNoDefault scrut_ty = returnL Nothing
-lintDeflt deflt@(StgBindDefault binder _ rhs) scrut_ty 
-  = checkTys (getIdUniType binder) scrut_ty (mkDefltMsg deflt)	`thenL_`
+lintDeflt deflt@(StgBindDefault binder _ rhs) scrut_ty
+  = checkTys (idType binder) scrut_ty (mkDefltMsg deflt)	`thenL_`
     addInScopeVars [binder] (
 	lintStgExpr rhs
     )
@@ -300,7 +292,7 @@ pp_binders sty bs
   = ppInterleave ppComma (map pp_binder bs)
   where
     pp_binder b
-      = ppCat [ppr sty b, ppStr "::", ppr sty (getIdUniType b)]
+      = ppCat [ppr sty b, ppStr "::", ppr sty (idType b)]
 \end{code}
 
 \begin{code}
@@ -320,12 +312,12 @@ returnL r loc scope errs = (r, errs)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
 thenL m k loc scope errs
-  = case m loc scope errs of 
+  = case m loc scope errs of
       (r, errs') -> k r loc scope errs'
 
 thenL_ :: LintM a -> LintM b -> LintM b
 thenL_ m k loc scope errs
-  = case m loc scope errs of 
+  = case m loc scope errs of
       (_, errs') -> k loc scope errs'
 
 thenMaybeL :: LintM (Maybe a) -> (a -> LintM (Maybe b)) -> LintM (Maybe b)
@@ -396,10 +388,10 @@ addInScopeVars ids m loc scope errs
 \end{code}
 
 \begin{code}
-checkFunApp :: UniType 		-- The function type
-	    -> [UniType] 	-- The arg type(s)
+checkFunApp :: Type 		-- The function type
+	    -> [Type] 	-- The arg type(s)
 	    -> ErrMsg 		-- Error messgae
-	    -> LintM (Maybe UniType)	-- The result type
+	    -> LintM (Maybe Type)	-- The result type
 
 checkFunApp fun_ty arg_tys msg loc scope errs
   = cfa res_ty expected_arg_tys arg_tys
@@ -411,7 +403,7 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 
     cfa res_ty [] arg_tys	-- Expected arg tys ran out first;
 				-- first see if res_ty is a tyvar template;
-				-- otherwise, maybe res_ty is a 
+				-- otherwise, maybe res_ty is a
 				-- dictionary type which is actually a function?
       | isTyVarTemplateTy res_ty
       = (Just res_ty, errs)
@@ -434,7 +426,7 @@ checkInScope id loc scope errs
     else
 	((), errs)
 
-checkTys :: UniType -> UniType -> ErrMsg -> LintM ()
+checkTys :: Type -> Type -> ErrMsg -> LintM ()
 checkTys ty1 ty2 msg loc scope errs
   = case (sleazy_cmp_ty ty1 ty2) of
       EQ_   -> ((), errs)
@@ -442,13 +434,13 @@ checkTys ty1 ty2 msg loc scope errs
 \end{code}
 
 \begin{code}
-mkCaseAltMsg :: PlainStgCaseAlternatives -> ErrMsg
+mkCaseAltMsg :: StgCaseAlts -> ErrMsg
 mkCaseAltMsg alts sty
   = ppAbove (ppStr "In some case alternatives, type of alternatives not all same:")
 	    -- LATER: (ppr sty alts)
 	    (panic "mkCaseAltMsg")
 
-mkCaseDataConMsg :: PlainStgExpr -> ErrMsg
+mkCaseDataConMsg :: StgExpr -> ErrMsg
 mkCaseDataConMsg expr sty
   = ppAbove (ppStr "A case scrutinee not a type-constructor type:")
 	    (pp_expr sty expr)
@@ -458,37 +450,37 @@ mkCaseAbstractMsg tycon sty
   = ppAbove (ppStr "An algebraic case on an abstract type:")
 	    (ppr sty tycon)
 
-mkDefltMsg :: PlainStgCaseDefault -> ErrMsg
+mkDefltMsg :: StgCaseDefault -> ErrMsg
 mkDefltMsg deflt sty
   = ppAbove (ppStr "Binder in default case of a case expression doesn't match type of scrutinee:")
 	    --LATER: (ppr sty deflt)
 	    (panic "mkDefltMsg")
 
-mkFunAppMsg :: UniType -> [UniType] -> PlainStgExpr -> ErrMsg
+mkFunAppMsg :: Type -> [Type] -> StgExpr -> ErrMsg
 mkFunAppMsg fun_ty arg_tys expr sty
   = ppAboves [ppStr "In a function application, function type doesn't match arg types:",
 	      ppHang (ppStr "Function type:") 4 (ppr sty fun_ty),
 	      ppHang (ppStr "Arg types:") 4 (ppAboves (map (ppr sty) arg_tys)),
 	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
 
-mkRhsConMsg :: UniType -> [UniType] -> ErrMsg
+mkRhsConMsg :: Type -> [Type] -> ErrMsg
 mkRhsConMsg fun_ty arg_tys sty
   = ppAboves [ppStr "In a RHS constructor application, con type doesn't match arg types:",
 	      ppHang (ppStr "Constructor type:") 4 (ppr sty fun_ty),
 	      ppHang (ppStr "Arg types:") 4 (ppAboves (map (ppr sty) arg_tys))]
 
-mkUnappTyMsg :: Id -> UniType -> ErrMsg
+mkUnappTyMsg :: Id -> Type -> ErrMsg
 mkUnappTyMsg var ty sty
   = ppAboves [ppStr "Variable has a for-all type, but isn't applied to any types.",
 	      ppBeside (ppStr "Var:      ") (ppr sty var),
 	      ppBeside (ppStr "Its type: ") (ppr sty ty)]
 
-mkAlgAltMsg1 :: UniType -> ErrMsg
+mkAlgAltMsg1 :: Type -> ErrMsg
 mkAlgAltMsg1 ty sty
   = ppAbove (ppStr "In some case statement, type of scrutinee is not a data type:")
 	    (ppr sty ty)
 
-mkAlgAltMsg2 :: UniType -> Id -> ErrMsg
+mkAlgAltMsg2 :: Type -> Id -> ErrMsg
 mkAlgAltMsg2 ty con sty
   = ppAboves [
 	ppStr "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
@@ -504,7 +496,7 @@ mkAlgAltMsg3 con alts sty
 	ppr sty alts
     ]
 
-mkAlgAltMsg4 :: UniType -> Id -> ErrMsg
+mkAlgAltMsg4 :: Type -> Id -> ErrMsg
 mkAlgAltMsg4 ty arg sty
   = ppAboves [
 	ppStr "In some algebraic case alternative, type of argument doesn't match data constructor:",
@@ -512,20 +504,20 @@ mkAlgAltMsg4 ty arg sty
 	ppr sty arg
     ]
 
-mkPrimAltMsg :: (BasicLit, PlainStgExpr) -> ErrMsg
+mkPrimAltMsg :: (Literal, StgExpr) -> ErrMsg
 mkPrimAltMsg alt sty
   = ppAbove (ppStr "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
 	    (ppr sty alt)
 
-mkRhsMsg :: Id -> UniType -> ErrMsg
+mkRhsMsg :: Id -> Type -> ErrMsg
 mkRhsMsg binder ty sty
-  = ppAboves [ppCat [ppStr "The type of this binder doesn't match the type of its RHS:", 
+  = ppAboves [ppCat [ppStr "The type of this binder doesn't match the type of its RHS:",
 		     ppr sty binder],
-	      ppCat [ppStr "Binder's type:", ppr sty (getIdUniType binder)],
+	      ppCat [ppStr "Binder's type:", ppr sty (idType binder)],
 	      ppCat [ppStr "Rhs type:", ppr sty ty]
 	     ]
 
-pp_expr :: PprStyle -> PlainStgExpr -> Pretty
+pp_expr :: PprStyle -> StgExpr -> Pretty
 pp_expr sty expr = ppr sty expr
 
 sleazy_cmp_ty ty1 ty2

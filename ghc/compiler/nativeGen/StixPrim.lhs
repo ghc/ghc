@@ -8,29 +8,27 @@
 module StixPrim (
 	genPrimCode, amodeCode, amodeCode',
 
-    	Target, CAddrMode, StixTree, PrimOp, SplitUniqSupply
+    	Target, CAddrMode, StixTree, PrimOp, UniqSupply
     ) where
 
 IMPORT_Trace	-- ToDo: rm debugging
 
 import AbsCSyn
-import AbsPrel		( PrimOp(..), PrimOpResultInfo(..), TyCon,
+import PrelInfo		( PrimOp(..), PrimOpResultInfo(..), TyCon,
 			  getPrimOpResultInfo, isCompareOp, showPrimOp
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( cmpTyCon ) -- pragmas only
 import CgCompInfo	( spARelToInt, spBRelToInt )
 import MachDesc
-import Pretty	    
-import PrimKind		( isFloatingKind )
+import Pretty
+import PrimRep		( isFloatingRep )
 import CostCentre
 import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import Stix
 import StixMacro	( smStablePtrTable )
 import StixInteger	{- everything -}
-import SplitUniq
-import Unique
+import UniqSupply
 import Unpretty
 import Util
 
@@ -43,11 +41,11 @@ arrayOfData_info      = sStLitLbl SLIT("ArrayOfData_info") -- out here to avoid 
 imMutArrayOfPtrs_info = sStLitLbl SLIT("ImMutArrayOfPtrs_info")
 
 genPrimCode
-    :: Target 
+    :: Target
     -> [CAddrMode]  	-- results
     -> PrimOp 	    	-- op
     -> [CAddrMode]  	-- args
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
 
 \end{code}
 
@@ -75,12 +73,12 @@ genPrimCode target_STRICT res op args
   heap_chkr = heapCheck target
   size_of   = sizeof target
   fixed_hs  = fixedHeaderSize target
-  var_hs    = varHeaderSize target 
+  var_hs    = varHeaderSize target
 
   --- real code will follow... -------------
 \end{code}
 
-The (MP) integer operations are a true nightmare.  Since we don't have a 
+The (MP) integer operations are a true nightmare.  Since we don't have a
 convenient abstract way of allocating temporary variables on the (C) stack,
 we use the space just below HpLim for the @MP_INT@ structures, and modify our
 heap check accordingly.
@@ -115,10 +113,10 @@ Since we are using the heap for intermediate @MP_INT@ structs, integer compariso
 
 \begin{code}
   genprim res@[exponr,ar,sr,dr] FloatDecodeOp args@[hp, arg] =
-    decodeFloatingKind FloatKind target (exponr,ar,sr,dr) (hp, arg)
+    decodeFloatingKind FloatRep target (exponr,ar,sr,dr) (hp, arg)
 
   genprim res@[exponr,ar,sr,dr] DoubleDecodeOp args@[hp, arg] =
-    decodeFloatingKind DoubleKind target (exponr,ar,sr,dr) (hp, arg)
+    decodeFloatingKind DoubleRep target (exponr,ar,sr,dr) (hp, arg)
 
   genprim res@[ar,sr,dr] Int2IntegerOp args@[hp, n]
     = gmpInt2Integer target (ar,sr,dr) (hp, n)
@@ -133,22 +131,22 @@ Since we are using the heap for intermediate @MP_INT@ structs, integer compariso
     = gmpInteger2Int target res (hp, aa,sa,da)
 
   genprim [res] FloatEncodeOp args@[hp, aa,sa,da, expon] =
-    encodeFloatingKind FloatKind target res (hp, aa,sa,da, expon)
+    encodeFloatingKind FloatRep target res (hp, aa,sa,da, expon)
 
   genprim [res] DoubleEncodeOp args@[hp, aa,sa,da, expon] =
-    encodeFloatingKind DoubleKind target res (hp, aa,sa,da, expon)
+    encodeFloatingKind DoubleRep target res (hp, aa,sa,da, expon)
 
   genprim [res] Int2AddrOp [arg] =
-    simpleCoercion AddrKind res arg
+    simpleCoercion AddrRep res arg
 
   genprim [res] Addr2IntOp [arg] =
-    simpleCoercion IntKind res arg
+    simpleCoercion IntRep res arg
 
   genprim [res] Int2WordOp [arg] =
-    simpleCoercion IntKind{-WordKind?-} res arg
+    simpleCoercion IntRep{-WordRep?-} res arg
 
   genprim [res] Word2IntOp [arg] =
-    simpleCoercion IntKind res arg
+    simpleCoercion IntRep res arg
 
 \end{code}
 
@@ -157,10 +155,10 @@ closure, flush stdout and stderr, and jump to the @ErrorIO_innards@.
 
 \begin{code}
 
-  genprim [] ErrorIOPrimOp [rhs] = 
-    let changeTop = StAssign PtrKind topClosure (a2stix rhs)
+  genprim [] ErrorIOPrimOp [rhs] =
+    let changeTop = StAssign PtrRep topClosure (a2stix rhs)
     in
-	returnSUs (\xs -> changeTop : flushStdout : flushStderr : errorIO : xs)
+	returnUs (\xs -> changeTop : flushStdout : flushStderr : errorIO : xs)
 
 \end{code}
 
@@ -169,44 +167,44 @@ closure, flush stdout and stderr, and jump to the @ErrorIO_innards@.
 \begin{code}
   genprim [res] NewArrayOp args =
     let	[liveness, n, initial] = map a2stix args
-        result = a2stix res
+	result = a2stix res
     	space = StPrim IntAddOp [n, mut_hs]
-    	loc = StIndex PtrKind stgHp 
+    	loc = StIndex PtrRep stgHp
     	      (StPrim IntNegOp [StPrim IntSubOp [space, StInt 1]])
-    	assign = StAssign PtrKind result loc
-    	initialise = StCall SLIT("newArrZh_init") VoidKind [result, n, initial]
+    	assign = StAssign PtrRep result loc
+    	initialise = StCall SLIT("newArrZh_init") VoidRep [result, n, initial]
     in
-    	heap_chkr liveness space (StInt 0)	`thenSUs` \ heap_chk ->
+    	heap_chkr liveness space (StInt 0)	`thenUs` \ heap_chk ->
 
-    	returnSUs (heap_chk . (\xs -> assign : initialise : xs))
+    	returnUs (heap_chk . (\xs -> assign : initialise : xs))
 
   genprim [res] (NewByteArrayOp pk) args =
     let	[liveness, count] = map a2stix args
-        result = a2stix res
+	result = a2stix res
     	n = StPrim IntMulOp [count, StInt (toInteger (size_of pk))]
-        slop = StPrim IntAddOp [n, StInt (toInteger (size_of IntKind - 1))]
-        words = StPrim IntQuotOp [slop, StInt (toInteger (size_of IntKind))]
+	slop = StPrim IntAddOp [n, StInt (toInteger (size_of IntRep - 1))]
+	words = StPrim IntQuotOp [slop, StInt (toInteger (size_of IntRep))]
     	space = StPrim IntAddOp [n, StPrim IntAddOp [words, data_hs]]
-    	loc = StIndex PtrKind stgHp 
+    	loc = StIndex PtrRep stgHp
     	      (StPrim IntNegOp [StPrim IntSubOp [space, StInt 1]])
-    	assign = StAssign PtrKind result loc
-    	init1 = StAssign PtrKind (StInd PtrKind loc) arrayOfData_info
-        init2 = StAssign IntKind 
-    	    	    	 (StInd IntKind 
-    	    	    	    	(StIndex IntKind loc 
+    	assign = StAssign PtrRep result loc
+    	init1 = StAssign PtrRep (StInd PtrRep loc) arrayOfData_info
+	init2 = StAssign IntRep
+    	    	    	 (StInd IntRep
+    	    	    	    	(StIndex IntRep loc
     	    	    	    	    	 (StInt (toInteger fixed_hs))))
-                         (StPrim IntAddOp [words, 
+			 (StPrim IntAddOp [words,
     	    	    	    	    	  StInt (toInteger (var_hs (DataRep 0)))])
     in
-    	heap_chkr liveness space (StInt 0)	`thenSUs` \ heap_chk ->
+    	heap_chkr liveness space (StInt 0)	`thenUs` \ heap_chk ->
 
-    	returnSUs (heap_chk . (\xs -> assign : init1 : init2 : xs))
+    	returnUs (heap_chk . (\xs -> assign : init1 : init2 : xs))
 
   genprim [res] SameMutableArrayOp args =
     let compare = StPrim AddrEqOp (map a2stix args)
-        assign = StAssign IntKind (a2stix res) compare
+	assign = StAssign IntRep (a2stix res) compare
     in
-        returnSUs (\xs -> assign : xs)
+	returnUs (\xs -> assign : xs)
 
   genprim res@[_] SameMutableByteArrayOp args =
     genprim res SameMutableArrayOp args
@@ -222,14 +220,14 @@ the indirection (most likely, it's a VanillaReg).
   genprim [lhs] UnsafeFreezeArrayOp [rhs] =
     let lhs' = a2stix lhs
     	rhs' = a2stix rhs
-    	header = StInd PtrKind lhs'
-	assign = StAssign PtrKind lhs' rhs'
-	freeze = StAssign PtrKind header imMutArrayOfPtrs_info
+    	header = StInd PtrRep lhs'
+	assign = StAssign PtrRep lhs' rhs'
+	freeze = StAssign PtrRep header imMutArrayOfPtrs_info
     in
-	returnSUs (\xs -> assign : freeze : xs)
+	returnUs (\xs -> assign : freeze : xs)
 
   genprim [lhs] UnsafeFreezeByteArrayOp [rhs] =
-    simpleCoercion PtrKind lhs rhs
+    simpleCoercion PtrRep lhs rhs
 
 \end{code}
 
@@ -244,19 +242,19 @@ Most other array primitives translate to simple indexing.
     let lhs' = a2stix lhs
     	obj' = a2stix obj
     	ix' = a2stix ix
-    	base = StIndex IntKind obj' mut_hs
-    	assign = StAssign PtrKind lhs' (StInd PtrKind (StIndex PtrKind base ix'))
+    	base = StIndex IntRep obj' mut_hs
+    	assign = StAssign PtrRep lhs' (StInd PtrRep (StIndex PtrRep base ix'))
     in
-    	returnSUs (\xs -> assign : xs)
+    	returnUs (\xs -> assign : xs)
 
   genprim [lhs] WriteArrayOp [obj, ix, v] =
     let	obj' = a2stix obj
     	ix' = a2stix ix
     	v' = a2stix v
-    	base = StIndex IntKind obj' mut_hs
-    	assign = StAssign PtrKind (StInd PtrKind (StIndex PtrKind base ix')) v'
+    	base = StIndex IntRep obj' mut_hs
+    	assign = StAssign PtrRep (StInd PtrRep (StIndex PtrRep base ix')) v'
     in
-    	returnSUs (\xs -> assign : xs)
+    	returnUs (\xs -> assign : xs)
 
   genprim lhs@[_] (IndexByteArrayOp pk) args =
     genprim lhs (ReadByteArrayOp pk) args
@@ -267,10 +265,10 @@ Most other array primitives translate to simple indexing.
     let lhs' = a2stix lhs
     	obj' = a2stix obj
     	ix' = a2stix ix
-    	base = StIndex IntKind obj' data_hs
+    	base = StIndex IntRep obj' data_hs
     	assign = StAssign pk lhs' (StInd pk (StIndex pk base ix'))
     in
-    	returnSUs (\xs -> assign : xs)
+    	returnUs (\xs -> assign : xs)
 
   genprim [lhs] (IndexOffAddrOp pk) [obj, ix] =
     let lhs' = a2stix lhs
@@ -278,16 +276,16 @@ Most other array primitives translate to simple indexing.
     	ix' = a2stix ix
     	assign = StAssign pk lhs' (StInd pk (StIndex pk obj' ix'))
     in
-    	returnSUs (\xs -> assign : xs)
+    	returnUs (\xs -> assign : xs)
 
   genprim [] (WriteByteArrayOp pk) [obj, ix, v] =
     let	obj' = a2stix obj
     	ix' = a2stix ix
     	v' = a2stix v
-    	base = StIndex IntKind obj' data_hs
+    	base = StIndex IntRep obj' data_hs
     	assign = StAssign pk (StInd pk (StIndex pk base ix')) v'
     in
-    	returnSUs (\xs -> assign : xs)
+    	returnUs (\xs -> assign : xs)
 \end{code}
 
 Stable pointer operations.
@@ -298,12 +296,12 @@ First the easy one.
 
   genprim [lhs] DeRefStablePtrOp [sp] =
     let lhs' = a2stix lhs
-    	pk = getAmodeKind lhs
+    	pk = getAmodeRep lhs
     	sp' = a2stix sp
 	call = StCall SLIT("deRefStablePointer") pk [sp', smStablePtrTable]
     	assign = StAssign pk lhs' call
     in
-    	returnSUs (\xs -> assign : xs)
+    	returnUs (\xs -> assign : xs)
 
 \end{code}
 
@@ -315,25 +313,25 @@ do {                                                                 \
   EXTDATA(MK_INFO_LBL(StablePointerTable));                          \
   EXTDATA(UnusedSP);                                                 \
   StgStablePtr newSP;                                                \
-                                                                     \
+								     \
   if (SPT_EMPTY(StorageMgrInfo.StablePointerTable)) { /* free stack is empty */ \
     I_ OldNoPtrs = SPT_NoPTRS(StorageMgrInfo.StablePointerTable);    \
-                                                                     \
+								     \
     /* any strictly increasing expression will do here */            \
     I_ NewNoPtrs = OldNoPtrs * 2 + 100;                              \
-                                                                     \
+								     \
     I_ NewSize = DYN_VHS + NewNoPtrs + 1 + NewNoPtrs;                \
     P_ SPTable;                                                      \
-                                                                     \
+								     \
     HEAP_CHK(NO_LIVENESS, _FHS+NewSize, 0);                          \
     CC_ALLOC(CCC, _FHS+NewSize, SPT_K); /* cc prof */                \
-                                                                     \
+								     \
     SPTable = Hp + 1 - (_FHS + NewSize);                             \
     SET_DYN_HDR(SPTable,StablePointerTable,CCC,NewSize,NewNoPtrs);   \
     SAFESTGCALL2(void, (void *, P_, P_), enlargeSPTable, SPTable, StorageMgrInfo.StablePointerTable);      \
     StorageMgrInfo.StablePointerTable = SPTable;                     \
   }                                                                  \
-                                                                     \
+								     \
   newSP = SPT_POP(StorageMgrInfo.StablePointerTable);                \
   SPT_SPTR(StorageMgrInfo.StablePointerTable, newSP) = unstablePtr; \
   stablePtr = newSP;                                                 \
@@ -352,33 +350,33 @@ Notes for ADR:
 
 \begin{pseudocode}
   genprim [lhs] MakeStablePtrOp args =
-    let 
+    let
 	-- some useful abbreviations (I'm sure these must exist already)
-	add = trPrim . IntAddOp 
+	add = trPrim . IntAddOp
 	sub = trPrim . IntSubOp
 	one = trInt [1]
-	dec x = trAssign IntKind [x, sub [x, one]]
-	inc x = trAssign IntKind [x, add [x, one]]
+	dec x = trAssign IntRep [x, sub [x, one]]
+	inc x = trAssign IntRep [x, add [x, one]]
 
 	-- tedious hardwiring in of closure layout offsets (from SMClosures)
 	dynHS = 2 + fixedHeaderSize md sty + varHeaderSize md sty DynamicRep
-	spt_SIZE c   = trIndex PtrKind [c, trInt [fhs + gc_reserved] ]
-	spt_NoPTRS c = trIndex PtrKind [c, trInt [fhs + gc_reserved + 1] ]
-	spt_SPTR c i = trIndex PtrKind [c, add [trInt [dynHS], i]]
-	spt_TOP c    = trIndex PtrKind [c, add [trInt [dynHS], spt_NoPTRS c]]
-	spt_FREE c i = trIndex PtrKind [c, add [trInt [dynHS], spt_NoPTRS c]]
+	spt_SIZE c   = trIndex PtrRep [c, trInt [fhs + gc_reserved] ]
+	spt_NoPTRS c = trIndex PtrRep [c, trInt [fhs + gc_reserved + 1] ]
+	spt_SPTR c i = trIndex PtrRep [c, add [trInt [dynHS], i]]
+	spt_TOP c    = trIndex PtrRep [c, add [trInt [dynHS], spt_NoPTRS c]]
+	spt_FREE c i = trIndex PtrRep [c, add [trInt [dynHS], spt_NoPTRS c]]
 
 	-- tedious hardwiring in of stack manipulation macros (from SMClosures)
 	spt_FULL c lbl =
 		trCondJump lbl [trPrim IntEqOp [spt_TOP c, spt_NoPTRS c]]
 	spt_EMPTY c lbl =
 		trCondJump lbl [trPrim IntEqOp [spt_TOP c, trInt [0]]]
-	spt_PUSH c f = [ 
-		trAssign PtrKind [spt_FREE c (spt_TOP c), f],
+	spt_PUSH c f = [
+		trAssign PtrRep [spt_FREE c (spt_TOP c), f],
 		inc (spt_TOP c),
-	spt_POP c x  = [ 
-		dec (spt_TOP c), 
-		trAssign PtrKind [x, spt_FREE c (spt_TOP c)]
+	spt_POP c x  = [
+		dec (spt_TOP c),
+		trAssign PtrRep [x, spt_FREE c (spt_TOP c)]
 	]
 
 	-- now to get down to business
@@ -391,83 +389,83 @@ Notes for ADR:
 	newSP = -- another temporary
 
 	allocNewTable = -- some sort fo heap allocation needed
-	copyOldTable = trCall "enlargeSPTable" PtrKind [newSPT, spt]
+	copyOldTable = trCall "enlargeSPTable" PtrRep [newSPT, spt]
 
-	enlarge = 
+	enlarge =
 		allocNewTable ++ [
 		copyOldTable,
-		trAssign PtrKind [spt, newSPT]
+		trAssign PtrRep [spt, newSPT]
 	allocate = [
 		spt_POP spt newSP,
-		trAssign PtrKind [spt_SPTR spt newSP, unstable],
-		trAssign StablePtrKind [lhs', newSP]
+		trAssign PtrRep [spt_SPTR spt newSP, unstable],
+		trAssign StablePtrRep [lhs', newSP]
 	]
-		
+
     in
     getUniqLabelCTS 	    	    	    	   `thenCTS` \ oklbl ->
-    returnCodes sty md 
+    returnCodes sty md
 	(spt_EMPTY spt oklbl : (enlarge ++ (trLabel [oklbl] : allocate)))
 \end{pseudocode}
 
 \begin{code}
   genprim res Word2IntegerOp args = panic "genPrimCode:Word2IntegerOp"
 
-  genprim lhs (CCallOp fn is_asm may_gc arg_tys result_ty) rhs 
+  genprim lhs (CCallOp fn is_asm may_gc arg_tys result_ty) rhs
    | is_asm = error "ERROR: Native code generator can't handle casm"
    | otherwise =
     case lhs of
-    	[] -> returnSUs (\xs -> (StCall fn VoidKind args) : xs)
+    	[] -> returnUs (\xs -> (StCall fn VoidRep args) : xs)
     	[lhs] ->
     	    let lhs' = a2stix lhs
-    	    	pk = if isFloatingKind (getAmodeKind lhs) then DoubleKind else IntKind
+    	    	pk = if isFloatingRep (getAmodeRep lhs) then DoubleRep else IntRep
 	    	call = StAssign pk lhs' (StCall fn pk args)
     	    in
-	    	returnSUs (\xs -> call : xs)
+	    	returnUs (\xs -> call : xs)
     where
     	args = map amodeCodeForCCall rhs
-        amodeCodeForCCall x = 
+	amodeCodeForCCall x =
     	    let base = a2stix' x
     	    in
-    	    	case getAmodeKind x of
-    	    	    ArrayKind -> StIndex PtrKind base mut_hs
-    	    	    ByteArrayKind -> StIndex IntKind base data_hs
-		    MallocPtrKind -> error "ERROR: native-code generator can't handle Malloc Ptrs (yet): use -fvia-C!"
+    	    	case getAmodeRep x of
+    	    	    ArrayRep -> StIndex PtrRep base mut_hs
+    	    	    ByteArrayRep -> StIndex IntRep base data_hs
+		    MallocPtrRep -> error "ERROR: native-code generator can't handle Malloc Ptrs (yet): use -fvia-C!"
     	    	    _ -> base
-\end{code}    
+\end{code}
 
 Now the more mundane operations.
 
 \begin{code}
-  genprim lhs op rhs = 
+  genprim lhs op rhs =
     let lhs' = map a2stix  lhs
     	rhs' = map a2stix' rhs
     in
-        returnSUs (\ xs -> simplePrim lhs' op rhs' : xs)
+	returnUs (\ xs -> simplePrim lhs' op rhs' : xs)
 
   {-
-  simpleCoercion 
-      :: Target 
-      -> PrimKind 
-      -> [CAddrMode] 
-      -> [CAddrMode] 
-      -> SUniqSM StixTreeList
+  simpleCoercion
+      :: Target
+      -> PrimRep
+      -> [CAddrMode]
+      -> [CAddrMode]
+      -> UniqSM StixTreeList
   -}
   simpleCoercion pk lhs rhs =
-      returnSUs (\xs -> StAssign pk (a2stix lhs) (a2stix rhs) : xs)
+      returnUs (\xs -> StAssign pk (a2stix lhs) (a2stix rhs) : xs)
 
 \end{code}
 
 Here we try to rewrite primitives into a form the code generator
-can understand.	 Any primitives not handled here must be handled 
+can understand.	 Any primitives not handled here must be handled
 at the level of the specific code generator.
 
 \begin{code}
   {-
-  simplePrim 
-    :: Target 
-    -> [StixTree] 
-    -> PrimOp 
-    -> [StixTree] 
+  simplePrim
+    :: Target
+    -> [StixTree]
+    -> PrimOp
+    -> [StixTree]
     -> StixTree
   -}
 \end{code}
@@ -477,8 +475,8 @@ Now look for something more conventional.
 \begin{code}
 
   simplePrim [lhs] op rest = StAssign pk lhs (StPrim op rest)
-    where pk = if isCompareOp op then IntKind 
-               else case getPrimOpResultInfo op of
+    where pk = if isCompareOp op then IntRep
+	       else case getPrimOpResultInfo op of
 		 ReturnsPrim pk -> pk
 		 _ -> simplePrim_error op
 
@@ -498,12 +496,12 @@ amodes that might possibly need the extra cast.
 
 \begin{code}
 
-amodeCode, amodeCode' 
-    :: Target 
-    -> CAddrMode 
+amodeCode, amodeCode'
+    :: Target
+    -> CAddrMode
     -> StixTree
 
-amodeCode'{-'-} target_STRICT am@(CVal rr CharKind) 
+amodeCode'{-'-} target_STRICT am@(CVal rr CharRep)
     | mixedTypeLocn am = StPrim ChrOp [amodeToStix target am]
     | otherwise = amodeToStix target am
 
@@ -519,22 +517,22 @@ amodeCode target_STRICT am
  a2stix    = amodeToStix target
 
  -- real code: ----------------------------------
- acode am@(CVal rr CharKind) | mixedTypeLocn am =
-	 StInd IntKind (acode (CAddr rr))
+ acode am@(CVal rr CharRep) | mixedTypeLocn am =
+	 StInd IntRep (acode (CAddr rr))
 
  acode (CVal rr pk) = StInd pk (acode (CAddr rr))
 
- acode (CAddr r@(SpARel spA off)) =
-     StIndex PtrKind stgSpA (StInt (toInteger (spARelToInt r)))
+ acode (CAddr (SpARel spA off)) =
+     StIndex PtrRep stgSpA (StInt (toInteger (spARelToInt spA off)))
 
- acode (CAddr r@(SpBRel spB off)) =
-     StIndex IntKind stgSpB (StInt (toInteger (spBRelToInt r)))
+ acode (CAddr (SpBRel spB off)) =
+     StIndex IntRep stgSpB (StInt (toInteger (spBRelToInt spB off)))
 
  acode (CAddr (HpRel hp off)) =
-     StIndex IntKind stgHp (StInt (toInteger (-(hp_rel (hp `subOff` off)))))
+     StIndex IntRep stgHp (StInt (toInteger (-(hp_rel (hp `subOff` off)))))
 
  acode (CAddr (NodeRel off)) =
-     StIndex IntKind stgNode (StInt (toInteger (hp_rel off)))
+     StIndex IntRep stgNode (StInt (toInteger (hp_rel off)))
 
  acode (CReg magic) = StReg (StixMagicId magic)
  acode (CTemp uniq pk) = StReg (StixTemp uniq pk)
@@ -543,25 +541,25 @@ amodeCode target_STRICT am
 
  acode (CUnVecLbl dir _) = StCLbl dir
 
- acode (CTableEntry base off pk) = 
+ acode (CTableEntry base off pk) =
      StInd pk (StIndex pk (acode base) (acode off))
 
  -- For CharLike and IntLike, we attempt some trivial constant-folding here.
 
- acode (CCharLike (CLit (MachChar c))) = 
+ acode (CCharLike (CLit (MachChar c))) =
      StLitLbl (uppBeside (uppPStr SLIT("CHARLIKE_closures+")) (uppInt off))
      where off = char_like * ord c
 
- acode (CCharLike x) = 
+ acode (CCharLike x) =
      StPrim IntAddOp [charLike, off]
-     where off = StPrim IntMulOp [acode x, 
+     where off = StPrim IntMulOp [acode x,
 	     StInt (toInteger (char_like))]
 
- acode (CIntLike (CLit (MachInt i _))) = 
+ acode (CIntLike (CLit (MachInt i _))) =
      StPrim IntAddOp [intLikePtr, StInt off]
      where off = toInteger int_like * i
 
- acode (CIntLike x) = 
+ acode (CIntLike x) =
      StPrim IntAddOp [intLikePtr, off]
      where off = StPrim IntMulOp [acode x,
 	     StInt (toInteger int_like)]
@@ -585,14 +583,14 @@ amodeCode target_STRICT am
  -- COffsets are in words, not bytes!
  acode (COffset off) = StInt (toInteger (hp_rel off))
 
- acode (CMacroExpr _ macro [arg]) = 
+ acode (CMacroExpr _ macro [arg]) =
      case macro of
-	 INFO_PTR -> StInd PtrKind (a2stix arg)
+	 INFO_PTR -> StInd PtrRep (a2stix arg)
 	 ENTRY_CODE -> a2stix arg
 	 INFO_TAG -> tag
 	 EVAL_TAG -> StPrim IntGeOp [tag, StInt 0]
    where
-     tag = StInd IntKind (StIndex IntKind (a2stix arg) (StInt (-2)))
+     tag = StInd IntRep (StIndex IntRep (a2stix arg) (StInt (-2)))
      -- That ``-2'' really bothers me. (JSM)
 
  acode (CCostCentre cc print_as_string)
@@ -610,7 +608,7 @@ data segment.  (These are in bytes.)
 
 intLikePtr :: StixTree
 
-intLikePtr = StInd PtrKind (sStLitLbl SLIT("INTLIKE_closures"))
+intLikePtr = StInd PtrRep (sStLitLbl SLIT("INTLIKE_closures"))
 
 -- The CHARLIKE base
 
@@ -622,10 +620,10 @@ charLike = sStLitLbl SLIT("CHARLIKE_closures")
 
 topClosure, flushStdout, flushStderr, errorIO :: StixTree
 
-topClosure = StInd PtrKind (sStLitLbl SLIT("TopClosure"))
-flushStdout = StCall SLIT("fflush") VoidKind [StLitLit SLIT("stdout")]
-flushStderr = StCall SLIT("fflush") VoidKind [StLitLit SLIT("stderr")]
-errorIO = StJump (StInd PtrKind (sStLitLbl SLIT("ErrorIO_innards")))
+topClosure = StInd PtrRep (sStLitLbl SLIT("TopClosure"))
+flushStdout = StCall SLIT("fflush") VoidRep [StLitLit SLIT("stdout")]
+flushStderr = StCall SLIT("fflush") VoidRep [StLitLit SLIT("stderr")]
+errorIO = StJump (StInd PtrRep (sStLitLbl SLIT("ErrorIO_innards")))
 
 \end{code}
 

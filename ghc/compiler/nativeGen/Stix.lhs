@@ -9,33 +9,29 @@ module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList(..),
 	sStLitLbl,
 
-	stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg, 
+	stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg,
 	stgSpA, stgSuA, stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg,
 --	stgActivityReg,
 	stgStdUpdRetVecReg, stgStkStubReg,
-	getUniqLabelNCG,
+	getUniqLabelNCG
 
 	-- And for self-sufficiency, by golly...
-	MagicId, CLabel, PrimKind, PrimOp, Unique,
-	SplitUniqSupply, SUniqSM(..)
     ) where
 
 import AbsCSyn	    ( MagicId(..), kindFromMagicId, node, infoptr )
-import AbsPrel	    ( showPrimOp, PrimOp
+import PrelInfo	    ( showPrimOp, PrimOp
 		      IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 		    )
-import CLabelInfo   ( CLabel, mkAsmTempLabel )
+import CLabel   ( CLabel, mkAsmTempLabel )
 import Outputable
-import PrimKind	    ( PrimKind(..) )
-import SplitUniq
-import Unique
-import Unpretty 
+import UniqSupply
+import Unpretty
 import Util
 \end{code}
 
 Here is the tag at the nodes of our @StixTree@.	 Notice its
-relationship with @PrimOp@ in prelude/PrimOps.
+relationship with @PrimOp@ in prelude/PrimOp.
 
 \begin{code}
 
@@ -48,11 +44,7 @@ data StixTree =
 	-- We can tag the leaves with constants/immediates.
 
       | StInt	  Integer      -- ** add Kind at some point
-#if __GLASGOW_HASKELL__ <= 22
-      | StDouble  Double
-#else
       | StDouble  Rational
-#endif
       | StString  FAST_STRING
       | StLitLbl  Unpretty	-- literal labels (will be _-prefixed on some machines)
       | StLitLit  FAST_STRING	-- innards from CLitLit
@@ -64,15 +56,15 @@ data StixTree =
 
 	-- A typed offset from a base location
 
-      | StIndex PrimKind StixTree StixTree -- kind, base, offset
+      | StIndex PrimRep StixTree StixTree -- kind, base, offset
 
 	-- An indirection from an address to its contents.
 
-      | StInd PrimKind StixTree
+      | StInd PrimRep StixTree
 
 	-- Assignment is typed to determine size and register placement
 
-      | StAssign PrimKind StixTree StixTree -- dst, src
+      | StAssign PrimRep StixTree StixTree -- dst, src
 
 	-- A simple assembly label that we might jump to.
 
@@ -99,7 +91,7 @@ data StixTree =
 
 	-- Raw data (as in an info table).
 
-      | StData PrimKind	[StixTree]
+      | StData PrimRep	[StixTree]
 
     	-- Primitive Operations
 
@@ -107,7 +99,7 @@ data StixTree =
 
     	-- Calls to C functions
 
-      | StCall FAST_STRING PrimKind [StixTree]
+      | StCall FAST_STRING PrimRep [StixTree]
 
 	-- Comments, of course
 
@@ -126,7 +118,7 @@ map to real, machine level registers.
 
 data StixReg = StixMagicId MagicId	-- Regs which are part of the abstract machine model
 
-	     | StixTemp Unique PrimKind -- "Regs" which model local variables (CTemps) in
+	     | StixTemp Unique PrimRep -- "Regs" which model local variables (CTemps) in
 					-- the abstract C.
 	     deriving ()
 
@@ -168,9 +160,9 @@ stgLivenessReg = StReg (StixMagicId LivenessReg)
 stgStdUpdRetVecReg = StReg (StixMagicId StdUpdRetVecReg)
 stgStkStubReg = StReg (StixMagicId StkStubReg)
 
-getUniqLabelNCG :: SUniqSM CLabel
-getUniqLabelNCG = 
-      getSUnique	      `thenSUs` \ u ->
-      returnSUs (mkAsmTempLabel u)
+getUniqLabelNCG :: UniqSM CLabel
+getUniqLabelNCG =
+      getUnique	      `thenUs` \ u ->
+      returnUs (mkAsmTempLabel u)
 
 \end{code}

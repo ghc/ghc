@@ -15,8 +15,7 @@ import MachDesc
 import Maybes		( maybeToBool, Maybe(..) )
 import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import Stix
-import SplitUniq
-import Unique
+import UniqSupply
 import Unpretty
 import Util
 
@@ -41,37 +40,37 @@ genCodeInfoTable
        (HeapOffset -> Int)	-- needed bit of Target
     -> (CAddrMode -> StixTree)	-- ditto
     -> AbstractC
-    -> SUniqSM StixTreeList
+    -> UniqSM StixTreeList
 
 genCodeInfoTable hp_rel amode2stix (CClosureInfoAndCode cl_info _ _ upd cl_descr _) =
-    returnSUs (\xs -> info : lbl : xs)
+    returnUs (\xs -> info : lbl : xs)
 
     where
-	info = StData PtrKind table
+	info = StData PtrRep table
 	lbl = StLabel info_lbl
 
 	table = case sm_rep of
 	    StaticRep _ _ -> [
 		StInt (toInteger ptrs),
-                StInt (toInteger size),
-                upd_code,
+		StInt (toInteger size),
+		upd_code,
 		static___rtbl,
-                tag]
+		tag]
 
 	    SpecialisedRep ConstantRep _ _ _ -> [
 		StCLbl closure_lbl,
-                upd_code,
-                const___rtbl,
-                tag]
+		upd_code,
+		const___rtbl,
+		tag]
 
 	    SpecialisedRep CharLikeRep _ _ _ -> [
 		upd_code,
 		charlike___rtbl,
-                tag]
+		tag]
 
 	    SpecialisedRep IntLikeRep _ _ _ -> [
 		upd_code,
-                intlike___rtbl,
+		intlike___rtbl,
 		tag]
 
 	    SpecialisedRep _ _ _ updatable ->
@@ -85,27 +84,27 @@ genCodeInfoTable hp_rel amode2stix (CClosureInfoAndCode cl_info _ _ upd cl_descr
 				    SMNormalForm -> SLIT("Spec_N_")
 				    SMSingleEntry -> SLIT("Spec_S_")
 				    SMUpdatable -> SLIT("Spec_U_")
-			           ),
+				   ),
 			   uppInt size,
 			   uppChar '_',
 			   uppInt ptrs,
 			   uppPStr SLIT("_rtbl")])
-                in
+		in
 		    case updatable of
 			SMNormalForm -> [upd_code, StLitLbl rtbl, tag]
-		        _            -> [StLitLbl rtbl, tag]
+			_            -> [StLitLbl rtbl, tag]
 
 	    GenericRep _ _ updatable ->
-                let rtbl = case updatable of
-                            SMNormalForm  -> gen_N___rtbl
-                            SMSingleEntry -> gen_S___rtbl
+		let rtbl = case updatable of
+			    SMNormalForm  -> gen_N___rtbl
+			    SMSingleEntry -> gen_S___rtbl
 			    SMUpdatable   -> gen_U___rtbl
-                in [
+		in [
 		    StInt (toInteger ptrs),
-                    StInt (toInteger size),
+		    StInt (toInteger size),
 		    upd_code,
-                    rtbl,
-                    tag]
+		    rtbl,
+		    tag]
 
 	    BigTupleRep _ -> [
 		tuple___rtbl,
@@ -126,9 +125,9 @@ genCodeInfoTable hp_rel amode2stix (CClosureInfoAndCode cl_info _ _ upd cl_descr
 	closure_lbl	= closureLabelFromCI   cl_info
 
 	sm_rep	= closureSMRep cl_info
-        maybe_selector = maybeSelectorInfo cl_info
-        is_selector = maybeToBool maybe_selector
-        (Just (_, select_word)) = maybe_selector
+	maybe_selector = maybeSelectorInfo cl_info
+	is_selector = maybeToBool maybe_selector
+	(Just (_, select_word)) = maybe_selector
 
 	tag = StInt (toInteger (closureSemiTag cl_info))
 

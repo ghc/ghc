@@ -1,5 +1,5 @@
 %
-% (c) The GRASP Project, Glasgow University, 1992-1995
+% (c) The GRASP Project, Glasgow University, 1992-1996
 %
 \section[Outputable]{Classes for pretty-printing}
 
@@ -17,38 +17,24 @@ module Outputable (
 
 	-- PRINTERY AND FORCERY
 	Outputable(..), 	-- class
-	PprStyle(..),		-- style-ry (re-exported)
 
 	interppSP, interpp'SP,
---UNUSED: ifPprForUser,
 	ifnotPprForUser,
-	ifPprDebug, --UNUSED: ifnotPprDebug,
+	ifPprDebug,
 	ifPprShowAll, ifnotPprShowAll,
-	ifPprInterface, --UNUSED: ifnotPprInterface,
---UNUSED: ifPprForC, ifnotPprForC,
---UNUSED: ifPprUnfolding, ifnotPprUnfolding,
+	ifPprInterface,
 
 	isOpLexeme, pprOp, pprNonOp,
-	isConop, isAconop, isAvarid, isAvarop, --UNUSED: isAconid,
+	isConop, isAconop, isAvarid, isAvarop
 
 	-- and to make the interface self-sufficient...
-	Pretty(..), GlobalSwitch,
-	PrettyRep, UniType, Unique, SrcLoc
     ) where
 
-import AbsUniType	( UniType,
-			  TyCon, Class, TyVar, TyVarTemplate -- for SPECIALIZing
-			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
-			  IF_ATTACK_PRAGMAS(COMMA cmpTyVar)
-			  IF_ATTACK_PRAGMAS(COMMA cmpTyCon)
-			)
-import Id		( Id ) -- for specialising
-import NameTypes	-- for specialising
-import ProtoName	-- for specialising
+import Ubiq{-uitous-}
+
+import PprStyle		( PprStyle(..) )
 import Pretty
-import SrcLoc		( SrcLoc )
-import Unique		( Unique )
-import Util
+import Util		( cmpPString )
 \end{code}
 
 %************************************************************************
@@ -65,9 +51,7 @@ class NamedThing a where
     getOccurrenceName	:: a -> FAST_STRING
     getInformingModules	:: a -> [FAST_STRING]
     getSrcLoc		:: a -> SrcLoc
-    getTheUnique	:: a -> Unique
-    hasType		:: a -> Bool
-    getType		:: a -> UniType
+    getItsUnique	:: a -> Unique
     fromPreludeCore	:: a -> Bool
     -- see also friendly functions that follow...
 \end{code}
@@ -91,11 +75,6 @@ Gets the name of the modules that told me about this @NamedThing@.
 
 \item[@getSrcLoc@:]
 Obvious.
-
-\item[@hasType@ and @getType@:]
-In pretty-printing @AbsSyntax@, we need to query if a datatype has
-types attached yet or not.  We use @hasType@ to see if there are types
-available; and @getType@ if we want to grab one...  (Ugly but effective)
 
 \item[@fromPreludeCore@:]
 Tests a quite-delicate property: it is \tr{True} iff the entity is
@@ -205,24 +184,17 @@ interpp'SP sty xs
 {-# SPECIALIZE interpp'SP :: PprStyle -> [ProtoName] -> Pretty #-}
 {-# SPECIALIZE interpp'SP :: PprStyle -> [TyVarTemplate] -> Pretty #-}
 {-# SPECIALIZE interpp'SP :: PprStyle -> [TyVar] -> Pretty #-}
-{-# SPECIALIZE interpp'SP :: PprStyle -> [UniType] -> Pretty #-}
+{-# SPECIALIZE interpp'SP :: PprStyle -> [Type] -> Pretty #-}
 #endif
 \end{code}
 
 \begin{code}
---UNUSED: ifPprForUser	sty p = case sty of PprForUser	 -> p ; _ -> ppNil
 ifPprDebug	sty p = case sty of PprDebug	 -> p ; _ -> ppNil
 ifPprShowAll	sty p = case sty of PprShowAll	 -> p ; _ -> ppNil
-ifPprInterface  sty p = case sty of PprInterface _ -> p ; _ -> ppNil
---UNUSED: ifPprForC   	sty p = case sty of PprForC      _ -> p ; _ -> ppNil
---UNUSED: ifPprUnfolding  sty p = case sty of PprUnfolding _ -> p ; _ -> ppNil
+ifPprInterface  sty p = case sty of PprInterface -> p ; _ -> ppNil
 
-ifnotPprForUser	  sty p = case sty of PprForUser    -> ppNil ; _ -> p
---UNUSED: ifnotPprDebug	  sty p = case sty of PprDebug	    -> ppNil ; _ -> p
-ifnotPprShowAll	  sty p = case sty of PprShowAll    -> ppNil ; _ -> p
---UNUSED: ifnotPprInterface sty p = case sty of PprInterface _ -> ppNil; _ -> p
---UNUSED: ifnotPprForC   	  sty p = case sty of PprForC      _ -> ppNil; _ -> p
---UNUSED: ifnotPprUnfolding sty p = case sty of PprUnfolding _ -> ppNil; _ -> p
+ifnotPprForUser	  sty p = case sty of PprForUser -> ppNil ; _ -> p
+ifnotPprShowAll	  sty p = case sty of PprShowAll -> ppNil ; _ -> p
 \end{code}
 
 These functions test strings to see if they fit the lexical categories
@@ -234,16 +206,12 @@ isConop, isAconop, isAvarid, isAvarop :: FAST_STRING -> Bool
 
 isConop cs
   | _NULL_ cs	= False
-  | c == '_'	= isConop (_TAIL_ cs)	-- allow for leading _'s
-  | otherwise	= isUpper c || c == ':'
-  where
+  | c == '_'	= isConop (_TAIL_ cs)		-- allow for leading _'s
+  | otherwise	= isUpper c || c == ':' 
+		  || c == '[' || c == '('	-- [] () and (,,) come is as Conop strings !!!
+		  || isUpperISO c
+  where					
     c = _HEAD_ cs
-
-{- UNUSED:
-isAconid []       = False
-isAconid ('_':cs) = isAconid cs
-isAconid (c:cs)   = isUpper c
--}
 
 isAconop cs
   | _NULL_ cs	= False
@@ -252,19 +220,27 @@ isAconop cs
     c = _HEAD_ cs
 
 isAvarid cs
-  | _NULL_ cs	= False
-  | c == '_'	= isAvarid (_TAIL_ cs)	-- allow for leading _'s
-  | otherwise	= isLower c
+  | _NULL_ cs	 = False
+  | c == '_'	 = isAvarid (_TAIL_ cs)	-- allow for leading _'s
+  | isLower c	 = True
+  | isLowerISO c = True
+  | otherwise    = False
   where
     c = _HEAD_ cs
 
 isAvarop cs
-  | _NULL_ cs	= False
-  | isLower c	= False -- shortcut
-  | isUpper c	= False -- ditto
-  | otherwise	= c `elem` "!#$%&*+./<=>?@\\^|~-" -- symbol or minus
+  | _NULL_ cs	 		    = False
+  | isLower c    		    = False
+  | isUpper c    		    = False
+  | c `elem` "!#$%&*+./<=>?@\\^|~-" = True
+  | isSymbolISO c		    = True
+  | otherwise			    = False
   where
     c = _HEAD_ cs
+
+isSymbolISO c = ord c `elem` (0xd7 : 0xf7 : [0xa1 .. 0xbf])
+isUpperISO  c = 0xc0 <= oc && oc <= 0xde && oc /= 0xd7 where oc = ord c
+isLowerISO  c = 0xdf <= oc && oc <= 0xff && oc /= 0xf7 where oc = ord c
 \end{code}
 
 And one ``higher-level'' interface to those:

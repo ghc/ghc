@@ -1,0 +1,31 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_pbinding where
+import Ubiq --  debugging consistency check
+import UgenUtil
+
+import U_constr		( U_constr )	-- interface only
+import U_binding
+import U_coresyn	( U_coresyn )	-- ditto
+import U_hpragma	( U_hpragma )	-- ditto
+import U_list
+import U_literal	( U_literal )	-- ditto
+import U_maybe		( U_maybe )	-- ditto
+import U_qid
+import U_tree
+import U_ttype		( U_ttype )	-- ditto
+%}}
+type pbinding;
+	pgrhs	: < ggpat	: tree;
+		    ggdexprs	: pbinding;
+		    ggbind	: binding;
+	 	    ggfuncname	: qid;
+		    ggline	: long; >;
+
+	pnoguards : < gpnoguard : tree; >;
+	pguards   : < gpguards  : list; >;
+	pgdexp	  : < gpguard	: tree;
+	              gpexp     : tree; >;
+end;

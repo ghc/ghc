@@ -8,18 +8,11 @@
 
 module SimplPgm ( simplifyPgm ) where
 
-import PlainCore
-import TaggedCore
-
-import Pretty		-- ToDo: rm debugging
-IMPORT_Trace
-
-import AbsUniType	( getTyVarMaybe )
+import Type		( getTyVarMaybe )
 import CmdLineOpts	( switchIsOn, intSwitchSet,
 			  GlobalSwitch(..), SimplifierSwitch(..)
 			)
-import Id		( cmpId, externallyVisibleId )
-import IdEnv
+import Id		( externallyVisibleId )
 import IdInfo
 import Maybes		( catMaybes, Maybe(..) )
 import Outputable
@@ -27,23 +20,18 @@ import SimplEnv
 import SimplMonad
 import Simplify		( simplTopBinds )
 import OccurAnal	-- occurAnalyseBinds
-#if ! OMIT_FOLDR_BUILD
-import NewOccurAnal	-- newOccurAnalyseBinds
-#endif
-import TyVarEnv		-- ( nullTyVarEnv )
-import SplitUniq
-import Unique
+import UniqSupply
 import Util
 \end{code}
 
 \begin{code}
-simplifyPgm :: [PlainCoreBinding]		-- input
+simplifyPgm :: [CoreBinding]		-- input
 	    -> (GlobalSwitch->SwitchResult)	-- switch lookup fns (global
 	    -> (SimplifierSwitch->SwitchResult) -- and this-simplification-specific)
 	    -> SimplCount                       -- info about how many times
 						-- each transformation has occurred
-	    -> SplitUniqSupply
-	    -> ([PlainCoreBinding],	-- output
+	    -> UniqSupply
+	    -> ([CoreBinding],	-- output
 		 Int,			-- info about how much happened
 		 SimplCount)		-- accumulated simpl stats
 
@@ -56,20 +44,14 @@ simplifyPgm binds g_sw_chkr s_sw_chkr simpl_stats us
     global_switch_is_on = switchIsOn g_sw_chkr
     simpl_switch_is_on  = switchIsOn s_sw_chkr
 
-#if OMIT_FOLDR_BUILD
     occur_anal = occurAnalyseBinds
-#else
-    occur_anal = if simpl_switch_is_on SimplDoNewOccurAnal 
-		 then newOccurAnalyseBinds
-		 else occurAnalyseBinds
-#endif
 
     max_simpl_iterations
       = case (intSwitchSet s_sw_chkr MaxSimplifierIterations) of
 	  Nothing  -> 1    -- default
 	  Just max -> max
 
-    simpl_pgm :: Int -> Int -> [PlainCoreBinding] -> SmplM ([PlainCoreBinding], Int, SimplCount)
+    simpl_pgm :: Int -> Int -> [CoreBinding] -> SmplM ([CoreBinding], Int, SimplCount)
 
     simpl_pgm n iterations pgm
       =	-- find out what top-level binders are used,
@@ -104,11 +86,11 @@ simplifyPgm binds g_sw_chkr s_sw_chkr simpl_stats us
 	(let stop_now = r == n {-nothing happened-}
 		     || (if iterations > max_simpl_iterations then
 			    (if max_simpl_iterations > 1 {-otherwise too boring-} then
-				trace 
+				trace
 				("NOTE: Simplifier still going after "++show max_simpl_iterations++" iterations; bailing out.")
 			     else id)
 			    True
-			 else 
+			 else
 			    False)
 	in
 	if stop_now then
@@ -143,26 +125,26 @@ type BlastEnv = IdEnv Id  -- domain is local Ids; range is exported Ids
 
 not_elem = isn'tIn "undup"
 
-tidy_top :: [PlainCoreBinding] -> SUniqSM [PlainCoreBinding]
+tidy_top :: [CoreBinding] -> UniqSM [CoreBinding]
 
 tidy_top binds_in
   = if null blast_alist then
-	returnSUs binds_in    -- no joy there
+	returnUs binds_in    -- no joy there
     else
 	-- pprTrace "undup output length:" (ppInt (length blast_alist)) (
-	mapSUs blast binds_in	`thenSUs` \ binds_maybe ->
-	returnSUs (catMaybes binds_maybe)
+	mapUs blast binds_in	`thenUs` \ binds_maybe ->
+	returnUs (catMaybes binds_maybe)
 	-- )
   where
     blast_alist  = undup (foldl find_cand [] binds_in)
     blast_id_env = mkIdEnv blast_alist
-    blast_val_env= mkIdEnv [ (l, CoVar e) | (l,e) <- blast_alist ]
+    blast_val_env= mkIdEnv [ (l, Var e) | (l,e) <- blast_alist ]
     blast_all_exps = map snd blast_alist
 
     ---------
-    find_cand blast_list (CoRec _) = blast_list	-- recursively paranoid, as usual
+    find_cand blast_list (Rec _) = blast_list	-- recursively paranoid, as usual
 
-    find_cand blast_list (CoNonRec binder rhs)
+    find_cand blast_list (NonRec binder rhs)
       = if not (isExported binder) then
 	   blast_list
     	else
@@ -178,73 +160,48 @@ tidy_top binds_in
     undup blast_list
       = -- pprTrace "undup input length:" (ppInt (length blast_list)) (
 	let
-	    (singles, dups) = removeDups cmp blast_list
+	    (singles, dups) = removeDups compare blast_list
 	    list_of_dups    = concat dups
 	in
 	[ s | s <- singles, s `not_elem` list_of_dups ]
 	-- )
       where
-        cmp (x,_) (y,_) = x `cmpId` y
+	compare (x,_) (y,_) = x `cmp` y
 
     ------------------------------------------
-    rhs_equiv_to_local_var (CoVar x)
+    rhs_equiv_to_local_var (Var x)
       = if externallyVisibleId x then Nothing else Just x
 
     rhs_equiv_to_local_var expr = Nothing
-{- MAYBE NOT:
-      = case (digForLambdas expr) of { (tyvars, binders, body) ->
-	case (collectArgs   body) of { (fun, args) ->
-	case fun of
-	  CoVar x -> if   null binders
-		       && not (isExported x)
-		       && tylams_match_tyargs tyvars args then
-		       -- may need to chk for "tyvars" occurring in "x"'s type
-		        Just x
-		     else
-		        Nothing
-	  _ -> Nothing
-        }}
-      where
-	-- looking for a very restricted special case:
-	-- /\ tv1 tv2 ... -> var tv1 tv2 ...
-
-	tylams_match_tyargs []       [] = True
-	tylams_match_tyargs (tv:tvs) (TypeArg ty : args)
-	  = ASSERT(not (isPrimType ty))
-	    case (getTyVarMaybe ty) of
-	      Nothing    -> False
-	      Just tyvar -> tv == tyvar
-	tylams_match_tyargs _ _ = False
--}
 
     ------------------------------------------
     -- "blast" does the substitution:
     -- returns Nothing  if a binding goes away
     -- returns "Just b" to give back a fixed-up binding
 
-    blast :: PlainCoreBinding -> SUniqSM (Maybe PlainCoreBinding)
+    blast :: CoreBinding -> UniqSM (Maybe CoreBinding)
 
-    blast (CoRec pairs)
-      = mapSUs blast_pr pairs `thenSUs` \ blasted_pairs ->
-	returnSUs (Just (CoRec blasted_pairs))
+    blast (Rec pairs)
+      = mapUs blast_pr pairs `thenUs` \ blasted_pairs ->
+	returnUs (Just (Rec blasted_pairs))
       where
 	blast_pr (binder, rhs)
-	  = subst_CoreExprUS blast_val_env nullTyVarEnv rhs `thenSUs` \ blasted_rhs ->
-	    returnSUs (
+	  = subst_CoreExprUS blast_val_env nullTyVarEnv rhs `thenUs` \ blasted_rhs ->
+	    returnUs (
 	    case lookupIdEnv blast_id_env binder of
 	      Just exportee -> (exportee, blasted_rhs)
 	      Nothing	    -> (binder,   blasted_rhs)
 	    )
 
-    blast (CoNonRec binder rhs)
+    blast (NonRec binder rhs)
       = if binder `is_elem` blast_all_exps then
-	   returnSUs Nothing -- this binding dies!
+	   returnUs Nothing -- this binding dies!
     	else
-	   subst_CoreExprUS blast_val_env nullTyVarEnv rhs `thenSUs` \ blasted_rhs ->
-	   returnSUs (Just (
+	   subst_CoreExprUS blast_val_env nullTyVarEnv rhs `thenUs` \ blasted_rhs ->
+	   returnUs (Just (
 	   case lookupIdEnv blast_id_env binder of
-	     Just exportee -> CoNonRec exportee blasted_rhs
-	     Nothing	   -> CoNonRec binder   blasted_rhs
+	     Just exportee -> NonRec exportee blasted_rhs
+	     Nothing	   -> NonRec binder   blasted_rhs
 	   ))
       where
 	is_elem = isIn "blast"

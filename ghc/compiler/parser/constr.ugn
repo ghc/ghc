@@ -1,0 +1,38 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_constr where
+import Ubiq --  debugging consistency check
+import UgenUtil
+
+import U_maybe
+import U_list
+import U_qid
+import U_ttype
+%}}
+type constr;
+	/* constr in prefix form: */
+	constrpre   : < gconcid	    : qid;
+			gconctypel  : list; /* [ttype] */
+			gconcline   : long; >;
+
+	/* constr in infix form: */
+	constrinf   : < gconity1    : ttype;
+			gconiop	    : qid;
+			gconity2    : ttype;
+			gconiline   : long; >;
+
+	/* constr in record form: */
+	constrrec   : < gconrid	    : qid;
+			gconrfieldl : list; /* [field] */
+			gconrline   : long; >;
+
+	/* constr in simple "newtype" form: */
+	constrnew   : < gconnid	    : qid;
+			gconnty	    : ttype;
+			gconnline   : long; >;
+
+	field	    : < gfieldn	    : list;
+			gfieldt	    : ttype; >;
+end;

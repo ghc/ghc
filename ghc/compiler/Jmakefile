@@ -11,17 +11,12 @@
 #endif
 SUBDIRS = __ghc_compiler_tests_dir
 #undef __ghc_compiler_tests_dir
-/* ?????? ToDo: something about test dirs underneath yaccParser ????? */
 
-#if BuildDataParallelHaskell != YES
-    /* DPH likes to play around in subdirs */
-# define NoAllTargetForSubdirs
-# define NoDocsTargetForSubdirs
-# define NoInstallDocsTargetForSubdirs
-# define NoDependTargetForSubdirs
-#endif
-    /* these always apply */
-# define NoInstallTargetForSubdirs
+#define NoAllTargetForSubdirs
+#define NoDocsTargetForSubdirs
+#define NoInstallDocsTargetForSubdirs
+#define NoDependTargetForSubdirs
+#define NoInstallTargetForSubdirs
 #define NoTagTargetForSubdirs
 
 /* Suffix rules: we do not use them much at all in GHC.
@@ -37,10 +32,7 @@ LitSuffixRule(.lprl,.prl) /* for makeSymbolList.prl */
 */
 
 SUBDIR_LIST = \ /* here they are, colon separated (for mkdependHS) */
-utils:basicTypes:uniType:abstractSyn:prelude:envs:rename:typecheck:deSugar:coreSyn:specialise:simplCore:stranal:stgSyn:simplStg:codeGen:nativeGen:absCSyn:main:reader:profiling:deforest:podizeCore:yaccParser:nhcParser:interpreter
-
-DASH_I_SUBDIR_LIST = \ /* same thing, in -I<dir> format */
--Iutils -IbasicTypes -IuniType -IabstractSyn -Iprelude -Ienvs -Irename -Itypecheck -IdeSugar -IcoreSyn -Ispecialise -IsimplCore -Istranal -IstgSyn -IsimplStg -IcodeGen -InativeGen -IabsCSyn -Imain -Ireader -Iprofiling -Ideforest -IpodizeCore -IyaccParser -InhcParser -Iinterpreter
+utils:basicTypes:types:hsSyn:prelude:envs:rename:typecheck:deSugar:coreSyn:specialise:simplCore:stranal:stgSyn:simplStg:codeGen:nativeGen:absCSyn:main:reader:profiling:deforest:parser
 
 #ifdef MainIncludeDir
 MAIN_INCLUDE_DIR=MainIncludeDir
@@ -63,149 +55,116 @@ NATIVEGEN_DIR=$(TOP_PWD)/$(CURRENT_DIR)/nativeGen
 
 /* in order-of-passes order, utility modules at the end */
 
-#if GhcBuilderVersion >= 23 && GhcBuildeeVersion >= 23
-# define USE_NEW_READER YES
-# define __new_reader_flag -DUSE_NEW_READER=1
-#else
-# define __new_reader_flag /*none*/
-#endif
-#if USE_NEW_READER == YES
-# define READERSRCS_HS	\
-yaccParser/U_atype.hs	\
-yaccParser/U_binding.hs	\
-yaccParser/U_coresyn.hs	\
-yaccParser/U_entidt.hs	\
-yaccParser/U_finfot.hs	\
-yaccParser/U_hpragma.hs	\
-yaccParser/U_list.hs	\
-yaccParser/U_literal.hs	\
-yaccParser/U_pbinding.hs \
-yaccParser/U_treeHACK.hs \
-yaccParser/U_ttype.hs
-#define READERSRCS_LHS	\
-yaccParser/UgenUtil.lhs	\
-yaccParser/UgenAll.lhs	\
-reader/ReadPrefix2.lhs	\
-reader/ReadPragmas2.lhs
-#define hsp_library libhsp.a
-#else
-#define READERSRCS_HS	/* none */
-#define READERSRCS_LHS	\
-reader/ReadPrefix.lhs	\
-reader/ReadPragmas.lhs
-#define hsp_library /*none*/
-#endif
+#define READERSRCS_HS	\
+parser/U_constr.hs	\
+parser/U_binding.hs	\
+parser/U_pbinding.hs	\
+parser/U_coresyn.hs	\
+parser/U_entidt.hs	\
+parser/U_hpragma.hs	\
+parser/U_list.hs	\
+parser/U_literal.hs	\
+parser/U_maybe.hs	\
+parser/U_either.hs	\
+parser/U_qid.hs		\
+parser/U_tree.hs 	\
+parser/U_ttype.hs
 
-#define FRONTSRCS_LHS	\
+#define hsp_library libhsp.a
+
+#define READERSRCS_LHS	\
+parser/UgenUtil.lhs	\
+parser/UgenAll.lhs	\
+reader/ReadPrefix.lhs	\
+reader/ReadPragmas.lhs	\
+\
 reader/PrefixSyn.lhs	\
 reader/PrefixToHs.lhs	\
+reader/RdrHsSyn.lhs	\
 \
-basicTypes/Unique.lhs	\
-basicTypes/SplitUniq.lhs \
-basicTypes/ProtoName.lhs \
-basicTypes/NameTypes.lhs \
-basicTypes/SrcLoc.lhs	\
-basicTypes/Id.lhs	\
-basicTypes/IdInfo.lhs	\
-basicTypes/Inst.lhs	\
-basicTypes/BasicLit.lhs	\
-basicTypes/CLabelInfo.lhs \
-basicTypes/OrdList.lhs \
+hsSyn/HsBinds.lhs  /* abstract Haskell syntax */ \
+hsSyn/HsCore.lhs \
+hsSyn/HsDecls.lhs \
+hsSyn/HsExpr.lhs \
+hsSyn/HsImpExp.lhs \
+hsSyn/HsLit.lhs \
+hsSyn/HsMatches.lhs \
+hsSyn/HsPat.lhs \
+hsSyn/HsPragmas.lhs \
+hsSyn/HsTypes.lhs \
+hsSyn/HsSyn.lhs
+
+#define NOT_SO_BASICSRCS_LHS 	\
+basicTypes/Unique.lhs		\
+basicTypes/UniqSupply.lhs 	\
+basicTypes/ProtoName.lhs 	\
+basicTypes/Name.lhs 		\
+basicTypes/NameTypes.lhs 	\
+basicTypes/SrcLoc.lhs		\
+basicTypes/Id.lhs		\
+basicTypes/IdInfo.lhs		\
+basicTypes/IdUtils.lhs		\
+basicTypes/PragmaInfo.lhs	\
+basicTypes/Literal.lhs		\
 \
-uniType/TyVar.lhs	\
-uniType/TyCon.lhs	\
-uniType/Class.lhs	\
-uniType/UniType.lhs	\
-uniType/UniTyFuns.lhs	\
-uniType/AbsUniType.lhs	\
+types/Class.lhs			\
+types/Kind.lhs			\
+types/PprType.lhs		\
+types/TyCon.lhs			\
+types/TyVar.lhs			\
+types/Usage.lhs			\
+types/Type.lhs			\
 \
-abstractSyn/Name.lhs /* abstract Haskell syntax */ \
-abstractSyn/HsCore.lhs \
-abstractSyn/HsPragmas.lhs \
-abstractSyn/HsImpExp.lhs \
-abstractSyn/HsDecls.lhs \
-abstractSyn/HsBinds.lhs \
-abstractSyn/HsMatches.lhs \
-abstractSyn/HsLit.lhs \
-abstractSyn/HsExpr.lhs \
-abstractSyn/HsPat.lhs \
-abstractSyn/HsTypes.lhs \
-abstractSyn/AbsSyn.lhs \
-abstractSyn/AbsSynFuns.lhs \
-\
-rename/Rename.lhs \
-rename/Rename1.lhs \
-rename/Rename2.lhs \
-rename/Rename3.lhs \
-rename/Rename4.lhs \
-rename/RenameAuxFuns.lhs \
-rename/RenameMonad12.lhs \
-rename/RenameMonad3.lhs \
-rename/RenameMonad4.lhs \
-rename/RenameBinds4.lhs \
-rename/RenameExpr4.lhs
+specialise/SpecEnv.lhs
+
+
+#define RENAMERSRCS_LHS \
+rename/RnPass1.lhs \
+rename/RnPass2.lhs \
+rename/RnPass3.lhs \
+rename/RnPass4.lhs \
+rename/RnHsSyn.lhs \
+rename/RnUtils.lhs \
+rename/RnMonad12.lhs \
+rename/RnMonad3.lhs \
+rename/RnMonad4.lhs \
+rename/RnBinds4.lhs \
+rename/RnExpr4.lhs \
+rename/Rename.lhs
 
 #define TCSRCS_LHS \
-prelude/PrelFuns.lhs \
-prelude/PrimKind.lhs \
-prelude/PrimOps.lhs \
-prelude/TysPrim.lhs \
-prelude/TysWiredIn.lhs \
-prelude/PrelVals.lhs \
-prelude/AbsPrel.lhs \
-\
-envs/IdEnv.lhs \
-envs/TyVarEnv.lhs \
-envs/LIE.lhs \
-envs/CE.lhs \
-envs/E.lhs \
-envs/InstEnv.lhs \
-envs/TCE.lhs \
-envs/TVE.lhs \
-\
-typecheck/BackSubst.lhs \
-typecheck/Disambig.lhs \
+typecheck/TcHsSyn.lhs \
 typecheck/GenSpecEtc.lhs \
-typecheck/Spec.lhs \
-typecheck/Subst.lhs	\
+typecheck/Inst.lhs	\
 typecheck/TcBinds.lhs \
 typecheck/TcClassDcl.lhs \
-typecheck/TcClassSig.lhs \
-typecheck/TcConDecls.lhs \
-typecheck/TcContext.lhs \
 typecheck/TcDefaults.lhs \
 typecheck/TcDeriv.lhs \
 typecheck/TcExpr.lhs \
-typecheck/TcGRHSs.lhs \
 typecheck/TcGenDeriv.lhs \
+typecheck/TcGRHSs.lhs \
 typecheck/TcIfaceSig.lhs \
 typecheck/TcInstDcls.lhs \
+typecheck/TcInstUtil.lhs \
 typecheck/TcMatches.lhs \
 typecheck/TcModule.lhs \
 typecheck/TcMonad.lhs \
-typecheck/TcMonadFns.lhs \
-typecheck/TcMonoBnds.lhs \
+typecheck/TcEnv.lhs \
+typecheck/TcKind.lhs \
+typecheck/TcType.lhs \
 typecheck/TcMonoType.lhs \
 typecheck/TcPat.lhs \
-typecheck/TcPolyType.lhs \
-typecheck/TcPragmas.lhs \
-typecheck/TcQuals.lhs \
 typecheck/TcSimplify.lhs \
+typecheck/TcTyClsDecls.lhs \
 typecheck/TcTyDecls.lhs \
 typecheck/Typecheck.lhs \
 typecheck/Unify.lhs
 
+/*
+typecheck/TcPragmas.lhs \
+*/
+
 #define DSSRCS_LHS \
-coreSyn/AnnCoreSyn.lhs \
-coreSyn/CoreSyn.lhs \
-coreSyn/PlainCore.lhs \
-coreSyn/TaggedCore.lhs \
-coreSyn/CoreFuns.lhs \
-coreSyn/CoreUnfold.lhs \
-coreSyn/FreeVars.lhs \
-coreSyn/CoreLift.lhs \
-coreSyn/CoreLint.lhs \
-\
 deSugar/Desugar.lhs \
 deSugar/Match.lhs \
 deSugar/MatchCon.lhs \
@@ -214,12 +173,20 @@ deSugar/DsBinds.lhs \
 deSugar/DsCCall.lhs \
 deSugar/DsExpr.lhs \
 deSugar/DsGRHSs.lhs \
+deSugar/DsHsSyn.lhs \
 deSugar/DsListComp.lhs \
 deSugar/DsMonad.lhs \
 deSugar/DsUtils.lhs \
 \
+coreSyn/CoreLift.lhs \
+coreSyn/CoreLint.lhs
+
+#define SIMPL_SRCS_LHS \
+coreSyn/AnnCoreSyn.lhs \
+coreSyn/FreeVars.lhs \
+\
 specialise/Specialise.lhs \
-specialise/SpecTyFuns.lhs \
+specialise/SpecUtils.lhs \
 \
 simplCore/SimplCase.lhs \
 simplCore/SimplEnv.lhs \
@@ -231,17 +198,14 @@ simplCore/Simplify.lhs \
 \
 simplCore/LiberateCase.lhs \
 \
-simplCore/BinderInfo.lhs \
 simplCore/ConFold.lhs \
 simplCore/FloatIn.lhs \
 simplCore/FloatOut.lhs \
-simplCore/MagicUFs.lhs \
 simplCore/SAT.lhs \
 simplCore/SATMonad.lhs \
 simplCore/SetLevels.lhs \
 simplCore/SimplCore.lhs \
 simplCore/OccurAnal.lhs \
-simplCore/NewOccurAnal.lhs \
 simplCore/FoldrBuildWW.lhs \
 simplCore/AnalFBWW.lhs \
 \
@@ -254,37 +218,6 @@ stranal/WorkWrap.lhs \
 profiling/SCCauto.lhs \
 profiling/SCCfinal.lhs \
 profiling/CostCentre.lhs
-
-#if UseSemantiqueStrictnessAnalyser != YES
-#define SEM_STRANAL_SRCS_LHS /* omit */
-#else
-#define SEM_STRANAL_SRCS_LHS \
-stranal-sem/AFE.lhs \
-stranal-sem/AbsVal.lhs \
-stranal-sem/AssocPair.lhs \
-stranal-sem/BuildAFE.lhs \
-stranal-sem/ConstrEnv.lhs \
-stranal-sem/Cycles.lhs \
-stranal-sem/FG.lhs \
-stranal-sem/FourProj.lhs \
-stranal-sem/OAL.lhs \
-stranal-sem/OAT.lhs \
-stranal-sem/OL.lhs \
-stranal-sem/ProgEnv.lhs \
-stranal-sem/ProjBasic.lhs \
-stranal-sem/ProjFactor.lhs  \
-stranal-sem/ProjFolds.lhs  \
-stranal-sem/ProjGets.lhs  \
-stranal-sem/ProjLubAnd.lhs \
-stranal-sem/REL.lhs \
-stranal-sem/StrAnal.lhs \
-stranal-sem/StrAnn.lhs \
-stranal-sem/StrAnnCore.lhs \
-stranal-sem/StrAnnUtil.lhs \
-stranal-sem/StrTypeEnv.lhs \
-stranal-sem/Transformer.lhs \
-stranal-sem/Tree.lhs
-#endif /* UseSemantiqueStrictnessAnalyser */
 
 #if GhcWithDeforester != YES
 #define __omit_deforester_flag -DOMIT_DEFORESTER=1
@@ -302,97 +235,10 @@ deforest/Cyclic.lhs \
 deforest/TreelessForm.lhs
 #endif /* GhcWithDeforester */
 
-#if BuildGHCI != YES
-#define __build_ghci_flag /*nope*/
-#define NHCSRCS_LHS /* omit */
-#define GHCISRCS_LHS /* omit */
-#else
-#define __build_ghci_flag -DBUILD_GHCI=1
-#define NHCSRCS_LHS \
-nhcParser/Parse.lhs      \
-nhcParser/ParseCore.lhs  \
-nhcParser/ParseLib.lhs   \
-nhcParser/ParseLex.lhs   \
-nhcParser/PPSyntax.lhs   \
-nhcParser/PPLib.lhs      \
-nhcParser/Lexical.lhs    \
-nhcParser/Lex.lhs        \
-nhcParser/LexPre.lhs     \
-nhcParser/LexStr.lhs     \
-nhcParser/HS.lhs         \
-nhcParser/MkSyntax.lhs   \
-nhcParser/SyntaxPos.lhs  \
-nhcParser/Syntax.lhs     \
-nhcParser/Extra.lhs      \
-nhcParser/ScopeLib.lhs   \
-nhcParser/Import.lhs     \
-nhcParser/AttrLib.lhs    \
-nhcParser/Attr.lhs       \
-nhcParser/NHCName.lhs    \
-nhcParser/NameLow.lhs    \
-nhcParser/ParseI.lhs     \
-nhcParser/Tree234.lhs    \
-nhcParser/MergeSort.lhs  \
-nhcParser/StrName.lhs    \
-nhcParser/NameLib.lhs    \
-nhcParser/OsOnly.lhs     \
-nhcParser/Flags.lhs      \
-nhcParser/Fixity.lhs     \
-nhcParser/StrSyntax.lhs  \
-nhcParser/Either.lhs     \
-nhcParser/ListUtil.lhs   \
-nhcParser/NHCPackedString.lhs \
-nhcParser/HbcOnly.lhs    \
-nhcParser/LexLow.lhs     
-
-/* Bits we don't need after all.  ToDo: delete their source...
-nhcParser/IName.lhs      \
-nhcParser/IExtract.lhs   \
-nhcParser/Error.lhs      \
-nhcParser/BindLib.lhs    \
-nhcParser/BindI.lhs      
-*/
-
-#define GHCISRCS_LHS \
-interpreter/ToPrefix.lhs   \
-interpreter/UnsafeCoerce.lhs \
-interpreter/Dynamic.lhs \
-interpreter/Interpreter.lhs \
-interpreter/MkInterface.lhs \
-interpreter/GHCIMonad.lhs  \
-interpreter/FullEnv.lhs  \
-interpreter/Command.lhs    \
-interpreter/GHCIFlags.lhs	 \
-interpreter/GHCInterface.lhs \
-interpreter/GHCI.lhs \
-interpreter/GHCICore.lhs \
-interpreter/Dld.lhs
-
-/* ToDo: mkworld-ify */
-DLD_DIR 	= ./dld
-DLD_LIB 	= $(DLD_DIR)/libdld.a
-DLD_INCLUDE 	= $(DLD_DIR)/dld.h
-
-DLD_OBJS_O =			\
-	dld/dld.o		\
-	dld/find_exec.o		\
-	dld/define.o		\
-	dld/get_func.o		\
-	dld/get_symbol.o	\
-	dld/list_undef.o	\
-	dld/mk_dummy.o		\
-	dld/ref.o		\
-	dld/ul_file.o		\
-	dld/ul_symbol.o		\
-	dld/remove.o		\
-	dld/error.o
-
-#endif /* BuildGHCI */
-
 #define BACKSRCS_LHS \
 stgSyn/CoreToStg.lhs \
 stgSyn/StgSyn.lhs \
-stgSyn/StgFuns.lhs \
+stgSyn/StgUtils.lhs \
 stgSyn/StgLint.lhs \
 \
 simplStg/SatStgRhs.lhs \
@@ -404,17 +250,17 @@ simplStg/StgSATMonad.lhs \
 simplStg/StgSAT.lhs \
 simplStg/SimplStg.lhs \
 \
+absCSyn/AbsCUtils.lhs \
 absCSyn/AbsCSyn.lhs \
+absCSyn/CLabel.lhs \
 absCSyn/Costs.lhs \
 absCSyn/HeapOffs.lhs \
-absCSyn/AbsCFuns.lhs \
 absCSyn/PprAbsC.lhs \
 \
 codeGen/CodeGen.lhs \
 codeGen/ClosureInfo.lhs \
 codeGen/SMRep.lhs \
 codeGen/CgConTbls.lhs \
-codeGen/CgCompInfo.lhs \
 codeGen/CgMonad.lhs \
 codeGen/CgUsages.lhs \
 codeGen/CgHeapery.lhs \
@@ -434,36 +280,30 @@ codeGen/CgUpdate.lhs
        distributed C files, which do not have a native-code
        generator in them
     */
-#define __omit_ncg_maybe -DOMIT_NATIVE_CODEGEN=1
-#define NATIVEGEN_SRCS_LHS /*none*/
+# define __omit_ncg_maybe -DOMIT_NATIVE_CODEGEN=1
+# define NATIVEGEN_SRCS_LHS /*none*/
 #else
-#define __omit_ncg_maybe /*none*/
-#if i386_TARGET_ARCH
-#define __machdep_nativegen_lhs \
+# define __omit_ncg_maybe /*none*/
+# if i386_TARGET_ARCH
+# define __machdep_nativegen_lhs \
 nativeGen/I386Desc.lhs \
 nativeGen/I386Code.lhs \
 nativeGen/I386Gen.lhs
-#define __ghci_machdep_nativegen_lhs \
-nativeGen/I386Code.lhs
-#endif
-#if sparc_TARGET_ARCH
-#define __machdep_nativegen_lhs \
+# endif
+# if sparc_TARGET_ARCH
+# define __machdep_nativegen_lhs \
 nativeGen/SparcDesc.lhs \
 nativeGen/SparcCode.lhs \
 nativeGen/SparcGen.lhs
-#define __ghci_machdep_nativegen_lhs \
-nativeGen/SparcCode.lhs
-#endif
-#if alpha_TARGET_ARCH
-#define __machdep_nativegen_lhs \
+# endif
+# if alpha_TARGET_ARCH
+# define __machdep_nativegen_lhs \
 nativeGen/AlphaDesc.lhs \
 nativeGen/AlphaCode.lhs \
 nativeGen/AlphaGen.lhs
-#define __ghci_machdep_nativegen_lhs \
-nativeGen/AlphaCode.lhs
-#endif
+# endif
 
-#define NATIVEGEN_SRCS_LHS \
+# define NATIVEGEN_SRCS_LHS \
 nativeGen/AbsCStixGen.lhs \
 nativeGen/AsmCodeGen.lhs \
 nativeGen/AsmRegAlloc.lhs \
@@ -477,126 +317,80 @@ __machdep_nativegen_lhs /*arch-specific ones */
 #endif
 
 #define UTILSRCS_LHS \
-utils/CharSeq.lhs \
+utils/Argv.lhs \
 utils/Bag.lhs \
-utils/Pretty.lhs \
-utils/Unpretty.lhs \
-utils/Maybes.lhs \
-utils/Digraph.lhs \
 utils/BitSet.lhs \
-utils/LiftMonad.lhs \
-utils/ListSetOps.lhs \
-utils/Outputable.lhs \
+utils/CharSeq.lhs \
+utils/Digraph.lhs \
 utils/FiniteMap.lhs \
+utils/ListSetOps.lhs \
+utils/MatchEnv.lhs \
+utils/Maybes.lhs \
+utils/OrdList.lhs \
+utils/Outputable.lhs \
+utils/PprStyle.lhs \
+utils/Pretty.lhs \
+utils/SST.lhs \
 utils/UniqFM.lhs \
 utils/UniqSet.lhs \
+utils/Unpretty.lhs \
 utils/Util.lhs
 
-#if BuildDataParallelHaskell != YES
-#define DPH_SRCS_LHS /*none*/
-#else
-#define DPH_SRCS_LHS \
-\
-typecheck/TcParQuals.lhs \
-deSugar/DsParZF.lhs \
-deSugar/MatchProc.lhs \
-prelude/ClsPid.lhs \
-prelude/ClsProc.lhs \
-prelude/TyPod.lhs \
-prelude/TyProcs.lhs \
-\
-podizeCore/PodInfoTree.lhs \
-podizeCore/PodInfoMonad.lhs \
-podizeCore/PodInfo1.lhs \
-podizeCore/PodInfo2.lhs \
-podizeCore/PodizeMonad.lhs \
-podizeCore/PodizePass0.lhs \
-podizeCore/PodizePass1.lhs \
-podizeCore/PodizePass2.lhs \
-podizeCore/PodizeCore.lhs
-#endif /* DPH */
-
 #define MAIN_SRCS_LHS \
-main/MkIface.lhs \
-main/ErrUtils.lhs \
-main/ErrsRn.lhs \
-main/ErrsTc.lhs \
-main/Errors.lhs \
 main/MainMonad.lhs \
 main/CmdLineOpts.lhs \
+main/ErrUtils.lhs \
 main/Main.lhs
+
+/* 
+main/MkIface.lhs \
+*/
+
+#define VBASICSRCS_LHS \
+prelude/PrelMods.lhs \
+prelude/PrimRep.lhs \
+prelude/PrimOp.lhs \
+prelude/TysPrim.lhs \
+prelude/TysWiredIn.lhs \
+prelude/PrelVals.lhs \
+prelude/PrelInfo.lhs \
+\
+absCSyn/CStrings.lhs \
+codeGen/CgCompInfo.lhs \
+coreSyn/CoreSyn.lhs \
+coreSyn/CoreUnfold.lhs \
+coreSyn/CoreUtils.lhs \
+coreSyn/PprCore.lhs \
+profiling/CostCentre.lhs \
+simplCore/BinderInfo.lhs \
+simplCore/MagicUFs.lhs
 
 ALLSRCS_HS = READERSRCS_HS
 ALLSRCS_LHS = /* all pieces of the compiler */ \
-READERSRCS_LHS \
-FRONTSRCS_LHS \
-TCSRCS_LHS \
-DSSRCS_LHS \
-BACKSRCS_LHS \
+VBASICSRCS_LHS \
+NOT_SO_BASICSRCS_LHS \
+UTILSRCS_LHS \
 MAIN_SRCS_LHS \
-UTILSRCS_LHS NATIVEGEN_SRCS_LHS DEFORESTER_SRCS_LHS SEM_STRANAL_SRCS_LHS DPH_SRCS_LHS NHCSRCS_LHS GHCISRCS_LHS
-/* NB: all the ones that may be empty (e.g., DPH_SRCS_LHS)
+READERSRCS_LHS \
+RENAMERSRCS_LHS \
+TCSRCS_LHS \
+DSSRCS_LHS
+
+/*
+SIMPL_SRCS_LHS
+BACKSRCS_LHS
+*/
+
+/* 
+NATIVEGEN_SRCS_LHS DEFORESTER_SRCS_LHS */
+/* NB: all the ones that may be empty (e.g., NATIVEGEN_SRCS_LHS)
 	need to be on the last line.
 */
 
-HSCSRCS_HS = READERSRCS_HS
-HSCSRCS_LHS = /* all pieces of the compiler */ \
-READERSRCS_LHS \
-FRONTSRCS_LHS \
-TCSRCS_LHS \
-DSSRCS_LHS \
-BACKSRCS_LHS \
-MAIN_SRCS_LHS \
-UTILSRCS_LHS NATIVEGEN_SRCS_LHS DEFORESTER_SRCS_LHS SEM_STRANAL_SRCS_LHS DPH_SRCS_LHS
-
-/* 
-As well as the obvious inclusions, there are a few non-obvious ones
-obtained from the transitive closure:
-
-* main/Errors.lhs andmain/CmdLineOpts.lhs are actually used.
-
-* most of the rest trickles in through the prelude.
-
-ToDo: hack around in the prelude to avoid all this...
-
-*/
-
-GHCISRCS = /* all pieces of the interpreter */ \
-FRONTSRCS_LHS \
-TCSRCS_LHS \
-DSSRCS_LHS \
-main/Errors.lhs \
-main/ErrUtils.lhs \
-main/ErrsRn.lhs \
-main/ErrsTc.lhs \
-main/CmdLineOpts.lhs \
-main/MainMonad.lhs \
-absCSyn/HeapOffs.lhs \
-codeGen/SMRep.lhs \
-codeGen/CgCompInfo.lhs \
-codeGen/ClosureInfo.lhs \
-codeGen/CgRetConv.lhs \
-absCSyn/AbsCSyn.lhs \
-codeGen/CgMonad.lhs \
-absCSyn/AbsCFuns.lhs \
-codeGen/CgBindery.lhs \
-codeGen/CgUsages.lhs \
-absCSyn/Costs.lhs \
-absCSyn/PprAbsC.lhs \
-stgSyn/StgSyn.lhs \
-nativeGen/AsmRegAlloc.lhs __ghci_machdep_nativegen_lhs \
-UTILSRCS_LHS SEM_STRANAL_SRCS_LHS DEFORESTER_SRCS_LHS NHCSRCS_LHS GHCISRCS_LHS
-
-
 /* should't use these fancy `make' things, really */
+ALLHCS =$(ALLSRCS_LHS:.lhs=.hc) $(ALLSRCS_HS:.hs=.hc)
 ALLOBJS=$(ALLSRCS_LHS:.lhs=.o)  $(ALLSRCS_HS:.hs=.o)
 ALLINTS=$(ALLSRCS_LHS:.lhs=.hi) $(ALLSRCS_HS:.hs=.hi)
-
-HSCOBJS=$(HSCSRCS_LHS:.lhs=.o)  $(HSCSRCS_HS:.hs=.o)
-HSCINTS=$(HSCSRCS_LHS:.lhs=.hi) $(HSCSRCS_HS:.hs=.hi)
-
-GHCIOBJS=$(GHCISRCS:.lhs=.o) interpreter/DldHacks.o interpreter/DldC.o interpreter/prelude.o interpreter/runtime.o
-GHCIINTS=$(GHCISRCS:.lhs=.hi) interpreter/Dldhacks.hi
 
 .PRECIOUS: $(ALLINTS)
 
@@ -605,14 +399,6 @@ GHCIINTS=$(GHCISRCS:.lhs=.hi) interpreter/Dldhacks.hi
 #else
 # define use_DDEBUG /*nothing*/
 #endif
-
-#if HaskellCompilerType == HC_CHALMERS_HBC
-
-HC_OPTS = -D__HASKELL1__=2 -M -H12m -DCOMPILING_GHC use_DDEBUG -I. -i$(SUBDIR_LIST)
-
-/* ToDo: else something for Niklas Rojemo's NHC (not yet) */
-
-#else /* assume we either have GlasgowHaskell or are booting from .hc C files */
 
 #if GhcWithHscOptimised == YES
 #define __version_sensitive_flags -DUSE_ATTACK_PRAGMAS -fshow-pragma-name-errs -fomit-reexported-instances -fshow-import-specs
@@ -631,72 +417,36 @@ HC_OPTS = -D__HASKELL1__=2 -M -H12m -DCOMPILING_GHC use_DDEBUG -I. -i$(SUBDIR_LI
 #undef  AllProjectsHcOpts
 #define AllProjectsHcOpts /**/
 
-HC_OPTS = -cpp -H12m HcMaxHeapFlag -fglasgow-exts -DCOMPILING_GHC \
+HC_OPTS = -cpp HcMaxHeapFlag -fhaskell-1.3 -fglasgow-exts -DCOMPILING_GHC \
 	-fomit-derived-read \
 	-I. -i$(SUBDIR_LIST) \
-	use_DDEBUG __version_sensitive_flags __unreg_opts_maybe __omit_ncg_maybe __new_reader_flag __build_ghci_flag __omit_deforester_flag
+	use_DDEBUG __version_sensitive_flags __unreg_opts_maybe __omit_ncg_maybe
 
 #undef __version_sensitive_flags
 #undef __unreg_opts_maybe
 #undef __omit_ncg_maybe
-#undef __new_reader_flag
-#undef __build_ghci_flag
 #undef __omit_deforester_flag
 
 #if GhcWithHscBuiltViaC == YES /* not using a Haskell compiler */
 
-HSCHCS=$(HSCSRCS_LHS:.lhs=.hc) $(HSCSRCS_HS:.hs=.hc)
-hcs:: $(HSCHCS)
+hcs:: $(ALLHCS)
 
-#if HaskellCompilerType == HC_USE_HC_FILES
+# if HaskellCompilerType == HC_USE_HC_FILES
 HC = $(GHC) /* uses the driver herein */
-#endif
+# endif
 
 #endif /* using .hc files */
-#endif /* not using HBC */
 
 /*
     -DCOMPILING_GHC
-	we're compiling the compiler with itself; clear enough?
-	Only used at present to ask for SPECIALIZEd functions
-	in modules that are allegedly "generic" (e.g., FiniteMap).
-
-    -DUSE_SEMANTIQUE_STRANAL
-	to include the Semantique strictness analyser into the compiler
-	[probably quite moth-eaten by now 94/05 (WDP)]
-
-    -DDPH	compiling Jon Hill's "data parallel Haskell"
-
-    (there are more, as yet unlisted WDP 94/12)
+	Used when compiling GHC.  Some GHC utility modules are
+	*also* part of the GHC library.  There are a few bits
+	of those modules that only apply to GHC itself and
+	should not be in the library stuff.  We use this
+	CPP thing to isolate those bits.
 */
-#if UseSemantiqueStrictnessAnalyser == YES
-STRANAL_SEM_P = -DUSE_SEMANTIQUE_STRANAL
-#endif
 
-#if BuildDataParallelHaskell == YES
-DPH_P = -DDPH
-#endif
-
-#if GhcUseSplittableUniqueSupply == YES
-/* ToDo: delete? */
-SPLIT_P = -DUSE_SPLITTABLE_UNIQUESUPPLY
-#endif
-
-GHC_EXTRA_DEFINES = $(STRANAL_SEM_P) $(DPH_P) $(SPLIT_P)
-
-#if USE_NEW_READER == YES
-BuildPgmFromHaskellModules(hsc,$(HSCOBJS) yaccParser/hsclink.o yaccParser/hschooks.o,,libhsp.a)
-#else
-BuildPgmFromHaskellModules(hsc,$(HSCOBJS),,)
-#endif
-
-/* ghci::	hsc */
-/* Hack to let me bootstrap (needed for error handlers) */
-/* Comment out if building boot copy of hsc */
-/*HC = ../driver/ghc*/
-#if BuildGHCI == YES
-BuildPgmFromHaskellModules(ghci,$(GHCIOBJS),,$(DLD_LIB))
-#endif
+BuildPgmFromHaskellModules(hsc,$(ALLOBJS) parser/hsclink.o parser/hschooks.o,,libhsp.a)
 
 #if DoInstallGHCSystem == YES
 MakeDirectories(install, $(INSTLIBDIR_GHC))
@@ -744,143 +494,152 @@ HaskellCompileWithExtraFlags_Recursive(module,isuf,o,-c,extra_flags)
 
 #endif /* ! booting from C */
 
-#if HaskellCompilerType == HC_CHALMERS_HBC
-# define if_ghc(x)   /*nothing*/
-# define if_ghc26(x) /*nothing*/
-#else /* hope for GHC-ish */
-# define if_ghc(x) x
-# if GhcBuilderVersion >= 26
+#define if_ghc(x) x
+#if GhcBuilderVersion >= 26
 #  define if_ghc26(x) x
-# else
+#else
 #  define if_ghc26(x) /*nothing*/
-# endif
 #endif
 
 /* OK, here we go: */
 
-compile(absCSyn/AbsCFuns,lhs,)
-compile_rec(absCSyn/AbsCSyn,lhs,if_ghc(-fno-omit-reexported-instances))
-compile(absCSyn/Costs,lhs,)              /* HWL */
-compile_rec(absCSyn/HeapOffs,lhs,)
-compile(absCSyn/PprAbsC,lhs,-H20m)
+utils/Ubiq.hi : utils/Ubiq.lhi
+	$(GHC_UNLIT) utils/Ubiq.lhi utils/Ubiq.hi
 
-compile_rec(abstractSyn/AbsSyn,lhs,if_ghc(-fno-omit-reexported-instances))
-compile_rec(abstractSyn/AbsSynFuns,lhs,)
-compile_rec(abstractSyn/HsBinds,lhs,)
-compile_rec(abstractSyn/HsCore,lhs,)
-compile(abstractSyn/HsDecls,lhs,)
-compile_rec(abstractSyn/HsExpr,lhs,-H14m)
-compile(abstractSyn/HsImpExp,lhs,)
-compile(abstractSyn/HsLit,lhs,)
-compile(abstractSyn/HsMatches,lhs,)
-compile(abstractSyn/HsPat,lhs,)
-compile_rec(abstractSyn/HsPragmas,lhs,)
-compile(abstractSyn/HsTypes,lhs,)
-compile_rec(abstractSyn/Name,lhs,)
+basicTypes/IdLoop.hi : basicTypes/IdLoop.lhi
+	$(GHC_UNLIT) basicTypes/IdLoop.lhi basicTypes/IdLoop.hi
+basicTypes/NameLoop.hi : basicTypes/NameLoop.lhi
+	$(GHC_UNLIT) basicTypes/NameLoop.lhi basicTypes/NameLoop.hi
+deSugar/DsLoop.hi : deSugar/DsLoop.lhi
+	$(GHC_UNLIT) deSugar/DsLoop.lhi deSugar/DsLoop.hi
+hsSyn/HsLoop.hi : hsSyn/HsLoop.lhi
+	$(GHC_UNLIT) hsSyn/HsLoop.lhi hsSyn/HsLoop.hi
+prelude/PrelLoop.hi : prelude/PrelLoop.lhi
+	$(GHC_UNLIT) prelude/PrelLoop.lhi prelude/PrelLoop.hi
+reader/RdrLoop.hi : reader/RdrLoop.lhi
+	$(GHC_UNLIT) reader/RdrLoop.lhi reader/RdrLoop.hi
+rename/RnLoop.hi : rename/RnLoop.lhi
+	$(GHC_UNLIT) rename/RnLoop.lhi rename/RnLoop.hi
+simplCore/SmplLoop.hi : simplCore/SmplLoop.lhi
+	$(GHC_UNLIT) simplCore/SmplLoop.lhi simplCore/SmplLoop.hi
+typecheck/TcMLoop.hi : typecheck/TcMLoop.lhi
+	$(GHC_UNLIT) typecheck/TcMLoop.lhi typecheck/TcMLoop.hi
+typecheck/TcLoop.hi : typecheck/TcLoop.lhi
+	$(GHC_UNLIT) typecheck/TcLoop.lhi typecheck/TcLoop.hi
+types/TyLoop.hi : types/TyLoop.lhi
+	$(GHC_UNLIT) types/TyLoop.lhi types/TyLoop.hi
 
-compile(basicTypes/BasicLit,lhs,)
-compile(basicTypes/OrdList,lhs,)
-compile_rec(basicTypes/CLabelInfo,lhs,)
-compile_rec(basicTypes/Id,lhs,-H20m)
-compile_rec(basicTypes/IdInfo,lhs,-H20m -K2m)
-compile(basicTypes/Inst,lhs,)
+compile(absCSyn/AbsCUtils,lhs,)
+compile(absCSyn/CStrings,lhs,)
+compile(absCSyn/CLabel,lhs,)
+compile(absCSyn/Costs,lhs,)
+compile(absCSyn/HeapOffs,lhs,)
+compile(absCSyn/PprAbsC,lhs,)
+compile(absCSyn/AbsCSyn,lhs,if_ghc(-fno-omit-reexported-instances))
+
+compile(hsSyn/HsBinds,lhs,)
+compile(hsSyn/HsCore,lhs,)
+compile(hsSyn/HsDecls,lhs,)
+compile(hsSyn/HsExpr,lhs,)
+compile(hsSyn/HsImpExp,lhs,)
+compile(hsSyn/HsLit,lhs,)
+compile(hsSyn/HsMatches,lhs,)
+compile(hsSyn/HsPat,lhs,)
+compile(hsSyn/HsPragmas,lhs,)
+compile(hsSyn/HsTypes,lhs,)
+compile(hsSyn/HsSyn,lhs,if_ghc(-fno-omit-reexported-instances))
+
+compile(basicTypes/Id,lhs,)
+compile(basicTypes/IdInfo,lhs,-K2m)
+compile(basicTypes/IdUtils,lhs,)
+compile(basicTypes/Literal,lhs,)
+compile(basicTypes/Name,lhs,)
 compile(basicTypes/NameTypes,lhs,)
+compile(basicTypes/PragmaInfo,lhs,)
 compile(basicTypes/ProtoName,lhs,)
 compile(basicTypes/SrcLoc,lhs,)
+compile(basicTypes/UniqSupply,lhs,)
 compile(basicTypes/Unique,lhs,)
-compile_rec(basicTypes/SplitUniq,lhs,)
 
 compile(codeGen/CgBindery,lhs,)
-compile(codeGen/CgCase,lhs,-H16m)
-compile(codeGen/CgClosure,lhs,-H16m)
-compile_rec(codeGen/CgCompInfo,lhs,-I$(COMPINFO_DIR))
+compile(codeGen/CgCase,lhs,)
+compile(codeGen/CgClosure,lhs,)
+compile(codeGen/CgCompInfo,lhs,-I$(COMPINFO_DIR))
 compile(codeGen/CgCon,lhs,)
 compile(codeGen/CgConTbls,lhs,)
-compile_rec(codeGen/CgExpr,lhs,)
+compile(codeGen/CgExpr,lhs,)
 compile(codeGen/CgHeapery,lhs,)
 compile(codeGen/CgLetNoEscape,lhs,)
-compile_rec(codeGen/CgMonad,lhs,if_ghc(-fno-omit-reexported-instances))
-compile_rec(codeGen/CgRetConv,lhs,)
+compile(codeGen/CgMonad,lhs,)
+compile(codeGen/CgRetConv,lhs,)
 compile(codeGen/CgStackery,lhs,)
 compile(codeGen/CgTailCall,lhs,)
 compile(codeGen/CgUpdate,lhs,)
 compile(codeGen/CgUsages,lhs,)
-compile_rec(codeGen/ClosureInfo,lhs,)
+compile(codeGen/ClosureInfo,lhs,)
 compile(codeGen/CodeGen,lhs,)
 compile(codeGen/SMRep,lhs,)
 
 compile(coreSyn/AnnCoreSyn,lhs,if_ghc(-fno-omit-reexported-instances))
-compile(coreSyn/CoreFuns,lhs,-H16m)
+compile(coreSyn/CoreUtils,lhs,)
 compile(coreSyn/CoreLift,lhs,)
 compile(coreSyn/CoreLint,lhs,)
 compile(coreSyn/CoreSyn,lhs,)
+compile(coreSyn/PprCore,lhs,)
 compile(coreSyn/CoreUnfold,lhs,)
 compile(coreSyn/FreeVars,lhs,)
-compile_rec(coreSyn/PlainCore,lhs,if_ghc(-fno-omit-reexported-instances))
-compile(coreSyn/TaggedCore,lhs,if_ghc(-fno-omit-reexported-instances))
 
 compile(deSugar/Desugar,lhs,)
-compile_rec(deSugar/DsBinds,lhs,-H16m)
+compile(deSugar/DsBinds,lhs,)
 compile(deSugar/DsCCall,lhs,)
-compile_rec(deSugar/DsExpr,lhs,-H16m)
+compile(deSugar/DsExpr,lhs,)
 compile(deSugar/DsGRHSs,lhs,)
+compile(deSugar/DsHsSyn,lhs,)
 compile(deSugar/DsListComp,lhs,)
 compile(deSugar/DsMonad,lhs,)
-compile_rec(deSugar/DsUtils,lhs,)
-compile_rec(deSugar/Match,lhs,)
+compile(deSugar/DsUtils,lhs,)
+compile(deSugar/Match,lhs,)
 compile(deSugar/MatchCon,lhs,)
 compile(deSugar/MatchLit,lhs,)
 
-compile(envs/CE,lhs,)
-compile(envs/E,lhs,)
-compile(envs/IdEnv,lhs,)
-compile_rec(envs/InstEnv,lhs,)
-compile(envs/LIE,lhs,)
-compile(envs/TCE,lhs,)
-compile(envs/TVE,lhs,)
-compile_rec(envs/TyVarEnv,lhs,)
-
-compile(main/CmdLineOpts,lhs,-K2m if_ghc(-fvia-C))
-compile_rec(main/Errors,lhs,)
-compile_rec(main/ErrsTc,lhs,-H20m if_ghc26(-monly-4-regs))
-compile_rec(main/ErrsRn,lhs,)
-compile_rec(main/ErrUtils,lhs,)
-compile(main/Main,lhs,-H16m if_ghc(-fvia-C -fno-update-analysis)) /* ToDo: update */
-compile(main/MainMonad,lhs,if_ghc(-fno-omit-reexported-instances))
+compile(main/CmdLineOpts,lhs,if_ghc(-fvia-C))
+compile(main/ErrUtils,lhs,)
+compile(main/Main,lhs,if_ghc(-fvia-C))
+compile(main/MainMonad,lhs,)
 compile(main/MkIface,lhs,)
 
 #if GhcWithNativeCodeGen == YES
 compile(nativeGen/AbsCStixGen,lhs,)
 compile(nativeGen/AsmCodeGen,lhs,-I$(COMPINFO_DIR))
-compile_rec(nativeGen/AsmRegAlloc,lhs,-I$(COMPINFO_DIR) -H20m)
+compile(nativeGen/AsmRegAlloc,lhs,-I$(COMPINFO_DIR))
 compile(nativeGen/MachDesc,lhs,)
 compile(nativeGen/Stix,lhs,)
 compile(nativeGen/StixInfo,lhs,-I$(NATIVEGEN_DIR))
-compile(nativeGen/StixInteger,lhs,-H20m)
+compile(nativeGen/StixInteger,lhs,)
 compile(nativeGen/StixMacro,lhs,-I$(NATIVEGEN_DIR))
-compile(nativeGen/StixPrim,lhs,-H16m)
+compile(nativeGen/StixPrim,lhs,)
 # if i386_TARGET_ARCH
-compile_rec(nativeGen/I386Desc,lhs,)
-compile(nativeGen/I386Code,lhs,-H20m -I$(NATIVEGEN_DIR) if_ghc(-monly-4-regs))
-compile(nativeGen/I386Gen,lhs,-H20m)
+compile(nativeGen/I386Desc,lhs,)
+compile(nativeGen/I386Code,lhs,-I$(NATIVEGEN_DIR) if_ghc(-monly-4-regs))
+compile(nativeGen/I386Gen,lhs,)
 # endif
 # if sparc_TARGET_ARCH
-compile_rec(nativeGen/SparcDesc,lhs,)
-compile(nativeGen/SparcCode,lhs,-H20m -I$(NATIVEGEN_DIR))
-compile(nativeGen/SparcGen,lhs,-H20m)
+compile(nativeGen/SparcDesc,lhs,)
+compile(nativeGen/SparcCode,lhs,-I$(NATIVEGEN_DIR))
+compile(nativeGen/SparcGen,lhs,)
 # endif
 # if alpha_TARGET_ARCH
-compile_rec(nativeGen/AlphaDesc,lhs,)
-compile(nativeGen/AlphaCode,lhs,-H24m -K2m -I$(NATIVEGEN_DIR))
-compile(nativeGen/AlphaGen,lhs,-H24m -K2m)
+compile(nativeGen/AlphaDesc,lhs,)
+compile(nativeGen/AlphaCode,lhs,-I$(NATIVEGEN_DIR))
+compile(nativeGen/AlphaGen,lhs,)
 # endif
 #endif
 
-compile_rec(prelude/AbsPrel,lhs,-H16m -K2m if_ghc(-fno-omit-reexported-instances -fno-update-analysis))
-compile_rec(prelude/PrelFuns,lhs,)
+compile(prelude/PrelInfo,lhs,)
+compile(prelude/PrelMods,lhs,)
 compile(prelude/PrelVals,lhs,)
-compile_rec(prelude/PrimKind,lhs,-I$(COMPINFO_DIR))
-compile_rec(prelude/PrimOps,lhs,-H16m -K3m)
+compile(prelude/PrimRep,lhs,-I$(COMPINFO_DIR))
+compile(prelude/PrimOp,lhs,-K3m -H10m)
 compile(prelude/TysPrim,lhs,)
 compile(prelude/TysWiredIn,lhs,)
 
@@ -889,23 +648,23 @@ compile(profiling/SCCfinal,lhs,)
 compile(profiling/CostCentre,lhs,)
 
 compile(reader/PrefixSyn,lhs,)
-compile(reader/PrefixToHs,lhs,-H16m)
+compile(reader/PrefixToHs,lhs,)
+compile(reader/ReadPrefix,lhs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -Iparser '-#include"hspincl.h"'))
 compile(reader/ReadPragmas,lhs,)
-compile_rec(reader/ReadPrefix,lhs,)
-compile_rec(reader/ReadPrefix2,lhs,-H20m if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(reader/ReadPragmas2,lhs,-H20m)
+compile(reader/RdrHsSyn,lhs,)
 
 compile(rename/Rename,lhs,)
-compile(rename/Rename1,lhs,)
-compile(rename/Rename2,lhs,)
-compile(rename/Rename3,lhs,)
-compile(rename/Rename4,lhs,-H20m)
-compile(rename/RenameAuxFuns,lhs,)
-compile_rec(rename/RenameBinds4,lhs,)
-compile_rec(rename/RenameExpr4,lhs,)
-compile(rename/RenameMonad12,lhs,)
-compile(rename/RenameMonad3,lhs,)
-compile(rename/RenameMonad4,lhs,)
+compile(rename/RnPass1,lhs,)
+compile(rename/RnPass2,lhs,)
+compile(rename/RnPass3,lhs,)
+compile(rename/RnPass4,lhs,)
+compile(rename/RnUtils,lhs,)
+compile(rename/RnHsSyn,lhs,)
+compile(rename/RnBinds4,lhs,)
+compile(rename/RnExpr4,lhs,)
+compile(rename/RnMonad12,lhs,)
+compile(rename/RnMonad3,lhs,)
+compile(rename/RnMonad4,lhs,)
 
 compile(simplCore/BinderInfo,lhs,)
 compile(simplCore/ConFold,lhs,)
@@ -915,21 +674,19 @@ compile(simplCore/LiberateCase,lhs,)
 compile(simplCore/MagicUFs,lhs,)
 compile(simplCore/OccurAnal,lhs,)
 
-compile(simplCore/NewOccurAnal,lhs,)
 compile(simplCore/AnalFBWW,lhs,)
 compile(simplCore/FoldrBuildWW,lhs,)
-/* ANDY: compile(simplCore/SimplHaskell,lhs,) */
 
 compile(simplCore/SAT,lhs,)
 compile(simplCore/SATMonad,lhs,)
 compile(simplCore/SetLevels,lhs,)
-compile_rec(simplCore/SimplCase,lhs,-H20m)
+compile(simplCore/SimplCase,lhs,)
 compile(simplCore/SimplCore,lhs,)
-compile_rec(simplCore/SimplEnv,lhs,)
+compile(simplCore/SimplEnv,lhs,)
 compile(simplCore/SimplMonad,lhs,)
 compile(simplCore/SimplPgm,lhs,)
 compile(simplCore/SimplUtils,lhs,)
-compile_rec(simplCore/SimplVar,lhs,)
+compile(simplCore/SimplVar,lhs,)
 compile(simplCore/Simplify,lhs,)
 
 compile(simplStg/SatStgRhs,lhs,)
@@ -944,21 +701,22 @@ compile(simplStg/SimplStg,lhs,)
 #if GhcWithDeforester == YES
 compile(deforest/Core2Def,lhs,)
 compile(deforest/Cyclic,lhs,)
-compile_rec(deforest/Def2Core,lhs,)
-compile(deforest/DefExpr,lhs,-H20m)
+compile(deforest/Def2Core,lhs,)
+compile(deforest/DefExpr,lhs,)
 compile(deforest/DefSyn,lhs,)
-compile(deforest/DefUtils,lhs,-H16m)
+compile(deforest/DefUtils,lhs,)
 compile(deforest/Deforest,lhs,)
 compile(deforest/TreelessForm,lhs,)
 #endif
 
-compile(specialise/Specialise,lhs,-H32m) /* sigh */
-compile(specialise/SpecTyFuns,lhs,)
+compile(specialise/Specialise,lhs,)
+compile(specialise/SpecEnv,lhs,)
+compile(specialise/SpecUtils,lhs,)
 
 compile(stgSyn/CoreToStg,lhs,)
-compile(stgSyn/StgFuns,lhs,)
+compile(stgSyn/StgUtils,lhs,)
 compile(stgSyn/StgLint,lhs,)
-compile(stgSyn/StgSyn,lhs,if_ghc(-fno-omit-reexported-instances) -H16m)
+compile(stgSyn/StgSyn,lhs,if_ghc(-fno-omit-reexported-instances))
 
 compile(stranal/SaAbsInt,lhs,)
 compile(stranal/SaLib,lhs,)
@@ -966,164 +724,60 @@ compile(stranal/StrictAnal,lhs,)
 compile(stranal/WorkWrap,lhs,)
 compile(stranal/WwLib,lhs,)
 
-compile(typecheck/BackSubst,lhs,)
-compile_rec(typecheck/Disambig,lhs,)
 compile(typecheck/GenSpecEtc,lhs,)
-compile(typecheck/Spec,lhs,)
-compile(typecheck/Subst,lhs,if_ghc(-fvia-C) if_ghc26(-monly-4-regs))
+compile(typecheck/Inst,lhs,)
+compile(typecheck/TcHsSyn,lhs,)
 compile(typecheck/TcBinds,lhs,)
-compile(typecheck/TcClassDcl,lhs,-H14m)
-compile(typecheck/TcClassSig,lhs,)
-compile(typecheck/TcConDecls,lhs,)
-compile(typecheck/TcContext,lhs,)
+compile(typecheck/TcClassDcl,lhs,)
 compile(typecheck/TcDefaults,lhs,)
-compile_rec(typecheck/TcDeriv,lhs,-H20m)
-compile_rec(typecheck/TcExpr,lhs,-H20m)
-compile_rec(typecheck/TcGRHSs,lhs,)
-compile(typecheck/TcGenDeriv,lhs,-H20m)
+compile(typecheck/TcDeriv,lhs,)
+compile(typecheck/TcExpr,lhs,)
+compile(typecheck/TcGRHSs,lhs,)
+compile(typecheck/TcGenDeriv,lhs,)
 compile(typecheck/TcIfaceSig,lhs,)
-compile(typecheck/TcInstDcls,lhs,-H20m)
+compile(typecheck/TcInstDcls,lhs,)
+compile(typecheck/TcInstUtil,lhs,)
 compile(typecheck/TcMatches,lhs,)
 compile(typecheck/TcModule,lhs,)
-compile_rec(typecheck/TcMonad,lhs,)
-compile(typecheck/TcMonadFns,lhs,)
-compile(typecheck/TcMonoBnds,lhs,)
+compile(typecheck/TcMonad,lhs,)
+compile(typecheck/TcKind,lhs,)
+compile(typecheck/TcType,lhs,)
+compile(typecheck/TcEnv,lhs,)
 compile(typecheck/TcMonoType,lhs,)
-compile(typecheck/TcPat,lhs,-H14m)
-compile_rec(typecheck/TcPolyType,lhs,)
-compile(typecheck/TcPragmas,lhs,-H20m)
-compile(typecheck/TcQuals,lhs,)
+compile(typecheck/TcPat,lhs,)
+compile(typecheck/TcPragmas,lhs,)
 compile(typecheck/TcSimplify,lhs,)
+compile(typecheck/TcTyClsDecls,lhs,)
 compile(typecheck/TcTyDecls,lhs,)
 compile(typecheck/Typecheck,lhs,)
 compile(typecheck/Unify,lhs,)
 
-compile_rec(uniType/AbsUniType,lhs,if_ghc(-fno-omit-reexported-instances))
-compile_rec(uniType/Class,lhs,)
-compile_rec(uniType/TyCon,lhs,)
-compile_rec(uniType/TyVar,lhs,)
-compile(uniType/UniTyFuns,lhs,-H20m)
-compile_rec(uniType/UniType,lhs,)
+compile(types/Class,lhs,)
+compile(types/Kind,lhs,)
+compile(types/PprType,lhs,)
+compile(types/TyCon,lhs,)
+compile(types/TyVar,lhs,)
+compile(types/Usage,lhs,)
+compile(types/Type,lhs,)
 
+compile(utils/Argv,lhs,if_ghc(-fvia-C))
 compile(utils/Bag,lhs,)
+compile(utils/BitSet,lhs,if_ghc26(-monly-4-regs))
 compile(utils/CharSeq,lhs,if_ghc(-fvia-C)) /* uses stg_putc */
 compile(utils/Digraph,lhs,)
-compile(utils/FiniteMap,lhs,-H20m)
-compile(utils/LiftMonad,lhs,)
+compile(utils/FiniteMap,lhs,)
 compile(utils/ListSetOps,lhs,)
 compile(utils/Maybes,lhs,)
-compile_rec(utils/Outputable,lhs,)
-compile_rec(utils/Pretty,lhs,)
-compile(utils/BitSet,lhs,if_ghc26(-monly-4-regs))
-compile_rec(utils/UniqFM,lhs,)
+compile(utils/OrdList,lhs,)
+compile(utils/Outputable,lhs,)
+compile(utils/PprStyle,lhs,)
+compile(utils/Pretty,lhs,)
+compile(utils/SST,lhs,if_ghc(-fvia-C))
+compile(utils/UniqFM,lhs,)
 compile(utils/UniqSet,lhs,)
 compile(utils/Unpretty,lhs,)
-compile_rec(utils/Util,lhs,)
-
-/* Some of these sizes have been boosted a little to fit the alpha */
-#if BuildGHCI == YES
-compile(nhcParser/Attr,lhs,)
-compile(nhcParser/AttrLib,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/Either,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/Extra,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/Fixity,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/Flags,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/HS,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/HbcOnly,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/Import,lhs,)
-compile(nhcParser/Lex,lhs,)
-compile(nhcParser/LexLow,lhs,)
-compile(nhcParser/LexPre,lhs,)
-compile(nhcParser/LexStr,lhs,)
-compile(nhcParser/Lexical,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/ListUtil,lhs,)
-compile(nhcParser/MergeSort,lhs,)
-compile(nhcParser/MkSyntax,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/NHCName,lhs,)
-compile(nhcParser/NHCPackedString,lhs,)
-compile(nhcParser/NameLib,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/NameLow,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/OsOnly,lhs,)
-compile(nhcParser/PPLib,lhs,)
-compile(nhcParser/PPSyntax,lhs,)
-compile(nhcParser/Parse,lhs,-H30m if_ghc(-fhaskell-1.3))
-compile(nhcParser/ParseCore,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/ParseI,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/ParseLex,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/ParseLib,lhs,if_ghc(-fhaskell-1.3))
-compile(nhcParser/ScopeLib,lhs,)
-compile(nhcParser/StrName,lhs,)
-compile(nhcParser/StrSyntax,lhs,)
-compile(nhcParser/Syntax,lhs,)
-compile(nhcParser/SyntaxPos,lhs,)
-compile(nhcParser/Tree234,lhs,)
-
-compile(interpreter/ToPrefix,lhs,if_ghc(-fhaskell-1.3))
-compile(interpreter/UnsafeCoerce,lhs,if_ghc(-nohi)) /* NB: no interface file, please! */
-compile(interpreter/Dynamic,lhs,)
-compile(interpreter/Interpreter,lhs,if_ghc(-fvia-C -fhaskell-1.3))
-compile(interpreter/MkInterface,lhs,)
-compile(interpreter/GHCIMonad,lhs,if_ghc(-fvia-C -fhaskell-1.3))
-compile(interpreter/FullEnv,lhs,if_ghc(-fhaskell-1.3))
-compile(interpreter/Command,lhs,)
-compile(interpreter/GHCIFlags,lhs,)
-compile(interpreter/GHCInterface,lhs,-H40m if_ghc(-fhaskell-1.3))
-compile(interpreter/GHCI,lhs,if_ghc(-fhaskell-1.3))
-compile(interpreter/GHCICore,lhs,if_ghc(-fhaskell-1.3))
-
-# Just using standard macro doesn't use the #include then compiling the
-# .hc file.
-
-HaskellCompileWithExtraFlags(interpreter/Dld,lhs,hc,-fvia-C -C -fhaskell-1.3,)
-HaskellCompileWithExtraFlags_Recursive(interpreter/Dld,hc,o,-c,'-#include"$(DLD_INCLUDE)"')
-
-# (There's gotta be a cleaner way of doing this but only one person in
-#  the entire world understands Jmakefiles well enough to use them
-#  effectively.)
-
-# some c-as-asm level hacks
-# also needs a hand-hacked interface file
-interpreter/DldHacks.o:	interpreter/DldHacks.lhc
-	$(RM) interpreter/DldHacks.hc interpreter/DldHacks.o
-	lit2pgm interpreter/DldHacks.lhc
-	$(GHC) -c $(GHC_FLAGS) interpreter/DldHacks.hc
-
-interpreter/DldC.o:	interpreter/DldC.lc
-	$(RM) interpreter/DldC.c interpreter/DldC.o
-	lit2pgm interpreter/DldC.lc
- 	$(GHC) -c $(GHC_FLAGS) interpreter/DldC.c -I$(DLD_DIR) -optcO-DNON_POSIX_SOURCE
-
-/* Does not work for a subdir ... (Sigh) 
-NormalLibraryTarget($(DLD_DIR)/libdld,$(DLD_OBJS_O))
-*/
-all :: dld/libdld.a
-clean ::
-        $(RM) dld/libdld.a
-dld/libdld.a :: $(DLD_OBJS_O)
-        $(RM) $@
-        $(AR) $@ $(DLD_OBJS_O)
-        $(RANLIB) $@
-
-# To improve loading speed, we generate some C programs which contain
-# references to all symbols in the libraries we link with.
-
-# ToDo: remove the appel dependency.
-
-MY_TOP = ..
-MY_LIB = $(MY_TOP)/lib
-MY_RTS = $(MY_TOP)/runtime
-
-interpreter/prelude.o: $(MY_LIB)/libHS.a makeSymbolList.prl
-	$(RM) interpreter/prelude.c interpreter/prelude.o
-	nm -p $(MY_LIB)/libHS.a | perl makeSymbolList.prl > interpreter/prelude.c
-	$(GHC) -c $(GHC_FLAGS) interpreter/prelude.c
-
-interpreter/runtime.o: $(MY_RTS)/libHSrts.a $(MY_RTS)/libHSclib.a makeSymbolList.prl
-	$(RM) interpreter/runtime.c interpreter/runtime.o
-	nm -p $(MY_RTS)/libHSrts.a $(MY_RTS)/libHSclib.a | perl makeSymbolList.prl > interpreter/runtime.c
-	$(GHC) -c $(GHC_FLAGS) interpreter/runtime.c
-
-#endif /* GHCI */
+compile(utils/MatchEnv,lhs,)
+compile(utils/Util,lhs,)
 
 /* for convenience in cross-compiling */
 objs:: $(ALLOBJS)
@@ -1131,121 +785,69 @@ objs:: $(ALLOBJS)
 /* *** parser ************************************************* */
 
 YACC_OPTS = -d
-CC_OPTS = -IyaccParser -I. -I$(COMPINFO_DIR)
+CC_OPTS = -Iparser -I. -I$(COMPINFO_DIR) -DUGEN_DEBUG=1 /*-DHSP_DEBUG=1*/ -g
 
 /* add to these on the command line with, e.g., EXTRA_YACC_OPTS=-v */
 
-#if BuildDataParallelHaskell == YES
-D_DPH = -DDPH
-#endif
-
 XCOMM D_DEBUG = -DDEBUG
 
-CPP_DEFINES = $(D_DEBUG) $(D_DPH)
+CPP_DEFINES = $(D_DEBUG)
 
-HSP_SRCS_C = /* yaccParser/main.c */ 		\
-		yaccParser/atype.c		\
-		yaccParser/binding.c		\
-		yaccParser/coresyn.c		\
-		yaccParser/entidt.c		\
-		yaccParser/finfot.c		\
-		yaccParser/hpragma.c		\
-		yaccParser/hslexer.c		\
-		yaccParser/hsparser.tab.c	\
-		yaccParser/id.c			\
-		yaccParser/import_dirlist.c	\
-		yaccParser/infix.c		\
-		yaccParser/list.c		\
-		yaccParser/literal.c		\
-		yaccParser/pbinding.c		\
-		/* yaccParser/printtree.c */	\
-		yaccParser/syntax.c		\
-		yaccParser/tree.c		\
-		yaccParser/ttype.c		\
-		yaccParser/type2context.c	\
-		yaccParser/util.c
+HSP_SRCS_C =    parser/constr.c		\
+		parser/binding.c	\
+		parser/pbinding.c	\
+		parser/coresyn.c	\
+		parser/entidt.c		\
+		parser/hpragma.c	\
+		parser/hslexer.c	\
+		parser/hsparser.tab.c	\
+		parser/id.c		\
+		parser/import_dirlist.c	\
+		parser/infix.c		\
+		parser/list.c		\
+		parser/literal.c	\
+		parser/maybe.c		\
+		parser/either.c		\
+		parser/qid.c		\
+		parser/syntax.c		\
+		parser/tree.c		\
+		parser/ttype.c		\
+		parser/type2context.c	\
+		parser/util.c
 
-HSP_OBJS_O = /* yaccParser/main.o */ 		\
-		yaccParser/atype.o		\
-		yaccParser/binding.o		\
-		yaccParser/coresyn.o		\
-		yaccParser/entidt.o		\
-		yaccParser/finfot.o		\
-		yaccParser/hpragma.o		\
-		yaccParser/hslexer.o		\
-		yaccParser/hsparser.tab.o	\
-		yaccParser/id.o			\
-		yaccParser/import_dirlist.o	\
-		yaccParser/infix.o		\
-		yaccParser/list.o		\
-		yaccParser/literal.o		\
-		yaccParser/pbinding.o		\
-		/* yaccParser/printtree.o */	\
-		yaccParser/syntax.o		\
-		yaccParser/tree.o		\
-		yaccParser/ttype.o		\
-		yaccParser/type2context.o	\
-		yaccParser/util.o
-
-/* DPH uses some tweaked files; here are the lists again... */
-
-#if BuildDataParallelHaskell == YES
-DPH_HSP_SRCS_C = yaccParser/atype.c		\
-		yaccParser/binding.c		\
-		yaccParser/coresyn.c		\
-		yaccParser/entidt.c		\
-		yaccParser/finfot.c		\
-		yaccParser/hpragma.c		\
-		yaccParser/hslexer-DPH.c	\
-		yaccParser/hsparser-DPH.tab.c	\
-		yaccParser/id.c			\
-		yaccParser/import_dirlist.c	\
-		yaccParser/infix.c		\
-		yaccParser/list.c		\
-		yaccParser/literal.c		\
-		yaccParser/main.c		\
-		yaccParser/pbinding.c		\
-		yaccParser/printtree.c		\
-		yaccParser/syntax.c		\
-		yaccParser/tree-DPH.c		\
-		yaccParser/ttype-DPH.c		\
-		yaccParser/type2context.c	\
-		yaccParser/util.c
-
-DPH_HSP_OBJS_O = yaccParser/atype.o		\
-		yaccParser/binding.o		\
-		yaccParser/coresyn.o		\
-		yaccParser/entidt.o		\
-		yaccParser/finfot.o		\
-		yaccParser/hpragma.o		\
-		yaccParser/hslexer-DPH.o	\
-		yaccParser/hsparser-DPH.tab.o	\
-		yaccParser/id.o			\
-		yaccParser/import_dirlist.o	\
-		yaccParser/infix.o		\
-		yaccParser/list.o		\
-		yaccParser/literal.o		\
-		yaccParser/main.o		\
-		yaccParser/pbinding.o		\
-		yaccParser/printtree.o		\
-		yaccParser/syntax.o		\
-		yaccParser/tree-DPH.o		\
-		yaccParser/ttype-DPH.o		\
-		yaccParser/type2context.o	\
-		yaccParser/util.o
-#endif
+HSP_OBJS_O =    parser/constr.o		\
+		parser/binding.o	\
+		parser/pbinding.o	\
+		parser/coresyn.o	\
+		parser/entidt.o		\
+		parser/hpragma.o	\
+		parser/hslexer.o	\
+		parser/hsparser.tab.o	\
+		parser/id.o		\
+		parser/import_dirlist.o	\
+		parser/infix.o		\
+		parser/list.o		\
+		parser/literal.o	\
+		parser/maybe.o		\
+		parser/either.o		\
+		parser/qid.o		\
+		parser/syntax.o		\
+		parser/tree.o		\
+		parser/ttype.o		\
+		parser/type2context.o	\
+		parser/util.o
 
 /* this is for etags */
-REAL_HSP_SRCS_C = yaccParser/main.c 		\
-		yaccParser/hschooks.c		\
-		yaccParser/hsclink.c		\
-		yaccParser/id.c 		\
-		yaccParser/util.c 		\
-		yaccParser/syntax.c 		\
-		yaccParser/type2context.c 	\
-		yaccParser/import_dirlist.c 	\
-		yaccParser/infix.c 		\
-		yaccParser/printtree.c 
+REAL_HSP_SRCS_C = parser/main.c 	\
+		parser/hschooks.c	\
+		parser/hsclink.c	\
+		parser/id.c 		\
+		parser/util.c 		\
+		parser/syntax.c 	\
+		parser/type2context.c 	\
+		parser/import_dirlist.c \
+		parser/infix.c 		\
+		parser/printtree.c
 
 UgenNeededHere(all depend)
 
@@ -1256,65 +858,64 @@ UgenNeededHere(all depend)
 NormalLibraryTarget(hsp,$(HSP_OBJS_O))
 
 /* We need the hsp program for hstags to work! */
-BuildPgmFromCFiles(hsp,yaccParser/printtree.o yaccParser/main.o,,libhsp.a)
-#if BuildDataParallelHaskell == YES
-BuildPgmFromCFiles(dphsp,$(DPH_HSP_OBJS_O),,)
-#endif
+BuildPgmFromCFiles(hsp,parser/printtree.o parser/main.o,,libhsp.a)
 
 #if DoInstallGHCSystem == YES
 MakeDirectories(install, $(INSTLIBDIR_GHC))
 InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC))
-# if BuildDataParallelHaskell == YES
-InstallBinaryTarget(dphsp,$(INSTLIBDIR_GHC))
-# endif
 #endif /* DoInstall... */
 
-YaccRunWithExpectMsg(yaccParser/hsparser,12,2)
+YaccRunWithExpectMsg(parser/hsparser,16,0)
 
-UgenTarget(yaccParser/atype)
-UgenTarget(yaccParser/binding)
-UgenTarget(yaccParser/coresyn)
-UgenTarget(yaccParser/entidt)
-UgenTarget(yaccParser/finfot)
-UgenTarget(yaccParser/literal)
-UgenTarget(yaccParser/list)
-UgenTarget(yaccParser/pbinding)
-UgenTarget(yaccParser/hpragma)
-UgenTarget(yaccParser/tree)
-UgenTarget(yaccParser/ttype)
+UgenTarget(parser/constr)
+UgenTarget(parser/binding)
+UgenTarget(parser/pbinding)
+UgenTarget(parser/coresyn)
+UgenTarget(parser/entidt)
+UgenTarget(parser/hpragma)
+UgenTarget(parser/list)
+UgenTarget(parser/literal)
+UgenTarget(parser/maybe)
+UgenTarget(parser/either)
+UgenTarget(parser/qid)
+UgenTarget(parser/tree)
+UgenTarget(parser/ttype)
 
-#if BuildDataParallelHaskell == YES
-YaccRunWithExpectMsg(yaccParser/hsparser-DPH,12,4)
-UgenTarget(yaccParser/tree-DPH)
-UgenTarget(yaccParser/ttype-DPH)
-#endif
+UGENS_C = parser/constr.c	\
+	parser/binding.c	\
+	parser/pbinding.c	\
+	parser/coresyn.c	\
+	parser/entidt.c		\
+	parser/literal.c	\
+	parser/list.c		\
+	parser/maybe.c		\
+	parser/either.c		\
+	parser/qid.c		\
+	parser/hpragma.c	\
+	parser/tree.c		\
+	parser/ttype.c
 
-UGENS_C = yaccParser/atype.c	\
-	yaccParser/binding.c	\
-	yaccParser/coresyn.c	\
-	yaccParser/entidt.c	\
-	yaccParser/finfot.c	\
-	yaccParser/literal.c	\
-	yaccParser/list.c	\
-	yaccParser/pbinding.c	\
-	yaccParser/hpragma.c	\
-	yaccParser/tree.c	\
-	yaccParser/ttype.c
+/* Putting the -#include"hspincl.h" option into the
+   PARSER_HS_OPTS line really does not work (it depends
+   on the 'make' that you use).
+*/
+PARSER_HS_OPTS = if_ghc(-fvia-C -I$(COMPINFO_DIR) -Iparser)
 
-compile(yaccParser/UgenAll,lhs,if_ghc(-fvia-C))
-compile(yaccParser/UgenUtil,lhs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_atype,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_binding,hs,-H20m if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_coresyn,hs,-H20m if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_entidt,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_finfot,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_hpragma,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_list,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_literal,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_pbinding,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_tree,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_treeHACK,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
-compile(yaccParser/U_ttype,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#include"hspincl.h"'))
+compile(parser/UgenAll,lhs,if_ghc(-fvia-C))
+compile(parser/UgenUtil,lhs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_constr,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_binding,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_pbinding,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_coresyn,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_entidt,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_hpragma,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_list,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_literal,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_maybe,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_either,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_qid,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_tree,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
+compile(parser/U_ttype,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 
 /* finished with local macros */
 #undef compile
@@ -1323,22 +924,12 @@ compile(yaccParser/U_ttype,hs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -IyaccParser '-#i
 
 /* *** misc *************************************************** */
 
-/* ?????????? ToDo: need parser depend/clean/etc in here ????? */
+DEPSRCS = $(ALLSRCS_LHS) $(ALLSRCS_HS)
 
-/* omit for now:
-LitDocRootTargetWithNamedOutput(root,lit,root-standalone)
-*/
-/* LitDependTarget(root,lit): built-in to the above */
-
-/* mkdependHS has to have the -i.../-I... subdirectory lists even if "ghc" does not
-*/
 #if GhcWithHscBuiltViaC == NO
-DEPSRCS	       = $(ALLSRCS_LHS) $(ALLSRCS_HS)
-MKDEPENDHS_OPTS= $(DASH_I_SUBDIR_LIST) -i$(SUBDIR_LIST) -I$(MAIN_INCLUDE_DIR) 
-
-#else /* booting from .hc (no ghci) */
-DEPSRCS	       = $(HSCSRCS_LHS) $(HSCSRCS_HS)
-MKDEPENDHS_OPTS= -o .hc $(DASH_I_SUBDIR_LIST) -i$(SUBDIR_LIST) -I$(MAIN_INCLUDE_DIR) 
+MKDEPENDHS_OPTS= -I$(MAIN_INCLUDE_DIR) -I$(COMPINFO_DIR) -x HsVersions.h
+#else /* booting from .hc */
+MKDEPENDHS_OPTS= -o .hc -I$(MAIN_INCLUDE_DIR) -I$(COMPINFO_DIR)  -x HsVersions.h
 #endif /* booting from .hc files */
 
 #if HaskellCompilerType != HC_USE_HC_FILES

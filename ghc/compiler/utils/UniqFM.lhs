@@ -1,17 +1,14 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[UniqFM]{Specialised finite maps, for things with @Uniques@}
 
 Based on @FiniteMaps@ (as you would expect).
 
 Basically, the things need to be in class @NamedThing@, and we use the
-@getTheUnique@ method to grab their @Uniques@.
+@getItsUnique@ method to grab their @Uniques@.
 
 (A similar thing to @UniqSet@, as opposed to @Set@.)
-
-@IdEnv@ and @TyVarEnv@ are the (backward-compatible?) specialisations
-of this stuff for Ids and TyVars, respectively.
 
 \begin{code}
 #if defined(COMPILING_GHC)
@@ -31,8 +28,9 @@ module UniqFM (
 	listToUFM,
 	listToUFM_Directly,
 	addToUFM,
-	IF_NOT_GHC(addListToUFM COMMA)
+	addListToUFM,
 	addToUFM_Directly,
+	addListToUFM_Directly,
 	IF_NOT_GHC(addToUFM_C COMMA)
 	IF_NOT_GHC(addListToUFM_C COMMA)
 	delFromUFM,
@@ -47,27 +45,26 @@ module UniqFM (
 	filterUFM,
 	sizeUFM,
 	isNullUFM,
-	lookupUFM,
-	lookupDirectlyUFM,
-	IF_NOT_GHC(lookupWithDefaultUFM COMMA)
+	lookupUFM, lookupUFM_Directly,
+	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
 	eltsUFM,
-	ufmToList,
+	ufmToList
 
 	-- to make the interface self-sufficient
-	Id, TyVar, Unique
-	IF_ATTACK_PRAGMAS(COMMA u2i)	-- profiling
     ) where
 
-import AbsUniType	-- for specialisation to TyVars
-import Id		-- for specialisation to Ids
-import IdInfo		-- sigh
-import Maybes		( maybeToBool, Maybe(..) )
-import Name
-import Outputable
-import Unique		( u2i, mkUniqueGrimily, Unique )
+#if defined(COMPILING_GHC)
+CHK_Ubiq() -- debugging consistency check
+#endif
+
+import Unique		( Unique, u2i, mkUniqueGrimily )
 import Util
+import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
+import Pretty		( Pretty(..), PrettyRep )
+import PprStyle		( PprStyle )
+import SrcLoc		( SrcLoc )
+
 #if ! OMIT_NATIVE_CODEGEN
-import AsmRegAlloc	( Reg )
 #define IF_NCG(a) a
 #else
 #define IF_NCG(a) {--}
@@ -80,7 +77,7 @@ import AsmRegAlloc	( Reg )
 %*									*
 %************************************************************************
 
-We use @FiniteMaps@, with a (@getTheUnique@-able) @Unique@ as ``key''.
+We use @FiniteMaps@, with a (@getItsUnique@-able) @Unique@ as ``key''.
 
 \begin{code}
 emptyUFM	:: UniqFM elt
@@ -123,10 +120,12 @@ filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
 sizeUFM		:: UniqFM elt -> Int
 
 lookupUFM	:: NamedThing key => UniqFM elt -> key -> Maybe elt
-lookupDirectlyUFM  -- when you've got the Unique already
+lookupUFM_Directly  -- when you've got the Unique already
 		:: UniqFM elt -> Unique -> Maybe elt
 lookupWithDefaultUFM
 		:: NamedThing key => UniqFM elt -> elt -> key -> elt
+lookupWithDefaultUFM_Directly
+		:: UniqFM elt -> elt -> Unique -> elt
 
 eltsUFM		:: UniqFM elt -> [elt]
 ufmToList	:: UniqFM elt -> [(Unique, elt)]
@@ -139,13 +138,13 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 %************************************************************************
 
 \begin{code}
+#if 0
+
 type IdFinMap	 elt = UniqFM elt
 type TyVarFinMap elt = UniqFM elt
 type NameFinMap  elt = UniqFM elt
 type RegFinMap   elt = UniqFM elt
-\end{code}
 
-\begin{code}
 #ifdef __GLASGOW_HASKELL__
 -- I don't think HBC was too happy about this (WDP 94/10)
 
@@ -221,6 +220,7 @@ type RegFinMap   elt = UniqFM elt
   #-}
 
 #endif {- __GLASGOW_HASKELL__ -}
+#endif {- 0 -}
 \end{code}
 
 %************************************************************************
@@ -285,7 +285,7 @@ First the ways of building a UniqFM.
 
 \begin{code}
 emptyUFM		     = EmptyUFM
-singletonUFM	     key elt = mkLeafUFM (u2i (getTheUnique key)) elt
+singletonUFM	     key elt = mkLeafUFM (u2i (getItsUnique key)) elt
 singletonDirectlyUFM key elt = mkLeafUFM (u2i key) elt
 
 listToUFM key_elt_pairs
@@ -308,12 +308,13 @@ addToUFM fm key elt = addToUFM_C use_snd fm key elt
 addToUFM_Directly fm u elt = insert_ele use_snd fm (u2i u) elt
 
 addToUFM_C combiner fm key elt
-  = insert_ele combiner fm (u2i (getTheUnique key)) elt
+  = insert_ele combiner fm (u2i (getItsUnique key)) elt
 
 addListToUFM fm key_elt_pairs = addListToUFM_C use_snd fm key_elt_pairs
+addListToUFM_Directly fm uniq_elt_pairs = addListToUFM_directly_C use_snd fm uniq_elt_pairs
 
 addListToUFM_C combiner fm key_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (u2i (getTheUnique k)) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (u2i (getItsUnique k)) e)
 	 fm key_elt_pairs
 
 addListToUFM_directly_C combiner fm uniq_elt_pairs
@@ -326,7 +327,7 @@ Now ways of removing things from UniqFM.
 \begin{code}
 delListFromUFM fm lst = foldl delFromUFM fm lst
 
-delFromUFM fm key = delete fm (u2i (getTheUnique key))
+delFromUFM fm key = delete fm (u2i (getItsUnique key))
 
 delete EmptyUFM _   = EmptyUFM
 delete fm       key = del_ele fm
@@ -340,7 +341,7 @@ delete fm       key = del_ele fm
     del_ele nd@(NodeUFM j p t1 t2)
       | j _GT_ key
       = mkSLNodeUFM (NodeUFMData j p) (del_ele t1) t2
-      | otherwise	
+      | otherwise
       = mkLSNodeUFM (NodeUFMData j p) t1 (del_ele t2)
 
     del_ele _ = panic "Found EmptyUFM FM when rec-deleting"
@@ -383,7 +384,7 @@ plusUFM_C f fm1 fm2	= mix_trees fm1 fm2
 		--	  j		j'			 j
 		--	 / \	+      / \	==>		/ \
 		--     t1   t2	    t1'	  t2'		t1 + t1'   t2 + t2'
-		--	
+		--
 	  mix_branches (SameRoot)
 		= mkSSNodeUFM (NodeUFMData j p)
 			(mix_trees t1 t1')
@@ -397,29 +398,29 @@ plusUFM_C f fm1 fm2	= mix_trees fm1 fm2
 		--     t1   t2	    t1'	  t2'		      t1   t2 + j'
 		--						       / \
 		--						     t1'  t2'
-	  mix_branches (LeftRoot Left) -- | trace "LL" True
+	  mix_branches (LeftRoot Leftt) -- | trace "LL" True
 	    = mkSLNodeUFM
 		(NodeUFMData j p)
-		(mix_trees t1 right_t)	
+		(mix_trees t1 right_t)
 		t2
 
-	  mix_branches (LeftRoot Right) -- | trace "LR" True
+	  mix_branches (LeftRoot Rightt) -- | trace "LR" True
 	    = mkLSNodeUFM
 		(NodeUFMData j p)
 		t1
-		(mix_trees t2 right_t)	
+		(mix_trees t2 right_t)
 
-	  mix_branches (RightRoot Left) -- | trace "RL" True
+	  mix_branches (RightRoot Leftt) -- | trace "RL" True
 	    = mkSLNodeUFM
 		(NodeUFMData j' p')
-		(mix_trees left_t t1')	
+		(mix_trees left_t t1')
 		t2'
 
-	  mix_branches (RightRoot Right) -- | trace "RR" True
+	  mix_branches (RightRoot Rightt) -- | trace "RR" True
 	    = mkLSNodeUFM
 		(NodeUFMData j' p')
 		t1'
-		(mix_trees left_t t2')	
+		(mix_trees left_t t2')
 
 	mix_trees _ _ = panic "EmptyUFM found when inserting into plusInt"
 \end{code}
@@ -453,8 +454,8 @@ minusUFM fm1 fm2     = minus_trees fm1 fm2
 		--	  j		j'		   j
 		--	 / \	+      / \	==>	  / \
 		--     t1   t2	    t1'	  t2'		 t1  t2
-		--				
-		--				
+		--
+		--
 		-- Fast, Ehh !
 		--
 	  minus_branches (NewRoot nd _) = left_t
@@ -464,7 +465,7 @@ minusUFM fm1 fm2     = minus_trees fm1 fm2
 		--	  j		j'			 j
 		--	 / \	+      / \	==>		/ \
 		--     t1   t2	    t1'	  t2'		t1 + t1'   t2 + t2'
-		--	
+		--
 	  minus_branches (SameRoot)
 		= mkSSNodeUFM (NodeUFMData j p)
 			(minus_trees t1 t1')
@@ -475,23 +476,23 @@ minusUFM fm1 fm2     = minus_trees fm1 fm2
 		--
 		-- The left is above the right
 		--
-	  minus_branches (LeftRoot Left)
+	  minus_branches (LeftRoot Leftt)
 	    = mkSLNodeUFM
 		(NodeUFMData j p)
-		(minus_trees t1 right_t)	
+		(minus_trees t1 right_t)
 		t2
-	  minus_branches (LeftRoot Right)
+	  minus_branches (LeftRoot Rightt)
 	    = mkLSNodeUFM
 		(NodeUFMData j p)
 		t1
-		(minus_trees t2 right_t)	
+		(minus_trees t2 right_t)
 
 		--
 		-- The right is above the left
 		--
-	  minus_branches (RightRoot Left)
+	  minus_branches (RightRoot Leftt)
 	    = minus_trees left_t t1'
-	  minus_branches (RightRoot Right)
+	  minus_branches (RightRoot Rightt)
 	    = minus_trees left_t t2'
 
 	minus_trees _ _ = panic "EmptyUFM found when insering into plusInt"
@@ -524,10 +525,10 @@ intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
 	  where
 		-- Given a disjoint j,j' (p >^ p' && p' >^ p):
 		--
-		--	  j		j'		
+		--	  j		j'
 		--	 / \	+      / \	==>		EmptyUFM
-		--     t1   t2	    t1'	  t2'		
-		--					
+		--     t1   t2	    t1'	  t2'
+		--
 		-- Fast, Ehh !
 		--
 	  intersect_branches (NewRoot nd _) = EmptyUFM
@@ -537,7 +538,7 @@ intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
 		--	  j		j'			 j
 		--	 / \	+      / \	==>		/ \
 		--     t1   t2	    t1'	  t2'		t1 x t1'   t2 x t2'
-		--	
+		--
 	  intersect_branches (SameRoot)
 		= mkSSNodeUFM (NodeUFMData j p)
 			(intersect_trees t1 t1')
@@ -549,16 +550,16 @@ intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
 		--	  j		j'		       t2 + j'
 		--	 / \	+      / \	==>		   / \
 		--     t1   t2	    t1'	  t2'			 t1'  t2'
-		--						
+		--
 		-- This does cut down the search space quite a bit.
-					
-	  intersect_branches (LeftRoot Left)
+
+	  intersect_branches (LeftRoot Leftt)
 	    = intersect_trees t1 right_t
-	  intersect_branches (LeftRoot Right)
+	  intersect_branches (LeftRoot Rightt)
 	    = intersect_trees t2 right_t
-	  intersect_branches (RightRoot Left)
+	  intersect_branches (RightRoot Leftt)
 	    = intersect_trees left_t t1'
-	  intersect_branches (RightRoot Right)
+	  intersect_branches (RightRoot Rightt)
 	    = intersect_trees left_t t2'
 
 	intersect_trees x y = panic ("EmptyUFM found when intersecting trees")
@@ -595,11 +596,16 @@ looking up in a hurry is the {\em whole point} of this binary tree lark.
 Lookup up a binary tree is easy (and fast).
 
 \begin{code}
-lookupUFM	  fm key = lookup fm (u2i (getTheUnique key))
-lookupDirectlyUFM fm key = lookup fm (u2i key)
+lookupUFM	  fm key = lookup fm (u2i (getItsUnique key))
+lookupUFM_Directly fm key = lookup fm (u2i key)
 
 lookupWithDefaultUFM fm deflt key
-  = case lookup fm (u2i (getTheUnique key)) of
+  = case lookup fm (u2i (getItsUnique key)) of
+      Nothing  -> deflt
+      Just elt -> elt
+
+lookupWithDefaultUFM_Directly fm deflt key
+  = case lookup fm (u2i key) of
       Nothing  -> deflt
       Just elt -> elt
 
@@ -763,7 +769,7 @@ map_tree f _ = panic "map_tree failed"
 filter_tree f nd@(NodeUFM j p t1 t2)
   = mkSSNodeUFM (NodeUFMData j p) (filter_tree f t1) (filter_tree f t2)
 
-filter_tree f lf@(LeafUFM i obj)	
+filter_tree f lf@(LeafUFM i obj)
   | f obj = lf
   | otherwise = EmptyUFM
 \end{code}
@@ -788,7 +794,7 @@ data NodeUFMData
 This is the information used when computing new NodeUFMs.
 
 \begin{code}
-data Side = Left | Right
+data Side = Leftt | Rightt -- NB: avoid 1.3 names "Left" and "Right"
 data CommonRoot
   = LeftRoot  Side	-- which side is the right down ?
   | RightRoot Side	-- which side is the left down ?
@@ -839,8 +845,8 @@ ask_about_common_ancestor x@(NodeUFMData j p) y@(NodeUFMData j2 p2)
 	| otherwise   -> NewRoot nd (j _GT_ j2)
     where
 	decideSide :: Bool -> Side
-	decideSide True	 = Left
-	decideSide False = Right
+	decideSide True	 = Leftt
+	decideSide False = Rightt
 \end{code}
 
 This might be better in Util.lhs ?
@@ -856,12 +862,8 @@ shiftR_ :: FAST_INT -> FAST_INT -> FAST_INT
 {-# INLINE shiftR_ #-}
 shiftL_ n p = word2Int#((int2Word# n) `shiftL#` p)
 shiftR_ n p = word2Int#((int2Word# n) `shiftr` p)
-# if __GLASGOW_HASKELL__ >= 23
   where
     shiftr x y = shiftRA# x y
-# else
-    shiftr x y = shiftR#  x y
-# endif
 
 #else {- not GHC -}
 shiftL_ n p = n * (2 ^ p)

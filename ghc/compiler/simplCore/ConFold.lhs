@@ -12,27 +12,23 @@ ToDo:
 
 module ConFold	( completePrim ) where
 
-IMPORT_Trace
-
-import PlainCore
-import TaggedCore
 import SimplEnv
 import SimplMonad
 
-import AbsPrel		( trueDataCon, falseDataCon, PrimOp(..), PrimKind
+import PrelInfo		( trueDataCon, falseDataCon, PrimOp(..), PrimRep
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import BasicLit		( mkMachInt, mkMachWord, BasicLit(..) )
-import Id 		( Id, getIdUniType )
+import Literal		( mkMachInt, mkMachWord, Literal(..) )
+import Id 		( Id, idType )
 import Maybes		( Maybe(..) )
 import Util
 \end{code}
 
 \begin{code}
-completePrim :: SimplEnv 
-	     -> PrimOp -> [OutType] -> [OutAtom] 
-	     -> SmplM OutExpr 
+completePrim :: SimplEnv
+	     -> PrimOp -> [OutType] -> [OutAtom]
+	     -> SmplM OutExpr
 \end{code}
 
 In the parallel world, we use _seq_ to control the order in which
@@ -46,7 +42,7 @@ Now, we know that the seq# primitive will never return 0#, but we
 don't let the simplifier know that.  We also use a special error
 value, parError#, which is *not* a bottoming Id, so as far as the
 simplifier is concerned, we have to evaluate seq# a before we know
-whether or not y will be evaluated.  
+whether or not y will be evaluated.
 
 If we didn't have the extra case, then after inlining the compiler might
 see:
@@ -56,7 +52,7 @@ If it sees that, it can see that f is strict in q, and hence it might
 evaluate q before p!  The "0# ->" case prevents this happening.
 By having the parError# branch we make sure that anything in the
 other branch stays there!
-  
+
 This is fine, but we'd like to get rid of the extraneous code.  Hence,
 we *do* let the simplifier know that seq# is strict in its argument.
 As a result, we hope that `a' will be evaluated before seq# is called.
@@ -68,19 +64,19 @@ NB: If we ever do case-floating, we have an extra worry:
 
     case a of
       a' -> let b' = case seq# a of { True -> b; False -> parError# }
-            in case b' of ...
+	    in case b' of ...
 
     =>
 
     case a of
-      a' -> let b' = case True of { True -> b; False -> parError# } 
-            in case b' of ...
+      a' -> let b' = case True of { True -> b; False -> parError# }
+	    in case b' of ...
 
     =>
 
     case a of
       a' -> let b' = b
-            in case b' of ...
+	    in case b' of ...
 
     =>
 
@@ -90,76 +86,76 @@ NB: If we ever do case-floating, we have an extra worry:
 The second case must never be floated outside of the first!
 
 \begin{code}
-completePrim env SeqOp [ty] [CoLitAtom lit]
-  = returnSmpl (CoLit (mkMachInt 1))
+completePrim env SeqOp [ty] [LitArg lit]
+  = returnSmpl (Lit (mkMachInt 1))
 
-completePrim env op@SeqOp tys@[ty] args@[CoVarAtom var]
+completePrim env op@SeqOp tys@[ty] args@[VarArg var]
   = case (lookupUnfolding env var) of
       NoUnfoldingDetails -> give_up
-      LiteralForm _ -> hooray
-      OtherLiteralForm _ -> hooray
-      ConstructorForm _ _ _ -> hooray
-      OtherConstructorForm _ -> hooray
-      GeneralForm _ WhnfForm _ _ -> hooray
-      _ -> give_up 
+      LitForm _ -> hooray
+      OtherLitForm _ -> hooray
+      ConForm _ _ _ -> hooray
+      OtherConForm _ -> hooray
+      GenForm _ WhnfForm _ _ -> hooray
+      _ -> give_up
   where
-    give_up = returnSmpl (CoPrim op tys args)
-    hooray = returnSmpl (CoLit (mkMachInt 1))
+    give_up = returnSmpl (Prim op tys args)
+    hooray = returnSmpl (Lit (mkMachInt 1))
 \end{code}
 
 \begin{code}
 completePrim env op tys args
   = case args of
-      [CoLitAtom (MachChar char_lit)]	   -> oneCharLit   op char_lit
-      [CoLitAtom (MachInt int_lit signed)] -> (if signed then oneIntLit else oneWordLit)
+      [LitArg (MachChar char_lit)]	   -> oneCharLit   op char_lit
+      [LitArg (MachInt int_lit signed)] -> (if signed then oneIntLit else oneWordLit)
 							   op int_lit
-      [CoLitAtom (MachFloat float_lit)]    -> oneFloatLit  op float_lit
-      [CoLitAtom (MachDouble double_lit)]  -> oneDoubleLit op double_lit
-      [CoLitAtom other_lit]		   -> oneLit       op other_lit 
+      [LitArg (MachFloat float_lit)]    -> oneFloatLit  op float_lit
+      [LitArg (MachDouble double_lit)]  -> oneDoubleLit op double_lit
+      [LitArg other_lit]		   -> oneLit       op other_lit
 
-      [CoLitAtom (MachChar char_lit1),
-       CoLitAtom (MachChar char_lit2)]     -> twoCharLits op char_lit1 char_lit2
+      [LitArg (MachChar char_lit1),
+       LitArg (MachChar char_lit2)]     -> twoCharLits op char_lit1 char_lit2
 
-      [CoLitAtom (MachInt int_lit1 True),     -- both *signed* literals
-       CoLitAtom (MachInt int_lit2 True)]  -> twoIntLits op int_lit1 int_lit2
+      [LitArg (MachInt int_lit1 True),     -- both *signed* literals
+       LitArg (MachInt int_lit2 True)]  -> twoIntLits op int_lit1 int_lit2
 
-      [CoLitAtom (MachInt int_lit1 False),    -- both *unsigned* literals
-       CoLitAtom (MachInt int_lit2 False)] -> twoWordLits op int_lit1 int_lit2
+      [LitArg (MachInt int_lit1 False),    -- both *unsigned* literals
+       LitArg (MachInt int_lit2 False)] -> twoWordLits op int_lit1 int_lit2
 
-      [CoLitAtom (MachInt int_lit1 False),    -- unsigned+signed (shift ops)
-       CoLitAtom (MachInt int_lit2 True)]  -> oneWordOneIntLit op int_lit1 int_lit2
+      [LitArg (MachInt int_lit1 False),    -- unsigned+signed (shift ops)
+       LitArg (MachInt int_lit2 True)]  -> oneWordOneIntLit op int_lit1 int_lit2
 
-      [CoLitAtom (MachFloat float_lit1),
-       CoLitAtom (MachFloat float_lit2)]   -> twoFloatLits op float_lit1 float_lit2
+      [LitArg (MachFloat float_lit1),
+       LitArg (MachFloat float_lit2)]   -> twoFloatLits op float_lit1 float_lit2
 
-      [CoLitAtom (MachDouble double_lit1),
-       CoLitAtom (MachDouble double_lit2)] -> twoDoubleLits op double_lit1 double_lit2
+      [LitArg (MachDouble double_lit1),
+       LitArg (MachDouble double_lit2)] -> twoDoubleLits op double_lit1 double_lit2
 
-      [CoLitAtom lit, CoVarAtom var]       -> litVar op lit var
-      [CoVarAtom var, CoLitAtom lit]       -> litVar op lit var
+      [LitArg lit, VarArg var]       -> litVar op lit var
+      [VarArg var, LitArg lit]       -> litVar op lit var
 
       other				   -> give_up
 
   where
-    give_up = returnSmpl (CoPrim op tys args)
+    give_up = returnSmpl (Prim op tys args)
 
-    return_char c   = returnSmpl (CoLit (MachChar   c))
-    return_int i    = returnSmpl (CoLit (mkMachInt  i))
-    return_word i   = returnSmpl (CoLit (mkMachWord i))
-    return_float f  = returnSmpl (CoLit (MachFloat  f))
-    return_double d = returnSmpl (CoLit (MachDouble d))
-    return_lit lit  = returnSmpl (CoLit lit)
+    return_char c   = returnSmpl (Lit (MachChar   c))
+    return_int i    = returnSmpl (Lit (mkMachInt  i))
+    return_word i   = returnSmpl (Lit (mkMachWord i))
+    return_float f  = returnSmpl (Lit (MachFloat  f))
+    return_double d = returnSmpl (Lit (MachDouble d))
+    return_lit lit  = returnSmpl (Lit lit)
 
     return_bool True  = returnSmpl trueVal
     return_bool False = returnSmpl falseVal
 
     return_prim_case var lit val_if_eq val_if_neq
-      = newId (getIdUniType var)	`thenSmpl` \ unused_binder ->
+      = newId (idType var)	`thenSmpl` \ unused_binder ->
 	let
 	    result
-	      =	CoCase (CoVar var)
-		  (CoPrimAlts [(lit,val_if_eq)] 
-		  (CoBindDefault unused_binder val_if_neq))
+	      =	Case (Var var)
+		  (PrimAlts [(lit,val_if_eq)]
+		  (BindDefault unused_binder val_if_neq))
 	in
 --	pprTrace "return_prim_case:" (ppr PprDebug result) (
 	returnSmpl result
@@ -300,7 +296,7 @@ completePrim env op tys args
 	-- This stuff turns
 	--	n ==# 3#
 	-- into
-	--	case n of 
+	--	case n of
 	--	  3# -> True
 	--	  m  -> False
 	--
@@ -323,6 +319,6 @@ completePrim env op tys args
     litVar other_op lit var = give_up
 
 
-trueVal  = CoCon trueDataCon  [] []
-falseVal = CoCon falseDataCon [] []
+trueVal  = Con trueDataCon  [] []
+falseVal = Con falseDataCon [] []
 \end{code}

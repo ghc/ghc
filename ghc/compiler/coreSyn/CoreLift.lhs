@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[CoreLift]{Lifts unboxed bindings and any references to them}
 
@@ -13,28 +13,28 @@ module CoreLift (
 	liftExpr,
 	bindUnlift,
 	applyBindUnlifts,
-	isUnboxedButNotState,
-	
-	CoreBinding, PlainCoreBinding(..),
-	CoreExpr, PlainCoreExpr(..),
-	Id, SplitUniqSupply, Unique
+	isUnboxedButNotState
+
     ) where
 
-IMPORT_Trace
-import Pretty
+import Ubiq{-uitous-}
 
-import AbsPrel		( liftDataCon, mkLiftTy )
-import TysPrim		( statePrimTyCon ) -- ToDo: get from AbsPrel
-import AbsUniType
-import Id		( getIdUniType, updateIdType, mkSysLocal, isLocallyDefined )
-import IdEnv
-import Outputable
-import PlainCore
-import SplitUniq
-import Util
+import CoreSyn
+import CoreUtils	( coreExprType )
+import Id		( idType, mkSysLocal,
+			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv(..),
+			  GenId{-instances-}
+			)
+import PrelInfo		( liftDataCon, mkLiftTy, statePrimTyCon )
+import TyCon		( TyCon{-instance-} )
+import Type		( maybeAppDataTyCon, eqTy )
+import UniqSupply	( getUnique, getUniques, splitUniqSupply, UniqSupply )
+import Util		( zipEqual, zipWithEqual, assertPanic, panic )
 
 infixr 9 `thenL`
 
+updateIdType = panic "CoreLift.updateIdType"
+isBoxedTyCon = panic "CoreLift.isBoxedTyCon"
 \end{code}
 
 %************************************************************************
@@ -46,27 +46,28 @@ infixr 9 `thenL`
 @liftCoreBindings@ is the top-level interface function.
 
 \begin{code}
-liftCoreBindings :: SplitUniqSupply	-- unique supply
-		 -> [PlainCoreBinding]	-- unlifted bindings
-		 -> [PlainCoreBinding]	-- lifted bindings
+liftCoreBindings :: UniqSupply	-- unique supply
+		 -> [CoreBinding]	-- unlifted bindings
+		 -> [CoreBinding]	-- lifted bindings
 
 liftCoreBindings us binds
   = initL (lift_top_binds binds) us
   where
+    lift_top_binds [] = returnL []
+
     lift_top_binds (b:bs)
       = liftBindAndScope True b (
-          lift_top_binds bs `thenL` \ bs ->
+	  lift_top_binds bs `thenL` \ bs ->
 	  returnL (ItsABinds bs)
-        ) 			`thenL` \ (b, ItsABinds bs) ->
+	) 			`thenL` \ (b, ItsABinds bs) ->
 	returnL (b:bs)
 
-    lift_top_binds []
-      = returnL []
-    
-liftBindAndScope :: Bool			-- top level ?
-		 -> PlainCoreBinding		-- As yet unprocessed
-		 -> LiftM BindsOrExpr		-- Do the scope of the bindings
-		 -> LiftM (PlainCoreBinding,	-- Processed
+
+-----------------------
+liftBindAndScope :: Bool		-- top level ?
+		 -> CoreBinding		-- As yet unprocessed
+		 -> LiftM BindsOrExpr	-- Do the scope of the bindings
+		 -> LiftM (CoreBinding,	-- Processed
 		 	   BindsOrExpr)
 
 liftBindAndScope top_lev bind scopeM
@@ -76,31 +77,33 @@ liftBindAndScope top_lev bind scopeM
       returnL (bind, bindsorexpr)
     )
 
+-----------------------
+liftCoreArg :: CoreArg -> LiftM (CoreArg, CoreExpr -> CoreExpr)
 
-liftCoreAtom :: PlainCoreAtom -> LiftM (PlainCoreAtom, PlainCoreExpr -> PlainCoreExpr)
-
-liftCoreAtom (CoLitAtom lit)
- = returnL (CoLitAtom lit, id)
-
-liftCoreAtom (CoVarAtom v)
+liftCoreArg arg@(TyArg     _) = returnL (arg, id)
+liftCoreArg arg@(UsageArg  _) = returnL (arg, id)
+liftCoreArg arg@(LitArg    _) = returnL (arg, id)
+liftCoreArg arg@(VarArg v)
  = isLiftedId v			`thenL` \ lifted ->
     case lifted of
+	Nothing -> returnL (arg, id)
+
 	Just (lifted, unlifted) ->
-	    returnL (CoVarAtom unlifted, bindUnlift lifted unlifted)
-	Nothing ->
-            returnL (CoVarAtom v, id)
+	    returnL (VarArg unlifted, bindUnlift lifted unlifted)
 
 
-liftCoreBind :: PlainCoreBinding -> LiftM PlainCoreBinding
+-----------------------
+liftCoreBind :: CoreBinding -> LiftM CoreBinding
 
-liftCoreBind (CoNonRec b rhs)
+liftCoreBind (NonRec b rhs)
   = liftOneBind (b,rhs)		`thenL` \ (b,rhs) ->
-    returnL (CoNonRec b rhs)
+    returnL (NonRec b rhs)
 
-liftCoreBind (CoRec pairs) 
-  = mapL liftOneBind pairs	`thenL` \ pairs -> 
-    returnL (CoRec pairs)
+liftCoreBind (Rec pairs)
+  = mapL liftOneBind pairs	`thenL` \ pairs ->
+    returnL (Rec pairs)
 
+-----------------------
 liftOneBind (binder,rhs)
   = liftCoreExpr rhs    	`thenL` \ rhs ->
     isLiftedId binder		`thenL` \ lifted ->
@@ -108,100 +111,92 @@ liftOneBind (binder,rhs)
 	Just (lifted, unlifted) ->
 	    returnL (lifted, liftExpr unlifted rhs)
 	Nothing ->
-            returnL (binder, rhs)
+	    returnL (binder, rhs)
 
-liftCoreExpr :: PlainCoreExpr -> LiftM PlainCoreExpr
+-----------------------
+liftCoreExpr :: CoreExpr -> LiftM CoreExpr
 
-liftCoreExpr (CoVar var)
+liftCoreExpr expr@(Var var)
   = isLiftedId var		`thenL` \ lifted ->
     case lifted of
+	Nothing -> returnL expr
 	Just (lifted, unlifted) ->
-	    returnL (bindUnlift lifted unlifted (CoVar unlifted))
-	Nothing ->
-            returnL (CoVar var)
+	    returnL (bindUnlift lifted unlifted (Var unlifted))
 
-liftCoreExpr (CoLit lit)
-  = returnL (CoLit lit)
+liftCoreExpr expr@(Lit lit) = returnL expr
 
-liftCoreExpr (CoSCC label expr)
+liftCoreExpr (SCC label expr)
   = liftCoreExpr expr		`thenL` \ expr ->
-    returnL (CoSCC label expr)
+    returnL (SCC label expr)
 
-liftCoreExpr (CoLet (CoNonRec binder rhs) body)		-- special case: no lifting
+liftCoreExpr (Let (NonRec binder rhs) body) -- special case: no lifting
   = liftCoreExpr rhs	`thenL` \ rhs ->
     liftCoreExpr body	`thenL` \ body ->
-    returnL (mkCoLetUnboxedToCase (CoNonRec binder rhs) body)
+    returnL (mkCoLetUnboxedToCase (NonRec binder rhs) body)
 
-liftCoreExpr (CoLet bind body)	-- general case
+liftCoreExpr (Let bind body)	-- general case
   = liftBindAndScope False bind (
       liftCoreExpr body	`thenL` \ body ->
       returnL (ItsAnExpr body)
     )				`thenL` \ (bind, ItsAnExpr body) ->
-    returnL (CoLet bind body)
+    returnL (Let bind body)
 
-liftCoreExpr (CoCon con tys args)
-  = mapAndUnzipL liftCoreAtom args	`thenL` \ (args, unlifts) ->
-    returnL (applyBindUnlifts unlifts (CoCon con tys args))
+liftCoreExpr (Con con args)
+  = mapAndUnzipL liftCoreArg args	`thenL` \ (args, unlifts) ->
+    returnL (applyBindUnlifts unlifts (Con con args))
 
-liftCoreExpr (CoPrim op tys args)
-  = mapAndUnzipL liftCoreAtom args	`thenL` \ (args, unlifts) ->
-    returnL (applyBindUnlifts unlifts (CoPrim op tys args))
+liftCoreExpr (Prim op args)
+  = mapAndUnzipL liftCoreArg args	`thenL` \ (args, unlifts) ->
+    returnL (applyBindUnlifts unlifts (Prim op args))
 
-liftCoreExpr (CoApp fun arg)
+liftCoreExpr (App fun arg)
   = lift_app fun [arg]
   where
-    lift_app (CoApp fun arg) args
+    lift_app (App fun arg) args
       = lift_app fun (arg:args)
     lift_app other_fun args
       = liftCoreExpr other_fun		`thenL` \ other_fun ->
-        mapAndUnzipL liftCoreAtom args	`thenL` \ (args, unlifts) ->
-        returnL (applyBindUnlifts unlifts (foldl CoApp other_fun args))
+	mapAndUnzipL liftCoreArg args	`thenL` \ (args, unlifts) ->
+	returnL (applyBindUnlifts unlifts (mkGenApp other_fun args))
 
-liftCoreExpr (CoTyApp fun ty_arg)
-  = liftCoreExpr fun		`thenL` \ fun ->
-    returnL (CoTyApp fun ty_arg)
-
-liftCoreExpr (CoLam binders expr)
+liftCoreExpr (Lam binder expr)
   = liftCoreExpr expr		`thenL` \ expr ->
-    returnL (CoLam binders expr)
+    returnL (Lam binder expr)
 
-liftCoreExpr (CoTyLam tyvar expr)
-  = liftCoreExpr expr		`thenL` \ expr ->
-    returnL (CoTyLam tyvar expr)
-
-liftCoreExpr (CoCase scrut alts)
+liftCoreExpr (Case scrut alts)
  = liftCoreExpr scrut		`thenL` \ scrut ->
    liftCoreAlts alts		`thenL` \ alts ->
-   returnL (CoCase scrut alts)
+   returnL (Case scrut alts)
 
+------------
+liftCoreAlts :: CoreCaseAlts -> LiftM CoreCaseAlts
 
-liftCoreAlts :: PlainCoreCaseAlternatives -> LiftM PlainCoreCaseAlternatives
-
-liftCoreAlts (CoAlgAlts alg_alts deflt)
+liftCoreAlts (AlgAlts alg_alts deflt)
  = mapL liftAlgAlt alg_alts	`thenL` \ alg_alts ->
    liftDeflt deflt		`thenL` \ deflt ->
-   returnL (CoAlgAlts alg_alts deflt)
+   returnL (AlgAlts alg_alts deflt)
 
-liftCoreAlts (CoPrimAlts prim_alts deflt)
+liftCoreAlts (PrimAlts prim_alts deflt)
  = mapL liftPrimAlt prim_alts	`thenL` \ prim_alts ->
    liftDeflt deflt		`thenL` \ deflt ->
-   returnL (CoPrimAlts prim_alts deflt)
+   returnL (PrimAlts prim_alts deflt)
 
-
+------------
 liftAlgAlt (con,args,rhs)
   = liftCoreExpr rhs		`thenL` \ rhs ->
     returnL (con,args,rhs)
 
+------------
 liftPrimAlt (lit,rhs)
   = liftCoreExpr rhs		`thenL` \ rhs ->
     returnL (lit,rhs)
-   
-liftDeflt CoNoDefault
-  = returnL CoNoDefault
-liftDeflt (CoBindDefault binder rhs)
-  = liftCoreExpr rhs		`thenL` \ rhs ->
-    returnL (CoBindDefault binder rhs)
 
+------------
+liftDeflt NoDefault
+  = returnL NoDefault
+liftDeflt (BindDefault binder rhs)
+  = liftCoreExpr rhs		`thenL` \ rhs ->
+    returnL (BindDefault binder rhs)
 \end{code}
 
 %************************************************************************
@@ -211,28 +206,28 @@ liftDeflt (CoBindDefault binder rhs)
 %************************************************************************
 
 \begin{code}
-type LiftM a = IdEnv (Id, Id)	-- lifted Ids are mapped to:
-				--   * lifted Id with the same Unique
-				--     (top-level bindings must keep their
-				--	unique (see TopLevId in Id.lhs))
-				--   * unlifted version with a new Unique
-            -> SplitUniqSupply	-- unique supply
-	    -> a		-- result
+type LiftM a
+  = IdEnv (Id, Id)	-- lifted Ids are mapped to:
+			--   * lifted Id with the same Unique
+			--     (top-level bindings must keep their
+			--	unique (see TopLevId in Id.lhs))
+			--   * unlifted version with a new Unique
+    -> UniqSupply	-- unique supply
+    -> a		-- result
 
-data BindsOrExpr = ItsABinds [PlainCoreBinding]
-		 | ItsAnExpr PlainCoreExpr
+data BindsOrExpr
+  = ItsABinds [CoreBinding]
+  | ItsAnExpr CoreExpr
 
-initL m us
-  = m nullIdEnv us
+initL m us = m nullIdEnv us
 
 returnL :: a -> LiftM a
-returnL r idenv us
-  = r
+returnL r idenv us = r
 
 thenL :: LiftM a -> (a -> LiftM b) -> LiftM b
 thenL m k idenv s0
-  = case splitUniqSupply s0	   of { (s1, s2) ->
-    case (m idenv s1) of { r ->
+  = case (splitUniqSupply s0)	of { (s1, s2) ->
+    case (m idenv s1)		of { r ->
     k r idenv s2 }}
 
 
@@ -251,28 +246,28 @@ mapAndUnzipL f (x:xs)
     returnL ((r1:rs1),(r2:rs2))
 
 -- liftBinders is only called for top-level or recusive case
-liftBinders :: Bool -> PlainCoreBinding -> LiftM thing -> LiftM thing
+liftBinders :: Bool -> CoreBinding -> LiftM thing -> LiftM thing
 
-liftBinders False (CoNonRec _ _) liftM idenv s0
-  = error "CoreLift:liftBinders"	-- should be caught by special case above
+liftBinders False (NonRec _ _) liftM idenv s0
+  = panic "CoreLift:liftBinders"	-- should be caught by special case above
 
 liftBinders top_lev bind liftM idenv s0
-  = liftM (growIdEnvList idenv lift_map) s1
+  = liftM (growIdEnvList idenv lift_map) s2
   where
-    lift_ids = [ id | id <- bindersOf bind, isUnboxedButNotState (getIdUniType id) ]
-    (lift_uniqs, s1) = getSUniquesAndDepleted (length lift_ids) s0
-    lift_map = zip lift_ids (zipWith mkLiftedId lift_ids lift_uniqs)
+    (s1, s2)   = splitUniqSupply s0
+    lift_ids   = [ id | id <- bindersOf bind, isUnboxedButNotState (idType id) ]
+    lift_uniqs = getUniques (length lift_ids) s1
+    lift_map   = zipEqual lift_ids (zipWithEqual mkLiftedId lift_ids lift_uniqs)
 
     -- ToDo: Give warning for recursive bindings involving unboxed values ???
 
-
 isLiftedId :: Id -> LiftM (Maybe (Id, Id))
 isLiftedId id idenv us
-  | isLocallyDefined id 
+  | isLocallyDefined id
      = lookupIdEnv idenv id
   | otherwise	-- ensure all imported ids are lifted
-     = if isUnboxedButNotState (getIdUniType id)
-       then Just (mkLiftedId id (getSUnique us))
+     = if isUnboxedButNotState (idType id)
+       then Just (mkLiftedId id (getUnique us))
        else Nothing
 
 mkLiftedId :: Id -> Unique -> (Id,Id)
@@ -284,36 +279,36 @@ mkLiftedId id u
     lifted_id   = updateIdType id lifted_ty
     unlifted_id = mkSysLocal id_name u unlifted_ty (getSrcLoc id)
 
-    unlifted_ty = getIdUniType id
+    unlifted_ty = idType id
     lifted_ty   = mkLiftTy unlifted_ty
 
-bindUnlift :: Id -> Id -> PlainCoreExpr -> PlainCoreExpr
+bindUnlift :: Id -> Id -> CoreExpr -> CoreExpr
 bindUnlift vlift vunlift expr
   = ASSERT (isUnboxedButNotState unlift_ty)
-    ASSERT (lift_ty == mkLiftTy unlift_ty)
-    CoCase (CoVar vlift)
-	   (CoAlgAlts [(liftDataCon, [vunlift], expr)] CoNoDefault)
+    ASSERT (lift_ty `eqTy` mkLiftTy unlift_ty)
+    Case (Var vlift)
+	   (AlgAlts [(liftDataCon, [vunlift], expr)] NoDefault)
   where
-    lift_ty   = getIdUniType vlift
-    unlift_ty = getIdUniType vunlift
+    lift_ty   = idType vlift
+    unlift_ty = idType vunlift
 
-liftExpr :: Id -> PlainCoreExpr -> PlainCoreExpr
+liftExpr :: Id -> CoreExpr -> CoreExpr
 liftExpr vunlift rhs
   = ASSERT (isUnboxedButNotState unlift_ty)
-    ASSERT (rhs_ty == unlift_ty)
-    CoCase rhs (CoPrimAlts [] (CoBindDefault vunlift 
-			      (CoCon liftDataCon [unlift_ty] [CoVarAtom vunlift])))
+    ASSERT (rhs_ty `eqTy` unlift_ty)
+    Case rhs (PrimAlts []
+	(BindDefault vunlift (mkCon liftDataCon [] [unlift_ty] [VarArg vunlift])))
   where
-    rhs_ty    = typeOfCoreExpr rhs
-    unlift_ty = getIdUniType vunlift
+    rhs_ty    = coreExprType rhs
+    unlift_ty = idType vunlift
 
 
-applyBindUnlifts :: [PlainCoreExpr -> PlainCoreExpr] -> PlainCoreExpr -> PlainCoreExpr
+applyBindUnlifts :: [CoreExpr -> CoreExpr] -> CoreExpr -> CoreExpr
 applyBindUnlifts []     expr = expr
 applyBindUnlifts (f:fs) expr = f (applyBindUnlifts fs expr)
 
 isUnboxedButNotState ty
-  = case (getUniDataTyCon_maybe ty) of
+  = case (maybeAppDataTyCon ty) of
       Nothing -> False
       Just (tycon, _, _) ->
 	not (isBoxedTyCon tycon) && not (tycon == statePrimTyCon)

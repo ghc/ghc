@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1996
 %
 \section[Simplify]{The main module of the simplifier}
 
@@ -13,21 +13,19 @@ import Outputable
 
 import SimplMonad
 import SimplEnv
-import TaggedCore
-import PlainCore
 
-import AbsPrel		( getPrimOpResultInfo, PrimOpResultInfo(..),
-			  primOpOkForSpeculation, PrimOp(..), PrimKind,
+import PrelInfo		( getPrimOpResultInfo, PrimOpResultInfo(..),
+			  primOpOkForSpeculation, PrimOp(..), PrimRep,
 			  realWorldStateTy
 			  IF_ATTACK_PRAGMAS(COMMA realWorldTy)
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( getUniDataTyCon_maybe, mkTyVarTy, applyTy,
+import Type		( maybeDataTyCon, mkTyVarTy, applyTy,
 			  splitTyArgs, splitTypeWithDictsAsArgs,
 			  maybeUnpackFunTy, isPrimType
 			)
-import BasicLit		( isNoRepLit, BasicLit(..) )
+import Literal		( isNoRepLit, Literal(..) )
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import ConFold		( completePrim )
@@ -48,7 +46,7 @@ passes:
 -fsimplify		= run the simplifier
 -ffloat-inwards		= runs the float lets inwards pass
 -ffloat			= runs the full laziness pass
-                          (ToDo: rename to -ffull-laziness)
+			  (ToDo: rename to -ffull-laziness)
 -fupdate-analysis	= runs update analyser
 -fstrictness		= runs strictness analyser
 -fsaturate-apps		= saturates applications (eta expansion)
@@ -56,20 +54,20 @@ passes:
 options:
 -------
 -ffloat-past-lambda	= OK to do full laziness.
-                          (ToDo: remove, as the full laziness pass is
-                                 useless without this flag, therefore
-                                 it is unnecessary. Just -ffull-laziness
-                                 should be kept.)
+			  (ToDo: remove, as the full laziness pass is
+				 useless without this flag, therefore
+				 it is unnecessary. Just -ffull-laziness
+				 should be kept.)
 
 -ffloat-lets-ok		= OK to float lets out of lets if the enclosing
-                          let is strict or if the floating will expose
-                          a WHNF [simplifier].
+			  let is strict or if the floating will expose
+			  a WHNF [simplifier].
 
--ffloat-primops-ok	= OK to float out of lets cases whose scrutinee 
-                          is a primop that cannot fail [simplifier].
+-ffloat-primops-ok	= OK to float out of lets cases whose scrutinee
+			  is a primop that cannot fail [simplifier].
 
 -fcode-duplication-ok	= allows the previous option to work on cases with
-                          multiple branches [simplifier].
+			  multiple branches [simplifier].
 
 -flet-to-case		= does let-to-case transformation [simplifier].
 
@@ -113,7 +111,7 @@ you decide not to use it.
 Head normal forms
 ~~~~~~~~~~~~~~~~~
 We *never* put a non-HNF unfolding in the UnfoldEnv except in the
-INLINE-pragma case.  
+INLINE-pragma case.
 
 At one time I thought it would be OK to put non-HNF unfoldings in for
 variables which occur only once [if they got inlined at that
@@ -126,7 +124,7 @@ would occur].   But consider:
 @
 Now, it seems that @x@ appears only once, but even so it is NOT safe to put @x@
 in the UnfoldEnv, because @f@ will be inlined, and will duplicate the references to
-@x@.  
+@x@.
 
 Becuase of this, the "unconditional-inline" mechanism above is the only way
 in which non-HNFs can get inlined.
@@ -151,7 +149,7 @@ because then we'd duplicate BIG when we inline'd y.  (Exception:
 things in the UnfoldEnv with UnfoldAlways flags, which originated in
 other INLINE pragmas.)
 
-So, we clean out the UnfoldEnv of all GeneralForm inlinings before
+So, we clean out the UnfoldEnv of all GenForm inlinings before
 going into such an RHS.
 
 What about imports?  They don't really matter much because we only
@@ -185,7 +183,7 @@ simplTopBinds env [] = returnSmpl []
 
 -- Dead code is now discarded by the occurrence analyser,
 
-simplTopBinds env (CoNonRec binder@(in_id, occ_info) rhs : binds)
+simplTopBinds env (NonRec binder@(in_id, occ_info) rhs : binds)
   | inlineUnconditionally ok_to_dup_code occ_info
   = --pprTrace "simplTopBinds (inline):" (ppr PprDebug in_id) (
     let
@@ -196,15 +194,15 @@ simplTopBinds env (CoNonRec binder@(in_id, occ_info) rhs : binds)
   where
     ok_to_dup_code = switchIsSet env SimplOkToDupCode
 
-simplTopBinds env (CoNonRec binder@(in_id,occ_info) rhs : binds)
+simplTopBinds env (NonRec binder@(in_id,occ_info) rhs : binds)
   = 	-- No cloning necessary at top level
  	-- Process the binding
     simplRhsExpr env binder rhs		`thenSmpl` \ rhs' ->
     let
        new_env = case rhs' of
-	 CoVar var			  -> extendIdEnvWithAtom env binder (CoVarAtom var)
-         CoLit lit | not (isNoRepLit lit) -> extendIdEnvWithAtom env binder (CoLitAtom lit)
-         other				  -> extendUnfoldEnvGivenRhs env binder in_id rhs'
+	 Var var			  -> extendIdEnvWithAtom env binder (VarArg var)
+	 Lit lit | not (isNoRepLit lit) -> extendIdEnvWithAtom env binder (LitArg lit)
+	 other				  -> extendUnfoldEnvGivenRhs env binder in_id rhs'
     in
     --pprTrace "simplTopBinds (nonrec):" (ppCat [ppr PprDebug in_id, ppr PprDebug rhs']) (
 
@@ -212,13 +210,13 @@ simplTopBinds env (CoNonRec binder@(in_id,occ_info) rhs : binds)
     simplTopBinds new_env binds	`thenSmpl` \ binds' ->
 
 	-- Glue together and return ...
-	-- We leave it to susequent occurrence analysis to throw away 
+	-- We leave it to susequent occurrence analysis to throw away
 	-- an unused atom binding. This localises the decision about
 	-- discarding top-level bindings.
-    returnSmpl (CoNonRec in_id rhs' : binds')
+    returnSmpl (NonRec in_id rhs' : binds')
     --)
 
-simplTopBinds env (CoRec pairs : binds)
+simplTopBinds env (Rec pairs : binds)
   = simplRecursiveGroup env triples 	`thenSmpl` \ (bind', new_env) ->
 
     --pprTrace "simplTopBinds (rec):" (ppCat [ppr PprDebug bind']) (
@@ -240,11 +238,11 @@ simplTopBinds env (CoRec pairs : binds)
 %*									*
 %************************************************************************
 
-	
-\begin{code} 
+
+\begin{code}
 simplExpr :: SimplEnv
 	  -> InExpr -> [OutArg]
-	  -> SmplM OutExpr 
+	  -> SmplM OutExpr
 \end{code}
 
 The expression returned has the same meaning as the input expression
@@ -257,7 +255,7 @@ Check if there's a macro-expansion, and if so rattle on.  Otherwise
 do the more sophisticated stuff.
 
 \begin{code}
-simplExpr env (CoVar v) args
+simplExpr env (Var v) args
   = --pprTrace "simplExpr:Var:" (ppr PprDebug v) (
     case lookupId env v of
       Nothing -> let
@@ -267,17 +265,17 @@ simplExpr env (CoVar v) args
 
       Just info ->
 	case info of
-    	  ItsAnAtom (CoLitAtom lit) 	-- A boring old literal
+    	  ItsAnAtom (LitArg lit) 	-- A boring old literal
 			-- Paranoia check for args empty
 	    ->	case args of
-		  []    -> returnSmpl (CoLit lit)
+		  []    -> returnSmpl (Lit lit)
 		  other -> panic "simplExpr:coVar"
 
-	  ItsAnAtom (CoVarAtom var) 	-- More interesting!  An id!
+	  ItsAnAtom (VarArg var) 	-- More interesting!  An id!
 					-- No need to substitute the type env here,
 					-- because we already have!
-	    -> completeVar env var args	
-		
+	    -> completeVar env var args
+
 	  InlineIt id_env ty_env in_expr 	-- A macro-expansion
 	    -> simplExpr (replaceInEnvs env (ty_env, id_env)) in_expr args
     --)
@@ -287,18 +285,18 @@ Literals
 ~~~~~~~~~
 
 \begin{code}
-simplExpr env (CoLit l) [] = returnSmpl (CoLit l)
-simplExpr env (CoLit l) _  = panic "simplExpr:CoLit with argument"
+simplExpr env (Lit l) [] = returnSmpl (Lit l)
+simplExpr env (Lit l) _  = panic "simplExpr:Lit with argument"
 \end{code}
 
-Primitive applications are simple.  
+Primitive applications are simple.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-NB: CoPrim expects an empty argument list! (Because it should be
+NB: Prim expects an empty argument list! (Because it should be
 saturated and not higher-order. ADR)
 
-\begin{code} 
-simplExpr env (CoPrim op tys prim_args) args
+\begin{code}
+simplExpr env (Prim op tys prim_args) args
   = ASSERT (null args)
     let
 	tys'       = [simplTy   env ty       | ty       <- tys]
@@ -309,7 +307,7 @@ simplExpr env (CoPrim op tys prim_args) args
   where
     -- PrimOps just need any types in them renamed.
 
-    simpl_op (CCallOp label is_asm may_gc arg_tys result_ty) 
+    simpl_op (CCallOp label is_asm may_gc arg_tys result_ty)
       = let
 	    arg_tys'	= map (simplTy env) arg_tys
 	    result_ty'	= simplTy env result_ty
@@ -319,27 +317,27 @@ simplExpr env (CoPrim op tys prim_args) args
     simpl_op other_op = other_op
 \end{code}
 
-Constructor applications 
-~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constructor applications
+~~~~~~~~~~~~~~~~~~~~~~~~
 Nothing to try here.  We only reuse constructors when they appear as the
 rhs of a let binding (see completeLetBinding).
 
 \begin{code}
-simplExpr env (CoCon con tys con_args) args
+simplExpr env (Con con tys con_args) args
   = ASSERT( null args )
-    returnSmpl (CoCon con tys' con_args')
+    returnSmpl (Con con tys' con_args')
   where
     con_args' = [simplAtom env con_arg | con_arg <- con_args]
     tys'      = [simplTy   env ty      | ty <- tys]
 \end{code}
 
 
-Applications are easy too: 
-~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Applications are easy too:
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Just stuff 'em in the arg stack
 
-\begin{code} 
-simplExpr env (CoApp fun arg) args
+\begin{code}
+simplExpr env (App fun arg) args
   = simplExpr env fun (ValArg (simplAtom env arg) : args)
 
 simplExpr env (CoTyApp fun ty) args
@@ -353,7 +351,7 @@ We only eta-reduce a type lambda if all type arguments in the body can
 be eta-reduced. This requires us to collect up all tyvar parameters so
 we can pass them all to @mkCoTyLamTryingEta@.
 
-\begin{code} 
+\begin{code}
 simplExpr env (CoTyLam tyvar body) (TypeArg ty : args)
   = -- ASSERT(not (isPrimType ty))
     let
@@ -363,7 +361,7 @@ simplExpr env (CoTyLam tyvar body) (TypeArg ty : args)
     simplExpr new_env body args
 
 simplExpr env tylam@(CoTyLam tyvar body) []
-  = do_tylambdas env [] tylam 
+  = do_tylambdas env [] tylam
   where
     do_tylambdas env tyvars' (CoTyLam tyvar body)
       =	  -- Clone the type variable
@@ -382,7 +380,7 @@ simplExpr env tylam@(CoTyLam tyvar body) []
 	)
 
 simplExpr env (CoTyLam tyvar body) (ValArg _ : _)
-  = panic "simplExpr:CoTyLam ValArg" 
+  = panic "simplExpr:CoTyLam ValArg"
 \end{code}
 
 
@@ -390,7 +388,7 @@ Ordinary lambdas
 ~~~~~~~~~~~~~~~~
 
 \begin{code}
-simplExpr env (CoLam binders body) args
+simplExpr env (Lam binder body) args
   | null leftover_binders
   = 	-- The lambda is saturated (or over-saturated)
     tick BetaReduction	`thenSmpl_`
@@ -405,11 +403,11 @@ simplExpr env (CoLam binders body) args
      else returnSmpl (panic "BetaReduction")
     ) `thenSmpl_`
 
-    simplLam env_for_too_few_args leftover_binders body 
+    simplLam env_for_too_few_args leftover_binders body
 	     0 {- Guaranteed applied to at least 0 args! -}
 
   where
-    (binder_args_pairs, leftover_binders, leftover_args) = collect_val_args binders args
+    (binder_args_pairs, leftover_binders, leftover_args) = collect_val_args [binder] args
 
     env_for_enough_args  = extendIdEnvWithAtomList env binder_args_pairs
 
@@ -426,7 +424,7 @@ simplExpr env (CoLam binders body) args
 	--		(\ x y z -> e) p q r
 	--	    ==> e[p/x, q/y, r/z]
 	--
-    zapped_binder_args_pairs = [ ((id, markDangerousToDup occ_info), arg) 
+    zapped_binder_args_pairs = [ ((id, markDangerousToDup occ_info), arg)
 			       | ((id, occ_info), arg) <- binder_args_pairs ]
 
     collect_val_args :: [InBinder] 	-- Binders
@@ -434,7 +432,7 @@ simplExpr env (CoLam binders body) args
 		     -> ([(InBinder,OutAtom)], 	-- Binder,arg pairs
 			  [InBinder],		-- Leftover binders
 			  [OutArg])		-- Leftover args
-	
+
 	-- collect_val_args strips off the leading ValArgs from
 	-- the current arg list, returning them along with the
 	-- depleted list
@@ -446,36 +444,36 @@ simplExpr env (CoLam binders body) args
 	  (rest_pairs, leftover_binders, leftover_args) = collect_val_args binders args
 
     collect_val_args (binder:binders) (other_val_arg : args) = panic "collect_val_args"
-		-- TypeArg should never meet a CoLam
+		-- TypeArg should never meet a Lam
 \end{code}
 
 
-Let expressions 
+Let expressions
 ~~~~~~~~~~~~~~~
 
-\begin{code}	
-simplExpr env (CoLet bind body) args
+\begin{code}
+simplExpr env (Let bind body) args
   | not (switchIsSet env SimplNoLetFromApp)		-- The common case
-  = simplBind env bind (\env -> simplExpr env body args) 
+  = simplBind env bind (\env -> simplExpr env body args)
 		       (computeResultType env body args)
 
   | otherwise		-- No float from application
-  = simplBind env bind (\env -> simplExpr env body []) 
+  = simplBind env bind (\env -> simplExpr env body [])
 		       (computeResultType env body [])	`thenSmpl` \ let_expr' ->
-    returnSmpl (applyToArgs let_expr' args)
+    returnSmpl (mkGenApp let_expr' args)
 \end{code}
 
-Case expressions 
+Case expressions
 ~~~~~~~~~~~~~~~~
 
 \begin{code}
-simplExpr env expr@(CoCase scrut alts) args
+simplExpr env expr@(Case scrut alts) args
   = simplCase env scrut alts (\env rhs -> simplExpr env rhs args)
 			     (computeResultType env expr args)
 \end{code}
 
 
-Set-cost-centre 
+Set-cost-centre
 ~~~~~~~~~~~~~~~
 
 A special case we do:
@@ -486,20 +484,20 @@ Simon thinks it's OK, at least for lexical scoping; and it makes
 interfaces change less (arities).
 
 \begin{code}
-simplExpr env (CoSCC cc (CoLam binders body)) args
-  = simplExpr env (CoLam binders (CoSCC cc body)) args
+simplExpr env (SCC cc (Lam binder body)) args
+  = simplExpr env (Lam binder (SCC cc body)) args
 
-simplExpr env (CoSCC cc (CoTyLam tyvar body)) args
-  = simplExpr env (CoTyLam tyvar (CoSCC cc body)) args
+simplExpr env (SCC cc (CoTyLam tyvar body)) args
+  = simplExpr env (CoTyLam tyvar (SCC cc body)) args
 \end{code}
 
 Some other slightly turgid SCC tidying-up cases:
 \begin{code}
-simplExpr env (CoSCC cc1 expr@(CoSCC _ _)) args
+simplExpr env (SCC cc1 expr@(SCC _ _)) args
   = simplExpr env expr args
-    -- the outer _scc_ serves no purpose 
+    -- the outer _scc_ serves no purpose
 
-simplExpr env (CoSCC cc expr) args
+simplExpr env (SCC cc expr) args
   | squashableDictishCcExpr cc expr
   = simplExpr env expr args
     -- the DICT-ish CC is no longer serving any purpose
@@ -509,12 +507,12 @@ NB: for other set-cost-centre we move arguments inside the body.
 ToDo: check with Patrick that this is ok.
 
 \begin{code}
-simplExpr env (CoSCC cost_centre body) args
+simplExpr env (SCC cost_centre body) args
   = let
 	new_env = setEnclosingCC env (EnclosingCC cost_centre)
     in
     simplExpr new_env body args		`thenSmpl` \ body' ->
-    returnSmpl (CoSCC cost_centre body') 
+    returnSmpl (SCC cost_centre body')
 \end{code}
 
 %************************************************************************
@@ -536,13 +534,13 @@ it transforms the rhs to
 This is a Very Good Thing!
 
 \begin{code}
-simplRhsExpr 
+simplRhsExpr
 	:: SimplEnv
 	-> InBinder
 	-> InExpr
-	-> SmplM OutExpr 
+	-> SmplM OutExpr
 
-simplRhsExpr env binder@(id,occ_info) rhs 
+simplRhsExpr env binder@(id,occ_info) rhs
   | dont_eta_expand rhs
   = simplExpr rhs_env rhs []
 
@@ -570,8 +568,8 @@ simplRhsExpr env binder@(id,occ_info) rhs
 	-- we might want a {-# INLINE UNSIMPLIFIED #-} option.
     rhs_env | simplIdWantsToBeINLINEd id env = filterUnfoldEnvForInlines env
 	    | otherwise			     = env
-	
-    (tyvars, binders, body) = digForLambdas rhs
+
+    (uvars, tyvars, binders, body) = digForLambdas rhs
 
     min_no_of_args | not (null binders)			&& 	-- It's not a thunk
 		     switchIsSet env SimplDoArityExpand	 	-- Arity expansion on
@@ -587,18 +585,18 @@ simplRhsExpr env binder@(id,occ_info) rhs
 	-- get eta-reduced back to y.  Furthermore, if this was a top level defn,
 	-- and x was exported, then the defn won't be eliminated, so this
 	-- silly expand/reduce cycle will happen every time, which makes the
-	-- simplifier loop!. 
+	-- simplifier loop!.
 	-- The solution is to not even try eta expansion unless the rhs looks
-	-- non-trivial.  
-    dont_eta_expand (CoLit _)     = True
-    dont_eta_expand (CoVar _)     = True
+	-- non-trivial.
+    dont_eta_expand (Lit _)     = True
+    dont_eta_expand (Var _)     = True
     dont_eta_expand (CoTyApp f _) = dont_eta_expand f
     dont_eta_expand (CoTyLam _ b) = dont_eta_expand b
-    dont_eta_expand (CoCon _ _ _) = True
+    dont_eta_expand (Con _ _ _) = True
     dont_eta_expand _		  = False
 \end{code}
 
-		
+
 %************************************************************************
 %*									*
 \subsection{Simplify a lambda abstraction}
@@ -621,7 +619,7 @@ simplLam env binders body min_no_of_args
     returnSmpl (
       (if switchIsSet new_env SimplDoEtaReduction
        then mkCoLamTryingEta
-       else mkCoLam) binders' body'
+       else mkValLam) binders' body'
     )
 
   | otherwise				-- Eta expansion possible
@@ -631,16 +629,16 @@ simplLam env binders body min_no_of_args
 	new_env = extendIdEnvWithClones env binders binders'
     in
     newIds extra_binder_tys						`thenSmpl` \ extra_binders' ->
-    simplExpr new_env body (map (ValArg.CoVarAtom) extra_binders')	`thenSmpl` \ body' ->
+    simplExpr new_env body (map (ValArg.VarArg) extra_binders')	`thenSmpl` \ body' ->
     returnSmpl (
       (if switchIsSet new_env SimplDoEtaReduction
        then mkCoLamTryingEta
-       else mkCoLam) (binders' ++ extra_binders') body'
+       else mkValLam) (binders' ++ extra_binders') body'
     )
 
   where
-    (potential_extra_binder_tys, res_ty) 
-	= splitTyArgs (simplTy env (typeOfCoreExpr (unTagBinders body)))
+    (potential_extra_binder_tys, res_ty)
+	= splitTyArgs (simplTy env (coreExprType (unTagBinders body)))
 	-- Note: it's possible that simplLam will be applied to something
 	-- with a forall type.  Eg when being applied to the rhs of
 	--		let x = wurble
@@ -710,11 +708,11 @@ becomes:
 
 ==>
       let join_body x' = foldr c n x'
-        in case y of
-        p1 -> let x* = build e1
-                in join_body x*
-        p2 -> let x* = build e2
-                in join_body x*
+	in case y of
+	p1 -> let x* = build e1
+		in join_body x*
+	p2 -> let x* = build e2
+		in join_body x*
 
 note that join_body is a let-no-escape.
 In this particular example join_body will later be inlined,
@@ -726,7 +724,7 @@ ToDo: check this is OK with andy
 \begin{code}
 -- Dead code is now discarded by the occurrence analyser,
 
-simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
+simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
   |  inlineUnconditionally ok_to_dup occ_info
   = body_c (extendIdEnvWithInlining env env binder rhs)
 
@@ -740,7 +738,7 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
 -- If we do case-floating first we get this:
 --
 --	let k = \a* -> b
---	in case v of 
+--	in case v of
 --		p1-> let a*=e1 in k a
 --		p2-> let a*=e2 in k a
 --
@@ -757,7 +755,7 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
 -- The latter is clearly better.  (Remember the reboxing let-decl
 -- for a is likely to go away, because after all b is strict in a.)
 
-  | will_be_demanded && 
+  | will_be_demanded &&
     try_let_to_case &&
     type_ok_for_let_to_case rhs_ty &&
     not (manifestlyWHNF rhs)
@@ -787,7 +785,7 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
 	-}
 
   | (will_be_demanded && not no_float) ||
-    always_float_let_from_let || 
+    always_float_let_from_let ||
     floatExposesHNF float_lets float_primops ok_to_dup rhs
   = try_float env rhs body_c
 
@@ -796,7 +794,7 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
 
   where
     will_be_demanded = willBeDemanded (getIdDemandInfo id)
-    rhs_ty 	     = getIdUniType id
+    rhs_ty 	     = idType id
 
     float_lets       	      = switchIsSet env SimplFloatLetsExposingWHNF
     float_primops    	      = switchIsSet env SimplOkToFloatPrimOps
@@ -811,28 +809,28 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
 	  completeLet env binder rhs rhs' body_c body_ty
 
     ---------------------------------------
-    try_float env (CoLet bind rhs) body_c
+    try_float env (Let bind rhs) body_c
       = tick LetFloatFromLet                    `thenSmpl_`
-        simplBind env (fix_up_demandedness will_be_demanded bind) 
+	simplBind env (fix_up_demandedness will_be_demanded bind)
 		      (\env -> try_float env rhs body_c) body_ty
 
-    try_float env (CoCase scrut alts) body_c
+    try_float env (Case scrut alts) body_c
       | will_be_demanded || (float_primops && is_cheap_prim_app scrut)
       = tick CaseFloatFromLet				`thenSmpl_`
 
 	-- First, bind large let-body if necessary
 	if no_need_to_bind_large_body then
 	    simplCase env scrut alts (\env rhs -> try_float env rhs body_c) body_ty
-	else		
+	else
 	    bindLargeRhs env [binder] body_ty body_c	`thenSmpl` \ (extra_binding, new_body) ->
 	    let
 		body_c' = \env -> simplExpr env new_body []
 	    in
-	    simplCase env scrut alts 
+	    simplCase env scrut alts
 		      (\env rhs -> try_float env rhs body_c')
 		      body_ty				`thenSmpl` \ case_expr ->
 
-	    returnSmpl (CoLet extra_binding case_expr)
+	    returnSmpl (Let extra_binding case_expr)
       where
 	no_need_to_bind_large_body
 	  = ok_to_dup || isSingleton (nonErrorRHSs alts)
@@ -840,7 +838,7 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
     try_float env other_rhs body_c = done_float env other_rhs body_c
 \end{code}
 
-Letrec expressions 
+Letrec expressions
 ~~~~~~~~~~~~~~~~~~
 
 Simplify each RHS, float any let(recs) from the RHSs (if let-floating is
@@ -853,7 +851,7 @@ macro-expansion is:
 	letrec
 		f = ....g...
 		g = ....f...
-	in 
+	in
 	....f...
 
 Here we would like the single call to g to be inlined.
@@ -909,12 +907,12 @@ group that are bound to constructors.  For example:
        /= a b    = unpack tuple a, unpack tuple b, call f
     in d.Eq
 
-here, by knowing about d.Eq in f's rhs, one could get rid of 
+here, by knowing about d.Eq in f's rhs, one could get rid of
 the case (and break out the recursion completely).
-[This occurred with more aggressive inlining threshold (4), 
+[This occurred with more aggressive inlining threshold (4),
 nofib/spectral/knights]
 
-How to do it?  
+How to do it?
 	1: we simplify constructor rhss first.
 	2: we record the "known constructors" in the environment
 	3: we simplify the other rhss, with the knowledge about the constructors
@@ -922,10 +920,10 @@ How to do it?
 
 
 \begin{code}
-simplBind env (CoRec pairs) body_c body_ty
+simplBind env (Rec pairs) body_c body_ty
   =	-- Do floating, if necessary
     (if float_lets || always_float_let_from_let
-     then 
+     then
 	mapSmpl float pairs	`thenSmpl` \ floated_pairs_s ->
 	returnSmpl (concat floated_pairs_s)
      else
@@ -944,7 +942,7 @@ simplBind env (CoRec pairs) body_c body_ty
 
     body_c new_env				`thenSmpl` \ body' ->
 
-    returnSmpl (CoLet binding body')
+    returnSmpl (Let binding body')
 
   where
     ------------ Floating stuff -------------------
@@ -981,21 +979,21 @@ simplBind env (CoRec pairs) body_c body_ty
     float_pair (binder, rhs)
     	| always_float_let_from_let ||
 	  floatExposesHNF True False False rhs
-        = (binder,rhs') : pairs'
+	= (binder,rhs') : pairs'
 
 	| otherwise
 	= [(binder,rhs)]
-	where 
+	where
 	  (pairs', rhs') = do_float rhs
 
 	-- Float just pulls out any top-level let(rec) bindings
     do_float :: InExpr -> ([(InBinder,InExpr)], InExpr)
-    do_float (CoLet (CoRec pairs) body)     = (float_pairs pairs    ++ pairs', body')
-				            where
-				              (pairs', body') = do_float body
-    do_float (CoLet (CoNonRec id rhs) body) = (float_pair (id,rhs) ++ pairs', body')
-				            where
-				              (pairs', body') = do_float body
+    do_float (Let (Rec pairs) body)     = (float_pairs pairs    ++ pairs', body')
+					    where
+					      (pairs', body') = do_float body
+    do_float (Let (NonRec id rhs) body) = (float_pair (id,rhs) ++ pairs', body')
+					    where
+					      (pairs', body') = do_float body
     do_float other			    = ([], other)
 
 simplRecursiveGroup env triples
@@ -1030,7 +1028,7 @@ simplRecursiveGroup env triples
 	(early_triples, late_triples)
 	  = partition is_early_triple ordinary_triples
 
-	is_early_triple (_, (_, CoCon _ _ _)) = True
+	is_early_triple (_, (_, Con _ _ _)) = True
 	is_early_triple (i, _               ) = idWantsToBeINLINEd i
     in
 	-- Process the early bindings first
@@ -1039,20 +1037,20 @@ simplRecursiveGroup env triples
 	-- Now further extend the environment to record our knowledge
 	-- about the form of the binders bound in the constructor bindings
     let
-        env_w_early_info = foldr add_early_info env_w_inlinings early_triples'
-        add_early_info (binder, (id', rhs')) env = extendUnfoldEnvGivenRhs env binder id' rhs'
+	env_w_early_info = foldr add_early_info env_w_inlinings early_triples'
+	add_early_info (binder, (id', rhs')) env = extendUnfoldEnvGivenRhs env binder id' rhs'
     in
 	-- Now process the non-constructor bindings
     mapSmpl (do_one_binding env_w_early_info) late_triples	`thenSmpl` \ late_triples' ->
 
 	-- Phew! We're done
     let
-	binding = CoRec (map snd early_triples' ++ map snd late_triples')
+	binding = Rec (map snd early_triples' ++ map snd late_triples')
     in
     returnSmpl (binding, env_w_early_info)
   where
 
-    do_one_binding env (id', (binder,rhs)) 
+    do_one_binding env (id', (binder,rhs))
       = simplRhsExpr env binder rhs `thenSmpl` \ rhs' ->
 	returnSmpl (binder, (id', rhs'))
 \end{code}
@@ -1061,7 +1059,7 @@ simplRecursiveGroup env triples
 @completeLet@ looks at the simplified post-floating RHS of the
 let-expression, and decides what to do.  There's one interesting
 aspect to this, namely constructor reuse.  Consider
-@	
+@
 	f = \x -> case x of
 		    (y:ys) -> y:ys
 		    []     -> ...
@@ -1076,7 +1074,7 @@ const.Int.max.wrk{-s2516-} =
 	  a.s3299 :: Int
 	  _N_ {-# U(P) #-}
 	  a.s3299 = I#! upk.s3297#
-	} in 
+	} in
 	  case (const.Int._tagCmp.wrk{-s2513-} upk.s3297# upk.s3298#) of {
 	    _LT -> I#! upk.s3298#
 	    _EQ -> a.s3299
@@ -1091,8 +1089,8 @@ only do the reverse (turn a constructor application back into a
 variable) when we find a let-expression:
 @
 	let x = C a1 .. an
-	in 
-	... (let y = C a1 .. an in ...) ... 
+	in
+	... (let y = C a1 .. an in ...) ...
 @
 where it is always good to ditch the binding for y, and replace y by
 x.  That's just what completeLetBinding does.
@@ -1118,7 +1116,7 @@ completeLet env binder@(id,binder_info) old_rhs new_rhs body_c body_ty
     body_c new_env
 
   -- Maybe the rhs is an application of error, and sure to be demanded
-  | will_be_demanded && 
+  | will_be_demanded &&
     maybeToBool maybe_error_app
   = tick CaseOfError			`thenSmpl_`
     returnSmpl retyped_error_app
@@ -1131,7 +1129,7 @@ completeLet env binder@(id,binder_info) old_rhs new_rhs body_c body_ty
 	new_env = _scc_ "euegR2" (extendUnfoldEnvGivenRhs env1 binder id' new_rhs)
     in
     body_c new_env			`thenSmpl` \ body' ->
-    returnSmpl (CoLet (CoNonRec id' new_rhs) body')
+    returnSmpl (Let (NonRec id' new_rhs) body')
 
   where
     will_be_demanded = willBeDemanded (getIdDemandInfo id)
@@ -1145,22 +1143,22 @@ completeLet env binder@(id,binder_info) old_rhs new_rhs body_c body_ty
 
     maybe_atomic_rhs
       = case new_rhs of
-	  CoVar var -> Just (CoVarAtom var, AtomicRhs)
+	  Var var -> Just (VarArg var, AtomicRhs)
 
-	  CoLit lit | not (isNoRepLit lit) 
-	    -> Just (CoLitAtom lit, AtomicRhs)
+	  Lit lit | not (isNoRepLit lit)
+	    -> Just (LitArg lit, AtomicRhs)
 
-	  CoCon con tys con_args
-	    | try_to_reuse_constr 
+	  Con con tys con_args
+	    | try_to_reuse_constr
 		   -- Look out for
 		   --	let v = C args
-		   --	in 
+		   --	in
 		   --- ...(let w = C same-args in ...)...
 		   -- Then use v instead of w.	 This may save
 		   -- re-constructing an existing constructor.
 	     -> case lookForConstructor env con tys con_args of
 		  Nothing  -> Nothing
-		  Just var -> Just (CoVarAtom var, ConReused)
+		  Just var -> Just (VarArg var, ConReused)
 
 	  other -> Nothing
 
@@ -1177,18 +1175,18 @@ completeLet env binder@(id,binder_info) old_rhs new_rhs body_c body_ty
 \begin{code}
 simplAtom :: SimplEnv -> InAtom -> OutAtom
 
-simplAtom env (CoLitAtom lit) = CoLitAtom lit
+simplAtom env (LitArg lit) = LitArg lit
 
-simplAtom env (CoVarAtom id)
+simplAtom env (VarArg id)
   | isLocallyDefined id
   = case lookupId env id of
 	Just (ItsAnAtom atom) -> atom
 	Just (InlineIt _ _ _) -> pprPanic "simplAtom InLineIt:" (ppAbove (ppr PprDebug id) (pprSimplEnv env))
-	Nothing		      -> CoVarAtom id 	-- Must be an uncloned thing
+	Nothing		      -> VarArg id 	-- Must be an uncloned thing
 
   | otherwise
   = 	-- Not locally defined, so no change
-    CoVarAtom id
+    VarArg id
 \end{code}
 
 
@@ -1202,23 +1200,23 @@ simplAtom env (CoVarAtom id)
 \begin{code}
 -- fix_up_demandedness switches off the willBeDemanded Info field
 -- for bindings floated out of a non-demanded let
-fix_up_demandedness True {- Will be demanded -} bind 
+fix_up_demandedness True {- Will be demanded -} bind
    = bind	-- Simple; no change to demand info needed
-fix_up_demandedness False {- May not be demanded -} (CoNonRec binder rhs)
-   = CoNonRec (un_demandify binder) rhs
-fix_up_demandedness False {- May not be demanded -} (CoRec pairs)
-   = CoRec [(un_demandify binder, rhs) | (binder,rhs) <- pairs]
+fix_up_demandedness False {- May not be demanded -} (NonRec binder rhs)
+   = NonRec (un_demandify binder) rhs
+fix_up_demandedness False {- May not be demanded -} (Rec pairs)
+   = Rec [(un_demandify binder, rhs) | (binder,rhs) <- pairs]
 
 un_demandify (id, occ_info) = (id `addIdDemandInfo` noInfo, occ_info)
 
-is_cheap_prim_app (CoPrim op tys args) = primOpOkForSpeculation op
+is_cheap_prim_app (Prim op tys args) = primOpOkForSpeculation op
 is_cheap_prim_app other		       = False
 
 computeResultType :: SimplEnv -> InExpr -> [OutArg] -> OutUniType
 computeResultType env expr args
   = do expr_ty' args
   where
-    expr_ty  = typeOfCoreExpr (unTagBinders expr)
+    expr_ty  = coreExprType (unTagBinders expr)
     expr_ty' = simplTy env expr_ty
 
     do ty [] = ty

@@ -20,11 +20,9 @@ module AlphaCode (
 
 	v0, f0, sp, ra, pv, gp, zero, argRegs,
 
-	freeRegs, reservedRegs,
+	freeRegs, reservedRegs
 
 	-- and, for self-sufficiency ...
-	CLabel, CodeSegment, OrdList, PrimKind, Reg, UniqSet(..),
-	UniqFM, FiniteMap, Unique, MagicId, CSeq, BitSet
     ) where
 
 IMPORT_Trace
@@ -34,13 +32,13 @@ import AsmRegAlloc  ( MachineCode(..), MachineRegisters(..), FutureLive(..),
 		      Reg(..), RegUsage(..), RegLiveness(..)
 		    )
 import BitSet
-import CLabelInfo   ( CLabel, pprCLabel, externallyVisibleCLabel, charToC )
+import CLabel   ( CLabel, pprCLabel, externallyVisibleCLabel, charToC )
 import CgCompInfo   ( mAX_Double_REG, mAX_Float_REG, mAX_Vanilla_REG )
 import FiniteMap
 import Maybes	    ( Maybe(..), maybeToBool )
 import OrdList	    ( OrdList, mkUnitList, flattenOrdList )
 import Outputable
-import PrimKind	    ( PrimKind(..) )
+import PrimRep	    ( PrimRep(..) )
 import UniqSet
 import Stix
 import Unpretty
@@ -772,8 +770,8 @@ instance MachineRegisters AlphaRegs where
 	(ints, floats) = partition (< 32) xs
 	floats' = map (subtract 32) floats
 
-    possibleMRegs FloatKind (SRegs _ floats) = [ x + 32 | x <- listBS floats]
-    possibleMRegs DoubleKind (SRegs _ floats) = [ x + 32 | x <- listBS floats]
+    possibleMRegs FloatRep (SRegs _ floats) = [ x + 32 | x <- listBS floats]
+    possibleMRegs DoubleRep (SRegs _ floats) = [ x + 32 | x <- listBS floats]
     possibleMRegs _ (SRegs ints _) = listBS ints
 
     useMReg (SRegs ints floats) n =
@@ -797,10 +795,6 @@ instance MachineRegisters AlphaRegs where
 	SRegs ints' floats' = mkMRegs xs
 
 instance MachineCode AlphaInstr where
-    -- Alas, we don't do anything clever with our OrdLists
---OLD:
---  flatten = flattenOrdList
-
     regUsage = alphaRegUsage
     regLiveness = alphaRegLiveness
     patchRegs = alphaPatchRegs
@@ -812,23 +806,22 @@ instance MachineCode AlphaInstr where
 spRel :: Int -> Addr
 spRel n = AddrRegImm sp (ImmInt (n * 8))
 
-kindToSize :: PrimKind -> Size
-kindToSize PtrKind	    = Q
-kindToSize CodePtrKind	    = Q
-kindToSize DataPtrKind	    = Q
-kindToSize RetKind	    = Q
-kindToSize InfoPtrKind	    = Q
-kindToSize CostCentreKind   = Q
-kindToSize CharKind	    = BU
-kindToSize IntKind	    = Q
-kindToSize WordKind	    = Q
-kindToSize AddrKind	    = Q
-kindToSize FloatKind	    = TF
-kindToSize DoubleKind	    = TF
-kindToSize ArrayKind	    = Q
-kindToSize ByteArrayKind    = Q
-kindToSize StablePtrKind    = Q
-kindToSize MallocPtrKind    = Q
+kindToSize :: PrimRep -> Size
+kindToSize PtrRep	    = Q
+kindToSize CodePtrRep	    = Q
+kindToSize DataPtrRep	    = Q
+kindToSize RetRep	    = Q
+kindToSize CostCentreRep   = Q
+kindToSize CharRep	    = BU
+kindToSize IntRep	    = Q
+kindToSize WordRep	    = Q
+kindToSize AddrRep	    = Q
+kindToSize FloatRep	    = TF
+kindToSize DoubleRep	    = TF
+kindToSize ArrayRep	    = Q
+kindToSize ByteArrayRep    = Q
+kindToSize StablePtrRep    = Q
+kindToSize MallocPtrRep    = Q
 
 \end{code}
 
@@ -930,10 +923,6 @@ freeSet = mkUniqSet freeRegs
 noUsage :: RegUsage
 noUsage = RU emptyUniqSet emptyUniqSet
 
---OLD:
---endUsage :: RegUsage
---endUsage = RU emptyUniqSet freeSet
-
 -- Color me CAF-like
 argSet :: Int -> UniqSet Reg
 argSet 0 = emptyUniqSet
@@ -977,7 +966,7 @@ alphaRegLiveness instr info@(RL live future@(FL all env)) = case instr of
     BSR _ _		 -> RL live future
     JSR _ _ _		 -> RL live future
     LABEL lbl		 -> RL live (FL (all `unionUniqSets` live) (addToFM env lbl live))
-    _			 -> info  
+    _			 -> info
 
   where
     lookup lbl = case lookupFM env lbl of

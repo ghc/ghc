@@ -9,12 +9,12 @@
 #include "HsVersions.h"
 
 module I386Code (
-	Addr(..), 
-        Cond(..), Imm(..), Operand(..), Size(..),
-        Base(..), Index(..), Displacement(..),
+	Addr(..),
+	Cond(..), Imm(..), Operand(..), Size(..),
+	Base(..), Index(..), Displacement(..),
 	I386Code(..),I386Instr(..),I386Regs,
-	strImmLit, --UNUSED: strImmLab,
-        spRel,
+	strImmLit,
+	spRel,
 
     	printLabeledCodes,
 
@@ -26,27 +26,22 @@ module I386Code (
 
     	st0, st1, eax, ebx, ecx, edx, esi, edi, ebp, esp,
 
-    	freeRegs, reservedRegs,
+    	freeRegs, reservedRegs
 
 	-- and, for self-sufficiency ...
-	CLabel, CodeSegment, OrdList, PrimKind, Reg, UniqSet(..),
-	UniqFM, FiniteMap, Unique, MagicId, CSeq, BitSet
     ) where
-
-IMPORT_Trace
 
 import AbsCSyn	    	( MagicId(..) )
 import AsmRegAlloc  	( MachineCode(..), MachineRegisters(..), FutureLive(..),
     	    	    	  Reg(..), RegUsage(..), RegLiveness(..)
     	    	    	)
-import BitSet	 
+import BitSet
 import CgCompInfo   	( mAX_Double_REG, mAX_Float_REG, mAX_Vanilla_REG )
-import CLabelInfo   	( CLabel, pprCLabel, externallyVisibleCLabel, charToC )
-import FiniteMap    
+import CLabel   	( CLabel, pprCLabel, externallyVisibleCLabel, charToC )
+import FiniteMap
 import Maybes	    	( Maybe(..), maybeToBool )
 import OrdList	    	( OrdList, mkUnitList, flattenOrdList )
-import Outputable    
-import PrimKind	    	( PrimKind(..) )
+import Outputable
 import UniqSet
 import Stix
 import Unpretty
@@ -112,7 +107,6 @@ data Imm = ImmInt Int
 	 | ImmLit Unpretty	      -- Simple string
 	 deriving ()
 
---UNUSED:strImmLab s = ImmLab (uppStr s)
 strImmLit s = ImmLit (uppStr s)
 
 data Cond = ALWAYS
@@ -140,13 +134,13 @@ data Size = B
 	  deriving ()
 
 data Operand = OpReg  Reg	-- register
-             | OpImm  Imm	-- immediate value
-             | OpAddr Addr	-- memory reference
+	     | OpImm  Imm	-- immediate value
+	     | OpAddr Addr	-- memory reference
 	     deriving ()
 
 data Addr = Addr Base Index Displacement
-          | ImmAddr Imm Int
-          -- deriving Eq
+	  | ImmAddr Imm Int
+	  -- deriving Eq
 
 type Base         = Maybe Reg
 type Index        = Maybe (Reg, Int)	-- Int is 2, 4 or 8
@@ -156,18 +150,18 @@ data I386Instr =
 
 -- Moves.
 
-		MOV	      Size Operand Operand 
+		MOV	      Size Operand Operand
 	      | MOVZX	      Size Operand Operand -- size is the size of operand 2
 	      | MOVSX	      Size Operand Operand -- size is the size of operand 2
 
 -- Load effective address (also a very useful three-operand add instruction :-)
 
-              | LEA           Size Operand Operand
+	      | LEA           Size Operand Operand
 
 -- Int Arithmetic.
 
-	      | ADD	      Size Operand Operand 
-	      | SUB	      Size Operand Operand 
+	      | ADD	      Size Operand Operand
+	      | SUB	      Size Operand Operand
 
 -- Multiplication (signed and unsigned), Division (signed and unsigned),
 -- result in %eax, %edx.
@@ -177,15 +171,15 @@ data I386Instr =
 
 -- Simple bit-twiddling.
 
-	      | AND	      Size Operand Operand 
-	      | OR	      Size Operand Operand 
-	      | XOR	      Size Operand Operand 
-	      | NOT	      Size Operand 
+	      | AND	      Size Operand Operand
+	      | OR	      Size Operand Operand
+	      | XOR	      Size Operand Operand
+	      | NOT	      Size Operand
 	      | NEGI	      Size Operand -- NEG instruction (name clash with Cond)
 	      | SHL	      Size Operand Operand -- 1st operand must be an Imm
 	      | SAR	      Size Operand Operand -- 1st operand must be an Imm
 	      | SHR	      Size Operand Operand -- 1st operand must be an Imm
-	      | NOP	      
+	      | NOP
 
 -- Float Arithmetic. -- ToDo for 386
 
@@ -193,66 +187,66 @@ data I386Instr =
 -- right up until we spit them out.
 
 	      | SAHF	      -- stores ah into flags
-    	      | FABS          
+    	      | FABS
 	      | FADD	      Size Operand -- src
-	      | FADDP	      
+	      | FADDP
 	      | FIADD	      Size Addr -- src
-    	      | FCHS          
+    	      | FCHS
     	      | FCOM	      Size Operand -- src
-    	      | FCOS          
+    	      | FCOS
 	      | FDIV	      Size Operand -- src
-	      | FDIVP	      
+	      | FDIVP
 	      | FIDIV	      Size Addr -- src
 	      | FDIVR	      Size Operand -- src
-	      | FDIVRP	      
+	      | FDIVRP
 	      | FIDIVR	      Size Addr -- src
     	      | FICOM	      Size Addr -- src
     	      | FILD	      Size Addr Reg -- src, dst
     	      | FIST	      Size Addr -- dst
     	      | FLD	      Size Operand -- src
-    	      | FLD1          
-    	      | FLDZ          
+    	      | FLD1
+    	      | FLDZ
     	      | FMUL	      Size Operand -- src
-    	      | FMULP	      
+    	      | FMULP
     	      | FIMUL	      Size Addr -- src
-    	      | FRNDINT       
-    	      | FSIN          
-    	      | FSQRT         
+    	      | FRNDINT
+    	      | FSIN
+    	      | FSQRT
     	      | FST	      Size Operand -- dst
     	      | FSTP	      Size Operand -- dst
 	      | FSUB	      Size Operand -- src
-	      | FSUBP	      
+	      | FSUBP
 	      | FISUB	      Size Addr -- src
 	      | FSUBR	      Size Operand -- src
-	      | FSUBRP	      
+	      | FSUBRP
 	      | FISUBR	      Size Addr -- src
-	      | FTST          
+	      | FTST
     	      | FCOMP	      Size Operand -- src
-    	      | FUCOMPP	      
+    	      | FUCOMPP
 	      | FXCH
 	      | FNSTSW
 	      | FNOP
 
 -- Comparison
-        
-              | TEST          Size Operand Operand
-              | CMP           Size Operand Operand
-              | SETCC         Cond Operand
+
+	      | TEST          Size Operand Operand
+	      | CMP           Size Operand Operand
+	      | SETCC         Cond Operand
 
 -- Stack Operations.
 
-              | PUSH          Size Operand
-              | POP           Size Operand
+	      | PUSH          Size Operand
+	      | POP           Size Operand
 
 -- Jumping around.
 
 	      | JMP	      Operand -- target
 	      | JXX	      Cond CLabel -- target
-	      | CALL	      Imm 
+	      | CALL	      Imm
 
 -- Other things.
 
-              | CLTD -- sign extend %eax into %edx:%eax
+	      | CLTD -- sign extend %eax into %edx:%eax
 
 -- Pseudo-ops.
 
@@ -292,32 +286,32 @@ pprReg s other         = uppStr (show other) -- should only happen when debuggin
 pprI386Reg :: Size -> FAST_INT -> Unpretty
 pprI386Reg B i = uppPStr
     (case i of {
-        ILIT( 0) -> SLIT("%al");  ILIT( 1) -> SLIT("%bl");
+	ILIT( 0) -> SLIT("%al");  ILIT( 1) -> SLIT("%bl");
 	ILIT( 2) -> SLIT("%cl");  ILIT( 3) -> SLIT("%dl");
 	_ -> SLIT("very naughty I386 byte register")
     })
 
 pprI386Reg HB i = uppPStr
     (case i of {
-        ILIT( 0) -> SLIT("%ah");  ILIT( 1) -> SLIT("%bh");
+	ILIT( 0) -> SLIT("%ah");  ILIT( 1) -> SLIT("%bh");
 	ILIT( 2) -> SLIT("%ch");  ILIT( 3) -> SLIT("%dh");
 	_ -> SLIT("very naughty I386 high byte register")
     })
 
 pprI386Reg S i = uppPStr
     (case i of {
-        ILIT( 0) -> SLIT("%ax");  ILIT( 1) -> SLIT("%bx");
+	ILIT( 0) -> SLIT("%ax");  ILIT( 1) -> SLIT("%bx");
 	ILIT( 2) -> SLIT("%cx");  ILIT( 3) -> SLIT("%dx");
-        ILIT( 4) -> SLIT("%si");  ILIT( 5) -> SLIT("%di");
+	ILIT( 4) -> SLIT("%si");  ILIT( 5) -> SLIT("%di");
 	ILIT( 6) -> SLIT("%bp");  ILIT( 7) -> SLIT("%sp");
 	_ -> SLIT("very naughty I386 word register")
     })
 
 pprI386Reg L i = uppPStr
     (case i of {
-        ILIT( 0) -> SLIT("%eax");  ILIT( 1) -> SLIT("%ebx");
+	ILIT( 0) -> SLIT("%eax");  ILIT( 1) -> SLIT("%ebx");
 	ILIT( 2) -> SLIT("%ecx");  ILIT( 3) -> SLIT("%edx");
-        ILIT( 4) -> SLIT("%esi");  ILIT( 5) -> SLIT("%edi");
+	ILIT( 4) -> SLIT("%esi");  ILIT( 5) -> SLIT("%edi");
 	ILIT( 6) -> SLIT("%ebp");  ILIT( 7) -> SLIT("%esp");
 	_ -> SLIT("very naughty I386 double word register")
     })
@@ -325,9 +319,9 @@ pprI386Reg L i = uppPStr
 pprI386Reg F i = uppPStr
     (case i of {
 --ToDo: rm these
-        ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
+	ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
 	ILIT(10) -> SLIT("%st(2)");  ILIT(11) -> SLIT("%st(3)");
-        ILIT(12) -> SLIT("%st(4)");  ILIT(13) -> SLIT("%st(5)");
+	ILIT(12) -> SLIT("%st(4)");  ILIT(13) -> SLIT("%st(5)");
 	ILIT(14) -> SLIT("%st(6)");  ILIT(15) -> SLIT("%st(7)");
 	_ -> SLIT("very naughty I386 float register")
     })
@@ -335,9 +329,9 @@ pprI386Reg F i = uppPStr
 pprI386Reg D i = uppPStr
     (case i of {
 --ToDo: rm these
-        ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
+	ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
 	ILIT(10) -> SLIT("%st(2)");  ILIT(11) -> SLIT("%st(3)");
-        ILIT(12) -> SLIT("%st(4)");  ILIT(13) -> SLIT("%st(5)");
+	ILIT(12) -> SLIT("%st(4)");  ILIT(13) -> SLIT("%st(5)");
 	ILIT(14) -> SLIT("%st(6)");  ILIT(15) -> SLIT("%st(7)");
 	_ -> SLIT("very naughty I386 float register")
     })
@@ -352,7 +346,7 @@ pprCond x = uppPStr
 	LEU	-> SLIT("be");	NE    -> SLIT("ne");
 	NEG	-> SLIT("s");	POS   -> SLIT("ns");
 	ALWAYS	-> SLIT("mp");	-- hack
-        _       -> error "Spix: iI386Code: unknown conditional!"
+	_       -> error "Spix: iI386Code: unknown conditional!"
     })
 
 pprDollImm :: PprStyle -> Imm -> Unpretty
@@ -374,24 +368,24 @@ pprImm sty (ImmLit s) = s
 pprAddr :: PprStyle -> Addr -> Unpretty
 pprAddr sty (ImmAddr imm off)
   =  uppBesides [pprImm sty imm,
-                 if off > 0 then uppChar '+' else uppPStr SLIT(""),
-                 if off == 0 then uppPStr SLIT("") else uppInt off
-                ]
+		 if off > 0 then uppChar '+' else uppPStr SLIT(""),
+		 if off == 0 then uppPStr SLIT("") else uppInt off
+		]
 pprAddr sty (Addr Nothing Nothing displacement)
   =  uppBesides [pprDisp sty displacement]
 pprAddr sty (Addr base index displacement)
   =  uppBesides [pprDisp sty displacement,
-                 uppChar '(',
-                 pprBase base,
-                 pprIndex index,
-                 uppChar ')'
-                ]
+		 uppChar '(',
+		 pprBase base,
+		 pprIndex index,
+		 uppChar ')'
+		]
   where
     pprBase (Just r) = uppBesides [pprReg L r,
-                                   case index of 
-                                     Nothing -> uppPStr SLIT("")
-                                     _       -> uppChar ','
-                                  ]
+				   case index of
+				     Nothing -> uppPStr SLIT("")
+				     _       -> uppChar ','
+				  ]
     pprBase _        = uppPStr SLIT("")
     pprIndex (Just (r,i)) = uppBesides [pprReg L r, uppChar ',', uppInt i]
     pprIndex _       = uppPStr SLIT("")
@@ -410,7 +404,7 @@ pprSize x = uppPStr
     (case x of
 	B  -> SLIT("b")
 	HB -> SLIT("b")
-        S  -> SLIT("w")
+	S  -> SLIT("w")
 	L  -> SLIT("l")
 	F  -> SLIT("s")
 	D  -> SLIT("l")
@@ -469,7 +463,7 @@ pprSizeAddrReg sty name size op dst =
 	uppChar ' ',
 	pprAddr sty op,
 	uppComma,
-        pprReg size dst
+	pprReg size dst
     ]
 
 pprOpOp :: PprStyle -> FAST_STRING -> Size -> Operand -> Operand -> Unpretty
@@ -499,29 +493,29 @@ pprI386Instr :: PprStyle -> I386Instr -> Unpretty
 pprI386Instr sty (MOV size (OpReg src) (OpReg dst)) -- hack
   | src == dst
   = uppPStr SLIT("")
-pprI386Instr sty (MOV size src dst) 
+pprI386Instr sty (MOV size src dst)
   = pprSizeOpOp sty SLIT("mov") size src dst
 pprI386Instr sty (MOVZX size src dst) = pprSizeOpOpCoerce sty SLIT("movzx") L size src dst
 pprI386Instr sty (MOVSX size src dst) = pprSizeOpOpCoerce sty SLIT("movxs") L size src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
-pprI386Instr sty (LEA size (OpAddr (Addr src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3)) 
+pprI386Instr sty (LEA size (OpAddr (Addr src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
   | reg1 == reg3
   = pprSizeOpOp sty SLIT("add") size (OpReg reg2) dst
-pprI386Instr sty (LEA size (OpAddr (Addr src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3)) 
+pprI386Instr sty (LEA size (OpAddr (Addr src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
   | reg2 == reg3
   = pprSizeOpOp sty SLIT("add") size (OpReg reg1) dst
-pprI386Instr sty (LEA size (OpAddr (Addr src1@(Just reg1) Nothing displ)) dst@(OpReg reg3)) 
+pprI386Instr sty (LEA size (OpAddr (Addr src1@(Just reg1) Nothing displ)) dst@(OpReg reg3))
   | reg1 == reg3
   = pprI386Instr sty (ADD size (OpImm displ) dst)
 pprI386Instr sty (LEA size src dst) = pprSizeOpOp sty SLIT("lea") size src dst
 
-pprI386Instr sty (ADD size (OpImm (ImmInt (-1))) dst) 
+pprI386Instr sty (ADD size (OpImm (ImmInt (-1))) dst)
   = pprSizeOp sty SLIT("dec") size dst
-pprI386Instr sty (ADD size (OpImm (ImmInt 1)) dst) 
+pprI386Instr sty (ADD size (OpImm (ImmInt 1)) dst)
   = pprSizeOp sty SLIT("inc") size dst
-pprI386Instr sty (ADD size src dst) 
+pprI386Instr sty (ADD size src dst)
   = pprSizeOpOp sty SLIT("add") size src dst
 pprI386Instr sty (SUB size src dst) = pprSizeOpOp sty SLIT("sub") size src dst
 pprI386Instr sty (IMUL size op1 op2) = pprSizeOpOp sty SLIT("imul") size op1 op2
@@ -557,22 +551,22 @@ pprI386Instr sty (CALL imm) =
 pprI386Instr sty SAHF = uppPStr SLIT("\tsahf")
 pprI386Instr sty FABS = uppPStr SLIT("\tfabs")
 
-pprI386Instr sty (FADD sz src@(OpAddr _)) 
+pprI386Instr sty (FADD sz src@(OpAddr _))
   = uppBesides [uppPStr SLIT("\tfadd"), pprSize sz, uppChar ' ', pprOperand sty sz src]
-pprI386Instr sty (FADD sz src) 
+pprI386Instr sty (FADD sz src)
   = uppPStr SLIT("\tfadd")
-pprI386Instr sty FADDP 
+pprI386Instr sty FADDP
   = uppPStr SLIT("\tfaddp")
-pprI386Instr sty (FMUL sz src) 
+pprI386Instr sty (FMUL sz src)
   = uppBesides [uppPStr SLIT("\tfmul"), pprSize sz, uppChar ' ', pprOperand sty sz src]
-pprI386Instr sty FMULP 
+pprI386Instr sty FMULP
   = uppPStr SLIT("\tfmulp")
 pprI386Instr sty (FIADD size op) = pprSizeAddr sty SLIT("fiadd") size op
 pprI386Instr sty FCHS = uppPStr SLIT("\tfchs")
 pprI386Instr sty (FCOM size op) = pprSizeOp sty SLIT("fcom") size op
 pprI386Instr sty FCOS = uppPStr SLIT("\tfcos")
 pprI386Instr sty (FIDIV size op) = pprSizeAddr sty SLIT("fidiv") size op
-pprI386Instr sty (FDIV sz src) 
+pprI386Instr sty (FDIV sz src)
   = uppBesides [uppPStr SLIT("\tfdiv"), pprSize sz, uppChar ' ', pprOperand sty sz src]
 pprI386Instr sty FDIVP
   = uppPStr SLIT("\tfdivp")
@@ -584,9 +578,9 @@ pprI386Instr sty (FIDIVR size op) = pprSizeAddr sty SLIT("fidivr") size op
 pprI386Instr sty (FICOM size op) = pprSizeAddr sty SLIT("ficom") size op
 pprI386Instr sty (FILD sz op reg) = pprSizeAddrReg sty SLIT("fild") sz op reg
 pprI386Instr sty (FIST size op) = pprSizeAddr sty SLIT("fist") size op
-pprI386Instr sty (FLD sz (OpImm (ImmCLbl src))) 
+pprI386Instr sty (FLD sz (OpImm (ImmCLbl src)))
   = uppBesides [uppPStr SLIT("\tfld"),pprSize sz,uppChar ' ',pprCLabel sty src]
-pprI386Instr sty (FLD sz src) 
+pprI386Instr sty (FLD sz src)
   = uppBesides [uppPStr SLIT("\tfld"),pprSize sz,uppChar ' ',pprOperand sty sz src]
 pprI386Instr sty FLD1 = uppPStr SLIT("\tfld1")
 pprI386Instr sty FLDZ = uppPStr SLIT("\tfldz")
@@ -594,12 +588,12 @@ pprI386Instr sty (FIMUL size op) = pprSizeAddr sty SLIT("fimul") size op
 pprI386Instr sty FRNDINT = uppPStr SLIT("\tfrndint")
 pprI386Instr sty FSIN = uppPStr SLIT("\tfsin")
 pprI386Instr sty FSQRT = uppPStr SLIT("\tfsqrt")
-pprI386Instr sty (FST sz dst) 
+pprI386Instr sty (FST sz dst)
   = uppBesides [uppPStr SLIT("\tfst"), pprSize sz, uppChar ' ', pprOperand sty sz dst]
-pprI386Instr sty (FSTP sz dst) 
+pprI386Instr sty (FSTP sz dst)
   = uppBesides [uppPStr SLIT("\tfstp"), pprSize sz, uppChar ' ', pprOperand sty sz dst]
 pprI386Instr sty (FISUB size op) = pprSizeAddr sty SLIT("fisub") size op
-pprI386Instr sty (FSUB sz src) 
+pprI386Instr sty (FSUB sz src)
   = uppBesides [uppPStr SLIT("\tfsub"), pprSize sz, uppChar ' ', pprOperand sty sz src]
 pprI386Instr sty FSUBP
   = uppPStr SLIT("\tfsubp")
@@ -607,10 +601,10 @@ pprI386Instr sty (FSUBR size src)
   = pprSizeOp sty SLIT("fsubr") size src
 pprI386Instr sty FSUBRP
   = uppPStr SLIT("\tfsubpr")
-pprI386Instr sty (FISUBR size op) 
+pprI386Instr sty (FISUBR size op)
   = pprSizeAddr sty SLIT("fisubr") size op
 pprI386Instr sty FTST = uppPStr SLIT("\tftst")
-pprI386Instr sty (FCOMP sz op) 
+pprI386Instr sty (FCOMP sz op)
   = uppBesides [uppPStr SLIT("\tfcomp"), pprSize sz, uppChar ' ', pprOperand sty sz op]
 pprI386Instr sty FUCOMPP = uppPStr SLIT("\tfucompp")
 pprI386Instr sty FXCH = uppPStr SLIT("\tfxch")
@@ -648,9 +642,9 @@ pprI386Instr sty (ASCII True str) = uppBeside (uppStr "\t.ascii \"") (asciify st
     	asciify :: String -> Int -> Unpretty
     	asciify [] _ = uppStr ("\\0\"")
     	asciify s n | n <= 0 = uppBeside (uppStr "\"\n\t.ascii \"") (asciify s 60)
-        asciify ('\\':cs) n = uppBeside (uppStr "\\\\") (asciify cs (n-1))
-        asciify ('\"':cs) n = uppBeside (uppStr "\\\"") (asciify cs (n-1))
-        asciify (c:cs) n | isPrint c = uppBeside (uppChar c) (asciify cs (n-1))
+	asciify ('\\':cs) n = uppBeside (uppStr "\\\\") (asciify cs (n-1))
+	asciify ('\"':cs) n = uppBeside (uppStr "\\\"") (asciify cs (n-1))
+	asciify (c:cs) n | isPrint c = uppBeside (uppChar c) (asciify cs (n-1))
     	asciify [c] _ = uppBeside (uppStr (charToC c)) (uppStr ("\\0\""))
     	asciify (c:(cs@(d:_))) n | isDigit d =
     	    	    	    	    	uppBeside (uppStr (charToC c)) (asciify cs 0)
@@ -684,8 +678,8 @@ instance MachineRegisters I386Regs where
     	(ints, floats) = partition (< 8) xs
     	floats' = map (subtract 8) floats
 
-    possibleMRegs FloatKind (SRegs _ floats) = [ x + 8 | x <- listBS floats]
-    possibleMRegs DoubleKind (SRegs _ floats) = [ x + 8 | x <- listBS floats]
+    possibleMRegs FloatRep (SRegs _ floats) = [ x + 8 | x <- listBS floats]
+    possibleMRegs DoubleRep (SRegs _ floats) = [ x + 8 | x <- listBS floats]
     possibleMRegs _ (SRegs ints _) = listBS ints
 
     useMReg (SRegs ints floats) n =
@@ -696,60 +690,55 @@ instance MachineRegisters I386Regs where
     	SRegs (ints `minusBS` ints')
     	      (floats `minusBS` floats')
       where
-        SRegs ints' floats' = mkMRegs xs
+	SRegs ints' floats' = mkMRegs xs
 
     freeMReg (SRegs ints floats) n =
     	if n _LT_ ILIT(8) then SRegs (ints `unionBS` singletonBS IBOX(n)) floats
     	else SRegs ints (floats `unionBS` singletonBS (IBOX(n _SUB_ ILIT(8))))
 
     freeMRegs (SRegs ints floats) xs =
-        SRegs (ints `unionBS` ints')
+	SRegs (ints `unionBS` ints')
     	      (floats `unionBS` floats')
       where
-        SRegs ints' floats' = mkMRegs xs
+	SRegs ints' floats' = mkMRegs xs
 
 instance MachineCode I386Instr where
-    -- Alas, we don't do anything clever with our OrdLists
---OLD:
---  flatten = flattenOrdList
-
     regUsage = i386RegUsage
     regLiveness = i386RegLiveness
     patchRegs = i386PatchRegs
 
     -- We spill just below the stack pointer, leaving two words per spill location.
-    spillReg dyn (MemoryReg i pk) 
+    spillReg dyn (MemoryReg i pk)
       = trace "spillsave"
-        (mkUnitList (MOV (kindToSize pk) (OpReg dyn) (OpAddr (spRel (-2 * i)))))
-    loadReg (MemoryReg i pk) dyn 
+	(mkUnitList (MOV (kindToSize pk) (OpReg dyn) (OpAddr (spRel (-2 * i)))))
+    loadReg (MemoryReg i pk) dyn
       = trace "spillload"
-        (mkUnitList (MOV (kindToSize pk) (OpAddr (spRel (-2 * i))) (OpReg dyn)))
+	(mkUnitList (MOV (kindToSize pk) (OpAddr (spRel (-2 * i))) (OpReg dyn)))
 
 --spRel gives us a stack relative addressing mode for volatile temporaries
 --and for excess call arguments.
 
-spRel  
+spRel
     :: Int      -- desired stack offset in words, positive or negative
     -> Addr
 spRel n = Addr (Just esp) Nothing (ImmInt (n * 4))
 
-kindToSize :: PrimKind -> Size
-kindToSize PtrKind	    = L
-kindToSize CodePtrKind	    = L
-kindToSize DataPtrKind	    = L
-kindToSize RetKind	    = L
-kindToSize InfoPtrKind	    = L
-kindToSize CostCentreKind   = L
-kindToSize CharKind	    = L
-kindToSize IntKind	    = L
-kindToSize WordKind	    = L
-kindToSize AddrKind	    = L
-kindToSize FloatKind	    = F
-kindToSize DoubleKind	    = D
-kindToSize ArrayKind	    = L
-kindToSize ByteArrayKind    = L
-kindToSize StablePtrKind    = L
-kindToSize MallocPtrKind    = L
+kindToSize :: PrimRep -> Size
+kindToSize PtrRep	    = L
+kindToSize CodePtrRep	    = L
+kindToSize DataPtrRep	    = L
+kindToSize RetRep	    = L
+kindToSize CostCentreRep   = L
+kindToSize CharRep	    = L
+kindToSize IntRep	    = L
+kindToSize WordRep	    = L
+kindToSize AddrRep	    = L
+kindToSize FloatRep	    = F
+kindToSize DoubleRep	    = D
+kindToSize ArrayRep	    = L
+kindToSize ByteArrayRep    = L
+kindToSize StablePtrRep    = L
+kindToSize MallocPtrRep    = L
 
 \end{code}
 
@@ -843,7 +832,7 @@ i386RegUsage instr = case instr of
     usage1 (OpAddr ea)    = usage (addrToRegs ea) []
     allFPRegs = [st0,st1,st2,st3,st4,st5,st6,st7]
     --callClobberedRegs = [ eax, ecx, edx ] -- according to gcc, anyway.
-    callClobberedRegs = [eax] 
+    callClobberedRegs = [eax]
 
 -- General purpose register collecting functions.
 
@@ -853,9 +842,9 @@ i386RegUsage instr = case instr of
 
     addrToRegs (Addr base index _) = baseToReg base ++ indexToReg index
       where  baseToReg Nothing       = []
-             baseToReg (Just r)      = [r]
-             indexToReg Nothing      = []
-             indexToReg (Just (r,_)) = [r]
+	     baseToReg (Just r)      = [r]
+	     indexToReg Nothing      = []
+	     indexToReg (Just (r,_)) = [r]
     addrToRegs (ImmAddr _ _) = []
 
     usage src dst = RU (mkUniqSet (filter interesting src))
@@ -910,7 +899,7 @@ i386RegLiveness instr info@(RL live future@(FL all env)) = case instr of
     lookup lbl = case lookupFM env lbl of
 	Just regs -> regs
 	Nothing -> trace ("Missing " ++ (uppShow 80 (pprCLabel (PprForAsm (\_->False) False id) lbl)) ++
-                          " in future?") emptyUniqSet
+			  " in future?") emptyUniqSet
 
 \end{code}
 
@@ -928,7 +917,7 @@ i386PatchRegs instr env = case instr of
     ADD  sz src dst	-> patch2 (ADD  sz) src dst
     SUB  sz src dst	-> patch2 (SUB  sz) src dst
     IMUL sz src dst 	-> patch2 (IMUL sz) src dst
-    IDIV sz src  	-> patch1 (IDIV sz) src 
+    IDIV sz src  	-> patch1 (IDIV sz) src
     AND  sz src dst	-> patch2 (AND  sz) src dst
     OR   sz src dst	-> patch2 (OR   sz) src dst
     XOR  sz src dst	-> patch2 (XOR  sz) src dst
@@ -969,7 +958,7 @@ i386PatchRegs instr env = case instr of
     FISUBR sz asrc	-> FISUBR sz (lookupAddr asrc)
     FCOMP sz src	-> FCOMP sz (patchOp src)
     _			-> instr
-	
+
   where
 		patch1 insn op = insn (patchOp op)
 		patch2 insn src dst = insn (patchOp src) (patchOp dst)
@@ -978,13 +967,13 @@ i386PatchRegs instr env = case instr of
 		patchOp (OpImm  imm) = OpImm imm
 		patchOp (OpAddr ea)  = OpAddr (lookupAddr ea)
 
-		lookupAddr (Addr base index disp) 
+		lookupAddr (Addr base index disp)
 			= Addr (lookupBase base) (lookupIndex index) disp
 			where lookupBase Nothing        = Nothing
  	      		      lookupBase (Just r)       = Just (env r)
 	      		      lookupIndex Nothing       = Nothing
 	      		      lookupIndex (Just (r,i))  = Just (env r, i)
-		lookupAddr (ImmAddr imm off) 
+		lookupAddr (ImmAddr imm off)
 			= ImmAddr imm off
 
 \end{code}
@@ -993,17 +982,12 @@ Sometimes, we want to be able to modify addresses at compile time.
 (Okay, just for chrCode of a fetch.)
 
 \begin{code}
-
-#ifdef __GLASGOW_HASKELL__
-
 {-# SPECIALIZE
     is13Bits :: Int -> Bool
   #-}
 {-# SPECIALIZE
     is13Bits :: Integer -> Bool
   #-}
-
-#endif
 
 is13Bits :: Integral a => a -> Bool
 is13Bits x = x >= -4096 && x < 4096
@@ -1022,7 +1006,6 @@ offset (ImmAddr imm off1) off2
   where off3 = off1 + off2
 
 offset _ _ = Nothing
-
 \end{code}
 
 If you value your sanity, do not venture below this line.
@@ -1054,7 +1037,7 @@ If you value your sanity, do not venture below this line.
 #define st5 13
 #define st6 14
 #define st7 15
-#define CALLER_SAVES_Hp 
+#define CALLER_SAVES_Hp
 -- ToDo: rm when we give esp back
 #define REG_Hp esp
 #define REG_R2 ecx
@@ -1160,7 +1143,7 @@ callerSaves SpB	    	    	= True
 #ifdef CALLER_SAVES_SuB
 callerSaves SuB	    	    	= True
 #endif
-#ifdef CALLER_SAVES_Hp 
+#ifdef CALLER_SAVES_Hp
 callerSaves Hp	    	    	= True
 #endif
 #ifdef CALLER_SAVES_HpLim
@@ -1248,7 +1231,7 @@ stgRegMap SpB	    	   = Just (FixedReg ILIT(REG_SpB))
 #ifdef REG_SuB
 stgRegMap SuB	    	   = Just (FixedReg ILIT(REG_SuB))
 #endif
-#ifdef REG_Hp 
+#ifdef REG_Hp
 stgRegMap Hp	    	   = Just (FixedReg ILIT(REG_Hp))
 #endif
 #ifdef REG_HpLim

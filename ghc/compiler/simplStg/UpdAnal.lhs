@@ -12,20 +12,17 @@
 
 > module UpdAnal ( updateAnalyse ) where
 >
-> IMPORT_Trace
-
-> import AbsUniType	( splitTyArgs, splitType, Class, TyVarTemplate, 
+> import Type		( splitTyArgs, splitSigmaTy, Class, TyVarTemplate,
 > 			  TauType(..)
 >			)
 > import Id
-> import IdEnv
 > import IdInfo
 > import Outputable	( isExported )
 > import Pretty
 > import SrcLoc 	( mkUnknownSrcLoc )
 > import StgSyn
 > import UniqSet
-> import Unique 	( getBuiltinUniques )
+> import UniqSupply 	( getBuiltinUniques )
 > import Util
 
 %-----------------------------------------------------------------------------
@@ -113,11 +110,11 @@ value.  Lookup is designed to be partially applied to a variable, and
 repeatedly applied to different environments after that.
 
 > lookup v
->   | isImportedId v 
+>   | isImportedId v
 >   = const (case updateInfoMaybe (getIdUpdateInfo v) of
 >		Nothing   -> unknownClosure
 >		Just spec -> convertUpdateSpec spec)
->   | otherwise	 
+>   | otherwise
 >   = \p -> case lookup_IdEnv p v of
 >		Just b  -> b
 >		Nothing -> unknownClosure
@@ -180,16 +177,16 @@ contains more buried references.
 udData is used when we are putting a list of closure references into a
 data structure, or something else that we know nothing about.
 
-> udData :: [PlainStgAtom] -> CaseBoundVars -> AbVal
+> udData :: [StgArg] -> CaseBoundVars -> AbVal
 > udData vs cvs
 > 	= \p -> (null_IdEnv, getrefs p local_ids noRefs, bottom)
->	where local_ids = [ lookup v | (StgVarAtom v) <- vs, v `notCaseBound` cvs ]
+>	where local_ids = [ lookup v | (StgVarArg v) <- vs, v `notCaseBound` cvs ]
 
 %-----------------------------------------------------------------------------
 \subsection{Analysing an atom}
 
-> udAtom :: CaseBoundVars -> PlainStgAtom -> AbVal
-> udAtom cvs (StgVarAtom v) 
+> udAtom :: CaseBoundVars -> StgArg -> AbVal
+> udAtom cvs (StgVarArg v)
 >	| v `isCaseBound` cvs = const unknownClosure
 >	| otherwise	      = lookup v
 >
@@ -198,13 +195,13 @@ data structure, or something else that we know nothing about.
 %-----------------------------------------------------------------------------
 \subsection{Analysing an STG expression}
 
-> ud :: PlainStgExpr			-- Expression to be analysed
+> ud :: StgExpr			-- Expression to be analysed
 >    -> CaseBoundVars			-- List of case-bound vars
 >    -> IdEnvClosure			-- Current environment
->    -> (PlainStgExpr, AbVal)		-- (New expression, abstract value)
+>    -> (StgExpr, AbVal)		-- (New expression, abstract value)
 >
-> ud e@(StgPrimApp _ vs _) cvs p = (e, udData vs cvs)
-> ud e@(StgConApp  _ vs _) cvs p = (e, udData vs cvs)
+> ud e@(StgPrim _ vs _) cvs p = (e, udData vs cvs)
+> ud e@(StgCon  _ vs _) cvs p = (e, udData vs cvs)
 > ud e@(StgSCC ty lab a)   cvs p = ud a cvs p =: \(a', abval_a) ->
 >                                  (StgSCC ty lab a', abval_a)
 
@@ -220,11 +217,11 @@ I've left the type signature for doApp in to make things a bit clearer.
 >   where
 >     abval_atoms = map (udAtom cvs) atoms
 >     abval_a     = udAtom cvs a
->     abval_app = \p -> 
+>     abval_app = \p ->
 >	let doApp :: Closure -> AbVal -> Closure
 >	    doApp (c, b, Fun f) abval_atom =
->		  abval_atom p		=: \e@(_,_,_)    -> 
-> 		  f e			=: \(c', b', f') -> 
+>		  abval_atom p		=: \e@(_,_,_)    ->
+> 		  f e			=: \(c', b', f') ->
 >		  (combine_IdEnvs (+) c' c, b', f')
 >	in foldl doApp (abval_a p) abval_atoms
 
@@ -240,11 +237,11 @@ I've left the type signature for doApp in to make things a bit clearer.
 >     in
 >     (StgCase expr' lve lva uniq alts', abval_case)
 >   where
->   
->     udAlt :: PlainStgCaseAlternatives
+>
+>     udAlt :: StgCaseAlts
 >           -> IdEnvClosure
->           -> (PlainStgCaseAlternatives, AbVal)
->	    
+>           -> (StgCaseAlts, AbVal)
+>
 >     udAlt (StgAlgAlts ty [alt] StgNoDefault) p
 >         = udAlgAlt p alt		=: \(alt', abval) ->
 >	    (StgAlgAlts ty [alt'] StgNoDefault, abval)
@@ -268,10 +265,10 @@ I've left the type signature for doApp in to make things a bit clearer.
 >     udAlgAlt p (id, vs, use_mask, e)
 >       = ud e (moreCaseBound cvs vs) p	=: \(e', v) -> ((id, vs, use_mask, e'), v)
 >
->     udDef :: PlainStgCaseDefault
+>     udDef :: StgCaseDefault
 >           -> IdEnvClosure
->           -> (PlainStgCaseDefault, AbVal)
-> 
+>           -> (StgCaseDefault, AbVal)
+>
 >     udDef StgNoDefault p
 >       = (StgNoDefault, \p -> (null_IdEnv, noRefs, dont_know noRefs))
 >     udDef (StgBindDefault v is_used expr) p
@@ -299,7 +296,7 @@ closure updatable or not, based on the results of analysing the body.
 >    ud body cvs p			=: \(body', abval_body) ->
 >    abval_body	p 			=: \(c, b, abfun) ->
 >    tag b (combine_IdEnvs (+) cs c) binds' =: \tagged_binds ->
->    let 
+>    let
 >       abval p
 >	  = abval2 p				=: \(c1, p')       ->
 >    	    abval_body (grow_IdEnv p p')	=: \(c2, b, abfun) ->
@@ -309,7 +306,7 @@ closure updatable or not, based on the results of analysing the body.
 
 %-----------------------------------------------------------------------------
 \subsection{Analysing bindings}
-  
+
 For recursive sets of bindings we perform one iteration of a fixed
 point algorithm, using (dont_know fv) as a safe approximation to the
 real fixed point, where fv are the (mappings in the environment of
@@ -321,15 +318,15 @@ respective bindings have already been analysed.
 
 We don't need to find anything out about closures with arguments,
 constructor closures etc.
-  
-> udBinding :: PlainStgBinding
+
+> udBinding :: StgBinding
 >	    -> CaseBoundVars
 >           -> IdEnvClosure
->	    -> (PlainStgBinding,
+>	    -> (StgBinding,
 >		[Id],
 >	    	IdEnvClosure -> (IdEnvInt, IdEnvClosure),
 >		IdEnvClosure -> (IdEnvInt, IdEnvClosure))
-> 
+>
 > udBinding (StgNonRec v rhs) cvs p
 >   = udRhs rhs cvs p			=: \(rhs', abval) ->
 >     abval p				=: \(c, b, abfun) ->
@@ -356,20 +353,20 @@ constructor closures etc.
 >	  (cs, ps) = unzip (doRec vs abvals)
 >
 >	  doRec [] _ = []
->	  doRec (v:vs) (abval:as) 
+>	  doRec (v:vs) (abval:as)
 >	  	= abval p'	=: \(c,b,abfun) ->
 >		  (c, (v,(null_IdEnv, b, abfun))) : doRec vs as
->		
+>
 >      	in
 >	(foldr (combine_IdEnvs (+)) null_IdEnv cs, mk_IdEnv ps)
->     
+>
 >     udBind (v,rhs)
 >       = udRhs rhs cvs p		=: \(rhs', abval) ->
 >	  (v,(v,rhs'), abval)
 >
 >     collectfv (_, StgRhsClosure _ _ fv _ _ _) = fv
->     collectfv (_, StgRhsCon _ con args)       = [ v | (StgVarAtom v) <- args ]
-  
+>     collectfv (_, StgRhsCon _ con args)       = [ v | (StgVarArg v) <- args ]
+
 %-----------------------------------------------------------------------------
 \subsection{Analysing Right-Hand Sides}
 
@@ -396,11 +393,11 @@ analyse each lambda expression.
 >
 >       doLam :: Id -> (Refs -> AbVal) -> Refs -> AbVal
 >       doLam i f b p
->		= (null_IdEnv, b, 
->		   Fun (\x@(c',b',_) -> 
+>		= (null_IdEnv, b,
+>		   Fun (\x@(c',b',_) ->
 >		   	let b'' = dom_IdEnv c' `merge2` b' `merge2` b in
 >			f b'' (addOneTo_IdEnv p i x)))
-  
+
 %-----------------------------------------------------------------------------
 \subsection{Adjusting Update flags}
 
@@ -408,9 +405,9 @@ The closure is tagged single entry iff it is used at most once, it is
 not referenced from inside a data structure or function, and it has no
 arguments (closures with arguments are re-entrant).
 
-> tag :: Refs -> IdEnvInt -> PlainStgBinding -> PlainStgBinding
+> tag :: Refs -> IdEnvInt -> StgBinding -> StgBinding
 >
-> tag b c r@(StgNonRec v (StgRhsClosure cc bi fv Updatable [] body)) 
+> tag b c r@(StgNonRec v (StgRhsClosure cc bi fv Updatable [] body))
 >   = if (v `notInRefs` b) && (lookupc c v <= 1)
 >     then -- trace "One!" (
 >	   StgNonRec v (StgRhsClosure cc bi fv SingleEntry [] body)
@@ -429,11 +426,11 @@ Should we tag top level closures? This could have good implications
 for CAFs (i.e. they could be made non-updateable if only used once,
 thus preventing a space leak).
 
-> updateAnalyse :: PlainStgProgram -> PlainStgProgram {- Exported -}
-> updateAnalyse bs 
+> updateAnalyse :: [StgBinding] -> [StgBinding] {- Exported -}
+> updateAnalyse bs
 >  = udProgram bs null_IdEnv
-  
-> udProgram :: PlainStgProgram -> IdEnvClosure -> PlainStgProgram
+
+> udProgram :: [StgBinding] -> IdEnvClosure -> [StgBinding]
 > udProgram [] p = []
 > udProgram (d:ds) p
 >  = udBinding d noCaseBound p		=: \(d', vs, _, abval_bind) ->
@@ -455,14 +452,14 @@ into a real Closure value.
 >
 > mkClosure c b b' []       = (c, b', dont_know b')
 > mkClosure c b b' (0 : ns) = (null_IdEnv, b, Fun (\ _ -> mkClosure c b b' ns))
-> mkClosure c b b' (1 : ns) = (null_IdEnv, b, Fun (\ (c',b'',f) -> 
->     mkClosure 
->             (combine_IdEnvs (+) c c') 
+> mkClosure c b b' (1 : ns) = (null_IdEnv, b, Fun (\ (c',b'',f) ->
+>     mkClosure
+>             (combine_IdEnvs (+) c c')
 >             (dom_IdEnv c' `merge2` b'' `merge2` b)
 >             (b'' `merge2` b')
 >	      ns ))
 > mkClosure c b b' (n : ns) = (null_IdEnv, b, Fun (\ (c',b'',f) ->
->     mkClosure c 
+>     mkClosure c
 >             (dom_IdEnv c' `merge2` b'' `merge2` b)
 >             (dom_IdEnv c' `merge2` b'' `merge2` b')
 >	      ns ))
@@ -471,7 +468,7 @@ Convert a Closure into a representation that can be placed in a .hi file.
 
 > mkUpdateSpec :: Id -> Closure -> UpdateSpec
 > mkUpdateSpec v f = {- removeSuperfluous2s -} (map countUses ids)
->	    where 
+>	    where
 >		(c,b,_)     = foldl doApp f ids
 >	      	ids         = map mkid (getBuiltinUniques arity)
 >	      	mkid u      = mkSysLocal SLIT("upd") u noType mkUnknownSrcLoc
@@ -479,10 +476,10 @@ Convert a Closure into a representation that can be placed in a .hi file.
 >	      	noType      = panic "UpdAnal: no type!"
 >
 >     		doApp (c,b,Fun f) i
->       		= f (unit_IdEnv i 1, noRefs, dont_know noRefs)  =: \(c',b',f') -> 
+>       		= f (unit_IdEnv i 1, noRefs, dont_know noRefs)  =: \(c',b',f') ->
 >	  		  (combine_IdEnvs (+) c' c, b', f')
 >
->		(_,dict_tys,tau_ty) = (splitType . getIdUniType) v
+>		(_,dict_tys,tau_ty) = (splitSigmaTy . idType) v
 > 	        (reg_arg_tys, _)    = splitTyArgs tau_ty
 >		arity               = length dict_tys + length reg_arg_tys
 
@@ -499,11 +496,11 @@ suffice for now.
 >   = case b of
 >	StgNonRec v rhs -> StgNonRec (attachOne v) rhs
 >	StgRec bs 	-> StgRec [ (attachOne v, rhs) | (v, rhs) <- bs ]
->	
+>
 >   where attachOne v
->		| isExported v 
+>		| isExported v
 >			= let c = lookup v p in
->		 		addIdUpdateInfo v 
+>		 		addIdUpdateInfo v
 >					(mkUpdateInfo (mkUpdateSpec v c))
 >		| otherwise    = v
 

@@ -15,12 +15,10 @@ module CgTailCall (
 	performReturn,
 	mkStaticAlgReturnCode, mkDynamicAlgReturnCode,
 	mkPrimReturnCode,
-	
-	tailCallBusiness,
+
+	tailCallBusiness
 
 	-- and to make the interface self-sufficient...
-	StgAtom, Id, CgState, CAddrMode, TyCon,
-	CgInfoDownwards, HeapOffset, Maybe
     ) where
 
 IMPORT_Trace
@@ -31,7 +29,7 @@ import StgSyn
 import CgMonad
 import AbsCSyn
 
-import AbsUniType	( isPrimType, UniType )
+import Type		( isPrimType, Type )
 import CgBindery	( getAtomAmodes, getCAddrMode, getCAddrModeAndInfo )
 import CgCompInfo	( oTHER_TAG, iND_TAG )
 import CgRetConv	( dataReturnConvPrim, ctrlReturnConvAlg, dataReturnConvAlg,
@@ -40,15 +38,15 @@ import CgRetConv	( dataReturnConvPrim, ctrlReturnConvAlg, dataReturnConvAlg,
 			)
 import CgStackery	( adjustRealSps, mkStkAmodes )
 import CgUsages		( getSpARelOffset, getSpBRelOffset )
-import CLabelInfo	( CLabel, mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel )
+import CLabel	( CLabel, mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel )
 import ClosureInfo	( nodeMustPointToIt, getEntryConvention, EntryConvention(..) )
 import CmdLineOpts	( GlobalSwitch(..) )
 import Id		( getDataConTyCon, getDataConTag,
-			  getIdUniType, getIdKind, fIRST_TAG, Id,
+			  idType, getIdPrimRep, fIRST_TAG, Id,
 			  ConTag(..)
 			)
 import Maybes		( assocMaybe, maybeToBool, Maybe(..) )
-import PrimKind		( retKindSize )
+import PrimRep		( retPrimRepSize )
 import Util
 \end{code}
 
@@ -59,7 +57,7 @@ import Util
 %************************************************************************
 
 \begin{code}
-cgTailCall :: PlainStgAtom -> [PlainStgAtom] -> PlainStgLiveVars -> Code
+cgTailCall :: StgArg -> [StgArg] -> StgLiveVars -> Code
 \end{code}
 
 Here's the code we generate for a tail call.  (NB there may be no
@@ -87,7 +85,7 @@ themselves in an appropriate register and returning to the address on
 top of the B stack.
 
 \begin{code}
-cgTailCall (StgLitAtom lit) [] live_vars
+cgTailCall (StgLitArg lit) [] live_vars
   = performPrimReturn (CLit lit) live_vars
 \end{code}
 
@@ -96,15 +94,15 @@ mode for the local instead of (CLit lit) in the assignment.
 
 Case for unboxed @Ids@ first:
 \begin{code}
-cgTailCall atom@(StgVarAtom fun) [] live_vars
-  | isPrimType (getIdUniType fun)
+cgTailCall atom@(StgVarArg fun) [] live_vars
+  | isPrimType (idType fun)
   = getCAddrMode fun `thenFC` \ amode ->
     performPrimReturn amode live_vars
 \end{code}
 
 The general case (@fun@ is boxed):
 \begin{code}
-cgTailCall (StgVarAtom fun) args live_vars = performTailCall fun args live_vars
+cgTailCall (StgVarArg fun) args live_vars = performTailCall fun args live_vars
 \end{code}
 
 %************************************************************************
@@ -134,26 +132,25 @@ KCAH-RDA
 
 \begin{code}
 performPrimReturn :: CAddrMode	-- The thing to return
-		  -> PlainStgLiveVars
+		  -> StgLiveVars
 		  -> Code
 
 performPrimReturn amode live_vars
   = let
-	kind = getAmodeKind amode
+	kind = getAmodeRep amode
 	ret_reg = dataReturnConvPrim kind
 
 	assign_possibly = case kind of
-	  VoidKind -> AbsCNop
+	  VoidRep -> AbsCNop
 	  kind -> (CAssign (CReg ret_reg) amode)
     in
     performReturn assign_possibly mkPrimReturnCode live_vars
 
 mkPrimReturnCode :: Sequel -> Code
---UNUSED:mkPrimReturnCode RestoreCostCentre  = panic "mkPrimReturnCode: RCC"
-mkPrimReturnCode (UpdateCode _)	    = panic "mkPrimReturnCode: Upd"
-mkPrimReturnCode sequel		    = sequelToAmode sequel	`thenFC` \ dest_amode ->
-				      absC (CReturn dest_amode DirectReturn)
-				      -- Direct, no vectoring
+mkPrimReturnCode (UpdateCode _)	= panic "mkPrimReturnCode: Upd"
+mkPrimReturnCode sequel		= sequelToAmode sequel	`thenFC` \ dest_amode ->
+				  absC (CReturn dest_amode DirectReturn)
+				  -- Direct, no vectoring
 
 -- All constructor arguments in registers; Node and InfoPtr are set.
 -- All that remains is
@@ -195,7 +192,7 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
 				-- Set the info pointer, and jump
 			set_info_ptr		`thenC`
 			getIntSwitchChkrC	`thenFC` \ isw_chkr ->
-    			absC (CJump (CLbl (update_label isw_chkr) CodePtrKind))
+    			absC (CJump (CLbl (update_label isw_chkr) CodePtrRep))
 
 	CaseAlts _ (Just (alts, _)) ->	-- Ho! We know the constructor so
 					-- we can go right to the alternative
@@ -206,7 +203,7 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
 			-- is going to handle.
 
 			case assocMaybe alts tag of
-			   Just (alt_absC, join_lbl) -> absC (CJump (CLbl join_lbl CodePtrKind))
+			   Just (alt_absC, join_lbl) -> absC (CJump (CLbl join_lbl CodePtrRep))
 			   Nothing		     -> panic "mkStaticAlgReturnCode: default"
 				-- The Nothing case should never happen; it's the subject
 				-- of a wad of special-case code in cgReturnCon
@@ -223,7 +220,7 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
     tycon	      = getDataConTyCon con
     return_convention = ctrlReturnConvAlg tycon
     zero_indexed_tag  = tag - fIRST_TAG	      -- Adjust tag to be zero-indexed
-					      -- cf AbsCFuns.mkAlgAltsCSwitch
+					      -- cf AbsCUtils.mkAlgAltsCSwitch
 
     update_label isw_chkr
       = case (dataReturnConvAlg isw_chkr con) of
@@ -236,7 +233,7 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
 
     set_info_ptr = case maybe_info_lbl of
 			Nothing	      -> nopC
-			Just info_lbl -> absC (CAssign (CReg infoptr) (CLbl info_lbl DataPtrKind))
+			Just info_lbl -> absC (CAssign (CReg infoptr) (CLbl info_lbl DataPtrRep))
 
 
 mkDynamicAlgReturnCode :: TyCon -> CAddrMode -> Sequel -> Code
@@ -246,7 +243,7 @@ mkDynamicAlgReturnCode tycon dyn_tag sequel
 	VectoredReturn sz ->
 
 		profCtrC SLIT("VEC_RETURN") [mkIntCLit sz] `thenC`
-		sequelToAmode sequel		`thenFC` \ ret_addr ->	
+		sequelToAmode sequel		`thenFC` \ ret_addr ->
 		absC (CReturn ret_addr (DynamicVectoredReturn dyn_tag))
 
 	UnvectoredReturn no_of_constrs ->
@@ -272,14 +269,14 @@ performReturn :: AbstractC	    -- Simultaneous assignments to perform
 	      -> (Sequel -> Code)   -- The code to execute to actually do
 				    -- the return, given an addressing mode
 				    -- for the return address
-	      -> PlainStgLiveVars
+	      -> StgLiveVars
 	      -> Code
 
 performReturn sim_assts finish_code live_vars
   = getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_spa args_spb sequel) ->
 
 	-- Do the simultaneous assignments,
-    doSimAssts args_spa live_vars {-UNUSED:live_regs-} sim_assts	`thenC`
+    doSimAssts args_spa live_vars sim_assts	`thenC`
 
 	-- Adjust stack pointers
     adjustRealSps args_spa args_spb	`thenC`
@@ -287,16 +284,12 @@ performReturn sim_assts finish_code live_vars
 	-- Do the return
     finish_code sequel		-- "sequel" is `robust' in that it doesn't
 				-- depend on stk-ptr values
--- where
---UNUSED:    live_regs = getDestinationRegs sim_assts
-	  -- ToDo: this is a *really* boring way to compute the
-	  -- live-reg set!
 \end{code}
 
 \begin{code}
 performTailCall :: Id			-- Function
-		-> [PlainStgAtom]	-- Args
-		-> PlainStgLiveVars
+		-> [StgArg]	-- Args
+		-> StgLiveVars
 		-> Code
 
 performTailCall fun args live_vars
@@ -313,7 +306,7 @@ performTailCall fun args live_vars
 tailCallBusiness :: Id -> CAddrMode	-- Function and its amode
 		 -> LambdaFormInfo	-- Info about the function
 		 -> [CAddrMode]		-- Arguments
-		 -> PlainStgLiveVars	-- Live in continuation
+		 -> StgLiveVars	-- Live in continuation
 
 		 -> AbstractC		-- Pending simultaneous assignments
 					-- *** GUARANTEED to contain only stack assignments.
@@ -327,7 +320,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 
     nodeMustPointToIt lf_info			`thenFC` \ node_points ->
     getEntryConvention fun lf_info
-	(map getAmodeKind arg_amodes)		`thenFC` \ entry_conv ->
+	(map getAmodeRep arg_amodes)		`thenFC` \ entry_conv ->
 
     getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_spa args_spb sequel) ->
 
@@ -346,33 +339,27 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 			CCallProfCtrMacro SLIT("ENT_VIA_NODE") [],
 			CAssign (CReg infoptr)
 
-				(CMacroExpr DataPtrKind INFO_PTR [CReg node]),
-			CJump (CMacroExpr CodePtrKind ENTRY_CODE [CReg infoptr])
+				(CMacroExpr DataPtrRep INFO_PTR [CReg node]),
+			CJump (CMacroExpr CodePtrRep ENTRY_CODE [CReg infoptr])
 		     ])
-	      StdEntry lbl Nothing	  -> ([], CJump (CLbl lbl CodePtrKind))
-	      StdEntry lbl (Just itbl)	  -> ([], CAssign (CReg infoptr) (CLbl itbl DataPtrKind)
+	      StdEntry lbl Nothing	  -> ([], CJump (CLbl lbl CodePtrRep))
+	      StdEntry lbl (Just itbl)	  -> ([], CAssign (CReg infoptr) (CLbl itbl DataPtrRep)
 						     `mkAbsCStmts`
-						  CJump (CLbl lbl CodePtrKind))
+						  CJump (CLbl lbl CodePtrRep))
 	      DirectEntry lbl arity regs  ->
 		(regs,	 (if do_arity_chks
 			  then CMacroStmt SET_ARITY [mkIntCLit arity]
 			  else AbsCNop)
-			 `mkAbsCStmts` CJump (CLbl lbl CodePtrKind))
+			 `mkAbsCStmts` CJump (CLbl lbl CodePtrRep))
 
 	no_of_args = length arg_amodes
 
-{- UNUSED:	live_regs = if node_points then
-			node : arg_regs
-		    else
-			arg_regs
--}
 	(reg_arg_assts, stk_arg_amodes)
-	    = (mkAbstractCs (zipWith assign_to_reg arg_regs arg_amodes),
+	    = (mkAbstractCs (zipWithEqual assign_to_reg arg_regs arg_amodes),
 			drop (length arg_regs) arg_amodes) -- No regs, or
 							   -- args beyond arity
 
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
-
     in
     case fun_amode of
       CJoinPoint join_spa join_spb ->  -- Ha!  A let-no-escape thingy
@@ -388,7 +375,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 		      `thenFC` \ (final_spa, final_spb, stk_arg_assts) ->
 
 		-- Do the simultaneous assignments,
-	  doSimAssts join_spa live_vars {-UNUSED: live_regs-}
+	  doSimAssts join_spa live_vars
 		(mkAbstractCs [pending_assts, reg_arg_assts, stk_arg_assts])
 			`thenC`
 
@@ -402,7 +389,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 
 		-- Make instruction to save return address
 	    loadRetAddrIntoRetReg sequel	`thenFC` \ ret_asst ->
-		
+
 	    mkStkAmodes args_spa args_spb stk_arg_amodes
 						`thenFC`
 			    \ (final_spa, final_spb, stk_arg_assts) ->
@@ -411,7 +398,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 		-- on top, is recorded in final_spb.
 
 		-- Do the simultaneous assignments,
-	    doSimAssts args_spa live_vars {-UNUSED: live_regs-}
+	    doSimAssts args_spa live_vars
 		(mkAbstractCs [pending_assts, node_asst, ret_asst,
 			       reg_arg_assts, stk_arg_assts])
 						`thenC`
@@ -449,7 +436,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 		let
 		    join_details_to_code (load_regs_and_profiling_code, join_lbl)
 			= load_regs_and_profiling_code		`mkAbsCStmts`
-			  CJump (CLbl join_lbl CodePtrKind)
+			  CJump (CLbl join_lbl CodePtrRep)
 
 		    semi_tagged_alts = [ (mkMachInt (toInteger (tag - fIRST_TAG)),
 					  join_details_to_code join_details)
@@ -460,24 +447,24 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 		      -- Enter Node (we know infoptr will have the info ptr in it)!
 		      = mkAbstractCs [
 			CCallProfCtrMacro SLIT("RET_SEMI_FAILED")
-					[CMacroExpr IntKind INFO_TAG [CReg infoptr]],
-			CJump (CMacroExpr CodePtrKind ENTRY_CODE [CReg infoptr]) ]
+					[CMacroExpr IntRep INFO_TAG [CReg infoptr]],
+			CJump (CMacroExpr CodePtrRep ENTRY_CODE [CReg infoptr]) ]
 		in
 			-- Final switch
 		absC (mkAbstractCs [
 			    CAssign (CReg infoptr)
-				    (CVal (NodeRel zeroOff) DataPtrKind),
+				    (CVal (NodeRel zeroOff) DataPtrRep),
 
 			    case maybe_deflt_join_details of
 				Nothing ->
-				    CSwitch (CMacroExpr IntKind INFO_TAG [CReg infoptr])
+				    CSwitch (CMacroExpr IntRep INFO_TAG [CReg infoptr])
 					(semi_tagged_alts)
 					(enter_jump)
 				Just (_, details) ->
-				    CSwitch (CMacroExpr IntKind EVAL_TAG [CReg infoptr])
+				    CSwitch (CMacroExpr IntRep EVAL_TAG [CReg infoptr])
 				     [(mkMachInt 0, enter_jump)]
 				     (CSwitch
-					 (CMacroExpr IntKind INFO_TAG [CReg infoptr])
+					 (CMacroExpr IntRep INFO_TAG [CReg infoptr])
 					 (semi_tagged_alts)
 					 (join_details_to_code details))
 		])
@@ -511,12 +498,11 @@ They are separate because we sometimes do some jiggery-pokery in between.
 
 \begin{code}
 doSimAssts :: VirtualSpAOffset	-- tail_spa: SpA as seen by continuation
-	   -> PlainStgLiveVars	-- Live in continuation
---UNUSED:  -> [MagicId]		-- Live regs (ptrs and non-ptrs)
+	   -> StgLiveVars	-- Live in continuation
 	   -> AbstractC
 	   -> Code
 
-doSimAssts tail_spa live_vars {-UNUSED: live_regs-} sim_assts
+doSimAssts tail_spa live_vars sim_assts
   =	-- Do the simultaneous assignments
     absC (CSimultaneous sim_assts)	`thenC`
 
@@ -540,6 +526,6 @@ doSimAssts tail_spa live_vars {-UNUSED: live_regs-} sim_assts
   where
     stub_A_slot :: VirtualSpAOffset -> Code
     stub_A_slot offset = getSpARelOffset offset		`thenFC` \ spa_rel ->
-			 absC (CAssign	(CVal spa_rel PtrKind)
+			 absC (CAssign	(CVal spa_rel PtrRep)
 					(CReg StkStubReg))
 \end{code}

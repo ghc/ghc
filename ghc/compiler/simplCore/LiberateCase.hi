@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface LiberateCase where
-import CoreSyn(CoreBinding)
-import Id(Id)
-liberateCase :: Int -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-

@@ -7,41 +7,44 @@
 #include "HsVersions.h"
 
 module TcSimplify (
-	tcSimplify, tcSimplifyAndCheck,
+	tcSimplify, tcSimplifyAndCheck, tcSimplifyWithExtraGlobals,
 	tcSimplifyTop, tcSimplifyThetas, tcSimplifyCheckThetas, tcSimplifyRank2,
 	bindInstsOfLocalFuns
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
-import Outputable
+import Ubiq
+
+import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit, 
+			  Match, HsBinds, Qual, PolyType, ArithSeqInfo,
+			  GRHSsAndBinds, Stmt, Fake )
+import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcExpr(..), TcMonoBinds(..) )
+
+import TcMonad
+import Inst		( lookupInst, tyVarsOfInst, isTyVarDict, isDict, matchesInst,
+			  instToId, instBindingRequired, instCanBeGeneralised, newDictsAtLoc,
+			  Inst(..), LIE(..), zonkLIE, emptyLIE, plusLIE, unitLIE, consLIE,
+			  InstOrigin(..), OverloadedLit	)
+import TcEnv		( tcGetGlobalTyVars )
+import TcType		( TcType(..), TcTyVar(..), TcTyVarSet(..), TcMaybe, tcInstType )
+import Unify		( unifyTauTy )
+
+import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 
+			  snocBag, consBag, unionBags, isEmptyBag )
+import Class		( isNumericClass, isStandardClass, isCcallishClass,
+			  isSuperClassOf, getSuperDictSelId )
+import Id		( GenId )
+import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool, Maybe(..) )
+import Outputable	( Outputable(..) )
+import PprType		( GenType, GenTyVar )
 import Pretty
-
-import TcMonad		-- typechecking monadic machinery
-import TcMonadFns	( newDicts, applyTcSubstAndExpectTyVars )
-import AbsSyn		-- the stuff being typechecked
-
-import AbsUniType	( isSuperClassOf, getTyVar, eqTyVar, ltTyVar,
-			  instantiateThetaTy, isFunType, getUniDataTyCon,
-			  getSuperDictSelId, InstTyEnv(..)
-			  IF_ATTACK_PRAGMAS(COMMA isTyVarTy COMMA pprUniType)
-			  IF_ATTACK_PRAGMAS(COMMA assocMaybe)
-			)
-import UniType		( UniType(..) ) -- ******* CHEATING ************
-import Disambig		( disambiguateDicts )
-import Errors		( reduceErr, genCantGenErr, Error(..) )
-import Id		( mkInstId )
-import Inst		( extractTyVarsFromInst, isTyVarDict, matchesInst,
-			  instBindingRequired, instCanBeGeneralised,
-			  Inst(..),	-- We import the CONCRETE type, because
-					-- TcSimplify is allowed to see the rep
-					-- of Insts
-			  InstOrigin, OverloadedLit, InstTemplate
-			)
-import InstEnv
-import LIE
-import ListSetOps	( minusList )
-import Maybes		( catMaybes, maybeToBool, Maybe(..) )
+import SrcLoc		( mkUnknownSrcLoc )
 import Util
+import Type		( GenType, Type(..), TauType(..), mkTyVarTy, getTyVar, eqSimpleTy )
+import TysWiredIn	( intTy )
+import TyVar		( GenTyVar, GenTyVarSet(..), 
+			  elementOfTyVarSet, emptyTyVarSet, unionTyVarSets,
+			  isEmptyTyVarSet, tyVarSetToList )
+import Unique		( Unique )
 \end{code}
 
 
@@ -68,46 +71,32 @@ OTHERWISE
 
 
 \begin{code}
-tcSimpl :: Bool				-- True <=> Don't simplify const insts
-	-> [TyVar]			-- ``Global'' type variables
-	-> [TyVar]			-- ``Local''  type variables
-	-> [Inst]			-- Given; these constrain only local tyvars
-	-> [Inst]			-- Wanted
-	-> TcM ([Inst],			-- Free
-		[(Inst,TypecheckedExpr)],-- Bindings
-		[Inst])			-- Remaining wanteds; no dups
+tcSimpl :: Bool				-- True <=> simplify const insts
+	-> TcTyVarSet s			-- ``Global'' type variables
+	-> TcTyVarSet s			-- ``Local''  type variables
+					-- ASSERT: both these tyvar sets are already zonked
+	-> LIE s			-- Given; these constrain only local tyvars
+	-> LIE s			-- Wanted
+	-> TcM s (LIE s,			-- Free
+		  [(TcIdOcc s,TcExpr s)],	-- Bindings
+		  LIE s)			-- Remaining wanteds; no dups
 
-tcSimpl dont_squash_consts global_tvs local_tvs givens wanteds
-  =
-	 -- Make sure the insts and type variables are fixed points of the substitution
-    applyTcSubstAndExpectTyVars global_tvs `thenNF_Tc` \ global_tvs ->
-    applyTcSubstAndExpectTyVars local_tvs  `thenNF_Tc` \ local_tvs ->
-    applyTcSubstToInsts givens		 `thenNF_Tc` \ givens ->
-    applyTcSubstToInsts wanteds		 `thenNF_Tc` \ wanteds ->
-    let
-	is_elem1 = isIn "tcSimpl1"
-	is_elem2 = isIn "tcSimpl2"
-    in
+tcSimpl squash_consts global_tvs local_tvs givens wanteds
+  =	-- ASSSERT: global_tvs and local_tvs are already zonked
+	-- Make sure the insts fixed points of the substitution
+    zonkLIE givens		 	`thenNF_Tc` \ givens ->
+    zonkLIE wanteds		 	`thenNF_Tc` \ wanteds ->
+
 	-- Deal with duplicates and type constructors
     elimTyCons
-	 dont_squash_consts (\tv -> tv `is_elem1` global_tvs)
+	 squash_consts (\tv -> tv `elementOfTyVarSet` global_tvs)
 	 givens wanteds		`thenTc` \ (globals, tycon_binds, locals_and_ambigs) ->
 
-	-- Now disambiguate if necessary
+   	-- Now disambiguate if necessary
     let
-	(ambigs, unambigs) = partition (is_ambiguous local_tvs) locals_and_ambigs
-	(locals, cant_generalise) = partition instCanBeGeneralised unambigs
+	ambigs = filterBag is_ambiguous locals_and_ambigs
     in
-    checkTc (not (null cant_generalise)) (genCantGenErr cant_generalise) 	`thenTc_`
-
-    (if (null ambigs) then
-
-	-- No ambiguous dictionaries.  Just bash on with the results
-	-- of the elimTyCons
-	returnTc (globals, tycon_binds, locals_and_ambigs)
-
-    else
-
+    if not (isEmptyBag ambigs) then
 	-- Some ambiguous dictionaries.	 We now disambiguate them,
 	-- which binds the offending type variables to suitable types in the
 	-- substitution, and then we retry the whole process.  This
@@ -119,25 +108,30 @@ tcSimpl dont_squash_consts global_tvs local_tvs givens wanteds
 	-- to a particular type might enable a short-cut simplification which
 	-- elimTyCons will have missed the first time.
 
-	disambiguateDicts ambigs	`thenTc_`
-	applyTcSubstToInsts givens	`thenNF_Tc` \ givens ->
-	applyTcSubstToInsts wanteds	`thenNF_Tc` \ wanteds ->
-	elimTyCons
-		dont_squash_consts (\tv -> tv `is_elem2` global_tvs)
-		givens wanteds
+	disambiguateDicts ambigs		`thenTc_`
+	tcSimpl squash_consts global_tvs local_tvs givens wanteds
 
-    ) {- End of the "if" -} `thenTc` \ (globals, tycon_binds, locals) ->
+    else
+	-- No ambiguous dictionaries.  Just bash on with the results
+	-- of the elimTyCons
+
+	-- Check for non-generalisable insts
+    let
+  	locals		= locals_and_ambigs	-- ambigs is empty
+	cant_generalise = filterBag (not . instCanBeGeneralised) locals
+    in
+    checkTc (isEmptyBag cant_generalise)
+	    (genCantGenErr cant_generalise)	`thenTc_`
+
 
 	-- Deal with superclass relationships
     elimSCs givens locals		`thenNF_Tc` \ (sc_binds, locals2) ->
 
 	 -- Finished
-    returnTc (globals, sc_binds ++ tycon_binds, locals2)
+    returnTc (globals, bagToList (sc_binds `unionBags` tycon_binds), locals2)
   where
-    is_ambiguous local_tvs (Dict _ _ ty _)
-      = getTyVar "is_ambiguous" ty `not_elem` local_tvs
-      where
-	not_elem = isn'tIn "is_ambiguous"
+    is_ambiguous (Dict _ _ ty _ _)
+	= not (getTyVar "is_ambiguous" ty `elementOfTyVarSet` local_tvs)
 \end{code}
 
 The main wrapper is @tcSimplify@.  It just calls @tcSimpl@, but with
@@ -149,77 +143,91 @@ float them out if poss, after inlinings are sorted out.
 
 \begin{code}
 tcSimplify
-	:: Bool				-- True <=> top level
-	-> [TyVar]			-- ``Global'' type variables
-	-> [TyVar]			-- ``Local''  type variables
-	-> [Inst]			-- Wanted
-	-> TcM ([Inst],			-- Free
-		[(Inst, TypecheckedExpr)],-- Bindings
-		[Inst])			-- Remaining wanteds; no dups
+	:: TcTyVarSet s			-- ``Local''  type variables
+	-> LIE s			-- Wanted
+	-> TcM s (LIE s,			-- Free
+		  [(TcIdOcc s,TcExpr s)],	-- Bindings
+		  LIE s)			-- Remaining wanteds; no dups
 
-tcSimplify top_level global_tvs local_tvs wanteds
-  = tcSimpl (not top_level) global_tvs local_tvs [] wanteds
+tcSimplify local_tvs wanteds
+  = tcGetGlobalTyVars			`thenNF_Tc` \ global_tvs ->
+    tcSimpl False global_tvs local_tvs emptyBag wanteds
+\end{code}
+
+@tcSimplifyWithExtraGlobals@ is just like @tcSimplify@ except that you get
+to specify some extra global type variables that the simplifer will treat
+as free in the environment.
+
+\begin{code}
+tcSimplifyWithExtraGlobals
+	:: TcTyVarSet s			-- Extra ``Global'' type variables
+	-> TcTyVarSet s			-- ``Local''  type variables
+	-> LIE s			-- Wanted
+	-> TcM s (LIE s,			-- Free
+		  [(TcIdOcc s,TcExpr s)],	-- Bindings
+		  LIE s)			-- Remaining wanteds; no dups
+
+tcSimplifyWithExtraGlobals extra_global_tvs local_tvs wanteds
+  = tcGetGlobalTyVars			`thenNF_Tc` \ global_tvs ->
+    tcSimpl False
+	    (global_tvs `unionTyVarSets` extra_global_tvs)
+	    local_tvs emptyBag wanteds
 \end{code}
 
 @tcSimplifyAndCheck@ is similar to the above, except that it checks
-that there is an empty wanted-set at the end.
-
-It may still return some of constant insts, which have
-to be resolved finally at the end.
+that there is an empty wanted-set at the end.  It may still return
+some of constant insts, which have to be resolved finally at the end.
 
 \begin{code}
 tcSimplifyAndCheck
-	 :: Bool				-- True <=> top level
-	 -> [TyVar]				-- ``Global''  type variables
-	 -> [TyVar]				-- ``Local''  type variables
-	 -> [Inst]				-- Given
-	 -> [Inst]				-- Wanted
-	 -> UnifyErrContext			-- Context info for error 
-	 -> TcM ([Inst],			-- Free
-		 [(Inst, TypecheckedExpr)])	-- Bindings
+	 :: TcTyVarSet s		-- ``Local''  type variables; ASSERT is fixpoint
+	 -> LIE s			-- Given
+	 -> LIE s			-- Wanted
+	 -> TcM s (LIE s,			-- Free
+		   [(TcIdOcc s,TcExpr s)])	-- Bindings
 
-tcSimplifyAndCheck top_level global_tvs local_tvs givens wanteds err_ctxt
-  = tcSimpl (not top_level) global_tvs local_tvs givens wanteds
-			`thenTc` \ (free_insts, binds, wanteds') ->
-    checkTc (not (null wanteds')) (reduceErr wanteds' err_ctxt)
-			`thenTc_`
+tcSimplifyAndCheck local_tvs givens wanteds
+  = tcGetGlobalTyVars			`thenNF_Tc` \ global_tvs ->
+    tcSimpl False global_tvs local_tvs
+	    givens wanteds		`thenTc` \ (free_insts, binds, wanteds') ->
+    checkTc (isEmptyBag wanteds')
+	    (reduceErr wanteds')	`thenTc_`
     returnTc (free_insts, binds)
 \end{code}
 
 @tcSimplifyRank2@ checks that the argument of a rank-2 polymorphic function
-is not overloaded.  
+is not overloaded.
 
 \begin{code}
-tcSimplifyRank2 :: [TyVar]		-- ``Local'' type variables; guaranteed fixpoint of subst
-		-> [Inst]		-- Given
-		-> UnifyErrContext
-		-> TcM ([Inst],				-- Free
-			[(Inst, TypecheckedExpr)])	-- Bindings
+tcSimplifyRank2 :: TcTyVarSet s		-- ``Local'' type variables; ASSERT is fixpoint
+		-> LIE s		-- Given
+		-> TcM s (LIE s,			-- Free
+			  [(TcIdOcc s,TcExpr s)])	-- Bindings
 
-tcSimplifyRank2 local_tvs givens err_ctxt
-  = applyTcSubstToInsts givens		 `thenNF_Tc` \ givens' ->
-    elimTyCons False 
-	       (\tv -> not (tv `is_elem` local_tvs))
+
+tcSimplifyRank2 local_tvs givens
+  = zonkLIE givens			`thenNF_Tc` \ givens' ->
+    elimTyCons True
+	       (\tv -> not (tv `elementOfTyVarSet` local_tvs))
 		-- This predicate claims that all
 		-- any non-local tyvars are global,
 		-- thereby postponing dealing with
 		-- ambiguity until the enclosing Gen
-	       [] givens'	`thenTc` \ (free, dict_binds, wanteds) ->
+	       emptyLIE givens'	`thenTc` \ (free, dict_binds, wanteds) ->
 
-    checkTc (not (null wanteds)) (reduceErr wanteds err_ctxt)	`thenTc_`
+    checkTc (isEmptyBag wanteds) (reduceErr wanteds)	`thenTc_`
 
-    returnTc (free, dict_binds)
-  where
-    is_elem = isIn "tcSimplifyRank2"
+    returnTc (free, bagToList dict_binds)
 \end{code}
 
 @tcSimplifyTop@ deals with constant @Insts@, using the standard simplification
 mechansim with the extra flag to say ``beat out constant insts''.
 
 \begin{code}
-tcSimplifyTop :: [Inst] -> TcM [(Inst, TypecheckedExpr)]
+tcSimplifyTop :: LIE s -> TcM s [(TcIdOcc s, TcExpr s)]
 tcSimplifyTop dicts
-  = tcSimpl False [] [] [] dicts    `thenTc` \ (_, binds, _) ->
+  = tcGetGlobalTyVars						`thenNF_Tc` \ global_tvs ->
+    tcSimpl True emptyTyVarSet emptyTyVarSet emptyBag dicts	`thenTc` \ (_, binds, _) ->
     returnTc binds
 \end{code}
 
@@ -228,28 +236,30 @@ tcSimplifyTop dicts
 only interested in the simplified bunch of class/type constraints.
 
 \begin{code}
-tcSimplifyThetas :: (Class -> TauType -> InstOrigin)  -- Creates an origin for the dummy dicts
+tcSimplifyThetas :: (Class -> TauType -> InstOrigin s)  -- Creates an origin for the dummy dicts
 	       	 -> [(Class, TauType)]		      -- Simplify this
-	       	 -> TcM [(Class, TauType)]  	      -- Result
+	       	 -> TcM s [(Class, TauType)]  	      -- Result
 
+tcSimplifyThetas = panic "tcSimplifyThetas"
+
+{- 	LATER
 tcSimplifyThetas mk_inst_origin theta
   = let
-	dicts = map mk_dummy_dict theta
+	dicts = listToBag (map mk_dummy_dict theta)
     in
 	 -- Do the business (this is just the heart of "tcSimpl")
-    elimTyCons False (\tv -> False) [] dicts    `thenTc`	\ (_, _, dicts2) ->
+    elimTyCons True (\tv -> False) emptyLIE dicts    `thenTc`	\ (_, _, dicts2) ->
 
 	  -- Deal with superclass relationships
     elimSCs [] dicts2		    `thenNF_Tc` \ (_, dicts3) ->
 
-    returnTc (map unmk_dummy_dict dicts3)
+    returnTc (map unmk_dummy_dict (bagToList dicts3))
   where
-    mk_dummy_dict (clas, ty)
-      = Dict uniq clas ty (mk_inst_origin clas ty)
+    mk_dummy_dict (clas, ty) = Dict uniq clas ty (mk_inst_origin clas ty) mkUnknownSrcLoc
+    uniq 		     = panic "tcSimplifyThetas:uniq"
 
-    uniq = panic "tcSimplifyThetas:uniq"
-
-    unmk_dummy_dict (Dict _ clas ty _) = (clas, ty)
+    unmk_dummy_dict (Dict _ clas ty _ _) = (clas, ty)
+-}
 \end{code}
 
 @tcSimplifyCheckThetas@ just checks class-type constraints, essentially;
@@ -257,23 +267,27 @@ used with \tr{default} declarations.  We are only interested in
 whether it worked or not.
 
 \begin{code}
-tcSimplifyCheckThetas :: InstOrigin		-- context; for error msg
-		-> [(Class, TauType)]	-- Simplify this
-		-> TcM ()
+tcSimplifyCheckThetas :: InstOrigin s		-- context; for error msg
+		      -> [(Class, TauType)]	-- Simplify this
+		      -> TcM s ()
 
+tcSimplifyCheckThetas = panic "tcSimplifyCheckThetas"
+
+{- 	LATER
 tcSimplifyCheckThetas origin theta
   = let
 	dicts = map mk_dummy_dict theta
     in
 	 -- Do the business (this is just the heart of "tcSimpl")
-    elimTyCons False (\tv -> False) [] dicts    `thenTc`	\ _ ->
+    elimTyCons True (\tv -> False) emptyLIE dicts    `thenTc`	\ _ ->
 
     returnTc ()
   where
     mk_dummy_dict (clas, ty)
-      = Dict uniq clas ty origin
+      = Dict uniq clas ty origin mkUnknownSrcLoc
 
     uniq = panic "tcSimplifyCheckThetas:uniq"
+-}
 \end{code}
 
 
@@ -284,13 +298,13 @@ tcSimplifyCheckThetas origin theta
 %************************************************************************
 
 \begin{code}
-elimTyCons :: Bool				-- True <=> Don't simplify const insts
-	   -> (TyVar -> Bool)			-- Free tyvar predicate
-	   -> [Inst]				-- Given
-	   -> [Inst]				-- Wanted
-	   -> TcM ([Inst],			-- Free
-		   [(Inst, TypecheckedExpr)],	-- Bindings
-		   [Inst]			-- Remaining wanteds; no dups;
+elimTyCons :: Bool				-- True <=> Simplify const insts
+	   -> (TcTyVar s -> Bool)		-- Free tyvar predicate
+	   -> LIE s				-- Given
+	   -> LIE s				-- Wanted
+	   -> TcM s (LIE s,			-- Free
+		     Bag (TcIdOcc s, TcExpr s),	-- Bindings
+		     LIE s			-- Remaining wanteds; no dups;
 						-- dicts only (no Methods)
 	       )
 \end{code}
@@ -318,114 +332,102 @@ The final arrangement of the {\em non-recursive} bindings is
     let <yet-more-bindings> ...
 
 \begin{code}
-elimTyCons dont_squash_consts is_free_tv givens wanteds
-  = eTC givens wanteds
+elimTyCons squash_consts is_free_tv givens wanteds
+  = eTC givens (bagToList wanteds)	`thenTc` \ (_, free, binds, irreds) ->
+    returnTc (free,binds,irreds)
   where
-    eTC :: [Inst] -> [Inst]
-	-> TcM ([Inst], [(Inst, TypecheckedExpr)], [Inst])
+--    eTC :: LIE s -> [Inst s]
+--	  -> TcM s (LIE s, LIE s, Bag (TcIdOcc s, TcExpr s), LIE s)
 
-    eTC _ [] = returnTc ([], [], [])
+    eTC givens [] = returnTc (givens, emptyBag, emptyBag, emptyBag)
 
-    eTC givens (wanted:wanteds) = try givens wanted wanteds
-				      (extractTyVarsFromInst wanted)
-				      (find_equiv givens wanted)
-	-- find_equiv looks in "givens" for an inst equivalent to "wanted"
-	-- This is used only in Case 2 below; it's like a guard which also
-	-- returns a result.
-
-    try :: [Inst] -> Inst -> [Inst] -> [TyVar] -> (Maybe Inst)
-	-> TcM ([Inst], [(Inst, TypecheckedExpr)], [Inst])
-
-    -- Case 0: same as existing dict, so build a simple binding
-    try givens wanted wanteds tvs_of_wanted (Just this)
-     = eTC givens wanteds	`thenTc` \ (frees, binds, wanteds') ->
-       let 
+    eTC givens (wanted:wanteds)
+    -- Case 0: same as an existing inst
+      | maybeToBool maybe_equiv
+      = eTC givens wanteds	`thenTc` \ (givens1, frees, binds, irreds) ->
+	let
 	  -- Create a new binding iff it's needed
-	  new_binds | instBindingRequired wanted = (wanted, Var (mkInstId this)):binds
-	            | otherwise			 = binds
-       in
-       returnTc (frees, new_binds, wanteds')
+	  this = expectJust "eTC" maybe_equiv
+	  new_binds | instBindingRequired wanted = (instToId wanted, HsVar (instToId this))
+						   `consBag` binds
+		    | otherwise			 = binds
+	in
+	returnTc (givens1, frees, new_binds, irreds)
 
     -- Case 1: constrains no type variables at all
     -- In this case we have a quick go to see if it has an
     -- instance which requires no inputs (ie a constant); if so we use
     -- it; if not, we give up on the instance and just heave it out the
     -- top in the free result
-    try givens wanted wanteds tvs_of_wanted _ | null tvs_of_wanted
-      = simplify_it dont_squash_consts {- If dont_squash_consts is true,
-					  simplify only if trival -}
+      | isEmptyTyVarSet tvs_of_wanted
+      = simplify_it squash_consts	{- If squash_consts is false,
+					   simplify only if trival -}
 		    givens wanted wanteds
 
     -- Case 2: constrains free vars only, so fling it out the top in free_ids
-    try givens wanted wanteds tvs_of_wanted _
-      | all is_free_tv tvs_of_wanted
-      = eTC (wanted:givens) wanteds	`thenTc` \ (frees, binds, wanteds') ->
-	returnTc (wanted:frees, binds, wanteds')
+      | all is_free_tv (tyVarSetToList tvs_of_wanted)
+      = eTC (wanted `consBag` givens) wanteds	`thenTc` \ (givens1, frees, binds, irreds) ->
+	returnTc (givens1, wanted `consBag` frees, binds, irreds)
 
     -- Case 3: is a dict constraining only a tyvar,
     -- so return it as part of the "wanteds" result
-    try givens wanted wanteds tvs_of_wanted _
       | isTyVarDict wanted
-      = eTC (wanted:givens) wanteds	`thenTc` \ (frees, binds, wanteds') ->
-	returnTc (frees, binds, wanted:wanteds')
+      = eTC (wanted `consBag` givens) wanteds	`thenTc` \ (givens1, frees, binds, irreds) ->
+	returnTc (givens1, frees, binds, wanted `consBag` irreds)
 
     -- Case 4: is not a simple dict, so look up in instance environment
-    try givens wanted wanteds tvs_of_wanted _
-      = simplify_it False {- Simplify even if not trivial -}
+      | otherwise
+      = simplify_it True {- Simplify even if not trivial -}
 		    givens wanted wanteds
-
-    simplify_it only_if_trivial givens wanted wanteds
-      = if not (instBindingRequired wanted) then
-		-- No binding required for this chap, so squash right away
-	   lookupNoBindInst_Tc wanted	`thenTc` \ simpler_wanteds ->
-
-	   eTC givens simpler_wanteds	`thenTc` \ (frees1, binds1, wanteds1) ->
-	   let
-	       new_givens = [new_given | (new_given,rhs) <- binds1]
-		-- Typically binds1 is empty
-	   in
-	   eTC givens wanteds		`thenTc` \ (frees2, binds2, wanteds2) ->
-
-	   returnTc (frees1 ++ frees2,
-		     binds1 ++ binds2,
-		     wanteds1 ++ wanteds2)
-
-	else	-- An binding is required for this inst
-	lookupInst_Tc wanted	`thenTc` \ (rhs, simpler_wanteds) ->
-
-        if (only_if_trivial && not_var rhs) then
-	   -- Ho ho!  It isn't trivial to simplify "wanted",
-	   -- because the rhs isn't a simple variable.	The flag
-	   -- dont_squash_consts tells us to give up now and
-	   -- just fling it out the top.
-	   eTC (wanted:givens) wanteds	`thenTc` \ (frees, binds, wanteds') ->
-	   returnTc (wanted:frees, binds, wanteds')
-	else
-	   -- Aha! Either it's easy, or dont_squash_consts is
-	   -- False, so we must do it right here.
-
-	   eTC givens simpler_wanteds	`thenTc` \ (frees1, binds1, wanteds1) ->
-	   let
-	       new_givens = [new_given | (new_given,rhs) <- binds1]
-	   in
-	   eTC (new_givens ++ [wanted] ++ wanteds1 ++ givens) wanteds
-				   `thenTc` \ (frees2, binds2, wanteds2) ->
-	   returnTc (frees1 ++ frees2,
-		     binds1 ++ [(wanted, rhs)] ++ binds2,
-		     wanteds1 ++ wanteds2)
       where
-	not_var :: TypecheckedExpr -> Bool
-	not_var (Var _) = False
-	not_var other	= True
+	tvs_of_wanted  = tyVarsOfInst wanted
 
-    find_equiv :: [Inst] -> Inst -> Maybe Inst
-	-- Look through the argument list for an inst which is
-	-- equivalent to the second arg.
+	-- Look for something in "givens" that matches "wanted"
+	Just the_equiv = maybe_equiv
+	maybe_equiv    = foldBag seqMaybe try Nothing givens
+	try given | wanted `matchesInst` given = Just given
+		  | otherwise		       = Nothing
 
-    find_equiv []	      wanted = Nothing
-    find_equiv (given:givens) wanted
-      | wanted `matchesInst` given = Just given
-      | otherwise		   = find_equiv givens wanted
+
+    simplify_it simplify_always givens wanted wanteds
+	-- Recover immediately on no-such-instance errors
+      = recoverTc (returnTc (wanted `consBag` givens, emptyLIE, emptyBag, emptyLIE)) 
+		  (simplify_one simplify_always givens wanted)
+				`thenTc` \ (givens1, frees1, binds1, irreds1) ->
+	eTC givens1 wanteds	`thenTc` \ (givens2, frees2, binds2, irreds2) ->
+	returnTc (givens2, frees1 `plusLIE` frees2,
+			   binds1 `unionBags` binds2,
+		  	   irreds1 `plusLIE` irreds2)
+
+
+    simplify_one simplify_always givens wanted
+     | not (instBindingRequired wanted)
+     = 		-- No binding required for this chap, so squash right away
+	   lookupInst wanted		`thenTc` \ (simpler_wanteds, _) ->
+	   eTC givens simpler_wanteds	`thenTc` \ (givens1, frees1, binds1, irreds1) ->
+	   returnTc (wanted `consBag` givens1, frees1, binds1, irreds1)
+
+     | otherwise
+     = 		-- An binding is required for this inst
+	lookupInst wanted		`thenTc` \ (simpler_wanteds, bind@(_,rhs)) ->
+
+	if (not_var rhs && not simplify_always) then
+	   -- Ho ho!  It isn't trivial to simplify "wanted",
+	   -- because the rhs isn't a simple variable.	Unless the flag
+	   -- simplify_always is set, just give up now and
+	   -- just fling it out the top.
+	   returnTc (wanted `consLIE` givens, unitLIE wanted, emptyBag, emptyLIE)
+	else
+	   -- Aha! Either it's easy, or simplify_always is True
+	   -- so we must do it right here.
+	   eTC givens simpler_wanteds	`thenTc` \ (givens1, frees1, binds1, irreds1) ->
+	   returnTc (wanted `consLIE` givens1, frees1,
+		     binds1 `snocBag` bind,
+		     irreds1)
+
+    not_var :: TcExpr s -> Bool
+    not_var (HsVar _) = False
+    not_var other     = True
 \end{code}
 
 
@@ -436,88 +438,78 @@ elimTyCons dont_squash_consts is_free_tv givens wanteds
 %************************************************************************
 
 \begin{code}
-elimSCs :: [Inst]				-- Given; no dups
-	-> [Inst]				-- Wanted; no dups; all dictionaries, all
+elimSCs :: LIE s				-- Given; no dups
+	-> LIE s				-- Wanted; no dups; all dictionaries, all
 						-- constraining just a type variable
-	-> NF_TcM ([(Inst,TypecheckedExpr)],	-- Bindings
-		   [Inst])			-- Minimal wanted set
+	-> NF_TcM s (Bag (TcIdOcc s,TcExpr s),	-- Bindings
+		     LIE s)			-- Minimal wanted set
 
 elimSCs givens wanteds
   = -- Sort the wanteds so that subclasses occur before superclasses
     elimSCs_help
-	[dict | dict@(Dict _ _ _ _) <- givens]	-- Filter out non-dictionaries
+	(filterBag isDict givens)	-- Filter out non-dictionaries
 	(sortSC wanteds)
 
-elimSCs_help :: [Inst]				-- Given; no dups
-	     -> [Inst]				-- Wanted; no dups;
-	     -> NF_TcM ([(Inst,TypecheckedExpr)],-- Bindings
-			[Inst])			-- Minimal wanted set
+elimSCs_help :: LIE s					-- Given; no dups
+	     -> [Inst s]				-- Wanted; no dups;
+	     -> NF_TcM s (Bag (TcIdOcc s, TcExpr s),	-- Bindings
+		    	  LIE s)			-- Minimal wanted set
 
-elimSCs_help given [] = returnNF_Tc ([], [])
+elimSCs_help given [] = returnNF_Tc (emptyBag, emptyLIE)
 
-elimSCs_help givens (wanted@(Dict _ wanted_class wanted_ty wanted_orig):wanteds)
-  = case (trySC givens wanted_class wanted_ty) of
+elimSCs_help givens (wanted:wanteds)
+  = trySC givens wanted 		`thenNF_Tc` \ (givens1, binds1, irreds1) ->
+    elimSCs_help givens1 wanteds	`thenNF_Tc` \ (binds2, irreds2) ->
+    returnNF_Tc (binds1 `unionBags` binds2, irreds1 `plusLIE` irreds2)
 
-      Nothing -> -- No superclass relnship found
-		 elimSCs_help (wanted:givens) wanteds `thenNF_Tc` \ (binds, wanteds') ->
-		 returnNF_Tc (binds, wanted:wanteds')
 
-      Just (given, classes) ->	-- Aha! There's a superclass relnship
+trySC :: LIE s				-- Givens
+      -> Inst s				-- Wanted
+      -> NF_TcM s (LIE s,			-- New givens,
+		   Bag (TcIdOcc s,TcExpr s),	-- Bindings
+		   LIE s)			-- Irreducible wanted set
 
+trySC givens wanted@(Dict _ wanted_class wanted_ty wanted_orig loc)
+  | not (maybeToBool maybe_best_subclass_chain)
+  = 	-- No superclass relationship
+    returnNF_Tc (givens, emptyBag, unitLIE wanted)
+
+  | otherwise
+  = 	-- There's a subclass relationship with a "given"
 	-- Build intermediate dictionaries
-	let
-	    theta = [ (clas, wanted_ty) | clas <- classes ]
-	in
-	newDicts wanted_orig theta		`thenNF_Tc` \ intermediates ->
-
-	-- Deal with the recursive call
-	elimSCs_help (wanted : (intermediates ++ givens)) wanteds
-						`thenNF_Tc` \ (binds, wanteds') ->
+    let
+	theta = [ (clas, wanted_ty) | clas <- reverse classes ]
+	-- The reverse is because the list comes back in the "wrong" order I think
+    in
+    newDictsAtLoc wanted_orig loc theta		`thenNF_Tc` \ (intermediates, _) ->
 
 	-- Create bindings for the wanted dictionary and the intermediates.
 	-- Later binds may depend on earlier ones, so each new binding is pushed
 	-- on the front of the accumulating parameter list of bindings
-	let
-	    new_binds = mk_binds wanted wanted_class (intermediates ++ [given]) []
-	in
-	returnNF_Tc (new_binds ++ binds, wanteds')
+    let
+	mk_bind (dict,clas) dict_sub@(Dict _ dict_sub_class ty _ _)
+	  = ((dict_sub, dict_sub_class),
+	     (instToId dict, DictApp (TyApp (HsVar (RealId (getSuperDictSelId dict_sub_class 
+									      clas)))
+					    [ty])
+				     [instToId dict_sub]))
+	(_, new_binds) = mapAccumR mk_bind (wanted,wanted_class) (given : intermediates)
+    in
+    returnNF_Tc (wanted `consLIE` givens `plusLIE` listToBag intermediates,
+	         listToBag new_binds,
+	         emptyLIE)
+
   where
-    mk_binds :: Inst				-- Define this
-	     -> Class				-- ...whose class is this
-	     -> [Inst]				-- In terms of this sub-class chain
-	     -> [(Inst, TypecheckedExpr)]	-- Push the binding on front of these
-	     -> [(Inst, TypecheckedExpr)]
+    maybe_best_subclass_chain = foldBag choose_best find_subclass_chain Nothing givens
+    Just (given, classes, _) = maybe_best_subclass_chain
 
-    mk_binds dict clas [] binds_so_far = binds_so_far
-    mk_binds dict clas (dict_sub@(Dict _ dict_sub_class ty _):dicts_sub) binds_so_far
-      = mk_binds dict_sub dict_sub_class dicts_sub (new_bind:binds_so_far)
-      where
-	new_bind = (dict, DictApp (TyApp (Var (getSuperDictSelId dict_sub_class clas))
-					 [ty])
-				  [mkInstId dict_sub])
+    choose_best c1@(Just (_,_,n1)) c2@(Just (_,_,n2)) | n1 <= n2  = c1
+						      | otherwise = c2
+    choose_best Nothing		   c2				  = c2
+    choose_best c1		   Nothing		  	  = c1
 
-
-trySC :: [Inst]				-- Givens
-      -> Class -> UniType		-- Wanted
-      -> Maybe (Inst, [Class])		-- Nothing if no link; Just (given, classes)
-					-- if wanted can be given in terms of given, with
-					-- intermediate classes specified
-trySC givens wanted_class wanted_ty
-  = case subclass_relns of
-	 [] -> Nothing
-	 ((given, classes, _): _) -> Just (given, classes)
-  where
-    subclass_relns :: [(Inst, [Class], Int)]	-- Subclass of wanted,
-						 -- intervening classes,
-						 -- and number of intervening classes
-						 -- Sorted with shortest link first
-    subclass_relns = sortLt reln_lt (catMaybes (map find_subclass_reln givens))
-
-    reln_lt :: (Inst, [Class], Int) -> (Inst, [Class], Int) -> Bool
-    (_,_,n1) `reln_lt` (_,_,n2) = n1 < n2
-
-    find_subclass_reln given@(Dict _ given_class given_ty _)
-	 | wanted_ty == given_ty
+    find_subclass_chain given@(Dict _ given_class given_ty _ _)
+	 | wanted_ty `eqSimpleTy` given_ty
 	 = case (wanted_class `isSuperClassOf` given_class) of
 
 		 Just classes -> Just (given,
@@ -529,18 +521,18 @@ trySC givens wanted_class wanted_ty
 	 | otherwise = Nothing
 
 
-sortSC :: [Inst]    -- Expected to be all dicts (no MethodIds), all of
+sortSC :: LIE s     -- Expected to be all dicts (no MethodIds), all of
 		    -- which constrain type variables
-       -> [Inst]    -- Sorted with subclasses before superclasses
+       -> [Inst s]  -- Sorted with subclasses before superclasses
 
-sortSC dicts = sortLt lt dicts
+sortSC dicts = sortLt lt (bagToList dicts)
   where
-    (Dict _ c1 ty1 _) `lt` (Dict _ c2 ty2 _)
-       = tv1 `ltTyVar` tv2 ||
-	(tv1 `eqTyVar` tv2 && maybeToBool (c2 `isSuperClassOf` c1))
-       where
-	tv1 = getTyVar "sortSC" ty1
-	tv2 = getTyVar "sortSC" ty2
+    (Dict _ c1 ty1 _ _) `lt` (Dict _ c2 ty2 _ _)
+       = if ty1 `eqSimpleTy` ty2 then
+		maybeToBool (c2 `isSuperClassOf` c1)
+	 else
+		-- order is immaterial, I think...
+		False
 \end{code}
 
 
@@ -567,36 +559,195 @@ there, they would have unresolvable references to @f@.
 We pass in an @init_lie@ of @Insts@ and a list of locally-bound @Ids@.
 For each method @Inst@ in the @init_lie@ that mentions one of the
 @Ids@, we create a binding.  We return the remaining @Insts@ (in an
-@LIE@), as well as the @Binds@ generated.
+@LIE@), as well as the @HsBinds@ generated.
 
 \begin{code}
-bindInstsOfLocalFuns ::	LIE -> [Id] -> NF_TcM (LIE, TypecheckedMonoBinds)
+bindInstsOfLocalFuns ::	LIE s -> [TcIdBndr s] -> TcM s (LIE s, TcMonoBinds s)
 
 bindInstsOfLocalFuns init_lie local_ids
-  = let
-	insts = unMkLIE init_lie
-    in
-    bind_insts insts [] EmptyMonoBinds
+  = foldrTc bind_inst (emptyBag, EmptyMonoBinds) (bagToList init_lie)
   where
-    bind_insts	:: [Inst]		-- Insts to mangle
-		-> [Inst]		-- accum. Insts to return
-		-> TypecheckedMonoBinds -- accum. Binds to return
-		-> NF_TcM (LIE, TypecheckedMonoBinds)
-
-    bind_insts [] acc_insts acc_binds
-      = returnNF_Tc (mkLIE acc_insts, acc_binds)
-
-    bind_insts (inst@(Method uniq id tys orig):insts) acc_insts acc_binds
+    bind_inst inst@(Method uniq (TcId id) tys rho orig loc) (insts, binds)
       | id `is_elem` local_ids
-      = noFailTc (lookupInst_Tc inst)	`thenNF_Tc` \ (expr, dict_insts) ->
-	let
-	    bind =  VarMonoBind (mkInstId inst) expr
-	in
-	bind_insts insts (dict_insts ++ acc_insts) (bind `AndMonoBinds` acc_binds)
+      = lookupInst inst		`thenTc` \ (dict_insts, (id,rhs)) ->
+	returnTc (listToBag dict_insts `plusLIE` insts, 
+		  VarMonoBind id rhs `AndMonoBinds` binds)
 
-    bind_insts (some_other_inst:insts) acc_insts acc_binds
+    bind_inst some_other_inst (insts, binds)
 	-- Either not a method, or a method instance for an id not in local_ids
-      = bind_insts insts (some_other_inst:acc_insts) acc_binds
+      = returnTc (some_other_inst `consBag` insts, binds)
 
     is_elem = isIn "bindInstsOfLocalFuns"
 \end{code}
+
+
+%************************************************************************
+%*									*
+\section[Disambig]{Disambiguation of overloading}
+%*									*
+%************************************************************************
+
+
+If a dictionary constrains a type variable which is
+\begin{itemize}
+\item
+not mentioned in the environment
+\item
+and not mentioned in the type of the expression
+\end{itemize}
+then it is ambiguous. No further information will arise to instantiate
+the type variable; nor will it be generalised and turned into an extra
+parameter to a function.
+
+It is an error for this to occur, except that Haskell provided for
+certain rules to be applied in the special case of numeric types.
+
+Specifically, if
+\begin{itemize}
+\item
+at least one of its classes is a numeric class, and
+\item
+all of its classes are numeric or standard
+\end{itemize}
+then the type variable can be defaulted to the first type in the
+default-type list which is an instance of all the offending classes.
+
+So here is the function which does the work.  It takes the ambiguous
+dictionaries and either resolves them (producing bindings) or
+complains.  It works by splitting the dictionary list by type
+variable, and using @disambigOne@ to do the real business.
+
+IMPORTANT: @disambiguate@ assumes that its argument dictionaries
+constrain only a simple type variable.
+
+\begin{code}
+type SimpleDictInfo s = (Inst s, Class, TcTyVar s)
+
+disambiguateDicts :: LIE s -> TcM s ()
+
+disambiguateDicts insts
+  = mapTc disambigOne inst_infos    `thenTc` \ binds_lists ->
+    returnTc ()
+  where
+    inst_infos = equivClasses cmp_tyvars (map mk_inst_info (bagToList insts))
+    (_,_,tv1) `cmp_tyvars` (_,_,tv2) = tv1 `cmp` tv2
+
+    mk_inst_info dict@(Dict _ clas ty _ _)
+      = (dict, clas, getTyVar "disambiguateDicts" ty)
+\end{code}
+
+@disambigOne@ assumes that its arguments dictionaries constrain all
+the same type variable.
+
+ADR Comment 20/6/94: I've changed the @CReturnable@ case to default to
+@()@ instead of @Int@.  I reckon this is the Right Thing to do since
+the most common use of defaulting is code like:
+\begin{verbatim}
+	_ccall_ foo	`seqPrimIO` bar
+\end{verbatim}
+Since we're not using the result of @foo@, the result if (presumably)
+@void@.
+WDP Comment: no such thing as voidTy; so not quite in yet (94/07).
+SLPJ comment: since 
+
+\begin{code}
+disambigOne :: [SimpleDictInfo s] -> TcM s ()
+
+disambigOne dict_infos
+  | not (isStandardNumericDefaultable classes)
+  = failTc (ambigErr dicts) -- no default
+
+  | otherwise -- isStandardNumericDefaultable dict_infos
+  = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
+	-- SO, TRY DEFAULT TYPES IN ORDER
+
+	-- Failure here is caused by there being no type in the
+	-- default list which can satisfy all the ambiguous classes.
+	-- For example, if Real a is reqd, but the only type in the
+	-- default list is Int.
+    tcGetDefaultTys			`thenNF_Tc` \ default_tys ->
+    let
+      try_default [] 	-- No defaults work, so fail
+	= failTc (defaultErr dicts default_tys) 
+
+      try_default (default_ty : default_tys)
+	= tryTc (try_default default_tys) $	-- If default_ty fails, we try
+						-- default_tys instead
+	  tcSimplifyCheckThetas DefaultDeclOrigin thetas	`thenTc` \ _ ->
+	  returnTc default_ty
+        where
+	  thetas = classes `zip` repeat default_ty
+    in
+	-- See if any default works, and if so bind the type variable to it
+    try_default default_tys		`thenTc` \ chosen_default_ty ->
+    tcInstType [] chosen_default_ty	`thenNF_Tc` \ chosen_default_tc_ty ->	-- Tiresome!
+    unifyTauTy (mkTyVarTy tyvar) chosen_default_tc_ty
+
+  where
+    (_,_,tyvar) = head dict_infos		-- Should be non-empty
+    dicts   = [dict | (dict,_,_) <- dict_infos]
+    classes = [clas | (_,clas,_) <- dict_infos]
+
+\end{code}
+
+@isStandardNumericDefaultable@ sees whether the dicts have the
+property required for defaulting; namely at least one is numeric, and
+all are standard; or all are CcallIsh.
+
+\begin{code}
+isStandardNumericDefaultable :: [Class] -> Bool
+
+isStandardNumericDefaultable classes
+  | any isNumericClass classes && all isStandardClass classes
+  = True
+
+isStandardNumericDefaultable classes
+  | all isCcallishClass classes
+  = True
+
+isStandardNumericDefaultable classes
+  = False
+\end{code}
+
+
+
+Errors and contexts
+~~~~~~~~~~~~~~~~~~~
+ToDo: for these error messages, should we note the location as coming
+from the insts, or just whatever seems to be around in the monad just
+now?
+
+\begin{code}
+genCantGenErr insts sty	-- Can't generalise these Insts
+  = ppHang (ppStr "Cannot generalise these overloadings (in a _ccall_):") 
+	   4  (ppAboves (map (ppr sty) (bagToList insts)))
+\end{code}
+
+\begin{code}
+ambigErr insts sty
+  = ppHang (ppStr "Ambiguous overloading")
+	4 (ppAboves (map (ppr sty) insts))
+\end{code}
+
+@reduceErr@ complains if we can't express required dictionaries in
+terms of the signature.
+
+\begin{code}
+reduceErr insts sty
+  = ppHang (ppStr "Type signature lacks context required by inferred type")
+	 4 (ppHang (ppStr "Context reqd: ")
+	         4 (ppAboves (map (ppr sty) (bagToList insts)))
+          )
+\end{code}
+
+\begin{code}
+defaultErr dicts defaulting_tys sty
+  = ppHang (ppStr "Ambiguously-overloaded types could not be resolved:")
+	 4 (ppAboves [
+	     ppHang (ppStr "Conflicting:")
+		  4 (ppInterleave ppSemi (map (ppr sty) dicts)),
+	     ppHang (ppStr "Defaulting types :")
+		  4 (ppr sty defaulting_tys),
+	     ppStr "([Int, Double] is the default list of defaulting types.)" ])
+\end{code}
+

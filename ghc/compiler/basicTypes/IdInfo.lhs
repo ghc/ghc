@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[IdInfo]{@IdInfos@: Non-essential information about @Ids@}
 
@@ -16,10 +16,13 @@ module IdInfo (
 	ppIdInfo,
 	applySubstToIdInfo, apply_to_IdInfo,    -- not for general use, please
 
-	OptIdInfo(..),	-- class; for convenience only, really
-	-- all the *Infos herein are instances of it
+	OptIdInfo(..),	-- class; for convenience only
+			-- all the *Infos herein are instances of it
 
 	-- component "id infos"; also abstract:
+	SrcLoc,
+	getSrcLocIdInfo,
+
 	ArityInfo,
 	mkArityInfo, unknownArity, arityMaybe,
 
@@ -27,17 +30,11 @@ module IdInfo (
 	mkDemandInfo,
 	willBeDemanded,
 
-	SpecEnv, SpecInfo(..),
-	nullSpecEnv, mkSpecEnv, addOneToSpecEnv,
-	lookupSpecId, lookupSpecEnv, lookupConstMethodId,
+	MatchEnv,		-- the SpecEnv
+	StrictnessInfo(..), 	-- non-abstract
+	Demand(..),	    	-- non-abstract
 
-	SrcLoc,
-	getSrcLocIdInfo,
-
-	StrictnessInfo(..), -- non-abstract
-	Demand(..),	    -- non-abstract
 	wwLazy, wwStrict, wwUnpack, wwPrim, wwEnum,
---UNUSED: isStrict, absentArg,
 	indicatesWorker, nonAbsentArgs,
 	mkStrictnessInfo, mkBottomStrictnessInfo,
 	getWrapperArgTypeCategories,
@@ -45,10 +42,7 @@ module IdInfo (
 	workerExists,
 	bottomIsGuaranteed,
 
-	UnfoldingDetails(..),	-- non-abstract! re-exported
-	UnfoldingGuidance(..),	-- non-abstract; ditto
 	mkUnfolding,
-	iWantToBeINLINEd, mkMagicUnfolding,
 	noInfo_UF, getInfo_UF, addInfo_UF, -- to avoid instance virus
 
 	UpdateInfo,
@@ -58,7 +52,7 @@ module IdInfo (
 
 	DeforestInfo(..),
 
-	ArgUsageInfo,	
+	ArgUsageInfo,
 	ArgUsage(..),
 	ArgUsageType(..),
 	mkArgUsageInfo,
@@ -69,53 +63,35 @@ module IdInfo (
 	FBConsum(..),
 	FBProd(..),
 	mkFBTypeInfo,
-	getFBType,
+	getFBType
 
-	-- and to make the interface self-sufficient...
-	Bag, BasicLit, BinderInfo, CoreAtom, CoreExpr, Id,
-	IdEnv(..), UniqFM, Unique, IdVal, FormSummary,
-	InstTemplate, MagicUnfoldingFun, Maybe, UniType, UniqSM(..),
-	SimplifiableBinder(..), SimplifiableCoreExpr(..),
-	PlainCoreExpr(..), PlainCoreAtom(..), PprStyle, Pretty(..),
-	PrettyRep, UniqueSupply, InExpr(..), OutAtom(..), OutExpr(..),
-	OutId(..), Subst
-
-	-- and to make sure pragmas work...
-	IF_ATTACK_PRAGMAS(COMMA mkUnknownSrcLoc)
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
+import Ubiq
 
-import AbsPrel		( mkFunTy, nilDataCon{-HACK-}
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import AbsUniType
-import Bag		( emptyBag, Bag )
-import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( getIdUniType, getIdInfo,
-			  getDataConSig, getInstantiatedDataConSig,
-			  externallyVisibleId, isDataCon,
-			  unfoldingUnfriendlyId, isWorkerId,
-			  isWrapperId, DataCon(..)
-			  IF_ATTACK_PRAGMAS(COMMA applyTypeEnvToId)
-			  IF_ATTACK_PRAGMAS(COMMA getIdStrictness) -- profiling
-			)
-import IdEnv		-- ( nullIdEnv, lookupIdEnv )
-import Inst		( apply_to_Inst, applySubstToInst, Inst )
-import MagicUFs
-import Maybes
-import Outputable
-import PlainCore
+import IdLoop		-- IdInfo is a dependency-loop ranch, and
+			-- we break those loops by using IdLoop and
+			-- *not* importing much of anything else,
+			-- except from the very general "utils".
+
+import CmdLineOpts	( opt_OmitInterfacePragmas )
+import Maybes		( firstJust )
+import MatchEnv		( nullMEnv, mEnvToList )
+import Outputable	( ifPprInterface, Outputable(..){-instances-} )
+import PprStyle		( PprStyle(..) )
 import Pretty
-import SimplEnv		-- UnfoldingDetails(..), UnfoldingGuidance(..)
-import SrcLoc
-import Subst		( applySubstToTy, Subst )
-import OccurAnal	( occurAnalyseGlobalExpr )
-import TaggedCore	-- SimplifiableCore* ...
-import Unique
-import Util
-import WwLib		( mAX_WORKER_ARGS )
+import SrcLoc		( mkUnknownSrcLoc )
+import Type		( eqSimpleTy )
+import Util		( mapAccumL, panic, assertPanic, pprPanic )
+
+applySubstToTy = panic "IdInfo.applySubstToTy"
+isUnboxedDataType = panic "IdInfo.isUnboxedDataType"
+splitTypeWithDictsAsArgs = panic "IdInfo.splitTypeWithDictsAsArgs"
+showTypeCategory = panic "IdInfo.showTypeCategory"
+mkFormSummary = panic "IdInfo.mkFormSummary"
+occurAnalyseGlobalExpr = panic "IdInfo.occurAnalyseGlobalExpr"
+isWrapperFor = panic "IdInfo.isWrapperFor"
+pprCoreUnfolding = panic "IdInfo.pprCoreUnfolding"
 \end{code}
 
 An @IdInfo@ gives {\em optional} information about an @Id@.  If
@@ -138,19 +114,21 @@ data IdInfo
 	DemandInfo		-- Whether or not it is definitely
 				-- demanded
 
-	SpecEnv			-- Specialisations of this function which exist
+	(MatchEnv [Type] CoreExpr)
+				-- Specialisations of this function which exist
+				-- This corresponds to a SpecEnv which we do
+				-- not import directly to avoid loop
 
 	StrictnessInfo		-- Strictness properties, notably
 				-- how to conjure up "worker" functions
 
 	UnfoldingDetails	-- Its unfolding; for locally-defined
 				-- things, this can *only* be NoUnfoldingDetails
-				-- or IWantToBeINLINEd (i.e., INLINE pragma).
 
 	UpdateInfo		-- Which args should be updated
 
-        DeforestInfo            -- Whether its definition should be
-                                -- unfolded during deforestation
+	DeforestInfo            -- Whether its definition should be
+				-- unfolded during deforestation
 
 	ArgUsageInfo		-- how this Id uses its arguments
 
@@ -169,19 +147,21 @@ data IdInfo
 noIdInfo = IdInfo noInfo noInfo noInfo noInfo noInfo_UF
 		  noInfo noInfo noInfo noInfo mkUnknownSrcLoc
 
--- "boring" means: nothing to put an interface
+-- "boring" means: nothing to put in interface
 boringIdInfo (IdInfo UnknownArity
 		     UnknownDemand
-		     nullSpecEnv
+		     specenv
 		     strictness
 		     unfolding
 		     NoUpdateInfo
 		     Don'tDeforest
 		     _ {- arg_usage: currently no interface effect -}
 		     _ {- no f/b w/w -}
-		     _ {- src_loc: no effect on interfaces-})
-		     |  boring_strictness strictness
-		     && boring_unfolding unfolding
+		     _ {- src_loc: no effect on interfaces-}
+	      )
+	      |  null (mEnvToList specenv)
+	      && boring_strictness strictness
+	      && boring_unfolding unfolding
   = True
   where
     boring_strictness NoStrictnessInfo = True
@@ -200,17 +180,18 @@ Simply turgid.  But BE CAREFUL: don't @apply_to_Id@ if that @Id@
 will in turn @apply_to_IdInfo@ of the self-same @IdInfo@.  (A very
 nasty loop, friends...)
 \begin{code}
-apply_to_IdInfo ty_fn
-    (IdInfo arity demand spec strictness unfold update deforest arg_usage fb_ww srcloc)
-  = let
+apply_to_IdInfo ty_fn (IdInfo arity demand spec strictness unfold
+			      update deforest arg_usage fb_ww srcloc)
+  = panic "IdInfo:apply_to_IdInfo"
+{- LATER:
+    let
 	new_spec = apply_spec spec
 
-	-- NOT a good idea: 
+	-- NOT a good idea:
 	--   apply_strict strictness 	`thenLft` \ new_strict ->
 	--   apply_wrap wrap 		`thenLft` \ new_wrap ->
     in
-    IdInfo arity demand
-	   new_spec strictness unfold
+    IdInfo arity demand new_spec strictness unfold
 	   update deforest arg_usage fb_ww srcloc
   where
     apply_spec (SpecEnv is)
@@ -222,6 +203,7 @@ apply_to_IdInfo ty_fn
 	  where
 	    apply_to_maybe Nothing   = Nothing
 	    apply_to_maybe (Just ty) = Just (ty_fn ty)
+-}
 
 {- NOT a good idea;
     apply_strict info@NoStrictnessInfo = returnLft info
@@ -232,20 +214,22 @@ apply_to_IdInfo ty_fn
 	   Just xx -> applySubstToId subst xx `thenLft` \ new_xx ->
 		      returnLft (Just new_xx)
 	) `thenLft` \ new_id_maybe ->
-        returnLft (StrictnessInfo wrap_arg_info new_id_maybe)
+	returnLft (StrictnessInfo wrap_arg_info new_id_maybe)
 -}
 \end{code}
 
 Variant of the same thing for the typechecker.
 \begin{code}
-applySubstToIdInfo s0
-    (IdInfo arity demand spec strictness unfold update deforest arg_usage fb_ww srcloc)
-  = case (apply_spec s0 spec) of { (s1, new_spec) ->
+applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
+			      update deforest arg_usage fb_ww srcloc)
+  = panic "IdInfo:applySubstToIdInfo"
+{- LATER:
+    case (apply_spec s0 spec) of { (s1, new_spec) ->
     (s1, IdInfo arity demand new_spec strictness unfold update deforest arg_usage fb_ww srcloc) }
   where
     apply_spec s0 (SpecEnv is)
       = case (mapAccumL do_one s0 is) of { (s1, new_is) ->
-        (s1, SpecEnv new_is) }
+	(s1, SpecEnv new_is) }
       where
     	do_one s0 (SpecInfo ty_maybes ds spec_id)
 	  = case (mapAccumL apply_to_maybe s0 ty_maybes) of { (s1, new_maybes) ->
@@ -255,6 +239,7 @@ applySubstToIdInfo s0
 	    apply_to_maybe s0 (Just ty)
 	      = case (applySubstToTy s0 ty) of { (s1, new_ty) ->
 		(s1, Just new_ty) }
+-}
 \end{code}
 
 \begin{code}
@@ -268,7 +253,7 @@ ppIdInfo :: PprStyle
 	 -> Pretty
 
 ppIdInfo sty for_this_id specs_please better_id_fn inline_env
-    i@(IdInfo arity demand specialise strictness unfold update deforest arg_usage fbtype srcloc)
+    i@(IdInfo arity demand specenv strictness unfold update deforest arg_usage fbtype srcloc)
   | boringIdInfo i
   = ppPStr SLIT("_NI_")
 
@@ -281,15 +266,15 @@ ppIdInfo sty for_this_id specs_please better_id_fn inline_env
 		    ppInfo sty better_id_fn deforest,
 
 		    pp_strictness sty (Just for_this_id)
-				  better_id_fn inline_env strictness,
+						  better_id_fn inline_env strictness,
 
 		    if bottomIsGuaranteed strictness
 		    then pp_NONE
 		    else pp_unfolding sty for_this_id inline_env unfold,
 
 		    if specs_please
-		    then pp_specs sty (not (isDataCon for_this_id))
-			          better_id_fn inline_env specialise
+		    then ppSpecs sty (not (isDataCon for_this_id))
+				 better_id_fn inline_env (mEnvToList specenv)
 		    else pp_NONE,
 
 		    -- DemandInfo needn't be printed since it has no effect on interfaces
@@ -298,21 +283,10 @@ ppIdInfo sty for_this_id specs_please better_id_fn inline_env
 		]
     in
     case sty of
-      PprInterface sw_chker ->	if sw_chker OmitInterfacePragmas
-				then ppNil
-				else stuff
-      _			    ->	stuff
-\end{code}
-
-\begin{code}
-{- OLD:
-pp_info_op :: String -> Pretty -- like pprNonOp
-
-pp_info_op name
-  = if isAvarop name || isAconop name
-    then ppBesides [ppLparen, ppStr name, ppRparen]
-    else ppStr name
--}
+      PprInterface -> if opt_OmitInterfacePragmas
+		      then ppNil
+		      else stuff
+      _		   -> stuff
 \end{code}
 
 %************************************************************************
@@ -402,7 +376,7 @@ mkDemandInfo :: Demand -> DemandInfo
 mkDemandInfo demand = DemandedAsPer demand
 
 willBeDemanded :: DemandInfo -> Bool
-willBeDemanded (DemandedAsPer demand) = isStrict demand 
+willBeDemanded (DemandedAsPer demand) = isStrict demand
 willBeDemanded _		      = False
 \end{code}
 
@@ -414,12 +388,12 @@ instance OptIdInfo DemandInfo where
 
 {-	DELETED!  If this line is in, there is no way to
 	nuke a DemandInfo, and we have to be able to do that
-	when floating let-bindings around 
+	when floating let-bindings around
     addInfo id_info UnknownDemand = id_info
 -}
     addInfo (IdInfo a _ c d e f g h i j) demand = IdInfo a demand c d e f g h i j
 
-    ppInfo (PprInterface _) _ _	      = ppNil
+    ppInfo PprInterface _ _	      = ppNil
     ppInfo sty _ UnknownDemand	      = ppStr "{-# L #-}"
     ppInfo sty _ (DemandedAsPer info)
       = ppCat [ppStr "{-#", ppStr (showList [info] ""), ppStr "#-}"]
@@ -431,192 +405,22 @@ instance OptIdInfo DemandInfo where
 %*									*
 %************************************************************************
 
-The details of one specialisation, held in an @Id@'s
-@SpecEnv@ are as follows:
-\begin{code}
-data SpecInfo
-  = SpecInfo	[Maybe UniType] -- Instance types; no free type variables in here
-	    	Int		-- No. of dictionaries to eat
-		Id		-- Specialised version
-\end{code}
-
-For example, if \tr{f} has this @SpecInfo@:
-\begin{verbatim}
-	SpecInfo [Just t1, Nothing, Just t3] 2 f'
-\end{verbatim}
-then
-\begin{verbatim}
-	f t1 t2 t3 d1 d2  ===>  f t2
-\end{verbatim}
-The \tr{Nothings} identify type arguments in which the specialised
-version is polymorphic.
+See SpecEnv.lhs
 
 \begin{code}
-data SpecEnv = SpecEnv [SpecInfo]
-
-mkSpecEnv = SpecEnv
-nullSpecEnv = SpecEnv []
-addOneToSpecEnv (SpecEnv xs) x = SpecEnv (x : xs)
-
-lookupConstMethodId :: Id -> UniType -> Maybe Id
-    -- slight variant on "lookupSpecEnv" below
-
-lookupConstMethodId sel_id spec_ty
-  = case (getInfo (getIdInfo sel_id)) of
-      SpecEnv spec_infos -> firstJust (map try spec_infos)
-  where
-    try (SpecInfo (Just ty:nothings) _ const_meth_id)
-      = ASSERT(all nothing_is_nothing nothings)
-	case (cmpUniType True{-properly-} ty spec_ty) of
-	  EQ_ -> Just const_meth_id
-	  _   -> Nothing
-
-    nothing_is_nothing Nothing = True  -- debugging only
-    nothing_is_nothing _       = panic "nothing_is_nothing!"
-
-lookupSpecId :: Id		-- *un*specialised Id
-	     -> [Maybe UniType]	-- types to which it is to be specialised
-	     -> Id		-- specialised Id
-
-lookupSpecId unspec_id ty_maybes
-  = case (getInfo (getIdInfo unspec_id)) of { SpecEnv spec_infos ->
-
-    case (firstJust (map try spec_infos)) of
-      Just id -> id
-      Nothing -> error ("ERROR: There is some confusion about a value specialised to a type;\ndetails follow (and more info in the User's Guide):\n\t"++(ppShow 80 (ppr PprDebug unspec_id)))
-    }
-  where
-    try (SpecInfo template_maybes _ id) 
-	| and (zipWith same template_maybes ty_maybes)
-	&& length template_maybes == length ty_maybes = Just id
-	| otherwise 				      = Nothing
-
-    same Nothing    Nothing    = True
-    same (Just ty1) (Just ty2) = ty1 == ty2
-    same _	    _	       = False
-
-lookupSpecEnv :: SpecEnv
-	      -> [UniType]
-	      -> Maybe (Id,
-			[UniType],
-			Int)
-
-lookupSpecEnv (SpecEnv []) _ = Nothing 	-- rather common case
-
-lookupSpecEnv spec_env [] = Nothing	-- another common case
- 
-	-- This can happen even if there is a non-empty spec_env, because
-	-- of eta reduction.  For example, we might have a defn
-	--
-	--	f = /\a -> \d -> g a d
-	-- which gets transformed to
-	--	f = g
-	--
-	-- Now g isn't applied to any arguments
-
-lookupSpecEnv se@(SpecEnv spec_infos) spec_tys
-  = select_match spec_infos
-  where
-    select_match []		-- no matching spec_infos
-      = Nothing
-    select_match (SpecInfo ty_maybes toss spec_id : rest)
-      = case (match ty_maybes spec_tys) of
-	  Nothing       -> select_match rest
-	  Just tys_left -> select_next [(spec_id,tys_left,toss)] (length tys_left) toss rest
-
-	-- Ambiguity can only arise as a result of specialisations with
-	-- an explicit spec_id. The best match is deemed to be the match
-	-- with least polymorphism i.e. has the least number of tys left.
-	-- This is a non-critical approximation. The only type arguments
-	-- where there may be some discretion is for non-overloaded boxed
-	-- types. Unboxed types must be matched and we insist that we
-	-- always specialise on overloaded types (and discard all the dicts).
-
-    select_next best _ toss []
-      =	case best of
-	    [match] -> Just match	-- Unique best match 
-	    ambig   -> pprPanic "Ambiguous Specialisation:\n"
-				(ppAboves [ppStr "(check specialisations with explicit spec ids)",
-					   ppCat (ppStr "between spec ids:" : 
-						  map (ppr PprDebug) [id | (id, _, _) <- ambig]),
-					   pp_stuff])
-
-    select_next best tnum dnum (SpecInfo ty_maybes toss spec_id : rest)
-      = ASSERT(dnum == toss)
-	case (match ty_maybes spec_tys) of
-	  Nothing       -> select_next best tnum dnum rest
-	  Just tys_left ->
-	     let tys_len = length tys_left in
-	     case _tagCmp tnum tys_len of
-	       _LT -> select_next [(spec_id,tys_left,toss)] tys_len dnum rest	-- better match
-	       _EQ -> select_next ((spec_id,tys_left,toss):best) tnum dnum rest	-- equivalent match
-	       _GT -> select_next best tnum dnum rest				-- worse match
-
-
-    match [{-out of templates-}] [] = Just []
-
-    match (Nothing:ty_maybes) (spec_ty:spec_tys)
-      = case (isUnboxedDataType spec_ty) of
-	  True  -> Nothing	-- Can only match boxed type against
-				-- type argument which has not been
-				-- specialised on
-	  False -> case match ty_maybes spec_tys of
-	             Nothing  -> Nothing
-	             Just tys -> Just (spec_ty:tys)
-
-    match (Just ty:ty_maybes) (spec_ty:spec_tys)
-      = case (cmpUniType True{-properly-} ty spec_ty) of
-	  EQ_   -> match ty_maybes spec_tys
-	  other -> Nothing
-
-    match [] _ = pprPanic "lookupSpecEnv1\n" pp_stuff
-		 -- This is a Real Problem
-
-    match _ [] = pprPanic "lookupSpecEnv2\n" pp_stuff
-		 -- Partial eta abstraction might make this happen;
-		 -- meanwhile let's leave in the check
-
-    pp_stuff = ppAbove (pp_specs PprDebug True (\x->x) nullIdEnv se) (ppr PprDebug spec_tys)
-\end{code}
-
-
-\begin{code}
-instance OptIdInfo SpecEnv where
-    noInfo = nullSpecEnv
+instance OptIdInfo (MatchEnv [Type] CoreExpr) where
+    noInfo = nullMEnv
 
     getInfo (IdInfo _ _ spec _ _ _ _ _ _ _) = spec
 
-    addInfo (IdInfo a b (SpecEnv old_spec) d e f g h i j) (SpecEnv new_spec)
-	= IdInfo a b (SpecEnv (new_spec ++ old_spec)) d e f g h i j
-	-- We *add* the new specialisation info rather than just replacing it
-	-- so that we don't lose old specialisation details.
+    addInfo id_info spec | null (mEnvToList spec) = id_info
+    addInfo (IdInfo a b _ d e f g h i j) spec = IdInfo a b spec d e f g h i j
 
-    ppInfo sty better_id_fn spec_env
-      = pp_specs sty True better_id_fn nullIdEnv spec_env
+    ppInfo sty better_id_fn spec
+      = ppSpecs sty True better_id_fn nullIdEnv (mEnvToList spec)
 
-pp_specs sty _ _ _ (SpecEnv [])  = pp_NONE
-pp_specs sty print_spec_ids better_id_fn inline_env (SpecEnv specs)
-  = ppBeside (ppPStr SLIT("_SPECIALISE_ ")) (pp_the_list [
-       ppCat [ppLbrack, ppIntersperse pp'SP{-'-} (map pp_maybe ty_maybes), ppRbrack,
-	      ppInt numds,
-	      let
-		 better_spec_id = better_id_fn spec_id
-		 spec_id_info = getIdInfo better_spec_id
-	      in
-	      if not print_spec_ids || boringIdInfo spec_id_info then
-		 ppNil
-	      else
-		 ppCat [ppChar '{',
-			ppIdInfo sty better_spec_id True{-wrkr specs too!-} better_id_fn inline_env spec_id_info,
-			ppChar '}']
-	     ]
-       | (SpecInfo ty_maybes numds spec_id) <- specs ])
-  where
-    pp_the_list [p]    = p
-    pp_the_list (p:ps) = ppBesides [p, pp'SP{-'-}, pp_the_list ps]
-
-    pp_maybe Nothing  = ifPprInterface sty pp_NONE
-    pp_maybe (Just t) = pprParendUniType sty t
+ppSpecs sty print_spec_id_info better_id_fn inline_env spec_env
+  = panic "IdInfo:ppSpecs"
 \end{code}
 
 %************************************************************************
@@ -698,7 +502,7 @@ bottomIsGuaranteed BottomGuaranteed = True
 bottomIsGuaranteed other    	    = False
 
 getWrapperArgTypeCategories
-	:: UniType		-- wrapper's type
+	:: Type		-- wrapper's type
 	-> StrictnessInfo	-- strictness info about its args
 	-> Maybe String
 
@@ -731,13 +535,6 @@ isStrict WwPrim		= True
 isStrict WwEnum		= True
 isStrict _		= False
 
-{- UNUSED:
-absentArg :: Demand -> Bool
-
-absentArg (WwLazy absentp) = absentp
-absentArg other		   = False
--}
-
 nonAbsentArgs :: [Demand] -> Int
 
 nonAbsentArgs cmpts
@@ -748,7 +545,7 @@ nonAbsentArgs cmpts
 
 all_present_WwLazies :: [Demand] -> Bool
 all_present_WwLazies infos
-  = and (map is_L infos) 
+  = and (map is_L infos)
   where
     is_L (WwLazy False) = True	-- False <=> "Absent" args do *not* count!
     is_L _	        = False	-- (as they imply a worker)
@@ -764,7 +561,7 @@ or an Absent {\em that we accept}.
 indicatesWorker :: [Demand] -> Bool
 
 indicatesWorker dems
-  = fake_mk_ww (mAX_WORKER_ARGS - nonAbsentArgs dems) dems
+  = fake_mk_ww (_trace "mAX_WORKER_ARGS" 6 - nonAbsentArgs dems) dems
   where
     fake_mk_ww _ [] = False
     fake_mk_ww _ (WwLazy True : _) = True -- we accepted an Absent
@@ -779,9 +576,9 @@ indicatesWorker dems
 
 \begin{code}
 mkWrapperArgTypeCategories
-	:: UniType		-- wrapper's type
+	:: Type		-- wrapper's type
 	-> [Demand]	-- info about its arguments
-	-> String		-- a string saying lots about the args
+	-> String	-- a string saying lots about the args
 
 mkWrapperArgTypeCategories wrapper_ty wrap_info
   = case (splitTypeWithDictsAsArgs wrapper_ty) of { (_,arg_tys,_) ->
@@ -880,9 +677,8 @@ pp_strictness sty for_this_id_maybe better_id_fn inline_env
 		  Nothing -> wrapper_args
 		  Just id -> if externallyVisibleId id
 			     && (unfoldingUnfriendlyId id || not have_wrkr) then
-				-- pprTrace "IdInfo: unworker-ising:" (ppCat [ppr PprDebug have_wrkr, ppr PprDebug id]) (
+				-- pprTrace "IdInfo: unworker-ising:" (ppCat [ppr PprDebug have_wrkr, ppr PprDebug id]) $
 				map un_workerise wrapper_args
-				-- )
 			     else
 				wrapper_args
 
@@ -891,10 +687,7 @@ pp_strictness sty for_this_id_maybe better_id_fn inline_env
 	      Nothing -> False
 	      Just id -> isWorkerId id
 
-	am_printing_iface
-	  = case sty of
-	      PprInterface _ -> True
-	      _ -> False
+	am_printing_iface = case sty of { PprInterface -> True ; _ -> False }
 
 	pp_basic_info
 	  = ppBesides [ppStr "_S_ \"",
@@ -931,21 +724,10 @@ pp_strictness sty for_this_id_maybe better_id_fn inline_env
 %************************************************************************
 
 \begin{code}
-mkUnfolding	 :: UnfoldingGuidance -> PlainCoreExpr -> UnfoldingDetails
-iWantToBeINLINEd :: UnfoldingGuidance -> UnfoldingDetails
-mkMagicUnfolding :: FAST_STRING -> UnfoldingDetails
-
 mkUnfolding guide expr
-  = GeneralForm False (mkFormSummary NoStrictnessInfo expr) 
+  = GenForm False (mkFormSummary NoStrictnessInfo expr)
 	(BSCC("OccurExpr") occurAnalyseGlobalExpr expr ESCC)
 	guide
-\end{code}
-
-\begin{code}
-iWantToBeINLINEd guide = IWantToBeINLINEd guide
-
-mkMagicUnfolding tag  = MagicForm tag (mkMagicUnfoldingFun tag)
-
 \end{code}
 
 \begin{code}
@@ -953,17 +735,15 @@ noInfo_UF = NoUnfoldingDetails
 
 getInfo_UF (IdInfo _ _ _ _ unfolding _ _ _ _ _)
   = case unfolding of
-      NoUnfoldingDetails 	     -> NoUnfoldingDetails
-      GeneralForm _ _ _ BadUnfolding -> NoUnfoldingDetails
-      unfold_ok 		     -> unfold_ok
+      GenForm _ _ _ BadUnfolding -> NoUnfoldingDetails
+      unfolding_as_was 		     -> unfolding_as_was
 
 -- getInfo_UF ensures that any BadUnfoldings are never returned
 -- We had to delay the test required in TcPragmas until now due
 -- to strictness constraints in TcPragmas
 
 addInfo_UF id_info@(IdInfo a b c d e f g h i j) NoUnfoldingDetails = id_info
-addInfo_UF (IdInfo a b d e xxx f g h i j) uf = IdInfo a b d e uf f g h i j
-
+addInfo_UF   (IdInfo a b d e _ f g h i j) uf = IdInfo a b d e uf f g h i j
 \end{code}
 
 \begin{code}
@@ -974,17 +754,12 @@ pp_unfolding sty for_this_id inline_env uf_details
   where
     pp NoUnfoldingDetails = pp_NONE
 
-    pp (IWantToBeINLINEd guide) -- not in interfaces
-      = if isWrapperId for_this_id
-        then pp_NONE -- wrapper: don't complain or mutter
-	else ppCat [ppStr "{-IWantToBeINLINEd", ppr sty guide, ppStr "-}", pp_NONE]
-
     pp (MagicForm tag _)
       = ppCat [ppPStr SLIT("_MF_"), ppPStr tag]
 
-    pp (GeneralForm _ _ _ BadUnfolding) = pp_NONE
+    pp (GenForm _ _ _ BadUnfolding) = pp_NONE
 
-    pp (GeneralForm _ _ template guide)
+    pp (GenForm _ _ template guide)
       = let
 	    untagged = unTagBinders template
 	in
@@ -1068,7 +843,7 @@ instance OptIdInfo DeforestInfo where
     getInfo (IdInfo _ _ _ _ _ _ deforest _ _ _) = deforest
 
     addInfo id_info Don'tDeforest = id_info
-    addInfo (IdInfo a b d e f g _ h i j) deforest = 
+    addInfo (IdInfo a b d e f g _ h i j) deforest =
     	IdInfo a b d e f g deforest h i j
 
     ppInfo sty better_id_fn Don'tDeforest
@@ -1111,8 +886,8 @@ instance OptIdInfo ArgUsageInfo where
     addInfo id_info NoArgUsageInfo = id_info
     addInfo (IdInfo a b d e f g h _ i j) au_info = IdInfo a b d e f g h au_info i j
 
-    ppInfo sty better_id_fn NoArgUsageInfo	  = ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn (SomeArgUsageInfo []) = ifPprInterface sty pp_NONE
+    ppInfo sty better_id_fn NoArgUsageInfo		= ifPprInterface sty pp_NONE
+    ppInfo sty better_id_fn (SomeArgUsageInfo [])	= ifPprInterface sty pp_NONE
     ppInfo sty better_id_fn (SomeArgUsageInfo aut)
       = ppBeside (ppPStr SLIT("_L_ ")) (ppArgUsageType aut)
 
@@ -1120,7 +895,7 @@ instance OptIdInfo ArgUsageInfo where
 ppArgUsage (ArgUsage n)      = ppInt n
 ppArgUsage (UnknownArgUsage) = ppChar '-'
 
-ppArgUsageType aut = ppBesides 
+ppArgUsageType aut = ppBesides
 	[ ppChar '"' ,
 	  ppIntersperse ppComma (map ppArgUsage aut),
 	  ppChar '"' ]
@@ -1160,16 +935,16 @@ instance OptIdInfo FBTypeInfo where
     addInfo id_info NoFBTypeInfo = id_info
     addInfo (IdInfo a b d e f g h i _ j) fb_info = IdInfo a b d e f g h i fb_info j
 
-    ppInfo (PprInterface _) better_id_fn NoFBTypeInfo = ppNil
-    ppInfo sty better_id_fn NoFBTypeInfo	= ifPprInterface sty pp_NONE
-    ppInfo sty better_id_fn (SomeFBTypeInfo (FBType cons prod))
+    ppInfo PprInterface _ NoFBTypeInfo = ppNil
+    ppInfo sty 		_ NoFBTypeInfo = ifPprInterface sty pp_NONE
+    ppInfo sty 		_ (SomeFBTypeInfo (FBType cons prod))
       = ppBeside (ppPStr SLIT("_F_ ")) (ppFBType cons prod)
 
 --ppFBType (FBType n)      = ppBesides [ppInt n]
 --ppFBType (UnknownFBType) = ppBesides [ppStr "-"]
 --
 
-ppFBType cons prod = ppBesides 
+ppFBType cons prod = ppBesides
 	([ ppChar '"' ] ++ map ppCons cons ++ [ ppChar '-', ppProd prod, ppChar '"' ])
   where
 	ppCons FBGoodConsum = ppChar 'G'

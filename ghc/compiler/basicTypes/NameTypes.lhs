@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %************************************************************************
 %*									*
@@ -24,18 +24,20 @@ module NameTypes (
 
 	unlocaliseFullName, unlocaliseShortName,
 
-#ifdef DPH
-	isInventedFullName,
-#endif {- Data Parallel Haskell -}
-
 	-- and to make the interface self-sufficient....
 	ExportFlag, Unique, SrcLoc
     ) where
 
-import CLabelInfo	( identToC, cSEP )
+CHK_Ubiq()	 -- debugging consistency check
+import PrelLoop  -- for paranoia checking
+
+import PrelMods		( pRELUDE, pRELUDE_CORE ) -- NB: naughty import
+
+import CStrings		( identToC, cSEP )
 import Outputable
-import PrelFuns		( pRELUDE, pRELUDE_CORE ) -- NB: naughty import
 import Pretty
+import PprStyle		( PprStyle(..), codeStyle )
+
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import Unique		( showUnique, Unique )
 import Util
@@ -152,16 +154,6 @@ mkPreludeCoreName mod name
 \end{code}
 
 \begin{code}
-#ifdef DPH
-isInventedFullName (FullName _ _ p _ _ _)
-  = case p of
-      InventedInThisModule -> True
-      _			   -> False
-
-#endif {- Data Parallel Haskell -}
-\end{code}
-
-\begin{code}
 unlocaliseShortName :: FAST_STRING -> Unique -> ShortName -> FullName
 
 {- We now elucidate Simon's favourite piece of code:
@@ -207,10 +199,8 @@ instance NamedThing ShortName where
     getSrcLoc	(ShortName s l)       = l
     fromPreludeCore _		      = False
 #ifdef DEBUG
-    getTheUnique (ShortName s l)      = panic "NamedThing.ShortName.getTheUnique" 
+    getItsUnique (ShortName s l)      = panic "NamedThing.ShortName.getItsUnique"
     getInformingModules a	      = panic "NamedThing.ShortName.getInformingModule"
-    hasType a			      = panic "NamedThing.ShortName.hasType"
-    getType a			      = panic "NamedThing.ShortName.getType"
 #endif
 \end{code}
 
@@ -251,9 +241,7 @@ instance NamedThing FullName where
 	  OtherPrelude _	-> [pRELUDE]
 
 #ifdef DEBUG
-    getTheUnique = panic "NamedThing.FullName.getTheUnique"
-    hasType = panic "NamedThing.FullName.hasType"
-    getType = panic "NamedThing.FullName.getType"
+    getItsUnique = panic "NamedThing.FullName.getItsUnique"
 #endif
 \end{code}
 
@@ -279,26 +267,26 @@ instance Outputable FullName where
 			else case sty of
 			      PprForUser     -> ppNil
 			      PprDebug	     -> ppNil
-			      PprInterface _ -> ppNil
-			      PprUnfolding _ -> ppNil	-- ToDo: something diff later?
-			      PprForC _ -> ppBeside (identToC m) (ppPStr cSEP)
-			      PprForAsm _ False _ -> ppBeside (identToC m) (ppPStr cSEP)
-			      PprForAsm _ True _ -> ppBesides [ppPStr cSEP, identToC m, ppPStr cSEP]
+			      PprInterface   -> ppNil
+			      PprUnfolding   -> ppNil	-- ToDo: something diff later?
+			      PprForC 	     -> ppBeside (identToC m) (ppPStr cSEP)
+			      PprForAsm False _ -> ppBeside (identToC m) (ppPStr cSEP)
+			      PprForAsm True  _ -> ppBesides [ppPStr cSEP, identToC m, ppPStr cSEP]
 			      _	        -> ppBeside (ppPStr m) (ppChar '.'))
 		       (if codeStyle sty
-		        then identToC s
+			then identToC s
 			else case sty of
-			       PprInterface _ -> pp_local_name s p
-			       PprForUser     -> pp_local_name s p
-			       _	      -> ppPStr s)
+			       PprInterface -> pp_local_name s p
+			       PprForUser   -> pp_local_name s p
+			       _	    -> ppPStr s)
 
 	    pp_debug = ppBeside pp_name (pp_occur_name s p)
 	in
-        case sty of
-	  PprShowAll 	 -> ppBesides [pp_debug, pp_exp e] -- (ppr sty loc)
-	  PprDebug   	 -> pp_debug
-	  PprUnfolding _ -> pp_debug
-	  _	     	 -> pp_name
+	case sty of
+	  PprShowAll   -> ppBesides [pp_debug, pp_exp e] -- (ppr sty loc)
+	  PprDebug     -> pp_debug
+	  PprUnfolding -> pp_debug
+	  _	       -> pp_name
       where
 	pp_exp NotExported = ppNil
 	pp_exp ExportAll   = ppPStr SLIT("/EXP(..)")

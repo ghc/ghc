@@ -1,7 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface AnalFBWW where
-import CmdLineOpts(GlobalSwitch)
-import CoreSyn(CoreBinding)
-import Id(Id)
-analFBWW :: (GlobalSwitch -> Bool) -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-

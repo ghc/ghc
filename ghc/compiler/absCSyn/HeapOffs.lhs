@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[HeapOffs]{Abstract C: heap offsets}
 
@@ -12,11 +12,7 @@ INTERNAL MODULE: should be accessed via @AbsCSyn.hi@.
 #include "HsVersions.h"
 
 module HeapOffs (
-#ifndef DPH
 	HeapOffset,
-#else
-	HeapOffset(..),	-- DPH needs to do a little peaking inside this thing.
-#endif {- Data Parallel Haskell -}
 
 	zeroOff, intOff, fixedHdrSize, totHdrSize, varHdrSize,
 	maxOff, addOff, subOff,
@@ -26,24 +22,27 @@ module HeapOffs (
 
 	intOffsetIntoGoods,
 
+#if 0
 #if ! OMIT_NATIVE_CODEGEN
-	hpRelToInt, 
+	hpRelToInt,
+#endif
 #endif
 
 	VirtualHeapOffset(..), HpRelOffset(..),
 	VirtualSpAOffset(..), VirtualSpBOffset(..),
 	SpARelOffset(..), SpBRelOffset(..)
-    ) where 
+    ) where
 
-import ClosureInfo	-- esp. about SMReps
-import SMRep		
-#if ! OMIT_NATIVE_CODEGEN
-import MachDesc
-#endif
-import Maybes		( catMaybes, Maybe(..) )
-import Outputable
+import Ubiq{-uitous-}
+
+import ClosureInfo	( isSpecRep )
+import Maybes		( catMaybes )
+import SMRep
 import Unpretty		-- ********** NOTE **********
-import Util
+import Util		( panic )
+#if ! OMIT_NATIVE_CODEGEN
+--import MachDesc		( Target )
+#endif
 \end{code}
 
 %************************************************************************
@@ -63,7 +62,7 @@ import Util
     * Node, the ptr to the closure, pts at its info-ptr field
 -}
 data HeapOffset
-  = MkHeapOffset	
+  = MkHeapOffset
 
 	FAST_INT	-- this many words...
 
@@ -88,13 +87,8 @@ data HeapOffset
 
   deriving () -- but: see `eqOff` below
 
-#if defined(__GLASGOW_HASKELL__)
 data SMRep__Int = SMRI_ SMRep Int#
 #define SMRI(a,b) (SMRI_ a b)
-#else
-type SMRep__Int = (SMRep, Int)
-#define SMRI(a,b) (a, b)
-#endif
 
 type VirtualHeapOffset	= HeapOffset
 type VirtualSpAOffset	= Int
@@ -113,7 +107,7 @@ intOff IBOX(n) = MkHeapOffset n ILIT(0) [] []
 
 fixedHdrSize = MkHeapOffset ILIT(0) ILIT(1) [] []
 
-totHdrSize sm_rep 
+totHdrSize sm_rep
   = if isSpecRep sm_rep -- Tot hdr size for a spec rep is just FixedHdrSize
     then MkHeapOffset ILIT(0) ILIT(1) [] []
     else MkHeapOffset ILIT(0) ILIT(0) [] [SMRI(sm_rep, ILIT(1))]
@@ -150,7 +144,7 @@ maxOff off1@(MkHeapOffset int_offs1 fixhdr_offs1 varhdr_offs1 tothdr_offs1)
     else
 	 MaxHeapOffset off1 off2
   where
-    -- Normalise, by realising that each tot-hdr is really a 
+    -- Normalise, by realising that each tot-hdr is really a
     -- var-hdr plus a fixed-hdr
     n_tothdr1    = total_of tothdr_offs1
     real_fixed1  = fixhdr_offs1 _ADD_ n_tothdr1
@@ -215,7 +209,7 @@ add_HdrSizes offs1 [] = offs1
 add_HdrSizes as@(off1@(SMRI(rep1,n1)) : offs1) bs@(off2@(SMRI(rep2,n2)) : offs2)
   = if rep1 `ltSMRepHdr` rep2 then
 	     off1 : (add_HdrSizes offs1 bs)
-    else 
+    else
     if rep2 `ltSMRepHdr` rep1 then
 	     off2 : (add_HdrSizes as offs2)
     else
@@ -293,7 +287,7 @@ pprHeapOffset sty (MkHeapOffset int_offs fxdhdr_offs varhdr_offs tothdr_offs)
 \end{code}
 
 \begin{code}
-pprHeapOffsetPieces :: PprStyle 
+pprHeapOffsetPieces :: PprStyle
 		    -> FAST_INT		-- Words
 		    -> FAST_INT		-- Fixed hdrs
 		    -> [SMRep__Int]	-- Var hdrs
@@ -336,7 +330,7 @@ pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
     pp_hdr pp_str (SMRI(rep, n))
       = if n _EQ_ ILIT(1) then
 	  uppBeside (uppStr (show rep)) pp_str
-        else
+	else
 	  uppBesides [uppInt IBOX(n), uppChar '*', uppStr (show rep), pp_str]
 \end{code}
 
@@ -366,6 +360,7 @@ intOffsetIntoGoods anything_else = Nothing
 \end{code}
 
 \begin{code}
+#if 0
 #if ! OMIT_NATIVE_CODEGEN
 
 hpRelToInt :: Target -> HeapOffset -> Int
@@ -399,4 +394,5 @@ hpRelToInt target (MkHeapOffset base fhs vhs ths)
     vhs_size r = (varHeaderSize target r) :: Int
 
 #endif
+#endif {-0-}
 \end{code}

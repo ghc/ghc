@@ -8,299 +8,352 @@
 
 module CoreLint (
 	lintCoreBindings,
-	lintUnfolding,
-	
-	PprStyle, CoreBinding, PlainCoreBinding(..), Id
+	lintUnfolding
     ) where
 
-IMPORT_Trace
+import Ubiq
 
-import AbsPrel		( typeOfPrimOp, mkFunTy, PrimOp(..), PrimKind
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import AbsUniType
+import CoreSyn
+
 import Bag
-import BasicLit		( typeOfBasicLit, BasicLit )
-import CoreSyn		( pprCoreBinding ) -- ToDo: correctly
-import Id		( getIdUniType, isNullaryDataCon, isBottomingId,
-			  getInstantiatedDataConSig, Id
-			  IF_ATTACK_PRAGMAS(COMMA bottomIsGuaranteed)
+import Kind		( Kind{-instance-} )
+import Literal		( literalType, Literal{-instance-} )
+import Id		( idType, isBottomingId,
+			  getInstantiatedDataConSig, GenId{-instances-}
 			)
-import Maybes
-import Outputable
-import PlainCore
+import Outputable	( Outputable(..) )
+import PprCore
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType, GenTyVar, TyCon )
 import Pretty
+import PrimOp		( primOpType, PrimOp(..) )
+import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
-import UniqSet
-import Util
+import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,getForAllTy_maybe,
+			  isPrimType,getTypeKind,instantiateTy,
+			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
+			  maybeAppDataTyCon, eqTy )
+import TyCon		( isPrimTyCon,isVisibleDataTyCon )
+import TyVar		( getTyVarKind, GenTyVar{-instances-} )
+import UniqSet		( emptyUniqSet, mkUniqSet, intersectUniqSets,
+			  unionUniqSets, elementOfUniqSet, UniqSet(..) )
+import Unique		( Unique )
+import Usage		( GenUsage )
+import Util		( zipEqual, pprTrace, pprPanic, assertPanic, panic )
 
-infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
+infixr 9 `thenL`, `seqL`, `thenMaybeL`, `seqMaybeL`
 \end{code}
 
-Checks for 
+%************************************************************************
+%*									*
+\subsection[lintCoreBindings]{@lintCoreBindings@: Top-level interface}
+%*									*
+%************************************************************************
+
+Checks that a set of core bindings is well-formed.  The PprStyle and String
+just control what we print in the event of an error.  The Bool value
+indicates whether we have done any specialisation yet (in which case we do
+some extra checks).
+
+We check for
 	(a) type errors
-	(b) locally-defined variables used but not defined
+	(b) Out-of-scope type variables
+	(c) Out-of-scope local variables
+	(d) Ill-kinded types
 
-Doesn't check for out-of-scope type variables, because they can
-legitimately arise.  Eg
-\begin{verbatim}
-	k = /\a b -> \x::a y::b -> x
-	f = /\c -> \z::c -> k c w z (error w "foo")
-\end{verbatim}
-Here \tr{w} is just a free type variable.
+If we have done specialisation the we check that there are
+	(a) No top-level bindings of primitive (unboxed type)
 
-%************************************************************************
-%*									*
-\subsection{``lint'' for various constructs}
-%*									*
-%************************************************************************
+Outstanding issues:
 
-@lintCoreBindings@ is the top-level interface function.
+    --
+    -- Things are *not* OK if:
+    --
+    -- * Unsaturated type app before specialisation has been done;
+    --
+    -- * Oversaturated type app after specialisation (eta reduction
+    --   may well be happening...);
+    --
+    -- Note: checkTyApp is usually followed by a call to checkSpecTyApp.
+    --
 
 \begin{code}
-lintCoreBindings :: PprStyle -> String -> Bool -> [PlainCoreBinding] -> [PlainCoreBinding]
+lintCoreBindings
+	:: PprStyle -> String -> Bool -> [CoreBinding] -> [CoreBinding]
 
-lintCoreBindings sty whodunnit spec_done binds
-  = BSCC("CoreLint")
-    case (initL (lint_binds binds) spec_done) of
+lintCoreBindings sty whoDunnit spec_done binds
+  = case (initL (lint_binds binds) spec_done) of
       Nothing  -> binds
-      Just msg -> pprPanic "" (ppAboves [
-			ppStr ("*** Core Lint Errors: in "++whodunnit++" ***"),
-			msg sty,
-			ppStr "*** Offending Program ***",
-			ppAboves (map (pprCoreBinding sty pprBigCoreBinder pprTypedCoreBinder ppr) binds),
-			ppStr "*** End of Offense ***"])
-    ESCC
+      Just msg ->
+	pprPanic "" (ppAboves [
+	  ppStr ("*** Core Lint Errors: in " ++ whoDunnit ++ " ***"),
+	  msg sty,
+	  ppStr "*** Offending Program ***",
+	  ppAboves
+	   (map (pprCoreBinding sty (pprBigCoreBinder sty) (pprTypedCoreBinder sty) (ppr sty))
+	    binds),
+	  ppStr "*** End of Offense ***"
+	])
   where
-    lint_binds :: [PlainCoreBinding] -> LintM ()
-
     lint_binds [] = returnL ()
-    lint_binds (bind:binds) 
-      = lintCoreBinds bind 		`thenL` \ binders ->
-	addInScopeVars binders (
-	    lint_binds binds
-	)
+    lint_binds (bind:binds)
+      = lintCoreBinding bind `thenL` \binders ->
+	addInScopeVars binders (lint_binds binds)
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[lintUnfolding]{lintUnfolding}
+%*									*
+%************************************************************************
 
 We use this to check all unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise):
+
 \begin{code}
-lintUnfolding :: SrcLoc -> PlainCoreExpr -> Maybe PlainCoreExpr
+lintUnfolding :: SrcLoc -> CoreExpr -> Maybe CoreExpr
 
 lintUnfolding locn expr
-  = case (initL (addLoc (ImportedUnfolding locn) (lintCoreExpr expr)) True{-pretend spec done-}) of
+  = case
+      (initL (addLoc (ImportedUnfolding locn) (lintCoreExpr expr))
+       True{-pretend spec done-})
+    of
       Nothing  -> Just expr
-      Just msg -> pprTrace "WARNING: Discarded bad unfolding from interface:\n"
-			   (ppAboves [msg PprForUser,
-				      ppStr "*** Bad unfolding ***",
-				      ppr PprDebug expr,
-				      ppStr "*** End unfolding ***"])
-		  Nothing
+      Just msg ->
+        pprTrace "WARNING: Discarded bad unfolding from interface:\n"
+	(ppAboves [msg PprForUser,
+		   ppStr "*** Bad unfolding ***",
+		   ppr PprDebug expr,
+		   ppStr "*** End unfolding ***"])
+	Nothing
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[lintCoreBinding]{lintCoreBinding}
+%*									*
+%************************************************************************
+
+Check a core binding, returning the list of variables bound.
+
 \begin{code}
-lintCoreAtom :: PlainCoreAtom -> LintM (Maybe UniType)
+lintCoreBinding :: CoreBinding -> LintM [Id]
 
-lintCoreAtom (CoLitAtom lit)       = returnL (Just (typeOfBasicLit lit))
-lintCoreAtom a@(CoVarAtom v)
-  = checkInScope v	`thenL_`
-    returnL (Just (getIdUniType v))
-\end{code}
+lintCoreBinding (NonRec binder rhs)
+  = lintSingleBinding (binder,rhs) `seqL` returnL [binder]
 
-\begin{code}
-lintCoreBinds :: PlainCoreBinding -> LintM [Id]		-- Returns the binders
-lintCoreBinds (CoNonRec binder rhs)
-  = lint_binds_help (binder,rhs) 	`thenL_`
-    returnL [binder]
-
-lintCoreBinds (CoRec pairs) 
+lintCoreBinding (Rec pairs)
   = addInScopeVars binders (
-	mapL lint_binds_help pairs `thenL_`
-	returnL binders
+      mapL lintSingleBinding pairs `seqL` returnL binders
     )
   where
     binders = [b | (b,_) <- pairs]
 
-lint_binds_help (binder,rhs)
+lintSingleBinding (binder,rhs)
   = addLoc (RhsOf binder) (
 	-- Check the rhs
-	lintCoreExpr rhs    	`thenL` \ maybe_rhs_ty ->
+	lintCoreExpr rhs
 
+	`thenL` \maybe_ty ->
 	-- Check match to RHS type
-	(case maybe_rhs_ty of
-	  Nothing     -> returnL ()
-	  Just rhs_ty -> checkTys (getIdUniType binder) 
-				   rhs_ty 
-				   (mkRhsMsg binder rhs_ty)
-	)			`thenL_` 
+	(case maybe_ty of
+	  Nothing -> returnL ()
+	  Just ty -> checkTys (idType binder) ty (mkRhsMsg binder ty))
 
-	-- Check not isPrimType
-	checkIfSpecDoneL (not (isPrimType (getIdUniType binder)))
-	       		 (mkRhsPrimMsg binder rhs)
-				`thenL_`
+	`seqL`
+	-- Check (not isPrimType)
+	checkIfSpecDoneL (not (isPrimType (idType binder)))
+	  (mkRhsPrimMsg binder rhs)
 
-	-- Check unfolding, if any
-	-- Blegh. This is tricky, because the unfolding is a SimplifiableCoreExpr
-	-- Give up for now
-
-	returnL ()
+	-- We should check the unfolding, if any, but this is tricky because
+	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
     )
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[lintCoreExpr]{lintCoreExpr}
+%*									*
+%************************************************************************
+
 \begin{code}
-lintCoreExpr :: PlainCoreExpr -> LintM (Maybe UniType)	-- Nothing if error found
+lintCoreExpr :: CoreExpr -> LintM (Maybe Type)	-- Nothing if error found
 
-lintCoreExpr (CoVar var)
-  = checkInScope var	`thenL_`
-    returnL (Just ty)
-{-
-    case (splitForalls ty) of { (tyvars, _) ->
-    if null tyvars then
-	returnL (Just ty)
+lintCoreExpr (Var var) = checkInScope var `seqL` returnL (Just (idType var))
+lintCoreExpr (Lit lit) = returnL (Just (literalType lit))
+lintCoreExpr (SCC _ expr) = lintCoreExpr expr
+
+lintCoreExpr (Let binds body)
+  = lintCoreBinding binds `thenL` \binders ->
+    if (null binders) then
+	lintCoreExpr body  -- Can't add a new source location
     else
-	addErrL (mkUnappTyMsg var ty)	`thenL_`
-	returnL Nothing
-    }
--}
-  where
-    ty = getIdUniType var
+      addLoc (BodyOfLetRec binders)
+	(addInScopeVars binders (lintCoreExpr body))
 
-lintCoreExpr (CoLit lit)	= returnL (Just (typeOfBasicLit lit))
-lintCoreExpr (CoSCC label expr)	= lintCoreExpr expr
+lintCoreExpr e@(Con con args)
+  = lintCoreArgs False e (idType con) args
+    -- Note: we don't check for primitive types in these arguments
 
-lintCoreExpr (CoLet binds body)	
-  = lintCoreBinds binds		`thenL` \ binders ->
-    ASSERT(not (null binders))
-    addLoc (BodyOfLetRec binders) (
-    addInScopeVars binders (
-	lintCoreExpr body
-    ))
+lintCoreExpr e@(Prim op args)
+  = lintCoreArgs True e (primOpType op) args
+    -- Note: we do check for primitive types in these arguments
 
-lintCoreExpr e@(CoCon con tys args)
-  = checkTyApp con_ty tys (mkTyAppMsg e)    	`thenMaybeL` \ con_tau_ty ->
-    -- Note: no call to checkSpecTyApp for constructor type args
-    mapMaybeL lintCoreAtom args			`thenL` \ maybe_arg_tys ->
-    case maybe_arg_tys of
-      Nothing 	    -> returnL Nothing
-      Just arg_tys  -> checkFunApp con_tau_ty arg_tys (mkFunAppMsg con_tau_ty arg_tys e)
-  where
-    con_ty = getIdUniType con
+lintCoreExpr e@(App fun@(Var v) arg) | isBottomingId v
+  = lintCoreExpr fun `thenMaybeL` \ ty -> lintCoreArg False e ty arg
+    -- Note: we don't check for primitive types in argument to 'error'
 
-lintCoreExpr e@(CoPrim op tys args)
-  = checkTyApp op_ty tys (mkTyAppMsg e)		`thenMaybeL` \ op_tau_ty ->
-    -- ToDo: checkSpecTyApp e tys (mkSpecTyAppMsg e)	`thenMaybeL_`
-    mapMaybeL lintCoreAtom args			`thenL` \ maybe_arg_tys ->
-    case maybe_arg_tys of
-      Nothing -> returnL Nothing
-      Just arg_tys -> checkFunApp op_tau_ty arg_tys (mkFunAppMsg op_tau_ty arg_tys e)
-  where
-    op_ty = typeOfPrimOp op
+lintCoreExpr e@(App fun arg)
+  = lintCoreExpr fun `thenMaybeL` \ty -> lintCoreArg True e ty arg
+    -- Note: we do check for primitive types in this argument
 
-lintCoreExpr e@(CoApp fun arg)
-  = lce e []
-  where
-    lce (CoApp fun arg) arg_tys = lintCoreAtom arg	`thenMaybeL` \ arg_ty ->
-			          lce fun (arg_ty:arg_tys)
+lintCoreExpr (Lam (ValBinder var) expr)
+  = addLoc (LambdaBodyOf var)
+      (addInScopeVars [var]
+	(lintCoreExpr expr `thenMaybeL` \ty ->
+	 returnL (Just (mkFunTy (idType var) ty))))
 
-    lce other_fun arg_tys = lintCoreExpr other_fun	`thenMaybeL` \ fun_ty ->
-			    checkFunApp fun_ty arg_tys (mkFunAppMsg fun_ty arg_tys e)
+lintCoreExpr (Lam (TyBinder tyvar) expr)
+  = lintCoreExpr expr `thenMaybeL` \ty ->
+    returnL (Just(mkForAllTy tyvar ty))
+    -- TODO: Should add in-scope type variable at this point
 
-lintCoreExpr e@(CoTyApp fun ty_arg)
-  = lce e []
-  where
-    lce (CoTyApp fun ty_arg) ty_args = lce fun (ty_arg:ty_args)
+lintCoreExpr e@(Case scrut alts)
+ = lintCoreExpr scrut `thenMaybeL` \ty ->
+   -- Check that it is a data type
+   case maybeAppDataTyCon ty of
+     Nothing -> addErrL (mkCaseDataConMsg e) `seqL` returnL Nothing
+     Just(tycon, _, _) -> lintCoreAlts alts ty tycon
+\end{code}
 
-    lce other_fun ty_args = lintCoreExpr other_fun	`thenMaybeL` \ fun_ty ->
-			    checkTyApp fun_ty ty_args (mkTyAppMsg e)
-							`thenMaybeL` \ res_ty ->
-			    checkSpecTyApp other_fun ty_args (mkSpecTyAppMsg e)
-							`thenMaybeL_`
-			    returnL (Just res_ty)
+%************************************************************************
+%*									*
+\subsection[lintCoreArgs]{lintCoreArgs}
+%*									*
+%************************************************************************
 
-lintCoreExpr (CoLam binders expr)
-  = ASSERT (not (null binders))
-    addLoc (LambdaBodyOf binders) (
-    addInScopeVars binders (
-	lintCoreExpr expr   `thenMaybeL` \ body_ty ->
-	returnL (Just (foldr (mkFunTy . getIdUniType) body_ty binders))
-    ))
+The boolean argument indicates whether we should flag type
+applications to primitive types as being errors.
 
-lintCoreExpr (CoTyLam tyvar expr)
-  = lintCoreExpr expr		`thenMaybeL` \ body_ty ->
-    case quantifyTy [tyvar] body_ty of
-      (_, ty) -> returnL (Just ty) -- not worried about the TyVarTemplates that come back
+\begin{code}
+lintCoreArgs :: Bool -> CoreExpr -> Type -> [CoreArg] -> LintM (Maybe Type)
 
-lintCoreExpr e@(CoCase scrut alts)
- = lintCoreExpr scrut		`thenMaybeL` \ scrut_ty ->
+lintCoreArgs _          _ ty [] = returnL (Just ty)
+lintCoreArgs checkTyApp e ty (a : args)
+  = lintCoreArg  checkTyApp e ty  a `thenMaybeL` \ res ->
+    lintCoreArgs checkTyApp e res args
+\end{code}
 
-	-- Check that it is a data type
-   case getUniDataTyCon_maybe scrut_ty of
-	Nothing -> addErrL (mkCaseDataConMsg e)	`thenL_`
-		   returnL Nothing
-	Just (tycon, _, _)
-		-> lintCoreAlts alts scrut_ty tycon
+%************************************************************************
+%*									*
+\subsection[lintCoreArg]{lintCoreArg}
+%*									*
+%************************************************************************
 
-lintCoreAlts :: PlainCoreCaseAlternatives
-	     -> UniType 		-- Type of scrutinee
+\begin{code}
+lintCoreArg :: Bool -> CoreExpr -> Type -> CoreArg -> LintM (Maybe Type)
+
+lintCoreArg _ e ty (LitArg lit)
+  = -- Make sure function type matches argument
+    case (getFunTy_maybe ty) of
+      Just (arg,res) | (literalType lit `eqTy` arg) -> returnL(Just res)
+      _ -> addErrL (mkAppMsg ty (literalType lit) e) `seqL` returnL Nothing
+
+lintCoreArg _ e ty (VarArg v)
+  = -- Make sure variable is bound
+    checkInScope v `seqL`
+    -- Make sure function type matches argument
+    case (getFunTy_maybe ty) of
+      Just (arg,res) | (idType v `eqTy` arg) -> returnL(Just res)
+      _ -> addErrL (mkAppMsg ty (idType v) e) `seqL` returnL Nothing
+
+lintCoreArg checkTyApp e ty a@(TyArg arg_ty)
+  = -- TODO: Check that ty is well-kinded and has no unbound tyvars
+    checkIfSpecDoneL (not (isPrimType arg_ty)) (mkSpecTyAppMsg a)
+    `seqL`
+    case (getForAllTy_maybe ty) of
+      Just (tyvar,body) | (getTyVarKind tyvar == getTypeKind arg_ty) ->
+	returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
+      _ -> addErrL (mkTyAppMsg ty arg_ty e) `seqL` returnL Nothing
+	
+lintCoreArg _ e ty (UsageArg u)
+  = -- TODO: Check that usage has no unbound usage variables
+    case (getForAllUsageTy ty) of
+      Just (uvar,bounds,body) ->
+        -- TODO Check argument satisfies bounds
+        returnL(Just(panic "lintCoreArg:instantiateUsage uvar u body"))
+      _ -> addErrL (mkUsageAppMsg ty u e) `seqL` returnL Nothing
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[lintCoreAlts]{lintCoreAlts}
+%*									*
+%************************************************************************
+
+\begin{code}
+lintCoreAlts :: CoreCaseAlts
+	     -> Type  			-- Type of scrutinee
 	     -> TyCon			-- TyCon pinned on the case
-	     -> LintM (Maybe UniType)	-- Type of alternatives
+	     -> LintM (Maybe Type)	-- Type of alternatives
 
-lintCoreAlts alts scrut_ty case_tycon
-  = (case alts of
-	 CoAlgAlts alg_alts deflt ->  
-	   chk_prim_type False case_tycon	`thenL_`
-	   chk_non_abstract_type case_tycon	`thenL_`
-	   mapL (lintAlgAlt scrut_ty) alg_alts 	`thenL` \ maybe_alt_tys ->
-	   lintDeflt deflt scrut_ty		`thenL` \ maybe_deflt_ty ->
-	   returnL (maybe_deflt_ty : maybe_alt_tys)
+lintCoreAlts (AlgAlts alts deflt) ty tycon
+  = panic "CoreLint.lintCoreAlts"
+{- LATER:
+  WDP: can't tell what type DNT wants here
+  = -- Check tycon is not a primitive tycon
+    addErrIfL (isPrimTyCon tycon) (mkCasePrimMsg tycon)
+    `seqL`
+    -- Check we have a non-abstract data tycon
+    addErrIfL (not (isVisibleDataTyCon tycon)) (mkCaseAbstractMsg tycon)
+    `seqL`
+    lintDeflt deflt ty
+    `thenL` \maybe_deflt_ty ->
+    mapL (lintAlgAlt ty tycon) alts
+    `thenL` \maybe_alt_tys ->
+    returnL (maybe_deflt_ty : maybe_alt_tys)
 
-	 CoPrimAlts prim_alts deflt -> 
-	   chk_prim_type True case_tycon	 `thenL_`
-	   mapL (lintPrimAlt scrut_ty) prim_alts `thenL` \ maybe_alt_tys ->
-	   lintDeflt deflt scrut_ty		 `thenL` \ maybe_deflt_ty ->
-	   returnL (maybe_deflt_ty : maybe_alt_tys)
-    )						 `thenL` \ maybe_result_tys ->
-	 -- Check the result types
+lintCoreAlts (PrimAlts alts deflt) ty tycon
+  = -- Check tycon is a primitive tycon
+    addErrIfL (not (isPrimTyCon tycon)) (mkCaseNotPrimMsg tycon)
+    `seqL`
+    mapL (lintPrimAlt ty) alts
+    `thenL` \maybe_alt_tys ->
+    lintDeflt deflt ty
+    `thenL` \maybe_deflt_ty ->
+    returnL (maybe_deflt_ty : maybe_alt_tys)
+    -- Check the result types
+-}
+{-
+    `thenL` \ maybe_result_tys ->
     case catMaybes (maybe_result_tys) of
       []	     -> returnL Nothing
 
-      (first_ty:tys) -> mapL check tys	`thenL_`
+      (first_ty:tys) -> mapL check tys	`seqL`
 			returnL (Just first_ty)
 	where
 	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
-  where
-    chk_prim_type prim_required tycon
-      = if (isPrimTyCon tycon == prim_required) then
-	    returnL ()
-	else
-	    addErrL (mkCasePrimMsg prim_required tycon)
-
-    chk_non_abstract_type tycon
-      = case (getTyConFamilySize tycon) of
-	  Nothing -> addErrL (mkCaseAbstractMsg tycon)
-	  Just  _ -> returnL ()
-
+-}
 
 lintAlgAlt scrut_ty (con,args,rhs)
-  = (case getUniDataTyCon_maybe scrut_ty of
-      Nothing -> 
+  = (case maybeAppDataTyCon scrut_ty of
+      Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->
 	 let
 	   (_, arg_tys, _) = getInstantiatedDataConSig con tys_applied
 	 in
-	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`
-	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)	
-								 `thenL_`
-	 mapL check (arg_tys `zipEqual` args)			 `thenL_`
+	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `seqL`
+	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)
+								 `seqL`
+	 mapL check (arg_tys `zipEqual` args)			 `seqL`
 	 returnL ()
-    )								 `thenL_`
+    )								 `seqL`
     addInScopeVars args 	(
 	 lintCoreExpr rhs
     )
   where
-    check (ty, arg) = checkTys ty (getIdUniType arg) (mkAlgAltMsg4 ty arg)
+    check (ty, arg) = checkTys ty (idType arg) (mkAlgAltMsg4 ty arg)
 
     -- elem: yes, the elem-list here can sometimes be long-ish,
     -- but as it's use-once, probably not worth doing anything different
@@ -308,18 +361,15 @@ lintAlgAlt scrut_ty (con,args,rhs)
     elem _ []	    = False
     elem x (y:ys)   = x==y || elem x ys
 
-lintPrimAlt scrut_ty alt@(lit,rhs)
- = checkTys (typeOfBasicLit lit) scrut_ty (mkPrimAltMsg alt)	`thenL_`
+lintPrimAlt ty alt@(lit,rhs)
+ = checkTys (literalType lit) ty (mkPrimAltMsg alt) `seqL`
    lintCoreExpr rhs
-   
-lintDeflt CoNoDefault scrut_ty = returnL Nothing
-lintDeflt deflt@(CoBindDefault binder rhs) scrut_ty 
-  = checkTys (getIdUniType binder) scrut_ty (mkDefltMsg deflt)	`thenL_`
-    addInScopeVars [binder] (
-	lintCoreExpr rhs
-    )
-\end{code}
 
+lintDeflt NoDefault _ = returnL Nothing
+lintDeflt deflt@(BindDefault binder rhs) ty
+  = checkTys (idType binder) ty (mkDefltMsg deflt) `seqL`
+    addInScopeVars [binder] (lintCoreExpr rhs)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -338,7 +388,7 @@ type ErrMsg = PprStyle -> Pretty
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
-  | LambdaBodyOf [Id]	-- The lambda-binder
+  | LambdaBodyOf Id	-- The lambda-binder
   | BodyOfLetRec [Id]	-- One of the binders
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
 
@@ -346,9 +396,9 @@ instance Outputable LintLocInfo where
     ppr sty (RhsOf v)
       = ppBesides [ppr sty (getSrcLoc v), ppStr ": [RHS of ", pp_binders sty [v], ppStr "]"]
 
-    ppr sty (LambdaBodyOf bs)
-      = ppBesides [ppr sty (getSrcLoc (head bs)),
-		ppStr ": [in body of lambda with binders ", pp_binders sty bs, ppStr "]"]
+    ppr sty (LambdaBodyOf b)
+      = ppBesides [ppr sty (getSrcLoc b),
+		ppStr ": [in body of lambda with binder ", pp_binder sty b, ppStr "]"]
 
     ppr sty (BodyOfLetRec bs)
       = ppBesides [ppr sty (getSrcLoc (head bs)),
@@ -358,11 +408,10 @@ instance Outputable LintLocInfo where
       = ppBeside (ppr sty locn) (ppStr ": [in an imported unfolding]")
 
 pp_binders :: PprStyle -> [Id] -> Pretty
-pp_binders sty bs
-  = ppInterleave ppComma (map pp_binder bs)
-  where
-    pp_binder b
-      = ppCat [ppr sty b, ppStr "::", ppr sty (getIdUniType b)]
+pp_binders sty bs = ppInterleave ppComma (map (pp_binder sty) bs)
+
+pp_binder :: PprStyle -> Id -> Pretty
+pp_binder sty b = ppCat [ppr sty b, ppStr "::", ppr sty (idType b)]
 \end{code}
 
 \begin{code}
@@ -382,12 +431,12 @@ returnL r spec loc scope errs = (r, errs)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
 thenL m k spec loc scope errs
-  = case m spec loc scope errs of 
+  = case m spec loc scope errs of
       (r, errs') -> k r spec loc scope errs'
 
-thenL_ :: LintM a -> LintM b -> LintM b
-thenL_ m k spec loc scope errs
-  = case m spec loc scope errs of 
+seqL :: LintM a -> LintM b -> LintM b
+seqL m k spec loc scope errs
+  = case m spec loc scope errs of
       (_, errs') -> k spec loc scope errs'
 
 thenMaybeL :: LintM (Maybe a) -> (a -> LintM (Maybe b)) -> LintM (Maybe b)
@@ -396,8 +445,8 @@ thenMaybeL m k spec loc scope errs
       (Nothing, errs2) -> (Nothing, errs2)
       (Just r,  errs2) -> k r spec loc scope errs2
 
-thenMaybeL_ :: LintM (Maybe a) -> LintM (Maybe b) -> LintM (Maybe b)
-thenMaybeL_ m k spec loc scope errs
+seqMaybeL :: LintM (Maybe a) -> LintM (Maybe b) -> LintM (Maybe b)
+seqMaybeL m k spec loc scope errs
   = case m spec loc scope errs of
       (Nothing, errs2) -> (Nothing, errs2)
       (Just _,  errs2) -> k spec loc scope errs2
@@ -427,6 +476,9 @@ checkIfSpecDoneL :: Bool -> ErrMsg -> LintM ()
 checkIfSpecDoneL True  msg spec  loc scope errs = ((), errs)
 checkIfSpecDoneL False msg True  loc scope errs = ((), addErr errs msg loc)
 checkIfSpecDoneL False msg False loc scope errs = ((), errs)
+
+addErrIfL pred spec
+  = if pred then addErrL spec else returnL ()
 
 addErrL :: ErrMsg -> LintM ()
 addErrL msg spec loc scope errs = ((), addErr errs msg loc)
@@ -464,107 +516,36 @@ addInScopeVars ids m spec loc scope errs
 \end{code}
 
 \begin{code}
-checkTyApp :: UniType
-	   -> [UniType]
-	   -> ErrMsg
-	   -> LintM (Maybe UniType)
-
-checkTyApp forall_ty ty_args msg spec_done loc scope errs
-  = if (not spec_done && n_ty_args /= n_tyvars)
-    || (spec_done     && n_ty_args  > n_tyvars)
-    --
-    -- Things are *not* OK if:
-    --
-    -- * Unsaturated type app before specialisation has been done;
-    --
-    -- * Oversaturated type app after specialisation (eta reduction
-    --   may well be happening...);
-    --
-    -- Note: checkTyApp is usually followed by a call to checkSpecTyApp.
-    --
-    then (Nothing,     addErr errs msg loc)
-    else (Just res_ty, errs)
-  where
-    (tyvars, rho_ty) = splitForalls forall_ty
-    n_tyvars = length tyvars
-    n_ty_args = length ty_args
-    leftover_tyvars = drop n_ty_args tyvars
-    inst_env = tyvars `zip` ty_args
-    res_ty = mkForallTy leftover_tyvars (instantiateTy inst_env rho_ty)
-\end{code}
-
-\begin{code}
-checkSpecTyApp :: PlainCoreExpr -> [UniType] -> ErrMsg -> LintM (Maybe ())
-
-checkSpecTyApp expr ty_args msg spec_done loc scope errs
-  = if spec_done
-    && any isUnboxedDataType ty_args
-    && not (an_application_of_error expr)
-    then (Nothing, addErr errs msg loc)
-    else (Just (), errs)
-  where
-     -- always safe (but maybe unfriendly) to say "False"
-    an_application_of_error (CoVar id) | isBottomingId id = True
-    an_application_of_error _ = False
-\end{code}
-
-\begin{code}
-checkFunApp :: UniType 		-- The function type
-	    -> [UniType] 	-- The arg type(s)
-	    -> ErrMsg 		-- Error messgae
-	    -> LintM (Maybe UniType)	-- The result type
-
-checkFunApp fun_ty arg_tys msg spec loc scope errs
-  = cfa res_ty expected_arg_tys arg_tys
-  where
-    (expected_arg_tys, res_ty) = splitTyArgs fun_ty
-
-    cfa res_ty expected []	-- Args have run out; that's fine
-	= (Just (glueTyArgs expected res_ty), errs)
-
-    cfa res_ty [] arg_tys	-- Expected arg tys ran out first; maybe res_ty is a 
-				-- dictionary type which is actually a function?
-	= case splitTyArgs (unDictifyTy res_ty) of
-	    ([], _) 		    -> (Nothing, addErr errs msg loc)	-- Too many args
-	    (new_expected, new_res) -> cfa new_res new_expected arg_tys
-
-    cfa res_ty (expected_arg_ty:expected_arg_tys) (arg_ty:arg_tys)
-	= case (cmpUniType True{-properly-} expected_arg_ty arg_ty) of
-		EQ_ -> cfa res_ty expected_arg_tys arg_tys
-		other -> (Nothing, addErr errs msg loc)			-- Arg mis-match
-\end{code}
-
-\begin{code}
 checkInScope :: Id -> LintM ()
 checkInScope id spec loc scope errs
   = if isLocallyDefined id && not (id `elementOfUniqSet` scope) then
-	((), addErr errs (\ sty -> ppCat [ppr sty id, ppStr "is out of scope"]) loc)
+      ((),addErr errs (\sty -> ppCat [ppr sty id,ppStr "is out of scope"]) loc)
     else
-	((), errs)
+      ((),errs)
 
-checkTys :: UniType -> UniType -> ErrMsg -> LintM ()
+checkTys :: Type -> Type -> ErrMsg -> LintM ()
 checkTys ty1 ty2 msg spec loc scope errs
-  = case (cmpUniType True{-properly-} ty1 ty2) of
-	EQ_   -> ((), errs)
-	other -> ((), addErr errs msg loc)
+  = if ty1 `eqTy` ty2 then ((), errs) else ((), addErr errs msg loc)
 \end{code}
 
 \begin{code}
-mkCaseAltMsg :: PlainCoreCaseAlternatives -> ErrMsg
+mkCaseAltMsg :: CoreCaseAlts -> ErrMsg
 mkCaseAltMsg alts sty
-  = ppAbove (ppStr "In some case alternatives, type of alternatives not all same:")
+  = ppAbove (ppStr "Type of case alternatives not the same:")
 	    (ppr sty alts)
 
-mkCaseDataConMsg :: PlainCoreExpr -> ErrMsg
+mkCaseDataConMsg :: CoreExpr -> ErrMsg
 mkCaseDataConMsg expr sty
-  = ppAbove (ppStr "A case scrutinee not a type-constructor type:")
+  = ppAbove (ppStr "A case scrutinee not of data constructor type:")
 	    (pp_expr sty expr)
 
-mkCasePrimMsg :: Bool -> TyCon -> ErrMsg
-mkCasePrimMsg True tycon sty
+mkCaseNotPrimMsg :: TyCon -> ErrMsg
+mkCaseNotPrimMsg tycon sty
   = ppAbove (ppStr "A primitive case on a non-primitive type:")
 	    (ppr sty tycon)
-mkCasePrimMsg False tycon sty
+
+mkCasePrimMsg :: TyCon -> ErrMsg
+mkCasePrimMsg tycon sty
   = ppAbove (ppStr "An algebraic case on a primitive type:")
 	    (ppr sty tycon)
 
@@ -573,30 +554,41 @@ mkCaseAbstractMsg tycon sty
   = ppAbove (ppStr "An algebraic case on an abstract type:")
 	    (ppr sty tycon)
 
-mkDefltMsg :: PlainCoreCaseDefault -> ErrMsg
+mkDefltMsg :: CoreCaseDefault -> ErrMsg
 mkDefltMsg deflt sty
-  = ppAbove (ppStr "Binder in default case of a case expression doesn't match type of scrutinee:")
+  = ppAbove (ppStr "Binder in case default doesn't match type of scrutinee:")
 	    (ppr sty deflt)
 
-mkFunAppMsg :: UniType -> [UniType] -> PlainCoreExpr -> ErrMsg
-mkFunAppMsg fun_ty arg_tys expr sty
-  = ppAboves [ppStr "In a function application, function type doesn't match arg types:",
-	      ppHang (ppStr "Function type:") 4 (ppr sty fun_ty),
-	      ppHang (ppStr "Arg types:") 4 (ppAboves (map (ppr sty) arg_tys)),
+mkAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
+mkAppMsg fun arg expr sty
+  = ppAboves [ppStr "Argument values doesn't match argument type:",
+	      ppHang (ppStr "Fun type:") 4 (ppr sty fun),
+	      ppHang (ppStr "Arg type:") 4 (ppr sty arg),
 	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
 
-mkUnappTyMsg :: Id -> UniType -> ErrMsg
-mkUnappTyMsg var ty sty
-  = ppAboves [ppStr "Variable has a for-all type, but isn't applied to any types.",
-	      ppBeside (ppStr "Var:      ") (ppr sty var),
-	      ppBeside (ppStr "Its type: ") (ppr sty ty)]
+mkTyAppMsg :: Type -> Type -> CoreExpr -> ErrMsg
+mkTyAppMsg ty arg expr sty
+  = panic "mkTyAppMsg"
+{-
+  = ppAboves [ppStr "Illegal type application:",
+	      ppHang (ppStr "Exp type:") 4 (ppr sty exp),
+	      ppHang (ppStr "Arg type:") 4 (ppr sty arg),
+	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
+-}
 
-mkAlgAltMsg1 :: UniType -> ErrMsg
+mkUsageAppMsg :: Type -> Usage -> CoreExpr -> ErrMsg
+mkUsageAppMsg ty u expr sty
+  = ppAboves [ppStr "Illegal usage application:",
+	      ppHang (ppStr "Exp type:") 4 (ppr sty ty),
+	      ppHang (ppStr "Usage exp:") 4 (ppr sty u),
+	      ppHang (ppStr "Expression:") 4 (pp_expr sty expr)]
+
+mkAlgAltMsg1 :: Type -> ErrMsg
 mkAlgAltMsg1 ty sty
   = ppAbove (ppStr "In some case statement, type of scrutinee is not a data type:")
 	    (ppr sty ty)
 
-mkAlgAltMsg2 :: UniType -> Id -> ErrMsg
+mkAlgAltMsg2 :: Type -> Id -> ErrMsg
 mkAlgAltMsg2 ty con sty
   = ppAboves [
 	ppStr "In some algebraic case alternative, constructor is not a constructor of scrutinee type:",
@@ -612,7 +604,7 @@ mkAlgAltMsg3 con alts sty
 	ppr sty alts
     ]
 
-mkAlgAltMsg4 :: UniType -> Id -> ErrMsg
+mkAlgAltMsg4 :: Type -> Id -> ErrMsg
 mkAlgAltMsg4 ty arg sty
   = ppAboves [
 	ppStr "In some algebraic case alternative, type of argument doesn't match data constructor:",
@@ -620,37 +612,34 @@ mkAlgAltMsg4 ty arg sty
 	ppr sty arg
     ]
 
-mkPrimAltMsg :: (BasicLit, PlainCoreExpr) -> ErrMsg
+mkPrimAltMsg :: (Literal, CoreExpr) -> ErrMsg
 mkPrimAltMsg alt sty
-  = ppAbove (ppStr "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
+  = ppAbove
+    (ppStr "In a primitive case alternative, type of literal doesn't match type of scrutinee:")
 	    (ppr sty alt)
 
-mkRhsMsg :: Id -> UniType -> ErrMsg
+mkRhsMsg :: Id -> Type -> ErrMsg
 mkRhsMsg binder ty sty
-  = ppAboves [ppCat [ppStr "The type of this binder doesn't match the type of its RHS:", 
-		     ppr sty binder],
-	      ppCat [ppStr "Binder's type:", ppr sty (getIdUniType binder)],
-	      ppCat [ppStr "Rhs type:", ppr sty ty]
-	     ]
+  = ppAboves
+    [ppCat [ppStr "The type of this binder doesn't match the type of its RHS:",
+	    ppr sty binder],
+     ppCat [ppStr "Binder's type:", ppr sty (idType binder)],
+     ppCat [ppStr "Rhs type:", ppr sty ty]]
 
-mkRhsPrimMsg :: Id -> PlainCoreExpr -> ErrMsg
+mkRhsPrimMsg :: Id -> CoreExpr -> ErrMsg
 mkRhsPrimMsg binder rhs sty
-  = ppAboves [ppCat [ppStr "The type of this binder is primitive:", 
+  = ppAboves [ppCat [ppStr "The type of this binder is primitive:",
 		     ppr sty binder],
-	      ppCat [ppStr "Binder's type:", ppr sty (getIdUniType binder)]
+	      ppCat [ppStr "Binder's type:", ppr sty (idType binder)]
 	     ]
 
-mkTyAppMsg :: PlainCoreExpr -> ErrMsg
-mkTyAppMsg expr sty
-  = ppAboves [ppStr "In a type application, either the function's type doesn't match",
-	      ppStr "the argument types, or an argument type is primitive:",
-	      pp_expr sty expr]
+mkSpecTyAppMsg :: CoreArg -> ErrMsg
+mkSpecTyAppMsg arg sty
+  = ppAbove
+      (ppStr "Unboxed types in a type application (after specialisation):")
+      (ppr sty arg)
 
-mkSpecTyAppMsg :: PlainCoreExpr -> ErrMsg
-mkSpecTyAppMsg expr sty
-  = ppAbove (ppStr "Unboxed types in a type application (after specialisation):")
-	    (pp_expr sty expr)
-
+pp_expr :: PprStyle -> CoreExpr -> Pretty
 pp_expr sty expr
-  = pprCoreExpr sty pprBigCoreBinder pprTypedCoreBinder pprTypedCoreBinder expr
+  = pprCoreExpr sty (pprBigCoreBinder sty) (pprTypedCoreBinder sty) (pprTypedCoreBinder sty) expr
 \end{code}

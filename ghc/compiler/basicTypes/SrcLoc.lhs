@@ -20,9 +20,10 @@ module SrcLoc (
 	unpackSrcLoc
     ) where
 
-import Outputable
+import Ubiq
+
+import PprStyle		( PprStyle(..) )
 import Pretty
-import Util
 \end{code}
 
 %************************************************************************

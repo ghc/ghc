@@ -1,9 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface StrictAnal where
-import CmdLineOpts(GlobalSwitch)
-import CoreSyn(CoreBinding)
-import Id(Id)
-import SplitUniq(SplitUniqSupply)
-saTopBinds :: (Bool, Bool) -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-saWwTopBinds :: SplitUniqSupply -> (GlobalSwitch -> Bool) -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-

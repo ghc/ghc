@@ -21,7 +21,6 @@ module CgMonad (
 	SemiTaggingStuff(..),
 
 	addBindC, addBindsC, modifyBindC, lookupBindC,
---UNUSED:	grabBindsC,
 
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
@@ -29,7 +28,6 @@ module CgMonad (
 	AStackUsage(..), BStackUsage(..), HeapUsage(..),
 	StubFlag,
 	isStubbed,
---UNUSED:	grabStackSizeC,
 
 	nukeDeadBindings, getUnstubbedAStackSlots,
 
@@ -39,7 +37,7 @@ module CgMonad (
 	isSwitchSetC, isStringSwitchSetC, getIntSwitchChkrC,
 
 	noBlackHolingFlag,
-	profCtrC, --UNUSED: concurrentC,
+	profCtrC,
 
 	costCentresC, costCentresFlag, moduleName,
 
@@ -51,35 +49,26 @@ module CgMonad (
 	CgInfoDownwards(..), CgState(..),	-- non-abstract
 	CgIdInfo, -- abstract
 	CompilationInfo(..), IntSwitchChecker(..),
-	GlobalSwitch, -- abstract
 
-	stableAmodeIdInfo, heapIdInfo,
+	stableAmodeIdInfo, heapIdInfo
 
 	-- and to make the interface self-sufficient...
-	AbstractC, CAddrMode, CLabel, LambdaFormInfo, IdEnv(..),
-	Unique, HeapOffset, CostCentre, IsCafCC,
-	Id, UniqSet(..), UniqFM,
-	VirtualSpAOffset(..), VirtualSpBOffset(..),
-	VirtualHeapOffset(..), DataCon(..), PlainStgLiveVars(..),
-	Maybe
     ) where
 
 import AbsCSyn
-import AbsUniType	( kindFromType, UniType
+import Type		( primRepFromType, Type
 			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
 			)
 import CgBindery
 import CgUsages         ( getSpBRelOffset )
 import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( getIdUniType, ConTag(..), DataCon(..) )
-import IdEnv		-- ops on CgBindings use these
+import Id		( idType, ConTag(..), DataCon(..) )
 import Maybes		( catMaybes, maybeToBool, Maybe(..) )
 import Pretty		-- debugging only?
-import PrimKind		( getKindSize, retKindSize )
+import PrimRep		( getPrimRepSize, retPrimRepSize )
 import UniqSet		-- ( elementOfUniqSet, UniqSet(..) )
 import CostCentre	-- profiling stuff
-import StgSyn		( PlainStgAtom(..), PlainStgLiveVars(..) )
-import Unique		( UniqueSupply )
+import StgSyn		( StgArg(..), StgLiveVars(..) )
 import Util
 
 infixr 9 `thenC`	-- Right-associative!
@@ -109,13 +98,7 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 
 data CompilationInfo
   = MkCompInfo
-	(GlobalSwitch -> Bool)
-			-- use it to look up whatever we like in command-line flags
-	IntSwitchChecker-- similar; for flags that have an Int assoc.
-			-- with them, notably number of regs available.
 	FAST_STRING	-- the module name
-
-type IntSwitchChecker = (Int -> GlobalSwitch) -> Maybe Int
 
 data CgState
   = MkCgState
@@ -135,10 +118,10 @@ data EndOfBlockInfo
 				-- push arguments starting just above this point on
 				-- a tail call.
 
-				-- This is therefore the A-stk ptr as seen 
+				-- This is therefore the A-stk ptr as seen
 				-- by a case alternative.
 
-				-- Args SpA is used when we want to stub any 
+				-- Args SpA is used when we want to stub any
 				-- currently-unstubbed dead A-stack (ptr) slots;
 				-- we want to know what SpA in the continuation is
 				-- so that we don't stub any slots which are off the
@@ -147,7 +130,7 @@ data EndOfBlockInfo
 	VirtualSpBOffset	-- Args SpB: Very similar to Args SpA.
 
 				-- Two main differences:
-				--  1.  If Sequel isn't OnStack, then Args SpB points 
+				--  1.  If Sequel isn't OnStack, then Args SpB points
 				-- 	just below the slot in which the return address
 				--	should be put.  In effect, the Sequel is
 				--	a pending argument.  If it is OnStack, Args SpB
@@ -155,7 +138,7 @@ data EndOfBlockInfo
 				--
 				--  2.  It ain't used for stubbing because there are
 				--	no ptrs on B stk.
-				
+
 	Sequel
 
 
@@ -170,19 +153,16 @@ block.
 
 \begin{code}
 data Sequel
-        = InRetReg              -- The continuation is in RetReg
+	= InRetReg              -- The continuation is in RetReg
 
-        | OnStack VirtualSpBOffset
-                                -- Continuation is on the stack, at the
-                                -- specified location
-
-
---UNUSED:	| RestoreCostCentre
+	| OnStack VirtualSpBOffset
+				-- Continuation is on the stack, at the
+				-- specified location
 
 	| UpdateCode CAddrMode	-- May be standard update code, or might be
 				-- the data-type-specific one.
 
-	| CaseAlts 
+	| CaseAlts
 		CAddrMode   -- Jump to this; if the continuation is for a vectored
 			    -- case this might be the label of a return vector
 			    -- Guaranteed to be a non-volatile addressing mode (I think)
@@ -200,7 +180,7 @@ type SemiTaggingStuff
      )
 
 type JoinDetails
-  = (AbstractC, CLabel)		-- Code to load regs from heap object + profiling macros, 
+  = (AbstractC, CLabel)		-- Code to load regs from heap object + profiling macros,
 				-- and join point label
 -- The abstract C is executed only from a successful
 -- semitagging venture, when a case has looked at a variable, found
@@ -209,7 +189,7 @@ type JoinDetails
 
 
 -- DIRE WARNING.
--- The OnStack case of sequelToAmode delivers an Amode which is only valid 
+-- The OnStack case of sequelToAmode delivers an Amode which is only valid
 -- just before the final control transfer, because it assumes that
 -- SpB is pointing to the top word of the return address.
 -- This seems unclean but there you go.
@@ -218,17 +198,13 @@ sequelToAmode :: Sequel -> FCode CAddrMode
 
 sequelToAmode (OnStack virt_spb_offset)
   = getSpBRelOffset virt_spb_offset `thenFC` \ spb_rel ->
-    returnFC (CVal spb_rel RetKind)
+    returnFC (CVal spb_rel RetRep)
 
 sequelToAmode InRetReg		 = returnFC (CReg RetReg)
---UNUSED:sequelToAmode RestoreCostCentre  = returnFC mkRestoreCostCentreLbl
 --Andy/Simon's patch:
 --WAS: sequelToAmode (UpdateCode amode) = returnFC amode
 sequelToAmode (UpdateCode amode) = returnFC (CReg StdUpdRetVecReg)
 sequelToAmode (CaseAlts amode _) = returnFC amode
-
--- ToDo: move/do something
---UNUSED:mkRestoreCostCentreLbl = panic "mkRestoreCostCentreLbl"
 \end{code}
 
 See the NOTES about the details of stack/heap usage tracking.
@@ -302,7 +278,7 @@ stateIncUsage :: CgState -> CgState -> CgState
 stateIncUsage (MkCgState abs_c bs ((vA,fA,rA,hA1),(vB,fB,rB,hB1),(vH1,rH1)))
 	      (MkCgState _     _  (( _, _, _,hA2),( _, _, _,hB2),(vH2, _)))
      = MkCgState abs_c
-		 bs 
+		 bs
 		 ((vA,fA,rA,hA1 `max` hA2),
 		  (vB,fB,rB,hB1 `max` hB2),
 		  (vH1 `maxOff` vH2, rH1))
@@ -318,11 +294,9 @@ stateIncUsage (MkCgState abs_c bs ((vA,fA,rA,hA1),(vB,fB,rB,hB1),(vH1,rH1)))
 type FCode a = CgInfoDownwards -> CgState -> (a, CgState)
 type Code    = CgInfoDownwards -> CgState -> CgState
 
-#ifdef __GLASGOW_HASKELL__
 {-# INLINE thenC #-}
 {-# INLINE thenFC #-}
 {-# INLINE returnFC #-}
-#endif
 \end{code}
 The Abstract~C is not in the environment so as to improve strictness.
 
@@ -428,8 +402,8 @@ bindings and usage information is otherwise unchanged.
 \begin{code}
 forkClosureBody :: Code -> Code
 
-forkClosureBody code 
-	(MkCgInfoDown cg_info statics _) 
+forkClosureBody code
+	(MkCgInfoDown cg_info statics _)
 	(MkCgState absC_in binds un_usage)
   = MkCgState (AbsCStmts absC_in absC_fork) binds un_usage
   where
@@ -452,7 +426,7 @@ forkAbsC :: Code -> FCode AbstractC
 forkAbsC code info_down (MkCgState absC1 bs usage)
   = (absC2, new_state)
   where
-    MkCgState absC2 _ ((_, _, _,hA2),(_, _, _,hB2), _) = 
+    MkCgState absC2 _ ((_, _, _,hA2),(_, _, _,hB2), _) =
 	code info_down (MkCgState AbsCNop bs usage)
     ((vA, fA, rA, hA1), (vB, fB, rB, hB1), heap_usage) = usage
 
@@ -473,13 +447,13 @@ The "extra branches" arise from handling the default case:
 	  C1 a b -> e1
 	  z     -> e2
 
-Here we in effect expand to 
+Here we in effect expand to
 
-	case f x of 
+	case f x of
 	  C1 a b -> e1
 	  C2 c -> let z = C2 c in JUMP(default)
 	  C3 d e f -> let z = C2 d e f in JUMP(default)
-	  
+
 	  default: e2
 
 The stuff for C2 and C3 are the extra branches.  They are
@@ -527,18 +501,18 @@ forkEval :: EndOfBlockInfo              -- For the body
 	 -> FCode Sequel		-- Semi-tagging info to store
 	 -> FCode EndOfBlockInfo	-- The new end of block info
 
-forkEval body_eob_info env_code body_code 
+forkEval body_eob_info env_code body_code
   = forkEvalHelp body_eob_info env_code body_code `thenFC` \ (vA, vB, sequel) ->
     returnFC (EndOfBlockInfo vA vB sequel)
 
-forkEvalHelp :: EndOfBlockInfo  -- For the body 
+forkEvalHelp :: EndOfBlockInfo  -- For the body
     	     -> Code		-- Code to set environment
 	     -> FCode a		-- The code to do after the eval
 	     -> FCode (Int,	-- SpA
 		       Int,	-- SpB
 		       a)	-- Result of the FCode
 
-forkEvalHelp body_eob_info env_code body_code 
+forkEvalHelp body_eob_info env_code body_code
 	 info_down@(MkCgInfoDown cg_info statics _) state
   = ((vA,vB,value_returned), state `stateIncUsageEval` state_at_end_return)
   where
@@ -555,7 +529,7 @@ forkEvalHelp body_eob_info env_code body_code
 
     state_for_body = MkCgState AbsCNop
 	 		     (nukeVolatileBinds binds)
-			     ((vA,stubbed_fA,vA,vA),	-- Set real and hwms 
+			     ((vA,stubbed_fA,vA,vA),	-- Set real and hwms
 			      (vB,fB,vB,vB),		-- to virtual ones
 			      (initVirtHp, initRealHp))
 
@@ -566,10 +540,10 @@ forkEvalHelp body_eob_info env_code body_code
 stateIncUsageEval :: CgState -> CgState -> CgState
 stateIncUsageEval (MkCgState absC1 bs ((vA,fA,rA,hA1),(vB,fB,rB,hB1),heap_usage))
 		  (MkCgState absC2 _  (( _, _, _,hA2),( _, _, _,hB2),	     _))
-     = MkCgState (absC1 `AbsCStmts` absC2) 
+     = MkCgState (absC1 `AbsCStmts` absC2)
 		 -- The AbsC coming back should consist only of nested declarations,
 		 -- notably of the return vector!
-		 bs 
+		 bs
 		 ((vA,fA,rA,hA1 `max` hA2),
 		  (vB,fB,rB,hB1 `max` hB2),
 		  heap_usage)
@@ -600,21 +574,6 @@ info (whether SCC profiling or profiling-ctrs going) and possibly emit
 nothing.
 
 \begin{code}
-isSwitchSetC :: GlobalSwitch -> FCode Bool
-
-isSwitchSetC switch (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
-  = (sw_chkr switch, state)
-
-isStringSwitchSetC :: (String -> GlobalSwitch) -> FCode Bool
-
-isStringSwitchSetC switch (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
-  = (sw_chkr (switch (panic "isStringSwitchSetC")), state)
-
-getIntSwitchChkrC :: FCode IntSwitchChecker
-
-getIntSwitchChkrC (MkCgInfoDown (MkCompInfo _ isw_chkr _) _ _) state
-  = (isw_chkr, state)
-
 costCentresC :: FAST_STRING -> [CAddrMode] -> Code
 
 costCentresC macro args (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
@@ -631,23 +590,11 @@ profCtrC macro args (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
     then state
     else MkCgState (mkAbsCStmts absC (CCallProfCtrMacro macro args)) binds usage
 
-{- Try to avoid adding too many special compilation strategies here.  
-   It's better to modify the header files as necessary for particular targets, 
-   so that we can get away with as few variants of .hc files as possible.
-   'ForConcurrent' is somewhat special anyway, as it changes entry conventions
-   pretty significantly.
--}
-
--- if compiling for concurrency...
-  
-{- UNUSED, as it happens:
-concurrentC :: AbstractC -> Code
-
-concurrentC more_absC (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
-			state@(MkCgState absC binds usage)
-  = if not (sw_chkr ForConcurrent)
-    then state
-    else MkCgState (mkAbsCStmts absC more_absC) binds usage
+{- Try to avoid adding too many special compilation strategies here.
+   It's better to modify the header files as necessary for particular
+   targets, so that we can get away with as few variants of .hc files
+   as possible.  'ForConcurrent' is somewhat special anyway, as it
+   changes entry conventions pretty significantly.
 -}
 \end{code}
 
@@ -732,7 +679,7 @@ modifyBindC name mangle_fn info_down (MkCgState absC binds usage)
 Lookup is expected to find a binding for the @Id@.
 \begin{code}
 lookupBindC :: Id -> FCode CgIdInfo
-lookupBindC name info_down@(MkCgInfoDown _ static_binds _) 
+lookupBindC name info_down@(MkCgInfoDown _ static_binds _)
 		 state@(MkCgState absC local_binds usage)
   = (val, state)
   where
@@ -752,28 +699,6 @@ lookupBindC name info_down@(MkCgInfoDown _ static_binds _)
 			    ppStr "local binds for:",
 			    ppAboves [ ppr PprDebug i | (MkCgIdInfo i _ _ _) <- rngIdEnv local_binds ]
 			 ])
-\end{code}
-
-For dumping debug information, we also have the ability to grab the
-local bindings environment.
-
-ToDo: Maybe do the pretty-printing here to restrict what people do
-with the environment.
-
-\begin{code}
-{- UNUSED:
-grabBindsC :: FCode CgBindings
-grabBindsC info_down state@(MkCgState absC binds usage)
-  = (binds, state)
--}
-\end{code}
-
-\begin{code}
-{- UNUSED:
-grabStackSizeC :: FCode (Int, Int)
-grabStackSizeC info_down state -- @(MkCgState absC binds ((vA,_,_,_), (vB,_,_,_), _))
-  = panic "grabStackSizeC" -- (vA, vB)
--}
 \end{code}
 
 %************************************************************************
@@ -804,7 +729,7 @@ set, so that no stack-stubbing will take place.
 Probably *naughty* to look inside monad...
 
 \begin{code}
-nukeDeadBindings :: PlainStgLiveVars  -- All the *live* variables
+nukeDeadBindings :: StgLiveVars  -- All the *live* variables
 		 -> Code
 nukeDeadBindings
 	live_vars
@@ -819,10 +744,9 @@ nukeDeadBindings
 		 heap_usage)
 
     (dead_a_slots, dead_b_slots, bs')
-      = dead_slots live_vars 
-		   [] [] [] 
+      = dead_slots live_vars
+		   [] [] []
 		   [ (i, b) | b@(MkCgIdInfo i _ _ _) <- rngIdEnv binds ]
-		   --OLD: (getIdEnvMapping binds)
 
     extra_free_a = (sortLt (<)  dead_a_slots) `zip` (repeat NotStubbed)
     extra_free_b = sortLt (<) dead_b_slots
@@ -842,7 +766,7 @@ getUnstubbedAStackSlots tail_spa
 Several boring auxiliary functions to do the dirty work.
 
 \begin{code}
-dead_slots :: PlainStgLiveVars
+dead_slots :: StgLiveVars
 	   -> [(Id,CgIdInfo)] -> [VirtualSpAOffset] -> [VirtualSpBOffset]
 	   -> [(Id,CgIdInfo)]
 	   -> ([VirtualSpAOffset], [VirtualSpBOffset], [(Id,CgIdInfo)])
@@ -878,7 +802,7 @@ dead_slots live_vars fbs das dbs ((v,i):bs)
 	_ -> dead_slots live_vars fbs das dbs bs
   where
     size :: Int
-    size = (getKindSize . kindFromType . getIdUniType) v
+    size = (getPrimRepSize . primRepFromType . idType) v
 
 -- addFreeSlots expects *both* args to be in increasing order
 addFreeASlots :: [(Int,StubFlag)] -> [(Int,StubFlag)] -> [(Int,StubFlag)]

@@ -1,0 +1,16 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_qid where
+import Ubiq --  debugging consistency check
+import UgenUtil
+%}}
+type qid;
+	noqual	: < gnoqual 	: stringId; >;
+	aqual	: < gqualmod  	: stringId;
+		    gqualname 	: stringId; >;
+	gid	: < ggid	: long;
+		    gidname     : stringId; >;
+end;
+

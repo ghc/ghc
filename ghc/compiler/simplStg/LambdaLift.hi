@@ -1,7 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface LambdaLift where
-import Id(Id)
-import SplitUniq(SplitUniqSupply)
-import StgSyn(StgBinding)
-liftProgram :: SplitUniqSupply -> [StgBinding Id Id] -> [StgBinding Id Id]
-

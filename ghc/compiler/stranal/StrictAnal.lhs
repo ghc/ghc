@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[StrictAnal]{``Simple'' Mycroft-style strictness analyser}
 
@@ -11,23 +11,13 @@ Semantique analyser) was written by Andy Gill.
 
 module StrictAnal ( saWwTopBinds, saTopBinds ) where
 
-IMPORT_Trace
-import Outputable
-import Pretty
-
-import CmdLineOpts	( GlobalSwitch(..) )
-import CoreSyn		-- ToDo: get pprCoreBinding straight from PlainCore?
 import Id		( addIdDemandInfo, isWrapperId, addIdStrictness,
-			  getIdUniType, getIdDemandInfo
-			  IF_ATTACK_PRAGMAS(COMMA getIdStrictness) -- profiling
+			  idType, getIdDemandInfo
 			)
-import IdEnv
 import IdInfo
-import PlainCore
 import SaAbsInt
 import SaLib
-import SplitUniq
-import Unique
+import UniqSupply
 import Util
 import WorkWrap		-- "back-end" of strictness analyser
 import WwLib		( WwM(..) )
@@ -49,12 +39,12 @@ A note about worker-wrappering.  If we have
 and we deduce that f is strict, it is nevertheless NOT safe to worker-wapper to
 
 	f = \x -> case x of Int x# -> fw x#
-	fw = \x# -> let x = Int x# 
-		    in 
+	fw = \x# -> let x = Int x#
+		    in
 		    let v = <expensive>
 		    in <body>
 
-because this obviously loses laziness, since now <expensive> 
+because this obviously loses laziness, since now <expensive>
 is done each time.  Alas.
 
 WATCH OUT!  This can mean that something is unboxed only to be
@@ -81,10 +71,10 @@ Alas and alack.
 %************************************************************************
 
 \begin{code}
-saWwTopBinds :: SplitUniqSupply
+saWwTopBinds :: UniqSupply
 	     -> (GlobalSwitch -> Bool)
-	     -> [PlainCoreBinding]
-	     -> [PlainCoreBinding]
+	     -> [CoreBinding]
+	     -> [CoreBinding]
 
 saWwTopBinds us switch_chker binds
   = let
@@ -151,8 +141,8 @@ environment which maps @Id@s to their abstract values (i.e., an
 @AbsValEnv@ maps an @Id@ to its @AbsVal@).
 
 \begin{code}
-saTopBinds   :: StrAnalFlags -> [PlainCoreBinding] -> [PlainCoreBinding]     -- exported
-sa_top_binds :: StrAnalFlags -> [PlainCoreBinding] -> SaM [PlainCoreBinding] -- not exported
+saTopBinds   :: StrAnalFlags -> [CoreBinding] -> [CoreBinding]     -- exported
+sa_top_binds :: StrAnalFlags -> [CoreBinding] -> SaM [CoreBinding] -- not exported
 
 saTopBinds strflags binds
 #ifndef OMIT_STRANAL_STATS
@@ -181,10 +171,10 @@ be used; we can't turn top-level @let@s into @case@s.
 
 \begin{code}
 saTopBind :: StrictEnv -> AbsenceEnv
-	  -> PlainCoreBinding
-	  -> SaM (StrictEnv, AbsenceEnv, PlainCoreBinding)
+	  -> CoreBinding
+	  -> SaM (StrictEnv, AbsenceEnv, CoreBinding)
 
-saTopBind str_env abs_env (CoNonRec binder rhs)
+saTopBind str_env abs_env (NonRec binder rhs)
   = saExpr str_env abs_env rhs 	`thenSa` \ new_rhs ->
     let
 	strflags = getStrAnalFlags str_env
@@ -195,7 +185,7 @@ saTopBind str_env abs_env (CoNonRec binder rhs)
 	widened_str_rhs = widen StrAnal str_rhs
 	widened_abs_rhs = widen AbsAnal abs_rhs
 		-- The widening above is done for efficiency reasons.
-		-- See notes on CoLet case in SaAbsInt.lhs
+		-- See notes on Let case in SaAbsInt.lhs
 
 	new_binder
 	  = addStrictnessInfoToId
@@ -209,9 +199,9 @@ saTopBind str_env abs_env (CoNonRec binder rhs)
       	new_str_env = addOneToAbsValEnv str_env binder widened_str_rhs
       	new_abs_env = addOneToAbsValEnv abs_env binder widened_abs_rhs
     in
-    returnSa (new_str_env, new_abs_env, CoNonRec new_binder new_rhs)
+    returnSa (new_str_env, new_abs_env, NonRec new_binder new_rhs)
 
-saTopBind str_env abs_env (CoRec pairs)
+saTopBind str_env abs_env (Rec pairs)
   = let
 	strflags    = getStrAnalFlags str_env
 	(binders,rhss) = unzip pairs
@@ -220,14 +210,14 @@ saTopBind str_env abs_env (CoRec pairs)
 		      -- fixpoint returns widened values
       	new_str_env = growAbsValEnvList str_env (binders `zip` str_rhss)
       	new_abs_env = growAbsValEnvList abs_env (binders `zip` abs_rhss)
-	new_binders = zipWith4 (addStrictnessInfoToId strflags)
-				str_rhss abs_rhss binders rhss
+	new_binders = zipWith4Equal (addStrictnessInfoToId strflags)
+				    str_rhss abs_rhss binders rhss
     in
     mapSa (saExpr new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
     let
 	new_pairs   = new_binders `zip` new_rhss
     in
-    returnSa (new_str_env, new_abs_env, CoRec new_pairs)
+    returnSa (new_str_env, new_abs_env, Rec new_pairs)
 \end{code}
 
 %************************************************************************
@@ -240,42 +230,42 @@ saTopBind str_env abs_env (CoRec pairs)
 environment.
 
 \begin{code}
-saExpr :: StrictEnv -> AbsenceEnv -> PlainCoreExpr -> SaM PlainCoreExpr
+saExpr :: StrictEnv -> AbsenceEnv -> CoreExpr -> SaM CoreExpr
 
-saExpr _ _ e@(CoVar _)      = returnSa e
-saExpr _ _ e@(CoLit _)      = returnSa e
-saExpr _ _ e@(CoCon _ _ _)  = returnSa e
-saExpr _ _ e@(CoPrim _ _ _) = returnSa e
+saExpr _ _ e@(Var _)      = returnSa e
+saExpr _ _ e@(Lit _)      = returnSa e
+saExpr _ _ e@(Con _ _ _)  = returnSa e
+saExpr _ _ e@(Prim _ _ _) = returnSa e
 
-saExpr str_env abs_env (CoLam args body)
+saExpr str_env abs_env (Lam arg body)
   = saExpr str_env abs_env body	`thenSa` \ new_body ->
     let
-      	new_args  = addDemandInfoToIds str_env abs_env body args
+	new_arg = addDemandInfoToId str_env abs_env body arg
     in
-    tickLambdas new_args	`thenSa_` -- stats
-    returnSa (CoLam new_args new_body)
+    tickLambda new_arg	`thenSa_` -- stats
+    returnSa (Lam new_arg new_body)
 
 saExpr str_env abs_env (CoTyLam ty expr)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
     returnSa (CoTyLam ty new_expr)
 
-saExpr str_env abs_env (CoApp fun arg)
+saExpr str_env abs_env (App fun arg)
   = saExpr str_env abs_env fun	`thenSa` \ new_fun ->
-    returnSa (CoApp new_fun arg)
+    returnSa (App new_fun arg)
 
 saExpr str_env abs_env (CoTyApp expr ty)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
     returnSa (CoTyApp new_expr ty)
 
-saExpr str_env abs_env (CoSCC cc expr)
+saExpr str_env abs_env (SCC cc expr)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
-    returnSa (CoSCC cc new_expr)
+    returnSa (SCC cc new_expr)
 
-saExpr str_env abs_env (CoCase expr (CoAlgAlts alts deflt))
+saExpr str_env abs_env (Case expr (AlgAlts alts deflt))
   = saExpr    str_env abs_env expr  `thenSa` \ new_expr  ->
     saDefault str_env abs_env deflt `thenSa` \ new_deflt ->
     mapSa sa_alt alts		    `thenSa` \ new_alts  ->
-    returnSa (CoCase new_expr (CoAlgAlts new_alts new_deflt))
+    returnSa (Case new_expr (AlgAlts new_alts new_deflt))
   where
     sa_alt (con, binders, rhs)
       = saExpr str_env abs_env rhs  `thenSa` \ new_rhs ->
@@ -285,17 +275,17 @@ saExpr str_env abs_env (CoCase expr (CoAlgAlts alts deflt))
 	tickCases new_binders	    `thenSa_` -- stats
 	returnSa (con, new_binders, new_rhs)
 
-saExpr str_env abs_env (CoCase expr (CoPrimAlts alts deflt))
+saExpr str_env abs_env (Case expr (PrimAlts alts deflt))
   = saExpr    str_env abs_env expr  `thenSa` \ new_expr  ->
     saDefault str_env abs_env deflt `thenSa` \ new_deflt ->
     mapSa sa_alt alts		    `thenSa` \ new_alts  ->
-    returnSa (CoCase new_expr (CoPrimAlts new_alts new_deflt))
+    returnSa (Case new_expr (PrimAlts new_alts new_deflt))
   where
     sa_alt (lit, rhs)
       = saExpr str_env abs_env rhs `thenSa` \ new_rhs ->
 	returnSa (lit, new_rhs)
 
-saExpr str_env abs_env (CoLet (CoNonRec binder rhs) body)
+saExpr str_env abs_env (Let (NonRec binder rhs) body)
   =	-- Analyse the RHS in the environment at hand
     saExpr str_env abs_env rhs  `thenSa` \ new_rhs  ->
     let
@@ -309,7 +299,7 @@ saExpr str_env abs_env (CoLet (CoNonRec binder rhs) body)
 	widened_str_rhs = widen StrAnal str_rhs_val
 	widened_abs_rhs = widen AbsAnal abs_rhs_val
 		-- The widening above is done for efficiency reasons.
-		-- See notes on CoLet case in SaAbsInt.lhs
+		-- See notes on Let case in SaAbsInt.lhs
 
       	new_str_env	= addOneToAbsValEnv str_env binder widened_str_rhs
       	new_abs_env	= addOneToAbsValEnv abs_env binder widened_abs_rhs
@@ -323,9 +313,9 @@ saExpr str_env abs_env (CoLet (CoNonRec binder rhs) body)
     in
     tickLet new_binder			`thenSa_` -- stats
     saExpr new_str_env new_abs_env body	`thenSa` \ new_body ->
-    returnSa (CoLet (CoNonRec new_binder new_rhs) new_body)
+    returnSa (Let (NonRec new_binder new_rhs) new_body)
 
-saExpr str_env abs_env (CoLet (CoRec pairs) body)
+saExpr str_env abs_env (Let (Rec pairs) body)
   = let
 	strflags       = getStrAnalFlags str_env
 	(binders,rhss) = unzip pairs
@@ -339,7 +329,7 @@ saExpr str_env abs_env (CoLet (CoRec pairs) body)
     mapSa (saExpr new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
     let
 --	new_binders      = addDemandInfoToIds new_str_env new_abs_env body binders
--- 		DON'T add demand info in a CoRec!
+-- 		DON'T add demand info in a Rec!
 --		a) it's useless: we can't do let-to-case
 --		b) it's incorrect.  Consider
 --			letrec x = ...y...
@@ -350,28 +340,28 @@ saExpr str_env abs_env (CoLet (CoRec pairs) body)
 --		   deciding that y is absent, which is plain wrong!
 --		It's much easier simply not to do this.
 
-	improved_binders = zipWith4 (addStrictnessInfoToId strflags)
-				    str_vals abs_vals binders rhss
+	improved_binders = zipWith4Equal (addStrictnessInfoToId strflags)
+				         str_vals abs_vals binders rhss
 
 	whiter_than_white_binders = launder improved_binders
 
       	new_pairs   = whiter_than_white_binders `zip` new_rhss
     in
-    returnSa (CoLet (CoRec new_pairs) new_body)
+    returnSa (Let (Rec new_pairs) new_body)
   where
     launder me = {-still-} me
 \end{code}
 
 \begin{code}
-saDefault str_env abs_env CoNoDefault = returnSa CoNoDefault
+saDefault str_env abs_env NoDefault = returnSa NoDefault
 
-saDefault str_env abs_env (CoBindDefault bdr rhs)
+saDefault str_env abs_env (BindDefault bdr rhs)
   = saExpr str_env abs_env rhs	`thenSa` \ new_rhs ->
     let
 	new_bdr = addDemandInfoToId str_env abs_env rhs bdr
     in
     tickCases [new_bdr]		`thenSa_` -- stats
-    returnSa (CoBindDefault new_bdr new_rhs)
+    returnSa (BindDefault new_bdr new_rhs)
 \end{code}
 
 
@@ -393,26 +383,26 @@ A better idea might be to have some kind of arity analysis to
 tell how many args could safely be grabbed.
 
 \begin{code}
-addStrictnessInfoToId 
+addStrictnessInfoToId
 	:: StrAnalFlags
 	-> AbsVal 		-- Abstract strictness value
 	-> AbsVal		-- Ditto absence
 	-> Id 			-- The id
-	-> PlainCoreExpr	-- Its RHS
+	-> CoreExpr	-- Its RHS
 	-> Id			-- Augmented with strictness
 
 addStrictnessInfoToId strflags str_val abs_val binder body
   = if isWrapperId binder then
-	binder	-- Avoid clobbering existing strictness info 
+	binder	-- Avoid clobbering existing strictness info
 		-- (and, more importantly, worker info).
 		-- Deeply suspicious (SLPJ)
     else
     if (isBot str_val) then
 	binder `addIdStrictness` mkBottomStrictnessInfo
     else
-	case (digForLambdas body) of { (_, lambda_bounds, rhs) ->
-        let
-		tys        = map getIdUniType lambda_bounds
+	case (digForLambdas body) of { (_, _, lambda_bounds, rhs) ->
+	let
+		tys        = map idType lambda_bounds
 		strictness = findStrictness strflags tys str_val abs_val
 	in
 	binder `addIdStrictness` mkStrictnessInfo strictness Nothing
@@ -420,17 +410,17 @@ addStrictnessInfoToId strflags str_val abs_val binder body
 \end{code}
 
 \begin{code}
-addDemandInfoToId :: StrictEnv -> AbsenceEnv 
-		  -> PlainCoreExpr 	-- The scope of the id
-		  -> Id 
+addDemandInfoToId :: StrictEnv -> AbsenceEnv
+		  -> CoreExpr 	-- The scope of the id
+		  -> Id
 		  -> Id			-- Id augmented with Demand info
 
 addDemandInfoToId str_env abs_env expr binder
   = binder `addIdDemandInfo` (mkDemandInfo (findDemand str_env abs_env expr binder))
 
-addDemandInfoToIds :: StrictEnv -> AbsenceEnv -> PlainCoreExpr -> [Id] -> [Id]
+addDemandInfoToIds :: StrictEnv -> AbsenceEnv -> CoreExpr -> [Id] -> [Id]
 
-addDemandInfoToIds str_env abs_env expr binders 
+addDemandInfoToIds str_env abs_env expr binders
   = map (addDemandInfoToId str_env abs_env expr) binders
 \end{code}
 
@@ -453,15 +443,13 @@ thenSa	      :: SaM a -> (a -> SaM b) -> SaM b
 thenSa_	      :: SaM a -> SaM b -> SaM b
 returnSa      :: a -> SaM a
 
-#ifdef __GLASGOW_HASKELL__
 {-# INLINE thenSa #-}
 {-# INLINE thenSa_ #-}
 {-# INLINE returnSa #-}
-#endif
 
-tickLambdas :: [Id] -> SaM ()
-tickCases   :: [Id] -> SaM ()
-tickLet     :: Id   -> SaM ()
+tickLambda :: [Id] -> SaM ()
+tickCases  :: [Id] -> SaM ()
+tickLet    :: Id   -> SaM ()
 
 #ifndef OMIT_STRANAL_STATS
 type SaM a = SaStats -> (a, SaStats)
@@ -476,8 +464,8 @@ thenSa_ expr cont stats
 
 returnSa x stats = (x, stats)
 
-tickLambdas vars (SaStats tlam dlam tc dc tlet dlet)
-  = case (foldr tick_demanded (0,0) vars) of { (IBOX(tot), IBOX(demanded)) ->
+tickLambda var (SaStats tlam dlam tc dc tlet dlet)
+  = case (tick_demanded (0,0) var) of { (IBOX(tot), IBOX(demanded)) ->
     ((), SaStats (tlam _ADD_ tot) (dlam _ADD_ demanded) tc dc tlet dlet) }
 
 tickCases vars (SaStats tlam dlam tc dc tlet dlet)
@@ -504,9 +492,9 @@ thenSa_ expr cont = cont
 
 returnSa x = x
 
-tickLambdas vars = panic "OMIT_STRANAL_STATS: tickLambdas"
-tickCases   vars = panic "OMIT_STRANAL_STATS: tickCases"
-tickLet     var  = panic "OMIT_STRANAL_STATS: tickLet"
+tickLambda var  = panic "OMIT_STRANAL_STATS: tickLambda"
+tickCases  vars = panic "OMIT_STRANAL_STATS: tickCases"
+tickLet    var  = panic "OMIT_STRANAL_STATS: tickLet"
 
 #endif {-OMIT_STRANAL_STATS-}
 

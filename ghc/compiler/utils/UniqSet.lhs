@@ -1,13 +1,11 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[UniqSet]{Specialised sets, for things with @Uniques@}
 
 Based on @UniqFMs@ (as you would expect).
 
 Basically, the things need to be in class @NamedThing@.
-
-We also export specialisations for @Ids@ and @TyVars@.
 
 \begin{code}
 #include "HsVersions.h"
@@ -17,41 +15,22 @@ module UniqSet (
 
 	mkUniqSet, uniqSetToList, emptyUniqSet, singletonUniqSet,
 	unionUniqSets, unionManyUniqSets, minusUniqSet,
-	elementOfUniqSet, mapUniqSet,
-	intersectUniqSets, isEmptyUniqSet,
-	
-	-- specalised for Ids:
-	IdSet(..),
-
-	-- specalised for TyVars:
-	TyVarSet(..),
-
-	-- specalised for Names:
-	NameSet(..),
-
-	-- to make the interface self-sufficient
-	Id, TyVar, Name,
-
-	UniqFM, Unique
-
-	-- and to be pragma friendly
-#ifdef USE_ATTACK_PRAGMAS
-	, emptyUFM, intersectUFM, isNullUFM, minusUFM, singletonUFM,
-	plusUFM, eltsUFM,
-	u2i
-#endif
+	elementOfUniqSet, mapUniqSet, intersectUniqSets,
+	isEmptyUniqSet
     ) where
 
+CHK_Ubiq() -- debugging consistency check
+
+import Maybes		( maybeToBool, Maybe )
 import UniqFM
-import Id		-- for specialisation to Ids
-import IdInfo		-- sigh
-import Maybes		( maybeToBool, Maybe(..) )
-import Name
-import Outputable
-import AbsUniType	-- for specialisation to TyVars
-import Util
+import Unique		( Unique )
+import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
+import SrcLoc		( SrcLoc )
+import Pretty		( Pretty(..), PrettyRep )
+import PprStyle		( PprStyle )
+import Util		( Ord3(..) )
+
 #if ! OMIT_NATIVE_CODEGEN
-import AsmRegAlloc	( Reg )
 #define IF_NCG(a) a
 #else
 #define IF_NCG(a) {--}
@@ -64,7 +43,7 @@ import AsmRegAlloc	( Reg )
 %*									*
 %************************************************************************
 
-We use @UniqFM@, with a (@getTheUnique@-able) @Unique@ as ``key''
+We use @UniqFM@, with a (@getItsUnique@-able) @Unique@ as ``key''
 and the thing itself as the ``value'' (for later retrieval).
 
 \begin{code}
@@ -80,7 +59,7 @@ singletonUniqSet :: NamedThing a => a -> UniqSet a
 singletonUniqSet x = MkUniqSet (singletonUFM x x)
 
 uniqSetToList :: UniqSet a -> [a]
-uniqSetToList (MkUniqSet set) = BSCC("uniqSetToList") eltsUFM set ESCC
+uniqSetToList (MkUniqSet set) = eltsUFM set
 
 mkUniqSet :: NamedThing a => [a]  -> UniqSet a
 mkUniqSet xs = MkUniqSet (listToUFM [ (x, x) | x <- xs])
@@ -124,41 +103,43 @@ mapUniqSet f (MkUniqSet set)
 @IdSet@ is a specialised version, optimised for sets of Ids.
 
 \begin{code}
-type IdSet    = UniqSet Id
-type TyVarSet = UniqSet TyVar
-type NameSet  = UniqSet Name
+--type NameSet           = UniqSet Name
+--type GenTyVarSet flexi = UniqSet (GenTyVar flexi)
+--type GenIdSet ty       = UniqSet (GenId ty)
+
 #if ! OMIT_NATIVE_CODEGEN
-type RegSet   = UniqSet Reg
+--type RegSet   = UniqSet Reg
 #endif
 
+#if 0
 #if __GLASGOW_HASKELL__
-    -- avoid hbc bug (0.999.7)
 {-# SPECIALIZE
-    singletonUniqSet :: Id    -> IdSet,
-			TyVar -> TyVarSet,
+    singletonUniqSet :: GenId ty       -> GenIdSet ty,
+			GenTyVar flexi -> GenTyVarSet flexi,
 			Name  -> NameSet
     IF_NCG(COMMA	Reg   -> RegSet)
     #-}
 
 {-# SPECIALIZE
-    mkUniqSet :: [Id]    -> IdSet,
-		 [TyVar] -> TyVarSet,
+    mkUniqSet :: [GenId ty]    -> GenIdSet ty,
+		 [GenTyVar flexi] -> GenTyVarSet flexi,
 		 [Name]  -> NameSet
     IF_NCG(COMMA [Reg]   -> RegSet)
     #-}
 
 {-# SPECIALIZE
-    elementOfUniqSet :: Id    -> IdSet    -> Bool,
-		    	TyVar -> TyVarSet -> Bool,
+    elementOfUniqSet :: GenId ty       -> GenIdSet ty       -> Bool,
+		    	GenTyVar flexi -> GenTyVarSet flexi -> Bool,
 			Name  -> NameSet  -> Bool
     IF_NCG(COMMA	Reg   -> RegSet   -> Bool)
     #-}
 
 {-# SPECIALIZE
-    mapUniqSet :: (Id    -> Id)    -> IdSet    -> IdSet,
-		  (TyVar -> TyVar) -> TyVarSet -> TyVarSet,
+    mapUniqSet :: (GenId ty       -> GenId ty)       -> GenIdSet ty        -> GenIdSet ty,
+		  (GenTyVar flexi -> GenTyVar flexi) -> GenTyVarSet flexi -> GenTyVarSet flexi,
 		  (Name  -> Name)  -> NameSet  -> NameSet
     IF_NCG(COMMA  (Reg  -> Reg)    -> RegSet   -> RegSet)
     #-}
+#endif
 #endif
 \end{code}

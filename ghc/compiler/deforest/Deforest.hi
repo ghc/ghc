@@ -1,8 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
-interface Deforest where
-import CmdLineOpts(GlobalSwitch, SwitchResult)
-import CoreSyn(CoreBinding)
-import Id(Id)
-import SplitUniq(SplitUniqSupply)
-deforestProgram :: (GlobalSwitch -> SwitchResult) -> [CoreBinding Id Id] -> SplitUniqSupply -> [CoreBinding Id Id]
-

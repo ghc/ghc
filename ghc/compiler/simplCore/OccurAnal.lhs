@@ -7,85 +7,24 @@
 %*									*
 %************************************************************************
 
-The occurrence analyser analyses the way in which variables are used
-in their scope, and pins that information on the binder.  It does {\em
-not} take any strategic decisions about what to do as a result (eg
-discard binding, inline binding etc).  That's the job of the
-simplifier.
-
-The occurrence analyser {\em simply} records usage information.  That is,
-it pins on each binder info on how that binder occurs in its scope.
-
-Any uses within the RHS of a let(rec) binding for a variable which is
-itself unused are ignored.  For example:
-@
-	let x = ...
- 	    y = ...x...
-	in
-	x+1
-@
-Here, y is unused, so x will be marked as appearing just once.
-
-An exported Id gets tagged as ManyOcc.
-
-IT MUST OBSERVE SCOPING: CANNOT assume unique binders.
-
-Lambdas
-~~~~~~~
-The occurrence analyser marks each binder in a lambda the same way.
-Thus:
-	\ x y -> f y x
-will have both x and y marked as single occurrence, and *not* dangerous-to-dup.
-Technically, x occurs inside a lambda, and therefore *is* dangerous-to-dup,
-but the simplifer very carefully takes care of this special case.
-(See the CoLam case in simplExpr.)
-
-Why?  Because typically applications are saturated, in which case x is *not*
-dangerous-to-dup.
-
-Things to muse upon
-~~~~~~~~~~~~~~~~~~~
-
-There *is* a reason not to substitute for
-variables applied to types: it can undo the effect of floating
-Consider:
-\begin{verbatim}
-	c = /\a -> e
-	f = /\b -> let d = c b
-		   in \ x::b -> ...
-\end{verbatim}
-Here, inlining c would be a Bad Idea.
-
-At present I've set it up so that the "inside-lambda" flag sets set On for
-type-lambdas too, which effectively prevents such substitutions.  I don't *think*
-it disables any interesting ones either.
+The occurrence analyser re-typechecks a core expression, returning a new
+core expression with (hopefully) improved usage information.
 
 \begin{code}
 #include "HsVersions.h"
 
 module OccurAnal (
-	occurAnalyseBinds, occurAnalyseExpr, occurAnalyseGlobalExpr,
+	occurAnalyseBinds, occurAnalyseExpr, occurAnalyseGlobalExpr
 
 	-- and to make the interface self-sufficient...
-	CoreExpr, CoreBinding, Id, BinderInfo, GlobalSwitch,
-	PlainCoreProgram(..), PlainCoreExpr(..),
-	SimplifiableCoreExpr(..), SimplifiableCoreBinding(..)
     ) where
 
-IMPORT_Trace
-import Outputable	-- ToDo: rm; debugging
-import Pretty
-
-import PlainCore	-- the stuff we read...
-import TaggedCore	-- ... and produce Simplifiable*
-
-import AbsUniType
+import Type
 import BinderInfo
 import CmdLineOpts	( GlobalSwitch(..), SimplifierSwitch(..) )
 import Digraph		( stronglyConnComp )
-import Id		( eqId, idWantsToBeINLINEd, isConstMethodId_maybe,
+import Id		( eqId, idWantsToBeINLINEd, isConstMethodId,
 			  isSpecPragmaId_maybe, SpecInfo )
-import IdEnv
 import Maybes
 import UniqSet
 import Util
@@ -99,51 +38,47 @@ import Util
 %************************************************************************
 
 \begin{code}
-data OccEnv = OccEnv
-		Bool		-- Keep-unused-bindings flag
-				-- False <=> OK to chuck away binding
-				-- 	     and ignore occurrences within it
-		Bool		-- Keep-spec-pragma-ids flag
-				-- False <=> OK to chuck away spec pragma bindings
-				-- 	     and ignore occurrences within it
-		Bool		-- Keep-conjurable flag
-				-- False <=> OK to throw away *dead*
-				-- "conjurable" Ids; at the moment, that
-				-- *only* means constant methods, which
-				-- are top-level.  A use of a "conjurable"
-				-- Id may appear out of thin air -- e.g.,
-				-- specialiser conjuring up refs to const
-				-- methods.
-		Bool		-- IgnoreINLINEPragma flag
-				-- False <=> OK to use INLINEPragma information
-				-- True  <=> ignore INLINEPragma information
-		(UniqSet Id)	-- Candidates
+data OccEnv =
+  OccEnv
+    Bool	-- Keep-unused-bindings flag
+		-- False <=> OK to chuck away binding
+		-- 	     and ignore occurrences within it
+    Bool	-- Keep-spec-pragma-ids flag
+		-- False <=> OK to chuck away spec pragma bindings
+		-- 	     and ignore occurrences within it
+    Bool	-- Keep-conjurable flag
+		-- False <=> OK to throw away *dead*
+		-- "conjurable" Ids; at the moment, that
+		-- *only* means constant methods, which
+		-- are top-level.  A use of a "conjurable"
+		-- Id may appear out of thin air -- e.g.,
+		-- specialiser conjuring up refs to const methods.
+   Bool		-- IgnoreINLINEPragma flag
+		-- False <=> OK to use INLINEPragma information
+		-- True  <=> ignore INLINEPragma information
+   (UniqSet Id)	-- Candidates
 
 addNewCands :: OccEnv -> [Id] -> OccEnv
-addNewCands (OccEnv keep_dead keep_spec keep_conjurable ignore_inline_pragma cands) ids
-  = OccEnv keep_dead keep_spec keep_conjurable ignore_inline_pragma (cands `unionUniqSets` mkUniqSet ids)
+addNewCands (OccEnv kd ks kc ip cands) ids
+  = OccEnv kd ks kc ip (cands `unionUniqSets` mkUniqSet ids)
 
 addNewCand :: OccEnv -> Id -> OccEnv
-addNewCand (OccEnv keep_dead keep_spec keep_conjurable ignore_inline_pragma cands) id
-  = OccEnv keep_dead keep_spec keep_conjurable ignore_inline_pragma (cands `unionUniqSets` singletonUniqSet id)
+addNewCand (OccEnv ks kd kc ip cands) id
+  = OccEnv kd ks kc ip (cands `unionUniqSets` singletonUniqSet id)
 
 isCandidate :: OccEnv -> Id -> Bool
 isCandidate (OccEnv _ _ _ _ cands) id = id `elementOfUniqSet` cands
 
 ignoreINLINEPragma :: OccEnv -> Bool
-ignoreINLINEPragma (OccEnv _ _ _ ignore_inline_pragma _) = ignore_inline_pragma
+ignoreINLINEPragma (OccEnv _ _ _ ip _) = ip
 
 keepUnusedBinding :: OccEnv -> Id -> Bool
 keepUnusedBinding (OccEnv keep_dead keep_spec keep_conjurable _ _) binder
-  = keep_dead || (keep_spec && is_spec)
-  where
-    is_spec = maybeToBool (isSpecPragmaId_maybe binder)
+  = keep_dead || (keep_spec && maybeToBool (isSpecPragmaId_maybe binder))
 
 keepBecauseConjurable :: OccEnv -> Id -> Bool
 keepBecauseConjurable (OccEnv _ _ keep_conjurable _ _) binder
-  = keep_conjurable && is_conjurable
-  where
-    is_conjurable = maybeToBool (isConstMethodId_maybe binder)
+  = keep_conjurable && isConstMethodId binder
 
 type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
 
@@ -196,7 +131,7 @@ usage_of usage binder
       Just info -> info
 
 isNeeded env usage binder
-  = case usage_of usage binder of	
+  = case usage_of usage binder of
       DeadCode  -> keepUnusedBinding env binder	-- Maybe keep it anyway
       other     -> True
 \end{code}
@@ -212,7 +147,7 @@ Here's the externally-callable interface:
 
 \begin{code}
 occurAnalyseBinds
-	:: [PlainCoreBinding]		-- input
+	:: [CoreBinding]		-- input
 	-> (GlobalSwitch -> Bool)
 	-> (SimplifierSwitch -> Bool)
 	-> [SimplifiableCoreBinding]	-- output
@@ -242,7 +177,7 @@ occurAnalyseBinds binds global_sw_chkr simplifier_sw_chkr
 
 \begin{code}
 occurAnalyseExpr :: UniqSet Id 			-- Set of interesting free vars
-		 -> PlainCoreExpr 
+		 -> CoreExpr
 		 -> (IdEnv BinderInfo,		-- Occ info for interesting free vars
 		     SimplifiableCoreExpr)
 
@@ -255,9 +190,9 @@ occurAnalyseExpr candidates expr
 			 False {- Do not ignore INLINE Pragma -}
 			 candidates
 
-occurAnalyseGlobalExpr :: PlainCoreExpr -> SimplifiableCoreExpr
+occurAnalyseGlobalExpr :: CoreExpr -> SimplifiableCoreExpr
 occurAnalyseGlobalExpr expr
-  = 	-- Top level expr, so no interesting free vars, and 
+  = 	-- Top level expr, so no interesting free vars, and
 	-- discard occurence info returned
     expr' where (_, expr') = occurAnalyseExpr emptyUniqSet expr
 \end{code}
@@ -273,15 +208,15 @@ Bindings
 
 \begin{code}
 occAnalBind :: OccEnv
-	    -> PlainCoreBinding
+	    -> CoreBinding
 	    -> UsageDetails		-- Usage details of scope
 	    -> (UsageDetails,		-- Of the whole let(rec)
 		[SimplifiableCoreBinding])
 
-occAnalBind env (CoNonRec binder rhs) body_usage
+occAnalBind env (NonRec binder rhs) body_usage
   | isNeeded env body_usage binder		-- It's mentioned in body
   = (final_body_usage `combineUsageDetails` rhs_usage,
-     [CoNonRec tagged_binder rhs'])
+     [NonRec tagged_binder rhs'])
 
   | otherwise
   = (body_usage, [])
@@ -298,9 +233,9 @@ Dropping dead code for recursive bindings is done in a very simple way:
 
 This seems to miss an obvious improvement.
 @
-	letrec  f = ...g...	
-	        g = ...f...
-	in	
+	letrec  f = ...g...
+		g = ...f...
+	in
 	...g...
 
 ===>
@@ -327,7 +262,7 @@ It isn't easy to do a perfect job in one blow.  Consider
 
 
 \begin{code}
-occAnalBind env (CoRec pairs) body_usage
+occAnalBind env (Rec pairs) body_usage
   = foldr do_final_bind (body_usage, []) sccs
   where
 
@@ -336,7 +271,7 @@ occAnalBind env (CoRec pairs) body_usage
 
     analysed_pairs :: [(Id, (UsageDetails, SimplifiableCoreExpr))]
     analysed_pairs  = [(id, occAnalRhs new_env id rhs) | (id,rhs) <- pairs]
-    
+
     lookup :: Id -> (UsageDetails, SimplifiableCoreExpr)
     lookup id =  assoc "occAnalBind:lookup" analysed_pairs id
 
@@ -344,7 +279,7 @@ occAnalBind env (CoRec pairs) body_usage
     ---- stuff for dependency analysis of binds -------------------------------
 
     edges :: [(Id,Id)]		-- (a,b) means a mentions b
-    edges = concat [ edges_from binder rhs_usage 
+    edges = concat [ edges_from binder rhs_usage
 		   | (binder, (rhs_usage, _)) <- analysed_pairs]
 
     edges_from :: Id -> UsageDetails -> [(Id,Id)]
@@ -372,8 +307,8 @@ occAnalBind env (CoRec pairs) body_usage
 	(combined_usage, tagged_binder) = tagBinder total_usage binder
 
 	new_bind
-	  | mentions_itself binder rhs_usage = CoRec [(tagged_binder,rhs')]
-	  | otherwise		             = CoNonRec tagged_binder rhs'
+	  | mentions_itself binder rhs_usage = Rec [(tagged_binder,rhs')]
+	  | otherwise		             = NonRec tagged_binder rhs'
 	  where
 	    mentions_itself binder usage
 	      = maybeToBool (lookupIdEnv usage binder)
@@ -389,7 +324,7 @@ occAnalBind env (CoRec pairs) body_usage
 	total_usage		         = foldr combineUsageDetails body_usage rhs_usages
 	(combined_usage, tagged_binders) = tagBinders total_usage sCC
 
-	new_bind	    	         = CoRec (tagged_binders `zip` rhss')
+	new_bind	    	         = Rec (tagged_binders `zip` rhss')
 \end{code}
 
 @occAnalRhs@ deals with the question of bindings where the Id is marked
@@ -402,7 +337,7 @@ ToDo: try using the occurrence info for the inline'd binder.
 \begin{code}
 occAnalRhs :: OccEnv
 	   -> Id		-- Binder
-	   -> PlainCoreExpr	-- Rhs
+	   -> CoreExpr	-- Rhs
 	   -> (UsageDetails, SimplifiableCoreExpr)
 
 occAnalRhs env id rhs
@@ -420,43 +355,42 @@ Expressions
 ~~~~~~~~~~~
 \begin{code}
 occAnal :: OccEnv
-	-> PlainCoreExpr
+	-> CoreExpr
 	-> (UsageDetails, 		-- Gives info only about the "interesting" Ids
 	    SimplifiableCoreExpr)
 
-occAnal env (CoVar v)
+occAnal env (Var v)
   | isCandidate env v
-  = (unitIdEnv v (funOccurrence 0), CoVar v)
+  = (unitIdEnv v (funOccurrence 0), Var v)
 
   | otherwise
-  = (emptyDetails, CoVar v)
+  = (emptyDetails, Var v)
 
-occAnal env (CoLit lit)	   = (emptyDetails, CoLit lit)
-occAnal env (CoCon con tys args) = (occAnalAtoms env args, CoCon con tys args)
-occAnal env (CoPrim op tys args) = (occAnalAtoms env args, CoPrim op tys args)
+occAnal env (Lit lit)	   = (emptyDetails, Lit lit)
+occAnal env (Con con tys args) = (occAnalAtoms env args, Con con tys args)
+occAnal env (Prim op tys args) = (occAnalAtoms env args, Prim op tys args)
 
-occAnal env (CoSCC cc body)
-  = (mapIdEnv markInsideSCC usage, CoSCC cc body')
+occAnal env (SCC cc body)
+  = (mapIdEnv markInsideSCC usage, SCC cc body')
   where
     (usage, body') = occAnal env body
 
-occAnal env (CoApp fun arg)
-  = (fun_usage `combineUsageDetails` arg_usage, CoApp fun' arg)
+occAnal env (App fun arg)
+  = (fun_usage `combineUsageDetails` arg_usage, App fun' arg)
   where
     (fun_usage, fun') = occAnal env fun
     arg_usage	      = occAnalAtom env arg
-			
+
 occAnal env (CoTyApp fun ty)
   = (fun_usage, CoTyApp fun' ty)
   where
     (fun_usage, fun') = occAnal env fun
 
-occAnal env (CoLam binders body)
-  = (mapIdEnv markDangerousToDup final_usage, mkCoLam tagged_binders body')
+occAnal env (Lam binder body)
+  = (mapIdEnv markDangerousToDup final_usage, Lam tagged_binder body')
   where
-    new_env			  = env `addNewCands` binders
-    (body_usage, body') 	  = occAnal new_env body
-    (final_usage, tagged_binders) = tagBinders body_usage binders
+    (body_usage, body') 	  = occAnal (env `addNewCand` binder) body
+    (final_usage, tagged_binder) = tagBinder body_usage binder
 
 -- ANDY: WE MUST THINK ABOUT THIS! (ToDo)
 occAnal env (CoTyLam tyvar body)
@@ -464,15 +398,15 @@ occAnal env (CoTyLam tyvar body)
   where
     (body_usage, body') = occAnal env body
 
-occAnal env (CoCase scrut alts)
+occAnal env (Case scrut alts)
   = (scrut_usage `combineUsageDetails` alts_usage,
-     CoCase scrut' alts')
+     Case scrut' alts')
   where
     (scrut_usage, scrut') = occAnal env scrut
     (alts_usage, alts')   = occAnalAlts env alts
 
-occAnal env (CoLet bind body)
-  = (final_usage, foldr CoLet body' new_binds) -- mkCoLet* wants PlainCore... (sigh)
+occAnal env (Let bind body)
+  = (final_usage, foldr Let body' new_binds) -- mkCoLet* wants Core... (sigh)
   where
     new_env		     = env `addNewCands` (bindersOf bind)
     (body_usage, body')      = occAnal new_env body
@@ -484,10 +418,10 @@ occAnal env (CoLet bind body)
 Case alternatives
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-occAnalAlts env (CoAlgAlts alts deflt)
+occAnalAlts env (AlgAlts alts deflt)
   = (foldr combineAltsUsageDetails deflt_usage alts_usage,
 	-- Note: combine*Alts*UsageDetails...
-     CoAlgAlts alts' deflt')
+     AlgAlts alts' deflt')
   where
     (alts_usage,  alts')  = unzip (map do_alt alts)
     (deflt_usage, deflt') = occAnalDeflt env deflt
@@ -499,10 +433,10 @@ occAnalAlts env (CoAlgAlts alts deflt)
 	(rhs_usage, rhs')	   = occAnal new_env rhs
 	(final_usage, tagged_args) = tagBinders rhs_usage args
 
-occAnalAlts env (CoPrimAlts alts deflt)
+occAnalAlts env (PrimAlts alts deflt)
   = (foldr combineAltsUsageDetails deflt_usage alts_usage,
 	-- Note: combine*Alts*UsageDetails...
-     CoPrimAlts alts' deflt')
+     PrimAlts alts' deflt')
   where
     (alts_usage, alts')   = unzip (map do_alt alts)
     (deflt_usage, deflt') = occAnalDeflt env deflt
@@ -512,10 +446,10 @@ occAnalAlts env (CoPrimAlts alts deflt)
       where
 	(rhs_usage, rhs') = occAnal env rhs
 
-occAnalDeflt env CoNoDefault = (emptyDetails, CoNoDefault)
+occAnalDeflt env NoDefault = (emptyDetails, NoDefault)
 
-occAnalDeflt env (CoBindDefault binder rhs)
-  = (final_usage, CoBindDefault tagged_binder rhs')
+occAnalDeflt env (BindDefault binder rhs)
+  = (final_usage, BindDefault tagged_binder rhs')
   where
     new_env			 = env `addNewCand` binder
     (rhs_usage, rhs')		 = occAnal new_env rhs
@@ -526,21 +460,21 @@ occAnalDeflt env (CoBindDefault binder rhs)
 Atoms
 ~~~~~
 \begin{code}
-occAnalAtoms :: OccEnv -> [PlainCoreAtom] -> UsageDetails
+occAnalAtoms :: OccEnv -> [CoreArg] -> UsageDetails
 
 occAnalAtoms env atoms
   = foldr do_one_atom emptyDetails atoms
   where
-    do_one_atom (CoLitAtom lit) usage = usage
-    do_one_atom (CoVarAtom v) usage
+    do_one_atom (LitArg lit) usage = usage
+    do_one_atom (VarArg v) usage
 	| isCandidate env v = addOneOcc usage v (argOccurrence 0)
-        | otherwise	    = usage
+	| otherwise	    = usage
 
 
-occAnalAtom  :: OccEnv -> PlainCoreAtom -> UsageDetails
+occAnalAtom  :: OccEnv -> CoreArg -> UsageDetails
 
-occAnalAtom env (CoLitAtom lit) = emptyDetails
-occAnalAtom env (CoVarAtom v)
+occAnalAtom env (LitArg lit) = emptyDetails
+occAnalAtom env (VarArg v)
   | isCandidate env v = unitDetails v (argOccurrence 0)
   | otherwise         = emptyDetails
 \end{code}

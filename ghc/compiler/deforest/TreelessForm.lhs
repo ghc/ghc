@@ -8,22 +8,19 @@
 > module TreelessForm (
 > 	convertToTreelessForm
 >	) where
-> 
+>
 > import DefSyn
-> import PlainCore
 > import DefUtils
 
-> import CoreFuns	( typeOfCoreExpr )
-> import IdEnv
 > import CmdLineOpts	( SwitchResult, switchIsOn )
-> import SplitUniq
-> import SimplEnv	( SwitchChecker(..) )
-> import Maybes		( Maybe(..) )
+> import CoreUtils	( coreExprType )
 > import Id		( replaceIdInfo, getIdInfo )
 > import IdInfo
-> import Util
+> import Maybes		( Maybe(..) )
 > import Outputable
-
+> import SimplEnv	( SwitchChecker(..) )
+> import UniqSupply
+> import Util
 
 > -- tmp
 > import Pretty
@@ -39,89 +36,89 @@ ToDo: make this better.
 > convertToTreelessForm
 > 	:: SwitchChecker sw
 >	-> DefExpr
->	-> SUniqSM DefExpr
->	
+>	-> UniqSM DefExpr
+>
 > convertToTreelessForm sw e
 > 	= convExpr e
 >
 > convExpr
 > 	:: DefExpr
->	-> SUniqSM DefExpr
+>	-> UniqSM DefExpr
 
 > convExpr e = case e of
 >
-> 	CoVar (DefArgExpr e) -> 
->		panic "TreelessForm(substTy): CoVar (DefArgExpr _)"
->		
->	CoVar (Label l e) -> 
->		panic "TreelessForm(substTy): CoVar (Label _ _)"
->		
->       CoVar (DefArgVar id) -> returnSUs e
->	
->       CoLit l -> returnSUs e
->	
->       CoCon c ts es -> 
->		mapSUs convAtom es		`thenSUs` \es ->
->		returnSUs (CoCon c ts es)
->	
->       CoPrim op ts es -> 
->		mapSUs convAtom es		`thenSUs` \es ->
->		returnSUs (CoPrim op ts es)
->		
->       CoLam vs e -> 
->		convExpr e			`thenSUs` \e ->
->		returnSUs (CoLam vs e)
+> 	Var (DefArgExpr e) ->
+>		panic "TreelessForm(substTy): Var (DefArgExpr _)"
 >
->       CoTyLam alpha e -> 
->		convExpr e			`thenSUs` \e ->
->		returnSUs (CoTyLam alpha e)
+>	Var (Label l e) ->
+>		panic "TreelessForm(substTy): Var (Label _ _)"
 >
->       CoApp e v -> 
->		convExpr e			`thenSUs` \e ->
+>       Var (DefArgVar id) -> returnUs e
+>
+>       Lit l -> returnUs e
+>
+>       Con c ts es ->
+>		mapUs convAtom es		`thenUs` \es ->
+>		returnUs (Con c ts es)
+>
+>       Prim op ts es ->
+>		mapUs convAtom es		`thenUs` \es ->
+>		returnUs (Prim op ts es)
+>
+>       Lam vs e ->
+>		convExpr e			`thenUs` \e ->
+>		returnUs (Lam vs e)
+>
+>       CoTyLam alpha e ->
+>		convExpr e			`thenUs` \e ->
+>		returnUs (CoTyLam alpha e)
+>
+>       App e v ->
+>		convExpr e			`thenUs` \e ->
 >		case v of
->		  CoLitAtom l -> returnSUs (CoApp e v)
->		  CoVarAtom v' ->
+>		  LitArg l -> returnUs (App e v)
+>		  VarArg v' ->
 >		    case v' of
 >		    	DefArgVar _ -> panic "TreelessForm(convExpr): DefArgVar"
->			DefArgExpr (CoVar (DefArgVar id)) 
->				| (not.deforestable) id -> 
->					returnSUs (CoApp e v)
->			DefArgExpr e' -> 
->			   newLet e' (\id -> CoApp e (CoVarAtom 
+>			DefArgExpr (Var (DefArgVar id))
+>				| (not.deforestable) id ->
+>					returnUs (App e v)
+>			DefArgExpr e' ->
+>			   newLet e' (\id -> App e (VarArg
 >			   				(DefArgExpr id)))
->						
->       CoTyApp e ty -> 
->		convExpr e			`thenSUs` \e ->
->		returnSUs (CoTyApp e ty)
->		
->       CoCase e ps -> 
->		convCaseAlts ps			`thenSUs` \ps ->
->		case e of 
->			CoVar (DefArgVar id)  | (not.deforestable) id ->
->				returnSUs (CoCase e ps)
->			CoPrim op ts es -> returnSUs (CoCase e ps) 
->			_ -> d2c e		`thenSUs` \e' ->
->			     newLet e (\v -> CoCase v ps)
 >
->       CoLet (CoNonRec id e) e' -> 
->		convExpr e			`thenSUs` \e  ->
->		convExpr e'			`thenSUs` \e' ->
->		returnSUs (CoLet (CoNonRec id e) e')
->		
->       CoLet (CoRec bs) e -> 
->--		convRecBinds bs e		`thenSUs` \(bs,e) ->
->--		returnSUs (CoLet (CoRec bs) e)
->		convExpr e			`thenSUs` \e ->
->		mapSUs convRecBind bs		`thenSUs` \bs ->
->		returnSUs (CoLet (CoRec bs) e)
+>       CoTyApp e ty ->
+>		convExpr e			`thenUs` \e ->
+>		returnUs (CoTyApp e ty)
+>
+>       Case e ps ->
+>		convCaseAlts ps			`thenUs` \ps ->
+>		case e of
+>			Var (DefArgVar id)  | (not.deforestable) id ->
+>				returnUs (Case e ps)
+>			Prim op ts es -> returnUs (Case e ps)
+>			_ -> d2c e		`thenUs` \e' ->
+>			     newLet e (\v -> Case v ps)
+>
+>       Let (NonRec id e) e' ->
+>		convExpr e			`thenUs` \e  ->
+>		convExpr e'			`thenUs` \e' ->
+>		returnUs (Let (NonRec id e) e')
+>
+>       Let (Rec bs) e ->
+>--		convRecBinds bs e		`thenUs` \(bs,e) ->
+>--		returnUs (Let (Rec bs) e)
+>		convExpr e			`thenUs` \e ->
+>		mapUs convRecBind bs		`thenUs` \bs ->
+>		returnUs (Let (Rec bs) e)
 >	   where
->	   	convRecBind (v,e) = 
->			convExpr e		`thenSUs` \e ->
->			returnSUs (v,e)
->			
->       CoSCC l e ->
->		convExpr e			`thenSUs` \e ->
->		returnSUs (CoSCC l e)
+>	   	convRecBind (v,e) =
+>			convExpr e		`thenUs` \e ->
+>			returnUs (v,e)
+>
+>       SCC l e ->
+>		convExpr e			`thenUs` \e ->
+>		returnUs (SCC l e)
 
 Mark all the recursive functions as deforestable.  Might as well,
 since they will be in treeless form anyway.  This helps to cope with
@@ -129,61 +126,61 @@ overloaded functions, where the compiler earlier lifts out the
 dictionary deconstruction.
 
 > convRecBinds bs e =
-> 	convExpr e				`thenSUs` \e'   ->
->	mapSUs convExpr es			`thenSUs` \es'  ->
-> 	mapSUs (subst s) es'			`thenSUs` \es'' ->
->	subst s	e'				`thenSUs` \e''  ->
-> 	returnSUs (zip vs' es', e')
+> 	convExpr e				`thenUs` \e'   ->
+>	mapUs convExpr es			`thenUs` \es'  ->
+> 	mapUs (subst s) es'			`thenUs` \es'' ->
+>	subst s	e'				`thenUs` \e''  ->
+> 	returnUs (zip vs' es', e')
 >    where
 >	(vs,es) = unzip bs
 >	vs'  = map mkDeforestable vs
->	s = zip vs (map (CoVar . DefArgVar) vs')
+>	s = zip vs (map (Var . DefArgVar) vs')
 >	mkDeforestable v = replaceIdInfo v (addInfo (getIdInfo v) DoDeforest)
 
-> convAtom :: DefAtom -> SUniqSM DefAtom
-> 
-> convAtom (CoVarAtom v) = 
-> 	convArg v				`thenSUs` \v ->
-> 	returnSUs (CoVarAtom v)
-> convAtom (CoLitAtom l) =
-> 	returnSUs (CoLitAtom l)		-- XXX
+> convAtom :: DefAtom -> UniqSM DefAtom
+>
+> convAtom (VarArg v) =
+> 	convArg v				`thenUs` \v ->
+> 	returnUs (VarArg v)
+> convAtom (LitArg l) =
+> 	returnUs (LitArg l)		-- XXX
 
-> convArg :: DefBindee -> SUniqSM DefBindee
-> 
+> convArg :: DefBindee -> UniqSM DefBindee
+>
 > convArg (DefArgExpr e) =
-> 	convExpr e				`thenSUs` \e ->
->	returnSUs (DefArgExpr e)
-> convArg e@(Label _ _)  = 
+> 	convExpr e				`thenUs` \e ->
+>	returnUs (DefArgExpr e)
+> convArg e@(Label _ _)  =
 > 	panic "TreelessForm(convArg): Label _ _"
 > convArg e@(DefArgVar id)  =
 > 	panic "TreelessForm(convArg): DefArgVar _ _"
 
-> convCaseAlts :: DefCaseAlternatives -> SUniqSM DefCaseAlternatives
-> 
-> convCaseAlts (CoAlgAlts as def) =
-> 	mapSUs convAlgAlt as			`thenSUs` \as ->
->	convDefault def				`thenSUs` \def ->
->	returnSUs (CoAlgAlts as def)
-> convCaseAlts (CoPrimAlts as def) =
-> 	mapSUs convPrimAlt as			`thenSUs` \as ->
->	convDefault def				`thenSUs` \def ->
->	returnSUs (CoPrimAlts as def)
+> convCaseAlts :: DefCaseAlternatives -> UniqSM DefCaseAlternatives
+>
+> convCaseAlts (AlgAlts as def) =
+> 	mapUs convAlgAlt as			`thenUs` \as ->
+>	convDefault def				`thenUs` \def ->
+>	returnUs (AlgAlts as def)
+> convCaseAlts (PrimAlts as def) =
+> 	mapUs convPrimAlt as			`thenUs` \as ->
+>	convDefault def				`thenUs` \def ->
+>	returnUs (PrimAlts as def)
 
-> convAlgAlt  (c, vs, e) = 
-> 	convExpr e				`thenSUs` \e ->
->	returnSUs (c, vs, e)
-> convPrimAlt (l, e) = 
-> 	convExpr e				`thenSUs` \e ->
->	returnSUs (l, e)
+> convAlgAlt  (c, vs, e) =
+> 	convExpr e				`thenUs` \e ->
+>	returnUs (c, vs, e)
+> convPrimAlt (l, e) =
+> 	convExpr e				`thenUs` \e ->
+>	returnUs (l, e)
 
-> convDefault CoNoDefault = 
-> 	returnSUs CoNoDefault
-> convDefault (CoBindDefault id e) = 
-> 	convExpr e				`thenSUs` \e ->
->     	returnSUs (CoBindDefault id e)
+> convDefault NoDefault =
+> 	returnUs NoDefault
+> convDefault (BindDefault id e) =
+> 	convExpr e				`thenUs` \e ->
+>     	returnUs (BindDefault id e)
 
-> newLet :: DefExpr -> (DefExpr -> DefExpr) -> SUniqSM DefExpr
-> newLet e body = 
-> 	d2c e					`thenSUs` \core_expr ->
->	newDefId (typeOfCoreExpr core_expr)	`thenSUs` \new_id ->
->	returnSUs (CoLet (CoNonRec new_id e) (body (CoVar (DefArgVar new_id))))
+> newLet :: DefExpr -> (DefExpr -> DefExpr) -> UniqSM DefExpr
+> newLet e body =
+> 	d2c e					`thenUs` \core_expr ->
+>	newDefId (coreExprType core_expr)	`thenUs` \new_id ->
+>	returnUs (Let (NonRec new_id e) (body (Var (DefArgVar new_id))))

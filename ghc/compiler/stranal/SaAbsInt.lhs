@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[SaAbsInt]{Abstract interpreter for strictness analysis}
 
@@ -20,29 +20,24 @@ import Pretty
 --import FiniteMap
 import Outputable
 
-import AbsPrel		( PrimOp(..),
+import PrelInfo		( PrimOp(..),
 			  intTyCon, integerTyCon, doubleTyCon,
 			  floatTyCon, wordTyCon, addrTyCon,
-			  PrimKind
+			  PrimRep
 			)
-import AbsUniType	( isPrimType, getUniDataTyCon_maybe,
+import Type		( isPrimType, maybeDataTyCon,
 			  maybeSingleConstructorTyCon,
 			  returnsRealWorld,
 			  isEnumerationTyCon, TyVarTemplate, TyCon
-			  IF_ATTACK_PRAGMAS(COMMA cmpTyCon)
 			)
-import Id		( getIdStrictness, getIdUniType, getIdUnfolding,
+import CoreUtils	( unTagBinders )
+import Id		( getIdStrictness, idType, getIdUnfolding,
 			  getDataConSig, getInstantiatedDataConSig,
 			  DataCon(..), isBottomingId
 			)
-
 import IdInfo		-- various bits
-import IdEnv
-import CoreFuns		( unTagBinders )
 import Maybes		( maybeToBool, Maybe(..) )
-import PlainCore
 import SaLib
-import SimplEnv		( FormSummary(..) ) -- nice data abstraction, huh? (WDP 95/03)
 import Util
 \end{code}
 
@@ -62,11 +57,10 @@ lub val1 val2 | isBot val2    = val1	-- one of the val's is a function which
 					-- always returns bottom, such as \y.x,
 					-- when x is bound to bottom.
 
-lub (AbsProd xs) (AbsProd ys) = ASSERT (length xs == length ys)
-				AbsProd (zipWith lub xs ys)
+lub (AbsProd xs) (AbsProd ys) = AbsProd (zipWithEqual lub xs ys)
 
 lub _		  _	      = AbsTop	-- Crude, but conservative
-					-- The crudity only shows up if there 
+					-- The crudity only shows up if there
 					-- are functions involved
 
 -- Slightly funny glb; for absence analysis only;
@@ -77,7 +71,7 @@ lub _		  _	      = AbsTop	-- Crude, but conservative
 --
 --   f = \a b -> ...
 --
---   g = \x y z -> case x of 
+--   g = \x y z -> case x of
 --	  	     []     -> f x
 --		     (p:ps) -> f p
 --
@@ -105,9 +99,9 @@ lub _		  _	      = AbsTop	-- Crude, but conservative
 -- Deal with functions specially, because AbsTop isn't the
 -- top of their domain.
 
-glb v1 v2 
+glb v1 v2
   | is_fun v1 || is_fun v2
-  = if not (anyBot v1) && not (anyBot v2) 
+  = if not (anyBot v1) && not (anyBot v2)
     then
 	AbsTop
     else
@@ -119,8 +113,7 @@ glb v1 v2
 
 -- The non-functional cases are quite straightforward
 
-glb (AbsProd xs) (AbsProd ys) = ASSERT (length xs == length ys)
-				AbsProd (zipWith glb xs ys)
+glb (AbsProd xs) (AbsProd ys) = AbsProd (zipWithEqual glb xs ys)
 
 glb AbsTop	 v2	      = v2
 glb v1           AbsTop	      = v1
@@ -129,7 +122,7 @@ glb _            _            = AbsBot 		-- Be pessimistic
 
 
 
-combineCaseValues 
+combineCaseValues
 	:: AnalysisKind
 	-> AbsVal	-- Value of scrutinee
 	-> [AbsVal]	-- Value of branches (at least one)
@@ -149,7 +142,7 @@ combineCaseValues StrAnal other_scrutinee branches
 	  AbsTop    -> True; 	-- i.e., cool
 	  AbsProd _ -> True; 	-- ditto
 	  _ 	    -> False 	-- party over
-	}  
+	}
 
 -- For absence analysis, check if the scrutinee is all poison (isBot)
 -- If so, return poison (AbsBot); otherwise, any nested poison will come
@@ -200,8 +193,8 @@ isBot :: AbsVal -> Bool
 
 isBot AbsBot		     = True
 isBot (AbsFun args body env) = isBot (absEval StrAnal body env)
-			       -- Don't bother to extend the envt because 
-			       -- unbound variables default to AbsTop anyway 
+			       -- Don't bother to extend the envt because
+			       -- unbound variables default to AbsTop anyway
 isBot other	 	     = False
 \end{code}
 
@@ -227,7 +220,7 @@ it, so it can be compared for equality by @sameVal@.
 \begin{code}
 widen :: AnalysisKind -> AbsVal -> AbsVal
 
-widen StrAnal (AbsFun args body env) 
+widen StrAnal (AbsFun args body env)
   | isBot (absEval StrAnal body env) = AbsBot
   | otherwise
   = ASSERT (not (null args))
@@ -248,12 +241,12 @@ widen StrAnal (AbsFun args body env)
     -- alternative here would be to bind g to its exact abstract
     -- value, but that entails lots of potential re-computation, at
     -- every application of g.)
-	
+
 widen StrAnal (AbsProd vals) = AbsProd (map (widen StrAnal) vals)
 widen StrAnal other_val	     = other_val
 
 
-widen AbsAnal (AbsFun args body env) 
+widen AbsAnal (AbsFun args body env)
   | anyBot (absEval AbsAnal body env) = AbsBot
 	-- In the absence-analysis case it's *essential* to check
 	-- that the function has no poison in its body.  If it does,
@@ -262,7 +255,7 @@ widen AbsAnal (AbsFun args body env)
   | otherwise
   = ASSERT (not (null args))
     AbsApproxFun (map (findDemandAbsOnly env body) args)
-	
+
 widen AbsAnal (AbsProd vals) = AbsProd (map (widen AbsAnal) vals)
 
 	-- It's desirable to do a good job of widening for product
@@ -280,7 +273,7 @@ widen AbsAnal (AbsProd vals) = AbsProd (map (widen AbsAnal) vals)
 
 widen AbsAnal other_val = other_val
 
--- OLD			  if anyBot val then AbsBot else AbsTop
+-- WAS:	  if anyBot val then AbsBot else AbsTop
 -- Nowadays widen is doing a better job on functions for absence analysis.
 \end{code}
 
@@ -309,8 +302,7 @@ sameVal AbsBot other  = False	-- widen has reduced AbsFun bots to AbsBot
 sameVal AbsTop AbsTop = True
 sameVal AbsTop other  = False		-- Right?
 
-sameVal (AbsProd vals1) (AbsProd vals2) = ASSERT (length vals1 == length vals2)
-					  and (zipWith sameVal vals1 vals2)
+sameVal (AbsProd vals1) (AbsProd vals2) = and (zipWithEqual sameVal vals1 vals2)
 sameVal (AbsProd _)	AbsTop 		= False
 sameVal (AbsProd _)	AbsBot 		= False
 
@@ -327,9 +319,9 @@ sameVal val1 val2 = panic "sameVal: type mismatch or AbsFun encountered"
 (@True@ is the exciting answer; @False@ is always safe.)
 
 \begin{code}
-evalStrictness :: Demand 
-	       -> AbsVal 
-	       -> Bool		-- True iff the value is sure 
+evalStrictness :: Demand
+	       -> AbsVal
+	       -> Bool		-- True iff the value is sure
 				-- to be less defined than the Demand
 
 evalStrictness (WwLazy _) _   = False
@@ -340,15 +332,14 @@ evalStrictness (WwUnpack demand_info) val
   = case val of
       AbsTop	   -> False
       AbsBot	   -> True
-      AbsProd vals -> ASSERT (length vals == length demand_info)
-		      or (zipWith evalStrictness demand_info vals)
+      AbsProd vals -> or (zipWithEqual evalStrictness demand_info vals)
       _	    	   -> trace "evalStrictness?" False
 
 evalStrictness WwPrim val
   = case val of
-      AbsTop -> False	
+      AbsTop -> False
 
-      other  ->   -- A primitive value should be defined, never bottom; 
+      other  ->   -- A primitive value should be defined, never bottom;
 		  -- hence this paranoia check
 		pprPanic "evalStrictness: WwPrim:" (ppr PprDebug other)
 \end{code}
@@ -359,15 +350,14 @@ function call; that is, whether the specified demand can {\em
 possibly} hit poison.
 
 \begin{code}
-evalAbsence (WwLazy True) _ = False	-- Can't possibly hit poison 
+evalAbsence (WwLazy True) _ = False	-- Can't possibly hit poison
 					-- with Absent demand
 
 evalAbsence (WwUnpack demand_info) val
   = case val of
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison
-	AbsProd vals -> ASSERT (length demand_info == length vals)
-			or (zipWith evalAbsence demand_info vals)
+	AbsProd vals -> or (zipWithEqual evalAbsence demand_info vals)
 	_	     -> panic "evalAbsence: other"
 
 evalAbsence other val = anyBot val
@@ -394,17 +384,17 @@ absId anal var env
      result =
       case (lookupAbsValEnv env var, getIdStrictness var, getIdUnfolding var) of
 
-        (Just abs_val, _, _) -> 
+	(Just abs_val, _, _) ->
 			abs_val	-- Bound in the environment
 
-	(Nothing, NoStrictnessInfo, LiteralForm _) -> 
+	(Nothing, NoStrictnessInfo, LitForm _) ->
 			AbsTop 	-- Literals all terminate, and have no poison
 
-	(Nothing, NoStrictnessInfo, ConstructorForm _ _ _) -> 
+	(Nothing, NoStrictnessInfo, ConForm _ _ _) ->
 			AbsTop -- An imported constructor won't have
 			       -- bottom components, nor poison!
 
-	(Nothing, NoStrictnessInfo, GeneralForm _ _ unfolding _) -> 
+	(Nothing, NoStrictnessInfo, GenForm _ _ unfolding _) ->
 			-- We have an unfolding for the expr
 			-- Assume the unfolding has no free variables since it
 			-- came from inside the Id
@@ -429,14 +419,14 @@ absId anal var env
 		--        "U(U(U(U(SL)LLLLLLLLL)LL)LLLLLSLLLLL)" _N_ _N_ #-}
 
 
-	(Nothing, strictness_info, _) -> 	
+	(Nothing, strictness_info, _) ->
 			-- Includes MagicForm, IWantToBeINLINEd, NoUnfoldingDetails
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
 
 
 	-- 	Done via strictness now
-	--	  GeneralForm _ BottomForm _ _ -> AbsBot
+	--	  GenForm _ BottomForm _ _ -> AbsBot
     in
     -- pprTrace "absId:" (ppBesides [ppr PprDebug var, ppStr "=:", pp_anal anal, ppStr ":=",ppr PprDebug result]) (
     result
@@ -445,16 +435,16 @@ absId anal var env
     pp_anal StrAnal = ppStr "STR"
     pp_anal AbsAnal = ppStr "ABS"
 
-absEvalAtom anal (CoVarAtom v) env = absId anal v env
-absEvalAtom anal (CoLitAtom _) env = AbsTop
+absEvalAtom anal (VarArg v) env = absId anal v env
+absEvalAtom anal (LitArg _) env = AbsTop
 \end{code}
 
 \begin{code}
-absEval :: AnalysisKind -> PlainCoreExpr -> AbsValEnv -> AbsVal
+absEval :: AnalysisKind -> CoreExpr -> AbsValEnv -> AbsVal
 
-absEval anal (CoVar var) env = absId anal var env
+absEval anal (Var var) env = absId anal var env
 
-absEval anal (CoLit _) env = AbsTop
+absEval anal (Lit _) env = AbsTop
     -- What if an unboxed literal?  That's OK: it terminates, so its
     -- abstract value is AbsTop.
 
@@ -484,12 +474,12 @@ Things are a little different for absence analysis, because we want
 to make sure that any poison (?????)
 
 \begin{code}
-absEval StrAnal (CoPrim SeqOp [t] [e]) env
+absEval StrAnal (Prim SeqOp [t] [e]) env
   = if isBot (absEvalAtom StrAnal e env) then AbsBot else AbsTop
 	-- This is a special case to ensure that seq# is strict in its argument.
 	-- The comments below (for most normal PrimOps) do not apply.
 
-absEval StrAnal (CoPrim op ts es) env = AbsTop
+absEval StrAnal (Prim op ts es) env = AbsTop
 	-- The arguments are all of unboxed type, so they will already
 	-- have been eval'd.  If the boxed version was bottom, we'll
 	-- already have returned bottom.
@@ -500,21 +490,21 @@ absEval StrAnal (CoPrim op ts es) env = AbsTop
 	-- uses boxed args and we don't know whether or not it's
     	-- strict, so we assume laziness. (JSM)
 
-absEval AbsAnal (CoPrim op ts as) env 
+absEval AbsAnal (Prim op ts as) env
   = if any anyBot [absEvalAtom AbsAnal a env | a <- as]
     then AbsBot
     else AbsTop
 	-- For absence analysis, we want to see if the poison shows up...
 
-absEval anal (CoCon con ts as) env
+absEval anal (Con con ts as) env
   | has_single_con
   = AbsProd [absEvalAtom anal a env | a <- as]
 
   | otherwise	-- Not single-constructor
   = case anal of
 	StrAnal -> 	-- Strictness case: it's easy: it certainly terminates
-		   AbsTop	
-	AbsAnal -> 	-- In the absence case we need to be more 
+		   AbsTop
+	AbsAnal -> 	-- In the absence case we need to be more
 			-- careful: look to see if there's any
 			-- poison in the components
 		   if any anyBot [absEvalAtom AbsAnal a env | a <- as]
@@ -526,18 +516,20 @@ absEval anal (CoCon con ts as) env
 \end{code}
 
 \begin{code}
-absEval anal (CoLam []      body) env	= absEval anal body env	-- paranoia
-absEval anal (CoLam binders body) env	= AbsFun binders body env
-absEval anal (CoTyLam ty expr)	  env	= absEval  anal expr env
-absEval anal (CoApp e1 e2)	  env	= absApply anal (absEval     anal e1 env) 
-							(absEvalAtom anal e2 env)
-absEval anal (CoTyApp expr ty)	  env	= absEval anal expr env
+absEval anal (Lam binder body) env
+  = AbsFun [binder] body env
+absEval anal (CoTyLam ty expr) env
+  = absEval  anal expr env
+absEval anal (App e1 e2) env
+  = absApply anal (absEval anal e1 env) (absEvalAtom anal e2 env)
+absEval anal (CoTyApp expr ty) env
+  = absEval anal expr env
 \end{code}
 
 For primitive cases, just GLB the branches, then LUB with the expr part.
 
 \begin{code}
-absEval anal (CoCase expr (CoPrimAlts alts deflt)) env
+absEval anal (Case expr (PrimAlts alts deflt)) env
   = let
 	expr_val    = absEval anal expr env
 	abs_alts    = [ absEval anal rhs env | (_, rhs) <- alts ]
@@ -549,9 +541,9 @@ absEval anal (CoCase expr (CoPrimAlts alts deflt)) env
 	combineCaseValues anal expr_val
 			       (abs_deflt ++ abs_alts)
 
-absEval anal (CoCase expr (CoAlgAlts alts deflt)) env
+absEval anal (Case expr (AlgAlts alts deflt)) env
   = let
-	expr_val  = absEval anal expr env 
+	expr_val  = absEval anal expr env
 	abs_alts  = [ absEvalAlgAlt anal expr_val alt env | alt <- alts ]
 	abs_deflt = absEvalDefault anal expr_val deflt env
     in
@@ -569,7 +561,7 @@ absEval anal (CoCase expr (CoAlgAlts alts deflt)) env
     result
 \end{code}
 
-For @CoLets@ we widen the value we get.  This is nothing to
+For @Lets@ we widen the value we get.  This is nothing to
 do with fixpointing.  The reason is so that we don't get an explosion
 in the amount of computation.  For example, consider:
 \begin{verbatim}
@@ -580,7 +572,7 @@ in the amount of computation.  For example, consider:
 	f x = case x of
 		p1 -> ...g r...
 		p2 -> ...g s...
-      in 
+      in
 	f e
 \end{verbatim}
 If we bind @f@ and @g@ to their exact abstract value, then we'll
@@ -594,31 +586,27 @@ alternative approach would be to try with a certain amount of ``fuel''
 and be prepared to bale out.
 
 \begin{code}
-absEval anal (CoLet (CoNonRec binder e1) e2) env
+absEval anal (Let (NonRec binder e1) e2) env
   = let
 	new_env = addOneToAbsValEnv env binder (widen anal (absEval anal e1 env))
     in
-	-- The binder of a CoNonRec should *not* be of unboxed type,
+	-- The binder of a NonRec should *not* be of unboxed type,
 	-- hence no need to strictly evaluate the Rhs.
     absEval anal e2 new_env
 
-absEval anal (CoLet (CoRec pairs) body) env
+absEval anal (Let (Rec pairs) body) env
   = let
 	(binders,rhss) = unzip pairs
 	rhs_vals = cheapFixpoint anal binders rhss env	-- Returns widened values
 	new_env  = growAbsValEnvList env (binders `zip` rhs_vals)
     in
     absEval anal body new_env
+
+absEval anal (SCC cc expr) env = absEval anal expr env
 \end{code}
 
 \begin{code}
-absEval anal (CoSCC cc expr) env = absEval anal expr env
-
--- ToDo: add DPH stuff here
-\end{code}
-
-\begin{code}
-absEvalAlgAlt :: AnalysisKind -> AbsVal -> (Id,[Id],PlainCoreExpr) -> AbsValEnv -> AbsVal
+absEvalAlgAlt :: AnalysisKind -> AbsVal -> (Id,[Id],CoreExpr) -> AbsValEnv -> AbsVal
 
 absEvalAlgAlt anal (AbsProd arg_vals) (con, args, rhs) env
   =	-- The scrutinee is a product value, so it must be of a single-constr
@@ -646,15 +634,15 @@ absEvalAlgAlt anal other_scrutinee (con, args, rhs) env
 	  _ 	 -> False   -- party over
 	}
 
- 
-absEvalDefault :: AnalysisKind 
+
+absEvalDefault :: AnalysisKind
 	       -> AbsVal		-- Value of scrutinee
-	       -> PlainCoreCaseDefault 
-	       -> AbsValEnv 
+	       -> CoreCaseDefault
+	       -> AbsValEnv
 	       -> [AbsVal]		-- Empty or singleton
 
-absEvalDefault anal scrut_val CoNoDefault env = []
-absEvalDefault anal scrut_val (CoBindDefault binder expr) env	   
+absEvalDefault anal scrut_val NoDefault env = []
+absEvalDefault anal scrut_val (BindDefault binder expr) env
   = [absEval anal expr (addOneToAbsValEnv env binder scrut_val)]
 \end{code}
 
@@ -673,7 +661,7 @@ absApply anal AbsBot arg = AbsBot
   -- AbsBot represents the abstract bottom *function* too
 
 absApply StrAnal AbsTop	arg = AbsTop
-absApply AbsAnal AbsTop	arg = if anyBot arg 
+absApply AbsAnal AbsTop	arg = if anyBot arg
 			      then AbsBot
 			      else AbsTop
 	-- To be conservative, we have to assume that a function about
@@ -682,7 +670,7 @@ absApply AbsAnal AbsTop	arg = if anyBot arg
 \end{code}
 
 An @AbsFun@ with only one more argument needed---bind it and eval the
-result.	 A @CoLam@ with two or more args: return another @AbsFun@ with
+result.	 A @Lam@ with two or more args: return another @AbsFun@ with
 an augmented environment.
 
 \begin{code}
@@ -741,8 +729,8 @@ See notes on @addStrictnessInfoToId@.
 
 \begin{code}
 findStrictness :: StrAnalFlags
-	       -> [UniType]	-- Types of args in which strictness is wanted
-	       -> AbsVal 	-- Abstract strictness value of function 
+	       -> [Type]	-- Types of args in which strictness is wanted
+	       -> AbsVal 	-- Abstract strictness value of function
 	       -> AbsVal	-- Abstract absence value of function
 	       -> [Demand]	-- Resulting strictness annotation
 
@@ -764,7 +752,7 @@ findStrictness strflags (ty:tys) str_val abs_val
 
 \begin{code}
 findDemandStrOnly str_env expr binder 	-- Only strictness environment available
-  = findRecDemand strflags [] str_fn abs_fn (getIdUniType binder)
+  = findRecDemand strflags [] str_fn abs_fn (idType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = AbsBot		-- Always says poison; so it looks as if
@@ -772,17 +760,17 @@ findDemandStrOnly str_env expr binder 	-- Only strictness environment available
     strflags   = getStrAnalFlags str_env
 
 findDemandAbsOnly abs_env expr binder 	-- Only absence environment available
-  = findRecDemand strflags [] str_fn abs_fn (getIdUniType binder)
+  = findRecDemand strflags [] str_fn abs_fn (idType binder)
   where
     str_fn val = AbsBot		-- Always says non-termination;
 				-- that'll make findRecDemand peer into the
 				-- structure of the value.
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
     strflags   = getStrAnalFlags abs_env
-  
+
 
 findDemand str_env abs_env expr binder
-  = findRecDemand strflags [] str_fn abs_fn (getIdUniType binder)
+  = findRecDemand strflags [] str_fn abs_fn (idType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
@@ -827,7 +815,7 @@ findRecDemand :: StrAnalFlags
 				    -- zooming into recursive types
 	      -> (AbsVal -> AbsVal) -- The strictness function
 	      -> (AbsVal -> AbsVal) -- The absence function
-	      -> UniType 	    -- The type of the argument
+	      -> Type 	    -- The type of the argument
 	      -> Demand
 
 findRecDemand strflags seen str_fn abs_fn ty
@@ -845,7 +833,7 @@ findRecDemand strflags seen str_fn abs_fn ty
 
     else -- It's strict (or we're pretending it is)!
 
-       case getUniDataTyCon_maybe ty of
+       case maybeDataTyCon ty of
 
 	 Nothing    -> wwStrict
 
@@ -886,7 +874,7 @@ findRecDemand strflags seen str_fn abs_fn ty
     (all_strict, num_strict) = strflags
 
     is_numeric_type ty
-      = case (getUniDataTyCon_maybe ty) of -- NB: duplicates stuff done above
+      = case (maybeDataTyCon ty) of -- NB: duplicates stuff done above
 	  Nothing -> False
 	  Just (tycon, _, _)
 	    | tycon `is_elem`
@@ -926,7 +914,7 @@ That allows us to make rapid progress, at the cost of a less-than-wonderful
 approximation.
 
 \begin{code}
-cheapFixpoint :: AnalysisKind -> [Id] -> [PlainCoreExpr] -> AbsValEnv -> [AbsVal]
+cheapFixpoint :: AnalysisKind -> [Id] -> [CoreExpr] -> AbsValEnv -> [AbsVal]
 
 cheapFixpoint AbsAnal [id] [rhs] env
   = [crudeAbsWiden (absEval AbsAnal rhs new_env)]
@@ -948,7 +936,7 @@ cheapFixpoint anal ids rhss env
   = [widen anal (absEval anal rhs new_env) | rhs <- rhss]
 		-- We do just one iteration, starting from a safe
 		-- approximation.  This won't do a good job in situations
-		-- like:	
+		-- like:
 		--	\x -> letrec f = ...g...
 		--		     g = ...f...x...
 		--	      in
@@ -980,16 +968,16 @@ mkLookupFun eq lt alist s
 \end{verbatim}
 
 \begin{code}
-fixpoint :: AnalysisKind -> [Id] -> [PlainCoreExpr] -> AbsValEnv -> [AbsVal]
+fixpoint :: AnalysisKind -> [Id] -> [CoreExpr] -> AbsValEnv -> [AbsVal]
 
 fixpoint anal [] _ env = []
 
-fixpoint anal ids rhss env 
+fixpoint anal ids rhss env
   = fix_loop initial_vals
   where
     initial_val id
       = case anal of	-- The (unsafe) starting point
-	  StrAnal -> if (returnsRealWorld (getIdUniType id))
+	  StrAnal -> if (returnsRealWorld (idType id))
 		     then AbsTop -- this is a massively horrible hack (SLPJ 95/05)
 		     else AbsBot
 	  AbsAnal -> AbsTop
@@ -998,14 +986,17 @@ fixpoint anal ids rhss env
 
     fix_loop :: [AbsVal] -> [AbsVal]
 
-    fix_loop current_widened_vals 
+    fix_loop current_widened_vals
       = let
 	    new_env  = growAbsValEnvList env (ids `zip` current_widened_vals)
 	    new_vals = [ absEval anal rhs new_env | rhs <- rhss ]
 	    new_widened_vals = map (widen anal) new_vals
-        in
+	in
 	if (and (zipWith sameVal current_widened_vals new_widened_vals)) then
 	    current_widened_vals
+
+	    -- NB: I was too chicken to make that a zipWithEqual,
+	    -- lest I jump into a black hole.  WDP 96/02
 
 	    -- Return the widened values.  We might get a slightly
 	    -- better value by returning new_vals (which we used to
@@ -1035,7 +1026,7 @@ isn't safe).  Why isn't @AbsTop@ safe?  Consider:
 	letrec
 	  x = ...p..d...
 	  d = (x,y)
-	in 	
+	in
 	...
 \end{verbatim}
 Here, if p is @AbsBot@, then we'd better {\em not} end up with a ``fixed

@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface StgVarInfo where
-import Id(Id)
-import StgSyn(StgBinding)
-setStgVarInfo :: Bool -> [StgBinding Id Id] -> [StgBinding Id Id]
-

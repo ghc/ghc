@@ -21,24 +21,21 @@ module CgRetConv (
 
 	assignPrimOpResultRegs,
 	makePrimOpArgsRobust,
-	assignRegs,
+	assignRegs
 
 	-- and to make the interface self-sufficient...
-	MagicId, PrimKind, Id, CLabel, TyCon
     ) where
 
 import AbsCSyn
 
-import AbsPrel		( PrimOp(..), PrimOpResultInfo(..), primOpCanTriggerGC,
-			  getPrimOpResultInfo, integerDataCon, PrimKind
+import PrelInfo		( PrimOp(..), PrimOpResultInfo(..), primOpCanTriggerGC,
+			  getPrimOpResultInfo, integerDataCon
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( getTyConFamilySize, kindFromType, getTyConDataCons,
+import Type		( getTyConFamilySize, primRepFromType, getTyConDataCons,
 			  TyVarTemplate, TyCon, Class,
-			  TauType(..), ThetaType(..), UniType
-			  IF_ATTACK_PRAGMAS(COMMA cmpTyCon COMMA cmpClass)
-			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
+			  TauType(..), ThetaType(..), Type
 			)
 import CgCompInfo	-- various things
 import CgMonad		( IntSwitchChecker(..) )
@@ -47,7 +44,7 @@ import Id		( Id, getDataConSig, fIRST_TAG, isDataCon,
 			  DataCon(..), ConTag(..)
 			)
 import Maybes		( catMaybes, Maybe(..) )
-import PrimKind
+import PrimRep
 import Util
 import Pretty
 \end{code}
@@ -70,7 +67,7 @@ data-constructor is returned.
 \begin{code}
 data DataReturnConvention
   = ReturnInHeap
-  | ReturnInRegs	[MagicId]	
+  | ReturnInRegs	[MagicId]
 \end{code}
 The register assignment given by a @ReturnInRegs@ obeys three rules:
 \begin{itemize}
@@ -126,14 +123,10 @@ dataReturnConvAlg isw_chkr data_con
     (reg_assignment, leftover_kinds)
       = assignRegs isw_chkr_to_use
 		   [node, infoptr] -- taken...
-		   (map kindFromType arg_tys)
- 
+		   (map primRepFromType arg_tys)
+
     isw_chkr_to_use = isw_chkr
-{-OLD:
-      = if is_prim_result_ty {-and therefore *ignore* any return-in-regs threshold-}
-	then \ x -> Nothing
-	else isw_chkr
--}
+
     is_prim_result_ty = data_con == integerDataCon -- ***HACK***! (WDP 95/11)
 \end{code}
 
@@ -149,7 +142,7 @@ mkLiveRegsBitMask regs
   = foldl do_reg noLiveRegsMask regs
   where
     do_reg acc (VanillaReg kind reg_no)
-      | isFollowableKind kind
+      | isFollowableRep kind
       = acc + (reg_tbl !! IBOX(reg_no _SUB_ ILIT(1)))
 
     do_reg acc anything_else = acc
@@ -166,10 +159,10 @@ mkLiveRegsBitMask regs
   = foldl (+) noLiveRegsMask (map liveness_bit regs)
   where
     liveness_bit (VanillaReg kind reg_no)
-      | isFollowableKind kind
+      | isFollowableRep kind
       = reg_tbl !! (reg_no - 1)
 
-    liveness_bit anything_else 
+    liveness_bit anything_else
       = noLiveRegsBitMask
 
     reg_tbl
@@ -189,34 +182,28 @@ WARNING! If you add a return convention which can return a pointer,
 make sure you alter CgCase (cgPrimDefault) to generate the right sort
 of heap check!
 \begin{code}
-dataReturnConvPrim :: PrimKind -> MagicId
+dataReturnConvPrim :: PrimRep -> MagicId
 
-#ifndef DPH
-dataReturnConvPrim IntKind	= VanillaReg IntKind  ILIT(1)
-dataReturnConvPrim WordKind	= VanillaReg WordKind ILIT(1)
-dataReturnConvPrim AddrKind	= VanillaReg AddrKind ILIT(1)
-dataReturnConvPrim CharKind	= VanillaReg CharKind ILIT(1)
-dataReturnConvPrim FloatKind	= FloatReg  ILIT(1)
-dataReturnConvPrim DoubleKind	= DoubleReg ILIT(1)
-dataReturnConvPrim VoidKind	= VoidReg
+dataReturnConvPrim IntRep	= VanillaReg IntRep  ILIT(1)
+dataReturnConvPrim WordRep	= VanillaReg WordRep ILIT(1)
+dataReturnConvPrim AddrRep	= VanillaReg AddrRep ILIT(1)
+dataReturnConvPrim CharRep	= VanillaReg CharRep ILIT(1)
+dataReturnConvPrim FloatRep	= FloatReg  ILIT(1)
+dataReturnConvPrim DoubleRep	= DoubleReg ILIT(1)
+dataReturnConvPrim VoidRep	= VoidReg
 
 -- Return a primitive-array pointer in the usual register:
-dataReturnConvPrim ArrayKind     = VanillaReg ArrayKind ILIT(1)
-dataReturnConvPrim ByteArrayKind = VanillaReg ByteArrayKind ILIT(1)
+dataReturnConvPrim ArrayRep     = VanillaReg ArrayRep ILIT(1)
+dataReturnConvPrim ByteArrayRep = VanillaReg ByteArrayRep ILIT(1)
 
-dataReturnConvPrim StablePtrKind = VanillaReg StablePtrKind ILIT(1)
-dataReturnConvPrim MallocPtrKind = VanillaReg MallocPtrKind ILIT(1)
+dataReturnConvPrim StablePtrRep = VanillaReg StablePtrRep ILIT(1)
+dataReturnConvPrim MallocPtrRep = VanillaReg MallocPtrRep ILIT(1)
 
-dataReturnConvPrim PtrKind	= panic "dataReturnConvPrim: PtrKind"
+#ifdef DEBUG
+dataReturnConvPrim PtrRep	= panic "dataReturnConvPrim: PtrRep"
 dataReturnConvPrim _		= panic "dataReturnConvPrim: other"
-
-#else
-dataReturnConvPrim VoidKind	= VoidReg
-dataReturnConvPrim PtrKind	= panic "dataReturnConvPrim: PtrKind"
-dataReturnConvPrim kind         = DataReg kind 2 -- Don't Hog a Modifier reg.
-#endif {- Data Parallel Haskell -}
+#endif
 \end{code}
-
 
 %********************************************************
 %*							*
@@ -243,7 +230,7 @@ assignPrimOpResultRegs op
 	     -- As R1 is dead, it can hold the tag if necessary
 	     case cons of
 		[_]   -> result_regs
-		other -> (VanillaReg IntKind ILIT(1)) : result_regs
+		other -> (VanillaReg IntRep ILIT(1)) : result_regs
   where
     get_return_regs con
       = case (dataReturnConvAlg fake_isw_chkr con) of
@@ -279,7 +266,7 @@ makePrimOpArgsRobust op arg_amodes
   = ASSERT (primOpCanTriggerGC op)
     let
 	non_robust_amodes = filter (not . amodeCanSurviveGC) arg_amodes
-    	arg_kinds = map getAmodeKind non_robust_amodes
+    	arg_kinds = map getAmodeRep non_robust_amodes
 
 	(arg_regs, extra_args)
 	  = assignRegs fake_isw_chkr [{-nothing live-}] arg_kinds
@@ -289,11 +276,13 @@ makePrimOpArgsRobust op arg_amodes
 			   []    -> arg_regs
 			   other -> error ("Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?) " ++ ppShow 80 (ppr PprDebug op))
 
-	arg_assts = mkAbstractCs (zipWith assign_to_reg final_arg_regs non_robust_amodes)
+	arg_assts
+	  = mkAbstractCs (zipWithEqual assign_to_reg final_arg_regs non_robust_amodes)
+
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
 
-    	safe_arg regs arg 
-		| amodeCanSurviveGC arg = (regs, arg) 
+    	safe_arg regs arg
+		| amodeCanSurviveGC arg = (regs, arg)
     		| otherwise    		= (tail regs, CReg (head regs))
     	safe_amodes = snd (mapAccumL safe_arg final_arg_regs arg_amodes)
 
@@ -321,32 +310,32 @@ register); we just return immediately with the left-overs specified.
 \begin{code}
 assignRegs  :: IntSwitchChecker
 	    -> [MagicId]	-- Unavailable registers
-	    -> [PrimKind]	-- Arg or result kinds to assign
+	    -> [PrimRep]	-- Arg or result kinds to assign
 	    -> ([MagicId],	-- Register assignment in same order
 				-- for *initial segment of* input list
-		[PrimKind])-- leftover kinds
+		[PrimRep])-- leftover kinds
 
 assignRegs isw_chkr regs_in_use kinds
  = assign_reg kinds [] (mkRegTbl isw_chkr regs_in_use)
  where
 
-    assign_reg	:: [PrimKind]  -- arg kinds being scrutinized
+    assign_reg	:: [PrimRep]  -- arg kinds being scrutinized
 		-> [MagicId]	    -- accum. regs assigned so far (reversed)
 		-> ([Int], [Int], [Int])
 			-- regs still avail: Vanilla, Float, Double
-		-> ([MagicId], [PrimKind])
+		-> ([MagicId], [PrimRep])
 
-    assign_reg (VoidKind:ks) acc supply
+    assign_reg (VoidRep:ks) acc supply
 	= assign_reg ks (VoidReg:acc) supply -- one VoidReg is enough for everybody!
 
-    assign_reg (FloatKind:ks) acc (vanilla_rs, IBOX(f):float_rs, double_rs)
+    assign_reg (FloatRep:ks) acc (vanilla_rs, IBOX(f):float_rs, double_rs)
 	= assign_reg ks (FloatReg f:acc) (vanilla_rs, float_rs, double_rs)
 
-    assign_reg (DoubleKind:ks) acc (vanilla_rs, float_rs, IBOX(d):double_rs)
+    assign_reg (DoubleRep:ks) acc (vanilla_rs, float_rs, IBOX(d):double_rs)
 	= assign_reg ks (DoubleReg d:acc) (vanilla_rs, float_rs, double_rs)
 
     assign_reg (k:ks) acc (IBOX(v):vanilla_rs, float_rs, double_rs)
-	| not (isFloatingKind k)
+	| not (isFloatingRep k)
 	= assign_reg ks (VanillaReg k v:acc) (vanilla_rs, float_rs, double_rs)
 
     -- The catch-all.  It can happen because either
@@ -376,7 +365,7 @@ mkRegTbl :: IntSwitchChecker -> [MagicId] -> ([Int], [Int], [Int])
 mkRegTbl isw_chkr regs_in_use
   = (ok_vanilla, ok_float, ok_double)
   where
-    ok_vanilla = catMaybes (map (select (VanillaReg VoidKind)) (taker vanillaRegNos))
+    ok_vanilla = catMaybes (map (select (VanillaReg VoidRep)) (taker vanillaRegNos))
     ok_float   = catMaybes (map (select FloatReg)	       floatRegNos)
     ok_double  = catMaybes (map (select DoubleReg)	       doubleRegNos)
 

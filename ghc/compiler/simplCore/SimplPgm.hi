@@ -1,9 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface SimplPgm where
-import CmdLineOpts(GlobalSwitch, SimplifierSwitch, SwitchResult)
-import CoreSyn(CoreBinding)
-import Id(Id)
-import SimplMonad(SimplCount)
-import SplitUniq(SplitUniqSupply)
-simplifyPgm :: [CoreBinding Id Id] -> (GlobalSwitch -> SwitchResult) -> (SimplifierSwitch -> SwitchResult) -> SimplCount -> SplitUniqSupply -> ([CoreBinding Id Id], Int, SimplCount)
-

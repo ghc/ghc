@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Typecheck]{Outside-world interfaces to the typechecker}
 
@@ -7,77 +7,66 @@
 #include "HsVersions.h"
 
 module Typecheck (
-	typecheckModule,
-
-	-- and to make the interface self-sufficient...
-	Module, Bag, CE(..), Binds, FixityDecl, E, Expr, InPat,
-	RenamedPat(..), TypecheckedPat, Id, Inst, Maybe, MaybeErr,
-	Name, PprStyle, PrettyRep, ProtoName, Error(..), Pretty(..),
-	InstInfo, SplitUniqSupply, GlobalSwitch, UniqFM
+	typecheckModule, InstInfo
     ) where
 
-import TcMonad		-- typechecking monad machinery
-import AbsSyn		-- the stuff being typechecked
+import Ubiq
+import TcMonad
+import TcModule		( tcModule )
+import TcInstUtil	( InstInfo )
 
-import E		( nullE, E )
+import HsSyn
+import RnHsSyn
+import TcHsSyn
+
+import ErrUtils		( TcWarning(..), TcError(..) )
+import Pretty
+import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 import Maybes		( MaybeErr(..) )
-import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
-import TcModule		-- tcModule, and associated stuff
-import Util		-- for pragmas only
 \end{code}
 
 The typechecker stuff lives inside a complicated world of @TcM@
-monadery.  This module provides three interfaces into that world, one
-for typechecking a module, another for typechecking an expression, and
-one for typechecking an interface.  This last one works as if
-@typecheckModule@ was applied to the very simple module:
-\begin{verbatim}
-module EmptyModule where
+monadery. 
 
-import InterfaceOfInterest
-\end{verbatim}
-This is used when we want to augment an @E@ with information from an
-interface.  (Used in the interpreter.)
+ToDo: Interfaces for interpreter ...
+	Typecheck an expression
+	Typecheck an interface
 
 \begin{code}
-typecheckModule ::
-       (GlobalSwitch -> Bool)	-- cmd-line switch checker
-    -> SplitUniqSupply		-- name supply in
-    -> GlobalNameFuns		-- renamer info (for doing derivings)
-    -> RenamedModule		-- input module
-	
-    ->	------- OUTPUTS -----------
-	-- depends v much on whether typechecking succeeds or not!
+typecheckModule
+    :: UniqSupply		-- name supply in
+    -> GlobalNameMappers	-- renamer info (for doing derivings)
+    -> RenamedHsModule		-- input module
+
+    -> -- OUTPUTS ...
     MaybeErr
        -- SUCCESS ...
-       (((TypecheckedBinds,	-- binds from class decls; does NOT
-				--    include default-methods bindings
-	 TypecheckedBinds,	-- binds from instance decls; INCLUDES
-				--    class default-methods binds
-	 TypecheckedBinds,	-- binds from value decls
-	 [(Inst, TypecheckedExpr)]),
+      (((TypecheckedHsBinds,	   -- binds from class decls; does NOT
+				   --    include default-methods bindings
+	 TypecheckedHsBinds,	   -- binds from instance decls; INCLUDES
+				   --    class default-methods binds
+	 TypecheckedHsBinds,	   -- binds from value decls
 
-	([RenamedFixityDecl],	-- things for the interface generator
-	 [Id],			-- to look at...
-	 CE,
-	 TCE,
-	 Bag InstInfo),
+	 [(Id, TypecheckedHsExpr)] -- constant instance binds
+	),
 
-	FiniteMap TyCon [(Bool, [Maybe UniType])],
+        ([RenamedFixityDecl], [Id], UniqFM TyCon, UniqFM Class, Bag InstInfo),
+				-- things for the interface generator
+
+        (UniqFM TyCon, UniqFM Class),
+				-- environments of info from this module only
+
+	FiniteMap TyCon [(Bool, [Maybe Type])],
 				-- source tycon specialisation requests
 
---UNUSED:	E,			-- new cumulative E (with everything)
-	E,			-- E just for stuff from THIS module
-		-- NB: if you want the diff between two prev Es: i.e.,
-		-- things in cumulative E that were added because of
-		-- this module's import-ery, just do:
-		--	bigE `minusE` thisModuleE
+    	PprStyle->Pretty),	-- stuff to print for -ddump-deriving
 
-    	PprStyle->Pretty))	-- stuff to print for -ddump-deriving
+       Bag TcWarning)		-- pretty-print this to get warnings
 
        -- FAILURE ...
-       (Bag Error)		-- pretty-print this to find out what went wrong
+      (Bag TcError,		-- pretty-print this to get errors
+       Bag TcWarning)		-- pretty-print this to get warnings
 
-typecheckModule sw_chkr us renamer_name_funs modyule
-  = initTc sw_chkr us (tcModule nullE renamer_name_funs modyule)
+typecheckModule us renamer_name_funs mod
+  = initTc us (tcModule renamer_name_funs mod)
 \end{code}

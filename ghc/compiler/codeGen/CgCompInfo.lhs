@@ -39,17 +39,13 @@ module CgCompInfo (
 	uF_COST_CENTRE,
 
 	mAX_Vanilla_REG,
-#ifndef DPH
 	mAX_Float_REG,
 	mAX_Double_REG,
-#else
-	mAX_Data_REG,
-#endif {- Data Parallel Haskell -}
 
 	mIN_BIG_TUPLE_SIZE,
 
     	mIN_MP_INT_SIZE,
-        mP_STRUCT_SIZE,
+	mP_STRUCT_SIZE,
 
 	oTHER_TAG, iND_TAG,	-- semi-tagging stuff
 
@@ -66,10 +62,10 @@ module CgCompInfo (
 
 
 	spARelToInt,
-	spBRelToInt,
+	spBRelToInt
 
 	-- and to make the interface self-sufficient...
-	RegRelative
+--	RegRelative
     ) where
 
 -- This magical #include brings in all the everybody-knows-these magic
@@ -77,13 +73,10 @@ module CgCompInfo (
 -- we want; if we just hope a -I... will get the right one, we could
 -- be in trouble.
 
-#ifndef DPH
 #include "../../includes/GhcConstants.h"
-#else
-#include "../dphsystem/imports/DphConstants.h"
-#endif {- Data Parallel Haskell -}
 
-import AbsCSyn
+CHK_Ubiq() -- debugging consistency check
+
 import Util
 \end{code}
 
@@ -148,8 +141,8 @@ mAX_INTLIKE = MAX_INTLIKE
 
 \begin{code}
 -- THESE ARE DIRECTION SENSITIVE!
-spARelToInt (SpARel spA off) = spA - off -- equiv to: AREL(spA - off)
-spBRelToInt (SpBRel spB off) = off - spB -- equiv to: BREL(spB - off)
+spARelToInt spA off = spA - off -- equiv to: AREL(spA - off)
+spBRelToInt spB off = off - spB -- equiv to: BREL(spB - off)
 \end{code}
 
 A section of code-generator-related MAGIC CONSTANTS.
@@ -174,16 +167,7 @@ uF_COST_CENTRE = (UF_COST_CENTRE::Int)
 \end{code}
 
 \begin{code}
-#ifndef DPH
 mAX_Vanilla_REG	= (MAX_VANILLA_REG :: Int)
 mAX_Float_REG	= (MAX_FLOAT_REG :: Int)
 mAX_Double_REG	= (MAX_DOUBLE_REG :: Int)
-#else
--- The DAP has only got 14 registers :-( After various heap and stack 
--- pointers we dont have that many left over..
-mAX_Vanilla_REG	= (4 :: Int)	-- Ptr, Int, Char, Float	
-mAX_Data_REG    = (4 :: Int)	--      Int, Char, Float, Double
-mAX_Float_REG	= error "mAX_Float_REG : not used in DPH"
-mAX_Double_REG	= error "mAX_Double_REG: not used in DPH"
-#endif {- Data Parallel Haskell -}
 \end{code}

@@ -1,8 +1,7 @@
-%************************************************************************
-%*									*
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
+%
 \section[ProtoName]{@ProtoName@: name type used early in the compiler}
-%*									*
-%************************************************************************
 
 \begin{code}
 #include "HsVersions.h"
@@ -14,22 +13,16 @@ module ProtoName (
 
 	cmpProtoName, eqProtoName, elemProtoNames,
 	cmpByLocalName, eqByLocalName, elemByLocalNames,
-	
-	isConopPN,
+
+	isConopPN
 
 	-- and to make the module self-sufficient...
-	Name, Maybe
-#ifndef __GLASGOW_HASKELL__
-	,TAG_
-#endif
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
+import Ubiq{-uitous-}
 
-import Name		( cmpName, Name
-			  IF_ATTACK_PRAGMAS(COMMA eqName)
-			)
-import Outputable
+import Name		( Name )
+import Outputable	( ifPprShowAll, isConop )
 import Pretty
 import Util
 \end{code}
@@ -44,18 +37,15 @@ import Util
 data ProtoName
   = Unk		FAST_STRING	-- local name in module
 
-  | Imp		FAST_STRING	-- name of defining module 
+  | Qunk	FAST_STRING	-- qualified name
+		FAST_STRING
+
+  | Imp		FAST_STRING	-- name of defining module
 		FAST_STRING	-- name used in defining name
 		[FAST_STRING]	-- name of the module whose interfaces
 				-- told me about this thing
-		FAST_STRING	-- occurrence name; Nothing => same as field 2
+		FAST_STRING	-- occurrence name;
   | Prel	Name
-{- LATER:
-  | Unk2	FAST_INT	-- same as Unk but this FAST_INT is
-				-- the index into hash table (makes for
-				-- superbly great equality comparisons!)
-		FAST_STRING
--}
 \end{code}
 
 %************************************************************************
@@ -90,16 +80,16 @@ things.
 (Later the same night...: but, oh yes, you do:
 
 Given two instance decls
-    
+
 \begin{verbatim}
 instance Eq  {-PreludeCore-}	Foo
 instance Bar {-user-defined-} 	Foo
 \end{verbatim}
 
-you will get a comparison of "Eq" (a Prel) with "Bar" (an {Unk,Imp})) 
+you will get a comparison of "Eq" (a Prel) with "Bar" (an {Unk,Imp}))
 
 @cmp_name@ compares either by ``local name'' (the string by which
-the entity is known in this module, renaming and all) or by original
+the entity is known in this module) or by original
 name, in which case the module name is also taken into account.
 (Just watch what happens on @Imps@...)
 
@@ -112,7 +102,7 @@ cmp_name by_local (Unk n1) (Prel nm)
   =  let  (_, n2) = getOrigName nm  in
      _CMP_STRING_ n1 n2
 
-cmp_name by_local (Prel n1) (Prel n2) = cmpName n1 n2
+cmp_name by_local (Prel n1) (Prel n2) = cmp n1 n2
 
 -- in ordering these things, it's *most* important to have "names" (vs "modules")
 -- as the primary comparison key; otherwise, a list of ProtoNames like...
@@ -194,8 +184,9 @@ elemByLocalNames x (y:ys)
       GT__ -> elemByLocalNames x ys
 
 isConopPN :: ProtoName -> Bool
-isConopPN (Unk s)	= isConop s
-isConopPN (Imp _ n _ _) = isConop n -- ToDo: should use occurrence name???
+isConopPN (Unk    s)	 = isConop s
+isConopPN (Qunk _ s)	 = isConop s
+isConopPN (Imp  _ n _ _) = isConop n -- ToDo: should use occurrence name???
 \end{code}
 
 %************************************************************************
@@ -203,8 +194,6 @@ isConopPN (Imp _ n _ _) = isConop n -- ToDo: should use occurrence name???
 \subsection{Instances}
 %*									*
 %************************************************************************
-
-********** REMOVE THESE WHEN WE FIX THE SET-ery IN RenameBinds4 *********
 
 \begin{code}
 {- THESE INSTANCES ARE TOO DELICATE TO BE USED!
@@ -223,29 +212,29 @@ instance Ord ProtoName where
 instance NamedThing ProtoName where
 
     getOrigName (Unk _)		= panic "NamedThing.ProtoName.getOrigName (Unk)"
+    getOrigName (Qunk _ _)	= panic "NamedThing.ProtoName.getOrigName (Qunk)"
     getOrigName (Imp m s _ _)	= (m, s)
     getOrigName (Prel name)	= getOrigName name
 
     getOccurrenceName (Unk s)	    = s
+    getOccurrenceName (Qunk _ s)    = s
     getOccurrenceName (Imp m s _ o) = o
     getOccurrenceName (Prel name)   = getOccurrenceName name
-
-    hasType pn			= False
 
 #ifdef DEBUG
     getSrcLoc pn		= panic "NamedThing.ProtoName.getSrcLoc"
     getInformingModules pn	= panic "NamedThing.ProtoName.getInformingModule"
-    getTheUnique pn		= panic "NamedThing.ProtoName.getUnique"
+    getItsUnique pn		= panic "NamedThing.ProtoName.getItsUnique"
     fromPreludeCore pn		= panic "NamedThing.ProtoName.fromPreludeCore"
     getExportFlag pn		= panic "NamedThing.ProtoName.getExportFlag"
     isLocallyDefined pn		= panic "NamedThing.ProtoName.isLocallyDefined"
-    getType pn			= panic "NamedThing.ProtoName.getType"
 #endif
 \end{code}
 
 \begin{code}
 instance Outputable ProtoName where
     ppr sty (Unk s)     = ppPStr s
+    ppr sty (Qunk m s)  = ppBesides [ppPStr m, ppChar '.', ppPStr s]
     ppr sty (Prel name) = ppBeside (ppr sty name) (ifPprShowAll sty (ppPStr SLIT("/PREL")))
     ppr sty (Imp mod dec imod loc)
       = ppBesides [ppPStr mod, ppChar '.', ppPStr dec, pp_occur_name dec loc ]

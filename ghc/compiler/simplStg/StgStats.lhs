@@ -76,7 +76,7 @@ countN = singletonFM
 %************************************************************************
 
 \begin{code}
-showStgStats :: PlainStgProgram -> String
+showStgStats :: [StgBinding] -> String
 
 showStgStats prog
   = "STG Statistics:\n\n"
@@ -101,9 +101,9 @@ showStgStats prog
     s (SingleEntryBinds _)    = "SingleEntryBinds_Nested    "
     s (UpdatableBinds _)      = "UpdatableBinds_Nested      "
 
-gatherStgStats :: PlainStgProgram -> StatEnv
+gatherStgStats :: [StgBinding] -> StatEnv
 
-gatherStgStats binds 
+gatherStgStats binds
   = combineSEs (map (statBinding True{-top-level-}) binds)
 \end{code}
 
@@ -115,7 +115,7 @@ gatherStgStats binds
 
 \begin{code}
 statBinding :: Bool -- True <=> top-level; False <=> nested
-	    -> PlainStgBinding
+	    -> StgBinding
 	    -> StatEnv
 
 statBinding top (StgNonRec b rhs)
@@ -124,13 +124,13 @@ statBinding top (StgNonRec b rhs)
 statBinding top (StgRec pairs)
   = combineSEs (map (statRhs top) pairs)
 
-statRhs :: Bool -> (Id, PlainStgRhs) -> StatEnv
+statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 
 statRhs top (b, StgRhsCon cc con args)
   = countOne (ConstructorBinds top)
 
 statRhs top (b, StgRhsClosure cc bi fv u args body)
-  = statExpr body			`combineSE` 
+  = statExpr body			`combineSE`
     countN FreeVariables (length fv)	`combineSE`
     countOne (
       case u of
@@ -146,18 +146,18 @@ statRhs top (b, StgRhsClosure cc bi fv u args body)
 %*									*
 %************************************************************************
 
-\begin{code}    
-statExpr :: PlainStgExpr -> StatEnv
+\begin{code}
+statExpr :: StgExpr -> StatEnv
 
-statExpr (StgApp _ [] lvs) 
+statExpr (StgApp _ [] lvs)
   = countOne Literals
-statExpr (StgApp _ _ lvs) 
+statExpr (StgApp _ _ lvs)
   = countOne Applications
 
-statExpr (StgConApp con as lvs)
+statExpr (StgCon con as lvs)
   = countOne ConstructorApps
 
-statExpr (StgPrimApp op as lvs)
+statExpr (StgPrim op as lvs)
   = countOne PrimitiveApps
 
 statExpr (StgSCC ty l e)
@@ -165,11 +165,11 @@ statExpr (StgSCC ty l e)
 
 statExpr (StgLetNoEscape lvs_whole lvs_rhss binds body)
   = statBinding False{-not top-level-} binds	`combineSE`
-    statExpr body				`combineSE` 
+    statExpr body				`combineSE`
     countOne LetNoEscapes
 
 statExpr (StgLet binds body)
-  = statBinding False{-not top-level-} binds	`combineSE` 
+  = statBinding False{-not top-level-} binds	`combineSE`
     statExpr body
 
 statExpr (StgCase expr lve lva uniq alts)
@@ -178,7 +178,7 @@ statExpr (StgCase expr lve lva uniq alts)
     where
       stat_alts (StgAlgAlts ty alts def)
 	= combineSEs (map statExpr [ e | (_,_,_,e) <- alts ])
-					`combineSE` 
+					`combineSE`
 	  stat_deflt def		`combineSE`
 	  countOne AlgCases
 
@@ -190,6 +190,6 @@ statExpr (StgCase expr lve lva uniq alts)
 
       stat_deflt StgNoDefault = emptySE
 
-      stat_deflt (StgBindDefault b u expr) = statExpr expr	
+      stat_deflt (StgBindDefault b u expr) = statExpr expr
 \end{code}
 

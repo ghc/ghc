@@ -10,25 +10,19 @@ Support code for @Simplify@.
 
 module SimplCase ( simplCase, bindLargeRhs ) where
 
-IMPORT_Trace
-import Pretty		-- these are for debugging only
-import Outputable
-
 import SimplMonad
 import SimplEnv
-import TaggedCore
-import PlainCore
 
-import AbsPrel		( getPrimOpResultInfo, PrimOpResultInfo(..), PrimOp,
+import PrelInfo		( getPrimOpResultInfo, PrimOpResultInfo(..), PrimOp,
 			  voidPrimTy, voidPrimId, mkFunTy, primOpOkForSpeculation
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( splitType, splitTyArgs, glueTyArgs,
+import Type		( splitSigmaTy, splitTyArgs, glueTyArgs,
 			  getTyConFamilySize, isPrimType,
-			  getUniDataTyCon_maybe
+			  maybeDataTyCon
 			)
-import BasicLit		( isNoRepLit, BasicLit, PrimKind )
+import Literal		( isNoRepLit, Literal )
 import CmdLineOpts	( SimplifierSwitch(..) )
 import Id
 import IdInfo
@@ -53,7 +47,7 @@ simplCase :: SimplEnv
 	  -> OutUniType				-- Type of result expression
 	  -> SmplM OutExpr
 
-simplCase env (CoLet bind body) alts rhs_c result_ty
+simplCase env (Let bind body) alts rhs_c result_ty
   | not (switchIsSet env SimplNoLetFromCase)
   = 	-- Float the let outside the case scrutinee (if not disabled by flag)
     tick LetFloatFromCase		`thenSmpl_`
@@ -86,7 +80,7 @@ by abstracting the outer rhss wrt the pattern variables.  For example
 ===>
 	let b = \ x y -> body
 	in
-	case e of 
+	case e of
 	  p1 -> case rhs1 of (x,y) -> b x y
 	  ...
 	  pn -> case rhsn of (x,y) -> b x y
@@ -103,28 +97,28 @@ All of this works equally well if the outer case has multiple rhss.
 
 
 \begin{code}
-simplCase env (CoCase inner_scrut inner_alts) outer_alts rhs_c result_ty
+simplCase env (Case inner_scrut inner_alts) outer_alts rhs_c result_ty
   | switchIsSet env SimplCaseOfCase
   = 	-- Ha!  Do case-of-case
     tick CaseOfCase	`thenSmpl_`
 
     if no_need_to_bind_large_alts
     then
-	simplCase env inner_scrut inner_alts 
+	simplCase env inner_scrut inner_alts
 		  (\env rhs -> simplCase env rhs outer_alts rhs_c result_ty) result_ty
     else
 	bindLargeAlts env outer_alts rhs_c result_ty	`thenSmpl` \ (extra_bindings, outer_alts') ->
 	let
 	   rhs_c' = \env rhs -> simplExpr env rhs []
 	in
-	simplCase env inner_scrut inner_alts 
+	simplCase env inner_scrut inner_alts
 		  (\env rhs -> simplCase env rhs outer_alts' rhs_c' result_ty)
 		  result_ty
 						`thenSmpl` \ case_expr ->
 	returnSmpl (mkCoLetsNoUnboxed extra_bindings case_expr)
 
   where
-    no_need_to_bind_large_alts = switchIsSet env SimplOkToDupCode || 
+    no_need_to_bind_large_alts = switchIsSet env SimplOkToDupCode ||
    			         isSingleton (nonErrorRHSs inner_alts)
 \end{code}
 
@@ -137,7 +131,7 @@ simplCase env scrut alts rhs_c result_ty
     tick CaseOfError 	`thenSmpl_`
     rhs_c env retyped_error_app
   where
-    alts_ty 	    	   = typeOfCoreAlts (unTagBindersAlts alts)
+    alts_ty 	    	   = coreAltsType (unTagBindersAlts alts)
     maybe_error_app 	   = maybeErrorApp scrut (Just alts_ty)
     Just retyped_error_app = maybe_error_app
 \end{code}
@@ -167,7 +161,7 @@ completeCase
 	-> SmplM OutExpr	-- The whole case expression
 \end{code}
 
-Scrutinising a literal or constructor.  
+Scrutinising a literal or constructor.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's an obvious win to do:
 
@@ -184,14 +178,14 @@ need to check for the variable case separately.
 Sanity check: we don't have a good
 story to tell about case analysis on NoRep things.  ToDo.
 
-\begin{code}	
-completeCase env (CoLit lit) alts rhs_c
+\begin{code}
+completeCase env (Lit lit) alts rhs_c
   | not (isNoRepLit lit)
   = 	-- Ha!  Select the appropriate alternative
     tick KnownBranch		`thenSmpl_`
     completePrimCaseWithKnownLit env lit alts rhs_c
 
-completeCase env expr@(CoCon con tys con_args) alts rhs_c
+completeCase env expr@(Con con tys con_args) alts rhs_c
   = 	-- Ha! Staring us in the face -- select the appropriate alternative
     tick KnownBranch		`thenSmpl_`
     completeAlgCaseWithKnownCon env con tys con_args alts rhs_c
@@ -215,7 +209,7 @@ match.  For example:
 	case x of
 	  0#    -> ...
 	  other -> ...(case x of
-			 0#    -> ... 
+			 0#    -> ...
 			 other -> ...) ...
 \end{code}
 Here the inner case can be eliminated.  This really only shows up in
@@ -226,7 +220,7 @@ Lastly, we generalise the transformation to handle this:
 	case e of	===> r
 	   True  -> r
 	   False -> r
-	   
+
 We only do this for very cheaply compared r's (constructors, literals
 and variables).  If pedantic bottoms is on, we only do it when the
 scrutinee is a PrimOp which can't fail.
@@ -246,7 +240,7 @@ So the case-elimination algorithm is:
 	3. Check we can safely ditch the case:
 		   * PedanticBottoms is off,
 		or * the scrutinee is an already-evaluated variable
-		or * the scrutinee is a primop which is ok for speculation 
+		or * the scrutinee is a primop which is ok for speculation
 			-- ie we want to preserve divide-by-zero errors, and
 			-- calls to error itself!
 
@@ -267,17 +261,17 @@ If so, then we can replace the case with one of the rhss.
 completeCase env scrut alts rhs_c
   | switchIsSet env SimplDoCaseElim &&
 
-    binders_unused && 
+    binders_unused &&
 
     all_rhss_same &&
 
-    (not  (switchIsSet env SimplPedanticBottoms) || 
+    (not  (switchIsSet env SimplPedanticBottoms) ||
      scrut_is_evald ||
      scrut_is_eliminable_primitive ||
      rhs1_is_scrutinee ||
      scrut_is_var_and_single_strict_default
      )
-    
+
   = tick CaseElim 	`thenSmpl_`
     rhs_c new_env rhs1
   where
@@ -289,7 +283,7 @@ completeCase env scrut alts rhs_c
 	-- whether none of their binders are used
     (binders_unused, possible_rhss, new_env)
       = case alts of
-	  CoPrimAlts alts deflt -> (deflt_binder_unused, 	-- No binders other than deflt
+	  PrimAlts alts deflt -> (deflt_binder_unused, 	-- No binders other than deflt
 				    deflt_rhs ++ rhss,
 				    new_env)
 	    where
@@ -297,12 +291,12 @@ completeCase env scrut alts rhs_c
 
 		-- Eliminate unused rhss if poss
 	      rhss = case scrut_form of
-			OtherLiteralForm not_these -> [rhs | (alt_lit,rhs) <- alts, 
+			OtherLitForm not_these -> [rhs | (alt_lit,rhs) <- alts,
 						       not (alt_lit `is_elem` not_these)
 						      ]
 			other -> [rhs | (_,rhs) <- alts]
 
-	  CoAlgAlts alts deflt -> (deflt_binder_unused && all alt_binders_unused possible_alts,
+	  AlgAlts alts deflt -> (deflt_binder_unused && all alt_binders_unused possible_alts,
 				   deflt_rhs ++ [rhs | (_,_,rhs) <- possible_alts],
 				   new_env)
 	    where
@@ -310,14 +304,14 @@ completeCase env scrut alts rhs_c
 
 		-- Eliminate unused alts if poss
 	      possible_alts = case scrut_form of
-				OtherConstructorForm not_these ->
+				OtherConForm not_these ->
 					 	-- Remove alts which can't match
 					[alt | alt@(alt_con,_,_) <- alts,
 					       not (alt_con `is_elem` not_these)]
 
 #ifdef DEBUG
---				ConstructorForm c t v -> pprPanic "completeCase!" (ppAbove (ppCat [ppr PprDebug c, ppr PprDebug t, ppr PprDebug v]) (ppr PprDebug alts))
-				  -- ConstructorForm can't happen, since we'd have
+--				ConForm c t v -> pprPanic "completeCase!" (ppAbove (ppCat [ppr PprDebug c, ppr PprDebug t, ppr PprDebug v]) (ppr PprDebug alts))
+				  -- ConForm can't happen, since we'd have
 				  -- inlined it, and be in completeCaseWithKnownCon by now
 #endif
 				other -> alts
@@ -328,51 +322,51 @@ completeCase env scrut alts rhs_c
 
 	-- If the scrutinee is a variable, look it up to see what we know about it
     scrut_form = case scrut of
-		  CoVar v -> lookupUnfolding env v
+		  Var v -> lookupUnfolding env v
 		  other   -> NoUnfoldingDetails
 
-	-- If the scrut is already eval'd then there's no worry about 
+	-- If the scrut is already eval'd then there's no worry about
 	-- eliminating the case
     scrut_is_evald = case scrut_form of
-			OtherLiteralForm _     -> True
-			ConstructorForm _ _ _  -> True
-			OtherConstructorForm _ -> True
+			OtherLitForm _     -> True
+			ConForm _ _ _  -> True
+			OtherConForm _ -> True
 			other		       -> False
 
 
     scrut_is_eliminable_primitive
       = case scrut of
-	   CoPrim op _ _ -> primOpOkForSpeculation op
-	   CoVar _       -> case alts of
-				CoPrimAlts _ _ -> True	-- Primitive, hence non-bottom
-				CoAlgAlts _ _  -> False	-- Not primitive
+	   Prim op _ _ -> primOpOkForSpeculation op
+	   Var _       -> case alts of
+				PrimAlts _ _ -> True	-- Primitive, hence non-bottom
+				AlgAlts _ _  -> False	-- Not primitive
 	   other	 -> False
-    
+
 	-- case v of w -> e{strict in w}  ===>   e[v/w]
     scrut_is_var_and_single_strict_default
       = case scrut of
-	  CoVar _ -> case alts of 
-			CoAlgAlts [] (CoBindDefault (v,_) _) -> willBeDemanded (getIdDemandInfo v)
-		        other -> False
+	  Var _ -> case alts of
+			AlgAlts [] (BindDefault (v,_) _) -> willBeDemanded (getIdDemandInfo v)
+			other -> False
 	  other -> False
 
-    elim_deflt_binder CoNoDefault 	    		 -- No Binder
-        = (True, [], env)
-    elim_deflt_binder (CoBindDefault (id, DeadCode) rhs) -- Binder unused
+    elim_deflt_binder NoDefault 	    		 -- No Binder
+	= (True, [], env)
+    elim_deflt_binder (BindDefault (id, DeadCode) rhs) -- Binder unused
 	= (True, [rhs], env)
-    elim_deflt_binder (CoBindDefault used_binder rhs) 	 -- Binder used
+    elim_deflt_binder (BindDefault used_binder rhs) 	 -- Binder used
 	= case scrut of
-		CoVar v -> 	-- Binder used, but can be eliminated in favour of scrut
-			   (True, [rhs], extendIdEnvWithAtom env used_binder (CoVarAtom v))
+		Var v -> 	-- Binder used, but can be eliminated in favour of scrut
+			   (True, [rhs], extendIdEnvWithAtom env used_binder (VarArg v))
 		non_var -> 	-- Binder used, and can't be elimd
 			   (False, [rhs], env)
 
 	-- Check whether the chosen unique rhs (ie rhs1) is the same as
 	-- the scrutinee.  Remember that the rhs is as yet unsimplified.
     rhs1_is_scrutinee = case (scrut, rhs1) of
-			  (CoVar scrut_var, CoVar rhs_var) 
+			  (Var scrut_var, Var rhs_var)
 				-> case lookupId env rhs_var of
-				    Just (ItsAnAtom (CoVarAtom rhs_var')) 
+				    Just (ItsAnAtom (VarArg rhs_var'))
 					-> rhs_var' == scrut_var
 				    other -> False
 			  other -> False
@@ -383,7 +377,7 @@ completeCase env scrut alts rhs_c
 Scrutinising anything else.  If it's a variable, it can't be bound to a
 constructor or literal, because that would have been inlined
 
-\begin{code}	
+\begin{code}
 completeCase env scrut alts rhs_c
   = simplAlts env scrut alts rhs_c	`thenSmpl` \ alts' ->
     mkCoCase scrut alts'
@@ -393,41 +387,41 @@ completeCase env scrut alts rhs_c
 
 
 \begin{code}
-bindLargeAlts :: SimplEnv 
-	      -> InAlts 
+bindLargeAlts :: SimplEnv
+	      -> InAlts
 	      -> (SimplEnv -> InExpr -> SmplM OutExpr)		-- Old rhs handler
 	      -> OutUniType					-- Result type
 	      -> SmplM ([OutBinding],	-- Extra bindings
 			InAlts)		-- Modified alts
 
-bindLargeAlts env the_lot@(CoAlgAlts alts deflt) rhs_c rhs_ty
+bindLargeAlts env the_lot@(AlgAlts alts deflt) rhs_c rhs_ty
   = mapAndUnzipSmpl do_alt alts			`thenSmpl` \ (alt_bindings, alts') ->
     bindLargeDefault env deflt rhs_ty rhs_c	`thenSmpl` \ (deflt_bindings, deflt') ->
-    returnSmpl (deflt_bindings ++ alt_bindings, CoAlgAlts alts' deflt')
+    returnSmpl (deflt_bindings ++ alt_bindings, AlgAlts alts' deflt')
   where
-    do_alt (con,args,rhs) = bindLargeRhs env args rhs_ty 
+    do_alt (con,args,rhs) = bindLargeRhs env args rhs_ty
 				(\env -> rhs_c env rhs) `thenSmpl` \ (bind,rhs') ->
 			    returnSmpl (bind, (con,args,rhs'))
 
-bindLargeAlts env the_lot@(CoPrimAlts alts deflt) rhs_c rhs_ty
+bindLargeAlts env the_lot@(PrimAlts alts deflt) rhs_c rhs_ty
   = mapAndUnzipSmpl do_alt alts			`thenSmpl` \ (alt_bindings, alts') ->
     bindLargeDefault env deflt rhs_ty rhs_c	`thenSmpl` \ (deflt_bindings, deflt') ->
-    returnSmpl (deflt_bindings ++ alt_bindings, CoPrimAlts alts' deflt')
+    returnSmpl (deflt_bindings ++ alt_bindings, PrimAlts alts' deflt')
   where
     do_alt (lit,rhs) = bindLargeRhs env [] rhs_ty
 				(\env -> rhs_c env rhs) `thenSmpl` \ (bind,rhs') ->
 		       returnSmpl (bind, (lit,rhs'))
 
-bindLargeDefault env CoNoDefault rhs_ty rhs_c
-  = returnSmpl ([], CoNoDefault)
-bindLargeDefault env (CoBindDefault binder rhs) rhs_ty rhs_c
-  = bindLargeRhs env [binder] rhs_ty 
+bindLargeDefault env NoDefault rhs_ty rhs_c
+  = returnSmpl ([], NoDefault)
+bindLargeDefault env (BindDefault binder rhs) rhs_ty rhs_c
+  = bindLargeRhs env [binder] rhs_ty
 		 (\env -> rhs_c env rhs) `thenSmpl` \ (bind,rhs') ->
-    returnSmpl ([bind], CoBindDefault binder rhs')
+    returnSmpl ([bind], BindDefault binder rhs')
 \end{code}
 
 	bindLargeRhs env [x1,..,xn] rhs rhs_ty rhs_c
-	 | otherwise        = (rhs_id = \x1..xn -> rhs_c rhs, 
+	 | otherwise        = (rhs_id = \x1..xn -> rhs_c rhs,
 			       rhs_id x1 .. xn)
 
 \begin{code}
@@ -445,7 +439,7 @@ bindLargeRhs env args rhs_ty rhs_c
 	-- with potentially-disastrous strictness results.  So
 	-- instead we turn it into a function: \v -> e
 	-- where v::VoidPrim.  Since arguments of type
-	-- VoidPrim don't generate any code, this gives the 
+	-- VoidPrim don't generate any code, this gives the
 	-- desired effect.
 	--
 	-- The general structure is just the same as for the common "otherwise~ case
@@ -453,8 +447,8 @@ bindLargeRhs env args rhs_ty rhs_c
     newId voidPrimTy		`thenSmpl` \ void_arg_id ->
     rhs_c env 			`thenSmpl` \ prim_new_body ->
 
-    returnSmpl (CoNonRec prim_rhs_fun_id (mkCoLam [void_arg_id] prim_new_body),
-	        CoApp (CoVar prim_rhs_fun_id) (CoVarAtom voidPrimId))
+    returnSmpl (NonRec prim_rhs_fun_id (mkValLam [void_arg_id] prim_new_body),
+		App (Var prim_rhs_fun_id) (VarArg voidPrimId))
 
   | otherwise
   = 	-- Make the new binding Id.  NB: it's an OutId
@@ -470,20 +464,20 @@ bindLargeRhs env args rhs_ty rhs_c
 	final_rhs
 	  = (if switchIsSet new_env SimplDoEtaReduction
 	     then mkCoLamTryingEta
-	     else mkCoLam) used_args' rhs'
+	     else mkValLam) used_args' rhs'
     in
-    returnSmpl (CoNonRec rhs_fun_id final_rhs,
-		foldl CoApp (CoVar rhs_fun_id) used_arg_atoms)
+    returnSmpl (NonRec rhs_fun_id final_rhs,
+		foldl App (Var rhs_fun_id) used_arg_atoms)
 	-- This is slightly wierd. We're retuning an OutId as part of the
 	-- modified rhs, which is meant to be an InExpr. However, that's ok, because when
 	-- it's processed the OutId won't be found in the environment, so it
 	-- will be left unmodified.
   where
     rhs_fun_ty :: OutUniType
-    rhs_fun_ty = glueTyArgs [simplTy env (getIdUniType id) | (id,_) <- used_args] rhs_ty
+    rhs_fun_ty = glueTyArgs [simplTy env (idType id) | (id,_) <- used_args] rhs_ty
 
     used_args      = [arg | arg@(_,usage) <- args, not (dead usage)]
-    used_arg_atoms = [CoVarAtom arg_id | (arg_id,_) <- used_args]
+    used_arg_atoms = [VarArg arg_id | (arg_id,_) <- used_args]
     dead DeadCode  = True
     dead other     = False
 
@@ -502,45 +496,45 @@ case x of
 it is best to make sure that \tr{default_e} mentions \tr{x} in
 preference to \tr{y}.  The code generator can do a cheaper job if it
 doesn't have to come up with a binding for \tr{y}.
-          
+
 \begin{code}
 simplAlts :: SimplEnv
 	  -> OutExpr			-- Simplified scrutinee;
-					-- only of interest if its a var, 
+					-- only of interest if its a var,
 					-- in which case we record its form
-	  -> InAlts 
+	  -> InAlts
 	  -> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
 	  -> SmplM OutAlts
 
-simplAlts env scrut (CoAlgAlts alts deflt) rhs_c
+simplAlts env scrut (AlgAlts alts deflt) rhs_c
   = mapSmpl do_alt alts					`thenSmpl` \ alts' ->
     simplDefault env scrut deflt deflt_form rhs_c	`thenSmpl` \ deflt' ->
-    returnSmpl (CoAlgAlts alts' deflt')
+    returnSmpl (AlgAlts alts' deflt')
   where
-    deflt_form = OtherConstructorForm [con | (con,_,_) <- alts]
+    deflt_form = OtherConForm [con | (con,_,_) <- alts]
     do_alt (con, con_args, rhs)
       = cloneIds env con_args				`thenSmpl` \ con_args' ->
 	let
 	    env1    = extendIdEnvWithClones env con_args con_args'
-	    new_env = case scrut of 
-		       CoVar var -> _scc_ "euegC1" (extendUnfoldEnvGivenConstructor env1 var con con_args')
+	    new_env = case scrut of
+		       Var var -> _scc_ "euegC1" (extendUnfoldEnvGivenConstructor env1 var con con_args')
 		       other     -> env1
-        in
+	in
 	rhs_c new_env rhs 				`thenSmpl` \ rhs' ->
 	returnSmpl (con, con_args', rhs')
 
-simplAlts env scrut (CoPrimAlts alts deflt) rhs_c
+simplAlts env scrut (PrimAlts alts deflt) rhs_c
   = mapSmpl do_alt alts					`thenSmpl` \ alts' ->
     simplDefault env scrut deflt deflt_form rhs_c	`thenSmpl` \ deflt' ->
-    returnSmpl (CoPrimAlts alts' deflt')
+    returnSmpl (PrimAlts alts' deflt')
   where
-    deflt_form = OtherLiteralForm [lit | (lit,_) <- alts]
+    deflt_form = OtherLitForm [lit | (lit,_) <- alts]
     do_alt (lit, rhs)
       = let
 	    new_env = case scrut of
-			CoVar var -> _scc_ "euegFD1" (extendUnfoldEnvGivenFormDetails env var (LiteralForm lit))
+			Var var -> _scc_ "euegFD1" (extendUnfoldEnvGivenFormDetails env var (LitForm lit))
 			other	  -> env
-        in
+	in
 	rhs_c new_env rhs 				`thenSmpl` \ rhs' ->
 	returnSmpl (lit, rhs')
 \end{code}
@@ -577,25 +571,25 @@ simplDefault
 	-> OutExpr			-- Simplified scrutinee
 	-> InDefault 			-- Default alternative to be completed
 	-> UnfoldingDetails		-- Gives form of scrutinee
-        -> (SimplEnv -> InExpr -> SmplM OutExpr)		-- Old rhs handler
+	-> (SimplEnv -> InExpr -> SmplM OutExpr)		-- Old rhs handler
 	-> SmplM OutDefault
 
-simplDefault env scrut CoNoDefault form rhs_c
-  = returnSmpl CoNoDefault
+simplDefault env scrut NoDefault form rhs_c
+  = returnSmpl NoDefault
 
 -- Special case for variable scrutinee; see notes above.
-simplDefault env (CoVar scrut_var) (CoBindDefault binder rhs) form_from_this_case rhs_c
+simplDefault env (Var scrut_var) (BindDefault binder rhs) form_from_this_case rhs_c
   = cloneId env binder 	`thenSmpl` \ binder' ->
     let
-      env1    = extendIdEnvWithAtom env binder (CoVarAtom binder')
+      env1    = extendIdEnvWithAtom env binder (VarArg binder')
 
 	-- Add form details for the default binder
       scrut_form = lookupUnfolding env scrut_var
       final_form
-        = case (form_from_this_case, scrut_form) of
-	    (OtherConstructorForm cs, OtherConstructorForm ds) -> OtherConstructorForm (cs++ds)
-	    (OtherLiteralForm cs,     OtherLiteralForm ds)     -> OtherLiteralForm (cs++ds)
-			-- ConstructorForm, LiteralForm impossible
+	= case (form_from_this_case, scrut_form) of
+	    (OtherConForm cs, OtherConForm ds) -> OtherConForm (cs++ds)
+	    (OtherLitForm cs,     OtherLitForm ds)     -> OtherLitForm (cs++ds)
+			-- ConForm, LitForm impossible
 			-- (ASSERT?  ASSERT?  Hello? WDP 95/05)
 	    other 				               -> form_from_this_case
 
@@ -603,22 +597,22 @@ simplDefault env (CoVar scrut_var) (CoBindDefault binder rhs) form_from_this_cas
 
 	-- Change unfold details for scrut var.  We now want to unfold it
 	-- to binder'
-      new_scrut_var_form = GeneralForm True {- OK to dup -} WhnfForm 
-				       (CoVar binder') UnfoldAlways
+      new_scrut_var_form = GenForm True {- OK to dup -} WhnfForm
+				       (Var binder') UnfoldAlways
       new_env    = extendUnfoldEnvGivenFormDetails env2 scrut_var new_scrut_var_form
-			
+
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
-    returnSmpl (CoBindDefault binder' rhs')
+    returnSmpl (BindDefault binder' rhs')
 
-simplDefault env scrut (CoBindDefault binder rhs) form rhs_c
+simplDefault env scrut (BindDefault binder rhs) form rhs_c
   = cloneId env binder 	`thenSmpl` \ binder' ->
     let
-	env1    = extendIdEnvWithAtom env binder (CoVarAtom binder')
+	env1    = extendIdEnvWithAtom env binder (VarArg binder')
 	new_env = _scc_ "euegFD2" (extendUnfoldEnvGivenFormDetails env1 binder' form)
     in
     rhs_c new_env rhs			`thenSmpl` \ rhs' ->
-    returnSmpl (CoBindDefault binder' rhs')
+    returnSmpl (BindDefault binder' rhs')
 \end{code}
 
 Case alternatives when we know what the scrutinee is
@@ -627,15 +621,15 @@ Case alternatives when we know what the scrutinee is
 \begin{code}
 completePrimCaseWithKnownLit
 	:: SimplEnv
-	-> BasicLit
+	-> Literal
 	-> InAlts
-        -> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
+	-> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
 	-> SmplM OutExpr
 
-completePrimCaseWithKnownLit env lit (CoPrimAlts alts deflt) rhs_c
+completePrimCaseWithKnownLit env lit (PrimAlts alts deflt) rhs_c
   = search_alts alts
   where
-    search_alts :: [(BasicLit, InExpr)] -> SmplM OutExpr
+    search_alts :: [(Literal, InExpr)] -> SmplM OutExpr
 
     search_alts ((alt_lit, rhs) : _)
       | alt_lit == lit
@@ -644,17 +638,17 @@ completePrimCaseWithKnownLit env lit (CoPrimAlts alts deflt) rhs_c
 
     search_alts (_ : other_alts)
       = 	-- This alternative doesn't match; keep looking
-        search_alts other_alts
+	search_alts other_alts
 
     search_alts []
       = case deflt of
-	  CoNoDefault 	 -> 	-- Blargh!
+	  NoDefault 	 -> 	-- Blargh!
 	    panic "completePrimCaseWithKnownLit: No matching alternative and no default"
 
-	  CoBindDefault binder rhs ->	-- OK, there's a default case
-				        -- Just bind the Id to the atom and continue
+	  BindDefault binder rhs ->	-- OK, there's a default case
+					-- Just bind the Id to the atom and continue
 	    let
-		new_env = extendIdEnvWithAtom env binder (CoLitAtom lit)
+		new_env = extendIdEnvWithAtom env binder (LitArg lit)
 	    in
 	    rhs_c new_env rhs
 \end{code}
@@ -669,13 +663,13 @@ var [substitute \tr{y} out of existence].
 \begin{code}
 completeAlgCaseWithKnownCon
 	:: SimplEnv
-	-> DataCon -> [UniType] -> [InAtom]
+	-> DataCon -> [Type] -> [InAtom]
 		-- Scrutinee is (con, type, value arguments)
 	-> InAlts
-        -> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
+	-> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
 	-> SmplM OutExpr
 
-completeAlgCaseWithKnownCon env con tys con_args (CoAlgAlts alts deflt) rhs_c
+completeAlgCaseWithKnownCon env con tys con_args (AlgAlts alts deflt) rhs_c
   = ASSERT(isDataCon con)
     search_alts alts
   where
@@ -688,29 +682,29 @@ completeAlgCaseWithKnownCon env con tys con_args (CoAlgAlts alts deflt) rhs_c
 	    new_env = extendIdEnvWithAtomList env (zip alt_args con_args)
 	in
 	rhs_c new_env rhs
-	
+
     search_alts (_ : other_alts)
       = 	-- This alternative doesn't match; keep looking
-        search_alts other_alts
+	search_alts other_alts
 
     search_alts []
       = 	-- No matching alternative
 	case deflt of
-	  CoNoDefault 	 -> 	-- Blargh!
+	  NoDefault 	 -> 	-- Blargh!
 	    panic "completeAlgCaseWithKnownCon: No matching alternative and no default"
 
-	  CoBindDefault binder rhs ->	-- OK, there's a default case
+	  BindDefault binder rhs ->	-- OK, there's a default case
 			-- let-bind the binder to the constructor
 		cloneId env binder		`thenSmpl` \ id' ->
 		let
 		    env1    = extendIdEnvWithClone env binder id'
-		    new_env = _scc_ "euegFD3" (extendUnfoldEnvGivenFormDetails env1 id' 
-					(ConstructorForm con tys con_args))
+		    new_env = _scc_ "euegFD3" (extendUnfoldEnvGivenFormDetails env1 id'
+					(ConForm con tys con_args))
 		in
 		rhs_c new_env rhs		`thenSmpl` \ rhs' ->
-		returnSmpl (CoLet (CoNonRec id' (CoCon con tys con_args)) rhs')
+		returnSmpl (Let (NonRec id' (Con con tys con_args)) rhs')
 \end{code}
-							
+
 Case absorption and identity-case elimination
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -726,10 +720,10 @@ case v of                 ==>   case v of
   pm -> rhsm                      pm -> rhsm
   d  -> case v of                 pn -> rhsn[v/d]  {or (alg)  let d=v in rhsn}
 						   {or (prim) case v of d -> rhsn}
-          pn -> rhsn              ...
-          ...                     po -> rhso[v/d]
-          po -> rhso              d  -> rhsd[d/d'] {or let d'=d in rhsd}
-          d' -> rhsd
+	  pn -> rhsn              ...
+	  ...                     po -> rhso[v/d]
+	  po -> rhso              d  -> rhsd[d/d'] {or let d'=d in rhsd}
+	  d' -> rhsd
 
 which merges two cases in one case when -- the default alternative of
 the outer case scrutises the same variable as the outer case This
@@ -743,17 +737,17 @@ case e of                 ==>   case e of
   ...	                          ...
   pm -> rhsm                      pm -> rhsm
   d  -> case d of                 pn -> let d = pn in rhsn
-          pn -> rhsn              ...
-          ...                     po -> let d = po in rhso
-          po -> rhso              d  -> rhsd[d/d'] {or let d'=d in rhsd}
-          d' -> rhsd
+	  pn -> rhsn              ...
+	  ...                     po -> let d = po in rhso
+	  po -> rhso              d  -> rhsd[d/d'] {or let d'=d in rhsd}
+	  d' -> rhsd
 
 Here, the let's are essential, because d isn't in scope any more.
 Sigh.  Of course, they may be unused, in which case they'll be
 eliminated on the next round.  Unfortunately, we can't figure out
 whether or not they are used at this juncture.
 
-NB: The binder in a CoBindDefault USED TO BE guaranteed unused if the
+NB: The binder in a BindDefault USED TO BE guaranteed unused if the
 scrutinee is a variable, because it'll be mapped to the scrutinised
 variable.  Hence the [v/d] substitions can be omitted.
 
@@ -765,21 +759,21 @@ The following code handles *both* these transformations (one
 equation for AlgAlts, one for PrimAlts):
 
 \begin{code}
-mkCoCase scrut (CoAlgAlts outer_alts 
-			  (CoBindDefault deflt_var
-					 (CoCase (CoVar scrut_var') 
-						 (CoAlgAlts inner_alts inner_deflt))))
+mkCoCase scrut (AlgAlts outer_alts
+			  (BindDefault deflt_var
+					 (Case (Var scrut_var')
+						 (AlgAlts inner_alts inner_deflt))))
   |  (scrut_is_var && scrut_var == scrut_var')	-- First transformation
   || deflt_var == scrut_var'			-- Second transformation
   = 	-- Aha! The default-absorption rule applies
     tick CaseMerge	`thenSmpl_`
-    returnSmpl (CoCase scrut (CoAlgAlts (outer_alts ++ munged_reduced_inner_alts)
+    returnSmpl (Case scrut (AlgAlts (outer_alts ++ munged_reduced_inner_alts)
 			     (munge_alg_deflt deflt_var inner_deflt)))
-	-- NB: see comment in this location for the CoPrimAlts case
+	-- NB: see comment in this location for the PrimAlts case
   where
 	-- Check scrutinee
-    scrut_is_var = case scrut of {CoVar v -> True; other -> False}
-    scrut_var    = case scrut of CoVar v -> v
+    scrut_is_var = case scrut of {Var v -> True; other -> False}
+    scrut_var    = case scrut of Var v -> v
 
 	--  Eliminate any inner alts which are shadowed by the outer ones
     reduced_inner_alts = [alt | alt@(con,_,_) <- inner_alts,
@@ -790,40 +784,40 @@ mkCoCase scrut (CoAlgAlts outer_alts
 	-- Add the lets if necessary
     munged_reduced_inner_alts = map munge_alt reduced_inner_alts
 
-    munge_alt (con, args, rhs) = (con, args, CoLet (CoNonRec deflt_var v) rhs)
+    munge_alt (con, args, rhs) = (con, args, Let (NonRec deflt_var v) rhs)
        where
-	 v | scrut_is_var = CoVar scrut_var
-	   | otherwise    = CoCon con arg_tys (map CoVarAtom args)
+	 v | scrut_is_var = Var scrut_var
+	   | otherwise    = Con con arg_tys (map VarArg args)
 
-    arg_tys = case getUniDataTyCon_maybe (getIdUniType deflt_var) of
+    arg_tys = case maybeDataTyCon (idType deflt_var) of
 		Just (_, arg_tys, _) -> arg_tys
 
-mkCoCase scrut (CoPrimAlts 
-		  outer_alts 
-		  (CoBindDefault deflt_var (CoCase 
-					      (CoVar scrut_var') 
-					      (CoPrimAlts inner_alts inner_deflt))))
+mkCoCase scrut (PrimAlts
+		  outer_alts
+		  (BindDefault deflt_var (Case
+					      (Var scrut_var')
+					      (PrimAlts inner_alts inner_deflt))))
   | (scrut_is_var && scrut_var == scrut_var') ||
     deflt_var == scrut_var'
   = 	-- Aha! The default-absorption rule applies
     tick CaseMerge	`thenSmpl_`
-    returnSmpl (CoCase scrut (CoPrimAlts (outer_alts ++ munged_reduced_inner_alts)
+    returnSmpl (Case scrut (PrimAlts (outer_alts ++ munged_reduced_inner_alts)
 			     (munge_prim_deflt deflt_var inner_deflt)))
 
 	-- Nota Bene: we don't recurse to mkCoCase again, because the
 	-- default will now have a binding in it that prevents
 	-- mkCoCase doing anything useful.  Much worse, in this
 	-- PrimAlts case the binding in the default branch is another
-	-- CoCase, so if we recurse to mkCoCase we will get into an
+	-- Case, so if we recurse to mkCoCase we will get into an
 	-- infinite loop.
-	-- 
+	--
 	-- ToDo: think of a better way to do this.  At the moment
 	-- there is at most one case merge per round.  That's probably
 	-- plenty but it seems unclean somehow.
   where
 	-- Check scrutinee
-    scrut_is_var = case scrut of {CoVar v -> True; other -> False}
-    scrut_var    = case scrut of CoVar v -> v
+    scrut_is_var = case scrut of {Var v -> True; other -> False}
+    scrut_var    = case scrut of Var v -> v
 
 	--  Eliminate any inner alts which are shadowed by the outer ones
     reduced_inner_alts = [alt | alt@(lit,_) <- inner_alts,
@@ -838,17 +832,17 @@ mkCoCase scrut (CoPrimAlts
 	-- it isn't easy to do so right away.
     munged_reduced_inner_alts = map munge_alt reduced_inner_alts
 
-    munge_alt (lit, rhs) 
-      | scrut_is_var = (lit, CoCase (CoVar scrut_var)
-				    (CoPrimAlts [] (CoBindDefault deflt_var rhs)))
-      | otherwise = (lit, CoCase (CoLit lit) 
-				 (CoPrimAlts [] (CoBindDefault deflt_var rhs)))
+    munge_alt (lit, rhs)
+      | scrut_is_var = (lit, Case (Var scrut_var)
+				    (PrimAlts [] (BindDefault deflt_var rhs)))
+      | otherwise = (lit, Case (Lit lit)
+				 (PrimAlts [] (BindDefault deflt_var rhs)))
 \end{code}
 
 Now the identity-case transformation:
 
 	case e of 		===> e
-		True -> True; 
+		True -> True;
 		False -> False
 
 and similar friends.
@@ -859,15 +853,17 @@ mkCoCase scrut alts
   = tick CaseIdentity		`thenSmpl_`
     returnSmpl scrut
   where
-    identity_alts (CoAlgAlts alts deflt)  = all identity_alg_alt  alts && identity_deflt deflt
-    identity_alts (CoPrimAlts alts deflt) = all identity_prim_alt alts && identity_deflt deflt
+    identity_alts (AlgAlts alts deflt)  = all identity_alg_alt  alts && identity_deflt deflt
+    identity_alts (PrimAlts alts deflt) = all identity_prim_alt alts && identity_deflt deflt
 
-    identity_alg_alt (con, args, CoCon con' _ args') 
-	 = con == con' && and (zipWith eq_arg args args')
+    identity_alg_alt (con, args, Con con' _ args')
+	 = con == con'
+	   && and (zipWith eq_arg args args')
+	   && length args == length args'
     identity_alg_alt other
 	 = False
 
-    identity_prim_alt (lit, CoLit lit') = lit == lit'
+    identity_prim_alt (lit, Lit lit') = lit == lit'
     identity_prim_alt other	       = False
 
 	 -- For the default case we want to spot both
@@ -875,21 +871,21 @@ mkCoCase scrut alts
 	 -- and
 	 --	case y of { ... ; x -> y }
 	 -- as "identity" defaults
-    identity_deflt CoNoDefault = True
-    identity_deflt (CoBindDefault binder (CoVar x)) = x == binder ||
-						      case scrut of 
-							 CoVar y -> y == x
+    identity_deflt NoDefault = True
+    identity_deflt (BindDefault binder (Var x)) = x == binder ||
+						      case scrut of
+							 Var y -> y == x
 							 other   -> False
     identity_deflt _ = False
 
-    eq_arg binder (CoVarAtom x) = binder == x
+    eq_arg binder (VarArg x) = binder == x
     eq_arg _      _	       = False
 \end{code}
 
 The catch-all case
 
 \begin{code}
-mkCoCase other_scrut other_alts = returnSmpl (CoCase other_scrut other_alts)
+mkCoCase other_scrut other_alts = returnSmpl (Case other_scrut other_alts)
 \end{code}
 
 Boring local functions used above.  They simply introduce a trivial binding
@@ -900,43 +896,43 @@ or
 depending on whether it's an algebraic or primitive case.
 
 \begin{code}
-munge_prim_deflt _ CoNoDefault = CoNoDefault
+munge_prim_deflt _ NoDefault = NoDefault
 
-munge_prim_deflt deflt_var (CoBindDefault d' rhs) 
-  =   CoBindDefault deflt_var (CoCase (CoVar deflt_var)
-			 	      (CoPrimAlts [] (CoBindDefault d' rhs)))
+munge_prim_deflt deflt_var (BindDefault d' rhs)
+  =   BindDefault deflt_var (Case (Var deflt_var)
+			 	      (PrimAlts [] (BindDefault d' rhs)))
 
-munge_alg_deflt _ CoNoDefault = CoNoDefault
+munge_alg_deflt _ NoDefault = NoDefault
 
-munge_alg_deflt deflt_var (CoBindDefault d' rhs) 
-  =   CoBindDefault deflt_var (CoLet (CoNonRec d' (CoVar deflt_var)) rhs)
+munge_alg_deflt deflt_var (BindDefault d' rhs)
+  =   BindDefault deflt_var (Let (NonRec d' (Var deflt_var)) rhs)
 
 -- This line caused a generic version of munge_deflt (ie one used for
 -- both alg and prim) to space leak massively.  No idea why.
---  = CoBindDefault deflt_var (mkCoLetUnboxedToCase (CoNonRec d' (CoVar deflt_var)) rhs)
+--  = BindDefault deflt_var (mkCoLetUnboxedToCase (NonRec d' (Var deflt_var)) rhs)
 \end{code}
 
 \begin{code}
 	-- A cheap equality test which bales out fast!
 cheap_eq :: InExpr -> InExpr -> Bool
-cheap_eq (CoVar v1) (CoVar v2) = v1==v2
-cheap_eq (CoLit l1) (CoLit l2) = l1==l2
-cheap_eq (CoCon con1 tys1 args1) (CoCon con2 tys2 args2) = (con1==con2) && 
+cheap_eq (Var v1) (Var v2) = v1==v2
+cheap_eq (Lit l1) (Lit l2) = l1==l2
+cheap_eq (Con con1 tys1 args1) (Con con2 tys2 args2) = (con1==con2) &&
 							   (args1 `eq_args` args2)
 							   -- Types bound to be equal
-cheap_eq (CoPrim op1 tys1 args1) (CoPrim op2 tys2 args2) = (op1==op2) &&
+cheap_eq (Prim op1 tys1 args1) (Prim op2 tys2 args2) = (op1==op2) &&
 							   (args1 `eq_args` args2)
 							   -- Types bound to be equal
-cheap_eq (CoApp   f1 a1) (CoApp   f2 a2) = (f1 `cheap_eq` f2) && (a1 `eq_atom` a2)
+cheap_eq (App   f1 a1) (App   f2 a2) = (f1 `cheap_eq` f2) && (a1 `eq_atom` a2)
 cheap_eq (CoTyApp f1 t1) (CoTyApp f2 t2) = (f1 `cheap_eq` f2) && (t1 == t2)
 cheap_eq _ _ = False
 
--- ToDo: make CoreAtom an instance of Eq
+-- ToDo: make CoreArg an instance of Eq
 eq_args (arg1: args1) (arg2 : args2) = (arg1 `eq_atom` arg2) && (args1 `eq_args` args2)
 eq_args []		       []		      = True
 eq_args other1		       other2		      = False
 
-eq_atom (CoLitAtom l1) (CoLitAtom l2) =  l1==l2
-eq_atom (CoVarAtom v1) (CoVarAtom v2) =  v1==v2
+eq_atom (LitArg l1) (LitArg l2) =  l1==l2
+eq_atom (VarArg v1) (VarArg v2) =  v1==v2
 eq_atom other1	       other2	      =  False
 \end{code}

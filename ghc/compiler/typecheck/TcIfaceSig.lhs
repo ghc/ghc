@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[TcIfaceSig]{Type checking of type signatures in interface files}
 
@@ -8,29 +8,25 @@
 
 module TcIfaceSig ( tcInterfaceSigs ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
-import Outputable
+import Ubiq
+
+import TcMonad
+import TcMonoType	( tcPolyType )
+
+import HsSyn		( Sig(..), PolyType )
+import RnHsSyn		( RenamedSig(..) )
+
+import CmdLineOpts	( opt_CompilingPrelude )
+import Id		( mkImported )
+import Name		( Name(..) )
 import Pretty
+import Util		( panic )
 
-import TcMonad		-- typechecking monadic machinery
-import AbsSyn		-- the stuff being typechecked
 
-import AbsUniType	( splitType, splitTyArgs )
-import CmdLineOpts	( GlobalSwitch(..) )
-import E		( getE_CE, getE_TCE, nullGVE, unitGVE,
-			  plusGVE, GVE(..), E, CE(..), TCE(..), UniqFM
-			)
-import Errors		( confusedNameErr )
-import Id		-- mkImported
-#if USE_ATTACK_PRAGMAS
-import IdInfo		( workerExists )
-#endif
-import Maybes		( Maybe(..) )
-import TcPragmas	( tcGenPragmas )
-import TVE		( nullTVE, TVE(..) )
-import TcPolyType	( tcPolyType )
-import UniqFM		( emptyUFM ) -- profiling, pragmas only
-import Util
+--import TcPragmas	( tcGenPragmas )
+import IdInfo		( noIdInfo )
+tcGenPragmas ty id ps = returnNF_Tc noIdInfo
+
 \end{code}
 
 Ultimately, type signatures in interfaces will have pragmatic
@@ -41,37 +37,30 @@ As always, we do not have to worry about user-pragmas in interface
 signatures.
 
 \begin{code}
-tcInterfaceSigs :: E -> [RenamedSig] -> Baby_TcM GVE
+tcInterfaceSigs :: [RenamedSig] -> TcM s [Id]
 
-tcInterfaceSigs e [] = returnB_Tc nullGVE
+tcInterfaceSigs [] = returnTc []
 
-tcInterfaceSigs e (sig:sigs)
-  = tc_sig	      sig  `thenB_Tc` \ gve1 ->
-    tcInterfaceSigs e sigs `thenB_Tc` \ gve2 ->
-    returnB_Tc (plusGVE gve1 gve2)
-  where
-    ce  = getE_CE  e
-    tce = getE_TCE e
+tcInterfaceSigs (Sig name@(ValName uniq full_name) ty pragmas src_loc : sigs)
+  = tcAddSrcLoc src_loc		(
+    tcPolyType ty		`thenTc` \ sigma_ty ->
+    fixTc ( \ rec_id ->
+	tcGenPragmas (Just sigma_ty) rec_id pragmas
+				`thenNF_Tc` \ id_info ->
+        returnTc (mkImported uniq full_name sigma_ty id_info)
+    ))				`thenTc` \ id ->
+    tcInterfaceSigs sigs	`thenTc` \ sigs' ->
+    returnTc (id:sigs')
 
-    tc_sig (Sig name@(OtherTopId uniq full_name) ty pragmas src_loc)
-      = addSrcLocB_Tc src_loc			 (
-	tcPolyType ce tce nullTVE ty	`thenB_Tc` \ sigma_ty ->
 
-	fixB_Tc ( \ rec_imported_id ->
-	    tcGenPragmas e (Just sigma_ty) rec_imported_id pragmas
-				`thenB_Tc` \ id_info ->
+tcInterfaceSigs (Sig odd_name _ _ src_loc : sigs)
+  = case odd_name of
+      WiredInVal _ | opt_CompilingPrelude
+        -> tcInterfaceSigs sigs
+      _ -> tcAddSrcLoc src_loc	$
+	   failTc (ifaceSigNameErr odd_name)
 
-	    returnB_Tc (mkImported uniq full_name sigma_ty id_info)
-	) `thenB_Tc` \ final_id ->
-
-	returnB_Tc (unitGVE name final_id)
-	)
-
-    tc_sig (Sig odd_name _ _ src_loc)
-      = getSwitchCheckerB_Tc	`thenB_Tc` \ sw_chkr ->
-	case odd_name of
-	  WiredInVal _ | sw_chkr CompilingPrelude -- OK, that's cool; ignore
-	    -> returnB_Tc nullGVE
-	  _ -> failB_Tc (confusedNameErr "Bad name on a type signature (a Prelude name?)"
-		        	odd_name src_loc)
+ifaceSigNameErr name sty
+  = ppHang (ppStr "Bad name in an interface type signature (a Prelude name?)")
+	 4 (ppr sty name)
 \end{code}

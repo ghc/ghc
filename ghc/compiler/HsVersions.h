@@ -53,8 +53,10 @@ you will screw up the layout where they are used in case expressions!
 
 #ifdef DEBUG
 #define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
+#define CHK_Ubiq() import Ubiq
 #else
 #define ASSERT(e)
+#define CHK_Ubiq()
 #endif
 
 -- ToDo: ghci needs to load far too many bits of the backend because

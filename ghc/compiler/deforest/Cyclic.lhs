@@ -10,25 +10,21 @@
 > 	) where
 
 > import DefSyn
-> import PlainCore
 > import DefUtils
 > import Def2Core 	( d2c, defPanic )
->#ifdef __HBC__
-> import Trace
->#endif
 
-> import AbsUniType	( glueTyArgs, quantifyTy, mkForallTy, mkTyVarTy,
+> import Type		( glueTyArgs, quantifyTy, mkForallTy, mkTyVarTy,
 >			  TyVarTemplate
 >			)
 > import Digraph	( dfs )
-> import Id		( getIdUniType, toplevelishId, updateIdType,
+> import Id		( idType, toplevelishId, updateIdType,
 > 			  getIdInfo, replaceIdInfo, eqId, Id
 >			)
 > import IdInfo
 > import Maybes		( Maybe(..) )
 > import Outputable
 > import Pretty
-> import SplitUniq
+> import UniqSupply
 > import Util
 
 -----------------------------------------------------------------------------
@@ -45,21 +41,21 @@ times, but only examined once.
 -----------------------------------------------------------------------------
 Monad for the knot-tier.
 
-> type Lbl a = SUniqSM (
+> type Lbl a = UniqSM (
 > 	[(Id)],				-- loops used
 >	[(Id,DefExpr,[Id],DefExpr)],	-- bindings floating upwards
 >	[(Id,DefExpr)],			-- back loops
 >	a)				-- computation result
-> 
+>
 > thenLbl :: Lbl a -> (a -> Lbl b) -> Lbl b
 > thenLbl a k
-> 	= a 	`thenSUs` \(ls, bs, bls,  a) ->
->	  k a	`thenSUs` \(ls',bs',bls', b) ->
->	  returnSUs (ls ++ ls', bs ++ bs', bls ++ bls', b)
-> 
+> 	= a 	`thenUs` \(ls, bs, bls,  a) ->
+>	  k a	`thenUs` \(ls',bs',bls', b) ->
+>	  returnUs (ls ++ ls', bs ++ bs', bls ++ bls', b)
+>
 > returnLbl :: a -> Lbl a
-> returnLbl a = returnSUs ([],[],[],a)
-> 
+> returnLbl a = returnUs ([],[],[],a)
+>
 > mapLbl :: (a -> Lbl b) -> [a] -> Lbl [b]
 > mapLbl f [] = returnLbl []
 > mapLbl f (x:xs)
@@ -71,11 +67,11 @@ Monad for the knot-tier.
 
 This is terribly inefficient.
 
-> mkLoops :: DefExpr -> SUniqSM ([(Id,DefExpr)],DefExpr)
-> mkLoops e = 
+> mkLoops :: DefExpr -> UniqSM ([(Id,DefExpr)],DefExpr)
+> mkLoops e =
 >  error "mkLoops"
 >{- LATER:
-> 	loop [] e `thenSUs` \(ls,bs,bls,e) ->
+> 	loop [] e `thenUs` \(ls,bs,bls,e) ->
 
 Throw away all the extracted bindings that can't be reached.  These
 can occur as the result of some forward loops being short-circuited by
@@ -87,36 +83,36 @@ of the expression being returned.
 >		loops_out = filter deforestable (freeVars e)
 >		(_,reachable) = dfs (==) r ([],[]) loops_out
 >		r f = lookup f bs
->				
+>
 >		lookup f [] = []
 >		lookup f ((g,out,_):xs) | f == g = out
 >					| otherwise = lookup f xs
->					
+>
 >		isReachable (f,_,_) = f `elem` reachable
 >	in
-> 	returnSUs (map (\(f,_,e) -> (f,e)) (filter isReachable bs),e)
+> 	returnUs (map (\(f,_,e) -> (f,e)) (filter isReachable bs),e)
 >   where
 
 >       loop :: [(Id,DefExpr,[Id],[TyVar])] -> DefExpr -> Lbl DefExpr
 
->   	loop ls (CoVar (Label e e1))
->   	    = 
->	     d2c e `thenSUs` \core_e ->
+>   	loop ls (Var (Label e e1))
+>   	    =
+>	     d2c e `thenUs` \core_e ->
 >--	     trace ("loop:\n" ++ ppShow 80 (ppr PprDebug core_e)) $
 
->	     mapSUs (\(f,e',val_args,ty_args) -> 
->	             renameExprs e' e	`thenSUs` \r ->
->		     returnSUs (f,val_args,ty_args,r)) ls `thenSUs` \results ->
+>	     mapUs (\(f,e',val_args,ty_args) ->
+>	             renameExprs e' e	`thenUs` \r ->
+>		     returnUs (f,val_args,ty_args,r)) ls `thenUs` \results ->
 >	     let
-> 		loops = 
->			[ (f,val_args,ty_args,r) | 
+> 		loops =
+>			[ (f,val_args,ty_args,r) |
 >			  (f,val_args,ty_args,IsRenaming r) <- results ]
->		inconsistent_renamings = 
->			[ (f,r) | 
->			  (f,val_args,ty_args,InconsistentRenaming r) 
+>		inconsistent_renamings =
+>			[ (f,r) |
+>			  (f,val_args,ty_args,InconsistentRenaming r)
 >			  	<- results ]
 >	     in
->	
+>
 >  	     (case loops of
 >	      [] ->
 
@@ -128,32 +124,32 @@ actually done unless the function is required).
 The type of a new function, if one is generated at this point, is
 constructed as follows:
 
-    \/ a1 ... \/ an . b1 -> ... -> bn -> t 
+    \/ a1 ... \/ an . b1 -> ... -> bn -> t
 
 where a1...an are the free type variables in the expression, b1...bn
 are the types of the free variables in the expression, and t is the
 type of the expression itself.
 
 >		let
->		
+>
 > 		   -- Collect the value/type arguments for the function
 >		   fvs       = freeVars e
 >		   val_args  = filter isArgId fvs
 >		   ty_args   = freeTyVars e
->		   
+>
 >		   -- Now to make up the type...
->		   base_type = typeOfCoreExpr core_e
->		   fun_type  = glueTyArgs (map getIdUniType val_args) base_type
+>		   base_type = coreExprType core_e
+>		   fun_type  = glueTyArgs (map idType val_args) base_type
 >		   (_, type_of_f) = quantifyTy ty_args fun_type
 >		in
->		
->		newDefId type_of_f	`thenSUs` \f' ->
->		let 
-> 		       f = replaceIdInfo f' 
+>
+>		newDefId type_of_f	`thenUs` \f' ->
+>		let
+> 		       f = replaceIdInfo f'
 >		       		(addInfo (getIdInfo f') DoDeforest)
 >		in
 >		loop ((f,e,val_args,ty_args):ls) e1
->					`thenSUs` \res@(ls',bs,bls,e') ->
+>					`thenUs` \res@(ls',bs,bls,e') ->
 
 Key: ls = loops, bs = bindings, bls = back loops, e = expression.
 
@@ -168,43 +164,43 @@ Comment the next section out to disable back-loops.
 >		let back_loops = reverse [ e | (f',e) <- bls, f' == f ] in
 >		if not (null back_loops){- && not (f `elem` ls')-} then
 >		   --if length back_loops > 1 then panic "barf!" else
->		   	d2c (head back_loops)	`thenSUs` \core_e ->
->		   	trace ("Back Loop:\n" ++ 
+>		   	d2c (head back_loops)	`thenUs` \core_e ->
+>		   	trace ("Back Loop:\n" ++
 >				ppShow 80 (ppr PprDebug core_e)) $
 
 If we find a back-loop that also occurs where we would normally make a
 new function...
 
 >		   if f `elem` ls' then
->			d2c e'			`thenSUs` \core_e' ->
+>			d2c e'			`thenUs` \core_e' ->
 >			trace ("In Forward Loop " ++
 >				ppShow 80 (ppr PprDebug f) ++ "\n" ++
 >				ppShow 80 (ppr PprDebug core_e')) $
 >		   	if f `notElem` (freeVars (head back_loops)) then
->				returnSUs (ls', bs, bls, head back_loops)
+>				returnUs (ls', bs, bls, head back_loops)
 >			else
 >				panic "hello"
 >		   else
 
-> 		   returnSUs (ls', bs, bls, head back_loops)
+> 		   returnUs (ls', bs, bls, head back_loops)
 >		else
 
 If we are in a forward-loop (i.e. we found a label somewhere below
 which is a renaming of this one), then make a new function definition.
 
 >		if f `elem` ls' then
->		
->			rebindExpr (mkCoTyLam ty_args (mkCoLam val_args e'))
->							`thenSUs` \rhs ->
->			returnSUs
->			    (ls', 
->			     (f,filter deforestable (freeVars e'),e,rhs) : bs, 
+>
+>			rebindExpr (mkLam ty_args val_args e')
+>							`thenUs` \rhs ->
+>			returnUs
+>			    (ls',
+>			     (f,filter deforestable (freeVars e'),e,rhs) : bs,
 >			     bls,
 >			     mkLoopFunApp val_args ty_args f)
 
 otherwise, forget about it
 
->			else returnSUs res
+>			else returnUs res
 
 This is a loop, just make a call to the function which we
 will create on the way back up the tree.
@@ -212,81 +208,81 @@ will create on the way back up the tree.
 (NB: it appears that sometimes we do get more than one loop matching,
 investigate this?)
 
->	      ((f,val_args,ty_args,r):_) -> 
->	      
->		     returnSUs 
+>	      ((f,val_args,ty_args,r):_) ->
+>
+>		     returnUs
 >		     	([f],		-- found a loop, propagate it back
 >			 [],		-- no bindings
 >			 [],		-- no back loops
 >		         mkLoopFunApp (applyRenaming r val_args) ty_args f)
->			 
->		) `thenSUs` \res@(ls',bs,bls,e') ->
+>
+>		) `thenUs` \res@(ls',bs,bls,e') ->
 
 If this expression reoccurs, record the binding and replace the cycle
 with a call to the new function.  We also rebind all the free
 variables in the new function to avoid name clashes later.
 
 >	   let
->		findBackLoops (g,r) bls 
->			| consistent r' = subst s e' `thenSUs` \e' ->
->					  returnSUs ((g,e') : bls)
->			| otherwise     = returnSUs bls
+>		findBackLoops (g,r) bls
+>			| consistent r' = subst s e' `thenUs` \e' ->
+>					  returnUs ((g,e') : bls)
+>			| otherwise     = returnUs bls
 >			where
 >			  r' = map swap r
->			  s = map (\(x,y) -> (x, CoVar (DefArgVar y))) (nub r')
+>			  s = map (\(x,y) -> (x, Var (DefArgVar y))) (nub r')
 >	   in
 
 We just want the first one (ie. furthest up the tree), so reverse the
 list of inconsistent renamings.
 
 >	   foldrSUs findBackLoops [] (reverse inconsistent_renamings)
->						`thenSUs` \back_loops ->
+>						`thenUs` \back_loops ->
 
 Comment out the next block to disable back-loops.  ToDo: trace all of them.
 
 >	   if not (null back_loops) then
->		d2c e'	`thenSUs` \core_e ->
->		trace ("Floating back loop:\n" 
->			++ ppShow 80 (ppr PprDebug core_e)) 
->		returnSUs (ls', bs, back_loops ++ bls, e')
+>		d2c e'	`thenUs` \core_e ->
+>		trace ("Floating back loop:\n"
+>			++ ppShow 80 (ppr PprDebug core_e))
+>		returnUs (ls', bs, back_loops ++ bls, e')
 >	   else
-> 		returnSUs res
+> 		returnUs res
 
->   	loop ls e@(CoVar (DefArgVar v))
+>   	loop ls e@(Var (DefArgVar v))
 > 	    = returnLbl e
->   	loop ls e@(CoLit l)
+>   	loop ls e@(Lit l)
 >   	    = returnLbl e
->   	loop ls (CoCon c ts es)
+>   	loop ls (Con c ts es)
 >   	    = mapLbl (loopAtom ls) es       `thenLbl` \es ->
->   	      returnLbl (CoCon c ts es)
->   	loop ls (CoPrim op ts es)
+>   	      returnLbl (Con c ts es)
+>   	loop ls (Prim op ts es)
 >   	    = mapLbl (loopAtom ls) es       `thenLbl` \es ->
->   	      returnLbl (CoPrim op ts es)
->   	loop ls (CoLam vs e)
+>   	      returnLbl (Prim op ts es)
+>   	loop ls (Lam vs e)
 >   	    = loop ls e                     `thenLbl` \e ->
->   	      returnLbl (CoLam vs e)
+>   	      returnLbl (Lam vs e)
 >   	loop ls (CoTyLam alpha e)
 >   	    = loop ls e                     `thenLbl` \e ->
 >   	      returnLbl (CoTyLam alpha e)
->   	loop ls (CoApp e v)
+>   	loop ls (App e v)
 >   	    = loop ls e                     `thenLbl` \e ->
 >   	      loopAtom ls v                 `thenLbl` \v ->
->   	      returnLbl (CoApp e v)
+>   	      returnLbl (App e v)
 >   	loop ls (CoTyApp e t)
 >   	    = loop ls e                     `thenLbl` \e ->
 >   	      returnLbl (CoTyApp e t)
->   	loop ls (CoCase e ps)
+>   	loop ls (Case e ps)
 >   	    = loop ls e                     `thenLbl` \e ->
 >   	      loopCaseAlts ls ps            `thenLbl` \ps ->
->   	      returnLbl (CoCase e ps)
->   	loop ls (CoLet (CoNonRec v e) e')
+>   	      returnLbl (Case e ps)
+>   	loop ls (Let (NonRec v e) e')
 >   	    = loop ls e                     `thenLbl` \e ->
 >   	      loop ls e'                    `thenLbl` \e' ->
->   	      returnLbl (CoLet (CoNonRec v e) e')
->   	loop ls (CoLet (CoRec bs) e)
+>   	      returnLbl (Let (NonRec v e) e')
+>   	loop ls (Let (Rec bs) e)
 >   	    = mapLbl loopRecBind bs         `thenLbl` \bs ->
 >   	      loop ls e                     `thenLbl` \e ->
->   	      returnLbl (CoLet (CoRec bs) e)
+>   	      returnLbl (Let (Rec bs) e)
 >   	    where
 >	      vs = map fst bs
 >   	      loopRecBind (v, e)
@@ -295,42 +291,42 @@ Comment out the next block to disable back-loops.  ToDo: trace all of them.
 >	loop ls e
 >	    = defPanic "Cyclic" "loop" e
 
-> 	loopAtom ls (CoVarAtom (DefArgExpr e))
+> 	loopAtom ls (VarArg (DefArgExpr e))
 > 	      = loop ls e                     `thenLbl` \e ->
-> 	        returnLbl (CoVarAtom (DefArgExpr e))
-> 	loopAtom ls (CoVarAtom e@(DefArgVar v))
-> 	      = defPanic "Cyclic" "loopAtom" (CoVar e)
-> 	loopAtom ls (CoVarAtom e@(Label _ _))
-> 	      = defPanic "Cyclic" "loopAtom" (CoVar e)
-> 	loopAtom ls e@(CoLitAtom l)
+> 	        returnLbl (VarArg (DefArgExpr e))
+> 	loopAtom ls (VarArg e@(DefArgVar v))
+> 	      = defPanic "Cyclic" "loopAtom" (Var e)
+> 	loopAtom ls (VarArg e@(Label _ _))
+> 	      = defPanic "Cyclic" "loopAtom" (Var e)
+> 	loopAtom ls e@(LitArg l)
 > 	      = returnLbl e
 >
-> 	loopCaseAlts ls (CoAlgAlts as def) = 
+> 	loopCaseAlts ls (AlgAlts as def) =
 >		mapLbl loopAlgAlt as		`thenLbl` \as ->
 > 	        loopDefault ls def		`thenLbl` \def ->
-> 	        returnLbl (CoAlgAlts as def)
+> 	        returnLbl (AlgAlts as def)
 >	      where
 >	      	loopAlgAlt (c, vs, e) =
 >			loop ls e		`thenLbl` \e ->
 > 	        	returnLbl (c, vs, e)
 
-> 	loopCaseAlts ls (CoPrimAlts as def) = 
+> 	loopCaseAlts ls (PrimAlts as def) =
 >		mapLbl loopPrimAlt as		`thenLbl` \as ->
 > 	        loopDefault ls def		`thenLbl` \def ->
-> 	        returnLbl (CoPrimAlts as def)
+> 	        returnLbl (PrimAlts as def)
 >	      where
->	      	loopPrimAlt (l, e) = 
+>	      	loopPrimAlt (l, e) =
 >			loop ls e		`thenLbl` \e ->
 > 	        	returnLbl (l, e)
 
-> 	loopDefault ls CoNoDefault = 
->		returnLbl CoNoDefault
-> 	loopDefault ls (CoBindDefault v e) = 
+> 	loopDefault ls NoDefault =
+>		returnLbl NoDefault
+> 	loopDefault ls (BindDefault v e) =
 >		loop ls e			`thenLbl` \e ->
-> 	        returnLbl (CoBindDefault v e)
+> 	        returnLbl (BindDefault v e)
 > -}
 
-> mkVar v = CoVarAtom (DefArgExpr (CoVar (DefArgVar v)))
+> mkVar v = VarArg (DefArgExpr (Var (DefArgVar v)))
 
 -----------------------------------------------------------------------------
 The next function is applied to all deforestable functions which are
@@ -347,20 +343,20 @@ expressions and function right hand sides that call this function.
 > 	case fvs of
 >		[] -> ((id,e),[])
 >		_  -> let new_type =
->		      		glueTyArgs (map getIdUniType fvs) 
->					(getIdUniType id)
+>		      		glueTyArgs (map idType fvs)
+>					(idType id)
 >			  new_id =
 >			  	updateIdType id new_type
 >		      in
 >		      let
->		          t = foldl CoApp (CoVar (DefArgVar new_id)) 
+>		          t = foldl App (Var (DefArgVar new_id))
 >			  			(map mkVar fvs)
 > 		      in
 >		      trace ("adding " ++ show (length fvs) ++ " args to " ++ ppShow 80 (ppr PprDebug id)) $
->		      ((new_id, mkCoLam fvs e), [(id,t)])
+>		      ((new_id, mkValLam fvs e), [(id,t)])
 >	where
 >		fvs = case e of
->			CoLam bvs e -> filter (`notElem` bvs) total_fvs
+>			Lam bvs e -> filter (`notElem` bvs) total_fvs
 >			_ -> total_fvs
 
 > swap (x,y) = (y,x)
@@ -374,8 +370,8 @@ expressions and function right hand sides that call this function.
 
 > mkLoopFunApp :: [Id] -> [TyVar] -> Id -> DefExpr
 > mkLoopFunApp val_args ty_args f =
-> 	foldl CoApp 
->	  (foldl CoTyApp (CoVar (DefArgVar f))
+> 	foldl App
+>	  (foldl CoTyApp (Var (DefArgVar f))
 >	    (map mkTyVarTy ty_args))
 >	  	(map mkVar val_args)
 
@@ -384,28 +380,28 @@ Removing duplicates from a list of definitions.
 
 > removeDuplicateDefinitions
 > 	:: [(DefExpr,(Id,DefExpr))] 	-- (label,(id,rhs))
-> 	-> SUniqSM [(Id,DefExpr)]
+> 	-> UniqSM [(Id,DefExpr)]
 
-> removeDuplicateDefinitions defs = 
-> 	foldrSUs rem ([],[]) defs	`thenSUs` \(newdefs,s) ->
->	mapSUs (\(l,(f,e)) -> subst s e `thenSUs` \e -> 
->			      returnSUs (f, e)) newdefs
->   where 
+> removeDuplicateDefinitions defs =
+> 	foldrSUs rem ([],[]) defs	`thenUs` \(newdefs,s) ->
+>	mapUs (\(l,(f,e)) -> subst s e `thenUs` \e ->
+>			      returnUs (f, e)) newdefs
+>   where
 
 > 	rem d@(l,(f,e)) (defs,s) =
->		findDup l defs		`thenSUs` \maybe ->
+>		findDup l defs		`thenUs` \maybe ->
 > 		case maybe of
->		   Nothing -> returnSUs (d:defs,s)
->		   Just g  -> returnSUs (defs, (f,(CoVar.DefArgVar) g):s)
+>		   Nothing -> returnUs (d:defs,s)
+>		   Just g  -> returnUs (defs, (f,(Var.DefArgVar) g):s)
 
 We insist that labels rename in both directions, is this necessary?
 
-> 	findDup l [] = returnSUs Nothing
+> 	findDup l [] = returnUs Nothing
 > 	findDup l ((l',(f,e)):defs) =
-> 		renameExprs l l' 	`thenSUs` \r ->
+> 		renameExprs l l' 	`thenUs` \r ->
 >		case r of
->		  IsRenaming _ -> renameExprs l' l 	`thenSUs` \r ->
+>		  IsRenaming _ -> renameExprs l' l 	`thenUs` \r ->
 >				  case r of
->				  	IsRenaming r -> returnSUs (Just f)
+>				  	IsRenaming r -> returnUs (Just f)
 >					_ -> findDup l defs
 >		  _ -> findDup l defs

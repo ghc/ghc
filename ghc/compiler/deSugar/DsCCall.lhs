@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[DsCCall]{Desugaring \tr{_ccall_}s and \tr{_casm_}s}
 
@@ -8,24 +8,30 @@
 
 module DsCCall ( dsCCall ) where
 
-IMPORT_Trace
+import Ubiq
 
-import AbsSyn		-- the stuff being desugared
-import PlainCore	-- the output of desugaring
-import DsMonad		-- the monadery used in the desugarer
+import CoreSyn
 
-import AbsPrel
-import TysPrim		-- ****** ToDo: PROPERLY
-import TysWiredIn
-import AbsUniType
+import DsMonad
 import DsUtils
-import Id		( getInstantiatedDataConSig, mkTupleCon, DataCon(..) )
-import Maybes		( maybeToBool, Maybe(..) )
+
+import CoreUtils	( coreExprType )
+import Id		( getInstantiatedDataConSig, mkTupleCon )
+import Maybes		( maybeToBool )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenType{-instances-}, GenTyVar{-instance-} )
+import PrelInfo		( byteArrayPrimTy, getStatePairingConInfo,
+		          packStringForCId, realWorldStatePrimTy,
+			  realWorldStateTy, realWorldTy, stateDataCon,
+			  stringTy )
 import Pretty
-#if USE_ATTACK_PRAGMAS
-import Unique
-#endif
-import Util
+import PrimOp		( PrimOp(..) )
+import Type		( isPrimType, maybeAppDataTyCon, eqTy )
+import TyVar		( GenTyVar{-instance-} )
+import Unique		( Unique{-instances-} )
+import Util		( pprPanic, panic )
+
+maybeBoxedPrimType = panic "DsCCall.maybeBoxedPrimType"
 \end{code}
 
 Desugaring of @ccall@s consists of adding some state manipulation,
@@ -39,7 +45,7 @@ The unboxing is straightforward, as all information needed to unbox is
 available from the type.  For each boxed-primitive argument, we
 transform:
 \begin{verbatim}
-   _ccall_ foo [ r, t1, ... tm ] e1 ... em 
+   _ccall_ foo [ r, t1, ... tm ] e1 ... em
    |
    |
    V
@@ -60,61 +66,61 @@ follows:
    |
    V
    \ s# -> case (ccall# foo [ r, t1#, ... tm# ] s# e1# ... em#) of
-          (StateAnd<r># result# state#) -> (R# result#, realWorld#)
+	  (StateAnd<r># result# state#) -> (R# result#, realWorld#)
 \end{verbatim}
 
 \begin{code}
 dsCCall :: FAST_STRING		-- C routine to invoke
-	-> [PlainCoreExpr]	-- Arguments (desugared)
+	-> [CoreExpr]	-- Arguments (desugared)
 	-> Bool			-- True <=> might cause Haskell GC
 	-> Bool			-- True <=> really a "_casm_"
-	-> UniType		-- Type of the result (a boxed-prim type)
-	-> DsM PlainCoreExpr
+	-> Type		-- Type of the result (a boxed-prim type)
+	-> DsM CoreExpr
 
 dsCCall label args may_gc is_asm result_ty
   = newSysLocalDs realWorldStateTy	`thenDs` \ old_s ->
 
-    mapAndUnzipDs unboxArg (CoVar old_s : args)	`thenDs` \ (final_args, arg_wrappers) ->
+    mapAndUnzipDs unboxArg (Var old_s : args)	`thenDs` \ (final_args, arg_wrappers) ->
 
     boxResult result_ty				`thenDs` \ (final_result_ty, res_wrapper) ->
 
     let
 	the_ccall_op = CCallOp label is_asm may_gc
-			       (map typeOfCoreExpr final_args)
+			       (map coreExprType final_args)
 			       final_result_ty
     in
-    mkCoPrimDs the_ccall_op
+    mkPrimDs the_ccall_op
 	       [] -- ***NOTE*** no ty apps; the types are inside the_ccall_op.
 	       final_args	`thenDs` \ the_prim_app ->
     let
 	the_body = foldr apply (res_wrapper the_prim_app) arg_wrappers
     in
-    returnDs (CoLam [old_s] the_body)
+    returnDs (Lam (ValBinder old_s) the_body)
   where
     apply f x = f x
 \end{code}
 
 \begin{code}
-unboxArg :: PlainCoreExpr			-- The supplied argument
-	 -> DsM (PlainCoreExpr,			-- To pass as the actual argument
-		 PlainCoreExpr -> PlainCoreExpr	-- Wrapper to unbox the arg
+unboxArg :: CoreExpr			-- The supplied argument
+	 -> DsM (CoreExpr,			-- To pass as the actual argument
+		 CoreExpr -> CoreExpr	-- Wrapper to unbox the arg
 		)
 unboxArg arg
 
   -- Primitive types
   -- ADR Question: can this ever be used?  None of the PrimTypes are
   -- instances of the _CCallable class.
-  | isPrimType arg_ty 
+  | isPrimType arg_ty
   = returnDs (arg, \body -> body)
 
   -- Strings
-  | arg_ty == stringTy
+  | arg_ty `eqTy` stringTy
   -- ToDo (ADR): - allow synonyms of Strings too?
   = newSysLocalDs byteArrayPrimTy		`thenDs` \ prim_arg ->
-    mkCoAppDs (CoVar packStringForCId) arg	`thenDs` \ pack_appn ->
-    returnDs (CoVar prim_arg,
-	      \body -> CoCase pack_appn (CoPrimAlts [] 
-						    (CoBindDefault prim_arg body))
+    mkAppDs (Var packStringForCId) [] [arg]	`thenDs` \ pack_appn ->
+    returnDs (Var prim_arg,
+	      \body -> Case pack_appn (PrimAlts []
+						    (BindDefault prim_arg body))
     )
 
   | null data_cons
@@ -123,25 +129,25 @@ unboxArg arg
 
   -- Byte-arrays, both mutable and otherwise
   -- (HACKy method -- but we really don't want the TyCons wired-in...) [WDP 94/10]
-  | is_data_type && 
+  | is_data_type &&
     length data_con_arg_tys == 2 &&
     not (isPrimType data_con_arg_ty1) &&
     isPrimType data_con_arg_ty2
     -- and, of course, it is an instance of _CCallable
---  ( tycon == byteArrayTyCon || 
+--  ( tycon == byteArrayTyCon ||
 --    tycon == mutableByteArrayTyCon )
   = newSysLocalsDs data_con_arg_tys		`thenDs` \ vars@[ixs_var, arr_cts_var] ->
-    returnDs (CoVar arr_cts_var,
-	      \ body -> CoCase arg (CoAlgAlts [(the_data_con,vars,body)] 
-					      CoNoDefault)
+    returnDs (Var arr_cts_var,
+	      \ body -> Case arg (AlgAlts [(the_data_con,vars,body)]
+					      NoDefault)
     )
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   | maybeToBool maybe_boxed_prim_arg_ty
   = newSysLocalDs the_prim_arg_ty		`thenDs` \ prim_arg ->
-    returnDs (CoVar prim_arg,
-	      \ body -> CoCase arg (CoAlgAlts [(box_data_con,[prim_arg],body)] 
-					      CoNoDefault)
+    returnDs (Var prim_arg,
+	      \ body -> Case arg (AlgAlts [(box_data_con,[prim_arg],body)]
+					      NoDefault)
     )
   -- ... continued below ....
 \end{code}
@@ -164,11 +170,11 @@ we decide what's happening with enumerations. ADR
 
     let
       alts = [ (con, [], mkMachInt i) | (con,i) <- data_cons `zip` [0..] ]
-      arg_tag = CoCase arg (CoAlgAlts alts) CoNoDefault
+      arg_tag = Case arg (AlgAlts alts) NoDefault
     in
 
-    returnDs (CoVar prim_arg,
-	      \ body -> CoCase arg_tag (CoPrimAlts [(prim_arg, body)] CoNoDefault)
+    returnDs (Var prim_arg,
+	      \ body -> Case arg_tag (PrimAlts [(prim_arg, body)] NoDefault)
     )
 #endif
 \end{code}
@@ -178,12 +184,12 @@ we decide what's happening with enumerations. ADR
   | otherwise
   = pprPanic "unboxArg: " (ppr PprDebug arg_ty)
   where
-    arg_ty = typeOfCoreExpr arg
+    arg_ty = coreExprType arg
 
     maybe_boxed_prim_arg_ty = maybeBoxedPrimType arg_ty
     (Just (box_data_con, the_prim_arg_ty)) = maybe_boxed_prim_arg_ty
 
-    maybe_data_type 			   = getUniDataTyCon_maybe arg_ty
+    maybe_data_type 			   = maybeAppDataTyCon arg_ty
     is_data_type			   = maybeToBool maybe_data_type
     (Just (tycon, tycon_arg_tys, data_cons)) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
@@ -198,11 +204,11 @@ can't_see_datacons_error thing ty
 
 \begin{code}
 tuple_con_2 = mkTupleCon 2 -- out here to avoid CAF (sigh)
-covar_tuple_con_0 = CoVar (mkTupleCon 0) -- ditto
+covar_tuple_con_0 = Var (mkTupleCon 0) -- ditto
 
-boxResult :: UniType				-- Type of desired result
-	  -> DsM (UniType,			-- Type of the result of the ccall itself
-		  PlainCoreExpr -> PlainCoreExpr)	-- Wrapper for the ccall 
+boxResult :: Type				-- Type of desired result
+	  -> DsM (Type,			-- Type of the result of the ccall itself
+		  CoreExpr -> CoreExpr)	-- Wrapper for the ccall
 							-- to box the result
 boxResult result_ty
   | null data_cons
@@ -214,41 +220,41 @@ boxResult result_ty
     (null other_data_cons) &&					-- Just one constr
     not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
     isPrimType the_prim_result_ty				-- of primitive type
-  = 
+  =
     newSysLocalDs realWorldStatePrimTy				`thenDs` \ prim_state_id ->
     newSysLocalDs the_prim_result_ty 				`thenDs` \ prim_result_id ->
 
-    mkCoConDs stateDataCon [realWorldTy] [CoVar prim_state_id]	`thenDs` \ new_state ->
-    mkCoConDs the_data_con tycon_arg_tys   [CoVar prim_result_id]	`thenDs` \ the_result ->
-    
-    mkCoConDs tuple_con_2
-	      [result_ty, realWorldStateTy]
-	      [the_result, new_state]				`thenDs` \ the_pair ->
+    mkConDs stateDataCon [realWorldTy] [Var prim_state_id]	`thenDs` \ new_state ->
+    mkConDs the_data_con tycon_arg_tys [Var prim_result_id]	`thenDs` \ the_result ->
+
+    mkConDs tuple_con_2
+	    [result_ty, realWorldStateTy]
+	    [the_result, new_state]				`thenDs` \ the_pair ->
     let
 	the_alt = (state_and_prim_datacon, [prim_state_id, prim_result_id], the_pair)
     in
     returnDs (state_and_prim_ty,
-	      \prim_app -> CoCase prim_app (CoAlgAlts [the_alt] CoNoDefault)
+	      \prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault)
     )
 
   -- Data types with a single nullary constructor
   | (maybeToBool maybe_data_type) &&				-- Data type
     (null other_data_cons) &&					-- Just one constr
     (null data_con_arg_tys)
-  = 
+  =
     newSysLocalDs realWorldStatePrimTy				`thenDs` \ prim_state_id ->
 
-    mkCoConDs stateDataCon [realWorldTy] [CoVar prim_state_id]	`thenDs` \ new_state ->
-    
-    mkCoConDs tuple_con_2
-	      [result_ty, realWorldStateTy]
-	      [covar_tuple_con_0, new_state]	`thenDs` \ the_pair ->
+    mkConDs stateDataCon [realWorldTy] [Var prim_state_id]	`thenDs` \ new_state ->
+
+    mkConDs tuple_con_2
+	    [result_ty, realWorldStateTy]
+	    [covar_tuple_con_0, new_state]	`thenDs` \ the_pair ->
 
     let
 	the_alt  = (stateDataCon, [prim_state_id], the_pair)
     in
     returnDs (realWorldStateTy,
-	      \prim_app -> CoCase prim_app (CoAlgAlts [the_alt] CoNoDefault)
+	      \prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault)
     )
 
 #if 0
@@ -257,33 +263,33 @@ boxResult result_ty
   -- Data types with several nullary constructors (Enumerated types)
   | isEnumerationType result_ty &&				-- Enumeration
     (length data_cons) <= 5					-- fairly short
-  = 
+  =
     newSysLocalDs realWorldStatePrimTy				`thenDs` \ prim_state_id ->
     newSysLocalDs intPrimTy 					`thenDs` \ prim_result_id ->
 
-    mkCoConDs stateDataCon [realWorldTy] [CoVar prim_state_id]	`thenDs` \ new_state ->
+    mkConDs stateDataCon [realWorldTy] [Var prim_state_id]	`thenDs` \ new_state ->
 
     let
       alts = [ (mkMachInt i, con) | (i, con) <- [0..] `zip` data_cons ]
-      the_result = CoCase prim_result_id (CoPrimAlts alts) CoNoDefault
+      the_result = Case prim_result_id (PrimAlts alts) NoDefault
     in
 
-    mkCoConDs (mkTupleCon 2)
+    mkConDs (mkTupleCon 2)
 	      [result_ty, realWorldStateTy]
 	      [the_result, new_state]				`thenDs` \ the_pair ->
     let
 	the_alt = (state_and_prim_datacon, [prim_state_id, prim_result_id], the_pair)
     in
     returnDs (state_and_prim_ty,
-	      \prim_app -> CoCase prim_app (CoAlgAlts [the_alt] CoNoDefault)
+	      \prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault)
     )
 #endif
 
-  | otherwise 
+  | otherwise
   = pprPanic "boxResult: " (ppr PprDebug result_ty)
 
   where
-    maybe_data_type 			   = getUniDataTyCon_maybe result_ty
+    maybe_data_type 			   = maybeAppDataTyCon result_ty
     Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
     (the_data_con : other_data_cons)       = data_cons
 

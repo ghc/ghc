@@ -1,6 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface ListSetOps where
-intersectLists :: Eq a => [a] -> [a] -> [a]
-minusList :: Eq a => [a] -> [a] -> [a]
-unionLists :: Eq a => [a] -> [a] -> [a]
-

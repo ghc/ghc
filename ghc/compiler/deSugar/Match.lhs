@@ -1,51 +1,44 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Main_match]{The @match@ function}
 
 \begin{code}
-module Match (
-	match, matchWrapper, matchSimply
-    ) where
-
 #include "HsVersions.h"
 
-import AbsSyn		-- the stuff being desugared
-import PlainCore	-- the output of desugaring;
-			-- importing this module also gets all the
-			-- CoreSyn utility functions
-import DsMonad		-- the monadery used in the desugarer
+module Match ( match, matchWrapper, matchSimply ) where
 
-import AbsPrel		( nilDataCon, consDataCon, mkTupleTy, mkListTy,
-			  charTy, charDataCon, intTy, intDataCon, floatTy,
-			  floatDataCon, doubleTy, doubleDataCon,
-			  integerTy, intPrimTy, charPrimTy,
-			  floatPrimTy, doublePrimTy, mkFunTy, stringTy,
-			  addrTy, addrPrimTy, addrDataCon,
-			  wordTy, wordPrimTy, wordDataCon
-#ifdef DPH
-			 ,mkProcessorTy
-#endif {- Data Parallel Haskell -}
-			)
-import PrimKind		( PrimKind(..) ) -- Rather ugly import; ToDo???
+import Ubiq
+import DsLoop		-- here for paranoia-checking reasons
+			-- and to break dsExpr/dsBinds-ish loop
 
-import AbsUniType	( isPrimType )
-import DsBinds		( dsBinds )
-import DsExpr		( dsExpr )
+import HsSyn
+import TcHsSyn		( TypecheckedPat(..), TypecheckedMatch(..),
+			  TypecheckedHsBinds(..), TypecheckedHsExpr(..)	)
+import DsHsSyn		( outPatType, collectTypedPatBinders )
+import CoreSyn
+
+import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils
-#ifdef DPH
-import Id		( eqId, getIdUniType, mkTupleCon, mkProcessorCon )
-import MatchProc	( matchProcessor)
-#else
-import Id		( eqId, getIdUniType, mkTupleCon, DataCon(..), Id )
-#endif {- Data Parallel Haskell -}
-import Maybes		( Maybe(..) )
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
-import Outputable	-- all for one "panic"...
-import Pretty
-import Util
+
+import CoreUtils	( escErrorMsg, mkErrorApp )
+import Id		( idType, mkTupleCon, GenId{-instance-} )
+import PprStyle		( PprStyle(..) )
+import PprType		( GenTyVar{-instance-}, GenType{-instance-} )
+import PrelInfo		( nilDataCon, consDataCon, mkTupleTy, mkListTy,
+			  charTy, charDataCon, intTy, intDataCon,
+			  floatTy, floatDataCon, doubleTy, doubleDataCon,
+			  integerTy, intPrimTy, charPrimTy,
+			  floatPrimTy, doublePrimTy, stringTy,
+			  addrTy, addrPrimTy, addrDataCon,
+			  wordTy, wordPrimTy, wordDataCon )
+import Type		( isPrimType, eqTy )
+import TyVar		( GenTyVar )
+import Unique		( Unique )
+import Util		( panic, pprPanic )
 \end{code}
 
 The function @match@ is basically the same as in the Wadler chapter,
@@ -67,7 +60,7 @@ the $m$ equations:
 \item
 the $n$ patterns for that equation, and
 \item
-a list of Core bindings [@(Id, PlainCoreExpr)@ pairs] to be ``stuck on
+a list of Core bindings [@(Id, CoreExpr)@ pairs] to be ``stuck on
 the front'' of the matching code, as in:
 \begin{verbatim}
 let <binds>
@@ -90,11 +83,11 @@ showed no benefit.
 \item
 A default expression---what to evaluate if the overall pattern-match
 fails.  This expression will (almost?) always be
-a measly expression @CoVar@, unless we know it will only be used once
+a measly expression @Var@, unless we know it will only be used once
 (as we do in @glue_success_exprs@).
 
 Leaving out this third argument to @match@ (and slamming in lots of
-@CoVar "fail"@s) is a positively {\em bad} idea, because it makes it
+@Var "fail"@s) is a positively {\em bad} idea, because it makes it
 impossible to share the default expressions.  (Also, it stands no
 chance of working in our post-upheaval world of @Locals@.)
 \end{enumerate}
@@ -159,14 +152,14 @@ match [] eqns_info shadows
 	returnDs match_result
     else
 	returnDs match_result
-	
+
   where
     pin_eqns [EqnInfo [] match_result] = returnDs match_result
       -- Last eqn... can't have pats ...
 
     pin_eqns (EqnInfo [] match_result1 : more_eqns)
       = pin_eqns more_eqns 			`thenDs` \ match_result2 ->
-        combineMatchResults match_result1 match_result2
+	combineMatchResults match_result1 match_result2
 
     pin_eqns other_pat = panic "match: pin_eqns"
 
@@ -199,7 +192,7 @@ corresponds roughly to @matchVarCon@.
 match vars@(v:vs) eqns_info shadows
   = mapDs (tidyEqnInfo v) eqns_info	`thenDs` \ tidy_eqns_info ->
     mapDs (tidyEqnInfo v) shadows	`thenDs` \ tidy_shadows ->
-    let  
+    let
 	tidy_eqns_blks = unmix_eqns tidy_eqns_info
     in
     match_unmixed_eqn_blks vars tidy_eqns_blks tidy_shadows
@@ -261,12 +254,12 @@ The @VarPat@ information isn't needed any more after this.
 \item[@ConPats@:]
 @ListPats@, @TuplePats@, etc., are all converted into @ConPats@.
 
-\item[@LitPats@ and @NPats@ (and @NPlusKPats@):]
-@LitPats@/@NPats@/@NPlusKPats@ of ``known friendly types'' (Int, Char,
+\item[@LitPats@ and @NPats@:]
+@LitPats@/@NPats@ of ``known friendly types'' (Int, Char,
 Float, 	Double, at least) are converted to unboxed form; e.g.,
-\tr{(NPat (IntLit i) _ _)} is converted to:
+\tr{(NPat (HsInt i) _ _)} is converted to:
 \begin{verbatim}
-(ConPat I# _ _ [LitPat (IntPrimLit i) _])
+(ConPat I# _ _ [LitPat (HsIntPrim i) _])
 \end{verbatim}
 \end{description}
 
@@ -288,17 +281,17 @@ tidy1 :: Id 					-- The Id being scrutinised
 						-- of new bindings to be added to the front
 
 tidy1 v (VarPat var) match_result
-  = returnDs (WildPat (getIdUniType var),
+  = returnDs (WildPat (idType var),
 	      mkCoLetsMatchResult extra_binds match_result)
   where
-    extra_binds | v `eqId` var = []
-		| otherwise    = [CoNonRec var (CoVar v)]
+    extra_binds | v == var  = []
+		| otherwise = [NonRec var (Var v)]
 
 tidy1 v (AsPat var pat) match_result
   = tidy1 v pat (mkCoLetsMatchResult extra_binds match_result)
   where
-    extra_binds | v `eqId` var = []
-		| otherwise    = [CoNonRec var (CoVar v)]
+    extra_binds | v == var  = []
+		| otherwise = [NonRec var (Var v)]
 
 tidy1 v (WildPat ty) match_result
   = returnDs (WildPat ty, match_result)
@@ -311,13 +304,13 @@ tidy1 v (WildPat ty) match_result
 
     ToDo: in "v_i = ... -> v_i", are the v_i's really the same thing?
 
-    The case expr for v_i is just: match [v] [(p, [], \ x -> CoVar v_i)] any_expr
+    The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
 tidy1 v (LazyPat pat) match_result
-  = mkSelectorBinds [] pat l_to_l (CoVar v)	`thenDs` \ sel_binds ->
-    returnDs (WildPat (getIdUniType v), 
-	      mkCoLetsMatchResult [CoNonRec b rhs | (b,rhs) <- sel_binds] match_result)
+  = mkSelectorBinds [] pat l_to_l (Var v)	`thenDs` \ sel_binds ->
+    returnDs (WildPat (idType v),
+	      mkCoLetsMatchResult [NonRec b rhs | (b,rhs) <- sel_binds] match_result)
   where
     l_to_l = binders `zip` binders 	-- Boring
     binders = collectTypedPatBinders pat
@@ -342,22 +335,18 @@ tidy1 v (TuplePat pats) match_result
     arity = length pats
     tuple_ConPat
       = ConPat (mkTupleCon arity)
-	       (mkTupleTy arity (map typeOfPat pats))
+	       (mkTupleTy arity (map outPatType pats))
 	       pats
 
-#ifdef DPH
-tidy1 v (ProcessorPat pats convs pat) match_result
-  = returnDs ((ProcessorPat pats convs pat), match_result)
-{-
-tidy1 v (ProcessorPat pats _ _ pat) match_result
-  = returnDs (processor_ConPat, match_result)
+tidy1 v (DictPat dicts methods) match_result
+  = case num_of_d_and_ms of
+	0 -> tidy1 v (TuplePat []) match_result
+	1 -> tidy1 v (head dict_and_method_pats) match_result
+	_ -> tidy1 v (TuplePat dict_and_method_pats) match_result
   where
-    processor_ConPat
-      = ConPat (mkProcessorCon (length pats))
-	       (mkProcessorTy (map typeOfPat pats) (typeOfPat pat))
-	       (pats++[pat])
--}
-#endif {- Data Parallel Haskell -}
+    num_of_d_and_ms	 = length dicts + length methods
+    dict_and_method_pats = map VarPat (dicts ++ methods)
+
 
 -- deeply ugly mangling for some (common) NPats/LitPats
 
@@ -367,61 +356,45 @@ tidy1 v pat@(LitPat lit lit_ty) match_result
   | isPrimType lit_ty
   = returnDs (pat, match_result)
 
-  | lit_ty == charTy
+  | lit_ty `eqTy` charTy
   = returnDs (ConPat charDataCon charTy [LitPat (mk_char lit) charPrimTy],
 	      match_result)
 
   | otherwise = pprPanic "tidy1:LitPat:" (ppr PprDebug pat)
   where
-    mk_char (CharLit c)    = CharPrimLit c
+    mk_char (HsChar c)    = HsCharPrim c
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 
 tidy1 v pat@(NPat lit lit_ty _) match_result
   = returnDs (better_pat, match_result)
   where
-    better_pat 
-      | lit_ty == charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
-      | lit_ty == intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
-      | lit_ty == wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
-      | lit_ty == addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
-      | lit_ty == floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
-      | lit_ty == doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
+    better_pat
+      | lit_ty `eqTy` charTy   = ConPat charDataCon   lit_ty [LitPat (mk_char lit)   charPrimTy]
+      | lit_ty `eqTy` intTy    = ConPat intDataCon    lit_ty [LitPat (mk_int lit)    intPrimTy]
+      | lit_ty `eqTy` wordTy   = ConPat wordDataCon   lit_ty [LitPat (mk_word lit)   wordPrimTy]
+      | lit_ty `eqTy` addrTy   = ConPat addrDataCon   lit_ty [LitPat (mk_addr lit)   addrPrimTy]
+      | lit_ty `eqTy` floatTy  = ConPat floatDataCon  lit_ty [LitPat (mk_float lit)  floatPrimTy]
+      | lit_ty `eqTy` doubleTy = ConPat doubleDataCon lit_ty [LitPat (mk_double lit) doublePrimTy]
       | otherwise	   = pat
 
-    mk_int    (IntLit i) = IntPrimLit i
-    mk_int    l@(LitLitLit s _) = l
-	      
-    mk_char   (CharLit c)= CharPrimLit c
-    mk_char   l@(LitLitLit s _) = l
-	      
-    mk_word   l@(LitLitLit s _) = l
+    mk_int    (HsInt i)      = HsIntPrim i
+    mk_int    l@(HsLitLit s) = l
 
-    mk_addr   l@(LitLitLit s _) = l
+    mk_char   (HsChar c)     = HsCharPrim c
+    mk_char   l@(HsLitLit s) = l
 
-    mk_float  (IntLit i) = FloatPrimLit (fromInteger i)
-#if __GLASGOW_HASKELL__ <= 22
-    mk_float  (FracLit f)= FloatPrimLit (fromRational f) -- ToDo???
-#else
-    mk_float  (FracLit f)= FloatPrimLit f
-#endif
-    mk_float  l@(LitLitLit s _) = l
-	      
-    mk_double (IntLit i) = DoublePrimLit (fromInteger i)
-#if __GLASGOW_HASKELL__ <= 22
-    mk_double (FracLit f)= DoublePrimLit (fromRational f) -- ToDo???
-#else
-    mk_double (FracLit f)= DoublePrimLit f
-#endif
-    mk_double l@(LitLitLit s _) = l
+    mk_word   l@(HsLitLit s) = l
 
-{- OLD: and wrong!  I don't think we can do anything 
-   useful with n+k patterns, so drop through to default case
+    mk_addr   l@(HsLitLit s) = l
 
-tidy1 v pat@(NPlusKPat n k lit_ty and so on) match_result
-  = returnDs (NPlusKPat v k lit_ty and so on,
-	      (if v `eqId` n then id else (mkCoLet (CoNonRec n (CoVar v)))) . match_result)
--}
+    mk_float  (HsInt i)      = HsFloatPrim (fromInteger i)
+    mk_float  (HsFrac f)     = HsFloatPrim f
+    mk_float  l@(HsLitLit s) = l
+
+    mk_double (HsInt i)      = HsDoublePrim (fromInteger i)
+    mk_double (HsFrac f)     = HsDoublePrim f
+    mk_double l@(HsLitLit s) = l
 
 -- and everything else goes through unchanged...
 
@@ -518,12 +491,6 @@ matchUnmixedEqns all_vars@(var:vars) eqns_info shadows
   =	-- Real true variables, just like in matchVar, SLPJ p 94
     match vars remaining_eqns_info remaining_shadows
 
-#ifdef DPH
-  | patsAreAllProcessor column_1_pats
-  =	-- ToDo: maybe check just one...
-    matchProcessor all_vars eqns_info
-#endif {- Data Parallel Haskell -}
-
   | patsAreAllCons column_1_pats	-- ToDo: maybe check just one...
   = matchConFamily all_vars eqns_info shadows
 
@@ -536,7 +503,7 @@ matchUnmixedEqns all_vars@(var:vars) eqns_info shadows
   where
     column_1_pats 	= [pat                       | EqnInfo (pat:_)  _            <- eqns_info]
     remaining_eqns_info = [EqnInfo pats match_result | EqnInfo (_:pats) match_result <- eqns_info]
-    remaining_shadows   = [EqnInfo pats match_result | EqnInfo (pat:pats) match_result <- shadows, 
+    remaining_shadows   = [EqnInfo pats match_result | EqnInfo (pat:pats) match_result <- shadows,
 						       irrefutablePat pat ]
 	-- Discard shadows which can be refuted, since they don't shadow
 	-- a variable
@@ -567,7 +534,7 @@ As results, @matchWrapper@ produces:
 A list of variables (@Locals@) that the caller must ``promise'' to
 bind to appropriate values; and
 \item
-a @PlainCoreExpr@, the desugared output (main result).
+a @CoreExpr@, the desugared output (main result).
 \end{itemize}
 
 The main actions of @matchWrapper@ include:
@@ -590,7 +557,7 @@ Call @match@ with all of this information!
 matchWrapper :: DsMatchKind			-- For shadowing warning messages
 	     -> [TypecheckedMatch]		-- Matches being desugared
 	     -> String 				-- Error message if the match fails
-	     -> DsM ([Id], PlainCoreExpr) 	-- Results
+	     -> DsM ([Id], CoreExpr) 	-- Results
 
 -- a special case for the common ...:
 --	just one Match
@@ -620,13 +587,13 @@ matchWrapper kind matches error_string
   = flattenMatches kind matches	`thenDs` \ eqns_info@(EqnInfo arg_pats (MatchResult _ result_ty _ _) : _) ->
 
     selectMatchVars arg_pats	`thenDs` \ new_vars ->
-    match new_vars eqns_info []	`thenDs` \ match_result -> 
+    match new_vars eqns_info []	`thenDs` \ match_result ->
 
     getSrcLocDs			`thenDs` \ (src_file, src_line) ->
     newSysLocalDs stringTy	`thenDs` \ str_var -> -- to hold the String
     let
 	src_loc_str = escErrorMsg ('"' : src_file) ++ "%l" ++ src_line
-	fail_expr   = mkErrorCoApp result_ty str_var (src_loc_str++": "++error_string)
+	fail_expr   = mkErrorApp result_ty str_var (src_loc_str++": "++error_string)
     in
     extractMatchResult match_result fail_expr	`thenDs` \ result_expr ->
     returnDs (new_vars, result_expr)
@@ -643,27 +610,27 @@ situation where we want to match a single expression against a single
 pattern. It returns an expression.
 
 \begin{code}
-matchSimply :: PlainCoreExpr			-- Scrutinee
+matchSimply :: CoreExpr			-- Scrutinee
 	    -> TypecheckedPat			-- Pattern it should match
-	    -> UniType				-- Type of result
-	    -> PlainCoreExpr			-- Return this if it matches
-	    -> PlainCoreExpr			-- Return this if it does
-	    -> DsM PlainCoreExpr
+	    -> Type				-- Type of result
+	    -> CoreExpr			-- Return this if it matches
+	    -> CoreExpr			-- Return this if it does
+	    -> DsM CoreExpr
 
-matchSimply (CoVar var) pat result_ty result_expr fail_expr
+matchSimply (Var var) pat result_ty result_expr fail_expr
   = match [var] [eqn_info] []	`thenDs` \ match_result ->
     extractMatchResult match_result fail_expr
   where
     eqn_info = EqnInfo [pat] initial_match_result
-    initial_match_result = MatchResult CantFail 
+    initial_match_result = MatchResult CantFail
 				       result_ty
-				       (\ ignore -> result_expr) 
+				       (\ ignore -> result_expr)
 				       NoMatchContext
-    
+
 matchSimply scrut_expr pat result_ty result_expr msg
-  = newSysLocalDs (typeOfPat pat) 				`thenDs` \ scrut_var ->
-    matchSimply (CoVar scrut_var) pat result_ty result_expr msg	`thenDs` \ expr ->
-    returnDs (CoLet (CoNonRec scrut_var scrut_expr) expr)
+  = newSysLocalDs (outPatType pat) 				`thenDs` \ scrut_var ->
+    matchSimply (Var scrut_var) pat result_ty result_expr msg	`thenDs` \ expr ->
+    returnDs (Let (NonRec scrut_var scrut_expr) expr)
 
 
 extractMatchResult (MatchResult CantFail _ match_fn _) fail_expr
@@ -671,7 +638,7 @@ extractMatchResult (MatchResult CantFail _ match_fn _) fail_expr
 
 extractMatchResult (MatchResult CanFail result_ty match_fn _) fail_expr
   = mkFailurePair result_ty 	`thenDs` \ (fail_bind_fn, if_it_fails) ->
-    returnDs (CoLet (fail_bind_fn fail_expr) (match_fn if_it_fails))
+    returnDs (Let (fail_bind_fn fail_expr) (match_fn if_it_fails))
 \end{code}
 
 %************************************************************************
@@ -697,7 +664,7 @@ flattenMatches kind (match : matches)
     returnDs (eqn_info : eqn_infos)
   where
     flatten_match :: [TypecheckedPat] 		-- Reversed list of patterns encountered so far
-		  -> TypecheckedMatch 
+		  -> TypecheckedMatch
 		  -> DsM EquationInfo
 
     flatten_match pats_so_far (PatMatch pat match)

@@ -1,0 +1,76 @@
+Breaks the IdInfo/<everything> loops.
+
+\begin{code}
+interface IdLoop where
+
+import PreludePS	( _PackedString )
+import PreludeStdIO	( Maybe )
+
+import BinderInfo	( BinderInfo )
+import CoreSyn		( CoreExpr(..), GenCoreExpr, GenCoreArg )
+import CoreUnfold 	( FormSummary(..), UnfoldingDetails(..), UnfoldingGuidance(..) )
+import CoreUtils	( unTagBinders )
+import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
+			  unfoldingUnfriendlyId, getIdInfo,
+			  nullIdEnv, lookupIdEnv, IdEnv(..),
+			  Id(..), GenId
+			)
+import IdInfo		( IdInfo )
+import Literal		( Literal )
+import MagicUFs		( MagicUnfoldingFun )
+import Outputable	( Outputable(..) )
+import PprStyle		( PprStyle )
+import PprType		( pprParendType )
+import Pretty		( PrettyRep )
+import Type		( GenType )
+import TyVar		( GenTyVar )
+import UniqFM		( UniqFM )
+import Unique		( Unique )
+import Usage		( GenUsage )
+import Util		( Ord3(..) )
+import WwLib		( mAX_WORKER_ARGS )
+
+externallyVisibleId	:: Id	    -> Bool
+isDataCon		:: GenId ty -> Bool
+isWorkerId		:: GenId ty -> Bool
+isWrapperId		:: Id	    -> Bool
+unfoldingUnfriendlyId	:: Id	    -> Bool
+getIdInfo		:: Id	    -> IdInfo
+nullIdEnv		:: UniqFM a
+lookupIdEnv		:: UniqFM b -> GenId a -> Maybe b
+mAX_WORKER_ARGS		:: Int
+pprParendType		:: (Eq a, Outputable a, Eq b, Outputable b) => PprStyle -> GenType a b -> Int -> Bool -> PrettyRep
+unTagBinders :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), a) b c d -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) b c d
+
+type IdEnv a = UniqFM a
+type CoreExpr = GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique))
+			    (GenId (GenType (GenTyVar (GenUsage Unique)) Unique))
+			    (GenTyVar (GenUsage Unique)) Unique
+
+instance Outputable UnfoldingGuidance
+instance Eq	    Unique
+instance Outputable Unique
+instance Eq	    (GenTyVar a)
+instance Ord3	    (GenTyVar a)
+instance Outputable (GenTyVar a)
+instance (Outputable a) => Outputable (GenId a)
+instance (Eq a, Outputable a, Eq b, Outputable b) => Outputable (GenType a b)
+
+data MagicUnfoldingFun
+data FormSummary   = WhnfForm | BottomForm | OtherForm
+data UnfoldingDetails
+  = NoUnfoldingDetails
+  | LitForm Literal
+  | OtherLitForm [Literal]
+  | ConForm (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) [GenCoreArg (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique]
+  | OtherConForm [GenId (GenType (GenTyVar (GenUsage Unique)) Unique)]
+  | GenForm Bool FormSummary (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) UnfoldingGuidance
+  | MagicForm _PackedString MagicUnfoldingFun
+
+data UnfoldingGuidance
+  = UnfoldNever
+  | UnfoldAlways
+  | EssentialUnfolding
+  | UnfoldIfGoodArgs Int Int [Bool] Int
+  | BadUnfolding
+\end{code}

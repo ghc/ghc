@@ -1,9 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface OrdList where
-data OrdList a 
-flattenOrdList :: OrdList a -> [a]
-mkEmptyList :: OrdList a
-mkParList :: OrdList a -> OrdList a -> OrdList a
-mkSeqList :: OrdList a -> OrdList a -> OrdList a
-mkUnitList :: a -> OrdList a
-

@@ -8,60 +8,48 @@
 
 module TcDefaults ( tcDefaults ) where
 
-import TcMonad
-import AbsSyn
+import Ubiq
 
-import AbsPrel		( intTy, doubleTy, unitTy )
-import AbsUniType	( UniType
-			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
-			)
-import CE		( lookupCE, CE(..) )
-import E
-import Inst
-import Name
+import HsSyn		( DefaultDecl(..), MonoType,
+			  HsExpr, HsLit, ArithSeqInfo, Fake, InPat)
+import RnHsSyn		( RenamedDefaultDecl(..) )
+import TcHsSyn		( TcIdOcc )
+
+import TcMonad
+import Inst		( InstOrigin(..) )
+import TcEnv		( tcLookupClassByKey )
 import TcMonoType	( tcMonoType )
 import TcSimplify	( tcSimplifyCheckThetas )
-import TVE
-import Unique		( numClassKey, Unique )
+
+import PrelInfo		( intTy, doubleTy, unitTy )
+import Unique		( numClassKey )
 import Util
 \end{code}
 
 \begin{code}
-tcDefaults :: E
-	   -> [RenamedDefaultDecl]
-	   -> TcM [UniType] 	    -- defaulting types to heave
+tcDefaults :: [RenamedDefaultDecl]
+	   -> TcM s [Type] 	    -- defaulting types to heave
 				    -- into Tc monad for later use
 				    -- in Disambig.
 
-tcDefaults _ []
-  = returnTc [intTy, doubleTy] -- language-specified default `default'
+tcDefaults []
+  = returnTc [intTy, doubleTy] 	    -- language-specified default `default'
 
-tcDefaults e [DefaultDecl mono_tys locn]
-  = let
-	ce  = getE_CE  e
-	tce = getE_TCE e
-	tve = nullTVE
+tcDefaults [DefaultDecl mono_tys locn]
+  = tcAddSrcLoc locn $
+    mapTc tcMonoType mono_tys	`thenTc` \ tau_tys ->
 
-	num_clas = lookupCE ce (PreludeClass numClassKey (panic "tcDefaults"))
-    in
-    babyTcMtoTcM (mapB_Tc (tcMonoType ce tce tve) mono_tys) `thenTc` \ tau_tys ->
-
-	-- compensate for extreme parser hack: `default ()' actually
-	-- sends the *type* () through to here.  Squash it.
     case tau_tys of
-      [ty] | ty == unitTy -> returnTc []
+      [] -> returnTc []		-- no defaults
 
-      _  -> -- (Back to your regularly scheduled programming...)
-
+      _  ->
 	    -- Check that all the types are instances of Num
-
-	tcSimplifyCheckThetas (DefaultDeclOrigin locn)
-			 [ (num_clas, ty) | ty <- tau_tys ] `thenTc` \ _ ->
 	    -- We only care about whether it worked or not
 
-	returnTc tau_tys -- caller will bung them into Tc monad
+	tcLookupClassByKey numClassKey			`thenNF_Tc` \ num ->
+	tcSimplifyCheckThetas DefaultDeclOrigin
+		[ (num, ty) | ty <- tau_tys ]		`thenTc` \ _ ->
 
-tcDefaults _ (_:_)
-  = error "ERROR: You can only have one `default' declaration per module."
-    -- ToDo: proper error msg.
+	returnTc tau_tys
+
 \end{code}

@@ -28,17 +28,15 @@ module CharSeq (
 #endif
 	cShow
 
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 22
+#if ! defined(COMPILING_GHC)
+   ) where
+#else
 	, cAppendFile
    ) where
 
-#if __GLASGOW_HASKELL__ < 26
-import PreludePrimIO
-#endif
-import PreludeGlaST
+CHK_Ubiq() -- debugging consistency check
 
-#else
-   ) where
+import PreludeGlaST
 #endif
 \end{code}
 
@@ -66,12 +64,7 @@ cPStr	:: FAST_STRING -> CSeq
 cCh 	:: Char -> CSeq
 cInt	:: Int -> CSeq
 
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 22
-
-# if __GLASGOW_HASKELL__ < 23
-#  define _FILE _Addr
-# endif
-
+#if defined(COMPILING_GHC)
 cAppendFile :: _FILE -> CSeq -> PrimIO ()
 #endif
 \end{code}
@@ -92,7 +85,7 @@ data CSeq
   | CStr	[Char]
   | CCh		Char
   | CInt	Int	-- equiv to "CStr (show the_int)"
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 23
+#if defined(COMPILING_GHC)
   | CPStr	_PackedString
 #endif
 \end{code}
@@ -120,7 +113,7 @@ cStr	= CStr
 cCh	= CCh
 cInt	= CInt
 
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 23
+#if defined(COMPILING_GHC)
 cPStr	= CPStr
 #else
 cPStr	= CStr
@@ -133,7 +126,7 @@ cShows seq rest = cShow seq ++ rest
 cLength seq = length (cShow seq) -- *not* the best way to do this!
 #endif
 
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 22
+#if defined(COMPILING_GHC)
 cAppendFile file_star seq
   = flattenIO file_star seq
 #endif
@@ -162,14 +155,14 @@ flatten n _TRUE_  CNewline seqs = flattenS _TRUE_ seqs	-- Already at start of li
 flatten n _FALSE_ (CStr s) seqs = s ++ flattenS _FALSE_ seqs
 flatten n _FALSE_ (CCh  c) seqs = c :  flattenS _FALSE_ seqs
 flatten n _FALSE_ (CInt i) seqs = show i ++ flattenS _FALSE_ seqs
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 23
+#if defined(COMPILING_GHC)
 flatten n _FALSE_ (CPStr s) seqs = _unpackPS s ++ flattenS _FALSE_ seqs
 #endif
 
 flatten n _TRUE_  (CStr s) seqs = mkIndent n (s ++ flattenS _FALSE_ seqs)
 flatten n _TRUE_  (CCh  c) seqs = mkIndent n (c :  flattenS _FALSE_ seqs)
 flatten n _TRUE_  (CInt i) seqs = mkIndent n (show i ++ flattenS _FALSE_ seqs)
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 23
+#if defined(COMPILING_GHC)
 flatten n _TRUE_ (CPStr s) seqs = mkIndent n (_unpackPS s ++ flattenS _FALSE_ seqs)
 #endif
 \end{code}
@@ -195,39 +188,25 @@ This code is massively {\em hammered}.
 It {\em ignores} indentation.
 
 \begin{code}
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 22
+#if defined(COMPILING_GHC)
 
 flattenIO :: _FILE	-- file we are writing to
 	  -> CSeq	-- Seq to print
 	  -> PrimIO ()
 
 flattenIO file sq
-# if __GLASGOW_HASKELL__ >= 23
   | file == ``NULL'' = error "panic:flattenIO" -- really just to force eval :-)
   | otherwise
-# endif
   = flat sq
   where
-    flat CNil = BSCC("flatCNil") returnPrimIO () ESCC
-
-    flat (CIndent n2 seq) = BSCC("flatCIndent") flat seq ESCC
-
-    flat (CAppend seq1 seq2)
-      = BSCC("flatCAppend")
-	flat seq1 `seqPrimIO` flat seq2
-	ESCC
-
-    flat CNewline = BSCC("flatCNL") _ccall_ stg_putc '\n' file ESCC
-
-    flat (CCh c) = BSCC("flatCCh") _ccall_ stg_putc c file ESCC
-
-    flat (CInt i) = BSCC("flatCInt") _ccall_ fprintf file percent_d i ESCC
-
-    flat (CStr s) = BSCC("flatCStr") put_str s ESCC
-
-# if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ >= 23
-    flat (CPStr s) = BSCC("flatCPStr") put_pstr s ESCC
-# endif
+    flat CNil		  = returnPrimIO ()
+    flat (CIndent n2 seq) = flat seq
+    flat (CAppend s1 s2)  = flat s1 `seqPrimIO` flat s2
+    flat CNewline  	  = _ccall_ stg_putc '\n' file
+    flat (CCh c)   	  = _ccall_ stg_putc c file
+    flat (CInt i)  	  = _ccall_ fprintf file percent_d i
+    flat (CStr s)  	  = put_str s
+    flat (CPStr s) 	  = put_pstr s
 
     -----
     put_str, put_str2 :: String -> PrimIO ()
@@ -236,47 +215,33 @@ flattenIO file sq
       = --put_str2 ``stderr'' (str ++ "\n") `seqPrimIO`
 	put_str2		str
 
-    put_str2 [] = BSCC("putNil") returnPrimIO () ESCC
+    put_str2 [] = returnPrimIO ()
 
     put_str2 (c1@(C# _) : c2@(C# _) : c3@(C# _) : c4@(C# _) : cs)
-      = BSCC("put4")
-	_ccall_ stg_putc  c1 file	`seqPrimIO`
+      = _ccall_ stg_putc  c1 file	`seqPrimIO`
 	_ccall_ stg_putc  c2 file	`seqPrimIO`
 	_ccall_ stg_putc  c3 file	`seqPrimIO`
 	_ccall_ stg_putc  c4 file	`seqPrimIO`
 	put_str2 cs	-- efficiency hack?  who knows... (WDP 94/10)
-	ESCC
 
     put_str2 (c1@(C# _) : c2@(C# _) : c3@(C# _) : cs)
-      = BSCC("put3")
-	_ccall_ stg_putc  c1 file	`seqPrimIO`
+      = _ccall_ stg_putc  c1 file	`seqPrimIO`
 	_ccall_ stg_putc  c2 file	`seqPrimIO`
 	_ccall_ stg_putc  c3 file	`seqPrimIO`
 	put_str2 cs	-- efficiency hack?  who knows... (WDP 94/10)
-	ESCC
 
     put_str2 (c1@(C# _) : c2@(C# _) : cs)
-      = BSCC("put2")
-	_ccall_ stg_putc  c1 file	`seqPrimIO`
+      = _ccall_ stg_putc  c1 file	`seqPrimIO`
 	_ccall_ stg_putc  c2 file	`seqPrimIO`
 	put_str2 cs	-- efficiency hack?  who knows... (WDP 94/10)
-	ESCC
 
     put_str2 (c1@(C# _) : cs)
-      = BSCC("put1")
-	_ccall_ stg_putc  c1 file	`seqPrimIO`
+      = _ccall_ stg_putc  c1 file	`seqPrimIO`
 	put_str2 cs	-- efficiency hack?  who knows... (WDP 94/10)
-	ESCC
 
-# if __GLASGOW_HASKELL__ >= 23
     put_pstr ps = _putPS file ps
-# endif
 
-# if __GLASGOW_HASKELL__ >= 23
 percent_d = _psToByteArray SLIT("%d")
-# else
-percent_d = "%d"
-# endif
 
-#endif {- __GLASGOW_HASKELL__ >= 22 -}
+#endif {- COMPILING_GHC -}
 \end{code}

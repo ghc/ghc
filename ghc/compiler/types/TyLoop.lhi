@@ -1,0 +1,45 @@
+Breaks the TyCon/types loop and the types/Id loop.
+
+\begin{code}
+interface TyLoop where
+
+import PreludePS(_PackedString)
+import PreludeStdIO ( Maybe )
+import Unique ( Unique )
+
+import Id      ( Id, GenId, StrictnessMark, mkTupleCon, mkDataCon,
+		 getDataConSig, getInstantiatedDataConSig )
+import PprType ( specMaybeTysSuffix )
+import NameTypes ( FullName )
+import TyCon   ( TyCon )
+import TyVar   ( GenTyVar, TyVar )
+import Type    ( GenType, Type )
+import Usage   ( GenUsage )
+import Class   ( Class, GenClass )
+
+data GenId    ty
+data GenType  tyvar uvar
+data GenTyVar uvar
+data GenClass tyvar uvar
+data GenUsage u
+
+type Type  = GenType (GenTyVar (GenUsage Unique)) Unique
+type TyVar = GenTyVar (GenUsage Unique)
+type Class = GenClass (GenTyVar (GenUsage Unique)) Unique
+type Id	   = GenId (GenType (GenTyVar (GenUsage Unique)) Unique)
+
+-- Needed in TyCon
+mkTupleCon :: Int -> Id
+getDataConSig :: Id -> ([TyVar], [(Class, Type)], [Type], TyCon)
+specMaybeTysSuffix :: [Maybe Type] -> _PackedString
+instance Eq (GenClass a b)
+
+-- Needed in Type
+getInstantiatedDataConSig :: Id -> [Type] -> ([Type],[Type],Type)
+
+-- Needed in TysWiredIn
+data StrictnessMark = MarkedStrict | NotMarkedStrict
+mkDataCon :: Unique -> FullName -> [StrictnessMark]
+	  -> [TyVar] -> [(Class,Type)] -> [Type] -> TyCon
+	  -> Id
+\end{code}

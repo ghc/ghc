@@ -7,21 +7,10 @@
 #include "HsVersions.h"
 
 module SimplCore (
-	core2core,
-
-	IdEnv(..),
-	UnfoldingDetails,
-	SpecialiseData(..),
-	UniqFM, Unique, Bag
+	core2core
     ) where
 
-IMPORT_Trace
-import Outputable
-import Pretty
-
-import PlainCore
-
-import AbsUniType	( getTyConDataCons, alpha_ty, alpha_tyvar, beta_ty, beta_tyvar )
+import Type		( getTyConDataCons )
 --SAVE:import ArityAnal	( arityAnalProgram )
 import Bag
 import BinderInfo	( BinderInfo) -- instances only
@@ -35,39 +24,32 @@ import CoreLint		( lintCoreBindings )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import Id		( getIdUnfolding,
-			  getIdUniType, toplevelishId,
+			  idType, toplevelishId,
 			  idWantsToBeINLINEd,
 			  unfoldingUnfriendlyId, isWrapperId,
 			  mkTemplateLocals
-			  IF_ATTACK_PRAGMAS(COMMA getIdStrictness)
 			)
-import IdEnv
 import IdInfo
 import LiberateCase	( liberateCase )
 import MainMonad
 import Maybes
 import SAT		( doStaticArgs )
 import SCCauto
-import SimplEnv		( UnfoldingGuidance(..), SwitchChecker(..) ) -- instances
 --ANDY:
 --import SimplHaskell	( coreToHaskell )
 import SimplMonad	( zeroSimplCount, showSimplCount, TickType, SimplCount )
 import SimplPgm		( simplifyPgm )
 import SimplVar		( leastItCouldCost )
 import Specialise
-import SpecTyFuns	( pprSpecErrs )
+import SpecUtils	( pprSpecErrs )
 import StrictAnal	( saWwTopBinds )
-#if ! OMIT_FOLDR_BUILD
-import FoldrBuildWW	
+import FoldrBuildWW
 import AnalFBWW
-#endif
 #if ! OMIT_DEFORESTER
 import Deforest		( deforestProgram )
 import DefUtils		( deforestable )
 #endif
-import TyVarEnv	    	( nullTyVarEnv )
-import SplitUniq
-import Unique
+import UniqSupply
 import Util
 \end{code}
 
@@ -76,12 +58,12 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	  -> (GlobalSwitch->SwitchResult)-- "global" command-line info lookup fn
 	  -> FAST_STRING		-- module name (profiling only)
 	  -> PprStyle			-- printing style (for debugging only)
-	  -> SplitUniqSupply		-- a name supply
+	  -> UniqSupply		-- a name supply
 	  -> [TyCon]			-- local data tycons and tycon specialisations
-	  -> FiniteMap TyCon [(Bool, [Maybe UniType])]
-	  -> [PlainCoreBinding]		-- input...
+	  -> FiniteMap TyCon [(Bool, [Maybe Type])]
+	  -> [CoreBinding]		-- input...
 	  -> MainIO
-	      ([PlainCoreBinding],	-- results: program, plus...
+	      ([CoreBinding],	-- results: program, plus...
 	       IdEnv UnfoldingDetails,	--  unfoldings to be exported from here
 	      SpecialiseData)		--  specialisation data
 
@@ -103,14 +85,14 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 		core_todos
 		`thenMn` \ (processed_binds, _, inline_env, spec_data, simpl_stats) ->
 
-        (if  switch_is_on D_simplifier_stats
-         then writeMn stderr ("\nSimplifier Stats:\n")
+	(if  switch_is_on D_simplifier_stats
+	 then writeMn stderr ("\nSimplifier Stats:\n")
 		`thenMn_`
 	      writeMn stderr (showSimplCount simpl_stats)
 		`thenMn_`
 	      writeMn stderr "\n"
-         else returnMn ()
-        ) `thenMn_`
+	 else returnMn ()
+	) `thenMn_`
 
 	returnMn (processed_binds, inline_env, spec_data)
     ESCC
@@ -141,36 +123,28 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	  CoreDoSimplify simpl_sw_chkr
 	    -> BSCC("CoreSimplify")
 	       begin_pass ("Simplify" ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
-				         then " (foldr/build)" else "") `thenMn_`
+					 then " (foldr/build)" else "") `thenMn_`
 	       case (simplifyPgm binds sw_chkr simpl_sw_chkr simpl_stats us1) of
 		 (p, it_cnt, simpl_stats2)
 		   -> end_pass False us2 p inline_env spec_data simpl_stats2
-			       ("Simplify (" ++ show it_cnt ++ ")" 
+			       ("Simplify (" ++ show it_cnt ++ ")"
 				 ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
 				    then " foldr/build" else "")
 	       ESCC
 
 	  CoreDoFoldrBuildWorkerWrapper
-#if OMIT_FOLDR_BUILD
-	    -> error "ERROR: CoreDoFoldrBuildWorkerWrapper: not built into compiler\n"
-#else
 	    -> BSCC("CoreDoFoldrBuildWorkerWrapper")
 	       begin_pass "FBWW" `thenMn_`
 	       case (mkFoldrBuildWW switch_is_on us1 binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FBWW"
 	       } ESCC
-#endif
 
 	  CoreDoFoldrBuildWWAnal
-#if OMIT_FOLDR_BUILD
-	    -> error "ERROR: CoreDoFoldrBuildWWAnal: not built into compiler\n"
-#else
 	    -> BSCC("CoreDoFoldrBuildWWAnal")
 	       begin_pass "AnalFBWW" `thenMn_`
 	       case (analFBWW switch_is_on binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AnalFBWW"
 	       } ESCC
-#endif
 
 	  CoreLiberateCase
 	    -> BSCC("LiberateCase")
@@ -198,7 +172,7 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	       begin_pass "FloatIn" `thenMn_`
 	       case (floatInwards binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatIn"
-               } ESCC
+	       } ESCC
 
 	  CoreDoFullLaziness
 	    -> BSCC("CoreFloating")
@@ -232,7 +206,7 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 					  spec_errs spec_warn spec_tyerrs)) ->
 
 		   -- if we got errors, we die straight away
-		   (if not spec_noerrs || 
+		   (if not spec_noerrs ||
 		       (switch_is_on ShowImportSpecs && not (isEmptyBag spec_warn)) then
 			writeMn stderr (ppShow 1000 {-pprCols-}
 			    (pprSpecErrs module_name spec_errs spec_warn spec_tyerrs))
@@ -241,7 +215,7 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 			returnMn ()) `thenMn_`
 
 		   (if not spec_noerrs then -- Stop here if specialisation errors occured
-		        exitMn 1
+			exitMn 1
 		   else
 			returnMn ()) `thenMn_`
 
@@ -249,18 +223,18 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	       }
 	       ESCC
 
-          CoreDoDeforest
+	  CoreDoDeforest
 #if OMIT_DEFORESTER
 	    -> error "ERROR: CoreDoDeforest: not built into compiler\n"
 #else
-            -> BSCC("Deforestation")
-               begin_pass "Deforestation" `thenMn_`
+	    -> BSCC("Deforestation")
+	       begin_pass "Deforestation" `thenMn_`
 	       case (deforestProgram sw_chkr binds us1) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "Deforestation"
-               }
-               ESCC
+	       }
+	       ESCC
 #endif
- 
+
 	  CoreDoAutoCostCentres
 	    -> BSCC("AutoSCCs")
 	       begin_pass "AutoSCCs" `thenMn_`
@@ -269,7 +243,7 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	       }
 	       ESCC
 
-          CoreDoPrintCore	-- print result of last pass
+	  CoreDoPrintCore	-- print result of last pass
 	    -> end_pass True us2 binds inline_env spec_data simpl_stats "Print"
 
 
@@ -285,11 +259,11 @@ core2core core_todos sw_chkr module_name ppr_style us local_tycons tycon_specs b
 	     simpl_stats2 what
       = -- report verbosely, if required
 	(if (do_verbose_core2core && not print) ||
-	    (print && not do_verbose_core2core) 
-         then
+	    (print && not do_verbose_core2core)
+	 then
 	    writeMn stderr ("\n*** "++what++":\n")
 		`thenMn_`
-	    writeMn stderr (ppShow 1000 
+	    writeMn stderr (ppShow 1000
 		(ppAboves (map (pprPlainCoreBinding ppr_style) binds2)))
 		`thenMn_`
 	    writeMn stderr "\n"
@@ -335,7 +309,7 @@ will be visible on the other side of an interface, too.
 calcInlinings :: Bool	-- True => inlinings with _scc_s are OK
 	      -> (GlobalSwitch -> SwitchResult)
 	      -> IdEnv UnfoldingDetails
-	      -> [PlainCoreBinding]
+	      -> [CoreBinding]
 	      -> IdEnv UnfoldingDetails
 
 calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
@@ -350,7 +324,7 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
       where
     	pp_det NoUnfoldingDetails   = ppStr "_N_"
 	pp_det (IWantToBeINLINEd _) = ppStr "INLINE"
-    	pp_det (GeneralForm _ _ expr guide)
+    	pp_det (GenForm _ _ expr guide)
     	  = ppAbove (ppr PprDebug guide) (ppr PprDebug expr)
     	pp_det other	    	    = ppStr "???"
 
@@ -378,10 +352,10 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 
     con_discount_weight = uNFOLDING_CON_DISCOUNT_WEIGHT
 
-    calci inline_env (CoRec pairs)
+    calci inline_env (Rec pairs)
       = foldl (calc True{-recursive-}) inline_env pairs
 
-    calci inline_env bind@(CoNonRec binder rhs)
+    calci inline_env bind@(NonRec binder rhs)
       = calc False{-not recursive-} inline_env (binder, rhs)
 
     ---------------------------------------
@@ -389,11 +363,11 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
     calc is_recursive inline_env (binder, rhs)
       | not (toplevelishId binder)
       = --pprTrace "giving up on not top-level:" (ppr PprDebug binder)
-	ignominious_defeat 
+	ignominious_defeat
 
       | rhs_mentions_an_unmentionable
       || (not explicit_INLINE_requested
-          && (rhs_looks_like_a_caf || guidance_says_don't || guidance_size_too_big))
+	  && (rhs_looks_like_a_caf || guidance_says_don't || guidance_size_too_big))
       = let
 	    my_my_trace
 	      = if explicit_INLINE_requested
@@ -404,7 +378,7 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 
 	    which = if scc_s_OK then " (late):" else " (early):"
     	in
-	--pprTrace "giving up on size:" (ppCat [ppr PprDebug binder, ppr PprDebug 
+	--pprTrace "giving up on size:" (ppCat [ppr PprDebug binder, ppr PprDebug
 	--	[rhs_mentions_an_unmentionable, explicit_INLINE_requested,
 	--	 rhs_looks_like_a_caf, guidance_says_don't, guidance_size_too_big]]) (
 	my_my_trace ("unfolding disallowed for"++which++(ppShow 80 (ppr PprDebug binder))) (
@@ -420,18 +394,18 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 	ignominious_defeat
 
 #if ! OMIT_DEFORESTER
-	-- For the deforester: bypass the barbed wire for recursive 
+	-- For the deforester: bypass the barbed wire for recursive
 	-- functions that want to be inlined and are tagged deforestable
 	-- by the user, allowing these things to be communicated
 	-- across module boundaries.
 
-      | is_recursive && 
-        explicit_INLINE_requested && 
+      | is_recursive &&
+	explicit_INLINE_requested &&
 	deforestable binder &&
-	scc_s_OK			-- hack, only get them in 
+	scc_s_OK			-- hack, only get them in
 					-- calc_inlinings2
       = glorious_success UnfoldAlways
-#endif      
+#endif
 
       | is_recursive && not rhs_looks_like_a_data_val
 	-- The only recursive defns we are prepared to tolerate at the
@@ -440,7 +414,7 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
       = --pprTrace "giving up on rec:" (ppr PprDebug binder)
     	ignominious_defeat
 
-        -- Not really interested unless it's exported, but doing it
+	-- Not really interested unless it's exported, but doing it
 	-- this way (not worrying about export-ness) gets us all the
 	-- workers/specs, etc., too; which we will need for generating
 	-- interfaces.  We are also not interested if this binder is
@@ -479,7 +453,7 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 	      EssentialUnfolding -> False
 	      UnfoldIfGoodArgs _ no_val_args arg_info_vec size
 
-	        -> if explicit_creation_threshold then
+		-> if explicit_creation_threshold then
 		      False 	-- user set threshold; don't second-guess...
 
 		   else if no_val_args == 0 && rhs_looks_like_a_data_val then
@@ -494,18 +468,18 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 --		      (if (unfold_use_threshold < cost) then (pprTrace "cost:" (ppInt cost)) else \x->x ) (
 		      unfold_use_threshold < cost
 --		      )
-		        
+
 
 	rhs_looks_like_a_caf = not (manifestlyWHNF rhs)
 
 	rhs_looks_like_a_data_val
-	  = case digForLambdas rhs of
-	      (_, [], CoCon _ _ _) -> True
-	      other 		   -> False
+	  = case (digForLambdas rhs) of
+	      (_, _, [], Con _ _ _) -> True
+	      other		    -> False
 
 	rhs_arg_tys
-	  = case digForLambdas rhs of
-	      (_, val_binders, _) -> map getIdUniType val_binders
+	  = case (digForLambdas rhs) of
+	      (_, _, val_binders, _) -> map idType val_binders
 
 	(mentioned_ids, _, _, mentions_litlit)
 	  = mentionedInUnfolding (\x -> x) rhs
@@ -596,7 +570,7 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 		    ignominious_defeat -- and at the last hurdle, too!
 \end{code}
 
-ANDY, on the hatred of the check above; why obliterate it?  Consider 
+ANDY, on the hatred of the check above; why obliterate it?  Consider
 
  head xs = foldr (\ x _ -> x) (_|_) xs
 

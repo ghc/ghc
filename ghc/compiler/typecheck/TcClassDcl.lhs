@@ -7,186 +7,196 @@
 #include "HsVersions.h"
 
 module TcClassDcl (
-	tcClassDecls1, tcClassDecls2,
-	ClassInfo   -- abstract
+	tcClassDecl1, tcClassDecls2
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
-import Pretty	-- add proper one below
+import Ubiq
 
-import TcMonad		-- typechecking monad machinery
-import TcMonadFns	( newDicts, newClassOpLocals, copyTyVars )
-import AbsSyn		-- the stuff being typechecked
+import HsSyn		( ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
+			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..),
+			  HsLit(..), OutPat(..), Sig(..), PolyType(..), MonoType, 
+			  Stmt, Qual, ArithSeqInfo, InPat, Fake )
+import HsPragmas	( ClassPragmas(..) )
+import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
+			  RenamedClassOpSig(..), RenamedMonoBinds(..),
+			  RenamedGenPragmas(..), RenamedContext(..) )
+import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
+			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, unZonkId )
 
-import AbsPrel		( pAT_ERROR_ID )
-import AbsUniType	( mkClass, getClassKey, getClassBigSig,
-			  getClassOpString, getClassOps, splitType,
-			  mkSuperDictSelType, InstTyEnv(..),
-			  instantiateTy, instantiateThetaTy, UniType
-			)
-import BackSubst	( applyTcSubstToBinds )
-import CE		-- ( nullCE, unitCE, plusCE, CE(..), UniqFM )
-import E		( mkE, getE_TCE, getE_CE, tvOfE, nullGVE, plusGVE, E, TCE(..), UniqFM, GVE(..) )
-import Errors		( confusedNameErr, Error(..) )
-import HsPragmas	-- ****** NEED TO SEE CONSTRUCTORS ******
-import Id		( mkSuperDictSelId, mkInstId, getIdUniType,
-			  Id, DictFun(..)
-			)
-import IdInfo
-import Inst		( InstOrigin(..), Inst )
-import InstEnv
-import LIE		( nullLIE, mkLIE, plusLIE, LIE )
-import Maybes		( Maybe(..) )
-import Name		( Name(..) )
-import PlainCore	( escErrorMsg )
-import Spec		( specTy )
-import TVE		( mkTVE, TVE(..)
-			  IF_ATTACK_PRAGMAS(COMMA u2i)
-			)
-import TcClassSig	( tcClassSigs )
-import TcContext	( tcContext )
+import TcMonad
+import GenSpecEtc	( specTy )
+import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts )
+import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds)
 import TcInstDcls	( processInstBinds )
-import TcPragmas	( tcGenPragmas )
+import TcKind		( unifyKind )
+import TcMonoType	( tcMonoType, tcContext )
+import TcType		( TcTyVar(..), tcInstType, tcInstTyVar )
+import TcKind		( TcKind )
+
+import Bag		( foldBag )
+import Class		( GenClass, mkClass, mkClassOp, getClassBigSig, 
+			  getClassOps, getClassOpString, getClassOpLocalType )
+import CoreUtils	( escErrorMsg )
+import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
+			  idType )
+import IdInfo		( noIdInfo )
+import Name		( Name, getNameFullName, getTagFromClassOpName )
+import PrelVals		( pAT_ERROR_ID )
+import PprStyle
+import Pretty
+import PprType		( GenType, GenTyVar, GenClassOp )
+import SpecEnv		( SpecEnv(..) )
+import SrcLoc		( mkGeneratedSrcLoc )
+import Type		( mkFunTy, mkTyVarTy, mkDictTy,
+			  mkForAllTy, mkSigmaTy, splitSigmaTy)
+import TysWiredIn	( stringTy )
+import TyVar		( GenTyVar )			 
+import Unique		( Unique )			 
 import Util
+
+-- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
+tcGenPragmas ty id ps = returnNF_Tc noIdInfo
+tcClassOpPragmas ty sel def spec ps = returnNF_Tc (noIdInfo, noIdInfo)
+
 \end{code}
 
-@ClassInfo@ communicates the essential information about
-locally-defined classes between passes 1 and 2.
-
 \begin{code}
-data ClassInfo
-  = ClassInfo	Class
-		RenamedMonoBinds
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[TcClassDcl]{Does the real work (apart from default methods)}
-%*									*
-%************************************************************************
-
-\begin{code}
-tcClassDecls1
-    :: E			-- Consult the CE/TCE args only to build knots
-    -> InstanceMapper		-- Maps class name to its instances,
-				-- ...and its ops to their instances,
-    -> [RenamedClassDecl]
-    -> TcM ([ClassInfo],	-- boiled-down info related to classes
-	    CE,			-- env so we can look up classes elsewhere
-	    GVE)		-- env so we can look up class ops elsewhere
-
-tcClassDecls1 e rec_inst_mapper []
-  = returnTc ([], nullCE, nullGVE)
-
-tcClassDecls1 e rec_inst_mapper (cd:cds)
-  = tc_clas1			    cd  `thenTc` \ (cinfo1_maybe, ce1, gve1) ->
-    tcClassDecls1 e rec_inst_mapper cds `thenTc` \ (cinfo2, ce2, gve2) ->
-    let
-	glued_cinfos
-	  = case cinfo1_maybe of
-	      Nothing -> cinfo2
-	      Just xx -> xx : cinfo2
-    in
-    returnTc (glued_cinfos, ce1 `plusCE` ce2, gve1 `plusGVE` gve2)
-  where
-    rec_ce  = getE_CE  e
-    rec_tce = getE_TCE e
-
-    tc_clas1 (ClassDecl context class_name
+tcClassDecl1 rec_inst_mapper
+      	     (ClassDecl context class_name
 			tyvar_name class_sigs def_methods pragmas src_loc)
+  = tcAddSrcLoc src_loc	$
+    tcAddErrCtxt (classDeclCtxt class_name) $
 
-      = addSrcLocTc src_loc	(
+	-- LOOK THINGS UP IN THE ENVIRONMENT
+    tcLookupClass class_name	`thenNF_Tc` \ (class_kind, rec_class) ->
+    tcLookupTyVar tyvar_name	`thenNF_Tc` \ (tyvar_kind, rec_tyvar) ->
+    let
+	(rec_class_inst_env, rec_class_op_inst_fn) = rec_inst_mapper rec_class
+    in
 
-	    -- The knot is needed so that the signatures etc can point
-	    -- back to the class itself
-	fixTc (\ ~(rec_clas, _) ->
-	  let
-	     (rec_clas_inst_env, rec_class_op_inst_fn) = rec_inst_mapper rec_clas
-	  in
-	    -- Get new (template) type variables for the class
-	  let  (tve, [clas_tyvar], [alpha]) = mkTVE [tyvar_name]  in
+	-- FORCE THE CLASS AND ITS TYVAR TO HAVE SAME KIND
+    unifyKind class_kind tyvar_kind	`thenTc_`
 
-	    -- Typecheck the class context; since there is only one type
-	    -- variable in scope, we are assured that the it will be of
-	    -- the form (C1 a, C2 a...)
-	  babyTcMtoTcM (tcContext rec_ce rec_tce tve context) `thenTc` \ theta ->
+	-- CHECK THE CONTEXT
+    tcClassContext rec_class rec_tyvar context pragmas	
+				`thenTc` \ (scs, sc_sel_ids) ->
 
-	    -- Make the superclass selector ids; the "class" pragmas
-	    -- may have info about the superclass dict selectors;
-	    -- so it is only tcClassPragmas that gives back the
-	    -- final Ids.
-	  getUniquesTc (length theta)		`thenNF_Tc` \ uniqs ->
-	  let
-	      super_classes = [ supers | (supers, _) <- theta ]
-	      super_tys
-	        = [ mkSuperDictSelType rec_clas super | super <- super_classes ]
-	      super_info = zip3 super_classes uniqs super_tys
-	  in
-	  (case pragmas of
-	    NoClassPragmas ->
-	      returnNF_Tc [ mk_super_id rec_clas info noIdInfo | info <- super_info ]
+	-- CHECK THE CLASS SIGNATURES,
+    mapTc (tcClassSig rec_class rec_tyvar rec_class_op_inst_fn) class_sigs
+				`thenTc` \ sig_stuff ->
 
-	    SuperDictPragmas prags ->
---	      pprTrace "SuperDictPragmas:" (ppAboves (ppr PprDebug prags : map pp super_info)) (
-	      mapNF_Tc (mk_super_id_w_info rec_clas) (super_info `zipEqual` prags)
---	      )
---	      where
---		pp (sc, u, ty) = ppCat [ppr PprDebug sc, ppr PprDebug ty]
+	-- MAKE THE CLASS OBJECT ITSELF
+    tcGetUnique			`thenNF_Tc` \ uniq ->
+    let
+	(ops, op_sel_ids, defm_ids) = unzip3 sig_stuff
+	clas = mkClass uniq (getNameFullName class_name) rec_tyvar
+		       scs sc_sel_ids ops op_sel_ids defm_ids
+		       rec_class_inst_env
+    in
+    returnTc clas
+\end{code}
 
-	  ) `thenNF_Tc` \ super_class_sel_ids ->
 
-	    -- Typecheck the class signatures, checking that each mentions
-	    -- the class type variable somewhere, and manufacturing
-	    -- suitable Ids for selectors and default methods.
-	  babyTcMtoTcM
-	    (tcClassSigs e tve rec_clas rec_class_op_inst_fn
-			       clas_tyvar defm_names class_sigs)
-		   `thenTc` \ (ops, ops_gve, op_sel_ids, defm_ids) ->
+\begin{code}
+tcClassContext :: Class -> TyVar
+	       -> RenamedContext 	-- class context
+	       -> RenamedClassPragmas	-- pragmas for superclasses  
+	       -> TcM s ([Class],	-- the superclasses
+			 [Id])  	-- superclass selector Ids
 
-	     -- Make the class object itself, producing clas::Class
-	  let
-	     clas
-		= mkClass class_name clas_tyvar
-			  super_classes super_class_sel_ids
-			  ops op_sel_ids defm_ids
-			  rec_clas_inst_env
-	  in
-	  returnTc (clas, ops_gve)
-	)				`thenTc` \ (clas, ops_gve) ->
+tcClassContext rec_class rec_tyvar context pragmas
+  = 	-- Check the context.
+	-- The renamer has already checked that the context mentions
+	-- only the type variable of the class decl.
+    tcContext context			`thenTc` \ theta ->
+    let
+      super_classes = [ supers | (supers, _) <- theta ]
+    in
 
-	     -- Return the class decl for further work if it is
-	     -- local, otherwise just return the CE
-	returnTc (if (isLocallyDefined class_name) then
-		     Just (ClassInfo clas def_methods)
-		  else
-		     Nothing,
-		  unitCE (getClassKey clas) clas,
-		  ops_gve
-    	))
-      where
-	defm_names = collectMonoBinders def_methods
+	-- Make super-class selector ids
+    mapTc (mk_super_id rec_class) 
+	  (super_classes `zip` maybe_pragmas)	`thenTc` \ sc_sel_ids ->
 
-	-----------
-	mk_super_id clas (super_clas, uniq, ty) id_info
-	  = mkSuperDictSelId uniq clas super_clas ty id_info
+	-- Done
+    returnTc (super_classes, sc_sel_ids)
 
-	-----------
-	mk_super_id_w_info clas ((super_clas, uniq, ty), gen_prags)
-	  = fixNF_Tc ( \ rec_super_id ->
-		babyTcMtoNF_TcM
-		    (tcGenPragmas e{-fake_E-} Nothing{-ty unknown-} rec_super_id gen_prags)
-			`thenNF_Tc` \ id_info ->
+  where
+    mk_super_id rec_class (super_class, maybe_pragma)
+        = fixTc ( \ rec_super_id ->
+	    tcGetUnique			`thenNF_Tc` \ uniq ->
 
-		returnNF_Tc(mkSuperDictSelId uniq clas super_clas ty id_info)
-	    )
+		-- GET THE PRAGMA INFO FOR THE SUPERCLASS
+	    (case maybe_pragma of
+		Nothing   -> returnNF_Tc noIdInfo
+		Just prag -> tcGenPragmas Nothing{-ty unknown-} rec_super_id prag
+	    )				`thenNF_Tc` \ id_info ->
+	    let
+	      ty = mkForAllTy rec_tyvar (
+	           mkFunTy (mkDictTy rec_class   (mkTyVarTy rec_tyvar))
+		           (mkDictTy super_class (mkTyVarTy rec_tyvar))
+		   )
+	    in
+		-- BUILD THE SUPERCLASS ID
+	    returnTc (mkSuperDictSelId uniq rec_class super_class ty id_info)
+	  )
 
-{- SOMETHING LIKE THIS NEEDED? ToDo [WDP]
-    tc_clas1 (ClassDecl _ bad_name _ _ _ _ src_loc)
-      = failTc (confusedNameErr
-		    "Bad name for a class (a type constructor, or Prelude name?)"
-		    bad_name src_loc)
--}
+    maybe_pragmas :: [Maybe RenamedGenPragmas]
+    maybe_pragmas = case pragmas of
+			NoClassPragmas	       -> repeat Nothing
+			SuperDictPragmas prags -> ASSERT(length prags == length context)
+						  map Just prags
+			-- If there are any pragmas there should
+			-- be one for each superclass
+
+
+
+tcClassSig :: Class	    		-- Knot tying only!
+	   -> TyVar		 	-- The class type variable, used for error check only
+	   -> (ClassOp -> SpecEnv)	-- Ditto; the spec info for the class ops
+	   -> RenamedClassOpSig
+	   -> TcM s (ClassOp,		-- class op
+		     Id,		-- selector id
+		     Id)		-- default-method ids
+
+tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
+	   (ClassOpSig op_name
+		       (HsForAllTy tyvar_names context monotype)
+		       pragmas src_loc)
+  = tcAddSrcLoc src_loc $
+    fixTc ( \ ~(_, rec_sel_id, rec_defm_id) ->	-- Knot for pragmas
+
+	-- Check the type signature.  NB that the envt *already has*
+	-- bindings for the type variables; see comments in TcTyAndClassDcls.
+    tcContext context				`thenTc`    \ theta ->
+    tcMonoType monotype				`thenTc`    \ tau ->
+    mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (_,tyvars) ->
+    let
+	full_tyvars = rec_clas_tyvar : tyvars
+	full_theta  = (rec_clas, mkTyVarTy rec_clas_tyvar) : theta
+	global_ty   = mkSigmaTy full_tyvars full_theta tau
+	local_ty    = mkSigmaTy tyvars theta tau
+	class_op    = mkClassOp (getOccurrenceName op_name)
+				(getTagFromClassOpName op_name)
+				local_ty
+    in
+
+	-- Munch the pragmas
+    tcClassOpPragmas
+		global_ty
+		rec_sel_id rec_defm_id
+		(rec_classop_spec_fn class_op)
+		pragmas				`thenNF_Tc` \ (op_info, defm_info) ->
+
+	-- Build the selector id and default method id
+    tcGetUnique					`thenNF_Tc` \ d_uniq ->
+    let
+	op_uniq = getItsUnique op_name
+	sel_id  = mkMethodSelId     op_uniq rec_clas class_op global_ty op_info
+	defm_id = mkDefaultMethodId d_uniq  rec_clas class_op False global_ty defm_info
+			-- ToDo: improve the "False"
+    in
+    returnTc (class_op, sel_id, defm_id)
+    )
 \end{code}
 
 
@@ -204,69 +214,57 @@ using them to produce a complete set of default-method decls.
 (Omitted ones elicit an error message.)
 \item
 to produce a definition for the selector function for each method
+and superclass dictionary.
 \end{enumerate}
 
 Pass~2 only applies to locally-defined class declarations.
 
-The function @tcClassDecls2@ just arranges to apply
-@tcClassDecls2_help@ to each local class decl.
+The function @tcClassDecls2@ just arranges to apply @tcClassDecl2@ to
+each local class decl.
 
 \begin{code}
-tcClassDecls2 e class_info
-  = let
-	-- Get type variables free in environment. Sadly, there may be
-	-- some, because of the dreaded monomorphism restriction
-	free_tyvars = tvOfE e
-    in
-    tcClassDecls2_help e free_tyvars class_info
+tcClassDecls2 :: Bag RenamedClassDecl
+	      -> NF_TcM s (LIE s, TcHsBinds s)
 
-tcClassDecls2_help
-	:: E
-	-> [TyVar]
-	-> [ClassInfo]
-	-> NF_TcM (LIE, TypecheckedBinds)
-
-tcClassDecls2_help e free_tyvars [] = returnNF_Tc (nullLIE, EmptyBinds)
-
-tcClassDecls2_help e free_tyvars ((ClassInfo clas default_binds) : rest)
-  = tcClassDecl2 e free_tyvars clas default_binds `thenNF_Tc` \ (lie1, binds1) ->
-    tcClassDecls2_help e free_tyvars rest	  `thenNF_Tc` \ (lie2, binds2) ->
-    returnNF_Tc (lie1 `plusLIE` lie2, binds1 `ThenBinds` binds2)
+tcClassDecls2 decls
+  = foldBag combine
+	    tcClassDecl2
+	    (returnNF_Tc (emptyLIE, EmptyBinds))
+	    decls
+  where
+    combine tc1 tc2 = tc1 `thenNF_Tc` \ (lie1, binds1) ->
+		      tc2 `thenNF_Tc` \ (lie2, binds2) ->
+		      returnNF_Tc (lie1 `plusLIE` lie2,
+				   binds1 `ThenBinds` binds2)
 \end{code}
 
 @tcClassDecl2@ is the business end of things.
 
 \begin{code}
-tcClassDecl2 :: E
-	     -> [TyVar]			-- Free in the envt
-	     -> Class
-	     -> RenamedMonoBinds	-- The default decls
-	     -> NF_TcM (LIE, TypecheckedBinds)
+tcClassDecl2 :: RenamedClassDecl	-- The class declaration
+	     -> NF_TcM s (LIE s, TcHsBinds s)
 
-tcClassDecl2 e free_tyvars clas default_binds
-  = let 
-	src_loc = getSrcLoc clas
-	origin  = ClassDeclOrigin src_loc
-	(clas_tyvar_tmpl, scs, sc_sel_ids, ops, op_sel_ids, defm_ids)
+tcClassDecl2 (ClassDecl context class_name
+			tyvar_name class_sigs default_binds pragmas src_loc)
+  = recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyBinds)) $
+    tcAddSrcLoc src_loc		     		      $
+
+	-- Get the relevant class
+    tcLookupClass class_name		`thenNF_Tc` \ (_, clas) ->
+    let
+	(tyvar, scs, sc_sel_ids, ops, op_sel_ids, defm_ids)
 	  = getClassBigSig clas
     in
-	 -- Prune the substitution when we are finished, and arrange error recovery
-    recoverTc (nullLIE, EmptyBinds) (
-    addSrcLocTc src_loc		    (
-    pruneSubstTc free_tyvars	    (
+    tcInstTyVar tyvar			`thenNF_Tc` \ clas_tyvar ->
 
-	 -- Generate bindings for the selector functions
-    buildSelectors origin clas clas_tyvar_tmpl scs sc_sel_ids ops op_sel_ids
+	-- Generate bindings for the selector functions
+    buildSelectors clas clas_tyvar scs sc_sel_ids ops op_sel_ids
 						`thenNF_Tc` \ sel_binds ->
-	 -- Ditto for the methods
-    buildDefaultMethodBinds e free_tyvars origin clas clas_tyvar_tmpl
-		defm_ids default_binds		`thenTc` \ (const_insts, meth_binds) ->
+	-- Ditto for the methods
+    buildDefaultMethodBinds clas clas_tyvar defm_ids default_binds
+						`thenTc` \ (const_insts, meth_binds) ->
 
-	 -- Back-substitute through the definitions
-    applyTcSubstToInsts const_insts			   `thenNF_Tc` \ final_const_insts ->
-    applyTcSubstToBinds (sel_binds `ThenBinds` meth_binds) `thenNF_Tc` \ final_binds ->
-    returnTc (mkLIE final_const_insts, final_binds)
-    )))
+    returnTc (const_insts, sel_binds `ThenBinds` meth_binds)
 \end{code}
 
 %************************************************************************
@@ -276,43 +274,42 @@ tcClassDecl2 e free_tyvars clas default_binds
 %************************************************************************
 
 \begin{code}
-buildSelectors :: InstOrigin
-	       -> Class			-- The class object
-	       -> TyVarTemplate		-- Class type variable
+buildSelectors :: Class			-- The class object
+	       -> TcTyVar s		-- Class type variable
 	       -> [Class] -> [Id]	-- Superclasses and selectors
 	       -> [ClassOp] -> [Id]	-- Class ops and selectors
-	       -> NF_TcM TypecheckedBinds
+	       -> NF_TcM s (TcHsBinds s)
 
-buildSelectors origin clas clas_tyvar_tmpl
-	scs sc_sel_ids
-	ops op_sel_ids
+buildSelectors clas clas_tyvar scs sc_sel_ids ops op_sel_ids
   =
-	 -- Instantiate the class variable
-    copyTyVars [clas_tyvar_tmpl] `thenNF_Tc` \ (inst_env, [clas_tyvar], [clas_tyvar_ty]) ->
-	 -- Make an Inst for each class op, and
-	 -- dicts for the superclasses.	 These are used to
-	 -- construct the selector functions
-    newClassOpLocals inst_env ops			`thenNF_Tc` \ method_ids ->
-    newDicts origin [ (super_clas, clas_tyvar_ty)
-		    | super_clas <- scs
-		    ]					`thenNF_Tc` \ dicts ->
-    let dict_ids = map mkInstId dicts  in
+	-- Make new Ids for the components of the dictionary
+    mapNF_Tc (tcInstType [] . getClassOpLocalType) ops	`thenNF_Tc` \ op_tys ->
+
+    newLocalIds (map getClassOpString ops) op_tys	`thenNF_Tc` \ method_ids ->
+
+    newDicts ClassDeclOrigin 
+	     [ (super_clas, mkTyVarTy clas_tyvar)
+	     | super_clas <- scs ]			`thenNF_Tc` \ (_,dict_ids) ->
+
+    newDicts ClassDeclOrigin 
+	     [ (clas, mkTyVarTy clas_tyvar) ]		`thenNF_Tc` \ (_,[clas_dict]) ->
 
 	 -- Make suitable bindings for the selectors
-    let mk_op_sel op sel_id method_id
-	  = mkSelExpr origin clas_tyvar dict_ids method_ids method_id	`thenNF_Tc` \ rhs ->
-	    returnNF_Tc (VarMonoBind sel_id rhs)
-	mk_sc_sel sc sel_id dict_id
-	 = mkSelExpr origin clas_tyvar dict_ids method_ids dict_id	`thenNF_Tc` \ rhs ->
-	   returnNF_Tc (VarMonoBind sel_id rhs)
+    let
+        tc_method_ids = map TcId method_ids
+
+	mk_sel sel_id method_or_dict
+	  = mkSelBind sel_id clas_tyvar clas_dict dict_ids tc_method_ids method_or_dict
     in
-    listNF_Tc (zipWith3 mk_op_sel ops op_sel_ids method_ids)	`thenNF_Tc` \ op_sel_binds ->
-    listNF_Tc (zipWith3 mk_sc_sel scs sc_sel_ids dict_ids)	`thenNF_Tc` \ sc_sel_binds ->
+    listNF_Tc (zipWithEqual mk_sel op_sel_ids tc_method_ids) `thenNF_Tc` \ op_sel_binds ->
+    listNF_Tc (zipWithEqual mk_sel sc_sel_ids dict_ids)      `thenNF_Tc` \ sc_sel_binds ->
 
     returnNF_Tc (SingleBind (
 		 NonRecBind (
-		 foldr AndMonoBinds EmptyMonoBinds (
-		 op_sel_binds ++ sc_sel_binds))))
+		 foldr AndMonoBinds
+		       (foldr AndMonoBinds EmptyMonoBinds op_sel_binds)
+		       sc_sel_binds
+		 )))
 \end{code}
 
 %************************************************************************
@@ -321,8 +318,8 @@ buildSelectors origin clas clas_tyvar_tmpl
 %*									*
 %************************************************************************
 
-Make a selector expression for @local@ from a dictionary consisting of
-@dicts@ and @op_locals@.
+Make a selector expression for @sel_id@ from a dictionary @clas_dict@
+consisting of @dicts@ and @methods@.
 
 We have to do a bit of jiggery pokery to get the type variables right.
 Suppose we have the class decl:
@@ -333,11 +330,12 @@ Suppose we have the class decl:
 \end{verbatim}
 Then the method selector for \tr{op1} is like this:
 \begin{verbatim}
-	op1_sel = /\ab -> \dFoo -> case dFoo of
-					(op1_method,op2_method) -> op1_method b
+	op1_sel = /\a b -> \dFoo dOrd -> case dFoo of
+					 (op1_method,op2_method) -> op1_method b dOrd
 \end{verbatim}
-Note that the type variable for \tr{b} is lifted to the top big lambda, and
-\tr{op1_method} is applied to it.  This is preferable to the alternative:
+Note that the type variable for \tr{b} and the (Ord b) dictionary
+are lifted to the top lambda, and
+\tr{op1_method} is applied to them.  This is preferable to the alternative:
 \begin{verbatim}
 	op1_sel' = /\a -> \dFoo -> case dFoo of
 					(op1_method,op2_method) -> op1_method
@@ -351,43 +349,45 @@ whereas \tr{op1_sel} (the one we use) has the decent type
 	op1_sel :: forall a b. Foo a -> Ord b -> a -> b -> a
 \end{verbatim}
 
-{\em NOTE:}
-We could do the same thing for the dictionaries, giving
-\begin{verbatim}
-	op1_sel = /\ab -> \dFoo -> \dOrd -> case dFoo of
-						(m1,m2) -> m1 b dOrd
-\end{verbatim}
-but WE ASSUME THAT DICTIONARY APPLICATION IS CURRIED, so the two are
-precisely equivalent, and have the same type, namely
-\begin{verbatim}
-	op1_sel :: forall a b. Foo a -> Ord b -> a -> b -> a
-\end{verbatim}
+NOTE that we return a TcMonoBinds (which is later zonked) even though
+there's no real back-substitution to do. It's just simpler this way!
 
-WDP 95/03: Quite false (``DICTIONARY APPLICATION IS CURRIED'').
-Specialisation now wants to see all type- and dictionary-applications
-absolutely explicitly.
+NOTE ALSO that the selector has no free type variables, so we
+don't bother to instantiate the class-op's local type; instead
+we just use the variables inside it.
 
 \begin{code}
-mkSelExpr :: InstOrigin -> TyVar -> [Id] -> [Id] -> Id -> NF_TcM TypecheckedExpr
+mkSelBind :: Id 			-- the selector id
+	  -> TcTyVar s -> TcIdOcc s	-- class tyvar and dict
+	  -> [TcIdOcc s] -> [TcIdOcc s] -- superclasses and methods in class dict
+	  -> TcIdOcc s 			-- the superclass/method being slected
+	  -> NF_TcM s (TcMonoBinds s)
 
-mkSelExpr origin clas_tyvar dicts op_locals local
+mkSelBind sel_id clas_tyvar clas_dict dicts methods method_or_dict@(TcId op)
   = let
-	(op_tyvar_tmpls,local_theta,_) = splitType (getIdUniType local)
+	(op_tyvars,op_theta,op_tau) = splitSigmaTy (idType op)
+	op_tys = map mkTyVarTy op_tyvars
     in
-    copyTyVars op_tyvar_tmpls	`thenNF_Tc` \ (inst_env, op_tyvars, tys) ->
-    let
-	inst_theta = instantiateThetaTy inst_env local_theta
-    in
-    newDicts origin inst_theta	`thenNF_Tc` \ local_dict_insts ->
-    let
-	local_dicts = map mkInstId local_dict_insts
-    in
-    returnNF_Tc (TyLam (clas_tyvar:op_tyvars)
-		   (ClassDictLam
-		      dicts
-		      op_locals
-		      (mkDictLam local_dicts
-			(mkDictApp (mkTyApp (Var local) tys) local_dicts))))
+    newDicts ClassDeclOrigin op_theta	`thenNF_Tc` \ (_, op_dicts) ->
+
+	-- sel_id = /\ clas_tyvar op_tyvars -> \ clas_dict op_dicts ->
+	--	    case clas_dict of 
+	--		 <dicts..methods> -> method_or_dict op_tyvars op_dicts
+
+    returnNF_Tc (VarMonoBind (RealId sel_id)  (
+		 TyLam (clas_tyvar:op_tyvars) (
+		 DictLam (clas_dict:op_dicts) (
+		 HsCase
+		   (HsVar clas_dict)
+                   ([PatMatch  (DictPat dicts methods) (
+		     GRHSMatch (GRHSsAndBindsOut
+			[OtherwiseGRHS
+			   (mkHsDictApp (mkHsTyApp (HsVar method_or_dict) op_tys) op_dicts)
+		  	   mkGeneratedSrcLoc]
+			EmptyBinds
+			op_tau))])
+		    mkGeneratedSrcLoc
+		 ))))
 \end{code}
 
 
@@ -454,24 +454,21 @@ dfun.Foo.List
 
 \begin{code}
 buildDefaultMethodBinds
-	:: E
-	-> [TyVar]
-	-> InstOrigin
-	-> Class
-	-> TyVarTemplate
+	:: Class
+	-> TcTyVar s
 	-> [Id]
 	-> RenamedMonoBinds
-	-> TcM ([Inst], TypecheckedBinds)
+	-> TcM s (LIE s, TcHsBinds s)
 
-buildDefaultMethodBinds e free_tyvars origin clas clas_tyvar_tmpl
+buildDefaultMethodBinds clas clas_tyvar
 			default_method_ids default_binds
   =	-- Deal with the method declarations themselves
-    processInstBinds e
-	 free_tyvars
-	 (makeClassDeclDefaultMethodRhs clas origin default_method_ids)
-	 []	-- No tyvars in scope for "this inst decl"
-	 []	-- No insts available
-	 default_method_ids
+    mapNF_Tc unZonkId default_method_ids	`thenNF_Tc` \ tc_defm_ids ->
+    processInstBinds
+	 (makeClassDeclDefaultMethodRhs clas default_method_ids)
+	 []		-- No tyvars in scope for "this inst decl"
+	 emptyLIE 	-- No insts available
+	 (map TcId tc_defm_ids)
 	 default_binds		`thenTc` \ (dicts_needed, default_binds') ->
 
     returnTc (dicts_needed, SingleBind (NonRecBind default_binds'))
@@ -483,19 +480,20 @@ class declaration when no explicit default method is given.
 \begin{code}
 makeClassDeclDefaultMethodRhs
 	:: Class
-	-> InstOrigin
 	-> [Id]
 	-> Int
-	-> NF_TcM TypecheckedExpr
+	-> NF_TcM s (TcExpr s)
 
-makeClassDeclDefaultMethodRhs clas origin method_ids tag
-  = specTy origin (getIdUniType method_id) `thenNF_Tc` \ (tyvars, dicts, tau) ->
+makeClassDeclDefaultMethodRhs clas method_ids tag
+  = specTy ClassDeclOrigin (idType method_id) `thenNF_Tc` \ (tyvars, dicts, tau, dict_ids) ->
 
-    returnNF_Tc (mkTyLam tyvars (
-		 mkDictLam (map mkInstId dicts) (
-		 App (mkTyApp (Var pAT_ERROR_ID) [tau])
-		     (Lit (StringLit (_PK_ error_msg))))))
+    returnNF_Tc (mkHsTyLam tyvars (
+		 mkHsDictLam dict_ids (
+		 HsApp (mkHsTyApp (HsVar (RealId pAT_ERROR_ID)) [tau])
+		     (HsLitOut (HsString (_PK_ error_msg)) stringTy))))
   where
+    (clas_mod, clas_name) = getOrigName clas
+
     method_id = method_ids  !! (tag-1)
     class_op = (getClassOps clas) !! (tag-1)
 
@@ -506,6 +504,12 @@ makeClassDeclDefaultMethodRhs clas origin method_ids tag
 	_UNPK_ clas_mod ++ "." ++ _UNPK_ clas_name ++ "."
 	     ++ (ppShow 80 (ppr PprForUser class_op))
 	     ++ "\"" )
+\end{code}
 
-    (clas_mod, clas_name) = getOrigName clas
+
+Contexts
+~~~~~~~~
+\begin{code}
+classDeclCtxt class_name sty
+  = ppCat [ppStr "In the class declaration for", ppr sty class_name]
 \end{code}

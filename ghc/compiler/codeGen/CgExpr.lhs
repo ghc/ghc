@@ -11,28 +11,23 @@
 #include "HsVersions.h"
 
 module CgExpr (
-	cgExpr, cgSccExpr, getPrimOpArgAmodes,
+	cgExpr, cgSccExpr, getPrimOpArgAmodes
 
 	-- and to make the interface self-sufficient...
-	StgExpr, Id, CgState
     ) where
-
-IMPORT_Trace		-- NB: not just for debugging
-import Outputable	-- ToDo: rm (just for debugging)
-import Pretty		-- ToDo: rm (just for debugging)
 
 import StgSyn
 import CgMonad
 import AbsCSyn
 
-import AbsPrel		( PrimOp(..), PrimOpResultInfo(..), HeapRequirement(..), 
-    	    	    	  primOpHeapReq, getPrimOpResultInfo, PrimKind, 
+import PrelInfo		( PrimOp(..), PrimOpResultInfo(..), HeapRequirement(..),
+    	    	    	  primOpHeapReq, getPrimOpResultInfo, PrimRep,
     	    	    	  primOpCanTriggerGC
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType	( isPrimType, getTyConDataCons )
-import CLabelInfo	( CLabel, mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
+import Type		( isPrimType, getTyConDataCons )
+import CLabel	( CLabel, mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
 import ClosureInfo	( LambdaFormInfo, mkClosureLFInfo )
 import CgBindery	( getAtomAmodes )
 import CgCase		( cgCase, saveVolatileVarsAndRegs )
@@ -42,11 +37,11 @@ import CgHeapery	( allocHeap )
 import CgLetNoEscape	( cgLetNoEscapeClosure )
 import CgRetConv	-- various things...
 import CgTailCall	( cgTailCall, performReturn, mkDynamicAlgReturnCode,
-                          mkPrimReturnCode
-                        )
+			  mkPrimReturnCode
+			)
 import CostCentre	( setToAbleCostCentre, isDupdCC, CostCentre )
 import Maybes		( Maybe(..) )
-import PrimKind		( getKindSize )
+import PrimRep		( getPrimRepSize )
 import UniqSet
 import Util
 \end{code}
@@ -56,7 +51,7 @@ with STG {\em expressions}.  See also @CgClosure@, which deals
 with closures, and @CgCon@, which deals with constructors.
 
 \begin{code}
-cgExpr	:: PlainStgExpr		-- input
+cgExpr	:: StgExpr		-- input
 	-> Code			-- output
 \end{code}
 
@@ -68,7 +63,7 @@ cgExpr	:: PlainStgExpr		-- input
 
 ``Applications'' mean {\em tail calls}, a service provided by module
 @CgTailCall@.  This includes literals, which show up as
-@(STGApp (StgLitAtom 42) [])@.
+@(STGApp (StgLitArg 42) [])@.
 
 \begin{code}
 cgExpr (StgApp fun args live_vars) = cgTailCall fun args live_vars
@@ -81,11 +76,11 @@ cgExpr (StgApp fun args live_vars) = cgTailCall fun args live_vars
 %********************************************************
 
 \begin{code}
-cgExpr (StgConApp con args live_vars)
+cgExpr (StgCon con args live_vars)
   = getAtomAmodes args `thenFC` \ amodes ->
     cgReturnDataCon con amodes (all zero_size args) live_vars
   where
-    zero_size atom = getKindSize (getAtomKind atom) == 0
+    zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
 \end{code}
 
 %********************************************************
@@ -97,7 +92,7 @@ cgExpr (StgConApp con args live_vars)
 Here is where we insert real live machine instructions.
 
 \begin{code}
-cgExpr x@(StgPrimApp op args live_vars)
+cgExpr x@(StgPrim op args live_vars)
   = getIntSwitchChkrC		`thenFC` \ isw_chkr ->
     getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
     let
@@ -112,7 +107,7 @@ cgExpr x@(StgPrimApp op args live_vars)
 	-- Use registers for args, and assign args to the regs
 	-- (Can-trigger-gc primops guarantee to have their args in regs)
 	let
-	    (arg_robust_amodes, liveness_mask, arg_assts) 
+	    (arg_robust_amodes, liveness_mask, arg_assts)
 	      = makePrimOpArgsRobust {-NO:isw_chkr-} op arg_amodes
 
 	    liveness_arg = mkIntCLit liveness_mask
@@ -140,7 +135,7 @@ cgExpr x@(StgPrimApp op args live_vars)
 
 	ReturnsPrim kind ->
 	    performReturn do_before_stack_cleanup
-    	    	    	  (\ sequel -> robustifySequel may_gc sequel	
+    	    	    	  (\ sequel -> robustifySequel may_gc sequel
 							`thenFC` \ (ret_asst, sequel') ->
 			   absC (ret_asst `mkAbsCStmts` do_just_before_jump)
 							`thenC`
@@ -148,14 +143,13 @@ cgExpr x@(StgPrimApp op args live_vars)
 			  live_vars
 
 	ReturnsAlg tycon ->
---OLD:	    evalCostCentreC "SET_RetCC" [CReg CurCostCentre]	`thenC`	
 	    profCtrC SLIT("RET_NEW_IN_REGS") [num_of_fields]	`thenC`
 
 	    performReturn do_before_stack_cleanup
 			  (\ sequel -> robustifySequel may_gc sequel
 						    	`thenFC` \ (ret_asst, sequel') ->
-			   absC (mkAbstractCs [ret_asst, 
-                                               do_just_before_jump, 
+			   absC (mkAbstractCs [ret_asst,
+					       do_just_before_jump,
 					       info_ptr_assign])
 			-- Must load info ptr here, not in do_just_before_stack_cleanup,
 			-- because the info-ptr reg clashes with argument registers
@@ -171,22 +165,19 @@ cgExpr x@(StgPrimApp op args live_vars)
 		info_ptr_assign = CAssign (CReg infoptr) info_lbl
 
 		info_lbl
-		  = -- OLD: pprTrace "ctrlReturn7:" (ppr PprDebug tycon) (
-		    case (ctrlReturnConvAlg tycon) of
-		      VectoredReturn _   -> vec_lbl
+		  = case (ctrlReturnConvAlg tycon) of
+		      VectoredReturn   _ -> vec_lbl
 		      UnvectoredReturn _ -> dir_lbl
-		    -- )
 
-	        vec_lbl  = CTableEntry (CLbl (mkInfoTableVecTblLabel tycon) DataPtrKind) 
-    	    	    	        dyn_tag DataPtrKind
+		vec_lbl  = CTableEntry (CLbl (mkInfoTableVecTblLabel tycon) DataPtrRep)
+    	    	    	        dyn_tag DataPtrRep
 
 		data_con = head (getTyConDataCons tycon)
 
 		(dir_lbl, num_of_fields)
 		  = case (dataReturnConvAlg fake_isw_chkr data_con) of
 		      ReturnInRegs rs
-			-> (CLbl (mkPhantomInfoTableLabel data_con) DataPtrKind,
---OLD:			    pprTrace "CgExpr:prim datacon:" (ppr PprDebug data_con) $
+			-> (CLbl (mkPhantomInfoTableLabel data_con) DataPtrRep,
 			    mkIntCLit (length rs)) -- for ticky-ticky only
 
     	    	      ReturnInHeap
@@ -208,7 +199,7 @@ cgExpr x@(StgPrimApp op args live_vars)
     -- sequel is OnStack.  If that's the case, arrange to pull the
     -- sequel out into RetReg before performing the primOp.
 
-    robustifySequel True sequel@(OnStack _) = 
+    robustifySequel True sequel@(OnStack _) =
 	sequelToAmode sequel			`thenFC` \ amode ->
 	returnFC (CAssign (CReg RetReg) amode, InRetReg)
     robustifySequel _ sequel = returnFC (AbsCNop, sequel)
@@ -254,12 +245,12 @@ cgExpr (StgLet (StgRec pairs) expr)
 cgExpr (StgLetNoEscape live_in_whole_let live_in_rhss bindings body)
   =    	-- Figure out what volatile variables to save
     nukeDeadBindings live_in_whole_let	`thenC`
-    saveVolatileVarsAndRegs live_in_rhss 
+    saveVolatileVarsAndRegs live_in_rhss
     	    `thenFC` \ (save_assts, rhs_eob_info, maybe_cc_slot) ->
 
 	-- ToDo: cost centre???
 
-	-- Save those variables right now!	
+	-- Save those variables right now!
     absC save_assts				`thenC`
 
 	-- Produce code for the rhss
@@ -286,9 +277,7 @@ For evaluation scoping we also need to save the cost centre in an
 nested SCCs.
 
 \begin{code}
-cgExpr scc_expr@(StgSCC ty cc expr)
---OLD:WDP:94/06  = evalPushRCCFrame (isPrimType ty) (cgSccExpr scc_expr)
-  = cgSccExpr scc_expr
+cgExpr scc_expr@(StgSCC ty cc expr) = cgSccExpr scc_expr
 \end{code}
 
 @cgSccExpr@ (also used in \tr{CgClosure}):
@@ -315,13 +304,13 @@ cgSccExpr other
 \subsection[non-top-level-bindings]{Converting non-top-level bindings}
 
 @cgBinding@ is only used for let/letrec, not for unboxed bindings.
-So the kind should always be @PtrKind@.
+So the kind should always be @PtrRep@.
 
 We rely on the support code in @CgCon@ (to do constructors) and
 in @CgClosure@ (to do closures).
 
 \begin{code}
-cgRhs :: Id -> PlainStgRhs -> FCode (Id, CgIdInfo)
+cgRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along so a binding can be set up
 
 cgRhs name (StgRhsCon maybe_cc con args)
@@ -330,7 +319,7 @@ cgRhs name (StgRhsCon maybe_cc con args)
 				`thenFC` \ idinfo ->
     returnFC (name, idinfo)
   where
-    zero_size atom = getKindSize (getAtomKind atom) == 0
+    zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag args body)
   = cgRhsClosure name cc bi fvs args body lf_info
@@ -340,15 +329,15 @@ cgRhs name (StgRhsClosure cc bi fvs upd_flag args body)
 
 \begin{code}
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgNonRec binder rhs)
-  = cgLetNoEscapeRhs live_in_rhss rhs_eob_info maybe_cc_slot binder rhs	
+  = cgLetNoEscapeRhs live_in_rhss rhs_eob_info maybe_cc_slot binder rhs
     	    	    	    	`thenFC` \ (binder, info) ->
     addBindC binder info
 
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgRec pairs)
   = fixC (\ new_bindings ->
 		addBindsC new_bindings 	`thenC`
-		listFCs [ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info 
-                          maybe_cc_slot b e | (b,e) <- pairs ]
+		listFCs [ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info
+			  maybe_cc_slot b e | (b,e) <- pairs ]
     ) `thenFC` \ new_bindings ->
 
     addBindsC new_bindings
@@ -357,12 +346,12 @@ cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgRec pairs)
     -- delete the bindings for the binder from the environment!
     full_live_in_rhss = live_in_rhss `unionUniqSets` (mkUniqSet [b | (b,r) <- pairs])
 
-cgLetNoEscapeRhs 
-    :: PlainStgLiveVars	-- Live in rhss
-    -> EndOfBlockInfo 
+cgLetNoEscapeRhs
+    :: StgLiveVars	-- Live in rhss
+    -> EndOfBlockInfo
     -> Maybe VirtualSpBOffset
     -> Id
-    -> PlainStgRhs
+    -> StgRhs
     -> FCode (Id, CgIdInfo)
 
 cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot binder
@@ -374,14 +363,14 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot binder
     --     other     -> cgLetNoEscapeClosure binder cc bi live_in_whole_let live_in_rhss args body
     cgLetNoEscapeClosure binder cc bi full_live_in_rhss rhs_eob_info maybe_cc_slot args body
 
--- For a constructor RHS we want to generate a single chunk of code which 
+-- For a constructor RHS we want to generate a single chunk of code which
 -- can be jumped to from many places, which will return the constructor.
 -- It's easy; just behave as if it was an StgRhsClosure with a ConApp inside!
 cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot binder
     	    	 (StgRhsCon cc con args)
   = cgLetNoEscapeClosure binder cc stgArgOcc{-safe-} full_live_in_rhss rhs_eob_info maybe_cc_slot
 	[] 	--No args; the binder is data structure, not a function
-	(StgConApp con args full_live_in_rhss)
+	(StgCon con args full_live_in_rhss)
 \end{code}
 
 Some PrimOps require a {\em fixed} amount of heap allocation.  Rather
@@ -404,7 +393,7 @@ getPrimOpArgAmodes op args
 	FixedHeapRequired size -> allocHeap size `thenFC` \ amode ->
      	    	    	    	  returnFC (amode : arg_amodes)
 
-	_   	    	       -> returnFC arg_amodes    
+	_   	    	       -> returnFC arg_amodes
 \end{code}
 
 

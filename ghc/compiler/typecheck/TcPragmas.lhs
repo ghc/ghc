@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[TcPragmas]{Typecheck ``pragmas'' of various kinds}
 
@@ -10,41 +10,27 @@ module TcPragmas (
 	tcClassOpPragmas,
 	tcDataPragmas,
 	tcDictFunPragmas,
-	tcGenPragmas,
-	tcTypePragmas
+	tcGenPragmas
     ) where
 
-IMPORT_Trace	-- ToDo: rm (debugging)
-import Pretty
-import Outputable
-
 import TcMonad		-- typechecking monadic machinery
-import TcMonadFns	( mkIdsWithGivenTys )
-import AbsSyn		-- the stuff being typechecked
+import HsSyn		-- the stuff being typechecked
 
-import AbsPrel		( PrimOp(..)	-- to see CCallOp
+import PrelInfo		( PrimOp(..)	-- to see CCallOp
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import AbsUniType
-import CE		( lookupCE, nullCE, CE(..) )
+import Type
 import CmdLineOpts
 import CostCentre
-import E
-import Errors
 import HsCore		-- ****** NEED TO SEE CONSTRUCTORS ******
 import HsPragmas	-- ****** NEED TO SEE CONSTRUCTORS ******
 import Id
 import IdInfo
-import WwLib		( mkWwBodies )
-import InstEnv		( lookupClassInstAtSimpleType )
+--import WwLib		( mkWwBodies )
 import Maybes		( assocMaybe, catMaybes, Maybe(..) )
-import CoreLint		( lintUnfolding )
-import PlainCore
-import TCE		( TCE(..), UniqFM )
-import TVE
-import TcMonoType	( tcMonoType )
-import TcPolyType	( tcPolyType )
+--import CoreLint		( lintUnfolding )
+import TcMonoType	( tcMonoType, tcPolyType )
 import Util
 import SrcLoc
 \end{code}
@@ -63,7 +49,7 @@ Of course, the pragmas also need to be checked.
 
 \begin{code}
 tcClassOpPragmas :: E			-- Class/TyCon lookup tables
-	     -> UniType			-- global type of the class method
+	     -> Type			-- global type of the class method
 	     -> Id			-- *final* ClassOpId
 	     -> Id			-- *final* DefaultMethodId
 	     -> SpecEnv			-- Instance info for this class op
@@ -74,7 +60,7 @@ tcClassOpPragmas _ _ rec_classop_id rec_defm_id spec_infos NoClassOpPragmas
   = returnB_Tc (noIdInfo `addInfo` spec_infos, noIdInfo)
 
 tcClassOpPragmas e global_ty
-		 rec_classop_id rec_defm_id 
+		 rec_classop_id rec_defm_id
 		 spec_infos
 		 (ClassOpPragmas classop_pragmas defm_pragmas)
   = tcGenPragmas e
@@ -101,7 +87,7 @@ convey information about a DictFunId.
 \begin{code}
 tcDictFunPragmas
 	:: E 			    -- Class/TyCon lookup tables
-	-> UniType		    -- DictFunId type
+	-> Type		    -- DictFunId type
 	-> Id			    -- final DictFunId (don't touch)
 	-> RenamedInstancePragmas   -- info w/ which to complete, giving...
 	-> Baby_TcM IdInfo	    -- ... final DictFun IdInfo
@@ -132,7 +118,7 @@ a problem, it just returns @noIdInfo@.
 \begin{code}
 tcGenPragmas
 	:: E			-- lookup table
-	-> Maybe UniType	-- of Id, if we have it (for convenience)
+	-> Maybe Type	-- of Id, if we have it (for convenience)
 	-> Id			-- *incomplete* Id (do not *touch*!)
 	-> RenamedGenPragmas	-- info w/ which to complete, giving...
 	-> Baby_TcM IdInfo	-- IdInfo for this Id
@@ -162,7 +148,7 @@ tcGenPragmas e ty_maybe rec_final_id
 	-- Same as unfolding; if we fail, don't junk all IdInfo
     recoverIgnoreErrorsB_Tc nullSpecEnv (
 	tc_specs e rec_final_id ty_maybe specs
-    )				`thenB_Tc` \ spec_env -> 
+    )				`thenB_Tc` \ spec_env ->
 
     returnB_Tc (
 	noIdInfo
@@ -192,7 +178,7 @@ Don't use the strictness info if a flag set.
 \begin{code}
 tc_strictness
 	:: E
-	-> Maybe UniType
+	-> Maybe Type
 	-> Id		-- final Id (do not *touch*)
 	-> ImpStrictness Name
 	-> Baby_TcM (StrictnessInfo, UnfoldingDetails)
@@ -250,15 +236,15 @@ do_strictness e (Just wrapper_ty) rec_final_id
     -- go wrong if there's an abstract type involved, mind you.
     let
 	(tv_tmpls, arg_tys, ret_ty) = splitTypeWithDictsAsArgs wrapper_ty
-	n_wrapper_args		    = length wrap_arg_info	
-		-- Don't have more args than this, else you risk 
+	n_wrapper_args		    = length wrap_arg_info
+		-- Don't have more args than this, else you risk
 		-- losing laziness!!
     in
     getUniquesB_Tc (length tv_tmpls)	`thenB_Tc` \ tyvar_uniqs ->
     getUniquesB_Tc n_wrapper_args	`thenB_Tc` \ arg_uniqs ->
-    
+
     let
-        (inst_env, tyvars, tyvar_tys) = instantiateTyVarTemplates tv_tmpls tyvar_uniqs
+	(inst_env, tyvars, tyvar_tys) = instantiateTyVarTemplates tv_tmpls tyvar_uniqs
 
 	inst_arg_tys = map (instantiateTy inst_env) arg_tys
 	(undropped_inst_arg_tys, dropped_inst_arg_tys)
@@ -267,7 +253,7 @@ do_strictness e (Just wrapper_ty) rec_final_id
 	inst_ret_ty  = glueTyArgs dropped_inst_arg_tys
 				  (instantiateTy inst_env ret_ty)
 
-	args         = zipWith mk_arg arg_uniqs	undropped_inst_arg_tys
+	args         = zipWithEqual mk_arg arg_uniqs	undropped_inst_arg_tys
 	mk_arg uniq ty = mkSysLocal SLIT("wrap") uniq ty mkUnknownSrcLoc
 	-- ASSERT: length args = n_wrapper_args
     in
@@ -281,7 +267,7 @@ do_strictness e (Just wrapper_ty) rec_final_id
 
 	Just (wrapper_w_hole, worker_w_hole, worker_strictness, worker_ty_w_hole) ->
 
-	    let 
+	    let
 		worker_ty   = worker_ty_w_hole inst_ret_ty
 	    in
 	    getUniqueB_Tc `thenB_Tc` \ uniq ->
@@ -304,7 +290,7 @@ do_strictness e (Just wrapper_ty) rec_final_id
 		wrapper_rhs = wrapper_w_hole worker_id
 		n_tyvars    = length tyvars
 		arity	    = length args
-	
+
 	    in
 	    returnB_Tc (
 		mkStrictnessInfo wrap_arg_info (Just worker_id),
@@ -316,7 +302,7 @@ do_strictness e (Just wrapper_ty) rec_final_id
 \begin{code}
 tc_specs :: E
 	 -> Id -- final Id for which these are specialisations (do not *touch*)
-	 -> Maybe UniType
+	 -> Maybe Type
 	 -> [([Maybe RenamedMonoType], Int, RenamedGenPragmas)]
 	 -> Baby_TcM SpecEnv
 
@@ -328,7 +314,7 @@ tc_specs e rec_main_id (Just main_ty) spec_pragmas
     returnB_Tc (mkSpecEnv spec_infos)
   where
     (main_tyvars, _) = splitForalls main_ty
- 
+
     rec_ce  = getE_CE  e
     rec_tce = getE_TCE e
 
@@ -342,7 +328,7 @@ tc_specs e rec_main_id (Just main_ty) spec_pragmas
 		(badSpecialisationErr "value" "wrong number of specialising types"
 				      (length main_tyvars) maybe_tys locn)
 				`thenB_Tc_`
-	let 
+	let
 	    spec_ty = specialiseTy main_ty maybe_tys dicts_to_ignore
 	in
 	fixB_Tc ( \ rec_spec_id ->
@@ -381,7 +367,7 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 
 	(lint_guidance, lint_expr) = case maybe_lint_expr of
 	  Just lint_expr -> (guidance, lint_expr)
-          Nothing        -> (BadUnfolding, panic_expr) 
+	  Nothing        -> (BadUnfolding, panic_expr)
     in
     returnB_Tc (mkUnfolding lint_guidance lint_expr)
   where
@@ -394,73 +380,60 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 			    -- (others: we hope we can figure them out)
 	       -> TVE	    -- lookup table for tyvars
 	       -> UnfoldingCoreExpr Name
-	       -> Baby_TcM PlainCoreExpr
+	       -> Baby_TcM CoreExpr
 
-    tc_uf_core lve tve (UfCoVar v)
+    tc_uf_core lve tve (UfVar v)
       = tc_uf_Id lve v		`thenB_Tc` \ id ->
-	returnB_Tc (CoVar id)
+	returnB_Tc (Var id)
 
-    tc_uf_core lve tve (UfCoLit l)
-      = returnB_Tc (CoLit l)
+    tc_uf_core lve tve (UfLit l)
+      = returnB_Tc (Lit l)
 
-    tc_uf_core lve tve (UfCoCon con tys as)
+    tc_uf_core lve tve (UfCon con tys as)
       = tc_uf_Id lve (BoringUfId con)	`thenB_Tc` \ con_id ->
 	mapB_Tc (tc_uf_type tve) tys	`thenB_Tc` \ core_tys ->
 	mapB_Tc (tc_uf_atom lve tve) as	`thenB_Tc` \ core_atoms ->
-	returnB_Tc (CoCon con_id core_tys core_atoms)
+	returnB_Tc (Con con_id core_tys core_atoms)
 
     --  If a ccall, we have to patch in the types read from the pragma.
 
-    tc_uf_core lve tve (UfCoPrim (UfCCallOp str is_casm may_gc arg_tys res_ty) app_tys as)
+    tc_uf_core lve tve (UfPrim (UfCCallOp str is_casm may_gc arg_tys res_ty) app_tys as)
       = ASSERT(null app_tys)
     	mapB_Tc (tc_uf_type tve) arg_tys	`thenB_Tc` \ core_arg_tys ->
-        tc_uf_type tve res_ty		`thenB_Tc` \ core_res_ty ->
-        mapB_Tc (tc_uf_type tve) app_tys	`thenB_Tc` \ core_app_tys ->
+	tc_uf_type tve res_ty		`thenB_Tc` \ core_res_ty ->
+	mapB_Tc (tc_uf_type tve) app_tys	`thenB_Tc` \ core_app_tys ->
 	mapB_Tc (tc_uf_atom lve tve) as	`thenB_Tc` \ core_atoms ->
-	returnB_Tc (CoPrim (CCallOp str is_casm may_gc core_arg_tys core_res_ty)
+	returnB_Tc (Prim (CCallOp str is_casm may_gc core_arg_tys core_res_ty)
 			 core_app_tys core_atoms)
 
-    tc_uf_core lve tve (UfCoPrim (UfOtherOp op) tys as)
+    tc_uf_core lve tve (UfPrim (UfOtherOp op) tys as)
       = mapB_Tc (tc_uf_type tve) tys	`thenB_Tc` \ core_tys ->
 	mapB_Tc (tc_uf_atom lve tve) as	`thenB_Tc` \ core_atoms ->
-	returnB_Tc (CoPrim op core_tys core_atoms)
+	returnB_Tc (Prim op core_tys core_atoms)
 
-    tc_uf_core lve tve (UfCoLam binders body)
-      = tc_uf_binders tve binders `thenB_Tc` \ lve2 ->
+    tc_uf_core lve tve (UfLam binder body)
+      = tc_uf_binders tve [binder] `thenB_Tc` \ lve2 ->
 	let
-	    new_binders = map snd lve2
+	    [new_binder] = map snd lve2
 	    new_lve     = lve2 `plusLVE` lve
 	in
 	tc_uf_core new_lve tve body	 `thenB_Tc` \ new_body ->
-	returnB_Tc (CoLam new_binders new_body)
+	returnB_Tc (Lam new_binder new_body)
 
-    tc_uf_core lve tve (UfCoTyLam tv body)
-      = let
-	    (new_tv, uniq, new_tv_ty) = tc_uf_tyvar tv
-	    new_tve = tve `plusTVE` (unitTVE uniq new_tv_ty)
-	in
-	tc_uf_core lve new_tve body	 `thenB_Tc` \ new_body ->
-	returnB_Tc (CoTyLam new_tv new_body)
-
-    tc_uf_core lve tve (UfCoApp fun arg)
+    tc_uf_core lve tve (UfApp fun arg)
       = tc_uf_core lve tve fun	`thenB_Tc` \ new_fun ->
-        tc_uf_atom lve tve arg	`thenB_Tc` \ new_arg ->
-	returnB_Tc (CoApp new_fun new_arg)
+	tc_uf_atom lve tve arg	`thenB_Tc` \ new_arg ->
+	returnB_Tc (App new_fun new_arg)
 
-    tc_uf_core lve tve (UfCoTyApp expr ty)
-      = tc_uf_core lve tve expr	`thenB_Tc` \ new_expr ->
-        tc_uf_type tve ty	`thenB_Tc` \ new_ty ->
-	returnB_Tc (mkCoTyApp new_expr new_ty)
-
-    tc_uf_core lve tve (UfCoCase scrut alts)
+    tc_uf_core lve tve (UfCase scrut alts)
       = tc_uf_core lve tve scrut `thenB_Tc` \ new_scrut ->
 	tc_alts alts		 `thenB_Tc` \ new_alts ->
-	returnB_Tc (CoCase new_scrut new_alts)
+	returnB_Tc (Case new_scrut new_alts)
       where
 	tc_alts (UfCoAlgAlts alts deflt)
 	  = mapB_Tc tc_alg_alt alts   `thenB_Tc` \ new_alts ->
 	    tc_deflt deflt  	    `thenB_Tc` \ new_deflt ->
-	    returnB_Tc (CoAlgAlts new_alts new_deflt)
+	    returnB_Tc (AlgAlts new_alts new_deflt)
 	  where
 	    tc_alg_alt (con, params, rhs)
 	      = tc_uf_Id lve (BoringUfId con)	`thenB_Tc` \ con_id ->
@@ -475,13 +448,13 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	tc_alts (UfCoPrimAlts alts deflt)
 	  = mapB_Tc tc_prim_alt alts  `thenB_Tc` \ new_alts ->
 	    tc_deflt deflt  	    `thenB_Tc` \ new_deflt ->
-	    returnB_Tc (CoPrimAlts new_alts new_deflt)
+	    returnB_Tc (PrimAlts new_alts new_deflt)
 	  where
 	    tc_prim_alt (lit, rhs)
 	      = tc_uf_core lve tve rhs	`thenB_Tc` \ new_rhs ->
 		returnB_Tc (lit, new_rhs)
 
-	tc_deflt UfCoNoDefault = returnB_Tc CoNoDefault
+	tc_deflt UfCoNoDefault = returnB_Tc NoDefault
 	tc_deflt (UfCoBindDefault b rhs)
 	  = tc_uf_binders tve [b]	`thenB_Tc` \ lve2 ->
 	    let
@@ -489,9 +462,9 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 		new_lve = lve2 `plusLVE` lve
 	    in
 	    tc_uf_core new_lve tve rhs	`thenB_Tc` \ new_rhs ->
-	    returnB_Tc (CoBindDefault new_b new_rhs)
+	    returnB_Tc (BindDefault new_b new_rhs)
 
-    tc_uf_core lve tve (UfCoLet (UfCoNonRec b rhs) body)
+    tc_uf_core lve tve (UfLet (UfCoNonRec b rhs) body)
       = tc_uf_core lve tve rhs	`thenB_Tc` \ new_rhs ->
 	tc_uf_binders tve [b]	`thenB_Tc` \ lve2 ->
 	let
@@ -499,9 +472,9 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	    new_lve = lve2 `plusLVE` lve
 	in
 	tc_uf_core new_lve tve body `thenB_Tc` \ new_body ->
-	returnB_Tc (CoLet (CoNonRec new_b new_rhs) new_body)
+	returnB_Tc (Let (NonRec new_b new_rhs) new_body)
 
-    tc_uf_core lve tve (UfCoLet (UfCoRec pairs) body)
+    tc_uf_core lve tve (UfLet (UfCoRec pairs) body)
       = let
 	    (binders, rhss) = unzip pairs
 	in
@@ -512,12 +485,12 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	in
 	mapB_Tc (tc_uf_core new_lve tve) rhss `thenB_Tc` \ new_rhss ->
 	tc_uf_core new_lve tve         body `thenB_Tc` \ new_body ->
-	returnB_Tc (CoLet (CoRec (new_binders `zip` new_rhss)) new_body)
+	returnB_Tc (Let (Rec (new_binders `zip` new_rhss)) new_body)
 
-    tc_uf_core lve tve (UfCoSCC uf_cc body)
+    tc_uf_core lve tve (UfSCC uf_cc body)
       = tc_uf_cc   uf_cc	    `thenB_Tc` \ new_cc ->
 	tc_uf_core lve tve body     `thenB_Tc` \ new_body ->
-	returnB_Tc (CoSCC new_cc new_body)
+	returnB_Tc (SCC new_cc new_body)
       where
 	tc_uf_cc (UfAutoCC id m g is_dupd is_caf)
 	  = tc_uf_Id lve id	`thenB_Tc` \ new_id ->
@@ -527,10 +500,10 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	  = tc_uf_Id lve id	`thenB_Tc` \ new_id ->
 	    returnB_Tc (adjust is_caf is_dupd (mkDictCC new_id m g IsNotCafCC))
 
-        tc_uf_cc (UfUserCC n m g d c) = returnB_Tc (adjust c d (mkUserCC n m g))
+	tc_uf_cc (UfUserCC n m g d c) = returnB_Tc (adjust c d (mkUserCC n m g))
 
-        tc_uf_cc (UfPreludeDictsCC d) = returnB_Tc (preludeDictsCostCentre d)
-        tc_uf_cc (UfAllDictsCC m g d) = returnB_Tc (mkAllDictsCC m g d)
+	tc_uf_cc (UfPreludeDictsCC d) = returnB_Tc (preludeDictsCostCentre d)
+	tc_uf_cc (UfAllDictsCC m g d) = returnB_Tc (mkAllDictsCC m g d)
 
 	--------
 	adjust is_caf is_dupd cc
@@ -542,11 +515,11 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 
     ---------------
     tc_uf_atom lve tve (UfCoLitAtom l)
-      = returnB_Tc (CoLitAtom l)
+      = returnB_Tc (LitArg l)
 
     tc_uf_atom lve tve (UfCoVarAtom v)
       = tc_uf_Id lve v			`thenB_Tc` \ new_v ->
-	returnB_Tc (CoVarAtom new_v)
+	returnB_Tc (VarArg new_v)
 
     ---------------
     tc_uf_binders tve ids_and_tys
@@ -607,7 +580,7 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	    dfun_id = case (lookupClassInstAtSimpleType clas new_ty) of
 			  Just id -> id
 			  Nothing -> pprPanic "tc_uf_Id:DictFunUfId:"
-					(ppr PprDebug (UfCoVar uf_id))
+					(ppr PprDebug (UfVar uf_id))
 					-- The class and type are both
 					-- visible, so the instance should
 					-- jolly well be too!
@@ -626,14 +599,14 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
       = tc_uf_Id lve unspec 	    `thenB_Tc` \ unspec_id ->
 	mapB_Tc (tc_ty_maybe rec_ce rec_tce) ty_maybes
 				    `thenB_Tc` \ maybe_tys ->
-        let
+	let
 	   spec_id = lookupSpecId unspec_id maybe_tys
 	in
 	returnB_Tc spec_id
 
     tc_uf_Id lve (WorkerUfId unwrkr)
       = tc_uf_Id lve unwrkr 	`thenB_Tc` \ unwrkr_id ->
-        let
+	let
 	    strictness_info = getIdStrictness unwrkr_id
  	in
 	if isLocallyDefined unwrkr_id
@@ -641,7 +614,7 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	    -- A locally defined value will not have any strictness info (yet),
 	    -- so we can't extract the locally defined worker Id from it :-(
 
-            pprTrace "WARNING: Discarded bad unfolding from interface:\n"
+	    pprTrace "WARNING: Discarded bad unfolding from interface:\n"
 		     (ppCat [ppStr "Worker Id in unfolding is defined locally:",
 			     ppr PprDebug unwrkr_id])
 	    (failB_Tc (panic "tc_uf_Id:WorkerUfId: locally defined"))
@@ -654,7 +627,7 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
       = getClassOps clas !! (tag - 1)
 
     ---------------------------------------------------------------------
-    tc_uf_type :: TVE -> UnfoldingType Name -> Baby_TcM UniType
+    tc_uf_type :: TVE -> UnfoldingType Name -> Baby_TcM Type
 
     tc_uf_type tve ty = tcPolyType rec_ce rec_tce tve ty
 \end{code}
@@ -697,23 +670,5 @@ tcDataPragmas rec_tce tve rec_tycon new_tyvars (DataPragmas con_decls specs)
 				      (length new_tyvars) maybe_tys locn)
 				`thenB_Tc_`
 
-        returnB_Tc (SpecInfo maybe_tys 0 (panic "DataPragma:SpecInfo:SpecId"))
+	returnB_Tc (SpecInfo maybe_tys 0 (panic "DataPragma:SpecInfo:SpecId"))
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[tcTypePragmas]{@type@ synonym pragmas}
-%*									*
-%************************************************************************
-
-The purpose of a @type@ pragma is to say that the synonym's
-representation should not be used by the user.
-
-\begin{code}
-tcTypePragmas :: TypePragmas
-	      -> Bool		-- True <=> abstract synonym, please
-
-tcTypePragmas NoTypePragmas     = False
-tcTypePragmas AbstractTySynonym = True
-\end{code}
-

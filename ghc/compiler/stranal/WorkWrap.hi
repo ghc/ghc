@@ -1,8 +1,0 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
-interface WorkWrap where
-import CmdLineOpts(GlobalSwitch)
-import CoreSyn(CoreBinding)
-import Id(Id)
-import SplitUniq(SplitUniqSupply)
-workersAndWrappers :: [CoreBinding Id Id] -> SplitUniqSupply -> (GlobalSwitch -> Bool) -> [CoreBinding Id Id]
-

@@ -7,40 +7,34 @@
 #include "HsVersions.h"
 
 module I386Desc (
-    	mkI386,
+    	mkI386
 
     	-- and assorted nonsense referenced by the class methods
-
-        PprStyle, SMRep, MagicId, RegLoc, StixTree, PrimKind, SwitchResult
-
     ) where
 
 import AbsCSyn
-import AbsPrel	    ( PrimOp(..)
+import PrelInfo	    ( PrimOp(..)
 		      IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 		    )
 import AsmRegAlloc  ( Reg, MachineCode(..), MachineRegisters(..),
 		      RegLiveness(..), RegUsage(..), FutureLive(..)
 		    )
-import CLabelInfo   ( CLabel )
+import CLabel   ( CLabel )
 import CmdLineOpts  ( GlobalSwitch(..), stringSwitchSet, switchIsOn, SwitchResult(..) )
 import HeapOffs	    ( hpRelToInt )
 import MachDesc
 import Maybes	    ( Maybe(..) )
 import OrdList
 import Outputable
-import PrimKind	    ( PrimKind(..) )
 import SMRep	    ( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import I386Code
 import I386Gen	    ( i386CodeGen )
 import Stix
 import StixMacro
 import StixPrim
-import SplitUniq
-import Unique
+import UniqSupply
 import Util
-
 \end{code}
 
 Header sizes depend only on command-line options, not on the target
@@ -87,11 +81,11 @@ i386Reg switches x =
     	    StkStubReg -> sStLitLbl SLIT("STK_STUB_closure")
     	    StdUpdRetVecReg -> sStLitLbl SLIT("vtbl_StdUpdFrame")
     	    BaseReg -> sStLitLbl SLIT("MainRegTable")
-    	    --Hp -> StInd PtrKind (sStLitLbl SLIT("StorageMgrInfo"))
-    	    --HpLim -> StInd PtrKind (sStLitLbl SLIT("StorageMgrInfo+4"))
-    	    TagReg -> StInd IntKind (StPrim IntSubOp [infoptr, StInt (1*4)])
-    	    	      where 
-    	    	    	  r2 = VanillaReg PtrKind ILIT(2)
+    	    --Hp -> StInd PtrRep (sStLitLbl SLIT("StorageMgrInfo"))
+    	    --HpLim -> StInd PtrRep (sStLitLbl SLIT("StorageMgrInfo+4"))
+    	    TagReg -> StInd IntRep (StPrim IntSubOp [infoptr, StInt (1*4)])
+    	    	      where
+    	    	    	  r2 = VanillaReg PtrRep ILIT(2)
     	    	    	  infoptr = case i386Reg switches r2 of
     	    	    	    	    	Always tree -> tree
     	    	    	    	    	Save _ -> StReg (StixMagicId r2)
@@ -100,8 +94,8 @@ i386Reg switches x =
     	  baseLoc = case stgRegMap BaseReg of
     	    Just _ -> StReg (StixMagicId BaseReg)
     	    Nothing -> sStLitLbl SLIT("MainRegTable")
-          offset = baseRegOffset x
-		    
+	  offset = baseRegOffset x
+
 \end{code}
 
 Sizes in bytes.
@@ -119,20 +113,20 @@ because some are reloaded from constants.
 
 \begin{code}
 
-vsaves switches vols = 
+vsaves switches vols =
     map save ((filter callerSaves) ([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg{-,ActivityReg-}] ++ vols))
     where
-        save x = StAssign (kindFromMagicId x) loc reg
+	save x = StAssign (kindFromMagicId x) loc reg
     	    	    where reg = StReg (StixMagicId x)
     	    	    	  loc = case i386Reg switches x of
     	    	    	    	    Save loc -> loc
     	    	    	    	    Always loc -> panic "vsaves"
 
-vrests switches vols = 
-    map restore ((filter callerSaves) 
+vrests switches vols =
+    map restore ((filter callerSaves)
     	([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg{-,ActivityReg-},StkStubReg,StdUpdRetVecReg] ++ vols))
     where
-        restore x = StAssign (kindFromMagicId x) reg loc
+	restore x = StAssign (kindFromMagicId x) reg loc
     	    	    where reg = StReg (StixMagicId x)
     	    	    	  loc = case i386Reg switches x of
     	    	    	    	    Save loc -> loc
@@ -146,22 +140,22 @@ Static closure sizes.
 
 charLikeSize, intLikeSize :: Target -> Int
 
-charLikeSize target = 
-    size PtrKind * (fixedHeaderSize target + varHeaderSize target charLikeRep + 1)
+charLikeSize target =
+    size PtrRep * (fixedHeaderSize target + varHeaderSize target charLikeRep + 1)
     where charLikeRep = SpecialisedRep CharLikeRep 0 1 SMNormalForm
 
-intLikeSize target = 
-    size PtrKind * (fixedHeaderSize target + varHeaderSize target intLikeRep + 1)
+intLikeSize target =
+    size PtrRep * (fixedHeaderSize target + varHeaderSize target intLikeRep + 1)
     where intLikeRep = SpecialisedRep IntLikeRep 0 1 SMNormalForm
 
 mhs, dhs :: (GlobalSwitch -> SwitchResult) -> StixTree
 
 mhs switches = StInt (toInteger words)
-  where 
+  where
     words = fhs switches + vhs switches (MuTupleRep 0)
 
 dhs switches = StInt (toInteger words)
-  where 
+  where
     words = fhs switches + vhs switches (DataRep 0)
 
 \end{code}
@@ -172,26 +166,26 @@ Setting up a i386 target.
 mkI386 :: Bool
 	-> (GlobalSwitch -> SwitchResult)
 	-> (Target,
-	    (PprStyle -> [[StixTree]] -> SUniqSM Unpretty), -- codeGen
+	    (PprStyle -> [[StixTree]] -> UniqSM Unpretty), -- codeGen
 	    Bool,					    -- underscore
 	    (String -> String))				    -- fmtAsmLbl
 
-mkI386 decentOS switches = 
+mkI386 decentOS switches =
     let fhs' = fhs switches
     	vhs' = vhs switches
     	i386Reg' = i386Reg switches
     	vsaves' = vsaves switches
     	vrests' = vrests switches
-    	hprel = hpRelToInt target 
-        as = amodeCode target
-        as' = amodeCode' target
+    	hprel = hpRelToInt target
+	as = amodeCode target
+	as' = amodeCode' target
     	csz = charLikeSize target
     	isz = intLikeSize target
     	mhs' = mhs switches
     	dhs' = dhs switches
     	ps = genPrimCode target
     	mc = genMacroCode target
-    	hc = doHeapCheck --UNUSED NOW: target
+    	hc = doHeapCheck
     	target = mkTarget {-switches-} fhs' vhs' i386Reg' {-id-} size
     	    	    	  hprel as as'
 			  (vsaves', vrests', csz, isz, mhs', dhs', ps, mc, hc)
@@ -199,6 +193,6 @@ mkI386 decentOS switches =
     in
     (target, i386CodeGen, decentOS, id)
 \end{code}
-            
+
 
 

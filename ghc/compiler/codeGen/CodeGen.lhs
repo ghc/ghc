@@ -17,19 +17,13 @@ functions drive the mangling of top-level bindings.
 \begin{code}
 #include "HsVersions.h"
 
-module CodeGen (
-	codeGen,
-
-	-- and to make the interface self-sufficient...
-	UniqFM, AbstractC, StgBinding, Id, FiniteMap
-    ) where
-
+module CodeGen ( codeGen ) where
 
 import StgSyn
 import CgMonad
 import AbsCSyn
 
-import CLabelInfo	( modnameToC )
+import CLabel	( modnameToC )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits, TCE(..), UniqFM )
@@ -38,7 +32,7 @@ import CmdLineOpts
 import FiniteMap	( FiniteMap )
 import Maybes		( Maybe(..) )
 import Pretty		-- debugging only
-import PrimKind		( getKindSize )
+import PrimRep		( getPrimRepSize )
 import Util
 \end{code}
 
@@ -47,47 +41,22 @@ codeGen :: FAST_STRING		-- module name
 	-> ([CostCentre],	-- local cost-centres needing declaring/registering
 	    [CostCentre])	-- "extern" cost-centres needing declaring
 	-> [FAST_STRING]	-- import names
-	-> (GlobalSwitch -> SwitchResult)
-				-- global switch lookup function
 	-> [TyCon]		-- tycons with data constructors to convert
-	-> FiniteMap TyCon [(Bool, [Maybe UniType])]
+	-> FiniteMap TyCon [(Bool, [Maybe Type])]
 				-- tycon specialisation info
-	-> PlainStgProgram	-- bindings to convert
+	-> [StgBinding]	-- bindings to convert
 	-> AbstractC		-- output
 
-codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons tycon_specs stg_pgm
+codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg_pgm
   = let
-	switch_is_on	  = switchIsOn   sw_lookup_fn
-	int_switch_set	  = intSwitchSet sw_lookup_fn
-	doing_profiling   = switch_is_on SccProfilingOn
-	compiling_prelude = switch_is_on CompilingPrelude
+	doing_profiling   = opt_SccProfilingOn
+	compiling_prelude = opt_CompilingPrelude
 	maybe_split       = if (switch_is_on (EnsureSplittableC (panic "codeGen:esc")))
 			    then CSplitMarker
 			    else AbsCNop
 
 	cinfo = MkCompInfo switch_is_on int_switch_set mod_name
     in
-
-{- OLD:
-    pprTrace "codeGen:" (ppCat [
-    (case (switch_is_on StgDoLetNoEscapes) of
-	False -> ppStr "False?"
-	True  -> ppStr "True?"
-    ),
-    (case (int_switch_set ReturnInRegsThreshold) of
-	Nothing -> ppStr "Nothing!"
-	Just  n -> ppCat [ppStr "Just", ppInt n]
-    ),
-    (case (int_switch_set UnfoldingUseThreshold) of
-	Nothing -> ppStr "Nothing!"
-	Just  n -> ppCat [ppStr "Just", ppInt n]
-    ),
-    (case (int_switch_set UnfoldingCreationThreshold) of
-	Nothing -> ppStr "Nothing!"
-	Just  n -> ppCat [ppStr "Just", ppInt n]
-    )
-    ]) $
--}
     if not doing_profiling then
 	mkAbstractCs [
 	    genStaticConBits cinfo gen_tycons tycon_specs,
@@ -122,12 +91,12 @@ codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons ty
 
     -----------------
     mkCcRegister ccs import_names
-      = let 
+      = let
 	    register_ccs     = mkAbstractCs (map mk_register ccs)
 	    register_imports = mkAbstractCs (map mk_import_register import_names)
 	in
 	mkAbstractCs [
-	    CCallProfCCMacro SLIT("START_REGISTER_CCS") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ mod_name)) AddrKind],
+	    CCallProfCCMacro SLIT("START_REGISTER_CCS") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ mod_name)) AddrRep],
 	    register_ccs,
 	    register_imports,
 	    CCallProfCCMacro SLIT("END_REGISTER_CCS") []
@@ -137,7 +106,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons ty
 	  = CCallProfCCMacro SLIT("REGISTER_CC") [mkCCostCentre cc]
 
 	mk_import_register import_name
-	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ import_name)) AddrKind]
+	  = CCallProfCCMacro SLIT("REGISTER_IMPORT") [CLitLit (modnameToC (SLIT("_reg") _APPEND_ import_name)) AddrRep]
 \end{code}
 
 %************************************************************************
@@ -157,18 +126,18 @@ style, with the increasing static environment being plumbed as a state
 variable.
 
 \begin{code}
-cgTopBindings :: AbstractC -> PlainStgProgram -> Code
+cgTopBindings :: AbstractC -> [StgBinding] -> Code
 
 cgTopBindings split bindings = mapCs (cgTopBinding split) bindings
-  
-cgTopBinding :: AbstractC -> PlainStgBinding -> Code
 
-cgTopBinding split (StgNonRec name rhs) 
+cgTopBinding :: AbstractC -> StgBinding -> Code
+
+cgTopBinding split (StgNonRec name rhs)
   = absC split		`thenC`
     cgTopRhs name rhs	`thenFC` \ (name, info) ->
     addBindC name info
 
-cgTopBinding split (StgRec pairs) 
+cgTopBinding split (StgRec pairs)
   = absC split		`thenC`
     fixC (\ new_binds -> addBindsC new_binds	`thenC`
 			 mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs
@@ -179,13 +148,13 @@ cgTopBinding split (StgRec pairs)
 -- to enclose the listFCs in cgTopBinding, but that tickled the
 -- statics "error" call in initC.  I DON'T UNDERSTAND WHY!
 
-cgTopRhs :: Id -> PlainStgRhs -> FCode (Id, CgIdInfo)
+cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along for setting up a binding...
 
 cgTopRhs name (StgRhsCon cc con args)
   = forkStatics (cgTopRhsCon name con args (all zero_size args))
   where
-    zero_size atom = getKindSize (getAtomKind atom) == 0
+    zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
 
 cgTopRhs name (StgRhsClosure cc bi fvs upd_flag args body)
   = ASSERT(null fvs) -- There should be no free variables

@@ -1,0 +1,12 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_maybe where
+import Ubiq --  debugging consistency check
+import UgenUtil
+%}}
+type maybe;
+	nothing	: <> ;
+	just	: < gthing : VOID_STAR; > ;
+end;

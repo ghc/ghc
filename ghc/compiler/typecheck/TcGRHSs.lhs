@@ -6,52 +6,49 @@
 \begin{code}
 module TcGRHSs ( tcGRHSsAndBinds ) where
 
-import TcMonad		-- typechecking monad machinery
-import AbsSyn		-- the stuff being typechecked
+import Ubiq{-uitous-}
+import TcLoop -- for paranoia checking
 
-import AbsPrel		( boolTy )
-import E		( growE_LVE, E, LVE(..), TCE(..), UniqFM, CE(..) )
-			-- TCE and CE for pragmas only
-import Errors		( UnifyErrContext(..) )
-import LIE		( plusLIE, LIE )
-import TcBinds		( tcLocalBindsAndThen )
+import HsSyn		( GRHSsAndBinds(..), GRHS(..),
+			  HsExpr, HsBinds(..), InPat, OutPat, Bind, Sig, Fake )
+import RnHsSyn		( RenamedGRHSsAndBinds(..), RenamedGRHS(..) )
+import TcHsSyn		( TcGRHSsAndBinds(..), TcGRHS(..), TcIdOcc(..) )
+
+import TcMonad
+import Inst		( Inst, LIE(..), plusLIE )
+import TcBinds		( tcBindsAndThen )
 import TcExpr		( tcExpr )
+import TcType		( TcType(..) ) 
 import Unify		( unifyTauTy )
-import Util		-- pragmas only
+
+import PrelInfo		( boolTy )
 \end{code}
 
 \begin{code}
-tcGRHSs :: E -> [RenamedGRHS] -> TcM ([TypecheckedGRHS], LIE, UniType)
+tcGRHSs :: [RenamedGRHS] -> TcM s ([TcGRHS s], LIE s, TcType s)
 
-tcGRHSs e [grhs]
-  = tcGRHS e grhs	`thenTc` \ (grhs', lie, ty) ->
+tcGRHSs [grhs]
+  = tcGRHS grhs		`thenTc` \ (grhs', lie, ty) ->
     returnTc ([grhs'], lie, ty)
 
-tcGRHSs e gs@(grhs:grhss)
-  = tcGRHS  e grhs	`thenTc` \ (grhs',  lie1, ty1) ->
-    tcGRHSs e grhss	`thenTc` \ (grhss', lie2, ty2) ->
-
-    unifyTauTy ty1 ty2 (GRHSsBranchCtxt gs) `thenTc_`
-
+tcGRHSs (grhs:grhss)
+  = tcGRHS  grhs	`thenTc` \ (grhs',  lie1, ty1) ->
+    tcGRHSs grhss	`thenTc` \ (grhss', lie2, ty2) ->
+    unifyTauTy ty1 ty2	`thenTc_`
     returnTc (grhs' : grhss', lie1 `plusLIE` lie2, ty1)
 
 
-tcGRHS e (OtherwiseGRHS expr locn)
-  = addSrcLocTc locn	 (
-    tcExpr e expr	`thenTc` \ (expr, lie, ty) ->
+tcGRHS (OtherwiseGRHS expr locn)
+  = tcAddSrcLoc locn	 $
+    tcExpr expr	`thenTc` \ (expr, lie, ty) ->
     returnTc (OtherwiseGRHS expr locn, lie, ty)
-    )
 
-tcGRHS e (GRHS guard expr locn)
-  = addSrcLocTc locn		 (
-    tcExpr e guard		`thenTc` \ (guard2, guard_lie, guard_ty) ->
-
-    unifyTauTy guard_ty boolTy (GRHSsGuardCtxt guard) `thenTc_`
-
-    tcExpr e expr		`thenTc` \ (expr2, expr_lie, expr_ty) ->
-
+tcGRHS (GRHS guard expr locn)
+  = tcAddSrcLoc locn		$
+    tcExpr guard		`thenTc` \ (guard2, guard_lie, guard_ty) ->
+    unifyTauTy boolTy guard_ty	`thenTc_`
+    tcExpr expr			`thenTc` \ (expr2, expr_lie, expr_ty) ->
     returnTc (GRHS guard2 expr2 locn, plusLIE guard_lie expr_lie, expr_ty)
-    )
 \end{code}
 
 
@@ -59,18 +56,16 @@ tcGRHS e (GRHS guard expr locn)
 pieces.
 
 \begin{code}
-tcGRHSsAndBinds :: E 
-		-> RenamedGRHSsAndBinds
-		-> TcM (TypecheckedGRHSsAndBinds, LIE, UniType)
+tcGRHSsAndBinds :: RenamedGRHSsAndBinds
+		-> TcM s (TcGRHSsAndBinds s, LIE s, TcType s)
 
-tcGRHSsAndBinds e (GRHSsAndBindsIn grhss binds)
-  = tcLocalBindsAndThen e 
-	 combiner binds 
-	 (\e -> tcGRHSs e grhss		`thenTc` (\ (grhss', lie, ty) ->
-		returnTc (GRHSsAndBindsOut grhss' EmptyBinds ty, lie, ty) 
-		)
+tcGRHSsAndBinds (GRHSsAndBindsIn grhss binds)
+  = tcBindsAndThen
+	 combiner binds
+	 (tcGRHSs grhss		`thenTc` \ (grhss', lie, ty) ->
+	  returnTc (GRHSsAndBindsOut grhss' EmptyBinds ty, lie, ty)
 	 )
   where
-    combiner binds1 (GRHSsAndBindsOut grhss binds2 ty)
-	= GRHSsAndBindsOut grhss (binds1 `ThenBinds` binds2) ty
+    combiner binds1 (GRHSsAndBindsOut grhss binds2 ty) 
+ 	= GRHSsAndBindsOut grhss (binds1 `ThenBinds` binds2) ty
 \end{code}

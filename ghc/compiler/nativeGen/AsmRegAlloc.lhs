@@ -12,25 +12,20 @@ module AsmRegAlloc (
 	MachineRegisters(..), MachineCode(..),
 
 	mkReg, runRegAllocate, runHairyRegAllocate,
-	extractMappedRegNos,
+	extractMappedRegNos
 
 	-- And, for self-sufficiency
-	CLabel, OrdList, PrimKind, UniqSet(..), UniqFM,
-	FiniteMap, Unique
     ) where
 
-IMPORT_Trace
-
-import CLabelInfo	( CLabel )
+import CLabel	( CLabel )
 import FiniteMap
 import MachDesc
 import Maybes		( maybeToBool, Maybe(..) )
 import OrdList		-- ( mkUnitList, mkSeqList, mkParList, OrdList )
 import Outputable
 import Pretty
-import PrimKind		( PrimKind(..) )
 import UniqSet
-import Unique
+import Unique		( Unique )
 import Util
 
 #if ! OMIT_NATIVE_CODEGEN
@@ -83,16 +78,16 @@ data Reg = FixedReg  FAST_INT		-- A pre-allocated machine register
 
 	 | MappedReg FAST_INT		-- A dynamically allocated machine register
 
-	 | MemoryReg Int PrimKind	-- A machine "register" actually held in a memory
+	 | MemoryReg Int PrimRep	-- A machine "register" actually held in a memory
 					-- allocated table of registers which didn't fit
 					-- in real registers.
 
-	 | UnmappedReg Unique PrimKind	-- One of an infinite supply of registers,
+	 | UnmappedReg Unique PrimRep	-- One of an infinite supply of registers,
 					-- always mapped to one of the earlier two
 					-- before we're done.
 	 -- No thanks: deriving (Eq)
 
-mkReg :: Unique -> PrimKind -> Reg
+mkReg :: Unique -> PrimRep -> Reg
 mkReg = UnmappedReg
 
 instance Text Reg where
@@ -109,7 +104,7 @@ instance Outputable Reg where
 cmpReg (FixedReg i) (FixedReg i') = cmp_ihash i i'
 cmpReg (MappedReg i) (MappedReg i') = cmp_ihash i i'
 cmpReg (MemoryReg i _) (MemoryReg i' _) = cmp_i i i'
-cmpReg (UnmappedReg u _) (UnmappedReg u' _) = cmpUnique u u'
+cmpReg (UnmappedReg u _) (UnmappedReg u' _) = cmp u u'
 cmpReg r1 r2 =
     let tag1 = tagReg r1
 	tag2 = tagReg r2
@@ -136,17 +131,15 @@ instance Ord Reg where
     a <	 b = case cmpReg a b of { LT_ -> True;	EQ_ -> False; GT__ -> False }
     a >= b = case cmpReg a b of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
     a >	 b = case cmpReg a b of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-#ifdef __GLASGOW_HASKELL__
     _tagCmp a b = case cmpReg a b of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
-#endif
 
 instance NamedThing Reg where
-    -- the *only* method that should be defined is "getTheUnique"!
+    -- the *only* method that should be defined is "getItsUnique"!
     -- (so we can use UniqFMs/UniqSets on Regs
-    getTheUnique (UnmappedReg u _) = u
-    getTheUnique (FixedReg i)	   = mkPseudoUnique1 IBOX(i)
-    getTheUnique (MappedReg i)	   = mkPseudoUnique2 IBOX(i)
-    getTheUnique (MemoryReg i _)   = mkPseudoUnique3 i
+    getItsUnique (UnmappedReg u _) = u
+    getItsUnique (FixedReg i)	   = mkPseudoUnique1 IBOX(i)
+    getItsUnique (MappedReg i)	   = mkPseudoUnique2 IBOX(i)
+    getItsUnique (MemoryReg i _)   = mkPseudoUnique3 i
 \end{code}
 
 This is the generic register allocator.
@@ -167,7 +160,7 @@ exist (for allocation purposes, anyway).
 
 class MachineRegisters a where
     mkMRegs	    :: [Int] -> a
-    possibleMRegs   :: PrimKind -> a -> [Int]
+    possibleMRegs   :: PrimRep -> a -> [Int]
     useMReg	    :: a -> FAST_INT -> a
     useMRegs	    :: a -> [Int] -> a
     freeMReg	    :: a -> FAST_INT -> a
@@ -207,21 +200,17 @@ data RegLiveness
 	FutureLive
 
 class MachineCode a where
--- OLD:
---    flatten	    :: OrdList a -> [a]
       regUsage	    :: a -> RegUsage
       regLiveness   :: a -> RegLiveness -> RegLiveness
       patchRegs	    :: a -> (Reg -> Reg) -> a
       spillReg	    :: Reg -> Reg -> OrdList a
       loadReg	    :: Reg -> Reg -> OrdList a
-
 \end{code}
 
 First we try something extremely simple.
 If that fails, we have to do things the hard way.
 
 \begin{code}
-
 runRegAllocate
     :: (MachineRegisters a, MachineCode b)
     => a
@@ -230,7 +219,7 @@ runRegAllocate
     -> [b]
 
 runRegAllocate regs reserve_regs instrs =
-    case simpleAlloc of 
+    case simpleAlloc of
 	Just x  -> x
 	Nothing -> hairyAlloc
   where

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
 %
 \section[StgVarInfo]{Sets free/live variable info in STG syntax}
 
@@ -20,7 +20,6 @@ import StgSyn
 import Id		( getIdArity, externallyVisibleId )
 import IdInfo		-- ( arityMaybe, ArityInfo )
 
-import IdEnv
 import Maybes		( maybeToBool, Maybe(..) )
 import UniqSet
 import Util
@@ -44,7 +43,7 @@ it can be referred to {\em directly} again.  In particular, a dead
 variable's stack slot (if it has one):
 \begin{enumerate}
 \item
-should be stubbed to avoid space leaks, and 
+should be stubbed to avoid space leaks, and
 \item
 may be reused for something else.
 \end{enumerate}
@@ -52,14 +51,14 @@ may be reused for something else.
 There ought to be a better way to say this.  Here are some examples:
 \begin{verbatim}
 	let v = [q] \[x] -> e
-	in 
+	in
 	...v...	 (but no q's)
 \end{verbatim}
 
 Just after the `in', v is live, but q is dead.	If the whole of that
 let expression was enclosed in a case expression, thus:
 \begin{verbatim}
-	case (let v = [q] \[x] -> e in ...v...) of 
+	case (let v = [q] \[x] -> e in ...v...) of
 		alts[...q...]
 \end{verbatim}
 (ie @alts@ mention @q@), then @q@ is live even after the `in'; because
@@ -68,7 +67,7 @@ we'll return later to the @alts@ and need it.
 Let-no-escapes make this a bit more interesting:
 \begin{verbatim}
 	let-no-escape v = [q] \ [x] -> e
-	in 
+	in
 	...v...
 \end{verbatim}
 Here, @q@ is still live at the `in', because @v@ is represented not by
@@ -86,14 +85,14 @@ if @v@ is.
 Top-level:
 \begin{code}
 setStgVarInfo	:: Bool			-- True <=> do let-no-escapes
-		-> [PlainStgBinding]	-- input
-		-> [PlainStgBinding]	-- result
+		-> [StgBinding]	-- input
+		-> [StgBinding]	-- result
 
-setStgVarInfo want_LNEs pgm 
-  = pgm' 
+setStgVarInfo want_LNEs pgm
+  = pgm'
   where
     (pgm', _) = initLne want_LNEs (varsTopBinds pgm)
-    
+
 \end{code}
 
 For top-level guys, we basically aren't worried about this
@@ -101,7 +100,7 @@ live-variable stuff; we do need to keep adding to the environment
 as we step through the bindings (using @extendVarEnv@).
 
 \begin{code}
-varsTopBinds :: [PlainStgBinding] -> LneM ([PlainStgBinding], FreeVarsInfo)
+varsTopBinds :: [StgBinding] -> LneM ([StgBinding], FreeVarsInfo)
 
 varsTopBinds [] = returnLne ([], emptyFVInfo)
 varsTopBinds (bind:binds)
@@ -111,10 +110,10 @@ varsTopBinds (bind:binds)
     	returnLne ((bind' : binds'),
 		   (fv_binds `unionFVInfo` fv_bind) `minusFVBinders` binders
 		  )
-		   
+
     )
   where
-    env_extension = [(b, LetrecBound 
+    env_extension = [(b, LetrecBound
 				True {- top level -}
 				(rhsArity rhs)
 				emptyUniqSet)
@@ -128,8 +127,8 @@ varsTopBinds (bind:binds)
 
 
 varsTopBind :: FreeVarsInfo		-- Info about the body
-	    -> PlainStgBinding
-	    -> LneM (PlainStgBinding, FreeVarsInfo)
+	    -> StgBinding
+	    -> LneM (StgBinding, FreeVarsInfo)
 
 varsTopBind body_fvs (StgNonRec binder rhs)
   = varsRhs body_fvs (binder,rhs)		`thenLne` \ (rhs2, fvs, _) ->
@@ -140,7 +139,7 @@ varsTopBind body_fvs (StgRec pairs)
 	(binders, rhss) = unzip pairs
     in
     fixLne (\ ~(_, rec_rhs_fvs) ->
-	let 
+	let
 		scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
 	in
 	mapAndUnzip3Lne (varsRhs scope_fvs) pairs `thenLne` \ (rhss2, fvss, _) ->
@@ -154,41 +153,41 @@ varsTopBind body_fvs (StgRec pairs)
 
 \begin{code}
 varsRhs :: FreeVarsInfo		-- Free var info for the scope of the binding
-	-> (Id,PlainStgRhs)
-	-> LneM (PlainStgRhs, FreeVarsInfo, EscVarsSet)
+	-> (Id,StgRhs)
+	-> LneM (StgRhs, FreeVarsInfo, EscVarsSet)
 
 varsRhs scope_fv_info (binder, StgRhsCon cc con args)
   = varsAtoms args	`thenLne` \ fvs ->
     returnLne (StgRhsCon cc con args, fvs, getFVSet fvs)
 
-varsRhs scope_fv_info (binder, StgRhsClosure cc _ _ upd args body) 
+varsRhs scope_fv_info (binder, StgRhsClosure cc _ _ upd args body)
   = extendVarEnv [ (a, LambdaBound) | a <- args ] (
     do_body args body	`thenLne` \ (body2, body_fvs, body_escs) ->
     let
 	set_of_args	= mkUniqSet args
 	rhs_fvs		= body_fvs  `minusFVBinders` args
 	rhs_escs	= body_escs `minusUniqSet`   set_of_args
-        binder_info     = lookupFVInfo scope_fv_info binder
+	binder_info     = lookupFVInfo scope_fv_info binder
     in
-    returnLne (StgRhsClosure cc binder_info (getFVs rhs_fvs) upd args body2, 
+    returnLne (StgRhsClosure cc binder_info (getFVs rhs_fvs) upd args body2,
 	       rhs_fvs, rhs_escs)
     )
   where
 	-- Pick out special case of application in body of thunk
-    do_body [] (StgApp (StgVarAtom f) args _) = varsApp (Just upd) f args
+    do_body [] (StgApp (StgVarArg f) args _) = varsApp (Just upd) f args
     do_body _ other_body 		      = varsExpr other_body
 \end{code}
 
 \begin{code}
-varsAtoms :: [PlainStgAtom]
+varsAtoms :: [StgArg]
 	  -> LneM FreeVarsInfo
 
 varsAtoms atoms
   = mapLne var_atom atoms	`thenLne` \ fvs_lists ->
     returnLne (unionFVInfos fvs_lists)
   where
-    var_atom a@(StgLitAtom	   _) = returnLne emptyFVInfo
-    var_atom a@(StgVarAtom v)
+    var_atom a@(StgLitArg	   _) = returnLne emptyFVInfo
+    var_atom a@(StgVarArg v)
       = lookupVarEnv v	`thenLne` \ how_bound ->
 	returnLne (singletonFVInfo v how_bound stgArgOcc)
 \end{code}
@@ -202,21 +201,21 @@ varsAtoms atoms
 @varsExpr@ carries in a monad-ised environment, which binds each
 let(rec) variable (ie non top level, not imported, not lambda bound,
 not case-alternative bound) to:
-	- its STG arity, and 
-	- its set of live vars.	 
+	- its STG arity, and
+	- its set of live vars.
 For normal variables the set of live vars is just the variable
 itself.	 For let-no-escaped variables, the set of live vars is the set
 live at the moment the variable is entered.  The set is guaranteed to
 have no further let-no-escaped vars in it.
 
 \begin{code}
-varsExpr :: PlainStgExpr
-	 -> LneM (PlainStgExpr,	-- Decorated expr
+varsExpr :: StgExpr
+	 -> LneM (StgExpr,	-- Decorated expr
 		  FreeVarsInfo,	-- Its free vars (NB free, not live)
 		  EscVarsSet)	-- Its escapees, a subset of its free vars;
 				-- also a subset of the domain of the envt
 				-- because we are only interested in the escapees
-				-- for vars which might be turned into 
+				-- for vars which might be turned into
 				-- let-no-escaped ones.
 \end{code}
 
@@ -227,24 +226,24 @@ on these components, but it in turn is not scrutinised as the basis for any
 decisions.  Hence no black holes.
 
 \begin{code}
-varsExpr (StgApp lit@(StgLitAtom _) args _)
+varsExpr (StgApp lit@(StgLitArg _) args _)
   = --(if null args then id else (trace (ppShow 80 (ppr PprShowAll args)))) (
     returnLne (StgApp lit [] emptyUniqSet, emptyFVInfo, emptyUniqSet)
     --)
 
-varsExpr (StgApp fun@(StgVarAtom f) args _) = varsApp Nothing f args
+varsExpr (StgApp fun@(StgVarArg f) args _) = varsApp Nothing f args
 
-varsExpr (StgConApp con args _) 
+varsExpr (StgCon con args _)
   = getVarsLiveInCont		`thenLne` \ live_in_cont ->
     varsAtoms args		`thenLne` \ args_fvs ->
 
-    returnLne (StgConApp con args live_in_cont, args_fvs, getFVSet args_fvs)
+    returnLne (StgCon con args live_in_cont, args_fvs, getFVSet args_fvs)
 
-varsExpr (StgPrimApp op args _) 
+varsExpr (StgPrim op args _)
   = getVarsLiveInCont		`thenLne` \ live_in_cont ->
     varsAtoms args		`thenLne` \ args_fvs ->
 
-    returnLne (StgPrimApp op args live_in_cont, args_fvs, getFVSet args_fvs)
+    returnLne (StgPrim op args live_in_cont, args_fvs, getFVSet args_fvs)
 
 varsExpr (StgSCC ty label expr)
   = varsExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
@@ -345,24 +344,17 @@ then to let-no-escapes, if we wish.
 \begin{code}
 varsExpr (StgLetNoEscape _ _ _ _) = panic "varsExpr: unexpected StgLetNoEscape"
 
-varsExpr (StgLet bind body) 
+varsExpr (StgLet bind body)
   = isSwitchSetLne {-StgDoLetNoEscapes-} `thenLne` \ want_LNEs ->
 
     (fixLne (\ ~(_, _, _, no_binder_escapes) ->
-	let 
+	let
 	    non_escaping_let = want_LNEs && no_binder_escapes
 	in
-	vars_let non_escaping_let bind body 
+	vars_let non_escaping_let bind body
     ))					`thenLne` \ (new_let, fvs, escs, _) ->
 
     returnLne (new_let, fvs, escs)
-\end{code}
-
-\begin{code}
-#ifdef DPH
--- rest of varsExpr goes here
-
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 Applications:
@@ -372,24 +364,24 @@ varsApp :: Maybe UpdateFlag		-- Just upd <=> this application is
 					-- 	x = [...] \upd [] -> the_app
 					-- with specified update flag
 	-> Id				-- Function
-	-> [PlainStgAtom]		-- Arguments
-	-> LneM (PlainStgExpr, FreeVarsInfo, EscVarsSet)
+	-> [StgArg]		-- Arguments
+	-> LneM (StgExpr, FreeVarsInfo, EscVarsSet)
 
 varsApp maybe_thunk_body f args
   = getVarsLiveInCont		`thenLne` \ live_in_cont ->
 
     varsAtoms args		`thenLne` \ args_fvs ->
-  
+
     lookupVarEnv f		`thenLne` \ how_bound ->
-   
+
     let
-        n_args = length args
+	n_args = length args
 
 	fun_fvs = singletonFVInfo f how_bound fun_occ
 
 	fun_occ =
-	  case how_bound of 
-	    LetrecBound _ arity _ 
+	  case how_bound of
+	    LetrecBound _ arity _
 		| n_args == 0 -> stgFakeFunAppOcc   -- Function Application
 						    -- with no arguments.
 						    -- used by the lambda lifter.
@@ -414,13 +406,13 @@ varsApp maybe_thunk_body f args
 
 	fun_escs = case how_bound of
 
-		     LetrecBound _ arity lvs -> 
+		     LetrecBound _ arity lvs ->
 		       if arity == n_args then
 			  emptyUniqSet -- Function doesn't escape
 		       else
 			  myself -- Inexact application; it does escape
 
-		     other -> emptyUniqSet	-- Only letrec-bound escapees 
+		     other -> emptyUniqSet	-- Only letrec-bound escapees
 						-- are interesting
 
 	-- At the moment of the call:
@@ -440,9 +432,9 @@ varsApp maybe_thunk_body f args
 				   other	       -> emptyUniqSet
     in
     returnLne (
-	StgApp (StgVarAtom f) args live_at_call,
+	StgApp (StgVarArg f) args live_at_call,
 	fun_fvs  `unionFVInfo` args_fvs,
-	fun_escs `unionUniqSets` (getFVSet args_fvs)	
+	fun_escs `unionUniqSets` (getFVSet args_fvs)
 				-- All the free vars of the args are disqualified
 				-- from being let-no-escaped.
     )
@@ -451,9 +443,9 @@ varsApp maybe_thunk_body f args
 The magic for lets:
 \begin{code}
 vars_let :: Bool		-- True <=> yes, we are let-no-escaping this let
-	 -> PlainStgBinding	-- bindings
-	 -> PlainStgExpr	-- body
-    	 -> LneM (PlainStgExpr,	-- new let
+	 -> StgBinding	-- bindings
+	 -> StgExpr	-- body
+    	 -> LneM (StgExpr,	-- new let
 		  FreeVarsInfo,	-- variables free in the whole let
 		  EscVarsSet,	-- variables that escape from the whole let
 		  Bool)		-- True <=> none of the binders in the bindings
@@ -474,7 +466,7 @@ vars_let let_no_escape bind body
 	-- by virtue of being accessible via the free vars of the binding (lvs_from_fvs)
 	-- together with the live_in_cont ones
 	lookupLiveVarsForSet (bind_fvs `minusFVBinders` binders)	`thenLne` \ lvs_from_fvs ->
-	let 
+	let
 		bind_lvs = lvs_from_fvs `unionUniqSets` live_in_cont
 	in
 
@@ -482,19 +474,19 @@ vars_let let_no_escape bind body
 	-- but bind_lvs does not
 
   	-- Do the body
-        extendVarEnv env_ext (
-	        varsExpr body			`thenLne` \ (body2, body_fvs, body_escs) ->
-	        lookupLiveVarsForSet body_fvs	`thenLne` \ body_lvs ->
+	extendVarEnv env_ext (
+		varsExpr body			`thenLne` \ (body2, body_fvs, body_escs) ->
+		lookupLiveVarsForSet body_fvs	`thenLne` \ body_lvs ->
 
-	        returnLne (bind2, bind_fvs, bind_escs, bind_lvs,
-		           body2, body_fvs, body_escs, body_lvs)
+		returnLne (bind2, bind_fvs, bind_escs, bind_lvs,
+			   body2, body_fvs, body_escs, body_lvs)
 
     )) `thenLne` (\ (bind2, bind_fvs, bind_escs, bind_lvs,
 		     body2, body_fvs, body_escs, body_lvs) ->
 
 
 	-- Compute the new let-expression
-    let 
+    let
 	new_let = if let_no_escape then
 		     -- trace "StgLetNoEscape!" (
 		     StgLetNoEscape live_in_whole_let bind_lvs bind2 body2
@@ -508,7 +500,7 @@ vars_let let_no_escape bind body
 	live_in_whole_let
 	  = bind_lvs `unionUniqSets` (body_lvs `minusUniqSet` set_of_binders)
 
-	real_bind_escs = if let_no_escape then 
+	real_bind_escs = if let_no_escape then
 			    bind_escs
 			 else
 			    getFVSet bind_fvs
@@ -520,7 +512,7 @@ vars_let let_no_escape bind body
 						-- this let(rec)
 
 	no_binder_escapes = isEmptyUniqSet (set_of_binders `intersectUniqSets` all_escs)
-		-- Mustn't depend on the passed-in let_no_escape flag, since 
+		-- Mustn't depend on the passed-in let_no_escape flag, since
 		-- no_binder_escapes is used by the caller to derive the flag!
     in
     returnLne (
@@ -542,15 +534,15 @@ vars_let let_no_escape bind body
 			live_vars
 	  )
 	where
-	   live_vars = if let_no_escape then 
+	   live_vars = if let_no_escape then
 			    bind_lvs `unionUniqSets` singletonUniqSet binder
-		       else 
+		       else
 			    singletonUniqSet binder
 
-    vars_bind :: PlainStgLiveVars
+    vars_bind :: StgLiveVars
 	      -> FreeVarsInfo			-- Free var info for body of binding
-	      -> PlainStgBinding
-	      -> LneM (PlainStgBinding,
+	      -> StgBinding
+	      -> LneM (StgBinding,
 		       FreeVarsInfo, EscVarsSet,	-- free vars; escapee vars
 		       [(Id, HowBound)])
 					 -- extension to environment
@@ -569,7 +561,7 @@ vars_let let_no_escape bind body
 	in
 	extendVarEnv env_ext		  (
 	fixLne (\ ~(_, rec_rhs_fvs, _, _) ->
-		let 
+		let
 			rec_scope_fvs = unionFVInfo rec_body_fvs rec_rhs_fvs
 		in
 		mapAndUnzip3Lne (varsRhs rec_scope_fvs) pairs `thenLne` \ (rhss2, fvss, escss) ->
@@ -593,7 +585,7 @@ help.  All the stuff here is only passed {\em down}.
 \begin{code}
 type LneM a =  Bool			-- True <=> do let-no-escapes
 	    -> IdEnv HowBound
-	    -> PlainStgLiveVars		-- vars live in continuation
+	    -> StgLiveVars		-- vars live in continuation
 	    -> a
 
 type Arity = Int
@@ -602,14 +594,14 @@ data HowBound
   = ImportBound
   | CaseBound
   | LambdaBound
-  | LetrecBound	
+  | LetrecBound
 	Bool			-- True <=> bound at top level
 	Arity			-- Arity
-	PlainStgLiveVars	-- Live vars... see notes below
+	StgLiveVars	-- Live vars... see notes below
 \end{code}
 
-For a let(rec)-bound variable, x,  we record what varibles are live if 
-x is live.  For "normal" variables that is just x alone.  If x is 
+For a let(rec)-bound variable, x,  we record what varibles are live if
+x is live.  For "normal" variables that is just x alone.  If x is
 a let-no-escaped variable then x is represented by a code pointer and
 a stack pointer (well, one for each stack).  So all of the variables
 needed in the execution of x are live if x is, and are therefore recorded
@@ -620,11 +612,9 @@ The std monad functions:
 initLne :: Bool -> LneM a -> a
 initLne want_LNEs m = m want_LNEs nullIdEnv emptyUniqSet
 
-#ifdef __GLASGOW_HASKELL__
 {-# INLINE thenLne #-}
 {-# INLINE thenLne_ #-}
 {-# INLINE returnLne #-}
-#endif
 
 returnLne :: a -> LneM a
 returnLne e sw env lvs_cont = e
@@ -671,20 +661,14 @@ fixLne expr sw env lvs_cont = result
 
 Functions specific to this monad:
 \begin{code}
-{- NOT USED:
-ifSwitchSetLne :: GlobalSwitch -> LneM a -> LneM a -> LneM a
-ifSwitchSetLne switch then_ else_ switch_checker env lvs_cont
-  = (if switch_checker switch then then_ else else_) switch_checker env lvs_cont
--}
-
 isSwitchSetLne :: LneM Bool
 isSwitchSetLne want_LNEs env lvs_cont
   = want_LNEs
 
-getVarsLiveInCont :: LneM PlainStgLiveVars
+getVarsLiveInCont :: LneM StgLiveVars
 getVarsLiveInCont sw env lvs_cont = lvs_cont
 
-setVarsLiveInCont :: PlainStgLiveVars -> LneM a -> LneM a
+setVarsLiveInCont :: StgLiveVars -> LneM a -> LneM a
 setVarsLiveInCont new_lvs_cont expr sw env lvs_cont
   = expr sw env new_lvs_cont
 
@@ -705,7 +689,7 @@ lookupVarEnv v sw env lvs_cont
 -- only ever tacked onto a decorated expression. It is never used as
 -- the basis of a control decision, which might give a black hole.
 
-lookupLiveVarsForSet :: FreeVarsInfo -> LneM PlainStgLiveVars
+lookupLiveVarsForSet :: FreeVarsInfo -> LneM StgLiveVars
 
 lookupLiveVarsForSet fvs sw env lvs_cont
   = returnLne (unionManyUniqSets (map do_one (getFVs fvs)))
@@ -729,11 +713,11 @@ lookupLiveVarsForSet fvs sw env lvs_cont
 %************************************************************************
 
 \begin{code}
-type FreeVarsInfo = IdEnv (Id, Bool, StgBinderInfo)	
+type FreeVarsInfo = IdEnv (Id, Bool, StgBinderInfo)
 			-- If f is mapped to NoStgBinderInfo, that means
 			-- that f *is* mentioned (else it wouldn't be in the
 			-- IdEnv at all), but only in a saturated applications.
-			-- 
+			--
 			-- All case/lambda-bound things are also mapped to
 			-- NoStgBinderInfo, since we aren't interested in their
 			-- occurence info.
@@ -781,7 +765,7 @@ plusFVInfo (id1,top1,info1) (id2,top2,info2)
 \end{code}
 
 \begin{code}
-rhsArity :: PlainStgRhs -> Arity
+rhsArity :: StgRhs -> Arity
 rhsArity (StgRhsCon _ _ _)              = 0
 rhsArity (StgRhsClosure _ _ _ _ args _) = length args
 \end{code}

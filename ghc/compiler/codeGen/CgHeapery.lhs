@@ -11,7 +11,7 @@ module CgHeapery (
 	allocHeap, allocDynClosure,
 
 #ifdef GRAN
-        -- new for GrAnSim    HWL
+	-- new for GrAnSim    HWL
 	heapCheckOnly, fetchAndReschedule,
 #endif  {- GRAN -}
 
@@ -46,8 +46,8 @@ This is std code we replaced by the bits below for GrAnSim. -- HWL
 #ifndef GRAN
 
 heapCheck :: [MagicId] 		-- Live registers
-          -> Bool 		-- Node reqd after GC?
-	  -> Code 
+	  -> Bool 		-- Node reqd after GC?
+	  -> Code
 	  -> Code
 
 heapCheck regs node_reqd code
@@ -91,26 +91,26 @@ is not local) then an automatic context switch is done.
 #ifdef GRAN
 
 heapCheck :: [MagicId]          -- Live registers
-          -> Bool               -- Node reqd after GC?
-          -> Code 
-          -> Code
+	  -> Bool               -- Node reqd after GC?
+	  -> Code
+	  -> Code
 
 heapCheck = heapCheck' False
 
 heapCheckOnly :: [MagicId]          -- Live registers
-                 -> Bool               -- Node reqd after GC?
-                 -> Code 
-                 -> Code
+		 -> Bool               -- Node reqd after GC?
+		 -> Code
+		 -> Code
 
 heapCheckOnly = heapCheck' False
 
--- May be emit context switch and emit heap check macro 
+-- May be emit context switch and emit heap check macro
 
 heapCheck' ::   Bool                    -- context switch here?
-                -> [MagicId]            -- Live registers
-                -> Bool                 -- Node reqd after GC?
-                -> Code 
-                -> Code
+		-> [MagicId]            -- Live registers
+		-> Bool                 -- Node reqd after GC?
+		-> Code
+		-> Code
 
 heapCheck' do_context_switch regs node_reqd code
   = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
@@ -118,74 +118,74 @@ heapCheck' do_context_switch regs node_reqd code
 
     do_heap_chk :: HeapOffset -> Code
     do_heap_chk words_required
-      =         
-        -- HWL:: absC (CComment "Forced heap check --- HWL")  `thenC`
-        --absC  (if do_context_switch 
-        --         then context_switch_code
-        --         else AbsCNop)                                 `thenC`
+      =
+	-- HWL:: absC (CComment "Forced heap check --- HWL")  `thenC`
+	--absC  (if do_context_switch
+	--         then context_switch_code
+	--         else AbsCNop)                                 `thenC`
 
-        absC (if do_context_switch && not (isZeroOff words_required)
-                then context_switch_code
-                else AbsCNop)                                   `thenC`
-        absC (if isZeroOff(words_required)
-                then  AbsCNop 
-                else  checking_code)  `thenC`
+	absC (if do_context_switch && not (isZeroOff words_required)
+		then context_switch_code
+		else AbsCNop)                                   `thenC`
+	absC (if isZeroOff(words_required)
+		then  AbsCNop
+		else  checking_code)  `thenC`
 
-        -- HWL was here:
-        --  For GrAnSim we want heap checks even if no heap is allocated in 
-        --  the basic block to make context switches possible.
-        --  So, the if construct has been replaced by its else branch.
+	-- HWL was here:
+	--  For GrAnSim we want heap checks even if no heap is allocated in
+	--  the basic block to make context switches possible.
+	--  So, the if construct has been replaced by its else branch.
 
-            -- The test is *inside* the absC, to avoid black holes!
+	    -- The test is *inside* the absC, to avoid black holes!
 
-        -- Now we have set up the real heap pointer and checked there is
-        -- enough space. It remains only to reflect this in the environment
-        
-        setRealHp words_required
+	-- Now we have set up the real heap pointer and checked there is
+	-- enough space. It remains only to reflect this in the environment
 
-            -- The "word_required" here is a fudge.
-            -- *** IT DEPENDS ON THE DIRECTION ***, and on
-            -- whether the Hp is moved the whole way all
-            -- at once or not.
+	setRealHp words_required
+
+	    -- The "word_required" here is a fudge.
+	    -- *** IT DEPENDS ON THE DIRECTION ***, and on
+	    -- whether the Hp is moved the whole way all
+	    -- at once or not.
       where
-        all_regs = if node_reqd then node:regs else regs
-        liveness_mask = mkLiveRegsBitMask all_regs
+	all_regs = if node_reqd then node:regs else regs
+	liveness_mask = mkLiveRegsBitMask all_regs
 
-        maybe_context_switch = if do_context_switch
-                                then context_switch_code
-                                else AbsCNop
+	maybe_context_switch = if do_context_switch
+				then context_switch_code
+				else AbsCNop
 
-        context_switch_code = CMacroStmt THREAD_CONTEXT_SWITCH [
-                              mkIntCLit liveness_mask,
-                              mkIntCLit (if node_reqd then 1 else 0)]
+	context_switch_code = CMacroStmt THREAD_CONTEXT_SWITCH [
+			      mkIntCLit liveness_mask,
+			      mkIntCLit (if node_reqd then 1 else 0)]
 
-        -- Good old heap check (excluding context switch)
-        checking_code = CMacroStmt HEAP_CHK [
-                        mkIntCLit liveness_mask,
-                        COffset words_required,
-                        mkIntCLit (if node_reqd then 1 else 0)]
+	-- Good old heap check (excluding context switch)
+	checking_code = CMacroStmt HEAP_CHK [
+			mkIntCLit liveness_mask,
+			COffset words_required,
+			mkIntCLit (if node_reqd then 1 else 0)]
 
 -- Emit macro for simulating a fetch and then reschedule
 
 fetchAndReschedule ::   [MagicId]               -- Live registers
-                        -> Bool                 -- Node reqd
-                        -> Code 
+			-> Bool                 -- Node reqd
+			-> Code
 
 fetchAndReschedule regs node_reqd =
       if (node `elem` regs || node_reqd)
 	then fetch_code `thenC` reschedule_code
 	else absC AbsCNop
       where
-        all_regs = if node_reqd then node:regs else regs
-        liveness_mask = mkLiveRegsBitMask all_regs
+	all_regs = if node_reqd then node:regs else regs
+	liveness_mask = mkLiveRegsBitMask all_regs
 
-        reschedule_code = absC  (CMacroStmt GRAN_RESCHEDULE [
-                                 mkIntCLit liveness_mask,
-                                 mkIntCLit (if node_reqd then 1 else 0)])
+	reschedule_code = absC  (CMacroStmt GRAN_RESCHEDULE [
+				 mkIntCLit liveness_mask,
+				 mkIntCLit (if node_reqd then 1 else 0)])
 
-         --HWL: generate GRAN_FETCH macro for GrAnSim 
-         --     currently GRAN_FETCH and GRAN_FETCH_AND_RESCHEDULE are miai
-        fetch_code = absC (CMacroStmt GRAN_FETCH [])
+	 --HWL: generate GRAN_FETCH macro for GrAnSim
+	 --     currently GRAN_FETCH and GRAN_FETCH_AND_RESCHEDULE are miai
+	fetch_code = absC (CMacroStmt GRAN_FETCH [])
 
 #endif  {- GRAN -}
 \end{code}
@@ -219,10 +219,10 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
     let  info_offset = addOff virtHp (intOff 1)
 
 	-- do_move IS THE ASSIGNMENT FUNCTION
-         do_move (amode, offset_from_start)
+	 do_move (amode, offset_from_start)
 	   = CAssign (CVal (HpRel realHp
 				  (info_offset `addOff` offset_from_start))
-			   (getAmodeKind amode))
+			   (getAmodeRep amode))
 		     amode
     in
 	-- SAY WHAT WE ARE ABOUT TO DO
@@ -240,7 +240,7 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
 	-- GENERATE CC PROFILING MESSAGES
     costCentresC SLIT("CC_ALLOC") [blame_cc,
 			     COffset closure_size,
-			     CLitLit (_PK_ (closureKind closure_info)) IntKind]
+			     CLitLit (_PK_ (closureKind closure_info)) IntRep]
 					 		`thenC`
 
 	-- BUMP THE VIRTUAL HEAP POINTER

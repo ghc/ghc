@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -22,7 +22,7 @@ module AbsCSyn (
 	CAddrMode(..),
 	ReturnInfo(..),
 	mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
-	mkIntCLit, 
+	mkIntCLit,
 	mkAbsCStmtList,
 	mkCCostCentre,
 
@@ -46,64 +46,43 @@ module AbsCSyn (
 	-- closure info
 	ClosureInfo, LambdaFormInfo, UpdateFlag, SMRep,
 
-	-- stuff from AbsCFuns and PprAbsC...
-	nonemptyAbsC, flattenAbsC, getAmodeKind,
+	-- stuff from AbsCUtils and PprAbsC...
+	nonemptyAbsC, flattenAbsC, getAmodeRep,
 	mixedTypeLocn, mixedPtrLocn,
-#ifdef __GLASGOW_HASKELL__
 	writeRealC,
-#endif
 	dumpRealC,
-	kindFromMagicId, -- UNUSED: getDestinationRegs,
-	amodeCanSurviveGC,
+	kindFromMagicId,
+	amodeCanSurviveGC
 
 #ifdef GRAN
-	CostRes(Cost),
+	, CostRes(Cost)
 #endif
 
 	-- and stuff to make the interface self-sufficient
-	Outputable(..), NamedThing(..),
-	PrettyRep, ExportFlag, SrcLoc, Unique,
-	CSeq, PprStyle, Pretty(..), Unpretty(..),
-	-- blargh...
-	UniType,
-
-	PrimKind(..), -- re-exported NON-ABSTRACTLY
-	BasicLit(..), mkMachInt, mkMachWord,   -- re-exported NON-ABSTRACTLY
-	Id, ConTag(..), Maybe, PrimOp, SplitUniqSupply, TyCon,
-	CLabel, GlobalSwitch, CostCentre,
-	SimplifierSwitch, UniqSet(..), UniqFM, StgExpr, StgAtom
     ) where
 
-import AbsCFuns		-- used, and re-exported
+import AbsCUtils	-- used, and re-exported
 import ClosureInfo	-- ditto
 import Costs
 import PprAbsC		-- ditto
 import HeapOffs		hiding ( hpRelToInt )
 
-import AbsPrel		( PrimOp
+import PrelInfo		( PrimOp
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import CLabelInfo
-import CmdLineOpts	( GlobalSwitch(..), SimplifierSwitch )
-import BasicLit		( mkMachInt, mkMachWord, BasicLit(..) )
+import Literal		( mkMachInt, mkMachWord, Literal(..) )
+import CLabel
+import CgCompInfo   	( mAX_Vanilla_REG, mAX_Float_REG, mAX_Double_REG )
+import CostCentre	-- for CostCentre type
 import Id		( Id, ConTag(..), DataCon(..) )
 import Maybes		( Maybe )
 import Outputable
-import Unpretty		-- ********** NOTE **********
-import PrimKind		( PrimKind(..) )
-import CostCentre	-- for CostCentre type
-import StgSyn		( StgExpr, StgAtom, StgBinderInfo )
+import PrimRep		( PrimRep(..) )
+import StgSyn		( GenStgExpr, GenStgArg, StgBinderInfo )
 import UniqSet		( UniqSet(..), UniqFM )
-import Unique		( Unique )
+import Unpretty		-- ********** NOTE **********
 import Util
-
-#ifndef DPH
-import CgCompInfo   	( mAX_Vanilla_REG, mAX_Float_REG, mAX_Double_REG )
-#else
-import CgCompInfo	( spARelToInt, spBRelToInt )
-import DapInfo		( virtualHeapOffsetToInt   )
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 @AbstractC@ is a list of Abstract~C statements, but the data structure
@@ -120,7 +99,7 @@ A note on @CAssign@: In general, the type associated with an assignment
 is the type of the lhs.  However, when the lhs is a pointer to mixed
 types (e.g. SpB relative), the type of the assignment is the type of
 the rhs for float types, or the generic StgWord for all other types.
-(In particular, a CharKind on the rhs is promoted to IntKind when
+(In particular, a CharRep on the rhs is promoted to IntRep when
 stored in a mixed type location.)
 
 \begin{code}
@@ -130,7 +109,7 @@ stored in a mixed type location.)
 
   | CJump
 	CAddrMode	-- Put this in the program counter
-			-- eg `CJump (CReg (VanillaReg PtrKind 1))' puts Ret1 in PC
+			-- eg `CJump (CReg (VanillaReg PtrRep 1))' puts Ret1 in PC
 			-- Enter can be done by:
 			--	  CJump (CVal NodeRel zeroOff)
 
@@ -144,7 +123,7 @@ stored in a mixed type location.)
     	ReturnInfo  	-- How to get the return address from the base address
 
   | CSwitch CAddrMode
-	[(BasicLit, AbstractC)]	-- alternatives
+	[(Literal, AbstractC)]	-- alternatives
 	AbstractC		-- default; if there is no real Abstract C in here
 				-- (e.g., all comments; see function "nonemptyAbsC"),
 				-- then that means the default _cannot_ occur.
@@ -178,12 +157,12 @@ stored in a mixed type location.)
 	-- INVARIANT: When a PrimOp which can cause GC is used, the
 	-- only live data is tidily on the STG stacks or in the STG
 	-- registers (the code generator ensures this).
-	-- 
+	--
 	-- Why this?  Because if the arguments were arbitrary
 	-- addressing modes, they might be things like (Hp+6) which
 	-- will get utterly spongled by GC.
 
-  | CSimultaneous	-- Perform simultaneously all the statements 
+  | CSimultaneous	-- Perform simultaneously all the statements
 	AbstractC	-- in the nested AbstractC.  They are only
 			-- allowed to be CAssigns, COpStmts and AbsCNops, so the
 			-- "simultaneous" part just concerns making
@@ -200,8 +179,8 @@ stored in a mixed type location.)
 
   | CStaticClosure
 	CLabel	-- The (full, not base) label to use for labelling the closure.
-	ClosureInfo	
-	CAddrMode	-- cost centre identifier to place in closure	
+	ClosureInfo
+	CAddrMode	-- cost centre identifier to place in closure
 	[CAddrMode]	-- free vars; ptrs, then non-ptrs
 
 
@@ -239,30 +218,12 @@ stored in a mixed type location.)
 			-- False <=> extern; just say so
 	CostCentre
 
-{-UNUSED:
-  | CComment		-- to insert a comment into the output
-	FAST_STRING
--}
-
   | CClosureUpdInfo
     	AbstractC 	-- InRegs Info Table (CClosureInfoTable)
 			--                    ^^^^^^^^^^^^^^^^^
 			--                                out of date -- HWL
 
   | CSplitMarker	-- Split into separate object modules here
-
-#ifdef DPH
-  | CNativeInfoTableAndCode
-	ClosureInfo	-- Explains placement and layout of closure
-	String		-- closure description
-	AbstractC	-- We want to apply the trick outlined in the STG 
-			-- paper of putting the info table before the normal 
-			-- entry point to a function (well a very similar 
-			-- trick, see nativeDap/NOTES.static). By putting the 
-			-- abstractC here we stop the info table 
-			-- wandering off :-) (No post mangler hacking going
-			-- on here Will :-)
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 About @CMacroStmt@, etc.: notionally, they all just call some
@@ -291,17 +252,16 @@ data CStmtMacro
   | UPD_BH_SINGLE_ENTRY
   | PUSH_STD_UPD_FRAME
   | POP_STD_UPD_FRAME
---UNUSED:  | PUSH_CON_UPD_FRAME 
   | SET_ARITY
   | CHK_ARITY
   | SET_TAG
 #ifdef GRAN
-  | GRAN_FETCH	    		-- for GrAnSim only  -- HWL 
-  | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL 
-  | GRAN_FETCH_AND_RESCHEDULE	-- for GrAnSim only  -- HWL 
-  | THREAD_CONTEXT_SWITCH   	-- for GrAnSim only  -- HWL 
+  | GRAN_FETCH	    		-- for GrAnSim only  -- HWL
+  | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL
+  | GRAN_FETCH_AND_RESCHEDULE	-- for GrAnSim only  -- HWL
+  | THREAD_CONTEXT_SWITCH   	-- for GrAnSim only  -- HWL
 #endif
-  deriving Text 
+  deriving Text
 
 \end{code}
 
@@ -357,7 +317,7 @@ to the code to be resumed. (ToDo: update)
 Addressing modes: these have @PrimitiveKinds@ pinned on them.
 \begin{code}
 data CAddrMode
-  = CVal  RegRelative PrimKind
+  = CVal  RegRelative PrimRep
 			-- On RHS of assign: Contents of Magic[n]
 			-- On LHS of assign: location Magic[n]
 			-- (ie at addr Magic+n)
@@ -375,23 +335,21 @@ data CAddrMode
   | CTableEntry     	    -- CVal should be generalized to allow this
     	    	CAddrMode   -- Base
     	        CAddrMode   -- Offset
-    	    	PrimKind    -- For casting
+    	    	PrimRep    -- For casting
 
-  | CTemp Unique PrimKind	-- Temporary locations
+  | CTemp Unique PrimRep	-- Temporary locations
 	-- ``Temporaries'' correspond to local variables in C, and registers in
 	-- native code.
-	-- OLD: The kind (that used to be there) is redundant, but it's REALLY helpful for
-	-- generating C declarations
 
   | CLbl    CLabel	-- Labels in the runtime system, etc.
 			-- See comment under CLabelledData about (String,Name)
-	    PrimKind	-- the kind is so we can generate accurate C decls
+	    PrimRep	-- the kind is so we can generate accurate C decls
 
   | CUnVecLbl 	    	-- A choice of labels left up to the back end
     	      CLabel	-- direct
     	      CLabel	-- vectored
 
-  | CCharLike CAddrMode	-- The address of a static char-like closure for 
+  | CCharLike CAddrMode	-- The address of a static char-like closure for
 			-- the specified character.  It is guaranteed to be in
 			-- the range 0..255.
 
@@ -400,10 +358,10 @@ data CAddrMode
 			-- range mIN_INTLIKE..mAX_INTLIKE
 
   | CString FAST_STRING	-- The address of the null-terminated string
-  | CLit    BasicLit
+  | CLit    Literal
   | CLitLit FAST_STRING	-- completely literal literal: just spit this String
 			-- into the C output
-	    PrimKind
+	    PrimRep
 
   | COffset HeapOffset	-- A literal constant, not an offset *from* anything!
 			-- ToDo: this should really be CLitOffset
@@ -423,9 +381,9 @@ data CAddrMode
 				-- then the code for this thing will be entered
 
   | CMacroExpr
-    	PrimKind    	-- the kind of the result
+    	PrimRep    	-- the kind of the result
     	CExprMacro    	-- the macro to generate a value
-        [CAddrMode]   	-- and its arguments
+	[CAddrMode]   	-- and its arguments
 
   | CCostCentre		-- If Bool is True ==> it to be printed as a String,
 	CostCentre	-- (*not* as a C identifier or some such).
@@ -514,7 +472,7 @@ data MagicId
 
   -- Argument and return registers
   | VanillaReg		-- pointers, unboxed ints and chars
-	PrimKind	-- PtrKind, IntKind, CharKind, StablePtrKind or MallocPtrKind
+	PrimRep	-- PtrRep, IntRep, CharRep, StablePtrRep or MallocPtrRep
 			--	(in case we need to distinguish)
 	FAST_INT	-- its number (1 .. mAX_Vanilla_REG)
 
@@ -545,7 +503,6 @@ data MagicId
   | LivenessReg	-- (parallel only) used when we need to record explicitly
 		-- what registers are live
 
-  | ActivityReg	    	-- mentioned only in nativeGen (UNUSED)
   | StdUpdRetVecReg 	-- mentioned only in nativeGen
   | StkStubReg	    	-- register holding STK_STUB_closure (for stubbing dead stack slots)
 
@@ -553,33 +510,15 @@ data MagicId
 
   | VoidReg -- see "VoidPrim" type; just a placeholder; no actual register
 
-#ifdef DPH
--- In DPH we use:  
---	(VanillaReg X)  for pointers, ints, chars floats 
---	(DataReg X)     for ints chars or floats
---	(DoubleReg X)   first 32 bits of double in register X, second 32 in
---		        register X+1; DoubleReg is a synonymn for 
---			DataReg X; DataReg X+1
-
-  | DataReg
-	PrimKind
-	Int
-#endif {- Data Parallel Haskell -}
-
-node 	= VanillaReg PtrKind     ILIT(1) -- A convenient alias for Node
-infoptr = VanillaReg DataPtrKind ILIT(2) -- An alias for InfoPtr
+node 	= VanillaReg PtrRep     ILIT(1) -- A convenient alias for Node
+infoptr = VanillaReg DataPtrRep ILIT(2) -- An alias for InfoPtr
 \end{code}
 
 We need magical @Eq@ because @VanillaReg@s come in multiple flavors.
 
 \begin{code}
 instance Eq MagicId where
-#ifdef DPH
-    (FloatReg  f1) == (FloatReg  f2) = f1 == f2
-    (DoubleReg d1) == (DoubleReg d2) = d1 == d2
-    (DataReg _ d1) == (DataReg _ d2) = d1 == d2
-#endif {- Data Parallel Haskell -}
-    reg1	   == reg2	     = tagOf_MagicId reg1 _EQ_ tagOf_MagicId reg2
+    reg1 == reg2 = tagOf_MagicId reg1 _EQ_ tagOf_MagicId reg2
 
 tagOf_MagicId BaseReg		= (ILIT(0) :: FAST_INT)
 tagOf_MagicId StkOReg		= ILIT(1)
@@ -592,7 +531,6 @@ tagOf_MagicId SuB		= ILIT(7)
 tagOf_MagicId Hp		= ILIT(8)
 tagOf_MagicId HpLim		= ILIT(9)
 tagOf_MagicId LivenessReg	= ILIT(10)
---tagOf_MagicId ActivityReg	= ILIT(11) -- UNUSED
 tagOf_MagicId StdUpdRetVecReg	= ILIT(12)
 tagOf_MagicId StkStubReg	= ILIT(13)
 tagOf_MagicId CurCostCentre	= ILIT(14)
@@ -600,7 +538,6 @@ tagOf_MagicId VoidReg		= ILIT(15)
 
 tagOf_MagicId (VanillaReg _ i) = ILIT(15) _ADD_ i
 
-#ifndef DPH
 tagOf_MagicId (FloatReg i) = ILIT(15) _ADD_ maxv _ADD_ i
   where
     maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
@@ -609,11 +546,6 @@ tagOf_MagicId (DoubleReg i) = ILIT(15) _ADD_ maxv _ADD_ maxf _ADD_ i
   where
     maxv = case mAX_Vanilla_REG of { IBOX(x) -> x }
     maxf = case mAX_Float_REG   of { IBOX(x) -> x }
-
-#else
-tagOf_MagicId (DoubleReg i)	    = ILIT(1066) _ADD_ i -- Hacky, but we want disjoint
-tagOf_MagicId (DataReg _ IBOX(i))   = ILIT(1066) _ADD_ i -- range with Vanillas
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 Returns True for any register that {\em potentially} dies across
@@ -622,7 +554,7 @@ let the (machine-specific) registering macros sort things out...
 \begin{code}
 isVolatileReg :: MagicId -> Bool
 
-isVolatileReg any	= True
+isVolatileReg any = True
 --isVolatileReg (FloatReg _)	= True
 --isVolatileReg (DoubleReg _)	= True
 \end{code}
@@ -634,59 +566,3 @@ isVolatileReg any	= True
 %************************************************************************
 
 It's in \tr{PprAbsC.lhs}.
-
-%************************************************************************
-%*									*
-\subsection[EqInstances]{Eq instance for RegRelative & CAddrMode}
-%*									*
-%************************************************************************
-
-DPH requires CAddrMode to be in class Eq for its register allocation
-algorithm. The code for equality is rather conservative --- it doesnt
-matter if two things are determined to be not equal (even if they really are,
-i.e with CVal's), we just generate less efficient code.
-
-NOTE(07/04/93) It does matter, its doing really bad with the reg relative
- 	       stuff.
-
-\begin{code}
-#ifdef DPH
-instance Eq CAddrMode where
-  (CVal r _)          == (CVal r' _)        = r `eqRRel` r'	
-  (CAddr r)           == (CAddr r')         = r `eqRRel` r'
-  (CReg reg)          == (CReg reg')        = reg == reg'
-  (CTemp u _)         == (CTemp u' _)       = u == u'
-  (CLbl l _)          == (CLbl l' _)        = l == l'
-  (CUnVecLbl d v)     == (CUnVecLbl d' v')  = d == d' && v == v'
-  (CCharLike c)       == (CCharLike c')     = c == c'
-  (CIntLike c)        == (CIntLike c')      = c == c'
-  (CString str)       == (CString str')     = str == str'
-  (CLit lit)          == (CLit lit')        = lit == lit'
-  (COffset off)       == (COffset off')     = possiblyEqualHeapOffset off off'
-  (CCode _)           == (CCode _)          = panic "(==) Code in CAddrMode"
-  (CLabelledCode _ _) == (CLabelledCode _ _)= panic "(==) LabCode in CAddrMode"
-  _                   == _                  = False
-
-
-eqRRel :: RegRelative -> RegRelative -> Bool
-eqRRel (NodeRel x) (NodeRel y)	  
-  = virtualHeapOffsetToInt x == virtualHeapOffsetToInt y
-
-eqRRel l@(SpARel _ _) r@(SpARel _ _)    
-  = spARelToInt l == spARelToInt r
-
-eqRRel l@(SpBRel _ _) r@(SpBRel _ _)    
-  = spBRelToInt l == spBRelToInt r
-
-eqRRel (HpRel hp off) (HpRel hp' off')  
-  = (virtualHeapOffsetToInt (hp  `subOff` off)) == 
-    (virtualHeapOffsetToInt (hp' `subOff` off'))
-
-eqRRel _ _ = False
-
-eqRetInfo:: ReturnInfo -> ReturnInfo -> Bool
-eqRetInfo DirectReturn	    	    DirectReturn    	      = True
-eqRetInfo (StaticVectoredReturn x)  (StaticVectoredReturn x') = x == x'
-eqRetInfo _ 	    	    	    _ 			      = False
-#endif {- Data Parallel Haskell -}
-\end{code}

@@ -1,0 +1,138 @@
+Things which are ubiquitous in the GHC compiler.
+
+\begin{code}
+interface Ubiq where
+
+import PreludePS(_PackedString)
+
+import Bag		( Bag )
+import BinderInfo	( BinderInfo )
+import Class		( GenClass, GenClassOp, Class(..), ClassOp )
+import CmdLineOpts	( SimplifierSwitch, SwitchResult )
+import CoreSyn		( GenCoreArg, GenCoreBinder, GenCoreBinding, GenCoreExpr,
+			  GenCoreCaseAlts, GenCoreCaseDefault
+			)
+import CoreUnfold	( UnfoldingDetails, UnfoldingGuidance )
+import CostCentre	( CostCentre )
+import FiniteMap	( FiniteMap )
+import HsCore		( UnfoldingCoreExpr )
+import HsPat		( OutPat )
+import HsPragmas	( ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas,
+			  InstancePragmas
+			)
+import Id		( StrictnessMark, GenId, Id(..) )
+import IdInfo		( IdInfo, OptIdInfo(..), DeforestInfo, Demand, StrictnessInfo, UpdateInfo )
+import Kind		( Kind )
+import Literal		( Literal )
+import Maybes		( MaybeErr )
+import MatchEnv 	( MatchEnv )
+import Name		( Name )
+import NameTypes	( FullName, ShortName )
+import Outputable	( ExportFlag, NamedThing(..), Outputable(..) )
+import PprStyle		( PprStyle )
+import PragmaInfo	( PragmaInfo )
+import Pretty		( PrettyRep )
+import PrimOp		( PrimOp )
+import PrimRep		( PrimRep )
+import ProtoName	( ProtoName )
+import SrcLoc		( SrcLoc )
+import TcType		( TcMaybe )
+import TyCon		( TyCon, Arity(..) )
+import TyVar		( GenTyVar, TyVar(..) )
+import Type		( GenType, Type(..) )
+import UniqFM		( UniqFM )
+import UniqSupply	( UniqSupply )
+import Unique		( Unique )
+import Usage		( GenUsage, Usage(..) )
+import Util		( Ord3(..) )
+
+-- All the classes in GHC go; life is just too short
+-- to try to contain their visibility.
+
+class NamedThing a where
+	getExportFlag :: a -> ExportFlag
+	isLocallyDefined :: a -> Bool
+	getOrigName :: a -> (_PackedString, _PackedString)
+	getOccurrenceName :: a -> _PackedString
+	getInformingModules :: a -> [_PackedString]
+	getSrcLoc :: a -> SrcLoc
+	getItsUnique :: a -> Unique
+	fromPreludeCore :: a -> Bool
+class OptIdInfo a where
+	noInfo	:: a
+	getInfo	:: IdInfo -> a
+	addInfo	:: IdInfo -> a -> IdInfo
+	ppInfo	:: PprStyle -> (Id -> Id) -> a -> Int -> Bool -> PrettyRep
+class Ord3 a where
+	cmp :: a -> a -> Int#
+class Outputable a where
+	ppr :: PprStyle -> a -> Int -> Bool -> PrettyRep
+
+-- For datatypes, we ubiquitize those types that (a) are
+-- used everywhere and (b) the compiler doesn't lose much
+-- optimisation-wise by not seeing their pragma-gunk.
+
+data Bag a
+data BinderInfo
+data ClassOpPragmas a
+data ClassPragmas a
+data CostCentre
+data DataPragmas a
+data DeforestInfo
+data Demand
+data ExportFlag
+data FiniteMap a b
+data FullName	-- NB: fails the optimisation criterion
+data GenClass a b
+data GenClassOp a
+data GenCoreArg a b c
+data GenCoreBinder a b c
+data GenCoreBinding a b c d
+data GenCoreCaseAlts a b c d
+data GenCoreCaseDefault a b c d
+data GenCoreExpr a b c d
+data GenId a	-- NB: fails the optimisation criterion
+data GenPragmas a
+data GenTyVar a	-- NB: fails the optimisation criterion
+data GenType  a b
+data GenUsage a
+data IdInfo
+data InstancePragmas a
+data Kind
+data Literal
+data MaybeErr a b
+data MatchEnv a b
+data Name
+data OutPat a b c
+data PprStyle
+data PragmaInfo
+data PrettyRep
+data PrimOp
+data PrimRep	-- NB: an enumeration
+data ProtoName
+data ShortName	-- NB: fails the optimisation criterion
+data SimplifierSwitch
+data SrcLoc
+data StrictnessInfo
+data StrictnessMark
+data SwitchResult
+data TcMaybe s
+data TyCon
+data UnfoldingCoreExpr a
+data UniqFM a
+data UpdateInfo
+data UniqSupply
+data UnfoldingDetails
+data UnfoldingGuidance
+data Unique	-- NB: fails the optimisation criterion
+
+-- don't get clever and unexpand some of these synonyms
+-- (GHC 0.26 will barf)
+type Arity = Int
+type Class = GenClass (GenTyVar (GenUsage Unique)) Unique
+type ClassOp = GenClassOp (GenType (GenTyVar (GenUsage Unique)) Unique)
+type Id	   = GenId (GenType (GenTyVar (GenUsage Unique)) Unique)
+type Type  = GenType (GenTyVar (GenUsage Unique)) Unique
+type TyVar = GenTyVar (GenUsage Unique)
+type Usage = GenUsage Unique
+\end{code}

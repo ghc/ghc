@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1995
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[TysPrim]{Wired-in knowledge about primitive types}
 
@@ -11,12 +11,24 @@ types and operations.''
 
 module TysPrim where
 
-import PrelFuns		-- help functions, types and things
-import PrimKind
+import Ubiq
 
-import AbsUniType	( applyTyCon )
+import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind )
+import NameTypes	( mkPreludeCoreName, FullName )
+import PrelMods		( pRELUDE_BUILTIN )
+import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
+import TyCon		( mkPrimTyCon, mkDataTyCon,
+			  ConsVisible(..), NewOrData(..) )
+import TyVar		( GenTyVar(..), alphaTyVars )
+import Type		( applyTyCon, mkTyVarTy )
+import Usage		( usageOmega )
 import Unique
-import Util
+
+\end{code}
+
+\begin{code}
+alphaTys = map mkTyVarTy alphaTyVars
+(alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 \end{code}
 
 %************************************************************************
@@ -26,23 +38,49 @@ import Util
 %************************************************************************
 
 \begin{code}
+-- only used herein
+pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> ([PrimRep] -> PrimRep) -> TyCon
+pcPrimTyCon key name arity{-UNUSED-} kind_fn{-UNUSED-}
+  = mkPrimTyCon key full_name mkUnboxedTypeKind
+  where
+    full_name = mkPreludeCoreName pRELUDE_BUILTIN name
+
+
 charPrimTy	= applyTyCon charPrimTyCon []
-charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 (\ [] -> CharKind)
+charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 (\ [] -> CharRep)
 
 intPrimTy	= applyTyCon intPrimTyCon []
-intPrimTyCon	= pcPrimTyCon intPrimTyConKey SLIT("Int#") 0 (\ [] -> IntKind)
+intPrimTyCon	= pcPrimTyCon intPrimTyConKey SLIT("Int#") 0 (\ [] -> IntRep)
 
 wordPrimTy	= applyTyCon wordPrimTyCon []
-wordPrimTyCon	= pcPrimTyCon wordPrimTyConKey SLIT("Word#") 0 (\ [] -> WordKind)
+wordPrimTyCon	= pcPrimTyCon wordPrimTyConKey SLIT("Word#") 0 (\ [] -> WordRep)
 
 addrPrimTy	= applyTyCon addrPrimTyCon []
-addrPrimTyCon	= pcPrimTyCon addrPrimTyConKey SLIT("Addr#") 0 (\ [] -> AddrKind)
+addrPrimTyCon	= pcPrimTyCon addrPrimTyConKey SLIT("Addr#") 0 (\ [] -> AddrRep)
 
 floatPrimTy	= applyTyCon floatPrimTyCon []
-floatPrimTyCon	= pcPrimTyCon floatPrimTyConKey SLIT("Float#") 0 (\ [] -> FloatKind)
+floatPrimTyCon	= pcPrimTyCon floatPrimTyConKey SLIT("Float#") 0 (\ [] -> FloatRep)
 
 doublePrimTy	= applyTyCon doublePrimTyCon []
-doublePrimTyCon	= pcPrimTyCon doublePrimTyConKey SLIT("Double#") 0 (\ [] -> DoubleKind)
+doublePrimTyCon	= pcPrimTyCon doublePrimTyConKey SLIT("Double#") 0 (\ [] -> DoubleRep)
+\end{code}
+
+@PrimitiveKinds@ are used in @PrimitiveOps@, for which we often need
+to reconstruct various type information.  (It's slightly more
+convenient/efficient to make type info from kinds, than kinds [etc.]
+from type info.)
+
+\begin{code}
+getPrimRepInfo ::
+    PrimRep -> (String,		-- tag string
+		Type, TyCon)	-- prim type and tycon
+
+getPrimRepInfo CharRep   = ("Char",   charPrimTy,   charPrimTyCon)
+getPrimRepInfo IntRep    = ("Int",    intPrimTy,    intPrimTyCon)
+getPrimRepInfo WordRep   = ("Word",   wordPrimTy,   wordPrimTyCon)
+getPrimRepInfo AddrRep   = ("Addr",   addrPrimTy,   addrPrimTyCon)
+getPrimRepInfo FloatRep  = ("Float",  floatPrimTy,  floatPrimTyCon)
+getPrimRepInfo DoubleRep = ("Double", doublePrimTy, doublePrimTyCon)
 \end{code}
 
 %************************************************************************
@@ -56,7 +94,7 @@ Very similar to the @State#@ type.
 voidPrimTy = applyTyCon voidPrimTyCon []
   where
    voidPrimTyCon = pcPrimTyCon voidPrimTyConKey SLIT("Void#") 0
-			(\ [] -> VoidKind)
+			(\ [] -> VoidRep)
 \end{code}
 
 %************************************************************************
@@ -68,16 +106,23 @@ voidPrimTy = applyTyCon voidPrimTyCon []
 \begin{code}
 mkStatePrimTy ty = applyTyCon statePrimTyCon [ty]
 statePrimTyCon	 = pcPrimTyCon statePrimTyConKey SLIT("State#") 1
-			(\ [s_kind] -> VoidKind)
+			(\ [s_kind] -> VoidRep)
 \end{code}
 
 @_RealWorld@ is deeply magical.  It {\em is primitive}, but it
 {\em is not unboxed}.
 \begin{code}
-realWorldTy	  = applyTyCon realWorldTyCon []
+realWorldTy = applyTyCon realWorldTyCon []
 realWorldTyCon
-  = pcDataTyCon realWorldTyConKey pRELUDE_BUILTIN SLIT("_RealWorld") []
+  = mkDataTyCon realWorldTyConKey mkBoxedTypeKind full_name
+	[{-no tyvars-}]
+	[{-no context-}]
 	[{-no data cons!-}] -- we tell you *nothing* about this guy
+	[{-no derivings-}]
+	ConsInvisible
+	DataType
+  where
+    full_name = mkPreludeCoreName pRELUDE_BUILTIN SLIT("_RealWorld")
 
 realWorldStatePrimTy = mkStatePrimTy realWorldTy
 \end{code}
@@ -93,16 +138,16 @@ defined in \tr{TysWiredIn.lhs}, not here.
 
 \begin{code}
 arrayPrimTyCon	= pcPrimTyCon arrayPrimTyConKey SLIT("Array#") 1
-			(\ [elt_kind] -> ArrayKind)
+			(\ [elt_kind] -> ArrayRep)
 
 byteArrayPrimTyCon = pcPrimTyCon byteArrayPrimTyConKey SLIT("ByteArray#") 0
-			(\ [] -> ByteArrayKind)
+			(\ [] -> ByteArrayRep)
 
 mutableArrayPrimTyCon = pcPrimTyCon mutableArrayPrimTyConKey SLIT("MutableArray#") 2
-			(\ [s_kind, elt_kind] -> ArrayKind)
+			(\ [s_kind, elt_kind] -> ArrayRep)
 
 mutableByteArrayPrimTyCon = pcPrimTyCon mutableByteArrayPrimTyConKey SLIT("MutableByteArray#") 1
-			(\ [s_kind] -> ByteArrayKind)
+			(\ [s_kind] -> ByteArrayRep)
 
 mkArrayPrimTy elt    	    = applyTyCon arrayPrimTyCon [elt]
 byteArrayPrimTy	    	    = applyTyCon byteArrayPrimTyCon []
@@ -118,7 +163,7 @@ mkMutableByteArrayPrimTy s  = applyTyCon mutableByteArrayPrimTyCon [s]
 
 \begin{code}
 synchVarPrimTyCon = pcPrimTyCon synchVarPrimTyConKey SLIT("SynchVar#") 2
-			(\ [s_kind, elt_kind] -> PtrKind)
+			(\ [s_kind, elt_kind] -> PtrRep)
 
 mkSynchVarPrimTy s elt 	    = applyTyCon synchVarPrimTyCon [s, elt]
 \end{code}
@@ -131,7 +176,7 @@ mkSynchVarPrimTy s elt 	    = applyTyCon synchVarPrimTyCon [s, elt]
 
 \begin{code}
 stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConKey SLIT("StablePtr#") 1
-			(\ [elt_kind] -> StablePtrKind)
+			(\ [elt_kind] -> StablePtrRep)
 
 mkStablePtrPrimTy ty = applyTyCon stablePtrPrimTyCon [ty]
 \end{code}
@@ -158,5 +203,5 @@ could possibly be added?)
 
 \begin{code}
 mallocPtrPrimTyCon = pcPrimTyCon mallocPtrPrimTyConKey SLIT("MallocPtr#") 0
-			(\ [] -> MallocPtrKind)
+			(\ [] -> MallocPtrRep)
 \end{code}

@@ -1,66 +1,48 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
 #include "HsVersions.h"
 
-module TcPat (
-	tcPat
-#ifdef DPH
-	, tcPats
-#endif
-    ) where
+module TcPat ( tcPat ) where
 
-import TcMonad		-- typechecking monad machinery
-import TcMonadFns	( newOpenTyVarTy, newPolyTyVarTy,
-			  newPolyTyVarTys, copyTyVars, newMethod,
-			  newOverloadedLit
-			)
-import AbsSyn		-- the stuff being typechecked
+import Ubiq{-uitous-}
 
-import AbsPrel		( charPrimTy, intPrimTy, floatPrimTy,
+import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
+			  Match, HsBinds, Qual, PolyType,
+			  ArithSeqInfo, Stmt, Fake )
+import RnHsSyn		( RenamedPat(..) )
+import TcHsSyn		( TcPat(..), TcIdOcc(..) )
+
+import TcMonad
+import Inst		( Inst, OverloadedLit(..), InstOrigin(..), LIE(..),
+			  emptyLIE, plusLIE, newMethod, newOverloadedLit )
+import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
+			  tcLookupLocalValueOK )
+import TcType 		( TcType(..), TcMaybe, tcInstType, newTyVarTy, newTyVarTys )
+import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
+
+import Bag		( Bag )
+import CmdLineOpts	( opt_IrrefutableTuples )
+import ErrUtils		( arityErr )
+import Id		( GenId, idType )
+import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
+import Name		( Name )
+import PprType		( GenType, GenTyVar )
+import PrelInfo		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, charTy, stringTy, mkListTy,
-			  mkTupleTy, addrTy, addrPrimTy, --OLD: eqStringId
-			  PrimOp
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-#ifdef DPH
-			  ,mkProcessorTy, toDomainId
-#endif {- Data Parallel Haskell -}
-			)
-import AbsUniType	( instantiateTauTy, applyTyCon, InstTyEnv(..)
-			  IF_ATTACK_PRAGMAS(COMMA instantiateTy)
-			)
-import CmdLineOpts	( GlobalSwitch(..) )
-import Id		( mkInstId, getIdUniType, getDataConSig,
-			  getInstantiatedDataConSig, Id, DataCon(..)
-			)
-import Inst
-import E		( lookupE_Binder, lookupE_Value,
-			  lookupE_ClassOpByKey, E,
-			  LVE(..), TCE(..), UniqFM, CE(..)
-			-- TCE and CE for pragmas only
-			)
-import Errors		( dataConArityErr, Error(..), UnifyErrContext(..)
-			)
-import LIE		( nullLIE, plusLIE, mkLIE, LIE )
-import Unify
-import Unique		-- some ClassKey stuff
-import Util
+			  mkTupleTy, addrTy, addrPrimTy )
+import Pretty
+import Type		( Type(..), GenType, splitFunTy, splitSigmaTy )
+import TyVar		( GenTyVar )
+import Unique		( Unique, eqClassOpKey )
 
-#ifdef DPH
-import TcParQuals
-#endif {- Data Parallel Haskell -}
 \end{code}
 
-The E passed in already contains bindings for all the variables in
-the pattern, usually to fresh type variables (but maybe not, if there
-were type signatures present).
-
 \begin{code}
-tcPat :: E -> RenamedPat -> TcM (TypecheckedPat, LIE, UniType)
+tcPat :: RenamedPat -> TcM s (TcPat s, LIE s, TcType s)
 \end{code}
 
 %************************************************************************
@@ -70,27 +52,24 @@ tcPat :: E -> RenamedPat -> TcM (TypecheckedPat, LIE, UniType)
 %************************************************************************
 
 \begin{code}
-tcPat e (VarPatIn name)
-  = let
-	id = lookupE_Binder e name
-    in
-    returnTc (VarPat id, nullLIE, getIdUniType id)
+tcPat (VarPatIn name)
+  = tcLookupLocalValueOK "tcPat1" name	`thenNF_Tc` \ id ->
+    returnTc (VarPat (TcId id), emptyLIE, idType id)
 
-tcPat e (LazyPatIn pat)
-  = tcPat e pat		`thenTc` \ (pat', lie, ty) ->
+tcPat (LazyPatIn pat)
+  = tcPat pat		`thenTc` \ (pat', lie, ty) ->
     returnTc (LazyPat pat', lie, ty)
 
-tcPat e pat_in@(AsPatIn name pat)
-  = let
-	id = lookupE_Binder e name
-    in
-    tcPat e pat				`thenTc` \ (pat', lie, ty) ->
-    unifyTauTy (getIdUniType id) ty (PatCtxt pat_in) `thenTc_`
-    returnTc (AsPat id pat', lie, ty)
+tcPat pat_in@(AsPatIn name pat)
+  = tcLookupLocalValueOK "tcPat2"  name	`thenNF_Tc` \ id ->
+    tcPat pat				`thenTc` \ (pat', lie, ty) ->
+    tcAddErrCtxt (patCtxt pat_in) 	$
+    unifyTauTy (idType id) ty		`thenTc_`
+    returnTc (AsPat (TcId id) pat', lie, ty)
 
-tcPat e (WildPatIn)
-  = newOpenTyVarTy    `thenNF_Tc` \ tyvar_ty ->
-    returnTc (WildPat tyvar_ty, nullLIE, tyvar_ty)
+tcPat (WildPatIn)
+  = newTyVarTy mkTypeKind	`thenNF_Tc` \ tyvar_ty ->
+    returnTc (WildPat tyvar_ty, emptyLIE, tyvar_ty)
 \end{code}
 
 %************************************************************************
@@ -100,29 +79,27 @@ tcPat e (WildPatIn)
 %************************************************************************
 
 \begin{code}
-tcPat e pat_in@(ListPatIn pats)
-  = tcPats e pats	`thenTc`    \ (pats', lie, tys) ->
-    newPolyTyVarTy	`thenNF_Tc` \ tyvar_ty ->
-
-    unifyTauTyList (tyvar_ty:tys) (PatCtxt pat_in) `thenTc_`
+tcPat pat_in@(ListPatIn pats)
+  = tcPats pats				`thenTc`    \ (pats', lie, tys) ->
+    newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ tyvar_ty ->
+    tcAddErrCtxt (patCtxt pat_in)	$
+    unifyTauTyList (tyvar_ty:tys)	`thenTc_`
 
     returnTc (ListPat tyvar_ty pats', lie, mkListTy tyvar_ty)
 
-tcPat e pat_in@(TuplePatIn pats)
+tcPat pat_in@(TuplePatIn pats)
   = let
 	arity = length pats
     in
-    tcPats e pats   `thenTc` \ (pats', lie, tys) ->
+    tcPats pats   			`thenTc` \ (pats', lie, tys) ->
 
-	-- We have to unify with fresh polymorphic type variables, to
-	-- make sure we record that the tuples can only contain boxed
-	-- types.
-    newPolyTyVarTys arity   `thenNF_Tc` \ tyvar_tys ->
+	-- Make sure we record that the tuples can only contain boxed types
+    newTyVarTys arity mkBoxedTypeKind  	`thenNF_Tc` \ tyvar_tys ->
 
-    unifyTauTyLists tyvar_tys tys (PatCtxt pat_in) `thenTc_`
+    tcAddErrCtxt (patCtxt pat_in)	$
+    unifyTauTyLists tyvar_tys tys	`thenTc_`
 
 	-- possibly do the "make all tuple-pats irrefutable" test:
-    getSwitchCheckerTc	`thenNF_Tc` \ sw_chkr ->
     let
 	unmangled_result = TuplePat pats'
 
@@ -130,8 +107,9 @@ tcPat e pat_in@(TuplePatIn pats)
 	-- so that we can experiment with lazy tuple-matching.
 	-- This is a pretty odd place to make the switch, but
 	-- it was easy to do.
+
 	possibly_mangled_result
-	  = if sw_chkr IrrefutableTuples
+	  = if opt_IrrefutableTuples
 	    then LazyPat unmangled_result
 	    else unmangled_result
 
@@ -168,26 +146,30 @@ ToDo: exploit new representation of constructors to make this more
 efficient?
 
 \begin{code}
-tcPat e pat_in@(ConPatIn name pats)
-  = let
-	con_id = lookupE_Value e name
-    in
-    tcPats e pats `thenTc` \ (pats', lie, tys) ->
+tcPat pat_in@(ConPatIn name pats)
+  = tcLookupGlobalValue name		`thenNF_Tc` \ con_id ->
 
-    matchConArgTys con_id tys (\ ty -> PatCtxt pat_in) `thenTc` \ data_ty ->
+    tcPats pats				`thenTc` \ (pats', lie, tys) ->
 
-    returnTc (ConPat con_id data_ty pats', lie, data_ty)
+    tcAddErrCtxt (patCtxt pat_in)	$
+    matchConArgTys con_id tys 		`thenTc` \ data_ty ->
 
-tcPat e pat_in@(ConOpPatIn pat1 op pat2) -- & in binary-op form...
-  = let
-	con_id = lookupE_Value e op
-    in
-    tcPats e [pat1, pat2]   `thenTc`	\ ([pat1',pat2'], lie, tys) ->
-	 -- ToDo: there exists a less ugly way, no doubt...
+    returnTc (ConPat con_id data_ty pats', 
+	      lie, 
+	      data_ty)
 
-    matchConArgTys con_id tys (\ ty -> PatCtxt pat_in) `thenTc` \ data_ty ->
+tcPat pat_in@(ConOpPatIn pat1 op pat2) -- & in binary-op form...
+  = tcLookupGlobalValue op		`thenNF_Tc` \ con_id ->
 
-    returnTc (ConOpPat pat1' con_id pat2' data_ty, lie, data_ty)
+    tcPat pat1				`thenTc` \ (pat1', lie1, ty1) ->
+    tcPat pat2				`thenTc` \ (pat2', lie2, ty2) ->
+
+    tcAddErrCtxt (patCtxt pat_in)	$
+    matchConArgTys con_id [ty1,ty2]	`thenTc` \ data_ty ->
+
+    returnTc (ConOpPat pat1' con_id pat2' data_ty, 
+	      lie1 `plusLIE` lie2, 
+	      data_ty)
 \end{code}
 
 %************************************************************************
@@ -197,38 +179,28 @@ tcPat e pat_in@(ConOpPatIn pat1 op pat2) -- & in binary-op form...
 %************************************************************************
 
 \begin{code}
-tcPat e (LitPatIn lit@(CharLit str))
-  = returnTc (LitPat lit charTy, nullLIE, charTy)
+tcPat (LitPatIn lit@(HsChar str))
+  = returnTc (LitPat lit charTy, emptyLIE, charTy)
 
-tcPat e (LitPatIn lit@(StringLit str))
-  = getSrcLocTc				`thenNF_Tc` \ loc ->
+tcPat (LitPatIn lit@(HsString str))
+  = tcLookupGlobalValueByKey eqClassOpKey	`thenNF_Tc` \ sel_id ->
+    newMethod (LiteralOrigin lit) 
+	      (RealId sel_id) [stringTy]	`thenNF_Tc` \ (lie, eq_id) ->
     let
-	origin = LiteralOrigin lit loc
-	eq_id  = lookupE_ClassOpByKey e eqClassKey  SLIT("==")
+	comp_op = HsApp (HsVar eq_id) (HsLitOut lit stringTy)
     in
-    newMethod origin eq_id [stringTy]	`thenNF_Tc` \ eq ->
-    let
-	comp_op = App (Var (mkInstId eq)) (Lit lit)
-    in
-    returnTc (NPat lit stringTy comp_op, mkLIE [eq], stringTy)
+    returnTc (NPat lit stringTy comp_op, lie, stringTy)
 
-{- OLD:
-tcPat e (LitPatIn lit@(StringLit str))
-  = returnTc (NPat lit stringTy comp_op, nullLIE, stringTy)
-  where
-    comp_op   = App (Var eqStringId) (Lit lit)
--}
-
-tcPat e (LitPatIn lit@(IntPrimLit _))
-  = returnTc (LitPat lit intPrimTy, nullLIE, intPrimTy)
-tcPat e (LitPatIn lit@(CharPrimLit _))
-  = returnTc (LitPat lit charPrimTy, nullLIE, charPrimTy)
-tcPat e (LitPatIn lit@(StringPrimLit _))
-  = returnTc (LitPat lit addrPrimTy, nullLIE, addrPrimTy)
-tcPat e (LitPatIn lit@(FloatPrimLit _))
-  = returnTc (LitPat lit floatPrimTy, nullLIE, floatPrimTy)
-tcPat e (LitPatIn lit@(DoublePrimLit _))
-  = returnTc (LitPat lit doublePrimTy, nullLIE, doublePrimTy)
+tcPat (LitPatIn lit@(HsIntPrim _))
+  = returnTc (LitPat lit intPrimTy, emptyLIE, intPrimTy)
+tcPat (LitPatIn lit@(HsCharPrim _))
+  = returnTc (LitPat lit charPrimTy, emptyLIE, charPrimTy)
+tcPat (LitPatIn lit@(HsStringPrim _))
+  = returnTc (LitPat lit addrPrimTy, emptyLIE, addrPrimTy)
+tcPat (LitPatIn lit@(HsFloatPrim _))
+  = returnTc (LitPat lit floatPrimTy, emptyLIE, floatPrimTy)
+tcPat (LitPatIn lit@(HsDoublePrim _))
+  = returnTc (LitPat lit doublePrimTy, emptyLIE, doublePrimTy)
 \end{code}
 
 %************************************************************************
@@ -238,109 +210,38 @@ tcPat e (LitPatIn lit@(DoublePrimLit _))
 %************************************************************************
 
 \begin{code}
-tcPat e (LitPatIn lit@(IntLit i))
-  = getSrcLocTc				`thenNF_Tc` \ loc ->
-    let
-	origin = LiteralOrigin lit loc
-    in
-    newPolyTyVarTy			`thenNF_Tc` \ tyvar_ty ->
-    let
-	from_int     = lookupE_ClassOpByKey e numClassKey SLIT("fromInt")
-	from_integer = lookupE_ClassOpByKey e numClassKey SLIT("fromInteger")
-	eq_id	     = lookupE_ClassOpByKey e eqClassKey  SLIT("==")
-    in
-    newOverloadedLit origin
-		     (OverloadedIntegral i from_int from_integer)
-		     tyvar_ty		`thenNF_Tc` \ over_lit ->
+tcPat (LitPatIn lit@(HsInt i))
+  = newTyVarTy mkBoxedTypeKind				`thenNF_Tc` \ tyvar_ty ->
+    newOverloadedLit origin  
+		     (OverloadedIntegral i) tyvar_ty	`thenNF_Tc` \ (lie1, over_lit_id) ->
 
-    newMethod origin eq_id [tyvar_ty]	`thenNF_Tc` \ eq ->
+    tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
+    newMethod origin (RealId eq_sel_id) [tyvar_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
 
-    returnTc (NPat lit tyvar_ty (App (Var (mkInstId eq))
-				     (Var (mkInstId over_lit))),
-	      mkLIE [over_lit, eq],
+    returnTc (NPat lit tyvar_ty (HsApp (HsVar eq_id)
+				       (HsVar over_lit_id)),
+	      lie1 `plusLIE` lie2,
 	      tyvar_ty)
+  where
+    origin = LiteralOrigin lit
 
-tcPat e (LitPatIn lit@(FracLit f))
-  = getSrcLocTc				`thenNF_Tc` \ loc ->
-    let
-	origin = LiteralOrigin lit loc
-    in
-    newPolyTyVarTy			`thenNF_Tc` \ tyvar_ty ->
-    let
-	eq_id	      = lookupE_ClassOpByKey e eqClassKey   	  SLIT("==")
-	from_rational = lookupE_ClassOpByKey e fractionalClassKey SLIT("fromRational")
-    in
+tcPat (LitPatIn lit@(HsFrac f))
+  = newTyVarTy mkBoxedTypeKind				`thenNF_Tc` \ tyvar_ty ->
     newOverloadedLit origin
-		     (OverloadedFractional f from_rational)
-		     tyvar_ty		`thenNF_Tc` \ over_lit ->
+		     (OverloadedFractional f) tyvar_ty	`thenNF_Tc` \ (lie1, over_lit_id) ->
 
-    newMethod origin eq_id [tyvar_ty]	`thenNF_Tc` \ eq ->
+    tcLookupGlobalValueByKey eqClassOpKey		`thenNF_Tc` \ eq_sel_id ->
+    newMethod origin (RealId eq_sel_id) [tyvar_ty]	`thenNF_Tc` \ (lie2, eq_id) ->
 
-    returnTc (NPat lit tyvar_ty (App (Var (mkInstId eq))
-			             (Var (mkInstId over_lit))),
-	      mkLIE [over_lit, eq],
+    returnTc (NPat lit tyvar_ty (HsApp (HsVar eq_id)
+				       (HsVar over_lit_id)),
+	      lie1 `plusLIE` lie2,
 	      tyvar_ty)
+  where
+    origin = LiteralOrigin lit
 
-tcPat e (LitPatIn lit@(LitLitLitIn s))
+tcPat (LitPatIn lit@(HsLitLit s))
   = error "tcPat: can't handle ``literal-literal'' patterns"
-{-
-  = getSrcLocTc				`thenNF_Tc` \ loc ->
-    let
-	origin = LiteralOrigin lit loc
-    in
-    newPolyTyVarTy			`thenNF_Tc` \ tyvar_ty ->
-    let
-	eq_id = lookupE_ClassOpByKey e eqClassKey "=="
-    in
-    newOverloadedLit origin
-		     (OverloadedLitLit s)
-		     tyvar_ty		`thenNF_Tc` \ over_lit ->
-
-    newMethod origin eq_id [tyvar_ty]	`thenNF_Tc` \ eq ->
-
-    returnTc (NPat lit tyvar_ty (App (Var (mkInstId eq))
-			             (Var (mkInstId over_lit))),
-	      mkLIE [over_lit, eq],
-	      tyvar_ty)
--}
-
-tcPat e (NPlusKPatIn name lit@(IntLit k))
-  = getSrcLocTc				`thenNF_Tc` \ loc ->
-    let
-	origin 	 = LiteralOrigin lit loc
-
-	local	 = lookupE_Binder e name
-	local_ty = getIdUniType local
-
-	ge_id        = lookupE_ClassOpByKey e ordClassKey SLIT(">=")
-	minus_id     = lookupE_ClassOpByKey e numClassKey SLIT("-")
-	from_int     = lookupE_ClassOpByKey e numClassKey SLIT("fromInt")
-	from_integer = lookupE_ClassOpByKey e numClassKey SLIT("fromInteger")
-    in
-    newOverloadedLit origin
-		     (OverloadedIntegral k from_int from_integer)
-		     local_ty		   `thenNF_Tc` \ over_lit ->
-
-    newMethod origin ge_id  	[local_ty] `thenNF_Tc` \ ge ->
-    newMethod origin minus_id	[local_ty] `thenNF_Tc` \ minus ->
-
-    returnTc (NPlusKPat local lit local_ty
-			(Var (mkInstId over_lit))
-			(Var (mkInstId ge))
-			(Var (mkInstId minus)),
-	      mkLIE [over_lit, ge, minus],
-	      local_ty)
-
-tcPat e (NPlusKPatIn pat other) = panic "TcPat:NPlusKPat: not an IntLit"
-
-#ifdef DPH
-tcPat e (ProcessorPatIn pats pat)
-  = tcPidPats e pats		`thenTc` \ (pats',convs, lie, tys)->
-    tcPat e pat 		`thenTc` \ (pat', ty, lie') ->
-    returnTc (ProcessorPat pats' convs pat',
-	      plusLIE lie lie',
-	      mkProcessorTy tys ty)
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 %************************************************************************
@@ -350,13 +251,13 @@ tcPat e (ProcessorPatIn pats pat)
 %************************************************************************
 
 \begin{code}
-tcPats :: E -> [RenamedPat] -> TcM ([TypecheckedPat], LIE, [UniType])
+tcPats :: [RenamedPat] -> TcM s ([TcPat s], LIE s, [TcType s])
 
-tcPats e [] = returnTc ([], nullLIE, [])
+tcPats [] = returnTc ([], emptyLIE, [])
 
-tcPats e (pat:pats)
-  = tcPat e pat			`thenTc` \ (pat',  lie,  ty)  ->
-    tcPats e pats		`thenTc` \ (pats', lie', tys) ->
+tcPats (pat:pats)
+  = tcPat pat		`thenTc` \ (pat',  lie,  ty)  ->
+    tcPats pats		`thenTc` \ (pats', lie', tys) ->
 
     returnTc (pat':pats', plusLIE lie lie', ty:tys)
 \end{code}
@@ -365,25 +266,31 @@ tcPats e (pat:pats)
 unifies the actual args against the expected ones.
 
 \begin{code}
-matchConArgTys :: Id -> [UniType] -> (UniType -> UnifyErrContext) -> TcM UniType
+matchConArgTys :: Id -> [TcType s] -> TcM s (TcType s)
 
-matchConArgTys con_id arg_tys err_ctxt
-  = let
+matchConArgTys con_id arg_tys
+  = tcInstType [] (idType con_id)		`thenNF_Tc` \ con_ty ->
+    let
 	no_of_args = length arg_tys
-	(sig_tyvars, sig_theta, sig_tys, _) = getDataConSig con_id
+	(con_tyvars, con_theta, con_tau) = splitSigmaTy con_ty
 	     -- Ignore the sig_theta; overloaded constructors only
 	     -- behave differently when called, not when used for
 	     -- matching.
-	con_arity  = length sig_tys
+	(con_args, con_result) = splitFunTy con_tau
+	con_arity  = length con_args
     in
-    getSrcLocTc				`thenNF_Tc` \ loc ->
-    checkTc (con_arity /= no_of_args) 
-	    (dataConArityErr con_id con_arity no_of_args loc) `thenTc_`
+    checkTc (con_arity == no_of_args)
+	    (arityErr "Constructor" con_id con_arity no_of_args)	`thenTc_`
 
-    copyTyVars sig_tyvars	      	`thenNF_Tc` \ (inst_env, _, new_tyvar_tys) ->
-    let 
-	(_,inst_arg_tys,inst_result_ty) = getInstantiatedDataConSig con_id new_tyvar_tys
-    in
-    unifyTauTyLists arg_tys inst_arg_tys (err_ctxt inst_result_ty)  `thenTc_`
-    returnTc inst_result_ty
+    unifyTauTyLists arg_tys con_args	 				`thenTc_`
+    returnTc con_result
+\end{code}
+
+
+% =================================================
+
+Errors and contexts
+~~~~~~~~~~~~~~~~~~~
+\begin{code}
+patCtxt pat sty = ppHang (ppStr "In the pattern:") 4 (ppr sty pat)
 \end{code}

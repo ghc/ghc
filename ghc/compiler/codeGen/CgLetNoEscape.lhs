@@ -22,9 +22,9 @@ import CgHeapery	( heapCheck )
 import CgRetConv	( assignRegs )
 import CgStackery	( mkVirtStkOffsets )
 import CgUsages		( setRealAndVirtualSps, getVirtSps )
-import CLabelInfo	( mkStdEntryLabel )
+import CLabel	( mkStdEntryLabel )
 import ClosureInfo	( mkLFLetNoEscape )
-import Id		( getIdKind )
+import Id		( getIdPrimRep )
 import Util
 \end{code}
 
@@ -39,8 +39,8 @@ import Util
 Consider:
 \begin{verbatim}
 	let x = fvs \ args -> e
-	in 
-	 	if ... then x else 
+	in
+	 	if ... then x else
 		if ... then x else ...
 \end{verbatim}
 @x@ is used twice (so we probably can't unfold it), but when it is
@@ -93,7 +93,7 @@ non-escaping.
 @x@ can even be recursive!  Eg:
 \begin{verbatim}
 	letrec x = [y] \ [v] -> if v then x True else ...
-	in 
+	in
 		...(x b)...
 \end{verbatim}
 
@@ -130,12 +130,12 @@ cgLetNoEscapeClosure
 	:: Id			-- binder
 	-> CostCentre 	   	-- NB: *** NOT USED *** ToDo (WDP 94/06)
 	-> StgBinderInfo	-- NB: ditto
-	-> PlainStgLiveVars	-- variables live in RHS, including the binders
+	-> StgLiveVars	-- variables live in RHS, including the binders
 				-- themselves in the case of a recursive group
-        -> EndOfBlockInfo       -- where are we going to?
-        -> Maybe VirtualSpBOffset -- Slot for current cost centre
+	-> EndOfBlockInfo       -- where are we going to?
+	-> Maybe VirtualSpBOffset -- Slot for current cost centre
 	-> [Id]			-- args (as in \ args -> body)
-    	-> PlainStgExpr		-- body (as in above)
+    	-> StgExpr		-- body (as in above)
 	-> FCode (Id, CgIdInfo)
 
 -- ToDo: deal with the cost-centre issues
@@ -145,37 +145,37 @@ cgLetNoEscapeClosure binder cc bi full_live_in_rhss rhs_eob_info maybe_cc_slot a
 	arity   = length args
 	lf_info = mkLFLetNoEscape arity full_live_in_rhss{-used???-}
     in
-    forkEvalHelp 
-        rhs_eob_info
+    forkEvalHelp
+	rhs_eob_info
 	(nukeDeadBindings full_live_in_rhss)
-	(forkAbsC (cgLetNoEscapeBody args body)) 
+	(forkAbsC (cgLetNoEscapeBody args body))
 	    	    	    	     	`thenFC` \ (vA, vB, code) ->
     let
 	label = mkStdEntryLabel binder -- arity
     in
-    absC (CCodeBlock label code) `thenC` 
+    absC (CCodeBlock label code) `thenC`
     returnFC (binder, letNoEscapeIdInfo binder vA vB lf_info)
 \end{code}
 
 \begin{code}
 cgLetNoEscapeBody :: [Id]		-- Args
-		  -> PlainStgExpr	-- Body
+		  -> StgExpr	-- Body
 		  -> Code
 
 cgLetNoEscapeBody all_args rhs
   = getVirtSps		`thenFC` \ (vA, vB) ->
     getIntSwitchChkrC	`thenFC` \ isw_chkr ->
     let
-	arg_kinds	= map getIdKind all_args
+	arg_kinds	= map getIdPrimRep all_args
 	(arg_regs, _)	= assignRegs isw_chkr [{-nothing live-}] arg_kinds
     	stk_args	= drop (length arg_regs) all_args
 
     	-- stk_args is the args which are passed on the stack at the fast-entry point
     	-- Using them, we define the stack layout
     	(spA_stk_args, spB_stk_args, stk_bxd_w_offsets, stk_ubxd_w_offsets)
-	  = mkVirtStkOffsets 
+	  = mkVirtStkOffsets
 		vA vB 		-- Initial virtual SpA, SpB
-		getIdKind 
+		getIdPrimRep
 		stk_args
     in
 

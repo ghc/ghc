@@ -1,0 +1,25 @@
+This module breaks the loops among the reader modules
+ReadPragmas and ReadPrefix.
+
+\begin{code}
+interface RdrLoop where
+
+import PreludeStdIO	( Maybe )
+
+import U_list		( U_list )
+import U_maybe		( U_maybe )
+import U_ttype  	( U_ttype )
+import UgenUtil		( UgnM(..), ParseTree(..) )
+import ReadPrefix	( rdConDecl, rdMonoType, wlkList, wlkMaybe, wlkMonoType )
+import RdrHsSyn		( ProtoNameMonoType(..), ProtoNameConDecl(..) )
+
+data U_list
+data U_ttype
+
+rdConDecl   :: ParseTree -> UgnM ProtoNameConDecl
+rdMonoType  :: ParseTree -> UgnM ProtoNameMonoType
+wlkList	    :: (_Addr -> UgnM a) -> U_list -> UgnM [a]
+wlkMaybe    :: (_Addr -> UgnM a) -> U_maybe -> UgnM (Maybe a)
+wlkMonoType :: U_ttype -> UgnM ProtoNameMonoType
+\end{code}
+
