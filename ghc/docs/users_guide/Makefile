@@ -11,7 +11,7 @@ endif
 SGML_SRCS = \
 	user.sgml \
 	intro.sgml \
-	3-01-notes.sgml \
+	3-02-notes.sgml \
 	using.sgml \
 	  runtime_control.sgml \
 	  profiling.sgml \
