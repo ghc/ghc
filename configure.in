@@ -207,6 +207,7 @@ i[[3456]]86-*-mingw32*)
 	# the gcc command-line used here with -mno-cygwin -mwin32
 	# to arrange for good things to happen.
 	CFLAGS="-mno-cygwin -mwin32 $CFLAGS"
+	CPPFLAGS="-mno-cygwin -mwin32 $CPPFLAGS"
         ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
