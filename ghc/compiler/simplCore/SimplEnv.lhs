@@ -60,10 +60,12 @@ import CostCentre	( CostCentre, isCurrentCostCentre, useCurrentCostCentre,
 			  currentOrSubsumedCosts
 			)
 import FiniteMap	-- lots of things
-import Id		( getInlinePragma,
+import Id		( IdEnv, IdSet, Id, 
+		          getInlinePragma,
 			  nullIdEnv, growIdEnvList, lookupIdEnv, delOneFromIdEnv,
 			  addOneToIdEnv, modifyIdEnv, modifyIdEnv_Directly,
-			  IdEnv, IdSet, Id )
+			  idMustBeINLINEd
+			)
 import Literal		( Literal )
 import Maybes		( expectJust )
 import OccurAnal	( occurAnalyseExpr )
@@ -263,7 +265,7 @@ setCaseScrutinee (SimplEnv chkr encl_cc ty_env id_env con_apps)
 the RHS of an Id that's marked with an INLINE pragma.  It is going to
 be inlined wherever they are used, and then all the inlining will take
 effect.  Meanwhile, there isn't much point in doing anything to the
-as-yet-un-INLINEd rhs.  Furthremore, it's very important to switch off
+as-yet-un-INLINEd rhs.  Furthermore, it's very important to switch off
 inlining!  because
 	(a) not doing so will inline a worker straight back into its wrapper!
 
@@ -291,12 +293,32 @@ all the unfolding info. At one point we did it by modifying the chkr so
 that it said "EssentialUnfoldingsOnly", but that prevented legitmate, and important,
 simplifications happening in the body of the RHS.
 
+6/98 update: 
+
+We don't prevent inlining from happening for identifiers
+that are marked as must-be-inlined. An example of where
+doing this is crucial is:
+  
+   class Bar a => Foo a where
+     ...g....
+   {-# INLINE f #-}
+   f :: Foo a => a -> b
+   f x = ....Foo_sc1...
+   
+If `f' needs to peer inside Foo's superclass, Bar, it refers
+to the appropriate super class selector, which is marked as
+must-inlineable. We don't generate any code for a superclass
+selector, so failing to inline it in the RHS of `f' will
+leave a reference to a non-existent id, with bad consequences.
+
 \begin{code}
 switchOffInlining :: SimplEnv -> SimplEnv
 switchOffInlining (SimplEnv chkr encl_cc ty_env (in_scope_ids, id_subst) con_apps)
   = SimplEnv chkr encl_cc ty_env (mapUFM forget in_scope_ids, id_subst) nullConApps
   where
-    forget (id, binder_info, rhs_info) = (id, noBinderInfo, NoUnfolding)
+    forget (id, binder_info, rhs_info)
+      | idMustBeINLINEd id	       = (id, binder_info, rhs_info)
+      | otherwise		       = (id, noBinderInfo, NoUnfolding)
 \end{code}
 
 
