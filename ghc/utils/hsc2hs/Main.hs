@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.9 2001/01/13 12:11:00 qrczak Exp $
+-- $Id: Main.hs,v 1.10 2001/01/13 19:46:49 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -12,12 +12,13 @@
 -- See the documentation in the Users' Guide for more details.
 
 import GetOpt
-import System    (getProgName, getArgs, ExitCode(..), system, exitWith, exitFailure)
-import Directory (removeFile)
+import System      (getProgName, getArgs, ExitCode(..), system, exitWith, exitFailure)
+import Directory   (removeFile)
 import Parsec
-import Monad     (liftM, liftM2, when)
-import Char      (ord, intToDigit, isSpace, isAlpha, isAlphaNum, toUpper)
-import List      (intersperse)
+import ParsecError
+import Monad       (liftM, liftM2, when)
+import Char        (ord, intToDigit, isSpace, isAlpha, isAlphaNum, toUpper)
+import List        (intersperse)
 
 version :: String
 version = "hsc2hs-0.64"
@@ -77,27 +78,45 @@ processFile flags name = do
         Right toks -> output flags name toks
 
 data Token
-    = Text String
-    | Special String String
+    = Text    SourcePos String
+    | Special SourcePos String String
 
 parser :: Parser [Token]
 parser = many (text <|> special)
 
 text :: Parser Token
-text =
-    liftM (Text . concat) $ many1
-    (   many1 (satisfy (\ch -> not (isAlpha ch || ch `elem` "\"#'-_{")))
-    <|> (do a <- satisfy (\ch -> isAlpha ch || ch == '_')
-            b <- many (satisfy (\ch -> isAlphaNum ch || ch == '_' || ch == '\''))
-            return (a:b))
-    <|> (do char '\"'; a <- hsString '\"'; char '\"'; return ("\""++a++"\""))
-    <|> (do try (string "##"); return "#")
-    <|> (do char '\''; a <- hsString '\''; char '\''; return ("\'"++a++"\'"))
-    <|> (do try (string "--"); a <- many (satisfy (/= '\n')); return ("--"++a))
-    <|> string "-"
-    <|> (do try (string "{-"); a <- hsComment; return ("{-"++a))
-    <|> string "{"
-    <?> "Haskell source")
+text = do
+    pos <- getPosition
+    liftM (Text pos . concat) $ many1
+        (   many1 (satisfy (\ch -> not (isAlpha ch || ch `elem` "\"#'-_{")))
+        <|> (do a <- satisfy (\ch -> isAlpha ch || ch == '_')
+                b <- many (satisfy (\ch -> isAlphaNum ch || ch == '_' || ch == '\''))
+                return (a:b))
+        <|> (do char '\"'; a <- hsString '\"'; char '\"'; return ("\""++a++"\""))
+        <|> (do try (string "##"); return "#")
+        <|> (do char '\''; a <- hsString '\''; char '\''; return ("\'"++a++"\'"))
+        <|> (do try (string "--"); a <- many (satisfy (/= '\n')); return ("--"++a))
+        <|> string "-"
+        <|> (do try (string "{-#"); optional (try linePragma); a <- hsComment; return ("{-#"++a))
+        <|> (do try (string "{-"); a <- hsComment; return ("{-"++a))
+        <|> string "{"
+        <?> "Haskell source")
+
+linePragma :: Parser ()
+linePragma = do
+    state <- getState
+    spaces
+    string "LINE"
+    skipMany1 space
+    line <- many1 digit
+    skipMany1 space
+    char '\"'
+    file <- many (satisfy (/= '\"'))
+    char '\"'
+    spaces
+    string "#-}"
+    setState state
+    setPosition (newPos file (read line - 1) 1)
 
 hsComment :: Parser String
 hsComment =
@@ -120,13 +139,14 @@ hsString quote =
 
 special :: Parser Token
 special = do
+    pos <- getPosition
     char '#'
     skipMany (oneOf " \t")
     key <- liftM2 (:) (letter <|> char '_') (many (alphaNum <|> char '_'))
         <?> "hsc directive"
     skipMany (oneOf " \t")
     arg <- argument pzero
-    return (Special key arg)
+    return (Special pos key arg)
 
 argument :: Parser String -> Parser String
 argument eol =
@@ -175,9 +195,9 @@ output flags name toks = let
         '/':_ -> progName
         _     -> "./"++progName
     
-    specials = [(key, arg) | Special key arg <- toks]
+    specials = [(pos, key, arg) | Special pos key arg <- toks]
     
-    needsC = any (\(key, _) -> key == "def") specials
+    needsC = any (\(_, key, _) -> key == "def") specials
     needsH = needsC
     
     includeGuard = map fixChar outHName
@@ -202,6 +222,7 @@ output flags name toks = let
         outHeaderCProg specials++
         "\nint main (void)\n{\n"++
         outHeaderHs flags (if needsH then Just outHName else Nothing) specials++
+        outHsLine (newPos name 0 1)++
         concatMap outTokenHs toks++
         "    return 0;\n}\n"
     
@@ -249,27 +270,28 @@ onlyOne what = do
     putStrLn ("Only one "++what++" may be specified")
     exitFailure
 
-outHeaderCProg :: [(String, String)] -> String
-outHeaderCProg = concatMap $ \(key, arg) -> case key of
-    "include"           -> "#include "++arg++"\n"
-    "define"            -> "#define "++arg++"\n"
-    "undef"             -> "#undef "++arg++"\n"
-    "def"               -> case arg of
-        's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
-        't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
+outHeaderCProg :: [(SourcePos, String, String)] -> String
+outHeaderCProg =
+    concatMap $ \(pos, key, arg) -> outCLine pos ++ case key of
+        "include"           -> "#include "++arg++"\n"
+        "define"            -> "#define "++arg++"\n"
+        "undef"             -> "#undef "++arg++"\n"
+        "def"               -> case arg of
+            's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
+            't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
+            _ -> ""
+        _ | conditional key -> "#"++key++" "++arg++"\n"
+        "let"               -> case break (== '=') arg of
+            (_,      "")     -> ""
+            (header, _:body) -> case break isSpace header of
+                (name, args) ->
+                    "#define hsc_"++name++"("++dropWhile isSpace args++") \
+                    \printf ("++joinLines body++");\n"
         _ -> ""
-    _ | conditional key -> "#"++key++" "++arg++"\n"
-    "let"               -> case break (== '=') arg of
-        (_,      "")     -> ""
-        (header, _:body) -> case break isSpace header of
-            (name, args) ->
-                "#define hsc_"++name++"("++dropWhile isSpace args++") \
-                \printf ("++joinLines body++");\n"
-    _ -> ""
     where
     joinLines = concat . intersperse " \\\n" . lines
 
-outHeaderHs :: [Flag] -> Maybe String -> [(String, String)] -> String
+outHeaderHs :: [Flag] -> Maybe String -> [(SourcePos, String, String)] -> String
 outHeaderHs flags inH toks =
     "#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 409\n\
     \    printf (\"{-# OPTIONS -optc-D__GLASGOW_HASKELL__=%d #-}\\n\", \
@@ -278,7 +300,7 @@ outHeaderHs flags inH toks =
     includeH++
     concatMap outSpecial toks
     where
-    outSpecial (key, arg) = case key of
+    outSpecial (pos, key, arg) = outCLine pos ++ case key of
         "include" -> case inH of
             Nothing -> outOption ("-#include "++arg)
             Just _  -> ""
@@ -304,53 +326,64 @@ outHeaderHs flags inH toks =
                   showCString s++"\");\n"
 
 outTokenHs :: Token -> String
-outTokenHs (Text s) = "    fputs (\""++showCString s++"\", stdout);\n"
-outTokenHs (Special key arg) = case key of
-    "include"           -> ""
-    "define"            -> ""
-    "undef"             -> ""
-    "def"               -> ""
-    _ | conditional key -> "#"++key++" "++arg++"\n"
-    "let"               -> ""
-    _                   -> "    hsc_"++key++" ("++arg++");\n"
+outTokenHs (Text pos text) =
+    case break (== '\n') text of
+        (all, [])       -> outText all
+        (first, _:rest) ->
+            outText (first++"\n")++
+            outHsLine pos++
+            outText rest
+    where
+    outText s = "    fputs (\""++showCString s++"\", stdout);\n"
+outTokenHs (Special pos key arg) =
+    outCLine pos ++ case key of
+        "include"           -> ""
+        "define"            -> ""
+        "undef"             -> ""
+        "def"               -> ""
+        _ | conditional key -> "#"++key++" "++arg++"\n"
+        "let"               -> ""
+        _                   -> "    hsc_"++key++" ("++arg++");\n"
 
-outTokenH :: (String, String) -> String
-outTokenH (key, arg) = case key of
-    "include" -> "#include "++arg++"\n"
-    "define"  -> "#define " ++arg++"\n"
-    "undef"   -> "#undef "  ++arg++"\n"
-    "def"     -> case arg of
-        's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
-        't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
-        'i':'n':'l':'i':'n':'e':' ':_ ->
-            "#ifdef __GNUC__\n\
-            \extern\n\
-            \#endif\n"++
-            arg++"\n"
-        _ -> "extern "++header++";\n"
-        where header = takeWhile (\c -> c/='{' && c/='=') arg
-    _ | conditional key -> "#"++key++" "++arg++"\n"
-    _ -> ""
+outTokenH :: (SourcePos, String, String) -> String
+outTokenH (pos, key, arg) =
+    outCLine pos ++ case key of
+        "include" -> "#include "++arg++"\n"
+        "define"  -> "#define " ++arg++"\n"
+        "undef"   -> "#undef "  ++arg++"\n"
+        "def"     -> case arg of
+            's':'t':'r':'u':'c':'t':' ':_ -> arg++"\n"
+            't':'y':'p':'e':'d':'e':'f':' ':_ -> arg++"\n"
+            'i':'n':'l':'i':'n':'e':' ':_ ->
+                "#ifdef __GNUC__\n\
+                \extern\n\
+                \#endif\n"++
+                arg++"\n"
+            _ -> "extern "++header++";\n"
+            where header = takeWhile (\c -> c/='{' && c/='=') arg
+        _ | conditional key -> "#"++key++" "++arg++"\n"
+        _ -> ""
 
-outTokenC :: (String, String) -> String
-outTokenC (key, arg) = case key of
-    "def" -> case arg of
-        's':'t':'r':'u':'c':'t':' ':_ -> ""
-        't':'y':'p':'e':'d':'e':'f':' ':_ -> ""
-        'i':'n':'l':'i':'n':'e':' ':_ ->
-            "#ifndef __GNUC__\n\
-            \extern\n\
-            \#endif\n"++
-            header++
-            "\n#ifndef __GNUC__\n\
-            \;\n\
-            \#else\n"++
-            body++
-            "\n#endif\n"
-        _ -> arg++"\n"
-        where (header, body) = span (\c -> c/='{' && c/='=') arg
-    _ | conditional key -> "#"++key++" "++arg++"\n"
-    _ -> ""
+outTokenC :: (SourcePos, String, String) -> String
+outTokenC (pos, key, arg) =
+    outCLine pos ++ case key of
+        "def" -> case arg of
+            's':'t':'r':'u':'c':'t':' ':_ -> ""
+            't':'y':'p':'e':'d':'e':'f':' ':_ -> ""
+            'i':'n':'l':'i':'n':'e':' ':_ ->
+                "#ifndef __GNUC__\n\
+                \extern\n\
+                \#endif\n"++
+                header++
+                "\n#ifndef __GNUC__\n\
+                \;\n\
+                \#else\n"++
+                body++
+                "\n#endif\n"
+            _ -> arg++"\n"
+            where (header, body) = span (\c -> c/='{' && c/='=') arg
+        _ | conditional key -> "#"++key++" "++arg++"\n"
+        _ -> ""
 
 conditional :: String -> Bool
 conditional "if"     = True
@@ -361,6 +394,24 @@ conditional "else"   = True
 conditional "endif"  = True
 conditional "error"  = True
 conditional _        = False
+
+sourceFileName :: SourcePos -> String
+sourceFileName pos = fileName (sourceName pos)
+    where
+    fileName s = case break (== '/') s of
+        (name, [])      -> name
+        (_,     _:rest) -> fileName rest
+
+outCLine :: SourcePos -> String
+outCLine pos =
+    "# "++show (sourceLine pos)++
+    " \""++showCString (sourceFileName pos)++"\"\n"
+
+outHsLine :: SourcePos -> String
+outHsLine pos =
+    "    printf (\"{-# LINE %d \\\"%s\\\" #-}\\n\", "++
+    show (sourceLine pos + 1)++", \""++
+    showCString (sourceFileName pos)++"\");\n"
 
 showCString :: String -> String
 showCString = concatMap showCChar
