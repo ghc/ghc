@@ -9,7 +9,7 @@ __interface PrelGHC 2 0 where
 
 __export PrelGHC
 
-  ->
+  ZLzmzgZR	-- (->)
 
   All	-- Pseudo class used for universal quantification
   CCallable
@@ -20,293 +20,295 @@ __export PrelGHC
 
   -- I/O primitives
   RealWorld
-  realWorld#
-  State#
+  realWorldzh
+  Statezh
 
   -- Concurrency primitives
-  ThreadId#
-  fork#
-  killThread#
-  delay#
-  waitRead#
-  waitWrite#
+  ThreadIdzh
+  forkzh
+  killThreadzh
+  delayzh
+  waitReadzh
+  waitWritezh
 
   -- MVars
-  MVar#
-  sameMVar#
-  newMVar#
-  takeMVar#
-  putMVar#
-  isEmptyMVar#
+  MVarzh
+  sameMVarzh
+  newMVarzh
+  takeMVarzh
+  putMVarzh
+  isEmptyMVarzh
   
   -- Parallel
-  seq#
-  par#
-  parGlobal#
-  parLocal#
-  parAt#
-  parAtAbs#
-  parAtRel#
-  parAtForNow#
+  seqzh
+  parzh
+  parGlobalzh
+  parLocalzh
+  parAtzh
+  parAtAbszh
+  parAtRelzh
+  parAtForNowzh
 
   -- Character Type
-  Char# 
-  gtChar#
-  geChar#
-  eqChar#
-  neChar#
-  ltChar#
-  leChar#
-  ord#
-  chr#
+  Charzh 
+  gtCharzh
+  geCharzh
+  eqCharzh
+  neCharzh
+  ltCharzh
+  leCharzh
+  ordzh
+  chrzh
   
   -- Int Type
-  Int#
-  >#
-  >=#
-  ==#
-  /=#
-  <#
-  <=#
-  +#
-  -#
-  *#
-  quotInt#
-  remInt#
-  negateInt#
-  iShiftL#
-  iShiftRA#
-  iShiftRL#
+  Intzh
+  zgzh
+  zgzezh
+  zezezh
+  zszezh
+  zlzh
+  zlzezh
+  zpzh
+  zmzh
+  ztzh
+  zszh
+  quotIntzh
+  remIntzh
+  negateIntzh
+  iShiftLzh
+  iShiftRAzh
+  iShiftRLzh
   
-  Word#
-  gtWord#
-  geWord#
-  eqWord#
-  neWord#
-  ltWord#
-  leWord#
-  quotWord#
-  remWord#
-  and#
-  or#
-  not#
-  xor#
-  shiftL#
-  shiftRL#
-  int2Word#
-  word2Int#
+  Wordzh
+  gtWordzh
+  geWordzh
+  eqWordzh
+  neWordzh
+  ltWordzh
+  leWordzh
+  quotWordzh
+  remWordzh
+  andzh
+  orzh
+  notzh
+  xorzh
+  shiftLzh
+--  shiftRAzh
+  shiftRLzh
+  int2Wordzh
+  word2Intzh
   
-  Word64#
+  Word64zh
 
-  Int64#
+  Int64zh
 
-  Addr#
-  gtAddr#
-  geAddr#
-  eqAddr#
-  neAddr#
-  ltAddr#
-  leAddr#
-  int2Addr#
-  addr2Int#
-  addr2Integer#
+  Addrzh
+  gtAddrzh
+  geAddrzh
+  eqAddrzh
+  neAddrzh
+  ltAddrzh
+  leAddrzh
+  int2Addrzh
+  addr2Intzh
+  addr2Integerzh
 
-  Float#
-  gtFloat#
-  geFloat#
-  eqFloat#
-  neFloat#
-  ltFloat#
-  leFloat#
-  plusFloat#
-  minusFloat#
-  timesFloat#
-  divideFloat#
-  negateFloat#
-  float2Int#
-  int2Float#
-  expFloat#
-  logFloat#
-  sqrtFloat#
-  sinFloat#
-  cosFloat#
-  tanFloat#
-  asinFloat#
-  acosFloat#
-  atanFloat#
-  sinhFloat#
-  coshFloat#
-  tanhFloat#
-  powerFloat#
-  decodeFloat#
-  encodeFloat#
+  Floatzh
+  gtFloatzh
+  geFloatzh
+  eqFloatzh
+  neFloatzh
+  ltFloatzh
+  leFloatzh
+  plusFloatzh
+  minusFloatzh
+  timesFloatzh
+  divideFloatzh
+  negateFloatzh
+  float2Intzh
+  int2Floatzh
+  expFloatzh
+  logFloatzh
+  sqrtFloatzh
+  sinFloatzh
+  cosFloatzh
+  tanFloatzh
+  asinFloatzh
+  acosFloatzh
+  atanFloatzh
+  sinhFloatzh
+  coshFloatzh
+  tanhFloatzh
+  powerFloatzh
+  decodeFloatzh
+  encodeFloatzh
   
-  Double#
-  >##
-  >=##
-  ==##
-  /=##
-  <##
-  <=##
-  +##
-  -##
-  *##
-  /##
-  negateDouble#
-  double2Int#
-  int2Double#
-  double2Float#
-  float2Double#
-  expDouble#
-  logDouble#
-  sqrtDouble#
-  sinDouble#
-  cosDouble#
-  tanDouble#
-  asinDouble#
-  acosDouble#
-  atanDouble#
-  sinhDouble#
-  coshDouble#
-  tanhDouble#
-  **##
-  decodeDouble#
-  encodeDouble#
+  Doublezh
+  zgzhzh
+  zgzezhzh
+  zezezhzh
+  zszezhzh
+  zlzhzh
+  zlzezhzh
+  zpzhzh
+  zmzhzh
+  ztzhzh
+  zszhzh
+  negateDoublezh
+  double2Intzh
+  int2Doublezh
+  double2Floatzh
+  float2Doublezh
+  expDoublezh
+  logDoublezh
+  sqrtDoublezh
+  sinDoublezh
+  cosDoublezh
+  tanDoublezh
+  asinDoublezh
+  acosDoublezh
+  atanDoublezh
+  sinhDoublezh
+  coshDoublezh
+  tanhDoublezh
+  ztztzhzh
+  decodeDoublezh
+  encodeDoublezh
   
-  cmpInteger#
-  negateInteger#
-  plusInteger#
-  minusInteger#
-  timesInteger#
-  quotRemInteger#
-  integer2Int#
-  integer2Word#
-  int2Integer#
-  word2Integer#
-  integerToInt64#
-  integerToWord64#
-  int64ToInteger#
-  word64ToInteger#
+  cmpIntegerzh
+  negateIntegerzh
+  plusIntegerzh
+  minusIntegerzh
+  timesIntegerzh
+  quotRemIntegerzh
+  integer2Intzh
+  integer2Wordzh
+  int2Integerzh
+  word2Integerzh
+  integerToInt64zh
+  integerToWord64zh
+  int64ToIntegerzh
+  word64ToIntegerzh
   
-  Array#
-  ByteArray#
-  MutableArray#
-  MutableByteArray#
+  Arrayzh
+  ByteArrayzh
+  MutableArrayzh
+  MutableByteArrayzh
   
-  sameMutableArray#
-  sameMutableByteArray#
+  sameMutableArrayzh
+  sameMutableByteArrayzh
   
-  newArray#
-  newCharArray#
-  newIntArray#
-  newWordArray#
-  newFloatArray#
-  newDoubleArray#
-  newAddrArray#
-  newStablePtrArray#
+  newArrayzh
+  newCharArrayzh
+  newIntArrayzh
+  newWordArrayzh
+  newFloatArrayzh
+  newDoubleArrayzh
+  newAddrArrayzh
+  newStablePtrArrayzh
   
-  indexArray#
-  indexCharArray#
-  indexIntArray#
-  indexWordArray#
-  indexFloatArray#
-  indexDoubleArray#
-  indexAddrArray#
-  indexStablePtrArray#
-  indexInt64Array#
-  indexWord64Array#
+  indexArrayzh
+  indexCharArrayzh
+  indexIntArrayzh
+  indexWordArrayzh
+  indexFloatArrayzh
+  indexDoubleArrayzh
+  indexAddrArrayzh
+  indexStablePtrArrayzh
+  indexInt64Arrayzh
+  indexWord64Arrayzh
   
---  indexOffAddr#
-indexCharOffAddr#
-indexIntOffAddr#
-indexWordOffAddr#
-indexAddrOffAddr#
-indexFloatOffAddr#
-indexDoubleOffAddr#
-indexStablePtrOffAddr#
-indexInt64OffAddr#
-indexWord64OffAddr#
+--  indexOffAddrzh
+  indexCharOffAddrzh
+  indexIntOffAddrzh
+  indexWordOffAddrzh
+  indexAddrOffAddrzh
+  indexFloatOffAddrzh
+  indexDoubleOffAddrzh
+  indexStablePtrOffAddrzh
+  indexInt64OffAddrzh
+  indexWord64OffAddrzh
+  
+  writeCharOffAddrzh
+  writeIntOffAddrzh
+  writeWordOffAddrzh
+  writeAddrOffAddrzh
+  writeForeignObjOffAddrzh
+  writeFloatOffAddrzh
+  writeDoubleOffAddrzh
+  writeStablePtrOffAddrzh
+  writeInt64OffAddrzh
+  writeWord64OffAddrzh
 
-writeCharOffAddr#
-writeIntOffAddr#
-writeWordOffAddr#
-writeAddrOffAddr#
-writeForeignObjOffAddr#
-writeFloatOffAddr#
-writeDoubleOffAddr#
-writeStablePtrOffAddr#
-writeInt64OffAddr#
-writeWord64OffAddr#
-
---  indexOffForeignObj#
-indexCharOffForeignObj#
-indexIntOffForeignObj#
-indexWordOffForeignObj#
-indexAddrOffForeignObj#
-indexFloatOffForeignObj#
-indexDoubleOffForeignObj#
-indexStablePtrOffForeignObj#
-indexInt64OffForeignObj#
-indexWord64OffForeignObj#
+--  indexOffForeignObjzh
+  indexCharOffForeignObjzh
+  indexIntOffForeignObjzh
+  indexWordOffForeignObjzh
+  indexAddrOffForeignObjzh
+  indexFloatOffForeignObjzh
+  indexDoubleOffForeignObjzh
+  indexStablePtrOffForeignObjzh
+  indexInt64OffForeignObjzh
+  indexWord64OffForeignObjzh
   
-  writeArray#
-  writeCharArray#
-  writeIntArray#
-  writeWordArray#
-  writeFloatArray#
-  writeDoubleArray#
-  writeAddrArray#
-  writeStablePtrArray#
-  writeInt64Array#
-  writeWord64Array#
+  writeArrayzh
+  writeCharArrayzh
+  writeIntArrayzh
+  writeWordArrayzh
+  writeFloatArrayzh
+  writeDoubleArrayzh
+  writeAddrArrayzh
+  writeStablePtrArrayzh
+  writeInt64Arrayzh
+  writeWord64Arrayzh
   
-  readArray#
-  readCharArray#
-  readIntArray#
-  readWordArray#
-  readFloatArray#
-  readDoubleArray#
-  readAddrArray#
-  readStablePtrArray#
-  readInt64Array#
-  readWord64Array#
+  readArrayzh
+  readCharArrayzh
+  readIntArrayzh
+  readWordArrayzh
+  readFloatArrayzh
+  readDoubleArrayzh
+  readAddrArrayzh
+  readStablePtrArrayzh
+  readInt64Arrayzh
+  readWord64Arrayzh
+
+  unsafeFreezzeArrayzh		-- Note zz in the middle
+  unsafeFreezzeByteArrayzh	-- Ditto
+
+  sizzeofByteArrayzh		-- Ditto
+  sizzeofMutableByteArrayzh	-- Ditto
+
+  MutVarzh
+  newMutVarzh
+  readMutVarzh
+  writeMutVarzh
+  sameMutVarzh
+
+  catchzh
+  raisezh
+
+  Weakzh
+  mkWeakzh
+  deRefWeakzh
   
-  unsafeFreezeArray#
-  unsafeFreezeByteArray#
-  
-  sizeofByteArray#
-  sizeofMutableByteArray#
+  ForeignObjzh
+  makeForeignObjzh
+  writeForeignObjzh
 
-  MutVar#
-  newMutVar#
-  readMutVar#
-  writeMutVar#
-  sameMutVar#
+  StablePtrzh
+  makeStablePtrzh
+  deRefStablePtrzh
+  eqStablePtrzh
 
-  catch#
-  raise#
+  StableNamezh
+  makeStableNamezh
+  eqStableNamezh
+  stableNameToIntzh
 
-  Weak#
-  mkWeak#
-  deRefWeak#
-  
-  ForeignObj#
-  makeForeignObj#
-  writeForeignObj#
+  reallyUnsafePtrEqualityzh
 
-  StablePtr#
-  makeStablePtr#
-  deRefStablePtr#
-  eqStablePtr#
-
-  StableName#
-  makeStableName#
-  eqStableName#
-  stableNameToInt#
-
-  reallyUnsafePtrEquality#
-
-  unsafeCoerce#
+  unsafeCoercezh
 ;
 
 -- CCallable and CReturnable have kind (Type AnyBox) so that
