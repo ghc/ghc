@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.10 $
- * $Date: 2001/01/10 17:21:18 $
+ * $Revision: 1.11 $
+ * $Date: 2001/01/12 12:06:24 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -47,6 +47,25 @@
 
 #define RETURN(retcode) \
    SAVE_STACK_POINTERS; return retcode;
+
+
+static __inline__ StgPtr allocate_UPD ( int n_words )
+{
+  //fprintf(stderr, "alloc_UPD    %d -> ", n_words );
+   if (n_words - sizeofW(StgHeader) < MIN_UPD_SIZE)
+      n_words = MIN_UPD_SIZE + sizeofW(StgHeader);
+   //fprintf(stderr, "%d\n", n_words );
+   return allocate(n_words);
+}
+
+static __inline__ StgPtr allocate_NONUPD ( int n_words )
+{
+  //fprintf(stderr, "alloc_NONUPD %d -> ", n_words );
+   if (n_words - sizeofW(StgHeader) < MIN_NONUPD_SIZE)
+      n_words = MIN_NONUPD_SIZE + sizeofW(StgHeader);
+   //fprintf(stderr, "%d\n", n_words );
+   return allocate(n_words);
+}
 
 
 StgThreadReturnCode interpretBCO ( Capability* cap )
@@ -154,16 +173,16 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 		   //}
                    do_print_stack = 1;
 		   fprintf(stderr,"iSp = %p   iSu = %p   pc = %d      ", iSp, iSu, bciPtr);
-                  disInstr(bco,bciPtr);
-                  if (0) { int i;
-                           fprintf(stderr,"\n");
-                           for (i = 8; i >= 0; i--) 
-                              fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(iSp+i)));
-                           fprintf(stderr,"\n");
-                         }
-                 );
+                   disInstr(bco,bciPtr);
+                    if (0) { int i;
+                             fprintf(stderr,"\n");
+                             for (i = 8; i >= 0; i--) 
+                                fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(iSp+i)));
+                             fprintf(stderr,"\n");
+                           }
+		    //if (do_print_stack) checkStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
+                  );
 
-	  //             checkStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
 
           switch (BCO_NEXT) {
 
@@ -176,7 +195,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  /* Handle arg check failure.  Copy the spare args
                     into a PAP frame. */
 		 /* fprintf(stderr, "arg check fail %d %d\n", arg_words_reqd, arg_words_avail ); */
-                 pap = (StgPAP*)allocate(PAP_sizeW(arg_words_avail));
+                 pap = (StgPAP*)allocate_UPD(PAP_sizeW(arg_words_avail));
                  SET_HDR(pap,&stg_PAP_info,CCS_SYSTEM/*ToDo*/);
                  pap->n_args = arg_words_avail;
                  pap->fun = obj;
@@ -186,6 +205,10 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  iSp = (StgPtr)iSu;
                  iSp --;
                  StackWord(0) = (W_)pap;
+		 IF_DEBUG(evaluator,
+                          fprintf(stderr,"\tBuilt "); 
+                          printObj((StgClosure*)pap);
+		         );
                  RETURN(ThreadEnterGHC);
               }
               case bci_PUSH_L: {
@@ -256,8 +279,10 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  goto nextInsn;
               }
               case bci_ALLOC: {
+                 StgAP_UPD* ap; 
                  int n_payload = BCO_NEXT - 1;
-                 StgAP_UPD* ap = (StgAP_UPD*)allocate(AP_sizeW(n_payload));
+                 int request   = AP_sizeW(n_payload);
+                 ap = (StgAP_UPD*)allocate_UPD(request);
                  StackWord(-1) = (W_)ap;
                  ap->n_args = n_payload;
                  SET_HDR(ap, &stg_AP_UPD_info, ??)
@@ -274,6 +299,10 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  for (i = 0; i < n_payload; i++)
                     ap->payload[i] = (StgClosure*)StackWord(i+1);
                  iSp += n_payload+1;
+		 IF_DEBUG(evaluator,
+                          fprintf(stderr,"\tBuilt "); 
+                          printObj((StgClosure*)ap);
+		         );
                  goto nextInsn;
               }
               case bci_UNPACK: {
@@ -308,16 +337,23 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int i;
                  int o_itbl         = BCO_NEXT;
                  int n_words        = BCO_NEXT;
-                 StgInfoTable* itbl = BCO_ITBL(o_itbl);
-                 /* A bit of a kludge since n_words = n_p + n_np */
-                 int request        = CONSTR_sizeW( n_words, 0 );
-                 StgClosure* con = (StgClosure*)allocate(request);
-                 SET_HDR(con, itbl, CCS_SYSTEM/*ToDo*/);
+                 StgInfoTable* itbl = INFO_PTR_TO_STRUCT(BCO_ITBL(o_itbl));
+                 int request        = CONSTR_sizeW( itbl->layout.payload.ptrs, 
+                                                    itbl->layout.payload.nptrs );
+                 StgClosure* con = (StgClosure*)allocate_NONUPD(request);
+		 //fprintf(stderr, "---PACK p %d, np %d\n",
+		 //	 (int) itbl->layout.payload.ptrs,
+		 //	 (int) itbl->layout.payload.nptrs );
+                 SET_HDR(con, BCO_ITBL(o_itbl), CCS_SYSTEM/*ToDo*/);
                  for (i = 0; i < n_words; i++)
                     con->payload[i] = (StgClosure*)StackWord(i);
                  iSp += n_words;
                  iSp --;
                  StackWord(0) = (W_)con;
+		 IF_DEBUG(evaluator,
+                          fprintf(stderr,"\tBuilt "); 
+                          printObj((StgClosure*)con);
+		         );
                  goto nextInsn;
               }
               case bci_TESTLT_P: {
