@@ -17,7 +17,9 @@ import List		( nub )
 import Maybe		( catMaybes, maybeToList, fromMaybe )
 import Maybes		( maybeToBool )
 import Outputable
-import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM )
+import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
+			  UniqFM, listToUFM )
+import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 
 import CmLink
@@ -166,11 +168,15 @@ cmLoadModule cmstate1 rootname
                = removeFromTopLevelEnvs mods_to_zap (hst1, hit1, ui1)
         -- should be cycle free; ignores 'import source's
         let mg2 = topological_sort False mg2unsorted
-        -- ... whereas this takes them into account.  Only used for
+        -- ... whereas this takes them into account.  Used for
         -- backing out partially complete cycles following a failed
-        -- upsweep.
+        -- upsweep, and for removing from hst/hit all the modules
+        -- not in strict downwards closure, during calls to compile.
         let mg2_with_srcimps = topological_sort True mg2unsorted
       
+        let reachable_from :: ModuleName -> [ModuleName]
+            reachable_from = downwards_closure_of_module mg2unsorted
+
         hPutStrLn stderr "after tsort:\n"
         hPutStrLn stderr (showSDoc (vcat (map ppr mg2)))
 
@@ -185,7 +191,7 @@ cmLoadModule cmstate1 rootname
         let threaded2 = CmThreaded pcs1 hst2 hit2
 
         (upsweep_complete_success, threaded3, modsDone, newLis)
-           <- upsweep_mods ghci_mode ui2 source_changed threaded2 mg2
+           <- upsweep_mods ghci_mode ui2 reachable_from source_changed threaded2 mg2
 
         let ui3 = add_to_ui ui2 newLis
         let (CmThreaded pcs3 hst3 hit3) = threaded3
@@ -334,6 +340,7 @@ data CmThreaded  -- stuff threaded through individual module compilations
 -- There better had not be any cyclic groups here -- we check for them.
 upsweep_mods :: GhciMode
              -> UnlinkedImage         -- old linkables
+             -> (ModuleName -> [ModuleName])  -- to construct downward closures
              -> (ModSummary -> Bool)  -- has source changed?
              -> CmThreaded            -- PCS & HST & HIT
              -> [SCC ModSummary]      -- mods to do (the worklist)
@@ -343,22 +350,24 @@ upsweep_mods :: GhciMode
                     [ModSummary],     -- mods which succeeded
                     [Linkable])       -- new linkables
 
-upsweep_mods ghci_mode oldUI source_changed threaded []
+upsweep_mods ghci_mode oldUI reachable_from source_changed threaded []
    = return (True, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI source_changed threaded ((CyclicSCC ms):_)
+upsweep_mods ghci_mode oldUI reachable_from source_changed threaded ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("ghc: module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.name_of_summary) ms))
         return (False, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI source_changed threaded ((AcyclicSCC mod):mods)
+upsweep_mods ghci_mode oldUI reachable_from source_changed threaded ((AcyclicSCC mod):mods)
    = do (threaded1, maybe_linkable) 
-           <- upsweep_mod ghci_mode oldUI threaded mod (source_changed mod)
+           <- upsweep_mod ghci_mode oldUI threaded mod 
+                          (reachable_from (name_of_summary mod)) 
+                          (source_changed mod)
         case maybe_linkable of
            Just linkable 
               -> -- No errors; do the rest
                  do (restOK, threaded2, modOKs, linkables) 
-                       <- upsweep_mods ghci_mode oldUI source_changed threaded1 mods
+                       <- upsweep_mods ghci_mode oldUI reachable_from source_changed threaded1 mods
                     return (restOK, threaded2, mod:modOKs, linkable:linkables)
            Nothing -- we got a compilation error; give up now
               -> return (False, threaded1, [], [])
@@ -370,10 +379,12 @@ upsweep_mod :: GhciMode
             -> UnlinkedImage
             -> CmThreaded
             -> ModSummary
+            -> [ModuleName]
             -> Bool
             -> IO (CmThreaded, Maybe Linkable)
 
-upsweep_mod ghci_mode oldUI threaded1 summary1 source_might_have_changed
+upsweep_mod ghci_mode oldUI threaded1 summary1 
+            reachable_from_here source_might_have_changed
    = do let mod_name = name_of_summary summary1
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
@@ -393,12 +404,14 @@ upsweep_mod ghci_mode oldUI threaded1 summary1 source_might_have_changed
                = source_might_have_changed || compilation_mandatory
             source_unchanged
                = not compilation_might_be_needed
+            (hst1_strictDC, hit1_strictDC)
+               = retainInTopLevelEnvs reachable_from_here (hst1,hit1)
 
         compresult <- compile ghci_mode summary1 source_unchanged
-                              old_iface hst1 hit1 pcs1
+                         old_iface hst1_strictDC hit1_strictDC pcs1
 
-        putStrLn ( "UPSWEEP_MOD: smhc = " ++ show source_might_have_changed 
-                   ++ ",  cman = " ++ show compilation_mandatory)
+        --putStrLn ( "UPSWEEP_MOD: smhc = " ++ show source_might_have_changed 
+        --           ++ ",  cman = " ++ show compilation_mandatory)
 
         case compresult of
 
@@ -443,7 +456,46 @@ removeFromTopLevelEnvs zap_these (hst, hit, ui)
       filterModuleLinkables (`notElem` zap_these) ui
      )
 
+retainInTopLevelEnvs :: [ModuleName]
+                        -> (HomeSymbolTable, HomeIfaceTable)
+                        -> (HomeSymbolTable, HomeIfaceTable)
+retainInTopLevelEnvs keep_these (hst, hit)
+   = (retainInUFM hst keep_these,
+      retainInUFM hit keep_these
+     )
+     where
+        retainInUFM :: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
+        retainInUFM ufm keys_to_keep
+           = listToUFM (concatMap (maybeLookupUFM ufm) keys_to_keep)
+        maybeLookupUFM ufm u 
+           = case lookupUFM ufm u of Nothing -> []; Just val -> [(u, val)] 
 
+-- Needed to clean up HIT and HST so that we don't get duplicates in inst env
+downwards_closure_of_module :: [ModSummary] -> ModuleName -> [ModuleName]
+downwards_closure_of_module summaries root
+   = let toEdge :: ModSummary -> (ModuleName,[ModuleName])
+         toEdge summ
+             = (name_of_summary summ, ms_srcimps summ ++ ms_imps summ)
+         res = simple_transitive_closure (map toEdge summaries) [root]             
+     in
+         trace (showSDoc (text "DC of mod" <+> ppr root
+                          <+> text "=" <+> ppr res)) (
+         res
+         )
+
+-- Calculate transitive closures from a set of roots given an adjacency list
+simple_transitive_closure :: Eq a => [(a,[a])] -> [a] -> [a]
+simple_transitive_closure graph set 
+   = let set2      = nub (concatMap dsts set ++ set)
+         dsts node = fromMaybe [] (lookup node graph)
+     in
+         if   length set == length set2
+         then set
+         else simple_transitive_closure graph set2
+
+
+-- Calculate SCCs of the module graph, with or without taking into
+-- account source imports.
 topological_sort :: Bool -> [ModSummary] -> [SCC ModSummary]
 topological_sort include_source_imports summaries
    = let 
