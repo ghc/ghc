@@ -1,18 +1,18 @@
 
-ds020.hs:5:
+ds020.hs:5:0:
     Warning: Pattern match(es) are overlapped
 	     In the definition of `a': a ~(~[], ~[], ~[]) = ...
 
-ds020.hs:8:
+ds020.hs:8:0:
     Warning: Pattern match(es) are overlapped
 	     In the definition of `b': b ~(~x : ~xs : ~ys) = ...
 
-ds020.hs:13:
+ds020.hs:13:0:
     Warning: Pattern match(es) are overlapped
 	     In the definition of `d':
 		 d ~(n+43) = ...
 		 d ~(n+999) = ...
 
-ds020.hs:19:
+ds020.hs:19:0:
     Warning: Pattern match(es) are overlapped
 	     In the definition of `f': f (x@(~[])) = ...
