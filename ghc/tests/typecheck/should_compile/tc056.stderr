@@ -1,0 +1,4 @@
+
+tc056.hs:14:
+    Warning: Duplicate class assertion `Eq' a' in the context:
+		 (Eq' a, Eq' a) => ...

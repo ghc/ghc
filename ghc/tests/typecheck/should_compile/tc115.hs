@@ -1,4 +1,4 @@
-{-# OPTIONS -w -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts #-}
 
 -- !!! Functional dependencies
 -- This broke an early impl of functional dependencies
