@@ -37,6 +37,10 @@ import GHC.IOBase ( IOException(..) )
 #else
 import System.IO		( try )
 #endif
+#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+import Foreign.Ptr
+import Foreign.C
+#endif
 import System.Directory(doesFileExist, doesDirectoryExist, getPermissions, setPermissions, createDirectory)
 
 getAppUserDataDirectory :: String -> IO FilePath
