@@ -28,8 +28,9 @@ module Ix
     ) where
 
 import Prelude
+#ifndef __HUGS__
 import PrelArr
-
+#endif
 -- This module is empty, because Ix is defined in PrelArr.
 -- Reason: it's needed internally in the Prelude.  
 -- This module serves solely to export it to the user.
