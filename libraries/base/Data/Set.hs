@@ -427,7 +427,7 @@ elems s
 {--------------------------------------------------------------------
   Lists 
 --------------------------------------------------------------------}
--- | /O(n)/. Convert the set to an ascending list of elements.
+-- | /O(n)/. Convert the set to a list of elements.
 toList :: Set a -> [a]
 toList s
   = toAscList s
