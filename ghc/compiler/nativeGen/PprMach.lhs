@@ -428,15 +428,15 @@ pprInstr (LABEL clab)
     ]
 
 pprInstr (ASCII False{-no backslash conversion-} str)
-  = uppBesides [ uppPStr SLIT("\t.asciz \""), uppStr str, uppChar '"' ]
+  = uppBesides [ uppPStr SLIT("\t.asciz "), uppChar '\"', uppStr str, uppChar '"' ]
 
 pprInstr (ASCII True str)
-  = uppBeside (uppPStr SLIT("\t.ascii \"")) (asciify str 60)
+  = uppBeside (uppStr "\t.ascii \"") (asciify str 60)
   where
     asciify :: String -> Int -> Unpretty
 
-    asciify [] _ = uppPStr SLIT("\\0\"")
-    asciify s     n | n <= 0 = uppBeside (uppPStr SLIT("\"\n\t.ascii \"")) (asciify s 60)
+    asciify [] _ = uppStr "\\0\""
+    asciify s     n | n <= 0 = uppBeside (uppStr "\"\n\t.ascii \"") (asciify s 60)
     asciify ('\\':cs)      n = uppBeside (uppStr "\\\\") (asciify cs (n-1))
     asciify ('\"':cs)      n = uppBeside (uppStr "\\\"") (asciify cs (n-1))
     asciify (c:cs) n | isPrint c = uppBeside (uppChar c) (asciify cs (n-1))
