@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.35 2001/07/05 13:31:09 sewardj Exp $
+# $Id: paths.mk,v 1.36 2001/07/31 14:31:28 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -22,7 +22,6 @@ GHC_INCLUDE_DIR   	:= $(TOP)/includes
 GHC_COMPILER_DIR  	:= $(TOP)/compiler
 GHC_RUNTIME_DIR   	:= $(TOP)/rts
 GHC_LIB_DIR	 	:= $(TOP)/lib
-GHC_INTERPRETER_DIR 	:= $(TOP)/interpreter
 
 # ---------------------------------------------------
 # -- These variables are defined primarily so they can 
