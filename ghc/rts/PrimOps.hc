@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.108 2003/07/03 15:14:58 sof Exp $
+ * $Id: PrimOps.hc,v 1.109 2003/07/12 00:08:28 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1640,6 +1640,10 @@ FN_(delayzh_fast)
     ares->len     = 0;
     ares->errCode = 0;
     CurrentTSO->block_info.async_result = ares;
+    /* Having all async-blocked threads reside on the blocked_queue simplifies matters, so
+     * change the status to OnDoProc & put the delayed thread on the blocked_queue.
+     */
+    CurrentTSO->why_blocked = BlockedOnDoProc;
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
 #else
     target = (R1.i / (TICK_MILLISECS*1000)) + getourtimeofday();
