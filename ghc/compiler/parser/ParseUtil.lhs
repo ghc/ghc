@@ -271,6 +271,11 @@ checkValSig other     ty loc = parseError "Type signature given for an expressio
 isFunLhs :: RdrNameHsExpr -> [RdrNameHsExpr] -> Maybe (RdrName, Bool, [RdrNameHsExpr])
 isFunLhs (OpApp l (HsVar op) fix r) es  | not (isRdrDataCon op)
 			  	= Just (op, True, (l:r:es))
+					| otherwise
+				= case isFunLhs l es of
+				    Just (op', True, j : k : es') ->
+				      Just (op', True, j : OpApp k (HsVar op) fix r : es')
+				    Nothing -> Nothing
 isFunLhs (HsVar f) es | not (isRdrDataCon f)
 			 	= Just (f,False,es)
 isFunLhs (HsApp f e) es 	= isFunLhs f (e:es)
