@@ -48,6 +48,12 @@ Giving a @+RTS -f@<nidx>-f RTS option</nidx> option will print out the
 RTS options actually available in your program (which vary, depending
 on how you compiled).
 
+NOTE: to send RTS options to the compiler itself, you need to prefix
+the option with @-optCrts@, eg. to increase the maximum heap size for
+a compilation to 128M, you would add @-optCrts-M128m@ to the command
+line.  The compiler understands some options directly without needing
+@-optCrts@: these are @-H@ and @-K@.
+
 %************************************************************************
 %*                                                                      *
 <sect2>RTS options to control the garbage-collector
