@@ -40,12 +40,14 @@ data Expr
    = EOp        Op Expr Expr
    | EVar       Var
    | EString    String
+   | EBool	Bool
    | EContents  Expr
+   | EExists    Expr
    | EMacro     MacroName [Expr]
    | ECond      Expr Expr (Maybe Expr)
    | EOtherwise
    | EHasValue  Expr
-   | EFFail      Expr
+   | EFFail     Expr
      deriving Show
 
 data Stmt
@@ -55,7 +57,7 @@ data Stmt
    | SRun       Var Expr
    | SReturn    Expr
    | SMacro     MacroName [Expr]
-   | SFFail      Expr
+   | SFFail     Expr
      deriving Show
 
 data TopDef

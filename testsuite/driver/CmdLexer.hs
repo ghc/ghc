@@ -13,6 +13,8 @@ data Lexeme
    = LString   String		-- "string"
    | LText     String		-- some_lump_of_text
    | LVar      String		-- $varname
+   | LBool     Bool		-- True or False
+   | L_Exists			-- exists
    | L_When			-- when
    | L_Expect			-- expect
    | L_And			-- &&
@@ -126,6 +128,7 @@ tokenise_wrk n (c:cs)
             "else"         -> kw L_Else
             "fi"           -> kw L_Fi
             "print"        -> kw L_Print
+            "exists"       -> kw L_Exists
             "when"         -> kw L_When
             "expect"       -> kw L_Expect
             "pass"         -> kw L_Pass
@@ -137,6 +140,8 @@ tokenise_wrk n (c:cs)
             "return"       -> kw L_Return
             "otherwise"    -> kw L_Otherwise
             "include"      -> kw L_Include
+            "True"         -> kw (LBool True)
+            "False"        -> kw (LBool False)
             other          -> kw (LText other)
 
 takeDrop :: (Char -> Bool) -> String -> (String, String)

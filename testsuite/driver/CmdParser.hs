@@ -92,7 +92,9 @@ pExpr0
    = pAlts [
         pApply EVar pVar,
         pApply EString pString,
+        pApply EBool pBool,
         p2 (\c expr -> EContents expr) (pKW L_Contents) (pInParens pExpr),
+        p2 (\c expr -> EExists expr) (pKW L_Exists) (pInParens pExpr),
         p2 (\mnm args -> EMacro mnm args) pText pMacroArgs,
         p5 (\_ c _ t e -> ECond c t e)
            (pKW L_If) pExpr (pKW L_Then) pExpr (pMaybeElse pExpr),
@@ -118,6 +120,8 @@ pResult
             pConstKW L_Unknown Unknown
            ]
 
+pBool
+   = pSatMap f where f (LBool b) = Just b ; f _ = Nothing
 pString
    = pSatMap f where f (LString str) = Just str ; f _ = Nothing
 pVar

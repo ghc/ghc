@@ -232,7 +232,7 @@ doStmt p (SAssign v expr)
      returnE (p_new, Nothing)
 doStmt p (SPrint expr)
    = evalExpr p expr			`thenE` \ str ->
-     ioToE (putStr str)			`thenE_`
+     ioToE (putStrLn str)		`thenE_`
      returnE (p, Nothing)
 doStmt p (SCond c t maybe_f)
    = evalExprToBool p c			`thenE` \ c_bool ->
@@ -287,9 +287,15 @@ evalExpr p (EOp OpAnd e1 e2)
                     returnE (fromBool b2)
 evalExpr p (EString str)
    = returnE str
+evalExpr p (EBool b)
+   = returnE (fromBool b)
 evalExpr p (EContents expr)
    = evalExpr p expr 			`thenE` \ filename ->
      readFileE p filename
+evalExpr p (EExists expr)
+   = evalExpr p expr 			`thenE` \ filename ->
+     doesFileExistE p filename		`thenE` \ b ->
+     returnE (fromBool b)
 evalExpr p (EHasValue expr)
    = evalExpr p expr			`thenE` \ str ->
      returnE (fromBool (not (null str)))
@@ -351,7 +357,9 @@ substExpr env expr
                      Just str -> EString str
                      Nothing -> EVar v
         EString str -> EString str
+        EBool b -> EBool b
         EContents e -> EContents (se e)
+        EExists e -> EExists (se e)
         EMacro mnm es -> EMacro mnm (map se es)
         ECond c t Nothing  -> ECond (se c) (se t) Nothing
         ECond c t (Just f) -> ECond (se c) (se t) (Just (se f))
@@ -364,6 +372,13 @@ substExpr env expr
 
 
 -------------------------
+
+-- Does filename exist?
+doesFileExistE :: EvalEnv -> String -> IOE Bool
+doesFileExistE p filename
+   = ioToE (doesFileExist filename)	`thenE` \ b ->
+     returnE b
+
 
 -- If filename doesn't contain any slashes, stick $testdir/ on
 -- the front of it.
