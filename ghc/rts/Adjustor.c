@@ -155,12 +155,16 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      the following assembly language snippet
      (offset and machine code prefixed):
 
-  <00>: 13 00 3f fb     sethi  %hi(0x00ffeffa), %o1 # load up wptr (1 of 2)
-  <04>: 11 37 ab 6f     sethi  %hi(0xdeadbeef), %o0 # load up hptr (1 of 2)
-  <08>: 81 c2 63 fa     jmp    %o1+%lo(0x00ffeffa)  # jump to wptr (load 2 of 2)
-  <0c>: 90 12 22 ef     or     %o0, %lo(0xdeadbeef), %o0 # load up hptr (2 of 2)
+  <00>: BA 10 00 1B     mov    %i3, %i5
+  <04>: B8 10 00 1A     mov    %i2, %i4
+  <08>: B6 10 00 19     mov    %i1, %i3
+  <0c>: B4 10 00 18     mov    %i0, %i2
+  <10>: 13 00 3f fb     sethi  %hi(0x00ffeffa), %o1 # load up wptr (1 of 2)
+  <14>: 11 37 ab 6f     sethi  %hi(0xdeadbeef), %o0 # load up hptr (1 of 2)
+  <18>: 81 c2 63 fa     jmp    %o1+%lo(0x00ffeffa)  # jump to wptr (load 2 of 2)
+  <1c>: 90 12 22 ef     or     %o0, %lo(0xdeadbeef), %o0 # load up hptr (2 of 2)
                                                          # [in delay slot]
-  <10>: de ad be ef     # Place the value of the StgStablePtr somewhere readable
+  <20>: de ad be ef     # Place the value of the StgStablePtr somewhere readable
 
     ccall'ing on a SPARC leaves little to be performed by the caller.
     The callee shifts the window on entry and restores it on exit.
@@ -168,27 +172,51 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     code above contains the input paramter to wptr.) The return address
     is stored in %o7/%i7. Since we don't shift the window in this code,
     the return address is preserved and wptr will return to our caller.
+
+    JRS, 21 Aug 01: the above para is a fiction.  The caller passes
+    args in %i0 .. %i5 and then the rest at [%sp+92].  We want to
+    tailjump to wptr, passing hptr as the new first arg, and a dummy
+    second arg, which would be where the return address is on x86.
+    That means we have to shuffle the original caller's args along by
+    two.
+
+    We do a half-correct solution which works only if the original
+    caller passed 4 or fewer arg words.  Move %i0 .. %i3 into %i3
+    .. %i6, so we can park hptr in %i0 and a bogus arg in %i1.  The
+    fully correct solution would be to subtract 8 from %sp and then
+    place %i4 and %i5 at [%sp+92] and [%sp+96] respectively.  This
+    machinery should then work in all cases.  (Or would it?  Perhaps
+    it would trash parts of the caller's frame.  Dunno).  
   */
-    if ((adjustor = stgMallocBytes(28, "createAdjustor")) != NULL) {
-	unsigned char *const adj_code = (unsigned char *)adjustor;
+    if ((adjustor = stgMallocBytes(4*(8+1), "createAdjustor")) != NULL) {
+	unsigned long *const adj_code = (unsigned long *)adjustor;
+
+	/* mov	%o3, %o5 */
+	adj_code[0] = (unsigned long)0x9A10000B;
+	/* mov	%o2, %o4 */
+	adj_code[1] = (unsigned long)0x9810000A;
+	/* mov	%o1, %o3 */
+	adj_code[2] = (unsigned long)0x96100009;
+	/* mov	%o0, %o2 */
+	adj_code[3] = (unsigned long)0x94100008;
 
 	/* sethi %hi(wptr), %o1 */
-	*((unsigned long*)(adj_code+0x00)) = (unsigned long)0x13000000;
-	*((unsigned long*)(adj_code+0x00)) |= ((unsigned long)wptr) >> 10;
+	adj_code[4] = (unsigned long)0x13000000;
+	adj_code[4] |= ((unsigned long)wptr) >> 10;
 
 	/* sethi %hi(hptr), %o0 */
-	*((unsigned long*)(adj_code+0x04)) = (unsigned long)0x11000000;
-	*((unsigned long*)(adj_code+0x04)) |= ((unsigned long)hptr) >> 10;
+	adj_code[5] = (unsigned long)0x11000000;
+	adj_code[5] |= ((unsigned long)hptr) >> 10;
 
 	/* jmp %o1+%lo(wptr) */
-	*((unsigned long*)(adj_code+0x08)) = (unsigned long)0x81c26000;
-	*((unsigned long*)(adj_code+0x08)) |= ((unsigned long)wptr) & 0x000003ff;
+	adj_code[6] = (unsigned long)0x81c26000;
+	adj_code[6] |= ((unsigned long)wptr) & 0x000003ff;
 
 	/* or %o0, %lo(hptr), %o0 */
-	*((unsigned long*)(adj_code+0x0c)) = (unsigned long)0x90122000;
-	*((unsigned long*)(adj_code+0x0c)) |= ((unsigned long)hptr) & 0x000003ff;
+	adj_code[7] = (unsigned long)0x90122000;
+	adj_code[7] |= ((unsigned long)hptr) & 0x000003ff;
 
-	*((StgStablePtr*)(adj_code+0x10)) = (StgStablePtr)hptr;
+	adj_code[8] = (StgStablePtr)hptr;
     }
 #elif defined(alpha_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of
