@@ -803,6 +803,11 @@ etaExpand :: Arity	  	-- Result should have this number of value args
 -- Given e' = etaExpand n us e ty
 -- We should have
 --	ty = exprType e = exprType e'
+--
+-- Note that SCCs are not treated specially.  If we have
+--	etaExpand 2 (\x -> scc "foo" e)
+--	= (\xy -> (scc "foo" e) y)
+-- So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
 
 etaExpand n us expr ty
   | manifestArity expr >= n = expr		-- The no-op case
@@ -830,22 +835,12 @@ eta_expand n us expr ty
     -- The ILX code generator requires eta expansion for type arguments
     -- too, but alas the 'n' doesn't tell us how many of them there 
     -- may be.  So we eagerly eta expand any big lambdas, and just
-    -- cross our fingers about possible loss of sharing in the
-    -- ILX case. 
+    -- cross our fingers about possible loss of sharing in the ILX case. 
     -- The Right Thing is probably to make 'arity' include
     -- type variables throughout the compiler.  (ToDo.)
     not (isForAllTy ty)	
     -- Saturated, so nothing to do
   = expr
-
-eta_expand n us (Note note@(Coerce _ ty) e) _
-  = Note note (eta_expand n us e ty)
-
-	-- Use mkNote so that _scc_s get pushed inside any lambdas that
-	-- are generated as part of the eta expansion.  We rely on this
-	-- behaviour in CorePrep, when we eta expand an already-prepped RHS.
-eta_expand n us (Note note e) ty
-  = mkNote note (eta_expand n us e ty)
 
 	-- Short cut for the case where there already
 	-- is a lambda; no point in gratuitously adding more
@@ -855,6 +850,19 @@ eta_expand n us (Lam v body) ty
 
   | otherwise
   = Lam v (eta_expand (n-1) us body (funResultTy ty))
+
+-- We used to have a special case that stepped inside Coerces here,
+-- thus:  eta_expand n us (Note note@(Coerce _ ty) e) _  
+--		= Note note (eta_expand n us e ty)
+-- BUT this led to an infinite loop
+-- Example: 	newtype T = MkT (Int -> Int)
+--	eta_expand 1 (coerce (Int->Int) e)
+--	--> coerce (Int->Int) (eta_expand 1 T e)
+--		by the bogus eqn
+--	--> coerce (Int->Int) (coerce T 
+--		(\x::Int -> eta_expand 1 (coerce (Int->Int) e)))
+--		by the splitNewType_maybe case below
+--	and round we go
 
 eta_expand n us expr ty
   = case splitForAllTy_maybe ty of { 
@@ -869,6 +877,13 @@ eta_expand n us expr ty
  				   (uniq:us2) = us
 				   
 	; Nothing ->
+
+		-- Given this:
+		-- 	newtype T = MkT (Int -> Int)
+		-- Consider eta-expanding this
+		--  	eta_expand 1 e T
+		-- We want to get
+		--	coerce T (\x::Int -> (coerce (Int->Int) e) x)
 
     	case splitNewType_maybe ty of {
  	  Just ty' -> mkCoerce2 ty ty' (eta_expand n us (mkCoerce2 ty' ty expr) ty') ;
