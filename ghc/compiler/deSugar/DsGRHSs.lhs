@@ -32,7 +32,7 @@ It desugars:
 	where binds
 \end{verbatim}
 producing an expression with a runtime error in the corner if
-necessary.  The type argument gives the type of the ei.
+necessary.  The type argument gives the type of the @ei@.
 
 \begin{code}
 dsGuarded :: TypecheckedGRHSs -> DsM CoreExpr
@@ -103,7 +103,8 @@ matchGuard (BindStmt pat rhs locn : stmts) ctx
     matchSinglePat core_rhs ctx pat match_result
 \end{code}
 
--- Should *fail* if e returns D
-
+Should {\em fail} if @e@ returns @D@
+\begin{verbatim}
 f x | p <- e', let C y# = e, f y# = r1
     | otherwise 	 = r2 
+\end{verbatim}

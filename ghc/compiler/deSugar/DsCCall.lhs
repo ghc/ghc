@@ -180,9 +180,10 @@ unboxArg arg
     Just (arg2_tycon,_) = maybe_arg2_tycon
 
 can'tSeeDataConsPanic thing ty
-  = pprPanic "ERROR: Can't see the data constructor(s) for _ccall_/_casm_/foreign declaration"
-	     (hcat [text thing, text "; type: ", ppr ty, text "(try compiling with -fno-prune-tydecls ..)\n"])
-
+  = pprPanic
+     "ERROR: Can't see the data constructor(s) for _ccall_/_casm_/foreign declaration"
+     (hcat [ text thing, text "; type: ", ppr ty
+           , text "(try compiling with -fno-prune-tydecls ..)\n"])
 \end{code}
 
 

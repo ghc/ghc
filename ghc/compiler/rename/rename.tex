@@ -1,0 +1,18 @@
+\documentstyle{report}
+\input{lit-style}
+
+\begin{document}
+\centerline{{\Large{rename}}}
+\tableofcontents
+
+\input{Rename}    % {Renaming and dependency analysis passes}
+\input{RnSource}  % {Main pass of renamer}
+\input{RnMonad}   % {The monad used by the renamer}
+\input{RnEnv}     % {Environment manipulation for the renamer monad}
+\input{RnHsSyn}   % {Specialisations of the @HsSyn@ syntax for the renamer}
+\input{RnNames}   % {Extracting imported and top-level names in scope}
+\input{RnExpr}    % {Renaming of expressions}
+\input{RnBinds}   % {Renaming and dependency analysis of bindings}
+\input{RnIfaces}  % {Cacheing and Renaming of Interfaces}
+
+\end{document}

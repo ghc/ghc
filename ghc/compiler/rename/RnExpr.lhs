@@ -684,9 +684,10 @@ checkPrec op pat right
 \end{code}
 
 Consider
+\begin{verbatim}
 	a `op1` b `op2` c
-
-(compareFixity op1 op2) tells which way to arrange appication, or
+\end{verbatim}
+@(compareFixity op1 op2)@ tells which way to arrange appication, or
 whether there's an error.
 
 \begin{code}
@@ -713,7 +714,8 @@ compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
 %*									*
 %************************************************************************
 
-When literals occur we have to make sure that the types and classes they involve
+When literals occur we have to make sure
+that the types and classes they involve
 are made available.
 
 \begin{code}
@@ -822,8 +824,9 @@ precParseErr op1 op2
 	       ptext SLIT("in the same infix expression")])
 
 nonStdGuardErr guard
-  = hang (ptext SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)"))
-      4 (ppr guard)
+  = hang (ptext
+    SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)")
+    ) 4 (ppr guard)
 
 patSigErr ty
   = hang (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)

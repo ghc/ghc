@@ -216,7 +216,7 @@ dsLookupGlobalValue name us genv loc mod_and_grp warns
 
 %************************************************************************
 %*									*
-%* type synonym EquationInfo and access functions for its pieces	*
+\subsection{Type synonym @EquationInfo@ and access functions for its pieces}
 %*									*
 %************************************************************************
 

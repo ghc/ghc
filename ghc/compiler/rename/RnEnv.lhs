@@ -149,11 +149,12 @@ newLocalTopBinder mod occ rec_exp_fn loc
 
 %*********************************************************
 %*							*
-\subsection{Dfuns and default methods
+\subsection{Dfuns and default methods}
 %*							*
 %*********************************************************
 
-@newImplicitBinder@ is used for (a) dfuns (b) default methods, defined in this module
+@newImplicitBinder@ is used for (a) dfuns
+(b) default methods, defined in this module.
 
 \begin{code}
 newImplicitBinder occ src_loc
@@ -193,7 +194,7 @@ get_tycon_key (MonoFunTy _ _)  = getOccName funTyCon
 
 \begin{code}
 -------------------------------------
-bindLocatedLocalsRn :: SDoc			-- Documentation string for error message
+bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
 	   	    -> [(RdrName,SrcLoc)]
 	    	    -> ([Name] -> RnMS a)
 	    	    -> RnMS a
@@ -258,7 +259,7 @@ bindCoreLocalFVRn rdr_name enclosed_scope
     let
 	new_name_env = extendRdrEnv name_env rdr_name name
     in
-    setLocalNameEnv new_name_env (enclosed_scope name)		`thenRn` \ (result, fvs) ->
+    setLocalNameEnv new_name_env (enclosed_scope name)	`thenRn` \ (result, fvs) ->
     returnRn (result, delFromNameSet fvs name)
 
 bindCoreLocalsFVRn []     thing_inside = thing_inside []
@@ -379,15 +380,15 @@ lookupBndrRn rdr_name
 	InterfaceMode -> 	-- Look in the global name cache
 			    mkImportedGlobalFromRdrName rdr_name
 
-	SourceMode    -> 	-- Source mode, so look up a *qualified* version
-				-- of the name, so that we get the right one even
-				-- if there are many with the same occ name
-				-- There must *be* a binding
-			    getModuleRn		`thenRn` \ mod ->
-			    case lookupRdrEnv global_env (qualifyRdrName mod rdr_name) of
-				Just (name:rest) -> ASSERT( null rest )
-						    returnRn name 
-				Nothing		 -> pprPanic "lookupBndrRn" (ppr mod <+> ppr rdr_name)
+	SourceMode    -> -- Source mode, so look up a *qualified* version
+			 -- of the name, so that we get the right one even
+			 -- if there are many with the same occ name
+			 -- There must *be* a binding
+		getModuleRn		`thenRn` \ mod ->
+		case lookupRdrEnv global_env (qualifyRdrName mod rdr_name) of
+		  Just (name:rest) -> ASSERT( null rest )
+				      returnRn name 
+		  Nothing	   -> pprPanic "lookupBndrRn" (ppr mod <+> ppr rdr_name)
     }
 
 -- Just like lookupRn except that we record the occurrence too
@@ -396,7 +397,7 @@ lookupBndrRn rdr_name
 -- deciding which instance declarations to import.
 lookupOccRn :: RdrName -> RnMS Name
 lookupOccRn rdr_name
-  = getNameEnvs					`thenRn` \ (global_env, local_env) ->
+  = getNameEnvs				`thenRn` \ (global_env, local_env) ->
     lookup_occ global_env local_env rdr_name
 
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
@@ -405,7 +406,7 @@ lookupOccRn rdr_name
 --	class op names in class and instance decls
 lookupGlobalOccRn :: RdrName -> RnMS Name
 lookupGlobalOccRn rdr_name
-  = getNameEnvs					`thenRn` \ (global_env, local_env) ->
+  = getNameEnvs				`thenRn` \ (global_env, local_env) ->
     lookup_global_occ global_env rdr_name
 
 -- Look in both local and global env
@@ -429,32 +430,35 @@ lookup_global_occ global_env rdr_name
 			-- Not found when processing an imported declaration,
 			-- so we create a new name for the purpose
 			InterfaceMode -> mkImportedGlobalFromRdrName rdr_name
+\end{code}
+%
+@lookupImplicitOccRn@ takes an RdrName representing an {\em original} name,
+and adds it to the occurrence pool so that it'll be loaded later.
+This is used when language constructs
+(such as monad comprehensions, overloaded literals, or deriving clauses)
+require some stuff to be loaded that isn't explicitly mentioned in the code.
 
-  
--- lookupImplicitOccRn takes an RdrName representing an *original* name, and
--- adds it to the occurrence pool so that it'll be loaded later.  This is
--- used when language constructs (such as monad comprehensions, overloaded literals,
--- or deriving clauses) require some stuff to be loaded that isn't explicitly
--- mentioned in the code.
---
--- This doesn't apply in interface mode, where everything is explicit, but
--- we don't check for this case: it does no harm to record an "extra" occurrence
--- and lookupImplicitOccRn isn't used much in interface mode (it's only the
--- Nothing clause of rnDerivs that calls it at all I think).
---	[Jan 98: this comment is wrong: rnHsType uses it quite a bit.]
---
--- For List and Tuple types it's important to get the correct
--- isLocallyDefined flag, which is used in turn when deciding
--- whether there are any instance decls in this module are "special".
--- The name cache should have the correct provenance, though.
+This doesn't apply in interface mode, where everything is explicit,
+but we don't check for this case:
+it does no harm to record an ``extra'' occurrence
+and @lookupImplicitOccRn@ isn't used much in interface mode
+(it's only the @Nothing@ clause of @rnDerivs@ that calls it at all I think).
 
+  \fbox{{\em Jan 98: this comment is wrong: @rnHsType@ uses it quite a bit.}}
+
+For List and Tuple types it's important to get the correct
+@isLocallyDefined@ flag, which is used in turn when deciding
+whether there are any instance decls in this module are ``special''.
+The name cache should have the correct provenance, though.
+
+\begin{code}
 lookupImplicitOccRn :: RdrName -> RnMS Name 
 lookupImplicitOccRn rdr_name = mkImportedGlobalFromRdrName rdr_name
 \end{code}
 
-unQualInScope returns a function that takes a Name and tells whether
+@unQualInScope@ returns a function that takes a @Name@ and tells whether
 its unqualified name is in scope.  This is put as a boolean flag in
-the Name's provenance to guide whether or not to print the name qualified
+the @Name@'s provenance to guide whether or not to print the name qualified
 in error messages.
 
 \begin{code}
@@ -473,7 +477,8 @@ unQualInScope env
 %*									*
 %************************************************************************
 
-===============  NameEnv  ================
+\subsubsection{NameEnv}%  ================
+
 \begin{code}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusFM_C combine_globals env1 env2
@@ -510,22 +515,23 @@ better_provenance n1 n2
 is_duplicate :: Name -> Name -> Bool
 is_duplicate n1 n2 | isLocallyDefined n1 && isLocallyDefined n2 = False
 		   | otherwise 		                        = n1 == n2
-	-- We treat two bindings of a locally-defined name as a duplicate,
-	-- because they might be two separate, local defns and we want to report
-	-- and error for that, *not* eliminate a duplicate.
-
-	-- On the other hand, if you import the same name from two different
-	-- import statements, we *do* want to eliminate the duplicate, not report
-	-- an error.
-	--
-	-- If a module imports itself then there might be a local defn and an imported
-	-- defn of the same name; in this case the names will compare as equal, but
-	-- will still have different provenances
 \end{code}
+We treat two bindings of a locally-defined name as a duplicate,
+because they might be two separate, local defns and we want to report
+and error for that, {\em not} eliminate a duplicate.
+
+On the other hand, if you import the same name from two different
+import statements, we {\em d}* want to eliminate the duplicate, not report
+an error.
+
+If a module imports itself then there might be a local defn and an imported
+defn of the same name; in this case the names will compare as equal, but
+will still have different provenances.
 
 
 
-===============  ExportAvails  ================
+\subsubsection{ExportAvails}%  ================
+
 \begin{code}
 mkEmptyExportAvails :: ModuleName -> ExportAvails
 mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyUFM)
@@ -564,7 +570,8 @@ plusExportAvails (m1, e1) (m2, e2)
 \end{code}
 
 
-===============  AvailInfo  ================
+\subsubsection{AvailInfo}%  ================
+
 \begin{code}
 plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
 plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n1 (nub (ns1 ++ ns2))
@@ -682,8 +689,10 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 warnUnusedLocalBinds, warnUnusedTopNames, warnUnusedMatches :: [Name] -> RnM d ()
 
 warnUnusedTopNames names
-  | not opt_WarnUnusedBinds && not opt_WarnUnusedImports = returnRn ()	-- Don't force ns unless necessary
-  | otherwise						 = warnUnusedBinds (\ is_local -> not is_local) names
+  | not opt_WarnUnusedBinds && not opt_WarnUnusedImports
+  = returnRn () 	-- Don't force ns unless necessary
+  | otherwise
+  = warnUnusedBinds (\ is_local -> not is_local) names
 
 warnUnusedLocalBinds ns
   | not opt_WarnUnusedBinds = returnRn ()
@@ -706,7 +715,8 @@ warnUnusedBinds warn_when_local names
    cmp_prov (LocalDef _ _) (NonLocalDef _ _)       = LT
    cmp_prov (LocalDef loc1 _) (LocalDef loc2 _)    = loc1 `compare` loc2
    cmp_prov (NonLocalDef (UserImport m1 loc1 _) _)
-            (NonLocalDef (UserImport m2 loc2 _) _) = (m1 `compare` m2) `thenCmp` (loc1 `compare` loc2)
+            (NonLocalDef (UserImport m2 loc2 _) _) =
+	 (m1 `compare` m2) `thenCmp` (loc1 `compare` loc2)
    cmp_prov (NonLocalDef _ _) (LocalDef _ _)       = GT
 			-- In-scope NonLocalDefs must have UserImport info on them
 
@@ -727,8 +737,9 @@ warnUnusedGroup emit_warning names
     (is_local, def_loc, msg)
 	= case getNameProvenance name1 of
 		LocalDef loc _ 			     -> (True, loc, text "Defined but not used")
-		NonLocalDef (UserImport mod loc _) _ -> (True, loc, text "Imported from" <+> quotes (ppr mod) <+> 
-								     text "but not used")
+		NonLocalDef (UserImport mod loc _) _ ->
+		 (True, loc, text "Imported from" <+> quotes (ppr mod) <+> 
+			 			      text "but not used")
 		other -> (False, getSrcLoc name1, text "Strangely defined but not used")
 \end{code}
 

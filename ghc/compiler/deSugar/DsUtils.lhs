@@ -57,7 +57,7 @@ import Outputable
 
 %************************************************************************
 %*									*
-%* Building lets
+\subsection{ Building lets}
 %*									*
 %************************************************************************
 
@@ -78,7 +78,7 @@ mkDsLets binds body = foldr mkDsLet body binds
 
 %************************************************************************
 %*									*
-%* Selecting match variables
+\subsection{ Selecting match variables}
 %*									*
 %************************************************************************
 
@@ -224,7 +224,8 @@ mkCoAlgCaseMatchResult var match_alts
 	-- Stuff for newtype
     (con_id, arg_ids, match_result) = head match_alts
     arg_id 	   		    = head arg_ids
-    coercion_bind		    = NonRec arg_id (Note (Coerce (idType arg_id) scrut_ty) (Var var))
+    coercion_bind		    = NonRec arg_id
+			(Note (Coerce (idType arg_id) scrut_ty) (Var var))
     newtype_sanity		    = null (tail match_alts) && null (tail arg_ids)
 
 	-- Stuff for data types
@@ -253,10 +254,12 @@ mkCoAlgCaseMatchResult var match_alts
     un_mentioned_constructors
         = mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- match_alts]
     exhaustive_case = isEmptyUniqSet un_mentioned_constructors
-
--- for each constructor we match on, we might need to re-pack some
--- of the strict fields if they are unpacked in the constructor.
-
+\end{code}
+%
+For each constructor we match on, we might need to re-pack some
+of the strict fields if they are unpacked in the constructor.
+%
+\begin{code}
 rebuildConArgs
   :: DataCon				-- the con we're matching on
   -> [Id]				-- the source-level args
@@ -314,10 +317,10 @@ mkErrorAppDs err_id ty msg
 
 This is used in various places to do with lazy patterns.
 For each binder $b$ in the pattern, we create a binding:
-
+\begin{verbatim}
     b = case v of pat' -> b'
-
-where pat' is pat with each binder b cloned into b'.
+\end{verbatim}
+where @pat'@ is @pat@ with each binder @b@ cloned into @b'@.
 
 ToDo: making these bindings should really depend on whether there's
 much work to be done per binding.  If the pattern is complex, it
@@ -354,11 +357,15 @@ mkSelectorBinds pat val_expr
 
 
   | otherwise
-  = mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (showSDoc (ppr pat))	`thenDs` \ error_expr ->
-    matchSimply val_expr LetMatch pat local_tuple error_expr	`thenDs` \ tuple_expr ->
-    newSysLocalDs tuple_ty					`thenDs` \ tuple_var ->
+  = mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (showSDoc (ppr pat))
+    `thenDs` \ error_expr ->
+    matchSimply val_expr LetMatch pat local_tuple error_expr
+    `thenDs` \ tuple_expr ->
+    newSysLocalDs tuple_ty
+    `thenDs` \ tuple_var ->
     let
-	mk_tup_bind binder = (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
+	mk_tup_bind binder =
+	  (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
     in
     returnDs ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where
@@ -413,10 +420,10 @@ If there is just one id in the ``tuple'', then the selector is
 just the identity.
 
 \begin{code}
-mkTupleSelector :: [Id]			-- The tuple args
-		-> Id			-- The selected one
-		-> Id			-- A variable of the same type as the scrutinee
-		-> CoreExpr		-- Scrutinee
+mkTupleSelector :: [Id]		-- The tuple args
+		-> Id		-- The selected one
+		-> Id		-- A variable of the same type as the scrutinee
+		-> CoreExpr	-- Scrutinee
 		-> CoreExpr
 
 mkTupleSelector [var] should_be_the_same_var scrut_var scrut
@@ -467,7 +474,7 @@ fail-variable, and use that variable if the thing fails:
 Then
 \begin{itemize}
 \item
-If the case can't fail, then there'll be no mention of fail.33, and the
+If the case can't fail, then there'll be no mention of @fail.33@, and the
 simplifier will later discard it.
 
 \item
@@ -478,7 +485,7 @@ Only if it is used more than once will the let-binding remain.
 \end{itemize}
 
 There's a problem when the result of the case expression is of
-unboxed type.  Then the type of fail.33 is unboxed too, and
+unboxed type.  Then the type of @fail.33@ is unboxed too, and
 there is every chance that someone will change the let into a case:
 \begin{verbatim}
 	case error "Help" of
@@ -499,7 +506,7 @@ for the primitive case:
 		p4 -> ...
 \end{verbatim}
 
-Now fail.33 is a function, so it can be let-bound.
+Now @fail.33@ is a function, so it can be let-bound.
 
 \begin{code}
 mkFailurePair :: CoreExpr	-- Result type of the whole case expression

@@ -73,18 +73,20 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
 	mk_core_lit ty (HsFloatPrim   f) = MachFloat  f
 	mk_core_lit ty (HsDoublePrim  d) = MachDouble d
 	mk_core_lit ty (HsLitLit      s) = ASSERT(isUnLiftedType ty)
-					   MachLitLit s (panic "MatchLit.matchLiterals:mk_core_lit:HsLitLit; typePrimRep???")
+          MachLitLit s (panic
+             "MatchLit.matchLiterals:mk_core_lit:HsLitLit; typePrimRep???")
     	mk_core_lit ty other	         = panic "matchLiterals:mk_core_lit:unhandled"
 \end{code}
 
 \begin{code}
-matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx ((NPat literal lit_ty eq_chk):ps1) _ : eqns)
+matchLiterals all_vars@(var:vars)
+  eqns_info@(EqnInfo n ctx ((NPat literal lit_ty eq_chk):ps1) _ : eqns)
   = let
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	  = partitionEqnsByLit Nothing literal eqns_info
     in
-    dsExpr (HsApp eq_chk (HsVar var))			  `thenDs` \ pred_expr ->
-    match vars shifted_eqns_for_this_lit                  `thenDs` \ inner_match_result ->
+    dsExpr (HsApp eq_chk (HsVar var))		`thenDs` \ pred_expr ->
+    match vars shifted_eqns_for_this_lit        `thenDs` \ inner_match_result ->
     let
 	match_result1 = mkGuardedMatchResult pred_expr inner_match_result
     in
@@ -131,9 +133,9 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx ((NPlusKPat master_n 
 	returnDs (combineMatchResults match_result1 match_result2)
 \end{code}
 
-Given a blob of LitPats/NPats, we want to split them into those
+Given a blob of @LitPat@s/@NPat@s, we want to split them into those
 that are ``same''/different as one we are looking at.  We need to know
-whether we're looking at a LitPat/NPat, and what literal we're after.
+whether we're looking at a @LitPat@/@NPat@, and what literal we're after.
 
 \begin{code}
 partitionEqnsByLit :: Maybe Id 	-- (Just v) for N-plus-K patterns, where v
@@ -163,15 +165,19 @@ partitionEqnsByLit nPlusK lit eqns
       | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn (Just master_n) lit  (EqnInfo n ctx (NPlusKPat n' k _ _ _ : remaining_pats) match_result)
+    partition_eqn (Just master_n) lit
+        (EqnInfo n ctx (NPlusKPat n' k _ _ _ : remaining_pats) match_result)
       | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats new_match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
       where
 	new_match_result | master_n == n' = match_result
-			 | otherwise 	  = mkCoLetsMatchResult [NonRec n' (Var master_n)] match_result
+			 | otherwise 	  = mkCoLetsMatchResult
+			       [NonRec n' (Var master_n)] match_result
 
-	-- Wild-card patterns, which will only show up in the shadows, go into both groups
-    partition_eqn nPlusK lit eqn@(EqnInfo n ctx (WildPat _ : remaining_pats) match_result)
+	-- Wild-card patterns, which will only show up in the shadows,
+        -- go into both groups
+    partition_eqn nPlusK lit
+                  eqn@(EqnInfo n ctx (WildPat _ : remaining_pats) match_result)
 			= (Just (EqnInfo n ctx remaining_pats match_result), Just eqn)
 
 	-- Default case; not for this pattern

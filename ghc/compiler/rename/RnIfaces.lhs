@@ -108,17 +108,18 @@ loadInterface doc_str mod_name from
 	mod_map_result ->
 
 	-- READ THE MODULE IN
-   findAndReadIface doc_str mod_name from in_map	`thenRn` \ (hi_boot_read, read_result) ->
+   findAndReadIface doc_str mod_name from in_map
+   `thenRn` \ (hi_boot_read, read_result) ->
    case read_result of {
 	Nothing -> 	-- Not found, so add an empty export env to the Ifaces map
 			-- so that we don't look again
-		   let
-			mod         = mkVanillaModule mod_name
-			new_mod_map = addToFM mod_map mod_name (0, False, Just (mod, False, []))
-			new_ifaces  = ifaces { iImpModInfo = new_mod_map }
-		   in
-		   setIfacesRn new_ifaces		`thenRn_`
-		   failWithRn (mod, new_ifaces) (noIfaceErr mod hi_boot_read) ;
+	   let
+		mod         = mkVanillaModule mod_name
+		new_mod_map = addToFM mod_map mod_name (0, False, Just (mod, False, []))
+		new_ifaces  = ifaces { iImpModInfo = new_mod_map }
+	   in
+	   setIfacesRn new_ifaces		`thenRn_`
+	   failWithRn (mod, new_ifaces) (noIfaceErr mod hi_boot_read) ;
 
 	-- Found and parsed!
 	Just (mod, iface) ->
@@ -169,7 +170,7 @@ addModDeps mod mod_deps new_deps
     is_lib = isLibModule mod	-- Don't record dependencies when importing a library module
     add (imp_mod, version, has_orphans, _) deps
 	| is_lib && not has_orphans = deps
-	| otherwise		    = addToFM_C combine deps imp_mod (version, has_orphans, Nothing)
+	| otherwise  =  addToFM_C combine deps imp_mod (version, has_orphans, Nothing)
 	-- Record dependencies for modules that are
 	--	either are dependent via a non-library module
 	--	or contain orphan rules or instance decls
@@ -273,8 +274,9 @@ loadDecl mod decls_map (version, decl)
        dates from a time where we picked up a .hi file first if it existed?]
     -}
     decl' = case decl of
-	       SigD (IfaceSig name tp ls loc) | opt_IgnoreIfacePragmas ->  SigD (IfaceSig name tp [] loc)
-	       other						       -> decl
+	       SigD (IfaceSig name tp ls loc) | opt_IgnoreIfacePragmas
+			 ->  SigD (IfaceSig name tp [] loc)
+	       other	 -> decl
 
 loadInstDecl :: Module
 	     -> Bag GatedDecl
@@ -363,18 +365,18 @@ checkModUsage ((mod_name, old_mod_vers, _, whats_imported) : rest)
 	Nothing -> 	-- If we can't find a version number for the old module then
 			-- bail out saying things aren't up to date
 		traceRn (sep [ptext SLIT("Can't find version number for module"), 
-			      pprModuleName mod_name])				`thenRn_`
-		returnRn False ;
+			      pprModuleName mod_name])
+		`thenRn_` returnRn False ;
 
 	Just new_mod_vers ->
 
 	-- If the module version hasn't changed, just move on
     if new_mod_vers == old_mod_vers then
-	traceRn (sep [ptext SLIT("Module version unchanged:"), pprModuleName mod_name])	`thenRn_`
-	checkModUsage rest
+	traceRn (sep [ptext SLIT("Module version unchanged:"), pprModuleName mod_name])
+	`thenRn_` checkModUsage rest
     else
-    traceRn (sep [ptext SLIT("Module version has changed:"), pprModuleName mod_name])	`thenRn_`
-
+    traceRn (sep [ptext SLIT("Module version has changed:"), pprModuleName mod_name])
+    `thenRn_`
 	-- Module version changed, so check entities inside
 
 	-- If the usage info wants to say "I imported everything from this module"
@@ -406,8 +408,8 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
     case lookupNameEnv decls name of
 
 	Nothing       -> 	-- We used it before, but it ain't there now
-			  putDocRn (sep [ptext SLIT("No longer exported:"), ppr name])	`thenRn_`
-			  returnRn False
+			  putDocRn (sep [ptext SLIT("No longer exported:"), ppr name])
+			  `thenRn_` returnRn False
 
 	Just (new_vers,_,_,_) 	-- It's there, but is it up to date?
 		| new_vers == old_vers
@@ -475,20 +477,20 @@ getNonWiredInDecl needed_name
 @getWiredInDecl@ maps a wired-in @Name@ to what it makes available.
 It behaves exactly as if the wired in decl were actually in an interface file.
 Specifically,
-
-  *	if the wired-in name is a data type constructor or a data constructor, 
+\begin{itemize}
+\item	if the wired-in name is a data type constructor or a data constructor, 
 	it brings in the type constructor and all the data constructors; and
-	marks as "occurrences" any free vars of the data con.
+	marks as ``occurrences'' any free vars of the data con.
 
-  * 	similarly for synonum type constructor
+\item 	similarly for synonum type constructor
 
-  * 	if the wired-in name is another wired-in Id, it marks as "occurrences"
+\item 	if the wired-in name is another wired-in Id, it marks as ``occurrences''
 	the free vars of the Id's type.
 
-  *	it loads the interface file for the wired-in thing for the
+\item	it loads the interface file for the wired-in thing for the
 	sole purpose of making sure that its instance declarations are available
-
-All this is necessary so that we know all types that are "in play", so
+\end{itemize}
+All this is necessary so that we know all types that are ``in play'', so
 that we know just what instances to bring into scope.
 	
 
@@ -500,18 +502,18 @@ that we know just what instances to bring into scope.
 %*							*
 %*********************************************************
 
-@getInterfaceExports@ is called only for directly-imported modules
+@getInterfaceExports@ is called only for directly-imported modules.
 
 \begin{code}
 getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, Avails)
 getInterfaceExports mod_name from
   = loadInterface doc_str mod_name from	`thenRn` \ (mod, ifaces) ->
     case lookupFM (iImpModInfo ifaces) mod_name of
-	Nothing ->	-- Not there; it must be that the interface file wasn't found;
-			-- the error will have been reported already.
-			-- (Actually loadInterface should put the empty export env in there
-			--  anyway, but this does no harm.)
-		      returnRn (mod, [])
+	Nothing -> -- Not there; it must be that the interface file wasn't found;
+		   -- the error will have been reported already.
+		   -- (Actually loadInterface should put the empty export env in there
+		   --  anyway, but this does no harm.)
+		   returnRn (mod, [])
 
 	Just (_, _, Just (mod, _, avails)) -> returnRn (mod, avails)
   where
@@ -532,10 +534,11 @@ getImportedInstDecls gates
 	-- Orphan-instance modules are recorded in the module dependecnies
     getIfacesRn 						`thenRn` \ ifaces ->
     let
-	orphan_mods = [mod | (mod, (_, True, Nothing)) <- fmToList (iImpModInfo ifaces)]
+	orphan_mods =
+	  [mod | (mod, (_, True, Nothing)) <- fmToList (iImpModInfo ifaces)]
     in
-    traceRn (text "Loading orphan modules" <+> fsep (map pprModuleName orphan_mods))	`thenRn_`
-    mapRn_ load_it orphan_mods 	`thenRn_`
+    traceRn (text "Loading orphan modules" <+> fsep (map pprModuleName orphan_mods))
+    `thenRn_` mapRn_ load_it orphan_mods 	`thenRn_`
 
 	-- Now we're ready to grab the instance declarations
 	-- Find the un-gated ones and return them, 
@@ -548,7 +551,8 @@ getImportedInstDecls gates
 
     traceRn (sep [text "getImportedInstDecls:", 
 		  nest 4 (fsep (map ppr (nameSetToList gates))),
-		  text "Slurped" <+> int (length decls) <+> text "instance declarations"])	`thenRn_`
+		  text "Slurped" <+> int (length decls)
+			         <+> text "instance declarations"]) `thenRn_`
     returnRn decls
   where
     load_it mod = loadInterface (doc_str mod) mod ImportBySystem
@@ -603,42 +607,50 @@ lookupFixity name
 %*							*
 %*********************************************************
 
-getImportVersions figures out what the "usage information" for this moudule is;
+getImportVersions figures out
+what the ``usage information'' for this moudule is;
 that is, what it must record in its interface file as the things it uses.
 It records:
-	- anything reachable from its body code
-	- any module exported with a "module Foo".
-
-Why the latter?  Because if Foo changes then this module's export list
+\begin{itemize}
+\item anything reachable from its body code
+\item any module exported with a @module Foo@.
+\end{itemize}
+%
+Why the latter?  Because if @Foo@ changes then this module's export list
 will change, so we must recompile this module at least as far as
 making a new interface file --- but in practice that means complete
 recompilation.
 
 What about this? 
-	module A( f, g ) where		module B( f ) where
-	  import B( f )			  f = h 3
-	  g = ...			  h = ...
+\begin{verbatim}
+	module A( f, g ) where	|	module B( f ) where
+	  import B( f )		|	  f = h 3
+	  g = ...		|	  h = ...
+\end{verbatim}
+Should we record @B.f@ in @A@'s usages?  In fact we don't.  Certainly, if
+anything about @B.f@ changes than anyone who imports @A@ should be recompiled;
+they'll get an early exit if they don't use @B.f@.  However, even if @B.f@
+doesn't change at all, @B.h@ may do so, and this change may not be reflected
+in @f@'s version number.  So there are two things going on when compiling module @A@:
+\begin{enumerate}
+\item Are @A.o@ and @A.hi@ correct?  Then we can bale out early.
+\item Should modules that import @A@ be recompiled?
+\end{enumerate}
+For (1) it is slightly harmful to record @B.f@ in @A@'s usages,
+because a change in @B.f@'s version will provoke full recompilation of @A@,
+producing an identical @A.o@,
+and @A.hi@ differing only in its usage-version of @B.f@
+(which isn't used by any importer).
 
-Should we record B.f in A's usages?  In fact we don't.  Certainly, if
-anything about B.f changes than anyone who imports A should be recompiled;
-they'll get an early exit if they don't use B.f.  However, even if B.f
-doesn't change at all, B.h may do so, and this change may not be reflected
-in f's version number.  So there are two things going on when compiling module A:
+For (2), because of the tricky @B.h@ question above,
+we ensure that @A.hi@ is touched
+(even if identical to its previous version)
+if A's recompilation was triggered by an imported @.hi@ file date change.
+Given that, there's no need to record @B.f@ in @A@'s usages.
 
-1.  Are A.o and A.hi correct?  Then we can bale out early.
-2.  Should modules that import A be recompiled?
-
-For (1) it is slightly harmful to record B.f in A's usages, because a change in
-B.f's version will provoke full recompilation of A, producing an identical A.o,
-and A.hi differing only in its usage-version of B.f (which isn't used by any importer).
-
-For (2), because of the tricky B.h question above, we ensure that A.hi is touched
-(even if identical to its previous version) if A's recompilation was triggered by
-an imported .hi file date change.  Given that, there's no need to record B.f in
-A's usages.
-
-On the other hand, if A exports "module B" then we *do* count module B among
-A's usages, because we must recompile A to ensure that A.hi changes appropriately.
+On the other hand, if @A@ exports @module B@,
+then we {\em do} count @module B@ among @A@'s usages,
+because we must recompile @A@ to ensure that @A.hi@ changes appropriately.
 
 \begin{code}
 getImportVersions :: ModuleName			-- Name of this module
@@ -722,8 +734,8 @@ recordSlurp maybe_version avail
 It's used for both source code (from @availsFromDecl@) and interface files
 (from @loadDecl@).
 
-It doesn't deal with source-code specific things: ValD, DefD.  They
-are handled by the sourc-code specific stuff in RnNames.
+It doesn't deal with source-code specific things: @ValD@, @DefD@.  They
+are handled by the sourc-code specific stuff in @RnNames@.
 
 \begin{code}
 getDeclBinders :: (RdrName -> SrcLoc -> RnM d Name)	-- New-name function
@@ -788,8 +800,8 @@ getClassOpNames new_name (ClassOpSig op _ _ src_loc) = new_name op src_loc
 
 @getDeclSysBinders@ gets the implicit binders introduced by a decl.
 A the moment that's just the tycon and datacon that come with a class decl.
-They aren'te returned by getDeclBinders because they aren't in scope;
-but they *should* be put into the DeclsMap of this module.
+They aren't returned by @getDeclBinders@ because they aren't in scope;
+but they {\em should} be put into the @DeclsMap@ of this module.
 
 Note that this excludes the default-method names of a class decl,
 and the dict fun of an instance decl, because both of these have 
@@ -833,7 +845,8 @@ findAndReadIface doc_str mod_name from hi_file
 	
     case find_path from hi_maps of
          -- Found the file
-       (hi_boot, Just (fpath, mod)) -> traceRn (ptext SLIT("...reading from") <+> text fpath)	`thenRn_`
+       (hi_boot, Just (fpath, mod)) -> traceRn (ptext SLIT("...reading from") <+> text fpath)
+				       `thenRn_`
 				       readIface mod fpath	`thenRn` \ result ->
 				       returnRn (hi_boot, result)
        (hi_boot, Nothing)           -> traceRn (ptext SLIT("...not found"))	`thenRn_`
@@ -879,13 +892,13 @@ readIface the_mod file_path
 				loc = mkSrcLoc (mkFastString file_path) 1 } of
 	          PFailed err                    -> failWithRn Nothing err 
 		  POk _  (PIface mod_nm iface) ->
-			    warnCheckRn (mod_nm == moduleName the_mod)
-					(hsep [ ptext SLIT("Something is amiss; requested module name")
-				                , pprModule the_mod
-				                , ptext SLIT("differs from name found in the interface file ")
-						, pprModuleName mod_nm
-						])				  `thenRn_`
-			    returnRn (Just (the_mod, iface))
+		    warnCheckRn (mod_nm == moduleName the_mod)
+			(hsep [ ptext SLIT("Something is amiss; requested module name")
+		        , pprModule the_mod
+		        , ptext SLIT("differs from name found in the interface file ")
+			, pprModuleName mod_nm
+			])
+		    `thenRn_` returnRn (Just (the_mod, iface))
 
         Left err
 	  | isDoesNotExistError err -> returnRn Nothing
@@ -920,12 +933,15 @@ getDeclWarn name loc
 	 ptext SLIT("desired at") <+> ppr loc]
 
 importDeclWarn mod name
-  = sep [ptext SLIT("Compiler tried to import decl from interface file with same name as module."), 
-	 ptext SLIT("(possible cause: module name clashes with interface file already in scope.)")
+  = sep [ptext SLIT(
+    "Compiler tried to import decl from interface file with same name as module."), 
+	 ptext SLIT(
+    "(possible cause: module name clashes with interface file already in scope.)")
 	] $$
     hsep [ptext SLIT("Interface:"), quotes (pprModuleName mod), 
 	  comma, ptext SLIT("name:"), quotes (ppr name)]
 
 warnRedundantSourceImport mod_name
-  = ptext SLIT("Unnecessary {- SOURCE -} in the import of module") <+> quotes (pprModuleName mod_name)
+  = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
+          <+> quotes (pprModuleName mod_name)
 \end{code}

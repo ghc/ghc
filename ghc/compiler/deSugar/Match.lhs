@@ -78,8 +78,8 @@ matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
 	eqns_shadow   = map (\n -> qs!!(n - 1)) unused_eqns
 \end{code}
 
-This variable shows the maximun number of lines of output generated for warnings.
-It will limit the number of patterns/equations displayed to maximum_output.
+This variable shows the maximum number of lines of output generated for warnings.
+It will limit the number of patterns/equations displayed to@ maximum_output@.
 
 (ToDo: add command-line option?)
 
@@ -87,7 +87,7 @@ It will limit the number of patterns/equations displayed to maximum_output.
 maximum_output = 4
 \end{code}
 
-The next two functions creates the warning message.
+The next two functions create the warning message.
 
 \begin{code}
 dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
@@ -582,7 +582,8 @@ tidy1 v non_interesting_pat match_result
   = returnDs (non_interesting_pat, match_result)
 \end{code}
 
-PREVIOUS matchTwiddled STUFF:
+\noindent
+{\bf Previous @matchTwiddled@ stuff:}
 
 Now we get to the only interesting part; note: there are choices for
 translation [from Simon's notes]; translation~1:
@@ -741,23 +742,29 @@ matchWrapper :: DsMatchKind			-- For shadowing warning messages
 
  There is one small problem with the Lambda Patterns, when somebody
  writes something similar to:
+\begin{verbatim}
     (\ (x:xs) -> ...)
+\end{verbatim}
  he/she don't want a warning about incomplete patterns, that is done with 
- the flag opt_WarnSimplePatterns.
- This problem also appears in the :
-   do patterns, but if the do can fail it creates another equation if the match can 
-                fail (see DsExpr.doDo function)
-   let patterns, are treated by matchSimply
-   List Comprension Patterns, are treated by matchSimply also
+ the flag @opt_WarnSimplePatterns@.
+ This problem also appears in the:
+\begin{itemize}
+\item @do@ patterns, but if the @do@ can fail
+      it creates another equation if the match can fail
+      (see @DsExpr.doDo@ function)
+\item @let@ patterns, are treated by @matchSimply@
+   List Comprension Patterns, are treated by @matchSimply@ also
+\end{itemize}
 
-We can't call matchSimply with Lambda patterns, due to lambda patterns can have more than
+We can't call @matchSimply@ with Lambda patterns,
+due to the fact that lambda patterns can have more than
 one pattern, and match simply only accepts one pattern.
 
 JJQC 30-Nov-1997
- 
+
 \begin{code}
 matchWrapper kind matches error_string
-  = flattenMatches kind matches				`thenDs` \ (result_ty, eqns_info) ->
+  = flattenMatches kind matches			`thenDs` \ (result_ty, eqns_info) ->
     let
 	EqnInfo _ _ arg_pats _ : _ = eqns_info
     in

@@ -47,15 +47,15 @@ import Outputable
 
 Desugaring of @foreign@ declarations is naturally split up into
 parts, an @import@ and an @export@  part. A @foreign import@ 
-declaration 
-
+declaration
+\begin{verbatim}
   foreign import cc nm f :: prim_args -> IO prim_res
-
+\end{verbatim}
 is the same as
-
+\begin{verbatim}
   f :: prim_args -> IO prim_res
   f a1 ... an = _ccall_ nm cc a1 ... an
-
+\end{verbatim}
 so we reuse the desugaring code in @DsCCall@ to deal with these.
 
 \begin{code}
@@ -63,8 +63,10 @@ dsForeigns :: Module
            -> [TypecheckedForeignDecl] 
 	   -> DsM ( [CoreBind]        -- desugared foreign imports
                   , [CoreBind]        -- helper functions for foreign exports
-		  , SDoc	      -- Header file prototypes for "foreign exported" functions.
-		  , SDoc 	      -- C stubs to use when calling "foreign exported" funs.
+		  , SDoc	      -- Header file prototypes for
+                                      -- "foreign exported" functions.
+		  , SDoc 	      -- C stubs to use when calling
+                                      -- "foreign exported" functions.
 		  )
 dsForeigns mod_name fos = foldlDs combine ([],[],empty,empty) fos
  where
@@ -99,7 +101,7 @@ dsForeigns mod_name fos = foldlDs combine ([],[],empty,empty) fos
 
 Desugaring foreign imports is just the matter of creating a binding
 that on its RHS unboxes its arguments, performs the external call
-(using the CCallOp primop), before boxing the result up and returning it.
+(using the @CCallOp@ primop), before boxing the result up and returning it.
 
 \begin{code}
 dsFImport :: Id
@@ -201,16 +203,16 @@ dsFLabel nm ext_name = returnDs (NonRec nm fo_rhs)
 
 \end{code}
 
-The function that does most of the work for 'foreign export' declarations.
-(see below for the boilerplate code a 'foreign export' declaration expands
+The function that does most of the work for `@foreign export@' declarations.
+(see below for the boilerplate code a `@foreign export@' declaration expands
  into.)
 
-For each 'foreign export foo' in a module M we generate:
-
-* a C function 'foo', which calls
-* a Haskell stub 'M.$ffoo', which calls
-
-the user-written Haskell function 'M.foo'.
+For each `@foreign export foo@' in a module M we generate:
+\begin{itemize}
+\item a C function `@foo@', which calls
+\item a Haskell stub `@M.$ffoo@', which calls
+\end{itemize}
+the user-written Haskell function `@M.foo@'.
 
 \begin{code}
 dsFExport :: Id
@@ -267,7 +269,7 @@ dsFExport i ty mod_name ext_name cconv isDyn =
         returnDs (i, 
 	          \ body -> body,
 		  panic "stbl_ptr"  -- should never be touched.
-		  ))					`thenDs` \ (i, getFun_wrapper, stbl_ptr) ->
+		  ))			`thenDs` \ (i, getFun_wrapper, stbl_ptr) ->
      let
       wrapper_args
        | isDyn      = stbl_ptr:fe_args
@@ -291,7 +293,8 @@ dsFExport i ty mod_name ext_name cconv isDyn =
 	  ExtName fs _ -> fs
 	  Dynamic      -> panic "dsFExport: Dynamic - shouldn't ever happen."
 
-      (h_stub, c_stub) = fexportEntry c_nm f_helper_glob wrapper_arg_tys the_result_ty cconv isDyn
+      (h_stub, c_stub) = fexportEntry c_nm f_helper_glob
+                                      wrapper_arg_tys the_result_ty cconv isDyn
      in
      returnDs (NonRec f_helper_glob the_body, h_stub, c_stub)
 
@@ -333,7 +336,7 @@ dsFExport i ty mod_name ext_name cconv isDyn =
    
 \end{code}
 
-"foreign export dynamic" lets you dress up Haskell IO actions
+@foreign export dynamic@ lets you dress up Haskell IO actions
 of some fixed type behind an externally callable interface (i.e.,
 as a C function pointer). Useful for callbacks and stuff.
 
@@ -376,7 +379,8 @@ dsFExportDynamic i ty mod_name ext_name cconv =
        fe_nm	   = toCName fe_id
        fe_ext_name = ExtName (_PK_ fe_nm) Nothing
      in
-     dsFExport  i export_ty mod_name fe_ext_name cconv True `thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
+     dsFExport  i export_ty mod_name fe_ext_name cconv True
+     `thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
      newSysLocalDs arg_ty			            `thenDs` \ cback ->
      dsLookupGlobalValue makeStablePtr_NAME	   `thenDs` \ makeStablePtrId ->
      let

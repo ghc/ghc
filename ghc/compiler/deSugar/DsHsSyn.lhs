@@ -44,11 +44,11 @@ outPatType (DictPat ds ms)      = case (length ds_ms) of
 \end{code}
 
 
-Nota bene: DsBinds relies on the fact that at least for simple
+Nota bene: @DsBinds@ relies on the fact that at least for simple
 tuple patterns @collectTypedPatBinders@ returns the binders in
 the same order as they appear in the tuple.
 
-collectTypedBinders and collectedTypedPatBinders are the exportees.
+@collectTypedBinders@ and @collectedTypedPatBinders@ are the exportees.
 
 \begin{code}
 collectTypedMonoBinders :: TypecheckedMonoBinds -> [Id]

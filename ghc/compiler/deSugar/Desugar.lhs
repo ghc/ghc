@@ -76,7 +76,7 @@ deSugar mod_name us (TcResults {tc_env = global_val_env,
     module_and_group = (mod_name, grp_name)
     grp_name  = case opt_SccGroup of
 	          Just xx -> _PK_ xx
-	    	  Nothing -> _PK_ (moduleString mod_name)	-- default: module name
+	    	  Nothing -> _PK_ (moduleString mod_name) -- default: module name
 
 dsProgram mod_name all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
@@ -121,8 +121,8 @@ dsRule (RuleDecl name sig_tvs vars lhs rhs loc)
 ds_lhs all_vars lhs
   = let
 	(dict_binds, body) = case lhs of
-				(HsLet (MonoBind dict_binds _ _) body) -> (dict_binds, body)
-				other			 	       -> (EmptyMonoBinds, lhs)
+		(HsLet (MonoBind dict_binds _ _) body) -> (dict_binds, body)
+		other			 	       -> (EmptyMonoBinds, lhs)
     in
     ds_dict_binds dict_binds 	`thenDs` \ dict_binds' ->
     dsExpr body			`thenDs` \ body' ->

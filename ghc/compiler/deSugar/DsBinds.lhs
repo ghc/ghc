@@ -89,7 +89,8 @@ dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
 
 	-- Common case: one exported variable
 	-- All non-recursive bindings come through this way
-dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] inlines binds) rest
+dsMonoBinds auto_scc
+     (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] inlines binds) rest
   = ASSERT( all (`elem` tyvars) all_tyvars )
     dsMonoBinds (addSccs auto_scc exps) binds []	`thenDs` \ core_prs ->
     let 
@@ -207,7 +208,8 @@ worthSCC (Con _ _)        = False
 worthSCC core_expr        = True
 \end{code}
 
-If profiling and dealing with a dict binding, wrap the dict in "_scc_ DICT <dict>":
+If profiling and dealing with a dict binding,
+wrap the dict in @_scc_ DICT <dict>@:
 
 \begin{code}
 addDictScc var rhs = returnDs rhs

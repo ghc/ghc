@@ -153,7 +153,7 @@ it expects the global environment to contain bindings for the binders
 
 %************************************************************************
 %*									*
-%* 		Top-level bindings
+\subsubsection{ Top-level bindings}
 %*									*
 %************************************************************************
 
@@ -178,8 +178,8 @@ rnTopMonoBinds mbinds sigs
 	binder_occ_fm = listToFM [(nameOccName x,x) | x <- binder_names]
     in
     renameSigs opt_WarnMissingSigs binder_set
-	       (lookupSigOccRn binder_occ_fm) sigs	`thenRn` \ (siglist, sig_fvs) ->
-    rn_mono_binds siglist mbinds			`thenRn` \ (final_binds, bind_fvs) ->
+	       (lookupSigOccRn binder_occ_fm) sigs `thenRn` \ (siglist, sig_fvs) ->
+    rn_mono_binds siglist mbinds		   `thenRn` \ (final_binds, bind_fvs) ->
     returnRn (final_binds, bind_fvs `plusFV` sig_fvs)
   where
     binder_rdr_names = map fst (bagToList (collectMonoBinders mbinds))
@@ -199,12 +199,16 @@ lookupSigOccRn binder_occ_fm rdr_name
 %*									*
 %************************************************************************
 
-@rnMonoBinds@
-	- collects up the binders for this declaration group,
-	- checks that they form a set
-	- extends the environment to bind them to new local names
-	- calls @rnMonoBinds@ to do the real work
+\subsubsection{Nested binds}
 
+@rnMonoBinds@
+\begin{itemize}
+\item collects up the binders for this declaration group,
+\item checks that they form a set
+\item extends the environment to bind them to new local names
+\item calls @rnMonoBinds@ to do the real work
+\end{itemize}
+%
 \begin{code}
 rnBinds	      :: RdrNameHsBinds 
 	      -> (RenamedHsBinds -> RnMS (result, FreeVars))
@@ -226,7 +230,8 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
   =	-- Extract all the binders in this group,
 	-- and extend current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
-    bindLocatedLocalsRn (text "a binding group") mbinders_w_srclocs		$ \ new_mbinders ->
+    bindLocatedLocalsRn (text "a binding group") mbinders_w_srclocs
+    $ \ new_mbinders ->
     let
 	binder_set  = mkNameSet new_mbinders
 
@@ -255,8 +260,8 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
       rn_mono_binds siglist mbinds
     )	 				   `thenRn` \ (binds, bind_fvs) ->
 
-	-- Now do the "thing inside", and deal with the free-variable calculations
-    thing_inside binds					`thenRn` \ (result,result_fvs) ->
+    -- Now do the "thing inside", and deal with the free-variable calculations
+    thing_inside binds			   `thenRn` \ (result,result_fvs) ->
     let
 	all_fvs        = result_fvs `plusFV` bind_fvs `plusFV` sig_fvs
 	unused_binders = nameSetToList (binder_set `minusNameSet` all_fvs)
@@ -270,14 +275,14 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
 
 %************************************************************************
 %*									*
-%* 		MonoBinds -- the main work is done here
+\subsubsection{		MonoBinds -- the main work is done here}
 %*									*
 %************************************************************************
 
-@rn_mono_binds@ is used by *both* top-level and nested bindings.  It
-assumes that all variables bound in this group are already in scope.
-This is done *either* by pass 3 (for the top-level bindings), *or* by
-@rnMonoBinds@ (for the nested ones).
+@rn_mono_binds@ is used by {\em both} top-level and nested bindings.
+It assumes that all variables bound in this group are already in scope.
+This is done {\em either} by pass 3 (for the top-level bindings),
+{\em or} by @rnMonoBinds@ (for the nested ones).
 
 \begin{code}
 rn_mono_binds :: [RenamedSig]	        -- Signatures attached to this group
@@ -307,8 +312,8 @@ rn_mono_binds siglist mbinds
 @flattenMonoBinds@ is ever-so-slightly magical in that it sticks
 unique ``vertex tags'' on its output; minor plumbing required.
 
-Sigh - need to pass along the signatures for the group of bindings,
-in case any of them 
+Sigh --- need to pass along the signatures for the group of bindings,
+in case any of them \fbox{\ ???\ } 
 
 \begin{code}
 flattenMonoBinds :: [RenamedSig]		-- Signatures
@@ -357,16 +362,18 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
 
 
 @rnMethodBinds@ is used for the method bindings of a class and an instance
-declaration.   like @rnMonoBinds@ but without dependency analysis.
+declaration.   Like @rnMonoBinds@ but without dependency analysis.
 
-NOTA BENE: we record each *binder* of a method-bind group as a free variable.
+NOTA BENE: we record each {\em binder} of a method-bind group as a free variable.
 That's crucial when dealing with an instance decl:
+\begin{verbatim}
 	instance Foo (T a) where
 	   op x = ...
-This might be the *sole* occurrence of 'op' for an imported class Foo,
-and unless op occurs we won't treat the type signature of op in the class
-decl for Foo as a source of instance-decl gates.  But we should!  Indeed,
-in many ways the op in an instance decl is just like an occurrence, not
+\end{verbatim}
+This might be the {\em sole} occurrence of @op@ for an imported class @Foo@,
+and unless @op@ occurs we won't treat the type signature of @op@ in the class
+decl for @Foo@ as a source of instance-decl gates.  But we should!  Indeed,
+in many ways the @op@ in an instance decl is just like an occurrence, not
 a binder.
 
 \begin{code}
@@ -427,7 +434,7 @@ reconstructCycle (CyclicSCC cycle)
 
 %************************************************************************
 %*									*
-%*	Manipulating FlatMonoBindInfo					*
+\subsubsection{	Manipulating FlatMonoBindInfo}
 %*									*
 %************************************************************************
 
@@ -465,19 +472,22 @@ mkEdges flat_info
 %*									*
 %************************************************************************
 
-@renameSigs@ checks for: (a)~more than one sig for one thing;
-(b)~signatures given for things not bound here; (c)~with suitably
-flaggery, that all top-level things have type signatures.
-
+@renameSigs@ checks for:
+\begin{enumerate}
+\item more than one sig for one thing;
+\item signatures given for things not bound here;
+\item with suitably flaggery, that all top-level things have type signatures.
+\end{enumerate}
+%
 At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
-renameSigs ::  Bool			-- True => warn if (required) type signatures are missing.
-	    -> NameSet			-- Set of names bound in this group
+renameSigs ::  Bool		-- True => warn if (required) type signatures are missing.
+	    -> NameSet		-- Set of names bound in this group
 	    -> (RdrName -> RnMS Name)
 	    -> [RdrNameSig]
-	    -> RnMS ([RenamedSig], FreeVars)		 -- List of Sig constructors
+	    -> RnMS ([RenamedSig], FreeVars)	 -- List of Sig constructors
 
 renameSigs sigs_required binders lookup_occ_nm sigs
   =	 -- Rename the signatures
@@ -517,7 +527,7 @@ renameSig lookup_occ_nm (Sig v ty src_loc)
 
 renameSig _ (SpecInstSig ty src_loc)
   = pushSrcLocRn src_loc $
-    rnHsSigType (text "A SPECIALISE instance pragma") ty	`thenRn` \ (new_ty, fvs) ->
+    rnHsSigType (text "A SPECIALISE instance pragma") ty `thenRn` \ (new_ty, fvs) ->
     returnRn (SpecInstSig new_ty src_loc, fvs)
 
 renameSig lookup_occ_nm (SpecSig v ty src_loc)

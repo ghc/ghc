@@ -89,9 +89,9 @@ putDocRn msg = ioToRnM (printErrs msg)	`thenRn_`
 %*									*
 %************************************************************************
 
-===================================================
-		MONAD TYPES
-===================================================
+%===================================================
+\subsubsection{		MONAD TYPES}
+%===================================================
 
 \begin{code}
 type RnM d r = RnDown -> d -> IO r
@@ -113,16 +113,17 @@ data RnDown = RnDown {
 data SDown = SDown {
 		  rn_mode :: RnMode,
 
-		  rn_genv :: GlobalRdrEnv,	-- Global envt; the fixity component gets extended
-						--   with local fixity decls
+		  rn_genv :: GlobalRdrEnv,
+		    	--   Global envt; the fixity component gets extended
+		    	--   with local fixity decls
 
 		  rn_lenv :: LocalRdrEnv,	-- Local name envt
-					--   Does *not* includes global name envt; may shadow it
-					--   Includes both ordinary variables and type variables;
-					--   they are kept distinct because tyvar have a different
-					--   occurrence contructor (Name.TvOcc)
-					-- We still need the unsullied global name env so that
-					--   we can look up record field names
+			--   Does *not* include global name envt; may shadow it
+			--   Includes both ordinary variables and type variables;
+			--   they are kept distinct because tyvar have a different
+			--   occurrence contructor (Name.TvOcc)
+			-- We still need the unsullied global name env so that
+			--   we can look up record field names
 
 		  rn_fixenv :: FixityEnv	-- Local fixities
 						-- The global ones are held in the
@@ -133,9 +134,9 @@ data RnMode	= SourceMode			-- Renaming source code
 		| InterfaceMode			-- Renaming interface declarations.  
 \end{code}
 
-===================================================
-		ENVIRONMENTS
-===================================================
+%===================================================
+\subsubsection{		ENVIRONMENTS}
+%===================================================
 
 \begin{code}
 --------------------------------
@@ -213,26 +214,29 @@ data ExportEnv	  = ExportEnv Avails Fixities
 type Avails	  = [AvailInfo]
 type Fixities	  = [(Name, Fixity)]
 
-type ExportAvails = (FiniteMap ModuleName Avails,	-- Used to figure out "module M" export specifiers
-							-- Includes avails only from *unqualified* imports
-							-- (see 1.4 Report Section 5.1.1)
+type ExportAvails = (FiniteMap ModuleName Avails,
+	-- Used to figure out "module M" export specifiers
+	-- Includes avails only from *unqualified* imports
+	-- (see 1.4 Report Section 5.1.1)
 
-		     NameEnv AvailInfo)		-- Used to figure out all other export specifiers.
-						-- Maps a Name to the AvailInfo that contains it
+	NameEnv AvailInfo)	-- Used to figure out all other export specifiers.
+				-- Maps a Name to the AvailInfo that contains it
 
 
-data GenAvailInfo name	= Avail name		-- An ordinary identifier
-			| AvailTC name 		-- The name of the type or class
-				  [name]	-- The available pieces of type/class. NB: If the type or
-						-- class is itself to be in scope, it must be in this list.
-						-- Thus, typically: AvailTC Eq [Eq, ==, /=]
+data GenAvailInfo name	= Avail name	 -- An ordinary identifier
+			| AvailTC name 	 -- The name of the type or class
+				  [name] -- The available pieces of type/class.
+					 -- NB: If the type or class is itself
+					 -- to be in scope, it must be in this list.
+					 -- Thus, typically: AvailTC Eq [Eq, ==, /=]
+
 type AvailInfo    = GenAvailInfo Name
 type RdrAvailInfo = GenAvailInfo OccName
 \end{code}
 
-===================================================
-		INTERFACE FILE STUFF
-===================================================
+%===================================================
+\subsubsection{		INTERFACE FILE STUFF}
+%===================================================
 
 \begin{code}
 type ExportItem		 = (ModuleName, [RdrAvailInfo])
@@ -248,7 +252,7 @@ type WhetherHasOrphans   = Bool
 	--		the function in the head of the rule.
 
 data WhatsImported name  = Everything 
-			 | Specifically [LocalVersion name]	-- List guaranteed non-empty
+			 | Specifically [LocalVersion name] -- List guaranteed non-empty
 
     -- ("M", hif, ver, Everything) means there was a "module M" in 
     -- this module's export list, so we just have to go by M's version, "ver",
@@ -269,8 +273,8 @@ data ParsedIface
     }
 
 type InterfaceDetails = (WhetherHasOrphans,
-			 VersionInfo Name,	-- Version information for what this module imports
-			 ExportEnv)		-- What modules this one depends on
+			 VersionInfo Name, -- Version information for what this module imports
+			 ExportEnv)	   -- What modules this one depends on
 
 
 -- needed by Main to fish out the fixities assoc list.
@@ -290,22 +294,24 @@ data Ifaces = Ifaces {
 
 		iFixes :: FixityEnv,	-- A single, global map of Names to fixities
 
-		iSlurp :: NameSet,	-- All the names (whether "big" or "small", whether wired-in or not,
-					-- whether locally defined or not) that have been slurped in so far.
+		iSlurp :: NameSet,
+		-- All the names (whether "big" or "small", whether wired-in or not,
+		-- whether locally defined or not) that have been slurped in so far.
 
-		iVSlurp :: [(Name,Version)],	-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
-						-- names that have been slurped in so far, with their versions. 
-						-- This is used to generate the "usage" information for this module.
-						-- Subset of the previous field.
+		iVSlurp :: [(Name,Version)],
+		-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
+		-- names that have been slurped in so far, with their versions.
+		-- This is used to generate the "usage" information for this module.
+		-- Subset of the previous field.
 
 		iInsts :: Bag GatedDecl,
-				-- The as-yet un-slurped instance decls; this bag is depleted when we
-				-- slurp an instance decl so that we don't slurp the same one twice.
-				-- Each is 'gated' by the names that must be available before
-				-- this instance decl is needed.
+		-- The as-yet un-slurped instance decls; this bag is depleted when we
+		-- slurp an instance decl so that we don't slurp the same one twice.
+		-- Each is 'gated' by the names that must be available before
+		-- this instance decl is needed.
 
 		iRules :: Bag GatedDecl
-				-- Ditto transformation rules
+			-- Ditto transformation rules
 	}
 
 type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
@@ -411,9 +417,10 @@ builtins =
  	  builtinNames)
 \end{code}
 
-@renameSourceCode@ is used to rename stuff "out-of-line"; that is, not as part of
-the main renamer.  Sole examples: derived definitions, which are only generated
-in the type checker.
+@renameSourceCode@ is used to rename stuff ``out-of-line'';
+that is, not as part of the main renamer.
+Sole examples: derived definitions,
+which are only generated in the type checker.
 
 The @RnNameSupply@ includes a @UniqueSupply@, so if you call it more than
 once you must either split it, or install a fresh unique supply.
@@ -436,7 +443,8 @@ renameSourceCode mod_name name_supply m
 	    rn_down = RnDown { rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
 			       rn_errs = errs_var,
 			       rn_mod = mod_name }
-	    s_down = SDown { rn_mode = InterfaceMode,	-- So that we can refer to PrelBase.True etc
+	    s_down = SDown { rn_mode = InterfaceMode,
+			       -- So that we can refer to PrelBase.True etc
 			     rn_genv = emptyRdrEnv, rn_lenv = emptyRdrEnv,
 			     rn_fixenv = emptyNameEnv }
 	in
@@ -533,7 +541,9 @@ mapMaybeRn f (x:xs) = f x		`thenRn` \ maybe_r ->
 %************************************************************************
 
 
-================  Errors and warnings =====================
+%================
+\subsubsection{  Errors and warnings}
+%=====================
 
 \begin{code}
 failWithRn :: a -> Message -> RnM d a
@@ -573,7 +583,9 @@ checkErrsRn (RnDown {rn_errs = errs_var}) l_down
 \end{code}
 
 
-================  Source location =====================
+%================
+\subsubsection{  Source location}
+%=====================
 
 \begin{code}
 pushSrcLocRn :: SrcLoc -> RnM d a -> RnM d a
@@ -585,7 +597,9 @@ getSrcLocRn down l_down
   = return (rn_loc down)
 \end{code}
 
-================  Name supply =====================
+%================
+\subsubsection{  Name supply}
+%=====================
 
 \begin{code}
 getNameSupplyRn :: RnM d RnNameSupply
@@ -619,7 +633,9 @@ getUniqRn (RnDown {rn_ns = names_var}) l_down
    return (uniqFromSupply us1)
 \end{code}
 
-================  Module =====================
+%================
+\subsubsection{  Module}
+%=====================
 
 \begin{code}
 getModuleRn :: RnM d ModuleName
@@ -638,7 +654,9 @@ setModuleRn new_mod enclosed_thing rn_down l_down
 %*									*
 %************************************************************************
 
-================  RnEnv  =====================
+%================
+\subsubsection{  RnEnv}
+%=====================
 
 \begin{code}
 getNameEnvs :: RnMS (GlobalRdrEnv, LocalRdrEnv)
@@ -666,7 +684,9 @@ extendFixityEnv fixes enclosed_scope
     enclosed_scope rn_down (l_down {rn_fixenv = new_fixity_env})
 \end{code}
 
-================  Mode  =====================
+%================
+\subsubsection{  Mode}
+%=====================
 
 \begin{code}
 getModeRn :: RnMS RnMode

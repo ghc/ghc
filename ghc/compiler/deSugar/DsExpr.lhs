@@ -60,14 +60,14 @@ import Outputable
 %*									*
 %************************************************************************
 
-@dsLet@ is a match-result transformer, taking the MatchResult for the body
+@dsLet@ is a match-result transformer, taking the @MatchResult@ for the body
 and transforming it into one for the let-bindings enclosing the body.
 
 This may seem a bit odd, but (source) let bindings can contain unboxed
 binds like
-
+\begin{verbatim}
 	C x# = e
-
+\end{verbatim}
 This must be transformed to a case expression and, if the type has
 more than one constructor, may fail.
 
@@ -83,7 +83,8 @@ dsLet (ThenBinds b1 b2) body
   
 -- Special case for bindings which bind unlifted variables
 -- Silently ignore INLINE pragmas...
-dsLet (MonoBind (AbsBinds [] [] binder_triples inlines (PatMonoBind pat grhss loc)) sigs is_rec) body
+dsLet (MonoBind (AbsBinds [] [] binder_triples inlines
+                          (PatMonoBind pat grhss loc)) sigs is_rec) body
   | or [isUnLiftedType (idType g) | (_, g, l) <- binder_triples]
   = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
     putSrcLocDs loc			$
@@ -93,7 +94,8 @@ dsLet (MonoBind (AbsBinds [] [] binder_triples inlines (PatMonoBind pat grhss lo
 	bind (tyvars, g, l) body = ASSERT( null tyvars )
 				   bindNonRec g (Var l) body
     in
-    mkErrorAppDs iRREFUT_PAT_ERROR_ID result_ty (showSDoc (ppr pat))	`thenDs` \ error_expr ->
+    mkErrorAppDs iRREFUT_PAT_ERROR_ID result_ty (showSDoc (ppr pat))
+    `thenDs` \ error_expr ->
     matchSimply rhs PatBindMatch pat body' error_expr
   where
     result_ty = coreExprType body
@@ -124,17 +126,17 @@ dsExpr e@(HsVar var) = returnDs (Var var)
 %*									*
 %************************************************************************
 
-We give int/float literals type Integer and Rational, respectively.
+We give int/float literals type @Integer@ and @Rational@, respectively.
 The typechecker will (presumably) have put \tr{from{Integer,Rational}s}
 around them.
 
-ToDo: put in range checks for when converting "i"
+ToDo: put in range checks for when converting ``@i@''
 (or should that be in the typechecker?)
 
 For numeric literals, we try to detect there use at a standard type
-(Int, Float, etc.) are directly put in the right constructor.
+(@Int@, @Float@, etc.) are directly put in the right constructor.
 [NB: down with the @App@ conversion.]
-Otherwise, we punt, putting in a "NoRep" Core literal (where the
+Otherwise, we punt, putting in a @NoRep@ Core literal (where the
 representation decisions are delayed)...
 
 See also below where we look for @DictApps@ for \tr{plusInt}, etc.
@@ -322,8 +324,8 @@ dsExpr (HsSCC cc expr)
 dsExpr (HsCase discrim matches@[Match _ [TuplePat ps boxed] _ _] src_loc)
  | not boxed && all var_pat ps 
  =  putSrcLocDs src_loc $
-    dsExpr discrim				`thenDs` \ core_discrim ->
-    matchWrapper CaseMatch matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
+    dsExpr discrim			  `thenDs` \ core_discrim ->
+    matchWrapper CaseMatch matches "case" `thenDs` \ ([discrim_var], matching_code) ->
     case matching_code of
 	Case (Var x) bndr alts | x == discrim_var -> 
 		returnDs (Case core_discrim bndr alts)
@@ -331,8 +333,8 @@ dsExpr (HsCase discrim matches@[Match _ [TuplePat ps boxed] _ _] src_loc)
 
 dsExpr (HsCase discrim matches src_loc)
   = putSrcLocDs src_loc $
-    dsExpr discrim				`thenDs` \ core_discrim ->
-    matchWrapper CaseMatch matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
+    dsExpr discrim			  `thenDs` \ core_discrim ->
+    matchWrapper CaseMatch matches "case" `thenDs` \ ([discrim_var], matching_code) ->
     returnDs (bindNonRec discrim_var core_discrim matching_code)
 
 dsExpr (HsLet binds body)
@@ -370,8 +372,9 @@ dsExpr (HsIf guard_expr then_expr else_expr src_loc)
 \end{code}
 
 
-Type lambda and application
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\noindent
+\underline{\bf Type lambda and application}
+%              ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 dsExpr (TyLam tyvars expr)
   = dsExpr expr `thenDs` \ core_expr ->
@@ -383,8 +386,9 @@ dsExpr (TyApp expr tys)
 \end{code}
 
 
-Various data construction things
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\noindent
+\underline{\bf Various data construction things}
+%              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 dsExpr (ExplicitListOut ty xs)
   = go xs
@@ -443,25 +447,26 @@ dsExpr (ArithSeqOut expr (FromThenTo from thn two))
     returnDs (mkApps expr2 [from2, thn2, two2])
 \end{code}
 
-Record construction and update
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\noindent
+\underline{\bf Record construction and update}
+%              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For record construction we do this (assuming T has three arguments)
-
+\begin{verbatim}
 	T { op2 = e }
 ==>
 	let err = /\a -> recConErr a 
 	T (recConErr t1 "M.lhs/230/op1") 
 	  e 
 	  (recConErr t1 "M.lhs/230/op3")
-
-recConErr then converts its arugment string into a proper message
+\end{verbatim}
+@recConErr@ then converts its arugment string into a proper message
 before printing it as
+\begin{verbatim}
+	M.lhs, line 230: missing field op1 was evaluated
+\end{verbatim}
 
-	M.lhs, line 230: Missing field in record construction op1
-
-
-We also handle C{} as valid construction syntax for an unlabelled
-constructor C, setting all of C's fields to bottom.
+We also handle @C{}@ as valid construction syntax for an unlabelled
+constructor @C@, setting all of @C@'s fields to bottom.
 
 \begin{code}
 dsExpr (RecordConOut data_con con_expr rbinds)
@@ -489,13 +494,13 @@ dsExpr (RecordConOut data_con con_expr rbinds)
 \end{code}
 
 Record update is a little harder. Suppose we have the decl:
-
+\begin{verbatim}
 	data T = T1 {op1, op2, op3 :: Int}
 	       | T2 {op4, op2 :: Int}
 	       | T3
-
+\end{verbatim}
 Then we translate as follows:
-
+\begin{verbatim}
 	r { op2 = e }
 ===>
 	let op2 = e in
@@ -503,9 +508,9 @@ Then we translate as follows:
 	  T1 op1 _ op3 -> T1 op1 op2 op3
 	  T2 op4 _     -> T2 op4 op2
 	  other	       -> recUpdError "M.lhs/230"
-
-It's important that we use the constructor Ids for T1, T2 etc on the
-RHSs, and do not generate a Core Con directly, because the constructor
+\end{verbatim}
+It's important that we use the constructor Ids for @T1@, @T2@ etc on the
+RHSs, and do not generate a Core @Con@ directly, because the constructor
 might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
@@ -569,8 +574,10 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	ok (sel_id, _, _) = recordSelectorFieldLabel sel_id `elem` con_fields
 \end{code}
 
-Dictionary lambda and application
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+\noindent
+\underline{\bf Dictionary lambda and application}
+%              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @DictLam@ and @DictApp@ turn into the regular old things.
 (OLD:) @DictFunApp@ also becomes a curried application, albeit slightly more
 complicated; reminiscent of fully-applied constructors.
@@ -625,7 +632,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  = do_expr expr locn			`thenDs` \ expr2 ->
 	    go stmts				`thenDs` \ rest ->
 	    let msg = ASSERT( isNotUsgTy b_ty )
-                      "Pattern match failure in do expression, " ++ showSDoc (ppr locn) in
+                 "Pattern match failure in do expression, " ++ showSDoc (ppr locn) in
 	    returnDs (mkIfThenElse expr2 
 				   rest 
 				   (App (App (Var fail_id) 
@@ -635,7 +642,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	go (ExprStmt expr locn : stmts)
 	  = do_expr expr locn		`thenDs` \ expr2 ->
 	    let
-		(_, a_ty) = splitAppTy (coreExprType expr2)	-- Must be of form (m a)
+		(_, a_ty) = splitAppTy (coreExprType expr2)  -- Must be of form (m a)
 	    in
 	    if null stmts then
 		returnDs expr2
@@ -653,13 +660,15 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  = putSrcLocDs locn $
 	    dsExpr expr 	   `thenDs` \ expr2 ->
 	    let
-		(_, a_ty)  = splitAppTy (coreExprType expr2)	-- Must be of form (m a)
-		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty]) (HsLitOut (HsString (_PK_ msg)) stringTy)
+		(_, a_ty)  = splitAppTy (coreExprType expr2) -- Must be of form (m a)
+		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
+                                   (HsLitOut (HsString (_PK_ msg)) stringTy)
 	        msg = ASSERT2( isNotUsgTy a_ty, ppr a_ty )
                       ASSERT2( isNotUsgTy b_ty, ppr b_ty )
                       "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
 		main_match = mkSimpleMatch [pat] 
-					   (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty locn)
+					   (HsDoOut do_or_lc stmts return_id then_id
+                                                    fail_id result_ty locn)
 					   (Just result_ty) locn
 		the_matches
 		  | failureFreePat pat = [main_match]

@@ -2,6 +2,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 %
 % Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
+\section{Module @Check@ in @deSugar@}
 
 \begin{code}
 
@@ -56,61 +57,69 @@ import Outputable
 \end{code}
 
 This module performs checks about if one list of equations are:
-	- Overlapped
-	- Non exhaustive
-
+\begin{itemize}
+\item Overlapped
+\item Non exhaustive
+\end{itemize}
 To discover that we go through the list of equations in a tree-like fashion.
 
 If you like theory, a similar algorithm is described in:
-	Two Techniques for Compiling Lazy Pattern Matching
-	Luc Maranguet
+\begin{quotation}
+	{\em Two Techniques for Compiling Lazy Pattern Matching},
+	Luc Maranguet,
 	INRIA Rocquencourt (RR-2385, 1994)
-
-The algorithm is based in the first Technique, but there are some differences:
-	- We don't generate code
-	- We have constructors and literals (not only literals as in the 
+\end{quotation}
+The algorithm is based on the first technique, but there are some differences:
+\begin{itemize}
+\item We don't generate code
+\item We have constructors and literals (not only literals as in the 
 	  article)
-	- We don't use directions, we must select the columns from 
+\item We don't use directions, we must select the columns from 
 	  left-to-right
-
+\end{itemize}
 (By the way the second technique is really similar to the one used in 
- Match.lhs to generate code)
+ @Match.lhs@ to generate code)
 
 This function takes the equations of a pattern and returns:
-  - The patterns that are not recognized
-  - The equations that are not overlapped
-
-It simplify the patterns and then call check' (the same semantics),and it 
+\begin{itemize}
+\item The patterns that are not recognized
+\item The equations that are not overlapped
+\end{itemize}
+It simplify the patterns and then call @check'@ (the same semantics), and it 
 needs to reconstruct the patterns again ....
 
 The problem appear with things like:
+\begin{verbatim}
   f [x,y]   = ....
   f (x:xs)  = .....
-
+\end{verbatim}
 We want to put the two patterns with the same syntax, (prefix form) and 
 then all the constructors are equal:
+\begin{verbatim}
   f (: x (: y []))   = ....
   f (: x xs)         = .....
+\end{verbatim}
+(more about that in @simplify_eqns@)
 
-(more about that in simplify_eqns)
-
-We would prefer to have a WarningPat of type String, but Strings and the 
+We would prefer to have a @WarningPat@ of type @String@, but Strings and the 
 Pretty Printer are not friends.
 
-We use InPat in WarningPat instead of OutPat because we need to print the 
+We use @InPat@ in @WarningPat@ instead of @OutPat@
+because we need to print the 
 warning messages in the same way they are introduced, i.e. if the user 
 wrote:
+\begin{verbatim}
 	f [x,y] = ..
-
+\end{verbatim}
 He don't want a warning message written:
-        
+\begin{verbatim}
         f (: x (: y [])) ........
-
+\end{verbatim}
 Then we need to use InPats.
-
-     Juan Quintela 5 JUL 1998
+\begin{quotation}
+     Juan Quintela 5 JUL 1998\\
 	  User-friendliness and compiler writers are no friends.
-   
+\end{quotation}
 \begin{code}
 
 type WarningPat = InPat Name
@@ -178,11 +187,11 @@ untidy_lit lit = lit
 This equation is the same that check, the only difference is that the
 boring work is done, that work needs to be done only once, this is
 the reason top have two functions, check is the external interface,
-check' is called recursively.
+@check'@ is called recursively.
 
 There are several cases:
 
-\begin{item} 
+\begin{itemize} 
 \item There are no equations: Everything is OK. 
 \item There are only one equation, that can fail, and all the patterns are
       variables. Then that equation is used and the same equation is 
@@ -198,7 +207,7 @@ There are several cases:
 \item In the general case, there can exist literals ,constructors or only 
       vars in the first column, we actuate in consequence.
 
-\end{item}
+\end{itemize}
 
 
 \begin{code}
@@ -243,7 +252,7 @@ split_by_literals qs = process_literals used_lits qs
              used_lits = get_used_lits qs
 \end{code}
 
-process_explicit_literals is a function that process each literal that appears 
+@process_explicit_literals@ is a function that process each literal that appears 
 in the column of the matrix. 
 
 \begin{code}
@@ -256,7 +265,7 @@ process_explicit_literals lits qs = (concat pats, unionManyUniqSets indexs)
 \end{code}
 
 
-Process_literals calls process_explicit_literals to deal with the literals 
+@process_literals@ calls @process_explicit_literals@ to deal with the literals 
 that appears in the matrix and deal also with the rest of the cases. It 
 must be one Variable to be complete.
 
@@ -297,7 +306,7 @@ remove_first_column_lit lit qs =
 \end{code}
 
 This function splits the equations @qs@ in groups that deal with the 
-same constructor 
+same constructor.
 
 \begin{code}
 
@@ -327,7 +336,7 @@ constructor, using all the constructors that appears in the first column
 of the pattern matching.
 
 We can need a default clause or not ...., it depends if we used all the 
-constructors or not explicitly. The reasoning is similar to process_literals,
+constructors or not explicitly. The reasoning is similar to @process_literals@,
 the difference is that here the default case is not always needed.
 
 \begin{code}
@@ -362,15 +371,15 @@ Here remove first column is more difficult that with literals due to the fact
 that constructors can have arguments.
 
 For instance, the matrix
-
+\begin{verbatim}
  (: x xs) y
  z        y
-
+\end{verbatim}
 is transformed in:
-
+\begin{verbatim}
  x xs y
  _ _  y
-
+\end{verbatim}
 
 \begin{code}
 remove_first_column :: TypecheckedPat                -- Constructor 
@@ -436,7 +445,8 @@ get_unused_cons used_cons = unused_cons
        Just (ty_con,_) 	   = splitTyConApp_maybe ty
        all_cons        	   = tyConDataCons ty_con
        used_cons_as_id 	   = map (\ (ConPat d _ _ _ _) -> d) used_cons
-       unused_cons     	   = uniqSetToList (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
+       unused_cons     	   = uniqSetToList
+		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
 
 all_vars :: [TypecheckedPat] -> Bool
@@ -446,7 +456,8 @@ all_vars _               = False
 
 remove_var :: EquationInfo -> EquationInfo
 remove_var (EqnInfo n ctx (WildPat _:ps) result) = EqnInfo n ctx ps result
-remove_var _                                     = panic "Check:remove_var: equation not begin with a variable"
+remove_var _                                     =
+	 panic "Check.remove_var: equation does not begin with a variable"
 
 is_con :: EquationInfo -> Bool
 is_con (EqnInfo _ _ ((ConPat _ _ _ _ _):_) _) = True
@@ -481,39 +492,43 @@ is_var_lit lit (EqnInfo _ _ ((NPat lit' _ _):_) _) | lit == lit' = True
 is_var_lit lit _                                                 = False
 \end{code}
 
-The difference beteewn make_con and make_whole_con is that
-make_wole_con creates a new constructor with all their arguments, and
-make_Con takes a list of argumntes, creates the contructor geting thir
-argumnts from the list. See where are used for details.
+The difference beteewn @make_con@ and @make_whole_con@ is that
+@make_wole_con@ creates a new constructor with all their arguments, and
+@make_con@ takes a list of argumntes, creates the contructor getting their
+arguments from the list. See where \fbox{\ ???\ } are used for details.
 
 We need to reconstruct the patterns (make the constructors infix and
 similar) at the same time that we create the constructors.
 
 You can tell tuple constructors using
-
+\begin{verbatim}
         Id.isTupleCon
-
+\end{verbatim}
 You can see if one constructor is infix with this clearer code :-))))))))))
-
+\begin{verbatim}
         Lex.isLexConSym (Name.occNameString (Name.getOccName con))
+\end{verbatim}
 
        Rather clumsy but it works. (Simon Peyton Jones)
 
 
-We con't mind the nilDataCon because it doesn't change the way to
-print the messsage, we are searching only for things like: [1,2,3],
-not x:xs ....
+We don't mind the @nilDataCon@ because it doesn't change the way to
+print the messsage, we are searching only for things like: @[1,2,3]@,
+not @x:xs@ ....
 
-In reconstruct_pat we want to "undo" the work that we have done in simplify_pat
+In @reconstruct_pat@ we want to ``undo'' the work
+that we have done in @simplify_pat@.
 In particular:
-	((,) x y)  returns to be (x, y)
-        ((:) x xs) returns to be (x:xs)
-        (x:(...:[]) returns to be [x,...]
-
+\begin{tabular}{lll}
+	@((,) x y)@   & returns to be & @(x, y)@
+\\      @((:) x xs)@  & returns to be & @(x:xs)@
+\\      @(x:(...:[])@ & returns to be & @[x,...]@
+\end{tabular}
+%
 The difficult case is the third one becouse we need to follow all the
-contructors until the [] to know taht we need to use the second case,
-not the second.
-
+contructors until the @[]@ to know that we need to use the second case,
+not the second. \fbox{\ ???\ }
+%
 \begin{code}
 isInfixCon con = isDataSymOcc (getOccName con)
 
@@ -560,9 +575,9 @@ new_wild_pat :: WarningPat
 new_wild_pat = WildPatIn
 \end{code}
 
-This equation makes the same thing that tidy in Match.lhs, the
+This equation makes the same thing as @tidy@ in @Match.lhs@, the
 difference is that here we can do all the tidy in one place and in the
-Match tidy it must be done one column each time due to bookkeeping 
+@Match@ tidy it must be done one column each time due to bookkeeping 
 constraints.
 
 \begin{code}
@@ -584,9 +599,9 @@ simplify_pat (AsPat id p)   = simplify_pat p
 
 simplify_pat (ConPat id ty tvs dicts ps) = ConPat id ty tvs dicts (map simplify_pat ps)
 
-simplify_pat (ListPat ty ps) = foldr (\ x -> \y -> ConPat consDataCon  list_ty [] [] [x, y])
-	                                            (ConPat nilDataCon list_ty [] [] [])
-	                                            (map simplify_pat ps)
+simplify_pat (ListPat ty ps) = foldr (\ x -> \y -> ConPat consDataCon list_ty [] [] [x, y])
+	                             (ConPat nilDataCon list_ty [] [] [])
+	                             (map simplify_pat ps)
                              where list_ty = mkListTy ty
 
 

@@ -276,14 +276,17 @@ slurpSourceRefs source_binders source_fvs
 						returnRn ()
         where
 	  doc = ptext SLIT("need home module for wired in thing") <+> ppr name
+\end{code}
+%
+@slurpInstDecls@ imports appropriate instance decls.
+It has to incorporate a loop, because consider
+\begin{verbatim}
+	instance Foo a => Baz (Maybe a) where ...
+\end{verbatim}
+It may be that @Baz@ and @Maybe@ are used in the source module,
+but not @Foo@; so we need to chase @Foo@ too.
 
--------------------------------------------------------
--- slurpInstDecls imports appropriate instance decls.
--- It has to incorporate a loop, because consider
---	instance Foo a => Baz (Maybe a) where ...
--- It may be that Baz and Maybe are used in the source module,
--- but not Foo; so we need to chase Foo too.
-
+\begin{code}
 slurpInstDecls decls needed gates
   | isEmptyFVs gates
   = returnRn (decls, needed)
@@ -354,18 +357,20 @@ slurpDecl decls fvs wanted_name
 
 %*********************************************************
 %*						 	 *
-\subsection{Extracting the 'gates'}
+\subsection{Extracting the `gates'}
 %*							 *
 %*********************************************************
 
 When we import a declaration like
-
+\begin{verbatim}
 	data T = T1 Wibble | T2 Wobble
-
-we don't want to treat Wibble and Wobble as gates *unless* T1, T2
-respectively are mentioned by the user program.  If only T is mentioned
-we want only T to be a gate; that way we don't suck in useless instance
-decls for (say) Eq Wibble, when they can't possibly be useful.
+\end{verbatim}
+we don't want to treat @Wibble@ and @Wobble@ as gates
+{\em unless} @T1@, @T2@ respectively are mentioned by the user program.
+If only @T@ is mentioned
+we want only @T@ to be a gate;
+that way we don't suck in useless instance
+decls for (say) @Eq Wibble@, when they can't possibly be useful.
 
 @getGates@ takes a newly imported (and renamed) decl, and the free
 vars of the source program, and extracts from the decl the gate names.
@@ -423,14 +428,15 @@ getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _))
 getGates source_fvs other_decl = emptyFVs
 \end{code}
 
-getWiredInGates is just like getGates, but it sees a wired-in Name
+@getWiredInGates@ is just like @getGates@, but it sees a wired-in @Name@
 rather than a declaration.
 
 \begin{code}
 getWiredInGates :: Name -> FreeVars
 getWiredInGates name 	-- No classes are wired in
   | is_id	         = getWiredInGates_s (namesOfType (idType the_id))
-  | isSynTyCon the_tycon = getWiredInGates_s (delListFromNameSet (namesOfType ty) (map getName tyvars))
+  | isSynTyCon the_tycon = getWiredInGates_s
+	 (delListFromNameSet (namesOfType ty) (map getName tyvars))
   | otherwise 	         = unitFV name
   where
     maybe_wired_in_id    = maybeWiredInIdName name
@@ -467,16 +473,17 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _) mentioned_names
 	-- Now, a use of C implies a use of T,
 	-- if C was brought into scope by T(..) or T(C)
 	really_used_names = used_names `unionNameSets`
-			    mkNameSet [ availName avail	
-				      | sub_name <- nameSetToList used_names,
-					let avail = case lookupNameEnv avail_env sub_name of
-							Just avail -> avail
-							Nothing -> pprTrace "r.u.n" (ppr sub_name) $
-								   Avail sub_name
-				      ]
+	  mkNameSet [ availName avail	
+		    | sub_name <- nameSetToList used_names,
+	              let avail = case lookupNameEnv avail_env sub_name of
+			    Just avail -> avail
+		            Nothing -> pprTrace "r.u.n" (ppr sub_name) $
+				       Avail sub_name
+		    ]
 
 	defined_names = mkNameSet (concat (rdrEnvElts gbl_env))
-	defined_but_not_used = nameSetToList (defined_names `minusNameSet` really_used_names)
+	defined_but_not_used =
+	   nameSetToList (defined_names `minusNameSet` really_used_names)
 
 	-- Filter out the ones only defined implicitly
 	bad_guys = filter reportableUnusedName defined_but_not_used
@@ -489,14 +496,18 @@ reportableUnusedName name
   = explicitlyImported (getNameProvenance name) &&
     not (startsWithUnderscore (occNameUserString (nameOccName name)))
   where
-    explicitlyImported (LocalDef _ _) 		             = True	-- Report unused defns of local vars
-    explicitlyImported (NonLocalDef (UserImport _ _ expl) _) = expl 	-- Report unused explicit imports
-    explicitlyImported other			             = False	-- Don't report others
+    explicitlyImported (LocalDef _ _) 		             = True
+	-- Report unused defns of local vars
+    explicitlyImported (NonLocalDef (UserImport _ _ expl) _) = expl
+ 	-- Report unused explicit imports
+    explicitlyImported other			             = False
+	-- Don't report others
    
 	-- Haskell 98 encourages compilers to suppress warnings about
 	-- unused names in a pattern if they start with "_".
-    startsWithUnderscore ('_' : _) = True	-- Suppress warnings for names starting
-    startsWithUnderscore other     = False	-- with an underscore
+    startsWithUnderscore ('_' : _) = True
+	-- Suppress warnings for names starting with an underscore
+    startsWithUnderscore other     = False
 
 rnStats :: [RenamedHsDecl] -> RnMG ()
 rnStats imp_decls
@@ -526,10 +537,10 @@ getRnStats imported_decls
 	n_mods = length [() | (_, _, Just _) <- eltsFM (iImpModInfo ifaces)]
 
 	decls_read     = [decl | (_, avail, True, (_,decl)) <- nameEnvElts (iDecls ifaces),
-					-- Data, newtype, and class decls are in the decls_fm
-					-- under multiple names; the tycon/class, and each
-					-- constructor/class op too.
-					-- The 'True' selects just the 'main' decl
+				-- Data, newtype, and class decls are in the decls_fm
+				-- under multiple names; the tycon/class, and each
+				-- constructor/class op too.
+				-- The 'True' selects just the 'main' decl
 				 not (isLocallyDefined (availName avail))
 			     ]
 

@@ -107,7 +107,7 @@ already desugared.  @dsListComp@ does the top TE rule mentioned above.
 \begin{code}
 deListComp :: [TypecheckedStmt] -> CoreExpr -> DsM CoreExpr
 
-deListComp [ReturnStmt expr] list		-- Figure 7.4, SLPJ, p 135, rule C above
+deListComp [ReturnStmt expr] list	-- Figure 7.4, SLPJ, p 135, rule C above
   = dsExpr expr			`thenDs` \ core_expr ->
     returnDs (mkConsExpr (coreExprType core_expr) core_expr list)
 
