@@ -177,7 +177,7 @@ stdout = unsafePerformIO (do
 #ifndef __CONCURRENT_HASKELL__
  	    fo <- CCALL(openStdFile) 1 1{-flush on close-} 0{-writeable-}  -- ConcHask: SAFE, won't block
 #else
- 	    fo <- CCALL(openStdFile) 1 (1{-flush on close-} + 128{-don't block on I/O-})
+ 	    fo <- CCALL(openStdFile) 1 (1{-flush on close-} {-+ 128 don't block on I/O-})
 					0{-writeable-}  -- ConcHask: SAFE, won't block
 #endif
 
@@ -208,7 +208,7 @@ stdin = unsafePerformIO (do
 #ifndef __CONCURRENT_HASKELL__
 	    fo <- CCALL(openStdFile) 0 0{-don't flush on close -} 1{-readable-}  -- ConcHask: SAFE, won't block
 #else
-	    fo <- CCALL(openStdFile) 0 (0{-flush on close-} + 128{-don't block on I/O-})
+	    fo <- CCALL(openStdFile) 0 (0{-flush on close-} {- + 128  don't block on I/O-})
 					1{-readable-}  -- ConcHask: SAFE, won't block
 #endif
 
@@ -237,7 +237,7 @@ stderr = unsafePerformIO (do
 #ifndef __CONCURRENT_HASKELL__
  	    fo <- CCALL(openStdFile) 2 1{-flush on close-} 0{-writeable-} -- ConcHask: SAFE, won't block
 #else
- 	    fo <- CCALL(openStdFile) 2 (1{-flush on close-} + 128{-don't block on I/O-})
+ 	    fo <- CCALL(openStdFile) 2 (1{-flush on close-} {- + 128  don't block on I/O-})
 					0{-writeable-} -- ConcHask: SAFE, won't block
 #endif
 
@@ -292,7 +292,7 @@ openFileEx f m = do
 #ifndef __CONCURRENT_HASKELL__
     file_flags = file_flags'
 #else
-    file_flags = file_flags' + 128{-Don't block on I/O-}
+    file_flags = file_flags' {-+ 128  Don't block on I/O-}
 #endif
 
     (file_flags', file_mode) =
