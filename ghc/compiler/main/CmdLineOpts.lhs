@@ -382,7 +382,7 @@ standardWarnings
 	Opt_WarnOverlappingPatterns,
 	Opt_WarnMissingFields,
 	Opt_WarnMissingMethods,
-	Opt_WarnDuplicateExports,
+	Opt_WarnDuplicateExports
       ]
 
 minusWOpts
