@@ -16,7 +16,6 @@ necessary.
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module Linker ( HValue, initLinker, showLinkerState,
-		findLinkable,
 		linkLibraries, linkExpr,
 		unload, extendLinkEnv, 
 		LibrarySpec(..)
@@ -34,8 +33,7 @@ import ByteCodeAsm	( CompiledByteCode(..), bcosFreeNames,
 import Packages		( PackageConfig(..), PackageName, PackageConfigMap, lookupPkg,
 			  packageDependents, packageNameString )
 import DriverState	( v_Library_paths, v_Cmdline_libraries, getPackageConfigMap )
-import DriverUtil	( splitFilename3 )
-import Finder		( findModule )
+import Finder		( findModule, findLinkable )
 import HscTypes		( Linkable(..), isObjectLinkable, nameOfObject, byteCodeOfObject,
 			  Unlinked(..), isInterpretable, isObject, Dependencies(..),
 			  HscEnv(..), PersistentCompilerState(..), ExternalPackageState(..),
@@ -789,24 +787,6 @@ findFile mk_file_path (dir:dirs)
 	     return (Just file_path)
 	  else
 	     findFile mk_file_path dirs }
-
-
-findLinkable :: ModuleName -> ModLocation -> IO (Maybe Linkable)
-findLinkable mod locn
-   | Just obj_fn <- ml_obj_file locn
-   = do obj_exist <- doesFileExist obj_fn
-        if not obj_exist 
-         then return Nothing 
-         else 
-         do let stub_fn = case splitFilename3 obj_fn of
-                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
-            stub_exist <- doesFileExist stub_fn
-            obj_time <- getModificationTime obj_fn
-            if stub_exist
-             then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
-             else return (Just (LM obj_time mod [DotO obj_fn]))
-   | otherwise
-   = return Nothing
 \end{code}
 
 \begin{code}

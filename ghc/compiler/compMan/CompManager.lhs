@@ -93,7 +93,7 @@ import Id		( idType )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import BasicTypes	( Fixity, FixitySig(..), defaultFixity )
-import Linker		( HValue, unload, extendLinkEnv, findLinkable )
+import Linker		( HValue, unload, extendLinkEnv )
 import GHC.Exts		( unsafeCoerce# )
 import Foreign
 import Control.Exception as Exception ( Exception, try )

@@ -14,6 +14,8 @@ module Finder (
     mkHomeModLocation,	-- :: ModuleName -> String -> FilePath 
 			--	-> IO ModLocation
 
+    findLinkable,	-- :: ModuleName -> ModLocation -> IO (Maybe Linkable)
+
     hiBootExt,		-- :: String
     hiBootVerExt,	-- :: String
 
@@ -24,8 +26,9 @@ module Finder (
 import Module
 import UniqFM		( filterUFM )
 import Packages		( PackageConfig(..) )
+import HscTypes		( Linkable(..), Unlinked(..) )
 import DriverState
-import DriverUtil	( split_longest_prefix )
+import DriverUtil	( split_longest_prefix, splitFilename3 )
 import FastString
 import Config
 import Util
@@ -309,4 +312,27 @@ mkHomeModLocation mod_name is_root path basename extension = do
 
    addToFinderCache mod_name result
    return result
+\end{code}
+
+-- -----------------------------------------------------------------------------
+-- findLinkable isn't related to the other stuff in here, 
+-- but there' no other obvious place for it
+
+\begin{code}
+findLinkable :: ModuleName -> ModLocation -> IO (Maybe Linkable)
+findLinkable mod locn
+   | Just obj_fn <- ml_obj_file locn
+   = do obj_exist <- doesFileExist obj_fn
+        if not obj_exist 
+         then return Nothing 
+         else 
+         do let stub_fn = case splitFilename3 obj_fn of
+                             (dir, base, ext) -> dir ++ "/" ++ base ++ ".stub_o"
+            stub_exist <- doesFileExist stub_fn
+            obj_time <- getModificationTime obj_fn
+            if stub_exist
+             then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
+             else return (Just (LM obj_time mod [DotO obj_fn]))
+   | otherwise
+   = return Nothing
 \end{code}
