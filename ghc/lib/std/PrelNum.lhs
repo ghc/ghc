@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.41 2001/10/03 13:57:42 simonmar Exp $
+% $Id: PrelNum.lhs,v 1.42 2001/10/31 16:38:55 rrt Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -109,7 +109,13 @@ divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
 \begin{code}
 data Integer	
    = S# Int#				-- small integers
+#ifndef ILX
    | J# Int# ByteArray#			-- large integers
+#else
+   | J# Void BigInteger                 -- .NET big ints
+
+foreign type dotnet "BigInteger" BigInteger
+#endif
 \end{code}
 
 Convenient boxed Integer PrimOps. 
