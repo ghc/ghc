@@ -20,12 +20,21 @@ module IOExts
 
         , trace
         , performGC
+	
+	, reallyUnsafePtrEq
         ) where
 \end{code}
 
 \begin{code}
+import PrelBase
 import IOBase
 import IORef
 import STBase
 import Unsafe
+import GHC
+
+reallyUnsafePtrEq a b =
+    case reallyUnsafePtrEquality# a b of
+	 0# -> False
+	 _  -> True
 \end{code}
