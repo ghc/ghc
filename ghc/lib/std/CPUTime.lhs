@@ -25,6 +25,7 @@ import PrelIOBase
 import PrelST
 #endif
 import IO		( ioError )
+import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
 import Ratio
 
 #ifdef __HUGS__

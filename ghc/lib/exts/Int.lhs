@@ -116,6 +116,7 @@ import PrelAddr ( Int64(..), Word64(..), Addr(..), Word(..) )
 #endif
 import Ix
 import Bits
+import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
 import Ratio   ( (%) )
 import Numeric ( readDec )
 import Word    ( Word32 )

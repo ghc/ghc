@@ -50,6 +50,9 @@ module GlaExts
         -- the representation of some basic types:
         Int(..),Addr(..),Word(..),Float(..),Double(..),Integer(..),Char(..),
 
+	-- The non-standard fromInt and toInt methods
+	Num( fromInt ), Integral( toInt ),
+
 	-- Fusion
 	build, augment,
 
@@ -63,6 +66,7 @@ module GlaExts
 
 import PrelGHC
 import PrelBase
+import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
 import PrelAddr   ( Addr(..), Word(..) )
 import PrelST
 import IOExts

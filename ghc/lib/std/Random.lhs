@@ -32,6 +32,7 @@ import CPUTime (getCPUTime)
 import PrelST
 import PrelRead
 import PrelShow
+import PrelNum		-- So we get fromInt, toInt
 import PrelIOBase
 import PrelNumExtra ( float2Double, double2Float )
 import PrelBase

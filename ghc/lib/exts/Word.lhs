@@ -125,6 +125,7 @@ import PrelIOBase
 import PrelAddr
 #endif
 import Ix
+import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
 import Bits
 import Ratio
 import Numeric (readDec, showInt)
