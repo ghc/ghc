@@ -32,28 +32,9 @@ module PrelErr
        ) where
 
 import PrelBase
-import PrelIOBase   ( IO(..) )
---import PrelHandle   ( catch )
-import PrelAddr
 import PrelList     ( span )
 import PrelException
-import PrelPack     ( packString )
-import PrelArr      ( ByteArray(..) )
 
-#ifndef __PARALLEL_HASKELL__
-import PrelStable  ( StablePtr, deRefStablePtr )
-#endif
-
----------------------------------------------------------------
--- HACK: Magic unfoldings not implemented for unboxed lists
---	 Need to define a "build" to avoid undefined symbol
--- in this module to avoid .hi proliferation.
-
---{-# GENERATE_SPECS build a #-}
---build 		:: ((a -> [a] -> [a]) -> [a] -> [a]) -> [a]
---build g 	= g (:) []
---build   = error "GHCbase.build"
---augment = error "GHCbase.augment"
 \end{code}
 
 %*********************************************************
@@ -63,65 +44,9 @@ import PrelStable  ( StablePtr, deRefStablePtr )
 %*********************************************************
 
 \begin{code}
-{-
-errorIO :: IO () -> a
-
-errorIO (IO io)
-  = case (errorIO# io) of
-      _ -> bottom
-  where
-    bottom = bottom -- Never evaluated
--}
---ioError :: String -> a
---ioError s = error__ ``&IOErrorHdrHook'' s 
-
 -- error stops execution and displays an error message
 error :: String -> a
 error s = throw (ErrorCall s)
---error s = error__ ``&ErrorHdrHook'' s
-{-
--- This local variant of "error" calls PatErrorHdrHook instead of ErrorHdrHook,
--- but the former does exactly the same as the latter, so I nuked it.
---		SLPJ Jan 97
---
--- Hmm..distinguishing between these two kinds of error is quite useful in the
--- compiler sources, printing out a more verbose msg in the case of patter
--- matching failure.
--- So I've reinstated patError to invoke its own message function hook again.
---    SOF 8/98
-patError__ x = error__ ``&PatErrorHdrHook'' x
-
-error__ :: Addr{-C function pointer to hook-} -> String -> a
-
-error__ msg_hdr s
-#ifdef __PARALLEL_HASKELL__
-  = errorIO (do
-     (hFlush stdout) `catchException` (\ _ -> return ())
-     let bs@(ByteArray (_,len) _) = packString s
-     _ccall_ writeErrString__ msg_hdr bs len
-     _ccall_ stg_exit (1::Int)
-    )
-#else
-  = errorIO ( do
-      (hFlush stdout) `catchException` (\ _ -> return ())
-	    -- Note: there's potential for trouble here in a
-	    -- a concurrent setting if an error is flagged after the
-	    -- lock on the stdout handle. (I don't see a possibility
-	    -- of this occurring with the current impl, but still.)
-      let bs@(ByteArray (_,len) _) = packString s
-      _ccall_ writeErrString__ msg_hdr bs len
-      errorHandler <- _ccall_ getErrorHandler
-      if errorHandler == (-1::Int) then
-	 _ccall_ stg_exit (1::Int)
-       else do
-	osptr <- _casm_ ``%r = (StgStablePtr)(%0);'' errorHandler
-	_ccall_ decrementErrorCount
-	oact  <- deRefStablePtr osptr
-	oact
-   )
-
-#endif {- !parallel -}
--}
 \end{code}
 
 %*********************************************************

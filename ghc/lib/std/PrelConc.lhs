@@ -10,17 +10,13 @@ Basic concurrency stuff
 {-# OPTIONS -fno-implicit-prelude #-}
 
 module PrelConc
-
-	-- Thread Ids
-	( ThreadId	-- abstract
+	( ThreadId(..)
 
 	-- Forking and suchlike
-	, forkIO	-- :: IO () -> IO ThreadId
 	, myThreadId 	-- :: IO ThreadId
 	, killThread	-- :: ThreadId -> IO ()
 	, raiseInThread -- :: ThreadId -> Exception -> IO ()
 	, par  		-- :: a -> b -> b
-	, fork  	-- :: a -> b -> b
 	, seq  		-- :: a -> b -> b
 	{-threadDelay, threadWaitRead, threadWaitWrite,-}
 
@@ -43,7 +39,7 @@ import PrelIOBase	( IO(..), MVar(..), unsafePerformIO )
 import PrelBase		( Int(..) )
 import PrelException    ( Exception(..), AsyncException(..) )
 
-infixr 0 `par`, `fork`
+infixr 0 `par`
 \end{code}
 
 %************************************************************************
@@ -58,9 +54,7 @@ data ThreadId = ThreadId ThreadId#
 -- But since ThreadId# is unlifted, the Weak type must use open
 -- type variables.
 
-forkIO :: IO () -> IO ThreadId
-forkIO action = IO $ \ s -> 
-   case (fork# action s) of (# s1, id #) -> (# s1, ThreadId id #)
+--forkIO has now been hoisted out into the concurrent library.
 
 killThread :: ThreadId -> IO ()
 killThread (ThreadId id) = IO $ \ s ->
@@ -89,17 +83,14 @@ myThreadId = IO $ \s ->
 seq :: a -> b -> b
 seq  x y = case (seq#  x) of { 0# -> seqError; _ -> y }
 
-par, fork :: a -> b -> b
+par :: a -> b -> b
 
 {-# INLINE par  #-}
-{-# INLINE fork #-}
 #if defined(__PARALLEL_HASKELL__) || defined (__GRANSIM__)
 par  x y = case (par# x) of { 0# -> parError; _ -> y }
 #else
 par  _ y = y
 #endif
-
-fork x y = unsafePerformIO (forkIO (x `seq` return ())) `seq` y
 
 \end{code}
 

@@ -15,20 +15,22 @@ which are supported for them.
 module PrelHandle where
 
 import PrelBase
-import PrelArr		( newVar, readVar, writeVar, ByteArray )
+import PrelAddr		( Addr, nullAddr )
+import PrelArr		( newVar, readVar, writeVar, ByteArray(..) )
 import PrelRead		( Read )
 import PrelList 	( span )
 import PrelIOBase
-import PrelException 	( throw, ioError, catchException )
+import PrelException
 import PrelMaybe	( Maybe(..) )
-import PrelAddr		( Addr, nullAddr )
 import PrelBounded      ()   -- get at Bounded Int instance.
 import PrelNum		( toInteger, toBig )
+import PrelPack         ( packString )
 import PrelWeak		( addForeignFinalizer )
+import Ix
+
 #if __CONCURRENT_HASKELL__
 import PrelConc
 #endif
-import Ix
 
 #ifndef __PARALLEL_HASKELL__
 import PrelForeign  ( makeForeignObj )
@@ -1087,6 +1089,57 @@ ioeGetFileName (IOError _ _  _ str) =
    (fs,_)  -> Just fs
 
 \end{code}
+
+'Top-level' IO actions want to catch exceptions (e.g., forkIO and 
+PrelMain.mainIO) and report them - topHandler is the exception
+handler they should use for this:
+
+\begin{code}
+-- make sure we handle errors while reporting the error!
+-- (e.g. evaluating the string passed to 'error' might generate
+--  another error, etc.)
+topHandler :: Bool -> Exception -> IO ()
+topHandler bombOut err = catchException (real_handler bombOut err) (topHandler bombOut)
+
+real_handler :: Bool -> Exception -> IO ()
+real_handler bombOut ex =
+  case ex of
+	AsyncException StackOverflow -> reportStackOverflow bombOut
+	ErrorCall s -> reportError bombOut s
+	other       -> reportError bombOut (showsPrec 0 other "\n")
+
+reportStackOverflow :: Bool -> IO ()
+reportStackOverflow bombOut = do
+   (hFlush stdout) `catchException` (\ _ -> return ())
+   callStackOverflowHook
+   if bombOut then
+     stg_exit 2
+    else
+     return ()
+
+reportError :: Bool -> String -> IO ()
+reportError bombOut str = do
+   (hFlush stdout) `catchException` (\ _ -> return ())
+   let bs@(ByteArray (_,len) _) = packString str
+   writeErrString addrOf_ErrorHdrHook bs len
+   if bombOut then
+     stg_exit 1
+    else
+     return ()
+
+foreign label "ErrorHdrHook" 
+        addrOf_ErrorHdrHook :: Addr
+
+foreign import ccall "writeErrString__" 
+	writeErrString :: Addr -> ByteArray Int -> Int -> IO ()
+
+foreign import ccall "stackOverflow"
+	callStackOverflowHook :: IO ()
+
+foreign import ccall "stg_exit"
+	stg_exit :: Int -> IO ()
+\end{code}
+
 
 A number of operations want to get at a readable or writeable handle, and fail
 if it isn't:

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.8 1999/03/31 09:52:05 sof Exp $
+% $Id: PrelIOBase.lhs,v 1.9 1999/04/27 17:41:19 sof Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -164,7 +164,6 @@ data IOErrorType
   | EOF
 #ifdef _WIN32
   | ComError Int           -- HRESULT
-	     (Maybe Addr)  -- Pointer to 'exception' object. (IExceptionInfo..)
 #endif
   deriving (Eq)
 
@@ -191,6 +190,9 @@ instance Show IOErrorType where
       UserError         -> "failed"
       UnsupportedOperation -> "unsupported operation"
       EOF		-> "end of file"
+#ifdef _WIN32
+      ComError _	-> "COM error"
+#endif
 
 
 
