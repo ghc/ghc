@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.28 2001/02/20 15:44:26 simonpj Exp $
+-- $Id: DriverState.hs,v 1.29 2001/02/21 11:36:01 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -154,6 +154,7 @@ hsc_minusNoO_flags =
 -- these are the static flags you get when -O is on.
 hsc_minusO_flags =
   [ 
+	"-fignore-asserts",
 	"-ffoldr-build-on",
         "-fdo-eta-reduction",
 	"-fdo-lambda-eta-expansion",
