@@ -451,6 +451,10 @@ mkApp  fun = mk_thing (mkGenApp fun)
 mkCon  con = mk_thing (Con      con)
 mkPrim op  = mk_thing (Prim     op)
 
+mk_thing :: ([GenCoreArg val_occ flexi] -> GenCoreExpr val_bdr val_occ flexi)
+	 -> [GenType flexi] 
+	 -> [GenCoreArg val_occ flexi] 
+	 -> GenCoreExpr val_bdr val_occ flexi
 mk_thing thing tys vals
   = ASSERT( all isValArg vals )
     thing (map TyArg tys ++ vals)

@@ -15,7 +15,7 @@ import DsUtils
 
 import TcHsSyn		( maybeBoxedPrimType )
 import CoreUtils	( coreExprType )
-import Id		( Id(..), dataConArgTys, idType )
+import Id		( Id, dataConArgTys, idType )
 import Maybes		( maybeToBool )
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )

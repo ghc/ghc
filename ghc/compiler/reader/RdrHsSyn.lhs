@@ -55,7 +55,7 @@ module RdrHsSyn (
 
 import HsSyn
 import Lex
-import BasicTypes	( Module(..), IfaceFlavour(..), Unused )
+import BasicTypes	( Module, IfaceFlavour(..), Unused )
 import Name		( pprModule, OccName(..), pprOccName, 
 			  prefixOccName, NamedThing(..) )
 import Util		( thenCmp )
