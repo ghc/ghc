@@ -7,6 +7,3 @@ Data.Generics			GHC-specific
 Data.PackedString		uses Data.Array.Unboxed
 Debug.QuickCheck.Batch		needs pre-emptive concurrency
 System.Posix.Signals
-Text.ParserCombinators.ReadP	ReadS clashes with Prelude
-Text.ParserCombinators.ReadPrec	uses ReadP
-Text.Read.Lex			uses ReadP
