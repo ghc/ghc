@@ -226,7 +226,7 @@ BuildingParallel=$(subst mp,YES,$(filter mp,$(WAYS)))
 BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 
 #------------------------------------------------------------------------------
-# Options for GHC's Prelude
+# Options for Libraries
 
 # What extra ways to build the libraries in
 # In addition to the normal sequential way, the default is to also build
@@ -262,6 +262,21 @@ DLLized=@EnableWin32DLLs@
 #
 MinimalUnixDeps=@MinimalUnixDeps@
 
+# Strip local symbols from libraries?  This can make the libraries smaller,
+# but makes debugging somewhat more difficult.  Doesn't work with all ld's.
+#
+StripLibraries=NO
+
+
+# ----------------------------------------------------------------------------
+# Object-file splitting
+#
+# 	Set SplitObjs=YES or NO in your build.mk
+#
+#	Don't use -split-objs in in GhcLibHcOpts, because the build
+#		system needs to do other special magic if you are
+#		doing object-file splitting
+
 # Don't split object files for libs if we're building DLLs, or booting from
 # .hc files.
 SplitObjs=YES
@@ -275,11 +290,6 @@ endif
 ifeq "$(GhcUnregisterised)" "YES"
 SplitObjs=NO
 endif
-
-# Strip local symbols from libraries?  This can make the libraries smaller,
-# but makes debugging somewhat more difficult.  Doesn't work with all ld's.
-#
-StripLibraries=NO
 
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
