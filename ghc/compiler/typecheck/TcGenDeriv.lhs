@@ -1030,9 +1030,9 @@ From the data type
 
 we generate
 
-  $cT1 = mkConstr 1 "T1" Prefix
-  $cT2 = mkConstr 2 "T2" Prefix
-  $dT  = mkDataType [$con_T1, $con_T2]
+  $cT1 = mkDataCon $dT "T1" Prefix
+  $cT2 = mkDataCon $dT "T2" Prefix
+  $dT  = mkDataType "Module.T" [$con_T1, $con_T2]
 
   instance (Data a, Data b) => Data (T a b) where
     gfoldl k z (T1 a b) = z T `k` a `k` b
@@ -1085,40 +1085,37 @@ gen_Data_binds fix_env tycon
     to_con_eqn dc = ([nlWildConPat dc], nlHsVar (mk_constr_name dc))
     
 	------------ dataTypeOf
-    dataTypeOf_bind = mkVarBind
+    dataTypeOf_bind = mk_easy_FunBind
                         tycon_loc
                         dataTypeOf_RDR
+			[wildPat]
+                        emptyBag
                         (nlHsVar data_type_name)
 
 	------------ $dT
 
     data_type_name = mkDerivedRdrName tycon_name mkDataTOcc
-    datatype_bind  = mk_easy_FunBind
+    datatype_bind  = mkVarBind
                        tycon_loc
                        data_type_name
-                       [a_Pat]
-                       emptyBag
 		       (           nlHsVar mkDataType_RDR 
+                         `nlHsApp` nlHsLit (mkHsString (showSDoc (ppr tycon)))
                          `nlHsApp` nlList constrs
-                         `nlHsApp` nlHsVar a_RDR
                        )
     constrs = [nlHsVar (mk_constr_name con) | con <- data_cons]
 
-{-
-    data_type_name = mkDerivedRdrName tycon_name mkDataTOcc
-    datatype_bind  = mkVarBind tycon_loc data_type_name
-				   (nlHsVar mkDataType_RDR `nlHsApp` 
-				    nlList constrs)
-    constrs = [nlHsVar (mk_constr_name con) | con <- data_cons]
--}
 
 	------------ $cT1 etc
     mk_constr_name con = mkDerivedRdrName (dataConName con) mkDataCOcc
-    mk_con_bind dc = mkVarBind tycon_loc (mk_constr_name dc) 
-					     (nlHsApps mkConstr_RDR (constr_args dc))
-    constr_args dc = [nlHsIntLit (toInteger (dataConTag dc)),		-- Tag
-		      nlHsLit (mkHsString (occNameUserString dc_occ)),	-- String name
-		      nlHsVar fixity]					-- Fixity
+    mk_con_bind dc = mkVarBind
+                       tycon_loc
+                       (mk_constr_name dc) 
+		       (nlHsApps mkConstr_RDR (constr_args dc))
+    constr_args dc =
+	 [ -- nlHsIntLit (toInteger (dataConTag dc)),		-- Tag
+	   nlHsVar data_type_name,				-- DataType
+	   nlHsLit (mkHsString (occNameUserString dc_occ)),	-- String name
+	   nlHsVar fixity]					-- Fixity
 	where
 	  dc_occ   = getOccName dc
 	  is_infix = isDataSymOcc dc_occ
@@ -1129,7 +1126,7 @@ gfoldl_RDR     = varQual_RDR gENERICS_Name FSLIT("gfoldl")
 fromConstr_RDR = varQual_RDR gENERICS_Name FSLIT("fromConstr")
 toConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("toConstr")
 dataTypeOf_RDR = varQual_RDR gENERICS_Name FSLIT("dataTypeOf")
-mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkDataConstr")
+mkConstr_RDR   = varQual_RDR gENERICS_Name FSLIT("mkDataCon")
 mkDataType_RDR = varQual_RDR gENERICS_Name FSLIT("mkDataType")
 conIndex_RDR   = varQual_RDR gENERICS_Name FSLIT("conIndex")
 prefix_RDR     = dataQual_RDR gENERICS_Name FSLIT("Prefix")
