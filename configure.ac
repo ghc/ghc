@@ -983,6 +983,7 @@ FPTOOLS_CHECK_HTYPE(blkcnt_t)
 FPTOOLS_CHECK_HTYPE(nlink_t)
 FPTOOLS_CHECK_HTYPE(ssize_t)
 FPTOOLS_CHECK_HTYPE(rlim_t)
+FPTOOLS_CHECK_HTYPE(wint_t)
 
 dnl ** Map OpenGL data types to Haskell types
 if test $GhcLibsWithHOpenGL = YES ; then
