@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.23 $
- * $Date: 1999/12/07 11:36:40 $
+ * $Revision: 1.24 $
+ * $Date: 1999/12/10 15:59:56 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1033,16 +1033,14 @@ Int size; {
 Void translateControl(what)
 Int what; {
     switch (what) {
-    case INSTALL:
-        {
-            /* deliberate fall through */
-        }
-    case RESET: 
-            stgGlobals=NIL;
-            break;
-    case MARK: 
-            mark(stgGlobals);
-            break;
+       case POSTPREL: break;
+       case PREPREL:
+       case RESET: 
+          stgGlobals=NIL;
+          break;
+       case MARK: 
+          mark(stgGlobals);
+          break;
     }
 }
 

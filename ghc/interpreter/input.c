@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/12/06 16:20:26 $
+ * $Revision: 1.18 $
+ * $Date: 1999/12/10 15:59:45 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -121,7 +121,7 @@ static Void local skipWhitespace  Args((Void));
 static Int  local yylex           Args((Void));
 static Int  local repeatLast      Args((Void));
 
-static Void local parseInput      Args((Int));
+static Cell local parseInput      Args((Int));
 
 static Bool local doesNotExceed   Args((String,Int,Int));
 static Int  local stringToInt     Args((String,Int));
@@ -1595,9 +1595,10 @@ Name n; {
  * main entry points to parser/lexer:
  * ------------------------------------------------------------------------*/
 
-static Void local parseInput(startWith)/* Parse input with given first tok,*/
+static Cell local parseInput(startWith)/* Parse input with given first tok,*/
 Int startWith; {                       /* determining whether to read a    */
-    firstToken   = TRUE;               /* script or an expression          */
+    Cell final   = NIL;                /* script or an expression          */
+    firstToken   = TRUE;
     firstTokenIs = startWith;
     if (startWith==INTERFACE) {
        offsideON = FALSE; readingInterface = TRUE; 
@@ -1610,9 +1611,10 @@ Int startWith; {                       /* determining whether to read a    */
         ERRMSG(row) "Parser overflow"  /* as all syntax errors are caught  */
         EEND;                          /* in the parser...                 */
     }
-    drop();
+    final = pop();
     if (!stackEmpty())                 /* stack should now be empty        */
         internal("parseInput");
+    return final;
 }
 
 #ifdef HSCRIPT
@@ -1675,12 +1677,12 @@ Void parseContext() {                  /* Read a context to prove   */
 }
 #endif
 
-Void parseInterface(nm,len)            /* Read a GHC interface file        */
+Cell parseInterface(nm,len)            /* Read a GHC interface file        */
 String nm;
 Long   len; {                          /* Used to set a target for reading */
-    input(RESET);
-    fileInput(nm,len);
-    parseInput(INTERFACE);
+   input(RESET);
+   fileInput(nm,len);
+   return parseInput(INTERFACE);
 }
 
 
@@ -1691,7 +1693,9 @@ Long   len; {                          /* Used to set a target for reading */
 Void input(what)
 Int what; {
     switch (what) {
-        case INSTALL : initCharTab();
+        case POSTPREL: break;
+
+        case PREPREL : initCharTab();
                        textCase       = findText("case");
                        textOfK        = findText("of");
                        textData       = findText("data");
@@ -1770,7 +1774,6 @@ Int what; {
                        instDefns    = NIL;
                        selDefns     = NIL;
                        genDefns     = NIL;
-                       //primDefns    = NIL;
                        unqualImports= NIL;
                        foreignImports= NIL;
                        foreignExports= NIL;
@@ -1792,7 +1795,6 @@ Int what; {
                        mark(instDefns);
                        mark(selDefns);
                        mark(genDefns);
-                       //mark(primDefns);
                        mark(unqualImports);
                        mark(foreignImports);
                        mark(foreignExports);

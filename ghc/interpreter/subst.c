@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/11/23 15:12:07 $
+ * $Revision: 1.10 $
+ * $Date: 1999/12/10 15:59:55 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1956,7 +1956,9 @@ Int what; {
 #endif
                        break;
 
-        case INSTALL : substitution(RESET);
+        case POSTPREL: break;
+
+        case PREPREL : substitution(RESET);
                        for (i=0; i<MAXTUPCON; ++i)
                            tupleConTypes[i] = NIL;
                        for (i=0; i<MAXKINDFUN; ++i) {

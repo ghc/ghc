@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.20 $
- * $Date: 1999/12/03 17:56:04 $
+ * $Revision: 1.21 $
+ * $Date: 1999/12/10 15:59:43 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -17,6 +17,7 @@
  * ------------------------------------------------------------------------*/
 
 extern Bool   haskell98;                /* TRUE => Haskell 98 compatibility*/
+extern Bool   combined;                 /* TRUE => combined operation      */
 extern Module modulePrelude;
 
 /* --------------------------------------------------------------------------
@@ -177,12 +178,19 @@ extern Bool  allowOverlap;              /* TRUE => allow overlapping insts */
 
 extern Void everybody Args((Int));
 
-#define RESET   1               /* reset subsystem                         */
-#define MARK    2               /* mark parts of graph in use by subsystem */
-#define INSTALL 3               /* install subsystem (executed once only)  */
-#define EXIT    4               /* Take action immediately before exit()   */
-#define BREAK   5               /* Take action after program break         */
-#define GCDONE  6               /* Restore subsystem invariantss after GC  */
+
+#define RESET    1            /* reset subsystem                           */
+#define MARK     2            /* mark parts of graph in use by subsystem   */
+#define PREPREL  3            /* do startup actions before Prelude loading */
+#define POSTPREL 4            /* do startup actions after Prelude loading  */
+#define EXIT     5            /* Take action immediately before exit()     */
+#define BREAK    6            /* Take action after program break           */
+#define GCDONE   7            /* Restore subsystem invariantss after GC    */
+
+/* PREPREL was formerly called INSTALL.  POSTPREL doesn't have an analogy
+   in the old Hugs. 
+*/
+
 
 typedef long   Target;
 extern  Void   setGoal          Args((String, Target));
@@ -545,29 +553,16 @@ extern Void  interface        Args((Int));
 
 extern Void getFileSize       Args((String, Long *));
 
-extern Void loadInterface     Args((String,Long));
+extern ZPair readInterface      Args((String,Long));
+extern Void  processInterfaces  Args((Void));
 
-extern Void openGHCIface      Args((Text));
-extern Void loadSharedLib     Args((String));
-extern Void addGHCImports     Args((Int,Text,List));
-extern Void addGHCExports     Args((Cell,List));
-extern Void addGHCVar         Args((Int,Text,Type));
-extern Void addGHCSynonym     Args((Int,Cell,List,Type));
-extern Void addGHCDataDecl    Args((Int,List,Cell,List,List));
-extern Void addGHCNewType     Args((Int,List,Cell,List,Cell));
-extern Void addGHCClass       Args((Int,List,Cell,List,List));
-extern Void addGHCInstance    Args((Int,List,Pair,Text));
-extern Void finishInterfaces  Args((Void));
+extern List /* of ZTriple(I_INTERFACE, 
+                          Text--name of obj file, 
+                          Int--size of obj file) */
+             ifaces_outstanding;
+
 
 extern Void hi_o_namesFromSrcName Args((String,String*,String* oName));
-extern Void parseInterface        Args((String,Long));
+extern Cell parseInterface        Args((String,Long));
 
-
-#define SMALL_INLINE_SIZE 9
-
-
-// nasty hack, but seems an easy to convey the object name
-// and size to openGHCIface
-char nameObj[FILENAME_MAX+1];
-int  sizeObj;
 

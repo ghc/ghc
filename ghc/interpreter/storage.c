@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.24 $
- * $Date: 1999/12/07 11:14:57 $
+ * $Revision: 1.25 $
+ * $Date: 1999/12/10 15:59:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -578,19 +578,24 @@ List   ts; {                            /* Null pattern matches every tycon*/
     return ts;
 }
 
-Text ghcTupleText(tup)
-Tycon tup; {
+Text ghcTupleText_n ( Int n )
+{
     Int  i;
     char buf[103];
-    assert(isTuple(tup));
-    tup = tupleOf(tup);
-    if (tup >= 100) internal("ghcTupleText");
+    if (n < 0 || n >= 100) internal("ghcTupleText_n");
     buf[0] = '(';
-    for (i = 1; i <= tup; i++) buf[i] = ',';
+    for (i = 1; i <= n; i++) buf[i] = ',';
     buf[i] = ')';
     buf[i+1] = 0;
     return findText(buf);
 }
+
+Text ghcTupleText(tup)
+Tycon tup; {
+    assert(isTuple(tup));
+    return ghcTupleText_n ( tupleOf(tup) );
+}
+
 
 Tycon mkTuple ( Int n )
 {
@@ -605,17 +610,16 @@ Tycon mkTuple ( Int n )
 Void allocTupleTycon ( Int n )
 {
    Int   i;
-   char  buf[20];
    Kind  k;
    Tycon t;
    for (i = TYCMIN; i < tyconHw; i++)
       if (tycon(i).tuple == n) return;
-   sprintf(buf,"Tuple%d",n);
+
    //t = addPrimTycon(findText(buf),simpleKind(n),n, DATATYPE,NIL);
 
    k = STAR;
    for (i = 0; i < n; i++) k = ap(STAR,k);
-   t = newTycon(findText(buf));
+   t = newTycon(ghcTupleText_n(n));
    tycon(t).kind = k;
    tycon(t).tuple = n;
    tycon(t).what = DATATYPE;
@@ -1046,6 +1050,20 @@ Type tc; {
     return (ty==tc)
         || (isAp(ty) && (typeInvolves(fun(ty),tc)
                          || typeInvolves(arg(ty),tc)));
+}
+
+Inst findSimpleInstance ( ConId klass, ConId dataty )
+{
+   Inst in;
+   for (in = INSTMIN; in < instHw; in++) {
+      Cell head = inst(in).head;
+      if (isClass(fun(head)) 
+          && cclass(fun(head)).text==textOf(klass)
+          && typeInvolves(arg(head), findTycon(textOf(dataty)) )
+         )
+         return in;
+   }
+   return NIL;
 }
 
 /* --------------------------------------------------------------------------
@@ -1951,7 +1969,7 @@ Int  depth; {
                 Printf("Offset %d", offsetOf(c));
                 break;
         case TUPLE:
-                Printf("Tuple %d", tupleOf(c));
+                Printf("%s", textToStr(ghcTupleText(tupleOf(c))));
                 break;
         case POLYTYPE:
                 Printf("Polytype");
@@ -2083,6 +2101,10 @@ Int  depth; {
                 print(snd(c),depth-1);
                 Putchar(')');
                 break;
+        case ZTUP2:
+                Printf("<ZPair ");
+                print(snd(c),depth-1);
+                Putchar('>');
         case BANG:
                 Printf("(BANG,");
                 print(snd(c),depth-1);
@@ -2480,6 +2502,133 @@ List xs; {                              /* non destructive                 */
    return outs;
 }
 
+
+/* --------------------------------------------------------------------------
+ * Strongly-typed lists (z-lists) and tuples (experimental)
+ * ------------------------------------------------------------------------*/
+
+static void z_tag_check ( Cell x, int tag, char* caller )
+{
+   char buf[100];
+   if (isNull(x)) {
+      sprintf(buf,"z_tag_check(%s): null\n", caller);
+      internal(buf);
+   }
+   if (whatIs(x) != tag) {
+      sprintf(buf, 
+          "z_tag_check(%s): tag was %d, expected %d\n",
+          caller, whatIs(x), tag );
+      internal(buf);
+   }  
+}
+
+#if 0
+Cell zcons ( Cell x, Cell xs )
+{
+   if (!(isNull(xs) || whatIs(xs)==ZCONS)) 
+      internal("zcons: ill typed tail");
+   return ap(ZCONS,ap(x,xs));
+}
+
+Cell zhd ( Cell xs )
+{
+   if (isNull(xs)) internal("zhd: empty list");
+   z_tag_check(xs,ZCONS,"zhd");
+   return fst( snd(xs) );
+}
+
+Cell ztl ( Cell xs )
+{
+   if (isNull(xs)) internal("ztl: empty list");
+   z_tag_check(xs,ZCONS,"zhd");
+   return snd( snd(xs) );
+}
+
+Int zlength ( ZList xs )
+{
+   Int n = 0;
+   while (nonNull(xs)) {
+      z_tag_check(xs,ZCONS,"zlength");
+      n++;
+      xs = snd( snd(xs) );
+   }
+   return n;
+}
+
+ZList zreverse ( ZList xs )
+{
+   ZList rev = NIL;
+   while (nonNull(xs)) {
+      z_tag_check(xs,ZCONS,"zreverse");
+      rev = zcons(zhd(xs),rev);
+      xs = ztl(xs);
+   }
+   return rev;
+}
+
+Cell zsingleton ( Cell x )
+{
+   return zcons (x,NIL);
+}
+
+Cell zdoubleton ( Cell x, Cell y )
+{
+   return zcons(x,zcons(y,NIL));
+}
+#endif
+
+Cell zpair ( Cell x1, Cell x2 )
+{ return ap(ZTUP2,ap(x1,x2)); }
+Cell zfst ( Cell zpair )
+{ z_tag_check(zpair,ZTUP2,"zfst"); return fst( snd(zpair) ); }
+Cell zsnd ( Cell zpair )
+{ z_tag_check(zpair,ZTUP2,"zsnd"); return snd( snd(zpair) ); }
+
+Cell ztriple ( Cell x1, Cell x2, Cell x3 )
+{ return ap(ZTUP3,ap(x1,ap(x2,x3))); }
+Cell zfst3 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP3,"zfst3"); return fst( snd(zpair) ); }
+Cell zsnd3 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP3,"zsnd3"); return fst(snd( snd(zpair) )); }
+Cell zthd3 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP3,"zthd3"); return snd(snd( snd(zpair) )); }
+
+Cell z4ble ( Cell x1, Cell x2, Cell x3, Cell x4 )
+{ return ap(ZTUP4,ap(x1,ap(x2,ap(x3,x4)))); }
+Cell zsel14 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP4,"zsel14"); return fst( snd(zpair) ); }
+Cell zsel24 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP4,"zsel24"); return fst(snd( snd(zpair) )); }
+Cell zsel34 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP4,"zsel34"); return fst(snd(snd( snd(zpair) ))); }
+Cell zsel44 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP4,"zsel44"); return snd(snd(snd( snd(zpair) ))); }
+
+Cell z5ble ( Cell x1, Cell x2, Cell x3, Cell x4, Cell x5 )
+{ return ap(ZTUP5,ap(x1,ap(x2,ap(x3,ap(x4,x5))))); }
+Cell zsel15 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP5,"zsel15"); return fst( snd(zpair) ); }
+Cell zsel25 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP5,"zsel25"); return fst(snd( snd(zpair) )); }
+Cell zsel35 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP5,"zsel35"); return fst(snd(snd( snd(zpair) ))); }
+Cell zsel45 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP5,"zsel45"); return fst(snd(snd(snd( snd(zpair) )))); }
+Cell zsel55 ( Cell zpair )
+{ z_tag_check(zpair,ZTUP5,"zsel55"); return snd(snd(snd(snd( snd(zpair) )))); }
+
+
+Cell unap ( int tag, Cell c )
+{
+   char buf[100];
+   if (whatIs(c) != tag) {
+      sprintf(buf, "unap: specified %d, actual %d\n",
+                   tag, whatIs(c) );
+      internal(buf);
+   }
+   return snd(c);
+}
+
 /* --------------------------------------------------------------------------
  * Operations on applications:
  * ------------------------------------------------------------------------*/
@@ -2638,6 +2787,8 @@ Int what; {
     Int i;
 
     switch (what) {
+        case POSTPREL: break;
+
         case RESET   : clearStack();
 
                        /* the next 2 statements are particularly important
@@ -2725,7 +2876,7 @@ Int what; {
 
                        break;
 
-        case INSTALL : heapFst = heapAlloc(heapSize);
+        case PREPREL : heapFst = heapAlloc(heapSize);
                        heapSnd = heapAlloc(heapSize);
 
                        if (heapFst==(Heap)0 || heapSnd==(Heap)0) {

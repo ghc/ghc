@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.17 $
- * $Date: 1999/12/03 17:01:22 $
+ * $Revision: 1.18 $
+ * $Date: 1999/12/10 15:59:49 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -120,79 +120,73 @@ start     : EXPR exp wherePart          {inputExpr = letrec($3,$2); sp-=2;}
  */
 
 /*- Top-level interface files -----------------------------*/
-iface     : INTERFACE ifName NUMLIT orphans checkVersion WHERE ifDecls 
-                                        {$$ = gc7(NIL); }
+iface     : INTERFACE ifCon NUMLIT ifOrphans ifCheckVersion WHERE ifTopDecls 
+                                        {$$ = gc7(ap(I_INTERFACE, 
+                                                     zpair($2,$7))); }
           | INTERFACE error             {syntaxError("interface file");}
           ;
-ifDecls:                                {$$=gc0(NIL);}
-          | ifDecl ';' ifDecls          {$$=gc3(cons($1,$3));}
-          ;
-varid_or_conid
-          : VARID                       { $$=gc1($1); }
-          | CONID                       { $$=gc1($1); }
+
+ifTopDecls:                             {$$=gc0(NIL);}
+          | ifTopDecl ';' ifTopDecls    {$$=gc3(cons($1,$3));}
           ;
 
-ifName    : CONID                       {openGHCIface(textOf($1)); 
-                                         $$ = gc1(NIL);}
-checkVersion
-          : NUMLIT                      {$$ = gc1(NIL); }
-          ;
-ifDecl    
-          : IMPORT CONID NUMLIT orphans opt_COCO version_list_junk
-                                        { addGHCImports(intOf($3),textOf($2),
-                                                       $6);
-                                          $$ = gc6(NIL); 
-                                        }
+ifTopDecl    
+          : IMPORT CONID NUMLIT ifOrphans ifOptCOCO ifVersionList
+                                        {$$=gc6(ap(I_IMPORT,zpair($2,$6))); }
 
-          | INSTIMPORT CONID            {$$=gc2(NIL);}
+          | INSTIMPORT CONID            {$$=gc2(ap(I_INSTIMPORT,NIL));}
 
-          | UUEXPORT CONID ifEntities   { addGHCExports($2,$3);
-                                          $$=gc3(NIL);}
+          | UUEXPORT CONID ifEntities   {$$=gc3(ap(I_EXPORT,zpair($2,$3)));}
 
-          | NUMLIT INFIXL optDigit varid_or_conid   
-                                        {$$ = gc4(fixdecl($2,singleton($4),
-                                                          LEFT_ASS,$3)); }
-          | NUMLIT INFIXR optDigit varid_or_conid   
-                                        {$$ = gc4(fixdecl($2,singleton($4),
-                                                          RIGHT_ASS,$3)); }
-          | NUMLIT INFIXN optDigit varid_or_conid   
-                                        {$$ = gc4(fixdecl($2,singleton($4),
-                                                          NON_ASS,$3)); }
+          | NUMLIT INFIXL optDigit ifVarCon
+                                        {$$=gc4(ap(I_FIXDECL,
+                                            ztriple($3,mkInt(LEFT_ASS),$4)));}
+          | NUMLIT INFIXR optDigit ifVarCon
+                                        {$$=gc4(ap(I_FIXDECL,
+                                            ztriple($3,mkInt(RIGHT_ASS),$4)));}
+          | NUMLIT INFIXN optDigit ifVarCon
+                                        {$$=gc4(ap(I_FIXDECL,
+                                            ztriple($3,mkInt(NON_ASS),$4)));}
 
           | TINSTANCE ifCtxInst ifInstHdL '=' ifVar
-                                        { addGHCInstance(intOf($1),$2,$3,
-                                          textOf($5)); 
-                                          $$ = gc5(NIL); }
+                                        {$$=gc5(ap(I_INSTANCE,
+                                                   z4ble($1,$2,$3,$5)));}
+
           | NUMLIT TYPE ifCon ifKindedTyvarL '=' ifType
-                                        { addGHCSynonym(intOf($2),$3,$4,$6);
-                                          $$ = gc6(NIL); }
+                                        {$$=gc6(ap(I_TYPE,
+                                                   z4ble($2,$3,$4,$6)));}
 
           | NUMLIT DATA ifCtxDecl ifConData ifKindedTyvarL ifConstrs
-                                        { addGHCDataDecl(intOf($2),
-                                                         $3,$4,$5,$6);
-                                          $$ = gc6(NIL); }
+                                        {$$=gc6(ap(I_DATA,
+                                                   z5ble($2,$3,$4,$5,$6)));}
 
           | NUMLIT TNEWTYPE ifCtxDecl ifConData ifKindedTyvarL ifNewTypeConstr
-                                        { addGHCNewType(intOf($2),
-                                                        $3,$4,$5,$6);
-                                          $$ = gc6(NIL); }
+                                        {$$=gc6(ap(I_NEWTYPE,
+                                                   z5ble($2,$3,$4,$5,$6)));}
+
           | NUMLIT TCLASS ifCtxDecl ifCon ifKindedTyvar ifCmeths
-                                        { addGHCClass(intOf($2),$3,$4,$5,$6);
-                                          $$ = gc6(NIL); }
+                                        {$$=gc6(ap(I_CLASS,
+                                                   z5ble($2,$3,$4,
+                                                         singleton($5),$6)));}
+
           | NUMLIT ifVar COCO ifType
-                                        { addGHCVar(intOf($3),textOf($2),$4);
-                                          $$ = gc4(NIL); }
+                                        {$$=gc4(ap(I_VALUE,
+				                   ztriple($3,$2,$4)));}
+
           | error                       { syntaxError(
                                              "interface declaration"); }
           ;
 
 
 /*- Top-level misc interface stuff ------------------------*/
-orphans   : '!'                         {$$=gc1(NIL);}
+ifOrphans : '!'                         {$$=gc1(NIL);}
           |                             {$$=gc0(NIL);}
           ;
-opt_COCO  : COCO                        {$$=gc1(NIL);}
+ifOptCOCO : COCO                        {$$=gc1(NIL);}
           |                             {$$=gc0(NIL);}
+          ;
+ifCheckVersion
+          : NUMLIT                      {$$ = gc1(NIL); }
           ;
 
 
@@ -204,6 +198,11 @@ ifVar     : VARID                       {$$ = gc1($1);}
           ;
 ifCon     : CONID                       {$$ = gc1($1);}
           ;
+
+ifVarCon  : VARID                       {$$ = gc1($1);}
+          | CONID                       {$$ = gc1($1);}
+          ;
+
 ifQCon    : CONID                       {$$ = gc1($1);}
           | QCONID                      {$$ = gc1($1);}
           ;
@@ -231,74 +230,74 @@ ifCtxInst /* __forall [a b] {M.C1 a, M.C2 b} =>  */
           |                             {$$=gc0(NIL);}
           ;
 ifInstHd /* { Class aType }    :: (ConId, Type) */
-          : '{' ifQCon ifAType '}'       {$$=gc4(ap(DICTAP,pair($2,singleton($3))));}
+          : '{' ifQCon ifAType '}'       {$$=gc4(ap(DICTAP,
+                                                 zpair($2,singleton($3))));}
           ;
 
-ifInstHdL /* { C a1 } -> { C2 a2 } -> ... -> { Cn an }   :: [(ConId, Type)] */
-          /* Note: not constructing the list with fn($1,$3) */
+ifInstHdL /* { C a1 } -> { C2 a2 } -> ... -> { Cn an } :: Type */
           : ifInstHd ARROW ifInstHdL    {$$=gc3(fn($1,$3));}
           | ifInstHd                    {$$=gc1(NIL);}
           ;
 
-
 ifCtxDecl /* {M.C1 a, C2 b} =>  :: [(QConId, VarId)] */ 
-          :                             { $$ = gc0(NIL); }
-          | '{' ifCtxDeclL '}' IMPLIES  { $$ = gc4($2);  }
+          : ifCtxDeclT IMPLIES          { $$ = gc2($1);  }
+          |                             { $$ = gc0(NIL); }
           ;					
 ifCtxDeclT /* {M.C1 a, C2 b} :: [(QConId, VarId)] */ 
           :                             { $$ = gc0(NIL); }
           | '{' ifCtxDeclL '}'          { $$ = gc3($2);  }
           ;					
+
 ifCtxDeclL /* M.C1 a, C2 b :: [(QConId, VarId)] */
           : ifCtxDeclLE ',' ifCtxDeclL  {$$=gc3(cons($1,$3));}
           | ifCtxDeclLE                 {$$=gc1(cons($1,NIL));}
           |                             {$$=gc0(NIL);}
           ;
 ifCtxDeclLE /* M.C1 a   :: (QConId,VarId) */
-          : ifQCon ifTyvar              {$$=gc2(pair($1,$2));}
+          : ifQCon ifTyvar              {$$=gc2(zpair($1,$2));}
           ;
 
 
 /*- Interface data declarations - constructor lists -------*/
-/* The (Type,Text,Int) are (field type, name (or NIL), strictness).
+/* The (Type,VarId,Int) are (field type, name (or NIL), strictness).
    Strictness is a number: mkInt(0) indicates lazy, mkInt(1)
    indicates a strict field (!type) as in standard H98, and 
    mkInt(2) indicates unpacked -- a GHC extension.
 */
 
-ifConstrs /* = Con1 | ... | ConN  :: [(ConId,[(Type,Text,Int)],NIL)] */
+ifConstrs /* = Con1 | ... | ConN  :: [(ConId,[(Type,VarId,Int)])] */
           :                             {$$ = gc0(NIL);}
           | '=' ifConstrL               {$$ = gc2($2);}
           ;
-ifConstrL /* [(ConId,[(Type,Text,Int)],NIL)] */
+ifConstrL /* [(ConId,[(Type,VarId,Int)])] */
           : ifConstr                    {$$ = gc1(singleton($1));}
           | ifConstr '|' ifConstrL      {$$ = gc3(cons($1,$3));}
           ;
-ifConstr /* (ConId,[(Type,Text,Int)],NIL) */
-          : ifConData ifDataAnonFieldL  {$$ = gc2(triple($1,$2,NIL));}
+ifConstr /* (ConId,[(Type,VarId,Int)]) */
+          : ifConData ifDataAnonFieldL  {$$ = gc2(zpair($1,$2));}
           | ifConData '{' ifDataNamedFieldL '}' 
-                                        {$$ = gc4(triple($1,$3,NIL));}
+                                        {$$ = gc4(zpair($1,$3));}
           ;
-ifDataAnonFieldL /* [(Type,Text,Int)] */
+ifDataAnonFieldL /* [(Type,VarId,Int)] */
           :                             {$$=gc0(NIL);}
           | ifDataAnonField ifDataAnonFieldL
                                         {$$=gc2(cons($1,$2));}
           ;
-ifDataNamedFieldL /* [(Type,Text,Int)] */
+ifDataNamedFieldL /* [(Type,VarId,Int)] */
           :                             {$$=gc0(NIL);}
           | ifDataNamedField            {$$=gc1(cons($1,NIL));}
           | ifDataNamedField ',' ifDataNamedFieldL 
                                         {$$=gc3(cons($1,$3));}
           ;
-ifDataAnonField /* (Type,Text,Int) */
-          : ifAType                     {$$=gc1(triple($1,NIL,mkInt(0)));}
-          | '!' ifAType                 {$$=gc2(triple($2,NIL,mkInt(1)));}
-          | '!' '!' ifAType             {$$=gc3(triple($3,NIL,mkInt(2)));}
+ifDataAnonField /* (Type,VarId,Int) */
+          : ifAType                     {$$=gc1(ztriple($1,NIL,mkInt(0)));}
+          | '!' ifAType                 {$$=gc2(ztriple($2,NIL,mkInt(1)));}
+          | '!' '!' ifAType             {$$=gc3(ztriple($3,NIL,mkInt(2)));}
           ;
-ifDataNamedField  /* (Type,Text,Int) */
-          : VARID COCO ifAType          {$$=gc3(triple($3,$1,mkInt(0)));}
-          | VARID COCO '!' ifAType      {$$=gc4(triple($4,$1,mkInt(1)));}
-          | VARID COCO '!' '!' ifAType  {$$=gc5(triple($5,$1,mkInt(2)));}
+ifDataNamedField  /* (Type,VarId,Int) */
+          : ifVar COCO ifAType          {$$=gc3(ztriple($3,$1,mkInt(0)));}
+          | ifVar COCO '!' ifAType      {$$=gc4(ztriple($4,$1,mkInt(1)));}
+          | ifVar COCO '!' '!' ifAType  {$$=gc5(ztriple($5,$1,mkInt(2)));}
           ;
 
 
@@ -312,15 +311,15 @@ ifCmethL /* [(VarId,Type)] */
           | ifCmeth ';' ifCmethL        { $$ = gc3(cons($1,$3));    }
           ;
 ifCmeth /* (VarId,Type) */
-          : ifVar     COCO ifType       { $$ = gc3(pair($1,$3)); }
-          | ifVar '=' COCO ifType       { $$ = gc4(pair($1,$4)); } 
+          : ifVar     COCO ifType       { $$ = gc3(zpair($1,$3)); }
+          | ifVar '=' COCO ifType       { $$ = gc4(zpair($1,$4)); } 
                                               /* has default method */
           ;
 
 
 /*- Interface newtype declararions ------------------------*/
 ifNewTypeConstr /* (ConId,Type) */
-          : '=' ifCon ifAType           { $$ = gc3(pair($2,$3)); }
+          : '=' ifCon ifAType           { $$ = gc3(zpair($2,$3)); }
           ;
 
 
@@ -381,8 +380,8 @@ ifKindedTyvarL /* [(VarId,Kind)] */
           | ifKindedTyvar ifKindedTyvarL { $$ = gc2(cons($1,$2)); }
           ;
 ifKindedTyvar /* (VarId,Kind) */
-          : ifTyvar                     { $$ = gc1(pair($1,STAR)); }
-          | ifTyvar COCO ifAKind        { $$ = gc3(pair($1,$3));   }
+          : ifTyvar                     { $$ = gc1(zpair($1,STAR)); }
+          | ifTyvar COCO ifAKind        { $$ = gc3(zpair($1,$3));   }
           ; 
 ifKind    : ifAKind                     { $$ = gc1($1);        }
           | ifAKind ARROW ifKind        { $$ = gc3(fn($1,$3)); }
@@ -400,7 +399,7 @@ ifEntities
           ;
 ifEntity
           : ifEntityOcc                 {$$=gc1($1);}
-          | ifEntityOcc ifStuffInside   {$$=gc2(pair($1,$2));}
+          | ifEntityOcc ifStuffInside   {$$=gc2(zpair($1,$2));}
           ;
 ifEntityOcc
           : ifVar                       { $$ = gc1($1); }
@@ -417,15 +416,15 @@ ifValOccs
           | ifVar ifValOccs             { $$ = gc2(cons($1,$2));   }
           | ifCon ifValOccs             { $$ = gc2(cons($1,$2));   }
           ;
-version_list_junk
-          :                                {$$=gc0(NIL);}
-          | VARID NUMLIT version_list_junk {$$=gc3(cons($1,$3));} 
-          | CONID NUMLIT version_list_junk {$$=gc3(cons($1,$3));}
+
+ifVersionList
+          :                             {$$=gc0(NIL);}
+          | VARID NUMLIT ifVersionList  {$$=gc3(cons($1,$3));} 
+          | CONID NUMLIT ifVersionList  {$$=gc3(cons($1,$3));}
           ;
 
 
 /*- Haskell module header/import parsing: -----------------------------------
-
  * Syntax for Haskell modules (module headers and imports) is parsed but
  * most of it is ignored.  However, module names in import declarations
  * are used, of course, if import chasing is turned on.

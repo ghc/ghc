@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/11/29 18:59:29 $
+ * $Revision: 1.10 $
+ * $Date: 1999/12/10 15:59:47 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -200,14 +200,15 @@ List liftBinds( List binds )
 Void liftControl(what)
 Int what; {
     switch (what) {
-    case INSTALL:
-            /* deliberate fall though */
-    case RESET: 
-            liftedBinds = NIL;
-            break;
-    case MARK: 
-            mark(liftedBinds);
-            break;
+       case POSTPREL: break;
+
+       case PREPREL:
+       case RESET: 
+          liftedBinds = NIL;
+          break;
+       case MARK: 
+          mark(liftedBinds);
+          break;
     }
 }
 

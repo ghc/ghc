@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/12/03 12:39:44 $
+ * $Revision: 1.20 $
+ * $Date: 1999/12/10 15:59:50 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -5035,7 +5035,8 @@ Void checkDefns() {                     /* Top level static analysis       */
     }
     mapProc(checkImportList, unqualImports);
 
-    linkPreludeTC();                    /* Get prelude tycons and classes  */
+    if (!combined) linkPreludeTC();     /* Get prelude tycons and classes  */
+
     mapProc(checkTyconDefn,tyconDefns); /* validate tycon definitions      */
     checkSynonyms(tyconDefns);          /* check synonym definitions       */
     mapProc(checkClassDefn,classDefns); /* process class definitions       */
@@ -5043,7 +5044,8 @@ Void checkDefns() {                     /* Top level static analysis       */
     mapProc(extendFundeps,classDefns);  /* finish class definitions	   */
     mapProc(addMembers,classDefns);     /* add definitions for member funs */
     mapProc(visitClass,classDefns);     /* check class hierarchy           */
-    linkPreludeCM();                    /* Get prelude cfuns and mfuns     */
+
+    if (!combined) linkPreludeCM();     /* Get prelude cfuns and mfuns     */
     
     instDefns = rev(instDefns);         /* process instance definitions    */
     mapProc(checkInstDefn,instDefns);
@@ -5059,7 +5061,7 @@ Void checkDefns() {                     /* Top level static analysis       */
 
     mapProc(allNoPrevDef,valDefns);     /* check against previous defns    */
 
-    linkPreludeNames();
+    if (!combined) linkPreludeNames();  /* link names in Prelude           */
 
     mapProc(checkForeignImport,foreignImports); /* check foreign imports   */
     mapProc(checkForeignExport,foreignExports); /* check foreign exports   */
@@ -5268,11 +5270,12 @@ Int what; {
 #endif
                        break;
 
-        case INSTALL : staticAnalysis(RESET);
+        case POSTPREL: break;
+
+        case PREPREL : staticAnalysis(RESET);
 #if TREX
                        extKind = pair(STAR,pair(ROW,ROW));
 #endif
-                       break;
     }
 }
 

@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/12/03 14:38:39 $
+ * $Revision: 1.17 $
+ * $Date: 1999/12/10 15:59:48 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -1543,7 +1543,8 @@ Void machdep(what)                      /* Handle machine specific         */
 Int what; {                             /* initialisation etc..            */
     switch (what) {
         case MARK    : break;
-        case INSTALL : installHandlers();
+        case POSTPREL: break;
+        case PREPREL : installHandlers();
                        break;
         case RESET   :
         case BREAK   :

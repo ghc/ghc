@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.29 $
- * $Date: 1999/12/06 16:25:24 $
+ * $Revision: 1.30 $
+ * $Date: 1999/12/10 15:59:44 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -157,6 +157,8 @@ static String prompt     = 0;           /* Prompt string                   */
 static Int    hpSize     = DEFAULTHEAP; /* Desired heap size               */
        String hugsEdit   = 0;           /* String for editor command       */
        String hugsPath   = 0;           /* String for file search path     */
+
+       List  ifaces_outstanding = NIL;
 
 #if REDIRECT_OUTPUT
 static Bool disableOutput = FALSE;      /* redirect output to buffer?      */
@@ -364,7 +366,8 @@ String argv[]; {
         Printf("Standalone mode: Restart with command line +c for combined mode\n\n" );
     }
  
-    everybody(INSTALL);
+    everybody(PREPREL);
+
     evalModule = findText("");      /* evaluate wrt last module by default */
     if (proj) {
         if (namesUpto>1) {
@@ -972,7 +975,6 @@ Int stacknum; {
 
     //   setLastEdit(name,0);
 
-   nameObj[0] = 0;
    strcpy(name, scriptInfo[stacknum].path);
    strcat(name, scriptInfo[stacknum].modName);
    if (scriptInfo[stacknum].fromSource)
@@ -982,7 +984,7 @@ Int stacknum; {
    scriptFile = name;
 
    if (scriptInfo[stacknum].fromSource) {
-      if (lastWasObject) finishInterfaces();
+      if (lastWasObject) processInterfaces();
       lastWasObject = FALSE;
       Printf("Reading script \"%s\":\n",name);
       needsImports = FALSE;
@@ -992,6 +994,12 @@ Int stacknum; {
       typeCheckDefns();
       compileDefns();
    } else {
+      Cell    iface;
+      List    imports;
+      ZTriple iface_info;
+      char    nameObj[FILENAME_MAX+1];
+      Int     sizeObj;
+
       Printf("Reading  iface \"%s\":\n", name);
       scriptFile = name;
       needsImports = FALSE;
@@ -1002,14 +1010,25 @@ Int stacknum; {
       strcat(nameObj, DLL_ENDING);
       sizeObj = scriptInfo[stacknum].oSize;
 
-      loadInterface(name,len);
+      iface = readInterface(name,len);
+      imports = zsnd(iface); iface = zfst(iface);
+
+      if (nonNull(imports)) chase(imports);
       scriptFile = 0;
       lastWasObject = TRUE;
+
+      iface_info = ztriple(iface, findText(nameObj), mkInt(sizeObj) );
+      ifaces_outstanding = cons(iface_info,ifaces_outstanding);
+
       if (needsImports) return FALSE;
    }
  
    scriptFile = 0;
-   preludeLoaded = TRUE;
+
+   if (strcmp(scriptInfo[stacknum].modName, "Prelude")==0) {
+      preludeLoaded = TRUE;
+      everybody(POSTPREL);
+   }
    return TRUE;
 }
 
@@ -1186,7 +1205,7 @@ Int n; {                                /* loading everything after and    */
     //numScripts = 0;
 
     while (numScripts < namesUpto) {
-ppSmStack ( "readscripts-loop2" );
+       ppSmStack ( "readscripts-loop2" );
 
        if (scriptInfo[numScripts].fromSource) {
 
@@ -1195,7 +1214,7 @@ ppSmStack ( "readscripts-loop2" );
           nextNumScripts = NUM_SCRIPTS; //bogus initialisation
           if (addScript(numScripts)) {
              numScripts++;
-assert(nextNumScripts==NUM_SCRIPTS);
+             assert(nextNumScripts==NUM_SCRIPTS);
           }
           else
              dropScriptsFrom(numScripts-1);
@@ -1213,21 +1232,21 @@ assert(nextNumScripts==NUM_SCRIPTS);
              nextNumScripts = NUM_SCRIPTS;
              if (addScript(numScripts)) {
                 numScripts++;
-assert(nextNumScripts==NUM_SCRIPTS);
+                assert(nextNumScripts==NUM_SCRIPTS);
              } else {
 	        //while (!scriptInfo[numScripts].fromSource && numScripts > 0)
 	        //   numScripts--;
 	        //if (scriptInfo[numScripts].fromSource)
 	        //   numScripts++;
                 numScripts = nextNumScripts;
-assert(nextNumScripts<NUM_SCRIPTS);
+                assert(nextNumScripts<NUM_SCRIPTS);
              }
           }
        }
-if (numScripts==namesUpto) ppSmStack( "readscripts-final") ;
+       if (numScripts==namesUpto) ppSmStack( "readscripts-final") ;
     }
 
-    finishInterfaces();
+    processInterfaces();
 
     { Int  m     = namesUpto-1;
       Text mtext = findText(scriptInfo[m].modName);
@@ -2387,8 +2406,9 @@ FILE* fp; {
 
 Void everybody(what)            /* send command `what' to each component of*/
 Int what; {                     /* system to respond as appropriate ...    */
+fprintf ( stderr, "EVERYBODY %d\n", what );
     machdep(what);              /* The order of calling each component is  */
-    storage(what);              /* important for the INSTALL command       */
+    storage(what);              /* important for the PREPREL command       */
     substitution(what);
     input(what);
     translateControl(what);

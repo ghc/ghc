@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/12/06 16:25:28 $
+ * $Revision: 1.19 $
+ * $Date: 1999/12/10 15:59:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2795,63 +2795,71 @@ Int what; {
 		       mark(typeProgIO);
                        break;
 
-        case INSTALL : typeChecker(RESET);
-                       dummyVar     = inventVar();
+        case POSTPREL: break;
 
-                       setCurrModule(modulePrelude);
+        case PREPREL : 
+           typeChecker(RESET);
 
-                       starToStar   = simpleKind(1);
+           if (combined) {
+           } else {
+               dummyVar     = inventVar();
 
-                       typeUnit     = addPrimTycon(findText("()"),
-                                                   STAR,0,DATATYPE,NIL);
-                       typeArrow    = addPrimTycon(findText("(->)"),
-                                                   simpleKind(2),2,
-                                                   DATATYPE,NIL);
-                       typeList     = addPrimTycon(findText("[]"),
-                                                   starToStar,1,
-                                                   DATATYPE,NIL);
+               setCurrModule(modulePrelude);
 
-                       arrow        = fn(aVar,bVar);
-                       listof       = ap(typeList,aVar);
-                       boundPair    = ap(ap(mkTuple(2),aVar),aVar);
+               starToStar   = simpleKind(1);
 
-                       nameUnit     = addPrimCfun(findText("()"),0,0,typeUnit);
-                       tycon(typeUnit).defn
-                                    = singleton(nameUnit);
+               typeUnit     = addPrimTycon(findText("()"),
+                                           STAR,0,DATATYPE,NIL);
+               typeArrow    = addPrimTycon(findText("(->)"),
+                                           simpleKind(2),2,
+                                           DATATYPE,NIL);
+               typeList     = addPrimTycon(findText("[]"),
+                                           starToStar,1,
+                                           DATATYPE,NIL);
 
-                       nameNil      = addPrimCfun(findText("[]"),0,1,
-                                                   mkPolyType(starToStar,
-                                                              listof));
-                       nameCons     = addPrimCfun(findText(":"),2,2,
-                                                   mkPolyType(starToStar,
-                                                              fn(aVar,
-                                                              fn(listof,
-                                                                 listof))));
-                       name(nameNil).parent =
-                       name(nameCons).parent = typeList;
+               arrow        = fn(aVar,bVar);
+               listof       = ap(typeList,aVar);
+               boundPair    = ap(ap(mkTuple(2),aVar),aVar);
 
-                       name(nameCons).syntax
-                                    = mkSyntax(RIGHT_ASS,5);
+               nameUnit     = addPrimCfun(findText("()"),0,0,typeUnit);
+               tycon(typeUnit).defn
+                            = singleton(nameUnit);
 
-                       tycon(typeList).defn
-                                    = cons(nameNil,cons(nameCons,NIL));
+               nameNil      = addPrimCfun(findText("[]"),0,1,
+                                           mkPolyType(starToStar,
+                                                      listof));
+               nameCons     = addPrimCfun(findText(":"),2,2,
+                                           mkPolyType(starToStar,
+                                                      fn(aVar,
+                                                      fn(listof,
+                                                         listof))));
+               name(nameNil).parent =
+               name(nameCons).parent = typeList;
 
-                       typeVarToVar = fn(aVar,aVar);
+               name(nameCons).syntax
+                            = mkSyntax(RIGHT_ASS,5);
+
+               tycon(typeList).defn
+                            = cons(nameNil,cons(nameCons,NIL));
+
+               typeVarToVar = fn(aVar,aVar);
 #if TREX
-                       typeNoRow    = addPrimTycon(findText("EmptyRow"),
-                                                   ROW,0,DATATYPE,NIL);
-                       typeRec      = addPrimTycon(findText("Rec"),
-                                                   pair(ROW,STAR),1,
-                                                   DATATYPE,NIL);
-                       nameNoRec    = addPrimCfun(findText("EmptyRec"),0,0,
-                                                        ap(typeRec,typeNoRow));
+               typeNoRow    = addPrimTycon(findText("EmptyRow"),
+                                           ROW,0,DATATYPE,NIL);
+               typeRec      = addPrimTycon(findText("Rec"),
+                                           pair(ROW,STAR),1,
+                                           DATATYPE,NIL);
+               nameNoRec    = addPrimCfun(findText("EmptyRec"),0,0,
+                                                ap(typeRec,typeNoRow));
 #else
-                       /* bogus definitions to avoid changing the prelude */
-                       addPrimCfun(findText("Rec"),      0,0,typeUnit);
-                       addPrimCfun(findText("EmptyRow"), 0,0,typeUnit);
-                       addPrimCfun(findText("EmptyRec"), 0,0,typeUnit);
+               /* bogus definitions to avoid changing the prelude */
+               addPrimCfun(findText("Rec"),      0,0,typeUnit);
+               addPrimCfun(findText("EmptyRow"), 0,0,typeUnit);
+               addPrimCfun(findText("EmptyRec"), 0,0,typeUnit);
 #endif
-                       break;
+	   }
+           break;
+
     }
 }
 

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.19 $
- * $Date: 1999/12/07 11:14:58 $
+ * $Revision: 1.20 $
+ * $Date: 1999/12/10 15:59:54 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -46,6 +46,9 @@ typedef Cell         Float;                      /* floating pt literal    */
 #if TREX
 typedef Cell         Ext;                        /* extension label        */
 #endif
+
+typedef Cell         ConId;
+typedef Cell         VarId;
 
 /* --------------------------------------------------------------------------
  * Text storage:
@@ -297,6 +300,7 @@ extern  Ptr             cptrOf          Args((Cell));
 #define PTRCELL      82           /* C Heap Pointer snd :: (Int,Int)       */
 #endif
 
+/* STG syntax */
 #define STGVAR       92           /* STGVAR     snd :: (StgRhs,info)       */
 #define STGAPP       93           /* STGAPP     snd :: (StgVar,[Arg])      */
 #define STGPRIM      94           /* STGPRIM    snd :: (PrimOp,[Arg])      */
@@ -305,13 +309,80 @@ extern  Ptr             cptrOf          Args((Cell));
 #define DEEFALT      97           /* DEEFALT    snd :: (Var,Expr)          */
 #define CASEALT      98           /* CASEALT    snd :: (Con,[Var],Expr)    */
 #define PRIMALT      99           /* PRIMALT    snd :: ([Var],Expr)        */
+
+
+/* 
+   Top-level interface entities 
+   type Line             = Int  -- a line number 
+   type ConVarId         = CONIDCELL | VARIDCELL
+   type <a>              = ZList a
+   type ExportListEntry  = ConVarId | (ConId, <ConVarId>) 
+   type Associativity    = mkInt of LEFT_ASS | RIGHT_ASS | NON_ASS
+   type Constr           = (ConId, <(Type,VarId,Int)>)
+               (constr name, list of (type, field name if any, strictness))
+               strictness: 0 => none, 1 => !, 2 => !! (unpacked)
+   All 2/3/4/5 tuples in the interface abstract syntax are done with
+   z-tuples.
+*/
+
+#define I_INTERFACE  109  /* snd :: (ConId, <I_IMPORT..I_VALUE>) 
+                                    interface name, list of iface entities */
+
+#define I_IMPORT     110  /* snd :: (ConId, <ConVarId>)
+                                    module name, list of entities          */
+
+#define I_INSTIMPORT 111  /* snd :: NIL    -- not used at present          */
+
+#define I_EXPORT     112  /* snd :: (ConId, <ExportListEntry>
+                                    this module name?, entities to export  */
+
+#define I_FIXDECL    113  /* snd :: (NIL|Int, Associativity, ConVarId)   
+                                    fixity, associativity, name            */
+
+#define I_INSTANCE   114 /* snd :: (Line, <(QConId,VarId)>, Type, VarId)
+                   lineno, 
+                   forall-y bit (eg __forall [a b] {M.C1 a, M.C2 b} =>),
+                   other bit, eg { C a1 } -> { C2 a2 } -> ... -> { Cn an },
+                   name of dictionary builder */
+
+#define I_TYPE       115 /* snd :: (Line, ConId, <(VarId,Kind)>, Type)
+                            lineno, tycon, kinded tyvars, the type expr    */
+
+#define I_DATA       116 /* snd :: (Line, <(QConId,VarId)>, ConId, 
+                                          <(VarId,Kind)>, <Constr>) 
+                            lineno, context, tycon, kinded tyvars, constrs */
+
+#define I_NEWTYPE    117 /* snd :: (Line, <(QConId,VarId)>, ConId,
+                                          <(VarId,Kind)>, (ConId,Type))
+                             lineno, context, tycon, kinded tyvars, constr */
+
+#define I_CLASS      118 /* snd :: (Line, <(QConId,VarId)>, ConId,
+                                    <(VarId,Kind)>, <(VarId,Type)>)
+                            lineno, context, classname, 
+                                      kinded tyvars, method sigs           */
+
+#define I_VALUE      119 /* snd :: (Line, VarId, Type)                     */
+
+
+
+/* Generic syntax */
+#if 0
+#define ZCONS        190          /* snd :: (Cell,Cell)                   */
+#endif
+
+
+#define ZTUP2        192          /* snd :: (Cell,Cell)                   */
+#define ZTUP3        193          /* snd :: (Cell,(Cell,Cell))            */
+#define ZTUP4        194          /* snd :: (Cell,(Cell,(Cell,Cell)))     */
+#define ZTUP5        195       /* snd :: (Cell,(Cell,(Cell,(Cell,Cell)))) */
+
 /* Last constructor tag must be less than SPECMIN */
 
 /* --------------------------------------------------------------------------
  * Special cell values:
  * ------------------------------------------------------------------------*/
 
-#define SPECMIN      101
+#define SPECMIN      201
 
 #if TREX
 #define isSpec(c)    (SPECMIN<=(c) && (c)<EXTMIN)/* Special cell values    */
@@ -319,52 +390,53 @@ extern  Ptr             cptrOf          Args((Cell));
 #define isSpec(c)    (SPECMIN<=(c) && (c)<OFFMIN)
 #endif
 
-#define NONE         101          /* Dummy stub                            */
-#define STAR         102          /* Representing the kind of types        */
+#define NONE         201          /* Dummy stub                            */
+#define STAR         202          /* Representing the kind of types        */
 #if TREX
-#define ROW          103          /* Representing the kind of rows         */
+#define ROW          203          /* Representing the kind of rows         */
 #endif
-#define WILDCARD     104          /* Wildcard pattern                      */
-#define SKOLEM       105          /* Skolem constant                       */
+#define WILDCARD     204          /* Wildcard pattern                      */
+#define SKOLEM       205          /* Skolem constant                       */
 
-#define DOTDOT       106          /* ".." in import/export list            */
+#define DOTDOT       206          /* ".." in import/export list            */
 
-#define NAME         110          /* whatIs code for isName                */
-#define TYCON        111          /* whatIs code for isTycon               */
-#define CLASS        112          /* whatIs code for isClass               */
-#define MODULE       113          /* whatIs code for isModule              */
-#define INSTANCE     114          /* whatIs code for isInst                */
-#define TUPLE        115          /* whatIs code for tuple constructor     */
-#define OFFSET       116          /* whatis code for offset                */
-#define AP           117          /* whatIs code for application node      */
-#define CHARCELL     118          /* whatIs code for isChar                */
+#define NAME         210          /* whatIs code for isName                */
+#define TYCON        211          /* whatIs code for isTycon               */
+#define CLASS        212          /* whatIs code for isClass               */
+#define MODULE       213          /* whatIs code for isModule              */
+#define INSTANCE     214          /* whatIs code for isInst                */
+#define TUPLE        215          /* whatIs code for tuple constructor     */
+#define OFFSET       216          /* whatis code for offset                */
+#define AP           217          /* whatIs code for application node      */
+#define CHARCELL     218          /* whatIs code for isChar                */
 #if TREX
-#define EXT          119          /* whatIs code for isExt                 */
+#define EXT          219          /* whatIs code for isExt                 */
 #endif
 
-#define SIGDECL      120          /* Signature declaration                 */
-#define FIXDECL      121          /* Fixity declaration                    */
-#define FUNBIND      122          /* Function binding                      */
-#define PATBIND      123          /* Pattern binding                       */
+#define SIGDECL      220          /* Signature declaration                 */
+#define FIXDECL      221          /* Fixity declaration                    */
+#define FUNBIND      222          /* Function binding                      */
+#define PATBIND      223          /* Pattern binding                       */
 
-#define DATATYPE     130          /* Datatype type constructor             */
-#define NEWTYPE      131          /* Newtype type constructor              */
-#define SYNONYM      132          /* Synonym type constructor              */
-#define RESTRICTSYN  133          /* Synonym with restricted scope         */
+#define DATATYPE     230          /* Datatype type constructor             */
+#define NEWTYPE      231          /* Newtype type constructor              */
+#define SYNONYM      232          /* Synonym type constructor              */
+#define RESTRICTSYN  233          /* Synonym with restricted scope         */
 
-#define NODEPENDS    135          /* Stop calculation of deps in type check*/
-#define PREDEFINED   136          /* Predefined name, not yet filled       */
+#define NODEPENDS    235          /* Stop calculation of deps in type check*/
+#define PREDEFINED   236          /* Predefined name, not yet filled       */
 
 /* --------------------------------------------------------------------------
  * Tuple data/type constructors:
  * ------------------------------------------------------------------------*/
 
-extern Text ghcTupleText Args((Tycon));
+extern Text ghcTupleText    Args((Tycon));
+extern Text ghcTupleText_n  Args((Int));
 
 
 
 #if TREX
-#define EXTMIN       201
+#define EXTMIN       301
 #define isExt(c)     (EXTMIN<=(c) && (c)<OFFMIN)
 #define extText(e)   tabExt[(e)-EXTMIN]
 #define extField(c)  arg(fun(c))
@@ -383,7 +455,7 @@ extern Ext           mkExt Args((Text));
 #if TREX
 #define OFFMIN       (EXTMIN+NUM_EXT)
 #else
-#define OFFMIN       201
+#define OFFMIN       301
 #endif
 #define isOffset(c)  (OFFMIN<=(c) && (c)<MODMIN)
 #define offsetOf(c)  ((c)-OFFMIN)
@@ -653,6 +725,7 @@ extern Class findQualClass Args((Cell));
 extern Inst  newInst       Args((Void));
 extern Inst  findFirstInst Args((Tycon));
 extern Inst  findNextInst  Args((Tycon,Inst));
+extern Inst  findSimpleInstance ( ConId klass, ConId dataty );
 
 /* --------------------------------------------------------------------------
  * Character values:
@@ -757,6 +830,52 @@ extern  List         nubList      Args((List));         /* non-destructive */
 #define map1Accum(_f,_acc,_a,_xs)       mapBasic(_xs,_acc=_f(_acc,_a,hd(Zs)))
 #define map2Accum(_f,_acc,_a,_b,_xs)    mapBasic(_xs,_acc=_f(_acc,_a,_b,hd(Zs)))
 #define map3Accum(_f,_acc,_a,_b,_c,_xs) mapBasic(_xs,_acc=_f(_acc,_a,_b,_c,hd(Zs)))
+
+
+/* --------------------------------------------------------------------------
+ * Strongly-typed lists (z-lists) and tuples (experimental)
+ * ------------------------------------------------------------------------*/
+
+typedef Cell ZPair;
+typedef Cell ZTriple;
+typedef Cell Z4Ble;
+typedef Cell Z5Ble;
+
+#if 0
+typedef Cell ZList;
+extern Cell  zcons ( Cell x, Cell xs );
+extern Cell  zhd ( Cell xs );
+extern Cell  ztl ( Cell xs );
+extern Cell  zsingleton ( Cell x );
+extern Cell  zdoubleton ( Cell x, Cell y );
+extern Int   zlength ( ZList xs );
+extern ZList zreverse ( ZList xs );
+#endif
+
+extern Cell zpair ( Cell x1, Cell x2 );
+extern Cell zfst ( Cell zpair );
+extern Cell zsnd ( Cell zpair );
+
+extern Cell ztriple ( Cell x1, Cell x2, Cell x3 );
+extern Cell zfst3 ( Cell zpair );
+extern Cell zsnd3 ( Cell zpair );
+extern Cell zthd3 ( Cell zpair );
+
+extern Cell z4ble ( Cell x1, Cell x2, Cell x3, Cell x4 );
+extern Cell zsel14 ( Cell zpair );
+extern Cell zsel24 ( Cell zpair );
+extern Cell zsel34 ( Cell zpair );
+extern Cell zsel44 ( Cell zpair );
+
+extern Cell z5ble ( Cell x1, Cell x2, Cell x3, Cell x4, Cell x5 );
+extern Cell zsel15 ( Cell zpair );
+extern Cell zsel25 ( Cell zpair );
+extern Cell zsel35 ( Cell zpair );
+extern Cell zsel45 ( Cell zpair );
+extern Cell zsel55 ( Cell zpair );
+
+extern Cell unap ( int tag, Cell c );
+#define isZPair(c) (whatIs((c))==ZTUP2)
 
 /* --------------------------------------------------------------------------
  * Implementation of function application nodes:

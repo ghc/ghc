@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/22 16:00:21 $
+ * $Revision: 1.16 $
+ * $Date: 1999/12/10 15:59:42 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1557,14 +1557,6 @@ Void compileDefns() {                  /* compile script definitions       */
     Target i = 0;
     List binds = NIL;
 
-    /* a nasty hack.  But I don't know an easier way to make */
-    /* these things appear.                                  */
-    if (lastModule() == modulePrelude) {
-       implementCfun ( nameCons, NIL );
-       implementCfun ( nameNil, NIL );
-       implementCfun ( nameUnit, NIL );
-    }
-
     {
         List vss;
         List vs;
@@ -1653,20 +1645,17 @@ Pair p; {                               /* Should be merged with genDefns, */
 Void compiler(what)
 Int what; {
     switch (what) {
-        case INSTALL :
+        case PREPREL :
         case RESET   : freeVars      = NIL;
                        freeFuns      = NIL;
                        freeBegin     = mkOffset(0);
-                       //extraVars     = NIL;
-                       //numExtraVars  = 0;
-                       //localOffset   = 0;
-                       //localArity    = 0;
                        break;
 
         case MARK    : mark(freeVars);
                        mark(freeFuns);
-                       //mark(extraVars);
                        break;
+
+        case POSTPREL: break;
     }
 }
 

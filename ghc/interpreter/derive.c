@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/12/01 10:22:53 $
+ * $Revision: 1.11 $
+ * $Date: 1999/12/10 15:59:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1010,8 +1010,7 @@ Tycon t; {
 Void deriveControl(what)
 Int what; {
     switch (what) {
-        case INSTALL :
-                /* deliberate fall through */
+        case PREPREL :
         case RESET   : 
                 diVars      = NIL;
                 diNum       = 0;
@@ -1022,6 +1021,8 @@ Int what; {
                 mark(diVars);
                 mark(cfunSfuns);
                 break;
+
+       case POSTPREL: break;
     }
 }
 
