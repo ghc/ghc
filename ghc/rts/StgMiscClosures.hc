@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.35 2000/02/04 11:18:05 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.36 2000/03/01 16:57:57 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -714,7 +714,8 @@ FN_(forceIO_ret_entry)
   Sp += 2;
   Sp -= sizeofW(StgSeqFrame);
   PUSH_SEQ_FRAME(Sp);
-  JMP_(GET_ENTRY(rval));
+  R1.cl = rval;
+  JMP_(GET_ENTRY(R1.cl));
 }
 #endif
 
