@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.32 2001/02/06 11:57:30 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.33 2001/02/06 16:22:12 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -192,6 +192,7 @@ runCommand c =
    doCommand c
 
 doCommand (':' : command) = specialCommand command
+doCommand ('-':'-':_) = return False	-- comments, useful in scripts
 doCommand expr
    = do expr_expanded <- expandExpr expr
         -- io (putStrLn ( "Before: " ++ expr ++ "\nAfter:  " ++ expr_expanded))
