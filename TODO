@@ -1,7 +1,5 @@
 For 1.0:
 
-* parse module headers, augment Interface with info from header
-
 * IDoc compatibility, as far as possible
 	- bird-tracks for code blocks
 
