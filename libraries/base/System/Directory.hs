@@ -12,24 +12,15 @@
 --
 -----------------------------------------------------------------------------
 
-{-
-A directory contains a series of entries, each of which is a named
-reference to a file system object (file, directory etc.).  Some
-entries may be hidden, inaccessible, or have some administrative
-function (e.g. "." or ".." under POSIX), but in this standard all such
-entries are considered to form part of the directory contents.
-Entries in sub-directories are not, however, considered to form part
-of the directory contents.
-
-Each file system object is referenced by a {\em path}.  There is
-normally at least one absolute path to each file system object.  In
-some operating systems, it may also be possible to have paths which
-are relative to the current directory.
--}
-
 module System.Directory 
    ( 
-      Permissions(
+     -- $intro
+
+     -- * Permissions
+
+     -- $permissions
+
+     Permissions(
 	Permissions,
 	readable,		-- :: Permissions -> Bool 
 	writable,		-- :: Permissions -> Bool
@@ -37,6 +28,7 @@ module System.Directory
 	searchable		-- :: Permissions -> Bool
      )
 
+    -- * Actions on directories
     , createDirectory		-- :: FilePath -> IO ()
     , removeDirectory		-- :: FilePath -> IO ()
     , renameDirectory		-- :: FilePath -> FilePath -> IO ()
@@ -45,14 +37,20 @@ module System.Directory
     , getCurrentDirectory       -- :: IO FilePath
     , setCurrentDirectory       -- :: FilePath -> IO ()
 
+    -- * Actions on files
     , removeFile		-- :: FilePath -> IO ()
     , renameFile                -- :: FilePath -> FilePath -> IO ()
 
+    -- * Existence tests
     , doesFileExist		-- :: FilePath -> IO Bool
     , doesDirectoryExist        -- :: FilePath -> IO Bool
 
+    -- * Setting and retrieving permissions
+
     , getPermissions            -- :: FilePath -> IO Permissions
     , setPermissions	        -- :: FilePath -> Permissions -> IO ()
+
+    -- * Timestamps
 
     , getModificationTime       -- :: FilePath -> IO ClockTime
    ) where
@@ -69,12 +67,43 @@ import GHC.Posix
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
 #endif
 
+{- $intro
+A directory contains a series of entries, each of which is a named
+reference to a file system object (file, directory etc.).  Some
+entries may be hidden, inaccessible, or have some administrative
+function (e.g. `.' or `..' under POSIX
+<http://www.opengroup.org/onlinepubs/007904975/toc.htm>), but in 
+this standard all such entries are considered to form part of the
+directory contents. Entries in sub-directories are not, however,
+considered to form part of the directory contents.
+
+Each file system object is referenced by a /path/.  There is
+normally at least one absolute path to each file system object.  In
+some operating systems, it may also be possible to have paths which
+are relative to the current directory.
+-}
+
 -----------------------------------------------------------------------------
 -- Permissions
 
--- The Permissions type is used to record whether certain
--- operations are permissible on a file/directory:
--- [to whom? - presumably the "current user"]
+{- $permissions
+
+ The 'Permissions' type is used to record whether certain operations are
+ permissible on a file\/directory. 'getPermissions' and 'setPermissions'
+ get and set these permissions, respectively. Permissions apply both to
+ files and directories. For directories, the executable field will be
+ 'False', and for files the searchable field will be 'False'. Note that
+ directories may be searchable without being readable, if permission has
+ been given to use them as part of a path, but not to examine the 
+ directory contents.
+
+Note that to change some, but not all permissions, a construct on the following lines must be used. 
+
+>  makeReadable f = do
+>     p <- getPermissions f
+>     setPermissions f (p {readable = True})
+
+-}
 
 data Permissions
  = Permissions {
@@ -82,40 +111,73 @@ data Permissions
     executable, searchable :: Bool 
    } deriving (Eq, Ord, Read, Show)
 
+getPermissions :: FilePath -> IO Permissions
+getPermissions name = do
+  withCString name $ \s -> do
+  read  <- c_access s r_OK
+  write <- c_access s w_OK
+  exec  <- c_access s x_OK
+  withFileStatus name $ \st -> do
+  is_dir <- isDirectory st
+  return (
+    Permissions {
+      readable   = read  == 0,
+      writable   = write == 0,
+      executable = not is_dir && exec == 0,
+      searchable = is_dir && exec == 0
+    }
+   )
+
+setPermissions :: FilePath -> Permissions -> IO ()
+setPermissions name (Permissions r w e s) = do
+    let
+     read  = if r      then s_IRUSR else emptyCMode
+     write = if w      then s_IWUSR else emptyCMode
+     exec  = if e || s then s_IXUSR else emptyCMode
+
+     mode  = read `unionCMode` (write `unionCMode` exec)
+
+    withCString name $ \s ->
+      throwErrnoIfMinus1_ "setPermissions" $ c_chmod s mode
+
 -----------------------------------------------------------------------------
 -- Implementation
 
--- `createDirectory dir' creates a new directory dir which is
--- initially empty, or as near to empty as the operating system
--- allows.
+{- |@'createDirectory' dir@ creates a new directory @dir@ which is
+initially empty, or as near to empty as the operating system
+allows.
 
--- The operation may fail with:
+The operation may fail with:
 
-{-
-\begin{itemize}
-\item @isPermissionError@ / @PermissionDenied@
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EROFS, EACCES]@
-\item @isAlreadyExistsError@ / @AlreadyExists@
+
+* 'isAlreadyExistsError' \/ 'AlreadyExists'
 The operand refers to a directory that already exists.  
 @ [EEXIST]@
-\item @HardwareFault@
-A physical I/O error has occurred.
-@ [EIO]@
-\item @InvalidArgument@
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
+@[EIO]@
+
+* 'InvalidArgument'
 The operand is not a valid directory name.
 @[ENAMETOOLONG, ELOOP]@
-\item @NoSuchThing@
+
+* 'NoSuchThing'
 There is no path to the directory. 
 @[ENOENT, ENOTDIR]@
-\item @ResourceExhausted@
+
+* 'ResourceExhausted'
 Insufficient resources (virtual memory, process file descriptors,
 physical disk space, etc.) are available to perform the operation.
 @[EDQUOT, ENOSPC, ENOMEM, EMLINK]@
-\item @InappropriateType@
+
+* 'InappropriateType'
 The path refers to an existing non-directory object.
 @[EEXIST]@
-\end{itemize}
+
 -}
 
 createDirectory :: FilePath -> IO ()
@@ -124,8 +186,7 @@ createDirectory path = do
       throwErrnoIfMinus1Retry_ "createDirectory" $
 	mkdir s 0o777
 
-{-
-@removeDirectory dir@ removes an existing directory {\em dir}.  The
+{- | @'removeDirectory' dir@ removes an existing directory /dir/.  The
 implementation may specify additional constraints which must be
 satisfied before a directory can be removed (e.g. the directory has to
 be empty, or may not be in use by other processes).  It is not legal
@@ -135,29 +196,35 @@ support directory removal in all situations (e.g. removal of the root
 directory).
 
 The operation may fail with:
-\begin{itemize}
-\item @HardwareFault@
-A physical I/O error has occurred.
-[@EIO@]
-\item @InvalidArgument@
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
+EIO
+
+* 'InvalidArgument'
 The operand is not a valid directory name.
-@[ENAMETOOLONG, ELOOP]@
-\item @isDoesNotExist@ / @NoSuchThing@
+[ENAMETOOLONG, ELOOP]
+
+* 'isDoesNotExist'  'NoSuchThing'
 The directory does not exist. 
 @[ENOENT, ENOTDIR]@
-\item @isPermissionError@ / @PermissionDenied@
+
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EROFS, EACCES, EPERM]@
-\item @UnsatisfiedConstraints@
+
+* 'UnsatisfiedConstraints'
 Implementation-dependent constraints are not satisfied.  
 @[EBUSY, ENOTEMPTY, EEXIST]@
-\item @UnsupportedOperation@
+
+* 'UnsupportedOperation'
 The implementation does not support removal in this situation.
 @[EINVAL]@
-\item @InappropriateType@
+
+* 'InappropriateType'
 The operand refers to an existing non-directory object.
 @[ENOTDIR]@
-\end{itemize}
+
 -}
 
 removeDirectory :: FilePath -> IO ()
@@ -165,34 +232,38 @@ removeDirectory path = do
     withCString path $ \s ->
        throwErrnoIfMinus1Retry_ "removeDirectory" (c_rmdir s)
 
-{-
-@Removefile file@ removes the directory entry for an existing file
-{\em file}, where {\em file} is not itself a directory. The
+{- |@'removefile' file@ removes the directory entry for an existing file
+/file/, where /file/ is not itself a directory. The
 implementation may specify additional constraints which must be
 satisfied before a file can be removed (e.g. the file may not be in
 use by other processes).
 
 The operation may fail with:
-\begin{itemize}
-\item @HardwareFault@
-A physical I/O error has occurred.
-@[EIO]@
-\item @InvalidArgument@
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
+'EIO'
+
+* 'InvalidArgument'
 The operand is not a valid file name.
 @[ENAMETOOLONG, ELOOP]@
-\item @isDoesNotExist@ / @NoSuchThing@
+
+* 'isDoesNotExist' \/ 'NoSuchThing'
 The file does not exist. 
 @[ENOENT, ENOTDIR]@
-\item @isPermissionError@ / @PermissionDenied@
+
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EROFS, EACCES, EPERM]@
-\item @UnsatisfiedConstraints@
+
+* 'UnsatisfiedConstraints'
 Implementation-dependent constraints are not satisfied.  
 @[EBUSY]@
-\item @InappropriateType@
+
+* 'InappropriateType'
 The operand refers to an existing directory.
 @[EPERM, EINVAL]@
-\end{itemize}
+
 -}
 
 removeFile :: FilePath -> IO ()
@@ -200,44 +271,50 @@ removeFile path = do
     withCString path $ \s ->
       throwErrnoIfMinus1Retry_ "removeFile" (c_unlink s)
 
-{-
-@renameDirectory@ {\em old} {\em new} changes the name of an existing
-directory from {\em old} to {\em new}.  If the {\em new} directory
-already exists, it is atomically replaced by the {\em old} directory.
-If the {\em new} directory is neither the {\em old} directory nor an
-alias of the {\em old} directory, it is removed as if by
-$removeDirectory$.  A conformant implementation need not support
+{- |@'renameDirectory' old new@ changes the name of an existing
+directory from /old/ to /new/.  If the /new/ directory
+already exists, it is atomically replaced by the /old/ directory.
+If the /new/ directory is neither the /old/ directory nor an
+alias of the /old/ directory, it is removed as if by
+'removeDirectory'.  A conformant implementation need not support
 renaming directories in all situations (e.g. renaming to an existing
 directory, or across different physical devices), but the constraints
 must be documented.
 
 The operation may fail with:
-\begin{itemize}
-\item @HardwareFault@
-A physical I/O error has occurred.
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
 @[EIO]@
-\item @InvalidArgument@
+
+* 'InvalidArgument'
 Either operand is not a valid directory name.
 @[ENAMETOOLONG, ELOOP]@
-\item @isDoesNotExistError@ / @NoSuchThing@
+
+* 'isDoesNotExistError' \/ 'NoSuchThing'
 The original directory does not exist, or there is no path to the target.
 @[ENOENT, ENOTDIR]@
-\item @isPermissionError@ / @PermissionDenied@
+
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EROFS, EACCES, EPERM]@
-\item @ResourceExhausted@
+
+* 'ResourceExhausted'
 Insufficient resources are available to perform the operation.  
 @[EDQUOT, ENOSPC, ENOMEM, EMLINK]@
-\item @UnsatisfiedConstraints@
+
+* 'UnsatisfiedConstraints'
 Implementation-dependent constraints are not satisfied.
 @[EBUSY, ENOTEMPTY, EEXIST]@
-\item @UnsupportedOperation@
+
+* 'UnsupportedOperation'
 The implementation does not support renaming in this situation.
 @[EINVAL, EXDEV]@
-\item @InappropriateType@
+
+* 'InappropriateType'
 Either path refers to an existing non-directory object.
 @[ENOTDIR, EISDIR]@
-\end{itemize}
+
 -}
 
 renameDirectory :: FilePath -> FilePath -> IO ()
@@ -253,42 +330,48 @@ renameDirectory opath npath =
      withCString npath $ \s2 ->
         throwErrnoIfMinus1Retry_ "renameDirectory" (c_rename s1 s2)
 
-{-
-@renameFile@ {\em old} {\em new} changes the name of an existing file system
-object from {\em old} to {\em new}.  If the {\em new} object already
-exists, it is atomically replaced by the {\em old} object.  Neither
+{- |@'renameFile' old new@ changes the name of an existing file system
+object from /old/ to /new/.  If the /new/ object already
+exists, it is atomically replaced by the /old/ object.  Neither
 path may refer to an existing directory.  A conformant implementation
 need not support renaming files in all situations (e.g. renaming
 across different physical devices), but the constraints must be
 documented.
 
 The operation may fail with:
-\begin{itemize}
-\item @HardwareFault@
-A physical I/O error has occurred.
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
 @[EIO]@
-\item @InvalidArgument@
+
+* 'InvalidArgument'
 Either operand is not a valid file name.
 @[ENAMETOOLONG, ELOOP]@
-\item @isDoesNotExistError@ / @NoSuchThing@
+
+* 'isDoesNotExistError' \/ 'NoSuchThing'
 The original file does not exist, or there is no path to the target.
 @[ENOENT, ENOTDIR]@
-\item @isPermissionError@ / @PermissionDenied@
+
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EROFS, EACCES, EPERM]@
-\item @ResourceExhausted@
+
+* 'ResourceExhausted'
 Insufficient resources are available to perform the operation.  
 @[EDQUOT, ENOSPC, ENOMEM, EMLINK]@
-\item @UnsatisfiedConstraints@
+
+* 'UnsatisfiedConstraints'
 Implementation-dependent constraints are not satisfied.
 @[EBUSY]@
-\item @UnsupportedOperation@
+
+* 'UnsupportedOperation'
 The implementation does not support renaming in this situation.
 @[EXDEV]@
-\item @InappropriateType@
+
+* 'InappropriateType'
 Either path refers to an existing directory.
 @[ENOTDIR, EISDIR, EINVAL, EEXIST, ENOTEMPTY]@
-\end{itemize}
+
 -}
 
 renameFile :: FilePath -> FilePath -> IO ()
@@ -304,31 +387,35 @@ renameFile opath npath =
       withCString npath $ \s2 ->
          throwErrnoIfMinus1Retry_ "renameFile" (c_rename s1 s2)
 
-{-
-@getDirectoryContents dir@ returns a list of {\em all} entries
-in {\em dir}. 
+{- |@'getDirectoryContents' dir@ returns a list of /all/ entries
+in /dir/. 
 
 The operation may fail with:
-\begin{itemize}
-\item @HardwareFault@
-A physical I/O error has occurred.
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
 @[EIO]@
-\item @InvalidArgument@
+
+* 'InvalidArgument'
 The operand is not a valid directory name.
 @[ENAMETOOLONG, ELOOP]@
-\item @isDoesNotExistError@ / @NoSuchThing@
+
+* 'isDoesNotExistError' \/ 'NoSuchThing'
 The directory does not exist.
 @[ENOENT, ENOTDIR]@
-\item @isPermissionError@ / @PermissionDenied@
+
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EACCES]@
-\item @ResourceExhausted@
+
+* 'ResourceExhausted'
 Insufficient resources are available to perform the operation.
 @[EMFILE, ENFILE]@
-\item @InappropriateType@
+
+* 'InappropriateType'
 The path refers to an existing non-directory object.
 @[ENOTDIR]@
-\end{itemize}
+
 -}
 
 getDirectoryContents :: FilePath -> IO [FilePath]
@@ -365,27 +452,30 @@ getDirectoryContents path = do
 
 
 
-{-
-If the operating system has a notion of current directories,
-@getCurrentDirectory@ returns an absolute path to the
+{- |If the operating system has a notion of current directories,
+'getCurrentDirectory' returns an absolute path to the
 current directory of the calling process.
 
 The operation may fail with:
-\begin{itemize}
-\item @HardwareFault@
-A physical I/O error has occurred.
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
 @[EIO]@
-\item @isDoesNotExistError@ / @NoSuchThing@
+
+* 'isDoesNotExistError' \/ 'NoSuchThing'
 There is no path referring to the current directory.
 @[EPERM, ENOENT, ESTALE...]@
-\item @isPermissionError@ / @PermissionDenied@
+
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EACCES]@
-\item @ResourceExhausted@
+
+* 'ResourceExhausted'
 Insufficient resources are available to perform the operation.
-\item @UnsupportedOperation@
+
+* 'UnsupportedOperation'
 The operating system has no notion of current directory.
-\end{itemize}
+
 -}
 
 getCurrentDirectory :: IO FilePath
@@ -405,32 +495,36 @@ getCurrentDirectory = do
 			        go p' bytes'
 		        else throwErrno "getCurrentDirectory"
 
-{-
-If the operating system has a notion of current directories,
-@setCurrentDirectory dir@ changes the current
-directory of the calling process to {\em dir}.
+{- |If the operating system has a notion of current directories,
+@'setCurrentDirectory' dir@ changes the current
+directory of the calling process to /dir/.
 
 The operation may fail with:
-\begin{itemize}
-\item @HardwareFault@
-A physical I/O error has occurred.
+
+* 'HardwareFault'
+A physical I\/O error has occurred.
 @[EIO]@
-\item @InvalidArgument@
+
+* 'InvalidArgument'
 The operand is not a valid directory name.
 @[ENAMETOOLONG, ELOOP]@
-\item @isDoesNotExistError@ / @NoSuchThing@
+
+* 'isDoesNotExistError' \/ 'NoSuchThing'
 The directory does not exist.
 @[ENOENT, ENOTDIR]@
-\item @isPermissionError@ / @PermissionDenied@
+
+* 'isPermissionError' \/ 'PermissionDenied'
 The process has insufficient privileges to perform the operation.
 @[EACCES]@
-\item @UnsupportedOperation@
+
+* 'UnsupportedOperation'
 The operating system has no notion of current directory, or the
 current directory cannot be dynamically changed.
-\item @InappropriateType@
+
+* 'InappropriateType'
 The path refers to an existing non-directory object.
 @[ENOTDIR]@
-\end{itemize}
+
 -}
 
 setCurrentDirectory :: FilePath -> IO ()
@@ -439,9 +533,8 @@ setCurrentDirectory path = do
        throwErrnoIfMinus1Retry_ "setCurrentDirectory" (c_chdir s)
 	-- ToDo: add path to error
 
-{-
-To clarify, @doesDirectoryExist@ returns True if a file system object
-exist, and it's a directory. @doesFileExist@ returns True if the file
+{- |To clarify, 'doesDirectoryExist' returns 'True' if a file system object
+exist, and it's a directory. 'doesFileExist' returns 'True' if the file
 system object exist, but it's not a directory (i.e., for every other 
 file system object that is not a directory.) 
 -}
@@ -462,35 +555,6 @@ getModificationTime :: FilePath -> IO ClockTime
 getModificationTime name =
  withFileStatus name $ \ st ->
  modificationTime st
-
-getPermissions :: FilePath -> IO Permissions
-getPermissions name = do
-  withCString name $ \s -> do
-  read  <- c_access s r_OK
-  write <- c_access s w_OK
-  exec  <- c_access s x_OK
-  withFileStatus name $ \st -> do
-  is_dir <- isDirectory st
-  return (
-    Permissions {
-      readable   = read  == 0,
-      writable   = write == 0,
-      executable = not is_dir && exec == 0,
-      searchable = is_dir && exec == 0
-    }
-   )
-
-setPermissions :: FilePath -> Permissions -> IO ()
-setPermissions name (Permissions r w e s) = do
-    let
-     read  = if r      then s_IRUSR else emptyCMode
-     write = if w      then s_IWUSR else emptyCMode
-     exec  = if e || s then s_IXUSR else emptyCMode
-
-     mode  = read `unionCMode` (write `unionCMode` exec)
-
-    withCString name $ \s ->
-      throwErrnoIfMinus1_ "setPermissions" $ c_chmod s mode
 
 withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileStatus name f = do
