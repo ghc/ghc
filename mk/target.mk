@@ -80,7 +80,7 @@
 
 ifneq "$(SUBDIRS)" ""
 
-all docs runtests boot TAGS clean veryclean maintainer-clean install info html ps dvi txt::
+all docs runtests boot TAGS clean distclean mostlyclean maintainer-clean install info html ps dvi txt::
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
@@ -141,35 +141,6 @@ endif
 ifneq "$(SUBDIRS)" ""
 $(SUBDIRS) ::
 	  $(MAKE) -C $@ $(MFLAGS)
-endif
-
-ifneq "$(WAYS)" ""
-ifeq "$(way)" ""
-
-# NB: the targets exclude 
-#	boot info TAGS runtests
-# since these are way-independent
-all docs TAGS clean veryclean maintainer-clean install ::
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-# Don't rely on -e working, instead we check exit return codes from sub-makes.
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(WAYS) ; do \
-	  echo "------------------------------------------------------------------------"; \
-	  echo "==fptools== $(MAKE) way=$$i $@;"; \
-	  echo "PWD = $(shell pwd)"; \
-	  echo "------------------------------------------------------------------------"; \
-	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
-	  if [ $$? -eq 0 ] ; then true; else exit $$x_on_err; fi; \
-	done
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Finished recursively making \`$@' for ways: $(WAYS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-
-endif
 endif
 
 ##################################################################
@@ -1070,31 +1041,28 @@ endif
 #
 ###########################################
 
-.PHONY: realclean mostlyclean clean distclean maintainer-clean
-
-# realclean is just a synonym for maintainer-clean
-realclean: maintainer-clean
-
+.PHONY: mostlyclean clean distclean maintainer-clean
 
 ifneq "$(MOSTLY_CLEAN_FILES)" ""
 mostlyclean::
 	rm -f $(MOSTLY_CLEAN_FILES)
 endif
 
-ifneq "$(CLEAN_FILES)" ""
 clean:: mostlyclean
+ifneq "$(CLEAN_FILES)" ""
+clean::
 	rm -f $(CLEAN_FILES)
 endif
 
-
+distclean:: clean
 ifneq "$(DIST_CLEAN_FILES)" ""
-distclean:: mostlyclean clean
+distclean::
 	rm -f $(DIST_CLEAN_FILES)
 endif
 
-
+maintainer-clean:: distclean
 ifneq "$(MAINTAINER_CLEAN_FILES)" ""
-maintainer-clean:: mostlyclean clean distclean
+maintainer-clean:: 
 	@echo 'This command is intended for maintainers to use; it'
 	@echo 'deletes files that may need special tools to rebuild.'
 	rm -f $(MAINTAINER_CLEAN_FILES)
@@ -1158,3 +1126,32 @@ $(LIB_WAY_TARGETS) :
 	$(MAKE) $(MFLAGS) $@ way=$(subst .,,$(suffix $(subst _,.,$(basename $@))))
 
 endif	# if way
+
+ifneq "$(WAYS)" ""
+ifeq "$(way)" ""
+
+# NB: the targets exclude 
+#	boot runtests
+# since these are way-independent
+all docs TAGS clean distclean mostlyclean maintainer-clean install ::
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(WAYS) ; do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "==fptools== $(MAKE) way=$$i $@;"; \
+	  echo "PWD = $(shell pwd)"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
+	  if [ $$? -eq 0 ] ; then true; else exit $$x_on_err; fi; \
+	done
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Finished recursively making \`$@' for ways: $(WAYS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+
+endif
+endif
