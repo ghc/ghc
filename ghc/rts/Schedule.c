@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.92 2001/03/02 14:25:04 simonmar Exp $
+ * $Id: Schedule.c,v 1.93 2001/03/02 16:15:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2841,14 +2841,24 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	/* Replace the updatee with an indirection - happily
 	 * this will also wake up any threads currently
 	 * waiting on the result.
+	 *
+	 * Warning: if we're in a loop, more than one update frame on
+	 * the stack may point to the same object.  Be careful not to
+	 * overwrite an IND_OLDGEN in this case, because we'll screw
+	 * up the mutable lists.  To be on the safe side, don't
+	 * overwrite any kind of indirection at all.  See also
+	 * threadSqueezeStack in GC.c, where we have to make a similar
+	 * check.
 	 */
-	UPD_IND_NOLOCK(su->updatee,ap);  /* revert the black hole */
+	if (!closure_IND(su->updatee)) {
+	    UPD_IND_NOLOCK(su->updatee,ap);  /* revert the black hole */
+	}
 	su = su->link;
 	sp += sizeofW(StgUpdateFrame) -1;
 	sp[0] = (W_)ap; /* push onto stack */
 	break;
       }
-      
+
     case CATCH_FRAME:
       {
 	StgCatchFrame *cf = (StgCatchFrame *)su;

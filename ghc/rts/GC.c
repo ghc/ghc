@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.97 2001/03/02 14:28:44 simonmar Exp $
+ * $Id: GC.c,v 1.98 2001/03/02 16:15:53 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -3341,8 +3341,15 @@ threadSqueezeStack(StgTSO *tso)
       /* wasn't there something about update squeezing and ticky to be
        * sorted out?  oh yes: we aren't counting each enter properly
        * in this case.  See the log somewhere.  KSW 1999-04-21
+       *
+       * Check two things: that the two update frames don't point to
+       * the same object, and that the updatee_bypass isn't already an
+       * indirection.  Both of these cases only happen when we're in a
+       * block hole-style loop (and there are multiple update frames
+       * on the stack pointing to the same closure), but they can both
+       * screw us up if we don't check.
        */
-      if (updatee_bypass != updatee_keep) {
+      if (updatee_bypass != updatee_keep && !closure_IND(updatee_bypass)) {
 	  /* this wakes the threads up */
 	  UPD_IND_NOLOCK(updatee_bypass, updatee_keep);
       }

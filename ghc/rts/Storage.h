@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.30 2001/03/02 14:36:16 simonmar Exp $
+ * $Id: Storage.h,v 1.31 2001/03/02 16:15:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -164,12 +164,17 @@ recordOldToNewPtrs(StgMutClosure *p)
 
 /* In the DEBUG case, we also zero out the slop of the old closure,
  * so that the sanity checker can tell where the next closure is.
+ *
+ * Two important invariants: we should never try to update a closure
+ * to point to itself, and the closure being updated should not
+ * already have been updated (the mutable list will get messed up
+ * otherwise).
  */
 #define updateWithIndirection(info, p1, p2)				\
   {									\
     bdescr *bd;								\
 									\
-    ASSERT( p1 != p2 );							\
+    ASSERT( p1 != p2 && !closure_IND(p1) );				\
     bd = Bdescr((P_)p1);						\
     if (bd->gen->no == 0) {						\
       ((StgInd *)p1)->indirectee = p2;					\
@@ -203,7 +208,7 @@ recordOldToNewPtrs(StgMutClosure *p)
  */
 #define updateWithStaticIndirection(info, p1, p2)			\
   {									\
-    ASSERT( p1 != p2 );							\
+    ASSERT( p1 != p2 && !closure_IND(p1) );				\
     ASSERT( ((StgMutClosure*)p1)->mut_link == NULL );			\
 									\
     ACQUIRE_LOCK(&sm_mutex);						\
@@ -222,7 +227,7 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
 {
   bdescr *bd;
 
-  ASSERT( p1 != p2 );							\
+  ASSERT( p1 != p2 && !closure_IND(p1) );
   bd = Bdescr((P_)p1);
   if (bd->gen->no == 0) {
     ((StgInd *)p1)->indirectee = p2;
