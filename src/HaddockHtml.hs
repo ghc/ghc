@@ -120,15 +120,6 @@ src_button source_url _ file
   | otherwise =
 	Html.emptyTable
   
-parent_button :: String -> HtmlTable
-parent_button mdl = 
-  case span (/= '.') (reverse mdl) of
-   (_, '.':rest) -> 
-       topButBox (
-  	 anchor ! [href (moduleHtmlFile "" (reverse rest))] << toHtml "Parent")
-   _ -> 
-	Html.emptyTable
-
 contentsButton :: Maybe String -> HtmlTable
 contentsButton maybe_contents_url 
   = topButBox (anchor ! [href url] << toHtml "Contents")
@@ -164,7 +155,6 @@ pageHeader mdl iface doctitle source_url maybe_contents_url maybe_index_url =
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
 	src_button source_url mdl (iface_filename iface) <->
-	parent_button mdl <->
 	contentsButton maybe_contents_url <->
 	indexButton maybe_index_url
     )
