@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.16 1999/07/03 18:39:40 sof Exp $
+ * $Id: RtsStartup.c,v 1.17 1999/07/06 15:33:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -148,6 +148,7 @@ startupHaskell(int argc, char *argv[])
 void
 shutdownHaskellAndExit(int n)
 {
+  OnExitHook();
   shutdownHaskell();
   stg_exit(n);
 }
@@ -187,7 +188,7 @@ shutdownHaskell(void)
 
 
 /* 
- * called from STG-land to exit the program cleanly 
+ * called from STG-land to exit the program
  */
 
 void  
@@ -196,7 +197,7 @@ stg_exit(I_ n)
 #ifdef PAR
   par_exit(n);
 #else
-  OnExitHook();
   exit(n);
 #endif
 }
+
