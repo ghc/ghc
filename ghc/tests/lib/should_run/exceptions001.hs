@@ -41,7 +41,7 @@ test1 [] = ()
 
 guardTest = catchAllIO (case test2 of () -> return ())
   (\ex -> case ex of
-		NonExhaustiveGuards err -> putStr err
+		PatternMatchFail err -> putStr err
 		other 		     -> error "help!")
 
 test2 | all (==0) [1] = ()
