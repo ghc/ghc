@@ -65,7 +65,7 @@ module SysTools (
 #include "HsVersions.h"
 
 import DriverUtil
-import DriverPhases     ( haskellish_user_src_file )
+import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
 import Panic		( progName, GhcException(..) )
@@ -701,7 +701,7 @@ removeTmpFiles verb fs
         hPutStrLn stderr ("WARNING - NOT deleting source files: " ++ unwords non_deletees)
 	act
 
-    (non_deletees, deletees) = partition haskellish_user_src_file fs
+    (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
     rm f = removeFile f `IO.catch` 
 		(\_ignored -> 

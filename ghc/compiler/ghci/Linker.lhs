@@ -30,6 +30,7 @@ import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
 import DriverState	( v_Library_paths, v_Opt_l, v_Ld_inputs, getStaticOpts, v_ExplicitPackages )
+import DriverPhases	( isObjectFilename, isDynLibFilename )
 import DriverUtil	( getFileSuffix )
 #ifdef darwin_TARGET_OS
 import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
@@ -214,7 +215,7 @@ reallyInitDynLinker
 	; lib_paths <- readIORef v_Library_paths
 	; cmdline_ld_inputs <- readIORef v_Ld_inputs
 
-	; let (cmdline_libs, cmdline_objs) = partition libish cmdline_ld_inputs
+	; classified_ld_inputs <- mapM classifyLdInput cmdline_ld_inputs
 
 	   	-- (e) Link any MacOS frameworks
 #ifdef darwin_TARGET_OS	
@@ -225,8 +226,7 @@ reallyInitDynLinker
 	; let framework_paths = []
 #endif
 		-- Finally do (c),(d),(e)	
-        ; let cmdline_lib_specs = map Object    cmdline_objs
-			       ++ map DLLPath   cmdline_libs
+        ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
 			       ++ map DLL       minus_ls 
 			       ++ map Framework frameworks
 	; if null cmdline_lib_specs then return ()
@@ -240,16 +240,13 @@ reallyInitDynLinker
 	  else throwDyn (InstallationError "linking extra libraries/objects failed")
 	}}
 
-libish :: String -> Bool
-libish f = getFileSuffix f `elem` dynlib_suffixes
-
-#ifdef mingw32_TARGET_OS
-dynlib_suffixes = ["dll", "DLL"]
-#elif defined(darwin_TARGET_OS)
-dynlib_suffixes = ["dylib"]
-#else
-dynlib_suffixes = ["so"]
-#endif
+classifyLdInput :: FilePath -> IO (Maybe LibrarySpec)
+classifyLdInput f
+  | isObjectFilename f = return (Just (Object f))
+  | isDynLibFilename f = return (Just (DLLPath f))
+  | otherwise 	       = do
+	hPutStrLn stderr ("Warning: ignoring unrecognised input `" ++ f ++ "'")
+	return Nothing
 
 preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
 preloadLib dflags lib_paths framework_paths lib_spec

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.27 2003/06/26 21:55:47 sof Exp $
+-- $Id: DriverPhases.hs,v 1.28 2003/10/22 14:31:09 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -15,13 +15,14 @@ module DriverPhases (
    startPhase,		-- :: String -> Phase
    phaseInputExt, 	-- :: Phase -> String
 
-   haskellish_file, haskellish_suffix,
-   haskellish_src_file, haskellish_src_suffix,
-   objish_file, objish_suffix,
-   cish_file, cish_suffix,
-   isExtCore_file, extcoreish_suffix,
-   haskellish_user_src_file,
-   isSourceFile         -- :: FilePath -> Bool
+   isHaskellishFilename, 
+   isHaskellSrcFilename,
+   isObjectFilename,
+   isCishFilename,
+   isExtCoreFilename,
+   isDynLibFilename,
+   isHaskellUserSrcFilename,
+   isSourceFilename         -- :: FilePath -> Bool
  ) where
 
 import DriverUtil
@@ -107,28 +108,37 @@ phaseInputExt Ilx2Il      = "ilx"
 phaseInputExt Ilasm       = "il"
 #endif
 
-haskellish_suffix          = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s" ])
-haskellish_src_suffix      = (`elem` [ "hs", "lhs", "hspp", "hscpp", "hcr"])
-cish_suffix                = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
-extcoreish_suffix          = (`elem` [ "hcr" ])
-haskellish_user_src_suffix = (`elem` [ "hs", "lhs" ])
+haskellish_suffixes          = [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s" ]
+haskellish_src_suffixes      = [ "hs", "lhs", "hspp", "hscpp", "hcr"]
+cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S" ]
+extcoreish_suffixes          = [ "hcr" ]
+haskellish_user_src_suffixes = [ "hs", "lhs" ]
 
 -- Use the appropriate suffix for the system on which 
 -- the GHC-compiled code will run
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
-objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
+objish_suffixes     = [ "o", "O", "obj", "OBJ" ]
 #else
-objish_suffix     = (`elem` [ "o" ])
+objish_suffixes     = [ "o" ]
 #endif
 
-haskellish_file          = haskellish_suffix     . getFileSuffix
-haskellish_src_file      = haskellish_src_suffix . getFileSuffix
-cish_file                = cish_suffix           . getFileSuffix
-isExtCore_file           = extcoreish_suffix     . getFileSuffix
-objish_file              = objish_suffix         . getFileSuffix
-haskellish_user_src_file = haskellish_user_src_suffix . getFileSuffix
+#ifdef mingw32_TARGET_OS
+dynlib_suffixes = ["dll", "DLL"]
+#elif defined(darwin_TARGET_OS)
+dynlib_suffixes = ["dylib"]
+#else
+dynlib_suffixes = ["so"]
+#endif
 
-isSourceFile :: FilePath -> Bool
-isSourceFile   f    =
-   haskellish_file f ||
-   cish_file   f
+isHaskellishFilename     f = getFileSuffix f `elem` haskellish_suffixes
+isHaskellSrcFilename     f = getFileSuffix f `elem` haskellish_src_suffixes
+isCishFilename           f = getFileSuffix f `elem` cish_suffixes
+isExtCoreFilename        f = getFileSuffix f `elem` extcoreish_suffixes
+isObjectFilename         f = getFileSuffix f `elem` objish_suffixes
+isHaskellUserSrcFilename f = getFileSuffix f `elem` haskellish_user_src_suffixes
+isDynLibFilename	 f = getFileSuffix f `elem` dynlib_suffixes
+
+isSourceFilename :: FilePath -> Bool
+isSourceFilename f  =
+   isHaskellishFilename f ||
+   isCishFilename f

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.134 2003/10/09 11:58:57 simonpj Exp $
+-- $Id: Main.hs,v 1.135 2003/10/22 14:31:10 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -44,7 +44,7 @@ import DriverFlags	( buildStaticHscOpts,
 			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
-import DriverPhases	( isSourceFile )
+import DriverPhases	( isSourceFilename )
 
 import DriverUtil	( add, handle, handleDyn, later, unknownFlagsErr )
 import CmdLineOpts	( dynFlag, restoreDynFlags,
@@ -212,7 +212,7 @@ main =
       Everything else is considered to be a linker object, and passed
       straight through to the linker.
     -}
-    looks_like_an_input m =  isSourceFile m 
+    looks_like_an_input m =  isSourceFilename m 
 			  || looksLikeModuleName m
 			  || '.' `notElem` m
 

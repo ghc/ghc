@@ -1032,7 +1032,7 @@ downsweep roots old_summaries
      where
 	getRootSummary :: FilePath -> IO ModSummary
 	getRootSummary file
-	   | haskellish_src_file file
+	   | isHaskellSrcFilename file
 	   = do exists <- doesFileExist file
 		if exists then summariseFile file else do
 		throwDyn (CmdLineError ("can't find file `" ++ file ++ "'"))	

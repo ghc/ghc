@@ -70,7 +70,7 @@ import Maybe
 
 preprocess :: FilePath -> IO FilePath
 preprocess filename =
-  ASSERT(haskellish_src_file filename) 
+  ASSERT(isHaskellSrcFilename filename) 
   do restoreDynFlags	-- Restore to state of last save
      runPipeline (StopBefore Hsc) ("preprocess") 
 	False{-temporary output file-}
@@ -562,7 +562,7 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 	
   -- gather the imports and module name
         (_,_,mod_name) <- 
-            if extcoreish_suffix suff
+            if isExtCoreFilename ('.':suff)
 	     then do
                -- no explicit imports in ExtCore input.
 	       m <- getCoreModuleName input_fn

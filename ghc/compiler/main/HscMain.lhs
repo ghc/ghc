@@ -61,7 +61,7 @@ import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
 import CmdLineOpts
-import DriverPhases     ( isExtCore_file )
+import DriverPhases     ( isExtCoreFilename )
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import UniqSupply	( mkSplitUniqSupply )
 
@@ -197,7 +197,7 @@ hscRecomp hsc_env have_object
       	; let dflags    = hsc_dflags hsc_env
 	; let toInterp  = dopt_HscLang dflags == HscInterpreted
 	; let toCore    = isJust (ml_hs_file location) &&
-			  isExtCore_file (fromJust (ml_hs_file location))
+			  isExtCoreFilename (fromJust (ml_hs_file location))
 
       	; when (not one_shot && verbosity dflags >= 1) $
 		hPutStrLn stderr ("Compiling " ++ 
