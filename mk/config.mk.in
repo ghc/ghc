@@ -305,7 +305,8 @@ HsLibHcOpts=$(GhcLibHcOpts)
 WithHappyHc = $(WithGhcHc)
 
 # HappyHcOpts gives the flags to pass to the Haskell compiler used
-# 	      to compile the Happy source coed
+# 	      to compile the Happy sources with.
+#
 HappyHcOpts = 
 
 
