@@ -1,1 +1,8 @@
-tcfail063.hs:4: Illegal class assertion
+
+tcfail063.hs:6:
+    Couldn't match `*' against `* -> *'
+	Expected kind: *
+	Inferred kind: * -> *
+    When checking kinds in `Num'
+    In the type: forall a. (Num) => Int -> a -> Int
+    While checking the type signature for `moby'

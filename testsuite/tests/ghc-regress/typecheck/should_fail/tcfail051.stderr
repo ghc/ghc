@@ -1,6 +1,4 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail051.hs:3:
-    Type constructor or class not in scope: `B'
+tcfail051.hs:3: Type constructor or class not in scope: `B'
 
-tests/ghc-regress/typecheck/should_fail/tcfail051.hs:4:
-    Variable not in scope: `op1'
+

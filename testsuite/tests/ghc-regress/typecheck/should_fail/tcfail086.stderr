@@ -1,3 +1,5 @@
 
-Can't derive any instances for type `Ex'
-because it has existentially-quantified constructor(s)
+tcfail086.hs:6:
+    Can't make a derived instance of `Eq Ex'
+    (it has existentially-quantified constructor(s))
+    When deriving classes for `Ex'

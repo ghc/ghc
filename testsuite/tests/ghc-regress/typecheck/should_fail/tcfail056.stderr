@@ -1,4 +1,2 @@
 
-Duplicate instance declarations:
-  tcfail056.hs:5: Eq Foo
-  tcfail056.hs:8: Eq Foo
+tcfail056.hs:10: Variable not in scope: `<='
