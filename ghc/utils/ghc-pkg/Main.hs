@@ -268,11 +268,7 @@ getPkgDatabases modify flags = do
 	subdir = targetARCH ++ '-':targetOS ++ '-':version
 	archdir   = appdir `joinFileName` subdir
 	user_conf = archdir `joinFileName` "package.conf"
-  b <- doesFileExist user_conf
-  when (not b) $ do
-	putStrLn ("Creating user package database in " ++ user_conf)
-	createDirectoryIfMissing True archdir
-	writeFile user_conf emptyPackageConfig
+  user_exists <- doesFileExist user_conf
 
   let
 	-- The semantics here are slightly strange.  If we are
@@ -281,8 +277,9 @@ getPkgDatabases modify flags = do
 	-- If we are not modifying (eg. list, describe etc.) then
 	-- the user database is included by default.
 	databases
-	  | modify    = foldl addDB [global_conf] flags
-	  | otherwise = foldl addDB [user_conf,global_conf] flags
+	  | modify          = foldl addDB [global_conf] flags
+	  | not user_exists = foldl addDB [global_conf] flags
+	  | otherwise       = foldl addDB [user_conf,global_conf] flags
 
 	-- implement the following rules:
 	-- 	--user means overlap with the user database
@@ -294,6 +291,11 @@ getPkgDatabases modify flags = do
 	addDB dbs FlagGlobal     = [global_conf]
 	addDB dbs (FlagConfig f) = f : dbs
 	addDB dbs _		 = dbs
+
+  when (not user_exists && user_conf `elem` databases) $ do
+	putStrLn ("Creating user package database in " ++ user_conf)
+	createDirectoryIfMissing True archdir
+	writeFile user_conf emptyPackageConfig
 
   db_stack <- mapM readParseDatabase databases
   return db_stack
