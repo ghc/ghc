@@ -312,7 +312,7 @@ sub process_asm_block_iX86 {
     $str = "\.text\n\t.align 4\n" . $str;
 
     # remove/record any literal constants defined here
-    while ( ($str =~ /((LC\d+):\n\t\.ascii.*\n)/ )) {
+    while ( ($str =~ /((\.?LC\d+):\n\t\.(ascii|string).*\n)/ )) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -321,7 +321,7 @@ sub process_asm_block_iX86 {
 
 	$LocalConstant{$label} = $body;
 	
-	$str =~ s/LC\d+:\n\t\.ascii.*\n//;
+	$str =~ s/\.?LC\d+:\n\t\.(ascii|string).*\n//;
     }
 
     # inject definitions for any local constants now used herein
