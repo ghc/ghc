@@ -22,6 +22,10 @@ not sure about feel free to bug the local CVS meister (namely Me
 The following guidelines should mean we don't step on each other's
 toes too much.  Ok, here's what you do:
 
+
+Using Remote CVS
+----------------
+
 * (only if using CVS remotely, i.e. not at Glasgow):
 
   To use remote CVS, you need to supply me with a username and
@@ -38,6 +42,10 @@ toes too much.  Ok, here's what you do:
   The CVSROOT environment variable will be recorded in the checked-out
   tree, so you don't need to set this every time either.  Ignore the
   instructions for setting CVSROOT below.
+
+
+Using CVS for the First Time
+----------------------------
 
 * (ok, everybody now...) Firstly, identify which areas of the source
   tree you'll be working on.  The directory structure looks like this:
@@ -68,6 +76,10 @@ toes too much.  Ok, here's what you do:
   the -P flag to 'checkout' says prune empty directories, which is
   normally what you want.
 
+
+Checking Out a Source Tree
+--------------------------
+
 * Check out your sources.  The Approved Way (at least by me) to do
   this is as follows:
 
@@ -93,6 +105,10 @@ toes too much.  Ok, here's what you do:
   The second command here checks out the relevant modules you want to
   work on.  For a GHC build, for instance, you need at least ghc and
   hslibs.
+
+
+Committing Your Changes
+-----------------------
 
 * Build the software, if necessary.  Unless you're just working on
   documentation, you'll probably want to build the software in order
@@ -158,6 +174,10 @@ toes too much.  Ok, here's what you do:
   list saying which files changed, and giving the commit message.  
   For a multiple-file change, you should still get only *one* message.
 
+
+General Hints
+-------------
+
 * As a general rule: commit changes in small units, preferably
   addressing one issue or implementing a single feature.  Provide a 
   descriptive log message so that the repository records exactly which 
@@ -173,7 +193,31 @@ toes too much.  Ok, here's what you do:
   each day and how we're doing in relation to previous verions.  This
   idea is truely wrecked if the compiler won't build in the first place!
 
-Ok, that'll do for now.
+* To check out extra bits into an already-checked-out tree, use the
+  following procedure.  Suppose you have a checked-out fptools tree containing
+  just ghc and hslibs, and you want to add nofib to it:
+
+	cd fptools
+	cvs checkout nofib
+
+  or:
+	
+	cd fptools
+	cvs update -d nofib
+
+  (the -d flag tells update to create a new directory).  If you just want
+  part of the nofib suite, you can do
+
+	cd fptools
+	cvs checkout nofib/spectral
+
+  This works because 'nofib' is a module in its own right, and spectral
+  is a subdirectory of the nofib module.  The path argument to checkout
+  must always start with a module name.  There's no equivalent form of
+  this command using update.
+
+Ok, that'll do for now.  If there's anything else you'd like to see in
+this file, just let me know.
 
 Simon Marlow <simonm@dcs.gla.ac.uk>
 
