@@ -1,0 +1,575 @@
+<Chapter id="sooner-faster-quicker">
+<Title>Advice on: sooner, faster, smaller, stingier
+</Title>
+
+<Para>
+Please advise us of other ``helpful hints'' that should go here!
+</Para>
+
+<Sect1 id="sooner">
+<Title>Sooner: producing a program more quickly
+</Title>
+
+<Para>
+<IndexTerm><Primary>compiling faster</Primary></IndexTerm>
+<IndexTerm><Primary>faster compiling</Primary></IndexTerm>
+<VariableList>
+
+<VarListEntry>
+<Term>Don't use <Literal>-O</Literal> or (especially) <Literal>-O2</Literal>:</Term>
+<ListItem>
+<Para>
+By using them, you are telling GHC that you are willing to suffer
+longer compilation times for better-quality code.
+</Para>
+
+<Para>
+GHC is surprisingly zippy for normal compilations without <Literal>-O</Literal>!
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Use more memory:</Term>
+<ListItem>
+<Para>
+Within reason, more memory for heap space means less garbage
+collection for GHC, which means less compilation time.  If you use
+the <Literal>-Rgc-stats</Literal> option, you'll get a garbage-collector report.
+(Again, you can use the cheap-and-nasty <Literal>-optCrts-Sstderr</Literal> option to
+send the GC stats straight to standard error.)
+</Para>
+
+<Para>
+If it says you're using more than 20&percnt; of total time in garbage
+collecting, then more memory would help.
+</Para>
+
+<Para>
+If the heap size is approaching the maximum (64M by default), and you
+have lots of memory, try increasing the maximum with the
+<Literal>-M&lt;size&gt;</Literal><IndexTerm><Primary>-M&lt;size&gt; option</Primary></IndexTerm> option, e.g.: <Literal>ghc -c -O
+-M1024m Foo.hs</Literal>.
+</Para>
+
+<Para>
+Increasing the default allocation area size used by the compiler's RTS
+might also help: use the <Literal>-A&lt;size&gt;</Literal><IndexTerm><Primary>-A&lt;size&gt; option</Primary></IndexTerm>
+option.
+</Para>
+
+<Para>
+If GHC persists in being a bad memory citizen, please report it as a
+bug.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Don't use too much memory!</Term>
+<ListItem>
+<Para>
+As soon as GHC plus its ``fellow citizens'' (other processes on your
+machine) start using more than the <Emphasis>real memory</Emphasis> on your
+machine, and the machine starts ``thrashing,'' <Emphasis>the party is
+over</Emphasis>.  Compile times will be worse than terrible!  Use something
+like the csh-builtin <Literal>time</Literal> command to get a report on how many page
+faults you're getting.
+</Para>
+
+<Para>
+If you don't know what virtual memory, thrashing, and page faults are,
+or you don't know the memory configuration of your machine,
+<Emphasis>don't</Emphasis> try to be clever about memory use: you'll just make
+your life a misery (and for other people, too, probably).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Try to use local disks when linking:</Term>
+<ListItem>
+<Para>
+Because Haskell objects and libraries tend to be large, it can take
+many real seconds to slurp the bits to/from a remote filesystem.
+</Para>
+
+<Para>
+It would be quite sensible to <Emphasis>compile</Emphasis> on a fast machine using
+remotely-mounted disks; then <Emphasis>link</Emphasis> on a slow machine that had
+your disks directly mounted.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Don't derive/use <Literal>Read</Literal> unnecessarily:</Term>
+<ListItem>
+<Para>
+It's ugly and slow.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>GHC compiles some program constructs slowly:</Term>
+<ListItem>
+<Para>
+Deeply-nested list comprehensions seem to be one such; in the past,
+very large constant tables were bad, too.
+</Para>
+
+<Para>
+We'd rather you reported such behaviour as a bug, so that we can try
+to correct it.
+</Para>
+
+<Para>
+The parts of the compiler that seem most prone to wandering off for a
+long time are the abstract interpreters (strictness and update
+analysers).  You can turn these off individually with
+<Literal>-fno-strictness</Literal><IndexTerm><Primary>-fno-strictness anti-option</Primary></IndexTerm> and
+<Literal>-fno-update-analysis</Literal>.<IndexTerm><Primary>-fno-update-analysis anti-option</Primary></IndexTerm>
+</Para>
+
+<Para>
+To figure out which part of the compiler is badly behaved, the
+<Literal>-dshow-passes</Literal><IndexTerm><Primary>-dshow-passes option</Primary></IndexTerm> option is your
+friend.
+</Para>
+
+<Para>
+If your module has big wads of constant data, GHC may produce a huge
+basic block that will cause the native-code generator's register
+allocator to founder.  Bring on <Literal>-fvia-C</Literal><IndexTerm><Primary>-fvia-C option</Primary></IndexTerm>
+(not that GCC will be that quick about it, either).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Avoid the consistency-check on linking:</Term>
+<ListItem>
+<Para>
+Use <Literal>-no-link-chk</Literal><IndexTerm><Primary>-no-link-chk</Primary></IndexTerm>; saves effort.  This is
+probably safe in a I-only-compile-things-one-way setup.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Explicit <Literal>import</Literal> declarations:</Term>
+<ListItem>
+<Para>
+Instead of saying <Literal>import Foo</Literal>, say <Literal>import Foo (...stuff I want...)</Literal>.
+</Para>
+
+<Para>
+Truthfully, the reduction on compilation time will be very small.
+However, judicious use of <Literal>import</Literal> declarations can make a
+program easier to understand, so it may be a good idea anyway.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect1>
+
+<Sect1 id="faster">
+<Title>Faster: producing a program that runs quicker
+</Title>
+
+<Para>
+<IndexTerm><Primary>faster programs, how to produce</Primary></IndexTerm>
+</Para>
+
+<Para>
+The key tool to use in making your Haskell program run faster are
+GHC's profiling facilities, described separately in <XRef LinkEnd="profiling">.  There is <Emphasis>no substitute</Emphasis> for
+finding where your program's time/space is <Emphasis>really</Emphasis> going, as
+opposed to where you imagine it is going.
+</Para>
+
+<Para>
+Another point to bear in mind: By far the best way to improve a
+program's performance <Emphasis>dramatically</Emphasis> is to use better
+algorithms.  Once profiling has thrown the spotlight on the guilty
+time-consumer(s), it may be better to re-think your program than to
+try all the tweaks listed below.
+</Para>
+
+<Para>
+Another extremely efficient way to make your program snappy is to use
+library code that has been Seriously Tuned By Someone Else.  You
+<Emphasis>might</Emphasis> be able to write a better quicksort than the one in the
+HBC library, but it will take you much longer than typing <Literal>import
+QSort</Literal>.  (Incidentally, it doesn't hurt if the Someone Else is Lennart
+Augustsson.)
+</Para>
+
+<Para>
+Please report any overly-slow GHC-compiled programs.  The current
+definition of ``overly-slow'' is ``the HBC-compiled version ran
+faster''&hellip;
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>Optimise, using <Literal>-O</Literal> or <Literal>-O2</Literal>:</Term>
+<ListItem>
+<Para>
+This is the most basic way
+to make your program go faster.  Compilation time will be slower,
+especially with <Literal>-O2</Literal>.
+</Para>
+
+<Para>
+At present, <Literal>-O2</Literal> is nearly indistinguishable from <Literal>-O</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Compile via C and crank up GCC:</Term>
+<ListItem>
+<Para>
+Even with <Literal>-O</Literal>, GHC tries to
+use a native-code generator, if available.  But the native
+code-generator is designed to be quick, not mind-bogglingly clever.
+Better to let GCC have a go, as it tries much harder on register
+allocation, etc.
+</Para>
+
+<Para>
+So, when we want very fast code, we use: <Literal>-O -fvia-C -O2-for-C</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Overloaded functions are not your friend:</Term>
+<ListItem>
+<Para>
+Haskell's overloading (using type classes) is elegant, neat, etc.,
+etc., but it is death to performance if left to linger in an inner
+loop.  How can you squash it?
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>Give explicit type signatures:</Term>
+<ListItem>
+<Para>
+Signatures are the basic trick; putting them on exported, top-level
+functions is good software-engineering practice, anyway.  (Tip: using
+<Literal>-fwarn-missing-signatures</Literal><IndexTerm><Primary>-fwarn-missing-signatures
+option</Primary></IndexTerm> can help enforce good signature-practice).
+</Para>
+
+<Para>
+The automatic specialisation of overloaded functions (with <Literal>-O</Literal>)
+should take care of overloaded local and/or unexported functions.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Use <Literal>SPECIALIZE</Literal> pragmas:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>SPECIALIZE pragma</Primary></IndexTerm>
+<IndexTerm><Primary>overloading, death to</Primary></IndexTerm>
+</Para>
+
+<Para>
+Specialize the overloading on key functions in your program.  See
+<XRef LinkEnd="specialize-pragma"> and
+<XRef LinkEnd="specialize-instance-pragma">.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``But how do I know where overloading is creeping in?'':</Term>
+<ListItem>
+<Para>
+A low-tech way: grep (search) your interface files for overloaded
+type signatures; e.g.,:
+
+<ProgramListing>
+% egrep '^[a-z].*::.*=&#62;' *.hi
+</ProgramListing>
+
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Strict functions are your dear friends:</Term>
+<ListItem>
+<Para>
+and, among other things, lazy pattern-matching is your enemy.
+</Para>
+
+<Para>
+(If you don't know what a ``strict function'' is, please consult a
+functional-programming textbook.  A sentence or two of
+explanation here probably would not do much good.)
+</Para>
+
+<Para>
+Consider these two code fragments:
+
+<ProgramListing>
+f (Wibble x y) =  ... # strict
+
+f arg = let { (Wibble x y) = arg } in ... # lazy
+</ProgramListing>
+
+The former will result in far better code.
+</Para>
+
+<Para>
+A less contrived example shows the use of <Literal>cases</Literal> instead
+of <Literal>lets</Literal> to get stricter code (a good thing):
+
+<ProgramListing>
+f (Wibble x y)  # beautiful but slow
+  = let
+        (a1, b1, c1) = unpackFoo x
+        (a2, b2, c2) = unpackFoo y
+    in ...
+
+f (Wibble x y)  # ugly, and proud of it
+  = case (unpackFoo x) of { (a1, b1, c1) -&#62;
+    case (unpackFoo y) of { (a2, b2, c2) -&#62;
+    ...
+    }}
+</ProgramListing>
+
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>GHC loves single-constructor data-types:</Term>
+<ListItem>
+<Para>
+It's all the better if a function is strict in a single-constructor
+type (a type with only one data-constructor; for example, tuples are
+single-constructor types).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Newtypes are better than datatypes:</Term>
+<ListItem>
+<Para>
+If your datatype has a single constructor with a single field, use a
+<Literal>newtype</Literal> declaration instead of a <Literal>data</Literal> declaration.  The <Literal>newtype</Literal>
+will be optimised away in most cases.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``How do I find out a function's strictness?''</Term>
+<ListItem>
+<Para>
+Don't guess&mdash;look it up.
+</Para>
+
+<Para>
+Look for your function in the interface file, then for the third field
+in the pragma; it should say <Literal>&lowbar;S&lowbar; &lt;string&gt;</Literal>.  The <Literal>&lt;string&gt;</Literal>
+gives the strictness of the function's arguments.  <Literal>L</Literal> is lazy
+(bad), <Literal>S</Literal> and <Literal>E</Literal> are strict (good), <Literal>P</Literal> is ``primitive'' (good),
+<Literal>U(...)</Literal> is strict and
+``unpackable'' (very good), and <Literal>A</Literal> is absent (very good).
+</Para>
+
+<Para>
+For an ``unpackable'' <Literal>U(...)</Literal> argument, the info inside
+tells the strictness of its components.  So, if the argument is a
+pair, and it says <Literal>U(AU(LSS))</Literal>, that means ``the first component of the
+pair isn't used; the second component is itself unpackable, with three
+components (lazy in the first, strict in the second \&#38; third).''
+</Para>
+
+<Para>
+If the function isn't exported, just compile with the extra flag <Literal>-ddump-simpl</Literal>;
+next to the signature for any binder, it will print the self-same
+pragmatic information as would be put in an interface file.
+(Besides, Core syntax is fun to look at!)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Force key functions to be <Literal>INLINE</Literal>d (esp. monads):</Term>
+<ListItem>
+<Para>
+Placing <Literal>INLINE</Literal> pragmas on certain functions that are used a lot can
+have a dramatic effect.  See <XRef LinkEnd="inline-pragma">.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Explicit <Literal>export</Literal> list:</Term>
+<ListItem>
+<Para>
+If you do not have an explicit export list in a module, GHC must
+assume that everything in that module will be exported.  This has
+various pessimising effects.  For example, if a bit of code is actually
+<Emphasis>unused</Emphasis> (perhaps because of unfolding effects), GHC will not be
+able to throw it away, because it is exported and some other module
+may be relying on its existence.
+</Para>
+
+<Para>
+GHC can be quite a bit more aggressive with pieces of code if it knows
+they are not exported.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Look at the Core syntax!</Term>
+<ListItem>
+<Para>
+(The form in which GHC manipulates your code.)  Just run your
+compilation with <Literal>-ddump-simpl</Literal> (don't forget the <Literal>-O</Literal>).
+</Para>
+
+<Para>
+If profiling has pointed the finger at particular functions, look at
+their Core code.  <Literal>lets</Literal> are bad, <Literal>cases</Literal> are good, dictionaries
+(<Literal>d.&lt;Class&gt;.&lt;Unique&gt;</Literal>) &lsqb;or anything overloading-ish&rsqb; are bad,
+nested lambdas are bad, explicit data constructors are good, primitive
+operations (e.g., <Literal>eqInt&num;</Literal>) are good,&hellip;
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Use unboxed types (a GHC extension):</Term>
+<ListItem>
+<Para>
+When you are <Emphasis>really</Emphasis> desperate for speed, and you want to get
+right down to the ``raw bits.''  Please see <XRef LinkEnd="glasgow-unboxed"> for some information about using unboxed
+types.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Use <Literal>&lowbar;ccall&lowbar;s</Literal> (a GHC extension) to plug into fast libraries:</Term>
+<ListItem>
+<Para>
+This may take real work, but&hellip; There exist piles of
+massively-tuned library code, and the best thing is not
+to compete with it, but link with it.
+</Para>
+
+<Para>
+<XRef LinkEnd="glasgow-ccalls"> says a little about how to use C calls.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Don't use <Literal>Float</Literal>s:</Term>
+<ListItem>
+<Para>
+We don't provide specialisations of Prelude functions for <Literal>Float</Literal>
+(but we do for <Literal>Double</Literal>).  If you end up executing overloaded
+code, you will lose on performance, perhaps badly.
+</Para>
+
+<Para>
+<Literal>Floats</Literal> (probably 32-bits) are almost always a bad idea, anyway,
+unless you Really Know What You Are Doing.  Use Doubles.  There's
+rarely a speed disadvantage&mdash;modern machines will use the same
+floating-point unit for both.  With <Literal>Doubles</Literal>, you are much less
+likely to hang yourself with numerical errors.
+</Para>
+
+<Para>
+One time when <Literal>Float</Literal> might be a good idea is if you have a
+<Emphasis>lot</Emphasis> of them, say a giant array of <Literal>Float</Literal>s.  They take up
+half the space in the heap compared to <Literal>Doubles</Literal>.  However, this isn't
+true on a 64-bit machine.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Use a bigger heap!</Term>
+<ListItem>
+<Para>
+If your program's GC stats (<Literal>-S</Literal><IndexTerm><Primary>-S RTS option</Primary></IndexTerm> RTS option)
+indicate that it's doing lots of garbage-collection (say, more than
+20&percnt; of execution time), more memory might help&mdash;with the
+<Literal>-M&lt;size&gt;</Literal><IndexTerm><Primary>-M&lt;size&gt; RTS option</Primary></IndexTerm> or
+<Literal>-A&lt;size&gt;</Literal><IndexTerm><Primary>-A&lt;size&gt; RTS option</Primary></IndexTerm> RTS options (see
+<XRef LinkEnd="rts-options-gc">).
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect1>
+
+<Sect1 id="smaller">
+<Title>Smaller: producing a program that is smaller
+</Title>
+
+<Para>
+<IndexTerm><Primary>smaller programs, how to produce</Primary></IndexTerm>
+</Para>
+
+<Para>
+Decrease the ``go-for-it'' threshold for unfolding smallish
+expressions.  Give a
+<Literal>-funfolding-use-threshold0</Literal><IndexTerm><Primary>-funfolding-use-threshold0
+option</Primary></IndexTerm> option for the extreme case. (``Only unfoldings with
+zero cost should proceed.'')  Warning: except in certain specialiised
+cases (like Happy parsers) this is likely to actually
+<Emphasis>increase</Emphasis> the size of your program, because unfolding
+generally enables extra simplifying optimisations to be performed.
+</Para>
+
+<Para>
+Avoid <Literal>Read</Literal>.
+</Para>
+
+<Para>
+Use <Literal>strip</Literal> on your executables.
+</Para>
+
+</Sect1>
+
+<Sect1 id="stingier">
+<Title>Stingier: producing a program that gobbles less heap space
+</Title>
+
+<Para>
+<IndexTerm><Primary>memory, using less heap</Primary></IndexTerm>
+<IndexTerm><Primary>space-leaks, avoiding</Primary></IndexTerm>
+<IndexTerm><Primary>heap space, using less</Primary></IndexTerm>
+</Para>
+
+<Para>
+``I think I have a space leak&hellip;''  Re-run your program with
+<Literal>+RTS -Sstderr</Literal>,<IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> and remove all doubt!
+(You'll see the heap usage get bigger and bigger&hellip;)  &lsqb;Hmmm&hellip;this
+might be even easier with the <Literal>-F2s</Literal><IndexTerm><Primary>-F2s RTS option</Primary></IndexTerm> RTS
+option; so&hellip; <Literal>./a.out +RTS -Sstderr -F2s</Literal>...]
+</Para>
+
+<Para>
+Once again, the profiling facilities (<XRef LinkEnd="profiling">) are the basic tool for demystifying the space
+behaviour of your program.
+</Para>
+
+<Para>
+Strict functions are good for space usage, as they are for time, as
+discussed in the previous section.  Strict functions get right down to
+business, rather than filling up the heap with closures (the system's
+notes to itself about how to evaluate something, should it eventually
+be required).
+</Para>
+
+</Sect1>
+
+</Chapter>

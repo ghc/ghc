@@ -1,0 +1,462 @@
+<Chapter id="wrong">
+<Title>What to do when something goes wrong
+</Title>
+
+<Para>
+<IndexTerm><Primary>problems</Primary></IndexTerm>
+</Para>
+
+<Para>
+If you still have a problem after consulting this section, then you
+may have found a <Emphasis>bug</Emphasis>&mdash;please report it!  See <XRef LinkEnd="bug-reports"> for a
+list of things we'd like to know about your bug.  If in doubt, send a
+report&mdash;we love mail from irate users :-!
+</Para>
+
+<Para>
+(<XRef LinkEnd="vs-Haskell-defn">, which describes Glasgow
+Haskell's shortcomings vs.&nbsp;the Haskell language definition, may also
+be of interest.)
+</Para>
+
+<Sect1 id="wrong-compiler">
+<Title>When the compiler ``does the wrong thing''
+</Title>
+
+<Para>
+<IndexTerm><Primary>compiler problems</Primary></IndexTerm>
+<IndexTerm><Primary>problems with the compiler</Primary></IndexTerm>
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>``Help! The compiler crashed (or `panic'd)!''</Term>
+<ListItem>
+<Para>
+These events are <Emphasis>always</Emphasis> bugs in the GHC system&mdash;please report them.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``The compiler ran out of heap (or stack) when compiling itself!''</Term>
+<ListItem>
+<Para>
+It happens.  We try to supply reasonable <Literal>-H&lt;n&gt;</Literal> flags for
+<Literal>ghc/compiler/</Literal> and <Literal>ghc/lib/</Literal>, but GHC's memory consumption
+can vary by platform (e.g., on a 64-bit machine).
+</Para>
+
+<Para>
+Just say <Literal>make all EXTRA&lowbar;HC&lowbar;OPTS=-H&lt;a reasonable number&gt;</Literal> and see
+how you get along.
+</Para>
+
+<Para>
+Note that this is less likely to happen if you are compiling with GHC
+4.00 or later, since the introduction of the dynamically expanding
+heap.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``The compiler died with a pattern-matching error.''</Term>
+<ListItem>
+<Para>
+This is a bug just as surely as a ``panic.'' Please report it.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``This is a terrible error message.''</Term>
+<ListItem>
+<Para>
+If you think that GHC could have produced a better error message,
+please report it as a bug.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``What about these `trace' messages from GHC?''</Term>
+<ListItem>
+<Para>
+Almost surely not a problem.  About some specific cases&hellip;
+<VariableList>
+
+<VarListEntry>
+<Term>Simplifier still going after N iterations:</Term>
+<ListItem>
+<Para>
+Sad, but harmless.  You can change the number with a
+<Literal>-fmax-simplifier-iterations&lt;N&gt;</Literal><IndexTerm><Primary>-fmax-simplifier-iterations&lt;N&gt; option</Primary></IndexTerm> option (no space);
+and you can see what actions took place in each iteration by
+turning on the <Literal>-fshow-simplifier-progress</Literal>
+<IndexTerm><Primary>-fshow-simplifier-progress option</Primary></IndexTerm> option.
+</Para>
+
+<Para>
+If the simplifier definitely seems to be ``looping,'' please report
+it.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``What about this warning from the C compiler?''</Term>
+<ListItem>
+<Para>
+For example: ``&hellip;warning: `Foo' declared `static' but never defined.''
+Unsightly, but shouldn't be a problem.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Sensitivity to <Literal>.hi</Literal> interface files:</Term>
+<ListItem>
+<Para>
+GHC is very sensitive about interface files.  For example, if it picks
+up a non-standard <Literal>Prelude.hi</Literal> file, pretty terrible things will
+happen.  If you turn on
+<Literal>-fno-implicit-prelude</Literal><IndexTerm><Primary>-fno-implicit-prelude option</Primary></IndexTerm>, the
+compiler will almost surely die, unless you know what you are doing.
+</Para>
+
+<Para>
+Furthermore, as sketched below, you may have big problems
+running programs compiled using unstable interfaces.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``I think GHC is producing incorrect code'':</Term>
+<ListItem>
+<Para>
+Unlikely :-) A useful be-more-paranoid option to give to GHC is
+<Literal>-dcore-lint</Literal><IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>; this causes a ``lint''
+pass to check for errors (notably type errors) after each Core-to-Core
+transformation pass.  We run with <Literal>-dcore-lint</Literal> on all the time; it
+costs about 5&percnt; in compile time.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``Why did I get a link error?''</Term>
+<ListItem>
+<Para>
+If the linker complains about not finding <Literal>&lowbar;&lt;something&gt;&lowbar;fast</Literal>, then
+something is inconsistent: you probably didn't compile modules in the
+proper dependency order.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``What's a `consistency error'?''</Term>
+<ListItem>
+<Para>
+(These are reported just after linking your program.)
+</Para>
+
+<Para>
+You tried to link incompatible object files, e.g., normal ones
+(registerised, Appel garbage-collector) with profiling ones (two-space
+collector).  Or those compiled by a previous version of GHC
+with an incompatible newer version.
+</Para>
+
+<Para>
+If you run <Literal>nm -o *.o &verbar; egrep 't (cc&verbar;hsc)\.'</Literal> (or, on
+unregisterised files: <Literal>what *.o</Literal>), you'll see all the consistency
+tags/strings in your object files.  They must all be the same!
+(ToDo: tell you what they mean&hellip;)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``Is this line number right?''</Term>
+<ListItem>
+<Para>
+On this score, GHC usually does pretty well, especially
+if you ``allow'' it to be off by one or two.  In the case of an
+instance or class declaration, the line number
+may only point you to the declaration, not to a specific method.
+</Para>
+
+<Para>
+Please report line-number errors that you find particularly unhelpful.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect1>
+
+<Sect1 id="wrong-compilee">
+<Title>When your program ``does the wrong thing''
+</Title>
+
+<Para>
+<IndexTerm><Primary>problems running your program</Primary></IndexTerm>
+</Para>
+
+<Para>
+(For advice about overly slow or memory-hungry Haskell programs,
+please see <XRef LinkEnd="sooner-faster-quicker">).
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>``Help! My program crashed!''</Term>
+<ListItem>
+<Para>
+(e.g., a `segmentation fault' or `core dumped')
+<IndexTerm><Primary>segmentation fault</Primary></IndexTerm>
+</Para>
+
+<Para>
+If your program has no <Literal>&lowbar;ccall&lowbar;</Literal>s/<Literal>&lowbar;casm&lowbar;</Literal>s in it, then a crash is
+always a BUG in the GHC system, except in one case: If your program is
+made of several modules, each module must have been compiled after any
+modules on which it depends (unless you use <Literal>.hi-boot</Literal> files, in which
+case these <Emphasis>must</Emphasis> be correct with respect to the module source). 
+</Para>
+
+<Para>
+For example, if an interface is lying about the type of an imported
+value then GHC may well generate duff code for the importing module.
+<Emphasis>This applies to pragmas inside interfaces too!</Emphasis>  If the pragma is
+lying (e.g., about the ``arity'' of a value), then duff code may result.
+Furthermore, arities may change even if types do not.
+</Para>
+
+<Para>
+In short, if you compile a module and its interface changes, then all
+the modules that import that interface <Emphasis>must</Emphasis> be re-compiled.
+</Para>
+
+<Para>
+A useful option to alert you when interfaces change is
+<Literal>-hi-diffs</Literal><IndexTerm><Primary>-hi-diffs option</Primary></IndexTerm>.  It will run <Literal>diff</Literal> on the
+changed interface file, before and after, when applicable.
+</Para>
+
+<Para>
+If you are using <Literal>make</Literal>, a useful tool to make sure that every module
+<Emphasis>is</Emphasis> up-to-date with respect to its imported interfaces is
+<Literal>mkdependHS</Literal> (which comes with GHC).  Please see <XRef LinkEnd="mkdependHS">.
+</Para>
+
+<Para>
+If you are down to your last-compile-before-a-bug-report, we would
+recommend that you add a <Literal>-dcore-lint</Literal> option (for extra checking) to your compilation options.
+</Para>
+
+<Para>
+So, before you report a bug because of a core dump, you should probably:
+
+<Screen>
+% rm *.o        # scrub your object files
+% make my_prog  # re-make your program; use -hi-diffs to highlight changes;
+                # as mentioned above, use -dcore-lint to be more paranoid
+% ./my_prog ... # retry...
+</Screen>
+
+</Para>
+
+<Para>
+Of course, if you have <Literal>&lowbar;ccall&lowbar;</Literal>s/<Literal>&lowbar;casm&lowbar;</Literal>s in your program then all
+bets are off, because you can trash the heap, the stack, or whatever.
+</Para>
+
+<Para>
+If you are interested in hard-core debugging of a crashing
+GHC-compiled program, please see <XRef LinkEnd="hard-core-debug">.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``My program entered an `absent' argument.''</Term>
+<ListItem>
+<Para>
+This is definitely caused by a bug in GHC. Please report it.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>``What's with this `arithmetic (or `floating') exception' ''?</Term>
+<ListItem>
+<Para>
+<Literal>Int</Literal>, <Literal>Float</Literal>, and <Literal>Double</Literal> arithmetic is <Emphasis>unchecked</Emphasis>.
+Overflows, underflows and loss of precision are either silent or
+reported as an exception by the operating system (depending on the
+architecture).  Divide-by-zero <Emphasis>may</Emphasis> cause an untrapped
+exception (please report it if it does).
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect1>
+
+<Sect1 id="bug-reports">
+<Title>How to report a bug in the GHC system
+</Title>
+
+<Para>
+<IndexTerm><Primary>bug reports</Primary></IndexTerm>
+</Para>
+
+<Para>
+Glasgow Haskell is a changing system so there are sure to be bugs in
+it.  Please report them to <ULink
+URL="mailto:glasgow-haskell-bugs@haskell.org"
+>glasgow-haskell-bugs@haskell.org</ULink
+>!  (However, please
+check the earlier part of this section to be sure it's not a known
+not-really-a problem.)
+</Para>
+
+<Para>
+The name of the bug-reporting game is: facts, facts, facts.
+Don't omit them because ``Oh, they won't be interested&hellip;''
+</Para>
+
+<Para>
+
+<OrderedList>
+<ListItem>
+
+<Para>
+ What kind of machine are you running on, and exactly what
+version of the operating system are you using? (<Literal>uname -a</Literal> or <Literal>cat
+/etc/motd</Literal> will show the desired information.)
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+ What version of GCC are you using? <Literal>gcc -v</Literal> will tell you.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+ Run the sequence of compiles/runs that caused the offending
+behaviour, capturing all the input/output in a ``script'' (a UNIX
+command) or in an Emacs shell window.  We'd prefer to see the whole
+thing.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+ Be sure any Haskell compilations are run with a <Literal>-v</Literal> (verbose)
+flag, so we can see exactly what was run, what versions of things you
+have, etc.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+ What is the program behaviour that is wrong, in your opinion?
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+ If practical, please send enough source files/interface files
+for us to duplicate the problem.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+ If you are a Hero and track down the problem in the
+compilation-system sources, please send us patches relative to a known
+released version of GHC, or whole files if you prefer.
+
+</Para>
+</ListItem>
+
+</OrderedList>
+
+</Para>
+
+</Sect1>
+
+<Sect1 id="hard-core-debug">
+<Title>Hard-core debugging of GHC-compiled programs
+</Title>
+
+<Para>
+<IndexTerm><Primary>debugging, hard-core</Primary></IndexTerm>
+</Para>
+
+<Para>
+If your program is crashing, you should almost surely file a bug
+report, as outlined in previous sections.
+</Para>
+
+<Para>
+This section suggests ways to Make Further Progress Anyway.
+</Para>
+
+<Para>
+The first thing to establish is: Is it a garbage-collection (GC) bug?
+Try your program with a very large heap and a <Literal>-Sstderr</Literal> RTS
+flag.
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+If it crashes <Emphasis>without</Emphasis> garbage-collecting, then it is
+definitely <Emphasis>not</Emphasis> a GC bug.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+If you can make it crash with one heap size but not with another, then
+it <Emphasis>probably is</Emphasis> a GC bug.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+If it crashes with the normal
+collector, but not when you force two-space collection (<Literal>-F2s</Literal>
+runtime flag), then it <Emphasis>probably is</Emphasis> a GC bug.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+<Para>
+If it <Emphasis>is</Emphasis> a GC bug, you may be able to avoid it by using a
+particular heap size or by using a <Literal>-F2s</Literal> runtime flag.  (But don't
+forget to report the bug!!!)
+</Para>
+
+<Para>
+ToDo: more here?
+</Para>
+
+</Sect1>
+
+</Chapter>

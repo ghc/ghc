@@ -1,0 +1,188 @@
+<Sect1 id="concurrent-and-parallel">
+<Title>Concurrent and Parallel Haskell
+</Title>
+
+<Para>
+<IndexTerm><Primary>Concurrent Haskell</Primary></IndexTerm>
+<IndexTerm><Primary>Parallel Haskell</Primary></IndexTerm>
+</Para>
+
+<Para>
+Concurrent and Parallel Haskell are Glasgow extensions to Haskell
+which let you structure your program as a group of independent
+`threads'.
+</Para>
+
+<Para>
+Concurrent and Parallel Haskell have very different purposes.
+</Para>
+
+<Para>
+Concurrent Haskell is for applications which have an inherent
+structure of interacting, concurrent tasks (i.e. `threads').  Threads
+in such programs may be <Emphasis>required</Emphasis>.  For example, if a concurrent thread has been spawned to handle a mouse click, it isn't
+optional&mdash;the user wants something done!
+</Para>
+
+<Para>
+A Concurrent Haskell program implies multiple `threads' running within
+a single Unix process on a single processor.
+</Para>
+
+<Para>
+You will find at least one paper about Concurrent Haskell hanging off
+of <ULink URL="http://www.dcs.gla.ac.uk/~simonpj/">Simon Peyton Jones's Web page</ULink>.
+</Para>
+
+<Para>
+Parallel Haskell is about <Emphasis>speed</Emphasis>&mdash;spawning threads onto multiple
+processors so that your program will run faster.  The `threads'
+are always <Emphasis>advisory</Emphasis>&mdash;if the runtime system thinks it can
+get the job done more quickly by sequential execution, then fine.
+</Para>
+
+<Para>
+A Parallel Haskell program implies multiple processes running on
+multiple processors, under a PVM (Parallel Virtual Machine) framework.
+</Para>
+
+<Para>
+Parallel Haskell is still relatively new; it is more about ``research
+fun'' than about ``speed.'' That will change.
+</Para>
+
+<Para>
+Again, check Simon's Web page for publications about Parallel Haskell
+(including ``GUM'', the key bits of the runtime system).
+</Para>
+
+<Para>
+Some details about Parallel Haskell follow.  For more information
+about concurrent Haskell, see the Concurrent section in the <ULink
+URL="libs.html"
+>GHC/Hugs Extension Libraries</ULink
+> documentation.
+</Para>
+
+<Sect2>
+<Title>Features specific to Parallel Haskell
+<IndexTerm><Primary>Parallel Haskell&mdash;features</Primary></IndexTerm></Title>
+
+<Sect3>
+<Title>The <Literal>Parallel</Literal> interface (recommended)
+<IndexTerm><Primary>Parallel interface</Primary></IndexTerm></Title>
+
+<Para>
+GHC provides two functions for controlling parallel execution, through
+the <Literal>Parallel</Literal> interface:
+</Para>
+
+<Para>
+
+<ProgramListing>
+interface Parallel where
+infixr 0 `par`
+infixr 1 `seq`
+
+par :: a -&#62; b -&#62; b
+seq :: a -&#62; b -&#62; b
+</ProgramListing>
+
+</Para>
+
+<Para>
+The expression <Literal>(x `par` y)</Literal> <Emphasis>sparks</Emphasis> the evaluation of <Literal>x</Literal>
+(to weak head normal form) and returns <Literal>y</Literal>.  Sparks are queued for
+execution in FIFO order, but are not executed immediately.  At the
+next heap allocation, the currently executing thread will yield
+control to the scheduler, and the scheduler will start a new thread
+(until reaching the active thread limit) for each spark which has not
+already been evaluated to WHNF.
+</Para>
+
+<Para>
+The expression <Literal>(x `seq` y)</Literal> evaluates <Literal>x</Literal> to weak head normal
+form and then returns <Literal>y</Literal>.  The <Literal>seq</Literal> primitive can be used to
+force evaluation of an expression beyond WHNF, or to impose a desired
+execution sequence for the evaluation of an expression.
+</Para>
+
+<Para>
+For example, consider the following parallel version of our old
+nemesis, <Literal>nfib</Literal>:
+</Para>
+
+<Para>
+
+<ProgramListing>
+import Parallel
+
+nfib :: Int -&#62; Int
+nfib n | n &#60;= 1 = 1
+       | otherwise = par n1 (seq n2 (n1 + n2 + 1))
+                     where n1 = nfib (n-1)
+                           n2 = nfib (n-2)
+</ProgramListing>
+
+</Para>
+
+<Para>
+For values of <Literal>n</Literal> greater than 1, we use <Literal>par</Literal> to spark a thread
+to evaluate <Literal>nfib (n-1)</Literal>, and then we use <Literal>seq</Literal> to force the
+parent thread to evaluate <Literal>nfib (n-2)</Literal> before going on to add
+together these two subexpressions.  In this divide-and-conquer
+approach, we only spark a new thread for one branch of the computation
+(leaving the parent to evaluate the other branch).  Also, we must use
+<Literal>seq</Literal> to ensure that the parent will evaluate <Literal>n2</Literal> <Emphasis>before</Emphasis>
+<Literal>n1</Literal> in the expression <Literal>(n1 + n2 + 1)</Literal>.  It is not sufficient to
+reorder the expression as <Literal>(n2 + n1 + 1)</Literal>, because the compiler may
+not generate code to evaluate the addends from left to right.
+</Para>
+
+</Sect3>
+
+<Sect3>
+<Title>Underlying functions and primitives
+<IndexTerm><Primary>parallelism primitives</Primary></IndexTerm>
+<IndexTerm><Primary>primitives for parallelism</Primary></IndexTerm></Title>
+
+<Para>
+The functions <Literal>par</Literal> and <Literal>seq</Literal> are wired into GHC, and unfold
+into uses of the <Literal>par&num;</Literal> and <Literal>seq&num;</Literal> primitives, respectively.  If
+you'd like to see this with your very own eyes, just run GHC with the
+<Literal>-ddump-simpl</Literal> option.  (Anything for a good time&hellip;)
+</Para>
+
+</Sect3>
+
+<Sect3>
+<Title>Scheduling policy for concurrent/parallel threads
+<IndexTerm><Primary>Scheduling&mdash;concurrent/parallel</Primary></IndexTerm>
+<IndexTerm><Primary>Concurrent/parallel scheduling</Primary></IndexTerm></Title>
+
+<Para>
+Runnable threads are scheduled in round-robin fashion.  Context
+switches are signalled by the generation of new sparks or by the
+expiry of a virtual timer (the timer interval is configurable with the
+<Literal>-C[&lt;num&gt;]</Literal><IndexTerm><Primary>-C&lt;num&gt; RTS option (concurrent,
+parallel)</Primary></IndexTerm> RTS option).  However, a context switch doesn't
+really happen until the current heap block is full.  You can't get any
+faster context switching than this.
+</Para>
+
+<Para>
+When a context switch occurs, pending sparks which have not already
+been reduced to weak head normal form are turned into new threads.
+However, there is a limit to the number of active threads (runnable or
+blocked) which are allowed at any given time.  This limit can be
+adjusted with the <Literal>-t&lt;num&gt;</Literal><IndexTerm><Primary>-t &lt;num&gt; RTS option (concurrent, parallel)</Primary></IndexTerm>
+RTS option (the default is 32).  Once the
+thread limit is reached, any remaining sparks are deferred until some
+of the currently active threads are completed.
+</Para>
+
+</Sect3>
+
+</Sect2>
+
+</Sect1>

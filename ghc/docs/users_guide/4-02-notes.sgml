@@ -1,0 +1,59 @@
+<sect1>Release notes for version~4.02---12/98
+<label id="release-4-02">
+<p>
+
+<itemize>
+
+<item> Full Haskell 98 language support.
+
+<item> Scoped type variables implemented (see Section <ref
+name="Scoped Type Variables" id="scoped-type-variables">).
+
+<item> Several bugs in _ccall_GC and foreign export fixed.
+
+<item> Warnings for unused variables should work now (they didn't before).
+
+<item> Simplifier improvements:
+   <itemize>
+        <item> Much better treatment of strict arguments.
+        <item> Function arguments of unlifted type are treated as strict.
+        <item> Better treatment of bottoming Ids.
+        <item> No need for worker/wrapper split for fns that are merely strict.
+        <item> Fewer iterations needed, I hope.
+   </itemize>
+
+<item> Strictness of primitive operations is now explicit and used by
+the simplifier.
+
+<item> Less gratuitous renaming in interface files and abs C.
+
+<item> <tt/OccName/ is a separate module, and is an abstract data type.
+ 
+<item> A new generational garbage collector: the number of generations
+is variable, using the -G RTS option (see <ref id="rts-options-gc"
+name="RTS options to control the garbage-collector">).  This collector
+is faster and more space-efficient than the two-space collector in 4.01.
+
+<item> Error messages and warnings are now printed out in the order they
+occur in the source code.
+
+<item> <tt/isEmptyMVar/ operation added to the <tt/Concurrent/ library.
+
+<item> Two new functions exported from <tt/ST/ (and <tt/LazyST/):
+<tt/unsafeIOToST/ and <tt/stToIO/.
+
+<item> The <tt/+RTS -H&lt;size&gt;/ option is reinstated.  Now it
+means "use about this much memory" (see Section <ref
+id="rts-options-gc" name="RTS options to control the garbage
+collector">).  This option was added mainly so that 4.02 GC times look
+good compared to 3.02 :-).
+
+<item> <tt/finalise/ and <tt/mkWeakNoFinaliser/ operations added to
+<tt/Weak/ library.
+
+<item> Ticky-ticky profiling works again (cost-centre profiling is
+still broken).
+
+<item> Better <tt/egcs-1.1.1/ support.
+
+</itemize>

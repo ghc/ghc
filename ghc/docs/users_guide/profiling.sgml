@@ -1,0 +1,1012 @@
+<Chapter id="profiling">
+<Title>Profiling
+</Title>
+
+<Para>
+<IndexTerm><Primary>profiling, with cost-centres</Primary></IndexTerm>
+<IndexTerm><Primary>cost-centre profiling</Primary></IndexTerm>
+</Para>
+
+<Para>
+Glasgow Haskell comes with a time and space profiling system. Its
+purpose is to help you improve your understanding of your program's
+execution behaviour, so you can improve it.
+</Para>
+
+<Para>
+Any comments, suggestions and/or improvements you have are welcome.
+Recommended ``profiling tricks'' would be especially cool!
+</Para>
+
+<Sect1 id="profiling-intro">
+<Title>How to profile a Haskell program
+</Title>
+
+<Para>
+The GHC approach to profiling is very simple: annotate the expressions
+you consider ``interesting'' with <Emphasis>cost centre</Emphasis> labels (strings);
+so, for example, you might have:
+</Para>
+
+<Para>
+
+<ProgramListing>
+f x y
+  = let
+        output1 = _scc_ "Pass1" ( pass1 x )
+        output2 = _scc_ "Pass2" ( pass2 output1 y )
+        output3 = _scc_ "Pass3" ( pass3 (output2 `zip` [1 .. ]) )
+    in concat output3
+</ProgramListing>
+
+</Para>
+
+<Para>
+The costs of the evaluating the expressions bound to <Literal>output1</Literal>,
+<Literal>output2</Literal> and <Literal>output3</Literal> will be attributed to the ``cost
+centres'' <Literal>Pass1</Literal>, <Literal>Pass2</Literal> and <Literal>Pass3</Literal>, respectively.
+</Para>
+
+<Para>
+The costs of evaluating other expressions, e.g., <Literal>concat output4</Literal>,
+will be inherited by the scope which referenced the function <Literal>f</Literal>.
+</Para>
+
+<Para>
+You can put in cost-centres via <Literal>&lowbar;scc&lowbar;</Literal> constructs by hand, as in the
+example above.  Perfectly cool.  That's probably what you
+<Emphasis>would</Emphasis> do if your program divided into obvious ``passes'' or
+``phases'', or whatever.
+</Para>
+
+<Para>
+If your program is large or you have no clue what might be gobbling
+all the time, you can get GHC to mark all functions with <Literal>&lowbar;scc&lowbar;</Literal>
+constructs, automagically.  Add an <Literal>-auto</Literal> compilation flag to the
+usual <Literal>-prof</Literal> option.
+</Para>
+
+<Para>
+Once you start homing in on the Guilty Suspects, you may well switch
+from automagically-inserted cost-centres to a few well-chosen ones of
+your own.
+</Para>
+
+<Para>
+To use profiling, you must <Emphasis>compile</Emphasis> and <Emphasis>run</Emphasis> with special
+options.  (We usually forget the ``run'' magic!&mdash;Do as we say, not as
+we do&hellip;) Details follow.
+</Para>
+
+<Para>
+If you're serious about this profiling game, you should probably read
+one or more of the Sansom/Peyton Jones papers about the GHC profiling
+system.  Just visit the <ULink URL="http://www.dcs.gla.ac.uk/fp/">Glasgow FP group web page</ULink>&hellip;
+</Para>
+
+</Sect1>
+
+<Sect1 id="prof-compiler-options">
+<Title>Compiling programs for profiling
+</Title>
+
+<Para>
+<IndexTerm><Primary>profiling options</Primary></IndexTerm>
+<IndexTerm><Primary>options, for profiling</Primary></IndexTerm>
+</Para>
+
+<Para>
+To make use of the cost centre profiling system <Emphasis>all</Emphasis> modules must
+be compiled and linked with the <Literal>-prof</Literal> option.<IndexTerm><Primary>-prof option</Primary></IndexTerm>
+Any <Literal>&lowbar;scc&lowbar;</Literal> constructs you've put in your source will spring to life.
+</Para>
+
+<Para>
+Without a <Literal>-prof</Literal> option, your <Literal>&lowbar;scc&lowbar;</Literal>s are ignored; so you can
+compiled <Literal>&lowbar;scc&lowbar;</Literal>-laden code without changing it.
+</Para>
+
+<Para>
+There are a few other profiling-related compilation options.  Use them
+<Emphasis>in addition to</Emphasis> <Literal>-prof</Literal>.  These do not have to be used
+consistently for all modules in a program.
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-auto</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-auto option</Primary></IndexTerm>
+<IndexTerm><Primary>cost centres, automatically inserting</Primary></IndexTerm>
+GHC will automatically add <Literal>&lowbar;scc&lowbar;</Literal> constructs for
+all top-level, exported functions.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-auto-all</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-auto-all option</Primary></IndexTerm>
+<Emphasis>All</Emphasis> top-level functions, exported or not, will be automatically
+<Literal>&lowbar;scc&lowbar;</Literal>'d.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-caf-all</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-caf-all option</Primary></IndexTerm>
+The costs of all CAFs in a module are usually attributed to one
+``big'' CAF cost-centre. With this option, all CAFs get their own cost-centre.
+An ``if all else fails'' option&hellip;
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ignore-scc</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-ignore-scc option</Primary></IndexTerm>
+Ignore any <Literal>&lowbar;scc&lowbar;</Literal> constructs,
+so a module which already has <Literal>&lowbar;scc&lowbar;</Literal>s can be
+compiled for profiling with the annotations ignored.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-G&lt;group&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-G&lt;group&gt; option</Primary></IndexTerm>
+Specifies the <Literal>&lt;group&gt;</Literal> to be attached to all the cost-centres
+declared in the module. If no group is specified it defaults to the
+module name.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+In addition to the <Literal>-prof</Literal> option your system might be setup to enable
+you to compile and link with the <Literal>-prof-details</Literal> <IndexTerm><Primary>-prof-details
+option</Primary></IndexTerm> option instead. This enables additional detailed counts
+to be reported with the <Literal>-P</Literal> RTS option.
+</Para>
+
+</Sect1>
+
+<Sect1 id="prof-rts-options">
+<Title>How to control your profiled program at runtime
+</Title>
+
+<Para>
+<IndexTerm><Primary>profiling RTS options</Primary></IndexTerm>
+<IndexTerm><Primary>RTS options, for profiling</Primary></IndexTerm>
+</Para>
+
+<Para>
+It isn't enough to compile your program for profiling with <Literal>-prof</Literal>!
+</Para>
+
+<Para>
+When you <Emphasis>run</Emphasis> your profiled program, you must tell the runtime
+system (RTS) what you want to profile (e.g., time and/or space), and
+how you wish the collected data to be reported.  You also may wish to
+set the sampling interval used in time profiling.
+</Para>
+
+<Para>
+Executive summary: <Literal>./a.out +RTS -pT</Literal> produces a time profile in
+<Literal>a.out.prof</Literal>; <Literal>./a.out +RTS -hC</Literal> produces space-profiling
+info which can be mangled by <Literal>hp2ps</Literal> and viewed with <Literal>ghostview</Literal>
+(or equivalent).
+</Para>
+
+<Para>
+Profiling runtime flags are passed to your program between the usual
+<Literal>+RTS</Literal> and <Literal>-RTS</Literal> options.
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-p&lt;sort&gt;</Literal> or <Literal>-P&lt;sort&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-p&lt;sort&gt; RTS option (profiling)</Primary></IndexTerm>
+<IndexTerm><Primary>-P&lt;sort&gt; RTS option (profiling)</Primary></IndexTerm>
+<IndexTerm><Primary>time profile</Primary></IndexTerm>
+<IndexTerm><Primary>serial time profile</Primary></IndexTerm>
+The <Literal>-p?</Literal> option produces a standard <Emphasis>time profile</Emphasis> report.
+It is written into the file <Literal>&lt;program&gt;@.prof</Literal>.
+</Para>
+
+<Para>
+The <Literal>-P?</Literal> option produces a more detailed report containing the
+actual time and allocation data as well.  (Not used much.)
+</Para>
+
+<Para>
+The <Literal>&lt;sort&gt;</Literal> indicates how the cost centres are to be sorted in the
+report. Valid <Literal>&lt;sort&gt;</Literal> options are:
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>T</Literal>:</Term>
+<ListItem>
+<Para>
+by time, largest first (the default);
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>A</Literal>:</Term>
+<ListItem>
+<Para>
+by bytes allocated, largest first;
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>C</Literal>:</Term>
+<ListItem>
+<Para>
+alphabetically by group, module and cost centre.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-i&lt;secs&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-i&lt;secs&gt; RTS option
+(profiling)</Primary></IndexTerm> Set the profiling (sampling) interval to <Literal>&lt;secs&gt;</Literal>
+seconds (the default is 1&nbsp;second).  Fractions are allowed: for example
+<Literal>-i0.2</Literal> will get 5 samples per second.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-h&lt;break-down&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-h&lt;break-down&gt; RTS option (profiling)</Primary></IndexTerm>
+<IndexTerm><Primary>heap profile</Primary></IndexTerm>
+</Para>
+
+<Para>
+Produce a detailed <Emphasis>space profile</Emphasis> of the heap occupied by live
+closures. The profile is written to the file <Literal>&lt;program&gt;@.hp</Literal> from
+which a PostScript graph can be produced using <Literal>hp2ps</Literal> (see 
+<XRef LinkEnd="hp2ps">).
+</Para>
+
+<Para>
+The heap space profile may be broken down by different criteria:
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-hC</Literal>:</Term>
+<ListItem>
+<Para>
+cost centre which produced the closure (the default).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-hM</Literal>:</Term>
+<ListItem>
+<Para>
+cost centre module which produced the closure.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-hG</Literal>:</Term>
+<ListItem>
+<Para>
+cost centre group which produced the closure.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-hD</Literal>:</Term>
+<ListItem>
+<Para>
+closure description&mdash;a string describing the closure.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-hY</Literal>:</Term>
+<ListItem>
+<Para>
+closure type&mdash;a string describing the closure's type.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+By default all live closures in the heap are profiled, but particular
+closures of interest can be selected (see below).
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+Heap (space) profiling uses hash tables. If these tables
+should fill the run will abort. The
+<Literal>-z&lt;tbl&gt;&lt;size&gt;</Literal><IndexTerm><Primary>-z&lt;tbl&gt;&lt;size&gt; RTS option (profiling)</Primary></IndexTerm> option is used to
+increase the size of the relevant hash table (<Literal>C</Literal>, <Literal>M</Literal>,
+<Literal>G</Literal>, <Literal>D</Literal> or <Literal>Y</Literal>, defined as for <Literal>&lt;break-down&gt;</Literal> above). The
+actual size used is the next largest power of 2.
+</Para>
+
+<Para>
+The heap profile can be restricted to particular closures of interest.
+The closures of interest can selected by the attached cost centre
+(module:label, module and group), closure category (description, type,
+and kind) using the following options:
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-c&lcub;&lt;mod&gt;:&lt;lab&gt;,&lt;mod&gt;:&lt;lab&gt;...</Literal>&rcub;:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-c&lcub;&lt;lab&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
+Selects individual cost centre(s).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-m&lcub;&lt;mod&gt;,&lt;mod&gt;...</Literal>&rcub;:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-m&lcub;&lt;mod&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
+Selects all cost centres from the module(s) specified.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-g&lcub;&lt;grp&gt;,&lt;grp&gt;...</Literal>&rcub;:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-g&lcub;&lt;grp&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
+Selects all cost centres from the groups(s) specified.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-d&lcub;&lt;des&gt;,&lt;des&gt;...</Literal>&rcub;:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-d&lcub;&lt;des&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
+Selects closures which have one of the specified descriptions.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-y&lcub;&lt;typ&gt;,&lt;typ&gt;...</Literal>&rcub;:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-y&lcub;&lt;typ&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
+Selects closures which have one of the specified type descriptions.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-k&lcub;&lt;knd&gt;,&lt;knd&gt;...</Literal>&rcub;:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-k&lcub;&lt;knd&gt;</Primary></IndexTerm> RTS option (profiling)&rcub;
+Selects closures which are of one of the specified closure kinds.
+Valid closure kinds are <Literal>CON</Literal> (constructor), <Literal>FN</Literal> (manifest
+function), <Literal>PAP</Literal> (partial application), <Literal>BH</Literal> (black hole) and
+<Literal>THK</Literal> (thunk).
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+The space occupied by a closure will be reported in the heap profile
+if the closure satisfies the following logical expression:
+</Para>
+
+<Para>
+<Quote>(&lsqb;-c&rsqb; or &lsqb;-m&rsqb; or &lsqb;-g&rsqb;) and (&lsqb;-d&rsqb; or &lsqb;-y&rsqb; or &lsqb;-k&rsqb;)</Quote>
+</Para>
+
+<Para>
+where a particular option is true if the closure (or its attached cost
+centre) is selected by the option (or the option is not specified).
+</Para>
+
+</Sect1>
+
+<Sect1 id="prof-output">
+<Title>What's in a profiling report?
+</Title>
+
+<Para>
+<IndexTerm><Primary>profiling report, meaning thereof</Primary></IndexTerm>
+</Para>
+
+<Para>
+When you run your profiled program with the <Literal>-p</Literal> RTS option <IndexTerm><Primary>-p
+RTS option</Primary></IndexTerm>, you get the following information about your ``cost
+centres'':
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>COST CENTRE</Literal>:</Term>
+<ListItem>
+<Para>
+The cost-centre's name.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>MODULE</Literal>:</Term>
+<ListItem>
+<Para>
+The module associated with the cost-centre;
+important mostly if you have identically-named cost-centres in
+different modules.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>scc</Literal>:</Term>
+<ListItem>
+<Para>
+How many times this cost-centre was entered; think
+of it as ``I got to the <Literal>&lowbar;scc&lowbar;</Literal> construct this many times&hellip;''
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>&percnt;time</Literal>:</Term>
+<ListItem>
+<Para>
+What part of the time was spent in this cost-centre (see also ``ticks,''
+below).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>&percnt;alloc</Literal>:</Term>
+<ListItem>
+<Para>
+What part of the memory allocation was done in this cost-centre
+(see also ``bytes,'' below).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>inner</Literal>:</Term>
+<ListItem>
+<Para>
+How many times this cost-centre ``passed control'' to an inner
+cost-centre; for example, <Literal>scc=4</Literal> plus <Literal>subscc=8</Literal> means
+``This <Literal>&lowbar;scc&lowbar;</Literal> was entered four times, but went out to
+other <Literal>&lowbar;scc&lowbar;s</Literal> eight times.''
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>cafs</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>CAF, profiling</Primary></IndexTerm>
+How many CAFs this cost centre evaluated.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>dicts</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>Dictionaries, profiling</Primary></IndexTerm>
+How many dictionaries this cost centre evaluated.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+In addition you can use the <Literal>-P</Literal> RTS option <IndexTerm><Primary></Primary></IndexTerm> to get the following additional information:
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>ticks</Literal>:</Term>
+<ListItem>
+<Para>
+The raw number of time ``ticks'' which were
+attributed to this cost-centre; from this, we get the <Literal>&percnt;time</Literal>
+figure mentioned above.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>bytes</Literal>:</Term>
+<ListItem>
+<Para>
+Number of bytes allocated in the heap while in
+this cost-centre; again, this is the raw number from which we
+get the <Literal>&percnt;alloc</Literal> figure mentioned above.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+Finally if you built your program with <Literal>-prof-details</Literal>
+<IndexTerm><Primary></Primary></IndexTerm> the <Literal>-P</Literal> RTS option will also
+produce the following information:
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>closures</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>closures, profiling</Primary></IndexTerm>
+How many heap objects were allocated; these objects may be of varying
+size.  If you divide the number of bytes (mentioned below) by this
+number of ``closures'', then you will get the average object size.
+(Not too interesting, but still&hellip;)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>thunks</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>thunks, profiling</Primary></IndexTerm>
+How many times we entered (evaluated) a thunk&mdash;an unevaluated
+object in the heap&mdash;while we were in this cost-centre.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>funcs</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>functions, profiling</Primary></IndexTerm>
+How many times we entered (evaluated) a function while we we in this
+cost-centre.  (In Haskell, functions are first-class values and may be
+passed as arguments, returned as results, evaluated, and generally
+manipulated just like data values)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>PAPs</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>partial applications, profiling</Primary></IndexTerm>
+How many times we entered (evaluated) a partial application (PAP), i.e.,
+a function applied to fewer arguments than it needs.  For example, <Literal>Int</Literal>
+addition applied to one argument would be a PAP.  A PAP is really
+just a particular form for a function.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect1>
+
+<Sect1 id="prof-graphs">
+<Title>Producing graphical heap profiles
+</Title>
+
+<Para>
+<IndexTerm><Primary>heap profiles, producing</Primary></IndexTerm>
+</Para>
+
+<Para>
+Utility programs which produce graphical profiles.
+</Para>
+
+<Sect2 id="hp2ps">
+<Title><Literal>hp2ps</Literal>--heap profile to PostScript
+</Title>
+
+<Para>
+<IndexTerm><Primary>hp2ps (utility)</Primary></IndexTerm>
+<IndexTerm><Primary>heap profiles</Primary></IndexTerm>
+<IndexTerm><Primary>PostScript, from heap profiles</Primary></IndexTerm>
+</Para>
+
+<Para>
+Usage:
+</Para>
+
+<Para>
+
+<Screen>
+hp2ps [flags] [&#60;file&#62;[.stat]]
+</Screen>
+
+</Para>
+
+<Para>
+The program <Literal>hp2ps</Literal><IndexTerm><Primary>hp2ps program</Primary></IndexTerm> converts a heap profile
+as produced by the <Literal>-h&lt;break-down&gt;</Literal><IndexTerm><Primary>-h&lt;break-down&gt; RTS
+option</Primary></IndexTerm> runtime option into a PostScript graph of the heap
+profile. By convention, the file to be processed by <Literal>hp2ps</Literal> has a
+<Literal>.hp</Literal> extension. The PostScript output is written to <Literal>&lt;file&gt;@.ps</Literal>. If
+<Literal>&lt;file&gt;</Literal> is omitted entirely, then the program behaves as a filter.
+</Para>
+
+<Para>
+<Literal>hp2ps</Literal> is distributed in <Literal>ghc/utils/hp2ps</Literal> in a GHC source
+distribution. It was originally developed by Dave Wakeling as part of
+the HBC/LML heap profiler.
+</Para>
+
+<Para>
+The flags are:
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-d</Literal></Term>
+<ListItem>
+<Para>
+In order to make graphs more readable, <Literal>hp2ps</Literal> sorts the shaded
+bands for each identifier. The default sort ordering is for the bands
+with the largest area to be stacked on top of the smaller ones.  The
+<Literal>-d</Literal> option causes rougher bands (those representing series of
+values with the largest standard deviations) to be stacked on top of
+smoother ones.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-b</Literal></Term>
+<ListItem>
+<Para>
+Normally, <Literal>hp2ps</Literal> puts the title of the graph in a small box at the
+top of the page. However, if the JOB string is too long to fit in a
+small box (more than 35 characters), then
+<Literal>hp2ps</Literal> will choose to use a big box instead.  The <Literal>-b</Literal>
+option forces <Literal>hp2ps</Literal> to use a big box.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-e&lt;float&gt;[in&verbar;mm&verbar;pt]</Literal></Term>
+<ListItem>
+<Para>
+Generate encapsulated PostScript suitable for inclusion in LaTeX
+documents.  Usually, the PostScript graph is drawn in landscape mode
+in an area 9 inches wide by 6 inches high, and <Literal>hp2ps</Literal> arranges
+for this area to be approximately centred on a sheet of a4 paper.
+This format is convenient of studying the graph in detail, but it is
+unsuitable for inclusion in LaTeX documents.  The <Literal>-e</Literal> option
+causes the graph to be drawn in portrait mode, with float specifying
+the width in inches, millimetres or points (the default).  The
+resulting PostScript file conforms to the Encapsulated PostScript
+(EPS) convention, and it can be included in a LaTeX document using
+Rokicki's dvi-to-PostScript converter <Literal>dvips</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-g</Literal></Term>
+<ListItem>
+<Para>
+Create output suitable for the <Literal>gs</Literal> PostScript previewer (or
+similar). In this case the graph is printed in portrait mode without
+scaling. The output is unsuitable for a laser printer.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-l</Literal></Term>
+<ListItem>
+<Para>
+Normally a profile is limited to 20 bands with additional identifiers
+being grouped into an <Literal>OTHER</Literal> band. The <Literal>-l</Literal> flag removes this
+20 band and limit, producing as many bands as necessary. No key is
+produced as it won't fit!. It is useful for creation time profiles
+with many bands.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-m&lt;int&gt;</Literal></Term>
+<ListItem>
+<Para>
+Normally a profile is limited to 20 bands with additional identifiers
+being grouped into an <Literal>OTHER</Literal> band. The <Literal>-m</Literal> flag specifies an
+alternative band limit (the maximum is 20).
+</Para>
+
+<Para>
+<Literal>-m0</Literal> requests the band limit to be removed. As many bands as
+necessary are produced. However no key is produced as it won't fit! It
+is useful for displaying creation time profiles with many bands.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-p</Literal></Term>
+<ListItem>
+<Para>
+Use previous parameters. By default, the PostScript graph is
+automatically scaled both horizontally and vertically so that it fills
+the page.  However, when preparing a series of graphs for use in a
+presentation, it is often useful to draw a new graph using the same
+scale, shading and ordering as a previous one. The <Literal>-p</Literal> flag causes
+the graph to be drawn using the parameters determined by a previous
+run of <Literal>hp2ps</Literal> on <Literal>file</Literal>. These are extracted from
+<Literal>file@.aux</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-s</Literal></Term>
+<ListItem>
+<Para>
+Use a small box for the title.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-t&lt;float&gt;</Literal></Term>
+<ListItem>
+<Para>
+Normally trace elements which sum to a total of less than 1&percnt; of the
+profile are removed from the profile. The <Literal>-t</Literal> option allows this
+percentage to be modified (maximum 5&percnt;).
+</Para>
+
+<Para>
+<Literal>-t0</Literal> requests no trace elements to be removed from the profile,
+ensuring that all the data will be displayed.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-?</Literal></Term>
+<ListItem>
+<Para>
+Print out usage information.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2 id="stat2resid">
+<Title><Literal>stat2resid</Literal>&mdash;residency info from GC stats
+</Title>
+
+<Para>
+<IndexTerm><Primary>stat2resid (utility)</Primary></IndexTerm>
+<IndexTerm><Primary>GC stats&mdash;residency info</Primary></IndexTerm>
+<IndexTerm><Primary>residency, from GC stats</Primary></IndexTerm>
+</Para>
+
+<Para>
+Usage:
+</Para>
+
+<Para>
+
+<Screen>
+stat2resid [&#60;file&#62;[.stat] [&#60;outfile&#62;]]
+</Screen>
+
+</Para>
+
+<Para>
+The program <Literal>stat2resid</Literal><IndexTerm><Primary>stat2resid</Primary></IndexTerm> converts a detailed
+garbage collection statistics file produced by the
+<Literal>-S</Literal><IndexTerm><Primary>-S RTS option</Primary></IndexTerm> runtime option into a PostScript heap
+residency graph. The garbage collection statistics file can be
+produced without compiling your program for profiling.
+</Para>
+
+<Para>
+By convention, the file to be processed by <Literal>stat2resid</Literal> has a
+<Literal>.stat</Literal> extension. If the <Literal>&lt;outfile&gt;</Literal> is not specified the
+PostScript will be written to <Literal>&lt;file&gt;@.resid.ps</Literal>. If
+<Literal>&lt;file&gt;</Literal> is omitted entirely, then the program behaves as a filter.
+</Para>
+
+<Para>
+The plot can not be produced from the statistics file for a
+generational collector, though a suitable stats file can be produced
+using the <Literal>-F2s</Literal><IndexTerm><Primary>-F2s RTS option</Primary></IndexTerm> runtime option when the
+program has been compiled for generational garbage collection (the
+default).
+</Para>
+
+<Para>
+<Literal>stat2resid</Literal> is distributed in <Literal>ghc/utils/stat2resid</Literal> in a GHC source
+distribution.
+</Para>
+
+</Sect2>
+
+</Sect1>
+
+<Sect1 id="ticky-ticky">
+<Title>Using ``ticky-ticky'' profiling (for implementors)
+</Title>
+
+<Para>
+<IndexTerm><Primary>ticky-ticky profiling (implementors)</Primary></IndexTerm>
+</Para>
+
+<Para>
+(ToDo: document properly.)
+</Para>
+
+<Para>
+It is possible to compile Glasgow Haskell programs so that they will
+count lots and lots of interesting things, e.g., number of updates,
+number of data constructors entered, etc., etc.  We call this
+``ticky-ticky'' profiling,<IndexTerm><Primary>ticky-ticky profiling</Primary></IndexTerm>
+<IndexTerm><Primary>profiling, ticky-ticky</Primary></IndexTerm> because that's the sound a Sun4 makes
+when it is running up all those counters (<Emphasis>slowly</Emphasis>).
+</Para>
+
+<Para>
+Ticky-ticky profiling is mainly intended for implementors; it is quite
+separate from the main ``cost-centre'' profiling system, intended for
+all users everywhere.
+</Para>
+
+<Para>
+To be able to use ticky-ticky profiling, you will need to have built
+appropriate libraries and things when you made the system.  See
+``Customising what libraries to build,'' in the installation guide.
+</Para>
+
+<Para>
+To get your compiled program to spit out the ticky-ticky numbers, use
+a <Literal>-r</Literal> RTS option<IndexTerm><Primary>-r RTS option</Primary></IndexTerm>.  See <XRef LinkEnd="runtime-control">.
+</Para>
+
+<Para>
+Compiling your program with the <Literal>-ticky</Literal> switch yields an executable
+that performs these counts.  Here is a sample ticky-ticky statistics
+file, generated by the invocation <Literal>foo +RTS -rfoo.ticky</Literal>.
+</Para>
+
+<Para>
+
+<Screen>
+ foo +RTS -rfoo.ticky
+
+
+ALLOCATIONS: 3964631 (11330900 words total: 3999476 admin, 6098829 goods, 1232595 slop)
+                                total words:        2     3     4     5    6+
+  69647 (  1.8%) function values                 50.0  50.0   0.0   0.0   0.0
+2382937 ( 60.1%) thunks                           0.0  83.9  16.1   0.0   0.0
+1477218 ( 37.3%) data values                     66.8  33.2   0.0   0.0   0.0
+      0 (  0.0%) big tuples
+      2 (  0.0%) black holes                      0.0 100.0   0.0   0.0   0.0
+      0 (  0.0%) prim things
+  34825 (  0.9%) partial applications             0.0   0.0   0.0 100.0   0.0
+      2 (  0.0%) thread state objects             0.0   0.0   0.0   0.0 100.0
+
+Total storage-manager allocations: 3647137 (11882004 words)
+        [551104 words lost to speculative heap-checks]
+
+STACK USAGE:
+
+ENTERS: 9400092  of which 2005772 (21.3%) direct to the entry code
+                  [the rest indirected via Node's info ptr]
+1860318 ( 19.8%) thunks
+3733184 ( 39.7%) data values
+3149544 ( 33.5%) function values
+                  [of which 1999880 (63.5%) bypassed arg-satisfaction chk]
+ 348140 (  3.7%) partial applications
+ 308906 (  3.3%) normal indirections
+      0 (  0.0%) permanent indirections
+
+RETURNS: 5870443
+2137257 ( 36.4%) from entering a new constructor
+                  [the rest from entering an existing constructor]
+2349219 ( 40.0%) vectored [the rest unvectored]
+
+RET_NEW:         2137257:  32.5% 46.2% 21.3%  0.0%  0.0%  0.0%  0.0%  0.0%  0.0%
+RET_OLD:         3733184:   2.8% 67.9% 29.3%  0.0%  0.0%  0.0%  0.0%  0.0%  0.0%
+RET_UNBOXED_TUP:       2:   0.0%  0.0%100.0%  0.0%  0.0%  0.0%  0.0%  0.0%  0.0%
+
+RET_VEC_RETURN : 2349219:   0.0%  0.0%100.0%  0.0%  0.0%  0.0%  0.0%  0.0%  0.0%
+
+UPDATE FRAMES: 2241725 (0 omitted from thunks)
+SEQ FRAMES:    1
+CATCH FRAMES:  1
+UPDATES: 2241725
+      0 (  0.0%) data values
+  34827 (  1.6%) partial applications
+                  [2 in place, 34825 allocated new space]
+2206898 ( 98.4%) updates to existing heap objects (46 by squeezing)
+UPD_CON_IN_NEW:         0:       0      0      0      0      0      0      0      0      0
+UPD_PAP_IN_NEW:     34825:       0      0      0  34825      0      0      0      0      0
+
+NEW GEN UPDATES: 2274700 ( 99.9%)
+
+OLD GEN UPDATES: 1852 (  0.1%)
+
+Total bytes copied during GC: 190096
+
+**************************************************
+3647137 ALLOC_HEAP_ctr
+11882004 ALLOC_HEAP_tot
+  69647 ALLOC_FUN_ctr
+  69647 ALLOC_FUN_adm
+  69644 ALLOC_FUN_gds
+  34819 ALLOC_FUN_slp
+  34831 ALLOC_FUN_hst_0
+  34816 ALLOC_FUN_hst_1
+      0 ALLOC_FUN_hst_2
+      0 ALLOC_FUN_hst_3
+      0 ALLOC_FUN_hst_4
+2382937 ALLOC_UP_THK_ctr
+      0 ALLOC_SE_THK_ctr
+ 308906 ENT_IND_ctr
+      0 E!NT_PERM_IND_ctr requires +RTS -Z
+[... lots more info omitted ...]
+      0 GC_SEL_ABANDONED_ctr
+      0 GC_SEL_MINOR_ctr
+      0 GC_SEL_MAJOR_ctr
+      0 GC_FAILED_PROMOTION_ctr
+  47524 GC_WORDS_COPIED_ctr
+</Screen>
+
+</Para>
+
+<Para>
+The formatting of the information above the row of asterisks is
+subject to change, but hopefully provides a useful human-readable
+summary.  Below the asterisks <Emphasis>all counters</Emphasis> maintained by the
+ticky-ticky system are dumped, in a format intended to be
+machine-readable: zero or more spaces, an integer, a space, the
+counter name, and a newline.
+</Para>
+
+<Para>
+In fact, not <Emphasis>all</Emphasis> counters are necessarily dumped; compile- or
+run-time flags can render certain counters invalid.  In this case,
+either the counter will simply not appear, or it will appear with a
+modified counter name, possibly along with an explanation for the
+omission (notice <Literal>ENT&lowbar;PERM&lowbar;IND&lowbar;ctr</Literal> appears with an inserted <Literal>!</Literal>
+above).  Software analysing this output should always check that it
+has the counters it expects.  Also, beware: some of the counters can
+have <Emphasis>large</Emphasis> values!
+</Para>
+
+</Sect1>
+
+</Chapter>

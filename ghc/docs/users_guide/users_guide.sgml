@@ -1,0 +1,44 @@
+<!DOCTYPE BOOK PUBLIC "-//Davenport//DTD DocBook V3.0//EN" [
+        <!ENTITY license        SYSTEM "license.sgml">
+        <!ENTITY intro          SYSTEM "intro.sgml" >
+        <!ENTITY relnotes       SYSTEM "4-04-notes.sgml" >
+        <!ENTITY using          SYSTEM "using.sgml" >
+        <!ENTITY runtime        SYSTEM "runtime_control.sgml" >
+        <!ENTITY prof           SYSTEM "profiling.sgml" >
+        <!ENTITY debug          SYSTEM "debugging.sgml" >
+        <!ENTITY sooner         SYSTEM "sooner.sgml" >
+        <!ENTITY lang           SYSTEM "lang.sgml" >
+        <!ENTITY glaexts        SYSTEM "glasgow_exts.sgml" >
+        <!ENTITY parallel       SYSTEM "parallel.sgml" >
+        <!ENTITY vs-hs          SYSTEM "vs_haskell.sgml" >
+        <!ENTITY libs           SYSTEM "libraries.sgml" >
+        <!ENTITY posix          SYSTEM "posix.sgml" >
+        <!ENTITY libmisc        SYSTEM "libmisc.sgml" >
+        <!ENTITY wrong          SYSTEM "gone_wrong.sgml" >
+        <!ENTITY utils          SYSTEM "utils.sgml" >
+        <!ENTITY mutablearray   SYSTEM "MutableArray.sgml">
+        <!ENTITY bytearray      SYSTEM "ByteArray.sgml">
+        <!ENTITY win32-dll      SYSTEM "win32-dlls.sgml">
+]>
+<Book>
+
+<BookInfo>
+<Title>The Glasgow Haskell Compiler User's Guide, Version&nbsp;4.04</Title>
+<Author><OtherName>The GHC Team</OtherName></Author>
+<Address>
+<Email>glasgow-haskell-&lcub;bugs,users&rcub;-request@haskell.org</Email>
+</Address>
+</BookInfo>
+
+&license
+&intro
+&using
+&prof
+&sooner
+&lang
+&libs
+&wrong
+&utils
+&win32-dll
+
+</Book>

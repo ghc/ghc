@@ -1,0 +1,676 @@
+<Sect1 id="options-debugging">
+<Title>Debugging the compiler
+</Title>
+
+<Para>
+<IndexTerm><Primary>debugging options (for GHC)</Primary></IndexTerm>
+</Para>
+
+<Para>
+HACKER TERRITORY. HACKER TERRITORY.
+(You were warned.)
+</Para>
+
+<Sect2 id="replacing-phases">
+<Title>Replacing the program for one or more phases.
+</Title>
+
+<Para>
+<IndexTerm><Primary>GHC phases, changing</Primary></IndexTerm>
+<IndexTerm><Primary>phases, changing GHC</Primary></IndexTerm>
+You may specify that a different program be used for one of the phases
+of the compilation system, in place of whatever the driver <Literal>ghc</Literal> has
+wired into it.  For example, you might want to try a different
+assembler.  The
+<Literal>-pgm&lt;phase-code&gt;&lt;program-name&gt;</Literal><IndexTerm><Primary>-pgm&lt;phase&gt;&lt;stuff&gt;
+option</Primary></IndexTerm> option to <Literal>ghc</Literal> will cause it to use <Literal>&lt;program-name&gt;</Literal>
+for phase <Literal>&lt;phase-code&gt;</Literal>, where the codes to indicate the phases are:
+</Para>
+
+<Para>
+<InformalTable>
+<TGroup Cols="2">
+<ColSpec Align="Left" Colsep="0">
+<ColSpec Align="Left" Colsep="0">
+<TBody>
+<Row>
+<Entry><Emphasis>code</Emphasis> </Entry>
+<Entry><Emphasis>phase</Emphasis> </Entry>
+</Row>
+
+<Row>
+<Entry>
+L </Entry>
+<Entry> literate pre-processor </Entry>
+</Row>
+<Row>
+<Entry>
+P </Entry>
+<Entry> C pre-processor (if -cpp only) </Entry>
+</Row>
+<Row>
+<Entry>
+C </Entry>
+<Entry> Haskell compiler </Entry>
+</Row>
+<Row>
+<Entry>
+c </Entry>
+<Entry> C compiler</Entry>
+</Row>
+<Row>
+<Entry>
+a </Entry>
+<Entry> assembler </Entry>
+</Row>
+<Row>
+<Entry>
+l </Entry>
+<Entry> linker </Entry>
+</Row>
+<Row>
+<Entry>
+dep </Entry>
+<Entry> Makefile dependency generator </Entry>
+</Row>
+
+</TBody>
+
+</TGroup>
+</InformalTable>
+</Para>
+
+</Sect2>
+
+<Sect2 id="forcing-options-through">
+<Title>Forcing options to a particular phase.
+</Title>
+
+<Para>
+<IndexTerm><Primary>forcing GHC-phase options</Primary></IndexTerm>
+</Para>
+
+<Para>
+The preceding sections describe driver options that are mostly
+applicable to one particular phase.  You may also <Emphasis>force</Emphasis> a
+specific option <Literal>&lt;option&gt;</Literal> to be passed to a particular phase
+<Literal>&lt;phase-code&gt;</Literal> by feeding the driver the option
+<Literal>-opt&lt;phase-code&gt;&lt;option&gt;</Literal>.<IndexTerm><Primary>-opt&lt;phase&gt;&lt;stuff&gt;
+option</Primary></IndexTerm> The codes to indicate the phases are the same as in the
+previous section.
+</Para>
+
+<Para>
+So, for example, to force an <Literal>-Ewurble</Literal> option to the assembler, you
+would tell the driver <Literal>-opta-Ewurble</Literal> (the dash before the E is
+required).
+</Para>
+
+<Para>
+Besides getting options to the Haskell compiler with <Literal>-optC&lt;blah&gt;</Literal>,
+you can get options through to its runtime system with
+<Literal>-optCrts&lt;blah&gt;</Literal><IndexTerm><Primary>-optCrts&lt;blah&gt; option</Primary></IndexTerm>.
+</Para>
+
+<Para>
+So, for example: when I want to use my normal driver but with my
+profiled compiler binary, I use this script:
+
+<ProgramListing>
+#! /bin/sh
+exec /local/grasp_tmp3/simonpj/ghc-BUILDS/working-alpha/ghc/driver/ghc \
+     -pgmC/local/grasp_tmp3/simonpj/ghc-BUILDS/working-hsc-prof/hsc \
+     -optCrts-i0.5 \
+     -optCrts-PT \
+     "$@"
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="dumping-output">
+<Title>Dumping out compiler intermediate structures
+</Title>
+
+<Para>
+<IndexTerm><Primary>dumping GHC intermediates</Primary></IndexTerm>
+<IndexTerm><Primary>intermediate passes, output</Primary></IndexTerm>
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-noC</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-noC option</Primary></IndexTerm>
+Don't bother generating C output <Emphasis>or</Emphasis> an interface file.  Usually
+used in conjunction with one or more of the <Literal>-ddump-*</Literal> options; for
+example: <Literal>ghc -noC -ddump-simpl Foo.hs</Literal>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-hi</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-hi option</Primary></IndexTerm>
+<Emphasis>Do</Emphasis> generate an interface file.  This would normally be used in
+conjunction with <Literal>-noC</Literal>, which turns off interface generation;
+thus: <Literal>-noC -hi</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-dshow-passes</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dshow-passes option</Primary></IndexTerm>
+Prints a message to stderr as each pass starts.  Gives a warm but
+undoubtedly misleading feeling that GHC is telling you what's
+happening.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-&lt;pass&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-ddump-&lt;pass&gt; options</Primary></IndexTerm>
+Make a debugging dump after pass <Literal>&lt;pass&gt;</Literal> (may be common enough to
+need a short form&hellip;).  You can get all of these at once (<Emphasis>lots</Emphasis> of
+output) by using <Literal>-ddump-all</Literal>, or most of them with <Literal>-ddump-most</Literal>.
+Some of the most useful ones are:
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-ddump-parsed</Literal>:</Term>
+<ListItem>
+<Para>
+oarser output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-rn</Literal>:</Term>
+<ListItem>
+<Para>
+renamer output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-tc</Literal>:</Term>
+<ListItem>
+<Para>
+typechecker output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-deriv</Literal>:</Term>
+<ListItem>
+<Para>
+derived instances
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-ds</Literal>:</Term>
+<ListItem>
+<Para>
+desugarer output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-spec</Literal>:</Term>
+<ListItem>
+<Para>
+output of specialisation pass
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-rules</Literal>:</Term>
+<ListItem>
+<Para>
+dumps all rewrite rules (including those generated by the specialisation pass)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-simpl</Literal>:</Term>
+<ListItem>
+<Para>
+simplifer output (Core-to-Core passes)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-usagesp</Literal>:</Term>
+<ListItem>
+<Para>
+UsageSP inference pre-inf and output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-cpranal</Literal>:</Term>
+<ListItem>
+<Para>
+CPR analyser output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-stranal</Literal>:</Term>
+<ListItem>
+<Para>
+strictness analyser output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-workwrap</Literal>:</Term>
+<ListItem>
+<Para>
+worker/wrapper split output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-occur-anal</Literal>:</Term>
+<ListItem>
+<Para>
+`occurrence analysis' output
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-stg</Literal>:</Term>
+<ListItem>
+<Para>
+output of STG-to-STG passes
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-absC</Literal>:</Term>
+<ListItem>
+<Para>
+<Emphasis>un</Emphasis>flattened Abstract&nbsp;C
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-flatC</Literal>:</Term>
+<ListItem>
+<Para>
+<Emphasis>flattened</Emphasis> Abstract&nbsp;C
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-realC</Literal>:</Term>
+<ListItem>
+<Para>
+same as what goes to the C compiler
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-asm</Literal>:</Term>
+<ListItem>
+<Para>
+assembly language from the native-code generator
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+<IndexTerm><Primary>-ddump-all option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-most option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-parsed option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-rn option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-tc option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-deriv option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-ds option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-simpl option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-cpranal option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-workwrap option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-rules option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-usagesp option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-stranal option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-occur-anal option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-spec option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-stg option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-absC option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-flatC option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-realC option</Primary></IndexTerm>
+<IndexTerm><Primary>-ddump-asm option</Primary></IndexTerm>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-dverbose-simpl</Literal> and <Literal>-dverbose-stg</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dverbose-simpl option</Primary></IndexTerm>
+<IndexTerm><Primary>-dverbose-stg option</Primary></IndexTerm>
+Show the output of the intermediate Core-to-Core and STG-to-STG
+passes, respectively.  (<Emphasis>Lots</Emphasis> of output!) So: when we're 
+really desperate:
+
+<Screen>
+% ghc -noC -O -ddump-simpl -dverbose-simpl -dcore-lint Foo.hs
+</Screen>
+
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-simpl-iterations</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-ddump-simpl-iterations option</Primary></IndexTerm>
+Show the output of each <Emphasis>iteration</Emphasis> of the simplifier (each run of
+the simplifier has a maximum number of iterations, normally 4).  Used
+when even <Literal>-dverbose-simpl</Literal> doesn't cut it.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-dppr-&lcub;user,debug</Literal>&rcub;:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dppr-user option</Primary></IndexTerm>
+<IndexTerm><Primary>-dppr-debug option</Primary></IndexTerm>
+Debugging output is in one of several ``styles.''  Take the printing
+of types, for example.  In the ``user'' style, the compiler's internal
+ideas about types are presented in Haskell source-level syntax,
+insofar as possible.  In the ``debug'' style (which is the default for
+debugging output), the types are printed in with
+explicit foralls, and variables have their unique-id attached (so you
+can check for things that look the same but aren't).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-simpl-stats</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-ddump-simpl-stats option</Primary></IndexTerm>
+Dump statistics about how many of each kind
+of transformation too place.  If you add <Literal>-dppr-debug</Literal> you get more detailed information.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-raw-asm</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-ddump-raw-asm option</Primary></IndexTerm>
+Dump out the assembly-language stuff, before the ``mangler'' gets it.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-ddump-rn-trace</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-ddump-rn-trace</Primary></IndexTerm>
+Make the renamer be *real* chatty about what it is upto.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-dshow-rn-stats</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dshow-rn-stats</Primary></IndexTerm>
+Print out summary of what kind of information the renamer had to bring
+in.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-dshow-unused-imports</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dshow-unused-imports</Primary></IndexTerm>
+Have the renamer report what imports does not contribute.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2 id="checking-consistency">
+<Title>Checking for consistency
+</Title>
+
+<Para>
+<IndexTerm><Primary>consistency checks</Primary></IndexTerm>
+<IndexTerm><Primary>lint</Primary></IndexTerm>
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-dcore-lint</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dcore-lint option</Primary></IndexTerm>
+Turn on heavyweight intra-pass sanity-checking within GHC, at Core
+level.  (It checks GHC's sanity, not yours.)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-dstg-lint</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dstg-lint option</Primary></IndexTerm>
+Ditto for STG level.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-dusagesp-lint</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-dstg-lint option</Primary></IndexTerm>
+Turn on checks around UsageSP inference (<Literal>-fusagesp</Literal>).  This verifies
+various simple properties of the results of the inference, and also
+warns if any identifier with a used-once annotation before the
+inference has a used-many annotation afterwards; this could indicate a
+non-worksafe transformation is being applied.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2>
+<Title>How to read Core syntax (from some <Literal>-ddump-*</Literal> flags)</Title>
+
+<Para>
+<IndexTerm><Primary>reading Core syntax</Primary></IndexTerm>
+<IndexTerm><Primary>Core syntax, how to read</Primary></IndexTerm>
+</Para>
+
+<Para>
+Let's do this by commenting an example.  It's from doing
+<Literal>-ddump-ds</Literal> on this code:
+
+<ProgramListing>
+skip2 m = m : skip2 (m+2)
+</ProgramListing>
+
+</Para>
+
+<Para>
+Before we jump in, a word about names of things.  Within GHC,
+variables, type constructors, etc., are identified by their
+``Uniques.''  These are of the form `letter' plus `number' (both
+loosely interpreted).  The `letter' gives some idea of where the
+Unique came from; e.g., <Literal>&lowbar;</Literal> means ``built-in type variable'';
+<Literal>t</Literal> means ``from the typechecker''; <Literal>s</Literal> means ``from the
+simplifier''; and so on.  The `number' is printed fairly compactly in
+a `base-62' format, which everyone hates except me (WDP).
+</Para>
+
+<Para>
+Remember, everything has a ``Unique'' and it is usually printed out
+when debugging, in some form or another.  So here we go&hellip;
+</Para>
+
+<Para>
+<ProgramListing>
+Desugared:
+Main.skip2{-r1L6-} :: _forall_ a$_4 =&#62;{{Num a$_4}} -&#62; a$_4 -&#62; [a$_4]
+
+--# `r1L6' is the Unique for Main.skip2;
+--# `_4' is the Unique for the type-variable (template) `a'
+--# `{{Num a$_4}}' is a dictionary argument
+
+_NI_
+
+--# `_NI_' means "no (pragmatic) information" yet; it will later
+--# evolve into the GHC_PRAGMA info that goes into interface files.
+
+Main.skip2{-r1L6-} =
+    /\ _4 -&#62; \ d.Num.t4Gt -&#62;
+        let {
+          {- CoRec -}
+          +.t4Hg :: _4 -&#62; _4 -&#62; _4
+          _NI_
+          +.t4Hg = (+{-r3JH-} _4) d.Num.t4Gt
+
+          fromInt.t4GS :: Int{-2i-} -&#62; _4
+          _NI_
+          fromInt.t4GS = (fromInt{-r3JX-} _4) d.Num.t4Gt
+
+--# The `+' class method (Unique: r3JH) selects the addition code
+--# from a `Num' dictionary (now an explicit lamba'd argument).
+--# Because Core is 2nd-order lambda-calculus, type applications
+--# and lambdas (/\) are explicit.  So `+' is first applied to a
+--# type (`_4'), then to a dictionary, yielding the actual addition
+--# function that we will use subsequently...
+
+--# We play the exact same game with the (non-standard) class method
+--# `fromInt'.  Unsurprisingly, the type `Int' is wired into the
+--# compiler.
+
+          lit.t4Hb :: _4
+          _NI_
+          lit.t4Hb =
+              let {
+                ds.d4Qz :: Int{-2i-}
+                _NI_
+                ds.d4Qz = I#! 2#
+              } in  fromInt.t4GS ds.d4Qz
+
+--# `I# 2#' is just the literal Int `2'; it reflects the fact that
+--# GHC defines `data Int = I# Int#', where Int# is the primitive
+--# unboxed type.  (see relevant info about unboxed types elsewhere...)
+
+--# The `!' after `I#' indicates that this is a *saturated*
+--# application of the `I#' data constructor (i.e., not partially
+--# applied).
+
+          skip2.t3Ja :: _4 -&#62; [_4]
+          _NI_
+          skip2.t3Ja =
+              \ m.r1H4 -&#62;
+                  let { ds.d4QQ :: [_4]
+                        _NI_
+                        ds.d4QQ =
+                    let {
+                      ds.d4QY :: _4
+                      _NI_
+                      ds.d4QY = +.t4Hg m.r1H4 lit.t4Hb
+                    } in  skip2.t3Ja ds.d4QY
+                  } in
+                  :! _4 m.r1H4 ds.d4QQ
+
+          {- end CoRec -}
+        } in  skip2.t3Ja
+</ProgramListing>
+</Para>
+
+<Para>
+(``It's just a simple functional language'' is an unregisterised
+trademark of Peyton Jones Enterprises, plc.)
+</Para>
+
+</Sect2>
+
+<Sect2 id="source-file-options">
+<Title>Command line options in source files
+</Title>
+
+<Para>
+<IndexTerm><Primary>source-file options</Primary></IndexTerm>
+</Para>
+
+<Para>
+Sometimes it is useful to make the connection between a source file
+and the command-line options it requires quite tight. For instance,
+if a (Glasgow) Haskell source file uses <Literal>casm</Literal>s, the C back-end
+often needs to be told about which header files to include. Rather than
+maintaining the list of files the source depends on in a
+<Literal>Makefile</Literal> (using the <Literal>-&num;include</Literal> command-line option), it is
+possible to do this directly in the source file using the <Literal>OPTIONS</Literal>
+pragma <IndexTerm><Primary>OPTIONS pragma</Primary></IndexTerm>: 
+</Para>
+
+<Para>
+<ProgramListing>
+{-# OPTIONS -#include "foo.h" #-}
+module X where
+
+...
+</ProgramListing>
+</Para>
+
+<Para>
+<Literal>OPTIONS</Literal> pragmas are only looked for at the top of your source
+files, upto the first (non-literate,non-empty) line not containing
+<Literal>OPTIONS</Literal>. Multiple <Literal>OPTIONS</Literal> pragmas are recognised. Note
+that your command shell does not get to the source file options, they
+are just included literally in the array of command-line arguments
+the compiler driver maintains internally, so you'll be desperately
+disappointed if you try to glob etc. inside <Literal>OPTIONS</Literal>.
+</Para>
+
+<Para>
+NOTE: the contents of OPTIONS are prepended to the command-line
+options, so you *do* have the ability to override OPTIONS settings
+via the command line.
+</Para>
+
+<Para>
+It is not recommended to move all the contents of your Makefiles into
+your source files, but in some circumstances, the <Literal>OPTIONS</Literal> pragma
+is the Right Thing. (If you use <Literal>-keep-hc-file-too</Literal> and have OPTION
+flags in your module, the OPTIONS will get put into the generated .hc
+file).
+</Para>
+
+</Sect2>
+
+</Sect1>

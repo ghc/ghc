@@ -1,0 +1,191 @@
+<Sect1 id="vs-Haskell-defn">
+<Title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
+</Title>
+
+<Para>
+<IndexTerm><Primary>GHC vs the Haskell 98 language</Primary></IndexTerm>
+<IndexTerm><Primary>Haskell 98 language vs GHC</Primary></IndexTerm>
+</Para>
+
+<Para>
+This section lists Glasgow Haskell infelicities in its implementation
+of Haskell&nbsp;98.  See also the ``when things go wrong'' section
+(<XRef LinkEnd="wrong">)
+for information about crashes, space leaks, and other undesirable
+phenomena.
+</Para>
+
+<Para>
+The limitations here are listed in Haskell-Report order (roughly).
+</Para>
+
+<Sect2 id="infelicities-exprs-pats">
+<Title>Expressions and patterns
+</Title>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>Very long <Literal>String</Literal> constants:</Term>
+<ListItem>
+<Para>
+May not go through.  If you add a ``string gap'' every
+few thousand characters, then the strings can be as long
+as you like.
+</Para>
+
+<Para>
+Bear in mind that string gaps and the <Literal>-cpp</Literal><IndexTerm><Primary>-cpp option</Primary></IndexTerm>
+option don't mix very well (see <XRef LinkEnd="c-pre-processor">).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Very long literal lists:</Term>
+<ListItem>
+<Para>
+These may tickle a ``yacc stack overflow'' error in the parser.
+(It depends on the Yacc used to build your parser.)
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Single quotes in module names:</Term>
+<ListItem>
+<Para>
+It might work, but it's just begging for trouble.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2 id="infelicities-decls">
+<Title>Declarations and bindings
+</Title>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>Derived instances for records:</Term>
+<ListItem>
+<Para>
+Hmmm.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2 id="infelicities-Modules">
+<Title>Module system and interface files
+</Title>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term> Namespace pollution </Term>
+<ListItem>
+<Para>
+Several modules internal to GHC are visible in the standard namespace.
+All of these modules begin with <Literal>Prel</Literal>, so the rule is: don't use any
+modules beginning with <Literal>Prel</Literal> in your program, or you will be
+comprehensively screwed.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2 id="infelicities-numbers">
+<Title>Numbers, basic types, and built-in classes
+</Title>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>Unchecked arithmetic:</Term>
+<ListItem>
+<Para>
+Arguably <Emphasis>not</Emphasis> an infelicity, but&hellip; Bear in mind that
+operations on <Literal>Int</Literal>, <Literal>Float</Literal>, and <Literal>Double</Literal> numbers are
+<Emphasis>unchecked</Emphasis> for overflow, underflow, and other sad occurrences.
+(note, however that some architectures trap floating-point overflow
+and loss-of-precision and report a floating-point
+exception)<IndexTerm><Primary>floating-point exceptions</Primary></IndexTerm>.
+</Para>
+
+<Para>
+Use <Literal>Integer</Literal>, <Literal>Rational</Literal>, etc., numeric types if this stuff
+keeps you awake at night.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Multiply-defined array elements&mdash;not checked:</Term>
+<ListItem>
+<Para>
+This code fragment <Emphasis>should</Emphasis> elicit a fatal error, but it does not:
+
+<ProgramListing>
+main = print (array (1,1) [ 1:=2, 1:=3 ])
+</ProgramListing>
+
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2 id="infelicities-Prelude">
+<Title>In Prelude support
+</Title>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>Arbitrary-sized tuples:</Term>
+<ListItem>
+<Para>
+Plain old tuples of arbitrary size <Emphasis>do</Emphasis> work.
+</Para>
+
+<Para>
+HOWEVER: standard instances for tuples (<Literal>Eq</Literal>, <Literal>Ord</Literal>, <Literal>Bounded</Literal>, <Literal>Ix</Literal>
+<Literal>Read</Literal>, and <Literal>Show</Literal>) are available <Emphasis>only</Emphasis> up to 5-tuples.
+</Para>
+
+<Para>
+These limitations are easily subvertible, so please ask if you get
+stuck on them.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>Unicode character set:</Term>
+<ListItem>
+<Para>
+Haskell 98 embraces the Unicode character set, but GHC doesn't
+handle it. Yet.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+</Sect1>

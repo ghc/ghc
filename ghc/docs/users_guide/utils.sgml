@@ -1,0 +1,369 @@
+<Chapter id="utils">
+<Title>Other Haskell utility programs
+</Title>
+
+<IndexTerm><Primary>utilities, Haskell</Primary></IndexTerm>
+
+<Para>
+This section describes other program(s) which we distribute, that help
+with the Great Haskell Programming Task.
+</Para>
+
+<Sect1 id="mkdependHS">
+<Title>Makefile dependencies in Haskell: using <Literal>mkdependHS</Literal>
+</Title>
+
+<Para>
+<IndexTerm><Primary>mkdependHS</Primary></IndexTerm>
+<IndexTerm><Primary>Makefile dependencies</Primary></IndexTerm>
+<IndexTerm><Primary>dependencies in Makefiles</Primary></IndexTerm>
+</Para>
+
+<Para>
+You run <Literal>mkdependHS</Literal> like this:
+
+<Screen>
+mkdependHS [mkdependHS options] [-- GHC options --] srcfile1 [srcfile2 ...]
+</Screen>
+
+or
+
+<Screen>
+ghc -M [mkdependHS options(prefix with -optdep)] [ GHC options ] srcfile1 [srcfile2 ...]
+</Screen>
+
+To see <Literal>mkdependHS</Literal>'s command-line flags, give it a duff flag,
+e.g., <Literal>mkdependHS -help</Literal>.
+</Para>
+
+<Para>
+In general, if module <Literal>A</Literal> contains the line
+
+<ProgramListing>
+import B ...blah...
+</ProgramListing>
+
+then <Literal>mkdependHS</Literal> will generate a dependency line of the form:
+
+<ProgramListing>
+A.o : B.hi
+</ProgramListing>
+
+If module <Literal>A</Literal> contains the line 
+
+<ProgramListing>
+import {-# SOURCE #-} B ...blah...
+</ProgramListing>
+
+then <Literal>mkdependHS</Literal> will generate a dependency line of the form:
+
+<ProgramListing>
+A.o : B.hi-boot
+</ProgramListing>
+
+(See <XRef LinkEnd="hi-files"> for details of interface files.)
+If <Literal>A</Literal> imports multiple modules, then there will be multiple lines with <Literal>A.o</Literal> as the
+target.
+</Para>
+
+<Para>
+By default, <Literal>mkdependHS</Literal> generates all the dependencies, and then
+concatenates them onto the end of
+<Literal>makefile</Literal> (or <Literal>Makefile</Literal> if <Literal>makefile</Literal> doesn't exist) bracketed by
+the lines "<Literal>&num; DO NOT DELETE: Beginning of Haskell dependencies</Literal>" and
+"<Literal>&num; DO NOT DELETE: End of Haskell dependencies</Literal>".  If these lines
+already exist in the <Literal>makefile</Literal>, <Literal>mkdependHS</Literal> deletes the old
+dependencies first.
+</Para>
+
+<Para>
+<Literal>mkdependHS</Literal> takes GHC options between <Literal>--</Literal> brackets.
+It understands the following ones. Any options between <Literal>--</Literal> brackets
+that it doesn't understand are simply ignored; this way you can feed your
+Makefile's standard GHC options to <Literal>mkdependHS</Literal> un-filtered.
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-cpp</Literal></Term>
+<ListItem>
+<Para>
+Run the C pre-processor over the input files. The
+default is not to.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-D&lt;blah&gt;</Literal></Term>
+<ListItem>
+<Para>
+A cpp <Literal>&num;define</Literal>; usual meaning.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-i&lt;dirs&gt;</Literal></Term>
+<ListItem>
+<Para>
+Add <Literal>&lt;dirs&gt;</Literal> (colon-separated) to list of directories
+to search for "import"ed modules.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-I&lt;dir&gt;</Literal></Term>
+<ListItem>
+<Para>
+Add <Literal>&lt;dir&gt;</Literal> to list of directories to search for
+.h files (i.e., usual meaning).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-syslib &lt;blah&gt;</Literal></Term>
+<ListItem>
+<Para>
+This program uses this GHC system library; take
+appropriate action (e.g., recognise when they are
+"import"ing a module from that library).
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+Here are the <Literal>mkdependHS</Literal>-specific options (not between <Literal>--</Literal>'s):
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-v</Literal></Term>
+<ListItem>
+<Para>
+Be verbose.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-v -v</Literal></Term>
+<ListItem>
+<Para>
+Be very verbose.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-w</Literal></Term>
+<ListItem>
+<Para>
+Turn off warnings about interface file shadowing.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-f blah</Literal></Term>
+<ListItem>
+<Para>
+Use <Literal>blah</Literal> as the makefile, rather than <Literal>makefile</Literal>
+or <Literal>Makefile</Literal>.  If <Literal>blah</Literal> doesn't exist, <Literal>mkdependHS</Literal> creates it.
+We often use <Literal>-f .depend</Literal> to put the dependencies in <Literal>.depend</Literal> and
+then <Literal>include</Literal> the file <Literal>.depend</Literal> into <Literal>Makefilpe</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-o &lt;osuf&gt;</Literal></Term>
+<ListItem>
+<Para>
+Use <Literal>.&lt;osuf&gt;</Literal> as the "target file" suffix ( default: <Literal>o</Literal>).
+Multiple <Literal>-o</Literal> flags are permitted (GHC2.05 onwards).  Thus "<Literal>-o hc -o o</Literal>"
+will generate dependencies for <Literal>.hc</Literal> and <Literal>.o</Literal> files.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-s &lt;suf&gt;</Literal></Term>
+<ListItem>
+<Para>
+Make extra dependencies that declare that files with
+suffix <Literal>.&lt;suf&gt;&lowbar;&lt;osuf&gt;</Literal> depend on interface files with suffix <Literal>.&lt;suf&gt;&lowbar;hi</Literal>, or
+(for <Literal>&lcub;-&num; SOURCE &num;-&rcub;</Literal> imports) on <Literal>.hi-boot</Literal>.
+Multiple <Literal>-s</Literal> flags are permitted.
+For example, "<Literal>-o hc -s a -s b</Literal>" will
+make dependencies for <Literal>.hc</Literal> on <Literal>.hi</Literal>, <Literal>.a&lowbar;hc</Literal> on <Literal>.a&lowbar;hi</Literal>, and <Literal>.b&lowbar;hc</Literal> on <Literal>.b&lowbar;hi</Literal>.
+(Useful in conjunction with NoFib "ways".)  
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>--exclude-module=&lt;file&gt;</Literal></Term>
+<ListItem>
+<Para>
+Regard <Literal>&lt;file&gt;</Literal> as "stable"; i.e., exclude it from having
+dependencies on it.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-x</Literal></Term>
+<ListItem>
+<Para>
+same as <Literal>--exclude-module</Literal>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>--exclude-directory=&lt;dirs&gt;</Literal></Term>
+<ListItem>
+<Para>
+Regard the colon-separated list of directories <Literal>&lt;dirs&gt;</Literal> as containing stable,
+don't generate any dependencies on modules therein.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-Xdirs</Literal></Term>
+<ListItem>
+<Para>
+same as <Literal>--exclude-directory</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>--include-module=&lt;file&gt;</Literal></Term>
+<ListItem>
+<Para>
+Regard <Literal>&lt;file&gt;</Literal> as not "stable"; i.e., generate dependencies
+on it (if any). This option is normally used in conjunction 
+with the <Literal>--exclude-directory</Literal> option.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>--include-prelude</Literal></Term>
+<ListItem>
+<Para>
+Regard prelude libraries as unstable, i.e., generate dependencies
+on the prelude modules used (including <Literal>Prelude</Literal>).
+This option is normally only used by the various system libraries. If
+a <Literal>-syslib</Literal> option is used, dependencies will also be
+generated on the library's interfaces. 
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect1>
+
+<Sect1 id="hstags">
+<Title>Emacs `TAGS' for Haskell: <Literal>hstags</Literal>
+</Title>
+
+<Para>
+<IndexTerm><Primary>hstags</Primary></IndexTerm>
+<IndexTerm><Primary>TAGS for Haskell</Primary></IndexTerm>
+</Para>
+
+<Para>
+`Tags' is a facility for indexing the definitions of
+programming-language things in a multi-file program, and then using
+that index to jump around among these definitions.
+</Para>
+
+<Para>
+Rather than scratch your head, saying ``Now where did we define
+`foo'?'', you just do (in Emacs) <Literal>M-. foo RET</Literal>, and You're There!
+Some people go wild over this stuff&hellip;
+</Para>
+
+<Para>
+GHC comes with a program <Literal>hstags</Literal>, which build Emacs-able TAGS files.  The invocation syntax is:
+
+<Screen>
+hstags [GHC-options] file [files...]
+</Screen>
+
+</Para>
+
+<Para>
+The best thing is just to feed it your GHC command-line flags.
+A good Makefile entry might be:
+
+<ProgramListing>
+tags:
+        $(RM) TAGS
+        hstags $(GHC_FLAGS) *.lhs
+</ProgramListing>
+
+</Para>
+
+<Para>
+The only flags of its own are: <Literal>-v</Literal> to be verbose; <Literal>-a</Literal> to
+**APPEND** to the TAGS file, rather than write to it.
+</Para>
+
+<Para>
+Shortcomings: (1)&nbsp;Instance declarations don't get into the TAGS file
+(but the definitions inside them do); as instances aren't named, this
+is probably just as well.  (2)&nbsp;Data-constructor definitions don't get
+in.  Go for the corresponding type constructor instead.
+</Para>
+
+<Para>
+(Actually, GHC also comes with <Literal>etags</Literal> &lsqb;for C&rsqb;, and <Literal>perltags</Literal>
+&lsqb;for You Know What&rsqb;.  And&mdash;I cannot tell a lie&mdash;there is Denis
+Howe's <Literal>fptags</Literal> &lsqb;for Haskell, etc.&rsqb; in the <Literal>ghc/CONTRIB</Literal>
+section&hellip;)
+</Para>
+
+</Sect1>
+
+<Sect1 id="happy">
+<Title>``Yacc for Haskell'': <Literal>happy</Literal>
+</Title>
+
+<Para>
+<IndexTerm><Primary>happy</Primary></IndexTerm>
+<IndexTerm><Primary>Yacc for Haskell</Primary></IndexTerm>
+<IndexTerm><Primary>parser generator for Haskell</Primary></IndexTerm>
+Andy Gill and Simon Marlow have written a parser-generator for
+Haskell, called <Literal>happy</Literal>.<IndexTerm><Primary>happy parser generator</Primary></IndexTerm> <Literal>Happy</Literal>
+is to Haskell what <Literal>Yacc</Literal> is to C.
+</Para>
+
+<Para>
+You can get <Literal>happy</Literal> by FTP from <Literal>ftp.dcs.gla.ac.uk</Literal> in
+<Literal>pub/haskell/happy</Literal>, the file <Literal>happy-1.5-src.tar.gz</Literal>.
+</Para>
+
+<Para>
+<Literal>Happy</Literal> is at its shining best when compiled by GHC.
+</Para>
+
+</Sect1>
+
+<Sect1 id="pphs">
+<Title>Pretty-printing Haskell: <Literal>pphs</Literal>
+</Title>
+
+<Para>
+<IndexTerm><Primary>pphs</Primary></IndexTerm>
+<IndexTerm><Primary>pretty-printing Haskell code</Primary></IndexTerm>
+</Para>
+
+<Para>
+Andrew Preece has written
+<Literal>pphs</Literal>,<IndexTerm><Primary>pphs</Primary></IndexTerm><IndexTerm><Primary>pretty-printing Haskell</Primary></IndexTerm>
+a utility to pretty-print Haskell code in LaTeX documents.
+Keywords in bolds, variables in italics&mdash;that sort of thing.  It is
+good at lining up program clauses and equals signs, things that are
+very tiresome to do by hand.
+</Para>
+
+<Para>
+The code is distributed with GHC in <Literal>ghc/CONTRIB/pphs</Literal>.
+</Para>
+
+</Sect1>
+
+</Chapter>

@@ -1,0 +1,1046 @@
+<Sect1 id="GHC-library">
+<Title>Miscellaneous libraries
+</Title>
+
+<Para>
+<IndexTerm><Primary>libraries, miscellaneous</Primary></IndexTerm>
+<IndexTerm><Primary>misc, syslib</Primary></IndexTerm>
+</Para>
+
+<Para>
+This section describes a collection of Haskell libraries we've
+collected over the years.  Access to any of these modules is provided
+by giving the <Literal>-syslib misc</Literal><IndexTerm><Primary>-syslib misc option</Primary></IndexTerm>.
+</Para>
+
+<Sect2 id="Bag">
+<Title>The <Literal>Bag</Literal> type
+</Title>
+
+<Para>
+<IndexTerm><Primary>Bag module (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+A <Emphasis>bag</Emphasis> is an unordered collection of elements which may contain
+duplicates.  To use, <Literal>import Bag</Literal>.
+</Para>
+
+<Para>
+
+<ProgramListing>
+data Bag elt    -- abstract
+
+emptyBag        :: Bag elt
+unitBag         :: elt -&#62; Bag elt
+
+consBag         :: elt       -&#62; Bag elt -&#62; Bag elt
+snocBag         :: Bag elt   -&#62; elt     -&#62; Bag elt
+
+unionBags       :: Bag elt   -&#62; Bag elt -&#62; Bag elt
+unionManyBags   :: [Bag elt] -&#62; Bag elt
+
+isEmptyBag      :: Bag elt   -&#62; Bool
+elemBag         :: Eq elt =&#62; elt -&#62; Bag elt -&#62; Bool
+
+filterBag       :: (elt -&#62; Bool) -&#62; Bag elt -&#62; Bag elt
+partitionBag    :: (elt -&#62; Bool) -&#62; Bag elt-&#62; (Bag elt, Bag elt)
+        -- returns the elements that do/don't satisfy the predicate
+
+concatBag       :: Bag (Bag a) -&#62; Bag a
+foldBag         :: (r -&#62; r -&#62; r) -&#62; (a -&#62; r) -&#62; r -&#62; Bag a -&#62; r
+mapBag          :: (a -&#62; b) -&#62; Bag a -&#62; Bag b
+
+listToBag       :: [elt] -&#62; Bag elt
+bagToList       :: Bag elt -&#62; [elt]
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="FiniteMap">
+<Title>The <Literal>FiniteMap</Literal> type
+</Title>
+
+<Para>
+<IndexTerm><Primary>FiniteMap module (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+What functional programmers call a <Emphasis>finite map</Emphasis>, everyone else
+calls a <Emphasis>lookup table</Emphasis>.
+</Para>
+
+<Para>
+Out code is derived from that in this paper:
+<QUOTE
+>S Adams
+"Efficient sets: a balancing act"
+Journal of functional programming 3(4) Oct 1993, pages 553-562</QUOTE
+>
+Guess what?  The implementation uses balanced trees.
+</Para>
+
+<Para>
+
+<ProgramListing>
+data FiniteMap key elt  -- abstract
+
+--      BUILDING
+emptyFM         :: FiniteMap key elt
+unitFM          :: key -&#62; elt -&#62; FiniteMap key elt
+listToFM        :: Ord key =&#62; [(key,elt)] -&#62; FiniteMap key elt
+                        -- In the case of duplicates, the last is taken
+
+--      ADDING AND DELETING
+                   -- Throws away any previous binding
+                   -- In the list case, the items are added starting with the
+                   -- first one in the list
+addToFM         :: Ord key =&#62; FiniteMap key elt -&#62; key -&#62; elt  -&#62; FiniteMap key elt
+addListToFM     :: Ord key =&#62; FiniteMap key elt -&#62; [(key,elt)] -&#62; FiniteMap key elt
+
+                 -- Combines with previous binding
+                 -- In the combining function, the first argument is
+                 -- the "old" element, while the second is the "new" one.
+addToFM_C       :: Ord key =&#62; (elt -&#62; elt -&#62; elt)
+                           -&#62; FiniteMap key elt -&#62; key -&#62; elt
+                           -&#62; FiniteMap key elt
+addListToFM_C   :: Ord key =&#62; (elt -&#62; elt -&#62; elt)
+                           -&#62; FiniteMap key elt -&#62; [(key,elt)]
+                           -&#62; FiniteMap key elt
+
+                 -- Deletion doesn't complain if you try to delete something
+                 -- which isn't there
+delFromFM       :: Ord key =&#62; FiniteMap key elt -&#62; key   -&#62; FiniteMap key elt
+delListFromFM   :: Ord key =&#62; FiniteMap key elt -&#62; [key] -&#62; FiniteMap key elt
+
+--      COMBINING
+                 -- Bindings in right argument shadow those in the left
+plusFM          :: Ord key =&#62; FiniteMap key elt -&#62; FiniteMap key elt
+                           -&#62; FiniteMap key elt
+
+                   -- Combines bindings for the same thing with the given function
+plusFM_C        :: Ord key =&#62; (elt -&#62; elt -&#62; elt)
+                           -&#62; FiniteMap key elt -&#62; FiniteMap key elt -&#62; FiniteMap key elt
+
+minusFM         :: Ord key =&#62; FiniteMap key elt -&#62; FiniteMap key elt -&#62; FiniteMap key elt
+                   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
+
+intersectFM     :: Ord key =&#62; FiniteMap key elt -&#62; FiniteMap key elt -&#62; FiniteMap key elt
+intersectFM_C   :: Ord key =&#62; (elt -&#62; elt -&#62; elt)
+                           -&#62; FiniteMap key elt -&#62; FiniteMap key elt -&#62; FiniteMap key elt
+
+--      MAPPING, FOLDING, FILTERING
+foldFM          :: (key -&#62; elt -&#62; a -&#62; a) -&#62; a -&#62; FiniteMap key elt -&#62; a
+mapFM           :: (key -&#62; elt1 -&#62; elt2) -&#62; FiniteMap key elt1 -&#62; FiniteMap key elt2
+filterFM        :: Ord key =&#62; (key -&#62; elt -&#62; Bool)
+                           -&#62; FiniteMap key elt -&#62; FiniteMap key elt
+
+--      INTERROGATING
+sizeFM          :: FiniteMap key elt -&#62; Int
+isEmptyFM       :: FiniteMap key elt -&#62; Bool
+
+elemFM          :: Ord key =&#62; key -&#62; FiniteMap key elt -&#62; Bool
+lookupFM        :: Ord key =&#62; FiniteMap key elt -&#62; key -&#62; Maybe elt
+lookupWithDefaultFM
+                :: Ord key =&#62; FiniteMap key elt -&#62; elt -&#62; key -&#62; elt
+                -- lookupWithDefaultFM supplies a "default" elt
+                -- to return for an unmapped key
+
+--      LISTIFYING
+fmToList        :: FiniteMap key elt -&#62; [(key,elt)]
+keysFM          :: FiniteMap key elt -&#62; [key]
+eltsFM          :: FiniteMap key elt -&#62; [elt]
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="ListSetOps">
+<Title>The <Literal>ListSetOps</Literal> type
+</Title>
+
+<Para>
+<IndexTerm><Primary>ListSetOps module (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+Just a few set-sounding operations on lists.  If you want sets, use
+the <Literal>Set</Literal> module.
+</Para>
+
+<Para>
+
+<ProgramListing>
+unionLists          :: Eq a =&#62; [a] -&#62; [a] -&#62; [a]
+intersectLists      :: Eq a =&#62; [a] -&#62; [a] -&#62; [a]
+minusList           :: Eq a =&#62; [a] -&#62; [a] -&#62; [a]
+disjointLists       :: Eq a =&#62; [a] -&#62; [a] -&#62; Bool
+intersectingLists   :: Eq a =&#62; [a] -&#62; [a] -&#62; Bool
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="Maybes">
+<Title>The <Literal>Maybes</Literal> type
+</Title>
+
+<Para>
+<IndexTerm><Primary>Maybes module (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+The <Literal>Maybe</Literal> type is in the Haskell 1.4 prelude. Moreover, the
+required <Literal>Maybe</Literal> library provides many useful functions on
+<Literal>Maybe</Literal>s. This (pre-1.3) module provides some more:
+</Para>
+
+<Para>
+An <Literal>Either</Literal>-like type called <Literal>MaybeErr</Literal>:
+
+<ProgramListing>
+data MaybeErr val err = Succeeded val | Failed err
+</ProgramListing>
+
+</Para>
+
+<Para>
+Some operations to do with <Literal>Maybe</Literal> (some commentary follows):
+
+<ProgramListing>
+maybeToBool :: Maybe a -&#62; Bool      -- Nothing =&#62; False; Just =&#62; True
+allMaybes   :: [Maybe a] -&#62; Maybe [a]
+firstJust   :: [Maybe a] -&#62; Maybe a
+findJust    :: (a -&#62; Maybe b) -&#62; [a] -&#62; Maybe b
+
+assocMaybe  :: Eq a =&#62; [(a,b)] -&#62; a -&#62; Maybe b
+mkLookupFun :: (key -&#62; key -&#62; Bool) -- Equality predicate
+            -&#62; [(key,val)]          -- The assoc list
+            -&#62; (key -&#62; Maybe val)   -- A lookup fun to use
+mkLookupFunDef :: (key -&#62; key -&#62; Bool)  -- Equality predicate
+               -&#62; [(key,val)]           -- The assoc list
+               -&#62; val                   -- Value to return on failure
+               -&#62; key                   -- The key
+               -&#62; val                   -- The corresponding value
+
+    -- a monad thing
+thenMaybe   :: Maybe a -&#62; (a -&#62; Maybe b) -&#62; Maybe b
+returnMaybe :: a -&#62; Maybe a
+failMaybe   :: Maybe a
+mapMaybe    :: (a -&#62; Maybe b) -&#62; [a] -&#62; Maybe [b]
+</ProgramListing>
+
+</Para>
+
+<Para>
+NB: <Literal>catMaybes</Literal> which used to be here, is now available via the
+standard <Literal>Maybe</Literal> interface (<Literal>Maybe</Literal> is an instance of <Literal>MonadPlus</Literal>).
+</Para>
+
+<Para>
+<Literal>allMaybes</Literal> collects a list of <Literal>Justs</Literal> into a single <Literal>Just</Literal>, returning
+<Literal>Nothing</Literal> if there are any <Literal>Nothings</Literal>.
+</Para>
+
+<Para>
+<Literal>firstJust</Literal> takes a list of <Literal>Maybes</Literal> and returns the
+first <Literal>Just</Literal> if there is one, or <Literal>Nothing</Literal> otherwise.
+</Para>
+
+<Para>
+<Literal>assocMaybe</Literal> looks up in an association list, returning
+<Literal>Nothing</Literal> if it fails.
+</Para>
+
+<Para>
+Now, some operations to do with <Literal>MaybeErr</Literal> (comments follow):
+
+<ProgramListing>
+    -- a monad thing (surprise, surprise)
+thenMaB   :: MaybeErr a err -&#62; (a -&#62; MaybeErr b err) -&#62; MaybeErr b err
+returnMaB :: val -&#62; MaybeErr val err
+failMaB   :: err -&#62; MaybeErr val err
+
+listMaybeErrs :: [MaybeErr val err] -&#62; MaybeErr [val] [err]
+foldlMaybeErrs :: (acc -&#62; input -&#62; MaybeErr acc err)
+               -&#62; acc
+               -&#62; [input]
+               -&#62; MaybeErr acc [err]
+</ProgramListing>
+
+</Para>
+
+<Para>
+<Literal>listMaybeErrs</Literal> takes a list of <Literal>MaybeErrs</Literal> and, if they all succeed,
+returns a <Literal>Succeeded</Literal> of a list of their values.  If any fail, it
+returns a <Literal>Failed</Literal> of the list of all the errors in the list.
+</Para>
+
+<Para>
+<Literal>foldlMaybeErrs</Literal> works along a list, carrying an accumulator; it
+applies the given function to the accumulator and the next list item,
+accumulating any errors that occur.
+</Para>
+
+</Sect2>
+
+<Sect2 id="memo-library">
+<Title>The <Literal>Memo</Literal> library
+</Title>
+
+<Para>
+<IndexTerm><Primary>Memo (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+The <Literal>Memo</Literal> library provides fast polymorphic memo functions using hash
+tables.  The interface is:
+</Para>
+
+<Para>
+
+<ProgramListing>
+memo :: (a -&#62; b) -&#62; a -&#62; b
+</ProgramListing>
+
+</Para>
+
+<Para>
+So, for example, <Literal>memo f</Literal> is a version of <Literal>f</Literal> that caches the results
+of previous calls.
+</Para>
+
+<Para>
+The searching is very fast, being based on pointer equality.  One
+consequence of this is that the caching will only be effective if
+<Emphasis>exactly the same argument is passed again to the memoised
+function</Emphasis>.  This means not just a copy of a previous argument, but the
+same instance.  It's not useful to memoise integer functions using
+this interface, because integers are generally copied a lot and two
+instances of '27' are unlikely to refer to the same object.
+</Para>
+
+<Para>
+This memoisation library works well when the keys are large (or even
+infinite).
+</Para>
+
+<Para>
+The memo table implementation uses weak pointers and stable names (see
+the GHC/Hugs library document) to avoid space leaks and allow hashing
+for arbitrary Haskell objects.  NOTE: while individual memo table
+entries will be garbage collected if the associated key becomes
+garbage, the memo table itself will not be collected if the function
+becomes garbage.  We plan to fix this in a future version.
+</Para>
+
+<Para>
+There's another version of <Literal>memo</Literal> if you want to explicitly give a
+size for the hash table (the default size is 1001 buckets):
+</Para>
+
+<Para>
+
+<ProgramListing>
+memo_sized :: Int -&#62; (a -&#62; b) -&#62; a -&#62; b
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="PackedString">
+<Title>The <Literal>PackedString</Literal> type
+</Title>
+
+<Para>
+<IndexTerm><Primary>PackedString module (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+You need to <Literal>import PackedString</Literal> and heave in your
+<Literal>-syslib ghc</Literal> to use <Literal>PackedString</Literal>s.
+</Para>
+
+<Para>
+The basic type and functions available are:
+
+<ProgramListing>
+data PackedString -- abstract
+
+packString          :: [Char] -&#62; PackedString
+packStringST        :: [Char] -&#62; ST s PackedString
+packCBytesST        :: Int -&#62; Addr -&#62; ST s PackedString
+packBytesForCST     :: [Char] -&#62; ST s (ByteArray Int)
+byteArrayToPS       :: ByteArray Int -&#62; PackedString
+unsafeByteArrayToPS :: ByteArray a   -&#62; Int -&#62; PackedString
+psToByteArray       :: PackedString -&#62; ByteArray Int
+psToByteArrayST     :: PackedString -&#62; ST s (ByteArray Int)
+
+unpackPS        :: PackedString -&#62; [Char]
+</ProgramListing>
+
+</Para>
+
+<Para>
+We also provide a wad of list-manipulation-like functions:
+
+<ProgramListing>
+nilPS       :: PackedString
+consPS      :: Char -&#62; PackedString -&#62; PackedString
+
+headPS      :: PackedString -&#62; Char
+tailPS      :: PackedString -&#62; PackedString
+nullPS      :: PackedString -&#62; Bool
+appendPS    :: PackedString -&#62; PackedString -&#62; PackedString
+lengthPS    :: PackedString -&#62; Int
+indexPS     :: PackedString -&#62; Int -&#62; Char
+            -- 0-origin indexing into the string
+mapPS       :: (Char -&#62; Char) -&#62; PackedString -&#62; PackedString
+filterPS    :: (Char -&#62; Bool) -&#62; PackedString -&#62; PackedString
+foldlPS     :: (a -&#62; Char -&#62; a) -&#62; a -&#62; PackedString -&#62; a
+foldrPS     :: (Char -&#62; a -&#62; a) -&#62; a -&#62; PackedString -&#62; a
+takePS      :: Int -&#62; PackedString -&#62; PackedString
+dropPS      :: Int -&#62; PackedString -&#62; PackedString
+splitAtPS   :: Int -&#62; PackedString -&#62; (PackedString, PackedString)
+takeWhilePS :: (Char -&#62; Bool) -&#62; PackedString -&#62; PackedString
+dropWhilePS :: (Char -&#62; Bool) -&#62; PackedString -&#62; PackedString
+spanPS      :: (Char -&#62; Bool) -&#62; PackedString -&#62; (PackedString, PackedString)
+breakPS     :: (Char -&#62; Bool) -&#62; PackedString -&#62; (PackedString, PackedString)
+linesPS     :: PackedString -&#62; [PackedString]
+wordsPS     :: PackedString -&#62; [PackedString]
+reversePS   :: PackedString -&#62; PackedString
+concatPS    :: [PackedString] -&#62; PackedString
+elemPS      :: Char -&#62; PackedString -&#62; Bool
+  -- Perl-style split&amp;join
+splitPS     :: Char -&#62; PackedString -&#62; [PackedString]
+splitWithPS :: (Char -&#62; Bool) -&#62; PackedString -&#62; [PackedString]
+joinPS      :: PackedString -&#62; [PackedString] -&#62; PackedString
+
+substrPS   :: PackedString -&#62; Int -&#62; Int -&#62; PackedString
+           -- pluck out a piece of a PackedString
+           -- start and end chars you want; both 0-origin-specified
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="Set">
+<Title>The <Literal>Set</Literal> type
+</Title>
+
+<Para>
+<IndexTerm><Primary>Set module (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+Our implementation of <Emphasis>sets</Emphasis> (key property: no duplicates) is just
+a variant of the <Literal>FiniteMap</Literal> module.
+</Para>
+
+<Para>
+
+<ProgramListing>
+data Set        -- abstract
+                -- instance of: Eq
+
+emptySet        :: Set a
+mkSet           :: Ord a =&#62; [a]  -&#62; Set a
+setToList       :: Set a -&#62; [a]
+unitSet         :: a -&#62; Set a
+singletonSet    :: a -&#62; Set a  -- deprecated, use unitSet.
+
+union           :: Ord a =&#62; Set a -&#62; Set a -&#62; Set a
+unionManySets   :: Ord a =&#62; [Set a] -&#62; Set a
+minusSet        :: Ord a =&#62; Set a -&#62; Set a -&#62; Set a
+mapSet          :: Ord a =&#62; (b -&#62; a) -&#62; Set b -&#62; Set a
+intersect       :: Ord a =&#62; Set a -&#62; Set a -&#62; Set a
+
+elementOf       :: Ord a =&#62; a -&#62; Set a -&#62; Bool
+isEmptySet      :: Set a -&#62; Bool
+
+cardinality     :: Set a -&#62; Int
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="BitSet">
+<Title>The <Literal>BitSet</Literal> interface
+</Title>
+
+<Para>
+<IndexTerm><Primary>Bitset interface (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+Bit sets are a fast implementation of sets of integers ranging from 0
+to one less than the number of bits in a machine word (typically 31).
+If any element exceeds the maximum value for a particular machine
+architecture, the results of these operations are undefined.  You have
+been warned.
+</Para>
+
+<Para>
+
+<ProgramListing>
+data BitSet   -- abstract
+              -- instance of:
+
+emptyBS       :: BitSet
+mkBS          :: [Int] -&#62; BitSet
+unitBS        :: Int -&#62; BitSet
+unionBS       :: BitSet -&#62; BitSet -&#62; BitSet
+minusBS       :: BitSet -&#62; BitSet -&#62; BitSet
+isEmptyBS     :: BitSet -&#62; Bool
+intersectBS   :: BitSet -&#62; BitSet -&#62; BitSet
+elementBS     :: Int -&#62; BitSet -&#62; Bool
+listBS        :: BitSet -&#62; [Int]
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="Util">
+<Title>The <Literal>Util</Literal> type
+</Title>
+
+<Para>
+<IndexTerm><Primary>Util module (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+Stuff that has been generally useful to use in writing the compiler.
+Don't be too surprised if this stuff moves/gets-renamed/etc.
+</Para>
+
+<Para>
+
+<ProgramListing>
+-- general list processing
+forall          :: (a -&#62; Bool) -&#62; [a] -&#62; Bool
+exists          :: (a -&#62; Bool) -&#62; [a] -&#62; Bool
+
+nOfThem         :: Int -&#62; a -&#62; [a]
+lengthExceeds   :: [a] -&#62; Int -&#62; Bool
+isSingleton     :: [a] -&#62; Bool
+
+--paranoid zip'ing (equal length lists)
+zipEqual        :: [a] -&#62; [b] -&#62; [(a,b)]
+zipWithEqual    :: String -&#62; (a-&#62;b-&#62;c) -&#62; [a]-&#62;[b]-&#62;[c]
+zipWith3Equal   :: String -&#62; (a-&#62;b-&#62;c-&#62;d) -&#62; [a]-&#62;[b]-&#62;[c]-&#62;[d]
+zipWith4Equal   :: String -&#62; (a-&#62;b-&#62;c-&#62;d-&#62;e) -&#62; [a]-&#62;[b]-&#62;[c]-&#62;[d]-&#62;[e]
+-- lazy in second argument
+zipLazy :: [a] -&#62; [b] -&#62; [(a,b)]
+
+mapAndUnzip :: (a -&#62; (b, c)) -&#62; [a] -&#62; ([b], [c])
+mapAndUnzip3 :: (a -&#62; (b, c, d)) -&#62; [a] -&#62; ([b], [c], [d])
+
+-- prefix and suffix matching on lists of characters.
+startsWith :: {-prefix-}String -&#62; String -&#62; Maybe String
+endsWith   :: {-suffix-}String -&#62; String -&#62; Maybe String
+
+-- association lists
+assoc       :: Eq a =&#62; String -&#62; [(a, b)] -&#62; a -&#62; b
+
+-- duplicate handling
+hasNoDups    :: Eq a =&#62; [a] -&#62; Bool
+equivClasses :: (a -&#62; a -&#62; Ordering) -&#62; [a] -&#62; [[a]]
+runs         :: (a -&#62; a -&#62; Bool)     -&#62; [a] -&#62; [[a]]
+removeDups   :: (a -&#62; a -&#62; Ordering) -&#62; [a] -&#62; ([a], [[a]])
+
+-- sorting (don't complain of no choice...)
+quicksort          :: (a -&#62; a -&#62; Bool)     -&#62; [a] -&#62; [a]
+sortLt             :: (a -&#62; a -&#62; Bool)     -&#62; [a] -&#62; [a]
+stableSortLt       :: (a -&#62; a -&#62; Bool)     -&#62; [a] -&#62; [a]
+mergesort          :: (a -&#62; a -&#62; _CMP_TAG) -&#62; [a] -&#62; [a]
+mergeSort          :: Ord a =&#62; [a] -&#62; [a]
+naturalMergeSort   :: Ord a =&#62; [a] -&#62; [a]
+mergeSortLe        :: Ord a =&#62; [a] -&#62; [a]
+naturalMergeSortLe :: Ord a =&#62; [a] -&#62; [a]
+
+-- transitive closures
+transitiveClosure :: (a -&#62; [a])         -- Successor function
+                  -&#62; (a -&#62; a -&#62; Bool)   -- Equality predicate
+                  -&#62; [a]
+                  -&#62; [a]                -- The transitive closure
+
+-- accumulating (Left, Right, Bi-directional)
+mapAccumL :: (acc -&#62; x -&#62; (acc, y))
+                        -- Function of elt of input list and
+                        -- accumulator, returning new accumulator and
+                        -- elt of result list
+          -&#62; acc        -- Initial accumulator
+          -&#62; [x]        -- Input list
+          -&#62; (acc, [y]) -- Final accumulator and result list
+
+mapAccumR :: (acc -&#62; x -&#62; (acc, y)) -&#62; acc -&#62; [x] -&#62; (acc, [y])
+
+mapAccumB :: (accl -&#62; accr -&#62; x -&#62; (accl, accr,y))
+          -&#62; accl -&#62; accr -&#62; [x]
+          -&#62; (accl, accr, [y])
+
+--list comparison with explicit element comparer.
+cmpList :: (a -&#62; a -&#62; Ordering) -&#62; [a] -&#62; [a] -&#62; Ordering
+
+-- pairs
+applyToPair :: ((a -&#62; c), (b -&#62; d)) -&#62; (a, b) -&#62; (c, d)
+applyToFst  :: (a -&#62; c) -&#62; (a, b) -&#62; (c, b)
+applyToSnd  :: (b -&#62; d) -&#62; (a, b) -&#62; (a, d)
+foldPair    :: (a-&#62;a-&#62;a, b-&#62;b-&#62;b) -&#62; (a, b) -&#62; [(a, b)] -&#62; (a, b)
+unzipWith   :: (a -&#62; b -&#62; c) -&#62; [(a, b)] -&#62; [c]
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+</Sect1>
+
+<Sect1 id="C-interfaces">
+<Title>Interfaces to C libraries
+</Title>
+
+<Para>
+<IndexTerm><Primary>C library interfaces</Primary></IndexTerm>
+<IndexTerm><Primary>interfaces, C library</Primary></IndexTerm>
+</Para>
+
+<Para>
+The GHC system library (<Literal>-syslib misc</Literal>) also provides interfaces to
+several useful C libraries, mostly from the GNU project.
+</Para>
+
+<Sect2 id="Readline">
+<Title>The <Literal>Readline</Literal> interface
+</Title>
+
+<Para>
+<IndexTerm><Primary>Readline library (misc syslib)</Primary></IndexTerm>
+<IndexTerm><Primary>command-line editing library</Primary></IndexTerm>
+</Para>
+
+<Para>
+(Darren Moffat supplied the <Literal>Readline</Literal> interface.)
+</Para>
+
+<Para>
+The <Literal>Readline</Literal> module is a straightforward interface to the GNU
+Readline library.  As such, you will need to look at the GNU
+documentation (and have a <Literal>libreadline.a</Literal> file around somewhere&hellip;)
+</Para>
+
+<Para>
+You'll need to link any Readlining program with <Literal>-lreadline -ltermcap</Literal>,
+besides the usual <Literal>-syslib ghc</Literal> (and <Literal>-fhaskell-1.3</Literal>).
+</Para>
+
+<Para>
+The main function you'll use is:
+
+<ProgramListing>
+readline :: String{-the prompt-} -&#62; IO String
+</ProgramListing>
+
+</Para>
+
+<Para>
+If you want to mess around with Full Readline G(l)ory, we also
+provide:
+
+<ProgramListing>
+rlInitialize, addHistory,
+
+rlBindKey, rlAddDefun, RlCallbackFunction(..),
+
+rlGetLineBuffer, rlSetLineBuffer, rlGetPoint, rlSetPoint, rlGetEnd,
+rlSetEnd, rlGetMark, rlSetMark, rlSetDone, rlPendingInput,
+
+rlPrompt, rlTerminalName, rlSetReadlineName, rlGetReadlineName
+</ProgramListing>
+
+(All those names are just Haskellised versions of what you
+will see in the GNU readline documentation.)
+</Para>
+
+</Sect2>
+
+<Sect2 id="Regex">
+<Title>The <Literal>Regex</Literal> and <Literal>MatchPS</Literal> interfaces
+</Title>
+
+<Para>
+<IndexTerm><Primary>Regex library (misc syslib)</Primary></IndexTerm>
+<IndexTerm><Primary>MatchPS library (misc syslib)</Primary></IndexTerm>
+<IndexTerm><Primary>regular-expressions library</Primary></IndexTerm>
+</Para>
+
+<Para>
+(Sigbjorn Finne supplied the regular-expressions interface.)
+</Para>
+
+<Para>
+The <Literal>Regex</Literal> library provides quite direct interface to the GNU
+regular-expression library, for doing manipulation on <Literal>PackedString</Literal>s.
+You probably need to see the GNU documentation if you are operating at
+this level.  Alternatively, you can use the simpler and higher-level
+<Literal>RegexString</Literal> interface.
+</Para>
+
+<Para>
+The datatypes and functions that <Literal>Regex</Literal> provides are:
+
+<ProgramListing>
+data PatBuffer  # just a bunch of bytes (mutable)
+
+data REmatch
+ = REmatch (Array Int GroupBounds)  -- for $1, ... $n
+           GroupBounds              -- for $` (everything before match)
+           GroupBounds              -- for $&amp; (entire matched string)
+           GroupBounds              -- for $' (everything after)
+           GroupBounds              -- for $+ (matched by last bracket)
+
+-- GroupBounds hold the interval where a group
+-- matched inside a string, e.g.
+--
+-- matching "reg(exp)" "a regexp" returns the pair (5,7) for the
+-- (exp) group. (PackedString indices start from 0)
+
+type GroupBounds = (Int, Int)
+
+re_compile_pattern
+        :: PackedString         -- pattern to compile
+        -&#62; Bool                 -- True &#60;=&#62; assume single-line mode
+        -&#62; Bool                 -- True &#60;=&#62; case-insensitive
+        -&#62; PrimIO PatBuffer
+
+re_match :: PatBuffer           -- compiled regexp
+         -&#62; PackedString        -- string to match
+         -&#62; Int                 -- start position
+         -&#62; Bool                -- True &#60;=&#62; record results in registers
+         -&#62; PrimIO (Maybe REmatch)
+
+-- Matching on 2 strings is useful when you're dealing with multiple
+-- buffers, which is something that could prove useful for
+-- PackedStrings, as we don't want to stuff the contents of a file
+-- into one massive heap chunk, but load (smaller chunks) on demand.
+
+re_match2 :: PatBuffer          -- 2-string version
+          -&#62; PackedString
+          -&#62; PackedString
+          -&#62; Int
+          -&#62; Int
+          -&#62; Bool
+          -&#62; PrimIO (Maybe REmatch)
+
+re_search :: PatBuffer          -- compiled regexp
+          -&#62; PackedString       -- string to search
+          -&#62; Int                -- start index
+          -&#62; Int                -- stop index
+          -&#62; Bool               -- True &#60;=&#62; record results in registers
+          -&#62; PrimIO (Maybe REmatch)
+
+re_search2 :: PatBuffer         -- Double buffer search
+           -&#62; PackedString
+           -&#62; PackedString
+           -&#62; Int               -- start index
+           -&#62; Int               -- range (?)
+           -&#62; Int               -- stop index
+           -&#62; Bool              -- True &#60;=&#62; results in registers
+           -&#62; PrimIO (Maybe REmatch)
+</ProgramListing>
+
+</Para>
+
+<Para>
+The <Literal>MatchPS</Literal> module provides Perl-like ``higher-level'' facilities
+to operate on <Literal>PackedStrings</Literal>.  The regular expressions in
+question are in Perl syntax.  The ``flags'' on various functions can
+include: <Literal>i</Literal> for case-insensitive, <Literal>s</Literal> for single-line mode, and
+<Literal>g</Literal> for global.  (It's probably worth your time to peruse the
+source code&hellip;)
+</Para>
+
+<Para>
+
+<ProgramListing>
+matchPS :: PackedString    -- regexp
+        -&#62; PackedString    -- string to match
+        -&#62; [Char]          -- flags
+        -&#62; Maybe REmatch   -- info about what matched and where
+
+searchPS :: PackedString    -- regexp
+         -&#62; PackedString    -- string to match
+         -&#62; [Char]          -- flags
+         -&#62; Maybe REmatch
+
+-- Perl-like match-and-substitute:
+substPS :: PackedString     -- regexp
+        -&#62; PackedString     -- replacement
+        -&#62; [Char]           -- flags
+        -&#62; PackedString     -- string
+        -&#62; PackedString
+
+-- same as substPS, but no prefix and suffix:
+replacePS :: PackedString  -- regexp
+          -&#62; PackedString  -- replacement
+          -&#62; [Char]        -- flags
+          -&#62; PackedString  -- string
+          -&#62; PackedString
+
+match2PS :: PackedString   -- regexp
+         -&#62; PackedString   -- string1 to match
+         -&#62; PackedString   -- string2 to match
+         -&#62; [Char]         -- flags
+         -&#62; Maybe REmatch
+
+search2PS :: PackedString  -- regexp
+          -&#62; PackedString  -- string to match
+          -&#62; PackedString  -- string to match
+          -&#62; [Char]        -- flags
+          -&#62; Maybe REmatch
+
+-- functions to pull the matched pieces out of an REmatch:
+
+getMatchesNo    :: REmatch -&#62; Int
+getMatchedGroup :: REmatch -&#62; Int -&#62; PackedString -&#62; PackedString
+getWholeMatch   :: REmatch -&#62; PackedString -&#62; PackedString
+getLastMatch    :: REmatch -&#62; PackedString -&#62; PackedString
+getAfterMatch   :: REmatch -&#62; PackedString -&#62; PackedString
+
+-- (reverse) brute-force string matching;
+-- Perl equivalent is index/rindex:
+findPS, rfindPS :: PackedString -&#62; PackedString -&#62; Maybe Int
+
+-- Equivalent to Perl "chop" (off the last character, if any):
+chopPS :: PackedString -&#62; PackedString
+
+-- matchPrefixPS: tries to match as much as possible of strA starting
+-- from the beginning of strB (handy when matching fancy literals in
+-- parsers):
+matchPrefixPS :: PackedString -&#62; PackedString -&#62; Int
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="RegexString">
+<Title>The <Literal>RegexString</Literal> interface
+</Title>
+
+<Para>
+<IndexTerm><Primary>RegexString library (misc syslib)</Primary></IndexTerm>
+<IndexTerm><Primary>regular-expressions library</Primary></IndexTerm>
+</Para>
+
+<Para>
+(Simon Marlow supplied the String Regex wrapper.)
+</Para>
+
+<Para>
+For simple regular expression operations, the <Literal>Regex</Literal> library is a
+little heavyweight.  <Literal>RegexString</Literal> permits regex matching on ordinary
+Haskell <Literal>String</Literal>s.
+</Para>
+
+<Para>
+The datatypes and functions that <Literal>RegexString</Literal> provides are:
+
+<ProgramListing>
+data Regex              -- a compiled regular expression
+
+mkRegex
+        :: String       -- regexp to compile
+        -&#62; Regex        -- compiled regexp
+
+matchRegex
+        :: Regex        -- compiled regexp
+        -&#62; String       -- string to match
+        -&#62; Maybe [String] -- text of $1, $2, ... (if matched)
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="Socket">
+<Title>Network-interface toolkit&mdash;<Literal>Socket</Literal> and <Literal>SocketPrim</Literal>
+</Title>
+
+<Para>
+<IndexTerm><Primary>SocketPrim interface (misc syslib)</Primary></IndexTerm>
+<IndexTerm><Primary>Socket interface (misc syslib)</Primary></IndexTerm>
+<IndexTerm><Primary>network-interface library</Primary></IndexTerm>
+<IndexTerm><Primary>sockets library</Primary></IndexTerm>
+<IndexTerm><Primary>BSD sockets library</Primary></IndexTerm>
+(Darren Moffat supplied the initial version of this library.)
+</Para>
+
+<Para>
+Your best bet for documentation is to look at the code&mdash;really!&mdash;
+normally in
+<Literal>fptools/ghc/lib/misc/&lcub;BSD,Socket,SocketPrim</Literal>.lhs&rcub;.
+</Para>
+
+<Para>
+The <Literal>BSD</Literal> module provides functions to get at
+system-database info; pretty straightforward if you're into this sort of
+thing:
+
+<ProgramListing>
+getHostName         :: IO String
+
+getServiceByName    :: ServiceName -&#62; IO ServiceEntry
+getServicePortNumber:: ServiceName -&#62; IO PortNumber
+getServiceEntry     :: IO ServiceEntry
+setServiceEntry     :: Bool -&#62; IO ()
+endServiceEntry     :: IO ()
+
+getProtocolByName   :: ProtocolName -&#62; IO ProtocolEntry
+getProtocolByNumber :: ProtocolNumber -&#62; IO ProtcolEntry
+getProtocolNumber   :: ProtocolName -&#62; ProtocolNumber
+getProtocolEntry    :: IO ProtocolEntry
+setProtocolEntry    :: Bool -&#62; IO ()
+endProtocolEntry    :: IO ()
+
+getHostByName       :: HostName -&#62; IO HostEntry
+getHostByAddr       :: Family -&#62; HostAddress -&#62; IO HostEntry
+getHostEntry        :: IO HostEntry
+setHostEntry        :: Bool -&#62; IO ()
+endHostEntry        :: IO ()
+</ProgramListing>
+</Para>
+
+<Para>
+The <Literal>SocketPrim</Literal> interface provides quite direct access to
+the socket facilities in a BSD Unix system, including all the
+complications.  We hope you don't need to use it!  See the source if
+needed&hellip;
+</Para>
+
+<Para>
+The <Literal>Socket</Literal> interface is a ``higher-level'' interface to
+sockets, and it is what we recommend.  Please tell us if the facilities it
+offers are inadequate to your task!
+</Para>
+
+<Para>
+The interface is relatively modest:
+
+<ProgramListing>
+connectTo       :: Hostname -&#62; PortID -&#62; IO Handle
+listenOn        :: PortID -&#62; IO Socket
+
+accept          :: Socket -&#62; IO (Handle, HostName)
+sendTo          :: Hostname -&#62; PortID -&#62; String -&#62; IO ()
+
+recvFrom        :: Hostname -&#62; PortID -&#62; IO String
+socketPort      :: Socket -&#62; IO PortID
+
+data PortID     -- PortID is a non-abstract type
+  = Service String        -- Service Name eg "ftp"
+  | PortNumber PortNumber -- User defined Port Number
+  | UnixSocket String     -- Unix family socket in file system
+
+type Hostname = String
+
+ -- 16-bit value (stored in network byte order).
+data PortNumber
+ -- instance of: Eq, Num, Show.
+
+mkPortNumber :: Int -&#62; PortNumber
+</ProgramListing>
+</Para>
+
+<Para>
+Various examples of networking Haskell code are provided in
+</Para>
+
+</Sect2>
+
+<Sect2 id="Select">
+<Title>The <Literal>Select</Literal> interface
+</Title>
+
+<Para>
+<IndexTerm><Primary>Select interface (misc syslib)</Primary></IndexTerm>
+</Para>
+
+<Para>
+The <Literal>Select</Literal> interface provides a Haskell wrapper for the <Literal>select()</Literal>
+OS call supplied by many modern UNIX variants. <Literal>Select</Literal> exports the
+following:
+</Para>
+
+<Para>
+
+<ProgramListing>
+type TimeOut = Maybe Int
+  -- Nothing =&#62; wait indefinitely.
+  -- Just x | x &#62;= 0    =&#62; block waiting for 'x' micro seconds.
+  --        | otherwise =&#62; block waiting for '-x' micro seconds.
+
+hSelect :: [Handle]
+        -&#62; [Handle]
+        -&#62; [Handle]
+        -&#62; TimeOut
+        -&#62; IO SelectResult
+
+type SelectResult
+ = ( [Handle]  -- input  handles ready
+   , [Handle]  -- output handles ready
+   , [Handle]  -- exc.   handles ready
+   )
+</ProgramListing>
+
+</Para>
+
+<Para>
+Here's an example of how it could be used:
+</Para>
+
+<Para>
+
+<ProgramListing>
+module Main(main) where
+
+import Select
+import IO
+
+main :: IO ()
+main = do
+  hSetBuffering stdin NoBuffering
+  putStrLn "waiting for input to appear"
+  hSelect [stdin] [] [] Nothing
+  putStrLn "input ready, let's try reading"
+  x &#60;- getChar
+  print x
+</ProgramListing>
+
+</Para>
+
+<Para>
+where the call to <Literal>hSelect</Literal> makes the process go to sleep
+until there's input available on <Literal>stdin</Literal>.
+</Para>
+
+<Para>
+Notice that this particular use of <Literal>hSelect</Literal> is now really a no-op
+with GHC compiled code, as its implementation of IO will take care to
+avoid blocking the process (i.e., all running Haskell threads), and
+call <Literal>select()</Literal> for you, if needs be. However, <Literal>hSelect</Literal> exposes
+functionality that is useful in other contexts (e.g., you want to
+wait for input on two <Literal>Handles</Literal> for 3 seconds, but no longer.)
+</Para>
+
+</Sect2>
+
+</Sect1>

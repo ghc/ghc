@@ -1,0 +1,570 @@
+<Sect1 id="runtime-control">
+<Title>Running a compiled program
+</Title>
+
+<Para>
+<IndexTerm><Primary>runtime control of Haskell programs</Primary></IndexTerm>
+<IndexTerm><Primary>running, compiled program</Primary></IndexTerm>
+<IndexTerm><Primary>RTS options</Primary></IndexTerm>
+</Para>
+
+<Para>
+To make an executable program, the GHC system compiles your code and
+then links it with a non-trivial runtime system (RTS), which handles
+storage management, profiling, etc.
+</Para>
+
+<Para>
+You have some control over the behaviour of the RTS, by giving special
+command-line arguments to your program.
+</Para>
+
+<Para>
+When your Haskell program starts up, its RTS extracts command-line
+arguments bracketed between <Literal>+RTS</Literal><IndexTerm><Primary>+RTS option</Primary></IndexTerm> and
+<Literal>-RTS</Literal><IndexTerm><Primary>-RTS option</Primary></IndexTerm> as its own.  For example:
+</Para>
+
+<Para>
+
+<Screen>
+% ./a.out -f +RTS -p -S -RTS -h foo bar
+</Screen>
+
+</Para>
+
+<Para>
+The RTS will snaffle <Literal>-p -S</Literal> for itself, and the remaining arguments
+<Literal>-f -h foo bar</Literal> will be handed to your program if/when it calls
+<Literal>System.getArgs</Literal>.
+</Para>
+
+<Para>
+No <Literal>-RTS</Literal> option is required if the runtime-system options extend to
+the end of the command line, as in this example:
+</Para>
+
+<Para>
+
+<Screen>
+% hls -ltr /usr/etc +RTS -A5m
+</Screen>
+
+</Para>
+
+<Para>
+If you absolutely positively want all the rest of the options in a
+command line to go to the program (and not the RTS), use a
+<Literal>--RTS</Literal><IndexTerm><Primary>--RTS option</Primary></IndexTerm>.
+</Para>
+
+<Para>
+As always, for RTS options that take <Literal>&lt;size&gt;</Literal>s: If the last
+character of <Literal>size</Literal> is a K or k, multiply by 1000; if an M or m, by
+1,000,000; if a G or G, by 1,000,000,000.  (And any wraparound in the
+counters is <Emphasis>your</Emphasis> fault!)
+</Para>
+
+<Para>
+Giving a <Literal>+RTS -f</Literal><IndexTerm><Primary>-f RTS option</Primary></IndexTerm> option will print out the
+RTS options actually available in your program (which vary, depending
+on how you compiled).
+</Para>
+
+<Para>
+NOTE: to send RTS options to the compiler itself, you need to prefix
+the option with <Literal>-optCrts</Literal>, eg. to increase the maximum heap size for
+a compilation to 128M, you would add <Literal>-optCrts-M128m</Literal> to the command
+line.  The compiler understands some options directly without needing
+<Literal>-optCrts</Literal>: these are <Literal>-H</Literal> and <Literal>-K</Literal>.
+</Para>
+
+<Sect2 id="rts-options-gc">
+<Title>RTS options to control the garbage-collector
+</Title>
+
+<Para>
+<IndexTerm><Primary>RTS options, garbage-collection</Primary></IndexTerm>
+</Para>
+
+<Para>
+There are several options to give you precise control over garbage
+collection.  Hopefully, you won't need any of these in normal
+operation, but there are several things that can be tweaked for
+maximum performance.
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-A&lt;size&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-A&lt;size&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>allocation area, size</Primary></IndexTerm>
+</Para>
+
+<Para>
+&lsqb;Default: 256k&rsqb; Set the allocation area size used by the garbage
+collector.  The allocation area (actually generation 0 step 0) is
+fixed and is never resized (unless you use <Literal>-H</Literal>, below).
+</Para>
+
+<Para>
+Increasing the allocation area size may or may not give better
+performance (a bigger allocation area means worse cache behaviour but
+fewer garbage collections and less promotion).
+</Para>
+
+<Para>
+With only 1 generation (<Literal>-G1</Literal>) the <Literal>-A</Literal> option specifies the
+minimum allocation area, since the actual size of the allocation area
+will be resized according to the amount of data in the heap (see
+<Literal>-F</Literal>, below).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-F&lt;factor&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-F&lt;factor&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>heap size, factor</Primary></IndexTerm>
+</Para>
+
+<Para>
+&lsqb;Default: 2&rsqb; This option controls the amount of memory reserved for
+the older generations (and in the case of a two space collector the
+size of the allocation area) as a factor of the amount of live data.
+For example, if there was 2M of live data in the oldest generation
+when we last collected it, then by default we'll wait until it grows
+to 4M before collecting it again.
+</Para>
+
+<Para>
+The default seems to work well here.  If you have plenty of memory, it
+is usually better to use <Literal>-H&lt;size&gt;</Literal> than to increase
+<Literal>-F&lt;factor&gt;</Literal>.
+</Para>
+
+<Para>
+The <Literal>-F</Literal> setting will be automatically reduced by the garbage
+collector when the maximum heap size (the <Literal>-M&lt;size&gt;</Literal> setting)
+is approaching.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-G&lt;generations&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-G&lt;generations&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>generations, number of</Primary></IndexTerm>
+</Para>
+
+<Para>
+&lsqb;Default: 2&rsqb; Set the number of generations used by the garbage
+collector.  The default of 2 seems to be good, but the garbage
+collector can support any number of generations.  Anything larger than
+about 4 is probably not a good idea unless your program runs for a
+<Emphasis>long</Emphasis> time, because the oldest generation will never get
+collected.
+</Para>
+
+<Para>
+Specifying 1 generation with <Literal>+RTS -G1</Literal> gives you a simple 2-space
+collector, as you would expect.  In a 2-space collector, the <Literal>-A</Literal>
+option (see above) specifies the <Emphasis>minimum</Emphasis> allocation area size,
+since the allocation area will grow with the amount of live data in
+the heap.  In a multi-generational collector the allocation area is a
+fixed size (unless you use the <Literal>-H</Literal> option, see below).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-H&lt;size&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-H&lt;size&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>heap size, suggested</Primary></IndexTerm>
+</Para>
+
+<Para>
+&lsqb;Default: 0&rsqb; This option provides a "suggested heap size" for the
+garbage collector.  The garbage collector will use about this much
+memory until the program residency grows and the heap size needs to be
+expanded to retain reasonable performance.
+</Para>
+
+<Para>
+By default, the heap will start small, and grow and shrink as
+necessary.  This can be bad for performance, so if you have plenty of
+memory it's worthwhile supplying a big <Literal>-H&lt;size&gt;</Literal>.  For
+improving GC performance, using <Literal>-H&lt;size&gt;</Literal> is usually a better
+bet than <Literal>-A&lt;size&gt;</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-k&lt;size&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-k&lt;size&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>stack, minimum size</Primary></IndexTerm>
+</Para>
+
+<Para>
+&lsqb;Default: 1k&rsqb; Set the initial stack size for new threads.  Thread
+stacks (including the main thread's stack) live on the heap, and grow
+as required.  The default value is good for concurrent applications
+with lots of small threads; if your program doesn't fit this model
+then increasing this option may help performance.
+</Para>
+
+<Para>
+The main thread is normally started with a slightly larger heap to cut
+down on unnecessary stack growth while the program is starting up.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-K&lt;size&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-K&lt;size&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>stack, maximum size</Primary></IndexTerm>
+</Para>
+
+<Para>
+&lsqb;Default: 1M&rsqb; Set the maximum stack size for an individual thread to
+<Literal>&lt;size&gt;</Literal> bytes.  This option is there purely to stop the program
+eating up all the available memory in the machine if it gets into an
+infinite loop.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-m&lt;n&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-m&lt;n&gt; RTS option</Primary></IndexTerm>
+Minimum &percnt; <Literal>&lt;n&gt;</Literal> of heap which must be available for allocation.
+The default is 3&percnt;.
+<IndexTerm><Primary>heap, minimum free</Primary></IndexTerm>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-M&lt;size&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-M&lt;size&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>heap size, maximum</Primary></IndexTerm>
+</Para>
+
+<Para>
+&lsqb;Default: 64M&rsqb; Set the maximum heap size to <Literal>&lt;size&gt;</Literal> bytes.  The heap
+normally grows and shrinks according to the memory requirements of the
+program.  The only reason for having this option is to stop the heap
+growing without bound and filling up all the available swap space,
+which at the least will result in the program being summarily killed
+by the operating system.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-s&lt;file&gt;</Literal> or <Literal>-S&lt;file&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-S&lt;file&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>-s&lt;file&gt; RTS option</Primary></IndexTerm>
+Write modest (<Literal>-s</Literal>) or verbose (<Literal>-S</Literal>) garbage-collector
+statistics into file <Literal>&lt;file&gt;</Literal>. The default <Literal>&lt;file&gt;</Literal> is
+<Literal>&lt;program&gt;@.stat</Literal>. The <Literal>&lt;file&gt;</Literal> <Literal>stderr</Literal> is treated
+specially, with the output really being sent to <Literal>stderr</Literal>.
+</Para>
+
+<Para>
+This option is useful for watching how the storage manager adjusts the
+heap size based on the current amount of live data.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2>
+<Title>RTS options for profiling and Concurrent/Parallel Haskell</Title>
+
+<Para>
+The RTS options related to profiling are described in <XRef LinkEnd="prof-rts-options">; and those for concurrent/parallel stuff, in
+<XRef LinkEnd="parallel-rts-opts">.
+</Para>
+
+</Sect2>
+
+<Sect2>
+<Title>RTS options for hackers, debuggers, and over-interested souls</Title>
+
+<Para>
+<IndexTerm><Primary>RTS options, hacking/debugging</Primary></IndexTerm>
+</Para>
+
+<Para>
+These RTS options might be used (a)&nbsp;to avoid a GHC bug, (b)&nbsp;to see
+``what's really happening'', or (c)&nbsp;because you feel like it.  Not
+recommended for everyday use!
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>-B</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-B RTS option</Primary></IndexTerm>
+Sound the bell at the start of each (major) garbage collection.
+</Para>
+
+<Para>
+Oddly enough, people really do use this option!  Our pal in Durham
+(England), Paul Callaghan, writes: ``Some people here use it for a
+variety of purposes&mdash;honestly!&mdash;e.g., confirmation that the
+code/machine is doing something, infinite loop detection, gauging cost
+of recently added code. Certain people can even tell what stage &lsqb;the
+program&rsqb; is in by the beep pattern. But the major use is for annoying
+others in the same office&hellip;''
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-r&lt;file&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-r &lt;file&gt; RTS option</Primary></IndexTerm>
+<IndexTerm><Primary>ticky ticky profiling</Primary></IndexTerm>
+Produce ``ticky-ticky'' statistics at the end of the program run.
+The <Literal>&lt;file&gt;</Literal> business works just like on the <Literal>-S</Literal> RTS option (above).
+</Para>
+
+<Para>
+``Ticky-ticky'' statistics are counts of various program actions
+(updates, enters, etc.)  The program must have been compiled using
+<Literal>-ticky</Literal><IndexTerm><Primary>-ticky option</Primary></IndexTerm> (a.k.a. ``ticky-ticky profiling''),
+and, for it to be really useful, linked with suitable system
+libraries.  Not a trivial undertaking: consult the installation guide
+on how to set things up for easy ``ticky-ticky'' profiling.  For more
+information, see <XRef LinkEnd="ticky-ticky">.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-D&lt;num&gt;</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-D RTS option</Primary></IndexTerm>
+An RTS debugging flag; varying quantities of output depending on which
+bits are set in <Literal>&lt;num&gt;</Literal>.  Only works if the RTS was compiled with the
+<Literal>DEBUG</Literal> option.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>-Z</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-Z RTS option</Primary></IndexTerm>
+Turn <Emphasis>off</Emphasis> ``update-frame squeezing'' at garbage-collection
+time.  (There's no particularly good reason to turn it off, except to
+ensure the accuracy of certain data collected regarding thunk entry
+counts.)
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+</Sect2>
+
+<Sect2 id="rts-hooks">
+<Title>``Hooks'' to change RTS behaviour
+</Title>
+
+<Para>
+<IndexTerm><Primary>hooks, RTS</Primary></IndexTerm>
+<IndexTerm><Primary>RTS hooks</Primary></IndexTerm>
+<IndexTerm><Primary>RTS behaviour, changing</Primary></IndexTerm>
+</Para>
+
+<Para>
+GHC lets you exercise rudimentary control over the RTS settings for
+any given program, by compiling in a ``hook'' that is called by the
+run-time system.  The RTS contains stub definitions for all these
+hooks, but by writing your own version and linking it on the GHC
+command line, you can override the defaults.
+</Para>
+
+<Para>
+The function <Literal>defaultsHook</Literal><IndexTerm><Primary>defaultHook</Primary></IndexTerm> lets you change various
+RTS options.  The commonest use for this is to give your program a
+default heap and/or stack size that is greater than the default.  For
+example, to set <Literal>-H8m -K1m</Literal>:
+</Para>
+
+<Para>
+
+<ProgramListing>
+#include "Rts.h"
+#include "RtsFlags.h"
+void defaultsHook (void) {
+   RTSflags.GcFlags.stksSize =  1000002 / sizeof(W_);
+   RTSflags.GcFlags.heapSize =  8000002 / sizeof(W_);
+}
+</ProgramListing>
+
+</Para>
+
+<Para>
+Don't use powers of two for heap/stack sizes: these are more likely to
+interact badly with direct-mapped caches.  The full set of flags is
+defined in <Literal>ghc/rts/RtsFlags.h</Literal> the the GHC source tree.
+</Para>
+
+<Para>
+You can also change the messages printed when the runtime system
+``blows up,'' e.g., on stack overflow.  The hooks for these are as
+follows:
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>void ErrorHdrHook (FILE *)</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>ErrorHdrHook</Primary></IndexTerm>
+What's printed out before the message from <Literal>error</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>void OutOfHeapHook (unsigned long, unsigned long)</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>OutOfHeapHook</Primary></IndexTerm>
+The heap-overflow message.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>void StackOverflowHook (long int)</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>StackOverflowHook</Primary></IndexTerm>
+The stack-overflow message.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>void MallocFailHook (long int)</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>MallocFailHook</Primary></IndexTerm>
+The message printed if <Literal>malloc</Literal> fails.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>void PatErrorHdrHook (FILE *)</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>PatErrorHdrHook</Primary></IndexTerm>
+The message printed if a pattern-match fails (the failures
+that were not handled by the Haskell programmer).
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>void PreTraceHook (FILE *)</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>PreTraceHook</Primary></IndexTerm>
+What's printed out before a <Literal>trace</Literal> message.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>void PostTraceHook (FILE *)</Literal>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>PostTraceHook</Primary></IndexTerm>
+What's printed out after a <Literal>trace</Literal> message.
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+For example, here is the ``hooks'' code used by GHC itself:
+
+<ProgramListing>
+#include &#60;stdio.h&#62;
+#define W_ unsigned long int
+#define I_ long int
+
+void
+ErrorHdrHook (FILE *where)
+{
+    fprintf(where, "\n"); /* no "Fail: " */
+}
+
+void
+OutOfHeapHook (W_ request_size, W_ heap_size) /* both sizes in bytes */
+{
+    fprintf(stderr, "GHC's heap exhausted;\nwhile trying to 
+        allocate %lu bytes in a %lu-byte heap;\nuse the `-H&#60;size&#62;'
+        option to increase the total heap size.\n",
+        request_size,
+        heap_size);
+}
+
+void
+StackOverflowHook (I_ stack_size)    /* in bytes */
+{
+    fprintf(stderr, "GHC stack-space overflow: current size
+        %ld bytes.\nUse the `-K&#60;size&#62;' option to increase it.\n",
+        stack_size);
+}
+
+void
+PatErrorHdrHook (FILE *where)
+{
+    fprintf(where, "\n*** Pattern-matching error within GHC!\n\n
+        This is a compiler bug; please report it to
+        glasgow-haskell-bugs@haskell.org.\n\nFail: ");
+}
+
+void
+PreTraceHook (FILE *where)
+{
+    fprintf(where, "\n"); /* not "Trace On" */
+}
+
+void
+PostTraceHook (FILE *where)
+{
+    fprintf(where, "\n"); /* not "Trace Off" */
+}
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+</Sect1>

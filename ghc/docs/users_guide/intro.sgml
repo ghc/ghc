@@ -1,0 +1,398 @@
+<Chapter id="introduction-GHC">
+<Title>Introduction to GHC
+</Title>
+
+<Para>
+This is a guide to using the Glasgow Haskell compilation (GHC) system. It is
+a batch compiler for the Haskell&nbsp;98 language, with support for various
+Glasgow-only extensions. In this document, we assume that GHC has been
+installed at your site as <Literal>ghc</Literal>.  A separate document,
+``Building and Installing the Glasgow Functional Programming Tools Suite'',
+describes how to install <Literal>ghc</Literal>.
+</Para>
+
+<Para>
+Many people will use GHC very simply: compile some
+modules&mdash;<Literal>ghc -c -O Foo.hs Bar.hs</Literal>; and link them&mdash;
+<Literal>ghc -o wiggle -O Foo.o Bar.o</Literal>.
+</Para>
+
+<Para>
+But if you need to do something more complicated, GHC can do that,
+too:
+
+<Screen>
+ghc -c -O -fno-foldr-build -dcore-lint -fvia-C -ddump-simpl Foo.lhs
+</Screen>
+
+Stay tuned&mdash;all will be revealed!
+</Para>
+
+<Para>
+The rest of this section provide some tutorial information
+on batch-style compilation; if you're familiar with these concepts
+already, then feel free to skip to the next section.
+</Para>
+
+<Sect1 id="batch-system-parts">
+<Title>The (batch) compilation system components</Title>
+
+<Para>
+The Glorious Haskell Compilation System, as with most UNIX (batch)
+compilation systems, has several interacting parts:
+
+<OrderedList>
+<ListItem>
+<Para>
+A <Emphasis>driver</Emphasis><IndexTerm><Primary>driver program</Primary></IndexTerm> 
+<Literal>ghc</Literal><IndexTerm><Primary>ghc</Primary></IndexTerm>&mdash;which
+you usually think of as ``the compiler''&mdash;is a program that merely
+invokes/glues-together the other pieces of the system (listed below),
+passing the right options to each, slurping in the right libraries, etc.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+A <Emphasis>literate pre-processor</Emphasis>
+<IndexTerm><Primary>literate pre-processor</Primary></IndexTerm>
+<IndexTerm><Primary>pre-processor, literate</Primary></IndexTerm>
+<Literal>unlit</Literal><IndexTerm><Primary>unlit</Primary></IndexTerm> that extracts Haskell
+code from a literate script; used if you believe in that sort of
+thing.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Emphasis>Haskellised C pre-processor</Emphasis>
+<IndexTerm><Primary>Haskellised C pre-processor</Primary></IndexTerm>
+<IndexTerm><Primary>C pre-processor, Haskellised</Primary></IndexTerm>
+<IndexTerm><Primary>pre-processor, Haskellised C</Primary></IndexTerm>
+<Literal>hscpp</Literal>,<IndexTerm><Primary>hscpp</Primary></IndexTerm> only needed by people requiring conditional
+compilation, probably for large systems.  The ``Haskellised'' part
+just means that <Literal>&num;line</Literal> directives in the output have been
+converted into proper Haskell <Literal>&lcub;-&num; LINE ... -&rcub;</Literal> pragmas. You must give an explicit <Literal>-cpp</Literal> option 
+<IndexTerm><Primary>-cpp option</Primary></IndexTerm> for the C pre-processor to be invoked.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Emphasis>Haskell compiler</Emphasis>
+<IndexTerm><Primary>Haskell compiler</Primary></IndexTerm>
+<IndexTerm><Primary>compiler, Haskell</Primary></IndexTerm>
+<Literal>hsc</Literal>,<IndexTerm><Primary>hsc</Primary></IndexTerm>
+which&mdash;in normal use&mdash;takes its input from the C pre-processor
+and produces assembly-language output (sometimes: ANSI C output).
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Emphasis>ANSI&nbsp;C Haskell high-level assembler :-)</Emphasis>
+<IndexTerm><Primary>ANSI C compiler</Primary></IndexTerm>
+<IndexTerm><Primary>high-level assembler</Primary></IndexTerm>
+<IndexTerm><Primary>assembler, high-level</Primary></IndexTerm>
+compiles <Literal>hsc</Literal>'s C output into assembly language for a particular
+target architecture.  In fact, the only C compiler we currently
+support is <Literal>gcc</Literal>, because we make use of certain extensions to the
+C language only supported by gcc.  Version 2.x is a must; we recommend
+version 2.7.2.1 for stability (we've heard both good and bad reports
+of later versions).
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Emphasis>assembler</Emphasis><IndexTerm><Primary>assembler</Primary></IndexTerm>&mdash;a standard UNIX one, probably
+<Literal>as</Literal><IndexTerm><Primary>as</Primary></IndexTerm>.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Emphasis>linker</Emphasis><IndexTerm><Primary>linker</Primary></IndexTerm>&mdash;a standard UNIX one, probably
+<Literal>ld</Literal>.<IndexTerm><Primary>ld</Primary></IndexTerm>
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+A <Emphasis>runtime system</Emphasis>,<IndexTerm><Primary>runtime system</Primary></IndexTerm> including (most notably)
+a storage manager; the linker links in the code for this.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+The <Emphasis>Haskell standard prelude</Emphasis><IndexTerm><Primary>standard prelude</Primary></IndexTerm>, a
+large library of standard functions, is linked in as well.
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Parts of other <Emphasis>installed libraries</Emphasis> that you have at your site may be linked in also.
+</Para>
+</ListItem>
+
+</OrderedList>
+</Para>
+
+</Sect1>
+
+<Sect1 id="compile-what-really-happens">
+<Title>What really happens when I ``compile'' a Haskell program?
+</Title>
+
+<Para>
+You invoke the Glasgow Haskell compilation system through the
+driver program <Literal>ghc</Literal>.<IndexTerm><Primary>ghc</Primary></IndexTerm> For example, if you had typed a
+literate ``Hello, world!'' program into <Literal>hello.lhs</Literal>, and you then
+invoked:
+
+<Screen>
+ghc hello.lhs
+</Screen>
+
+</Para>
+
+<Para>
+the following would happen:
+
+<OrderedList>
+<ListItem>
+
+<Para>
+The file <Literal>hello.lhs</Literal> is run through the literate-program
+code extractor <Literal>unlit</Literal><IndexTerm><Primary>unlit</Primary></IndexTerm>, feeding its output to
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The Haskell compiler proper <Literal>hsc</Literal><IndexTerm><Primary>hsc</Primary></IndexTerm>, which produces
+input for
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The assembler (or that ubiquitous ``high-level assembler,'' a C
+compiler), which produces an object file and passes it to
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The linker, which links your code with the appropriate libraries
+(including the standard prelude), producing an executable program in
+the default output file named <Literal>a.out</Literal>.
+</Para>
+</ListItem>
+
+</OrderedList>
+
+</Para>
+
+<Para>
+You have considerable control over the compilation process.  You feed
+command-line arguments (call them ``options,'' for short) to the
+driver, <Literal>ghc</Literal>; the ``types'' of the input files (as encoded in
+their names' suffixes) also matter.
+</Para>
+
+<Para>
+Here's hoping this is enough background so that you can read the rest
+of this guide!
+</Para>
+
+</Sect1>
+
+<Sect1 id="mailing-lists-GHC">
+<Title>Meta-information: Web sites, mailing lists, etc.
+</Title>
+
+<Para>
+<IndexTerm><Primary>mailing lists, Glasgow Haskell</Primary></IndexTerm>
+<IndexTerm><Primary>Glasgow Haskell mailing lists</Primary></IndexTerm>
+</Para>
+
+<Para>
+On the World-Wide Web, there are several URLs of likely interest:
+</Para>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+  <ULink
+URL="http://www.haskell.org/"
+>Haskell home page</ULink
+>
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+  <ULink
+URL="http://www.haskell.org/ghc/"
+>GHC home page</ULink
+>
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+  <ULink
+URL="http://www.dcs.gla.ac.uk/fp/"
+>Glasgow FP group page</ULink
+>
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+  <ULink
+URL="http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html"
+>comp.lang.functional FAQ</ULink
+>
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+<Para>
+We run two mailing lists about Glasgow Haskell.  We encourage you to
+join, as you feel is appropriate.
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term>glasgow-haskell-users:</Term>
+<ListItem>
+<Para>
+This list is for GHC users to chat among themselves.  Subscribe by
+sending mail to <ULink
+URL="mailto:majordomo@haskell.org"
+>majordomo@haskell.org</ULink
+>, with a message body (not
+header) like this:
+</Para>
+
+<Para>
+
+<Screen> 
+subscribe glasgow-haskell-users MyName &#60;m.y.self@bigbucks.com&#62; 
+</Screen>
+ 
+</Para>
+
+<Para>
+(The last bit is your all-important e-mail address, of course.)
+</Para>
+
+<Para>
+To communicate with your fellow users, send mail to <ULink
+URL="mailto:glasgow-haskell-users@haskell.org"
+>glasgow-haskell-users@haskell.org</ULink
+>.
+</Para>
+
+<Para>
+To contact the list administrator, send mail to <ULink
+URL="mailto:glasgow-haskell-users-request@haskell.org"
+>glasgow-haskell-users-request@haskell.org</ULink
+>.  An archive
+of the list is available on the Web: <ULink
+URL="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-users"
+>glasgow-haskell-users mailing list archive</ULink
+>.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term>glasgow-haskell-bugs:</Term>
+<ListItem>
+<Para>
+Send bug reports for GHC to this address!  The sad and lonely people
+who subscribe to this list will muse upon what's wrong and what you
+might do about it.
+</Para>
+
+<Para>
+Subscribe via <ULink
+URL="mailto:majordomo@haskell.org"
+>majordomo@haskell.org</ULink
+> with:
+</Para>
+
+<Para>
+
+<Screen>
+subscribe glasgow-haskell-bugs My Name &#60;m.y.self@hackers.r.us&#62;
+</Screen>
+
+</Para>
+
+<Para>
+Again, you may contact the list administrator at <ULink
+URL="mailto:glasgow-haskell-bugs-request@haskell.org"
+>glasgow-haskell-bugs-request@haskell.org</ULink
+>.
+And, yes, an archive of the list is available on the Web at: : <ULink
+URL="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs"
+>glasgow-haskell-bugs mailing list archive</ULink
+>
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+There is also the general Haskell mailing list.  Subscribe by sending
+email to <ULink
+URL="mailto:majordomo@dcs.gla.ac.uk"
+>majordomo@dcs.gla.ac.uk</ULink
+>, with the usual message body:
+</Para>
+
+<Para>
+
+<Screen>
+subscribe haskell My Name &#60;m.y.self@@fp.rules.ok.org&#62;
+</Screen>
+
+</Para>
+
+<Para>
+Some Haskell-related discussion takes place in the Usenet newsgroup
+<Literal>comp.lang.functional</Literal>.  (But note: news is basically dead at Glasgow.
+That's one reason Glaswegians aren't too active in c.f.l.)
+</Para>
+
+<Para>
+The main anonymous-FTP site for Glasgow Haskell is <ULink
+URL="ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow"
+>ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow</ULink
+>.  ``Important''
+bits are mirrored at other Haskell archive sites (and we have their
+stuff, too).
+</Para>
+
+</Sect1>
+
+&relnotes
+
+</Chapter>
