@@ -10,8 +10,7 @@ test "ffi001"   { vtr("-fglasgow-exts",        "", "") }
 
 -- skip this test for now: we don't have the machinery to compile the .c file
 -- separately.
-test "ffi002"   { skip when True
-		  vtr("ffi002.c -fglasgow-exts -no-hs-main", "", "") }
+test "ffi002"   { vtr("ffi002_c.c -fglasgow-exts -no-hs-main", "", "") }
 
 test "ffi003"   { skip when $platform == "alpha-dec-osf3" -- no NCG on Alpha yet
 		  vtr("-fglasgow-exts", "", "") }
