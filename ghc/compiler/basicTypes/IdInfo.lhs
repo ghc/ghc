@@ -511,6 +511,15 @@ downstream, by the code generator.
 data CgInfo = CgInfo 
 		!Arity 		-- Exact arity for calling purposes
 		!CafInfo
+#ifdef DEBUG
+	    | NoCgInfo		-- In debug mode we don't want a black hole here
+				-- See Id.idCgInfo
+
+	-- noCgInfo is used for local Ids, which shouldn't need any CgInfo
+noCgInfo = NoCgInfo
+#else
+noCgInfo = panic "NoCgInfo!"
+#endif
 
 cgArity   (CgInfo arity _)    = arity
 cgCafInfo (CgInfo _ caf_info) = caf_info
@@ -522,9 +531,6 @@ setCafInfo info caf_info =
 setCgArity info arity = 
   case cgInfo info of { CgInfo _ caf_info  -> 
 	info `setCgInfo` CgInfo arity caf_info }
-
-	-- Used for local Ids, which shouldn't need any CgInfo
-noCgInfo = panic "noCgInfo!"
 
 cgMayHaveCafRefs (CgInfo _ caf_info) = mayHaveCafRefs caf_info
 

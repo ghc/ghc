@@ -97,6 +97,7 @@ import PrimRep		( PrimRep )
 import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
 import SrcLoc		( SrcLoc )
+import Outputable
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques, 
 			  getNumBuiltinUniques )
 
@@ -358,7 +359,13 @@ setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 	---------------------------------
 	-- CG INFO
 idCgInfo :: Id -> CgInfo
+#ifdef DEBUG
+idCgInfo id = case cgInfo (idInfo id) of
+		  NoCgInfo -> pprPanic "idCgInfo" (ppr id)
+		  info     -> info
+#else
 idCgInfo id = cgInfo (idInfo id)
+#endif		
 
 setIdCgInfo :: Id -> CgInfo -> Id
 setIdCgInfo id cg_info = modifyIdInfo (`setCgInfo` cg_info) id

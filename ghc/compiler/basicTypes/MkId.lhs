@@ -220,6 +220,7 @@ mkDataConWrapId data_con
 		-- The Cpr info can be important inside INLINE rhss, where the
 		-- wrapper constructor isn't inlined
 	   `setCgArity` 	arity
+		-- The NoCaf-ness is set by noCafNoTyGenIdInfo
 	   `setArityInfo`	exactArity arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
