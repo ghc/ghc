@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.117 2003/06/24 07:58:20 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.118 2003/08/08 16:46:51 simonmar Exp $
 --
 -- Driver flags
 --
@@ -127,7 +127,7 @@ findArg :: [(String,OptKind)] -> String -> Maybe (String,OptKind)
 findArg spec arg
   = case [ (remove_spaces rest, k) 
 	 | (pat,k)   <- spec, 
-	   Just rest <- [my_prefix_match pat arg],
+	   Just rest <- [maybePrefixMatch pat arg],
 	   arg_ok k rest arg ] 
     of
 	[]      -> Nothing
@@ -252,7 +252,7 @@ static_flags =
 				    then do writeIORef v_Split_object_files True
 					    add v_Opt_C "-fglobalise-toplev-names"
 				    else hPutStrLn stderr
-					    "warning: don't know how to  split \
+					    "warning: don't know how to  split \ 
 					    \object files on this architecture"
 				) )
 
