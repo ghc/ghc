@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.52 2001/02/11 16:48:21 simonmar Exp $
+# $Id: Makefile,v 1.53 2001/02/11 17:01:46 simonmar Exp $
 #
 
 TOP=..
@@ -94,7 +94,7 @@ INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 
 ifeq "$(INSTALLING)" "1"
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-SCRIPT_LINK 	=  ghci
+LINK 		=  ghci
 else
 SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
 endif

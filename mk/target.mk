@@ -428,6 +428,7 @@ endif
 $(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
 	ld -r -x -o $@ $(GHCI_LIBOBJS) $(STUBOBJS)
 
+INSTALL_LIBS += $(GHCI_LIBRARY)
 CLEAN_FILES += $(GHCI_LIBRARY)
 endif
 endif
@@ -633,30 +634,67 @@ endif
 	@echo Done.
 endif
 
-# links to script programs: we sometimes install a script as
-# <name>-<version> with a link from <name> to the real script.
+# ---------------------------------------------------------------------------
+# Symbolic links
 
-ifneq "$(SCRIPT_LINK)" ""
-all :: $(SCRIPT_LINK)
+# links to programs: we sometimes install a program as
+# <name>-<version> with a link from <name> to the real program.
+
+ifneq "$(LINK)" ""
+
+all :: $(LINK)
+
+CLEAN_FILES += $(LINK)
+
+ifeq "$(LINK_TARGET)" ""
+ifneq "$(SCRIPT_PROG)" ""
+LINK_TARGET = $(SCRIPT_PROG)
+else
+ifneq "$(HS_PROG)" ""
+LINK_TARGET = $(HS_PROG)
+else
+ifneq "$(C_PROG)" ""
+LINK_TARGET = $(C_PROG)
+else
+LINK_TARGET = dunno
+endif
+endif
+endif
+endif
 
 #
-# Don't want to overwrite $(SCRIPT_LINK)s that aren't symbolic
+# Don't want to overwrite $(LINK)s that aren't symbolic
 # links. Testing for symbolic links is problematic to do in
 # a portable fashion using a /bin/sh test, so we simply rely
 # on perl.
 #
-$(SCRIPT_LINK) : $(SCRIPT_PROG)
-	@if ( $(PERL) -e '$$fn="$(SCRIPT_LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   echo "Creating a symbolic link from $(SCRIPT_PROG) to $(SCRIPT_LINK)"; \
-	   $(RM) $(SCRIPT_LINK); \
-	   $(LN_S) $(SCRIPT_PROG) $(SCRIPT_LINK); \
+$(LINK) : $(LINK_TARGET)
+	@if ( $(PERL) -e '$$fn="$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK)"; \
+	   $(RM) $(LINK); \
+	   $(LN_S) $(LINK_TARGET) $(LINK); \
 	 else \
-	   echo "Creating a symbolic link from $(SCRIPT_PROG) to $(SCRIPT_LINK) failed: \`$(SCRIPT_LINK)' already exists"; \
-	   echo "Perhaps remove \`$(SCRIPT_LINK)' manually?"; \
+	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) failed: \`$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(LINK)' manually?"; \
 	   exit 1; \
 	 fi;
-endif
 
+
+#
+# install links to script drivers.
+#
+install ::
+	@if ( $(PERL) -e '$$fn="$(bindir)/$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbol link from $(LINK_TARGET) to $(LINK) in $(bindir)"; \
+	   $(RM) $(bindir)/$(LINK); \
+	   $(LN_S) $(LINK_TARGET) $(bindir)/$(LINK); \
+	 else \
+	   echo "Creating a symbol link from $(LINK_TARGET) to $(LINK) in $(bindir) failed: \`$(bindir)/$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(bindir)/$(LINK)' manually?"; \
+	   exit 1; \
+	 fi;
+
+endif # LINK 
 
 
 ###########################################
@@ -854,23 +892,6 @@ uninstall::
 ifneq "$(way)" ""
 install-strip::
 	@$(MAKE) EXTRA_INSTALL_OPTS='-s' install                                	
-endif
-
-#
-# install links to script drivers.
-#
-ifneq "$(SCRIPT_LINK)" ""
-install ::
-	@if ( $(PERL) -e '$$fn="$(bindir)/$(SCRIPT_LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK) in $(bindir)"; \
-	   $(RM) $(bindir)/$(SCRIPT_LINK); \
-	   $(LN_S) $(SCRIPT_PROG) $(bindir)/$(SCRIPT_LINK); \
-	 else \
-	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK) in $(bindir) failed: \`$(bindir)/$(SCRIPT_LINK)' already exists"; \
-	   echo "Perhaps remove \`$(bindir)/$(SCRIPT_LINK)' manually?"; \
-	   exit 1; \
-	 fi;
-
 endif
 
 ###########################################
