@@ -2,7 +2,7 @@
 cc002.hs:10:
     No instance for `CReturnable ForeignObj'
     arising from the result of the _ccall_ to `a' at cc002.hs:10
-    In the right-hand side of a pattern binding: _ccall_ a
+    In the right-hand side of an equation for `a': _ccall_ a
 
 Compilation had errors
 

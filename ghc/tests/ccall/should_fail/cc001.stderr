@@ -2,7 +2,7 @@
 cc001.hs:5:
     Ambiguous type variable(s) `t' in the constraint `CCallable t'
     arising from an argument in the _ccall_ to `foo', namely `(undefined ())' at cc001.hs:5
-    In the right-hand side of a pattern binding:
+    In the right-hand side of an equation for `f':
 	_ccall_ foo (undefined ())
 
 Compilation had errors
