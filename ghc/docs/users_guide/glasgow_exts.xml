@@ -2108,6 +2108,68 @@ the binding for <literal>?x</literal>, so the type of <literal>f</literal> is
 </para>
 
 </sect3>
+
+<sect3><title>Implicit parameters and polymorphic recursion</title>
+
+<para>
+Consider these two definitions:
+<programlisting>
+  len1 :: [a] -> Int
+  len1 xs = let ?acc = 0 in len_acc1 xs
+
+  len_acc1 [] = ?acc
+  len_acc1 (x:xs) = let ?acc = ?acc + (1::Int) in len_acc1 xs
+
+  ------------
+
+  len2 :: [a] -> Int
+  len2 xs = let ?acc = 0 in len_acc2 xs
+
+  len_acc2 :: (?acc :: Int) => [a] -> Int
+  len_acc2 [] = ?acc
+  len_acc2 (x:xs) = let ?acc = ?acc + (1::Int) in len_acc2 xs
+</programlisting>
+The only difference between the two groups is that in the second group
+<literal>len_acc</literal> is given a type signature.
+In the former case, <literal>len_acc1</literal> is monomorphic in its own
+right-hand side, so the implicit parameter <literal>?acc</literal> is not
+passed to the recursive call.  In the latter case, because <literal>len_acc2</literal>
+has a type signature, the recursive call is made to the
+<emphasis>polymoprhic</emphasis> version, which takes <literal>?acc</literal>
+as an implicit parameter.  So we get the following results in GHCi:
+<programlisting>
+  Prog> len1 "hello"
+  0
+  Prog> len2 "hello"
+  5
+</programlisting>
+Adding a type signature dramatically changes the result!  This is a rather
+counter-intuitive phenomenon, worth watching out for.
+</para>
+</sect3>
+
+<sect3><title>Implicit parameters and monomorphism</title>
+
+<para>GHC applies the dreaded Monomorphism Restriction (section 4.5.5 of the
+Haskell Report) to implicit parameters.  For example, consider:
+<programlisting>
+ f :: Int -> Int
+  f v = let ?x = 0     in
+        let y = ?x + v in
+        let ?x = 5     in
+        y
+</programlisting>
+Since the binding for <literal>y</literal> falls under the Monomorphism
+Restriction it is not generalised, so the type of <literal>y</literal> is
+simply <literal>Int</literal>, not <literal>(?x::Int) => Int</literal>.
+Hence, <literal>(f 9)</literal> returns result <literal>9</literal>.
+If you add a type signature for <literal>y</literal>, then <literal>y</literal>
+will get type <literal>(?x::Int) => Int</literal>, so the occurrence of
+<literal>y</literal> in the body of the <literal>let</literal> will see the
+inner binding of <literal>?x</literal>, so <literal>(f 9)</literal> will return
+<literal>14</literal>.
+</para>
+</sect3>
 </sect2>
 
 <sect2 id="linear-implicit-parameters">
