@@ -382,7 +382,7 @@ overlappingError pkg overlaps
 multiplePackagesErr str ps =
   throwDyn (CmdLineError (showSDoc (
 		   text "Error; multiple packages match" <+> 
-			text str <> colon <>
+			text str <> colon <+>
 		    sep (punctuate comma (map (text.showPackageId.package) ps))
 		)))
 
