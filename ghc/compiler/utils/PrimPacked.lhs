@@ -62,7 +62,7 @@ strLength a =
     _ccall_ strlen a  >>= \ len@(I# _) ->
     return len
  )
-
+{-# NOINLINE strLength #-}
 \end{code}
 
 Copying a char string prefix into a byte array,
