@@ -32,7 +32,7 @@ import Match		( matchWrapper, matchSimply )
 import CostCentre	( mkUserCC )
 import FieldLabel	( FieldLabel )
 import Id		( Id, idType, recordSelectorFieldLabel )
-import DataCon		( DataCon, dataConId, dataConTyCon, dataConArgTys, dataConFieldLabels )
+import DataCon		( DataCon, dataConWrapId, dataConTyCon, dataConArgTys, dataConFieldLabels )
 import PrelInfo		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, addr2IntegerId )
 import TyCon		( isNewTyCon )
 import DataCon		( isExistentialDataCon )
@@ -507,7 +507,7 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
 					(dataConFieldLabels con) arg_ids
-		rhs = foldl HsApp (DictApp (TyApp (HsVar (dataConId con)) 
+		rhs = foldl HsApp (DictApp (TyApp (HsVar (dataConWrapId con)) 
 						  out_inst_tys)
 					   dicts)
 				  val_args

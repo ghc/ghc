@@ -57,8 +57,8 @@ import Name		( Name, getName )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  ipName_maybe,
 			  splitFunTy_maybe, splitFunTys, isNotUsgTy,
-			  mkTyConApp,
-			  splitForAllTys, splitRhoTy,
+			  mkTyConApp, splitSigmaTy, 
+			  splitRhoTy,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
 			  isForAllTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
 			  boxedTypeKind, mkArrowKind,
@@ -562,8 +562,9 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 	(Just sel_id : _)	  = maybe_sel_ids
-	(_, tau)	      	  = ASSERT( isNotUsgTy (idType sel_id) )
-                                    splitForAllTys (idType sel_id)
+	(_, _, tau)	      	  = ASSERT( isNotUsgTy (idType sel_id) )
+                                    splitSigmaTy (idType sel_id)	-- Selectors can be overloaded
+									-- when the data type has a context
 	Just (data_ty, _)     	  = splitFunTy_maybe tau	-- Must succeed since sel_id is a selector
 	(tycon, _, data_cons) 	  = splitAlgTyConApp data_ty
 	(con_tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
