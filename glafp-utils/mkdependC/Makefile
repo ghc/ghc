@@ -13,7 +13,7 @@ SCRIPT_OBJS=mkdependC.prl
 # Prepend (perl) bindings for these Makefile variables
 # when creating `mkdependC' (a more flexible way of doing msub).
 #
-SCRIPT_SUBST_VARS=DEFAULT_TMPDIR CPP
+SCRIPT_SUBST_VARS=DEFAULT_TMPDIR CPP BUILDPLATFORM
 
 CLEAN_FILES += $(SCRIPT_PROG)
 INTERP=perl

@@ -1,8 +1,8 @@
 #
-# This stub of perl assumes that the following two
-# variables are prepended:
+# This perl script template assumes that definitions for
+# the following variables are prepended:
 #
-# DEFAULT_TMPDIR CPP
+# DEFAULT_TMPDIR CPP BUILDPLATFORM
 #
 # ToDo: strip out all the .h junk
 #
@@ -22,6 +22,12 @@ $Makefile = '';
 @Src_files = ();
 @File_suffix = ();
 $baseName='';
+$ignore_output='> /dev/null';
+
+if ( ${BUILDPLATFORM} == "i386-unknown-mingw32" ) {
+    # Assuming the underlying perl uses cmd to exec system() calls.
+    $ignore_output = ">nul";
+}
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependC$$";
@@ -166,13 +172,11 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
     # ..and the -MM & -MMD.
-    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname > /dev/null");
+    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname $ignore_output");
  
     if ($result != 0) {
         # On the cheesy side..we do want to know what went wrong, so
-	# re-run the command. (This also has the beneficial effect
-	# of fixing a redirection problem with gcc-2.95 builds used with
-	# mingw32.)
+	# re-run the command.
 	$result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname ");
 	if ($result != 0) {
 	   unlink($tempfile);
