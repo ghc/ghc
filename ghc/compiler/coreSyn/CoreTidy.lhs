@@ -95,7 +95,8 @@ binder
     to ensure that the unique assigned is the same as the Id had 
     in any previous compilation run.
   
- 3. If it's an external Id, make it have a global Name and vice versa.
+ 3. If it's an external Id, make it have a global Name, otherwise
+    make it have a local Name.
     This is used by the code generator to decide whether
     to make the label externally visible
 
