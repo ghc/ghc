@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.19 1999/09/13 11:02:08 sof Exp $
+ * $Id: RtsStartup.c,v 1.20 1999/09/15 13:45:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,8 +22,7 @@
 
 #if defined(PROFILING)
 # include "ProfRts.h"
-#elif defined(DEBUG)
-# include "DebugProf.h"
+# include "ProfHeap.h"
 #endif
 
 #ifdef PAR

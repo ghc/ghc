@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: DebugProf.h,v 1.2 1998/12/02 13:28:15 simonm Exp $
+ * $Id: DebugProf.h,v 1.3 1999/09/15 13:45:16 simonmar Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -9,8 +9,6 @@
 
 #if !defined(PROFILING) && defined(DEBUG)
 
-extern nat  initProfiling(void);
-extern void endProfiling(void);
 extern void heapCensus(bdescr *bd);
 
 #endif

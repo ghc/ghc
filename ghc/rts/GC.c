@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.61 1999/08/25 16:11:46 simonmar Exp $
+ * $Id: GC.c,v 1.62 1999/09/15 13:45:16 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -19,7 +19,7 @@
 #include "GC.h"
 #include "BlockAlloc.h"
 #include "Main.h"
-#include "DebugProf.h"
+#include "ProfHeap.h"
 #include "SchedAPI.h"
 #include "Weak.h"
 #include "StablePriv.h"
@@ -693,6 +693,7 @@ void GarbageCollect(void (*get_roots)(void))
 
   /* restore enclosing cost centre */
 #ifdef PROFILING
+  heapCensus();
   CCCS = prev_CCS;
 #endif
 

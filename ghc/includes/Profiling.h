@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.5 1999/04/23 09:47:30 simonm Exp $
+ * $Id: Profiling.h,v 1.6 1999/09/15 13:45:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -59,6 +59,10 @@ typedef struct _CostCentre {
   char *module;
   char *group;
  
+  /* used for accumulating costs at the end of the run... */
+  unsigned long time_ticks;
+  unsigned long mem_alloc;
+
   char is_subsumed;
 
   struct _CostCentre *link;
@@ -83,6 +87,7 @@ typedef struct _CostCentreStack {
     
   unsigned long time_ticks;
   unsigned long mem_alloc;
+  unsigned long mem_resid;
 
   CostCentre *root;
 } CostCentreStack;

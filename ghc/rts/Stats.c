@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.13 1999/05/20 10:23:43 simonmar Exp $
+ * $Id: Stats.c,v 1.14 1999/09/15 13:45:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -183,6 +183,24 @@ elapsedtime(void)
 }
 #endif /* !_WIN32 */
 
+/* mut_user_time_during_GC() and mut_user_time()
+ *
+ * This function can be used to get the current mutator time *during*
+ * a GC, i.e. between stat_startGC and stat_endGC.  This is used in
+ * the heap profiler for accurately time stamping the heap sample.
+ */
+double
+mut_user_time_during_GC(void)
+{
+  return (GC_start_time - GC_tot_time);
+}
+
+double
+mut_user_time(void)
+{
+  return (usertime() - GC_tot_time);
+}
+
 
 static nat
 pagefaults(void)
@@ -239,7 +257,7 @@ initStats(void)
   nat i;
   FILE *sf = RtsFlags.GcFlags.statsFile;
   
-  if (RtsFlags.GcFlags.giveStats) {
+  if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
     fprintf(sf, "    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
     fprintf(sf, "    bytes     bytes     bytes  user  elap    user    elap\n");
   }

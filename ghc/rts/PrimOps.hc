@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.29 1999/08/25 16:11:48 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.30 1999/09/15 13:45:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -813,7 +813,7 @@ FN_(newMVarzh_fast)
   CCS_ALLOC(CCCS,sizeofW(StgMVar)); /* ccs prof */
   
   mvar = (StgMVar *) (Hp - sizeofW(StgMVar) + 1);
-  SET_INFO(mvar,&EMPTY_MVAR_info);
+  SET_HDR(mvar,&EMPTY_MVAR_info,CCCS);
   mvar->head = mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
   mvar->value = (StgClosure *)&END_TSO_QUEUE_closure;
 

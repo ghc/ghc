@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.8 1999/08/25 16:11:49 simonmar Exp $
+ * $Id: Profiling.c,v 1.9 1999/09/15 13:45:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -18,6 +18,7 @@
 #include "Storage.h"
 #include "Proftimer.h"
 #include "Itimer.h"
+#include "ProfHeap.h"
 
 /*
  * Global variables used to assign unique IDs to cc's, ccs's, and 
@@ -119,6 +120,7 @@ static    CostCentreStack *pruneCCSTree ( CostCentreStack *ccs );
 #ifdef DEBUG
 static    void printCCS            ( CostCentreStack *ccs );
 #endif
+static    void initTimeProfiling   ( void );
 
 /* -----------------------------------------------------------------------------
    Initialise the profiling environment
@@ -161,15 +163,6 @@ initProfiling (void)
   registerCostCentres();
   CCCS = CCS_SYSTEM;
 
-  if (!RtsFlags.CcFlags.doCostCentres)
-    return;
-  
-  time_profiling = rtsTrue;
-
-  /* Initialise the log file name */
-  prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
-  sprintf(prof_filename, "%s.prof", prog_argv[0]);
-
   /* find all the "special" cost centre stacks, and make them children
    * of CCS_MAIN.
    */
@@ -183,6 +176,24 @@ initProfiling (void)
     ccs = next;
   }
   
+  if (RtsFlags.CcFlags.doCostCentres) {
+    initTimeProfiling();
+  }
+
+  if (RtsFlags.ProfFlags.doHeapProfile) {
+    initHeapProfiling();
+  }
+}
+  
+void
+initTimeProfiling(void)
+{
+  time_profiling = rtsTrue;
+
+  /* Initialise the log file name */
+  prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
+  sprintf(prof_filename, "%s.prof", prog_argv[0]);
+
   /* Start ticking */
   startProfTimer();
 };
@@ -190,13 +201,12 @@ initProfiling (void)
 void 
 endProfiling ( void )
 {
-  stopProfTimer();
-}
-
-void
-heapCensus ( bdescr *bd STG_UNUSED )
-{
-  /* nothing yet */
+  if (RtsFlags.CcFlags.doCostCentres) {
+    stopProfTimer();
+  }
+  if (RtsFlags.ProfFlags.doHeapProfile) {
+    endHeapProfiling();
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -496,6 +506,111 @@ DecCCS(CostCentreStack *ccs)
 
 static FILE *prof_file;
 
+/* -----------------------------------------------------------------------------
+   Generating the aggregated per-cost-centre time/alloc report.
+   -------------------------------------------------------------------------- */
+
+static CostCentre *sorted_cc_list;
+
+static void
+aggregate_cc_costs( CostCentreStack *ccs )
+{
+  IndexTable *i;
+
+  ccs->cc->mem_alloc += ccs->mem_alloc;
+  ccs->cc->time_ticks += ccs->time_ticks;
+
+  for (i = ccs->indexTable; i != 0; i = i->next) {
+    aggregate_cc_costs(i->ccs);
+  }
+}
+
+static void
+insert_cc_in_sorted_list( CostCentre *new_cc )
+{
+  CostCentre **prev, *cc;
+
+  prev = &sorted_cc_list;
+  for (cc = sorted_cc_list; cc != NULL; cc = cc->link) {
+    if (new_cc->time_ticks > cc->time_ticks) {
+      new_cc->link = cc;
+      *prev = new_cc;
+      return;
+    } else {
+      prev = &(cc->link);
+    }
+  }
+  new_cc->link = NULL;
+  *prev = new_cc;
+}
+
+static void
+report_per_cc_costs( void )
+{
+  CostCentre *cc, *next;
+
+  aggregate_cc_costs(CCS_MAIN);
+  sorted_cc_list = NULL;
+
+  for (cc = CC_LIST; cc != NULL; cc = next) {
+    next = cc->link;
+    if (cc->time_ticks > total_prof_ticks/100
+	|| cc->mem_alloc > total_alloc/100) {
+      insert_cc_in_sorted_list(cc);
+    }
+  }
+  
+  fprintf(prof_file, "%-20s %-10s", "COST CENTRE", "MODULE");  
+  fprintf(prof_file, "%6s %6s", "%time", "%alloc");
+  if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
+    fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
+  }
+  fprintf(prof_file, "\n\n");
+
+  for (cc = sorted_cc_list; cc != NULL; cc = cc->link) {
+    fprintf(prof_file, "%-20s %-10s", cc->label, cc->module);
+    fprintf(prof_file, "%6.1f %6.1f",
+	    total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) total_prof_ticks * 100),
+	    total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat)
+				      total_alloc * 100)
+	    );
+
+    if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
+      fprintf(prof_file, "  %5ld %9ld", cc->time_ticks, cc->mem_alloc);
+    }
+    fprintf(prof_file, "\n");
+  }
+
+  fprintf(prof_file,"\n\n");
+}
+
+/* -----------------------------------------------------------------------------
+   Generate the cost-centre-stack time/alloc report
+   -------------------------------------------------------------------------- */
+
+static void 
+fprint_header( void )
+{
+  fprintf(prof_file, "%-24s %-10s", "COST CENTRE", "MODULE");  
+
+#ifdef NOT_YET
+  do_groups = have_interesting_groups(Registered_CC);
+  if (do_groups) fprintf(prof_file, " %-11.11s", "GROUP");
+#endif
+
+  fprintf(prof_file, "%8s %5s %5s %8s %5s", "scc", "%time", "%alloc", "inner", "cafs");
+
+  if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
+    fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
+#if defined(PROFILING_DETAIL_COUNTS)
+    fprintf(prof_file, "  %8s %8s %8s %8s %8s %8s %8s",
+	    "closures", "thunks", "funcs", "PAPs", "subfuns", "subcafs", "cafssub");
+#endif
+  }
+
+  fprintf(prof_file, "\n\n");
+}
+
 void
 report_ccs_profiling( void )
 {
@@ -546,24 +661,9 @@ report_ccs_profiling( void )
 #endif
     fprintf(prof_file, "  (excludes profiling overheads)\n\n");
 
-    fprintf(prof_file, "%-24s %-10s", "COST CENTRE", "MODULE");
+    report_per_cc_costs();
 
-#ifdef NOT_YET
-    do_groups = have_interesting_groups(Registered_CC);
-    if (do_groups) fprintf(prof_file, " %-11.11s", "GROUP");
-#endif
-
-    fprintf(prof_file, "%8s %5s %5s %8s %5s", "scc", "%time", "%alloc", "inner", "cafs");
-
-    if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-	fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
-#if defined(PROFILING_DETAIL_COUNTS)
-	fprintf(prof_file, "  %8s %8s %8s %8s %8s %8s %8s",
-		"closures", "thunks", "funcs", "PAPs", "subfuns", "subcafs", "cafssub");
-#endif
-    }
-    fprintf(prof_file, "\n\n");
-
+    fprint_header();
     reportCCS(pruneCCSTree(CCS_MAIN), 0);
 
     fclose(prof_file);
@@ -576,7 +676,6 @@ reportCCS(CostCentreStack *ccs, nat indent)
   IndexTable *i;
 
   cc = ccs->cc;
-  ASSERT(cc == CC_MAIN || cc->link != 0);
   
   /* Only print cost centres with non 0 data ! */
   
@@ -592,7 +691,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
     if (do_groups) fprintf(prof_file, " %-11.11s",cc->group);
 #endif
 
-    fprintf(prof_file, "%8ld  %4.1f  %4.1f %8ld %5ld",
+    fprintf(prof_file, "%8ld %5.1f %5.1f %8ld %5ld",
 	    ccs->scc_count, 
 	    total_prof_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_prof_ticks * 100),
 	    total_alloc == 0 ? 0.0 : (ccs->mem_alloc / (StgFloat) total_alloc * 100),

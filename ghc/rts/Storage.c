@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.17 1999/03/16 13:20:18 simonm Exp $
+ * $Id: Storage.c,v 1.18 1999/09/15 13:45:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,6 +52,19 @@ initStorage (void)
   nat g, s;
   step *step;
   generation *gen;
+
+  /* If we're doing heap profiling, we want a two-space heap with a
+   * fixed-size allocation area so that we get roughly even-spaced
+   * samples.
+   */
+#if defined(PROFILING) || defined(DEBUG)
+  if (RtsFlags.ProfFlags.doHeapProfile) {
+    RtsFlags.GcFlags.generations = 1;
+    RtsFlags.GcFlags.steps = 1;
+    RtsFlags.GcFlags.oldGenFactor = 0;
+    RtsFlags.GcFlags.heapSizeSuggestion = 0;
+  }
+#endif
 
   if (RtsFlags.GcFlags.heapSizeSuggestion > 
       RtsFlags.GcFlags.maxHeapSize) {

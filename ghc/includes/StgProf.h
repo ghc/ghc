@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.6 1999/04/23 09:47:31 simonm Exp $
+ * $Id: StgProf.h,v 1.7 1999/09/15 13:45:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -87,10 +87,12 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 # define CC_DECLARE(cc_ident,name,module,group,subsumed,is_local)	\
      is_local CostCentre cc_ident[1]					\
 	= {{ 0,								\
-	     name, 							\
-	     module, 							\
+	     name,							\
+	     module,							\
 	     group,							\
-	     subsumed, 							\
+             0,								\
+	     0,								\
+	     subsumed,							\
 	     0 }};
 
 # define CCS_DECLARE(ccs_ident,cc_ident,subsumed,is_local)	\
@@ -104,6 +106,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 	    sub_cafcc_count 	: 0,				\
 	    time_ticks 		: 0,				\
 	    mem_alloc 		: 0,				\
+	    mem_resid 		: 0,				\
 	    root 		: 0,				\
        }};
 

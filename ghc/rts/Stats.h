@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.h,v 1.5 1999/02/23 15:45:08 simonm Exp $
+ * $Id: Stats.h,v 1.6 1999/09/15 13:45:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -17,3 +17,5 @@ extern void      stat_endGC(lnat alloc, lnat collect, lnat live,
 			    lnat copied, lnat gen);
 extern void      initStats(void);
 extern void      stat_describe_gens(void);
+extern double    mut_user_time_during_GC(void);
+extern double    mut_user_time(void);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.18 1999/09/13 08:14:51 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.19 1999/09/15 13:45:19 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -224,7 +224,7 @@ usage_text[] = {
 # if defined(PROFILING)
 "",
 "  -h<break-down> Heap residency profile      (output file <program>.hp)",
-"     break-down: C = cost centre (default), M = module, G = group",
+"     break-down: C = cost centre stack (default), M = module, G = group",
 "                 D = closure description, Y = type description",
 "                 T<ints>,<start> = time closure created",
 "                    ints:  no. of interval bands plotted (default 18)",
@@ -579,7 +579,7 @@ error = rtsTrue;
 		switch (rts_argv[arg][2]) {
 		  case '\0':
 		  case CCchar:
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CC;
+		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
 		    break;
 		  case MODchar:
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;

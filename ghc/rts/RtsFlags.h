@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.15 1999/08/25 16:11:50 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.16 1999/09/15 13:45:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -87,7 +87,7 @@ struct PROFILING_FLAGS {
     unsigned int	doHeapProfile;
 
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
-# define HEAP_BY_CC		1
+# define HEAP_BY_CCS		1
 # define HEAP_BY_MOD		2
 # define HEAP_BY_GRP		3
 # define HEAP_BY_DESCR		4
