@@ -422,7 +422,7 @@ The basic encoding scheme is this.
 
 * Tuples (,,,) are coded as Z3T
 
-* Alphabetic characters (upper and lower), digits, and '_'
+* Alphabetic characters (upper and lower) and digits
 	all translate to themselves; 
 	except 'Z', which translates to 'ZZ'
 	and    'z', which translates to 'zz'
@@ -456,7 +456,6 @@ The basic encoding scheme is this.
 alreadyEncoded :: String -> Bool
 alreadyEncoded s = all ok s
 		 where
-		   ok '_' = True
 		   ok ' ' = True		-- This is a bit of a lie; if we really wanted spaces
 						-- in names we'd have to encode them.  But we do put
 						-- spaces in ccall "occurrences", and we don't want to
@@ -490,7 +489,6 @@ encodeFS fast_str  | all unencodedChar str = fast_str
 		     str = _UNPK_ fast_str
 
 unencodedChar :: Char -> Bool	-- True for chars that don't need encoding
-unencodedChar '_' = True
 unencodedChar 'Z' = False
 unencodedChar 'z' = False
 unencodedChar c   = ISALPHANUM c
@@ -510,6 +508,7 @@ encode_ch 'Z'  = "ZZ"
 encode_ch 'z'  = "zz"
 encode_ch '&'  = "za"
 encode_ch '|'  = "zb"
+encode_ch '^'  = "zc"
 encode_ch '$'  = "zd"
 encode_ch '='  = "ze"
 encode_ch '>'  = "zg"
@@ -523,7 +522,7 @@ encode_ch '\'' = "zq"
 encode_ch '\\' = "zr"
 encode_ch '/'  = "zs"
 encode_ch '*'  = "zt"
-encode_ch '^'  = "zu"
+encode_ch '_'  = "zu"
 encode_ch '%'  = "zv"
 encode_ch c    = ['z', 'x', intToDigit hi, intToDigit lo]
 	       where
