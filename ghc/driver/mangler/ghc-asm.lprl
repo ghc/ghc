@@ -184,7 +184,7 @@ sub init_TARGET_STUFF {
     $T_X86_PRE_LLBL	    = '.L';
     $T_X86_BADJMP   = '^\tjmp\s+[^\.\*]';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,\s*0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+,\d+|\.ident.*)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,\s*0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*)\n)';
     $T_COPY_DIRVS   = '^\s*\.(globl|type|size)';
 
     if ( $TargetPlatform =~ /freebsd|netbsd/ ) {
