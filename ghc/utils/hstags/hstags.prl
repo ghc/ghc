@@ -5,8 +5,7 @@
 #   INSTALLING
 #   TMPDIR
 #   TOP_PWD
-#   INSTLIBDIR_GHC
-#   INSTDATADIR_GHC
+#   libdir
 #   PROJECTVERSION
 #   HSP_IMPORTS
 
@@ -17,8 +16,8 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
 }
 
-$TopPwd         = "${TOP_PWD}";
-$InstLibDirGhc  = "${INSTLIBDIR_GHC}";
+$TopPwd         = "${TOP_PWD}"; # *Only* needed when using it in-situ (i.e., INSTALLING=0).
+$InstLibDirGhc  = "${libdir}";
 
 $Unlit = ( $INSTALLING ? 
            "${InstLibDirGhc}/unlit" : 
@@ -59,7 +58,7 @@ $ghc_version_info = int(${PROJECTVERSION} * 100);
 $DoHsCpp = ( ! $DoCpp ) ? 'cat'
 			: "$HsCpp -D__HASKELL1__=2 -D__GLASGOW_HASKELL__=$ghc_version_info $Cpp_opts";
 
-# to find Prelude.hi
+# to find Prelude.hi and friends.
 $HsP_opts .= ( $INSTALLING  ? 
 	       "-J${InstLibDirGhc}/imports" : 
 	       ( '-J' . join(' -J',split(/:/,${HSP_IMPORTS})) ));

@@ -2,7 +2,7 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 # No ways
-WAYS=
+override WAYS=
 
 # Note: might be overridden from cmd-line (see install rule below)
 INSTALLING=0
@@ -19,7 +19,7 @@ SCRIPT_SUBST_VARS=\
  PROJECTVERSION
 
 ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += INSTLIBDIR_GHC
+SCRIPT_SUBST_VARS += libdir
 endif
 
 #
@@ -31,12 +31,9 @@ ifeq "$(INSTALLING)" "1"
 TOP_PWD := $(prefix)
 ifeq "$(BIN_DIST)" "1"
 SCRIPT_PREFIX_FILES += prefix.txt
-else
-INSTLIBDIR_GHC=$(libdir)
 endif
 else
 TOP_PWD := $(FPTOOLS_TOP_ABS)
-INSTLIBDIR_GHC=$(libdir)
 HSP_IMPORTS:="$(TOP_PWD)/ghc/lib/ghc":"$(TOP_PWD)/ghc/lib/required":"$(TOP_PWD)/ghc/lib/glaExts":"$(TOP_PWD)/ghc/lib/concurrent"
 SCRIPT_SUBST_VARS += HSP_IMPORTS
 endif
@@ -51,7 +48,7 @@ INTERP=perl
 #
 # install setup
 #
-INSTALL_PROGS=$(SCRIPT_PROG)
+INSTALL_SCRIPTS+=$(SCRIPT_PROG)
 INSTALL_LIBEXECS=$(C_PROG)
 
 #
