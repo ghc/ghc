@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.9 1999/09/19 19:15:26 sof Exp $
+ * $Id: openFile.c,v 1.10 1999/09/30 12:35:04 sof Exp $
  *
  * openFile Runtime Support
  */
@@ -29,7 +29,7 @@
 #include <fcntl.h>
 #endif
 
-#ifdef mingw32_TARGET_OS
+#if defined(mingw32_TARGET_OS) && !defined(O_NOCTTY)
 #define O_NOCTTY 0
 #endif
 
