@@ -13,6 +13,9 @@ main = do
   r <- timeout 5 (tryTakeMVar m) (putStrLn "timed out!" >> return Nothing)
   print (r :: Maybe Int)
 
+  m <- newMVar True
+  r <- timeout 5 (tryTakeMVar m) (putStrLn "timed out!" >> return Nothing)
+  print r
 
 timeout
    :: Int	-- secs
