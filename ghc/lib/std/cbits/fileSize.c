@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileSize.c,v 1.3 1998/12/02 13:27:30 simonm Exp $
+ * $Id: fileSize.c,v 1.4 2000/12/11 17:51:57 simonmar Exp $
  *
  * hClose Runtime Support
  */
@@ -18,9 +18,7 @@
 #endif
   
 StgInt
-fileSize(ptr, result)
-StgForeignPtr ptr;
-StgByteArray result;
+fileSize(StgForeignPtr ptr, StgByteArray result)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
@@ -50,9 +48,7 @@ StgByteArray result;
 }
 
 StgInt
-fileSize_int64(ptr, result)
-StgForeignPtr ptr;
-StgByteArray result;
+fileSize_int64(StgForeignPtr ptr, StgByteArray result)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
