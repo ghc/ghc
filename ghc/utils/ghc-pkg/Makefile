@@ -16,6 +16,11 @@ SRC_HC_OPTS      += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 
+ifeq "$(Windows)" "YES"
+# not very nice, but required for -lghccompat on Windows
+SRC_LD_OPTS += -lshell32
+endif
+
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
 endif

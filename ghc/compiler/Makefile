@@ -513,6 +513,11 @@ ifeq "$(stage)" "1"
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 
+ifeq "$(Windows)" "YES"
+# not very nice, but required for -lghccompat on Windows
+SRC_LD_OPTS += -lshell32
+endif
+
 # This is horrible.  We ought to be able to omit the entire directory
 # from mkDependHS.
 SRC_MKDEPENDHS_OPTS += \
