@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.12 1999/12/08 15:47:07 simonmar Exp $
+# $Id: Makefile,v 1.13 2000/03/14 01:52:25 sof Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -28,7 +28,7 @@ $(DLL_NAME) : DllVersionInfo.o
 endif
 
 DLL_NAME = HScbits.dll
-DLL_IMPLIB_NAME = libHScbits_imp.a
+DLL_IMPLIB_NAME = libHS_cbits_imp.a
 DLL_DESCRIPTION = "Haskell Prelude helpers"
 SRC_BLD_DLL_OPTS += --export-all --output-def=HScbits.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -L../../../rts
@@ -36,7 +36,7 @@ SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -
 #
 # Compile the files using the Haskell compiler (ghc really).
 # 
-# CC=$(GHC_INPLACE)
+CC=$(GHC_INPLACE)
 
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 

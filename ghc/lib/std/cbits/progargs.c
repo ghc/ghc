@@ -1,16 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: progargs.c,v 1.2 1999/03/02 20:14:01 sof Exp $
+ * $Id: progargs.c,v 1.3 2000/03/14 01:52:25 sof Exp $
  *
  * System.getArgs Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
-
-DLLIMPORT extern char** prog_argv;
-DLLIMPORT extern int prog_argc;
 
 StgAddr
 get_prog_argv(void)

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.17 2000/01/30 10:11:32 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.18 2000/03/14 01:52:25 sof Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -12,6 +12,7 @@ concretely; the @IO@ module itself exports abstractly.
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 #include "cbits/stgerror.h"
+#include "config.h"
 
 #ifndef __HUGS__ /* Hugs just includes this in PreludeBuiltin so no header needed */
 module PrelIOBase where
@@ -174,7 +175,7 @@ data IOErrorType
   | TimeExpired          | UnsatisfiedConstraints
   | UnsupportedOperation | UserError
   | EOF
-#ifdef _WIN32
+#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
   | ComError Int           -- HRESULT
 #endif
   deriving (Eq)
@@ -202,7 +203,7 @@ instance Show IOErrorType where
       UserError         -> "failed"
       UnsupportedOperation -> "unsupported operation"
       EOF		-> "end of file"
-#ifdef _WIN32
+#if defined(cygwin32_TARGET_OS) || defined(mingw32_TARGET_OS)
       ComError _	-> "COM error"
 #endif
 
