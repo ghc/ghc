@@ -1,0 +1,60 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+<TITLE>GHC Documentation</TITLE>
+<BODY>
+
+<H1>GHC Documentation</H1>
+
+<P>Welcome to GHC!
+
+<P>This is the top of the GHC documentation tree, where you will find
+links to all the supplied documentation about GHC and its
+libraries.</P>
+
+<UL>
+ <LI><P><B><A HREF="users_guide/users_guide.html">The User's Guide</A></B>
+     <P>The User's Guide has all you need to know about using GHC:
+     command line options, language extensions, GHCi, etc.
+ </LI>
+
+ <P>
+ <LI><P><B>Hierarchical Libraries</B>
+
+ <P>GHC comes with a large number of libraries, arranged
+ hierarchically.  The libraries are divided into <EM>packages</EM> -
+ to use a package of libraries from GHC or GHCi just add the flag
+ <TT>-package &lt;name&gt;</TT> to the command line, where
+ <TT>&lt;name&gt;</TT> is the name of the package (see the
+ section on packages in the User's Guide for more information).  The
+ <TT>base</TT> and <TT>haskell98</TT> packages are always available,
+ so you don't need to use the <TT>-package</TT> flag to get these.
+
+ <P>
+ <UL>
+  <LI><A HREF="base/index.html"><TT>base</TT></a> package</LI>
+  <LI><A HREF="haskell98/index.html"><TT>haskell98</TT></a> package</LI>
+  <LI><A HREF="network/index.html"><TT>network</TT></a> package</LI>
+  <LI><A HREF="hssource/index.html"><TT>hssource</TT></a> package</LI>
+ </UL>
+ </LI>
+
+ <P>
+ <LI><B><A HREF="hslibs/hslibs.html">(Old) Haskell Libraries</A></B>
+
+ <P>Previous versions of GHC (before version 5.04) came with a suite
+ of libraries known as <TT>hslibs</TT>, aka the Hugs-GHC libraries.
+ As we are in the process of moving towards using hierarchical
+ libraries for everything, many of these libraries have moved over to
+ the new packages in the hierarchical libraries above.  We still
+ provide the old <TT>hslibs</TT> libraries for backwards compatibility
+ and also for those libraries which have yet to move into the
+ hierarchy.  For libraries which have moved, the documentation
+ contains a pointer to the location in the new libraries.
+ </LI>
+
+
+</UL>
+
+</BODY>
+</HTML>
