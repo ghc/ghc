@@ -37,7 +37,7 @@ import PrelAddr		( wordToInt )
 import Word		( Word64 )
 import Outputable
 
-#if __GLASGOW_HASKELL__ > 404
+#if __GLASGOW_HASKELL__ > 405
 import PrelAddr ( intToWord )
 #else
 import PrelAddr ( Word(..) )
