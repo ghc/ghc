@@ -120,6 +120,30 @@ Config.hs contains two sorts of things
 		
 
 
+---------------------------------------------
+NOTES for an ALTERNATIVE scheme (i.e *not* what is currently implemented):
+
+Another hair-brained scheme for simplifying the current tool location
+nightmare in GHC: Simon originally suggested using another
+configuration file along the lines of GCC's specs file - which is fine
+except that it means adding code to read yet another configuration
+file.  What I didn't notice is that the current package.conf is
+general enough to do this:
+
+Package
+    {name = "tools",    import_dirs = [],  source_dirs = [],
+     library_dirs = [], hs_libraries = [], extra_libraries = [],
+     include_dirs = [], c_includes = [],   package_deps = [],
+     extra_ghc_opts = ["-pgmc/usr/bin/gcc","-pgml${libdir}/bin/unlit", ... etc.],
+     extra_cc_opts = [], extra_ld_opts = []}
+
+Which would have the advantage that we get to collect together in one
+place the path-specific package stuff with the path-specific tool
+stuff.
+		End of NOTES
+---------------------------------------------
+
+
 %************************************************************************
 %*									*
 \subsection{Global variables to contain system programs}
