@@ -1,10 +1,10 @@
-#################################################################################
+############################################################################
 #
 #			fptools/Makefile
 #
 #		This is the main Makefile for fptools.
 #
-#################################################################################
+############################################################################
 
 TOP=.
 include $(TOP)/mk/boilerplate.mk
@@ -17,7 +17,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 CURRENT_TARGET = $(MAKECMDGOALS)
 SUBDIRS = $(shell if (test x$(CURRENT_TARGET) = xinstall) ; then echo $(ProjectsToInstall); else echo $(ProjectsToBuild); fi)
 
-ifneq ($(Project),"")
+ifneq "$(Project)" ""
    include $(shell echo $(Project) | tr A-Z a-z)/mk/config.mk
 endif
 
