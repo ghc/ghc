@@ -3,8 +3,8 @@ Haddock, a Haskell Documentation Tool
 
 This is Haddock, a tool for automatically generating documentation
 from annotated Haskell source code.  It is primary intended for
-documenting libraries, but it should be useful for any kind of Haskell
-code.
+documenting library interfaces, but it should be useful for any kind
+of Haskell code.
 
 Like other systems ([1],[2]), Haddock lets you write documentation
 annotations next to the definitions of functions and types in the
@@ -39,6 +39,12 @@ format.
 Please send questions and suggestions to me:
 
 Simon Marlow <simonmar@microsoft.com>
+
+
+System Requirements
+===================
+
+Haddock currently requires GHC version 4.08 or later to compile.
 
 
 [1] IDoc - A No Frills Haskell Interface Documentation System
