@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.153 2001/04/11 10:24:38 sewardj Exp $
+# $Id: Makefile,v 1.154 2001/04/13 13:37:24 panne Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -220,10 +220,20 @@ utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
 ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
 ghci/ByteCodeLink_HC_OPTS	= -fvia-C
 
-# CSE interacts badly with the top-level IORefs in DriverState, causing some
-# of them to be commoned up.  We have a fix for this in 5.00+, but earlier
-# versions of the compiler will need CSE turned off on this module.
+# CSE interacts badly with top-level IORefs (reportedly in DriverState and
+# DriverMkDepend), causing some of them to be commoned up.  We have a fix for
+# this in 5.00+, but earlier versions of the compiler will need CSE turned off.
+# To be on the safe side, we disable CSE in *all* modules with top-level IORefs.
+compMan/CompManager_HC_OPTS	= -fno-cse
+ghci/InteractiveUI_HC_OPTS	= -fno-cse
+main/CmdLineOpts_HC_OPTS	= -fno-cse
+main/DriverFlags_HC_OPTS	= -fno-cse
+main/DriverMkDepend_HC_OPTS	= -fno-cse
+main/DriverPipeline_HC_OPTS	= -fno-cse
 main/DriverState_HC_OPTS	= -fno-cse
+main/DriverUtil_HC_OPTS		= -fno-cse
+main/Finder_HC_OPTS		= -fno-cse
+main/TmpFiles_HC_OPTS		= -fno-cse
 
 # ----------------------------------------------------------------------------
 #		C compilations
