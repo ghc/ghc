@@ -34,7 +34,7 @@ module Lex (
 
 #include "HsVersions.h"
 
-import Char 		( ord, isSpace )
+import Char 		( ord, isSpace, toUpper )
 import List             ( isSuffixOf )
 
 import IdInfo		( InlinePragInfo(..), CprInfo(..) )
@@ -236,6 +236,7 @@ pragmaKeywordsFM = listToUFM $
 	( "SOURCE",	ITsource_prag ),
 	( "INLINE",     ITinline_prag ),
 	( "NOINLINE",   ITnoinline_prag ),
+	( "NOTINLINE",	ITnoinline_prag ),
 	( "LINE",       ITline_prag ),
 	( "RULES",	ITrules_prag ),
 	( "RULEZ",	ITrules_prag )	-- american spelling :-)
@@ -402,7 +403,8 @@ lexer cont buf s@(PState{
 		  if lookAhead# buf 3# `eqChar#` '#'# then is_a_token else
 		  case expandWhile# is_space (setCurrentPos# buf 3#) of { buf1->
 		  case expandWhile# is_ident (stepOverLexeme buf1)   of { buf2->
-		  let lexeme = lexemeToFastString buf2 in
+		  let lexeme = mkFastString -- ToDo: too slow
+			          (map toUpper (lexemeToString buf2)) in
 		  case lookupUFM pragmaKeywordsFM lexeme of
 			Just ITline_prag -> line_prag (lexer cont) buf2 s'
 			Just other -> is_a_token
