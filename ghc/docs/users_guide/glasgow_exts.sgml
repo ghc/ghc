@@ -420,6 +420,33 @@ contains up to date information on recursive monadic bindings.
 
 </sect2>
 
+
+<sect2> <title> Infix type constructors </title>
+
+<para>GHC supports infix type constructors, much as it supports infix data constructors.  For example:
+<programlisting>
+  infixl 5 :+:
+
+  data a :+: b = Inl a | Inr b
+
+  f :: a `Either` b -> a :+: b
+  f (Left x) = Inl x
+</programlisting>
+</para>
+<para>The lexical 
+syntax of an infix type constructor is just like that of an infix data constructor: either
+it's an operator beginning with ":", or it is an ordinary (alphabetic) type constructor enclosed in
+back-quotes.</para>
+
+<para>
+When you give a fixity declaration, the fixity applies to both the data constructor and the
+type constructor with the specified name.  You cannot give different fixities to the type constructor T
+and the data constructor T.
+</para>
+
+
+</sect2>
+
    <!-- ===================== PARALLEL LIST COMPREHENSIONS ===================  -->
 
   <sect2 id="parallel-list-comprehensions">
