@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.32 1999/11/11 17:19:15 simonmar Exp $
+ * $Id: Schedule.c,v 1.33 1999/11/15 14:14:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -1246,13 +1246,20 @@ unblockThread(StgTSO *tso)
   case BlockedOnRead:
   case BlockedOnWrite:
     {
-      last = &blocked_queue_hd;
+      StgTSO *prev = NULL;
       for (t = blocked_queue_hd; t != END_TSO_QUEUE; 
-	   last = &t->link, t = t->link) {
+	   prev = t, t = t->link) {
 	if (t == tso) {
-	  *last = tso->link;
-	  if (blocked_queue_tl == t) {
-	    blocked_queue_tl = tso->link;
+	  if (prev == NULL) {
+	    blocked_queue_hd = t->link;
+	    if (blocked_queue_tl == t) {
+	      blocked_queue_tl = END_TSO_QUEUE;
+	    }
+	  } else {
+	    prev->link = t->link;
+	    if (blocked_queue_tl == t) {
+	      blocked_queue_tl = prev;
+	    }
 	  }
 	  goto done;
 	}
