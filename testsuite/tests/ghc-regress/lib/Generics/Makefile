@@ -34,7 +34,8 @@ clean:
 	find . -depth -name "*.comp.*"   -exec rm -rf \{\} \;
 	find . -depth -name "*.interp.*" -exec rm -rf \{\} \;
 	find . -depth -name "*.run.*"    -exec rm -rf \{\} \;
-	rm -f foldTree
+	rm -f bits/bits
+	rm -f gzip/gzip
 	rm -f freeNames/freeNames
 	rm -f geq/geq
 	rm -f gmapQ-assoc
