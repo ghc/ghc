@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.56 2001/03/22 03:51:08 hwloidl Exp $
+-- $Id: DriverPipeline.hs,v 1.57 2001/03/23 16:36:20 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -322,12 +322,7 @@ run_phase Unlit _basename _suff input_fn output_fn
 run_phase Cpp basename suff input_fn output_fn
   = do src_opts <- getOptionsFromSource input_fn
        unhandled_flags <- processArgs dynamic_flags src_opts []
-
-       when (not (null unhandled_flags)) 
-            (throwDyn (OtherError (
-                          basename ++ "." ++ suff 
-                          ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
-                          ++ unwords unhandled_flags)) (ExitFailure 1))
+       checkProcessArgsResult unhandled_flags basename suff
 
        do_cpp <- dynFlag cppFlag
        if do_cpp
@@ -443,6 +438,20 @@ run_phase Hsc basename suff input_fn output_fn
 			   Nothing -> basename ++ '.':hisuf
 			   Just fn -> fn
 
+  -- figure out which header files to #include in a generated .hc file
+	c_includes <- getPackageCIncludes
+	cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
+
+	let cc_injects = unlines (map mk_include 
+				(c_includes ++ reverse cmdline_includes))
+	    mk_include h_file = 
+		case h_file of 
+		   '"':_{-"-} -> "#include "++h_file
+		   '<':_      -> "#include "++h_file
+		   _          -> "#include \""++h_file++"\""
+
+	writeIORef v_HCHeader cc_injects
+
   -- figure out if the source has changed, for recompilation avoidance.
   -- only do this if we're eventually going to generate a .o file.
   -- (ToDo: do when generating .hc files too?)
@@ -519,7 +528,7 @@ run_phase Hsc basename suff input_fn output_fn
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-run_phase cc_phase _basename _suff input_fn output_fn
+run_phase cc_phase basename suff input_fn output_fn
    | cc_phase == Cc || cc_phase == HCc
    = do	cc <- readIORef v_Pgm_c
        	cc_opts <- (getOpts opt_c)
@@ -533,26 +542,6 @@ run_phase cc_phase _basename _suff input_fn output_fn
         pkg_include_dirs <- getPackageIncludePath
 	let include_paths = map (\p -> "-I"++p) (cmdline_include_dirs 
 							++ pkg_include_dirs)
-
-	c_includes <- getPackageCIncludes
-	cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
-
-	let cc_injects | hcc = unlines (map mk_include 
-					(c_includes ++ reverse cmdline_includes))
-		       | otherwise = ""
-	    mk_include h_file = 
-		case h_file of 
-		   '"':_{-"-} -> "#include "++h_file
-		   '<':_      -> "#include "++h_file
-		   _          -> "#include \""++h_file++"\""
-
-	cc_help <- newTempName "c"
-	h <- openFile cc_help WriteMode
-	hPutStr h cc_injects
-	hPutStrLn h ("#include \"" ++ input_fn ++ "\"\n")
-	hClose h
-
-	ccout <- newTempName "ccout"
 
 	mangle <- readIORef v_Do_asm_mangling
 	(md_c_flags, md_regd_c_flags) <- machdepCCOpts
@@ -572,7 +561,7 @@ run_phase cc_phase _basename _suff input_fn output_fn
 	excessPrecision <- readIORef v_Excess_precision
 
 	runSomething "C Compiler"
-	 (unwords ([ cc, "-x", "c", cc_help, "-o", output_fn ]
+	 (unwords ([ cc, "-x", "c", input_fn, "-o", output_fn ]
 		   ++ md_c_flags
 		   ++ (if cc_phase == HCc && mangle
 			 then md_regd_c_flags
@@ -584,7 +573,6 @@ run_phase cc_phase _basename _suff input_fn output_fn
 		   ++ (if excessPrecision then [] else [ "-ffloat-store" ])
 		   ++ include_paths
 		   ++ pkg_extra_cc_opts
---		   ++ [">", ccout]
 		   ))
 	return True
 
@@ -763,6 +751,15 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
   "system(\"cp $ENV{'HOME'}/$pvm_executable_base.???.gr .\") if -f \"$ENV{'HOME'}/$pvm_executable_base.002.gr\";",
   "exit($return_val);"
  ]
+
+-----------------------------------------------------------------------------
+-- Complain about non-dynamic flags in OPTIONS pragmas
+
+checkProcessArgsResult flags basename suff
+  = do when (not (null flags)) (throwDyn (OtherError (
+           basename ++ "." ++ suff 
+           ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
+           ++ unwords flags)) (ExitFailure 1))
 
 -----------------------------------------------------------------------------
 -- Linking

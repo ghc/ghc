@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.15 2000/12/14 15:19:48 sewardj Exp $
+ * $Id: HeapStackCheck.hc,v 1.16 2001/03/23 16:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,6 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "Stg.h"
 #include "Rts.h"
 #include "Storage.h"   	/* for CurrentTSO */
 #include "StgRun.h"	/* for StgReturn and register saving */

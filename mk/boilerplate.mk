@@ -49,6 +49,10 @@ include $(TOP)/mk/opts.mk
 include $(TOP)/mk/suffix.mk
 # Suffix rules for Haskell, C and literate 
 
+ifeq "$(BootingFromHc)" "YES"
+include $(TOP)/mk/bootstrap.mk
+endif
+
 -include $(TOP)/mk/build.mk
 # (Optional) build-specific configuration
 #

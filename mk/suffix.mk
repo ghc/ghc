@@ -30,6 +30,11 @@ endif
 #-----------------------------------------------------------------------------
 # Haskell Suffix Rules
 
+# Turn off all the Haskell suffix rules if we're booting from .hc
+# files.  The file bootstrap.mk contains alternative suffix rules in
+# this case.
+ifneq "$(BootingFromHc)" "YES"
+
 %.$(way_)o : %.hs
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@ -osuf $(subst .,,$(suffix $@))
@@ -90,6 +95,8 @@ endif
 	    exit 1; \
 	else exit 0 ; \
 	fi
+
+endif # BootingViaC
 
 #-----------------------------------------------------------------------------
 # Happy Suffix Rules
@@ -214,6 +221,9 @@ endif
 
 %.html : %.sgml
 	@$(RM) $@
+#	$(PERL) $(COLLATEINDEX) -N -o index.sgml
+#	$(JADE) -t sgml -V html-index -d $(SGMLSTYLESHEET) -c $(DOCBOOK_CATALOG) $<
+#	$(PERL) $(COLLATEINDEX) -N -o index.sgml
 	$(SGML2HTML) $(SGML2HTML_OPTS) $<
 
 %.html : %.tex

@@ -97,8 +97,11 @@ exeext=@exeext@
 #
 ################################################################################
 
+# BootingFromHc - build GHC and the libraries from .hc files?
+BootingFromHc = @BootingFromHc@
+
 # build the libs first if we're bootstrapping from .hc files
-ifeq "$(GhcWithHscBuiltViaC)" "YES"
+ifeq "$(BootingFromHc)" "YES"
 AllProjects = glafp-utils hslibs ghc green-card happy hdirect hood nofib
 else
 AllProjects = glafp-utils ghc hslibs green-card happy hdirect hood nofib
@@ -156,9 +159,6 @@ GhcCompilerWays=
 #			a pretty strong internal check
 GhcHcOpts=-O -Rghc-timing
 
-# GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
-GhcWithHscBuiltViaC=@BootingFromHc@
-
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
@@ -214,7 +214,7 @@ BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 # In addition to the normal sequential way, the default is to also build
 # profiled prelude libraries.
 # When booting from .hc files, turn this off.
-ifeq "$(GhcWithHscBuiltViaC)" "YES"
+ifeq "$(BootingFromHc)" "YES"
 GhcLibWays=
 else
 GhcLibWays=p
@@ -231,14 +231,18 @@ endif
 GhcLibHcOpts=-O -Rghc-timing
 
 # Win32 only: Enable the RTS and libraries to be built as DLLs
-# Don't split object files for libs if we're building DLLs
 DLLized=@EnableWin32DLLs@
+
+# Don't split object files for libs if we're building DLLs, or booting from
+# .hc files.
+SplitObjs=YES
+
 ifeq "$(DLLized)" "YES"
 SplitObjs=NO
-else
-SplitObjs=YES
 endif
-
+ifeq "$(BootingFromHc)" "YES"
+SplitObjs=NO
+endif
 
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.
@@ -574,6 +578,9 @@ else
   CC	= $(WhatGccIsCalled)
 endif
 endif
+
+# default C compiler flags
+SRC_CC_OPTS = -O
 
 #-----------------------------------------------------------------------------
 # GMP Library (version 2.0.x or above)

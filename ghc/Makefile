@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.14 2000/11/06 13:14:52 simonmar Exp $
+# $Id: Makefile,v 1.15 2001/03/23 16:36:20 simonmar Exp $
 #
 
 TOP=.
@@ -20,10 +20,10 @@ include $(TOP)/mk/boilerplate.mk
 # If we're booting from .hc files, swap the order
 # we descend into compiler/ and lib/
 #
-ifeq "$(GhcWithHscBuiltViaC)" "NO"
-SUBDIRS = includes utils driver docs compiler rts lib
+ifeq "$(BootingFromHc)" "YES"
+SUBDIRS = includes driver rts docs lib compiler
 else
-SUBDIRS = includes utils driver rts docs lib compiler
+SUBDIRS = includes utils driver docs compiler rts lib
 endif
 
 # Easier to copy

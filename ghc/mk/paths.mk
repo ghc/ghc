@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.29 2001/03/05 10:29:00 simonmar Exp $
+# $Id: paths.mk,v 1.30 2001/03/23 16:36:22 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -35,15 +35,3 @@ GHC_SPLIT		= $(GHC_SPLIT_DIR)/ghc-split
 
 GHC_SYSMAN    		= $(GHC_RUNTIME_DIR)/parallel/SysMan
 GHC_SYSMAN_DIR 		= $(GHC_RUNTIME_DIR)/parallel
-
-#-----------------------------------------------------------------------------
-# Stuff for the C-compiling phase in particular...
-
-#
-# There's no need to compute dependencies when booting from .hc files
-#
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-MKDEPENDHS_SRCS = $(HS_SRCS)
-else
-MKDEPENDHS_SRCS =
-endif

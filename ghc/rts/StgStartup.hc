@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.14 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.15 2001/03/23 16:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,6 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "Stg.h"
 #include "Rts.h"
 #include "StgRun.h" /* StgReturn */
 #include "StgStartup.h"

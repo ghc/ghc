@@ -9,12 +9,6 @@
 TOP=.
 include $(TOP)/mk/boilerplate.mk
 
-#
-# Totally evil hack to make the setting of SUBDIRS be dependent
-# on whether we do `make install' or not. Having a $(ifeq ... ) would
-# be preferable..
-CURRENT_TARGET = $(MAKECMDGOALS)
-
 # find the projects that actually exist...
 SUBDIRS = $(filter $(patsubst %/, %, $(wildcard */)), $(AllProjects))
 
@@ -29,6 +23,10 @@ ifneq "$(Project)" ""
    include $(shell echo $(Project) | tr A-Z a-z)/mk/config.mk
 endif
 
+# -----------------------------------------------------------------------------
+# Certain targets require that Project is set from the command line.
+
+CURRENT_TARGET = $(MAKECMDGOALS)
 project-check :
 	@if [ "$(Project)" = "" ]; then \
 		echo "	You need to set \"Project\" in order to make $(CURRENT_TARGET)"; \

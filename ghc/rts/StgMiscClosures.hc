@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.65 2001/02/15 14:30:07 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.66 2001/03/23 16:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -7,6 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "Stg.h"
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.34 2001/03/22 03:51:08 hwloidl Exp $
+-- $Id: DriverState.hs,v 1.35 2001/03/23 16:36:20 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -321,6 +321,8 @@ addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path
   = do paths <- readIORef ref
        writeIORef ref (paths ++ split split_marker path)
+
+GLOBAL_VAR(v_HCHeader, "", String)
 
 -----------------------------------------------------------------------------
 -- Packages

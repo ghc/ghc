@@ -22,8 +22,7 @@ endif
 # 	Setting the standard variables
 #
 
-HC 	 = $(GHC_INPLACE)
-CC	 = $(GHC_INPLACE)
+HC = $(GHC_INPLACE)
 
 ifneq "$(DLLized)" "YES"
 PACKAGE = -package-name std
@@ -72,8 +71,12 @@ PrelPrimopWrappers.hs: ../../compiler/prelude/primops.txt
 PrelGHC.$(way_)hi	: PrelGHC.hi-boot
 	cp $< $@
 
-boot :: PrelPrimopWrappers.hs PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
-all :: PrelPrimopWrappers.hs
+boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+
+ifneq "$(BootingFromHc)" "YES"
+boot :: PrelPrimopWrappers.hs
+all  :: PrelPrimopWrappers.hs
+endif
 
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 

@@ -20,6 +20,7 @@ import IlxGen		( ilxGen )
 import JavaGen		( javaGen )
 import qualified PrintJava
 
+import DriverState	( v_HCHeader )
 import TyCon		( TyCon )
 import Id		( Id )
 import CoreSyn		( CoreBind )
@@ -34,8 +35,8 @@ import Outputable
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 import TmpFiles		( newTempName )
 
-import IO		( IOMode(..), hClose, openFile, Handle )
-import IO		( hPutStr, stderr) 	-- Debugging
+import IOExts
+import IO
 \end{code}
 
 
@@ -99,7 +100,10 @@ doOutput filenm io_action
 \begin{code}
 outputC dflags filenm flat_absC
   = do dumpIfSet_dyn dflags Opt_D_dump_realC "Real C" (dumpRealC flat_absC)
-       doOutput filenm (\ h -> writeRealC h flat_absC)
+       header <- readIORef v_HCHeader
+       doOutput filenm $ \ h -> do
+	  hPutStr h header
+	  writeRealC h flat_absC
 \end{code}
 
 

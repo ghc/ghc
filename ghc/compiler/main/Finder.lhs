@@ -30,7 +30,7 @@ import Directory
 import List
 import IO
 import Monad
-import Outputable	( showSDoc, ppr )	-- debugging only
+import Outputable
 \end{code}
 
 The Finder provides a thin filesystem abstraction to the rest of the
@@ -211,5 +211,5 @@ getDirectoryContents' d
 		          ("WARNING: error while reading directory " ++ d)
 		    return []
 	  )
-	 
+
 \end{code}

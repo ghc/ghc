@@ -97,7 +97,7 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #             (caveat: assuming no funny use of -hisuf and that
 #               file name and module name match)
 
-SRCS=$(wildcard *.lhs *.hs *.c *.lc *.prl *.lprl *.lit *.verb)
+SRCS=$(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb)
 
 HS_SRCS=$(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS=$(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
@@ -105,7 +105,7 @@ HS_HCS=$(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
 HS_SS=$(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
 HS_IFACES=$(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
-C_SRCS=$(filter %.lc %.c,$(SRCS))
+C_SRCS=$(filter %.c,$(SRCS))
 C_OBJS=$(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 
 # SCRIPT_SRCS:  list of raw script files (in literate form)
@@ -129,7 +129,13 @@ OBJS=$(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
 # The default set of files for the dependency generators to work on
 # is just their source equivalents.
 # 
+
+ifneq "$(BootingFromHc)" "YES"
 MKDEPENDHS_SRCS=$(HS_SRCS)
+else
+MKDEPENDHS_SRCS=
+endif
+
 MKDEPENDC_SRCS=$(C_SRCS)
 
 #------------------------------------------------------------------
@@ -159,8 +165,13 @@ TAGS_C_SRCS=$(C_SRCS)
 #
 MOSTLY_CLEAN_FILES     += $(HS_OBJS) $(C_OBJS)
 CLEAN_FILES            += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
-			  $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_HCS) $(HS_SS) \
+			  $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_SS) \
 			  a.out
+
+# Don't clean the .hc files if we're bootstrapping
+ifneq "$(BootingFromHc)" "YES"
+CLEAN_FILES += $(HS_HCS)
+endif
 
 DIST_CLEAN_FILES += .depend
 MAINTAINER_CLEAN_FILES += $(BOOT_SRCS)

@@ -318,29 +318,39 @@ endif
 
 
 #----------------------------------------
-#	Libraries/archives
+#	Building HsLibs libraries.
+
+ifneq "$(HSLIB)" ""
 
 ifeq "$(IS_CBITS_LIB)" "YES"
 _cbits := _cbits
 endif
 
-ifneq "$(HSLIB)" ""
 LIBRARY      = libHS$(HSLIB)$(_cbits)$(_way).a
 GHCI_LIBRARY = HS$(HSLIB)$(_cbits)$(_way).o
+
+ifneq "$(IS_CBITS_LIB)" "YES"
+WAYS=$(GhcLibWays)
+endif
+
 ifeq "$(LIBOBJS)" ""
-  ifneq "$(IS_CBITS_LIB)" "YES"
-  LIBOBJS = $(HS_OBJS)
-  else
+  ifeq "$(IS_CBITS_LIB)" "YES"
   LIBOBJS = $(C_OBJS)
+  else
+  LIBOBJS = $(HS_OBJS)
   endif
 endif
-ifneq "$(IS_CBITS_LIB)" ""
-CC = $(HC)
+
+ifeq "$(IS_CBITS_LIB)" "YES"
 override datadir:=$(libdir)/includes
 INSTALL_DATAS += Hs$(shell perl -e 'print ucfirst "$(HSLIB)"').h
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR)
 endif
-endif
+
+endif # HSLIB
+
+#----------------------------------------
+#	Libraries/archives
 
 ifneq "$(LIBRARY)" ""
 all :: $(LIBRARY)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.14 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: StgStdThunks.hc,v 1.15 2001/03/23 16:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -7,6 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "Stg.h"
 #include "Rts.h"
 #include "StoragePriv.h"
 #include "HeapStackCheck.h"

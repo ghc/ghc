@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.43 2001/01/26 14:40:18 simonmar Exp $
+# $Id: Makefile,v 1.44 2001/03/23 16:36:21 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -32,12 +32,12 @@ else
 SRCS_RTS_C  := $(filter-out Main.c, $(SRCS_RTS_C))
 endif
 
-#-----------------------------------------------------------------------------
-# creating and installing libHSrts.a (in its many flavors)
-#
 LIBOBJS = $(patsubst %.c,%.$(way_)o,$(SRCS_RTS_C)) \
           $(patsubst %.hc,%.$(way_)o,$(SRCS_RTS_HC)) \
           $(patsubst %.S,%.$(way_)o,$(SRCS_RTS_S))
+
+#-----------------------------------------------------------------------------
+# Flags for compiling RTS .c and .hc files
 
 # gcc provides lots of useful warnings if you ask it.
 # This is a pretty good list to start with - use a # to comment out
@@ -60,7 +60,6 @@ WARNING_OPTS += -optc-Wbad-function-cast
 #WARNING_OPTS += -optc-Wconversion
 
 SRC_HC_OPTS += -I../includes -I. -Iparallel $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
-SRC_CC_OPTS = $(GhcRtsCcOpts)
 
 ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
@@ -70,6 +69,11 @@ endif
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
 endif
+
+# compiling straight C files: use all the HC_OPTS, plus any extra options in
+# $(GhcRtsCcOpts).
+SRC_CC_OPTS += $(GhcRtsCcOpts)
+SRC_CC_OPTS += $(HC_OPTS)
 
 #-----------------------------------------------------------------------------
 # Include the Front panel code?
@@ -100,7 +104,16 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 # ../driver/ghc (a better C compiler :-) to compile the
 # different RTS pieces
 #
-CC=$(GHC_INPLACE) $(HC_OPTS) $($*_HC_OPTS)
+
+ifeq "$(BootingFromHc)" "YES"
+# use the normal $(CC) when booting from .hc files
+SRC_CC_OPTS := $(patsubst -optc%,%,$(SRC_CC_OPTS))
+SRC_CC_OPTS += $(PLATFORM_CC_OPTS)
+else
+# otherwise, use $(GHC_INPLACE) as the C compiler.
+CC=$(GHC_INPLACE)
+endif
+
 HC=$(GHC_INPLACE)
 
 # prevent this value from leaking into the GMP makefile

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.94 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Schedule.c,v 1.95 2001/03/23 16:36:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1478,7 +1478,6 @@ createThread_(nat size, rtsBool have_lock)
   tso->why_blocked  = NotBlocked;
   tso->blocked_exceptions = NULL;
 
-  //tso->splim        = (P_)&(tso->stack) + RESERVED_STACK_WORDS;
   tso->stack_size   = stack_size;
   tso->max_stack_size = round_to_mblocks(RtsFlags.GcFlags.maxStkSize) 
                               - TSO_STRUCT_SIZEW;
@@ -2245,7 +2244,6 @@ threadStackOverflow(StgTSO *tso)
   diff = (P_)new_sp - (P_)tso->sp; /* In *words* */
   dest->su    = (StgUpdateFrame *) ((P_)dest->su + diff);
   dest->sp    = new_sp;
-  //dest->splim = (P_)dest->splim + (nat)((P_)dest - (P_)tso);
   dest->stack_size = new_stack_size;
 	
   /* and relocate the update frame list */
