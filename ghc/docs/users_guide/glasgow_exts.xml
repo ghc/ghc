@@ -3226,7 +3226,7 @@ class to the new type:
 <para>
 
 As a result of this extension, all derived instances in newtype
-declarations are treated uniformly (and implemented just by reusing
+ declarations are treated uniformly (and implemented just by reusing
 the dictionary for the representation type), <emphasis>except</emphasis>
 <literal>Show</literal> and <literal>Read</literal>, which really behave differently for
 the newtype and its representation.
@@ -3306,6 +3306,14 @@ then we would not have been able to derive an instance for the
 <literal>Parser</literal> type above. We hypothesise that multi-parameter
 classes usually have one "main" parameter for which deriving new
 instances is most interesting.
+</para>
+<para>Lastly, all of this applies only for classes other than
+<literal>Read</literal>, <literal>Show</literal>, <literal>Typeable</literal>, 
+and <literal>Data</literal>, for which the built-in derivation applies (section
+4.3.3. of the Haskell Report).
+(For the standard classes <literal>Eq</literal>, <literal>Ord</literal>,
+<literal>Ix</literal>, and <literal>Bounded</literal> it is immaterial whether
+the standard method is used or the one described here.)
 </para>
 </sect3>
 
