@@ -413,7 +413,9 @@ checkOldIface ghci_mode dflags hit hst pcs iface_path source_unchanged maybe_ifa
           -> readIface iface_path	`thenRn` \ read_result ->
              case read_result of
                Left err -> -- Old interface file not found, or garbled; give up
-			   traceRn (text "Bad old interface file" $$ nest 4 err) `thenRn_`
+			   traceHiDiffsRn (
+				text "Cannot read old interface file:"
+			   	   $$ nest 4 err) `thenRn_`
 	                   returnRn (outOfDate, Nothing)
 
                Right parsed_iface
