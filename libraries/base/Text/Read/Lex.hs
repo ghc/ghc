@@ -217,8 +217,14 @@ lexChar =
 
   lexAscii =
     do choice
-         [ string "NUL" >> return '\NUL'
-         , string "SOH" >> return '\SOH'
+         [ do { string "SO" ; s <- look; 
+		case s of
+		  'H' : _ -> do { get ; return '\SOH' }
+		  other   -> return '\SO' 
+	      }
+		-- \SO and \SOH need maximal-munch treatment
+		-- See the Haskell report Sect 2.6
+         , string "NUL" >> return '\NUL'
          , string "STX" >> return '\STX'
          , string "ETX" >> return '\ETX'
          , string "EOT" >> return '\EOT'
@@ -231,7 +237,6 @@ lexChar =
          , string "VT"  >> return '\VT'
          , string "FF"  >> return '\FF'
          , string "CR"  >> return '\CR'
-         , string "SO"  >> return '\SO'
          , string "SI"  >> return '\SI'
          , string "DLE" >> return '\DLE'
          , string "DC1" >> return '\DC1'
