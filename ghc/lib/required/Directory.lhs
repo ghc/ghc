@@ -383,7 +383,7 @@ getCurrentDirectory =
     _ccall_ getCurrentDirectory	    `thenIO_Prim` \ str ->
     if str /= ``NULL'' then
         _ccall_ strlen str		`thenIO_Prim` \ len ->
-        stToIO (unpackNBytesST len str)	>>=	      \ pwd ->
+        stToIO (unpackNBytesST str len)	>>=	      \ pwd ->
         _ccall_ free str		`thenIO_Prim` \ () ->
         return pwd
     else
