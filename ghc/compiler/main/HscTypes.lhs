@@ -972,6 +972,6 @@ pprNameProvenance (GRE {gre_name = name, gre_prov = prov})
 ppr_reason ImplicitImport	  = ptext SLIT("implicitly imported")
 ppr_reason (UserImport mod loc _) = ptext SLIT("imported from") <+> ppr mod <+> ptext SLIT("at") <+> ppr loc
 
-ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("at") <+> ppr loc)
+ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
 	     | otherwise	= empty
 \end{code}

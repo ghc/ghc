@@ -38,10 +38,10 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  IsBootInterface,
 			  availName, availNames, availsToNameSet, 
 			  Deprecations(..), ModIface(..), Dependencies(..),
-		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE
+		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE, pprNameProvenance
 			)
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv,
-			  emptyRdrEnv, foldRdrEnv, mkRdrUnqual, isQual )
+			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual )
 import Outputable
 import Maybe		( isJust, isNothing, catMaybes )
 import ListSetOps	( removeDups )
@@ -543,10 +543,9 @@ exportsFromAvail Nothing
 
 exportsFromAvail (Just exports)
  = do { TcGblEnv { tcg_imports = imports } <- getGblEnv ;
-	warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
-	exports_from_avail exports warn_dup_exports imports }
+	exports_from_avail exports imports }
 
-exports_from_avail export_items warn_dup_exports
+exports_from_avail export_items 
 		   (ImportAvails { imp_qual = mod_avail_env, 
 				   imp_env  = entity_avail_env }) 
   = foldlM exports_from_item emptyExportAccum
@@ -558,13 +557,15 @@ exports_from_avail export_items warn_dup_exports
 
     exports_from_item acc@(mods, occs, avails) ie@(IEModuleContents mod)
 	| mod `elem` mods 	-- Duplicate export of M
-	= warnIf warn_dup_exports (dupModuleExport mod)	`thenM_`
-	  returnM acc
+	= do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
+	       warnIf warn_dup_exports (dupModuleExport mod) ;
+	       returnM acc }
 
 	| otherwise
 	= case lookupModuleEnvByName mod_avail_env mod of
-	    Nothing	        -> addErr (modExportErr mod)	`thenM_`
-				   returnM acc
+	    Nothing -> addErr (modExportErr mod)	`thenM_`
+		       returnM acc
+
 	    Just avail_env
 		-> getGlobalRdrEnv		`thenM` \ global_env ->
   		   let
@@ -580,9 +581,8 @@ exports_from_avail export_items warn_dup_exports
 		-- and others, but also internally within this item.  That is,
 		-- if 'M.x' is in scope in several ways, we'll have several
 		-- members of mod_avails with the same OccName.
-		   foldlM (check_occs warn_dup_exports ie) 
-			  occs mod_avails	`thenM` \ occs' ->
 
+		   foldlM (check_occs ie) occs mod_avails	`thenM` \ occs' ->
 		   returnM (mod:mods, occs', avails')
 
     exports_from_item acc@(mods, occs, avails) ie
@@ -608,7 +608,7 @@ exports_from_avail export_items warn_dup_exports
 
 		-- Phew!  It's OK!  Now to check the occurrence stuff!
 	  warnIf (not (ok_item ie avail)) (dodgyExportWarn ie)	`thenM_`
-          check_occs warn_dup_exports ie occs export_avail	`thenM` \ occs' ->
+          check_occs ie occs export_avail			`thenM` \ occs' ->
 	  returnM (mods, occs', addAvail avails export_avail)
 	  }}}
 
@@ -628,7 +628,10 @@ filter_unqual env (AvailTC n ns)
 in_scope :: GlobalRdrEnv -> Name -> Bool
 -- Checks whether the Name is in scope unqualified, 
 -- regardless of whether it's ambiguous or not
-in_scope env n = isJust (lookupRdrEnv env (mkRdrUnqual (nameOccName n)))
+in_scope env n 
+  = case lookupRdrEnv env (mkRdrUnqual (nameOccName n)) of
+	Nothing   -> False
+	Just gres -> or [n == gre_name g | g <- gres]
 
 
 -------------------------------
@@ -639,22 +642,24 @@ ok_item (IEThingAll _) (AvailTC _ [n]) = False
 ok_item _ _ = True
 
 -------------------------------
-check_occs :: Bool -> RdrNameIE -> ExportOccMap -> AvailInfo -> TcRn m ExportOccMap
-check_occs warn_dup_exports ie occs avail 
+check_occs :: RdrNameIE -> ExportOccMap -> AvailInfo -> TcRn m ExportOccMap
+check_occs ie occs avail 
   = foldlM check occs (availNames avail)
   where
     check occs name
       = case lookupFM occs name_occ of
-	  Nothing	    -> returnM (addToFM occs name_occ (name, ie))
-	  Just (name', ie') 
-	    | name == name' -> 	-- Duplicate export
-				warnIf warn_dup_exports
-					(dupExportWarn name_occ ie ie')
-				`thenM_` returnM occs
+	  Nothing -> returnM (addToFM occs name_occ (name, ie))
 
-	    | otherwise	    ->	-- Same occ name but different names: an error
-				addErr (exportClashErr name name' ie ie')	`thenM_`
-				returnM occs
+	  Just (name', ie') 
+	    | name == name'  	-- Duplicate export
+	    ->	do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
+		     warnIf warn_dup_exports (dupExportWarn name_occ ie ie') ;
+		     returnM occs }
+
+	    | otherwise		-- Same occ name but different names: an error
+	    ->	do { global_env <- getGlobalRdrEnv ;
+  		     addErr (exportClashErr global_env name name' ie ie') ;
+		     returnM occs }
       where
 	name_occ = nameOccName name
 \end{code}
@@ -849,22 +854,26 @@ exportItemErr export_item
   = sep [ ptext SLIT("The export item") <+> quotes (ppr export_item),
 	  ptext SLIT("attempts to export constructors or class methods that are not visible here") ]
 
-exportClashErr name1 name2 ie1 ie2
-  | different_items
-  = sep [ ptext SLIT("The export items") <+> quotes (ppr ie1)
-	  <+> ptext SLIT("and") <+> quotes (ppr ie2)
-	, ptext SLIT("create") <+> name_msg <+> ptext SLIT("respectively") ]
-  | otherwise
-  = sep [ ptext SLIT("The export item") <+> quotes (ppr ie1)
-	, ptext SLIT("creates") <+> name_msg ]
+exportClashErr global_env name1 name2 ie1 ie2
+  = vcat [ ptext SLIT("Conflicting exports for") <+> quotes (ppr occ) <> colon
+	 , ppr_export ie1 name1 
+	 , ppr_export ie2 name2  ]
   where
-    name_msg = ptext SLIT("conflicting exports for") <+> quotes (ppr name1)
-	       <+> ptext SLIT("and") <+> quotes (ppr name2)
-    different_items 	-- This only comes into play when we have a single
-			-- 'module M' export item which gives rise to conflicts
-	= case (ie1,ie2) of
-		(IEModuleContents m1, IEModuleContents m2) -> m1 /= m2
-		other -> True
+    occ = nameOccName name1
+    ppr_export ie name = nest 2 (quotes (ppr ie) <+> ptext SLIT("exports") <+> 
+			 	 quotes (ppr name) <+> pprNameProvenance (get_gre name))
+
+	-- get_gre finds a GRE for the Name, in a very inefficient way
+	-- There isn't a more efficient way to do it, because we don't necessarily
+	-- know the RdrName under which this Name is in scope.  So we just
+	-- search linearly.  Shouldn't matter because this only happens
+	-- in an error message.
+    get_gre name
+	= case [gre | gres <- rdrEnvElts global_env,
+		      gre  <- gres,
+		      gre_name gre == name] of
+	     (gre:_) -> gre
+	     []	     -> pprPanic "exportClashErr" (ppr name)
 
 dupDeclErr (n:ns)
   = vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr n),
