@@ -20,7 +20,7 @@ module PprType(
 -- (PprType can see all the representations it's trying to print)
 import TypeRep		( Type(..), TyNote(..), Kind, liftedTypeKind ) -- friend
 import Type		( SourceType(..), isUTyVar, eqKind )
-import TcType		( ThetaType, PredType, tcSplitPredTy_maybe, 
+import TcType		( ThetaType, PredType, 
 			  tcSplitSigmaTy, isPredTy, isDictTy,
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
 			) 
