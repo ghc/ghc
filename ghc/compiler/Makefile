@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.151 2001/04/03 12:55:01 rrt Exp $
+# $Id: Makefile,v 1.152 2001/04/06 04:28:53 lewie Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -96,7 +96,7 @@ ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
 ghc_411_at_least = 1
 else
-ghc_411_at_least = $(shell expr "$(GhcMinVersion)" \>= 11)
+ghc_411_at_least = $(shell expr "$(GhcVersion)" \>= 4.11)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
