@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/01/10 16:23:32 $
+ * $Revision: 1.29 $
+ * $Date: 2000/01/10 16:27:04 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -89,7 +89,7 @@ Name nameBind;             /* for translating monad comps     */
 Name nameZero;                          /* for monads with a zero          */
 
 Name nameId;
-Name nameRunIO;
+Name nameRunIO_toplevel;
 Name namePrint;
 
 Name nameOtherwise;
@@ -459,7 +459,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         /* static(tidyInfix)                        */
         nameNegate         = linkName("negate");
         /* user interface                           */
-        nameRunIO          = linkName("hugsprimRunIO_toplevel");
+        nameRunIO_toplevel = linkName("hugsprimRunIO_toplevel");
         namePrint          = linkName("print");
         /* desugar                                  */
         nameOtherwise      = linkName("otherwise");

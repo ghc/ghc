@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/01/07 16:56:47 $
+ * $Revision: 1.34 $
+ * $Date: 2000/01/10 16:27:03 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1406,7 +1406,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
 
 #if 1
     if (isProgType(ks,bd)) {
-        inputExpr = ap(nameRunIO,inputExpr);
+        inputExpr = ap(nameRunIO_toplevel,inputExpr);
         evalExp();
         Putchar('\n');
     } else {
@@ -1420,7 +1420,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
         }
         inputExpr = ap2(findName(findText("show")),d,inputExpr);
         inputExpr = ap(findName(findText("putStr")), inputExpr);
-        inputExpr = ap(nameRunIO, inputExpr);
+        inputExpr = ap(nameRunIO_toplevel, inputExpr);
 
         evalExp(); printf("\n");
         if (addType) {
