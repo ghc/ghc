@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 2001/12/21 15:07:20 simonmar Exp $
+# $Id: Makefile,v 1.8 2002/01/02 15:13:23 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -51,18 +51,16 @@ CLEAN_FILES += GHC/PrimopWrappers.hs
 # -----------------------------------------------------------------------------
 # GHC/Prim.hi-boot
 
-#GHC/Prim.$(way_)hi	: GHC/Prim.hi-boot
-#	cp $< $@
-#
-#ALL_PRIMS = GHC/Prim.hi $(foreach way, $(WAYS), GHC/Prim.$(way)_hi)
-#
-#lib  : $(ALL_PRIMS)
-#
-#boot :: $(ALL_PRIMS)
-#
-#CLEAN_FILES += $(ALL_PRIMS)
+GHC/Prim.$(way_)hi	: GHC/Prim.hi-boot
+	cp $< $@
 
-lib : GHC/Prim.hi-boot
+ALL_PRIMS = GHC/Prim.hi $(foreach way, $(WAYS), GHC/Prim.$(way)_hi)
+
+lib  : $(ALL_PRIMS)
+
+boot :: $(ALL_PRIMS)
+
+CLEAN_FILES += $(ALL_PRIMS)
 
 SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -traditional
 
