@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.75 2001/06/07 11:03:07 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.76 2001/06/08 20:09:43 sof Exp $
 --
 -- GHC Driver
 --
@@ -480,9 +480,13 @@ run_phase Hsc basename suff input_fn output_fn
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
-	do_recomp <- readIORef v_Recomp
-	todo <- readIORef v_GhcMode
-        let o_file = unJust "source_unchanged" (ml_obj_file location)
+	do_recomp   <- readIORef v_Recomp
+	todo        <- readIORef v_GhcMode
+	expl_o_file <- readIORef v_Output_file
+        let o_file = 
+		case expl_o_file of
+		  Nothing -> unJust "source_unchanged" (ml_obj_file location)
+		  Just x  -> x
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
 	     then return False
