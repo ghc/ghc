@@ -736,7 +736,7 @@ HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
-GHC_HAPPY_OPTS		= $(shell if expr $(HAPPY_VERSION) \< "1.8" >/dev/null; then echo -g; else echo -agc; fi)
+GHC_HAPPY_OPTS		= $(shell if ( test `echo $(HAPPY_VERSION) | sed -e "s/\(.*\)\..*/\1/g"` "-gt" "1" || test `echo $(HAPPY_VERSION) | sed -e "s/.*\.\(.*\)/\1/g"` "-ge" "9" ); then echo -agc; else echo -g; fi)
 
 #
 # Stuff from fptools/literate
