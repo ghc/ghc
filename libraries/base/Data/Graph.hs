@@ -43,7 +43,7 @@ module Data.Graph(
 	components,
 	scc,
 	bcc,
-	-- back, cross, forward,
+	-- tree, back, cross, forward,
 	reachable, path,
 
 	module Data.Tree
@@ -59,6 +59,10 @@ import Data.Tree (Tree(Node), Forest)
 import Data.Maybe
 import Data.Array
 import Data.List
+
+#ifdef __HADDOCK__
+import Prelude
+#endif
 
 -------------------------------------------------------------------------
 --									-
@@ -320,6 +324,10 @@ scc g = dfs g (reverse (postOrd (transposeG g)))
 ------------------------------------------------------------
 -- Algorithm 5: Classifying edges
 ------------------------------------------------------------
+
+tree              :: Bounds -> Forest Vertex -> Graph
+tree bnds ts       = buildG bnds (concat (map flat ts))
+ where flat (Node v ts) = [ (v, w) | Node w _us <- ts ] ++ concat (map flat ts)
 
 back              :: Graph -> Table Int -> Graph
 back g post        = mapT select g

@@ -89,6 +89,10 @@ import Data.Maybe ( isJust )
 import GHC.Base
 #endif
 
+#ifdef __HADDOCK__
+import Prelude
+#endif
+
 #ifdef COMPILING_GHC
 IMP_Ubiq(){-uitous-}
 # ifdef DEBUG

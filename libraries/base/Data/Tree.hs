@@ -18,6 +18,10 @@ module Data.Tree(
 	flatten, levels,
     ) where
 
+#ifdef __HADDOCK__
+import Prelude
+#endif
+
 -- | Multi-way trees, also known as /rose trees/.
 data Tree a   = Node a (Forest a) -- ^ a value and zero or more child trees.
 #ifndef __HADDOCK__
