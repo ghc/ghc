@@ -113,7 +113,7 @@ isEmptyChan (Chan read write) = do
 -- Operators for interfacing with functional streams.
 
 -- |Return a lazy list representing the contents of the supplied
--- 'Chan', much like 'IO.hGetContents'.
+-- 'Chan', much like 'System.IO.hGetContents'.
 getChanContents :: Chan a -> IO [a]
 getChanContents ch
   = unsafeInterleaveIO (do
