@@ -202,7 +202,7 @@ dsLookupGlobalValue :: Unique -> DsM Id
 dsLookupGlobalValue key us genv loc mod warns
   = (lookupWithDefaultUFM_Directly genv def key, warns)
   where
-    def = pprPanic "tcLookupGlobalValue:" (ppr key)
+    def = pprPanic "dsLookupGlobalValue:" (ppr key)
 \end{code}
 
 
