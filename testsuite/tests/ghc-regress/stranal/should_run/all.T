@@ -1,10 +1,6 @@
+# Optimised only, we're testing the strictness analyser here
+setTestOpts( only_ways(['opt']) )
 
-include ($confdir ++ "/../vanilla-test.T")
-
--- Args to vt are: extra compile flags
---                 extra run flags
---                 expected process return value, if not zero
-
-test "strun001" { vtr("", "", "") }
-test "strun002" { vtr("-O", "", "1") }
+test('strun001', normal, compile_and_run, [''])
+test('strun002', exit_code(1), compile_and_run, [''])
 
