@@ -697,7 +697,8 @@ check_tau_type rank ubx_tup (NoteTy note ty)
 	-- Synonym notes are built only when the synonym is 
 	-- saturated (see Type.mkSynTy)
 	-- Not checking the 'note' part allows us to instantiate a synonym
-	-- defn with a for-all type, but that seems OK too
+	-- defn with a for-all type, or with a partially-applied type synonym,
+	-- but that seems OK too
 
 check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   | isSynTyCon tc	

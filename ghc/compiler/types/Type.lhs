@@ -33,7 +33,7 @@ module Type (
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, splitFunTys, 
 	funResultTy, funArgTy, zipFunTys, isFunTy,
 
-	mkTyConApp, mkTyConTy, 
+	mkGenTyConApp, mkTyConApp, mkTyConTy, 
 	tyConAppTyCon, tyConAppArgs, 
 	splitTyConApp_maybe, splitTyConApp,
 
@@ -194,8 +194,16 @@ mkAppTy orig_ty1 orig_ty2
     mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
-    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
+    mk_app (TyConApp tc tys) = mkGenTyConApp tc (tys ++ [orig_ty2])
     mk_app ty1		     = AppTy orig_ty1 orig_ty2
+	-- We call mkGenTyConApp because the TyConApp could be an 
+	-- under-saturated type synonym.  GHC allows that; e.g.
+	--	type Foo k = k a -> k a
+	--	type Id x = x
+	--	foo :: Foo Id -> Foo Id
+	--
+	-- Here Id is partially applied in the type sig for Foo,
+	-- but once the type synonyms are expanded all is well
 
 mkAppTys :: Type -> [Type] -> Type
 mkAppTys orig_ty1 []	    = orig_ty1
@@ -306,6 +314,11 @@ funArgTy ty		 = pprPanic "funArgTy" (pprType ty)
 as apppropriate.
 
 \begin{code}
+mkGenTyConApp :: TyCon -> [Type] -> Type
+mkGenTyConApp tc tys
+  | isSynTyCon tc = mkSynTy tc tys
+  | otherwise     = mkTyConApp tc tys
+
 mkTyConApp :: TyCon -> [Type] -> Type
 -- Assumes TyCon is not a SynTyCon; use mkSynTy instead for those
 mkTyConApp tycon tys

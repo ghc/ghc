@@ -34,9 +34,9 @@ import TcMType		( newKindVar, zonkKindEnv, tcInstType,
 import TcUnify		( unifyKind, unifyOpenTypeKind )
 import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
 			  TcTyVar, TcKind, TcThetaType, TcTauType,
-			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
+			  mkTyVarTy, mkTyVarTys, mkFunTy, 
 		 	  hoistForAllTys, zipFunTys, 
-			  mkSigmaTy, mkPredTy, mkTyConApp, mkAppTys, 
+			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
 			  mkArrowKinds, tcSplitFunTy_maybe
 			)
@@ -45,7 +45,7 @@ import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
 import Id		( mkLocalId, idName, idType )
 import Var		( TyVar, mkTyVar, tyVarKind )
 import ErrUtils		( Message )
-import TyCon		( TyCon, isSynTyCon, tyConKind )
+import TyCon		( TyCon, tyConKind )
 import Class		( classTyCon )
 import Name		( Name )
 import NameSet
@@ -480,9 +480,7 @@ tc_fun_type name arg_tys
     case thing of
 	ATyVar tv -> returnTc (mkAppTys (mkTyVarTy tv) arg_tys)
 
-	AGlobal (ATyCon tc)
-		| isSynTyCon tc ->  returnTc (mkSynTy tc arg_tys)
-		| otherwise	->  returnTc (mkTyConApp tc arg_tys)
+	AGlobal (ATyCon tc) -> returnTc (mkGenTyConApp tc arg_tys)
 
 	other -> failWithTc (wrongThingErr "type constructor" thing name)
 \end{code}

@@ -87,7 +87,7 @@ module TcType (
   Type, SourceType(..), PredType, ThetaType, 
   mkForAllTy, mkForAllTys, 
   mkFunTy, mkFunTys, zipFunTys, 
-  mkTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
+  mkTyConApp, mkGenTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
   mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys, 
 
   isUnLiftedType,	-- Source types are always lifted
@@ -115,7 +115,7 @@ import Type		(	-- Re-exports
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
 			  mkForAllTy, mkForAllTys, defaultKind, isTypeKind, isAnyTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
-			  mkTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
+			  mkTyConApp, mkGenTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
 			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys,
 			  isUnLiftedType, isUnboxedTupleType, isPrimitiveType,
 			  splitNewType_maybe, splitTyConApp_maybe,
