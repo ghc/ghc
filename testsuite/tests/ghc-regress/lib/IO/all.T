@@ -74,4 +74,5 @@ test('readwrite002', compose(omit_ways(['ghci']), set_stdin('readwrite002.hs')),
 	compile_and_run, ['-cpp'])
 clean(['readwrite002.inout'])
 
-test('hGetBuf001', expect_fail_if_windows, compile_and_run, ['-package unix'])
+test('hGetBuf001', compose(only_compiler_types(['ghc']),
+		expect_fail_if_windows), compile_and_run, ['-package unix'])
