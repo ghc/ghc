@@ -361,11 +361,11 @@ initRn :: Module -> UniqSupply -> SearchPath -> SrcLoc
        -> IO (r, Bag ErrMsg, Bag WarnMsg)
 
 initRn mod us dirs loc do_rn = do
+  (himap, hibmap) <- mkModuleHiMaps dirs
   names_var <- sstToIO (newMutVarSST (us, emptyFM, builtins))
   errs_var  <- sstToIO (newMutVarSST (emptyBag,emptyBag))
   iface_var <- sstToIO (newMutVarSST (emptyIfaces mod))
   occs_var  <- sstToIO (newMutVarSST initOccs)
-  (himap, hibmap) <- mkModuleHiMaps dirs
   let
         rn_down = RnDown { rn_loc = loc, rn_omit = \n -> False, rn_ns = names_var, 
 			   rn_errs = errs_var, rn_occs = occs_var,
@@ -400,11 +400,11 @@ emptyIfaces mod = Ifaces { iMod = mod,
 			   iDefData = emptyNameEnv, 
 			   iInstMods = []
 		  }
-
 builtins :: FiniteMap (Module,OccName) Name
-builtins = bagToFM $
-	   mapBag (\ name -> ((nameModule name, nameOccName name), name)) 
-		  builtinNames
+builtins = 
+   bagToFM (
+   mapBag (\ name ->  ((nameModule name, nameOccName name), name))
+ 	  builtinNames)
 
 	-- Initial value for the occurrence pool.
 initOccs :: ([Occurrence],[Occurrence])	-- Compulsory and optional respectively
@@ -912,7 +912,11 @@ and 'hi-boot' mentions of names, with the flavour in the
 being encoded inside a @Module@.
 
 @setModuleFlavourRn@ fixes up @Module@ values containing
-normal flavours, checking to see whether 
+normal flavours, returning a @Module@ value containing
+the attributes of the module that's in scope. The only
+attribute at the moment is the DLLness of a module, i.e.,
+whether the object code for that module resides in a
+Win32 DLL or not.
 
 \begin{code}
 setModuleFlavourRn :: Module -> RnM s d Module
@@ -920,13 +924,13 @@ setModuleFlavourRn mod
   | bootFlavour hif = returnRn mod
   | otherwise       =
      getModuleHiMap (bootFlavour hif) `thenRn` \ himap ->
-     let mod_pstr = moduleString mod in
      case (lookupFM himap mod_pstr) of
        Nothing -> returnRn mod
-       Just (_,is_in_a_dll) ->
-            returnRn (setModuleFlavour (mkDynFlavour is_in_a_dll hif) mod)
-  where
-    hif = moduleIfaceFlavour mod
+       Just (_, is_in_a_dll) ->
+           returnRn (setModuleFlavour (mkDynFlavour is_in_a_dll hif) mod)
+    where
+      mod_pstr = moduleString mod
+      hif      = moduleIfaceFlavour mod
 
 \end{code}
 

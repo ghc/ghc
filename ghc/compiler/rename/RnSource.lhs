@@ -335,8 +335,8 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 	   addImplicitOccRn deRefStablePtr_NAME `thenRn_`
 	   addImplicitOccRn bindIO_NAME         `thenRn_`
 	   returnRn name'
-	_ -> returnRn name')		`thenRn_`
-    rnHsSigType fo_decl_msg ty		`thenRn` \ (ty', fvs) ->
+	_ -> returnRn name')		        `thenRn_`
+    rnHsSigType fo_decl_msg ty		        `thenRn` \ (ty', fvs) ->
     returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), fvs)
  where
   fo_decl_msg = ptext SLIT("a foreign declaration")

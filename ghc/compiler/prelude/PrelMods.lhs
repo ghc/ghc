@@ -61,8 +61,8 @@ mAIN	     = mkSrcModule "Main"
 
 iNT, wORD   :: Module
 
-iNT	     = mkPrelModule "Int"
-wORD	     = mkPrelModule "Word"
+iNT	     = mkSrcModule "Int"
+wORD	     = mkSrcModule "Word"
 
 \end{code}
 

@@ -99,12 +99,8 @@ module Unique (
 	intPrimTyConKey,
 	intTyConKey,
 	int8TyConKey,
-	int8DataConKey,
 	int16TyConKey,
-	int16DataConKey,
 	int32TyConKey,
-	int32DataConKey,
-	int64DataConKey,
 	int64PrimTyConKey,
 	int64TyConKey,
 	smallIntegerDataConKey,
@@ -188,12 +184,8 @@ module Unique (
 	wordPrimTyConKey,
 	wordTyConKey,
 	word8TyConKey,
-	word8DataConKey,
 	word16TyConKey,
-	word16DataConKey,
 	word32TyConKey,
-	word32DataConKey,
-	word64DataConKey,
 	word64PrimTyConKey,
 	word64TyConKey,
 	zipIdKey
@@ -556,10 +548,6 @@ doubleDataConKey			= mkPreludeDataConUnique  4
 falseDataConKey				= mkPreludeDataConUnique  5
 floatDataConKey				= mkPreludeDataConUnique  6
 intDataConKey				= mkPreludeDataConUnique  7
-int8DataConKey				= mkPreludeDataConUnique  8
-int16DataConKey				= mkPreludeDataConUnique  9
-int32DataConKey				= mkPreludeDataConUnique 10
-int64DataConKey				= mkPreludeDataConUnique 11
 smallIntegerDataConKey			= mkPreludeDataConUnique 12
 largeIntegerDataConKey			= mkPreludeDataConUnique 13
 foreignObjDataConKey			= mkPreludeDataConUnique 14
@@ -569,10 +557,6 @@ stablePtrDataConKey			= mkPreludeDataConUnique 17
 stableNameDataConKey			= mkPreludeDataConUnique 18
 trueDataConKey				= mkPreludeDataConUnique 34
 wordDataConKey				= mkPreludeDataConUnique 35
-word8DataConKey				= mkPreludeDataConUnique 36
-word16DataConKey			= mkPreludeDataConUnique 37
-word32DataConKey			= mkPreludeDataConUnique 38
-word64DataConKey			= mkPreludeDataConUnique 39
 stDataConKey				= mkPreludeDataConUnique 40
 ioDataConKey				= mkPreludeDataConUnique 42
 \end{code}

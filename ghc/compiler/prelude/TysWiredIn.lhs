@@ -36,12 +36,6 @@ module TysWiredIn (
 	isIntTy,
 	inIntRange,
 
-	int8TyCon,
-	int16TyCon,
-	int32TyCon,
-
-	int64TyCon,
-
 	integerTy,
 	integerTyCon,
 	smallIntegerDataCon,
@@ -71,11 +65,6 @@ module TysWiredIn (
 	wordTy,
 	wordTyCon,
 
-	word8TyCon,
-	word16TyCon,
-	word32TyCon,
-	word64TyCon,
-	
 	isFFIArgumentTy,  -- :: Type -> Bool
 	isFFIResultTy,    -- :: Type -> Bool
 	isFFIExternalTy,  -- :: Type -> Bool
@@ -298,21 +287,6 @@ max_int, min_int :: Integer
 max_int = toInteger maxInt  
 min_int = toInteger minInt
 
-int8TyCon = pcNonRecDataTyCon int8TyConKey iNT SLIT("Int8") [] [int8DataCon]
-  where
-   int8DataCon = pcDataCon int8DataConKey iNT SLIT("I8#") [] [] [intPrimTy] int8TyCon
-
-int16TyCon = pcNonRecDataTyCon int16TyConKey iNT SLIT("Int16") [] [int16DataCon]
-  where
-   int16DataCon = pcDataCon int16DataConKey iNT SLIT("I16#") [] [] [intPrimTy] int16TyCon
-
-int32TyCon = pcNonRecDataTyCon int32TyConKey iNT SLIT("Int32") [] [int32DataCon]
-  where
-   int32DataCon = pcDataCon int32DataConKey iNT SLIT("I32#") [] [] [intPrimTy] int32TyCon
-
-int64TyCon = pcNonRecDataTyCon int64TyConKey pREL_ADDR SLIT("Int64") [] [int64DataCon]
-  where
-   int64DataCon = pcDataCon int64DataConKey pREL_ADDR SLIT("I64#") [] [] [int64PrimTy] int64TyCon
 \end{code}
 
 \begin{code}
@@ -321,22 +295,6 @@ wordTy = mkTyConTy wordTyCon
 
 wordTyCon = pcNonRecDataTyCon wordTyConKey   pREL_ADDR SLIT("Word") [] [wordDataCon]
 wordDataCon = pcDataCon wordDataConKey pREL_ADDR SLIT("W#") [] [] [wordPrimTy] wordTyCon
-
-word8TyCon = pcNonRecDataTyCon word8TyConKey   wORD SLIT("Word8") [] [word8DataCon]
-  where
-   word8DataCon = pcDataCon word8DataConKey wORD SLIT("W8#") [] [] [wordPrimTy] word8TyCon
-
-word16TyCon = pcNonRecDataTyCon word16TyConKey   wORD SLIT("Word16") [] [word16DataCon]
-  where
-   word16DataCon = pcDataCon word16DataConKey wORD SLIT("W16#") [] [] [wordPrimTy] word16TyCon
-
-word32TyCon = pcNonRecDataTyCon word32TyConKey   wORD SLIT("Word32") [] [word32DataCon]
-  where
-   word32DataCon = pcDataCon word32DataConKey wORD SLIT("W32#") [] [] [wordPrimTy] word32TyCon
-
-word64TyCon = pcNonRecDataTyCon word64TyConKey   pREL_ADDR SLIT("Word64") [] [word64DataCon]
-  where
-    word64DataCon = pcDataCon word64DataConKey pREL_ADDR SLIT("W64#") [] [] [word64PrimTy] word64TyCon
 \end{code}
 
 \begin{code}

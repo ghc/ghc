@@ -9,7 +9,7 @@ module PrelInfo (
 			-- that is all. If something is in here, you know that
 			-- if it's used at all then it's Name will be just as
 			-- it is here, unique and all.  Includes all the 
-			-- wiredd-in names.
+			-- wired-in names.
 
 	thinAirIdNames,	-- Names of non-wired-in Ids that may be used out of
 	setThinAirIds,	-- thin air in any compilation. If they are not wired in
@@ -33,7 +33,7 @@ module PrelInfo (
 	-- Random other things
 	main_NAME, ioTyCon_NAME,
 	deRefStablePtr_NAME, makeStablePtr_NAME,
-	bindIO_NAME,
+	bindIO_NAME, 
 
 	maybeCharLikeCon, maybeIntLikeCon,
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, 
@@ -188,17 +188,9 @@ data_tycons
     , doubleTyCon
     , floatTyCon
     , intTyCon
-    , int8TyCon
-    , int16TyCon
-    , int32TyCon
-    , int64TyCon
     , integerTyCon
     , listTyCon
     , wordTyCon
-    , word8TyCon
-    , word16TyCon
-    , word32TyCon
-    , word64TyCon
     ]
 \end{code}
 
@@ -402,6 +394,16 @@ knownKeyNames
     , (filter_RDR,		filterIdKey)
     , (zip_RDR,			zipIdKey)
 
+	-- FFI primitive types that are not wired-in.
+    , (int8TyCon_RDR,           int8TyConKey)
+    , (int16TyCon_RDR,          int16TyConKey)
+    , (int32TyCon_RDR,          int32TyConKey)
+    , (int64TyCon_RDR,          int64TyConKey)
+    , (word8TyCon_RDR,          word8TyConKey)
+    , (word16TyCon_RDR,         word16TyConKey)
+    , (word32TyCon_RDR,         word32TyConKey)
+    , (word64TyCon_RDR,         word64TyConKey)
+
 	-- Others
     , (otherwiseId_RDR,		otherwiseIdKey)
     , (assert_RDR,		assertIdKey)
@@ -535,6 +537,16 @@ plus_RDR	   = varQual pREL_BASE SLIT("+")
 times_RDR	   = varQual pREL_BASE SLIT("*")
 mkInt_RDR	   = dataQual pREL_BASE SLIT("I#")
 
+int8TyCon_RDR    = tcQual iNT       SLIT("Int8")
+int16TyCon_RDR   = tcQual iNT       SLIT("Int16")
+int32TyCon_RDR   = tcQual iNT       SLIT("Int32")
+int64TyCon_RDR   = tcQual pREL_ADDR SLIT("Int64")
+
+word8TyCon_RDR    = tcQual wORD      SLIT("Word8")
+word16TyCon_RDR   = tcQual wORD      SLIT("Word16")
+word32TyCon_RDR   = tcQual wORD      SLIT("Word32")
+word64TyCon_RDR   = tcQual pREL_ADDR SLIT("Word64")
+
 error_RDR	   = varQual pREL_ERR SLIT("error")
 assert_RDR         = varQual pREL_GHC SLIT("assert")
 assertErr_RDR      = varQual pREL_ERR SLIT("assertError")
@@ -667,7 +679,7 @@ cCallishClassKeys =
 	]
 
 	-- Renamer always imports these data decls replete with constructors
-	-- so that desugarer can always see the constructor.  Ugh!
+	-- so that desugarer can always see their constructors.  Ugh!
 cCallishTyKeys = 
 	[ addrTyConKey
 	, wordTyConKey
@@ -675,6 +687,14 @@ cCallishTyKeys =
 	, mutableByteArrayTyConKey
 	, foreignObjTyConKey
 	, stablePtrTyConKey
+	, int8TyConKey
+	, int16TyConKey
+	, int32TyConKey
+	, int64TyConKey
+	, word8TyConKey
+	, word16TyConKey
+	, word32TyConKey
+	, word64TyConKey
 	]
 
 standardClassKeys
