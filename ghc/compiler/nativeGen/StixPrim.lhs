@@ -200,6 +200,15 @@ primCode [lhs] (IndexOffForeignObjOp pk) [obj, ix]
     in
     returnUs (\xs -> assign : xs)
 
+primCode [] (WriteOffAddrOp pk) [obj, ix, v]
+  = let
+	obj' = amodeToStix obj
+    	ix' = amodeToStix ix
+    	v' = amodeToStix v
+    	assign = StAssign pk (StInd pk (StIndex pk obj' ix')) v'
+    in
+    returnUs (\xs -> assign : xs)
+
 primCode [] (WriteByteArrayOp pk) [obj, ix, v]
   = let
 	obj' = amodeToStix obj
