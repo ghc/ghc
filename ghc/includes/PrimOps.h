@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.24 1999/03/16 13:20:09 simonm Exp $
+ * $Id: PrimOps.h,v 1.25 1999/04/23 13:54:12 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -759,6 +759,13 @@ EF_(makeForeignObjzh_fast);
 #define eqForeignObj(f1,f2)  ((f1)==(f2))
 
 #endif
+
+/* -----------------------------------------------------------------------------
+   Constructor tags
+   -------------------------------------------------------------------------- */
+
+#define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
+/*  tagToEnum# is handled directly by the code generator. */
 
 /* -----------------------------------------------------------------------------
    Signal processing.  Not really primops, but called directly from

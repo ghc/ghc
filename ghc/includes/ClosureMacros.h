@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.10 1999/03/23 08:34:07 sof Exp $
+ * $Id: ClosureMacros.h,v 1.11 1999/04/23 13:54:12 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -73,7 +73,7 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
 #define INIT_ENTRY(e)    code : {}
 #define GET_ENTRY(c)     stgCast(StgFunPtr,((c)->header.info))
 #define ENTRY_CODE(info) (info)
-#define INFO_PTR_TO_STRUCT(info) (stgCast(StgInfoTable*,info) - 1)
+#define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)(info) - 1)
 #define get_itbl(c)      (stgCast(StgInfoTable*,(c)->header.info) -1)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return stgCast(StgFunPtr,itbl+1);
