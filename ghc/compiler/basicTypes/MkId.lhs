@@ -299,7 +299,7 @@ mkDataConWrapId data_con
 			       (map varToCoreExpr (all_tyvars ++ reverse rep_ids))
 
     (tyvars, _, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
-    all_tyvars   = ex_tyvars ++ tyvars
+    all_tyvars   = tyvars ++ ex_tyvars
 
     ex_dict_tys  = mkPredTys ex_theta
     all_arg_tys  = ex_dict_tys ++ orig_arg_tys

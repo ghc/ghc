@@ -372,15 +372,15 @@ tcInstDataCon orig data_con
 	     -- We generate constraints for the stupid theta even when 
 	     -- pattern matching (as the Report requires)
     in
-    tcInstTyVars VanillaTv (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
+    tcInstTyVars VanillaTv (tvs ++ ex_tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
     let
 	stupid_theta' = substTheta tenv stupid_theta
 	ex_theta'     = substTheta tenv ex_theta
 	arg_tys'      = map (substTy tenv) arg_tys
 
-	n_ex_tvs  = length ex_tvs
-	ex_tvs'   = take n_ex_tvs all_tvs'
-	result_ty = mkTyConApp tycon (drop n_ex_tvs ty_args')
+	n_normal_tvs  = length tvs
+	ex_tvs'       = drop n_normal_tvs all_tvs'
+	result_ty     = mkTyConApp tycon (take n_normal_tvs ty_args')
     in
     newDicts orig stupid_theta'	`thenNF_Tc` \ stupid_dicts ->
     newDicts orig ex_theta'	`thenNF_Tc` \ ex_dicts ->

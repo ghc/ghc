@@ -436,6 +436,7 @@ lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
 	-- Scrutinee type must be a tycon applicn; checked by caller
 	-- This code is remarkably compact considering what it does!
 	-- NB: args must be in scope here so that the lintCoreArgs line works.
+	-- NB: relies on existential type args coming *after* ordinary type args
     case splitTyConApp scrut_ty of { (tycon, tycon_arg_tys) ->
 	lintTyApps (dataConRepType con) tycon_arg_tys	`thenL` \ con_type ->
 	lintCoreArgs con_type (map mk_arg args)		`thenL` \ con_result_ty ->

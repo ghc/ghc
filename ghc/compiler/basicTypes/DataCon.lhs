@@ -118,13 +118,18 @@ data DataCon
 	--	data Eq a => T a = forall b. Ord b => MkT a [b]
 
 	dcRepType   :: Type,	-- Type of the constructor
-				-- 	forall b a . Ord b => a -> [b] -> MkT a
+				-- 	forall a b . Ord b => a -> [b] -> MkT a
 				-- (this is *not* of the constructor wrapper Id:
 				--  see notes after this data type declaration)
 				--
-				-- Notice that the existential type parameters come
-				-- *first*.  It doesn't really matter provided we are
-				-- consistent.
+	-- Notice that the existential type parameters come *second*.  
+	-- Reason: in a case expression we may find:
+	--	case (e :: T t) of { MkT b (d:Ord b) (x:t) (xs:[b]) -> ... }
+	-- It's convenient to apply the rep-type of MkT to 't', to get
+	--	forall b. Ord b => ...
+	-- and use that to check the pattern.  Mind you, this is really only
+	-- use in CoreLint.
+
 
 	-- The next six fields express the type of the constructor, in pieces
 	-- e.g.
@@ -295,7 +300,7 @@ mkDataCon name arg_stricts fields
     (rep_arg_stricts, rep_arg_tys) = computeRep real_stricts real_arg_tys
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
-    ty  = mkForAllTys (ex_tyvars ++ tyvars)
+    ty  = mkForAllTys (tyvars ++ ex_tyvars)
 	              (mkFunTys rep_arg_tys result_ty)
 		-- NB: the existential dict args are already in rep_arg_tys
 
@@ -371,7 +376,7 @@ dataConArgTys :: DataCon
 
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
- = map (substTyWith (ex_tyvars ++ tyvars) inst_tys) arg_tys
+ = map (substTyWith (tyvars ++ ex_tyvars) inst_tys) arg_tys
 
 dataConTheta :: DataCon -> ThetaType
 dataConTheta dc = dcStupidTheta dc
@@ -384,7 +389,7 @@ dataConExistentialTyVars dc = dcExTyVars dc
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
 dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
- = map (substTyWith (ex_tyvars ++ tyvars) inst_tys) arg_tys
+ = map (substTyWith (tyvars ++ ex_tyvars) inst_tys) arg_tys
 \end{code}
 
 These two functions get the real argument types of the constructor,
