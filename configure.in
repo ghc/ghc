@@ -75,7 +75,7 @@ exeext=''
 # We also record the architecture, vendor, and operating system (OS)
 # separately.
 case $HostPlatform in
-alpha-dec-osf[[12]]*)
+alpha*-dec-osf[[12]]*)
 	HostPlatform=alpha-dec-osf1   # canonicalise for our purposes
 	TargetPlatform=alpha-dec-osf1 # this will work for now... (hack)
 	BuildPlatform=alpha-dec-osf1  # hack
@@ -84,7 +84,7 @@ alpha-dec-osf[[12]]*)
         HostVendor_CPP='dec'
         HostOS_CPP='osf1'
         ;;
-alpha-dec-osf[[34]]*)
+alpha*-dec-osf[[345]]*)
 	HostPlatform=alpha-dec-osf3   # canonicalise for our purposes
 	TargetPlatform=alpha-dec-osf3 # this will work for now... (hack)
 	BuildPlatform=alpha-dec-osf3  # hack
@@ -93,7 +93,7 @@ alpha-dec-osf[[34]]*)
         HostVendor_CPP='dec'
         HostOS_CPP='osf3'
         ;;
-alpha-unknown-linux)
+alpha*-unknown-linux)
 	HostPlatform=alpha-unknown-linux
 	TargetPlatform=alpha-unknown-linux
 	BuildPlatform=alpha-unknown-linux
@@ -102,7 +102,7 @@ alpha-unknown-linux)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
-alpha-unknown-freebsd*)
+alpha*-unknown-freebsd*)
 	HostPlatform=alpha-unknown-freebsd
 	TargetPlatform=alpha-unknown-freebsd
 	BuildPlatform=alpha-unknown-freebsd
