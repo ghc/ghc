@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.20 2001/12/10 17:55:40 sewardj Exp $
+ * $Id: HeapStackCheck.hc,v 1.21 2002/01/26 17:58:47 rje Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -640,7 +640,7 @@ EXTFUN(stg_gc_seq_1)
  * return address from the stack, we can get rid of this little
  * function/info table...  
  */
-INFO_TABLE_SRT_BITMAP(stg_gc_noregs_ret_info, stg_gc_noregs_ret, 0/*BITMAP*/, 
+INFO_TABLE_SRT_BITMAP(stg_gc_noregs_info, stg_gc_noregs_ret, 0/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
@@ -655,14 +655,14 @@ EXTFUN(stg_gc_noregs)
 {
   FB_
   Sp -= 1;
-  Sp[0] = (W_)&stg_gc_noregs_ret_info;
+  Sp[0] = (W_)&stg_gc_noregs_info;
   GC_GENERIC
   FE_
 }
 
 /*-- R1 is boxed/unpointed -------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_ret_info, stg_gc_unpt_r1_ret, 0/*BITMAP*/, 
+INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_info, stg_gc_unpt_r1_ret, 0/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
@@ -680,14 +680,14 @@ EXTFUN(stg_gc_unpt_r1)
   FB_
   Sp -= 2;
   Sp[1] = R1.w;
-  Sp[0] = (W_)&stg_gc_unpt_r1_ret_info;
+  Sp[0] = (W_)&stg_gc_unpt_r1_info;
   GC_GENERIC
   FE_
 }
 
 /*-- R1 is unboxed -------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_unbx_r1_ret_info, stg_gc_unbx_r1_ret, 1/*BITMAP*/,
+INFO_TABLE_SRT_BITMAP(stg_gc_unbx_r1_info, stg_gc_unbx_r1_ret, 1/*BITMAP*/,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 /* the 1 is a bitmap - i.e. 1 non-pointer word on the stack. */
@@ -713,7 +713,7 @@ EXTFUN(stg_gc_unbx_r1)
 
 /*-- F1 contains a float ------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_f1_ret_info, stg_gc_f1_ret, 1/*BITMAP*/,
+INFO_TABLE_SRT_BITMAP(stg_gc_f1_info, stg_gc_f1_ret, 1/*BITMAP*/,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
@@ -731,7 +731,7 @@ EXTFUN(stg_gc_f1)
   FB_
   Sp -= 2;
   ASSIGN_FLT(Sp+1, F1);
-  Sp[0] = (W_)&stg_gc_f1_ret_info;
+  Sp[0] = (W_)&stg_gc_f1_info;
   GC_GENERIC
   FE_
 }
@@ -746,7 +746,7 @@ EXTFUN(stg_gc_f1)
 #  define DBL_BITMAP 3
 #endif 
 
-INFO_TABLE_SRT_BITMAP(stg_gc_d1_ret_info, stg_gc_d1_ret, DBL_BITMAP,
+INFO_TABLE_SRT_BITMAP(stg_gc_d1_info, stg_gc_d1_ret, DBL_BITMAP,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
@@ -764,10 +764,11 @@ EXTFUN(stg_gc_d1)
   FB_
   Sp -= 1 + sizeofW(StgDouble);
   ASSIGN_DBL(Sp+1,D1);
-  Sp[0] = (W_)&stg_gc_d1_ret_info;
+  Sp[0] = (W_)&stg_gc_d1_info;
   GC_GENERIC
   FE_
 }
+
 
 /*-- L1 contains an int64 ------------------------------------------------- */
 
@@ -779,7 +780,7 @@ EXTFUN(stg_gc_d1)
 #  define LLI_BITMAP 3
 #endif 
 
-INFO_TABLE_SRT_BITMAP(stg_gc_l1_ret_info, stg_gc_l1_ret, LLI_BITMAP,
+INFO_TABLE_SRT_BITMAP(stg_gc_l1_info, stg_gc_l1_ret, LLI_BITMAP,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
@@ -797,7 +798,7 @@ EXTFUN(stg_gc_l1)
   FB_
   Sp -= 1 + sizeofW(StgWord64);
   ASSIGN_Int64(Sp+1,L1);
-  Sp[0] = (W_)&stg_gc_l1_ret_info;
+  Sp[0] = (W_)&stg_gc_l1_info;
   GC_GENERIC
   FE_
 }
@@ -832,7 +833,7 @@ EXTFUN(stg_gc_l1)
 
 /*---- R1 contains a pointer: ------ */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_ut_1_0_ret_info, stg_gc_ut_1_0_ret, 1/*BITMAP*/, 
+INFO_TABLE_SRT_BITMAP(stg_gc_ut_1_0_info, stg_gc_ut_1_0_ret, 1/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
@@ -851,14 +852,14 @@ EXTFUN(stg_gc_ut_1_0)
   Sp -= 3;
   Sp[2] = R1.w;
   Sp[1] = R2.w;
-  Sp[0] = (W_)&stg_gc_ut_1_0_ret_info;
+  Sp[0] = (W_)&stg_gc_ut_1_0_info;
   GC_GENERIC
   FE_
 }
 
 /*---- R1 contains a non-pointer: ------ */
 
-INFO_TABLE_SRT_BITMAP(stg_gc_ut_0_1_ret_info, stg_gc_ut_0_1_ret, 3/*BITMAP*/, 
+INFO_TABLE_SRT_BITMAP(stg_gc_ut_0_1_info, stg_gc_ut_0_1_ret, 3/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
 
@@ -875,7 +876,7 @@ EXTFUN(stg_gc_ut_0_1)
 {
   FB_
   Sp -= 3;
-  Sp[0] = (W_)&stg_gc_ut_0_1_ret_info;
+  Sp[0] = (W_)&stg_gc_ut_0_1_info;
   Sp[1] = R2.w;
   Sp[2] = R1.w;
   GC_GENERIC
@@ -1205,7 +1206,7 @@ FN_(stg_yield_noregs)
 {
   FB_
   Sp--;
-  Sp[0] = (W_)&stg_gc_noregs_ret_info;
+  Sp[0] = (W_)&stg_gc_noregs_info;
   YIELD_GENERIC;
   FE_
 }
@@ -1234,7 +1235,7 @@ FN_(stg_block_noregs)
 {
   FB_
   Sp--;
-  Sp[0] = (W_)&stg_gc_noregs_ret_info;
+  Sp[0] = (W_)&stg_gc_noregs_info;
   BLOCK_GENERIC;
   FE_
 }
@@ -1268,7 +1269,7 @@ FN_(stg_block_1)
  * 
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE_SRT_BITMAP(stg_block_takemvar_ret_info,  stg_block_takemvar_ret,
+INFO_TABLE_SRT_BITMAP(stg_block_takemvar_info,  stg_block_takemvar_ret,
 		      0/*BITMAP*/, 0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, IF_, 0, 0);
 
@@ -1291,7 +1292,7 @@ FN_(stg_block_takemvar)
   FE_
 }
 
-INFO_TABLE_SRT_BITMAP(stg_block_putmvar_ret_info,  stg_block_putmvar_ret,
+INFO_TABLE_SRT_BITMAP(stg_block_putmvar_info,  stg_block_putmvar_ret,
 		      0/*BITMAP*/, 0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, IF_, 0, 0);
 
