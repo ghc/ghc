@@ -550,13 +550,11 @@ utils/FastMutInt_HC_OPTS	+= -O
 compMan/CompManager_HC_OPTS	= -fno-cse
 ghci/InteractiveUI_HC_OPTS	= -fno-cse
 main/CmdLineOpts_HC_OPTS	= -fno-cse
-main/DriverFlags_HC_OPTS	= -fno-cse
 main/DriverMkDepend_HC_OPTS	= -fno-cse
 main/DriverPipeline_HC_OPTS	= -fno-cse
-main/DriverState_HC_OPTS	= -fno-cse
-main/DriverUtil_HC_OPTS		= -fno-cse
 main/Finder_HC_OPTS		= -fno-cse
 main/SysTools_HC_OPTS		= -fno-cse
+main/StaticFlags_HC_OPTS	= -fno-cse
 
 # The #include is vital for the via-C route, else the C
 # compiler doesn't realise that the stcall foreign imports are indeed
