@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.124 2002/05/01 17:56:54 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.125 2002/06/04 18:09:00 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -1118,7 +1118,7 @@ locateOneObj (d:ds) lib
 -- ----------------------------------------------------------------------------
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
-#ifdef mingw32_TARGET_OS
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
 loadDynamic paths rootname = addDLL rootname
   -- ignore paths on windows (why? --SDM)
 
