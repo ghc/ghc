@@ -59,6 +59,10 @@ import FastString	( LitString )
 
 import GHC.Base		( unsafeCoerce#, Int#, Int(..) )	-- Should have a better home in the module hierarchy
 import Monad 		( liftM )
+
+#ifdef GHCI
+import FastString	( mkFastString )
+#endif
 \end{code}
 
 
