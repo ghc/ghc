@@ -19,6 +19,7 @@ module Time
      ,	getClockTime
 
      ,  TimeDiff(..)
+     ,  noTimeDiff      -- non-standard (but useful when constructing TimeDiff vals.)
      ,  diffClockTimes
      ,  addToClockTime
 
@@ -44,6 +45,7 @@ import PrelHandle
 import PrelArr
 import PrelST
 import PrelAddr
+import PrelNum
 import PrelPack 	( unpackCString, new_ps_array,
 			  freeze_ps_array, unpackCStringBA
 			)
@@ -146,7 +148,7 @@ field indicates whether Daylight Savings Time would be in effect.
 data CalendarTime 
  = CalendarTime  {
      ctYear    :: Int,
-     ctMonth   :: Int,
+     ctMonth   :: Month,
      ctDay     :: Int,
      ctHour    :: Int,
      ctMin     :: Int,
@@ -185,6 +187,9 @@ data TimeDiff
 #endif
    }
    deriving (Eq,Ord,Read,Show)
+
+noTimeDiff :: TimeDiff
+noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 \end{code}
 
 @getClockTime@ returns the current time in its internal representation.
@@ -239,16 +244,22 @@ t2} as a @TimeDiff@.
 \begin{code}
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec) 
-	       (TOD c_sec c_psec) = unsafePerformIO $ do
-    res <- malloc1
-    rc <- toClockSec year mon day hour min sec (0::Int) res 
-    if rc /= (0::Int)
-     then do
-            diff_sec <- cvtUnsigned res
-	    let diff_psec = psec
-            return (TOD (c_sec + diff_sec) (c_psec + diff_psec))
-     else
-          error "Time.addToClockTime: can't perform conversion of TimeDiff"
+	       (TOD c_sec c_psec) = 
+	let
+	  sec_diff = fromInt sec + 60 * fromInt min + 3600 * fromInt hour + 24 * 3600 * fromInt day
+	  cal      = toUTCTime (TOD (c_sec + sec_diff) (c_psec + psec))
+
+          new_mon  = fromEnum (ctMonth cal) + r_mon 
+	  (month', yr_diff)
+	    | new_mon < 0  = (toEnum (12 + new_mon), (-1))
+	    | new_mon > 11 = (toEnum (new_mon `mod` 12), 1)
+	    | otherwise    = (toEnum new_mon, 0)
+	    
+	  (r_yr, r_mon) = mon `quotRem` 12
+
+          year' = ctYear cal + year + r_yr + yr_diff
+	in
+	toClockTime cal{ctMonth=month', ctYear=year'}
 
 diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
 diffClockTimes tod_a tod_b =
@@ -257,7 +268,7 @@ diffClockTimes tod_a tod_b =
    CalendarTime year_b mon_b day_b hour_b min_b sec_b psec_b _ _ _ _ _ = toUTCTime tod_b
   in
   TimeDiff (year_a - year_b) 
-	   (mon_a  - mon_b) 
+	   (fromEnum mon_a  - fromEnum mon_b) 
 	   (day_a  - day_b)
 	   (hour_a - hour_b)
 	   (min_a  - min_b)
@@ -327,7 +338,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
     else
         unsafePerformIO ( do
 	    res <- allocWords sizeof_int64
-	    rc <- toClockSec year mon mday hour min sec isDst res
+	    rc <- toClockSec year (fromEnum mon) mday hour min sec isDst res
             if rc /= (0::Int)
              then do
                tm <- primReadInt64Array res 0
@@ -360,7 +371,11 @@ toCalendarTime (TOD (J# s# d#) psec) = do
        zone  <-  get_ZONE res
        tz    <-  get_GMTOFF res
        let tzname = unpackCString zone
-       return (CalendarTime (1900+year) mon mday hour min sec psec 
+           month  
+	    | mon >= 0 && mon <= 11 = toEnum mon
+	    | otherwise             = error ("toCalendarTime: illegal month value: " ++ show mon)
+	    
+       return (CalendarTime (1900+year) month mday hour min sec psec 
             		    (toEnum wday) yday tzname tz (isdst /= (0::Int)))
 
 toUTCTime :: ClockTime -> CalendarTime
@@ -382,7 +397,12 @@ toUTCTime  (TOD (J# s# d#) psec) = unsafePerformIO $ do
 	    year  <- get_tm_year res
 	    wday  <- get_tm_wday res
 	    yday  <- get_tm_yday res
-            return (CalendarTime (1900+year) mon mday hour min sec psec 
+	    let
+             month  
+	      | mon >= 0 && mon <= 11 = toEnum mon
+	      | otherwise             = error ("toCalendarTime: illegal month value: " ++ show mon)
+
+            return (CalendarTime (1900+year) month mday hour min sec psec 
             		  (toEnum wday) yday "UTC" 0 False)
 
 toClockTime :: CalendarTime -> ClockTime
@@ -394,7 +414,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec _wday _yday _tzname tz
     else
         unsafePerformIO ( do
 	    res <- malloc1
-	    rc  <- toClockSec year mon mday hour min sec isDst res
+	    rc  <- toClockSec year (fromEnum mon) mday hour min sec isDst res
             if rc /= 0
              then do
 	       i <- cvtUnsigned res
@@ -552,15 +572,15 @@ formatTimeDiff l fmt (TimeDiff year month day hour min sec _)
 \end{code}
 
 \begin{code}
-foreign import "libHS_cbits" "get_tm_sec"   get_tm_sec   :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_min"   get_tm_min   :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_hour"  get_tm_hour  :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_mday"  get_tm_mday  :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_mon"   get_tm_mon   :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_year"  get_tm_year  :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_wday"  get_tm_wday  :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_yday"  get_tm_yday  :: MBytes -> IO Int
-foreign import "libHS_cbits" "get_tm_isdst" get_tm_isdst :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_sec"   unsafe get_tm_sec   :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_min"   unsafe get_tm_min   :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_hour"  unsafe get_tm_hour  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_mday"  unsafe get_tm_mday  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_mon"   unsafe get_tm_mon   :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_year"  unsafe get_tm_year  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_wday"  unsafe get_tm_wday  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_yday"  unsafe get_tm_yday  :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_tm_isdst" unsafe get_tm_isdst :: MBytes -> IO Int
 	       		   
 foreign import "libHS_cbits" "prim_ZONE"    prim_ZONE    :: Bytes -> IO Addr
 foreign import "libHS_cbits" "prim_GMTOFF"  prim_GMTOFF  :: Bytes -> IO Int
@@ -577,28 +597,28 @@ type MBytes = MutableByteArray RealWorld Int
 
 foreign import "libHS_cbits" "sizeof_time_t"    sizeof_time_t    :: Int
 
-foreign import "libHS_cbits" "prim_SETZONE" prim_SETZONE :: MBytes -> MBytes -> IO Int
+foreign import "libHS_cbits" "prim_SETZONE" unsafe prim_SETZONE :: MBytes -> MBytes -> IO Int
 #ifdef __HUGS__
-foreign import "libHS_cbits" "prim_toLocalTime"  prim_toLocalTime :: Int64 -> MBytes -> IO Int
-foreign import "libHS_cbits" "prim_toUTCTime"    prim_toUTCTime   :: Int64 -> MBytes -> IO Int
+foreign import "libHS_cbits" "prim_toLocalTime"  unsafe prim_toLocalTime :: Int64 -> MBytes -> IO Int
+foreign import "libHS_cbits" "prim_toUTCTime"    unsafe prim_toUTCTime   :: Int64 -> MBytes -> IO Int
 #else
-foreign import "libHS_cbits" "toLocalTime"  prim_toLocalTime :: Int -> Bytes -> MBytes -> IO Int
-foreign import "libHS_cbits" "toUTCTime"    prim_toUTCTime   :: Int -> Bytes -> MBytes -> IO Int
+foreign import "libHS_cbits" "toLocalTime"  unsafe prim_toLocalTime :: Int -> Bytes -> MBytes -> IO Int
+foreign import "libHS_cbits" "toUTCTime"    unsafe prim_toUTCTime   :: Int -> Bytes -> MBytes -> IO Int
 #endif
 
-foreign import "libHS_cbits" "get_ZONE"  get_ZONE    :: MBytes -> IO Addr
-foreign import "libHS_cbits" "GMTOFF"   get_GMTOFF   :: MBytes -> IO Int
+foreign import "libHS_cbits" "get_ZONE"  unsafe get_ZONE   :: MBytes -> IO Addr
+foreign import "libHS_cbits" "GMTOFF"    unsafe get_GMTOFF :: MBytes -> IO Int
 
 
-foreign import "libHS_cbits" "toClockSec"
+foreign import "libHS_cbits" "toClockSec" unsafe 
             toClockSec   :: Int -> Int -> Int -> Int -> Int 
 	    		 -> Int -> Int -> MBytes -> IO Int
 
-foreign import "libHS_cbits" "getClockTime" 
+foreign import "libHS_cbits" "getClockTime"  unsafe 
            primGetClockTime :: MutableByteArray RealWorld Int
 	                    -> MutableByteArray RealWorld Int
 			    -> IO Int
-foreign import "libHS_cbits" "showTime" 
+foreign import "libHS_cbits" "showTime" unsafe 
            showTime :: Int
 	            -> Bytes
 		    -> Int
