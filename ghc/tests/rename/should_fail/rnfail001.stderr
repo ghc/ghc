@@ -1,7 +1,7 @@
 
 rnfail001.hs:3:
     Conflicting definitions for `x'
-    in a pattern type-signature
+    in in a pattern match
 
 Compilation had errors
 
