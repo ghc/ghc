@@ -534,10 +534,20 @@ dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hopengl,
 [  --enable-hopengl
         Build HOpenGL, a Haskell binding for OpenGL/GLUT.
+        On Mac OS X, use --enable-hopengl=x11 to use X11 instead
+        of the "native" libraries.
 ],
 [GhcLibsWithHOpenGL=YES],
 [GhcLibsWithHOpenGL=NO]
 )
+UseQuartzOpenGL=NO
+if test x"$TargetOS_CPP" = x"darwin"; then
+  if test x"$enable_hopengl" != x"x11"; then
+    AC_DEFINE(USE_QUARTZ_OPENGL)
+    UseQuartzOpenGL=YES
+  fi
+fi
+
 AC_SUBST(GhcLibsWithHOpenGL)
 
 dnl ** .NET interop support?
@@ -771,7 +781,11 @@ dnl ** check for Windows include files
 AC_CHECK_HEADERS(windows.h)
 
 dnl ** check for OpenGL include files
-AC_CHECK_HEADERS(GL/gl.h)
+if test $UseQuartzOpenGL = YES ; then
+  AC_CHECK_HEADERS(OpenGL/gl.h)
+else
+  AC_CHECK_HEADERS(GL/gl.h)
+fi
 
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
@@ -1081,7 +1095,18 @@ AC_PATH_XTRA()
 
 dnl ** check for OpenGL/GLUT/GLX include paths and libraries
 if test $GhcLibsWithHOpenGL = YES ; then
-FPTOOLS_HAVE_OPENGL
+  if test $UseQuartzOpenGL = YES ; then
+    dnl Take a shortcut for Mac OS X native OpenGL:
+    dnl It's in a non-standard location, but it's always there
+    GL_CFLAGS=
+	GL_LIBS=
+	GLUT_LIBS=
+	AC_SUBST(GL_CFLAGS)
+	AC_SUBST(GL_LIBS)
+	AC_SUBST(GLUT_LIBS)
+  else
+    FPTOOLS_HAVE_OPENGL
+  fi
 fi
 
 dnl ################################################################
