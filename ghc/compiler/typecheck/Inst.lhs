@@ -368,7 +368,7 @@ tcOverloadedLit :: InstOrigin
 		 -> TcType
 		 -> TcM (HsOverLit TcId)
 tcOverloadedLit orig lit@(HsIntegral i fi) expected_ty
-  | fi `isHsVar` fromIntegerName	-- Do not generate a LitInst for rebindable syntax.  
+  | not (fi `isHsVar` fromIntegerName)	-- Do not generate a LitInst for rebindable syntax.  
 	-- Reason: If we do, tcSimplify will call lookupInst, which
 	--	   will call tcSyntaxName, which does unification, 
 	--	   which tcSimplify doesn't like
@@ -385,7 +385,7 @@ tcOverloadedLit orig lit@(HsIntegral i fi) expected_ty
 	; return (HsIntegral i expr) }
 
 tcOverloadedLit orig lit@(HsFractional r fr) expected_ty
-  | fr `isHsVar` fromRationalName	-- c.f. HsIntegral case
+  | not (fr `isHsVar` fromRationalName)	-- c.f. HsIntegral case
   = do	{ rat_ty <- tcMetaTy rationalTyConName
 	; fr' <- tcSyntaxOp orig fr (mkFunTy rat_ty expected_ty)
 	; return (HsFractional r (HsApp (noLoc fr') (nlHsLit (HsRat r rat_ty)))) }
