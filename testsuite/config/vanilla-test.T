@@ -5,6 +5,16 @@
 --- for everything.                                                 ---
 -----------------------------------------------------------------------
 
+$diff = "diff -c2"
+$rm   = "rm -f"
+$cp   = "cp"
+
+---------------------------------------------------------------
+-- Define the following things on the command line:
+--
+-- $verbose	print command lines
+-- $accept	accept any changed output
+
 ---------------------------------------------------------------
 --- UTILITY FNs                                             ---
 ---------------------------------------------------------------
@@ -29,6 +39,19 @@ def runCmd( $cmd )
    return $res
 }
 
+def runCmdDontFail( $cmd )
+{
+   $res = runCmd($cmd)
+   if $res /= "0"
+	then framefail ("unexpected cmd failure: " ++ $cmd)
+   fi
+}
+
+def runCmdIgnoreResult( $cmd )
+{
+   $res = runCmd($cmd)
+}
+
 -- (eg) "run.stdout"  -->  "testdir/testname.run.stdout"
 def qualify ( $_filename_frag )
 {
@@ -43,7 +66,7 @@ def qualify ( $_filename_frag )
 -- Delete a file and abort if that doesn't work.
 def rm_or_fail ( $_files )
 {
-   $cmd = "rm -f " ++ $_files
+   $cmd = $rm ++ " " ++ $_files
    $res = runCmd($cmd)
    if $res /= "0" then framefail ("rm_or_fail: can't rm: " ++ $_files) fi
 }
@@ -51,7 +74,7 @@ def rm_or_fail ( $_files )
 -- Delete a file but keep going antidisirregardless of the outcome.
 def rm_nofail ( $_files )
 {
-   $cmd = "rm -f " ++ $_files
+   $cmd = $rm ++ " " ++ $_files
    $res = runCmd($cmd)
 }
 
@@ -69,6 +92,13 @@ def say_fail_because_noteq ( $filename1, $filename2 )
    print "--- FAIL because the following files differ:"
    print "---      " ++ $filename1
    print "---      " ++ $filename2
+   if defined $accept then
+	print "--- (accepting new output)"
+	runCmdDontFail($cp ++ " " ++ $filename2 ++ " " ++ $filename1)
+   fi
+   if defined $verbose then
+	runCmdIgnoreResult($diff ++ " " ++ $filename1 ++ " " ++ $filename2)
+   fi
 }
 
 def say_fail_because_nonempty ( $filename1 )
@@ -304,7 +334,7 @@ def vanilla-compok-test-actions ( $extra_compile_args )
         $stderr_e = normalise_errmsg(contents($expected_stderr))
         if   $stderr_e /= $stderr_a
         then print "UNMATCHED WARNING MSGS:"
-             $dummy = runCmd("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
+             $dummy = runCmd($diff ++ " " ++ $expected_stderr ++ " " ++ $actual_stderr)
              return False
         else return True
         fi
@@ -344,7 +374,7 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
 
    if   $stderr_e /= $stderr_a
    then print "UNMATCHED ERROR MSGS:"
-        $dummy = runCmd("diff " ++ $expected_stderr ++ " " ++ $actual_stderr)
+        $dummy = runCmd($diff ++ " " ++ $expected_stderr ++ " " ++ $actual_stderr)
    fi
 
    if $res /= "0" && $stderr_e == $stderr_a
