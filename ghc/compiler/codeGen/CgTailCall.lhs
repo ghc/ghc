@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.24 2000/03/23 17:45:19 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.25 2000/07/11 16:03:37 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -30,7 +30,7 @@ import CgMonad
 import AbsCSyn
 import PprAbsC		( pprAmode )
 
-import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
+import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgBindery	( getArgAmodes, getCAddrMode, getCAddrModeAndInfo )
 import CgRetConv	( dataReturnConvPrim,
 			  ctrlReturnConvAlg, CtrlReturnConvention(..),
@@ -48,7 +48,6 @@ import ClosureInfo	( nodeMustPointToIt,
 import CmdLineOpts	( opt_DoSemiTagging )
 import Id		( Id, idType, idName )
 import DataCon		( DataCon, dataConTyCon, dataConTag, fIRST_TAG )
-import Literal		( mkMachInt )
 import Maybes		( assocMaybe, maybeToBool )
 import PrimRep		( PrimRep(..) )
 import StgSyn		( StgArg, GenStgArg(..) )

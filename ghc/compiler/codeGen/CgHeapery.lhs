@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.20 2000/01/13 14:33:58 hwloidl Exp $
+% $Id: CgHeapery.lhs,v 1.21 2000/07/11 16:03:37 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -21,7 +21,6 @@ import CLabel
 import CgMonad
 
 import CgStackery	( getFinalStackHW, mkTaggedStkAmodes, mkTagAssts )
-import SMRep		( fixedHdrSize )
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgUsages		( getVirtAndRealHp, getRealSp, setVirtHp, setRealHp,
 			  initHeapUsage

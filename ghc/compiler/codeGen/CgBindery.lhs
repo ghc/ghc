@@ -32,7 +32,7 @@ import AbsCSyn
 import CgMonad
 
 import CgUsages		( getHpRelOffset, getSpRelOffset, getRealSp )
-import CgStackery	( freeStackSlots, addFreeSlots )
+import CgStackery	( freeStackSlots )
 import CLabel		( mkClosureLabel,
 			  mkBitmapLabel, pprCLabel )
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
@@ -45,7 +45,7 @@ import VarEnv
 import VarSet		( varSetElems )
 import Literal		( Literal )
 import Maybes		( catMaybes, maybeToBool )
-import Name		( isLocallyDefined, isWiredInName, NamedThing(..) )
+import Name		( isLocallyDefined, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif

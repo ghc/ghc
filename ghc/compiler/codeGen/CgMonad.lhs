@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.23 1999/10/13 16:39:16 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.24 2000/07/11 16:03:37 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -54,7 +54,6 @@ import DataCon		( ConTag )
 import Id		( Id )
 import VarEnv
 import PrimRep		( PrimRep(..) )
-import StgSyn		( StgLiveVars )
 import Outputable
 
 infixr 9 `thenC`	-- Right-associative!

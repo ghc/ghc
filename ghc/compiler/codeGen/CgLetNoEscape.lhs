@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.13 1999/05/13 17:30:57 simonm Exp $
+% $Id: CgLetNoEscape.lhs,v 1.14 2000/07/11 16:03:37 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -19,7 +19,6 @@ import {-# SOURCE #-} CgExpr ( cgExpr )
 import StgSyn
 import CgMonad
 import AbsCSyn
-import CLabel		( CLabel )
 
 import CgBindery	( letNoEscapeIdInfo, bindArgsToRegs,
 			  bindNewToStack, buildContLivenessMask, CgIdInfo,

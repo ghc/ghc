@@ -11,10 +11,8 @@ module CgUpdate ( pushUpdateFrame, reserveSeqFrame, pushSeqFrame ) where
 import CgMonad
 import AbsCSyn
 
-import PrimRep		( PrimRep(..) )
 import CgStackery	( allocStackTop, updateFrameSize, seqFrameSize )
 import CgUsages		( getVirtSp, getSpRelOffset )
-import CmdLineOpts	( opt_SccProfilingOn )
 import Panic		( assertPanic )
 \end{code}
 

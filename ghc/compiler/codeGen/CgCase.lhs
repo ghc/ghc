@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.42 2000/05/25 12:41:15 simonpj Exp $
+% $Id: CgCase.lhs,v 1.43 2000/07/11 16:03:37 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -25,7 +25,7 @@ import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
 			  getAmodeRep, nonemptyAbsC
 			)
 import CgUpdate		( reserveSeqFrame )
-import CgBindery	( getVolatileRegs, getArgAmodes, getArgAmode,
+import CgBindery	( getVolatileRegs, getArgAmodes,
 			  bindNewToReg, bindNewToTemp,
 			  bindNewPrimToAmode,
 			  rebindToStack, getCAddrMode,
@@ -48,7 +48,6 @@ import CLabel		( CLabel, mkVecTblLabel, mkReturnPtLabel,
 			)
 import ClosureInfo	( mkLFArgument )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
-import CostCentre	( CostCentre )
 import Id		( Id, idPrimRep, isDeadBinder )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, ConTag,
 			  isUnboxedTupleCon )
@@ -62,7 +61,6 @@ import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			)
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
 			  splitTyConApp_maybe, repType )
-import PprType		( {- instance Outputable Type -} )
 import Unique           ( Unique, Uniquable(..), mkPseudoUnique1 )
 import Maybes		( maybeToBool )
 import Util

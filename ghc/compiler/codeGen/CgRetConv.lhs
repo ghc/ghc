@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.22 2000/05/25 12:41:15 simonpj Exp $
+% $Id: CgRetConv.lhs,v 1.23 2000/07/11 16:03:37 simonmar Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -27,11 +27,8 @@ import CmdLineOpts	( opt_UseVanillaRegs, opt_UseFloatRegs,
 			  opt_UseDoubleRegs, opt_UseLongRegs
 			)
 import Maybes		( catMaybes )
-import DataCon		( DataCon )
-import PrimOp		( PrimOp{-instance Outputable-} )
 import PrimRep		( isFloatingRep, PrimRep(..), is64BitRep )
 import TyCon		( TyCon, tyConFamilySize )
-import Type		( Type, typePrimRep, isUnLiftedType )
 import Util		( isn'tIn )
 
 import Outputable

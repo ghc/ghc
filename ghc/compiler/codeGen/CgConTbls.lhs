@@ -11,7 +11,6 @@ module CgConTbls ( genStaticConBits ) where
 import AbsCSyn
 import CgMonad
 
-import StgSyn		( SRT(..) )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
 import CLabel		( mkConEntryLabel )
@@ -19,14 +18,12 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			  mkConLFInfo, ClosureInfo
 			)
 import CostCentre	( dontCareCCS )
-import FiniteMap	( fmToList, FiniteMap )
 import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
 import Name		( getOccName )
 import OccName		( occNameUserString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
-import Type		( typePrimRep, Type )
-import Outputable	
+import Type		( typePrimRep )
 \end{code}
 
 For every constructor we generate the following info tables:

@@ -25,7 +25,7 @@ import AbsCSyn
 import CLabel		( CLabel, mkSRTLabel, mkClosureLabel, mkModuleInitLabel )
 
 import PprAbsC		( dumpRealC )
-import AbsCUtils	( mkAbstractCs, mkAbsCStmts, flattenAbsC )
+import AbsCUtils	( mkAbstractCs, flattenAbsC )
 import CgBindery	( CgIdInfo, addBindC, addBindsC )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
@@ -35,10 +35,9 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC,
 			  opt_D_dump_absC
 			)
 import CostCentre       ( CostCentre, CostCentreStack )
-import FiniteMap	( FiniteMap )
 import Id               ( Id, idName )
 import Module           ( Module, moduleString, moduleName, 
-			  ModuleName, moduleNameString )
+			  ModuleName )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Type             ( Type )
 import TyCon            ( TyCon, isDataTyCon )

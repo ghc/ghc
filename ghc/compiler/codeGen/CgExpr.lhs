@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.34 2000/04/13 20:41:30 panne Exp $
+% $Id: CgExpr.lhs,v 1.35 2000/07/11 16:03:37 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -40,7 +40,6 @@ import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
 import Id		( idPrimRep, idType, Id )
 import VarSet
 import DataCon		( DataCon, dataConTyCon )
-import IdInfo		( ArityInfo(..) )
 import PrimOp		( primOpOutOfLine, ccallMayGC,
 			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
 			)
@@ -48,7 +47,6 @@ import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import TyCon		( maybeTyConSingleCon,
 			  isUnboxedTupleTyCon, isEnumerationTyCon )
 import Type		( Type, typePrimRep, splitTyConApp_maybe, repType )
-import PprType		( {- instance Outputable Type -} )
 import Maybes		( assocMaybe, maybeToBool )
 import Unique		( mkBuiltinUnique )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
