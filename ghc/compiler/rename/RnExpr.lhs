@@ -487,7 +487,7 @@ horner b i | abs q <= 1 = if r == 0 || r == i then mkInt i else mkInt r `plus` m
          mkInt i  = HsLit (HsInt i)
          plus     = mkOp "+"
          times    = mkOp "*"
-         mkOp op = \x y -> OpApp x (HsVar (mkSrcUnqual varName (_PK_ op))) (panic "fixity") y
+         mkOp op  = \x y -> HsPar (OpApp x (HsVar (mkSrcUnqual varName (_PK_ op))) (panic "fixity") y)
 \end{code}
 
 %************************************************************************
