@@ -1,4 +1,5 @@
-
-test('life_space_leak', normal, multimod_compile_and_run, ['Main', ''])
+# exhausts Hugs's heap (CAF leak)
+test('life_space_leak', expect_fail_if_compiler_type('hugs'),
+	multimod_compile_and_run, ['Main', ''])
 clean_o_hi()
 
