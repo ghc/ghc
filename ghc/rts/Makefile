@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 1999/03/03 19:26:31 sof Exp $
+# $Id: Makefile,v 1.8 1999/04/27 09:37:04 simonm Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -54,7 +54,7 @@ WARNING_OPTS += -optc-Wbad-function-cast
 #WARNING_OPTS += -optc-Wconversion
 
 SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
-SRC_CC_OPTS += $(GhcRtsCcOpts) -optc-DCOMPILING_RTS
+SRC_CC_OPTS = $(GhcRtsCcOpts)
 
 DLLWRAP = dllwrap
 
