@@ -15,6 +15,10 @@ in instead of the defaults.
 #include "HsFFI.h"
 #endif
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 void
 defaultsHook (void)
 {
