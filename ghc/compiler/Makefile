@@ -73,9 +73,7 @@ HCS      = $(patsubst %.lhs, %.hc, $(patsubst %.hs, %.hc, $(HS_SRCS)))
 # the suffix .hs, since they're special and don't fall under the umbrella of $(HS_SRCS)
 # always (only when $(Ghc2_0) is equal to YES)
 ifeq "$(Ghc2_0)" "YES"
-#OLD:LOOPS_HS  = $(wildcard */*Loop*.hs)
 MKDEPENDHS_SRCS = $(HS_SRCS)
-#HS_SRCS  += $(LOOPS_HS)
 else
 LOOPS   = $(patsubst %.lhi, %.hi, $(wildcard */*.lhi))
 endif
@@ -131,9 +129,6 @@ SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
 
 ifeq "$(Ghc2_0)" "NO"
 SRC_HC_OPTS += -fomit-derived-read -fomit-reexported-instances
-else
-# Recompilation checking - unconditionally so (ToDo: move to mk/config.mk.in)
-SRC_HC_OPTS += -recomp
 endif
 
 ifeq ($(GhcWithDeforester),NO)
@@ -273,41 +268,26 @@ CLEAN_FILES += hsp
 #
 # Building the loop breakers from .lhi (0.2x) or .hi-boot (2.xx) files
 #
-ifeq ($(Ghc2_0),YES)
-
-BOOT_HI_STEMS = $(basename $(wildcard */*.hi-boot))
-
-hi-boot :: 
-	@for n in $(BOOT_HI_STEMS); \
-	do  \
-	  echo Creating $$n.hi ; \
-	  $(RM) $$n.hi ; \
-	  $(CP) $$n.hi-boot $$n.hi || ( $(RM) $$n.hi && exit 1 ) ; \
-	done 
-#
-# Have the collector *Loop.hs interface files be generated just after having
-# created the .hi's from the .hi-boot's. 
-
-
-else
+ifeq "$(Ghc2_0)" "NO"
 hi-boot :: $(LOOPS)
 
 %.hi : %.lhi
 	$(RM) $@
 	$(UNLIT) $<  $@ || ( $(RM) $@ && exit 1 )
 	@chmod 444 $@
-endif
 
 boot :: hi-boot
+else
+# hi-boot not needed when using 2.04+ as HC, defining it here
+# to be consistent across setting of Ghc2_0
+hi-boot :
+	@echo "Done."
+endif
 
 #-----------------------------------------------------------------------------
 # 		Linking
 
 SRC_LD_OPTS += -no-link-chk
-
-# Build-specific
-#SRC_LD_OPTS += "-pgml time gcc -B/projects/unsupported/gnu/sparc-sunos5/bin/g"
-
 
 #-----------------------------------------------------------------------------
 # 		install
