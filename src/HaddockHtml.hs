@@ -501,7 +501,10 @@ ppHsDataDecl doc_map summary is_newty decl@(HsDataDecl loc ctx nm args cons drv)
         = td << vanillaTable << (header </> datadoc </> constrs)
   where
 	header = declBox (ppHsDataHeader False is_newty nm args)
-	datadoc = docBox (markup htmlMarkup (fromJust doc))
+
+	datadoc 
+	  | isJust doc = docBox (markup htmlMarkup (fromJust doc))
+	  | otherwise  = Html.emptyTable
 
 	constr_hdr = tda [ theclass "section4" ] << toHtml "Constructors"
 
@@ -560,7 +563,11 @@ ppHsFullConstr doc_map (HsRecDecl pos nm tvs ctxt fields maybe_doc) =
    )
 
   where hdr = declBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm)
-	constr_doc = docBox (markup htmlMarkup (fromJust doc))
+
+	constr_doc	
+	  | isJust doc = docBox (markup htmlMarkup (fromJust doc))
+	  | otherwise  = Html.emptyTable
+
 	fields_html = 
 	   td << 
 	      table ! [width "100%", cellpadding 0, cellspacing 8] << (
