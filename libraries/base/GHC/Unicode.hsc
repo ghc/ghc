@@ -57,6 +57,16 @@ isPrint                 :: Char -> Bool
 -- | Selects white-space characters in the Latin-1 range.
 -- (In Unicode terms, this includes spaces and some control characters.)
 isSpace                 :: Char -> Bool
+-- isSpace includes non-breaking space
+-- Done with explicit equalities both for efficiency, and to avoid a tiresome
+-- recursion with GHC.List elem
+isSpace c		=  c == ' '	||
+			   c == '\t'	||
+			   c == '\n'	||
+			   c == '\r'	||
+			   c == '\f'	||
+			   c == '\v'	||
+			   c == '\xa0'
 
 -- | Selects alphabetic Unicode characters (letters) that are not lower-case.
 -- (In Unicode terms, this includes letters in upper and title cases,
@@ -119,7 +129,7 @@ type CInt = (#type int)
 isDigit    c = iswdigit (fromIntegral (ord c)) /= 0
 isAlpha    c = iswalpha (fromIntegral (ord c)) /= 0
 isAlphaNum c = iswalnum (fromIntegral (ord c)) /= 0
-isSpace    c = iswspace (fromIntegral (ord c)) /= 0
+--isSpace    c = iswspace (fromIntegral (ord c)) /= 0
 isControl  c = iswcntrl (fromIntegral (ord c)) /= 0
 isPrint    c = iswprint (fromIntegral (ord c)) /= 0
 isUpper    c = iswupper (fromIntegral (ord c)) /= 0
@@ -165,17 +175,6 @@ foreign import ccall unsafe "towupper"
 
 isControl c		=  c < ' ' || c >= '\DEL' && c <= '\x9f'
 isPrint c		=  not (isControl c)
-
--- isSpace includes non-breaking space
--- Done with explicit equalities both for efficiency, and to avoid a tiresome
--- recursion with GHC.List elem
-isSpace c		=  c == ' '	||
-			   c == '\t'	||
-			   c == '\n'	||
-			   c == '\r'	||
-			   c == '\f'	||
-			   c == '\v'	||
-			   c == '\xa0'
 
 -- The upper case ISO characters have the multiplication sign dumped
 -- randomly in the middle of the range.  Go figure.
