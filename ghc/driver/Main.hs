@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.64 2000/10/05 13:27:54 simonmar Exp $
+-- $Id: Main.hs,v 1.65 2000/10/09 09:19:16 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -396,6 +396,7 @@ minusWallOpts 	  = minusWOpts ++
 		    [ "-fwarn-type-defaults"
 		    , "-fwarn-name-shadowing"
 		    , "-fwarn-missing-signatures"
+		    , "-fwarn-hi-shadowing"
 		    ]
 
 data WarningState = W_default | W_ | W_all | W_not
