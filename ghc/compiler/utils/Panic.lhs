@@ -22,17 +22,18 @@ module Panic
    ) where
 
 #include "HsVersions.h"
+#include "config.h"
 
 import Config
 import FastTypes
 
-#if __GLASGOW_HASKELL__ > 504
-import System.Posix.Signals
-#else
-import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
-#endif
-
 #ifndef mingw32_HOST_OS
+# if __GLASGOW_HASKELL__ > 504
+import System.Posix.Signals
+# else
+import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
+# endif
+
 import CONCURRENT	( myThreadId )
 
 # if __GLASGOW_HASKELL__ < 500
