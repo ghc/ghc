@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.16 2000/07/09 16:17:10 panne Exp $
+ * $Id: ProfHeap.c,v 1.17 2000/11/07 18:00:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -496,9 +496,10 @@ heapCensus(void)
 	break;
 	
       case CONSTR:
-	if (((StgClosure *)p)->header.info == &DEAD_WEAK_info) {
-	  size = sizeofW(StgWeak);
-	  break;
+	if (((StgClosure *)p)->header.info == &DEAD_WEAK_info
+	    && !(LOOKS_LIKE_GHC_INFO(*(p + sizeW_fromITBL(info))))) {
+	    size = sizeofW(StgWeak);
+	    break;
 	}
 	/* else, fall through... */
 
