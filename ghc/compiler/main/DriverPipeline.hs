@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.62 2001/03/28 16:51:03 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.63 2001/04/03 15:36:44 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -446,7 +446,7 @@ run_phase Hsc basename suff input_fn output_fn
 	cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
 
 	let cc_injects = unlines (map mk_include 
-				(c_includes ++ reverse cmdline_includes))
+				 (c_includes ++ reverse cmdline_includes))
 	    mk_include h_file = 
 		case h_file of 
 		   '"':_{-"-} -> "#include "++h_file
@@ -991,6 +991,20 @@ compile ghci_mode summary source_unchanged have_object
        dyn_flags' = dyn_flags { hscOutName = output_fn,
 				hscStubCOutName = basename ++ "_stub.c",
 				hscStubHOutName = basename ++ "_stub.h" }
+
+   -- figure out which header files to #include in a generated .hc file
+   c_includes <- getPackageCIncludes
+   cmdline_includes <- dynFlag cmdlineHcIncludes -- -#include options
+
+   let cc_injects = unlines (map mk_include 
+                                 (c_includes ++ reverse cmdline_includes))
+       mk_include h_file = 
+	case h_file of 
+           '"':_{-"-} -> "#include "++h_file
+           '<':_      -> "#include "++h_file
+           _          -> "#include \""++h_file++"\""
+
+   writeIORef v_HCHeader cc_injects
 
    -- run the compiler
    hsc_result <- hscMain ghci_mode dyn_flags'
