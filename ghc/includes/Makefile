@@ -89,8 +89,7 @@ $(TARGETPLATFORM).h : mkNativeHdr
 # to do it (ghc really).
 #
 mkNativeHdr : $(HLIT) $(HFILES) mkNativeHdr.c
-	$(HC) -c mkNativeHdr.c
-	$(HC) -o mkNativeHdr mkNativeHdr.o
+	$(CC) -o mkNativeHdr mkNativeHdr.c
 
 all :: $(H_CONFIG) $(ALL_FILES)
 
