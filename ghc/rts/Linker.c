@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.143 2003/12/23 10:10:53 simonmar Exp $
+ * $Id: Linker.c,v 1.144 2004/01/05 17:32:35 simonmar Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -10,6 +10,12 @@
 #if 0
 #include "PosixSource.h"
 #endif
+
+//  Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h>.
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "HsFFI.h"
@@ -697,7 +703,11 @@ initLinker( void )
 #   endif
 
 #   if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+#   if defined(RTLD_DEFAULT)    
+    dl_prog_handle = RTLD_DEFAULT;
+#   else
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
+#   endif // RTLD_DEFAULT
 #   endif
 }
 
