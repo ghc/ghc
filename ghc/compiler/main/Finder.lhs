@@ -20,7 +20,6 @@ import DriverState
 import Module
 import FiniteMap
 import Util
-import Panic
 
 import IOExts
 import Directory
@@ -49,36 +48,16 @@ newFinder (PackageConfigInfo pkgs) = do
   -- expunge our home cache
   writeIORef v_HomeDirCache Nothing
 
-  -- populate the package cache, if necessary
-  pkg_cache <- readIORef v_PkgDirCache
-  case pkg_cache of 
-    Nothing -> do
-
-	let extendFM fm pkg = do
-		let dirs = import_dirs pkg
-		    pkg_name = _PK_ (name pkg)
-		let addDir fm dir = do
-			contents <- getDirectoryContents' dir
-			return (addListToFM fm (zip contents 
-						   (repeat (pkg_name,dir))))
-                foldM addDir fm dirs
-
-  	pkg_map <- foldM extendFM emptyFM pkgs
-	writeIORef v_PkgDirCache (Just pkg_map)
-
-    Just _ -> 
-        return ()
-
   -- and return the finder
-  return finder
+  return (finder pkgs)
 
   
-finder :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-finder name = do
+finder :: [Package] -> ModuleName -> IO (Maybe (Module, ModuleLocation))
+finder pkgs name = do
   j <- maybeHomeModule name
   case j of
 	Just home_module -> return (Just home_module)
-	Nothing -> maybePackageModule name
+	Nothing -> maybePackageModule pkgs name
 
 maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybeHomeModule mod_name = do
@@ -136,12 +115,32 @@ mkHomeModuleLocn mod_name basename source_fn = do
 	         }
 	))
 
-maybePackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-maybePackageModule mod_name = do
+maybePackageModule :: [Package] -> ModuleName 
+	-> IO (Maybe (Module, ModuleLocation))
+
+maybePackageModule pkgs mod_name = do
   maybe_pkg_cache <- readIORef v_PkgDirCache
-  case maybe_pkg_cache of {
-     Nothing -> panic "maybePackageModule: no pkg_cache";
-     Just pkg_cache -> do
+
+  -- populate the package cache, if necessary
+  pkg_cache <-
+    case maybe_pkg_cache of 
+      Nothing -> do
+
+	let extendFM fm pkg = do
+		let dirs = import_dirs pkg
+		    pkg_name = _PK_ (name pkg)
+		let addDir fm dir = do
+			contents <- getDirectoryContents' dir
+			return (addListToFM fm (zip contents 
+						   (repeat (pkg_name,dir))))
+                foldM addDir fm dirs
+
+  	pkg_map <- foldM extendFM emptyFM pkgs
+	writeIORef v_PkgDirCache (Just pkg_map)
+        return pkg_map
+
+      Just pkg_cache -> 
+        return pkg_cache
 
   -- hi-suffix for packages depends on the build tag.
   package_hisuf <-
@@ -164,7 +163,6 @@ maybePackageModule mod_name = do
 			   }
 		   ))
 
-   }
 
 getDirectoryContents' d
    = IO.catch (getDirectoryContents d)
