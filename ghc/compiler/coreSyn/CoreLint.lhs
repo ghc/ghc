@@ -12,7 +12,7 @@ module CoreLint (
 
 #include "HsVersions.h"
 
-import IO	( hPutStr, hPutStrLn, stderr, stdout )
+import IO	( hPutStr, hPutStrLn, stdout )
 
 import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
 import CoreSyn
@@ -21,20 +21,18 @@ import CoreFVs		( idFreeVars, mustHaveLocalBinding )
 import CoreUtils	( exprOkForSpeculation, coreBindsSize, mkPiType )
 
 import Bag
-import Literal		( Literal, literalType )
-import DataCon		( DataCon, dataConRepType )
-import Id		( isDeadBinder )
+import Literal		( literalType )
+import DataCon		( dataConRepType )
 import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId )
 import VarSet
 import Subst		( mkTyVarSubst, substTy )
-import Name		( isLocallyDefined, getSrcLoc )
+import Name		( getSrcLoc )
 import PprCore
 import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message, 
 			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
                           WarnMsg, pprBagOfWarnings)
-import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc, noSrcLoc, isNoSrcLoc )
-import Type		( Type, Kind, tyVarsOfType,
+import Type		( Type, tyVarsOfType,
 			  splitFunTy_maybe, mkTyVarTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, 
@@ -64,7 +62,7 @@ and do Core Lint when necessary.
 beginPass :: String -> IO ()
 beginPass pass_name
   | opt_D_show_passes
-  = hPutStrLn stderr ("*** " ++ pass_name)
+  = hPutStrLn stdout ("*** " ++ pass_name)
   | otherwise
   = return ()
 
@@ -160,7 +158,7 @@ lintCoreBindings whoDunnit binds
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
     done_lint = doIfSet opt_D_show_passes
-		        (hPutStr stderr ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
+		        (hPutStr stdout ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
     warn warnings
       = vcat [
                 text ("*** Core Lint Warnings: in result of " ++ whoDunnit ++ " ***"),
