@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.4 2000/05/15 14:44:42 simonmar Exp $
+ * $Id: mkNativeHdr.c,v 1.5 2000/08/17 14:30:26 simonmar Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -37,8 +37,8 @@
 #define OFFSET_CurrentNursery OFFSET(RegTable, RegTable.rCurrentNursery)
 
 #define TSO_SP       OFFSET(tso, tso.sp)
-#define TSO_SPLIM    OFFSET(tso, tso.splim)
 #define TSO_SU       OFFSET(tso, tso.su)
+#define TSO_STACK    OFFSET(tso, tso.stack)
 
 #define BDESCR_START OFFSET(bd, bd.start)
 #define BDESCR_FREE  OFFSET(bd, bd.free)
@@ -87,7 +87,7 @@ main()
 
     printf("#define TSO_SP %d\n", TSO_SP);
     printf("#define TSO_SU %d\n", TSO_SU);
-    printf("#define TSO_SPLIM %d\n", TSO_SPLIM);
+    printf("#define TSO_STACK %d\n", TSO_STACK);
 
     printf("\n-- Block descriptor offsets for the Native Code Generator\n");
 

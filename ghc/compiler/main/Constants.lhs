@@ -24,6 +24,7 @@ module Constants (
 	aRR_WORDS_HDR_SIZE,
 	aRR_PTRS_HDR_SIZE,
         rESERVED_C_STACK_BYTES,
+        rESERVED_STACK_WORDS,
 
 	sTD_ITBL_SIZE,
 	pROF_ITBL_SIZE,
@@ -229,6 +230,13 @@ area is has available.
 
 \begin{code}
 rESERVED_C_STACK_BYTES = (RESERVED_C_STACK_BYTES :: Int)
+\end{code}
+
+The amount of (Haskell) stack to leave free for saving registers when
+returning to the scheduler.
+
+\begin{code}
+rESERVED_STACK_WORDS = (RESERVED_STACK_WORDS :: Int)
 \end{code}
 
 Size of a word, in bytes

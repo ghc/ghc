@@ -18,7 +18,8 @@ import Literal		( Literal(..), word2IntLit )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
-import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE )
+import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
+			  rESERVED_STACK_WORDS )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
 import Outputable
@@ -570,10 +571,6 @@ save_thread_state
 	   (StInd PtrRep (StPrim IntAddOp 
 		[tso, StInt (toInteger (TSO_SU*BYTES_PER_WORD))]))
 	   stgSu :
-	StAssign PtrRep 
-	   (StInd PtrRep (StPrim IntAddOp 
-		[tso, StInt (toInteger (TSO_SPLIM*BYTES_PER_WORD))]))
-	   stgSpLim :
 	StAssign PtrRep
 	   (StInd PtrRep (StPrim IntAddOp
 		[stgCurrentNursery, 
@@ -594,8 +591,9 @@ load_thread_state
 	   (StInd PtrRep (StPrim IntAddOp 
 		[tso, StInt (toInteger (TSO_SU*BYTES_PER_WORD))])) :
 	StAssign PtrRep stgSpLim
-	   (StInd PtrRep (StPrim IntAddOp 
-		[tso, StInt (toInteger (TSO_SPLIM*BYTES_PER_WORD))])) :
+	   (StPrim IntAddOp [tso, 
+			     StInt (toInteger ((TSO_STACK + rESERVED_STACK_WORDS)
+					       *BYTES_PER_WORD))]) :
 	StAssign PtrRep stgHp
 	   (StPrim IntSubOp [
 	      StInd PtrRep (StPrim IntAddOp
