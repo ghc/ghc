@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.23 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.24 2001/08/07 19:34:01 ken Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -308,7 +308,7 @@ fprint_data(FILE *fp)
     nat i;
     for (i = 0; i < SYMBOL_HASH_SIZE; i++) {
 	if (symbol_hash[i].data > 0) {
-	    fprintf(fp, "   %s %d\n", symbol_hash[i].name, symbol_hash[i].data);
+	    fprintf(fp, "   %s %lu\n", symbol_hash[i].name, (unsigned long)symbol_hash[i].data);
 	}
     }
 }
@@ -392,7 +392,7 @@ fprint_closure_types(FILE *fp)
 
   for (i = 0; i < N_CLOSURE_TYPES; i++) {
     if (closure_types[i]) {
-      fprintf(fp, "   %s %d\n", type_names[i], closure_types[i]);
+      fprintf(fp, "   %s %lu\n", type_names[i], (unsigned long)closure_types[i]);
     }
   }
 }
@@ -520,7 +520,9 @@ heapCensus(void)
   StgDouble time;
   nat size;
   StgPtr p;
+#ifdef PROFILING
   nat elapsed;
+#endif
     
 #ifdef DEBUG_HEAP_PROF
   switch (RtsFlags.ProfFlags.doHeapProfile) {
