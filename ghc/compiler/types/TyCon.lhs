@@ -12,7 +12,7 @@ module TyCon(
 	SYN_IE(Arity), NewOrData(..),
 
 	isFunTyCon, isPrimTyCon, isBoxedTyCon,
-	isDataTyCon, isSynTyCon, isNewTyCon, maybeNewTyCon,
+	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, maybeNewTyCon,
 
 	mkDataTyCon,
 	mkFunTyCon,
@@ -35,7 +35,7 @@ module TyCon(
 
         maybeTyConSingleCon,
 	isEnumerationTyCon, isTupleTyCon,
-	derivedFor
+	derivedClasses
 ) where
 
 CHK_Ubiq()	-- debugging consistency check
@@ -48,6 +48,7 @@ IMPORT_DELOOPER(TyLoop) ( SYN_IE(Type), GenType,
 			  --LATER: specMaybeTysSuffix
 			)
 
+import BasicTypes	( SYN_IE(Arity), NewOrData(..) )
 import TyVar		( GenTyVar, alphaTyVars, alphaTyVar, betaTyVar, SYN_IE(TyVar) )
 import Usage		( GenUsage, SYN_IE(Usage) )
 import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
@@ -62,15 +63,9 @@ import PrelMods		( gHC__, pREL_TUP, pREL_BASE )
 import Lex		( mkTupNameStr )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import Util		( nOfThem, isIn, Ord3(..), panic, panic#, assertPanic )
---import {-hide me-}
---	PprType (pprTyCon)
---import {-hide me-}
---	PprStyle--ToDo:rm
 \end{code}
 
 \begin{code}
-type Arity = Int
-
 data TyCon
   = FunTyCon		-- Kind = Type -> Type -> Type
 
@@ -123,10 +118,6 @@ data TyCon
 	Type		-- Right-hand side, mentioning these type vars.
 			-- Acts as a template for the expansion when
 			-- the tycon is applied to some types.
-
-data NewOrData
-  = NewType	    -- "newtype Blah ..."
-  | DataType	    -- "data Blah ..."
 \end{code}
 
 \begin{code}
@@ -150,8 +141,12 @@ isPrimTyCon _ = False
 -- isBoxedTyCon is just the negation of isPrimTyCon.
 isBoxedTyCon = not . isPrimTyCon
 
+-- isAlgTyCon returns True for both @data@ and @newtype@
+isAlgTyCon (DataTyCon _ _ _ _ _ _ _ _) = True
+isAlgTyCon (TupleTyCon _ _ _)	       = True
+isAlgTyCon other 		       = False
+
 -- isDataTyCon returns False for @newtype@.
--- Not sure about this decision yet.
 isDataTyCon (DataTyCon _ _ _ _ _ _ _ DataType) = True
 isDataTyCon (TupleTyCon _ _ _)		       = True
 isDataTyCon other 			       = False
@@ -298,9 +293,9 @@ function doesn't deal with that.
 ToDo: what about derivings for specialised tycons !!!
 
 \begin{code}
-derivedFor :: Class -> TyCon -> Bool
-derivedFor clas (DataTyCon _ _ _ _ _ _ derivs _) = isIn "derivedFor" clas derivs
-derivedFor clas something_weird		         = False
+derivedClasses :: TyCon -> [Class]
+derivedClasses (DataTyCon _ _ _ _ _ _ derivs _) = derivs
+derivedClasses something_weird		        = []
 \end{code}
 
 %************************************************************************
