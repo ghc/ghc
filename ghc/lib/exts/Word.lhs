@@ -108,12 +108,17 @@ module Word
 	-- non-standard, GHC specific
 	, wordToInt
 
+	-- Internal, do not use.
+	, word8ToWord#
+	, word16ToWord#
+	, word32ToWord#
+
 	) where
 
 #ifdef __HUGS__
 import PreludeBuiltin
 #else
-import GlaExts
+import PrelBase
 import CCall
 import PrelForeign
 import PrelIOBase
@@ -1193,18 +1198,29 @@ the GHC specific Word type:
 
 \begin{code}
 wordToWord8  :: Word -> Word8
-word8ToWord  :: Word8 -> Word
 wordToWord16 :: Word -> Word16
-word16ToWord :: Word16 -> Word
 wordToWord32 :: Word -> Word32
+
+word8ToWord  :: Word8 -> Word
+word16ToWord :: Word16 -> Word
 word32ToWord :: Word32 -> Word
 
-word8ToWord (W8# w#)   = W# w#
+word8ToWord#   :: Word8 -> Word#
+word16ToWord#  :: Word16 -> Word#
+word32ToWord#  :: Word32 -> Word#
+
+word8ToWord  (W8# w#)   = W# w#
+word8ToWord# (W8# w#)   = w#
+
 wordToWord8 (W# w#)    = W8# (w# `and#` (case (maxBound::Word8) of W8# x# -> x#))
-word16ToWord (W16# w#) = W# w#
+word16ToWord  (W16# w#) = W# w#
+word16ToWord# (W16# w#) = w#
+
 wordToWord16 (W# w#)   = W16# (w# `and#` (case (maxBound::Word16) of W16# x# -> x#))
-word32ToWord (W32# w#) = W# w#
 wordToWord32 (W# w#)   = W32# (w# `and#` (case (maxBound::Word32) of W32# x# -> x#))
+
+word32ToWord  (W32# w#) = W# w#
+word32ToWord# (W32# w#) = w#
 
 wordToWord64  :: Word -> Word64
 wordToWord64 (W# w#) = W64# (wordToWord64# w#)

@@ -98,16 +98,21 @@ module Int
 	-- non-standard, GHC specific
 	, intToWord
 
+	-- Internal, do not use.
+	, int8ToInt#
+	, int16ToInt#
+	, int32ToInt#
+
 	) where
 
 #ifdef __HUGS__
 import PreludeBuiltin
 #else
-import GlaExts
-import PrelGHC
+import PrelBase
 import CCall
 import PrelForeign
-import PrelAddr ( Int64(..), Word64(..) )
+import PrelIOBase
+import PrelAddr ( Int64(..), Word64(..), Addr(..), Word(..) )
 #endif
 import Ix
 import Bits
@@ -122,6 +127,10 @@ import Word    ( Word32 )
 int8ToInt  :: Int8  -> Int
 int16ToInt :: Int16 -> Int
 int32ToInt :: Int32 -> Int
+
+int8ToInt#  :: Int8  -> Int#
+int16ToInt# :: Int16 -> Int#
+int32ToInt# :: Int32 -> Int#
 
 intToInt8  :: Int   -> Int8
 intToInt16 :: Int   -> Int16
@@ -159,10 +168,11 @@ data Int8 = I8# Int#
 instance CCallable Int8
 instance CReturnable Int8
 
-int8ToInt (I8# x) = I# (int8ToInt# x)
+int8ToInt (I8# x)  = I# (i8ToInt# x)
+int8ToInt# (I8# x) = i8ToInt# x
 
-int8ToInt# :: Int# -> Int#
-int8ToInt# x = if x' <=# 0x7f# then x' else x' -# 0x100#
+i8ToInt# :: Int# -> Int#
+i8ToInt# x = if x' <=# 0x7f# then x' else x' -# 0x100#
    where x' = word2Int# (int2Word# x `and#` int2Word# 0xff#)
 
 --
@@ -180,7 +190,7 @@ instance Eq  Int8     where
   (I8# x#) /= (I8# y#) = x# /=# y#
 
 instance Ord Int8 where 
-  compare (I8# x#) (I8# y#) = compareInt# (int8ToInt# x#) (int8ToInt# y#)
+  compare (I8# x#) (I8# y#) = compareInt# (i8ToInt# x#) (i8ToInt# y#)
 
 compareInt# :: Int# -> Int# -> Ordering
 compareInt# x# y#
@@ -232,8 +242,8 @@ instance Integral Int8 where
     toInt     i8  = int8ToInt i8
 
 remInt8, quotInt8 :: Int8 -> Int8 -> Int8
-remInt8  (I8# x) (I8# y) = I8# (intToInt8# ((int8ToInt# x) `remInt#` (int8ToInt# y)))
-quotInt8 (I8# x) (I8# y) = I8# (intToInt8# ((int8ToInt# x) `quotInt#` (int8ToInt# y)))
+remInt8  (I8# x) (I8# y) = I8# (intToInt8# ((i8ToInt# x) `remInt#`  (i8ToInt# y)))
+quotInt8 (I8# x) (I8# y) = I8# (intToInt8# ((i8ToInt# x) `quotInt#` (i8ToInt# y)))
 
 instance Ix Int8 where
     range (m,n)          = [m..n]
@@ -280,13 +290,13 @@ instance Bits Int8 where
   (I8# x) `xor` (I8# y) = I8# (word2Int# ((int2Word# x) `xor#` (int2Word# y)))
   complement (I8# x)    = I8# (word2Int# ((int2Word# x) `xor#` (int2Word# 0xff#)))
   shift (I8# x) i@(I# i#)
-	| i > 0     = I8# (intToInt8# (iShiftL# (int8ToInt# x)  i#))
-	| otherwise = I8# (intToInt8# (iShiftRA# (int8ToInt# x) (negateInt# i#)))
+	| i > 0     = I8# (intToInt8# (iShiftL# (i8ToInt# x)  i#))
+	| otherwise = I8# (intToInt8# (iShiftRA# (i8ToInt# x) (negateInt# i#)))
   i8@(I8# x)  `rotate` (I# i)
         | i ==# 0#    = i8
 	| i ># 0#     = 
 	     I8# (intToInt8# ( word2Int#  (
-	             (int2Word# (iShiftL# (int8ToInt# x) i'))
+	             (int2Word# (iShiftL# (i8ToInt# x) i'))
 		             `or#`
                      (int2Word# (iShiftRA# (word2Int# (
 		                                (int2Word# x) `and#` 
@@ -321,10 +331,11 @@ data Int16  = I16# Int#
 instance CCallable Int16
 instance CReturnable Int16
 
-int16ToInt (I16# x) = I# (int16ToInt# x)
+int16ToInt  (I16# x) = I# (i16ToInt# x)
+int16ToInt# (I16# x) = i16ToInt# x
 
-int16ToInt# :: Int# -> Int#
-int16ToInt# x = if x' <=# 0x7fff# then x' else x' -# 0x10000#
+i16ToInt# :: Int# -> Int#
+i16ToInt# x = if x' <=# 0x7fff# then x' else x' -# 0x10000#
    where x' = word2Int# (int2Word# x `and#` int2Word# 0xffff#)
 
 intToInt16 (I# x) = I16# (intToInt16# x)
@@ -337,7 +348,7 @@ instance Eq  Int16     where
   (I16# x#) /= (I16# y#) = x# /=# y#
 
 instance Ord Int16 where
-  compare (I16# x#) (I16# y#) = compareInt# (int16ToInt# x#) (int16ToInt# y#)
+  compare (I16# x#) (I16# y#) = compareInt# (i16ToInt# x#) (i16ToInt# y#)
 
 instance Num Int16 where
   (I16# x#) + (I16# y#) = I16# (intToInt16# (x# +# y#))
@@ -382,8 +393,8 @@ instance Integral Int16 where
     toInt     i16  = int16ToInt i16
 
 remInt16, quotInt16 :: Int16 -> Int16 -> Int16
-remInt16  (I16# x) (I16# y) = I16# (intToInt16# ((int16ToInt# x) `remInt#` (int16ToInt# y)))
-quotInt16 (I16# x) (I16# y) = I16# (intToInt16# ((int16ToInt# x) `quotInt#` (int16ToInt# y)))
+remInt16  (I16# x) (I16# y) = I16# (intToInt16# ((i16ToInt# x) `remInt#` (i16ToInt# y)))
+quotInt16 (I16# x) (I16# y) = I16# (intToInt16# ((i16ToInt# x) `quotInt#` (i16ToInt# y)))
 
 instance Ix Int16 where
     range (m,n)          = [m..n]
@@ -430,13 +441,13 @@ instance Bits Int16 where
   (I16# x) `xor` (I16# y) = I16# (word2Int# ((int2Word# x) `xor#`  (int2Word# y)))
   complement (I16# x)    = I16# (word2Int# ((int2Word# x) `xor#` (int2Word# 0xffff#)))
   shift (I16# x) i@(I# i#)
-	| i > 0     = I16# (intToInt16# (iShiftL# (int16ToInt# x)  i#))
-	| otherwise = I16# (intToInt16# (iShiftRA# (int16ToInt# x) (negateInt# i#)))
+	| i > 0     = I16# (intToInt16# (iShiftL# (i16ToInt# x)  i#))
+	| otherwise = I16# (intToInt16# (iShiftRA# (i16ToInt# x) (negateInt# i#)))
   i16@(I16# x)  `rotate` (I# i)
         | i ==# 0#    = i16
 	| i ># 0#     = 
 	     I16# (intToInt16# (word2Int# (
-	            (int2Word# (iShiftL# (int16ToInt# x) i')) 
+	            (int2Word# (iShiftL# (i16ToInt# x) i')) 
 		             `or#`
                     (int2Word# (iShiftRA# ( word2Int# (
 		                    (int2Word# x) `and#` (int2Word# (0x100# -# pow2# i2))))
@@ -468,14 +479,15 @@ data Int32  = I32# Int#
 instance CCallable Int32
 instance CReturnable Int32
 
-int32ToInt (I32# x) = I# (int32ToInt# x)
+int32ToInt  (I32# x) = I# (i32ToInt# x)
+int32ToInt# (I32# x) = i32ToInt# x
 
-int32ToInt# :: Int# -> Int#
+i32ToInt# :: Int# -> Int#
 #if WORD_SIZE_IN_BYTES > 4
-int32ToInt# x = if x' <=# 0x7fffffff# then x' else x' -# 0x100000000#
+i32ToInt# x = if x' <=# 0x7fffffff# then x' else x' -# 0x100000000#
    where x' = word2Int# (int2Word# x `and#` int2Word# 0xffffffff#)
 #else
-int32ToInt# x = x
+i32ToInt# x = x
 #endif
 
 intToInt32 (I# x) = I32# (intToInt32# x)
@@ -491,7 +503,7 @@ instance Eq  Int32     where
   (I32# x#) /= (I32# y#) = x# /=# y#
 
 instance Ord Int32    where
-  compare (I32# x#) (I32# y#) = compareInt# (int32ToInt# x#) (int32ToInt# y#)
+  compare (I32# x#) (I32# y#) = compareInt# (i32ToInt# x#) (i32ToInt# y#)
 
 instance Num Int32 where
   (I32# x#) + (I32# y#) = I32# (intToInt32# (x# +# y#))
@@ -539,8 +551,8 @@ instance Integral Int32 where
     toInt     i32  = int32ToInt i32
 
 remInt32, quotInt32 :: Int32 -> Int32 -> Int32
-remInt32  (I32# x) (I32# y) = I32# (intToInt32# ((int32ToInt# x) `remInt#` (int32ToInt# y)))
-quotInt32 (I32# x) (I32# y) = I32# (intToInt32# ((int32ToInt# x) `quotInt#` (int32ToInt# y)))
+remInt32  (I32# x) (I32# y) = I32# (intToInt32# ((i32ToInt# x) `remInt#` (i32ToInt# y)))
+quotInt32 (I32# x) (I32# y) = I32# (intToInt32# ((i32ToInt# x) `quotInt#` (i32ToInt# y)))
 
 instance Ix Int32 where
     range (m,n)          = [m..n]
@@ -591,14 +603,14 @@ instance Bits Int32 where
   complement (I32# x)     = I32# (word2Int# ((int2Word# x) `xor#` (int2Word# (negateInt# 1#))))
 #endif
   shift (I32# x) i@(I# i#)
-	| i > 0     = I32# (intToInt32# (iShiftL# (int32ToInt# x)  i#))
-	| otherwise = I32# (intToInt32# (iShiftRA# (int32ToInt# x) (negateInt# i#)))
+	| i > 0     = I32# (intToInt32# (iShiftL# (i32ToInt# x)  i#))
+	| otherwise = I32# (intToInt32# (iShiftRA# (i32ToInt# x) (negateInt# i#)))
   i32@(I32# x)  `rotate` (I# i)
         | i ==# 0#    = i32
 	| i ># 0#     = 
              -- ( (x<<i') | ((x&(0x100000000-2^i2))>>i2)
 	     I32# (intToInt32# ( word2Int# (
-	            (int2Word# (iShiftL# (int32ToInt# x) i')) 
+	            (int2Word# (iShiftL# (i32ToInt# x) i')) 
 		          `or#`
                     (int2Word# (iShiftRA# (word2Int# (
 		                              (int2Word# x) 
