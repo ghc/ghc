@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.36 2001/02/12 04:55:33 chak Exp $
+ * $Id: StgMiscClosures.h,v 1.37 2001/02/15 14:27:36 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -65,11 +65,12 @@ STGFUN(stg_interp_constr7_entry);
 STGFUN(stg_interp_constr8_entry);
 
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
-   to the interpreter. */
+   or a VoidRep to the interpreter. */
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1p_info;
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1n_info;
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_F1_info;
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_D1_info;
+extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_V_info;
 
 /* Used by the interpreter to return an unboxed value on the stack to
    compiled code. */

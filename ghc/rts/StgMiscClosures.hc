@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.64 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.65 2001/02/15 14:30:07 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -225,6 +225,35 @@ STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_6_entry);
 STG_CtoI_RET_D1_Template(stg_ctoi_ret_D1_7_entry);
 
 VEC_POLY_INFO_TABLE(stg_ctoi_ret_D1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+
+
+/* When the returned value a VoidRep ... */
+#define STG_CtoI_RET_V_Template(label) 	\
+   IFN_(label)			        \
+   {                                    \
+      StgPtr bco;                       \
+      FB_				\
+      bco = ((StgPtr*)Sp)[1];           \
+      Sp -= 1;                          \
+      ((StgPtr*)Sp)[0] = 0; /* VoidRep tag */ \
+      Sp -= 1;				\
+      ((StgPtr*)Sp)[0] = bco;		\
+      JMP_(stg_yield_to_interpreter);   \
+      FE_                               \
+   }
+
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_0_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_1_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_2_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_3_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_4_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_5_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_6_entry);
+STG_CtoI_RET_V_Template(stg_ctoi_ret_V_7_entry);
+
+VEC_POLY_INFO_TABLE(stg_ctoi_ret_V,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+
 
 /* The other way round: when the interpreter returns a value to
    compiled code.  The stack looks like this:

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.36 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: Printer.c,v 1.37 2001/02/15 14:30:07 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -354,6 +354,9 @@ StgPtr printStackObj( StgPtr sp )
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_D1_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_D1_info\n" );
+	} else
+        if (c == (StgClosure*)&stg_ctoi_ret_V_info) {
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_V_info\n" );
 	} else
         if (get_itbl(c)->type == BCO) {
            fprintf(stderr, "\t\t\t");

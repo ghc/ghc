@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.19 $
- * $Date: 2001/02/13 11:11:06 $
+ * $Revision: 1.20 $
+ * $Date: 2001/02/15 14:30:07 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -706,7 +706,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  if (ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1p_info
                      || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1n_info
                      || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_F1_info
-                     || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_D1_info) {
+                     || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_D1_info
+                     || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_V_info) {
                      /* Returning to interpreted code.  Interpret the BCO 
                         immediately underneath the itbl. */
                      StgBCO* ret_bco = (StgBCO*)StackWord(tag +1+1);
@@ -720,9 +721,20 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                         the TOS value into R1/F1/D1 and do a standard
                         compiled-code return. */
                      StgInfoTable* magic_itbl = BCO_ITBL(o_itoc_itbl);
-                     StackWord(0) = (W_)magic_itbl;
-                     cap->rCurrentTSO->what_next = ThreadRunGHC;
-                     RETURN(ThreadYielding);
+                     if (magic_itbl != NULL) {
+                        StackWord(0) = (W_)magic_itbl;
+                        cap->rCurrentTSO->what_next = ThreadRunGHC;
+                        RETURN(ThreadYielding);
+                     } else {
+                        /* Special case -- returning a VoidRep to
+                           compiled code.  T.O.S is the VoidRep tag,
+                           and underneath is the return itbl.  Zap the
+                           tag and enter the itbl. */
+		        ASSERT(StackWord(0) == (W_)NULL);
+		        iSp ++;
+                        cap->rCurrentTSO->what_next = ThreadRunGHC;
+                        RETURN(ThreadYielding);
+                     }
                  }
               }
         
