@@ -36,6 +36,7 @@ clean:
 	rm -f gread
 	rm -f foldTree
 	rm -f local-quantors
+	rm -f shortcut
 	rm -f where
 	rm -f gmapQ-assoc
 	rm -f strings/strings

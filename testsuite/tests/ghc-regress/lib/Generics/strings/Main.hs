@@ -13,6 +13,7 @@ module Main where
 import Data.Generics
 import CompanyDatatypes
 
-main = print (maybe False
-                    (geq genCom . fst)
-                    (gread (gshow genCom)))
+main = print $ case gread (gshow genCom) of
+                 [(x,_)] -> geq genCom x
+                 _ -> False
+
