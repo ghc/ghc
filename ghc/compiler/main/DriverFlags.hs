@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.28 2000/12/06 13:03:29 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.29 2000/12/08 10:26:41 simonmar Exp $
 --
 -- Driver flags
 --
@@ -438,6 +438,13 @@ dynamic_flags = [
 
   ,  ( "fglasgow-exts", NoArg (setDynFlag Opt_GlasgowExts) )
   ,  ( "fno-implicit-prelude", NoArg (setDynFlag Opt_NoImplicitPrelude) )
+
+	-- Optimisation flags are treated specially, so the normal
+	-- -fno-* pattern below doesn't work.  We therefore allow
+	-- certain optimisation passes to be turned off explicitly:
+  ,  ( "fno-strictness"	   , NoArg (writeIORef v_Strictness False) )
+  ,  ( "fno-cpr"	   , NoArg (writeIORef v_CPR False) )
+  ,  ( "fno-cse"	   , NoArg (writeIORef v_CSE False) )
 
   ,  ( "fallow-overlapping-instances",	
 		NoArg (setDynFlag Opt_AllowOverlappingInstances) )
