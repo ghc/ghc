@@ -14,7 +14,7 @@
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and
 --	      Higher-Order Polymorphism/, 
---	    Mark P Jones (<http://www.cse.ogi.edu/~mpj>)
+--	    Mark P Jones (<http://www.cse.ogi.edu/~mpj/>)
 --		  Advanced School of Functional Programming, 1995.
 --
 -----------------------------------------------------------------------------

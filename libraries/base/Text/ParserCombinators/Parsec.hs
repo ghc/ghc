@@ -17,7 +17,7 @@
 --   Monadic Parser Combinators.
 --   Technical report NOTTCS-TR-96-4. 
 --   Department of Computer Science, University of Nottingham, 1996. 
---   <http://www.cs.nott.ac.uk/Department/Staff/gmh/monparsing.ps>
+--   <http://www.cs.nott.ac.uk/~gmh/monparsing.ps>
 --
 -- * Andrew Partridge, David Wright: 
 --   Predictive parser combinators need four values to report errors.

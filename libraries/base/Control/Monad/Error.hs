@@ -12,7 +12,7 @@
 --
 -- Rendered by Michael Weber <mailto:michael.weber@post.rwth-aachen.de>,
 --	inspired by the Haskell Monad Template Library from
---	Andy Gill (<http://www.cse.ogi.edu/~andy>)
+--	Andy Gill (<http://www.cse.ogi.edu/~andy/>)
 --
 -----------------------------------------------------------------------------
 
