@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.1 2000/10/10 13:21:10 simonmar Exp $
+-- $Id: TmpFiles.hs,v 1.2 2000/10/11 11:54:58 simonmar Exp $
 --
 -- Temporary file management
 --
@@ -11,10 +11,12 @@ module TmpFiles (
    Suffix,
    initTempFileStorage,  -- :: IO ()
    cleanTempFiles,       -- :: IO ()
-   newTempName		 -- :: Suffix -> IO FilePath
+   newTempName,		 -- :: Suffix -> IO FilePath
+   addFilesToClean	 -- :: [FilePath] -> IO ()
  ) where
 
 -- main
+import DriverState
 import Config
 import Util
 
@@ -31,13 +33,12 @@ import Monad
 
 #include "HsVersions.h"
 
-GLOBAL_VAR( v_FilesToClean, [],               [String] )
-GLOBAL_VAR( v_TmpDir,       cDEFAULT_TMPDIR,  String   )
+GLOBAL_VAR(v_FilesToClean, [],               [String] )
 
 initTempFileStorage = do
 	-- check whether TMPDIR is set in the environment
    IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
-	      writeIORef tmpdir dir)
+	      writeIORef v_TmpDir dir)
 
 
 cleanTempFiles :: Bool -> IO ()
@@ -65,5 +66,14 @@ newTempName extn = do
   	   let filename = tmp_dir ++ "/ghc" ++ show x ++ '.':extn
   	   b  <- doesFileExist filename
 	   if b then findTempName tmp_dir (x+1)
-		else return filename
+		else do add v_FilesToClean filename -- clean it up later
+		        return filename
+
+addFilesToClean :: [FilePath] -> IO ()
+addFilesToClean files = mapM_ (add v_FilesToClean) files
+
+add :: IORef [a] -> a -> IO ()
+add var x = do
+  xs <- readIORef var
+  writeIORef var (x:xs)
 

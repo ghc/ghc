@@ -356,22 +356,6 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
 \end{code}
 
 \begin{code}
-compiler_version :: String
-compiler_version =
-     case (show opt_HiVersion) of
-	[x]	 -> ['0','.',x]
-	ls@[x,y] -> "0." ++ ls
-	ls       -> go ls
- where
-  -- 10232353 => 10232.53
-  go ls@[x,y] = '.':ls
-  go (x:xs)   = x:go xs
-
-booter_version
- = case "\ 
-	\ __GLASGOW_HASKELL__" of
-    ' ':n:ns -> n:'.':ns
-    ' ':m    -> m
 \end{code}
 
 \begin{code}

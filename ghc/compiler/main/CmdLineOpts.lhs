@@ -7,14 +7,16 @@
 
 module CmdLineOpts (
 	CoreToDo(..),
-	SimplifierSwitch(..),
+	SimplifierSwitch(..), isAmongSimpl,
 	StgToDo(..),
 	SwitchResult(..),
 	HscLang(..),
-	DynFlag(..),	-- needed non-abstractly by Main
+	DynFlag(..),	-- needed non-abstractly by DriverFlags
+	DynFlags(..),
 
 	intSwitchSet,
 	switchIsOn,
+	isStaticHscFlag,
 
 	-- debugging opts
 	dopt_D_dump_absC,
@@ -158,6 +160,7 @@ import Array	( array, (//) )
 import GlaExts
 import Argv
 import Constants	-- Default values for some flags
+import DriverUtil
 
 import Maybes		( firstJust )
 import Panic		( panic )
@@ -236,6 +239,8 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoCPResult 
   | CoreDoGlomBinds
   | CoreCSE
+
+  | CoreDoNothing 	 -- useful when building up lists of these things
 \end{code}
 
 \begin{code}
@@ -550,12 +555,89 @@ opt_UseLongRegs    | opt_Unregisterised = 0
 
 %************************************************************************
 %*									*
+\subsection{List of static hsc flags}
+%*									*
+%************************************************************************
+
+\begin{code}
+isStaticHscFlag f = 
+  f `elem` [
+	"-fwarn-duplicate-exports",
+	"-fwarn-hi-shadowing",
+	"-fwarn-incomplete-patterns",
+	"-fwarn-missing-fields",
+	"-fwarn-missing-methods",
+	"-fwarn-missing-signatures",
+	"-fwarn-name-shadowing",
+	"-fwarn-overlapping-patterns",
+	"-fwarn-simple-patterns",
+	"-fwarn-type-defaults",
+	"-fwarn-unused-binds",
+	"-fwarn-unused-imports",
+	"-fwarn-unused-matches",
+	"-fwarn-deprecations",
+	"-fauto-sccs-on-all-toplevs",
+	"-fauto-sccs-on-exported-toplevs",
+	"-fauto-sccs-on-individual-cafs",
+	"-fauto-sccs-on-dicts",
+	"-fscc-profiling",
+	"-fticky-ticky",
+	"-fall-strict",
+	"-fdicts-strict",
+	"-fgenerics",
+	"-firrefutable-tuples",
+	"-fnumbers-strict",
+	"-fparallel",
+	"-fsmp",
+	"-fsemi-tagging",
+	"-ffoldr-build-on",
+	"-flet-no-escape",
+	"-funfold-casms-in-hi-file",
+	"-fusagesp-on",
+	"-funbox-strict-fields",
+	"-femit-extern-decls",
+	"-fglobalise-toplev-names",
+	"-fgransim",
+	"-fignore-asserts",
+	"-fignore-interface-pragmas",
+	"-fno-hi-version-check",
+	"-fno-implicit-prelude",
+	"-dno-black-holing",
+	"-fomit-interface-pragmas",
+	"-fno-pre-inlining",
+	"-fdo-eta-reduction",
+	"-fdo-lambda-eta-expansion",
+	"-fcase-of-case",
+	"-fcase-merge",
+	"-fpedantic-bottoms",
+	"-fexcess-precision",
+	"-funfolding-update-in-place",
+	"-freport-compile",
+	"-fno-prune-decls",
+	"-fno-prune-tydecls",
+	"-static",
+	"-funregisterised",
+	"-v" ]
+  || any (flip prefixMatch f) [
+	"-fcontext-stack",
+	"-fliberate-case-threshold",
+	"-fhi-version=",
+	"-fhistory-size",
+	"-funfolding-interface-threshold",
+	"-funfolding-creation-threshold",
+	"-funfolding-use-threshold",
+	"-funfolding-fun-discount",
+	"-funfolding-keeness-factor"
+     ]
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection{Switch ordering}
 %*									*
 %************************************************************************
 
-In spite of the @Produce*@ constructor, these things behave just like
-enumeration types.
+These things behave just like enumeration types.
 
 \begin{code}
 instance Eq SimplifierSwitch where
@@ -585,7 +667,6 @@ lAST_SIMPL_SWITCH_TAG = 5
 
 \begin{code}
 isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
-
 isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 					-- in the list; defaults right at the end.
   = let
