@@ -1098,8 +1098,7 @@ collectInstances mod_ifaces
 			
     ty_inst_pairs = [ (nm, [(ctxt,(cls,args))])
 		    | HsInstDecl _ ctxt (cls,args) _ <- all_instances,
-		      arg <- args,
-		      nm <- freeTyCons arg
+		      nm <- nub (concat (map freeTyCons args))
 		    ]
  
 -- -----------------------------------------------------------------------------
