@@ -1212,7 +1212,7 @@ retryzh_fast
   W_ outer;
   W_ r;
 
-  MAYBE_GC (NO_PTRS, readTVarzh_fast); // STM operations may allocate
+  MAYBE_GC (NO_PTRS, retryzh_fast); // STM operations may allocate
 
   // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
 retry_pop_stack:
