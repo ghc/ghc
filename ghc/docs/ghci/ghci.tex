@@ -221,77 +221,6 @@ New data structures are:
    @Linkable@, if it has one, and that's returned unchanged if the
    module isn't recompiled.
 
-\item
-   {\bf Object Symbol Table (OST)} @:: FiniteMap String Addr+HValue@
-
-   OST keeps track of symbol entry points in the linked image.  In
-   some sense it {\em is} the linked image.  The mapping supplies
-   @Addr@s for low level symbol names (eg, @Foo_bar_fast3@) which are
-   in machine code modules in memory.  For symbols of the form
-   @Foo_bar_closure@ pertaining to an interpreted module, OST supplies
-   an @HValue@, which is the application of the interpreter function to
-   the STG tree for @Foo.bar@.
-
-   When @link@ loads object code from disk, symbols from the object
-   are entered as @Addr@s into OST.  When preparing to link an
-   unlinked bunch of STG trees, @HValue@s are added.  Resolving of
-   object-level references can then be done purely by consulting OST,
-   with no need to look in HST, PRC, or anywhere else.
-
-   Following the downsweep (re-establishment of the state and
-   up-to-dateness of the module graph), CM may determine that certain
-   parts of the linked image are out of date.  It then will instruct
-   @unlink@ to throw groups of @Unlinked@s out of OST, working down
-   the module graph, so that at no time does OST hold entries for
-   modules/packages which refer to modules/packages which have already
-   been removed from OST.  In other words, the transitive completeness
-   of OST is maintained even during unlinking operations.  Because of
-   mutually recursive module groups, CM asks @unlink@ to delete sets
-   of @Unlinked@s in one go, rather than singly.
-
-   \ToDo{Need a way to refer to @Unlinked@s.  Some kind of keys?}
-
-   For batch mode compilation, OST doesn't exist.  CM doesn't know
-   anything aboyt OST's representation, and the only modifiers of it
-   are @link@ and @unlink@.  So for batch compilation, OST can just 
-   be a unit value ignored by all parties.
-
-\item
-   {\bf Linked Image (LI)} @:: no-explicit-representation@
-
-   LI isn't explicitly represented in the system, but we record it
-   here for completeness anyway.  LI is the current set of
-   linked-together module, package and other library fragments
-   constituting the current executable mass.  LI comprises:
-   \begin{itemize}
-   \item Machine code (@.o@, @.a@, @.DLL@ file images) in memory.
-         These are loaded from disk when needed, and stored in
-         @malloc@ville.  To simplify storage management, they are
-         never freed or reused, since this creates serious
-         complications for storage management.  When no longer needed,
-         they are simply abandoned.  New linkings of the same object
-         code produces new copies in memory.  We hope this not to be
-         too much of a space leak.
-   \item STG trees, which live in the GHCI heap and are managed by the
-         storage manager in the usual way.  They are held alive (are 
-         reachable) via the @HValue@s in the OST.  Such @HValue@s are
-         applications of the interpreter function to the trees
-         themselves.  Linking a tree comprises travelling over the 
-         tree, replacing all the @Id@s with pointers directly to the
-         relevant @_closure@ labels, as determined by searching the
-         OST.  Once the leaves are linked, trees are wrapped with the
-         interpreter function.  The resulting @HValue@s then behave
-         indistinguishably from compiled versions of the same code.
-   \end{itemize}
-   Because object code is outside the heap and never deallocated,
-   whilst interpreted code is held alive by the OST, there's no need
-   to have a data structure which ``is'' the linked image.
-
-   For batch compilation, LI doesn't exist because OST doesn't exist,
-   and because @link@ doesn't load code into memory, instead just
-   invokes the system linker.
-
-   \ToDo{Do we need to say anything about CAFs and SRTs?  Probably ...}
 \end{itemize}
 
 There are also a few auxiliary structures, of somehow lesser importance:
@@ -361,38 +290,12 @@ can be created quickly.
       too?}
 \ToDo{Also say that @ModIFace@ contains its module's @ModSummary@.}
 
-
-\subsubsection*{To do with linking}
-Two important types: @Unlinked@ and @Linkable@.  The latter is a 
-higher-level representation involving multiple of the former.
-An @Unlinked@ is a reference to unlinked executable code, something
-a linker could take as input:
-\begin{verbatim}
-   data Unlinked = DotO   Path
-                 | DotA   Path            
-                 | DotDLL Path
-                 | Trees  [StgTree RdrName]
-\end{verbatim}
-The first three describe the location of a file (presumably)
-containing the code to link.  @Trees@, which only exists in 
-interactive mode, gives a list of @StgTrees@, in which the 
-unresolved references are @RdrNames@ -- hence it's non-linkedness.
-Once linked, those @RdrNames@ are replaced with pointers to the
-machine code implementing them.
-
-A @Linkable@ gathers together several @Unlinked@s and associates them
-with either a module or package:
-\begin{verbatim}
-   data Linkable = LM Module  [Unlinked]   -- a module
-                 | LP PkgName [Unlinked]   -- a package
-\end{verbatim}
-The order of the @Unlinked@s in the list is important, particularly
-for package contents -- we'll have to decide on a left-to-right or 
-right-to-left dependency ordering.
-
 @compile@ is supplied with, and checks PIT (inside PCS) before
 reading package interfaces, so it doesn't read and add duplicate
 @ModIFace@s to PIT.
+
+\subsection{Package Configuration}
+\label{sec:package-config}
 
 PCI, the package configuration information, is a list of @PkgInfo@,
 each containing at least the following:
@@ -520,62 +423,191 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
    boot interface against the inferred interface.}
 \end{itemize}
 
-\subsection{What {\tt link} and {\tt unlink} do}
+\section{Linking}
+
+\subsection{External API}
+
 \begin{verbatim}
-   link :: [[Unlinked]] -> OST -> IO LinkResult
+   data LinkState  -- abstract
 
-   unlink :: [Unlinked] -> OST -> IO OST
+   link :: [[Linkable]] -> LinkState -> IO LinkResult
 
-   data LinkResult = LinkOK OST
-                   | LinkErrs [SDoc] OST
+   data LinkResult = LinkOK LinkState
+                   | LinkErrs [SDoc] LinkState
 \end{verbatim}
-Given a list of list of @Unlinked@s, @link@ places the symbols they
-export in the OST, then resolves symbol references in the new code.
 
-The list-of-lists scheme reflects the fact that CM has to handle
-recursive module groups.  Each list is a minimal strongly connected
-group.  CM guarantees that @link@ can process the outer list left to
-right, so that after each group (inner list) is linked, the linked 
-image as a whole is consistent -- there are no unresolved references
-in it.  If linking in of a group should fail for some reason, it is
-@link@'s responsibility to not modify OST at all.  In other words,
-linking each group is atomic; it either succeeds or fails.  
+In practice, the @LinkState@ might be hidden in the I/O monad rather
+than passed around explicitly.
 
-A successful link returns the final OST.  Failed links return some
-error message and the OST updated up to but not including the group 
-that failed.  In either case, the intention is (1) that the linked
-image does not contain any dangling references, and (2) that CM can
-determine by inspecting the resulting OST how much linking succeeded.
+The linker is used by the compilation manager as follows after
+repeatedly calling the compiler to compile all modules which are
+out-of-date, the linker is invoked.  The @[[Linkable]]@ argument to
+@link@ represents the list of (recursive groups of) modules which have
+been newly compiled, along with @Linkable@s representing each of the
+packages in use (the compilation manager knows which external packages
+are referenced by the home package).  The order of the list is
+important: it is sorted in such a way that linking any prefix of the
+list will result in an image with no unresolved references.  Note that
+for batch linking there may be further restrictions; for example it
+may not be possible to link recursive groups containing libraries.
 
-CM specifies not only the @Unlinked@s for the home modules, but also
-those for all needed packages.  It can examine the module graph (MG)
-which presumably contains @ModSummary@s to determine all package
-modules needed, then look in PCI to discover which packages those
-modules correspond to.  The needed @Unlinked@s are those for all 
-needed packages {\em plus all indirectly dependent packages}.
-Packages dependencies are also recorded in PCI.
+The linker must do the following when invoked via @link@:
 
-\ToDo{What happens in batch linking, where there isn't a real OST for
-      CM to examine?}
+\begin{itemize}
+  \item Unlink any objects already in memory which correspond to
+  modules which have just been recompiled (interactive system only).
+  The objects which correspond to a module are obtained from the
+  @Linkable@ (see below).
 
-@unlink@ is used by CM to remove out-of-date code from the LI prior
-to an upsweep.  CM calls @unlink@ in a top-down fashion, specifying
-groups of @Unlinked@s to delete, again in such a manner that LI has
-no dangling references between invokations.  
+  \item Link the objects representing the newly compiled modules into
+  memory, along with any packages which haven't already been brought
+  in.  In the batch system, this just means invoking the external
+  linker to link everything in one go.
 
-CM may call @unlink@ repeatedly in order to reduce the LI to what it
-wants.  By contrast, CM promises to call @link@ only when it has
-successfully compiled the root module.  This is so that @link@ doesn't
-have to do incremental linking, which is important when working with
-system linkers in batch mode.  In batch mode, @unlink@ does nothing,
-and @link@ just invokes the system linker.  Presumably CM must 
-insert package @Unlinked@s in the list-of-lists in such a way as to
-ensure that they can be correctly processed in a single left-to-right
-pass idiomatic of Unix linkers.
+  Note that it is the linker's responsibility to remember which
+  objects and packages have already been linked.
+\end{itemize}
 
-\ToDo{Be more specific about how OST is organised -- how does @unlink@
-      know which entries came from which @Linkable@s ?}
+If linking in of a group should fail for some reason, it is @link@'s
+responsibility to not modify its @LinkState@ at all.  In other words,
+linking each group is atomic; it either succeeds or fails.
 
+\subsection{Internal Data Structures}
+
+Two important types: @Unlinked@ and @Linkable@.  The latter is a 
+higher-level representation involving multiple of the former.
+An @Unlinked@ is a reference to unlinked executable code, something
+a linker could take as input:
+
+\begin{verbatim}
+   data Unlinked = DotO   Path
+                 | DotA   Path            
+                 | DotDLL Path
+                 | Trees  [StgTree RdrName]
+\end{verbatim}
+
+\noindent The first three describe the location of a file (presumably)
+containing the code to link.  @Trees@, which only exists in
+interactive mode, gives a list of @StgTrees@, in which the unresolved
+references are @RdrNames@ -- hence it's non-linkedness.  Once linked,
+those @RdrNames@ are replaced with pointers to the machine code
+implementing them.
+
+A @Linkable@ gathers together several @Unlinked@s and associates them
+with either a module or package:
+
+\begin{verbatim}
+   data Linkable = LM Module  [Unlinked]   -- a module
+                 | LP PkgName              -- a package
+\end{verbatim}
+
+\noindent The order of the @Unlinked@s in the list is important, as
+they are linked in left-to-right order.  The @Unlinked@ objects for a
+particular package can be obtained from the package configuration (see
+Section \ref{sec:package-config}).
+
+\subsubsection{Contents of \texttt{LinkState}}
+
+The @LinkState@ is empty for batch compilation, where the linker
+doesn't need andy persistent state because there is only a single link
+step.
+
+In the interactive system, the @LinkState@ contains two symbol tables:
+
+\begin{itemize}
+\item \textbf{The Source Symbol Table}@ :: FiniteMap RdrName HValue@
+
+The source symbol table is used when linking interpreted code.
+Unlinked interpreted code consists of an abstract syntax tree where
+the leaves are @RdrNames@; the linker's job is to resolve these to
+actual addresses (the alternative is to resolve these lazily when the
+code is run, but this requires passing the full symbol table through
+the interpreter and the repeated lookups will probably be expensive).
+
+The source symbol table therefore maps @RdrName@s to @HValue@s, for
+every @RdrName@ that currently \emph{has} an @HValue@, including all
+exported functions from object code modules that are currently linked
+in.
+
+It is important that we can prune this symbol table by throwing away
+the mappings for an entire module, whenever we recompile/relink a
+given module.  The representation is therefore probably a two-level
+mapping, from module names, to function/constructor names, to
+@HValue@s.
+
+\item \textbf{The Object Symbol Table}@ :: FiniteMap String Addr@
+
+This is a lower level symbol table, mapping symbol names in object
+modules to their addresses in memory.  It is used only when resolving
+the external references in an object module, and contains only entries
+that are defined in object modules.
+\end{itemize}
+
+Why have two symbol tables?  Well, there is a clear distinction
+between the two: the source symbol table is mapping Haskell symbols to
+Haskell values, and the object symbol table is mapping object symbols
+to addresses.  There is some overlap, in that Haskell symbols
+certainly have addresses, and we could look up a Haskell symbol's
+address by manufacturing the right object symbol and looking that up
+in the object symbol table, but this is likely to be slow and would
+force us to extend the object symbol table with all the symbols
+``exported'' by interpreted code.  Doing it this way enables us to
+decouple the object management subsystem from the rest of the linker
+with a minimal interface; something like
+
+\begin{verbatim}
+  loadObject   :: Unlinked -> IO Object
+  unloadModule :: Unlinked -> IO ()
+  lookupSymbol :: String   -> IO Addr
+\end{verbatim}
+
+\noindent Rather unfortunately we need @lookupSymbol@ in order to
+populate the source symbol table when linking in a new compiled
+module.
+
+Our object management subsystem is currently written in C, so
+decoupling this interface as much as possible is highly desirable.
+
+The @LinkState@ also notionally contains the currently linked image:
+
+\begin{itemize}
+\item
+   {\bf Linked Image (LI)} @:: no-explicit-representation@
+
+   LI isn't explicitly represented in the system, but we record it
+   here for completeness anyway.  LI is the current set of
+   linked-together module, package and other library fragments
+   constituting the current executable mass.  LI comprises:
+   \begin{itemize}
+   \item Machine code (@.o@, @.a@, @.DLL@ file images) in memory.
+         These are loaded from disk when needed, and stored in
+         @malloc@ville.  To simplify storage management, they are
+         never freed or reused, since this creates serious
+         complications for storage management.  When no longer needed,
+         they are simply abandoned.  New linkings of the same object
+         code produces new copies in memory.  We hope this not to be
+         too much of a space leak.
+   \item STG trees, which live in the GHCI heap and are managed by the
+         storage manager in the usual way.  They are held alive (are 
+         reachable) via the @HValue@s in the OST.  Such @HValue@s are
+         applications of the interpreter function to the trees
+         themselves.  Linking a tree comprises travelling over the 
+         tree, replacing all the @Id@s with pointers directly to the
+         relevant @_closure@ labels, as determined by searching the
+         OST.  Once the leaves are linked, trees are wrapped with the
+         interpreter function.  The resulting @HValue@s then behave
+         indistinguishably from compiled versions of the same code.
+   \end{itemize}
+   Because object code is outside the heap and never deallocated,
+   whilst interpreted code is held alive by the OST, there's no need
+   to have a data structure which ``is'' the linked image.
+
+   For batch compilation, LI doesn't exist because OST doesn't exist,
+   and because @link@ doesn't load code into memory, instead just
+   invokes the system linker.
+
+   \ToDo{Do we need to say anything about CAFs and SRTs?  Probably ...}
+\end{itemize}
 
 \subsection{What CM does}
 Pretty much as before.  
