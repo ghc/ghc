@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.26 $
- * $Date: 2001/08/03 15:05:52 $
+ * $Revision: 1.27 $
+ * $Date: 2001/08/07 09:02:02 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -54,13 +54,18 @@
 #define BCO_LIT(n)    (W_)literals[n]
 #define BCO_ITBL(n)   itbls[n]
 
-#define LOAD_STACK_POINTERS \
-    iSp = cap->rCurrentTSO->sp; iSu = cap->rCurrentTSO->su;
+#define LOAD_STACK_POINTERS          \
+    iSp = cap->rCurrentTSO->sp;      \
+    iSu = cap->rCurrentTSO->su;      \
+    /* We don't change this ... */   \
+    iSpLim = cap->rCurrentTSO->stack + RESERVED_STACK_WORDS;
 
-#define SAVE_STACK_POINTERS \
-    cap->rCurrentTSO->sp = iSp; cap->rCurrentTSO->su = iSu;
 
-#define RETURN(retcode) \
+#define SAVE_STACK_POINTERS          \
+    cap->rCurrentTSO->sp = iSp;      \
+    cap->rCurrentTSO->su = iSu;
+
+#define RETURN(retcode)              \
    SAVE_STACK_POINTERS; return retcode;
 
 
@@ -168,9 +173,6 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
     register StgClosure*      obj;
 
     LOAD_STACK_POINTERS;
-
-    /* We don't change this ... */
-    iSpLim = cap->rCurrentTSO->stack + RESERVED_STACK_WORDS;
 
     /* Main object-entering loop.  Object to be entered is on top of
        stack. */
@@ -762,9 +764,14 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  }
               }
               case bci_CCALL: {
+                 StgInt tok;
                  int o_itbl                = BCO_NEXT;
                  void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
+                 SAVE_STACK_POINTERS;
+                 tok = suspendThread(cap);
                  marshall_fn ( (void*)(& StackWord(0) ) );
+                 cap = resumeThread(tok);
+                 LOAD_STACK_POINTERS;
                  goto nextInsn;
               }
               case bci_JMP: {
