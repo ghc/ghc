@@ -197,13 +197,21 @@ rnMonoBindsAndThen mbinds sigs thing_inside -- Non-empty monobinds
 
 	-- Final error checking
     let
+	all_uses     = duUses bind_dus `plusFV` result_fvs
 	bndrs        = duDefs bind_dus
-	all_uses     = findUses bind_dus result_fvs
+	real_uses    = findUses bind_dus result_fvs
 	unused_bndrs = nameSetToList (bndrs `minusNameSet` all_uses)
     in
     warnUnusedLocalBinds unused_bndrs	`thenM_`
 
     returnM (result, all_uses `minusNameSet` bndrs)
+	-- It's important to return all the uses, not the 'real uses' used for
+	-- warning about unused bindings.  Otherwise consider:
+	--	x = 3
+	--	y = let p = x in 'x'
+	-- If we don't "see" the dependency of 'y' on 'x', we may put the
+	-- bindings in the wrong order, and the type checker will complain
+	-- that x isn't in scope
   where
     mbinders_w_srclocs = collectLocatedMonoBinders mbinds
     doc = text "In the binding group for:"
@@ -246,7 +254,6 @@ rnMonoBinds top_lvl mbinds sigs
 	final_binds = foldr ThenBinds EmptyBinds binds_s
 	binders     = duDefs bind_dus
     in
-
 	-- Check for duplicate or mis-placed signatures
     checkSigs (okBindSig binders) siglist	`thenM_`
 
