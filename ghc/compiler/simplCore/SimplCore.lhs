@@ -372,10 +372,7 @@ simplifyPgm dflags rule_base
 			 text "",
 			 pprSimplCount counts_out]);
 
-	endPass dflags "Simplify" 
-		(dopt Opt_D_verbose_core2core dflags 
-                 && not (dopt Opt_D_dump_simpl_iterations dflags))
-		binds' ;
+	endPass dflags "Simplify" Opt_D_verbose_core2core binds';
 
 	return (counts_out, binds')
     }
@@ -431,7 +428,7 @@ simplifyPgm dflags rule_base
 	   if dopt Opt_D_dump_simpl_iterations dflags then
 		endPass dflags 
                         ("Simplifier iteration " ++ show iteration_no ++ " result")
-			(dopt Opt_D_verbose_core2core dflags)
+			Opt_D_verbose_core2core
 			binds'
 	   else
 		return [] ;

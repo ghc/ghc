@@ -11,28 +11,29 @@ module CoreTidy (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas, dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
+import CoreUtils	( exprArity )
 import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
 import CoreLint		( showPass, endPass )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId,
-			  mkVanillaId, mkId, isLocalId, omitIfaceSigForId,
-			  setIdStrictness, setIdDemandInfo,
+			  mkId, isLocalId, omitIfaceSigForId
 			) 
-import IdInfo		( mkIdInfo,
+import IdInfo		( IdInfo, mkIdInfo, vanillaIdInfo,
 			  IdFlavour(..), flavourInfo, ppFlavourInfo,
 			  specInfo, setSpecInfo, 
-			  cprInfo, setCprInfo,
+			  cprInfo, setCprInfo, 
 			  inlinePragInfo, setInlinePragInfo, isNeverInlinePrag,
-			  strictnessInfo, setStrictnessInfo, isBottomingStrictness,
+			  strictnessInfo, setStrictnessInfo, 
+			  isBottomingStrictness,
 			  unfoldingInfo, setUnfoldingInfo, 
-			  demandInfo, 
 			  occInfo, isLoopBreaker,
-			  workerInfo, setWorkerInfo, WorkerInfo(..)
+			  workerInfo, setWorkerInfo, WorkerInfo(..),
+			  ArityInfo(..), setArityInfo
 			)
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
 		  	  localiseName, mkLocalName, isGlobalName
@@ -43,7 +44,7 @@ import Module		( Module, moduleName )
 import HscTypes		( PersistentCompilerState( pcs_PRS ), PersistentRenamerState( prsOrig ),
 			  OrigNameEnv( origNames ), OrigNameNameEnv
 			)
-import Unique		( Uniquable(..) )
+import UniqSupply
 import FiniteMap	( lookupFM, addToFM )
 import Maybes		( maybeToBool, orElse )
 import ErrUtils		( showPass )
@@ -80,7 +81,6 @@ exported with their unfoldings, so we produce not an IdSet but an
 IdEnv Bool
 
 
-
 Step 2: Tidy the program
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Next we traverse the bindings top to bottom.  For each top-level
@@ -97,6 +97,10 @@ binder
   - Give external Ids the same Unique as they had before
     if the name is in the renamer's name cache
   
+  - Clone all local Ids.  This means that Tidy Core has the property
+    that all Ids are unique, rather than the weaker guarantee of
+    no clashes which the simplifier provides.
+
   - Give the Id its final IdInfo; in ptic, 
 	* Its flavour becomes ConstantId, reflecting the fact that
 	  from now on we regard it as a constant, not local, Id
@@ -116,16 +120,19 @@ tidyCorePgm dflags mod pcs binds_in orphans_in
 
 	; let ext_ids = findExternalSet binds_in orphans_in
 
-	; let ((orig_env', occ_env, subst_env), binds_out) 
-		  = mapAccumL (tidyTopBind mod ext_ids) init_tidy_env binds_in
+	; us <- mkSplitUniqSupply 't' -- for "tidy"
 
-	; let orphans_out = tidyIdRules (occ_env,subst_env) orphans_in
+	; let ((us1, orig_env', occ_env, subst_env), binds_out) 
+	       		= mapAccumL (tidyTopBind mod ext_ids) 
+				    (init_tidy_env us) binds_in
 
-	; let pcs' = pcs { pcs_PRS = prs { prsOrig = orig { origNames = orig_env' }}}
+	; let (orphans_out, us2) 
+		   = initUs us1 (tidyIdRules (occ_env,subst_env) orphans_in)
 
-	; endPass dflags "Tidy Core" (dopt Opt_D_dump_simpl dflags || 
-				      dopt Opt_D_verbose_core2core dflags)
-	          binds_out
+	; let prs' = prs { prsOrig = orig { origNames = orig_env' } }
+	      pcs' = pcs { pcs_PRS = prs' }
+
+	; endPass dflags "Tidy Core" Opt_D_dump_simpl binds_out
 
 	; return (pcs', binds_out, orphans_out)
 	}
@@ -138,12 +145,12 @@ tidyCorePgm dflags mod pcs binds_in orphans_in
 	-- The second exported decl must 'get' the name 'f', so we
 	-- have to put 'f' in the avoids list before we get to the first
 	-- decl.  tidyTopId then does a no-op on exported binders.
-    prs	 	  = pcs_PRS pcs
-    orig	  = prsOrig prs
-    orig_env 	  = origNames orig
+    prs	 	     = pcs_PRS pcs
+    orig	     = prsOrig prs
+    orig_env 	     = origNames orig
 
-    init_tidy_env = (orig_env, initTidyOccEnv avoids, emptyVarEnv)
-    avoids	  = [getOccName bndr | bndr <- bindersOfBinds binds_in,
+    init_tidy_env us = (us, orig_env, initTidyOccEnv avoids, emptyVarEnv)
+    avoids	     = [getOccName bndr | bndr <- bindersOfBinds binds_in,
 				       isGlobalName (idName bndr)]
 \end{code}
 
@@ -248,7 +255,7 @@ addExternal (id,rhs) needed
 
 
 \begin{code}
-type TopTidyEnv = (OrigNameNameEnv, TidyOccEnv, VarEnv Var)
+type TopTidyEnv = (UniqSupply, OrigNameNameEnv, TidyOccEnv, VarEnv Var)
 
 -- TopTidyEnv: when tidying we need to know
 --   * orig_env: Any pre-ordained Names.  These may have arisen because the
@@ -257,44 +264,56 @@ type TopTidyEnv = (OrigNameNameEnv, TidyOccEnv, VarEnv Var)
 --	  invented an Id whose name is $wf (but with a different unique)
 --	  we want to rename it to have unique r77, so that we can do easy
 --	  comparisons with stuff from the interface file
-
---   * occ_env: The TidyOccEnv, which tells us which local occurrences are 'used'
-
+--
+--   * occ_env: The TidyOccEnv, which tells us which local occurrences 
+--     are 'used'
+--
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
+--
+--   * uniqsuppy: so we can clone any Ids with non-preordained names.
+--
 \end{code}
 
 
 \begin{code}
 tidyTopBind :: Module
-	    -> IdEnv Bool	-- Domain = Ids that should be exernal
+	    -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
 	    -> TopTidyEnv -> CoreBind
 	    -> (TopTidyEnv, CoreBind)
 
 tidyTopBind mod ext_ids env (NonRec bndr rhs)
-  = (env', NonRec bndr' rhs')
+  = ((us2,orig,occ,subst) , NonRec bndr' rhs')
   where
-    rhs'	  = tidyTopRhs env rhs
-    (env', bndr') = tidyTopBinder mod ext_ids env rhs' env bndr
+    (env1@(us1,orig,occ,subst), bndr') = tidyTopBinder mod ext_ids env rhs' env bndr
+    (rhs',us2)   = initUs us1 (tidyTopRhs env1 rhs)
 
 tidyTopBind mod ext_ids env (Rec prs)
   = (final_env, Rec prs')
   where
     (final_env, prs')     = mapAccumL do_one env prs
-    do_one env (bndr,rhs) = (env', (bndr', rhs'))
-			  where
-			    rhs'	  = tidyTopRhs final_env rhs
-			    (env', bndr') = tidyTopBinder mod ext_ids final_env
-							  rhs' env bndr
 
-tidyTopRhs :: TopTidyEnv -> CoreExpr -> CoreExpr
+    do_one env (bndr,rhs) 
+	= ((us',orig,occ,subst), (bndr',rhs'))
+	where
+	(env'@(us,orig,occ,subst), bndr') 
+		= tidyTopBinder mod ext_ids final_env rhs' env bndr
+        (rhs', us') = initUs us (tidyTopRhs final_env rhs)
+
+
+tidyTopRhs :: TopTidyEnv -> CoreExpr -> UniqSM CoreExpr
 	-- Just an impedence matcher
-tidyTopRhs (_, occ_env, subst_env) rhs = tidyExpr (occ_env, subst_env) rhs
+tidyTopRhs (_, _, occ_env, subst_env) rhs
+  = tidyExpr (occ_env, subst_env) rhs
+
 
 tidyTopBinder :: Module -> IdEnv Bool
 	      -> TopTidyEnv -> CoreExpr
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
-tidyTopBinder mod ext_ids env_idinfo rhs env@(orig_env, occ_env, subst_env) id
+tidyTopBinder mod ext_ids 
+ 	final_env@(_,  orig_env1, occ_env1, subst_env1) rhs 
+	      env@(us, orig_env2, occ_env2, subst_env2) id
+
   | omitIfaceSigForId id	-- Don't mess with constructors, 
   = (env, id)			-- record selectors, and the like
 
@@ -307,15 +326,19 @@ tidyTopBinder mod ext_ids env_idinfo rhs env@(orig_env, occ_env, subst_env) id
 
 	-- The rhs is already tidied
 	
-  = ((orig_env', occ_env', subst_env'), id')
+  = ((us_r, orig_env', occ_env', subst_env'), id')
   where
-    (orig_env', occ_env', name') = tidyTopName mod orig_env occ_env 
+    (us_l, us_r)    = splitUniqSupply us
+
+    (orig_env', occ_env', name') = tidyTopName mod orig_env2 occ_env2
 					       is_external
 					       (idName id)
-    ty'	       = tidyTopType (idType id)
-    idinfo'    = tidyIdInfo env_idinfo is_external unfold_info id
+    ty'	       	    = tidyTopType (idType id)
+    idinfo'         = tidyIdInfo us_l (occ_env1, subst_env1)
+			 is_external unfold_info arity_info id
+
     id'	       = mkId name' ty' idinfo'
-    subst_env' = extendVarEnv subst_env id id'
+    subst_env' = extendVarEnv subst_env2 id id'
 
     maybe_external = lookupVarEnv ext_ids id
     is_external    = maybeToBool maybe_external
@@ -325,23 +348,32 @@ tidyTopBinder mod ext_ids env_idinfo rhs env@(orig_env, occ_env, subst_env) id
     unfold_info | show_unfold = mkTopUnfolding rhs
 		| otherwise   = noUnfolding
 
-tidyIdInfo (_, occ_env, subst_env) is_external unfold_info id
+    arity_info = exprArity rhs
+
+
+tidyIdInfo us tidy_env is_external unfold_info arity_info id
   | opt_OmitInterfacePragmas || not is_external
 	-- No IdInfo if the Id isn't external, or if we don't have -O
-  = mkIdInfo new_flavour
+  = mkIdInfo new_flavour 
 	`setStrictnessInfo` strictnessInfo core_idinfo
-	-- Keep strictness info; it's used by the code generator
+	`setArityInfo`	    ArityExactly arity_info
+	-- Keep strictness and arity info; it's used by the code generator
 
   | otherwise
-  = mkIdInfo new_flavour
+  =  let (rules', _) = initUs us (tidyRules  tidy_env (specInfo core_idinfo))
+     in
+     mkIdInfo new_flavour
 	`setCprInfo`	    cprInfo core_idinfo
 	`setStrictnessInfo` strictnessInfo core_idinfo
 	`setInlinePragInfo` inlinePragInfo core_idinfo
 	`setUnfoldingInfo`  unfold_info
 	`setWorkerInfo`	    tidyWorker tidy_env (workerInfo core_idinfo)
-	`setSpecInfo`	    tidyRules  tidy_env (specInfo core_idinfo)
+	`setSpecInfo`	    rules'
+	`setArityInfo`	    ArityExactly arity_info
+		-- this is the final IdInfo, it must agree with the
+		-- code finally generated (i.e. NO more transformations
+		-- after this!).
   where
-    tidy_env    = (occ_env, subst_env)
     core_idinfo = idInfo id
 
 	-- A DFunId must stay a DFunId, so that we can gather the
@@ -354,18 +386,27 @@ tidyIdInfo (_, occ_env, subst_env) is_external unfold_info id
 		    flavour    -> pprTrace "tidyIdInfo" (ppr id <+> ppFlavourInfo flavour)
 				  flavour
 
+-- this is where we set names to local/global based on whether they really are 
+-- externally visible (see comment at the top of this module).  If the name
+-- was previously local, we have to give it a unique occurrence name if
+-- we intend to globalise it.
 tidyTopName mod orig_env occ_env external name
-  | global && internal = (orig_env, occ_env,  localiseName name)
-  | local  && internal = (orig_env, occ_env', setNameOcc name occ')
-  | global && external = (orig_env, occ_env,  name)
+  | global && internal = (orig_env, occ_env, localiseName name)
+  | local  && internal = (orig_env, occ_env', setNameOcc name occ') -- (*)
+  | global && external = (orig_env, occ_env, name)
   | local  && external = globalise
+	-- (*) just in case we're globalising all top-level names (because of
+	-- -split-objs), we need to give *all* the top-level ids a 
+	-- unique occurrence name.  The actual globalisation now happens in the code
+	-- generator.
   where
 	-- If we want to globalise a currently-local name, check
 	-- whether we have already assigned a unique for it.
 	-- If so, use it; if not, extend the table
-    globalise = case lookupFM orig_env key of
-		  Just orig -> (orig_env,			  occ_env', orig)
-		  Nothing   -> (addToFM orig_env key global_name, occ_env', global_name)
+    globalise 
+	= case lookupFM orig_env key of
+	  Just orig -> (orig_env,			  occ_env', orig)
+	  Nothing   -> (addToFM orig_env key global_name, occ_env', global_name)
 
     (occ_env', occ') = tidyOccName occ_env (nameOccName name)
     key		     = (moduleName mod, occ')
@@ -374,31 +415,33 @@ tidyTopName mod orig_env occ_env external name
     local	     = not global
     internal	     = not external
 
-tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
-tidyIdRules env rules
-  = [ (tidyVarOcc env fn, tidyRule env rule) | (fn,rule) <- rules  ]
-
+tidyIdRules :: TidyEnv -> [IdCoreRule] -> UniqSM [IdCoreRule]
+tidyIdRules env [] = returnUs []
+tidyIdRules env ((fn,rule) : rules)
+  = tidyRule env rule  		`thenUs` \ rule ->
+    tidyIdRules env rules 	`thenUs` \ rules ->
+    returnUs ((tidyVarOcc env fn, rule) : rules)
 
 tidyWorker tidy_env (HasWorker work_id wrap_arity) 
   = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
 tidyWorker tidy_env NoWorker
   = NoWorker
 
-tidyRules :: TidyEnv -> CoreRules -> CoreRules
+tidyRules :: TidyEnv -> CoreRules -> UniqSM CoreRules
 tidyRules env (Rules rules fvs) 
-  = Rules (map (tidyRule env) rules)
-	  (foldVarSet tidy_set_elem emptyVarSet fvs)
+  = mapUs (tidyRule env) rules 		`thenUs` \ rules ->
+    returnUs (Rules rules (foldVarSet tidy_set_elem emptyVarSet fvs))
   where
     tidy_set_elem var new_set = extendVarSet new_set (tidyVarOcc env var)
 
-tidyRule :: TidyEnv -> CoreRule -> CoreRule
-tidyRule env rule@(BuiltinRule _) = rule
+tidyRule :: TidyEnv -> CoreRule -> UniqSM CoreRule
+tidyRule env rule@(BuiltinRule _) = returnUs rule
 tidyRule env (Rule name vars tpl_args rhs)
-  = (Rule name vars' (map (tidyExpr env') tpl_args) (tidyExpr env' rhs))
-  where
-    (env', vars') = tidyBndrs env vars
+  = tidyBndrs env vars			`thenUs` \ (env', vars) ->
+    mapUs (tidyExpr env') tpl_args  	`thenUs` \ tpl_args ->
+    tidyExpr env' rhs		 	`thenUs` \ rhs ->
+    returnUs (Rule name vars tpl_args rhs)
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -409,51 +452,53 @@ tidyRule env (Rule name vars tpl_args rhs)
 \begin{code}
 tidyBind :: TidyEnv
 	 -> CoreBind
-	 -> (TidyEnv, CoreBind)
+	 -> UniqSM (TidyEnv, CoreBind)
 tidyBind env (NonRec bndr rhs)
-  = let
-	(env', bndr') = tidyBndr env bndr
-	rhs'	      = tidyExpr env' rhs
-	-- We use env' when tidying the RHS even though it's not
-	-- strictly necessary; it makes the tidied code pretty 
-	-- hard to read if we don't!
-    in
-    (env', NonRec bndr' rhs')
+  = tidyBndrWithRhs env (bndr,rhs) `thenUs` \ (env', bndr') ->
+    tidyExpr env' rhs  		   `thenUs` \ rhs' ->
+    returnUs (env', NonRec bndr' rhs')
 
 tidyBind env (Rec prs)
-  = (final_env, Rec prs')
-  where
-    (final_env, prs')     = mapAccumL do_one env prs
-    do_one env (bndr,rhs) = (env', (bndr', rhs'))
-			  where
-			    (env', bndr') = tidyBndr env bndr
-			    rhs'          = tidyExpr final_env rhs
+  = mapAccumLUs tidyBndrWithRhs env prs 	`thenUs` \ (env', bndrs') ->
+    mapUs (tidyExpr env') (map snd prs)		`thenUs` \ rhss' ->
+    returnUs (env', Rec (zip bndrs' rhss'))
 
-tidyExpr env (Type ty)	     = Type (tidyType env ty)
-tidyExpr env (Lit lit)	     = Lit lit
-tidyExpr env (App f a)       = App (tidyExpr env f) (tidyExpr env a)
-tidyExpr env (Note n e)      = Note (tidyNote env n) (tidyExpr env e)
+tidyExpr env (Var v)   = returnUs (Var (tidyVarOcc env v))
+tidyExpr env (Type ty) = returnUs (Type (tidyType env ty))
+tidyExpr env (Lit lit) = returnUs (Lit lit)
 
-tidyExpr env (Let b e)       = Let b' (tidyExpr env' e)
-			     where
-			       (env', b') = tidyBind env b
+tidyExpr env (App f a)
+  = tidyExpr env f 		`thenUs` \ f ->
+    tidyExpr env a 		`thenUs` \ a ->
+    returnUs (App f a)
 
-tidyExpr env (Case e b alts) = Case (tidyExpr env e) b' (map (tidyAlt env') alts)
-			     where
-			       (env', b') = tidyBndr env b
+tidyExpr env (Note n e)
+  = tidyExpr env e 		`thenUs` \ e ->
+    returnUs (Note (tidyNote env n) e)
 
-tidyExpr env (Var v)         = Var (tidyVarOcc env v)
+tidyExpr env (Let b e) 
+  = tidyBind env b 		`thenUs` \ (env', b') ->
+    tidyExpr env' e 		`thenUs` \ e ->
+    returnUs (Let b' e)
 
-tidyExpr env (Lam b e)	     = Lam b' (tidyExpr env' e)
-			     where
-			       (env', b') = tidyBndr env b
+tidyExpr env (Case e b alts)
+  = tidyExpr env e 		`thenUs` \ e ->
+    tidyBndr env b 		`thenUs` \ (env', b) ->
+    mapUs (tidyAlt env') alts 	`thenUs` \ alts ->
+    returnUs (Case e b alts)
 
-tidyAlt env (con, vs, rhs)   = (con, vs', tidyExpr env' rhs)
-			     where
-			       (env', vs') = tidyBndrs env vs
+tidyExpr env (Lam b e)
+  = tidyBndr env b 		`thenUs` \ (env', b) ->
+    tidyExpr env' e		`thenUs` \ e ->
+    returnUs (Lam b e)
+
+
+tidyAlt env (con, vs, rhs)
+  = tidyBndrs env vs		`thenUs` \ (env', vs) ->
+    tidyExpr env' rhs		`thenUs` \ rhs ->
+    returnUs (con, vs, rhs)
 
 tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)
-
 tidyNote env note            = note
 \end{code}
 
@@ -469,35 +514,38 @@ tidyVarOcc (_, var_env) v = case lookupVarEnv var_env v of
 				  Just v' -> v'
 				  Nothing -> v
 
-tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
-tidyBndr env var | isTyVar var = tidyTyVar env var
-		 | otherwise   = tidyId    env var
+-- tidyBndr is used for lambda and case binders
+tidyBndr :: TidyEnv -> Var -> UniqSM (TidyEnv, Var)
+tidyBndr env var
+  | isTyVar var = returnUs (tidyTyVar env var)
+  | otherwise   = tidyId env var vanillaIdInfo
 
-tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
-tidyBndrs env vars = mapAccumL tidyBndr env vars
+tidyBndrs :: TidyEnv -> [Var] -> UniqSM (TidyEnv, [Var])
+tidyBndrs env vars = mapAccumLUs tidyBndr env vars
 
-tidyId :: TidyEnv -> Id -> (TidyEnv, Id)
-tidyId env@(tidy_env, var_env) id
-  = 	-- Non-top-level variables
-    let 
-	-- Give the Id a fresh print-name, *and* rename its type
-	-- The SrcLoc isn't important now, though we could extract it from the Id
-	name'        	  = mkLocalName (getUnique id) occ' noSrcLoc
-	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
-        ty'          	  = tidyType env (idType id)
-	idinfo		  = idInfo id
-	id'          	  = mkVanillaId name' ty'
-			    `setIdStrictness` strictnessInfo idinfo
-			    `setIdDemandInfo` demandInfo idinfo
+-- tidyBndrWithRhs is used for let binders
+tidyBndrWithRhs :: TidyEnv -> (Var, CoreExpr) -> UniqSM (TidyEnv, Var)
+tidyBndrWithRhs env (id,rhs)
+   = tidyId env id idinfo
+   where
+	idinfo = vanillaIdInfo `setArityInfo` ArityExactly (exprArity rhs)
 			-- NB: This throws away the IdInfo of the Id, which we
 			-- no longer need.  That means we don't need to
 			-- run over it with env, nor renumber it.
-			--
-			-- The exception is strictness and demand info, which 
-			-- is used to decide whether to use let or case for
-			-- function arguments and let bindings
 
+tidyId :: TidyEnv -> Id -> IdInfo -> UniqSM (TidyEnv, Id)
+tidyId env@(tidy_env, var_env) id idinfo
+  = 	-- Non-top-level variables
+    getUniqueUs   `thenUs` \ uniq ->
+    let 
+	-- Give the Id a fresh print-name, *and* rename its type
+	-- The SrcLoc isn't important now, 
+	-- though we could extract it from the Id
+	name'        	  = mkLocalName uniq occ' noSrcLoc
+	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
+        ty'          	  = tidyType (tidy_env,var_env) (idType id)
+	id'          	  = mkId name' ty' idinfo
 	var_env'	  = extendVarEnv var_env id id'
     in
-    ((tidy_env', var_env'), id')
+    returnUs ((tidy_env', var_env'), id')
 \end{code}

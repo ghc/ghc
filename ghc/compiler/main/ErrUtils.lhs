@@ -13,7 +13,7 @@ module ErrUtils (
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 
 	ghcExit,
-	doIfSet, doIfSet_dyn, dumpIfSet, dumpIfSet_dyn, showPass
+	doIfSet, doIfSet_dyn, dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, showPass
     ) where
 
 #include "HsVersions.h"
@@ -122,10 +122,17 @@ dumpIfSet flag hdr doc
   | not flag   = return ()
   | otherwise  = printDump (dump hdr doc)
 
+dumpIfSet_core :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
+dumpIfSet_core dflags flag hdr doc
+  | dopt flag dflags
+	|| verbosity dflags >= 4
+	|| dopt Opt_D_verbose_core2core dflags 	= printDump (dump hdr doc)
+  | otherwise                                   = return ()
+
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | not (dopt flag dflags) && verbosity dflags < 4 = return ()
-  | otherwise                                      = printDump (dump hdr doc)
+  | dopt flag dflags || verbosity dflags >= 4 = printDump (dump hdr doc)
+  | otherwise                                 = return ()
 
 dump hdr doc 
    = vcat [text "", 

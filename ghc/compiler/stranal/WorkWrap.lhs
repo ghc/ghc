@@ -70,9 +70,7 @@ wwTopBinds dflags us binds
 	let { binds' = workersAndWrappers us binds };
 
 	endPass dflags "Worker Wrapper binds" 
-		(dopt Opt_D_dump_worker_wrapper dflags || 
-                    dopt Opt_D_verbose_core2core dflags) 
-                binds'
+		Opt_D_dump_worker_wrapper binds'
     }
 \end{code}
 

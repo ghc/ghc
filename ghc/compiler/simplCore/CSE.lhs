@@ -109,9 +109,7 @@ cseProgram dflags binds
   = do {
 	showPass dflags "Common sub-expression";
 	let { binds' = cseBinds emptyCSEnv binds };
-	endPass dflags "Common sub-expression" 
-	 	(dopt Opt_D_dump_cse dflags || dopt Opt_D_verbose_core2core dflags)
-		binds'	
+	endPass dflags "Common sub-expression" 	Opt_D_dump_cse binds'	
     }
 
 cseBinds :: CSEnv -> [CoreBind] -> [CoreBind]

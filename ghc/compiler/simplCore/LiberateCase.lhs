@@ -153,10 +153,8 @@ liberateCase dflags binds
   = do {
 	showPass dflags "Liberate case" ;
 	let { binds' = do_prog (initEnv opt_LiberateCaseThreshold) binds } ;
-	endPass dflags "Liberate case" 
-	 	(dopt Opt_D_verbose_core2core dflags)
+	endPass dflags "Liberate case" Opt_D_verbose_core2core binds'
 				{- no specific flag for dumping -} 
-		binds'
     }
   where
     do_prog env [] = []

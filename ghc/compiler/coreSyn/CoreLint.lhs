@@ -27,7 +27,7 @@ import VarSet
 import Subst		( mkTyVarSubst, substTy )
 import Name		( getSrcLoc )
 import PprCore
-import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message, showPass,
+import ErrUtils		( doIfSet, dumpIfSet_core, ghcExit, Message, showPass,
 			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
                           WarnMsg, pprBagOfWarnings)
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -58,13 +58,14 @@ place for them.  They print out stuff before and after core passes,
 and do Core Lint when necessary.
 
 \begin{code}
-endPass :: DynFlags -> String -> Bool -> [CoreBind] -> IO [CoreBind]
+endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
 endPass dflags pass_name dump_flag binds
   = do  
         (binds, _) <- endPassWithRules dflags pass_name dump_flag binds Nothing
         return binds
 
-endPassWithRules :: DynFlags -> String -> Bool -> [CoreBind] -> Maybe RuleBase
+endPassWithRules :: DynFlags -> String -> DynFlag -> [CoreBind] 
+		 -> Maybe RuleBase
                  -> IO ([CoreBind], Maybe RuleBase)
 endPassWithRules dflags pass_name dump_flag binds rules
   = do 
@@ -78,7 +79,7 @@ endPassWithRules dflags pass_name dump_flag binds rules
 	   return ()
 
 	-- Report verbosely, if required
-	dumpIfSet dump_flag pass_name
+	dumpIfSet_core dflags dump_flag pass_name
 		  (pprCoreBindings binds $$ case rules of
                                               Nothing -> empty
                                               Just rb -> pprRuleBase rb)

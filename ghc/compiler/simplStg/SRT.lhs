@@ -9,14 +9,18 @@ bindings have no CAF references, and record the fact in their IdInfo.
 \begin{code}
 module SRT where
 
-import Id       ( Id, setIdCafInfo, idCafInfo, externallyVisibleId,
-		)
-import CoreUtils( idAppIsBottom )
-import IdInfo 	( CafInfo(..) )
+import Id        ( Id, setIdCafInfo, idCafInfo, externallyVisibleId )
+import CoreUtils ( idAppIsBottom )
+import IdInfo 	 ( CafInfo(..) )
 import StgSyn
 
 import UniqFM
 import UniqSet
+
+#ifdef DEBUG
+import Outputable
+import Panic
+#endif
 \end{code}
 
 \begin{code}
@@ -273,6 +277,12 @@ srtExpr rho conts@(cont,lne) off
 srtExpr rho cont off (StgSCC cc expr) =
    srtExpr rho cont off expr	=: \(expr, g, srt, off) ->
    (StgSCC cc expr, g, srt, off)
+
+#ifdef DEBUG
+srtExpr rho cont off expr = pprPanic "srtExpr" (ppr expr)
+#else
+srtExpr rho cont off expr = panic "srtExpr"
+#endif
 \end{code}
 
 -----------------------------------------------------------------------------

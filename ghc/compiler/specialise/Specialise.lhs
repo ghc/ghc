@@ -585,9 +585,7 @@ specProgram dflags us binds
 	let binds' = initSM us (go binds 	`thenSM` \ (binds', uds') ->
 			        returnSM (dumpAllDictBinds uds' binds'))
 
-	endPass dflags "Specialise" 
-                       (dopt Opt_D_dump_spec dflags 
-                          || dopt Opt_D_verbose_core2core dflags) binds'
+	endPass dflags "Specialise" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
 		  (vcat (map dump_specs (concat (map bindersOf binds'))))

@@ -189,9 +189,7 @@ data CoreToDo		-- These are diff core-to-core passes,
 
 \begin{code}
 data StgToDo
-  = StgDoStaticArgs
-  | StgDoLambdaLift
-  | StgDoMassageForProfiling  -- should be (next to) last
+  = StgDoMassageForProfiling  -- should be (next to) last
   -- There's also setStgVarInfo, but its absolute "lastness"
   -- is so critical that it is hardwired in (no flag).
   | D_stg_stats
@@ -231,6 +229,7 @@ data DynFlag
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
+   | Opt_D_dump_sat
    | Opt_D_dump_stg
    | Opt_D_dump_stranal
    | Opt_D_dump_tc

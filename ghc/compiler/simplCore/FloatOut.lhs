@@ -96,10 +96,8 @@ floatOutwards dflags float_lams us pgm
 			int ntlets, ptext SLIT(" Lets floated elsewhere; from "),
 			int lams,   ptext SLIT(" Lambda groups")]);
 
-	endPass dflags float_msg
-	 	(dopt Opt_D_verbose_core2core dflags)
+	endPass dflags float_msg  Opt_D_verbose_core2core (concat binds_s')
 			{- no specific flag for dumping float-out -} 
-		(concat binds_s')
     }
   where
     float_msg | float_lams = "Float out (floating lambdas too)"

@@ -10,12 +10,10 @@ module SimplStg ( stg2stg ) where
 
 import StgSyn
 
-import LambdaLift	( liftProgram )
 import CostCentre       ( CostCentre, CostCentreStack )
 import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
-import StgVarInfo	( setStgVarInfo )
 import SRT		( computeSRTs )
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, 
@@ -47,27 +45,14 @@ stg2stg dflags module_name binds
 	; doIfSet_dyn dflags Opt_D_verbose_stg2stg 
 		      (printDump (text "VERBOSE STG-TO-STG:"))
 
-	; (binds', us', ccs) <- end_pass us "Core2Stg" ([],[],[]) binds
+	; (binds', us', ccs) <- end_pass us "Stg2Stg" ([],[],[]) binds
 
 		-- Do the main business!
 	; (processed_binds, _, cost_centres) 
 		<- foldl_mn do_stg_pass (binds', us', ccs)
 			    (dopt_StgToDo dflags)
 
-		-- Do essential wind-up
-	-- Essential wind-up: part (b), do setStgVarInfo. It has to
-	-- happen regardless, because the code generator uses its
-	-- decorations.
-	--
-	-- Why does it have to happen last?  Because earlier passes
-	-- may move things around, which would change the live-var
-	-- info.  Also, setStgVarInfo decides about let-no-escape
-	-- things, which in turn do a better job if arities are
-	-- correct, which is done by satStgRhs.
-	--
-
-	; let annotated_binds = setStgVarInfo opt_StgDoLetNoEscapes processed_binds
-	      srt_binds       = computeSRTs annotated_binds
+	; let srt_binds = computeSRTs processed_binds
 
 	; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
 	     		(pprStgBindingsWithSRTs srt_binds)
@@ -86,19 +71,9 @@ stg2stg dflags module_name binds
 	    (us1, us2) = splitUniqSupply us
 	in
 	case to_do of
-	  StgDoStaticArgs ->  panic "STG static argument transformation deleted"
-
 	  D_stg_stats ->
 	     trace (showStgStats binds)
 	     end_pass us2 "StgStats" ccs binds
-
-	  StgDoLambdaLift ->
-	     _scc_ "StgLambdaLift"
-		-- NB We have to do setStgVarInfo first!
-	     let
-		binds3 = liftProgram module_name us1 (setStgVarInfo opt_StgDoLetNoEscapes binds)
-	     in
-	     end_pass us2 "LambdaLift" ccs binds3
 
 	  StgDoMassageForProfiling ->
 	     _scc_ "ProfMassage"

@@ -70,11 +70,11 @@ deSugar dflags pcs hst mod_name unqual
 		  (printErrs unqual (pprBagOfWarnings ds_warns))
 
 	-- Lint result if necessary
-        ; let do_dump_ds = dopt Opt_D_dump_ds dflags
-        ; endPass dflags "Desugar" do_dump_ds ds_binds
+        ; endPass dflags "Desugar" Opt_D_dump_ds ds_binds
 
 	-- Dump output
-	; doIfSet do_dump_ds (printDump (ppr_ds_rules ds_rules))
+	; doIfSet (dopt Opt_D_dump_ds dflags) 
+		(printDump (ppr_ds_rules ds_rules))
 
         ; return result
 	}

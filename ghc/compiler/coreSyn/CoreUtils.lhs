@@ -16,6 +16,7 @@ module CoreUtils (
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe,
 	idAppIsBottom, idAppIsCheap,
+	exprArity,
 
 	-- Expr transformation
 	etaReduce, exprEtaExpandArity, 
@@ -491,8 +492,22 @@ exprIsConApp_maybe expr
 		Just unf -> exprIsConApp_maybe unf
 
     analyse other = Nothing
-\end{code} 
+\end{code}
 
+The arity of an expression (in the code-generator sense, i.e. the
+number of lambdas at the beginning).
+
+\begin{code}
+exprArity :: CoreExpr -> Int
+exprArity (Lam x e)
+  | isTyVar x = exprArity e
+  | otherwise = 1 + exprArity e
+exprArity (Note _ e)
+  -- Ignore coercions.   Top level sccs are removed by the final 
+  -- profiling pass, so we ignore those too.
+  = exprArity e
+exprArity _ = 0
+\end{code}
 
 %************************************************************************
 %*									*

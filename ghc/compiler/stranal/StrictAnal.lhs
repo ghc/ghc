@@ -94,8 +94,7 @@ saBinds dflags binds
 	let { binds_w_strictness = saTopBindsBinds binds };
 #endif
 
-	endPass dflags "Strictness analysis" 
-	        (dopt Opt_D_dump_stranal dflags || dopt Opt_D_verbose_core2core dflags)
+	endPass dflags "Strictness analysis" Opt_D_dump_stranal
 		binds_w_strictness
     }
 \end{code}

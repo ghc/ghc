@@ -39,10 +39,8 @@ floatInwards dflags binds
   = do {
 	showPass dflags "Float inwards";
 	let { binds' = map fi_top_bind binds };
-	endPass dflags "Float inwards" 
-	 	(dopt Opt_D_verbose_core2core dflags)
+	endPass dflags "Float inwards" Opt_D_verbose_core2core binds'	
 				{- no specific flag for dumping float-in -} 
-		binds'	
     }
 			  
   where

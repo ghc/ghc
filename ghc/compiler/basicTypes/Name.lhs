@@ -358,7 +358,7 @@ pprGlobal sty name uniq mod occ
   | codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
 
   | debugStyle sty       = ppr (moduleName mod) <> dot <> pprOccName occ <> 
-			    text "{-" <> pprUnique10 uniq <> text "-}"
+			    text "{-" <> pprUnique uniq <> text "-}"
 
   | unqualStyle sty name = pprOccName occ
   | otherwise		 = ppr (moduleName mod) <> dot <> pprOccName occ

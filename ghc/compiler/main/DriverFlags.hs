@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.27 2000/12/05 16:59:03 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.28 2000/12/06 13:03:29 simonmar Exp $
 --
 -- Driver flags
 --
@@ -381,6 +381,7 @@ dynamic_flags = [
   ,  ( "ddump-simpl",        	 NoArg (setDynFlag Opt_D_dump_simpl) )
   ,  ( "ddump-simpl-iterations", NoArg (setDynFlag Opt_D_dump_simpl_iterations) )
   ,  ( "ddump-spec",         	 NoArg (setDynFlag Opt_D_dump_spec) )
+  ,  ( "ddump-sat",          	 NoArg (setDynFlag Opt_D_dump_sat) )
   ,  ( "ddump-stg",          	 NoArg (setDynFlag Opt_D_dump_stg) )
   ,  ( "ddump-stranal",      	 NoArg (setDynFlag Opt_D_dump_stranal) )
   ,  ( "ddump-tc",           	 NoArg (setDynFlag Opt_D_dump_tc) )
