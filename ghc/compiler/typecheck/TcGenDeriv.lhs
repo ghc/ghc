@@ -1066,7 +1066,7 @@ gen_tag_n_con_monobind
 gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
   | lots_of_constructors
   = mk_FunMonoBind (getSrcLoc tycon) rdr_name 
-	[([VarPatIn a_RDR], HsApp dataToTag_Expr a_Expr)]
+	[([VarPatIn a_RDR], HsApp getTag_Expr a_Expr)]
 
   | otherwise
   = mk_FunMonoBind (getSrcLoc tycon) rdr_name (map mk_stuff (tyConDataCons tycon))
@@ -1361,7 +1361,7 @@ gtTag_Expr	= HsVar gtTag_RDR
 false_Expr	= HsVar false_RDR
 true_Expr	= HsVar true_RDR
 
-dataToTag_Expr  = HsVar dataToTagH_RDR
+getTag_Expr  	= HsVar getTag_RDR
 con2tag_Expr tycon = HsVar (con2tag_RDR tycon)
 
 a_Pat		= VarPatIn a_RDR

@@ -437,16 +437,6 @@ coreExprToStgFloat env expr@(Con (PrimOp (CCallOp (Right _) a b c)) args)
     let con' = PrimOp (CCallOp (Right u) a b c) in
     returnUs (binds, StgCon con' stg_atoms (coreExprType expr))
 
--- for dataToTag#, we need to make sure the argument is evaluated first.
-coreExprToStgFloat env expr@(Con op@(PrimOp DataToTagOp) [Type ty, a])
-  = newStgVar ty		`thenUs` \ v ->
-    coreArgToStg env a		`thenUs` \ (binds, arg) ->
-    let e = case arg of
-		StgVarArg v -> StgApp v []
-		StgConArg c -> StgCon c [] (coreExprType a)
-    in
-    returnUs (binds ++ [CaseBind v e], StgCon op [StgVarArg v] (coreExprType expr))
-
 coreExprToStgFloat env expr@(Con con args)
   = coreArgsToStg env args	`thenUs` \ (binds, stg_atoms) ->
     returnUs (binds, StgCon con stg_atoms (coreExprType expr))

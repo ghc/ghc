@@ -20,6 +20,8 @@ import SimplMonad
 import TysWiredIn	( trueDataCon, falseDataCon )
 import TyCon		( tyConDataCons, isEnumerationTyCon )
 import DataCon		( dataConTag, fIRST_TAG )
+import Const		( conOkForAlt )
+import CoreUnfold	( Unfolding(..) )
 import Type		( splitTyConApp_maybe )
 
 import Char		( ord, chr )
@@ -104,14 +106,24 @@ tryPrimOp TagToEnumOp [Type ty, Con (Literal (MachInt i _)) _]
 	  constrs = tyConDataCons tycon
 	  (dc:_) = [ dc | dc <- constrs, tag == dataConTag dc ]
 	  (Just (tycon,_)) = splitTyConApp_maybe ty
+\end{code}
 
+For dataToTag#, we can reduce if either 
+	
+	(a) the argument is a constructor
+	(b) the argument is a variable whose unfolding is a known constructor
+
+\begin{code}
 tryPrimOp DataToTagOp [Type ty, Con (DataCon dc) _]
   = Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
 tryPrimOp DataToTagOp [Type ty, Var x]
-  | unfolding_is_constr
+  | has_unfolding && unfolding_is_constr
   = Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
   where
-    unfolding = getIdUnfolding var
+    has_unfolding = case unfolding of
+			CoreUnfolding _ _ _ -> True
+			other		    -> False
+    unfolding = getIdUnfolding x
     CoreUnfolding form guidance unf_template = unfolding
     unfolding_is_constr = case unf_template of
 				  Con con@(DataCon _) _ -> conOkForAlt con

@@ -12,7 +12,7 @@ import AbsCSyn
 import CgMonad
 
 import StgSyn		( SRT(..) )
-import AbsCUtils	( mkAbstractCs )
+import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
 import CLabel		( mkConEntryLabel, mkStaticClosureLabel	)
 import ClosureInfo	( layOutStaticClosure, layOutDynCon,
@@ -24,7 +24,7 @@ import DataCon		( DataCon, dataConName, dataConRawArgTys )
 import Const		( Con(..) )
 import Name		( getOccString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
-import TyCon		( tyConDataCons, TyCon )
+import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep, Type )
 import BasicTypes	( TopLevelFlag(..) )
 import Outputable	
@@ -96,7 +96,13 @@ genStaticConBits comp_info gen_tycons tycon_specs
   where
     gen_for_tycon :: TyCon -> AbstractC
     gen_for_tycon tycon
-      = mkAbstractCs (map (genConInfo comp_info tycon) (tyConDataCons tycon))
+      = mkAbstractCs (map (genConInfo comp_info tycon) (tyConDataCons tycon)) 
+ 	`mkAbsCStmts` (
+	  -- after the con decls, so we don't need to declare the constructor labels
+	  if (isEnumerationTyCon tycon)
+	    then CClosureTbl tycon
+	    else AbsCNop
+	)
 \end{code}
 
 %************************************************************************

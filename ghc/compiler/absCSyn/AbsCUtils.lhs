@@ -362,6 +362,7 @@ flatAbsC stmt@(COpStmt results op args vol_regs)= returnFlt (stmt, AbsCNop)
 -- Some statements only make sense at the top level, so we always float
 -- them.  This probably isn't necessary.
 flatAbsC stmt@(CStaticClosure _ _ _ _)		= returnFlt (AbsCNop, stmt)
+flatAbsC stmt@(CClosureTbl _)			= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CSRT _ _)	  		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CBitmap _ _)	  		= returnFlt (AbsCNop, stmt)
 flatAbsC stmt@(CCostCentreDecl _ _) 		= returnFlt (AbsCNop, stmt)

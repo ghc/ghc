@@ -95,6 +95,7 @@ module Unique (
 	funTyConKey,
 	functorClassKey,
 	geClassOpKey,
+	getTagIdKey,
 	intDataConKey,
 	intPrimTyConKey,
 	intTyConKey,
@@ -606,6 +607,7 @@ zipIdKey		      = mkPreludeMiscIdUnique 35
 bindIOIdKey		      = mkPreludeMiscIdUnique 36
 deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 37
 makeStablePtrIdKey	      = mkPreludeMiscIdUnique 38
+getTagIdKey		      = mkPreludeMiscIdUnique 39
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

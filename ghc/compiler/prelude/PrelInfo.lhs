@@ -51,7 +51,7 @@ module PrelInfo (
 	ltH_Float_RDR, eqH_Double_RDR, ltH_Double_RDR, eqH_Int_RDR, 
 	ltH_Int_RDR, geH_RDR, leH_RDR, minusH_RDR, false_RDR, true_RDR,
 	and_RDR, not_RDR, append_RDR, map_RDR, compose_RDR, mkInt_RDR,
-	error_RDR, assertErr_RDR, dataToTagH_RDR,
+	error_RDR, assertErr_RDR, getTag_RDR,
 	showString_RDR, showParen_RDR, readParen_RDR, lex_RDR,
 	showSpace_RDR, showList___RDR, readList___RDR, negate_RDR,
 
@@ -221,9 +221,10 @@ wired_in_ids
     , rEC_CON_ERROR_ID
     , rEC_UPD_ERROR_ID
 
-	-- These two can't be defined in Haskell
+	-- These three can't be defined in Haskell
     , realWorldPrimId
     , unsafeCoerceId
+    , getTagId
     ]
 
 \end{code}
@@ -566,7 +567,8 @@ ltH_Int_RDR	= prelude_primop IntLtOp
 geH_RDR		= prelude_primop IntGeOp
 leH_RDR		= prelude_primop IntLeOp
 minusH_RDR	= prelude_primop IntSubOp
-dataToTagH_RDR  = prelude_primop DataToTagOp
+
+getTag_RDR	= varQual pREL_GHC SLIT("getTag#")
 \end{code}
 
 \begin{code}

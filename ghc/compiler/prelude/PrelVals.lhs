@@ -20,6 +20,8 @@ import TysWiredIn
 -- others:
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
+import PrimOp		( PrimOp(..) )
+import Const		( Con(..) )
 import Module		( Module )
 import Name		( mkWiredInIdName, mkSrcVarOcc )
 import Type		
@@ -59,6 +61,21 @@ unsafeCoerceId
     [x] = mkTemplateLocals [alphaTy]
     template = mkLams [alphaTyVar,betaTyVar,x] $
 	       Note (Coerce betaTy alphaTy) (Var x)
+\end{code}
+
+@getTag#@ is another function which can't be defined in Haskell.  It needs to
+evaluate its argument and call the dataToTag# primitive.
+
+\begin{code}
+getTagId
+  = pcMiscPrelId getTagIdKey pREL_GHC SLIT("getTag#") ty 
+	(mk_inline_unfolding template)
+  where
+    ty = mkForAllTys [alphaTyVar] (mkFunTy alphaTy intPrimTy)
+    [x,y] = mkTemplateLocals [alphaTy,alphaTy]
+    template = mkLams [alphaTyVar,x] $
+	       Case (Var x) y [ (DEFAULT, [], 
+		   Con (PrimOp DataToTagOp) [Type alphaTy, Var y]) ]
 \end{code}
 
 

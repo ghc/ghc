@@ -29,7 +29,8 @@ import Constants	( mIN_UPD_SIZE )
 import CallConv		( CallConv, callConvAttribute, cCallConv )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  isReadOnly, needsCDecl, pprCLabel,
-			  mkReturnInfoLabel, mkReturnPtLabel,
+			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
+			  mkStaticClosureLabel,
 			  CLabel, CLabelType(..), labelType, labelDynamic
 			)
 
@@ -40,6 +41,9 @@ import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
 import CStrings		( stringToC )
 import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import Const		( Literal(..) )
+import TyCon		( tyConDataCons )
+import Name		( NamedThing(..) )
+import DataCon		( DataCon{-instance NamedThing-} )
 import Maybes		( maybeToBool, catMaybes )
 import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, showPrimRep )
@@ -251,10 +255,6 @@ pprAbsC stmt@(CSRT lbl closures) c
       $$ nest 2 (hcat (punctuate comma (map pp_closure_lbl closures)))
          <> ptext SLIT("};")
   }
-  where 
-    pp_closure_lbl lbl
-      | labelDynamic lbl = text "DLL_SRT_ENTRY" <> parens (pprCLabel lbl)
-      | otherwise	 = char '&' <> pprCLabel lbl
 
 pprAbsC stmt@(CBitmap lbl mask) c
   = vcat [
@@ -461,6 +461,15 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
     pp_descr = hcat [char '"', text (stringToC cl_descr), char '"']
     pp_type  = hcat [char '"', text (stringToC (closureTypeDescr cl_info)), char '"']
 
+pprAbsC stmt@(CClosureTbl tycon) _
+  = vcat (
+	ptext SLIT("CLOSURE_TBL") <> 
+	   lparen <> pprCLabel (mkClosureTblLabel tycon) <> rparen :
+	punctuate comma (
+	   map (pp_closure_lbl . mkStaticClosureLabel . getName) (tyConDataCons tycon)
+	)
+   ) $$ ptext SLIT("};")
+
 pprAbsC stmt@(CRetDirect uniq code srt liveness) _
   = vcat [
       hcat [
@@ -625,6 +634,12 @@ pp_srt_info srt =
 		hcat [ 	pprCLabel lbl, comma,
 		       	int off, comma,
 		       	int len, comma ]
+\end{code}
+
+\begin{code}
+pp_closure_lbl lbl
+      | labelDynamic lbl = text "DLL_SRT_ENTRY" <> parens (pprCLabel lbl)
+      | otherwise	 = char '&' <> pprCLabel lbl
 \end{code}
 
 \begin{code}

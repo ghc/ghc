@@ -35,8 +35,9 @@ import Id		( Id, mkSysLocal, mkUserId, isBottomingId,
 			)
 import IdInfo		( InlinePragInfo(..), specInfo, setSpecInfo,
 			  inlinePragInfo, setInlinePragInfo,
-			  setUnfoldingInfo
+			  setUnfoldingInfo, setDemandInfo
 			)
+import Demand		( wwLazy )
 import VarEnv
 import VarSet
 import Module		( Module )
@@ -370,7 +371,7 @@ tidyIdInfo env info
 		ICanSafelyBeINLINEd _ _ -> NoInlinePragInfo `setInlinePragInfo` info1
 		other			-> info1
 
-    info3 = noUnfolding `setUnfoldingInfo` info2
+    info3 = noUnfolding `setUnfoldingInfo` (wwLazy `setDemandInfo`  info2)
 
     tidy_item (tyvars, tys, rhs)
 	= (tyvars', tidyTypes env' tys, tidyExpr env' rhs)

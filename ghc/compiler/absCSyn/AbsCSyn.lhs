@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.21 1999/03/11 11:32:22 simonm Exp $
+% $Id: AbsCSyn.lhs,v 1.22 1999/04/26 16:06:27 simonm Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -52,6 +52,7 @@ import PrimRep		( PrimRep(..) )
 import PrimOp           ( PrimOp )
 import Unique           ( Unique )
 import StgSyn		( SRT(..) )
+import TyCon		( TyCon )
 import BitSet				-- for liveness masks
 
 \end{code}
@@ -195,6 +196,9 @@ stored in a mixed type location.)
 	[CAddrMode]
 	(CLabel,SRT)		-- SRT info
 	Liveness		-- stack liveness at the return point
+
+  | CClosureTbl 		-- table of constructors for enumerated types
+	TyCon			-- which TyCon this table is for
 
   | CCostCentreDecl		-- A cost centre *declaration*
 	Bool			-- True  <=> local => full declaration
