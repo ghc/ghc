@@ -1,10 +1,13 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.7 2000/03/17 09:48:48 simonmar Exp $
+ * $Id: system.c,v 1.8 2000/03/28 14:29:13 simonmar Exp $
  *
  * system Runtime Support
  */
+
+/* The itimer stuff in this module is non-posix */
+#define NON_POSIX_SOURCE
 
 #include "Rts.h"
 #include "stgio.h"
@@ -77,6 +80,7 @@ systemCmd(StgByteArray cmd)
 	}
     case 0:
       {
+#ifdef HAVE_SETITIMER
 	/* Reset the itimers in the child, so it doesn't get plagued
 	 * by SIGVTALRM interrupts.
 	 */
@@ -87,6 +91,7 @@ systemCmd(StgByteArray cmd)
 	setitimer(ITIMER_REAL, &itv, NULL);
 	setitimer(ITIMER_VIRTUAL, &itv, NULL);
 	setitimer(ITIMER_PROF, &itv, NULL);
+#endif
 
 	/* the child */
 	execl("/bin/sh", "sh", "-c", cmd, NULL);
