@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.17 $
- * $Date: 2001/01/03 16:44:30 $
+ * $Revision: 1.18 $
+ * $Date: 2001/01/05 15:24:28 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -64,6 +64,7 @@ int disInstr ( StgBCO *bco, int pc )
       case bci_PUSH_AS:
          fprintf(stderr, "PUSH_AS  " ); printPtr( ptrs[instrs[pc]] );
          fprintf(stderr, " 0x%x", literals[instrs[pc+1]] );
+         fprintf(stderr, "\n");
          pc += 2; break;
       case bci_PUSH_UBX:
          fprintf(stderr, "PUSH_UBX ");
@@ -94,6 +95,7 @@ int disInstr ( StgBCO *bco, int pc )
       case bci_PACK:
          fprintf(stderr, "PACK     %d words with itbl ", instrs[pc+1] );
          printPtr( (StgPtr)itbls[instrs[pc]] );
+         fprintf(stderr, "\n");
          pc += 2; break;
 
       case bci_TESTLT_I:

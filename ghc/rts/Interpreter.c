@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.7 $
- * $Date: 2001/01/03 16:44:30 $
+ * $Revision: 1.8 $
+ * $Date: 2001/01/05 15:24:28 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -86,32 +86,34 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
        case INVALID_OBJECT:
                barf("Invalid object %p",(StgPtr)obj);
 
-    case AP_UPD:
-      { nat Words;
-        nat i;
-        StgAP_UPD *ap = (StgAP_UPD*)obj;
-fprintf(stderr, "home-grown AP_UPD code\n");
-        Words = ap->n_args;
+#if 0
+       case AP_UPD:
+        { nat Words;
+          nat i;
+          StgAP_UPD *ap = (StgAP_UPD*)obj;
+          Words = ap->n_args;
 
-        iSp -= sizeofW(StgUpdateFrame);
+          iSp -= sizeofW(StgUpdateFrame);
 
-        {
-                StgUpdateFrame *__frame;
-                __frame = (StgUpdateFrame *)iSp;
-                SET_INFO(__frame, (StgInfoTable *)&stg_upd_frame_info);
-                __frame->link = iSu;
-                __frame->updatee = (StgClosure *)(ap);
-                iSu = __frame;
+          {
+              StgUpdateFrame *__frame;
+              __frame = (StgUpdateFrame *)iSp;
+              SET_INFO(__frame, (StgInfoTable *)&stg_upd_frame_info);
+              __frame->link = iSu;
+              __frame->updatee = (StgClosure *)(ap);
+              iSu = __frame;
+          }
+
+	  /* WARNING: do a stack overflow check here ! */
+          iSp -= Words;
+
+          /* Reload the stack */
+          for (i=0; i<Words; i++) StackWord(i) = (W_)ap->payload[i];
+
+          iSp--; StackWord(0) = (W_)ap->fun;
+          goto nextEnter;
         }
-
-        iSp -= Words;
-
-        /* Reload the stack */
-        for (i=0; i<Words; i++) StackWord(i) = (W_)ap->payload[i];
-
-        iSp--; StackWord(0) = (W_)ap->fun;
-        goto nextEnter;
-      }
+#endif
 
        case BCO:
 
@@ -159,7 +161,7 @@ fprintf(stderr, "home-grown AP_UPD code\n");
                  if (arg_words_avail >= arg_words_reqd) goto nextInsn;
                  /* Handle arg check failure.  Copy the spare args
                     into a PAP frame. */
- fprintf(stderr, "arg check fail %d %d\n", arg_words_reqd, arg_words_avail );
+		 /* fprintf(stderr, "arg check fail %d %d\n", arg_words_reqd, arg_words_avail ); */
                  pap = (StgPAP*)allocate(PAP_sizeW(arg_words_avail));
                  SET_HDR(pap,&stg_PAP_info,CCS_SYSTEM/*ToDo*/);
                  pap->n_args = arg_words_avail;
@@ -206,8 +208,8 @@ fprintf(stderr, "home-grown AP_UPD code\n");
               case bci_PUSH_AS: {
                  int o_bco  = BCO_NEXT;
                  int o_itbl = BCO_NEXT;
-                 StackWord(-1) = BCO_LIT(o_itbl);
-                 StackWord(-2) = BCO_PTR(o_bco);
+                 StackWord(-2) = BCO_LIT(o_itbl);
+                 StackWord(-1) = BCO_PTR(o_bco);
                  iSp -= 2;
                  goto nextInsn;
               }
@@ -252,7 +254,7 @@ fprintf(stderr, "home-grown AP_UPD code\n");
                  int stkoff = BCO_NEXT;
                  int n_payload = BCO_NEXT - 1;
                  StgAP_UPD* ap = (StgAP_UPD*)StackWord(stkoff);
-                 ASSERT(ap->n_args == n_payload);
+                 ASSERT((int)ap->n_args == n_payload);
                  ap->fun = (StgClosure*)StackWord(0);
                  for (i = 0; i < n_payload; i++)
                     ap->payload[i] = (StgClosure*)StackWord(i+1);
@@ -307,7 +309,7 @@ fprintf(stderr, "home-grown AP_UPD code\n");
                  int discr  = BCO_NEXT;
                  int failto = BCO_NEXT;
                  StgClosure* con = (StgClosure*)StackWord(0);
-                 if (constrTag(con) < discr)
+                 if (constrTag(con) >= discr)
                     bciPtr = failto;
                  goto nextInsn;
               }
@@ -378,8 +380,10 @@ fprintf(stderr, "home-grown AP_UPD code\n");
 
        default: {
           /* Can't handle this object; yield to sched. */
-          fprintf(stderr, "entering unknown closure -- yielding to sched\n"); 
-          printObj(obj);
+          IF_DEBUG(evaluator,
+                   fprintf(stderr, "entering unknown closure -- yielding to sched\n"); 
+                   printObj(obj);
+                  )
           cap->rCurrentTSO->what_next = ThreadEnterGHC;
           iSp--; StackWord(0) = (W_)obj;
           RETURN(ThreadYielding);
