@@ -1,4 +1,4 @@
-<sect1>Release notes for version~3-03---4/97
+<sect1>Release notes for version~3-03---10/98
 <label id="release-3-03">
 <p>
 
@@ -12,13 +12,16 @@ Changes made since 3.02:
 
 <item> Add Sven Panne's Haskell GetOpt library (in <tt/-syslib misc/).
 
+<item> Added <tt/MD5/ message digest interface to <tt/-syslib misc/.
+
+<item> Turned off the unfolding of <tt/_casm_/s across modules. Should
+you need the old behaviour back (v. unlikely), use <tt/-funfold-casms-in-hi-file/.
+
 <item> Add Dynamic library.
 
 <item> Add foreign export/import constructs.
 
 <item> Rewritten I/O system.
-
-<item> Add MD5 library.
 
 <item> Add socket option support to the socket library.
 
