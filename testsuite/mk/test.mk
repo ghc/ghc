@@ -53,13 +53,15 @@ RUNTEST_OPTS +=  \
 
 TESTS	     = 
 TEST	     = 
+WAY          =
 
 all :: test
 
 test:
 	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
-		$(patsubst %, --only=%, $(TESTS))
+		$(patsubst %, --only=%, $(TESTS)) \
+		$(patsubst %, --way=%, $(WAY))
 
 verbose: test
 
@@ -67,5 +69,6 @@ accept:
 	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
+		$(patsubst %, --way=%, $(WAY)) \
 		-e config.accept=1
 
