@@ -399,8 +399,7 @@ bit or 64 bit precision.
 
 	| MUL	      MachRep Operand Operand
 	| IMUL	      MachRep Operand Operand	-- signed int mul
-        | IMUL64      Reg Reg
-	-- operand1:operand2 := (operand1[31:0] *signed operand2[31:0])
+        | IMUL2       MachRep Operand -- %edx:%eax = operand * %eax
 
 	| DIV	      MachRep Operand	-- eax := eax:edx/op, edx := eax:edx%op
 	| IDIV	      MachRep Operand	-- ditto, but signed

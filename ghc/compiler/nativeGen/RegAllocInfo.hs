@@ -149,7 +149,7 @@ regUsage instr = case instr of
     ADC    sz src dst	-> usageRM src dst
     SUB    sz src dst	-> usageRM src dst
     IMUL   sz src dst	-> usageRM src dst
-    IMUL64    sd1 sd2   -> mkRU [sd1,sd2] [sd1,sd2]
+    IMUL2  sz src       -> mkRU (eax:use_R src) [eax,edx]
     MUL    sz src dst	-> usageRM src dst
     DIV    sz op	-> mkRU (eax:edx:use_R op) [eax,edx]
     IDIV   sz op	-> mkRU (eax:edx:use_R op) [eax,edx]
@@ -171,13 +171,8 @@ regUsage instr = case instr of
     JXX    cond lbl	-> mkRU [] []
     JMP    op		-> mkRU (use_R op) []
     JMP_TBL op ids      -> mkRU (use_R op) []
-#if i386_TARGET_ARCH
     CALL   (Left imm)	-> mkRU [] callClobberedRegs
     CALL   (Right reg)	-> mkRU [reg] callClobberedRegs
-#else
-    CALL   (Left imm)	-> mkRU params callClobberedRegs
-    CALL   (Right reg)	-> mkRU (reg:params) callClobberedRegs
-#endif
     CLTD   sz		-> mkRU [eax] [edx]
     NOP			-> mkRU [] []
 
@@ -227,12 +222,6 @@ regUsage instr = case instr of
     _other		-> panic "regUsage: unrecognised instr"
 
  where
-#if x86_64_TARGET_ARCH
-	-- call parameters: include %eax, because it is used
-	-- to pass the number of SSE reg arguments to varargs fns.
-    params = eax : allArgRegs ++ allFPArgRegs
-#endif
-
     -- 2 operand form; first operand Read; second Written
     usageRW :: Operand -> Operand -> RegUsage
     usageRW op (OpReg reg) = mkRU (use_R op) [reg]
@@ -479,7 +468,7 @@ patchRegs instr env = case instr of
     ADC  sz src dst	-> patch2 (ADC  sz) src dst
     SUB  sz src dst	-> patch2 (SUB  sz) src dst
     IMUL sz src dst 	-> patch2 (IMUL sz) src dst
-    IMUL64  sd1 sd2     -> IMUL64 (env sd1) (env sd2)
+    IMUL2 sz src        -> patch1 (IMUL2 sz) src
     MUL sz src dst 	-> patch2 (MUL sz) src dst
     IDIV sz op		-> patch1 (IDIV sz) op
     DIV sz op		-> patch1 (DIV sz) op
@@ -717,9 +706,7 @@ mkSpillInstr reg delta slot
     let off_w = (off-delta) `div` 8
     in case regClass reg of
 	   RcInteger -> MOV I64 (OpReg reg) (OpAddr (spRel off_w))
-	   RcDouble  -> MOV F64 (OpReg reg) (OpAddr (spRel off_w))
-		-- ToDo: will it work to always spill as a double?
-		-- does that cause a stall if the data was a float?
+	   _         -> panic "mkSpillInstr: ToDo"
 #endif
 #ifdef sparc_TARGET_ARCH
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
@@ -761,7 +748,7 @@ mkLoadInstr reg delta slot
 	let off_w = (off-delta) `div` 8
         in case regClass reg of
               RcInteger -> MOV I64 (OpAddr (spRel off_w)) (OpReg reg)
-              _         -> MOV F64 (OpAddr (spRel off_w)) (OpReg reg)
+              _         -> panic "mkLoadInstr: ToDo"
 #endif
 #if sparc_TARGET_ARCH
         let{off_w = 1 + (off `div` 4);

@@ -117,11 +117,11 @@ pprBasicBlock (BasicBlock (BlockId id) instrs) =
 pprUserReg :: Reg -> Doc
 pprUserReg = pprReg IF_ARCH_i386(I32,) IF_ARCH_x86_64(I64,)
 
-pprReg :: IF_ARCH_i386(MachRep ->,) IF_ARCH_x86_64(MachRep ->,) Reg -> Doc
+pprReg :: IF_ARCH_i386(MachRep ->, IF_ARCH_x86_64(MachRep ->,)) Reg -> Doc
 
-pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
+pprReg IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) r
   = case r of
-      RealReg i      -> ppr_reg_no IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) i
+      RealReg i      -> ppr_reg_no IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) i
       VirtualRegI  u  -> text "%vI_" <> asmSDoc (pprUnique u)
       VirtualRegHi u  -> text "%vHi_" <> asmSDoc (pprUnique u)
       VirtualRegF  u  -> text "%vF_" <> asmSDoc (pprUnique u)
@@ -263,9 +263,8 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
 	22 -> SLIT("%xmm6");   23 -> SLIT("%xmm7");
 	24 -> SLIT("%xmm8");   25 -> SLIT("%xmm9");
 	26 -> SLIT("%xmm10");  27 -> SLIT("%xmm11");
-	28 -> SLIT("%xmm12");  29 -> SLIT("%xmm13");
-	30 -> SLIT("%xmm14");  31 -> SLIT("%xmm15");
-	_  -> SLIT("very naughty x86_64 register")
+	28 -> SLIT("%xmm12");  28 -> SLIT("%xmm13");
+	30 -> SLIT("%xmm13");  31 -> SLIT("%xmm15")
       })
 #endif
 
@@ -1266,8 +1265,7 @@ pprInstr (CALL (Right reg))     = (<>) (ptext SLIT("\tcall *")) (pprReg wordRep 
 
 pprInstr (IDIV sz op)	= pprSizeOp SLIT("idiv") sz op
 pprInstr (DIV sz op)    = pprSizeOp SLIT("div")  sz op
-
-pprInstr (IMUL64 sd_hi sd_lo) = pprInstr_imul64 sd_hi sd_lo
+pprInstr (IMUL2 sz op)  = pprSizeOp SLIT("imul") sz op
 
 #if x86_64_TARGET_ARCH
 pprInstr (MUL size op1 op2) = pprSizeOpOp SLIT("mul") size op1 op2
@@ -1544,22 +1542,6 @@ pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg SLIT("gdiv") sz src1 src2 d
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
--- Emit code to make hi_reg:lo_reg be the 64-bit product of hi_reg and lo_reg
-pprInstr_imul64 hi_reg lo_reg
-   = let fakeInsn = text "imul64" <+> pp_hi_reg <> comma <+> pp_lo_reg
-         pp_hi_reg = pprReg wordRep hi_reg
-         pp_lo_reg = pprReg wordRep lo_reg
-     in     
-         vcat [
-            text "\t# BEGIN " <> fakeInsn,
-            text "\tpushl" <+> pp_hi_reg <> text" ;  pushl" <+> pp_lo_reg,
-            text "\tpushl %eax ; pushl %edx",
-            text "\tmovl 12(%esp), %eax ; imull 8(%esp)",
-            text "\tmovl %edx, 12(%esp) ; movl %eax, 8(%esp)",
-            text "\tpopl %edx ; popl %eax",
-            text "\tpopl" <+> pp_lo_reg <> text " ;  popl" <+> pp_hi_reg,
-            text "\t# END   " <> fakeInsn
-         ]
 -- Continue with I386-only printing bits and bobs:
 
 pprDollImm :: Imm -> Doc

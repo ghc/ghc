@@ -15,7 +15,6 @@ module MachCodeGen ( cmmTopCodeGen, InstrBlock ) where
 
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
-#include "MachDeps.h"
 
 -- NCG stuff:
 import MachInstrs
@@ -1087,23 +1086,25 @@ getRegister e@(CmmMachOp mop [x, y]) -- dyadic MachOps
     --------------------
     imulMayOflo :: MachRep -> CmmExpr -> CmmExpr -> NatM Register
     imulMayOflo rep a b = do
-         res_lo <- getNewRegNat rep
-         res_hi <- getNewRegNat rep
          (a_reg, a_code) <- getNonClobberedReg a
-         (b_reg, b_code) <- getSomeReg   b
+         b_code <- getAnyReg b
          let 
-             code dst = a_code `appOL` b_code `appOL`
+	     shift_amt  = case rep of
+			   I32 -> 31
+			   I64 -> 63
+			   _ -> panic "shift_amt"
+
+             code = a_code `appOL` b_code eax `appOL`
                         toOL [
-                           MOV rep (OpReg a_reg) (OpReg res_hi),
-                           MOV rep (OpReg b_reg) (OpReg res_lo),
-                           IMUL64 res_hi res_lo, 		-- result in res_hi:res_lo
-                           SAR rep (OpImm (ImmInt 31)) (OpReg res_lo),	-- sign extend lower part
-                           SUB rep (OpReg res_hi) (OpReg res_lo),	-- compare against upper
-                           MOV rep (OpReg res_lo) (OpReg dst)
-                           -- dst==0 if high part == sign extended low part
+			   IMUL2 rep (OpReg a_reg),   -- result in %edx:%eax
+                           SAR rep (OpImm (ImmInt shift_amt)) (OpReg eax),
+				-- sign extend lower part
+                           SUB rep (OpReg edx) (OpReg eax)
+				-- compare against upper
+                           -- eax==0 if high part == sign extended low part
                         ]
          -- in
-	 return (Any rep code)
+	 return (Fixed rep eax code)
 
     --------------------
     shift_code :: MachRep
@@ -1216,34 +1217,10 @@ getRegister (CmmLoad mem pk)
 
 getRegister (CmmLit (CmmInt 0 rep))
   = let
-	-- x86_64: 32-bit xor is one byte shorter, and zero-extends to 64 bits
-	adj_rep = case rep of I64 -> I32; _ -> rep
-	rep1 = IF_ARCH_i386( rep, adj_rep ) 
     	code dst 
-           = unitOL (XOR rep1 (OpReg dst) (OpReg dst))
+           = unitOL (XOR rep (OpReg dst) (OpReg dst))
     in
     	return (Any rep code)
-
-#if x86_64_TARGET_ARCH
-  -- optimisation for loading small literals on x86_64: take advantage
-  -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
-  -- instruction forms are shorter.
-getRegister (CmmLit lit) 
-  | I64 <- cmmLitRep lit, not (isBigLit lit)
-  = let 
-	imm = litToImm lit
-	code dst = unitOL (MOV I32 (OpImm imm) (OpReg dst))
-    in
-    	return (Any I64 code)
-  where
-   isBigLit (CmmInt i I64) = i < 0 || i > 0xffffffff
-   isBigLit _ = False
-	-- note1: not the same as is64BitLit, because that checks for
-	-- signed literals that fit in 32 bits, but we want unsigned
-	-- literals here.
-	-- note2: all labels are small, because we're assuming the
-	-- small memory model (see gcc docs, -mcmodel=small).
-#endif
 
 getRegister (CmmLit lit)
   = let 
@@ -1253,7 +1230,7 @@ getRegister (CmmLit lit)
     in
     	return (Any rep code)
 
-getRegister other = pprPanic "getRegister(x86)" (ppr other)
+getRegister other = panic "getRegister(x86)"
 
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr
@@ -2050,8 +2027,6 @@ getRegOrMem e = do
 
 #if x86_64_TARGET_ARCH
 is64BitLit (CmmInt i I64) = i > 0x7fffffff || i < -0x80000000
-   -- assume that labels are in the range 0-2^31-1: this assumes the
-   -- small memory model (see gcc docs, -mcmodel=small).
 #endif
 is64BitLit x = False
 #endif
