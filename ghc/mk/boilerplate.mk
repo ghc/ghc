@@ -36,4 +36,4 @@ TOP:=$(GHC_TOP)
 # Override $(libexecdir): we like our binaries in a subdirectory
 # of $(libdir).
 
-libexecdir := $(libdir)/bin
+libexecdir := $(libdir)/extra-bin
