@@ -77,13 +77,11 @@ include $(TOP)/mk/suffix.mk
 # Compiler produced files that are targets of the source's imports.
 MKDEPENDHS_OBJ_SUFFICES=o
 
-ifneq "$(STAMP_PKG_CONF)" ""
+ifneq "$(BootingFromHc)" "YES"
 PKGCONF_DEP = $(STAMP_PKG_CONF)
-else
-PKGCONF_DEP =
 endif
 
-depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS) $(STAMP_PKG_CONF)
+depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS) $(PKGCONF_DEP)
 	@$(RM) .depend
 	@touch .depend
 ifneq "$(DOC_SRCS)" ""
