@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.97 2002/04/23 11:11:15 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.98 2002/04/23 11:22:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -270,9 +270,26 @@ FN_(newPinnedByteArrayzh_fast)
      MAYBE_GC(NO_PTRS,newPinnedByteArrayzh_fast);
      n = R1.w;
      stuff_size = BYTES_TO_STGWORDS(n);
+
+     // We want an 8-byte aligned array.  allocatePinned() gives us
+     // 8-byte aligned memory by default, but we want to align the
+     // *goods* inside the ArrWords object, so we have to check the
+     // size of the ArrWords header and adjust our size accordingly.
      size = sizeofW(StgArrWords)+ stuff_size;
+     if ((sizeof(StgArrWords) & 7) != 0) {
+	 size++;
+     }
+
      p = (StgArrWords *)RET_STGCALL1(P_,allocatePinned,size);
      TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0);
+
+     // Again, if the ArrWords header isn't a multiple of 8 bytes, we
+     // have to push the object forward one word so that the goods
+     // fall on an 8-byte boundary.
+     if ((sizeof(StgArrWords) & 7) != 0) {
+	 ((StgPtr)p)++;
+     }
+
      SET_HDR(p, &stg_ARR_WORDS_info, CCCS);
      p->words = stuff_size;
      TICK_RET_UNBOXED_TUP(1)
