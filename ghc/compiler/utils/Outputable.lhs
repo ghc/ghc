@@ -160,9 +160,13 @@ printErrs doc = printDoc PageMode stderr (final_doc user_style)
 		user_style = mkUserStyle (PartWay opt_PprUserLength)
 
 printDump :: SDoc -> IO ()
-printDump doc = printDoc PageMode stderr (final_doc PprDebug)
+printDump doc = printDoc PageMode stderr (final_doc user_style)
 	      where
 		final_doc = doc $$ text ""
+		user_style = mkUserStyle (PartWay opt_PprUserLength)
+		-- We used to always print in debug style, but I want
+		-- to try the effect of a more user-ish style (unless you
+		-- say -dppr-debug
 
 
 -- printForC, printForAsm doe what they sound like
