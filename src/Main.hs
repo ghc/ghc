@@ -362,6 +362,12 @@ extractDecl name mod decl
 	    HsDataDecl loc ctxt t tvs cons drvs mb_doc ->
 		extractRecSel name mod t tvs cons
 
+	    HsNewTypeDecl loc ctxt t tvs con drvs mb_doc ->
+		extractRecSel name mod t tvs [con]
+
+	    _ -> error ("extractDecl: "  ++ show decl)
+
+
 extractClassDecl c mod tvs (HsTypeSig loc [n] ty doc)
  = case ty of
  	HsForAllType tvs ctxt' ty' -> 
