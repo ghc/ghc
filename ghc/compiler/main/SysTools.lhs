@@ -352,7 +352,11 @@ initSysTools minusB_args
 	; let split_path  = perl_path ++ " \"" ++ split_script ++ "\""
 	      mangle_path = perl_path ++ " \"" ++ mangle_script ++ "\""
 
-	; let mkdll_path = cMKDLL
+	; let mkdll_path 
+	        | am_installed = pgmPath (installed "gcc-lib/") cMKDLL ++
+				 " --dlltool-name " ++ pgmPath (installed "gcc-lib/") "dlltool" ++
+				 " --driver-name " ++ gcc_path
+		| otherwise    = cMKDLL
 #else
 	--		UNIX-SPECIFIC STUFF
 	-- On Unix, the "standard" tools are assumed to be
