@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.37 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Storage.h,v 1.38 2002/01/25 16:35:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -284,16 +284,21 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
 
   ASSERT( p1 != p2 && !closure_IND(p1) );
 
+#ifdef PROFILING
   // @LDV profiling
   // Destroy the old closure.
+  // Nb: LDV_* stuff cannot mix with ticky-ticky
   LDV_recordDead_FILL_SLOP_DYNAMIC(p1);
+#endif
   bd = Bdescr((P_)p1);
   if (bd->gen_no == 0) {
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1,&stg_IND_PERM_info);
+#ifdef PROFILING
     // @LDV profiling
     // We have just created a new closure.
     LDV_recordCreate(p1);
+#endif
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
     ((StgIndOldGen *)p1)->indirectee = p2;
@@ -304,9 +309,11 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
       RELEASE_LOCK(&sm_mutex);
     }
     SET_INFO(p1,&stg_IND_OLDGEN_PERM_info);
+#ifdef PROFILING
     // @LDV profiling
     // We have just created a new closure.
     LDV_recordCreate(p1);
+#endif
     TICK_UPD_OLD_PERM_IND();
   }
 }
