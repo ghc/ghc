@@ -831,6 +831,7 @@ getRegister (StMachOp mop [x]) -- unary MachOps
   = case mop of
       MO_NatS_Neg  -> trivialUCode (NEGI L) x
       MO_Nat_Not   -> trivialUCode (NOT L) x
+      MO_32U_to_8U -> trivialUCode (AND L (OpImm (ImmInt 255))) x
 
       MO_Flt_Neg  -> trivialUFCode FloatRep  (GNEG F) x
       MO_Dbl_Neg  -> trivialUFCode DoubleRep (GNEG DF) x
@@ -871,6 +872,7 @@ getRegister (StMachOp mop [x]) -- unary MachOps
       MO_8S_to_NatS   -> integerExtend True  24 x
       MO_16U_to_NatU  -> integerExtend False 16 x
       MO_16S_to_NatS  -> integerExtend True  16 x
+      MO_8U_to_32U    -> integerExtend False 24 x
 
       other_op 
          -> getRegister (
@@ -882,7 +884,7 @@ getRegister (StMachOp mop [x]) -- unary MachOps
         integerExtend signed nBits x
            = getRegister (
                 StMachOp (if signed then MO_Nat_Sar else MO_Nat_Shr) 
-                         [StInt nBits, StMachOp MO_Nat_Shl [StInt nBits, x]]
+                         [StMachOp MO_Nat_Shl [x, StInt nBits], StInt nBits]
              )
 
         conversionNop new_rep expr
@@ -1270,7 +1272,7 @@ getRegister (StMachOp mop [x]) -- unary PrimOps
         integerExtend signed nBits x
            = getRegister (
                 StMachOp (if signed then MO_Nat_Sar else MO_Nat_Shr) 
-                         [StInt nBits, StMachOp MO_Nat_Shl [StInt nBits, x]]
+                         [StMachOp MO_Nat_Shl [x, StInt nBits], StInt nBits]
              )
         conversionNop new_rep expr
             = getRegister expr		`thenNat` \ e_code ->

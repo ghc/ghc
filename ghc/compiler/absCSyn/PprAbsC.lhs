@@ -762,6 +762,9 @@ pprMachOp_for_C MO_8U_to_NatU    = text "(StgWord8)(StgWord)"
 pprMachOp_for_C MO_16U_to_NatU   = text "(StgWord16)(StgWord)"
 pprMachOp_for_C MO_32U_to_NatU   = text "(StgWord32)(StgWord)"
 
+pprMachOp_for_C MO_8U_to_32U     = text "(StgWord32)"
+pprMachOp_for_C MO_32U_to_8U     = text "(StgWord8)"
+
 pprMachOp_for_C (MO_ReadOSBI _ _)  = panic "pprMachOp_for_C:MO_ReadOSBI"
 pprMachOp_for_C (MO_WriteOSBI _ _) = panic "pprMachOp_for_C:MO_WriteOSBI"
 

@@ -590,6 +590,8 @@ rrConflictsWithRR s1b s2b rr1 rr2 = rr rr1 rr2
 
 \begin{code}
 
+-- We begin with some helper functions.  The main Dude here is
+-- dscCOpStmt, defined a little further down.
 
 ------------------------------------------------------------------------------
 
@@ -655,20 +657,54 @@ non_void_amode amode
         VoidRep -> False
         k       -> True
 
-doIndexOffForeignObjOp rep res addr idx
-   = Just (Just res, MO_ReadOSBI fixedHdrSize rep, [addr,idx])
+-- Helpers for translating various minor variants of array indexing.
 
-doIndexOffAddrOp rep res addr idx
-   = Just (Just res, MO_ReadOSBI 0 rep, [addr,idx])
+doIndexOffForeignObjOp maybe_post_read_cast rep res addr idx
+   = mkBasicIndexedRead fixedHdrSize maybe_post_read_cast rep res addr idx
 
-doIndexByteArrayOp rep res addr idx
-   = Just (Just res, MO_ReadOSBI arrWordsHdrSize rep, [addr,idx])
+doIndexOffAddrOp maybe_post_read_cast rep res addr idx
+   = mkBasicIndexedRead 0 maybe_post_read_cast rep res addr idx
 
-doWriteOffAddrOp rep addr idx val
-   = Just (Nothing, MO_WriteOSBI 0 rep, [addr,idx,val])
+doIndexByteArrayOp maybe_post_read_cast rep res addr idx
+   = mkBasicIndexedRead arrWordsHdrSize maybe_post_read_cast rep res addr idx
 
-doWriteByteArrayOp rep addr idx val
-   = Just (Nothing, MO_WriteOSBI arrWordsHdrSize rep, [addr,idx,val])
+doReadPtrArrayOp res addr idx
+   = mkBasicIndexedRead arrPtrsHdrSize Nothing PtrRep res addr idx
+
+
+doWriteOffAddrOp maybe_pre_write_cast rep addr idx val
+   = mkBasicIndexedWrite 0 maybe_pre_write_cast rep addr idx val
+
+doWriteByteArrayOp maybe_pre_write_cast rep addr idx val
+   = mkBasicIndexedWrite arrWordsHdrSize maybe_pre_write_cast rep addr idx val
+
+doWritePtrArrayOp addr idx val
+   = mkBasicIndexedWrite arrPtrsHdrSize Nothing PtrRep addr idx val
+
+
+
+mkBasicIndexedRead offw Nothing read_rep res base idx
+   = returnFlt (
+        CMachOpStmt (Just res) (MO_ReadOSBI offw read_rep) [base,idx] Nothing
+     )
+mkBasicIndexedRead offw (Just cast_to_mop) read_rep res base idx
+   = mkTemp read_rep			`thenFlt` \ tmp ->
+     (returnFlt . CSequential) [
+        CMachOpStmt (Just tmp) (MO_ReadOSBI offw read_rep) [base,idx] Nothing,
+        CMachOpStmt (Just res) cast_to_mop [tmp] Nothing
+     ]
+
+mkBasicIndexedWrite offw Nothing write_rep base idx val
+   = returnFlt (
+        CMachOpStmt Nothing (MO_WriteOSBI offw write_rep) [base,idx,val] Nothing
+     )
+mkBasicIndexedWrite offw (Just cast_to_mop) write_rep base idx val
+   = mkTemp write_rep 			`thenFlt` \ tmp ->
+     (returnFlt . CSequential) [
+        CMachOpStmt (Just tmp) cast_to_mop [val] Nothing,
+        CMachOpStmt Nothing (MO_WriteOSBI offw write_rep) [base,idx,tmp] Nothing
+     ]
+
 
 -- Simple dyadic op but one for which we need to cast first arg to
 -- be sure of correctness
@@ -694,6 +730,11 @@ getBitsPerWordMinus1
      )
 
 ------------------------------------------------------------------------------
+
+-- This is the main top-level desugarer PrimOps into MachOps.  First we
+-- handle various awkward cases specially.  The remaining easy cases are
+-- then handled by translateOp, defined below.
+
 
 dscCOpStmt :: [CAddrMode]	-- Results
            -> PrimOp
@@ -903,6 +944,160 @@ dscCOpStmt [r] ISrlOp [a1,a2] vols
 dscCOpStmt [r] ISraOp [a1,a2] vols 
    = translateOp_dyadic_cast1 MO_Nat_Sar r IntRep a1 a2 vols
 
+-- Reading/writing pointer arrays
+
+dscCOpStmt [r] ReadArrayOp  [obj,ix]   vols  = doReadPtrArrayOp r obj ix
+dscCOpStmt [r] IndexArrayOp [obj,ix]   vols  = doReadPtrArrayOp r obj ix
+dscCOpStmt []  WriteArrayOp [obj,ix,v] vols  = doWritePtrArrayOp obj ix v
+
+-- IndexXXXoffForeignObj
+
+dscCOpStmt [r] IndexOffForeignObjOp_Char      [a,i] vols = doIndexOffForeignObjOp (Just MO_8U_to_32U) Word8Rep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_WideChar  [a,i] vols = doIndexOffForeignObjOp Nothing Word32Rep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Int       [a,i] vols = doIndexOffForeignObjOp Nothing IntRep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Word      [a,i] vols = doIndexOffForeignObjOp Nothing WordRep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Addr      [a,i] vols = doIndexOffForeignObjOp Nothing AddrRep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Float     [a,i] vols = doIndexOffForeignObjOp Nothing FloatRep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Double    [a,i] vols = doIndexOffForeignObjOp Nothing DoubleRep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_StablePtr [a,i] vols = doIndexOffForeignObjOp Nothing StablePtrRep r a i
+
+dscCOpStmt [r] IndexOffForeignObjOp_Int8      [a,i] vols = doIndexOffForeignObjOp Nothing Int8Rep  r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Int16     [a,i] vols = doIndexOffForeignObjOp Nothing Int16Rep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Int32     [a,i] vols = doIndexOffForeignObjOp Nothing Int32Rep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Int64     [a,i] vols = doIndexOffForeignObjOp Nothing Int64Rep r a i
+
+dscCOpStmt [r] IndexOffForeignObjOp_Word8     [a,i] vols = doIndexOffForeignObjOp Nothing Word8Rep  r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Word16    [a,i] vols = doIndexOffForeignObjOp Nothing Word16Rep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Word32    [a,i] vols = doIndexOffForeignObjOp Nothing Word32Rep r a i
+dscCOpStmt [r] IndexOffForeignObjOp_Word64    [a,i] vols = doIndexOffForeignObjOp Nothing Word64Rep r a i
+
+-- IndexXXXoffAddr
+
+dscCOpStmt [r] IndexOffAddrOp_Char      [a,i] vols = doIndexOffAddrOp (Just MO_8U_to_32U) Word8Rep r a i
+dscCOpStmt [r] IndexOffAddrOp_WideChar  [a,i] vols = doIndexOffAddrOp Nothing Word32Rep r a i
+dscCOpStmt [r] IndexOffAddrOp_Int       [a,i] vols = doIndexOffAddrOp Nothing IntRep r a i
+dscCOpStmt [r] IndexOffAddrOp_Word      [a,i] vols = doIndexOffAddrOp Nothing WordRep r a i
+dscCOpStmt [r] IndexOffAddrOp_Addr      [a,i] vols = doIndexOffAddrOp Nothing AddrRep r a i
+dscCOpStmt [r] IndexOffAddrOp_Float     [a,i] vols = doIndexOffAddrOp Nothing FloatRep r a i
+dscCOpStmt [r] IndexOffAddrOp_Double    [a,i] vols = doIndexOffAddrOp Nothing DoubleRep r a i
+dscCOpStmt [r] IndexOffAddrOp_StablePtr [a,i] vols = doIndexOffAddrOp Nothing StablePtrRep r a i
+
+dscCOpStmt [r] IndexOffAddrOp_Int8      [a,i] vols = doIndexOffAddrOp Nothing Int8Rep  r a i
+dscCOpStmt [r] IndexOffAddrOp_Int16     [a,i] vols = doIndexOffAddrOp Nothing Int16Rep r a i
+dscCOpStmt [r] IndexOffAddrOp_Int32     [a,i] vols = doIndexOffAddrOp Nothing Int32Rep r a i
+dscCOpStmt [r] IndexOffAddrOp_Int64     [a,i] vols = doIndexOffAddrOp Nothing Int64Rep r a i
+
+dscCOpStmt [r] IndexOffAddrOp_Word8     [a,i] vols = doIndexOffAddrOp Nothing Word8Rep  r a i
+dscCOpStmt [r] IndexOffAddrOp_Word16    [a,i] vols = doIndexOffAddrOp Nothing Word16Rep r a i
+dscCOpStmt [r] IndexOffAddrOp_Word32    [a,i] vols = doIndexOffAddrOp Nothing Word32Rep r a i
+dscCOpStmt [r] IndexOffAddrOp_Word64    [a,i] vols = doIndexOffAddrOp Nothing Word64Rep r a i
+
+-- ReadXXXoffAddr, which are identical, for our purposes, to IndexXXXoffAddr.
+
+dscCOpStmt [r] ReadOffAddrOp_Char      [a,i] vols = doIndexOffAddrOp (Just MO_8U_to_32U) Word8Rep r a i
+dscCOpStmt [r] ReadOffAddrOp_WideChar  [a,i] vols = doIndexOffAddrOp Nothing Word32Rep r a i
+dscCOpStmt [r] ReadOffAddrOp_Int       [a,i] vols = doIndexOffAddrOp Nothing IntRep r a i
+dscCOpStmt [r] ReadOffAddrOp_Word      [a,i] vols = doIndexOffAddrOp Nothing WordRep r a i
+dscCOpStmt [r] ReadOffAddrOp_Addr      [a,i] vols = doIndexOffAddrOp Nothing AddrRep r a i
+dscCOpStmt [r] ReadOffAddrOp_Float     [a,i] vols = doIndexOffAddrOp Nothing FloatRep r a i
+dscCOpStmt [r] ReadOffAddrOp_Double    [a,i] vols = doIndexOffAddrOp Nothing DoubleRep r a i
+dscCOpStmt [r] ReadOffAddrOp_StablePtr [a,i] vols = doIndexOffAddrOp Nothing StablePtrRep r a i
+
+dscCOpStmt [r] ReadOffAddrOp_Int8      [a,i] vols = doIndexOffAddrOp Nothing Int8Rep  r a i
+dscCOpStmt [r] ReadOffAddrOp_Int16     [a,i] vols = doIndexOffAddrOp Nothing Int16Rep r a i
+dscCOpStmt [r] ReadOffAddrOp_Int32     [a,i] vols = doIndexOffAddrOp Nothing Int32Rep r a i
+dscCOpStmt [r] ReadOffAddrOp_Int64     [a,i] vols = doIndexOffAddrOp Nothing Int64Rep r a i
+
+dscCOpStmt [r] ReadOffAddrOp_Word8     [a,i] vols = doIndexOffAddrOp Nothing Word8Rep  r a i
+dscCOpStmt [r] ReadOffAddrOp_Word16    [a,i] vols = doIndexOffAddrOp Nothing Word16Rep r a i
+dscCOpStmt [r] ReadOffAddrOp_Word32    [a,i] vols = doIndexOffAddrOp Nothing Word32Rep r a i
+dscCOpStmt [r] ReadOffAddrOp_Word64    [a,i] vols = doIndexOffAddrOp Nothing Word64Rep r a i
+
+-- IndexXXXArray
+
+dscCOpStmt [r] IndexByteArrayOp_Char      [a,i] vols = doIndexByteArrayOp (Just MO_8U_to_32U) Word8Rep r a i
+dscCOpStmt [r] IndexByteArrayOp_WideChar  [a,i] vols = doIndexByteArrayOp Nothing Word32Rep r a i
+dscCOpStmt [r] IndexByteArrayOp_Int       [a,i] vols = doIndexByteArrayOp Nothing IntRep r a i
+dscCOpStmt [r] IndexByteArrayOp_Word      [a,i] vols = doIndexByteArrayOp Nothing WordRep r a i
+dscCOpStmt [r] IndexByteArrayOp_Addr      [a,i] vols = doIndexByteArrayOp Nothing AddrRep r a i
+dscCOpStmt [r] IndexByteArrayOp_Float     [a,i] vols = doIndexByteArrayOp Nothing FloatRep r a i
+dscCOpStmt [r] IndexByteArrayOp_Double    [a,i] vols = doIndexByteArrayOp Nothing DoubleRep r a i
+dscCOpStmt [r] IndexByteArrayOp_StablePtr [a,i] vols = doIndexByteArrayOp Nothing StablePtrRep r a i
+
+dscCOpStmt [r] IndexByteArrayOp_Int8      [a,i] vols = doIndexByteArrayOp Nothing Int8Rep  r a i
+dscCOpStmt [r] IndexByteArrayOp_Int16     [a,i] vols = doIndexByteArrayOp Nothing Int16Rep  r a i
+dscCOpStmt [r] IndexByteArrayOp_Int32     [a,i] vols = doIndexByteArrayOp Nothing Int32Rep  r a i
+dscCOpStmt [r] IndexByteArrayOp_Int64     [a,i] vols = doIndexByteArrayOp Nothing Int64Rep  r a i
+
+dscCOpStmt [r] IndexByteArrayOp_Word8     [a,i] vols = doIndexByteArrayOp Nothing Word8Rep  r a i
+dscCOpStmt [r] IndexByteArrayOp_Word16    [a,i] vols = doIndexByteArrayOp Nothing Word16Rep  r a i
+dscCOpStmt [r] IndexByteArrayOp_Word32    [a,i] vols = doIndexByteArrayOp Nothing Word32Rep  r a i
+dscCOpStmt [r] IndexByteArrayOp_Word64    [a,i] vols = doIndexByteArrayOp Nothing Word64Rep  r a i
+
+-- ReadXXXArray, identical to IndexXXXArray.
+
+dscCOpStmt [r] ReadByteArrayOp_Char       [a,i] vols = doIndexByteArrayOp (Just MO_8U_to_32U) Word8Rep r a i
+dscCOpStmt [r] ReadByteArrayOp_WideChar   [a,i] vols = doIndexByteArrayOp Nothing Word32Rep r a i
+dscCOpStmt [r] ReadByteArrayOp_Int        [a,i] vols = doIndexByteArrayOp Nothing IntRep r a i
+dscCOpStmt [r] ReadByteArrayOp_Word       [a,i] vols = doIndexByteArrayOp Nothing WordRep r a i
+dscCOpStmt [r] ReadByteArrayOp_Addr       [a,i] vols = doIndexByteArrayOp Nothing AddrRep r a i
+dscCOpStmt [r] ReadByteArrayOp_Float      [a,i] vols = doIndexByteArrayOp Nothing FloatRep r a i
+dscCOpStmt [r] ReadByteArrayOp_Double     [a,i] vols = doIndexByteArrayOp Nothing DoubleRep r a i
+dscCOpStmt [r] ReadByteArrayOp_StablePtr  [a,i] vols = doIndexByteArrayOp Nothing StablePtrRep r a i
+
+dscCOpStmt [r] ReadByteArrayOp_Int8       [a,i] vols = doIndexByteArrayOp Nothing Int8Rep  r a i
+dscCOpStmt [r] ReadByteArrayOp_Int16      [a,i] vols = doIndexByteArrayOp Nothing Int16Rep  r a i
+dscCOpStmt [r] ReadByteArrayOp_Int32      [a,i] vols = doIndexByteArrayOp Nothing Int32Rep  r a i
+dscCOpStmt [r] ReadByteArrayOp_Int64      [a,i] vols = doIndexByteArrayOp Nothing Int64Rep  r a i
+
+dscCOpStmt [r] ReadByteArrayOp_Word8      [a,i] vols = doIndexByteArrayOp Nothing Word8Rep  r a i
+dscCOpStmt [r] ReadByteArrayOp_Word16     [a,i] vols = doIndexByteArrayOp Nothing Word16Rep  r a i
+dscCOpStmt [r] ReadByteArrayOp_Word32     [a,i] vols = doIndexByteArrayOp Nothing Word32Rep  r a i
+dscCOpStmt [r] ReadByteArrayOp_Word64     [a,i] vols = doIndexByteArrayOp Nothing Word64Rep  r a i
+
+-- WriteXXXoffAddr
+
+dscCOpStmt [] WriteOffAddrOp_Char       [a,i,x] vols = doWriteOffAddrOp (Just MO_32U_to_8U) Word8Rep a i x
+dscCOpStmt [] WriteOffAddrOp_WideChar   [a,i,x] vols = doWriteOffAddrOp Nothing Word32Rep a i x
+dscCOpStmt [] WriteOffAddrOp_Int        [a,i,x] vols = doWriteOffAddrOp Nothing IntRep a i x
+dscCOpStmt [] WriteOffAddrOp_Word       [a,i,x] vols = doWriteOffAddrOp Nothing WordRep a i x
+dscCOpStmt [] WriteOffAddrOp_Addr       [a,i,x] vols = doWriteOffAddrOp Nothing AddrRep a i x
+dscCOpStmt [] WriteOffAddrOp_Float      [a,i,x] vols = doWriteOffAddrOp Nothing FloatRep a i x
+dscCOpStmt [] WriteOffAddrOp_ForeignObj [a,i,x] vols = doWriteOffAddrOp Nothing ForeignObjRep a i x
+dscCOpStmt [] WriteOffAddrOp_Double     [a,i,x] vols = doWriteOffAddrOp Nothing DoubleRep a i x
+dscCOpStmt [] WriteOffAddrOp_StablePtr  [a,i,x] vols = doWriteOffAddrOp Nothing StablePtrRep a i x
+
+dscCOpStmt [] WriteOffAddrOp_Int8       [a,i,x] vols = doWriteOffAddrOp Nothing Int8Rep  a i x
+dscCOpStmt [] WriteOffAddrOp_Int16      [a,i,x] vols = doWriteOffAddrOp Nothing Int16Rep a i x
+dscCOpStmt [] WriteOffAddrOp_Int32      [a,i,x] vols = doWriteOffAddrOp Nothing Int32Rep a i x
+dscCOpStmt [] WriteOffAddrOp_Int64      [a,i,x] vols = doWriteOffAddrOp Nothing Int64Rep a i x
+
+dscCOpStmt [] WriteOffAddrOp_Word8      [a,i,x] vols = doWriteOffAddrOp Nothing Word8Rep  a i x
+dscCOpStmt [] WriteOffAddrOp_Word16     [a,i,x] vols = doWriteOffAddrOp Nothing Word16Rep a i x
+dscCOpStmt [] WriteOffAddrOp_Word32     [a,i,x] vols = doWriteOffAddrOp Nothing Word32Rep a i x
+dscCOpStmt [] WriteOffAddrOp_Word64     [a,i,x] vols = doWriteOffAddrOp Nothing Word64Rep a i x
+
+-- WriteXXXArray
+
+dscCOpStmt [] WriteByteArrayOp_Char      [a,i,x] vols = doWriteByteArrayOp (Just MO_32U_to_8U) Word8Rep a i x
+dscCOpStmt [] WriteByteArrayOp_WideChar  [a,i,x] vols = doWriteByteArrayOp Nothing Word32Rep a i x
+dscCOpStmt [] WriteByteArrayOp_Int       [a,i,x] vols = doWriteByteArrayOp Nothing IntRep a i x
+dscCOpStmt [] WriteByteArrayOp_Word      [a,i,x] vols = doWriteByteArrayOp Nothing WordRep a i x
+dscCOpStmt [] WriteByteArrayOp_Addr      [a,i,x] vols = doWriteByteArrayOp Nothing AddrRep a i x
+dscCOpStmt [] WriteByteArrayOp_Float     [a,i,x] vols = doWriteByteArrayOp Nothing FloatRep a i x
+dscCOpStmt [] WriteByteArrayOp_Double    [a,i,x] vols = doWriteByteArrayOp Nothing DoubleRep a i x
+dscCOpStmt [] WriteByteArrayOp_StablePtr [a,i,x] vols = doWriteByteArrayOp Nothing StablePtrRep a i x
+
+dscCOpStmt [] WriteByteArrayOp_Int8      [a,i,x] vols = doWriteByteArrayOp Nothing Int8Rep  a i x
+dscCOpStmt [] WriteByteArrayOp_Int16     [a,i,x] vols = doWriteByteArrayOp Nothing Int16Rep  a i x
+dscCOpStmt [] WriteByteArrayOp_Int32     [a,i,x] vols = doWriteByteArrayOp Nothing Int32Rep  a i x
+dscCOpStmt [] WriteByteArrayOp_Int64     [a,i,x] vols = doWriteByteArrayOp Nothing Int64Rep  a i x
+
+dscCOpStmt [] WriteByteArrayOp_Word8     [a,i,x] vols = doWriteByteArrayOp Nothing Word8Rep  a i x
+dscCOpStmt [] WriteByteArrayOp_Word16    [a,i,x] vols = doWriteByteArrayOp Nothing Word16Rep  a i x
+dscCOpStmt [] WriteByteArrayOp_Word32    [a,i,x] vols = doWriteByteArrayOp Nothing Word32Rep  a i x
+dscCOpStmt [] WriteByteArrayOp_Word64    [a,i,x] vols = doWriteByteArrayOp Nothing Word64Rep  a i x
+
 
 -- Handle all others as simply as possible.
 dscCOpStmt ress op args vols
@@ -914,163 +1109,6 @@ dscCOpStmt ress op args vols
                  CMachOpStmt maybe_res mop args 
                     (if isDefinitelyInlineMachOp mop then Nothing else Just vols)
               )
-
-
-
-translateOp [r] ReadArrayOp [obj,ix] 
-   = Just (Just r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
-translateOp [r] IndexArrayOp [obj,ix] 
-   = Just (Just r, MO_ReadOSBI arrPtrsHdrSize PtrRep, [obj,ix])
-translateOp [] WriteArrayOp [obj,ix,v] 
-   = Just (Nothing, MO_WriteOSBI arrPtrsHdrSize PtrRep, [obj,ix,v])
-
--- IndexXXXoffForeignObj
-
-translateOp [r] IndexOffForeignObjOp_Char [a,i]  = doIndexOffForeignObjOp Word8Rep r a i
-translateOp [r] IndexOffForeignObjOp_WideChar [a,i]  = doIndexOffForeignObjOp Word32Rep r a i
-translateOp [r] IndexOffForeignObjOp_Int [a,i]  = doIndexOffForeignObjOp IntRep r a i
-translateOp [r] IndexOffForeignObjOp_Word [a,i]  = doIndexOffForeignObjOp WordRep r a i
-translateOp [r] IndexOffForeignObjOp_Addr [a,i]  = doIndexOffForeignObjOp AddrRep r a i
-translateOp [r] IndexOffForeignObjOp_Float [a,i]  = doIndexOffForeignObjOp FloatRep r a i
-translateOp [r] IndexOffForeignObjOp_Double [a,i]  = doIndexOffForeignObjOp DoubleRep r a i
-translateOp [r] IndexOffForeignObjOp_StablePtr [a,i]  = doIndexOffForeignObjOp StablePtrRep r a i
-
-translateOp [r] IndexOffForeignObjOp_Int8  [a,i] = doIndexOffForeignObjOp Int8Rep  r a i
-translateOp [r] IndexOffForeignObjOp_Int16 [a,i] = doIndexOffForeignObjOp Int16Rep r a i
-translateOp [r] IndexOffForeignObjOp_Int32 [a,i] = doIndexOffForeignObjOp Int32Rep r a i
-translateOp [r] IndexOffForeignObjOp_Int64 [a,i] = doIndexOffForeignObjOp Int64Rep r a i
-
-translateOp [r] IndexOffForeignObjOp_Word8  [a,i] = doIndexOffForeignObjOp Word8Rep  r a i
-translateOp [r] IndexOffForeignObjOp_Word16 [a,i] = doIndexOffForeignObjOp Word16Rep r a i
-translateOp [r] IndexOffForeignObjOp_Word32 [a,i] = doIndexOffForeignObjOp Word32Rep r a i
-translateOp [r] IndexOffForeignObjOp_Word64 [a,i] = doIndexOffForeignObjOp Word64Rep r a i
-
--- IndexXXXoffAddr
-
-translateOp [r] IndexOffAddrOp_Char [a,i]  = doIndexOffAddrOp Word8Rep r a i
-translateOp [r] IndexOffAddrOp_WideChar [a,i]  = doIndexOffAddrOp Word32Rep r a i
-translateOp [r] IndexOffAddrOp_Int [a,i]  = doIndexOffAddrOp IntRep r a i
-translateOp [r] IndexOffAddrOp_Word [a,i]  = doIndexOffAddrOp WordRep r a i
-translateOp [r] IndexOffAddrOp_Addr [a,i]  = doIndexOffAddrOp AddrRep r a i
-translateOp [r] IndexOffAddrOp_Float [a,i]  = doIndexOffAddrOp FloatRep r a i
-translateOp [r] IndexOffAddrOp_Double [a,i]  = doIndexOffAddrOp DoubleRep r a i
-translateOp [r] IndexOffAddrOp_StablePtr [a,i]  = doIndexOffAddrOp StablePtrRep r a i
-
-translateOp [r] IndexOffAddrOp_Int8  [a,i] = doIndexOffAddrOp Int8Rep  r a i
-translateOp [r] IndexOffAddrOp_Int16 [a,i] = doIndexOffAddrOp Int16Rep r a i
-translateOp [r] IndexOffAddrOp_Int32 [a,i] = doIndexOffAddrOp Int32Rep r a i
-translateOp [r] IndexOffAddrOp_Int64 [a,i] = doIndexOffAddrOp Int64Rep r a i
-
-translateOp [r] IndexOffAddrOp_Word8  [a,i] = doIndexOffAddrOp Word8Rep  r a i
-translateOp [r] IndexOffAddrOp_Word16 [a,i] = doIndexOffAddrOp Word16Rep r a i
-translateOp [r] IndexOffAddrOp_Word32 [a,i] = doIndexOffAddrOp Word32Rep r a i
-translateOp [r] IndexOffAddrOp_Word64 [a,i] = doIndexOffAddrOp Word64Rep r a i
-
--- ReadXXXoffAddr, which are identical, for our purposes, to IndexXXXoffAddr.
-
-translateOp [r] ReadOffAddrOp_Char [a,i]  = doIndexOffAddrOp Word8Rep r a i
-translateOp [r] ReadOffAddrOp_WideChar [a,i]  = doIndexOffAddrOp Word32Rep r a i
-translateOp [r] ReadOffAddrOp_Int [a,i]  = doIndexOffAddrOp IntRep r a i
-translateOp [r] ReadOffAddrOp_Word [a,i]  = doIndexOffAddrOp WordRep r a i
-translateOp [r] ReadOffAddrOp_Addr [a,i]  = doIndexOffAddrOp AddrRep r a i
-translateOp [r] ReadOffAddrOp_Float [a,i]  = doIndexOffAddrOp FloatRep r a i
-translateOp [r] ReadOffAddrOp_Double [a,i]  = doIndexOffAddrOp DoubleRep r a i
-translateOp [r] ReadOffAddrOp_StablePtr [a,i]  = doIndexOffAddrOp StablePtrRep r a i
-
-translateOp [r] ReadOffAddrOp_Int8  [a,i] = doIndexOffAddrOp Int8Rep  r a i
-translateOp [r] ReadOffAddrOp_Int16 [a,i] = doIndexOffAddrOp Int16Rep r a i
-translateOp [r] ReadOffAddrOp_Int32 [a,i] = doIndexOffAddrOp Int32Rep r a i
-translateOp [r] ReadOffAddrOp_Int64 [a,i] = doIndexOffAddrOp Int64Rep r a i
-
-translateOp [r] ReadOffAddrOp_Word8  [a,i] = doIndexOffAddrOp Word8Rep  r a i
-translateOp [r] ReadOffAddrOp_Word16 [a,i] = doIndexOffAddrOp Word16Rep r a i
-translateOp [r] ReadOffAddrOp_Word32 [a,i] = doIndexOffAddrOp Word32Rep r a i
-translateOp [r] ReadOffAddrOp_Word64 [a,i] = doIndexOffAddrOp Word64Rep r a i
-
--- WriteXXXoffAddr
-
-translateOp [] WriteOffAddrOp_Char [a,i,x]  = doWriteOffAddrOp Word8Rep a i x
-translateOp [] WriteOffAddrOp_WideChar [a,i,x]  = doWriteOffAddrOp Word32Rep a i x
-translateOp [] WriteOffAddrOp_Int [a,i,x]  = doWriteOffAddrOp IntRep a i x
-translateOp [] WriteOffAddrOp_Word [a,i,x]  = doWriteOffAddrOp WordRep a i x
-translateOp [] WriteOffAddrOp_Addr [a,i,x]  = doWriteOffAddrOp AddrRep a i x
-translateOp [] WriteOffAddrOp_Float [a,i,x]  = doWriteOffAddrOp FloatRep a i x
-translateOp [] WriteOffAddrOp_ForeignObj [a,i,x]  = doWriteOffAddrOp ForeignObjRep a i x
-translateOp [] WriteOffAddrOp_Double [a,i,x]  = doWriteOffAddrOp DoubleRep a i x
-translateOp [] WriteOffAddrOp_StablePtr [a,i,x]  = doWriteOffAddrOp StablePtrRep a i x
-
-translateOp [] WriteOffAddrOp_Int8  [a,i,x] = doWriteOffAddrOp Int8Rep  a i x
-translateOp [] WriteOffAddrOp_Int16 [a,i,x] = doWriteOffAddrOp Int16Rep a i x
-translateOp [] WriteOffAddrOp_Int32 [a,i,x] = doWriteOffAddrOp Int32Rep a i x
-translateOp [] WriteOffAddrOp_Int64 [a,i,x] = doWriteOffAddrOp Int64Rep a i x
-
-translateOp [] WriteOffAddrOp_Word8  [a,i,x] = doWriteOffAddrOp Word8Rep  a i x
-translateOp [] WriteOffAddrOp_Word16 [a,i,x] = doWriteOffAddrOp Word16Rep a i x
-translateOp [] WriteOffAddrOp_Word32 [a,i,x] = doWriteOffAddrOp Word32Rep a i x
-translateOp [] WriteOffAddrOp_Word64 [a,i,x] = doWriteOffAddrOp Word64Rep a i x
-
--- IndexXXXArray
-
-translateOp [r] IndexByteArrayOp_Char [a,i]  = doIndexByteArrayOp Word8Rep r a i
-translateOp [r] IndexByteArrayOp_WideChar [a,i]  = doIndexByteArrayOp Word32Rep r a i
-translateOp [r] IndexByteArrayOp_Int [a,i]  = doIndexByteArrayOp IntRep r a i
-translateOp [r] IndexByteArrayOp_Word [a,i]  = doIndexByteArrayOp WordRep r a i
-translateOp [r] IndexByteArrayOp_Addr [a,i]  = doIndexByteArrayOp AddrRep r a i
-translateOp [r] IndexByteArrayOp_Float [a,i]  = doIndexByteArrayOp FloatRep r a i
-translateOp [r] IndexByteArrayOp_Double [a,i]  = doIndexByteArrayOp DoubleRep r a i
-translateOp [r] IndexByteArrayOp_StablePtr [a,i]  = doIndexByteArrayOp StablePtrRep r a i
-
-translateOp [r] IndexByteArrayOp_Int8  [a,i] = doIndexByteArrayOp Int8Rep  r a i
-translateOp [r] IndexByteArrayOp_Int16 [a,i] = doIndexByteArrayOp Int16Rep  r a i
-translateOp [r] IndexByteArrayOp_Int32 [a,i] = doIndexByteArrayOp Int32Rep  r a i
-translateOp [r] IndexByteArrayOp_Int64 [a,i] = doIndexByteArrayOp Int64Rep  r a i
-
-translateOp [r] IndexByteArrayOp_Word8  [a,i] = doIndexByteArrayOp Word8Rep  r a i
-translateOp [r] IndexByteArrayOp_Word16 [a,i] = doIndexByteArrayOp Word16Rep  r a i
-translateOp [r] IndexByteArrayOp_Word32 [a,i] = doIndexByteArrayOp Word32Rep  r a i
-translateOp [r] IndexByteArrayOp_Word64 [a,i] = doIndexByteArrayOp Word64Rep  r a i
-
--- ReadXXXArray, identical to IndexXXXArray.
-
-translateOp [r] ReadByteArrayOp_Char [a,i]  = doIndexByteArrayOp Word8Rep r a i
-translateOp [r] ReadByteArrayOp_WideChar [a,i]  = doIndexByteArrayOp Word32Rep r a i
-translateOp [r] ReadByteArrayOp_Int [a,i]  = doIndexByteArrayOp IntRep r a i
-translateOp [r] ReadByteArrayOp_Word [a,i]  = doIndexByteArrayOp WordRep r a i
-translateOp [r] ReadByteArrayOp_Addr [a,i]  = doIndexByteArrayOp AddrRep r a i
-translateOp [r] ReadByteArrayOp_Float [a,i]  = doIndexByteArrayOp FloatRep r a i
-translateOp [r] ReadByteArrayOp_Double [a,i]  = doIndexByteArrayOp DoubleRep r a i
-translateOp [r] ReadByteArrayOp_StablePtr [a,i]  = doIndexByteArrayOp StablePtrRep r a i
-
-translateOp [r] ReadByteArrayOp_Int8  [a,i] = doIndexByteArrayOp Int8Rep  r a i
-translateOp [r] ReadByteArrayOp_Int16 [a,i] = doIndexByteArrayOp Int16Rep  r a i
-translateOp [r] ReadByteArrayOp_Int32 [a,i] = doIndexByteArrayOp Int32Rep  r a i
-translateOp [r] ReadByteArrayOp_Int64 [a,i] = doIndexByteArrayOp Int64Rep  r a i
-
-translateOp [r] ReadByteArrayOp_Word8  [a,i] = doIndexByteArrayOp Word8Rep  r a i
-translateOp [r] ReadByteArrayOp_Word16 [a,i] = doIndexByteArrayOp Word16Rep  r a i
-translateOp [r] ReadByteArrayOp_Word32 [a,i] = doIndexByteArrayOp Word32Rep  r a i
-translateOp [r] ReadByteArrayOp_Word64 [a,i] = doIndexByteArrayOp Word64Rep  r a i
-
--- WriteXXXArray
-
-translateOp [] WriteByteArrayOp_Char [a,i,x]  = doWriteByteArrayOp Word8Rep a i x
-translateOp [] WriteByteArrayOp_WideChar [a,i,x]  = doWriteByteArrayOp Word32Rep a i x
-translateOp [] WriteByteArrayOp_Int [a,i,x]  = doWriteByteArrayOp IntRep a i x
-translateOp [] WriteByteArrayOp_Word [a,i,x]  = doWriteByteArrayOp WordRep a i x
-translateOp [] WriteByteArrayOp_Addr [a,i,x]  = doWriteByteArrayOp AddrRep a i x
-translateOp [] WriteByteArrayOp_Float [a,i,x]  = doWriteByteArrayOp FloatRep a i x
-translateOp [] WriteByteArrayOp_Double [a,i,x]  = doWriteByteArrayOp DoubleRep a i x
-translateOp [] WriteByteArrayOp_StablePtr [a,i,x]  = doWriteByteArrayOp StablePtrRep a i x
-
-translateOp [] WriteByteArrayOp_Int8  [a,i,x] = doWriteByteArrayOp Int8Rep  a i x
-translateOp [] WriteByteArrayOp_Int16 [a,i,x] = doWriteByteArrayOp Int16Rep  a i x
-translateOp [] WriteByteArrayOp_Int32 [a,i,x] = doWriteByteArrayOp Int32Rep  a i x
-translateOp [] WriteByteArrayOp_Int64 [a,i,x] = doWriteByteArrayOp Int64Rep  a i x
-
-translateOp [] WriteByteArrayOp_Word8  [a,i,x] = doWriteByteArrayOp Word8Rep  a i x
-translateOp [] WriteByteArrayOp_Word16 [a,i,x] = doWriteByteArrayOp Word16Rep  a i x
-translateOp [] WriteByteArrayOp_Word32 [a,i,x] = doWriteByteArrayOp Word32Rep  a i x
-translateOp [] WriteByteArrayOp_Word64 [a,i,x] = doWriteByteArrayOp Word64Rep  a i x
 
 -- Native word signless ops
 

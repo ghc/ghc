@@ -159,6 +159,9 @@ data MachOp
   | MO_16U_to_NatU
   | MO_32U_to_NatU
 
+  | MO_8U_to_32U	-- zero extend
+  | MO_32U_to_8U	-- mask out all but lowest byte
+
   -- Reading/writing arrays
   | MO_ReadOSBI Int PrimRep   -- args: [base_ptr, index_value]
   | MO_WriteOSBI Int PrimRep  -- args: [base_ptr, index_value, value_to_write]
@@ -293,6 +296,9 @@ pprMachOp MO_32S_to_NatS   = text "MO_32S_to_NatS"
 pprMachOp MO_8U_to_NatU    = text "MO_8U_to_NatU"
 pprMachOp MO_16U_to_NatU   = text "MO_16U_to_NatU"
 pprMachOp MO_32U_to_NatU   = text "MO_32U_to_NatU"
+
+pprMachOp MO_8U_to_32U     = text "MO_8U_to_32U"
+pprMachOp MO_32U_to_8U     = text "MO_32U_to_8U"
 
 pprMachOp (MO_ReadOSBI offset rep)
    = text "MO_ReadOSBI" <> parens (int offset <> comma <> ppr rep)
@@ -434,7 +440,7 @@ machOpProps MO_Flt_Sqrt      = (Just FloatRep, [])
 machOpProps MO_Flt_Neg       = (Just FloatRep, [inline])
 
 machOpProps MO_32U_to_NatS   = (Just IntRep, [inline])
-machOpProps MO_NatS_to_32U   = (Just WordRep, [inline])
+machOpProps MO_NatS_to_32U   = (Just Word32Rep, [inline])
 
 machOpProps MO_NatS_to_Dbl   = (Just DoubleRep, [inline])
 machOpProps MO_Dbl_to_NatS   = (Just IntRep, [inline])
@@ -461,8 +467,8 @@ machOpProps MO_8U_to_NatU    = (Just WordRep, [inline])
 machOpProps MO_16U_to_NatU   = (Just WordRep, [inline])
 machOpProps MO_32U_to_NatU   = (Just WordRep, [inline])
 
+machOpProps MO_8U_to_32U     = (Just Word32Rep, [inline])
+machOpProps MO_32U_to_8U     = (Just Word8Rep, [inline])
+
 machOpProps (MO_ReadOSBI offset rep)  = (Just rep, [inline])
 machOpProps (MO_WriteOSBI offset rep) = (Nothing, [inline])
-
-
-
