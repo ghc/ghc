@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (local universal quantification)
 --
 -- This is a library of parser combinators, originally written by Koen Claessen.
 -- It parses all alternatives in parallel, so it never keeps hold of 
@@ -49,14 +49,20 @@ module Text.ParserCombinators.ReadP
  where
 
 import Control.Monad( MonadPlus(..) )
+#ifdef __GLASGOW_HASKELL__
 import GHC.Show( isSpace  )
 import GHC.Base
+#else
+import Data.Char( isSpace )
+#endif
 
 infixr 5 +++, <++
 
+#ifdef __GLASGOW_HASKELL__
 -- We define a local version of ReadS here,
 -- because its "real" definition site is in GHC.Read
 type ReadS a = String -> [(a,String)]
+#endif
 
 -- ---------------------------------------------------------------------------
 -- The P type
@@ -170,6 +176,7 @@ R f1 +++ R f2 = R (\k -> f1 k `mplus` f2 k)
 -- ^ Local, exclusive, left-biased choice: If left parser
 --   locally produces any result at all, then right parser is
 --   not used.
+#ifdef __GLASGOW_HASKELL__
 R f <++ q =
   do s <- look
      probe (f return) s 0#
@@ -182,6 +189,20 @@ R f <++ q =
 
   discard 0# = return ()
   discard n  = get >> discard (n-#1#)
+#else
+R f <++ q =
+  do s <- look
+     probe (f return) s 0
+ where
+  probe (Get f)        (c:s) n = probe (f c) s (n+1)
+  probe (Look f)       s     n = probe (f s) s n
+  probe p@(Result _ _) _     n = discard n >> R (p >>=)
+  probe (Final r)      _     _ = R (Final r >>=)
+  probe _              _     _ = q
+
+  discard 0 = return ()
+  discard n  = get >> discard (n-1)
+#endif
 
 gather :: ReadP a -> ReadP (String, a)
 -- ^ Transforms a parser into one that does the same, but

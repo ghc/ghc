@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
 --
 -- This library defines parser combinators for precedence parsing.
 
@@ -58,8 +58,10 @@ import qualified Text.ParserCombinators.ReadP as ReadP
   )
 
 import Control.Monad( MonadPlus(..) )
+#ifdef __GLASGOW_HASKELL__
 import GHC.Num( Num(..) )
 import GHC.Base
+#endif
 
 -- ---------------------------------------------------------------------------
 -- The readPrec type
@@ -130,9 +132,11 @@ choice ps = foldr (+++) pfail ps
 -- ---------------------------------------------------------------------------
 -- Converting between ReadPrec and Read
 
+#ifdef __GLASGOW_HASKELL__
 -- We define a local version of ReadS here,
 -- because its "real" definition site is in GHC.Read
 type ReadS a = String -> [(a,String)]
+#endif
 
 readPrec_to_P :: ReadPrec a -> (Int -> ReadP a)
 readPrec_to_P (P f) = f

@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
--- Portability :  portable
+-- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
 --
 -- The cut-down Haskell lexer, used by Text.Read
 --
@@ -31,6 +31,7 @@ module Text.Read.Lex
 
 import Text.ParserCombinators.ReadP
 
+#ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(.. ), isSpace, isAlpha, isAlphaNum )
@@ -38,6 +39,14 @@ import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral,
 		 toInteger, (^), (^^), infinity, notANumber )
 import GHC.List
 import GHC.Enum( maxBound )
+#else
+import Prelude hiding ( lex )
+import Data.Char( chr, ord, isSpace, isAlpha, isAlphaNum )
+import Data.Ratio( Ratio, (%) )
+#endif
+#ifdef __HUGS__
+import Hugs.Prelude( Ratio(..) )
+#endif
 import Data.Maybe
 import Control.Monad
 
@@ -126,6 +135,12 @@ lexId = lex_nan <++ lex_id
   	  -- Identifiers can start with a '_'
     isIdsChar c = isAlpha c || c == '_'
     isIdfChar c = isAlphaNum c || c `elem` "_'"
+
+#ifndef __GLASGOW_HASKELL__
+infinity, notANumber :: Rational
+infinity   = 1 :% 0
+notANumber = 0 :% 0
+#endif
 
 -- ---------------------------------------------------------------------------
 -- Lexing character literals
