@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.7 1999/02/09 12:49:23 simonm Exp $
+ * $Id: Stats.c,v 1.8 1999/02/23 12:02:57 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -78,27 +78,29 @@
 /* huh? */
 #define BIG_STRING_LEN              512
 
-static StgDouble ElapsedTimeStart = 0.0;
-static StgDouble TicksPerSecond   = 0.0;
+static double ElapsedTimeStart = 0.0;
+static double TicksPerSecond   = 0.0;
 
-static StgDouble InitUserTime = 0.0;
-static StgDouble InitElapsedTime = 0.0;
+static double InitUserTime = 0.0;
+static double InitElapsedTime = 0.0;
 
 static ullong GC_tot_alloc = 0;
 
-static StgDouble GC_start_time,  GC_tot_time = 0;  /* User GC Time */
-static StgDouble GCe_start_time, GCe_tot_time = 0; /* Elapsed GC time */
+static double GC_start_time,  GC_tot_time = 0;  /* User GC Time */
+static double GCe_start_time, GCe_tot_time = 0; /* Elapsed GC time */
 
 lnat MaxResidency = 0;     /* in words; for stats only */
 lnat ResidencySamples = 0; /* for stats only */
 
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
+static double *GC_coll_times;
+
 /* ToDo: convert this to use integers? --SDM */
 
 /* elapsedtime() -- The current elapsed time in seconds */
 
-StgDouble
+double
 elapsedtime(void)
 {
 #if ! (defined(HAVE_TIMES) || defined(HAVE_FTIME))
@@ -118,7 +120,7 @@ elapsedtime(void)
     struct tms t;
     clock_t r = times(&t);
 
-    return (((StgDouble)r)/TicksPerSecond - ElapsedTimeStart);
+    return (((double)r)/TicksPerSecond - ElapsedTimeStart);
 
 # else /* HAVE_FTIME */
     struct timeb t;
@@ -156,11 +158,11 @@ start_time(void)
 	fprintf(stderr, "stat_init: bad call to 'sysconf'!\n");
     	stg_exit(EXIT_FAILURE);
     }
-    TicksPerSecond = (StgDouble) ticks;
+    TicksPerSecond = (double) ticks;
 
 #else /* no "sysconf"; had better guess */
 # ifdef HZ
-    TicksPerSecond = (StgDouble) (HZ);
+    TicksPerSecond = (double) (HZ);
 
 # else /* had better guess wildly */
     /* We will #ifdef around the fprintf for machines
@@ -178,16 +180,24 @@ start_time(void)
 void
 initStats(void)
 {
+  nat i;
   FILE *sf = RtsFlags.GcFlags.statsFile;
   
   if (RtsFlags.GcFlags.giveStats) {
     fprintf(sf, "    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
     fprintf(sf, "    bytes     bytes     bytes  user  elap    user    elap\n");
   }
+
+  GC_coll_times = 
+    (double *)stgMallocBytes(sizeof(double) * RtsFlags.GcFlags.generations,
+			   "initStats");
+  for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
+    GC_coll_times[i] = 0.0;
+  }
 }    
 
 
-StgDouble
+double
 usertime(void)
 {
 #if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
@@ -203,7 +213,7 @@ usertime(void)
     struct tms t;
 
     times(&t);
-    return(((StgDouble)(t.tms_utime))/TicksPerSecond);
+    return(((double)(t.tms_utime))/TicksPerSecond);
 
 #else /* HAVE_GETRUSAGE */
     struct rusage t;
@@ -266,8 +276,8 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat gen)
     FILE *sf = RtsFlags.GcFlags.statsFile;
 
     if (sf != NULL) {
-	StgDouble time = usertime();
-	StgDouble etime = elapsedtime();
+	double time = usertime();
+	double etime = elapsedtime();
 
 	if (RtsFlags.GcFlags.giveStats) {
 	    nat faults = pagefaults();
@@ -286,6 +296,8 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat gen)
 	    GC_end_faults = faults;
 	    fflush(sf);
 	}
+
+	GC_coll_times[gen] += time-GC_start_time;
 
 	GC_tot_alloc += (ullong) alloc;
 	GC_tot_time  += time-GC_start_time;
@@ -320,9 +332,9 @@ stat_exit(int alloc)
 
     if (sf != NULL){
 	char temp[BIG_STRING_LEN];
-	StgDouble time = usertime();
-	StgDouble etime = elapsedtime();
-	StgDouble MutTime, MutElapsedTime;
+	double time = usertime();
+	double etime = elapsedtime();
+	double MutTime, MutElapsedTime;
 
 	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
 	if (time  == 0.0)  time = 0.0001;
@@ -349,8 +361,8 @@ stat_exit(int alloc)
 	{ /* Count garbage collections */
 	  nat g;
 	  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	    fprintf(sf, "%11d collections in generation %d\n", 
-		    generations[g].collections, g);
+	    fprintf(sf, "%11d collections in generation %d (%6.2fs)\n", 
+		    generations[g].collections, g, GC_coll_times[g]);
 	  }
 	}
 	fprintf(sf,"\n%11ld Mb total memory in use\n\n", 
