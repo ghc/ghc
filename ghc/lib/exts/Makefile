@@ -40,7 +40,8 @@ SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
 Int_HC_OPTS          += -H8m -fno-prune-tydecls
-Word_HC_OPTS         += -H8m
+Word_HC_OPTS         += -H8m -fno-prune-tydecls
+Foreign_HC_OPTS      += -fno-prune-tydecls
 NativeInfo_HC_OPTS   += -fno-prune-tydecls
 Dynamic_HC_OPTS	     += $(MAGIC_HSCPP_OPTS)
 
