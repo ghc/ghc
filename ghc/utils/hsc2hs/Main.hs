@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.17 2001/02/10 10:43:25 qrczak Exp $
+-- $Id: Main.hs,v 1.18 2001/02/13 15:09:02 rrt Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -213,7 +213,11 @@ output flags name toks = let
         [c] -> return c
         _   -> onlyOne "compiler"
     linker <- case [l | Linker l <- flags] of
+#ifndef mingw32_TARGET_OS
         []  -> return "gcc"
+#else
+        []  -> return "gcc -mno-cygwin"
+#endif
         [l] -> return l
         _   -> onlyOne "linker"
         

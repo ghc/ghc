@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 2001/02/10 10:43:25 qrczak Exp $
+# $Id: Makefile,v 1.9 2001/02/13 15:09:02 rrt Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -33,7 +33,11 @@ HSC2HS_EXTRA=--cc=$(bindir)/ghc-$(ProjectVersion)
 endif # BIN_DIST
 else
 HSC2HS_DIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HSC2HS_EXTRA="--cc=$(CC) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
+else
+HSC2HS_EXTRA="--cc=$(CC) --cflag=-mno-cygwin --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
+endif
 endif
 
 $(SCRIPT_PROG) : Makefile
