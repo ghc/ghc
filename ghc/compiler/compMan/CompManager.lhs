@@ -6,7 +6,7 @@
 \begin{code}
 module CompManager ( cmInit, cmLoadModule,
 #ifdef GHCI
-                     cmGetExpr, cmRunExpr,
+                     cmGetExpr, cmTypeExpr, cmRunExpr,
 #endif
                      CmState, emptyCmState  -- abstract
                    )
@@ -25,6 +25,7 @@ import DriverPipeline
 import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState, ModDetails(..) )
+import Type		( Type )
 import Name		( lookupNameEnv )
 import Module
 import PrelNames	( mainName )
@@ -45,7 +46,7 @@ import Panic		( panic )
 #ifdef GHCI
 import CmdLineOpts	( DynFlags(..) )
 import Interpreter	( HValue )
-import HscMain		( hscExpr )
+import HscMain		( hscExpr, hscTypeExpr )
 import RdrName
 import PrelGHC		( unsafeCoerce# )
 #endif
@@ -84,6 +85,19 @@ cmGetExpr cmstate dflags modname expr
 	        return (cmstate{ pcs=new_pcs }, Just hValue)
 
    -- ToDo: check that the module we passed in is sane/exists?
+   where
+       CmState{ pcs=pcs, pcms=pcms, pls=pls } = cmstate
+       PersistentCMState{ hst=hst, hit=hit } = pcms
+
+cmTypeExpr :: CmState
+	  -> DynFlags
+          -> ModuleName
+          -> String
+          -> IO (CmState, Maybe Type)
+cmTypeExpr cmstate dflags modname expr
+   = do (new_pcs, expr_type) <- 
+	   hscTypeExpr dflags hst hit pcs (mkHomeModule modname) expr
+        return (cmstate{ pcs=new_pcs }, expr_type)
    where
        CmState{ pcs=pcs, pcms=pcms, pls=pls } = cmstate
        PersistentCMState{ hst=hst, hit=hit } = pcms

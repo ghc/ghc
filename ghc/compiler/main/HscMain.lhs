@@ -4,7 +4,7 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-module HscMain ( HscResult(..), hscMain, hscExpr,
+module HscMain ( HscResult(..), hscMain, hscExpr, hscTypeExpr,
 		 initPersistentCompilerState ) where
 
 #include "HsVersions.h"
@@ -28,6 +28,8 @@ import PrelNames	( knownKeyNames )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface, pprIface )
 import TcModule
+import Type
+import TcHsSyn
 import InstEnv		( emptyInstEnv )
 import Desugar
 import SimplCore
@@ -401,6 +403,56 @@ hscExpr dflags hst hit pcs this_module expr
 #else 
 
 hscExpr dflags hst hit pcs0 this_module expr
+   = do {
+	-- parse, rename & typecheck the expression
+        (pcs1, maybe_tc_result)
+	   <- hscExprFrontEnd dflags hst hit pcs0 this_module expr;
+
+	case maybe_tc_result of {
+	   Nothing -> return (pcs1, Nothing);
+	   Just (print_unqual, tc_expr, ty) -> do {
+
+	-- if it isn't an IO-typed expression, 
+	-- wrap "print" around it & recompile...
+	let { is_IO_type = case splitTyConApp_maybe ty of {
+	   		    Just (tycon, _) -> getUnique tycon == ioTyConKey;
+			    Nothing -> False }
+            };
+
+        if (not is_IO_type)
+		then hscExpr dflags hst hit pcs1 this_module 
+			("print (" ++ expr ++ ")")
+		else do
+
+		-- Desugar it
+	ds_expr <- deSugarExpr dflags pcs1 hst this_module
+			print_unqual tc_expr;
+	
+		-- Simplify it
+	simpl_expr <- simplifyExpr dflags pcs1 hst ds_expr;
+
+		-- Convert to STG
+	stg_expr <- coreToStgExpr dflags simpl_expr;
+
+		-- ToDo: need to do StgVarInfo?  or SRTs?
+
+		-- Convert to InterpSyn
+	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
+
+	return (pcs1, Just unlinked_iexpr);
+     }}}
+
+hscExprFrontEnd
+  :: DynFlags
+  -> HomeSymbolTable	
+  -> HomeIfaceTable
+  -> PersistentCompilerState    -- IN: persistent compiler state
+  -> Module			-- Context for compiling
+  -> String			-- The expression
+  -> IO ( PersistentCompilerState, 
+	  Maybe (PrintUnqualified,TypecheckedHsExpr,Type) 
+	)
+hscExprFrontEnd dflags hst hit pcs0 this_module expr
   = do	{ 	-- Parse it
 	maybe_parsed <- hscParseExpr dflags expr;
 	case maybe_parsed of
@@ -419,35 +471,24 @@ hscExpr dflags hst hit pcs0 this_module expr
 	   <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
 	case maybe_tc_return of
 		Nothing -> return (pcs1, Nothing)
-		Just (pcs2, tc_expr, ty) -> do {
+		Just (pcs2, tc_expr, ty) -> 
+		   return (pcs2, Just (print_unqual, tc_expr, ty))
+    }}}
 
-	let { is_IO_type = case splitTyConApp_maybe ty of {
-	   		    Just (tycon, _) -> getUnique tycon == ioTyConKey;
-			    Nothing -> False }
-            };
-
-        if (not is_IO_type)
-		then hscExpr dflags hst hit pcs2 this_module 
-			("print (" ++ expr ++ ")")
-		else do
-
-		-- Desugar it
-	ds_expr <- deSugarExpr dflags pcs2 hst this_module
-			print_unqual tc_expr;
-	
-		-- Simplify it
-	simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr;
-
-		-- Convert to STG
-	stg_expr <- coreToStgExpr dflags simpl_expr;
-
-		-- ToDo: need to do StgVarInfo?  or SRTs?
-
-		-- Convert to InterpSyn
-	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
-
-	return (pcs2, Just unlinked_iexpr);
-     }}}}
+hscTypeExpr
+  :: DynFlags
+  -> HomeSymbolTable	
+  -> HomeIfaceTable
+  -> PersistentCompilerState    -- IN: persistent compiler state
+  -> Module			-- Context for compiling
+  -> String			-- The expression
+  -> IO (PersistentCompilerState, Maybe Type)
+hscTypeExpr dflags hst hit pcs0 this_module expr
+  = do (pcs1, maybe_tc_result)
+	  <- hscExprFrontEnd dflags hst hit pcs0 this_module expr
+       case maybe_tc_result of
+	  Nothing -> return (pcs1, Nothing)
+	  Just (_,_,ty) -> return (pcs1, Just ty)
 
 hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
 hscParseExpr dflags str

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.8 2000/11/21 14:32:44 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.9 2000/11/21 15:00:58 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -122,7 +122,7 @@ runCommand c =
 doCommand (':' : command) = specialCommand command
 doCommand expr
  = do st <- getGHCiState
-      dflags <- io (readIORef v_DynFlags)
+      dflags <- io (getDynFlags)
       (new_cmstate, maybe_hvalue) <- 
       	 io (cmGetExpr (cmstate st) dflags (current_module st) expr)
       setGHCiState st{cmstate = new_cmstate}
@@ -216,7 +216,14 @@ setOptions str =
    )
 
 typeOfExpr :: String -> GHCi ()
-typeOfExpr = panic "typeOfExpr"
+typeOfExpr str 
+  = do st <- getGHCiState
+       dflags <- io (getDynFlags)
+       (st, maybe_ty) <- io (cmTypeExpr (cmstate st) dflags 
+				(current_module st) str)
+       case maybe_ty of
+	 Nothing -> return ()
+	 Just ty -> io (putStrLn (showSDoc (ppr ty)))
 
 quit :: String -> GHCi ()
 quit _ = return ()
