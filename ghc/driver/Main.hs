@@ -1550,10 +1550,12 @@ do_link o_files unknown_srcs = do
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef ld_inputs
 
+	-- opts from -optl-<blah>
+    extra_ld_opts <- getOpts opt_l
+
     run_something "Linker"
        (unwords 
 	 ([ ln, verb, "-o", output_fn ]
-	     -- ToDo: -u <blah> options
 	 ++ o_files
 	 ++ unknown_srcs
 	 ++ extra_ld_inputs
@@ -1562,6 +1564,7 @@ do_link o_files unknown_srcs = do
 	 ++ pkg_lib_path_opts
 	 ++ pkg_lib_opts
 	 ++ pkg_extra_ld_opts
+	 ++ extra_ld_opts
 	)
        )
 
