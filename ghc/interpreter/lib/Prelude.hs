@@ -94,7 +94,7 @@ module Prelude (
               isInfinite, isDenormalized, isIEEE, isNegativeZero),
     Monad((>>=), (>>), return, fail),
     Functor(fmap),
-    mapM, mapM_, accumulate, sequence, (=<<),
+    mapM, mapM_, sequence, sequence_, (=<<),
     maybe, either,
     (&&), (||), not, otherwise,
     subtract, even, odd, gcd, lcm, (^), (^^), 
@@ -110,8 +110,8 @@ module Prelude (
     ,primUnsafeFreezeArray,primIndexArray,primGetRawArgs,primGetEnv
     ,nh_stdin,nh_stdout,nh_stderr,copy_String_to_cstring,nh_open
     ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
-    ,unsafeInterleaveIO,nh_write,primCharToInt
-
+    ,unsafeInterleaveIO,nh_write,primCharToInt,
+    nullAddr, incAddr, isNullAddr,
     -- debugging hacks
     --,ST(..)
     --,primIntToAddr
@@ -402,20 +402,20 @@ class Monad m where
     p >> q  = p >>= \ _ -> q
     fail s  = error s
 
-accumulate       :: Monad m => [m a] -> m [a]
-accumulate []     = return []
-accumulate (c:cs) = do x  <- c
-		       xs <- accumulate cs
-		       return (x:xs)
+sequence       :: Monad m => [m a] -> m [a]
+sequence []     = return []
+sequence (c:cs) = do x  <- c
+		     xs <- sequence cs
+		     return (x:xs)
 
-sequence         :: Monad m => [m a] -> m ()
-sequence          = foldr (>>) (return ())
+sequence_        :: Monad m => [m a] -> m () 
+sequence_        =  foldr (>>) (return ())
 
 mapM             :: Monad m => (a -> m b) -> [a] -> m [b]
-mapM f            = accumulate . map f
+mapM f            = sequence . map f
 
 mapM_            :: Monad m => (a -> m b) -> [a] -> m ()
-mapM_ f           = sequence . map f
+mapM_ f           = sequence_ . map f
 
 (=<<)            :: Monad m => (a -> m b) -> m a -> m b
 f =<< x           = x >>= f
@@ -632,14 +632,6 @@ instance Show a => Show [a]  where
 
 -- data (a,b) = (a,b) deriving (Eq, Ord, Ix, Read, Show)
 -- etc..
-
--- Functions ----------------------------------------------------------------
-
-instance Show (a -> b) where
-    showsPrec p f = showString "<<function>>"
-
-instance Functor ((->) a) where
-    fmap = (.)
 
 -- Standard Integral types --------------------------------------------------
 
@@ -1759,7 +1751,7 @@ writetohandle fname h (c:cs)
 primGetRawArgs :: IO [String]
 primGetRawArgs
    = primGetArgc >>= \argc ->
-     accumulate (map get_one_arg [0 .. argc-1])
+     sequence (map get_one_arg [0 .. argc-1])
      where
         get_one_arg :: Int -> IO String
         get_one_arg argno
