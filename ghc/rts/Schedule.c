@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.25 1999/09/10 11:11:51 simonmar Exp $
+ * $Id: Schedule.c,v 1.26 1999/10/04 16:13:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -732,11 +732,23 @@ unblockThread(StgTSO *tso)
       barf("unblockThread (BLACKHOLE): TSO not found");
     }
 
+  case BlockedOnDelay:
   case BlockedOnRead:
   case BlockedOnWrite:
-  case BlockedOnDelay:
-    /* ToDo */
-    barf("unblockThread {read,write,delay}");
+    {
+      last = &blocked_queue_hd;
+      for (t = blocked_queue_hd; t != END_TSO_QUEUE; 
+	   last = &t->link, t = t->link) {
+	if (t == tso) {
+	  *last = tso->link;
+	  if (blocked_queue_tl == t) {
+	    blocked_queue_tl = tso->link;
+	  }
+	  goto done;
+	}
+      }
+      barf("unblockThread (I/O): TSO not found");
+    }
 
   default:
     barf("unblockThread");
