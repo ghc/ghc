@@ -291,7 +291,8 @@ exportedNames mod mod_scope decls local_names (Just expspecs) decl_map
     HsEAbs t -> [t]
     HsEThingAll t
 	|  Just decl <- export_lookup t 
-	-> t : map (Qual mod) (declBinders decl)
+	-> t : map (Qual t_mod) (declBinders decl)
+	where t_mod = case t of Qual m _ -> m; otherwise -> mod
     HsEThingWith t cs -> t : cs
     HsEModuleContents m
 	| m == mod  -> map (Qual mod) local_names
@@ -306,7 +307,7 @@ exportedNames mod mod_scope decls local_names (Just expspecs) decl_map
 	= trace ("Warning(exportedNames): UnQual! " ++ show n) $ Nothing
   export_lookup (Qual m n)
 	| m == mod  = lookupFM decl_map n
-	| otherwise	
+	| otherwise
 	    = case lookupFM mod_scope m of
 		Just iface -> lookupFM (iface_decls iface) n
 		Nothing    -> trace ("Warning: module not found: " ++ show m) 
