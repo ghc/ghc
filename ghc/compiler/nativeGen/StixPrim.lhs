@@ -140,7 +140,6 @@ primCode [lhs] SizeofMutableByteArrayOp [rhs]
 Most other array primitives translate to simple indexing.
 
 \begin{code}
-
 primCode lhs@[_] IndexArrayOp args
   = primCode lhs ReadArrayOp args
 
@@ -233,6 +232,26 @@ primCode lhs (CCallOp (Left fn) is_asm may_gc cconv) rhs
 	      ByteArrayRep  -> StIndex IntRep base arrHS
 	      ForeignObjRep -> StIndex PtrRep base fixedHS
 	      _ -> base
+\end{code}
+
+DataToTagOp won't work for 64-bit archs, as it is.
+
+\begin{code}
+primCode [lhs] DataToTagOp [arg]
+  = let lhs'        = amodeToStix lhs
+        arg'        = amodeToStix arg
+        infoptr     = StInd PtrRep arg'
+        word_32     = StInd WordRep (StIndex PtrRep infoptr (StInt (-1)))
+        masked_le32 = StPrim SrlOp [word_32, StInt 16]
+        masked_be32 = StPrim AndOp [word_32, StInt 65535]
+#ifdef WORDS_BIGENDIAN
+        masked      = masked_be32
+#else
+        masked      = masked_le32
+#endif
+        assign      = StAssign IntRep lhs' masked
+    in
+    returnUs (\xs -> assign : xs)
 \end{code}
 
 Now the more mundane operations.
