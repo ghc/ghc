@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Real.lhs,v 1.2 2001/12/21 15:07:25 simonmar Exp $
+% $Id: Real.lhs,v 1.3 2002/02/12 15:51:26 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -282,16 +282,6 @@ realToFrac = fromRational . toRational
 {-# RULES
 "realToFrac/Int->Int" realToFrac = id :: Int -> Int
     #-}
-
--- For backward compatibility
-{-# DEPRECATED fromInt "use fromIntegral instead" #-}
-fromInt :: Num a => Int -> a
-fromInt = fromIntegral
-
--- For backward compatibility
-{-# DEPRECATED toInt "use fromIntegral instead" #-}
-toInt :: Integral a => a -> Int
-toInt = fromIntegral
 \end{code}
 
 %*********************************************************
