@@ -25,5 +25,7 @@ type ttype;
 	forall  : < gtforalltv  : list;		/* tyvars */
 		    gtforallctxt : list;	/* theta */
 		    gtforallt   : ttype; >;
+	imp_forall : < gtiforallctxt : list ;	/* Implicit forall; no explicit tyvars */
+		       gtiforallt    : ttype; >;
 end;
 

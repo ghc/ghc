@@ -81,9 +81,11 @@ extractHsTyNames ty
     get (MonoFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (MonoDictTy cls tys)     = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
     get (MonoTyVar tv)	         = unitNameSet tv
-    get (HsForAllTy tvs ctxt ty) = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
+    get (HsForAllTy (Just tvs) 
+		    ctxt ty)     = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
 					    `minusNameSet`
 				    mkNameSet (map getTyVarName tvs)
+    get ty@(HsForAllTy Nothing _ _) = pprPanic "extractHsTyNames" (ppr ty)
 
 extractHsTyNames_s  :: [RenamedHsType] -> NameSet
 extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet tys

@@ -37,7 +37,7 @@ type ClassAssertion name = (name, [HsType name])
 	-- doesn't have to be when reading interface files
 
 data HsType name
-  = HsForAllTy		[HsTyVar name]
+  = HsForAllTy		(Maybe [HsTyVar name])	-- Nothing for implicitly quantified signatures
 			(Context name)
 			(HsType name)
 
@@ -59,7 +59,7 @@ data HsType name
 			[HsType name]
 
 mkHsForAllTy []  []   ty = ty
-mkHsForAllTy tvs ctxt ty = HsForAllTy tvs ctxt ty
+mkHsForAllTy tvs ctxt ty = HsForAllTy (Just tvs) ctxt ty
 
 data HsTyVar name
   = UserTyVar name
@@ -120,9 +120,13 @@ pprHsType, pprParendHsType :: (Outputable name) => HsType name -> SDoc
 pprHsType ty       = ppr_mono_ty pREC_TOP ty
 pprParendHsType ty = ppr_mono_ty pREC_CON ty
 
-ppr_mono_ty ctxt_prec (HsForAllTy tvs ctxt ty)
+ppr_mono_ty ctxt_prec (HsForAllTy maybe_tvs ctxt ty)
   = maybeParen (ctxt_prec >= pREC_FUN) $
     sep [pprForAll tvs, pprContext ctxt, pprHsType ty]
+  where
+    tvs = case maybe_tvs of
+		Just tvs -> tvs
+		Nothing  -> []
 
 ppr_mono_ty ctxt_prec (MonoTyVar name)
   = ppr name
@@ -179,8 +183,8 @@ cmpHsTypes cmp tys1 [] = GT
 cmpHsTypes cmp (ty1:tys1) (ty2:tys2) = cmpHsType cmp ty1 ty2 `thenCmp` cmpHsTypes cmp tys1 tys2
 
 cmpHsType cmp (HsForAllTy tvs1 c1 t1) (HsForAllTy tvs2 c2 t2)
-  = cmpList (cmpHsTyVar cmp) tvs1 tvs2  `thenCmp`
-    cmpContext cmp c1 c2    		`thenCmp`
+  = cmpMaybe (cmpList (cmpHsTyVar cmp)) tvs1 tvs2	`thenCmp`
+    cmpContext cmp c1 c2    				`thenCmp`
     cmpHsType cmp t1 t2
 
 cmpHsType cmp (MonoTyVar n1) (MonoTyVar n2)
@@ -221,4 +225,10 @@ cmpContext cmp a b
   where
     cmp_ctxt (c1, tys1) (c2, tys2)
       = cmp c1 c2 `thenCmp` cmpHsTypes cmp tys1 tys2
+
+-- Should be in Maybes, I guess
+cmpMaybe cmp Nothing  Nothing  = EQ
+cmpMaybe cmp Nothing  (Just x) = LT
+cmpMaybe cmp (Just x)  Nothing = GT
+cmpMaybe cmp (Just x) (Just y) = x `cmp` y
 \end{code}

@@ -507,7 +507,7 @@ instd	:  instkey inst_type maybe_where	{ $$ = mkibind($2,$3,startlineno); }
 /* Compare polytype */
 /* [July 98: first production was tautype DARROW tautype, but I can't see why.] */
 inst_type : apptype DARROW apptype		{ is_context_format( $3, 0 );   /* Check the instance head */
-						  $$ = mkforall(Lnil,type2context($1),$3); }
+						  $$ = mkimp_forall(type2context($1),$3); }
 	  | apptype				{ is_context_format( $1, 0 );   /* Check the instance head */
 						  $$ = $1; }
 	  ;
@@ -705,7 +705,7 @@ polyatype : atype
 polytype : FORALL tyvars1 DOT
                   apptype DARROW tautype	{ $$ = mkforall($2,   type2context($4), $6); }
          | FORALL tyvars1 DOT tautype           { $$ = mkforall($2,   Lnil,             $4); }
-         |        apptype DARROW tautype	{ $$ = mkforall(Lnil, type2context($1), $3); }
+         |        apptype DARROW tautype	{ $$ = mkimp_forall(  type2context($1), $3); }
          | tautype
 	 ;
 

@@ -115,17 +115,18 @@ extract_ctxt ctxt acc = foldr extract_ass acc ctxt
 		      where
 			extract_ass (cls, tys) acc = foldr extract_ty acc tys
 
-extract_ty (MonoTyApp ty1 ty2)	    acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoListTy ty)	    acc = extract_ty ty acc
-extract_ty (MonoTupleTy tys _)      acc = foldr extract_ty acc tys
-extract_ty (MonoFunTy ty1 ty2)	    acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (MonoDictTy cls tys)	    acc = foldr extract_ty acc tys
-extract_ty (MonoTyVar tv)           acc = insertTV tv acc
-extract_ty (HsForAllTy tvs ctxt ty) acc = acc ++
-					  (filter (`notElem` locals) $
-				           extract_ctxt ctxt (extract_ty ty []))
-				        where
-				          locals = map getTyVarName tvs
+extract_ty (MonoTyApp ty1 ty2)	acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (MonoListTy ty)	acc = extract_ty ty acc
+extract_ty (MonoTupleTy tys _)  acc = foldr extract_ty acc tys
+extract_ty (MonoFunTy ty1 ty2)	acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (MonoDictTy cls tys)	acc = foldr extract_ty acc tys
+extract_ty (MonoTyVar tv)       acc = insertTV tv acc
+extract_ty (HsForAllTy (Just tvs) ctxt ty) 
+				acc = acc ++
+				      (filter (`notElem` locals) $
+				       extract_ctxt ctxt (extract_ty ty []))
+				    where
+				      locals = map getTyVarName tvs
 
 insertTV name   acc | isRdrTyVar name = name : acc
 insertTV other  acc 		      = acc

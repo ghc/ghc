@@ -152,7 +152,7 @@ tc_type_kind (MonoDictTy class_name tys)
   = tcClassAssertion (class_name, tys)	`thenTc` \ (clas, arg_tys) ->
     returnTc (boxedTypeKind, mkDictTy clas arg_tys)
 
-tc_type_kind (HsForAllTy tv_names context ty)
+tc_type_kind (HsForAllTy (Just tv_names) context ty)
   = tcExtendTyVarScope tv_names		$ \ tyvars -> 
     tcContext context			`thenTc` \ theta ->
     tc_boxed_type ty			`thenTc` \ tau ->

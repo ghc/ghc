@@ -51,7 +51,7 @@ import Bag		( bagToList )
 import Outputable
 import SrcLoc		( SrcLoc )
 import UniqFM		( lookupUFM )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, catMaybes )
 import Util
 \end{code}
 
@@ -271,8 +271,8 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
     rnHsSigType (text "an instance decl") inst_ty	`thenRn` \ (inst_ty', inst_fvs) ->
     let
 	inst_tyvars = case inst_ty' of
-			HsForAllTy inst_tyvars _ _ -> inst_tyvars
-			other			   -> []
+			HsForAllTy (Just inst_tyvars) _ _ -> inst_tyvars
+			other			          -> []
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too
     in
@@ -495,59 +495,59 @@ rnIfaceType doc ty
  = rnHsType doc ty	`thenRn` \ (ty,_) ->
    returnRn ty
 
+
+rnForAll doc forall_tyvars ctxt ty
+  = bindTyVarsFVRn doc forall_tyvars			$ \ new_tyvars ->
+    rnContext doc ctxt					`thenRn` \ (new_ctxt, cxt_fvs) ->
+    rnHsType doc ty					`thenRn` \ (new_ty, ty_fvs) ->
+    returnRn (mkHsForAllTy new_tyvars new_ctxt new_ty,
+	      cxt_fvs `plusFV` ty_fvs)
+
+-- Check that each constraint mentions at least one of the forall'd type variables
+-- Since the forall'd type variables are a subset of the free tyvars
+-- of the tau-type part, this guarantees that every constraint mentions
+-- at least one of the free tyvars in ty
+checkConstraints explicit_forall doc forall_tyvars ctxt ty
+   = mapRn check ctxt			`thenRn` \ maybe_ctxt' ->
+     returnRn (catMaybes maybe_ctxt')
+	    -- Remove problem ones, to avoid duplicate error message.
+   where
+     check ct@(_,tys)
+	| forall_mentioned = returnRn (Just ct)
+	| otherwise	   = addErrRn (ctxtErr explicit_forall doc forall_tyvars ct ty)	`thenRn_`
+			     returnRn Nothing
+        where
+	  forall_mentioned = foldr ((||) . any (`elem` forall_tyvars) . extractHsTyVars)
+			     False
+			     tys
+
+
 rnHsType :: SDoc -> RdrNameHsType -> RnMS s (RenamedHsType, FreeVars)
 
-rnHsType doc (HsForAllTy [] ctxt ty)
+rnHsType doc (HsForAllTy Nothing ctxt ty)
 	-- From source code (no kinds on tyvars)
-
 	-- Given the signature  C => T  we universally quantify 
 	-- over FV(T) \ {in-scope-tyvars} 
-	-- 
-	-- We insist that the universally quantified type vars is a superset of FV(C)
-	-- It follows that FV(T) is a superset of FV(C), so that the context constrains
-	-- no type variables that don't appear free in the tau-type part.
-
   = getLocalNameEnv		`thenRn` \ name_env ->
     let
 	mentioned_tyvars = extractHsTyVars ty
 	forall_tyvars    = filter (not . (`elemFM` name_env)) mentioned_tyvars
-
-	ctxt_w_ftvs :: [((RdrName,[RdrNameHsType]), [RdrName])]
-	ctxt_w_ftvs  = [ (constraint, foldr ((++) . extractHsTyVars) [] tys)
-		       | constraint@(_,tys) <- ctxt]
-
-	-- A 'non-poly constraint' is one that does not mention *any*
-	-- of the forall'd type variables
-	non_poly_constraints = filter non_poly ctxt_w_ftvs
-	non_poly (c,ftvs)    = not (any (`elem` forall_tyvars) ftvs)
-
-	-- A 'non-mentioned' constraint is one that mentions a
-	-- type variable that does not appear in 'ty'
-	non_mentioned_constraints = filter non_mentioned ctxt_w_ftvs
-	non_mentioned (c,ftvs)    = any (not . (`elem` mentioned_tyvars)) ftvs
-
-	-- Zap the context if there's a problem, to avoid duplicate error message.
-	ctxt' | null non_poly_constraints && null non_mentioned_constraints = ctxt
-	      | otherwise = []
     in
-    mapRn (ctxtErr1 doc forall_tyvars ty) non_poly_constraints		`thenRn_`
-    mapRn (ctxtErr2 doc ty)               non_mentioned_constraints	`thenRn_`
+    checkConstraints False doc forall_tyvars ctxt ty	`thenRn` \ ctxt' ->
+    rnForAll doc (map UserTyVar forall_tyvars) ctxt' ty
 
-    (bindTyVarsFVRn doc (map UserTyVar forall_tyvars)	$ \ new_tyvars ->
-    rnContext doc ctxt'					`thenRn` \ (new_ctxt, cxt_fvs) ->
-    rnHsType doc ty					`thenRn` \ (new_ty, ty_fvs) ->
-    returnRn (mkHsForAllTy new_tyvars new_ctxt new_ty,
-	      cxt_fvs `plusFV` ty_fvs)
-    )
-
-rnHsType doc (HsForAllTy tvs ctxt ty)
-	-- tvs are non-empty, hence must be from an interface file
-	-- 	(tyvars may be kinded)
-  = bindTyVarsFVRn doc tvs		$ \ new_tyvars ->
-    rnContext doc ctxt			`thenRn` \ (new_ctxt, cxt_fvs) ->
-    rnHsType doc ty			`thenRn` \ (new_ty, ty_fvs) ->
-    returnRn (mkHsForAllTy new_tyvars new_ctxt new_ty,
-	      cxt_fvs `plusFV` ty_fvs)
+rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt ty)
+	-- Explicit quantification.
+	-- Check that the forall'd tyvars are a subset of the
+	-- free tyvars in the tau-type part
+  = let
+	mentioned_tyvars   = extractHsTyVars ty
+	bad_guys	   = filter (`notElem` mentioned_tyvars) forall_tyvar_names
+	forall_tyvar_names = map getTyVarName forall_tyvars
+    in
+    mapRn (forAllErr doc ty) bad_guys				`thenRn_`
+    checkConstraints True doc forall_tyvar_names ctxt ty	`thenRn` \ ctxt' ->
+    rnForAll doc forall_tyvars ctxt' ty
 
 rnHsType doc (MonoTyVar tyvar)
   = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
@@ -791,23 +791,21 @@ dupClassAssertWarn ctxt (assertion : dups)
 badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 
-ctxtErr1 doc tyvars ty (constraint, _)
+forAllErr doc ty tyvar
   = addErrRn (
-      sep [ptext SLIT("The constraint") <+> quotes (pprClassAssertion constraint) <+>
-		   ptext SLIT("does not mention any of"),
-	   nest 4 (ptext SLIT("the universally quantified type variables") <+> braces (interpp'SP tyvars)),
-	   nest 4 (ptext SLIT("of the type") <+> quotes (ppr ty))
-      ]
+      sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
+	   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
       $$
-      (ptext SLIT("In") <+> doc)
-    )
+      (ptext SLIT("In") <+> doc))
 
-ctxtErr2 doc ty (constraint,_)
-  = addErrRn (
-	sep [ptext SLIT("The constraint") <+> quotes (pprClassAssertion constraint),
-	nest 4 (ptext SLIT("mentions type variables that do not appear in the type")),
-	nest 4 (quotes (ppr ty))]
-        $$
-	(ptext SLIT("In") <+> doc)
-    )
+ctxtErr explicit_forall doc tyvars constraint ty
+  = sep [ptext SLIT("The constraint") <+> quotes (pprClassAssertion constraint) <+>
+		   ptext SLIT("does not mention any of"),
+	 if explicit_forall then
+ 	   nest 4 (ptext SLIT("the universally quantified type variables") <+> braces (interpp'SP tyvars))
+	 else
+	   nest 4 (ptext SLIT("the type variables in the type") <+> quotes (ppr ty))
+    ]
+    $$
+    (ptext SLIT("In") <+> doc)
 \end{code}

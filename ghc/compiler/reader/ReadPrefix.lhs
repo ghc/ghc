@@ -739,16 +739,21 @@ wlkHsSigType ttype
 	-- make sure it starts with a ForAll
     case ty of
 	HsForAllTy _ _ _ -> returnUgn ty
-	other		 -> returnUgn (HsForAllTy [] [] ty)
+	other		 -> returnUgn (HsForAllTy Nothing [] ty)
 
 wlkHsType :: U_ttype -> UgnM RdrNameHsType
 wlkHsType ttype
   = case ttype of
-      U_forall u_tyvars u_theta u_ty -> -- context
+      U_forall u_tyvars u_theta u_ty -> -- Explicit forall
 	wlkList rdTvId u_tyvars		`thenUgn` \ tyvars -> 
 	wlkContext u_theta		`thenUgn` \ theta ->
 	wlkHsType u_ty			`thenUgn` \ ty	 ->
-	returnUgn (HsForAllTy (map UserTyVar tyvars) theta ty)
+	returnUgn (HsForAllTy (Just (map UserTyVar tyvars)) theta ty)
+
+      U_imp_forall u_theta u_ty ->	-- Implicit forall
+	wlkContext u_theta		`thenUgn` \ theta ->
+	wlkHsType u_ty			`thenUgn` \ ty	 ->
+	returnUgn (HsForAllTy Nothing theta ty)
 
       U_namedtvar tv -> -- type variable
 	wlkTvId tv	`thenUgn` \ tyvar ->
@@ -786,11 +791,16 @@ wlkInstType ttype
 	wlkList rdTvId u_tyvars		`thenUgn` \ tyvars -> 
 	wlkContext  u_theta		`thenUgn` \ theta ->
 	wlkClsTys inst_head		`thenUgn` \ (clas, tys)	 ->
-	returnUgn (HsForAllTy (map UserTyVar tyvars) theta (MonoDictTy clas tys))
+	returnUgn (HsForAllTy (Just (map UserTyVar tyvars)) theta (MonoDictTy clas tys))
+
+      U_imp_forall u_theta inst_head ->
+	wlkContext  u_theta		`thenUgn` \ theta ->
+	wlkClsTys inst_head		`thenUgn` \ (clas, tys)	 ->
+	returnUgn (HsForAllTy Nothing theta (MonoDictTy clas tys))
 
       other -> -- something else
 	wlkClsTys other   `thenUgn` \ (clas, tys) ->
-	returnUgn (HsForAllTy [] [] (MonoDictTy clas tys))
+	returnUgn (HsForAllTy Nothing [] (MonoDictTy clas tys))
 \end{code}
 
 \begin{code}
