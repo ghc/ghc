@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.161 2001/06/22 13:31:29 rrt Exp $
+# $Id: Makefile,v 1.162 2001/06/23 10:54:07 panne Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -142,10 +142,6 @@ endif
 HS_OBJS = \
   $(patsubst %.hc, %.o, $(HCS)) \
   parser/hschooks.o
-
-ifneq "$(ghc_501_at_least)" "1"
-HS_OBJS += main/system.o
-endif
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
