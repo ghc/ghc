@@ -144,7 +144,7 @@ especially with \tr{-O2}.
 
 At present, \tr{-O2} is nearly indistinguishable from \tr{-O}.
 
-At version 2.01, \tr{-O} is a dodgy proposition, no matter what.
+%At version 2.01, \tr{-O} is a dodgy proposition, no matter what.
 
 %----------------------------------------------------------------
 \item[Compile via C and crank up GCC:] Even with \tr{-O}, GHC tries to

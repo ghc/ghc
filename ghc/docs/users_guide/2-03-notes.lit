@@ -4,8 +4,13 @@ ways:
 \begin{itemize}
 \item
     A slew of small bugs are fixed.  You can find the complete list
-    at @http://www.cse.ogi.edu/~simonpj/ghc-bugs.html@.  One
-    bug remains un-fixes, namely the crash when there's an empty
+    at:
+
+\begin{verbatim}
+http://www.cse.ogi.edu/~simonpj/ghc-bugs.html
+\end{verbatim}
+
+    One bug remains un-fixes, namely the crash when there's an empty 
     comment at the end of file.  It's wierd!
 
 \item

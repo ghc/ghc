@@ -8,8 +8,8 @@
 
 This part of the guide is to help people upgrading from a
 previous version of GHC.  Right now, it is mostly to help people
-switching from GHC~0.26 (a Haskell~1.2 compiler, mostly) to GHC~2.01
-(a Haskell~1.3 compiler).
+switching from GHC~0.29 (a Haskell~1.2 compiler, mostly) to GHC~2.04
+(a Haskell~1.4 compiler).
 
 %ToDo: index
 
@@ -17,8 +17,8 @@ If you need to maintain Haskell code that will work for multiple
 versions of GHC, you can use the \tr{-cpp} flag and the
 \tr{__GLASGOW_HASKELL__} pre-processor variable.
 
-For example, in GHC~0.26, \tr{__GLASGOW_HASKELL__} will be 26; for~2.01,
-it will be 201.  Thus, you can write:
+For example, in GHC~0.29, \tr{__GLASGOW_HASKELL__} will be 29; for~2.04,
+it will be 204.  Thus, you can write:
 \begin{verbatim}
 #if __HASKELL1__ <= 2
 main = appendChan stdout "Hello, world!\n" exit done -- 1.2
@@ -148,7 +148,7 @@ exact equivalent exists in 1.3.
 %*                                                                      *
 %************************************************************************
 
-GHC~0.26 supported an early DRAFT of the Haskell~1.3 monadic I/O
+GHC~0.29 supported an early DRAFT of the Haskell~1.3 monadic I/O
 facilities.  Inevitably, what Really Made It into 1.3 is not quite
 what was in the draft.
 
@@ -164,7 +164,7 @@ The function \tr{try} didn't make it into 1.3 I/O.  GHC supplies it
 All the system modules named \tr{LibSomething} dropped the \tr{Lib}.
 So: \tr{LibSystem} is now just \tr{System}.
 
-In~0.26, you could mix-n-match @IO@ with @PrimIO@, simply because the
+In~0.29, you could mix-n-match @IO@ with @PrimIO@, simply because the
 implementation happend to allow it.  Not any more.
 
 The \tr{IOError} type is now abstract; you cannot see it's
@@ -233,7 +233,7 @@ overloaded, you will need to switch to \tr{genericTake},
 %*                                                                      *
 %************************************************************************
 
-GHC~2.01 is fussier than 0.26 about junk in import lists.  This is a
+GHC~2.04 is fussier than 0.29 about junk in import lists.  This is a
 feature.
 
 \tr{Foo..} (in export lists) must be changed to \tr{module Foo}.
@@ -276,4 +276,4 @@ and @fwrite@ are dead.
 
 The \tr{LibPosix} stuff didn't make it into 1.3 I/O, so it has become
 a ``system library'' (\tr{-syslib posix}).  Other than dropping the
-\tr{Lib*} prefix, everything should be the same as in 0.26.
+\tr{Lib*} prefix, everything should be the same as in 0.29.

@@ -1,5 +1,5 @@
 %
-% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/users_guide/Attic/intro.lit,v 1.4 1997/03/24 04:42:47 sof Exp $
+% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/users_guide/Attic/intro.lit,v 1.5 1997/06/06 22:19:30 sof Exp $
 %
 \section[introduction-GHC]{Introduction to GHC}
 
@@ -30,11 +30,11 @@ material in \sectionref{compiler-tutorial} may help.
 
 On the World-Wide Web, there are several URLs of likely interest:
 \begin{display}
+Haskell home page -- \tr{http://haskell.org/}
 GHC home page -- \tr{http://www.dcs.gla.ac.uk/fp/software/ghc/}
 Glasgow FP group page -- \tr{http://www.dcs.gla.ac.uk/fp/}
-comp.lang.functional FAQ -- \tr{http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html}
-programming language research page --
-   \tr{http://www.cs.cmu.edu/afs/cs.cmu.edu/user/mleone/web/language-research.html}
+comp.lang.functional FAQ -- 
+   \tr{http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html}
 \end{display}
 We run two mailing lists about Glasgow Haskell.  We encourage you to
 join, as you feel is appropriate.

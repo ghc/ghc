@@ -26,17 +26,21 @@ Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 % pointers to it.  Mentioning something in the release notes is not
 % the same as documenting it.
 
-\section[release-2-03]{Release notes for version~2.04---6/97}
+\section[release-notes]{Release notes}
+
+\subsection[release-2-04]{Release notes for version~2.04---6/97}
 \input{2-04-notes.lit}
 
-\section[release-2-03]{Release notes for version~2.03---4/97}
+\subsection[release-2-03]{Release notes for version~2.03---4/97}
 \input{2-03-notes.lit}
 
-\section[release-2-02]{Release notes for version~2.02---3/97}
+\subsection[release-2-02]{Release notes for version~2.02---3/97}
+\downsection
 \input{2-02-notes.lit}
+\upsection
 
-\section[release-2-01]{Release notes for version~2.01---7/96}
-\input{2-01-notes.lit}
+%\section[release-2-01]{Release notes for version~2.01---7/96}
+%\input{2-01-notes.lit}
 
 %\section[release-RSN]{What we hope to do Real Soon Now}
 %\downsection
@@ -58,7 +62,7 @@ Email: glasgow-haskell-\{users,bugs\}-request\@dcs.gla.ac.uk}
 %with bug fixes''; i.e., the current state-of-play on the Haskell~1.2
 %compiler development.
 
-\section{Old release notes}
+\subsection[older-release-notes]{Old release notes}
 
 We used to include the release notes back to the dawn of time in this
 document.  Made for a nice long document, but it wasn't that

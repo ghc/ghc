@@ -2342,9 +2342,12 @@ shortToInt :: Short -> Int        -- convert a Short to Int
 byteToInt :: Byte -> Int          -- convert a Byte to Int
 \end{verbatim}
 
-\item[\tr{Time}:]
+\item[\tr{TimeUtil}:]
 \index{Time module (HBC library)}%
 Manipulate time values (a Double with seconds since 1970).
+[7/97 -- this lib has been more or less superceeded by the standard Time
+ interface]
+
 \begin{verbatim}
 --               year mon  day  hour min  sec  dec-sec  weekday
 data Time = Time Int  Int  Int  Int  Int  Int  Double  Int

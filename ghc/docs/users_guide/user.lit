@@ -1,7 +1,7 @@
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
 \begin{document}
-\title{The Glorious Glasgow Haskell Compilation System\\ Version~2.02\\ User's Guide}
+\title{The Glorious Glasgow Haskell Compilation System\\ Version~2.04\\ User's Guide}
 \author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\

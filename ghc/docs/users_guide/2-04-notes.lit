@@ -4,8 +4,8 @@ adds the following:
 
 \begin{itemize}
 \item
-Data constructors can now have polymophic fields, and ordinary
-functions can have polymoprhic arguments.  Details on
+Data constructors can now have polymorphic fields, and ordinary
+functions can have polymorphic arguments.  Details on
 
 \begin{verbatim}
 	http://www.cse.ogi.edu/~simonpj/quantification.html
@@ -43,7 +43,7 @@ renamer optimisations. You can try the effect with the renamer
 statistics. War stories welcome.
 
 \item
-    The Heroic Efforts of \tr{Andre\' Santos <alms@di.ufpe.br>} have
+    The Heroic Efforts of \tr{Andr\'e Santos <alms@di.ufpe.br>} have
     been included, AIX/RS6000 is now a supported \tr{ghc}
     platform! Bug reports concerning this port to (as always)
     \tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
