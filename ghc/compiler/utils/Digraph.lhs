@@ -2,7 +2,7 @@
 module Digraph(
 
 	-- At present the only one with a "nice" external interface
-	stronglyConnComp, stronglyConnCompR, SCC(..),
+	stronglyConnComp, stronglyConnCompR, SCC(..), flattenSCC, flattenSCCs,
 
 	Graph, Vertex, 
 	graphFromEdges, buildG, transposeG, reverseE, outdegree, indegree,
@@ -56,6 +56,14 @@ import List
 data SCC vertex = AcyclicSCC vertex
 	        | CyclicSCC  [vertex]
 
+flattenSCCs :: [SCC a] -> [a]
+flattenSCCs = concatMap flattenSCC
+
+flattenSCC (AcyclicSCC v) = [v]
+flattenSCC (CyclicSCC vs) = vs
+\end{code}
+
+\begin{code}
 stronglyConnComp
 	:: Ord key
 	=> [(node, key, [key])]		-- The graph; its ok for the

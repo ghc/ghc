@@ -285,12 +285,6 @@ simple_transitive_closure graph set
          else simple_transitive_closure graph set2
 
 
-flattenSCCs :: [SCC a] -> [a]
-flattenSCCs = concatMap flatten
-
-flatten (AcyclicSCC v) = [v]
-flatten (CyclicSCC vs) = vs
-
 -- For each module in mods_to_group, extract the relevant linkable
 -- out of UI, and arrange these linkables in SCCs as defined by modGraph.
 -- All this is so that we can pass SCCified Linkable groups to the

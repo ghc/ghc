@@ -31,9 +31,14 @@ module StgInterp (
 
 #if __GLASGOW_HASKELL__ <= 408
 
-import Panic ( panic )
-type ItblEnv = ()
-type ClosureEnv = ()
+import Panic 		( panic )
+import RdrName 		( RdrName )
+import PrelAddr 	( Addr )
+import FiniteMap	( FiniteMap )
+import InterpSyn	( HValue )
+
+type ItblEnv    = FiniteMap RdrName Addr
+type ClosureEnv = FiniteMap RdrName HValue
 linkIModules   = panic "StgInterp.linkIModules: this hsc was not built with an interpreter"
 stgToInterpSyn = panic "StgInterp.linkIModules: this hsc was not built with an interpreter"
 

@@ -13,14 +13,14 @@ module CmLink ( Linkable(..),  Unlinked(..),
 where
 
 import StgInterp	( linkIModules, ClosureEnv, ItblEnv )
-
+import Linker		( loadObj, resolveObjs )
 import CmStaticInfo	( PackageConfigInfo )
 import Module		( ModuleName, PackageName )
 import InterpSyn	( UnlinkedIBind, HValue, binder )
 import Module		( Module )
 import Outputable	( SDoc )
 import FiniteMap	( emptyFM )
-import Digraph		( SCC(..) )
+import Digraph		( SCC(..), flattenSCC )
 import Outputable
 import Panic		( panic )
 
@@ -89,8 +89,23 @@ link :: PackageConfigInfo
      -> PersistentLinkerState 
      -> IO LinkResult
 
+#ifndef GHCI_NOTYET
+--link = panic "CmLink.link: not implemented"
+link pci groups pls1
+   = do putStrLn "Hello from the Linker!"
+        putStrLn (showSDoc (vcat (map ppLinkableSCC groups)))
+        putStrLn "Bye-bye from the Linker!"
+        return (LinkOK pls1)
+
+ppLinkableSCC :: SCC Linkable -> SDoc
+ppLinkableSCC = ppr . flattenSCC
+
+#else
+
+
 link pci [] pls = return (LinkOK pls)
-link pci (group:groups) pls = do
+link pci (groupSCC:groups) pls = do
+   let group = flattenSCC groupSCC
    -- the group is either all objects or all interpretable, for now
    if all isObject group
 	then do mapM loadObj [ file | DotO file <- group ]
@@ -106,6 +121,8 @@ link pci (group:groups) pls = do
 				   itbl_env=new_itbl_env})
     else
 	return (LinkErrs pls (ptext SLIT("linker: group must contain all objects or all interpreted modules")))
+#endif
+
 
 modname_of_linkable (LM nm _) = nm
 modname_of_linkable (LP _)    = panic "modname_of_linkable: package"

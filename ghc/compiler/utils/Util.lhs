@@ -53,7 +53,7 @@ module Util (
 #endif
 
 	, global
-	, myProcessID
+	, myGetProcessID
 
 #if __GLASGOW_HASKELL__ <= 408
 	, catchJust
@@ -724,10 +724,10 @@ throwTo   = raiseInThread
 #endif
 
 #ifdef mingw32_TARGET_OS
-foreign import "_getpid" myProcessID :: IO Int 
+foreign import "_getpid" myGetProcessID :: IO Int 
 #else
-myProcessID :: IO Int
-myProcessID = do hPutStrLn stderr "Warning:myProcessID"
-                 return 12345
+myGetProcessID :: IO Int
+myGetProcessID = do hPutStrLn stderr "Warning:faking process ID in myGetProcessID"
+                    return 12345
 #endif
 \end{code}
