@@ -147,10 +147,22 @@ restrictTo names decl = case decl of
      _ -> decl
    
 restrictCons :: [HsName] -> [HsConDecl] -> [HsConDecl]
-restrictCons names decls = filter keep decls
-  where keep (HsConDecl _ n _ _ _ _) = n `elem` names
-	keep (HsRecDecl _ n _ _ _ _) = n `elem` names
-	-- ToDo: records not right
+restrictCons names decls = [ d | Just d <- map keep decls ]
+  where keep d@(HsConDecl _ n _ _ _ _)
+	  | n `elem` names  = Just d
+	keep d@(HsRecDecl loc n tvs ctx fields doc) 
+	  | n `elem` names
+	  = if all field_avail fields
+		then Just d
+		else Just (HsConDecl loc n tvs ctx confields doc)
+		-- if we have *all* the field names available, then
+		-- keep the record declaration.  Otherwise degrade to
+		-- a constructor declaration.  This isn't quite right, but
+		-- it's the best we can do.
+	   where
+		field_avail (HsFieldDecl ns _ _) = all (`elem` names) ns
+		confields = [ ty | HsFieldDecl ns ty doc <- fields, n <- ns ]
+	keep d = Nothing
 
 restrictDecls :: [HsName] -> [HsDecl] -> [HsDecl]
 restrictDecls names decls = filter keep decls
