@@ -3386,27 +3386,21 @@ directive.
       <sect3>
 	<title>Installing the DocBook tools on Linux</title>
 
-	<para>If you're on a recent RedHat system (7.0+), you probably
-        have working DocBook tools already installed.  The configure
-        script should detect your setup and you're away.</para>
+	<para>If you're on a recent RedHat (7.0+) or SuSE (8.1+) system,
+        you probably have working DocBook tools already installed. The
+        configure script should detect your setup and you're away.</para>
 
 	<para>If you don't have DocBook tools installed, and you are
-        using a system that can handle RedHat RPM packages, you can
-        probably use the <ulink
-        url="http://sourceware.cygnus.com/docbook-tools/">Cygnus
-        DocBook tools</ulink>, which is the most shrink-wrapped SGML
-        suite that we could find. You need all the RPMs except for
-        psgml (i.e.  <filename>docbook</filename>,
-        <filename>jade</filename>, <filename>jadetex</filename>,
-        <filename>sgmlcommon</filename> and
-        <filename>stylesheets</filename>). Note that most of these
-        RPMs are architecture neutral, so are likely to be found in a
-        <filename>noarch</filename> directory. The SuSE RPMs also
-        work; the RedHat ones <emphasis>don't</emphasis> in RedHat 6.2
-        (7.0 and later should be OK), but they are easy to fix: just
-        make a symlink from
-        <filename>/usr/lib/sgml/stylesheets/nwalsh-modular/lib/dblib.dsl</filename>
-        to <filename>/usr/lib/sgml/lib/dblib.dsl</filename>. </para>
+        using a system that can handle RPM packages, you can use <ulink
+        url="http://rpmfind.net/">Rpmfind.net</ulink> to find suitable
+        packages for your system. Search for the packages
+        <literal>docbook-dtd</literal>,
+        <literal>docbook-xsl-stylesheets</literal>,
+        <literal>libxslt</literal>,
+        <literal>libxml2</literal>,
+        <literal>fop</literal>,
+        <literal>xmltex</literal>, and
+        <literal>dvips</literal>.</para>
       </sect3>
     
       <sect3>
@@ -3428,77 +3422,24 @@ $ make install</screen>
       <sect3>
 	<title>Installing from binaries on Windows</title>
 	
-	<para>It's a good idea to use Norman Walsh's <ulink
-        url="http://nwalsh.com/docbook/dsssl/doc/install.html">installation
-        notes</ulink> as a guide. You should get version 3.1 of
-        DocBook, and note that his file <filename>test.sgm</filename>
-        won't work, as it needs version 3.0. You should unpack Jade
-        into <filename>\Jade</filename>, along with the entities,
-        DocBook into <filename>\docbook</filename>, and the DocBook
-        stylesheets into <filename>\docbook\stylesheets</filename> (so
-        they actually end up in
-        <filename>\docbook\stylesheets\docbook</filename>).</para>
+	<para>Probably the fastest route to a working DocBook environment on
+	Windows is to install <ulink url="http://www.cygwin.com/">Cygwin</ulink>
+	with the complete <literal>Doc</literal> category. If you are using
+	<ulink url="http://www.mingw.org/">MinGW</ulink> for compilation, you
+	have to help <command>configure</command> a little bit: Set the
+	environment variables <envar>XmllintCmd</envar> and
+	<envar>XsltprocCmd</envar> to the paths of the Cygwin executables
+	<command>xmllint</command> and <command>xsltproc</command>,
+	respectively, and set <envar>fp_cv_dir_docbook_xsl</envar> to the path
+	of the directory where the XSL stylesheets are installed,
+	e.g. <filename>c:/cygwin/usr/share/docbook-xsl</filename>.
+        </para>
+
+	<para>If you want to build HTML Help, you have to install the
+        <ulink url="http://msdn.microsoft.com/library/default.asp?url=/library/en-us/htmlhelp/html/hworiHTMLHelpStartPage.asp">HTML Help SDK</ulink>,
+        too, and make sure that <command>hhc</command> is in your <envar>PATH</envar>.</para>
       </sect3>
 
-
-      <sect3>
-	<title>Installing the DocBook tools from source</title>
-
-	<sect4>
-	  <title>Jade</title>
-
-	  <para>Install <ulink
-          url="http://openjade.sourceforge.net/">OpenJade</ulink>
-          (Windows binaries are available as well as sources). If you
-          want DVI, PS, or PDF then install JadeTeX from the
-          <filename>dsssl</filename> subdirectory. (If you get the
-          error:
-
-<screen>! LaTeX Error: Unknown option implicit=false' for package hyperref'.</screen>
-
-          your version of <command>hyperref</command> is out of date;
-          download it from CTAN
-          (<filename>macros/latex/contrib/supported/hyperref</filename>),
-          and make it, ensuring that you have first removed or renamed
-          your old copy. If you start getting file not found errors
-          when making the test for <command>hyperref</command>, you
-          can abort at that point and proceed straight to
-          <command>make install</command>, or enter them as
-          <filename>../</filename><emphasis>filename</emphasis>.)</para>
-
-	  <para>Make links from <filename>virtex</filename> to
-          <filename>jadetex</filename> and
-          <filename>pdfvirtex</filename> to
-          <filename>pdfjadetex</filename> (otherwise DVI, PostScript
-          and PDF output will not work). Copy
-          <filename>dsssl/*.{dtd,dsl}</filename> and
-          <filename>catalog</filename> to
-          <filename>/usr/[local/]lib/sgml</filename>.</para>
-	</sect4>
-
-	<sect4>
-	  <title>DocBook and the DocBook stylesheets</title>
-
-	  <para>Get a Zip of <ulink
-          url="http://www.oasis-open.org/docbook/sgml/3.1/index.html">DocBook</ulink>
-          and install the contents in
-          <filename>/usr/[local/]/lib/sgml</filename>.</para>
-
-	  <para>Get the <ulink
-          url="http://nwalsh.com/docbook/dsssl/">DocBook
-          stylesheets</ulink> and install in
-          <filename>/usr/[local/]lib/sgml/stylesheets</filename>
-          (thereby creating a subdirectory docbook). For indexing,
-          copy or link <filename>collateindex.pl</filename> from the
-          DocBook stylesheets archive in <filename>bin</filename> into
-          a directory on your <constant>PATH</constant>.</para>
-
-	  <para>Download the <ulink
-          url="http://www.oasis-open.org/cover/ISOEnts.zip">ISO
-          entities</ulink> into
-          <filename>/usr/[local/]lib/sgml</filename>.</para>
-	</sect4>
-      </sect3>
     </sect2>
 
     <sect2>
@@ -3508,20 +3449,6 @@ $ make install</screen>
       will detect them and set up the build system accordingly. If you
       have a system that isn't supported, let us know, and we'll try
       to help.</para>
-    </sect2>
-
-    <sect2>
-      <title>Remaining problems</title>
-
-      <para>If you install from source, you'll get a pile of warnings
-      of the form
-
-<screen>DTDDECL catalog entries are not supported</screen>
-
-      every time you build anything. These can safely be ignored, but
-      if you find them tedious you can get rid of them by removing all
-      the <constant>DTDDECL</constant> entries from
-      <filename>docbook.cat</filename>.</para>
     </sect2>
 
     <sect2>
