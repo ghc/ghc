@@ -24,15 +24,16 @@ module Prelude (
     Ordering(LT, EQ, GT),
     Char, String, Int, Integer, Float, Double, IO,
     Rational,
-#ifdef __GLASGOW_HASKELL__
+#if defined(__GLASGOW_HASKELL__) || defined(__NHC__)
 	-- Restore export of (:) until we get to 5.05
-    []((:), []),	-- Not legal Haskell 98; available through built-in syntax
+    []((:), []),	-- Not legal Haskell 98;
+			-- ... available through built-in syntax
+    ()(..),		-- Not legal Haskell 98
+    (->),		-- ... available through built-in syntax
 #endif
     
     module Data.Tuple,
         -- Includes tuple types + fst, snd, curry, uncurry
-    -- ()(..),		-- Not legal Haskell 98
-    -- (->),		-- ... available through built-in syntax
     
     -- * Basic type classes
     Eq((==), (/=)),
