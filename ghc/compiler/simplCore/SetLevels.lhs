@@ -293,11 +293,17 @@ lvlExpr ctxt_lvl env (_, AnnNote note expr)
 
 lvlExpr ctxt_lvl env expr@(_, AnnLam bndr rhs)
   = lvlMFE True new_lvl new_env body	`thenLvl` \ new_body ->
-    returnLvl (glue_binders new_bndrs expr new_body)
+    returnLvl (mkLams new_bndrs new_body)
   where 
-    (bndrs, body)	 = collect_binders expr
+    (bndrs, body)	 = collectAnnBndrs expr
     (new_lvl, new_bndrs) = lvlLamBndrs ctxt_lvl bndrs
     new_env 		 = extendLvlEnv env new_bndrs
+	-- At one time we called a special verion of collectBinders,
+	-- which ignored coercions, because we don't want to split
+	-- a lambda like this (\x -> coerce t (\s -> ...))
+	-- This used to happen quite a bit in state-transformer programs,
+	-- but not nearly so much now non-recursive newtypes are transparent.
+	-- [See SetLevels rev 1.50 for a version with this approach.]
 
 lvlExpr ctxt_lvl env (_, AnnLet bind body)
   = lvlBind NotTopLevel ctxt_lvl env bind	`thenLvl` \ (bind', new_env) ->
@@ -320,22 +326,6 @@ lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
 	where
 	  bs'     = [ (b, incd_lvl) | b <- bs ]
 	  new_env = extendLvlEnv alts_env bs'
-
-collect_binders lam
-  = go [] lam
-  where
-    go rev_bndrs (_, AnnLam b e)  = go (b:rev_bndrs) e
--- TEMP FIX
---    go rev_bndrs (_, AnnNote n e) = go rev_bndrs e
-    go rev_bndrs rhs		  = (reverse rev_bndrs, rhs)
-	-- Ignore notes, because we don't want to split
-	-- a lambda like this (\x -> coerce t (\s -> ...))
-	-- This happens quite a bit in state-transformer programs
-
-	-- glue_binders puts the lambda back together
-glue_binders (b:bs) (_, AnnLam _ e)  body = Lam b (glue_binders bs e body)
-glue_binders bs	    (_, AnnNote n e) body = Note n (glue_binders bs e body)
-glue_binders []	    e		     body = body
 \end{code}
 
 @lvlMFE@ is just like @lvlExpr@, except that it might let-bind
@@ -462,14 +452,14 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
     in
     cloneVar NotTopLevel rhs_env bndr rhs_lvl rhs_lvl	`thenLvl` \ (rhs_env', new_bndr) ->
     let
-	(lam_bndrs, rhs_body)     = collect_binders rhs
+	(lam_bndrs, rhs_body)     = collectAnnBndrs rhs
         (body_lvl, new_lam_bndrs) = lvlLamBndrs rhs_lvl lam_bndrs
 	body_env 		  = extendLvlEnv rhs_env' new_lam_bndrs
     in
     lvlExpr body_lvl body_env rhs_body		`thenLvl` \ new_rhs_body ->
     newPolyBndrs dest_lvl env abs_vars [bndr]	`thenLvl` \ (poly_env, [poly_bndr]) ->
     returnLvl (Rec [((poly_bndr,dest_lvl), mkLams abs_vars_w_lvls $
-					   glue_binders new_lam_bndrs rhs $
+					   mkLams new_lam_bndrs $
 					   Let (Rec [((new_bndr,rhs_lvl), mkLams new_lam_bndrs new_rhs_body)]) 
 						(mkVarApps (Var new_bndr) lam_bndrs))],
 	       poly_env)
@@ -510,6 +500,11 @@ lvlFloatRhs abs_vars dest_lvl env rhs
 %************************************************************************
 
 \begin{code}
+collectAnnBndrs :: CoreExprWithFVs -> ([CoreBndr], CoreExprWithFVs)
+collectAnnBndrs (_, AnnLam b e) = case collectAnnBndrs e of
+					(bs,e') -> (b:bs, e')
+collectAnnBndrs e	  	= ([], e)
+
 lvlLamBndrs :: Level -> [CoreBndr] -> (Level, [(CoreBndr, Level)])
 -- Compute the levels for the binders of a lambda group
 -- The binders returned are exactly the same as the ones passed,
