@@ -328,12 +328,10 @@ Notes:
   the number of bits in the type (or <tt/Nothing/ for unbounded types); and
   <tt/isSigned/ returns whether the type is signed or not.  
 <item>
-  <tt/shift/ performs sign extension.  
-  That is, right shifts fill the top bits with 1 if the  number is negative
+  <tt/shift/ performs sign extension on signed number types.
+  That is, right shifts fill the top bits with 1 if the number is negative
   and with 0 otherwise.
-  (Since unsigned types are always positive, the top bit is always filled with
-  0.)
-<item> 
+<item>
   Bits are numbered from 0 with bit 0 being the least significant bit.
 <item>
   <tt/shift x i/ and <tt/rotate x i/ shift to the left if <tt/i/ is
