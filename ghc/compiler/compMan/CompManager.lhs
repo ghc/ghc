@@ -15,7 +15,7 @@ module CompManager (
     cmDepAnal,	   -- :: CmState -> DynFlags -> [FilePath] -> IO ModuleGraph
 
     cmLoadModules, -- :: CmState -> DynFlags -> ModuleGraph
-		   --	 -> IO (CmState, [String])
+		   --	 -> IO (CmState, Bool, [String])
 
     cmUnload,	   -- :: CmState -> DynFlags -> IO CmState
 
@@ -1151,7 +1151,8 @@ downsweep :: [FilePath] -> [ModSummary] -> IO [ModSummary]
 downsweep roots old_summaries
    = do rootSummaries <- mapM getRootSummary roots
         all_summaries
-           <- loop (concat (map ms_imps rootSummaries))
+           <- loop (concat (map (\ m -> zip (repeat (fromMaybe "<unknown>" (ml_hs_file (ms_location m))))
+	   				    (ms_imps m)) rootSummaries))
 		(mkModuleEnv [ (mod, s) | s <- rootSummaries, 
 					  let mod = ms_mod s, isHomeModule mod 
 			     ])
@@ -1169,7 +1170,7 @@ downsweep roots old_summaries
 		exists <- doesFileExist lhs_file
 		if exists then summariseFile lhs_file else do
 		let mod_name = mkModuleName file
-		maybe_summary <- getSummary mod_name
+		maybe_summary <- getSummary (file, mod_name)
 		case maybe_summary of
 		   Nothing -> packageModErr mod_name
 		   Just s  -> return s
@@ -1177,24 +1178,26 @@ downsweep roots old_summaries
 		 hs_file = file ++ ".hs"
 		 lhs_file = file ++ ".lhs"
 
-        getSummary :: ModuleName -> IO (Maybe ModSummary)
-        getSummary nm
+        getSummary :: (FilePath,ModuleName) -> IO (Maybe ModSummary)
+        getSummary (currentMod,nm)
            = do found <- findModule nm
 		case found of
 		   Just (mod, location) -> do
 			let old_summary = findModInSummaries old_summaries mod
 			summarise mod location old_summary
 
-		   Nothing -> throwDyn (CmdLineError 
+		   Nothing -> 
+		        throwDyn (CmdLineError 
                                    ("can't find module `" 
-                                     ++ showSDoc (ppr nm) ++ "'"))
+                                     ++ showSDoc (ppr nm) ++ "' (while processing " 
+				     ++ show currentMod ++ ")"))
 
         -- loop invariant: env doesn't contain package modules
-        loop :: [ModuleName] -> ModuleEnv ModSummary -> IO [ModSummary]
+        loop :: [(FilePath,ModuleName)] -> ModuleEnv ModSummary -> IO [ModSummary]
 	loop [] env = return (moduleEnvElts env)
         loop imps env
            = do -- imports for modules we don't already have
-                let needed_imps = nub (filter (not . (`elemUFM` env)) imps)
+                let needed_imps = nub (filter (not . (`elemUFM` env).snd) imps)
 
 		-- summarise them
                 needed_summaries <- mapM getSummary needed_imps
@@ -1203,7 +1206,8 @@ downsweep roots old_summaries
                 let new_home_summaries = [ s | Just s <- needed_summaries ]
 
 		-- loop, checking the new imports
-		let new_imps = concat (map ms_imps new_home_summaries)
+		let new_imps = concat (map (\ m -> zip (repeat (fromMaybe "<unknown>" (ml_hs_file (ms_location m))))
+						       (ms_imps m)) new_home_summaries)
                 loop new_imps (extendModuleEnvList env 
 				[ (ms_mod s, s) | s <- new_home_summaries ])
 
