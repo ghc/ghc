@@ -59,4 +59,4 @@ AC_SUBST(HOpenGLHTMLStart)
 AC_SUBST(HOpenGLHTMLEnd)
 
 dnl * Write the results...
-AC_OUTPUT(ghc.spec docs/index.html)
+AC_OUTPUT(ghc.spec docs/index.html docs/libraries.html)
