@@ -1632,19 +1632,102 @@ it needs to know.
 </sect2>
 
 
-<sect2 id="hoist">
+<sect2 id="implicit-quant">
+<title>Implicit quantification</title>
+
+<para>
+GHC performs implicit quantification as follows.  <emphasis>At the top level (only) of 
+user-written types, if and only if there is no explicit <literal>forall</literal>,
+GHC finds all the type variables mentioned in the type that are not already
+in scope, and universally quantifies them.</emphasis>  For example, the following pairs are 
+equivalent:
+<programlisting>
+  f :: a -> a
+  f :: forall a. a -> a
+
+  g (x::a) = let
+                h :: a -> b -> b
+                h x y = y
+             in ...
+  g (x::a) = let
+                h :: forall b. a -> b -> b
+                h x y = y
+             in ...
+</programlisting>
+</para>
+<para>
+Notice that GHC does <emphasis>not</emphasis> find the innermost possible quantification
+point.  For example:
+<programlisting>
+  f :: (a -> a) -> Int
+           -- MEANS
+  f :: forall a. (a -> a) -> Int
+           -- NOT
+  f :: (forall a. a -> a) -> Int
+
+
+  g :: (Ord a => a -> a) -> Int
+           -- MEANS the illegal type
+  g :: forall a. (Ord a => a -> a) -> Int
+           -- NOT
+  g :: (forall a. Ord a => a -> a) -> Int
+</programlisting>
+The latter produces an illegal type, which you might think is silly,
+but at least the rule is simple.  If you want the latter type, you
+can write your for-alls explicitly.  Indeed, doing so is strongly advised
+for rank-2 types.
+</para>
+</sect2>
+</sect1>
+
+<sect1 id="hoist">
 <title>Type synonyms and hoisting
 </title>
 
 <para>
-GHC also allows you to write a <literal>forall</literal> in a type synonym, thus:
+Type synonmys are like macros at the type level, and GHC is much more liberal
+about them than Haskell 98.  In particular:
+<itemizedlist>
+<listitem> <para>You can write a <literal>forall</literal> (including overloading)
+in a type synonym, thus:
 <programlisting>
-  type Discard a = forall b. a -> b -> a
+  type Discard a = forall b. Show b => a -> b -> (a, String)
 
   f :: Discard a
-  f x y = x
+  f x y = (x, show y)
+
+  g :: Discard Int -> (Int,Bool)    -- A rank-2 type
+  g f = f Int True
 </programlisting>
-However, it is often convenient to use these sort of synonyms at the right hand
+</para>
+</listitem>
+
+<listitem><para>
+You can write an unboxed tuple in a type synonym:
+<programlisting>
+  type Pr = (# Int, Int #)
+
+  h :: Int -> Pr
+  h x = (# x, x #)
+</programlisting>
+</para></listitem>
+</itemizedlist>
+</para>
+<para>
+GHC does validity checking on types <emphasis>after expanding type synonyms</emphasis> 
+so, for example,
+this will be rejected:
+<programlisting>
+  type Pr = (# Int, Int #)
+
+  h :: Pr -> Int
+  h x = ...
+</programlisting>
+because GHC does not allow  unboxed tuples on the left of a function arrow.
+</para>
+
+<para>
+However, it is often convenient to use these sort of generalised synonyms at the right hand
 end of an arrow, thus:
 <programlisting>
   type Discard a = forall b. a -> b -> a
@@ -1664,9 +1747,9 @@ In general, the rule is this: <emphasis>to determine the type specified by any e
 user-written type (e.g. in a type signature), GHC expands type synonyms and then repeatedly
 performs the transformation:</emphasis>
 <programlisting>
-  <emphasis>type1</emphasis> -> forall a. <emphasis>type2</emphasis>
+  <emphasis>type1</emphasis> -> forall a1..an. <emphasis>context2</emphasis> => <emphasis>type2</emphasis>
 ==>
-  forall a. <emphasis>type1</emphasis> -> <emphasis>type2</emphasis>
+  forall a1..an. <emphasis>context2</emphasis> => <emphasis>type1</emphasis> -> <emphasis>type2</emphasis>
 </programlisting>
 (In fact, GHC tries to retain as much synonym information as possible for use in
 error messages, but that is a usability issue.)  This rule applies, of course, whether
@@ -1676,9 +1759,8 @@ valid way to write <literal>g</literal>'s type signature:
   g :: Int -> Int -> forall b. b -> Int
 </programlisting>
 </para>
-</sect2>
-
 </sect1>
+
 
 <sect1 id="existential-quantification">
 <title>Existentially quantified data constructors
