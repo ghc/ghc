@@ -338,7 +338,7 @@ lEX_Name       = mkModuleName "Text.Read.Lex"
 mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "GHC.Int"
 pREL_WORD_Name	  = mkModuleName "GHC.Word"
-mONAD_FIX_Name	  = mkModuleName "Control.Monad.MonadRec"
+mONAD_FIX_Name	  = mkModuleName "Control.Monad.Fix"
 aDDR_Name	  = mkModuleName "Addr"
 
 gLA_EXTS_Name   = mkModuleName "GHC.Exts"
