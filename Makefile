@@ -21,7 +21,7 @@ SUBDIRS = $(shell if (test x$(CURRENT_TARGET) = xinstall) ; then echo $(Projects
 # Files to include in fptools source distribution
 #
 SRC_DIST_DIRS += mk docs CONTRIB distrib $(ProjectsToBuild)
-SRC_DIST_FILES += configure.in config.guess config.sub configure aclocal.m4 README INSTALL Makefile install-sh
+SRC_DIST_FILES += configure.in config.guess config.sub configure aclocal.m4 acconfig.h README INSTALL Makefile install-sh
 
 #
 # Making a binary distribution
