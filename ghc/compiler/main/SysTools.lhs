@@ -187,7 +187,11 @@ initSysTools minusB_args
 		-- NB: top_dir is assumed to be in standard Unix format '/' separated
 
 	; let installed, installed_bin :: FilePath -> FilePath
+#ifndef mingw32_TARGET_OS
+              installed_bin pgm   =  pgmPath (top_dir `slash` "extra-bin") pgm
+#else
               installed_bin pgm   =  pgmPath (top_dir `slash` "bin") pgm
+#endif
 	      installed     file  =  pgmPath top_dir file
 	      inplace dir   pgm   =  pgmPath (top_dir `slash` dir) pgm
 
@@ -378,6 +382,9 @@ getTopDir minusbs
     -- In a build tree, the ghc binary lives in $fptools/ghc/compiler,
     -- so we strip off the /ghc/compiler suffix here too, leaving a
     -- standard TOPDIR.
+    -- Unfortunately, getting top_dir like this and then using it to generate
+    -- the path on which to find binaries means that we're ignoring
+    -- $libexecdir anyway.
     remove_suffix ghc_bin_dir	-- ghc_bin_dir is in standard Unix format
 	| "/ghc/compiler" `isSuffixOf` ghc_bin_dir	= back_two
 	| "/bin" `isSuffixOf` ghc_bin_dir  		= back_one
