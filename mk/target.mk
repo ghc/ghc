@@ -423,11 +423,7 @@ $(SCRIPT_PROG) :: $(SCRIPT_OBJS)
 	$(RM) $@
 	@echo Creating $@...
 ifeq "$(INTERP)" "perl"
-ifneq "$(BIN_DIST)" "1"
 	echo "#! "$(PERL) > $@
-else
-	@touch $@
-endif
 else
 ifneq "$(INTERP)" ""
 	@echo "#!"$(INTERP) > $@
@@ -771,7 +767,7 @@ show:
 #--------------------------------------------------------------------------
 # SGML Documentation
 #
-.PHONY: dvi ps html info txt
+.PHONY: dvi ps html pdf rtf
 
 ifneq "$(SGML_DOC)" ""
 
@@ -792,19 +788,23 @@ endif
 
 SGML_DVI  = $(SGML_DOC).dvi
 SGML_PS   = $(SGML_DOC).ps
-SGML_INFO = $(SGML_DOC).info
+SGML_PDF  = $(SGML_DOC).pdf
+SGML_RTF  = $(SGML_DOC).rtf
 SGML_HTML = $(SGML_DOC).html
-SGML_TEXT = $(SGML_DOC).txt
+# HTML output goes in a subdirectory on its own.
 
 $(SGML_DVI) $(SGML_PS) $(SGML_INFO) $(SGML_HTML) $(SGML_TEXT) :: $(SGML_SRCS)
 
 dvi  :: $(SGML_DVI)
-info :: $(SGML_INFO)
-html :: $(SGML_HTML)
-txt  :: $(SGML_TXT)
 ps   :: $(SGML_PS)
+pdf  :: $(SGML_PDF)
+rtf  :: $(SGML_RTF)
+html :: $(SGML_HTML)
 
-CLEAN_FILES += $(SGML_TEXT) $(SGML_DOC)*.html $(SGML_PS) $(SGML_DVI)
+CLEAN_FILES += $(SGML_TEXT) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGML_RTF) $(SGML_HTML)
+
+clean ::
+	$(RM) -rf $(SGML_DOC)
 
 endif
 
