@@ -1,5 +1,5 @@
 <sect2> <idx/MutableArray/
-<label id="sec:MutableArray">
+<label id="MutableArray">
 <p>
 
 The <tt/MutableArray/ interface provide operations for reading and
@@ -9,7 +9,7 @@ and <em/mutable byte arrays/, chunks of memory containing
 values of some basic type. 
 
 <sect3> <idx/Mutable arrays/
-<label id="sec:MutableArray:mutable-arrays">
+<label id="MutableArray:mutable-arrays">
 <p>
 
 The mutable array section of the API provides the following
@@ -54,7 +54,7 @@ copying. The operation <tt/unsafeThawArray/ is not provided
 </itemize>
 
 <sect3> <idx/Mutable byte arrays/
-<label id="sec:MutableArray:mutable-byte-arrays">
+<label id="MutableArray:mutable-byte-arrays">
 <p>
 
 <tscreen><code>
