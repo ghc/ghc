@@ -2,7 +2,7 @@ name:		PACKAGE
 version:	VERSION
 license:	BSD3
 maintainer:	glasgow-haskell-users@haskell.org
-exposed:	True
+exposed:	False
 
 exposed-modules:
 	BasicTypes,
@@ -260,42 +260,42 @@ exposed-modules:
 	Util
 
 #ifdef INSTALLING
-import-dirs:	"$libdir/ghc-package"
+import-dirs:	PKG_LIBDIR"/hslibs-imports/ghc"
 #else
-import-dirs:   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/utils",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/basicTypes",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/types",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/hsSyn",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/prelude",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/rename",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/typecheck",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/deSugar",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/coreSyn",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/specialise",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/simplCore",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/stranal",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/stgSyn",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/simplStg",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/codeGen",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/main",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/profiling",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/parser",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cprAnalysis",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/compMan",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/ndpFlatten",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/iface",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cmm",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/nativeGen"
+import-dirs:   FPTOOLS_TOP_ABS"/ghc/compiler/stage2/utils",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/basicTypes",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/types",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/hsSyn",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/prelude",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/rename",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/typecheck",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/deSugar",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/coreSyn",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/specialise",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/simplCore",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/stranal",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/stgSyn",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/simplStg",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/codeGen",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/main",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/profiling",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/parser",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/cprAnalysis",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/compMan",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/ndpFlatten",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/iface",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/cmm",
+	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/nativeGen"
 #endif
 
 #ifdef INSTALLING
-library-dirs: "$libdir",
+library-dirs:		LIB_DIR
 #else
-library-dirs: FPTOOLS_TOP_ABS"/ghc/compiler"
+library-dirs:		FPTOOLS_TOP_ABS"/ghc/compiler"
 #endif
 
-hs-libraries: LIBRARY
-
+hs-libraries: 		"HSghc"
 extra-libraries:
-
-package_deps: "base", "haskell98"
+package_deps: 		PKG_DEPENDS
+haddock-interfaces:	HADDOCK_IFACE
+haddock-html:		HTML_DIR

@@ -181,7 +181,6 @@ endif
 # be to do `env PATH=$(PATH) make ghc' to minimise the environment. (or the
 # equivalent of `env' if it doesn't exist locally).
 #
-ifneq "$(BuildPackageGHC)" "YES"
 ifneq "$(way)" "dll"
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HS_PROG=$(odir)/ghc$(_way)-$(ProjectVersion)
@@ -190,7 +189,6 @@ HS_PROG=$(odir)/ghc$(_way)
 endif
 else
 HS_PROG=$(odir)/ghc-$(ProjectVersion)
-endif
 endif
 
 # -----------------------------------------------------------------------------
@@ -407,6 +405,7 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
 # Yes, include the interepreter, readline, and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package template-haskell
+PKG_DEPENDS += template_haskell
 
 ALL_DIRS += ghci
 
@@ -421,10 +420,12 @@ ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ifeq "$(stage)" "1"
 ifeq "$(GhcHasReadline)" "YES"
 SRC_HC_OPTS += -package readline -DUSE_READLINE
+PKG_DEPENDS += readline
 endif
 else
 ifeq "$(GhcLibsWithReadline)" "YES"
 SRC_HC_OPTS += -package readline -DUSE_READLINE
+PKG_DEPENDS += readline
 endif
 endif # stage=1
 endif # not windows
@@ -476,11 +477,13 @@ ifeq "$(bootstrapped) $(ghc_ge_601)" "NO NO"
 SRC_HC_OPTS += -package posix
 else
 SRC_HC_OPTS += -package unix
+PKG_DEPENDS += unix
 endif
 endif
 
 ifneq "$(findstring YES, $(bootstrapped) $(ghc_ge_603))" ""
 SRC_HC_OPTS += -package Cabal
+PKG_DEPENDS += Cabal
 endif
 
 SRC_CC_OPTS += -Iparser -I. -O
@@ -732,15 +735,21 @@ endif
 coreSyn/CorePrep_HC_OPTS += -auto-all
 
 #-----------------------------------------------------------------------------
-# Building GHC package
+# Building the GHC package
 
-ifeq "$(BuildPackageGHC)" "YES"
+# The GHC package is made from the stage 2 build.  Fortunately the
+# package build system framework more or less does the right thing for
+# us here.
 
+ifeq "$(stage)" "2"
 PACKAGE = ghc
-VERSION = 6.4
-STANDALONE_PACKAGE = YES
-PACKAGE_DEPS =
+HIERARCHICAL_LIB = NO
+VERSION = $(ProjectVersion)
+PKG_DEPENDS += base haskell98
+PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(PKG_DEPENDS)'
 
+# override default definition of HS_IFACES so we can add $(odir)
+HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 endif
 
 #-----------------------------------------------------------------------------
