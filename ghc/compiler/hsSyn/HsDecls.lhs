@@ -32,7 +32,7 @@ import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
 
 import HsBinds		( HsBindGroup, HsBind, LHsBinds, 
-			  Sig(..), LSig, LFixitySig )
+			  Sig(..), LSig, LFixitySig, pprLHsBinds )
 import HsPat		( HsConDetails(..), hsConArgs )
 import HsImpExp		( pprHsVar )
 import HsTypes
@@ -541,7 +541,7 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
     ppr (InstDecl inst_ty binds uprags)
       = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
 	      nest 4 (ppr uprags),
-	      nest 4 (ppr binds) ]
+	      nest 4 (pprLHsBinds binds) ]
 \end{code}
 
 %************************************************************************

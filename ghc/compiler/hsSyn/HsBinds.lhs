@@ -50,7 +50,7 @@ instance OutputableBndr id => Outputable (HsBindGroup id) where
   ppr (HsBindGroup binds sigs is_rec)
      = vcat [ppr_isrec,
      	     vcat (map ppr sigs),
-	     vcat (map ppr (bagToList binds))
+	     pprLHsBinds binds
        ]
      where
        ppr_isrec = getPprStyle $ \ sty -> 
@@ -80,6 +80,9 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
 
 type LHsBinds id = Bag (LHsBind id)
 type LHsBind  id = Located (HsBind id)
+
+pprLHsBinds :: OutputableBndr id => LHsBinds id -> SDoc
+pprLHsBinds binds = lbrace <+> vcat (map ppr (bagToList binds)) <+> rbrace
 
 data HsBind id
   = FunBind     (Located id)
@@ -161,7 +164,7 @@ ppr_monobind (AbsBinds tyvars dictvars exports inlines val_binds)
        nest 4 ( vcat [pprBndr LetBind x | (_,x,_) <- exports]
 			-- Print type signatures
 		$$
-		ppr val_binds )
+		pprLHsBinds val_binds )
 \end{code}
 
 %************************************************************************
