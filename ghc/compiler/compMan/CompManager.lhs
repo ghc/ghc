@@ -253,7 +253,7 @@ mkTopLevEnv :: HomePackageTable -> String -> IO GlobalRdrEnv
 mkTopLevEnv hpt mod
  = case lookupModuleEnv hpt (mkModule mod) of
       Nothing      -> throwDyn (ProgramError ("mkTopLevEnv: not a home module " ++ mod))
-      Just details -> case hm_globals details of
+      Just details -> case mi_globals (hm_iface details) of
 			Nothing  -> throwDyn (ProgramError ("mkTopLevEnv: not interpreted " ++ mod))
 			Just env -> return env
 
@@ -264,7 +264,7 @@ cmGetContext CmState{cm_ic=ic} =
 cmModuleIsInterpreted :: CmState -> String -> IO Bool
 cmModuleIsInterpreted cmstate str 
  = case lookupModuleEnv (cmHPT cmstate) (mkModule str) of
-      Just details       -> return (isJust (hm_globals details))
+      Just details       -> return (isJust (mi_globals (hm_iface details)))
       _not_a_home_module -> return False
 
 -----------------------------------------------------------------------------
@@ -1038,11 +1038,10 @@ upsweep_mod hsc_env (old_hpt, old_linkables) summary
            -- Compilation "succeeded", and may or may not have returned a new
            -- linkable (depending on whether compilation was actually performed
 	   -- or not).
-           CompOK new_details new_globals new_iface maybe_new_linkable
+           CompOK new_details new_iface maybe_new_linkable
               -> do let 
 			new_linkable = maybe_new_linkable `orElse` old_linkable
 			new_info = HomeModInfo { hm_iface = new_iface,
-						 hm_globals = new_globals,
 						 hm_details = new_details,
 						 hm_linkable = new_linkable }
                     return (Just new_info)

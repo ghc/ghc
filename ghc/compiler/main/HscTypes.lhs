@@ -169,8 +169,6 @@ emptyPackageIfaceTable = emptyModuleEnv
 
 data HomeModInfo 
   = HomeModInfo { hm_iface    :: ModIface,
-	          hm_globals  :: Maybe GlobalRdrEnv,	-- Its top level environment
-							-- Nothing <-> compiled module
 		  hm_details  :: ModDetails,
 		  hm_linkable :: Linkable }
 \end{code}
@@ -283,6 +281,11 @@ data ModIface
 		-- Ditto data constructors, class operations, except that 
 		-- the version of the parent class/tycon changes
 	mi_decls :: [(Version,IfaceDecl)],	-- Sorted
+
+        mi_globals  :: !(Maybe GlobalRdrEnv),
+		-- Its top level environment or Nothing if we read this
+		-- interface from an interface file.  (We need the source
+		-- file to figure out the top-level environment.)
 
 		-- Instance declarations and rules
 	mi_insts     :: [IfaceInst],	-- Sorted
@@ -399,6 +402,7 @@ emptyModIface pkg mod
 	       mi_insts = [],
 	       mi_rules = [],
 	       mi_decls = [],
+	       mi_globals  = Nothing,
 	       mi_rule_vers = initialVersion,
 	       mi_dep_fn = emptyIfaceDepCache,
 	       mi_fix_fn = emptyIfaceFixCache,

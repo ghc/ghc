@@ -263,6 +263,7 @@ mkIface hsc_env location maybe_old_iface
 		      mg_usages = usages,
 		      mg_deps   = deps,
 		      mg_exports = exports,
+		      mg_rdr_env = rdr_env,
 		      mg_fix_env = fix_env,
 		      mg_deprecs = src_deprecs,
 		      mg_insts = insts, 
@@ -306,7 +307,8 @@ mkIface hsc_env location maybe_old_iface
 			mi_rules    = iface_rules,
 			mi_fixities = fixities,
 			mi_deprecs  = deprecs,
-	
+			mi_globals  = Just rdr_env,
+
 			-- Left out deliberately: filled in by addVersionInfo
 			mi_mod_vers  = initialVersion,
  			mi_exp_vers  = initialVersion,

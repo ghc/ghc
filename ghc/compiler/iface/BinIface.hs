@@ -173,6 +173,7 @@ instance Binary ModIface where
 		 mi_fixities  = fixities,
 		 mi_deprecs   = deprecs,
 		 mi_decls     = decls,
+		 mi_globals   = Nothing,
 		 mi_insts     = insts,
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers,

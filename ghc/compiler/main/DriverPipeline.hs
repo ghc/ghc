@@ -137,9 +137,6 @@ compile :: HscEnv
 
 data CompResult
    = CompOK   ModDetails 		-- New details
-	      (Maybe GlobalRdrEnv)	-- Lexical environment for the module
-					-- (Maybe because we may have loaded it from
-					--  its precompiled interface)
               ModIface			-- New iface
               (Maybe Linkable)	-- New code; Nothing => compilation was not reqd
 		                --			(old code is still valid)
@@ -207,13 +204,13 @@ compile hsc_env mod_summary
    case hsc_result of
       HscFail -> return CompErrs
 
-      HscNoRecomp details iface -> return (CompOK details Nothing iface Nothing)
+      HscNoRecomp details iface -> return (CompOK details iface Nothing)
 
-      HscRecomp details rdr_env iface
+      HscRecomp details iface
 		stub_h_exists stub_c_exists maybe_interpreted_code 
 
 	| isHsBoot src_flavour	-- No further compilation to do
-	-> return (CompOK details rdr_env iface Nothing)
+	-> return (CompOK details iface Nothing)
 
 	| otherwise		-- Normal Haskell source files
 	-> do
@@ -255,7 +252,7 @@ compile hsc_env mod_summary
 	   let linkable = LM unlinked_time this_mod
 			     (hs_unlinked ++ stub_unlinked)
 
-	   return (CompOK details rdr_env iface (Just linkable))
+	   return (CompOK details iface (Just linkable))
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
@@ -698,7 +695,7 @@ runPhase (Hsc src_flavour) stop dflags basename suff input_fn get_output_fn _may
 		SysTools.touch dflags' "Touching object file" o_file
 		return (StopLn, dflags', Just location4, o_file)
 
-	    HscRecomp _details _rdr_env _iface 
+	    HscRecomp _details _iface 
 		      stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 

@@ -141,7 +141,6 @@ data HscResult
 
    -- Did recompilation
    | HscRecomp   ModDetails  		-- new details (HomeSymbolTable additions)
-		 (Maybe GlobalRdrEnv)		
                  ModIface		-- new iface (if any compilation was done)
 	         Bool	 	 	-- stub_h exists
 	         Bool  		 	-- stub_c exists
@@ -296,15 +295,13 @@ hscBootBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 			 mkIface hsc_env (ms_location mod_summary)
                          	 maybe_checked_iface ds_result
 
-	; let { final_globals = Just $! (mg_rdr_env ds_result)
-	      ; final_details = ModDetails { md_types = mg_types ds_result,
+	; let { final_details = ModDetails { md_types = mg_types ds_result,
 					     md_insts = mg_insts ds_result,
 					     md_rules = mg_rules ds_result } }
       	  -- And the answer is ...
 	; dumpIfaceStats hsc_env
 
 	; return (HscRecomp final_details
-			    final_globals
 			    final_iface
                             False False Nothing)
  	}
@@ -387,9 +384,6 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 	; final_iface <-
 	     if one_shot then return (error "no final iface")
 			 else return new_iface
-	; let { final_globals | one_shot  = Nothing
-			      | otherwise = Just $! (mg_rdr_env tidy_result) }
-	; final_globals `seq` return ()
 
 	    -- Build the final ModDetails (except in one-shot mode, where
 	    -- we won't need this information after compilation).
@@ -409,7 +403,6 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 	; dumpIfaceStats hsc_env
 
 	; return (HscRecomp final_details
-			    final_globals
 			    final_iface
                             stub_h_exists stub_c_exists
       			    maybe_bcos)
