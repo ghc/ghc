@@ -35,7 +35,8 @@ import {-# SOURCE #-} MagicUFs	( MagicUnfoldingFun, mkMagicUnfoldingFun )
 import CmdLineOpts	( opt_UnfoldingCreationThreshold,
 			  opt_UnfoldingUseThreshold,
 			  opt_UnfoldingConDiscount,
-			  opt_UnfoldingKeenessFactor
+			  opt_UnfoldingKeenessFactor,
+			  opt_UnfoldCasms
 			)
 import Constants	( uNFOLDING_CHEAP_OP_COST,
 			  uNFOLDING_DEAR_OP_COST,
@@ -563,7 +564,7 @@ file), but turning it off seems to the simplest thing to do.
 
 \begin{code}
 okToUnfoldInHiFile :: CoreExpr -> Bool
-okToUnfoldInHiFile e = go e
+okToUnfoldInHiFile e = opt_UnfoldCasms || go e
  where
     -- Race over an expression looking for CCalls..
     go (Var _)   = True
@@ -593,7 +594,7 @@ okToUnfoldInHiFile e = go e
 	      BindDefault _ rhs -> rhs:ls
 
     -- ok to unfold a PrimOp as long as it's not a _casm_
-    okToUnfoldPrimOp (CCallOp _ is_casm _ _ _) = not is_casm
-    okToUnfoldPrimOp _                         = True
+    okToUnfoldPrimOp (CCallOp _ is_casm _ _ _ _) = not is_casm
+    okToUnfoldPrimOp _                           = True
      
 \end{code}

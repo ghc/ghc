@@ -85,6 +85,7 @@ module CmdLineOpts (
 	opt_StgDoLetNoEscapes,
 
 	opt_InterfaceUnfoldThreshold,
+	opt_UnfoldCasms,
 	opt_UnfoldingCreationThreshold,
 	opt_UnfoldingConDiscount,
 	opt_UnfoldingUseThreshold,
@@ -362,6 +363,7 @@ opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
 opt_SccGroup  			= lookup_str "-G="
 opt_Verbose			= lookUp  SLIT("-v")
 
+opt_UnfoldCasms		        = lookUp SLIT("-funfold-casms-in-hi-file")
 opt_InterfaceUnfoldThreshold	= lookup_def_int "-funfolding-interface-threshold" iNTERFACE_UNFOLD_THRESHOLD
 opt_UnfoldingCreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  uNFOLDING_CREATION_THRESHOLD
 opt_UnfoldingUseThreshold	= lookup_def_int "-funfolding-use-threshold"	   uNFOLDING_USE_THRESHOLD
