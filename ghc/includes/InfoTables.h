@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.20 2001/03/02 16:12:18 simonmar Exp $
+ * $Id: InfoTables.h,v 1.21 2001/03/22 03:51:09 hwloidl Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -140,6 +140,7 @@ extern StgWord16 closure_flags[];
 
 #define closure_HNF(c)          (  closureFlags(c) & _HNF)
 #define closure_BITMAP(c)       (  closureFlags(c) & _BTM)
+#define closure_NON_SPARK(c)    ( (closureFlags(c) & _NS))
 #define closure_SHOULD_SPARK(c) (!(closureFlags(c) & _NS))
 #define closure_STATIC(c)       (  closureFlags(c) & _STA)
 #define closure_THUNK(c)        (  closureFlags(c) & _THU)

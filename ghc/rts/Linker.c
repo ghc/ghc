@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.32 2001/02/28 10:03:42 sewardj Exp $
+ * $Id: Linker.c,v 1.33 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -56,6 +56,19 @@ typedef struct _RtsSymbolVal {
     void   *addr;
 } RtsSymbolVal;
 
+
+#if !defined(PAR)
+#define Maybe_ForeignObj        SymX(mkForeignObjzh_fast)
+
+#define Maybe_Stable_Names      SymX(mkWeakzh_fast)			\
+      				SymX(makeStableNamezh_fast)		\
+      				SymX(finalizzeWeakzh_fast)
+#else
+/* These are not available in GUM!!! -- HWL */
+#define Maybe_ForeignObj
+#define Maybe_Stable_Names
+#endif
+         
 
 #define RTS_SYMBOLS				\
       SymX(MainRegTable)			\
@@ -125,7 +138,7 @@ typedef struct _RtsSymbolVal {
       SymX(stackOverflow)			\
       SymX(int2Integerzh_fast)			\
       SymX(word2Integerzh_fast)			\
-      SymX(mkForeignObjzh_fast)			\
+      Maybe_ForeignObj              			\
       SymX(__encodeDouble)			\
       SymX(decodeDoublezh_fast)			\
       SymX(decodeFloatzh_fast)			\
@@ -146,9 +159,7 @@ typedef struct _RtsSymbolVal {
       SymX(orIntegerzh_fast)			\
       SymX(xorIntegerzh_fast)			\
       SymX(complementIntegerzh_fast)		\
-      SymX(mkWeakzh_fast)			\
-      SymX(makeStableNamezh_fast)		\
-      SymX(finalizzeWeakzh_fast)		\
+      Maybe_Stable_Names                                  \
       SymX(blockAsyncExceptionszh_fast)		\
       SymX(unblockAsyncExceptionszh_fast)	\
       SymX(isDoubleNaN)				\

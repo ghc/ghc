@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
-   Time-stamp: <Tue Mar 21 2000 20:10:18 Stardate: [-30]4539.20 hwloidl>
-   $Id: LLC.h,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
+   Time-stamp: <Sun Mar 18 2001 21:23:50 Stardate: [-30]6349.45 hwloidl>
+   $Id: LLC.h,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
 
    Low Level Communications Header (LLC.h)
 
@@ -48,7 +48,7 @@
 #define	PEGROUP		"PE"
 
 #define	MGRGROUP	"MGR"
-#define	PECTLGROUP	"PECTL"
+#define	SYSGROUP	"SYS"
 
 
 #define	PETASK		"PE"
@@ -84,18 +84,18 @@
 #define MAX_DATA_WORDS_IN_PACKET	1024
 
 /* basic PVM packing */
-#define PutArg1(a)		pvm_pklong(&(a),1,1)
-#define PutArg2(a)		pvm_pklong(&(a),1,1)
-#define PutArgN(n,a)		pvm_pklong(&(a),1,1)
-#define PutArgs(b,n)		pvm_pklong(b,n,1)
+#define PutArg1(a)		pvm_pklong((long *)&(a),1,1)
+#define PutArg2(a)		pvm_pklong((long *)&(a),1,1)
+#define PutArgN(n,a)		pvm_pklong((long *)&(a),1,1)
+#define PutArgs(b,n)		pvm_pklong((long *)b,n,1)
 
 #define PutLit(l)		{ int a = l; PutArgN(?,a); }
 
 /* basic PVM unpacking */
-#define GetArg1(a)		pvm_upklong(&(a),1,1)
-#define GetArg2(a)		pvm_upklong(&(a),1,1)
-#define GetArgN(n,a)		pvm_upklong(&(a),1,1)
-#define GetArgs(b,n)		pvm_upklong(b,n,1)
+#define GetArg1(a)		pvm_upklong((long *)&(a),1,1)
+#define GetArg2(a)		pvm_upklong((long *)&(a),1,1)
+#define GetArgN(n,a)		pvm_upklong((long *)&(a),1,1)
+#define GetArgs(b,n)		pvm_upklong((long *)b,n,1)
 
 //@node Externs,  , PVM macros, Low Level Communications Header
 //@subsection Externs
@@ -108,20 +108,23 @@ extern void sendOp   (OpCode,GlobalTaskId),
             sendOpN  (OpCode,GlobalTaskId,int,StgPtr),
             sendOpNV (OpCode,GlobalTaskId,int,StgPtr,int,...);
 
+extern void broadcastOpN(OpCode op, char *group, int n, StgPtr args);
+
 /* extracting data out of a packet */
 OpCode        getOpcode (rtsPacket p);
 void          getOpcodeAndSender (rtsPacket p, OpCode *popcode, 
 			          GlobalTaskId *psender_id);
 GlobalTaskId  senderTask (rtsPacket p);
-rtsPacket     waitForPEOp (OpCode op, GlobalTaskId who);
+rtsPacket     waitForPEOp(OpCode op, GlobalTaskId who, void(*processUnexpected)(rtsPacket) );
 
 /* Init and shutdown routines */
-GlobalTaskId *startUpPE (unsigned nPEs);
+void          startUpPE (void);
 void          shutDownPE(void);
+int           getExitCode(int nbytes, GlobalTaskId *sender_idp);
 
 /* aux functions */
 char  *getOpName (unsigned op);  // returns string of opcode
-void   processUnexpected (rtsPacket);
+void   processUnexpectedMessage (rtsPacket);
 //void   NullException(void);
 
 #endif /*PAR */

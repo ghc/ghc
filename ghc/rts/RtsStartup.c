@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.49 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.50 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -35,14 +35,16 @@
 #endif
 
 #if defined(GRAN)
-#include "GranSimRts.h"
-#include "ParallelRts.h"
+# include "GranSimRts.h"
+#endif
+
+#if defined(GRAN) || defined(PAR)
+# include "ParallelRts.h"
 #endif
 
 #if defined(PAR)
-#include "ParInit.h"
-#include "Parallel.h"
-#include "LLC.h"
+# include "Parallel.h"
+# include "LLC.h"
 #endif
 
 /*
@@ -52,7 +54,7 @@ struct RTS_FLAGS RtsFlags;
 
 static int rts_has_started_up = 0;
 #if defined(PAR)
-static ullong startTime = 0;
+ullong startTime = 0;
 #endif
 
 EXTFUN(__init_Prelude);
@@ -93,25 +95,19 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     stat_startInit();
 
 #ifdef PAR
-/*
- * The parallel system needs to be initialised and synchronised before
- * the program is run.  
- */
-    fprintf(stderr, "startupHaskell: argv[0]=%s\n", argv[0]);
-    if (*argv[0] == '-') {     /* Look to see whether we're the Main Thread */
-	IAmMainThread = rtsTrue;
-        argv++; argc--;			/* Strip off flag argument */
-	// IF_PAR_DEBUG(verbose,
-		     fprintf(stderr, "[%x] I am Main Thread\n", mytid);
+    /*
+     * The parallel system needs to be initialised and synchronised before
+     * the program is run.  
+     */ 
+    startupParallelSystem(argv);
+     
+    if (*argv[0] == '-') { /* Strip off mainPE flag argument */
+      argv++; 
+      argc--;			
     }
-    /* 
-     * Grab the number of PEs out of the argument vector, and
-     * eliminate it from further argument processing.
-     */
-    nPEs = atoi(argv[1]);
-    argv[1] = argv[0];
+
+    argv[1] = argv[0];   /* ignore the nPEs argument */
     argv++; argc--;
-    initEachPEHook();                  /* HWL: hook to be execed on each PE */
 #endif
 
     /* Set the RTS flags to default values. */
@@ -127,8 +123,9 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 
 #if defined(PAR)
     /* NB: this really must be done after processing the RTS flags */
-    fprintf(stderr, "Synchronising system (%d PEs)\n", nPEs);
-    SynchroniseSystem();             // calls initParallelSystem etc
+    IF_PAR_DEBUG(verbose,
+                 fprintf(stderr, "==== Synchronising system (%d PEs)\n", nPEs));
+    synchroniseSystem();             // calls initParallelSystem etc
 #endif	/* PAR */
 
     /* initialise scheduler data structures (needs to be done before
@@ -257,7 +254,12 @@ shutdownHaskellAndExit(int n)
 {
   OnExitHook();
   shutdownHaskell();
+#if defined(PAR)
+  /* really exit (stg_exit() would call shutdownParallelSystem() again) */
+  exit(n);
+#else
   stg_exit(n);
+#endif;
 }
 
 void
@@ -292,7 +294,11 @@ shutdownHaskell(void)
   resetNonBlockingFd(2);
 
 #if defined(PAR)
+  /* controlled exit; good thread! */
   shutdownParallelSystem(0);
+
+  /* global statistics in parallel system */
+  PAR_TICKY_PAR_END();
 #endif
 
   /* stop timing the shutdown, we're about to print stats */
@@ -322,20 +328,28 @@ shutdownHaskell(void)
 #endif
 
   rts_has_started_up=0;
-
 }
 
 /* 
  * called from STG-land to exit the program
  */
 
+#ifdef PAR
+static int exit_started=rtsFalse;
+#endif
+
 void  
 stg_exit(I_ n)
-{
-#if 0 /* def PAR */
-  par_exit(n);
-#else
-  exit(n);
+{ 
+#ifdef PAR
+  /* HACK: avoid a loop when exiting due to a stupid error */
+  if (exit_started) 
+    return;
+  exit_started=rtsTrue;
+
+  IF_PAR_DEBUG(verbose, fprintf(stderr,"==-- stg_exit %d on [%x]...", n, mytid));
+  shutdownParallelSystem(n);
 #endif
+  exit(n);
 }
 

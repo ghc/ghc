@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.75 2001/02/28 00:01:03 qrczak Exp $
+ * $Id: PrimOps.h,v 1.76 2001/03/22 03:51:09 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -742,8 +742,6 @@ extern void stg_exit(I_ n)  __attribute__ ((noreturn));
    Stable Name / Stable Pointer  PrimOps
    -------------------------------------------------------------------------- */
 
-#ifndef PAR
-
 EXTFUN_RTS(makeStableNamezh_fast);
 
 #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
@@ -761,8 +759,6 @@ EXTFUN_RTS(makeStableNamezh_fast);
 
 #define eqStablePtrzh(r,sp1,sp2) \
     (r = ((stgCast(StgWord,sp1) & ~STABLEPTR_WEIGHT_MASK) == (stgCast(StgWord,sp2) & ~STABLEPTR_WEIGHT_MASK)))
-
-#endif
 
 /* -----------------------------------------------------------------------------
    Concurrency/Exception PrimOps.
@@ -793,7 +789,7 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 
 #if defined(GRAN)
 //@cindex _par_
-#define parzh(r,node)             PAR(r,node,1,0,0,0,0,0)
+#define parzh(r,node)             parAny(r,node,1,0,0,0,0,0)
 
 //@cindex _parAt_
 #define parAtzh(r,node,where,identifier,gran_info,size_info,par_info,rest) \
@@ -833,13 +829,13 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 
 //@cindex _parLocal_
 #define parLocalzh(r,node,identifier,gran_info,size_info,par_info,rest)	\
-	PAR(r,node,rest,identifier,gran_info,size_info,par_info,1)
+	parAny(r,node,rest,identifier,gran_info,size_info,par_info,1)
 
 //@cindex _parGlobal_
 #define parGlobalzh(r,node,identifier,gran_info,size_info,par_info,rest) \
-	PAR(r,node,rest,identifier,gran_info,size_info,par_info,0)
+	parAny(r,node,rest,identifier,gran_info,size_info,par_info,0)
 
-#define PAR(r,node,rest,identifier,gran_info,size_info,par_info,local) \
+#define parAny(r,node,rest,identifier,gran_info,size_info,par_info,local) \
 {                                                                        \
   if (closure_SHOULD_SPARK((StgClosure*)node)) {                         \
     rtsSpark *result;						         \
@@ -887,8 +883,6 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
    Weak Pointer PrimOps.
    -------------------------------------------------------------------------- */
 
-#ifndef PAR
-
 EXTFUN_RTS(mkWeakzh_fast);
 EXTFUN_RTS(finalizzeWeakzh_fast);
 
@@ -903,13 +897,10 @@ EXTFUN_RTS(finalizzeWeakzh_fast);
 
 #define sameWeakzh(w1,w2)  ((w1)==(w2))
 
-#endif
 
 /* -----------------------------------------------------------------------------
    Foreign Object PrimOps.
    -------------------------------------------------------------------------- */
-
-#ifndef PAR
 
 #define ForeignObj_CLOSURE_DATA(c)  (((StgForeignObj *)c)->data)
 
@@ -941,9 +932,6 @@ EXTFUN_RTS(mkForeignObjzh_fast);
 #define indexInt64OffForeignObjzh(r,fo,i)	indexInt64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexWord64OffForeignObjzh(r,fo,i)	indexWord64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #endif
-
-#endif
-
 
 /* -----------------------------------------------------------------------------
    Constructor tags

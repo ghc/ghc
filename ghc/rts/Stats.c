@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.24 2001/03/14 15:01:04 sewardj Exp $
+ * $Id: Stats.c,v 1.25 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,6 +16,7 @@
 #include "MBlock.h"
 #include "Schedule.h"
 #include "Stats.h"
+#include "ParTicky.h"                       // ToDo: move into Rts.h
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -53,6 +54,10 @@
 
 #if HAVE_WINDOWS_H
 #include <windows.h>
+#endif
+
+#if defined(PAR) || !(!defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(_WIN32))
+#include <sys/resource.h>
 #endif
 
 /* huh? */

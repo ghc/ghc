@@ -1,6 +1,6 @@
 /*
-  Time-stamp: <Tue Mar 28 2000 23:50:54 Stardate: [-30]4574.76 hwloidl>
-  $Id: Parallel.h,v 1.3 2000/03/31 03:09:35 hwloidl Exp $
+  Time-stamp: <Tue Mar 06 2001 00:09:10 Stardate: [-30]6285.03 hwloidl>
+  $Id: Parallel.h,v 1.4 2001/03/22 03:51:09 hwloidl Exp $
  
   Definitions for GUM i.e. running on a parallel machine.
 
@@ -131,7 +131,7 @@ extern nat advisory_thread_count;
 
 extern rtsBool InGlobalGC;  /* Are we in the midst of performing global GC */
 
-static ullong startTime;    /* start of comp; in RtsStartup.c */
+extern ullong startTime;    /* start of comp; in RtsStartup.c */
 
 /* the spark pools proper */
 extern rtsSpark *pending_sparks_hd[];  /* ptr to start of a spark pool */ 
@@ -289,7 +289,7 @@ typedef struct rtsPackBuffer_ {
   StgInt /* nat */           size;
   StgInt /* nat */           unpacked_size;
   StgTSO       *tso;
-  StgBuffer    *buffer;  
+  StgWord      *buffer;  
 } rtsPackBuffer;
 
 //@node Macros,  , Prototypes, GranSim

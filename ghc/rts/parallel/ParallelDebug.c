@@ -1,10 +1,10 @@
 /*
-  Time-stamp: <Mon Mar 20 2000 19:27:38 Stardate: [-30]4534.05 hwloidl>
+  Time-stamp: <Sun Mar 18 2001 19:32:56 Stardate: [-30]6349.07 hwloidl>
 
-Various debugging routines for GranSim and GUM
+  Various debugging routines for GranSim and GUM
 */
 
-#if defined(GRAN) || defined(PAR)                             /* whole file */
+#if defined(DEBUG) && (defined(GRAN) || defined(PAR))        /* whole file */
 
 //@node Debugging routines for GranSim and GUM, , ,
 //@section Debugging routines for GranSim and GUM
@@ -34,6 +34,8 @@ Various debugging routines for GranSim and GUM
 #include "StgMiscClosures.h"
 #include "Printer.h"
 # if defined(DEBUG)
+# include "Hash.h" 
+# include "Storage.h"
 # include "ParallelDebug.h"
 # endif
 
@@ -45,6 +47,80 @@ rtsBool  isFixed(globalAddr *ga);
 */
 //@node Constants and Variables, Closures, Prototypes, Debugging routines for GranSim and GUM
 //@subsection Constants and Variables
+
+static HashTable *tmpClosureTable;  // used in GraphFingerPrint and PrintGraph
+
+#if defined(PAR)
+static char finger_print_char[] = {
+ '/',  /* INVALID_OBJECT          0 */
+ 'C', /* CONSTR                  1 */
+ 'C', /*	CONSTR_1_0		2 */
+ 'C', /*	CONSTR_0_1		3 */
+ 'C', /*	CONSTR_2_0		4 */
+ 'C', /*	CONSTR_1_1		5 */
+ 'C', /*	CONSTR_0_2		6 */
+ 'I', /* CONSTR_INTLIKE	        7  */
+ 'I', /* CONSTR_CHARLIKE	        8  */
+ 'S', /* CONSTR_STATIC	        9  */
+ 'S', /* CONSTR_NOCAF_STATIC     10 */
+ 'F', /* FUN		        11 */
+ 'F', /*	FUN_1_0		  	12 */
+ 'F', /*	FUN_0_1		  	13 */
+ 'F', /*	FUN_2_0		  	14 */
+ 'F', /*	FUN_1_1		  	15 */
+ 'F', /*	FUN_0_2			16 */
+ 'S', /* FUN_STATIC	        17 */
+ 'T', /* THUNK		        18 */
+ 'T', /*	THUNK_1_0	19 */
+ 'T', /*	THUNK_0_1	20 */
+ 'T', /*	THUNK_2_0	21 */
+ 'T', /*	THUNK_1_1	22 */
+ 'T', /*	THUNK_0_2	23 */
+ 'S', /* THUNK_STATIC	        24 */
+ 'E', /* THUNK_SELECTOR	        25 */
+ 'b', /* BCO		        26 */
+ 'p', /* AP_UPD		        27 */
+ 'p', /* PAP			28 */
+ '_', /* IND		        29 */
+ '_', /* IND_OLDGEN	        30 */
+ '_', /* IND_PERM	        31 */
+ '_', /* IND_OLDGEN_PERM	32 */
+ '_', /* IND_STATIC	        33 */
+ '?', /* ***unused***	        34 */
+ '?', /* ***unused***	        35 */
+ '^', /* RET_BCO                36 */
+ '^', /* RET_SMALL	        37 */
+ '^', /* RET_VEC_SMALL	        38 */
+ '^', /* RET_BIG		39 */
+ '^', /* RET_VEC_BIG	        40 */
+ '^', /* RET_DYN		41 */
+ '~', /* UPDATE_FRAME	        42 */
+ '~', /* CATCH_FRAME	        43 */
+ '~', /* STOP_FRAME	        44 */
+ '~', /* SEQ_FRAME	        45 */
+ 'o', /* CAF_BLACKHOLE	        46 */
+ 'o', /* BLACKHOLE	        47 */
+ 'o', /* BLACKHOLE_BQ	        48 */
+ 'o', /* SE_BLACKHOLE		49 */
+ 'o', /* SE_CAF_BLACKHOLE	50 */
+ 'm', /* MVAR		        51 */
+ 'a', /* ARR_WORDS	        52 */
+ 'a', /* MUT_ARR_PTRS	        53 */
+ 'a', /* MUT_ARR_PTRS_FROZEN    54 */
+ 'q', /* MUT_VAR		55 */
+ 'w', /* WEAK		        56 */
+ 'f', /* FOREIGN		57 */
+ 's', /* STABLE_NAME	        58 */
+ '@', /* TSO		        59 */
+ '#', /* BLOCKED_FETCH	        60 */
+ '>', /* FETCH_ME               61 */
+ '>', /* FETCH_ME_BQ            62 */
+ '$', /* RBH                    63 */
+ 'v', /* EVACUATED              64 */
+ '>' /* REMOTE_REF              65 */  
+     /* ASSERT(there are N_CLOSURE_TYPES (==66) in this arrary) */
+};
+#endif /* PAR */
 
 #if defined(GRAN) && defined(GRAN_CHECK)
 //@node Closures, Threads, Constants and Variables, Debugging routines for GranSim and GUM
@@ -161,7 +237,7 @@ StgClosure* node;
    } else {
      /* Fixed header */
      fprintf(stderr, "(%s) FH [%#lx", info_type, node[locn++]);
-     for (i = 1; i < FIXED_HS; i++)
+     for (i = 1; i < _HS; i++)
        fprintf(stderr, " %#lx", node[locn++]);
      
      /* Variable header */
@@ -639,9 +715,9 @@ StgPtr node;
          fprintf(stderr,"\n      ");
 
        if(i < ptrs)
-         fprintf(stderr," 0x%lx[P]",*(node+_FHS+vhs+i));
+         fprintf(stderr," 0x%lx[P]",*(node+_HS+vhs+i));
        else
-         fprintf(stderr," %lu[D]",*(node+_FHS+vhs+i));
+         fprintf(stderr," %lu[D]",*(node+_HS+vhs+i));
      }
    fprintf(stderr, "\n");
 }
@@ -669,7 +745,7 @@ StgPtr node;
   INFO_PTR(node) |= INFO_MASK;
 
   for(i = 0; i < ptrs; ++i)
-    DEBUG_TREE((StgPtr)node[i+vhs+_FHS]);
+    DEBUG_TREE((StgPtr)node[i+vhs+_HS]);
 
   /* Unmark the node */
   INFO_PTR(node) &= ~INFO_MASK;
@@ -761,11 +837,46 @@ char *str;
 void
 PrintGraph(StgClosure *p, int indent_level)
 {
+  void PrintGraph_(StgClosure *p, int indent_level);
+
+  ASSERT(tmpClosureTable==NULL);
+
+  /* init hash table */
+  tmpClosureTable = allocHashTable();
+
+  /* now do the real work */
+  PrintGraph_(p, indent_level);
+
+  /* nuke hash table */
+  freeHashTable(tmpClosureTable, NULL);
+  tmpClosureTable = NULL;
+}
+
+/*
+  This is the actual worker functions. 
+  All recursive calls should be made to this function.
+*/
+void
+PrintGraph_(StgClosure *p, int indent_level)
+{
   StgPtr x, q;
   rtsBool printed = rtsFalse;
   nat i, j;
   const StgInfoTable *info;
   
+  /* check whether we have met this node already to break cycles */
+  if (lookupHashTable(tmpClosureTable, (StgWord)p)) { // ie. already touched
+    /* indentation */
+    for (j=0; j<indent_level; j++)
+      fputs(" ", stderr);
+
+    fprintf(stderr, "#### cylce to %p", p);
+    return; 
+  }
+
+  /* record that we are processing this closure */
+  insertHashTable(tmpClosureTable, (StgWord) p, (void *)rtsTrue/*non-NULL*/);
+
   q = p;			/* save ptr to object */
   
   /* indentation */
@@ -791,11 +902,13 @@ PrintGraph(StgClosure *p, int indent_level)
     {
   	StgBCO* bco = stgCast(StgBCO*,p);
   	nat i;
-	fprintf(stderr, "BCO (%p) with %d pointers\n", p, bco->n_ptrs);
+	fprintf(stderr, "BCO (%p)\n", p);
+        /*
   	for (i = 0; i < bco->n_ptrs; i++) {
   	  // bcoConstCPtr(bco,i) = 
-	  PrintGraph(bcoConstCPtr(bco,i), indent_level+1);
+	  PrintGraph_(bcoConstCPtr(bco,i), indent_level+1);
   	}
+	*/
   	// p += bco_sizeW(bco);
   	break;
     }
@@ -809,11 +922,11 @@ PrintGraph(StgClosure *p, int indent_level)
   	// evac_gen = 0;
 	fprintf(stderr, "MVAR (%p) with 3 pointers (head, tail, value)\n", p);
   	// (StgClosure *)mvar->head = 
-	PrintGraph((StgClosure *)mvar->head, indent_level+1);
+	PrintGraph_((StgClosure *)mvar->head, indent_level+1);
   	// (StgClosure *)mvar->tail = 
-	PrintGraph((StgClosure *)mvar->tail, indent_level+1);
+	PrintGraph_((StgClosure *)mvar->tail, indent_level+1);
   	//(StgClosure *)mvar->value = 
-	PrintGraph((StgClosure *)mvar->value, indent_level+1);
+	PrintGraph_((StgClosure *)mvar->value, indent_level+1);
   	// p += sizeofW(StgMVar);
   	// evac_gen = saved_evac_gen;
   	break;
@@ -836,10 +949,10 @@ PrintGraph(StgClosure *p, int indent_level)
       printed = rtsTrue;
     }
     // ((StgClosure *)p)->payload[0] = 
-    PrintGraph(((StgClosure *)p)->payload[0],
+    PrintGraph_(((StgClosure *)p)->payload[0],
 	       indent_level+1);
     // ((StgClosure *)p)->payload[1] = 
-    PrintGraph(((StgClosure *)p)->payload[1],
+    PrintGraph_(((StgClosure *)p)->payload[1],
 	       indent_level+1);
     // p += sizeofW(StgHeader) + 2;
     break;
@@ -848,7 +961,7 @@ PrintGraph(StgClosure *p, int indent_level)
     // scavenge_srt(info);
     fprintf(stderr, "THUNK_1_0 (%p) with 1 pointer\n", p);
     // ((StgClosure *)p)->payload[0] = 
-    PrintGraph(((StgClosure *)p)->payload[0],
+    PrintGraph_(((StgClosure *)p)->payload[0],
 	       indent_level+1);
     // p += sizeofW(StgHeader) + 2; /* MIN_UPD_SIZE */
     break;
@@ -865,7 +978,7 @@ PrintGraph(StgClosure *p, int indent_level)
       printed = rtsTrue;
     }
     // ((StgClosure *)p)->payload[0] = 
-    PrintGraph(((StgClosure *)p)->payload[0],
+    PrintGraph_(((StgClosure *)p)->payload[0],
 	       indent_level+1);
     // p += sizeofW(StgHeader) + 1;
     break;
@@ -920,7 +1033,7 @@ PrintGraph(StgClosure *p, int indent_level)
       printed = rtsTrue;
     }
     // ((StgClosure *)p)->payload[0] = 
-    PrintGraph(((StgClosure *)p)->payload[0],
+    PrintGraph_(((StgClosure *)p)->payload[0],
 	       indent_level+1);
     // p += sizeofW(StgHeader) + 2;
     break;
@@ -947,7 +1060,7 @@ PrintGraph(StgClosure *p, int indent_level)
     }
     /* basically same as loop in STABLE_NAME case  */
     for (i=0; i<info->layout.payload.ptrs; i++)
-      PrintGraph(((StgClosure *)p)->payload[i],
+      PrintGraph_(((StgClosure *)p)->payload[i],
 		 indent_level+1);
     break;
     /* NOT fall through */
@@ -978,7 +1091,7 @@ PrintGraph(StgClosure *p, int indent_level)
       end = (StgPtr)((StgClosure *)p)->payload + info->layout.payload.ptrs;
       for (p = (StgPtr)((StgClosure *)p)->payload; p < end; p++) {
 	// (StgClosure *)*p = 
-	//PrintGraph((StgClosure *)*p, indent_level+1);
+	//PrintGraph_((StgClosure *)*p, indent_level+1);
 	fprintf(stderr, ", %p", *p); 
       }
       //fputs("\n", stderr);
@@ -1004,7 +1117,7 @@ PrintGraph(StgClosure *p, int indent_level)
       printed = rtsTrue;
     }
     // ((StgIndOldGen *)p)->indirectee = 
-    PrintGraph(((StgIndOldGen *)p)->indirectee,
+    PrintGraph_(((StgIndOldGen *)p)->indirectee,
 	       indent_level+1);
     //if (failed_to_evac) {
     //	failed_to_evac = rtsFalse;
@@ -1013,48 +1126,12 @@ PrintGraph(StgClosure *p, int indent_level)
     // p += sizeofW(StgIndOldGen);
     break;
   
-  case CAF_UNENTERED:
-    {
-  	StgCAF *caf = (StgCAF *)p;
-  
-	fprintf(stderr, "CAF_UNENTERED (%p) pointing to %p\n", p, caf->body);
-  	PrintGraph(caf->body, indent_level+1);
-  	//if (failed_to_evac) {
-  	//  failed_to_evac = rtsFalse;
-  	//  recordOldToNewPtrs((StgMutClosure *)p);
-  	//} else {
-  	//  caf->mut_link = NULL;
-  	//}
-	//p += sizeofW(StgCAF);
-  	break;
-    }
-  
-  case CAF_ENTERED:
-    {
-  	StgCAF *caf = (StgCAF *)p;
-  
-	fprintf(stderr, "CAF_ENTERED (%p) pointing to %p and %p\n", 
-		p, caf->body, caf->value);
-  	// caf->body = 
-	PrintGraph(caf->body, indent_level+1);
-  	//caf->value = 
-	PrintGraph(caf->value, indent_level+1);
-  	//if (failed_to_evac) {
-  	//  failed_to_evac = rtsFalse;
-  	//  recordOldToNewPtrs((StgMutClosure *)p);
-  	//} else {
-  	//  caf->mut_link = NULL;
-  	//}
-	//p += sizeofW(StgCAF);
-  	break;
-    }
-
   case MUT_VAR:
     /* ignore MUT_CONSs */
     fprintf(stderr, "MUT_VAR (%p) pointing to %p\n", p, ((StgMutVar *)p)->var);
-    if (((StgMutVar *)p)->header.info != &MUT_CONS_info) {
+    if (((StgMutVar *)p)->header.info != &stg_MUT_CONS_info) {
       //evac_gen = 0;
-      PrintGraph(((StgMutVar *)p)->var, indent_level+1);
+      PrintGraph_(((StgMutVar *)p)->var, indent_level+1);
   	//evac_gen = saved_evac_gen;
     }
     //p += sizeofW(StgMutVar);
@@ -1089,7 +1166,7 @@ PrintGraph(StgClosure *p, int indent_level)
       // (StgClosure *)bh->blocking_queue = 
       fprintf(stderr, "BLACKHOLE_BQ (%p) pointing to %p\n", 
 	      p, (StgClosure *)bh->blocking_queue);
-      PrintGraph((StgClosure *)bh->blocking_queue, indent_level+1);
+      PrintGraph_((StgClosure *)bh->blocking_queue, indent_level+1);
       //if (failed_to_evac) {
       //  failed_to_evac = rtsFalse;
       //  recordMutable((StgMutClosure *)bh);
@@ -1103,20 +1180,20 @@ PrintGraph(StgClosure *p, int indent_level)
       StgSelector *s = (StgSelector *)p;
       fprintf(stderr, "THUNK_SELECTOR (%p) pointing to %p\n", 
 	      p, s->selectee);
-      PrintGraph(s->selectee, indent_level+1);
+      PrintGraph_(s->selectee, indent_level+1);
       // p += THUNK_SELECTOR_sizeW();
       break;
     }
   
   case IND:
     fprintf(stderr, "IND (%p) pointing to %p\n", p, ((StgInd*)p)->indirectee);
-    PrintGraph(((StgInd*)p)->indirectee, indent_level+1);
+    PrintGraph_(((StgInd*)p)->indirectee, indent_level+1);
     break;
 
   case IND_OLDGEN:
     fprintf(stderr, "IND_OLDGEN (%p) pointing to %p\n", 
 	    p, ((StgIndOldGen*)p)->indirectee);
-    PrintGraph(((StgIndOldGen*)p)->indirectee, indent_level+1);
+    PrintGraph_(((StgIndOldGen*)p)->indirectee, indent_level+1);
     break;
   
   case CONSTR_INTLIKE:
@@ -1176,14 +1253,14 @@ PrintGraph(StgClosure *p, int indent_level)
     fprintf(stderr, "AP_UPD (%p) with 0 pointers\n", p);
   case PAP:
     /* Treat a PAP just like a section of stack, not forgetting to
-     * PrintGraph the function pointer too...
+     * PrintGraph_ the function pointer too...
      */
     { 
   	StgPAP* pap = stgCast(StgPAP*,p);
   
 	fprintf(stderr, "PAP (%p) pointing to %p\n", p, pap->fun);
   	// pap->fun = 
-	//PrintGraph(pap->fun, indent_level+1);
+	//PrintGraph_(pap->fun, indent_level+1);
   	//scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
   	//p += pap_sizeW(pap);
   	break;
@@ -1206,7 +1283,7 @@ PrintGraph(StgClosure *p, int indent_level)
   	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
   	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
   	  // (StgClosure *)*p = 
-	  // PrintGraph((StgClosure *)*p, indent_level+1);
+	  // PrintGraph_((StgClosure *)*p, indent_level+1);
 	  fprintf(stderr, ", %p", *p); 
   	}
 	fputs("\n", stderr);
@@ -1224,7 +1301,7 @@ PrintGraph(StgClosure *p, int indent_level)
   	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
   	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
   	  // (StgClosure *)*p = 
-	  // PrintGraph((StgClosure *)*p, indent_level+1);
+	  // PrintGraph_((StgClosure *)*p, indent_level+1);
 	  fprintf(stderr, ", %p", *p); 
   	}
 	fputs("\n", stderr);
@@ -1245,9 +1322,9 @@ PrintGraph(StgClosure *p, int indent_level)
   	// evac_gen = 0;
   	/* chase the link field for any TSOs on the same queue */
   	// (StgClosure *)tso->link = 
-	PrintGraph((StgClosure *)tso->link, indent_level+1);
+	PrintGraph_((StgClosure *)tso->link, indent_level+1);
   	//if (tso->blocked_on) {
-  	//  tso->blocked_on = PrintGraph(tso->blocked_on);
+  	//  tso->blocked_on = PrintGraph_(tso->blocked_on);
   	//}
   	/* scavenge this thread's stack */
   	//scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
@@ -1282,13 +1359,20 @@ PrintGraph(StgClosure *p, int indent_level)
 	    p, ((StgFetchMeBlockingQueue *)p)->blocking_queue);
     break;
 #endif
+    
+#ifdef DIST    
+  case REMOTE_REF:
+    fprintf(stderr, "REMOTE_REF (%p) with 0 pointers\n", p);
+    break;
+#endif
+
   case EVACUATED:
     fprintf(stderr, "EVACUATED (%p) with 0 pointers (evacuee=%p)\n", 
 	    p, ((StgEvacuated *)p)->evacuee);
     break;
   
   default:
-    barf("PrintGraph: unknown closure %d (%s)",
+    barf("PrintGraph_: unknown closure %d (%s)",
 	 info -> type, info_type(info));
   }
   
@@ -1301,6 +1385,324 @@ PrintGraph(StgClosure *p, int indent_level)
   //  failed_to_evac = rtsFalse;
   //}
 }    
+
+# if defined(PAR)
+/*
+  Generate a finger-print for a graph.
+  A finger-print is a string, with each char representing one node; 
+  depth-first traversal
+*/
+
+void
+GraphFingerPrint(StgClosure *p, char *finger_print)
+{
+  void GraphFingerPrint_(StgClosure *p, char *finger_print);
+
+  ASSERT(tmpClosureTable==NULL);
+  ASSERT(strlen(finger_print)==0);
+
+  /* init hash table */
+  tmpClosureTable = allocHashTable();
+
+  /* now do the real work */
+  GraphFingerPrint_(p, finger_print);
+
+  /* nuke hash table */
+  freeHashTable(tmpClosureTable, NULL);
+  tmpClosureTable = NULL;
+}
+
+/*
+  This is the actual worker functions. 
+  All recursive calls should be made to this function.
+*/
+void
+GraphFingerPrint_(StgClosure *p, char *finger_print)
+{
+  StgPtr x, q;
+  rtsBool printed = rtsFalse;
+  nat i, j, len;
+  const StgInfoTable *info;
+
+  q = p;			/* save ptr to object */
+  len = strlen(finger_print);
+  ASSERT(len<=MAX_FINGER_PRINT_LEN);
+  /* at most 7 chars for this node (I think) */
+  if (len+7>=MAX_FINGER_PRINT_LEN)
+    return;
+
+  /* check whether we have met this node already to break cycles */
+  if (lookupHashTable(tmpClosureTable, (StgWord)p)) { // ie. already touched
+    strcat(finger_print, "#");
+    return; 
+  }
+
+  /* record that we are processing this closure */
+  insertHashTable(tmpClosureTable, (StgWord) p, (void *)rtsTrue/*non-NULL*/);
+
+  ASSERT(p!=(StgClosure*)NULL);
+  ASSERT(LOOKS_LIKE_STATIC(p) ||
+	 LOOKS_LIKE_GHC_INFO(GET_INFO((StgClosure *)p)) ||
+         IS_HUGS_CONSTR_INFO(GET_INFO((StgClosure *)p)));
+
+  info = get_itbl((StgClosure *)p);
+  // append char for this node
+  finger_print[len] = finger_print_char[info->type]; finger_print[len+1] = '\0'; 
+  /* the rest of this fct recursively traverses the graph */
+  switch (info -> type) {
+  
+  case BCO:
+    {
+  	StgBCO* bco = stgCast(StgBCO*,p);
+  	nat i;
+	//%% fprintf(stderr, "BCO (%p) with %d pointers\n", p, bco->n_ptrs);
+        /*
+  	for (i = 0; i < bco->n_ptrs; i++) {
+  	  // bcoConstCPtr(bco,i) = 
+	  GraphFingerPrint_(bcoConstCPtr(bco,i), finger_print);
+  	}
+	*/
+  	// p += bco_sizeW(bco);
+  	break;
+    }
+  
+  case MVAR:
+    break;
+  
+  case THUNK_2_0:
+  case FUN_2_0:
+  case CONSTR_2_0:
+    // append char for this node
+    strcat(finger_print, "22(");
+    GraphFingerPrint_(((StgClosure *)p)->payload[0], finger_print);
+    GraphFingerPrint_(((StgClosure *)p)->payload[1], finger_print);
+    if (strlen(finger_print)+2<MAX_FINGER_PRINT_LEN)
+      strcat(finger_print, ")");
+    break;
+  
+  case THUNK_1_0:
+  case FUN_1_0:
+  case CONSTR_1_0:
+    // append char for this node
+    strcat(finger_print, "12(");
+    GraphFingerPrint_(((StgClosure *)p)->payload[0], finger_print);
+    if (strlen(finger_print)+2<MAX_FINGER_PRINT_LEN)
+      strcat(finger_print, ")");
+    break;
+  
+  case THUNK_0_1:
+  case FUN_0_1:
+  case CONSTR_0_1:
+    // append char for this node
+    strcat(finger_print, "01");
+    break;
+  
+  case THUNK_0_2:
+  case FUN_0_2:
+  case CONSTR_0_2:
+    // append char for this node
+    strcat(finger_print, "02");
+    break;
+  
+  case THUNK_1_1:
+  case FUN_1_1:
+  case CONSTR_1_1:
+    // append char for this node
+    strcat(finger_print, "11(");
+    GraphFingerPrint_(((StgClosure *)p)->payload[0], finger_print);
+    if (strlen(finger_print)+2<MAX_FINGER_PRINT_LEN)
+      strcat(finger_print, ")");
+    break;
+  
+  case FUN:
+  case THUNK:
+  case CONSTR:
+    /* basically same as loop in STABLE_NAME case  */
+    {
+	char str[6];
+	sprintf(str,"%d?(",info->layout.payload.ptrs);
+	strcat(finger_print,str); 
+	for (i=0; i<info->layout.payload.ptrs; i++)
+	  GraphFingerPrint_(((StgClosure *)p)->payload[i], finger_print);
+	if (strlen(finger_print)+2<MAX_FINGER_PRINT_LEN)
+	  strcat(finger_print, ")");
+    }
+    break;
+  
+  case WEAK:
+  case FOREIGN:
+  case STABLE_NAME:
+    {
+      StgPtr end;
+      char str[6];
+      sprintf(str,"%d?", info->layout.payload.ptrs);
+      strcat(finger_print,str); 
+
+	//end = (StgPtr)((StgClosure *)p)->payload + info->layout.payload.ptrs;
+      //for (p = (StgPtr)((StgClosure *)p)->payload; p < end; p++) {
+      // GraphFingerPrint_((StgClosure *)*p, finger_print);
+      //}
+      break;
+    }
+  
+  case IND_PERM:
+  case IND_OLDGEN_PERM:
+    GraphFingerPrint_(((StgIndOldGen *)p)->indirectee, finger_print);
+    break;
+  
+  case MUT_VAR:
+    /* ignore MUT_CONSs */
+    if (((StgMutVar *)p)->header.info != &stg_MUT_CONS_info) {
+      GraphFingerPrint_(((StgMutVar *)p)->var, finger_print);
+    }
+    break;
+  
+  case CAF_BLACKHOLE:
+  case SE_CAF_BLACKHOLE:
+  case SE_BLACKHOLE:
+  case BLACKHOLE:
+    break;
+  
+  case BLACKHOLE_BQ:
+    { 
+      StgBlockingQueue *bh = (StgBlockingQueue *)p;
+      // GraphFingerPrint_((StgClosure *)bh->blocking_queue, finger_print);
+      break;
+    }
+  
+  case THUNK_SELECTOR:
+    { 
+      StgSelector *s = (StgSelector *)p;
+      GraphFingerPrint_(s->selectee, finger_print);
+      break;
+    }
+  
+  case IND:
+    GraphFingerPrint_(((StgInd*)p)->indirectee, finger_print);
+    break;
+
+  case IND_OLDGEN:
+    GraphFingerPrint_(((StgIndOldGen*)p)->indirectee, finger_print);
+    break;
+
+  case IND_STATIC:
+    GraphFingerPrint_(((StgIndOldGen*)p)->indirectee, finger_print);
+    break;
+  
+  case CONSTR_INTLIKE:
+  case CONSTR_CHARLIKE:
+  case CONSTR_STATIC:
+  case CONSTR_NOCAF_STATIC:
+  case THUNK_STATIC:
+  case FUN_STATIC:
+    break;
+  
+  case RET_BCO:
+  case RET_SMALL:
+  case RET_VEC_SMALL:
+  case RET_BIG:
+  case RET_VEC_BIG:
+  case RET_DYN:
+  case UPDATE_FRAME:
+  case STOP_FRAME:
+  case CATCH_FRAME:
+  case SEQ_FRAME:
+    break;
+  
+  case AP_UPD: /* same as PAPs */
+  case PAP:
+    /* Treat a PAP just like a section of stack, not forgetting to
+     * GraphFingerPrint_ the function pointer too...
+     */
+    { 
+  	StgPAP* pap = stgCast(StgPAP*,p);
+	char str[6];
+	sprintf(str,"%d",pap->n_args);
+	strcat(finger_print,str); 
+	//GraphFingerPrint_(pap->fun, finger_print); // ??
+  	break;
+    }
+    
+  case ARR_WORDS:
+    {
+	char str[6];
+	sprintf(str,"%d",((StgArrWords*)p)->words);
+	strcat(finger_print,str); 
+    }
+    break;
+
+  case MUT_ARR_PTRS:
+    /* follow everything */
+    {
+	char str[6];
+	sprintf(str,"%d",((StgMutArrPtrs*)p)->ptrs);
+	strcat(finger_print,str); 
+    }
+    {
+  	StgPtr next;
+  	//next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+  	//for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	//  GraphFingerPrint_((StgClosure *)*p, finger_print);
+  	//}
+  	break;
+    }
+  
+  case MUT_ARR_PTRS_FROZEN:
+    /* follow everything */
+    {
+	char str[6];
+	sprintf(str,"%d",((StgMutArrPtrs*)p)->ptrs);
+	strcat(finger_print,str); 
+    }
+    {
+  	StgPtr start = p, next;
+  	//next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+  	//for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	//  GraphFingerPrint_((StgClosure *)*p, finger_print);
+  	//}
+  	break;
+    }
+  
+  case TSO:
+    { 
+      StgTSO *tso = (StgTSO *)p;
+      char str[6];
+      sprintf(str,"%d",tso->id);
+      strcat(finger_print,str); 
+    }
+    //GraphFingerPrint_((StgClosure *)tso->link, indent_level+1);
+    break;
+  
+#if defined(GRAN) || defined(PAR)
+  case RBH:
+    {
+      // use this
+      // StgInfoTable *rip = REVERT_INFOPTR(get_itbl(p));
+    }
+    break;
+#endif
+#if defined(PAR)
+  case BLOCKED_FETCH:
+    break;
+  case FETCH_ME:
+    break;
+  case FETCH_ME_BQ:
+    break;
+#endif
+#ifdef DIST    
+  case REMOTE_REF:
+    break;
+#endif
+  case EVACUATED:
+    break;
+  
+  default:
+    barf("GraphFingerPrint_: unknown closure %d (%s)",
+	 info -> type, info_type(info));
+  }
+ 
+}    
+# endif /* PAR */
 
 /*
   Do a sanity check on the whole graph, down to a recursion level of level.
@@ -1330,9 +1732,11 @@ checkGraph(StgClosure *p, int rec_level)
     {
   	StgBCO* bco = stgCast(StgBCO*,p);
   	nat i;
+        /*
   	for (i = 0; i < bco->n_ptrs; i++) {
 	  checkGraph(bcoConstCPtr(bco,i), rec_level-1);
   	}
+	*/
   	break;
     }
   
@@ -1407,29 +1811,9 @@ checkGraph(StgClosure *p, int rec_level)
     checkGraph(((StgIndOldGen *)p)->indirectee, rec_level-1);
     break;
   
-  case CAF_UNENTERED:
-    {
-  	StgCAF *caf = (StgCAF *)p;
-  
-	fprintf(stderr, "CAF_UNENTERED (%p) pointing to %p\n", p, caf->body);
-  	checkGraph(caf->body, rec_level-1);
-  	break;
-    }
-  
-  case CAF_ENTERED:
-    {
-  	StgCAF *caf = (StgCAF *)p;
-  
-	fprintf(stderr, "CAF_ENTERED (%p) pointing to %p and %p\n", 
-		p, caf->body, caf->value);
-	checkGraph(caf->body, rec_level-1);
-	checkGraph(caf->value, rec_level-1);
-  	break;
-    }
-
   case MUT_VAR:
     /* ignore MUT_CONSs */
-    if (((StgMutVar *)p)->header.info != &MUT_CONS_info) {
+    if (((StgMutVar *)p)->header.info != &stg_MUT_CONS_info) {
       checkGraph(((StgMutVar *)p)->var, rec_level-1);
     }
     break;

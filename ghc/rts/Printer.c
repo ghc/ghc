@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.37 2001/02/15 14:30:07 sewardj Exp $
+ * $Id: Printer.c,v 1.38 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -21,9 +21,11 @@
 
 #include "Printer.h"
 
+#if defined(GRAN) || defined(PAR)
 // HWL: explicit fixed header size to make debugging easier
 int fixed_hs = FIXED_HS, itbl_sz = sizeofW(StgInfoTable), 
     uf_sz=sizeofW(StgUpdateFrame), sf_sz=sizeofW(StgSeqFrame); 
+#endif
 
 /* --------------------------------------------------------------------------
  * local function decls
@@ -174,6 +176,14 @@ void printClosure( StgClosure *obj )
       fprintf(stderr,")\n"); 
       break;
 
+#ifdef DIST      
+    case REMOTE_REF:
+      fprintf(stderr,"REMOTE_REF("); 
+      printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
+      fprintf(stderr,")\n"); 
+      break;
+#endif
+  
     case FETCH_ME_BQ:
       fprintf(stderr,"FETCH_ME_BQ("); 
       // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
@@ -552,7 +562,8 @@ static char *closure_type_names[] = {
   "FETCH_ME_BQ",                /* 62 */
   "RBH",                        /* 63 */
   "EVACUATED",                  /* 64 */
-  "N_CLOSURE_TYPES"         	/* 65 */
+  "REMOTE_REF",                 /* 65 */
+  "N_CLOSURE_TYPES"         	/* 66 */
 };
 
 char *
@@ -792,7 +803,7 @@ static void printZcoded( const char *raw )
 /* Causing linking trouble on Win32 plats, so I'm
    disabling this for now. 
 */
-#if defined(HAVE_BFD_H) && !defined(_WIN32)
+#if defined(HAVE_BFD_H) && !defined(_WIN32) && !defined(PAR) && !defined(GRAN)
 
 #include <bfd.h>
 

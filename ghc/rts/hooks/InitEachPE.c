@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: InitEachPE.c,v 1.2 1998/12/02 13:29:12 simonm Exp $
+ * $Id: InitEachPE.c,v 1.3 2001/03/22 03:51:11 hwloidl Exp $
  *
  * User-overridable RTS hooks.
  *
@@ -9,17 +9,16 @@
 
 #ifdef PAR
 void
-initEachPEHook (void)
-{ /* in a GUM setup this is called on each
-     PE immediately before SynchroniseSystem
-     it can be used to read in static data 
+InitEachPEHook (void)
+{ /* In a GUM setup this is called on each
+     PE immediately before SynchroniseSystem.
+     It can be used to read in static data 
      to each PE which has to be available to
-     each PE
-
-     This version is the one specialised 
-     for Lolita, calling the LoadAllData stuff.
-     The default version probably should do 
-     nothing -- HWL
+     each PE. See GPH-Maple as an example how to
+     use this in combination with foreign language
+     code:
+       http://www.risc.uni-linz.ac.at/software/ghc-maple/
+     -- HWL
   */
 }
 #endif

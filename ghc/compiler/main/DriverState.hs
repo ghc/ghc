@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.33 2001/03/12 14:06:47 simonpj Exp $
+-- $Id: DriverState.hs,v 1.34 2001/03/22 03:51:08 hwloidl Exp $
 --
 -- Settings for the driver
 --
@@ -507,14 +507,45 @@ way_details =
     (WayUnreg, Way  "u" "Unregisterised" 
 	unregFlags ),
 
+    -- optl's below to tell linker where to find the PVM library -- HWL
     (WayPar, Way  "mp" "Parallel" 
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
 	, "-package concurrent"
+        , "-optc-w"
+        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
+        , "-optl-lpvm3"
+        , "-optl-lgpvm3"
 	, "-fvia-C" ]),
 
-    (WayGran, Way  "mg" "Gransim" 
+    -- at the moment we only change the RTS and could share compiler and libs!
+    (WayPar, Way  "mt" "Parallel ticky profiling" 
+	[ "-fparallel"
+	, "-D__PARALLEL_HASKELL__"
+	, "-optc-DPAR"
+	, "-optc-DPAR_TICKY"
+	, "-package concurrent"
+        , "-optc-w"
+        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
+        , "-optl-lpvm3"
+        , "-optl-lgpvm3"
+	, "-fvia-C" ]),
+
+    (WayPar, Way  "md" "Distributed" 
+	[ "-fparallel"
+	, "-D__PARALLEL_HASKELL__"
+	, "-D__DISTRIBUTED_HASKELL__"
+	, "-optc-DPAR"
+	, "-optc-DDIST"
+	, "-package concurrent"
+        , "-optc-w"
+        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
+        , "-optl-lpvm3"
+        , "-optl-lgpvm3"
+	, "-fvia-C" ]),
+
+    (WayGran, Way  "mg" "GranSim" 
 	[ "-fgransim"
 	, "-D__GRANSIM__"
 	, "-optc-DGRAN"

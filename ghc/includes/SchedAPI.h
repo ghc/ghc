@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.12 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: SchedAPI.h,v 1.13 2001/03/22 03:51:09 hwloidl Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -31,6 +31,9 @@ SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret);
 StgTSO *createThread(nat stack_size, StgInt pri);
 #else
 StgTSO *createThread(nat stack_size);
+#endif
+#if defined(PAR) || defined(SMP)
+void taskStart(void);
 #endif
 void scheduleThread(StgTSO *tso);
 

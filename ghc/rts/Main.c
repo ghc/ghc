@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.26 2001/02/09 12:40:22 simonmar Exp $
+ * $Id: Main.c,v 1.27 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -25,8 +25,8 @@
 #endif
 
 #ifdef PAR
-# include "ParInit.h"
 # include "Parallel.h"
+# include "ParallelRts.h"
 # include "LLC.h"
 #endif
 
@@ -78,7 +78,8 @@ int main(int argc, char *argv[])
 #   endif
 
     if (IAmMainThread == rtsTrue) {
-      fprintf(stderr, "Main Thread Started ...\n");
+      IF_PAR_DEBUG(verbose,
+		   fprintf(stderr, "==== [%x] Main Thread Started ...\n", mytid));
 
       /* ToDo: Dump event for the main thread */
       status = rts_evalIO((HaskellObj)mainIO_closure, NULL);
@@ -89,7 +90,8 @@ int main(int argc, char *argv[])
 			   mytid));
      
       /* all non-main threads enter the scheduler without work */
-      status = rts_evalNothing((StgClosure*)NULL);
+      taskStart();       
+      status = Success;  // declare victory (see shutdownParallelSystem)
     }
 
 #  elif defined(GRAN)
@@ -104,7 +106,6 @@ int main(int argc, char *argv[])
 
 #  endif /* !PAR && !GRAN */
 
-    // ToDo: update for parallel execution
     /* check the status of the entire Haskell computation */
     switch (status) {
     case Deadlock:
@@ -122,6 +123,12 @@ int main(int argc, char *argv[])
     case Success:
       exit_status = EXIT_SUCCESS;
       break;
+#if defined(PAR)
+    case NoStatus:
+      prog_belch("main thread PE killed; probably due to failure of another PE; check /tmp/pvml...");
+      exit_status = EXIT_KILLED;
+      break;
+#endif 
     default:
       barf("main thread completed with invalid status");
     }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.73 2001/02/28 00:01:04 qrczak Exp $
+ * $Id: PrimOps.hc,v 1.74 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -314,7 +314,6 @@ FN_(newMutVarzh_fast)
 
    -------------------------------------------------------------------------- */
 
-#ifndef PAR
 FN_(mkForeignObjzh_fast)
 {
   /* R1.p = ptr to foreign object,
@@ -336,7 +335,6 @@ FN_(mkForeignObjzh_fast)
   RET_P(result);
   FE_
 }
-#endif
 
 /* These two are out-of-line for the benefit of the NCG */
 FN_(unsafeThawArrayzh_fast)
@@ -353,8 +351,6 @@ FN_(unsafeThawArrayzh_fast)
 /* -----------------------------------------------------------------------------
    Weak Pointer Primitives
    -------------------------------------------------------------------------- */
-
-#ifndef PAR
 
 FN_(mkWeakzh_fast)
 {
@@ -418,8 +414,6 @@ FN_(finalizzeWeakzh_fast)
   }
   FE_
 }
-
-#endif /* !PAR */
 
 /* -----------------------------------------------------------------------------
    Arbitrary-precision Integer operations.

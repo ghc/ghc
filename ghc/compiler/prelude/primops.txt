@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.18 2001/02/28 00:01:02 qrczak Exp $
+-- $Id: primops.txt,v 1.19 2001/03/22 03:51:08 hwloidl Exp $
 --
 -- Primitive Operations
 --
@@ -787,8 +787,6 @@ primop IndexOffForeignObjOp_Word32 "indexWord32OffForeignObj#" GenPrimOp
 primop IndexOffForeignObjOp_Word64 "indexWord64OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Word64#
 
-
-
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
 
@@ -1152,7 +1150,6 @@ primop TouchOp "touch#" GenPrimOp
    with
    strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
 
-
 ------------------------------------------------------------------------
 --- Weak pointers                                                    ---
 ------------------------------------------------------------------------
@@ -1182,7 +1179,6 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
                                             [id,id,inFun FinalizeWeakOp mkR mkM])) }
    has_side_effects = True
    out_of_line      = True
-
 
 ------------------------------------------------------------------------
 --- Stable pointers and names                                        ---
@@ -1302,6 +1298,7 @@ primop  ParAtForNowOp  "parAtForNow#" GenPrimOp
 -- copyable# and noFollow# have no corresponding entry in
 -- PrelGHC.hi-boot, so I don't know whether they should still
 -- be here or not.  JRS, 15 Jan 01
+-- not implemented; please, keep the comment as reminder -- HWL 12/3/01
 --
 --primop  CopyableOp  "copyable#" GenPrimOp
 --   a -> Int#

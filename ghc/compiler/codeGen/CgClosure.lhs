@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.45 2001/03/06 10:13:35 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.46 2001/03/22 03:51:08 hwloidl Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -320,12 +320,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	--
     	arg_regs = case entry_conv of
 		DirectEntry lbl arity regs -> regs
-		other 		           -> trace ("*** closureCodeBody:arg_regs " ++ (pprHWL entry_conv) ++ "(HWL ignored; no args passed in regs)") []
-
-        pprHWL :: EntryConvention -> String    
-        pprHWL (ViaNode) = "ViaNode"
-        pprHWL (StdEntry cl) = "StdEntry"
-        pprHWL (DirectEntry cl i l) = "DirectEntry"
+		other 		           -> []  -- "(HWL ignored; no args passed in regs)"
 
 	num_arg_regs = length arg_regs
 	

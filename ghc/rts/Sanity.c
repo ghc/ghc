@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.26 2001/02/09 13:09:16 simonmar Exp $
+ * $Id: Sanity.c,v 1.27 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -387,6 +387,11 @@ checkClosure( StgClosure* p )
       ASSERT(LOOKS_LIKE_PTR((((StgBlockedFetch *)p)->node)));
       return sizeofW(StgBlockedFetch);  // see size used in evacuate()
 
+#ifdef DIST
+    case REMOTE_REF:
+      return sizeofW(StgFetchMe); 
+#endif //DIST
+      
     case FETCH_ME:
       ASSERT(LOOKS_LIKE_GA(((StgFetchMe *)p)->ga));
       return sizeofW(StgFetchMe);  // see size used in evacuate()
@@ -500,9 +505,35 @@ checkHeap(bdescr *bd, StgPtr start)
 	    xxx);
 }
 
+#if defined(PAR)
 /* 
    Check heap between start and end. Used after unpacking graphs.
 */
+extern void 
+checkHeapChunk(StgPtr start, StgPtr end)
+{
+  extern globalAddr *LAGAlookup(StgClosure *addr);
+  StgPtr p;
+  nat size;
+
+  for (p=start; p<end; p+=size) {
+    ASSERT(LOOKS_LIKE_GHC_INFO((void*)*p));
+    if (get_itbl((StgClosure*)p)->type == FETCH_ME &&
+	*(p+1) == 0x0000eeee /* ie. unpack garbage (see SetGAandCommonUp) */) {
+      /* if it's a FM created during unpack and commoned up, it's not global */
+      ASSERT(LAGAlookup((StgClosure*)p)==NULL);
+      size = sizeofW(StgFetchMe);
+    } else if (get_itbl((StgClosure*)p)->type == IND) {
+      *(p+2) = 0x0000ee11; /* mark slop in IND as garbage */
+      size = MIN_UPD_SIZE;
+    } else {
+      size = checkClosure(stgCast(StgClosure*,p));
+      /* This is the smallest size of closure that can live in the heap. */
+      ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
+    }
+  }
+}
+#else /* !PAR */
 extern void 
 checkHeapChunk(StgPtr start, StgPtr end)
 {
@@ -516,6 +547,7 @@ checkHeapChunk(StgPtr start, StgPtr end)
     ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
   }
 }
+#endif
 
 //@cindex checkChain
 extern void
@@ -916,11 +948,9 @@ checkLAGAtable(rtsBool check_closures)
     ASSERT(!gala->preferred || gala == gala0);
     ASSERT(LOOKS_LIKE_GHC_INFO(((StgClosure *)gala->la)->header.info));
     ASSERT(gala->next!=gala); // detect direct loops
-    /*
     if ( check_closures ) {
       checkClosure(stgCast(StgClosure*,gala->la));
     }
-    */
   }
 
   for (gala = liveRemoteGAs; gala != NULL; gala = gala->next) {

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.21 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: Schedule.h,v 1.22 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -31,7 +31,6 @@ void exitScheduler( void );
 #ifdef SMP
 void startTasks( void );
 #endif
-
 
 //@cindex awakenBlockedQueue
 /* awakenBlockedQueue()
@@ -198,15 +197,15 @@ void printThreadStatus(StgTSO *tso);
 void printAllThreads(void);
 #endif
 void print_bq (StgClosure *node);
+#if defined(PAR)
+void print_bqe (StgBlockingQueueElement *bqe);
+#endif
 
 /* -----------------------------------------------------------------------------
  * Some convenient macros...
  */
 
-/* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
-#define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
-/* this is the NIL ptr for a list CAFs */
-#define END_ECAF_LIST   ((StgCAF *)(void*)&stg_END_TSO_QUEUE_closure)
+/* END_TSO_QUEUE and friends now defined in includes/StgMiscClosures.h */
 
 //@cindex APPEND_TO_RUN_QUEUE
 /* Add a thread to the end of the run queue.
@@ -272,6 +271,11 @@ void print_bq (StgClosure *node);
 #else
 #define THREAD_RUNNABLE()  /* nothing */
 #endif
+
+//@cindex EMPTY_RUN_QUEUE
+/* Check whether the run queue is empty i.e. the PE is idle
+ */
+#define EMPTY_RUN_QUEUE()     (run_queue_hd == END_TSO_QUEUE)
 
 //@node Index,  , Some convenient macros
 //@subsection Index

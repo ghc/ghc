@@ -1392,21 +1392,21 @@ LinkEnd="sec-Concurrent">.
 
 <para>
 &lsqb;You won't be able to execute parallel Haskell programs unless PVM3
-(Parallel Virtual Machine, version 3) is installed at your site.]
-</para>
+(Parallel Virtual Machine, version 3) is installed at your site.&rsqb;
+</Para>
 
 <para>
 To compile a Haskell program for parallel execution under PVM, use the
-<option>-parallel</option> option,<indexterm><primary>-parallel
-option</primary></indexterm> both when compiling <emphasis>and
-linking</emphasis>.  You will probably want to <literal>import
-Parallel</literal> into your Haskell modules.
-</para>
+<Option>-parallel</Option> option,<IndexTerm><Primary>-parallel
+option</Primary></IndexTerm> both when compiling <Emphasis>and
+linking</Emphasis>.  You will probably want to <Literal>import
+Parallel</Literal> into your Haskell modules.
+</Para>
 
 <para>
 To run your parallel program, once PVM is going, just invoke it
 &ldquo;as normal&rdquo;.  The main extra RTS option is
-<option>-N&lt;n&gt;</option>, to say how many PVM
+<Option>-qp&lt;n&gt;</Option>, to say how many PVM
 &ldquo;processors&rdquo; your program to run on.  (For more details of
 all relevant RTS options, please see <XRef
 LinkEnd="parallel-rts-opts">.)
@@ -1418,8 +1418,8 @@ out of them (e.g., parallelism profiles) is a battle with the vagaries of
 PVM, detailed in the following sections.
 </para>
 
-<sect2>
-<title>Dummy's guide to using PVM</title>
+<Sect2 id="pvm-dummies">
+<Title>Dummy's guide to using PVM</Title>
 
 <para>
 <indexterm><primary>PVM, how to use</primary></indexterm>
@@ -1438,11 +1438,23 @@ setenv PVM_DPATH $PVM_ROOT/lib/pvmd
 
 <para>
 Creating and/or controlling your &ldquo;parallel machine&rdquo; is a purely-PVM
-business; nothing specific to Parallel Haskell.
-</para>
+business; nothing specific to Parallel Haskell. The following paragraphs
+describe how to configure your parallel machine interactively.
+</Para>
 
-<para>
-You use the <command>pvm</command><indexterm><primary>pvm command</primary></indexterm> command to start PVM on your
+<Para>
+If you use parallel Haskell regularly on the same machine configuration it
+is a good idea to maintain a file with all machine names and to make the
+environment variable PVM_HOST_FILE point to this file. Then you can avoid
+the interactive operations described below by just saying
+</Para>
+
+<ProgramListing>
+pvm $PVM_HOST_FILE
+</ProgramListing>
+
+<Para>
+You use the <Command>pvm</Command><IndexTerm><Primary>pvm command</Primary></IndexTerm> command to start PVM on your
 machine.  You can then do various things to control/monitor your
 &ldquo;parallel machine;&rdquo; the most useful being:
 </para>
@@ -1504,8 +1516,8 @@ The PVM documentation can tell you much, much more about <command>pvm</command>!
 
 </sect2>
 
-<sect2>
-<title>Parallelism profiles</title>
+<Sect2 id="par-profiles">
+<Title>Parallelism profiles</Title>
 
 <para>
 <indexterm><primary>parallelism profiles</primary></indexterm>
@@ -1518,25 +1530,25 @@ With Parallel Haskell programs, we usually don't care about the
 results&mdash;only with &ldquo;how parallel&rdquo; it was!  We want pretty pictures.
 </para>
 
-<para>
-Parallelism profiles (&agrave; la <command>hbcpp</command>) can be generated with the
-<option>-q</option><indexterm><primary>-q RTS option (concurrent, parallel)</primary></indexterm> RTS option.  The
+<Para>
+Parallelism profiles (&agrave; la <Command>hbcpp</Command>) can be generated with the
+<Option>-qP</Option><IndexTerm><Primary>-qP RTS option (concurrent, parallel)</Primary></IndexTerm> RTS option.  The
 per-processor profiling info is dumped into files named
-<filename>&lt;full-path&gt;&lt;program&gt;.gr</filename>.  These are then munged into a PostScript picture,
+<Filename>&lt;full-path&gt;&lt;program&gt;.gr</Filename>.  These are then munged into a PostScript picture,
 which you can then display.  For example, to run your program
-<filename>a.out</filename> on 8 processors, then view the parallelism profile, do:
-</para>
+<Filename>a.out</Filename> on 8 processors, then view the parallelism profile, do:
+</Para>
 
-<para>
+<Para>
 
 <Screen>
-% ./a.out +RTS -N8 -q
-% grs2gr *.???.gr &#62; temp.gr     # combine the 8 .gr files into one
-% gr2ps -O temp.gr              # cvt to .ps; output in temp.ps
-% ghostview -seascape temp.ps   # look at it!
+<prompt> ./a.out +RTS -qP -qp8
+<prompt> grs2gr *.???.gr &#62; temp.gr # combine the 8 .gr files into one
+<prompt> gr2ps -O temp.gr              # cvt to .ps; output in temp.ps
+<prompt> ghostview -seascape temp.ps   # look at it!
 </Screen>
 
-</para>
+</Para>
 
 <para>
 The scripts for processing the parallelism profiles are distributed
@@ -1545,13 +1557,13 @@ in <filename>ghc/utils/parallel/</filename>.
 
 </sect2>
 
-<sect2>
-<title>Other useful info about running parallel programs</title>
+<Sect2>
+<Title>Other useful info about running parallel programs</Title>
 
-<para>
+<Para>
 The &ldquo;garbage-collection statistics&rdquo; RTS options can be useful for
 seeing what parallel programs are doing.  If you do either
-<option>+RTS -Sstderr</option><indexterm><primary>-Sstderr RTS option</primary></indexterm> or <option>+RTS -sstderr</option>, then
+<Option>+RTS -Sstderr</Option><IndexTerm><Primary>-Sstderr RTS option</Primary></IndexTerm> or <Option>+RTS -sstderr</Option>, then
 you'll get mutator, garbage-collection, etc., times on standard
 error. The standard error of all PE's other than the `main thread'
 appears in <filename>/tmp/pvml.nnn</filename>, courtesy of PVM.
@@ -1584,12 +1596,12 @@ for concurrent/parallel execution.
 <para>
 <VariableList>
 
-<varlistentry>
-<term><option>-N&lt;N&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-N&lt;N&gt; RTS option (parallel)</primary></indexterm>
-(PARALLEL ONLY) Use <literal>&lt;N&gt;</literal> PVM processors to run this program;
+<VarListEntry>
+<Term><Option>-qp&lt;N&gt;</Option>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-qp&lt;N&gt; RTS option</Primary></IndexTerm>
+(PARALLEL ONLY) Use <Literal>&lt;N&gt;</Literal> PVM processors to run this program;
 the default is 2.
 </para>
 </listitem>
@@ -1623,60 +1635,98 @@ records the movement of threads between the green (runnable) and red
 green queue is split into green (for the currently running thread
 only) and amber (for other runnable threads).  We do not recommend
 that you use the verbose suboption if you are planning to use the
-<command>hbcpp</command> profiling tools or if you are context switching at every heap
-check (with <option>-C</option>).
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-t&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-t&lt;num&gt; RTS option</primary></indexterm>
-(PARALLEL ONLY) Limit the number of concurrent threads per processor
-to <literal>&lt;num&gt;</literal>.  The default is 32.  Each thread requires slightly over 1K
-<emphasis>words</emphasis> in the heap for thread state and stack objects.  (For
-32-bit machines, this translates to 4K bytes, and for 64-bit machines,
-8K bytes.)
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-d</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-d RTS option (parallel)</primary></indexterm>
+<Command>hbcpp</Command> profiling tools or if you are context switching at every heap
+check (with <Option>-C</Option>).
+-->
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Option>-qt&lt;num&gt;</Option>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-qt&lt;num&gt; RTS option</Primary></IndexTerm>
+(PARALLEL ONLY) Limit the thread pool size, i.e. the number of concurrent
+threads per processor to <Literal>&lt;num&gt;</Literal>.  The default is
+32.  Each thread requires slightly over 1K <Emphasis>words</Emphasis> in
+the heap for thread state and stack objects.  (For 32-bit machines, this
+translates to 4K bytes, and for 64-bit machines, 8K bytes.)
+</Para>
+</ListItem>
+</VarListEntry>
+<!-- no more -- HWL
+<VarListEntry>
+<Term><Option>-d</Option>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-d RTS option (parallel)</Primary></IndexTerm>
 (PARALLEL ONLY) Turn on debugging.  It pops up one xterm (or GDB, or
-something&hellip;) per PVM processor.  We use the standard <command>debugger</command>
+something&hellip;) per PVM processor.  We use the standard <Command>debugger</Command>
 script that comes with PVM3, but we sometimes meddle with the
-<command>debugger2</command> script.  We include ours in the GHC distribution,
-in <filename>ghc/utils/pvm/</filename>.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-e&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-e&lt;num&gt; RTS option (parallel)</primary></indexterm>
-(PARALLEL ONLY) Limit the number of pending sparks per processor to
-<literal>&lt;num&gt;</literal>. The default is 100. A larger number may be appropriate if
-your program generates large amounts of parallelism initially.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-Q&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-Q&lt;num&gt; RTS option (parallel)</primary></indexterm>
+<Command>debugger2</Command> script.  We include ours in the GHC distribution,
+in <Filename>ghc/utils/pvm/</Filename>.
+</Para>
+</ListItem>
+</VarListEntry>
+-->
+<VarListEntry>
+<Term><Option>-qe&lt;num&gt;</Option>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-qe&lt;num&gt; RTS option
+(parallel)</Primary></IndexTerm> (PARALLEL ONLY) Limit the spark pool size
+i.e. the number of pending sparks per processor to
+<Literal>&lt;num&gt;</Literal>. The default is 100. A larger number may be
+appropriate if your program generates large amounts of parallelism
+initially.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Option>-qQ&lt;num&gt;</Option>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-qQ&lt;num&gt; RTS option (parallel)</Primary></IndexTerm>
 (PARALLEL ONLY) Set the size of packets transmitted between processors
-to <literal>&lt;num&gt;</literal>. The default is 1024 words. A larger number may be
+to <Literal>&lt;num&gt;</Literal>. The default is 1024 words. A larger number may be
 appropriate if your machine has a high communication cost relative to
 computation speed.
-</para>
-</listitem>
-</varlistentry>
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Option>-qh&lt;num&gt;</Option>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-qh&lt;num&gt; RTS option (parallel)</Primary></IndexTerm>
+(PARALLEL ONLY) Select a packing scheme. Set the number of non-root thunks to pack in one packet to
+&lt;num&gt;-1 (0 means infinity). By default GUM uses full-subgraph
+packing, i.e. the entire subgraph with the requested closure as root is
+transmitted (provided it fits into one packet). Choosing a smaller value
+reduces the amount of pre-fetching of work done in GUM. This can be
+advantageous for improving data locality but it can also worsen the balance
+of the load in the system. 
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Option>-qg&lt;num&gt;</Option>:</Term>
+<ListItem>
+<Para>
+<IndexTerm><Primary>-qg&lt;num&gt; RTS option
+(parallel)</Primary></IndexTerm> (PARALLEL ONLY) Select a globalisation
+scheme. This option affects the
+generation of global addresses when transferring data. Global addresses are
+globally unique identifiers required to maintain sharing in the distributed
+graph structure. Currently this is a binary option. With &lt;num&gt;=0 full globalisation is used
+(default). This means a global address is generated for every closure that
+is transmitted. With &lt;num&gt;=1 a thunk-only globalisation scheme is
+used, which generated global address only for thunks. The latter case may
+lose sharing of data but has a reduced overhead in packing graph structures
+and maintaining internal tables of global addresses.
+</Para>
+</ListItem>
+</VarListEntry>
 </VariableList>
 </para>
 

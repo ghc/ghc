@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
-   Time-stamp: <Sun Dec 05 1999 21:02:36 Stardate: [-30]4004.38 hwloidl>
-   $Id: HLC.h,v 1.2 2000/01/13 14:34:07 hwloidl Exp $
+   Time-stamp: <Sun Mar 18 2001 20:16:14 Stardate: [-30]6349.22 hwloidl>
+   $Id: HLC.h,v 1.3 2001/03/22 03:51:11 hwloidl Exp $
 
    High Level Communications Header (HLC.h)
 
@@ -29,16 +29,17 @@
 rtsBool  initMoreBuffers(void);
 
 void 	 sendFetch (globalAddr *ga, globalAddr *bqga, int load);
-void 	 sendResume(globalAddr *rga, int nelem, rtsPackBuffer *data);
+void 	 sendResume(globalAddr *rga, int nelem, rtsPackBuffer *packBuffer);
 void 	 sendAck (GlobalTaskId task, int ngas, globalAddr *gagamap);
 void 	 sendFish (GlobalTaskId destPE, GlobalTaskId origPE, int age, int history, int hunger);
 void 	 sendFree (GlobalTaskId destPE, int nelem, P_ data);
-void 	 sendSchedule(GlobalTaskId origPE, int nelem, rtsPackBuffer *data);
+void 	 sendSchedule(GlobalTaskId origPE, int nelem, rtsPackBuffer *packBuffer);
+void 	 sendReval(GlobalTaskId origPE, int nelem, rtsPackBuffer *data);
 
 //@node Message-Processing Functions
 //@subsection Message-Processing Functions
 
-void 	 processMessages(void);
+rtsBool	 processMessages(void);
 void 	 processFetches(void);
 void 	 processTheRealFetches(void);
 
@@ -52,6 +53,10 @@ void 	 sendFreeMessages(void);
 GlobalTaskId  choosePE(void);
 StgClosure   *createBlockedFetch (globalAddr ga, globalAddr rga);
 void 	      waitForTermination(void);
+
+/* Message bouncing (startup and shutdown, mainly) */
+void          bounceFish(void);
+void          bounceReval(void);
 
 void          DebugPrintGAGAMap (globalAddr *gagamap, int nGAs);
 

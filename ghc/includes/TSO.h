@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.19 2000/12/14 15:19:47 sewardj Exp $
+ * $Id: TSO.h,v 1.20 2001/03/22 03:51:09 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -12,8 +12,7 @@
 
 #if defined(GRAN) || defined(PAR)
 
-#if DEBUG // && PARANOIA_LEVEL>999
-// magic marker for TSOs; debugging only
+#if DEBUG
 #define TSO_MAGIC 4321
 #endif
 
@@ -52,6 +51,17 @@ typedef StgTSOStatBuf StgTSOParInfo;
 typedef struct {
 } StgTSOParInfo;
 #endif /* PAR */
+
+#if defined(DIST)
+typedef struct {
+  StgThreadPriority  priority;   
+  StgInt             revalTid;   /* ToDo: merge both into 1 word */
+  StgInt             revalSlot;
+} StgTSODistInfo;
+#else /* !DIST */
+typedef struct {
+} StgTSODistInfo;
+#endif /* DIST */
 
 #if defined(GRAN)
 typedef StgTSOStatBuf StgTSOGranInfo;
@@ -107,6 +117,16 @@ typedef enum {
   ThreadBlocked,
   ThreadFinished
 } StgThreadReturnCode;
+
+/*
+ * We distinguish between the various classes of threads in the system.
+ */
+
+typedef enum {
+  AdvisoryPriority,
+  MandatoryPriority,
+  RevalPriority
+} StgThreadPriority;
 
 /* 
  * Threads may be blocked for several reasons.  A blocked thread will
@@ -164,7 +184,8 @@ typedef struct StgTSO_ {
   StgTSOProfInfo     prof;
   StgTSOParInfo      par;
   StgTSOGranInfo     gran;
-
+  StgTSODistInfo     dist;
+    
   /* The thread stack... */
   StgWord    	     stack_size;     /* stack size in *words* */
   StgWord            max_stack_size; /* maximum stack size in *words* */

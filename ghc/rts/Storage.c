@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.36 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: Storage.c,v 1.37 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -260,6 +260,15 @@ newCAF(StgClosure* caf)
   }
 
   RELEASE_LOCK(&sm_mutex);
+
+#ifdef PAR
+  /* If we are PAR or DIST then  we never forget a CAF */
+  { globalAddr *newGA;
+    //belch("<##> Globalising CAF %08x %s",caf,info_type(caf));
+    newGA=makeGlobal(caf,rtsTrue); /*given full weight*/
+    ASSERT(newGA);
+  } 
+#endif PAR  
 }
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Mon Mar 13 2000 18:50:36 Stardate: [-30]4498.92 hwloidl>
+  Time-stamp: <Tue Mar 13 2001 19:07:13 Stardate: [-30]6323.98 hwloidl>
 
   Revertible Black Hole Manipulation.
   Used in GUM and GranSim during the packing of closures. These black holes
@@ -38,9 +38,9 @@
 //@node Externs and prototypes, Conversion Functions
 //@section Externs and prototypes
 
-EXTFUN(RBH_Save_0_info);
-EXTFUN(RBH_Save_1_info);
-EXTFUN(RBH_Save_2_info);
+EXTFUN(stg_RBH_Save_0_info);
+EXTFUN(stg_RBH_Save_1_info);
+EXTFUN(stg_RBH_Save_2_info);
 
 //@node Conversion Functions, Index, Externs and prototypes
 //@section Conversion Functions
@@ -75,10 +75,10 @@ StgClosure *closure;
      RBH_Save_N closures, with N being the number of pointers for this
      closure.  */
   IF_GRAN_DEBUG(pack,
-		belch("*>:: Converting closure %p (%s) into an RBH",
+		belch("*>::   %p (%s): Converting closure into an RBH",
 		      closure, info_type(closure))); 
   IF_PAR_DEBUG(pack,
-		belch("*>:: Converting closure %p (%s) into an RBH",
+		belch("*>::   %p (%s): Converting closure into an RBH",
 		      closure, info_type(closure))); 
 
   ASSERT(closure_THUNK(closure));
@@ -87,11 +87,11 @@ StgClosure *closure;
 		old_info = get_itbl(closure));
 
   /* Allocate a new closure for the holding data ripped out of closure */
-  if ((rbh_save = (StgRBHSave *)allocate(FIXED_HS + 2)) == NULL)
+  if ((rbh_save = (StgRBHSave *)allocate(_HS + 2)) == NULL)
     return NULL;  /* have to Garbage Collect; check that in the caller! */
 
   info_ptr = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
-  ASSERT(size >= MIN_UPD_SIZE);
+  ASSERT(size >= _HS+MIN_UPD_SIZE);
 
   /* Fill in the RBH_Save closure with the original data from closure */
   rbh_save->payload[0] = (StgPtr) ((StgRBH *)closure)->blocking_queue;
@@ -100,9 +100,9 @@ StgClosure *closure;
   /* Set the info_ptr for the rbh_Save closure according to the number of
      pointers in the original */
 
-  rbh_info_ptr = (StgInfoTable *) (ptrs == 0 ? &RBH_Save_0_info :
-				   ptrs == 1 ? &RBH_Save_1_info :
-				   &RBH_Save_2_info);
+  rbh_info_ptr = (StgInfoTable *) (ptrs == 0 ? &stg_RBH_Save_0_info :
+				   ptrs == 1 ? &stg_RBH_Save_1_info :
+				   &stg_RBH_Save_2_info);
   SET_INFO(rbh_save, rbh_info_ptr);
   /* same bitmask as the original closure */
   SET_GRAN_HDR(rbh_save, PROCS(closure));
@@ -165,7 +165,7 @@ StgClosure *closure;
 
 # if defined(PAR)
 
-EXTFUN(FETCH_ME_info);
+EXTFUN(stg_FETCH_ME_info);
 
 //@cindex convertToFetchMe
 void
@@ -187,7 +187,7 @@ globalAddr *ga;
   recordMutable((StgMutClosure *)rbh);
 
   /* actually turn it into a FETCH_ME */
-  SET_INFO((StgClosure *)rbh, &FETCH_ME_info);
+  SET_INFO((StgClosure *)rbh, &stg_FETCH_ME_info);
 
   /* set the global pointer in the FETCH_ME closure to the given value */
   ((StgFetchMe *)rbh)->ga = ga;

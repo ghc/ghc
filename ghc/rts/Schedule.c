@@ -1,20 +1,26 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.93 2001/03/02 16:15:53 simonmar Exp $
+ * $Id: Schedule.c,v 1.94 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
  * Scheduler
  *
- * The main scheduling code in GranSim is quite different from that in std
- * (concurrent) Haskell: while concurrent Haskell just iterates over the
- * threads in the runnable queue, GranSim is event driven, i.e. it iterates
- * over the events in the global event queue.  -- HWL
+ * Different GHC ways use this scheduler quite differently (see comments below)
+ * Here is the global picture:
+ *
+ * WAY  Name     CPP flag  What's it for
+ * --------------------------------------
+ * mp   GUM      PAR       Parallel execution on a distributed memory machine
+ * s    SMP      SMP       Parallel execution on a shared memory machine
+ * mg   GranSim  GRAN      Simulation of parallel execution
+ * md   GUM/GdH  DIST      Distributed execution (based on GUM)
  * --------------------------------------------------------------------------*/
 
 //@node Main scheduling code, , ,
 //@section Main scheduling code
 
-/* Version with scheduler monitor support for SMPs.
+/* 
+ * Version with scheduler monitor support for SMPs (WAY=s):
 
    This design provides a high-level API to create and schedule threads etc.
    as documented in the SMP design document.
@@ -32,6 +38,24 @@
    In a non-SMP build, there is one global capability, namely MainRegTable.
 
    SDM & KH, 10/99
+
+ * Version with support for distributed memory parallelism aka GUM (WAY=mp):
+
+   The main scheduling loop in GUM iterates until a finish message is received.
+   In that case a global flag @receivedFinish@ is set and this instance of
+   the RTS shuts down. See ghc/rts/parallel/HLComms.c:processMessages()
+   for the handling of incoming messages, such as PP_FINISH.
+   Note that in the parallel case we have a system manager that coordinates
+   different PEs, each of which are running one instance of the RTS.
+   See ghc/rts/parallel/SysMan.c for the main routine of the parallel program.
+   From this routine processes executing ghc/rts/Main.c are spawned. -- HWL
+
+ * Version with support for simulating parallel execution aka GranSim (WAY=mg):
+
+   The main scheduling code in GranSim is quite different from that in std
+   (concurrent) Haskell: while concurrent Haskell just iterates over the
+   threads in the runnable queue, GranSim is event driven, i.e. it iterates
+   over the events in the global event queue.  -- HWL
 */
 
 //@menu
@@ -261,6 +285,7 @@ nat await_death;
 #if defined(PAR)
 StgTSO *LastTSO;
 rtsTime TimeOfLastYield;
+rtsBool emitSchedule = rtsTrue;
 #endif
 
 #if DEBUG
@@ -279,6 +304,11 @@ char *threadReturnCode_strs[] = {
   "ThreadBlocked",
   "ThreadFinished"
 };
+#endif
+
+#ifdef PAR
+StgTSO * createSparkThread(rtsSpark spark);
+StgTSO * activateSpark (rtsSpark spark);  
 #endif
 
 /*
@@ -339,6 +369,10 @@ schedule( void )
   rtsSpark spark;
   StgTSO *tso;
   GlobalTaskId pe;
+  rtsBool receivedFinish = rtsFalse;
+# if defined(DEBUG)
+  nat tp_size, sp_size; // stats only
+# endif
 #endif
   rtsBool was_interrupted = rtsFalse;
   
@@ -370,8 +404,8 @@ schedule( void )
 
 #elif defined(PAR)
 
-  while (!GlobalStopPending) {          /* GlobalStopPending set in par_exit */
-
+  while (!receivedFinish) {    /* set by processMessages */
+                               /* when receiving PP_FINISH message         */ 
 #else
 
   while (1) {
@@ -471,23 +505,16 @@ schedule( void )
 
       for (; n > 0; n--) {
 	StgClosure *spark;
-	spark = findSpark();
+	spark = findSpark(rtsFalse);
 	if (spark == NULL) {
 	  break; /* no more sparks in the pool */
 	} else {
 	  /* I'd prefer this to be done in activateSpark -- HWL */
 	  /* tricky - it needs to hold the scheduler lock and
 	   * not try to re-acquire it -- SDM */
-	  StgTSO *tso;
-	  tso = createThread_(RtsFlags.GcFlags.initialStkSize, rtsTrue);
-	  pushClosure(tso,spark);
-	  PUSH_ON_RUN_QUEUE(tso);
-#ifdef PAR
-	  advisory_thread_count++;
-#endif
-	  
+	  createSparkThread(spark);	  
 	  IF_DEBUG(scheduler,
-		   sched_belch("turning spark of closure %p into a thread",
+		   sched_belch("==^^ turning spark of closure %p into a thread",
 			       (StgClosure *)spark));
 	}
       }
@@ -553,6 +580,8 @@ schedule( void )
 	    main_threads = NULL;
 	}
     }
+#elif defined(PAR)
+    /* ToDo: add deadlock detection in GUM (similar to SMP) -- HWL */
 #else /* ! SMP */
     if (blocked_queue_hd == END_TSO_QUEUE
 	&& run_queue_hd == END_TSO_QUEUE
@@ -603,7 +632,7 @@ schedule( void )
     if (!RtsFlags.GranFlags.Light)
       handleIdlePEs();
 
-    IF_DEBUG(gran, fprintf(stderr, "GRAN: switch by event-type\n"))
+    IF_DEBUG(gran, fprintf(stderr, "GRAN: switch by event-type\n"));
 
     /* main event dispatcher in GranSim */
     switch (event->evttype) {
@@ -717,7 +746,7 @@ schedule( void )
 
     IF_DEBUG(gran, 
 	     fprintf(stderr, "GRAN: About to run current thread, which is\n");
-	     G_TSO(t,5))
+	     G_TSO(t,5));
 
     context_switch = 0; // turned on via GranYield, checking events and time slice
 
@@ -727,14 +756,13 @@ schedule( void )
     procStatus[CurrentProc] = Busy;
 
 #elif defined(PAR)
-
     if (PendingFetches != END_BF_QUEUE) {
         processFetches();
     }
 
     /* ToDo: phps merge with spark activation above */
     /* check whether we have local work and send requests if we have none */
-    if (run_queue_hd == END_TSO_QUEUE) {  /* no runnable threads */
+    if (EMPTY_RUN_QUEUE()) {  /* no runnable threads */
       /* :-[  no local threads => look out for local sparks */
       /* the spark pool for the current PE */
       pool = &(MainRegTable.rSparks); // generalise to cap = &MainRegTable
@@ -748,8 +776,8 @@ schedule( void )
 	 * to turn one of those pending sparks into a
 	 * thread... 
 	 */
-	
-	spark = findSpark();                /* get a spark */
+
+	spark = findSpark(rtsFalse);                /* get a spark */
 	if (spark != (rtsSpark) NULL) {
 	  tso = activateSpark(spark);       /* turn the spark into a thread */
 	  IF_PAR_DEBUG(schedule,
@@ -766,9 +794,13 @@ schedule( void )
 			     spark_queue_len(pool)));
 	  goto next_thread;
 	}
-      } else  
+      }
+
+      /* If we still have no work we need to send a FISH to get a spark
+	 from another PE 
+      */
+      if (EMPTY_RUN_QUEUE()) {
       /* =8-[  no local sparks => look for work on other PEs */
-      {
 	/*
 	 * We really have absolutely no work.  Send out a fish
 	 * (there may be some out there already), and wait for
@@ -777,28 +809,48 @@ schedule( void )
 	 * we're hoping to see.  (Of course, we still have to
 	 * respond to other types of messages.)
 	 */
-	if (//!fishing &&  
-	    outstandingFishes < RtsFlags.ParFlags.maxFishes ) { // &&
-	  // (last_fish_arrived_at+FISH_DELAY < CURRENT_TIME)) {
-	  /* fishing set in sendFish, processFish;
+	TIME now = msTime() /*CURRENT_TIME*/;
+	IF_PAR_DEBUG(verbose, 
+		     belch("--  now=%ld", now));
+	IF_PAR_DEBUG(verbose,
+		     if (outstandingFishes < RtsFlags.ParFlags.maxFishes &&
+			 (last_fish_arrived_at!=0 &&
+			  last_fish_arrived_at+RtsFlags.ParFlags.fishDelay > now)) {
+		       belch("--$$ delaying FISH until %ld (last fish %ld, delay %ld, now %ld)",
+			     last_fish_arrived_at+RtsFlags.ParFlags.fishDelay,
+			     last_fish_arrived_at,
+			     RtsFlags.ParFlags.fishDelay, now);
+		     });
+	
+	if (outstandingFishes < RtsFlags.ParFlags.maxFishes &&
+	    (last_fish_arrived_at==0 ||
+	     (last_fish_arrived_at+RtsFlags.ParFlags.fishDelay <= now))) {
+	  /* outstandingFishes is set in sendFish, processFish;
 	     avoid flooding system with fishes via delay */
 	  pe = choosePE();
 	  sendFish(pe, mytid, NEW_FISH_AGE, NEW_FISH_HISTORY, 
 		   NEW_FISH_HUNGER);
+
+	  // Global statistics: count no. of fishes
+	  if (RtsFlags.ParFlags.ParStats.Global &&
+	      RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
+	    globalParStats.tot_fish_mess++;
+	  }
 	}
-	
-	processMessages();
+      
+	receivedFinish = processMessages();
 	goto next_thread;
-	// ReSchedule(0);
       }
     } else if (PacketsWaiting()) {  /* Look for incoming messages */
-      processMessages();
+      receivedFinish = processMessages();
     }
 
     /* Now we are sure that we have some work available */
     ASSERT(run_queue_hd != END_TSO_QUEUE);
+
     /* Take a thread from the run queue, if we have work */
     t = POP_RUN_QUEUE();  // take_off_run_queue(END_TSO_QUEUE);
+    IF_DEBUG(sanity,checkTSO(t));
 
     /* ToDo: write something to the log-file
     if (RTSflags.ParFlags.granSimStats && !sameThread)
@@ -809,17 +861,23 @@ schedule( void )
     /* the spark pool for the current PE */
     pool = &(MainRegTable.rSparks); // generalise to cap = &MainRegTable
 
-    IF_DEBUG(scheduler, belch("--^^ %d sparks on [%#x] (hd=%x; tl=%x; base=%x, lim=%x)", 
-			      spark_queue_len(pool), 
-			      CURRENT_PROC,
-			      pool->hd, pool->tl, pool->base, pool->lim));
+    IF_DEBUG(scheduler, 
+	     belch("--=^ %d threads, %d sparks on [%#x]", 
+		   run_queue_len(), spark_queue_len(pool), CURRENT_PROC));
 
-    IF_DEBUG(scheduler, belch("--== %d threads on [%#x] (hd=%x; tl=%x)", 
-			      run_queue_len(), CURRENT_PROC,
-			      run_queue_hd, run_queue_tl));
+#if 1
+    if (0 && RtsFlags.ParFlags.ParStats.Full && 
+	t && LastTSO && t->id != LastTSO->id && 
+	LastTSO->why_blocked == NotBlocked && 
+	LastTSO->what_next != ThreadComplete) {
+      // if previously scheduled TSO not blocked we have to record the context switch
+      DumpVeryRawGranEvent(TimeOfLastYield, CURRENT_PROC, CURRENT_PROC,
+			   GR_DESCHEDULE, LastTSO, (StgClosure *)NULL, 0, 0);
+    }
 
-#if 0
-    if (t != LastTSO) {
+    if (RtsFlags.ParFlags.ParStats.Full && 
+	(emitSchedule /* forced emit */ ||
+        (t && LastTSO && t->id != LastTSO->id))) {
       /* 
 	 we are running a different TSO, so write a schedule event to log file
 	 NB: If we use fair scheduling we also have to write  a deschedule 
@@ -829,8 +887,9 @@ schedule( void )
       */
       DumpRawGranEvent(CURRENT_PROC, CURRENT_PROC,
 		       GR_SCHEDULE, t, (StgClosure *)NULL, 0, 0);
-      
+      emitSchedule = rtsFalse;
     }
+     
 #endif
 #else /* !GRAN && !PAR */
   
@@ -912,12 +971,21 @@ schedule( void )
     /* HACK 675: if the last thread didn't yield, make sure to print a 
        SCHEDULE event to the log file when StgRunning the next thread, even
        if it is the same one as before */
-    LastTSO = t; //(ret == ThreadBlocked) ? END_TSO_QUEUE : t; 
+    LastTSO = t; 
     TimeOfLastYield = CURRENT_TIME;
 #endif
 
     switch (ret) {
     case HeapOverflow:
+#if defined(GRAN)
+      IF_DEBUG(gran, 
+	       DumpGranEvent(GR_DESCHEDULE, t));
+      globalGranStats.tot_heapover++;
+#elif defined(PAR)
+      // IF_DEBUG(par, 
+      //DumpGranEvent(GR_DESCHEDULE, t);
+      globalParStats.tot_heapover++;
+#endif
       /* make all the running tasks block on a condition variable,
        * maybe set context_switch and wait till they all pile in,
        * then have them wait on a GC condition variable.
@@ -927,6 +995,15 @@ schedule( void )
       threadPaused(t);
 #if defined(GRAN)
       ASSERT(!is_on_queue(t,CurrentProc));
+#elif defined(PAR)
+      /* Currently we emit a DESCHEDULE event before GC in GUM.
+         ToDo: either add separate event to distinguish SYSTEM time from rest
+	       or just nuke this DESCHEDULE (and the following SCHEDULE) */
+      if (0 && RtsFlags.ParFlags.ParStats.Full) {
+	DumpRawGranEvent(CURRENT_PROC, CURRENT_PROC,
+			 GR_DESCHEDULE, t, (StgClosure *)NULL, 0, 0);
+	emitSchedule = rtsTrue;
+      }
 #endif
       
       ready_to_gc = rtsTrue;
@@ -936,6 +1013,15 @@ schedule( void )
       break;
       
     case StackOverflow:
+#if defined(GRAN)
+      IF_DEBUG(gran, 
+	       DumpGranEvent(GR_DESCHEDULE, t));
+      globalGranStats.tot_stackover++;
+#elif defined(PAR)
+      // IF_DEBUG(par, 
+      // DumpGranEvent(GR_DESCHEDULE, t);
+      globalParStats.tot_stackover++;
+#endif
       IF_DEBUG(scheduler,belch("--<< thread %ld (%p; %s) stopped, StackOverflow", 
 			       t->id, t, whatNext_strs[t->what_next]));
       /* just adjust the stack for this thread, then pop it back
@@ -967,8 +1053,9 @@ schedule( void )
 	       DumpGranEvent(GR_DESCHEDULE, t));
       globalGranStats.tot_yields++;
 #elif defined(PAR)
-      IF_DEBUG(par, 
-	       DumpGranEvent(GR_DESCHEDULE, t));
+      // IF_DEBUG(par, 
+      // DumpGranEvent(GR_DESCHEDULE, t);
+      globalParStats.tot_yields++;
 #endif
       /* put the thread back on the run queue.  Then, if we're ready to
        * GC, check whether this is the last task to stop.  If so, wake
@@ -1001,7 +1088,18 @@ schedule( void )
 	       //belch("&& Doing sanity check on all ThreadQueues (and their TSOs).");
 	       checkThreadQsSanity(rtsTrue));
 #endif
+#if defined(PAR)
+      if (RtsFlags.ParFlags.doFairScheduling) { 
+	/* this does round-robin scheduling; good for concurrency */
+	APPEND_TO_RUN_QUEUE(t);
+      } else {
+	/* this does unfair scheduling; good for parallelism */
+	PUSH_ON_RUN_QUEUE(t);
+      }
+#else
+      /* this does round-robin scheduling; good for concurrency */
       APPEND_TO_RUN_QUEUE(t);
+#endif
 #if defined(GRAN)
       /* add a ContinueThread event to actually process the thread */
       new_event(CurrentProc, CurrentProc, CurrentTime[CurrentProc],
@@ -1010,7 +1108,7 @@ schedule( void )
       IF_GRAN_DEBUG(bq, 
 	       belch("GRAN: eventq and runnableq after adding yielded thread to queue again:");
 	       G_EVENTQ(0);
-	       G_CURR_THREADQ(0))
+	       G_CURR_THREADQ(0));
 #endif /* GRAN */
       break;
       
@@ -1036,16 +1134,19 @@ schedule( void )
 	procStatus[CurrentProc] = Idle;
       */
 #elif defined(PAR)
-      IF_DEBUG(par, 
-	       DumpGranEvent(GR_DESCHEDULE, t)); 
+      IF_DEBUG(scheduler,
+	       belch("--<< thread %ld (%p; %s) stopped, blocking on node %p with BQ: ", 
+		     t->id, t, whatNext_strs[t->what_next], t->block_info.closure));
+      IF_PAR_DEBUG(bq,
+
+		   if (t->block_info.closure!=(StgClosure*)NULL) 
+		     print_bq(t->block_info.closure));
 
       /* Send a fetch (if BlockedOnGA) and dump event to log file */
       blockThread(t);
 
-      IF_DEBUG(scheduler,
-	       belch("--<< thread %ld (%p; %s) stopped, blocking on node %p with BQ: ", 
-			       t->id, t, whatNext_strs[t->what_next], t->block_info.closure);
-	       if (t->block_info.closure!=(StgClosure*)NULL) print_bq(t->block_info.closure));
+      /* whatever we schedule next, we must log that schedule */
+      emitSchedule = rtsTrue;
 
 #else /* !GRAN */
       /* don't need to do anything.  Either the thread is blocked on
@@ -1079,8 +1180,17 @@ schedule( void )
 #if defined(GRAN)
       endThread(t, CurrentProc); // clean-up the thread
 #elif defined(PAR)
+      /* For now all are advisory -- HWL */
+      //if(t->priority==AdvisoryPriority) ??
       advisory_thread_count--;
-      if (RtsFlags.ParFlags.ParStats.Full) 
+      
+# ifdef DIST
+      if(t->dist.priority==RevalPriority)
+	FinishReval(t);
+# endif
+      
+      if (RtsFlags.ParFlags.ParStats.Full &&
+	  !RtsFlags.ParFlags.ParStats.Suppressed) 
 	DumpEndEvent(CURRENT_PROC, t, rtsFalse /* not mandatory */);
 #endif
       break;
@@ -1122,7 +1232,7 @@ schedule( void )
       IF_GRAN_DEBUG(bq, 
 	       fprintf(stderr, "GRAN: eventq and runnableq after Garbage collection:\n");
 	       G_EVENTQ(0);
-	       G_CURR_THREADQ(0))
+	       G_CURR_THREADQ(0));
 #endif /* GRAN */
     }
 #if defined(GRAN)
@@ -1143,6 +1253,8 @@ schedule( void )
   */
 #endif /* GRAN */
   } /* end of while(1) */
+  IF_PAR_DEBUG(verbose,
+	       belch("== Leaving schedule() after having received Finish"));
 }
 
 /* ---------------------------------------------------------------------------
@@ -1366,6 +1478,7 @@ createThread_(nat size, rtsBool have_lock)
   tso->why_blocked  = NotBlocked;
   tso->blocked_exceptions = NULL;
 
+  //tso->splim        = (P_)&(tso->stack) + RESERVED_STACK_WORDS;
   tso->stack_size   = stack_size;
   tso->max_stack_size = round_to_mblocks(RtsFlags.GcFlags.maxStkSize) 
                               - TSO_STRUCT_SIZEW;
@@ -1391,14 +1504,24 @@ createThread_(nat size, rtsBool have_lock)
    */
 #endif
 
-#if defined(GRAN) || defined(PAR)
-  DumpGranEvent(GR_START,tso);
+#if defined(GRAN) 
+  if (RtsFlags.GranFlags.GranSimStats.Full) 
+    DumpGranEvent(GR_START,tso);
+#elif defined(PAR)
+  if (RtsFlags.ParFlags.ParStats.Full) 
+    DumpGranEvent(GR_STARTQ,tso);
+  /* HACk to avoid SCHEDULE 
+     LastTSO = tso; */
 #endif
 
   /* Link the new thread on the global thread list.
    */
   tso->global_link = all_threads;
   all_threads = tso;
+
+#if defined(DIST)
+  tso->dist.priority = MandatoryPriority; //by default that is...
+#endif
 
 #if defined(GRAN)
   tso->gran.pri = pri;
@@ -1448,6 +1571,13 @@ createThread_(nat size, rtsBool have_lock)
   globalGranStats.threads_created_on_PE[CurrentProc]++;
   globalGranStats.tot_sq_len += spark_queue_len(CurrentProc);
   globalGranStats.tot_sq_probes++;
+#elif defined(PAR)
+  // collect parallel global statistics (currently done together with GC stats)
+  if (RtsFlags.ParFlags.ParStats.Global &&
+      RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
+    //fprintf(stderr, "Creating thread %d @ %11.2f\n", tso->id, usertime()); 
+    globalParStats.tot_threads_created++;
+  }
 #endif 
 
 #if defined(GRAN)
@@ -1465,6 +1595,36 @@ createThread_(nat size, rtsBool have_lock)
   return tso;
 }
 
+#if defined(PAR)
+/* RFP:
+   all parallel thread creation calls should fall through the following routine.
+*/
+StgTSO *
+createSparkThread(rtsSpark spark) 
+{ StgTSO *tso;
+  ASSERT(spark != (rtsSpark)NULL);
+  if (advisory_thread_count >= RtsFlags.ParFlags.maxThreads) 
+  { threadsIgnored++;
+    barf("{createSparkThread}Daq ghuH: refusing to create another thread; no more than %d threads allowed (currently %d)",
+	  RtsFlags.ParFlags.maxThreads, advisory_thread_count);    
+    return END_TSO_QUEUE;
+  }
+  else
+  { threadsCreated++;
+    tso = createThread_(RtsFlags.GcFlags.initialStkSize, rtsTrue);
+    if (tso==END_TSO_QUEUE)	
+      barf("createSparkThread: Cannot create TSO");
+#if defined(DIST)
+    tso->priority = AdvisoryPriority;
+#endif
+    pushClosure(tso,spark);
+    PUSH_ON_RUN_QUEUE(tso);
+    advisory_thread_count++;    
+  }
+  return tso;
+}
+#endif
+
 /*
   Turn a spark into a thread.
   ToDo: fix for SMP (needs to acquire SCHED_MUTEX!)
@@ -1475,22 +1635,13 @@ StgTSO *
 activateSpark (rtsSpark spark) 
 {
   StgTSO *tso;
-  
-  ASSERT(spark != (rtsSpark)NULL);
-  tso = createThread_(RtsFlags.GcFlags.initialStkSize, rtsTrue);
-  if (tso!=END_TSO_QUEUE) {
-    pushClosure(tso,spark);
-    PUSH_ON_RUN_QUEUE(tso);
-    advisory_thread_count++;
 
-    if (RtsFlags.ParFlags.ParStats.Full) {
-      //ASSERT(run_queue_hd == END_TSO_QUEUE); // I think ...
-      IF_PAR_DEBUG(verbose,
-		   belch("==^^ activateSpark: turning spark of closure %p (%s) into a thread",
-			 (StgClosure *)spark, info_type((StgClosure *)spark)));
-    }
-  } else {
-    barf("activateSpark: Cannot create TSO");
+  tso = createSparkThread(spark);
+  if (RtsFlags.ParFlags.ParStats.Full) {   
+    //ASSERT(run_queue_hd == END_TSO_QUEUE); // I think ...
+    IF_PAR_DEBUG(verbose,
+		 belch("==^^ activateSpark: turning spark of closure %p (%s) into a thread",
+		       (StgClosure *)spark, info_type((StgClosure *)spark)));
   }
   // ToDo: fwd info on local/global spark to thread -- HWL
   // tso->gran.exported =  spark->exported;
@@ -1544,10 +1695,10 @@ scheduleThread(StgTSO *tso)
  * ------------------------------------------------------------------------ */
 
 #if defined(PAR) || defined(SMP)
-void *
-taskStart( void *arg STG_UNUSED )
+void
+taskStart(void) /*  ( void *arg STG_UNUSED)  */
 {
-  rts_evalNothing(NULL);
+  scheduleThread(END_TSO_QUEUE);
 }
 #endif
 
@@ -1788,7 +1939,7 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   m->link = main_threads;
   main_threads = m;
 
-  IF_DEBUG(scheduler, fprintf(stderr, "scheduler: new main thread (%d)\n", 
+  IF_DEBUG(scheduler, fprintf(stderr, "== scheduler: new main thread (%d)\n", 
 			      m->tso->id));
 
 #ifdef SMP
@@ -1813,7 +1964,7 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   pthread_cond_destroy(&m->wakeup);
 #endif
 
-  IF_DEBUG(scheduler, fprintf(stderr, "scheduler: main thread (%d) finished\n", 
+  IF_DEBUG(scheduler, fprintf(stderr, "== scheduler: main thread (%d) finished\n", 
 			      m->tso->id));
   free(m);
 
@@ -2079,7 +2230,7 @@ threadStackOverflow(StgTSO *tso)
   new_tso_size = round_to_mblocks(new_tso_size);  /* Be MBLOCK-friendly */
   new_stack_size = new_tso_size - TSO_STRUCT_SIZEW;
 
-  IF_DEBUG(scheduler, fprintf(stderr,"scheduler: increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
+  IF_DEBUG(scheduler, fprintf(stderr,"== scheduler: increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
 
   dest = (StgTSO *)allocate(new_tso_size);
   TICK_ALLOC_TSO(new_tso_size-sizeofW(StgTSO),0);
@@ -2094,6 +2245,7 @@ threadStackOverflow(StgTSO *tso)
   diff = (P_)new_sp - (P_)tso->sp; /* In *words* */
   dest->su    = (StgUpdateFrame *) ((P_)dest->su + diff);
   dest->sp    = new_sp;
+  //dest->splim = (P_)dest->splim + (nat)((P_)dest - (P_)tso);
   dest->stack_size = new_stack_size;
 	
   /* and relocate the update frame list */
@@ -2148,8 +2300,10 @@ unblockCount ( StgBlockingQueueElement *bqe, StgClosure *node )
      update blocked and fetch time (depending on type of the orig closure) */
   if (RtsFlags.ParFlags.ParStats.Full) {
     DumpRawGranEvent(CURRENT_PROC, CURRENT_PROC, 
-		     GR_RESUME, ((StgTSO *)bqe), ((StgTSO *)bqe)->block_info.closure,
+		     GR_RESUMEQ, ((StgTSO *)bqe), ((StgTSO *)bqe)->block_info.closure,
 		     0, 0 /* spark_queue_len(ADVISORY_POOL) */);
+    if (EMPTY_RUN_QUEUE())
+      emitSchedule = rtsTrue;
 
     switch (get_itbl(node)->type) {
 	case FETCH_ME_BQ:
@@ -2160,6 +2314,10 @@ unblockCount ( StgBlockingQueueElement *bqe, StgClosure *node )
 	case BLACKHOLE_BQ:
 	  ((StgTSO *)bqe)->par.blocktime += CURRENT_TIME-((StgTSO *)bqe)->par.blockedat;
 	  break;
+#ifdef DIST
+        case MVAR:
+          break;
+#endif	  
 	default:
 	  barf("{unblockOneLocked}Daq Qagh: unexpected closure in blocking queue");
 	}
@@ -2229,8 +2387,8 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
     case BLOCKED_FETCH:
       /* if it's a BLOCKED_FETCH put it on the PendingFetches list */
       next = bqe->link;
-      bqe->link = PendingFetches;
-      PendingFetches = bqe;
+      bqe->link = (StgBlockingQueueElement *)PendingFetches;
+      PendingFetches = (StgBlockedFetch *)bqe;
       break;
 
 # if defined(DEBUG)
@@ -2249,7 +2407,7 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
 	   (StgClosure *)bqe);
 # endif
     }
-  // IF_DEBUG(scheduler,sched_belch("waking up thread %ld", tso->id));
+  IF_PAR_DEBUG(bq, fprintf(stderr, ", %p (%s)", bqe, info_type((StgClosure*)bqe)));
   return next;
 }
 
@@ -2299,13 +2457,14 @@ awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node)
   nat len = 0; 
 
   IF_GRAN_DEBUG(bq, 
-		belch("## AwBQ for node %p on PE %d @ %ld by TSO %d (%p): ", \
+		belch("##-_ AwBQ for node %p on PE %d @ %ld by TSO %d (%p): ", \
 		      node, CurrentProc, CurrentTime[CurrentProc], 
 		      CurrentTSO->id, CurrentTSO));
 
   node_loc = where_is(node);
 
-  ASSERT(get_itbl(q)->type == TSO ||   // q is either a TSO or an RBHSave
+  ASSERT(q == END_BQ_QUEUE ||
+	 get_itbl(q)->type == TSO ||   // q is either a TSO or an RBHSave
 	 get_itbl(q)->type == CONSTR); // closure (type constructor)
   ASSERT(is_unique(node));
 
@@ -2375,15 +2534,23 @@ awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node)
 void 
 awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node)
 {
-  StgBlockingQueueElement *bqe, *next;
+  StgBlockingQueueElement *bqe;
 
   ACQUIRE_LOCK(&sched_mutex);
 
   IF_PAR_DEBUG(verbose, 
-	       belch("## AwBQ for node %p on [%x]: ",
+	       belch("##-_ AwBQ for node %p on [%x]: ",
 		     node, mytid));
-
-  ASSERT(get_itbl(q)->type == TSO ||           
+#ifdef DIST  
+  //RFP
+  if(get_itbl(q)->type == CONSTR || q==END_BQ_QUEUE) {
+    IF_PAR_DEBUG(verbose, belch("## ... nothing to unblock so lets just return. RFP (BUG?)"));
+    return;
+  }
+#endif
+  
+  ASSERT(q == END_BQ_QUEUE ||
+	 get_itbl(q)->type == TSO ||           
   	 get_itbl(q)->type == BLOCKED_FETCH || 
   	 get_itbl(q)->type == CONSTR); 
 
@@ -2514,6 +2681,7 @@ unblockThread(StgTSO *tso)
   case BlockedOnRead:
   case BlockedOnWrite:
     {
+      /* take TSO off blocked_queue */
       StgBlockingQueueElement *prev = NULL;
       for (t = (StgBlockingQueueElement *)blocked_queue_hd; t != END_BQ_QUEUE; 
 	   prev = t, t = t->link) {
@@ -2537,6 +2705,7 @@ unblockThread(StgTSO *tso)
 
   case BlockedOnDelay:
     {
+      /* take TSO off sleeping_queue */
       StgBlockingQueueElement *prev = NULL;
       for (t = (StgBlockingQueueElement *)sleeping_queue; t != END_BQ_QUEUE; 
 	   prev = t, t = t->link) {
@@ -3101,7 +3270,22 @@ printAllThreads(void)
 {
   StgTSO *t;
 
+# if defined(GRAN)
+  char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
+  ullong_format_string(TIME_ON_PROC(CurrentProc), 
+		       time_string, rtsFalse/*no commas!*/);
+
+  sched_belch("all threads at [%s]:", time_string);
+# elif defined(PAR)
+  char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
+  ullong_format_string(CURRENT_TIME,
+		       time_string, rtsFalse/*no commas!*/);
+
+  sched_belch("all threads at [%s]:", time_string);
+# else
   sched_belch("all threads:");
+# endif
+
   for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
     fprintf(stderr, "\tthread %d ", t->id);
     printThreadStatus(t);
@@ -3127,27 +3311,41 @@ print_bq (StgClosure *node)
   /* should cover all closures that may have a blocking queue */
   ASSERT(get_itbl(node)->type == BLACKHOLE_BQ ||
 	 get_itbl(node)->type == FETCH_ME_BQ ||
-	 get_itbl(node)->type == RBH);
+	 get_itbl(node)->type == RBH ||
+	 get_itbl(node)->type == MVAR);
     
   ASSERT(node!=(StgClosure*)NULL);         // sanity check
+
+  print_bqe(((StgBlockingQueue*)node)->blocking_queue);
+}
+
+/* 
+   Print a whole blocking queue starting with the element bqe.
+*/
+void 
+print_bqe (StgBlockingQueueElement *bqe)
+{
+  rtsBool end;
+
   /* 
      NB: In a parallel setup a BQ of an RBH must end with an RBH_Save closure;
   */
-  for (bqe = ((StgBlockingQueue*)node)->blocking_queue, end = (bqe==END_BQ_QUEUE);
+  for (end = (bqe==END_BQ_QUEUE);
        !end; // iterate until bqe points to a CONSTR
-       end = (get_itbl(bqe)->type == CONSTR) || (bqe->link==END_BQ_QUEUE), bqe = end ? END_BQ_QUEUE : bqe->link) {
-    ASSERT(bqe != END_BQ_QUEUE);             // sanity check
-    ASSERT(bqe != (StgTSO*)NULL);            // sanity check
+       end = (get_itbl(bqe)->type == CONSTR) || (bqe->link==END_BQ_QUEUE), 
+       bqe = end ? END_BQ_QUEUE : bqe->link) {
+    ASSERT(bqe != END_BQ_QUEUE);                               // sanity check
+    ASSERT(bqe != (StgBlockingQueueElement *)NULL);            // sanity check
     /* types of closures that may appear in a blocking queue */
     ASSERT(get_itbl(bqe)->type == TSO ||           
 	   get_itbl(bqe)->type == BLOCKED_FETCH || 
 	   get_itbl(bqe)->type == CONSTR); 
     /* only BQs of an RBH end with an RBH_Save closure */
-    ASSERT(get_itbl(bqe)->type != CONSTR || get_itbl(node)->type == RBH);
+    //ASSERT(get_itbl(bqe)->type != CONSTR || get_itbl(node)->type == RBH);
 
     switch (get_itbl(bqe)->type) {
     case TSO:
-      fprintf(stderr," TSO %d (%x),",
+      fprintf(stderr," TSO %u (%x),",
 	      ((StgTSO *)bqe)->id, ((StgTSO *)bqe));
       break;
     case BLOCKED_FETCH:
@@ -3165,8 +3363,8 @@ print_bq (StgClosure *node)
 	       "RBH_Save_?"), get_itbl(bqe));
       break;
     default:
-      barf("Unexpected closure type %s in blocking queue of %p (%s)",
-	   info_type(bqe), node, info_type(node));
+      barf("Unexpected closure type %s in blocking queue", // of %p (%s)",
+	   info_type((StgClosure *)bqe)); // , node, info_type(node));
       break;
     }
   } /* for */
@@ -3270,6 +3468,8 @@ sched_belch(char *s, ...)
   va_start(ap,s);
 #ifdef SMP
   fprintf(stderr, "scheduler (task %ld): ", pthread_self());
+#elif defined(PAR)
+  fprintf(stderr, "== ");
 #else
   fprintf(stderr, "scheduler: ");
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.37 2001/03/14 11:18:18 sewardj Exp $
+ * $Id: RtsFlags.c,v 1.38 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -135,7 +135,7 @@ char *gran_debug_opts_prefix[] = {
 
 char *par_debug_opts_strs[] = {
   "DEBUG (-qDv, -qD1): verbose; be generally verbose with parallel related stuff.\n",
-  "DEBUG (-qDt, -qD2): trace; trace messages.\n",
+  "DEBUG (-qDq, -qD2): bq; print blocking queues.\n",
   "DEBUG (-qDs, -qD4): schedule; scheduling of parallel threads.\n",
   "DEBUG (-qDe, -qD8): free; free messages.\n",
   "DEBUG (-qDr, -qD16): resume; resume messages.\n",
@@ -146,18 +146,19 @@ char *par_debug_opts_strs[] = {
   //"DEBUG (-qDo, -qD512): forward; forwarding messages to other PEs.\n",
   "DEBUG (-qDl, -qD256): tables; print internal LAGA etc tables.\n",
   "DEBUG (-qDo, -qD512): packet; packets and graph structures when packing.\n",
-  "DEBUG (-qDp, -qD1024): pack; packing and unpacking graphs.\n"
+  "DEBUG (-qDp, -qD1024): pack; packing and unpacking graphs.\n",
+  "DEBUG (-qDz, -qD2048): paranoia; ridiculously detailed output (excellent for filling a partition).\n"
 };
 
 /* one character codes for the available debug options */
 char par_debug_opts_flags[] = {
-  'v', 't', 's', 'e', 'r', 'w', 'F', 'f', 'l', 'o', 'p'  
+  'v', 'q', 's', 'e', 'r', 'w', 'F', 'f', 'l', 'o', 'p', 'z'
 };
 
 /* prefix strings printed with the debug messages of the corresponding type */
 char *par_debug_opts_prefix[] = {
   "  ", /* verbose */
-  "..", /* trace */
+  "##", /* bq */
   "--", /* schedule */
   "!!", /* free */
   "[]", /* resume */
@@ -168,6 +169,7 @@ char *par_debug_opts_prefix[] = {
   "", /* tables */
   "**", /* packet */
   "**" /* pack */
+  ":(" /* paranoia */
 };
 
 #endif /* PAR */
@@ -225,10 +227,16 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.heapSizeSuggestion	= 0;    /* none */
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
+#if defined(PAR)
+    /* A hack currently needed for GUM -- HWL */
+    RtsFlags.GcFlags.generations        = 1;
+    RtsFlags.GcFlags.steps              = 2;
+    RtsFlags.GcFlags.squeezeUpdFrames	= rtsFalse;
+#else
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.steps              = 2;
-
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
+#endif
 #ifdef RTS_GTK_FRONTPANEL
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
 #endif
@@ -256,6 +264,7 @@ void initRtsFlagsDefaults(void)
 
 #ifdef PAR
     RtsFlags.ParFlags.ParStats.Full   	  = rtsFalse;
+    RtsFlags.ParFlags.ParStats.Suppressed = rtsFalse;
     RtsFlags.ParFlags.ParStats.Binary 	  = rtsFalse;
     RtsFlags.ParFlags.ParStats.Sparks 	  = rtsFalse;
     RtsFlags.ParFlags.ParStats.Heap   	  = rtsFalse;
@@ -263,8 +272,14 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.ParStats.Global     = rtsFalse;
 
     RtsFlags.ParFlags.outputDisabled	= rtsFalse;
+#ifdef DIST
+    RtsFlags.ParFlags.doFairScheduling  = rtsTrue;  /* fair sched by def */
+#else
+    RtsFlags.ParFlags.doFairScheduling  = rtsFalse;  /* unfair sched by def */
+#endif
     RtsFlags.ParFlags.packBufferSize	= 1024;
-
+    RtsFlags.ParFlags.thunksToPack      = 1; /* 0 ... infinity; */
+    RtsFlags.ParFlags.globalising       = 1; /* 0 ... everything */
     RtsFlags.ParFlags.maxThreads        = 1024;
     RtsFlags.ParFlags.maxFishes        = MAX_FISHES;
     RtsFlags.ParFlags.fishDelay         = FISH_DELAY;
@@ -554,7 +569,7 @@ error = rtsTrue;
 # define SMP_BUILD_ONLY(x)      x
 #else
 # define SMP_BUILD_ONLY(x) \
-prog_belch("GHC not built for: -parallel"); \
+prog_belch("GHC not built for: -smp"); \
 error = rtsTrue;
 #endif
 
@@ -693,9 +708,9 @@ error = rtsTrue;
 
 	    stats:
 #ifdef PAR
-		  /* Opening all those files would almost certainly fail... */
-		  RtsFlags.ParFlags.ParStats.Full = rtsTrue;
-		  RtsFlags.GcFlags.statsFile = stderr; /* temporary; ToDo: rm */
+		/* Opening all those files would almost certainly fail... */
+		// RtsFlags.ParFlags.ParStats.Full = rtsTrue;
+		RtsFlags.GcFlags.statsFile = stderr; /* temporary; ToDo: rm */
 #else
 		  RtsFlags.GcFlags.statsFile
 		      = open_stats_file(arg, *argc, argv,
@@ -843,14 +858,14 @@ error = rtsTrue;
 
     	      case 'q':
 		PAR_BUILD_ONLY(
-		process_par_option(arg, rts_argc, rts_argv, &error);
+		  process_par_option(arg, rts_argc, rts_argv, &error);
 		) break;
 
 	      /* =========== GRAN =============================== */
 
     	      case 'b':
 		GRAN_BUILD_ONLY(
-		process_gran_option(arg, rts_argc, rts_argv, &error);
+		  process_gran_option(arg, rts_argc, rts_argv, &error);
 		) break;
 
 	      /* =========== TICKY ============================== */
@@ -1657,9 +1672,12 @@ help_GranSim_debug_options(nat n) {
 static void
 process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 {
-  if (rts_argv[arg][1] != 'q') /* All GUM options start with -q */
+
+  if (rts_argv[arg][1] != 'q') { /* All GUM options start with -q */
+    belch("Warning: GUM option does not start with -q: %s", rts_argv[arg]);
     return;
-  
+  }
+
   /* Communication and task creation cost parameters */
   switch(rts_argv[arg][2]) {
   case 'e':  /* -qe<n>  ... allow <n> local sparks */
@@ -1701,17 +1719,16 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 		       RtsFlags.ParFlags.maxFishes));
     break;
   
-
-  case 'd':
+  case 'F':
     if (rts_argv[arg][3] != '\0') {
       RtsFlags.ParFlags.fishDelay
 	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
     } else {
-      belch("setupRtsFlags: missing fish delay time for -qd\n");
+      belch("setupRtsFlags: missing fish delay time for -qF\n");
       *error = rtsTrue;
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qd<n>: fish delay time %d", 
+		 belch("-qF<n>: fish delay time %d us", 
 		       RtsFlags.ParFlags.fishDelay));
     break;
 
@@ -1721,13 +1738,39 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 		 belch("-qO: output disabled"));
     break;
   
+  case 'g': /* -qg<n> ... globalisation scheme */
+    if (rts_argv[arg][3] != '\0') {
+      RtsFlags.ParFlags.globalising = decode(rts_argv[arg]+3);
+    } else {
+      belch("setupRtsFlags: missing identifier for globalisation scheme (for -qg)\n");
+      *error = rtsTrue;
+    }
+    IF_PAR_DEBUG(verbose,
+		 belch("-qg<n>: globalisation scheme set to  %d", 
+		       RtsFlags.ParFlags.globalising));
+    break;
+
+  case 'h': /* -qh<n> ... max number of thunks (except root) in packet */
+    if (rts_argv[arg][3] != '\0') {
+      RtsFlags.ParFlags.thunksToPack = decode(rts_argv[arg]+3);
+    } else {
+      belch("setupRtsFlags: missing number of thunks per packet (for -qh)\n");
+      *error = rtsTrue;
+    }
+    IF_PAR_DEBUG(verbose,
+		 belch("-qh<n>: thunks per packet set to %d", 
+		       RtsFlags.ParFlags.thunksToPack));
+    break;
+
   case 'P': /* -qP for writing a log file */
-    RtsFlags.ParFlags.ParStats.Full = rtsTrue;
+    //RtsFlags.ParFlags.ParStats.Full = rtsFalse;
     /* same encoding as in GranSim after -bP */	
     switch(rts_argv[arg][3]) {
-    case '\0': break; // nothing special, just an ordinary profile
-      //case '0': RtsFlags.ParFlags.ParStats.Suppressed = rtsTrue;
-      //  break;
+    case '\0': RtsFlags.ParFlags.ParStats.Full = rtsTrue;
+      break; // nothing special, just an ordinary profile
+    case '0': RtsFlags.ParFlags.ParStats.Suppressed = rtsTrue;
+	RtsFlags.ParFlags.ParStats.Full = rtsFalse;
+      break;
     case 'b': RtsFlags.ParFlags.ParStats.Binary = rtsTrue;
       break;
     case 's': RtsFlags.ParFlags.ParStats.Sparks = rtsTrue;
@@ -1736,7 +1779,13 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
       //  break;
     case 'n': RtsFlags.ParFlags.ParStats.NewLogfile = rtsTrue;
       break;
-    case 'g': RtsFlags.ParFlags.ParStats.Global = rtsTrue;
+    case 'g': 
+# if defined(PAR_TICKY)
+      RtsFlags.ParFlags.ParStats.Global = rtsTrue;
+# else 
+      fprintf(stderr,"-qPg is only possible for a PAR_TICKY RTS, which this is not");
+      stg_exit(EXIT_FAILURE);
+# endif
       break;
     default: barf("Unknown option -qP%c", rts_argv[arg][2]);
     }
@@ -1749,14 +1798,20 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
     if (rts_argv[arg][3] != '\0') {
       RtsFlags.ParFlags.packBufferSize = decode(rts_argv[arg]+3);
     } else {
-      belch("setupRtsFlags: missing size of PackBuffer (for -Q)\n");
-      error = rtsTrue;
+      belch("setupRtsFlags: missing size of PackBuffer (for -qQ)\n");
+      *error = rtsTrue;
     }
     IF_PAR_DEBUG(verbose,
 		 belch("-qQ<n>: pack buffer size set to %d", 
 		       RtsFlags.ParFlags.packBufferSize));
     break;
 
+  case 'R':
+    RtsFlags.ParFlags.doFairScheduling = rtsTrue;
+    IF_PAR_DEBUG(verbose,
+		 belch("-qR: fair-ish scheduling"));
+    break;
+  
 # if defined(DEBUG)  
   case 'w':
     if (rts_argv[arg][3] != '\0') {
@@ -1792,7 +1847,8 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
     break;
 # endif
   default:
-    belch("Unknown option -q%c", rts_argv[arg][2]);
+    belch("Unknown option -q%c (%d opts in total)", 
+	  rts_argv[arg][2], *rts_argc);
     break;
   } /* switch */
 }
@@ -1810,7 +1866,7 @@ set_par_debug_options(nat n) {
       fprintf(stderr, par_debug_opts_strs[i]);
       switch (i) {
         case 0: RtsFlags.ParFlags.Debug.verbose       = rtsTrue;  break;
-        case 1: RtsFlags.ParFlags.Debug.trace         = rtsTrue;  break;
+        case 1: RtsFlags.ParFlags.Debug.bq            = rtsTrue;  break;
         case 2: RtsFlags.ParFlags.Debug.schedule      = rtsTrue;  break;
         case 3: RtsFlags.ParFlags.Debug.free          = rtsTrue;  break;
         case 4: RtsFlags.ParFlags.Debug.resume        = rtsTrue;  break;
@@ -1820,8 +1876,10 @@ set_par_debug_options(nat n) {
         case 7: RtsFlags.ParFlags.Debug.fish          = rtsTrue;  break;
         case 8: RtsFlags.ParFlags.Debug.tables        = rtsTrue;  break;
         case 9: RtsFlags.ParFlags.Debug.packet        = rtsTrue;  break;
-        case 10: RtsFlags.ParFlags.Debug.pack          = rtsTrue;  break;
-        default: barf("set_par_debug_options: only %d debug options expected");
+        case 10: RtsFlags.ParFlags.Debug.pack         = rtsTrue;  break;
+        case 11: RtsFlags.ParFlags.Debug.paranoia     = rtsTrue;  break;
+        default: barf("set_par_debug_options: only %d debug options expected",
+		      MAX_PAR_DEBUG_OPTION);
       } /* switch */
     } /* if */
 }
@@ -1850,19 +1908,20 @@ set_debug_options(nat n) {
     if ((n>>i)&1) {
       fprintf(stderr, debug_opts_strs[i]);
       switch (i) {
-        case 0:  RtsFlags.DebugFlags.scheduler   = rtsTrue; break;
-        case 1:  RtsFlags.DebugFlags.evaluator   = rtsTrue; break;
-        case 2:  RtsFlags.DebugFlags.codegen     = rtsTrue; break;
-        case 3:  RtsFlags.DebugFlags.weak        = rtsTrue; break;
-        case 4:  RtsFlags.DebugFlags.gccafs      = rtsTrue; break;
-        case 5:  RtsFlags.DebugFlags.gc          = rtsTrue; break;
-        case 6:  RtsFlags.DebugFlags.block_alloc = rtsTrue; break;
-        case 7:  RtsFlags.DebugFlags.sanity      = rtsTrue; break;
-        case 8:  RtsFlags.DebugFlags.stable      = rtsTrue; break;
-        case 9:  RtsFlags.DebugFlags.prof        = rtsTrue; break;
-        case 10: RtsFlags.DebugFlags.gran        = rtsTrue; break;
-        case 11: RtsFlags.DebugFlags.par         = rtsTrue; break;
-        case 12: RtsFlags.DebugFlags.linker      = rtsTrue; break;
+        case 0: RtsFlags.DebugFlags.scheduler   = rtsTrue; break;
+        case 1: RtsFlags.DebugFlags.evaluator   = rtsTrue; break;
+        case 2: RtsFlags.DebugFlags.codegen     = rtsTrue; break;
+        case 3: RtsFlags.DebugFlags.weak        = rtsTrue; break;
+        case 4: RtsFlags.DebugFlags.gccafs      = rtsTrue; break;
+        case 5: RtsFlags.DebugFlags.gc          = rtsTrue; break;
+        case 6: RtsFlags.DebugFlags.block_alloc = rtsTrue; break;
+        case 7: RtsFlags.DebugFlags.sanity      = rtsTrue; break;
+        case 8: RtsFlags.DebugFlags.stable      = rtsTrue; break;
+        case 9: RtsFlags.DebugFlags.prof        = rtsTrue; break;
+        case 10:  RtsFlags.DebugFlags.gran       = rtsTrue; break;
+        case 11:  RtsFlags.DebugFlags.par        = rtsTrue; break;
+        default: barf("set_debug_options: only %d debug options expected",
+		      MAX_DEBUG_OPTION);
       } /* switch */
     } /* if */
 }

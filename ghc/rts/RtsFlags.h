@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.31 2001/03/14 11:18:18 sewardj Exp $
+ * $Id: RtsFlags.h,v 1.32 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -124,7 +124,7 @@ struct CONCURRENT_FLAGS {
 /* currently the same as GRAN_STATS_FLAGS */
 struct PAR_STATS_FLAGS {
   rtsBool Full;       /* Full .gr profile (rtsTrue) or only END events? */
-  // rtsBool Suppressed; /* No .gr profile at all */
+  rtsBool Suppressed; /* No .gr profile at all */
   rtsBool Binary;     /* Binary profile? (not yet implemented) */
   rtsBool Sparks;     /* Info on sparks in profile? */
   rtsBool Heap;       /* Info on heap allocs in profile? */ 
@@ -135,7 +135,7 @@ struct PAR_STATS_FLAGS {
 struct PAR_DEBUG_FLAGS {  
   /* flags to control debugging output in various subsystems */
   rtsBool verbose    : 1; /*    1 */
-  rtsBool trace      : 1; /*    2 */
+  rtsBool bq         : 1; /*    2 */
   rtsBool schedule   : 1; /*    4 */
   rtsBool free       : 1; /*    8 */
   rtsBool resume     : 1; /*   16 */
@@ -145,9 +145,10 @@ struct PAR_DEBUG_FLAGS {
   rtsBool tables     : 1; /*  256 */
   rtsBool packet     : 1; /*  512 */
   rtsBool pack       : 1; /* 1024 */
+  rtsBool paranoia   : 1; /* 2048 */
 };
 
-#define MAX_PAR_DEBUG_OPTION     10
+#define MAX_PAR_DEBUG_OPTION     11
 #define PAR_DEBUG_MASK(n)        ((nat)(ldexp(1,n)))
 #define MAX_PAR_DEBUG_MASK       ((nat)(ldexp(1,(MAX_PAR_DEBUG_OPTION+1))-1))
 
@@ -155,7 +156,10 @@ struct PAR_FLAGS {
   struct PAR_STATS_FLAGS ParStats;  /* profile and stats output */
   struct PAR_DEBUG_FLAGS Debug;         /* debugging options */
   rtsBool  outputDisabled;	  /* Disable output for performance purposes */
+  rtsBool  doFairScheduling;	  /* Fair-ish scheduling (round robin; no time-slices) */
   nat      packBufferSize;
+  nat      thunksToPack;          /* number of thunks in packet + 1 */ 
+  nat      globalising;           /* globalisation scheme */
   nat	   maxLocalSparks;        /* spark pool size */
   nat      maxThreads;            /* thread pool size */
   nat      maxFishes;             /* max number of active fishes */

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelWeak.lhs,v 1.15 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelWeak.lhs,v 1.16 2001/03/22 03:51:09 hwloidl Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
@@ -15,8 +15,6 @@ import PrelGHC
 import PrelBase
 import PrelMaybe
 import PrelIOBase	( IO(..), unIO )
-
-#ifndef __PARALLEL_HASKELL__
 
 data Weak v = Weak (Weak# v)
 
@@ -63,7 +61,5 @@ runFinalizerBatch (I# n) arr =
 			}}
    in
         go n
-
-#endif
 
 \end{code}

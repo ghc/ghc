@@ -1,22 +1,25 @@
 /* -----------------------------------------------------------------------------
- * $Id: FetchMe.h,v 1.2 2000/01/13 14:34:06 hwloidl Exp $
+ * $Id: FetchMe.h,v 1.3 2001/03/22 03:51:11 hwloidl Exp $
  *
  * Closure types for the parallel system.
  *
  * ---------------------------------------------------------------------------*/
 
-EI_(FETCH_ME_info);
-EF_(FETCH_ME_entry);
+EI_(stg_FETCH_ME_info);
+EF_(stg_FETCH_ME_entry);
 
-EI_(FETCH_ME_BQ_info);
-EF_(FETCH_ME_BQ_entry);
+EI_(stg_FETCH_ME_BQ_info);
+EF_(stg_FETCH_ME_BQ_entry);
 
-EI_(BLOCKED_FETCH_info);
-EF_(BLOCKED_FETCH_entry);
+EI_(stg_BLOCKED_FETCH_info);
+EF_(stg_BLOCKED_FETCH_entry);
 
-EI_(RBH_Save_0_info);
-EF_(RBH_Save_0_entry);
-EI_(RBH_Save_1_info);
-EF_(RBH_Save_1_entry);
-EI_(RBH_Save_2_info);
-EF_(RBH_Save_2_entry);
+EI_(stg_REMOTE_REF_info);
+EF_(stg_REMOTE_REF_entry);
+
+EI_(stg_RBH_Save_0_info);
+EF_(stg_RBH_Save_0_entry);
+EI_(stg_RBH_Save_1_info);
+EF_(stg_RBH_Save_1_entry);
+EI_(stg_RBH_Save_2_info);
+EF_(stg_RBH_Save_2_entry);

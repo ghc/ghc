@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Thu Mar 23 2000 18:20:17 Stardate: [-30]4548.82 hwloidl>
+  Time-stamp: <Wed Mar 21 2001 16:42:40 Stardate: [-30]6363.48 hwloidl>
 
   Basic functions for use in either GranSim or GUM.
 */
@@ -10,8 +10,10 @@
 //* Includes::			
 //* Variables and constants::	
 //* Writing to the log-file::	
+//* Global statistics::		
 //* Dumping routines::		
 //@end menu
+//*/ fool highlight
 
 //@node Includes, Variables and constants
 //@subsection Includes
@@ -19,6 +21,7 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "Storage.h"
 #include "GranSimRts.h"
 #include "ParallelRts.h"
 
@@ -29,7 +32,102 @@
 FILE *gr_file = NULL;
 char gr_filename[STATS_FILENAME_MAXLEN];
 
-//@node Writing to the log-file, Dumping routines, Variables and constants
+#if defined(PAR)
+/* Global statistics */
+GlobalParStats globalParStats;
+#endif
+
+#if defined(PAR) && !defined(DEBUG)
+// HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACCCCCCCCCKKKKKKKKKKKK
+// Definitely the wrong place for info_type in !DEBUG (see Printer.c) -- HWL
+
+static char *closure_type_names[] = {
+  "INVALID_OBJECT",          	/* 0  */
+  "CONSTR",                  	/* 1  */
+  "CONSTR_1_0",			/* 2  */
+  "CONSTR_0_1",			/* 3  */
+  "CONSTR_2_0",			/* 4  */
+  "CONSTR_1_1",			/* 5  */
+  "CONSTR_0_2",			/* 6  */
+  "CONSTR_INTLIKE",	        /* 7  */
+  "CONSTR_CHARLIKE",	        /* 8  */
+  "CONSTR_STATIC",	        /* 9  */
+  "CONSTR_NOCAF_STATIC",     	/* 10 */
+  "FUN",		        /* 11 */
+  "FUN_1_0",		  	/* 12 */
+  "FUN_0_1",		  	/* 13 */
+  "FUN_2_0",		  	/* 14 */
+  "FUN_1_1",		  	/* 15 */
+  "FUN_0_2",			/* 16 */
+  "FUN_STATIC",	        	/* 17 */
+  "THUNK",		        /* 18 */
+  "THUNK_1_0",	  		/* 19 */
+  "THUNK_0_1",	  		/* 20 */
+  "THUNK_2_0",	  		/* 21 */
+  "THUNK_1_1",	  		/* 22 */
+  "THUNK_0_2",			/* 23 */
+  "THUNK_STATIC",	        /* 24 */
+  "THUNK_SELECTOR",	        /* 25 */
+  "BCO",		        /* 26 */
+  "AP_UPD",		        /* 27 */
+  "PAP",			/* 28 */
+  "IND",		        /* 29 */
+  "IND_OLDGEN",	        	/* 30 */
+  "IND_PERM",	        	/* 31 */
+  "IND_OLDGEN_PERM",	        /* 32 */
+  "IND_STATIC",	        	/* 33 */
+  "CAF_UNENTERED",           	/* 34 */
+  "CAF_ENTERED",		/* 35 */
+  "CAF_BLACKHOLE",		/* 36 */
+  "RET_BCO",                 	/* 37 */
+  "RET_SMALL",	        	/* 38 */
+  "RET_VEC_SMALL",	        /* 39 */
+  "RET_BIG",		        /* 40 */
+  "RET_VEC_BIG",	        /* 41 */
+  "RET_DYN",		        /* 42 */
+  "UPDATE_FRAME",	        /* 43 */
+  "CATCH_FRAME",	        /* 44 */
+  "STOP_FRAME",	        	/* 45 */
+  "SEQ_FRAME",	        	/* 46 */
+  "BLACKHOLE",	        	/* 47 */
+  "BLACKHOLE_BQ",	        /* 48 */
+  "SE_BLACKHOLE",		/* 49 */
+  "SE_CAF_BLACKHOLE",		/* 50 */
+  "MVAR",		        /* 51 */
+  "ARR_WORDS",	        	/* 52 */
+  "MUT_ARR_PTRS",	        /* 53 */
+  "MUT_ARR_PTRS_FROZEN",     	/* 54 */
+  "MUT_VAR",		        /* 55 */
+  "WEAK",		        /* 56 */
+  "FOREIGN",		        /* 57 */
+  "STABLE_NAME",	        /* 58 */
+  "TSO",		        /* 59 */
+  "BLOCKED_FETCH",	        /* 60 */
+  "FETCH_ME",                   /* 61 */
+  "FETCH_ME_BQ",                /* 62 */
+  "RBH",                        /* 63 */
+  "EVACUATED",                  /* 64 */
+  "REMOTE_REF",                 /* 65 */
+  "N_CLOSURE_TYPES"         	/* 66 */
+};
+
+char *
+info_type(StgClosure *closure){ 
+  return closure_type_names[get_itbl(closure)->type];
+}
+
+char *
+info_type_by_ip(StgInfoTable *ip){ 
+  return closure_type_names[ip->type];
+}
+
+void
+info_hdr_type(StgClosure *closure, char *res){ 
+  strcpy(res,closure_type_names[get_itbl(closure)->type]);
+}
+#endif
+
+//@node Writing to the log-file, Global statistics, Variables and constants
 //@subsection Writing to the log-file
 /*
   Writing to the log-file
@@ -77,7 +175,7 @@ int prog_argc, rts_argc;
 	 gr_filename);
   }
 
-  setbuf(gr_file, NULL); // for debugging turn buffering off
+  setbuf(gr_file, NULL);                   /* turn  buffering off */
 
   /* write header with program name, options and setup to gr_file */
   fputs("Granularity Simulation for ", gr_file);
@@ -195,6 +293,8 @@ int prog_argc, rts_argc;
 
 #elif defined(PAR)
 
+void init_gr_stats (void);
+
 void
 init_gr_simulation(rts_argc, rts_argv, prog_argc, prog_argv)
 char *prog_argv[], *rts_argv[];
@@ -209,10 +309,13 @@ int prog_argc, rts_argc;
   if (!RtsFlags.ParFlags.ParStats.Full) 
     return;
 
+  if (RtsFlags.ParFlags.ParStats.Global)
+    init_gr_stats();
+
   if ((gr_file = fopen(gr_filename, "w")) == NULL)
     barf("Can't open activity report file %s\n", gr_filename);
 
-  setbuf(gr_file, NULL); // for debugging turn buffering off
+  setbuf(gr_file, NULL);                   /* turn  buffering off */
 
   /* write header with program name, options and setup to gr_file */
   for (i = 0; i < prog_argc; ++i) {
@@ -234,7 +337,9 @@ int prog_argc, rts_argc;
   fputs("Start-Time: ", gr_file);
   fputs(time_str(), gr_file);
   fputc('\n', gr_file);
-    
+
+  ASSERT(startTime==0);
+  // startTime = msTime();
   startTime = CURRENT_TIME;
   ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
   fprintf(gr_file, "PE %2u [%s]: TIME\n", thisPE, time_string);
@@ -259,6 +364,36 @@ int prog_argc, rts_argc;
 
     return;
 }
+
+void 
+init_gr_stats (void) {
+  // memset(&globalParStats, '\0', sizeof(GlobalParStats));
+
+  globalParStats.tot_mark_GA = globalParStats.tot_rebuild_GA = globalParStats.tot_free_GA = globalParStats.res_mark_GA = globalParStats.res_rebuild_GA = globalParStats.res_free_GA = globalParStats.tot_size_GA = globalParStats.res_size_GA = globalParStats.tot_global = globalParStats.tot_local = 0;
+  globalParStats.cnt_mark_GA = globalParStats.cnt_rebuild_GA = globalParStats.cnt_free_GA = globalParStats.res_free_GA = globalParStats.local_alloc_GA = 0;
+
+  globalParStats.time_mark_GA = 0.0;
+  globalParStats.time_rebuild_GA = 0.0;
+  globalParStats.time_sparks = 0.0;
+  globalParStats.time_pack = 0.0;
+
+  globalParStats.res_sp = globalParStats.res_tp = globalParStats.tot_sp = globalParStats.tot_tp = globalParStats.cnt_sp = globalParStats.cnt_tp = globalParStats.emp_sp = globalParStats.emp_tp = 0;
+  globalParStats.tot_packets = globalParStats.tot_packet_size = globalParStats.tot_thunks = globalParStats.res_packet_size = globalParStats.res_thunks = globalParStats.rec_res_packet_size = globalParStats.rec_res_thunks = 0;
+
+  globalParStats.tot_fish_mess = globalParStats.tot_fetch_mess = globalParStats.tot_resume_mess = globalParStats.tot_schedule_mess = 0;
+  globalParStats.rec_fish_mess = globalParStats.rec_resume_mess = globalParStats.rec_schedule_mess = 0;
+  globalParStats.rec_fetch_mess = 0;
+#if defined(DIST)
+  globalParStats.tot_reval_mess = 0;
+  globalParStats.rec_reval_mess = 0;
+#endif
+
+  globalParStats.tot_threads_created = globalParStats.tot_sparks_created = globalParStats.tot_sparks_ignored = globalParStats.tot_sparks_marked = globalParStats.res_sparks_created = globalParStats.res_sparks_ignored = globalParStats.res_sparks_marked = 0;
+   globalParStats.tot_yields = globalParStats.tot_stackover = globalParStats.tot_heapover = 0;
+
+   globalParStats.tot_arrs = globalParStats.tot_arr_size = 0; 
+}
+
 #endif /* PAR */
 
 //@cindex end_gr_simulation
@@ -401,7 +536,13 @@ end_gr_simulation(void)
 }
 #endif /* PAR */
 
-//@node Dumping routines,  , Writing to the log-file
+//@node Global statistics, Dumping routines, Writing to the log-file
+//@subsection Global statistics
+/* 
+   Called at the end of execution
+*/
+
+//@node Dumping routines,  , Global statistics
 //@subsection Dumping routines
 
 //@cindex DumpGranEvent
@@ -410,7 +551,7 @@ DumpGranEvent(name, tso)
 GranEventType name;
 StgTSO *tso;
 {
-    DumpRawGranEvent(CURRENT_PROC, (PEs)0, name, tso, END_TSO_QUEUE, (StgInt)0, (StgInt)0);
+    DumpRawGranEvent(CURRENT_PROC, (PEs)0, name, tso, &stg_END_TSO_QUEUE_closure, (StgInt)0, (StgInt)0);
 }
 
 //@cindex DumpRawGranEvent
@@ -422,33 +563,56 @@ StgTSO *tso;
 StgClosure *node;
 StgInt sparkname, len;
 {
+# if defined(GRAN)
+  DumpVeryRawGranEvent(TIME_ON_PROC(proc), 
+		       proc, p, name, tso, node, sparkname, len);
+# elif defined(PAR)
+  DumpVeryRawGranEvent(CURRENT_TIME,
+		       proc, p, name, tso, node, sparkname, len);
+# endif
+}
+
+//@cindex DumpVeryRawGranEvent
+void
+DumpVeryRawGranEvent(time, proc, p, name, tso, node, sparkname, len)
+rtsTime time;
+PEs proc, p;         /* proc ... where it happens; p ... where node lives */
+GranEventType name;
+StgTSO *tso;
+StgClosure *node;
+StgInt sparkname, len;
+{
   FILE *output_file; // DEBUGGING ONLY !!!!!!!!!!!!!!!!!!!!!!!!!1
   StgWord id;
   char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
 # if defined(GRAN)
-  ullong_format_string(TIME_ON_PROC(proc), 
+  ullong_format_string(time,
 		       time_string, rtsFalse/*no commas!*/);
 # elif defined(PAR)
-  ullong_format_string(CURRENT_TIME,
+  ullong_format_string(time,
 		       time_string, rtsFalse/*no commas!*/);
 # endif
   output_file = gr_file;
+
 # if defined(GRAN)
+
   if (RtsFlags.GranFlags.GranSimStats.Full) 
     ASSERT(output_file!=NULL);
 
-  IF_DEBUG(gran,
-	   fprintf(stderr, "GRAN: Dumping info to file with handle %#x\n", output_file))
-		   
   if (RtsFlags.GranFlags.GranSimStats.Suppressed)
     return;
 # elif defined(PAR)
+
   if (RtsFlags.ParFlags.ParStats.Full) 
     ASSERT(output_file!=NULL);
+
+  if (RtsFlags.ParFlags.ParStats.Suppressed)
+    return;
+
 # endif
 
   id = tso == NULL ? -1 : tso->id;
-  if (node==stgCast(StgClosure*,&END_TSO_QUEUE_closure))
+  if (node==stgCast(StgClosure*,&stg_END_TSO_QUEUE_closure))
       strcpy(node_str,"________");  /* "END_TSO_QUEUE"); */
   else
       sprintf(node_str,"0x%-6lx",node);
@@ -502,6 +666,7 @@ StgInt sparkname, len;
      case GR_BLOCK:
      case GR_STOLEN:
      case GR_STOLENQ:
+     case GR_STEALING:
 	fprintf(output_file, "PE %2u [%s]: %-9s\t%lx \t%s\t(from %2u)\n",
 	        proc, time_string, gran_event_names[name], 
 		id,node_str,p);
@@ -512,10 +677,6 @@ StgInt sparkname, len;
      case GR_DESCHEDULE:
         fprintf(output_file,"PE %2u [%s]: %-9s\t%lx \n",
 	        proc,time_string,gran_event_names[name],id);
-        break;
-     case GR_STEALING:
-        fprintf(output_file,"PE %2u [%s]: %-9s\t%lx\t        \t(by %2u)\n",
-	        proc,time_string,gran_event_names[name],id,p);
         break;
      case GR_ALLOC:
         fprintf(output_file,"PE %2u [%s]: %-9s\t%lx\t        \tallocating %u words\n",
@@ -594,14 +755,14 @@ rtsBool mandatory_thread;
 	 * NB: DumpGranEvent cannot be used because PE may be wrong 
 	 * (as well as the extra info)
 	 */
-	fprintf(output_file, "PE %2u [%s]: END %lx, SN %u, ST %lu, EXP %c, BB %u, HA %u, RT %u, BT %u (%u), FT %u (%u), LS %u, GS %u, MY %c\n"
+	fprintf(output_file, "PE %2u [%s]: END %lx, SN %u, ST %lu, EXP %s, BB %u, HA %u, RT %u, BT %u (%u), FT %u (%u), LS %u, GS %u, MY %s\n"
 	  ,proc
 	  ,time_string
 	  ,tso->id
 #if defined(GRAN)		
 	  ,tso->gran.sparkname
 	  ,tso->gran.startedat
-	  ,tso->gran.exported ? 'T' : 'F'
+	  ,((tso->gran.exported) ? 'T' : 'F')
 	  ,tso->gran.basicblocks
 	  ,tso->gran.allocs
 	  ,tso->gran.exectime
@@ -614,7 +775,7 @@ rtsBool mandatory_thread;
 #elif defined(PAR)
 	  ,tso->par.sparkname
 	  ,tso->par.startedat
-	  ,tso->par.exported ? 'T' : 'F'
+	  ,(tso->par.exported) ? "T" : "F"
 	  ,tso->par.basicblocks
 	  ,tso->par.allocs
 	  ,tso->par.exectime
@@ -625,7 +786,7 @@ rtsBool mandatory_thread;
 	  ,tso->par.localsparks
 	  ,tso->par.globalsparks
 #endif
-	  ,mandatory_thread ? 'T' : 'F'
+	  ,(mandatory_thread ? "T" : "F")
 	  );
     }
 }
@@ -709,7 +870,7 @@ rtsTime v;
       return;
 # endif
 
-    DumpGranEvent(GR_TERMINATE, stgCast(StgTSO*,&END_TSO_QUEUE_closure));
+    DumpGranEvent(GR_TERMINATE, stgCast(StgTSO*,&stg_END_TSO_QUEUE_closure));
 
     if (sizeof(rtsTime) == 4) {
       putc('\0', gr_file);
@@ -829,6 +990,20 @@ get_closure_info(StgClosure* node, nat *size, nat *ptrs, nat *nonptrs,
 #endif
     return info;
 
+#ifdef DIST    
+  case REMOTE_REF: //same as for FETCH_ME...
+    *size = sizeofW(StgFetchMe);
+    *ptrs = (nat)0;
+    *nonptrs = (nat)0;
+    *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
+#if 0 /* DEBUG */
+    info_hdr_type(node, info_hdr_ty);
+#else
+    strcpy(info_hdr_ty, "REMOTE_REF");
+#endif
+    return info; 
+#endif DIST
+    
   case FETCH_ME_BQ:
     *size = sizeofW(StgFetchMeBlockingQueue);
     *ptrs = (nat)0;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.99 2001/03/20 11:37:21 simonmar Exp $
+ * $Id: GC.c,v 1.100 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -44,6 +44,7 @@
 #include "Weak.h"
 #include "StablePriv.h"
 #include "Prelude.h"
+#include "ParTicky.h"                       // ToDo: move into Rts.h
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
 # include "ParallelRts.h"
@@ -210,6 +211,9 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 
   /* tell the stats department that we've started a GC */
   stat_startGC();
+
+  /* Init stats and print par specific (timing) info */
+  PAR_TICKY_PAR_START();
 
   /* attribute any costs to CCS_GC */
 #ifdef PROFILING
@@ -404,6 +408,8 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 
   /* Mark the entries in the GALA table of the parallel system */
   markLocalGAs(major_gc);
+  /* Mark all entries on the list of pending fetches */
+  markPendingFetches(major_gc);
 #endif
 
   /* Mark the weak pointer list, and prepare to detect dead weak
@@ -786,6 +792,8 @@ void GarbageCollect ( void (*get_roots)(void), rtsBool force_major_gc )
 
   /* ok, GC over: tell the stats department what happened. */
   stat_endGC(allocated, collected, live, copied, N);
+
+  //PAR_TICKY_TP();
 }
 
 //@node Weak Pointers, Evacuation, Garbage Collect
@@ -1491,6 +1499,37 @@ loop:
 	/* not evaluated yet */
 	break;
 
+#if defined(PAR)
+	/* a copy of the top-level cases below */
+      case RBH: // cf. BLACKHOLE_BQ
+  	{
+  	  //StgInfoTable *rip = get_closure_info(q, &size, &ptrs, &nonptrs, &vhs, str);
+  	  to = copy(q,BLACKHOLE_sizeW(),stp); 
+  	  //ToDo: derive size etc from reverted IP
+  	  //to = copy(q,size,stp);
+  	  // recordMutable((StgMutClosure *)to);
+  	  return to;
+  	}
+    
+      case BLOCKED_FETCH:
+  	ASSERT(sizeofW(StgBlockedFetch) >= MIN_NONUPD_SIZE);
+  	to = copy(q,sizeofW(StgBlockedFetch),stp);
+  	return to;
+
+# ifdef DIST    
+      case REMOTE_REF:
+# endif
+      case FETCH_ME:
+  	ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
+  	to = copy(q,sizeofW(StgFetchMe),stp);
+  	return to;
+    
+      case FETCH_ME_BQ:
+  	ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
+  	to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
+  	return to;
+#endif
+
       default:
 	barf("evacuate: THUNK_SELECTOR: strange selectee %d",
 	     (int)(selectee_info->type));
@@ -1689,6 +1728,9 @@ loop:
 		   q, info_type(q), to, info_type(to)));
     return to;
 
+# ifdef DIST    
+  case REMOTE_REF:
+# endif
   case FETCH_ME:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
     to = copy(q,sizeofW(StgFetchMe),stp);
@@ -2150,10 +2192,10 @@ scavenge(step *stp)
 	break;
       }
 
+#ifdef DIST
+    case REMOTE_REF:
+#endif
     case FETCH_ME:
-      IF_DEBUG(gc,
-	       belch("@@ scavenge: HWL claims nothing to do for %p (%s)",
-		     p, info_type((StgClosure *)p)));
       p += sizeofW(StgFetchMe);
       break; // nothing to do in this case
 
@@ -2583,6 +2625,10 @@ scavenge_mutable_list(generation *gen)
 	break;
       }
 
+#ifdef DIST
+    case REMOTE_REF:
+      barf("scavenge_mutable_list: REMOTE_REF %d", (int)(info->type));
+#endif
     case FETCH_ME:
       p += sizeofW(StgFetchMe);
       break; // nothing to do in this case

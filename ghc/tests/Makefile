@@ -22,4 +22,3 @@ SUBDIRS = \
 
 include $(TOP)/mk/target.mk
 
-

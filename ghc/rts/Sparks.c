@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Sparks.c,v 1.2 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: Sparks.c,v 1.3 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -15,6 +15,7 @@
 //* GUM code::			
 //* GranSim code::		
 //@end menu
+//*/
 
 //@node Includes, GUM code, Spark Management Routines, Spark Management Routines
 //@subsection Includes
@@ -25,8 +26,10 @@
 #include "Storage.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "ParTicky.h"
 # if defined(PAR)
 # include "ParallelRts.h"
+# include "GranSimRts.h"   // for GR_...
 # elif defined(GRAN)
 # include "GranSimRts.h"
 # endif
@@ -39,7 +42,7 @@
 
 static void slide_spark_pool( StgSparkPool *pool );
 
-void
+rtsBool
 initSparkPools( void )
 {
   Capability *cap;
@@ -62,14 +65,21 @@ initSparkPools( void )
     pool->hd  = pool->base;
     pool->tl  = pool->base;
   }
+  return rtsTrue; /* Qapla' */
 }
 
+/* 
+   We traverse the spark pool until we find the 2nd usable (i.e. non-NF)
+   spark. Rationale, we don't want to give away the only work a PE has.
+   ToDo: introduce low- and high-water-marks for load balancing.
+*/
 StgClosure *
-findSpark( void )
+findSpark( rtsBool for_export )
 {
   Capability *cap;
   StgSparkPool *pool;
-  StgClosure *spark;
+  StgClosure *spark, *first=NULL;
+  rtsBool isIdlePE = EMPTY_RUN_QUEUE();
 
 #ifdef SMP
   /* walk over the capabilities, allocating a spark pool for each one */
@@ -82,14 +92,36 @@ findSpark( void )
     pool = &(cap->rSparks);
     while (pool->hd < pool->tl) {
       spark = *pool->hd++;
-      if (closure_SHOULD_SPARK(spark))
-	return spark;
+      if (closure_SHOULD_SPARK(spark)) {
+	if (for_export && isIdlePE) {
+	  if (first==NULL) {
+	    first = spark; // keep the first usable spark if PE is idle
+	  } else {
+	    pool->hd--;    // found a second spark; keep it in the pool 
+	    ASSERT(*pool->hd==spark);
+	    if (RtsFlags.ParFlags.ParStats.Sparks) 
+	      DumpRawGranEvent(CURRENT_PROC, CURRENT_PROC, 
+			       GR_STEALING, ((StgTSO *)NULL), first, 
+			       0, 0 /* spark_queue_len(ADVISORY_POOL) */);
+	    return first;  // and return the *first* spark found
+	  }
+        } else {
+	  if (RtsFlags.ParFlags.ParStats.Sparks && for_export) 
+	    DumpRawGranEvent(CURRENT_PROC, CURRENT_PROC, 
+			     GR_STEALING, ((StgTSO *)NULL), spark, 
+			     0, 0 /* spark_queue_len(ADVISORY_POOL) */);
+	  return spark;    // return first spark found
+	}
+      }
     }
     slide_spark_pool(pool);
   }
   return NULL;
 }
 
+/* 
+   activateSpark is defined in Schedule.c
+*/
 rtsBool
 add_to_spark_queue( StgClosure *closure, StgSparkPool *pool )
 {
@@ -99,8 +131,25 @@ add_to_spark_queue( StgClosure *closure, StgSparkPool *pool )
   if (closure_SHOULD_SPARK(closure) && 
       pool->tl < pool->lim) {
     *(pool->tl++) = closure;
+
+#if defined(PAR)
+    // collect parallel global statistics (currently done together with GC stats)
+    if (RtsFlags.ParFlags.ParStats.Global &&
+	RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
+      // fprintf(stderr, "Creating spark for %x @ %11.2f\n", closure, usertime()); 
+      globalParStats.tot_sparks_created++;
+    }
+#endif
     return rtsTrue;
   } else {
+#if defined(PAR)
+    // collect parallel global statistics (currently done together with GC stats)
+    if (RtsFlags.ParFlags.ParStats.Global &&
+	RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
+      //fprintf(stderr, "Ignoring spark for %x @ %11.2f\n", closure, usertime()); 
+      globalParStats.tot_sparks_ignored++;
+    }
+#endif
     return rtsFalse;
   }
 }
@@ -141,11 +190,11 @@ void
 markSparkQueue( void )
 { 
   StgClosure **sparkp, **to_sparkp;
-#ifdef DEBUG
-  nat n, pruned_sparks;
-#endif
+  nat n, pruned_sparks; // stats only
   StgSparkPool *pool;
   Capability *cap;
+
+  PAR_TICKY_MARK_SPARK_QUEUE_START();
 
 #ifdef SMP
   /* walk over the capabilities, allocating a spark pool for each one */
@@ -156,8 +205,9 @@ markSparkQueue( void )
   {
 #endif
     pool = &(cap->rSparks);
-    
-#ifdef DEBUG
+
+#if defined(PAR)
+    // stats only
     n = 0;
     pruned_sparks = 0;
 #endif
@@ -172,11 +222,11 @@ markSparkQueue( void )
       if (closure_SHOULD_SPARK(*sparkp)) {
 	*to_sparkp = MarkRoot(*sparkp);
 	to_sparkp++;
-#ifdef DEBUG
+#ifdef PAR
 	n++;
 #endif
       } else {
-#ifdef DEBUG
+#ifdef PAR
 	pruned_sparks++;
 #endif
       }
@@ -185,6 +235,8 @@ markSparkQueue( void )
     pool->hd = pool->base;
     pool->tl = to_sparkp;
 
+    PAR_TICKY_MARK_SPARK_QUEUE_END(n);
+    
 #if defined(SMP)
     IF_DEBUG(scheduler,
 	     belch("markSparkQueue: marked %d sparks and pruned %d sparks on [%x]",
@@ -420,7 +472,7 @@ activateSpark (rtsEvent *event, rtsSparkQ spark)
       IF_GRAN_DEBUG(pri,
 		    belch("++ No high priority spark available; low priority (%u) spark chosen: node=%p; name=%u\n",
 			  spark->gran_info, 
-			  spark->node, spark->name);)
+			  spark->node, spark->name));
     } 
     
     CurrentTime[proc] += RtsFlags.GranFlags.Costs.threadcreatetime;
@@ -441,7 +493,7 @@ activateSpark (rtsEvent *event, rtsSparkQ spark)
     		  FindWork,
     		  (StgTSO*)NULL, (StgClosure*)NULL, (rtsSpark*)NULL);
       barf("//// activateSpark: out of heap ; ToDo: call GarbageCollect()");
-      GarbageCollect(GetRoots);
+      GarbageCollect(GetRoots, rtsFalse);
       // HWL old: ReallyPerformThreadGC(TSO_HS+TSO_CTS_SIZE,rtsFalse);
       // HWL old: SAVE_Hp -= TSO_HS+TSO_CTS_SIZE;
       spark = NULL;

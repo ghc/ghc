@@ -43,6 +43,7 @@ sequential execution, then fine.
 <Para>
 A Parallel Haskell program implies multiple processes running on
 multiple processors, under a PVM (Parallel Virtual Machine) framework.
+An MPI interface is under development but not fully functional, yet.
 </Para>
 
 <Para>
@@ -51,8 +52,12 @@ fun&rdquo; than about &ldquo;speed.&rdquo; That will change.
 </Para>
 
 <Para>
-Again, check Simon's Web page for publications about Parallel Haskell
-(including &ldquo;GUM&rdquo;, the key bits of the runtime system).
+Check the <ULink URL="http://www.cee.hw.ac.uk/~dsg/gph/">GPH Page</Ulink>
+for more information on &ldquo;GPH&rdquo; (Haskell98 with extensions for
+parallel execution), the latest version of &ldquo;GUM&rdquo; (the runtime
+system to enable parallel executions) and papers on research issues.  A
+list of publications about GPH and about GUM is also available from Simon's
+Web Page.
 </Para>
 
 <Para>
@@ -151,10 +156,10 @@ you'd like to see this with your very own eyes, just run GHC with the
 
 </Sect3>
 
-<Sect3 id="sec-scheduling-policy">
-<Title>Scheduling policy for concurrent/parallel threads
-<IndexTerm><Primary>Scheduling&mdash;concurrent/parallel</Primary></IndexTerm>
-<IndexTerm><Primary>Concurrent/parallel scheduling</Primary></IndexTerm></Title>
+<Sect3>
+<Title>Scheduling policy for concurrent threads
+<IndexTerm><Primary>Scheduling&mdash;concurrent</Primary></IndexTerm>
+<IndexTerm><Primary>Concurrent scheduling</Primary></IndexTerm></Title>
 
 <Para>
 Runnable threads are scheduled in round-robin fashion.  Context
@@ -177,6 +182,19 @@ thread limit is reached, any remaining sparks are deferred until some
 of the currently active threads are completed.
 </Para>
 
+</Sect3>
+
+<Sect3>
+<Title>Scheduling policy for parallel threads
+<IndexTerm><Primary>Scheduling&mdash;parallel</Primary></IndexTerm>
+<IndexTerm><Primary>Parallel scheduling</Primary></IndexTerm></Title>
+
+<Para>
+In GUM we use an unfair scheduler, which means that a thread continues to
+perform graph reduction until it blocks on a closure under evaluation, on a
+remote closure or until the thread finishes. 
+</Para>
+ 
 </Sect3>
 
 </Sect2>

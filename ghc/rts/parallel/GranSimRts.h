@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
-   Time-stamp: <Wed Mar 29 2000 19:09:41 Stardate: [-30]4578.78 hwloidl>
-   $Id: GranSimRts.h,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
+   Time-stamp: <Tue Mar 06 2001 00:18:30 Stardate: [-30]6285.06 hwloidl>
+   $Id: GranSimRts.h,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
 
    Variables and functions specific to GranSim.
    ----------------------------------------------------------------------- */
@@ -19,6 +19,7 @@
 //* Statistics gathering::	
 //* Prototypes::		
 //@end menu
+//*/ fool highlight
 
 //@node Event queue, Spark handling routines, Headers for GranSim objs used only in the RTS internally, Headers for GranSim objs used only in the RTS internally
 //@subsection Event queue
@@ -200,7 +201,7 @@ typedef struct GlobalGranStats_ {
   nat tot_sparks_created, sparks_created_on_PE[MAX_PROC];
 
   /* scheduling stats */
-  nat tot_yields;
+  nat tot_yields, tot_stackover, tot_heapover;
 
   /* blocking queue statistics */
   rtsTime tot_bq_processing_time;
@@ -247,14 +248,22 @@ nat     thread_queue_len(PEs proc);
 
 /* For debugging */
 rtsBool is_on_queue (StgTSO *tso, PEs proc);
+#endif
 
-/* Interface for dumping routines (i.e. writing to log file) */
+#if defined(GRAN) || defined(PAR)
+/* 
+   Interface for dumping routines (i.e. writing to log file).
+   These routines are shared with GUM (and could also be used for SMP).
+*/
 void DumpGranEvent(GranEventType name, StgTSO *tso);
 void DumpEndEvent(PEs proc, StgTSO *tso, rtsBool mandatory_thread);
 void DumpTSO(StgTSO *tso);
 void DumpRawGranEvent(PEs proc, PEs p, GranEventType name, 
- 	              StgTSO *tso, StgClosure *node, StgInt sparkname, StgInt len);
-
+ 	              StgTSO *tso, StgClosure *node, 
+		      StgInt sparkname, StgInt len);
+void DumpVeryRawGranEvent(rtsTime time, PEs proc, PEs p, GranEventType name,
+			  StgTSO *tso, StgClosure *node, 
+			  StgInt sparkname, StgInt len);
 #endif
 
 #endif /* GRANSIM_RTS_H  */

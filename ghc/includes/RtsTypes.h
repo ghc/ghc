@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Mon Nov 22 1999 21:29:44 Stardate: [-30]3939.47 hwloidl>
+  Time-stamp: <Mon Mar 05 2001 22:39:27 Stardate: [-30]6284.72 hwloidl>
 
   RTS specific types.
 */
@@ -68,6 +68,9 @@ typedef struct gala {
 
 #elif defined(GRAN)
 
+// GlobalTaskId is dummy in GranSim; 
+// we define it to have cleaner code in the RTS
+typedef int       GlobalTaskId;
 typedef lnat      rtsTime;
 typedef StgWord   PEs;
 

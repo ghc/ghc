@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ClosureFlags.c,v 1.8 2001/03/02 16:12:18 simonmar Exp $
+ * $Id: ClosureFlags.c,v 1.9 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -89,6 +89,7 @@ StgWord16 closure_flags[] = {
 [FETCH_ME_BQ          	] = ( 	       _NS|         _MUT|_UPT           ),
 [RBH                  	] = ( 	       _NS|         _MUT|_UPT           ),
 [EVACUATED		] = ( 0                                         ),
+[REMOTE_REF		] = (_HNF|     _NS|              _UPT           ),
 
 [N_CLOSURE_TYPES        ] = ( 0                                   )
 };

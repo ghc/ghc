@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 2000/11/03 16:23:38 simonmar Exp $
+# $Id: Makefile,v 1.9 2001/03/22 03:51:12 hwloidl Exp $
 #
 # (c) The GHC Team, 1999-2000
 #
@@ -30,6 +30,12 @@ NOT_THESE += jeff-bug lennart_array
 
 NOT_THESE += dmgob_native1 dmgob_native2
 #	Native library doens't exist
+
+ifneq "$(HWL_NOFIB_HACK)" ""
+NOT_THESE += callback zhang_ccall
+# HWL: tmp disabled for testing GUM-merged version          (20/3/01)
+#      don't compile: failed to load interface for `IOExts'
+endif
 
 SUBDIRS = $(filter-out $(patsubst %, %/, $(NOT_THESE)), $(wildcard */))
 

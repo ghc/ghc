@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.14 2001/01/29 17:23:41 simonmar Exp $
+ * $Id: ClosureTypes.h,v 1.15 2001/03/22 03:51:09 hwloidl Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -79,6 +79,8 @@
 
 #define EVACUATED               64
 
-#define N_CLOSURE_TYPES         65
+#define REMOTE_REF              65
+
+#define N_CLOSURE_TYPES         66
 
 #endif /* CLOSURETYPES_H */

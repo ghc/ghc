@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------------
-   Time-stamp: <Mon Mar 27 2000 17:10:57 Stardate: [-30]4568.37 hwloidl>
-   $Id: Global.c,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
+   Time-stamp: <Wed Mar 21 2001 16:32:23 Stardate: [-30]6363.44 hwloidl>
+   $Id: Global.c,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
 
    (c) The AQUA/Parade Projects, Glasgow University, 1995
        The GdH/APART 624 Projects, Heriot-Watt University, Edinburgh, 1999
@@ -24,6 +24,7 @@
 //* GC functions for GALA tables::  
 //* Index::			
 //@end menu
+//*/
 
 //@node Includes, Global tables and lists, Global Address Manipulation, Global Address Manipulation
 //@subsection Includes
@@ -33,9 +34,14 @@
 #include "RtsUtils.h"
 #include "Storage.h"
 #include "Hash.h"
+#include "HLC.h"
 #include "ParallelRts.h"
+#if defined(DEBUG)
+# include "Sanity.h"
+#include "ParallelDebug.h"
+#endif
 #if defined(DIST)
-#include "Dist.h"
+# include "Dist.h"
 #endif
 
 /*
@@ -114,7 +120,7 @@ allocGALA(void)
   if ((gl = freeGALAList) != NULL) {
     IF_DEBUG(sanity,
 	     ASSERT(gl->ga.weight==0xdead0add);
-             ASSERT(gl->la==0xdead00aa));
+             ASSERT(gl->la==(StgPtr)0xdead00aa));
     freeGALAList = gl->next;
   } else {
     gl = (GALA *) stgMallocBytes(GCHUNK * sizeof(GALA), "allocGALA");
@@ -124,17 +130,17 @@ allocGALA(void)
       p->next = p + 1;
       IF_DEBUG(sanity,
 	       p->ga.weight=0xdead0add;
-               p->la=0xdead00aa);
+               p->la=(StgPtr)0xdead00aa);
     }
     /* last elem in the new block has NULL pointer in link field */
     p->next = NULL;
     IF_DEBUG(sanity,
 	     p->ga.weight=0xdead0add;
-	     p->la=0xdead00aa);
+	     p->la=(StgPtr)0xdead00aa);
   }
   IF_DEBUG(sanity,
 	   gl->ga.weight=0xdead0add;
-           gl->la=0xdead00aa);
+           gl->la=(StgPtr)0xdead00aa);
   return gl;
 }
 
@@ -151,18 +157,17 @@ allocGALA(void)
 PEs
 taskIDtoPE(GlobalTaskId gtid)
 {
-  return (PEs) lookupHashTable(taskIDtoPEtable, gtid);
+  return ((PEs) lookupHashTable(taskIDtoPEtable, gtid));
 }
 
 //@cindex registerTask
 void 
-registerTask(gtid)
-GlobalTaskId gtid;
-{
+registerTask(GlobalTaskId gtid) { 
+  nextPE++;               //start counting from 1
   if (gtid == mytid)
     thisPE = nextPE;
 
-  insertHashTable(taskIDtoPEtable, gtid, (void *) (StgWord) nextPE++);
+  insertHashTable(taskIDtoPEtable, gtid, (void *) (StgWord) nextPE);
 }
 
 //@node Interface to LAGA table, Interface to GALA table, Interface to taskId-PE table, Global Address Manipulation
@@ -244,7 +249,7 @@ globalAddr *ga;
   gala = (GALA *) lookupHashTable(pGAtoGALAtable, pga);
   ASSERT(gala!=NULL);
   ASSERT(gala->preferred==rtsTrue);
-  gala->preferred==rtsFalse;
+  gala->preferred = rtsFalse;
 }
 
 /*
@@ -272,20 +277,23 @@ allocIndirection(StgClosure *closure)
   if ((gala = freeIndirections) != NULL) {
     IF_DEBUG(sanity,
 	     ASSERT(gala->ga.weight==0xdead0add);
-             ASSERT(gala->la==0xdead00aa));
+             ASSERT(gala->la==(StgPtr)0xdead00aa));
     freeIndirections = gala->next;
   } else {
     gala = allocGALA();
     IF_DEBUG(sanity,
 	     ASSERT(gala->ga.weight==0xdead0add);
-             ASSERT(gala->la==0xdead00aa));
+             ASSERT(gala->la==(StgPtr)0xdead00aa));
     gala->ga.payload.gc.gtid = mytid;
     gala->ga.payload.gc.slot = nextIndirection++;
+    IF_DEBUG(sanity,
+	     if (nextIndirection>=MAX_SLOTS)
+	       barf("Cannot handle more than %d slots for GA in a sanity-checking setup (this is no error)"));
   }
   gala->ga.weight = MAX_GA_WEIGHT;
-  gala->la = closure;
+  gala->la = (StgPtr)closure;
   IF_DEBUG(sanity,
-	   gala->next=0xcccccccc);
+	   gala->next=(struct gala *)0xcccccccc);
   return gala;
 }
 
@@ -320,15 +328,21 @@ rtsBool preferred;
   /* check whether we already have a GA for this local closure */
   GALA *oldGALA = lookupHashTable(LAtoGALAtable, (StgWord) closure);
   /* create an entry in the LAGA table */
-  GALA *newGALA = allocIndirection((StgPtr)closure);
+  GALA *newGALA = allocIndirection(closure);
   StgWord pga = PackGA(thisPE, newGALA->ga.payload.gc.slot);
 
   IF_DEBUG(sanity,
-	   ASSERT(newGALA->next==0xcccccccc););
+	   ASSERT(newGALA->next==(struct gala *)0xcccccccc););
   // ASSERT(HEAP_ALLOCED(closure)); // check that closure might point into the heap; might be static, though
   ASSERT(GALAlookup(&(newGALA->ga)) == NULL);
   
-  newGALA->la = closure;
+  /* global statistics gathering */
+  if (RtsFlags.ParFlags.ParStats.Global &&
+      RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
+    globalParStats.local_alloc_GA++;
+  }
+
+  newGALA->la = (StgPtr)closure;
   newGALA->preferred = preferred;
 
   if (preferred) {
@@ -387,7 +401,7 @@ rtsBool preferred;
   ASSERT(GALAlookup(remote_ga) == NULL);
 
   newGALA->ga = *remote_ga;
-  newGALA->la = local_closure;
+  newGALA->la = (StgPtr)local_closure;
   newGALA->preferred = preferred;
 
   if (preferred) {
@@ -470,8 +484,13 @@ globalAddr *
 addWeight(ga)
 globalAddr *ga;
 {
-  StgWord pga = PackGA(taskIDtoPE(ga->payload.gc.gtid), ga->payload.gc.slot);
-  GALA *gala = (GALA *) lookupHashTable(pGAtoGALAtable, pga);
+  StgWord pga;
+  GALA *gala;
+
+  ASSERT(LOOKS_LIKE_GA(ga));
+
+  pga = PackGA(taskIDtoPE(ga->payload.gc.gtid), ga->payload.gc.slot);
+  gala = (GALA *) lookupHashTable(pGAtoGALAtable, pga);
 
   IF_PAR_DEBUG(weight,
 	       fprintf(stderr, "@* Adding weight %x to ", ga->weight);
@@ -497,9 +516,6 @@ initGAtables(void)
   taskIDtoPEtable = allocHashTable();
   LAtoGALAtable = allocHashTable();
   pGAtoGALAtable = allocHashTable();
-#ifdef DIST  
-  stickyClosureTable = allocHashTable();
-#endif
 }
 
 //@cindex PackGA
@@ -546,23 +562,24 @@ int slot;
 void
 markLocalGAs(rtsBool full)
 {
-  GALA *gala;
-  GALA *next;
-  GALA *prev = NULL;
+  GALA *gala, *next, *prev = NULL;
   StgPtr old_la, new_la;
   nat n=0, m=0; // debugging only
-  
+  double start_time_GA; // stats only
+
   IF_PAR_DEBUG(tables,
-	   belch("@@%%%% markLocalGAs: Marking LIVE INDIRECTIONS in GALA table starting with GALA at %p\n",
-		 liveIndirections);
+	   belch("@@%%%% markLocalGAs (full=%d): Marking LIVE INDIRECTIONS in GALA table starting with GALA at %p\n",
+		 full, liveIndirections);
 	   printLAGAtable());
+
+  PAR_TICKY_MARK_LOCAL_GAS_START();
 
   for (gala = liveIndirections, m=0; gala != NULL; gala = next, m++) {
     IF_PAR_DEBUG(tables,
 		 fputs("@@ ",stderr);
 		 printGA(&(gala->ga));
 		 fprintf(stderr, ";@ %d: LA: %p (%s) ",
-			 m, gala->la, info_type(gala->la)));
+			 m, (void*)gala->la, info_type((StgClosure*)gala->la)));
     next = gala->next;
     old_la = gala->la;
     ASSERT(gala->ga.payload.gc.gtid == mytid); /* it's supposed to be local */
@@ -570,7 +587,7 @@ markLocalGAs(rtsBool full)
       /* Remote references exist, so we must evacuate the local closure */
       if (get_itbl((StgClosure *)old_la)->type == EVACUATED) {
 	/* somebody else already evacuated this closure */
-	new_la = ((StgEvacuated *)old_la)->evacuee;
+	new_la = (StgPtr)((StgEvacuated *)old_la)->evacuee;
 	IF_PAR_DEBUG(tables,
 		 belch(" already evacuated to %p", new_la));
       } else {
@@ -580,10 +597,12 @@ markLocalGAs(rtsBool full)
 	//ASSERT(HEAP_ALLOCED(foo));
 	n++;
 
-	new_la = MarkRoot(foo); // or just evacuate(old_ga)
+	new_la = (StgPtr) MarkRoot(foo);
 	IF_PAR_DEBUG(tables,
 		     belch(" evacuated %p to %p", foo, new_la));
-	//ASSERT(Bdescr(new_la)->evacuated);
+	/* ToDo: is this the right assertion to check that new_la is in to-space?
+	ASSERT(!HEAP_ALLOCED(new_la) || Bdescr(new_la)->evacuated);
+	*/
 #else
 	new_la = MarkRoot(old_la); // or just evacuate(old_ga)
 	IF_PAR_DEBUG(tables,
@@ -593,7 +612,7 @@ markLocalGAs(rtsBool full)
 
       gala->la = new_la;
       /* remove old LA and replace with new LA */
-      if (!full && gala->preferred && new_la != old_la) {
+      if (/* !full && */ gala->preferred && new_la != old_la) {
 	GALA *q;
 	ASSERT(lookupHashTable(LAtoGALAtable, (StgWord)old_la));
 	(void) removeHashTable(LAtoGALAtable, (StgWord) old_la, (void *) gala);
@@ -602,7 +621,7 @@ markLocalGAs(rtsBool full)
 	    q->preferred = rtsFalse;
 	    IF_PAR_DEBUG(tables,
 			 fprintf(stderr, "@@## found hash entry for closure %p (%s): deprecated GA ",
-			   new_la, info_type(new_la));
+			   new_la, info_type((StgClosure*)new_la));
 			 printGA(&(q->ga));
 			 fputc('\n', stderr)); 
 	  }
@@ -616,6 +635,14 @@ markLocalGAs(rtsBool full)
 
       gala->next = prev;
       prev = gala;
+    } else if(LOOKS_LIKE_STATIC_CLOSURE(gala->la)) {
+      /* to handle the CAFs, is this all?*/
+      MarkRoot(gala->la);
+      IF_PAR_DEBUG(tables,
+		   belch(" processed static closure"));
+      n++;
+      gala->next = prev;
+      prev = gala;   
     } else {
       /* Since we have all of the weight, this GA is no longer needed */
       StgWord pga = PackGA(thisPE, gala->ga.payload.gc.slot);
@@ -627,15 +654,18 @@ markLocalGAs(rtsBool full)
       gala->next = freeIndirections;
       freeIndirections = gala;
       (void) removeHashTable(pGAtoGALAtable, pga, (void *) gala);
-      if (!full && gala->preferred)
+      if (/* !full && */ gala->preferred)
 	(void) removeHashTable(LAtoGALAtable, (W_) gala->la, (void *) gala);
 
       IF_DEBUG(sanity,
 	       gala->ga.weight = 0xdead0add;
-	       gala->la = (StgClosure *) 0xdead00aa);
+	       gala->la = (StgPtr) 0xdead00aa);
     }
   } /* for gala ... */
   liveIndirections = prev;  /* list has been reversed during the marking */
+
+
+  PAR_TICKY_MARK_LOCAL_GAS_END(n);
 
   IF_PAR_DEBUG(tables,
 	       belch("@@%%%% markLocalGAs: %d of %d GALAs marked on PE %x",
@@ -652,16 +682,17 @@ markLocalGAs(rtsBool full)
 void
 rebuildGAtables(rtsBool full)
 {
-  GALA *gala;
-  GALA *next;
-  GALA *prev;
-  StgClosure *closure, *last, *new_closure;
-
-  prepareFreeMsgBuffers();
+  GALA *gala, *next, *prev;
+  StgClosure *closure;
+  nat n = 0, size_GA = 0; // stats only (no. of GAs, and their heap size in bytes)
 
   IF_PAR_DEBUG(tables,
-	   belch("@@%%%% rebuildGAtables: rebuilding LIVE REMOTE GAs in GALA table starting with GALA at %p\n",
-		 liveRemoteGAs));
+	   belch("@@%%%% rebuildGAtables (full=%d): rebuilding LIVE REMOTE GAs in GALA table starting with GALA at %p\n",
+		 full, liveRemoteGAs));
+
+  PAR_TICKY_REBUILD_GA_TABLES_START();
+
+  prepareFreeMsgBuffers();
 
   for (gala = liveRemoteGAs, prev = NULL; gala != NULL; gala = next) {
     IF_PAR_DEBUG(tables,
@@ -671,10 +702,10 @@ rebuildGAtables(rtsBool full)
 
     closure = (StgClosure *) (gala->la);
     IF_PAR_DEBUG(tables,
-	     fprintf(stderr, " %p (%s) ",
-		     (StgClosure *)closure, info_type(closure)));
+		 fprintf(stderr, " %p (%s) ",
+			 (StgClosure *)closure, info_type(closure)));
 
-    if (!full && gala->preferred)
+    if (/* !full && */ gala->preferred)
       (void) removeHashTable(LAtoGALAtable, (StgWord) gala->la, (void *) gala);
 
     /* Follow indirection chains to the end, just in case */
@@ -687,6 +718,7 @@ rebuildGAtables(rtsBool full)
        This approach also drops global aliases for PLCs.
     */
 
+    //ASSERT(!HEAP_ALLOCED(closure) || !(Bdescr((StgPtr)closure)->evacuated));
     if (get_itbl(closure)->type == EVACUATED) {
       closure = ((StgEvacuated *)closure)->evacuee;
       IF_PAR_DEBUG(tables,
@@ -698,29 +730,28 @@ rebuildGAtables(rtsBool full)
       StgWord pga = PackGA(pe, gala->ga.payload.gc.slot);
 
       /* check that the block containing this closure is not in to-space */
-      //ASSERT(Bdescr(closure)->evacuated==0);
       IF_PAR_DEBUG(tables,
 		   fprintf(stderr, " !EVAC %p (%s); sending free to PE %d\n",
 			   closure, info_type(closure), pe));
 
       (void) removeHashTable(pGAtoGALAtable, pga, (void *) gala);
-      freeRemoteGA(pe, &(gala->ga));
+      freeRemoteGA(pe-1, &(gala->ga)); //-1 cause ids start at 1... not 0
       gala->next = freeGALAList;
       freeGALAList = gala;
       IF_DEBUG(sanity,
 	       gala->ga.weight = 0xdead0add;
-	       gala->la = 0xdead00aa);
+	       gala->la = (StgPtr)0xdead00aa);
       continue;
     }
-    gala->la = closure;
-    if (!full && gala->preferred) {
+    gala->la = (StgPtr)closure;
+    if (/* !full && */ gala->preferred) {
       GALA *q;
       if ((q = lookupHashTable(LAtoGALAtable, (StgWord) gala->la))!=NULL) {
 	if (q->preferred && gala->preferred) {
 	    q->preferred = rtsFalse;
 	    IF_PAR_DEBUG(tables,
 			 fprintf(stderr, "@@## found hash entry for closure %p (%s): deprecated GA ",
-			   gala->la, info_type(gala->la));
+			   gala->la, info_type((StgClosure*)gala->la));
 			 printGA(&(q->ga));
 			 fputc('\n', stderr)); 
 	}
@@ -730,19 +761,37 @@ rebuildGAtables(rtsBool full)
     }
     gala->next = prev;
     prev = gala;
+    /* Global statistics: count GAs and total size
+    if (RtsFlags.ParFlags.ParStats.Global &&
+	RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
+      StgInfoTable *info;
+      nat size, ptrs, nonptrs, vhs, i;
+      char str[80];
+
+      info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+
+      size_GA += size ;
+      n++; // stats: count number of GAs we add to the new table
+    }
+    */
   }
-  //}
   liveRemoteGAs = prev; /* list is reversed during marking */
 
   /* If we have any remaining FREE messages to send off, do so now */
   sendFreeMessages();
 
+  PAR_TICKY_CNT_FREE_GA();
+
   IF_DEBUG(sanity,
 	   checkFreeGALAList();
 	   checkFreeIndirectionsList());
 
-  if (full)
-    rebuildLAGAtable();
+  rebuildLAGAtable();
+
+#if defined(PAR_TICKY)
+  getLAGAtableSize(&n, &size_GA);        // determine no of GAs and global heap
+  PAR_TICKY_REBUILD_GA_TABLES_END(n, size_GA); // record these values
+#endif
 
   IF_PAR_DEBUG(tables,
 	   belch("@#%%%% rebuildGAtables: After ReBuilding GALA table starting with GALA at %p",
@@ -783,14 +832,14 @@ rebuildLAGAtable(void)
     n++;
     if (gala->preferred) {
       GALA *q;
-      if (q = lookupHashTable(LAtoGALAtable, (StgWord) gala->la)) {
+      if ((q = lookupHashTable(LAtoGALAtable, (StgWord) gala->la))!=NULL) {
 	if (q->preferred && gala->preferred) {
 	  /* this deprecates q (see also GALAdeprecate) */
 	  q->preferred = rtsFalse;
 	  (void) removeHashTable(LAtoGALAtable, (StgWord) gala->la, (void *)q);
 	  IF_PAR_DEBUG(tables,
 		       fprintf(stderr, "@@## found hash entry for closure %p (%s): deprecated GA ",
-			       gala->la, info_type(gala->la));
+			       gala->la, info_type((StgClosure*)gala->la));
 		       printGA(&(q->ga));
 		       fputc('\n', stderr)); 
 	}
@@ -803,14 +852,14 @@ rebuildLAGAtable(void)
     m++;
     if (gala->preferred) {
       GALA *q;
-      if (q = lookupHashTable(LAtoGALAtable, (StgWord) gala->la)) {
+      if ((q = lookupHashTable(LAtoGALAtable, (StgWord) gala->la))!=NULL) {
 	if (q->preferred && gala->preferred) {
 	  /* this deprecates q (see also GALAdeprecate) */
 	  q->preferred = rtsFalse;
 	  (void) removeHashTable(LAtoGALAtable, (StgWord) gala->la, (void *)q);
 	  IF_PAR_DEBUG(tables,
 		       fprintf(stderr, "@@## found hash entry for closure %p (%s): deprecated GA ",
-			       gala->la, info_type(gala->la));
+			       (StgClosure*)gala->la, info_type((StgClosure*)gala->la));
 		       printGA(&(q->ga));
 		       fputc('\n', stderr)); 
 	}
@@ -822,6 +871,55 @@ rebuildLAGAtable(void)
   IF_PAR_DEBUG(tables,
 	   belch("@@%%%% rebuildLAGAtable: inserted %d entries from liveIndirections and %d entries from liveRemoteGAs",
 		 n,m)); 
+}
+
+/*
+  Determine the size of the LAGA and GALA tables.
+  Has to be done after rebuilding the tables. 
+  Only used for global statistics gathering.
+*/
+
+//@cindex getLAGAtableSize
+void
+getLAGAtableSize(nat *nP, nat *sizeP)
+{
+  GALA *gala;
+  // nat n=0, tot_size=0;
+  StgClosure *closure;
+  StgInfoTable *info;
+  nat size, ptrs, nonptrs, vhs, i;
+  char str[80];
+  /* IN order to avoid counting closures twice we maintain a hash table
+     of all closures seen so far.
+     ToDo: collect this data while rebuilding the GALA table and make use
+           of the existing hash tables;
+  */
+  HashTable *closureTable;  // hash table for closures encountered already
+
+  closureTable = allocHashTable();
+
+  (*nP) = (*sizeP) = 0;
+  for (gala = liveIndirections; gala != NULL; gala = gala->next) {
+    closure = (StgClosure*) gala->la;
+    if (lookupHashTable(closureTable, (StgWord)closure)==NULL) { // not seen yet
+      insertHashTable(closureTable, (StgWord)closure, (void *)1);
+      info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+      (*sizeP) += size ;   // stats: measure total heap size of global closures
+      (*nP)++;             // stats: count number of GAs
+    }
+  }
+
+  for (gala = liveRemoteGAs; gala != NULL; gala = gala->next) {
+    closure = (StgClosure*) gala->la;
+    if (lookupHashTable(closureTable, (StgWord)closure)==NULL) { // not seen yet
+      insertHashTable(closureTable, (StgWord)closure, (void *)1);
+      info = get_closure_info(closure, &size, &ptrs, &nonptrs, &vhs, str);
+      (*sizeP) += size ;   // stats: measure total heap size of global closures
+      (*nP)++;             // stats: count number of GAs
+    }
+  }
+
+  freeHashTable(closureTable, NULL);
 }
 
 //@node Debugging routines, Index, GC functions for GALA tables, Global Address Manipulation
@@ -842,8 +940,10 @@ void
 printGALA (GALA *gala)
 {
   printGA(&(gala->ga));
-  fprintf(stderr, " -> %p (%s)", (StgPtr)gala->la, info_type(gala->la));
-  fprintf(stderr, " %s", (gala->preferred) ? "PREF" : "____");
+  fprintf(stderr, " -> %p (%s)",
+	  (StgClosure*)gala->la, info_type((StgClosure*)gala->la));
+  fprintf(stderr, " %s",
+	  (gala->preferred) ? "PREF" : "____");
 }
 
 /*
@@ -944,7 +1044,7 @@ checkFreeGALAList(void) {
 
   for (gl=freeGALAList; gl != NULL; gl=gl->next) {
     ASSERT(gl->ga.weight==0xdead0add);
-    ASSERT(gl->la==0xdead00aa);
+    ASSERT(gl->la==(StgPtr)0xdead00aa);
   }
 }
 
@@ -954,7 +1054,7 @@ checkFreeIndirectionsList(void) {
 
   for (gl=freeIndirections; gl != NULL; gl=gl->next) {
     ASSERT(gl->ga.weight==0xdead0add);
-    ASSERT(gl->la==0xdead00aa);
+    ASSERT(gl->la==(StgPtr)0xdead00aa);
   }
 }
 #endif /* PAR -- whole file */

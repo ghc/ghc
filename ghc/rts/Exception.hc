@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.18 2000/12/04 12:31:20 simonmar Exp $
+ * $Id: Exception.hc,v 1.19 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -75,12 +75,12 @@ FN_(stg_unblockAsyncExceptionszh_ret_entry)
     ASSERT(CurrentTSO->blocked_exceptions != NULL);
 #if defined(GRAN)
       awakenBlockedQueue(CurrentTSO->blocked_exceptions, 
-	                 CurrentTSO->block_info.closure);
+	                 (StgClosure*)NULL); 
 #elif defined(PAR)
-      // is CurrentTSO->block_info.closure always set to the node
-      // holding the blocking queue !? -- HWL
+      /* we don't need node info (2nd arg) in this case
+	 (note that CurrentTSO->block_info.closure isn't always set) */
       awakenBlockedQueue(CurrentTSO->blocked_exceptions, 
-	                 CurrentTSO->block_info.closure);
+	                 (StgClosure*)NULL); 
 #else
     awakenBlockedQueue(CurrentTSO->blocked_exceptions);
 #endif

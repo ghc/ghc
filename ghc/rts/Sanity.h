@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.h,v 1.7 2000/12/11 12:37:00 simonmar Exp $
+ * $Id: Sanity.h,v 1.8 2001/03/22 03:51:10 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -8,6 +8,14 @@
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
+
+# if defined(PAR)
+# define PVM_PE_MASK    0xfffc0000
+# define MAX_PVM_PES    MAX_PES
+# define MAX_PVM_TIDS   MAX_PES
+# define MAX_SLOTS      100000
+# endif
+
 /* debugging routines */
 extern void checkHeap  ( bdescr *bd, StgPtr start );
 extern void checkHeapChunk ( StgPtr start, StgPtr end );

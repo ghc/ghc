@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.23 2001/02/09 13:09:17 simonmar Exp $
+ * $Id: Updates.h,v 1.24 2001/03/22 03:51:09 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -104,7 +104,7 @@
 #if defined(PAR) 
 
 /* 
-   In a parallel setup several types of closures, might have a blocking queue:
+   In a parallel setup several types of closures might have a blocking queue:
      BLACKHOLE_BQ ... same as in the default concurrent setup; it will be
                       reawakened via calling UPD_IND on that closure after
 		      having finished the computation of the graph
@@ -121,7 +121,7 @@
      TSO           ... as in the default concurrent setup
      BLOCKED_FETCH ... indicating that a TSO on another PE is waiting for
                        the result of the current computation
-     CONSTR        ... a RBHSave closure (which contains data ripped out of
+     CONSTR        ... an RBHSave closure (which contains data ripped out of
                        the closure to make room for a blocking queue; since
 		       it only contains data we use the exisiting type of
 		       a CONSTR closure); this closure is the end of a 
@@ -136,9 +136,7 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
      	if (info == &stg_BLACKHOLE_BQ_info ||               \
 	    info == &stg_FETCH_ME_BQ_info ||                \
 	    get_itbl(closure)->type == RBH) {		                \
-		StgBlockingQueueElement *bqe = ((StgBlockingQueue *)closure)->blocking_queue;\
-		ASSERT(bqe!=END_BQ_QUEUE);		                \
-		DO_AWAKEN_BQ(bqe, closure);     	                \
+		DO_AWAKEN_BQ(((StgBlockingQueue *)closure)->blocking_queue, closure);     	                \
 	}
 
 #elif defined(GRAN)
@@ -152,9 +150,7 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #define AWAKEN_BQ(info,closure)						\
      	if (info == &stg_BLACKHOLE_BQ_info ||               \
 	    get_itbl(closure)->type == RBH) {		                \
-		StgBlockingQueueElement *bqe = ((StgBlockingQueue *)closure)->blocking_queue;\
-		ASSERT(bqe!=END_BQ_QUEUE);		                \
-		DO_AWAKEN_BQ(bqe, closure);     	                \
+		DO_AWAKEN_BQ(((StgBlockingQueue *)closure)->blocking_queue, closure);     	                \
 	}
 
 

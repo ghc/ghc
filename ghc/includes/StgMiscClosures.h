@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.37 2001/02/15 14:27:36 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.38 2001/03/22 03:51:09 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -78,12 +78,17 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_gc_unbx_r1_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_f1_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_d1_info;
 
+/* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
+#define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
+/* this is the NIL ptr for a list CAFs */
+#define END_ECAF_LIST   ((StgCAF *)(void*)&stg_END_TSO_QUEUE_closure)
 #if defined(PAR) || defined(GRAN)
 /* this is the NIL ptr for a blocking queue */
-# define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&END_TSO_QUEUE_closure)
+# define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&stg_END_TSO_QUEUE_closure)
 /* this is the NIL ptr for a blocked fetch queue (as in PendingFetches in GUM) */
-# define END_BF_QUEUE  ((StgBlockedFetch *)(void*)&END_TSO_QUEUE_closure)
+# define END_BF_QUEUE  ((StgBlockedFetch *)(void*)&stg_END_TSO_QUEUE_closure)
 #endif
+/* ToDo?: different name for end of sleeping queue ? -- HWL */
 
 /* info tables */
 
@@ -106,6 +111,9 @@ extern DLL_IMPORT_RTS const StgInfoTable stg_SE_CAF_BLACKHOLE_info;
 #endif
 #if defined(PAR) || defined(GRAN)
 extern DLL_IMPORT_RTS const StgInfoTable stg_RBH_info;
+#endif
+#if defined(PAR)
+extern DLL_IMPORT_RTS const StgInfoTable stg_FETCH_ME_BQ_info;
 #endif
 extern DLL_IMPORT_RTS const StgInfoTable stg_BCO_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_EVACUATED_info;

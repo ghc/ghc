@@ -1,6 +1,6 @@
 /* 
-   Time-stamp: <Mon Mar 20 2000 19:18:25 Stardate: [-30]4534.02 hwloidl>
-   $Id: GranSim.c,v 1.3 2000/03/31 03:09:37 hwloidl Exp $
+   Time-stamp: <Tue Mar 06 2001 00:17:42 Stardate: [-30]6285.06 hwloidl>
+   $Id: GranSim.c,v 1.4 2001/03/22 03:51:11 hwloidl Exp $
 
    Variables and functions specific to GranSim the parallelism simulator
    for GPH.
@@ -517,7 +517,7 @@ rtsSpark *spark;
 
   IF_DEBUG(gran, 
 	   fprintf(stderr, "GRAN: new_event: \n"); 
-	   print_event(newentry))
+	   print_event(newentry));
 }
 
 //@cindex prepend_event
@@ -1181,7 +1181,7 @@ do_the_fetchnode(rtsEvent* event)
 # endif
      barf("//// do_the_fetchnode: out of heap after handleFetchRequest; ToDo: call GarbageCollect()");
      prepend_event(event);
-     performGC(); // GarbageCollect(GetRoots); 
+     GarbageCollect(GetRoots, rtsFalse); 
      // HWL: ToDo: check whether a ContinueThread has to be issued
      // HWL old: ReallyPerformThreadGC(PACK_HEAP_REQUIRED, rtsFalse);
 # if 0 && defined(GRAN_CHECK)  && defined(GRAN)
@@ -1839,7 +1839,7 @@ StgTSO* tso;        // the tso which needs the node
 	ASSERT(!is_on_queue(tso, from));
 	
 	// ToDo: check whether graph is ever used as an rtsPackBuffer!!
-	if ((graph = (StgClosure *)PackNearbyGraph(node, tso, &size)) == NULL) 
+	if ((graph = (StgClosure *)PackNearbyGraph(node, tso, &size, 0)) == NULL) 
 	  return (OutOfHeap);  /* out of heap */
 
 	/* Actual moving/copying of node is done on arrival; see FETCHREPLY */
@@ -2124,7 +2124,7 @@ PEs proc;
   }
   IF_GRAN_DEBUG(randomSteal,
 		belch("^^ RANDOM_STEAL (fishing): stealing from PE %d (current proc is %d)",
-		      p, proc);)
+		      p, proc));
     
   return (PEs)p;
 }
@@ -2924,7 +2924,7 @@ StgClosure *node;
 
   IF_DEBUG(gran,
 	   belch("GRAN: TSO %d (%p) [PE %d] blocks on closure %p @ %lx",
-		 tso->id, tso, proc, node, CurrentTime[proc]);)
+		 tso->id, tso, proc, node, CurrentTime[proc]));
 
 
     /* THIS SHOULD NEVER HAPPEN!

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelForeign.lhs,v 1.17 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelForeign.lhs,v 1.18 2001/03/22 03:51:09 hwloidl Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -23,7 +23,7 @@ import PrelPtr
 %*********************************************************
 
 \begin{code}
-#ifndef __PARALLEL_HASKELL__
+
 newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 newForeignPtr p finalizer
   = do fObj <- mkForeignPtr p
@@ -53,7 +53,7 @@ foreignPtrToPtr :: ForeignPtr a -> Ptr a
 foreignPtrToPtr (ForeignPtr fo) = Ptr (foreignObjToAddr# fo)
 
 castForeignPtr (ForeignPtr a) = ForeignPtr a
-#endif
+
 \end{code}
 
 
