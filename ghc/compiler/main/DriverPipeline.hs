@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.36 2000/12/04 16:42:14 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.37 2000/12/05 12:15:19 rrt Exp $
 --
 -- GHC Driver
 --
@@ -652,6 +652,8 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 
 -----------------------------------------------------------------------------
 -- Linking
+
+GLOBAL_VAR(no_hs_main, False, Bool)
 
 doLink :: [String] -> IO ()
 doLink o_files = do
