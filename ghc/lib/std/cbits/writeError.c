@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  *
- * $Id: writeError.c,v 1.4 1999/11/09 10:46:27 simonmar Exp $
+ * $Id: writeError.c,v 1.5 2000/05/01 14:44:25 panne Exp $
  *
  * hPutStr Runtime Support
  */
@@ -23,6 +23,12 @@ implementation in one or two places.)
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+
+StgAddr
+addrOf_ErrorHdrHook(void)
+{
+  return &ErrorHdrHook;
+}
 
 void
 writeErrString__ (msg_hdr, msg, len)
