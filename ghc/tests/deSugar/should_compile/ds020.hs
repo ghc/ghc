@@ -1,4 +1,4 @@
---!!! ds020 -- lazy patterns (in detail)
+-- !!! ds020 -- lazy patterns (in detail)
 --
 module Test where
 

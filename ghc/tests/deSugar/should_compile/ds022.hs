@@ -1,4 +1,4 @@
---!!! ds022 -- literal patterns (wimp version)
+-- !!! ds022 -- literal patterns (wimp version)
 --
 module Tests where
 

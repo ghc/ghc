@@ -1,4 +1,4 @@
---!!! ds002 -- overlapping equations and guards
+-- !!! ds002 -- overlapping equations and guards
 --
 -- this tests "overlapping" variables and guards
 

@@ -1,4 +1,4 @@
---!!! ds003 -- list, tuple, lazy, as patterns
+-- !!! ds003 -- list, tuple, lazy, as patterns
 --
 module Test where
 

@@ -1,4 +1,4 @@
---!!! ds015 -- lambdas
+-- !!! ds015 -- lambdas
 --
 module Tests where
 

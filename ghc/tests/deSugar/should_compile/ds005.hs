@@ -1,4 +1,4 @@
---!!! ds005 -- mappairs from SLPJ Ch 5'
+-- !!! ds005 -- mappairs from SLPJ Ch 5'
 --
 -- this simply tests a "typical" example
 

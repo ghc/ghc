@@ -1,4 +1,4 @@
---!!! ds013 -- simple Rational arithmetic
+-- !!! ds013 -- simple Rational arithmetic
 
 module Tests where
 

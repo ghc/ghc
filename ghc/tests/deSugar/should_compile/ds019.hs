@@ -1,4 +1,4 @@
---!!! ds019 -- mixed var and uni-constructor pats
+-- !!! ds019 -- mixed var and uni-constructor pats
 
 module Test where
 

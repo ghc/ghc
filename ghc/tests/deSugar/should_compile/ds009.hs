@@ -1,4 +1,4 @@
---!!! ds009 -- simple list comprehensions
+-- !!! ds009 -- simple list comprehensions
 
 module SimpleListComp where
 

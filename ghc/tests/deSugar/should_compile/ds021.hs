@@ -1,4 +1,4 @@
---!!! ds021 -- hairier uses of guards
+-- !!! ds021 -- hairier uses of guards
 
 module Test where
 

@@ -1,4 +1,4 @@
---!!! ds029: pattern binding with guards (dubious but valid)
+-- !!! ds029: pattern binding with guards (dubious but valid)
 --
 
 module Test where

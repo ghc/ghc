@@ -1,4 +1,4 @@
---!!! ds030: checks that types substituted into binders
+-- !!! ds030: checks that types substituted into binders
 --
 module Test where
 

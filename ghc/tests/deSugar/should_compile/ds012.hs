@@ -1,4 +1,4 @@
---!!! ds012 -- simple Integer arithmetic
+-- !!! ds012 -- simple Integer arithmetic
 --
 module Tests where
 

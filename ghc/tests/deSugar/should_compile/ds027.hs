@@ -1,4 +1,4 @@
---!!! ds027 -- simple instances
+-- !!! ds027 -- simple instances
 --
 module Test where
 

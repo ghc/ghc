@@ -27,7 +27,7 @@ fails with:
 
 data X = A {a :: Int} | B {a :: Int}
 
-f x = let A {a} = x
+f x = let A {a=a} = x
       in a
 
 main = print (f (A {a = 3}))

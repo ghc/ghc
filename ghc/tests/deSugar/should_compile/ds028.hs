@@ -1,4 +1,4 @@
---!!! ds028: failable pats in top row
+-- !!! ds028: failable pats in top row
 
 module ShouldSucceed where
 

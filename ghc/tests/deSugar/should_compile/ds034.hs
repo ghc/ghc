@@ -1,4 +1,4 @@
---!!! mutually-recursive methods in an instance declaration
+-- !!! mutually-recursive methods in an instance declaration
 --
 module Test where
 

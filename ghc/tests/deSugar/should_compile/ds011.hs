@@ -1,4 +1,4 @@
---!!! ds011 -- uses of "error"
+-- !!! ds011 -- uses of "error"
 
 module Tests where
 

@@ -1,4 +1,4 @@
---!!! ds001 -- simple function and pattern bindings
+-- !!! ds001 -- simple function and pattern bindings
 --
 -- this tests ultra-simple function and pattern bindings (no patterns)
 

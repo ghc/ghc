@@ -1,5 +1,5 @@
---!!! Jon Hill reported a bug in desugaring this in 0.09
---!!! (recursive with n+k patts)
+-- !!! Jon Hill reported a bug in desugaring this in 0.09
+-- !!! (recursive with n+k patts)
 --
 module ShouldSucceed where
 

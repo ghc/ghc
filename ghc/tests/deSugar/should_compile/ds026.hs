@@ -1,4 +1,4 @@
---!!! ds026 -- classes -- incl. polymorphic method
+-- !!! ds026 -- classes -- incl. polymorphic method
 
 module ShouldSucceed where
 

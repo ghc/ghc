@@ -1,4 +1,4 @@
---!!! getting top-level dependencies right
+-- !!! getting top-level dependencies right
 --
 module Test where
 

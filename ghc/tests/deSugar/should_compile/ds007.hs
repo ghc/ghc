@@ -1,4 +1,4 @@
---!!! ds007 -- simple local bindings
+-- !!! ds007 -- simple local bindings
 
 module ShouldSucceed where
 

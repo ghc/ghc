@@ -1,4 +1,4 @@
---!!! recursive funs tangled in an AbsBind
+-- !!! recursive funs tangled in an AbsBind
 
 module ShouldSucceed where
 

@@ -1,4 +1,4 @@
---!!! ds008 -- free tyvars on RHSs
+-- !!! ds008 -- free tyvars on RHSs
 --
 -- these tests involve way-cool TyApps
 

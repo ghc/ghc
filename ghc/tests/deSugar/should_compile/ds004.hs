@@ -1,4 +1,4 @@
---!!! ds004 -- nodups from SLPJ p 79
+-- !!! ds004 -- nodups from SLPJ p 79
 --
 module Test where
 

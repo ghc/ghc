@@ -1,4 +1,4 @@
---!!! Another bug in overloaded n+k patts
+-- !!! Another bug in overloaded n+k patts
 --
 
 main  = print ((4::Int) ^^^^ (6::Int))

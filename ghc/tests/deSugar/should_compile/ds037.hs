@@ -1,4 +1,4 @@
---!!! AbsBinds with tyvars, no dictvars, but some dict binds
+-- !!! AbsBinds with tyvars, no dictvars, but some dict binds
 --
 module ShouldSucceed where
 
