@@ -23,7 +23,7 @@ module System.Posix.Types (
 
 #ifndef mingw32_TARGET_OS
   CGid(..), CNlink(..), CUid(..), CCc(..), CSpeed(..),
-  CTcflag(..),
+  CTcflag(..), CRLim(..),
 #endif
 
   Fd(..),
@@ -84,6 +84,7 @@ INTEGRAL_TYPE(CUid,tyConCUid,"CUid",HTYPE_UID_T)
 NUMERIC_TYPE(CCc,tyConCCc,"CCc",HTYPE_CC_T)
 NUMERIC_TYPE(CSpeed,tyConCSpeed,"CSpeed",HTYPE_SPEED_T)
 INTEGRAL_TYPE(CTcflag,tyConCTcflag,"CTcflag",HTYPE_TCFLAG_T)
+INTEGRAL_TYPE(CRLim,tyConCRlim,"CRLim",HTYPE_RLIM_T)
 #endif
 
 -- ToDo: blksize_t, clockid_t, blkcnt_t, fsblkcnt_t, fsfilcnt_t, id_t, key_t
