@@ -58,23 +58,7 @@ setHeapSize( HsInt size )
 }
 
 void
-PreTraceHook (long fd)
-{
-    const char msg[]="\n";
-    write(fd,msg,sizeof(msg)-1);
-}
-
-void
-PostTraceHook (long fd)
-{
-#if 0
-    const char msg[]="\n";
-    write(fd,msg,sizeof(msg)-1);
-#endif
-}
-
-void
-OutOfHeapHook (unsigned long request_size/* always zero these days */, 
+OutOfHeapHook (unsigned long request_size/* always zero these days */,
 	       unsigned long heap_size)
     /* both in bytes */
 {

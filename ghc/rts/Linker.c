@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.144 2004/01/05 17:32:35 simonmar Exp $
+ * $Id: Linker.c,v 1.145 2004/02/15 13:29:44 krasimir Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -135,7 +135,7 @@ typedef struct _RtsSymbolVal {
 #define RTS_MINGW_ONLY_SYMBOLS /**/
 /* Don't have the ability to read import libs / archives, so
  * we have to stupidly list a lot of what libcygwin.a
- * exports; sigh. 
+ * exports; sigh.
  */
 #define RTS_CYGWIN_ONLY_SYMBOLS                 \
       SymX(regfree)                             \
@@ -226,7 +226,7 @@ typedef struct _RtsSymbolVal {
 #if __GNUC__>=3
 #define RTS_MINGW_EXTRA_SYMS                    \
       Sym(_imp____mb_cur_max)                   \
-      Sym(_imp___pctype)            
+      Sym(_imp___pctype)
 #else
 #define RTS_MINGW_EXTRA_SYMS
 #endif
@@ -341,14 +341,10 @@ typedef struct _RtsSymbolVal {
       SymX(stg_block_takemvar)			\
       SymX(stg_block_putmvar)			\
       SymX(stg_seq_frame_info)			\
-      SymX(ErrorHdrHook)			\
       MAIN_CAP_SYM                              \
       SymX(MallocFailHook)			\
       SymX(OnExitHook)				\
       SymX(OutOfHeapHook)			\
-      SymX(PatErrorHdrHook)			\
-      SymX(PostTraceHook)			\
-      SymX(PreTraceHook)			\
       SymX(StackOverflowHook)			\
       SymX(__encodeDouble)			\
       SymX(__encodeFloat)			\
@@ -703,7 +699,7 @@ initLinker( void )
 #   endif
 
 #   if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
-#   if defined(RTLD_DEFAULT)    
+#   if defined(RTLD_DEFAULT)
     dl_prog_handle = RTLD_DEFAULT;
 #   else
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
@@ -728,7 +724,7 @@ initLinker( void )
  * to give to loadSymbol, so that we can find the symbols.  For such
  * libraries, the LoadLibrary call should be a no-op except for returning
  * the handle.
- * 
+ *
  */
 
 #if defined(OBJFORMAT_PEi386)
@@ -1135,7 +1131,7 @@ unloadObj( char *path )
     ASSERT(symhash != NULL);
     ASSERT(objects != NULL);
 
-    initLinker(); 
+    initLinker();
 
     prev = NULL;
     for (oc = objects; oc; prev = oc, oc = oc->next) {
@@ -1923,9 +1919,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
          *
 	 * See Section 4.1 (last para) of the PE spec (rev6.0).
 	 *
-	 * Nov2003 update: the GNU linker still doesn't correctly 
-	 * handle the generation of relocatable object files with 
-	 * overflown relocations. Hence the output to warn of potential 
+	 * Nov2003 update: the GNU linker still doesn't correctly
+	 * handle the generation of relocatable object files with
+	 * overflown relocations. Hence the output to warn of potential
 	 * troubles.
 	 */
         COFF_reloc* rel = (COFF_reloc*)
@@ -3016,7 +3012,7 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
 /*
   Support for MachO linking on Darwin/MacOS X on PowerPC chips
   by Wolfgang Thaller (wolfgang.thaller@gmx.net)
-  
+
   I hereby formally apologize for the hackish nature of this code.
   Things that need to be done:
   *) implement ocVerifyImage_MachO
@@ -3026,10 +3022,10 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
 
 /*
   ocAllocateJumpIslands_MachO
-  
+
   Allocate additional space at the end of the object file image to make room
   for jump islands.
-  
+
   PowerPC relative branch instructions have a 24 bit displacement field.
   As PPC code is always 4-byte-aligned, this yields a +-32MB range.
   If a particular imported symbol is outside this range, we have to redirect
@@ -3057,7 +3053,7 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
             unsigned long nundefsym = dsymLC->nundefsym;
             oc->island_start_symbol = dsymLC->iundefsym;
             oc->n_islands = nundefsym;
-            
+
             if(nundefsym > 0)
             {
 #ifdef USE_MMAP
@@ -3066,11 +3062,11 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
                 oc->image = stgReallocBytes(
                     image, oc->fileSize + islandSize * nundefsym,
                     "ocAllocateJumpIslands_MachO");
-#endif                    
+#endif
                 oc->jump_islands = oc->image + oc->fileSize;
                 memset(oc->jump_islands, 0, islandSize * nundefsym);
             }
-            
+
             break;  // there can be only one LC_DSYMTAB
         }
 	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
@@ -3093,14 +3089,14 @@ static int resolveImports(
     struct nlist *nlist)
 {
     unsigned i;
-    
+
     for(i=0;i*4<sect->size;i++)
     {
 	// according to otool, reserved1 contains the first index into the indirect symbol table
 	struct nlist *symbol = &nlist[indirectSyms[sect->reserved1+i]];
 	char *nm = image + symLC->stroff + symbol->n_un.n_strx;
 	void *addr = NULL;
-	
+
 	if((symbol->n_type & N_TYPE) == N_UNDF
 	    && (symbol->n_type & N_EXT) && (symbol->n_value != 0))
 	    addr = (void*) (symbol->n_value);
@@ -3117,7 +3113,7 @@ static int resolveImports(
 	checkProddableBlock(oc,((void**)(image + sect->offset)) + i);
 	((void**)(image + sect->offset))[i] = addr;
     }
-    
+
     return 1;
 }
 
@@ -3130,19 +3126,19 @@ static void* makeJumpIsland(
         symbolNumber - oc->island_start_symbol > oc->n_islands)
         return NULL;
     symbolNumber -= oc->island_start_symbol;
-    
+
     void *island = (void*) ((char*)oc->jump_islands + islandSize * symbolNumber);
     unsigned long *p = (unsigned long*) island;
-    
+
         // lis r12, hi16(target)
     *p++ = 0x3d800000 | ( ((unsigned long) target) >> 16 );
         // ori r12, r12, lo16(target)
-    *p++ = 0x618c0000 | ( ((unsigned long) target) & 0xFFFF ); 
+    *p++ = 0x618c0000 | ( ((unsigned long) target) & 0xFFFF );
         // mtctr r12
     *p++ = 0x7d8903a6;
         // bctr
     *p++ = 0x4e800420;
-    
+
     return (void*) island;
 }
 
@@ -3151,7 +3147,7 @@ static char* relocateAddress(
     int nSections,
     struct section* sections,
     unsigned long address)
-{  
+{
     int i;
     for(i = 0; i < nSections; i++)
     {
@@ -3168,13 +3164,13 @@ static char* relocateAddress(
 
 static int relocateSection(
     ObjectCode* oc,
-    char *image, 
+    char *image,
     struct symtab_command *symLC, struct nlist *nlist,
     int nSections, struct section* sections, struct section *sect)
 {
     struct relocation_info *relocs;
     int i,n;
-    
+
     if(!strcmp(sect->sectname,"__la_symbol_ptr"))
 	return 1;
     else if(!strcmp(sect->sectname,"__nl_symbol_ptr"))
@@ -3182,14 +3178,14 @@ static int relocateSection(
 
     n = sect->nreloc;
     relocs = (struct relocation_info*) (image + sect->reloff);
-    
+
     for(i=0;i<n;i++)
     {
 	if(relocs[i].r_address & R_SCATTERED)
 	{
 	    struct scattered_relocation_info *scat =
 		(struct scattered_relocation_info*) &relocs[i];
-	    
+
 	    if(!scat->r_pcrel)
 	    {
 		if(scat->r_length == 2)
@@ -3197,7 +3193,7 @@ static int relocateSection(
 		    unsigned long word = 0;
 		    unsigned long* wordPtr = (unsigned long*) (image + sect->offset + scat->r_address);
 		    checkProddableBlock(oc,wordPtr);
-		    
+
 		    // Step 1: Figure out what the relocated value should be
 		    if(scat->r_type == GENERIC_RELOC_VANILLA)
 		    {
@@ -3210,11 +3206,11 @@ static int relocateSection(
 		    {
 		        struct scattered_relocation_info *pair =
 		                (struct scattered_relocation_info*) &relocs[i+1];
-		                
+
 		        if(!pair->r_scattered || pair->r_type != PPC_RELOC_PAIR)
 		            barf("Invalid Mach-O file: "
 		                 "PPC_RELOC_*_SECTDIFF not followed by PPC_RELOC_PAIR");
-		        
+
 		        word = (unsigned long)
 		               (relocateAddress(oc, nSections, sections, scat->r_value)
 		              - relocateAddress(oc, nSections, sections, pair->r_value));
@@ -3243,7 +3239,7 @@ static int relocateSection(
                     }
 		}
 	    }
-	    
+
 	    continue; // FIXME: I hope it's OK to ignore all the others.
 	}
 	else
@@ -3251,16 +3247,16 @@ static int relocateSection(
 	    struct relocation_info *reloc = &relocs[i];
 	    if(reloc->r_pcrel && !reloc->r_extern)
 		continue;
-		
+
 	    if(reloc->r_length == 2)
 	    {
 		unsigned long word = 0;
                 unsigned long jumpIsland = 0;
                 long offsetToJumpIsland;
-                
+
 		unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
 		checkProddableBlock(oc,wordPtr);
-		
+
 		if(reloc->r_type == GENERIC_RELOC_VANILLA)
 		{
 		    word = *wordPtr;
@@ -3289,11 +3285,11 @@ static int relocateSection(
 
 		if(!reloc->r_extern)
 		{
-		    long delta = 
+		    long delta =
 			sections[reloc->r_symbolnum-1].offset
 			- sections[reloc->r_symbolnum-1].addr
 			+ ((long) image);
-		    
+
 		    word += delta;
 		}
 		else
@@ -3306,7 +3302,7 @@ static int relocateSection(
 			belch("\nunknown symbol `%s'", nm);
 			return 0;
 		    }
-		    
+
 		    if(reloc->r_pcrel)
                     {
                         jumpIsland = (long) makeJumpIsland(oc,reloc->r_symbolnum,(void*)word);
@@ -3318,7 +3314,7 @@ static int relocateSection(
                         }
                     }
 		}
-		
+
 		if(reloc->r_type == GENERIC_RELOC_VANILLA)
 		{
 		    *wordPtr = word;
@@ -3349,7 +3345,7 @@ static int relocateSection(
                         if(jumpIsland == 0)
                             barf("unconditional relative branch out of range: "
                                  "no jump island available");
-                            
+
                         word = offsetToJumpIsland;
                         if((long)word > (long)0x01FFFFFF || (long)word < (long)0xFFE00000)
                             barf("unconditional relative branch out of range: "
@@ -3392,36 +3388,36 @@ static int ocGetNames_MachO(ObjectCode* oc)
 	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
     }
 
-    sections = (struct section*) (segLC+1); 
+    sections = (struct section*) (segLC+1);
     nlist = (struct nlist*) (image + symLC->symoff);
 
     for(i=0;i<segLC->nsects;i++)
     {
         if(sections[i].size == 0)
             continue;
-        
+
         if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL)
         {
             char * zeroFillArea = stgCallocBytes(1,sections[i].size,
                                       "ocGetNames_MachO(common symbols)");
             sections[i].offset = zeroFillArea - image;
         }
-    
+
 	if(!strcmp(sections[i].sectname,"__text"))
-	    addSection(oc, SECTIONKIND_CODE_OR_RODATA, 
+	    addSection(oc, SECTIONKIND_CODE_OR_RODATA,
 		(void*) (image + sections[i].offset),
 		(void*) (image + sections[i].offset + sections[i].size));
 	else if(!strcmp(sections[i].sectname,"__const"))
-	    addSection(oc, SECTIONKIND_RWDATA, 
+	    addSection(oc, SECTIONKIND_RWDATA,
 		(void*) (image + sections[i].offset),
 		(void*) (image + sections[i].offset + sections[i].size));
 	else if(!strcmp(sections[i].sectname,"__data"))
-	    addSection(oc, SECTIONKIND_RWDATA, 
+	    addSection(oc, SECTIONKIND_RWDATA,
 		(void*) (image + sections[i].offset),
 		(void*) (image + sections[i].offset + sections[i].size));
 	else if(!strcmp(sections[i].sectname,"__bss")
 	        || !strcmp(sections[i].sectname,"__common"))
-	    addSection(oc, SECTIONKIND_RWDATA, 
+	    addSection(oc, SECTIONKIND_RWDATA,
 		(void*) (image + sections[i].offset),
 		(void*) (image + sections[i].offset + sections[i].size));
 
@@ -3447,35 +3443,35 @@ static int ocGetNames_MachO(ObjectCode* oc)
     }
     oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
 				   "ocGetNames_MachO(oc->symbols)");
-    
+
 	// insert symbols into hash table
     for(i=dsymLC->iextdefsym,curSymbol=0;i<dsymLC->iextdefsym+dsymLC->nextdefsym;i++)
     {
 	if((nlist[i].n_type & N_TYPE) == N_SECT)
 	{
 	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-	    ghciInsertStrHashTable(oc->fileName, symhash, nm, image + 
+	    ghciInsertStrHashTable(oc->fileName, symhash, nm, image +
 		sections[nlist[i].n_sect-1].offset
 		- sections[nlist[i].n_sect-1].addr
 		+ nlist[i].n_value);
 	    oc->symbols[curSymbol++] = nm;
 	}
     }
-    
+
 	// insert local symbols into lochash
     for(i=dsymLC->ilocalsym;i<dsymLC->ilocalsym+dsymLC->nlocalsym;i++)
     {
 	if((nlist[i].n_type & N_TYPE) == N_SECT)
 	{
 	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-	    ghciInsertStrHashTable(oc->fileName, oc->lochash, nm, image + 
+	    ghciInsertStrHashTable(oc->fileName, oc->lochash, nm, image +
 		sections[nlist[i].n_sect-1].offset
 		- sections[nlist[i].n_sect-1].addr
 		+ nlist[i].n_value);
 	}
     }
 
-    
+
     commonStorage = stgCallocBytes(1,commonSize,"ocGetNames_MachO(common symbols)");
     commonCounter = (unsigned long)commonStorage;
     for(i=0;i<symLC->nsyms;i++)
@@ -3485,12 +3481,12 @@ static int ocGetNames_MachO(ObjectCode* oc)
 	{
 	    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
 	    unsigned long sz = nlist[i].n_value;
-	    
+
 	    nlist[i].n_value = commonCounter;
-	    
+
 	    ghciInsertStrHashTable(oc->fileName, symhash, nm, (void*)commonCounter);
 	    oc->symbols[curSymbol++] = nm;
-	    
+
 	    commonCounter += sz;
 	}
     }
@@ -3520,8 +3516,8 @@ static int ocResolve_MachO(ObjectCode* oc)
 	    dsymLC = (struct dysymtab_command*) lc;
 	lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
     }
-    
-    sections = (struct section*) (segLC+1); 
+
+    sections = (struct section*) (segLC+1);
     nlist = (struct nlist*) (image + symLC->symoff);
 
     for(i=0;i<segLC->nsects;i++)
@@ -3531,7 +3527,7 @@ static int ocResolve_MachO(ObjectCode* oc)
 	else if(!strcmp(sections[i].sectname,"__nl_symbol_ptr"))
 	    nl_ptrs = &sections[i];
     }
-    
+
     indirectSyms = (unsigned long*) (image + dsymLC->indirectsymoff);
 
     if(la_ptrs)
@@ -3540,7 +3536,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     if(nl_ptrs)
 	if(!resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist))
 	    return 0;
-    
+
     for(i=0;i<segLC->nsects;i++)
     {
 	if(!relocateSection(oc,image,symLC,nlist,segLC->nsects,sections,&sections[i]))
@@ -3550,7 +3546,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     /* Free the local symbol table; we won't need it again. */
     freeHashTable(oc->lochash, NULL);
     oc->lochash = NULL;
-    
+
     /*
         Flush the data & instruction caches.
         Because the PPC has split data/instruction caches, we have to
@@ -3583,11 +3579,11 @@ static void machoInitSymbolsWithoutUnderscore()
 {
     void *p;
 
-#undef Sym    
+#undef Sym
 #define Sym(x)						\
     __asm__ ("lis %0,hi16(" #x ")\n\tori %0,%0,lo16(" #x ")" : "=r" (p));	\
     ghciInsertStrHashTable("(GHCi built-in symbols)", symhash, #x, p);
-    
+
     RTS_MACHO_NOUNDERLINE_SYMBOLS
 
 }
