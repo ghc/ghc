@@ -3163,101 +3163,123 @@ first, and the most dependent last.
 
 </Sect2>
 
-<Sect2 id="sec-ways">
-<Title>Way management
+    <sect2 id="sec-ways">
+      <title>Way management</title>
+      <indexterm><primary>way management</primary></indexterm>
 
-<indexterm><primary>way management</primary></indexterm></Title>
+      <para>We sometimes want to build essentially the same system in
+      several different ``ways''.  For example, we want to build GHC's
+      <literal>Prelude</literal> libraries with and without profiling,
+      so that there is an appropriately-built library archive to link
+      with when the user compiles his program.  It would be possible
+      to have a completely separate build tree for each such ``way'',
+      but it would be horribly bureaucratic, especially since often
+      only parts of the build tree need to be constructed in multiple
+      ways.</para>
 
-<para>
-We sometimes want to build essentially the same system in several
-different ``ways''.  For example, we want to build GHC's <Literal>Prelude</Literal>
-libraries with and without profiling, with and without concurrency,
-and so on, so that there is an appropriately-built library archive to
-link with when the user compiles his program.  It would be possible to
-have a completely separate build tree for each such ``way'', but it
-would be horribly bureaucratic, especially since often only parts of
-the build tree need to be constructed in multiple ways.
-</para>
+      <para>Instead, the
+      <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm>
+      contains some clever magic to allow you to build several
+      versions of a system; and to control locally how many versions
+      are built and how they differ.  This section explains the
+      magic.</para>
 
-<para>
-Instead, the <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm> contains some clever magic to
-allow you to build several versions of a system; and to control
-locally how many versions are built and how they differ.  This section
-explains the magic.
-</para>
+      <para>The files for a particular way are distinguished by
+      munging the suffix.  The <quote>normal way</quote> is always
+      built, and its files have the standard suffices
+      <filename>.o</filename>, <filename>.hi</filename>, and so on.
+      In addition, you can build one or more extra ways, each
+      distinguished by a <emphasis>way tag</emphasis>.  The object
+      files and interface files for one of these extra ways are
+      distinguished by their suffix.  For example, way
+      <literal>mp</literal> has files
+      <filename>.mp&lowbar;o</filename> and
+      <filename>.mp&lowbar;hi</filename>.  Library archives have their
+      way tag the other side of the dot, for boring reasons; thus,
+      <filename>libHS&lowbar;mp.a</filename>.</para>
 
-<para>
-The files for a particular way are distinguished by munging the
-suffix.  The ``normal way'' is always built, and its files have the
-standard suffices <filename>.o</filename>, <filename>.hi</filename>, and so on.  In addition, you can build
-one or more extra ways, each distinguished by a <Emphasis>way tag</Emphasis>.  The
-object files and interface files for one of these extra ways are
-distinguished by their suffix.  For example, way <Literal>mp</Literal> has files
-<filename>.mp&lowbar;o</filename> and <filename>.mp&lowbar;hi</filename>.  Library archives have their way tag the other
-side of the dot, for boring reasons; thus, <filename>libHS&lowbar;mp.a</filename>.
-</para>
+      <para>A <Command>make</Command> variable called
+      <constant>way</constant> holds the current way tag.
+      <emphasis><constant>way</constant> is only ever set on the
+      command line of <Command>gmake</Command></emphasis> (usually in
+      a recursive invocation of <command>gmake</command> by the
+      system).  It is never set inside a
+      <filename>Makefile</filename>.  So it is a global constant for
+      any one invocation of <Command>gmake</Command>.  Two other
+      <Command>make</Command> variables,
+      <constant>way&lowbar;</constant> and
+      <constant>&lowbar;way</constant> are immediately derived from
+      <constant>&dollar;(way)</constant> and never altered.  If
+      <constant>way</constant> is not set, then neither are
+      <constant>way&lowbar;</constant> and
+      <constant>&lowbar;way</constant>, and the invocation of
+      <Command>make</Command> will build the <quote>normal
+      way</quote>.  If <constant>way</constant> is set, then the other
+      two variables are set in sympathy.  For example, if
+      <constant>&dollar;(way)</constant> is ``<Literal>mp</Literal>'',
+      then <constant>way&lowbar;</constant> is set to
+      ``<Literal>mp&lowbar;</Literal>'' and
+      <constant>&lowbar;way</constant> is set to
+      ``<Literal>&lowbar;mp</Literal>''.  These three variables are
+      then used when constructing file names.</para>
 
-<para>
-A <Command>make</Command> variable called <constant>way</constant> holds the current way tag.  <Emphasis><constant>way</constant>
-is only ever set on the command line of a recursive invocation of
-<Command>gmake</Command>.</Emphasis> It is never set inside a <filename>Makefile</filename>.  So it is a global
-constant for any one invocation of <Command>gmake</Command>.  Two other <Command>make</Command>
-variables, <constant>way&lowbar;</constant> and <constant>&lowbar;way</constant> are immediately derived from <constant>&dollar;(way)</constant> and
-never altered.  If <constant>way</constant> is not set, then neither are <constant>way&lowbar;</constant> and
-<constant>&lowbar;way</constant>, and the invocation of <Command>make</Command> will build the ``normal way''.
-If <constant>way</constant> is set, then the other two variables are set in sympathy.
-For example, if <constant>&dollar;(way)</constant> is ``<Literal>mp</Literal>'', then <constant>way&lowbar;</constant> is set to ``<Literal>mp&lowbar;</Literal>''
-and <constant>&lowbar;way</constant> is set to ``<Literal>&lowbar;mp</Literal>''.  These three variables are then used
-when constructing file names.
-</para>
+      <para>So how does <Command>make</Command> ever get recursively
+      invoked with <constant>way</constant> set?  There are two ways
+      in which this happens:</para>
 
-<para>
-So how does <Command>make</Command> ever get recursively invoked with <constant>way</constant> set?  There
-are two ways in which this happens:
-</para>
+      <itemizedlist>
+	<listitem>
+	  <para>For some (but not all) of the standard targets, when
+          in a leaf sub-directory, <Command>make</Command> is
+          recursively invoked for each way tag in
+          <constant>&dollar;(WAYS)</constant>.  You set
+          <constant>WAYS</constant> in the
+          <filename>Makefile</filename> to the list of way tags you
+          want these targets built for.  The mechanism here is very
+          much like the recursive invocation of
+          <Command>make</Command> in sub-directories (<Xref
+          LinkEnd="sec-subdirs">).  It is up to you to set
+          <constant>WAYS</constant> in your
+          <filename>Makefile</filename>; this is how you control what
+          ways will get built.</para>
+	</listitem>
 
-<para>
-
-<ItemizedList>
-<listitem>
-
-<para>
- For some (but not all) of the standard targets, when in a leaf
-sub-directory, <Command>make</Command> is recursively invoked for each way tag in
-<constant>&dollar;(WAYS)</constant>.  You set <constant>WAYS</constant> to the list of way tags you want these
-targets built for.  The mechanism here is very much like the recursive
-invocation of <Command>make</Command> in sub-directories (<Xref LinkEnd="sec-subdirs">).
-
-It is up to you to set <constant>WAYS</constant> in your <filename>Makefile</filename>; this is how you
-control what ways will get built.  
-</para>
-</listitem>
-<listitem>
-
-<para>
- For a useful collection of
-targets (such as <filename>libHS&lowbar;mp.a</filename>, <filename>Foo.mp&lowbar;o</filename>) there is a rule which
-recursively invokes <Command>make</Command> to make the specified target, setting the
-<constant>way</constant> variable.  So if you say <Command>gmake Foo.mp&lowbar;o</Command> you should see a
-recursive invocation <Command>gmake Foo.mp&lowbar;o way=mp</Command>, and <Emphasis>in this
-recursive invocation the pattern rule for compiling a Haskell file
-into a <filename>.o</filename> file will match</Emphasis>.  The key pattern rules (in <filename>suffix.mk</filename>)
-look like this:
-
+	<listitem>
+	  <para>For a useful collection of targets (such as
+          <filename>libHS&lowbar;mp.a</filename>,
+          <filename>Foo.mp&lowbar;o</filename>) there is a rule which
+          recursively invokes <Command>make</Command> to make the
+          specified target, setting the <constant>way</constant>
+          variable.  So if you say <Command>gmake
+          Foo.mp&lowbar;o</Command> you should see a recursive
+          invocation <Command>gmake Foo.mp&lowbar;o way=mp</Command>,
+          and <Emphasis>in this recursive invocation the pattern rule
+          for compiling a Haskell file into a <filename>.o</filename>
+          file will match</Emphasis>.  The key pattern rules (in
+          <filename>suffix.mk</filename>) look like this:
 
 <ProgramListing>
 %.$(way_)o : %.lhs
       $(HC) $(HC_OPTS) $&#60; -o $@
 </ProgramListing>
 
+          Neat, eh?</para>
+	</listitem>
 
-Neat, eh?
-</para>
-</listitem>
+	<listitem>
+	  <para>You can invoke <command>make</command> with a
+	  particular <literal>way</literal> setting yourself, in order
+	  to build files related to a particular
+	  <literal>way</literal> in the current directory.  eg.
 
-</ItemizedList>
+<screen>
+$ make way=p
+</screen>
 
-</para>
+          will build files for the profiling way only in the current
+          directory. </para>
+	</listitem>
+      </itemizedlist>
 
 </Sect2>
 
@@ -3623,6 +3645,7 @@ running /bin/sh ./configure  --cache-file=.././config.cache --srcdir=.
 ./configure: ./configure: No such file or directory
 configure: error: ./configure failed for ghc
 </Screen>
+</para>
 </listitem>
 
 <listitem>
