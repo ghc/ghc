@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.50 2004/02/07 16:37:06 panne Exp $
+-- $Id: Main.hs,v 1.51 2004/02/09 15:04:19 malcolm Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -11,7 +11,7 @@
 --
 -- See the documentation in the Users' Guide for more details.
 
-#if __GLASGOW_HASKELL__ >= 504
+#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
 import System.Console.GetOpt
 #else
 import GetOpt
@@ -26,7 +26,7 @@ import IO            (hPutStr, hPutStrLn, stderr)
 
 #if defined(mingw32_HOST_OS)
 import Foreign
-#if __GLASGOW_HASKELL__ >= 504
+#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
 import Foreign.C.String
 #else
 import CString

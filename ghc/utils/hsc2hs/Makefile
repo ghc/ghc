@@ -1,4 +1,6 @@
 # -----------------------------------------------------------------------------
+# To compile with nhc98 on unix:
+#     nhc98 -cpp -DEXEEXT="\"\"" -package base -o hsc2hs-bin Main.hs
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
