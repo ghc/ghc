@@ -1,126 +1,383 @@
-<Chapter id="utils">
-<Title>Other Haskell utility programs
-</Title>
+<chapter id="utils">
+  <title>Other Haskell utility programs</title>
+  <indexterm><primary>utilities, Haskell</primary></indexterm>
 
-<IndexTerm><Primary>utilities, Haskell</Primary></IndexTerm>
+  <para>This section describes other program(s) which we distribute,
+  that help with the Great Haskell Programming Task.</para>
 
-<Para>
-This section describes other program(s) which we distribute, that help
-with the Great Haskell Programming Task.
-</Para>
+<!-- comment: hstags doesn't work anymore
 
-<Sect1 id="hstags">
-<Title>Emacs `TAGS' for Haskell: <Command>hstags</Command>
-</Title>
+  <sect1 id="hstags">
+    <title>Emacs `TAGS' for Haskell: <command>hstags</command></title>
+    <indexterm><primary><command>hstags</command></primary></indexterm>
+    <indexterm><primary>TAGS for Haskell</primary></indexterm>
 
-<Para>
-<IndexTerm><Primary>hstags</Primary></IndexTerm>
-<IndexTerm><Primary>TAGS for Haskell</Primary></IndexTerm>
-</Para>
+    <para>`Tags' is a facility for indexing the definitions of
+    programming-language things in a multi-file program, and then
+    using that index to jump around among these definitions.</para>
 
-<Para>
-`Tags' is a facility for indexing the definitions of
-programming-language things in a multi-file program, and then using
-that index to jump around among these definitions.
-</Para>
+    <para>Rather than scratch your head, saying &ldquo;Now where did
+    we define `foo'?&rdquo;, you just do (in Emacs) <Literal>M-. foo
+    RET</Literal>, and You're There!  Some people go wild over this
+    stuff&hellip;</para>
 
-<Para>
-Rather than scratch your head, saying &ldquo;Now where did we define
-`foo'?&rdquo;, you just do (in Emacs) <Literal>M-. foo RET</Literal>, and You're There!
-Some people go wild over this stuff&hellip;
-</Para>
+    <para>GHC comes with a program <command>hstags</command>, which
+    build Emacs-able TAGS files.  The invocation syntax is:</para>
 
-<Para>
-GHC comes with a program <Command>hstags</Command>, which build Emacs-able TAGS files.  The invocation syntax is:
-
-<Screen>
+<screen>
 hstags [GHC-options] file [files...]
-</Screen>
+</screen>
 
-</Para>
+    <para>The best thing is just to feed it your GHC command-line
+    flags.  A good Makefile entry might be:</para>
 
-<Para>
-The best thing is just to feed it your GHC command-line flags.
-A good Makefile entry might be:
-
-<ProgramListing>
+<programlisting>
 tags:
         $(RM) TAGS
         hstags $(GHC_FLAGS) *.lhs
-</ProgramListing>
+</programlisting>
 
-</Para>
+    <para>The only flags of its own are: <Option>-v</Option> to be
+    verbose; <Option>-a</Option> to <Emphasis>APPEND</Emphasis> to the
+    TAGS file, rather than write to it.</para>
 
-<Para>
-The only flags of its own are: <Option>-v</Option> to be verbose; <Option>-a</Option> to
-<Emphasis>APPEND</Emphasis> to the TAGS file, rather than write to it.
-</Para>
+    <para>Shortcomings: (1)&nbsp;Instance declarations don't get into
+    the TAGS file (but the definitions inside them do); as instances
+    aren't named, this is probably just as well.
+    (2)&nbsp;Data-constructor definitions don't get in.  Go for the
+    corresponding type constructor instead.</para>
 
-<Para>
-Shortcomings: (1)&nbsp;Instance declarations don't get into the TAGS file
-(but the definitions inside them do); as instances aren't named, this
-is probably just as well.  (2)&nbsp;Data-constructor definitions don't get
-in.  Go for the corresponding type constructor instead.
-</Para>
+    <para>Actually, GHC also comes with <command>etags</command>
+    &lsqb;for C&rsqb;, and <Command>perltags</Command> &lsqb;for You
+    Know What&rsqb;.  And&mdash;I cannot tell a lie&mdash;there is
+    Denis Howe's <Command>fptags</Command> &lsqb;for Haskell,
+    etc.&rsqb; in the <Filename>ghc/CONTRIB</Filename>
+    section&hellip;)</para>
 
-<Para>
-(Actually, GHC also comes with <Command>etags</Command> &lsqb;for C&rsqb;, and <Command>perltags</Command>
-&lsqb;for You Know What&rsqb;.  And&mdash;I cannot tell a lie&mdash;there is Denis
-Howe's <Command>fptags</Command> &lsqb;for Haskell, etc.&rsqb; in the <Filename>ghc/CONTRIB</Filename>
-section&hellip;)
-</Para>
+  </sect1>
+-->
 
-</Sect1>
+  <sect1 id="happy">
+    <title>&ldquo;Yacc for Haskell&rdquo;: <command>happy</command></title>
 
-<Sect1 id="happy">
-<Title>&ldquo;Yacc for Haskell&rdquo;: <Command>happy</Command>
-</Title>
+    <indexterm><primary>Happy</primary></indexterm>
+    <indexterm><primary>Yacc for Haskell</primary></indexterm>
+    <indexterm><primary>parser generator for Haskell</primary></indexterm>
 
-<Para>
-<IndexTerm><Primary>happy</Primary></IndexTerm>
-<IndexTerm><Primary>Yacc for Haskell</Primary></IndexTerm>
-<IndexTerm><Primary>parser generator for Haskell</Primary></IndexTerm>
-Andy Gill and Simon Marlow have written a parser-generator for
-Haskell, called <Command>happy</Command>.<IndexTerm><Primary>happy parser generator</Primary></IndexTerm> <Command>Happy</Command>
-is to Haskell what <Command>Yacc</Command> is to C.
-</Para>
+    <para>Andy Gill and Simon Marlow have written a parser-generator
+    for Haskell, called
+    <Command>happy</Command>.<IndexTerm><Primary>happy parser
+    generator</Primary></IndexTerm> <command>Happy</command> is to
+    Haskell what <command>Yacc</command> is to C.</para>
 
-<Para>
-You can get <Command>happy</Command> from <ulink
-url="http://www.haskell.org/happy/">the Happy Homepage</ulink>.
-</Para>
+    <para>You can get <Command>happy</Command> from <ulink
+    url="http://www.haskell.org/happy/">the Happy
+    Homepage</ulink>.</para>
 
-<Para>
-<Command>Happy</Command> is at its shining best when compiled by GHC.
-</Para>
+    <para><command>Happy</command> is at its shining best when
+    compiled by GHC.</para>
 
-</Sect1>
+  </sect1>
 
-<Sect1 id="pphs">
-<Title>Pretty-printing Haskell: <Command>pphs</Command>
-</Title>
+<!-- we don't distribute this anymore
+  <sect1 id="pphs">
+    <title>Pretty-printing Haskell: <Command>pphs</Command></title>
+    <indexterm><primary>pphs</primary></indexterm>
+    <indexterm><primary>pretty-printing Haskell code</primary></indexterm>
 
-<Para>
-<IndexTerm><Primary>pphs</Primary></IndexTerm>
-<IndexTerm><Primary>pretty-printing Haskell code</Primary></IndexTerm>
-</Para>
+    <para>Andrew Preece has written
+    <Command>pphs</Command>,<IndexTerm><Primary>pphs</Primary></IndexTerm><IndexTerm><Primary>pretty-printing
+    Haskell</Primary></IndexTerm> a utility to pretty-print Haskell
+    code in LaTeX documents.  Keywords in bolds, variables in
+    italics&mdash;that sort of thing.  It is good at lining up program
+    clauses and equals signs, things that are very tiresome to do by
+    hand.</para>
 
-<Para>
-Andrew Preece has written
-<Command>pphs</Command>,<IndexTerm><Primary>pphs</Primary></IndexTerm><IndexTerm><Primary>pretty-printing Haskell</Primary></IndexTerm>
-a utility to pretty-print Haskell code in LaTeX documents.
-Keywords in bolds, variables in italics&mdash;that sort of thing.  It is
-good at lining up program clauses and equals signs, things that are
-very tiresome to do by hand.
-</Para>
+    <para>The code is distributed with GHC in
+    <Filename>ghc/CONTRIB/pphs</Filename>.</para>
+  </sect1>
+-->
 
-<Para>
-The code is distributed with GHC in <Filename>ghc/CONTRIB/pphs</Filename>.
-</Para>
+  <sect1 id="hs2c">
+    <title>Writing Haskell interfaces to C code:
+    <command>hs2c</command></title>
+    <indexterm><primary><command>hs2c</command></primary>
+    </indexterm>
 
-</Sect1>
+    <para>The <command>hs2c</command> command can be used to automate
+    some parts of the process of writing Haskell bindings to C code.
+    It reads an almost-Haskell source with embedded special
+    constructs, and outputs a real Haskell file with these constructs
+    processed, based on information taken from some C headers. The
+    extra constructs deal with accessing C data from Haskell.</para>
 
-</Chapter>
+    <para>It may also output a C file which contains additional C
+    functions to be linked into the program, together with a C header
+    that gets included into the C code to which the Haskell module
+    will be compiled (when compiled via C) and into the C file. These
+    two files are created when the <literal>#def</literal> construct
+    is used.</para>
+
+    <para>Actually <command>hs2c</command> does not output the Haskell
+    file directly.  It creates a C program that includes the headers,
+    gets automatically compiled and run. That program outputs the
+    Haskell code.</para>
+
+    <para>In the following, &ldquo;Haskell file&rdquo; is the main
+    output (usually a <literal>.hs</literal> file), &ldquo;compiled
+    Haskell file&rdquo; is the Haskell file after
+    <command>ghc</command> has compiled it to C (i.e. a
+    <literal>.hc</literal> file), &ldquo;C program&rdquo; is the
+    program that outputs the Haskell file, &ldquo;C file&rdquo; is the
+    optionally generated C file, and &ldquo;C header&rdquo; is its
+    header file.</para>
+
+    <sect2>
+      <title>Command line syntax</title>
+
+      <para>glue-hsc takes input files as arguments, and flags that
+      modify its behavior:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><literal>-t FILE</literal> or
+	  <literal>--template=FILE</literal></term>
+	  <listitem>
+	    <para>The template file (see below).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--cc=PROG</literal></term>
+	  <listitem>
+	    <para>The C compiler to use (default:
+	    <command>ghc</command>)</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--ld=PROG</literal></term>
+	  <listitem>
+	    <para>The linker to use (default:
+	    <command>gcc</command>).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--cflag=FLAG</literal></term>
+	  <listitem>
+	    <para>An extra flag to pass to the C compiler.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--lflag=FLAG</literal></term>
+	  <listitem>
+	    <para>An extra flag to pass to the linker.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--help</literal></term>
+	  <listitem>
+	    <para>Display a summary of the available flags.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>The input file should end with .hsc. Output files get
+      names with the <literal>.hsc</literal> suffix replaced:</para>
+
+      <informaltable>
+	<tgroup cols=2>
+	  <tbody>
+	    <row>
+	      <entry><literal>.hs</literal></entry>
+	      <entry>Haskell file</entry>
+	    </row>
+	    <row>
+	      <entry><literal>_hsc.h</literal></entry>
+	      <entry>C header</entry>
+	    </row>
+	    <row>
+	      <entry><literal>_hsc.c</literal></entry>
+	      <entry>C file</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+
+      <para>The C program is compiled using the Haskell compiler. This
+      provides the include path to <filename>HsFFI.h</filename> which
+      is automatically included into the C program.</para>
+
+    </sect2>
+    <sect2><title>Input syntax</title>
+
+      <para>All special processing is triggered by the
+      <literal>#</literal> character. To output a literal
+      <literal>#</literal>, write it twice: <literal>##</literal>.</para>
+
+      <para>Otherwise <literal>#</literal> is followed by optional
+      spaces and tabs, an alphanumeric key that describes the kind of
+      processing, and its arguments. Arguments look like C expressions
+      and extend up to the nearest unmatched <literal>)</literal>,
+      <literal>]</literal>, or <literal>}</literal>, or to the end of
+      line outside any <literal>() [] {} '' "" /* */</literal>. Any
+      character may be preceded by a backslash and will not be treated
+      specially.</para>
+
+      <para>Meanings of specific keys:</para>
+
+      <variablelist>
+
+	<varlistentry>
+	  <term><literal>#include &lt;file.h&gt;</literal></term>
+	  <term><literal>#include "file.h"</literal></term>
+	  <listitem>
+	    <para>The specified file gets included into the C program,
+            the compiled Haskell file, and the C
+            header. <literal>&lt;HsFFI.h&gt;</literal> is included
+            automatically.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#define name</literal></term>
+	  <term><literal>#define name value</literal></term>
+	  <listitem>
+	    <para>Similar to <literal>#include</literal>. Note that
+            <literal>#includes</literal> and
+            <literal>#defines</literal> may be put in the same file
+            twice so they should not assume otherwise.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#option opt</literal></term>
+	  <listitem>
+	    <para>The specified Haskell compiler command-line option
+            is placed in the <literal>{-# OPTIONS #-}</literal> pragma
+            at the top of the Haskell file (see <xref
+            linkend="source-file-options">). This is needed because
+            glue-hsc emits its own <literal>OPTIONS</literal> pragma,
+            and only one such pragma is interpreted by GHC.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#def C_definition</literal></term>
+	  <listitem>
+	    <para>The definition (of a function, variable, struct or
+            typedef) is written to the C file, and its prototype or
+            extern declaration to the C header. Inline functions are
+            handled correctly.  struct definitions and typedefs are
+            written to the C program too.  The
+            <literal>inline</literal>, <literal>struct</literal> or
+            <literal>typedef</literal> keyword must come just after
+            <literal>def</literal>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#if condition</literal></term>
+	  <term><literal>#ifdef name</literal></term>
+	  <term><literal>#ifndef name</literal></term>
+	  <term><literal>#elif condition</literal></term>
+	  <term><literal>#else</literal></term>
+	  <term><literal>#endif</literal></term>
+	  <listitem>
+	    <para>Conditional compilation directives are passed
+            unmodified to the C program, C file, and C header. Putting
+            them in the C program means that appropriate parts of the
+            Haskell file will be skipped.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#const C_expression</literal></term>
+	  <listitem>
+	    <para>The expression must be convertible to
+            <literal>long</literal> or <literal>unsigned
+            long</literal>.  Its value (literal or negated literal)
+            will be output.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#const_str C_expression</literal></term>
+	  <listitem>
+	    <para>The expression must be convertible to const char
+            pointer.  Its value (string literal) will be output.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#type C_type</literal></term>
+	  <listitem>
+	    <para>A Haskell equivalent of the C numeric type will be
+            output.  It will be one of
+            <literal>{Int,Word}{8,16,32,64}</literal>,
+            <literal>Float</literal>, <literal>Double</literal>,
+            <literal>LDouble</literal>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#peek struct_type, field</literal></term>
+	  <listitem>
+	    <para>A function that peeks a field of a C struct will be
+	    output.  It will have the type 
+              <literal>Storable b => Ptr a -> IO b</literal>.  
+
+            The intention is that <literal>#peek</literal> and
+            <literal>#poke</literal> can be used for implementing the
+            operations of class <literal>Storable</literal> for a
+            given C struct (see <xref linkend="sec-Storable">).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#poke struct_type, field</literal></term>
+	  <listitem>
+	    <para>Similarly for poke. It will have the type 
+              <literal>Storable b => Ptr a -> b -> IO ()</literal>.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>#ptr struct_type, field</literal></term>
+	  <listitem>
+	    <para>Makes a pointer to a field struct. It will have the type
+            <literal>Ptr a -> Ptr b</literal>.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+    </sect2>
+
+    <sect2>
+      <title>Custom constructs</title>
+
+      <para><literal>#const</literal>, <literal>#type</literal>,
+      <literal>#peek</literal>, <literal>#poke</literal> and
+      <literal>#ptr</literal> are not hardwired into the
+      <command>hs2c</command>, but are defined in a C template that is
+      included in the C program: <filename>template-hsc.h</filename>.
+      Custom constructs and templates can be used too. Any
+      <literal>#</literal>-construct with unknown key is expected to
+      be handled by a C template.</para>
+
+      <para>A C template should define a macro or function with name
+      prefixed by <literal>hsc_</literal> that handles the construct
+      by emitting the expansion to stdout. See
+      <filename>template-hsc.h</filename> for examples.</para>
+
+    </sect2>
+
+  </sect1>
+
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
