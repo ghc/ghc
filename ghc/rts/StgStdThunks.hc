@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.4 1999/03/26 10:29:05 simonm Exp $
+ * $Id: StgStdThunks.hc,v 1.5 1999/04/23 09:45:27 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -29,10 +29,12 @@
 #ifdef PROFILING
 #define SAVE_CCCS(fs)  	CCS_HDR(Sp-fs)=CCCS
 #define GET_SAVED_CCCS  RESTORE_CCCS(CCS_HDR(Sp))
+#define ENTER_CCS(p)    ENTER_CCS_TCL(p)
 #define RET_BITMAP 1
 #else
 #define SAVE_CCCS(fs)   /* empty */
 #define GET_SAVED_CCCS  /* empty */
+#define ENTER_CCS(p)    /* empty */
 #define RET_BITMAP 0
 #endif
 
@@ -55,6 +57,7 @@
       STK_CHK_NP(UPD_FRAME_SIZE,1,);					\
       UPD_BH_UPDATABLE(R1.p);						\
       PUSH_UPD_FRAME(R1.p,0);						\
+      ENTER_CCS(R1.p);							\
       SAVE_CCCS(UPD_FRAME_SIZE);					\
       Sp[-UPD_FRAME_SIZE]=(W_)__sel_ret_##offset##_upd_ret;		\
       R1.p = (P_)R1.cl->payload[0];					\
@@ -97,6 +100,7 @@ SELECTOR_CODE_UPD(15);
   EF_(__sel_##offset##_noupd_entry) {					\
     FB_									\
       STK_CHK_NP(NOUPD_FRAME_SIZE,1,)					\
+      ENTER_CCS(R1.p);							\
       SAVE_CCCS(NOUPD_FRAME_SIZE);					\
       Sp[-NOUPD_FRAME_SIZE]=(W_)__sel_ret_##offset##_noupd_ret;		\
       R1.p = (P_)R1.cl->payload[0];					\
@@ -156,6 +160,7 @@ FN_(__ap_1_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame),1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   R1.p=(P_)(R1.cl->payload[0]);
   Sp = Sp - sizeofW(StgUpdateFrame);
@@ -168,6 +173,7 @@ FN_(__ap_2_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+1,1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[1]);
   R1.p=(P_)(R1.cl->payload[0]);
@@ -181,6 +187,7 @@ FN_(__ap_3_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+2,1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[2]);
   Sp[-UF_SIZE-2]=(W_)(R1.cl->payload[1]);
@@ -195,6 +202,7 @@ FN_(__ap_4_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+3,1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[3]);
   Sp[-UF_SIZE-2]=(W_)(R1.cl->payload[2]);
@@ -210,6 +218,7 @@ FN_(__ap_5_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+4,1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[4]);
   Sp[-UF_SIZE-2]=(W_)(R1.cl->payload[3]);
@@ -226,6 +235,7 @@ FN_(__ap_6_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+5,1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[5]);
   Sp[-UF_SIZE-2]=(W_)(R1.cl->payload[4]);
@@ -243,6 +253,7 @@ FN_(__ap_7_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+6,1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[6]);
   Sp[-UF_SIZE-2]=(W_)(R1.cl->payload[5]);
@@ -261,6 +272,7 @@ FN_(__ap_8_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+7,1,);
   UPD_BH_UPDATABLE(R1.p);
+  ENTER_CCS(R1.p);
   PUSH_UPD_FRAME(R1.p,0);
   Sp[-UF_SIZE-1]=(W_)(R1.cl->payload[7]);
   Sp[-UF_SIZE-2]=(W_)(R1.cl->payload[6]);
