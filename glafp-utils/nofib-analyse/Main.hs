@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.1 1999/11/12 11:54:17 simonmar Exp $
+-- $Id: Main.hs,v 1.2 2000/03/01 18:38:45 keithw Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -42,6 +42,10 @@ main = do
 
  if ascii && html 
 	then die "Can't produce both ASCII and HTML"
+	else do
+
+ if devs && nodevs
+	then die "Can't both display and hide deviations"
 	else do
 
  results <- parse_logs other_args
@@ -154,13 +158,16 @@ htmlShowResults
 htmlShowResults (r:rs) ss f stat result_ok
   =   tabHeader ss
   +/+ foldr1 (+/+) (zipWith tableRow [1..] results_per_prog)
-  +/+ tableRow (-1) ("Average", geometric_means)
+  +/+ foldr1 (+/+) (tableRow (-1) ("Average", gms)
+                    : if nodevs then []
+                                else [tableRow (-1) ("-1 s.d.", lows),
+                                      tableRow (-1) ("+1 s.d.", highs)])
  where
 	-- results_per_prog :: [ (String,[BoxValue a]) ]
 	results_per_prog = map (calc_result rs f stat result_ok) (fmToList r)
 	
-	results_per_run = transpose (map snd results_per_prog)
-	geometric_means = map calc_gm results_per_run
+	results_per_run  = transpose (map snd results_per_prog)
+	(lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
 htmlShowMultiResults
     :: Result a
@@ -172,31 +179,42 @@ htmlShowMultiResults
 
 htmlShowMultiResults (r:rs) ss f result_ok =
 	multiTabHeader ss 
-	 +/+ foldr1 (+/+) (map show_results_for_prog base_results)
-
+	 +/+ foldr1 (+/+) (map show_results_for_prog results_per_prog_mod_run)
+         +/+ foldr1 (+/+) ((cellHtml [] (bold [] (htmlStr "Average"))
+                            +-+ tableRow (-1) ("", gms))
+                           : if nodevs then []
+                                       else [(cellHtml [] (bold [] (htmlStr "-1 s.d.")))
+                                             +-+ tableRow (-1) ("", lows),
+                                             (cellHtml [] (bold [] (htmlStr "+1 s.d.")))
+                                             +-+ tableRow (-1) ("", highs)])
   where
 	base_results = fmToList r :: [(String,Results)]
 
-	show_results_for_prog (prog,r) =
+        -- results_per_prog_mod_run :: [(String,[(String,[BoxValue a])])]
+        results_per_prog_mod_run = map get_results_for_prog base_results
+
+        -- get_results_for_prog :: (String,Results) -> (String,[BoxValue a])
+        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (fmToList (f r)))
+
+           where fms = map get_run_results rs
+
+                 get_run_results fm = case lookupFM fm prog of
+                                        Nothing  -> emptyFM
+                                        Just res -> f res
+
+                 get_results_for_mod (id,attr) = calc_result fms Just (const Success)
+                                                             result_ok (id,attr)
+
+        show_results_for_prog (prog,mrs) =
 	    cellHtml [valign "top"] (bold [] (htmlStr prog))
-	    +-+ (if null base then
+	    +-+ (if null mrs then
 		   cellHtml [] (htmlStr "(no modules compiled)")
 	         else
-		   foldr1 (+/+) (map (show_one_result fms) base))
+		   foldr1 (+/+) (map (tableRow 0) mrs))
 
-         where
-	    base = fmToList (f r)
-	    fms = map (get_results_for prog) rs
-
-	get_results_for prog m = case lookupFM m prog of
-				   Nothing -> emptyFM
-				   Just r -> f r
-
-	show_one_result other_results (id,attribute) = 
-		tableRow 0 (
-		   	calc_result other_results Just (const Success) 
-				result_ok (id,attribute) 
-		)
+        results_per_run  = transpose [xs | (_,mods) <- results_per_prog_mod_run,
+                                           (_,xs) <- mods]
+        (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
 tableRow :: Result a => Int -> (String, [BoxValue a]) -> HtmlTable
 tableRow row_no (prog, results)
@@ -295,13 +313,18 @@ ascii_show_results (r:rs) ss f stat result_ok
 	= ascii_header ss
 	. interleave "\n" (map show_per_prog_results results_per_prog)
 	. str "\n"
-	. show_per_prog_results ("Average",geometric_means)
+	. show_per_prog_results ("Average",gms)
+        . if nodevs then id
+                    else   str "\n"
+	                 . show_per_prog_results ("-1 s.d.",lows)
+	                 . str "\n"
+	                 . show_per_prog_results ("+1 s.d.",highs)
  where
 	-- results_per_prog :: [ (String,[BoxValue a]) ]
 	results_per_prog = map (calc_result rs f stat result_ok) (fmToList r)
 	
-	results_per_run = transpose (map snd results_per_prog)
-	geometric_means = map calc_gm results_per_run
+	results_per_run  = transpose (map snd results_per_prog)
+        (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
 ascii_show_multi_results
    :: Result a
@@ -313,30 +336,43 @@ ascii_show_multi_results
 
 ascii_show_multi_results (r:rs) ss f result_ok
 	= ascii_header ss 
-	. interleave "\n" (map show_results_for_prog base_results)
+	. interleave "\n" (map show_results_for_prog results_per_prog_mod_run)
+	. str "\n"
+	. str "\n"
+	. show_per_prog_results ("Average",gms)
+        . if nodevs then id
+                    else   str "\n"
+	                 . show_per_prog_results ("-1 s.d.",lows)
+	                 . str "\n"
+	                 . show_per_prog_results ("+1 s.d.",highs)
   where
 	base_results = fmToList r :: [(String,Results)]
 
-	show_results_for_prog (prog,r) =
+        -- results_per_prog_mod_run :: [(String,[(String,[BoxValue a])])]
+        results_per_prog_mod_run = map get_results_for_prog base_results
+
+        -- get_results_for_prog :: (String,Results) -> (String,[BoxValue a])
+        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (fmToList (f r)))
+
+           where fms = map get_run_results rs
+
+                 get_run_results fm = case lookupFM fm prog of
+                                        Nothing  -> emptyFM
+                                        Just res -> f res
+
+                 get_results_for_mod (id,attr) = calc_result fms Just (const Success)
+                                                             result_ok (id,attr)
+
+        show_results_for_prog (prog,mrs) =
 	      str ("\n"++prog++"\n")
-	    . (if null base then
-		 str "(no modules compiled)\n"
-	       else
-		 interleave "\n" (map (show_one_result fms) base))
+	    . (if null mrs then
+		   str "(no modules compiled)\n"
+	         else
+		   interleave "\n" (map show_per_prog_results mrs))
 
-         where
-	    base = fmToList (f r)
-	    fms = map (get_results_for prog) rs
-
-	get_results_for prog m = case lookupFM m prog of
-				   Nothing -> emptyFM
-				   Just r -> f r
-
-	show_one_result other_results (id,attribute) = 
-	 	show_per_prog_results (
-			calc_result other_results Just (const Success) 
-				result_ok (id,attribute) 
-		)
+        results_per_run  = transpose [xs | (_,mods) <- results_per_prog_mod_run,
+                                           (_,xs) <- mods]
+        (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
 show_per_prog_results :: Result a => (String, [BoxValue a]) -> ShowS
 show_per_prog_results (prog,results)
@@ -414,7 +450,7 @@ show_box (Percentage p) = show_pcntage p
 show_box (Result a)     = result_to_string a
 
 -----------------------------------------------------------------------------
--- Calculating geometric means
+-- Calculating geometric means and standard deviations
 
 {-
 This is done using the log method, to avoid needing really large
@@ -427,16 +463,43 @@ which is equivalent to
 	e ^ ( (log a1 + ... + log an) / n )
 
 where log is the natural logarithm function.
+
+Similarly, to compute the geometric standard deviation we compute the
+deviation of each log, take the root-mean-square, and take the
+exponential again:
+
+        e ^ sqrt( ( sqr(log a1 - lbar) + ... + sqr(log an - lbar) ) / n )
+
+where lbar is the mean log,
+
+        (log a1 + ... + log an) / n
+
+This is a *factor*: i.e., the 1 s.d. points are (gm/sdf,gm*sdf); do
+not subtract 100 from gm before performing this calculation.
+
+We therefore return a (low, mean, high) triple.
+
 -}
 
-calc_gm :: [BoxValue a] -> BoxValue Float
-calc_gm xs 
-  | null percentages = RunFailed NotDone
-  | otherwise        = Percentage (exp (sum (map log percentages) / 
-				          fromInt (length percentages)))
+calc_gmsd :: [BoxValue a] -> (BoxValue Float, BoxValue Float, BoxValue Float)
+calc_gmsd xs 
+  | null percentages = (RunFailed NotDone, RunFailed NotDone, RunFailed NotDone)
+  | otherwise        = let sqr x = x * x
+                           len   = fromInt (length percentages)
+                           logs  = map log percentages
+                           lbar  = sum logs / len
+                           devs  = map (sqr . (lbar-)) logs
+                           dbar  = sum devs / len
+                           gm    = exp lbar
+                           sdf   = exp (sqrt dbar)
+                       in
+                       (Percentage (gm/sdf),
+                        Percentage gm,
+                        Percentage (gm*sdf))
  where
-  percentages = [ f | Percentage f <- xs, f /= 0.0 ]
+  percentages = [ if f < 5 then 5 else f | Percentage f <- xs ]
 	-- can't do log(0.0), so exclude zeros
+        -- small values have inordinate effects so cap at -95%.
 
 -----------------------------------------------------------------------------
 -- Generic stuff for results generation

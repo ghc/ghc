@@ -22,10 +22,15 @@ tooquick_threshold
 	[] -> default_tooquick_threshold
 	(i:_) -> i
 
+devs   = OptDeviations   `elem` flags
+nodevs = OptNoDeviations `elem` flags
+
 data CLIFlags
   = OptASCIIOutput
   | OptHTMLOutput
   | OptIgnoreSmallTimes Float
+  | OptDeviations
+  | OptNoDeviations
   | OptHelp
   deriving Eq
 
@@ -39,5 +44,9 @@ argInfo =
 	"Produce HTML output"
   , Option ['i'] ["ignore"]  (ReqArg (OptIgnoreSmallTimes . read) "secs")
 	"Ignore runtimes smaller than <secs>"
+  , Option ['d'] ["deviations"] (NoArg OptDeviations)
+	"Display deviations (default)"
+  , Option ['n'] ["nodeviations"] (NoArg OptNoDeviations)
+	"Hide deviations"
   ]
 
