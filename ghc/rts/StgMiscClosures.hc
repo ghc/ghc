@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.79 2002/09/17 12:33:08 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.80 2002/09/17 12:34:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -40,7 +40,7 @@
 STGFUN(stg_##type##_entry)			\
 {						\
   FB_						\
-    barf(#type " object entered!\n");		\
+    STGCALL1(barf, #type " object entered!\n");	\
   FE_						\
 }
 
