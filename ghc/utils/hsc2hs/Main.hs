@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.10 2001/01/13 19:46:49 qrczak Exp $
+-- $Id: Main.hs,v 1.11 2001/01/13 20:33:51 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -409,7 +409,7 @@ outCLine pos =
 
 outHsLine :: SourcePos -> String
 outHsLine pos =
-    "    printf (\"{-# LINE %d \\\"%s\\\" #-}\\n\", "++
+    "    hsc_line ("++
     show (sourceLine pos + 1)++", \""++
     showCString (sourceFileName pos)++"\");\n"
 

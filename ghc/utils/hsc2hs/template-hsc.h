@@ -11,6 +11,14 @@
 #define offsetof(t, f) ((size_t) &((t *)0)->f)
 #endif
 
+#if __NHC__
+#define hsc_line(line, file) \
+    printf ("# %d \"%s\"\n", line, file);
+#else
+#define hsc_line(line, file) \
+    printf ("{-# LINE %d \"%s\" #-}\n", line, file);
+#endif
+
 #define hsc_const(x)                        \
     if ((x) < 0)                            \
         printf ("%ld", (long)(x));          \
