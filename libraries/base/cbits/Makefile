@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.7 2002/02/14 15:14:02 simonmar Exp $
+# $Id: Makefile,v 1.8 2002/07/18 22:01:07 sof Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -12,6 +12,10 @@ EXCLUDED_SRCS += regex/engine.c
 endif
 
 EXCLUDED_SRCS += ilxstubs.c
+
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+EXCLUDED_SRCS += consUtils.c
+endif
 
 SRC_CC_OPTS += -Wall -DCOMPILING_STDLIB 
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -I../include
