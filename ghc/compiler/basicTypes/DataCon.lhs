@@ -9,7 +9,7 @@ module DataCon (
 	ConTag, fIRST_TAG,
 	mkDataCon,
 	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
-	dataConArgTys, dataConOrigArgTys,
+	dataConArgTys, dataConOrigArgTys, dataConInstOrigArgTys,
 	dataConRepArgTys, dataConTheta,
 	dataConFieldLabels, dataConStrictMarks, 
 	dataConSourceArity, dataConRepArity,
@@ -28,7 +28,6 @@ module DataCon (
 import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 
 import CmdLineOpts	( opt_DictsStrict )
-import TysPrim
 import Type		( Type, ThetaType, TauType, ClassContext,
 			  mkForAllTys, mkFunTys, mkTyConApp, 
 			  mkTyVarTys, mkDictTys,
@@ -46,7 +45,6 @@ import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
 import PprType		()	-- Instances
-import UniqSet
 import Maybes		( maybeToBool )
 import Maybe
 import Util		( assoc )
@@ -357,7 +355,15 @@ dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
  = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
 
-dataConTheta (MkData {dcTheta = theta}) = theta
+dataConTheta :: DataCon -> ClassContext
+dataConTheta dc = dcTheta dc
+
+-- And the same deal for the original arg tys:
+
+dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
+dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars, 
+		       dcExTyVars = ex_tyvars}) inst_tys
+ = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
 \end{code}
 
 These two functions get the real argument types of the constructor,

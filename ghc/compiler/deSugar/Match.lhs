@@ -21,7 +21,7 @@ import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils
 import Id		( idType, recordSelectorFieldLabel, Id )
-import DataCon		( dataConFieldLabels, dataConArgTys )
+import DataCon		( dataConFieldLabels, dataConInstOrigArgTys )
 import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 import PrelInfo		( pAT_ERROR_ID )
@@ -466,7 +466,7 @@ tidy1 v (RecPat data_con pat_ty ex_tvs dicts rpats) match_result
 
 	-- Boring stuff to find the arg-tys of the constructor
     (_, inst_tys, _) = splitAlgTyConApp pat_ty
-    con_arg_tys'     = dataConArgTys data_con (inst_tys ++ mkTyVarTys ex_tvs)
+    con_arg_tys'     = dataConInstOrigArgTys data_con (inst_tys ++ mkTyVarTys ex_tvs)
     tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels data_con)
 
 	-- mk_pat picks a WildPat of the appropriate type for absent fields,
