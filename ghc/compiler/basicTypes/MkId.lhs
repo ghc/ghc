@@ -429,7 +429,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 		   mkFunTy data_ty field_tau
       
     arity = 1 + n_dict_tys + n_field_dict_tys
-    info = mkIdInfo (RecordSelId field_label) NoCafRefs
+    info = mkIdInfo (RecordSelId field_label) caf_info
 	   `setArityInfo`	exactArity arity
 	   `setUnfoldingInfo`	unfolding	
            `setTyGenInfo`	TyGenNever
@@ -445,8 +445,14 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 
     alts      = map mk_maybe_alt data_cons
     the_alts  = catMaybes alts
-    default_alt | all isJust alts = []	-- No default needed
-		| otherwise	  = [(DEFAULT, [], error_expr)]
+
+    no_default = all isJust alts	-- No default needed
+    default_alt | no_default = []
+		| otherwise  = [(DEFAULT, [], error_expr)]
+
+	-- the default branch may have CAF refs, because it calls recSelError etc.
+    caf_info    | no_default = NoCafRefs
+	        | otherwise  = MayHaveCafRefs
 
     sel_rhs = mkLams tyvars   $ mkLams field_tyvars $ 
 	      mkLams dict_ids $ mkLams field_dict_ids $
