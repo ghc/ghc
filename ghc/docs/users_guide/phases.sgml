@@ -2,7 +2,7 @@
     <title>Options related to a particular phase</title>
 
     <sect2 id="replacing-phases">
-      <title>Replacing the program for one or more phases.</title>
+      <title>Replacing the program for one or more phases</title>
       <indexterm><primary>phases, changing</primary></indexterm>
 
       <para>You may specify that a different program be used for one
@@ -10,12 +10,94 @@
       the <Command>ghc</Command> has wired into it.  For example, you
       might want to try a different assembler.  The following options
       allow you to change the external program used for a given
-      compilation phases:</para>
+      compilation phase:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><option>-pgmL</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgmL</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the literate
+	    pre-processor.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-pgmP</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgmP</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the C
+	    pre-processor (with <option>-cpp</option> only).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-pgmc</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgmc</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the C
+	    compiler.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-pgma</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgma</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the
+	    assembler.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-pgml</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgml</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the
+	    linker.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-pgmdll</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgmdll</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the DLL
+	    generator.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-pgmdep</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgmdep</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the dependency
+	    generator.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-pgmF</option> <replaceable>cmd</replaceable></term>
+	  <indexterm><primary><option>-pgmF</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Use <replaceable>cmd</replaceable> as the
+	    pre-processor (with <option>-F</option> only).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
     </sect2>
 
     <sect2 id="forcing-options-through">
-      <title>Forcing options to a particular phase.</title>
+      <title>Forcing options to a particular phase</title>
       <indexterm><primary>forcing GHC-phase options</primary></indexterm>
 
       <para>Options can be forced through to a particlar compilation
