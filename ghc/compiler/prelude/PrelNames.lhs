@@ -992,7 +992,7 @@ choiceAIdKey	= mkPreludeMiscIdUnique 123 -- |||
 loopAIdKey	= mkPreludeMiscIdUnique 124
 
 ---------------- Template Haskell -------------------
---	USES IdUniques 200-299
+--	USES IdUniques 200-399
 -----------------------------------------------------
 \end{code}
 

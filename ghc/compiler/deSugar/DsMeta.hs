@@ -55,6 +55,9 @@ import BasicTypes ( isBoxed )
 import Packages	  ( thPackage )
 import Outputable
 import Bag	  ( bagToList )
+import FastString ( unpackFS )
+import ForeignCall ( Safety(..), ForeignCall(..), CCallConv(..),
+                     CCallTarget(..) )
 
 import Monad ( zipWithM )
 import List ( sortBy )
@@ -112,8 +115,9 @@ repTopDs group
 			val_ds  <- mapM rep_bind_group (hs_valds group) ;
 			tycl_ds <- mapM repTyClD (hs_tyclds group) ;
 			inst_ds <- mapM repInstD' (hs_instds group) ;
+			for_ds <- mapM repForD (hs_fords group) ;
 			-- more needed
-			return (de_loc $ sort_by_loc $ concat val_ds ++ catMaybes tycl_ds ++ inst_ds) }) ;
+			return (de_loc $ sort_by_loc $ concat val_ds ++ catMaybes tycl_ds ++ inst_ds ++ for_ds) }) ;
 
 	decl_ty <- lookupType decQTyConName ;
 	let { core_list = coreList' decl_ty decls } ;
@@ -231,6 +235,36 @@ repInstD' (L loc (InstDecl ty binds _))		-- Ignore user pragmas for now
 	; return (loc, i)}
  where
    (tvs, cxt, cls, tys) = splitHsInstDeclTy (unLoc ty)
+
+repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
+repForD (L loc (ForeignImport name typ (CImport cc s ch cn cis) _))
+ = do MkC name' <- lookupLOcc name
+      MkC typ' <- repLTy typ
+      MkC cc' <- repCCallConv cc
+      MkC s' <- repSafety s
+      MkC str <- coreStringLit $ static
+                              ++ unpackFS ch ++ " "
+                              ++ unpackFS cn ++ " "
+                              ++ conv_cimportspec cis
+      dec <- rep2 forImpDName [cc', s', str, name', typ']
+      return (loc, dec)
+ where
+    conv_cimportspec (CLabel cls) = panic "repForD': CLabel Not handled"
+    conv_cimportspec (CFunction DynamicTarget) = "dynamic"
+    conv_cimportspec (CFunction (StaticTarget fs)) = unpackFS fs
+    conv_cimportspec CWrapper = "wrapper"
+    static = case cis of
+                 CFunction (StaticTarget _) -> "static "
+                 _ -> ""
+
+repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
+repCCallConv CCallConv = rep2 cCallName []
+repCCallConv StdCallConv = rep2 stdCallName []
+
+repSafety :: Safety -> DsM (Core TH.Safety)
+repSafety PlayRisky = rep2 unsafeName []
+repSafety (PlaySafe False) = rep2 safeName []
+repSafety (PlaySafe True) = rep2 threadsafeName []
 
 -------------------------------------------------------
 -- 			Constructors
@@ -1253,7 +1287,7 @@ templateHaskellNames = [
     bindSName, letSName, noBindSName, parSName,
     -- Dec
     funDName, valDName, dataDName, newtypeDName, tySynDName,
-    classDName, instanceDName, sigDName,
+    classDName, instanceDName, sigDName, forImpDName,
     -- Cxt
     cxtName,
     -- Strict
@@ -1267,6 +1301,12 @@ templateHaskellNames = [
     -- Type
     forallTName, varTName, conTName, appTName,
     tupleTName, arrowTName, listTName,
+    -- Callconv
+    cCallName, stdCallName,
+    -- Safety
+    unsafeName,
+    safeName,
+    threadsafeName,
 
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
@@ -1395,6 +1435,7 @@ tySynDName    = libFun FSLIT("tySynD")    tySynDIdKey
 classDName    = libFun FSLIT("classD")    classDIdKey
 instanceDName = libFun FSLIT("instanceD") instanceDIdKey
 sigDName      = libFun FSLIT("sigD")      sigDIdKey
+forImpDName   = libFun FSLIT("forImpD")   forImpDIdKey
 
 -- type Ctxt = ...
 cxtName = libFun FSLIT("cxt") cxtIdKey
@@ -1423,6 +1464,15 @@ arrowTName  = libFun FSLIT("arrowT") arrowTIdKey
 listTName   = libFun FSLIT("listT")  listTIdKey
 appTName    = libFun FSLIT("appT")    appTIdKey
 			 
+-- data Callconv = ...
+cCallName = libFun FSLIT("cCall") cCallIdKey
+stdCallName = libFun FSLIT("stdCall") stdCallIdKey
+
+-- data Safety = ...
+unsafeName     = libFun FSLIT("unsafe") unsafeIdKey
+safeName       = libFun FSLIT("safe") safeIdKey
+threadsafeName = libFun FSLIT("threadsafe") threadsafeIdKey
+             
 matchQTyConName         = libTc FSLIT("MatchQ")        matchQTyConKey
 clauseQTyConName        = libTc FSLIT("ClauseQ")       clauseQTyConKey
 expQTyConName           = libTc FSLIT("ExpQ")          expQTyConKey
@@ -1456,7 +1506,7 @@ fieldExpTyConKey        = mkPreludeTyConUnique 116
 fieldPatTyConKey        = mkPreludeTyConUnique 117
 nameTyConKey             = mkPreludeTyConUnique 118
 
--- 	IdUniques available: 200-299
+-- 	IdUniques available: 200-399
 -- 	If you want to change this, make sure you check in PrelNames
 
 returnQIdKey        = mkPreludeMiscIdUnique 200
@@ -1547,6 +1597,7 @@ tySynDIdKey       = mkPreludeMiscIdUnique 276
 classDIdKey       = mkPreludeMiscIdUnique 277
 instanceDIdKey    = mkPreludeMiscIdUnique 278
 sigDIdKey         = mkPreludeMiscIdUnique 279
+forImpDIdKey      = mkPreludeMiscIdUnique 297
 
 -- type Cxt = ...
 cxtIdKey            = mkPreludeMiscIdUnique 280
@@ -1561,7 +1612,7 @@ recCIdKey         = mkPreludeMiscIdUnique 284
 infixCIdKey       = mkPreludeMiscIdUnique 285
 
 -- type StrictType = ...
-strictTKey        = mkPreludeMiscIdUnique 2286
+strictTKey        = mkPreludeMiscIdUnique 286
 
 -- type VarStrictType = ...
 varStrictTKey     = mkPreludeMiscIdUnique 287
@@ -1574,3 +1625,13 @@ tupleTIdKey       = mkPreludeMiscIdUnique 294
 arrowTIdKey       = mkPreludeMiscIdUnique 295
 listTIdKey        = mkPreludeMiscIdUnique 296
 appTIdKey         = mkPreludeMiscIdUnique 293
+
+-- data Callconv = ...
+cCallIdKey      = mkPreludeMiscIdUnique 300
+stdCallIdKey    = mkPreludeMiscIdUnique 301
+
+-- data Safety = ...
+unsafeIdKey     = mkPreludeMiscIdUnique 305
+safeIdKey       = mkPreludeMiscIdUnique 306
+threadsafeIdKey = mkPreludeMiscIdUnique 307
+
