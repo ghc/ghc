@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.3 2000/12/12 12:19:57 simonmar Exp $
+ * $Id: Linker.c,v 1.4 2000/12/14 10:36:49 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -20,6 +20,8 @@
 
 /* ToDo: configure this */
 #include <dlfcn.h>
+
+#ifdef GHCI /* endif is right at end of file */
 
 /* A bucket in the symbol hash-table.  Primarily, maps symbol names to
  * absolute addresses.  All symbols from a given module are linked
@@ -1443,3 +1445,4 @@ is_not_dynamically_loaded_ptr ( char* p )
    return (sk == SECTIONKIND_OTHER);
 }
 
+#endif /* GHCI */
