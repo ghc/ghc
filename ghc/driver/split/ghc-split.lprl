@@ -45,6 +45,11 @@ sub split_asm_file {
 #   &tidy_up_and_die(1,"$Pgm: no split markers in .s file!\n")
 #	if $prologue_stuff eq $s_stuff;
 
+    # about to use $Tmp_prefix in a regex - make sure backslashes don't get
+    # interpreted in a strange way.  ToDo: what about other regex
+    # characters, eg. '.'?
+    $Tmp_prefix =~ s/\\/\\\\/g;
+
     # lie about where this stuff came from
     $prologue_stuff =~ s|"${Tmp_prefix}\.c"|"$ifile_root\.hc"|g;
 
