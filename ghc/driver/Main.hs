@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.63 2000/10/05 13:25:03 simonmar Exp $
+-- $Id: Main.hs,v 1.64 2000/10/05 13:27:54 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -1791,11 +1791,11 @@ run_phase Hsc	basename suff input_fn output_fn
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef recomp
 	todo <- readIORef v_todo
+        o_file <- odir_ify (basename ++ '.':phase_input_ext Ln)
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
 	     then return ""
 	     else do t1 <- getModificationTime (basename ++ '.':suff)
-		     o_file <- odir_ify (basename ++ '.':phase_input_ext Ln)
 		     o_file_exists <- doesFileExist o_file
 		     if not o_file_exists
 		        then return ""	-- Need to recompile
@@ -1822,7 +1822,7 @@ run_phase Hsc	basename suff input_fn output_fn
 	b <- doesFileExist output_fn
 	if not b && not (null source_unchanged) -- sanity
 		then do run_something "Touching object file"
-			    ("touch " ++ output_fn)
+			    ("touch " ++ o_file)
 			return False
 		else do -- carry on...
 
