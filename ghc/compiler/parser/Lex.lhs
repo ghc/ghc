@@ -589,7 +589,7 @@ lexToken cont glaexts buf =
 		    '#'# -> case lookAhead# buf 3# of
 				'#'# -> 
 				   let (lexeme, buf') 
-					  = doDiscard False (stepOnBy# (stepOverLexeme buf) 4#) in
+					  = doDiscard 0# (stepOnBy# (stepOverLexeme buf) 4#) in
                                             cont (ITpragma lexeme) buf'
 				_ -> lex_prag cont (setCurrentPos# buf 3#)
 	   	    _    -> cont ITocurly (incLexeme buf) 
@@ -1076,13 +1076,13 @@ lex_ubx_tuple cont mod buf back_off =
 \end{code}
 
 -----------------------------------------------------------------------------
-doDiscard rips along really fast, looking for a '#-}', 
+doDiscard rips along really fast, looking for a '##-}', 
 indicating the end of the pragma we're skipping
 
 \begin{code}
 doDiscard inStr buf =
  case currentChar# buf of
-   '#'# | not inStr ->
+   '#'# | inStr ==# 0# ->
        case lookAhead# buf 1# of { '#'# -> 
        case lookAhead# buf 2# of { '-'# ->
        case lookAhead# buf 3# of { '}'# -> 
@@ -1090,24 +1090,32 @@ doDiscard inStr buf =
 	_    -> doDiscard inStr (incLexeme buf) };
         _    -> doDiscard inStr (incLexeme buf) };
         _    -> doDiscard inStr (incLexeme buf) }
+
    '"'# ->
        let
         odd_slashes buf flg i# =
           case lookAhead# buf i# of
 	   '\\'# -> odd_slashes buf (not flg) (i# -# 1#)
 	   _     -> flg
+
+	not_inStr = if inStr ==# 0# then 1# else 0#
        in
        case lookAhead# buf (negateInt# 1#) of --backwards, actually
 	 '\\'# -> -- escaping something..
-	   if odd_slashes buf True (negateInt# 2#) then
-	       -- odd number of slashes, " is escaped.
-	      doDiscard inStr (incLexeme buf)
-	   else
-	       -- even number of slashes, \ is escaped.
-	      doDiscard (not inStr) (incLexeme buf)
-         _ -> case inStr of -- forced to avoid build-up
-	       True  -> doDiscard False (incLexeme buf)
-               False -> doDiscard True  (incLexeme buf)
+	   if odd_slashes buf True (negateInt# 2#) 
+		then  -- odd number of slashes, " is escaped.
+	      	      doDiscard inStr (incLexeme buf)
+	        else  -- even number of slashes, \ is escaped.
+	      	      doDiscard not_inStr (incLexeme buf)
+         _ -> doDiscard not_inStr (incLexeme buf)
+
+   '\''# | inStr ==# 0# ->
+	case lookAhead# buf 1# of { '"'# ->
+	case lookAhead# buf 2# of { '\''# ->
+	   doDiscard inStr (setCurrentPos# buf 3#);
+	_ -> doDiscard inStr (incLexeme buf) };
+	_ -> doDiscard inStr (incLexeme buf) }
+
    _ -> doDiscard inStr (incLexeme buf)
 
 \end{code}
