@@ -133,8 +133,11 @@ if (!$Include_prelude) {
 foreach $lib ( @Syslibs ) {
     local($dir);
 
+    # Yuck ^ 2
     if ( $lib eq 'win32' && ! $INSTALLING ) {
       $dir = "${TopPwd}/hslibs/${lib}/src";
+    } elsif ( $lib eq 'com' && ! $INSTALLING ) {
+      $dir = "${TopPwd}/hdirect/lib";
     } else {
       $dir = ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
 	                   : "${TopPwd}/ghc/lib/${lib}";
@@ -338,7 +341,11 @@ sub preprocess_import_dirs {
 	for ($_ = readdir(DIR); $_; $_ = readdir(DIR)) {
 	    next unless /(.*)\.hi$/;
 	    $thing = $1;
-	    if ($ModuleIn{$thing} && $ModuleIn{$thing} ne $d) {
+ 	    # 
+ 	    # dLL_ifs.hi is used to indicate whether a directory
+ 	    # contains interface files whose object codes reside in a Win32 DLL.
+ 	    # 
+	    if ($ModuleIn{$thing} && $ModuleIn{$thing} ne $d && $thing ne 'dLL_ifs') {
 		print STDERR "$Pgm: warning: $thing.hi appears in both $ModuleIn{$thing} and $d!\n" if ($Warnings);
 	    } else {
 		$ModuleIn{$thing} = $d;
