@@ -31,9 +31,3 @@ TOP:=$(GHC_TOP)
 -include $(TOP)/mk/paths.mk
 -include $(TOP)/mk/opts.mk
 -include $(TOP)/mk/suffix.mk
-
-# -----------------------------------------------------------------
-# Override $(libexecdir): we like our binaries in a subdirectory
-# of $(libdir).
-
-libexecdir := $(libdir)/extra-bin
