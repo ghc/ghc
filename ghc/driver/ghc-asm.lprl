@@ -660,7 +660,7 @@ sub mangle_asm {
   		    $p =~ s/^\tstw? 0,\d+\(1\)\n//;
   		    $p =~ s/^\tstw?u 1,-\d+\(1\)\n//; 
   		    $p =~ s/^\tstw? \d+,-\d+\(1\)\n//g; 
-  		    $p =~ s/^\tstfd \d+,-\d+\(1\)\n//; 
+  		    $p =~ s/^\tstfd \d+,-\d+\(1\)\n//g; 
 		} else {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}

@@ -1216,15 +1216,12 @@ sub setupMachOpts {
       unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
       unshift(@CcBoth_flags,  ('-static'));
 
-  } elsif ($TargetPlatform =~ /^powerpc-|^rs6000/) {
+  } elsif ($TargetPlatform =~ /^powerpc-|^rs6000-/) {
       # we know how to *mangle* asm for PowerPC
 # :-(   unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
       unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
       unshift(@CcBoth_flags,  ('-static')); # always easier to start with
       unshift(@CcRegd_flags, ('-finhibit-size-directive')); # avoids traceback tables
-#      unshift(@Ld_flags, ('-Xlinker -bbigtoc -Xlinker -bnoquiet')); # if we have lots of toc entries...
-      unshift(@Ld_flags, ('-Xlinker -bbigtoc')); # just in case we have lots of toc entries...
-
   } elsif ($TargetPlatform =~ /^sparc-/) {
       # we know how to *mangle* asm for SPARC
       unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
@@ -1256,7 +1253,11 @@ sub setupLinkOpts {
 	  ,'-u', "${uscore}STBase_SZh_static_info"
           ,'-u', "${uscore}DEBUG_REGS"
 	));
-
+  if ($TargetPlatform =~ /^powerpc-|^rs6000-/) {
+    # sometimes we have lots of toc entries...
+    #  unshift(@Ld_flags, ('-Xlinker -bbigtoc -Xlinker -bnoquiet')); 
+    unshift(@Ld_flags, ('-Xlinker -bbigtoc')); 
+  }
 
 } # end of setupLinkOpts
 
@@ -1711,11 +1712,6 @@ Now the Haskell compiler, C compiler, and assembler
     }
 
     if ($do_cc) {
-#       # if we're going to split up object files,              #delete! andre
-#       # we inject split markers into the .hc file now         #delete! andre
-#       if ( $HscOut eq '-C=' && $SplitObjFiles ) {             #delete! andre
-#           &inject_split_markers ( $hsc_out );                 #delete! andre
-#        }                                                      #delete! andre
 	&runGcc    ($is_hc_file, $hsc_out, $cc_as_o);
 	&runMangler($is_hc_file, $cc_as_o, $cc_as, $ifile_root);
     }
