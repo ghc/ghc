@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.165 2004/05/07 21:19:21 panne Exp $
+ * $Id: GC.c,v 1.166 2004/05/10 11:53:41 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -447,11 +447,18 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	      // don't forget to fill it with zeros!
 	      memset(bitmap, 0, bitmap_size);
 	      
-	      // for each block in this step, point to its bitmap from the
+	      // For each block in this step, point to its bitmap from the
 	      // block descriptor.
 	      for (bd=stp->blocks; bd != NULL; bd = bd->link) {
 		  bd->u.bitmap = bitmap;
 		  bitmap += BLOCK_SIZE_W / (sizeof(W_)*BITS_PER_BYTE);
+
+		  // Also at this point we set the BF_COMPACTED flag
+		  // for this block.  The invariant is that
+		  // BF_COMPACTED is always unset, except during GC
+		  // when it is set on those blocks which will be
+		  // compacted.
+		  bd->flags |= BF_COMPACTED;
 	      }
 	  }
       }
@@ -753,8 +760,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 		// for a compacted step, just shift the new to-space
 		// onto the front of the now-compacted existing blocks.
 		for (bd = stp->to_blocks; bd != NULL; bd = bd->link) {
-		    bd->flags &= ~BF_EVACUATED;	// now from-space 
-		    bd->flags |= BF_COMPACTED;  // compacted next time
+		    bd->flags &= ~BF_EVACUATED;  // now from-space 
 		}
 		// tack the new blocks on the end of the existing blocks
 		if (stp->blocks == NULL) {
@@ -765,6 +771,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 			if (next == NULL) {
 			    bd->link = stp->to_blocks;
 			}
+			// NB. this step might not be compacted next
+			// time, so reset the BF_COMPACTED flags.
+			// They are set before GC if we're going to
+			// compact.  (search for BF_COMPACTED above).
+			bd->flags &= ~BF_COMPACTED;
 		    }
 		}
 		// add the new blocks to the block tally
@@ -774,7 +785,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 		stp->blocks = stp->to_blocks;
 		stp->n_blocks = stp->n_to_blocks;
 		for (bd = stp->blocks; bd != NULL; bd = bd->link) {
-		    bd->flags &= ~BF_EVACUATED;	// now from-space 
+		    bd->flags &= ~BF_EVACUATED;	 // now from-space 
 		}
 	    }
 	    stp->to_blocks = NULL;
