@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.86 2000/08/07 14:11:48 sewardj Exp $
+# $Id: Makefile,v 1.87 2000/08/08 15:16:09 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -234,31 +234,44 @@ SRC_C_OPTS     += -O -I. -IcodeGen
 
 GENPOC=$(TOP)/utils/genprimopcode/genprimopcode
 
-prelude/PrimOp.o : prelude/PrimOp.lhs prelude/primops.txt
-	$(RM) primop-data-decl.hs
-	$(RM) primop-tag
-	$(RM) primop-list
-	$(RM) primop-has-side-effects.hs
-	$(RM) primop-out-of-line.hs
-	$(RM) primop-commutable.hs
-	$(RM) primop-needs-wrapper.hs
-	$(RM) primop-can-fail.hs
-	$(RM) primop-strictness.hs
-	$(RM) primop-usage.hs
-	$(RM) primop-primop-info.hs
-	$(GENPOC) --data-decl          < prelude/primops.txt > primop-data-decl.hs
-	$(GENPOC) --primop-tag         < prelude/primops.txt > primop-tag.hs
-	$(GENPOC) --primop-list        < prelude/primops.txt > primop-list.hs
-	$(GENPOC) --has-side-effects   < prelude/primops.txt > primop-has-side-effects.hs
-	$(GENPOC) --out-of-line        < prelude/primops.txt > primop-out-of-line.hs
-	$(GENPOC) --commutable         < prelude/primops.txt > primop-commutable.hs
-	$(GENPOC) --needs-wrapper      < prelude/primops.txt > primop-needs-wrapper.hs
-	$(GENPOC) --can-fail           < prelude/primops.txt > primop-can-fail.hs
-	$(GENPOC) --strictness         < prelude/primops.txt > primop-strictness.hs
-	$(GENPOC) --usage              < prelude/primops.txt > primop-usage.hs
-	$(GENPOC) --primop-primop-info < prelude/primops.txt > primop-primop-info.hs
-	$(RM) $@
-	$(HC) -c -o $@ $(HC_OPTS) prelude/PrimOp.lhs
+PRIMOP_BITS=primop-data-decl.hs-incl \
+            primop-tag.hs-incl  \
+            primop-list.hs-incl  \
+            primop-has-side-effects.hs-incl  \
+            primop-out-of-line.hs-incl  \
+            primop-commutable.hs-incl  \
+            primop-needs-wrapper.hs-incl  \
+            primop-can-fail.hs-incl  \
+            primop-strictness.hs-incl  \
+            primop-usage.hs-incl  \
+            primop-primop-info.hs-incl
+
+prelude/PrimOp.lhs: $(PRIMOP_BITS)
+
+primop-data-decl.hs-incl: prelude/primops.txt
+	$(GENPOC) --data-decl          < prelude/primops.txt > primop-data-decl.hs-incl
+primop-tag.hs-incl: prelude/primops.txt
+	$(GENPOC) --primop-tag         < prelude/primops.txt > primop-tag.hs-incl
+primop-list.hs-incl: prelude/primops.txt
+	$(GENPOC) --primop-list        < prelude/primops.txt > primop-list.hs-incl
+primop-has-side-effects.hs-incl: prelude/primops.txt
+	$(GENPOC) --has-side-effects   < prelude/primops.txt > primop-has-side-effects.hs-incl
+primop-out-of-line.hs-incl: prelude/primops.txt
+	$(GENPOC) --out-of-line        < prelude/primops.txt > primop-out-of-line.hs-incl
+primop-commutable.hs-incl: prelude/primops.txt
+	$(GENPOC) --commutable         < prelude/primops.txt > primop-commutable.hs-incl
+primop-needs-wrapper.hs-incl: prelude/primops.txt
+	$(GENPOC) --needs-wrapper      < prelude/primops.txt > primop-needs-wrapper.hs-incl
+primop-can-fail.hs-incl: prelude/primops.txt
+	$(GENPOC) --can-fail           < prelude/primops.txt > primop-can-fail.hs-incl
+primop-strictness.hs-incl: prelude/primops.txt
+	$(GENPOC) --strictness         < prelude/primops.txt > primop-strictness.hs-incl
+primop-usage.hs-incl: prelude/primops.txt
+	$(GENPOC) --usage              < prelude/primops.txt > primop-usage.hs-incl
+primop-primop-info.hs-incl: prelude/primops.txt
+	$(GENPOC) --primop-primop-info < prelude/primops.txt > primop-primop-info.hs-incl
+
+
 
 # ----------------------------------------------------------------------------
 #		Parsers/lexers
@@ -317,6 +330,7 @@ endif
 # 		clean
 
 CLEAN_FILES += $(wildcard */*.$(way_)o */*.$(way_)hi)
+CLEAN_FILES += $(PRIMOP_BITS)
 
 # Extra tidy, remove the .hc files (if you've got them).
 MAINTAINER_CLEAN_FILES += $(wildcard */*.hc) \

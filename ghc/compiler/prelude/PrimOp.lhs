@@ -62,7 +62,7 @@ These are in \tr{state-interface.verb} order.
 
 -- supplies: 
 -- data PrimOp = ...
-#include "primop-data-decl.hs"
+#include "primop-data-decl.hs-incl"
     | CCallOp CCall          -- and don't forget to add CCall
 \end{code}
 
@@ -74,7 +74,7 @@ primOpTag op = IBOX( tagOf_PrimOp op )
 
 -- supplies   
 -- tagOf_PrimOp :: PrimOp -> FAST_INT
-#include "primop-tag.hs"
+#include "primop-tag.hs-incl"
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 
 
@@ -101,7 +101,7 @@ An @Enum@-derived list would be better; meanwhile... (ToDo)
 \begin{code}
 allThePrimOps :: [PrimOp]
 allThePrimOps =
-#include "primop-list.hs"
+#include "primop-list.hs-incl"
 -- Doesn't include CCall, which is really a family of primops
 \end{code}
 
@@ -153,7 +153,7 @@ primOpStrictness :: PrimOp -> Arity -> StrictnessInfo
 	-- See Demand.StrictnessInfo for discussion of what the results
 	-- The arity should be the arity of the primop; that's why
 	-- this function isn't exported.
-#include "primop-strictness.hs"
+#include "primop-strictness.hs-incl"
 \end{code}
 
 %************************************************************************
@@ -167,7 +167,7 @@ else, notably a type, can be constructed) for each @PrimOp@.
 
 \begin{code}
 primOpInfo :: PrimOp -> PrimOpInfo
-#include "primop-primop-info.hs"
+#include "primop-primop-info.hs-incl"
 \end{code}
 
 Here are a load of comments from the old primOp info:
@@ -337,7 +337,7 @@ perform a heap check or they block.
 
 \begin{code}
 primOpOutOfLine (CCallOp c_call) = ccallMayGC c_call
-#include "primop-out-of-line.hs"
+#include "primop-out-of-line.hs-incl"
 \end{code}
 
 
@@ -397,7 +397,7 @@ primOpIsDupable op = not (primOpNeedsWrapper op)
 
 \begin{code}
 primOpCanFail :: PrimOp -> Bool
-#include "primop-can-fail.hs"
+#include "primop-can-fail.hs-incl"
 \end{code}
 
 And some primops have side-effects and so, for example, must not be
@@ -406,7 +406,7 @@ duplicated.
 \begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
 primOpHasSideEffects (CCallOp _) 	= True
-#include "primop-has-side-effects.hs"
+#include "primop-has-side-effects.hs-incl"
 \end{code}
 
 Inline primitive operations that perform calls need wrappers to save
@@ -415,7 +415,7 @@ any live variables that are stored in caller-saves registers.
 \begin{code}
 primOpNeedsWrapper :: PrimOp -> Bool
 primOpNeedsWrapper (CCallOp _) 		= True
-#include "primop-needs-wrapper.hs"
+#include "primop-needs-wrapper.hs-incl"
 \end{code}
 
 \begin{code}
@@ -481,7 +481,7 @@ primOpSig op
 
 primOpUsg :: PrimOp -> ([TyVar],[Type],Type)
 primOpUsg p@(CCallOp _) = mangle p [] mkM
-#include "primop-usage.hs"
+#include "primop-usage.hs-incl"
 
 -- Things with no Haskell pointers inside: in actuality, usages are
 -- irrelevant here (hence it doesn't matter that some of these
@@ -553,7 +553,7 @@ to the right hand side for strength reduction.
 
 \begin{code}
 commutableOp :: PrimOp -> Bool
-#include "primop-commutable.hs"
+#include "primop-commutable.hs-incl"
 \end{code}
 
 Utils:
