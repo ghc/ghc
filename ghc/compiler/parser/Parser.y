@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.15 1999/11/01 17:10:23 simonpj Exp $
+$Id: Parser.y,v 1.16 1999/11/25 10:34:53 simonpj Exp $
 
 Haskell grammar.
 
@@ -474,7 +474,12 @@ ext_name :: { Maybe ExtName }
 -----------------------------------------------------------------------------
 -- Types
 
-{- ToDo: forall stuff -}
+-- A ctype is a for-all type
+ctype	:: { RdrNameHsType }
+	: 'forall' tyvars '.' ctype	{ mkHsForAllTy (Just $2) [] $4 }
+	| context type			{ mkHsForAllTy Nothing   $1 $2 }
+		-- A type of form (context => type) is an *implicit* HsForAllTy
+	| type				{ $1 }
 
 type :: { RdrNameHsType }
 	: btype '->' type		{ MonoFunTy $1 $3 }
@@ -505,14 +510,6 @@ gtycon 	:: { RdrName }
 -- hand corner, for convenience.
 inst_type :: { RdrNameHsType }
 	: ctype				{% checkInstType $1 }
-
-ctype	:: { RdrNameHsType }
-	: 'forall' tyvars '.' context type
-					{ mkHsForAllTy (Just $2) $4 $5 }
-	| 'forall' tyvars '.' type	{ mkHsForAllTy (Just $2) [] $4 }
-	| context type			{ mkHsForAllTy Nothing   $1 $2 }
-		-- A type of form (context => type) is an *implicit* HsForAllTy
-	| type				{ $1 }
 
 types0  :: { [RdrNameHsType] }
 	: types				{ $1 }
@@ -583,7 +580,7 @@ fielddecl :: { ([RdrName],RdrNameBangType) }
 	: vars '::' stype		{ (reverse $1, $3) }
 
 stype :: { RdrNameBangType }
-	: type				{ Unbanged $1 }	
+	: ctype				{ Unbanged $1 }	
 	| '!' atype			{ Banged   $2 }
 
 deriving :: { Maybe [RdrName] }

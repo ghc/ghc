@@ -76,7 +76,7 @@ data MonoUsageAnn name
 -- A valid type must have one for-all at the top of the type, or of the fn arg types
 
 mkHsForAllTy (Just []) [] ty = ty	-- Explicit for-all with no tyvars
-mkHsForAllTy mtvs1     [] (HsForAllTy mtvs2 ctxt ty) = HsForAllTy (mtvs1 `plus` mtvs2) ctxt ty
+mkHsForAllTy mtvs1     [] (HsForAllTy mtvs2 ctxt ty) = mkHsForAllTy (mtvs1 `plus` mtvs2) ctxt ty
 						     where
 						       mtvs1       `plus` Nothing     = mtvs1
 						       Nothing     `plus` mtvs2       = mtvs2 
