@@ -169,6 +169,7 @@ GHC
   quotRemInteger#
   integer2Int#
   int2Integer#
+  word2Integer#
   
   Array#
   ByteArray#
