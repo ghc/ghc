@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.188 2005/02/15 12:15:25 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.189 2005/02/23 12:44:17 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -26,7 +26,8 @@ import Linker		( showLinkerState, linkPackages )
 import Util
 import Name		( Name, NamedThing(..) )
 import OccName		( OccName, isSymOcc, occNameUserString )
-import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
+import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..),
+			  failed )
 import Outputable
 import CmdLineOpts	( DynFlags(..) )
 import Panic 		hiding ( showException )
@@ -55,6 +56,7 @@ import Data.Dynamic
 import Numeric
 import Data.List
 import Data.Int		( Int64 )
+import Data.Maybe	( isJust )
 import System.Cmd
 import System.CPUTime
 import System.Environment
@@ -93,7 +95,7 @@ builtin_commands = [
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("info",      keepGoing info),
-  ("load",	keepGoingPaths loadModule),
+  ("load",	keepGoingPaths loadModule_),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
   ("set",	keepGoing setCmd),
@@ -232,9 +234,13 @@ runGHCi paths dflags maybe_expr = do
   		  Right hdl -> fileLoop hdl False
 
   -- Perform a :load for files given on the GHCi command line
-  when (not (null paths)) $
-     ghciHandle showException $
-	loadModule paths
+  -- When in -e mode, if the load fails then we want to stop
+  -- immediately rather than going on to evaluate the expression.
+  when (not (null paths)) $ do
+     ok <- ghciHandle (\e -> do showException e; return Failed) $ 
+		loadModule paths
+     when (isJust maybe_expr && failed ok) $
+	io (exitWith (ExitFailure 1))
 
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
@@ -686,10 +692,13 @@ undefineMacro macro_name = do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
 
-loadModule :: [FilePath] -> GHCi ()
+loadModule :: [FilePath] -> GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
 
-loadModule' :: [FilePath] -> GHCi ()
+loadModule_ :: [FilePath] -> GHCi ()
+loadModule_ fs = do loadModule fs; return ()
+
+loadModule' :: [FilePath] -> GHCi SuccessFlag
 loadModule' files = do
   state <- getGHCiState
 
@@ -711,6 +720,7 @@ loadModule' files = do
   setContextAfterLoad mods
   dflags <- getDynFlags
   modulesLoadedMsg ok mods dflags
+  return ok
 
 
 reloadModule :: String -> GHCi ()
