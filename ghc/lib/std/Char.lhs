@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Char.lhs,v 1.7 2000/06/30 13:39:35 simonmar Exp $
+% $Id: Char.lhs,v 1.8 2000/12/11 17:51:34 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -36,10 +36,7 @@ module Char
 #ifndef __HUGS__
 import PrelBase
 import PrelShow
-import PrelEnum
-import PrelNum
 import PrelRead (readLitChar, lexLitChar, digitToInt)
-import PrelErr  ( error )
 #else
 isLatin1 c = True
 #endif
