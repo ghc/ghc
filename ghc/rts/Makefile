@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.68 2002/02/14 17:17:08 sof Exp $
+# $Id: Makefile,v 1.69 2002/02/18 17:26:48 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -118,7 +118,13 @@ endif
 ifeq "$(GhcRtsThreaded)" "YES"
 ifeq "$(way)" ""
 SRC_CC_OPTS += -DTHREADED_RTS
+PACKAGE_CPP_OPTS += -DTHREADED_RTS
 endif
+endif
+
+# If -DDEBUG is in effect, adjust package conf accordingly..
+ifneq "$(strip $(filter -DDEBUG,$(CC_OPTS)))" ""
+PACKAGE_CPP_OPTS += -DDEBUG
 endif
 
 #-----------------------------------------------------------------------------
