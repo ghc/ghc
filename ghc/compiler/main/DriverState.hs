@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.94 2003/06/25 08:20:21 simonpj Exp $
+-- $Id: DriverState.hs,v 1.95 2003/08/20 18:48:20 sof Exp $
 --
 -- Settings for the driver
 --
@@ -467,8 +467,8 @@ mungePackagePaths top_dir ps = map munge_pkg ps
   munge_paths = map munge_path
 
   munge_path p 
-	  | Just p' <- my_prefix_match "$libdir" p = top_dir ++ p'
-	  | otherwise				   = p
+	  | Just p' <- maybePrefixMatch "$libdir" p = top_dir ++ p'
+	  | otherwise				    = p
 
 
 -- -----------------------------------------------------------------------------
