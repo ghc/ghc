@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hs,v 1.4 2002/02/14 07:33:09 sof Exp $
+-- $Id: Posix.hs,v 1.5 2002/03/26 10:44:32 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -340,7 +340,7 @@ foreign import ccall unsafe "pipe"
    c_pipe :: Ptr CInt -> IO CInt
 
 foreign import ccall unsafe "sigaddset"
-   c_sigaddset :: Ptr CSigset -> CInt -> IO ()
+   c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
 foreign import ccall unsafe "sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO ()
