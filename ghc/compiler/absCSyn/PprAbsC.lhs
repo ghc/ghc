@@ -1108,6 +1108,29 @@ pprAmode amode
   = ppr_amode amode
 \end{code}
 
+When we have an indirection through a CIndex, we have to be careful to
+get the type casts right.  
+
+this amode:
+
+	CVal (CIndex kind1 base offset) kind2
+
+means (in C speak): 
+	
+	*(kind2 *)((kind1 *)base + offset)
+
+That is, the indexing is done in units of kind1, but the resulting
+amode has kind2.
+
+\begin{code}
+ppr_amode (CVal reg_rel@(CIndex _ _ _) kind)
+  = case (pprRegRelative False{-no sign wanted-} reg_rel) of
+	(pp_reg, Nothing)     -> panic "ppr_amode: CIndex"
+	(pp_reg, Just offset) -> 
+	   hcat [ char '*', parens (pprPrimKind kind <> char '*'),
+		  parens (pp_reg <> char '+' <> offset) ]
+\end{code}
+
 Now the rest of the cases for ``workhorse'' @ppr_amode@:
 
 \begin{code}
