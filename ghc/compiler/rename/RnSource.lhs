@@ -34,7 +34,6 @@ import Unique		( Unique )
 import UniqFM		( emptyUFM, addListToUFM, addListToUFM_C, listToUFM, lookupUFM, eltsUFM )
 import UniqSet		( UniqSet(..) )
 import Util		( isIn, isn'tIn, sortLt, removeDups, cmpPString, panic, assertPanic, pprTrace{-ToDo:rm-} )
-
 \end{code}
 
 rnSource `renames' the source module and export list.

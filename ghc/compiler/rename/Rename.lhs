@@ -176,7 +176,6 @@ renameModule b_names b_keys us
 
     rnIfaces iface_cache us3 orig_def_env orig_occ_env rn_module (imports_used ++ must_haves) >>=
 	\ (rn_module_with_imports, (implicit_val_fm, implicit_tc_fm), iface_errs, iface_warns) ->
-
     let
         all_imports_used = bagToList (unionManyBags [listToBag imports_used,
 						     listToBag (eltsFM implicit_tc_fm),

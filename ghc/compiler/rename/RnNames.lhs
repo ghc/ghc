@@ -242,6 +242,8 @@ doName locn rdr
 newGlobalName :: SrcLoc -> Maybe ExportFlag
 	      -> RdrName -> RnM_Info s Name
 
+-- ToDo: b_names and b_keys being defined in this module !!!
+
 newGlobalName locn maybe_exp rdr
   = getExtraRn			`thenRn` \ (_,b_keys,exp_fn,occ_fn) ->
     getModuleRn  		`thenRn` \ mod ->
