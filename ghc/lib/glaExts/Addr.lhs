@@ -22,6 +22,9 @@ import CCall
 \begin{code}
 data Addr = A# Addr# 	deriving (Eq, Ord)
 
+instance Show Addr where
+   showsPrec p (A# a) = showsPrec p (I# (addr2Int# a))
+
 nullAddr = ``NULL'' :: Addr
 
 plusAddr :: Addr -> Int -> Addr
