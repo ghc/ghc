@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.106 2000/11/02 14:27:02 simonmar Exp $
+# $Id: Makefile,v 1.107 2000/11/03 11:30:23 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -293,7 +293,7 @@ utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -optC-funfolding-interface-thre
 # separate bugfix to the fixpoint finder.
 simplStg/UpdAnal_HC_OPTS	= -fno-strictness
 
-stgSyn/StgInterp_HC_OPTS	= -fvia-C
+ghci/StgInterp_HC_OPTS		= -fvia-C
 
 # ----------------------------------------------------------------------------
 #		C compilations
