@@ -51,7 +51,6 @@ import Module		( Module )
 import CoreUtils	( exprType, mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..) )
-import Subst		( mkTopTyVarSubst, substClasses )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons, isDataTyCon, 
                           tyConTheta, isProductTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classBigSig, classTyCon, classTyVars, classSelIds )
@@ -70,8 +69,10 @@ import Demand		( wwStrict, wwPrim, mkStrictnessInfo )
 import DataCon		( DataCon, StrictnessMark(..), 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
 			  dataConArgTys, dataConRepType, dataConRepStrictness, 
+			  dataConInstOrigArgTys,
                           dataConName, dataConTheta,
-			  dataConSig, dataConStrictMarks, dataConId
+			  dataConSig, dataConStrictMarks, dataConId,
+			  maybeMarkedUnboxed, splitProductType_maybe
 			)
 import Id		( idType, mkId,
 			  mkVanillaId, mkTemplateLocals,
@@ -434,13 +435,17 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
 		Nothing		-> Nothing
-		Just the_arg_id -> Just (DataAlt data_con, arg_ids, 
-					 mkVarApps (Var the_arg_id) field_tyvars)
-	  where
-	    arg_ids 	     = mkTemplateLocals (dataConArgTys data_con tyvar_tys)
+		Just the_arg_id -> Just (DataAlt data_con, real_args, expr)
+		  where
+	    	    body 	      = mkVarApps (Var the_arg_id) field_tyvars
+	    	    strict_marks      = dataConStrictMarks data_con
+	    	    (expr, real_args) = rebuildConArgs data_con arg_ids strict_marks body
+					  (length arg_ids + 1)
+	where
+            arg_ids = mkTemplateLocals (dataConInstOrigArgTys data_con tyvar_tys)
 				    -- The first one will shadow data_id, but who cares
-	    field_lbls	     = dataConFieldLabels data_con
-	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_label
+    	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
+    	    field_lbls	      = dataConFieldLabels data_con
 
     error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy field_tau), err_string]
        -- preserves invariant that type args are *not* usage-annotated on top.  KSW 1999-04.
@@ -455,6 +460,43 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
         -- generic place to make string literals. This logic is repeated
         -- in DsUtils.
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
+
+
+-- this rather ugly function converts the unpacked data con arguments back into
+-- their packed form.  It is almost the same as the version in DsUtils, except that
+-- we use template locals here rather than newDsId (ToDo: merge these).
+
+rebuildConArgs
+  :: DataCon				-- the con we're matching on
+  -> [Id]				-- the source-level args
+  -> [StrictnessMark]			-- the strictness annotations (per-arg)
+  -> CoreExpr				-- the body
+  -> Int				-- template local
+  -> (CoreExpr, [Id])
+
+rebuildConArgs con [] stricts body i = (body, [])
+rebuildConArgs con (arg:args) stricts body i | isTyVar arg
+  = let (body', args') = rebuildConArgs con args stricts body i
+    in  (body',arg:args')
+rebuildConArgs con (arg:args) (str:stricts) body i
+  = case maybeMarkedUnboxed str of
+	Just (pack_con1, _) -> 
+	    case splitProductType_maybe (idType arg) of
+		Just (_, tycon_args, pack_con, con_arg_tys) ->
+		    ASSERT( pack_con == pack_con1 )
+		    let unpacked_args = zipWith mkTemplateLocal [i..] con_arg_tys
+			(body', real_args) = rebuildConArgs con args stricts body 
+						(i + length con_arg_tys)
+		    in
+		    (
+			 Let (NonRec arg (mkConApp pack_con 
+				   	          (map Type tycon_args ++
+				        	   map Var  unpacked_args))) body', 
+			 unpacked_args ++ real_args
+		    )
+
+	_ -> let (body', args') = rebuildConArgs con args stricts body i
+	     in  (body', arg:args')
 \end{code}
 
 
