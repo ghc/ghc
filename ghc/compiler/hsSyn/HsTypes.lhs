@@ -238,8 +238,7 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
 	       (hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty])
 
 ppr_mono_ty ctxt_prec (HsPredTy pred) 
-  = maybeParen (ctxt_prec >= pREC_FUN) $
-    braces (ppr pred)
+  = braces (ppr pred)
 
 ppr_mono_ty ctxt_prec (HsUsageTy u ty)
   = maybeParen (ctxt_prec >= pREC_CON)
