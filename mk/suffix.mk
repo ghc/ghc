@@ -209,9 +209,10 @@ endif
 
 %.html : %.tex
 	@$(RM) $@
-	$(LATEX2HTML) $(LATEX2HTML_OPTS) $(patsubst %.tex,%.hva,$<) $<
-	$(LATEX2HTML) $(LATEX2HTML_OPTS) $(patsubst %.tex,%.hva,$<) $<
-# Make twice to resolve xrefs
+	$(HEVEA) $(HEVEA_OPTS) $(patsubst %.tex,%.hva,$<) $<
+	$(HEVEA) $(HEVEA_OPTS) $(patsubst %.tex,%.hva,$<) $<
+	$(HACHA) $(HACHA_OPTS) $(patsubst %.tex,%.html,$<)
+# Run HeVeA twice to resolve labels
 
 %.rtf : %.sgml
 	@$(RM) $@

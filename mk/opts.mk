@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.16 2000/11/21 12:32:55 rrt Exp $
+# 	$Id: opts.mk,v 1.17 2000/11/27 12:04:00 rrt Exp $
 #
 #################################################################################
 
@@ -94,6 +94,8 @@ INSTALL_OPTS       = $(SRC_INSTALL_OPTS) $(WAY$(_way)_INSTALL_OPTS) $(EXTRA_INST
 INSTALL_BIN_OPTS   = $(INSTALL_OPTS) $(SRC_INSTALL_BIN_OPTS)
 LD_OPTS            = $(SRC_LD_OPTS) $(WAY$(_way)_LD_OPTS) $(EXTRA_LD_OPTS)
 LINT_OPTS          = $(SRC_LINT_OPTS) $(WAY$(_way)_LINT_OPTS) $(EXTRA_LINT_OPTS)
+HEVEA_OPTS         = $(SRC_HEVEA_OPTS) $(WAY$(_way)_HEVEA_OPTS) $(EXTRA_HEVEA_OPTS)
+HACHA_OPTS         = $(SRC_HACHA_OPTS) $(WAY$(_way)_HACHA_OPTS) $(EXTRA_HACHA_OPTS)
 LIT2CHANGELOG_OPTS = $(SRC_LIT2CHANGELOG_OPTS) $(WAY$(_way)_LIT2CHANGELOG_OPTS) \
                      $(EXTRA_LIT2CHANGELOG_OPTS)
 LIT2HTML_OPTS      = $(SRC_LIT2HTML_OPTS) $(WAY$(_way)_LIT2HTML_OPTS) $(EXTRA_LIT2HTML_OPTS)

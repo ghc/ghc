@@ -599,7 +599,8 @@ INSTALL			= @INSTALL@
 # 
 INSTALL			:= $(subst .././install-sh,$(FPTOOLS_TOP_ABS)/install-sh,$(INSTALL))
 LATEX			= latex
-LATEX2HTML		= hevea
+HEVEA			= hevea
+HACHA			= hacha
 LN_S			= @LN_S@
 MANMACROS		= -man
 MSMACROS 		= -ms
