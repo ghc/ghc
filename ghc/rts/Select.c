@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.28 2003/04/01 15:05:22 sof Exp $
+ * $Id: Select.c,v 1.29 2003/06/26 12:22:59 stolz Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -30,6 +30,10 @@
 
 #include <errno.h>
 #include <string.h>
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 /* last timestamp */
 nat timestamp = 0;
