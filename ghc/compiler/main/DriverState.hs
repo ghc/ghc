@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.32 2001/03/05 12:45:45 simonpj Exp $
+-- $Id: DriverState.hs,v 1.33 2001/03/12 14:06:47 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -387,19 +387,19 @@ getPackageExtraLdOpts = do
   ps <- getPackageInfo
   return (concatMap extra_ld_opts ps)
 
-getPackageInfo :: IO [Package]
+getPackageInfo :: IO [PackageConfig]
 getPackageInfo = do
   ps <- readIORef v_Packages
   getPackageDetails ps
 
-getPackageDetails :: [String] -> IO [Package]
+getPackageDetails :: [String] -> IO [PackageConfig]
 getPackageDetails ps = do
   pkg_details <- readIORef v_Package_details
   return [ pkg | p <- ps, Just pkg <- [ lookupPkg p pkg_details ] ]
 
-GLOBAL_VAR(v_Package_details, (error "package_details"), [Package])
+GLOBAL_VAR(v_Package_details, (error "package_details"), [PackageConfig])
 
-lookupPkg :: String -> [Package] -> Maybe Package
+lookupPkg :: String -> [PackageConfig] -> Maybe PackageConfig
 lookupPkg nm ps
    = case [p | p <- ps, name p == nm] of
         []    -> Nothing

@@ -5,7 +5,7 @@
 
 \begin{code}
 module Finder (
-    initFinder, 	-- :: PackageConfigInfo -> IO (), 
+    initFinder, 	-- :: [PackageConfig] -> IO (), 
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
     mkHomeModuleLocn,	-- :: ModuleName -> String -> FilePath 
 			--	-> IO ModuleLocation
@@ -49,7 +49,7 @@ GLOBAL_VAR(v_PkgDirCache, panic "no pkg cache!",
 GLOBAL_VAR(v_HomeDirCache, Nothing, Maybe (FiniteMap String FilePath))
 
 
-initFinder :: PackageConfigInfo -> IO ()
+initFinder :: [PackageConfig] -> IO ()
 initFinder pkgs 
   = do	{	-- expunge our home cache
 	; writeIORef v_HomeDirCache Nothing
@@ -160,7 +160,7 @@ mkHomeModuleLocn mod_name basename source_fn = do
 	))
 
 
-newPkgCache :: [Package] -> IO (FiniteMap String (PackageName, FilePath))
+newPkgCache :: [PackageConfig] -> IO (FiniteMap String (PackageName, FilePath))
 newPkgCache pkgs = do
     let extendFM fm pkg = do
     	    let dirs = import_dirs pkg

@@ -26,21 +26,21 @@ import Outputable
 %tokentype { Token }
 %%
 
-pkgconf :: { [ Package ] }
+pkgconf :: { [ PackageConfig ] }
 	: '[' pkgs ']'			{ reverse $2 }
 
-pkgs 	:: { [ Package ] }
+pkgs 	:: { [ PackageConfig ] }
 	: pkg 				{ [ $1 ] }
 	| pkgs ',' pkg			{ $3 : $1 }
 
-pkg 	:: { Package }
-	: CONID '{' fields '}'		{ $3 defaultPackage }
+pkg 	:: { PackageConfig }
+	: CONID '{' fields '}'		{ $3 defaultPackageConfig }
 
-fields  :: { Package -> Package }
+fields  :: { PackageConfig -> PackageConfig }
 	: field				{ \p -> $1 p }
 	| fields ',' field		{ \p -> $1 ($3 p) }
 
-field	:: { Package -> Package }
+field	:: { PackageConfig -> PackageConfig }
 	: VARID '=' STRING		
 		{\p -> case unpackFS $1 of
 		        "name" -> p{name = unpackFS $3} }
@@ -72,7 +72,7 @@ strs	:: { [String] }
 happyError :: P a
 happyError buf PState{ loc = loc } = PFailed (srcParseErr buf loc)
 
-parsePkgConf :: FilePath -> IO (Either SDoc [Package])
+parsePkgConf :: FilePath -> IO (Either SDoc [PackageConfig])
 parsePkgConf conf_filename = do
    buf <- hGetStringBuffer False conf_filename
    case parse buf PState{ bol = 0#, atbol = 1#,

@@ -4,7 +4,7 @@
 \section[CmStaticInfo]{Session-static info for the Compilation Manager}
 
 \begin{code}
-module CmStaticInfo ( GhciMode(..), Package(..), PackageConfigInfo, defaultPackage )
+module CmStaticInfo ( GhciMode(..), PackageConfig(..), defaultPackageConfig )
 where
 
 #include "HsVersions.h"
@@ -15,10 +15,8 @@ where
 data GhciMode = Batch | Interactive | OneShot 
      deriving Eq
 
-type PackageConfigInfo = [Package]
-
-data Package
-   = Package {
+data PackageConfig
+   = PackageConfig {
 	name            :: String,
 	import_dirs     :: [String],
 	source_dirs     :: [String],
@@ -33,8 +31,8 @@ data Package
 	extra_ld_opts   :: [String]
      }
 
-defaultPackage
-   = Package {
+defaultPackageConfig
+   = PackageConfig {
 	name = error "defaultPackage",
 	import_dirs     = [],
 	source_dirs     = [],

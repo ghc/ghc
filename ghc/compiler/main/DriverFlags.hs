@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.47 2001/03/08 09:50:18 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.48 2001/03/12 14:06:47 simonpj Exp $
 --
 -- Driver flags
 --
@@ -341,6 +341,7 @@ getOpts opts = dynFlag opts >>= return . reverse
 
 -- we can only change HscC to HscAsm and vice-versa with dynamic flags 
 -- (-fvia-C and -fasm).
+-- NB: we can also set the new lang to ILX, via -filx.  I hope this is right
 setLang l = do
    dfs <- readIORef v_DynFlags
    case hscLang dfs of
@@ -440,6 +441,9 @@ dynamic_flags = [
   ,  ( "fasm",		AnySuffix (\_ -> setLang HscAsm) )
   ,  ( "fvia-c",	NoArg (setLang HscC) )
   ,  ( "fvia-C",	NoArg (setLang HscC) )
+#ifdef ILX
+  ,  ( "filx",		NoArg (setLang HscILX) )
+#endif
 
 	-- "active negatives"
   ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )

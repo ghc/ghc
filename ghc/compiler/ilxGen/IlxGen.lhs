@@ -8,35 +8,47 @@ module IlxGen( ilxGen ) where
 
 import Char	( ord, chr )
 import StgSyn
-import Id	( idType, idName, isDeadBinder, idPrimRep, idArityInfo )
+import Id	( idType, idName, isDeadBinder, idArityInfo )
 import IdInfo   ( arityLowerBound )
 import Var	( Var, Id, TyVar, isId, isTyVar, tyVarKind, tyVarName )
 import VarEnv
-import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons, newTyConRep, tyConTyVars, isDataTyCon, isAlgTyCon )
+import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons, 
+		  newTyConRep, tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
+		)
 import Class	( Class,  classTyCon )
-import Type	( isUnboxedTupleType, isUnLiftedType, isTyVarTy, mkTyVarTy, splitForAllTys, splitFunTys, applyTy, splitNewType_maybe, applyTys,typeKind,getTyVar )
-import TypeRep	( Type(..), boxedKind,boxedTypeKind,openTypeKind,anyBoxKind, unboxedTypeKind )
+import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
+		  isUnLiftedType, isTyVarTy, mkTyVarTy, 
+		  splitForAllTys, splitFunTys, applyTy, applyTys
+		)
+import TypeRep	( Type(..) )
 import DataCon	( isUnboxedTupleCon, dataConTyCon, dataConRepType, dataConRepArgTys )
-import Literal	( Literal(..), literalType )
-import PrimOp	( PrimOp(..), CCallTarget(..),CCall(..) )
-import PrimRep	( PrimRep(..) )
-import Name	( nameModule, nameOccName, isGlobalName, isLocalName, isDllName, NamedThing(getName) )
-import Unique	-- Lots of keys
-import FiniteMap
+import Literal	( Literal(..) )
+import PrelNames	-- Lots of keys
+import PrimOp		( PrimOp(..), CCallTarget(..),CCall(..) )
+import TysWiredIn	( mkTupleTy, tupleCon )
+import PrimRep		( PrimRep(..) )
+import Name		( nameModule, nameOccName, isGlobalName, isLocalName, isDllName, NamedThing(getName) )
+import Subst   		( substTy, mkTyVarSubst )
+
+import Module		( Module, PackageName, ModuleName, moduleName, modulePackage, preludePackage,
+			  isHomeModule, pprModuleName, mkHomeModule, mkModuleName
+			)
+
 import UniqFM
-import Subst    ( substTy, mkTyVarSubst )
-import Module	( Module, PackageName, ModuleName, moduleName, modulePackageName, isLocalModule, pprModuleName, mkThisModule, mkSrcModule, mkPrelModule )
-import CStrings		( CLabelString, pprCLabelString )
-import TysWiredIn ( unboxedTupleTyCon, unboxedTupleCon, mkUnboxedTupleTy )
+import BasicTypes	( Boxity(..) )
+import CStrings		( pprCLabelString )
 import Outputable
-import Char	( ord )
-import List	( partition, elem, sortBy, insertBy,any  )
+import Char		( ord )
+import List		( partition, elem, insertBy,any  )
 import UniqSet
+
 import TysPrim  ( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
--- opt_DoEtaReduction is used to help with assembly naming conventions for different
+
+-- opt_SimplDoEtaReduction is used to help with assembly naming conventions for different
 -- versions of compiled Haskell code.  We add a ".O" to all assembly and module 
--- names when this is set.  One day this will be configured by the command line.
-import CmdLineOpts	( opt_Static, opt_InPackage, opt_DoEtaReduction )
+-- names when this is set (because that's clue that -O was set).  
+-- One day this will be configured by the command line.
+import CmdLineOpts	( opt_Static, opt_InPackage, opt_SimplDoEtaReduction )
 
 \end{code}
 
@@ -49,8 +61,9 @@ import CmdLineOpts	( opt_Static, opt_InPackage, opt_DoEtaReduction )
 %************************************************************************
 
 \begin{code}
-ilxGen :: Module -> [TyCon] -> [Class] -> [(StgBinding,[Id])] -> SDoc
-ilxGen mod tycons classes binds_w_srts
+ilxGen :: Module -> [TyCon] -> [(StgBinding,[Id])] -> SDoc
+	-- The TyCons should include those arising from classes
+ilxGen mod tycons binds_w_srts
   =  vcat [vcat (map (ilxImportPackage topenv) (uniqSetToList import_packages)),
             vcat (map (ilxImportModule topenv) (uniqSetToList import_modules)),
             vcat (map (ilxImportTyCon topenv) (uniqSetToList import_tycons)),
@@ -64,7 +77,7 @@ ilxGen mod tycons classes binds_w_srts
       toppairs = ilxPairs binds
       topenv = extendIlxEnvWithTops (emptyIlxEnv False mod) mod toppairs
  	-- Generate info from class decls as well
-      data_tycons = filter isDataTyCon (tycons ++ map classTyCon classes)
+      data_tycons = filter isDataTyCon tycons
 \end{code}
 
 %************************************************************************
@@ -94,14 +107,15 @@ importsExpr (StgSCC cc expr) = importsExpr expr
 importsExpr (StgCase scrut _ _ bndr srt alts)
   = importsExpr scrut  `unionImpInfo` imports_alts alts  `unionImpInfo` importsVar bndr
    where
-    imports_alts (StgAlgAlts ty alts deflt) 
-      = unionImpInfos (map imports_alg_alt alts) `unionImpInfo` imports_deflt deflt `unionImpInfo` importsType ty
+    imports_alts (StgAlgAlts _ alts deflt) 	-- The Maybe TyCon part is dealt with 
+						-- by the case-binder's type
+      = unionImpInfos (map imports_alg_alt alts) `unionImpInfo` imports_deflt deflt
        where
         imports_alg_alt (con, bndrs, _, rhs)
 	  = importsExpr rhs `unionImpInfo` importsDataCon con  `unionImpInfo` importsVars bndrs
 
-    imports_alts (StgPrimAlts ty alts deflt)
-      = unionImpInfos (map imports_prim_alt alts) `unionImpInfo` imports_deflt deflt `unionImpInfo` importsType ty
+    imports_alts (StgPrimAlts _ alts deflt)
+      = unionImpInfos (map imports_prim_alt alts) `unionImpInfo` imports_deflt deflt
        where
         imports_prim_alt (lit, rhs) = importsExpr rhs
     imports_deflt StgNoDefault = emptyImpInfo
@@ -125,13 +139,13 @@ importsVar v = importsName (idName v) `unionImpInfo`  importsType (idType v)
 importsName n
    | isLocalName n = emptyImpInfo
    | thisModule == nameModule n  = emptyImpInfo
-   | isDllName n = singlePackageImpInfo (modulePackageName (nameModule n))
+   | isDllName n = singlePackageImpInfo (modulePackage (nameModule n))
    | otherwise = singleModuleImpInfo (moduleName (nameModule n))
 
 importsModule m
    | thisModule   == m = emptyImpInfo
-   | isLocalModule m =  singleModuleImpInfo (moduleName m)
-   | otherwise       = singlePackageImpInfo (modulePackageName m)
+   | isHomeModule m =  singleModuleImpInfo (moduleName m)
+   | otherwise       = singlePackageImpInfo (modulePackage m)
 
 importsType :: Type -> ImportsInfo
 importsType ty = importsType2 (deepIlxRepType ty)
@@ -146,21 +160,17 @@ importsType2 (NoteTy _ ty) = importsType2 ty
 importsTypeArgs2 tys =unionImpInfos (map importsType2 tys)
 
 importsDataCon dcon = importsTyCon (dataConTyCon dcon)
+
+importsMaybeTyCon Nothing   = emptyImpInfo
+importsMaybeTyCon (Just tc) = importsName (getName tc)
+
 importsTyCon tc | (not (isDataTyCon tc) || 
                    isLocalName (getName tc) || 
                    thisModule == nameModule (getName tc)) = emptyImpInfo
 importsTyCon tc | otherwise = importsName (getName tc) `unionImpInfo` (emptyUniqSet, emptyUniqSet,unitUniqSet tc)
 
-importsPrelude =
-   if preludePackage == opt_InPackage then singleModuleImpInfo (mkSrcModule "PrelGHC")
-   else singlePackageImpInfo  preludePackage
-
-
--- hack to get at Module.preludePackage - we should reveal it....
-preludePackage 
-  =  if isLocalModule dummy then opt_InPackage else modulePackageName dummy
-   where
-      dummy = mkPrelModule (mkSrcModule "")
+importsPrelude | preludePackage == opt_InPackage = singleModuleImpInfo (mkModuleName "PrelGHC")
+	       | otherwise			 = singlePackageImpInfo preludePackage
 
 type ImportsInfo = (UniqSet PackageName, UniqSet ModuleName, UniqSet TyCon) -- (Packages, Modules, Datatypes)
 
@@ -180,7 +190,7 @@ ilxImportTyCon env tycon | isDataTyCon tycon = pprIlxTyConDef True env tycon
 ilxImportTyCon env tycon | otherwise =  empty
 
 ilxImportPackage :: IlxEnv -> PackageName -> SDoc
-ilxImportPackage env p = text ".assembly extern ilx" <+> singleQuotes (text (_UNPK_ p) <> hscOptionQual) <+> text "{ }"
+ilxImportPackage env p = text ".assembly extern ilx" <+> singleQuotes (ppr p <> hscOptionQual) <+> text "{ }"
 
 ilxImportModule :: IlxEnv -> ModuleName -> SDoc
 ilxImportModule env m = text ".module extern ilx" <+> singleQuotes (ppr m  <> hscOptionQual)
@@ -556,6 +566,8 @@ ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
 	  do_case_analysis alts
     ]
   where
+    scrut_rep_ty = deepIlxRepType (idType bndr)
+
     store_in_bndr | isDeadBinder bndr = empty
                   | isVoidIlxRepId bndr 
                         = ilxComment (text "ignoring store of zero-rep value to be analyzed")
@@ -564,25 +576,25 @@ ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
     do_case_analysis (StgAlgAlts _ []    deflt)
 	= do_deflt deflt
 
-    do_case_analysis (StgAlgAlts ty args deflt) 
-        = do_alg_alts (deepIlxRepType ty) ([1..] `zip` args) deflt
+    do_case_analysis (StgAlgAlts _ args deflt) 
+        = do_alg_alts ([1..] `zip` args) deflt
 
-    do_case_analysis (StgPrimAlts ty alts deflt)
+    do_case_analysis (StgPrimAlts _ alts deflt)
 	= do_prim_alts ([1..] `zip` alts) $$ do_deflt deflt
 
-    do_alg_alts ty [(i, alt@(data_con,bndrs,used_flags, rhs))] StgNoDefault | isUnboxedTupleCon data_con
+    do_alg_alts [(i, alt@(data_con,bndrs,used_flags, rhs))] StgNoDefault | isUnboxedTupleCon data_con
       -- Collapse the analysis of unboxed tuples where 
       -- some or all elements are zero-sized
       --
       -- TO DO: add bndrs to set of live variables
           = case bndrs' of
                   [h] -> bind_collapse bndrs used_flags <+> do_rhs_no_pop alt_env rhs
-                  _ -> bind_components alt_env  ty dcon' bndrs 0 used_flags <+> do_rhs alt_env rhs
+                  _ -> bind_components alt_env dcon' bndrs 0 used_flags <+> do_rhs alt_env rhs
            where 
             bndrs' = filter (not. isVoidIlxRepId) bndrs
             -- Replacement unboxed tuple type constructor, used if any of the
             -- arguments have zero-size and more than one remains.
-            dcon'  = unboxedTupleCon (length bndrs')
+            dcon'  = tupleCon Unboxed (length bndrs')
 
             alt_env = IlxEEnv (ilxPlaceAlt env i) live
             --alt_env = IlxEEnv (ilxPlaceAlt env i) 
@@ -594,17 +606,17 @@ ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
                 | otherwise = text "stloc" <+> pprId h
 
 
-    do_alg_alts ty [(i, alt@(data_con,bndrs,used_flags, rhs))] StgNoDefault 
-            = vcat [text "castdata" <+> sep [pprIlxTypeR env ty <> comma,
+    do_alg_alts [(i, alt@(data_con,bndrs,used_flags, rhs))] StgNoDefault 
+            = vcat [text "castdata" <+> sep [pprIlxTypeR env scrut_rep_ty <> comma,
 		  			     ilxConRef env data_con],
- 		do_alg_alt (IlxEEnv (ilxPlaceAlt env i) live) ty alt
+ 		do_alg_alt (IlxEEnv (ilxPlaceAlt env i) live) alt
 	      ]
 
-    do_alg_alts ty alts deflt
-	= vcat [text "datacase" <+> sep [pprIlxTypeR env ty,text ",",
+    do_alg_alts alts deflt
+	= vcat [text "datacase" <+> sep [pprIlxTypeR env scrut_rep_ty,text ",",
 					 pprSepWithCommas pp_case labels_w_alts],
 		do_deflt deflt,
-		vcat (map (do_labelled_alg_alt ty) labels_w_alts)
+		vcat (map do_labelled_alg_alt labels_w_alts)
 	  ]
 	where
 	  pp_case (i, (lbl, (data_con, _, _, _))) = parens (ilxConRef env data_con <> comma <> pprIlxLabel lbl)
@@ -618,31 +630,31 @@ ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
 	where
 	  lbl = mkAltLabel bndr i
 
-    do_labelled_alg_alt ty (i,(lbl, alt)) 
-        = ilxLabel lbl $$ do_alg_alt (IlxEEnv (ilxPlaceAlt env i) live) ty alt
+    do_labelled_alg_alt (i,(lbl, alt)) 
+        = ilxLabel lbl $$ do_alg_alt (IlxEEnv (ilxPlaceAlt env i) live) alt
 
-    do_alg_alt alt_eenv ty (data_con, bndrs, used_flags, rhs) 
-      = vcat [bind_components alt_eenv ty data_con bndrs 0 used_flags,
+    do_alg_alt alt_eenv (data_con, bndrs, used_flags, rhs) 
+      = vcat [bind_components alt_eenv data_con bndrs 0 used_flags,
 	      do_rhs alt_eenv rhs
 	     ]
 
-    bind_components alt_eenv ty data_con [] n _ = empty
-    bind_components alt_eenv ty data_con (h:t) n (is_used:used_flags) 
+    bind_components alt_eenv data_con [] n _ = empty
+    bind_components alt_eenv data_con (h:t) n (is_used:used_flags) 
        | isVoidIlxRepId h 
              -- don't increase the count in this case
              = ilxComment (text "zero-rep binding eliminated") 
-               <+> bind_components alt_eenv ty data_con t n used_flags
+               <+> bind_components alt_eenv data_con t n used_flags
        | otherwise 
-             = bind_component alt_eenv ty data_con h is_used n 
-               <+> bind_components alt_eenv ty data_con t (n + 1) used_flags
+             = bind_component alt_eenv data_con h is_used n 
+               <+> bind_components alt_eenv data_con t (n + 1) used_flags
 
-    bind_component alt_eenv@(IlxEEnv alt_env _) ty data_con bndr is_used reduced_fld_no 
+    bind_component alt_eenv@(IlxEEnv alt_env _) data_con bndr is_used reduced_fld_no 
 	| not is_used 
             = ilxComment (text "not used")
         | isVoidIlxRepId bndr 
             = ilxComment (text "ignoring bind of zero-rep variable")
 	| otherwise   = vcat [text "dup",
-			      ld_data alt_env ty data_con reduced_fld_no bndr,
+			      ld_data alt_env data_con reduced_fld_no bndr,
 			      text "stloc" <+> pprId bndr]
 
     do_deflt (StgBindDefault rhs) = do_rhs (IlxEEnv (ilxPlaceStgBindDefault env) live) rhs
@@ -654,13 +666,14 @@ ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
 
     do_rhs_no_pop alt_env rhs = ilxExpr alt_env rhs sequel
 
-    ld_data alt_env ty data_con reduced_fld_no bndr
+    ld_data alt_env data_con reduced_fld_no bndr
       | isUnboxedTupleCon data_con
-          = text "ldfld" <+> text "!" <> integer reduced_fld_no <+> pprIlxTypeR alt_env ty <> text "::fld" <> integer reduced_fld_no
+      = text "ldfld" <+> sep [text "!" <> integer reduced_fld_no,
+			      pprIlxTypeR alt_env scrut_rep_ty <> text "::fld" <> integer reduced_fld_no]
       | otherwise 
-          = text "lddata" <+> sep [pprIlxTypeR alt_env ty <> comma, 
-		                   ilxConRef env data_con <> comma,
-			           integer reduced_fld_no]
+      = text "lddata" <+> sep [pprIlxTypeR alt_env scrut_rep_ty <> comma, 
+		               ilxConRef env data_con <> comma,
+			       integer reduced_fld_no]
 
 
 -------------------------
@@ -995,7 +1008,7 @@ pushId_aux _ env var
 
 --------------------------------------
 -- Push a literal
-pushLit env (MachChar c)   = text "ldc.i4" <+> int (ord c)
+pushLit env (MachChar c)   = text "ldc.i4" <+> int c
 pushLit env (MachStr s)    = text "ldsflda char "  <+> ilxEnvQualifyByExact env (text "string") -- pprFSInILStyle s 
 pushLit env (MachInt i)    = text "ldc.i4" <+> integer i
 pushLit env (MachInt64 i)  = text "ldc.i8" <+> integer i
@@ -1072,7 +1085,7 @@ deepIlxRepType (TyConApp tc tys)
                let tys' = map deepIlxRepType (filter (not. isVoidIlxRepType) tys) in 
                case tys' of
                   [h] -> h
-                  _ -> mkUnboxedTupleTy (length tys') tys'
+                  _ -> mkTupleTy Unboxed (length tys') tys'
             else 
               TyConApp tc (map deepIlxRepType tys)
 deepIlxRepType (AppTy f x)  = AppTy (deepIlxRepType f) (deepIlxRepType x)
@@ -1201,10 +1214,9 @@ pprTyVarBinder_aux env tv =
 -- Only a subset of Haskell types can be generalized using the type quantification
 -- of ILX
 isIlxForAllKind h = 
-        ( h == boxedTypeKind) ||
-        ( h == unboxedTypeKind) ||
-        ( h == openTypeKind) ||
-        ( h == anyBoxKind) 
+        ( h == liftedTypeKind) ||
+        ( h == unliftedTypeKind) ||
+        ( h == openTypeKind)
 
 isIlxTyVar v = isTyVar v && isIlxForAllKind (tyVarKind v)
 
@@ -1268,7 +1280,7 @@ data HowBound = Top Module 	-- Bound in a modules
 -- e.g. Foo_bar_baz when inside closure baz inside closure bar inside module Foo.
 data IlxEnv = IlxEnv (Module, IlxTyEnv, IdEnv HowBound,IdEnv (IlxEnv, StgRhs), Place,Bool)
 type Place = (SDoc,SDoc)
-thisModule = mkThisModule (mkSrcModule "")
+thisModule = mkHomeModule (mkModuleName "")
 
 pprIlxTyVar (IlxEnv (_, tv_env, _, _,_,_)) tv = pprIlxTyVarInIlxTyEnv tv_env tv 
 
@@ -1372,31 +1384,31 @@ ilxLabel lbl =  line $$ (pprIlxLabel lbl <> colon)
 \begin{code}
 pprSepWithCommas :: (a -> SDoc) -> [a] -> SDoc
 pprSepWithCommas pp xs = sep (punctuate comma (map pp xs))
-ilxComment pp = text "/*" <+> pp <+> text "*/"
+ilxComment pp   = text "/*" <+> pp <+> text "*/"
 singleQuotes pp = char '\'' <> pp <> char '\''
-squareBrackets pp = char '[' <> pp <> char ']'
 
 line = text "// ----------------------------------"
+
+hscOptionQual = if opt_SimplDoEtaReduction then text ".O" else text ".Onot"
 
 nameReference (IlxEnv (thisMod, _, _, _, _, _)) n
   | isLocalName n = text "/* local */"
   | thisMod == nameModule n  = text ""
-  | isDllName n = squareBrackets ((text "ilx") <+> singleQuotes (text (_UNPK_ (modulePackageName (nameModule n))) <> hscOptionQual))
-  | otherwise   = squareBrackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName (moduleName (nameModule n)) <> hscOptionQual))
+  | isDllName n = brackets ((text "ilx") <+> singleQuotes (ppr (modulePackage (nameModule n)) <> hscOptionQual))
+  | otherwise   = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName (moduleName (nameModule n)) <> hscOptionQual))
 
-hscOptionQual = if opt_DoEtaReduction then text ".O" else text ".Onot"
 moduleReference (IlxEnv (thisMod, _, _, _, _, _)) m
-  | thisMod   == m    = text ""
-  | isLocalModule m = squareBrackets ((text ".module") <+> (text "ilx") <+>singleQuotes (pprModuleName (moduleName m) <> hscOptionQual))
-  | otherwise       = squareBrackets ((text "ilx") <+> singleQuotes (text (_UNPK_ (modulePackageName m)) <> hscOptionQual))
+  | thisMod   == m = text ""
+  | isHomeModule m = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName (moduleName m) <> hscOptionQual))
+  | otherwise      = brackets ((text "ilx") <+> singleQuotes (ppr (modulePackage m) <> hscOptionQual))
 
 prelGHCReference =
-   if preludePackage == opt_InPackage then squareBrackets (text ".module ilx PrelGHC" <> hscOptionQual) 
-   else squareBrackets (text "ilx" <+> text (_UNPK_ preludePackage)  <> hscOptionQual)
+   if preludePackage == opt_InPackage then brackets (text ".module ilx PrelGHC" <> hscOptionQual) 
+   else brackets (text "ilx" <+> text (_UNPK_ preludePackage)  <> hscOptionQual)
 
 prelBaseReference =
-   if preludePackage == opt_InPackage then squareBrackets (text ".module ilx PrelBase" <> hscOptionQual) 
-   else squareBrackets (text "ilx" <+> text (_UNPK_ preludePackage) <> hscOptionQual)
+   if preludePackage == opt_InPackage then brackets (text ".module ilx PrelBase" <> hscOptionQual) 
+   else brackets (text "ilx" <+> text (_UNPK_ preludePackage) <> hscOptionQual)
 
 ------------------------------------------------
 -- This code is copied from absCSyn/CString.lhs,
@@ -1477,7 +1489,7 @@ ilxConApp env data_con args
           -- may contain zero-sized elements.  Recompute all the 
           -- bits and pieces from the simpler case below for the new data
           -- type constructor....
-           let data_con' = unboxedTupleCon (length tm_args') in 
+           let data_con' = tupleCon Unboxed (length tm_args') in 
            let rep_ty_args' = filter (not . isVoidIlxRepType) rep_ty_args in 
 
            let tycon' = dataConTyCon data_con' in
@@ -1539,9 +1551,9 @@ ilxConRef env data_con
 
 tyPrimConTable :: UniqFM (IlxEnv -> [Type] -> SDoc)
 tyPrimConTable = listToUFM [(addrPrimTyConKey, 	(\_ _ -> repAddr)),
-			    (fileStreamPrimTyConKey, 	(\_ _ -> repFileStream)),
+--			    (fileStreamPrimTyConKey, 	(\_ _ -> repFileStream)),
 			    (foreignObjPrimTyConKey, 	(\_ _ -> text "/* ForeignObj */ void *")),
-			    -- (stablePtrPrimTyConKey, 	(\_ _ -> text "/* StablePtr */ void *")),
+--			    (stablePtrPrimTyConKey, 	(\_ _ -> text "/* StablePtr */ void *")),
 			    (charPrimTyConKey, 	(\_ _ -> repChar)),
 			    (wordPrimTyConKey, 	(\_ _ -> repWord)),
 	                    (byteArrayPrimTyConKey,	(\_ _ -> repByteArray)),
@@ -1612,13 +1624,7 @@ pprCValArgTy f env ty | otherwise = f env ty
 \begin{code}
 
 ilxPrimApp env (CCallOp ccall) args ret_ty = ilxCCall env ccall args ret_ty
-
-ilxPrimApp env op args ret_ty
-  = case lookupFM ilxPrimOpTable op of
-	Just fn -> fn env args
-	Nothing -> ilxComment (simp_op (text "Unknown primop!:" <+> pprId op) env args)
-
-
+ilxPrimApp env op 	       args ret_ty = ilxPrimOpTable op env args
 
 ilxMkBool =  text "call class" <+> prelBaseReference <+> 
              text "PrelBase_Bool" <+> 
@@ -1676,375 +1682,378 @@ ilxMethodRef rty cls nm tyargs args = rty <+> cls <+> text "::" <> squotes (text
 ilxSupportClass = prelGHCReference <+> text "GHC.support"
 ilxSuppMeth rty nm tyargs args = ilxMethodRef rty ilxSupportClass nm tyargs args
 
-ilxPrimOpTable :: FiniteMap PrimOp (IlxEnv -> [StgArg] -> SDoc)
-ilxPrimOpTable =
-  listToFM [(CharGtOp,    simp_op ilxCgt),
-            (CharGeOp,    simp_op ilxCge),
-            (CharEqOp,    simp_op ilxCeq),
-            (CharNeOp,    simp_op ilxCne),
-            (CharLtOp,    simp_op ilxClt),
-            (CharLeOp,    simp_op ilxCle),
+ilxPrimOpTable :: PrimOp -> IlxEnv -> [StgArg] -> SDoc
+ilxPrimOpTable op
+  = case op of
+ 	CharGtOp    -> simp_op ilxCgt
+	CharGeOp    -> simp_op ilxCge
+	CharEqOp    -> simp_op ilxCeq
+	CharNeOp    -> simp_op ilxCne
+	CharLtOp    -> simp_op ilxClt
+	CharLeOp    -> simp_op ilxCle
 
-            (OrdOp,       simp_op (text "conv.i4")), -- chars represented by UInt32 (u4)
-            (ChrOp,       simp_op (text "conv.u4")),
+	OrdOp       -> simp_op (text "conv.i4") -- chars represented by UInt32 (u4)
+	ChrOp       -> simp_op (text "conv.u4")
 
-	    (IntGtOp,     simp_op ilxCgt),
-	    (IntGeOp,     simp_op ilxCge),
-	    (IntEqOp,     simp_op ilxCeq),
-	    (IntNeOp,     simp_op ilxCne),
-	    (IntLtOp,     simp_op ilxClt),
-	    (IntLeOp,     simp_op ilxCle),
+	IntGtOp     -> simp_op ilxCgt
+	IntGeOp     -> simp_op ilxCge
+	IntEqOp     -> simp_op ilxCeq
+	IntNeOp     -> simp_op ilxCne
+	IntLtOp     -> simp_op ilxClt
+	IntLeOp     -> simp_op ilxCle
 
-	    (WordGtOp,     simp_op ilxCgtUn), -- words represented by UInt32 (u4)
-	    (WordGeOp,     simp_op ilxCgeUn),
-	    (WordEqOp,     simp_op ilxCeq),
-	    (WordNeOp,     simp_op ilxCne),
-	    (WordLtOp,     simp_op ilxCltUn),
-	    (WordLeOp,     simp_op ilxCleUn),
+	WordGtOp     -> simp_op ilxCgtUn -- words represented by UInt32 (u4)
+	WordGeOp     -> simp_op ilxCgeUn
+	WordEqOp     -> simp_op ilxCeq
+	WordNeOp     -> simp_op ilxCne
+	WordLtOp     -> simp_op ilxCltUn
+	WordLeOp     -> simp_op ilxCleUn
 
-	    (AddrGtOp,     simp_op ilxCgt),
-	    (AddrGeOp,     simp_op ilxCge),
-	    (AddrEqOp,     simp_op ilxCeq),
-	    (AddrNeOp,     simp_op ilxCne),
-	    (AddrLtOp,     simp_op ilxClt),
-	    (AddrLeOp,     simp_op ilxCle),
+	AddrGtOp     -> simp_op ilxCgt
+	AddrGeOp     -> simp_op ilxCge
+	AddrEqOp     -> simp_op ilxCeq
+	AddrNeOp     -> simp_op ilxCne
+	AddrLtOp     -> simp_op ilxClt
+	AddrLeOp     -> simp_op ilxCle
 
-	    (FloatGtOp,     simp_op ilxCgt),
-	    (FloatGeOp,     simp_op ilxCge),
-	    (FloatEqOp,     simp_op ilxCeq),
-	    (FloatNeOp,     simp_op ilxCne),
-	    (FloatLtOp,     simp_op ilxClt),
-	    (FloatLeOp,     simp_op ilxCle),
+	FloatGtOp     -> simp_op ilxCgt
+	FloatGeOp     -> simp_op ilxCge
+	FloatEqOp     -> simp_op ilxCeq
+	FloatNeOp     -> simp_op ilxCne
+	FloatLtOp     -> simp_op ilxClt
+	FloatLeOp     -> simp_op ilxCle
 
-	    (DoubleGtOp,     simp_op ilxCgt),
-	    (DoubleGeOp,     simp_op ilxCge),
-	    (DoubleEqOp,     simp_op ilxCeq),
-	    (DoubleNeOp,     simp_op ilxCne),
-	    (DoubleLtOp,     simp_op ilxClt),
-	    (DoubleLeOp,     simp_op ilxCle),
+	DoubleGtOp     -> simp_op ilxCgt
+	DoubleGeOp     -> simp_op ilxCge
+	DoubleEqOp     -> simp_op ilxCeq
+	DoubleNeOp     -> simp_op ilxCne
+	DoubleLtOp     -> simp_op ilxClt
+	DoubleLeOp     -> simp_op ilxCle
 
     -- Int#-related ops:
-	    (IntAddOp,    simp_op (text "add")),
-	    (IntSubOp,    simp_op (text "sub")),
-	    (IntMulOp,    simp_op (text "mul")),
-	    (IntQuotOp,   simp_op (text "div")),
-	    (IntNegOp,    simp_op (text "neg")),
-	    (IntRemOp,    simp_op (text "rem")),
+	IntAddOp    -> simp_op (text "add")
+	IntSubOp    -> simp_op (text "sub")
+	IntMulOp    -> simp_op (text "mul")
+	IntQuotOp   -> simp_op (text "div")
+	IntNegOp    -> simp_op (text "neg")
+	IntRemOp    -> simp_op (text "rem")
 
-	    (Addr2IntOp,  simp_op (text "conv.i4")), -- Addresses are very dodgy for ILX.  They are used for both C-strings and 
-	    (Int2AddrOp,  simp_op (text "conv.i")),  -- the FFI.  This needs more work.
-	    (ISllOp,      simp_op (text "shl")),
-	    (ISraOp,      simp_op (text "shr")),
-	    (ISrlOp,      simp_op (text "shr.un")),
-	    (IntAddCOp,   simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntAddCOp" [] [repInt, repInt])),
-	    (IntAddCOp,   simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntSubCOp" [] [repInt, repInt])),
-	    (IntAddCOp,   simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntMulCOp" [] [repInt, repInt])),
-	    (IntGcdOp,   simp_op (text "call" <+> ilxSuppMeth repInt "IntMulCOp" [] [repInt, repInt])),
+	Addr2IntOp  -> simp_op (text "conv.i4") -- Addresses are very dodgy for ILX.  They are used for both C-strings and 
+	Int2AddrOp  -> simp_op (text "conv.i")  -- the FFI.  This needs more work.
+	ISllOp      -> simp_op (text "shl")
+	ISraOp      -> simp_op (text "shr")
+	ISrlOp      -> simp_op (text "shr.un")
+	IntAddCOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntAddCOp" [] [repInt, repInt])
+	IntSubCOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntSubCOp" [] [repInt, repInt])
+	IntMulCOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntMulCOp" [] [repInt, repInt])
+	IntGcdOp    -> simp_op (text "call" <+> ilxSuppMeth repInt "IntMulCOp" [] [repInt, repInt])
 
 
     -- Word#-related ops:
-	    (AndOp,  simp_op (text "and")), 
-	    (OrOp,  simp_op (text "or")), 
-	    (NotOp,  simp_op (text "not")), 
-	    (XorOp,  simp_op (text "xor")), 
-	    (SllOp,  simp_op (text "shl")), 
-	    (SrlOp,  simp_op (text "shr")), 
-	    (Word2IntOp,  simp_op (text "conv.i4")),
-	    (Int2WordOp,  simp_op (text "conv.u4")),
+	AndOp  	    -> simp_op (text "and") 
+	OrOp   	    -> simp_op (text "or") 
+	NotOp  	    -> simp_op (text "not") 
+	XorOp  	    -> simp_op (text "xor") 
+	SllOp  	    -> simp_op (text "shl") 
+	SrlOp 	    -> simp_op (text "shr") 
+	Word2IntOp  -> simp_op (text "conv.i4")
+	Int2WordOp  -> simp_op (text "conv.u4")
 
     -- Float#-related ops:
-	    (FloatAddOp,  simp_op (text "add")),
-	    (FloatSubOp,  simp_op (text "sub")),
-	    (FloatMulOp,  simp_op (text "mul")),
-	    (FloatDivOp,  simp_op (text "div")),
-	    (FloatNegOp,  simp_op (text "neg")),
-	    (Float2IntOp,  simp_op (text "conv.i4")),
-	    (Int2FloatOp,  simp_op (text "conv.r4")),
+	FloatAddOp   -> simp_op (text "add")
+	FloatSubOp   -> simp_op (text "sub")
+	FloatMulOp   -> simp_op (text "mul")
+	FloatDivOp   -> simp_op (text "div")
+	FloatNegOp   -> simp_op (text "neg")
+	Float2IntOp  -> simp_op (text "conv.i4")
+	Int2FloatOp  -> simp_op (text "conv.r4")
 
-	    (DoubleAddOp,  simp_op (text "add")),
-	    (DoubleSubOp,  simp_op (text "sub")),
-	    (DoubleMulOp,  simp_op (text "mul")),
-	    (DoubleDivOp,  simp_op (text "div")),
-	    (DoubleNegOp,  simp_op (text "neg")),
-	    (Double2IntOp,  simp_op (text "conv.i4")),
-	    (Int2DoubleOp,  simp_op (text "conv.r4")),
-	    (Double2FloatOp,  simp_op (text "conv.r4")),
-	    (Float2DoubleOp,  simp_op (text "conv.r8")),
-	    (DoubleDecodeOp,   simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeDouble" [] [text "float64"])),
-	    (FloatDecodeOp,   simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeFloat" [] [text "float32"])),
+	DoubleAddOp   	-> simp_op (text "add")
+	DoubleSubOp   	-> simp_op (text "sub")
+	DoubleMulOp   	-> simp_op (text "mul")
+	DoubleDivOp   	-> simp_op (text "div")
+	DoubleNegOp   	-> simp_op (text "neg")
+	Double2IntOp  	-> simp_op (text "conv.i4")
+	Int2DoubleOp  	-> simp_op (text "conv.r4")
+	Double2FloatOp  -> simp_op (text "conv.r4")
+	Float2DoubleOp  -> simp_op (text "conv.r8")
+	DoubleDecodeOp  -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeDouble" [] [text "float64"])
+	FloatDecodeOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeFloat" [] [text "float32"])
 
-          (FloatExpOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Exp(float64) conv.r4")),
-          (FloatLogOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Log(float64) conv.r4")),
-          (FloatSqrtOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sqrt(float64) conv.r4")),
-          (FloatSinOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sin(float64) conv.r4")),
-          (FloatCosOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Cos(float64) conv.r4")),
-          (FloatTanOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Tan(float64) conv.r4")),
-          (FloatAsinOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Asin(float64) conv.r4")),
-          (FloatAcosOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Acos(float64) conv.r4")),
-          (FloatAtanOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Atan(float64) conv.r4")),
-          (FloatSinhOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sinh(float64) conv.r4")),
-          (FloatCoshOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Cosh(float64) conv.r4")),
-          (FloatTanhOp,   simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Tanh(float64) conv.r4")),
-          (FloatPowerOp,   simp_op (text "call float64 [mscorlib]System.Math::Pow(float64, float64) conv.r4")), -- ** op, make use of implicit cast to r8...
+	FloatExpOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Exp(float64) conv.r4")
+	FloatLogOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Log(float64) conv.r4")
+	FloatSqrtOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sqrt(float64) conv.r4")
+	FloatSinOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sin(float64) conv.r4")
+	FloatCosOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Cos(float64) conv.r4")
+	FloatTanOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Tan(float64) conv.r4")
+	FloatAsinOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Asin(float64) conv.r4")
+	FloatAcosOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Acos(float64) conv.r4")
+	FloatAtanOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Atan(float64) conv.r4")
+	FloatSinhOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sinh(float64) conv.r4")
+	FloatCoshOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Cosh(float64) conv.r4")
+	FloatTanhOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Tanh(float64) conv.r4")
+	FloatPowerOp -> simp_op (text "call float64 [mscorlib]System.Math::Pow(float64, float64) conv.r4") -- ** op, make use of implicit cast to r8...
 
-          (DoubleExpOp,   simp_op (text "call float64 [mscorlib]System.Math::Exp(float64)")),
-          (DoubleLogOp,   simp_op (text "call float64 [mscorlib]System.Math::Log(float64)")),
-          (DoubleSqrtOp,   simp_op (text "call float64 [mscorlib]System.Math::Sqrt(float64)")),
+	DoubleExpOp   -> simp_op (text "call float64 [mscorlib]System.Math::Exp(float64)")
+	DoubleLogOp   -> simp_op (text "call float64 [mscorlib]System.Math::Log(float64)")
+	DoubleSqrtOp  -> simp_op (text "call float64 [mscorlib]System.Math::Sqrt(float64)")
           
-          (DoubleSinOp,   simp_op (text "call float64 [mscorlib]System.Math::Sin(float64)")),
-          (DoubleCosOp,   simp_op (text "call float64 [mscorlib]System.Math::Cos(float64)")),
-          (DoubleTanOp,   simp_op (text "call float64 [mscorlib]System.Math::Tan(float64)")),
+	DoubleSinOp   -> simp_op (text "call float64 [mscorlib]System.Math::Sin(float64)")
+	DoubleCosOp   -> simp_op (text "call float64 [mscorlib]System.Math::Cos(float64)")
+	DoubleTanOp   -> simp_op (text "call float64 [mscorlib]System.Math::Tan(float64)")
           
-          (DoubleAsinOp,   simp_op (text "call float64 [mscorlib]System.Math::Asin(float64)")),
-          (DoubleAcosOp,   simp_op (text "call float64 [mscorlib]System.Math::Acos(float64)")),
-          (DoubleAtanOp,   simp_op (text "call float64 [mscorlib]System.Math::Atan(float64)")),
+	DoubleAsinOp   -> simp_op (text "call float64 [mscorlib]System.Math::Asin(float64)")
+	DoubleAcosOp   -> simp_op (text "call float64 [mscorlib]System.Math::Acos(float64)")
+	DoubleAtanOp   -> simp_op (text "call float64 [mscorlib]System.Math::Atan(float64)")
           
-          (DoubleSinhOp,   simp_op (text "call float64 [mscorlib]System.Math::Sinh(float64)")),
-          (DoubleCoshOp,   simp_op (text "call float64 [mscorlib]System.Math::Cosh(float64)")),
-          (DoubleTanhOp,   simp_op (text "call float64 [mscorlib]System.Math::Tanh(float64)")),
+	DoubleSinhOp   -> simp_op (text "call float64 [mscorlib]System.Math::Sinh(float64)")
+	DoubleCoshOp   -> simp_op (text "call float64 [mscorlib]System.Math::Cosh(float64)")
+	DoubleTanhOp   -> simp_op (text "call float64 [mscorlib]System.Math::Tanh(float64)")
           
-          (DoublePowerOp,   simp_op (text "call float64 [mscorlib]System.Math::Pow(float64, float64)")),
+	DoublePowerOp  -> simp_op (text "call float64 [mscorlib]System.Math::Pow(float64, float64)")
 
     -- Integer (and related...) ops: bail out to support routines
-	    (IntegerAddOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerAddOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerSubOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerSubOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerMulOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerMulOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerGcdOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerGcdOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerQuotRemOp,  simp_op (text "call" <+> ilxSuppMeth repIntegerPair "IntegerQuotRemOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerDivModOp,  simp_op (text "call" <+> ilxSuppMeth repIntegerPair "IntegerDivModOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerNegOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerNegOp" [] [repInt, repByteArray])),
-	    (IntegerIntGcdOp,  simp_op (text "call" <+> ilxSuppMeth repInt "IntegerIntGcdOp" [] [repInt, repByteArray, repInt])),
-	    (IntegerDivExactOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerDivExactOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerQuotOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerQuotOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerRemOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerRemOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerCmpOp,  simp_op (text "call" <+> ilxSuppMeth repInt "IntegerCmpOp" [] [repInt, repByteArray, repInt, repByteArray])),
-	    (IntegerCmpIntOp,  simp_op (text "call" <+> ilxSuppMeth repInt "IntegerCmpIntOp" [] [repInt, repByteArray, repInt])),
-	    (Integer2IntOp,  simp_op (text "call" <+> ilxSuppMeth repInt "Integer2IntOp" [] [repInt, repByteArray])),
-	    (Integer2WordOp,  simp_op (text "call" <+> ilxSuppMeth repWord "Integer2WordOp" [] [repInt, repByteArray])),
-	    (Int2IntegerOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "Int2IntegerOp" [] [repInt])),
-	    (Word2IntegerOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "Word2IntegerOp" [] [repWord])),
-	    (Addr2IntegerOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "Addr2IntegerOp" [] [repAddr])),
-	    (IntegerToInt64Op,  simp_op (text "call" <+> ilxSuppMeth repAddr "IntegerToInt64Op" [] [repInt,repByteArray])),
-	    (Int64ToIntegerOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "Int64ToIntegerOp" [] [repInt64])),
-	    (IntegerToWord64Op,  simp_op (text "call" <+> ilxSuppMeth repWord64 "IntegerToWord64Op" [] [repInt,repByteArray])),
-	    (Word64ToIntegerOp,  simp_op (text "call" <+> ilxSuppMeth repInteger "Word64ToIntegerOp" [] [repWord64])),
+--	IntegerNegOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerNegOp" [] [repInt, repByteArray])
+--	Addr2IntegerOp     -> simp_op (text "call" <+> ilxSuppMeth repInteger "Addr2IntegerOp" [] [repAddr])
+	IntegerAddOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerAddOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerSubOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerSubOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerMulOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerMulOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerGcdOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerGcdOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerQuotRemOp   -> simp_op (text "call" <+> ilxSuppMeth repIntegerPair "IntegerQuotRemOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerDivModOp    -> simp_op (text "call" <+> ilxSuppMeth repIntegerPair "IntegerDivModOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerIntGcdOp    -> simp_op (text "call" <+> ilxSuppMeth repInt "IntegerIntGcdOp" [] [repInt, repByteArray, repInt])
+	IntegerDivExactOp  -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerDivExactOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerQuotOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerQuotOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerRemOp   	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerRemOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerCmpOp   	   -> simp_op (text "call" <+> ilxSuppMeth repInt "IntegerCmpOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerCmpIntOp    -> simp_op (text "call" <+> ilxSuppMeth repInt "IntegerCmpIntOp" [] [repInt, repByteArray, repInt])
+	Integer2IntOp      -> simp_op (text "call" <+> ilxSuppMeth repInt "Integer2IntOp" [] [repInt, repByteArray])
+	Integer2WordOp     -> simp_op (text "call" <+> ilxSuppMeth repWord "Integer2WordOp" [] [repInt, repByteArray])
+	Int2IntegerOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "Int2IntegerOp" [] [repInt])
+	Word2IntegerOp     -> simp_op (text "call" <+> ilxSuppMeth repInteger "Word2IntegerOp" [] [repWord])
+	IntegerToInt64Op   -> simp_op (text "call" <+> ilxSuppMeth repAddr "IntegerToInt64Op" [] [repInt,repByteArray])
+	Int64ToIntegerOp   -> simp_op (text "call" <+> ilxSuppMeth repInteger "Int64ToIntegerOp" [] [repInt64])
+	IntegerToWord64Op  -> simp_op (text "call" <+> ilxSuppMeth repWord64 "IntegerToWord64Op" [] [repInt,repByteArray])
+	Word64ToIntegerOp  -> simp_op (text "call" <+> ilxSuppMeth repInteger "Word64ToIntegerOp" [] [repWord64])
 
- 	    (IndexOffForeignObjOp CharRep,  simp_op (text "add ldind.u1")),
- 	    (IndexOffForeignObjOp IntRep,  simp_op (text "ldc.i4 4 mul add ldind.i4")),
- 	    (IndexOffForeignObjOp WordRep,  simp_op (text "ldc.i4 4 mul add ldind.u4")),
- 	    (IndexOffForeignObjOp AddrRep,  warn_op "IndexOffForeignObjOp AddrRep: assuing 32 bit architecture" (simp_op (text "ldc.i4 4 mul add ldind.i  "))),
- 	    (IndexOffForeignObjOp FloatRep,  simp_op (text "ldc.i4 4 mul add ldind.r4")),
- 	    (IndexOffForeignObjOp DoubleRep,   simp_op (text "ldc.i4 8 mul add ldind.r8")),
- 	    (IndexOffForeignObjOp Int64Rep,  simp_op (text "ldc.i4 8 mul add ldind.i8")),
- 	    (IndexOffForeignObjOp Word64Rep,  simp_op (text "ldc.i4 8 mul add ldind.u8")),
+	IndexOffForeignObjOp_Char    -> simp_op (text "add ldind.u1")
+	IndexOffForeignObjOp_Int     -> simp_op (text "ldc.i4 4 mul add ldind.i4")
+	IndexOffForeignObjOp_Word    -> simp_op (text "ldc.i4 4 mul add ldind.u4")
+	IndexOffForeignObjOp_Addr    ->  warn_op "IndexOffForeignObjOp Addr: assuing 32 bit architecture" (simp_op (text "ldc.i4 4 mul add ldind.i  "))
+	IndexOffForeignObjOp_Float   -> simp_op (text "ldc.i4 4 mul add ldind.r4")
+	IndexOffForeignObjOp_Double  -> simp_op (text "ldc.i4 8 mul add ldind.r8")
+	IndexOffForeignObjOp_Int64   -> simp_op (text "ldc.i4 8 mul add ldind.i8")
+	IndexOffForeignObjOp_Word64  -> simp_op (text "ldc.i4 8 mul add ldind.u8")
 
- 	    (IndexOffAddrOp CharRep, simp_op (text "add ldind.u1")),
- 	    (IndexOffAddrOp IntRep, simp_op (text "ldc.i4 4 mul add ldind.i4")),
- 	    (IndexOffAddrOp WordRep, simp_op (text "ldc.i4 4 mul add ldind.u4")),
- 	    (IndexOffAddrOp AddrRep, warn_op "IndexOffAddrOp AddrRep: assuing 32 bit architecture" (simp_op (text "ldc.i4 4 mul add ldind.i"))),
- 	    (IndexOffAddrOp FloatRep, simp_op (text "ldc.i4 4 mul add ldind.r4")),
- 	    (IndexOffAddrOp DoubleRep, simp_op (text "ldc.i4 8 mul add ldind.r8")),
- 	    (IndexOffAddrOp Int64Rep, simp_op (text "ldc.i4 8 mul add ldind.i8")),
- 	    (IndexOffAddrOp Word64Rep, simp_op (text "ldc.i4 8 mul add ldind.u8")),
+	IndexOffAddrOp_Char    -> simp_op (text "add ldind.u1")
+	IndexOffAddrOp_Int     -> simp_op (text "ldc.i4 4 mul add ldind.i4")
+	IndexOffAddrOp_Word    -> simp_op (text "ldc.i4 4 mul add ldind.u4")
+	IndexOffAddrOp_Addr    -> warn_op "IndexOffAddrOp Addr: assuing 32 bit architecture" (simp_op (text "ldc.i4 4 mul add ldind.i"))
+	IndexOffAddrOp_Float   -> simp_op (text "ldc.i4 4 mul add ldind.r4")
+	IndexOffAddrOp_Double  -> simp_op (text "ldc.i4 8 mul add ldind.r8")
+	IndexOffAddrOp_Int64   -> simp_op (text "ldc.i4 8 mul add ldind.i8")
+	IndexOffAddrOp_Word64  -> simp_op (text "ldc.i4 8 mul add ldind.u8")
 
 
- 	    (WriteOffAddrOp CharRep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "add" <+> v <+> text "stind.u1")),
- 	    (WriteOffAddrOp IntRep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.i4")),
- 	    (WriteOffAddrOp WordRep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.u4")),
- 	    (WriteOffAddrOp AddrRep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.i")),
- 	    (WriteOffAddrOp FloatRep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.r4")),
- 	    (WriteOffAddrOp DoubleRep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.r8")),
- 	    (WriteOffAddrOp Int64Rep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.i8")),
- 	    (WriteOffAddrOp Word64Rep, ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.u8")),
+	WriteOffAddrOp_Char   -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "add" <+> v <+> text "stind.u1")
+	WriteOffAddrOp_Int    -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.i4")
+	WriteOffAddrOp_Word   -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.u4")
+	WriteOffAddrOp_Addr   -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.i")
+	WriteOffAddrOp_Float  -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.r4")
+	WriteOffAddrOp_Double -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.r8")
+	WriteOffAddrOp_Int64  -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.i8")
+	WriteOffAddrOp_Word64 -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.u8")
                   {-    Addr# -> Int# -> Char# -> State# s -> State# s -} 
 
- 	    (ReadOffAddrOp CharRep, simp_op (text "add ldind.u1")),
- 	    (ReadOffAddrOp IntRep, simp_op (text "ldc.i4 4 mul add ldind.i4")),
- 	    (ReadOffAddrOp WordRep, simp_op (text "ldc.i4 4 mul add ldind.u4")),
- 	    (ReadOffAddrOp AddrRep, simp_op (text "ldc.i4 4 mul add ldind.i")),
- 	    (ReadOffAddrOp FloatRep, simp_op (text "ldc.i4 4 mul add ldind.r4")),
- 	    (ReadOffAddrOp DoubleRep, simp_op (text "ldc.i4 8 mul add ldind.r8")),
- 	    (ReadOffAddrOp Int64Rep, simp_op (text "ldc.i4 8 mul add ldind.i8")),
- 	    (ReadOffAddrOp Word64Rep, simp_op (text "ldc.i4 8 mul add ldind.u8")),
+	ReadOffAddrOp_Char   -> simp_op (text "add ldind.u1")
+	ReadOffAddrOp_Int    -> simp_op (text "ldc.i4 4 mul add ldind.i4")
+	ReadOffAddrOp_Word   -> simp_op (text "ldc.i4 4 mul add ldind.u4")
+	ReadOffAddrOp_Addr   -> simp_op (text "ldc.i4 4 mul add ldind.i")
+	ReadOffAddrOp_Float  -> simp_op (text "ldc.i4 4 mul add ldind.r4")
+	ReadOffAddrOp_Double -> simp_op (text "ldc.i4 8 mul add ldind.r8")
+	ReadOffAddrOp_Int64  -> simp_op (text "ldc.i4 8 mul add ldind.i8")
+	ReadOffAddrOp_Word64 -> simp_op (text "ldc.i4 8 mul add ldind.u8")
                   {-    Addr# -> Int# -> Char# -> State# s -> State# s -} 
 
-            (RaiseOp, ty2_op (\ty1 ty2 -> text "throw")),
-            (CatchOp, ty2_op  (\ty1 ty2 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "catch" [ty1,ty2] [text "(func () --> !!0)", text "(func (!!1) --> (func () --> !!0))"])),
-                    {-        (State# RealWorld -> (# State# RealWorld, a #) )
-                           -> (b -> State# RealWorld -> (# State# RealWorld, a #) ) 
-                           -> State# RealWorld
-                           -> (# State# RealWorld, a #) 
-                     -} 
+	IndexByteArrayOp_Char  	   -> simp_op (text "ldelem.u1")
+	IndexByteArrayOp_Int   	   -> simp_op (text "ldelem.i4")
+	IndexByteArrayOp_Word  	   -> simp_op (text "ldelem.u4")
+	IndexByteArrayOp_Addr  	   -> simp_op (text "ldelem.u")
+	IndexByteArrayOp_Float 	   -> simp_op (text "ldelem.r4")
+	IndexByteArrayOp_Double    -> simp_op (text "ldelem.r8")
+	IndexByteArrayOp_StablePtr -> simp_op (text "ldelem.i4")
+	IndexByteArrayOp_Int64     -> simp_op (text "ldelem.i8")
+	IndexByteArrayOp_Word64    -> simp_op (text "ldelem.u8")
 
-             (BlockAsyncExceptionsOp, ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [text "(func () --> !!0)"])),
+                 {- ByteArr# -> Int# -> Char# -}
+
+	WriteByteArrayOp_Char  	   -> simp_op (text "stelem.u1")
+	WriteByteArrayOp_Int   	   -> simp_op (text "stelem.i4")
+	WriteByteArrayOp_Word  	   -> simp_op (text "stelem.u4")
+	WriteByteArrayOp_Addr  	   -> simp_op (text "stelem.u")
+	WriteByteArrayOp_Float 	   -> simp_op (text "stelem.r4")
+	WriteByteArrayOp_Double    -> simp_op (text "stelem.r8")
+	WriteByteArrayOp_StablePtr -> simp_op (text "stelem.i4")
+	WriteByteArrayOp_Int64     -> simp_op (text "stelem.i8")
+	WriteByteArrayOp_Word64    -> simp_op (text "stelem.u8")
+
+                 {- MutByteArr# s -> Int# -> Char# -> State# s -> State# s -}
+
+            {- should be monadic??? -}
+	ReadByteArrayOp_Char   	  -> simp_op (text "ldelem.u1")
+	ReadByteArrayOp_Int    	  -> simp_op (text "ldelem.i4")
+	ReadByteArrayOp_Word   	  -> simp_op (text "ldelem.u4")
+	ReadByteArrayOp_Addr   	  -> simp_op (text "ldelem.u")
+	ReadByteArrayOp_Float  	  -> simp_op (text "ldelem.r4")
+	ReadByteArrayOp_Double 	  -> simp_op (text "ldelem.r8")
+	ReadByteArrayOp_StablePtr -> simp_op (text "ldelem.i4")
+	ReadByteArrayOp_Int64     -> simp_op (text "ldelem.i8")
+	ReadByteArrayOp_Word64    -> simp_op (text "ldelem.u8")
+                 {-   MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #) -}
+
+            {- should be monadic??? -}
+	NewByteArrayOp_Char   	 -> simp_op (text "newarr [mscorlib]System.Byte")
+--	NewByteArrayOp_Int    	 -> simp_op (text "newarr [mscorlib]System.Int32")
+--	NewByteArrayOp_Word   	 -> simp_op (text "newarr [mscorlib]System.UInt32")
+--	NewByteArrayOp_Addr   	 -> simp_op (text "newarr [mscorlib]System.UInt64")
+--	NewByteArrayOp_Float  	 -> simp_op (text "newarr [mscorlib]System.Single")
+--	NewByteArrayOp_Double 	 -> simp_op (text "newarr [mscorlib]System.Double")
+--	NewByteArrayOp_StablePtr -> simp_op (text "newarr [mscorlib]System.UInt32")
+--      NewByteArrayOp_Int64     -> simp_op (text "newarr [mscorlib]System.Int64")  TODO: there is no unique for this one -}
+--      NewByteArrayOp_Word64    -> simp_op (text "newarr  [mscorlib]System.UInt64") -}
+                  {- Int# -> State# s -> (# State# s, MutByteArr# s #) -}
+
+	UnsafeFreezeByteArrayOp ->   ty1_op (\ty1  -> text "nop ")
+                  {- MutByteArr# s -> State# s -> (# State# s, ByteArr# #) -}
+	SizeofByteArrayOp  -> simp_op (text "ldlen")
+                  {- ByteArr# -> Int# -}
+
+	SameMutableByteArrayOp -> ty1_op (\ty1  -> text "ceq " <+> ilxMkBool)
+                 {- MutByteArr# s -> MutByteArr# s -> Bool -}
+	SizeofMutableByteArrayOp -> ty1_op (\ty1  -> text "ldlen")
+                 {- MutByteArr# s -> Int# -}
+
+	SameMutVarOp -> ty2_op (\ty1 ty2 -> text "ceq " <+> ilxMkBool)
+                 {- MutVar# s a -> MutVar# s a -> Bool -}
+	NewMutVarOp -> ty2_op (\ty1 ty2 -> text "newobj void" <+> repMutVar ty1 ty2 <+> text "::.ctor(!0)")
+                 {- a -> State# s -> (# State# s, MutVar# s a #) -}
+	ReadMutVarOp -> ty2_op (\ty1 ty2 ->  text "ldfld !0" <+> repMutVar ty1 ty2 <+> text "::contents")
+                 {-  MutVar# s a -> State# s -> (# State# s, a #) -}
+	WriteMutVarOp -> ty2_op (\ty1 ty2 -> text "stfld !0" <+> repMutVar ty1 ty2 <+> text "::contents")
+                 {- MutVar# s a -> a -> State# s -> State# s -}
+
+	NewArrayOp -> ty2_op (\ty1 ty2 -> text "call !!0[] " <+> ilxSupportClass <+> text "::newArray<" <> ty1 <> text ">(" <> repInt <> text ", !!0)")
+                 {- Int# -> a -> State# s -> (# State# s, MutArr# s a #) -}
+	IndexArrayOp -> ty1_op (\ty1 -> text "ldelem.ref")
+                 {- Array# a -> Int# -> (# a #) -}
+	WriteArrayOp -> ty2_op (\ty1 ty2 -> text "stelem.ref")
+                 {- MutArr# s a -> Int# -> a -> State# s -> State# s -}
+	ReadArrayOp -> ty2_op (\ty1 ty2 -> text "ldelem.ref")
+                 {- MutArr# s a -> Int# -> State# s -> (# State# s, a #) -}
+	UnsafeFreezeArrayOp -> ty2_op (\ty1 ty2 -> text "nop")
+                 {-   MutArr# s a -> State# s -> (# State# s, Array# a #) -}
+	UnsafeThawArrayOp -> ty2_op (\ty1 ty2 -> text "nop")
+                 {-  Array# a -> State# s -> (# State# s, MutArr# s a #) -}
+
+	SameMutableArrayOp -> ty2_op (\ty1 ty2 -> text "ceq " <+> ilxMkBool)
+                 {- MutArr# s a -> MutArr# s a -> Bool -}
+
+
+	RaiseOp -> ty2_op (\ty1 ty2 -> text "throw")
+	CatchOp -> ty2_op (\ty1 ty2 -> 
+			text "call" <+> ilxSuppMeth ilxMethA "catch" [ty1,ty2] [text "(func () --> !!0)", text "(func (!!1) --> (func () --> !!0))"])
+	                    {-        (State# RealWorld -> (# State# RealWorld, a #) )
+	                           -> (b -> State# RealWorld -> (# State# RealWorld, a #) ) 
+	                           -> State# RealWorld
+	                           -> (# State# RealWorld, a #) 
+	                     -} 
+
+	BlockAsyncExceptionsOp -> ty1_op (\ty1 -> 
+		text "call" <+> ilxSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [text "(func () --> !!0)"])
 
                 {-     (State# RealWorld -> (# State# RealWorld, a #))
                     -> (State# RealWorld -> (# State# RealWorld, a #))
                 -}
 
-             (UnblockAsyncExceptionsOp, ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [text "(func () --> !!0)"])),
+	UnblockAsyncExceptionsOp -> ty1_op (\ty1 -> 
+		text "call" <+> ilxSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [text "(func () --> !!0)"])
 
                 {-
-                       (State# RealWorld -> (# State# RealWorld, a #))
+		    State# RealWorld -> (# State# RealWorld, a #))
                     -> (State# RealWorld -> (# State# RealWorld, a #))
                 -}
  
-             (NewMVarOp, ty2_op (\sty ty -> 
-		text "newobj void " <+> repMVar ty <+> text "::.ctor()")),
+	NewMVarOp -> ty2_op (\sty ty -> 
+		text "newobj void " <+> repMVar ty <+> text "::.ctor()")
                  {- State# s -> (# State# s, MVar# s a #) -}
 
-             (TakeMVarOp, ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth ilxMethA "takeMVar" [ty] [repMVar ilxMethA])),
+	TakeMVarOp -> ty2_op (\sty ty -> 
+		text "call" <+> ilxSuppMeth ilxMethA "takeMVar" [ty] [repMVar ilxMethA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
-             (PutMVarOp, ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth (text "void") "putMVar" [ty] [repMVar ilxMethA, ilxMethA])),
+	PutMVarOp -> ty2_op (\sty ty -> 
+		text "call" <+> ilxSuppMeth (text "void") "putMVar" [ty] [repMVar ilxMethA, ilxMethA])
                    {- MVar# s a -> a -> State# s -> State# s -}
 
-             (SameMVarOp, ty2_op (\sty ty -> text "ceq " <+> ilxMkBool)),
+	SameMVarOp -> ty2_op (\sty ty -> text "ceq " <+> ilxMkBool)
                    {- MVar# s a -> MVar# s a -> Bool -}
 
-             (TakeMaybeMVarOp, ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt ilxMethA) "tryTakeMVar" [ty] [repMVar ilxMethA])),
+--	TakeMaybeMVarOp -> ty2_op (\sty ty -> 
+--		text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt ilxMethA) "tryTakeMVar" [ty] [repMVar ilxMethA])
+--              {- MVar# s a -> State# s -> (# State# s, Int#, a #) -}
 
-                {- MVar# s a -> State# s -> (# State# s, Int#, a #) -}
-
-             (IsEmptyMVarOp, ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth repInt "isEmptyMVar" [ty] [repMVar ilxMethA])),
+	IsEmptyMVarOp -> ty2_op (\sty ty -> 
+		text "call" <+> ilxSuppMeth repInt "isEmptyMVar" [ty] [repMVar ilxMethA])
                {- MVar# s a -> State# s -> (# State# s, Int# #) -}
 
-             (DataToTagOp, ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth repInt "dataToTag" [ty1] [ilxMethA])),
+	DataToTagOp -> ty1_op (\ty1 -> 
+		text "call" <+> ilxSuppMeth repInt "dataToTag" [ty1] [ilxMethA])
                {- a -> Int# -}
 
-             (TagToEnumOp, ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "tagToEnum" [ty1] [repInt])),
+	TagToEnumOp -> ty1_op (\ty1 -> 
+		text "call" <+> ilxSuppMeth ilxMethA "tagToEnum" [ty1] [repInt])
                {- Int# -> a -}
 
-             (IndexByteArrayOp CharRep, simp_op (text "ldelem.u1")),
-             (IndexByteArrayOp IntRep, simp_op (text "ldelem.i4")),
-             (IndexByteArrayOp WordRep, simp_op (text "ldelem.u4")),
-             (IndexByteArrayOp AddrRep, simp_op (text "ldelem.u")),
-             (IndexByteArrayOp FloatRep, simp_op (text "ldelem.r4")),
-             (IndexByteArrayOp DoubleRep, simp_op (text "ldelem.r8")),
-             (IndexByteArrayOp StablePtrRep, simp_op (text "ldelem.i4")),
-             (IndexByteArrayOp Int64Rep, simp_op (text "ldelem.i8")),
-             (IndexByteArrayOp Word64Rep, simp_op (text "ldelem.u8")),
-
-                 {- ByteArr# -> Int# -> Char# -}
-
-             (WriteByteArrayOp CharRep, simp_op (text "stelem.u1")),
-             (WriteByteArrayOp IntRep, simp_op (text "stelem.i4")),
-             (WriteByteArrayOp WordRep, simp_op (text "stelem.u4")),
-             (WriteByteArrayOp AddrRep, simp_op (text "stelem.u")),
-             (WriteByteArrayOp FloatRep, simp_op (text "stelem.r4")),
-             (WriteByteArrayOp DoubleRep, simp_op (text "stelem.r8")),
-             (WriteByteArrayOp StablePtrRep, simp_op (text "stelem.i4")),
-             (WriteByteArrayOp Int64Rep, simp_op (text "stelem.i8")),
-             (WriteByteArrayOp Word64Rep, simp_op (text "stelem.u8")),
-
-                 {- MutByteArr# s -> Int# -> Char# -> State# s -> State# s -}
-
-            {- should be monadic??? -}
-             (ReadByteArrayOp CharRep, simp_op (text "ldelem.u1")),
-             (ReadByteArrayOp IntRep, simp_op (text "ldelem.i4")),
-             (ReadByteArrayOp WordRep, simp_op (text "ldelem.u4")),
-             (ReadByteArrayOp AddrRep, simp_op (text "ldelem.u")),
-             (ReadByteArrayOp FloatRep, simp_op (text "ldelem.r4")),
-             (ReadByteArrayOp DoubleRep, simp_op (text "ldelem.r8")),
-             (ReadByteArrayOp StablePtrRep, simp_op (text "ldelem.i4")),
-             (ReadByteArrayOp Int64Rep, simp_op (text "ldelem.i8")),
-             (ReadByteArrayOp Word64Rep, simp_op (text "ldelem.u8")),
-                 {-   MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #) -}
-
-            {- should be monadic??? -}
-             (NewByteArrayOp CharRep, simp_op (text "newarr [mscorlib]System.Byte")),
-             (NewByteArrayOp IntRep, simp_op (text "newarr [mscorlib]System.Int32")),
-             (NewByteArrayOp WordRep, simp_op (text "newarr [mscorlib]System.UInt32")),
-             (NewByteArrayOp AddrRep, simp_op (text "newarr [mscorlib]System.UInt64")),
-             (NewByteArrayOp FloatRep, simp_op (text "newarr [mscorlib]System.Single")),
-             (NewByteArrayOp DoubleRep, simp_op (text "newarr [mscorlib]System.Double")),
-             (NewByteArrayOp StablePtrRep, simp_op (text "newarr [mscorlib]System.UInt32")),
-{-           (NewByteArrayOp Int64Rep, simp_op (text "newarr [mscorlib]System.Int64")),  TODO: there is no unique for this one -}
-{-           (NewByteArrayOp Word64Rep, simp_op (text "newarr  [mscorlib]System.UInt64")), -}
-                  {- Int# -> State# s -> (# State# s, MutByteArr# s #) -}
-
-             (UnsafeFreezeByteArrayOp,   ty1_op (\ty1  -> text "nop ")),
-                  {- MutByteArr# s -> State# s -> (# State# s, ByteArr# #) -}
-             (SizeofByteArrayOp,  simp_op (text "ldlen")),
-                  {- ByteArr# -> Int# -}
-
-             (SameMutableByteArrayOp, ty1_op (\ty1  -> text "ceq " <+> ilxMkBool)),
-                 {- MutByteArr# s -> MutByteArr# s -> Bool -}
-             (SizeofMutableByteArrayOp, ty1_op (\ty1  -> text "ldlen")),
-                 {- MutByteArr# s -> Int# -}
-
-             (SameMutVarOp, ty2_op (\ty1 ty2 -> text "ceq " <+> ilxMkBool)),
-                 {- MutVar# s a -> MutVar# s a -> Bool -}
-             (NewMutVarOp, ty2_op (\ty1 ty2 -> text "newobj void" <+> repMutVar ty1 ty2 <+> text "::.ctor(!0)")),
-                 {- a -> State# s -> (# State# s, MutVar# s a #) -}
-             (ReadMutVarOp, ty2_op (\ty1 ty2 ->  text "ldfld !0" <+> repMutVar ty1 ty2 <+> text "::contents")),
-                 {-  MutVar# s a -> State# s -> (# State# s, a #) -}
-             (WriteMutVarOp, ty2_op (\ty1 ty2 -> text "stfld !0" <+> repMutVar ty1 ty2 <+> text "::contents")),
-                 {- MutVar# s a -> a -> State# s -> State# s -}
-
-             (NewArrayOp, ty2_op (\ty1 ty2 -> text "call !!0[] " <+> ilxSupportClass <+> text "::newArray<" <> ty1 <> text ">(" <> repInt <> text ", !!0)")),
-                 {- Int# -> a -> State# s -> (# State# s, MutArr# s a #) -}
-             (IndexArrayOp, ty1_op (\ty1 -> text "ldelem.ref")),
-                 {- Array# a -> Int# -> (# a #) -}
-             (WriteArrayOp, ty2_op (\ty1 ty2 -> text "stelem.ref")),
-                 {- MutArr# s a -> Int# -> a -> State# s -> State# s -}
-             (ReadArrayOp, ty2_op (\ty1 ty2 -> text "ldelem.ref")),
-                 {- MutArr# s a -> Int# -> State# s -> (# State# s, a #) -}
-             (UnsafeFreezeArrayOp, ty2_op (\ty1 ty2 -> text "nop")),
-                 {-   MutArr# s a -> State# s -> (# State# s, Array# a #) -}
-             (UnsafeThawArrayOp, ty2_op (\ty1 ty2 -> text "nop")),
-                 {-  Array# a -> State# s -> (# State# s, MutArr# s a #) -}
-
-             (SameMutableArrayOp, ty2_op (\ty1 ty2 -> text "ceq " <+> ilxMkBool)),
-                 {- MutArr# s a -> MutArr# s a -> Bool -}
-
-             (MakeStablePtrOp, ty1_op (\ty1 -> text "newobj void class " <+> prelGHCReference <+> text "PrelGHC_StablePtrzh<" <> ty1 <> text ">::.ctor(!0)")),
+	MakeStablePtrOp -> ty1_op (\ty1 -> text "newobj void class " <+> prelGHCReference <+> text "PrelGHC_StablePtrzh<" <> ty1 <> text ">::.ctor(!0)")
                  {-   a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #) -}
 
-             (DeRefStablePtrOp, ty1_op (\ty1 ->  text "ldfld !0 class " <+> prelGHCReference <+> text "PrelGHC_StablePtrzh<" <> ty1  <> text ">::contents")),
+	DeRefStablePtrOp -> ty1_op (\ty1 ->  text "ldfld !0 class " <+> prelGHCReference <+> text "PrelGHC_StablePtrzh<" <> ty1  <> text ">::contents")
                  {-  StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #) -}
 
-             (EqStablePtrOp, ty1_op (\ty1 -> text "ceq " <+> ilxMkBool)),
+	EqStablePtrOp -> ty1_op (\ty1 -> text "ceq " <+> ilxMkBool)
                  {-  StablePtr# a -> StablePtr# a -> Int# -}
 
-             (MkWeakOp, ty3_op (\ty1 ty2 ty3 ->  text "call" <+> ilxMethodRef (repWeak (text "!!1")) (text "class " <+> prelGHCReference <+> text "PrelGHC_Weakzh") "bake" [ty1,ty2,ty3] [text "!!0", text "!!1", text "!!2"])),
+	MkWeakOp -> ty3_op (\ty1 ty2 ty3 ->  text "call" <+> ilxMethodRef (repWeak (text "!!1")) (text "class " <+> prelGHCReference <+> text "PrelGHC_Weakzh") "bake" [ty1,ty2,ty3] [text "!!0", text "!!1", text "!!2"])
                  {- o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #) -}
 
-             (DeRefWeakOp, ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "!0")) (repWeak ty1) "deref" [] [])),
-             (FinalizeWeakOp, ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "(func () --> class '()')")) (repWeak ty1) "finalizer" [] [])),
+	DeRefWeakOp -> ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "!0")) (repWeak ty1) "deref" [] [])
+	FinalizeWeakOp -> ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "(func () --> class '()')")) (repWeak ty1) "finalizer" [] [])
                    {-    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
-                        (State# RealWorld -> (# State# RealWorld, Unit #)) #) -}
+	State# RealWorld -> (# State# RealWorld, Unit #)) #) -}
 
-             (MkForeignObjOp, simp_op (text "nop /* newobj void class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::.ctor(void *) */")),
-             (WriteForeignObjOp, simp_op (text "pop /* stfld void * class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::contents */ ")),
-             -- (ForeignObjToAddrOp, simp_op (text "ldfld void * class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::contents"),
-             (YieldOp, simp_op (text "call class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() 
-                                call void class [mscorlib]System.Threading.Thread::Suspend()")),
-             (MyThreadIdOp, simp_op (text "call default  class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() ")),
-             (KillThreadOp, simp_op (text "call instance void class [mscorlib]System.Threading.Thread::Abort(class [mscorlib]System.Object) ")),
+	MkForeignObjOp -> simp_op (text "nop /* newobj void class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::.ctor(void *) */")
+	WriteForeignObjOp -> simp_op (text "pop /* stfld void * class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::contents */ ")
+             -- (ForeignObjToAddrOp -> simp_op (text "ldfld void * class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::contents"))
+	YieldOp -> simp_op (text "call class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() 
+                                call void class [mscorlib]System.Threading.Thread::Suspend()")
+	MyThreadIdOp -> simp_op (text "call default  class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() ")
+	KillThreadOp -> simp_op (text "call instance void class [mscorlib]System.Threading.Thread::Abort(class [mscorlib]System.Object) ")
               {-   ThreadId# -> a -> State# RealWorld -> State# RealWorld -}
 
-             (ForkOp, ty1_op (\ty -> text "call default class [mscorlib]System.Threading.Thread " <+> ilxSupportClass <+> text "::fork<" <> ty <> text ">(thunk<!0>)")),
+	ForkOp -> ty1_op (\ty -> text "call default class [mscorlib]System.Threading.Thread " <+> ilxSupportClass <+> text "::fork<" <> ty <> text ">(thunk<!0>)")
 
-  	    (ParOp,  warn_op "ParOp" (simp_op (text "/* ParOp skipped... */ pop ldc.i4 0"))),
+	ParOp ->  warn_op "ParOp" (simp_op (text "/* ParOp skipped... */ pop ldc.i4 0"))
 
-            (DelayOp, simp_op (text "call void class [mscorlib]System.Threading.Thread::Sleep(int32) ")),
+	DelayOp -> simp_op (text "call void class [mscorlib]System.Threading.Thread::Sleep(int32) ")
                  {-    Int# -> State# s -> State# s -}
-  	    (WaitReadOp,  warn_op "WaitReadOp" (simp_op (text "/* WaitReadOp skipped... */ pop"))),
-   	    (WaitWriteOp,  warn_op "WaitWriteOp" (simp_op (text " /* WaitWriteOp skipped... */ pop")))
+
+	WaitReadOp  -> warn_op "WaitReadOp" (simp_op (text "/* WaitReadOp skipped... */ pop"))
+   	WaitWriteOp -> warn_op "WaitWriteOp" (simp_op (text " /* WaitWriteOp skipped... */ pop"))
+
+		-- DEFAULT CASE
+	other -> \env args -> ilxComment (simp_op (text "Unknown primop!:" <+> pprId op) env args)
 
 
-
-  ]
 
 ty1_op  op env ((StgTypeArg ty1):rest)  = 
        vcat (ilxMapPlaceArgs 1 pushArg env rest) $$ op (pprIlxTypeR env (deepIlxRepType ty1)) 
@@ -2069,6 +2078,6 @@ ty1_arg4_op  op env [(StgTypeArg ty1), a1, a2, a3, a4] =
 hd (h:t) = h
 hd2 (h:t) = h
 
-simp_op  op env args  = vcat (ilxMapPlaceArgs 0 pushArg env args) $$ op
-warn_op  warning f args  = trace ("WARNING! IlxGen cannot translate primop " ++ warning) (f args)
+simp_op  op env args    = vcat (ilxMapPlaceArgs 0 pushArg env args) $$ op
+warn_op  warning f args = trace ("WARNING! IlxGen cannot translate primop " ++ warning) (f args)
 \end{code}

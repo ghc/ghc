@@ -21,11 +21,17 @@ in a different DLL, by setting the DLL flag.
 \begin{code}
 module Module 
     (
-      Module, moduleName, packageOfModule,
-			    -- abstract, instance of Eq, Ord, Outputable
+      Module, 		   	-- Abstract, instance of Eq, Ord, Outputable
+
+    , PackageName		-- = FastString; instance of Outputable, Uniquable
+    , modulePackage		-- :: Module -> PackageName
+    , preludePackage		-- :: PackageName	name of Standard Prelude package
+
     , ModuleName
+    , pprModuleName		-- :: ModuleName -> SDoc
     , printModulePrefix
 
+    , moduleName		-- :: Module -> ModuleName 
     , moduleNameString		-- :: ModuleName -> EncodedString
     , moduleNameUserString	-- :: ModuleName -> UserString
     , moduleNameFS		-- :: ModuleName -> EncodedFS
@@ -45,8 +51,6 @@ module Module
 
     , pprModule,
  
-    , PackageName
-
 	-- Where to find a .hi file
     , WhereFrom(..)
 
@@ -65,8 +69,8 @@ module Module
 import OccName
 import Outputable
 import CmdLineOpts	( opt_InPackage )
-import FastString	( FastString, uniqueOfFS )
-import Unique		( Uniquable(..), mkUniqueGrimily )
+import FastString	( FastString )
+import Unique		( Uniquable(..) )
 import UniqFM
 import UniqSet
 \end{code}
@@ -94,7 +98,7 @@ renamer href here.)
 \begin{code}
 data Module = Module ModuleName PackageInfo
 
-data PackageInfo 
+data PackageInfo
   = ThisPackage				-- A module from the same package 
 					-- as the one being compiled
   | AnotherPackage PackageName		-- A module from a different package
@@ -103,18 +107,21 @@ data PackageInfo
 		-- Main case: we've come across Foo.x in an interface file
 		-- but we havn't yet opened Foo.hi.  We need a Name for Foo.x
 		-- Later on (in RnEnv.newTopBinder) we'll update the cache
-		-- to have the right PackageInfo
+		-- to have the right PackageName
 
 type PackageName = FastString		-- No encoding at all
 
 preludePackage :: PackageName
 preludePackage = SLIT("std")
 
+packageInfoPackage :: PackageInfo -> PackageName
+packageInfoPackage ThisPackage        = SLIT("<THIS>")
+packageInfoPackage DunnoYet	      = SLIT("<?>")
+packageInfoPackage (AnotherPackage p) = p
+
 instance Outputable PackageInfo where
 	-- Just used in debug prints of lex tokens and in debug modde
-   ppr ThisPackage        = ptext SLIT("<THIS>")
-   ppr DunnoYet		  = ptext SLIT("<?>")
-   ppr (AnotherPackage p) = ptext p
+   ppr pkg_info = ppr (packageInfoPackage pkg_info)
 \end{code}
 
 
@@ -152,7 +159,7 @@ newtype ModuleName = ModuleName EncodedFS
 	-- so the module names have the z-encoding applied to them
 
 instance Uniquable ModuleName where
-  getUnique (ModuleName nm) = mkUniqueGrimily (uniqueOfFS nm)
+  getUnique (ModuleName nm) = getUnique nm
 
 instance Eq ModuleName where
   nm1 == nm2 = getUnique nm1 == getUnique nm2
@@ -241,7 +248,7 @@ isHomeModule _                       = False
 
 -- Used temporarily when we first come across Foo.x in an interface
 -- file, but before we've opened Foo.hi.
--- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
+-- (Until we've opened Foo.hi we don't know what the Package is.)
 mkVanillaModule :: ModuleName -> Module
 mkVanillaModule name = Module name DunnoYet
 
@@ -254,12 +261,11 @@ moduleString (Module (ModuleName fs) _) = _UNPK_ fs
 moduleName :: Module -> ModuleName
 moduleName (Module mod pkg_info) = mod
 
+modulePackage :: Module -> PackageName
+modulePackage (Module mod pkg_info) = packageInfoPackage pkg_info
+
 moduleUserString :: Module -> UserString
 moduleUserString (Module mod _) = moduleNameUserString mod
-
-packageOfModule :: Module -> Maybe PackageName
-packageOfModule (Module nm (AnotherPackage pn)) = Just pn
-packageOfModule _                               = Nothing
 
 printModulePrefix :: Module -> Bool
   -- When printing, say M.x

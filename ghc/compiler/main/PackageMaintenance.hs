@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PackageMaintenance.hs,v 1.9 2001/03/08 11:44:16 simonmar Exp $
+-- $Id: PackageMaintenance.hs,v 1.10 2001/03/12 14:06:47 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -42,7 +42,7 @@ newPackage = do
   details <- readIORef v_Package_details
   hPutStr stdout "Reading package info from stdin... "
   stuff <- getContents
-  let new_pkg = read stuff :: Package
+  let new_pkg = read stuff :: PackageConfig
   catchAll new_pkg
   	(\_ -> throwDyn (OtherError "parse error in package info"))
   hPutStrLn stdout "done."
@@ -88,7 +88,7 @@ maybeRestoreOldConfig conf_file io
 	throw e
     )
 
-writeNewConfig :: String -> ([Package] -> [Package]) -> IO ()
+writeNewConfig :: String -> ([PackageConfig] -> [PackageConfig]) -> IO ()
 writeNewConfig conf_file fn = do
   hPutStr stdout "Writing new package config file... "
   old_details <- readIORef v_Package_details
@@ -109,14 +109,14 @@ savePackageConfig conf_file = do
 -----------------------------------------------------------------------------
 -- Pretty printing package info
 
-listPkgs :: [Package] -> String
+listPkgs :: [PackageConfig] -> String
 listPkgs pkgs = render (fsep (punctuate comma (map (text . name) pkgs)))
 
-dumpPackages :: [Package] -> String
+dumpPackages :: [PackageConfig] -> String
 dumpPackages pkgs = 
    render (brackets (vcat (punctuate comma (map dumpPkgGuts pkgs))))
 
-dumpPkgGuts :: Package -> Doc
+dumpPkgGuts :: PackageConfig -> Doc
 dumpPkgGuts pkg =
    text "Package" $$ nest 3 (braces (
       sep (punctuate comma [

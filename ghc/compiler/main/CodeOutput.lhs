@@ -32,7 +32,6 @@ import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 import TmpFiles		( newTempName )
-import UniqSupply	( mkSplitUniqSupply )
 
 import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}
@@ -74,7 +73,8 @@ codeOutput dflags mod_name tycons core_binds stg_binds
              HscJava        -> outputJava dflags filenm mod_name tycons core_binds
           		       >> return stub_names
 #ifdef ILX
-	     HscILX         -> outputIlx mod_name tycons stg_binds
+	     HscILX         -> outputIlx dflags filenm mod_name tycons stg_binds
+			       >> return stub_names
 #endif
 	}
 
@@ -155,8 +155,8 @@ outputJava dflags filenm mod tycons core_binds
 
 \begin{code}
 #ifdef ILX
-outputIlx mod tycons stg_binds
-  =  doOutput (\ f -> printForC f pp_ilx)
+outputIlx dflags filename mod tycons stg_binds
+  =  doOutput filename (\ f -> printForC f pp_ilx)
   where
     pp_ilx = ilxGen mod tycons stg_binds
 #endif

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.53 2001/02/27 15:26:04 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.54 2001/03/12 14:06:46 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -594,7 +594,7 @@ type LibrarySpec
 showLS (Left nm)  = "(static) " ++ nm
 showLS (Right nm) = "(dynamic) " ++ nm
 
-linkPackages :: [LibrarySpec] -> [Package] -> IO ()
+linkPackages :: [LibrarySpec] -> [PackageConfig] -> IO ()
 linkPackages cmdline_lib_specs pkgs
    = do mapM_ linkPackage pkgs
         mapM_ preloadLib cmdline_lib_specs
@@ -620,7 +620,7 @@ linkPackages cmdline_lib_specs pkgs
         croak = throwDyn (OtherError "user specified .o/.so/.DLL could not be loaded.")
 
 
-linkPackage :: Package -> IO ()
+linkPackage :: PackageConfig -> IO ()
 -- ignore rts and gmp for now (ToDo; better?)
 linkPackage pkg 
    | name pkg `elem` ["rts", "gmp"] 
