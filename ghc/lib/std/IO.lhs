@@ -738,12 +738,14 @@ readLn          =  do l <- getLine
 
 #else
 \begin{code}
+import Ix(Ix)
+
 unimp :: String -> a
 unimp s = error ("function not implemented: " ++ s)
 
-type FILE_STAR = Int
-type Ptr       = Int
-nULL = 0 :: Int
+type FILE_STAR = Addr
+type Ptr       = Addr
+nULL           = nullAddr
 
 data Handle 
    = Handle { name     :: FilePath,
@@ -760,7 +762,7 @@ instance Eq Handle where
    h1 == h2   = file h1 == file h2
 
 instance Show Handle where
-   showsPrec _ h = showString ("<<handle " ++ name h ++ "=" ++ show (file h) ++ ">>")
+   showsPrec _ h = showString ("<<handle " ++ name h ++ ">>")
 
 data HandlePosn
    = HandlePosn 
@@ -878,7 +880,7 @@ hPutStr h s
         write_all f []
            = return ()
         write_all f (c:cs)
-           = nh_write f (primCharToInt c) >>
+           = nh_write f c >>
              write_all f cs
 
 hPutChar              :: Handle -> Char -> IO ()
@@ -946,8 +948,7 @@ bracket_ before after m = do
          case rs of
             Right r -> return r
             Left  e -> ioError e
-
--- TODO: Hugs/slurbFile
+-- TODO: Hugs/slurpFile
 slurpFile = unimp "slurpFile"
 \end{code}
 #endif
