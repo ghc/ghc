@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 2000/04/11 11:48:13 simonmar Exp $
+# $Id: Makefile,v 1.7 2000/04/11 11:53:47 simonmar Exp $
 #
 # (c) The GHC Team, 1999-2000
 #
@@ -27,6 +27,9 @@ NOT_THESE += andy_cherry barton-mangler-bug callback cvh_unboxing dmgob_native1 
 
 NOT_THESE += jeff-bug lennart_array
 #       compiles but doesn't run
+
+NOT_THESE += dmgob_native1 dmgob_native2
+#	Native library doens't exist
 
 SUBDIRS = $(filter-out $(patsubst %, %/, $(NOT_THESE)), $(wildcard */))
 
