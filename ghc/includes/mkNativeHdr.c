@@ -1,11 +1,13 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.8 2002/01/08 10:36:24 sewardj Exp $
+ * $Id: mkNativeHdr.c,v 1.9 2002/07/17 09:21:49 simonmar Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
  * Generate a header for the native code generator
  *
  * ------------------------------------------------------------------------*/
+
+#include <stdio.h>
 
 #include "Stg.h"
 

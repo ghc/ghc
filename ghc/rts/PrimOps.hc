@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.99 2002/06/26 08:18:41 stolz Exp $
+ * $Id: PrimOps.hc,v 1.100 2002/07/17 09:21:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -21,6 +21,12 @@
 #include "StgRun.h"
 #include "Itimer.h"
 #include "Prelude.h"
+
+#ifdef HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+
+#include <stdlib.h>
 
 /* ** temporary **
 

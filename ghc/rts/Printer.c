@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.51 2002/02/04 20:26:25 sof Exp $
+ * $Id: Printer.c,v 1.52 2002/07/17 09:21:50 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -11,6 +11,8 @@
 #include "Rts.h"
 #include "Printer.h"
 
+#include <stdio.h>
+
 #ifdef DEBUG
 
 #include "RtsUtils.h"
@@ -20,7 +22,8 @@
 #include "Bytecodes.h"  /* for InstrPtr */
 #include "Disassembler.h"
 
-#include "Printer.h"
+#include <stdlib.h>
+#include <string.h>
 
 #if defined(GRAN) || defined(PAR)
 // HWL: explicit fixed header size to make debugging easier

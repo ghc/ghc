@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   $Id: Arena.c,v 1.1 2001/10/18 14:41:01 simonmar Exp $ 
+   $Id: Arena.c,v 1.2 2002/07/17 09:21:49 simonmar Exp $ 
    (c) The University of Glasgow 2001
 
    Arena allocation.  Arenas provide fast memory allocation at the
@@ -23,6 +23,8 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "Arena.h"
+
+#include <stdlib.h>
 
 // Each arena struct is allocated using malloc().
 struct _Arena {

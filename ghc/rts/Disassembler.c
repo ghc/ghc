@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.24 $
- * $Date: 2001/08/14 13:40:09 $
+ * $Revision: 1.25 $
+ * $Date: 2002/07/17 09:21:49 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
@@ -23,6 +23,8 @@
 #include "Printer.h"
 #include "Disassembler.h"
 #include "Interpreter.h"
+
+#include <stdio.h>
 
 /* --------------------------------------------------------------------------
  * Disassembler

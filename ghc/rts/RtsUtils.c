@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.25 2002/05/18 05:28:14 ken Exp $
+ * $Id: RtsUtils.c,v 1.26 2002/07/17 09:21:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -31,6 +31,8 @@
 #include <sys/time.h>
 #endif
 
+#include <stdlib.h>
+#include <string.h>
 #include <stdarg.h>
 
 /* variable-argument error function. */

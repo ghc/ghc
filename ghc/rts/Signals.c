@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.25 2002/07/02 12:24:48 simonmar Exp $
+ * $Id: Signals.c,v 1.26 2002/07/17 09:21:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,8 +19,18 @@
 #include "StablePriv.h"
 
 #ifdef alpha_TARGET_ARCH
-#include <machine/fpu.h>
+# include <machine/fpu.h>
 #endif
+
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+
+#ifdef HAVE_SIGNAL_H
+# include <signal.h>
+#endif
+
+#include <stdlib.h>
 
 #ifndef mingw32_TARGET_OS
 
@@ -187,7 +197,7 @@ awaitUserSignals(void)
  * -------------------------------------------------------------------------- */
 
 StgInt 
-stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
+stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, void *mask)
 {
     sigset_t signals;
     struct sigaction action;
@@ -228,8 +238,8 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
         barf("stg_sig_install: bad spi");
     }
 
-    if (mask != 0)
-        action.sa_mask = *mask;
+    if (mask != NULL)
+        action.sa_mask = *(sigset_t *)mask;
     else
 	sigemptyset(&action.sa_mask);
 

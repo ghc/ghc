@@ -2,6 +2,8 @@
 #include "PosixSource.h"
 #include "ThreadLabels.h"
 
+#include <stdlib.h>
+
 HashTable * threadLabels = NULL;
 
 void

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.13 2001/11/08 14:42:11 simonmar Exp $
+ * $Id: BlockAlloc.c,v 1.14 2002/07/17 09:21:49 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -22,6 +22,8 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
+
+#include <string.h>
 
 static void    initMBlock(void *mblock);
 static bdescr *allocMegaGroup(nat mblocks);

@@ -1,11 +1,13 @@
 /* -----------------------------------------------------------------------------
- * $Id: MallocFail.c,v 1.2 1998/12/02 13:29:12 simonm Exp $
+ * $Id: MallocFail.c,v 1.3 2002/07/17 09:21:51 simonmar Exp $
  *
  * User-overridable RTS hooks.
  *
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+
+#include <stdio.h>
 
 void
 MallocFailHook (lnat request_size /* in bytes */, char *msg)

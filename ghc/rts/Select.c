@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.20 2002/07/09 20:44:24 sof Exp $
+ * $Id: Select.c,v 1.21 2002/07/17 09:21:51 simonmar Exp $
  *
- * (c) The GHC Team 1995-1999
+ * (c) The GHC Team 1995-2002
  *
  * Support for concurrent non-blocking I/O and thread waiting.
  *
@@ -28,6 +28,9 @@
 # ifdef mingw32_TARGET_OS
 #  include <windows.h>
 # endif
+
+#include <errno.h>
+#include <string.h>
 
 /* last timestamp */
 nat timestamp = 0;

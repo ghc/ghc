@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.c,v 1.8 2002/04/09 12:55:11 simonmar Exp $
+ * $Id: Hash.c,v 1.9 2002/07/17 09:21:49 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1995-1998
  * (c) The GHC Team, 1999
@@ -13,6 +13,9 @@
 #include "Rts.h"
 #include "Hash.h"
 #include "RtsUtils.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 #define HSEGSIZE    1024    /* Size of a single hash table segment */
 			    /* Also the minimum size of a hash table */

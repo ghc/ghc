@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.28 2002/04/12 04:00:35 sof Exp $
+ * $Id: MBlock.c,v 1.29 2002/07/17 09:21:50 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -39,6 +39,8 @@
 #if HAVE_WINDOWS_H
 #include <windows.h>
 #endif
+
+#include <errno.h>
 
 lnat mblocks_allocated = 0;
 

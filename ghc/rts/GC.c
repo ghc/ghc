@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.136 2002/07/10 09:28:54 simonmar Exp $
+ * $Id: GC.c,v 1.137 2002/07/17 09:21:49 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -44,6 +44,8 @@
 
 #include "RetainerProfile.h"
 #include "LdvProfile.h"
+
+#include <string.h>
 
 /* STATIC OBJECT LIST.
  *

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.56 2001/12/12 14:31:43 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.57 2002/07/17 09:21:50 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -36,6 +36,9 @@
 #ifdef HAVE_CTYPE_H
 #include <ctype.h>
 #endif
+
+#include <stdlib.h>
+#include <string.h>
 
 extern struct RTS_FLAGS RtsFlags;
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgPrimFloat.c,v 1.8 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: StgPrimFloat.c,v 1.9 2002/07/17 09:21:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -9,6 +9,8 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+
+#include <math.h>
 
 /*
  * Encoding and decoding Doubles.  Code based on the HBC code

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.64 2002/06/26 08:18:41 stolz Exp $
+ * $Id: RtsStartup.c,v 1.65 2002/07/17 09:21:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -49,6 +49,8 @@
 # include "Parallel.h"
 # include "LLC.h"
 #endif
+
+#include <stdlib.h>
 
 /*
  * Flag Structure

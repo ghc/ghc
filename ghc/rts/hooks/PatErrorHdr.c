@@ -1,11 +1,15 @@
 /* -----------------------------------------------------------------------------
- * $Id: PatErrorHdr.c,v 1.2 1998/12/02 13:29:15 simonm Exp $
+ * $Id: PatErrorHdr.c,v 1.3 2002/07/17 09:21:51 simonmar Exp $
  *
  * User-overridable RTS hooks.
  *
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 void
 PatErrorHdrHook (long fd)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.46 2002/06/03 13:08:41 matthewc Exp $
+ * $Id: Stg.h,v 1.47 2002/07/17 09:21:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -185,22 +185,6 @@ typedef StgWord64       LW_;
 
 /* RTS public interface */
 #include "RtsAPI.h"
-
-/* these are all ANSI C headers */
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <assert.h>
-#include <errno.h>
-#include <stdio.h>
-
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
-
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 
 #ifdef SMP
 #include <pthread.h>

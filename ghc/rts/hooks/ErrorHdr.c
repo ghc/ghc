@@ -1,11 +1,15 @@
 /* -----------------------------------------------------------------------------
- * $Id: ErrorHdr.c,v 1.2 1998/12/02 13:29:11 simonm Exp $
+ * $Id: ErrorHdr.c,v 1.3 2002/07/17 09:21:51 simonmar Exp $
  *
  * User-overridable RTS hooks.
  *
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 void
 ErrorHdrHook (long fd)

@@ -1,11 +1,13 @@
 /* -----------------------------------------------------------------------------
- * $Id: NoRunnableThreads.c,v 1.2 1998/12/02 13:29:13 simonm Exp $
+ * $Id: NoRunnableThreads.c,v 1.3 2002/07/17 09:21:51 simonmar Exp $
  *
  * User-overridable RTS hooks.
  *
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+
+#include <stdio.h>
 
 /*
   Hook to invoke when there's nothing left on the runnable threads

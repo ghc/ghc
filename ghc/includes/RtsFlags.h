@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.41 2001/12/12 14:58:26 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.42 2002/07/17 09:21:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,8 @@
 
 #ifndef RTSFLAGS_H
 #define RTSFLAGS_H
+
+#include <stdio.h>
 
 /* For defaults, see the @initRtsFlagsDefaults@ routine. */
 

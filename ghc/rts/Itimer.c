@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.29 2001/11/27 01:57:59 sof Exp $
+ * $Id: Itimer.c,v 1.30 2002/07/17 09:21:49 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -43,6 +43,10 @@
 # include <windows.h>
 #endif
  
+#ifdef HAVE_SIGNAL_H
+# include <signal.h>
+#endif
+
 lnat total_ticks = 0;
 
 /* ticks left before next pre-emptive context switch */

@@ -1,11 +1,12 @@
 /* -----------------------------------------------------------------------------
- * $Id: OutOfHeap.c,v 1.3 1999/06/29 13:06:45 panne Exp $
+ * $Id: OutOfHeap.c,v 1.4 2002/07/17 09:21:51 simonmar Exp $
  *
  * User-overridable RTS hooks.
  *
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include <stdio.h>
 
 void
 OutOfHeapHook (lnat request_size, lnat heap_size) /* both sizes in bytes */

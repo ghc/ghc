@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.66 2002/05/14 08:17:38 matthewc Exp $
+ * $Id: Storage.c,v 1.67 2002/07/17 09:21:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,6 +25,9 @@
 #include "StoragePriv.h"
 
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
+
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef darwin_TARGET_OS
 #include <mach-o/getsect.h>

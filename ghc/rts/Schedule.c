@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.147 2002/07/10 09:28:56 simonmar Exp $
+ * $Id: Schedule.c,v 1.148 2002/07/17 09:21:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -122,6 +122,8 @@
 #include <unistd.h>
 #endif
 
+#include <string.h>
+#include <stdlib.h>
 #include <stdarg.h>
 
 //@node Variables and Data structures, Prototypes, Includes, Main scheduling code
