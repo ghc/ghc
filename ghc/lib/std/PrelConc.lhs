@@ -20,9 +20,9 @@ module PrelConc(
     ) where
 
 import PrelBase
+import {-# SOURCE #-} PrelErr ( parError )
 import PrelST	  	( ST(..), STret(..), StateAndPtr#(..) )
 import PrelIOBase	( IO(..), IOResult(..), MVar(..) )
-import PrelErr		( parError )
 import PrelBase		( Int(..) )
 import PrelGHC		( fork#, delay#, waitRead#, waitWrite#,
 		  	  SynchVar#, newSynchVar#, takeMVar#, putMVar#,
