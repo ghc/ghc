@@ -29,10 +29,12 @@ test "rn033" { vtc("") }
 test "rn034" { vtc("") }
 test "rn035" { vtc("") }
 test "rn036" { vtc("") }
-
+	
 -- really a mulit-module test:
 test "Rn037Help" { vtc("") }
 test "rn037"     { vtc("") }
+
+test "rn038" { $expect = "fail" vtc("") }
 
 test "timing001" { vtc("") }
 test "timing002" { vtc("") }
