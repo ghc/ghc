@@ -2675,9 +2675,10 @@ libraries automatically; these are:
 </Para>
 
 <Para>
-If you are using a Haskell &ldquo;system library&rdquo; (e.g., the POSIX
-library), just use the <Option>-package posix</Option> option, and the correct code
-should be linked in.
+If you are using a Haskell &ldquo;package&rdquo; (e.g., the POSIX
+library), just use the <Option>-package posix</Option> option, and the
+correct code should be linked in.  See <xref linkend="packages"> for
+more details.
 </Para>
 </ListItem>
 </VarListEntry>
