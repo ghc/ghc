@@ -80,10 +80,12 @@ regexec :: Regex			-- ^ Compiled regular expression
 	 	-- ^ Returns: 'Nothing' if the regex did not match the
 		-- string, or:
 		--
-		--  > 'Just' (everything before match,
-		--  >       matched portion,
-		--  >       everything after match,
-		--  >       subexpression matches)
+		-- @
+		--   'Just' (everything before match,
+		--         matched portion,
+		--         everything after match,
+		--         subexpression matches)
+		-- @
 
 regexec (Regex regex_fptr) str = do
   withCString str $ \cstr -> do
