@@ -48,6 +48,8 @@ module StgInterp (
 
 #include "HsVersions.h"
 
+
+
 import Linker
 import Id 		( Id, idPrimRep )
 import Outputable
@@ -65,7 +67,7 @@ import Util
 import UniqFM
 import UniqSet
 
-import {-# SOURCE #-} MCI_make_constr
+--import {-# SOURCE #-} MCI_make_constr
 
 import FastString
 import GlaExts		( Int(..) )
@@ -93,6 +95,26 @@ import PrelGHC		--( unsafeCoerce#, dataToTag#,
 			--  indexPtrOffClosure#, indexWordOffClosure# )
 import PrelAddr 	( Addr(..) )
 import PrelFloat	( Float(..), Double(..) )
+
+
+#if 1
+interp = panic "interp"
+stgExprToInterpSyn = panic "stgExprToInterpSyn"
+stgBindsToInterpSyn = panic "stgBindsToInterpSyn"
+iExprToHValue = panic "iExprToHValue"
+linkIModules = panic "linkIModules"
+filterNameMap = panic "filterNameMap"
+type ItblEnv    = FiniteMap Name (Ptr StgInfoTable)
+type ClosureEnv = FiniteMap Name HValue
+data StgInfoTable = StgInfoTable {
+   ptrs :: Word16,
+   nptrs :: Word16,
+   srtlen :: Word16,
+   tipe :: Word16,
+   code0, code1, code2, code3, code4, code5, code6, code7 :: Word8
+}
+
+#else
 
 -- ---------------------------------------------------------------------------
 -- Environments needed by the linker
@@ -179,8 +201,6 @@ conapp2expr ie dcon args
                  (rearranged, offsets) = unzip rearranged_w_offsets
              in
                  rearranged
-
-foreign label "PrelBase_Izh_con_info" prelbase_Izh_con_info :: Addr
 
 -- Handle most common cases specially; do the rest with a generic
 -- mechanism (deferred till later :)
@@ -1399,5 +1419,7 @@ load addr = do x <- peek addr
 -----------------------------------------------------------------------------q
 
 foreign import "strncpy" strncpy :: Ptr a -> ByteArray# -> CInt -> IO ()
+#endif
+
 \end{code}
 
