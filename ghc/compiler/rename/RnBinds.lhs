@@ -160,12 +160,18 @@ rnTopMonoBinds mbinds sigs
     in
     renameSigsFVs (okBindSig bndr_name_set) sigs 	`thenM` \ (siglist, sig_fvs) ->
 
-    ifOptM Opt_WarnMissingSigs (
+	-- Warn about missing signatures, but not in interface mode
+	-- (This is important when renaming bindings from 'deriving' clauses.)
+    getModeRn						`thenM` \ mode ->
+    doptM Opt_WarnMissingSigs 				`thenM` \ warn_missing_sigs ->
+    (if not (isInterfaceMode mode && warn_missing_sigs) then
 	let
 	    type_sig_vars   = [n | Sig n _ _ <- siglist]
 	    un_sigd_binders = nameSetToList (delListFromNameSet bndr_name_set type_sig_vars)
 	in
         mappM_ missingSigWarn un_sigd_binders
+     else
+	returnM ()  
     )						`thenM_`
 
     rn_mono_binds siglist mbinds		`thenM` \ (final_binds, bind_fvs) ->
