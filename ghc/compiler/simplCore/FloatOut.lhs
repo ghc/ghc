@@ -16,18 +16,19 @@ IMPORT_1_3(List(partition))
 import CoreSyn
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_simplifier_stats )
-import CostCentre	( dupifyCC )
+import CostCentre	( dupifyCC, CostCentre )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, SYN_IE(IdEnv),
-			  GenId{-instance Outputable-}
+			  GenId{-instance Outputable-}, SYN_IE(Id)
 			)
 import Outputable	( Outputable(..){-instance (,)-} )
 import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenTyVar )
-import Pretty		( ppInt, ppPStr, ppBesides, ppAboves )
+import Pretty		( Doc, int, ptext, hcat, vcat )
 import SetLevels	-- all of it
-import TyVar		( GenTyVar{-instance Eq-} )
+import TyVar		( GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
 import Unique		( Unique{-instance Eq-} )
+import UniqSupply       ( UniqSupply )
 import Usage		( SYN_IE(UVar) )
 import Util		( pprTrace, panic )
 \end{code}
@@ -96,7 +97,7 @@ floatOutwards us pgm
 
     (if opt_D_verbose_core2core
      then pprTrace "Levels added:\n"
-		   (ppAboves (map (ppr PprDebug) annotated_w_levels))
+		   (vcat (map (ppr PprDebug) annotated_w_levels))
      else id
     )
     ( if not (opt_D_simplifier_stats) then
@@ -105,10 +106,10 @@ floatOutwards us pgm
 	 let
 	    (tlets, ntlets, lams) = get_stats (sum_stats fss)
 	 in
-	 pprTrace "FloatOut stats: " (ppBesides [
-		ppInt tlets,  ppPStr SLIT(" Lets floated to top level; "),
-		ppInt ntlets, ppPStr SLIT(" Lets floated elsewhere; from "),
-		ppInt lams,   ppPStr SLIT(" Lambda groups")])
+	 pprTrace "FloatOut stats: " (hcat [
+		int tlets,  ptext SLIT(" Lets floated to top level; "),
+		int ntlets, ptext SLIT(" Lets floated elsewhere; from "),
+		int lams,   ptext SLIT(" Lambda groups")])
     )
     concat final_toplev_binds_s
     }}
