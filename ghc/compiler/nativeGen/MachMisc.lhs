@@ -435,6 +435,34 @@ data RI
 #endif {- alpha_TARGET_ARCH -}
 \end{code}
 
+Intel, in their infinite wisdom, selected a stack model for floating
+point registers on x86.  That might have made sense back in 1979 --
+nowadays we can see it for the nonsense it really is.  A stack model
+fits poorly with the existing nativeGen infrastructure, which assumes
+flat integer and FP register sets.  Prior to this commit, nativeGen
+could not generate correct x86 FP code -- to do so would have meant
+somehow working the register-stack paradigm into the register
+allocator and spiller, which sounds very difficult.
+  
+We have decided to cheat, and go for a simple fix which requires no
+infrastructure modifications, at the expense of generating ropey but
+correct FP code.  All notions of the x86 FP stack and its insns have
+been removed.  Instead, we pretend (to the instruction selector and
+register allocator) that x86 has six floating point registers, %fake0
+.. %fake5, which can be used in the usual flat manner.  We further
+claim that x86 has floating point instructions very similar to SPARC
+and Alpha, that is, a simple 3-operand register-register arrangement.
+Code generation and register allocation proceed on this basis.
+  
+When we come to print out the final assembly, our convenient fiction
+is converted to dismal reality.  Each fake instruction is
+independently converted to a series of real x86 instructions.
+%fake0 .. %fake5 are mapped to %st(0) .. %st(5).  To do reg-reg
+arithmetic operations, the two operands are pushed onto the top of the
+FP stack, the operation done, and the result copied back into the
+relevant register.  There are only six %fake registers because 2 are
+needed for the translation, and x86 has 8 in total.
+
 \begin{code}
 #if i386_TARGET_ARCH
 
