@@ -46,6 +46,9 @@ import Data.IORef
 import System.IO.Unsafe	 ( unsafePerformIO )
 #endif
 
+import Foreign
+import Foreign.C
+
 #if __GLASGOW_HASKELL__ < 500
 import Regex
 import PackedString
