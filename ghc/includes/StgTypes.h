@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.5 1999/03/02 19:44:21 sof Exp $
+ * $Id: StgTypes.h,v 1.6 1999/07/15 16:11:29 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -132,7 +132,7 @@ typedef StgWord64	       LW_;
  */
 typedef StgWord            StgStablePtr;
 
-#define STABLEPTR_WEIGHT_MASK   (0xff << ((sizeof(StgWord)-1) * BITS_PER_BYTE))
+#define STABLEPTR_WEIGHT_MASK   ((StgWord)0xff << ((sizeof(StgWord)-1) * BITS_PER_BYTE))
 #define STABLEPTR_WEIGHT_SHIFT  (BITS_IN(StgWord) - 8)
 
 /*
