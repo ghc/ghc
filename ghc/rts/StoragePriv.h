@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.19 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.20 2002/03/12 11:51:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -28,8 +28,12 @@ extern StgTSO *relocate_stack(StgTSO *dest, ptrdiff_t diff);
 extern StgClosure *static_objects;
 extern StgClosure *scavenged_static_objects;
 
+extern StgWeak *old_weak_ptr_list;
+
 extern StgWeak    *weak_ptr_list;
 extern StgClosure *caf_list;
+
+extern StgTSO *resurrected_threads;
 
 extern bdescr *small_alloc_list;
 extern bdescr *large_alloc_list;

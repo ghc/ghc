@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.132 2002/02/18 17:27:24 sof Exp $
+ * $Id: Schedule.c,v 1.133 2002/03/12 11:51:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -119,35 +119,10 @@
 //@node Variables and Data structures, Prototypes, Includes, Main scheduling code
 //@subsection Variables and Data structures
 
-/* Main threads:
- *
- * These are the threads which clients have requested that we run.  
- *
- * In a 'threaded' build, we might have several concurrent clients all
- * waiting for results, and each one will wait on a condition variable
- * until the result is available.
- *
- * In non-SMP, clients are strictly nested: the first client calls
- * into the RTS, which might call out again to C with a _ccall_GC, and
- * eventually re-enter the RTS.
- *
- * Main threads information is kept in a linked list:
- */
-//@cindex StgMainThread
-typedef struct StgMainThread_ {
-  StgTSO *         tso;
-  SchedulerStatus  stat;
-  StgClosure **    ret;
-#if defined(RTS_SUPPORTS_THREADS)
-  Condition        wakeup;
-#endif
-  struct StgMainThread_ *link;
-} StgMainThread;
-
 /* Main thread queue.
  * Locks required: sched_mutex.
  */
-static StgMainThread *main_threads;
+StgMainThread *main_threads;
 
 /* Thread queues.
  * Locks required: sched_mutex.
@@ -2296,9 +2271,6 @@ GetRoots(evac_fn evac)
   }
 #endif 
 
-  for (m = main_threads; m != NULL; m = m->link) {
-      evac((StgClosure **)&m->tso);
-  }
   if (suspended_ccalling_threads != END_TSO_QUEUE) {
       evac((StgClosure **)&suspended_ccalling_threads);
   }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.131 2002/03/07 17:53:05 keithw Exp $
+ * $Id: GC.c,v 1.132 2002/03/12 11:50:02 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -99,12 +99,17 @@ static nat evac_gen;
 /* Weak pointers
  */
 StgWeak *old_weak_ptr_list; // also pending finaliser list
-static rtsBool weak_done;	   // all done for this pass
+
+/* Which stage of processing various kinds of weak pointer are we at?
+ * (see traverse_weak_ptr_list() below for discussion).
+ */
+typedef enum { WeakPtrs, WeakThreads, WeakDone } WeakStage;
+static WeakStage weak_stage;
 
 /* List of all threads during GC
  */
 static StgTSO *old_all_threads;
-static StgTSO *resurrected_threads;
+StgTSO *resurrected_threads;
 
 /* Flag indicating failure to evacuate an object to the desired
  * generation.
@@ -497,7 +502,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   mark_weak_ptr_list(&weak_ptr_list);
   old_weak_ptr_list = weak_ptr_list;
   weak_ptr_list = NULL;
-  weak_done = rtsFalse;
+  weak_stage = WeakPtrs;
 
   /* The all_threads list is like the weak_ptr_list.  
    * See traverse_weak_ptr_list() for the details.
@@ -581,10 +586,30 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
     if (flag) { goto loop; }
 
-    // must be last... 
+    // must be last...  invariant is that everything is fully
+    // scavenged at this point.
     if (traverse_weak_ptr_list()) { // returns rtsTrue if evaced something 
       goto loop;
     }
+  }
+
+  /* Update the pointers from the "main thread" list - these are
+   * treated as weak pointers because we want to allow a main thread
+   * to get a BlockedOnDeadMVar exception in the same way as any other
+   * thread.  Note that the threads should all have been retained by
+   * GC by virtue of being on the all_threads list, we're just
+   * updating pointers here.
+   */
+  {
+      StgMainThread *m;
+      StgTSO *tso;
+      for (m = main_threads; m != NULL; m = m->link) {
+	  tso = (StgTSO *) isAlive((StgClosure *)m->tso);
+	  if (tso == NULL) {
+	      barf("main thread has been GC'd");
+	  }
+	  m->tso = tso;
+      }
   }
 
 #if defined(PAR)
@@ -1024,6 +1049,30 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
    older generations than the one we're collecting.  This could
    probably be optimised by keeping per-generation lists of weak
    pointers, but for a few weak pointers this scheme will work.
+
+   There are three distinct stages to processing weak pointers:
+
+   - weak_stage == WeakPtrs
+
+     We process all the weak pointers whos keys are alive (evacuate
+     their values and finalizers), and repeat until we can find no new
+     live keys.  If no live keys are found in this pass, then we
+     evacuate the finalizers of all the dead weak pointers in order to
+     run them.
+
+   - weak_stage == WeakThreads
+
+     Now, we discover which *threads* are still alive.  Pointers to
+     threads from the all_threads and main thread lists are the
+     weakest of all: a pointers from the finalizer of a dead weak
+     pointer can keep a thread alive.  Any threads found to be unreachable
+     are evacuated and placed on the resurrected_threads list so we 
+     can send them a signal later.
+
+   - weak_stage == WeakDone
+
+     No more evacuation is done.
+
    -------------------------------------------------------------------------- */
 
 static rtsBool 
@@ -1033,127 +1082,144 @@ traverse_weak_ptr_list(void)
   StgClosure *new;
   rtsBool flag = rtsFalse;
 
-  if (weak_done) { return rtsFalse; }
+  switch (weak_stage) {
 
-  /* doesn't matter where we evacuate values/finalizers to, since
-   * these pointers are treated as roots (iff the keys are alive).
-   */
-  evac_gen = 0;
+  case WeakDone:
+      return rtsFalse;
 
-  last_w = &old_weak_ptr_list;
-  for (w = old_weak_ptr_list; w != NULL; w = next_w) {
-
-    /* There might be a DEAD_WEAK on the list if finalizeWeak# was
-     * called on a live weak pointer object.  Just remove it.
-     */
-    if (w->header.info == &stg_DEAD_WEAK_info) {
-      next_w = ((StgDeadWeak *)w)->link;
-      *last_w = next_w;
-      continue;
-    }
-
-    ASSERT(get_itbl(w)->type == WEAK);
-
-    /* Now, check whether the key is reachable.
-     */
-    new = isAlive(w->key);
-    if (new != NULL) {
-      w->key = new;
-      // evacuate the value and finalizer 
-      w->value = evacuate(w->value);
-      w->finalizer = evacuate(w->finalizer);
-      // remove this weak ptr from the old_weak_ptr list 
-      *last_w = w->link;
-      // and put it on the new weak ptr list 
-      next_w  = w->link;
-      w->link = weak_ptr_list;
-      weak_ptr_list = w;
-      flag = rtsTrue;
-      IF_DEBUG(weak, belch("Weak pointer still alive at %p -> %p", w, w->key));
-      continue;
-    }
-    else {
-      last_w = &(w->link);
-      next_w = w->link;
-      continue;
-    }
-  }
-
-  /* Now deal with the all_threads list, which behaves somewhat like
-   * the weak ptr list.  If we discover any threads that are about to
-   * become garbage, we wake them up and administer an exception.
-   */
-  {
-    StgTSO *t, *tmp, *next, **prev;
-
-    prev = &old_all_threads;
-    for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
-
-      (StgClosure *)tmp = isAlive((StgClosure *)t);
+  case WeakPtrs:
+      /* doesn't matter where we evacuate values/finalizers to, since
+       * these pointers are treated as roots (iff the keys are alive).
+       */
+      evac_gen = 0;
       
-      if (tmp != NULL) {
-	  t = tmp;
+      last_w = &old_weak_ptr_list;
+      for (w = old_weak_ptr_list; w != NULL; w = next_w) {
+	  
+	  /* There might be a DEAD_WEAK on the list if finalizeWeak# was
+	   * called on a live weak pointer object.  Just remove it.
+	   */
+	  if (w->header.info == &stg_DEAD_WEAK_info) {
+	      next_w = ((StgDeadWeak *)w)->link;
+	      *last_w = next_w;
+	      continue;
+	  }
+	  
+	  ASSERT(get_itbl(w)->type == WEAK);
+	  
+	  /* Now, check whether the key is reachable.
+	   */
+	  new = isAlive(w->key);
+	  if (new != NULL) {
+	      w->key = new;
+	      // evacuate the value and finalizer 
+	      w->value = evacuate(w->value);
+	      w->finalizer = evacuate(w->finalizer);
+	      // remove this weak ptr from the old_weak_ptr list 
+	      *last_w = w->link;
+	      // and put it on the new weak ptr list 
+	      next_w  = w->link;
+	      w->link = weak_ptr_list;
+	      weak_ptr_list = w;
+	      flag = rtsTrue;
+	      IF_DEBUG(weak, belch("Weak pointer still alive at %p -> %p", 
+				   w, w->key));
+	      continue;
+	  }
+	  else {
+	      last_w = &(w->link);
+	      next_w = w->link;
+	      continue;
+	  }
+      }
+      
+      /* If we didn't make any changes, then we can go round and kill all
+       * the dead weak pointers.  The old_weak_ptr list is used as a list
+       * of pending finalizers later on.
+       */
+      if (flag == rtsFalse) {
+	  for (w = old_weak_ptr_list; w; w = w->link) {
+	      w->finalizer = evacuate(w->finalizer);
+	  }
+
+	  // Next, move to the WeakThreads stage after fully
+	  // scavenging the finalizers we've just evacuated.
+	  weak_stage = WeakThreads;
       }
 
-      ASSERT(get_itbl(t)->type == TSO);
-      switch (t->what_next) {
-      case ThreadRelocated:
-	  next = t->link;
-	  *prev = next;
-	  continue;
-      case ThreadKilled:
-      case ThreadComplete:
-	  // finshed or died.  The thread might still be alive, but we
-	  // don't keep it on the all_threads list.  Don't forget to
-	  // stub out its global_link field.
-	  next = t->global_link;
-	  t->global_link = END_TSO_QUEUE;
-	  *prev = next;
-	  continue;
-      default:
-	  ;
-      }
+      return rtsTrue;
 
-      if (tmp == NULL) {
-	  // not alive (yet): leave this thread on the old_all_threads list.
-	  prev = &(t->global_link);
-	  next = t->global_link;
-      } 
-      else {
-	  // alive: move this thread onto the all_threads list.
-	  next = t->global_link;
-	  t->global_link = all_threads;
-	  all_threads  = t;
-	  *prev = next;
+  case WeakThreads:
+      /* Now deal with the all_threads list, which behaves somewhat like
+       * the weak ptr list.  If we discover any threads that are about to
+       * become garbage, we wake them up and administer an exception.
+       */
+      {
+	  StgTSO *t, *tmp, *next, **prev;
+	  
+	  prev = &old_all_threads;
+	  for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
+	      
+	      (StgClosure *)tmp = isAlive((StgClosure *)t);
+	      
+	      if (tmp != NULL) {
+		  t = tmp;
+	      }
+	      
+	      ASSERT(get_itbl(t)->type == TSO);
+	      switch (t->what_next) {
+	      case ThreadRelocated:
+		  next = t->link;
+		  *prev = next;
+		  continue;
+	      case ThreadKilled:
+	      case ThreadComplete:
+		  // finshed or died.  The thread might still be alive, but we
+		  // don't keep it on the all_threads list.  Don't forget to
+		  // stub out its global_link field.
+		  next = t->global_link;
+		  t->global_link = END_TSO_QUEUE;
+		  *prev = next;
+		  continue;
+	      default:
+		  ;
+	      }
+	      
+	      if (tmp == NULL) {
+		  // not alive (yet): leave this thread on the
+		  // old_all_threads list.
+		  prev = &(t->global_link);
+		  next = t->global_link;
+	      } 
+	      else {
+		  // alive: move this thread onto the all_threads list.
+		  next = t->global_link;
+		  t->global_link = all_threads;
+		  all_threads  = t;
+		  *prev = next;
+	      }
+	  }
       }
-    }
+      
+      /* And resurrect any threads which were about to become garbage.
+       */
+      {
+	  StgTSO *t, *tmp, *next;
+	  for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
+	      next = t->global_link;
+	      (StgClosure *)tmp = evacuate((StgClosure *)t);
+	      tmp->global_link = resurrected_threads;
+	      resurrected_threads = tmp;
+	  }
+      }
+      
+      weak_stage = WeakDone;  // *now* we're done,
+      return rtsTrue;         // but one more round of scavenging, please
+
+  default:
+      barf("traverse_weak_ptr_list");
   }
 
-  /* If we didn't make any changes, then we can go round and kill all
-   * the dead weak pointers.  The old_weak_ptr list is used as a list
-   * of pending finalizers later on.
-   */
-  if (flag == rtsFalse) {
-    for (w = old_weak_ptr_list; w; w = w->link) {
-      w->finalizer = evacuate(w->finalizer);
-    }
-
-    /* And resurrect any threads which were about to become garbage.
-     */
-    {
-      StgTSO *t, *tmp, *next;
-      for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
-	next = t->global_link;
-	(StgClosure *)tmp = evacuate((StgClosure *)t);
-	tmp->global_link = resurrected_threads;
-	resurrected_threads = tmp;
-      }
-    }
-
-    weak_done = rtsTrue;
-  }
-
-  return rtsTrue;
 }
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.29 2002/02/15 07:50:37 sof Exp $
+ * $Id: Schedule.h,v 1.30 2002/03/12 11:51:07 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -7,22 +7,11 @@
  * (RTS internal scheduler interface)
  *
  * -------------------------------------------------------------------------*/
+
 #ifndef __SCHEDULE_H__
 #define __SCHEDULE_H__
 #include "OSThreads.h"
 
-//@menu
-//* Scheduler Functions::	
-//* Scheduler Vars and Data Types::  
-//* Some convenient macros::	
-//* Index::			
-//@end menu
-
-//@node Scheduler Functions, Scheduler Vars and Data Types
-//@subsection Scheduler Functions
-
-//@cindex initScheduler
-//@cindex exitScheduler
 /* initScheduler(), exitScheduler(), startTasks()
  * 
  * Called from STG :  no
@@ -31,7 +20,6 @@
 extern void initScheduler  ( void );
 extern void exitScheduler  ( void );
 
-//@cindex awakenBlockedQueue
 /* awakenBlockedQueue()
  *
  * Takes a pointer to the beginning of a blocked TSO queue, and
@@ -48,7 +36,6 @@ void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 void awakenBlockedQueue(StgTSO *tso);
 #endif
 
-//@cindex unblockOne
 /* unblockOne()
  *
  * Takes a pointer to the beginning of a blocked TSO queue, and
@@ -63,7 +50,6 @@ StgBlockingQueueElement *unblockOne(StgBlockingQueueElement *bqe, StgClosure *no
 StgTSO *unblockOne(StgTSO *tso);
 #endif
 
-//@cindex raiseAsync
 /* raiseAsync()
  *
  * Raises an exception asynchronously in the specified thread.
@@ -73,7 +59,6 @@ StgTSO *unblockOne(StgTSO *tso);
  */
 void raiseAsync(StgTSO *tso, StgClosure *exception);
 
-//@cindex awaitEvent
 /* awaitEvent()
  *
  * Raises an exception asynchronously in the specified thread.
@@ -102,7 +87,6 @@ rtsBool wakeUpSleepingThreads(nat);  /* In Select.c */
 void GetRoots(evac_fn);
 
 // ToDo: check whether all fcts below are used in the SMP version, too
-//@cindex awaken_blocked_queue
 #if defined(GRAN)
 void    awaken_blocked_queue(StgBlockingQueueElement *q, StgClosure *node);
 void    unlink_from_bq(StgTSO* tso, StgClosure* node);
@@ -118,10 +102,6 @@ void    awaken_blocked_queue(StgTSO *q);
 void    initThread(StgTSO *tso, nat stack_size);
 #endif
 
-//@node Scheduler Vars and Data Types, Some convenient macros, Scheduler Functions
-//@subsection Scheduler Vars and Data Types
-
-//@cindex context_switch
 /* Context switch flag.
  * Locks required  : sched_mutex
  */
@@ -175,8 +155,39 @@ nat  run_queue_len(void);
 
 void resurrectThreads( StgTSO * );
 
-//@node Some convenient macros, Index, Scheduler Vars and Data Types
-//@subsection Some convenient macros
+/* Main threads:
+ *
+ * These are the threads which clients have requested that we run.  
+ *
+ * In a 'threaded' build, we might have several concurrent clients all
+ * waiting for results, and each one will wait on a condition variable
+ * until the result is available.
+ *
+ * In non-SMP, clients are strictly nested: the first client calls
+ * into the RTS, which might call out again to C with a _ccall_GC, and
+ * eventually re-enter the RTS.
+ *
+ * This is non-abstract at the moment because the garbage collector
+ * treats pointers to TSOs from the main thread list as "weak" - these
+ * pointers won't prevent a thread from receiving a BlockedOnDeadMVar
+ * exception.
+ *
+ * Main threads information is kept in a linked list:
+ */
+typedef struct StgMainThread_ {
+  StgTSO *         tso;
+  SchedulerStatus  stat;
+  StgClosure **    ret;
+#if defined(RTS_SUPPORTS_THREADS)
+  Condition        wakeup;
+#endif
+  struct StgMainThread_ *link;
+} StgMainThread;
+
+/* Main thread queue.
+ * Locks required: sched_mutex.
+ */
+extern StgMainThread *main_threads;
 
 /* debugging only 
  */
@@ -196,7 +207,6 @@ void print_bqe (StgBlockingQueueElement *bqe);
 
 /* END_TSO_QUEUE and friends now defined in includes/StgMiscClosures.h */
 
-//@cindex APPEND_TO_RUN_QUEUE
 /* Add a thread to the end of the run queue.
  * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.
  */
@@ -209,7 +219,6 @@ void print_bqe (StgBlockingQueueElement *bqe);
     }						\
     run_queue_tl = tso;
 
-//@cindex PUSH_ON_RUN_QUEUE
 /* Push a thread on the beginning of the run queue.  Used for
  * newly awakened threads, so they get run as soon as possible.
  */
@@ -220,7 +229,6 @@ void print_bqe (StgBlockingQueueElement *bqe);
       run_queue_tl = tso;			\
     }
 
-//@cindex POP_RUN_QUEUE
 /* Pop the first thread off the runnable queue.
  */
 #define POP_RUN_QUEUE()				\
@@ -235,7 +243,6 @@ void print_bqe (StgBlockingQueueElement *bqe);
     t;						\
   })
 
-//@cindex APPEND_TO_BLOCKED_QUEUE
 /* Add a thread to the end of the blocked queue.
  */
 #define APPEND_TO_BLOCKED_QUEUE(tso)		\
@@ -247,7 +254,6 @@ void print_bqe (StgBlockingQueueElement *bqe);
     }						\
     blocked_queue_tl = tso;
 
-//@cindex THREAD_RUNNABLE
 /* Signal that a runnable thread has become available, in
  * case there are any waiting tasks to execute it.
  */
@@ -261,30 +267,9 @@ void print_bqe (StgBlockingQueueElement *bqe);
 #define THREAD_RUNNABLE()  /* nothing */
 #endif
 
-//@cindex EMPTY_RUN_QUEUE
 /* Check whether the run queue is empty i.e. the PE is idle
  */
 #define EMPTY_RUN_QUEUE()     (run_queue_hd == END_TSO_QUEUE)
 #define EMPTY_QUEUE(q)        (q == END_TSO_QUEUE)
 
 #endif /* __SCHEDULE_H__ */
-
-//@node Index,  , Some convenient macros
-//@subsection Index
-
-//@index
-//* APPEND_TO_BLOCKED_QUEUE::  @cindex\s-+APPEND_TO_BLOCKED_QUEUE
-//* APPEND_TO_RUN_QUEUE::  @cindex\s-+APPEND_TO_RUN_QUEUE
-//* POP_RUN_QUEUE    ::  @cindex\s-+POP_RUN_QUEUE    
-//* PUSH_ON_RUN_QUEUE::  @cindex\s-+PUSH_ON_RUN_QUEUE
-//* awaitEvent::  @cindex\s-+awaitEvent
-//* awakenBlockedQueue::  @cindex\s-+awakenBlockedQueue
-//* awaken_blocked_queue::  @cindex\s-+awaken_blocked_queue
-//* context_switch::  @cindex\s-+context_switch
-//* exitScheduler::  @cindex\s-+exitScheduler
-//* gc_pending_cond::  @cindex\s-+gc_pending_cond
-//* initScheduler::  @cindex\s-+initScheduler
-//* raiseAsync::  @cindex\s-+raiseAsync
-//* startTasks::  @cindex\s-+startTasks
-//* unblockOne::  @cindex\s-+unblockOne
-//@end index

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.11 2001/12/11 12:03:23 simonmar Exp $
+ * $Id: GCCompact.c,v 1.12 2002/03/12 11:51:06 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -849,7 +849,6 @@ compact( void (*get_roots)(evac_fn) )
 {
     nat g, s, blocks;
     step *stp;
-    extern StgWeak *old_weak_ptr_list; // tmp
 
     // 1. thread the roots
     get_roots((evac_fn)thread);
@@ -870,6 +869,17 @@ compact( void (*get_roots)(evac_fn) )
 
     // the global thread list
     thread((StgPtr)&all_threads);
+
+    // any threads resurrected during this GC
+    thread((StgPtr)&resurrected_threads);
+
+    // the main threads list
+    {
+	StgMainThread *m;
+	for (m = main_threads; m != NULL; m = m->link) {
+	    thread((StgPtr)&m->tso);
+	}
+    }
 
     // the static objects
     thread_static(scavenged_static_objects);
