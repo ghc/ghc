@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.2 2001/01/12 16:40:07 simonmar Exp $
+-- $Id: Time.hsc,v 1.3 2001/01/12 16:44:13 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -228,19 +228,7 @@ noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 -- -----------------------------------------------------------------------------
 -- getClockTime returns the current time in its internal representation.
 
-#if defined(_WIN32) && !defined(cygwin32_TARGET_OS)
-  -- 
-  -- ftime() as implemented by cygwin (in B20.1) is
-  -- not right, so stay away & use time() there instead.
-  -- 
-getClockTime = do
-  allocaBytes (#const sizeof(struct timeb)) $ \ p_timeb -> do
-  ftime p_timeb
-  sec  <- (#peek struct timeb,time) p_timeb :: IO CTime
-  msec <- (#peek struct timeb,millitime) p_timeb :: IO CUShort
-  return (TOD (fromIntegral sec) (fromIntegral msec * 1000{-ToDo: correct???-}))
-
-#elif defined(HAVE_GETTIMEOFDAY)
+#if HAVE_GETTIMEOFDAY
 getClockTime = do
   allocaBytes (#const sizeof(struct timeval)) $ \ p_timeval -> do
     throwErrnoIfMinus1_ "getClockTime" $ gettimeofday p_timeval nullPtr
@@ -248,6 +236,18 @@ getClockTime = do
     usec <- (#peek struct timeval,tv_usec) p_timeval :: IO CLong
     return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000))
  
+#elif HAVE_FTIME && !defined(cygwin32_TARGET_OS)
+  --
+  -- ftime() as implemented by cygwin (in B20.1) is
+  -- not right, so stay away & use time() there instead.
+  --
+getClockTime = do
+  allocaBytes (#const sizeof(struct timeb)) $ \ p_timeb -> do
+  ftime p_timeb
+  sec  <- (#peek struct timeb,time) p_timeb :: IO CTime
+  msec <- (#peek struct timeb,millitime) p_timeb :: IO CUShort
+  return (TOD (fromIntegral sec) (fromIntegral msec * 1000{-ToDo: correct???-}))
+
 #else /* use POSIX time() */
 getClockTime = do
     secs <- time nullPtr -- can't fail, according to POSIX
@@ -609,12 +609,12 @@ foreign import unsafe strftime  :: Ptr CChar -> CSize -> Addr## -> Ptr CTm -> IO
 foreign import unsafe mktime    :: Ptr CTm   -> IO CTime
 foreign import unsafe time      :: Ptr CTime -> IO CTime
 
-#ifdef HAVE_GETTIMEOFDAY
+#if HAVE_GETTIMEOFDAY
 type CTimeVal = ()
 foreign import unsafe gettimeofday :: Ptr CTimeVal -> Ptr () -> IO CInt
 #endif
 
-#if defined(_WIN32) && !defined(cygwin32_TARGET_OS)
-type CTimeB
+#if HAVE_FTIME
+type CTimeB = ()
 foreign import unsafe ftime :: Ptr CTimeB -> IO CInt
 #endif
