@@ -305,6 +305,15 @@ powerpc-apple-darwin*)
 	HostVendor_CPP='apple'
 	HostOS_CPP='darwin'
 	;;
+powerpc-unknown-linux*)
+        HostPlatform=powerpc-unknown-linux
+        TargetPlatform=powerpc-unknown-linux
+        BuildPlatform=powerpc-unknown-linux
+        HostPlatform_CPP='powerpc_unknown_linux'
+        HostArch_CPP='powerpc'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
 sparc-sun-sunos4*)
 	HostPlatform=sparc-sun-sunos4
 	TargetPlatform=sparc-sun-sunos4 #hack
