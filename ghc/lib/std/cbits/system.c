@@ -1,13 +1,17 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.3 1998/12/02 13:27:59 simonm Exp $
+ * $Id: system.c,v 1.4 1999/01/07 15:42:33 simonm Exp $
  *
  * system Runtime Support
  */
 
 #include "Rts.h"
 #include "stgio.h"
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
