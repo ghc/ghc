@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.27 $
- * $Date: 2000/04/14 15:10:20 $
+ * $Revision: 1.28 $
+ * $Date: 2000/05/09 09:26:29 $
  * ------------------------------------------------------------------------*/
 
 
@@ -166,7 +166,10 @@
  * If you turn this off, you'll probably need to provide some
  * assembly language support for your architecture.
  */
-#define NO_REGS
+/* Disabled by JRS 09 May 00.  Seems unneccessary and generates a lot of
+   warnings compiling the RTS.
+*/
+/* #define NO_REGS */
 
 
 /* Define if :xplain should be enabled					   */
