@@ -29,7 +29,7 @@ import Var		( TyVar )
 import Name		( Name, mkWiredInName )
 import RdrName		( RdrName, mkRdrOrig )
 import OccName		( OccName, pprOccName, mkVarOcc )
-import TyCon		( TyCon )
+import TyCon		( TyCon, isPrimTyCon, tyConPrimRep )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep,
 			  splitFunTy_maybe, tyConAppTyCon, splitTyConApp,
                           mkUTy, usOnce, usMany
@@ -517,12 +517,14 @@ data PrimOpResultInfo
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 getPrimOpResultInfo op
   = case (primOpInfo op) of
-      Dyadic  _ ty		 -> ReturnsPrim (typePrimRep ty)
-      Monadic _ ty		 -> ReturnsPrim (typePrimRep ty)
-      Compare _ ty		 -> ReturnsAlg boolTyCon
-      GenPrimOp _ _ _ ty	 -> case typePrimRep ty of
-					   PtrRep -> ReturnsAlg (tyConAppTyCon ty)
-					   rep    -> ReturnsPrim rep
+      Dyadic  _ ty		 	  -> ReturnsPrim (typePrimRep ty)
+      Monadic _ ty		 	  -> ReturnsPrim (typePrimRep ty)
+      Compare _ ty		 	  -> ReturnsAlg boolTyCon
+      GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep tc)
+			 | otherwise      -> ReturnsAlg tc
+			 where
+			   tc = tyConAppTyCon ty
+			-- All primops return a tycon-app result
 \end{code}
 
 The commutable ops are those for which we will try to move constants
