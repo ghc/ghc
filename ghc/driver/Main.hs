@@ -5,6 +5,9 @@
 --
 -----------------------------------------------------------------------------
 
+-- with path so that ghc -M can find config.h
+#include "../includes/config.h"
+
 module Main (main) where
 
 import Package
@@ -12,7 +15,10 @@ import Config
 
 import RegexString
 import Concurrent
+#ifndef mingw32_TARGET_OS
 import Posix
+#endif
+import Directory
 import IOExts
 import Exception
 import Dynamic
@@ -24,6 +30,10 @@ import List
 import System
 import Maybe
 import Char
+
+#ifdef mingw32_TARGET_OS
+foreign import "_getpid" getProcessID :: IO Int 
+#endif
 
 #define GLOBAL_VAR(name,value,ty)  \
 name = global (value) :: IORef (ty); \
@@ -37,7 +47,7 @@ name = global (value) :: IORef (ty); \
 -- mkDLL
 -- java generation
 -- user ways
--- Win32 support
+-- Win32 support: proper signal handling
 -- make sure OPTIONS in .hs file propogate to .hc file if -C or -keep-hc-file-too
 -- reading the package configuration file is too slow
 
@@ -174,7 +184,7 @@ cleanTempFiles = do
   let blowAway f =
 	   (do  on verb (hPutStrLn stderr ("removing: " ++ f))
 		if '*' `elem` f then system ("rm -f " ++ f) >> return ()
-			        else removeLink f)
+			        else removeFile f)
 	    `catchAllIO`
 	   (\e -> on verb (hPutStrLn stderr 
 				("warning: can't remove tmp file" ++ f)))
@@ -236,7 +246,11 @@ GLOBAL_VAR(dry_run, 		False,		Bool)
 GLOBAL_VAR(recomp,  		True,		Bool)
 GLOBAL_VAR(tmp_prefix, 		cTMPDIR,	String)
 GLOBAL_VAR(stolen_x86_regs, 	4, 		Int)
-GLOBAL_VAR(static, 		True,		Bool)  -- ToDo: not for mingw32
+#if !defined(HAVE_WIN32_DLL_SUPPORT) || defined(DONT_WANT_WIN32_DLL_SUPPORT)
+GLOBAL_VAR(static, 		True,		Bool)
+#else
+GLOBAL_VAR(static,              False,          Bool)
+#endif
 GLOBAL_VAR(collect_ghc_timing, 	False,		Bool)
 GLOBAL_VAR(do_asm_mangling,	True,		Bool)
 
@@ -588,8 +602,8 @@ deletePackage pkg = do
 checkConfigAccess :: IO ()
 checkConfigAccess = do
   conf_file <- readIORef package_config
-  access <- fileAccess conf_file True True False
-  unless access $
+  access <- getPermissions conf_file
+  unless (writable access)
 	throwDyn (OtherError "you don't have permission to modify the package configuration file")
 
 maybeRestoreOldConfig :: String -> IO () -> IO ()
@@ -1096,10 +1110,13 @@ main =
   do
 	-- install signal handlers
    main_thread <- myThreadId
+
+#ifndef mingw32_TARGET_OS
    let sig_handler = Catch (raiseInThread main_thread 
 				(DynException (toDyn Interrupted)))
    installHandler sigQUIT sig_handler Nothing 
    installHandler sigINT  sig_handler Nothing
+#endif
 
    pgm    <- getProgName
    writeIORef prog_name pgm
@@ -1282,7 +1299,7 @@ newTempName extn = do
   findTempName tmp_dir x
   where findTempName tmp_dir x = do
   	   let filename = tmp_dir ++ "/ghc" ++ show x ++ '.':extn
-  	   b  <- fileExist filename
+  	   b  <- doesFileExist filename
 	   if b then findTempName tmp_dir (x+1)
 		else return filename
 
@@ -1423,7 +1440,7 @@ run_phase Hsc	basename input_fn output_fn
 	let stub_c = basename ++ "_stub.c"
 	
 		-- copy .h_stub file into current dir if present
-	b <- fileExist tmp_stub_h
+	b <- doesFileExist tmp_stub_h
 	on b (do
 	      	run_something "Copy stub .h file"
 				("cp " ++ tmp_stub_h ++ ' ':stub_h)
@@ -1457,9 +1474,8 @@ run_phase Hsc	basename input_fn output_fn
 run_phase cc_phase basename input_fn output_fn
    | cc_phase == Cc || cc_phase == HCc
    = do	cc <- readIORef pgm_c
-       	cc_opts <- getOpts opt_c
+       	cc_opts <- (getOpts opt_c)
        	cmdline_include_dirs <- readIORef include_paths
-       -- ToDo: $c_flags .= " -mno-cygwin" if ( $TargetPlatform =~ /-mingw32$/ );
 
         let hcc = cc_phase == HCc
 
@@ -1512,6 +1528,9 @@ run_phase cc_phase basename input_fn output_fn
 		   ++ [ verb, "-S", "-Wimplicit", opt_flag ]
 		   ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		   ++ cc_opts
+#ifdef mingw32_TARGET_OS
+                   ++ [" -mno-cygwin"]
+#endif
 		   ++ include_paths
 		   ++ pkg_extra_cc_opts
 --		   ++ [">", ccout]
@@ -1671,7 +1690,7 @@ run_something phase_name cmd
    unless n $ do 
 
    -- and run it!
-   exit_code <- system cmd  `catchAllIO` 
+   exit_code <- system ("sh -c \"" ++ cmd ++ "\"")  `catchAllIO` 
 		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
 
    if exit_code /= ExitSuccess
@@ -1985,7 +2004,7 @@ findFile name alt_path = unsafePerformIO (do
   top_dir <- readIORef topDir
   let installed_file = top_dir ++ '/':name
   let inplace_file   = top_dir ++ '/':cCURRENT_DIR ++ '/':alt_path
-  b <- fileExist inplace_file
+  b <- doesFileExist inplace_file
   if b  then return inplace_file
 	else return installed_file
  )

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.41 2000/07/06 09:35:37 simonmar Exp $
+# $Id: Makefile,v 1.42 2000/07/17 15:25:05 rrt Exp $
 #
 
 TOP=..
@@ -12,7 +12,11 @@ endif
 
 ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
 ifeq "$(ghc_407_at_least)" "1"
+ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package posix -package text
+else
+SRC_HC_OPTS += -fglasgow-exts -cpp -package concurrent -package text
+endif
 else
 SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
 endif
