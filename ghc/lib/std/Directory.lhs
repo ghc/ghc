@@ -263,7 +263,7 @@ renameDirectory opath npath = do
         constructErrorAndFailWithInfo "renameDirectory" ("old: " ++ opath ++ ",new: " ++ npath)
 \end{code}
 
-@renameFile old@ {\em new} changes the name of an existing file system
+@renameFile@ {\em old} {\em new} changes the name of an existing file system
 object from {\em old} to {\em new}.  If the {\em new} object already
 exists, it is atomically replaced by the {\em old} object.  Neither
 path may refer to an existing directory.  A conformant implementation
