@@ -86,12 +86,23 @@ matchConFamily (var:vars) ty eqns_info
   = let
 	-- Sort into equivalence classes by the unique on the constructor
 	-- All the EqnInfos should start with a ConPat
-	eqn_groups = equivClassesByUniq get_uniq eqns_info
+	groups = equivClassesByUniq get_uniq eqns_info
 	get_uniq (EqnInfo { eqn_pats = ConPatOut (L _ data_con) _ _ _ _ _ : _}) = getUnique data_con
+
+	-- Get the wrapper from the head of each group.  We're going to
+	-- use it as the pattern in this case expression, so we need to 
+	-- ensure that any type variables it mentions in the pattern are
+	-- in scope.  So we put its wrappers outside the case, and
+	-- zap the wrapper for it. 
+	wraps :: [CoreExpr -> CoreExpr]
+	wraps = map (eqn_wrap . head) groups
+
+	groups' = [ eqn { eqn_wrap = idWrapper } : eqns | eqn:eqns <- groups ]
     in
 	-- Now make a case alternative out of each group
-    mappM (match_con vars ty) eqn_groups	`thenDs` \ alts ->
-    returnDs (mkCoAlgCaseMatchResult var ty alts)
+    mappM (match_con vars ty) groups'	`thenDs` \ alts ->
+    returnDs (adjustMatchResult (foldr (.) idWrapper wraps) $
+	      mkCoAlgCaseMatchResult var ty alts)
 \end{code}
 
 And here is the local function that does all the work.  It is
@@ -105,8 +116,8 @@ wouldn't).  Cf.~@shift_lit_pats@ in @MatchLits@.
 \begin{code}
 match_con vars ty eqns
   = do	{ -- Make new vars for the con arguments; avoid new locals where possible
-	  arg_vars <- selectMatchVars (map unLoc arg_pats1) arg_tys
-	; eqns' <- mapM shift eqns 
+	  arg_vars     <- selectMatchVars (map unLoc arg_pats1) arg_tys
+	; eqns'        <- mapM shift eqns 
 	; match_result <- match (arg_vars ++ vars) ty eqns'
 	; return (con, tvs1 ++ dicts1 ++ arg_vars, match_result) }
   where
