@@ -40,7 +40,7 @@ Usage(str)
    printf("usage: %s -b -d -ef -g -i -p -mn -p -s -tf -y [file[.hp]]\n", programname);
    printf("where -b  use large title box\n");
    printf("      -d  sort by standard deviation\n"); 
-   printf("      -ef[in|mm|pt] produce Encapsulated PostScript f units wide\n");
+   printf("      -ef[in|mm|pt] produce Encapsulated PostScript f units wide (f > 2 inches)\n");
    printf("      -g  produce output suitable for GHOSTSCRIPT previever\n");
    printf("      -i[+|-] sort by identifier string (-i+ gives greatest on top) \n"); 
    printf("      -mn print maximum of n bands (default & max 20)\n");
