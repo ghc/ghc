@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.49 2003/09/23 17:07:39 sof Exp $
+ * $Id: MBlock.c,v 1.50 2003/10/31 16:21:27 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -271,7 +271,13 @@ getMBlocks(nat n)
   
   if ( (base_non_committed == 0) || (next_request + size > end_non_committed) ) {
     if (base_non_committed) {
-      barf("RTS exhausted max heap size (%d bytes)\n", size_reserved_pool);
+	/* Tacky, but if no user-provided -M option is in effect,
+	 * set it to the default (==256M) in time for the heap overflow PSA.
+	 */
+	if (RtsFlags.GcFlags.maxHeapSize == 0) {
+	    RtsFlags.GcFlags.maxHeapSize = size_reserved_pool / BLOCK_SIZE;
+	}
+	heapOverflow();
     }
     if (RtsFlags.GcFlags.maxHeapSize != 0) {
       size_reserved_pool = BLOCK_SIZE * RtsFlags.GcFlags.maxHeapSize;
