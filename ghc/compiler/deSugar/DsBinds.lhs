@@ -31,7 +31,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs,
 import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC )
 import Id		( idType, Id )
 import VarEnv
-import Name		( Module, isExported )
+import Name		( isExported )
 import Type		( mkTyVarTy, isDictTy, substTy
 			)
 import TysWiredIn	( voidTy )

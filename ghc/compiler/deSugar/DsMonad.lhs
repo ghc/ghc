@@ -29,7 +29,8 @@ import Bag		( emptyBag, snocBag, bagToList, Bag )
 import ErrUtils 	( WarnMsg, pprBagOfErrors )
 import HsSyn		( OutPat )
 import Id		( mkSysLocal, setIdUnique, Id )
-import Name		( Module, Name, maybeWiredInIdName )
+import Module		( Module )
+import Name		( Name, maybeWiredInIdName )
 import Var		( TyVar, setTyVarUnique )
 import VarEnv
 import Outputable

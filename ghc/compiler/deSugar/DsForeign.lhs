@@ -24,8 +24,9 @@ import Const		( Con(..), mkMachInt )
 import DataCon		( DataCon, dataConId )
 import Id		( Id, idType, idName, mkWildId, mkUserId )
 import Const		( Literal(..) )
+import Module		( Module )
 import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
-			  mkForeignExportOcc,
+			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..), Provenance(..), ExportFlag(..)
 			)
 import PrelVals		( realWorldPrimId )
@@ -59,13 +60,14 @@ is the same as
 so we reuse the desugaring code in @DsCCall@ to deal with these.
 
 \begin{code}
-dsForeigns :: [TypecheckedForeignDecl] 
+dsForeigns :: Module
+           -> [TypecheckedForeignDecl] 
 	   -> DsM ( [CoreBind]        -- desugared foreign imports
                   , [CoreBind]        -- helper functions for foreign exports
 		  , SDoc	      -- Header file prototypes for "foreign exported" functions.
 		  , SDoc 	      -- C stubs to use when calling "foreign exported" funs.
 		  )
-dsForeigns fos = foldlDs combine ([],[],empty,empty) fos
+dsForeigns mod_name fos = foldlDs combine ([],[],empty,empty) fos
  where
   combine (acc_fi, acc_fe, acc_h, acc_c) fo@(ForeignDecl i imp_exp _ ext_nm cconv _) 
     | isForeignImport =   -- foreign import (dynamic)?
@@ -75,11 +77,11 @@ dsForeigns fos = foldlDs combine ([],[],empty,empty) fos
         dsFLabel i ext_nm `thenDs` \ b -> 
 	returnDs (b:acc_fi, acc_fe, acc_h, acc_c)
     | isDynamic ext_nm =
-        dsFExportDynamic i (idType i) ext_nm cconv  `thenDs` \ (fi,fe,h,c) -> 
+        dsFExportDynamic i (idType i) mod_name ext_nm cconv  `thenDs` \ (fi,fe,h,c) -> 
 	returnDs (fi:acc_fi, fe:acc_fe, h $$ acc_h, c $$ acc_c)
 
     | otherwise	       =  -- foreign export
-        dsFExport i (idType i) ext_nm cconv False   `thenDs` \ (fe,h,c) ->
+        dsFExport i (idType i) mod_name ext_nm cconv False   `thenDs` \ (fe,h,c) ->
 	returnDs (acc_fi, fe:acc_fe, h $$ acc_h, c $$ acc_c)
    where
     isForeignImport = 
@@ -214,6 +216,7 @@ the user-written Haskell function 'M.foo'.
 \begin{code}
 dsFExport :: Id
 	  -> Type		-- Type of foreign export.
+	  -> Module
 	  -> ExtName
 	  -> CallConv
 	  -> Bool		-- True => invoke IO action that's hanging off 
@@ -222,17 +225,20 @@ dsFExport :: Id
 		 , SDoc
 		 , SDoc
 		 )
-dsFExport i ty ext_name cconv isDyn =
+dsFExport i ty mod_name ext_name cconv isDyn =
      getUniqueDs					`thenDs` \ uniq ->
      getSrcLocDs					`thenDs` \ src_loc ->
      let
 	f_helper_glob = mkUserId helper_name helper_ty
 		      where
-			name	    = idName i
-			mod	    = nameModule name
-			occ	    = mkForeignExportOcc (nameOccName name)
-			prov	    = LocalDef src_loc Exported
-			helper_name = mkGlobalName uniq mod occ prov
+			name	            = idName i
+			mod	
+			 | isLocalName name = mod_name
+			 | otherwise        = nameModule name
+
+			occ	            = mkForeignExportOcc (nameOccName name)
+			prov	            = LocalDef src_loc Exported
+			helper_name         = mkGlobalName uniq mod occ prov
      in
      newSysLocalsDs fe_arg_tys				`thenDs` \ fe_args ->
      (if isDyn then 
@@ -360,18 +366,19 @@ foreign export "f_helper" f_helper :: StablePtr (Addr -> Int -> IO Int) -> Addr 
 \begin{code}
 dsFExportDynamic :: Id
 		 -> Type		-- Type of foreign export.
+		 -> Module
 		 -> ExtName
 		 -> CallConv
 		 -> DsM (CoreBind, CoreBind, SDoc, SDoc)
-dsFExportDynamic i ty ext_name cconv =
+dsFExportDynamic i ty mod_name ext_name cconv =
      newSysLocalDs ty					 `thenDs` \ fe_id ->
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
        fe_nm	   = toCName fe_id
        fe_ext_name = ExtName (_PK_ fe_nm) Nothing
      in
-     dsFExport  i export_ty fe_ext_name cconv True `thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
-     newSysLocalDs arg_ty			   `thenDs` \ cback ->
+     dsFExport  i export_ty mod_name fe_ext_name cconv True `thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
+     newSysLocalDs arg_ty			            `thenDs` \ cback ->
      dsLookupGlobalValue makeStablePtr_NAME	   `thenDs` \ makeStablePtrId ->
      let
 	mk_stbl_ptr_app    = mkApps (Var makeStablePtrId) [ Type arg_ty, Var cback ]
@@ -528,16 +535,16 @@ mkCArgNames :: Int -> [a] -> [SDoc]
 mkCArgNames n as = zipWith (\ _ n -> text ('a':show n)) as [n..] 
 
 mkHObj :: Type -> SDoc
-mkHObj t = text "rts_mk" <> showFFIType t
+mkHObj t = text "rts_mk" <> text (showFFIType t)
 
 unpackHObj :: Type -> SDoc
-unpackHObj t = text "rts_get" <> showFFIType t
+unpackHObj t = text "rts_get" <> text (showFFIType t)
 
 showStgType :: Type -> SDoc
-showStgType t = text "Stg" <> showFFIType t
+showStgType t = text "Stg" <> text (showFFIType t)
 
-showFFIType :: Type -> SDoc
-showFFIType t = text (getOccString (getName tc))
+showFFIType :: Type -> String
+showFFIType t = getOccString (getName tc)
  where
   tc = case splitTyConApp_maybe t of
 	    Just (tc,_) -> tc

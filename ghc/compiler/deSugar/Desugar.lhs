@@ -18,7 +18,7 @@ import DsForeign	( dsForeigns )
 import DsUtils
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Name		( Module, moduleString )
+import Module		( Module, moduleString )
 import Bag		( isEmptyBag, unionBags )
 import CmdLineOpts	( opt_SccGroup, opt_SccProfilingOn )
 import CoreLint		( beginPass, endPass )
@@ -46,7 +46,7 @@ deSugar us global_val_env mod_name all_binds fo_decls = do
             ds_binds' = [Rec core_prs]
 
     	    ((fi_binds, fe_binds, h_code, c_code), ds_warns2) = 
-	            initDs us3 global_val_env module_and_group (dsForeigns fo_decls)
+	            initDs us3 global_val_env module_and_group (dsForeigns mod_name fo_decls)
 
   	    ds_binds  = fi_binds ++ ds_binds' ++ fe_binds
 
