@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PrelPosixTypes.hsc,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+-- $Id: PrelPosixTypes.hsc,v 1.2 2001/01/12 15:48:36 simonmar Exp $
 -- 
 -- (c) 2000
 -- 
@@ -27,4 +27,3 @@ type CUid    = #type uid_t
 type CCc     = #type cc_t
 type CSpeed  = #type speed_t
 type CTcflag = #type tcflag_t
-type CTime   = #type time_t
