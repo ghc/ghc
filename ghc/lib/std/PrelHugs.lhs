@@ -3,7 +3,7 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -#include "Assembler.h" -#include "../../rts/Schedule.h" -#include "../../rts/ForeignCall.h" #-}
 
 module PrelHugs (
    hugsprimPmInt,
