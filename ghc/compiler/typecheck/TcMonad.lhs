@@ -701,9 +701,9 @@ pprInstLoc (orig, locn, ctxt)
     pp_orig (OccurrenceOf id)
       	= hsep [ptext SLIT("use of"), quotes (ppr id)]
     pp_orig (IPOcc name)
-      	= hsep [ptext SLIT("use of implicit parameter"), quotes (char '?' <> ppr name)]
+      	= hsep [ptext SLIT("use of implicit parameter"), quotes (ppr name)]
     pp_orig (IPBind name)
-      	= hsep [ptext SLIT("binding for implicit parameter"), quotes (char '?' <> ppr name)]
+      	= hsep [ptext SLIT("binding for implicit parameter"), quotes (ppr name)]
     pp_orig RecordUpdOrigin
 	= ptext SLIT("a record update")
     pp_orig DataDeclOrigin
