@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.28 2000/04/21 18:05:19 panne Exp $
+# $Id: Makefile,v 1.29 2000/04/21 18:07:46 panne Exp $
 
 # We create two driver scripts: 
 #	- one to run in-place in the build tree for building libraries

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/04/21 18:05:19 $
+ * $Revision: 1.29 $
+ * $Date: 2000/04/21 18:07:47 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
