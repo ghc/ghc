@@ -68,7 +68,7 @@ import VarSet
 import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars )
 import IdInfo
 import Demand		( Demand )
-import Name	 	( Name, OccName, Module,
+import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
 			  isWiredInName
 			) 

@@ -23,13 +23,14 @@ module RdrName (
 #include "HsVersions.h"
 
 import OccName	( NameSpace, tcName,
-		  OccName, Module, IfaceFlavour,
-		  mkSysModuleFS, mkSysOccFS,
-		  mkSrcModuleFS, mkSrcOccFS, mkSrcVarOcc,
-		  isDataOcc, isTvOcc,
-		  pprModuleSep
+		  OccName,
+		  mkSysOccFS,
+		  mkSrcOccFS, mkSrcVarOcc,
+		  isDataOcc, isTvOcc
 		)
-
+import Module   ( Module, IfaceFlavour, mkSysModuleFS,
+		  mkSrcModuleFS, pprModuleSep
+		)
 import PrelMods	( pRELUDE )
 import Outputable
 import Util	( thenCmp )

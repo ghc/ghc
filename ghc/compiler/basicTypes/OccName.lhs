@@ -6,16 +6,6 @@
 
 \begin{code}
 module OccName (
-	-- Modules
-	Module,		-- Abstract, instance of Outputable
-	mkSrcModule, mkSrcModuleFS, mkSysModuleFS, mkImportModuleFS, mkBootModule, mkIfaceModuleFS,
-	moduleString, moduleUserString, moduleIfaceFlavour,
-	pprModule, pprModuleSep, pprModuleBoot,
-
-	-- IfaceFlavour
-	IfaceFlavour,
-	hiFile, hiBootFile, bootFlavour,
-
 	-- The NameSpace type; abstact
 	NameSpace, tcName, clsName, tcClsName, dataName, varName, tvName,
 	nameSpaceString, 
@@ -38,7 +28,7 @@ module OccName (
 	TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
 
 	-- Encoding
-	EncodedString, EncodedFS, UserString, UserFS, encode, encodeFS, decode,
+	EncodedString, EncodedFS, UserString, UserFS, encode, encodeFS, decode, pprEncodedFS,
 
 	-- The basic form of names
 	isLexCon, isLexVar, isLexId, isLexSym,
@@ -83,119 +73,6 @@ pprEncodedFS fs
     else
 	ptext fs
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Interface file flavour}
-%*									*
-%************************************************************************
-
-The IfaceFlavour type is used mainly in an imported Name's Provenance
-to say whether the name comes from a regular .hi file, or whether it comes
-from a hand-written .hi-boot file.  This is important, because it has to be 
-propagated.  Suppose
-
-	C.hs imports B
-	B.hs imports A
-	A.hs imports C {-# SOURCE -#} ( f )
-
-Then in A.hi we may mention C.f, in an inlining.  When compiling B we *must not* 
-read C.f's details from C.hi, even if the latter happens to exist from an earlier
-compilation run.  So we use the name "C!f" in A.hi, and when looking for an interface
-file with details of C!f we look in C.hi-boot.  The "!" stuff is recorded in the
-IfaceFlavour in the Module of C.f in A. 
-
-Not particularly beautiful, but it works.
-
-\begin{code}
-data IfaceFlavour = HiFile		-- The thing comes from a standard interface file
-					-- or from the source file itself
-		  | HiBootFile		-- ... or from a handwritten "hi-boot" interface file
-		  deriving( Eq )
-
-hiFile     = HiFile
-hiBootFile = HiBootFile
-
-instance Text IfaceFlavour where	-- Just used in debug prints of lex tokens
-  showsPrec n HiFile     s = s
-  showsPrec n HiBootFile s = "!" ++ s
-
-bootFlavour :: IfaceFlavour -> Bool
-bootFlavour HiBootFile = True
-bootFlavour HiFile     = False
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[Module]{The name of a module}
-%*									*
-%************************************************************************
-
-\begin{code}
-data Module = Module
-		EncodedFS
-		IfaceFlavour
-	-- Haskell module names can include the quote character ',
-	-- so the module names have the z-encoding applied to them
-\end{code}
-
-\begin{code}
-instance Outputable Module where
-  ppr = pprModule
-
--- Ignore the IfaceFlavour when comparing modules
-instance Eq Module where
-  (Module m1 _) == (Module m2 _) = m1 == m2
-
-instance Ord Module where
-  (Module m1 _) `compare` (Module m2 _) = m1 `compare` m2
-\end{code}
-
-
-\begin{code}
-pprModule :: Module -> SDoc
-pprModule (Module mod _) = pprEncodedFS mod
-
-pprModuleSep, pprModuleBoot :: Module -> SDoc
-pprModuleSep (Module mod HiFile)     = dot
-pprModuleSep (Module mod HiBootFile) = char '!'
-
-pprModuleBoot (Module mod HiFile)     = empty
-pprModuleBoot (Module mod HiBootFile) = char '!'
-\end{code}
-
-
-\begin{code}
-mkSrcModule :: UserString -> Module
-mkSrcModule s = Module (_PK_ (encode s)) HiFile
-
-mkSrcModuleFS :: UserFS -> Module
-mkSrcModuleFS s = Module (encodeFS s) HiFile
-
-mkImportModuleFS :: UserFS -> IfaceFlavour -> Module
-mkImportModuleFS s hif = Module (encodeFS s) hif
-
-mkSysModuleFS :: EncodedFS -> IfaceFlavour -> Module
-mkSysModuleFS s hif = Module s hif
-
-mkIfaceModuleFS :: EncodedFS -> Module
-mkIfaceModuleFS s = Module s HiFile
-
-mkBootModule :: Module -> Module
-mkBootModule (Module s _) = Module s HiBootFile
-
-moduleString :: Module -> EncodedString
-moduleString (Module mod _) = _UNPK_ mod
-
-moduleUserString :: Module -> UserString
-moduleUserString (Module mod _) = decode (_UNPK_ mod)
-
-moduleIfaceFlavour :: Module -> IfaceFlavour
-moduleIfaceFlavour (Module _ hif) = hif
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -572,7 +449,7 @@ encode cs = case maybe_tuple cs of
 		go (c:cs) = encode_ch c ++ go cs
 
 -- ToDo: Unboxed tuples too, perhaps?
-maybe_tuple ('(' : cs) = check_tuple 0 cs
+maybe_tuple ('(' : cs) = check_tuple (0::Int) cs
 maybe_tuple other      = Nothing
 
 check_tuple :: Int -> String -> Maybe Int

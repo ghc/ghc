@@ -43,6 +43,7 @@ import {-# SOURCE #-} Var   ( Id, setIdName )
 import {-# SOURCE #-} TyCon ( TyCon, setTyConName )
 
 import OccName		-- All of it
+import Module
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual )
 import CmdLineOpts	( opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
@@ -364,7 +365,10 @@ isExternallyVisibleName :: Name -> Bool
 nameUnique name = n_uniq name
 nameOccName name = n_occ name
 
-nameModule name = nameSortModule (n_sort name)
+nameModule name =
+  case n_sort name of
+    Local -> pprPanic "nameModule" (ppr name)
+    x     -> nameSortModule x
 
 nameSortModule (Global       mod)   = mod
 nameSortModule (WiredInId    mod _) = mod
