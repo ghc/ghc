@@ -230,14 +230,26 @@
     url="http://sourceforge.net/projects/ghc/">SoureForge GHC
     page</ulink>, go to the <quote>bugs</quote> section, click on
     <quote>submit</quote>, and enter your bug report.  You can also
-    check the outstanding bugs here to make sure it hasn't already
-    been reported.  Or:</para>
+    check the outstanding bugs here and search the archives to make
+    sure it hasn't already been reported.  Or:</para>
       </listitem>
       <listitem>
 	<para>Email your bug report to
     <Email>glasgow-haskell-bugs@haskell.org</Email>. </para>
       </listitem>
     </itemizedlist>
+
+    <sect2>
+      <title>How do I tell if my bug has already been
+      reported?</title>
+      
+      <para>Try searching the mailing list archives.  The archives
+      don't have a built-in search facility, but we find that <ulink
+      url="http://www.google.com/">Google</ulink>'s site search works
+      pretty well: enter
+      <quote><literal>site:www.haskell.org</literal></quote> followed
+      by your search term into Google.</para>
+    </sect2>
 
     <sect2>
       <title>What to put in a bug report</title>
