@@ -16,13 +16,14 @@ import RdrHsSyn		( RdrName(..), SYN_IE(RdrNameIE),
 			  rdrNameOcc, ieOcc, isQual, qual
 			)
 import HsTypes		( getTyVarName, replaceTyVarName )
+import BasicTypes	( Fixity(..), FixityDirection(..) )
 import RnMonad
-import Name		( Name, OccName(..), Provenance(..), DefnInfo(..), ExportFlag(..),
+import Name		( Name, OccName(..), Provenance(..), DefnInfo(..), ExportFlag(..), NamedThing(..),
 			  occNameString, occNameFlavour,
 			  SYN_IE(NameSet), emptyNameSet, addListToNameSet,
 			  mkLocalName, mkGlobalName, modAndOcc, isLocallyDefinedName,
 			  isWiredInName, nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
-			  pprProvenance, pprOccName, pprModule, pprNonSymOcc, pprNameProvenance
+			  pprProvenance, pprOccName, pprModule, pprNameProvenance
 			)
 import TyCon		( TyCon )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon, intTyCon )
@@ -34,7 +35,7 @@ import Maybes		( maybeToBool )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Pretty
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import Util		--( panic, removeDups, pprTrace, assertPanic )
 #if __GLASGOW_HASKELL__ >= 202
 import List (nub)
@@ -129,7 +130,7 @@ newSysName occ export_flag loc
 				mod_name occ
 				(\_ -> export_flag)
 				loc
-	InterfaceMode -> newGlobalName mod_name occ
+	InterfaceMode _ -> newGlobalName mod_name occ
 
 -- newDfunName is a variant, specially for dfuns.  
 -- When renaming derived definitions we are in *interface* mode (because we can trip
@@ -261,7 +262,7 @@ lookupRn name_env rdr_name
 		
 			-- Not found when processing an imported declaration,
 			-- so we create a new name for the purpose
-			InterfaceMode -> 
+			InterfaceMode _ -> 
 			    case rdr_name of
 
 				Qual mod_name occ -> newGlobalName mod_name occ
@@ -285,7 +286,7 @@ lookupOccRn :: RdrName -> RnMS s Name
 lookupOccRn rdr_name
   = getNameEnv 			`thenRn` \ name_env ->
     lookupRn name_env rdr_name	`thenRn` \ name ->
-    addOccurrenceName Compulsory name
+    addOccurrenceName name
 
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
 -- environment.  It's used for record field names only.
@@ -293,15 +294,7 @@ lookupGlobalOccRn :: RdrName -> RnMS s Name
 lookupGlobalOccRn rdr_name
   = getGlobalNameEnv		`thenRn` \ name_env ->
     lookupRn name_env rdr_name	`thenRn` \ name ->
-    addOccurrenceName Compulsory name
-
--- lookupOptionalOccRn is similar, but it's used in places where
--- we don't *have* to find a definition for the thing.
-lookupOptionalOccRn :: RdrName -> RnMS s Name
-lookupOptionalOccRn rdr_name
-  = getNameEnv 			`thenRn` \ name_env ->
-    lookupRn name_env rdr_name	`thenRn` \ name ->
-    addOccurrenceName Optional name
+    addOccurrenceName name
 
    
 
@@ -324,13 +317,13 @@ lookupOptionalOccRn rdr_name
 lookupImplicitOccRn :: RdrName -> RnMS s Name 
 lookupImplicitOccRn (Qual mod occ)
  = newGlobalName mod occ		`thenRn` \ name ->
-   addOccurrenceName Compulsory name
+   addOccurrenceName name
 
-addImplicitOccRn :: Name -> RnM s d Name
-addImplicitOccRn name = addOccurrenceName Compulsory name
+addImplicitOccRn :: Name -> RnMS s Name
+addImplicitOccRn name = addOccurrenceName name
 
-addImplicitOccsRn :: [Name] -> RnM s d ()
-addImplicitOccsRn names = addOccurrenceNames Compulsory names
+addImplicitOccsRn :: [Name] -> RnMS s ()
+addImplicitOccsRn names = addOccurrenceNames names
 
 listType_RDR	= qual (modAndOcc listType_name)
 tupleType_RDR n	= qual (modAndOcc (tupleType_name n))
@@ -485,39 +478,6 @@ filterAvail (IEThingAll _) avail@(AvailTC _ _)  = avail
 
 filterAvail ie avail = NotAvailable 
 
-{- 	OLD	to be deleted
-hideAvail :: RdrNameIE		-- Hide this
-	  -> AvailInfo		-- Available
-	  -> AvailInfo		-- Resulting available;
--- Don't complain about hiding non-existent things; that's done elsewhere
-
-hideAvail ie NotAvailable
-  = NotAvailable
-
-hideAvail ie (Avail n)
-  | not (ieOcc ie == nameOccName n) = Avail n		-- No match
-  | otherwise		            = NotAvailable	-- Names match
-
-hideAvail ie (AvailTC n ns)
-  | not (ieOcc ie == nameOccName n)		-- No match
-  = case ie of					-- But in case we are faced with ...hiding( (+) )
-						-- we filter the "ns" anyhow
-	IEVar op -> AvailTC n (filter keep ns)
-		 where
-		    op_occ = rdrNameOcc op
-		    keep n = nameOccName n /= op_occ
-
-	other	 -> AvailTC n ns
-
-  | otherwise					-- Names match
-  = case ie of
-	IEThingAbs _	       -> AvailTC n (filter (/= n) ns)
-	IEThingAll _ 	       -> NotAvailable
-	IEThingWith hide hides -> AvailTC n (filter keep ns)
-			       where
-				  keep n    = nameOccName n `notElem` hide_occs
-				  hide_occs = map rdrNameOcc (hide : hides)
--}
 
 -- In interfaces, pprAvail gets given the OccName of the "host" thing
 pprAvail PprInterface avail = ppr_avail (pprOccName PprInterface . nameOccName) avail
@@ -573,12 +533,12 @@ conflictFM bad fm key elt
 
 \begin{code}
 nameClashErr (rdr_name, (name1,name2)) sty
-  = hang (hsep [ptext SLIT("Conflicting definitions for: "), ppr sty rdr_name])
+  = hang (hsep [ptext SLIT("Conflicting definitions for:"), ppr sty rdr_name])
 	4 (vcat [pprNameProvenance sty name1,
 		     pprNameProvenance sty name2])
 
 fixityClashErr (rdr_name, (fp1,fp2)) sty
-  = hang (hsep [ptext SLIT("Conflicting fixities for: "), ppr sty rdr_name])
+  = hang (hsep [ptext SLIT("Conflicting fixities for:"), ppr sty rdr_name])
 	4 (vcat [pprFixityProvenance sty fp1,
 		     pprFixityProvenance sty fp2])
 
@@ -594,14 +554,14 @@ unknownNameErr name sty
 
 qualNameErr descriptor (name,loc)
   = pushSrcLocRn loc $
-    addErrRn (\sty -> hsep [ ptext SLIT("invalid use of qualified name"), 
+    addErrRn (\sty -> hsep [ ptext SLIT("Invalid use of qualified name"), 
 			     ppr sty name,
 			     ptext SLIT("in"),
 			     descriptor sty])
 
 dupNamesErr descriptor ((name,loc) : dup_things)
   = pushSrcLocRn loc $
-    addErrRn (\sty -> hsep [ptext SLIT("duplicate bindings of"), 
+    addErrRn (\sty -> hsep [ptext SLIT("Conflicting definitions for"), 
 			    ppr sty name, 
 			    ptext SLIT("in"), descriptor sty])
 \end{code}
