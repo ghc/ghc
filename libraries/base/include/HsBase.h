@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.16 2002/10/03 13:04:58 panne Exp $
+ * $Id: HsBase.h,v 1.17 2002/10/08 08:03:02 wolfgang Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -623,7 +623,9 @@ INLINE int __hsposix_SIGTTIN()   { return SIGTTIN; }
 INLINE int __hsposix_SIGTTOU()   { return SIGTTOU; }
 INLINE int __hsposix_SIGUSR1()   { return SIGUSR1; }
 INLINE int __hsposix_SIGUSR2()   { return SIGUSR2; }
+#if HAVE_SIGPOLL
 INLINE int __hsposix_SIGPOLL()   { return SIGPOLL; }
+#endif
 INLINE int __hsposix_SIGPROF()   { return SIGPROF; }
 INLINE int __hsposix_SIGSYS()    { return SIGSYS; }
 INLINE int __hsposix_SIGTRAP()   { return SIGTRAP; }

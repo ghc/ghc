@@ -41,7 +41,9 @@ module System.Posix.Signals (
   backgroundWrite, sigTTOU,
   userDefinedSignal1, sigUSR1,
   userDefinedSignal2, sigUSR2,
+#if HAVE_SIGPOLL
   pollableEvent, sigPOLL,
+#endif
   profilingTimerExpired, sigPROF,
   badSystemCall, sigSYS,
   breakpointTrap, sigTRAP,
@@ -121,7 +123,9 @@ foreign import ccall "__hsposix_SIGTTIN"   sigTTIN   :: CInt
 foreign import ccall "__hsposix_SIGTTOU"   sigTTOU   :: CInt
 foreign import ccall "__hsposix_SIGUSR1"   sigUSR1   :: CInt
 foreign import ccall "__hsposix_SIGUSR2"   sigUSR2   :: CInt
+#if HAVE_SIGPOLL
 foreign import ccall "__hsposix_SIGPOLL"   sigPOLL   :: CInt
+#endif
 foreign import ccall "__hsposix_SIGPROF"   sigPROF   :: CInt
 foreign import ccall "__hsposix_SIGSYS"    sigSYS    :: CInt
 foreign import ccall "__hsposix_SIGTRAP"   sigTRAP   :: CInt
@@ -192,8 +196,10 @@ userDefinedSignal1 = sigUSR1
 userDefinedSignal2 :: Signal
 userDefinedSignal2 = sigUSR2
 
+#if HAVE_SIGPOLL
 pollableEvent :: Signal
 pollableEvent = sigPOLL
+#endif
 
 profilingTimerExpired :: Signal
 profilingTimerExpired = sigPROF
