@@ -210,11 +210,11 @@ This has the same boxed/unboxed business as Core case expressions.
 	(GenStgExpr bndr occ)
 			-- the thing to examine
 
-	(GenStgLiveVars occ) -- Live vars of whole case
-			-- expression; i.e., those which mustn't be
-			-- overwritten
+	(GenStgLiveVars occ) -- Live vars of whole case expression, 
+			-- plus everything that happens after the case
+			-- i.e., those which mustn't be overwritten
 
-	(GenStgLiveVars occ) -- Live vars of RHSs;
+	(GenStgLiveVars occ) -- Live vars of RHSs (plus what happens afterwards)
 			-- i.e., those which must be saved before eval.
 			--
 			-- note that an alt's constructor's
