@@ -582,7 +582,7 @@ AC_SUBST(CompressSuffix)
 
 dnl ** check for installed happy binary + version
 dnl    (don't do it if we're booting from .hc files though.)
-if (test "$BootingFromHc" = "NO"); then
+if test "$BootingFromHc" = "NO"; then
 FPTOOLS_HAPPY
 fi;
 
