@@ -343,7 +343,7 @@ mkSigTy :: Id -> Arity -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
 mkSigTy id arity rhs (DmdType fv dmds res) 
   = (lazy_fv, mkStrictSig id arity dmd_ty)
   where
-    dmd_ty = DmdType strict_fv lazified_dmds res'
+    dmd_ty = DmdType strict_fv final_dmds res'
 
     lazy_fv   = filterUFM (not . isStrictDmd) fv
     strict_fv = filterUFM isStrictDmd         fv
