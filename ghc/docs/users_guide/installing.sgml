@@ -15,10 +15,19 @@ Haskell, so binary distributions allow you to install them without
 having a Haskell compiler.)
 </Para>
 
-<Para>This guide is in two parts: installing on Unix-a-likes, and installing on Windows.</Para>
+<Para>This guide is in several parts:</para>
+<itemizedlist>
+<listitem> Installing on Unix-a-likes (<Xref LinkEnd="sec-unix-a-likes">).  </listitem>
+<listitem> Installing on Windows  (<Xref LinkEnd="sec-install-windows">).  </listitem>
+<listitem> The layout of installed files  (<Xref LinkEnd="sec-install-files">).  
+You don't need to know this to install GHC,
+but it's useful if you are changing the implementation.   </listitem>
+<listitem> Installing or building the documentation (<Xref LinkEnd="building-docs">). </listitem>
+</itemizedlist>
 
 
-  <Sect1><Title>Installing on Unix-a-likes</Title>
+  
+  <Sect1 id="sec-unix-a-likes"><Title>Installing on Unix-a-likes</Title>
 
     <sect2>
       <title>When a platform-specific package is available</title>
@@ -657,6 +666,171 @@ unfortunately. Anyway, better to install 4.08 binaries and use those.
 </Sect2>
 
 </Sect1>
+
+
+<Sect1 id="sec-install-files><Title>The layout of installed files</Title>
+
+<para>
+This section describes what files get installed where.  You don't need to know it
+if you are simply installing GHC, but it is vital information if you are changing
+the implementation.
+</para>
+<para> GHC is installed in two directory trees:</para>
+<variablelist>
+<varlistentry>
+<term>Binary directory</term>
+<listitem> known as <Filename>$(bindir)</Filename>, holds executables that 
+the user is expected to invoke.  Notably,
+<Filename>ghc</Filename> and <Filename>ghci</FileName>.  On Unix, this directory
+is typically something like <Filename>/usr/local/bin</Filename>.  On Windows,
+however, this directory is always <Filename>$(libdir)/bin</Filename>.
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>Library directory,</term>
+<listitem> known as <Filename>$(libdir)</Filename>, holds all the 
+support files needed to run GHC.  On Unix, this 
+directory is usually something like <Filename>/usr/lib/ghc/ghc-5.02</Filename>.
+</listitem>
+</variablelist>
+
+<para>
+When GHC runs, it must know where its library directory is.
+It finds this out in one of two ways:
+</para>
+<itemizedlist>
+<listitem>
+<Filename>$(libdir)</Filename> is passed to GHC using the <option>-B</option> flag.
+On Unix (but not Windows), the installed <filename>ghc</filename> is just a one-line 
+shell script that invokes the real GHC, passing a suitable <option>-B</option> flag. 
+[All the user-supplied flags
+follow, and a later <option>-B</option> flag overrides an earlier one, so a user-supplied
+one wins.]
+
+</listitem>
+<listitem>
+On Windows (but not Unix), if no <option>-B</option> flag is given, GHC uses a system
+call to find the directory in which the running GHC executable lives, and derives 
+<Filename>$(libdir)</Filename> from that. [Unix lacks such a system call.]
+</listitem>
+</itemizedlist>
+
+<sect2> <title>Layout of the library directory</title>
+
+<para>
+The layout of the library directory is almost identical on Windows and Unix, 
+as follows:
+layout:</para>
+<programlisting>
+  $(libdir)/
+    package.conf           GHC package configuration
+    
+    bin/                   [Win32 only]  User-visible binaries
+         ghc.exe
+         ghci.bat
+
+    extra-bin/             Support binaries
+	 unlit             Remove literate markup
+    
+	 touch.exe         [Win32 only]
+	 perl.exe          [Win32 only]
+	 gcc.exe           [Win32 only]
+    
+         ghc               [Unix only]
+
+	 ghc-split         Asm code splitter
+	 ghc-asm	   Asm code mangler
+
+    gcc-lib/               [Win32 only] Support files for gcc
+        specs              gcc configuration
+ 
+        cpp0.exe           gcc support binaries
+        as.exe
+        ld.exe
+
+        crt0.o              Standard
+	   ..etc..	    binaries
+        
+        libmingw32.a        Standard
+	   ..etc..	    libraries
+
+        include/*.h         Include files
+
+    imports/                GHC interface files
+        std/*.hi              'std' library
+	lang/*.hi             'lang' library
+        ..etc..
+
+    include/                 C header files
+        StgMacros.h           GHC-specific
+        ..etc...              header files
+
+        mingw/*.h             Mingwin header files
+
+    libHSrts.a              GHC library archives
+    libHSstd.a
+    libHSlang.a
+      ..etc..
+
+    HSstd1.o                GHC library linkables
+    HSstd2.o                  (used by ghci, which does
+    HSlang.o                  not grok .a files yet)
+</programlisting>
+
+<para>Note that:</para>
+<itemizedlist>
+<listitem>
+<para>On Win32, the <filename>$(libdir)/bin</filename> directory contains user-visible binaries; 
+add it to you <filename>PATH</filename>.  The <filename>ghci</filename> executable is a <filename>.bat</filename>
+file which invokes <filename>ghc</filename>.   </para>
+
+<para>The GHC executable is the Real Thing (no intervening
+shell scripts or <filename>.bat</filename> files).  
+Reason: we sometimes invoke GHC with very long command lines,
+and <filename>.bat</filename> truncate them.  [We assume people won't invoke ghci with very long
+command lines.]</para>
+
+<para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/extra-bin/ghc</filename>,
+passing a suitable <option>-B</option> flag. 
+</para>
+</listitem>
+
+<listitem>
+<para>  <filename>$(libdir)/extra-bin/</filename> contains support binaries.  These
+are <emphasis>not</emphasis> expected to be on the user's <filename>PATH</filename>, but
+and are invoked directly by GHC.  In the Makefile system, this directory is called 
+<filename>$(libexecdir)</filename>, but <emphasis>you aren't free to change it</emphasis>.  It must
+be <filename>$(libdir)/extra-bin/</filename>.
+</para>
+</listitem>
+
+<listitem>
+<para> We distribute <filename>gcc</filename> with the Win32 distribution of GHC, so that users
+don't need to install <filename>gcc</filename>, nor need to care about which version it is.
+All <filename>gcc</filename>'s support files are kept in  <filename>$(libdir)/gcc-lib/</filename>.
+</para> 
+</listitem>
+
+<listitem>
+<para> Similarly, we distribute <filename>perl</filename> and <filename>touch</filename>
+with the Win32 distribution of GHC. </para> 
+</listitem>
+
+<listitem> <para> The support programs <filename>ghc-split</filename> and <filename>ghc-asm</filename>
+are Perl scripts.  The first line says <literal>#!/bin/perl</literal>; on Unix, the script is
+indeed invoked as a shell script, which invokes Perl; on Windows, GHC invokes 
+<filename>$(libdir)/extra-bin/perl</filename>
+directly,
+which treats the <literal>#!/bin/perl</literal> as a comment.  Reason: on Windows we want
+to invoke the Perl distributed with GHC, rather than assume some installed one.
+</para> 
+</listitem>
+
+</itemizelist>
+
+</sect2>
+
+</sect1>
 
 
 <Sect1 id="building-docs">
