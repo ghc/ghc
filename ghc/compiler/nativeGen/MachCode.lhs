@@ -316,7 +316,7 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       Double2FloatOp -> coerceFltCode x
       Float2DoubleOp -> coerceFltCode x
 
-      other_op -> getRegister (StCall fn cconv DoubleRep [x])
+      other_op -> getRegister (StCall fn cCallConv DoubleRep [x])
 	where
 	  fn = case other_op of
 		 FloatExpOp    -> SLIT("exp")

@@ -181,7 +181,11 @@ mAX_Long_REG    = (MAX_LONG_REG  :: Int)
 mAX_Real_Vanilla_REG	= (MAX_REAL_VANILLA_REG :: Int)
 mAX_Real_Float_REG	= (MAX_REAL_FLOAT_REG :: Int)
 mAX_Real_Double_REG	= (MAX_REAL_DOUBLE_REG :: Int)
+#ifdef MAX_REAL_LONG_REG
 mAX_Real_Long_REG	= (MAX_REAL_LONG_REG :: Int)
+#else
+mAX_Real_Long_REG       = (0::Int)
+#endif
 \end{code}
 
 Closure header sizes.
