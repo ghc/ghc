@@ -12,7 +12,7 @@ module Literal
 	, literalType, literalPrimRep
 	, hashLiteral
 
-	, inIntRange, inWordRange
+	, inIntRange, inWordRange, tARGET_MAX_INT
 
 	, word2IntLit, int2WordLit, char2IntLit, int2CharLit
 	, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit

@@ -50,6 +50,9 @@ import Util		( removeDups )
 import ListSetOps	( unionLists )
 import Maybes		( maybeToBool )
 import Outputable
+import Literal		( inIntRange, tARGET_MAX_INT )
+import RdrName		( mkSrcUnqual )
+import OccName		( varName )
 \end{code}
 
 
@@ -288,6 +291,12 @@ rnExpr (HsIPVar v)
   = getIPName v			`thenRn` \ name ->
     returnRn (HsIPVar name, emptyFVs)
 
+-- Special case for integral literals with a large magnitude:
+-- They are transformed into an expression involving only smaller
+-- integral literals. This improves constant folding.
+rnExpr (HsLit (HsInt i))
+  | not (inIntRange i) = rnExpr (horner tARGET_MAX_INT i)
+
 rnExpr (HsLit lit) 
   = litOccurrence lit		`thenRn` \ fvs ->
     returnRn (HsLit lit, fvs)
@@ -468,6 +477,17 @@ rnExpr e@(EAsPat _ _) = addErrRn (patSynErr e)	`thenRn_`
 
 rnExpr e@(ELazyPat _) = addErrRn (patSynErr e)	`thenRn_`
 		        returnRn (EWildPat, emptyFVs)
+
+-- Transform i into (x1 + (x2 + (x3 + (...) * b) * b) * b) with abs xi <= b
+horner :: Integer -> Integer -> RdrNameHsExpr
+horner b i | abs q <= 1 = if r == 0 || r == i then mkInt i else mkInt r `plus` mkInt (i-r)
+           | r == 0     =                 horner b q `times` mkInt b
+           | otherwise  = mkInt r `plus` (horner b q `times` mkInt b)
+   where (q,r)    = i `quotRem` b
+         mkInt i  = HsLit (HsInt i)
+         plus     = mkOp "+"
+         times    = mkOp "*"
+         mkOp op = \x y -> OpApp x (HsVar (mkSrcUnqual varName (_PK_ op))) (panic "fixity") y
 \end{code}
 
 %************************************************************************
