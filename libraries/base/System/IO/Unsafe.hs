@@ -14,7 +14,7 @@
 -----------------------------------------------------------------------------
 
 module System.IO.Unsafe (
-   -- * Unsafe 'IO' operations
+   -- * Unsafe 'System.IO.IO' operations
    unsafePerformIO,	-- :: IO a -> a
    unsafeInterleaveIO,	-- :: IO a -> IO a
   ) where
