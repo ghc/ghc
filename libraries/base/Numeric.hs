@@ -62,11 +62,8 @@ import Array
 #endif
 
 
--- *********************************************************
--- *							   *
--- \subsection{Reading}
--- *							   *
--- *********************************************************
+-- -----------------------------------------------------------------------------
+-- Reading
 
 readInt :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
 readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
@@ -102,13 +99,8 @@ readSigned readPos = readParen False read'
 			       return (n,s)
 
 
--- *********************************************************
--- *							   *
--- \subsection{Showing}
--- *							   *
--- *********************************************************
-
-
+-- -----------------------------------------------------------------------------
+-- Showing
 
 #ifdef __GLASGOW_HASKELL__
 showInt :: Integral a => a -> ShowS
