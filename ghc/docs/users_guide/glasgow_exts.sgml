@@ -1120,6 +1120,47 @@ Haskell programs without knowing their typing.
 
 </sect3>
 
+<sect3><title>Recursive functions</title>
+<para>Linear implicit parameters can be particularly tricky when you have a recursive function
+Consider
+<programlisting>
+        foo :: %x::T => Int -> [Int]
+        foo 0 = []
+        foo n = %x : foo (n-1)
+</programlisting>
+where T is some type in class Splittable.</para>
+<para>
+Do you get a list of all the same T's or all different T's
+(assuming that split gives two distinct T's back)?
+</para><para>
+If you supply the type signature, taking advantage of polymorphic
+recursion, you get what you'd probably expect.  Here's the
+translated term, where the implicit param is made explicit:
+<programlisting>
+        foo x 0 = []
+        foo x n = let (x1,x2) = split x
+                  in x1 : foo x2 (n-1)
+</programlisting>
+But if you don't supply a type signature, GHC uses the Hindley
+Milner trick of using a single monomorphic instance of the function
+for the recursive calls. That is what makes Hindley Milner type inference
+work.  So the translation becomes
+<programlisting>
+        foo x = let
+                  foom 0 = []
+                  foom n = x : foom (n-1)
+                in
+                foom
+</programlisting>
+Result: 'x' is not split, and you get a list of identical T's.  So the
+semantics of the program depends on whether or not foo has a type signature.
+Yikes!
+</para><para>
+You may say that this is a good reason to dislike linear implicit parameters
+and you'd be right.  That is why they are an experimental feature. 
+</para>
+</sect3>
+
 </sect2>
 
 <sect2 id="functional-dependencies">
