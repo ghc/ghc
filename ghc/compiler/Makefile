@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.40 1998/05/21 10:32:03 simonm Exp $
+# $Id: Makefile,v 1.41 1998/05/22 09:09:56 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -187,12 +187,24 @@ typecheck/TcExpr_HC_OPTS	= -H15m
 typecheck/TcEnv_HC_OPTS		= -H10m
 utils/Argv_HC_OPTS 		= -fvia-C
 utils/SST_HC_OPTS 		= -fvia-C
-utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -funfolding-interface-threshold10
 utils/FastString_HC_OPTS	= -fvia-C
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
 utils/DirUtils_HC_OPTS 		= -fvia-C
 
+# flags for PrimPacked:
+#
+# -monly-3-regs 
+#	because it contains a 'ccall strlen', which gets inlined by
+# 	gcc, causing a lack of registers.
+#
+# -optC-funfolding-interface-threshold10
+#	To stop the definition of 'strLength', which calls strlen, getting
+#	into the interface file and spreading the -monly-3-regs virus.
+#	We need -optC here because the driver before 3.02 didn't understand
+#	the -funfolding flags.
+
+utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -optC-funfolding-interface-threshold10
 
 # Strictness analyser misbehaving in 2.10, fails to terminate on
 # UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a
