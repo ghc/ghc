@@ -425,9 +425,31 @@ Here's a case that bit me:
 	...a...a...a....
 
 Re-ordering doesn't change the order of bindings, but there was no loop-breaker.
-(The first binding was a var-rhs; the second was a one-occ.)  So the simplifier looped.
+
 My solution was to make a=b bindings record b as Many, rather like INLINE bindings.
 Perhaps something cleverer would suffice.
+
+You might think that you can prevent non-termination simply by making
+sure that we simplify a recursive binding's RHS in an environment that
+simply clones the recursive Id.  But no.  Consider
+
+		letrec f = \x -> let z = f x' in ...
+
+		in
+		let n = f y
+		in
+		case n of { ... }
+
+We bind n to its *simplified* RHS, we then *re-simplify* it when
+we inline n.  Then we may well inline f; and then the same thing
+happens with z!
+
+I don't think it's possible to prevent non-termination by environment
+manipulation in this way.  Apart from anything else, successive
+iterations of the simplifier may unroll recursive loops in cases like
+that above.  The idea of beaking every recursive loop with an
+IMustNotBeINLINEd pragma is much much better.
+
 
 \begin{code}
 reOrderRec
