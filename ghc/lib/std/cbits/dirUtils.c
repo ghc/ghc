@@ -15,13 +15,8 @@
 #ifdef HAVE_STDDEF_H
 # include <stddef.h>
 #endif
-
 #ifdef HAVE_ERRNO_H
 # include <errno.h>
-#endif
-
-#ifndef offsetof
-#define offsetof(t, f) ((size_t) &((t *)0)->f)
 #endif
 
 HsInt
@@ -63,7 +58,7 @@ mode_t prel_st_mode(struct stat* st) { return st->st_mode; }
 HsAddr prel_d_name(struct dirent* d)
 { 
 #ifndef mingw32_TARGET_OS
-  return (HsAddr)((char*)d + (long)offsetof(struct dirent,d_name));
+  return (HsAddr)(&d->d_name);
 #else
   return (HsAddr)(d->d_name);
 #endif
