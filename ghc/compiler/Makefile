@@ -104,6 +104,7 @@ boot ::
 #     Hence the "../.." in the ln command line
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 	for i in */*hi-boot*; do \
+	    cp -f $$i stage$(stage)/$$i; \
 	done
 else
 	for i in */*hi-boot*; do \
