@@ -4,8 +4,8 @@ module ShouldFail where
 
 import PrelGHC
 
-foreign export foo :: Int# -> IO ()
+foreign export ccall foo :: Int# -> IO ()
 foo i | i ==# 0# = return ()
 
-foreign export bar :: Int -> Int#
+foreign export ccall bar :: Int -> Int#
 bar _ = 42#
