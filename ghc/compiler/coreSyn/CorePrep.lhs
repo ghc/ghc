@@ -320,6 +320,7 @@ corePrepRecPairs lvl env pairs
 
     get (FloatLet (NonRec b r)) prs2 = (b,r) : prs2
     get (FloatLet (Rec prs1))   prs2 = prs1 ++ prs2
+    get b			prs2 = pprPanic "corePrepRecPairs" (ppr b)
 
 --------------------------------
 corePrepRhs :: TopLevelFlag -> RecFlag
@@ -497,9 +498,10 @@ corePrepExprFloat env expr@(App _ _)
 	  returnUs (Note (Coerce ty1 ty2) fun', hd, ty1, floats, ss)
 
     collect_args (Note note fun) depth
-	| ignore_note note 
+	| ignore_note note 	-- Drop these notes altogether
+				-- They aren't used by the code generator
         = collect_args fun depth   `thenUs` \ (fun', hd, fun_ty, floats, ss) ->
-	  returnUs (Note note fun', hd, fun_ty, floats, ss)
+	  returnUs (fun', hd, fun_ty, floats, ss)
 
 	-- N-variable fun, better let-bind it
 	-- ToDo: perhaps we can case-bind rather than let-bind this closure,
@@ -526,29 +528,55 @@ corePrepExprFloat env expr@(App _ _)
 -- The type is the type of the entire application
 maybeSaturate :: Id -> CoreExpr -> Int -> Floats -> Type -> UniqSM (Floats, CoreExpr)
 maybeSaturate fn expr n_args floats ty
-  | hasNoBinding fn = saturate_it
+  | Just DataToTagOp <- isPrimOpId_maybe fn	-- DataToTag must have an evaluated arg
+						-- A gruesome special case
+  = saturate_it		`thenUs` \ sat_expr ->
+
+	-- OK, now ensure that the arg is evaluated.
+	-- But (sigh) take into account the lambdas we've now introduced
+    let 
+	(eta_bndrs, eta_body) = collectBinders sat_expr
+    in
+    eval_data2tag_arg eta_body	`thenUs` \ (eta_floats, eta_body') -> 
+    if null eta_bndrs then
+	returnUs (floats `appendFloats` eta_floats, eta_body')
+    else
+	mkBinds eta_floats eta_body'		`thenUs` \ eta_body'' ->
+	returnUs (floats, mkLams eta_bndrs eta_body'')
+
+  | hasNoBinding fn = saturate_it	`thenUs` \ sat_expr ->
+		      returnUs (floats, sat_expr)
+
   | otherwise       = returnUs (floats, expr)
+
   where
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
-    saturate_it  = getUniquesUs		`thenUs` \ us ->
-		   let expr' = etaExpand excess_arity us expr ty in
-		   case isPrimOpId_maybe fn of
-			Just DataToTagOp -> hack_data2tag expr'
-			other		 -> returnUs (floats, expr')
+
+    saturate_it :: UniqSM CoreExpr
+    saturate_it | excess_arity == 0 = returnUs expr
+		| otherwise	    = getUniquesUs		`thenUs` \ us ->
+				      returnUs (etaExpand excess_arity us expr ty)
 
 	-- Ensure that the argument of DataToTagOp is evaluated
-    hack_data2tag app@(Var _fn `App` _ty `App` Var arg_id)
+    eval_data2tag_arg :: CoreExpr -> UniqSM (Floats, CoreExpr)
+    eval_data2tag_arg app@(fun `App` Var arg_id)
 	| isEvaldUnfolding (idUnfolding arg_id)	-- Includes nullary constructors
-	= returnUs (floats, app)	-- The arg is evaluated
-    hack_data2tag app@(Var fn `App` Type ty `App` arg)
+	= returnUs (emptyFloats, app)	-- The arg is evaluated
 	| otherwise			-- Arg not evaluated, so evaluate it
-	= newVar ty		`thenUs` \ arg_id1 ->
-	  let arg_id2   = setIdUnfolding arg_id1 evaldUnfolding
-	      new_float = FloatCase arg_id2 arg False 
+	= newVar (idType arg_id)		`thenUs` \ arg_id1 ->
+	  let 
+	     arg_id2   = setIdUnfolding arg_id1 evaldUnfolding
 	  in
-	  returnUs (addFloat floats new_float, 
-		    Var fn `App` Type ty `App` Var arg_id2)
+	  returnUs (unitFloat (FloatCase arg_id2 (Var arg_id) False ),
+		    fun `App` Var arg_id2)
+
+    eval_data2tag_arg (Note note app)	-- Scc notes can appear
+	= eval_data2tag_arg app		`thenUs` \ (floats, app') ->
+	  returnUs (floats, Note note app')
+
+    eval_data2tag_arg other	-- Should not happen
+	= pprPanic "eval_data2tag" (ppr other)
 
 
 -- ---------------------------------------------------------------------------
@@ -614,6 +642,7 @@ mkBinds :: Floats -> CoreExpr -> UniqSM CoreExpr
 mkBinds (Floats _ binds) body 
   | isNilOL binds = returnUs body
   | otherwise	  = deLam body		`thenUs` \ body' ->
+			-- Lambdas are not allowed as the body of a 'let'
 		    returnUs (foldrOL mk_bind body' binds)
   where
     mk_bind (FloatCase bndr rhs _) body = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
