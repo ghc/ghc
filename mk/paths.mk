@@ -139,7 +139,7 @@ HAPPY_SRCS    = $(HAPPY_Y_SRCS) $(HAPPY_LY_SRCS)
 
 DERIVED_GC_SRCS       = $(patsubst %.gc,  %.hs, $(GC_SRCS)) \
 			$(patsubst %.gc, %_stub_ffi.c, $(GC_SRCS)) \
-			$(patsubst %.gc, %_stub_ffi.h, $(GC_SRCS)) \
+			$(patsubst %.gc, %_stub_ffi.h, $(GC_SRCS))
 
 DERIVED_HSC_SRCS      = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
