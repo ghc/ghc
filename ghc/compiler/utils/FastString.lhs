@@ -422,7 +422,7 @@ cmpFS (FastString u1# l1# b1#) (FastString u2# l2# b2#) =
   if u1# ==# u2# then EQ else
   let l# = if l1# <=# l2# then l1# else l2# in
   unsafePerformIO (
-    strncmp b1# b2# l# >>= \ (I# res) ->
+    memcmp b1# b2# l# >>= \ (I# res) ->
     return (
     if      res <#  0# then LT
     else if res ==# 0# then 
@@ -431,8 +431,8 @@ cmpFS (FastString u1# l1# b1#) (FastString u2# l2# b2#) =
     else		    GT
     ))
 
-foreign import ccall "strncmp" unsafe 
-  strncmp :: ByteArray# -> ByteArray# -> Int# -> IO Int
+foreign import ccall "ghc_memcmp" unsafe 
+  memcmp :: ByteArray# -> ByteArray# -> Int# -> IO Int
 
 -- -----------------------------------------------------------------------------
 -- Outputting 'FastString's
