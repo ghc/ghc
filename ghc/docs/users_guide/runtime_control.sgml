@@ -430,6 +430,23 @@
 	  -auto-all</literal> and running with <literal>+RTS -xc
 	  -RTS</literal> will tell you exactly the call stack at the
 	  point the error was raised.</para>
+
+	  <para>The output contains one line for each exception raised
+	  in the program (the program might raise and catch several
+	  exceptions during its execution), where each line is of the
+	  form:</para>
+
+<screen>
+&lt; cc<subscript>1</subscript>, ..., cc<subscript>n</subscript> &gt;
+</screen>
+	  <para>each <literal>cc</literal><subscript>i</subscript> is
+	  a cost centre in the program (see <xref
+	  linkend="cost-centres">), and the sequence represents the
+	  &ldquo;call stack&rdquo; at the point the exception was
+	  raised.  The leftmost item is the innermost function in the
+	  call stack, and the rightmost item is the outermost
+	  function.</para>
+
 	</listitem>
       </varlistentry>
 

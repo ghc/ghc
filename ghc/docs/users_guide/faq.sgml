@@ -202,6 +202,81 @@
         with g++ and gcc 3.0.</para>
       </listitem>
     </varlistentry>
+
+    <varlistentry>
+      <term>My program is failing with <literal>head []</literal>, or
+      an array bounds error, or some other random error, and I have no
+      idea how to find the bug.  Can you help?</term>
+
+      <listitem>
+	<para>Compile your program with <literal>-prof
+-auto-all</literal> (make sure you have the profiling libraries
+installed), and run it with <literal>+RTS -xc -RTS</literal> to get a
+&ldquo;stack trace&rdquo; at the point at which the exception was
+raised.  See <xref linkend="rts-options-debugging"> for more
+details.</para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>How do I increase the heap size permanently for a given
+      binary?</term>
+      <listitem>
+	<para>See <xref linkend="rts-hooks">.</para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>I'm trying to compile my program for parallel execution
+      with the <option>-parallel</option>, and GHC complains with an
+      error like &ldquo;failed to load interface file for
+      Prelude&rdquo;.</term>
+      <listitem>
+	<para>GHC doesn't ship with support for parallel execution,
+	that support is provided separately by the <ulink
+							  url="http://www.macs.hw.ac.uk/~dsg/gph/">GPH</ulink> project.</para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>When is it safe to use
+      <literal>unsafePerformIO</literal>?</term>
+      <listitem>
+	<para>We'll give two answers to this question, each of which
+	may be helpful.  These criteria are not rigorous in any real
+	sense (you'd need a formal semantics for Haskell in order to
+	give a proper answer to this question), but should give you a
+	feel for the kind of things you can and cannot do with
+	<literal>unsafePerformIO</literal>.</para>
+	
+	<itemizedlist>
+	  <listitem>
+	    <para>It is safe to implement a function or API using
+	    <literal>unsafePerformIO</literal> if you could imagine
+	    also implementing the same function or API in Haskell
+	    without using <literal>unsafePerformIO</literal> (forget
+	    about efficiency, just consider the semantics).</para>
+	  </listitem>
+
+	  <listitem>
+	    <para>In pure Haskell, the value of a function depends
+	    only on the values of its arguments (and free variables,
+	    if it has any).  If you can implement the function using
+	    <literal>unsafePerformIO</literal> and still retain this
+	    invariant, then you're probably using
+	    <literal>unsafePerformIO</literal> in a safe way.  Note
+	    that you need only consider the
+	    <emphasis>observable</emphasis> values of the arguments
+	    and result.</para>
+	  </listitem>
+	</itemizedlist>
+	
+	<para>For more information, see <ulink
+	url="http://www.haskell.org/pipermail/glasgow-haskell-users/2002-July/003681.html">this
+	thread</ulink>.</para>
+      </listitem>
+    </varlistentry>
+
   </variablelist>
 </chapter>
 

@@ -45,7 +45,7 @@
     
   </orderedlist>
   
-  <sect1>
+  <sect1 id="cost-centres">
     <title>Cost centres and cost-centre stacks</title>
     
     <para>GHC's profiling system assigns <firstterm>costs</firstterm>
