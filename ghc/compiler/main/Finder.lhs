@@ -281,10 +281,10 @@ mkHomeModLocation mod_name src_filename = do
    case maybePrefixMatch (reverse mod_basename) (reverse basename) of
 	Just ""   ->
 	   mkHomeModLocationSearched mod_name "."  mod_basename extension
-	Just rest -> do
+	Just rest@(r:_) | isPathSeparator r -> do
 	   let path = reverse (dropWhile (=='/') rest)
 	   mkHomeModLocationSearched mod_name path mod_basename extension
-	Nothing   -> do
+	_ -> do
 	  -- hPutStrLn stderr ("Warning: " ++ src_filename ++
 	  --			 ": filename and module name do not match")
 	  let (dir,basename,ext) = splitFilename3 src_filename
