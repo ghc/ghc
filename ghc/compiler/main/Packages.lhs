@@ -49,7 +49,7 @@ mungePackagePaths top_dir ps = map munge_pkg ps
 
   munge_path p 
 	  | Just p' <- my_prefix_match "$libdir" p = top_dir ++ p'
-	  | otherwise				   = trace ("not: " ++ p) p
+	  | otherwise				   = p
 \end{code}
 
 
