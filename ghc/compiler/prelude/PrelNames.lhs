@@ -160,7 +160,8 @@ knownKeyNames
 	timesIntegerName,
 	eqStringName,
 	assertName,
-	runSTRepName
+	runSTRepName,
+	printName
     ]
 \end{code}
 
@@ -184,6 +185,7 @@ pREL_TUP_Name     = mkModuleName "PrelTup"
 pREL_PACK_Name    = mkModuleName "PrelPack"
 pREL_CONC_Name    = mkModuleName "PrelConc"
 pREL_IO_BASE_Name = mkModuleName "PrelIOBase"
+pREL_IO_Name	  = mkModuleName "PrelIO"
 pREL_ST_Name	  = mkModuleName "PrelST"
 pREL_ARR_Name     = mkModuleName "PrelArr"
 pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
@@ -423,6 +425,9 @@ ioTyConName	  = tcQual   pREL_IO_BASE_Name SLIT("IO") ioTyConKey
 ioDataConName     = dataQual pREL_IO_BASE_Name SLIT("IO") ioDataConKey
 bindIOName	  = varQual  pREL_IO_BASE_Name SLIT("bindIO") bindIOIdKey
 returnIOName	  = varQual  pREL_IO_BASE_Name SLIT("returnIO") returnIOIdKey
+
+-- IO things
+printName	  = varQual pREL_IO_Name SLIT("print") printIdKey
 
 -- Int, Word, and Addr things
 int8TyConName     = tcQual pREL_INT_Name  SLIT("Int8") int8TyConKey
@@ -791,6 +796,7 @@ newStablePtrIdKey	      = mkPreludeMiscIdUnique 39
 getTagIdKey		      = mkPreludeMiscIdUnique 40
 plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
 timesIntegerIdKey	      = mkPreludeMiscIdUnique 42
+printIdKey		      = mkPreludeMiscIdUnique 43
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

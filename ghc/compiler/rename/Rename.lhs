@@ -44,14 +44,14 @@ import Name		( Name, NamedThing(..), getSrcLoc,
 			  nameIsLocalOrFrom, nameOccName, nameModule,
 			)
 import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
-import RdrName		( elemRdrEnv, foldRdrEnv, isQual )
+import RdrName		( foldRdrEnv, isQual )
 import OccName		( occNameFlavour )
 import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
 import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
-			  ioTyCon_RDR, main_RDR_Unqual,
-			  unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
-			  eqString_RDR
+			  ioTyConName, printName,
+			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
+			  eqStringName
 			)
 import PrelInfo		( derivingOccurrences )
 import Type		( funTyCon )
@@ -61,7 +61,7 @@ import Bag		( bagToList )
 import FiniteMap	( FiniteMap, fmToList, emptyFM, lookupFM, 
 			  addToFM_C, elemFM, addToFM
 			)
-import UniqFM		( lookupUFM )
+import UniqFM		( lookupWithDefaultUFM )
 import Maybes		( maybeToBool, catMaybes )
 import Outputable
 import IO		( openFile, IOMode(..) )
@@ -136,14 +136,18 @@ renameExpr dflags hit hst pcs this_module expr
 		returnRn Nothing
 	  else
 
-	  lookupOrigNames implicit_occs			`thenRn` \ implicit_names ->
-	  slurpImpDecls (fvs `plusFV` implicit_names)	`thenRn` \ decls ->
+	  let
+	    implicit_fvs = fvs `plusFV` string_names
+			       `plusFV` default_tycon_names
+			       `plusFV` unitFV printName
+					-- print :: a -> IO () may be needed later
+ 	  in
+	  slurpImpDecls (fvs `plusFV` implicit_fvs)	`thenRn` \ decls ->
 
 	  doDump e decls  `thenRn_`
 	  returnRn (Just (print_unqual, (e, decls)))
 	}}
   where
-     implicit_occs = string_occs
      doc = text "context for compiling expression"
 
      doDump :: RenamedHsExpr -> [RenamedHsDecl] -> RnMG (Either IOError ())
@@ -222,9 +226,6 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 	-- RENAME THE SOURCE
     rnSourceDecls gbl_env local_fixity_env local_decls	`thenRn` \ (rn_local_decls, source_fvs) ->
 
-	-- CHECK THAT main IS DEFINED, IF REQUIRED
-    checkMain this_module local_gbl_env		`thenRn_`
-
 	-- EXIT IF ERRORS FOUND
 	-- We exit here if there are any errors in the source, *before*
 	-- we attempt to slurp the decls from the interfaces, otherwise
@@ -294,57 +295,40 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     mod_name = moduleName this_module
 \end{code}
 
-Checking that main is defined
-
-\begin{code}
-checkMain :: Module -> GlobalRdrEnv -> RnMG ()
-checkMain this_mod local_env
-  | moduleName this_mod == mAIN_Name 
-  = checkRn (main_RDR_Unqual `elemRdrEnv` local_env) noMainErr
-  | otherwise
-  = returnRn ()
-\end{code}
-
 @implicitFVs@ forces the renamer to slurp in some things which aren't
 mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
 implicitFVs mod_name decls
-  = lookupOrigNames implicit_occs			`thenRn` \ implicit_names ->
-    returnRn (mkNameSet (map getName default_tycons)	`plusFV`
-	      implicit_names)
+  = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
+    returnRn (default_tycon_names  `plusFV`
+	      string_names	   `plusFV`
+	      deriving_names	   `plusFV`
+	      implicit_main)
   where
- 	-- Add occurrences for Int, and (), because they
-	-- are the types to which ambigious type variables may be defaulted by
-	-- the type checker; so they won't always appear explicitly.
-	-- [The () one is a GHC extension for defaulting CCall results.]
-	-- ALSO: funTyCon, since it occurs implicitly everywhere!
-	--  	 (we don't want to be bothered with making funTyCon a
-	--	  free var at every function application!)
-	-- Double is dealt with separately in getGates
-    default_tycons = [unitTyCon, funTyCon, boolTyCon, intTyCon]
 
 	-- Add occurrences for IO or PrimIO
     implicit_main |  mod_name == mAIN_Name
-		  || mod_name == pREL_MAIN_Name = [ioTyCon_RDR]
-		  |  otherwise 		        = []
+		  || mod_name == pREL_MAIN_Name = unitFV ioTyConName
+		  |  otherwise 		        = emptyFVs
 
-	-- Now add extra "occurrences" for things that
-	-- the deriving mechanism, or defaulting, will later need in order to
-	-- generate code
-    implicit_occs = string_occs ++ foldr ((++) . get) implicit_main decls
-
-
-    get (TyClD (TyData {tcdDerivs = Just deriv_classes})) = concat (map get_deriv deriv_classes)
-    get other						  = []
-
-    get_deriv cls = case lookupUFM derivingOccurrences cls of
-			Nothing   -> []
-			Just occs -> occs
+    deriv_occs = [occ | TyClD (TyData {tcdDerivs = Just deriv_classes}) <- decls,
+			cls <- deriv_classes,
+			occ <- lookupWithDefaultUFM derivingOccurrences [] cls ]
 
 -- Virtually every program has error messages in it somewhere
-string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, 
-	       unpackCStringUtf8_RDR, eqString_RDR]
+string_names = mkFVs [unpackCStringName, unpackCStringFoldrName, 
+		      unpackCStringUtf8Name, eqStringName]
+
+-- Add occurrences for Int, and (), because they
+-- are the types to which ambigious type variables may be defaulted by
+-- the type checker; so they won't always appear explicitly.
+-- [The () one is a GHC extension for defaulting CCall results.]
+-- ALSO: funTyCon, since it occurs implicitly everywhere!
+--  	 (we don't want to be bothered with making funTyCon a
+--	  free var at every function application!)
+-- Double is dealt with separately in getGates
+default_tycon_names = mkFVs (map getName [unitTyCon, funTyCon, boolTyCon, intTyCon])
 \end{code}
 
 \begin{code}
@@ -611,16 +595,15 @@ closeIfaceDecls dflags hit hst pcs
 	local_names    = foldl add emptyNameSet tycl_decls
 	add names decl = addListToNameSet names (map fst (tyClDeclSysNames decl ++ tyClDeclNames decl))
     in
-	-- Record that we have now got declarations for local_names
+
     recordLocalSlurps local_names	`thenRn_`
 
 	-- Do the transitive closure
-    lookupOrigNames implicit_occs	`thenRn` \ implicit_names ->
-    closeDecls decls (needed `plusFV` implicit_names) `thenRn` \closed_decls ->
+    closeDecls decls (needed `plusFV` implicit_fvs) `thenRn` \closed_decls ->
     rnDump [] closed_decls `thenRn_`
     returnRn closed_decls
   where
-    implicit_occs = string_occs	-- Data type decls with record selectors,
+    implicit_fvs = string_names	-- Data type decls with record selectors,
 				-- which may appear in the decls, need unpackCString
 				-- and friends. It's easier to just grab them right now.
 \end{code}
@@ -920,10 +903,6 @@ dupFixityDecl rdr_name loc1 loc2
 badDeprec d
   = sep [ptext SLIT("Illegal deprecation when whole module is deprecated"),
 	 nest 4 (ppr d)]
-
-noMainErr
-  = hsep [ptext SLIT("Module"), quotes (ppr mAIN_Name), 
-	  ptext SLIT("must include a definition for"), quotes (ptext SLIT("main"))]
 \end{code}
 
 

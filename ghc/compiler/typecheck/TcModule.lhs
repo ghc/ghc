@@ -11,10 +11,11 @@ module TcModule (
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..), DynFlags, opt_PprStyle_Debug )
-import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), 
+import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  isIfaceRuleDecl, nullBinds, andMonoBindList
 			)
 import HsTypes		( toHsType )
+import PrelNames	( mAIN_Name, mainName, ioTyConName, printName )
 import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedHsExpr )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
@@ -24,27 +25,31 @@ import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 
 
 import TcMonad
-import TcType		( newTyVarTy, zonkTcType )
+import TcType		( newTyVarTy, zonkTcType, tcInstType )
+import TcUnify		( unifyTauTy )
 import Inst		( plusLIE )
+import VarSet		( varSetElems )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults, defaultDefaultTys )
 import TcExpr		( tcMonoExpr )
-import TcEnv		( TcEnv, InstInfo, tcExtendGlobalValEnv, 
-			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
+import TcEnv		( TcEnv, InstInfo, tcExtendGlobalValEnv, tcLookup_maybe,
+			  isLocalThing, tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv,
+			  TcTyThing(..), tcLookupTyCon
 			)
 import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcSimplify	( tcSimplifyTop )
+import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
 
 import CoreUnfold	( unfoldingTemplate, hasUnfolding )
-import Type		( funResultTy, splitForAllTys, openTypeKind )
+import Type		( funResultTy, splitForAllTys, mkForAllTys, mkFunTys,
+			  liftedTypeKind, openTypeKind, mkTyConApp, tyVarsOfType, tidyType )
 import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
 import Id		( idType, idName, isLocalId, idUnfolding )
-import Module           ( Module, isHomeModule )
+import Module           ( Module, isHomeModule, moduleName )
 import Name		( Name, toRdrName, isGlobalName )
 import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
@@ -99,6 +104,7 @@ typecheckModule dflags pcs hst mod_iface unqual decls
 
 ---------------
 typecheckExpr :: DynFlags
+	      -> Bool			-- True <=> wrap in 'print' to get a result of IO type
 	      -> PersistentCompilerState
 	      -> HomeSymbolTable
 	      -> PrintUnqualified	-- For error printing
@@ -107,7 +113,7 @@ typecheckExpr :: DynFlags
 	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
 	      -> IO (Maybe (PersistentCompilerState, TypecheckedHsExpr, TcType))
 
-typecheckExpr dflags pcs hst unqual this_mod (expr, decls)
+typecheckExpr dflags wrap_io pcs hst unqual this_mod (expr, decls)
   = typecheck dflags pcs hst unqual $
 
  	 -- use the default default settings, i.e. [Integer, Double]
@@ -116,18 +122,49 @@ typecheckExpr dflags pcs hst unqual this_mod (expr, decls)
     ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
 
     tcSetEnv env				$
-    newTyVarTy openTypeKind	`thenTc` \ ty ->
-    tcMonoExpr expr ty		`thenTc` \ (expr', lie) ->
-    tcSimplifyTop lie		`thenTc` \ binds ->
-    let all_expr = mkHsLet binds expr' in
-    zonkExpr all_expr		`thenNF_Tc` \ zonked_expr ->
-    zonkTcType ty		`thenNF_Tc` \ zonked_ty ->
+    tc_expr expr 					`thenTc` \ (expr', lie, expr_ty) ->
+    tcSimplifyInfer smpl_doc 
+	(varSetElems (tyVarsOfType expr_ty)) lie	`thenTc` \ (qtvs, lie_free, dict_binds, dict_ids) ->
+    tcSimplifyTop lie_free				`thenTc` \ const_binds ->
+    let all_expr = mkHsLet const_binds	$
+		   TyLam qtvs  		$
+		   DictLam dict_ids	$
+		   mkHsLet dict_binds	$
+		   expr'
+	all_expr_ty = mkForAllTys qtvs (mkFunTys (map idType dict_ids) expr_ty)
+    in
+    zonkExpr all_expr					`thenNF_Tc` \ zonked_expr ->
+    zonkTcType all_expr_ty				`thenNF_Tc` \ zonked_ty ->
     ioToTc (dumpIfSet_dyn dflags 
 		Opt_D_dump_tc "Typechecked" (ppr zonked_expr)) `thenNF_Tc_`
     returnTc (new_pcs, zonked_expr, zonked_ty) 
+
   where
     get_fixity :: Name -> Maybe Fixity
     get_fixity n = pprPanic "typecheckExpr" (ppr n)
+
+    smpl_doc = ptext SLIT("main expression")
+
+     	-- Typecheck it, wrapping in 'print' if necessary to
+	-- get a result of type IO t.  Returns the result type
+	-- that is free in the result type
+    tc_expr e 
+	| wrap_io   = tryTc_ (tc_io_expr (HsApp (HsVar printName) e))	-- Recovery case
+			     (tc_io_expr e)				-- Main case
+	| otherwise = newTyVarTy openTypeKind	`thenTc` \ ty ->
+		      tcMonoExpr expr ty 	`thenTc` \ (expr', lie) ->
+		      returnTc (expr', lie, ty)
+		      
+	where
+		-- (tc_io_expr e) typechecks 'e' if that gives a result of IO t,
+		-- or 'print e' otherwise.  Either way the result is of type IO t
+	  tc_io_expr e = newTyVarTy openTypeKind	`thenTc` \ ty ->
+			 tcLookupTyCon ioTyConName	`thenNF_Tc` \ ioTyCon ->
+			 let
+			    res_ty = mkTyConApp ioTyCon [ty]
+			 in
+		 	 tcMonoExpr expr res_ty	`thenTc` \ (expr', lie) ->
+			 returnTc (expr', lie, res_ty)
 
 ---------------
 typecheck :: DynFlags
@@ -163,7 +200,11 @@ tcModule :: PersistentCompilerState
 
 tcModule pcs hst get_fixity this_mod decls
   = 	-- Type-check the type and class decls, and all imported decls
-    tcImports pcs hst get_fixity this_mod decls	`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
+	-- tcImports recovers internally, but if anything gave rise to
+	-- an error we'd better stop now, to avoid a cascade
+    checkNoErrsTc (
+	tcImports pcs hst get_fixity this_mod decls
+    )						`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
 
     tcSetEnv env				$
 
@@ -206,6 +247,9 @@ tcModule pcs hst get_fixity this_mod decls
     		       lie_rules
     in
     tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
+
+	-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
+    tcCheckMain this_mod			`thenTc_`
     
         -- Backsubstitution.    This must be done last.
         -- Even tcSimplifyTop may do some unification.
@@ -334,6 +378,58 @@ tcImports pcs hst get_fixity this_mod decls
     tycl_decls  = [d | TyClD d <- decls]
     iface_rules = [d | RuleD d <- decls, isIfaceRuleDecl d]
 \end{code}    
+
+%************************************************************************
+%*									*
+\subsection{Checking the type of main}
+%*									*
+%************************************************************************
+
+We must check that in module Main,
+	a) main is defined
+	b) main :: forall a1...an. IO t,  for some type t
+
+If we have
+	main = error "Urk"
+then the type of main will be 
+	main :: forall a. a
+and that should pass the test too.  
+
+So we just instantiate the type and unify with IO t, and declare 
+victory if doing so succeeds.
+
+\begin{code}
+tcCheckMain :: Module -> TcM ()
+tcCheckMain this_mod
+  | not (moduleName this_mod == mAIN_Name )
+  = returnTc ()
+
+  | otherwise
+  =	-- First unify the main_id with IO t, for any old t
+    tcLookup_maybe mainName		`thenNF_Tc` \ maybe_thing ->
+    case maybe_thing of
+	Just (ATcId main_id) -> check_main_ty (idType main_id)
+	other		     -> addErrTc noMainErr	
+  where
+    check_main_ty main_ty
+      = tcInstType main_ty		`thenNF_Tc` \ (tvs, theta, main_tau) ->
+	newTyVarTy liftedTypeKind	`thenNF_Tc` \ arg_ty ->
+	tcLookupTyCon ioTyConName	`thenNF_Tc` \ ioTyCon ->
+	tcAddErrCtxtM (mainTypeCtxt main_ty)	$
+	if not (null theta) then 
+		failWithTc empty	-- Context has the error message
+	else
+	unifyTauTy main_tau (mkTyConApp ioTyCon [arg_ty])
+
+mainTypeCtxt main_ty tidy_env 
+  = zonkTcType main_ty		`thenNF_Tc` \ main_ty' ->
+    returnNF_Tc (tidy_env, ptext SLIT("`main' has the illegal type") <+> 
+	 		 	 quotes (ppr (tidyType tidy_env main_ty')))
+
+noMainErr = hsep [ptext SLIT("Module") <+> quotes (ppr mAIN_Name), 
+	  	  ptext SLIT("must include a definition for") <+> quotes (ptext SLIT("main"))]
+\end{code}
+
 
 %************************************************************************
 %*									*

@@ -68,13 +68,13 @@ cmInit gmode
 #ifdef GHCI
 cmGetExpr :: CmState
 	  -> DynFlags
+	  -> Bool	-- True <=> wrap in 'print' to get an IO-typed result
           -> Module
           -> String
-          -> Bool
           -> IO (CmState, Maybe (HValue, PrintUnqualified, Type))
-cmGetExpr cmstate dflags mod expr wrap_print
+cmGetExpr cmstate dflags wrap_io mod expr
    = do (new_pcs, maybe_stuff) <- 
-	   hscExpr dflags hst hit pcs mod expr wrap_print
+	   hscExpr dflags wrap_io hst hit pcs mod expr
         case maybe_stuff of
 	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
 	   Just (bcos, print_unqual, ty) -> do

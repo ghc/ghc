@@ -397,16 +397,16 @@ myCoreToStg dflags this_mod tidy_binds env_tc
 #ifdef GHCI
 hscExpr
   :: DynFlags
+  -> Bool			-- True <=> wrap in 'print' to get a result of IO type
   -> HomeSymbolTable	
   -> HomeIfaceTable
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> Module			-- Context for compiling
   -> String			-- The expression
-  -> Bool			-- Should we wrap print if not IO-typed?
   -> IO ( PersistentCompilerState, 
 	  Maybe (UnlinkedBCOExpr, PrintUnqualified, Type) )
 
-hscExpr dflags hst hit pcs0 this_module expr wrap_print
+hscExpr dflags wrap_io hst hit pcs0 this_module expr
    = do {
 	maybe_parsed <- hscParseExpr dflags expr;
 	case maybe_parsed of
@@ -422,27 +422,10 @@ hscExpr dflags hst hit pcs0 this_module expr wrap_print
 
 		-- Typecheck it
 	maybe_tc_return
-	   <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
+	   <- typecheckExpr dflags wrap_io pcs1 hst print_unqual this_module rn_expr;
 	case maybe_tc_return of {
 		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing);
 		Just (pcs2, tc_expr, ty) -> do
-
-	-- if it isn't an IO-typed expression, 
-	-- wrap "print" around it & recompile...
-	let { is_IO_type = case splitTyConApp_maybe ty of {
-	   		    Just (tycon, _) -> getUnique tycon == ioTyConKey;
-			    Nothing -> False }
-            };
-
-        if (wrap_print && not is_IO_type)
-		then do (new_pcs, maybe_stuff)
-			  <- hscExpr dflags hst hit pcs2 this_module
-				("PrelIO.print (" ++ expr ++ ")") False
-		        case maybe_stuff of
-			   Nothing -> return (new_pcs, maybe_stuff)
-			   Just (bcos, _, _) ->
-			      return (new_pcs, Just (bcos, print_unqual, ty))
-		else do
 
 		-- Desugar it
 	ds_expr <- deSugarExpr dflags pcs2 hst this_module
