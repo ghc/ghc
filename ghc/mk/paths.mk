@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: paths.mk,v 1.41 2002/08/09 21:28:09 sof Exp $
+# $Id: paths.mk,v 1.42 2002/09/30 10:13:23 simonmar Exp $
 #
 # ghc project specific make variables
 #
@@ -45,9 +45,9 @@ GHC_LIB_DIR	 	= $(FPTOOLS_TOP)/libraries
 #
 #      xxx_PGM	        the name of an executable, without the path
 
-GHC_UNLIT_PGM		= unlit$(EXE_SUFFIX)
+GHC_UNLIT_PGM		= unlit$(exeext)
 GHC_HSTAGS_PGM		= hasktags
-GHC_TOUCHY_PGM		= touchy$(EXE_SUFFIX)
+GHC_TOUCHY_PGM		= touchy$(exeext)
 GHC_MANGLER_PGM		= ghc-asm
 GHC_SPLIT_PGM		= ghc-split
 GHC_SYSMAN_PGM 		= SysMan

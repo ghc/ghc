@@ -786,11 +786,6 @@ TAR			= @TarCmd@
 ZIP			= zip
 
 #
-# Under Windows, we have to deal with .exe suffixes
-#
-EXE_SUFFIX=@exeext@
-
-#
 # This is special to literate/, ToDo: add literate-specific
 # configure setup to literate/.
 #
@@ -879,8 +874,8 @@ LIT2TEXT 		= $(LITERATE_PREFIX)lit2text
 #
 # Stuff from fptools/ghc/utils
 #
-UNLIT	 		= $(UNLIT_PREFIX)unlit$(EXE_SUFFIX)
-HP2PS			= $(HP2PS_PREFIX)hp2ps$(EXE_SUFFIX)
+UNLIT	 		= $(UNLIT_PREFIX)unlit$(exeext)
+HP2PS			= $(HP2PS_PREFIX)hp2ps$(exeext)
 HSTAGS			= $(HSTAGS_PREFIX)hstags
 HSC2HS			= $(HSC2HS_PREFIX)hsc2hs-inplace
 
