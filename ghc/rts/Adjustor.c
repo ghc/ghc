@@ -34,8 +34,8 @@ An adjustor thunk differs from a C function pointer in one respect: when
 the code is through with it, it has to be freed in order to release Haskell
 and C resources. Failure to do so result in memory leaks on both the C and
 Haskell side.
-
 */
+
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsExternal.h"
@@ -48,53 +48,46 @@ Haskell side.
 
 #if defined(openbsd_TARGET_OS)
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/mman.h>
+
+/* no C99 header stdint.h on OpenBSD? */
+typedef unsigned long my_uintptr_t;
 #endif
 
 /* Heavily arch-specific, I'm afraid.. */
 
-typedef enum { 
-    pageExecuteRead, 
-    pageExecuteReadWrite 
-} pageMode;
-
 /*
- * Function: execPage()
+ * Allocate len bytes which are readable, writable, and executable.
  *
- * Set the executable bit on page containing addr.
- *
- * TODO: Can the code span more than one page? If yes, we need to make two
- * pages executable!
+ * ToDo: If this turns out to be a performance bottleneck, one could
+ * e.g. cache the last VirtualProtect/mprotect-ed region and do
+ * nothing in case of a cache hit.
  */
-static void
-execPage (void* addr, pageMode mode)
+static void*
+mallocBytesRWX(int len)
 {
-#if defined(i386_TARGET_ARCH) && defined(_WIN32) && 0
-    SYSTEM_INFO sInfo;
-    DWORD dwOldProtect = 0;
-
-    /* doesn't return a result, so presumably it can't fail... */
-    GetSystemInfo(&sInfo);
-    
-    if ( VirtualProtect ( (void*)((unsigned long)addr & (sInfo.dwPageSize - 1)),
-			  sInfo.dwPageSize,
-			  ( mode == pageExecuteReadWrite ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ),
-			  &dwOldProtect) == 0 ) {
-	DWORD rc = GetLastError();
-	barf("execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
-    }
-#else
-
-#if defined(openbsd_TARGET_OS)
-    /* malloc memory isn't executable by default on OpenBSD */
-    unsigned long pagesize = sysconf(_SC_PAGESIZE);
-    unsigned long round    = (unsigned long)addr & (pagesize - 1);
-    if (mprotect(addr - round, pagesize, PROT_EXEC|PROT_READ|PROT_WRITE) == -1)
-        barf("execPage: failed to protect 0x%p\n", addr);
+  void *addr = stgMallocBytes(len, "mallocBytesRWX");
+#if defined(i386_TARGET_ARCH) && defined(_WIN32)
+  /* This could be necessary for processors which distinguish between READ and
+     EXECUTE memory accesses, e.g. Itaniums. */
+  DWORD dwOldProtect = 0;
+  if (VirtualProtect (addr, len, PAGE_EXECUTE_READWRITE, &dwOldProtect) == 0) {
+    barf("mallocBytesRWX: failed to protect 0x%p; error=%lu; old protection: %lu\n",
+         addr, (unsigned long)GetLastError(), (unsigned long)dwOldProtect);
+  }
+#elif defined(openbsd_TARGET_OS)
+  /* malloced memory isn't executable by default on OpenBSD */
+  my_uintptr_t pageSize         = sysconf(_SC_PAGESIZE);
+  my_uintptr_t mask             = ~(pageSize - 1);
+  my_uintptr_t startOfFirstPage = ((my_uintptr_t)addr          ) & mask;
+  my_uintptr_t startOfLastPage  = ((my_uintptr_t)addr + len - 1) & mask;
+  my_uintptr_t size             = startOfLastPage - startOfFirstPage + pageSize;
+  if (mprotect((void*)startOfFirstPage, (size_t)size, PROT_EXEC | PROT_READ | PROT_WRITE) != 0) {
+    barf("mallocBytesRWX: failed to protect 0x%p\n", addr);
+  }
 #endif
-
-    (void)addr;   (void)mode;   /* keep gcc -Wall happy */
-#endif
+  return addr;
 }
 
 #if defined(i386_TARGET_ARCH)
@@ -162,7 +155,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      <c>: 	ff e0             jmp    %eax        	   # and jump to it.
 		# the callee cleans up the stack
     */
-    adjustor = stgMallocBytes(14, "createAdjustor");
+    adjustor = mallocBytesRWX(14);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 	adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
@@ -177,8 +170,6 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 
 	adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
 	adj_code[0x0d] = (unsigned char)0xe0;
-	
-	execPage(adjustor, pageExecuteReadWrite);
     }
 #endif
     break;
@@ -209,7 +200,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     That's (thankfully) the case here with the restricted set of 
     return types that we support.
   */
-    adjustor = stgMallocBytes(17, "createAdjustor");
+    adjustor = mallocBytesRWX(17);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 
@@ -224,8 +215,6 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
-
-	execPage(adjustor, pageExecuteReadWrite);
     }
 #elif defined(sparc_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of the following
@@ -257,7 +246,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      similarly, and local variables should be accessed via %fp, not %sp. In a
      nutshell: This should work! (Famous last words! :-)
   */
-    adjustor = stgMallocBytes(4*(11+1), "createAdjustor");
+    adjustor = mallocBytesRWX(4*(11+1));
     {
         unsigned long *const adj_code = (unsigned long *)adjustor;
 
@@ -334,7 +323,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
       4 bytes (getting rid of the nop), hence saving memory. [ccshan]
   */
     ASSERT(((StgWord64)wptr & 3) == 0);
-    adjustor = stgMallocBytes(48, "createAdjustor");
+    adjustor = mallocBytesRWX(48);
     {
 	StgWord64 *const code = (StgWord64 *)adjustor;
 
@@ -372,7 +361,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 	this code, it only works for up to 6 arguments (when floating point arguments
 	are involved, this may be more or less, depending on the exact situation).
 */
-	adjustor = stgMallocBytes(4*13, "createAdjustor");
+	adjustor = mallocBytesRWX(4*13);
 	{
 		unsigned long *const adj_code = (unsigned long *)adjustor;
 
@@ -593,14 +582,12 @@ initAdjustor(void)
   to return to it before tail jumping from the adjustor thunk.
   */
 
-  obscure_ccall_ret_code = stgMallocBytes(4, "initAdjustor");
+  obscure_ccall_ret_code = mallocBytesRWX(4);
 
   obscure_ccall_ret_code[0x00] = (unsigned char)0x83;  /* addl $0x4, %esp */
   obscure_ccall_ret_code[0x01] = (unsigned char)0xc4;
   obscure_ccall_ret_code[0x02] = (unsigned char)0x04;
 
   obscure_ccall_ret_code[0x03] = (unsigned char)0xc3;  /* ret */
-
-  execPage(obscure_ccall_ret_code, pageExecuteRead);
 #endif
 }
