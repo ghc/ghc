@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.8 2003/03/21 16:18:37 sof Exp $
+ * $Id: RetainerProfile.c,v 1.9 2003/04/23 08:54:45 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -1265,11 +1265,11 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    // traverse the bitmap first
 	    bitmap = GET_LIVENESS(dyn);
 	    p      = (P_)&((StgRetDyn *)p)->payload[0];
-	    size   = RET_DYN_SIZE;
+	    size   = RET_DYN_BITMAP_SIZE;
 	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 	    
 	    // skip over the non-ptr words
-	    p += GET_NONPTRS(dyn);
+	    p += GET_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
 	    
 	    // follow the ptr words
 	    for (size = GET_PTRS(dyn); size > 0; size--) {
