@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.130 2002/02/18 13:26:12 sof Exp $
+ * $Id: GC.c,v 1.131 2002/03/07 17:53:05 keithw Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1670,6 +1670,7 @@ loop:
 
 	  // perform the selection! 
 	  q = selectee->payload[offset];
+          if (major_gc==rtsTrue) {TICK_GC_SEL_MAJOR();} else {TICK_GC_SEL_MINOR();}
 
 	  /* if we're already in to-space, there's no need to continue
 	   * with the evacuation, just update the source address with
@@ -1723,8 +1724,10 @@ loop:
 		  thunk_selector_depth--;
 		  goto selector_loop;
 	      }
-	  }
-	  // otherwise, fall through... 
+	  } else {
+              TICK_GC_SEL_ABANDONED();
+              // and fall through...
+          }
 #         endif
 
       case AP_UPD:
