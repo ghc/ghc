@@ -107,17 +107,17 @@ YAxisMark(y, num, unit)
     switch (unit) {
     case MEGABYTE :
 	fprintf(psfp, "(");
-	CommaPrint(psfp, (int) (num / 1e6 + 0.5));
+	CommaPrint(psfp, (intish) (num / 1e6 + 0.5));
 	fprintf(psfp, "M)\n");
 	break;
     case KILOBYTE :
 	fprintf(psfp, "(");
-	CommaPrint(psfp, (int) (num / 1e3 + 0.5));
+	CommaPrint(psfp, (intish) (num / 1e3 + 0.5));
 	fprintf(psfp, "k)\n");
 	break;
     case BYTE:
 	fprintf(psfp, "(");
-	CommaPrint(psfp, (int) (num + 0.5));
+	CommaPrint(psfp, (intish) (num + 0.5));
 	fprintf(psfp, ")\n");
 	break;
     }

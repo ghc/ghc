@@ -150,7 +150,7 @@ void
 PutAuxFile(auxfp)
   FILE* auxfp;
 {
-    intish i;
+    int i;
 
     fprintf(auxfp, "X_RANGE %.2f\n", xrange);
     fprintf(auxfp, "Y_RANGE %.2f\n", yrange);

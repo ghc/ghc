@@ -67,13 +67,13 @@ OpenFile(s, mode)
 void
 CommaPrint(fp,n)
   FILE* fp;
-  int n;
+  intish n;
 {
     if (n < ONETHOUSAND) {
-        fprintf(fp, "%d", n);
+        fprintf(fp, "%d", (int)n);
     } else {
         CommaPrint(fp, n / ONETHOUSAND);
-        fprintf(fp, ",%03d", n % ONETHOUSAND);
+        fprintf(fp, ",%03d", (int)n % ONETHOUSAND);
     }
 }
 

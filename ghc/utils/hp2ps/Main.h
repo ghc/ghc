@@ -1,6 +1,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include "config.h"
+
 #ifdef __STDC__
 #define PROTO(x)	x
 #else
@@ -27,8 +29,16 @@ void _ghcAssert PROTO((char *, unsigned int));
 */
 typedef double	floatish;
 typedef double  doublish; /* higher precision, if anything; little used */
-typedef long	intish;
 typedef int	boolish;
+
+/* Use "long long" if we have it: the numbers in profiles can easily
+ * overflow 32 bits after a few seconds execution.
+ */
+#ifdef HAVE_LONG_LONG
+typedef long long int intish;
+#else
+typedef long int intish;
+#endif
 
 extern intish nsamples;
 extern intish nmarks;

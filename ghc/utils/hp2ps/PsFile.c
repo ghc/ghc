@@ -212,7 +212,7 @@ BigTitleText()
     fprintf(psfp, "HE%d setfont\n", TITLE_TEXT_FONT);
     fprintf(psfp, "%f %f moveto\n", x, y);
     fputc('(', psfp);
-    CommaPrint(psfp, (int) areabelow);
+    CommaPrint(psfp, (intish)areabelow);
     fprintf(psfp, " %s x %s)\n", valueunitstring, sampleunitstring); 
     fprintf(psfp, "show\n");
 
@@ -248,7 +248,7 @@ TitleText()
  
     fprintf(psfp, "HE%d setfont\n", TITLE_TEXT_FONT);
     fputc('(', psfp);
-    CommaPrint(psfp, (int) areabelow);
+    CommaPrint(psfp, (intish) areabelow);
     fprintf(psfp, " %s x %s)\n", valueunitstring, sampleunitstring);
  
     fprintf(psfp, "dup stringwidth pop\n");

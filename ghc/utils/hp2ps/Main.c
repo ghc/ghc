@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "Main.h"
 #include "Defines.h"
 #include "AuxFile.h"
@@ -14,10 +15,6 @@
 #include "Deviation.h"
 #include "Error.h"
 #include "Utilities.h"
-
-#ifndef atof
-double atof PROTO((char *));
-#endif
 
 boolish pflag = 0;	/* read auxiliary file			*/
 boolish eflag = 0;	/* scaled EPSF 				*/ 

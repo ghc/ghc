@@ -97,8 +97,6 @@ ThinkOfAShade()
 {
     static int thisshade = -1;
 
-    floatish x;
-
     thisshade++;
     return cflag ?
 	c_shades[ thisshade % N_COLOUR_SHADES ] :
