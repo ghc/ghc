@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.21 2002/12/12 15:03:42 simonmar Exp $
+ * $Id: Rts.h,v 1.22 2002/12/19 17:57:39 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -84,7 +84,7 @@ extern void* GetFiberData ( void );
    -------------------------------------------------------------------------- */
 
 #ifdef __GNUC__     /* Avoid spurious warnings                             */
-#if __GNUC__ >= 2 && __GNUC_MINOR__ >= 7
+#if (__GNUC__ == 2 && __GNUC_MINOR__ >= 7) || __GNUC__ >= 3
 #define STG_NORETURN  __attribute__ ((noreturn))
 #define STG_UNUSED    __attribute__ ((unused))
 #else
