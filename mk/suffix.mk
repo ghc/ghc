@@ -190,9 +190,18 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 	@$(RM) $@
 	expand $*.verb | $(SGMLVERB) > $@
 
+%.tex : %.sgml
+	@$(RM) $@
+	$(SGML2LATEX) -m --output=tex $<
+
 %.dvi : %.sgml
 	@$(RM) $@
 	$(SGML2LATEX) -m --output=dvi $<
+
+# Not yet: we already have a %.ps : %.dvi rule, this one would conflict.
+#%,ps : %.sgml
+#	@$(RM) $@
+#	$(SGML2LATEX) -m --output=ps $<
 
 %.html : %.sgml
 	@$(RM) $@
