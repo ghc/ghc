@@ -203,7 +203,7 @@ instance Bits Int8 where
   complement (I8# x)    = I8# (word2Int# ((int2Word# x) `xor#` (int2Word# 0xff#)))
   shift (I8# x) i@(I# i#)
 	| i > 0     = I8# (intToInt8# (iShiftL# (int8ToInt# x)  i#))
-	| otherwise = I8# (intToInt8# (iShiftRA# (int8ToInt# x) i#))
+	| otherwise = I8# (intToInt8# (iShiftRA# (int8ToInt# x) (negateInt# i#)))
   i8@(I8# x)  `rotate` (I# i)
         | i ==# 0#    = i8
 	| i ># 0#     = 
@@ -335,7 +335,7 @@ instance Bits Int16 where
   complement (I16# x)    = I16# (word2Int# ((int2Word# x) `xor#` (int2Word# 0xffff#)))
   shift (I16# x) i@(I# i#)
 	| i > 0     = I16# (intToInt16# (iShiftL# (int16ToInt# x)  i#))
-	| otherwise = I16# (intToInt16# (iShiftRA# (int16ToInt# x) i#))
+	| otherwise = I16# (intToInt16# (iShiftRA# (int16ToInt# x) (negateInt# i#)))
   i16@(I16# x)  `rotate` (I# i)
         | i ==# 0#    = i16
 	| i ># 0#     = 
@@ -484,7 +484,7 @@ instance Bits Int32 where
 #endif
   shift (I32# x) i@(I# i#)
 	| i > 0     = I32# (intToInt32# (iShiftL# (int32ToInt# x)  i#))
-	| otherwise = I32# (intToInt32# (iShiftRA# (int32ToInt# x) i#))
+	| otherwise = I32# (intToInt32# (iShiftRA# (int32ToInt# x) (negateInt# i#)))
   i32@(I32# x)  `rotate` (I# i)
         | i ==# 0#    = i32
 	| i ># 0#     = 
