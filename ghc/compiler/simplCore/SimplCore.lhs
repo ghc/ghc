@@ -94,13 +94,15 @@ core2core dflags pcs hst is_exported binds rules
 	return (processed_binds, orphan_rules)
 
 
-simplifyExpr :: DynFlags		-- includes spec of what core-to-core passes to do
+simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
 	     -> PersistentCompilerState
 	     -> HomeSymbolTable
 	     -> CoreExpr
 	     -> IO CoreExpr
 simplifyExpr dflags pcs hst expr
   = do	{
+	; showPass dflags "Simplify"
+
 	; us <-  mkSplitUniqSupply 's'
 
 	; let (expr', counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_all 	

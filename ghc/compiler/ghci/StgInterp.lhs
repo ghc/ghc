@@ -6,9 +6,26 @@
 \begin{code}
 
 module StgInterp ( 
-    ClosureEnv, ItblEnv, filterRdrNameEnv, 
-    linkIModules,
-    stgToInterpSyn,
+
+    ClosureEnv, ItblEnv, 
+    filterRdrNameEnv,   -- :: [ModuleName] -> FiniteMap RdrName a 
+			-- -> FiniteMap RdrName a
+
+    linkIModules, 	-- :: ItblEnv -> ClosureEnv
+	     		-- -> [([UnlinkedIBind], ItblEnv)]
+	     		-- -> IO ([LinkedIBind], ItblEnv, ClosureEnv)
+
+    iExprToHValue,	--  :: ItblEnv -> ClosureEnv 
+			--  -> UnlinkedIExpr -> HValue
+
+    stgBindsToInterpSyn,-- :: [StgBinding] 
+	       		-- -> [TyCon] -> [Class] 
+	       		-- -> IO ([UnlinkedIBind], ItblEnv)
+
+    stgExprToInterpSyn, -- :: StgExpr
+	       		-- -> IO UnlinkedIExpr
+
+    interp		-- :: LinkedIExpr -> HValue
  ) where
 
 {- -----------------------------------------------------------------------------
@@ -65,9 +82,12 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc )
 import FiniteMap
 import Panic		( panic )
 import OccName		( occNameString )
+import ErrUtils		( showPass )
+import CmdLineOpts	( DynFlags )
 
 import Foreign
 import CTypes
+import IO
 
 -- ---------------------------------------------------------------------------
 -- Environments needed by the linker
@@ -83,63 +103,34 @@ filterRdrNameEnv mods env
    = filterFM (\n _ -> rdrNameModule n `notElem` mods) env
 
 -- ---------------------------------------------------------------------------
--- Run our STG program through the interpreter
+-- Turn an UnlinkedIExpr into a value we can run, for the interpreter
 -- ---------------------------------------------------------------------------
 
-#if 0
--- To be nuked at some point soon.
-runStgI :: [TyCon] -> [Class] -> [StgBinding] -> IO Int
-
--- the bindings need to have a binding for stgMain, and the
--- body of it had better represent something of type Int# -> Int#
-runStgI tycons classes stgbinds
-   = do 
-	let unlinked_binds = concatMap (translateBind emptyUniqSet) stgbinds
-	     
-{-
-        let dbg_txt 
-               = "-------------------- Unlinked Binds --------------------\n" 
-                 ++ showSDoc (vcat (map (\bind -> pprIBind bind $$ char ' ')
-			 unlinked_binds))
-
-        hPutStr stderr dbg_txt
--}
-        (linked_binds, ie, ce) <-
- 		linkIModules emptyFM emptyFM [(tycons,unlinked_binds)]
-
-        let dbg_txt 
-               = "-------------------- Linked Binds --------------------\n" 
-                 ++ showSDoc (vcat (map (\bind -> pprIBind bind $$ char ' ') 
-			linked_binds))
-
-        hPutStr stderr dbg_txt
-
-        let stgMain
-               = case [rhs | IBind v rhs <- linked_binds, showSDoc (ppr v) == "stgMain"] of
-                    (b:_) -> b
-                    []    -> error "\n\nCan't find `stgMain'.  Giving up.\n\n"  
-
-        let result 
-               = I# (evalI (AppII stgMain (LitI 0#))
-                           emptyUFM{-initial de-}
-                    )
-        return result
-#endif
+iExprToHValue :: ItblEnv -> ClosureEnv -> UnlinkedIExpr -> IO HValue
+iExprToHValue ie ce expr = return (interp (linkIExpr ie ce expr))
 
 -- ---------------------------------------------------------------------------
 -- Convert STG to an unlinked interpretable
 -- ---------------------------------------------------------------------------
 
 -- visible from outside
-stgToInterpSyn :: [StgBinding] 
-	       -> [TyCon] -> [Class] 
-	       -> IO ([UnlinkedIBind], ItblEnv)
-stgToInterpSyn binds local_tycons local_classes
- = do let ibinds = concatMap (translateBind emptyUniqSet) binds
+stgBindsToInterpSyn :: DynFlags
+		    -> [StgBinding] 
+	            -> [TyCon] -> [Class] 
+	            -> IO ([UnlinkedIBind], ItblEnv)
+stgBindsToInterpSyn dflags binds local_tycons local_classes
+ = do showPass dflags "StgToInterp"
+      let ibinds = concatMap (translateBind emptyUniqSet) binds
       let tycs   = local_tycons ++ map classTyCon local_classes
       itblenv <- mkITbls tycs
       return (ibinds, itblenv)
 
+stgExprToInterpSyn :: DynFlags
+		   -> StgExpr
+	           -> IO UnlinkedIExpr
+stgExprToInterpSyn dflags expr
+ = do showPass dflags "StgToInterp"
+      return (stg2expr emptyUniqSet expr)
 
 translateBind :: UniqSet Id -> StgBinding -> [UnlinkedIBind]
 translateBind ie (StgNonRec v e)  = [IBind v (rhs2expr ie e)]
@@ -227,6 +218,9 @@ primRep2Rep primRep
 	ArrayRep      -> RepP
 	ByteArrayRep  -> RepP
 
+	FloatRep      -> RepF
+	DoubleRep     -> RepD
+
         other -> pprPanic "primRep2Rep" (ppr other)
 
 repOfStgExpr :: StgExpr -> Rep
@@ -300,10 +294,11 @@ lit2expr lit
 		-- Addr#.  So, copy the string into C land and introduce a 
 		-- memory leak at the same time.
 		  let n = I# l in
-		  case unsafePerformIO (do a <- mallocBytes (n+1); 
-				 	   strncpy a ba (fromIntegral n); 
-				 	   pokeByteOff a n '\0'
-				 	   case a of { Ptr a -> return a })
+		 -- CAREFUL!  Chars are 32 bits in ghc 4.09+
+		  case unsafePerformIO (do a@(Ptr addr) <- mallocBytes (n+1)
+				 	   strncpy a ba (fromIntegral n)
+				 	   writeCharOffAddr addr n '\0'
+				 	   return addr)
 		  of  A# a -> LitI (addr2Int# a)
 
      		_ -> error "StgInterp.lit2expr: unhandled string constant type"
@@ -352,7 +347,11 @@ stg2expr ie stgexpr
 		(translateBind ie binds) 
 		(stg2expr (addListToUniqSet ie (map fst bs)) body)
 
-        other 
+	-- treat let-no-escape just like let.
+	StgLetNoEscape _ _ binds body
+	   -> stg2expr ie (StgLet binds body)
+
+        other
            -> pprPanic "stg2expr" (ppr stgexpr)
      where
         doPrimAlt (lit,rhs) 
@@ -386,7 +385,12 @@ mkCaseAlg  RepP = CaseAlgP
 
 -- any var that isn't in scope is turned into a Native
 mkVar ie rep var
-  | var `elementOfUniqSet` ie = case rep of { RepI -> VarI; RepP -> VarP } $ var
+  | var `elementOfUniqSet` ie = 
+	(case rep of
+	   RepI -> VarI
+	   RepF -> VarF
+	   RepD -> VarD
+	   RepP -> VarP)  var
   | otherwise = Native (toRdrName var)
 
 mkRec RepI = RecI
@@ -414,11 +418,11 @@ id2VaaRep var = (var, repOfId var)
 -- Link interpretables into something we can run
 -- ---------------------------------------------------------------------------
 
-linkIModules :: ClosureEnv -- incoming global closure env; returned updated
-	     -> ItblEnv    -- incoming global itbl env; returned updated
+linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
+	     -> ClosureEnv -- incoming global closure env; returned updated
 	     -> [([UnlinkedIBind], ItblEnv)]
 	     -> IO ([LinkedIBind], ItblEnv, ClosureEnv)
-linkIModules gce gie mods = do
+linkIModules gie gce mods = do
   let (bindss, ies) = unzip mods
       binds  = concat bindss
       top_level_binders = map (toRdrName.binder) binds
@@ -444,6 +448,7 @@ linkIBinds ie ce binds = map (linkIBind ie ce) binds
 
 linkIBind ie ce (IBind bndr expr) = IBind bndr (linkIExpr ie ce expr)
 
+linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedIExpr -> LinkedIExpr
 linkIExpr ie ce expr = case expr of
 
    CaseAlgP  bndr expr alts dflt -> 
@@ -562,6 +567,9 @@ linkDefault ie ce (Just expr) = Just (linkIExpr ie ce expr)
 -- ---------------------------------------------------------------------------
 -- Evaluator for things of boxed (pointer) representation
 -- ---------------------------------------------------------------------------
+
+interp :: LinkedIExpr -> HValue
+interp iexpr = unsafeCoerce# (evalP iexpr emptyUFM)
 
 evalP :: LinkedIExpr -> UniqFM boxed -> boxed
 
@@ -695,10 +703,12 @@ evalP other de
 -- Evaluate something which has an unboxed Int rep
 evalI :: LinkedIExpr -> UniqFM boxed -> Int#
 
+{-
 evalI expr de
 --   | trace ("evalI: " ++ showExprTag expr) False
    | trace ("evalI:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
    = error "evalI: ?!?!"
+-}
 
 evalI (LitI i#) de = i#
 
@@ -752,10 +762,12 @@ evalI other de
 -- Evaluate something which has an unboxed Int rep
 evalF :: LinkedIExpr -> UniqFM boxed -> Float#
 
+{-
 evalF expr de
 --   | trace ("evalF: " ++ showExprTag expr) False
    | trace ("evalF:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
    = error "evalF: ?!?!"
+-}
 
 evalF (LitF f#) de = f#
 
@@ -806,10 +818,12 @@ evalF other de
 -- Evaluate something which has an unboxed Int rep
 evalD :: LinkedIExpr -> UniqFM boxed -> Double#
 
+{-
 evalD expr de
 --   | trace ("evalD: " ++ showExprTag expr) False
    | trace ("evalD:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
    = error "evalD: ?!?!"
+-}
 
 evalD (LitD d#) de = d#
 

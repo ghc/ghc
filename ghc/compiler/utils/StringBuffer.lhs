@@ -11,8 +11,10 @@ module StringBuffer
        (
         StringBuffer,
 
-	 -- creation
-        hGetStringBuffer,  -- :: FilePath       -> IO StringBuffer
+	 -- creation/destruction
+        hGetStringBuffer,     -- :: FilePath     -> IO StringBuffer
+	stringToStringBuffer, -- :: String       -> IO StringBuffer
+	freeStringBuffer,     -- :: StringBuffer -> IO ()
 
          -- Lookup
 	currentChar,      -- :: StringBuffer -> Char
@@ -172,6 +174,27 @@ unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
    _casm_ `` ((char *)%0)[(int)%1]=(char)%2; '' (A# a) (I# i#) (C# ch#) >>= \ () ->
    return s
  )
+\end{code}
+
+-----------------------------------------------------------------------------
+-- Turn a String into a StringBuffer
+
+\begin{code}
+stringToStringBuffer :: String -> IO StringBuffer
+stringToStringBuffer str =
+  do let sz@(I# sz#) = length str + 1
+     (Ptr a@(A# a#)) <- mallocBytes sz
+     fill_in str a
+     writeCharOffAddr a (sz-1) '\0'		-- sentinel
+     return (StringBuffer a# sz# 0# 0#)
+ where
+  fill_in [] _ = return ()
+  fill_in (c:cs) a = do
+    writeCharOffAddr a 0 c 
+    fill_in cs (a `plusAddr` 1)
+
+freeStringBuffer :: StringBuffer -> IO ()
+freeStringBuffer (StringBuffer a# _ _ _) = Foreign.free (Ptr (A# a#))
 \end{code}
 
 -----------------------------------------------------------------------------

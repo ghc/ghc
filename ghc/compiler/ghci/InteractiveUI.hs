@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.3 2000/11/16 16:54:36 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.4 2000/11/17 16:53:27 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -13,12 +13,11 @@ module InteractiveUI (interactiveUI) where
 
 import CompManager
 import CmStaticInfo
+import DriverFlags
 import DriverUtil
 import DriverState
 import Linker
 import Module
-import RdrName				-- tmp
-import OccName				-- tmp
 import Panic
 import Util
 
@@ -30,8 +29,6 @@ import System
 import Directory
 import IO
 import Char
-
-import PrelGHC  ( unsafeCoerce# )
 
 -----------------------------------------------------------------------------
 
@@ -84,7 +81,7 @@ interactiveUI st = do
 #ifndef NO_READLINE
    Readline.initialize
 #endif
-   _ <- (unGHCi uiLoop) GHCiState{ current_module = mkModuleName "Prelude", 
+   _ <- (unGHCi uiLoop) GHCiState{ current_module = mkModuleName "Main", 
 	  	                   target = Nothing,
 			           cmstate = st }
    return ()
@@ -107,26 +104,35 @@ uiLoop = do
   	  runCommand l
 	  uiLoop  
 
+-- Top level exception handler, just prints out the exception and carries on.
 runCommand c = 
-  myCatchDyn (doCommand c) 
+  ghciHandle ( \other_exception ->io (putStrLn (show other_exception) )) $
+  ghciHandleDyn
     (\dyn -> case dyn of
 		PhaseFailed phase code ->
 			io ( putStrLn ("Phase " ++ phase ++ " failed (code "
 				        ++ show code ++ ")"))
 		Interrupted -> io (putStrLn "Interrupted.")
 		_ -> io (putStrLn (show (dyn :: BarfKind)))
-    )
+    ) $
+   doCommand c
 
 doCommand (':' : command) = specialCommand command
 doCommand expr = do
   st <- getGHCiState
-  io (hPutStrLn stdout ("Run expression: " ++ expr))
+  dflags <- io (readIORef v_DynFlags)
+  (st, maybe_hvalue) <- 
+	io (cmGetExpr (cmstate st) dflags (current_module st) expr)
+  case maybe_hvalue of
+	Nothing -> return ()
+	Just hv -> io (cmRunExpr hv)
+{-
   let (mod,'.':str) = break (=='.') expr
   case cmLookupSymbol (mkOrig varName (mkModuleName mod) (_PK_ str)) (cmstate st) of
 	Nothing -> io (putStrLn "nothing.")
-	Just e  -> io (do unsafeCoerce# e :: IO ()
-		          putStrLn "done.")
+	Just e  -> io (
   return ()
+-}
 
 specialCommand str = do
   let (cmd,rest) = break isSpace str
@@ -144,8 +150,6 @@ noArgs c = io (hPutStrLn stdout ("command `:" ++ c ++ "' takes no arguments"))
 -----------------------------------------------------------------------------
 -- Commands
 
--- ToDo: don't forget to catch errors
-
 help :: String -> GHCi ()
 help _ = io (putStr helpText)
 
@@ -155,8 +159,16 @@ changeDirectory = io . setCurrentDirectory
 loadModule :: String -> GHCi ()
 loadModule path = do
   state <- getGHCiState
-  (new_cmstate, mod) <- io (cmLoadModule (cmstate state) ({-ToDo!!-}mkModuleName path))
-  setGHCiState state{cmstate=new_cmstate, target=Just path}  
+  (new_cmstate, mod) <- io (cmLoadModule (cmstate state) 
+				({-ToDo!!-}mkModuleName path))
+  let new_state = GHCiState {
+  			cmstate = new_cmstate,
+			current_module = case mod of 
+					   Nothing -> current_module state
+					   Just m  -> m,
+			target = Just path
+		   }
+  setGHCiState new_state
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
@@ -167,8 +179,25 @@ reloadModule "" = do
   			setGHCiState state{cmstate=new_cmstate}  
 reloadModule _ = noArgs ":reload"
 
+-- set options in the interpreter.  Syntax is exactly the same as the
+-- ghc command line, except that certain options aren't available (-C,
+-- -E etc.)
+--
+-- This is pretty fragile: most options won't work as expected.  ToDo:
+-- figure out which ones & disallow them.
 setOptions :: String -> GHCi ()
-setOptions = panic "setOptions"
+setOptions str =
+   io (do leftovers <- processArgs static_flags (words str) []
+	  dyn_flags <- readIORef v_InitDynFlags
+	  writeIORef v_DynFlags dyn_flags
+	  leftovers <- processArgs dynamic_flags leftovers []
+	  dyn_flags <- readIORef v_DynFlags
+	  writeIORef v_InitDynFlags dyn_flags
+          if (not (null leftovers))
+		then throwDyn (OtherError ("unrecognised flags: " ++ 
+						unwords leftovers))
+		else return ()
+   )
 
 typeOfExpr :: String -> GHCi ()
 typeOfExpr = panic "typeOfExpr"
@@ -200,9 +229,9 @@ setGHCiState s = GHCi $ \_ -> return (s,())
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 
-myCatch (GHCi m) h = GHCi $ \s -> 
+ghciHandle h (GHCi m) = GHCi $ \s -> 
    Exception.catch (m s) (\e -> unGHCi (h e) s)
-myCatchDyn (GHCi m) h = GHCi $ \s -> 
+ghciHandleDyn h (GHCi m) = GHCi $ \s -> 
    Exception.catchDyn (m s) (\e -> unGHCi (h e) s)
 
 -----------------------------------------------------------------------------
@@ -232,5 +261,3 @@ findFile (d:ds) obj = do
   let path = d ++ '/':obj
   b <- doesFileExist path
   if b then return path else findFile ds obj
-
-

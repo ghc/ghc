@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.24 2000/11/16 15:57:06 simonmar Exp $
+-- $Id: Main.hs,v 1.25 2000/11/17 16:53:27 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -72,6 +72,7 @@ import Maybe
 -- reading the package configuration file is too slow
 -- -H, -K, -Rghc-timing
 -- hi-diffs
+-- -ddump-all doesn't do anything
 
 -----------------------------------------------------------------------------
 -- Differences vs. old driver:

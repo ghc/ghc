@@ -4,7 +4,7 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-module HscMain ( HscResult(..), hscMain, 
+module HscMain ( HscResult(..), hscMain, hscExpr,
 		 initPersistentCompilerState ) where
 
 #include "HsVersions.h"
@@ -13,25 +13,27 @@ import Maybe		( isJust )
 import IO		( hPutStrLn, stderr )
 import HsSyn
 
-import StringBuffer	( hGetStringBuffer )
+import StringBuffer	( hGetStringBuffer, 
+			  stringToStringBuffer, freeStringBuffer )
 import Parser
+import RdrHsSyn		( RdrNameHsExpr )
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 
-import Rename		( renameModule, checkOldIface, closeIfaceDecls )
+import Rename
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( knownKeyNames )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface, pprIface )
-import TcModule		( TcResults(..), typecheckModule )
+import TcModule
 import InstEnv		( emptyInstEnv )
-import Desugar		( deSugar )
-import SimplCore	( core2core )
+import Desugar
+import SimplCore
 import OccurAnal	( occurAnalyseBinds )
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
-import CoreToStg	( topCoreBindsToStg )
+import CoreToStg	( topCoreBindsToStg, coreToStgExpr )
 import StgSyn		( collectFinalStgBinders )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -45,7 +47,7 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
 import Outputable
-import Interpreter	( UnlinkedIBind, ItblEnv, stgToInterpSyn )
+import Interpreter
 import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
@@ -95,12 +97,14 @@ hscMain
 
 hscMain ghci_mode dflags source_unchanged location maybe_old_iface hst hit pcs
  = do {
-      putStrLn ("CHECKING OLD IFACE for hs = " ++ show (ml_hs_file location)
-                ++ ", hspp = " ++ show (ml_hspp_file location));
+      showPass dflags ("Checking old interface for hs = " 
+			++ show (ml_hs_file location)
+                	++ ", hspp = " ++ show (ml_hspp_file location));
 
       (pcs_ch, errs_found, (recomp_reqd, maybe_checked_iface))
-         <- checkOldIface dflags hit hst pcs (unJust (ml_hi_file location) "hscMain")
-			  source_unchanged maybe_old_iface;
+         <- checkOldIface dflags hit hst pcs 
+		(unJust (ml_hi_file location) "hscMain")
+		source_unchanged maybe_old_iface;
 
       if errs_found then
          return (HscFail pcs_ch)
@@ -178,6 +182,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- RENAME
  	    -------------------
+        ; showPass dflags "Rename"
 	; (pcs_rn, maybe_rn_result) 
       	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
@@ -187,6 +192,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- TYPECHECK
  	    -------------------
+        ; showPass dflags "Typecheck"
 	; maybe_tc_result <- typecheckModule dflags pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls
 	; case maybe_tc_result of {
@@ -286,7 +292,8 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
                      hit pit -- these last two for mapping ModNames to Modules
  | toInterp
  = do (ibinds,itbl_env) 
-         <- stgToInterpSyn (map fst stg_binds) local_tycons local_classes
+         <- stgBindsToInterpSyn dflags (map fst stg_binds) 
+		local_tycons local_classes
       return (Nothing, Nothing, Just (ibinds,itbl_env))
 
  | otherwise
@@ -324,6 +331,7 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
 
 dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
  = do --------------------------  Desugaring ----------------
+      showPass dflags "DeSugar"
       -- _scc_     "DeSugar"
       (desugared, rules, h_code, c_code, fe_binders) 
          <- deSugar dflags pcs hst this_mod print_unqual tc_result
@@ -334,6 +342,7 @@ dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
          <- core2core dflags pcs hst is_exported desugared rules
 
       -- Do the final tidy-up
+      showPass dflags "TidyCore"
       (tidy_binds, tidy_orphan_rules) 
          <- tidyCorePgm dflags this_mod simplified orphan_rules
       
@@ -342,7 +351,6 @@ dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
 
 myCoreToStg dflags this_mod tidy_binds
  = do 
-      c2s_uniqs <- mkSplitUniqSupply 'c'
       st_uniqs  <- mkSplitUniqSupply 'g'
       let occ_anal_tidy_binds = occurAnalyseBinds tidy_binds
 
@@ -351,9 +359,8 @@ myCoreToStg dflags this_mod tidy_binds
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
-      showPass dflags "Core2Stg"
       -- _scc_     "Core2Stg"
-      let stg_binds   = topCoreBindsToStg c2s_uniqs occ_anal_tidy_binds
+      stg_binds <- topCoreBindsToStg dflags occ_anal_tidy_binds
 
       showPass dflags "Stg2Stg"
       -- _scc_     "Stg2Stg"
@@ -370,6 +377,7 @@ myCoreToStg dflags this_mod tidy_binds
 %*									*
 %************************************************************************
 
+\begin{code}
 hscExpr
   :: DynFlags
   -> HomeSymbolTable	
@@ -377,38 +385,78 @@ hscExpr
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> Module			-- Context for compiling
   -> String			-- The expression
-  -> IO HscResult
+  -> IO ( PersistentCompilerState, Maybe UnlinkedIExpr )
 
-hscExpr dflags hst hit pcs this_module expr
+hscExpr dflags hst hit pcs0 this_module expr
   = do	{ 	-- Parse it
-	  maybe_parsed <- myParseExpr dflags expr
-	; case maybe_parsed of {
-      	     Nothing -> return (HscFail pcs_ch);
+	maybe_parsed <- hscParseExpr dflags expr;
+	case maybe_parsed of
+      	     Nothing -> return (pcs0, Nothing)
       	     Just parsed_expr -> do {
 
 		-- Rename it
-	  (new_pcs, maybe_renamed_expr) <- renameExpr dflags hit hst pcs this_module parsed_expr ;
-	; case maybe_renamed_expr of {
-		Nothing -> FAIL
-		Just (print_unqual, rn_expr) -> 
+	(pcs1, maybe_renamed_expr) <- 
+		renameExpr dflags hit hst pcs0 this_module parsed_expr;
+	case maybe_renamed_expr of
+		Nothing -> return (pcs1, Nothing)
+		Just (print_unqual, rn_expr) -> do {
 
 		-- Typecheck it
-	  maybe_tc_expr <- typecheckExpr dflags pcs hst print_unqual rn_expr 
-	; case maybe_tc_expr of
-		Nothing -> FAIL
-		Just tc_expr ->
+	maybe_tc_expr <- typecheckExpr dflags pcs1 hst print_unqual rn_expr;
+	case maybe_tc_expr of
+		Nothing -> return (pcs1, Nothing)
+		Just tc_expr -> do {
 
 		-- Desugar it
-	; ds_expr <- deSugarExpr dflags pcs hst this_module print_unqual tc_expr
+	ds_expr <- deSugarExpr dflags pcs1 hst this_module 
+			print_unqual tc_expr;
 	
 		-- Simplify it
-	; simpl_expr <- simplifyExpr dflags pcs hst ds_expr
+	simpl_expr <- simplifyExpr dflags pcs1 hst ds_expr;
 
-	; return I'M NOT SURE
-	}
+		-- Convert to STG
+	stg_expr <- coreToStgExpr dflags simpl_expr;
 
-	
+		-- ToDo: need to do StgVarInfo?  or SRTs?
 
+		-- Convert to InterpSyn
+	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
+
+	return (pcs1, Just unlinked_iexpr);
+     }}}}
+
+hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
+hscParseExpr dflags str
+ = do --------------------------  Parser  ----------------
+      showPass dflags "Parser"
+      -- _scc_     "Parser"
+
+      buf <- stringToStringBuffer ("__expr " ++ str)
+
+      -- glaexts is True for now (because of the daft __expr at the front
+      -- of the string...)
+      let glaexts = 1#
+      --let glaexts | dopt Opt_GlasgowExts dflags = 1#
+      --	          | otherwise 		        = 0#
+
+      case parse buf PState{ bol = 0#, atbol = 1#,
+	 		     context = [], glasgow_exts = glaexts,
+			     loc = mkSrcLoc SLIT("<no file>") 0 } of {
+
+	PFailed err -> do { freeStringBuffer buf
+			  ; hPutStrLn stderr (showSDoc err)
+                          ; return Nothing };
+
+	POk _ (PExpr rdr_expr) -> do {
+
+      -- ToDo:
+      -- freeStringBuffer buf;
+
+      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_expr);
+      
+      return (Just rdr_expr)
+      }}
+\end{code}
 
 %************************************************************************
 %*									*

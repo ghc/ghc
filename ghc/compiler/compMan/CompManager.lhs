@@ -4,27 +4,18 @@
 \section[CompManager]{The Compilation Manager}
 
 \begin{code}
-module CompManager ( cmInit, cmLoadModule, 
+module CompManager ( cmInit, cmLoadModule,
                      cmGetExpr, cmRunExpr,
-                     CmState, emptyCmState,  -- abstract
-		     cmLookupSymbol --tmp
+                     CmState, emptyCmState  -- abstract
                    )
 where
 
 #include "HsVersions.h"
 
-import List		( nub )
-import Maybe		( catMaybes, fromMaybe )
-import Maybes		( maybeToBool )
-import Outputable
-import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
-			  UniqFM, listToUFM )
-import Unique		( Uniquable )
-import Digraph		( SCC(..), stronglyConnComp )
-
 import CmLink
 import CmTypes
 import HscTypes
+import HscMain		( hscExpr )
 import Interpreter	( HValue )
 import Module		( ModuleName, moduleName,
 			  isModuleInThisPackage, moduleEnvElts,
@@ -40,17 +31,28 @@ import Module
 import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
+import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
+			  UniqFM, listToUFM )
+import Unique		( Uniquable )
+import Digraph		( SCC(..), stronglyConnComp )
 import DriverUtil	( BarfKind(..), splitFilename3 )
+import CmdLineOpts	( DynFlags )
 import Util
+import Outputable
 import Panic		( panic )
 
+-- lang
 import Exception	( throwDyn )
-import IO
+
+-- std
 import Time             ( ClockTime )
 import Directory        ( getModificationTime, doesFileExist )
+import IO
+import List		( nub )
+import Maybe		( catMaybes, fromMaybe, isJust )
 
+import PrelGHC		( unsafeCoerce# )
 \end{code}
-
 
 
 \begin{code}
@@ -59,16 +61,29 @@ cmInit raw_package_info gmode
    = emptyCmState raw_package_info gmode
 
 cmGetExpr :: CmState
+	  -> DynFlags
           -> ModuleName
           -> String
-          -> IO (CmState, Either [SDoc] HValue)
-cmGetExpr cmstate modhdl expr
-   = return (panic "cmGetExpr:unimp")
+          -> IO (CmState, Maybe HValue)
+cmGetExpr cmstate dflags modname expr
+   = do (new_pcs, maybe_unlinked_iexpr) <- 
+	   hscExpr dflags hst hit pcs (mkModuleInThisPackage modname) expr
+        case maybe_unlinked_iexpr of
+	   Nothing     -> return (cmstate{ pcs=new_pcs }, Nothing)
+	   Just uiexpr -> do
+		hValue <- linkExpr pls uiexpr
+	        return (cmstate{ pcs=new_pcs }, Just hValue)
 
+   -- ToDo: check that the module we passed in is sane/exists?
+   where
+       CmState{ pcs=pcs, pcms=pcms, pls=pls } = cmstate
+       PersistentCMState{ hst=hst, hit=hit } = pcms
+
+-- The HValue should represent a value of type IO () (Perhaps IO a?)
 cmRunExpr :: HValue -> IO ()
 cmRunExpr hval
-   = return (panic "cmRunExpr:unimp")
-
+   = do unsafeCoerce# hval :: IO ()
+	-- putStrLn "done."
 
 -- Persistent state just for CM, excluding link & compile subsystems
 data PersistentCMState
@@ -312,7 +327,7 @@ findPartiallyCompletedCycles modsDone theGraph
 -- Does this ModDetails export Main.main?
 exports_main :: ModDetails -> Bool
 exports_main md
-   = maybeToBool (lookupNameEnv (md_types md) mainName)
+   = isJust (lookupNameEnv (md_types md) mainName)
 
 
 -- Add the given (LM-form) Linkables to the UI, overwriting previous
@@ -620,7 +635,4 @@ summarise mod location
                return (Just time)) 
            `catch`
            (\err -> return Nothing)
-
-cmLookupSymbol :: RdrName -> CmState -> Maybe HValue
-cmLookupSymbol nm CmState{ pls = pls } = lookupClosure nm pls
 \end{code}

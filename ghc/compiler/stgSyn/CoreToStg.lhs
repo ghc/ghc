@@ -10,7 +10,7 @@
 Convert a @CoreSyntax@ program to a @StgSyntax@ program.
 
 \begin{code}
-module CoreToStg ( topCoreBindsToStg ) where
+module CoreToStg ( topCoreBindsToStg, coreToStgExpr ) where
 
 #include "HsVersions.h"
 
@@ -39,6 +39,8 @@ import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
 import UniqSupply	-- all of it, really
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
 import UniqSet		( emptyUniqSet )
+import ErrUtils		( showPass )
+import CmdLineOpts	( DynFlags )
 import Maybes
 import Outputable
 \end{code}
@@ -177,12 +179,11 @@ bOGUS_FVs = []
 \end{code}
 
 \begin{code}
-topCoreBindsToStg :: UniqSupply	-- name supply
-		  -> [CoreBind]	-- input
-		  -> [StgBinding]	-- output
-
-topCoreBindsToStg us core_binds
-  = initUs_ us (coreBindsToStg emptyVarEnv core_binds)
+topCoreBindsToStg :: DynFlags -> [CoreBind] -> IO [StgBinding]
+topCoreBindsToStg dflags core_binds
+  = do showPass dflags "Core2Stg"
+       us <- mkSplitUniqSupply 'c'
+       return (initUs_ us (coreBindsToStg emptyVarEnv core_binds))
   where
     coreBindsToStg :: StgEnv -> [CoreBind] -> UniqSM [StgBinding]
 
@@ -208,6 +209,19 @@ topCoreBindsToStg us core_binds
 		      returnUs new_bs
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[coreToStgExpr]{Converting an expression (for the interpreter)}
+%*									*
+%************************************************************************
+
+\begin{code}
+coreToStgExpr :: DynFlags -> CoreExpr -> IO StgExpr
+coreToStgExpr dflags core_expr
+  = do showPass dflags "Core2Stg"
+       us <- mkSplitUniqSupply 'c'
+       return (initUs_ us (coreExprToStg emptyVarEnv core_expr))
+\end{code}
 
 %************************************************************************
 %*									*

@@ -12,7 +12,7 @@ module CmLink ( Linkable(..),  Unlinked(..),
                 link, 
 		unload,
                 PersistentLinkerState{-abstractly!-}, emptyPLS,
-		lookupClosure
+		linkExpr
   ) where
 
 
@@ -193,7 +193,7 @@ linkFinish pls mods ul_trees = do
        stuff        = [ (trees,itbls) | Trees trees itbls <- ul_trees ]
 
    (ibinds, new_itbl_env, new_closure_env) <-
-	linkIModules closure_env' itbl_env'  stuff
+	linkIModules itbl_env' closure_env' stuff
 
    let new_pls = PersistentLinkerState {
 				  closure_env = new_closure_env,
@@ -206,10 +206,8 @@ linkFinish pls mods ul_trees = do
 unload :: PersistentLinkerState -> IO PersistentLinkerState
 unload pls = return pls{ closure_env = emptyFM, itbl_env = emptyFM }
 
-lookupClosure :: RdrName -> PersistentLinkerState -> Maybe HValue
-lookupClosure nm PersistentLinkerState{ closure_env = cenv } =
-   case lookupFM cenv nm of
-	Nothing -> Nothing
- 	Just hv -> Just hv
+linkExpr :: PersistentLinkerState -> UnlinkedIExpr -> IO HValue
+linkExpr PersistentLinkerState{ itbl_env = ie, closure_env = ce } expr
+  = iExprToHValue ie ce expr
 #endif
 \end{code}

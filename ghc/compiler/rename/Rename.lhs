@@ -110,7 +110,12 @@ renameExpr dflags hit hst pcs this_module expr
 	  
 	; renameSource dflags hit hst pcs this_module $
 	  initRnMS rdr_env emptyLocalFixityEnv SourceMode $
-	  (rnExpr expr `thenRn` \ (e,_) -> returnRn (Just (print_unqual, e)))
+	  ( rnExpr expr `thenRn` \ (e,_) -> 
+
+	    doptRn Opt_D_dump_rn `thenRn` \ dump_rn ->
+	    ioToRnM (dumpIfSet dump_rn "Renamer:" (ppr e)) `thenRn_`
+
+	    returnRn (Just (print_unqual, e)))
 	}
 
   | otherwise
