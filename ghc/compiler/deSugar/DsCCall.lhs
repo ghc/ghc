@@ -173,7 +173,7 @@ unboxArg arg
     Just (arg2_tycon,_) = maybe_arg2_tycon
 
 can't_see_datacons_error thing ty
-  = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
+  = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ (try compiling with -fno-prune-tydecls ..)"
 	     (hcat [text thing, text "; type: ", ppr (PprForUser opt_PprUserLength) ty])
 \end{code}
 
