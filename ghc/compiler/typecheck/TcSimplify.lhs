@@ -722,16 +722,22 @@ tcSimplifyRestricted doc tau_tvs wanted_lie
 	--	foo = f (3::Int)
 	-- We want to infer the polymorphic type
 	--	foo :: forall b. b -> b
-    tcSimplifyToDicts wanted_lie	`thenTc` \ (dicts, _) ->
     let
-	constrained_tvs = tyVarsOfInsts dicts
+	wanteds = lieToList wanted_lie
+	try_me inst = ReduceMe		-- Reduce as far as we can.  Don't stop at
+					-- dicts; the idea is to get rid of as many type
+					-- variables as possible, and we don't want to stop
+					-- at (say) Monad (ST s), because that reduces
+					-- immediately, with no constraint on s.
     in
+    simpleReduceLoop doc try_me wanteds		`thenTc` \ (_, _, constrained_dicts) ->
 
 	-- Next, figure out the tyvars we will quantify over
     zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenNF_Tc` \ tau_tvs' ->
     tcGetGlobalTyVars				`thenNF_Tc` \ gbl_tvs ->
     let
-	qtvs = (tau_tvs' `minusVarSet` oclose (predsOfInsts dicts) gbl_tvs)
+	constrained_tvs = tyVarsOfInsts constrained_dicts
+	qtvs = (tau_tvs' `minusVarSet` oclose (predsOfInsts constrained_dicts) gbl_tvs)
 			 `minusVarSet` constrained_tvs
     in
 
@@ -752,7 +758,7 @@ tcSimplifyRestricted doc tau_tvs wanted_lie
     reduceContext doc try_me [] wanteds'	`thenTc` \ (no_improvement, frees, binds, irreds) ->
     ASSERT( no_improvement )
     ASSERT( null irreds )
-	-- No need to loop because tcSimplifyToDicts will have
+	-- No need to loop because simpleReduceLoop will have
 	-- already done any improvement necessary
 
     returnTc (varSetElems qtvs, mkLIE frees, binds)
