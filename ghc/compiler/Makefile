@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.164 2001/06/25 21:08:01 sof Exp $
+# $Id: Makefile,v 1.165 2001/06/26 11:07:55 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -272,6 +272,13 @@ main/DriverState_HC_OPTS	= -fno-cse
 main/DriverUtil_HC_OPTS		= -fno-cse
 main/Finder_HC_OPTS		= -fno-cse
 main/SysTools_HC_OPTS		= -fno-cse
+
+# The #include is vital for the via-C route, else the C
+# compiler doesn't realise that the stcall foreign imports are indeed
+# stdcall, and doesn't generate the Foo@8 name for them
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+main/SysTools_HC_OPTS		+= '-\#include <windows.h>'
+endif
 
 # ----------------------------------------------------------------------------
 #		C compilations
