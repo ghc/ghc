@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.39 2000/04/03 16:28:08 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.40 2000/04/10 14:28:14 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -51,6 +51,26 @@ static ullong startTime = 0;
 
 EXTFUN(__init_Prelude);
 static void initModules ( void * );
+
+void
+setProgArgv(int argc, char *argv[])
+{
+   /* Usually this is done by startupHaskell, so we don't need to call this. 
+      However, sometimes Hugs wants to change the arguments which Haskell
+      getArgs >>= ... will be fed.  So you can do that by calling here
+      _after_ calling startupHaskell.
+   */
+   prog_argc = argc;
+   prog_argv = argv;
+}
+
+void
+getProgArgv(int *argc, char **argv[])
+{
+   *argc = prog_argc;
+   *argv = prog_argv;
+}
+
 
 void
 startupHaskell(int argc, char *argv[], void *init_root)

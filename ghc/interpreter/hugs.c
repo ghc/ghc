@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.64 $
- * $Date: 2000/04/10 09:40:03 $
+ * $Revision: 1.65 $
+ * $Date: 2000/04/10 14:28:14 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -200,11 +200,9 @@ char *argv[]; {
  * Initialization, interpret command line args and read prelude:
  * ------------------------------------------------------------------------*/
 
-static List /*CONID*/ initialize(argc,argv)  /* Interpreter initialization */
-Int    argc;
-String argv[]; {
-   Int    i;
-   char   argv_0_orig[1000];
+static List /*CONID*/ initialize ( Int argc, String argv[] )
+{
+   Int    i, j;
    List   initialModules;
 
    setLastEdit((String)0,0);
@@ -220,11 +218,6 @@ String argv[]; {
    readOptions("-p\"%s> \" -r$$");
    readOptions(fromEnv("STGHUGSFLAGS",""));
 
-   strncpy(argv_0_orig,argv[0],1000);   /* startupHaskell mangles argv[0] */
-   startupHaskell (argc,argv,NULL);
-   argc = prog_argc; 
-   argv = prog_argv;
-
 #  if DEBUG
    { 
       char exe_name[N_INSTALLDIR + 6];
@@ -234,29 +227,37 @@ String argv[]; {
    }
 #  endif
 
+   /* startupHaskell extracts args between +RTS ... -RTS, and sets
+      prog_argc/prog_argv to the rest.  We want to further process 
+      the rest, so we then get hold of them again.
+   */
+   startupHaskell ( argc, argv, NULL );
+   getProgArgv ( &argc, &argv );
+
    /* Find out early on if we're in combined mode or not.
       everybody(PREPREL) needs to know this.  Also, establish the
       heap size;
    */ 
-   for (i=1; i < argc; ++i) {
+   for (i = 1; i < argc; ++i) {
       if (strcmp(argv[i], "--")==0) break;
       if (strcmp(argv[i], "-c")==0) combined = FALSE;
       if (strcmp(argv[i], "+c")==0) combined = TRUE;
 
-      if (strncmp(argv[i],"+h",2)==0 ||
-          strncmp(argv[i],"-h",2)==0)
+      if (strncmp(argv[i],"+h",2)==0 || strncmp(argv[i],"-h",2)==0)
          setHeapSize(&(argv[i][2]));
    }
 
    everybody(PREPREL);
    initialModules = NIL;
 
-   for (i=1; i < argc; ++i) {            /* process command line arguments  */
-      if (strcmp(argv[i], "--")==0) break;
-      if (argv[i] && argv[i][0]/* workaround for /bin/sh silliness*/
-          && !processOption(argv[i])) {
-         initialModules
-            = cons ( mkCon(findText(argv[i])), initialModules );
+   for (i = 1; i < argc; ++i) {          /* process command line arguments  */
+      if (strcmp(argv[i], "--")==0) 
+         { argv[i] = NULL; break; }
+      if (argv[i] && argv[i][0]/* workaround for /bin/sh silliness*/) {
+         if (!processOption(argv[i]))
+            initialModules
+               = cons ( mkCon(findText(argv[i])), initialModules );
+         argv[i] = NULL;
       }
    }
 
@@ -275,6 +276,16 @@ String argv[]; {
        Printf("Standalone mode: Restart with command line +c for"
               " combined mode\n\n" );
    }
+
+   /* slide args back over the deleted ones. */
+   j = 1;
+   for (i = 1; i < argc; i++)
+      if (argv[i])
+         argv[j++] = argv[i];
+
+   argc = j;
+
+   setProgArgv ( argc, argv );
 
    initDone = TRUE;
    return initialModules;

@@ -210,7 +210,7 @@ data ExitCode = ExitSuccess | ExitFailure Int
 
 getArgs                     :: IO [String]
 getArgs                      = primGetRawArgs >>= \rawargs ->
-                               return (drop 1 (dropWhile (/= "--") rawargs))
+                               return (tail rawargs)
 
 getProgName                 :: IO String
 getProgName                  = primGetRawArgs >>= \rawargs ->
