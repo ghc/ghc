@@ -22,7 +22,7 @@ import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
 import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
 			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
-			  unBindSubst, bindSubstList, unBindSubstList,
+			  unBindSubst, bindSubstList, unBindSubstList, substInScope
 			)
 import Id		( Id, getIdUnfolding, 
 			  getIdSpecialisation, setIdSpecialisation,
@@ -142,8 +142,8 @@ matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (FAST_STRING, CoreExp
 --	(\x->E)	matches (\x->F x)
 
 
-matchRule in_scope (Rule rn tpl_vars tpl_args rhs) args
- = go tpl_args args emptySubst
+matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
+  = go tpl_args args emptySubst
 	-- We used to use the in_scope set, but I don't think that's necessary
 	-- After all, the result is going to be simplified again with that in_scope set
  where
@@ -269,7 +269,16 @@ match (Lam x1 e1) e2 tpl_vars kont subst
 --			iff   M	y     ~  N
 -- Remembering that by (A), y can't be free in M, we get this
 match e1 (Lam x2 e2) tpl_vars kont subst
-  = bind [x2] [x2] (match (App e1 (mkVarArg x2)) e2) tpl_vars kont subst
+  = bind [new_id] [x2] (match (App e1 (mkVarArg new_id)) e2) tpl_vars kont subst
+  where
+    new_id = uniqAway (substInScope subst) x2
+	-- This uniqAway is actually needed.  Here's the example:
+	--  rule:	foldr (mapFB (:) f) [] = mapList
+	--  target:	foldr (\x. mapFB k f x) []
+	--	      where
+	--		k = \x. mapFB ... x
+	-- The first \x is ok, but when we inline k, hoping it might
+	-- match (:) we find a second \x.
 
 match (Case e1 x1 alts1) (Case e2 x2 alts2) tpl_vars kont subst
   = match e1 e2 tpl_vars case_kont subst
@@ -343,7 +352,7 @@ bind :: [CoreBndr]	-- Template binders
 -- We rename x to y in the template... but then erroneously
 -- match y against y.  But this can't happen because of (A)
 bind vs1 vs2 matcher tpl_vars kont subst
-  = ASSERT( all not_in_subst vs1) 
+  = WARN( not (all not_in_subst vs1), bug_msg )
     matcher tpl_vars kont' subst'
   where
     kont' subst'' = kont (unBindSubstList subst'' vs1 vs2)
@@ -351,6 +360,7 @@ bind vs1 vs2 matcher tpl_vars kont subst
 
 	-- The unBindSubst relies on no shadowing in the template
     not_in_subst v = not (maybeToBool (lookupSubst subst v))
+    bug_msg = sep [ppr vs1, ppr vs2]
 
 ----------------------------------------
 match_ty ty1 ty2 tpl_vars kont subst
