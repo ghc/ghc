@@ -53,7 +53,7 @@ binary-dist::
 	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in 
 	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.in 
 	@echo "Generating a shippable configure script.."
-	-(cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
+	#-(cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
 
 #
 # Creating and copying the documentation into the bin-dist tree.
