@@ -2980,6 +2980,25 @@ Result type signatures are not yet implemented in Hugs.
 
 </sect2>
 
+<sect2 id="deriving-typeable">
+<title>Deriving clause for classes <literal>Typeable</literal> and <literal>Data</literal></title>
+
+<para>
+Haskell 98 allows the programmer to add "<literal>deriving( Eq, Ord )</literal>" to a data type 
+declaration, to generate a standard instance declaration for classes specified in the <literal>deriving</literal> clause.  
+In Haskell 98, the only classes that may appear in the <literal>deriving</literal> clause are the standard
+classes <literal>Eq</literal>, <literal>Ord</literal>, 
+<literal>Enum</literal>, <literal>Ix</literal>, <literal>Bounded</literal>, <literal>Read</literal>, and <literal>Show</literal>.
+</para>
+<para>
+GHC extends this list with two more classes that may be automatically derived 
+(provided the <option>-fglasgow-exts</option> flag is specified):
+<literal>Typeable</literal>, and <literal>Data</literal>.  These classes are defined in the library
+modules <literal>Data.Dynamic</literal> and <literal>Data.Generics</literal> respectively, and the
+appropriate class must be in scope before it can be mentioned in the <literal>deriving</literal> clause.
+</para>
+</sect2>
+
 <sect2 id="newtype-deriving">
 <title>Generalised derived instances for newtypes</title>
 
