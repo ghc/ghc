@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsStd.h,v 1.5 2001/11/26 20:04:00 sof Exp $
+ * $Id: HsStd.h,v 1.6 2001/12/03 20:59:08 sof Exp $
  *
  * Definitions for package `std' which are visible in Haskell land.
  *
@@ -91,7 +91,7 @@ int *ghcErrno(void);
 HsInt systemCmd(HsAddr cmd);
 
 /* in inputReady.c */
-int inputReady(int fd, int msecs);
+int inputReady(int fd, int msecs, int isSock);
 
 /* in progargs.c */
 HsAddr get_prog_argv(void);

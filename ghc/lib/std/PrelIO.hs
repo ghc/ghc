@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hs,v 1.4 2001/11/26 20:04:00 sof Exp $
+-- $Id: PrelIO.hs,v 1.5 2001/12/03 20:59:08 sof Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -135,11 +135,11 @@ hWaitForInput h msecs = do
 	else do
 
   r <- throwErrnoIfMinus1Retry "hReady"
-	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs))
+	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs) (haIsStream handle_))
   return (r /= 0)
 
 foreign import "inputReady" unsafe
-  inputReady :: CInt -> CInt -> IO CInt
+  inputReady :: CInt -> CInt -> Bool -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- hGetChar

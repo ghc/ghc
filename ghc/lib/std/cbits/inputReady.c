@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.9 2001/08/14 13:40:08 sewardj Exp $
+ * $Id: inputReady.c,v 1.10 2001/12/03 20:59:08 sof Exp $
  *
  * hReady Runtime Support
  */
@@ -16,17 +16,17 @@
  * *character* from this file object without blocking?'
  */
 int
-inputReady(int fd, int msecs)
+inputReady(int fd, int msecs, int isSock)
 {
+  if 
 #ifndef mingw32_TARGET_OS
+    ( 1 ) {
+#else
+    ( isSock ) {
     int maxfd, ready;
     fd_set rfd;
     struct timeval tv;
-#endif
 
-#ifdef mingw32_TARGET_OS
-    return 1;
-#else
     FD_ZERO(&rfd);
     FD_SET(fd, &rfd);
 
@@ -45,6 +45,21 @@ inputReady(int fd, int msecs)
 
     /* 1 => Input ready, 0 => not ready, -1 => error */
     return (ready);
-
+#endif
+#ifdef mingw32_TARGET_OS
+    } else {
+      DWORD rc;
+      HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+    
+      rc = WaitForSingleObject( hFile,
+			        msecs /*millisecs*/);
+    
+      /* 1 => Input ready, 0 => not ready, -1 => error */
+      switch (rc) {
+       case WAIT_TIMEOUT: return 0;
+       case WAIT_OBJECT_0: return 1;
+       default: return -1;
+      }
+    }
 #endif
 }
