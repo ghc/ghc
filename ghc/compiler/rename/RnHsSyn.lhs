@@ -114,6 +114,7 @@ In all cases this is set up for interface-file declarations:
 	- for class decls we ignore the bindings
 	- for instance decls likewise, plus the pragmas
 	- for rule decls, we ignore HsRules
+        - for data decls, we ignore derivings
 
 	*** See "THE NAMING STORY" in HsDecls ****
 
@@ -126,12 +127,9 @@ tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})
   = extractHsTyNames ty			`plusFV` 
     plusFVs (map hsIdInfoFVs id_infos)
 
-tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls, tcdDerivs = derivings})
+tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls})
   = delFVs (map hsTyVarName tyvars) $
     extractHsCtxtTyNames context		`plusFV`
-    (case derivings of 
-	Nothing -> emptyFVs
-	Just ds -> extractHsCtxtTyNames ds)	`plusFV`
     plusFVs (map conDeclFVs condecls)
 
 tyClDeclFVs (TySynonym {tcdTyVars = tyvars, tcdSynRhs = ty})

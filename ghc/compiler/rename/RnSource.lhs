@@ -45,6 +45,7 @@ import SrcLoc		( SrcLoc )
 import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
 import Maybes		( maybeToBool )
+import Maybe            ( maybe )
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -432,6 +433,15 @@ finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- G
     returnRn (rn_cls_decl {tcdMeths = Just mbinds'}, meth_fvs)
   where
     meth_doc = text "In the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
+
+finishSourceTyClDecl _ tycl_decl@(TyData {tcdDerivs = derivings})
+  -- Derivings are returned here so that they don't form part of the tyClDeclFVs.
+  -- This is important, because tyClDeclFVs should contain only the
+  -- FVs that are `needed' by the interface file declaration, and
+  -- derivings do not appear in this.  It also means that the tcGroups
+  -- are smaller, which turned out to be important for the usage inference. KSW 2002-02.
+  = returnRn (tycl_decl,
+              maybe emptyFVs extractHsCtxtTyNames derivings)
 
 finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 	-- Not a class declaration
