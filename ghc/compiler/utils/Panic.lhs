@@ -221,6 +221,6 @@ installSignalHandlers = do
   installHandler (Catch sig_handler)
   return ()
 #else
-  -- nothing
+  return () -- nothing
 #endif
 \end{code}
