@@ -229,8 +229,8 @@ mkInterface mod_map filename
       name_strings = nub (map show missing_names)
 
   when (not (null name_strings)) $
-	  tell ["Warning: in module " ++ show mod ++ 
-		", the following names could not be resolved:\n\ 
+	  tell ["Warning: " ++ show mod ++ 
+		": the following names could not be resolved:\n\ 
 		\   " ++ concat (map (' ':) name_strings)
 		]
 
