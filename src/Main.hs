@@ -25,11 +25,14 @@ import FiniteMap
 --import Pretty
 
 import RegexString
+import Maybe	( maybeToList )
 import List	( nub )
 import Monad	( when )
 import Char	( isSpace )
 import IO
 import IOExts
+
+import MonadWriter
 
 #if __GLASGOW_HASKELL__ < 500
 import Regex
@@ -106,14 +109,15 @@ run flags files = do
   writeIORef saved_flags flags
   parsed_mods <- sequence (map parse_file files)
 
-  let ifaces = [ mkInterface module_map file parsed 
+  let ifaces = [ runWriter (mkInterface module_map file parsed)
 	       | (file,parsed) <- zip files parsed_mods ]
 
-      mod_ifaces = [ (m,i) | (m,i,_,_) <- ifaces ]
+      mod_ifaces = [ (m,i) | ((m,i),msgs) <- ifaces ]
+      all_msgs = concat (map snd ifaces)
+	
       module_map = listToFM mod_ifaces
 
-  sequence [ reportMissingNames m ns_docs ns_decls 
-	   | (m, _, ns_docs, ns_decls) <- ifaces ]
+  mapM (hPutStrLn stderr) all_msgs
 
   when (Flag_DocBook `elem` flags) $
     putStr (ppDocBook odir mod_ifaces)
@@ -133,116 +137,142 @@ parse_file file = do
 				 exitWith (ExitFailure 1)
     )
 
-reportMissingNames m [] [] = return ()
-reportMissingNames (Module m) ns_docs ns_decls =  do
-  hPutStrLn stderr ("Warning: in module " ++ m ++ 
-		  ", the following names could not be resolved:")
-  let name_strings = nub (map show ns_decls ++ ns_docs)
-  hPutStrLn stderr ("   " ++ concat (map (' ':) name_strings))
-
 -----------------------------------------------------------------------------
 -- Figuring out the definitions that are exported from a module
 
-mkInterface :: ModuleMap -> FilePath -> HsModule
-   -> (Module, 		-- the module name
-       Interface,	-- its "interface"
-       [String],	-- a list of names we couldn't resolve in the docs
-       [HsQName]	-- a list of names we couldn't resolve in the decls
-      )
+mkInterface
+   :: ModuleMap -> FilePath -> HsModule
+   -> ErrMsgM (
+	       Module, 		-- the module name
+	       Interface	-- its "interface"
+	      )
 
-mkInterface mod_map filename (HsModule mod exps imps decls maybe_doc)
-  = (mod, Interface { 
-	   iface_filename = filename,
-	   iface_env = name_env,
-	   iface_exports = renamed_export_list,
-	   iface_orig_exports = orig_export_list,
-	   iface_decls =  decl_map,
-	   iface_info = maybe_info,
-	   iface_name_docs   = doc_map,
-	   iface_doc         = module_doc
-	},
-      missing_names_doc1 ++ missing_names_doc2,   
-      missing_names1 ++ missing_names2 --ignore missing_names3 for now,
-    )
-  where
-  (module_doc, maybe_info, missing_names_doc1) = 
-    case maybe_doc of
-	Nothing  -> (Nothing, Nothing, [])
-	Just doc -> (Just doc2, maybe_info, ns)
-	  where 
-	    (doc1, maybe_info) = parseModuleHeader doc
-	    (doc2,ns) = formatDocString (lookupForDoc import_env) doc1
+mkInterface mod_map filename 
+	(HsModule mod exps imps decls maybe_opts maybe_doc) = do  
 
-  locally_defined_names = collectNames decls
+  -- Process the options, if available
+  options <- case maybe_opts of
+		Just opt_str -> processOptions opt_str
+		Nothing      -> return []
 
-  qual_local_names   = map (Qual mod) locally_defined_names
-  unqual_local_names = map UnQual     locally_defined_names
+  let
+     locally_defined_names = collectNames decls
 
-  local_env = listToFM (zip unqual_local_names qual_local_names ++
-			zip qual_local_names   qual_local_names)
+     qual_local_names   = map (Qual mod) locally_defined_names
+     unqual_local_names = map UnQual     locally_defined_names
+
+     local_env = listToFM (zip unqual_local_names qual_local_names ++
+			  zip qual_local_names   qual_local_names)
 	 -- both qualified and unqualifed names are in scope for local things
 
-  -- build the orig_env, which maps names to *original* names (so we can
-  -- find the original declarations & docs for things).
-  (ext_orig_envs, ext_import_envs) 
+     -- build the orig_env, which maps names to *original* names (so we can
+     -- find the original declarations & docs for things).
+     (ext_orig_envs, ext_import_envs) 
 	= unzip (map (buildEnv mod_map mod exported_names) imps)
-  orig_env   = foldr plusFM local_env ext_orig_envs  
-  import_env = foldr plusFM local_env ext_import_envs  
+     orig_env   = foldr plusFM local_env ext_orig_envs  
+     import_env = foldr plusFM local_env ext_import_envs  
 
-  -- convert names in source code to original, fully qualified, names
-  (orig_exports, missing_names1) 
+     -- convert names in source code to original, fully qualified, names
+     (orig_exports, missing_names1) 
 	= runRnFM orig_env (mapMaybeM renameExportList exps)
 
-  (orig_decls, missing_names2)
+     (orig_decls, missing_names2)
 	= runRnFM orig_env (mapM renameDecl decls)
 
-  orig_decl_map :: FiniteMap HsName HsDecl
-  orig_decl_map = listToFM [ (n,d) | d <- orig_decls, n <- declBinders d ]
+     orig_decl_map :: FiniteMap HsName HsDecl
+     orig_decl_map = listToFM [ (n,d) | d <- orig_decls, n <- declBinders d ]
 
-  -- gather up a list of entities that are exported (original names)
-  exported_names = exportedNames mod mod_map orig_decls
+     -- gather up a list of entities that are exported (original names)
+     exported_names = exportedNames mod mod_map orig_decls
 			locally_defined_names orig_exports
-			orig_decl_map
+			orig_decl_map options
 
-  final_decls = concat (map expandDecl orig_decls)
+  -- Parse the module header
+  (module_doc, maybe_info, missing_names_doc1) <-
+       case maybe_doc of
+	 Nothing  -> return (Nothing, Nothing, [])
+	 Just doc -> do
+	    let (doc1, maybe_info) = parseModuleHeader doc
+	    (doc2,ns) <- formatDocString (lookupForDoc import_env) doc1
+	    return (Just doc2, maybe_info, ns)
 
-  -- match documentation to names, and resolve identifiers in the documentation
-  local_docstrings :: [(HsName,DocString)]
-  local_docstrings = collectDoc final_decls
+  let
+     final_decls = concat (map expandDecl orig_decls)
 
-  local_docs_formatted :: [(HsName,(Doc,[String]))]
-  local_docs_formatted = 
-      [ (n, formatDocString (lookupForDoc orig_env) doc) 
-      | (n, doc) <- local_docstrings ]
+     -- match documentation to names, and resolve identifiers in the 
+     -- documentation
+     local_docstrings :: [(HsName,DocString)]
+     local_docstrings = collectDoc final_decls
 
-  local_docs :: [(HsName,Doc)]		-- with *original* names
-  local_docs = [ (n,doc) | (n,(doc,_)) <- local_docs_formatted ]
+     formatLocalDoc (n,doc) = do
+	doc' <- formatDocString (lookupForDoc orig_env) doc
+	return (n,doc')
 
-  -- collect the list of names which we couldn't resolve in the documentation
-  missing_names_doc2 = concat [ ns | (n,(doc,ns)) <- local_docs_formatted ]
+  local_docs_formatted <- mapM formatLocalDoc local_docstrings
 
-  -- get the documentation associated with entities exported from this module
-  -- ToDo: we should really store the documentation in both orig and imported
-  -- forms, like the export items.
-  doc_map :: FiniteMap HsName Doc	-- with *imported* names
-  doc_map = listToFM 
-    [ (nameOfQName n, doc)
-    | n <- exported_names,
-      Just doc <- [lookupDoc mod_map mod local_docs import_env n] ]
+  let
+     local_docs :: [(HsName,Doc)]		-- with *original* names
+     local_docs = [ (n,doc) | (n,(doc,_)) <- local_docs_formatted ]
 
-  decl_map :: FiniteMap HsName HsDecl
-  decl_map = listToFM [ (n,d) | d <- final_decls, n <- declBinders d ]
+     -- collect the list of names which we couldn't resolve in the documentation
+     missing_names_doc2 = concat [ ns | (n,(doc,ns)) <- local_docs_formatted ]
+
+     -- get the documentation associated with entities exported from this module
+     -- ToDo: we should really store the documentation in both orig and imported
+     -- forms, like the export items.
+     doc_map :: FiniteMap HsName Doc	-- with *imported* names
+     doc_map = listToFM 
+       [ (nameOfQName n, doc)
+       | n <- exported_names,
+         Just doc <- [lookupDoc mod_map mod local_docs import_env n] ]
+
+     decl_map :: FiniteMap HsName HsDecl
+     decl_map = listToFM [ (n,d) | d <- final_decls, n <- declBinders d ]
 
   -- make the "export items", which will be converted into docs later
-  orig_export_list = mkExportItems mod_map mod orig_env
-			decl_map final_decls orig_exports 
+  orig_export_list <- mkExportItems mod_map mod orig_env
+   			 decl_map final_decls options orig_exports
 
-  -- rename names in the exported declarations to point to things that
-  -- are closer, or maybe even exported by, the current module.
-  (renamed_export_list, missing_names3)
-     = runRnFM import_env (renameExportItems orig_export_list)
+  let
+     -- prune the export list to just those declarations that have
+     -- documentation, if the 'prune' option is on.
+     pruned_export_list
+	| OptPrune `elem` options = pruneExportItems doc_map orig_export_list
+	| otherwise = orig_export_list
 
-  name_env = listToFM [ (nameOfQName n, n) | n <- exported_names ]
+     -- rename names in the exported declarations to point to things that
+     -- are closer, or maybe even exported by, the current module.
+     (renamed_export_list, missing_names3)
+        = runRnFM import_env (renameExportItems pruned_export_list)
+
+     name_env = listToFM [ (nameOfQName n, n) | n <- exported_names ]
+
+  -- report any names we couldn't find/resolve
+
+  let missing_names_doc = missing_names_doc1 ++ missing_names_doc2
+      missing_names = missing_names1 ++ missing_names2
+			 --ignore missing_names3 for now,
+
+      name_strings = nub (map show missing_names ++ missing_names_doc)
+
+  when (not (null name_strings)) $
+	  tell ["Warning: in module " ++ (case mod of Module m -> m) ++ 
+		", the following names could not be resolved:\n\ 
+		\   " ++ concat (map (' ':) name_strings)
+		]
+
+  return (mod, Interface { 
+		   iface_filename = filename,
+		   iface_env = name_env,
+		   iface_exports = renamed_export_list,
+		   iface_orig_exports = pruned_export_list,
+		   iface_decls =  decl_map,
+		   iface_info = maybe_info,
+		   iface_name_docs   = doc_map,
+		   iface_doc         = module_doc,
+		   iface_options     = options
+		}
+      	  )
 
 -- -----------------------------------------------------------------------------
 -- Find the documentation for a particular name, and rename the
@@ -274,13 +304,20 @@ mkExportItems :: ModuleMap -> Module
 	-> FiniteMap HsQName HsQName	-- maps orig to imported names
 	-> FiniteMap HsName HsDecl	-- maps local names to declarations
 	-> [HsDecl]			-- decls in the current module
+	-> [DocOption]
 	-> Maybe [HsExportSpec]
-	-> [ExportItem]
-mkExportItems mod_map mod env decl_map decls Nothing
-  = fullContentsOfThisModule decls env -- everything exported
-mkExportItems mod_map mod env decl_map decls (Just specs)
-  = concat (map lookupExport specs)
+	-> ErrMsgM [ExportItem]
+mkExportItems mod_map mod env decl_map decls options maybe_exps
+  | Nothing <- maybe_exps	    = everything_local_exported
+  | OptIgnoreExports `elem` options = everything_local_exported
+  | Just specs <- maybe_exps = do 
+	exps <- mapM lookupExport specs
+        return (concat exps)
   where
+
+    everything_local_exported =
+	fullContentsOfThisModule decls env -- everything exported
+
     lookupExport (HsEVar x) 
 	| Just decl <- findDecl x
 	= let decl' | HsTypeSig loc ns ty <- decl
@@ -288,39 +325,46 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 		    | otherwise
 		  	= decl
 	  in
-	  [ ExportDecl decl' ]
+	  return [ ExportDecl decl' ]
 	  -- ToDo: cope with record selectors here
     lookupExport (HsEAbs t)
 	| Just decl <- findDecl t
-	= [ ExportDecl (restrictTo [] decl) ]
+	= return [ ExportDecl (restrictTo [] decl) ]
     lookupExport (HsEThingAll t)
 	| Just decl <- findDecl t
-	= [ ExportDecl decl ]
+	= return [ ExportDecl decl ]
     lookupExport (HsEThingWith t cs)
 	| Just decl <- findDecl t
-	= [ ExportDecl (restrictTo (map nameOfQName cs) decl) ]
+	= return [ ExportDecl (restrictTo (map nameOfQName cs) decl) ]
     lookupExport (HsEModuleContents m) = fullContentsOf m
     lookupExport (HsEGroup lev str)
-	= [ ExportGroup lev "" doc ]
-	where (doc, _names) = formatDocHeading (lookupForDoc env) str
-	-- ToDo: report the unresolved names
+	= do (doc, _names) <- formatDocHeading (lookupForDoc env) str
+	     return [ ExportGroup lev "" doc ]
+	  -- ToDo: report the unresolved names
     lookupExport (HsEDoc str)
-	= [ ExportDoc doc ]
-	where (doc, _names) = formatDocString (lookupForDoc env) str
+	= do (doc, _names) <- formatDocString (lookupForDoc env) str
+	     return [ ExportDoc doc ]
 	-- ToDo: report the unresolved names
     lookupExport (HsEDocNamed str)
-	| Just found <- findNamedDoc str decls
-	= let (doc, _names) = formatDocString (lookupForDoc env) found in
-	  [ ExportDoc doc ]
+	= do r <- findNamedDoc str decls
+	     case r of
+		Nothing -> return []
+		Just found -> do
+		  (doc, _nms) <- formatDocString (lookupForDoc env) found
+	  	  return [ ExportDoc doc ]
 	
-    lookupExport _ = [] -- didn't find it?
+    lookupExport _ = return [] -- didn't find it?
 
     fullContentsOf m
 	| m == mod  = fullContentsOfThisModule decls env
 	| otherwise = 
 	   case lookupFM mod_map m of
-	     Just iface -> iface_orig_exports iface
-	     Nothing    -> trace ("Warning: module not found: " ++ show m) []
+	     Just iface
+		| OptHide `elem` iface_options iface
+			-> return (iface_orig_exports iface)
+		| otherwise -> return [ ExportModule m ]
+	     Nothing -> do tell ["Warning: module not found: " ++ show m]
+			   return []
 
     findDecl :: HsQName -> Maybe HsDecl
     findDecl (UnQual n)
@@ -330,17 +374,15 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 	| otherwise = 
 	   case lookupFM mod_map m of
 		Just iface -> lookupFM (iface_decls iface) n
-		Nothing -> 
-		   trace ("Warning: module not found: " ++ show m) Nothing
+		Nothing -> Nothing
 
 fullContentsOfThisModule decls env = 
-  [ mkExportItem decl | decl <- decls, keepDecl decl ]
-  where mkExportItem (HsDocGroup lev str) =
-	   ExportGroup lev "" doc
-	  where
-	   (doc, _names) = formatDocHeading (lookupForDoc env) str
+  mapM mkExportItem (filter keepDecl decls)
+  where mkExportItem (HsDocGroup lev str) = do
+	   (doc, _names) <- formatDocHeading (lookupForDoc env) str
+	   return (ExportGroup lev "" doc)
 	   -- ToDo: report the unresolved names
-	mkExportItem decl = ExportDecl decl
+	mkExportItem decl = return (ExportDecl decl)
 
 
 keepDecl HsTypeSig{}     = True
@@ -352,17 +394,29 @@ keepDecl HsDocGroup{}	 = True
 keepDecl _ = False
 
 -- -----------------------------------------------------------------------------
+-- Pruning
+
+pruneExportItems :: FiniteMap HsName Doc -> [ExportItem] -> [ExportItem]
+pruneExportItems doc_map items = filter has_doc items
+  where has_doc (ExportDecl d) | Just n <- declMainBinder d = n `elemFM` doc_map
+	has_doc _ = True
+
+-- -----------------------------------------------------------------------------
 -- Gather a list of original names exported from this module
 
 exportedNames :: Module -> ModuleMap -> [HsDecl] -> [HsName]
 	-> Maybe [HsExportSpec]
 	-> FiniteMap HsName HsDecl
+	-> [DocOption]
 	-> [HsQName]
-exportedNames mod mod_scope decls local_names Nothing decl_map
-  = map (Qual mod) local_names
-exportedNames mod mod_scope decls local_names (Just expspecs) decl_map
-  = concat (map extract expspecs)
+
+exportedNames mod mod_scope decls local_names maybe_exps decl_map options
+  | Nothing <- maybe_exps 	    = all_local_names
+  | OptIgnoreExports `elem` options = all_local_names
+  | Just expspecs <- maybe_exps     = concat (map extract expspecs)
  where
+  all_local_names = map (Qual mod) local_names
+
   extract e = 
    case e of
     HsEVar x -> [x]
@@ -493,24 +547,26 @@ docsFromField (HsFieldDecl nms ty Nothing) rest
 
 -- this one formats a heading
 formatDocHeading :: (String -> Maybe HsQName) -> DocString
-  -> (Doc,[String])
+  -> ErrMsgM (Doc,[String])
 formatDocHeading lookup string = format parseString lookup string
 
 -- this one formats a sequence of paragraphs
 formatDocString :: (String -> Maybe HsQName) -> DocString
-  -> (Doc,[String])
+  -> ErrMsgM (Doc,[String])
 formatDocString lookup string = format parseParas lookup string
 
 format 	:: ([Token] -> Either String ParsedDoc)
 	-> (String -> Maybe HsQName)
 	-> DocString
-       	-> (Doc, [String])
+       	-> ErrMsgM (Doc, [String])
 format parse lookup string
   = case parse (tokenise string) of
-	Left error -> trace ("Warning: parse error in doc string beginning:\n\ 
-			     \    " ++ take 40 string) (DocEmpty, [])
-	Right doc -> runRn lookup (resolveDoc doc)
-  
+	Left error -> do 	
+	  tell ["Warning: parse error in doc string beginning:\n\ 
+		\    " ++ take 40 string]
+	  return (DocEmpty, [])
+	Right doc -> 
+	  return (runRn lookup (resolveDoc doc))
 
 -- ---------------------------------------------------------------------------
 -- Looking up names in documentation
@@ -584,17 +640,48 @@ mkRegexWithOpts s single_line case_sensitive
 -- -----------------------------------------------------------------------------
 -- Named documentation
 
-findNamedDoc :: String -> [HsDecl] -> Maybe String
+findNamedDoc :: String -> [HsDecl] -> ErrMsgM (Maybe String)
 findNamedDoc str decls = 
   case matchRegex docNameRE str of
      Just (name:_) -> search decls
-	where search [] = Nothing
+	where search [] = do
+		tell ["Cannot find documentation for: $" ++ name]
+		return Nothing
 	      search (HsDocCommentNamed str : rest) = 
 		case matchRegexAll docNameRE str of
 		   Just (_, _, after, _, name':_)
-			| name == name' -> Just after
+			| name == name' -> return (Just after)
 		   _otherwise -> search rest
 	      search (_other_decl : rest) = search rest
-     _other -> Nothing
+     _other -> do
+	tell ["Invalid documentation name: $" ++ str]
+	return Nothing
 
 docNameRE = mkRegex "[ \t]*([A-Za-z0-9_]*)"
+
+-- -----------------------------------------------------------------------------
+-- Haddock options embedded in the source file
+
+processOptions :: String -> ErrMsgM [DocOption]
+processOptions str = do
+  case break (== ',') str of
+    (this, ',':rest) -> do
+	opt <- parseOption this
+	opts <- processOptions rest
+	return (maybeToList opt ++ opts)
+    (this, _)
+	| all isSpace this -> return []
+	| otherwise -> do opt <- parseOption this; return (maybeToList opt)
+
+parseOption :: String -> ErrMsgM (Maybe DocOption)
+parseOption "hide" = return (Just OptHide)
+parseOption "prune" = return (Just OptPrune)
+parseOption "ignore-exports" = return (Just OptIgnoreExports)
+parseOption other = do tell ["Unrecognised option: " ++ other]; return Nothing
+
+-- -----------------------------------------------------------------------------
+-- A monad which collects error messages
+
+type ErrMsg = String
+type ErrMsgM a = Writer [ErrMsg] a
+

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.5 2002/04/26 11:18:57 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.6 2002/05/08 11:21:56 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -68,7 +68,9 @@ instance Show HsIdentifier where
    showsPrec _ (HsSpecial s) = showString s
 
 data HsModule = HsModule Module (Maybe [HsExportSpec])
-                         [HsImportDecl] [HsDecl] (Maybe String)
+                        [HsImportDecl] [HsDecl] 
+			(Maybe String)	-- the doc options
+			(Maybe String)	-- the module doc
   deriving Show
 
 -- Export/Import Specifications

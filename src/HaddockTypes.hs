@@ -7,6 +7,7 @@
 module HaddockTypes (
   -- * Module interfaces
   NameEnv, Interface(..), ModuleInfo(..), ExportItem(..), ModuleMap,
+  DocOption(..),
 
   -- * User documentation strings
   DocString, GenDoc(..), Doc, ParsedDoc, DocMarkup(..),
@@ -52,14 +53,20 @@ data Interface
 	iface_info :: Maybe ModuleInfo,
 		-- ^ information from the module header
 
-	iface_doc :: Maybe Doc
+	iface_doc :: Maybe Doc,
 		-- ^ documentation from the module header
+
+	iface_options :: [DocOption]
+		-- ^ module-wide doc options
   }
 
 data ModuleInfo = ModuleInfo
 	{ portability :: String,
 	  stability   :: String,
 	  maintainer  :: String }
+
+data DocOption = OptHide | OptPrune | OptIgnoreExports 
+  deriving (Eq)
 
 type DocString = String
 
@@ -74,6 +81,9 @@ data ExportItem
 
   | ExportDoc		-- some documentation
 	Doc
+
+  | ExportModule	-- a cross-reference to another module
+	Module
 
 type ModuleMap = FiniteMap Module Interface
 

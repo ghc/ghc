@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.7 2002/05/06 12:32:32 simonmar Exp $
+$Id: HsParser.ly,v 1.8 2002/05/08 11:21:56 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -72,6 +72,7 @@ Docs
 >	DOCPREV    { DocCommentPrev $$ }
 >	DOCNAMED   { DocCommentNamed $$ }
 >	DOCGROUP   { DocSection _ _ }
+>	DOCOPTIONS { DocOptions $$ }
 
 Symbols
 
@@ -152,13 +153,18 @@ Module Header
 
 > module :: { HsModule }
 > 	: optdoc 'module' modid maybeexports 'where' body
->		{ HsModule $3 $4 (reverse (fst $6)) (reverse (snd $6)) $1 }
+>	    { HsModule $3 $4 (reverse (fst $6)) (reverse (snd $6)) 
+>		(fst $1) (snd $1) }
 >	| body
->		{ HsModule main_mod Nothing (reverse (fst $1)) (reverse (snd $1)) Nothing }
+>	    { HsModule main_mod Nothing (reverse (fst $1)) (reverse (snd $1))
+>		Nothing Nothing }
 
-> optdoc :: { Maybe String }
->	: DOCNEXT					{ Just $1 }
->	| {- empty -}					{ Nothing }
+> optdoc :: { (Maybe String, Maybe String) }
+>	: DOCNEXT					{ (Nothing, Just $1) }
+>	| DOCOPTIONS					{ (Just $1, Nothing) }
+>	| DOCOPTIONS DOCNEXT 				{ (Just $1, Just $2) }
+>	| DOCNEXT DOCOPTIONS 				{ (Just $2, Just $1) }
+>	| {- empty -}					{ (Nothing, Nothing) }
 
 > body :: { ([HsImportDecl],[HsDecl]) }
 >	:  '{' bodyaux '}'				{ $2 }

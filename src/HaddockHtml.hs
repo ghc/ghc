@@ -48,14 +48,17 @@ ppHtml title source_url ifaces odir maybe_css libdir =  do
 	icon_file        = libdir ++ pathSeparator:iconFile
 	icon_destination = odir   ++ pathSeparator:iconFile
 
+	visible_ifaces = filter visible ifaces
+	visible (m,i) = OptHide `notElem` iface_options i
+
   css_contents <- readFile css_file
   writeFile css_destination css_contents
   icon_contents <- readFile icon_file
   writeFile icon_destination icon_contents
 
-  ppHtmlContents odir title source_url (map fst ifaces)
-  ppHtmlIndex odir title ifaces
-  mapM_ (ppHtmlModule odir title source_url) ifaces
+  ppHtmlContents odir title source_url (map fst visible_ifaces)
+  ppHtmlIndex odir title visible_ifaces
+  mapM_ (ppHtmlModule odir title source_url) visible_ifaces
 
 moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mod = mod ++ ".html" -- ToDo: Z-encode filename?
@@ -359,8 +362,6 @@ ppModuleContents exports
 
   process :: Int -> [ExportItem] -> ([Html],[ExportItem])
   process n [] = ([], [])
-  process n (ExportDecl _ : rest) = process n rest
-  process n (ExportDoc _ : rest) = process n rest
   process n items@(ExportGroup lev id doc : rest) 
     | lev <= n  = ( [], items )
     | otherwise = ( html:sections, rest2 )
@@ -369,6 +370,7 @@ ppModuleContents exports
 		 +++ mk_subsections subsections
 	(subsections, rest1) = process lev rest
 	(sections,    rest2) = process n   rest1
+  process n (_ : rest) = process n rest
 
   mk_subsections [] = noHtml
   mk_subsections ss = ddef << dlist << concatHtml ss
@@ -392,6 +394,8 @@ processExport doc_map summary (ExportDecl decl)
 processExport doc_map summary (ExportDoc doc)
   | summary = Html.emptyTable
   | otherwise = docBox (markup htmlMarkup doc)
+processExport doc_map summary (ExportModule (Module mod))
+  = declBox (toHtml "module" <+> ppHsModule mod)
 
 ppDocGroup lev doc
   | lev == 1  = tda [ theclass "section1" ] << doc
