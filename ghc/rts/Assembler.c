@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/05/10 09:00:20 $
+ * $Revision: 1.30 $
+ * $Date: 2000/05/10 16:53:35 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -106,6 +106,7 @@ AsmObject asmNewObject ( void )
    objects      = obj;
    obj->n_refs  = obj->n_words = obj->n_insns = 0;
    obj->closure = NULL;
+   obj->stgexpr = 0; /*NIL*/
    obj->magic   = 0x31415927;
    INITIALISE_TABLE(AsmEntity,obj->entities,
                               obj->sizeEntities,
@@ -135,6 +136,52 @@ void asmAddEntity ( AsmObject   obj,
          barf("asmAddEntity");
    }
 }
+
+/* Support for the peephole optimiser.  Find the instruction
+   byte n back, carefully stepping over any non Asm_Insn8 entities
+   on the way.
+*/
+static Instr asmInstrBack ( AsmBCO bco, StgInt n )
+{
+   StgInt ue = bco->usedEntities;
+   while (1) {
+      if (ue < 0 || n <= 0) barf("asmInstrBack");
+      ue--;
+      if (bco->entities[ue].kind != Asm_Insn8) continue;
+      n--;
+      if (n == 0) return bco->entities[ue].val;
+   }
+}
+
+
+/* Throw away n Asm_Insn8 bytes, and slide backwards any Asm_Insn8 entities
+   as necessary.
+*/
+static void asmInstrRecede ( AsmBCO bco, StgInt n )
+{
+   StgInt ue = bco->usedEntities;
+   StgInt wr;
+   while (1) {
+      if (ue < 0 || n <= 0) barf("asmInstrRecede");
+      ue--;
+      if (bco->entities[ue].kind != Asm_Insn8) continue;
+      n--;
+      bco->n_insns--;
+      if (n == 0) break;
+   }
+   /* Now ue is the place where we would recede usedEntities to,
+      except that there may be stuff to slide downwards.
+   */
+   wr = ue;
+   for (; ue < bco->usedEntities; ue++) {
+      if (bco->entities[ue].kind != Asm_Insn8) {
+         bco->entities[wr] = bco->entities[ue];
+         wr++;
+      }
+   }
+   bco->usedEntities = wr;
+}
+
 
 static int asmFindInNonPtrs ( AsmBCO bco, StgWord w )
 {
@@ -240,6 +287,7 @@ StgClosure* asmDerefEntity ( Asm_Entity entity )
    return NULL; /*notreached*/
 }
 
+
 void asmCopyAndLink ( void )
 {
    int       j, k;
@@ -259,7 +307,7 @@ void asmCopyAndLink ( void )
             bco->n_words  = abco->n_words;
             bco->n_instrs = abco->n_insns + (obj->max_sp <= 255 ? 2 : 3);
             bco->stgexpr  = abco->stgexpr;
-
+	    //ppStgExpr(bco->stgexpr);
             /* First copy in the ptrs. */
             k = 0;
             for (j = 0; j < obj->usedEntities; j++) {
@@ -430,9 +478,10 @@ void asmEndCAF( AsmCAF caf __attribute__ ((unused)) )
 
 AsmBCO asmBeginBCO( int /*StgExpr*/ e )
 {
-   AsmBCO bco = asmNewObject();
+   AsmBCO bco   = asmNewObject();
    bco->kind    = Asm_BCO;
    bco->stgexpr = e;
+   //ppStgExpr(bco->stgexpr);
    bco->sp      = 0;
    bco->max_sp  = 0;
    bco->lastOpc = i_INTERNAL_ERROR;
@@ -497,18 +546,6 @@ static void asmInstr16 ( AsmBCO bco, StgWord i )
     asmAddInstr(bco,i % 256);
 }
 
-#if 0
-static Instr asmInstrBack ( AsmBCO bco, StgWord n )
-{
-   return bco->is.elems[bco->is.len - n];
-}
-
-static void asmInstrRecede ( AsmBCO bco, StgWord n )
-{
-   if (bco->is.len < n) barf("asmInstrRecede");
-   bco->is.len -= n;
-}
-#endif
 
 #define asmAddNonPtrWords(bco,ty,x)                      \
     {                                                    \
@@ -575,7 +612,7 @@ int asmRepSizeW ( AsmRep rep )
 
 static void emiti_ ( AsmBCO bco, Instr opcode )
 {
-#if 0
+#if 1
    StgInt x, y;
    if (bco->lastOpc == i_SLIDE && opcode == i_ENTER) {
       /* SLIDE x y ; ENTER   ===>  SE x y */
@@ -604,7 +641,7 @@ static void emiti_ ( AsmBCO bco, Instr opcode )
 
 static void emiti_8 ( AsmBCO bco, Instr opcode, int arg1 )
 {
-#if 0
+#if 1
    StgInt x;
    if (bco->lastOpc == i_VAR && opcode == i_VAR) {
       /* VAR x ; VAR y ===>  VV x y */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/05/10 09:00:20 $
+ * $Revision: 1.25 $
+ * $Date: 2000/05/10 16:53:35 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -842,11 +842,10 @@ Void cgModule ( Module mod )
 Void codegen(what)
 Int what; {
     switch (what) {
-       case PREPREL:
-       case RESET: 
-       case MARK: 
-       case POSTPREL:
-          break;
+       case PREPREL:  break;
+       case RESET:    break;
+       case MARK:     break;
+       case POSTPREL: break;
     }
     liftControl(what);
 }
