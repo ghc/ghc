@@ -385,6 +385,9 @@
 /* Define if usleep returns void */
 #undef USLEEP_RETURNS_VOID
 
+/*Define if in_addr_t available */
+#undef HAVE_IN_ADDR_T
+
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 

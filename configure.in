@@ -1162,6 +1162,14 @@ case "$cv_func_usleep_return_type" in
 esac
 
 dnl --------------------------------------------------
+dnl * test for in_addr_t
+dnl --------------------------------------------------
+AC_MSG_CHECKING(for in_addr_t in netinet/in.h)
+AC_EGREP_HEADER(in_addr_t, netinet/in.h,
+ [ AC_DEFINE(HAVE_IN_ADDR_T) AC_MSG_RESULT(yes) ],
+ AC_MSG_RESULT(no))
+
+dnl --------------------------------------------------
 dnl * test for GTK+
 dnl --------------------------------------------------
 
