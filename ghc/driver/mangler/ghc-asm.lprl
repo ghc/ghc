@@ -371,6 +371,33 @@ sub init_TARGET_STUFF {
     $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^sparc-.*-linux/ ) {
+    $T_STABBY       = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US           = ''; # _ if symbols have an underscore on the front
+    $T_PRE_APP      = '#'; # regexp that says what comes before APP/NO_APP
+                           # Probably doesn't apply anyway
+    $T_CONST_LBL    = '^\.LLC(\d+):$'; # regexp for what such a lbl looks like
+    $T_POST_LBL     = ':';
+
+    $T_MOVE_DIRVS   = '^((\s+\.align\s+\d+|\s+\.proc\s+\d+|\s+\.global\s+\S+|\.text|\.data|\.seg|\.stab.*|\.section.*|\s+\.type.*|\s+\.size.*)\n)';
+    $T_COPY_DIRVS   = '\.(global|globl|proc|stab)';
+
+    $T_hsc_cc_PAT   = '\.asciz.*\)(hsc|cc) (.*)\\\\t(.*)"';
+    $T_DOT_WORD     = '\.(long|word|nword|xword|byte|half|short|skip|uahalf|uaword)';
+    $T_DOT_GLOBAL   = '^\t\.global';
+    $T_HDR_literal  = "\.text\n\t\.align 8\n";
+    $T_HDR_misc     = "\.text\n\t\.align 4\n";
+    $T_HDR_data     = "\.data\n\t\.align 8\n";
+    $T_HDR_consist  = "\.text\n";
+    $T_HDR_closure  = "\.data\n\t\.align 4\n";
+    $T_HDR_srt      = "\.data\n\t\.align 4\n";
+    $T_HDR_info     = "\.text\n\t\.align 4\n";
+    $T_HDR_entry    = "\.text\n\t\.align 4\n";
+    $T_HDR_vector   = "\.text\n\t\.align 4\n";
+    $T_HDR_direct   = "\.text\n\t\.align 4\n";
+    $T_create_word  = "\t.word";
+
+    #--------------------------------------------------------#
     } else {
 	print STDERR "$Pgm: don't know how to mangle assembly language for: $TargetPlatform\n";
 	exit 1;

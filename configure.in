@@ -312,6 +312,15 @@ sparc-sun-solaris2*)
         HostVendor_CPP='sun'
         HostOS_CPP='solaris2'
         ;;
+sparc*-linux*)
+        HostPlatform=sparc-unknown-linux
+        TargetPlatform=sparc-unknown-linux
+        BuildPlatform=sparc-unknown-linux
+        HostPlatform_CPP='sparc_unknown_linux'
+        HostArch_CPP='sparc'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
 *)
         echo "Unrecognised platform: $HostPlatform"
         exit 1
