@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.89 2001/08/15 15:50:41 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.90 2001/08/16 10:54:22 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -31,7 +31,8 @@ import Class		( className )
 import TyCon		( tyConName, tyConClass_maybe )
 import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
-import Name		( Name, isHomePackageName, nameSrcLoc )
+import Name		( Name, isHomePackageName, nameSrcLoc, NamedThing(..) )
+import BasicTypes	( defaultFixity )
 import Outputable
 import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, dopt_unset )
 import Panic		( GhcException(..) )
@@ -387,14 +388,20 @@ info s = do
   let 
     infoThings cms [] = return cms
     infoThings cms (name:names) = do
-      (cms, unqual, ty_things) <- io (cmInfoThing cms dflags name)
+      (cms, unqual, stuff) <- io (cmInfoThing cms dflags name)
       io (putStrLn (showSDocForUser unqual (
-	    vcat (intersperse (text "") (map showThing ty_things))))
+	    vcat (intersperse (text "") (map showThing stuff))))
          )
       infoThings cms names
 
-    showThing ty_thing = vcat [ text "-- " <> showTyThing ty_thing, 
-			        ppr (ifaceTyCls ty_thing) ]
+    showThing (ty_thing, fixity) 
+	= vcat [ text "-- " <> showTyThing ty_thing, 
+		 showFixity fixity (getName ty_thing),
+	         ppr (ifaceTyCls ty_thing) ]
+
+    showFixity fix name
+	| fix == defaultFixity = empty
+	| otherwise            = ppr fix <+> ppr name
 
     showTyThing (AClass cl) 
        = hcat [ppr cl, text " is a class", showSrcLoc (className cl)]

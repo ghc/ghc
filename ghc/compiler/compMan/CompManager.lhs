@@ -49,7 +49,8 @@ import HscMain		( initPersistentCompilerState )
 import HscTypes
 import RnEnv		( unQualInScope )
 import Id		( idType, idName )
-import Name		( Name, NamedThing(..), nameRdrName )
+import Name		( Name, NamedThing(..), nameRdrName, nameModule,
+			  isHomePackageName )
 import NameEnv
 import RdrName		( lookupRdrEnv, emptyRdrEnv )
 import Module
@@ -63,8 +64,10 @@ import ErrUtils		( showPass )
 import SysTools		( cleanTempFilesExcept )
 import Util
 import Outputable
+import BasicTypes	( Fixity, defaultFixity )
 import Panic
 import CmdLineOpts	( DynFlags(..) )
+
 import IOExts
 
 #ifdef GHCI
@@ -180,13 +183,24 @@ moduleNameToModule mn
 
 #ifdef GHCI
 cmInfoThing :: CmState -> DynFlags -> String 
-	-> IO (CmState, PrintUnqualified, [TyThing])
+	-> IO (CmState, PrintUnqualified, [(TyThing,Fixity)])
 cmInfoThing cmstate dflags id
    = do (new_pcs, things) <- hscThing dflags hst hit pcs icontext id
-	return (cmstate{ pcs=new_pcs }, unqual, things)
+	let pairs = map (\x -> (x, getFixity new_pcs (getName x))) things
+	return (cmstate{ pcs=new_pcs }, unqual, pairs)
    where 
      CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
      unqual = getUnqual pcs hit icontext
+
+     getFixity :: PersistentCompilerState -> Name -> Fixity
+     getFixity pcs name
+	| Just iface  <- lookupModuleEnv iface_table (nameModule name),
+	  Just fixity <- lookupNameEnv (mi_fixities iface) name
+	  = fixity
+	| otherwise
+	  = defaultFixity
+	where iface_table | isHomePackageName name = hit
+			  | otherwise              = pcs_PIT pcs
 #endif
 
 -----------------------------------------------------------------------------
