@@ -1,8 +1,11 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1996/11/21 16:48:25 simonm Exp $
+# $Id: Makefile,v 1.3 1997/03/14 05:11:36 sof Exp $
 
-TOP=../../..
-include $(TOP)/ghc/mk/ghc.mk
+TOP=../..
+include $(TOP)/mk/boilerplate.mk
+# There's only one `way' for gmp, empty WAYS variable right away.
+WAYS=
+
 
 GMP_OBJS = $(MPZ_OBJS) $(MPQ_OBJS) $(MPN_OBJS) $(IMPL_OBJS) mp_bases.o
 
@@ -50,20 +53,29 @@ MPN_SRCS = mpn_add.c mpn_sub.c mpn_cmp.c mpn_mul.c mpn_div.c mpn_dm_1.c \
 MPN_OBJS = mpn_add.o mpn_sub.o mpn_cmp.o mpn_mul.o mpn_div.o mpn_dm_1.o \
   mpn_mod_1.o mpn_lshift.o mpn_rshift.o mpn_rshiftci.o mpn_sqrt.o
 
-CC_OPTS = -I.
+#
+# Compiling gmp with gcc-2.7.2 *without* -O tripped up a bug in the
+# code that sets up and stores the regs around an __asm__ (mpn_mul.c : add_ssaaaa).
+# Enabling -O flushed out the problem, so dropping the -O is not advised.
+#
+SRC_CC_OPTS += -I. -O
 
 all depend :: gmp-mparam.h
 libgmp.a :: stamp-stddefh
 
-ARCHIVE = libgmp.a
+LIBRARY = libgmp.a
 LIBOBJS = $(GMP_OBJS)
 DESTDIR = $(INSTLIBDIR_GHC)
-C_DEP_SRCS = $(IMPL_SRCS) $(MPZ_SRCS) $(MPQ_SRCS) $(MPN_SRCS)
+C_SRCS  = $(IMPL_SRCS) $(MPZ_SRCS) $(MPQ_SRCS) $(MPN_SRCS)
 
-clean ::
-	$(RM) test-with-stddefh.c stamp-stddefh \
-		cre-mparam gmp-mparam.h mp_bases.c cre-conv-tab
+#
+# Install gmp
+# 
+INSTALL_LIBS += $(LIBRARY)
 
+CLEAN_FILES += test-with-stddefh.c stamp-stddefh cre-mparam gmp-mparam.h mp_bases.c cre-conv-tab
+
+SRC_H_FILES+=$(wildcard *.h) COPYING ChangeLog INSTALL Makefile.original README TODO VERSION gmp.texi mpn_mul_classic.c-EXTRA
 # ToDo: something to make the doc
 
 # from here on, it is magic from the original Makefile
@@ -105,4 +117,4 @@ gmp-mparam.h: cre-mparam
 cre-mparam: cre-mparam.c stamp-stddefh gmp.h
 	$(LOCAL_CC) $(CFLAGS) cre-mparam.c -o $@
 
-include $(TOP)/mk/lib.mk
+include $(TOP)/mk/target.mk
