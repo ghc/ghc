@@ -169,13 +169,13 @@ INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
 -- might be a 'ThreadKilled', for example).  In this case it is usually better
 -- to use 'catchJust' and select the kinds of exceptions to catch.
 --
--- Also note that The "Prelude" also exports a
--- function called 'catch' which has the same type as
+-- Also note that the "Prelude" also exports a
+-- function called 'Prelude.catch' which has the same type as
 -- 'Control.Exception.catch', the difference being that the
 -- "Prelude" version only catches the IO and user
 -- families of exceptions (as required by Haskell 98).  We recommend
 -- either hiding the "Prelude" version of
--- 'catch' when importing
+-- 'Prelude.catch' when importing
 -- "Control.Exception", or importing
 -- "Control.Exception" qualified, to avoid name-clashes.
 
@@ -235,7 +235,7 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- 'try' and variations.
 
 -- | Similar to 'catch', but returns an 'Either' result which is
--- @(Right a)@ if no exception was raised, or @(Left e)@ if an
+-- @('Right' a)@ if no exception was raised, or @('Left' e)@ if an
 -- exception was raised and its value is @e@.
 --
 -- >  try a = catch (Right \`liftM\` a) (return . Left)
