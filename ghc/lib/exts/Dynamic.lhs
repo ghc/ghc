@@ -59,6 +59,24 @@ module Dynamic
 import GlaExts
    END_FOR_GHC -}
 
+-- the following type imports are only needed in order to define
+-- Typeable instances locally.
+import IO    ( Handle )
+import Array ( Array )
+import Complex ( Complex )
+import Foreign ( ForeignObj, StablePtr )
+{- BEGIN_FOR_GHC
+import PrelConc ( MVar )
+   END_FOR_GHC -}
+{- BEGIN_FOR_HUGS -}
+import Concurrent ( MVar )
+{- END_FOR_HUGS -}
+import Word  ( Word8, Word16, Word32, Word64 )
+import Int   ( Int8, Int16, Int32 )
+{- BEGIN_FOR_GHC
+import Int   ( Int64 )
+   END_FOR_GHC -}
+
 import IOExts 
        ( unsafePerformIO,
          IORef, newIORef, readIORef, writeIORef
@@ -290,6 +308,24 @@ instance Typeable Dynamic where
 instance Typeable Ordering where
   typeOf _ = mkAppTy orderingTc []
 
+instance (Typeable ix, Typeable a) => Typeable (Array ix a) where
+  typeOf a = mkAppTy arrayTc [typeOf (ix a), typeOf (elt a)]
+   where
+    ix :: Array ix a -> ix
+    ix = undefined
+
+    elt :: Array ix a -> a
+    elt = undefined
+
+instance (Typeable a) => Typeable (Complex a) where
+  typeOf c = mkAppTy complexTc [typeOf (v c)]
+   where
+    v :: Complex a -> a
+    v = undefined
+
+instance Typeable Handle where
+  typeOf _ = mkAppTy handleTc []
+
 instance (Typeable a, Typeable b) => Typeable (a,b) where
   typeOf tu = mkAppTy tup2Tc [typeOf (fst tu), typeOf (snd tu)]
     where
@@ -363,6 +399,81 @@ instance ( Typeable a
 
       tup5Tc = mkTyCon ",,,,"
 
+-- Hugs/GHC extension lib types:
+instance Typeable Addr where
+   typeOf _ = mkAppTy addrTc []
+
+instance Typeable a => Typeable (StablePtr a) where
+   typeOf s = mkAppTy stablePtrTc [typeOf (t s)]
+    where
+      t  :: StablePtr a -> a
+      t = undefined
+
+instance Typeable a => Typeable (MVar a) where
+   typeOf m = mkAppTy mvarTc [typeOf (t m)]
+    where
+      t  :: MVar a -> a
+      t = undefined
+
+instance (Typeable s, Typeable a) => Typeable (ST s a) where
+   typeOf st = mkAppTy stTc [typeOf (s st), typeOf (a st)]
+    where
+      s  :: ST s a -> s
+      s = undefined
+
+      a  :: ST s a -> a
+      a = undefined
+
+instance Typeable ForeignObj where
+   typeOf _ = mkAppTy foreignObjTc []
+
+instance Typeable Int8 where
+   typeOf _ = mkAppTy int8Tc []
+
+instance Typeable Int16 where
+   typeOf _ = mkAppTy int16Tc []
+
+instance Typeable Int32 where
+   typeOf _ = mkAppTy int32Tc []
+
+{- BEGIN_FOR_GHC
+instance Typeable Int64 where
+   typeOf _ = mkAppTy int64Tc []
+   END_FOR_GHC -}
+
+instance Typeable Word8 where
+   typeOf _ = mkAppTy word8Tc []
+
+instance Typeable Word16 where
+   typeOf _ = mkAppTy word16Tc []
+
+instance Typeable Word32 where
+   typeOf _ = mkAppTy word32Tc []
+
+instance Typeable Word64 where
+   typeOf _ = mkAppTy word64Tc []
+
+{- BEGIN_FOR_GHC
+instance Typeable Word where
+   typeOf _ = mkAppTy wordTc []
+
+instance Typeable a => Typeable (ByteArray a) where
+   typeOf b = mkAppTy byteArrayTc [typeOf (t b)]
+    where
+     t :: ByteArray t -> t
+     t = undefined
+
+instance (Typeable s, Typeable a) => Typeable (MutableByteArray s a) where
+   typeOf mb = mkAppTy byteArrayTc [typeOf (s mb), typeOf (a mb)]
+    where
+     s :: MutableByteArray s a -> s
+     s = undefined
+
+     a :: MutableByteArray s a -> a
+     a = undefined
+
+   END_FOR_GHC -}
+
 \end{code}
 
 @TyCon@s are provided for the following:
@@ -412,33 +523,3 @@ wordTc       = mkTyCon "Word"
 
 \end{code}
 
-\begin{code}
-test1 = toDyn (1::Int)
-test2 = toDyn ((+) :: Int -> Int -> Int)
-test3 = dynApp test2 test1
-test4 = dynApp test3 test1
-
-test5, test6,test7 :: Int
-test5 = fromDyn test4 0
-test6 = fromDyn test1 0
-test7 = fromDyn test2 0
-
-test8 = toDyn (mkAppTy listTc)
-test9 :: Float
-test9 = fromDyn test8 0
-
-printf :: String -> [Dynamic] -> IO ()
-printf str args = putStr (decode str args)
- where
-  decode [] [] = []
-  decode ('%':'n':cs) (d:ds) =
-    (\ v -> show v++decode cs ds) (fromDyn  d (0::Int))
-  decode ('%':'c':cs) (d:ds) =
-    (\ v -> show v++decode cs ds) (fromDyn  d ('\0'))
-  decode ('%':'b':cs) (d:ds) =
-    (\ v -> show v++decode cs ds) (fromDyn  d (False::Bool))
-  decode (x:xs) ds = x:decode xs ds
-
-test10 :: IO ()
-test10 = printf "%n = %c, that much is %b\n" [toDyn (3::Int),toDyn 'a', toDyn False]
-\end{code}
