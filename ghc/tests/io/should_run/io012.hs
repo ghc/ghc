@@ -1,14 +1,21 @@
 -- !!! Test getCPUTime
 
 import IO
-
 import CPUTime
 
+main :: IO ()
 main = do
-    t <- getCPUTime
-    print (nfib 30)
-    t <- getCPUTime
-    print (length (show t)) -- printing the CPU time itself is un-cool if you want to diff the output..
+    t28 <- timeFib 28
+    t29 <- timeFib 29
+    t30 <- timeFib 30
+    print (t28 <= t29, t29 <= t30)
+
+timeFib :: Integer -> IO Integer
+timeFib n = do
+    start <- getCPUTime
+    print (nfib n)
+    end <- getCPUTime
+    return (end - start)
 
 nfib :: Integer -> Integer
 nfib n 
