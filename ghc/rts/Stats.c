@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.32 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Stats.c,v 1.33 2001/11/02 11:15:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -574,8 +574,8 @@ stat_exit(int alloc)
 	    fprintf(sf, "  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
 		    TICK_TO_DBL(time), TICK_TO_DBL(etime));
 	    fprintf(sf, "  %%GC time     %5.1f%%  (%.1f%% elapsed)\n\n",
-		    TICK_TO_DBL(GC_tot_time)*100/time, 
-		    TICK_TO_DBL(GCe_tot_time)*100/etime);
+		    TICK_TO_DBL(GC_tot_time)*100/TICK_TO_DBL(time),
+		    TICK_TO_DBL(GCe_tot_time)*100/TIC_TO_DBL(etime));
 
 	    if (time - GC_tot_time == 0)
 		ullong_format_string(0, temp, rtsTrue/*commas*/);
