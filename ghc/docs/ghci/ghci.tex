@@ -1,0 +1,1362 @@
+%
+% (c) The OBFUSCATION-THROUGH-GRATUITOUS-PREPROCESSOR-ABUSE Project,
+%     Glasgow University, 1990-2000
+%
+
+% \documentstyle[preprint]{acmconf}
+\documentclass[11pt]{article}
+\oddsidemargin 0.1 in       %   Note that \oddsidemargin = \evensidemargin
+\evensidemargin 0.1 in
+\marginparwidth 0.85in    %   Narrow margins require narrower marginal notes
+\marginparsep 0 in 
+\sloppy
+
+%\usepackage{epsfig}
+\usepackage{shortvrb}
+\MakeShortVerb{\@}
+
+%\newcommand{\note}[1]{{\em Note: #1}}
+\newcommand{\note}[1]{{{\bf Note:}\sl #1}}
+\newcommand{\ToDo}[1]{{{\bf ToDo:}\sl #1}}
+\newcommand{\Arg}[1]{\mbox{${\tt arg}_{#1}$}}
+\newcommand{\bottom}{\perp}
+
+\newcommand{\secref}[1]{Section~\ref{sec:#1}}
+\newcommand{\figref}[1]{Figure~\ref{fig:#1}}
+\newcommand{\Section}[2]{\section{#1}\label{sec:#2}}
+\newcommand{\Subsection}[2]{\subsection{#1}\label{sec:#2}}
+\newcommand{\Subsubsection}[2]{\subsubsection{#1}\label{sec:#2}}
+
+% DIMENSION OF TEXT:
+\textheight 8.5 in
+\textwidth 6.25 in
+
+\topmargin 0 in
+\headheight 0 in
+\headsep .25 in
+
+
+\setlength{\parskip}{0.15cm}
+\setlength{\parsep}{0.15cm}
+\setlength{\topsep}{0cm}	% Reduces space before and after verbatim,
+				% which is implemented using trivlist 
+\setlength{\parindent}{0cm}
+
+\renewcommand{\textfraction}{0.2}
+\renewcommand{\floatpagefraction}{0.7}
+
+\begin{document}
+
+\title{The GHCi Draft Design, round 2}
+\author{MSR Cambridge Haskell Crew \\
+        Microsoft Research Ltd., Cambridge}
+
+\maketitle
+
+%%%\tableofcontents
+%%%\newpage
+
+
+%%-----------------------------------------------------------------%%
+\section{Details}
+
+\subsection{Data structures and lifetimes}
+
+About lifetimes:
+\begin{itemize}
+\item {\bf Session} lifetime covers a complete run of GHCI, 
+      encompassing multiple recompilation runs.
+\item {\bf Rebuild} lifetime covers the actions needed to bring
+      the target module up to date -- a downsweep from the 
+      target to reestablish the module graph, and an upsweep to
+      bring the translations (compiled code) and global symbol
+      table back up to date.
+\item {\bf Module} lifetime: that of data needed to translate
+      a single module, but then discarded, for example Core,
+      AbstractC, Stix trees.
+\end{itemize}
+
+Structures with module lifetime are well documented and understood.
+Here we're really interested in structures with session and rebuild
+lifetimes.  Most of these structures are ``owned'' by CM, since that's
+the only major component of GHCI which deals with session-lifetime
+issues. 
+
+Terminology: ``home'' refers to modules in this package, precisely
+the ones tracked and updated by CM.  ``Package'' refers to all other
+packages, which are assumed static.
+
+New data structures are:
+\begin{itemize}
+
+\item
+   {\bf Home Symbol Table (HST)} @:: FiniteMap Module ModDetails@
+
+   The @ModDetails@ contain tycons, classes, instances,
+   etc, collectively known as ``entities''.  Referrals from other
+   modules to these entities is direct, with no intervening
+   indirections of any kind; conversely, these entities refer directly
+   to other entities, regardless of module boundaries.  HST only
+   holds information for home modules; the corresponding wired-up
+   details for package (non-home) modules are created lazily in
+   the package rename cache (PRC).
+
+   CM maintains the HST, which is passed to, but not modified by,
+   @compile@.  If compilation of a module is successful, @compile@
+   returns the resulting @ModDetails@ (inside the @CompResult@) which
+   CM then adds to HST.
+
+   CM throws away arbitrarily large parts of HST at the start of a
+   rebuild, and uses @compile@ to incrementally reconstruct it.
+
+\item
+   {\bf Home Interface Table (HIT)} @:: FiniteMap Module ModIFace@
+
+   (Completely private to CM; nobody else sees this).
+
+   Compilation of a module always creates a @ModIFace@, which contains
+   the unlinked symbol table entries.  CM maintains a @FiniteMap@
+   @ModName@ @ModIFace@, with session lifetime.  CM never throws away
+   @ModIFace@s, but it does update them, by passing old ones to
+   @compile@ if they exist, and getting new ones back.
+
+   CM acquires @ModuleIFace@s from @compile@, which it only applies
+   to modules in the home package.  As a result, HIT only contains
+   @ModuleIFace@s for modules in the home package.  Those from other
+   packages reside in ...
+
+\item
+   {\bf Persistent Compiler State (PCS)} @:: known-only-to-compile@
+
+   This contains info about foreign packages only, acting as a cache,
+   which is private to @compile@.  The cache never becomes out of
+   date.  There are at least two parts to it:
+
+   \begin{itemize}
+   \item
+      {\bf Package Interface Table (PIT)} @:: FiniteMap Module ModIFace@
+
+   @compile@ reads interfaces from modules in foreign packages, and
+   caches them in the PIT.  Subsequent imports of the same module get
+   them directly out of the PIT, avoiding slow lexing/parsing phases.
+   Because foreign packages are assumed never to become out of date,
+   all contents of PIT remain valid forever.
+
+   Successful runs of @compile@ can add arbitrary numbers of new
+   interfaces to the PIT.  Failed runs could also contribute any new
+   interfaces read, but this could create inconsistencies between the
+   PIT and the unlinked images (UI).  Specifically, we don't want the
+   PIT to acquire interfaces for which UI hasn't got a corresponding
+   @Linkable@, and we don't want @Linkable@s from failed compilation
+   runs to enter UI, because we can't be sure that they are actually
+   necessary for a successful link.  So it seems simplest, albeit at a
+   small compilation speed loss, for @compile@ not to update PCS at
+   all following a failed compile.  We may revisit this
+   decision later.
+
+   \item
+      {\bf Package Rename Cache (PRC)} @:: FiniteMap Module ModDetails@
+
+   Adding an package interface to PIT doesn't make it directly usable
+   to @compile@, because it first needs to be wired (renamed +
+   typechecked) into the sphagetti of the HST.  On the other hand,
+   most modules only use a few entities from any imported interface,
+   so wiring-in the interface at PIT-entry time might be a big time
+   waster.  Also, wiring in an interface could mean reading other
+   interfaces, and we don't want to do that unnecessarily.
+
+   The PRC avoids these problems by allowing incremental wiring-in to
+   happen.  Pieces of foreign interfaces are renamed and placed in the
+   PRC, but only as @compile@ discovers it needs them.  In the process
+   of incremental renaming, @compile@ may need to read more package
+   interfaces, which are returned to CM to add to the PIT.
+
+   CM passes the PRC to @compile@ and is returned an updated version
+   on success.  On failure, @compile@ doesn't return an updated
+   version even though it might have created some updates on the way
+   to failure.  This seems necessary to retain the (thus far unstated)
+   invariant that PRC only contains renamed fragments of interfaces in
+   PIT.
+   \end{itemize}
+
+   PCS is opaque to CM; only @compile@ knows what's in it, and how to
+   update it.  Because packages are assumed static, PCS never becomes
+   out of date.  So CM only needs to be able to create an empty PCS,
+   with @emptyPCS@, and thence just passes it through @compile@ with
+   no further ado.
+
+   In return, @compile@ must promise not to store in PCS any
+   information pertaining to the home modules.  If it did so, CM would
+   need to have a way to remove this information prior to commencing a
+   rebuild, which conflicts with PCS's opaqueness to CM.
+
+\item
+   {\bf Unlinked Images (UI)} @:: Set Linkable@
+
+   The @Linkable@s in UI represent executable but as-yet unlinked
+   module translations.  A @Linkable@ can contain the name of an
+   object, archive or DLL file.  In interactive mode, it may also be
+   the STG trees derived from translating a module.  So @compile@
+   returns a @Linkable@ from each successful run, namely that of
+   translating the module at hand.  At link-time, CM supplies these
+   @Linkable@s to @link@.  It also examines the @ModSummary@s for all
+   home modules, and by examining their imports and the PCI (package
+   configuration info) it can determine the @Linkable@s from all
+   required imported packages too.
+
+   @Linkable@s and @ModIFace@s have a close relationship.  Each
+   translated module has a corresponding @Linkable@ somewhere.
+   However, there may be @Linkable@s with no corresponding modules
+   (the RTS, for example).  Conversely, multiple modules may share a
+   single @Linkable@ -- as is the case for any module from a
+   multi-module package.  For these reasons it seems appropriate to
+   keep the two concepts distinct.  @Linkable@s also provide
+   information about how to link package components together, and that
+   insn't the business of any specific module to know.
+
+   CM passes @compile@ a module's old @ModIFace@, if it has one, in
+   the hope that the module won't need recompiling.  If so, @compile@
+   can just return the @ModIFace@ along with a new @ModDetails@
+   created from it.  Similarly, CM passes in a module's old
+   @Linkable@, if it has one, and that's returned unchanged if the
+   module isn't recompiled.
+
+\item
+   {\bf Object Symbol Table (OST)} @:: FiniteMap String Addr+HValue@
+
+   OST keeps track of symbol entry points in the linked image.  In
+   some sense it {\em is} the linked image.  The mapping supplies
+   @Addr@s for low level symbol names (eg, @Foo_bar_fast3@) which are
+   in machine code modules in memory.  For symbols of the form
+   @Foo_bar_closure@ pertaining to an interpreted module, OST supplies
+   an @HValue@, which is the application of the interpreter function to
+   the STG tree for @Foo.bar@.
+
+   When @link@ loads object code from disk, symbols from the object
+   are entered as @Addr@s into OST.  When preparing to link an
+   unlinked bunch of STG trees, @HValue@s are added.  Resolving of
+   object-level references can then be done purely by consulting OST,
+   with no need to look in HST, PRC, or anywhere else.
+
+   Following the downsweep (re-establishment of the state and
+   up-to-dateness of the module graph), CM may determine that certain
+   parts of the linked image are out of date.  It then will instruct
+   @unlink@ to throw groups of @Unlinked@s out of OST, working down
+   the module graph, so that at no time does OST hold entries for
+   modules/packages which refer to modules/packages which have already
+   been removed from OST.  In other words, the transitive completeness
+   of OST is maintained even during unlinking operations.  Because of
+   mutually recursive module groups, CM asks @unlink@ to delete sets
+   of @Unlinked@s in one go, rather than singly.
+
+   \ToDo{Need a way to refer to @Unlinked@s.  Some kind of keys?}
+
+   For batch mode compilation, OST doesn't exist.  CM doesn't know
+   anything aboyt OST's representation, and the only modifiers of it
+   are @link@ and @unlink@.  So for batch compilation, OST can just 
+   be a unit value ignored by all parties.
+
+\item
+   {\bf Linked Image (LI)} @:: no-explicit-representation@
+
+   LI isn't explicitly represented in the system, but we record it
+   here for completeness anyway.  LI is the current set of
+   linked-together module, package and other library fragments
+   constituting the current executable mass.  LI comprises:
+   \begin{itemize}
+   \item Machine code (@.o@, @.a@, @.DLL@ file images) in memory.
+         These are loaded from disk when needed, and stored in
+         @malloc@ville.  To simplify storage management, they are
+         never freed or reused, since this creates serious
+         complications for storage management.  When no longer needed,
+         they are simply abandoned.  New linkings of the same object
+         code produces new copies in memory.  We hope this not to be
+         too much of a space leak.
+   \item STG trees, which live in the GHCI heap and are managed by the
+         storage manager in the usual way.  They are held alive (are 
+         reachable) via the @HValue@s in the OST.  Such @HValue@s are
+         applications of the interpreter function to the trees
+         themselves.  Linking a tree comprises travelling over the 
+         tree, replacing all the @Id@s with pointers directly to the
+         relevant @_closure@ labels, as determined by searching the
+         OST.  Once the leaves are linked, trees are wrapped with the
+         interpreter function.  The resulting @HValue@s then behave
+         indistinguishably from compiled versions of the same code.
+   \end{itemize}
+   Because object code is outside the heap and never deallocated,
+   whilst interpreted code is held alive by the OST, there's no need
+   to have a data structure which ``is'' the linked image.
+
+   For batch compilation, LI doesn't exist because OST doesn't exist,
+   and because @link@ doesn't load code into memory, instead just
+   invokes the system linker.
+
+   \ToDo{Do we need to say anything about CAFs and SRTs?  Probably ...}
+\end{itemize}
+
+There are also a few auxiliary structures, of somehow lesser importance:
+
+\begin{itemize}
+\item 
+   {\bf Module Graph (MG)} @:: known-only-to-CM@
+
+   Records, for CM's purposes, the current module graph,
+   up-to-dateness and summaries.  More details when I get to them.
+
+\item
+   {\bf Package Config Info (PCI)} @:: [PkgInfo]@
+   
+   A value static over the entire session, giving, for each package,
+   its name, dependencies, linkable components and constitutent module
+   names.
+
+\item
+   {\bf Flags/options (FLAGS)} @:: dunno@
+   
+   Another session-static value, containing flags/options.  Burble.
+\end{itemize}
+
+
+
+\subsection{Important datatypes}
+
+\subsubsection*{Names, location and summarisation}
+The summary should contain the location, and the location contain the
+name.  Also it is hoped to remove the assumption that sources live on
+disk, but I'm not sure this is good enough yet.  @Module@s are now
+used as primary keys in various maps, so they are given a @Unique@.
+\begin{verbatim}
+   type ModName = String      -- a module name
+   type PkgName = String      -- a package name
+
+   type Module =  -- contains ModName and a Unique, at least
+\end{verbatim}
+@Path@ could be an indication of a location in a filesystem, or it
+could be some more generic kind of resource identifier, a URL for
+example.
+\begin{verbatim}
+   data Path = ...
+\end{verbatim}
+A @ModLocation@ says where a module is, what it's called and in what
+form it it.
+\begin{verbatim}
+   data ModLocation = SourceOnly Module Path         -- .hs
+                    | ObjectCode Module Path Path    -- .o, .hi
+                    | InPackage  Module PkgName
+                          -- examine PCI to determine package Path
+\end{verbatim}
+A @ModSummary@ records the minimum information needed to establish the
+module graph and determine whose source has changed.  @ModSummary@s
+can be created quickly.
+\begin{verbatim}
+   data ModSummary = ModSummary 
+                        ModLocation   -- location and kind
+                        Maybe (String, Fingerprint)
+                                      -- source and fingerprint if .hs
+                        [ModName]     -- imports
+
+   type Fingerprint = ...  -- file timestamp, or source checksum?
+\end{verbatim}
+\ToDo{Should @ModSummary@ contain source text for interface files
+      too?}
+\ToDo{Also say that @ModIFace@ contains its module's @ModSummary@.}
+
+
+\subsubsection*{To do with linking}
+Two important types: @Unlinked@ and @Linkable@.  The latter is a 
+higher-level representation involving multiple of the former.
+An @Unlinked@ is a reference to unlinked executable code, something
+a linker could take as input:
+\begin{verbatim}
+   data Unlinked = DotO   Path
+                 | DotA   Path            
+                 | DotDLL Path
+                 | Trees  [StgTree RdrName]
+\end{verbatim}
+The first three describe the location of a file (presumably)
+containing the code to link.  @Trees@, which only exists in 
+interactive mode, gives a list of @StgTrees@, in which the 
+unresolved references are @RdrNames@ -- hence it's non-linkedness.
+Once linked, those @RdrNames@ are replaced with pointers to the
+machine code implementing them.
+
+A @Linkable@ gathers together several @Unlinked@s and associates them
+with either a module or package:
+\begin{verbatim}
+   data Linkable = LM Module  [Unlinked]   -- a module
+                 | LP PkgName [Unlinked]   -- a package
+\end{verbatim}
+The order of the @Unlinked@s in the list is important, particularly
+for package contents -- we'll have to decide on a left-to-right or 
+right-to-left dependency ordering.
+
+@compile@ is supplied with, and checks PIT (inside PCS) before
+reading package interfaces, so it doesn't read and add duplicate
+@ModIFace@s to PIT.
+
+PCI, the package configuration information, is a list of @PkgInfo@,
+each containing at least the following:
+\begin{verbatim}
+   data PkgInfo
+      = PkgInfo PkgName    -- my name
+                Path       -- path to my base location
+                [PkgName]  -- who I depend on
+                [ModName]  -- modules I supply
+                [Unlinked] -- paths to my object files
+\end{verbatim}
+The @Path@s in it, including those in the @Unlinked@s, are set up
+when GHCI starts.  
+
+\subsection{Signatures}
+
+\subsubsection*{The finder}
+The module finder generates @ModLocation@s from @ModName@s.  We
+expect that it will assume packages to be static, but we want to 
+be able to track changes in home modules during the session.
+Specifically, we want to be able to notice that a module's object and
+interface have been updated, presumably by a compile run outside of 
+the GHCI session.  Hence the two-stage type:
+\begin{verbatim}
+   type Finder = ModName -> IO ModLocation
+   newFinder :: [PkgConfig] -> IO Finder
+\end{verbatim}
+@newFinder@ examines the package information right at the start, but 
+returns an @IO@-typed function which can inspect home module changes
+later in the session.
+
+
+\subsubsection*{Starting up}
+Some of the session-lifetime data structures are opaque to CM, so
+it doesn't know how to create an initial one.  Hence it relies on its
+client to supply the following:
+\begin{verbatim}
+   emptyPCS :: PCS
+   emptyOST :: OST
+\end{verbatim}
+The PCS is maintained solely by @compile@, and OST solely by
+@link@/@unlink@.  CM cannot know the representation of the latter
+since it depends on whether we're operating in interactive or batch
+mode.
+
+\subsubsection*{What {\tt compile} does}
+@compile@ is necessarily somewhat complex.  We've decided to do away
+with private global variables -- they make the design harder to
+understand and may interfere with CM's need to roll the system back
+to a consistent state following compilation failure for modules in 
+a cycle.  Without further ado:
+\begin{verbatim}
+   compile :: FLAGS       -- obvious
+           -> Finder      -- to find modules
+           -> ModSummary  -- summary, including source
+           -> Maybe (ModIFace, Linkable)
+                          -- former summary and code, if avail
+           -> HST         -- for home module ModDetails
+           -> PCS         -- IN: the persistent compiler state
+
+           -> CompResult
+
+   data CompResult
+      = CompOK  ModDetails   -- new details (== HST additions)
+                (ModIFace, Linkable)
+                             -- summary and code; same as went in if
+                             -- compilation was not needed
+                PCS          -- updated PCS
+                [SDoc]       -- warnings
+
+      | CompErrs PCS         -- updated PCS
+                 [SDoc]      -- warnings and errors
+
+   data PCS
+      = MkPCS PIT         -- package interfaces
+              PRC         -- rename cache/global symtab contents
+\end{verbatim}
+Although @compile@ is passed three of the global structures (FLAGS,
+HST and PCS), it only modifies PCS.  The rest are modified by CM as it
+sees fit, from the stuff returned in the @CompResult@.
+
+@compile@ is allowed to return an updated PCS even if compilation
+errors occur, since the information in it pertains only to foreign
+packages and is assumed to be always-correct.
+
+What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
+                           @finder@ come into the game?}
+\begin{itemize}
+\item Figure out if this module needs recompilation.
+   \begin{itemize}
+   \item If there's no old @ModIFace@, it does.  Else:
+   \item Compare the @ModSummary@ supplied with that in the
+         old @ModIFace@.  If the source has changed, recompilation
+         is needed.  Else:
+   \item Compare the usage version numbers in the old @ModIFace@ with
+         those in the imported @ModIFace@s.  All needed interfaces
+         for this should be in either HIT or PIT.  If any version
+         numbers differ, recompilation is needed.
+   \item Otherwise it isn't needed.   
+   \end{itemize}
+
+\item
+   If recompilation is not needed, create a new @ModDetails@ from the
+   old @ModIFace@, looking up information in HST and PCS.PRC as necessary.
+   Return the new details, the old @ModIFace@ and @Linkable@, the PCS
+   \ToDo{I don't think the PCS should be updated, but who knows?}, and
+   an empty warning list.
+
+\item
+   Otherwise, compilation is needed.  
+
+   If the module is only available in object+interface form, read the
+   interface, make up details, create a linkable pointing at the
+   object code.  Does this involve reading any more interfaces?  Does
+   it involve updating PRC?
+   
+   Otherwise, translate from source, then create and return: an
+   details, interface, linkable, updated PRC, and warnings.
+
+   When looking for a new interface, search HST, then PCS.PIT, and only
+   then read from disk.  In which case add the new interface(s) to
+   PCS.PIT.  
+   
+   \ToDo{If compiling a module with a boot-interface file, check the 
+   boot interface against the inferred interface.}
+\end{itemize}
+
+\subsection{What {\tt link} and {\tt unlink} do}
+\begin{verbatim}
+   link :: [[Unlinked]] -> OST -> IO LinkResult
+
+   unlink :: [Unlinked] -> OST -> IO OST
+
+   data LinkResult = LinkOK OST
+                   | LinkErrs [SDoc] OST
+\end{verbatim}
+Given a list of list of @Unlinked@s, @link@ places the symbols they
+export in the OST, then resolves symbol references in the new code.
+
+The list-of-lists scheme reflects the fact that CM has to handle
+recursive module groups.  Each list is a minimal strongly connected
+group.  CM guarantees that @link@ can process the outer list left to
+right, so that after each group (inner list) is linked, the linked 
+image as a whole is consistent -- there are no unresolved references
+in it.  If linking in of a group should fail for some reason, it is
+@link@'s responsibility to not modify OST at all.  In other words,
+linking each group is atomic; it either succeeds or fails.  
+
+A successful link returns the final OST.  Failed links return some
+error message and the OST updated up to but not including the group 
+that failed.  In either case, the intention is (1) that the linked
+image does not contain any dangling references, and (2) that CM can
+determine by inspecting the resulting OST how much linking succeeded.
+
+CM specifies not only the @Unlinked@s for the home modules, but also
+those for all needed packages.  It can examine the module graph (MG)
+which presumably contains @ModSummary@s to determine all package
+modules needed, then look in PCI to discover which packages those
+modules correspond to.  The needed @Unlinked@s are those for all 
+needed packages {\em plus all indirectly dependent packages}.
+Packages dependencies are also recorded in PCI.
+
+\ToDo{What happens in batch linking, where there isn't a real OST for
+      CM to examine?}
+
+@unlink@ is used by CM to remove out-of-date code from the LI prior
+to an upsweep.  CM calls @unlink@ in a top-down fashion, specifying
+groups of @Unlinked@s to delete, again in such a manner that LI has
+no dangling references between invokations.  
+
+CM may call @unlink@ repeatedly in order to reduce the LI to what it
+wants.  By contrast, CM promises to call @link@ only when it has
+successfully compiled the root module.  This is so that @link@ doesn't
+have to do incremental linking, which is important when working with
+system linkers in batch mode.  In batch mode, @unlink@ does nothing,
+and @link@ just invokes the system linker.  Presumably CM must 
+insert package @Unlinked@s in the list-of-lists in such a way as to
+ensure that they can be correctly processed in a single left-to-right
+pass idiomatic of Unix linkers.
+
+\ToDo{Be more specific about how OST is organised -- how does @unlink@
+      know which entries came from which @Linkable@s ?}
+
+
+\subsection{What CM does}
+Pretty much as before.  
+
+Plus: detect module cycles during the downsweep.  During the upsweep,
+ensure that compilation failures for modules in cycles do not leave
+any of the global structures in an inconsistent state.  
+\begin{itemize}
+\item 
+   For PCS, that's never a problem because PCS doesn't hold any
+   information pertaining to home modules.
+\item 
+   HST and HIT: CM knows that these are mappings from @Module@ to
+   whatever, and can throw away entries from failed cycles, or,
+   equivalently, not commit updates to them until cycles succeed,
+   remembering of course to synthesise appropriate HSTs during
+   compilation of a cycle.
+\item 
+   UI -- a collection of @Linkable@s, between which there are no
+   direct refererences, so CM can remove additions from failed cycles
+   with no difficulty.
+\item 
+   OST -- linking is not carried out until the upsweep has
+   succeeded, so there's no problem here.
+\end{itemize}
+
+Plus: clear out the global data structures after the downsweep but
+before the upsweep.
+
+\ToDo{CM needs to supply a way for @compile@ to know which modules in
+      HST are in its downwards closure, and which not, so it can
+      correctly construct its instance environment.}
+
+
+
+%%-----------------------------------------------------------------%%
+\section{Background ideas}
+\subsubsection*{Out of date, but correct in spirit}
+
+\subsection{Restructuring the system}
+
+At the moment @hsc@ compiles one source module into C or assembly.
+This functionality is pushed inside a function called @compile@,
+introduced shortly.  The main new chunk of code is CM, the compilation manager,
+which supervises multiple runs of @compile@ so as to create up-to-date
+translations of a whole bunch of modules, as quickly as possible.
+CM also employs some minor helper functions, @finder@, @summarise@ and
+@link@, to do its work.
+
+Our intent is to allow CM to be used as the basis either of a 
+multi-module, batch mode compilation system, or to supply an
+interactive environment similar to that of Hugs.
+Only minor modifications to the behaviour of @compile@ and @link@ 
+are needed to give these different behaviours.
+
+CM and @compile@, and, for interactive use, an interpreter, are the
+main code components.  The most important data structure is the global
+symbol table; much design effort has been expended thereupon.
+
+
+\subsection{How the global symbol table is implemented}
+
+The top level symbol table is a @FiniteMap@ @ModuleName@
+@ModuleDetails@.  @ModuleDetails@ contains essentially the environment
+created by compiling a module.  CM manages this finite map, adding and
+deleting module entries as required.
+
+The @ModuleDetails@ for a module @M@ contains descriptions of all
+tycons, classes, instances, values, unfoldings, etc (henceforth
+referred to as ``entities''), available from @M@.  These are just
+trees in the GHCI heap.  References from other modules to these
+entities is direct -- when you have a @TyCon@ in your hand, you really
+have a pointer directly to the @TyCon@ structure in the defining module,
+rather than some kind of index into a global symbol table.  So there
+is a global symbol table, but it has a distributed (sphagetti-like?)
+nature.
+
+This gives fast and convenient access to tycon, class, instance,
+etc, information.  But because there are no levels of indirection,
+there's a problem when we replace @M@ with an updated version of @M@.
+We then need to find all references to entities in the old @M@'s
+sphagetti, and replace them with pointers to the new @M@'s sphagetti.
+This problem motivates a large part of the design.
+
+
+
+\subsection{Implementing incremental recompilation -- simple version}
+Given the following module graph
+\begin{verbatim}
+         D
+       /   \
+      /     \
+     B       C
+      \     /
+       \   /
+         A
+\end{verbatim}
+(@D@ imports @B@ and @C@, @B@ imports @A@, @C@ imports @A@) the aim is to do the
+least possible amount of compilation to bring @D@ back up to date.  The
+simplest scheme we can think of is:
+\begin{itemize}
+\item {\bf Downsweep}: 
+  starting with @D@, re-establish what the current module graph is
+  (it might have changed since last time).  This means getting a
+  @ModuleSummary@ of @D@.  The summary can be quickly generated,
+  contains @D@'s import lists, and gives some way of knowing whether
+  @D@'s source has changed since the last time it was summarised.
+
+  Transitively follow summaries from @D@, thereby establishing the
+  module graph.
+\item
+  Remove from the global symbol table (the @FiniteMap@ @ModuleName@
+  @ModuleDetails@) the upwards closure of all modules in this package
+  which are out-of-date with respect to their previous versions.  Also
+  remove all modules no longer reachable from @D@.
+\item {\bf Upsweep}:
+  Starting at the lowest point in the still-in-date module graph,
+  start compiling upwards, towards @D@.  At each module, call
+  @compile@, passing it a @FiniteMap@ @ModuleName@ @ModuleDetails@,
+  and getting a new @ModuleDetails@ for the module, which is added to
+  the map.
+
+  When compiling a module, the compiler must be able to know which
+  entries in the map are for modules in its strict downwards closure,
+  and which aren't, so that it can manufacture the instance
+  environment correctly (as union of instances in its downwards
+  closure).
+\item
+  Once @D@ has been compiled, invoke some kind of linking phase
+  if batch compilation.  For interactive use, can either do it all
+  at the end, or as you go along.
+\end{itemize}
+In this simple world, recompilation visits the upwards closure of
+all changed modules.  That means when a module @M@ is recompiled,
+we can be sure no-one has any references to entities in the old @M@,
+because modules importing @M@ will have already been removed from the 
+top-level finite map in the second step above.
+
+The upshot is that we don't need to worry about updating links to @M@ in
+the global symbol table -- there shouldn't be any to update.
+\ToDo{What about mutually recursive modules?}
+
+CM will happily chase through module interfaces in other packages in
+the downsweep.  But it will only process modules in this package
+during the upsweep.  So it assumes that modules in other packages
+never become out of date.  This is a design decision -- we could have
+decided otherwise.
+
+In fact we go further, and require other packages to be compiled,
+i.e. to consist of a collection of interface files, and one or more
+source files.  CM will never apply @compile@ to a foreign package
+module, so there's no way a package can be built on the fly from source.
+
+We require @compile@ to cache foreign package interfaces it reads, so
+that subsequent uses don't have to re-read them.  The cache never
+becomes out of date, since we've assumed that the source of foreign
+packages doesn't change during the course of a session (run of GHCI).
+As well as caching interfaces, @compile@ must cache, in some sense,
+the linkable code for modules.  In batch compilation this might simply
+mean remembering the names of object files to link, whereas in
+interactive mode @compile@ probably needs to load object code into
+memory in preparation for in-memory linking.
+
+Important signatures for this simple scheme are:
+\begin{verbatim}
+   finder :: ModuleName -> ModLocation
+
+   summarise :: ModLocation -> IO ModSummary
+
+   compile :: ModSummary 
+              -> FM ModName ModDetails
+              -> IO CompileResult
+
+   data CompileResult = CompOK  ModDetails
+                      | CompErr [ErrMsg]
+
+   link :: [ModLocation] -> [PackageLocation] -> IO Bool  -- linked ok?
+\end{verbatim}
+
+
+\subsection{Implementing incremental recompilation -- clever version}
+
+So far, our upsweep, which is the computationally expensive bit,
+recompiles a module if either its source is out of date, or it 
+imports a module which has been recompiled.  Sometimes we know
+we can do better than this:
+\begin{verbatim}
+   module B where                module A 
+   import A ( f )                {-# NOINLINE f #-}
+   ... f ...                     f x = x + 42
+\end{verbatim}
+If the definition of @f@ is changed to @f x = x + 43@, the simple
+upsweep would recompile @B@ unnecessarily.  We would like to detect
+this situation and avoid propagating recompilation all the way to the
+top.  There are two parts to this: detecting when a module doesn't
+need recompilation, and managing inter-module references in the
+global symbol table.
+
+\subsubsection*{Detecting when a module doesn't need recompilation}
+
+To do this, we introduce a new concept: the @ModuleIFace@.  This is
+effectively an in-memory interface file.  References to entities in
+other modules are done via strings, rather than being pointers
+directly to those entities.  Recall that, by comparison,
+@ModuleDetails@ do contain pointers directly to the entities they
+refer to.  So a @ModuleIFace@ is not part of the global symbol table.
+
+As before, compiling a module produces a @ModuleDetails@ (inside the
+@CompileResult@), but it also produces a @ModuleIFace@.  The latter
+records, amongst things, the version numbers of all imported entities
+needed for the compilation of that module.  @compile@ optionally also
+takes the old @ModuleIFace@ as input during compilation:
+\begin{verbatim}
+   data CompileResult = CompOK  ModDetails ModIFace
+                      | CompErr [ErrMsg]
+
+   compile :: ModSummary 
+              -> FM ModName ModDetails
+              -> Maybe ModuleIFace
+              -> IO CompileResult
+\end{verbatim}
+Now, if the @ModuleSummary@ indicates this module's source hasn't
+changed, we only need to recompile it if something it depends on has
+changed.  @compile@ can detect this by inspecting the imported entity
+version numbers in the module's old @ModuleIFace@, and comparing them
+with the version numbers from the entities in the modules being
+imported.  If they are all the same, nothing it depends on has
+changed, so there's no point in recompiling.
+
+\subsubsection*{Managing inter-module references in the global symbol table}
+
+In the above example with @A@, @B@ and @f@, the specified change to @f@ would
+require @A@ but not @B@ to be recompiled.  That generates a new
+@ModuleDetails@ for @A@.  Problem is, if we leave @B@'s @ModuleDetails@ 
+unchanged, they continue to refer (directly) to the @f@ in @A@'s old
+@ModuleDetails@.  This is not good, especially if equality between
+entities is implemented using pointer equality.
+
+One solution is to throw away @B@'s @ModuleDetails@ and recompile @B@.
+But this is precisely what we're trying to avoid, as it's expensive.
+Instead, a cheaper mechanism achieves the same thing: recreate @B@'s
+details directly from the old @ModuleIFace@.  The @ModuleIFace@ will
+(textually) mention @f@; @compile@ can then find a pointer to the 
+up-to-date global symbol table entry for @f@, and place that pointer
+in @B@'s @ModuleDetails@.  The @ModuleDetails@ are, therefore,
+regenerated just by a quick lookup pass over the module's former
+@ModuleIFace@.  All this applies, of course, only when @compile@ has
+concluded it doesn't need to recompile @B@.
+
+Now @compile@'s signature becomes a little clearer.  @compile@ has to
+recompile the module, generating a fresh @ModuleDetails@ and
+@ModuleIFace@, if any of the following hold:
+\begin{itemize}
+\item
+  The old @ModuleIFace@ wasn't supplied, for some reason (perhaps
+  we've never compiled this module before?)
+\item
+  The module's source has changed.
+\item
+  The module's source hasn't changed, but inspection of @ModuleIFaces@ 
+  for this and its imports indicates that an imported entity has
+  changed.
+\end{itemize}
+If none of those are true, we're in luck: quickly knock up a new
+@ModuleDetails@ from the old @ModuleIFace@, and return them both.
+
+As a result, the upsweep still visits all modules in the upwards
+closure of those whose sources have changed.  However, at some point
+we hopefully make a transition from generating new @ModuleDetails@ the
+expensive way (recompilation) to a cheap way (recycling old
+@ModuleIFaces@).  Either way, all modules still get new
+@ModuleDetails@, so the global symbol table is correctly
+reconstructed.
+
+
+\subsection{How linking works, roughly}
+
+When @compile@ translates a module, it produces a @ModuleDetails@,
+@ModuleIFace@ and a @Linkable@.  The @Linkable@ contains the
+translated but un-linked code for the module.  And when @compile@
+ventures into an interface in package it hasn't seen so far, it
+copies the package's object code into memory, producing one or more
+@Linkable@s.  CM keeps track of these linkables.  
+
+Once all modules have been @compile@d, CM invokes @link@, supplying
+the all the @Linkable@s it knows about.  If @compile@ had also been
+linking incrementally as it went along, @link@ doesn't have to do
+anything.  On the other hand, @compile@ could choose not to be
+incremental, and leave @link@ to do all the work.
+
+@Linkable@s are opaque to CM.  For batch compilation, a @Linkable@
+can record just the name of an object file, DLL, archive, or whatever,
+in which case the CM's call to @link@ supplies exactly the set of
+file names to be linked.  @link@ can pass these verbatim to the
+standard system linker.
+
+
+
+
+%%-----------------------------------------------------------------%%
+\section{Ancient stuff}
+\subsubsection*{Should be selectively merged into ``Background ideas''}
+
+\subsection{Overall}
+Top level structure is:
+\begin{itemize}
+\item The Compilation Manager (CM) calculates and maintains module
+      dependencies, and knows how create up-to-date object or bytecode
+      for a given module.  In doing so it may need to recompile 
+      arbitrary other modules, based on its knowledge of the module
+      dependencies.  
+\item On top of the CM are the ``user-level'' services.  We envisage
+      both a HEP-like interface, for interactive use, and an
+      @hmake@ style batch compiler facility.
+\item The CM only deals with inter-module issues.  It knows nothing
+      about how to recompile an individual module, nor where the compiled
+      result for a module lives, nor how to tell if 
+      a module is up to date, nor how to find the dependencies of a module.
+      Instead, these services are supplied abstractly to CM via a
+      @Compiler@ record.  To a first approximation, a @Compiler@
+      contains
+      the same functionality as @hsc@ has had until now -- the ability to
+      translate a single Haskell module to C/assembly/object/bytecode.
+
+      Different clients of CM (HEP vs @hmake@) may supply different
+      @Compiler@s, since they need slightly different behaviours.
+      Specifically, HEP needs a @Compiler@ which creates bytecode
+      in memory, and knows how to link it, whereas @hmake@ wants
+      the traditional behaviour of emitting assembly code to disk,
+      and making no attempt at linkage.
+\end{itemize}
+
+\subsection{Open questions}
+\begin{itemize}
+\item
+  Error reporting from @open@ and @compile@.
+\item
+  Instance environment management
+\item
+  We probably need to make interface files say what
+  packages they depend on (so that we can figure out
+  which packages to load/link).
+\item 
+  CM is parameterised both by the client uses and the @Compiler@
+  supplied.  But it doesn't make sense to have a HEP-style client
+  attached to a @hmake@-style @Compiler@.  So, really, the 
+  parameterising entity should contain both aspects, not just the
+  current @Compiler@ contents.
+\end{itemize}
+
+\subsection{Assumptions}
+
+\begin{itemize}
+\item Packages other than the "current" one are assumed to be 
+  already compiled.  
+\item
+  The "current" package is usually "MAIN",
+  but we can set it with a command-line flag.
+  One invocation of ghci has only one "current" package.
+\item
+  Packages are not mutually recursive
+\item
+  All the object code for a package P is in libP.a or libP.dll
+\end{itemize}
+
+\subsection{Stuff we need to be able to do}
+\begin{itemize}
+\item Create the environment in which a module has been translated,
+      so that interactive queries can be satisfied as if ``in'' that
+      module.
+\end{itemize}
+
+%%-----------------------------------------------------------------%%
+\section{The Compilation Manager}
+
+CM (@compilationManager@) is a functor, thus:
+\begin{verbatim}
+compilationManager :: Compiler -> IO HEP  -- IO so that it can create 
+                                          -- global vars (IORefs)
+
+data HEP = HEP {
+        load          :: ModuleName -> IO (),
+        compileString :: ModuleName -> String -> IO HValue,
+        ....
+   }
+
+newCompiler :: IO Compiler   -- ??? this is a peer of compilationManager?
+
+run :: HValue -> IO ()       -- Run an HValue of type IO ()
+                             -- In HEP?
+\end{verbatim}
+
+@load@ is the central action of CM: its job is to bring a module and
+all its descendents into an executable state, by doing the following:
+\begin{enumerate}
+\item 
+   Use @summarise@ to descend the module hierarchy, starting from the
+   nominated root, creating @ModuleSummary@s, and
+   building a map @ModuleName@ @->@ @ModuleSummary@.  @summarise@ 
+   expects to be passed absolute paths to files.  Use @finder@ to 
+   convert module names to file paths.
+\item
+   Topologically sort the map, 
+   using dependency info in the @ModuleSummary@s.
+\item
+   Clean up the symbol table by deleting the upward closure of 
+   changed modules.
+\item 
+   Working bottom to top, call @compile@ on the upward closure of 
+   all modules whose source has changed.  A module's source has
+   changed when @sourceHasChanged@ indicates there is a difference
+   between old and new summaries for the module.  Update the running
+   @FiniteMap@ @ModuleName@ @ModuleDetails@ with the new details
+   for this module.  Ditto for the running
+   @FiniteMap@ @ModuleName@ @ModuleIFace@.
+\item
+   Call @compileDone@ to signify that we've reached the top, so
+   that the batch system can now link.
+\end{enumerate}
+
+
+%%-----------------------------------------------------------------%%
+\section{A compiler}
+
+Most of the system's complexity is hidden inside the functions
+supplied in the @Compiler@ record:
+\begin{verbatim}        
+data Compiler = Compiler {        
+
+        finder :: PackageConf -> [Path] -> IO (ModuleName -> ModuleLocation)
+
+        summarise :: ModuleLocation -> IO ModuleSummary
+
+        compile :: ModuleSummary
+                -> Maybe ModuleIFace 
+                -> FiniteMap ModuleName ModuleDetails
+                -> IO CompileResult
+
+        compileDone     :: IO ()
+        compileStarting :: IO ()   -- still needed?  I don't think so.
+    }
+
+type ModuleName = String (or some such)
+type Path = String  -- an absolute file name
+\end{verbatim}
+
+\subsection{The module \mbox{\tt finder}}
+The @finder@, given a package configuration file and a list of
+directories to look in, will map module names to @ModuleLocation@s,
+in which the @Path@s are filenames, probably with an absolute path
+to them.
+\begin{verbatim}
+data ModuleLocation = SourceOnly Path        -- .hs
+                    | ObjectCode Path Path   -- .o & .hi
+                    | InPackage  Path        -- .hi
+\end{verbatim}
+@SourceOnly@ and @ObjectCode@ are unremarkable.  For sanity,
+we require that a module's object and interface be in the same
+directory.  @InPackage@ indicates that the module is in a 
+different package.
+
+@Module@ values -- perhaps all @Name@ish things -- contain the name of
+their package.  That's so that 
+\begin{itemize}
+\item Correct code can be generated for in-DLL vs out-of-DLL refs.
+\item We don't have version number dependencies for symbols
+      imported from different packages.
+\end{itemize}
+
+Somehow or other, it will be possible to know all the packages
+required, so that the for the linker can load them.
+We could detect package dependencies by recording them in the
+@compile@r's @ModuleIFace@ cache, and with that and the 
+package config info, figure out the complete set of packages
+to link.  Or look at the command line args on startup.
+
+\ToDo{Need some way to tell incremental linkers about packages,
+      since in general we'll need to load and link them before
+      linking any modules in the current package.}
+
+
+\subsection{The module \mbox{\tt summarise}r}
+Given a filename of a module (\ToDo{presumably source or iface}),
+create a summary of it.  A @ModuleSummary@ should contain only enough
+information for CM to construct an up-to-date picture of the
+dependency graph.  Rather than expose CM to details of timestamps,
+etc, @summarise@ merely provides an up-to-date summary of any module.
+CM can extract the list of dependencies from a @ModuleSummary@, but
+other than that has no idea what's inside it.
+\begin{verbatim}
+data ModuleSummary = ... (abstract) ...
+
+depsFromSummary :: ModuleSummary -> [ModuleName]   -- module names imported
+sourceHasChanged :: ModuleSummary -> ModuleSummary -> Bool
+\end{verbatim}
+@summarise@ is intended to be fast -- a @stat@ of the source or
+interface to see if it has changed, and, if so, a quick semi-parse to
+determine the new imports.
+
+\subsection{The module \mbox{\tt compile}r}
+@compile@ traffics in @ModuleIFace@s and @ModuleDetails@.  
+
+A @ModuleIFace@ is an in-memory representation of the contents of an
+interface file, including version numbers, unfoldings and pragmas, and
+the linkable code for the module.  @ModuleIFace@s are un-renamed,
+using @HsSym@/@RdrNames@ rather than (globally distinct) @Names@.
+
+@ModuleDetails@, by contrast, is an in-memory representation of the
+static environment created by compiling a module.  It is phrased in
+terms of post-renaming @Names@, @TyCon@s, etc, so it's basically a
+renamed-to-global-uniqueness rendition of a @ModuleIFace@.
+
+In an interactive session, we'll want to be able to evaluate
+expressions as if they had been compiled in the scope of some
+specified module.  This means that the @ModuleDetails@ must contain
+the type of everything defined in the module, rather than just the
+types of exported stuff.  As a consequence, @ModuleIFace@ must also
+contain the type of everything, because it should always be possible
+to generate a module's @ModuleDetails@ from its @ModuleIFace@.
+
+CM maintains two mappings, one from @ModuleName@s to @ModuleIFace@s,
+the other from @ModuleName@s to @ModuleDetail@s.  It passes the former
+to each call of @compile@.  This is used to supply information about
+modules compiled prior to this one (lower down in the graph).  The
+returned @CompileResult@ supplies a new @ModuleDetails@ for the module
+if compilation succeeded, and CM adds this to the mapping.  The
+@CompileResult@ also supplies a new @ModuleIFace@, which is either the
+same as that supplied to @compile@, if @compile@ decided not to
+retranslate the module, or is the result of a fresh translation (from
+source).  So these mappings are an explicitly-passed-around part of
+the global system state.
+
+@compile@ may also {\em optionally} also accumulate @ModuleIFace@s for
+modules in different packages -- that is, interfaces which we read,
+but never attempt to recompile source for.  Such interfaces, being
+from foreign packages, never change, so @compile@ can accumulate them
+in perpetuity in a private global variable.  Indeed, a major motivator
+of this design is to facilitate this caching of interface files,
+reading of which is a serious bottleneck for the current compiler.
+
+When CM restarts compilation down at the bottom of the module graph,
+it first needs to throw away all \ToDo{all?} @ModuleDetails@ in the
+upward closure of the out-of-date modules.  So @ModuleDetails@ don't
+persist across recompilations.  But @ModuleIFace@s do, since they
+are conceptually equivalent to interface files.
+
+
+\subsubsection*{What @compile@ returns}
+@compile@ returns a @CompileResult@ to CM.
+Note that the @compile@'s foreign-package interface cache can
+become augmented even as a result of reading interfaces for a
+compilation attempt which ultimately fails, although it will not be
+augmented with a new @ModuleIFace@ for the failed module.
+\begin{verbatim}
+-- CompileResult is not abstract to the Compilation Manager
+data CompileResult
+   = CompOK   ModuleIFace 
+              ModuleDetails    -- compiled ok, here are new details
+                               -- and new iface
+
+   | CompErr  [SDoc]           -- compilation gave errors
+
+   | NoChange                  -- no change required, meaning:
+                               -- exports, unfoldings, strictness, etc,
+                               -- unchanged, and executable code unchanged
+\end{verbatim}
+
+
+
+\subsubsection*{Re-establishing local-to-global name mappings}
+Consider
+\begin{verbatim}
+module Upper where                         module Lower ( f ) where
+import Lower ( f )                         f = ...
+g = ... f ...
+\end{verbatim}
+When @Lower@ is first compiled, @f@ is allocated a @Unique@
+(presumably inside an @Id@ or @Name@?).  When @Upper@ is then
+compiled, its reference to @f@ is attached directly to the
+@Id@ created when compiling @Lower@.
+
+If the definition of @f@ is now changed, but not the type,
+unfolding, strictness, or any other thing which affects the way
+it should be called, we will have to recompile @Lower@, but not
+@Upper@.  This creates a problem -- @g@ will then refer to the
+the old @Id@ for @f@, not the new one.  This may or may not
+matter, but it seems safer to ensure that all @Unique@-based
+references into child modules are always up to date.
+
+So @compile@ recreates the @ModuleDetails@ for @Upper@ from 
+the @ModuleIFace@ of @Upper@ and the @ModuleDetails@ of @Lower@.
+
+The rule is: if a module is up to date with respect to its
+source, but a child @C@ has changed, then either:
+\begin{itemize}
+\item On examination of the version numbers in @C@'s
+      interface/@ModuleIFace@ that we used last time, we discover that
+      an @Id@/@TyCon@/class/instance we depend on has changed.  So 
+      we need to retranslate the module from its source, generating
+      a new @ModuleIFace@ and @ModuleDetails@.
+\item Or: there's nothing in @C@'s interface that we depend on.
+      So we quickly recreate a new @ModuleDetails@ from the existing
+      @ModuleIFace@, creating fresh links to the new @Unique@-world
+      entities in @C@'s new @ModuleDetails@.
+\end{itemize}
+
+Upshot: we need to redo @compile@ on all modules all the way up,
+rather than just the ones that need retranslation.  However, we hope
+that most modules won't need retranslation -- just regeneration of the
+@ModuleDetails@ from the @ModuleIFace@.  In effect, the @ModuleIFace@
+is a quickly-compilable representation of the module's contents, just
+enough to create the @ModuleDetails@.
+
+\ToDo{Is there anything in @ModuleDetails@ which can't be
+      recreated from @ModuleIFace@ ?}
+
+So the @ModuleIFace@s persist across calls to @HEP.load@, whereas
+@ModuleDetails@ are reconstructed on every compilation pass.  This
+means that @ModuleIFace@s have the same lifetime as the byte/object
+code, and so should somehow contain their code.
+
+The behind-the-scenes @ModuleIFace@ cache has some kind of holding-pen
+arrangement, to lazify the copying-out of stuff from it, and thus to
+minimise redundant interface reading.  \ToDo{Burble burble.  More
+details.}.
+
+When CM starts working back up the module graph with @compile@, it
+needs to remove from the travelling @FiniteMap@ @ModuleName@
+@ModuleDetails@ the details for all modules in the upward closure of
+the compilation start points.  However, since we're going to visit
+precisely those modules and no others on the way back up, we might as
+well just zap them the old @ModuleDetails@ incrementally.  This does
+mean that the @FiniteMap@ @ModuleName@ @ModuleDetails@ will be
+inconsistent until we reach the top.
+
+In interactive mode, each @compile@ call on a module for which no
+object code is available, or for which it is out of date wrt source,
+emit bytecode into memory, update the resulting @ModuleIFace@ with the
+address of the bytecode image, and link the image.
+
+In batch mode, emit assembly or object code onto disk.  Record
+somewhere \ToDo{where?} that this object file needs to go into the
+final link.
+
+When we reach the top, @compileDone@ is called, to signify that batch
+linking can now proceed, if need be.
+
+Modules in other packages never get a @ModuleIFace@ or @ModuleDetails@
+entry in CM's maps -- those maps are only for modules in this package.
+As previously mentioned, @compile@ may optionally cache @ModuleIFace@s
+for foreign package modules.  When reading such an interface, we don't
+need to read the version info for individual symbols, since foreign
+packages are assumed static.
+
+\subsubsection*{What's in a \mbox{\tt ModuleIFace}?}
+
+Current interface file contents?
+
+
+\subsubsection*{What's in a \mbox{\tt ModuleDetails}?}
+
+There is no global symbol table @:: Name -> ???@.  To look up a
+@Name@, first extract the @ModuleName@ from it, look that up in
+the passed-in @FiniteMap@ @ModuleName@ @ModuleDetails@, 
+and finally look in the relevant @Env@.
+
+\ToDo{Do we still have the @HoldingPen@, or is it now composed from
+per-module bits too?}
+\begin{verbatim}
+data ModuleDetails = ModuleDetails {
+
+        moduleExports :: what it exports (Names)
+                         -- roughly a subset of the .hi file contents
+
+        moduleEnv     :: RdrName -> Name
+                         -- maps top-level entities in this module to
+                         -- globally distinct (Uniq-ified) Names
+  
+        moduleDefs    :: Bag Name -- All the things in the global symbol table
+                                  -- defined by this module
+
+        package       :: Package -- what package am I in?
+
+        lastCompile   :: Date -- of last compilation
+
+        instEnv       :: InstEnv                 -- local inst env
+        typeEnv       :: Name -> TyThing         -- local tycon env?
+   }
+
+-- A (globally unique) symbol table entry. Note that Ids contain
+-- unfoldings. 
+data TyThing = AClass Class
+             | ATyCon TyCon
+             | AnId Id 
+\end{verbatim}
+What's the stuff in @ModuleDetails@ used for?
+\begin{itemize}
+\item @moduleExports@ so that the stuff which is visible from outside
+      the module can be calculated.
+\item @moduleEnv@: \ToDo{umm err}
+\item @moduleDefs@: one reason we want this is so that we can nuke the
+      global symbol table contribs from this module when it leaves the
+      system.  \ToDo{except ... we don't have a global symbol table any
+      more.}
+\item @package@: we will need to chase arbitrarily deep into the
+      interfaces of other packages.  Of course we don't want to 
+      recompile those, but as we've read their interfaces, we may
+      as well cache that info.  So @package@ indicates whether this
+      module is in the default package, or, if not, which it is in.
+
+      Also, when we come to linking, we'll need to know which
+      packages are demanded, so we know to load their objects.
+
+\item @lastCompile@: When the module was last compiled.  If the 
+      source is older than that, then a recompilation can only be
+      required if children have changed.
+\item @typeEnv@: obvious??
+\item @instEnv@: the instances contributed by this module only.  The
+      Report allegedly says that when a module is translated, the
+      available
+      instance env is all the instances in the downward closure of
+      itself in the module graph.
+      
+      We choose to use this simple representation -- each module 
+      holds just its own instances -- and do the naive thing when
+      creating an inst env for compilation with.  If this turns out
+      to be a performance problem we'll revisit the design.
+\end{itemize}
+
+
+
+%%-----------------------------------------------------------------%%
+\section{Misc text looking for a home}
+
+\subsection*{Linking}
+
+\ToDo{All this linking stuff is now bogus.}
+
+There's an abstract @LinkState@, which is threaded through the linkery
+bits.  CM can call @addpkgs@ to notify the linker of packages
+required, and it can call @addmods@ to announce modules which need to
+be linked.  Finally, CM calls @endlink@, after which an executable
+image should be ready.  The linker may link incrementally, during each
+call of @addpkgs@ and @addmods@, or it can just store up names and do
+all the linking when @endlink@ is called.
+
+In order that incremental linking is possible, CM should specify
+packages and module groups in dependency order, ie, from the bottom up.
+
+\subsection*{In-memory linking of bytecode}
+When being HEP-like, @compile@ will translate sources to bytecodes
+in memory, with all the bytecode for a module as a contiguous lump
+outside the heap.  It needs to communicate the addresses of these
+lumps to the linker.  The linker also needs to know whether a 
+given module is available as in-memory bytecode, or whether it
+needs to load machine code from a file.
+
+I guess @LinkState@ needs to map module names to base addresses
+of their loaded images, + the nature of the image, + whether or not
+the image has been linked.
+
+\subsection*{On disk linking of object code, to give an executable}
+The @LinkState@ in this case is just a list of module and package
+names, which @addpkgs@ and @addmods@ add to.  The final @endlink@
+call can invoke the system linker.
+
+\subsection{Finding out about packages, dependencies, and auxiliary 
+            objects}
+
+Ask the @packages.conf@ file that lives with the driver at the mo.
+
+\ToDo{policy about upward closure?}
+
+
+
+\ToDo{record story about how in memory linking is done.}
+
+\ToDo{linker start/stop/initialisation/persistence.  Need to
+      say more about @LinkState@.}
+
+
+\end{document}
+
+
