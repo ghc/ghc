@@ -758,11 +758,12 @@ ppFunSig summary nm ty0 doc
 -- ----------------------------------------------------------------------------
 -- Types and contexts
 
-ppHsAsst	    :: (HsQName,[HsType]) -> Html
+ppHsAsst	    :: HsAsst -> Html
 ppHsAsst (c,args)   =  ppHsQName c <+> hsep (map ppHsAType args)
 
 ppHsContext	    :: HsContext -> Html
 ppHsContext []      =  empty
+ppHsContext [asst]  =  ppHsAsst asst
 ppHsContext context =  parenList (map ppHsAsst context)
 
 ppHsForAll :: Maybe [HsName] -> HsContext -> Html
