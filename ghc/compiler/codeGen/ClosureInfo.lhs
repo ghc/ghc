@@ -17,6 +17,7 @@ module ClosureInfo (
 
 	mkClosureLFInfo, mkConLFInfo, mkSelectorLFInfo, mkVapLFInfo,
 	mkLFImported, mkLFArgument, mkLFLetNoEscape,
+	UpdateFlag,
 
 	closureSize, closureHdrSize,
 	closureNonHdrSize, closureSizeWithoutFixedHdr,
@@ -27,12 +28,15 @@ module ClosureInfo (
 	layOutStaticNoFVClosure, layOutPhantomClosure,
 	mkVirtHeapOffsets,
 
-	nodeMustPointToIt, getEntryConvention,
+	nodeMustPointToIt, getEntryConvention, 
+	SYN_IE(FCode), CgInfoDownwards, CgState, 
+
 	blackHoleOnEntry,
 
 	staticClosureRequired,
 	slowFunEntryCodeRequired, funInfoTableRequired,
 	stdVapRequired, noUpdVapRequired,
+	StgBinderInfo,
 
 	closureId, infoTableLabelFromCI, fastLabelFromCI,
 	closureLabelFromCI,
@@ -40,6 +44,7 @@ module ClosureInfo (
 	closureLFInfo, closureSMRep, closureUpdReqd,
 	closureSingleEntry, closureSemiTag, closureType,
 	closureReturnsUnboxedType, getStandardFormThunkInfo,
+	GenStgArg,
 
 	isToplevClosure,
 	closureKind, closureTypeDescr,		-- profiling
