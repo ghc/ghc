@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.14 2001/08/21 13:14:51 rrt Exp $
+-- $Id: Main.hs,v 1.15 2001/08/21 14:38:04 sewardj Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -18,7 +18,7 @@ import Directory
 import System
 import IO
 
-#include "config.h"
+#include "../../includes/config.h"
 
 #ifdef mingw32_TARGET_OS
 import Win32DLL
