@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.10 1999/02/26 13:36:14 simonm Exp $
+ * $Id: Weak.c,v 1.11 1999/07/06 15:05:49 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,7 @@
 
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "SchedAPI.h"
 #include "RtsFlags.h"
 #include "Weak.h"
 #include "Storage.h"
