@@ -10,6 +10,7 @@ module Simplify ( simplTopBinds, simplExpr ) where
 
 import CmdLineOpts	( switchIsOn, opt_SimplDoEtaReduction,
 			  opt_SimplNoPreInlining, 
+			  dopt, DynFlag(Opt_D_dump_inlinings),
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
@@ -38,6 +39,7 @@ import DataCon		( dataConNumInstArgs, dataConRepStrictness,
 			  dataConSig, dataConArgTys
 			)
 import CoreSyn
+import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreFVs		( mustHaveLocalBinding, exprFreeVars )
 import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 			  callSiteInline
@@ -830,6 +832,15 @@ completeCall var occ_info cont
     case maybe_rule of {
 	Just (rule_name, rule_rhs) -> 
 		tick (RuleFired rule_name)			`thenSmpl_`
+#ifdef DEBUG
+		(if dopt Opt_D_dump_inlinings dflags then
+		   pprTrace "Rule fired" (vcat [
+			text "Rule:" <+> ptext rule_name,
+			text "Before:" <+> ppr var <+> sep (map pprParendExpr args'),
+			text "After: " <+> pprCoreExpr rule_rhs])
+		 else
+			id)		$
+#endif
 		simplExprF rule_rhs call_cont ;
 	
 	Nothing -> 		-- No rules

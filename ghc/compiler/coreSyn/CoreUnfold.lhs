@@ -614,7 +614,6 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 						 arg_infos really_interesting_cont
 		
     in    
-#ifdef DEBUG
     if dopt Opt_D_dump_inlinings dflags then
 	pprTrace "Considering inlining"
 		 (ppr id <+> vcat [text "black listed:" <+> ppr black_listed,
@@ -630,7 +629,6 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 				   else empty])
 		  result
     else
-#endif
     result
     }
 
