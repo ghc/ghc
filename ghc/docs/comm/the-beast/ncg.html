@@ -435,7 +435,7 @@ bit code as simply as possible.  To this end, I used the
 simplified <code>getRegister</code> scheme described above, in which
 <code>iselExpr64</code>generates its results into two vregs which
 can always safely be modified afterwards.
-
+<p>
 Virtual registers are, unsurprisingly, distinguished by their
 <code>Unique</code>s.  There is a small difficulty in how to
 know what the vreg for the upper 32 bits of a value is, given the vreg
@@ -634,6 +634,16 @@ out-registers (<code>%o0</code> .. <code>%o5</code>).  This creates
 some unnecessary reg-reg moves.  The reason is explained in a
 comment in the code.
 
+
+<h3>Duplicate implementation for many STG macros</h3>
+
+This has been discussed at length already.  It has caused a couple of
+nasty bugs due to subtle untracked divergence in the macro
+translations.  The macro-expander really should be pushed up into the
+Abstract C phase, so the problem can't happen.
+<p>
+Doing so would have the added benefit that the NCG could be used to
+compile more "ways" -- well, at least the 'p' profiling way.
 
 
 <h3>How to debug the NCG without losing your sanity/hair/cool</h3>
