@@ -8,6 +8,7 @@ SUBDIRS = \
 	concurrent \
 	deSugar \
 	deriving \
+	io \
 	lib \
 	numeric \
 	reader \
@@ -18,7 +19,6 @@ SUBDIRS = \
 	programs
 
 #	printing \
-#	io \
 
 include $(TOP)/mk/target.mk
 
