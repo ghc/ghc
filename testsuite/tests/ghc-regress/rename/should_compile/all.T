@@ -32,6 +32,7 @@ test('rn037', normal, compile, [''])
 
 test('rn039', normal, compile, [''])
 test('rn040', expect_fail, compile, [''])
+test('rn041', normal, compile, [''])
 
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
