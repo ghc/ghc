@@ -308,16 +308,16 @@ dnl use either is considered a Feature.
 
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
-AC_ARG_WITH(ghc-hc,
-[  --with-ghc-hc=<haskell compiler>
-        Use a command different from 'ghc-2.10' to compile up the GHC compiler sources.
-         (no claims currently made that this will work with a compiler other than a
-          recent version of GHC, but you could always try...)
+AC_ARG_WITH(hc,
+[  --with-hc=<haskell compiler>
+        Use a command different from 'ghc' to compile up Haskell code.
+        (no claims currently made that this will work with a compiler other than a
+         recent version of GHC, but you could always try...)
 ],
-[WithGhcHc="$withval"],
-[WithGhcHc="ghc"]
+[WithHc="$withval"],
+[WithHc="ghc"]
 )
-AC_SUBST(WithGhcHc)
+AC_SUBST(WithHc)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------

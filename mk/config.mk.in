@@ -147,7 +147,7 @@ IncludeTestDirsInBuild=NO
 #		       	     HC_ROJEMO_NHC
 #		       	     HC_UNSPECIFIED
 
-WithGhcHc = @WithGhcHc@
+WithGhcHc = @WithHc@
 
 # Variable which is set to the version number of the $(WithGhcHc) we're using.
 # Not currently used, but might come in handy sometime soon.
@@ -160,11 +160,9 @@ GhcCompilerWays=
 # Extra option flags to pass to the compiler that compiles the compiler
 # (Ones that are essential are wired into ghc/compiler/Makefile)
 # Typical ones:
-#	-H25m		allocate a bigger heap (default is 6m)
+#	-H25m		allocate a bigger heap (might speed up compilation)
 #
 #	-O		compile an optimised compiler
-#			NB! If you add -O you'll almost certainly need to increase
-#			the amount of heap space too (to 15m or more)
 #
 #	-DDEBUG		include consistency/assertion checks in the compiled compiler
 #
@@ -259,7 +257,7 @@ EnableWin32DLLs=@EnableWin32DLLs@
 #################################################################################
 
 # The compiler you'd like to use to compile Happy
-WithHappyHc = $(WithGhcHc)
+WithHappyHc = @WithHc@
 
 # HappyHcOpts gives the flags to pass to the Haskell compiler used
 # 	      to compile the Happy sources with.
@@ -469,6 +467,7 @@ HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
 #-----------------------------------------------------------------------------
 # Haskell compiler and mkdependHS
 
+# ToDo: $(HC) should be a local installation of some Haskell compiler
 HC		= $(FPTOOLS_TOP)/ghc/driver/ghc
 MKDEPENDHS	= $(HC)
 
