@@ -1,0 +1,14 @@
+checkFD
+    f{-r48-} a{-r49-} -> r{-r4a-}
+    [p{-r4f-}, s{-r4g-}, t{-r4h-}, a{-r4j-}, b{-r4k-}, r{-r4l-},
+     c{-r4m-}] [(a{-r4j-}, b{-r4k-}) -> r{-r4l-},
+		(c{-r4m-} a{-r4j-}, c{-r4m-} b{-r4k-})]
+	       [p{-r4f-} -> s{-r4g-}, t{-r4h-} p{-r4f-}]
+    [r4f -> DoneTy (a{-r4j-}, b{-r4k-}),
+     r4h -> DoneTy PrelTup.Z2T{-46-} (c{-r4m-} a{-r4j-}),
+     r4l -> DoneTy s{-r4g-}, r4m -> DoneTy PrelTup.Z2T{-46-} a{-r4j-}]
+
+Functional dependencies conflict between instance declarations:
+  forall {s, a, b} (a, s) :=: (c a, s)
+  tcfail096.hs:23: Foo (p -> s) (t p) (t s)
+  tcfail096.hs:24: Foo ((a, b) -> r) (c a, c b) (c r)
