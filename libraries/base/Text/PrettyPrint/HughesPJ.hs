@@ -413,7 +413,7 @@ rational n = text (show n)
 -- SIGBJORN wrote instead:
 -- rational n = text (show (fromRationalX n))
 
-quotes p        = char '`' <> p <> char '\''
+quotes p        = char '\'' <> p <> char '\''
 doubleQuotes p  = char '"' <> p <> char '"'
 parens p        = char '(' <> p <> char ')'
 brackets p      = char '[' <> p <> char ']'
