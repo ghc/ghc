@@ -561,7 +561,7 @@ AC_CHECK_FUNCS(pclose    _pclose )
 
 
 dnl ** check for specific library functions that we are interested in
-AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect setitimer stat sysconf timelocal times vadvise vfork)
+AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect readlink setitimer stat symlink sysconf timelocal times vadvise vfork)
 
 dnl ** check whether this machine has gmp2 installed
 AC_CHECK_LIB(gmp,  mpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
