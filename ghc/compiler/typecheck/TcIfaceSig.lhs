@@ -87,9 +87,9 @@ tcInterfaceSigs unf_env mod decls
 tcIdInfo unf_env in_scope_vars name ty info_ins
   = foldlTc tcPrag init_info info_ins 
   where
-    -- set the CgInfo to something sensible but uninformative before
-    -- we start, because the default CgInfo is a panic.
-    init_info = vanillaIdInfo `setCgInfo` vanillaCgInfo
+    -- Set the CgInfo to something sensible but uninformative before
+    -- we start; default assumption is that it has CAFs
+    init_info = hasCafIdInfo
 
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
 

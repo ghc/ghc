@@ -493,7 +493,7 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs tidy_rhs
 
 tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
   | opt_OmitInterfacePragmas	-- If the interface file has no pragma info
-  = vanillaIdInfo		-- then discard all info right here
+  = hasCafIdInfo		-- then discard all info right here
 	-- This is not so important for *this* module, but it's
 	-- vital for ghc --make:
 	--   subsequent compilations must not see (e.g.) the arity if
@@ -501,11 +501,16 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
 	-- If they do, they'll exploit the arity; then the arity might
 	-- change, but the iface file doesn't change => recompilation
 	-- does not happen => disaster
+	--
+	-- This IdInfo will live long-term in the Id => need to make
+	-- conservative assumption about Caf-hood
 
   | not is_external	-- For internal Ids (not externally visible)
   = vanillaIdInfo	-- we only need enough info for code generation
 			-- Arity and strictness info are enough;
 			--	c.f. CoreTidy.tidyLetBndr
+	-- Use vanillaIdInfo (whose CafInfo is a panic) because we 
+	-- should not need the CafInfo
 	`setArityInfo`	       arity
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
 
