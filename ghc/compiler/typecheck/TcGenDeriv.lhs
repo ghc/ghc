@@ -840,7 +840,7 @@ gen_Read_binds fixities tycon
 				 ])
 	      | lab_fields == 0 =  -- common case.
     		  snd (mapAccumL mk_qual 
-				 c_Expr 
+				 d_Expr 
 				 (zipWithEqual "as_needed" 
 					       (\ con_field draw_from -> (mk_read_qual 10 con_field,
 									  draw_from))
@@ -891,8 +891,9 @@ gen_Read_binds fixities tycon
 	     | not is_infix  = 9
 	     | otherwise     = getFixity fixities dc_nm
 
-	   read_paren_arg  = -- parens depend on precedence...
-	     HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt paren_prec_limit)))
+	   read_paren_arg   -- parens depend on precedence...
+	    | nullary_con  = false_Expr -- it's optional.
+	    | otherwise    = HsPar (genOpApp a_Expr gt_RDR (HsLit (HsInt paren_prec_limit)))
 
 \end{code}
 
