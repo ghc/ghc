@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.23 2003/08/19 16:39:14 simonmar Exp $
+ * $Id: HsBase.h,v 1.24 2003/08/20 15:54:45 panne Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -259,11 +259,7 @@ __hscore_seek_cur()
 INLINE HsInt
 __hscore_o_binary()
 {
-#ifdef HAVE_O_BINARY
-  return O_BINARY;
-#else
-  return 0;
-#endif
+  return CONST_O_BINARY;
 }
 
 INLINE int
