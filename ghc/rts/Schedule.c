@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.70 2000/05/08 15:57:01 simonmar Exp $
+ * $Id: Schedule.c,v 1.71 2000/05/15 11:38:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1189,7 +1189,7 @@ suspendThread( Capability *cap )
   ACQUIRE_LOCK(&sched_mutex);
 
   IF_DEBUG(scheduler,
-	   sched_belch("thread %d did a _ccall_gc\n", cap->rCurrentTSO->id));
+	   sched_belch("thread %d did a _ccall_gc", cap->rCurrentTSO->id));
 
   threadPaused(cap->rCurrentTSO);
   cap->rCurrentTSO->link = suspended_ccalling_threads;
