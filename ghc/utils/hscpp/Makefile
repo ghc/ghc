@@ -3,17 +3,11 @@ include $(TOP)/mk/boilerplate.mk
 
 SCRIPT_PROG=hscpp
 SCRIPT_OBJS=hscpp.prl
-SCRIPT_SUBST_VARS=
-
-ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += RAWCPP
-endif
+SCRIPT_SUBST_VARS= RAWCPP
 
 # Note: might be overridden from cmd-line (see install rule below)
 INSTALLING=0
 
-# no INTERP: do *not* want #! script stuck on the front
-# what's the deal? I'll add it for now  -- SOF
 INTERP=perl
 
 #

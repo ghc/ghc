@@ -10,6 +10,7 @@ SCRIPT_OBJS=mkdependHS.prl
 SCRIPT_SUBST_VARS= \
  TOP_PWD \
  INSTALLING \
+ RAWCPP \
  HscIfaceFileVersion
 
 INTERP=perl
@@ -20,7 +21,7 @@ INTERP=perl
 INSTALL_LIB_SCRIPTS += $(SCRIPT_PROG)
 
 ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir datadir RAWCPP TMPDIR SED
+SCRIPT_SUBST_VARS += libdir datadir TMPDIR SED
 endif
 
 

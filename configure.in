@@ -402,7 +402,6 @@ FPTOOLS_HAVE_GCC
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
-FPTOOLS_PROG_GNUCPP
 
 dnl ** figure out how to do context diffs
 FPTOOLS_PROG_DIFF

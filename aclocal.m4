@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.42 1999/06/07 10:12:52 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.43 1999/07/14 13:26:48 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -301,36 +301,6 @@ fi
 ])
 HaveGcc=`echo $fptools_cv_have_gcc | sed 'y/yesno/YESNO/'`
 AC_SUBST(HaveGcc)
-])
-
-dnl
-dnl FPTOOLS_PROG_GNUCPP gathers the path to the cpp that the
-dnl gcc driver calls upon.
-dnl
-dnl Substitutes: GNUCPP and RAWCPP (latter is 'GNUCPP -traditional')
-dnl
-AC_DEFUN(FPTOOLS_PROG_GNUCPP,
-[AC_CACHE_CHECK([how to invoke GNU cpp directly], fptools_cv_gnu_cpp,
-[if test "$HaveGcc" = "YES"; then
-	echo > conftest.c
-	$CC -v -E conftest.c >/dev/null 2>conftest.out
-	# \x5c = backslash
-	echo 'tr/\x5c/\//; /(\S+\/)cpp/ && print "[$]{1}cpp -iprefix [$]1";' > conftest.pl
-	fptools_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
-	rm -fr conftest*
- else
-	# We need to be able to invoke CPP directly, preferably
-	# with input from stdin (mkdependHS and hscpp depend on
-	# this at the moment).
-	# Take a guess at what to use, this probably won't work.
-	echo Warning: GNU cpp not found, using $CPP
-	fptools_cv_gnu_cpp = $CPP
- fi
-])
-GNUCPP=$fptools_cv_gnu_cpp
-RAWCPP="$GNUCPP -traditional"
-AC_SUBST(GNUCPP)
-AC_SUBST(RAWCPP)
 ])
 
 dnl Small feature test for perl version. Assumes PerlCmd
