@@ -147,6 +147,7 @@ SRC_HC_OPTS += $(GhcHcOpts)
 #	adds these flags to the command line
 
 absCSyn/AbsCSyn_HC_OPTS 	= -fno-omit-reexported-instances
+absCSyn/CStrings_HC_OPTS 	= -monly-3-regs
 basicTypes/IdInfo_HC_OPTS 	= -K2m
 coreSyn/AnnCoreSyn_HC_OPTS 	= -fno-omit-reexported-instances
 hsSyn/HsExpr_HC_OPTS 		= -K2m
@@ -204,12 +205,13 @@ typecheck/TcEnv_HC_OPTS		= -H10m
 ifeq "$(Ghc2_0)" "NO"
 typecheck/TcMonad_HC_OPTS	= -fvia-C	
 endif
-utils/Argv_HC_OPTS 		= -fvia-C
+utils/Argv_HC_OPTS 		= -fvia-C -monly-3-regs
 utils/SST_HC_OPTS 		= -fvia-C
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
 utils/FastString_HC_OPTS	= -fvia-C -monly-3-regs
 utils/StringBuffer_HC_OPTS	= -fvia-C
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
+utils/Outputable_HC_OPTS	= -monly-3-regs
 
 # optimiser misbehaving in 0.29, occurrence analyser fails to terminate when
 # compiling lib/required/Time.lhs
