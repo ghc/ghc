@@ -16,6 +16,7 @@ import CoreSyn
 import CoreUnfold	( noUnfolding )
 import CoreLint		( beginPass, endPass )
 import Rules		( ProtoCoreRule(..) )
+import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
 import Var		( Id, IdOrTyVar )
@@ -38,8 +39,6 @@ import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( mapAccumL )
 import Outputable
-
-doUsageSPInf = panic "doUsageSpInf"
 \end{code}
 
 

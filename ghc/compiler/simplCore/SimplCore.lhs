@@ -19,7 +19,6 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
                           opt_UsageSPOn,
 			)
 import CoreLint		( beginPass, endPass )
-import CoreTidy		( tidyCorePgm )
 import CoreSyn
 import CSE		( cseProgram )
 import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareRuleBase, orphanRule )

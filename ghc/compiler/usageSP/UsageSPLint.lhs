@@ -6,7 +6,7 @@
 This code is (based on) PhD work of Keith Wansbrough <kw217@cl.cam.ac.uk>,
 September 1998 .. May 1999.
 
-Keith Wansbrough 1998-09-04..1999-05-03
+Keith Wansbrough 1998-09-04..1999-06-25
 
 \begin{code}
 module UsageSPLint ( doLintUSPAnnotsBinds,
@@ -342,6 +342,8 @@ checkCE (Note (SCC _) e)      (Note (SCC _) e')      = checkCE e e'
 checkCE (Note (Coerce _ _) e) (Note (Coerce _ _) e') = checkCE e e'
 
 checkCE (Note InlineCall e)   (Note InlineCall e')   = checkCE e e'
+
+checkCE (Note InlineMe   e)   (Note InlineMe   e')   = checkCE e e'
 
 checkCE t@(Note (TermUsg u) e) t'@(Note (TermUsg u') e')
                                                      = checkCE e e'

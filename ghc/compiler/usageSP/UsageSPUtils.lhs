@@ -6,7 +6,7 @@
 This code is (based on) PhD work of Keith Wansbrough <kw217@cl.cam.ac.uk>,
 September 1998 .. May 1999.
 
-Keith Wansbrough 1998-09-04..1999-05-07
+Keith Wansbrough 1998-09-04..1999-06-25
 
 \begin{code}
 module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
@@ -289,6 +289,9 @@ genAnnotCE mungeType mungeTerm = go
                                           }
         go (Note InlineCall       e) = do { e' <- go e
                                           ; return (Note InlineCall e')
+                                          }
+        go (Note InlineMe         e) = do { e' <- go e
+                                          ; return (Note InlineMe e')
                                           }
         go e0@(Note (TermUsg _)   _) = do { e1 <- mungeTerm e0
                                           ; case e1 of  -- munge may have removed note

@@ -6,7 +6,7 @@
 This code is (based on) PhD work of Keith Wansbrough <kw217@cl.cam.ac.uk>,
 September 1998 .. May 1999.
 
-Keith Wansbrough 1998-09-04..1999-05-05
+Keith Wansbrough 1998-09-04..1999-06-25
 
 \begin{code}
 module UsageSPInf ( doUsageSPInf ) where
@@ -355,6 +355,8 @@ usgInfCE (Note (Coerce ty1 ty0) e)
        }
 
 usgInfCE (Note InlineCall       e) = usgInfCE e
+
+usgInfCE (Note InlineMe         e) = usgInfCE e
 
 usgInfCE (Note (TermUsg u)      e) = pprTrace "usgInfCE: ignoring extra TermUsg:" (ppr u) $
                                        usgInfCE e
