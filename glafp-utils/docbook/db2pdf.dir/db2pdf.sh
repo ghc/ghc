@@ -46,7 +46,7 @@ then
   jadetex ${output}
 fi
 
-dvips ${output}.dvi ${output}.ps
+dvips ${output}.dvi -o ${output}.ps
 ps2pdf ${output}.ps ${output}.pdf
 
 # clean out 
