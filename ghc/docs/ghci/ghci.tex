@@ -59,20 +59,6 @@
 %%-----------------------------------------------------------------%%
 \section*{Misc text looking for a home}
 
-\subsubsection*{Starting up}
-Some of the session-lifetime data structures are opaque to CM, so
-it doesn't know how to create an initial one.  Hence it relies on its
-client to supply the following:
-\begin{verbatim}
-   emptyPCS :: PCS
-   emptyOST :: OST
-\end{verbatim}
-The PCS is maintained solely by @compile@, and OST solely by
-@link@/@unlink@.  CM cannot know the representation of the latter
-since it depends on whether we're operating in interactive or batch
-mode.
-
-
 @compile@ is supplied with, and checks PIT (inside PCS) before
 reading package interfaces, so it doesn't read and add duplicate
 @ModIFace@s to PIT.
@@ -268,15 +254,14 @@ inspecting them.
 \item
    {\bf Home Symbol Table (HST)} @:: FiniteMap Module ModDetails@
 
-   The @ModDetails@ contain tycons, classes, instances,
-   etc, collectively known as ``entities''.  Referrals from other
-   modules to these entities is direct, with no intervening
+   The @ModDetails@ (a couple of layers down) contain tycons, classes,
+   instances, etc, collectively known as ``entities''.  Referrals from
+   other modules to these entities is direct, with no intervening
    indirections of any kind; conversely, these entities refer directly
-   to other entities, regardless of module boundaries.  HST only
-   holds information for home modules; the corresponding wired-up
-   details for package (non-home) modules are created lazily in
-   the package symbol table (PST) inside the persistent compiler's state
-   (PST).
+   to other entities, regardless of module boundaries.  HST only holds
+   information for home modules; the corresponding wired-up details
+   for package (non-home) modules are created on demand in the package
+   symbol table (PST) inside the persistent compiler's state (PST).
 
    CM maintains the HST, which is passed to, but not modified by,
    @compile@.  If compilation of a module is successful, @compile@
@@ -311,11 +296,13 @@ inspecting them.
    object, archive or DLL file.  In interactive mode, it may also be
    the STG trees derived from translating a module.  So @compile@
    returns a @Linkable@ from each successful run, namely that of
-   translating the module at hand.  At link-time, CM supplies these
-   @Linkable@s to @link@.  It also examines the @ModSummary@s for all
-   home modules, and by examining their imports and the PCI (package
-   configuration info) it can determine the @Linkable@s from all
-   required imported packages too.
+   translating the module at hand.  
+
+   At link-time, CM supplies @Linkable@s for the upwards closure of
+   all packages which have changed, to @link@.  It also examines the
+   @ModSummary@s for all home modules, and by examining their imports
+   and the SI.PCI (package configuration info) it can determine the
+   @Linkable@s from all required imported packages too.
 
    @Linkable@s and @ModIFace@s have a close relationship.  Each
    translated module has a corresponding @Linkable@ somewhere.
@@ -324,8 +311,9 @@ inspecting them.
    single @Linkable@ -- as is the case for any module from a
    multi-module package.  For these reasons it seems appropriate to
    keep the two concepts distinct.  @Linkable@s also provide
-   information about how to link package components together, and that
-   insn't the business of any specific module to know.
+   information about the sequence in which individual package package
+   components should be linked, and that insn't the business of any
+   specific module to know.
 
    CM passes @compile@ a module's old @ModIFace@, if it has one, in
    the hope that the module won't need recompiling.  If so, @compile@
@@ -382,11 +370,11 @@ before the upsweep.
 
 \subsubsection{Data structures owned by \mbox{\tt compile}}
 
-   {\bf Persistent Compiler State (PCS)} @:: known-only-to-compile@
+{\bf Persistent Compiler State (PCS)} @:: known-only-to-compile@
 
-   This contains info about foreign packages only, acting as a cache,
-   which is private to @compile@.  The cache never becomes out of
-   date.  There are at least two parts to it:
+This contains info about foreign packages only, acting as a cache,
+which is private to @compile@.  The cache never becomes out of
+date.  There are three parts to it:
 
    \begin{itemize}
    \item
@@ -428,14 +416,18 @@ before the upsweep.
    interfaces, which are returned to CM to add to the PIT.
 
    CM passes the PST to @compile@ and is returned an updated version
-   on success.  On failure, @compile@ doesn't return an updated
-   version even though it might have created some updates on the way
-   to failure.  This seems necessary to retain the (thus far unstated)
-   invariant that PST only contains renamed fragments of interfaces in
-   PIT.
+   on both success and failure.
 
-   \item
-      {\bf Holding Pen (HP)} @:: Ifaces@
+   \item 
+      {\bf Holding Pen (HP)} @:: Ifaces@ 
+
+   HP holds parsed but not-yet renamed-or-typechecked fragments of
+   package interfaces.  As typechecking of other modules progresses,
+   fragments are removed (``slurped'') from HP, renamed and
+   typechecked, and placed in PCS.PST (see above).  Slurping a
+   fragment may require new interfaces to be read into HP.  The hope
+   is, though, that many fragments will never get slurped, reducing
+   the total number of interfaces read (as compared to eager slurping).
 
    \end{itemize}
 
@@ -453,7 +445,7 @@ before the upsweep.
 
 
 
-\subsubsection*{What {\tt compile} does}
+\subsubsection{What {\tt compile} does}
 @compile@ is necessarily somewhat complex.  We've decided to do away
 with private global variables -- they make the design harder to
 understand and may interfere with CM's need to roll the system back
@@ -484,6 +476,8 @@ a cycle.  Without further ado:
    data PCS
       = MkPCS PIT         -- package interfaces
               PST         -- rename cache/global symtab contents
+
+   emptyPCS :: IO PCS     -- since CM has no other way to make one
 \end{verbatim}
 Although @compile@ is passed three of the global structures (FLAGS,
 HST and PCS), it only modifies PCS.  The rest are modified by CM as it
@@ -521,8 +515,8 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
 
    If the module is only available in object+interface form, read the
    interface, make up details, create a linkable pointing at the
-   object code.  Does this involve reading any more interfaces?  Does
-   it involve updating PST?
+   object code.  \ToDo{Does this involve reading any more interfaces?  Does
+   it involve updating PST?}
    
    Otherwise, translate from source, then create and return: an
    details, interface, linkable, updated PST, and warnings.
@@ -535,6 +529,62 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
    boot interface against the inferred interface.}
 \end{itemize}
 
+
+\subsubsection{Contents of \mbox{\tt ModDetails}, 
+               \mbox{\tt ModIFace} and \mbox{\tt Ifaces}}
+Only @compile@ can see inside these three types -- they are opaque to
+everyone else.  @ModDetails@ holds the post-renaming,
+post-typechecking environment created by compiling a module.
+
+\begin{verbatim}
+   data ModDetails
+      = ModDetails {
+           moduleExports :: Avails
+           moduleEnv     :: GlobalRdrEnv    -- == FM RdrName [Name]
+           typeEnv       :: FM Name TyThing -- TyThing is in TcEnv.lhs
+           instEnv       :: InstEnv
+           fixityEnv     :: FM Name Fixity
+           ruleEnv       :: FM Id [Rule]
+        }
+\end{verbatim}
+
+@ModIFace@ is nearly the same as @ParsedIFace@ from @RnMonad.lhs@:
+\begin{verbatim}
+   type ModIFace = ParsedIFace    -- not really, but ...
+   data ParsedIface
+      = ParsedIface {
+           pi_mod       :: Module,                   -- Complete with package info
+           pi_vers      :: Version,                  -- Module version number
+           pi_orphan    :: WhetherHasOrphans,        -- Whether this module has orphans
+           pi_usages    :: [ImportVersion OccName],  -- Usages
+           pi_exports   :: [ExportItem],             -- Exports
+           pi_insts     :: [RdrNameInstDecl],        -- Local instance declarations
+           pi_decls     :: [(Version, RdrNameHsDecl)],    -- Local definitions
+           pi_fixity    :: (Version, [RdrNameFixitySig]), -- Local fixity declarations, 
+                                                          -- with their version
+           pi_rules     :: (Version, [RdrNameRuleDecl]),  -- Rules, with their version
+           pi_deprecs   :: [RdrNameDeprecation]           -- Deprecations
+       }
+\end{verbatim}
+
+@Ifaces@ is a cleaned-up version of that found in @RnMonad.lhs@, 
+retaining just the 3 pieces actually comprising the holding pen:
+\begin{verbatim}
+   data Ifaces 
+      = Ifaces {
+           iDecls :: DeclsMap,     -- A single, global map of Names to decls
+
+           iInsts :: IfaceInsts,
+           -- The as-yet un-slurped instance decls; this bag is depleted when we
+           -- slurp an instance decl so that we don't slurp the same one twice.
+           -- Each is 'gated' by the names that must be available before
+           -- this instance decl is needed.
+
+           iRules :: IfaceRules
+           -- Similar to instance decls, only for rules
+        }
+\end{verbatim}
+
 %%-- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --%%
 \subsection{The linker (\mbox{\tt link})}
 \label{sec:linker}
@@ -542,10 +592,10 @@ What @compile@ does: \ToDo{A bit vague ... needs refining.  How does
 \subsubsection{Data structures owned by the linker}
 
 In the same way that @compile@ has a persistent compiler state (PCS),
-the linker has a persistent (session-lifetime) state, LPS, the
-Linker's Persistent State.  In batch mode LPS is entirely irrelevant,
+the linker has a persistent (session-lifetime) state, PLS, the
+Linker's Persistent State.  In batch mode PLS is entirely irrelevant,
 because there is only a single link step, and can be a unit value
-ignored by everybody.  In interactive mode LPS is composed of the
+ignored by everybody.  In interactive mode PLS is composed of the
 following three parts:
 
 \begin{itemize}
@@ -628,7 +678,7 @@ following three parts:
          indistinguishably from compiled versions of the same code.
    \end{itemize}
    Because object code is outside the heap and never deallocated,
-   whilst interpreted code is held alive by the OST, there's no need
+   whilst interpreted code is held alive via the HST, there's no need
    to have a data structure which ``is'' the linked image.
 
    For batch compilation, LI doesn't exist because OST doesn't exist,
@@ -637,7 +687,8 @@ following three parts:
 
    \ToDo{Do we need to say anything about CAFs and SRTs?  Probably ...}
 \end{itemize}
-
+As with PCS, CM has no way to create an initial PLS, so we supply
+@emptyPLS@ for that purpose.
 
 \subsubsection{The linker's interface}
 
@@ -646,12 +697,14 @@ than passed around explicitly.  (The same might be true for PCS).
 Anyway:
 
 \begin{verbatim}
-   data PCS -- as described above; opaque to everybody except the linker
+   data PLS -- as described above; opaque to everybody except the linker
 
    link :: PCI -> ??? -> [[Linkable]] -> LinkState -> IO LinkResult
 
    data LinkResult = LinkOK   LinkState
                    | LinkErrs LinkState [SDoc]
+
+   emptyPLS :: IO PLS     -- since CM has no other way to make one
 \end{verbatim}
 
 CM uses @link@ as follows:
