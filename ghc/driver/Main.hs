@@ -1202,11 +1202,9 @@ newTempName extn = do
 
 do_mkdependHS :: [String] -> [String] -> IO ()
 do_mkdependHS cmd_opts srcs = do
-
-    -- 	# They're not (currently) needed, but we need to quote any -#include options
-    -- foreach (@Cmd_opts) {
-    -- 	   s/-#include.*$/'$&'/g;
-    -- };  
+   -- HACK
+   let quote_include_opt o | prefixMatch "-#include" o = "'" ++ o ++ "'"
+                           | otherwise                 = o
 
    mkdependHS      <- readIORef pgm_dep
    mkdependHS_opts <- getOpts opt_dep
@@ -1216,7 +1214,7 @@ do_mkdependHS cmd_opts srcs = do
 	(unwords (mkdependHS : 
 		      mkdependHS_opts
 		   ++ hs_src_cpp_opts
-		   ++ ("--" : cmd_opts )
+		   ++ ("--" : map quote_include_opt cmd_opts )
 		   ++ ("--" : srcs)
 	))
 
