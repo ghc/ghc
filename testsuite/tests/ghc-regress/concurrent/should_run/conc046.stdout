@@ -1,0 +1,9 @@
+Before
+Reading from svars:            Hello world
+Abandoning update with exception
+Abandoned
+Reading from svars:            Hello world
+Atomic block with internal exception
+Reading from svars:            Reached handler world
+Atomic block with handler but no exception
+Reading from svars:            Hello world

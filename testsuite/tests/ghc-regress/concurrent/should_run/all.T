@@ -84,3 +84,18 @@ test('conc040', compose(only_compiler_types(['ghc']),
 			compose(exit_code(1),
 			omit_ways(['ghci','threaded']))),
 		compile_and_run, [''])
+
+# STM-related tests.  As with conc033, omit threaded in 047 and 048 because
+# they rely on deadlock detection
+test('conc041', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc042', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc043', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc044', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc045', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc046', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc047', compose(only_compiler_types(['ghc']), 
+                        omit_ways(['threaded'])), compile_and_run, [''])
+test('conc048', compose(only_compiler_types(['ghc']), 
+                        omit_ways(['threaded'])), compile_and_run, [''])
+
+
