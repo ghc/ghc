@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.120 2000/12/19 12:27:09 simonmar Exp $
+# $Id: Makefile,v 1.121 2000/12/19 13:13:11 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -121,8 +121,7 @@ endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
-  parser/hschooks.o \
-  parser/hs_ctype.o
+  parser/hschooks.o
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
