@@ -19,6 +19,7 @@ $expect = "pass"
 ---------------------------------------------------------------
 
 include ($confdir ++ "/" ++ $conffilename)
+include ($confdir ++ "/../std-macros.T")
 
 -- (eg) "run.stdout"  -->  "testdir/testname.run.stdout"
 def qualify ( $_filename_frag )
