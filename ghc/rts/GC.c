@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.40 1999/02/24 16:30:45 simonm Exp $
+ * $Id: GC.c,v 1.41 1999/02/24 17:24:07 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -868,7 +868,11 @@ copy(StgClosure *src, nat size, step *step)
    * by evacuate()).
    */
   if (step->gen->no < evac_gen) {
+#ifdef NO_EAGER_PROMOTION    
+    failed_to_evac = rtsTrue;
+#else
     step = &generations[evac_gen].steps[0];
+#endif
   }
 
   /* chain a new block onto the to-space for the destination step if
@@ -899,7 +903,11 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *step)
 
   TICK_GC_WORDS_COPIED(size_to_copy);
   if (step->gen->no < evac_gen) {
+#ifdef NO_EAGER_PROMOTION    
+    failed_to_evac = rtsTrue;
+#else
     step = &generations[evac_gen].steps[0];
+#endif
   }
 
   if (step->hp + size_to_reserve >= step->hpLim) {
@@ -971,7 +979,11 @@ evacuate_large(StgPtr p, rtsBool mutable)
    */
   step = bd->step->to;
   if (step->gen->no < evac_gen) {
+#ifdef NO_EAGER_PROMOTION    
+    failed_to_evac = rtsTrue;
+#else
     step = &generations[evac_gen].steps[0];
+#endif
   }
 
   bd->step = step;
