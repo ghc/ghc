@@ -207,7 +207,7 @@ ppHtmlContents odir doctitle maybe_index_url
 	    s15 </>
 	    footer
 	  )
-  writeFile (odir ++ pathSeparator:contentsHtmlFile) (prettyHtml html)
+  writeFile (odir ++ pathSeparator:contentsHtmlFile) (renderHtml html False)
 
 ppPrologue :: String -> Maybe Doc -> HtmlTable
 ppPrologue title Nothing = Html.emptyTable
