@@ -14,11 +14,7 @@
 #endif
    /* Minimum int x such that FLT_RADIX**(x-1) is a normalised float */
 #ifndef FLT_MIN_EXP
-# ifdef __GLASGOW_HASKELL__
-#  define FLT_MIN_EXP (negate 125)
-# else
 #  define FLT_MIN_EXP (-125)
-# endif
 #endif
    /* Maximum int x such that FLT_RADIX**(x-1) is a representable float */
 #ifndef FLT_MAX_EXP
@@ -31,11 +27,7 @@
 #endif
    /* Minimum int x such that FLT_RADIX**(x-1) is a normalised double */
 #ifndef DBL_MIN_EXP
-# ifdef __GLASGOW_HASKELL__
-#  define DBL_MIN_EXP (negate 1021)
-# else
 #  define DBL_MIN_EXP (-1021)
-# endif
 #endif
    /* Maximum int x such that FLT_RADIX**(x-1) is a representable double */
 #ifndef DBL_MAX_EXP
