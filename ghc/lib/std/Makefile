@@ -111,7 +111,10 @@ GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
 
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-LIBOBJS=$(GHCI_LIBOBJS)
+# 		Standard rule
+HSstd.o :: $(GHCI_LIBOBJS)
+	ld -r -x -o $@ $(GHCI_LIBOBJS)
+
 else
 # 		Rule for Win32 platform
 # Keep HSstd.o as a pseudo-target (I think)
