@@ -8,9 +8,9 @@
 
 module CgBindery (
 	SYN_IE(CgBindings), CgIdInfo(..){-dubiously concrete-},
-	StableLoc, VolatileLoc,
+	VolatileLoc, StableLoc, -- (the latter is defined in CgMonad)
 
-	maybeAStkLoc, maybeBStkLoc,
+--	maybeAStkLoc, maybeBStkLoc,
 
 	stableAmodeIdInfo, heapIdInfo, newTempAmodeAndIdInfo,
 	letNoEscapeIdInfo, idInfoToAmode,
@@ -42,7 +42,6 @@ import Id		( idPrimRep, toplevelishId,
 			  idSetToList,
 			  GenId{-instance NamedThing-}, SYN_IE(Id)
 			)
-import Literal          ( Literal )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, isWiredInName,
 			  Name{-instance NamedThing-}, NamedThing(..) )
@@ -93,20 +92,6 @@ data VolatileLoc
   | VirNodeLoc	VirtualHeapOffset	-- Cts of offset indirect from Node
 					-- ie *(Node+offset)
 
-data StableLoc
-  = NoStableLoc
-  | VirAStkLoc		VirtualSpAOffset
-  | VirBStkLoc		VirtualSpBOffset
-  | LitLoc		Literal
-  | StableAmodeLoc	CAddrMode
-
--- these are so StableLoc can be abstract:
-
-maybeAStkLoc (VirAStkLoc offset) = Just offset
-maybeAStkLoc _			 = Nothing
-
-maybeBStkLoc (VirBStkLoc offset) = Just offset
-maybeBStkLoc _			 = Nothing
 \end{code}
 
 %************************************************************************

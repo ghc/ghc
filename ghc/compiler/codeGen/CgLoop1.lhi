@@ -3,14 +3,12 @@ interface CgLoop1 where
 import PreludeStdIO	( Maybe )
 
 import CgBindery	( CgBindings(..), CgIdInfo(..),
-			  VolatileLoc, StableLoc,
-			  nukeVolatileBinds,
-			  maybeAStkLoc, maybeBStkLoc
+			  VolatileLoc, nukeVolatileBinds
 		 	)
 import CgUsages		( getSpBRelOffset )
 
 import AbsCSyn		( RegRelative )
-import CgMonad		( FCode(..) )
+import CgMonad		( FCode(..), StableLoc, maybeAStkLoc, maybeBStkLoc )
 import ClosureInfo	( LambdaFormInfo )
 import HeapOffs		( VirtualSpAOffset(..), VirtualSpBOffset(..) )
 import Id		( IdEnv(..), Id(..) )

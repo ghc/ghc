@@ -42,6 +42,8 @@ module CgMonad (
 	Sequel(..), -- ToDo: unabstract?
 	sequelToAmode,
 
+	StableLoc(..), maybeAStkLoc, maybeBStkLoc,
+
 	-- out of general friendliness, we also export ...
 	CgInfoDownwards(..), CgState(..),	-- non-abstract
 	CompilationInfo(..)
@@ -73,6 +75,7 @@ import Id		( idType,
 			  SYN_IE(ConTag), GenId{-instance Outputable-},
 			  SYN_IE(Id)
 			)
+import Literal          ( Literal )
 import Maybes		( maybeToBool )
 import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instance Outputable-} )
@@ -216,6 +219,33 @@ sequelToAmode InRetReg		 = returnFC (CReg RetReg)
 --WAS: sequelToAmode (UpdateCode amode) = returnFC amode
 sequelToAmode (UpdateCode amode) = returnFC (CReg StdUpdRetVecReg)
 sequelToAmode (CaseAlts amode _) = returnFC amode
+\end{code}
+
+@StableLoc@ encodes where an Id can be found, used by
+the @CgBindings@ environment in @CgBindery@.
+
+The natural home for @StableLoc@ is @CgBindery@, but it is
+stuck out here to avoid giving the type for @maybeBStkLoc@
+and @maybeAStkLoc@ in the @.hi-boot@ file for @CgBindery@.
+This is problematic since they're both returning @Maybe@ types,
+which lives in @PrelBase@ (< ghc-2.09) or @PrelMaybe@ (> 2.09).
+ToDo: after the next major release, move it back.
+
+\begin{code}
+data StableLoc
+  = NoStableLoc
+  | VirAStkLoc		VirtualSpAOffset
+  | VirBStkLoc		VirtualSpBOffset
+  | LitLoc		Literal
+  | StableAmodeLoc	CAddrMode
+
+-- these are so StableLoc can be abstract:
+
+maybeAStkLoc (VirAStkLoc offset) = Just offset
+maybeAStkLoc _			 = Nothing
+
+maybeBStkLoc (VirBStkLoc offset) = Just offset
+maybeBStkLoc _			 = Nothing
 \end{code}
 
 See the NOTES about the details of stack/heap usage tracking.
@@ -709,7 +739,7 @@ lookupBindC name info_down@(MkCgInfoDown _ static_binds _)
 
 %************************************************************************
 %*									*
-\subsection[CgStackery-deadslots]{Finding dead stack slots}
+\subsection[CgMonad-deadslots]{Finding dead stack slots}
 %*									*
 %************************************************************************
 
