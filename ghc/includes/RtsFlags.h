@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.47 2004/11/18 09:56:20 tharris Exp $
+ * $Id: RtsFlags.h,v 1.48 2005/02/03 10:59:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -317,8 +317,10 @@ extern RTS_FLAGS RtsFlags;
 
 /* Routines that operate-on/to-do-with RTS flags: */
 
-void initRtsFlagsDefaults(void);
-void setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[]);
+extern void initRtsFlagsDefaults(void);
+extern void setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[]);
+extern void setProgName(char *argv[]);
+
 
 /*
  * The printf formats are here, so we are less likely to make
