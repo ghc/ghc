@@ -188,7 +188,8 @@ shiftRL x i   = shiftR x i
   Operators
 --------------------------------------------------------------------}
 
--- | /O(min(n,W))/. Find the value of a key. Calls 'error' when the element can not be found.
+-- | /O(min(n,W))/. Find the value at a key.
+-- Calls 'error' when the element can not be found.
 
 (!) :: IntMap a -> Key -> a
 m ! k    = find' k m
@@ -249,7 +250,7 @@ member k m
       Nothing -> False
       Just x  -> True
     
--- | /O(min(n,W))/. Lookup the value of a key in the map.
+-- | /O(min(n,W))/. Lookup the value at a key in the map.
 lookup :: Key -> IntMap a -> Maybe a
 lookup k t
   = let nk = natFromInt k  in seq nk (lookupN nk t)
@@ -273,7 +274,7 @@ find' k m
 
 
 -- | /O(min(n,W))/. The expression @('findWithDefault' def k map)@
--- returns the value of key @k@ or returns @def@ when the key is not an
+-- returns the value at key @k@ or returns @def@ when the key is not an
 -- element of the map.
 findWithDefault :: a -> Key -> IntMap a -> a
 findWithDefault def k m
@@ -713,19 +714,19 @@ mapWithKey f t
       Nil         -> Nil
 
 -- | /O(n)/. The function @'mapAccum'@ threads an accumulating
--- argument through the map in an unspecified order.
+-- argument through the map in ascending order of keys.
 mapAccum :: (a -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccum f a m
   = mapAccumWithKey (\a k x -> f a x) a m
 
 -- | /O(n)/. The function @'mapAccumWithKey'@ threads an accumulating
--- argument through the map in an unspecified order.
+-- argument through the map in ascending order of keys.
 mapAccumWithKey :: (a -> Key -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccumWithKey f a t
   = mapAccumL f a t
 
 -- | /O(n)/. The function @'mapAccumL'@ threads an accumulating
--- argument through the map in pre-order.
+-- argument through the map in ascending order of keys.
 mapAccumL :: (a -> Key -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccumL f a t
   = case t of
@@ -737,7 +738,7 @@ mapAccumL f a t
 
 
 -- | /O(n)/. The function @'mapAccumR'@ threads an accumulating
--- argument throught the map in post-order.
+-- argument throught the map in descending order of keys.
 mapAccumR :: (a -> Key -> b -> (a,c)) -> a -> IntMap b -> (a,IntMap c)
 mapAccumR f a t
   = case t of
@@ -821,17 +822,22 @@ splitLookup k t
 {--------------------------------------------------------------------
   Fold
 --------------------------------------------------------------------}
--- | /O(n)/. Fold over the elements of a map in an unspecified order.
+-- | /O(n)/. Fold the values in the map, such that
+-- @'fold' f z == 'Prelude.foldr' f z . 'elems'@.
+-- For example,
 --
--- > sum map   = fold (+) 0 map
 -- > elems map = fold (:) [] map
+--
 fold :: (a -> b -> b) -> b -> IntMap a -> b
 fold f z t
   = foldWithKey (\k x y -> f x y) z t
 
--- | /O(n)/. Fold over the elements of a map in an unspecified order.
+-- | /O(n)/. Fold the keys and values in the map, such that
+-- @'foldWithKey' f z == 'Prelude.foldr' ('uncurry' f) z . 'toAscList'@.
+-- For example,
 --
 -- > keys map = foldWithKey (\k x ks -> k:ks) [] map
+--
 foldWithKey :: (Key -> a -> b -> b) -> b -> IntMap a -> b
 foldWithKey f z t
   = foldr f z t
@@ -846,12 +852,13 @@ foldr f z t
 {--------------------------------------------------------------------
   List variations 
 --------------------------------------------------------------------}
--- | /O(n)/. Return all elements of the map.
+-- | /O(n)/.
+-- Return all elements of the map in the ascending order of their keys.
 elems :: IntMap a -> [a]
 elems m
   = foldWithKey (\k x xs -> x:xs) [] m  
 
--- | /O(n)/. Return all keys of the map.
+-- | /O(n)/. Return all keys of the map in ascending order.
 keys  :: IntMap a -> [Key]
 keys m
   = foldWithKey (\k x ks -> k:ks) [] m
@@ -861,7 +868,7 @@ keysSet :: IntMap a -> IntSet.IntSet
 keysSet m = IntSet.fromDistinctAscList (keys m)
 
 
--- | /O(n)/. Return all key\/value pairs in the map.
+-- | /O(n)/. Return all key\/value pairs in the map in ascending key order.
 assocs :: IntMap a -> [(Key,a)]
 assocs m
   = toList m

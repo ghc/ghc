@@ -171,7 +171,8 @@ import Data.Generics.Instances
 --------------------------------------------------------------------}
 infixl 9 !,\\ --
 
--- | /O(log n)/. Find the value of a key. Calls 'error' when the element can not be found.
+-- | /O(log n)/. Find the value at a key.
+-- Calls 'error' when the element can not be found.
 (!) :: Ord k => Map k a -> k -> a
 m ! k    = find k m
 
@@ -223,7 +224,7 @@ size t
       Bin sz k x l r  -> sz
 
 
--- | /O(log n)/. Lookup the value of key in the map.
+-- | /O(log n)/. Lookup the value at a key in the map.
 lookup :: Ord k => k -> Map k a -> Maybe a
 lookup k t
   = case t of
@@ -241,7 +242,8 @@ member k m
       Nothing -> False
       Just x  -> True
 
--- | /O(log n)/. Find the value of a key. Calls 'error' when the element can not be found.
+-- | /O(log n)/. Find the value at a key.
+-- Calls 'error' when the element can not be found.
 find :: Ord k => k -> Map k a -> a
 find k m
   = case lookup k m of
@@ -249,7 +251,7 @@ find k m
       Just x  -> x
 
 -- | /O(log n)/. The expression @('findWithDefault' def k map)@ returns
--- the value of key @k@ or returns @def@ when the key is not in the map.
+-- the value at key @k@ or returns @def@ when the key is not in the map.
 findWithDefault :: Ord k => a -> k -> Map k a -> a
 findWithDefault def k m
   = case lookup k m of
@@ -266,7 +268,7 @@ empty :: Map k a
 empty 
   = Tip
 
--- | /O(1)/. Create a map with a single element.
+-- | /O(1)/. A map with a single element.
 singleton :: k -> a -> Map k a
 singleton k x  
   = Bin 1 k x Tip Tip
@@ -464,18 +466,18 @@ deleteMax (Bin _ kx x l Tip)  = l
 deleteMax (Bin _ kx x l r)    = balance kx x l (deleteMax r)
 deleteMax Tip                 = Tip
 
--- | /O(log n)/. Update the minimal key.
+-- | /O(log n)/. Update the value at the minimal key.
 updateMin :: (a -> Maybe a) -> Map k a -> Map k a
 updateMin f m
   = updateMinWithKey (\k x -> f x) m
 
--- | /O(log n)/. Update the maximal key.
+-- | /O(log n)/. Update the value at the maximal key.
 updateMax :: (a -> Maybe a) -> Map k a -> Map k a
 updateMax f m
   = updateMaxWithKey (\k x -> f x) m
 
 
--- | /O(log n)/. Update the minimal key.
+-- | /O(log n)/. Update the value at the minimal key.
 updateMinWithKey :: (k -> a -> Maybe a) -> Map k a -> Map k a
 updateMinWithKey f t
   = case t of
@@ -485,7 +487,7 @@ updateMinWithKey f t
       Bin sx kx x l r    -> balance kx x (updateMinWithKey f l) r
       Tip                -> Tip
 
--- | /O(log n)/. Update the maximal key.
+-- | /O(log n)/. Update the value at the maximal key.
 updateMaxWithKey :: (k -> a -> Maybe a) -> Map k a -> Map k a
 updateMaxWithKey f t
   = case t of
@@ -794,19 +796,19 @@ mapWithKey f (Bin sx kx x l r)
   = Bin sx kx (f kx x) (mapWithKey f l) (mapWithKey f r)
 
 -- | /O(n)/. The function 'mapAccum' threads an accumulating
--- argument through the map in an unspecified order.
+-- argument through the map in ascending order of keys.
 mapAccum :: (a -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccum f a m
   = mapAccumWithKey (\a k x -> f a x) a m
 
 -- | /O(n)/. The function 'mapAccumWithKey' threads an accumulating
--- argument through the map in unspecified order. (= ascending pre-order)
+-- argument through the map in ascending order of keys.
 mapAccumWithKey :: (a -> k -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccumWithKey f a t
   = mapAccumL f a t
 
 -- | /O(n)/. The function 'mapAccumL' threads an accumulating
--- argument throught the map in (ascending) pre-order.
+-- argument throught the map in ascending order of keys.
 mapAccumL :: (a -> k -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccumL f a t
   = case t of
@@ -818,7 +820,7 @@ mapAccumL f a t
              in (a3,Bin sx kx x' l' r')
 
 -- | /O(n)/. The function 'mapAccumR' threads an accumulating
--- argument throught the map in (descending) post-order.
+-- argument throught the map in descending order of keys.
 mapAccumR :: (a -> k -> b -> (a,c)) -> a -> Map k b -> (a,Map k c)
 mapAccumR f a t
   = case t of
@@ -832,8 +834,9 @@ mapAccumR f a t
 -- | /O(n*log n)/. 
 -- @'mapKeys' f s@ is the map obtained by applying @f@ to each key of @s@.
 -- 
--- It's worth noting that the size of the result may be smaller if,
--- for some @(x,y)@, @x \/= y && f x == f y@
+-- The size of the result may be smaller if @f@ maps two or more distinct
+-- keys to the same new key.  In this case the value at the smallest of
+-- these keys is retained.
 
 mapKeys :: Ord k2 => (k1->k2) -> Map k1 a -> Map k2 a
 mapKeys = mapKeysWith (\x y->x)
@@ -841,9 +844,9 @@ mapKeys = mapKeysWith (\x y->x)
 -- | /O(n*log n)/. 
 -- @'mapKeysWith' c f s@ is the map obtained by applying @f@ to each key of @s@.
 -- 
--- It's worth noting that the size of the result may be smaller if,
--- for some @(x,y)@, @x \/= y && f x == f y@
--- In such a case, the values will be combined using @c@
+-- The size of the result may be smaller if @f@ maps two or more distinct
+-- keys to the same new key.  In this case the associated values will be
+-- combined using @c@.
 
 mapKeysWith :: Ord k2 => (a -> a -> a) -> (k1->k2) -> Map k1 a -> Map k2 a
 mapKeysWith c f = fromListWith c . List.map fFirst . toList
@@ -851,7 +854,8 @@ mapKeysWith c f = fromListWith c . List.map fFirst . toList
 
 
 -- | /O(n)/.
--- @'mapKeysMonotonic' f s == 'mapKeys' f s@, but works only when @f@ is monotonic.
+-- @'mapKeysMonotonic' f s == 'mapKeys' f s@, but works only when @f@
+-- is strictly monotonic.
 -- /The precondition is not checked./
 -- Semi-formally, we have:
 -- 
@@ -867,12 +871,23 @@ mapKeysMonotonic f (Bin sz k x l r) =
 {--------------------------------------------------------------------
   Folds  
 --------------------------------------------------------------------}
--- | /O(n)/. Fold the map in an unspecified order. (= descending post-order).
+
+-- | /O(n)/. Fold the values in the map, such that
+-- @'fold' f z == 'Prelude.foldr' f z . 'elems'@.
+-- For example,
+--
+-- > elems map = fold (:) [] map
+--
 fold :: (a -> b -> b) -> b -> Map k a -> b
 fold f z m
   = foldWithKey (\k x z -> f x z) z m
 
--- | /O(n)/. Fold the map in an unspecified order. (= descending post-order).
+-- | /O(n)/. Fold the keys and values in the map, such that
+-- @'foldWithKey' f z == 'Prelude.foldr' ('uncurry' f) z . 'toAscList'@.
+-- For example,
+--
+-- > keys map = foldWithKey (\k x ks -> k:ks) [] map
+--
 foldWithKey :: (k -> a -> b -> b) -> b -> Map k a -> b
 foldWithKey f z t
   = foldr f z t
@@ -895,12 +910,13 @@ foldl f z (Bin _ kx x l r) = foldl f (f (foldl f z l) kx x) r
 {--------------------------------------------------------------------
   List variations 
 --------------------------------------------------------------------}
--- | /O(n)/. Return all elements of the map.
+-- | /O(n)/.
+-- Return all elements of the map in the ascending order of their keys.
 elems :: Map k a -> [a]
 elems m
   = [x | (k,x) <- assocs m]
 
--- | /O(n)/. Return all keys of the map.
+-- | /O(n)/. Return all keys of the map in ascending order.
 keys  :: Map k a -> [k]
 keys m
   = [k | (k,x) <- assocs m]
@@ -909,7 +925,7 @@ keys m
 keysSet :: Map k a -> Set.Set k
 keysSet m = Set.fromDistinctAscList (keys m)
 
--- | /O(n)/. Return all key\/value pairs in the map.
+-- | /O(n)/. Return all key\/value pairs in the map in ascending key order.
 assocs :: Map k a -> [(k,a)]
 assocs m
   = toList m
