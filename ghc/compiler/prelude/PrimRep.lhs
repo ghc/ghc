@@ -207,9 +207,6 @@ showPrimRep  :: PrimRep -> String
 showPrimRepToUser :: PrimRep -> String
 
 showPrimRep PtrRep	   = "P_"	-- short for StgPtr
-
-showPrimRep CodePtrRep     = "P_"	-- DEATH to StgFunPtr! (94/02/22 WDP)
-showPrimRep PtrRep         = "P_"	-- short for StgPtr
 showPrimRep CodePtrRep     = "P_"	-- DEATH to StgFunPtr! (94/02/22 WDP)
 showPrimRep DataPtrRep     = "D_"
 showPrimRep RetRep         = "P_"
