@@ -341,10 +341,10 @@ dnl ** check if perl library is properly installed
 if $PerlCmd -e 'do "getopts.pl" || exit(1); exit(0);' > /dev/null 2>&1 ; then
     :
 else
-    echo "I think your perl library is misinstalled."
+    echo "I think your perl library is misinstalled:"
     echo "The following script did not work:"
     echo '      do "getopts.pl" || exit(1); exit(0);'
-    exit 1
+    echo 'But, anyway, we will continue in our quest..'
 fi
 #
 #
