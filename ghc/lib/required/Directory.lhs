@@ -45,7 +45,7 @@ import IOBase
 import STBase
 import UnsafeST		( unsafePerformPrimIO )
 import ArrBase
-import PackedString	( packCBytesST, unpackPS, psToByteArrayST )
+import PackBase		( unpackNBytesST )
 import Time             ( ClockTime(..) )
 
 \end{code}
@@ -351,10 +351,10 @@ getDirectoryContents path =
             return []
         else
             _ccall_ strlen str			    >>= \ len ->
-	    packCBytesST len str		    >>= \ entry ->
+	    unpackNBytesST str len		    >>= \ entry ->
             _ccall_ free str			    >>= \ () ->
             getEntries ptr (n+1)		    >>= \ entries ->
-	    return (unpackPS entry : entries)
+	    return (entry : entries)
 \end{code}
 
 If the operating system has a notion of current directories,
@@ -383,9 +383,9 @@ getCurrentDirectory =
     _ccall_ getCurrentDirectory	    `thenIO_Prim` \ str ->
     if str /= ``NULL'' then
         _ccall_ strlen str		`thenIO_Prim` \ len ->
-        stToIO (packCBytesST len str)	>>=	    \ pwd ->
+        stToIO (unpackNBytesST len str)	>>=	      \ pwd ->
         _ccall_ free str		`thenIO_Prim` \ () ->
-        return (unpackPS pwd)
+        return pwd
     else
         constructErrorAndFail "getCurrentDirectory"
 \end{code}
@@ -430,8 +430,7 @@ setCurrentDirectory path =
 \begin{code}
 --doesFileExist :: FilePath -> IO Bool
 doesFileExist name =
-  psToByteArrayST name			    `thenIO_Prim` \ path ->
-  _ccall_ access path (``F_OK''::Int)	    `thenIO_Prim` \ rc ->
+  _ccall_ access name (``F_OK''::Int)	    `thenIO_Prim` \ rc ->
   return (rc == 0)
 
 --doesDirectoryExist :: FilePath -> IO Bool
@@ -470,8 +469,7 @@ setPermissions name (Permissions r w e s) =
 
      mode  = I# (word2Int# (read# `or#` write# `or#` exec#))
     in
-    psToByteArrayST name			    `thenIO_Prim` \ path ->
-    _ccall_ chmod path mode			    `thenIO_Prim` \ rc ->
+    _ccall_ chmod name mode			    `thenIO_Prim` \ rc ->
     if rc == 0 then
 	return ()
     else
@@ -487,9 +485,8 @@ type FileStatus = ByteArray Int
 
 getFileStatus :: FilePath -> IO FileStatus
 getFileStatus name =
-    psToByteArrayST name			    `thenIO_Prim` \ path ->
     newCharArray (0,``sizeof(struct stat)'')        `thenIO_Prim` \ bytes ->
-    _casm_ ``%r = stat(%0,(struct stat *)%1);'' path bytes
+    _casm_ ``%r = stat(%0,(struct stat *)%1);'' name bytes
 						    `thenIO_Prim` \ rc ->
     if rc == 0 then
 	unsafeFreezeByteArray bytes          	    `thenIO_Prim` \ stat ->
