@@ -729,6 +729,9 @@ else
 GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
 endif
 
+# Set to YES if $(GHC) has the readline package installed
+GhcHasReadline	= @GhcHasReadline@
+
 HBC		= @HBC@
 NHC		= @NHC@
 
