@@ -68,7 +68,7 @@ void
 initCapabilities()
 {
 #if defined(RTS_SUPPORTS_THREADS)
-  initCondition(returning_worker_cond);
+  initCondition(&returning_worker_cond);
 #endif
 
 #if defined(SMP)
@@ -177,12 +177,12 @@ void
 grabReturnCapability(Capability** pCap)
 {
   IF_DEBUG(scheduler,
-	   sched_belch("thread %d: returning, waiting for sched. lock.\n", osThreadId()));
+	   fprintf(stderr,"worker (%ld): returning, waiting for sched. lock.\n", osThreadId()));
   ACQUIRE_LOCK(&sched_mutex);
   rts_n_waiting_workers++;
   IF_DEBUG(scheduler,
-	   sched_belch("worker (%d,%d): returning; workers waiting: %d\n",
-		       tok, osThreadId(), rts_n_waiting_workers));
+	   fprintf(stderr,"worker (%ld): returning; workers waiting: %d\n",
+		   osThreadId(), rts_n_waiting_workers));
   while ( noCapabilities() ) {
     waitCondition(&returning_worker_cond, &sched_mutex);
   }
@@ -208,7 +208,7 @@ void
 yieldCapability(Capability* cap)
 {
     IF_DEBUG(scheduler,
-	     sched_belch("worker thread (%d): giving up RTS token\n", osThreadId()));
+	     fprintf(stderr,"worker thread (%ld): giving up RTS token\n", osThreadId()));
     releaseCapability(cap);
     RELEASE_LOCK(&sched_mutex);
     yieldThread();
