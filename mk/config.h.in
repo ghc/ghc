@@ -665,6 +665,12 @@
 /* Define if you have the gettimeofday function.  */
 #undef HAVE_GETTIMEOFDAY
 
+/* Define if you have the gmtime_r function.  */
+#undef HAVE_GMTIME_R
+
+/* Define if you have the localtime_r function.  */
+#undef HAVE_LOCALTIME_R
+
 /* Define if you have the macsystem function.  */
 #undef HAVE_MACSYSTEM
 
