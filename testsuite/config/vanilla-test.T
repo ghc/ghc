@@ -276,16 +276,18 @@ def vanilla-comp-test-actions ( $extra_compile_args )
         return False 
    fi
 
-   -- If there's an expected .stderr (presumably containing
-   -- warnings), ensure the compiler produced the same.
+   -- If there's an expected .stderr, presumably containing
+   -- warnings, ensure the compiler produced the same.
+   $actual_stderr   = qualify("comp.stderr")
    $expected_stderr = qualify("stderr")
-   $actual_stderr = qualify("comp.stderr")
-
-   if   exists($expected_stderr) && 
-        (normalise_errmsg(contents($actual_stderr))
-             /= normalise_errmsg(contents($expected_stderr)))
-   then say_fail_because_noteq($expected_stderr, $actual_stderr)
-        return False 
+   if   exists($expected_stderr)
+   then $stderr_a = normalise_errmsg(contents($actual_stderr))
+        $stderr_e = normalise_errmsg(contents($expected_stderr))
+        if   $stderr_e /= $stderr_a
+        then print ( "-- UNMATCHED WARNING MSGS: EXPECTED\n" ++ $stderr_e ++
+                     "-- ACTUAL\n" ++ $stderr_a ++ "-- END\n" )
+             return False
+        fi
    fi
 
    -- There's no expected stderr, so just insist that the compiler
