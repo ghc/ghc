@@ -81,7 +81,7 @@ summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
    = if isModuleInThisPackage mod
 	then do 
-	    let source_fn = hs_file location
+	    let source_fn = hs_preprocd_file location
 	    -- ToDo:
 	    -- ppsource_fn <- preprocess source_fn
 	    modsrc <- readFile source_fn

@@ -48,6 +48,8 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 			= parens (interpp'SP spec)
 	pp_spec (Just (True, spec))
 			= ptext SLIT("hiding") <+> parens (interpp'SP spec)
+
+ideclName (ImportDecl mod_nm _ _ _ _ _) = mod_nm
 \end{code}
 
 %************************************************************************

@@ -19,7 +19,6 @@ import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 
 import Rename		( renameModule, checkOldIface, closeIfaceDecls )
-
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThings )
 import PrelNames	( knownKeyNames )
@@ -39,7 +38,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleName, emptyModuleEnv )
+import Module		( ModuleName, moduleName, emptyModuleEnv, mkModuleInThisPackage )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn )
 import UniqSupply	( mkSplitUniqSupply )
@@ -49,12 +48,11 @@ import Outputable
 import StgInterp	( stgToInterpSyn )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
-			  PersistentRenamerState(..), 
+			  PersistentRenamerState(..), ModuleLocation(..),
 			  HomeSymbolTable, PackageSymbolTable, 
 			  OrigNameEnv(..), PackageRuleBase, HomeIfaceTable, 
 			  extendTypeEnv, groupTyThings,
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
-import CmSummarise	( ModSummary(..), ms_get_imports, mimp_name )
 import InterpSyn	( UnlinkedIBind )
 import StgInterp	( ItblEnv )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
@@ -86,22 +84,19 @@ data HscResult
 
 hscMain
   :: DynFlags
-  -> Bool	      -- source unchanged?
-  -> ModSummary       -- summary, including source filename
-  -> Maybe ModIface   -- old interface, if available
+  -> Bool			-- source unchanged?
+  -> ModuleLocation		-- location info
+  -> Maybe ModIface		-- old interface, if available
   -> HomeSymbolTable		-- for home module ModDetails
   -> HomeIfaceTable
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain dflags source_unchanged summary maybe_old_iface hst hit pcs
+hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
  = do {
-      -- ????? source_unchanged :: Bool -- extracted from summary?
-      --let source_unchanged = trace "WARNING: source_unchanged?!" False
-      --;
       putStrLn "checking old iface ...";
       (pcs_ch, check_errs, (recomp_reqd, maybe_checked_iface))
-         <- checkOldIface dflags hit hst pcs (ms_mod summary)
+         <- checkOldIface dflags hit hst pcs (hi_file location)
 			  source_unchanged maybe_old_iface;
       if check_errs then
          return (HscFail pcs_ch)
@@ -112,17 +107,18 @@ hscMain dflags source_unchanged summary maybe_old_iface hst hit pcs
                     | otherwise                   = hscNoRecomp
       ;
       putStrLn "doing what_next ...";
-      what_next dflags summary maybe_checked_iface
+      what_next dflags location maybe_checked_iface
                 hst hit pcs_ch
       }}
 
 
-hscNoRecomp dflags summary maybe_checked_iface hst hit pcs_ch
+hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
  = do {
       -- we definitely expect to have the old interface available
       let old_iface = case maybe_checked_iface of 
                          Just old_if -> old_if
                          Nothing -> panic "hscNoRecomp:old_iface"
+          this_mod = mi_module old_iface
       ;
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -133,15 +129,15 @@ hscNoRecomp dflags summary maybe_checked_iface hst hit pcs_ch
 
       -- TYPECHECK
       maybe_tc_result
-         <- typecheckModule dflags (ms_mod summary) pcs_cl hst hit cl_hs_decls;
+         <- typecheckModule dflags this_mod pcs_cl hst hit cl_hs_decls;
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
          Just tc_result -> do {
 
-      let pcs_tc        = tc_pcs tc_result
-          env_tc        = tc_env tc_result
-          local_insts   = tc_insts tc_result
-          local_rules   = tc_rules tc_result
+      let pcs_tc      = tc_pcs tc_result
+          env_tc      = tc_env tc_result
+          local_insts = tc_insts tc_result
+          local_rules = tc_rules tc_result
       ;
       -- create a new details from the closed, typechecked, old iface
       let new_details = mkModDetailsFromIface env_tc local_insts local_rules
@@ -154,19 +150,21 @@ hscNoRecomp dflags summary maybe_checked_iface hst hit pcs_ch
       }}}}
 
 
-hscRecomp dflags summary maybe_checked_iface hst hit pcs_ch
+hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
  = do {
       -- what target are we shooting for?
       let toInterp = dopt_HscLang dflags == HscInterpreted
-          this_mod = ms_mod summary
       ;
+--      putStrLn ("toInterp = " ++ show toInterp);
       -- PARSE
-      maybe_parsed <- myParseModule dflags summary;
+      maybe_parsed <- myParseModule dflags (hs_preprocd_file location);
       case maybe_parsed of {
          Nothing -> return (HscFail pcs_ch);
          Just rdr_module -> do {
 
       -- RENAME
+      let this_mod = mkModuleInThisPackage (hsModuleName rdr_module)
+      ;
       show_pass dflags "Renamer";
       (pcs_rn, maybe_rn_result) 
          <- renameModule dflags hit hst pcs_ch this_mod rdr_module;
@@ -212,7 +210,8 @@ hscRecomp dflags summary maybe_checked_iface hst hit pcs_ch
       ;
       -- do the rest of code generation/emission
       (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
-         <- restOfCodeGeneration dflags toInterp summary
+         <- restOfCodeGeneration dflags toInterp this_mod
+	       (map ideclName (hsModuleImports rdr_module))
                cost_centre_info foreign_stuff env_tc stg_binds oa_tidy_binds
                hit (pcs_PIT pcs_tc)       
       ;
@@ -223,17 +222,10 @@ hscRecomp dflags summary maybe_checked_iface hst hit pcs_ch
       }}}}}}}
 
 
-myParseModule dflags summary
+myParseModule dflags src_filename
  = do --------------------------  Parser  ----------------
       show_pass dflags "Parser"
       -- _scc_     "Parser"
-
-      let src_filename -- name of the preprocessed source file
-            = case ms_ppsource summary of
-                 Just (filename, fingerprint) -> filename
-                 Nothing -> pprPanic 
-                               "myParseModule:summary is not of a source module"
-                               (ppr summary)
 
       buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
@@ -257,7 +249,7 @@ myParseModule dflags summary
       }}
 
 
-restOfCodeGeneration dflags toInterp summary cost_centre_info 
+restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_info 
                      foreign_stuff env_tc stg_binds oa_tidy_binds
                      hit pit -- these last two for mapping ModNames to Modules
  | toInterp
@@ -285,9 +277,7 @@ restOfCodeGeneration dflags toInterp summary cost_centre_info
  where
     local_tycons     = typeEnvTyCons env_tc
     local_classes    = typeEnvClasses env_tc
-    this_mod         = ms_mod summary
-    imported_modules = map (mod_name_to_Module.mimp_name) 
-	                   (ms_get_imports summary)
+    imported_modules = map mod_name_to_Module imported_module_names
     (fe_binders,h_code,c_code) = foreign_stuff
 
     mod_name_to_Module :: ModuleName -> Module

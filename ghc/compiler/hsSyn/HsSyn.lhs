@@ -24,7 +24,8 @@ module HsSyn (
 	module HsTypes,
 	Fixity, NewOrData, 
 
-	collectTopBinders, collectMonoBinders, collectLocatedMonoBinders
+	collectTopBinders, collectMonoBinders, collectLocatedMonoBinders,
+	hsModuleName, hsModuleImports
      ) where
 
 #include "HsVersions.h"
@@ -91,6 +92,9 @@ instance (Outputable name, Outputable pat)
 
 	pp_nonnull [] = empty
 	pp_nonnull xs = vcat (map ppr xs)
+
+hsModuleName    (HsModule mod_name _ _ _ _ _ _) = mod_name
+hsModuleImports (HsModule mod_name vers exports imports decls deprec src_loc) = imports
 \end{code}
 
 

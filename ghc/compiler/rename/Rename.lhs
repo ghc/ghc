@@ -25,7 +25,8 @@ import RnIfaces		( slurpImpDecls, mkImportInfo,
 			  getInterfaceExports, closeDecls,
 			  RecompileRequired, recompileRequired
 			)
-import RnHiFiles	( findAndReadIface, removeContext, loadExports, loadFixDecls, loadDeprecs )
+import RnHiFiles	( readIface, removeContext, 
+			  loadExports, loadFixDecls, loadDeprecs )
 import RnEnv		( availName, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
@@ -367,41 +368,45 @@ rnDeprecs gbl_env Nothing decls
 checkOldIface :: DynFlags
 	      -> HomeIfaceTable -> HomeSymbolTable
 	      -> PersistentCompilerState
-	      -> Module 
+	      -> FilePath
 	      -> Bool 			-- Source unchanged
 	      -> Maybe ModIface 	-- Old interface from compilation manager, if any
 	      -> IO (PersistentCompilerState, Bool, (RecompileRequired, Maybe ModIface))
 				-- True <=> errors happened
 
-checkOldIface dflags hit hst pcs mod source_unchanged maybe_iface
-  = initRn dflags hit hst pcs mod $
+checkOldIface dflags hit hst pcs iface_path source_unchanged maybe_iface
+  = initRn dflags hit hst pcs (panic "checkOldIface: bogus mod") $
 	
 	-- Load the old interface file, if we havn't already got it
-    loadOldIface mod maybe_iface			`thenRn` \ maybe_iface ->
+    loadOldIface iface_path maybe_iface				`thenRn` \ maybe_iface2 ->
 
 	-- Check versions
-    recompileRequired mod source_unchanged maybe_iface	`thenRn` \ recompile ->
+    recompileRequired iface_path source_unchanged maybe_iface2	`thenRn` \ recompile ->
 
-    returnRn (recompile, maybe_iface)
+    returnRn (recompile, maybe_iface2)
 \end{code}
 
 
 \begin{code}
-loadOldIface :: Module -> Maybe ModIface -> RnMG (Maybe ModIface)
-loadOldIface mod (Just iface) 
+loadOldIface :: FilePath -> Maybe ModIface -> RnMG (Maybe ModIface)
+loadOldIface iface_path (Just iface) 
   = returnRn (Just iface)
 
-loadOldIface mod Nothing
+loadOldIface iface_path Nothing
   = 	-- LOAD THE OLD INTERFACE FILE
-    findAndReadIface doc_str (moduleName mod) False {- Not hi-boot -}	`thenRn` \ read_result ->
+    -- call readIface ...
+    readIface iface_path `thenRn` \ read_result ->
     case read_result of {
 	Left err -> 	-- Old interface file not found, or garbled, so we'd better bail out
 		    traceRn (vcat [ptext SLIT("No old interface file:"), err])	`thenRn_`
 		    returnRn Nothing ;
 
-	Right (_, iface) ->
+	Right iface ->
 
 	-- RENAME IT
+    let mod = pi_mod iface
+        doc_str = ptext SLIT("need usage info from") <+> ppr mod
+    in
     initIfaceRnMS mod (
 	loadHomeDecls (pi_decls iface)	`thenRn` \ decls ->
 	loadHomeRules (pi_rules iface)	`thenRn` \ rules -> 
@@ -433,10 +438,6 @@ loadOldIface mod Nothing
     in
     returnRn (Just mod_iface)
     }
-
-    
-  where
-    doc_str = ptext SLIT("need usage info from") <+> ppr mod
 \end{code}
 
 \begin{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.11 2000/10/30 11:18:14 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.12 2000/10/30 13:46:24 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -37,7 +37,6 @@ import Module
 import CmdLineOpts
 import Config
 import Util
-import MkIface		( pprIface )
 
 import Directory
 import System
@@ -433,14 +432,12 @@ run_phase Hsc basename suff input_fn output_fn
 				  then return "-fsource-unchanged"
 				  else return ""
 
-   -- build a bogus ModSummary to pass to hscMain.
-	let summary = ModSummary {
-			ms_mod = (mkModuleInThisPackage . mkModuleName)
-                                    {-ToDo: modname!!-}basename,
-			ms_location = error "no loc",
-			ms_ppsource = Just (input_fn, error "no fingerprint"),
-			ms_imports = error "no imports"
-		     }
+   -- build a bogus ModuleLocation to pass to hscMain.
+        let location = ModuleLocation {
+                          hs_preprocd_file = input_fn,
+                          hi_file = hifile,
+                          obj_file = o_file
+                       }
 
   -- get the DynFlags
         dyn_flags <- readIORef v_DynFlags
@@ -449,7 +446,7 @@ run_phase Hsc basename suff input_fn output_fn
         pcs <- initPersistentCompilerState
 	result <- hscMain dyn_flags{ hscOutName = output_fn }
 			  (source_unchanged == "-fsource-unchanged")
-			  summary 
+			  location
 			  Nothing	 -- no iface
 			  emptyModuleEnv -- HomeSymbolTable
 			  emptyModuleEnv -- HomeIfaceTable
@@ -733,7 +730,7 @@ compile summary old_iface hst hit pcs = do
    
    let input_fn = case ms_ppsource summary of
 			Just (ppsource, fingerprint) -> ppsource
-			Nothing -> hs_file (ms_location summary)
+			Nothing -> hs_preprocd_file (ms_location summary)
 
    when verb (hPutStrLn stderr ("compile: input file " ++ input_fn))
 
@@ -751,7 +748,7 @@ compile summary old_iface hst hit pcs = do
    -- run the compiler
    hsc_result <- hscMain dyn_flags{ hscOutName = output_fn } 
 			 (panic "compile:source_unchanged")
-                         summary old_iface hst hit pcs
+                         (ms_location summary) old_iface hst hit pcs
 
    case hsc_result of {
       HscFail pcs -> return (CompErrs pcs);
@@ -764,7 +761,7 @@ compile summary old_iface hst hit pcs = do
 		Nothing -> return (CompOK details Nothing pcs);
 		Just iface -> do
 
-	   let (basename, _) = splitFilename (hs_file (ms_location summary))
+	   let (basename, _) = splitFilename (hs_preprocd_file (ms_location summary))
 	   maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
 	   let stub_unlinked = case maybe_stub_o of
 				  Nothing -> []

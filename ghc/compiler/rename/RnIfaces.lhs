@@ -18,7 +18,7 @@ where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, opt_NoPruneDecls, opt_NoPruneTyDecls, opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes
 import HsSyn		( HsDecl(..), Sig(..), TyClDecl(..), ConDecl(..), ConDetails(..),
 			  InstDecl(..), HsType(..), hsTyVarNames, getBangType
@@ -785,12 +785,12 @@ type RecompileRequired = Bool
 upToDate  = False	-- Recompile not required
 outOfDate = True	-- Recompile required
 
-recompileRequired :: Module 
+recompileRequired :: FilePath		-- Only needed for debug msgs
 		  -> Bool 		-- Source unchanged
 		  -> Maybe ModIface 	-- Old interface, if any
 		  -> RnMG RecompileRequired
-recompileRequired mod source_unchanged maybe_iface
-  = traceRn (text "Considering whether compilation is required for" <+> ppr mod <> colon)	`thenRn_`
+recompileRequired iface_path source_unchanged maybe_iface
+  = traceRn (text "Considering whether compilation is required for" <+> text iface_path <> colon)	`thenRn_`
 
 	-- CHECK WHETHER THE SOURCE HAS CHANGED
     if not source_unchanged then

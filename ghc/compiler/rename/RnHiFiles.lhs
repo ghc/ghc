@@ -5,7 +5,7 @@
 
 \begin{code}
 module RnHiFiles (
-	findAndReadIface, loadInterface, loadHomeInterface, 
+	readIface, findAndReadIface, loadInterface, loadHomeInterface, 
 	tryLoadInterface, loadOrphanModules,
 	loadExports, loadFixDecls, loadDeprecs,
 
@@ -485,10 +485,17 @@ findAndReadIface doc_str mod_name hi_boot_file
     ioToRnM (findModule mod_name)	`thenRn` \ maybe_found ->
 
     case maybe_found of
-      Right (Just (mod,locn))
-	| hi_boot_file -> readIface mod (hi_file locn ++ "-boot")
-	| otherwise    -> readIface mod (hi_file locn)
-	
+      Right (Just (wanted_mod,locn))
+        -> readIface (hi_file locn ++ if hi_boot_file then "-boot" else "")
+					`thenRn` \ read_result ->
+	   case read_result of
+              Left bad -> returnRn (Left bad)
+              Right iface 
+                 -> let read_mod = pi_mod iface
+		    in warnCheckRn (wanted_mod == read_mod)
+		   	           (hiModuleNameMismatchWarn wanted_mod read_mod) 
+				  	`thenRn_`
+		       returnRn (Right (wanted_mod, iface))
 	-- Can't find it
       other   -> traceRn (ptext SLIT("...not found"))	`thenRn_`
 		 returnRn (Left (noIfaceErr mod_name hi_boot_file))
@@ -504,12 +511,12 @@ findAndReadIface doc_str mod_name hi_boot_file
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: Module -> String -> RnM d (Either Message (Module, ParsedIface))
+readIface :: String -> RnM d (Either Message ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
-readIface wanted_mod file_path
-  = traceRn (ptext SLIT("...reading from") <+> text file_path)	`thenRn_`
-    ioToRnM (hGetStringBuffer False file_path)      		 `thenRn` \ read_result ->
+readIface file_path
+  = traceRn (ptext SLIT("readIFace") <+> text file_path)	`thenRn_`
+    ioToRnM (hGetStringBuffer False file_path)     		`thenRn` \ read_result ->
     case read_result of
 	Right contents	  -> 
              case parseIface contents
@@ -517,13 +524,7 @@ readIface wanted_mod file_path
 				context = [],
 				glasgow_exts = 1#,
 				loc = mkSrcLoc (mkFastString file_path) 1 } of
-		  POk _  (PIface iface) ->
-		      warnCheckRn (wanted_mod == read_mod)
-		    		  (hiModuleNameMismatchWarn wanted_mod read_mod) `thenRn_`
-		      returnRn (Right (wanted_mod, iface))
-		    where
-		      read_mod = pi_mod iface
-
+		  POk _  (PIface iface) -> returnRn (Right iface)
 		  PFailed err   -> bale_out err
 	          parse_result 	-> bale_out empty
 		 	-- This last case can happen if the interface file is (say) empty
