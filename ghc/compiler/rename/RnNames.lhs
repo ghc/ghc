@@ -12,7 +12,9 @@ module RnNames (
 
 IMP_Ubiq()
 
-import CmdLineOpts	( opt_SourceUnchanged, opt_NoImplicitPrelude )
+import CmdLineOpts	( opt_SourceUnchanged, opt_NoImplicitPrelude, 
+			  opt_WarnDuplicateExports
+			)
 import HsSyn	( HsModule(..), HsDecl(..), FixityDecl(..), Fixity, Fake, InPat, IE(..), HsTyVar,
 		  TyDecl, ClassDecl, InstDecl, DefaultDecl, ImportDecl(..), HsBinds, IfaceSig,
 		  collectTopBinders
@@ -27,6 +29,7 @@ import RnIfaces	( getInterfaceExports, getDeclBinders, checkUpToDate, recordSlur
 import BasicTypes ( IfaceFlavour(..) )
 import RnEnv
 import RnMonad
+
 import FiniteMap
 import PrelMods
 import UniqFM	( UniqFM, emptyUFM, addListToUFM_C, lookupUFM )
@@ -35,7 +38,7 @@ import Maybes	( maybeToBool, expectJust )
 import Name
 import Pretty
 import Outputable	( Outputable(..), PprStyle(..) )
-import Util	( panic, pprTrace, assertPanic )
+import Util	( panic, pprTrace, assertPanic, removeDups, cmpPString )
 \end{code}
 
 
@@ -222,7 +225,7 @@ filterImports :: Module
 		       [AvailInfo])			-- What was imported explicitly
 
 	-- Complains if import spec mentions things that the module doesn't export
-
+        -- Warns/informs if import spec contains duplicates.
 filterImports mod Nothing imports
   = returnRn (imports, [], [])
 
@@ -362,27 +365,45 @@ exported thing, and we also need to check for name clashes -- that
 is: two exported things must have different @OccNames@.
 
 \begin{code}
-type AvailEnv = FiniteMap OccName (RdrNameIE, AvailInfo)
+type AvailEnv = FiniteMap OccName (RdrNameIE, AvailInfo, Int{-no. of clashes-})
 	-- The FM maps each OccName to the RdrNameIE that gave rise to it,
 	-- for error reporting, as well as to its AvailInfo
 
 emptyAvailEnv = emptyFM
 
-unitAvailEnv :: RdrNameIE -> AvailInfo -> AvailEnv
-unitAvailEnv ie NotAvailable   = emptyFM
-unitAvailEnv ie (AvailTC _ []) = emptyFM
-unitAvailEnv ie avail	       = unitFM (nameOccName (availName avail)) (ie,avail)
+{-
+ Add new entry to environment. Checks for name clashes, i.e.,
+ plain duplicates or exported entity pairs that have different OccNames.
+ (c.f. 5.1.1 of Haskell 1.4 report.)
+-}
+addAvailEnv ie env NotAvailable   = returnRn env
+addAvailEnv ie env (AvailTC _ []) = returnRn env
+addAvailEnv ie env avail
+  = mapMaybeRn (addErrRn  . availClashErr) () conflict `thenRn_`
+    returnRn (addToFM_C add_avail env key elt)
+  where
+   key  = nameOccName (availName avail)
+   elt  = (ie,avail,reports_on)
 
-plusAvailEnv a1 a2
-  = mapRn (addErrRn.availClashErr) (conflictsFM bad_avail a1 a2)	`thenRn_`
-    returnRn (plusFM_C plus_avail a1 a2)
+   reports_on
+    | maybeToBool dup = 1
+    | otherwise       = 0
 
-listToAvailEnv :: RdrNameIE -> [AvailInfo] -> RnM s d AvailEnv
-listToAvailEnv ie items
-  = foldlRn plusAvailEnv emptyAvailEnv (map (unitAvailEnv ie) items)
+   conflict = conflictFM bad_avail env key elt
+   dup 
+    | opt_WarnDuplicateExports = conflictFM dup_avail env key elt
+    | otherwise                = Nothing
 
-bad_avail  (ie1,avail1) (ie2,avail2) = availName avail1 /= availName avail2	-- Same OccName, different Name
-plus_avail (ie1,a1) (ie2,a2) = (ie1, a1 `plusAvail` a2)
+addListToAvailEnv :: AvailEnv -> RdrNameIE -> [AvailInfo] -> RnM s d AvailEnv
+addListToAvailEnv env ie items = foldlRn (addAvailEnv ie) env items
+
+bad_avail  (ie1,avail1,r1) (ie2,avail2,r2) 
+   = availName avail1 /= availName avail2  -- Same OccName, different Name
+dup_avail  (ie1,avail1,r1) (ie2,avail2,r2) 
+   = availName avail1 == availName avail2 -- Same OccName & avail.
+
+add_avail (ie1,a1,r1) (ie2,a2,r2) = (ie1, a1 `plusAvail` a2, r1 + r2)
+
 \end{code}
 
 Processing the export list.
@@ -401,6 +422,7 @@ exportsFromAvail :: Module
 		 -> RnEnv
 		 -> RnMG (Name -> ExportFlag, ExportEnv)
 	-- Complains if two distinct exports have same OccName
+        -- Warns about identical exports.
 	-- Complains about exports items not in scope
 exportsFromAvail this_mod Nothing export_avails rn_env
   = exportsFromAvail this_mod (Just [IEModuleContents this_mod]) export_avails rn_env
@@ -408,39 +430,43 @@ exportsFromAvail this_mod Nothing export_avails rn_env
 exportsFromAvail this_mod (Just export_items) 
 		 (mod_avail_env, entity_avail_env)
 	         (RnEnv name_env fixity_env)
-  = mapRn exports_from_item export_items 		`thenRn` \ avail_envs ->
-    foldlRn plusAvailEnv emptyAvailEnv avail_envs	`thenRn` \ export_avail_env -> 
+  = checkForModuleExportDups export_items                 `thenRn` \ export_items' ->
+    foldlRn exports_from_item emptyAvailEnv export_items' `thenRn` \ export_avail_env ->
     let
-	export_avails   = map snd (eltsFM export_avail_env)
+     dup_entries = fmToList (filterFM (\ _ (_,_,clashes) -> clashes > 0) export_avail_env)
+    in
+    mapRn (addWarnRn . dupExportWarn) dup_entries         `thenRn_`
+    let
+	export_avails   = map (\ (_,a,_) -> a) (eltsFM export_avail_env)
 	export_fixities = mk_exported_fixities (availsToNameSet export_avails)
 	export_fn	= mk_export_fn export_avails
     in
     returnRn (export_fn, ExportEnv export_avails export_fixities)
 
   where
-    exports_from_item :: RdrNameIE -> RnMG AvailEnv
-    exports_from_item ie@(IEModuleContents mod)
+    exports_from_item :: AvailEnv -> RdrNameIE -> RnMG AvailEnv
+    exports_from_item export_avail_env ie@(IEModuleContents mod)
 	= case lookupFM mod_avail_env mod of
-		Nothing	    -> failWithRn emptyAvailEnv (modExportErr mod)
-		Just avails -> listToAvailEnv ie avails
+		Nothing	    -> failWithRn export_avail_env (modExportErr mod)
+		Just avails -> addListToAvailEnv export_avail_env ie avails
 
-    exports_from_item ie
+    exports_from_item export_avail_env ie
 	| not (maybeToBool maybe_in_scope) 
-	= failWithRn emptyAvailEnv (unknownNameErr (ieName ie))
+	= failWithRn export_avail_env (unknownNameErr (ieName ie))
 
 #ifdef DEBUG
 	-- I can't see why this should ever happen; if the thing is in scope
 	-- at all it ought to have some availability
 	| not (maybeToBool maybe_avail)
 	= pprTrace "exportsFromAvail: curious Nothing:" (ppr PprDebug name)
-	  returnRn emptyAvailEnv
+	  returnRn export_avail_env
 #endif
 
 	| not enough_avail
-	= failWithRn emptyAvailEnv (exportItemErr ie export_avail)
+	= failWithRn export_avail_env (exportItemErr ie export_avail)
 
 	| otherwise	-- Phew!  It's OK!
-	= returnRn (unitAvailEnv ie export_avail)
+	= addAvailEnv ie export_avail_env export_avail
        where
           maybe_in_scope  = lookupNameEnv name_env (ieName ie)
 	  Just name	  = maybe_in_scope
@@ -491,6 +517,31 @@ exportsFromAvail this_mod (Just export_items)
 	addToFM fix_env occ_name (fixity,prov)
 	}}
 
+{- warn and weed out duplicate module entries from export list. -}
+checkForModuleExportDups :: [RdrNameIE] -> RnMG [RdrNameIE]
+checkForModuleExportDups ls 
+  | opt_WarnDuplicateExports = check_modules ls
+  | otherwise                = returnRn ls
+  where
+   -- NOTE: reorders the export list by moving all module-contents
+   -- exports to the end (removing duplicates in the process.)
+   check_modules ls = 
+     (case dups of
+        [] -> returnRn ()
+        ls -> mapRn (\ ds@(IEModuleContents x:_) -> 
+                       addWarnRn (dupModuleExport x (length ds))) ls `thenRn_`
+              returnRn ()) `thenRn_`
+     returnRn (ls_no_modules ++ no_module_dups)
+     where
+      (ls_no_modules,modules) = foldr split_mods ([],[]) ls
+
+      split_mods i@(IEModuleContents _) ~(no_ms,ms) = (no_ms,i:ms)
+      split_mods i ~(no_ms,ms) = (i:no_ms,ms)
+
+      (no_module_dups, dups) = removeDups cmp_mods modules
+
+      cmp_mods (IEModuleContents m1) (IEModuleContents m2) = m1 `cmpPString` m2
+  
 mk_export_fn :: [AvailInfo] -> (Name -> ExportFlag)
 mk_export_fn avails
   = \name -> if name `elemNameSet` exported_names
@@ -499,8 +550,7 @@ mk_export_fn avails
   where
     exported_names :: NameSet
     exported_names = availsToNameSet avails
-\end{code}				  
-
+\end{code}
 
 %************************************************************************
 %*									*
@@ -523,8 +573,25 @@ exportItemErr export_item avail sty
 	   4 (vcat [hsep [ptext SLIT("Wanted:   "), ppr sty export_item],
 		    hsep [ptext SLIT("Available:"), ppr sty (ieOcc export_item), pprAvail sty avail]])
 
-availClashErr (occ_name, ((ie1,avail1), (ie2,avail2))) sty
+availClashErr (occ_name, ((ie1,avail1,_), (ie2,avail2,_))) sty
   = hsep [ptext SLIT("The export items"), ppr sty ie1, ptext SLIT("and"), ppr sty ie2,
 	  ptext SLIT("create conflicting exports for"), ppr sty occ_name]
+
+dupExportWarn (occ_name, (_,_,times)) sty
+  = hsep [ppr sty occ_name, 
+          ptext SLIT("mentioned"), text (speak_times (times+1)),
+          ptext SLIT("in export list")]
+
+dupModuleExport mod times sty
+  = hsep [ptext SLIT("Module"), pprModule sty mod, 
+          ptext SLIT("mentioned"), text (speak_times times),
+          ptext SLIT("in export list")]
+
+speak_times :: Int{- >=1 -} -> String
+speak_times t | t == 1 = "once"
+              | t == 2 = "twice"
+              | otherwise  = show t ++ " times"
+
+
 \end{code}
 
