@@ -11,7 +11,8 @@ module CmLink ( Linkable(..),  Unlinked(..),
 		LinkResult(..),
                 link, 
 		unload,
-                PersistentLinkerState{-abstractly!-}, emptyPLS
+                PersistentLinkerState{-abstractly!-}, emptyPLS,
+		lookupClosure
   ) where
 
 
@@ -19,15 +20,16 @@ import Interpreter
 import DriverPipeline
 import CmTypes
 import CmStaticInfo	( GhciMode(..) )
-import Module		( ModuleName, PackageName )
 import Outputable	( SDoc )
-import FiniteMap
 import Digraph		( SCC(..), flattenSCC )
-import Outputable
-import Exception
 import DriverUtil
+import Module		( ModuleName, PackageName )
+import RdrName
+import FiniteMap
+import Outputable
 import Panic		( panic )
 
+import Exception
 import IO
 
 #include "HsVersions.h"
@@ -102,14 +104,18 @@ link :: GhciMode		-- interactive or batch
 --	   to be actually linked this time around (or unlinked and re-linked 
 --	   if the module was recompiled).
 
-link Batch batch_attempt_linking linkables pls1
-   | batch_attempt_linking
-   = do hPutStrLn stderr "CmLink.link(batch): linkables are ..."
+link mode batch_attempt_linking linkables pls1
+   = do hPutStrLn stderr "CmLink.link: linkables are ..."
         hPutStrLn stderr (showSDoc (vcat (map ppr linkables)))
-        let o_files = concatMap getOfiles linkables
+	res <- link' mode batch_attempt_linking linkables pls1
+	hPutStrLn stderr "CmLink.link: done"
+	return res
+
+link' Batch batch_attempt_linking linkables pls1
+   | batch_attempt_linking
+   = do let o_files = concatMap getOfiles linkables
         doLink o_files
 	-- doLink only returns if it succeeds
-        hPutStrLn stderr "CmLink.link(batch): done"
         return (LinkOK pls1)
    | otherwise
    = do hPutStrLn stderr "CmLink.link(batch): upsweep (partially?) failed OR main not exported;"
@@ -119,8 +125,9 @@ link Batch batch_attempt_linking linkables pls1
       getOfiles (LP _)    = panic "CmLink.link(getOfiles): shouldn't get package linkables"
       getOfiles (LM _ us) = map nameOfObject (filter isObject us)
 
-link Interactive batch_attempt_linking linkables pls1
-   = linkObjs linkables pls1
+link' Interactive batch_attempt_linking linkables pls1
+    = linkObjs linkables pls1
+        
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC
@@ -179,6 +186,7 @@ invalidLinkable = throwDyn (OtherError "linkable doesn't contain entirely object
 -- link all the interpreted code in one go.  We first remove from the
 -- various environments any previous versions of these modules.
 linkFinish pls mods ul_trees = do
+   resolveObjs
    let itbl_env'    = filterRdrNameEnv mods (itbl_env pls)
        closure_env' = filterRdrNameEnv mods (closure_env pls)
        stuff        = [ (trees,itbls) | Trees trees itbls <- ul_trees ]
@@ -190,12 +198,17 @@ linkFinish pls mods ul_trees = do
 				  closure_env = new_closure_env,
 				  itbl_env    = new_itbl_env
 			}
-   resolveObjs
+   putStrLn (showSDoc (vcat (map ppr (keysFM new_closure_env))))
    return (LinkOK new_pls)
 
 -- purge the current "linked image"
 unload :: PersistentLinkerState -> IO PersistentLinkerState
 unload pls = return pls{ closure_env = emptyFM, itbl_env = emptyFM }
 
+lookupClosure :: RdrName -> PersistentLinkerState -> Maybe HValue
+lookupClosure nm PersistentLinkerState{ closure_env = cenv } =
+   case lookupFM cenv nm of
+	Nothing -> Nothing
+ 	Just hv -> Just hv
 #endif
 \end{code}

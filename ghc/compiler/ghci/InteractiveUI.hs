@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.2 2000/11/16 11:39:37 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.3 2000/11/16 16:54:36 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -9,12 +9,16 @@
 
 module InteractiveUI (interactiveUI) where
 
+#include "HsVersions.h"
+
 import CompManager
 import CmStaticInfo
 import DriverUtil
 import DriverState
 import Linker
 import Module
+import RdrName				-- tmp
+import OccName				-- tmp
 import Panic
 import Util
 
@@ -26,6 +30,8 @@ import System
 import Directory
 import IO
 import Char
+
+import PrelGHC  ( unsafeCoerce# )
 
 -----------------------------------------------------------------------------
 
@@ -87,7 +93,7 @@ uiLoop :: GHCi ()
 uiLoop = do
   st <- getGHCiState
 #ifndef NO_READLINE
-  l <- io (readline (moduleNameUserString (current_module st)  ++ ">"))
+  l <- io (readline (moduleNameUserString (current_module st)  ++ "> "))
 #else
   l <- io (hGetLine stdin)
 #endif
@@ -101,12 +107,25 @@ uiLoop = do
   	  runCommand l
 	  uiLoop  
 
-runCommand c = myCatch (doCommand c) 
-			(\e -> io (hPutStr stdout ("Error: " ++ show e)))
+runCommand c = 
+  myCatchDyn (doCommand c) 
+    (\dyn -> case dyn of
+		PhaseFailed phase code ->
+			io ( putStrLn ("Phase " ++ phase ++ " failed (code "
+				        ++ show code ++ ")"))
+		Interrupted -> io (putStrLn "Interrupted.")
+		_ -> io (putStrLn (show (dyn :: BarfKind)))
+    )
 
 doCommand (':' : command) = specialCommand command
 doCommand expr = do
+  st <- getGHCiState
   io (hPutStrLn stdout ("Run expression: " ++ expr))
+  let (mod,'.':str) = break (=='.') expr
+  case cmLookupSymbol (mkOrig varName (mkModuleName mod) (_PK_ str)) (cmstate st) of
+	Nothing -> io (putStrLn "nothing.")
+	Just e  -> io (do unsafeCoerce# e :: IO ()
+		          putStrLn "done.")
   return ()
 
 specialCommand str = do
@@ -114,10 +133,11 @@ specialCommand str = do
   case [ (s,f) | (s,f) <- commands, prefixMatch cmd s ] of
      []      -> io $ hPutStr stdout ("uknown command `:" ++ cmd ++ "'\n" 
 				    ++ shortHelpText)
-     [(_,f)] -> f rest
+     [(_,f)] -> f (dropWhile isSpace rest)
      cs      -> io $ hPutStrLn stdout ("prefix " ++ cmd ++ 
 			    	       " matches multiple commands (" ++ 
-	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs) ++ ")")
+	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs)
+					 ++ ")")
 
 noArgs c = io (hPutStrLn stdout ("command `:" ++ c ++ "' takes no arguments"))
 
@@ -180,7 +200,10 @@ setGHCiState s = GHCi $ \_ -> return (s,())
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 
-myCatch (GHCi m) h = GHCi $ \s -> Exception.catch (m s) (\e -> unGHCi (h e) s)
+myCatch (GHCi m) h = GHCi $ \s -> 
+   Exception.catch (m s) (\e -> unGHCi (h e) s)
+myCatchDyn (GHCi m) h = GHCi $ \s -> 
+   Exception.catchDyn (m s) (\e -> unGHCi (h e) s)
 
 -----------------------------------------------------------------------------
 -- package loader

@@ -6,7 +6,8 @@
 \begin{code}
 module CompManager ( cmInit, cmLoadModule, 
                      cmGetExpr, cmRunExpr,
-                     CmState, emptyCmState  -- abstract
+                     CmState, emptyCmState,  -- abstract
+		     cmLookupSymbol --tmp
                    )
 where
 
@@ -19,10 +20,7 @@ import Outputable
 import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
 
-import CmLink 		( PersistentLinkerState, emptyPLS, Linkable(..), 
-			  link, LinkResult(..), 
-			  filterModuleLinkables, modname_of_linkable,
-			  is_package_linkable, findModuleLinkable )
+import CmLink
 import CmTypes
 import HscTypes
 import Interpreter	( HValue )
@@ -35,6 +33,7 @@ import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState, ModDetails(..) )
 import Name		( lookupNameEnv )
+import RdrName
 import Module
 import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
@@ -511,4 +510,7 @@ summarise mod location
                return (Just time)) 
            `catch`
            (\err -> return Nothing)
+
+cmLookupSymbol :: RdrName -> CmState -> Maybe HValue
+cmLookupSymbol nm CmState{ pls = pls } = lookupClosure nm pls
 \end{code}
