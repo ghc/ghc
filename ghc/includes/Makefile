@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.18 2001/11/21 16:56:19 sof Exp $
+# $Id: Makefile,v 1.19 2002/02/11 13:59:01 simonmar Exp $
 #
 
 TOP = ..
@@ -66,9 +66,11 @@ endif
 	@echo "Done."
 
 # ---------------------------------------------------------------------------
-# Make NativeDefs.h for the NCG
+# Make DerivedConstants.h for the compiler
 
 all :: DerivedConstants.h
+
+mkDerivedConstants.c : $(H_CONFIG)
 
 mkDerivedConstantsHdr : mkDerivedConstants.o
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkDerivedConstants.o
