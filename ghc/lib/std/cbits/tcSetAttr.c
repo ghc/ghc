@@ -1,7 +1,7 @@
 /* 
  * (c) The GHC Team 2001
  *
- * $Id: tcSetAttr.c,v 1.1 2001/01/16 14:06:14 simonmar Exp $
+ * $Id: tcSetAttr.c,v 1.2 2001/01/26 17:51:40 rrt Exp $
  *
  * A wrapper around tcsetattr() which works for a background process.
  */
@@ -21,6 +21,7 @@
 #include <unistd.h>
 #endif
 
+#ifndef mingw32_TARGET_OS
 /* tcsetattr() when invoked by a background process causes the process
  * to be sent SIGTTOU regardless of whether the process has TOSTOP set
  * in its terminal flags (try it...).  This function provides a
@@ -40,3 +41,6 @@ tcSetAttr( int fd, int options, const struct termios *tp )
 
     return res;
 }
+#else
+#define tcSetAttr(f,o,t) tcsetattr((f),(o),(t))
+#endif

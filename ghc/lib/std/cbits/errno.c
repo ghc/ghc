@@ -1,13 +1,23 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: errno.c,v 1.3 1998/12/02 13:27:20 simonm Exp $
+ * $Id: errno.c,v 1.4 2001/01/26 17:51:40 rrt Exp $
  *
  * GHC Error Number Conversion
  */
 
 #include "Rts.h"
 #include "stgio.h"
+
+
+/* Raw errno */
+
+int *ghcErrno(void) {
+  return &errno;
+}
+
+
+/* Fancy errno */
 
 int ghc_errno = 0;
 int ghc_errtype = 0;
