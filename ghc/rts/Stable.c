@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.5 1999/07/16 09:53:44 panne Exp $
+ * $Id: Stable.c,v 1.6 1999/08/04 10:04:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -187,6 +187,9 @@ static inline void
 freeStableName(snEntry *sn)
 {
   ASSERT(sn->sn_obj == NULL);
+  if (sn->addr != NULL) {
+    removeHashTable(addrToStableHash, (W_)sn->addr, NULL);
+  }
   sn->addr = (P_)stable_ptr_free;
   stable_ptr_free = sn;
 }
@@ -347,9 +350,15 @@ gcStablePtrTable(rtsBool full)
 	  (StgClosure *)new = isAlive((StgClosure *)q);
 	  IF_DEBUG(stable, fprintf(stderr,"Stable name %d still alive at %p, weight %d\n", p - stable_ptr_table, new, p->weight));
 
-	  p->addr = new;
-	  if (new != NULL) {
-	    /* Re-hash this stable name */
+	  if (new == NULL) {
+	    /* The target has been garbage collected.  Remove its
+	     * entry from the hash table.
+	     */
+	    removeHashTable(addrToStableHash, (W_)q, NULL);
+
+	  } else {
+	    /* Target still alive, Re-hash this stable name 
+	     */
 	    if (full) {
 	      insertHashTable(addrToStableHash, (W_)new, (void *)(p - stable_ptr_table));
 	    } else if (new != q) {
@@ -357,6 +366,11 @@ gcStablePtrTable(rtsBool full)
 	      insertHashTable(addrToStableHash, (W_)new, (void *)(p - stable_ptr_table));
 	    }
 	  }
+
+	  /* finally update the address of the target to point to its
+	   * new location.
+	   */
+	  p->addr = new;
 	}
       }
     }
