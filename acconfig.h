@@ -86,6 +86,12 @@
 
 /* Define if RTLD_LOCAL is available */
 #undef HAVE_RTLDLOCAL
+ 
+/* Define if RTLD_GLOBAL is available */
+#undef RTLD_GLOBAL
+
+/* Define if RTLD_NOW is available */
+#undef RTLD_NOW
 
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
