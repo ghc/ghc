@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.23 $
- * $Date: 1999/12/06 16:47:07 $
+ * $Revision: 1.24 $
+ * $Date: 1999/12/07 11:14:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -468,6 +468,7 @@ Text t; {
     tycon(tyconHw).tagToCon      = NIL;
     tycon(tyconHw).tuple         = -1;
     tycon(tyconHw).mod           = currentModule;
+    tycon(tyconHw).itbl          = NULL;
     module(currentModule).tycons = cons(tyconHw,module(currentModule).tycons);
     tycon(tyconHw).nextTyconHash = tyconHash[h];
     tyconHash[h]                 = tyconHw;
@@ -659,6 +660,7 @@ Cell parent; {
     name(nameHw).type         = NIL;
     name(nameHw).primop       = 0;
     name(nameHw).mod          = currentModule;
+    name(nameHw).itbl         = NULL;
     module(currentModule).names=cons(nameHw,module(currentModule).names);
     name(nameHw).nextNameHash = nameHash[h];
     nameHash[h]               = nameHw;

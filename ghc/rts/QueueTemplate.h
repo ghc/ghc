@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: QueueTemplate.h,v 1.4 1999/04/27 10:07:19 sewardj Exp $
+ * $Id: QueueTemplate.h,v 1.5 1999/12/07 11:15:02 sewardj Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -16,8 +16,8 @@
  *   static void freeQueue  ( Queue* q );
  *
  * $RCSfile: QueueTemplate.h,v $
- * $Revision: 1.4 $
- * $Date: 1999/04/27 10:07:19 $
+ * $Revision: 1.5 $
+ * $Date: 1999/12/07 11:15:02 $
  *
  * ------------------------------------------------------------------------*/
 
@@ -36,6 +36,16 @@ typedef struct {
     nat    size;
 } Queue;
 
+
+#if MAKE_findIn
+static int mycat2(findIn,Queue)( Queue* q, Type x )
+{
+   nat i;
+   for (i = 0; i < q->len; i++)
+      if (q->elems[i] == x) return i;
+   return -1;
+}
+#endif
 
 static void mycat2(init,Queue)( Queue* q )
 {

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/11/29 18:59:40 $
+ * $Revision: 1.20 $
+ * $Date: 1999/12/07 11:15:00 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -79,25 +79,33 @@ typedef struct {
 
 #define Queue Instrs
 #define Type  StgWord8
+#define MAKE_findIn 0
 #include "QueueTemplate.h"
+#undef MAKE_findIn
 #undef Type
 #undef Queue
 
 #define Queue Ptrs
 #define Type  AsmObject
+#define MAKE_findIn 0
 #include "QueueTemplate.h"
+#undef MAKE_findIn
 #undef Type
 #undef Queue
 
 #define Queue Refs
 #define Type  AsmRef
+#define MAKE_findIn 0
 #include "QueueTemplate.h"
+#undef MAKE_findIn
 #undef Type
 #undef Queue
 
 #define Queue NonPtrs
 #define Type  StgWord
+#define MAKE_findIn 1
 #include "QueueTemplate.h"
+#undef MAKE_findIn
 #undef Type
 #undef Queue
 
@@ -465,6 +473,11 @@ static void asmPtr( AsmBCO bco, AsmObject x )
 static void asmWord( AsmBCO bco, StgWord i )
 {
     insertNonPtrs( &bco->nps, i );
+}
+
+static int asmFindInNonPtrs ( AsmBCO bco, StgWord i )
+{
+   return findInNonPtrs ( &bco->nps, i );
 }
 
 #define asmWords(bco,ty,x)                               \
@@ -1560,9 +1573,20 @@ AsmBCO asm_BCO_takeMVar ( void )
 
 AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info )
 {
+    int i;
     ASSERT( sizeW_fromITBL(info) >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
-    emiti_8(bco,i_ALLOC_CONSTR,bco->nps.len);
-    asmWords(bco,AsmInfo,info);
+
+    /* Look in this bco's collection of nonpointers (literals)
+       to see if the itbl pointer is already there.  If so, re-use it. */
+    i = asmFindInNonPtrs ( bco, (StgWord)info );
+
+    if (i == -1) {
+       emiti_8(bco,i_ALLOC_CONSTR,bco->nps.len);
+       asmWords(bco,AsmInfo,info);
+    } else {
+       emiti_8(bco,i_ALLOC_CONSTR,i);
+    }
+
     incSp(bco, sizeofW(StgClosurePtr));
     grabHpNonUpd(bco,sizeW_fromITBL(info));
     return bco->sp;

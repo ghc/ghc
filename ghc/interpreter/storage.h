@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.18 $
- * $Date: 1999/12/06 16:47:09 $
+ * $Revision: 1.19 $
+ * $Date: 1999/12/07 11:14:58 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -500,6 +500,7 @@ struct strTycon {
     Cell   defn;
     Name   conToTag;                    /* used in derived code            */
     Name   tagToCon;
+    void*  itbl;                       /* For tuples, the info tbl pointer */
     Tycon  nextTyconHash;
 };
 
@@ -540,9 +541,10 @@ struct strName {
     Int    number;
     Cell   type;
     Cell   defn;
-    Cell   stgVar;        /* really StgVar   */
-    Text   callconv;      /* for foreign import/export */
-    void*  primop;        /* really StgPrim* */
+    Cell   stgVar;                                      /* really StgVar   */
+    Text   callconv;                          /* for foreign import/export */
+    void*  primop;                                      /* really StgPrim* */
+    void*  itbl;                 /* For constructors, the info tbl pointer */
     Name   nextNameHash;
 };
 

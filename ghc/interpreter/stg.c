@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/11/29 18:59:32 $
+ * $Revision: 1.10 $
+ * $Date: 1999/12/07 11:14:56 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -28,12 +28,16 @@
 void* stgConInfo( StgDiscr d )
 {
     switch (whatIs(d)) {
-    case NAME:
-            return asmMkInfo(cfunOf(d),name(d).arity);
-    case TUPLE: 
-            return asmMkInfo(0,tupleOf(d));
-    default: 
-            internal("stgConInfo");
+       case NAME:
+          if (!name(d).itbl)
+             name(d).itbl = asmMkInfo(cfunOf(d),name(d).arity);
+          return name(d).itbl;
+       case TUPLE: 
+          if (!tycon(d).itbl)
+             tycon(d).itbl = asmMkInfo(0,tupleOf(d));
+          return tycon(d).itbl;
+       default: 
+          internal("stgConInfo");
     }
 }
 
