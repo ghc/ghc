@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.15 2000/03/15 15:31:36 simonmar Exp $
+ * $Id: Signals.c,v 1.16 2000/04/04 10:04:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -264,7 +264,15 @@ shutdown_handler(int sig STG_UNUSED)
   } else
 #endif
 
-    interruptStgRts();
+  /* If we're already trying to interrupt the RTS, terminate with
+   * extreme prejudice.  So the first ^C tries to exit the program
+   * cleanly, and the second one just kills it.
+   */
+  if (interrupted) {
+      exit(EXIT_INTERRUPTED);
+  } else {
+      interruptStgRts();
+  }
 }
 
 /*
@@ -274,10 +282,6 @@ shutdown_handler(int sig STG_UNUSED)
  * Haskell code may install their own SIGINT handler, which is
  * fine, provided they're so kind as to put back the old one
  * when they de-install.
- *
- * We ignore SIGPIPE, because our I/O library handles EPIPE properly,
- * and a SIGPIPE tends to cause the program to exit silently and
- * mysteriously.
  */
 void
 init_default_handlers()
@@ -292,11 +296,6 @@ init_default_handlers()
     action.sa_flags = 0;
     if (sigaction(SIGINT, &action, &oact) != 0) {
       /* Oh well, at least we tried. */
-      prog_belch("failed to install SIGINT handler");
-    }
-
-    action.sa_handler = SIG_IGN;
-    if (sigaction(SIGPIPE, &action, &oact) != 0) {
       prog_belch("failed to install SIGINT handler");
     }
 }
