@@ -122,6 +122,12 @@ stToIO (ST m) = IO m
 ioToST	      :: IO a -> ST RealWorld a
 ioToST (IO m) = (ST m)
 
+-- This relies on IO and ST having the same representation modulo the
+-- constraint on the type of the state
+--
+unsafeIOToST        :: IO a -> ST s a
+unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
+
 -- ---------------------------------------------------------------------------
 -- Unsafe IO operations
 

@@ -100,4 +100,18 @@ block (IO io) = IO $ blockAsyncExceptions# io
 unblock (IO io) = IO $ unblockAsyncExceptions# io
 \end{code}
 
-
+\begin{code}
+-- | Forces its argument to be evaluated, and returns the result in
+-- the 'IO' monad.  It can be used to order evaluation with respect to
+-- other 'IO' operations; its semantics are given by
+--
+-- >   evaluate undefined `seq` return ()  ==> return ()
+-- >   catch (evaluate undefined) (\e -> return ())  ==> return ()
+--
+-- NOTE: @(evaluate a)@ is /not/ the same as @(a \`seq\` return a)@.
+evaluate :: a -> IO a
+evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
+        -- NB. can't write  
+        --      a `seq` (# s, a #)
+        -- because we can't have an unboxed tuple as a function argument
+\end{code}

@@ -50,15 +50,9 @@ unsafeInterleaveST =
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.ST
-import GHC.Base		( unsafeCoerce#, RealWorld )
-import GHC.IOBase 	( IO(..), stToIO )
-
--- This relies on IO and ST having the same representation modulo the
--- constraint on the type of the state
---
-unsafeIOToST        :: IO a -> ST s a
-unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
+import GHC.ST		( ST, runST, fixST, unsafeInterleaveST )
+import GHC.Base		( RealWorld )
+import GHC.IOBase 	( stToIO, unsafeIOToST )
 #endif
 
 instance MonadFix (ST s) where
