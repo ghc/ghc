@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.69 2001/05/28 03:17:03 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.70 2001/05/28 12:56:35 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -145,9 +145,9 @@ interactiveUI cmstate mod cmdline_libs = do
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
 
-   (unGHCi runGHCi) GHCiState{ target = mod,
-			       cmstate = cmstate,
-			       options = [] }
+   startGHCi runGHCi GHCiState{ target = mod,
+			        cmstate = cmstate,
+			        options = [] }
    return ()
 
 
@@ -427,12 +427,10 @@ loadModule' path = do
   state <- getGHCiState
   dflags <- io (getDynFlags)
   cmstate1 <- io (cmUnload (cmstate state) dflags)
+  setGHCiState state{ cmstate = cmstate1, target = Nothing }
   io (revertCAFs)			-- always revert CAFs on load.
   (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 path)
-  let new_state = state{ cmstate = cmstate2,
-			 target = Just path
-		       }
-  setGHCiState new_state
+  setGHCiState state{ cmstate = cmstate2, target = Just path }
   modulesLoadedMsg ok mods
 
 reloadModule :: String -> GHCi ()
@@ -602,14 +600,17 @@ data GHCiOption
 GLOBAL_VAR(flush_stdout, error "no flush_stdout", IO ())
 GLOBAL_VAR(flush_stderr, error "no flush_stdout", IO ())
 
-newtype GHCi a = GHCi { unGHCi :: GHCiState -> IO (GHCiState, a) }
+newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> IO a }
+
+startGHCi :: GHCi a -> GHCiState -> IO a
+startGHCi g state = do ref <- newIORef state; unGHCi g ref
 
 instance Monad GHCi where
-  (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \(s,a) -> unGHCi (k a) s
-  return a  = GHCi $ \s -> return (s,a)
+  (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
+  return a  = GHCi $ \s -> return a
 
-getGHCiState   = GHCi $ \s -> return (s,s)
-setGHCiState s = GHCi $ \_ -> return (s,())
+getGHCiState   = GHCi $ \r -> readIORef r
+setGHCiState s = GHCi $ \r -> writeIORef r s
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt
@@ -626,7 +627,7 @@ unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
-io m = GHCi $ \s -> m >>= \a -> return (s,a)
+io m = GHCi $ \s -> m >>= \a -> return a
 
 -----------------------------------------------------------------------------
 -- recursive exception handlers
