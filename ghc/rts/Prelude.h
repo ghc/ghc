@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.24 2003/07/10 08:02:29 simonpj Exp $
+ * $Id: Prelude.h,v 1.25 2004/03/01 14:11:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -26,7 +26,6 @@ extern DLL_IMPORT StgClosure GHCziIOBase_stackOverflow_closure;
 extern DLL_IMPORT StgClosure GHCziIOBase_heapOverflow_closure;
 extern DLL_IMPORT StgClosure GHCziIOBase_BlockedOnDeadMVar_closure;
 extern DLL_IMPORT StgClosure GHCziIOBase_NonTermination_closure;
-extern DLL_IMPORT StgClosure GHCziIOBase_Deadlock_closure;
 
 extern DLL_IMPORT const StgInfoTable GHCziBase_Czh_static_info;
 extern DLL_IMPORT const StgInfoTable GHCziBase_Izh_static_info;
@@ -75,7 +74,6 @@ extern DLL_IMPORT const StgInfoTable GHCziStable_StablePtr_con_info;
 #define heapOverflow_closure      (&GHCziIOBase_heapOverflow_closure)
 #define BlockedOnDeadMVar_closure (&GHCziIOBase_BlockedOnDeadMVar_closure)
 #define NonTermination_closure    (&GHCziIOBase_NonTermination_closure)
-#define Deadlock_closure         (&GHCziIOBase_NonTermination_closure)
 
 #define Czh_static_info           (&GHCziBase_Czh_static_info)
 #define Fzh_static_info           (&GHCziFloat_Fzh_static_info)
