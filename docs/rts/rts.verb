@@ -799,6 +799,36 @@ How do we do this?
 
 \subsection{A GHC thread returns to a Hugs-compiled return address}
 
+When Hugs pushes return addresses on the stack, they look like this:
+
+@
+	|		|
+	|_______________|
+	|               |  -----> bytecode object
+	|_______________|
+	|               |  _____
+	|_______________|	|___ GHC-friendly return code
+					_____
+					|    |
+					|    | Info Table
+					|____|
+					.    .
+					.    . Code
+					.    .
+@
+
+If GHC is returning, it will return to the address at the top of the
+stack.  The code at this address
+
+\begin{itemize}
+\item saves the thread state in the TSO
+\item returns to the scheduler with a @whatNext@ field of @RunHugs@.
+\end{itemize}
+
+If Hugs is returning to one of these addresses, it can spot the
+special return address at the top and instead jump to the bytecodes
+pointed to by the second word on the stack.
+
 \subsection{A Hugs thread enters a GHC-compiled thunk}
 
 When Hugs is called on to enter a non-Hugs closure (these are
