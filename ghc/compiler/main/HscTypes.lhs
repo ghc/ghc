@@ -20,6 +20,8 @@ module HscTypes (
 
 	GlobalRdrEnv, RdrAvailInfo,
 
+	CompResult(..), HscResult(..),
+
 	-- Provenance
 	Provenance(..), ImportReason(..), PrintUnqualified,
         pprNameProvenance, hasBetterProv
@@ -49,6 +51,7 @@ import ErrUtils		( ErrMsg, WarnMsg )
 import CmLink		( Linkable )
 import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameHsDecl,
 			  RdrNameDeprecation, RdrNameFixitySig )
+import InterpSyn	( UnlinkedIBind )
 import UniqSupply	( UniqSupply )
 import HsDecls		( DeprecTxt )
 import CoreSyn		( CoreRule )
@@ -408,14 +411,14 @@ data HscResult
 	     (Maybe ModIFace)	     -- new iface (if any compilation was done)
 	     (Maybe String)  	     -- generated stub_h filename (in /tmp)
 	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
+	     (Maybe [UnlinkedIBind]) -- interpreted code, if any
              PersistentCompilerState -- updated PCS
-             [SDoc]                  -- warnings
+             (Bag WarnMsg) 		-- warnings
 
    | HscErrs PersistentCompilerState -- updated PCS
-             [SDoc]                  -- errors
-             [SDoc]                  -- warnings
+             (Bag ErrMsg)		-- errors
+             (Bag WarnMsg)             -- warnings
 
-	
 -- These two are only here to avoid recursion between CmCompile and
 -- CompManager.  They really ought to be in the latter.
 type ModuleEnv a = UniqFM a   -- Domain is Module
