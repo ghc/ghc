@@ -53,7 +53,7 @@ import PrimRep		( PrimRep(..) )
 import Stix		( StixTree(..), StixReg(..), CodeSegment, DestInfo(..) )
 import Panic		( panic )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
-import Outputable	( pprPanic, ppr )
+import Outputable	( pprPanic, ppr, showSDoc )
 import IOExts		( trace )
 import Config           ( cLeadingUnderscore )
 import FastTypes
@@ -272,11 +272,11 @@ primRepToSize CharRep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W, 
 
 primRepToSize Int8Rep	    = IF_ARCH_alpha(B,  IF_ARCH_i386(B,  IF_ARCH_sparc(B,  )))
 primRepToSize Int16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(W,  IF_ARCH_sparc(err,)))
-    where err = panic "primRepToSize Int16Rep"
+    where err = primRepToSize_fail "Int16Rep"
 primRepToSize Int32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize Word8Rep	    = IF_ARCH_alpha(Bu, IF_ARCH_i386(Bu, IF_ARCH_sparc(Bu, )))
 primRepToSize Word16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(Wu, IF_ARCH_sparc(err,)))
-    where err = panic "primRepToSize Word16Rep"
+    where err = primRepToSize_fail "Word16Rep"
 primRepToSize Word32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(Lu, IF_ARCH_sparc(W,  )))
 
 primRepToSize IntRep	    = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
@@ -292,9 +292,17 @@ primRepToSize ForeignObjRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W
 primRepToSize BCORep        = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize StablePtrRep  = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize ThreadIdRep   = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
--- SUP: Wrong!!! Only for testing the rest of the NCG
-primRepToSize Word64Rep     = trace "primRepToSize: Word64Rep not handled" B
-primRepToSize Int64Rep      = trace "primRepToSize: Int64Rep not handled"  B
+
+primRepToSize Word64Rep     = primRepToSize_fail "Word64Rep"
+primRepToSize Int64Rep      = primRepToSize_fail "Int64Rep"
+primRepToSize other         = primRepToSize_fail (showSDoc (ppr other))
+
+primRepToSize_fail str
+   = error ("ERROR: MachMisc.primRepToSize: cannot handle `" ++ str ++ "'.\n\t" 
+            ++ "Workaround: use -fvia-C.\n\t" 
+            ++ "Perhaps you should report it as a GHC bug,\n\t" 
+            ++ "to glasgow-haskell-bugs@haskell.org.")
+
 \end{code}
 
 %************************************************************************
