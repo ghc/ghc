@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.47 $
- * $Date: 2000/04/06 15:05:30 $
+ * $Revision: 1.48 $
+ * $Date: 2000/04/07 09:59:36 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1600,6 +1600,37 @@ static Void  finishGHCSynonym ( ConId tyc )
  * Data declarations
  * ------------------------------------------------------------------------*/
 
+static Type qualifyIfaceType ( Type unqual, List ctx )
+{
+   /* ctx :: [((QConId,VarId))] */
+   /* ctx is a list of (class name, tyvar) pairs.  
+      Attach to unqual qualifiers taken from ctx
+      for each tyvar which appears in unqual.
+   */
+   List tyvarsMentioned; /* :: [VarId] */
+   List ctx2  = NIL;
+   Cell kinds = NIL;
+
+   if (isPolyType(unqual)) {
+      kinds  = polySigOf(unqual);
+      unqual = monotypeOf(unqual);
+   }
+
+   assert(!isQualType(unqual));
+   tyvarsMentioned = ifTyvarsIn ( unqual );
+   for (; nonNull(ctx); ctx=tl(ctx)) {
+      ZPair ctxElem = hd(ctx); /* :: ((QConId, VarId)) */
+      if (nonNull(varIsMember(textOf(zsnd(ctxElem)),tyvarsMentioned)))
+         ctx2 = cons(ctxElem, ctx2);
+   }
+   if (nonNull(ctx2))
+      unqual = ap(QUAL,pair(reverse(ctx2),unqual));
+   if (nonNull(kinds))
+      unqual = mkPolyType(kinds,unqual);
+   return unqual;
+}
+
+
 static Void startGHCDataDecl(line,ctx0,tycon,ktyvars,constrs0)
 Int   line;
 List  ctx0;      /* [((QConId,VarId))]                */
@@ -1613,8 +1644,7 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
      */
 {
     Type    ty, resTy, selTy, conArgTy;
-    List    tmp, conArgs, sels, constrs, fields, tyvarsMentioned;
-    List    ctx, ctx2;
+    List    tmp, conArgs, sels, constrs, fields;
     Triple  constr;
     Cell    conid;
     Pair    conArg, ctxElem;
@@ -1654,14 +1684,8 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
            conid  = zfst(constr);
            fields = zsnd(constr);
 
-           /* Build type of constr and handle any selectors found.
-              Also collect up tyvars occurring in the constr's arg
-              types, so we can throw away irrelevant parts of the
-              context later.
-           */
+           /* Build type of constr and handle any selectors found. */
            ty = resTy;
-           tyvarsMentioned = NIL;  
-           /* tyvarsMentioned :: [VarId] */
 
            conStrictCompCount = 0;
            conArgs = reverse(fields);
@@ -1670,8 +1694,6 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
               conArgTy         = zfst3(conArg);
               conArgNm         = zsnd3(conArg);
               conArgStrictness = intOf(zthd3(conArg));
-              tyvarsMentioned = dupListOnto(ifTyvarsIn(conArgTy),
-                                            tyvarsMentioned);
               if (conArgStrictness > 0) conStrictCompCount++;
               ty = fn(conArgTy,ty);
               if (nonNull(conArgNm)) {
@@ -1679,24 +1701,17 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
                  selTy = fn(resTy,conArgTy);
                  if (whatIs(tycon(tc).kind) != STAR)
                     selTy = pair(POLYTYPE,pair(tycon(tc).kind, selTy));
+                 selTy = qualifyIfaceType ( selTy, ctx0 );
                  selTy = tvsToOffsets(line,selTy, ktyvars);
                  sels = cons( zpair(conArgNm,selTy), sels);
               }
            }
 
            /* Now ty is the constructor's type, not including context.
-              Throw away any parts of the context not mentioned in 
-              tyvarsMentioned, and use it to qualify ty.
+              Throw away any parts of the context not mentioned in ty,
+              and use it to qualify ty.
 	   */
-           ctx2 = NIL;
-           for (ctx=ctx0; nonNull(ctx); ctx=tl(ctx)) {
-              ctxElem = hd(ctx);     
-              /* ctxElem :: ((QConId,VarId)) */
-              if (nonNull(varIsMember(textOf(zsnd(ctxElem)),tyvarsMentioned)))
-                 ctx2 = cons(ctxElem, ctx2);
-           }
-           if (nonNull(ctx2))
-              ty = ap(QUAL,pair(ctx2,ty));
+           ty = qualifyIfaceType ( ty, ctx0 );
 
            /* stick the tycon's kind on, if not simply STAR */
            if (whatIs(tycon(tc).kind) != STAR)
