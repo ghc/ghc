@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.10 2001/11/21 10:09:15 simonmar Exp $
+ * $Id: Stable.h,v 1.11 2001/12/12 14:03:30 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -12,7 +12,10 @@
  * casting. Size is not a matter, because StgWord is always the same size as
  * a void*.
  *
- * ----------------------------------------------------------------------------*/
+ * ---------------------------------------------------------------------------*/
+
+#ifndef STABLE_H
+#define STABLE_H
 
 /* -----------------------------------------------------------------------------
    External C Interface
@@ -68,3 +71,5 @@ splitStablePtr(StgStablePtr sp)
 /* No deRefStableName, because the existence of a stable name doesn't
  * guarantee the existence of the object itself.
  */
+
+#endif
