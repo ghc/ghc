@@ -17,7 +17,7 @@ import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict,
 			  opt_D_dump_stranal, opt_D_simplifier_stats
 			)
 import CoreSyn
-import Id		( idType, addIdStrictness,
+import Id		( idType, addIdStrictness, isWrapperId,
 			  getIdDemandInfo, addIdDemandInfo,
 			  GenId{-instance Outputable-}
 			)
@@ -33,11 +33,8 @@ import SaLib
 import TyVar		( GenTyVar{-instance Eq-} )
 import WorkWrap		-- "back-end" of strictness analyser
 import Unique		( Unique{-instance Eq -} )
-import Util		( zipWith4Equal, pprTrace, panic{-ToDo:rm-} )
-
-isWrapperId = panic "StrictAnal.isWrapperId (ToDo)"
+import Util		( zipWith4Equal, pprTrace, panic )
 \end{code}
-
 
 %************************************************************************
 %*									*

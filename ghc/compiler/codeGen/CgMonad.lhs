@@ -10,22 +10,22 @@ monadic stuff fits into the Big Picture.
 #include "HsVersions.h"
 
 module CgMonad (
-	Code(..),	-- type
-	FCode(..),	-- type
+	SYN_IE(Code),	-- type
+	SYN_IE(FCode),	-- type
 
 	initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
 	returnFC, fixC, absC, nopC, getAbsC,
 
 	forkClosureBody, forkStatics, forkAlts, forkEval,
 	forkEvalHelp, forkAbsC,
-	SemiTaggingStuff(..),
+	SYN_IE(SemiTaggingStuff),
 
 	addBindC, addBindsC, modifyBindC, lookupBindC,
 
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
 
-	AStackUsage(..), BStackUsage(..), HeapUsage(..),
+	SYN_IE(AStackUsage), SYN_IE(BStackUsage), SYN_IE(HeapUsage),
 	StubFlag,
 	isStubbed,
 

@@ -44,6 +44,7 @@ Literal Literal
 Maybes MaybeErr
 Name ExportFlag
 Name Module
+Name Name
 Name NamedThing (..)
 Name OrigName (..)
 Name RdrName (..)
@@ -52,6 +53,7 @@ PprStyle PprStyle
 PragmaInfo PragmaInfo
 PrimOp PrimOp
 PrimRep PrimRep
+RnHsSyn RnName
 SrcLoc SrcLoc
 TyCon Arity
 TyCon TyCon

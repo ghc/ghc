@@ -21,14 +21,14 @@ import RnHsSyn
 
 import RnMonad
 import RnIfaces		( IfaceCache, cachedIface, cachedDecl, CachingResult(..) )
-import RnUtils		( SYN_IE(RnEnv), emptyRnEnv, extendGlobalRnEnv,
-			  lubExportFlag, qualNameErr, dupNamesErr
+import RnUtils		( SYN_IE(RnEnv), emptyRnEnv, initRnEnv, extendGlobalRnEnv,
+			  lubExportFlag, qualNameErr, dupNamesErr, pprRnEnv
 			)
 import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), ExportsMap(..), RdrIfaceInst )
 
 
 import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
-			  unionManyBags, mapBag, filterBag, listToBag, bagToList )
+			  unionManyBags, mapBag, foldBag, filterBag, listToBag, bagToList )
 import CmdLineOpts	( opt_NoImplicitPrelude, opt_CompilingGhcInternals )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning), addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, addToFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM, keysFM{-ToDo:rm-}, FiniteMap )
@@ -39,7 +39,7 @@ import Name		( RdrName(..), Name, isQual, mkTopLevName, mkWiredInName, origName,
 			  nameExportFlag, nameImportFlag,
 			  getLocalName, getSrcLoc, getImpLocs,
 			  moduleNamePair, pprNonSym,
-			  isLexCon, ExportFlag(..), OrigName(..)
+			  isLexCon, isLexSpecialSym, ExportFlag(..), OrigName(..)
 			)
 import PrelInfo		( SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
 import PrelMods		( pRELUDE, gHC_BUILTINS, modulesWithBuiltins )
@@ -93,7 +93,7 @@ getGlobalNames iface_cache info us
         unqual_vals = map (\rn -> (Unqual (getLocalName rn), rn)) (bagToList src_vals)
         unqual_tcs  = map (\rn -> (Unqual (getLocalName rn), rn)) (bagToList src_tcs)
 
-        (src_env, src_dups) = extendGlobalRnEnv emptyRnEnv unqual_vals unqual_tcs
+        (src_env, src_dups) = extendGlobalRnEnv initRnEnv unqual_vals unqual_tcs
 	(all_env, imp_dups) = extendGlobalRnEnv src_env (bagToList imp_vals) (bagToList imp_tcs)
 
 	-- remove dups of the same imported thing
@@ -108,6 +108,9 @@ getGlobalNames iface_cache info us
 	all_errs  = src_errs  `unionBags` imp_errs `unionBags` listToBag dup_errs
 	all_warns = src_warns `unionBags` imp_warns
     in
+--    pprTrace "initRnEnv:" (pprRnEnv PprDebug initRnEnv) $
+--    pprTrace "src_env:"   (pprRnEnv PprDebug src_env) $
+--    pprTrace "all_env:"   (pprRnEnv PprDebug all_env) $
     return (all_env, imp_mods, unqual_imps, imp_fixes, all_errs, all_warns) }
 \end{code}
 
@@ -406,25 +409,19 @@ doImportDecls iface_cache g_info us src_imps
 	    imp_errs `unionBags` errs,
 	    imp_warns `unionBags` warns)
   where
-    the_imps = implicit_prel  ++ src_imps
-    all_imps = implicit_qprel ++ the_imps
+    all_imps = implicit_prel  ++ src_imps
+--  all_imps = implicit_qprel ++ the_imps
 
-    implicit_qprel = ImportDecl gHC_BUILTINS True Nothing Nothing prel_loc
-		   : (if opt_NoImplicitPrelude
-		     then [{- no "import qualified Prelude" -}]
-		     else [ImportDecl pRELUDE True Nothing Nothing prel_loc])
+    explicit_prelude_imp
+      = not (null [ () | (ImportDecl mod qual _ _ _) <- src_imps, mod == pRELUDE ])
 
-    explicit_prelude_imp = not (null [ () | (ImportDecl mod qual _ _ _) <- src_imps,
-				            mod == pRELUDE ])
-
-    implicit_prel  = ImportDecl gHC_BUILTINS False Nothing Nothing prel_loc
-		   : (if explicit_prelude_imp || opt_NoImplicitPrelude
-		     then [{- no "import Prelude" -}]
-	             else [ImportDecl pRELUDE False Nothing Nothing prel_loc])
+    implicit_prel | opt_NoImplicitPrelude = []
+		  | explicit_prelude_imp  = [ImportDecl pRELUDE True  Nothing Nothing prel_loc]
+		  | otherwise		  = [ImportDecl pRELUDE False Nothing Nothing prel_loc]
 
     prel_loc = mkBuiltinSrcLoc
 
-    (uniq_imps, imp_dups) = removeDups cmp_mod the_imps
+    (uniq_imps, imp_dups) = removeDups cmp_mod all_imps
     cmp_mod (ImportDecl m1 _ _ _ _) (ImportDecl m2 _ _ _ _) = cmpPString m1 m2
 
     qprel_imps = [ imp | imp@(ImportDecl mod True Nothing _ _) <- src_imps,
@@ -443,7 +440,7 @@ doImportDecls iface_cache g_info us src_imps
       where
 	has_same_mod (_,ImportDecl mod2 _ _ _ _) = mod == mod2
 
-    imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps, mod /= gHC_BUILTINS ]
+    imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps ]
 
     imp_warns = listToBag (map dupImportWarn imp_dups)
     		`unionBags`
@@ -513,17 +510,14 @@ doImport :: IfaceCache
 		Bag (RnName,(ExportFlag,Bag SrcLoc)))	-- import flags and src locs
 
 doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
-  = let
-	(b_vals, b_tcs, maybe_spec') = getBuiltins info mod maybe_spec -- NB: a no-op ToDo:rm
-    in
-    (if mod == gHC_BUILTINS then
-     	return (Succeeded (panic "doImport:GHC fake import!"),
-    			 \ iface -> ([], [], emptyBag))
-     else
-	--pprTrace "doImport:" (ppPStr mod) $
-	cachedIface iface_cache False SLIT("doImport") mod >>= \ maybe_iface ->
-	return (maybe_iface, \ iface -> getOrigIEs iface maybe_spec')
-    )	>>= \ (maybe_iface, do_ies) ->
+  = --let
+    --	(b_vals, b_tcs, maybe_spec')
+    --	   = (emptyBag, emptyBag, maybe_spec)
+    --in
+    --pprTrace "doImport:" (ppPStr mod) $
+    cachedIface iface_cache False SLIT("doImport") mod >>= \ maybe_iface ->
+    return (maybe_iface, \ iface -> getOrigIEs iface maybe_spec)
+	    >>= \ (maybe_iface, do_ies) ->
 
     case maybe_iface of
       Failed err ->
@@ -538,15 +532,14 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
 	accumulate (map (checkOrigIE iface_cache) chk_ies)
 		>>= \ chk_errs_warns ->
 	let
-	    final_vals = mapBag fst_occ b_vals `unionBags` mapBag pair_occ ie_vals
-	    final_tcs  = mapBag fst_occ b_tcs  `unionBags` mapBag pair_occ ie_tcs
+	    fold_ies   = foldBag unionBags pair_occ emptyBag
+
+	    final_vals = {-OLD:mapBag fst_occ b_vals `unionBags`-} fold_ies ie_vals
+	    final_tcs  = {-OLD:mapBag fst_occ b_tcs  `unionBags`-} fold_ies ie_tcs
 	    final_vals_list = bagToList final_vals
 	in
-	(if mod == gHC_BUILTINS then
-	    return [ (Nothing, emptyBag) | _ <- final_vals_list ]
-	 else
-	    accumulate (map (getFixityDecl iface_cache . snd) final_vals_list)
-	)		>>= \ fix_maybes_errs ->
+	accumulate (map (getFixityDecl iface_cache . snd) final_vals_list)
+			>>= \ fix_maybes_errs ->
 	let
 	    (chk_errs, chk_warns)  = unzip chk_errs_warns
 	    (fix_maybes, fix_errs) = unzip fix_maybes_errs
@@ -575,13 +568,23 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
     fst_occ :: (FAST_STRING, RnName) -> (RdrName, RnName)
     fst_occ (str, rn) = (mk_occ str, rn)
 
-    pair_occ :: RnName -> (RdrName, RnName)
-    pair_occ rn = (mk_occ (getLocalName rn), rn)
+    pair_occ :: RnName -> Bag (RdrName, RnName)
+    pair_occ rn
+      = let
+	    str      = getLocalName rn
+	    qual_bag = unitBag (Qual as_mod str, rn)
+	in
+	if qual
+	then qual_bag
+	else qual_bag -- the qualified name is *also* visible
+	    `snocBag` (Unqual str, rn)
+	    
 
     pair_as :: RnName -> (Module, RnName)
     pair_as  rn = (as_mod, rn)
 
 -----------------------------
+{-
 getBuiltins :: ImportNameInfo
 	    -> Module
 	    -> Maybe (Bool, [RdrNameIE])
@@ -591,10 +594,9 @@ getBuiltins :: ImportNameInfo
 	       )
 
 getBuiltins _ modname maybe_spec
---OLD:  | modname `notElem` modulesWithBuiltins
+-- | modname `notElem` modulesWithBuiltins
   = (emptyBag, emptyBag, maybe_spec)
 
-{-
 getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) modname maybe_spec
   = case maybe_spec of 
       Nothing           -> (all_vals, all_tcs, Nothing)
@@ -677,13 +679,18 @@ getOrigIEs (ParsedIface _ _ _ _ _ _ exps _ _ _ _ _ _) (Just (False, ies))	-- imp
 mkAllIE :: (OrigName, ExportFlag) -> IE OrigName
 
 mkAllIE (orig,ExportAbs)
-  = ASSERT(isLexCon (nameOf orig))
+  = --ASSERT(isLexCon (nameOf orig))
+    -- the ASSERT is correct, but it is too easy to
+    -- trigger when writing .hi files by hand (e.g.
+    -- when hackily breaking a module loop)
     IEThingAbs orig
 mkAllIE (orig, ExportAll)
-  | isLexCon (nameOf orig)
+  | isLexCon name_orig || isLexSpecialSym name_orig
   = IEThingAll orig
   | otherwise
   = IEVar orig
+  where
+    name_orig = nameOf orig
 
 ------------
 lookupIEs :: ExportsMap
@@ -761,11 +768,13 @@ doOrigIE iface_cache info mod src_loc us ie
   where
     avoided_fn Nothing -- the thing should be in the source
       = (emptyBag, emptyBag, emptyBag, emptyBag, emptyBag)
-    avoided_fn (Just (Left  rn)) -- a builtin value brought into scope
+    avoided_fn (Just (Left  rn@(WiredInId _))) -- a builtin value brought into scope
       = (unitBag rn, emptyBag, emptyBag, emptyBag, emptyBag)
-    avoided_fn (Just (Right rn)) -- a builtin tc/class brought into scope
-      = --pprTrace "avoided:Right:" (ppr PprShowAll rn) $
-	(emptyBag, unitBag rn, emptyBag, emptyBag, emptyBag)
+    avoided_fn (Just (Right rn@(WiredInTyCon tc)))
+	-- a builtin tc brought into scope; we also must bring its
+	-- data constructors into scope
+      = --pprTrace "avoided:Right:" (ppr PprDebug rn) $
+	(listToBag [WiredInId dc | dc <- tyConDataCons tc], unitBag rn, emptyBag, emptyBag, emptyBag)
 
 -------------------------
 checkOrigIE :: IfaceCache
@@ -810,11 +819,13 @@ with_decl :: IfaceCache
 	  -> IO something
 
 with_decl iface_cache n do_avoid do_err do_decl
-  = cachedDecl iface_cache (isLexCon (nameOf n)) n   >>= \ maybe_decl ->
+  = cachedDecl iface_cache (isLexCon n_name || isLexSpecialSym n_name) n   >>= \ maybe_decl ->
     case maybe_decl of
       CachingAvoided info -> return (do_avoid info)
       CachingFail    err  -> return (do_err   err)
       CachingHit     decl -> return (do_decl  decl)
+  where
+    n_name = nameOf n
 
 -------------
 getFixityDecl :: IfaceCache

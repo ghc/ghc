@@ -75,6 +75,7 @@ module Id (
 	isTopLevId,
 	isTupleCon,
 	isWorkerId,
+	isWrapperId,
 	toplevelishId,
 	unfoldingUnfriendlyId,
 
@@ -101,6 +102,7 @@ module Id (
 	getIdUnfolding,
 	getIdUpdateInfo,
 	getPragmaInfo,
+	replaceIdInfo,
 
 	-- IdEnvs AND IdSets
 	SYN_IE(IdEnv), SYN_IE(GenIdSet), SYN_IE(IdSet),
@@ -606,9 +608,7 @@ isSuperDictSelId_maybe other_id				  = Nothing
 isWorkerId (Id _ _ _ (WorkerId _) _ _) = True
 isWorkerId other		     = False
 
-{-LATER:
 isWrapperId id = workerExists (getIdStrictness id)
--}
 \end{code}
 
 \begin{code}
@@ -778,7 +778,7 @@ unfoldingUnfriendlyId	-- return True iff it is definitely a bad
 	-> Bool		-- mentions this Id.  Reason: it cannot
 			-- possibly be seen in another module.
 
-unfoldingUnfriendlyId id = panic "Id.unfoldingUnfriendlyId"
+unfoldingUnfriendlyId id = True -- ToDo:panic "Id.unfoldingUnfriendlyId"
 {-LATER:
 
 unfoldingUnfriendlyId id
@@ -1213,11 +1213,11 @@ getPragmaInfo :: GenId ty -> PragmaInfo
 getIdInfo     (Id _ _ _ _ _ info) = info
 getPragmaInfo (Id _ _ _ _ info _) = info
 
-{-LATER:
 replaceIdInfo :: Id -> IdInfo -> Id
 
-replaceIdInfo (Id u n ty _ details) info = Id u n ty info details
+replaceIdInfo (Id u n ty details pinfo _) info = Id u n ty details pinfo info
 
+{-LATER:
 selectIdInfoForSpecId :: Id -> IdInfo
 selectIdInfoForSpecId unspec
   = ASSERT(not (maybeToBool (isSpecId_maybe unspec)))

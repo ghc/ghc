@@ -9,28 +9,31 @@
 module RnUtils (
 	SYN_IE(RnEnv), SYN_IE(QualNames),
 	SYN_IE(UnqualNames), SYN_IE(ScopeStack),
-	emptyRnEnv, extendGlobalRnEnv, extendLocalRnEnv,
+	emptyRnEnv, initRnEnv, extendGlobalRnEnv, extendLocalRnEnv,
 	lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
 	getLocalsFromRnEnv,
 
 	lubExportFlag,
 
 	qualNameErr,
-	dupNamesErr
+	dupNamesErr,
+	pprRnEnv -- debugging only
     ) where
 
 IMP_Ubiq(){-uitous-}
 IMPORT_1_3(List(partition))
 
 import Bag		( Bag, emptyBag, snocBag, unionBags )
-import CmdLineOpts	( opt_CompilingGhcInternals )
+import CmdLineOpts	( opt_GlasgowExts )
 import ErrUtils		( addShortErrLocLine )
-import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
-			  lookupFM, addListToFM, addToFM, eltsFM )
+import FiniteMap	( emptyFM, isEmptyFM, fmToList, listToFM, keysFM,
+			  lookupFM, addListToFM, addToFM, eltsFM, FiniteMap )
 import Maybes		( maybeToBool )
 import Name		( RdrName(..),  ExportFlag(..),
 			  isQual, pprNonSym, getLocalName, isLocallyDefined )
 import PprStyle		( PprStyle(..) )
+import PrelInfo		( builtinValNamesMap, builtinTcNamesMap )
+import PrelMods		( gHC_BUILTINS )
 import Pretty
 import RnHsSyn		( RnName )
 import Util		( assertPanic )
@@ -53,6 +56,7 @@ type UnqualNames  = FiniteMap FAST_STRING RnName
 type ScopeStack   = FiniteMap FAST_STRING RnName
 
 emptyRnEnv  	  :: RnEnv
+initRnEnv  	  :: RnEnv
 extendGlobalRnEnv :: RnEnv -> [(RdrName,RnName)] -> [(RdrName,RnName)]
 		  -> (RnEnv, Bag (RdrName, RnName, RnName))
 extendLocalRnEnv  :: Bool -> RnEnv -> [RnName] -> (RnEnv, [RnName])
@@ -80,8 +84,28 @@ seperately.
 It optionally reports any shadowed names.
 
 \begin{code}
-emptyRnEnv
-  = ((emptyFM, emptyFM, emptyFM, emptyFM), emptyFM)
+emptyRnEnv = ((emptyFM, emptyFM, emptyFM, emptyFM), emptyFM)
+
+    -- an emptyRnEnv is empty; the initRnEnv may have
+    -- primitive names already in it (both unqual and qual),
+    -- and quals for all the other wired-in dudes.
+
+initRnEnv
+  = if (not opt_GlasgowExts) then
+	emptyRnEnv
+    else
+	((listToFM qual, listToFM unqual, listToFM tc_qual, listToFM tc_unqual), emptyFM)
+  where
+    qual      = [ ((n,m), rn) | (OrigName m n, rn) <- fmToList builtinValNamesMap ]
+    tc_qual   = [ ((n,m), rn) | (OrigName m n, rn) <- fmToList builtinTcNamesMap  ]
+
+    builtin_qual    = filter (\ ((_,m),_) -> m == gHC_BUILTINS) qual
+    builtin_tc_qual = filter (\ ((_,m),_) -> m == gHC_BUILTINS) tc_qual
+
+    unqual    = map (\ ((n,_),rn) -> (n,rn)) builtin_qual
+    tc_unqual = map (\ ((n,_),rn) -> (n,rn)) builtin_tc_qual
+
+-----------------
 
 extendGlobalRnEnv ((qual, unqual, tc_qual, tc_unqual), stack) val_list tc_list
   = ASSERT(isEmptyFM stack)
@@ -129,16 +153,13 @@ extendLocalRnEnv report_shadows (global, stack) new_local
 	ext_dups = if maybeToBool (lookupFM stack str)
 		   then name:dups
 		   else dups
+\end{code}
 
-
+\begin{code}
 lookupRnEnv ((qual, unqual, _, _), stack) rdr
   = case rdr of 
-      Unqual str   -> lookup stack str (lookup unqual str Nothing)
-      Qual mod str -> lookup qual (str,mod)
-			(if not opt_CompilingGhcInternals -- see below
-			 then -- pprTrace "lookupRnEnv:" (ppAboves (ppCat [ppPStr mod, ppPStr str] : [ ppCat [ppPStr m, ppPStr s] | (s,m) <- keysFM qual ])) $
-			      Nothing
-			 else lookup unqual str Nothing)
+      Unqual str   -> lookup stack str (lookupFM unqual str)
+      Qual mod str -> lookupFM qual (str,mod)
   where
     lookup fm thing do_on_fail
       = case lookupFM fm thing of
@@ -148,25 +169,12 @@ lookupRnEnv ((qual, unqual, _, _), stack) rdr
 lookupGlobalRnEnv ((qual, unqual, _, _), _) rdr
   = case rdr of 
       Unqual str   -> lookupFM unqual str
-      Qual mod str -> case (lookupFM qual (str,mod)) of
-			Just xx -> Just xx
-			Nothing -> if not opt_CompilingGhcInternals then
-				      Nothing
-				   else -- "[]" may have turned into "Prelude.[]" and
-				        -- we are actually compiling "data [] a = ...";
-					-- maybe the right thing is to get "Prelude.[]"
-					-- into the "qual" table...
-				      lookupFM unqual str
+      Qual mod str -> lookupFM qual (str,mod)
 
 lookupTcRnEnv ((_, _, tc_qual, tc_unqual), _) rdr
   = case rdr of 
       Unqual str   -> lookupFM tc_unqual str
-      Qual mod str -> case (lookupFM tc_qual (str,mod)) of -- as above
-			Just xx -> Just xx
-			Nothing -> if not opt_CompilingGhcInternals then
-				      Nothing
-				   else
-				      lookupFM tc_unqual str
+      Qual mod str -> lookupFM tc_qual (str,mod)
 
 getLocalsFromRnEnv ((_, vals, _, tcs), _)
   = (filter isLocallyDefined (eltsFM vals),
@@ -209,5 +217,20 @@ dupNamesErr descriptor ((name1,locn1) : dup_things) sty
       = addShortErrLocLine locn (\ sty ->
 	ppBesides [ppStr "here was another declaration of `",
 		   pprNonSym sty name, ppStr "'" ]) sty
-\end{code}
 
+-----------------
+pprRnEnv :: PprStyle -> RnEnv -> Pretty
+
+pprRnEnv sty ((qual, unqual, tc_qual, tc_unqual), stack)
+  = ppAboves [ ppStr "Stack:"
+	     , ppCat (map ppPStr (keysFM stack))
+	     , ppStr "Val qual:"
+	     , ppAboves [ppBesides [ppPStr m, ppChar '.', ppPStr n] | (n,m) <- keysFM qual]
+	     , ppStr "Val unqual:"
+	     , ppCat (map ppPStr (keysFM unqual))
+	     , ppStr "Tc qual:"
+	     , ppAboves [ppBesides [ppPStr m, ppChar '.', ppPStr n] | (n,m) <- keysFM tc_qual]
+	     , ppStr "Tc unqual:"
+	     , ppCat (map ppPStr (keysFM tc_unqual))
+	     ]
+\end{code}

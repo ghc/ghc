@@ -15,8 +15,8 @@ module RnBinds (
 	rnTopBinds,
 	rnMethodBinds,
 	rnBinds,
-	FreeVars(..),
-	DefinedVars(..)
+	SYN_IE(FreeVars),
+	SYN_IE(DefinedVars)
    ) where
 
 IMP_Ubiq()
@@ -32,7 +32,7 @@ import RnExpr		( rnMatch, rnGRHSsAndBinds, rnPat, checkPrecMatch )
 import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp )
 import ErrUtils		( addErrLoc, addShortErrLocLine )
-import Name		( RdrName )
+import Name		( getLocalName, RdrName )
 import Maybes		( catMaybes )
 import PprStyle--ToDo:rm
 import Pretty
@@ -524,7 +524,7 @@ rnBindSigs is_toplev binder_occnames sigs
 	 -- Discard unbound ones we've already complained about, so we
 	 -- complain about duplicate ones.
 
-	(goodies, dups) = removeDups compare (filter not_unbound sigs')
+	(goodies, dups) = removeDups compare (filter (\ x -> not_unbound x && not_main x) sigs')
     in
     mapRn (addErrRn . dupSigDeclErr) dups `thenRn_`
 
@@ -598,13 +598,17 @@ rnBindSigs is_toplev binder_occnames sigs
 	   lookupValue v	`thenRn` \ new_v ->
 	   returnRn (Just (MagicUnfoldingSig new_v str src_loc))
 
-    not_unbound :: RenamedSig -> Bool
+    not_unbound, not_main :: RenamedSig -> Bool
 
     not_unbound (Sig n _ _ _)		  = not (isRnUnbound n)
     not_unbound (SpecSig n _ _ _)	  = not (isRnUnbound n)
     not_unbound (InlineSig n _)		  = not (isRnUnbound n)
     not_unbound (DeforestSig n _)	  = not (isRnUnbound n)
     not_unbound (MagicUnfoldingSig n _ _) = not (isRnUnbound n)
+
+    not_main (Sig n _ _ _)  = let str = getLocalName n in
+			      not (str == SLIT("main") || str == SLIT("mainPrimIO"))
+    not_main _		    = True
 
     -------------------------------------
     sig_free :: [RdrNameSig] -> RdrName -> Maybe RdrName

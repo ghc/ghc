@@ -16,7 +16,7 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 module HsCore (
 	UnfoldingCoreExpr(..), UnfoldingCoreAlts(..),
 	UnfoldingCoreDefault(..), UnfoldingCoreBinding(..),
-	UnfoldingCoreAtom(..), UfId(..), UnfoldingType(..),
+	UnfoldingCoreAtom(..), UfId(..), SYN_IE(UnfoldingType),
 	UnfoldingPrimOp(..), UfCostCentre(..)
     ) where
 

@@ -11,10 +11,12 @@ module WorkWrap ( workersAndWrappers ) where
 IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import CoreUnfold	( UnfoldingGuidance(..) )
+import CoreUnfold	( UnfoldingDetails(..){-ToDo:rm-}, UnfoldingGuidance(..) )
+IMPORT_DELOOPER(IdLoop)	 -- ToDo:rm when iWantToBeINLINEd goes
+
 import CoreUtils	( coreExprType )
 import Id		( idWantsToBeINLINEd, getIdStrictness, mkWorkerId,
-			  getIdInfo, GenId
+			  getIdInfo, replaceIdInfo, GenId
 			)
 import IdInfo		( noIdInfo, addInfo_UF, indicatesWorker,
 			  mkStrictnessInfo, StrictnessInfo(..)
@@ -22,10 +24,9 @@ import IdInfo		( noIdInfo, addInfo_UF, indicatesWorker,
 import SaLib
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
 import WwLib
-import Util		( panic{-ToDo:rm-} )
 
-replaceIdInfo = panic "WorkWrap.replaceIdInfo (ToDo)"
-iWantToBeINLINEd = panic "WorkWrap.iWantToBeINLINEd (ToDo)"
+iWantToBeINLINEd :: UnfoldingGuidance -> UnfoldingDetails
+iWantToBeINLINEd x = NoUnfoldingDetails --ToDo:panic "WorkWrap.iWantToBeINLINEd (ToDo)"
 \end{code}
 
 We take Core bindings whose binders have their strictness attached (by

@@ -93,7 +93,7 @@ uppInt n	= cInt n
 uppInteger n	= cStr (show n)
 
 uppSP		= cCh ' '
-upp'SP{-'-}	= cPStr SLIT(", ")
+upp'SP{-'-}	= uppBeside uppComma uppSP
 uppLbrack	= cCh '['
 uppRbrack	= cCh ']'
 uppLparen	= cCh '('

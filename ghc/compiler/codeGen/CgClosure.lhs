@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -49,7 +49,7 @@ import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_ForConcurrent, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre, currentOrSubsumedCosts,
 			  noCostCentreAttached, costsAreSubsumed,
-			  isCafCC, isDictCC, overheadCostCentre
+			  isCafCC, isDictCC, overheadCostCentre, showCostCentre
 			)
 import HeapOffs		( SYN_IE(VirtualHeapOffset) )
 import Id		( idType, idPrimRep, 
@@ -59,13 +59,14 @@ import Id		( idType, idPrimRep,
 			)
 import ListSetOps	( minusList )
 import Maybes		( maybeToBool )
+import Outputable	( Outputable(..){-instances-} ) -- ToDo:rm
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, TyCon{-ditto-} )
-import Pretty		( prettyToUn, ppBesides, ppChar, ppPStr )
+import Pretty		( prettyToUn, ppBesides, ppChar, ppPStr, ppCat, ppStr )
 import PrimRep		( isFollowableRep, PrimRep(..) )
 import TyCon		( isPrimTyCon, tyConDataCons )
 import Unpretty		( uppShow )
-import Util		( isIn, panic, pprPanic, assertPanic )
+import Util		( isIn, panic, pprPanic, assertPanic, pprTrace{-ToDo:rm-} )
 
 myWrapperMaybe = panic "CgClosure.myWrapperMaybe (ToDo)"
 showTypeCategory = panic "CgClosure.showTypeCategory (ToDo)"
@@ -409,8 +410,12 @@ closureCodeBody binder_info closure_info cc [] body
 
     body_addr   = CLbl (entryLabelFromCI closure_info) CodePtrRep
     body_code   = profCtrC SLIT("ENT_THK") [] 			`thenC`
-		  enterCostCentreCode closure_info cc IsThunk	`thenC`
-		  thunkWrapper closure_info (cgExpr body)
+		  thunkWrapper closure_info (
+			-- We only enter cc after setting up update so that cc
+			-- of enclosing scope will be recorded in update frame
+			-- CAF/DICT functions will be subsumed by this enclosing cc
+		    enterCostCentreCode closure_info cc IsThunk	`thenC`
+		    cgExpr body)
 
     stdUpd      = CLbl mkErrorStdEntryLabel CodePtrRep
 \end{code}
@@ -580,9 +585,9 @@ Node is guaranteed to point to it, if profiling and not inherited.
 
 \begin{code}
 data IsThunk = IsThunk | IsFunction -- Bool-like, local
-#ifdef DEBUG
+--#ifdef DEBUG
 	deriving Eq
-#endif
+--#endif
 
 enterCostCentreCode :: ClosureInfo -> CostCentre -> IsThunk -> Code
 
@@ -594,8 +599,9 @@ enterCostCentreCode closure_info cc is_thunk
 	ASSERT(not (noCostCentreAttached cc))
 
 	if costsAreSubsumed cc then
-	    ASSERT(isToplevClosure closure_info)
-	    ASSERT(is_thunk == IsFunction)
+	    --ASSERT(isToplevClosure closure_info)
+	    --ASSERT(is_thunk == IsFunction)
+	    (if isToplevClosure closure_info && is_thunk == IsFunction then \x->x else pprTrace "enterCostCenterCode:" (ppCat [ppr PprDebug (is_thunk == IsFunction){-, ppr PprDebug closure_info-}, ppStr (showCostCentre PprDebug False cc)])) $
 	    costCentresC SLIT("ENTER_CC_FSUB") []
 
 	else if currentOrSubsumedCosts cc then 
@@ -704,8 +710,8 @@ thunkWrapper closure_info thunk_code
     let
        emit_gran_macros = opt_GranMacros
     in
-    -- HWL: insert macros for GrAnSim; 2 versions depending on liveness of node
-    -- (we prefer fetchAndReschedule-style context switches to yield ones)
+	-- HWL: insert macros for GrAnSim; 2 versions depending on liveness of node
+	-- (we prefer fetchAndReschedule-style context switches to yield ones)
     (if emit_gran_macros 
       then if node_points 
              then fetchAndReschedule  [] node_points 
@@ -714,19 +720,20 @@ thunkWrapper closure_info thunk_code
 
     stackCheck closure_info [] node_points (	-- stackCheck *encloses* the rest
 
-    -- Must be after stackCheck: if stchk fails new stack
-    -- space has to be allocated from the heap
+	-- heapCheck must be after stackCheck: if stchk fails
+	-- new stack space is allocated from the heap which
+	-- would violate any previous heapCheck
 
-    heapCheck [] node_points (
-					-- heapCheck *encloses* the rest
-	-- The "[]" says there are no live argument registers
+    heapCheck [] node_points (			-- heapCheck *encloses* the rest
+    	-- The "[]" says there are no live argument registers
 
 	-- Overwrite with black hole if necessary
-    blackHoleIt closure_info 				`thenC`
+    blackHoleIt closure_info 			`thenC`
 
-	-- Push update frame if necessary
-    setupUpdate closure_info (		-- setupUpdate *encloses* the rest
-	thunk_code
+    setupUpdate closure_info (			-- setupUpdate *encloses* the rest
+
+	-- Finally, do the business
+    thunk_code
     )))
 
 funWrapper :: ClosureInfo 	-- Closure whose code body this is
@@ -744,11 +751,11 @@ funWrapper closure_info arg_regs fun_body
       then yield  arg_regs node_points
       else absC AbsCNop)                                 `thenC`
 
-    stackCheck closure_info arg_regs node_points (	-- stackCheck *encloses* the rest
+    stackCheck closure_info arg_regs node_points (
+	-- stackCheck *encloses* the rest
 
-	-- Heap overflow check
     heapCheck arg_regs node_points (
-					-- heapCheck *encloses* the rest
+	-- heapCheck *encloses* the rest
 
 	-- Finally, do the business
     fun_body

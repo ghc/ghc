@@ -2232,7 +2232,7 @@ genCCall fn kind [StInt i]
 		MOV L (OpImm (ImmCLbl lbl))
 		      -- this is hardwired
 		      (OpAddr (Addr (Just ebx) Nothing (ImmInt 104))),
-		JMP (OpImm (ImmLit (uppPStr (SLIT ("_PerformGC_wrapper"))))),
+		JMP (OpImm (ImmLit (uppPStr (if underscorePrefix then (SLIT ("_PerformGC_wrapper")) else (SLIT ("PerformGC_wrapper")))))),
 		LABEL lbl]
     in
     returnInstrs call

@@ -57,7 +57,7 @@ import Name		( SYN_IE(Module), RdrName(..), isQual,
 			  OrigName(..), Name, mkLocalName, mkImplicitName,
 			  getOccName, pprNonSym
 			)
-import PrelInfo		( builtinNameInfo, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
+import PrelInfo		( builtinNameMaps, builtinKeysMap, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
 import PrelMods		( pRELUDE )
 import PprStyle{-ToDo:rm-}
 import Outputable{-ToDo:rm-}
@@ -127,8 +127,7 @@ initRn source mod env us do_rn
 	    mode = if source then
 		       RnSource occ_var
 	           else
-		       case builtinNameInfo of { (wiredin_fm, key_fm, _) ->
-		       RnIface wiredin_fm key_fm imp_var }
+		       RnIface builtinNameMaps builtinKeysMap imp_var
 
 	    rn_down = RnDown () mod mkUnknownSrcLoc mode env us_var errs_var
 	in

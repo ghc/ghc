@@ -313,11 +313,11 @@ lexIface input
 	  Just (m,rest) -> lex_name (Just m) (in_the_club rest) rest
       where
 	in_the_club []    = panic "lex_word:in_the_club"
-	in_the_club (x:_) | isAlpha    x = is_var_sym
+	in_the_club (x:y) | isAlpha    x = is_var_sym
 			  | is_sym_sym x = is_sym_sym
 			  | x == '['	 = is_list_sym
 			  | x == '('	 = is_tuple_sym
-			  | otherwise    = panic ("lex_word:in_the_club="++[x])
+			  | otherwise    = panic ("lex_word:in_the_club="++(x:y))
 
     module_dot (c:cs)
       = if not (isUpper c) || c == '\'' then

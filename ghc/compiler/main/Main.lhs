@@ -94,7 +94,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     renameModule rn_uniqs rdr_module >>=
 	\ (rn_mod, rn_env, import_names,
-	   export_fn, usage_stuff,
+	   export_stuff, usage_stuff,
 	   rn_errs_bag, rn_warns_bag) ->
 
     if (not (isEmptyBag rn_errs_bag)) then
@@ -126,7 +126,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     startIface mod_name				    >>= \ if_handle ->
     ifaceUsages		 if_handle usages_map	    >>
     ifaceVersions	 if_handle version_info	    >>
-    ifaceExportList	 if_handle export_fn rn_mod >>
+    ifaceExportList	 if_handle export_stuff rn_env >>
     ifaceFixities	 if_handle rn_mod	    >>
     ifaceInstanceModules if_handle instance_modules >>
 

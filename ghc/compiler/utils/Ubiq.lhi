@@ -150,11 +150,19 @@ type Usage = GenUsage Unique
 
 -- These are here only for SPECIALIZing in FiniteMap (ToDo:move?)
 instance Ord Reg
+instance Ord OrigName
 instance Ord RdrName
 instance Ord CLabel
 instance Ord TyCon
 instance Eq Reg
+instance Eq OrigName
 instance Eq RdrName
 instance Eq CLabel
 instance Eq TyCon
+-- specializing in UniqFM, UniqSet
+instance Uniquable Unique
+instance Uniquable RnName
+instance Uniquable Name
+-- specializing in Name
+instance NamedThing RnName
 \end{code}

@@ -16,6 +16,7 @@ module PprType(
 	getTypeString,
 	typeMaybeString,
 	specMaybeTysSuffix,
+	getTyDescription,
 	GenClass, 
 	GenClassOp, pprGenClassOp,
 	
@@ -25,8 +26,8 @@ module PprType(
  ) where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(IdLoop) 	-- for paranoia checking
-IMPORT_DELOOPER(TyLoop) 	-- for paranoia checking
+IMPORT_DELOOPER(IdLoop)
+--IMPORT_DELOOPER(TyLoop) 	-- for paranoia checking
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
@@ -391,13 +392,13 @@ getTypeString ty
   where
     do_tc (TyConTy tc _) = Left (origName "do_tc" tc)
     do_tc (SynTy _ _ ty) = do_tc ty
-    do_tc other = pprTrace "getTypeString:do_tc:" (pprType PprDebug other) $
+    do_tc other = --pprTrace "getTypeString:do_tc:" (pprType PprDebug other) $
 		  Right (_PK_ (ppShow 1000 (pprType PprForC other)))
 
     do_arg_ty (TyConTy tc _) = Left (origName "do_arg_ty" tc)
     do_arg_ty (TyVarTy tv)   = Right (_PK_ (ppShow 80 (ppr PprForC tv)))
     do_arg_ty (SynTy _ _ ty) = do_arg_ty ty
-    do_arg_ty other	     = pprTrace "getTypeString:do_arg_ty:" (pprType PprDebug other) $
+    do_arg_ty other	     = --pprTrace "getTypeString:do_arg_ty:" (pprType PprDebug other) $
 			       Right (_PK_ (ppShow 1000 (pprType PprForC other)))
 
 	-- PprForC expands type synonyms as it goes;
@@ -437,6 +438,27 @@ specMaybeTysSuffix ty_maybes
     in
     _CONCAT_ dotted_tys
 -}
+\end{code}
+
+Grab a name for the type. This is used to determine the type
+description for profiling.
+\begin{code}
+getTyDescription :: Type -> String
+
+getTyDescription ty
+  = case (splitSigmaTy ty) of { (_, _, tau_ty) ->
+    case tau_ty of
+      TyVarTy _	      -> "*"
+      AppTy fun _     -> getTyDescription fun
+      FunTy _ res _   -> '-' : '>' : fun_result res
+      TyConTy tycon _ -> _UNPK_ (getLocalName tycon)
+      SynTy tycon _ _ -> _UNPK_ (getLocalName tycon)
+      DictTy _ _ _    -> "dict"
+      _		      -> pprPanic "getTyDescription: other" (pprType PprDebug tau_ty)
+    }
+  where
+    fun_result (FunTy _ res _) = '>' : fun_result res
+    fun_result other	       = getTyDescription other
 \end{code}
 
 ToDo: possibly move:

@@ -55,10 +55,6 @@ module UniqFM (
 
 #if defined(COMPILING_GHC)
 IMP_Ubiq(){-uitous-}
-import {-hide from mkdependHS-}
-	Name	( Name )   -- specialising only
-import {-hide from mkdependHS-}
-	RnHsSyn	( RnName ) -- specialising only
 #endif
 
 import Unique		( Unique, u2i, mkUniqueGrimily )

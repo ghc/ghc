@@ -21,7 +21,7 @@ module Type (
 
 	SYN_IE(RhoType), SYN_IE(SigmaType), SYN_IE(ThetaType),
 	mkDictTy,
-	mkRhoTy, splitRhoTy, mkTheta,
+	mkRhoTy, splitRhoTy, mkTheta, isDictTy,
 	mkSigmaTy, splitSigmaTy,
 
 	maybeAppTyCon, getAppTyCon,
@@ -41,9 +41,9 @@ module Type (
     ) where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking
-IMPORT_DELOOPER(TyLoop)	 -- for paranoia checking
-IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
+--IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking
+IMPORT_DELOOPER(TyLoop)
+--IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 
 -- friends:
 import Class	( classSig, classOpLocalType, GenClass{-instances-} )
@@ -72,8 +72,8 @@ import	{-mumble-}
 	Pretty
 import  {-mumble-}
 	PprStyle
-import	{-mumble-}
-	PprType --(pprType )
+--import	{-mumble-}
+--	PprType --(pprType )
 import  {-mumble-}
 	UniqFM (ufmToList )
 import {-mumble-}
@@ -281,8 +281,8 @@ mkTyConTy tycon
 
 applyTyCon :: TyCon -> [GenType t u] -> GenType t u
 applyTyCon tycon tys
-  = --ASSERT (not (isSynTyCon tycon))
-    (if (not (isSynTyCon tycon)) then \x->x else pprTrace "applyTyCon:" (pprTyCon PprDebug tycon)) $
+  = ASSERT (not (isSynTyCon tycon))
+    --(if (not (isSynTyCon tycon)) then \x->x else pprTrace "applyTyCon:" (pprTyCon PprDebug tycon)) $
     foldl AppTy (TyConTy tycon usageOmega) tys
 
 getTyCon_maybe		     :: GenType t u -> Maybe TyCon
@@ -348,7 +348,11 @@ mkTheta dict_tys
   = map cvt dict_tys
   where
     cvt (DictTy clas ty _) = (clas, ty)
-    cvt other		   = pprPanic "mkTheta:" (pprType PprDebug other)
+    cvt other		   = panic "Type.mkTheta" -- pprPanic "mkTheta:" (pprType PprDebug other)
+
+isDictTy (DictTy _ _ _) = True
+isDictTy (SynTy  _ _ t) = isDictTy t
+isDictTy _		= False
 \end{code}
 
 
@@ -686,7 +690,7 @@ typePrimRep (AppTy ty _)    = typePrimRep ty
 typePrimRep (TyConTy tc _)  
   | isPrimTyCon tc	    = case (assocMaybe tc_primrep_list (uniqueOf tc)) of
 				   Just xx -> xx
-				   Nothing -> pprPanic "typePrimRep:" (pprTyCon PprDebug tc)
+				   Nothing -> panic "Type.typePrimRep" -- pprPanic "typePrimRep:" (pprTyCon PprDebug tc)
 
   | otherwise		    = case maybeNewTyCon tc of
 				  Just (tyvars, ty) | isPrimType ty -> typePrimRep ty

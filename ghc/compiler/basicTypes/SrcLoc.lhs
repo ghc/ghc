@@ -77,7 +77,7 @@ unpackSrcLoc (SrcLoc2 src_file src_line) = (src_file, _PK_ (show IBOX(src_line))
 \begin{code}
 instance Outputable SrcLoc where
     ppr PprForUser (SrcLoc src_file src_line)
-      = ppBesides [ ppChar '"', ppPStr src_file, ppPStr SLIT("\", line "), ppPStr src_line ]
+      = ppBesides [ ppChar '"', ppPStr src_file, ppStr "\", line ", ppPStr src_line ]
 
     ppr sty (SrcLoc src_file src_line)
       = ppBesides [ppPStr SLIT("{-# LINE "), ppPStr src_line, ppSP,

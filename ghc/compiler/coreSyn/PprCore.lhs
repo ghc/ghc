@@ -265,6 +265,28 @@ ppr_expr pe expr@(App _ _)
 	          ])
 
 ppr_expr pe (Case expr alts)
+  | only_one_alt alts
+    -- johan thinks that single case patterns should be on same line as case,
+    -- and no indent; all sane persons agree with him.
+  = let
+	ppr_alt (AlgAlts  [] (BindDefault n _)) = ppBeside (pMinBndr pe n) (ppStr " ->")
+	ppr_alt (PrimAlts [] (BindDefault n _)) = ppBeside (pMinBndr pe n) (ppStr " ->")
+	ppr_alt (PrimAlts ((l, _):[]) NoDefault)= ppBeside (pLit pe l)	   (ppStr " ->")
+	ppr_alt (AlgAlts  ((con, params, _):[]) NoDefault)
+	  = ppCat [ppr_alt_con con (pCon pe con),
+		   ppInterleave ppSP (map (pMinBndr pe) params),
+		   ppStr "->"]
+
+	ppr_rhs (AlgAlts [] (BindDefault _ expr))   = ppr_expr pe expr
+	ppr_rhs (AlgAlts ((_,_,expr):[]) NoDefault) = ppr_expr pe expr
+	ppr_rhs (PrimAlts [] (BindDefault _ expr))  = ppr_expr pe expr
+	ppr_rhs (PrimAlts ((_,expr):[]) NoDefault)  = ppr_expr pe expr
+    in 
+    ppSep
+    [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_parend_expr pe expr), ppStr "of {", ppr_alt alts],
+	 ppBeside (ppr_rhs alts) (ppStr "}")]
+
+  | otherwise -- default "case" printing
   = ppSep
     [ppSep [ppPStr SLIT("case"), ppNest 4 (ppr_parend_expr pe expr), ppStr "of {"],
      ppNest 2 (ppr_alts pe alts),
@@ -303,6 +325,15 @@ ppr_expr pe (Coerce c ty expr)
   where
     pp_coerce (CoerceIn  v) = ppBeside (ppStr "{-in-}")  (ppr (pStyle pe) v)
     pp_coerce (CoerceOut v) = ppBeside (ppStr "{-out-}") (ppr (pStyle pe) v)
+
+only_one_alt (AlgAlts []     (BindDefault _ _)) = True
+only_one_alt (AlgAlts (_:[])  NoDefault) 	= True
+only_one_alt (PrimAlts []    (BindDefault _ _)) = True
+only_one_alt (PrimAlts (_:[]) NoDefault) 	= True
+only_one_alt _					= False 
+
+ppr_alt_con con pp_con
+  = if isSymLexeme con then ppParens pp_con else pp_con
 \end{code}
 
 \begin{code}
@@ -314,14 +345,11 @@ ppr_alts pe (AlgAlts alts deflt)
 		    ppCat [ppParens (ppInterleave ppComma (map (pMinBndr pe) params)),
 			   ppStr "->"]
 		else
-		    ppCat [ppr_con con (pCon pe con),
+		    ppCat [ppr_alt_con con (pCon pe con),
 			   ppInterleave ppSP (map (pMinBndr pe) params),
 			   ppStr "->"]
 	       )
 	     4 (ppr_expr pe expr)
-      where
-    	ppr_con con pp_con
-    	  = if isSymLexeme con then ppParens pp_con else pp_con
 
 ppr_alts pe (PrimAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]

@@ -85,6 +85,7 @@ module Util (
 #if defined(COMPILING_GHC)
 
 CHK_Ubiq() -- debugging consistency check
+IMPORT_1_3(List(zipWith4))
 
 import Pretty
 #endif

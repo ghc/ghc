@@ -61,10 +61,10 @@ import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import Util		( nOfThem, isIn, Ord3(..), panic, panic#, assertPanic, pprPanic{-ToDo:rm-} )
-import {-hide me-}
-	PprType (pprTyCon)
-import {-hide me-}
-	PprStyle--ToDo:rm
+--import {-hide me-}
+--	PprType (pprTyCon)
+--import {-hide me-}
+--	PprStyle--ToDo:rm
 \end{code}
 
 \begin{code}
@@ -238,7 +238,7 @@ tyConDataCons other				  = []
 tyConFamilySize (DataTyCon _ _ _ _ _ data_cons _ _) = length data_cons
 tyConFamilySize (TupleTyCon _ _ _)		    = 1
 #ifdef DEBUG
-tyConFamilySize other = pprPanic "tyConFamilySize:" (pprTyCon PprDebug other)
+--tyConFamilySize other = pprPanic "tyConFamilySize:" (pprTyCon PprDebug other)
 #endif
 
 tyConPrimRep :: TyCon -> PrimRep

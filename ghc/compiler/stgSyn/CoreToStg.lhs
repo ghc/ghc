@@ -476,14 +476,19 @@ coreExprToStg env expr@(Lam _ _)
 \begin{code}
 coreExprToStg env expr@(App _ _)
   = let
-	(fun, _, _, args) = collectArgs expr
+	(fun,args) = collect_args expr []
     in
 	-- Deal with the arguments
     coreArgsToStg env args `thenUs` \ (_, stg_args, arg_binds) ->
 
 	-- Now deal with the function
-    case fun of
-      Var fun_id -> returnUs (StgApp (stgLookup env fun_id) stg_args bOGUS_LVs, arg_binds)
+    case (fun, args) of
+      (Var fun_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
+				-- there are no arguments.
+			    returnUs (StgApp (stgLookup env fun_id) stg_args bOGUS_LVs, arg_binds)
+
+      (non_var_fun, []) -> 	-- No value args, so recurse into the function
+			    coreExprToStg env non_var_fun
 
       other ->	-- A non-variable applied to things; better let-bind it.
 		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
@@ -499,6 +504,12 @@ coreExprToStg env expr@(App _ _)
 		returnUs (StgLet (StgNonRec fun_id fun_rhs)
 			   	  (StgApp (StgVarArg fun_id) stg_args bOGUS_LVs),
 			   arg_binds `unionBags` fun_binds)
+  where
+	-- Collect arguments, discarding type/usage applications
+    collect_args (App e   (TyArg _))    args = collect_args e   args
+    collect_args (App e   (UsageArg _)) args = collect_args e   args
+    collect_args (App fun arg)          args = collect_args fun (arg:args)
+    collect_args fun                    args = (fun, args)
 \end{code}
 
 %************************************************************************

@@ -37,7 +37,7 @@ SuffixRule_c_o()
 */
 
 SUBDIR_LIST = \ /* here they are, colon separated (for mkdependHS) */
-utils:basicTypes:types:hsSyn:prelude:envs:rename:typecheck:deSugar:coreSyn:specialise:simplCore:stranal:stgSyn:simplStg:codeGen:nativeGen:absCSyn:main:reader:profiling:deforest:parser
+utils:basicTypes:types:hsSyn:prelude:rename:typecheck:deSugar:coreSyn:specialise:simplCore:stranal:stgSyn:simplStg:codeGen:nativeGen:absCSyn:main:reader:profiling:deforest:parser
 
 #ifdef MainIncludeDir
 MAIN_INCLUDE_DIR=MainIncludeDir
@@ -365,21 +365,21 @@ BACKSRCS_LHS NATIVEGEN_SRCS_LHS
 #  define loop_hi(f) CAT2(f,.hi)
 #endif
 
-DELOOP_HIs =		\
-utils/Ubiq.hi		\
-absCSyn/AbsCLoop.hi	\
-basicTypes/IdLoop.hi	\
-codeGen/CgLoop1.hi	\
-codeGen/CgLoop2.hi	\
-deSugar/DsLoop.hi	\
-hsSyn/HsLoop.hi		\
-nativeGen/NcgLoop.hi	\
-prelude/PrelLoop.hi	\
-rename/RnLoop.hi	\
-simplCore/SmplLoop.hi	\
-typecheck/TcMLoop.hi	\
-typecheck/TcLoop.hi	\
-types/TyLoop.hi
+DELOOP_HIs =			\
+loop_hi(utils/Ubiq)		\
+loop_hi(absCSyn/AbsCLoop)	\
+loop_hi(basicTypes/IdLoop)	\
+loop_hi(codeGen/CgLoop1)	\
+loop_hi(codeGen/CgLoop2)	\
+loop_hi(deSugar/DsLoop)		\
+loop_hi(hsSyn/HsLoop)		\
+loop_hi(nativeGen/NcgLoop)	\
+loop_hi(prelude/PrelLoop)	\
+loop_hi(rename/RnLoop)		\
+loop_hi(simplCore/SmplLoop)	\
+loop_hi(typecheck/TcMLoop)	\
+loop_hi(typecheck/TcLoop)	\
+loop_hi(types/TyLoop)
 
 /*
 \
@@ -440,6 +440,10 @@ HC = $(GHC) /* uses the driver herein */
 */
 
 BuildPgmFromHaskellModules(hsc,$(ALLOBJS) parser/hsclink.o parser/hschooks.o,,libhsp.a)
+
+parser/hschooks.o : parser/hschooks.c
+	$(RM) $@
+	$(HC) -c -o $@ $(HCFLAGS) parser/hschooks.c
 
 #if DoInstallGHCSystem == YES
 MakeDirectories(install, $(INSTLIBDIR_GHC))
@@ -512,7 +516,7 @@ compile(absCSyn/AbsCSyn,lhs,if_ghc(-fno-omit-reexported-instances))
 compile(hsSyn/HsBinds,lhs,)
 compile(hsSyn/HsCore,lhs,)
 compile(hsSyn/HsDecls,lhs,)
-compile(hsSyn/HsExpr,lhs,)
+compile(hsSyn/HsExpr,lhs,if_ghc(-K2m))
 compile(hsSyn/HsImpExp,lhs,)
 compile(hsSyn/HsLit,lhs,)
 compile(hsSyn/HsMatches,lhs,)
@@ -586,7 +590,7 @@ compile(nativeGen/AsmRegAlloc,lhs,-I$(COMPINFO_DIR))
 compile(nativeGen/MachCode,lhs,-I$(NATIVEGEN_DIR))
 compile(nativeGen/MachMisc,lhs,-I$(NATIVEGEN_DIR))
 compile(nativeGen/MachRegs,lhs,-I$(NATIVEGEN_DIR))
-compile(nativeGen/PprMach,lhs,-I$(NATIVEGEN_DIR))
+compile(nativeGen/PprMach,lhs,-I$(NATIVEGEN_DIR) if_ghc(-K2m))
 compile(nativeGen/RegAllocInfo,lhs,-I$(NATIVEGEN_DIR))
 compile(nativeGen/Stix,lhs,)
 compile(nativeGen/StixInfo,lhs,)
@@ -617,7 +621,7 @@ compile(rename/RnHsSyn,lhs,)
 compile(rename/RnMonad,lhs,if_ghc(-fvia-C))
 compile(rename/Rename,lhs,)
 compile(rename/RnNames,lhs,)
-compile(rename/RnSource,lhs,)
+compile(rename/RnSource,lhs,-H12m)
 compile(rename/RnBinds,lhs,)
 compile(rename/RnExpr,lhs,)
 compile(rename/RnIfaces,lhs,)
@@ -807,7 +811,7 @@ UgenNeededHere(all depend)
 NormalLibraryTarget(hsp,$(HSP_OBJS_O))
 
 /* We need the hsp program for hstags to work! */
-BuildPgmFromCFiles(hsp,parser/printtree.o parser/main.o,,libhsp.a)
+/* BuildPgmFromCFiles(hsp,parser/printtree.o parser/main.o,,libhsp.a) */
 
 #if DoInstallGHCSystem == YES
 MakeDirectories(install, $(INSTLIBDIR_GHC))
@@ -873,6 +877,11 @@ compile(parser/U_ttype,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 /* *** misc *************************************************** */
 
 DEPSRCS = $(ALLSRCS_LHS) $(ALLSRCS_HS)
+
+#if GhcBuilderVersion < 200
+/* this will go away soon enough... (once 1.3 is settled in) */
+MKDEPENDHS = mkdependHS-1.2
+#endif
 
 #if GhcWithHscBuiltViaC == NO
 MKDEPENDHS_OPTS= -I$(MAIN_INCLUDE_DIR) -I$(COMPINFO_DIR) -x HsVersions.h

@@ -50,7 +50,7 @@ import Name		( origName, moduleOf, nameOf, qualToOrigName, OrigName(..),
 			  isLexCon, RdrName(..), Name{-instance NamedThing-} )
 import PprStyle		-- ToDo:rm
 import Outputable	-- ToDo:rm
-import PrelInfo		( builtinNameInfo, SYN_IE(BuiltinNames) )
+import PrelInfo		( builtinNameMaps, builtinKeysMap, builtinTcNamesMap, SYN_IE(BuiltinNames) )
 import Pretty
 import UniqFM		( emptyUFM )
 import UniqSupply	( splitUniqSupply )
@@ -81,9 +81,7 @@ data IfaceCache
 
 initIfaceCache mod hi_files
   = newVar (emptyFM,emptyFM,hi_files) ST_THEN \ iface_var ->
-    return (IfaceCache mod b_names iface_var)
-  where
-    b_names = case builtinNameInfo of (b_names,_,_) -> b_names
+    return (IfaceCache mod builtinNameMaps iface_var)
 \end{code}
 
 *********************************************************
@@ -749,19 +747,9 @@ rnIfaceInstStuff iface_cache@(IfaceCache _ _ iface_var) modname us occ_env done_
 	      Just  _ -> True
 	      Nothing -> -- maybe it's builtin
 		let orig = qualToOrigName nm in
-		case (lookupFM b_tc_names orig) of
+		case (lookupFM builtinTcNamesMap orig) of
 		  Just  _ -> True
-		  Nothing -> maybeToBool (lookupFM b_keys orig)
-
-    (b_tc_names, b_keys) -- pretty UGLY ...
-      = case builtinNameInfo of ((_,builtin_tcs),b_keys,_) -> (builtin_tcs,b_keys)
-{-
-    ppr_insts insts
-      = ppAboves (map ppr_inst insts)
-      where
-	ppr_inst (InstSig c t _ inst_decl)
-	  = ppCat [ppr PprDebug c, ppr PprDebug t, ppr PprDebug inst_decl]
--}
+		  Nothing -> maybeToBool (lookupFM builtinKeysMap orig)
 \end{code}
 
 \begin{code}
@@ -877,7 +865,7 @@ ifaceLookupWiredErr msg n sty
   = ppBesides [ppPStr SLIT("Why am I looking up a wired-in "), ppStr msg, ppChar ':', ppr sty n]
 
 badIfaceLookupErr msg name decl sty
-  = ppBesides [ppPStr SLIT("Expected a "), ppStr msg, ppPStr SLIT(" declaration, but got this: ???")]
+  = ppBesides [ppPStr SLIT("Expected a "), ppStr msg, ppStr " declaration, but got this: ???"]
 
 ifaceIoErr io_msg rn sty
   = ppBesides [io_msg sty, ppStr "; looking for: ", ppr sty rn]

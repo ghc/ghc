@@ -27,14 +27,14 @@ import CmdLineOpts	( opt_ProduceHi )
 import FieldLabel	( FieldLabel{-instance NamedThing-} )
 import FiniteMap	( emptyFM, addToFM, lookupFM, fmToList, eltsFM, FiniteMap )
 import HsSyn
-import Id		( idType, dataConRawArgTys, dataConFieldLabels,
+import Id		( idType, dataConRawArgTys, dataConFieldLabels, isDataCon,
 			  dataConStrictMarks, StrictnessMark(..),
 			  GenId{-instance NamedThing/Outputable-}
 			)
 import Maybes		( maybeToBool )
 import Name		( origName, nameOf, moduleOf,
 			  exportFlagOn, nameExportFlag, ExportFlag(..),
-			  isLexSym, isLocallyDefined, isWiredInName,
+			  isLexSym, isLexCon, isLocallyDefined, isWiredInName,
 			  RdrName(..){-instance Outputable-},
 			  OrigName(..){-instance Ord-},
 			  Name{-instance NamedThing-}
@@ -44,10 +44,11 @@ import PprEnv		-- not sure how much...
 import PprStyle		( PprStyle(..) )
 import PprType		-- most of it (??)
 --import PrelMods	( modulesWithBuiltins )
-import PrelInfo		( builtinNameInfo )
+import PrelInfo		( builtinValNamesMap, builtinTcNamesMap )
 import Pretty		( prettyToUn )
 import Unpretty		-- ditto
-import RnHsSyn		( isRnConstr, SYN_IE(RenamedHsModule), RnName{-instance NamedThing-} )
+import RnHsSyn		( isRnConstr, SYN_IE(RenamedHsModule), RnName(..) )
+import RnUtils		( SYN_IE(RnEnv), pprRnEnv{-ToDo:rm-} )
 import TcModule		( SYN_IE(TcIfaceInfo) )
 import TcInstUtil	( InstInfo(..) )
 import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
@@ -84,8 +85,8 @@ ifaceVersions
 	    -> IO ()
 ifaceExportList
 	    :: Maybe Handle
-	    -> (Name -> ExportFlag)
-	    -> RenamedHsModule
+	    -> (Name -> ExportFlag, ([(Name,ExportFlag)], [(Name,ExportFlag)]))
+	    -> RnEnv
 	    -> IO ()
 ifaceFixities
 	    :: Maybe Handle
@@ -177,58 +178,74 @@ ifaceInstanceModules (Just if_hdl) imods
 
 Export list: grab the Names of things that are marked Exported, sort
 (so the interface file doesn't ``wobble'' from one compilation to the
-next...), and print.  Note that the ``module'' now contains all the
-imported things that we are dealing with, thus including any entities
-that we are re-exporting from somewhere else.
+next...), and print.  We work from the renamer's final ``RnEnv'',
+which has all the names we might possibly be interested in.
+(Note that the ``module X'' export items can cause a lot of grief.)
 \begin{code}
 ifaceExportList Nothing{-no iface handle-} _ _ = return ()
 
 ifaceExportList (Just if_hdl)
-		export_fn -- sadly, just the HsModule isn't enough,
-			  -- because it will have no record of exported
-			  -- wired-in names.
-		(HsModule _ _ _ _ _ typedecls _ classdecls _ _ _ binds sigs _)
+		(export_fn, (dotdot_vals, dotdot_tcs))
+		rn_env@((qual, unqual, tc_qual, tc_unqual), _)
   = let
-	(vals_wired, tcs_wired)
-	  = case builtinNameInfo of { ((vals_fm,tcs_fm), _, _) ->
-	    (eltsFM vals_fm, eltsFM tcs_fm) }
-
 	name_flag_pairs :: FiniteMap OrigName ExportFlag
 	name_flag_pairs
-	  = foldr (from_wired True{-val-ish-})
-	   (foldr (from_wired False{-tycon-ish-})
-	   (foldr from_ty
-	   (foldr from_cls
-	   (foldr from_sig
-	   (from_binds binds emptyFM{-init accum-})
-	     sigs)
-	     classdecls)
-	     typedecls)
-	     tcs_wired)
-	     vals_wired
+	  = foldr (from_wired  True{-val-ish-})
+	   (foldr (from_wired  False{-tycon-ish-})
+	   (foldr (from_dotdot True{-val-ish-})
+	   (foldr (from_dotdot False{-tycon-ish-})
+	   (foldr from_val
+	   (foldr from_val
+	   (foldr from_tc
+	   (foldr from_tc emptyFM{-init accum-}
+		  (eltsFM tc_unqual))
+		  (eltsFM tc_qual))
+		  (eltsFM unqual))
+		  (eltsFM qual))
+		  dotdot_tcs)
+		  dotdot_vals)
+		  (eltsFM builtinTcNamesMap))
+		  (eltsFM builtinValNamesMap)
 
 	sorted_pairs = sortLt lexical_lt (fmToList name_flag_pairs)
 
     in
+    --pprTrace "Exporting:" (pprRnEnv PprDebug rn_env) $
     hPutStr if_hdl "\n__exports__\n" >>
     hPutStr if_hdl (uppShow 0 (uppAboves (map upp_pair sorted_pairs)))
   where
-    from_ty (TyData _ n _ _ _ _ _) acc = maybe_add acc n
-    from_ty (TyNew  _ n _ _ _ _ _) acc = maybe_add acc n
-    from_ty (TySynonym n _ _ _)	   acc = maybe_add acc n
+    from_val rn acc
+      | fun_looking rn && exportFlagOn ef = addToFM acc on ef
+      | otherwise			  = acc
+      where
+	ef = export_fn n -- NB: using the export fn!
+	n  = getName rn
+	on = origName "from_val" n
 
-    from_cls (ClassDecl _ n _ _ _ _ _) acc = maybe_add acc n
+    -- fun_looking: must avoid class ops and data constructors
+    -- and record fieldnames
+    fun_looking (RnName    _) = True
+    fun_looking (WiredInId i) = not (isDataCon i)
+    fun_looking _		  = False
 
-    from_sig (Sig n _ _ _) acc = maybe_add acc n
+    from_tc rn acc
+      | exportFlagOn ef = addToFM acc on ef
+      | otherwise	= acc
+      where
+	ef = export_fn n -- NB: using the export fn!
+	n  = getName rn
+	on = origName "from_tc" n
 
-    from_binds bs acc = maybe_add_list acc (collectTopLevelBinders bs)
+    from_dotdot is_valish (n,ef) acc
+      | is_valish && isLexCon str = acc
+      | exportFlagOn ef		  = addToFM acc on ef
+      | otherwise		  = acc
+      where
+	on = origName "from_dotdot" n
+	(OrigName _ str) = on
 
-    --------------
     from_wired is_val_ish rn acc
-      | on_in_acc	= acc -- if already in acc (presumably from real decl),
-			      -- don't take the dubious export flag from the
-			      -- wired-in chappy
-      | is_val_ish && isRnConstr rn
+      | is_val_ish && not (fun_looking rn)
 			= acc -- these things don't cause export-ery
       | exportFlagOn ef = addToFM acc on ef
       | otherwise       = acc
@@ -236,25 +253,6 @@ ifaceExportList (Just if_hdl)
 	n  = getName rn
 	ef = export_fn n
 	on = origName "from_wired" n
-	(OrigName _ str) = on
-	on_in_acc = maybeToBool (lookupFM acc on)
-
-    --------------
-    maybe_add :: FiniteMap OrigName ExportFlag -> RnName -> FiniteMap OrigName ExportFlag
-
-    maybe_add acc rn
-      | on_in_acc	= trace "maybe_add?" acc -- surprising!
-      | exportFlagOn ef = addToFM acc on ef
-      | otherwise       = acc
-      where
-	ef = nameExportFlag n
-	n  = getName rn
-	on = origName "maybe_add" n
-	on_in_acc = maybeToBool (lookupFM acc on)
-
-    --------------
-    maybe_add_list acc []     = acc
-    maybe_add_list acc (n:ns) = maybe_add (maybe_add_list acc ns) n
 
     --------------
     lexical_lt (n1,_) (n2,_) = n1 < n2

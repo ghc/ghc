@@ -15,7 +15,7 @@ IMPORT_1_3(GHCio(stThen))
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
 import HsSyn
-import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas )
+import HsPragmas	( noDataPragmas, noClassPragmas, noInstancePragmas, noGenPragmas )
 import RdrHsSyn
 import PrefixToHs
 
@@ -25,7 +25,7 @@ import Name		( RdrName(..), isRdrLexConOrSpecial, preludeQual )
 import PprStyle		( PprStyle(..) )
 import PrelMods		( pRELUDE )
 import Pretty
-import SrcLoc		( SrcLoc )
+import SrcLoc		( mkBuiltinSrcLoc, SrcLoc )
 import Util		( nOfThem, pprError, panic )
 \end{code}
 
@@ -118,15 +118,37 @@ rdModule
 	      		  imports
 	      		  fixities
 	      		  tydecls
-	      		  tysigs
+			  tysigs
 	      		  classdecls
 	      		  instdecls
 	      		  instsigs
 	      		  defaultdecls
-	      		  (cvSepdBinds srcfile cvValSig binds)
+			  (add_main_sig modname (cvSepdBinds srcfile cvValSig binds))
 	      		  [{-no interface sigs yet-}]
 	      		  src_loc
        		)
+  where
+    add_main_sig modname binds
+      = if modname == SLIT("Main") then
+	    let
+	       s = Sig (Unqual SLIT("main")) (io_ty SLIT("IO")) noGenPragmas mkBuiltinSrcLoc
+	    in
+	    add_sig binds s
+
+	else if modname == SLIT("GHCmain") then
+	    let
+	       s = Sig (Unqual SLIT("mainPrimIO")) (io_ty SLIT("PrimIO")) noGenPragmas mkBuiltinSrcLoc
+	    in
+	    add_sig binds s
+
+	else -- add nothing
+	    binds
+      where
+	add_sig (SingleBind b)  s = BindWith b [s]
+	add_sig (BindWith b ss) s = BindWith b (s:ss)
+	add_sig _		_ = panic "rdModule:add_sig"
+
+	io_ty t = HsForAllTy [] [] (MonoTyApp (Unqual t) [MonoTupleTy []])
 \end{code}
 
 %************************************************************************

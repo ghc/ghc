@@ -112,8 +112,6 @@ module Unique (
 	liftTyConKey,
 	listTyConKey,
 	ltDataConKey,
-	mainIdKey,
-	mainPrimIOIdKey,
 	monadClassKey,
 	monadPlusClassKey,
 	monadZeroClassKey,
@@ -615,8 +613,6 @@ integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 14
 integerZeroIdKey	      = mkPreludeMiscIdUnique 15
 irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 16
 lexIdKey		      = mkPreludeMiscIdUnique 17
-mainIdKey		      = mkPreludeMiscIdUnique 18
-mainPrimIOIdKey		      = mkPreludeMiscIdUnique 19
 noDefaultMethodErrorIdKey     = mkPreludeMiscIdUnique 20
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 21
 nonExplicitMethodErrorIdKey   = mkPreludeMiscIdUnique 22

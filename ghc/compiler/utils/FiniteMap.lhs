@@ -73,8 +73,6 @@ IMP_Ubiq(){-uitous-}
 import Pretty
 # endif
 import Bag	( foldBag )
-import {-hide from mkdependHS-}
-	Name	( RdrName, OrigName )   -- specialising only
 
 # if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a

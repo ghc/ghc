@@ -90,7 +90,7 @@ import IdInfo		( arityMaybe )
 import Maybes		( assocMaybe, maybeToBool )
 import Name		( isLocallyDefined, nameOf, origName )
 import PprStyle		( PprStyle(..) )
-import PprType		( GenType{-instance Outputable-} )
+import PprType		( getTyDescription, GenType{-instance Outputable-} )
 import Pretty--ToDo:rm
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )
@@ -100,8 +100,6 @@ import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
 			  mkFunTys, maybeAppSpecDataTyConExpandingDicts
 			)
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
-
-getTyDescription = panic "ClosureInfo.getTyDescription (ToDo)"
 \end{code}
 
 The ``wrapper'' data type for closure information:

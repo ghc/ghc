@@ -16,11 +16,6 @@ module PprMach ( pprInstr ) where
 IMP_Ubiq(){-uitious-}
 IMPORT_1_3(Char(isPrint,isDigit))
 IMPORT_1_3(qualified GHCbase(Addr(..))) -- to see innards
-#if __GLASGOW_HASKELL__ >= 200
-# define A_HASH GHCbase.A#
-#else
-# define A_HASH A#
-#endif
 
 import MachRegs		-- may differ per-platform
 import MachMisc
@@ -32,6 +27,14 @@ import Maybes		( maybeToBool )
 import OrdList		( OrdList )
 import Stix		( CodeSegment(..), StixTree )
 import Unpretty		-- all of it
+
+#if __GLASGOW_HASKELL__ >= 200
+a_HASH   x = GHCbase.A# x
+pACK_STR x = packCString x
+#else
+a_HASH   x = A# x
+pACK_STR x = _packCString x
+#endif
 \end{code}
 
 %************************************************************************
@@ -296,12 +299,12 @@ pprImm (ImmLab s) | underscorePrefix = uppBeside (uppChar '_') s
 pprImm (LO i)
   = uppBesides [ pp_lo, pprImm i, uppRparen ]
   where
-    pp_lo = uppPStr (_packCString (A_HASH "%lo("#))
+    pp_lo = uppPStr (pACK_STR (a_HASH "%lo("#))
 
 pprImm (HI i)
   = uppBesides [ pp_hi, pprImm i, uppRparen ]
   where
-    pp_hi = uppPStr (_packCString (A_HASH "%hi("#))
+    pp_hi = uppPStr (pACK_STR (a_HASH "%hi("#))
 #endif
 \end{code}
 
@@ -396,7 +399,7 @@ pprInstr (SEGMENT TextSegment)
     = uppPStr
 	 IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
 	,IF_ARCH_sparc(SLIT("\t.text\n\t.align 4") {-word boundary-}
-	,IF_ARCH_i386(SLIT(".text\n\t.align 2,0x90") {-needs per-OS variation!-}
+	,IF_ARCH_i386((_PK_ ".text\n\t.align 2\x2c\&0x90") {-needs per-OS variation!-}
 	,)))
 
 pprInstr (SEGMENT DataSegment)
@@ -816,13 +819,8 @@ pprInstr (FUNBEGIN clab)
     where
 	pp_lab = pprCLabel_asm clab
 
-#if __GLASGOW_HASKELL__ >= 200
-# define PACK_STR packCString
-#else
-# define PACK_STR _packCString
-#endif
-	pp_ldgp  = uppPStr (PACK_STR (A_HASH ":\n\tldgp $29,0($27)\n"#))
-	pp_frame = uppPStr (PACK_STR (A_HASH "..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1"#))
+	pp_ldgp  = uppPStr (pACK_STR (a_HASH ":\n\tldgp $29,0($27)\n"#))
+	pp_frame = uppPStr (pACK_STR (a_HASH "..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1"#))
 
 pprInstr (FUNEND clab)
   = uppBeside (uppPStr SLIT("\t.align 4\n\t.end ")) (pprCLabel_asm clab)
@@ -1331,10 +1329,10 @@ pprRIReg name b ri reg1
 	pprReg reg1
     ]
 
-pp_ld_lbracket    = uppPStr (PACK_STR (A_HASH "\tld\t["#))
-pp_rbracket_comma = uppPStr (PACK_STR (A_HASH "],"#))
-pp_comma_lbracket = uppPStr (PACK_STR (A_HASH ",["#))
-pp_comma_a	  = uppPStr (PACK_STR (A_HASH ",a"#))
+pp_ld_lbracket    = uppPStr (pACK_STR (a_HASH "\tld\t["#))
+pp_rbracket_comma = uppPStr (pACK_STR (a_HASH "],"#))
+pp_comma_lbracket = uppPStr (pACK_STR (a_HASH ",["#))
+pp_comma_a	  = uppPStr (pACK_STR (a_HASH ",a"#))
 
 #endif {-sparc_TARGET_ARCH-}
 \end{code}

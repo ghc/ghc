@@ -44,7 +44,7 @@ Unify two @TauType@s.  Dead straightforward.
 
 \begin{code}
 unifyTauTy :: TcTauType s -> TcTauType s -> TcM s ()
-unifyTauTy ty1 ty2 
+unifyTauTy ty1 ty2 	-- ty1 expected, ty2 inferred
   = tcAddErrCtxtM (unifyCtxt ty1 ty2) $
     uTys ty1 ty1 ty2 ty2
 \end{code}
@@ -327,14 +327,14 @@ Errors
 ~~~~~~
 
 \begin{code}
-unifyCtxt ty1 ty2
+unifyCtxt ty1 ty2		-- ty1 expected, ty2 inferred
   = zonkTcType ty1	`thenNF_Tc` \ ty1' ->
     zonkTcType ty2	`thenNF_Tc` \ ty2' ->
     returnNF_Tc (err ty1' ty2')
   where
     err ty1' ty2' sty = ppAboves [
-			   ppCat [ppStr "When matching:", ppr sty ty1'],
-			   ppCat [ppStr "      against:", ppr sty ty2']
+			   ppCat [ppStr "Expected:", ppr sty ty1'],
+			   ppCat [ppStr "Inferred:", ppr sty ty2']
 		        ]
 
 unifyMisMatch ty1 ty2 sty

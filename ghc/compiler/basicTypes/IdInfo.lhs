@@ -567,7 +567,7 @@ or an Absent {\em that we accept}.
 indicatesWorker :: [Demand] -> Bool
 
 indicatesWorker dems
-  = fake_mk_ww (trace "mAX_WORKER_ARGS" 6 - nonAbsentArgs dems) dems
+  = fake_mk_ww (mAX_WORKER_ARGS - nonAbsentArgs dems) dems
   where
     fake_mk_ww _ [] = False
     fake_mk_ww _ (WwLazy True : _) = True -- we accepted an Absent

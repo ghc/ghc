@@ -71,8 +71,6 @@ import Unique		( funTyConKey, mkTupleDataConUnique, mkTupleTyConUnique,
 			  pprUnique, Unique
 			)
 import Util		( thenCmp, _CMP_STRING_, nOfThem, panic, assertPanic, pprTrace{-ToDo:rm-} )
-import {-hide from mkdependHS-}
-	RnHsSyn		( RnName ) -- instance for specializing only
 
 #ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
@@ -269,7 +267,9 @@ mkCompoundName :: Unique
 	       -> Name		-- from which we get provenance, etc....
 	       -> Name		-- result!
 
-mkCompoundName u m str ns (Local _ _ _ _) = panic "mkCompoundName:Local?"
+mkCompoundName u m str ns (Local _ _ _ locn) -- these arise for workers...
+  = Local u str True{-emph uniq-} locn
+
 mkCompoundName u m str ns (Global _ _ _ prov exp _)
   = Global u m (Right (Right str : ns)) prov exp []
 
@@ -304,9 +304,9 @@ mkTupleTyConName   arity
 
 mkTupNameStr 0 = SLIT("()")
 mkTupNameStr 1 = panic "Name.mkTupNameStr: 1 ???"
-mkTupNameStr 2 = SLIT("(,)")   -- not strictly necessary
-mkTupNameStr 3 = SLIT("(,,)")  -- ditto
-mkTupNameStr 4 = SLIT("(,,,)") -- ditto
+mkTupNameStr 2 = _PK_ "(,)"   -- not strictly necessary
+mkTupNameStr 3 = _PK_ "(,,)"  -- ditto
+mkTupNameStr 4 = _PK_ "(,,,)" -- ditto
 mkTupNameStr n
   = _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")")
 

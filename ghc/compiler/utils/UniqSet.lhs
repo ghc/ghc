@@ -30,9 +30,6 @@ import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PprStyle		( PprStyle )
 import Util		( Ord3(..) )
 
-import {-hide from mkdependHS-}
-	RnHsSyn	( RnName ) -- specialising only
-
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a
 #else

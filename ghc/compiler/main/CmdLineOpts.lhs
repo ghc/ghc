@@ -55,8 +55,6 @@ module CmdLineOpts (
 	opt_GranMacros,
 	opt_Haskell_1_3,
 	opt_HiMap,
-	opt_HideBuiltinNames,
-	opt_HideMostBuiltinNames,
 	opt_IgnoreIfacePragmas,
 	opt_IgnoreStrictnessPragmas,
 	opt_IrrefutableEverything,
@@ -274,8 +272,6 @@ opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
 opt_Haskell_1_3			= lookUp  SLIT("-fhaskell-1.3")
-opt_HideBuiltinNames		= lookUp  SLIT("-fhide-builtin-names")
-opt_HideMostBuiltinNames	= lookUp  SLIT("-fmin-builtin-names")
 opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
 opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")

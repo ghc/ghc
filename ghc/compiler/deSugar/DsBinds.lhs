@@ -38,7 +38,7 @@ import PprType		( GenType )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
 import Type		( mkTyVarTys, mkForAllTys, splitSigmaTy,
-			  tyVarsOfType, tyVarsOfTypes
+			  tyVarsOfType, tyVarsOfTypes, isDictTy
 			)
 import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
 import Util		( isIn, panic, pprTrace{-ToDo:rm-} )
@@ -46,8 +46,6 @@ import PprCore--ToDo:rm
 import PprType		( GenTyVar ) --ToDo:rm
 import Usage--ToDo:rm
 import Unique--ToDo:rm
-
-isDictTy = panic "DsBinds.isDictTy"
 \end{code}
 
 %************************************************************************

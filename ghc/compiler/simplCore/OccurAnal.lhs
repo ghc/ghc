@@ -44,7 +44,7 @@ import TyVar		( GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
 import Util		( assoc, zipEqual, pprTrace, panic )
 
-isSpecPragmaId_maybe = panic "OccurAnal.isSpecPragmaId_maybe (ToDo)"
+isSpecPragmaId_maybe x = Nothing -- ToDo:!trace "OccurAnal.isSpecPragmaId_maybe"
 \end{code}
 
 

@@ -316,7 +316,8 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
 	size_alg_alt (con,args,rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
 
-	(tycon, _, _) = trace "CoreUnfold.getAppDataTyConExpandingDicts" $ getAppDataTyConExpandingDicts scrut_ty
+	(tycon, _, _) = --trace "CoreUnfold.getAppDataTyConExpandingDicts" $
+			getAppDataTyConExpandingDicts scrut_ty
 
     size_up_alts _ (PrimAlts alts deflt)
       = foldr (addSize . size_prim_alt) (size_up_deflt deflt) alts

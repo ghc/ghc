@@ -83,7 +83,7 @@ completeVar env var args
 
       GenForm form_summary template guidance
 	-> considerUnfolding env var args
-			     (panic "completeVar"{-txt_occ-}) form_summary template guidance
+			     (False{-ToDo:!-}{-txt_occ-}) form_summary template guidance
 
       MagicForm str magic_fun
 	->  applyMagicUnfoldingFun magic_fun env args `thenSmpl` \ result ->

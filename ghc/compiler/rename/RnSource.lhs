@@ -25,7 +25,7 @@ import Class		( derivableClassKeys )
 import CmdLineOpts	( opt_CompilingGhcInternals )
 import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
-import Id		( GenId{-instance NamedThing-} )
+import Id		( isDataCon, GenId{-instance NamedThing-} )
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..), 
@@ -63,6 +63,8 @@ rnSource :: [Module]			-- imported modules
 	 -> RdrNameHsModule
 	 -> RnM s (RenamedHsModule,
 		   Name -> ExportFlag,		-- export info
+		   ([(Name, ExportFlag)], 	-- export module X stuff
+		    [(Name, ExportFlag)]),
 		   Bag (RnName, RdrName))	-- occurrence info
 
 rnSource imp_mods unqual_imps imp_fixes
@@ -73,7 +75,7 @@ rnSource imp_mods unqual_imps imp_fixes
 
   = pushSrcLocRn src_loc $
 
-    rnExports (mod:imp_mods) unqual_imps exports	`thenRn` \ exported_fn ->
+    rnExports (mod:imp_mods) unqual_imps exports	`thenRn` \ (exported_fn, module_dotdots) ->
     rnFixes fixes					`thenRn` \ src_fixes ->
     let
 	all_fixes     = src_fixes ++ bagToList imp_fixes
@@ -99,7 +101,7 @@ rnSource imp_mods unqual_imps imp_fixes
 		new_ty_decls new_specdata_sigs new_class_decls
 		new_inst_decls new_specinst_sigs new_defaults
 		new_binds [] src_loc,
-	      exported_fn,
+	      exported_fn, module_dotdots,
 	      occ_info
 	     )
   where
@@ -118,10 +120,15 @@ rnSource imp_mods unqual_imps imp_fixes
 rnExports :: [Module]
 	  -> Bag (Module,RnName)
 	  -> Maybe [RdrNameIE]
-	  -> RnM s (Name -> ExportFlag)
+	  -> RnM s (Name -> ExportFlag,    -- main export-flag fun
+		    ([(Name,ExportFlag)],  -- info about "module X" exports
+		     [(Name,ExportFlag)])
+		   )
 
 rnExports mods unqual_imps Nothing
-  = returnRn (\n -> if isLocallyDefined n then ExportAll else NotExported)
+  = returnRn (\n -> if isLocallyDefined n then ExportAll else NotExported
+	     , ([], [])
+	     )
 
 rnExports mods unqual_imps (Just exps)
   = getModuleRn			   `thenRn` \ this_mod ->
@@ -141,7 +148,7 @@ rnExports mods unqual_imps (Just exps)
 	(uniq_mods, dup_mods) = removeDups cmpPString exp_mods
 	(expmods_this, expmods_imps) = partition (== this_mod) uniq_mods
 
-	-- Get names for module This_Mod export
+	-- Get names for "module This_Mod" export
 	(this_tcs, this_vals)
 	  = if null expmods_this 
 	    then ([], [])
@@ -155,16 +162,23 @@ rnExports mods unqual_imps (Just exps)
 	(unqual_tcs, unqual_vals) = partition (isRnTyConOrClass.snd) (bagToList unqual_imps)
 
         get_mod_names mod
-	  = (tcs, vals, empty_mod)
+	  = --pprTrace "get_mod_names" (ppAboves [ppPStr mod, interpp'SP PprDebug (map fst tcs), interpp'SP PprDebug (map fst vals)]) $
+	    (tcs, vals, empty_mod)
           where
             tcs  = [(getName rn, nameImportFlag (getName rn))
 		   | (mod',rn) <- unqual_tcs, mod == mod']
             vals = [(getName rn, nameImportFlag (getName rn))
-		   | (mod',rn) <- unqual_vals, mod == mod']
+		   | (mod',rn) <- unqual_vals, mod == mod', fun_looking rn]
 	    empty_mod = if null tcs && null vals
 			then Just mod
 			else Nothing
 							    
+	    -- fun_looking: must avoid class ops and data constructors
+	    -- and record fieldnames
+	    fun_looking (RnName    _) = True
+	    fun_looking (WiredInId i) = not (isDataCon i)
+	    fun_looking _	      = False
+
 	-- Build finite map of exported names to export flag
 	tc_map0  = addListToUFM_C lub_expflag emptyUFM (map pair_fst tc_names)
 	tc_map1  = addListToUFM_C lub_expflag tc_map0  (map pair_fst mod_tcs)
@@ -198,8 +212,17 @@ rnExports mods unqual_imps (Just exps)
     mapRn (addWarnRn . emptyModExportWarn src_loc) empty_mods 		`thenRn_`
     mapRn (addErrRn  . dupLocalsExportErr src_loc) dup_tc_locals	`thenRn_`
     mapRn (addErrRn  . dupLocalsExportErr src_loc) dup_val_locals	`thenRn_`
-    returnRn exp_fn
+    returnRn (exp_fn, (mod_vals, mod_tcs))
 
+------------------------------------
+-- rename an "IE" in the export list
+
+rnIE ::	[Module]    -- this module and all the (directly?) imported modules
+     -> RdrNameIE
+     -> RnM s (
+	    Maybe Module,		-- Just m => a "module X" export item
+	    (Bag (Name, ExportFlag),	-- Exported tycons/classes
+	     Bag (Name, ExportFlag)))	-- Exported values
 
 rnIE mods (IEVar name)
   = lookupValue name	`thenRn` \ rn ->
@@ -249,7 +272,7 @@ rnIE mods (IEThingAll name)
 	warnAndContinueRn (unitBag (n, ExportAbs), emptyBag)
 			  (synAllExportErr False{-warning-} rn src_loc)
 
-    checkIEAll rn = pprTrace "rnIE:IEAll:panic? ToDo?:" (ppr PprDebug rn) $
+    checkIEAll rn = --pprTrace "rnIE:IEAll:panic? ToDo?:" (ppr PprDebug rn) $
 		    returnRn (emptyBag, emptyBag)
 
     exp_all n = (n, ExportAll)
@@ -622,7 +645,7 @@ rnFixes fixities
     	rn_fixity_pieces mk_fixity name i fix
       	  = getRnEnv `thenRn` \ env ->
 	      case lookupGlobalRnEnv env name of
-	  	Just res | isLocallyDefined res || opt_CompilingGhcInternals
+	  	Just res | isLocallyDefined res -- || opt_CompilingGhcInternals
 		  -- the opt_CompilingGhcInternals thing is a *HACK* to get (:)'s
 		  -- fixity decl to go through.  It has a builtin name, which
 		  -- doesn't respond to isLocallyDefined...  sigh.

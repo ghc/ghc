@@ -56,7 +56,7 @@ import TyVar		( SYN_IE(TyVarEnv), nullTyVarEnv )
 import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
 		          filterUFM, eltsUFM )
-import Unique		( iOTyConKey, mainIdKey, mainPrimIOIdKey )
+import Unique		( iOTyConKey )
 import Util
 
 import FiniteMap	( emptyFM, FiniteMap )
@@ -205,8 +205,6 @@ tcModule rn_env
 
 	`thenTc` \ ((val_binds, (inst_binds, cls_binds, final_env)), lie_alldecls, _) ->
 
-    checkTopLevelIds mod_name final_env	`thenTc_`
-
 	-- Deal with constant or ambiguous InstIds.  How could
 	-- there be ambiguous ones?  They can only arise if a
 	-- top-level decl falls under the monomorphism
@@ -259,56 +257,4 @@ tcModule rn_env
     ty_decls_bag   = listToBag ty_decls
     cls_decls_bag  = listToBag cls_decls
     inst_decls_bag = listToBag inst_decls
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Error checking code}
-%*									*
-%************************************************************************
-
-
-checkTopLevelIds checks that Main.main or GHCmain.mainPrimIO has correct type.
-
-\begin{code}
-checkTopLevelIds :: FAST_STRING -> TcEnv s -> TcM s ()
-
-checkTopLevelIds mod final_env
-  | mod /= SLIT("Main") && mod /= SLIT("GHCmain")
-  = returnTc ()
-
-  | mod == SLIT("Main")
-  = tcSetEnv final_env (
-	tcLookupLocalValueByKey mainIdKey	`thenNF_Tc` \ maybe_main ->
-	tcLookupTyConByKey iOTyConKey		`thenNF_Tc` \ io_tc ->
-
-	case maybe_main of
-	  Just main ->  tcAddErrCtxt mainCtxt $
-			unifyTauTy (applyTyCon io_tc [unitTy])
-				   (idType main)
-
-	  Nothing -> failTc (mainNoneIdErr "Main" "main")
-    )
-
-  | mod == SLIT("GHCmain")
-  = tcSetEnv final_env (
-	tcLookupLocalValueByKey mainPrimIOIdKey	`thenNF_Tc` \ maybe_prim ->
-	
-	case maybe_prim of
-	  Just prim -> tcAddErrCtxt primCtxt $
-		       unifyTauTy (mkPrimIoTy unitTy)
-				  (idType prim)
-
-	  Nothing -> failTc (mainNoneIdErr "GHCmain" "mainPrimIO")
-    )
-
-mainCtxt sty
-  = ppStr "Main.main should have type IO ()"
-
-primCtxt sty
-  = ppStr "GHCmain.mainPrimIO should have type PrimIO ()"
-
-mainNoneIdErr mod n sty
-  = ppCat [ppPStr SLIT("module"), ppStr mod, ppPStr SLIT("does not contain a definition for"), ppStr n]
 \end{code}

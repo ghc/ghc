@@ -9,7 +9,10 @@
 module PrelInfo (
 
 	-- finite maps for built-in things (for the renamer and typechecker):
-	builtinNameInfo, SYN_IE(BuiltinNames),
+	builtinNameInfo, builtinNameMaps,
+	builtinValNamesMap, builtinTcNamesMap,
+	builtinKeysMap,
+	SYN_IE(BuiltinNames),
 	SYN_IE(BuiltinKeys), SYN_IE(BuiltinIdInfos),
 
 	maybeCharLikeTyCon, maybeIntLikeTyCon
@@ -27,10 +30,6 @@ import TysPrim		-- TYPES
 import TysWiredIn
 
 -- others:
-import CmdLineOpts	( opt_HideBuiltinNames,
-			  opt_HideMostBuiltinNames,
-			  opt_ForConcurrent
-			)
 import FiniteMap	( FiniteMap, emptyFM, listToFM )
 import Id		( mkTupleCon, GenId, SYN_IE(Id) )
 import Maybes		( catMaybes )
@@ -64,45 +63,17 @@ type BuiltinKeys    = FiniteMap OrigName (Unique, Name -> RnName)
 
 type BuiltinIdInfos = UniqFM IdInfo		     -- Info for known unique Ids
 
+builtinNameMaps    = case builtinNameInfo of { (x,_,_) -> x }
+builtinKeysMap	   = case builtinNameInfo of { (_,x,_) -> x }
+builtinValNamesMap = fst builtinNameMaps
+builtinTcNamesMap  = snd builtinNameMaps
+
 builtinNameInfo
-  = if opt_HideBuiltinNames then
-	(
-	 (emptyFM, emptyFM),
-	 emptyFM,
-	 emptyUFM
-	)
-    else if opt_HideMostBuiltinNames then
-	(
-	 (listToFM min_assoc_val_wired, listToFM min_assoc_tc_wired),
-	 emptyFM,
-	 emptyUFM
-	)
-    else
-	(
-	 (listToFM assoc_val_wired, listToFM assoc_tc_wired),
-	 listToFM assoc_keys,
-	 listToUFM assoc_id_infos
-	)
-
+  = ( (listToFM assoc_val_wired, listToFM assoc_tc_wired)
+    , listToFM assoc_keys
+    , listToUFM assoc_id_infos
+    )
   where
-    min_assoc_val_wired	-- min needed when compiling bits of Prelude
-      = concat [
-	    -- data constrs
-	    concat (map pcDataConWiredInInfo g_con_tycons),
-	    concat (map pcDataConWiredInInfo min_nonprim_tycon_list),
-
-	    -- values
-	    map pcIdWiredInInfo wired_in_ids,
-	    primop_ids
-	 ]
-    min_assoc_tc_wired
-      = concat [
-	    -- tycons
-	    map pcTyConWiredInInfo prim_tycons,
-	    map pcTyConWiredInInfo g_tycons,
-	    map pcTyConWiredInInfo min_nonprim_tycon_list
-	 ]
-
     assoc_val_wired
     	= concat [
 	    -- data constrs
@@ -168,20 +139,7 @@ g_tycons
   = mkFunTyCon : g_con_tycons
 
 g_con_tycons
-  = listTyCon : mkTupleTyCon 0 : [mkTupleTyCon i | i <- [2..32] ]
-
-min_nonprim_tycon_list 	-- used w/ HideMostBuiltinNames
-  = [ boolTyCon
-    , charTyCon
-    , intTyCon
-    , floatTyCon
-    , doubleTyCon
-    , integerTyCon
-    , liftTyCon
-    , return2GMPsTyCon	-- ADR asked for these last two (WDP 94/11)
-    , returnIntAndGMPTyCon
-    ]
-
+  = listTyCon : mkTupleTyCon 0 : [mkTupleTyCon i | i <- [2..37] ]
 
 data_tycons
   = [ addrTyCon
@@ -311,12 +269,8 @@ For the Ids we may also have some builtin IdInfo.
 \begin{code}
 id_keys_infos :: [(OrigName, Unique, Maybe IdInfo)]
 id_keys_infos
-  = [ -- here so we can check the type of main/mainPrimIO
-      (OrigName SLIT("Main")    SLIT("main"),	    mainIdKey,	     Nothing)
-    , (OrigName SLIT("GHCmain") SLIT("mainPrimIO"), mainPrimIOIdKey, Nothing)
-
-      -- here because we use them in derived instances
-    , (OrigName pRELUDE SLIT("&&"),		andandIdKey,	Nothing)
+  = [ -- here because we use them in derived instances
+      (OrigName pRELUDE SLIT("&&"),		andandIdKey,	Nothing)
     , (OrigName pRELUDE SLIT("."),		composeIdKey,	Nothing)
     , (OrigName gHC__   SLIT("lex"),		lexIdKey,	Nothing)
     , (OrigName pRELUDE SLIT("not"),		notIdKey,	Nothing)

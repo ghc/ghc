@@ -24,7 +24,7 @@ module TyVar (
   ) where
 
 CHK_Ubiq() 	-- debugging consistency check
-IMPORT_DELOOPER(IdLoop) 	-- for paranoia checking
+--IMPORT_DELOOPER(IdLoop) 	-- for paranoia checking
 
 -- friends
 import Usage		( GenUsage, SYN_IE(Usage), usageOmega )

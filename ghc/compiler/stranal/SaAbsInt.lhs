@@ -44,7 +44,7 @@ import Util		( isIn, isn'tIn, nOfThem, zipWithEqual,
 			  pprTrace, panic, pprPanic, assertPanic
 			)
 
-returnsRealWorld = panic "SaAbsInt.returnsRealWorld (ToDo)"
+returnsRealWorld x = False -- ToDo: panic "SaAbsInt.returnsRealWorld (ToDo)"
 \end{code}
 
 %************************************************************************
