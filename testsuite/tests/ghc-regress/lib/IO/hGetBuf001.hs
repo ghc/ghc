@@ -7,6 +7,7 @@ import Foreign
 import Foreign.C
 import System.Exit
 import Control.Exception
+import Control.Monad
 
 
 main = do
@@ -16,25 +17,24 @@ main = do
 	threadDelay 2000000
 	throwTo main_t (ErrorCall "killed")
 
-  hGetBufTest 1 NoBuffering 		   NoBuffering
-  hGetBufTest 2 (BlockBuffering (Just 5))  NoBuffering
-  hGetBufTest 3 (BlockBuffering (Just 10)) NoBuffering
-  hGetBufTest 4 NoBuffering 		   (BlockBuffering (Just 5))
-  hGetBufTest 5 (BlockBuffering (Just 5))  (BlockBuffering (Just 5))
-  hGetBufTest 6 (BlockBuffering (Just 10)) (BlockBuffering (Just 5))
-  hGetBufTest 7 NoBuffering 		   (BlockBuffering (Just 10))
-  hGetBufTest 8 (BlockBuffering (Just 5))  (BlockBuffering (Just 10))
-  hGetBufTest 9 (BlockBuffering (Just 10)) (BlockBuffering (Just 10))
+  zipWithM_ ($) 
+	  [ f rbuf wbuf
+	    | f <- [hGetBufTest, hGetBufNBTest],
+	      rbuf <- [buf1,buf2,buf3],
+	      wbuf <- [buf1,buf2,buf3]
+	    ]
+	  [1..]
 
-  hGetBufNBTest 11 NoBuffering 		      NoBuffering
-  hGetBufNBTest 12 (BlockBuffering (Just 5))  NoBuffering
-  hGetBufNBTest 13 (BlockBuffering (Just 10)) NoBuffering
-  hGetBufNBTest 14 NoBuffering 		      (BlockBuffering (Just 5))
-  hGetBufNBTest 15 (BlockBuffering (Just 5))  (BlockBuffering (Just 5))
-  hGetBufNBTest 16 (BlockBuffering (Just 10)) (BlockBuffering (Just 5))
-  hGetBufNBTest 17 NoBuffering 		      (BlockBuffering (Just 10))
-  hGetBufNBTest 18 (BlockBuffering (Just 5))  (BlockBuffering (Just 10))
-  hGetBufNBTest 19 (BlockBuffering (Just 10)) (BlockBuffering (Just 10))
+msg = "hello!"
+msg_length = length msg
+
+buf1 = NoBuffering
+buf2 = BlockBuffering (Just 5)
+buf3 = BlockBuffering (Just 10)
+
+-- chosen to be larger than buf2 & smaller than buf3, so that we exercise
+-- all code paths:
+read_size = 8 :: Int
 
 -- ----------------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ main = do
 --   - the writing end is using hPutBuf, with various buffer sizes, and
 --     doing an hFlush at the end of each write.
 
-hGetBufTest n rbuf wbuf = do
+hGetBufTest rbuf wbuf n = do
   (read,write) <- createPipe
   hread <- fdToHandle read
   hwrite <- fdToHandle write
@@ -66,8 +66,8 @@ readProc m1 m2 finished h = do
   let
     loop 0 = return ()
     loop n = do putMVar m2 (); takeMVar m1
-		r <- hGetBuf h buf 5
-		if (r /= 5) 
+		r <- hGetBuf h buf msg_length
+		if (r /= msg_length) 
 			then do hPutStr stderr ("error: " ++ show r)
 			        exitFailure
 			else do s <- peekCStringLen (buf,r)
@@ -76,10 +76,10 @@ readProc m1 m2 finished h = do
   loop 100
   hPutStr stdout "\n"
   putMVar m2 (); takeMVar m1
-  r <- hGetBuf h buf 20 -- EOF, should get short read
+  r <- hGetBuf h buf read_size -- EOF, should get short read
   s <- peekCStringLen (buf,r)
   putStrLn ("got " ++ show r ++  ": " ++ s)
-  r <- hGetBuf h buf 20 -- EOF, should get zero-length read
+  r <- hGetBuf h buf read_size -- EOF, should get zero-length read
   s <- peekCStringLen (buf,r)
   putStrLn ("got " ++ show r ++  ": " ++ s)
   hClose h
@@ -90,9 +90,9 @@ writeProc m1 m2 h = do
   let
     loop 0 = return ()
     loop n =
-	withCString "hello"  $ \ s -> do
+	withCStringLen msg  $ \ (s,len) -> do
 	  takeMVar m2
-	  hPutBuf h s 5
+	  hPutBuf h s len
 	  hFlush h
 	  putMVar m1 ()
 	  loop (n-1)
@@ -107,7 +107,7 @@ writeProc m1 m2 h = do
 -- -----------------------------------------------------------------------------
 -- hGetBufNonBlocking:
 
-hGetBufNBTest n rbuf wbuf = do
+hGetBufNBTest rbuf wbuf n = do
   (read,write) <- createPipe
   hread <- fdToHandle read
   hwrite <- fdToHandle write
@@ -127,15 +127,15 @@ readProcNB m1 m2 finished h = do
   buf <- mallocBytes 20
 
   -- first, test that we can do a non-blocking read:
-  r <- hGetBufNonBlocking h buf 20
+  r <- hGetBufNonBlocking h buf read_size
   s <- peekCStringLen (buf,r)
   putStrLn ("got " ++ show r ++  ": " ++ s)
 
   let
     loop 0 = return ()
     loop n = do putMVar m2 (); takeMVar m1
-		r <- hGetBufNonBlocking h buf 20
-		if (r /= 5) 
+		r <- hGetBufNonBlocking h buf read_size
+		if (r /= msg_length) 
 			then do hPutStr stderr ("error: " ++ show r)
 			        exitFailure
 			else do s <- peekCStringLen (buf,r)
@@ -144,10 +144,10 @@ readProcNB m1 m2 finished h = do
   loop 100
   hPutStr stdout "\n"
   putMVar m2 (); takeMVar m1
-  r <- hGetBufNonBlocking h buf 20 -- EOF, should get short read
+  r <- hGetBufNonBlocking h buf read_size -- EOF, should get short read
   s <- peekCStringLen (buf,r)
   putStrLn ("got " ++ show r ++  ": " ++ s)
-  r <- hGetBufNonBlocking h buf 20 -- EOF, should get zero-length read
+  r <- hGetBufNonBlocking h buf read_size -- EOF, should get zero-length read
   s <- peekCStringLen (buf,r)
   putStrLn ("got " ++ show r ++  ": " ++ s)
   hClose h
@@ -158,9 +158,9 @@ writeProcNB m1 m2 h = do
   let
     loop 0 = return ()
     loop n =
-	withCString "hello"  $ \ s -> do
+	withCStringLen msg  $ \ (s,len) -> do
 	  takeMVar m2
-	  hPutBufNonBlocking h s 5
+	  hPutBufNonBlocking h s len
 	  hFlush h
 	  putMVar m1 ()
 	  loop (n-1)
