@@ -1,8 +1,6 @@
 THISPKG	= base
 SEARCH	= -I$(TOPDIR)/targets/$(MACHINE)
 
-DIRS	= $(shell ${LOCAL}pkgdirlist ${THISPKG})
-
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
 	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
