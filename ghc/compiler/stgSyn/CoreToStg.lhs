@@ -295,9 +295,11 @@ coreToStgExpr (Case scrut bndr alts)
     lookupLiveVarsForSet alts_fvs		`thenLne` \ alts_lvs ->
     let
 	-- determine whether the default binder is dead or not
-	bndr' = bndr `setIdOccInfo` occ_info
-	occ_info | bndr `elementOfFVInfo` alts_fvs = NoOccInfo
-		 | otherwise			   = IAmDead
+	-- This helps the code generator to avoid generating an assignment
+	-- for the case binder (is extremely rare cases) ToDo: remove.
+	bndr'= if (bndr `elementOfFVInfo` alts_fvs) 
+		  then bndr
+		  else bndr `setIdOccInfo` IAmDead
 
 	 -- for a _ccall_GC_, some of the *arguments* need to live across the
 	 -- call (see findLiveArgs comments.), so we annotate them as being live
