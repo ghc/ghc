@@ -62,7 +62,7 @@ doMkDependHS session srcs
 
 		-- Sort into dependency order
 		-- There should be no cycles
-	; let sorted = GHC.topSortModuleGraph False mod_summaries
+	; let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
 
 		-- Print out the dependencies if wanted
 	; if verbosity dflags >= 2 then

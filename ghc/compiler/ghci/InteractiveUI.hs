@@ -735,14 +735,19 @@ reloadModule "" = do
   session <- getSession
   ok <- io (GHC.load session Nothing)
   afterLoad ok session
-reloadModule _ = noArgs ":reload"
+reloadModule m = do
+  io (revertCAFs)		-- always revert CAFs on reload.
+  session <- getSession
+  ok <- io (GHC.load session (Just (mkModule m)))
+  afterLoad ok session
 
 afterLoad ok session = do
   io (revertCAFs)  -- always revert CAFs on load.
   graph <- io (GHC.getModuleGraph session)
   let mods = map GHC.ms_mod graph
-  setContextAfterLoad mods
-  modulesLoadedMsg ok mods
+  mods' <- filterM (io . GHC.isLoaded session) mods
+  setContextAfterLoad mods'
+  modulesLoadedMsg ok mods'
 
 setContextAfterLoad [] = do
   session <- getSession

@@ -20,7 +20,9 @@ module DriverPipeline (
    link, 
 
         -- DLL building
-   doMkDLL
+   doMkDLL,
+
+   matchOptions, -- used in module GHC
   ) where
 
 #include "HsVersions.h"

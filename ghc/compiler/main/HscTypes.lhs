@@ -188,7 +188,7 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 -- module.  If so, use this instead of the file contents (this
 -- is for use in an IDE where the file hasn't been saved by
 -- the user yet).
-data Target = Target TargetId (Maybe StringBuffer)
+data Target = Target TargetId (Maybe (StringBuffer,ClockTime))
 
 data TargetId
   = TargetModule Module	   -- | A module name: search for the file

@@ -5,7 +5,8 @@ module Digraph(
 	stronglyConnComp, stronglyConnCompR, SCC(..), flattenSCC, flattenSCCs,
 
 	Graph, Vertex, 
-	graphFromEdges, buildG, transposeG, reverseE, outdegree, indegree,
+	graphFromEdges, graphFromEdges', 
+	buildG, transposeG, reverseE, outdegree, indegree,
 
 	Tree(..), Forest,
 	showTree, showForest,
@@ -154,12 +155,19 @@ indegree  = outdegree . transposeG
 
 
 \begin{code}
-graphFromEdges
+graphFromEdges 
 	:: Ord key
 	=> [(node, key, [key])]
 	-> (Graph, Vertex -> (node, key, [key]))
-graphFromEdges edges
-  = (graph, \v -> vertex_map ! v)
+graphFromEdges edges = 
+  case graphFromEdges' edges of (graph, vertex_fn, _) -> (graph, vertex_fn) 
+
+graphFromEdges'
+	:: Ord key
+	=> [(node, key, [key])]
+	-> (Graph, Vertex -> (node, key, [key]), key -> Maybe Vertex)
+graphFromEdges' edges
+  = (graph, \v -> vertex_map ! v, key_vertex)
   where
     max_v      	    = length edges - 1
     bounds          = (0,max_v) :: (Vertex, Vertex)

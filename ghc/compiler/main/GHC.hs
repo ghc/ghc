@@ -36,6 +36,7 @@ module GHC (
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..),
 	getModuleGraph,
+	isLoaded,
 	topSortModuleGraph,
 
 	-- * Interactive evaluation
@@ -102,8 +103,8 @@ import Class		( Class )
 import DataCon		( DataCon )
 import Name		( Name )
 import NameEnv		( nameEnvElts )
-import DriverPipeline	( preprocess, compile, CompResult(..), link )
-import DriverPhases	( isHaskellSrcFilename )
+import DriverPipeline
+import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
 import Packages		( isHomePackage )
 import Finder
@@ -115,11 +116,11 @@ import SysTools		( initSysTools, cleanTempFiles )
 import Module
 import FiniteMap
 import Panic
-import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
+import Digraph
 import ErrUtils		( showPass )
 import qualified ErrUtils
 import Util
-import StringBuffer	( hGetStringBuffer )
+import StringBuffer	( StringBuffer(..), hGetStringBuffer, lexemeToString )
 import Outputable
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded )
@@ -133,6 +134,7 @@ import Monad		( unless, when, foldM )
 import System		( exitWith, ExitCode(..) )
 import Time		( ClockTime )
 import EXCEPTION as Exception hiding (handle)
+import GLAEXTS		( Int(..) )
 import DATA_IOREF
 import IO
 import Prelude hiding (init)
@@ -338,9 +340,12 @@ depanal (Session ref) excluded_mods = do
 -- attempt to load up to this target.  If no Module is supplied,
 -- then try to load all targets.
 load :: Session -> Maybe Module -> IO SuccessFlag
-load s@(Session ref) maybe_mod{-ToDo-} 
+load s@(Session ref) maybe_mod
    = do 
-	-- dependency analysis first
+	-- Dependency analysis first.  Note that this fixes the module graph:
+	-- even if we don't get a fully successful upsweep, the full module
+	-- graph is still retained in the Session.  We can tell which modules
+	-- were successfully loaded by inspecting the Session's HPT.
 	depanal s []
 
 	hsc_env <- readIORef ref
@@ -361,18 +366,13 @@ load s@(Session ref) maybe_mod{-ToDo-}
 					not (ms_mod s `elem` all_home_mods)]
 	ASSERT( null bad_boot_mods ) return ()
 
-        -- Topologically sort the module graph
-        -- mg2 should be cycle free; but it includes hi-boot ModSummary nodes
-        let mg2 :: [SCC ModSummary]
-	    mg2 = topSortModuleGraph False mod_graph
-
         -- mg2_with_srcimps drops the hi-boot nodes, returning a 
 	-- graph with cycles.  Among other things, it is used for
         -- backing out partially complete cycles following a failed
         -- upsweep, and for removing from hpt all the modules
         -- not in strict downwards closure, during calls to compile.
         let mg2_with_srcimps :: [SCC ModSummary]
-	    mg2_with_srcimps = topSortModuleGraph True mod_graph
+	    mg2_with_srcimps = topSortModuleGraph True mod_graph Nothing
 
 	    -- check the stability property for each module.
 	    stable_mods@(stable_obj,stable_bco)
@@ -408,13 +408,32 @@ load s@(Session ref) maybe_mod{-ToDo-}
         -- Now do the upsweep, calling compile for each module in
         -- turn.  Final result is version 3 of everything.
 
+        -- Topologically sort the module graph, this time including hi-boot
+	-- nodes, and possibly just including the portion of the graph
+	-- reachable from the module specified in the 2nd argument to load.
+	-- This graph should be cycle-free.
+	-- If we're restricting the upsweep to a portion of the graph, we
+	-- also want to retain everything that is still stable.
+        let full_mg, partial_mg :: [SCC ModSummary]
+	    full_mg    = topSortModuleGraph False mod_graph Nothing
+	    partial_mg = topSortModuleGraph False mod_graph maybe_mod
+
+	    stable_mg = 
+		[ AcyclicSCC ms
+	        | AcyclicSCC ms <- full_mg,
+		  ms_mod ms `elem` stable_obj++stable_bco,
+		  ms_mod ms `notElem` [ ms_mod ms' | 
+					AcyclicSCC ms' <- partial_mg ] ]
+
+	    mg = stable_mg ++ partial_mg
+
 	-- clean up between compilations
 	let cleanup = cleanTempFilesExcept dflags
-			  (ppFilesFromSummaries (flattenSCCs mg2))
+			  (ppFilesFromSummaries (flattenSCCs mg2_with_srcimps))
 
         (upsweep_ok, hsc_env1, modsUpswept)
            <- upsweep (hsc_env { hsc_HPT = emptyHomePackageTable })
-			   pruned_hpt stable_mods cleanup mg2
+			   pruned_hpt stable_mods cleanup mg
 
 	-- Make modsDone be the summaries for each home module now
 	-- available; this should equal the domain of hpt3.
@@ -460,8 +479,7 @@ load s@(Session ref) maybe_mod{-ToDo-}
 	      -- link everything together
               linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env1)
 
-	      let hsc_env4 = hsc_env1{ hsc_mod_graph = modsDone }
-	      loadFinish Succeeded linkresult ref hsc_env4
+	      loadFinish Succeeded linkresult ref hsc_env1
 
          else 
            -- Tricky.  We need to back out the effects of compiling any
@@ -492,8 +510,7 @@ load s@(Session ref) maybe_mod{-ToDo-}
 	      -- Link everything together
               linkresult <- link ghci_mode dflags False hpt4
 
-	      let hsc_env4 = hsc_env1{ hsc_mod_graph = mods_to_keep,
-				       hsc_HPT = hpt4 }
+	      let hsc_env4 = hsc_env1{ hsc_HPT = hpt4 }
 	      loadFinish Failed linkresult ref hsc_env4
 
 -- Finish up after a load.
@@ -889,6 +906,7 @@ retainInTopLevelEnvs keep_these hpt
 topSortModuleGraph
 	  :: Bool 		-- Drop hi-boot nodes? (see below)
 	  -> [ModSummary]
+	  -> Maybe Module
 	  -> [SCC ModSummary]
 -- Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
 --
@@ -901,8 +919,24 @@ topSortModuleGraph
 --		the a source-import of Foo is an import of Foo
 --		The resulting graph has no hi-boot nodes, but can by cyclic
 
-topSortModuleGraph drop_hs_boot_nodes summaries
-   = stronglyConnComp nodes
+topSortModuleGraph drop_hs_boot_nodes summaries Nothing
+  = stronglyConnComp (fst (moduleGraphNodes drop_hs_boot_nodes summaries))
+topSortModuleGraph drop_hs_boot_nodes summaries (Just mod)
+  = stronglyConnComp (map vertex_fn (reachable graph root))
+  where 
+	-- restrict the graph to just those modules reachable from
+	-- the specified module.  We do this by building a graph with
+	-- the full set of nodes, and determining the reachable set from
+	-- the specified node.
+	(nodes, lookup_key) = moduleGraphNodes drop_hs_boot_nodes summaries
+	(graph, vertex_fn, key_fn) = graphFromEdges' nodes
+	root 
+	  | Just key <- lookup_key HsSrcFile mod, Just v <- key_fn key = v
+	  | otherwise  = throwDyn (ProgramError "module does not exist")
+
+moduleGraphNodes :: Bool -> [ModSummary]
+  -> ([(ModSummary, Int, [Int])], HscSource -> Module -> Maybe Int)
+moduleGraphNodes drop_hs_boot_nodes summaries = (nodes, lookup_key)
    where
 	-- Drop hs-boot nodes by using HsSrcFile as the key
 	hs_boot_key | drop_hs_boot_nodes = HsSrcFile
@@ -999,11 +1033,11 @@ downsweep hsc_env old_summaries excl_mods
 	getRootSummary :: Target -> IO ModSummary
 	getRootSummary (Target (TargetFile file) maybe_buf)
 	   = do exists <- doesFileExist file
-		if exists then summariseFile hsc_env file else do
+		if exists then summariseFile hsc_env file maybe_buf else do
 		throwDyn (CmdLineError ("can't find file: " ++ file))	
 	getRootSummary (Target (TargetModule modl) maybe_buf)
  	   = do maybe_summary <- summarise hsc_env emptyNodeMap Nothing False 
-					   modl excl_mods
+					   modl maybe_buf excl_mods
 		case maybe_summary of
 		   Nothing -> packageModErr modl
 		   Just s  -> return s
@@ -1036,7 +1070,7 @@ downsweep hsc_env old_summaries excl_mods
 	  | key `elemFM` done = loop ss done
 	  | otherwise	      = do { mb_s <- summarise hsc_env old_summary_map 
 						 (Just cur_path) is_boot 
-						 wanted_mod excl_mods
+						 wanted_mod Nothing excl_mods
 				   ; case mb_s of
 					Nothing -> loop ss done
 					Just s  -> loop (msDeps s ++ ss) 
@@ -1074,21 +1108,18 @@ msDeps s =  concat [ [(f, m, True), (f,m,False)] | m <- ms_srcimps s]
 --	a summary.  The finder is used to locate the file in which the module
 --	resides.
 
-summariseFile :: HscEnv -> FilePath -> IO ModSummary
+summariseFile :: HscEnv -> FilePath
+   -> Maybe (StringBuffer,ClockTime)
+   -> IO ModSummary
 -- Used for Haskell source only, I think
 -- We know the file name, and we know it exists,
 -- but we don't necessarily know the module name (might differ)
-summariseFile hsc_env file
+summariseFile hsc_env file maybe_buf
    = do let dflags = hsc_dflags hsc_env
 
-	(dflags', hspp_fn) <- preprocess dflags file
-		-- The dflags' contains the OPTIONS pragmas
+	(dflags', hspp_fn, buf)
+	    <- preprocessFile dflags file maybe_buf
 
-	-- Read the file into a buffer.  We're going to cache
-	-- this buffer in the ModLocation (ml_hspp_buf) so that it
-	-- doesn't have to be slurped again when hscMain parses the
-	-- file later.
-	buf <- hGetStringBuffer hspp_fn
         (srcimps,the_imps,mod) <- getImports dflags' buf hspp_fn
 
 	-- Make a ModLocation for this file
@@ -1098,7 +1129,10 @@ summariseFile hsc_env file
 	-- to findModule will find it, even if it's not on any search path
 	addHomeModuleToFinder hsc_env mod location
 
-        src_timestamp <- getModificationTime file
+        src_timestamp <- case maybe_buf of
+			   Just (_,t) -> return t
+			   Nothing    -> getModificationTime file
+
 	obj_timestamp <- modificationTimeIfExists (ml_obj_file location)
 
         return (ModSummary { ms_mod = mod, ms_hsc_src = HsSrcFile,
@@ -1115,10 +1149,11 @@ summarise :: HscEnv
 	  -> Maybe FilePath	-- Importing module (for error messages)
 	  -> IsBootInterface	-- True <=> a {-# SOURCE #-} import
 	  -> Module 		-- Imported module to be summarised
+	  -> Maybe (StringBuffer, ClockTime)
 	  -> [Module]		-- Modules to exclude
 	  -> IO (Maybe ModSummary)	-- Its new summary
 
-summarise hsc_env old_summary_map cur_mod is_boot wanted_mod excl_mods
+summarise hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -1129,14 +1164,17 @@ summarise hsc_env old_summary_map cur_mod is_boot wanted_mod excl_mods
 	    src_fn = expectJust "summarise" (ml_hs_file location)
 
 		-- return the cached summary if the source didn't change
-	src_timestamp <- getModificationTime src_fn
+	src_timestamp <- case maybe_buf of
+			   Just (_,t) -> return t
+			   Nothing    -> getModificationTime src_fn
+
 	if ms_hs_date old_summary == src_timestamp 
 	   then do -- update the object-file timestamp
 		  obj_timestamp <- getObjTimestamp location is_boot
 		  return (Just old_summary{ ms_obj_date = obj_timestamp })
 	   else
 		-- source changed: re-summarise
-		new_summary location src_fn src_timestamp
+		new_summary location src_fn maybe_buf src_timestamp
 
   | otherwise
   = do	found <- findModule hsc_env wanted_mod True {-explicit-}
@@ -1165,15 +1203,14 @@ summarise hsc_env old_summary_map cur_mod is_boot wanted_mod excl_mods
 	maybe_t <- modificationTimeIfExists src_fn
 	case maybe_t of
 	  Nothing -> noHsFileErr cur_mod src_fn
-	  Just t  -> new_summary location' src_fn t
+	  Just t  -> new_summary location' src_fn Nothing t
 
 
-    new_summary location src_fn src_timestamp
+    new_summary location src_fn maybe_bug src_timestamp
       = do
 	-- Preprocess the source file and get its imports
 	-- The dflags' contains the OPTIONS pragmas
-	(dflags', hspp_fn) <- preprocess dflags src_fn
-	buf <- hGetStringBuffer hspp_fn
+	(dflags', hspp_fn, buf) <- preprocessFile dflags src_fn maybe_buf
         (srcimps, the_imps, mod_name) <- getImports dflags' buf hspp_fn
 
 	when (mod_name /= wanted_mod) $
@@ -1199,6 +1236,56 @@ summarise hsc_env old_summary_map cur_mod is_boot wanted_mod excl_mods
 getObjTimestamp location is_boot
   = if is_boot then return Nothing
 	       else modificationTimeIfExists (ml_obj_file location)
+
+
+preprocessFile :: DynFlags -> FilePath -> Maybe (StringBuffer,ClockTime)
+  -> IO (DynFlags, FilePath, StringBuffer)
+preprocessFile dflags src_fn Nothing
+  = do
+	(dflags', hspp_fn) <- preprocess dflags src_fn
+	buf <- hGetStringBuffer hspp_fn
+	return (dflags', hspp_fn, buf)
+
+preprocessFile dflags src_fn (Just (buf, time))
+  = do
+	-- case we bypass the preprocessing stage?
+	let 
+	    local_opts = getOptionsFromStringBuffer buf
+	--
+	(dflags', errs) <- parseDynamicFlags dflags local_opts
+
+	let
+	    needs_preprocessing
+		| Unlit _ <- startPhase src_fn  = True
+		  -- note: local_opts is only required if there's no Unlit phase
+		| dopt Opt_Cpp dflags'		= True
+		| dopt Opt_Pp  dflags'		= True
+		| otherwise			= False
+
+	when needs_preprocessing $
+	   ghcError (ProgramError "buffer needs preprocesing; interactive check disabled")
+
+	return (dflags', "<buffer>", buf)
+
+
+-- code adapted from the file-based version in DriverUtil
+getOptionsFromStringBuffer :: StringBuffer -> [String]
+getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) = 
+  let 
+	ls = lines (lexemeToString buffer (I# len#))  -- lazy, so it's ok
+  in
+  look ls
+  where
+	look [] = []
+	look (l':ls) = do
+	    let l = removeSpaces l'
+	    case () of
+		() | null l -> look ls
+		   | prefixMatch "#" l -> look ls
+		   | prefixMatch "{-# LINE" l -> look ls   -- -}
+		   | Just opts <- matchOptions l
+			-> opts ++ look ls
+		   | otherwise -> []
 
 -----------------------------------------------------------------------------
 -- 			Error messages
@@ -1254,10 +1341,13 @@ workingDirectoryChanged s = withSession s $ \hsc_env ->
 -- -----------------------------------------------------------------------------
 -- inspecting the session
 
--- | Get the module dependency graph.  After a 'load', this will contain
--- only the modules that were successfully loaded.
+-- | Get the module dependency graph.
 getModuleGraph :: Session -> IO ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph s = withSession s (return . hsc_mod_graph)
+
+isLoaded :: Session -> Module -> IO Bool
+isLoaded s m = withSession s $ \hsc_env ->
+  return $! isJust (lookupModuleEnv (hsc_HPT hsc_env) m)
 
 getBindings :: Session -> IO [TyThing]
 getBindings s = withSession s (return . nameEnvElts . ic_type_env . hsc_IC)
