@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.26 2005/01/28 12:55:51 simonmar Exp $
+# $Id: Makefile,v 1.27 2005/02/21 11:27:21 simonmar Exp $
 #
 
 TOP = ..
@@ -140,12 +140,12 @@ boot :: all
 # it gives (perhaps) a cleaner binary dist structure..might change.
 #
 override datadir:=$(libdir)/include
-INSTALL_DATAS += $(H_FILES) $(H_CONFIG)
+INSTALL_DATAS += $(H_FILES) $(H_CONFIG) $(H_PLATFORM)
 
 #
 # `make clean' settings:
 #
-CLEAN_FILES += $(H_CONFIG)
+CLEAN_FILES += $(H_CONFIG) $(H_PLATFORM)
 
 #
 # Finally, slurp in the standard targets.
