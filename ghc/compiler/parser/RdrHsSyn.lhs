@@ -519,6 +519,7 @@ checkTyVars :: [RdrNameHsType] -> P [RdrNameHsTyVar]
 checkTyVars tvs 
   = mapP chk tvs
   where
+	--  Check that the name space is correct!
     chk (HsKindSig (HsTyVar tv) k) | isRdrTyVar tv = returnP (IfaceTyVar tv k)
     chk (HsTyVar tv) 	           | isRdrTyVar tv = returnP (UserTyVar tv)
     chk other	 		   = parseError "Type found where type variable expected"
