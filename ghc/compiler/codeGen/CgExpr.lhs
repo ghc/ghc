@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.17 1998/12/18 17:40:50 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.18 1998/12/22 12:55:55 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -24,7 +24,7 @@ import SMRep		( fixedHdrSize )
 import CgBindery	( getArgAmodes, CgIdInfo, nukeDeadBindings )
 import CgCase		( cgCase, saveVolatileVarsAndRegs, 
 			  restoreCurrentCostCentre,
-			  splitAlgTyConAppThroughNewTypes )
+			  splitTyConAppThroughNewTypes )
 import CgClosure	( cgRhsClosure, cgStdRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
 import CgLetNoEscape	( cgLetNoEscapeClosure )
@@ -423,7 +423,7 @@ Little helper for primitives that return unboxed tuples.
 \begin{code}
 primRetUnboxedTuple :: PrimOp -> [StgArg] -> Type -> Code
 primRetUnboxedTuple op args res_ty
-  = let (tc,ty_args) = case splitAlgTyConAppThroughNewTypes res_ty of
+  = let (tc,ty_args) = case splitTyConAppThroughNewTypes res_ty of
 			  Nothing -> pprPanic "primRetUnboxedTuple" (ppr res_ty)
 			  Just pr -> pr
 

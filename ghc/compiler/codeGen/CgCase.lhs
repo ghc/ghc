@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.19 1998/12/18 17:40:48 simonpj Exp $
+% $Id: CgCase.lhs,v 1.20 1998/12/22 12:55:54 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -11,7 +11,7 @@
 
 \begin{code}
 module CgCase (	cgCase, saveVolatileVarsAndRegs, restoreCurrentCostCentre,
-		splitAlgTyConAppThroughNewTypes ) where
+		splitTyConAppThroughNewTypes ) where
 
 #include "HsVersions.h"
 
@@ -61,7 +61,7 @@ import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  isNewTyCon, isAlgTyCon,
 			  tyConDataCons, tyConFamilySize )
-import Type		( Type, typePrimRep, splitAlgTyConApp, splitAlgTyConApp_maybe,
+import Type		( Type, typePrimRep, splitAlgTyConApp, splitTyConApp_maybe,
 			  splitFunTys, applyTys )
 import Unique           ( Unique, Uniquable(..) )
 import Maybes		( maybeToBool )
@@ -154,6 +154,11 @@ cgCase (StgCon (PrimOp op) args res_ty) live_in_whole_case live_in_alts bndr srt
 	-- Scrutinise the result
     cgInlineAlts bndr alts
 \end{code}
+
+TODO: Case-of-case of primop can probably be done inline too (but
+maybe better to translate it out beforehand).  See
+ghc/lib/misc/PackedString.lhs for examples where this crops up (with
+4.02).
 
 Another special case: scrutinising a primitive-typed variable.	No
 evaluation required.  We don't save volatile variables, nor do we do a
@@ -993,7 +998,7 @@ possibleHeapCheck NoGC	_ _ tags lbl code
   = code
 \end{code}
 
-splitTyConAppThroughNewTypes is like splitAlgTyConApp_maybe except
+splitTyConAppThroughNewTypes is like splitTyConApp_maybe except
 that it looks through newtypes in addition to synonyms.  It's
 useful in the back end where we're not interested in newtypes
 anymore.
@@ -1005,10 +1010,11 @@ SEQ_FRAME to evaluate the case scrutinee.
 \begin{code}
 getScrutineeTyCon :: Type -> Maybe TyCon
 getScrutineeTyCon ty =
-   case (splitAlgTyConAppThroughNewTypes ty) of
+   case (splitTyConAppThroughNewTypes ty) of
 	Nothing -> Nothing
 	Just (tc,_) -> 
 		if not (isAlgTyCon tc) then Just tc else
+			-- works for primitive TyCons too
 		case (tyConFamilySize tc) of
 			0 -> pprTrace "Warning" (hcat [
 				text "constructors for ",
@@ -1017,14 +1023,15 @@ getScrutineeTyCon ty =
 				]) Nothing
 			_ -> Just tc
 
-splitAlgTyConAppThroughNewTypes  :: Type -> Maybe (TyCon, [Type])
-splitAlgTyConAppThroughNewTypes ty
-  = case splitAlgTyConApp_maybe ty of
-	Just (tc, tys, cons)
-	  | isNewTyCon tc ->  splitAlgTyConAppThroughNewTypes ty
-	  | otherwise     ->  Just (tc, tys)
-	  where
-	    ([ty], _) = splitFunTys (applyTys (dataConType (head cons)) tys)
+splitTyConAppThroughNewTypes  :: Type -> Maybe (TyCon, [Type])
+splitTyConAppThroughNewTypes ty
+  = case splitTyConApp_maybe ty of
+      Just (tc, tys)
+	| isNewTyCon tc ->  splitTyConAppThroughNewTypes ty
+	| otherwise     ->  Just (tc, tys)
+	where
+	  ([ty], _) = splitFunTys (applyTys (dataConType (head (tyConDataCons tc))) tys)
 
-	other  -> Nothing
+      other  -> Nothing
+
 \end{code}
