@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.5 2000/11/17 16:53:27 simonmar Exp $
+-- $Id: Interpreter.hs,v 1.6 2000/11/20 14:26:27 simonmar Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -50,7 +50,7 @@ emptyItblEnv = ()
 
 type HValue        = ()
 data UnlinkedIBind = UnlinkedIBind
-data UnlinkedIBind = UnlinkedIExpr
+data UnlinkedIExpr = UnlinkedIExpr
 
 instance Outputable UnlinkedIBind where
   ppr x = text "Can't output UnlinkedIBind"
