@@ -27,6 +27,20 @@ module Foreign.C.TypesISO
 	, CFile,        CFpos,     CJmpBuf
 	) where
 
+#ifdef __NHC__
+import NHC.FFI
+  ( CPtrdiff(..)
+  , CSize(..)
+  , CWchar(..)
+  , CSigAtomic(..)
+  , CClock(..)
+  , CTime(..)
+  , CFile
+  , CFpos
+  , CJmpBuf
+  )
+#else
+
 import Data.Bits	( Bits(..) )
 import Data.Int
 import Data.Word
@@ -76,3 +90,4 @@ data CJmpBuf = CJmpBuf
 -- C99 types which are still missing include:
 -- intptr_t, uintptr_t, intmax_t, uintmax_t, wint_t, wctrans_t, wctype_t
 
+#endif

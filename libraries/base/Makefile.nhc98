@@ -1,17 +1,29 @@
 THISPKG	= base
 SEARCH	=
 
-DIRS	= Data Control Debug System System/IO
+DIRS	= Data Control Control/Monad Debug System System/IO \
+	  Foreign Foreign/C Foreign/Marshal
 
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
 	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
-	Data/Set.hs Data/Tuple.hs Data/Word.hs \
-	Control/Monad.hs \
-	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs
+	Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
+	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Identity.hs \
+	Control/Monad/Trans.hs \
+	Debug/Trace.hs \
+	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
+	System/Environment.hs System/Exit.hs System/Locale.hs \
+	System/Mem.hs System/Cmd.hs \
+	Foreign/Ptr.hs Foreign/StablePtr.hs Foreign/Storable.hs \
+	Foreign/ForeignPtr.hs Foreign/C/Types.hs Foreign/C/TypesISO.hs \
+	Foreign/Marshal/Alloc.hs Foreign/Marshal/Array.hs \
+	Foreign/Marshal/Utils.hs Foreign/Marshal/Error.hs \
+	Foreign/C/String.hs
 
-#	Debug/Trace.hs Debug/QuickCheck.hs
+#	Data/Ratio.hs
+#	System/Random.hs
+#	Debug/QuickCheck.hs
 
 
 # Here are the main rules.
@@ -21,9 +33,43 @@ include ../Makefile.common
 # Here are the dependencies.
 $(OBJDIR)/Data/FiniteMap.$O: $(OBJDIR)/Data/Maybe.$O
 $(OBJDIR)/Data/Set.$O: $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/FiniteMap.$O
+$(OBJDIR)/Data/Array.$O: $(OBJDIR)/Data/Ix.$O
 $(OBJDIR)/System/IO.$O: $(OBJDIR)/System/IO/Error.$O
+$(OBJDIR)/System/Random.$O: $(OBJDIR)/Data/Char.$O $(OBJDIR)/Data/IORef.$O \
+	$(OBJDIR)/System/IO/Unsafe.$O
+$(OBJDIR)/Debug/Trace.$O: $(OBJDIR)/System/IO.$O $(OBJDIR)/System/IO/Unsafe.$O
+$(OBJDIR)/Control/Monad/Fix.$O: $(OBJDIR)/System/IO.$O
+$(OBJDIR)/Control/Monad/Identity.$O: $(OBJDIR)/Control/Monad.$O \
+	$(OBJDIR)/Control/Monad/Fix.$O
+$(OBJDIR)/Foreign/Marshal/Alloc.$O:  $(OBJDIR)/Data/Maybe.$O \
+	$(OBJDIR)/Foreign/Ptr.$O $(OBJDIR)/Foreign/Storable.$O \
+	$(OBJDIR)/Foreign/C/Types.$O
+$(OBJDIR)/Foreign/Marshal/Array.$O:  $(OBJDIR)/Control/Monad.$O \
+	$(OBJDIR)/Foreign/Ptr.$O $(OBJDIR)/Foreign/Storable.$O \
+	$(OBJDIR)/Foreign/Marshal/Alloc.$O $(OBJDIR)/Foreign/Marshal/Utils.$O
+$(OBJDIR)/Foreign/Marshal/Utils.$O:  $(OBJDIR)/Data/Maybe.$O \
+	$(OBJDIR)/Foreign/Ptr.$O $(OBJDIR)/Foreign/Storable.$O \
+	$(OBJDIR)/Foreign/Marshal/Alloc.$O $(OBJDIR)/Foreign/C/Types.$O
+$(OBJDIR)/Foreign/Marshal/Error.$O: $(OBJDIR)/Foreign/Ptr.$O
+$(OBJDIR)/Foreign/C/String.$O: $(OBJDIR)/Data/Word.$O $(OBJDIR)/Foreign/Ptr.$O \
+	$(OBJDIR)/Foreign/Marshal/Array.$O $(OBJDIR)/Foreign/C/Types.$O 
 
 # C-files dependencies.
 Data/FiniteMap.$C: Data/Maybe.$C
 Data/Set.$C:       Data/Maybe.$C Data/FiniteMap.$C
+Data/Array.$C:     Data/Ix.$C
 System/IO.$C:      System/IO/Error.$C
+System/Random.$C:  Data/Char.$C Data/IORef.$C System/IO/Unsafe.$C
+Debug/Trace.$C:    System/IO.$C System/IO/Unsafe.$C
+Control/Monad/Fix.$C:      System/IO.$C
+Control/Monad/Identity.$C: Control/Monad.$C Control/Monad/Fix.$C
+Control/Monad/Trans.$C:    System/IO.$C
+Foreign/Marshal/Alloc.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
+	Foreign/C/Types.$C
+Foreign/Marshal/Array.$C:  Control/Monad.$C Foreign/Ptr.$C Foreign/Storable.$C \
+	Foreign/Marshal/Alloc.$C Foreign/Marshal/Utils.$C
+Foreign/Marshal/Utils.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
+	Foreign/C/Types.$C Foreign/Marshal/Alloc.$C
+Foreign/Marshal/Error.$C:  Foreign/Ptr.$C
+Foreign/C/String.$C:       Data/Word.$C Foreign/Ptr.$C Foreign/C/Types.$C \
+	Foreign/Marshal/Array.$C

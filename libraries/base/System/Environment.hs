@@ -17,7 +17,7 @@ module System.Environment
       getArgs,	     -- :: IO [String]
       getProgName,   -- :: IO String
       getEnv,        -- :: String -> IO String
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
       withArgs,
       withProgName,
 #endif
@@ -26,18 +26,23 @@ module System.Environment
 import Prelude
 import System.IO 	( bracket )
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 import Foreign
 import Foreign.C
 import Control.Monad
-#endif
-
-#ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
 #endif
 
 #ifdef __HUGS__
 import Hugs.System
+#endif
+
+#ifdef __NHC__
+import System
+  ( getArgs
+  , getProgName
+  , getEnv
+  )
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -46,7 +51,7 @@ import Hugs.System
 -- Computation `getArgs' returns a list of the program's command
 -- line arguments (not including the program name).
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 getArgs :: IO [String]
 getArgs = 
   alloca $ \ p_argc ->  
@@ -156,4 +161,4 @@ setArgs argv = do
 
 foreign import ccall unsafe "setProgArgv" 
   setArgsPrim  :: Int -> Ptr CString -> IO ()
-#endif  /* __HUGS__ */
+#endif  /* __GLASGOW_HASKELL__ */

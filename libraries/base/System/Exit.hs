@@ -29,6 +29,13 @@ import GHC.IOBase
 import Hugs.System
 #endif
 
+#ifdef __NHC__
+import System
+  ( ExitCode(..)
+  , exitWith
+  )
+#endif
+
 -- ---------------------------------------------------------------------------
 -- exitWith
 

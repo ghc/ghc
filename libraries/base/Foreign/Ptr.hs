@@ -50,9 +50,27 @@ import GHC.Show
 import Numeric
 #endif
 
-#include "MachDeps.h"
+#ifdef __NHC__
+import NHC.FFI
+  ( Ptr
+  , nullPtr
+  , castPtr
+  , plusPtr
+  , alignPtr
+  , minusPtr
+  , FunPtr
+  , nullFunPtr
+  , castFunPtr
+  , castFunPtrToPtr
+  , castPtrToFunPtr
+  , freeHaskellFunPtr
+  )
+#endif
+
 
 #ifdef __GLASGOW_HASKELL__
+#include "MachDeps.h"
+
 #if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
 instance Show (Ptr a) where
    showsPrec p (Ptr a) rs = pad_out (showHex (word2Integer(int2Word#(addr2Int# a))) "") rs
@@ -69,5 +87,7 @@ instance Show (FunPtr a) where
 #endif
 #endif
 
+#ifndef __NHC__
 foreign import ccall unsafe "freeHaskellFunctionPtr"
     freeHaskellFunPtr :: FunPtr a -> IO ()
+#endif

@@ -50,3 +50,8 @@ trace string expr = unsafePerformIO $ do
 
 foreign import ccall "PostTraceHook" postTraceHook :: Int -> IO ()
 #endif
+
+#ifdef __NHC__
+trace :: String -> a -> a
+trace str expr = unsafePerformIO $ do hPutStr stderr str; return expr
+#endif

@@ -24,17 +24,15 @@ module Foreign.Marshal.Alloc (
   realloc,      -- :: Storable b => Ptr a        -> IO (Ptr b)
   reallocBytes, -- ::		    Ptr a -> Int -> IO (Ptr a)
 
-#ifdef __HUGS__
-  free,         -- :: Ptr a -> IO ()
-  finalizerFree -- :: FunPtr (Ptr a -> IO ())
-#else
   free          -- :: Ptr a -> IO ()
+#ifdef __HUGS__
+  , finalizerFree -- :: FunPtr (Ptr a -> IO ())
 #endif
 ) where
 
 import Data.Maybe
 import Foreign.Ptr	 	( Ptr, nullPtr, FunPtr )
-import Foreign.C.TypesISO 	( CSize )
+import Foreign.C.Types	 	( CSize, CInt(..) )
 import Foreign.Storable  	( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
@@ -44,8 +42,10 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
-#else
+#elsif defined(__HUGS__)
 import Control.Exception	( bracket )
+#else
+import System.IO		( bracket )
 #endif
 
 

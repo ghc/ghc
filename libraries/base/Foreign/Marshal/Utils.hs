@@ -53,7 +53,7 @@ module Foreign.Marshal.Utils (
 import Data.Maybe
 import Foreign.Ptr	        ( Ptr, nullPtr )
 import Foreign.Storable		( Storable(poke) )
-import Foreign.C.TypesISO    	( CSize )
+import Foreign.C.Types    	( CSize, CInt(..) )
 import Foreign.Marshal.Alloc 	( malloc, alloca )
 
 #ifdef __GLASGOW_HASKELL__

@@ -44,7 +44,9 @@ module  Data.Array
 
     ) where
 
+#ifndef __NHC__
 import Data.Dynamic
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import Data.Ix
@@ -56,5 +58,12 @@ import GHC.Err		( undefined )
 import Hugs.Array
 #endif
 
+#ifdef __NHC__
+import Array		-- Haskell'98 arrays
+import Data.Ix
+#endif
+
+#ifndef __NHC__
 #include "Dynamic.h"
 INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
+#endif

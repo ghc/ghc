@@ -26,3 +26,7 @@ import Hugs.IOExts
 -- | Triggers an immediate garbage collection
 foreign import ccall {-safe-} "performGC" performGC :: IO ()
 #endif
+
+#ifdef __NHC__
+import NHC.IOExtras (performGC)
+#endif

@@ -36,12 +36,27 @@ module Foreign.C.Types
 	, CFile,        CFpos,     CJmpBuf
 	) where
 
+#ifdef __NHC__
+import NHC.FFI
+  ( CChar(..),  CSChar(..),  CUChar(..)
+  , CShort(..), CUShort(..), CInt(..),   CUInt(..)
+  , CLong(..),  CULong(..), CLLong(..), CULLong(..)
+  , CPtrdiff(..), CSize(..), CWchar(..), CSigAtomic(..)
+  , CClock(..),   CTime(..)
+  , CFloat(..),  CDouble(..), CLDouble(..)
+  , CFile,        CFpos,     CJmpBuf
+  , Storable(..)
+  )
+#else
+
 import Foreign.C.TypesISO
 import Foreign.Storable
 import Data.Bits	( Bits(..) )
 import Data.Int		( Int8,  Int16,  Int32,  Int64  )
 import Data.Word	( Word8, Word16, Word32, Word64 )
+#ifndef __NHC__
 import Data.Dynamic
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -108,3 +123,4 @@ FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
 -- HACK: Currently no long double in the FFI, so we simply re-use double
 FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
 
+#endif

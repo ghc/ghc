@@ -29,6 +29,10 @@ module Foreign.Storable
         ) where
 
 
+#ifdef __NHC__
+import NHC.FFI (Storable(..))
+#else
+
 import Control.Monad		( liftM )
 
 #include "MachDeps.h"
@@ -237,3 +241,5 @@ STORABLE(Int32,SIZEOF_INT32,ALIGNMENT_INT32,
 
 STORABLE(Int64,SIZEOF_INT64,ALIGNMENT_INT64,
 	 readInt64OffPtr,writeInt64OffPtr)
+
+#endif
