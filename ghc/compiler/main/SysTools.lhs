@@ -688,13 +688,14 @@ slash s1 s2 = s1 ++ ('/' : s2)
 
 #if defined(mingw32_TARGET_OS)
 getExecDir :: IO (Maybe String)
-getExecDir = do let len = 2048
+getExecDir = do let len = 2048 -- plenty, PATH_MAX is 512 under Win32.
 		buf <- mallocArray (fromIntegral len)
 		ret <- getModuleFileName nullAddr buf len
 		if ret == 0 then return Nothing
 		            else do s <- peekCString buf
 				    destructArray (fromIntegral len) buf
-				    return (Just (reverse (tail (dropWhile (not . isSlash) (reverse (unDosifyPath s))))))
+				    return (Just (reverse (drop (length "/bin/ghc.exe") (reverse (unDosifyPath n)))))
+
 
 foreign import stdcall "GetModuleFileNameA" getModuleFileName :: Addr -> CString -> Int32 -> IO Int32
 #else
