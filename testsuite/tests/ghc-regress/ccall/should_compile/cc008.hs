@@ -5,4 +5,4 @@ import Addr
 
 newtype Ptr a = Ptr Addr
 
-foreign export dynamic mkFoo :: IO () -> IO (Ptr Int)
+foreign import ccall "wrapper" mkFoo :: IO () -> IO (Ptr Int)

@@ -6,7 +6,7 @@ import GlaExts
 import Int
 import Word
 
-foreign export ccall dynamic d8  :: (Int -> IO ())  -> IO Addr
+foreign import ccall "wrapper" d8  :: (Int -> IO ())  -> IO Addr
 
 -- exporting functions
 {-

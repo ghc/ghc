@@ -8,8 +8,8 @@ import Word
 
 -- importing functions
 
-foreign import stdcall "m" m_stdcall :: StablePtr a -> IO (StablePtr b)
-foreign import ccall   "m" unsafe m_ccall   :: ByteArray Int -> IO Int
+foreign import stdcall        "m" m_stdcall :: StablePtr a -> IO (StablePtr b)
+foreign import ccall   unsafe "m" m_ccall   :: ByteArray Int -> IO Int
 
 foreign import stdcall "sin" my_sin :: Double -> IO Double
 foreign import stdcall "cos" my_cos :: Double -> IO Double
@@ -19,12 +19,12 @@ foreign import stdcall "m2" m16 :: IO Int16
 foreign import stdcall "m3" m32 :: IO Int32
 foreign import stdcall "m4" m64 :: IO Int64
 
-foreign import stdcall dynamic d8  :: Addr -> IO Int8
-foreign import stdcall dynamic d16 :: Addr -> IO Int16
-foreign import stdcall dynamic d32 :: Addr -> IO Int32
-foreign import stdcall dynamic d64 :: Addr -> IO Int64
+foreign import stdcall "dynamic" d8  :: Addr -> IO Int8
+foreign import stdcall "dynamic" d16 :: Addr -> IO Int16
+foreign import stdcall "dynamic" d32 :: Addr -> IO Int32
+foreign import stdcall "dynamic" d64 :: Addr -> IO Int64
 
-foreign import ccall "kitchen" unsafe 
+foreign import ccall unsafe "kitchen"
    sink :: ForeignObj 
         -> ByteArray Int 
 	-> MutableByteArray Int RealWorld
@@ -42,7 +42,7 @@ foreign import ccall "kitchen" unsafe
 	-> IO ()
 
 
-foreign import ccall dynamic unsafe
+foreign import ccall unsafe "dynamic"
   sink2 :: Addr
         -> (ForeignObj 
         -> ByteArray Int 

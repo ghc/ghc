@@ -5,4 +5,4 @@ import Addr
 
 newtype Ptr a = Ptr Addr
 
-foreign label foo :: Ptr Int
+foreign import ccall "&" foo :: Ptr Int
