@@ -241,7 +241,6 @@ pREL_ARR_Name     = mkModuleName "GHC.Arr"
 pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
 fOREIGN_PTR_Name  = mkModuleName "Foreign.ForeignPtr"
 pREL_STABLE_Name  = mkModuleName "GHC.Stable"
-pREL_SPLIT_Name   = mkModuleName "GHC.Split"
 pREL_ADDR_Name    = mkModuleName "GHC.Addr"
 pREL_PTR_Name     = mkModuleName "GHC.Ptr"
 pREL_ERR_Name     = mkModuleName "GHC.Err"
@@ -257,7 +256,7 @@ pREL_WORD_Name	  = mkModuleName "GHC.Word"
 fOREIGNOBJ_Name	  = mkModuleName "ForeignObj"
 aDDR_Name	  = mkModuleName "Addr"
 
-gLA_EXTS_Name   = mkModuleName "GlaExts"
+gLA_EXTS_Name   = mkModuleName "GHC.Exts"
 
 gHC_PRIM     	= mkPrelModule gHC_PRIM_Name
 pREL_BASE    	= mkPrelModule pREL_BASE_Name
@@ -562,7 +561,7 @@ errorName	   = varQual pREL_ERR_Name FSLIT("error") errorIdKey
 runSTRepName	   = varQual pREL_ST_Name  FSLIT("runSTRep") runSTRepIdKey
 
 -- The "split" Id for splittable implicit parameters
-splitName          = varQual pREL_SPLIT_Name FSLIT("split") splitIdKey
+splitName          = varQual gLA_EXTS_Name FSLIT("split") splitIdKey
 \end{code}
 
 %************************************************************************
