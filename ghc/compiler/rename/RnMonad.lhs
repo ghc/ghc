@@ -202,14 +202,6 @@ lookupLocalFixity env name
 	Nothing		  	 -> defaultFixity
 \end{code}
 
-\begin{code}
-type ExportAvails = (FiniteMap ModuleName Avails,
-	-- Used to figure out "module M" export specifiers
-	-- Includes avails only from *unqualified* imports
-	-- (see 1.4 Report Section 5.1.1)
-
-		     AvailEnv)	-- Used to figure out all other export specifiers.
-\end{code}
 
 %===================================================
 \subsubsection{		INTERFACE FILE STUFF}

@@ -34,7 +34,7 @@ import RnHiFiles	( readIface, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
 			)
 import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
-			  unitAvailEnv, availEnvElts, 
+			  unitAvailEnv, availEnvElts, availNames,
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
 			  lookupSrcName, getImplicitStmtFVs, 
@@ -243,9 +243,25 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
   = pushSrcLocRn loc		$
 
  	-- FIND THE GLOBAL NAME ENVIRONMENT
-    getGlobalNames this_module contents 	`thenRn` \ (gbl_env, local_gbl_env, all_avails@(_, global_avail_env)) ->
+    getGlobalNames this_module contents		`thenRn` \ (gbl_env, local_gbl_env, 
+							    (mod_avail_env, global_avail_env)) ->
     let
 	print_unqualified = unQualInScope gbl_env
+
+	full_avail_env :: NameEnv AvailInfo
+		-- The domain of global_avail_env is just the 'major' things;
+		-- variables, type constructors, classes.  
+		-- 	E.g. Functor |-> Functor( Functor, fmap )
+		-- The domain of full_avail_env is everything in scope
+		--	E.g. Functor |-> Functor( Functor, fmap )
+		--	     fmap    |-> Functor( Functor, fmap )
+		-- 
+		-- This filled-out avail_env is needed to generate
+		-- exports (mkExportAvails), and for generating minimal
+		-- exports (reportUnusedNames)
+	full_avail_env = mkNameEnv [ (name,avail) 
+				   | avail <- availEnvElts global_avail_env,
+				     name  <- availNames avail]
     in
 	-- Exit if we've found any errors
     checkErrsRn				`thenRn` \ no_errs_so_far ->
@@ -256,7 +272,8 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     else
 	
 	-- PROCESS EXPORT LIST 
-    exportsFromAvail mod_name exports all_avails gbl_env	`thenRn` \ export_avails ->
+    exportsFromAvail mod_name exports mod_avail_env 
+		     full_avail_env gbl_env		`thenRn` \ export_avails ->
 	
     traceRn (text "Local top-level environment" $$ 
 	     nest 4 (pprGlobalRdrEnv local_gbl_env))	`thenRn_`
@@ -340,7 +357,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_iface print_unqualified 
-		      imports global_avail_env
+		      imports full_avail_env
 		      source_fvs2 rn_imp_decls		`thenRn_`
 		-- NB: source_fvs2: include exports (else we get bogus 
 		--     warnings of unused things) but not implicit FVs.
@@ -763,7 +780,8 @@ printMinimalImports this_mod unqual imps
     to_ie (AvailTC n [m]) = ASSERT( n==m ) 
 			    returnRn (IEThingAbs n)
     to_ie (AvailTC n ns)  
-	= loadInterface (text "Compute minimal imports from" <+> ppr n_mod) n_mod ImportBySystem	`thenRn` \ iface ->
+	= loadInterface (text "Compute minimal imports from" <+> ppr n_mod) 
+			n_mod ImportBySystem				`thenRn` \ iface ->
 	  case [xs | (m,as) <- mi_exports iface,
 		     m == n_mod,
 		     AvailTC x xs <- as, 

@@ -56,6 +56,7 @@ import Util		( sortLt )
 import BasicTypes	( mapIPName )
 import List		( nub )
 import UniqFM		( lookupWithDefaultUFM )
+import Maybe		( mapMaybe )
 import CmdLineOpts
 import FastString	( FastString )
 \end{code}
@@ -258,8 +259,10 @@ lookupInstDeclBndr cls_name rdr_name
   | otherwise	
   = getGlobalAvails	`thenRn` \ avail_env ->
     case lookupNameEnv avail_env cls_name of
-	  -- class not in scope; don't fail as later checks will catch this,
-	  -- but just return (bogus) name. Icky.
+	  -- The class itself isn't in scope, so cls_name is unboundName
+	  -- e.g.   import Prelude hiding( Ord )
+	  --	    instance Ord T where ...
+	  -- The program is wrong, but that should not cause a crash.
 	Nothing -> returnRn (mkUnboundName rdr_name)
 	Just (AvailTC _ ns) -> case [n | n <- ns, nameOccName n == occ] of
 				(n:ns)-> ASSERT( null ns ) returnRn n
@@ -681,13 +684,11 @@ mkGlobalRdrEnv :: ModuleName		-- Imported module (after doing the "as M" name ch
 	       -> Bool			-- True <=> want unqualified import
 	       -> (Name -> Provenance)
 	       -> Avails		-- Whats imported
-	       -> Avails		-- What's to be hidden
-					-- I.e. import (imports - hides)
 	       -> Deprecations
 	       -> GlobalRdrEnv
 
-mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails hides deprecs
-  = gbl_env3
+mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails deprecs
+  = gbl_env2
   where
  	-- Make the name environment.  We're talking about a 
 	-- single module here, so there must be no name clashes.
@@ -698,12 +699,9 @@ mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails hides deprecs
 	-- (Qualified names are always imported)
     gbl_env1 = foldl add_avail emptyRdrEnv avails
 
-	-- Delete (qualified names of) things that are hidden
-    gbl_env2 = foldl del_avail gbl_env1 hides
-
 	-- Add unqualified names
-    gbl_env3 | unqual_imp = foldl add_unqual gbl_env2 (rdrEnvToList gbl_env2)
-	     | otherwise  = gbl_env2
+    gbl_env2 | unqual_imp = foldl add_unqual gbl_env1 (rdrEnvToList gbl_env1)
+	     | otherwise  = gbl_env1
 
     add_unqual env (qual_name, elts)
 	= foldl add_one env elts
@@ -714,13 +712,6 @@ mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails hides deprecs
 	-- binding for each qualified name!  But if there's an error in
 	-- the module (multiple bindings for the same name) we may get
 	-- duplicates.  So the simple thing is to do the fold.
-
-    del_avail env avail 
-	= foldl delOneFromGlobalRdrEnv env rdr_names
-	where
-	  rdr_names = map (mkRdrQual this_mod . nameOccName)
-			  (availNames avail)
-
 
     add_avail :: GlobalRdrEnv -> AvailInfo -> GlobalRdrEnv
     add_avail env avail = foldl add_name env (availNames avail)
@@ -740,7 +731,7 @@ mkIfaceGlobalRdrEnv m_avails
   = foldl add emptyRdrEnv m_avails
   where
     add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True 
-								(\n -> LocalDef) avails [] NoDeprecs)
+								(\n -> LocalDef) avails NoDeprecs)
 		-- The NoDeprecs is a bit of a hack I suppose
 \end{code}
 
@@ -793,8 +784,12 @@ in error messages.
 
 \begin{code}
 unQualInScope :: GlobalRdrEnv -> Name -> Bool
--- True if 'f' is in scope, and has only one binding
+-- True if 'f' is in scope, and has only one binding,
+-- and the thing it is bound to is the name we are looking for
 -- (i.e. false if A.f and B.f are both in scope as unqualified 'f')
+--
+-- This fn is only efficient if the shared 
+-- partial application is used a lot.
 unQualInScope env
   = (`elemNameSet` unqual_names)
   where
@@ -919,6 +914,21 @@ sortAvail (AvailTC n ns) | n `elem` ns = AvailTC n (n : sortLt lt (filter (/= n)
 			   n1 `lt` n2 = nameOccName n1 < nameOccName n2
 \end{code}
 
+\begin{code}
+pruneAvails :: (Name -> Bool)	-- Keep if this is True
+	    -> [AvailInfo]
+	    -> [AvailInfo]
+pruneAvails keep avails
+  = mapMaybe del avails
+  where
+    del :: AvailInfo -> Maybe AvailInfo	-- Nothing => nothing left!
+    del (Avail n) | keep n    = Just (Avail n)
+    	          | otherwise = Nothing
+    del (AvailTC n ns) | null ns'  = Nothing
+		       | otherwise = Just (AvailTC n ns')
+		       where
+		         ns' = filter keep ns
+\end{code}
 
 %************************************************************************
 %*									*

@@ -5,7 +5,7 @@
 
 \begin{code}
 module RnNames (
-	getGlobalNames, exportsFromAvail
+	ExportAvails, getGlobalNames, exportsFromAvail
     ) where
 
 #include "HsVersions.h"
@@ -168,7 +168,7 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
     )							`thenRn_`
 
 	-- Filter the imports according to the import list
-    filterImports imp_mod_name from import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
+    filterImports imp_mod_name from import_spec avails	`thenRn` \ (filtered_avails, explicits) ->
 
     let
 	unqual_imp = not qual_only		-- Maybe want unqualified names
@@ -177,8 +177,8 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 			Just another_name -> another_name
 
 	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp mk_prov filtered_avails hides deprecs
-	exports      = mkExportAvails qual_mod unqual_imp gbl_env hides filtered_avails
+	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp mk_prov filtered_avails deprecs
+	exports      = mkExportAvails qual_mod unqual_imp gbl_env filtered_avails
     in
     returnRn (gbl_env, exports)
 \end{code}
@@ -210,9 +210,8 @@ importsFromLocalDecls this_mod decls
 	mod_name   = moduleName this_mod
 	unqual_imp = True	-- Want unqualified names
 	mk_prov n  = LocalDef	-- Provenance is local
-	hides	   = []		-- Hide nothing
 
-	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp mk_prov avails hides NoDeprecs
+	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp mk_prov avails NoDeprecs
 	    -- NoDeprecs: don't complain about locally defined names
 	    -- For a start, we may be exporting a deprecated thing
 	    -- Also we may use a deprecated thing in the defn of another
@@ -220,7 +219,7 @@ importsFromLocalDecls this_mod decls
 	    -- the defn of a non-deprecated thing, when changing a module's 
 	    -- interface
 
-	exports    = mkExportAvails mod_name unqual_imp gbl_env hides avails
+	exports    = mkExportAvails mod_name unqual_imp gbl_env avails
     in
     returnRn (gbl_env, exports)
 
@@ -272,18 +271,13 @@ filterImports :: ModuleName			-- The module being imported
 	      -> WhereFrom			-- Tells whether it's a {-# SOURCE #-} import
 	      -> Maybe (Bool, [RdrNameIE])	-- Import spec; True => hiding
 	      -> [AvailInfo]			-- What's available
-	      -> RnMG ([AvailInfo],		-- "chosens"
-		       [AvailInfo],		-- "hides"
-			-- The true imports are "chosens" - "hides"
-			-- (It's convenient to return both the above sets, because
-			--  the substraction can be done more efficiently when
-			--  building the environment.)
+	      -> RnMG ([AvailInfo],		-- What's imported
 		       NameSet)			-- What was imported explicitly
 
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
 filterImports mod from Nothing imports
-  = returnRn (imports, [], emptyNameSet)
+  = returnRn (imports, emptyNameSet)
 
 filterImports mod from (Just (want_hiding, import_items)) total_avails
   = flatMapRn get_item import_items		`thenRn` \ avails_w_explicits ->
@@ -291,13 +285,15 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 	(item_avails, explicits_s) = unzip avails_w_explicits
 	explicits		   = foldl addListToNameSet emptyNameSet explicits_s
     in
-    if want_hiding 
-    then	
-	-- All imported; item_avails to be hidden
-	returnRn (total_avails, item_avails, emptyNameSet)
+    if want_hiding then
+	let	-- All imported; item_avails to be hidden
+	   hidden = availsToNameSet item_avails
+	   keep n = not (n `elemNameSet` hidden)
+  	in
+	returnRn (pruneAvails keep total_avails, emptyNameSet)
     else
 	-- Just item_avails imported; nothing to be hidden
-	returnRn (item_avails, [], explicits)
+	returnRn (item_avails, explicits)
   where
     import_fm :: FiniteMap OccName AvailInfo
     import_fm = listToFM [ (nameOccName name, avail) 
@@ -364,62 +360,38 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 %************************************************************************
 
 \begin{code}
+type ExportAvails 
+   = (FiniteMap ModuleName Avails,
+		-- Used to figure out "module M" export specifiers
+		-- Includes avails only from *unqualified* imports
+		-- (see 1.4 Report Section 5.1.1)
+
+     AvailEnv)	-- All the things that are available.
+		-- Its domain is all the "main" things;
+		-- i.e. *excluding* class ops and constructors
+		--	(which appear inside their parent AvailTC)
+
 mkEmptyExportAvails :: ModuleName -> ExportAvails
 mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyNameEnv)
 
-mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> [AvailInfo] -> ExportAvails
-mkExportAvails mod_name unqual_imp gbl_env hides avails 
+plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
+plusExportAvails (m1, e1) (m2, e2) = (plusFM_C (++) m1 m2, plusAvailEnv e1 e2)
+
+mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> ExportAvails
+mkExportAvails mod_name unqual_imp gbl_env avails 
   = (mod_avail_env, entity_avail_env)
   where
     mod_avail_env = unitFM mod_name unqual_avails 
 
-	-- unqual_avails is the Avails that are visible in *unqualfied* form
-	-- (1.4 Report, Section 5.1.1)
-	-- For example, in 
-	--	import T hiding( f )
-	-- we delete f from avails
+	-- unqual_avails is the Avails that are visible in *unqualified* form
+	-- We need to know this so we know what to export when we see
+	--	module M ( module P ) where ...
+	-- Then we must export whatever came from P unqualified.
 
     unqual_avails | not unqual_imp = []	-- Short cut when no unqualified imports
-		  | otherwise      = mapMaybe prune avails
+		  | otherwise      = pruneAvails (unQualInScope gbl_env) avails
 
-    prune (Avail n) | unqual_in_scope n = Just (Avail n)
-                    | otherwise		= Nothing
-    prune (AvailTC n ns) | null uqs     = Nothing
-			 | otherwise    = Just (AvailTC n uqs)
-			 where
-			   uqs = filter unqual_in_scope ns
-
-    unqual_in_scope n = unQualInScope gbl_env n
-
-
-    entity_avail_env  = mkNameEnv ([ (availName avail,avail) | avail <- effective_avails ]  ++
-					-- sigh - need to have the method/field names in
-					-- the environment also, so that export lists
-					-- can be computed precisely (cf. exportsFromAvail)
-    				   [ (name,avail) | avail <- effective_avails,
-				   		    name  <- avNames avail ] )
-
-    avNames (Avail n) = [n]
-    avNames (AvailTC n ns) = filter (/=n) ns
-
-	-- remove 'hides' names from the avail list.
-    effective_avails = foldl wipeOut avails hides
-      where
-        wipeOut as (Avail n)       = mapMaybe (delName n) as
-	wipeOut as (AvailTC n ns)  = foldl wipeOut as (map Avail ns)
-
-	delName x a@(Avail n) 
-	  | n == x    = Nothing
-          | otherwise = Just a
-	delName x (AvailTC n ns) 
-	  = case (filter (/=x) ns) of
-	      [] -> Nothing
-	      xs -> Just (AvailTC n xs)
-
-plusExportAvails ::  ExportAvails ->  ExportAvails ->  ExportAvails
-plusExportAvails (m1, e1) (m2, e2)
-  = (plusFM_C (++) m1 m2, plusAvailEnv e1 e2)
-	-- ToDo: wasteful: we do this once for each constructor!
+    entity_avail_env  = mkNameEnv [(availName avail, avail) | avail <- avails]
 \end{code}
 
 
@@ -457,15 +429,17 @@ type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
 
 
 exportsFromAvail :: ModuleName
-		 -> Maybe [RdrNameIE]	-- Export spec
-		 -> ExportAvails
+		 -> Maybe [RdrNameIE]		-- Export spec
+		 -> FiniteMap ModuleName Avails	-- Used for (module M) exports
+		 -> NameEnv AvailInfo		-- Domain is every in-scope thing
 		 -> GlobalRdrEnv 
 		 -> RnMG Avails
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
-exportsFromAvail this_mod Nothing export_avails global_name_env
-  = exportsFromAvail this_mod true_exports export_avails global_name_env
+exportsFromAvail this_mod Nothing 
+		 mod_avail_env entity_avail_env global_name_env
+  = exportsFromAvail this_mod true_exports mod_avail_env entity_avail_env global_name_env
   where
     true_exports = Just $ if this_mod == mAIN_Name
                           then [IEVar main_RDR_Unqual]
@@ -474,8 +448,7 @@ exportsFromAvail this_mod Nothing export_avails global_name_env
                                -- but for all other modules export everything.
 
 exportsFromAvail this_mod (Just export_items) 
-		 (mod_avail_env, entity_avail_env)
-	         global_name_env
+		 mod_avail_env entity_avail_env global_name_env
   = doptRn Opt_WarnDuplicateExports 		`thenRn` \ warn_dup_exports ->
     foldlRn (exports_from_item warn_dup_exports)
 	    ([], emptyFM, emptyAvailEnv) export_items
