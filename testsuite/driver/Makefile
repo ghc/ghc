@@ -2,7 +2,7 @@ TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
 RUNTESTS_SRCS= \
-	TopSort.hs CmdLexer.hs CmdParser.hs CmdSemantics.hs CmdSyntax.hs Main.hs \
+	TopSort.hs CmdLexer.hs CmdParser.hs CmdSemantics.hs CmdSyntax.hs KludgedSystem.hs Main.hs \
 	basicRxLib/AbsTreeDefs.hs basicRxLib/Assertions.hs  \
 	basicRxLib/AugTreeDefs.hs basicRxLib/AugmentTree.hs \
 	basicRxLib/BagRE.hs basicRxLib/CompileREP.hs \

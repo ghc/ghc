@@ -6,7 +6,7 @@ import CmdSemantics	( parseOneTFile, processParsedTFile )
 
 import GetOpt
 import Directory
-import System
+import System           ( getArgs )
 import List
 import Maybe		( isJust, fromJust )
 import Monad		( when )

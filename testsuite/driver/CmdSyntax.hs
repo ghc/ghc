@@ -13,7 +13,8 @@ module CmdSyntax ( Var, MacroName, TestName, MacroDef(..),
 where
 
 import IO
-import System
+import System           ( getProgName, exitWith, ExitCode(..) )
+import KludgedSystem    ( system )
 
 ---------------------------------------------------------------------
 -- misc
@@ -28,8 +29,9 @@ die :: String -> IO a
 die s = do officialMsg s; exitWith (ExitFailure 1)
 
 my_system s
-   = do exit_code <- system s
-        --putStrLn (show exit_code)
+   = do -- putStr ("***" ++ s)
+	exit_code <- system s
+	-- putStrLn "ok"
         return exit_code
 
 isLeft (Left _)  = True
