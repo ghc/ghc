@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.40 2000/01/14 11:45:21 hwloidl Exp $
+ * $Id: PrimOps.hc,v 1.41 2000/02/14 10:56:47 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -183,7 +183,7 @@ W_ GHC_ZCCReturnable_static_info[0];
 #else /* 0 Regs available */
 
 #define PUSH_P(o,x) Sp[-o] = (W_)(x)
-#define PUSH_N(o,x) Sp[1-o] = (W_)(x); /* Sp[-o] = ARGTAG(1) */
+#define PUSH_N(o,x) Sp[1-o] = (W_)(x);  Sp[-o] = ARG_TAG(1);
 #define PUSHED(m)   Sp -= (m); JMP_(ENTRY_CODE(Sp[m]));
 
 /* Here's how to construct these macros:
@@ -633,7 +633,7 @@ FN_(word64ToIntegerzh_fast)
 FN_(name)								\
 {									\
   MP_INT arg1, arg2, result;						\
-  I_ s1, s2;							\
+  I_ s1, s2;								\
   StgArrWords* d1;							\
   StgArrWords* d2;							\
   FB_									\
@@ -668,7 +668,7 @@ FN_(name)								\
 FN_(name)								\
 {									\
   MP_INT arg1, arg2, result1, result2;					\
-  I_ s1, s2;							\
+  I_ s1, s2;								\
   StgArrWords* d1;							\
   StgArrWords* d2;							\
   FB_									\
