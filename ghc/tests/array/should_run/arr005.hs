@@ -1,4 +1,4 @@
---!!! Array - recurrences
+-- !!! Array - recurrences
 -- 
 -- array does not evaluate the elements.
 --

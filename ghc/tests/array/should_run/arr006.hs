@@ -1,4 +1,4 @@
---!!! Array - empty arrays
+-- !!! Array - empty arrays
 -- 
 -- print a couple of them to try to expose empty arrays 
 -- to a GC or two.

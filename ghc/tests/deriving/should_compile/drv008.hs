@@ -1,4 +1,4 @@
---!!! deriving Ix on d. type with nullary constructors
+-- !!! deriving Ix on d. type with nullary constructors
 module ShouldSucceed where
 
 import Ix

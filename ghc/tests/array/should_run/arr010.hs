@@ -1,4 +1,4 @@
---!!! Array - accumulated arrays
+-- !!! Array - accumulated arrays
 -- 
 --
 module Main(main) where

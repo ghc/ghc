@@ -1,4 +1,4 @@
---!!! canonical weird example for "deriving"
+-- !!! canonical weird example for "deriving"
 module ShouldSucceed where
 
 data X a b

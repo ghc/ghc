@@ -1,4 +1,4 @@
---!!! deriving Ix on d. type with one constructor
+-- !!! deriving Ix on d. type with one constructor
 module ShouldSucceed where
 
 import Ix

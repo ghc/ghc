@@ -1,6 +1,6 @@
 {-# OPTIONS -fglasgow-exts #-}
 
---!!! multi-dimensional arrays
+-- !!! multi-dimensional arrays
 
 module Main ( main ) where
 import GlaExts

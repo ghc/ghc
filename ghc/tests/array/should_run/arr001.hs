@@ -1,4 +1,4 @@
---!!! Simple array creation
+-- !!! Simple array creation
 
 import Array
 

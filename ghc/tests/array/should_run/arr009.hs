@@ -1,4 +1,4 @@
---!!! Array - derived ops
+-- !!! Array - derived ops
 -- 
 -- testing the well-behavedness of 
 -- derived ops for empty and non-empty arrays

@@ -1,4 +1,4 @@
---!!! Array - array difference operator
+-- !!! Array - array difference operator
 -- 
 --
 module Main(main) where

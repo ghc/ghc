@@ -1,4 +1,4 @@
---!!! simple examples of deriving Ix
+-- !!! simple examples of deriving Ix
 --
 module ShouldSucceed where
 import Ix

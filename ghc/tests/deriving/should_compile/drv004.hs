@@ -1,4 +1,4 @@
---!!! simple example of deriving Ord and Eq simultaneously
+-- !!! simple example of deriving Ord and Eq simultaneously
 --
 module ShouldSucceed where
 

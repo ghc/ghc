@@ -1,4 +1,4 @@
---!!! This is the example given in TcDeriv
+-- !!! This is the example given in TcDeriv
 --
 module ShouldSucceed where
 

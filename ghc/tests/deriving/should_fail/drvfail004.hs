@@ -1,4 +1,4 @@
---!!! deriving Ord without deriving Eq
+-- !!! deriving Ord without deriving Eq
 --
 module ShouldFail where
 

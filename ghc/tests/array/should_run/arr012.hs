@@ -1,4 +1,4 @@
---!!! Array map operations
+-- !!! Array map operations
 -- 
 --
 module Main(main) where

@@ -1,4 +1,4 @@
---!!! Array creation, (index,value) list with duplicates.
+-- !!! Array creation, (index,value) list with duplicates.
 -- 
 -- Haskell library report 1.3 (and earlier) specifies
 -- that `array' values created with lists containing dups,

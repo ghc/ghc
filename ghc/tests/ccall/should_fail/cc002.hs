@@ -1,4 +1,4 @@
---!!! cc002 -- ccall with non-standard boxed arguments and results
+-- !!! cc002 -- ccall with non-standard boxed arguments and results
 
 module Test where
 

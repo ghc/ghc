@@ -1,4 +1,4 @@
---!!! cc001 -- ccall with standard boxed arguments and results
+-- !!! cc001 -- ccall with standard boxed arguments and results
 
 module ShouldCompile where
 

@@ -1,4 +1,4 @@
---!!! cc004 -- ccall with synonyms, polymorphic type variables and user type variables.
+-- !!! cc004 -- ccall with synonyms, polymorphic type variables and user type variables.
 module Test where
 
 -- Since I messed up the handling of polymorphism originally, I'll

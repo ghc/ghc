@@ -1,4 +1,4 @@
---!!! Array - accessing undefined element
+-- !!! Array - accessing undefined element
 -- 
 -- Sample Haskell implementation in the 1.3 Lib report defines
 -- this as being undefined/error.

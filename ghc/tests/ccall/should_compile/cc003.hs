@@ -1,5 +1,5 @@
---!!! cc003 -- ccall with unresolved polymorphism (should fail)
---!!! not anymore (as of 0.29, result type will default to ())
+-- !!! cc003 -- ccall with unresolved polymorphism (should fail)
+-- !!! not anymore (as of 0.29, result type will default to ())
 module ShouldCompile where
 
 fubar :: IO Int

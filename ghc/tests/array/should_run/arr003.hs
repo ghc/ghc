@@ -1,4 +1,4 @@
---!!! Array creation, (index,value) list with out of bound index.
+-- !!! Array creation, (index,value) list with out of bound index.
 -- 
 -- Haskell library report 1.3 (and earlier) specifies
 -- that `array' values created with lists containing out-of-bounds indices,

@@ -1,4 +1,4 @@
---!!! cc002 -- ccall with ambiguous argument
+-- !!! cc002 -- ccall with ambiguous argument
 module Test where
 
 f :: IO ()

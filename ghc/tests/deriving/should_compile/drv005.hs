@@ -1,4 +1,4 @@
---!!! simple example of deriving Enum
+-- !!! simple example of deriving Enum
 --
 module ShouldSucceed where
 

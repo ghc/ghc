@@ -1,4 +1,4 @@
---!!! Array - accessing empty arrays
+-- !!! Array - accessing empty arrays
 -- 
 -- empty arrays are legal, but indexing them is undefined!
 --
