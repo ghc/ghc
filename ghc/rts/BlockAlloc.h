@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.h,v 1.3 1999/01/13 17:25:38 simonm Exp $
+ * $Id: BlockAlloc.h,v 1.4 1999/02/03 16:32:47 simonm Exp $
  *
  * Block Allocator Interface
  *
@@ -30,6 +30,23 @@ static inline bdescr *Bdescr(StgPtr p)
     ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) 
      | ((W_)p & ~MBLOCK_MASK)
      );
+}
+
+/* Round a value to megablocks --------------------------------------------- */
+
+#define WORDS_PER_MBLOCK  (BLOCKS_PER_MBLOCK * BLOCK_SIZE_W)
+
+static inline nat
+round_to_mblocks(nat words)
+{
+  if (words > WORDS_PER_MBLOCK) {
+    if ((words % WORDS_PER_MBLOCK) < (WORDS_PER_MBLOCK / 2)) {
+      words = (words / WORDS_PER_MBLOCK) * WORDS_PER_MBLOCK;
+    } else {
+      words = ((words / WORDS_PER_MBLOCK) + 1) * WORDS_PER_MBLOCK;
+    }
+  }
+  return words;
 }
 
 /* Debugging  -------------------------------------------------------------- */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.7 1999/02/02 14:21:31 simonm Exp $
+ * $Id: Schedule.c,v 1.8 1999/02/03 16:32:47 simonm Exp $
  *
  * Scheduler
  *
@@ -107,7 +107,8 @@ initThread(StgTSO *tso, nat stack_size)
 
   tso->splim        = (P_)&(tso->stack) + RESERVED_STACK_WORDS;
   tso->stack_size   = stack_size;
-  tso->max_stack_size = RtsFlags.GcFlags.maxStkSize - TSO_STRUCT_SIZEW;
+  tso->max_stack_size = round_to_mblocks(RtsFlags.GcFlags.maxStkSize) 
+                              - TSO_STRUCT_SIZEW;
   tso->sp           = (P_)&(tso->stack) + stack_size;
 
 #ifdef PROFILING
@@ -676,6 +677,7 @@ threadStackOverflow(StgTSO *tso)
   new_stack_size = stg_min(tso->stack_size * 2, tso->max_stack_size);
   new_tso_size   = (nat)BLOCK_ROUND_UP(new_stack_size * sizeof(W_) + 
 				       TSO_STRUCT_SIZE)/sizeof(W_);
+  new_tso_size = round_to_mblocks(new_tso_size);  /* Be MBLOCK-friendly */
   new_stack_size = new_tso_size - TSO_STRUCT_SIZEW;
 
   IF_DEBUG(scheduler, fprintf(stderr,"increasing stack size from %d words to %d.\n", tso->stack_size, new_stack_size));
