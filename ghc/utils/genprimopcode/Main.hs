@@ -249,7 +249,10 @@ gen_latex_doc (Info defaults entries)
 	   latex_encode (c:cs) = c:(latex_encode cs)
 
 gen_wrappers (Info defaults entries)
-   = "module GHC.PrimopWrappers where\n" 
+   = "{-# OPTIONS -fno-implicit-prelude #-}\n" 
+	-- Dependencies on Prelude must be explicit in libraries/base, but we
+	-- don't need the Prelude here so we add -fno-implicit-prelude.
+     ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
      ++ unlines (map f (filter (not.dodgy) (filter is_primop entries)))
      where
