@@ -782,13 +782,6 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-funfolding-interface-threshold</option></entry>
-	      <entry>Tweak unfolding settings</entry>
-	      <entry>static</entry>
-	      <entry><option>-fno-unfolding-interface-threshold</option></entry>
-	    </row>
-
-	    <row>
 	      <entry><option>-funfolding-update-in-place</option></entry>
 	      <entry>Tweak unfolding settings</entry>
 	      <entry>static</entry>

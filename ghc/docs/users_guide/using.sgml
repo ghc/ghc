@@ -1292,33 +1292,25 @@ data S = S !Int !Int
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-funfolding-interface-threshold&lt;n&gt;</option>:</term>
-	  <listitem>
-	    <indexterm><primary><option>-funfolding-interface-threshold</option></primary></indexterm>
-	    <indexterm><primary>inlining, controlling</primary></indexterm>
-	    <indexterm><primary>unfolding, controlling</primary></indexterm>
-
-	    <para>(Default: 30) By raising or lowering this number,
-            you can raise or lower the amount of pragmatic junk that
-            gets spewed into interface files.  (An unfolding has a
-            &ldquo;size&rdquo; that reflects the cost in terms of
-            &ldquo;code bloat&rdquo; of expanding that unfolding in
-            another module.  A bigger function would be assigned a
-            bigger cost.)</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term><option>-funfolding-creation-threshold&lt;n&gt;</option>:</term>
 	  <listitem>
 	    <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
 	    <indexterm><primary>inlining, controlling</primary></indexterm>
 	    <indexterm><primary>unfolding, controlling</primary></indexterm>
 	    
-	    <para>(Default: 30) This option is similar to
-            <option>-funfolding-interface-threshold</option>, except
-            that it governs unfoldings within a single module.
-            Increasing this figure is more likely to result in longer
+	    <para>(Default: 45) Governs the maximum size that GHC will 
+            allow a function unfolding to be.   (An unfolding has a
+            &ldquo;size&rdquo; that reflects the cost in terms of
+            &ldquo;code bloat&rdquo; of expanding that unfolding at
+            at a call site. A bigger function would be assigned a
+            bigger cost.) </para>
+
+	    <para> Consequences: (a) nothing larger than
+	    this will be inlined (unless it has an INLINE pragma); (b) nothing larger
+	    than this will be spewed into an interface file. </para>
+
+
+            <para> Increasing this figure is more likely to result in longer
             compile times than faster code.  The next option is more
             useful:</para>
 	  </listitem>
