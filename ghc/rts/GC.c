@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.121 2001/08/17 15:46:54 simonmar Exp $
+ * $Id: GC.c,v 1.122 2001/08/30 10:22:52 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -741,10 +741,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
       // Auto-enable compaction when the residency reaches a
       // certain percentage of the maximum heap size (default: 30%).
-      if (RtsFlags.GcFlags.compact ||
-	  (max > 0 &&
-	   oldest_gen->steps[0].n_blocks > 
-	   (RtsFlags.GcFlags.compactThreshold * max) / 100)) {
+      if (RtsFlags.GcFlags.generations > 1 &&
+	  (RtsFlags.GcFlags.compact ||
+	   (max > 0 &&
+	    oldest_gen->steps[0].n_blocks > 
+	    (RtsFlags.GcFlags.compactThreshold * max) / 100))) {
 	  oldest_gen->steps[0].is_compacted = 1;
 //	  fprintf(stderr,"compaction: on\n", live);
       } else {
