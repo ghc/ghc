@@ -136,8 +136,6 @@ basicKnownKeyNames
 	byteArrayTyConName,
 	mutableByteArrayTyConName,
 	bcoPrimTyConName,
-	stablePtrTyConName,
-	stablePtrDataConName,
 
 	--  Classes.  *Must* include:
 	--  	classes that are grabbed by key (e.g., eqClassKey)
@@ -203,6 +201,7 @@ basicKnownKeyNames
 	toPName, bpermutePName, bpermuteDftPName, indexOfPName,
 
 	-- FFI primitive types that are not wired-in.
+	stablePtrTyConName, ptrTyConName, funPtrTyConName, addrTyConName,
 	int8TyConName, int16TyConName, int32TyConName, int64TyConName,
 	word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
@@ -382,6 +381,7 @@ unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
 
 newStablePtr_RDR 	= nameRdrName newStablePtrName
+addrDataCon_RDR		= dataQual_RDR aDDR_Name FSLIT("A#")
 
 bindIO_RDR	  	= nameRdrName bindIOName
 returnIO_RDR	  	= nameRdrName returnIOName
@@ -664,14 +664,11 @@ wordTyConName     = wTcQual   pREL_WORD_Name FSLIT("Word")   wordTyConKey
 wordDataConName   = wDataQual pREL_WORD_Name FSLIT("W#")     wordDataConKey
 
 -- Addr module
-addrTyConName	  = wTcQual   aDDR_Name FSLIT("Addr") addrTyConKey
-addrDataConName   = wDataQual aDDR_Name FSLIT("A#") addrDataConKey
+addrTyConName	  = tcQual   aDDR_Name FSLIT("Addr") addrTyConKey
 
 -- PrelPtr module
-ptrTyConName	  = wTcQual   pREL_PTR_Name FSLIT("Ptr") ptrTyConKey
-ptrDataConName    = wDataQual pREL_PTR_Name FSLIT("Ptr") ptrDataConKey
-funPtrTyConName	  = wTcQual   pREL_PTR_Name FSLIT("FunPtr") funPtrTyConKey
-funPtrDataConName = wDataQual pREL_PTR_Name FSLIT("FunPtr") funPtrDataConKey
+ptrTyConName	  = tcQual   pREL_PTR_Name FSLIT("Ptr") ptrTyConKey
+funPtrTyConName	  = tcQual   pREL_PTR_Name FSLIT("FunPtr") funPtrTyConKey
 
 -- Byte array types
 byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  FSLIT("ByteArray") byteArrayTyConKey
@@ -679,7 +676,6 @@ mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  FSLIT("MutableByteArray") 
 
 -- Foreign objects and weak pointers
 stablePtrTyConName    = tcQual   pREL_STABLE_Name FSLIT("StablePtr") stablePtrTyConKey
-stablePtrDataConName  = dataQual pREL_STABLE_Name FSLIT("StablePtr") stablePtrDataConKey
 newStablePtrName      = varQual  pREL_STABLE_Name FSLIT("newStablePtr") newStablePtrIdKey
 
 -- Error module
@@ -869,7 +865,6 @@ unitTyConKey = mkTupleTyConUnique Boxed 0
 %************************************************************************
 
 \begin{code}
-addrDataConKey				= mkPreludeDataConUnique  0
 charDataConKey				= mkPreludeDataConUnique  1
 consDataConKey				= mkPreludeDataConUnique  2
 doubleDataConKey			= mkPreludeDataConUnique  3
@@ -880,13 +875,10 @@ smallIntegerDataConKey			= mkPreludeDataConUnique  7
 largeIntegerDataConKey			= mkPreludeDataConUnique  8
 nilDataConKey				= mkPreludeDataConUnique 11
 ratioDataConKey				= mkPreludeDataConUnique 12
-stablePtrDataConKey			= mkPreludeDataConUnique 13
 stableNameDataConKey			= mkPreludeDataConUnique 14
 trueDataConKey				= mkPreludeDataConUnique 15
 wordDataConKey				= mkPreludeDataConUnique 16
 ioDataConKey				= mkPreludeDataConUnique 17
-ptrDataConKey				= mkPreludeDataConUnique 18
-funPtrDataConKey			= mkPreludeDataConUnique 19
 
 -- Generic data constructors
 crossDataConKey		      		= mkPreludeDataConUnique 20

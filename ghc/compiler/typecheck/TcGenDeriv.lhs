@@ -59,7 +59,7 @@ import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
 			)
 import TcType		( isUnLiftedType, tcEqType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy, floatPrimTy, doublePrimTy )
-import TysWiredIn	( charDataCon, intDataCon, floatDataCon, doubleDataCon, addrDataCon, wordDataCon )
+import TysWiredIn	( charDataCon, intDataCon, floatDataCon, doubleDataCon, wordDataCon )
 import Util		( zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem, zipEqual )
 import Panic		( panic, assertPanic )
@@ -1341,7 +1341,7 @@ box_con_tbl =
     [(charPrimTy,	getRdrName charDataCon)
     ,(intPrimTy,	getRdrName intDataCon)
     ,(wordPrimTy,	getRdrName wordDataCon)
-    ,(addrPrimTy,	getRdrName addrDataCon)
+    ,(addrPrimTy,	addrDataCon_RDR)
     ,(floatPrimTy,	getRdrName floatDataCon)
     ,(doublePrimTy,	getRdrName doubleDataCon)
     ]

@@ -13,15 +13,6 @@ types and operations.''
 module TysWiredIn (
 	wiredInTyCons, genericTyCons,
 
-	addrDataCon,
-	addrTy,
-	addrTyCon,
-	ptrDataCon,
-	ptrTy,
-	ptrTyCon,
-	funPtrDataCon,
-	funPtrTy,
-	funPtrTyCon,
 	boolTy,
 	boolTyCon,
 	charDataCon,
@@ -62,7 +53,6 @@ module TysWiredIn (
 	plusTyCon, inrDataCon, inlDataCon,
 	crossTyCon, crossDataCon,
 
-	stablePtrTyCon,
 	stringTy,
 	trueDataCon, trueDataConId,
 	unitTy,
@@ -128,10 +118,7 @@ wiredInTyCons :: [TyCon]
 wiredInTyCons = data_tycons ++ tuple_tycons ++ unboxed_tuple_tycons
 
 data_tycons = genericTyCons ++
-	      [ addrTyCon
-	      , ptrTyCon
-	      , funPtrTyCon
-    	      , boolTyCon
+	      [ boolTyCon
     	      , charTyCon
     	      , doubleTyCon
     	      , floatTyCon
@@ -318,27 +305,6 @@ wordDataCon = pcDataCon wordDataConName [] [] [wordPrimTy] wordTyCon
 \end{code}
 
 \begin{code}
-addrTy = mkTyConTy addrTyCon
-
-addrTyCon = pcNonRecDataTyCon addrTyConName [] [] [addrDataCon]
-addrDataCon = pcDataCon addrDataConName [] [] [addrPrimTy] addrTyCon
-\end{code}
-
-\begin{code}
-ptrTy = mkTyConTy ptrTyCon
-
-ptrTyCon = pcNonRecDataTyCon ptrTyConName alpha_tyvar [(True,False)] [ptrDataCon]
-ptrDataCon = pcDataCon ptrDataConName alpha_tyvar [] [addrPrimTy] ptrTyCon
-\end{code}
-
-\begin{code}
-funPtrTy = mkTyConTy funPtrTyCon
-
-funPtrTyCon = pcNonRecDataTyCon funPtrTyConName alpha_tyvar [(True,False)] [funPtrDataCon]
-funPtrDataCon = pcDataCon funPtrDataConName alpha_tyvar [] [addrPrimTy] funPtrTyCon
-\end{code}
-
-\begin{code}
 floatTy	= mkTyConTy floatTyCon
 
 floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [] [floatDataCon]
@@ -348,19 +314,10 @@ floatDataCon = pcDataCon         floatDataConName [] [] [floatPrimTy] floatTyCon
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
 
-doubleTyCon   = pcNonRecDataTyCon doubleTyConName     [] [] [doubleDataCon]
+doubleTyCon   = pcNonRecDataTyCon doubleTyConName   [] [] [doubleDataCon]
 doubleDataCon = pcDataCon	  doubleDataConName [] [] [doublePrimTy] doubleTyCon
 \end{code}
 
-\begin{code}
-stablePtrTyCon
-  = pcNonRecDataTyCon stablePtrTyConName
-	alpha_tyvar [(True,False)] [stablePtrDataCon]
-  where
-    stablePtrDataCon
-      = pcDataCon stablePtrDataConName
-	    alpha_tyvar [] [mkStablePtrPrimTy alphaTy] stablePtrTyCon
-\end{code}
 
 %************************************************************************
 %*									*

@@ -172,7 +172,7 @@ unboxArg arg
 			     [(DEFAULT,[],body)])
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
-  -- This deals with Int, Float etc
+  -- This deals with Int, Float etc; also Ptr, ForeignPtr
   | is_product_type && data_con_arity == 1 
   = ASSERT(isUnLiftedType data_con_arg_ty1 )	-- Typechecker ensures this
     newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
@@ -398,6 +398,7 @@ resultWrapper result_ty
     returnDs (maybe_ty, \e -> Lam tyvar (wrapper e))
 
   -- Data types with a single constructor, which has a single arg
+  -- This includes types like Ptr and ForeignPtr
   | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
     dataConSourceArity data_con == 1
   = let

@@ -140,7 +140,7 @@ import Type		(	-- Re-exports
 			  superBoxity, typeKind, superKind, repType
 			)
 import DataCon		( DataCon )
-import TyCon		( TyCon, isUnLiftedTyCon )
+import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )
 import Class		( classHasFDs, Class )
 import Var		( TyVar, Id, tyVarKind, isMutTyVar, mutTyVarDetails )
 import ForeignCall	( Safety, playSafe
@@ -155,8 +155,7 @@ import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc )
 import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
-import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon,
-			  charTyCon, listTyCon )
+import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), ipNameName )
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
@@ -831,17 +830,17 @@ isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 isFFIDynArgumentTy :: Type -> Bool
 -- The argument type of a foreign import dynamic must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFIDynArgumentTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
+isFFIDynArgumentTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey, addrTyConKey]
 
 isFFIDynResultTy :: Type -> Bool
 -- The result type of a foreign export dynamic must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFIDynResultTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
+isFFIDynResultTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey, addrTyConKey]
 
 isFFILabelTy :: Type -> Bool
 -- The type of a foreign label must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
+isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey, addrTyConKey]
 
 isFFIDotnetTy :: DynFlags -> Type -> Bool
 isFFIDotnetTy dflags ty
@@ -907,6 +906,11 @@ checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 checkRepTyCon check_tc ty 
   | Just (tc,_) <- splitTyConApp_maybe (repType ty) = check_tc tc
   | otherwise				  	    = False
+
+checkRepTyConKey :: [Unique] -> Type -> Bool
+-- Like checkRepTyCon, but just looks at the TyCon key
+checkRepTyConKey keys
+  = checkRepTyCon (\tc -> tyConUnique tc `elem` keys)
 \end{code}
 
 ----------------------------------------------

@@ -39,10 +39,10 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..),
 			  ccallConvAttribute
 			)
 import CStrings		( CLabelString )
-import TysWiredIn	( unitTy, stablePtrTyCon, tupleTyCon )
+import TysWiredIn	( unitTy, tupleTyCon )
 import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy )
 import PrimRep          ( getPrimRepSizeInBytes )
-import PrelNames	( hasKey, ioTyConKey, newStablePtrName, bindIOName,
+import PrelNames	( hasKey, ioTyConKey, stablePtrTyConName, newStablePtrName, bindIOName,
 			  checkDotnetResName )
 import BasicTypes	( Activation( NeverActive ) )
 import Outputable
@@ -353,23 +353,24 @@ dsFExportDynamic id cconv
         -- hack: need to get at the name of the C stub we're about to generate.
        fe_nm	   = mkFastString (moduleString mod_name ++ "_" ++ toCName fe_id)
      in
-     dsFExport id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code, stub_args) ->
      newSysLocalDs arg_ty			`thenDs` \ cback ->
-     dsLookupGlobalId newStablePtrName	`thenDs` \ newStablePtrId ->
+     dsLookupGlobalId newStablePtrName		`thenDs` \ newStablePtrId ->
+     dsLookupTyCon stablePtrTyConName		`thenDs` \ stable_ptr_tycon ->
      let
-	mk_stbl_ptr_app    = mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
+	mk_stbl_ptr_app = mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
+	stable_ptr_ty	= mkTyConApp stable_ptr_tycon [arg_ty]
+	export_ty	= mkFunTy stable_ptr_ty arg_ty
      in
-     dsLookupGlobalId bindIOName		        `thenDs` \ bindIOId ->
-     newSysLocalDs (mkTyConApp stablePtrTyCon [arg_ty]) `thenDs` \ stbl_value ->
+     dsLookupGlobalId bindIOName		`thenDs` \ bindIOId ->
+     newSysLocalDs stable_ptr_ty		`thenDs` \ stbl_value ->
+     dsFExport id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code, stub_args) ->
      let
-      stbl_app cont ret_ty 
-	= mkApps (Var bindIOId)
-		 [ Type (mkTyConApp stablePtrTyCon [arg_ty])
-		 , Type ret_ty
-		 , mk_stbl_ptr_app
-		 , cont
-		 ]
-
+      stbl_app cont ret_ty = mkApps (Var bindIOId)
+				    [ Type stable_ptr_ty
+				    , Type ret_ty       
+				    , mk_stbl_ptr_app
+				    , cont
+				    ]
        {-
         The arguments to the external function which will
 	create a little bit of (template) code on the fly
@@ -383,12 +384,12 @@ dsFExportDynamic id cconv
 		      ]
         -- name of external entry point providing these services.
 	-- (probably in the RTS.) 
-      adjustor	    = FSLIT("createAdjustor")
+      adjustor	 = FSLIT("createAdjustor")
       
-      mb_sz_args =
-        case cconv of
-	  StdCallConv -> Just (sum (map (getPrimRepSizeInBytes . typePrimRep) stub_args))
-	  _ -> Nothing
+      sz_args	 = sum (map (getPrimRepSizeInBytes . typePrimRep) stub_args)
+      mb_sz_args = case cconv of
+		      StdCallConv -> Just sz_args
+		      _ 	  -> Nothing
      in
      dsCCall adjustor adj_args PlayRisky False io_res_ty	`thenDs` \ ccall_adj ->
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -411,7 +412,6 @@ dsFExportDynamic id cconv
   ([arg_ty], io_res_ty)	= tcSplitFunTys sans_foralls
   [res_ty]		= tcTyConAppArgs io_res_ty
 	-- Must use tcSplit* to see the (IO t), which is a newtype
-  export_ty		= mkFunTy (mkTyConApp stablePtrTyCon [arg_ty]) arg_ty
 
 toCName :: Id -> String
 toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
