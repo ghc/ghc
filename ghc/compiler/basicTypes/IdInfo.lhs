@@ -51,10 +51,17 @@ module IdInfo (
 IMP_Ubiq()
 IMPORT_1_3(Char(toLower))
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
 			-- we break those loops by using IdLoop and
 			-- *not* importing much of anything else,
 			-- except from the very general "utils".
+#else
+import {-# SOURCE #-} SpecEnv
+import {-# SOURCE #-} Id
+import {-# SOURCE #-} CoreUnfold
+import {-# SOURCE #-} StdIdInfo
+#endif
 
 import Type		( eqSimpleTy, splitFunTyExpandingDicts )
 import BasicTypes	( NewOrData )

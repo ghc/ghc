@@ -9,8 +9,13 @@
 module IdUtils ( primOpName ) where
 
 IMP_Ubiq()
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(PrelLoop)		-- here for paranoia checking
 IMPORT_DELOOPER(IdLoop) (SpecEnv)
+#else
+import {-# SOURCE #-} SpecEnv ( SpecEnv )
+#endif
 
 import CoreSyn
 import CoreUnfold	( UnfoldingGuidance(..), Unfolding, mkUnfolding )
