@@ -530,9 +530,10 @@ mkCase scrut@(Var fn `App` Type ty `App` arg) bndr alts
 		      Case arg   new_bndr [deflt_alt]
 	other	   -> Case scrut bndr alts
   where
-    (deflt_alt : _) = [alt | alt@(DEFAULT,_,_) <- alts]
+    (deflt_alt@(_,_,rhs) : _) = [alt | alt@(DEFAULT,_,_) <- alts]
 
-    new_bndr = ASSERT( isDeadBinder bndr )	-- The binder shouldn't be used in the expression!
+	-- The binder shouldn't be used in the expression!
+    new_bndr = ASSERT2( not (bndr `elemVarSet` exprFreeVars rhs), ppr bndr )
 	       setIdType bndr (exprType arg)
 	-- NB:  SeqOp :: forall a. a -> Int#
 	-- So bndr has type Int# 
