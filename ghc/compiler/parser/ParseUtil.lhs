@@ -139,7 +139,7 @@ checkDictTy :: RdrNameHsType -> [RdrNameHsType] -> P RdrNameHsType
 checkDictTy (HsTyVar t) args@(_:_) | not (isRdrTyVar t) 
   	= returnP (mkHsDictTy t args)
 checkDictTy (HsAppTy l r) args = checkDictTy l (r:args)
-checkDictTy _ _ = parseError "Illegal class assertion"
+checkDictTy _ _ = parseError "Malformed context in instance header"
 
 -- Put more comments!
 -- Checks that the lhs of a datatype declaration
