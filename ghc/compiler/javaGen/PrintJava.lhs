@@ -36,7 +36,7 @@ decls (d:ds) = decl d $$ decls ds
     
 decl = \d ->
   case d of
-    { Import n -> importDecl (hcat (punctuate dot (map text n)))
+    { Import n -> importDecl (name n)
     ; Field mfs t n e -> field (modifiers mfs) (typ t) (name n) e  
     ; Constructor mfs n as ss -> constructor (modifiers mfs) (name n) (parameters as) (statements ss)
     ; Method mfs t n as ts ss -> method (modifiers mfs) (typ t) (name n) (parameters as) (throws ts) (statements ss)
@@ -99,15 +99,25 @@ implements xs = text "implements" <+> hsep (punctuate comma (map name xs))
 throws [] = empty
 throws xs = text "throws" <+> hsep (punctuate comma (map name xs))
 
-name ns = text ns
+name n = text n
 
 parameters as = map parameter as
 
 parameter (Parameter mfs t n) = modifiers mfs <+> typ t <+> name n
 
-typ (PrimType s)  = text s
-typ (Type n)      = hcat (punctuate dot (map text n))
+typ (PrimType s)  = primtype s
+typ (Type n)      = name n
 typ (ArrayType t) = typ t <> text "[]"
+
+primtype PrimInt     = text "int"
+primtype PrimBoolean = text "boolean"
+primtype PrimChar    = text "char"
+primtype PrimLong    = text "long"
+primtype PrimFloat   = text "float"
+primtype PrimDouble  = text "double"
+primtype PrimByte    = text "byte"
+
+
 
 statements ss = vcat (map statement ss)
   
@@ -130,13 +140,11 @@ exprStatement e = e <> semi
 
 declStatement d = d
 
-ifthenelse ((e,s):ecs) ms = sep [text "if", 
-			        indent (parens e) <+> text "{", 
+ifthenelse ((e,s):ecs) ms = sep [text "if" <+> parens e <+> text "{", 
 			        indent s, 
 			      thenelse ecs ms]
 
-thenelse ((e,s):ecs) ms = sep [	text "} else if", 
-				indent (parens e) <+> text "{", 
+thenelse ((e,s):ecs) ms = sep [	text "} else if" <+> parens e <+> text "{", 
 				indent s,
 				thenelse ecs ms]
 
@@ -161,8 +169,8 @@ maybeExpr (Just e) = Just (expr e)
            
 expr = \e ->
  case e of
-   { Var n -> name n
-   ; Literal l -> literal l
+   { Var n _ -> name n
+   ; Literal l _ -> literal l
    ; Cast t e -> cast (typ t) e
    ; Access e n -> expr e <> text "." <> name n
    ; Assign l r -> assign (expr l) r
@@ -170,7 +178,6 @@ expr = \e ->
    ; Call e n es -> call (expr e) (name n) es
    ; Op e1 o e2 -> op e1 o e2
    ; InstanceOf e t -> expr e <+> text "instanceof" <+> typ t
-   ; NewArray n es -> newArray (typ n) es
    }
    
 op = \e1 -> \o -> \e2 ->
@@ -201,7 +208,6 @@ new n [] (Just ds) = sep [text "new" <+> n <+> text "()" <+> text "{",
 			     text "}"]
 new n es Nothing = text "new" <+> n <> parens (hsep (punctuate comma (map expr es)))
 
-newArray n es = text "new" <+> n <> text "[]" <+> braces (hsep (punctuate comma (map expr es)))
       
 call e n es = e <> dot <> n <> parens (hsep (punctuate comma (map expr es)))
 

@@ -1,9 +1,13 @@
-bstract syntax for Java subset that is the target of Mondrian.
+Anbstract syntax for Java subset that is the target of Mondrian.
 The syntax has been taken from "The Java Language Specification".
 
 (c) Erik Meijer & Arjan van IJzendoorn
 
 November 1999
+
+Major reworking to be usable for the intermeduate (GOO) language
+for the backend of GHC and to target languauges like Java sucessfully.
+-- Andy Gill
 
 \begin{code}
 module Java where
@@ -22,32 +26,37 @@ data CompilationUnit
     deriving (Show)
     
 data Decl
- = Import [Name]
- | Field [Modifier] Type Name (Maybe Expr)   
+ = Import PackageName
+ | Field [Modifier] Type Name (Maybe Expr)
  | Constructor [Modifier] Name [Parameter] [Statement]
- | Method [Modifier] Type Name [Parameter] [Name] [Statement]
+ | Method [Modifier] Type Name [Parameter] [Exception] [Statement]
  | Comment [String]
- | Interface [Modifier] Name [Name] [Decl]
- | Class [Modifier] Name [Name] [Name] [Decl]
+ | Interface [Modifier] Name [TypeName] [Decl]
+ | Class [Modifier] Name [TypeName] [TypeName] [Decl]
    deriving (Show)
-   
+
 data Parameter
  = Parameter [Modifier] Type Name
    deriving (Show)
    
 data Statement
   = Skip
-  | Return Expr
+  | Return Expr		-- This always comes last in a list
+			-- of statements, and it is understood
+			-- you might change this to something
+			-- else (like a variable assignment)
+			-- if this is not top level statements.
   | Block [Statement]
-  | ExprStatement Expr
+  | ExprStatement Expr	-- You are never interested in the result
+			-- of an ExprStatement
   | Declaration Decl -- variable = inner Field, Class = innerclass
   | IfThenElse [(Expr,Statement)] (Maybe Statement)
   | Switch Expr [(Expr, [Statement])] (Maybe [Statement])
     deriving (Show)
 
 data Expr 
-  = Var Name
-  | Literal Lit
+  = Var Name Type
+  | Literal Lit Type
   | Cast Type Expr
   | Access Expr Name
   | Assign Expr Expr
@@ -55,7 +64,6 @@ data Expr
   | Call Expr Name [Expr]
   | Op Expr String Expr
   | New Type [Expr] (Maybe [Decl]) -- anonymous innerclass
-  | NewArray Type [Expr]
     deriving (Show)
     
 data Modifier 
@@ -63,16 +71,38 @@ data Modifier
   | Static
   | Abstract | Final | Native | Synchronized | Transient | Volatile
   deriving (Show, Eq, Ord)
-  
+
+-- A type is used to refer in general to the shape of things,
+-- or a specific class. Never use a name to refer to a class,
+-- always use a type.
+
 data Type 
-  = PrimType String
+  = PrimType  PrimType
   | ArrayType Type
-  | Type [Name]
+  | Type      TypeName
     deriving (Show)
 
--- If you want qualified names, use Access <expr> <name> 
--- Type's are already qualified.
-type Name = String
+data PrimType 
+  = PrimInt 
+  | PrimBoolean
+  | PrimChar
+  | PrimLong
+  | PrimFloat
+  | PrimDouble
+  | PrimByte
+    deriving (Show)
+
+type PackageName = String	-- A package name
+				-- like "java.awt.Button"
+
+type Exception   = TypeName	-- A class name that must be an exception.
+
+type TypeName    = String	-- a fully qualified type name
+				-- like "java.lang.Object".
+
+type Name        = String	-- A class name or method etc, 
+				-- at defintion time,
+				-- this generally not a qualified name.
 
 data Lit
   = IntLit Int		-- Boxed
@@ -81,14 +111,6 @@ data Lit
   | UCharLit Char	-- Unboxed
   | StringLit String
   deriving Show
-
-data OType 
-  = ObjectType		-- Object *
-  | UnboxedIntType	-- int
-  | UnboxedCharType	-- char
-
-data OVar = OVar Name OType
-			-- Object x.y
 
 addModifier :: Modifier -> Decl -> Decl
 addModifier = \m -> \d ->

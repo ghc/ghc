@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-2000
 %
 \section{Generate Java}
 
@@ -9,11 +9,14 @@ module JavaGen( javaGen ) where
 import Java
 
 import Literal	( Literal(..) )
-import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder )
+import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder, idPrimRep )
 import Name	( NamedThing(..), getOccString, isGlobalName 
 		, nameModule )
-import DataCon	( DataCon, dataConRepArity, dataConId )
-import qualified CoreSyn 
+import PrimRep  ( PrimRep(..) )
+import DataCon	( DataCon, dataConRepArity, dataConRepArgTys, dataConId )
+import qualified TypeRep
+import qualified Type
+import qualified CoreSyn
 import CoreSyn	( CoreBind, CoreExpr, CoreAlt, CoreBndr,
 		  Bind(..), Alt, AltCon(..), collectBinders, isValArg
 		)
@@ -33,8 +36,8 @@ javaGen :: Module -> [Module] -> [TyCon] -> [CoreBind] -> CompilationUnit
 javaGen mod import_mods tycons binds
   = liftCompilationUnit package
   where
-    decls = [Import ["haskell","runtime","*"]] ++
-	    [Import [moduleString mod] | mod <- import_mods] ++
+    decls = [Import "haskell.runtime.*"] ++
+	    [Import (moduleString mod) | mod <- import_mods] ++
 	    concat (map javaTyCon (filter isDataTyCon tycons)) ++ 
 	    concat (map javaTopBind binds)
     package = Package (moduleString mod) decls
@@ -57,24 +60,44 @@ javaTyCon :: TyCon -> [Decl]
 --	public class $wNil extends List {}
 
 javaTyCon tycon 
-  = tycon_jclass : map constr_class constrs
+  = tycon_jclass : concat (map constr_class constrs)
   where
     constrs = tyConDataCons tycon
-    tycon_jclass_jname = javaName tycon
-    tycon_jclass = Class [Public] tycon_jclass_jname [] [] []
+	-- We add a postfix to types ("$c"), because constructors
+	-- and datastructure types are in the same namespace in Java.
+    tycon_jclass_jname = javaName tycon ++ "zdc"
+    tycon_jclass = Class [Public] (shortName tycon_jclass_jname) [] [] []
 
     constr_class data_con
-	= Class [Public] constr_jname [tycon_jclass_jname] [] field_decls
+	= [ Class [Public] (shortName constr_jname) [tycon_jclass_jname] [] field_decls
+	  , Class [Public] (shortName constr_jname) [] [codeName] [enter_meth]
+	  ]
 	where
 	  constr_jname = javaConstrWkrName data_con
 	  constr_jtype = javaConstrWkrType data_con
-	  enter_meth   = Method [Public] objectType enterName [] [papExcName] stmts
-	  n_val_args   = dataConRepArity data_con
-	  field_names  = map fieldName [1..n_val_args]
-	  field_decls  = [Field [Public] objectType f Nothing | f <- field_names]
-	  stmts	       = vmCOLLECT n_val_args (Var thisName) ++
-		     	 [var [Final] objectType f vmPOP | f <- field_names] ++
-		     	 [Return (New constr_jtype (map Var field_names) Nothing)]
+
+	  field_names  = constrToFields data_con
+	  field_decls  = [ Field [Public] t f Nothing 
+			 | (f,t) <- field_names
+			 ]
+
+	  n_val_args   = length field_names
+	  enter_meth   = Method [Public] objectType enterName [] [excName] stmts
+	  stmts	       = vmCOLLECT n_val_args this ++
+		     	 [var [Final] objectType f (vmPOP t) | (f,t) <- field_names] ++
+		     	 [Return (mkNew constr_jtype (map mkVar field_names))]
+
+	  mkVar (f,t) = Var f t
+
+mkNew :: Type -> [Expr] -> Expr
+mkNew t@(PrimType primType) [] = error "new primitive???"
+mkNew t@(Type _)            es = New t es Nothing
+mkNew _                     _  = error "new with strange arguments"
+
+
+constrToFields :: DataCon -> [(Name,Type)]
+constrToFields cons = zip (map fieldName [1..])
+			  (map javaTauType (dataConRepArgTys cons))
 \end{code}
 
 %************************************************************************
@@ -93,10 +116,10 @@ java_top_bind :: Id -> CoreExpr -> Decl
 --	  public Object ENTER() { ...translation of rhs... }
 --	}
 java_top_bind bndr rhs
-  = Class [Public] (javaShortName bndr) [] [codeName] [enter_meth]
+  = Class [Public] (shortName (javaName bndr)) [] [codeName] [enter_meth]
   where
-    enter_meth = Method [Public] objectType enterName [] [papExcName] 
-			(javaExpr rhs)
+    enter_meth = Method [Public] objectType enterName [vmArg] [excName] 
+			(javaExpr vmRETURN rhs)
 \end{code}
 
 
@@ -108,26 +131,26 @@ java_top_bind bndr rhs
 
 \begin{code}
 javaVar :: Id -> Expr
-javaVar v | isGlobalName (idName v) = New (javaType v) [] Nothing
-	  | otherwise	  	    = Var (javaName v)
+javaVar v | isGlobalName (idName v) = mkNew (javaGlobType v) []
+	  | otherwise	  	    = Var (javaName v) (javaType v)
 
-javaLit :: Literal.Literal -> Lit
-javaLit (MachInt i)  = UIntLit (fromInteger i)
-javaLit (MachChar c) = UCharLit c
+javaLit :: Literal.Literal -> Expr
+javaLit (MachInt i)  = Literal (UIntLit (fromInteger i)) (PrimType PrimInt)
+javaLit (MachChar c) = Literal (UCharLit c)              (PrimType PrimChar)
 javaLit other	     = pprPanic "javaLit" (ppr other)
 
-javaExpr :: CoreExpr -> [Statement]
+javaExpr :: (Expr -> Expr) -> CoreExpr -> [Statement]
 -- Generate code to apply the value of 
 -- the expression to the arguments aleady on the stack
-javaExpr (CoreSyn.Var v)   = [Return (javaVar v)]
-javaExpr (CoreSyn.Lit l)   = [Return (Literal (javaLit l))]
-javaExpr (CoreSyn.App f a) = javaApp f [a]
-javaExpr e@(CoreSyn.Lam _ _) = javaLam (collectBinders e)
-javaExpr (CoreSyn.Case e x alts) = javaCase e x alts
-javaExpr (CoreSyn.Let bind body) = javaBind bind ++ javaExpr body
-javaExpr (CoreSyn.Note _ e)	 = javaExpr e
+javaExpr r (CoreSyn.Var v)   = [Return (r (javaVar v))]
+javaExpr r (CoreSyn.Lit l)   = [Return (r (javaLit l))]
+javaExpr r (CoreSyn.App f a) = javaApp r f [a]
+javaExpr r e@(CoreSyn.Lam _ _) = javaLam r (collectBinders e)
+javaExpr r (CoreSyn.Case e x alts) = javaCase r e x alts
+javaExpr r (CoreSyn.Let bind body) = javaBind bind ++ javaExpr r body
+javaExpr r (CoreSyn.Note _ e)	 = javaExpr r e
 
-javaCase :: CoreExpr -> Id -> [CoreAlt] -> [Statement]
+javaCase :: (Expr -> Expr) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
 -- 	case e of x { Nil      -> r1
 --		      Cons p q -> r2 }
 -- ==>
@@ -140,18 +163,18 @@ javaCase :: CoreExpr -> Id -> [CoreAlt] -> [Statement]
 --		...translation of r2...
 --	} else return null
 
-javaCase e x alts
+javaCase r e x alts
   =  [var [Final] objectType (javaName x) (vmWHNF (javaArg e)),
       IfThenElse (map mk_alt alts) Nothing]
   where
-     mk_alt (DEFAULT, [], rhs)   = (true, 	    Block (javaExpr rhs))
-     mk_alt (DataAlt d, bs, rhs) = (instanceOf x d, Block (bind_args d bs ++ javaExpr rhs))
+     mk_alt (DEFAULT, [], rhs)   = (true, 	    Block (javaExpr r rhs))
+     mk_alt (DataAlt d, bs, rhs) = (instanceOf x d, Block (bind_args d bs ++ javaExpr r rhs))
      mk_alt alt@(LitAlt _, _, _) = pprPanic "mk_alt" (ppr alt)
 
-     bind_args d bs = [var [Final] objectType (javaName b) 
+     bind_args d bs = [var [Final] t (javaName b) 
 			   (Access (Cast (javaConstrWkrType d) (javaVar x)) f)
-		      | (b, f) <- filter isId bs `zip` map fieldName [1..],
-			not (isDeadBinder b)
+		      | (b, (f,t)) <- filter isId bs `zip` (constrToFields d)
+		      , not (isDeadBinder b)
 		      ]
 
 javaBind (NonRec x rhs)
@@ -160,7 +183,7 @@ javaBind (NonRec x rhs)
   ==>
 	final Object x = new Thunk( new Code() { ...code for rhs_x... } )
 -}
-  = [var [Final] objectType (javaName x) (javaArg rhs)]
+  = [var [Final] objectType (javaName x) (newThunk (newCode (javaExpr vmRETURN rhs)))]
 
 javaBind (Rec prs)
 {- 	rec { x = ...rhs_x...; y = ...rhs_y... }
@@ -187,54 +210,57 @@ javaBind (Rec prs)
     mk_class (b,r) = Declaration (Class [] (javaName b) [] [codeName] stmts)
 		   where
 		     stmts = [Field [] codeType (javaName b) Nothing | (b,_) <- prs] ++
-			     [Method [Public] objectType enterName [] [papExcName] (javaExpr r)]	
+			     [Method [Public] objectType enterName [vmArg] [excName] (javaExpr vmRETURN r)]	
 
-    mk_inst (b,r) = var [Final] (javaType b) (javaInstName b)
-			(New (javaType b) [] Nothing)
+    mk_inst (b,r) = var [Final] (javaGlobType b) (javaInstName b)
+			(New (javaGlobType b) [] Nothing)
 
     mk_thunk (b,r) = var [Final] thunkType (javaName b)
-			 (New thunkType [Var (javaInstName b)] Nothing)
+			 (New thunkType [Var (javaInstName b) (Type "<inst>")] Nothing)
 
     mk_knot (b,_) = [ExprStatement (Assign lhs rhs) 
 		    | (b',_) <- prs,
-		      let lhs = Access (Var (javaInstName b)) (javaName b'),
-		      let rhs = Var (javaName b')
+		      let lhs = Access (Var (javaInstName b) (Type "<inst>")) (javaName b'),
+		      let rhs = Var (javaName b') (Type "<inst>")
 		    ]
-		
-javaLam :: ([CoreBndr], CoreExpr) -> [Statement]
-javaLam (bndrs, body)
-  | null val_bndrs = javaExpr body
-  | otherwise
-  =  vmCOLLECT (length val_bndrs) (Var thisName)
-  ++ [var [Final] objectType (javaName n) vmPOP | n <- val_bndrs]
-  ++ javaExpr body
-  where
-    val_bndrs = filter isId bndrs
 
-javaApp :: CoreExpr -> [CoreExpr] -> [Statement]
-javaApp (CoreSyn.App f a) as = javaApp f (a:as)
-javaApp (CoreSyn.Var f) as
+
+javaLam :: (Expr -> Expr) -> ([CoreBndr], CoreExpr) -> [Statement]
+javaLam r (bndrs, body)
+  | null val_bndrs = javaExpr r body
+  | otherwise
+  =  vmCOLLECT (length val_bndrs) this
+  ++ [var [Final] t (javaName n) (vmPOP t) | (n,t) <- val_bndrs]
+  ++ javaExpr r body
+  where
+    val_bndrs = map (\ id -> (id,javaType id)) (filter isId bndrs)
+
+javaApp :: (Expr -> Expr) -> CoreExpr -> [CoreExpr] -> [Statement]
+javaApp r (CoreSyn.App f a) as = javaApp r f (a:as)
+javaApp r (CoreSyn.Var f) as
   = case isDataConId_maybe f of {
+{- For now, we are turning off all optimizations.
 	Just dc | length as == dataConRepArity dc
 		-> 	-- Saturated constructors
-		   [Return (New (javaType f) (javaArgs as) Nothing)]
+		   [Return (New (javaGlobType f) (javaArgs as) Nothing)]
 
+-}
     ; other ->   -- Not a saturated constructor
-	java_apply (CoreSyn.Var f) as
+	java_apply r (CoreSyn.Var f) as
     }
 	
-javaApp f as = java_apply f as
+javaApp r f as = java_apply r f as
 
-java_apply :: CoreExpr -> [CoreExpr] -> [Statement]
-java_apply f as = [ExprStatement (vmPUSH arg) | arg <- javaArgs as] ++ javaExpr f
+java_apply :: (Expr -> Expr) -> CoreExpr -> [CoreExpr] -> [Statement]
+java_apply r f as = [ExprStatement (vmPUSH arg) | arg <- javaArgs as] ++ javaExpr r f
 
 javaArgs :: [CoreExpr] -> [Expr]
 javaArgs args = [javaArg a | a <- args, isValArg a]
 
 javaArg :: CoreExpr -> Expr
 javaArg (CoreSyn.Type t) = pprPanic "javaArg" (ppr t)
-javaArg e | exprIsValue e || exprIsTrivial e = newCode (javaExpr e)
-	  | otherwise	 		     = newThunk (newCode (javaExpr e))
+javaArg e | exprIsValue e || exprIsTrivial e = newCode (javaExpr id e)
+	  | otherwise	 		     = newThunk (newCode (javaExpr id e))
 \end{code}
 
 %************************************************************************
@@ -245,36 +271,73 @@ javaArg e | exprIsValue e || exprIsTrivial e = newCode (javaExpr e)
 
 \begin{code}
 true, this :: Expr
-this = Var thisName
-
-true = Var "true"
+this = Var thisName (Type "<this>")
+true = Var "true" (PrimType PrimBoolean)
 
 vmCOLLECT :: Int -> Expr -> [Statement]
 vmCOLLECT 0 e = []
-vmCOLLECT n e = [ExprStatement (Call (Var vmName) "COLLECT" [Literal (IntLit n), e])]
+vmCOLLECT n e = [ExprStatement (Call varVM "COLLECT" 
+				     [Literal (IntLit n) (PrimType PrimInt), e])]
 
-vmPOP :: Expr
-vmPOP = Call (Var vmName) "POP" []
+vmPOP :: Type -> Expr 
+vmPOP ty = Call varVM ("POP" ++ suffix ty) []
 
 vmPUSH :: Expr -> Expr
-vmPUSH e = Call (Var vmName) "PUSH" [e]
+vmPUSH e = Call varVM ("PUSH" ++ suffix (exprType e)) [e]
+
+vmRETURN :: Expr -> Expr
+vmRETURN e = 
+     case ty of
+	PrimType _ -> Call varVM ("RETURN" ++ suffix (exprType e)) [e]
+	_ -> e
+  where
+	ty = exprType e
 
 var :: [Modifier] -> Type -> Name -> Expr -> Statement
 var ms ty field_name value = Declaration (Field ms ty field_name (Just value))
 
 vmWHNF :: Expr -> Expr
-vmWHNF e = Call (Var vmName) "WHNF" [e]
+vmWHNF e = Call varVM "WHNF" [e]
+
+suffix :: Type -> String
+suffix (PrimType t) = primName t
+suffix _            = ""
+
+primName :: PrimType -> String
+primName PrimInt  = "int"
+primName PrimChar = "char"
+primName _         = error "unsupported primitive"
+
+varVM :: Expr
+varVM = Var vmName (Type "haskell.runtime.VMEngine")
 
 instanceOf :: Id -> DataCon -> Expr
 instanceOf x data_con
-  = InstanceOf (Var (javaName x)) (javaConstrWkrType data_con)
+  = InstanceOf (Var (javaName x) (Type "<instof>")) (javaConstrWkrType data_con)
 
 newCode :: [Statement] -> Expr
 newCode [Return e] = e
-newCode stmts	   = New codeType [] (Just [Method [Public] objectType enterName [] [papExcName] stmts])
+newCode stmts	   = New codeType [] (Just [Method [Public] objectType enterName [vmArg] [excName] stmts])
 
 newThunk :: Expr -> Expr
 newThunk e = New thunkType [e] Nothing
+
+vmArg :: Parameter
+vmArg = Parameter [Final] (Type "haskell.runtime.VMEngine") vmName
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Haskell to Java Types}
+%*									*
+%************************************************************************
+
+\begin{code}
+exprType (Var _ t)     = t
+exprType (Literal _ t) = t
+exprType (Cast t _)    = t
+exprType (New t _ _)   = t
+exprType _             = error "can't figure out an expression type"
 \end{code}
 
 %************************************************************************
@@ -284,13 +347,13 @@ newThunk e = New thunkType [e] Nothing
 %************************************************************************
 
 \begin{code}
-codeName, enterName, vmName,papExcName :: Name
+codeName, thunkName, enterName, vmName,excName :: Name
 codeName  = "Code"
 thunkName = "Thunk"
 enterName = "ENTER"
 vmName    = "VM"
 thisName  = "this"
-papExcName = "PartialApplicationException"
+excName = "Exception"
 
 fieldName :: Int -> Name	-- Names for fields of a constructor
 fieldName n = "f" ++ show n
@@ -303,11 +366,11 @@ javaName n = if isGlobalName n'
 	     n' = getName n
 
 -- this is used for getting the name of a class when defining it.
-javaShortName n = getOccString n
+shortName = reverse . takeWhile (/= '.') . reverse
 
 javaConstrWkrName :: DataCon -> Name
 -- The function that makes the constructor
-javaConstrWkrName con = getOccString (dataConId con)
+javaConstrWkrName con = javaName (dataConId con)
 
 javaInstName :: NamedThing a => a -> Name
 -- Makes x_inst for Rec decls
@@ -321,17 +384,42 @@ javaInstName n = getOccString n ++ "_inst"
 %************************************************************************
 
 \begin{code}
-javaType :: NamedThing a => a -> Type
-javaType n = Type [javaName n]
+-- This mapping a global haskell name (typically a function name)
+-- to the name of the class that handles it.
+-- The name must be global. So "Test.foo" maps to Type "Test.foo"
+
+javaGlobType :: NamedThing a => a -> Type
+javaGlobType n | '.' `notElem` name
+	       = error ("not using a fully qualified name for javaGlobalType: " ++ name)
+	       | otherwise
+	       = mkType name
+  where name = javaName n
+
+-- This takes an id, and finds the ids *type* (for example, Int, Bool, a, etc).
+javaType :: Id -> Type
+javaType id = case (idPrimRep id) of
+		IntRep -> PrimType PrimInt
+		_ -> if isGlobalName (idName id)
+		     then Type (javaName id)
+		     else objectType		-- TODO: ?? for now ??
+
+-- This is where we map from type to possible primitive
+mkType "PrelGHC.Intzh" = PrimType PrimInt
+mkType other           = Type other
+
+javaTauType :: Type.TauType -> Type
+javaTauType (TypeRep.TyConApp tycon _) = javaGlobType tycon
+javaTauType (TypeRep.NoteTy _ t)       = javaTauType t
+javaTauType _                          = objectType
 
 javaConstrWkrType :: DataCon -> Type
 -- The function that makes the constructor
-javaConstrWkrType con = Type [javaConstrWkrName con]
+javaConstrWkrType con = Type (javaConstrWkrName con)
 
 codeType, thunkType, objectType :: Type
-objectType = Type ["Object"]
-codeType   = Type [codeName]
-thunkType  = Type [thunkName]
+objectType = Type ("java.lang.Object")
+codeType   = Type codeName
+thunkType  = Type thunkName
 \end{code}
 
 %************************************************************************
@@ -563,10 +651,10 @@ liftStatements env (s:ss) =
 liftExpr :: Env -> Expr -> LifterM Expr
 liftExpr = \ env expr ->
  case expr of
-   { Var n -> do { access env n 
-		 ; return (Var n)
-	         }
-   ; Literal l -> return expr
+   { Var n t -> do { access env n 
+		   ; return (Var n t)
+	           }
+   ; Literal l _ -> return expr
    ; Cast t e -> do { e <- liftExpr env e
 	            ; return (Cast (liftType env t) e) 
 	            }
@@ -591,7 +679,6 @@ liftExpr = \ env expr ->
 		      ; return (Op e1 o e2)
 		      }
    ; New n es ds -> new env n es ds
-   ; NewArray n es -> error "array not (yet) supported"
    }
 
 liftParameter env (Parameter ms t n) = Parameter ms (liftType env t) n
@@ -610,15 +697,16 @@ liftMaybeExpr env (Just stmt) = do { stmt <- liftExpr env stmt
 new :: Env -> Type -> [Expr] -> Maybe [Decl] -> LifterM Expr
 new env@(Env _ pairs) typ args Nothing =
   do { args <- liftExprs env args
-     ; return (mkNew env typ args)
+     ; return (listNew env typ args)
      }
 new env typ [] (Just inner) =
   -- anon. inner class
   do { innerName <- genAnonInnerClassName 
      ; frees <- liftClass env innerName inner [] [unType typ]
-     ; return (New (Type [innerName]) [ Var name | name <- frees ] Nothing)
+     ; return (New (Type (innerName)) 
+	      [ Var name (Type "<arg>") | name <- frees ] Nothing)
      }
-  where unType (Type [name]) = name
+  where unType (Type name) = name
 	unType _             = error "incorrect type style"
 	
 new env typ _ (Just inner) = error "cant handle inner class with args"
@@ -628,12 +716,13 @@ liftClass env@(Env bound _) innerName inner xs is =
   do { let newBound = getBoundAtDecls inner
      ; (inner,frees) <- 
 	   getFrees (liftDecls False (env `combineEnv` newBound) inner)
-     ; let trueFrees = both frees bound
+     ; let trueFrees = filter (\ xs -> xs /= "VM") (both frees bound)
      ; let mirrorFrees = [ "_" ++ name ++ "_" | name <- trueFrees ]
      ; let freeDefs = [ Field [Final] objectType n Nothing | n <- trueFrees ]
      ; let cons = Constructor [Public] innerName 
 		    [ Parameter [] objectType name | name <- mirrorFrees ]
-		    [ ExprStatement (Assign (Var true) (Var mirror))
+		    [ ExprStatement (Assign (Var true (Type "<frees>")) 
+				            (Var mirror (Type "<frees>")))
 		    | (true,mirror) <- zip trueFrees mirrorFrees
 		    ]
      ; let innerClass = Class [] innerName xs is (freeDefs ++ [cons] ++ inner)
@@ -642,18 +731,18 @@ liftClass env@(Env bound _) innerName inner xs is =
      }
 
 liftType :: Env -> Type -> Type
-liftType (Env _ env) typ@(Type [name]) 
+liftType (Env _ env) typ@(Type name) 
    = case lookup name env of
 	Nothing     -> typ
-	Just (nm,_) -> Type [nm]
+	Just (nm,_) -> Type nm
 liftType _           typ = typ
 
-mkNew :: Env -> Type -> [Expr] -> Expr
-mkNew (Env _ env) typ@(Type [name]) exprs
+liftNew :: Env -> Type -> [Expr] -> Expr
+liftNew (Env _ env) typ@(Type name) exprs
    = case lookup name env of
 	Nothing                     -> New typ exprs Nothing
 	Just (nm,args) | null exprs 
-		-> New (Type [nm]) (map Var args) Nothing
+		-> New (Type nm) (map (\ v -> Var v (Type "<v-varg")) args) Nothing
 	_ -> error "pre-lifted constructor with arguments"
-mkNew _           typ exprs = New typ exprs Nothing
+listNew _           typ exprs = New typ exprs Nothing
 \end{code}
