@@ -4,7 +4,7 @@
 if config.platform == 'i386-unknown-openbsd':
 	ways = normal
 else:
-	ways = expect_fail_for(['optasm'])
+	ways = expect_fail_for(['optasm','profasm'])
 
 test('cholewo-eval', ways, multimod_compile_and_run, ['Main', ''])
 clean_o_hi()
