@@ -19,7 +19,7 @@ import TcType		( zonkTcTypes, zonkTcTyVarToTyVar, newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( kcHsSigType, tcHsSigType, tcTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, isLocalThing )
+import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, tcGetGlobalTyVars, isLocalThing )
 import Rules		( extendRuleBase )
 import Inst		( LIE, plusLIEs, instToId )
 import Id		( idType, idName, mkVanillaId )
@@ -108,8 +108,14 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
 
 	-- Gather type variables to quantify over
 	-- and turn them into real TyVars (just as in TcBinds.tcBindWithSigs)
-    zonkTcTypes (rule_ty : map idType tpl_ids)				`thenNF_Tc` \ zonked_tys ->
-    mapTc zonkTcTyVarToTyVar (varSetElems (tyVarsOfTypes zonked_tys))	`thenTc` \ tvs ->
+    zonkTcTypes (rule_ty : map idType tpl_ids)	`thenNF_Tc` \ zonked_tys ->
+    tcGetGlobalTyVars				`thenNF_Tc` \ free_tyvars ->
+    let
+	poly_tyvars = tyVarsOfTypes zonked_tys `minusVarSet` free_tyvars
+	-- There can be tyvars free in the environment, if there are
+	-- monomorphic overloaded top-level bindings.  Sigh.
+    in
+    mapTc zonkTcTyVarToTyVar (varSetElems poly_tyvars)	`thenTc` \ tvs ->
 
 	-- RHS can be a bit more lenient.  In particular,
 	-- we let constant dictionaries etc float outwards
