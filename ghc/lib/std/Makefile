@@ -84,7 +84,7 @@ DLL_NAME = HSprel.dll
 DLL_DESCRIPTION="GHC-compiled Haskell Prelude"
 DLL_IMPLIB_NAME = libHS_imp.a
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSprel.def DllVersionInfo.o
-SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHScbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
+SRC_BLD_DLL_OPTS += -lwinmm -lHSrts_imp -lHS_cbits_imp -lgmp -L. -L../../rts/gmp -L../../rts -Lcbits
 
 ifeq "$(way)" "dll"
 HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
