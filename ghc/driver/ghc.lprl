@@ -704,6 +704,17 @@ sub setupOptimiseFlags {
 #	  '-fsimpl-uf-use-threshold0',
 #	  '-fessential-unfoldings-only',
 
+	  #
+	  # The presence of -fclone-binds is *temporary* to work around
+          # the fact that the desugarer in 3.0{2.3} does generate
+	  # bindings with identical ids, and the type checker doesn't perform
+	  # properly cloned type substitutions. Instead, we make sure that all 
+	  # binders are cloned first time through the simplifier.
+          #
+	  # Will be properly fixed in the `new compiler` I hear, at which point
+	  # the cloning can be turned off here.
+          '-fclone-binds',
+
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
 	  ']',
@@ -738,6 +749,9 @@ sub setupOptimiseFlags {
 #
 #	  '-fessential-unfoldings-only',
 #	  '-fsimpl-uf-use-threshold0',
+
+	  # See remark re: cloning in defn of minusnotO
+	  '-fclone-binds',
 
 	  '-fmax-simplifier-iterations1',
 	  $Oopt_PedanticBottoms,
@@ -2833,7 +2847,7 @@ arg: while($_ = $Args[0]) {
 			    } elsif ( $syslib eq 'misc' && 
 				      $TargetPlatform =~ /-solaris2$/ ) {
 				# needed for Berkeley socket/nwork stuff.
-				push(@SysLibrary, '-lnsl');
+				push(@SysLibrary, '-lnsl -lsocket');
 			    } elsif ( $syslib eq 'win32' && 
 				      $TargetPlatform =~ /-cygwin32$/ ) {
 				# need to get at UI/Graphics functionality.
@@ -2981,6 +2995,9 @@ arg: while($_ = $Args[0]) {
     # ---------------
 
     /^-funfolding-.*$/
+		    && do { push(@HsC_flags, $_); next arg };
+
+    /^-funfold-casms-in-hi-file$/
 		    && do { push(@HsC_flags, $_); next arg };
 
     /^(-fmax-simplifier-iterations)(.*)$/
