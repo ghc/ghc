@@ -39,7 +39,7 @@
       </listitem>
 
       <listitem>
-	<para>New flag: <option>-fdump-minimal-imports</option>, which
+	<para>New flag: <option>-ddump-minimal-imports</option>, which
 	dumps a file <literal>M.imports</literal> that contains the
 	(allegedly) minimal bunch of imports needed by the current
 	module.</para>
