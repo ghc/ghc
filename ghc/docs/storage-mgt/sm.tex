@@ -1,0 +1,504 @@
+\documentclass{article}
+\usepackage{code}
+
+\setlength{\parskip}{0.25cm}
+\setlength{\parsep}{0.25cm}
+\setlength{\topsep}{0cm}
+\setlength{\parindent}{0cm}
+\renewcommand{\textfraction}{0.2}
+\renewcommand{\floatpagefraction}{0.7}
+
+
+% Terminology
+\newcommand{\block}{block}
+\newcommand{\Block}{Block}
+\newcommand{\segment}{segment}
+\newcommand{\Segment}{Segment}
+\newcommand{\step}{step}
+\newcommand{\Step}{Step}
+
+\newcommand{\note}[1]{{\em $\spadesuit$ #1}}
+
+\begin{document}
+\title{The GHC storage manager}
+\author{Simon Peyton Jones}
+
+\makeatactive
+\maketitle
+
+\section{Introduction}
+
+This is a draft design document, not a completed thing.
+
+\section{Goals}
+
+Storage management goals:
+
+\begin{itemize}
+\item Generational collection, supporting multiple generations.
+
+\item The ability to pin the allocation
+area into a few pages that we hope will fit entirely in the cache.
+
+\item Allows objects to age within a generation before getting promoted.
+
+\item Heap can grow as needed, rather than having to be pre-sized
+  by the programmer.
+
+\item We support mark/sweep/compact collection for older generations.
+This is a Good Thing when the live memory approaches the available
+physical memory, because it reduces paging.
+
+\item Little OS support needed.  No mmap etc. All that we require is
+  the ability to @malloc@ (or whatever) a new chunk of memory.
+  There can be intervening ``sandbars'' allocated by other programs
+  (e.g. DLLs or other @malloc@'d structures) between chunks of heap.
+
+\item Possible feature: ability to support mostly-copying conservative 
+collection.[.bartlett mostly 1989, morrisset mostly.]
+Not top priority.
+\end{itemize}
+
+Language-support goals:
+\begin{itemize}
+\item The garbage collector ``shorts out'' indirection objects introduced
+by the mutator (notably when overwriting a thunk with an indirection).
+
+\item The garbage collector executes selector thunks.  
+For example, a thunk for
+@(fst x)@ where @x@ is a pointer to a pair @(a,b)@ would be
+evaluated by the garbage collector to just @a@.  This is an important
+strategy for plugging space leaks.
+
+\item The garbage collector traversese the code tree, as well as
+the heap data structures, to find which CAFs are live.  This is a Royal Pain.
+
+\item The garbage collector finalises some objects (typically a tiny minority).
+At the moment ``finalisation'' means ``call a C routine when this thing
+dies'' but it would be more general to schedule a call to a Haskell 
+procedure.
+\end{itemize}
+
+Instrumentation goals:
+
+\begin{itemize}
+\item The garbage collector can gather heap-census information for profiling.
+To this end we can force GC to happen more often than it otherwise would,
+and the collector can gather information about the type and cost-centre
+associated with each heap object.
+\end{itemize}
+
+
+\section{Assumptions}
+
+Every garbage collector uses assupmtions about the sort of
+objects it manipulates, and how the mutator behaves.  Here we
+collect our assumptions:
+\begin{itemize}
+\item Each heap object starts with a one-word header that encodes, or points
+to, information about the layout of the object.  The details of this
+encoding aren't fundamental to the collector, but are, of course, rather 
+important.
+
+\item Every heap pointer points to the beginning of
+an object; no pointers into the middle of objects.
+
+\item There are two spare bits in the LSB of a pointer, because
+every heap object is at least word aligned.
+
+\item
+Heap objects are packed contiguously, with no ``slop'' between them.
+This assumption makes it possible to scan a region of heap linearly.
+It's easy to arrange that objects are packed contiguously in the
+to-space of a copying collector, but the no-slop assumption also
+applies during mutation.  This is a bit of a pain, because we often
+update a thunk with an indirection to the thunk's value; and the
+indirection isn't necessarily the same size as the thunk.  This can be
+solved, but it takes a few more instructions.
+
+We know of two reasons to uphold the no-slop assumption:
+\begin{itemize}
+\item A {\em mostly-copying conservative (MCC) collector} has to deal with 
+possible pointers from conservative regions.[.morrisset mostly.]
+Given a possible pointer the MCC collector must find the head of the object into
+which the putative pointer points.  One easy way to do this is
+to scan forward from a known point; but only if there is no
+slop.
+\item An {\em incremental collector}
+will scan linearly during mutation.[.field while.]
+\end{itemize}
+\end{itemize}
+
+
+\section{\Block{}s}
+
+The basic memory structure is similar to other BIBOP-based 
+collectors.[.stop the bibop, reppy garbage collector, moss garbage toolkit.]
+
+A {\em \block} is a contiguous chunk of $2^K$ bytes, starting on a 
+$2^K$-byte boundary.  We expect a \block{} to be between 4k and 64k bytes.
+
+A \block{} is the unit of allocation for the storage manager.  That is,
+the {\em block allocator} hands over store to the mutator in multiples of
+one \block.  (The mutator may then allocate multiple heap objects within
+a \block, of course.)
+
+\Block{}s are often allocated individually, but for large
+objects, or just to reduce inter-block linkage costs, a
+contiguous group of \block{}s can be allocated; we call
+this a {\em \block{} group} or sometimes just {\em group}.
+The first \block{} of a group is called the {\em group head}.
+
+\subsection{\Block{} descriptors}
+
+Each block has an associated {\em block{} descriptor}, a
+record with the following structure:
+\begin{code}
+  typedef struct {
+	int Gen;
+	int Step;
+	void *Start;
+	void *Free;
+	bdescr *Link
+    } bdescr;
+\end{code}
+The function @BDescr(a)@ takes an address @a@ and returns
+the address of its block descriptor.  It is expected that 
+@BDescr@ only takes a few instructions (see below).
+The field of a \block{} descriptor have the following 
+purposes:
+\begin{center}
+\begin{tabular}{lp{4.5in}}
+@Gen@ & The generation to which this block belongs.  The 
+youngest generation is 0. Valid for all blocks whether or not
+it is a group head.
+\\ \\
+@Step@ & The number of GCs that this block has survived
+while within its current generation. Only valid for group heads.
+\\ \\
+@Start@ & Points to the first byte of the block itself. 
+Valid for all blocks.
+\\ \\
+@Free@ & For a group head, @Free@ points to the first free (un-allocated) 
+byte in the group. For non-group heads, @Free@ is set to zero;
+this identifies the \block{} as a non-head.
+\\ \\
+@Link@ & Used to chain \block{}s together.  For non-group-heads,
+@Link@ points to the (\block{} descriptor of the) group head.
+\end{tabular}
+\end{center}
+
+\subsection{\Step{}s}
+
+A {\em \step} is a linked list of \block{} groups, {\em not} necessarily contiguous,
+all belonging to the same generation,
+and all of which have survived the same number of garbage collections.
+
+We think of a \step{} as {\em logically} contiguous (via their @Link@ fields) even though
+it is not physically contiguous.
+
+The \step{} number of a \step{} indicates its age (in GCs) within its generation.
+(\Step{} zero is the youngest \step{} in a generation.)  During GC of generation G, 
+live objects
+from \step{} N are moved to \step{} N+1, and live objects from \step{} @MaxStep@(G)
+are promoted to generation G+1. In this way, objects are given a decent chance
+to die before being promoted.  
+
+In effect, we record the age for a set of objects grouped by address (the \step{}), 
+rather than recording the age for each object individually.  This is quite
+a conventional idea.
+
+\subsection{Generations}
+
+A {\em generation} is a set of \step{}s 
+(not necessarily contiguous).  Most allocation takes 
+place in generation zero, the youngest generation.
+
+The big difference between generations and \step{}s is that:
+\begin{itemize}
+\item Garbage collection applies to all of generation G and all younger
+  generations (for some G).  You cannot do garbage collection on just
+  part of a generation.
+
+\item Consequently we have to track inter-generational pointers from
+older to younger generations; we do not
+  track inter-\step{} pointers within a generation.
+\end{itemize}
+
+\subsection{The \block{} allocator}
+
+The {\em \block{} allocator} is responsible for
+allocating blocks.  It mediates between the higher levels of the
+storage manager and the operating system.
+
+It supports the following API:
+\begin{description}
+\item{@InitialiseBlockAllocator()@} initialises the \block{} allocator.
+\item{@bdescr *AllocBlocks( int n )@} allocates a {\em contiguous}
+group of @n@ \block{}s, returning a pointer to the \block{} 
+descriptor of the first.  Returns @NULL@ if the request can't be
+satisfied.  The block descriptors of the group are initialised by the block allocator.
+\item{@FreeBlocks( bdescr *p )@} returns a block group to the block allocator.
+\item{@BDescr( void *p )@} takes a pointer @p@ to any
+byte within a block{} and returns a pointer to its \block{}
+descriptor.  It does no error checking, and fails horribly if the @p@
+does not point into a \block{} allocated by the \block{} allocator.
+It is probably implemented as an @inline@ procedure.
+\end{description}
+
+
+\subsection{Implementation}
+
+Our current implementation plan for the \block{} allocator is as
+follows.  It allocates memory from the OS in {\em megablocks}.  A
+megablock is a contiguous chunk of memory of $2^M$ bytes or less,
+starting on a $2^M$ byte boundary.  All the \block{} descriptors are
+laid out in an array at the start of the megablock.  Each is less than 32 bytes
+long.  So to get from an address @p@ to its block descriptor, @BDESCR@
+does this:
+\begin{code}
+  bdescr *BDescr( void *p ) {
+	return (((p>>(K-5)) & Bmask) | (p & Mmask)));
+  }
+\end{code}
+Depending on how many \block{}s fit in the megablock, the first
+one or more descriptors will be unused.
+
+(An alternative design has the \block{} descriptors at the start of
+each \block{}.  This makes @BDescr@ shorter, but is pessimal for
+cache locality when fiddling with \block{} descriptors.  
+It also means that only the first block in a contiguous chunk of
+blocks can have a descriptor.  That in turn makes life difficult
+for a mostly-copying conservative collector.  Given a possible pointer
+from a conservative region, a MCC collector needs
+to find the start of the object into which the putative pointer
+points.  One way to do this is to scan from the start of the
+contiguous chunk of \block{}s into which the pointer points; and to 
+find that it helps to have a descriptor for each \block{}.)
+
+The \block{} allocator maintains a pool of free \block{}s.
+Because it may be asked for a contiguous chunk of \block{}s it 
+needs to keep the free-list ordered (or something similar).
+
+
+\section{The Storage Manager API}
+
+The storage manager supports the following API.
+\begin{description}
+\item[@void *Allocate( int n )@] allocates @n@ bytes and returns
+a pointer to the first byte of the block.  Returns @NULL@ if
+the request could not be satisfied --- @Allocate@ does not call
+the garbage collector itself.  It is the responsibility of the caller
+to completely fill in the allocated chunk with objects packed end to
+end. @OpenNursery( void **p_hp, void **p_hplim )@ 
+
+\item[@OpenNursery( void **p\_hp, void **p\_hplim )@]
+returns pointers in @*p_hp@ and @*p_hplim@, to the beginning and end
+of a free chunk of store.  
+More precisely, @*p_hp@ points to the first byte of the region
+and @*p_hplim@ to the first byte beyond the end of the region.
+@*p_hp@ is set to @NULL@ if there is no chunk available.
+
+@OpenNursery@ is used by the main mutuator to get a chunk of
+contiguous store to allocate in.  It allocates until @hp@ gets
+too close to @hplim@ and then calls @ExtendNursery@ to try
+to get a new region of nursery.
+
+\item[@ExtendNursery( void **p\_hp, void **p\_hplim )@]
+returns to the storage manager the region handed out by
+the previous @OpenNursery@ or @ExtendNursery@.  Suppose that 
+this previous call returned with @*p_hp@ set 
+to $hp$ and @p_hplim@ set to
+$hplim$.
+Then the @*p_hplim@ given to @ExtendNursery@ should be the same 
+as $hplim$, and @*p_hp@ should be greater than or equal to $hp$ and 
+less than or equal to $hplim$.  
+
+@ExtendNursery@ tries to find another suitable region.  If it 
+succeeds, it sets @*hp@ and @*hplim@ appropriately; if not, it sets
+@*hp@ to @NULL@.  The new region is not necessarily contiguous 
+with the old one.
+
+\note{Maybe @ExtendNursery@ should be a macro, so that we can pass a
+globally allocated register to it?  (We can't take the address of a register.)
+If so then presumably so should @OpenNursery@.}
+
+\item[@ZapNursery()@] arranges that the next call to @ExtendNursery@
+will fail.  @ZapNursery@ is called by asynchronous interrupts to arrange that 
+execution is brought to an orderly halt.
+
+\item[@GarbageCollect( void *Roots )@] performs garbage collection.
+The parameter @Roots@ is a procedure which is called by the garbage
+collector when it wishes to find all the roots.  This procedure
+should in turn call @MarkRoot@ on each such root.
+
+\item[@void *MarkRoot( void *p )@] informs the garbage collector that
+@p@ is a root.  It returns the new location of the object.
+
+\item[@RecordMutable( void *p )@] informs the storage manager that
+@p@ points to an object that may contain pointers to objects in
+a younger generation.
+
+It is not necessary to call @RecordMutable@ on objects known to
+be in the nursery.
+
+It is only necessary to call @RecordMutable@ once.  For objects that
+are genuinely mutable (like mutable arrays), the object is permanently
+recorded as mutable.  On the other hand, thunks that are updated only
+once can be dropped from the mutables pool once their pointer has been
+dealt with (promoted).
+
+\item{@boolean InNursery( void *p )@} tells whether @p@ points into
+the nursery.  This should be a rather fast test; it is used to guard
+calls to @RecordMutable@.
+\end{description}
+
+
+\section{Allocation}
+
+We want to experiment with the idea of keeping the youngest generation
+entirely in the cache, so that an object might be allocated, used,
+and garbage collected without ever hitting main memory.
+
+To do this, generation zero consists of a fixed number of one-\block{}
+\segment{}s, carefully allocated in a contiguous address range so that
+they fit snugly next to each other in the cache.  
+(Large objects are allocated directly into generation 1,
+so that there is no need to find contiguous \block{}s in generation 0 --- Section~\ref{sect:large}.)
+
+After a GC, the storage manager decides how many generation-0 \segment{}s
+(= \block{}s) can be
+allocated before the next minor GC; it chains these \segment{}s together
+through their @SegLink@ fields.  The storage manager then makes the allocation pointer 
+(@Hp@) point to the start of the first \segment{}, and the limit pointer
+(@HpLim@) point to the end of that \segment{}.
+Objects are allocated by incrementing the @Hp@ until
+it hits @HpLim@.  If the @SegLink@ field of the current \segment{} is NIL,
+then it is time for GC; otherwise @Hp@ is set to point to the first data 
+word of the next \segment{},
+and @HpLim@ to the end of the \segment{}, and allocation
+continues.  So between GCs allocation is only interrupted briefly
+(i.e. a handful of instructions)
+to move @Hp@/@HpLim@ on to the next \segment{}.  Actually, this regular
+interruption can be useful, because it makes a good moment to pre-empt
+a thread to schedule another, or to respond to an interrupt.
+(Pre-emption cannot occur at arbitrary times because we are assuming
+an accurate garbage collector.)
+
+We expect there to be two \step{}s in generation zero, \step{} 0 and \step{} 1.
+At a minor GC we promote live objects in \step{} 1, and copy \step{} 0 to
+become a new \step{} 1.  The new \step{} 1 should fit also fit into the cache.
+Suppose there are 16 generation-zero \segment{}s.  A reasonable budget
+might be this:
+\begin{center}
+\begin{tabular}{l}
+	10 \segment{}s to allocate into (\step{} 0) \\
+	3 \segment{}s for \step{} 1 \\
+	3 \segment{}s free for the new \step{} 1
+\end{tabular}
+\end{center}
+
+This assumes a 30\% survival rate from \step{} 0 to \step{} 1.  We can do in-flight
+measurements to tune this.  And (MOST IMPORTANT) if we get it wrong, and
+get a blip in which 9 \segment{}s survive minor GC, all is not lost... we simply
+have to use some new \block{}s and generation zero gets bigger for a while
+and perhaps less cache resident.  (This contrasts with systems which rely
+on contiguous partitions, where an overflow is catastrophic, and which must
+therefore over-reserve.  We get better address-space usage by not having
+to be so conservative.  Again, this isn't a new observation.)
+
+
+\section{Doing garbage collection}
+
+When GC happens, we first decide which generation to collect.  (How?)
+When we collect generation G we collect all younger generations too.
+
+To begin with we assume a copying style garbage collection
+algorithm.  The structure of a full GC is as follows:
+
+\begin{enumerate}
+\item Initialise
+\item For each root @r@ do @r:=Evacuate(r)@.
+\item Scavenge
+\item Tidy up
+\end{enumerate}
+
+A {\em root} is either a pointer held by the RTS (notably the queue
+of runnable threads), or a pointer from a generation > G that might
+point into a generation <= G.
+
+The @Evacuate@ operation does this:
+
+\begin{code}
+Evacuate(p) { 
+  /* Ignore pointers into non-collected generations */
+  if generation(p) > G then return(p);
+
+  /* Copy the object and return its new location */
+  p' := copy the object pointed to by p into to-space(g);
+
+  return(p');
+}
+\end{code}
+The @Scavenge@ operation operation does this:
+\begin{code}
+Scavenge() {
+  While there is an un-scavenged object O in to-space do
+	for each pointer q in O do
+		q := Mark(q)
+		remember that O has been scavenged
+}
+\end{code}
+We say ``copy into to-space'' and ``find an un-scavenged object in to-space'',
+but actually each \step{} of each generation has a separate to-space,
+complete with allocation pointer and sweep pointer. (The sweep pointer
+finds the un-scavenged objects.)  When copying
+into a to-space a check must be made for to-space 
+overflow and a new \segment{} chained on if necessary. 
+This is much as when the 
+mutator is doing allocation.  The difference is that we are allocating
+in multiple \segment{}s in an interleaved fashion, so we can't hold
+the allocation pointers in registers.
+
+Only when all the sweep pointers
+have reached the corresponding allocation pointer is GC done.
+This entails multiple passes through the \step{}s until a pass 
+finds no un-scavenged objects.  [NB: if we treated inter-generational pointers
+between generations <= G as roots, then we could avoid some of these multiple
+passes.  But we'd collect less garbage, and hence copy more
+objects, so it would probably be slower.]  
+
+Notice that there is no issue about partitioning the address space
+among generations, as there might be if each lived in a contiguous address
+space.
+
+\section{Large objects}
+\label{sect:large}
+
+Large objects are allocated directly in generation 1, each alone in its
+own \segment{}.  This means that they never, ever, need to be copied!  Instead,
+we simply change their generation or \step{} number.  We also need to chain the
+object onto a list of large objects to be swept for pointers.  This act also
+serves to mark the object, so we don't chain it on twice, or increment its
+\step{} number twice.
+
+Stack objects probably count as large objects.  This is one reason for not
+wanting \block{}s to be too big.
+
+
+\section{Mark sweep}
+
+So far we have assumed copying collection.  Actually, for 
+older generations we may want to use 
+mark/sweep/compact because it is a bit less greedy on address
+space, and may help paging behaviour.
+
+What I have in mind is a pointer-reversing mark phase, so that we don't have
+to allocate space for a mark stack, although one could argue that a mark
+stack will almost invariably be small, and if it gets big then you can always
+malloc some more space.  Mumble mumble.
+
+\bibliographystyle{plain} 
+\bibliography{bibl,simon}
+
+\end{document}
