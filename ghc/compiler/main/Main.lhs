@@ -74,7 +74,7 @@ main =
 doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
 
 doIt (core_cmds, stg_cmds) input_pgm
-  = doDump opt_Verbose ("Glasgow Haskell Compiler, version " ++ show PROJECTVERSION ++ ", for Haskell 1.4" "") >>
+  = doDump opt_Verbose ("Glasgow Haskell Compiler, version " ++ show PROJECTVERSION ++ ", for Haskell 1.4") "" >>
     -- ******* READER
     show_pass "Reader"	>>
     _scc_     "Reader"
