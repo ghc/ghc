@@ -23,7 +23,8 @@ import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
 			  opt_UF_UpdateInPlace
 			)
 import CoreSyn
-import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, etaExpand, exprEtaExpandArity, bindNonRec )
+import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, 
+			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce )
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, substExpr )
 import Id		( idType, idName, 
 			  idUnfolding, idStrictness,
@@ -789,14 +790,28 @@ and similar friends.
 mkCase scrut case_bndr alts
   | all identity_alt alts
   = tick (CaseIdentity case_bndr)		`thenSmpl_`
-    returnSmpl scrut
+    returnSmpl (re_note scrut)
   where
-    identity_alt (DEFAULT, [], Var v)     = v == case_bndr
-    identity_alt (DataAlt con, args, rhs) = cheapEqExpr rhs
-					  		(mkConApp con (map Type arg_tys ++ map varToCoreExpr args))
-    identity_alt other		          = False
+    identity_alt (con, args, rhs) = de_note rhs `cheapEqExpr` identity_rhs con args
 
-    arg_tys = tyConAppArgs (idType case_bndr)
+    identity_rhs (DataAlt con) args = mkConApp con (arg_tys ++ map varToCoreExpr args)
+    identity_rhs (LitAlt lit)  _    = Lit lit
+    identity_rhs DEFAULT       _    = Var case_bndr
+
+    arg_tys = map Type (tyConAppArgs (idType case_bndr))
+
+	-- We've seen this:
+	--	case coerce T e of x { _ -> coerce T' x }
+	-- And we definitely want to eliminate this case!
+	-- So we throw away notes from the RHS, and reconstruct
+	-- (at least an approximation) at the other end
+    de_note (Note _ e) = de_note e
+    de_note e	       = e
+
+	-- re_note wraps a coerce if it might be necessary
+    re_note scrut = case head alts of
+			(_,_,rhs1@(Note _ _)) -> mkCoerce (exprType rhs1) (idType case_bndr) scrut
+			other		      -> scrut
 \end{code}
 
 The catch-all case
