@@ -451,16 +451,6 @@ dnl do we have altzone?
 AC_ALTZONE
 
 #
-dnl do we have the GNU libc?
-AC_GNU_LIBC
-
-#
-dnl define uint, ulong and ullong if not already defined
-AC_CHECK_TYPE(uint,unsigned int)
-AC_CHECK_TYPE(ulong,unsigned long)
-AC_CHECK_TYPE(ullong,unsigned long long)
-
-#
 dnl ** check for specific library functions that we are interested in
 #
 AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect setitimer stat sysconf timelocal times vadvise vfork)
