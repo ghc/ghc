@@ -13,3 +13,4 @@ test "drvrun005" { vtr("", "", "") }
 test "drvrun006" { vtr("", "", "") }
 test "drvrun007" { vtr("", "", "") }
 test "drvrun008" { vtr("-funbox-strict-fields", "", "") }
+test "drvrun009" { vtr("", "", "") }
