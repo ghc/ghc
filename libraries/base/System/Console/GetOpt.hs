@@ -131,7 +131,7 @@ Process the command-line, and return the list of values that matched
 * The option descriptions (see 'OptDescr')
 
 * The actual command line arguments (presumably got from 
-  'System.Console.Environment.getArgs').
+  'System.Environment.getArgs').
 
 'getOpt' returns a triple, consisting of the argument values, a list
 of options that didn\'t match, and a list of error messages.
