@@ -91,3 +91,13 @@ void *prel_PrelIO_memcpy(char *dst, HsInt dst_off, const char *src, size_t sz)
   return memcpy(dst+dst_off, src, sz);
 }
 
+
+int s_isreg_PrelPosix_wrap(int m) { return S_ISREG(m); }
+int s_isdir_PrelPosix_wrap(int m) { return S_ISDIR(m); }
+int s_isfifo_PrelPosix_wrap(int m) { return S_ISFIFO(m); }
+int s_isblk_PrelPosix_wrap(int m) { return S_ISBLK(m); }
+int s_ischr_PrelPosix_wrap(int m) { return S_ISCHR(m); }
+#ifndef mingw32_TARGET_OS
+int s_issock_PrelPosix_wrap(int m) { return S_ISSOCK(m); }
+void sigemptyset_PrelPosix_wrap(sigset_t *set) { sigemptyset(set); }
+#endif

@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS -fno-implicit-prelude -#include "PrelIOUtils.h" #-}
 
 -- ---------------------------------------------------------------------------
 --
@@ -101,23 +101,13 @@ ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
 
 foreign import "s_isreg_PrelPosix_wrap" unsafe s_isreg :: CMode -> Bool
-#def inline int s_isreg_PrelPosix_wrap(m) { return S_ISREG(m); }
-
 foreign import "s_isdir_PrelPosix_wrap" unsafe s_isdir :: CMode -> Bool
-#def inline int s_isdir_PrelPosix_wrap(m) { return S_ISDIR(m); }
-
 foreign import "s_isfifo_PrelPosix_wrap" unsafe s_isfifo :: CMode -> Bool
-#def inline int s_isfifo_PrelPosix_wrap(m) { return S_ISFIFO(m); }
-
 foreign import "s_ischr_PrelPosix_wrap" unsafe s_ischr :: CMode -> Bool
-#def inline int s_ischr_PrelPosix_wrap(m) { return S_ISCHR(m); }
-
 foreign import "s_isblk_PrelPosix_wrap" unsafe s_isblk :: CMode -> Bool
-#def inline int s_isblk_PrelPosix_wrap(m) { return S_ISBLK(m); }
 
 #ifndef mingw32_TARGET_OS
 foreign import "s_issock_PrelPosix_wrap" unsafe s_issock :: CMode -> Bool
-#def inline int s_issock_PrelPosix_wrap(m) { return S_ISSOCK(m); }
 #else
 s_issock :: CMode -> Bool
 s_issock cmode = False
@@ -312,7 +302,6 @@ foreign import "fork" unsafe
 
 foreign import "sigemptyset_PrelPosix_wrap" unsafe
    c_sigemptyset :: Ptr CSigset -> IO ()
-#def inline void sigemptyset_PrelPosix_wrap(sigset_t *set) { sigemptyset(set); }
 
 foreign import "sigaddset" unsafe
    c_sigaddset :: Ptr CSigset -> CInt -> IO ()

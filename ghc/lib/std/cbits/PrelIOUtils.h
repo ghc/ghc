@@ -25,5 +25,16 @@ extern void* prel_PrelIO_memcpy(char *dst, HsInt dst_off, const char *src, size_
 /* writeError.c */
 extern void writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len);
 
+extern int s_isreg_PrelPosix_wrap(int);
+extern int s_isdir_PrelPosix_wrap(int);
+extern int s_isfifo_PrelPosix_wrap(int);
+extern int s_isblk_PrelPosix_wrap(int);
+extern int s_ischr_PrelPosix_wrap(int);
+#ifndef mingw32_TARGET_OS
+extern int s_issock_PrelPosix_wrap(int);
+extern void sigemptyset_PrelPosix_wrap(sigset_t *set);
+#endif
+
+
 #endif /* __PRELIOUTILS_H__ */
 
