@@ -204,7 +204,7 @@ testEnumInt64 = do
   mayBomb   (printTest (pred (minBound::Int64))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Int64) [1, fromIntegral (minBound::Int64), fromIntegral (maxBound::Int64)]))
+  mayBomb   (printTest ((map (toEnum::Int->Int64) [1, fromIntegral (minBound::Int64), fromIntegral (maxBound::Int64)])))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Int64))
 
      -- fromEnum
@@ -259,3 +259,4 @@ testEnumInt64 = do
 
 
 mayBomb x = catchJust errorCalls x (\e -> putStrLn ("error " ++ show e))
+  `Control.Exception.catch` (\e -> putStrLn ("Fail: " ++ show e))
