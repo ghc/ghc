@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.25 2000/06/25 17:25:42 panne Exp $
+ * $Id: Main.c,v 1.26 2001/02/09 12:40:22 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -38,7 +38,7 @@
 # include <windows.h>
 #endif
 
-EXTFUN(__init_PrelMain);
+extern void __init_PrelMain(void);
 
 /* Hack: we assume that we're building a batch-mode system unless 
  * INTERPRETER is set
