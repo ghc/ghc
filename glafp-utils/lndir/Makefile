@@ -9,4 +9,4 @@ DESTDIR=$(INSTBINDIR)
 
 include $(TOP)/mk/target.mk
 
-CC_OPTS := $(filter-out -mno-cygwin,$(CC_OPTS))
+CC_OPTS := $(filter-out -mno-cygwin -mwin32,$(CC_OPTS))
