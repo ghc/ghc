@@ -161,7 +161,11 @@ STGFUN(RBH_entry)
     STGCALL3(void,(),GranSimBlock,CurrentTSO,CurrentProc,Node);	
 #  endif
 
-    switch (INFO_TYPE(InfoPtr)) {
+    /* In GranSim and GUM on 2.04 the InfoPtr seems to be invalid when entering
+       this routine (exact reason is unknown). This change does the safe 
+       thing instead. -- HWL */
+
+    switch (INFO_TYPE(INFO_PTR(Node))) {  /* HWL orig: INFO_TYPE(InfoPtr) */
     case INFO_SPEC_RBH_TYPE:
 	TSO_LINK(CurrentTSO) = (P_) SPEC_RBH_BQ(Node);
 	SPEC_RBH_BQ(Node) = (W_) CurrentTSO;
