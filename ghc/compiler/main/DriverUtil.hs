@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.30 2002/02/08 14:59:19 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.31 2002/02/27 16:24:00 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -190,6 +190,9 @@ newdir dir s = dir ++ '/':drop_longest_prefix s isPathSeparator
 
 remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
+
+escapeSpaces :: String -> String
+escapeSpaces = foldr (\c s -> if isSpace c then '\\':c:s else c:s) ""
 
 isPathSeparator :: Char -> Bool
 isPathSeparator ch =
