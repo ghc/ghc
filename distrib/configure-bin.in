@@ -92,27 +92,16 @@ echo "Which we'll further canonicalise into: $TargetPlatform"
 AC_SUBST(TargetPlatform)
 AC_SUBST(exeext)
 
-AC_CHECK_PROG(PerlCmd,perl,$ac_dir/$ac_word)
-if test -z "$PerlCmd"; then
-    echo "You must install perl before you can continue"
-    echo "Perhaps it is already installed, but not in your PATH?"
-    echo ""
-    echo "Continuing, assuming perl will be available as: perl"
-fi
 #
-dnl ** does #!.../perl work? (sometimes it's too long...)
-echo "checking if \`#!$PerlCmd' works in shell scripts"
-echo "#!$PerlCmd"'
-exit $1;
-' > conftest
-chmod u+x conftest
-(SHELL=/bin/sh; export SHELL; ./conftest 69 > /dev/null)
-if test $? -ne 69; then
-   echo "It does!"
-else
-   echo "It doesn't!  Perhaps \`#!$PerlCmd' is too long (often 32 characters max).."
+dnl ** Check Perl installation **
+#
+AC_PATH_PROG(PerlCmd,perl)
+if test -z "$PerlCmd"; then
+   echo "You must install perl before you can continue"
+   echo "Perhaps it is already installed, but not in your PATH?"
+   exit 1
 fi
-rm -f conftest
+FPTOOLS_SHEBANG_PERL
 
 #
 dnl ** figure out how to do a BSD-ish install **
