@@ -285,7 +285,7 @@ tidyTopBind mod ext_ids env (Rec prs)
 			  where
 			    rhs'	  = tidyTopRhs final_env rhs
 			    (env', bndr') = tidyTopBinder mod ext_ids final_env
-							  rhs env bndr
+							  rhs' env bndr
 
 tidyTopRhs :: TopTidyEnv -> CoreExpr -> CoreExpr
 	-- Just an impedence matcher
