@@ -579,9 +579,9 @@ tcTySig sig1 (L span (Sig (L _ name) ty))
 	;   Just tenv -> do
 	; case check_tvs tenv tvs of
 	    Nothing   -> bale_out
-	    Just tvs' -> do 
+	    Just tvs' -> do {
 
-	{ let subst  = mkTvSubst tenv
+	  let subst  = mkTvSubst tenv
 	      theta' = substTheta subst theta
 	      tau'   = substTy subst tau
 	; loc <- getInstLoc (SigOrigin rigid_info)
