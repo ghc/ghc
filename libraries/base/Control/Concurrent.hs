@@ -137,7 +137,7 @@ for input will block /all/ threads, unless the @threadsafe@ attribute
 is used on the foreign call (and your compiler \/ operating system
 supports it).  GHC's I\/O system uses non-blocking I\/O internally to
 implement thread-friendly I\/O, so calling standard Haskell I\/O
-functions blocks only the thead making the call.
+functions blocks only the thread making the call.
 -}
 
 -- Thread Ids, specifically the instances of Eq and Ord for these things.
