@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: CPUTime.hsc,v 1.10 2001/08/10 09:53:40 sewardj Exp $
+-- $Id: CPUTime.hsc,v 1.11 2001/09/05 04:03:15 ken Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -51,10 +51,10 @@ getCPUTime = do
 
     let ru_utime = (#ptr struct rusage, ru_utime) p_rusage
     let ru_stime = (#ptr struct rusage, ru_stime) p_rusage
-    u_sec  <- (#peek struct timeval,tv_sec)  ru_utime :: IO CLong
-    u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CLong
-    s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CLong
-    s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CLong
+    u_sec  <- (#peek struct timeval,tv_sec)  ru_utime :: IO Int32
+    u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO Int32
+    s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO Int32
+    s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO Int32
 
     return ((fromIntegral u_sec * 1000000 + fromIntegral u_usec + 
              fromIntegral s_sec * 1000000 + fromIntegral s_usec) 
