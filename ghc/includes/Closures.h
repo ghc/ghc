@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.15 2000/01/13 14:34:00 hwloidl Exp $
+ * $Id: Closures.h,v 1.16 2000/01/18 12:36:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -117,7 +117,7 @@ typedef struct {
 #ifdef PAR
 	StgParHeader          par;
 #endif
-#if defined(GRAN)
+#ifdef GRAN
 	StgGranHeader         gran;
 #endif
 #ifdef TICKY_TICKY
@@ -273,7 +273,7 @@ typedef struct _StgStableName {
   StgHeader      header;
   StgWord        sn;
 } StgStableName;
-  
+
 typedef struct _StgWeak {	/* Weak v */
   StgHeader header;
   StgClosure *key;
@@ -325,9 +325,9 @@ typedef struct StgBlockingQueueElement_ {
 } StgBlockingQueueElement;
 
 typedef struct StgBlockingQueue_ {
-  StgHeader                         header;
-  struct StgBlockingQueueElement_  *blocking_queue;
-  StgMutClosure                    *mut_link;
+  StgHeader                 header;
+  struct StgBlockingQueueElement_ *blocking_queue;
+  StgMutClosure            *mut_link;
 } StgBlockingQueue;
 
 /* this closure is hanging at the end of a blocking queue in (par setup only) */
@@ -343,12 +343,13 @@ typedef struct StgRBH_ {
 } StgRBH;
 
 #else
-/* old sequential version of a blocking queue, which can only hold TSOs */
+
 typedef struct StgBlockingQueue_ {
-  StgHeader                 header;
-  struct StgTSO_           *blocking_queue;
-  StgMutClosure            *mut_link;
+  StgHeader          header;
+  struct StgTSO_    *blocking_queue;
+  StgMutClosure     *mut_link;
 } StgBlockingQueue;
+
 #endif
 
 #if defined(PAR)
