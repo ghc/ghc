@@ -198,7 +198,7 @@ void     prel_poke_lflag(struct termios* ts, tcflag_t t) { ts->c_lflag = t; }
 unsigned char* prel_ptr_c_cc(struct termios* ts) { return ((unsigned char*)(ts + offsetof(struct termios, c_cc))); }
 #endif
 
-int prel_sizeof_termios()
+HsInt prel_sizeof_termios()
 {
 #ifndef mingw32_TARGET_OS
   return sizeof(struct termios);
@@ -207,7 +207,7 @@ int prel_sizeof_termios()
 #endif
 }
 
-int prel_sizeof_sigset_t()
+HsInt prel_sizeof_sigset_t()
 {
 #ifndef mingw32_TARGET_OS
   return sizeof(sigset_t);
