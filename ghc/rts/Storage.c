@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.49 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Storage.c,v 1.50 2001/08/30 10:21:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -168,7 +168,11 @@ initStorage( void )
   
   /* The oldest generation has one step and it is compacted. */
   if (RtsFlags.GcFlags.compact) {
-      oldest_gen->steps[0].is_compacted = 1;
+      if (RtsFlags.GcFlags.generations == 1) {
+	  belch("WARNING: compaction is incompatible with -G1; disabled");
+      } else {
+	  oldest_gen->steps[0].is_compacted = 1;
+      }
   }
   oldest_gen->steps[0].to = &oldest_gen->steps[0];
 
