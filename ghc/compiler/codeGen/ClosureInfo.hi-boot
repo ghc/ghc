@@ -1,7 +1,0 @@
-_interface_ ClosureInfo 1
-_exports_
-ClosureInfo ClosureInfo LambdaFormInfo;
-_declarations_
-1 data LambdaFormInfo;
-1 data ClosureInfo;
-

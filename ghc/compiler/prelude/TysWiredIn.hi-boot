@@ -1,5 +1,0 @@
-_interface_ TysWiredIn 1
-_exports_
-TysWiredIn listTyCon ;
-_declarations_
-1 listTyCon _:_ TyCon!TyCon ;;

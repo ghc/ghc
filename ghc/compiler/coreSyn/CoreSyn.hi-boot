@@ -1,8 +1,0 @@
-_interface_ CoreSyn 1
-_exports_
-CoreSyn CoreExpr ;
-_declarations_
-
--- Needed by Var.lhs
-1 type CoreExpr = Expr Var.Var;
-1 data Expr b ;
