@@ -31,8 +31,12 @@ USE AT YOUR OWN RISK: you can make a big mess with this script!
 EOUSAGE
 
 $Makefile = 'Makefile';
-$Tmpfile  = "/tmp/Makefile$$";
-chop($Arch = `uname -a`);
+if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
+    $Tmpfile = $ENV{'TMPDIR'} . "/Makefile$$";
+} else {
+    $Tmpfile  = "$(TMPDIR)/Makefile$$";
+    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+}
 $SleazyTouch = '/usr/5bin/touch';
 $DoTouch = 0;
 $Verbose = 0;
@@ -111,11 +115,8 @@ while ( $_ ) {
 close(INF);
 close(OUTF);
 
-if ($Arch ne "sun3") {
-    $Make = 'make JMAKE=jmake LIT2PGM=lit2pgm LIT2LATEX=lit2latex LIT2TEXI=lit2texi MKDEPENDLIT=mkdependlit MAKEINFO=makeinfo POSTMAKEINFO=postmakeinfo';
-} else {
-    $Make = 'make';
-}
+$Make = 'make JMAKE=jmake LIT2PGM=lit2pgm LIT2LATEX=lit2latex LIT2TEXI=lit2texi MKDEPENDLIT=mkdependlit MAKEINFO=makeinfo POSTMAKEINFO=postmakeinfo';
+
 print STDERR "$Make $MakeFlags -f $Tmpfile $Target; rm $Tmpfile\n" if $Verbose;
 
 system( "$Make $MakeFlags -f $Tmpfile $Target; rm $Tmpfile" );

@@ -9,7 +9,7 @@
 $Usage  = "usage: $Pgm: not done yet\n";
 
 $Status  = 0; # just used for exit() status
-$Verbose = '';
+$Verbose = 0;
 $Dashdashes_seen = 0;
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of C dependencies\n";
@@ -27,7 +27,7 @@ if ( ! $Makefile && -f 'makefile' ) {
     $Makefile = 'makefile';
 } elsif ( ! $Makefile && -f 'Makefile') {
     $Makefile = 'Makefile';
-} else {
+} elsif ( ! $Makefile) {
     die "$Pgm: no makefile or Makefile found\n";
 }
 
@@ -73,7 +73,6 @@ while (<OMKF>) { # copy the rest through
 }
 close(NMKF);
 close(OMKF);
-chmod 0444, 'Makefile';
 exit 0;
 
 sub mangle_command_line_args {
@@ -90,7 +89,7 @@ sub mangle_command_line_args {
 
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
-		$Verbose	= '-v';
+		$Verbose++;
 	    } elsif ( /^-f/ ) {
 		$Makefile	= &grab_arg_arg($_);
 	    } elsif ( /^-o/ ) {

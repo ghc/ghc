@@ -60,6 +60,10 @@ $ToRun = "./$ToRun" if $ToRun !~ /^\//;
 arg: while ($_ = $ARGV[0]) {
     shift(@ARGV);
     
+    /^--$/	&& do { # let anything past after --
+			push(@PgmArgs, @ARGV);
+			last arg; };
+
     /^-v$/	&& do { $Verbose = 1; next arg; };
     /^-O(.*)/	&& do { push(@PgmArgs, &grab_arg_arg('-O',$1)); next arg; };
     /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
@@ -145,7 +149,7 @@ if ( $SpixTiming eq 'yes' ) {
 
     open(SPIXNM, "nm -n $ToRunOrig |") || die "nm -n $ToRunOrig open failed!\n";
     spix: while (<SPIXNM>) {
-	if ( / T (_FreeMallocPtr|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
+	if ( / T +(_FreeMallocPtr|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
 	    $LastSpix = $1;
 	    last spix;
 	}
@@ -320,16 +324,23 @@ sub process_stats_file {
 	#NB: nearly the same as in GHC driver's -ghc-timing stuff
 
 	open(STATS, $StatsFile) || die "Failed when opening $StatsFile\n";
-	local($tot_live) = 0; # for calculating avg residency
+
+	local($max_live)    = 0; 
+	local($tot_live)    = 0; # for calculating residency stuff
+	local($tot_samples) = 0;
 
 	while (<STATS>) {
-	    $tot_live += $1 if /^\s*\d+\s+\d+\s+\d+\.\d+\%\s+(\d+)\s+\d+\.\d+\%/;
+	    if (! /Minor/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+\%/ ) {
+		$max_live = $1 if $max_live < $1;
+		$tot_live += $1;
+		$tot_samples += 1;
+	    }
 
 	    $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
 
-	    if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
-		$MaxResidency = $1; $ResidencySamples = $2;
-	    }
+#	    if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
+#		$MaxResidency = $1; $ResidencySamples = $2;
+#	    }
 
 	    $GCs = $1 if /^\s*([0-9,]+) garbage collections? performed/;
 
@@ -342,8 +353,10 @@ sub process_stats_file {
 	    }
 	}
 	close(STATS) || die "Failed when closing $StatsFile\n";
-	if ( defined($ResidencySamples) && $ResidencySamples > 0 ) {
-	    $AvgResidency = int ($tot_live / $ResidencySamples) ;
+	if ( $tot_samples > 0 ) {
+	    $ResidencySamples = $tot_samples;
+	    $MaxResidency = $max_live;
+	    $AvgResidency = int ($tot_live / $tot_samples) ;
 	}
 
     } elsif ( $SysSpecificTiming eq 'hbc' ) {
