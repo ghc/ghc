@@ -82,8 +82,7 @@ codeOutput dflags mod_name tycons core_binds stg_binds
 
 doOutput :: String -> (Handle -> IO ()) -> IO ()
 doOutput filenm io_action
-  = (do	hPutStr stderr ("Writing to" ++ filenm)
-	handle <- openFile filenm WriteMode
+  = (do	handle <- openFile filenm WriteMode
 	io_action handle
 	hClose handle)
     `catch` (\err -> pprPanic "Failed to open or write code output file" 
