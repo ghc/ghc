@@ -90,16 +90,13 @@ boot :: all
 # Install all header files
 #
 # Hackily set the install destination here:
-INSTALL_DATAS += $(DELIT_H_FILES) $(H_FILES) $(TARGETPLATFORM).h
-
 #
-# We want the configuration header files for the different platforms
-# to be put inside the lib/../$(HOSTPLATFORM)/ directory 
+# Note: we keep per-platform copies of all the include files
+# (ditto for interface files). This is not *really* needed, but
+# it gives (perhaps) a cleaner binary dist structure..might change.
 #
-install :: $(H_CONFIG)
-	$(INSTALL_DIR) $(libdir)/includes
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(H_CONFIG) $(libdir)/includes
-
+datadir:=$(libdir)/includes
+INSTALL_DATAS += $(DELIT_H_FILES) $(H_FILES) $(TARGETPLATFORM).h $(H_CONFIG)
 
 #
 # `make clean' settings:
