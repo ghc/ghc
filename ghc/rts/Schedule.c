@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.152 2002/08/16 13:29:07 simonmar Exp $
+ * $Id: Schedule.c,v 1.153 2002/08/28 13:02:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3258,7 +3258,6 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
   /* Remove it from any blocking queues */
   unblockThread(tso);
 
-  IF_DEBUG(scheduler, sched_belch("raising exception in thread %ld.", tso->id));
   /* The stack freezing code assumes there's a closure pointer on
    * the top of the stack.  This isn't always the case with compiled
    * code, so we have to push a dummy closure on the top which just
