@@ -40,7 +40,6 @@ import Name		( Name, OccName,
 			  nameOccName, NamedThing(..)
 			)
 import NameSet
-import OccName		( mkDefaultMethodOcc )
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys,
 			  deRefStablePtr_RDR, makeStablePtr_RDR, 
@@ -54,7 +53,6 @@ import CmdLineOpts	( opt_GlasgowExts, opt_WarnUnusedMatches )	-- Warn of unused 
 import Unique		( Uniquable(..) )
 import ErrUtils		( Message )
 import CStrings		( isCLabelString )
-import Maybes		( maybeToBool, catMaybes )
 import Util
 \end{code}
 
