@@ -4433,7 +4433,7 @@ g x = show x
   f :: %forall a . GHCziShow.ZCTShow a ->
                    a -> GHCziBase.ZMZN GHCziBase.Char =
     \ @ a (zddShow::GHCziShow.ZCTShow a) (eta::a) ->
-        (%note "hello"
+        (%note "foo"
          %case zddShow %of (tpl::GHCziShow.ZCTShow a)
            {GHCziShow.ZCDShow
             (tpl1::GHCziBase.Int ->
