@@ -210,6 +210,10 @@ installSignalHandlers = do
   return ()
 #elif __GLASGOW_HASKELL__ >= 603
   -- GHC 6.3+ has support for console events on Windows
+  -- NOTE: running GHCi under a bash shell for some reason requires
+  -- you to press Ctrl-Break rather than Ctrl-C to provoke
+  -- an interrupt.  Ctrl-C is getting blocked somewhere, I don't know
+  -- why --SDM 17/12/2004
   let sig_handler ControlC = interrupt
       sig_handler Break    = interrupt
       sig_handler _        = return ()
