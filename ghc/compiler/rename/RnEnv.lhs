@@ -497,7 +497,8 @@ mkTopFixityEnv gbl_env fix_sigs
 		-- add both to the fixity env
 	go fix_env (FixitySig rdr_name fixity loc)
 	  = case catMaybes (map (lookup_local mod gbl_env) rdr_names) of
-		  [] -> addErrRn (unknownNameErr rdr_name)	`thenRn_`
+		  [] -> pushSrcLocRn loc 			$
+			addErrRn (unknownNameErr rdr_name)	`thenRn_`
 	 	        returnRn fix_env
 		  ns -> foldlRn add fix_env ns
 
