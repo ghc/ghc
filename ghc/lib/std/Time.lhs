@@ -376,7 +376,7 @@ toCalendarTime (TOD (J# s# d#) psec) = do
        wday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_wday;'' tm
        yday  <-  _casm_ ``%r = ((struct tm *)%0)->tm_yday;'' tm
        isdst <-  _casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm
-       zone  <-  _ccall_ ZONE tm
+       zone  <-  _ccall_ get_ZONE tm
        tz    <-  _ccall_ GMTOFF tm
        let tzname = unpackCString zone
        return (CalendarTime (1900+year) mon mday hour min sec psec 
