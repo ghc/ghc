@@ -383,6 +383,9 @@ tcSubPat :: TcSigmaType 		-- Pattern type signature
 	 -> TcM ()
 -- In patterns we insist on an exact match; hence no CoFn returned
 -- 	See Note [Pattern coercions] in TcPat
+-- However, we can't call unify directly, because both types might be
+-- polymorphic; hence the call to tcSub, followed by a check for
+-- the identity coercion
 
 tcSubPat sig_ty (Infer hole) 
   = do { sig_ty' <- zonkTcType sig_ty

@@ -23,7 +23,7 @@ import Type		( TvSubstEnv )
 import TcType		( Type, tcTyConAppTyCon, tcIsTyVarTy,
 			  tcSplitDFunTy, tyVarsOfTypes, isExistentialTyVar
 			)
-import Unify		( matchTys, unifyTys )
+import Unify		( tcMatchTys, tcUnifyTys )
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
@@ -336,7 +336,7 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 
     find [] ms us = (ms, us)
     find (item@(tpl_tyvars, tpl, dfun_id) : rest) ms us
-      = case matchTys tpl_tyvars tpl key_tys of
+      = case tcMatchTys tpl_tyvars tpl key_tys of
 	  Just subst -> find rest ((subst,item):ms) us
 	  Nothing 
 		-- Does not match, so next check whether the things unify
@@ -347,7 +347,7 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 		      )
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
-	      case unifyTys (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
+	      case tcUnifyTys (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
 	        Just _   -> find rest ms (dfun_id:us)
 	        Nothing  -> find rest ms us
 
@@ -369,7 +369,7 @@ insert_overlapping new_item (item:items)
     old_beats_new = item `beats` new_item
 
     (_, (tvs1, tys1, _)) `beats` (_, (tvs2, tys2, _))
-	= isJust (matchTys tvs2 tys2 tys1)	-- A beats B if A is more specific than B	
+	= isJust (tcMatchTys tvs2 tys2 tys1)	-- A beats B if A is more specific than B	
 						-- I.e. if B can be instantiated to match A
 \end{code}
 

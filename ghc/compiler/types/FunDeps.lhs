@@ -16,7 +16,7 @@ module FunDeps (
 import Name		( getSrcLoc )
 import Var		( Id, TyVar )
 import Class		( Class, FunDep, classTvsFds )
-import Unify		( unifyTys, unifyTysX )
+import Unify		( tcUnifyTys, tcUnifyTysX )
 import Type		( mkTvSubst, substTy )
 import TcType		( Type, ThetaType, PredType(..), tcEqType,
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
@@ -302,10 +302,10 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- The same function is also used from InstEnv.badFunDeps, when we need
 -- to *unify*; in which case the qtvs are the variables of both ls1 and ls2.
 -- However unifying with the qtvs being the left-hand lot *is* just matching,
--- so we can call unifyTys in both cases
-  = case unifyTys qtvs ls1 ls2 of
+-- so we can call tcUnifyTys in both cases
+  = case tcUnifyTys qtvs ls1 ls2 of
 	Nothing   -> []
-	Just unif | maybeToBool (unifyTysX qtvs unif rs1 rs2)
+	Just unif | maybeToBool (tcUnifyTysX qtvs unif rs1 rs2)
 			-- Don't include any equations that already hold. 
 			-- Reason: then we know if any actual improvement has happened,
 			-- 	   in which case we need to iterate the solver

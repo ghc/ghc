@@ -556,8 +556,8 @@ reifyThing (ATcId id _ _)
 	; fix <- reifyFixity (idName id)
 	; return (TH.VarI (reifyName id) ty2 Nothing fix) }
 
-reifyThing (ATyVar tv) 
-  = do	{ ty1 <- zonkTcTyVar tv
+reifyThing (ATyVar tv ty) 
+  = do	{ ty1 <- zonkTcType ty
 	; ty2 <- reifyType ty1
 	; return (TH.TyVarI (reifyName tv) ty2) }
 

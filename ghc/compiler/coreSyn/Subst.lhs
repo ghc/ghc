@@ -40,7 +40,7 @@ import CoreUtils	( exprIsTrivial )
 
 import qualified Type	( substTy )
 import Type		( Type, tyVarsOfType, mkTyVarTy,
-			  TvSubstEnv, TvSubst(..), substTyVar )
+			  TvSubstEnv, TvSubst(..), substTyVarBndr )
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId, mustHaveLocalBinding )
@@ -431,7 +431,7 @@ simplLetId subst@(Subst in_scope env tvs) old_id
 
 	-- Extend the substitution if the unique has changed,
 	-- or there's some useful occurrence information
-	-- See the notes with substTyVar for the delSubstEnv
+	-- See the notes with substTyVarBndr for the delSubstEnv
     occ_info = occInfo old_info
     new_env | new_id /= old_id || isFragileOcc occ_info
 	    = extendVarEnv env old_id (DoneId new_id occ_info)
@@ -473,9 +473,9 @@ substRecBndrs subst bndrs
 
 \begin{code}
 subst_tv :: Subst -> TyVar -> (Subst, TyVar)
--- Unpackage and re-package for substTyVar
+-- Unpackage and re-package for substTyVarBndr
 subst_tv (Subst in_scope id_env tv_env) tv
-  = case substTyVar (TvSubst in_scope tv_env) tv of
+  = case substTyVarBndr (TvSubst in_scope tv_env) tv of
 	(TvSubst in_scope' tv_env', tv') 
 	   -> (Subst in_scope' id_env tv_env', tv')
 
@@ -510,7 +510,7 @@ subst_id keep_fragile rec_subst subst@(Subst in_scope env tvs) old_id
     new_id = maybeModifyIdInfo (substIdInfo keep_fragile rec_subst) id2
 
 	-- Extend the substitution if the unique has changed
-	-- See the notes with substTyVar for the delSubstEnv
+	-- See the notes with substTyVarBndr for the delSubstEnv
     new_env | new_id /= old_id
 	    = extendVarEnv env old_id (DoneId new_id (idOccInfo old_id))
 	    | otherwise 

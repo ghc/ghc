@@ -1,11 +1,11 @@
 \begin{code}
 module Unify ( 
 	-- Matching and unification
-	matchTys, matchTyX, tcMatchPreds, MatchEnv(..), 
+	tcMatchTys, tcMatchTyX, tcMatchPreds, MatchEnv(..), 
 
-	unifyTys, unifyTysX,
+	tcUnifyTys, tcUnifyTysX,
 
-	tcRefineTys, tcMatchTys, coreRefineTys,
+	gadtRefineTys, gadtMatchTys, coreRefineTys,
 
 	-- Re-export
 	MaybeErr(..)
@@ -13,6 +13,7 @@ module Unify (
 
 #include "HsVersions.h"
 
+import Type		( pprParendType )
 import Var		( Var, TyVar, tyVarKind )
 import VarEnv
 import VarSet
@@ -62,13 +63,13 @@ data MatchEnv
  	, me_env   :: RnEnv2	-- Renaming envt for nested foralls
 	}			--   In-scope set includes template tyvars
 
-matchTys :: TyVarSet		-- Template tyvars
+tcMatchTys :: TyVarSet		-- Template tyvars
 	 -> [Type]		-- Template
 	 -> [Type]		-- Target
 	 -> Maybe TvSubstEnv	-- One-shot; in principle the template
 				-- variables could be free in the target
 
-matchTys tmpls tys1 tys2
+tcMatchTys tmpls tys1 tys2
   = match_tys (ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope_tyvars})
 	      emptyTvSubstEnv 
 	      tys1 tys2
@@ -87,13 +88,13 @@ tcMatchPreds tmpls ps1 ps2
     menv = ME { me_tmpls = mkVarSet tmpls, me_env = mkRnEnv2 in_scope_tyvars }
     in_scope_tyvars = mkInScopeSet (tyVarsOfTheta ps1 `unionVarSet` tyVarsOfTheta ps2)
 
-matchTyX :: MatchEnv 
+tcMatchTyX :: MatchEnv 
 	 -> TvSubstEnv		-- Substitution to extend
 	 -> Type		-- Template
 	 -> Type		-- Target
 	 -> Maybe TvSubstEnv
 
-matchTyX menv subst ty1 ty2 = match menv subst ty1 ty2	-- Rename for export
+tcMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2	-- Rename for export
 \end{code}
 
 Now the internals of matching
@@ -182,51 +183,48 @@ match_pred menv subst p1 p2 = Nothing
 %************************************************************************
 
 \begin{code}
-tcRefineTys, tcMatchTys 
+gadtRefineTys, gadtMatchTys 
 	:: [TyVar]			-- Try to unify these
 	-> TvSubstEnv			-- Not idempotent
 	-> [Type] -> [Type]
    	-> MaybeErr Message TvSubstEnv	-- Not idempotent
 -- This one is used by the type checker.  Neither the input nor result
 -- substitition is idempotent
-tcRefineTys ex_tvs subst tys1 tys2
+gadtRefineTys ex_tvs subst tys1 tys2
   = initUM (tryToBind (mkVarSet ex_tvs)) (unify_tys subst tys1 tys2)
 
-tcMatchTys ex_tvs subst tys1 tys2
+gadtMatchTys ex_tvs subst tys1 tys2
   = initUM (bindOnly (mkVarSet ex_tvs)) (unify_tys subst tys1 tys2)
 
 ----------------------------
 coreRefineTys :: [TyVar]	-- Try to unify these
 	      -> TvSubst	-- A full-blown apply-once substitition
-	      -> Type		-- A fixed point of the incoming substitution
-	      -> Type
+	      -> Type		-- Both types should be a fixed point 
+	      -> Type		--   of the incoming substitution
 	      -> Maybe TvSubstEnv	-- In-scope set is unaffected
 -- Used by Core Lint and the simplifier.  Takes a full apply-once substitution.
 -- The incoming substitution's in-scope set should mention all the variables free 
 -- in the incoming types
 coreRefineTys ex_tvs subst@(TvSubst in_scope orig_env) ty1 ty2
   = maybeErrToMaybe $ initUM (tryToBind (mkVarSet ex_tvs)) $
-    do	{ 	-- Apply the input substitution; nothing int ty2
-	  let ty1' = substTy subst ty1	
-		-- Run the unifier, starting with an empty env
-	; extra_env <- unify emptyTvSubstEnv ty1' ty2
+    do	{ 	-- Run the unifier, starting with an empty env
+	; extra_env <- unify emptyTvSubstEnv ty1 ty2
 
 		-- Find the fixed point of the resulting non-idempotent
-		-- substitution, and apply it to the 
+		-- substitution, and apply it to the incoming substitution
 	; let extra_subst     = TvSubst in_scope extra_env_fixpt
 	      extra_env_fixpt = mapVarEnv (substTy extra_subst) extra_env
 	      orig_env'	      = mapVarEnv (substTy extra_subst) orig_env
 	; return (orig_env' `plusVarEnv` extra_env_fixpt) }
-    
 
 ----------------------------
-unifyTys :: TyVarSet -> [Type] -> [Type] -> Maybe TvSubstEnv
-unifyTys bind_these tys1 tys2
+tcUnifyTys :: TyVarSet -> [Type] -> [Type] -> Maybe TvSubstEnv
+tcUnifyTys bind_these tys1 tys2
   = maybeErrToMaybe $ initUM (bindOnly bind_these) $
     unify_tys emptyTvSubstEnv tys1 tys2
 
-unifyTysX :: TyVarSet -> TvSubstEnv -> [Type] -> [Type] -> Maybe TvSubstEnv
-unifyTysX bind_these subst tys1 tys2
+tcUnifyTysX :: TyVarSet -> TvSubstEnv -> [Type] -> [Type] -> Maybe TvSubstEnv
+tcUnifyTysX bind_these subst tys1 tys2
   = maybeErrToMaybe $ initUM (bindOnly bind_these) $
     unify_tys subst tys1 tys2
 
@@ -258,8 +256,10 @@ unify :: TvSubstEnv		-- An existing substitution to extend
 -- nor guarantee that the outgoing one is.  That's fixed up by
 -- the wrappers.
 
+-- Respects newtypes, PredTypes
+
 unify subst ty1 ty2 = -- pprTrace "unify" (ppr subst <+> pprParendType ty1 <+> pprParendType ty2) $
-			unify_ subst ty1 ty2
+		      unify_ subst ty1 ty2
 
 -- in unify_, any NewTcApps/Preds should be taken at face value
 unify_ subst (TyVarTy tv1) ty2  = uVar False subst tv1 ty2

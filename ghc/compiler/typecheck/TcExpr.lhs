@@ -34,8 +34,8 @@ import TcEnv		( tcLookup, tcLookupId, checkProcLevel,
 import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig, TcMatchCtxt(..) )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcPat		( badFieldCon )
-import TcMType		( tcInstTyVars, tcInstType, newTyFlexiVarTy, zonkTcType, readMetaTyVar )
+import TcPat		( badFieldCon, refineTyVars )
+import TcMType		( tcInstTyVars, tcInstType, newTyFlexiVarTy, zonkTcType )
 import TcType		( Type, TcTyVar, TcType, TcSigmaType, TcRhoType, MetaDetails(..),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkTyConApp, tyVarsOfTypes, isLinearPred,
@@ -634,7 +634,8 @@ tcApp fun args res_ty
 	    Infer _ -> do	-- Type check args first, then
 				-- refine result type, then do tcResult
 		{ the_app'       <- tcArgs fun fun' args expected_arg_tys
-		; actual_res_ty' <- refineResultTy fun_tvs actual_res_ty
+		; subst		 <- refineTyVars fun_tvs
+		; let actual_res_ty' = substTy subst actual_res_ty
 		; co_fn          <- tcResult fun args res_ty actual_res_ty'
 		; traceTc (text "tcApp: infer" <+> vcat [ppr fun <+> ppr args, ppr the_app',
 							 ppr actual_res_ty, ppr actual_res_ty'])
@@ -722,24 +723,6 @@ checkArgsCtxt fun args (Check expected_res_ty) actual_res_ty tidy_env
 	      | otherwise		    = appCtxt fun args
     in
     returnM (env2, message)
-
-----------------
-refineResultTy :: [TcTyVar] 	-- Newly instantiated meta-tyvars of the function
-	       -> TcType 	-- Result type, instantiated with those tyvars
-	       -> TcM TcType	-- Refined result type
--- De-wobblify the result type, by taking account what we learned 
--- from type-checking the arguments.  Just one level of de-wobblification
--- though.  What a hack! 
-refineResultTy tvs res_ty
-  = do	{ mb_prs <- mapM mk_pr tvs
-	; let subst = mkTopTvSubst (catMaybes mb_prs)
-	; return (substTy subst res_ty) }
-  where
-    mk_pr tv = do { details <- readMetaTyVar tv
-		  ; case details of
-			Indirect ty -> return (Just (tv,ty))
-			other	    -> return Nothing 
-		  }
 \end{code}
 
 

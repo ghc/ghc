@@ -392,7 +392,7 @@ kcTyVar name	-- Could be a tyvar or a tycon
     tcLookup name	`thenM` \ thing ->
     traceTc (text "lk2" <+> ppr name <+> ppr thing) 	`thenM_`
     case thing of 
-	ATyVar tv	    	-> returnM (tyVarKind tv)
+	ATyVar tv _	    	-> returnM (tyVarKind tv)
 	AThing kind		-> returnM kind
 	AGlobal (ATyCon tc) 	-> returnM (tyConKind tc) 
 	other			-> wrongThingErr "type" thing name
@@ -500,7 +500,7 @@ ds_var_app :: Name -> [Type] -> TcM Type
 ds_var_app name arg_tys 
  = tcLookup name			`thenM` \ thing ->
     case thing of
-	ATyVar tv 	     -> returnM (mkAppTys (mkTyVarTy tv) arg_tys)
+	ATyVar _ ty 	     -> returnM (mkAppTys ty arg_tys)
 	AGlobal (ATyCon tc)  -> returnM (mkGenTyConApp tc arg_tys)
 --	AThing _ 	     -> tcLookupTyCon name	`thenM` \ tc ->
 --			        returnM (mkGenTyConApp tc arg_tys)

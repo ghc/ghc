@@ -4,7 +4,7 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, tcPats, PatCtxt(..), badFieldCon, polyPatSig ) where
+module TcPat ( tcPat, tcPats, PatCtxt(..), badFieldCon, polyPatSig, refineTyVars ) where
 
 #include "HsVersions.h"
 
@@ -20,18 +20,20 @@ import Inst		( InstOrigin(..),
 import Id		( Id, idType, mkLocalId )
 import Name		( Name )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
-import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv,
+import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv3,
 			  tcLookupClass, tcLookupDataCon, tcLookupId )
-import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars )
+import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars, readMetaTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcTauType, zipTopTvSubst,
 			  SkolemInfo(PatSkol), isSkolemTyVar, pprSkolemTyVar, 
+			  TvSubst, mkTvSubst, substTyVar, substTy, MetaDetails(..),
 			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy )
+import VarEnv		( mkVarEnv )	-- ugly
 import Kind		( argTypeKind, liftedTypeKind )
 import TcUnify		( tcSubPat, Expected(..), zapExpectedType, 
 			  zapExpectedTo, zapToListTy, zapToTyConApp )  
 import TcHsType		( UserTypeCtxt(..), TcSigInfo( sig_tau ), TcSigFun, tcHsPatSigType )
 import TysWiredIn	( stringTy, parrTyCon, tupleTyCon )
-import Unify		( MaybeErr(..), tcRefineTys, tcMatchTys )
+import Unify		( MaybeErr(..), gadtRefineTys, gadtMatchTys )
 import Type		( substTys, substTheta )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import TyCon		( TyCon )
@@ -41,6 +43,7 @@ import PrelNames	( eqStringName, eqName, geName, negateName, minusName,
 			  integralClassName )
 import BasicTypes	( isBoxed )
 import SrcLoc		( Located(..), SrcSpan, noLoc, unLoc, getLoc )
+import Maybes		( catMaybes )
 import ErrUtils		( Message )
 import Outputable
 import FastString
@@ -241,8 +244,13 @@ tc_pat ctxt (SigPatIn pat sig) pat_ty thing_inside
   = do	{ 	-- See Note [Pattern coercions] below
 	  (sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
  	; tcSubPat sig_ty pat_ty
-	; (pat', tvs, res) <- tcExtendTyVarEnv sig_tvs $
-			      tc_lpat ctxt pat (Check sig_ty) thing_inside
+	; subst <- refineTyVars sig_tvs	-- See note [Type matching]
+	; let tv_binds = [(tv, substTyVar subst  tv) | tv <- sig_tvs]
+	      sig_ty'  = substTy subst sig_ty
+	; (pat', tvs, res) 
+	      <- tcExtendTyVarEnv3 tv_binds $
+		 tc_lpat ctxt pat (Check sig_ty') thing_inside
+
 	; return (SigPatOut pat' sig_ty, tvs, res) }
 
 tc_pat ctxt pat@(TypePat ty) pat_ty thing_inside
@@ -492,8 +500,8 @@ refineAlt :: PatCtxt -> DataCon
 	    -> TcM a -> TcM a
 refineAlt ctxt con ex_tvs ctxt_tys pat_tys thing_inside 
   = do	{ old_subst <- getTypeRefinement
-	; let refiner | can_i_refine ctxt = tcRefineTys
-		      | otherwise         = tcMatchTys
+	; let refiner | can_i_refine ctxt = gadtRefineTys
+		      | otherwise         = gadtMatchTys
 	; case refiner ex_tvs old_subst pat_tys ctxt_tys of
 		Failed msg -> failWithTc (inaccessibleAlt msg)
 		Succeeded new_subst -> do {
@@ -503,6 +511,41 @@ refineAlt ctxt con ex_tvs ctxt_tys pat_tys thing_inside
   where
     can_i_refine (LamPat can_refine) = can_refine
     can_i_refine other_ctxt 	     = False
+\end{code}
+
+Note [Type matching]
+~~~~~~~~~~~~~~~~~~~~
+This little function @refineTyVars@ is a little tricky.  Suppose we have a pattern type
+signature
+	f = \(x :: Term a) -> body
+Then 'a' should be bound to a wobbly type.  But if we have
+	f :: Term b -> some-type
+	f = \(x :: Term a) -> body
+then 'a' should be bound to the rigid type 'b'.  So we want to
+	* instantiate the type sig with fresh meta tyvars (e.g. \alpha)
+	* unify with the type coming from the context
+	* read out whatever information has been gleaned
+		from that unificaiton (e.g. unifying \alpha with 'b')
+	* and replace \alpha by 'b' in the type, when typechecking the
+		pattern inside the type sig (x in this case)
+It amounts to combining rigid info from the context and from the sig.
+
+Exactly the same thing happens for 'smart function application'.
+
+\begin{code}
+refineTyVars :: [TcTyVar] 	-- Newly instantiated meta-tyvars of the function
+	     -> TcM TvSubst	-- Substitution mapping any of the meta-tyvars that
+				-- has been unifies to what it was instantiated to
+-- Just one level of de-wobblification though.  What a hack! 
+refineTyVars tvs
+  = do	{ mb_prs <- mapM mk_pr tvs
+	; return (mkTvSubst (mkVarEnv (catMaybes mb_prs))) }
+  where
+    mk_pr tv = do { details <- readMetaTyVar tv
+		  ; case details of
+			Indirect ty -> return (Just (tv,ty))
+			other	    -> return Nothing 
+		  }
 \end{code}
 
 %************************************************************************

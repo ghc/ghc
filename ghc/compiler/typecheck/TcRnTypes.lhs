@@ -48,7 +48,7 @@ import HscTypes		( FixityEnv,
 			  GenAvailInfo(..), AvailInfo,
 			  availName, IsBootInterface, Deprecations )
 import Packages		( PackageId )
-import Type		( Type, TvSubstEnv )
+import Type		( Type, TvSubstEnv, pprParendType )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes )
 import InstEnv		( DFunId, InstEnv )
@@ -386,15 +386,22 @@ topArrowCtxt = ArrCtxt { proc_level = topProcLevel, proc_banned = [] }
 
 data TcTyThing
   = AGlobal TyThing			-- Used only in the return type of a lookup
+
   | ATcId   TcId ThLevel ProcLevel 	-- Ids defined in this module; may not be fully zonked
-  | ATyVar  TyVar 			-- Type variables
+
+  | ATyVar  TyVar TcType		-- Type variables; tv -> type.  It can't just be a TyVar
+					-- that is mutated to point to the type it is bound to,
+					-- because that would make it a wobbly type, and we
+					-- want pattern-bound lexically-scoped type variables to
+					-- be able to stand for rigid types
+
   | AThing  TcKind 			-- Used temporarily, during kind checking, for the
 					--	tycons and clases in this recursive group
 
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = text "AGlobal" <+> ppr g
    ppr (ATcId g tl pl)  = text "ATcId" <+> ppr g <+> ppr tl <+> ppr pl
-   ppr (ATyVar t)       = text "ATyVar" <+> ppr t
+   ppr (ATyVar tv ty)   = text "ATyVar" <+> ppr tv <+> pprParendType ty
    ppr (AThing k)       = text "AThing" <+> ppr k
 \end{code}
 

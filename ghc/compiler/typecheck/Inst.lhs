@@ -67,7 +67,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar,
 		  pprPred, pprParendType, pprThetaArrow, pprTheta, pprClassPred
 		)
 import Type	( substTy, substTys, substTyWith, substTheta, zipTopTvSubst )
-import Unify	( matchTys )
+import Unify	( tcMatchTys )
 import Kind	( isSubKind )
 import Packages	( isHomeModule )
 import HscTypes	( ExternalPackageState(..) )
@@ -583,7 +583,7 @@ addInst dflags home_ie dfun
 	; let { tys' = substTys tenv tys
 	      ; (matches, _) = lookupInstEnv dflags (pkg_ie, home_ie) cls tys'
 	      ;	dup_dfuns = [dup_dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
-			  		isJust (matchTys (mkVarSet tvs) tys' dup_tys)] }
+			  		isJust (tcMatchTys (mkVarSet tvs) tys' dup_tys)] }
 		-- Find memebers of the match list which 
 		-- dfun itself matches. If the match is 2-way, it's a duplicate
 	; case dup_dfuns of

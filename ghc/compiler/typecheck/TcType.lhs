@@ -97,7 +97,7 @@ module TcType (
   mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
   getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
   extendTvSubst, extendTvSubstList, isInScope,
-  substTy, substTys, substTyWith, substTheta, substTyVar, 
+  substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
 
   isUnLiftedType,	-- Source types are always lifted
   isUnboxedTupleType,	-- Ditto
@@ -149,7 +149,7 @@ import Type		(	-- Re-exports
 			  mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
 			  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
 			  extendTvSubst, extendTvSubstList, isInScope,
-		  	  substTy, substTys, substTyWith, substTheta, substTyVar, 
+		  	  substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
 
 			  typeKind, repType,
 			  pprKind, pprParendKind,

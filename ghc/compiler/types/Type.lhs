@@ -70,7 +70,7 @@ module Type (
 	extendTvSubst, extendTvSubstList, isInScope,
 
 	-- Performing substitution on types
-	substTy, substTys, substTyWith, substTheta, substTyVar, 
+	substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
 	deShadowTy,
 
 	-- Pretty-printing
@@ -994,7 +994,7 @@ instance Ord PredType where { compare = tcCmpPred }
 \begin{code}
 data TvSubst 		
   = TvSubst InScopeSet 	-- The in-scope type variables
-	    TvSubstEnv	-- The substitution itself; guaranteed idempotent
+	    TvSubstEnv	-- The substitution itself
 			-- See Note [Apply Once]
 
 {- ----------------------------------------------------------
@@ -1138,13 +1138,10 @@ substPred subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
 
 -- Note that the in_scope set is poked only if we hit a forall
 -- so it may often never be fully computed 
-subst_ty subst@(TvSubst in_scope env) ty
+subst_ty subst ty
    = go ty
   where
-    go ty@(TyVarTy tv)   	   = case (lookupVarEnv env tv) of
-	       				Nothing  -> ty
-       					Just ty' -> ty'	-- See Note [Apply Once]
-					
+    go (TyVarTy tv)   		   = substTyVar subst tv
     go (TyConApp tc tys)	   = let args = map go tys
 				     in  args `seqList` TyConApp tc args
 
@@ -1158,11 +1155,17 @@ subst_ty subst@(TvSubst in_scope env) ty
 		-- The mkAppTy smart constructor is important
 		-- we might be replacing (a Int), represented with App
 		-- by [Int], represented with TyConApp
-    go (ForAllTy tv ty)		   = case substTyVar subst tv of
+    go (ForAllTy tv ty)		   = case substTyVarBndr subst tv of
 					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
 
-substTyVar :: TvSubst -> TyVar -> (TvSubst, TyVar)	
-substTyVar subst@(TvSubst in_scope env) old_var
+substTyVar :: TvSubst -> TyVar  -> Type
+substTyVar (TvSubst in_scope env) tv
+  = case (lookupVarEnv env tv) of
+	Nothing  -> TyVarTy tv
+       	Just ty' -> ty'	-- See Note [Apply Once]
+
+substTyVarBndr :: TvSubst -> TyVar -> (TvSubst, TyVar)	
+substTyVarBndr subst@(TvSubst in_scope env) old_var
   | old_var == new_var	-- No need to clone
 			-- But we *must* zap any current substitution for the variable.
 			--  For example:

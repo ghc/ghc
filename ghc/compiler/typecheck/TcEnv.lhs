@@ -17,7 +17,7 @@ module TcEnv(
 	
 	-- Local environment
 	tcExtendKindEnv,
-	tcExtendTyVarEnv, tcExtendTyVarEnv2, 
+	tcExtendTyVarEnv, tcExtendTyVarEnv2, tcExtendTyVarEnv3, 
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds,
 	tcLookupId, tcLookupTyVar,
@@ -49,9 +49,9 @@ import HsSyn		( LRuleDecl, LHsBinds, LSig, pprLHsBinds )
 import TcIface		( tcImportDecl )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
-import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, 
+import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType,
 			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
-			  getDFunTyKey, tcTyConAppTyCon, 
+			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
 			  tidyOpenType, tidyOpenTyVar, pprTyThingCategory
 			)
 import qualified Type	( getTyVar_maybe )
@@ -197,12 +197,12 @@ tcLookup name
 	Nothing    -> tcLookupGlobal name `thenM` \ thing ->
 		      returnM (AGlobal thing)
 
-tcLookupTyVar :: Name -> TcM Id
+tcLookupTyVar :: Name -> TcM TcTyVar
 tcLookupTyVar name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATyVar tv -> returnM tv
-	other	  -> pprPanic "tcLookupTyVar" (ppr name)
+	ATyVar _ ty -> returnM (tcGetTyVar "tcLookupTyVar" ty)
+	other	    -> pprPanic "tcLookupTyVar" (ppr name)
 
 tcLookupId :: Name -> TcM Id
 -- Used when we aren't interested in the binding level
@@ -248,22 +248,25 @@ tcExtendKindEnv things thing_inside
 
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
-  = tc_extend_tv_env [(getName tv, ATyVar tv) | tv <- tvs] tvs thing_inside
+  = tc_extend_tv_env [ATyVar tv (mkTyVarTy tv) | tv <- tvs] thing_inside
 
 tcExtendTyVarEnv2 :: [(TyVar,TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 tv_pairs thing_inside
-  = tc_extend_tv_env [(getName tv1, ATyVar tv2) | (tv1,tv2) <- tv_pairs]
-		     [tv | (_,tv) <- tv_pairs]
-		     thing_inside
+  = tc_extend_tv_env [ATyVar tv1 (mkTyVarTy tv2) | (tv1,tv2) <- tv_pairs] thing_inside
 
-tc_extend_tv_env binds tyvars thing_inside
+tcExtendTyVarEnv3 :: [(TyVar,TcType)] -> TcM r -> TcM r
+tcExtendTyVarEnv3 ty_pairs thing_inside
+  = tc_extend_tv_env [ATyVar tv1 ty2 | (tv1,ty2) <- ty_pairs] thing_inside
+
+tc_extend_tv_env binds thing_inside
   = getLclEnv	   `thenM` \ env@(TcLclEnv {tcl_env = le, 
 					    tcl_tyvars = gtvs, 
 					    tcl_rdr = rdr_env}) ->
     let
- 	le'        = extendNameEnvList le binds
-	rdr_env'   = extendLocalRdrEnv rdr_env (map fst binds)
-	new_tv_set = mkVarSet tyvars
+	names      = [getName tv | ATyVar tv _ <- binds]
+	rdr_env'   = extendLocalRdrEnv rdr_env names
+ 	le'        = extendNameEnvList le (names `zip` binds)
+	new_tv_set = tyVarsOfTypes [ty | ATyVar _ ty <- binds]
     in
 	-- It's important to add the in-scope tyvars to the global tyvar set
 	-- as well.  Consider
@@ -343,8 +346,8 @@ find_thing ignore_it tidy_env (ATcId id _ _)
     in
     returnM (tidy_env', Just msg)
 
-find_thing ignore_it tidy_env (ATyVar tv)
-  = zonkTcTyVar tv		`thenM` \ tv_ty ->
+find_thing ignore_it tidy_env (ATyVar tv ty)
+  = zonkTcType ty		`thenM` \ tv_ty ->
     if ignore_it tv_ty then
 	returnM (tidy_env, Nothing)
     else let
@@ -606,6 +609,6 @@ wrongThingErr expected thing name
 		ptext SLIT("used as a") <+> text expected)
   where
     pp_thing (AGlobal thing) = pprTyThingCategory thing
-    pp_thing (ATyVar _)      = ptext SLIT("Type variable")
+    pp_thing (ATyVar _ _)    = ptext SLIT("Type variable")
     pp_thing (ATcId _ _ _)   = ptext SLIT("Local identifier")
 \end{code}
