@@ -283,11 +283,8 @@ join, as you feel is appropriate.
 <ListItem>
 <Para>
 This list is for GHC users to chat among themselves.  Subscribe by
-sending mail to <ULink
-URL="mailto:majordomo@haskell.org"
->majordomo@haskell.org</ULink
->, with a message body (not
-header) like this:
+sending mail to <email>majordomo@haskell.org</email>, with a message
+body (not header) like this:
 </Para>
 
 <Para>
@@ -303,21 +300,15 @@ subscribe glasgow-haskell-users MyName &#60;m.y.self@bigbucks.com&#62;
 </Para>
 
 <Para>
-To communicate with your fellow users, send mail to <ULink
-URL="mailto:glasgow-haskell-users@haskell.org"
->glasgow-haskell-users@haskell.org</ULink
->.
+To communicate with your fellow users, send mail to <email>glasgow-haskell-users@haskell.org</email>.
 </Para>
 
 <Para>
-To contact the list administrator, send mail to <ULink
-URL="mailto:glasgow-haskell-users-request@haskell.org"
->glasgow-haskell-users-request@haskell.org</ULink
->.  An archive
-of the list is available on the Web: <ULink
-URL="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-users"
->glasgow-haskell-users mailing list archive</ULink
->.
+To contact the list administrator, send mail to
+<email>owner-glasgow-haskell-users@haskell.org</email>.  An archive
+of the list is available on the Web at the <ULink
+URL="http://www.mail-archive.com/glasgow-haskell-users@haskell.org">glasgow-haskell-users
+mailing list archive</ULink>.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -331,10 +322,7 @@ might do about it.
 </Para>
 
 <Para>
-Subscribe via <ULink
-URL="mailto:majordomo@haskell.org"
->majordomo@haskell.org</ULink
-> with:
+Subscribe via <email>majordomo@haskell.org</email> with:
 </Para>
 
 <Para>
@@ -346,13 +334,10 @@ subscribe glasgow-haskell-bugs My Name &#60;m.y.self@hackers.r.us&#62;
 </Para>
 
 <Para>
-Again, you may contact the list administrator at <ULink
-URL="mailto:glasgow-haskell-bugs-request@haskell.org"
->glasgow-haskell-bugs-request@haskell.org</ULink
->.
-And, yes, an archive of the list is available on the Web at: : <ULink
-URL="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs"
->glasgow-haskell-bugs mailing list archive</ULink
+Again, you may contact the list administrator at <email>owner-glasgow-haskell-bugs@haskell.org</email>.
+And, yes, an archive of the list is available on the Web at the <ULink
+URL="http://www.mail-archive.com/glasgow-haskell-bugs@haskell.org">
+glasgow-haskell-bugs mailing list archive</ULink
 >
 </Para>
 </ListItem>
@@ -362,16 +347,13 @@ URL="http://www.dcs.gla.ac.uk/mail-www/glasgow-haskell-bugs"
 
 <Para>
 There is also the general Haskell mailing list.  Subscribe by sending
-email to <ULink
-URL="mailto:majordomo@dcs.gla.ac.uk"
->majordomo@dcs.gla.ac.uk</ULink
->, with the usual message body:
+email to <email>majordomo@haskell.org</email>, with the usual message body:
 </Para>
 
 <Para>
 
 <Screen>
-subscribe haskell My Name &#60;m.y.self@@fp.rules.ok.org&#62;
+subscribe haskell My Name &#60;m.y.self@fp.rules.ok.org&#62;
 </Screen>
 
 </Para>
@@ -380,15 +362,6 @@ subscribe haskell My Name &#60;m.y.self@@fp.rules.ok.org&#62;
 Some Haskell-related discussion takes place in the Usenet newsgroup
 <Literal>comp.lang.functional</Literal>.  (But note: news is basically dead at Glasgow.
 That's one reason Glaswegians aren't too active in c.f.l.)
-</Para>
-
-<Para>
-The main anonymous-FTP site for Glasgow Haskell is <ULink
-URL="ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow"
->ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow</ULink
->.  ``Important''
-bits are mirrored at other Haskell archive sites (and we have their
-stuff, too).
 </Para>
 
 </Sect1>
