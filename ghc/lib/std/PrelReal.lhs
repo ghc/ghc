@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.12 2001/03/28 22:14:02 qrczak Exp $
+% $Id: PrelReal.lhs,v 1.13 2001/03/29 08:03:47 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -360,10 +360,10 @@ integralEnumFromThen n1 n2
     i_n1 = toInteger n1
     i_n2 = toInteger n2
 
-integralEnumFromTo :: (Integral a, Bounded a) => a -> a -> [a]
+integralEnumFromTo :: Integral a => a -> a -> [a]
 integralEnumFromTo n m = map fromInteger [toInteger n .. toInteger m]
 
-integralEnumFromThenTo :: (Integral a, Bounded a) => a -> a -> a -> [a]
+integralEnumFromThenTo :: Integral a => a -> a -> a -> [a]
 integralEnumFromThenTo n1 n2 m
   = map fromInteger [toInteger n1, toInteger n2 .. toInteger m]
 \end{code}
