@@ -3324,7 +3324,7 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
                 // symbol, so we don't have to allocate too many
                 // jump islands.
             struct symtab_command *symLC = (struct symtab_command *) lc;
-            int min = symLC->nsyms, max = 0;
+            unsigned min = symLC->nsyms, max = 0;
             struct nlist *nlist =
                 symLC ? (struct nlist*) ((char*) oc->image + symLC->symoff)
                       : NULL;
@@ -3355,7 +3355,7 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
     return ocAllocateJumpIslands(oc,0,0);
 }
 
-static int ocVerifyImage_MachO(ObjectCode* oc)
+static int ocVerifyImage_MachO(ObjectCode* oc STG_UNUSED)
 {
     // FIXME: do some verifying here
     return 1;
@@ -3398,7 +3398,7 @@ static int resolveImports(
     return 1;
 }
 
-static char* relocateAddress(
+static unsigned long relocateAddress(
     ObjectCode* oc,
     int nSections,
     struct section* sections,
@@ -3410,12 +3410,13 @@ static char* relocateAddress(
         if(sections[i].addr <= address
             && address < sections[i].addr + sections[i].size)
         {
-            return oc->image + sections[i].offset + address - sections[i].addr;
+            return (unsigned long)oc->image
+                    + sections[i].offset + address - sections[i].addr;
         }
     }
     barf("Invalid Mach-O file:"
          "Address out of bounds while relocating object file");
-    return NULL;
+    return 0;
 }
 
 static int relocateSection(
@@ -3551,7 +3552,9 @@ static int relocateSection(
 	    {
 		unsigned long word = 0;
                 unsigned long jumpIsland = 0;
-                long offsetToJumpIsland;
+                long offsetToJumpIsland = 0xBADBAD42; // initialise to bad value
+                                                      // to avoid warning and to catch
+                                                      // bugs.
 
 		unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
 		checkProddableBlock(oc,wordPtr);
@@ -3595,7 +3598,7 @@ static int relocateSection(
 		{
 		    struct nlist *symbol = &nlist[reloc->r_symbolnum];
 		    char *nm = image + symLC->stroff + symbol->n_un.n_strx;
-		    unsigned long symbolAddress = (unsigned long) (lookupSymbol(nm));
+		    void *symbolAddress = lookupSymbol(nm);
 		    if(!symbolAddress)
 		    {
 			errorBelch("\nunknown symbol `%s'", nm);
@@ -3607,7 +3610,7 @@ static int relocateSection(
                             // In the .o file, this should be a relative jump to NULL
                             // and we'll change it to a jump to a relative jump to the symbol
                         ASSERT(-word == reloc->r_address);
-                        word = symbolAddress;
+                        word = (unsigned long) symbolAddress;
                         jumpIsland = makeJumpIsland(oc,reloc->r_symbolnum,word);
 			word -= ((long)image) + sect->offset + reloc->r_address;
                         if(jumpIsland != 0)
@@ -3618,7 +3621,7 @@ static int relocateSection(
                     }
                     else
                     {
-                        word += symbolAddress;
+                        word += (unsigned long) symbolAddress;
                     }
 		}
 
@@ -3676,7 +3679,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
     struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
-    unsigned i,curSymbol;
+    unsigned i,curSymbol = 0;
     struct segment_command *segLC = NULL;
     struct section *sections;
     struct symtab_command *symLC = NULL;
@@ -3758,7 +3761,6 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
     if(symLC)
     {
-        curSymbol = 0;
         for(i=0;i<symLC->nsyms;i++)
         {
             if(nlist[i].n_type & N_STAB)
