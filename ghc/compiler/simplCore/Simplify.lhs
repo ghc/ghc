@@ -930,7 +930,7 @@ simplNonRec env binder@(id,occ_info) rhs body_c body_ty
     simpl_bind env rhs | try_let_to_case &&
 			 will_be_demanded &&
 		         (rhs_is_bot ||
-			  not rhs_is_whnf &&
+			  not rhs_is_whnf &&	-- Don't do it if RHS is a constr applicn 
 		          singleConstructorType rhs_ty
 				-- Only do let-to-case for single constructor types. 
 				-- For other types we defer doing it until the tidy-up phase at
