@@ -300,6 +300,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-minimal-imports</option></entry>
+	      <entry>Dump a minimal set of imports</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>--show-iface</option> <replaceable>file</replaceable></entry>
 	      <entry>Read the interface in
 	      <replaceable>file</replaceable> and dump it as text to
