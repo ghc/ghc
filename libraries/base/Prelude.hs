@@ -9,7 +9,9 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Standard module imported by default into Haskell modules.
+-- The Prelude: a standard module imported by default into all Haskell
+-- modules.  For more documentation, see the Haskell 98 Report
+-- <http://www.haskell.org/onlinereport/>.
 --
 -----------------------------------------------------------------------------
 
