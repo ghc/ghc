@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.4 2000/12/19 16:48:58 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.5 2001/02/06 12:01:00 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -50,5 +50,14 @@
 #define bci_CASEFAIL  23
 #define bci_ENTER     24
 #define bci_RETURN    25
+#define bci_STKCHECK  26
+
+
+/* If a BCO definitely requires less than this many words of stack,
+   don't include an explicit STKCHECK insn in it.  The interpreter
+   will check for this many words of stack before running each BCO,
+   rendering an explicit check unnecessary in the majority of
+   cases. */
+#define INTERP_STACK_CHECK_THRESH  50
 
 /*-------------------------------------------------------------------------*/
