@@ -437,14 +437,15 @@ setsockopt IPTOS_THROUGHPUT: Invalid argument
           the <literal>fpconfig</literal> bit.</para>
 <screen>
     $ cd <replaceable>directory</replaceable>
-    $ cvs checkout ghc hslibs
+    $ cvs checkout ghc hslibs libraries
 </screen>
 
 	  <para>The second command here checks out the relevant
           modules you want to work on. For a GHC build, for instance,
-          you need at least the <literal>ghc</literal> and
-          <literal>hslibs</literal> modules (for a full list of the
-          projects available, see <xref linkend="projects">).</para>
+          you need at least the <literal>ghc</literal>,
+          <literal>hslibs</literal> and <literal>libraries</literal>
+          modules (for a full list of the projects available, see
+          <xref linkend="projects">).</para>
 	</listitem>
       </itemizedlist>
     </sect2>
@@ -3263,8 +3264,8 @@ $ make way=p
           corresponding Haskell source (<filename>.hs</filename> or
           <filename>.lhs</filename>) in the compiler subdirectory
           <filename>ghc/compiler</filename> and in the libraries
-          (<filename>ghc/lib</filename>, and subdirectories of
-          <filename>hslibs</filename>).</para>
+          (subdirectories of <filename>hslibs</filename> and
+          <literal>libraries</literal>).</para>
 	</listitem>
 
 	<listitem>
