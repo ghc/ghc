@@ -89,7 +89,7 @@ sub init_TARGET_STUFF {
     $T_MOVE_DIRVS   = '^((\s+\.(IMPORT|EXPORT|PARAM).*|\s+\.align\s+\d+|\s+\.(SPACE|SUBSPA)\s+\S+|\s*)\n)';
     $T_COPY_DIRVS   = '^\s+\.(IMPORT|EXPORT)';
 
-    $T_hsc_cc_PAT   = '\.STRING.*\)(hsc|cc) (.*)\\\\x09(.*)\\\\x00';
+    $T_hsc_cc_PAT   = '\.STRING.*\)(hsc|cc) (.*)\\\\x09(.*)\\\\x00"';
     $T_DOT_WORD	    = '\.word';
     $T_DOT_GLOBAL   = '^\s+\.EXPORT';
     $T_HDR_literal  = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$LIT\$\n";
@@ -892,6 +892,25 @@ sub mangle_asm {
 		$consist =~ s/\//./g;
 		$consist =~ s/-/_/g;
 		$consist =~ s/[^A-Za-z0-9_.]/ZZ/g; # ToDo: properly?
+		#
+		# Using a cygnus-2.7-96q4 gcc build on hppas, the 
+		# consistency chunk for ghc_cc_ID often (but not always!)
+		# gets lumped with a bunch of .IMPORT directives containing info on
+		# the code or data space nature of external symbols. We can't
+		# toss these, so once the consistency ID has been turned into
+		# a representable symbol, we substitute it for the symbol
+		# that the string was attached to in the first place (ghc_cc_ID.)
+		# (The original string is also substituted away.)
+		#
+		# This change may affect the code output on other platforms in
+		# adverse ways, hence we restrict this hack hppa targets only.
+		#
+		#    -- 2/98 SOF
+		if ( $TargetPlatform =~ /^hppa/ )  {
+			$chk[$i] =~ s/^$TUS[@]?ghc.*c_ID$TPOSTLBL/$consist/o;
+			$chk[$i] =~ s/\t$T_hsc_cc_PAT/$T_HDR_misc/o;
+			$consist = $chk[$i]; #clumsily
+                }
 		print OUTASM $T_HDR_consist, "${consist}${T_POST_LBL}\n";
 
 	    } elsif ( $TargetPlatform !~ /^(mips)-/ ) { # we just don't try in those case (ToDo)
