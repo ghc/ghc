@@ -4,6 +4,7 @@
 \section[Posix]{Haskell 1.3 POSIX bindings}
 
 \begin{code}
+{-# OPTIONS -#include "../std/cbits/stgio.h" #-}
 module Posix  (
     module PosixDB,
     module PosixErr,

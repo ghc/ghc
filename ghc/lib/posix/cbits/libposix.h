@@ -70,8 +70,8 @@ int	copyenv	    (void);
 int	_setenv	    (char *);
 int	delenv	    (char *);
 int	execvpe	    (char *, char **, char **);
-void    stg_sigaddset(sigset_t *newset, sigset_t *oldset, int signum);
-void    stg_sigdelset(sigset_t *newset, sigset_t *oldset, int signum);
+void    stg_sigaddset(StgByteArray newset, StgByteArray oldset, int signum);
+void    stg_sigdelset(StgByteArray newset, StgByteArray oldset, int signum);
 
 #define LIBPOSIX_H
 #endif

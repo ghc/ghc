@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Proftimer.c,v 1.3 1999/02/05 16:02:48 simonm Exp $
+ * $Id: Proftimer.c,v 1.4 1999/08/04 17:03:41 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,9 +52,13 @@ startProfTimer(void)
   }
 };
 
+/* For a small collection of signal handler prototypes, see
+   http://web2.airmail.net/sjbaker1/software/signal_collection.html */
+
 void
-handleProfTick(void)
+handleProfTick(int unused)
 {
+  (void)unused;   /* no warnings, please */
   CCS_TICK(CCCS);
   total_ticks++;
 };

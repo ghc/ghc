@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Proftimer.h,v 1.2 1998/12/02 13:28:37 simonm Exp $
+ * $Id: Proftimer.h,v 1.3 1999/08/04 17:03:41 panne Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -10,5 +10,5 @@
 extern void initProfTimer(nat ms);
 extern void stopProfTimer(void);
 extern void startProfTimer(void);
-extern void handleProfTick(void);
+extern void handleProfTick(int unused);
 
