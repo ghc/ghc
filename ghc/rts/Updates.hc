@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.10 1999/03/18 17:57:24 simonm Exp $
+ * $Id: Updates.hc,v 1.11 1999/03/22 11:26:03 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -640,7 +640,7 @@ FN_(raisezh_fast)
 	break;
 
       case STOP_FRAME:
-	barf("raisezh_fast: STOP_FRAME");
+	barf("uncaught exception");
 
       default:
 	barf("raisezh_fast: weird activation record");
