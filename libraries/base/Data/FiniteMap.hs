@@ -74,6 +74,8 @@ module Data.FiniteMap (
 	IF_NOT_GHC(intersectFM_C COMMA)
 	IF_NOT_GHC(mapFM COMMA filterFM COMMA)
 
+	foldFM_GE, fmToList_GE, keysFM_GE, eltsFM_GE
+
 #ifdef COMPILING_GHC
 	, bagToFM
 #endif
@@ -428,6 +430,33 @@ fmToList fm = foldFM (\ key elt rest -> (key,elt) : rest) [] fm
 keysFM fm   = foldFM (\ key elt rest -> key : rest)       [] fm
 eltsFM fm   = foldFM (\ key elt rest -> elt : rest)       [] fm
 
+
+-- ---------------------------------------------------------------------------
+-- Bulk operations on all keys >= a certain threshold
+
+-- | Fold through all elements greater than or equal to the supplied key,
+-- in increasing order.
+foldFM_GE       :: Ord key => (key -> elt -> a -> a) -> a -> key ->
+   FiniteMap key elt -> a
+
+foldFM_GE k z fr EmptyFM = z
+foldFM_GE k z fr (Branch key elt _ fm_l fm_r)
+  | key >= fr = foldFM_GE k (k key elt (foldFM_GE k z fr fm_r)) fr fm_l
+  | otherwise = foldFM_GE k z fr fm_r
+
+-- | List elements greater than or equal to the supplied key, in increasing
+-- order
+fmToList_GE      :: Ord key => FiniteMap key elt -> key ->  [(key,elt)]
+fmToList_GE fm fr = foldFM_GE (\ key elt rest -> (key,elt) : rest) [] fr fm
+
+-- | List keys greater than or equal to the supplied key, in increasing order
+keysFM_GE       :: Ord key => FiniteMap key elt -> key -> [key]
+keysFM_GE fm fr  = foldFM_GE (\ key elt rest -> key : rest)       [] fr fm
+
+-- | List elements corresponding to keys greater than or equal to the supplied
+-- key, in increasing order of key.
+eltsFM_GE       :: Ord key => FiniteMap key elt -> key -> [elt]
+eltsFM_GE fm fr  = foldFM_GE (\ key elt rest -> elt : rest)       [] fr fm
 
 -- ---------------------------------------------------------------------------
 -- The implementation of balancing
