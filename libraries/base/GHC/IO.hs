@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: IO.hs,v 1.5 2002/02/11 12:28:31 simonmar Exp $
+-- $Id: IO.hs,v 1.6 2002/03/18 14:03:20 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -308,7 +308,7 @@ lazyReadHaveBuffer h handle_ fd ref buf = do
 
 
 unpackAcc :: RawBuffer -> Int -> Int -> [Char] -> IO [Char]
-unpackAcc buf r 0 acc  = return ""
+unpackAcc buf r 0 acc  = return acc
 unpackAcc buf (I# r) (I# len) acc = IO $ \s -> unpack acc (len -# 1#) s
    where
     unpack acc i s
