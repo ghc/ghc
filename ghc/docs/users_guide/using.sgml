@@ -1673,15 +1673,16 @@ construction of interface files, is (allegedly) in the works.
   "4.08",
   Package
        {
-        import_dirs    =  ["/usr/local/lib/imports/mypkg"],
-	library_dirs   =  ["/usr/local/lib"],
-	libraries      =  ["HSmypkg", "HSmypkg_cbits"],
-	include_dirs   =  [],
-	c_includes     =  ["HsMyPkg.h"],
-	package_deps   =  ["text", "data"],
-	extra_ghc_opts =  [],
-	extra_cc_opts  =  [],
-	extra_ld_opts  =  ["-lmy_clib"]
+        import_dirs     =  ["/usr/local/lib/imports/mypkg"],
+	library_dirs    =  ["/usr/local/lib"],
+	hs_libraries    =  ["HSmypkg" ],
+	extra_libraries =  ["HSmypkg_cbits"],
+	include_dirs    =  [],
+	c_includes      =  ["HsMyPkg.h"],
+	package_deps    =  ["text", "data"],
+	extra_ghc_opts  =  [],
+	extra_cc_opts   =  [],
+	extra_ld_opts   =  ["-lmy_clib"]
        }
  )
 </screen>
@@ -1717,14 +1718,42 @@ construction of interface files, is (allegedly) in the works.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>libraries</literal></term>
-	  <indexterm><primary><literal>libraries</literal></primary>
+	  <term><literal>hs_libraries</literal></term>
+	  <indexterm><primary><literal>hs_libraries</literal></primary>
 	    <secondary>package specification</secondary></indexterm>
 	  <listitem>
-	    <para>A list of libraries for this package, with the
-	    <literal>.a</literal> or <literal>.dll</literal> suffix
-	    omitted.  On Unix, the <literal>lib</literal> prefix is
-	    also omitted.</para>
+	    <para>A list of libraries containing Haskell code for this
+	    package, with the <literal>.a</literal> or
+	    <literal>.dll</literal> suffix omitted.  On Unix, the
+	    <literal>lib</literal> prefix is also omitted.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>extra_libraries</literal></term>
+	  <indexterm><primary><literal>extra_libraries</literal></primary>
+	    <secondary>package specification</secondary></indexterm>
+	  <listitem>
+	    <para>A list of extra libraries for this package.  The
+	    difference between <literal>hs_libraries</literal> and
+	    <literal>extra_libraries</literal> is that
+	    <literal>hs_libraries</literal> normally have several
+	    versions, to support profiling, parallel and other build
+	    options.  The various versions are given different
+	    suffixes to distinguish them, for example the profiling
+	    version of the standard prelude library is named
+	    <filename>libHSstd_p.a</filename>, with the
+	    <literal>_p</literal> indicating that this is a profiling
+	    version.  The suffix is added automatically by GHC for
+	    <literal>hs_libraries</literal> only, no suffix is added
+	    for libraries in
+	    <literal>extra_libraries</literal>.</para>
+
+	    <para>Also, <literal>extra_libraries</literal> are placed
+	    on the linker command line before the
+	    <literal>hs_libraries</literal> for the same package.  If
+	    your package has dependencies in the other direction, you
+	    might need to make two separate packages.</para>
 	  </listitem>
 	</varlistentry>
 
