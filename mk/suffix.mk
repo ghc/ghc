@@ -31,8 +31,8 @@ endif
 # Haskell Suffix Rules
 
 HASKELL_SPLIT_PRE= \
- $(RM) $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@) ; else exit 0; fi; \
- find $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food;
+ $(RM) $@ ; if [ ! -d $(basename $@) ]; then mkdir $(basename $@); else \
+ find $(basename $@) -name '*.$(way_)o' -print | xargs $(RM) __rm_food ; fi
 HASKELL_SPLIT_POST= touch $@
 HASKELL_PRE_COMPILE=$(patsubst %,$(HASKELL_SPLIT_PRE),$(filter -split-objs,$(HC_OPTS)))
 HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(HC_OPTS)))
@@ -150,10 +150,11 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 %.hs : %.runtest
 	$(TIME) $(RUNTEST) $(HC) $(RUNTEST_FLAGS) -o2 $*.stderr $<
 
-
 #-----------------------------------------------------------------------------
 # Doc processing suffix rules
-
+#
+# ToDo: make these more robust
+#
 %.dvi : %.tex
 	@$(RM) $@
 	$(LTX) $<
