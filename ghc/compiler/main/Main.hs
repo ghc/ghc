@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.73 2001/06/18 08:56:09 simonpj Exp $
+-- $Id: Main.hs,v 1.74 2001/06/18 21:45:49 sof Exp $
 --
 -- GHC Driver program
 --
@@ -59,17 +59,22 @@ import Directory	( doesFileExist )
 import IOExts		( readIORef, writeIORef )
 import Exception	( throwDyn, Exception(DynException) )
 import System		( getArgs, exitWith, ExitCode(..) )
-
-#ifndef mingw32_TARGET_OS
-import Concurrent	( myThreadId )
-import Exception	( throwTo )
-import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
-import Dynamic		( toDyn )
-#endif
-
 import Monad
 import List
 import Maybe
+
+#ifndef mingw32_TARGET_OS
+import Concurrent	( myThreadId )
+#ifdef __GLASGOW_HASKELL__ < 500
+import Exception        ( raiseInThread )
+#define throwTo  raiseInThread
+#else
+import Exception	( throwTo )
+#endif
+
+import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
+import Dynamic		( toDyn )
+#endif
 
 
 -----------------------------------------------------------------------------
