@@ -363,7 +363,7 @@ STGFUN(ErrorIO_innards)
 
     *SpA = (P_) WorldStateToken_closure;
 
-    STKO_LINK(StkOReg) = Prelude_Z91Z93_closure;
+    STKO_LINK(StkOReg) = PrelBase_Z91Z93_closure;
     STKO_RETURN(StkOReg) = NULL;
 
 #ifdef TICKY_TICKY
@@ -604,14 +604,15 @@ STGFUN(startCcRegisteringWorld)
     JMP_(_regMain);
     FE_
 }
-
-CC_DECLARE(CC_CAFs,  "CAFs_in_...",  "PRELUDE", "PRELUDE", CC_IS_CAF,/*not static*/);
-CC_DECLARE(CC_DICTs, "DICTs_in_...", "PRELUDE", "PRELUDE", CC_IS_DICT,/*not static*/);
+/* SOF: Prelude supplies these for you
+CC_DECLARE(CC_CAFs,  "CAFs_in_...",  "PRELUDE", "PRELUDE", CC_IS_CAF,*not static*);
+CC_DECLARE(CC_DICTs, "DICTs_in_...", "PRELUDE", "PRELUDE", CC_IS_DICT,*not static*);
 
 START_REGISTER_PRELUDE(_regPrelude);
 REGISTER_CC(CC_CAFs);
 REGISTER_CC(CC_DICTs);
 END_REGISTER_CCS()
+*/
 \end{code}
 
 We also need cost centre declarations and registering routines for other
