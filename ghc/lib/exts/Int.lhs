@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1997-1998
+% (c) The AQUA Project, Glasgow University, 1997-1999
 %
 
 \section[Int]{Module @Int@}
@@ -15,17 +15,41 @@ module Int
 	, Int16
 	, Int32
 	, Int64
+
+        , int8ToInt16   -- :: Int8  -> Int16
+        , int8ToInt32   -- :: Int8  -> Int32
+        , int8ToInt64   -- :: Int8  -> Int64
+
+        , int16ToInt8   -- :: Int16 -> Int8
+        , int16ToInt32  -- :: Int16 -> Int32
+        , int16ToInt64  -- :: Int16 -> Int64
+
+        , int32ToInt8   -- :: Int32 -> Int8
+        , int32ToInt16  -- :: Int32 -> Int16
+        , int32ToInt64  -- :: Int32 -> Int64
+
+        , int64ToInt8   -- :: Int64 -> Int8
+        , int64ToInt16  -- :: Int64 -> Int16
+        , int64ToInt32  -- :: Int64 -> Int32
+
 	, int8ToInt  -- :: Int8  -> Int
-	, intToInt8  -- :: Int   -> Int8
 	, int16ToInt -- :: Int16 -> Int
-	, intToInt16 -- :: Int   -> Int16
 	, int32ToInt -- :: Int32 -> Int
+	, int64ToInt -- :: Int32 -> Int
+
+	, intToInt8  -- :: Int   -> Int8
+	, intToInt16 -- :: Int   -> Int16
 	, intToInt32 -- :: Int   -> Int32
+	, intToInt64 -- :: Int   -> Int32
 
-	, intToInt64 -- :: Int   -> Int64
-	, int64ToInt -- :: Int64 -> Int
-
+        , integerToInt8  -- :: Integer -> Int8
+        , integerToInt16 -- :: Integer -> Int16
+        , integerToInt32 -- :: Integer -> Int32
         , integerToInt64 -- :: Integer -> Int64
+
+        , int8ToInteger  -- :: Int8    -> Integer
+        , int16ToInteger -- :: Int16   -> Integer
+        , int32ToInteger -- :: Int32   -> Integer
         , int64ToInteger -- :: Int64   -> Integer
 
 	-- plus Eq, Ord, Num, Bounded, Real, Integral, Ix, Enum, Read,
@@ -96,25 +120,30 @@ import Word    ( Word32 )
 -----------------------------------------------------------------------------
 
 int8ToInt  :: Int8  -> Int
-intToInt8  :: Int   -> Int8
 int16ToInt :: Int16 -> Int
-intToInt16 :: Int   -> Int16
 int32ToInt :: Int32 -> Int
-intToInt32 :: Int   -> Int32
 
--- And some non-exported ones
+intToInt8  :: Int   -> Int8
+intToInt16 :: Int   -> Int16
+intToInt32 :: Int   -> Int32
 
 int8ToInt16  :: Int8  -> Int16
 int8ToInt32  :: Int8  -> Int32
+
 int16ToInt8  :: Int16 -> Int8
 int16ToInt32 :: Int16 -> Int32
+
 int32ToInt8  :: Int32 -> Int8
 int32ToInt16 :: Int32 -> Int16
 
 int8ToInt16  (I8#  x) = I16# x
 int8ToInt32  (I8#  x) = I32# x
+int8ToInt64	      = int32ToInt64 . int8ToInt32
+
 int16ToInt8  (I16# x) = I8#  x
 int16ToInt32 (I16# x) = I32# x
+int16ToInt64	      = int32ToInt64 . int16ToInt32
+
 int32ToInt8  (I32# x) = I8#  x
 int32ToInt16 (I32# x) = I16# x
 
@@ -189,10 +218,10 @@ instance Integral Int8 where
 
     quot x@(I8# _) y@(I8# y#)
        | y# /=# 0# = x `quotInt8` y
-       | otherwise = error "Integral.Int8.quot: divide by 0\n"
+       | otherwise = divZeroError "quot{Int8}" x
     rem x@(I8# _) y@(I8# y#)
        | y# /=# 0#  = x `remInt8` y
-       | otherwise  = error "Integral.Int8.rem: divide by 0\n"
+       | otherwise  = divZeroError "rem{Int8}" x
     mod x y
        | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
        | otherwise = r
@@ -215,17 +244,26 @@ instance Ix Int8 where
 
 instance Enum Int8 where
     succ i
-      | i == maxBound = error ("Enum{Int8}.succ: tried to take `succ' of " ++ show i)
+      | i == maxBound = succError "Int8"
       | otherwise     = i+1
     pred i
-      | i == minBound = error ("Enum{Int8}.pred: tried to take `pred' of " ++ show i)
-      | otherwise     = i+1
+      | i == minBound = predError "Int8"
+      | otherwise     = i-1
 
-    toEnum         = intToInt8
-    fromEnum       = int8ToInt
-    enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Int8)]
-    enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Int8)]
-			  where last = if d < c then minBound else maxBound
+    toEnum x
+      | x >= toInt (minBound::Int8) && x <= toInt (maxBound::Int8) 
+      = intToInt8 x
+      | otherwise
+      = toEnumError "Int8" x (minBound::Int8,maxBound::Int8)
+
+    fromEnum           = int8ToInt
+    enumFrom e1        = map toEnum [fromEnum e1 .. fromEnum (maxBound::Int8)]
+    enumFromThen e1 e2 = 
+             map toEnum [fromEnum e1, fromEnum e2 .. fromEnum (last::Int8)]
+		where 
+		   last 
+		     | e2 < e1   = minBound
+		     | otherwise = maxBound
 
 instance Read Int8 where
     readsPrec p s = [ (intToInt8 x,r) | (x,r) <- readsPrec p s ]
@@ -330,10 +368,10 @@ instance Integral Int16 where
 
     quot x@(I16# _) y@(I16# y#)
        | y# /=# 0#      = x `quotInt16` y
-       | otherwise      = error "Integral.Int16.quot: divide by 0\n"
+       | otherwise      = divZeroError "quot{Int16}" x
     rem x@(I16# _) y@(I16# y#)
        | y# /=# 0#      = x `remInt16` y
-       | otherwise      = error "Integral.Int16.rem: divide by 0\n"
+       | otherwise      = divZeroError "rem{Int16}" x
     mod x y
        | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
        | otherwise			  = r
@@ -356,17 +394,26 @@ instance Ix Int16 where
 
 instance Enum Int16 where
     succ i
-      | i == maxBound = error ("Enum{Int16}.succ: tried to take `succ' of " ++ show i)
-      | otherwise     = i+1
-    pred i
-      | i == minBound = error ("Enum{Int16}.pred: tried to take `pred' of " ++ show i)
+      | i == maxBound = succError "Int16"
       | otherwise     = i+1
 
-    toEnum           = intToInt16
+    pred i
+      | i == minBound = predError "Int16"
+      | otherwise     = i-1
+
+    toEnum x
+      | x >= toInt (minBound::Int16) && x <= toInt (maxBound::Int16) 
+      = intToInt16 x
+      | otherwise
+      = toEnumError "Int16" x (minBound::Int16, maxBound::Int16)
+
     fromEnum         = int16ToInt
-    enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Int16)]
-    enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Int16)]
-			  where last = if d < c then minBound else maxBound
+
+    enumFrom e1        = map toEnum [fromEnum e1 .. fromEnum (maxBound::Int16)]
+    enumFromThen e1 e2 = map toEnum [fromEnum e1, fromEnum e2 .. fromEnum (last::Int16)]
+			  where last 
+			          | e2 < e1   = minBound
+				  | otherwise = maxBound
 
 instance Read Int16 where
     readsPrec p s = [ (intToInt16 x,r) | (x,r) <- readsPrec p s ]
@@ -464,11 +511,9 @@ instance Num Int32 where
                 = case (integer2Int# a# s# d#) of { i# -> I32# (intToInt32# i#) }
   fromInt       = intToInt32
 
--- ToDo: remove LitLit when minBound::Int is fixed (currently it's one
--- too high, and doesn't allow the correct minBound to be defined here).
 instance Bounded Int32 where 
-    minBound = case ``0x80000000'' of { I# x -> I32# x }
-    maxBound = I32# 0x7fffffff#
+    minBound = fromInt minBound
+    maxBound = fromInt maxBound
 
 instance Real Int32 where
     toRational x = toInteger x % 1
@@ -480,10 +525,10 @@ instance Integral Int32 where
        | otherwise      = quotInt32 x y
     quot x@(I32# _) y@(I32# y#)
        | y# /=# 0#  = x `quotInt32` y
-       | otherwise  = error "Integral.Int32.quot: divide by 0\n"
+       | otherwise  = divZeroError "quot{Int32}" x
     rem x@(I32# _) y@(I32# y#)
        | y# /=# 0#  = x `remInt32` y
-       | otherwise  = error "Integral.Int32.rem: divide by 0\n"
+       | otherwise  = divZeroError "rem{Int32}" x
     mod x y
        | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
        | otherwise			  = r
@@ -506,17 +551,29 @@ instance Ix Int32 where
 
 instance Enum Int32 where
     succ i
-      | i == maxBound = error ("Enum{Int32}.succ: tried to take `succ' of " ++ show i)
-      | otherwise     = i+1
-    pred i
-      | i == minBound = error ("Enum{Int32}.pred: tried to take `pred' of " ++ show i)
+      | i == maxBound = succError "Int32"
       | otherwise     = i+1
 
-    toEnum         = intToInt32
-    fromEnum       = int32ToInt
-    enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Int32)]
-    enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Int32)]
-			  where last = if d < c then minBound else maxBound
+    pred i
+      | i == minBound = predError "Int32"
+      | otherwise     = i-1
+
+    toEnum x
+        -- with Int having the same range as Int32, the following test
+	-- shouldn't fail. However, having it here 
+      | x >= toInt (minBound::Int32) && x <= toInt (maxBound::Int32) 
+      = intToInt32 x
+      | otherwise
+      = toEnumError "Int32" x (minBound::Int32, maxBound::Int32)
+
+    fromEnum           = int32ToInt
+
+    enumFrom e1        = map toEnum [fromEnum e1 .. fromEnum (maxBound::Int32)]
+    enumFromThen e1 e2 = map toEnum [fromEnum e1, fromEnum e2 .. fromEnum (last::Int32)]
+			  where 
+			    last
+			     | e2 < e1   = minBound
+			     | otherwise = maxBound
 
 instance Read Int32 where
     readsPrec p s = [ (intToInt32 x,r) | (x,r) <- readsPrec p s ]
@@ -602,9 +659,6 @@ instance Bounded Int64 where
   minBound = integerToInt64 (-0x8000000000000000)
   maxBound = integerToInt64 0x7fffffffffffffff
 
-instance Real Int64 where
-  toRational x = toInteger x % 1
-
 instance Integral Int64 where
     div x y
       | x > 0 && y < 0	= quotInt64 (x-y-1) y
@@ -613,11 +667,11 @@ instance Integral Int64 where
 
     quot x@(I64# _) y@(I64# y#)
        | y# /=# 0# = x `quotInt64` y
-       | otherwise = error "Integral.Int64.quot: divide by 0\n"
+       | otherwise = divZeroError "quot{Int64}" x
 
     rem x@(I64# _) y@(I64# y#)
        | y# /=# 0# = x `remInt64` y
-       | otherwise = error "Integral.Int32.rem: divide by 0\n"
+       | otherwise = divZeroError "rem{Int64}" x
 
     mod x y
        | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
@@ -627,27 +681,6 @@ instance Integral Int64 where
     a@(I64# _) `quotRem` b@(I64# _) = (a `quotInt64` b, a `remInt64` b)
     toInteger (I64# i#) = toInteger (I# i#)
     toInt     (I64# i#) = I# i#
-
-instance Enum Int64 where
-    succ i
-      | i == maxBound = error ("Enum{Int64}.succ: tried to take `succ' of " ++ show i)
-      | otherwise     = i+1
-    pred i
-      | i == minBound = error ("Enum{Int64}.pred: tried to take `pred' of " ++ show i)
-      | otherwise     = i+1
-
-    toEnum    (I# i)   = I64# i#
-    fromEnum  (I64# i) = I64# i#
-    enumFrom c         = map toEnum [fromEnum c .. fromEnum (maxBound::Int64)] -- a long list!
-    enumFromThen c d   = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Int64)]
-		       where last = if d < c then minBound else maxBound
-
-
-instance Read Int64 where
-    readsPrec p s = [ (intToInt64 x,r) | (x,r) <- readsPrec p s ]
-
-instance Show Int64 where
-    showsPrec p i64 = showsPrec p (int64ToInt i64)
 
 instance Bits Int64 where
   (I64# x) .&. (I64# y)   = I64# (word2Int# ((int2Word# x) `and#` (int2Word# y)))
@@ -717,12 +750,6 @@ int64ToInteger (I64# x#) =
 integerToInt64 :: Integer -> Int64
 integerToInt64 (J# a# s# d#) = I64# (integerToInt64# a# s# d#)
 
-instance Show Int64 where
-  showsPrec p x = showsPrec p (int64ToInteger x)
-
-instance Read Int64 where
-  readsPrec _ s = [ (integerToInt64 x,r) | (x,r) <- readDec s ]
-
 instance Eq  Int64     where 
   (I64# x) == (I64# y) = x `eqInt64#` y
   (I64# x) /= (I64# y) = x `neInt64#` y
@@ -758,9 +785,6 @@ instance Bounded Int64 where
   minBound = integerToInt64 (-0x8000000000000000)
   maxBound = integerToInt64 0x7fffffffffffffff
 
-instance Real Int64 where
-  toRational x = toInteger x % 1
-
 instance Integral Int64 where
     div x y
       | x > 0 && y < 0	= quotInt64 (x-y-1) y
@@ -769,11 +793,11 @@ instance Integral Int64 where
 
     quot x@(I64# _) y@(I64# y#)
        | y# `neInt64#` (intToInt64# 0#) = x `quotInt64` y
-       | otherwise = error "Integral.Int64.quot: divide by 0\n"
+       | otherwise = divZeroError "quot{Int64}" x
 
     rem x@(I64# _) y@(I64# y#)
        | y# `neInt64#` (intToInt64# 0#) = x `remInt64` y
-       | otherwise = error "Integral.Int32.rem: divide by 0\n"
+       | otherwise = divZeroError "rem{Int64}" x
 
     mod x y
        | x > 0 && y < 0 || x < 0 && y > 0 = if r/=0 then r+y else 0
@@ -783,25 +807,6 @@ instance Integral Int64 where
     a@(I64# _) `quotRem` b@(I64# _) = (a `quotInt64` b, a `remInt64` b)
     toInteger i         = int64ToInteger i
     toInt     i         = int64ToInt i
-
-instance Enum Int64 where
-    succ i
-      | i == maxBound = error ("Enum{Int64}.succ: tried to take `succ' of " ++ show i)
-      | otherwise     = i+1
-    pred i
-      | i == minBound = error ("Enum{Int64}.pred: tried to take `pred' of " ++ show i)
-      | otherwise     = i+1
-
-    toEnum    (I# i)   = I64# (intToInt64# i)
-    fromEnum  (I64# w) = I# (int64ToInt# w)
-    enumFrom i              = eft64 i 1
-    enumFromTo   i1 i2      = eftt64 i1 1 (> i2)
-    enumFromThen i1 i2      = eftt64 i1 (i2 - i1) (>last)
-        where 
-	 last
-	  | i1 < i2   = maxBound::Int64
-	  | otherwise = minBound
-
 
 instance Bits Int64 where
   (I64# x) .&. (I64# y)   = I64# (word64ToInt64# ((int64ToWord64# x) `and64#` (int64ToWord64# y)))
@@ -842,23 +847,6 @@ intToInt64 (I# i#) = I64# (intToInt64# i#)
 
 int64ToInt :: Int64 -> Int
 int64ToInt (I64# i#) = I# (int64ToInt# i#)
-
--- Enum Int64 helper funs:
-
-eftt64 :: Int64 -> Int64 -> (Int64->Bool) -> [Int64]
-eftt64 init step done = go init
-  where
-   go now
-     | done now  = []
-     | otherwise = now : go (now+step)
-
-eft64 :: Int64 -> Int64 -> [Int64]
-eft64 now step = go now
-  where 
-   go x
-    | x == maxBound = [x]
-    | otherwise     = x:go (x+step)
-
 
 -- Word64# primop wrappers:
 
@@ -1006,6 +994,44 @@ intToInt64# i# =
 
 #endif
 
+--
+-- Code that's independent of Int64 rep.
+-- 
+instance Enum Int64 where
+    succ i
+      | i == maxBound = succError "Int64"
+      | otherwise     = i+1
+
+    pred i
+      | i == minBound = predError "Int64"
+      | otherwise     = i-1
+
+    toEnum    i = intToInt64 i
+    fromEnum  x
+      | x >= intToInt64 (minBound::Int) && x <= intToInt64 (maxBound::Int)
+      = int64ToInt x
+      | otherwise
+      = fromEnumError "Int64" x
+
+    enumFrom e1        = map integerToInt64 [int64ToInteger e1 .. int64ToInteger (maxBound::Int64)]
+    enumFromTo e1 e2   = map integerToInt64 [int64ToInteger e1 .. int64ToInteger e2]
+    enumFromThen e1 e2 = map integerToInt64 [int64ToInteger e1, int64ToInteger e2 .. int64ToInteger last]
+		       where 
+			  last :: Int64
+		          last 
+			   | e2 < e1   = minBound
+			   | otherwise = maxBound
+
+    enumFromThenTo e1 e2 e3 = map integerToInt64 [int64ToInteger e1, int64ToInteger e2 .. int64ToInteger e3]
+
+
+instance Show Int64 where
+    showsPrec p i64 = showsPrec p (int64ToInteger i64)
+
+instance Read Int64 where
+  readsPrec _ s = [ (integerToInt64 x,r) | (x,r) <- readDec s ]
+
+
 instance Ix Int64 where
     range (m,n)          = [m..n]
     index b@(m,_) i
@@ -1013,9 +1039,37 @@ instance Ix Int64 where
 	   | otherwise   = indexError i b "Int64"
     inRange (m,n) i      = m <= i && i <= n
 
+instance Real Int64 where
+  toRational x = toInteger x % 1
+
 
 sizeofInt64 :: Word32
 sizeofInt64 = 8
+
+int8ToInteger :: Int8 -> Integer
+int8ToInteger i = toInteger i
+
+int16ToInteger :: Int16 -> Integer
+int16ToInteger i = toInteger i
+
+int32ToInteger :: Int32 -> Integer
+int32ToInteger i = toInteger i
+
+int64ToInt8 :: Int64 -> Int8
+int64ToInt8 = int32ToInt8 . int64ToInt32
+
+int64ToInt16 :: Int64 -> Int16
+int64ToInt16 = int32ToInt16 . int64ToInt32
+
+integerToInt8 :: Integer -> Int8
+integerToInt8 = fromInteger
+
+integerToInt16 :: Integer -> Int16
+integerToInt16 = fromInteger
+
+integerToInt32 :: Integer -> Int32
+integerToInt32 = fromInteger
+
 \end{code}
 
 %
@@ -1202,5 +1256,31 @@ indexError i rng tp
 	   showString " out of range " $
 	   showParen True (showsPrec 0 rng) "")
 
+
+toEnumError :: (Show a,Show b) => String -> a -> (b,b) -> c
+toEnumError inst_ty tag bnds
+  = error ("Enum.toEnum{" ++ inst_ty ++ "}: tag " ++
+           (showParen True (showsPrec 0 tag) $
+	     " is outside of bounds " ++
+	     show bnds))
+
+fromEnumError :: (Show a,Show b) => String -> a -> b
+fromEnumError inst_ty tag
+  = error ("Enum.fromEnum{" ++ inst_ty ++ "}: value " ++
+           (showParen True (showsPrec 0 tag) $
+	     " is outside of Int's bounds " ++
+	     show (minBound::Int,maxBound::Int)))
+
+succError :: String -> a
+succError inst_ty
+  = error ("Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of maxBound")
+
+predError :: String -> a
+predError inst_ty
+  = error ("Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound")
+
+divZeroError :: (Show a) => String -> a -> b
+divZeroError meth v 
+  = error ("Integral." ++ meth ++ ": divide by 0 (" ++ show v ++ " / 0)")
 
 \end{code}
