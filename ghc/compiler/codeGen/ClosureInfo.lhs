@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.33 1999/01/26 16:16:33 simonm Exp $
+% $Id: ClosureInfo.lhs,v 1.34 1999/03/04 17:52:08 simonm Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -434,13 +434,19 @@ chooseDynSMRep lf_info tot_wds ptr_wds
 getStaticClosureType :: LambdaFormInfo -> ClosureType
 getStaticClosureType lf_info =
     case lf_info of
-        LFCon con True       -> CONSTR_NOCAF
-	LFCon con False      -> CONSTR
-  	LFReEntrant _ _ _ _  -> FUN
-	LFTuple _ _	     -> CONSTR
+        LFCon con True        -> CONSTR_NOCAF
+	LFCon con False       -> CONSTR
+  	LFReEntrant _ _ _ _   -> FUN
+	LFTuple _ _	      -> CONSTR
 	LFThunk _ _ _ _ (SelectorThunk _) -> THUNK_SELECTOR
-	LFThunk _ _ _ _ _    -> THUNK
-	_                    -> panic "getClosureType"
+	LFThunk _ _ _ True _  -> THUNK
+	LFThunk _ _ _ False _ -> FUN
+	_                     -> panic "getClosureType"
+
+-- we *do* get non-updatable top-level thunks sometimes.  eg. f = g
+-- gets compiled to a jump to g (if g has non-zero arity), instead of
+-- messing around with update frames and PAPs.  We set the closure type
+-- to FUN_STATIC in this case.
 
 getClosureType :: Int -> Int -> Int -> LambdaFormInfo -> ClosureType
 getClosureType tot_wds ptrs nptrs lf_info =
