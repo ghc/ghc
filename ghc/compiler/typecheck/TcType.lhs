@@ -16,6 +16,10 @@ is the principal client.
 \begin{code}
 module TcType (
   --------------------------------
+  -- TyThing
+  TyThing(..),	-- instance NamedThing
+
+  --------------------------------
   -- Types 
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType, 
   TcTyVar, TcTyVarSet, TcKind, 
@@ -131,9 +135,10 @@ import Type		(	-- Re-exports
 			  hasMoreBoxityInfo, liftedBoxity,
 			  superBoxity, typeKind, superKind, repType
 			)
+import DataCon		( DataCon )
 import TyCon		( TyCon, isUnLiftedTyCon )
 import Class		( classHasFDs, Class )
-import Var		( TyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
+import Var		( TyVar, Id, tyVarKind, isMutTyVar, mutTyVarDetails )
 import ForeignCall	( Safety, playSafe )
 import VarEnv
 import VarSet
@@ -151,6 +156,26 @@ import SrcLoc		( SrcLoc )
 import Util		( cmpList, thenCmp, equalLength, snocView )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
+\end{code}
+
+
+%************************************************************************
+%*									*
+			TyThing
+%*									*
+%************************************************************************
+
+\begin{code}
+data TyThing = AnId     Id
+	     | ADataCon DataCon
+	     | ATyCon   TyCon
+	     | AClass   Class
+
+instance NamedThing TyThing where
+  getName (AnId id)     = getName id
+  getName (ATyCon tc)   = getName tc
+  getName (AClass cl)   = getName cl
+  getName (ADataCon dc) = getName dc
 \end{code}
 
 

@@ -21,7 +21,7 @@ import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlinePragma,
-			  isDataConId, isGlobalId, idArity,
+			  isDataConWorkId, isGlobalId, idArity,
 #ifdef OLD_STRICTNESS
 			  idDemandInfo,  idStrictness, idCprInfo, idName,
 #endif
@@ -761,7 +761,7 @@ dmdTransform :: SigEnv		-- The strictness environment
 dmdTransform sigs var dmd
 
 ------ 	DATA CONSTRUCTOR
-  | isDataConId var		-- Data constructor
+  | isDataConWorkId var		-- Data constructor
   = let 
 	StrictSig dmd_ty    = idNewStrictness var	-- It must have a strictness sig
 	DmdType _ _ con_res = dmd_ty

@@ -298,7 +298,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       | fun `hasKey` augmentIdKey = augmentSize
       | otherwise 
       = case globalIdDetails fun of
-	  DataConId dc -> conSizeN dc (valArgCount args)
+	  DataConWorkId dc -> conSizeN dc (valArgCount args)
 
 	  FCallId fc   -> sizeN opt_UF_DearOp
 	  PrimOpId op  -> primOpSize op (valArgCount args)

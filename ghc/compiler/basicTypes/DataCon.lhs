@@ -13,7 +13,9 @@ module DataCon (
 	dataConRepArgTys, dataConTheta, 
 	dataConFieldLabels, dataConStrictMarks,
 	dataConSourceArity, dataConRepArity,
-	dataConNumInstArgs, dataConWorkId, dataConWrapId, dataConRepStrictness,
+	dataConNumInstArgs, 
+	dataConWorkId, dataConWrapId, dataConWrapId_maybe,
+	dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
 	isExistentialDataCon, classDataCon, dataConExistentialTyVars,
 
@@ -40,27 +42,79 @@ import BasicTypes	( Arity, StrictnessMark(..) )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
-import Maybe
+import Maybes		( orElse )
 import ListSetOps	( assoc )
 import Util		( zipEqual, zipWithEqual, equalLength, notNull )
 \end{code}
 
 
-Stuff about data constructors
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Every constructor, C, comes with a
+Data constructor representation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following Haskell data type declaration
 
-  *wrapper*, called C, whose type is exactly what it looks like
-	in the source program. It is an ordinary function,
-	and it gets a top-level binding like any other function
+	data T = T !Int ![Int]
 
-  *worker*, called $wC, which is the actual data constructor.
-	Its type may be different to C, because:
+Using the strictness annotations, GHC will represent this as
+
+	data T = T Int# [Int]
+
+That is, the Int has been unboxed.  Furthermore, the Haskell source construction
+
+	T e1 e2
+
+is translated to
+
+	case e1 of { I# x -> 
+	case e2 of { r ->
+	T x r }}
+
+That is, the first argument is unboxed, and the second is evaluated.  Finally,
+pattern matching is translated too:
+
+	case e of { T a b -> ... }
+
+becomes
+
+	case e of { T a' b -> let a = I# a' in ... }
+
+To keep ourselves sane, we name the different versions of the data constructor
+differently, as follows.
+
+
+Note [Data Constructor Naming]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each data constructor C has two, and possibly three, Names associated with it:
+
+			     OccName	Name space	Used for
+  ---------------------------------------------------------------------------
+  * The "source data con" 	C	DataName	The DataCon itself
+  * The "real data con"		C	VarName		Its worker Id
+  * The "wrapper data con"	$wC	VarName		Wrapper Id (optional)
+
+Each of these three has a distinct Unique.  The "source data con" name
+appears in the output of the renamer, and names the Haskell-source
+data constructor.  The type checker translates it into either the wrapper Id
+(if it exists) or worker Id (otherwise).
+
+The data con has one or two Ids associated with it:
+
+  The "worker Id", is the actual data constructor.
+	Its type may be different to the Haskell source constructor
+	because:
 		- useless dict args are dropped
 		- strict args may be flattened
-	It does not have a binding.
+	The worker is very like a primop, in that it has no binding.
 
-  The worker is very like a primop, in that it has no binding,
+	Newtypes currently do get a worker-Id, but it is never used.
+
+
+  The "wrapper Id", $wC, whose type is exactly what it looks like
+	in the source program. It is an ordinary function,
+	and it gets a top-level binding like any other function.
+
+	The wrapper Id isn't generated for a data type if the worker
+	and wrapper are identical.  It's always generated for a newtype.
+
 
 
 A note about the stupid context
@@ -109,7 +163,8 @@ in an expression or in a pattern.
 data DataCon
   = MkData {			-- Used for data constructors only;
 				-- there *is* no constructor for a newtype
-	dcName   :: Name,
+	dcName    :: Name,	
+
 	dcUnique :: Unique, 		-- Cached from Name
 	dcTag    :: ConTag,
 
@@ -155,7 +210,7 @@ data DataCon
 		-- "Stupid", because the dictionaries aren't used for anything.  
 		-- 
 		-- Indeed, [as of March 02] they are no 
-		-- longer in the type of the dataConWrapId, because
+		-- longer in the type of the dcWrapId, because
 		-- that makes it harder to use the wrap-id to rebuild
 		-- values after record selection or in generics.
 
@@ -194,8 +249,11 @@ data DataCon
 
 	dcWorkId :: Id,		-- The corresponding worker Id
 				-- Takes dcRepArgTys as its arguments
+				-- Perhaps this should be a 'Maybe'; not reqd for newtype constructors
 
-	dcWrapId :: Id		-- The wrapper Id
+	dcWrapId :: Maybe Id	-- The wrapper Id, if it's necessary
+				-- It's deemed unnecessary if it performs the 
+				-- identity function
   }
 
 type ConTag = Int
@@ -260,25 +318,24 @@ instance Show DataCon where
 %************************************************************************
 
 \begin{code}
-mkDataCon :: Name
+mkDataCon :: Name 
 	  -> [StrictnessMark] -> [FieldLabel]
 	  -> [TyVar] -> ThetaType
 	  -> [TyVar] -> ThetaType
 	  -> [Type] -> TyCon
-	  -> Id -> Id
+	  -> Id -> Maybe Id	-- Worker and possible wrapper
 	  -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name arg_stricts fields
+mkDataCon name 
+	  arg_stricts 	-- Use [] to mean 'all non-strict'
+	  fields
 	  tyvars theta ex_tyvars ex_theta orig_arg_tys tycon
 	  work_id wrap_id
-  = ASSERT(equalLength arg_stricts orig_arg_tys)
-	-- The 'stricts' passed to mkDataCon are simply those for the
-	-- source-language arguments.  We add extra ones for the
-	-- dictionary arguments right here.
-    con
+  = con
   where
-    con = MkData {dcName = name, dcUnique = nameUnique name,
+    con = MkData {dcName = name, 
+		  dcUnique = nameUnique name,
 	  	  dcTyVars = tyvars, dcStupidTheta = theta,
 		  dcOrigArgTys = orig_arg_tys,
 		  dcRepArgTys = rep_arg_tys,
@@ -290,10 +347,15 @@ mkDataCon name arg_stricts fields
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
 	-- but  *including existential dictionaries*
+	-- 
+	-- The 'arg_stricts' passed to mkDataCon are simply those for the
+	-- source-language arguments.  We add extra ones for the
+	-- dictionary arguments right here.
     ex_dict_tys  = mkPredTys ex_theta
-    real_stricts = (map mk_dict_strict_mark ex_dict_tys) ++
-		   zipWithEqual "mkDataCon1" (chooseBoxingStrategy tycon) 
-				orig_arg_tys arg_stricts 
+    real_stricts = map mk_dict_strict_mark ex_dict_tys ++
+		   zipWith (chooseBoxingStrategy tycon) 
+			   orig_arg_tys 
+			   (arg_stricts ++ repeat NotMarkedStrict)
     real_arg_tys = ex_dict_tys ++ orig_arg_tys
 
 	-- Representation arguments and demands
@@ -326,8 +388,14 @@ dataConRepType = dcRepType
 dataConWorkId :: DataCon -> Id
 dataConWorkId = dcWorkId
 
+dataConWrapId_maybe :: DataCon -> Maybe Id
+dataConWrapId_maybe = dcWrapId
+
 dataConWrapId :: DataCon -> Id
-dataConWrapId = dcWrapId
+-- Returns an Id which looks like the Haskell-source constructor
+-- If there is no dcWrapId it's because there is no need for a 
+-- wrapper, so the worker is the Right Thing
+dataConWrapId dc = dcWrapId dc `orElse` dcWorkId dc
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields

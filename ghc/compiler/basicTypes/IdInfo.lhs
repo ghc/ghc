@@ -235,7 +235,7 @@ data GlobalIdDetails
   = VanillaGlobal		-- Imported from elsewhere, a default method Id.
 
   | RecordSelId FieldLabel	-- The Id for a record selector
-  | DataConId DataCon		-- The Id for a data constructor *worker*
+  | DataConWorkId DataCon	-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
 				-- [the only reasons we need to know is so that
 				--  a) we can  suppress printing a definition in the interface file
@@ -252,7 +252,7 @@ notGlobalId = NotGlobalId
 instance Outputable GlobalIdDetails where
     ppr NotGlobalId       = ptext SLIT("[***NotGlobalId***]")
     ppr VanillaGlobal     = ptext SLIT("[GlobalId]")
-    ppr (DataConId _)     = ptext SLIT("[DataCon]")
+    ppr (DataConWorkId _) = ptext SLIT("[DataCon]")
     ppr (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
     ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
     ppr (FCallId _)       = ptext SLIT("[ForeignCall]")

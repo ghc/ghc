@@ -17,7 +17,7 @@ import HsSyn		( TyClDecl(..),
 			)
 import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
-import HscTypes		( implicitTyThingIds )
+import HscTypes		( implicitTyThings )
 
 import TcRnMonad
 import TcEnv		( TcTyThing(..), TyThing(..), TyThingDetails(..),
@@ -61,22 +61,19 @@ The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
 tcTyAndClassDecls :: [RenamedTyClDecl]
-		  -> TcM [TyThing]	-- Returns newly defined things:
-					-- types, classes and implicit Ids
+		  -> TcM TcGblEnv	-- Returns extended environment
 
 tcTyAndClassDecls decls
   = tcGroups (stronglyConnComp edges)
   where
     edges = map mkEdges (filter isTypeOrClassDecl decls)
 
-tcGroups []
-  = returnM []
+tcGroups [] = getGblEnv
 
 tcGroups (group:groups)
-  = tcGroup group	`thenM` \ (env, new_things1) ->
+  = tcGroup group	`thenM` \ env ->
     setGblEnv env	$
-    tcGroups groups	`thenM` \ new_things2 ->
-    returnM (new_things1 ++ new_things2)
+    tcGroups groups
 \end{code}
 
 Dealing with a group
@@ -124,8 +121,8 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 
 \begin{code}
 tcGroup :: SCC RenamedTyClDecl 
-	-> TcM (TcGblEnv, 	-- Input env extended by types and classes only
-		[TyThing])	-- Things defined by this group
+	-> TcM TcGblEnv 	-- Input env extended by types and classes 
+				-- and their implicit Ids,DataCons
 					
 tcGroup scc
   = 	-- Step 1
@@ -169,23 +166,20 @@ tcGroup scc
     )						`thenM` \ (_, env, tyclss) ->
 
 	-- Step 7: Check validity
+    setGblEnv env 				$
+
     traceTc (text "ready for validity check")	`thenM_`
     getModule					`thenM` \ mod ->
-    setGblEnv env (
-	mappM_ (checkValidTyCl mod) decls
-    )						`thenM_`
+    mappM_ (checkValidTyCl mod) decls		`thenM_`
     traceTc (text "done")			`thenM_`
    
     let		-- Add the tycons that come from the classes
 		-- We want them in the environment because 
 		-- they are mentioned in interface files
-	implicit_tycons, implicit_ids, all_tyclss :: [TyThing]
-	implicit_tycons = [ATyCon (classTyCon clas) | AClass clas <- tyclss]
-	all_tyclss     = implicit_tycons ++ tyclss
-	implicit_ids   = [AnId id | id <- implicitTyThingIds all_tyclss]
-	new_things     = implicit_ids ++ all_tyclss
+	implicit_things = implicitTyThings tyclss
     in
-    returnM (env, new_things)
+    traceTc ((text "Adding" <+> ppr tyclss) $$ (text "and" <+> ppr implicit_things)) 	`thenM_`
+    tcExtendGlobalEnv implicit_things getGblEnv
 
   where
     decls = case scc of

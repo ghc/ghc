@@ -31,7 +31,7 @@ import Type		( typePrimRep, isUnLiftedType, splitTyConApp_maybe,
 			  isTyVarTy )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
                           isUnboxedTupleCon, isNullaryDataCon,
-			  dataConRepArity, dataConWorkId )
+			  dataConRepArity )
 import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isFunTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
@@ -239,7 +239,7 @@ schemeTopBind :: (Id, AnnExpr Id VarSet) -> BcM (ProtoBCO Name)
 
 
 schemeTopBind (id, rhs)
-  | Just data_con <- isDataConId_maybe id,
+  | Just data_con <- isDataConWorkId_maybe id,
     isNullaryDataCon data_con
   = 	-- Special case for the worker of a nullary data con.
 	-- It'll look like this:	$wNil = /\a -> $wNil a
@@ -360,7 +360,7 @@ schemeE d s p (AnnLit literal)
 
 schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
    | (AnnVar v, args_r_to_l) <- splitApp rhs,
-     Just data_con <- isDataConId_maybe v,
+     Just data_con <- isDataConWorkId_maybe v,
      dataConRepArity data_con == length args_r_to_l
    = 	-- Special case for a non-recursive let whose RHS is a 
 	-- saturatred constructor application.
@@ -554,7 +554,7 @@ schemeT d s p app
       -- saturated.  Otherwise, we'll call the constructor wrapper.
       n_args = length args_r_to_l
       maybe_saturated_dcon  
-	= case isDataConId_maybe fn of
+	= case isDataConWorkId_maybe fn of
 		Just con | dataConRepArity con == n_args -> Just con
 		_ -> Nothing
 
@@ -569,10 +569,9 @@ mkConAppCode :: Int -> Sequel -> BCEnv
 
 mkConAppCode orig_d s p con []	-- Nullary constructor
   = ASSERT( isNullaryDataCon con )
-    returnBc (unitOL (PUSH_G (getName (dataConWorkId con))))
+    returnBc (unitOL (PUSH_G (getName con)))
 	-- Instead of doing a PACK, which would allocate a fresh
 	-- copy of this constructor, use the single shared version.
-	-- The name of the constructor is the name of its wrapper function
 
 mkConAppCode orig_d s p con args_r_to_l 
   = ASSERT( dataConRepArity con == length args_r_to_l )

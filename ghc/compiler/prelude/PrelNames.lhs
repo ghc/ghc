@@ -684,7 +684,8 @@ All these are original names; hence mkOrig
 
 \begin{code}
 varQual  = mk_known_key_name varName
-dataQual = mk_known_key_name dataName
+dataQual = mk_known_key_name dataName	-- All the constructor names here are for the DataCon
+					-- itself, which lives in the VarName name space
 tcQual   = mk_known_key_name tcName
 clsQual  = mk_known_key_name clsName
 
@@ -692,10 +693,10 @@ wVarQual  = mk_wired_in_name varName	-- The wired-in analogues
 wDataQual = mk_wired_in_name dataName		
 wTcQual   = mk_wired_in_name tcName
 
-varQual_RDR  mod str = mkOrig mod (mkOccFS varName str)   -- note use of local alias vName
+varQual_RDR  mod str = mkOrig mod (mkOccFS varName str)	-- The RDR analogues
+dataQual_RDR mod str = mkOrig mod (mkOccFS dataName str)
 tcQual_RDR   mod str = mkOrig mod (mkOccFS tcName str)
 clsQual_RDR  mod str = mkOrig mod (mkOccFS clsName str)
-dataQual_RDR mod str = mkOrig mod (mkOccFS dataName str)
 
 mk_known_key_name space mod str uniq 
   = mkKnownKeyExternalName (mkBasePkgModule mod) (mkOccFS space str) uniq 

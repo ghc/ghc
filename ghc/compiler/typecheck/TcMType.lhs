@@ -1016,7 +1016,7 @@ checkValidDataCon con
 		-- This checks the argument types and
 		-- ambiguity of the existential context (if any)
     addErrCtxt (existentialCtxt con)
-		 (checkFreeness ex_tvs ex_theta)
+	       (checkFreeness ex_tvs ex_theta)
   where
     ctxt = ConArgCtxt (dataConName con) 
     (_, _, ex_tvs, ex_theta, _, _) = dataConSig con

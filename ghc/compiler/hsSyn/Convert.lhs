@@ -62,7 +62,7 @@ cvt_top (Data tc tvs constrs derivs)
   where
     mk_con (Constr c tys)
 	= ConDecl (cName c) noExistentials noContext
-		    (PrefixCon (map mk_arg tys)) loc0
+		  (PrefixCon (map mk_arg tys)) loc0
 
     mk_arg ty = BangType NotMarkedStrict (cvtType ty)
 
@@ -150,8 +150,8 @@ noFunDeps      = []
 convertToHsExpr :: Meta.Exp -> HsExpr RdrName
 convertToHsExpr = cvt
 
-cvt (Var s) 	  = HsVar(vName s)
-cvt (Con s) 	  = HsVar(cName s)
+cvt (Var s) 	  = HsVar (vName s)
+cvt (Con s) 	  = HsVar (cName s)
 cvt (Lit l) 
   | overloadedLit l = HsOverLit (cvtOverLit l)
   | otherwise	    = HsLit (cvtLit l)
@@ -332,9 +332,9 @@ loc0 = generatedSrcLoc
 vName :: String -> RdrName
 vName = mkName varName
 
--- Constructor function names
+-- Constructor function names; this is Haskell source, hence srcDataName
 cName :: String -> RdrName
-cName = mkName dataName
+cName = mkName srcDataName
 
 -- Type variable names
 tName :: String -> RdrName

@@ -23,7 +23,7 @@ module SaAbsInt (
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
 import CoreUnfold	( maybeUnfoldingTemplate )
-import Id		( Id, idType, idUnfolding, isDataConId_maybe,
+import Id		( Id, idType, idUnfolding, isDataConWorkId_maybe,
 			  idStrictness,
 			)
 import DataCon		( dataConTyCon, splitProductType_maybe, dataConRepArgTys )
@@ -353,7 +353,7 @@ evalAbsence other val = anyBot val
 
 absId anal var env
   = case (lookupAbsValEnv env var, 
-	  isDataConId_maybe var, 
+	  isDataConWorkId_maybe var, 
 	  idStrictness var, 
 	  maybeUnfoldingTemplate (idUnfolding var)) of
 

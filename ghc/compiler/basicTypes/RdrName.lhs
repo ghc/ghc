@@ -109,10 +109,10 @@ setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- The original-name case *can* occur when parsing
 -- 		data [] a = [] | a : [a]
 -- For the orig-name case we return an unqualified name.
-setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace occ ns)
-setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace occ ns)
-setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace occ ns)
-setRdrNameSpace (Exact n)    ns = Unqual (setOccNameSpace (nameOccName n) ns)
+setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
+setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
+setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
+setRdrNameSpace (Exact n)    ns = Unqual (setOccNameSpace ns (nameOccName n))
 \end{code}
 
 \begin{code}

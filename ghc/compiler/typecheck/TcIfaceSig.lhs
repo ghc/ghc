@@ -16,7 +16,8 @@ import TcHsSyn		( TypecheckedCoreBind )
 import TcRnTypes
 import TcRnMonad
 import TcMonoType	( tcIfaceType, kcHsSigType )
-import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv, tcLookupGlobalId )
+import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv, tcLookupGlobalId,
+			  tcLookupDataCon )
 
 import RnHsSyn		( RenamedCoreDecl, RenamedTyClDecl )
 import HsCore
@@ -27,7 +28,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkVanillaGlobal, mkLocalId, isDataConWrapId_maybe )
+import Id		( Id, mkVanillaGlobal, mkLocalId, isDataConWorkId_maybe )
 import MkId		( mkFCallId )
 import IdInfo
 import TyCon		( tyConDataCons, tyConTyVars )
@@ -374,11 +375,10 @@ tcConAlt :: UfConAlt Name -> TcM DataCon
 tcConAlt (UfTupleAlt (HsTupCon boxity arity))
   = returnM (tupleCon boxity arity)
 
-tcConAlt (UfDataAlt con_name)
-  = tcVar con_name	`thenM` \ con_id ->
-    returnM (case isDataConWrapId_maybe con_id of
-		    Just con -> con
-		    Nothing  -> pprPanic "tcCoreAlt" (ppr con_id))
+tcConAlt (UfDataAlt con_name)	-- When reading interface files
+				-- the con_name will be the real name of
+				-- the data con
+  = tcLookupDataCon con_name
 \end{code}
 
 %************************************************************************

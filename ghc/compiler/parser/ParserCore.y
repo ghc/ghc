@@ -150,7 +150,7 @@ cons1	:: { [ConDecl RdrName] }
 	| con ';' cons1	{ $1:$3 }
 
 con	:: { ConDecl RdrName }
-	: q_d_name attbinds atys 
+	: q_d_patt attbinds atys 
 		{ ConDecl $1 $2 [] (PrefixCon (map unbangedType $3)) noSrcLoc}
 
 atys	:: { [ RdrNameHsType] }
@@ -202,8 +202,8 @@ alts1	:: { [UfAlt RdrName] }
 	| alt ';' alts1	{ $1:$3 }
 
 alt	:: { UfAlt RdrName }
-	: q_d_name attbinds vbinds '->' exp 
-		{ {- ToDo: sort out-} (UfDataAlt $1, (map hsTyVarName $2 ++ map fst $3), $5) } 
+	: q_d_patt attbinds vbinds '->' exp 
+		{ (UfDataAlt $1, (map hsTyVarName $2 ++ map fst $3), $5) } 
 	| lit '->' exp
 		{ (UfLitAlt $1, [], $3) }
 	| '%_' '->' exp
@@ -211,7 +211,7 @@ alt	:: { UfAlt RdrName }
 
 lit	:: { Literal }
 	: '(' INTEGER '::' aty ')'	{ convIntLit $2 $4 }
-	| '(' RATIONAL '::' aty ')'	{ MachDouble $2 }
+	| '(' RATIONAL '::' aty ')'	{ convRatLit $2 $4 }
 	| '(' CHAR '::' aty ')'		{ MachChar (fromEnum $2) }
 	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
 
@@ -230,7 +230,7 @@ modid	:: { ModuleName }
 qname	:: { RdrName }           -- Includes data constructors
 	: name	                 { $1 }
 	| mname '.' NAME	 { mkIfaceOrig varName (mkFastString $1) (mkFastString $3) }
-        | q_d_name               { $1 }
+        | q_d_occ                { $1 }
 
 
 -- Type constructor
@@ -238,10 +238,17 @@ q_tc_name	:: { RdrName }
         : mname '.' cname 
 		{ mkIfaceOrig tcName (mkFastString $1) (mkFastString $3) }
 
--- Data constructor
-q_d_name	:: { RdrName }
+-- Data constructor in a pattern or data type declaration; use the dataName, 
+-- because that's what we expect in Core case patterns
+q_d_patt :: { RdrName }
         : mname '.' cname 
 		{ mkIfaceOrig dataName (mkFastString $1) (mkFastString $3) }
+
+-- Data constructor occurrence in an expression;
+-- use the varName because that's the worker Id
+q_d_occ :: { RdrName }
+        : mname '.' cname 
+		{ mkIfaceOrig varName (mkFastString $1) (mkFastString $3) }
 
 
 {
@@ -253,13 +260,21 @@ convIntLit i (HsTyVar n)
   | n == intPrimRdrName  = MachInt  i  
   | n == wordPrimRdrName = MachWord i
 convIntLit i aty
-  = pprPanic "Unknown literal type" (ppr aty $$ ppr intPrimRdrName) 
+  = pprPanic "Unknown integer literal type" (ppr aty $$ ppr intPrimRdrName) 
 
-wordPrimRdrName :: RdrName
-wordPrimRdrName = nameRdrName wordPrimTyConName
+convRatLit :: Rational -> RdrNameHsType -> Literal
+convRatLit r (HsTyVar n)
+  | n == floatPrimRdrName  = MachFloat  r
+  | n == doublePrimRdrName = MachDouble r
+convRatLit i aty
+  = pprPanic "Unknown rational literal type" (ppr aty $$ ppr intPrimRdrName) 
 
-intPrimRdrName :: RdrName
-intPrimRdrName = nameRdrName intPrimTyConName
+
+wordPrimRdrName, intPrimRdrName, floatPrimRdrName, doublePrimRdrName :: RdrName
+wordPrimRdrName   = nameRdrName wordPrimTyConName
+intPrimRdrName    = nameRdrName intPrimTyConName
+floatPrimRdrName  = nameRdrName floatPrimTyConName
+doublePrimRdrName = nameRdrName doublePrimTyConName
 
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l

@@ -29,7 +29,7 @@ module Id (
 	isRecordSelector,
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
-	isDataConId, isDataConId_maybe, 
+	isDataConWorkId, isDataConWorkId_maybe, 
 	isDataConWrapId, isDataConWrapId_maybe,
 	isBottomingId,
 	hasNoBinding,
@@ -257,13 +257,13 @@ isFCallId_maybe id = case globalIdDetails id of
 			    FCallId call -> Just call
 			    other	 -> Nothing
 
-isDataConId id = case globalIdDetails id of
-			DataConId _ -> True
-			other	    -> False
+isDataConWorkId id = case globalIdDetails id of
+			DataConWorkId _ -> True
+			other	        -> False
 
-isDataConId_maybe id = case globalIdDetails id of
-			  DataConId con -> Just con
-			  other	        -> Nothing
+isDataConWorkId_maybe id = case globalIdDetails id of
+			  DataConWorkId con -> Just con
+			  other	            -> Nothing
 
 isDataConWrapId_maybe id = case globalIdDetails id of
 				  DataConWrapId con -> Just con
@@ -292,7 +292,7 @@ isImplicitId id
 	RecordSelId _   -> True	-- Includes dictionary selectors
         FCallId _       -> True
         PrimOpId _      -> True
-        DataConId _     -> True
+        DataConWorkId _ -> True
 	DataConWrapId _ -> True
 		-- These are are implied by their type or class decl;
 		-- remember that all type and class decls appear in the interface file.

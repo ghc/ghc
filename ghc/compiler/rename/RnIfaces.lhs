@@ -31,7 +31,7 @@ import Id		( idType, idName, globalIdDetails )
 import IdInfo		( GlobalIdDetails(..) )
 import TcType		( tyClsNamesOfType, classNamesOfTheta )
 import FieldLabel	( fieldLabelTyCon )
-import DataCon		( dataConTyCon )
+import DataCon		( dataConTyCon, dataConWrapId )
 import TyCon		( visibleDataCons, isSynTyCon, getSynTyConDefn, tyConClass_maybe, tyConName )
 import Class		( className, classSCTheta )
 import Name		( Name {-instance NamedThing-}, isWiredInName, nameIsLocalOrFrom, 
@@ -189,13 +189,14 @@ rnIfaceDecl rn (mod, decl) = initRn (InterfaceMode mod) (rn decl)
 	-- Tiresomely, we must get the "main" name for the 
 	-- thing, because that's what VSlurp contains, and what
 	-- is recorded in the usage information
-get_main_name (AClass cl) = className cl
+get_main_name (AClass cl)   = className cl
+get_main_name (ADataCon dc) = tyConName (dataConTyCon dc)
 get_main_name (ATyCon tc)
   | Just clas <- tyConClass_maybe tc = get_main_name (AClass clas)
   | otherwise			     = tyConName tc
 get_main_name (AnId id)
   = case globalIdDetails id of
-	DataConId     dc -> get_main_name (ATyCon (dataConTyCon dc))
+	DataConWorkId dc -> get_main_name (ATyCon (dataConTyCon dc))
 	DataConWrapId dc -> get_main_name (ATyCon (dataConTyCon dc))
 	RecordSelId lbl  -> get_main_name (ATyCon (fieldLabelTyCon lbl))
 	other	         -> idName id
@@ -477,6 +478,7 @@ getWiredInGates (AClass cl)
     super_classes = classNamesOfTheta (classSCTheta cl)
 
 getWiredInGates (AnId the_id) = tyClsNamesOfType (idType the_id)
+getWiredInGates (ADataCon dc) = tyClsNamesOfType (idType (dataConWrapId dc))
 getWiredInGates (ATyCon tc)
   | isSynTyCon tc = tyClsNamesOfType ty
   | otherwise	  = unitFV (getName tc)

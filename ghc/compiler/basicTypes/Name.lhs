@@ -300,17 +300,13 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
 
 pprExternal sty name uniq mod occ
   | codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
-
-  | debugStyle sty       = ppr (moduleName mod) <> dot <> pprOccName occ <> 
-			    text "{-" <> pprUnique uniq <> text "-}"
-
+  | debugStyle sty       = ppr (moduleName mod) <> dot <> ppr_debug_occ uniq occ
   | unqualStyle sty name = pprOccName occ
   | otherwise		 = ppr (moduleName mod) <> dot <> pprOccName occ
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | debugStyle sty = pprOccName occ <> 
-		     text "{-" <> pprUnique uniq <> text "-}"
+  | debugStyle sty = ppr_debug_occ uniq occ
   | otherwise      = pprOccName occ	-- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
@@ -320,6 +316,10 @@ pprSystem sty uniq occ
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),
 				-- so print the unique
+
+ppr_debug_occ uniq occ = hsep [pprOccName occ, text "{-", 
+			       text (briefOccNameFlavour occ), 
+			       pprUnique uniq, text "-}"]
 \end{code}
 
 %************************************************************************

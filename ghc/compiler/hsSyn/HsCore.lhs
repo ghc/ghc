@@ -31,7 +31,7 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 			)
 
 -- others:
-import Id		( idArity, idType, isDataConId_maybe, isFCallId_maybe )
+import Id		( idArity, idType, isDataConWorkId_maybe, isFCallId_maybe )
 import Var		( varType, isId )
 import IdInfo		( InlinePragInfo )
 import Name		( Name, NamedThing(..), eqNameByOcc )
@@ -153,7 +153,7 @@ toUfBndr x | isId x    = UfValBinder (getName x) (toHsType (varType x))
 ---------------------
 toUfApp (App f a) as = toUfApp f (a:as)
 toUfApp (Var v) as
-  = case isDataConId_maybe v of
+  = case isDataConWorkId_maybe v of
 	-- We convert the *worker* for tuples into UfTuples
 	Just dc |  isTupleTyCon tc && saturated 
 		-> UfTuple (mk_hs_tup_con tc dc) tup_args

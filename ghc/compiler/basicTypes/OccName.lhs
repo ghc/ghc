@@ -9,7 +9,7 @@
 module OccName (
 	-- The NameSpace type; abstact
 	NameSpace, tcName, clsName, tcClsName, dataName, varName, 
-	tvName, nameSpaceString, 
+	tvName, srcDataName, nameSpaceString, 
 
 	-- The OccName type
 	OccName, 	-- Abstract, instance of Outputable
@@ -20,12 +20,14 @@ module OccName (
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
-	mkGenOcc1, mkGenOcc2, mkLocalOcc,
+	mkGenOcc1, mkGenOcc2, mkLocalOcc, 
+	mkDataConWrapperOcc, mkDataConWorkerOcc,
 	
 	isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
 	reportIfUnused,
 
-	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
+	occNameFS, occNameString, occNameUserString, occNameSpace, 
+	occNameFlavour, briefOccNameFlavour,
 	setOccNameSpace,
 
 	-- Tidying up
@@ -89,13 +91,31 @@ pprEncodedFS fs
 %************************************************************************
 
 \begin{code}
-data NameSpace = VarName	-- Variables
-	       | DataName	-- Data constructors
+data NameSpace = VarName	-- Variables, including "source" data constructors
+	       | DataName	-- "Real" data constructors 
 	       | TvName		-- Type variables
 	       | TcClsName	-- Type constructors and classes; Haskell has them
 				-- in the same name space for now.
 	       deriving( Eq, Ord )
    {-! derive: Binary !-}
+
+-- Note [Data Constructors]  
+-- see also: Note [Data Constructor Naming] in DataCon.lhs
+-- 
+--	"Source" data constructors are the data constructors mentioned
+--	in Haskell source code
+--
+--	"Real" data constructors are the data constructors of the
+--	representation type, which may not be the same as the source
+--	type
+
+-- Example:
+--	data T = T !(Int,Int)
+--
+-- The source datacon has type (Int,Int) -> T
+-- The real   datacon has type Int -> Int -> T
+-- GHC chooses a representation based on the strictness etc.
+
 
 -- Though type constructors and classes are in the same name space now,
 -- the NameSpace type is abstract, so we can easily separate them later
@@ -103,10 +123,12 @@ tcName    = TcClsName		-- Type constructors
 clsName   = TcClsName		-- Classes
 tcClsName = TcClsName		-- Not sure which!
 
-dataName = DataName
-tvName   = TvName
-varName  = VarName
+dataName    = DataName
+srcDataName = DataName	-- Haskell-source data constructors should be
+			-- in the Data name space
 
+tvName      = TvName
+varName     = VarName
 
 nameSpaceString :: NameSpace -> String
 nameSpaceString DataName  = "Data constructor"
@@ -222,12 +244,22 @@ occNameUserString occ = decode (occNameString occ)
 occNameSpace :: OccName -> NameSpace
 occNameSpace (OccName sp _) = sp
 
-setOccNameSpace :: OccName -> NameSpace -> OccName
-setOccNameSpace (OccName _ occ) sp = OccName sp occ
+setOccNameSpace :: NameSpace -> OccName -> OccName
+setOccNameSpace sp (OccName _ occ) = OccName sp occ
 
 -- occNameFlavour is used only to generate good error messages
 occNameFlavour :: OccName -> String
-occNameFlavour (OccName sp _) = nameSpaceString sp
+occNameFlavour (OccName DataName _)  = "Real data constructor"
+occNameFlavour (OccName TvName _)    = "Type variable"
+occNameFlavour (OccName TcClsName _) = "Type constructor or class"
+occNameFlavour (OccName VarName s)   = "Variable"
+
+-- briefOccNameFlavour is used in debug-printing of names
+briefOccNameFlavour :: OccName -> String
+briefOccNameFlavour (OccName DataName _)    = "d"
+briefOccNameFlavour (OccName VarName _)     = "v"
+briefOccNameFlavour (OccName TvName _)      = "tv"
+briefOccNameFlavour (OccName TcClsName _)   = "tc"
 \end{code}
 
 \begin{code}
@@ -246,9 +278,11 @@ isValOcc other		      = False
 -- Data constructor operator (starts with ':', or '[]')
 -- Pretty inefficient!
 isDataSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
+isDataSymOcc (OccName VarName s)  = isLexConSym (decodeFS s)
 isDataSymOcc other		  = False
 
 isDataOcc (OccName DataName _) = True
+isDataOcc (OccName VarName s)  = isLexCon (decodeFS s)
 isDataOcc other		       = False
 
 -- Any operator (data constructor or variable)
@@ -315,11 +349,13 @@ mkDictOcc, mkIPOcc, mkWorkerOcc, mkDefaultMethodOcc,
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
+mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
 mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies
 mkClassTyConOcc     = mk_simple_deriv tcName   ":T"	-- as a tycon/datacon
-mkClassDataConOcc   = mk_simple_deriv dataName ":D"	--
+mkClassDataConOcc   = mk_simple_deriv dataName ":D"	-- We go straight to the "real" data con
+							-- for datacons from classes
 mkDictOcc	    = mk_simple_deriv varName  "$d"
 mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
@@ -327,6 +363,12 @@ mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"      -- Generics
 mkGenOcc2           = mk_simple_deriv varName  "$gto"        -- Generics
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
+
+
+-- Data constructor workers are made by setting the name space
+-- of the data constructor OccName (which should be a DataName)
+-- to DataName
+mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ 
 \end{code}
 
 \begin{code}

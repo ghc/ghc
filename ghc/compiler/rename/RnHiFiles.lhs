@@ -53,7 +53,8 @@ import Module		( Module, ModuleName, ModLocation(ml_hi_file),
 			)
 import RdrName		( RdrName, mkRdrUnqual, rdrNameOcc, nameRdrName )
 import OccName		( OccName, mkWorkerOcc, mkClassTyConOcc, mkClassDataConOcc,
-			  mkSuperDictSelOcc, mkGenOcc1, mkGenOcc2 )
+			  mkSuperDictSelOcc, mkGenOcc1, mkGenOcc2, 
+			  mkDataConWrapperOcc, mkDataConWorkerOcc )
 import TyCon		( DataConDetails(..) )
 import SrcLoc		( noSrcLoc, mkSrcLoc )
 import Maybes		( maybeToBool )
@@ -326,13 +327,14 @@ getSysBinders :: Module -> TyClDecl RdrName -> TcRn m [Name]
 -- on RdrNames, returning OccNames
 
 getSysBinders mod (ClassDecl {tcdName = cname, tcdCtxt = cxt, tcdLoc = loc})
-  = sequenceM [new_sys_bndr mod n loc | n <- sys_occs]
+  = mapM (new_sys_bndr mod loc) sys_occs
   where
 	-- C.f. TcClassDcl.tcClassDecl1
-    sys_occs	= tc_occ : data_occ : dw_occ : sc_sel_occs
+    sys_occs	= tc_occ : data_occ : dwrap_occ : dwork_occ : sc_sel_occs
     cls_occ  	= rdrNameOcc cname
     data_occ 	= mkClassDataConOcc cls_occ
-    dw_occ  	= mkWorkerOcc data_occ
+    dwrap_occ  	= mkDataConWrapperOcc data_occ
+    dwork_occ  	= mkDataConWorkerOcc data_occ
     tc_occ    	= mkClassTyConOcc   cls_occ
     sc_sel_occs = [mkSuperDictSelOcc n cls_occ | n <- [1..length cxt]]
 
@@ -340,19 +342,21 @@ getSysBinders mod (TyData {tcdName = tc_name, tcdCons = DataCons cons,
 			   tcdGeneric = Just want_generic, tcdLoc = loc})
 	-- The 'Just' is because this is an interface-file decl
 	-- so it will say whether to derive generic stuff for it or not
-  = sequenceM ([new_sys_bndr mod n loc | n <- gen_occs] ++ 
-	       map con_sys_occ cons)
+  = mapM (new_sys_bndr mod loc) (gen_occs ++ concatMap mk_con_occs cons)
   where
+    new = new_sys_bndr
 	-- c.f. TcTyDecls.tcTyDecl
     tc_occ = rdrNameOcc tc_name
     gen_occs | want_generic = [mkGenOcc1 tc_occ, mkGenOcc2 tc_occ]
 	     | otherwise    = []
-    con_sys_occ (ConDecl name _ _ _ loc) 
-	= new_sys_bndr mod (mkWorkerOcc (rdrNameOcc name)) loc
+    mk_con_occs (ConDecl name _ _ _ _) 
+	= [mkDataConWrapperOcc con_occ, mkDataConWorkerOcc con_occ]
+	where
+	  con_occ = rdrNameOcc name	-- The "source name"
     
 getSysBinders mod decl = returnM []
 
-new_sys_bndr mod occ loc = newTopBinder mod (mkRdrUnqual occ) loc
+new_sys_bndr mod loc occ = newTopBinder mod (mkRdrUnqual occ) loc
 
 
 -----------------------------------------------------

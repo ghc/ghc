@@ -78,7 +78,7 @@ module TysWiredIn (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MkId( mkDataConId, mkDataConWrapId )
+import {-# SOURCE #-} MkId( mkDataConWorkId )
 import {-# SOURCE #-} Generics( mkTyConGenInfo )
 
 -- friends:
@@ -90,7 +90,7 @@ import Constants	( mAX_TUPLE_SIZE )
 import Module		( mkBasePkgModule )
 import Name		( Name, nameUnique, nameOccName, 
 			  nameModule, mkWiredInName )
-import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
+import OccName		( mkOccFS, tcName, dataName, mkDataConWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
@@ -192,27 +192,28 @@ mk_tc_gen_info mod tc_uniq tc_name tycon
 	name2	    = mkWiredInName  mod occ_name2 fn2_key
 
 pcDataCon :: Name -> [TyVar] -> ThetaType -> [Type] -> TyCon -> DataCon
+-- The Name should be in the DataName name space; it's the name
+-- of the DataCon itself.
+--
 -- The unique is the first of two free uniques;
--- the first is used for the datacon itself and the worker;
--- the second is used for the wrapper.
+-- the first is used for the datacon itself,
+-- the second is used for the "worker name"
 
-pcDataCon name tyvars context arg_tys tycon
+pcDataCon dc_name tyvars context arg_tys tycon
   = data_con
   where
-    data_con = mkDataCon name
-                [ NotMarkedStrict | a <- arg_tys ]
-                [ {- no labelled fields -} ]
-                tyvars context [] [] arg_tys tycon work_id wrap_id
+    data_con = mkDataCon dc_name	
+                [{- No strictness -}]
+                [{- No labelled fields -}]
+                tyvars context [] [] arg_tys tycon work_id 
+		Nothing {- No wrapper for wired-in things
+			   (they are too simple to need one) -}
 
-    wrap_occ  = nameOccName name
-
-    mod       = nameModule name
-    wrap_id   = mkDataConWrapId data_con
-
-    work_occ  = mkWorkerOcc wrap_occ
-    work_key  = incrUnique (nameUnique name)
-    work_name = mkWiredInName mod work_occ work_key
-    work_id   = mkDataConId work_name data_con
+    mod      = nameModule dc_name
+    wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
+    wrk_key  = incrUnique (nameUnique dc_name)
+    wrk_name = mkWiredInName mod wrk_occ wrk_key
+    work_id  = mkDataConWorkId wrk_name data_con
 \end{code}
 
 

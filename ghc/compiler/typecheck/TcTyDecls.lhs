@@ -4,7 +4,7 @@
 \section[TcTyDecls]{Typecheck type declarations}
 
 \begin{code}
-module TcTyDecls ( tcTyDecl, kcConDetails ) where
+module TcTyDecls ( tcTyDecl, kcConDetails, tcMkDataCon ) where
 
 #include "HsVersions.h"
 
@@ -12,22 +12,23 @@ import HsSyn		( TyClDecl(..), ConDecl(..), HsConDetails(..), BangType,
 			  getBangType, getBangStrictness, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
-import BasicTypes	( NewOrData(..) )
+import BasicTypes	( NewOrData(..), StrictnessMark )
 
 import TcMonoType	( tcHsTyVars, tcHsTheta, tcHsType, 
 			  kcHsContext, kcHsSigType, kcHsLiftedSigType
 			)
 import TcEnv		( tcExtendTyVarEnv, tcLookupTyCon, TyThingDetails(..) )
-import TcType		( tyVarsOfTypes, tyVarsOfPred, ThetaType )
+import TcType		( Type, tyVarsOfTypes, tyVarsOfPred, ThetaType )
 import RnEnv		( lookupSysName )
 import TcRnMonad
 
 import DataCon		( DataCon, mkDataCon, dataConFieldLabels )
-import FieldLabel	( fieldLabelName, fieldLabelType, allFieldLabelTags, mkFieldLabel )
-import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
+import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, allFieldLabelTags, mkFieldLabel )
+import MkId		( mkDataConWorkId, mkDataConWrapId, mkRecordSelId )
 import Var		( TyVar )
 import Name		( Name )
-import OccName		( mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
+import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc,
+			  mkGenOcc1, mkGenOcc2, setOccNameSpace )
 import Outputable
 import TyCon		( TyCon, DataConDetails(..), visibleDataCons,
 			  tyConTyVars, tyConName )
@@ -139,36 +140,55 @@ tcConDecls new_or_data tycon tyvars ctxt con_decls
 	
 	tc_datacon ex_tyvars ex_theta btys
 	  = mappM tcHsType (map getBangType btys)	`thenM` \ arg_tys ->
-	    mk_data_con ex_tyvars ex_theta (map getBangStrictness btys) arg_tys []
+	    tcMkDataCon name 
+			(map getBangStrictness btys)
+			[{- No field labels -}] 
+			tyvars ctxt ex_tyvars ex_theta 
+			arg_tys tycon
     
 	tc_rec_con ex_tyvars ex_theta fields
-	  = checkTc (null ex_tyvars) (exRecConErr name)	`thenM_`
+	  = checkTc (null ex_tyvars) (exRecConErr name)		`thenM_`
 	    mappM tc_field (fields `zip` allFieldLabelTags)	`thenM` \ field_labels ->
 	    let
-		arg_stricts = [str | (n, bty) <- fields, 
-				     let str = getBangStrictness bty
-			      ]
+		arg_stricts = [getBangStrictness bty | (n, bty) <- fields] 
+		arg_tys     = map fieldLabelType field_labels
 	    in
-	    mk_data_con ex_tyvars ex_theta arg_stricts 
-			(map fieldLabelType field_labels) field_labels
+	    tcMkDataCon name arg_stricts field_labels
+			tyvars ctxt ex_tyvars ex_theta 
+			arg_tys tycon
     
 	tc_field ((field_label_name, bty), tag)
 	  = tcHsType (getBangType bty)		`thenM` \ field_ty ->
 	    returnM (mkFieldLabel field_label_name tycon field_ty tag)
     
-	mk_data_con ex_tyvars ex_theta arg_stricts arg_tys fields
-	  = lookupSysName name mkWorkerOcc	`thenM` \ wkr_name ->
-	    let
-	       data_con = mkDataCon name arg_stricts fields
-			       tyvars (thinContext arg_tys ctxt)
-			       ex_tyvars ex_theta
-			       arg_tys
-			       tycon data_con_id data_con_wrap_id
-    
-	       data_con_id      = mkDataConId wkr_name data_con
-	       data_con_wrap_id = mkDataConWrapId data_con
-	    in
-	    returnM data_con
+tcMkDataCon :: Name
+	    -> [StrictnessMark] -> [FieldLabel]
+	    -> [TyVar] -> ThetaType
+	    -> [TyVar] -> ThetaType
+	    -> [Type] -> TyCon
+	    -> TcM DataCon
+-- A wrapper for DataCon.mkDataCon that
+--   a) makes the worker Id
+--   b) makes the wrapper Id if necessary, including
+--	allocating its unique (hence monadic)
+tcMkDataCon src_name arg_stricts fields 
+	    tyvars ctxt ex_tyvars ex_theta 
+	    arg_tys tycon
+  = lookupSysName src_name mkDataConWrapperOcc	`thenM` \ wrap_name ->
+    lookupSysName src_name mkDataConWorkerOcc 	`thenM` \ work_name -> 
+	-- This last one takes the name of the data constructor in the source
+	-- code, which (for Haskell source anyway) will be in the SrcDataName name
+	-- space, and makes it into a "real data constructor name"
+    let
+	data_con = mkDataCon src_name arg_stricts fields
+			     tyvars (thinContext arg_tys ctxt) 
+			     ex_tyvars ex_theta
+			     arg_tys tycon 
+			     data_con_work_id data_con_wrap_id
+	data_con_work_id = mkDataConWorkId work_name data_con
+	data_con_wrap_id = mkDataConWrapId wrap_name data_con
+    in
+    returnM data_con	
 
 -- The context for a data constructor should be limited to
 -- the type variables mentioned in the arg_tys

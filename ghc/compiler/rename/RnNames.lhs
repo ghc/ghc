@@ -32,7 +32,7 @@ import Module		( Module, ModuleName, ModuleEnv, moduleName,
 import Name		( Name, nameSrcLoc, nameOccName, nameModule, isExternalName )
 import NameSet
 import NameEnv
-import OccName		( OccName, dataName, isTcOcc )
+import OccName		( OccName, srcDataName, isTcOcc )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, 
 			  IsBootInterface,
@@ -433,7 +433,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 		avails -> returnM [(a, []) | a <- avails]
 				-- The 'explicits' list is irrelevant when hiding
       where
-	data_n = setRdrNameSpace n dataName
+	data_n = setRdrNameSpace n srcDataName
 
     get_item item
       = case check_item item of

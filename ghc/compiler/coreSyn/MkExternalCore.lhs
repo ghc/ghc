@@ -18,13 +18,14 @@ import TyCon
 import Class
 import TypeRep
 import Type
-import DataCon
+import DataCon	( DataCon, dataConExistentialTyVars, dataConRepArgTys, 
+		  dataConName, dataConWrapId_maybe )
 import CoreSyn
 import Var
 import IdInfo
-import Id( idUnfolding )
-import CoreTidy( tidyExpr )
-import VarEnv( emptyTidyEnv )
+import Id	( idUnfolding )
+import CoreTidy	( tidyExpr )
+import VarEnv	( emptyTidyEnv )
 import Literal
 import Name
 import CostCentre
@@ -32,7 +33,7 @@ import Outputable
 import ForeignCall
 import PprExternalCore	
 import CmdLineOpts
-import Maybes( orElse )
+import Maybes	( orElse, catMaybes )
 import IO
 import FastString
 
@@ -72,8 +73,8 @@ mkExternalCore (ModGuts {mg_module=this_mod, mg_types = type_env, mg_binds = bin
     other_implicit_binds  = map get_defn (concatMap other_implicit_ids (typeEnvElts type_env))
 
 implicit_con_ids :: TyThing -> [Id]
-implicit_con_ids (ATyCon tc) = map dataConWrapId (tyConDataCons_maybe tc `orElse` [])
-implicit_con_ids other       = []
+implicit_con_ids (ATyCon tc) | isAlgTyCon tc = catMaybes (map dataConWrapId_maybe (tyConDataCons tc))
+implicit_con_ids other       		     = []
 
 other_implicit_ids :: TyThing -> [Id]
 other_implicit_ids (ATyCon tc) = tyConSelIds tc ++ tyConGenIds tc

@@ -101,7 +101,7 @@ import HscTypes		( RdrAvailInfo, GenAvailInfo(..) )
 import TysWiredIn	( unitTyCon )
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..))
-import OccName  	( dataName, varName, isDataOcc, isTcOcc, occNameUserString,
+import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, occNameUserString,
 			  mkDefaultMethodOcc, mkVarOcc )
 import SrcLoc
 import CStrings		( CLabelString )
@@ -496,7 +496,7 @@ mkRecCon con fields
 tyConToDataCon :: RdrName -> P RdrName
 tyConToDataCon tc
   | isTcOcc (rdrNameOcc tc)
-  = returnP (setRdrNameSpace tc dataName)
+  = returnP (setRdrNameSpace tc srcDataName)
   | otherwise
   = parseError (showSDoc (text "Not a constructor:" <+> quotes (ppr tc)))
 

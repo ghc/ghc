@@ -43,7 +43,6 @@ import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
-import DataCon		( dataConWrapId )
 import Maybes		( catMaybes )
 import PrimOp		( primOpNeedsWrapper )
 import MachOp		( MachOp(..) )
@@ -473,7 +472,7 @@ pprAbsC stmt@(CClosureTbl tycon) _
 	ptext SLIT("CLOSURE_TBL") <> 
 	   lparen <> pprCLabel (mkClosureTblLabel tycon) <> rparen :
 	punctuate comma (
-	   map (pp_closure_lbl . mkClosureLabel . getName . dataConWrapId) (tyConDataCons tycon)
+	   map (pp_closure_lbl . mkClosureLabel . getName) (tyConDataCons tycon)
 	)
    ) $$ ptext SLIT("};")
 

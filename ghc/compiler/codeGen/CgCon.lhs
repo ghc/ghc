@@ -43,7 +43,7 @@ import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
 import DataCon		( DataCon, dataConTag, 
 			  isUnboxedTupleCon, isNullaryDataCon, dataConWorkId, 
-			  dataConWrapId, dataConRepArity
+			  dataConName, dataConRepArity
 			)
 import Id		( Id, idName, idPrimRep )
 import Literal		( Literal(..) )
@@ -138,7 +138,7 @@ at all.
 \begin{code}
 buildDynCon binder cc con []
   = returnFC (stableAmodeIdInfo binder
-				(CLbl (mkClosureLabel (idName (dataConWrapId con))) PtrRep)
+				(CLbl (mkClosureLabel (dataConName con)) PtrRep)
     				(mkConLFInfo con))
 \end{code}
 

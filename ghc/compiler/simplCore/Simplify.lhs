@@ -21,7 +21,7 @@ import SimplUtils	( mkCase, mkLam, newId, prepareAlts,
 			)
 import Var		( mustHaveLocalBinding )
 import VarEnv
-import Id		( Id, idType, idInfo, idArity, isDataConId, 
+import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
 			  setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo,
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
@@ -1131,8 +1131,8 @@ mkAtomicArgs :: Bool	-- A strict binding
 						  -- if the strict-binding flag is on
 
 mkAtomicArgs is_strict ok_float_unlifted rhs
-  | (Var fun, args) <- collectArgs rhs,			-- It's an application
-    isDataConId fun || valArgCount args < idArity fun	-- And it's a constructor or PAP
+  | (Var fun, args) <- collectArgs rhs,				-- It's an application
+    isDataConWorkId fun || valArgCount args < idArity fun	-- And it's a constructor or PAP
   = go fun nilOL [] args	-- Have a go
 
   | otherwise = bale_out	-- Give up

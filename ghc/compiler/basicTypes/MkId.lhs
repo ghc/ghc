@@ -16,7 +16,7 @@ module MkId (
 	mkDictFunId, mkDefaultMethodId,
 	mkDictSelId, 
 
-	mkDataConId, mkDataConWrapId,
+	mkDataConWorkId, mkDataConWrapId,
 	mkRecordSelId, 
 	mkPrimOpId, mkFCallId,
 
@@ -64,7 +64,7 @@ import DataCon		( DataCon,
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
 			  dataConArgTys, dataConRepType, 
 			  dataConOrigArgTys,
-                          dataConName, dataConTheta,
+                          dataConTheta,
 			  dataConSig, dataConStrictMarks, dataConWorkId,
 			  splitProductType
 			)
@@ -149,18 +149,18 @@ ghcPrimIds
 %************************************************************************
 
 \begin{code}
-mkDataConId :: Name -> DataCon -> Id
+mkDataConWorkId :: Name -> DataCon -> Id
 	-- Makes the *worker* for the data constructor; that is, the function
 	-- that takes the reprsentation arguments and builds the constructor.
-mkDataConId work_name data_con
-  = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
+mkDataConWorkId wkr_name data_con
+  = mkGlobalId (DataConWorkId data_con) wkr_name
+	       (dataConRepType data_con) info
   where
     info = noCafIdInfo
 	   `setArityInfo`		arity
 	   `setAllStrictnessInfo`	Just strict_sig
 
     arity      = dataConRepArity data_con
-
     strict_sig = mkStrictSig (mkTopDmdType (replicate arity topDmd) cpr_info)
 	-- Notice that we do *not* say the worker is strict
 	-- even if the data constructor is declared strict
@@ -237,18 +237,40 @@ Notice that
   it in the (common) case where the constructor arg is already evaluated.
 
 \begin{code}
-mkDataConWrapId data_con
-  = mkGlobalId (DataConWrapId data_con) (dataConName data_con) wrap_ty info
-  where
-    work_id = dataConWorkId data_con
+mkDataConWrapId :: Name -> DataCon -> Maybe Id
+-- Only make a wrapper Id if necessary
 
-    info = noCafIdInfo
-	   `setUnfoldingInfo`	wrap_unf
-		-- The NoCaf-ness is set by noCafIdInfo
-	   `setArityInfo`	arity
+mkDataConWrapId wrap_name data_con
+  | is_newtype || any isMarkedStrict strict_marks
+  = 	-- We need a wrapper function
+    Just (mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty info)
+
+  | otherwise
+  = Nothing	-- The common case, where there is no point in 
+		-- having a wrapper function.  Not only is this efficient,
+		-- but it also ensures that the wrapper is replaced
+		-- by the worker (becuase it *is* the wroker)
+		-- even when there are no args. E.g. in
+		-- 		f (:) x
+		-- the (:) *is* the worker.
+		-- This is really important in rule matching,
+		-- (We could match on the wrappers,
+		-- but that makes it less likely that rules will match
+		-- when we bring bits of unfoldings together.)
+  where
+    (tyvars, _, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
+    is_newtype = isNewTyCon tycon
+    all_tyvars = tyvars ++ ex_tyvars
+    work_id    = dataConWorkId data_con
+
+    common_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
+		  `setArityInfo` arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
-	   `setAllStrictnessInfo` 	Just wrap_sig
+
+    info | is_newtype = common_info `setUnfoldingInfo` newtype_unf
+	 | otherwise  = common_info `setUnfoldingInfo` data_unf
+				    `setAllStrictnessInfo` Just wrap_sig
 
     wrap_sig = mkStrictSig (mkTopDmdType arg_dmds res_info)
     res_info = strictSigResInfo (idNewStrictness work_id)
@@ -264,35 +286,15 @@ mkDataConWrapId data_con
 	--	...(let w = C x in ...(w p q)...)...
 	-- we want to see that w is strict in its two arguments
 
-    wrap_unf | isNewTyCon tycon
-	     = ASSERT( null ex_tyvars && null ex_dict_args && isSingleton orig_arg_tys )
-		-- No existentials on a newtype, but it can have a context
-		-- e.g. 	newtype Eq a => T a = MkT (...)
-		mkTopUnfolding $ Note InlineMe $
-		mkLams tyvars $ Lam id_arg1 $ 
-		mkNewTypeBody tycon result_ty (Var id_arg1)
+    newtype_unf = ASSERT( null ex_tyvars && null ex_dict_args && 
+			  isSingleton orig_arg_tys )
+	  	  -- No existentials on a newtype, but it can have a context
+	  	  -- e.g. 	newtype Eq a => T a = MkT (...)
+	  	  mkTopUnfolding $ Note InlineMe $
+	  	  mkLams tyvars $ Lam id_arg1 $ 
+	  	  mkNewTypeBody tycon result_ty (Var id_arg1)
 
-	     | not (any isMarkedStrict strict_marks)
-	     = mkCompulsoryUnfolding (Var work_id)
-			-- The common case.  Not only is this efficient,
-			-- but it also ensures that the wrapper is replaced
-			-- by the worker even when there are no args.
-			-- 		f (:) x
-			-- becomes 
-			--		f $w: x
-			-- This is really important in rule matching,
-			-- (We could match on the wrappers,
-			-- but that makes it less likely that rules will match
-			-- when we bring bits of unfoldings together.)
-		--
-		-- NB:	because of this special case, (map (:) ys) turns into
-		--	(map $w: ys).  The top-level defn for (:) is never used.
-		--	This is somewhat of a bore, but I'm currently leaving it 
-		--	as is, so that there still is a top level curried (:) for
-		--	the interpreter to call.
-
-	     | otherwise
-	     = mkTopUnfolding $ Note InlineMe $
+    data_unf = mkTopUnfolding $ Note InlineMe $
 	       mkLams all_tyvars $ 
 	       mkLams ex_dict_args $ mkLams id_args $
 	       foldr mk_case con_app 
@@ -300,9 +302,6 @@ mkDataConWrapId data_con
 
     con_app i rep_ids = mkApps (Var work_id)
 			       (map varToCoreExpr (all_tyvars ++ reverse rep_ids))
-
-    (tyvars, _, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
-    all_tyvars   = tyvars ++ ex_tyvars
 
     ex_dict_tys  = mkPredTys ex_theta
     all_arg_tys  = ex_dict_tys ++ orig_arg_tys

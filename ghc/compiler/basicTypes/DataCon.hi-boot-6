@@ -1,5 +1,4 @@
 module DataCon where
 
 data DataCon
-dataConRepType :: DataCon -> TypeRep.Type
 isExistentialDataCon :: DataCon -> GHC.Base.Bool

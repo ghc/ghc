@@ -830,8 +830,9 @@ tcTyClDecls tycl_decls
 	-- an error we'd better stop now, to avoid a cascade
 	
     traceTc (text "TyCl1")		`thenM_`
-    tcTyAndClassDecls tycl_decls	`thenM` \ tycl_things ->
-    tcExtendGlobalEnv tycl_things	$
+    tcTyAndClassDecls tycl_decls	`thenM` \ tcg_env ->
+	-- Returns the extended environment
+    setGblEnv tcg_env 			$
 
     traceTc (text "TyCl2")		`thenM_`
     tcInterfaceSigs tycl_decls		`thenM` \ tcg_env ->

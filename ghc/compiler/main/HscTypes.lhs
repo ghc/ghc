@@ -26,7 +26,7 @@ module HscTypes (
 	VersionInfo(..), initialVersionInfo, lookupVersion,
 	FixityEnv, lookupFixity, collectFixities, emptyFixityEnv,
 
-	TyThing(..), isTyClThing, implicitTyThingIds,
+	TyThing(..), implicitTyThings,
 
 	TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
 	extendTypeEnvList, extendTypeEnvWithIds,
@@ -78,11 +78,11 @@ import Module
 import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
-import Id		( Id )
-import Class		( Class, classSelIds )
-import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataCons_maybe )
-import Type		( TyThing(..), isTyClThing )
-import DataCon		( dataConWorkId, dataConWrapId )
+import Id		( Id, idName )
+import Class		( Class, classSelIds, classTyCon )
+import TyCon		( TyCon, tyConName, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataCons )
+import TcType		( TyThing(..) )
+import DataCon		( dataConWorkId, dataConWrapId, dataConWrapId_maybe )
 import Packages		( PackageName, basePackage )
 import CmdLineOpts	( DynFlags )
 
@@ -423,24 +423,6 @@ typeEnvElts    env = nameEnvElts env
 typeEnvClasses env = [cl | AClass cl <- typeEnvElts env]
 typeEnvTyCons  env = [tc | ATyCon tc <- typeEnvElts env] 
 typeEnvIds     env = [id | AnId id   <- typeEnvElts env] 
-
-implicitTyThingIds :: [TyThing] -> [Id]
--- Add the implicit data cons and selectors etc 
-implicitTyThingIds things
-  = concat (map go things)
-  where
-    go (AnId f)    = []
-    go (AClass cl) = classSelIds cl
-    go (ATyCon tc) = tyConGenIds tc ++
-		     tyConSelIds tc ++
-		     [ n | dc <- tyConDataCons_maybe tc `orElse` [],
-			   n  <- implicitConIds tc dc]
-		-- Synonyms return empty list of constructors and selectors
-
-    implicitConIds tc dc	-- Newtypes have a constructor wrapper,
-				-- but no worker
-	| isNewTyCon tc = [dataConWrapId dc]
-	| otherwise     = [dataConWorkId dc, dataConWrapId dc]
 \end{code}
 
 
@@ -453,8 +435,45 @@ mkTypeEnv :: [TyThing] -> TypeEnv
 mkTypeEnv things = extendTypeEnvList emptyTypeEnv things
 		
 extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
+-- Extend the type environment
 extendTypeEnvList env things
-  = extendNameEnvList env [(getName thing, thing) | thing <- things]
+  = foldl extend env things
+  where
+    extend env thing = extendNameEnv env (getName thing) thing
+
+implicitTyThings :: [TyThing] -> [TyThing]
+implicitTyThings things
+  = concatMap extras things
+  where
+    extras_plus thing = thing : extras thing
+
+    extras (AnId id)   = []
+
+	-- For type constructors, add the data cons (and their extras),
+	-- and the selectors and generic-programming Ids too
+	--
+	-- Newtypes don't have a worker Id, so don't generate that
+    extras (ATyCon tc) = map AnId (tyConGenIds tc ++ tyConSelIds tc) ++ data_con_stuff
+       where
+	data_con_stuff | isNewTyCon tc = [ADataCon dc1, AnId (dataConWrapId dc1)]
+		       | otherwise     = concatMap (extras_plus . ADataCon) dcs
+	dcs = tyConDataCons tc
+	dc1 = head dcs
+		     
+	-- For classes, add the class TyCon too (and its extras)
+	-- and the class selector Ids
+    extras (AClass cl) = map AnId (classSelIds cl) ++
+			 extras_plus (ATyCon (classTyCon cl))
+			 
+
+	-- For data cons add the worker and wrapper (if any)
+    extras (ADataCon dc) 
+	= AnId (dataConWorkId dc) : wrap_id_stuff
+	where
+		-- May or may not have a wrapper
+	  wrap_id_stuff = case dataConWrapId_maybe dc of 
+				Just id -> [AnId id]
+				Nothing -> []
 
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids

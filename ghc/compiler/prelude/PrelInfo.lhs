@@ -47,7 +47,7 @@ import OccName		( mkVarOcc )
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
 import RdrHsSyn		( mkClassDecl )
-import HscTypes 	( TyThing(..), implicitTyThingIds, TypeEnv, mkTypeEnv,
+import HscTypes 	( TyThing(..), implicitTyThings, TypeEnv, mkTypeEnv,
 			  GenAvailInfo(..), RdrAvailInfo )
 import Class	 	( Class, classKey, className )
 import Type		( funTyCon, openTypeKind, liftedTypeKind )
@@ -71,7 +71,7 @@ wiredInThings
   = concat
     [		-- Wired in TyCons and their implicit Ids
 	  tycon_things
-	, map AnId (implicitTyThingIds tycon_things)
+	, implicitTyThings tycon_things
 
 		-- Wired in Ids
 	, map AnId wiredInIds

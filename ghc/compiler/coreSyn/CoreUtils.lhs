@@ -50,7 +50,7 @@ import DataCon		( DataCon, dataConRepArity, dataConArgTys, isExistentialDataCon,
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
-			  isDataConId_maybe, mkSysLocal, isDataConId, isBottomingId
+			  isDataConWorkId_maybe, mkSysLocal, isDataConWorkId, isBottomingId
 			)
 import IdInfo		( GlobalIdDetails(..),
 			  megaSeqIdInfo )
@@ -446,10 +446,10 @@ idAppIsCheap id n_val_args
 				-- a variable (f t1 t2 t3)
 				-- counts as WHNF
   | otherwise = case globalIdDetails id of
-		  DataConId _   -> True			
-		  RecordSelId _ -> True			-- I'm experimenting with making record selection
-							-- look cheap, so we will substitute it inside a
-							-- lambda.  Particularly for dictionary field selection
+		  DataConWorkId _ -> True			
+		  RecordSelId _   -> True	-- I'm experimenting with making record selection
+						-- look cheap, so we will substitute it inside a
+						-- lambda.  Particularly for dictionary field selection
 
 		  PrimOpId op   -> primOpIsCheap op	-- In principle we should worry about primops
 		 					-- that return a type variable, since the result
@@ -496,7 +496,7 @@ exprOkForSpeculation other_expr
 	other	      -> False
  
   where
-    spec_ok (DataConId _) args
+    spec_ok (DataConWorkId _) args
       = True	-- The strictness of the constructor has already
 		-- been expressed by its "wrapper", so we don't need
 		-- to take the arguments into account
@@ -577,7 +577,7 @@ type must be ok-for-speculation (or trivial).
 \begin{code}
 exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
 exprIsValue (Var v) 	-- NB: There are no value args at this point
-  =  isDataConId v 	-- Catches nullary constructors, 
+  =  isDataConWorkId v 	-- Catches nullary constructors, 
 			--	so that [] and () are values, for example
   || idArity v > 0 	-- Catches (e.g.) primops that don't have unfoldings
   || isEvaldUnfolding (idUnfolding v)
@@ -596,7 +596,7 @@ exprIsValue other	     = False
 
 -- There is at least one value argument
 app_is_value (Var fun) args
-  |  isDataConId fun 			-- Constructor apps are values
+  |  isDataConWorkId fun 			-- Constructor apps are values
   || idArity fun > valArgCount args	-- Under-applied function
   = check_args (idType fun) args
 app_is_value (App f a) as = app_is_value f (a:as)
@@ -665,7 +665,7 @@ exprIsConApp_maybe (Note _ expr)
 exprIsConApp_maybe expr = analyse (collectArgs expr)
   where
     analyse (Var fun, args)
-	| Just con <- isDataConId_maybe fun,
+	| Just con <- isDataConWorkId_maybe fun,
 	  args `lengthAtLeast` dataConRepArity con
 		-- Might be > because the arity excludes type args
 	= Just (con,args)

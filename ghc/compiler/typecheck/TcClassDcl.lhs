@@ -29,6 +29,7 @@ import TcEnv		( TyThingDetails(..),
 			  tcLookupClass, tcExtendTyVarEnv2, 
 			  tcExtendTyVarEnv
 			)
+import TcTyDecls	( tcMkDataCon )
 import TcBinds		( tcMonoBinds )
 import TcMonoType	( TcSigInfo(..), tcHsType, tcHsTheta, mkTcSig )
 import TcSimplify	( tcSimplifyCheck )
@@ -46,8 +47,7 @@ import Class		( classTyVars, classBigSig, classTyCon,
 			  Class, ClassOpItem, DefMeth (..) )
 import TyCon		( tyConGenInfo )
 import Subst		( substTyWith )
-import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
-import DataCon		( mkDataCon )
+import MkId		( mkDictSelId, mkDefaultMethodId )
 import Id		( Id, idType, idName, mkUserLocal, setIdLocalExported, setInlinePragma )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv )
@@ -134,8 +134,8 @@ tcClassDecl1 (ClassDecl {tcdCtxt = context, tcdName = class_name,
     mappM (tcClassSig clas tyvars mb_dm_env) op_sigs	`thenM` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
-    lookupSysName class_name   mkClassDataConOcc 	`thenM` \ datacon_name ->
-    lookupSysName datacon_name mkWorkerOcc 		`thenM` \ datacon_wkr_name ->
+    lookupSysName class_name mkClassTyConOcc 		`thenM` \ tycon_name ->
+    lookupSysName class_name mkClassDataConOcc	 	`thenM` \ datacon_name ->
     mapM (lookupSysName class_name . mkSuperDictSelOcc) 
 	 [1..length context]				`thenM` \ sc_sel_names ->
       -- We number off the superclass selectors, 1, 2, 3 etc so that we 
@@ -145,26 +145,20 @@ tcClassDecl1 (ClassDecl {tcdCtxt = context, tcdName = class_name,
       --      D_sc1, D_sc2
       -- (We used to call them D_C, but now we can have two different
       --  superclasses both called C!)
-    lookupSysName class_name mkClassTyConOcc 	`thenM` \ tycon_name ->
     let
 	(op_tys, op_items) = unzip sig_stuff
         sc_tys		   = mkPredTys sc_theta
 	dict_component_tys = sc_tys ++ op_tys
         sc_sel_ids	   = [mkDictSelId sc_name clas | sc_name <- sc_sel_names]
-
-        dict_con = mkDataCon datacon_name
-			     [NotMarkedStrict | _ <- dict_component_tys]
-			     [{- No labelled fields -}]
-		      	     tyvars
-		      	     [{-No context-}]
-			     [{-No existential tyvars-}] [{-Or context-}]
-			     dict_component_tys
-		      	     (classTyCon clas)
-			     dict_con_id dict_wrap_id
-
-	dict_con_id  = mkDataConId datacon_wkr_name dict_con
-	dict_wrap_id = mkDataConWrapId dict_con
     in
+    tcMkDataCon datacon_name
+		[{- No strictness -}]
+		[{- No labelled fields -}]
+		tyvars [{-No context-}]
+		[{-No existential tyvars-}] [{-Or context-}]
+		dict_component_tys
+		(classTyCon clas)			`thenM` \ dict_con ->
+
     returnM (class_name, ClassDetails sc_theta sc_sel_ids op_items dict_con tycon_name)
 \end{code}
 

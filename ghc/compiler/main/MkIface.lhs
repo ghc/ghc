@@ -39,7 +39,7 @@ import HscTypes		( VersionInfo(..), ModIface(..),
 
 import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCgInfo )
-import DataCon		( dataConSig, dataConFieldLabels, dataConStrictMarks )
+import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
 import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
@@ -224,6 +224,7 @@ we miss them out of the accumulating parameter here.
 
 \begin{code}
 ifaceTyThing_acc :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
+ifaceTyThing_acc (ADataCon dc) so_far 		      = so_far
 ifaceTyThing_acc (AnId   id) so_far | isImplicitId id = so_far
 ifaceTyThing_acc (ATyCon id) so_far | isClassTyCon id = so_far
 ifaceTyThing_acc other so_far = ifaceTyThing other : so_far
@@ -308,7 +309,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
     ifaceConDecls (DataCons cs) = DataCons (map ifaceConDecl cs)
 
     ifaceConDecl data_con 
-	= ConDecl (getName data_con)
+	= ConDecl (dataConName data_con)
 		  (toHsTyVars ex_tyvars)
 		  (toHsContext ex_theta)
 		  details noSrcLoc

@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.114 2002/12/10 16:28:48 igloo Exp $
+$Id: Parser.y,v 1.115 2003/02/12 15:01:37 simonpj Exp $
 
 Haskell grammar.
 
@@ -21,13 +21,14 @@ import HscTypes		( ParsedIface(..), IsBootInterface, noDependencies )
 import Lex
 import RdrName
 import PrelNames	( mAIN_Name, funTyConName, listTyConName, 
-			  parrTyConName, consDataConName, nilDataConName )
-import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon )
+			  parrTyConName, consDataConName )
+import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon )
 import ForeignCall	( Safety(..), CExportSpec(..), 
 			  CCallConv(..), CCallTarget(..), defaultCCallConv,
 			)
 import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import TyCon		( DataConDetails(..) )
+import DataCon		( DataCon, dataConName )
 import SrcLoc		( SrcLoc )
 import Module
 import CmdLineOpts	( opt_SccProfilingOn, opt_InPackage )
@@ -1209,14 +1210,14 @@ deprec_var : var			{ $1 }
 	   | tycon			{ $1 }
 
 gcon 	:: { RdrName }	-- Data constructor namespace
-	: sysdcon		{ $1 }
+	: sysdcon		{ nameRdrName (dataConName $1) }
  	| qcon			{ $1 }
 -- the case of '[:' ':]' is part of the production `parr'
 
-sysdcon	:: { RdrName }	-- Data constructor namespace
-	: '(' ')'		{ getRdrName unitDataCon }
-	| '(' commas ')'	{ getRdrName (tupleCon Boxed $2) }
-	| '[' ']'		{ nameRdrName nilDataConName }
+sysdcon	:: { DataCon }	-- Wired in data constructors
+	: '(' ')'		{ unitDataCon }
+	| '(' commas ')'	{ tupleCon Boxed $2 }
+	| '[' ']'		{ nilDataCon }
 
 var 	:: { RdrName }
 	: varid			{ $1 }
@@ -1394,8 +1395,10 @@ qconsym :: { RdrName }	-- Qualified or unqualified
 
 consym :: { RdrName }
 	: CONSYM		{ mkUnqual dataName $1 }
-	| ':'			{ nameRdrName consDataConName }
+
 	-- ':' means only list cons
+	| ':'			{ nameRdrName consDataConName }
+				-- NB: SrcName because we are reading source
 
 
 -----------------------------------------------------------------------------

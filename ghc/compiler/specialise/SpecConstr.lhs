@@ -19,7 +19,7 @@ import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
 import Id		( Id, idName, idType, 
-			  isDataConId_maybe, 
+			  isDataConWorkId_maybe, 
 			  mkUserLocal, mkSysLocal )
 import Var		( Var )
 import VarEnv
@@ -582,7 +582,7 @@ is_con_app_maybe env (Lit lit)
 
 is_con_app_maybe env expr
   = case collectArgs expr of
-	(Var fun, args) | Just con <- isDataConId_maybe fun,
+	(Var fun, args) | Just con <- isDataConWorkId_maybe fun,
 			  args `lengthAtLeast` dataConRepArity con
 		-- Might be > because the arity excludes type args
 		        -> Just (DataAlt con,args)

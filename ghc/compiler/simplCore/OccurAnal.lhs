@@ -20,7 +20,7 @@ module OccurAnal (
 import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
-import Id		( isDataConId, isOneShotLambda, setOneShotLambda, 
+import Id		( isDataConWorkId, isOneShotLambda, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo,
 			  isExportedId, modifyIdInfo, idInfo, idArity,
 			  idSpecialisation, isLocalId,
@@ -704,7 +704,7 @@ occAnalApp env (Var fun, args) is_rhs
 	-- This is the *whole point* of the isRhsEnv predicate
         final_args_uds
 		| isRhsEnv env,
-		  isDataConId fun || valArgCount args < idArity fun
+		  isDataConWorkId fun || valArgCount args < idArity fun
 		= mapVarEnv markMany args_uds
 		| otherwise = args_uds
     in

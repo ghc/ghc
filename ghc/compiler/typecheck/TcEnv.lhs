@@ -62,7 +62,7 @@ import Var		( TyVar, Id, idType )
 import VarSet
 import VarEnv
 import CoreSyn		( IdCoreRule )
-import DataCon		( DataCon )
+import DataCon		( DataCon, dataConWrapId )
 import TyCon		( TyCon, DataConDetails )
 import Class		( Class, ClassOpItem )
 import Name		( Name, NamedThing(..), 
@@ -285,15 +285,21 @@ tcLookupGlobalId :: Name -> TcM Id
 tcLookupGlobalId name
   = tcLookupGlobal_maybe name	`thenM` \ maybe_thing ->
     case maybe_thing of
-	Just (AnId id) -> returnM id
-	other	       -> notFound "tcLookupGlobal" name
+	Just (AnId id)     -> returnM id
+
+	-- When typechecking Haskell source, occurrences of
+	-- data constructors use the "source name", which maps
+	-- to ADataCon; we want the wrapper instead
+	Just (ADataCon dc) -> returnM (dataConWrapId dc)
+
+	other	           -> notFound "tcLookupGlobal (id)" name
 
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon con_name
-  = tcLookupGlobalId con_name	`thenM` \ con_id ->
-    case isDataConWrapId_maybe con_id of
-	Just data_con -> returnM data_con
-	Nothing	      -> failWithTc (badCon con_id)
+  = tcLookupGlobal_maybe con_name	`thenM` \ maybe_thing ->
+    case maybe_thing of
+	Just (ADataCon data_con) -> returnM data_con
+	other	      		 -> notFound "tcLookupDataCon" con_name
 
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name
@@ -353,16 +359,19 @@ tcLookupId :: Name -> TcM Id
 tcLookupId name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id lvl	  -> returnM tc_id
-	AGlobal (AnId id) -> returnM id
-	other		  -> pprPanic "tcLookupId" (ppr name)
+	ATcId tc_id lvl	      -> returnM tc_id
+	AGlobal (AnId id)     -> returnM id
+	AGlobal (ADataCon dc) -> returnM (dataConWrapId dc)
+		-- C.f. tcLookupGlobalId
+	other		      -> pprPanic "tcLookupId" (ppr name)
 
 tcLookupIdLvl :: Name -> TcM (Id, Level)
 tcLookupIdLvl name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id lvl	  -> returnM (tc_id, lvl)
-	AGlobal (AnId id) -> returnM (id, topIdLvl id)
+	ATcId tc_id lvl	      -> returnM (tc_id, lvl)
+	AGlobal (AnId id)     -> returnM (id, topIdLvl id)
+	AGlobal (ADataCon dc) -> returnM (dataConWrapId dc, impLevel)
 	other		  -> pprPanic "tcLookupIdLvl" (ppr name)
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]

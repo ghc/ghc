@@ -31,7 +31,7 @@ import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
 import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
-import Id		( Id, idType, idInfo, isDataConId,
+import Id		( Id, idType, idInfo, isDataConWorkId,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo,
 			  idUnfolding, idNewStrictness
 			)
@@ -275,7 +275,7 @@ interestingArg :: OutExpr -> Bool
 interestingArg (Var v)	         = hasSomeUnfolding (idUnfolding v)
 					-- Was: isValueUnfolding (idUnfolding v')
 					-- But that seems over-pessimistic
-				 || isDataConId v
+				 || isDataConWorkId v
 					-- This accounts for an argument like
 					-- () or [], which is definitely interesting
 interestingArg (Type _)	         = False

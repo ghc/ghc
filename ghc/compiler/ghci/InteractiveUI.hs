@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.142 2002/12/27 12:20:06 panne Exp $
+-- $Id: InteractiveUI.hs,v 1.143 2003/02/12 15:01:35 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -26,10 +26,10 @@ import DriverUtil	( remove_spaces, handle )
 import Linker		( initLinker, showLinkerState, linkLibraries, 
 			  linkPackages )
 import Util
-import Id		( isRecordSelector, recordSelectorFieldLabel, 
-			  isDataConWrapId, isDataConId, idName )
+import Id		( isRecordSelector, isImplicitId, recordSelectorFieldLabel, idName )
 import Class		( className )
 import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon, DataConDetails(..) )
+import DataCon		( dataConName )
 import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
 import Module		( showModMsg, lookupModuleEnv )
@@ -497,6 +497,8 @@ info s = do
 
     showTyThing (AClass cl)
        = hcat [ppr cl, text " is a class", showSrcLoc (className cl)]
+    showTyThing (ADataCon dc)
+       = hcat [ppr dc, text " is a data constructor", showSrcLoc (dataConName dc)]
     showTyThing (ATyCon ty)
        | isPrimTyCon ty
        = hcat [ppr ty, text " is a primitive type constructor"]
@@ -511,7 +513,6 @@ info s = do
 				recordSelectorFieldLabel id)) of
 			Nothing -> text "record selector"
 			Just c  -> text "method in class " <> ppr c
-       | isDataConWrapId id  = text "data constructor"
        | otherwise           = text "variable"
 
 	-- also print out the source location for home things
@@ -702,8 +703,9 @@ browseModule m exports_only = do
 
       things' = filter wantToSee things
 
-      wantToSee (AnId id) = not (isDataConId id || isDataConWrapId id)
-      wantToSee _ = True
+      wantToSee (AnId id)    = not (isImplicitId id)
+      wantToSee (ADataCon _) = False	-- They'll come via their TyCon
+      wantToSee _ 	     = True
 
       thing_names = map getName things
 

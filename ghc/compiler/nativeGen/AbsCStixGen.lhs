@@ -35,7 +35,6 @@ import Util		( naturalMergeSortLe )
 import Panic		( panic )
 import TyCon		( tyConDataCons )
 import Constants	( wORD_SIZE, bITMAP_BITS_SHIFT )
-import DataCon		( dataConWrapId )
 import Name             ( NamedThing(..) )
 import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
 import Outputable	( assertPanic )
@@ -156,7 +155,7 @@ Here we handle top-level things, like @CCodeBlock@s and
  gentopcode stmt@(CClosureTbl tycon)
   = returnUs [ StSegment TextSegment
              , StLabel (mkClosureTblLabel tycon)
-             , StData DataPtrRep (map (StCLbl . mkClosureLabel . getName . dataConWrapId) 
+             , StData DataPtrRep (map (StCLbl . mkClosureLabel . getName) 
                                       (tyConDataCons tycon) )
              ]
 

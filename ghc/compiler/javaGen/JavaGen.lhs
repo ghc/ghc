@@ -47,7 +47,7 @@ module JavaGen( javaGen ) where
 import Java
 
 import Literal	( Literal(..) )
-import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder, idPrimRep
+import Id	( Id, isDataConWorkId_maybe, isId, idName, isDeadBinder, idPrimRep
 		, isPrimOpId_maybe )
 import Name	( NamedThing(..), getOccString, isExternalName, isInternalName
 		, nameModule )
@@ -420,7 +420,7 @@ javaApp r (CoreSyn.App f a) as
 	| isValArg a = javaApp r f (a:as)
 	| otherwise  = javaApp r f as
 javaApp r (CoreSyn.Var f) as 
-  = case isDataConId_maybe f of {
+  = case isDataConWorkId_maybe f of {
 	Just dc | as `lengthIs` dataConRepArity dc
 	 -- NOTE: Saturated constructors never returning a primitive at this point
 	 --

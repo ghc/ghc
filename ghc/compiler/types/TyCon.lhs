@@ -67,7 +67,7 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..),
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import Maybes		( expectJust )
+import Maybes		( expectJust, orElse )
 import Outputable
 import FastString
 \end{code}
@@ -363,27 +363,33 @@ setTyConName tc name = tc {tyConName = name, tyConUnique = nameUnique name}
 \end{code}
 
 \begin{code}
+isFunTyCon :: TyCon -> Bool
 isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
 
+isPrimTyCon :: TyCon -> Bool
 isPrimTyCon (PrimTyCon {}) = True
 isPrimTyCon _              = False
 
+isUnLiftedTyCon :: TyCon -> Bool
 isUnLiftedTyCon (PrimTyCon  {isUnLifted = is_unlifted}) = is_unlifted
 isUnLiftedTyCon (TupleTyCon {tyConBoxed = boxity})      = not (isBoxed boxity)
 isUnLiftedTyCon _    				        = False
 
 -- isBoxedTyCon should not be applied to SynTyCon, nor KindCon
+isBoxedTyCon :: TyCon -> Bool
 isBoxedTyCon (AlgTyCon {}) = True
 isBoxedTyCon (FunTyCon {}) = True
 isBoxedTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isBoxedTyCon (PrimTyCon {primTyConRep = rep}) = isFollowableRep rep
 
 -- isAlgTyCon returns True for both @data@ and @newtype@
+isAlgTyCon :: TyCon -> Bool
 isAlgTyCon (AlgTyCon {})   = True
 isAlgTyCon (TupleTyCon {}) = True
 isAlgTyCon other 	   = False
 
+isDataTyCon :: TyCon -> Bool
 -- isDataTyCon returns True for data types that are represented by
 -- heap-allocated constructors.
 -- These are srcutinised by Core-level @case@ expressions, and they
@@ -391,7 +397,7 @@ isAlgTyCon other 	   = False
 --	True for all @data@ types
 --	False for newtypes
 --		  unboxed tuples
-isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data, algTyConRec = is_rec})  
+isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data})  
   = case new_or_data of
 	NewTyCon _ -> False
 	other	   -> True
@@ -399,12 +405,11 @@ isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data, algTyConRec = is_rec})
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
+isNewTyCon :: TyCon -> Bool
 isNewTyCon (AlgTyCon {algTyConFlavour = NewTyCon _}) = True 
 isNewTyCon other			             = False
 
-newTyConRep :: TyCon -> ([TyVar], Type)
-newTyConRep (AlgTyCon {tyConTyVars = tvs, algTyConFlavour = NewTyCon rep}) = (tvs, rep)
-
+isProductTyCon :: TyCon -> Bool
 -- A "product" tycon
 --	has *one* constructor, 
 --	is *not* existential
@@ -416,29 +421,36 @@ isProductTyCon (AlgTyCon {dataCons = DataCons [data_con]}) = not (isExistentialD
 isProductTyCon (TupleTyCon {}) 			  	   = True   
 isProductTyCon other				  	   = False
 
+isSynTyCon :: TyCon -> Bool
 isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
 
+isEnumerationTyCon :: TyCon -> Bool
 isEnumerationTyCon (AlgTyCon {algTyConFlavour = EnumTyCon}) = True
 isEnumerationTyCon other				    = False
 
+isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon
 -- but I thought that was silly so I've undone it
 -- If it can't be for some reason, it should be a AlgTyCon
 isTupleTyCon (TupleTyCon {}) = True
 isTupleTyCon other 	     = False
 
+isUnboxedTupleTyCon :: TyCon -> Bool
 isUnboxedTupleTyCon (TupleTyCon {tyConBoxed = boxity}) = not (isBoxed boxity)
 isUnboxedTupleTyCon other = False
 
+isBoxedTupleTyCon :: TyCon -> Bool
 isBoxedTupleTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isBoxedTupleTyCon other = False
 
 tupleTyConBoxity tc = tyConBoxed tc
 
+isRecursiveTyCon :: TyCon -> Bool
 isRecursiveTyCon (AlgTyCon {algTyConRec = Recursive}) = True
 isRecursiveTyCon other				      = False
 
+isForeignTyCon :: TyCon -> Bool
 -- isForeignTyCon identifies foreign-imported type constructors
 -- For the moment, they are primitive but lifted, but that may change
 isForeignTyCon (PrimTyCon {isUnLifted = is_unlifted}) = not is_unlifted
@@ -452,7 +464,9 @@ tyConDataConDetails (TupleTyCon {dataCon = con}) = DataCons [con]
 tyConDataConDetails other			 = Unknown
 
 tyConDataCons :: TyCon -> [DataCon]
-tyConDataCons tycon = expectJust "tyConDataCons" (tyConDataCons_maybe tycon)
+-- It's convenient for tyConDataCons to return the
+-- empty list for type synonyms etc
+tyConDataCons tycon = tyConDataCons_maybe tycon `orElse` []
 
 tyConDataCons_maybe :: TyCon -> Maybe [DataCon]
 tyConDataCons_maybe (AlgTyCon {dataCons = DataCons cons}) = Just cons
@@ -473,6 +487,9 @@ tyConSelIds other_tycon		       = []
 \end{code}
 
 \begin{code}
+newTyConRep :: TyCon -> ([TyVar], Type)
+newTyConRep (AlgTyCon {tyConTyVars = tvs, algTyConFlavour = NewTyCon rep}) = (tvs, rep)
+
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
 tyConPrimRep tc			              = ASSERT( not (isUnboxedTupleTyCon tc) )

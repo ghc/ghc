@@ -28,7 +28,6 @@ import DataCon
 import CostCentre	( noCCS )
 import VarSet
 import VarEnv
-import DataCon		( dataConWrapId )
 import Maybes		( maybeToBool )
 import Name		( getOccName, isExternalName, isDllName )
 import OccName		( occNameUserString )
@@ -497,12 +496,12 @@ coreToStgApp maybe_thunk_body f args
 
 	res_ty = exprType (mkApps (Var f) args)
 	app = case globalIdDetails f of
-      		DataConId dc | saturated -> StgConApp dc args'
-	        PrimOpId op  		 -> ASSERT( saturated )
-					    StgOpApp (StgPrimOp op) args' res_ty
-		FCallId call		 -> ASSERT( saturated )
-					    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
-		_other      		 -> StgApp f args'
+      		DataConWorkId dc | saturated -> StgConApp dc args'
+	        PrimOpId op  		     -> ASSERT( saturated )
+					        StgOpApp (StgPrimOp op) args' res_ty
+		FCallId call	 -> ASSERT( saturated )
+				    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+		_other      	 -> StgApp f args'
 
     in
     returnLne (
@@ -1192,7 +1191,7 @@ rhsIsNonUpd p other_expr
 
 idAppIsNonUpd :: IdEnv HowBound -> Id -> Int -> [CoreExpr] -> Bool
 idAppIsNonUpd p id n_val_args args
-  | Just con <- isDataConId_maybe id = not (isCrossDllConApp con args)
+  | Just con <- isDataConWorkId_maybe id = not (isCrossDllConApp con args)
   | otherwise = False 	-- SDM: disbled.  See comment with isPAP above.
 			-- n_val_args < stgArity id (lookupBinding p id)
 

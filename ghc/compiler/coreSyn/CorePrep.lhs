@@ -16,16 +16,17 @@ import CoreLint	( endPass )
 import CoreSyn
 import Type	( Type, applyTy, splitFunTy_maybe, 
 		  isUnLiftedType, isUnboxedTupleType, seqType )
+import TcType	( TyThing( AnId ) )
 import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import Var 	( Var, Id, setVarUnique )
 import VarSet
 import VarEnv
 import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
-		  isFCallId, isGlobalId, 
+		  isFCallId, isGlobalId, isImplicitId,
 		  isLocalId, hasNoBinding, idNewStrictness, 
-		  isDataConId_maybe, idUnfolding
+		  idUnfolding, isDataConWorkId_maybe
 		)
-import HscTypes ( ModGuts(..), ModGuts, implicitTyThingIds, typeEnvElts )
+import HscTypes ( ModGuts(..), ModGuts, typeEnvElts )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
@@ -154,14 +155,18 @@ partial applications. But it's easier to let them through.
 \begin{code}
 mkImplicitBinds type_env
   = [ NonRec id (get_unfolding id)
-    | id <- implicitTyThingIds (typeEnvElts type_env) ]
+    | AnId id <- typeEnvElts type_env, isImplicitId id ]
+	-- The type environment already contains all the implicit Ids, 
+	-- so we just filter them out
+	--
 	-- The etaExpand is so that the manifest arity of the
 	-- binding matches its claimed arity, which is an 
 	-- invariant of top level bindings going into the code gen
 
 get_unfolding id 	-- See notes above
-  | Just data_con <- isDataConId_maybe id = Var id	-- The ice is thin here, but it works
-  | otherwise			  	  = unfoldingTemplate (idUnfolding id)
+  | Just data_con <- isDataConWorkId_maybe id = Var id	-- The ice is thin here, but it works
+							-- CorePrep will eta-expand it
+  | otherwise			     	      = unfoldingTemplate (idUnfolding id)
 \end{code}
 	
 

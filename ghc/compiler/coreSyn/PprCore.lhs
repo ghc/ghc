@@ -19,7 +19,7 @@ module PprCore (
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import Var		( Var )
-import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
+import Id		( Id, idType, isDataConWorkId_maybe, idLBVarInfo, idArity,
 			  idInfo, idInlinePragma, idOccInfo,
 #ifdef OLD_STRICTNESS
 			  idDemandInfo, 
@@ -138,7 +138,7 @@ ppr_expr add_par expr@(App fun arg)
 	pp_tup_args = sep (punctuate comma (map pprArg val_args))
     in
     case fun of
-	Var f -> case isDataConId_maybe f of
+	Var f -> case isDataConWorkId_maybe f of
 			-- Notice that we print the *worker*
 			-- for tuples in paren'd format.
 		   Just dc | saturated && isTupleTyCon tc

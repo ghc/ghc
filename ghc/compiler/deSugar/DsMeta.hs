@@ -59,8 +59,8 @@ import Name	  ( mkKnownKeyExternalName )
 import OccName	  ( mkOccFS )
 import NameEnv
 import NameSet
-import Type       ( Type, TyThing(..), mkGenTyConApp )
-import TcType	  ( tcTyConAppArgs )
+import Type       ( Type, mkGenTyConApp )
+import TcType	  ( TyThing(..), tcTyConAppArgs )
 import TyCon	  ( DataConDetails(..) )
 import TysWiredIn ( stringTy )
 import CoreSyn
