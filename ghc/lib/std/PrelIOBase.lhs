@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.32 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.33 2001/02/06 11:42:30 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -269,9 +269,10 @@ instance Show Handle where
      -- (Big) SIGH: unfolded defn of takeMVar to avoid
      -- an (oh-so) unfortunate module loop with PrelConc.
      hdl_ = unsafePerformIO (IO $ \ s# ->
-	     case h               of { MVar h# ->
-	     case takeMVar# h# s# of { (# s2# , r #) -> 
-		    (# s2#, r #) }})
+	     case h                 of { MVar h# ->
+	     case takeMVar# h# s#   of { (# s2# , r #) -> 
+	     case putMVar# h# r s2# of { s3# ->
+	     (# s3#, r #) }}})
 #endif
 #else
      hdl_ = unsafePerformIO (stToIO (readVar h))
