@@ -16,7 +16,7 @@ import RdrHsSyn		( RdrNameMonoBinds )
 import RnHsSyn		( RenamedHsBinds, RenamedTyClDecl, RenamedHsPred )
 import CmdLineOpts	( DynFlag(..) )
 
-import Generics		( mkGenericBinds )
+import Generics		( mkTyConGenericBinds )
 import TcRnMonad
 import TcEnv		( newDFunName, 
 			  InstInfo(..), pprInstInfo, InstBindings(..),
@@ -43,7 +43,7 @@ import Name		( Name, getSrcLoc )
 import NameSet		( NameSet, emptyNameSet, duDefs )
 import Unique		( Unique, getUnique )
 
-import TyCon		( tyConTyVars, tyConDataCons, tyConArity, 
+import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConTheta, isProductTyCon, isDataTyCon,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
@@ -211,8 +211,7 @@ tcDeriving tycl_decls
 		-- before tacking the "ordinary" ones
 
 	-- Generate the generic to/from functions from each type declaration
-	; tcg_env <- getGblEnv
-	; let gen_binds = mkGenericBinds (typeEnvTyCons (tcg_type_env tcg_env))
+	; gen_binds <- mkGenericBinds tycl_decls
 	; let inst_info  = newtype_inst_info ++ ordinary_inst_info
 
 	-- Rename these extra bindings, discarding warnings about unused bindings etc
@@ -254,6 +253,13 @@ deriveOrdinaryStuff eqns
 
 	-- Done
 	; returnM (inst_infos, andMonoBindList (extra_binds : aux_binds_s)) }
+
+-----------------------------------------
+mkGenericBinds tycl_decls
+  = do	{ tcs <- mapM tcLookupTyCon [tc_name | TyData { tcdName = tc_name } <- tycl_decls]
+		-- We are only interested in the data type declarations
+	; return (andMonoBindList [mkTyConGenericBinds tc | tc <- tcs, tyConHasGenerics tc]) }
+		-- And then only in the ones whose 'has-generics' flag is on
 \end{code}
 
 

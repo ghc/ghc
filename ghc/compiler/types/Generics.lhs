@@ -1,5 +1,5 @@
 \begin{code}
-module Generics ( canDoGenerics, mkGenericBinds,
+module Generics ( canDoGenerics, mkTyConGenericBinds,
 		  mkGenericRhs, 
 		  validGenericInstanceType, validGenericMethodType
     ) where
@@ -248,12 +248,8 @@ canDoGenerics data_cons
 type US = Int	-- Local unique supply, just a plain Int
 type FromAlt = (Pat RdrName, HsExpr RdrName)
 
-mkGenericBinds :: [TyCon] -> MonoBinds RdrName
-mkGenericBinds tcs = andMonoBindList [ mkTyConGenBinds tc 
-				     | tc <- tcs, tyConHasGenerics tc]
-
-mkTyConGenBinds :: TyCon -> MonoBinds RdrName
-mkTyConGenBinds tycon
+mkTyConGenericBinds :: TyCon -> MonoBinds RdrName
+mkTyConGenericBinds tycon
   = FunMonoBind from_RDR False {- Not infix -}
 		[mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
 		loc
