@@ -184,7 +184,7 @@ FptoolsHcOpts=-O
 #
 # NOTE: this is not the same as building the compiler itself
 # unregisterised.  That's done by either (a) bootstrapping with a
-# compiler that was built with GhcUnregisterized=YES, or (b)
+# compiler that was built with GhcUnregisterised=YES, or (b)
 # bootstrapping with a compiler that has way 'u' libraries, and the
 # flag '-unreg' is added to GhcHcOpts above.
 #
