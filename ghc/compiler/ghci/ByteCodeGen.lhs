@@ -314,11 +314,9 @@ schemeE d s p (fvs, AnnLit literal)
       let x = fn atom1 .. atomn  in B
    and
       let x = Con atom1 .. atomn  in B
-              (Con must be saturated, and atom1 .. n must be ptr-rep'd)
+              (Con must be saturated)
 
-   In these cases, generate code to allocate in-line.  The ptr-rep'd
-   restriction avoids the problem of having to reorder constructor
-   args.
+   In these cases, generate code to allocate in-line.
 
    This is optimisation of the general case for let, which follows
    this one; this case can safely be omitted.  The reduction in
@@ -327,13 +325,14 @@ schemeE d s p (fvs, AnnLit literal)
 
    This optimisation should be done more cleanly.  As-is, it is
    inapplicable to RHSs in letrecs, and needlessly duplicates code in
-   schemeR.  Some refactoring of the machinery would cure both ills.
+   schemeR and schemeT.  Some refactoring of the machinery would cure
+   both ills.  
 -}
 schemeE d s p ee@(fvs, AnnLet (AnnNonRec x rhs) b)
    | ok_to_go
    = let d_init = if is_con then d else d'
      in
-     mkPushes d_init order_in_which_to_push	`thenBc` \ (d_final, push_code) ->
+     mkPushes d_init args_r_to_l_reordered	`thenBc` \ (d_final, push_code) ->
      schemeE d' s p' b				`thenBc` \ body_code ->
      let size  = d_final - d_init
          alloc = if is_con then nilOL else unitOL (ALLOC size)
@@ -348,20 +347,24 @@ schemeE d s p ee@(fvs, AnnLet (AnnNonRec x rhs) b)
                  Nothing        -> (False, bomb 1, bomb 2, bomb 3)
                  Just (Left fn) -> (True,  False,  bomb 5, fn)
                  Just (Right dcon)
-                    |  all isPtrRepdVar args_r_to_l 
-                       && dataConRepArity dcon <= length args_r_to_l
+                    |  dataConRepArity dcon <= length args_r_to_l
                     -> (True, True, dcon, bomb 6)
                     |  otherwise
                     -> (False, bomb 7, bomb 8, bomb 9)
         bomb n = panic ("schemeE.is_con(hacky hack hack) " ++ show n)
 
-        isPtrRepdVar (_, AnnVar v)    = isFollowableRep (idPrimRep v)
-        isPtrRepdVar (_, AnnNote n e) = isPtrRepdVar e
-        isPtrRepdVar (_, AnnApp f (_, AnnType _)) = isPtrRepdVar f
-        isPtrRepdVar _                = False
-
         -- Extract the args (R -> L) and fn
-        order_in_which_to_push = map snd args_r_to_l
+        args_r_to_l_reordered
+           | not is_con
+           = args_r_to_l
+           | otherwise
+           = filter (not.isPtr.snd) args_r_to_l ++ filter (isPtr.snd) args_r_to_l
+             where isPtr = isFollowableRep . atomRep
+
+        args_r_to_l = filter (not.isTypeAtom.snd) args_r_to_l_raw
+        isTypeAtom (AnnType _) = True
+        isTypeAtom _           = False
+
         (args_r_to_l_raw, maybe_fn) = chomp rhs
         chomp expr
            = case snd expr of
@@ -372,29 +375,28 @@ schemeE d s p ee@(fvs, AnnLet (AnnNonRec x rhs) b)
                    -> case isDataConId_maybe v of
                          Just dcon -> ([], Just (Right dcon))
                          Nothing   -> ([], Just (Left v))
-
                 AnnApp f a  -> case chomp f of (az, f) -> (a:az, f)
                 AnnNote n e -> chomp e
                 other       -> ([], Nothing)
-        args_r_to_l = filter (not.isTypeAtom.snd) args_r_to_l_raw
-        isTypeAtom (AnnType _) = True
-        isTypeAtom _           = False
 
         -- This is the env in which to translate the body
         p' = addToFM p x d
         d' = d + 1
 
         -- Shove the args on the stack, including the fn in the non-dcon case
-        mkPushes :: Int{-curr depth-} -> [AnnExpr' Id VarSet] 
+        tag_when_push = not is_con
+
+        mkPushes :: Int{-curr depth-} -> [AnnExpr Id VarSet] 
                  -> BcM (Int{-final depth-}, BCInstrList)
         mkPushes dd []
            | is_con
            = returnBc (dd, nilOL)
            | otherwise
-           = pushAtom True dd p' (AnnVar the_fn) `thenBc` \ (fn_push_code, fn_szw) ->
+           = pushAtom False dd p' (AnnVar the_fn) `thenBc` \ (fn_push_code, fn_szw) ->
              returnBc (dd+fn_szw, fn_push_code)
         mkPushes dd (atom:atoms) 
-           = pushAtom True dd p' atom	 	`thenBc` \ (push1_code, push1_szw) ->
+           = pushAtom tag_when_push dd p' (snd atom) 	
+						`thenBc` \ (push1_code, push1_szw) ->
              mkPushes (dd+push1_szw) atoms 	`thenBc` \ (dd_final, push_rest) ->
              returnBc (dd_final, push1_code `appOL` push_rest)
 
