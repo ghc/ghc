@@ -29,8 +29,8 @@ module IOExts
 	, openFileEx
 	, IOModeEx(..)
 
---        , setEcho
---	, getEcho
+        , hSetEcho
+	, hGetEcho
 
         , trace
         , performGC
@@ -42,7 +42,9 @@ module IOExts
 \begin{code}
 import PrelBase
 import PrelIOBase
-import PrelHandle ( openFileEx, IOModeEx(..) )
+import PrelHandle ( openFileEx, IOModeEx(..),
+		    hSetEcho, hGetEcho
+		  )
 import PrelST
 import PrelArr
 import PrelGHC
@@ -91,9 +93,3 @@ writeIOArray (IOArray arr) ix elt = stToIO (writeArray arr ix elt)
 freezeIOArray (IOArray arr) = stToIO (freezeArray arr)
 \end{code}
 
-begin{code}
-setEcho :: Handle -> Bool -> IO ()
-setEcho 
-
-getEcho :: Handle -> IO Bool
-end{code}
