@@ -7,10 +7,10 @@ boot :: all
 SCRIPT_PROG=mkdependHS
 SCRIPT_OBJS=mkdependHS.prl
 SCRIPT_SUBST_VARS= \
- RAWCPP TMPDIR \
+ TMPDIR \
  TOP_PWD \
  INSTALLING \
- PROJECTVERSION SED
+ PROJECTVERSION
 
 INTERP=perl
 
@@ -20,7 +20,7 @@ INTERP=perl
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
 
 ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir datadir
+SCRIPT_SUBST_VARS += libdir datadir RAWCPP SED
 endif
 
 
