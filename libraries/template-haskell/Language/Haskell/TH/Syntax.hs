@@ -36,7 +36,7 @@ module Language.Haskell.TH.Syntax(
 	-- Internal functions
 	returnQ, bindQ, sequenceQ,
 	NameFlavour(..), NameSpace (..), 
-	mkNameG_v, mkNameG_d, mkNameG_tc, mkNameU,
+	mkNameG_v, mkNameG_d, mkNameG_tc, mkNameL, mkNameU,
  	tupleTypeName, tupleDataName,
 	OccName, mkOccName, occString,
 	ModName, mkModName, modString
@@ -285,6 +285,14 @@ data NameFlavour
 
   | NameU Int#			-- A unique local name
 
+	-- The next two are for lexically-scoped names that
+	-- are bound *outside* the TH syntax tree, 
+	-- either globally (NameG) or locally (NameL)
+	-- e.g. f x = $(h [| (map, x) |]
+	--      The 'map' will be a NameG, and 'x' wil be a NameL
+	-- These Names should never appear in a binding position in a TH syntax tree
+
+  | NameL Int#			-- 
   | NameG NameSpace ModName	-- An original name (occurrences only, not binders)
 				-- Need the namespace too to be sure which 
 				-- thing we are naming
@@ -325,6 +333,9 @@ mkName str
 mkNameU :: String -> Uniq -> Name	-- Only used internally
 mkNameU s (I# u) = Name (mkOccName s) (NameU u)
 
+mkNameL :: String -> Uniq -> Name	-- Only used internally
+mkNameL s (I# u) = Name (mkOccName s) (NameL u)
+
 mkNameG :: NameSpace -> String -> String -> Name	-- Used for 'x etc, but not available
 mkNameG ns mod occ 					-- to the programmer
   = Name (mkOccName occ) (NameG ns (mkModName mod))
@@ -344,7 +355,7 @@ instance Eq NameFlavour where
   f1 == f2 = cmpEq (f1 `compare` f2)
 
 instance Ord NameFlavour where
-	-- NameS < NameQ < NameU < NameG
+	-- NameS < NameQ < NameU < NameL < NameG
   NameS `compare` NameS = EQ
   NameS `compare` other = LT
 
@@ -359,15 +370,27 @@ instance Ord NameFlavour where
 				  | otherwise = GT
   (NameU _)  `compare` other = LT
 
-  (NameG ns1 m1) `compare` (NameG ns2 m2)  = (ns1 `compare` ns2) `thenCmp`
-					     (m1 `compare` m2)
-  (NameG _ _)    `compare` other	   = GT
+  (NameL _)  `compare` NameS      = GT
+  (NameL _)  `compare` (NameQ _)  = GT
+  (NameL _)  `compare` (NameU _)  = GT
+  (NameL u1) `compare` (NameL u2) | u1  <# u2 = LT
+				  | u1 ==# u2 = EQ
+				  | otherwise = GT
+  (NameL _)  `compare` other      = LT
+
+  (NameG ns1 m1) `compare` (NameG ns2 m2) = (ns1 `compare` ns2) `thenCmp`
+					    (m1 `compare` m2)
+  (NameG _ _)    `compare` other	  = GT
 
 instance Show Name where
+	-- For now, we make the NameQ and NameG print the same, 
+	-- and ditto NameU and NameL.  We may well want to
+	-- distinguish them in the end.
   show (Name occ NameS)        = occString occ
-  show (Name occ (NameQ m))    = modString m ++ "." ++ occString occ
   show (Name occ (NameU u))    = occString occ ++ "_" ++ show (I# u)
-  show (Name occ (NameG ns m)) = modString m ++ ":" ++ occString occ
+  show (Name occ (NameQ m))    = modString m ++ "." ++ occString occ
+  show (Name occ (NameL u))    = occString occ ++ "_" ++ show (I# u)
+  show (Name occ (NameG ns m)) = modString m   ++ "." ++ occString occ
 
 
 -- 	Tuple data and type constructors
@@ -579,9 +602,6 @@ data Con = NormalC Name [StrictType]
 
 type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)
-
-data Module = Module [ Dec ] 
-             deriving( Show, Eq )
 
 -- FIXME: Why this special status for "List" (even tuples might be handled
 --      differently)? -=chak
