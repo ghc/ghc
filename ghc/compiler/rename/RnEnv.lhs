@@ -41,8 +41,6 @@ import PrelNames	( mkUnboundName )
 import CmdLineOpts
 \end{code}
 
-
-
 %*********************************************************
 %*							*
 \subsection{Making new names}
@@ -50,8 +48,6 @@ import CmdLineOpts
 %*********************************************************
 
 \begin{code}
-implicitImportProvenance = NonLocalDef ImplicitImport False
-
 newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
 newTopBinder mod rdr_name loc
   = 	-- First check the cache
@@ -173,8 +169,8 @@ lookupTopBndrRn rdr_name
 		getModuleRn		`thenRn` \ mod ->
 		getGlobalNameEnv	`thenRn` \ global_env ->
 		case lookupRdrEnv global_env (qualifyRdrName (moduleName mod) rdr_name) of
-		  Just (name:rest) -> ASSERT( null rest )
-				      returnRn name 
+		  Just ((name,_):rest) -> ASSERT( null rest )
+				      	  returnRn name 
 		  Nothing	   -> 	-- Almost always this case is a compiler bug.
 					-- But consider a type signature that doesn't have 
 					-- a corresponding binder: 
@@ -221,8 +217,9 @@ lookupGlobalOccRn rdr_name
     getGlobalNameEnv	`thenRn` \ global_env ->
     case lookupRdrEnv global_env rdr_name of
 	Just [(name,_)]	 -> returnRn name
-	Just stuff@(_:_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
-			    returnRn rdr_name
+	Just stuff@((name,_):_) 
+		-> addNameClashErrRn rdr_name stuff	`thenRn_`
+       		   returnRn name
 	Nothing -> 	-- Not found when processing source code; so fail
 			failWithRn (mkUnboundName rdr_name)
 				   (unknownNameErr rdr_name)
@@ -512,9 +509,9 @@ combine_globals ns_old ns_new	-- ns_new is often short
 
     (n,pn) `beats` (m,pm) = n==m && pn `hasBetterProv` pm
 
-    is_duplicate :: Provenance -> (Name,Provenance) -> Bool
-    is_duplicate (n1,LocalDef _) (n2,LocalDef _) = False
-    is_duplicate n1		 n2		 = n1 == n2
+    is_duplicate :: (Name,Provenance) -> (Name,Provenance) -> Bool
+    is_duplicate (n1,LocalDef) (n2,LocalDef) = False
+    is_duplicate (n1,_)        (n2,_)	     = n1 == n2
 \end{code}
 
 We treat two bindings of a locally-defined name as a duplicate,
@@ -685,7 +682,7 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 warnUnusedModules :: [Module] -> RnM d ()
 warnUnusedModules mods
   = doptRn Opt_WarnUnusedImports `thenRn` \ warn ->
-    if warn then mapRn_ (addWarnRn . unused_mod . moduleName) mods
+    if warn then mapRn_ (addWarnRn . unused_mod) mods
 	    else returnRn ()
   where
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
@@ -696,7 +693,7 @@ warnUnusedModules mods
 warnUnusedImports :: [(Name,Provenance)] -> RnM d ()
 warnUnusedImports names
   = doptRn Opt_WarnUnusedImports `thenRn` \ warn ->
-    if warn then warnUnusedBinds names else return ()
+    if warn then warnUnusedBinds names else returnRn ()
 
 warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM d ()
 warnUnusedLocalBinds names
@@ -717,15 +714,8 @@ warnUnusedBinds names
   where
 	-- Group by provenance
    groups = equivClasses cmp names
-   (_,prov1) `cmp` (_,prov2) = prov1 `cmp_prov` prov2
+   (_,prov1) `cmp` (_,prov2) = prov1 `compare` prov2
  
-   cmp_prov (LocalDef _ _) (NonLocalDef _ _)       = LT
-   cmp_prov (LocalDef loc1 _) (LocalDef loc2 _)    = loc1 `compare` loc2
-   cmp_prov (NonLocalDef (UserImport m1 loc1 _) _)
-            (NonLocalDef (UserImport m2 loc2 _) _) =
-	 (m1 `compare` m2) `thenCmp` (loc1 `compare` loc2)
-   cmp_prov (NonLocalDef _ _) (LocalDef _ _)       = GT
-			-- In-scope NonLocalDefs must have UserImport info on them
 
 -------------------------
 
@@ -736,13 +726,13 @@ warnUnusedGroup names
   | otherwise
   = pushSrcLocRn def_loc	$
     addWarnRn			$
-    sep [msg <> colon, nest 4 (fsep (punctuate comma (map ppr filtered_names)))]
+    sep [msg <> colon, nest 4 (fsep (punctuate comma (map (ppr.fst) filtered_names)))]
   where
     filtered_names = filter reportable names
     (name1, prov1) = head filtered_names
     (is_local, def_loc, msg)
 	= case prov1 of
-		LocalDef loc _  -> (True, loc, text "Defined but not used")
+		LocalDef -> (True, getSrcLoc name1, text "Defined but not used")
 
 		NonLocalDef (UserImport mod loc _) _ 
 			-> (True, loc, text "Imported from" <+> quotes (ppr mod) <+> text "but not used")

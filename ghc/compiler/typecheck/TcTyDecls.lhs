@@ -48,7 +48,7 @@ import Type		( tyVarsOfTypes, splitFunTy, applyTys,
 			)
 import TysWiredIn	( unitTy )
 import VarSet		( intersectVarSet, isEmptyVarSet )
-import PrelNames	( unpackCStringIdKey, unpackCStringUtf8IdKey )
+import PrelNames	( unpackCStringName, unpackCStringUtf8Name )
 import ListSetOps	( equivClasses )
 \end{code}
 
@@ -263,8 +263,8 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 	-- data type use the same type variables
   = checkTc (all (== field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
-    tcLookupGlobalId unpackCStringIdName	`thenTc` \ unpack_id ->
-    tcLookupGlobalId unpackCStringUtf8IdName	`thenTc` \ unpackUtf8_id ->
+    tcLookupGlobalId unpackCStringName		`thenTc` \ unpack_id ->
+    tcLookupGlobalId unpackCStringUtf8Name	`thenTc` \ unpackUtf8_id ->
     returnTc (mkRecordSelId tycon first_field_label unpack_id unpackUtf8_id)
   where
     field_ty   = fieldLabelType first_field_label

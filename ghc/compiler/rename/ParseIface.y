@@ -49,10 +49,11 @@ import IdInfo           ( exactArity, InlinePragInfo(..) )
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
 
-import RnMonad		( ImportVersion, ParsedIface(..), WhatsImported(..),
-			  ExportItem, RdrAvailInfo, GenAvailInfo(..), 
-                          WhetherHasOrphans, IsBootInterface
-			) 
+import RnMonad		( ParsedIface(..) ) 
+import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..), 
+                          ImportVersion, ExportItem, WhatsImported(..),
+                          RdrAvailInfo )
+
 import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
 import Name		( OccName )
 import OccName          ( mkSysOccFS,
@@ -246,7 +247,7 @@ import_part :				    		  { [] }
 	    
 import_decl :: { ImportVersion OccName }
 import_decl : 'import' mod_name orphans is_boot whats_imported ';'
-			{ (mkSysModuleNameFS $2, $3, $4, $5) }
+			{ ({-mkSysModuleNameFS-} $2, $3, $4, $5) }
 
 orphans		    :: { WhetherHasOrphans }
 orphans		    : 						{ False }
@@ -275,7 +276,7 @@ name_version_pair   :  var_occ version			        { ($1, $2) }
 exports_part	:: { [ExportItem] }
 exports_part	:  					{ [] }
 		| '__export' mod_name entities ';'
-			exports_part 			{ (mkSysModuleNameFS $2, $3) : $5 }
+			exports_part 			{ ({-mkSysModuleNameFS-} $2, $3) : $5 }
 
 entities	:: { [RdrAvailInfo] }
 entities	: 					{ [] }

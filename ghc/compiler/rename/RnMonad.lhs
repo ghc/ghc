@@ -60,7 +60,8 @@ import UniqSupply
 import Outputable
 import Finder		( Finder )
 import PrelNames	( mkUnboundName )
-import HscTypes		( GlobalSymbolTable, OrigNameEnv, AvailEnv, 
+import HscTypes		( GlobalSymbolTable, AvailEnv, 
+			  OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 			  WhetherHasOrphans, ImportVersion, ExportItem,
 			  PersistentRenamerState(..), IsBootInterface, Avails,
 			  DeclsMap, IfaceInsts, IfaceRules, DeprecationEnv,
@@ -120,7 +121,9 @@ data RnDown
 	rn_hst     :: HomeSymbolTable,
 
 	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
-	rn_ns      :: IORef (UniqSupply, OrigNameEnv),
+
+	-- The second and third components are a flattened-out OrigNameEnv
+	rn_ns      :: IORef (UniqSupply, OrigNameNameEnv, OrigNameIParamEnv),
 	rn_ifaces  :: IORef Ifaces
     }
 
@@ -275,7 +278,8 @@ initRn dflags finder hst pcs mod loc do_rn
   = do 
 	let prs = pcs_PRS pcs
 	uniqs     <- mkSplitUniqSupply 'r'
-	names_var <- newIORef (uniqs, prsOrig prs)
+	names_var <- newIORef (uniqs, origNames (prsOrig prs), 
+				      origIParam (prsOrig prs))
 	errs_var  <- newIORef (emptyBag,emptyBag)
 	iface_var <- newIORef (initIfaces pcs)
 	let rn_down = RnDown { rn_mod = mod,
@@ -294,11 +298,11 @@ initRn dflags finder hst pcs mod loc do_rn
 	res <- do_rn rn_down ()
 	
 	-- Grab state and record it
-	(warns, errs) <- readIORef errs_var
-	new_ifaces    <- readIORef iface_var
-	(_, new_orig) <- readIORef names_var
-
-	let new_prs = prs { prsOrig = new_orig, 
+	(warns, errs) 		   <- readIORef errs_var
+	new_ifaces    		   <- readIORef iface_var
+	(_, new_origN, new_origIP) <- readIORef names_var
+	let new_orig = Orig { origNames = new_origN, origIParam = new_origIP }
+	let new_prs = prs { prsOrig = new_orig,
 			    prsDecls = iDecls new_ifaces,
 			    prsInsts = iInsts new_ifaces,
 			    prsRules = iRules new_ifaces }
@@ -360,9 +364,10 @@ renameSourceCode dflags mod prs m
 	-- only do any I/O if we need to read in a fixity declaration;
 	-- and that doesn't happen in pragmas etc
 
-        mkSplitUniqSupply 'r'			>>= \ new_us ->
-	newIORef (new_us, prsOrig prs)		>>= \ names_var ->
-	newIORef (emptyBag,emptyBag)		>>= \ errs_var ->
+        mkSplitUniqSupply 'r'				>>= \ new_us ->
+	newIORef (new_us, origNames (prsOrig prs), 
+			  origIParam (prsOrig prs))	>>= \ names_var ->
+	newIORef (emptyBag,emptyBag)			>>= \ errs_var ->
     	let
 	    rn_down = RnDown { rn_dflags = dflags,
 			       rn_loc = generatedSrcLoc, rn_ns = names_var,
@@ -551,21 +556,21 @@ getHomeSymbolTableRn down l_down = return (rn_hst down)
 %=====================
 
 \begin{code}
-getNameSupplyRn :: RnM d (UniqSupply, OrigNameEnv)
+getNameSupplyRn :: RnM d (UniqSupply, OrigNameNameEnv, OrigNameIParamEnv)
 getNameSupplyRn rn_down l_down
   = readIORef (rn_ns rn_down)
 
-setNameSupplyRn :: (UniqSupply, OrigNameEnv) -> RnM d ()
+setNameSupplyRn :: (UniqSupply, OrigNameNameEnv, OrigNameIParamEnv) -> RnM d ()
 setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeIORef names_var names'
 
 getUniqRn :: RnM d Unique
 getUniqRn (RnDown {rn_ns = names_var}) l_down
- = readIORef names_var >>= \ (us, {-cache,-} ipcache) ->
+ = readIORef names_var >>= \ (us, cache, ipcache) ->
    let
      (us1,us') = splitUniqSupply us
    in
-   writeIORef names_var (us', {-cache,-} ipcache)  >>
+   writeIORef names_var (us', cache, ipcache)  >>
    return (uniqFromSupply us1)
 \end{code}
 

@@ -26,7 +26,7 @@ import Finder 		( Finder, newFinder,
 import CmSummarise 	( summarise, ModSummary(..), 
 			  mi_name, ms_get_imports,
 			  name_of_summary, deps_of_summary )
-import CmCompile 	( PCS, emptyPCS, HST, HIT, CompResult(..), cmCompile )
+--import CmCompile 	( PCS, emptyPCS, HST, HIT, CompResult(..), cmCompile )
 import CmLink 		( PLS, emptyPLS, Linkable(..), 
 			  link, LinkResult(..), 
 			  filterModuleLinkables, modname_of_linkable,

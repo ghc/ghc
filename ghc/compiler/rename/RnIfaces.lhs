@@ -699,15 +699,15 @@ getInterfaceExports mod_name from
   = getHomeSymbolTableRn 		`thenRn` \ hst ->
     case lookupModuleEnvByName hst mod_name of {
 	Just mds -> returnRn (mdModule mds, mdExports mds) ;
-
  
     loadInterface doc_str mod_name from	`thenRn` \ ifaces ->
     case lookupModuleEnv (iPST ifaces) mod_name of
 	Just mds -> returnRn (mdModule mod, mdExports mds)
 	-- loadInterface always puts something in the map
 	-- even if it's a fake
-  where
-    doc_str = sep [pprModuleName mod_name, ptext SLIT("is directly imported")]
+    }
+    where
+      doc_str = sep [pprModuleName mod_name, ptext SLIT("is directly imported")]
 \end{code}
 
 

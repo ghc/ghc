@@ -10,9 +10,10 @@ module HscTypes (
 
 	TyThing(..), lookupTypeEnv, lookupFixityEnv,
 
-	WhetherHasOrphans, ImportVersion, ExportItem,
+	WhetherHasOrphans, ImportVersion, ExportItem, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-	IfaceInsts, IfaceRules, DeprecationEnv, OrigNameEnv, 
+	IfaceInsts, IfaceRules, DeprecationEnv, 
+	OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
 
@@ -61,6 +62,7 @@ import VarSet		( TyVarSet )
 import Panic		( panic )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
+import Util		( thenCmp )
 \end{code}
 
 %************************************************************************
@@ -360,9 +362,14 @@ we just store junk.  Then when we find the binding site, we fix it up.
 
 \begin{code}
 data OrigNameEnv
- = Orig { origNames  :: FiniteMap (ModuleName,OccName) Name,	-- Ensures that one original name gets one unique
-	  origIParam :: FiniteMap OccName Name			-- Ensures that one implicit parameter name gets one unique
+ = Orig { origNames  :: OrigNameNameEnv,
+		-- Ensures that one original name gets one unique
+	  origIParam :: OrigNameIParamEnv
+		-- Ensures that one implicit parameter name gets one unique
    }
+
+type OrigNameNameEnv   = FiniteMap (ModuleName,OccName) Name
+type OrigNameIParamEnv = FiniteMap OccName Name
 \end{code}
 
 
@@ -452,6 +459,29 @@ data Provenance
   | NonLocalDef  		-- Defined non-locally
 	ImportReason
 	PrintUnqualified
+
+-- Just used for grouping error messages (in RnEnv.warnUnusedBinds)
+instance Eq Provenance where
+  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
+
+instance Eq ImportReason where
+  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
+
+instance Ord Provenance where
+   compare LocalDef LocalDef = EQ
+   compare LocalDef (NonLocalDef _ _) = LT
+   compare (NonLocalDef _ _) LocalDef = GT
+
+   compare (NonLocalDef reason1 _) (NonLocalDef reason2 _) 
+      = compare reason1 reason2
+
+instance Ord ImportReason where
+   compare ImplicitImport ImplicitImport = EQ
+   compare ImplicitImport (UserImport _ _ _) = LT
+   compare (UserImport _ _ _) ImplicitImport = GT
+   compare (UserImport m1 loc1 _) (UserImport m2 loc2 _) 
+      = (m1 `compare` m2) `thenCmp` (loc1 `compare` loc2)
+
 
 {-
 Moved here from Name.
