@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.6 1999/02/05 16:02:51 simonm Exp $
+ * $Id: RtsUtils.c,v 1.7 1999/03/02 20:05:41 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,6 +35,7 @@ void barf(char *s, ...)
   }
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
+  fflush(stderr);
   stg_exit(EXIT_FAILURE);
 }
 
