@@ -719,12 +719,6 @@ AC_DEFINE(HAVE_O_BINARY)
 fi
 ])
 
-dnl *** Helper function **
-dnl 
-AC_DEFUN(FPTOOLS_IN_SCOPE,
-[AC_TRY_LINK([extern char* $1;],[return (int)&$2], $3=yes, $3=no)
-])
-
 
 dnl Based on AC_TRY_LINK - run iftrue if links cleanly with no warning
 
