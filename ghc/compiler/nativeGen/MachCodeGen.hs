@@ -15,6 +15,7 @@ module MachCodeGen ( cmmTopCodeGen, InstrBlock ) where
 
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
+#include "MachDeps.h"
 
 -- NCG stuff:
 import MachInstrs
@@ -1228,7 +1229,7 @@ getRegister (CmmLit lit)
     in
     	return (Any rep code)
 
-getRegister other = panic "getRegister(x86)"
+getRegister other = pprPanic "getRegister(x86)" (ppr other)
 
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr
