@@ -526,6 +526,8 @@ ppr_type p ty@(ForAllTy _ _)
     split1 tvs (NoteTy (FTVNote _) ty) = split1 tvs ty
     split1 tvs ty		       = (reverse tvs, ty)
  
+    split2 ps (NoteTy (FTVNote _) arg 	-- Rather a disgusting case
+	       `FunTy` res) 	      = split2 ps (arg `FunTy` res)
     split2 ps (PredTy p `FunTy` ty)   = split2 (p:ps) ty
     split2 ps (NoteTy (FTVNote _) ty) = split2 ps ty
     split2 ps ty		      = (reverse ps, ty)
