@@ -147,6 +147,7 @@ data PrimOp
 	-- This is just a cheesy encoding of a bunch of ops.
 	-- Note that ForeignObjRep is not included -- the only way of
 	-- creating a ForeignObj is with a ccall or casm.
+    | IndexOffForeignObjOp PrimRep
 
     | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp
 
@@ -406,35 +407,40 @@ tagOf_PrimOp (IndexOffAddrOp IntRep)	    = ILIT(144)
 tagOf_PrimOp (IndexOffAddrOp AddrRep)	    = ILIT(145)
 tagOf_PrimOp (IndexOffAddrOp FloatRep)	    = ILIT(146)
 tagOf_PrimOp (IndexOffAddrOp DoubleRep)    = ILIT(147)
-tagOf_PrimOp UnsafeFreezeArrayOp	    = ILIT(148)
-tagOf_PrimOp UnsafeFreezeByteArrayOp	    = ILIT(149)
-tagOf_PrimOp NewSynchVarOp		    = ILIT(150)
-tagOf_PrimOp TakeMVarOp		    	    = ILIT(151)
-tagOf_PrimOp PutMVarOp		    	    = ILIT(152)
-tagOf_PrimOp ReadIVarOp		    	    = ILIT(153)
-tagOf_PrimOp WriteIVarOp		    = ILIT(154)
-tagOf_PrimOp MakeForeignObjOp		    = ILIT(155)
-tagOf_PrimOp WriteForeignObjOp		    = ILIT(156)
-tagOf_PrimOp MakeStablePtrOp		    = ILIT(157)
-tagOf_PrimOp DeRefStablePtrOp		    = ILIT(158)
-tagOf_PrimOp (CCallOp _ _ _ _ _)	    = ILIT(159)
-tagOf_PrimOp ErrorIOPrimOp		    = ILIT(160)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	    = ILIT(161)
-tagOf_PrimOp SeqOp			    = ILIT(162)
-tagOf_PrimOp ParOp			    = ILIT(163)
-tagOf_PrimOp ForkOp			    = ILIT(164)
-tagOf_PrimOp DelayOp			    = ILIT(165)
-tagOf_PrimOp WaitReadOp			    = ILIT(166)
-tagOf_PrimOp WaitWriteOp		    = ILIT(167)
+tagOf_PrimOp (IndexOffForeignObjOp CharRep)   = ILIT(148)
+tagOf_PrimOp (IndexOffForeignObjOp IntRep)    = ILIT(149)
+tagOf_PrimOp (IndexOffForeignObjOp AddrRep)   = ILIT(150)
+tagOf_PrimOp (IndexOffForeignObjOp FloatRep)  = ILIT(151)
+tagOf_PrimOp (IndexOffForeignObjOp DoubleRep) = ILIT(152)
+tagOf_PrimOp UnsafeFreezeArrayOp	    = ILIT(153)
+tagOf_PrimOp UnsafeFreezeByteArrayOp	    = ILIT(154)
+tagOf_PrimOp NewSynchVarOp		    = ILIT(155)
+tagOf_PrimOp TakeMVarOp		    	    = ILIT(156)
+tagOf_PrimOp PutMVarOp		    	    = ILIT(157)
+tagOf_PrimOp ReadIVarOp		    	    = ILIT(158)
+tagOf_PrimOp WriteIVarOp		    = ILIT(159)
+tagOf_PrimOp MakeForeignObjOp		    = ILIT(160)
+tagOf_PrimOp WriteForeignObjOp		    = ILIT(161)
+tagOf_PrimOp MakeStablePtrOp		    = ILIT(162)
+tagOf_PrimOp DeRefStablePtrOp		    = ILIT(163)
+tagOf_PrimOp (CCallOp _ _ _ _ _)	    = ILIT(164)
+tagOf_PrimOp ErrorIOPrimOp		    = ILIT(165)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	    = ILIT(166)
+tagOf_PrimOp SeqOp			    = ILIT(167)
+tagOf_PrimOp ParOp			    = ILIT(168)
+tagOf_PrimOp ForkOp			    = ILIT(169)
+tagOf_PrimOp DelayOp			    = ILIT(170)
+tagOf_PrimOp WaitReadOp			    = ILIT(171)
+tagOf_PrimOp WaitWriteOp		    = ILIT(172)
 
-tagOf_PrimOp ParGlobalOp		    = ILIT(168)
-tagOf_PrimOp ParLocalOp			    = ILIT(169)
-tagOf_PrimOp ParAtOp			    = ILIT(170)
-tagOf_PrimOp ParAtAbsOp			    = ILIT(171)
-tagOf_PrimOp ParAtRelOp			    = ILIT(172)
-tagOf_PrimOp ParAtForNowOp		    = ILIT(173)
-tagOf_PrimOp CopyableOp			    = ILIT(174)
-tagOf_PrimOp NoFollowOp			    = ILIT(175)
+tagOf_PrimOp ParGlobalOp		    = ILIT(173)
+tagOf_PrimOp ParLocalOp			    = ILIT(174)
+tagOf_PrimOp ParAtOp			    = ILIT(175)
+tagOf_PrimOp ParAtAbsOp			    = ILIT(176)
+tagOf_PrimOp ParAtRelOp			    = ILIT(177)
+tagOf_PrimOp ParAtForNowOp		    = ILIT(178)
+tagOf_PrimOp CopyableOp			    = ILIT(179)
+tagOf_PrimOp NoFollowOp			    = ILIT(180)
 
 tagOf_PrimOp _ = panic# "tagOf_PrimOp: pattern-match"
 
@@ -590,6 +596,11 @@ allThePrimOps
 	IndexOffAddrOp AddrRep,
 	IndexOffAddrOp FloatRep,
 	IndexOffAddrOp DoubleRep,
+	IndexOffForeignObjOp CharRep,
+	IndexOffForeignObjOp IntRep,
+	IndexOffForeignObjOp AddrRep,
+	IndexOffForeignObjOp FloatRep,
+	IndexOffForeignObjOp DoubleRep,
 	UnsafeFreezeArrayOp,
 	UnsafeFreezeByteArrayOp,
     	NewSynchVarOp,
@@ -1051,6 +1062,13 @@ primOpInfo (IndexOffAddrOp kind)
 	op_str = _PK_ ("index" ++ str ++ "OffAddr#")
     in
     PrimResult op_str [] [addrPrimTy, intPrimTy] prim_tycon kind []
+
+primOpInfo (IndexOffForeignObjOp kind)
+  = let
+	(str, _, prim_tycon) = getPrimRepInfo kind
+	op_str = _PK_ ("index" ++ str ++ "OffForeignObj#")
+    in
+    PrimResult op_str [] [foreignObjPrimTy, intPrimTy] prim_tycon kind []
 
 ---------------------------------------------------------------------------
 primOpInfo UnsafeFreezeArrayOp
