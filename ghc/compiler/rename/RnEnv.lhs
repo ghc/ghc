@@ -233,14 +233,11 @@ lookupTopBndrRn rdr_name
 -- A separate function (importsFromLocalDecls) reports duplicate top level
 -- decls, so here it's safe just to choose an arbitrary one.
 
-   	-- There should never be a qualified name in a binding position 
-	-- The parser could check this, but doesn't (yet)
-  | isQual rdr_name
-  = getSrcLocM							`thenM` \ loc ->
-    qualNameErr (text "In its declaration") (rdr_name,loc)	`thenM_`
-    returnM (mkUnboundName rdr_name)
+  	-- There should never be a qualified name in a binding position in Haskell,
+	-- but there can be if we have read in an external-Core file.
+	-- The Haskell parser checks for the illegal qualified name, so we 
+	-- don't need to do so here.
 
-  | otherwise
   = ASSERT( not (isOrig rdr_name) )
 	-- Original names are used only for occurrences, 
 	-- not binding sites
@@ -338,15 +335,12 @@ lookupInstDeclBndr cls_name rdr_name
 
 	other		    -> pprPanic "lookupInstDeclBndr" (ppr cls_name)
 
-  | isQual rdr_name	-- Should never have a qualified name in a binding position
-  = getSrcLocM							`thenM` \ loc ->
-    qualNameErr (text "In an instance method") (rdr_name,loc)	`thenM_`
-    returnM (mkUnboundName rdr_name)
-	
+
   | otherwise	 	-- Occurs in derived instances, where we just
 			-- refer directly to the right method, and avail_env
 			-- isn't available
   = ASSERT2( not (isQual rdr_name), ppr rdr_name )
+	  -- NB: qualified names are rejected by the parser
     lookupOrigName rdr_name
 
   where
@@ -832,7 +826,9 @@ checkDupOrQualNames, checkDupNames :: SDoc
 	-- Works in any variant of the renamer monad
 
 checkDupOrQualNames doc_str rdr_names_w_loc
-  =	-- Check for use of qualified names
+  =	-- Qualified names in patterns are now rejected by the parser
+	-- but I'm not 100% certain that it finds all cases, so I've left
+	-- this check in for now.  Should go eventually.
     mappM_ (qualNameErr doc_str) quals 	`thenM_`
     checkDupNames doc_str rdr_names_w_loc
   where

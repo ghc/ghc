@@ -92,7 +92,7 @@ module RdrHsSyn (
 
 import HsSyn		-- Lots of it
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, mkUnqual, rdrNameOcc, 
-			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName,
+			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
 import BasicTypes	( RecFlag(..), FixitySig(..), maxPrecedence )
 import Class            ( DefMeth (..) )
@@ -612,8 +612,9 @@ checkPat (HsApp f x) args =
 	checkPat x [] `thenP` \x ->
 	checkPat f (x:args)
 checkPat e [] = case e of
-	EWildPat	   -> returnP (WildPat placeHolderType)
-	HsVar x		   -> returnP (VarPat x)
+	EWildPat	    -> returnP (WildPat placeHolderType)
+	HsVar x	| isQual x  -> parseError ("Qualified variable in pattern: " ++ showRdrName x)
+		| otherwise -> returnP (VarPat x)
 	HsLit l 	   -> returnP (LitPat l)
 	HsOverLit l	   -> returnP (NPatIn l Nothing)
 	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPat)
@@ -684,8 +685,11 @@ checkValDef
 
 checkValDef lhs opt_sig grhss loc
  = case isFunLhs lhs [] of
-	   Just (f,inf,es) -> 
-		checkPatterns loc es `thenP` \ps ->
+	   Just (f,inf,es) 
+	     | isQual f
+	     -> parseError ("Qualified name in function definition: "  ++ showRdrName f)
+	     | otherwise
+	     -> checkPatterns loc es `thenP` \ps ->
 		returnP (RdrValBinding (FunMonoBind f inf [Match ps opt_sig grhss] loc))
 
            Nothing ->
@@ -862,6 +866,9 @@ mkIfaceExports decls = map getExport decls
 -- Misc utils
 
 \begin{code}
+showRdrName :: RdrName -> String
+showRdrName r = showSDoc (ppr r)
+
 parseError :: String -> P a
 parseError s = 
   getSrcLocP `thenP` \ loc ->
