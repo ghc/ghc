@@ -31,18 +31,15 @@ then
   fi
 fi
 
-# assumption: pdfjadetex is on the PATH
-PDFJADETEX=pdfjadetex
-
 $JADE -t tex -d ${DB_STYLESHEET}\#print -o ${output}.tex -c $DOCBOOK_CATALOG $1
 
-${PDFJADETEX} ${output}
+pdfjadetex ${output}
 
 # See if running pdfjadetex twice cures the problem.
 if egrep '^LaTeX Warning: There were undefined references.$' ${TMPFN}.log >/dev/null 2>&1
 then
-  ${PDFJADETEX} ${output}
-  ${PDFJADETEX} ${output}
+  pdfjadetex ${output}
+  pdfjadetex ${output}
 fi
 
 # clean out 
