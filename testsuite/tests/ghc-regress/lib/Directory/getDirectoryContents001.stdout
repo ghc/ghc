@@ -5,4 +5,5 @@ getDirectoryContents001.o
 getDirectoryContents001.run.stderr
 getDirectoryContents001.run.stdout
 getDirectoryContents001.stdout
+getDirectoryContents001.stdout-i386-unknown-mingw32
 
