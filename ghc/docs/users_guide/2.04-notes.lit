@@ -1,0 +1,151 @@
+GHC 2.04 is a minor upgrade of GHC 2.02 (and the bugfix release,
+2.03), representing work done through May '97. This new release
+adds the following:
+
+\begin{itemize}
+\item
+Data constructors can now have polymophic fields, and ordinary
+functions can have polymoprhic arguments.  Details on
+
+\begin{verbatim}
+	http://www.cse.ogi.edu/~simonpj/quantification.html
+\end{verbatim}
+
+Existential types coming, but not done yet.
+
+\item Pattern guards implemented, see
+	
+\begin{verbatim}
+http://www.cse.ogi.edu/~simonpj/guards.html
+\end{verbatim}
+
+\item Compiler can now compile itself.
+
+\item \tr{INLINE} pragmas honoured (caveat: not yet
+working on instance-decl methods) 
+
+\item Simplifier improvements and better inlining gives
+better code; not sure how *much* better.
+
+\item \tr{-dshow-rn-stats} print out amusing statistics about what
+the renamer does.
+
+\item
+When compiling without -O, the renamer (the pass responsible for
+slurping in interface file and making sure everything is in scope
+etc.) is now more careful about what it will bring in (especially
+data constructors and instance declarations). The upshot of this
+change is that a lot of the (unnecessary) work this pass did in
+2.02/2.03 is now avoided.
+
+\tr{-fno-prune-tydecls} and \tr{-fno-prune-instdecls} switch off these
+renamer optimisations. You can try the effect with the renamer
+statistics. War stories welcome.
+
+\item
+    The Heroic Efforts of \tr{Andre\' Santos <alms@di.ufpe.br>} have
+    been included, AIX/RS6000 is now a supported \tr{ghc}
+    platform! Bug reports concerning this port to (as always)
+    \tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
+
+\item
+    A lot of the bugs that were present in versions 2.02/2.03
+    have been fixed (thanks to everyone that reported bugs!).
+    A list of the reported problems with 2.02/2.03 can be found at
+
+\begin{verbatim}
+    http://www.dcs.gla.ac.uk/fp/software/ghc/ghc-bugs.html
+\end{verbatim}
+
+    No doubt entries for 2.04 will be added here as well :-)
+
+\item
+    This release is available in source format only. To build it you'll
+    need to have either a copy of GHC~0.29 or GHC~2.02/3 installed.
+    For people either doing porting work or work on a (supported) 
+    platform for which there is no GHC binary bundles available, the
+    necessary intermediate files are also available (.hc and .hi files).
+
+    Consult the installation guide for more information on how
+    to build or bootstrap. The guide is included in the distribution
+    (in the fptools/docs directory), and an on-line version of the
+    document can be found at
+
+\begin{verbatim}
+    http://www.dcs.gla.ac.uk/fp/software/ghc/ghc-doc/install-guide.html
+\end{verbatim}
+\end{itemize}
+
+In addition to the above, we've made the following minor changes to
+the GHC libraries/our implementation of the Haskell standard prelude:
+
+\begin{itemize}
+\item
+\tr{isPrefixOf} and \tr{isSuffixOf} has been added to \tr{List}.
+\item
+The empty type \tr{Void} is now exported from the prelude.
+\item
+\tr{GlaExts} exports the \tr{Lift} data type:
+
+\begin{verbatim}
+data Lift a = Lift a
+\end{verbatim}
+
+you might need it someday...
+
+\item
+The \tr{Foreign} interface now also exports the representations
+for \tr{Word} and \tr{Addr}.
+
+\item The low-level file handle interface in the \tr{POSIX} system
+library has been reworked a bit, most notably is the renaming of
+\tr{Channel} to \tr{Fd} and the introduction of operations for converting
+to and from \tr{Handle} and \tr{Fd} values. The changes are:
+
+\begin{verbatim}
+--Renamed functions (old name in square brackets)
+openFd :: FilePath       
+       -> OpenMode 
+       -> Maybe FileMode 
+       -> OpenFileFlags 
+       -> IO Fd
+ -- [openChannel]
+fdSeek  :: Fd -> SeekMode -> FileOffset -> IO FileOffset 
+ --[seekChannel]
+fdRead  :: Fd -> ByteCount -> IO (String, ByteCount)     
+ --[readChannel]
+fdWrite :: Fd -> String -> IO ByteCount                  
+ --[writeChannel]
+fdClose :: Fd -> IO ()          
+ --[closeChannel]
+setFdOption :: Fd -> FdOption -> Bool -> IO ()
+ --[setChannelOption]
+queryFdOption :: Fd -> FdOption -> IO Bool
+ --[queryChannelOption]
+dup :: Fd -> IO Fd
+ --[dupChannel]
+dupTo :: Fd -> Fd -> IO ()
+ --[dupChannelTo]
+
+data FdOption = AppendOnWrite | CloseOnExec | NonBlockingRead
+ --[ChannelOption]
+getFdStatus :: Fd -> IO FileStatus
+ --[getChannelStatus]
+
+-- New data structure collecting together misc flags passed to openFd
+data OpenFileFlags =
+ OpenFileFlags {
+    append    :: Bool,
+    exclusive :: Bool,
+    noctty    :: Bool,
+    nonBlock  :: Bool,
+    trunc     :: Bool
+ }
+
+--New ops for converting between Fd and Handle:
+fdToHandle :: Fd -> IO Handle
+handleToFd :: Handle -> IO Fd
+intToFd    :: Int -> Fd -- use with care.
+\end{verbatim}
+
+\end{itemize}
