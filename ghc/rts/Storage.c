@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.65 2002/04/30 09:26:14 simonmar Exp $
+ * $Id: Storage.c,v 1.66 2002/05/14 08:17:38 matthewc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -618,10 +618,8 @@ stgAllocForGMP (size_t size_in_bytes)
   StgArrWords* arr;
   nat data_size_in_words, total_size_in_words;
   
-  /* should be a multiple of sizeof(StgWord) (whole no. of limbs) */
-  ASSERT(size_in_bytes % sizeof(W_) == 0);
-  
-  data_size_in_words  = size_in_bytes / sizeof(W_);
+  /* round up to a whole number of words */
+  data_size_in_words  = (size_in_bytes + sizeof(W_) + 1) / sizeof(W_);
   total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
   
   /* allocate and fill it in. */
