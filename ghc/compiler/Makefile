@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.121 2000/12/19 13:13:11 simonmar Exp $
+# $Id: Makefile,v 1.122 2000/12/20 10:43:47 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -55,7 +55,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> $(CONFIG_HS)
 	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> $(CONFIG_HS)
 	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> $(CONFIG_HS)
-	@echo "cGHC_STATS            = \"$(GHC_STATS)\"" >> $(CONFIG_HS)
 	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> $(CONFIG_HS)
 	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> $(CONFIG_HS)
 	@echo "cCP                   = \"$(CP)\"" >> $(CONFIG_HS)
@@ -121,7 +120,8 @@ endif
 
 HS_OBJS  = \
   $(patsubst %.hc, %.o, $(HCS)) \
-  parser/hschooks.o
+  parser/hschooks.o \
+  parser/hs_ctype.o
 
 DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
