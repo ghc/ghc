@@ -1,4 +1,9 @@
--- !!! Duplicate class assertion
+-- !!! Duplicate class assertion warning
+
+-- ghc 5.05 removes duplicate class assertions,
+-- mainly so that for-all-hoisting doesn't give
+-- such duplicates... so this test now compiles
+-- without warnings
 
 module ShouldSucceed where
 
