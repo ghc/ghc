@@ -36,3 +36,5 @@ test('ffi008', exit_code(1), compile_and_run, [''])
 # doesn't do -ffloat-store and gets different answers when
 # optimisation is on.
 test('ffi009', expect_fail_for(['optasm']), compile_and_run, [''])
+
+test('ffi010', normal, compile_and_run, [''])
