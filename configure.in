@@ -388,6 +388,11 @@ AC_SUBST(CompressSuffix)
 dnl ** check for installed happy binary + version
 #
 AC_HAPPY
+if expr $HappyVersion \< "1.3" >/dev/null; then
+	echo "   Happy Version 1.3 or later is required to compile GHC."
+	echo "   Using the Happy sources in the tree.";
+	HappyCmd=""
+fi;
 
 #
 #
