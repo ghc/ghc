@@ -249,14 +249,9 @@ cmLoadModule cmstate1 rootname
            putStrLn (showSDoc (text "STABLE MODULES:" 
                                <+> sep (map (text.moduleNameUserString) stable_mods)))
 
-        let (hst2, hit2) = retainInTopLevelEnvs stable_mods (hst1, hit1)
-
-	-- Now hst2 and hit2 now hold the 'reduced system', just the set of
-	-- modules which are stable.
-
         -- We could at this point detect cycles which aren't broken by
-        -- a source-import, and complain immediately, but it seems better 
-        -- to let upsweep_mods do this, so at least some useful work gets 
+        -- a source-import, and complain immediately, but it seems better
+        -- to let upsweep_mods do this, so at least some useful work gets
         -- done before the upsweep is abandoned.
         let upsweep_these
                = filter (\scc -> any (`notElem` stable_mods) 
@@ -274,7 +269,7 @@ cmLoadModule cmstate1 rootname
         -- Now do the upsweep, calling compile for each module in
         -- turn.  Final result is version 3 of everything.
 
-        let threaded2 = CmThreaded pcs1 hst2 hit2
+        let threaded2 = CmThreaded pcs1 hst1 hit1
 
         (upsweep_complete_success, threaded3, modsUpswept, newLis)
            <- upsweep_mods ghci_mode dflags valid_linkables reachable_from 
