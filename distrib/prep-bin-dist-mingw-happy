@@ -29,3 +29,4 @@ strip $ghc_binary_dir/bin/happy.exe
 echo "rejig lib/"
 mv lib/i386-unknown-mingw32/* $ghc_binary_dir
 
+exit 0

@@ -24,11 +24,10 @@ if ! [ -d bin/i386-unknown-mingw32 ] ; then
 fi;
 
 echo "rejig bin/"
-cp bin/i386-unknown-mingw32/greencard.exe $binary_dir/bin
+cp lib/i386-unknown-mingw32/greencard-bin.exe $binary_dir/bin/greencard.exe
 strip $binary_dir/bin/greencard.exe
 
 echo "rejig lib/"
-cp lib/i386-unknown-mingw32/* $binary_dir
+cp -r lib/i386-unknown-mingw32/* $binary_dir
 
-echo "rejig share/"
-cp share/* $binary_dir
+exit 0
