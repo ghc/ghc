@@ -592,8 +592,8 @@ checkSigsTyVars qtvs sigs
 	--	f () = ()
 	-- Here, 'a' won't appear in qtvs, so we have to add it
 
- 	sig_tvs = foldr (unionVarSet . mkVarSet) emptyVarSet sig_tvs_s
-	all_tvs = mkVarSet qtvs `unionVarSet` sig_tvs
+ 	sig_tvs = foldl extendVarSetList emptyVarSet sig_tvs_s
+	all_tvs = extendVarSetList sig_tvs qtvs
     in
     returnM (varSetElems all_tvs)
   where

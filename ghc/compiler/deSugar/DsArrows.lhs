@@ -46,7 +46,7 @@ import Outputable
 
 import HsPat		( collectPatBinders, collectPatsBinders )
 import VarSet		( IdSet, mkVarSet, varSetElems,
-			  intersectVarSet, minusVarSet, 
+			  intersectVarSet, minusVarSet, extendVarSetList, 
 			  unionVarSet, unionVarSets, elemVarSet )
 import SrcLoc		( Located(..), unLoc, noLoc, getLoc )
 \end{code}
@@ -705,7 +705,7 @@ dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd c_ty)
 		do_compose ids before_c_ty after_c_ty out_ty
 			(do_first ids in_ty1 c_ty out_ty core_cmd) $
 		do_arr ids after_c_ty out_ty snd_fn,
-	      fv_cmd `unionVarSet` mkVarSet out_ids)
+	      extendVarSetList fv_cmd out_ids)
   where
 
 --	A | xs1 |- c :: [] t

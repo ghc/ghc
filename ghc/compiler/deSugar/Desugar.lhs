@@ -261,7 +261,7 @@ dsRule in_scope (L loc (HsRule name act vars lhs rhs))
     returnDs (fn, Rule name act tpl_vars args core_rhs)
   where
     tpl_vars = [var | RuleBndr (L _ var) <- vars]
-    all_vars = mkInScopeSet (in_scope `unionVarSet` mkVarSet tpl_vars)
+    all_vars = mkInScopeSet (extendVarSetList in_scope tpl_vars)
 
 ds_lhs all_vars lhs
   = let

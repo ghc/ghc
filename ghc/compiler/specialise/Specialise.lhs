@@ -1105,7 +1105,7 @@ splitUDs bndrs uds@(MkUD {dict_binds = orig_dbs,
     dump_db (free_dbs, dump_dbs, dump_idset) db@(bind, fvs)
 	| dump_idset `intersectsVarSet` fvs	-- Dump it
 	= (free_dbs, dump_dbs `snocBag` db,
-	   dump_idset `unionVarSet` mkVarSet (bindersOf bind))
+	   extendVarSetList dump_idset (bindersOf bind))
 
 	| otherwise	-- Don't dump it
 	= (free_dbs `snocBag` db, dump_dbs, dump_idset)

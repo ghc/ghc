@@ -837,7 +837,7 @@ isCandidate (OccEnv cands encl _) id = id `elemVarSet` cands
 
 addNewCands :: OccEnv -> [Id] -> OccEnv
 addNewCands (OccEnv cands encl ctxt) ids
-  = OccEnv (cands `unionVarSet` mkVarSet ids) encl ctxt
+  = OccEnv (extendVarSetList cands ids) encl ctxt
 
 addNewCand :: OccEnv -> Id -> OccEnv
 addNewCand (OccEnv cands encl ctxt) id

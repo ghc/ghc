@@ -7,7 +7,7 @@
 module VarSet (
 	VarSet, IdSet, TyVarSet,
 	emptyVarSet, unitVarSet, mkVarSet,
-	extendVarSet, extendVarSet_C,
+	extendVarSet, extendVarSetList, extendVarSet_C,
 	elemVarSet, varSetElems, subVarSet,
 	unionVarSet, unionVarSets,
 	intersectVarSet, intersectsVarSet,
@@ -42,6 +42,7 @@ unionVarSets	:: [VarSet] -> VarSet
 varSetElems	:: VarSet -> [Var]
 unitVarSet	:: Var -> VarSet
 extendVarSet	:: VarSet -> Var -> VarSet
+extendVarSetList:: VarSet -> [Var] -> VarSet
 elemVarSet	:: Var -> VarSet -> Bool
 delVarSet	:: VarSet -> Var -> VarSet
 delVarSetList	:: VarSet -> [Var] -> VarSet
@@ -62,6 +63,7 @@ delVarSetByKey	:: VarSet -> Unique -> VarSet
 emptyVarSet	= emptyUniqSet
 unitVarSet	= unitUniqSet
 extendVarSet	= addOneToUniqSet
+extendVarSetList= addListToUniqSet
 intersectVarSet	= intersectUniqSets
 
 intersectsVarSet:: VarSet -> VarSet -> Bool 	-- True if non-empty intersection

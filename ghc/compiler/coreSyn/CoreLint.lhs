@@ -529,7 +529,7 @@ addLoc extra_loc m loc scope errs
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars ids m loc scope errs
-  = m loc (scope `unionVarSet` mkVarSet ids) errs
+  = m loc (extendVarSetList scope ids) errs
 \end{code}
 
 \begin{code}

@@ -44,7 +44,7 @@ import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TyVarDetails(VanillaTv),
 			  mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
-			  tyVarsOfPred )
+			  tyVarsOfPred, tcEqType )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
 import Name		( getOccName, getSrcLoc )
@@ -907,7 +907,7 @@ tcSimplifyToDicts wanteds
     doc = text "tcSimplifyToDicts"
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
-    try_me inst	| isDict inst = DontReduce NoSCs
+    try_me inst	| isDict inst = DontReduce NoSCs	-- See notes above for why NoSCs
 		| otherwise   = ReduceMe
 \end{code}
 
@@ -1412,19 +1412,19 @@ reduceList (n,stack) try_me wanteds state
 		      go ws state'
 
     -- Base case: we're done!
-reduce stack try_me wanted state
+reduce stack try_me wanted avails
     -- It's the same as an existing inst, or a superclass thereof
-  | Just avail <- isAvailable state wanted
+  | Just avail <- isAvailable avails wanted
   = if isLinearInst wanted then
-	addLinearAvailable state avail wanted	`thenM` \ (state', wanteds') ->
-	reduceList stack try_me wanteds' state'
+	addLinearAvailable avails avail wanted	`thenM` \ (avails', wanteds') ->
+	reduceList stack try_me wanteds' avails'
     else
-	returnM state		-- No op for non-linear things
+	returnM avails		-- No op for non-linear things
 
   | otherwise
   = case try_me wanted of {
 
-      DontReduce want_scs -> addIrred want_scs state wanted
+      DontReduce want_scs -> addIrred want_scs avails wanted
 
     ; DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
   				     -- First, see if the inst can be reduced to a constant in one step
@@ -1437,26 +1437,30 @@ reduce stack try_me wanted state
     ; ReduceMe ->		-- It should be reduced
 	lookupInst wanted	      `thenM` \ lookup_result ->
 	case lookup_result of
-	    GenInst wanteds' rhs -> addWanted state wanted rhs wanteds'		`thenM` \ state' ->
-				    reduceList stack try_me wanteds' state'
-		-- Experiment with doing addWanted *before* the reduceList, 
+	    GenInst wanteds' rhs -> addIrred NoSCs avails wanted		`thenM` \ avails1 ->
+				    reduceList stack try_me wanteds' avails1	`thenM` \ avails2 ->
+				    addWanted avails2 wanted rhs wanteds'
+		-- Experiment with temporarily doing addIrred *before* the reduceList, 
 		-- which has the effect of adding the thing we are trying
 		-- to prove to the database before trying to prove the things it
 		-- needs.  See note [RECURSIVE DICTIONARIES]
+		-- NB: we must not do an addWanted before, because that adds the
+		--     superclasses too, and thaat can lead to a spurious loop; see
+		--     the examples in [SUPERCLASS-LOOP]
+		-- So we do an addIrred before, and then overwrite it afterwards with addWanted
 
-	    SimpleInst rhs       -> addWanted state wanted rhs []
+	    SimpleInst rhs       -> addWanted avails wanted rhs []
 
 	    NoInstance ->    -- No such instance!
 			     -- Add it and its superclasses
-		    	     addIrred AddSCs state wanted
-
+		    	     addIrred AddSCs avails wanted
     }
   where
     try_simple do_this_otherwise
       = lookupInst wanted	  `thenM` \ lookup_result ->
 	case lookup_result of
-	    SimpleInst rhs -> addWanted state wanted rhs []
-	    other	   -> do_this_otherwise state wanted
+	    SimpleInst rhs -> addWanted avails wanted rhs []
+	    other	   -> do_this_otherwise avails wanted
 \end{code}
 
 
@@ -1512,14 +1516,13 @@ addFree avails free = returnM (addToFM avails free IsFree)
 
 addWanted :: Avails -> Inst -> LHsExpr TcId -> [Inst] -> TcM Avails
 addWanted avails wanted rhs_expr wanteds
-  = ASSERT2( not (wanted `elemFM` avails), ppr wanted $$ ppr avails )
-    addAvailAndSCs avails wanted avail
+  = addAvailAndSCs avails wanted avail
   where
     avail | instBindingRequired wanted = Rhs rhs_expr wanteds
 	  | otherwise		       = ASSERT( null wanteds ) NoRhs
 
 addGiven :: Avails -> Inst -> TcM Avails
-addGiven state given = addAvailAndSCs state given (Given (instToId given) False)
+addGiven avails given = addAvailAndSCs avails given (Given (instToId given) False)
 	-- No ASSERT( not (given `elemFM` avails) ) because in an instance
 	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 
 	-- so the assert isn't true
@@ -1535,21 +1538,23 @@ addAvailAndSCs avails inst avail
   | otherwise		   = traceTc (text "addAvailAndSCs" <+> vcat [ppr inst, ppr deps]) `thenM_`
 			     addSCs is_loop avails1 inst 
   where
-    avails1 = addToFM avails inst avail
-    is_loop inst = inst `elem` deps	-- Note: this compares by *type*, not by Unique
-    deps         = findAllDeps avails avail
+    avails1 	 = addToFM avails inst avail
+    is_loop inst = any (`tcEqType` idType (instToId inst)) dep_tys
+			-- Note: this compares by *type*, not by Unique
+    deps         = findAllDeps emptyVarSet avail
+    dep_tys	 = map idType (varSetElems deps)
 
-findAllDeps :: Avails -> Avail -> [Inst]
--- Find all the Insts that this one depends on
--- See Note [SUPERCLASS-LOOP]
-findAllDeps avails (Rhs _ kids) = kids ++ concat (map (find_all_deps_help avails) kids)
-findAllDeps avails other	= []
+    findAllDeps :: IdSet -> Avail -> IdSet
+    -- Find all the Insts that this one depends on
+    -- See Note [SUPERCLASS-LOOP]
+    -- Watch out, though.  Since the avails may contain loops 
+    -- (see Note [RECURSIVE DICTIONARIES]), so we need to track the ones we've seen so far
+    findAllDeps so_far (Rhs _ kids) 
+      = foldl findAllDeps
+    	      (extendVarSetList so_far (map instToId kids))	-- Add the kids to so_far
+              [a | Just a <- map (lookupFM avails) kids]	-- Find the kids' Avail
+    findAllDeps so_far other = so_far
 
-find_all_deps_help :: Avails -> Inst -> [Inst]
-find_all_deps_help avails inst
-  = case lookupFM avails inst of
-	Just avail -> findAllDeps avails avail
-	Nothing    -> []
 
 addSCs :: (Inst -> Bool) -> Avails -> Inst -> TcM Avails
 	-- Add all the superclasses of the Inst to Avails
@@ -1566,17 +1571,18 @@ addSCs is_loop avails dict
     sc_theta' = substTheta (mkTopTyVarSubst tyvars tys) sc_theta
 
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
-      | is_loop sc_dict
-      = returnM avails	-- See Note [SUPERCLASS-LOOP]
-      | otherwise
-      = case lookupFM avails sc_dict of
-	  Just (Given _ _) -> returnM avails	-- Given is cheaper than superclass selection
-	  Just other 	   -> returnM avails'	-- SCs already added
-	  Nothing 	   -> addSCs is_loop avails' sc_dict
+      | add_me sc_dict = addSCs is_loop avails' sc_dict
+      | otherwise      = returnM avails
       where
 	sc_sel_rhs = mkHsDictApp (mkHsTyApp (L (instSpan dict) (HsVar sc_sel)) tys) [instToId dict]
-	avail      = Rhs sc_sel_rhs [dict]
-	avails'    = addToFM avails sc_dict avail
+	avails'    = addToFM avails sc_dict (Rhs sc_sel_rhs [dict])
+
+    add_me :: Inst -> Bool
+    add_me sc_dict
+	| is_loop sc_dict = False	-- See Note [SUPERCLASS-LOOP]
+	| otherwise	  = case lookupFM avails sc_dict of
+				Just (Given _ _) -> False	-- Given is cheaper than superclass selection
+				other		 -> True	
 \end{code}
 
 Note [SUPERCLASS-LOOP]: Checking for loops
@@ -1643,13 +1649,13 @@ by instance decl, holds if
 
 by instance decl of Eq, holds if
 	d3 : D []
-	where	d2 = dfEqList d2
+	where	d2 = dfEqList d3
 		d1 = dfEqD d2
 
 But now we can "tie the knot" to give
 
 	d3 = d1
-	d2 = dfEqList d2
+	d2 = dfEqList d3
 	d1 = dfEqD d2
 
 and it'll even run!  The trick is to put the thing we are trying to prove
