@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: cgprof.c,v 1.1 2000/04/05 10:06:36 simonmar Exp $
+ * $Id: cgprof.c,v 1.2 2002/10/05 22:18:46 panne Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -1183,8 +1183,8 @@ void readRawProfile(FILE *fp,int *nonodes, int MaxNoNodes) {
   } /* end of new for loop */
 
   *nonodes = symbol_table_next;
-  fprintf(log,"%s: read %d lines from profile.Graph contains %i nodes. 
-          \n",Pgm,nolines,symbol_table_next);
+  fprintf(log,"%s: read %d lines from profile.Graph contains %i nodes.\n",
+          Pgm,nolines,symbol_table_next);
 
   free_cc_matrix(cc_m); /* be nice and clean up the cost centre matrix */
 }

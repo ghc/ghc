@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.60 2002/10/01 08:53:14 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.61 2002/10/05 22:18:45 panne Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -1439,8 +1439,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	      } else if (RtsFlags.GranFlags.proc > MAX_PROC || 
 			 RtsFlags.GranFlags.proc < 1)
 		{
-		  fprintf(stderr,"setupRtsFlags: no more than %u processors
-allowed\n", 
+		  fprintf(stderr,"setupRtsFlags: no more than %u processors allowed\n",
 			  MAX_PROC);
 		  *error = rtsTrue;
 		}
