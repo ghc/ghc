@@ -772,22 +772,26 @@ warnDeprecations this_mod export_avails my_deprecs used_names
 	pit     = iPIT ifaces
 	deprecs = [ (n,txt)
                   | n <- nameSetToList used_names,
+		    not (nameIsLocalOrFrom this_mod n),
                     Just txt <- [lookup_deprec hit pit n] ]
+	-- nameIsLocalOrFrom: don't complain about locally defined names
+	-- For a start, we may be exporting a deprecated thing
+	-- Also we may use a deprecated thing in the defn of another
+	-- deprecated things.  We may even use a deprecated thing in
+	-- the defn of a non-deprecated thing, when changing a module's 
+	-- interface
     in			  
     mapRn_ warnDeprec deprecs
 
   where
-    export_mods = nub [ moduleName (nameModule name) 
+    export_mods = nub [ moduleName mod
 		      | avail <- export_avails,
-			let name = availName avail,
-			not (nameIsLocalOrFrom this_mod name) ]
+			let mod = nameModule (availName avail),
+			mod /= this_mod ]
   
     load_home m = loadInterface (text "Check deprecations for" <+> ppr m) m ImportBySystem
 
     lookup_deprec hit pit n
-	| nameIsLocalOrFrom this_mod n
-	= lookupDeprec my_deprecs n 
-	| otherwise
 	= case lookupIface hit pit n of
 		Just iface -> lookupDeprec (mi_deprecs iface) n
 		Nothing    -> pprPanic "warnDeprecations:" (ppr n)
