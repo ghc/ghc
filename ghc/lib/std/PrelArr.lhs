@@ -18,7 +18,6 @@ import PrelST
 import PrelBase
 import PrelCCall
 import PrelAddr
-import PrelUnsafeST ( runST )
 import PrelGHC
 
 infixl 9  !, //

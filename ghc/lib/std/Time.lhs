@@ -37,7 +37,6 @@ import PrelBase
 import PrelIOBase
 import PrelArr
 import PrelST
-import PrelUnsafe	( unsafePerformIO )
 import PrelAddr
 import PrelPack 	( unpackCString )
 

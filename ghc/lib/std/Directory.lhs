@@ -42,7 +42,6 @@ module Directory
 import PrelBase
 import PrelIOBase
 import PrelST
-import PrelUnsafe	( unsafePerformIO )
 import PrelArr
 import PrelPack		( unpackNBytesST )
 import PrelForeign	( Word(..) )

@@ -33,7 +33,6 @@ module IO (
   ) where
 
 import PrelST
-import PrelUnsafe	( unsafePerformIO, unsafeInterleaveIO )
 import PrelIOBase
 import PrelArr		( MutableByteArray(..), newCharArray )
 import PrelHandle		-- much of the real stuff is in here

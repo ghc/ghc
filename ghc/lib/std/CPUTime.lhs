@@ -19,7 +19,6 @@ import PrelNum
 import PrelAddr
 import PrelIOBase
 import IO
-import PrelUnsafe   ( unsafePerformIO )
 import PrelST
 import Ratio
 

@@ -393,3 +393,37 @@ data BufferMode
 performGC :: IO ()
 performGC = _ccall_GC_ StgPerformGarbageCollection
 \end{code}
+
+%*********************************************************
+%*							*
+\subsection{Unsafe @IO@ operations}
+%*							*
+%*********************************************************
+
+\begin{code}
+{-# NOINLINE unsafePerformIO #-}
+unsafePerformIO	:: IO a -> a
+unsafePerformIO (IO m)
+  = case m realWorld# of
+      IOok _ r   -> r
+      IOfail _ e -> error ("unsafePerformIO: I/O error: " ++ show e ++ "\n")
+
+{-# NOINLINE unsafeInterleaveIO #-}
+unsafeInterleaveIO :: IO a -> IO a
+unsafeInterleaveIO (IO m) = IO ( \ s ->
+	let
+	    IOok _ r = m s
+	in
+	IOok s r)
+
+{-# NOINLINE trace #-}
+trace :: String -> a -> a
+trace string expr
+  = unsafePerformIO (
+	((_ccall_ PreTraceHook sTDERR{-msg-}):: IO ())  >>
+	fputs sTDERR string				>>
+	((_ccall_ PostTraceHook sTDERR{-msg-}):: IO ()) >>
+	return expr )
+  where
+    sTDERR = (``stderr'' :: Addr)
+\end{code}

@@ -52,7 +52,6 @@ import PrelList ( length )
 import PrelST
 import PrelArr
 import PrelAddr
-import PrelUnsafeST ( runST )
 
 \end{code}
 

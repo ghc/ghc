@@ -26,7 +26,7 @@ import PrelList
 import PrelMaybe
 
 import PrelArr		( Array, array, (!) )
-import PrelUnsafe   	( unsafePerformIO )
+import PrelIOBase   	( unsafePerformIO )
 import Ix		( Ix(..) )
 import PrelCCall	()	-- we need the definitions of CCallable and 
 				-- CReturnable for the _ccall_s herein.

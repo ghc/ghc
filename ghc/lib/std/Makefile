@@ -54,12 +54,6 @@ Time_HC_OPTS        += -monly-3-regs -H16m
 # Far too much heap is needed to compile PrelNum with -O at the
 # moment, but there you go..
 PrelNum_HC_OPTS     += -H30m
-# Note: this option has to go in the Makefile rather than in an
-# OPTIONS line in the source file. The reason being that we want
-# to override the SRC_HC_OPTS of -O, and anything option coming
-# from the Makefile overrides what's in OPTIONS lines. (mumble_HC_OPTS
-# does override SRC_HC_OPTS settings)
-PrelUnsafe_HC_OPTS           += -Onot
 
 PrelBase_HC_OPTS         += -H12m
 PrelRead_HC_OPTS         += -H13m

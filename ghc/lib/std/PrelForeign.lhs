@@ -24,7 +24,6 @@ module PrelForeign (
 
 import PrelIOBase
 import PrelST
-import PrelUnsafe
 import PrelBase
 import PrelCCall
 import PrelAddr

@@ -19,7 +19,6 @@ import PrelArr		( ByteArray(..), newVar, readVar, writeVar )
 import PrelRead		( Read )
 import PrelList 	( span )
 import PrelIOBase
-import PrelUnsafe   	( unsafePerformIO )
 import PrelTup
 import PrelMaybe
 import PrelBase
