@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.31 2002/12/11 15:36:51 simonmar Exp $
+ * $Id: Signals.c,v 1.32 2003/01/10 22:08:20 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -170,7 +170,7 @@ initUserSignals(void)
 void
 blockUserSignals(void)
 {
-    sigprocmask(SIG_SETMASK, &userSignals, &savedSignals);
+    sigprocmask(SIG_BLOCK, &userSignals, &savedSignals);
 }
 
 void
