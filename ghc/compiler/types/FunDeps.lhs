@@ -1,17 +1,30 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 2000
+%
+\section[FunDeps]{FunDeps - functional dependencies}
+
 It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
-module FunDeps(oclose, instantiateFdClassTys, tyVarFunDep, pprFundeps) where
+module FunDeps (
+	oclose,
+        instantiateFdClassTys,
+        tyVarFunDep,
+        pprFundeps
+    ) where
 
 #include "HsVersions.h"
 
-import Class		(classTvsFds)
-import Type		(tyVarsOfType)
-import Outputable	(interppSP, ptext, empty, hsep, punctuate, comma)
-import UniqSet		(elementOfUniqSet, addOneToUniqSet,
-			 uniqSetToList, unionManyUniqSets)
-import List		(elemIndex)
+import Class		( classTvsFds )
+import Type		( tyVarsOfType )
+import Outputable	( interppSP, ptext, empty, hsep, punctuate, comma )
+import UniqSet		( elementOfUniqSet, addOneToUniqSet,
+			  uniqSetToList, unionManyUniqSets )
+import List		( elemIndex )
+\end{code}
 
+
+\begin{code}
 oclose fds vs =
     case oclose1 fds vs of
       (vs', False) -> vs'
