@@ -14,7 +14,7 @@ module PrelMods (
 	pRELUDE_PRIMIO, pRELUDE_IO, pRELUDE_PS,
 	gLASGOW_ST, gLASGOW_MISC,
 	pRELUDE_FB,
-	rATIO,
+	rATIO, iX,
 	
 	fromPrelude
   ) where
@@ -36,6 +36,7 @@ pRELUDE_PS	= SLIT("PreludePS")
 pRELUDE_TEXT	= SLIT("PreludeText")
 
 rATIO = SLIT("Ratio")
+iX = SLIT("Ix")
 
 fromPrelude :: FAST_STRING -> Bool
 fromPrelude s = (_SUBSTR_ s 0 6 == SLIT("Prelude"))

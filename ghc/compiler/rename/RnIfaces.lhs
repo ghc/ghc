@@ -45,6 +45,7 @@ import Name		( moduleNamePair, origName, RdrName(..) )
 import PprStyle		-- ToDo:rm
 import Outputable	-- ToDo:rm
 import PrelInfo		( builtinNameInfo )
+import PrelMods		( pRELUDE )
 import Pretty
 import Maybes		( MaybeErr(..) )
 import UniqFM		( emptyUFM )
@@ -759,12 +760,10 @@ rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
 	  = case lookupTcRnEnv occ_env nm of
 	      Just  _ -> True
 	      Nothing -> -- maybe it's builtin
-		case nm of
-		  Qual _ _ -> False
-		  Unqual n ->
-		    case (lookupFM b_tc_names n) of
+		let str_mod = case nm of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
+	        in case (lookupFM b_tc_names str_mod) of
 		      Just  _ -> True
-		      Nothing -> maybeToBool (lookupFM b_keys n)
+		      Nothing -> maybeToBool (lookupFM b_keys str_mod)
 
     (b_tc_names, b_keys) -- pretty UGLY ...
       = case builtinNameInfo of ((_,builtin_tcs),b_keys,_) -> (builtin_tcs,b_keys)

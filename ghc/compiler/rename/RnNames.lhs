@@ -40,7 +40,7 @@ import Name		( RdrName(..), Name, isQual, mkTopLevName, origName,
 			  pprNonSym, isLexCon, isRdrLexCon, ExportFlag(..)
 			)
 import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
-import PrelMods		( fromPrelude, pRELUDE )
+import PrelMods		( fromPrelude, pRELUDE, rATIO, iX )
 import Pretty
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import TyCon		( tyConDataCons )
@@ -482,7 +482,7 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
 
 
 getBuiltins _ mod maybe_spec
-  | not (fromPrelude mod)
+  | not ((fromPrelude mod) || mod == iX || mod == rATIO )
   = (emptyBag, emptyBag, maybe_spec)
 
 getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
@@ -501,15 +501,20 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
     all_vals = do_all_builtin (fmToList b_val_names)
     all_tcs  = do_all_builtin (fmToList b_tc_names)
 
+    filter_mod = if fromPrelude mod then pRELUDE else mod
+
     do_all_builtin [] = emptyBag
-    do_all_builtin ((str,rn):rest)
+    do_all_builtin (((str,mod),rn):rest)
+      | mod == filter_mod
       = (str, rn) `consBag` do_all_builtin rest
+      | otherwise
+      = do_all_builtin rest
 
     do_builtin [] = (emptyBag,emptyBag,[]) 
     do_builtin (ie:ies)
       = let str = unqual_str (ie_name ie)
 	in
-	case (lookupFM b_tc_names str) of 	-- NB: we favour the tycon/class FM...
+	case (lookupFM b_tc_names (str,mod)) of 	-- NB: we favour the tycon/class FM...
 	  Just rn -> case (ie,rn) of
 	     (IEThingAbs _, WiredInTyCon tc)
 		-> (vals, (str, rn) `consBag` tcs, ies_left)
@@ -526,7 +531,7 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
 	     _ -> panic "importing builtin names (1)"
 
 	  Nothing ->
-	    case (lookupFM b_val_names str) of
+	    case (lookupFM b_val_names (str,mod)) of
 	      Nothing -> (vals, tcs, ie:ies_left)
 	      Just rn -> case (ie,rn) of
 		 (IEVar _, WiredInId _)        

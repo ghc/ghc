@@ -164,15 +164,9 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
         pair_orig rn = (origName rn, rn)
 
-	-- we must ensure that the definitions of things in the BuiltinKey
-	-- table which may be *required* by the typechecker etc are read.
-	-- We *hack* in a requirement for Ix.Ix here
-	-- (it's the one thing that doesn't come from Prelude.<blah>)
-
 	must_haves
-	  = (RnImplicitClass (mkBuiltinName ixClassKey SLIT("Ix") SLIT("Ix")))
-	  : [ name_fn (mkBuiltinName u pRELUDE str) 
-	    | (str, (u, name_fn)) <- fmToList b_keys,
+	  = [ name_fn (mkBuiltinName u mod str) 
+	    | ((str, mod), (u, name_fn)) <- fmToList b_keys,
 	      str `notElem` [ SLIT("main"), SLIT("mainPrimIO")] ]
     in
 --  ASSERT (isEmptyBag orig_occ_dups)

@@ -56,6 +56,7 @@ import Name		( Module(..), RdrName(..), isQual,
 			  getOccName
 			)
 import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
+import PrelMods		( pRELUDE )
 import Pretty		( Pretty(..), PrettyRep )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
@@ -368,30 +369,26 @@ lookup_val rdr lookup check do_err down@(RnDown _ _ locn (RnIface b_names b_key 
 	Nothing   -> lookup_nonexisting_val b_names b_key imp_var us_var rdr
 
 lookup_nonexisting_val (b_names,_) b_key imp_var us_var rdr
-  = case rdr of
-      Qual _ _ -> -- builtin things *don't* have Qual names
-		  lookup_or_create_implicit_val b_key imp_var us_var rdr
-
-      Unqual n -> case (lookupFM b_names n) of
-		    Nothing -> lookup_or_create_implicit_val b_key imp_var us_var rdr
-		    Just xx -> returnSST xx
+  = let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
+    in case (lookupFM b_names str_mod) of
+	 Nothing -> lookup_or_create_implicit_val b_key imp_var us_var rdr
+	 Just xx -> returnSST xx
 
 lookup_or_create_implicit_val b_key imp_var us_var rdr
   = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm) ->
     case lookupFM implicit_val_fm rdr of
 	Just implicit -> returnSST implicit
 	Nothing ->
-	  (case rdr of
-	     Qual _ _ -> get_unique us_var
-	     Unqual n -> case (lookupFM b_key n) of
-			   Just (u,_) -> returnSST u
-			   _	      -> get_unique us_var
-	  )					`thenSST` \ uniq -> 
+	  (let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
+	   in case (lookupFM b_key str_mod) of
+		Just (u,_) -> returnSST u
+		_          -> get_unique us_var
+	  )							`thenSST` \ uniq -> 
 	  let
 	      implicit   = mkRnImplicit (mkImplicitName uniq rdr)
 	      new_val_fm = addToFM implicit_val_fm rdr implicit
 	  in
-	  writeMutVarSST imp_var (new_val_fm, implicit_tc_fm) `thenSST_`
+	  writeMutVarSST imp_var (new_val_fm, implicit_tc_fm) 	`thenSST_`
 	  returnSST implicit
 \end{code}
 
@@ -429,13 +426,10 @@ lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnIface b_names b
     fail = failButContinueRn (mkRnUnbound rdr) (unknownNameErr err_str rdr locn) down
 
 lookup_nonexisting_tc check mk_implicit fail (_,b_names) b_key imp_var us_var rdr
-  = case rdr of
-      Qual _ _ -> -- builtin things *don't* have Qual names
-		  lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
-
-      Unqual n -> case (lookupFM b_names n) of
-		    Nothing -> lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
-		    Just xx -> returnSST xx
+  = let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
+    in case (lookupFM b_names str_mod) of
+	 Nothing -> lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
+	 Just xx -> returnSST xx
 
 lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
   = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm) ->
@@ -443,17 +437,16 @@ lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
 	Just implicit | check implicit -> returnSST implicit
 		      | otherwise      -> fail
 	Nothing ->
-	  (case rdr of
-	     Qual _ _ -> get_unique us_var
-	     Unqual n -> case (lookupFM b_key n) of
-			   Just (u,_) -> returnSST u
-			   _	      -> get_unique us_var
-	  )					`thenSST` \ uniq -> 
+	  (let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
+	   in case (lookupFM b_key str_mod) of
+		Just (u,_) -> returnSST u
+		_          -> get_unique us_var
+	  )							`thenSST` \ uniq -> 
 	  let
 	      implicit  = mk_implicit (mkImplicitName uniq rdr)
 	      new_tc_fm = addToFM implicit_tc_fm rdr implicit
 	  in
-	  writeMutVarSST imp_var (implicit_val_fm, new_tc_fm) `thenSST_`
+	  writeMutVarSST imp_var (implicit_val_fm, new_tc_fm) 	`thenSST_`
 	  returnSST implicit
 \end{code}
 
