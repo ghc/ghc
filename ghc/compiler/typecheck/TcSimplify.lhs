@@ -1990,7 +1990,8 @@ mkMonomorphismMsg tidy_env insts
 				--	f x = show (read "foo")
 				-- whre monomorphism doesn't play any role
     mk_msg docs = vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
-			nest 2 (vcat docs)]
+			nest 2 (vcat docs),
+			ptext SLIT("Probable fix: give these definition(s) an explicit type signature")]
     
 warnDefault dicts default_ty
   = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
