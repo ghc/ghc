@@ -39,8 +39,8 @@ ifneq "$(way)" ""
 SRC_HC_OPTS += -hisuf $(way_)hi
 endif
 
-Int_HC_OPTS          += -H14m -fno-prune-tydecls
-Word_HC_OPTS         += -H12m
+Int_HC_OPTS          += -H14m -fno-prune-tydecls -monly-3-regs
+Word_HC_OPTS         += -H12m -monly-3-regs
 Foreign_HC_OPTS      += -fno-prune-tydecls
 NativeInfo_HC_OPTS   += -fno-prune-tydecls
 Dynamic_HC_OPTS	     += $(MAGIC_HSCPP_OPTS)
