@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.30 2002/10/29 10:50:53 simonpj Exp $
+-- $Id: Main.hs,v 1.31 2002/10/29 10:53:42 simonpj Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -91,25 +91,16 @@ flags = [
 	"Automatically build libs for GHCi (with -a)"
   ]
 
-#ifdef mingw32_HOST_OS
-subst a b ls = map (\ x -> if x == a then b else x) ls
-
-unDosifyPath xs = subst '\\' '/' xs
-#endif
 
 runit clis = do
   let err_msg = "missing -f option, location of package.conf unknown"
   conf_file <- 
      case [ f | Config f <- clis ] of
         fs@(_:_)  -> return (last fs)
-#ifndef mingw32_HOST_OS
-	[] -> die err_msg
-#else
 	[] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
 		 case mb_dir of
 			Nothing  -> die err_msg
 			Just dir -> return (dir ++ "/package.conf")
-#endif
 
   let toField "import_dirs"     = return import_dirs
       toField "source_dirs"     = return source_dirs
@@ -414,6 +405,9 @@ my_catch = Exception.catchAllIO
 --	Cut and pasted from ghc/compiler/SysTools
 
 #if defined(mingw32_HOST_OS)
+subst a b ls = map (\ x -> if x == a then b else x) ls
+unDosifyPath xs = subst '\\' '/' xs
+
 getExecDir :: String -> IO (Maybe String)
 -- (getExecDir cmd) returns the directory in which the current
 --	  	    executable, which should be called 'cmd', is running
