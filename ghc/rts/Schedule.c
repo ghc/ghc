@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.22 1999/06/25 09:17:58 simonmar Exp $
+ * $Id: Schedule.c,v 1.23 1999/08/25 10:23:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -74,6 +74,23 @@ StgTSO   *MainTSO;
  * Static functions
  * -------------------------------------------------------------------------- */
 static void unblockThread(StgTSO *tso);
+
+/* -----------------------------------------------------------------------------
+ * Comparing Thread ids.
+ *
+ * This is used from STG land in the implementation of the
+ * instances of Eq/Ord for ThreadIds.
+ * -------------------------------------------------------------------------- */
+
+int cmp_thread(const StgTSO *tso1, const StgTSO *tso2) 
+{ 
+  StgThreadID id1 = tso1->id; 
+  StgThreadID id2 = tso2->id;
+ 
+  if (id1 < id2) return (-1);
+  if (id1 > id2) return 1;
+  return 0;
+}
 
 /* -----------------------------------------------------------------------------
    Create a new thread.

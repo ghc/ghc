@@ -63,8 +63,36 @@ import PrelArr		( ByteArray )
 import PrelPack	        ( packString )
 import PrelIOBase	( unsafePerformIO , unsafeInterleaveIO )
 import PrelBase		( fork# )
+import PrelGHC		( Addr#, unsafeCoerce# )
 
 infixr 0 `fork`
+\end{code}
+
+Thread Ids, specifically the instances of Eq and Ord for these things.
+The ThreadId type itself is defined in std/PrelConc.lhs.
+
+Rather than define a new primitve, we use a little helper function
+cmp_thread in the RTS.
+
+\begin{code}
+foreign import ccall "cmp_thread" unsafe cmp_thread :: Addr# -> Addr# -> Int
+-- Returns -1, 0, 1
+
+cmpThread :: ThreadId -> ThreadId -> Ordering
+cmpThread (ThreadId t1) (ThreadId t2) = 
+   case cmp_thread (unsafeCoerce# t1) (unsafeCoerce# t2) of
+      -1 -> LT
+      0  -> EQ
+      1  -> GT
+
+instance Eq ThreadId where
+   t1 == t2 = 
+      case t1 `cmpThread` t2 of
+         EQ -> True
+         _  -> False
+
+instance Ord ThreadId where
+   compare = cmpThread
 \end{code}
 
 \begin{code}

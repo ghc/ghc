@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.35 1999/08/24 09:36:41 simonmar Exp $
+ * $Id: PrimOps.h,v 1.36 1999/08/25 10:23:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -710,6 +710,8 @@ EF_(killThreadzh_fast);
 EF_(seqzh_fast);
 
 #define myThreadIdzh(t) (t = CurrentTSO)
+
+extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 
 /* Hmm, I'll think about these later. */
 /* -----------------------------------------------------------------------------
