@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.59 2001/05/03 08:08:44 simonpj Exp $
+$Id: Parser.y,v 1.60 2001/05/07 14:38:15 simonmar Exp $
 
 Haskell grammar.
 
@@ -688,10 +688,10 @@ infixexp :: { RdrNameHsExpr }
 						(panic "fixity") $3 )}
 
 exp10 :: { RdrNameHsExpr }
-	: '\\' aexp aexps opt_asig '->' srcloc exp	
-			{% checkPatterns ($2 : reverse $3) `thenP` \ ps -> 
-			   returnP (HsLam (Match [] ps $4 
-					    (GRHSs (unguardedRHS $7 $6) 
+	: '\\' srcloc aexp aexps opt_asig '->' srcloc exp	
+			{% checkPatterns $2 ($3 : reverse $4) `thenP` \ ps -> 
+			   returnP (HsLam (Match [] ps $5 
+					    (GRHSs (unguardedRHS $8 $7) 
 						   EmptyBinds Nothing))) }
   	| 'let' declbinds 'in' exp		{ HsLet $2 $4 }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
@@ -814,10 +814,10 @@ alts1 	:: { [RdrNameMatch] }
 	| alt				{ [$1] }
 
 alt 	:: { RdrNameMatch }
-	: infixexp opt_sig ralt wherebinds
-					{% (checkPattern $1 `thenP` \p ->
-				   	   returnP (Match [] [p] $2
-					             (GRHSs $3 $4 Nothing))  )}
+	: srcloc infixexp opt_sig ralt wherebinds
+					{% (checkPattern $1 $2 `thenP` \p ->
+				   	   returnP (Match [] [p] $3
+					             (GRHSs $4 $5 Nothing))  )}
 
 ralt :: { [RdrNameGRHS] }
 	: '->' srcloc exp		{ [GRHS [ExprStmt $3 $2] $2] }
@@ -857,7 +857,7 @@ maybe_stmt :: { Maybe RdrNameStmt }
 	| {- nothing -}			{ Nothing }
 
 stmt  :: { RdrNameStmt }
-	: srcloc infixexp '<-' exp	{% checkPattern $2 `thenP` \p ->
+	: srcloc infixexp '<-' exp	{% checkPattern $1 $2 `thenP` \p ->
 					   returnP (BindStmt p $4 $1) }
 	| srcloc exp			{ ExprStmt $2 $1 }
   	| srcloc 'let' declbinds	{ LetStmt $3 }

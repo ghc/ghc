@@ -20,7 +20,7 @@ module ParseUtil (
 	, checkDataHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
 	, checkSimple		-- HsType -> [HsName] -> P ((HsName,[HsName]))
 	, checkPattern		-- HsExp -> P HsPat
-	, checkPatterns		-- [HsExp] -> P [HsPat]
+	, checkPatterns		-- SrcLoc -> [HsExp] -> P [HsPat]
 	-- , checkExpr		-- HsExp -> P HsExp
 	, checkValDef		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	, checkValSig		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
@@ -172,11 +172,11 @@ checkSimple t _ = parseError "Illegal left hand side in data/newtype declaration
 -- We parse patterns as expressions and check for valid patterns below,
 -- converting the expression into a pattern at the same time.
 
-checkPattern :: RdrNameHsExpr -> P RdrNamePat
-checkPattern e = checkPat e []
+checkPattern :: SrcLoc -> RdrNameHsExpr -> P RdrNamePat
+checkPattern loc e = setSrcLocP loc (checkPat e [])
 
-checkPatterns :: [RdrNameHsExpr] -> P [RdrNamePat]
-checkPatterns es = mapP checkPattern es
+checkPatterns :: SrcLoc -> [RdrNameHsExpr] -> P [RdrNamePat]
+checkPatterns loc es = mapP (checkPattern loc) es
 
 checkPat :: RdrNameHsExpr -> [RdrNamePat] -> P RdrNamePat
 checkPat (HsVar c) args | isRdrDataCon c = returnP (ConPatIn c args)
@@ -249,11 +249,11 @@ checkValDef
 checkValDef lhs opt_sig grhss loc
  = case isFunLhs lhs [] of
 	   Just (f,inf,es) -> 
-		checkPatterns es `thenP` \ps ->
+		checkPatterns loc es `thenP` \ps ->
 		returnP (RdrValBinding (FunMonoBind f inf [Match [] ps opt_sig grhss] loc))
 
            Nothing ->
-		checkPattern lhs `thenP` \lhs ->
+		checkPattern loc lhs `thenP` \lhs ->
 		returnP (RdrValBinding (PatMonoBind lhs grhss loc))
 
 checkValSig
