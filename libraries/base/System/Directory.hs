@@ -63,6 +63,7 @@ import Prelude
 
 import Control.Exception       ( bracket )
 import System.Posix.Types
+import System.Posix.Internals
 import System.Time             ( ClockTime(..) )
 import System.IO
 import System.IO.Error
@@ -70,7 +71,6 @@ import Foreign
 import Foreign.C
 
 #ifdef __GLASGOW_HASKELL__
-import System.Posix.Internals
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
 #endif
 
@@ -161,15 +161,20 @@ The operation may fail with:
 
 setPermissions :: FilePath -> Permissions -> IO ()
 setPermissions name (Permissions r w e s) = do
-    let
-     read  = if r      then s_IRUSR else emptyCMode
-     write = if w      then s_IWUSR else emptyCMode
-     exec  = if e || s then s_IXUSR else emptyCMode
+  allocaBytes sizeof_stat $ \ p_stat -> do
+  withCString name $ \p_name -> do
+    throwErrnoIfMinus1_ "setPermissions" $ do
+      c_stat p_name p_stat
+      mode <- st_mode p_stat
+      let mode1 = modifyBit r mode s_IRUSR
+      let mode2 = modifyBit w mode1 s_IWUSR
+      let mode3 = modifyBit (e || s) mode2 s_IXUSR
+      c_chmod p_name mode3
 
-     mode  = read `unionCMode` (write `unionCMode` exec)
-
-    withCString name $ \s ->
-      throwErrnoIfMinus1_ "setPermissions" $ c_chmod s mode
+ where
+   modifyBit :: Bool -> CMode -> CMode -> CMode
+   modifyBit False m b = m .&. (complement b)
+   modifyBit True  m b = m .|. b
 
 -----------------------------------------------------------------------------
 -- Implementation
@@ -643,13 +648,6 @@ fileNameEndClean name =
   where
       i  = (length name) - 1
       ec = name !! i
-
-emptyCMode     :: CMode
-emptyCMode     = 0
-
-unionCMode     :: CMode -> CMode -> CMode
-unionCMode     = (+)
-
 
 foreign import ccall unsafe "__hscore_long_path_size"
   long_path_size :: Int
