@@ -1194,3 +1194,17 @@ ifneq "$(SUBDIRS)" ""
 $(SUBDIRS) ::
 	  $(MAKE) -C $@ $(MFLAGS)
 endif
+
+# -----------------------------------------------------------------------------
+# Further cleaning
+
+# Sometimes we want to clean things only after the recursve cleaning
+# has heppened (eg. if the files we're about to remove would affect
+# the recursive traversal).
+
+distclean::
+	rm -f $(LATE_DIST_CLEAN_FILES)
+
+maintainer-clean::
+	rm -f $(LATE_DIST_CLEAN_FILES)
+
