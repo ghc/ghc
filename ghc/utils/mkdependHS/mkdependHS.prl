@@ -156,15 +156,20 @@ print STDERR "Include_dirs=@Include_dirs\n" if $Verbose;
 
 @Depend_lines = ();
 
+# Delete temp. file if script is halted.
+sub quit_upon_signal { print STDERR "Deleting $Tmp_prefix.hs .. \n"; unlink "$Tmp_prefix.hs"; }
+$SIG{'INT'}  = 'quit_upon_signal';
+$SIG{'QUIT'} = 'quit_upon_signal';
+
 foreach $sf (@Src_files) {
+
     # just like lit-inputter
     # except it puts each file through CPP and
     # a de-commenter (not implemented);
     # builds up @Depend_lines
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
     ($bf = $sf) =~ s/\.l?(hs|y)$//;
-    #push(@Depend_lines, "$bf.$Obj_suffix $bf.hi : $sf\n");
-    #push(@Depend_lines, "$bf.$Obj_suffix : $sf\n");
+
     local($str)="";
     foreach $obj  (@Obj_suffix) {
   	$str .= "$bf.$obj ";
@@ -187,6 +192,7 @@ foreach $sf (@Src_files) {
 	unlink "$Tmp_prefix.hs";
     }
 }
+
 
 # OK, mangle the Makefile
 unlink("$Makefile.bak");
