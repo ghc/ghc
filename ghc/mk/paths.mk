@@ -73,3 +73,6 @@ MKDEPENDHS_SRCS = $(HS_SRCS)
 else
 MKDEPENDHS_SRCS =
 endif
+
+# temporary until the new RTS is merged in.
+MOSTLY_CLEAN_FILES += *.hc
