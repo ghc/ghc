@@ -17,4 +17,3 @@ main = print ([ gread str1,
                 gread str2,
                 gread str3 
               ] :: [Maybe (Bool, String)])
-

@@ -11,12 +11,14 @@ data Test = Test (GenericT) deriving Typeable
 
 instance Data Test
   where
-    conOf (Test _) = Constr "Test"
-    consOf _ = [Constr "Test"]
-    gfoldl f z x
-      = z x -- folding without descent 
-    gunfold f z c | conString c == "Test"
-      = undefined -- unfolding omitted
+    gfoldl _ z x = z x -- folding without descent 
+    toConstr (Test _) = testConstr
+    fromConstr c = case conIndex c of
+                     1 -> Test undefined
+    dataTypeOf _ = testDataType
+
+testConstr   = mkConstr 1 "Test" Prefix
+testDataType = mkDataType [testConstr]
 
 -- Test for compilation only
 main = undefined

@@ -14,10 +14,10 @@ reflect the left-to-right of immediate subterms in the queried list.
 In the module Data.Generics, we solve the problem by a common
 higher-order trick, that is, we do not cons lists during folding but
 we pass functions on lists starting from the identity function and
-passing [] to the resulting function. This is captured by a fancy
-datatype constructor Q. The example illustrates that we get indeed a
-unnatural right-to-left order if we just apply the simple constant
-datatype constructor CONST instead of Q.
+passing [] to the resulting function. The following example
+illustrates that we get indeed an undesirable right-to-left order if
+we just apply the simple constant datatype constructor CONST instead
+of the higher-order trick.
 
 Contributed by Ralf Laemmel, ralf@cwi.nl
 

@@ -1,6 +1,7 @@
 {-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
 
-{-
+{-:q
+
 
 We provide an illustrative ScrapYourBoilerplate example for a nested
 datatype.  For clarity, we do not derive the Typeable and Data
@@ -35,18 +36,20 @@ instance Typeable a => Typeable (Nest a)
 -- The Data instance for the nested datatype
 instance (Data a, Data [a]) => Data (Nest a)
   where
+    gfoldl k z (Box a)  = z Box `k` a
+    gfoldl k z (Wrap w) = z Wrap `k` w
     gmapT f (Box a)  = Box (f a)
     gmapT f (Wrap w) = Wrap (f w)
-    gmapQ f (Box a)  = [f a]
-    gmapQ f (Wrap w) = [f w]
-    gmapM f (Box a)  = f a >>= return . Box
-    gmapM f (Wrap w) = f w >>= return . Wrap
-    conOf (Box _)  = Constr "Box"
-    conOf (Wrap _) = Constr "Wrap"
-    consOf _ = map Constr ["Box","Wrap"]
-    gunfold f z c | conString c == "Box"  = f (z Box)
-    gunfold f z c | conString c == "Wrap" = f (z Wrap)
+    toConstr (Box _)  = boxConstr
+    toConstr (Wrap _) = wrapConstr
+    fromConstr c = case conIndex c of
+                     1 -> Box undefined
+                     2 -> Wrap undefined
+    dataTypeOf _ = nestDataType
 
+boxConstr    = mkConstr 1 "Box"  Prefix
+wrapConstr   = mkConstr 2 "Wrap" Prefix
+nestDataType = mkDataType [boxConstr,wrapConstr]
 
 -- test for compilation only
 main = undefined

@@ -3,19 +3,24 @@ TOP=${CWD}/../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-# Use a stage2 compiler
+# Reference to stage2 compiler supporting interactive use
 stage2=${TOP}/../ghc/compiler/stage2/ghc-inplace
 
 # A tweaked main target to use a stage 2 compiler
-tweak:
+stage2:
 	gmake TEST_HC=${stage2}
 
 # Just do the ghci way for testing during development
-fast:
+ghci:
 	gmake TEST_HC=${stage2} WAY=ghci
+
+# Just do normal compilation for testing during development
+normal:
+	gmake WAY=normal
 
 # Should probably be reused from somewhere else
 clean:
+	find . -depth -name "core"       -exec rm -rf \{\} \;
 	find . -depth -name "Main"       -exec rm -rf \{\} \;
 	find . -depth -name "*~"         -exec rm -rf \{\} \;
 	find . -depth -name "*.o"        -exec rm -rf \{\} \;
@@ -26,7 +31,13 @@ clean:
 	find . -depth -name "*.interp.*" -exec rm -rf \{\} \;
 	find . -depth -name "*.run.*"    -exec rm -rf \{\} \;
 	rm -f paradise/paradise
-	rm -f ReadShowEq/ReadShowEq
+	rm -f gshow/gshow
+	rm -f geq/geq
+	rm -f gread
+	rm -f foldTree
+	rm -f local-quantors
+	rm -f where
+	rm -f gmapQ-assoc
+	rm -f strings/strings
 	rm -f gzip/gzip
 	rm -f freeNames/freeNames
-

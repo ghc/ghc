@@ -108,8 +108,8 @@ result2 = everywhere (mkT stepid)    term37   -- preserves term without notice
 result3 = everywhereM (mkM stepfail) term42   -- fails in a harsh manner
 result4 = everywhereM (mkM stepfail) term37   -- fails rather early
 result5 = everywhereM recovered      term37   -- preserves term without notice
-result6 = somewhere (mkF stepfail)   term42   -- rewrites term accordingly
-result7 = somewhere (mkF stepfail)   term37   -- fails to notice lack of redex
+result6 = somewhere (mkMp stepfail)  term42   -- rewrites term accordingly
+result7 = somewhere (mkMp stepfail)  term37   -- fails to notice lack of redex
 
 main = print $ gshow ( result1,
                      ( result2,

@@ -21,7 +21,8 @@ genCom :: Company
 genCom = C [D "Research" laemmel [PU joost, PU marlow],
             D "Strategy" blair   []]
 
--- A typo for the sake of testing equality
+-- A typo for the sake of testing equality;
+-- (cf. lammel vs. laemmel)
 genCom' :: Company
 genCom' = C [D "Research" lammel [PU joost, PU marlow],
              D "Strategy" blair   []]
