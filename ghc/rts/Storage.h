@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.44 2002/03/26 23:56:44 sof Exp $
+ * $Id: Storage.h,v 1.45 2002/10/21 11:38:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -437,20 +437,6 @@ extern unsigned long macho_edata;
 #define IS_USER_PTR(p) ( ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER) \
                        && is_not_dynamically_loaded_ptr((char *)p) )
 #endif
-
-/* The HEAP_ALLOCED test below is called FOR EVERY SINGLE CLOSURE
- * during GC.  It needs to be FAST.
- *
- * BEWARE: when we're dynamically loading code (for GHCi), make sure
- * that we don't load any code above HEAP_BASE, or this test won't work.
- */
-#ifdef TEXT_BEFORE_HEAP
-# define HEAP_ALLOCED(x)  ((StgPtr)(x) >= (StgPtr)(HEAP_BASE))
-#else
-/* mingw, really */
-# define HEAP_ALLOCED(x)  (is_heap_alloced(x))
-#endif
-
 
 /* --------------------------------------------------------------------------
    Macros for distinguishing data pointers from code pointers

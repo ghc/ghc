@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.29 2002/07/17 09:21:50 simonmar Exp $
+ * $Id: MBlock.c,v 1.30 2002/10/21 11:38:53 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -18,24 +18,23 @@
 #include "MBlock.h"
 #include "BlockAlloc.h"
 
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-
 #ifndef mingw32_TARGET_OS
 # ifdef HAVE_SYS_MMAN_H
 # include <sys/mman.h>
 # endif
 #endif
-
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
-
 #if HAVE_WINDOWS_H
 #include <windows.h>
 #endif
@@ -44,56 +43,162 @@
 
 lnat mblocks_allocated = 0;
 
+/* -----------------------------------------------------------------------------
+   The MBlock Map: provides our implementation of HEAP_ALLOCED()
+   -------------------------------------------------------------------------- */
+
+StgWord8 mblock_map[4096]; // initially all zeros
+
+static void
+mblockIsHeap (void *p)
+{
+    mblock_map[((StgWord)p & ~MBLOCK_MASK) >> MBLOCK_SHIFT] = 1;
+}
+
+/* -----------------------------------------------------------------------------
+   Allocate new mblock(s)
+   -------------------------------------------------------------------------- */
+
 void *
 getMBlock(void)
 {
   return getMBlocks(1);
 }
 
+/* -----------------------------------------------------------------------------
+   The mmap() method
+
+   On Unix-like systems, we use mmap() to allocate our memory.  We
+   want memory in chunks of MBLOCK_SIZE, and aligned on an MBLOCK_SIZE
+   boundary.  The mmap() interface doesn't give us this level of
+   control, so we have to use some heuristics.
+
+   In the general case, if we want a block of n megablocks, then we
+   allocate n+1 and trim off the slop from either side (using
+   munmap()) to get an aligned chunk of size n.  However, the next
+   time we'll try to allocate directly after the previously allocated
+   chunk, on the grounds that this is aligned and likely to be free.
+   If it turns out that we were wrong, we have to munmap() and try
+   again using the general method.
+   -------------------------------------------------------------------------- */
+
 #if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
+
+// A wrapper around mmap(), to abstract away from OS differences in
+// the mmap() interface.
+
+static void *
+my_mmap (void *addr, int size)
+{
+    void *ret;
+
+#ifdef solaris2_TARGET_OS
+    { 
+	int fd = open("/dev/zero",O_RDONLY);
+	ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+		   MAP_FIXED | MAP_PRIVATE, fd, 0);
+	close(fd);
+    }
+#elif hpux_TARGET_OS
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+	       MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+#elif darwin_TARGET_OS
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+	       MAP_FIXED | MAP_ANON | MAP_PRIVATE, -1, 0);
+#else
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+	       MAP_ANON | MAP_PRIVATE, -1, 0);
+#endif
+
+    return ret;
+}    
+
+// Implements the general case: allocate a chunk of memory of 'size'
+// mblocks.
+
+static void *
+gen_map_mblocks (int size)
+{
+    int slop;
+    void *ret;
+
+    // Try to map a larger block, and take the aligned portion from
+    // it (unmap the rest).
+    size += MBLOCK_SIZE;
+    ret = my_mmap(0, size);
+    if (ret == (void *)-1) {
+	barf("gen_map_mblocks: mmap failed");
+    }
+    
+    // unmap the slop bits around the chunk we allocated
+    slop = (W_)ret & MBLOCK_MASK;
+	
+    if (munmap(ret, MBLOCK_SIZE - slop) == -1) {
+	barf("gen_map_mblocks: munmap failed");
+    }
+    if (slop > 0 && munmap(ret+size-slop, slop) == -1) {
+	barf("gen_map_mblocks: munmap failed");
+    }
+    
+    // next time, try after the block we just got.
+    ret += MBLOCK_SIZE - slop;
+    return ret;
+}
+
+
+// The external interface: allocate 'n' mblocks, and return the
+// address.
+
 void *
 getMBlocks(nat n)
 {
   static caddr_t next_request = (caddr_t)HEAP_BASE;
   caddr_t ret;
   lnat size = MBLOCK_SIZE * n;
+  nat i;
  
-#ifdef solaris2_TARGET_OS
-  { 
-      int fd = open("/dev/zero",O_RDONLY);
-      ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
-		 MAP_FIXED | MAP_PRIVATE, fd, 0);
-      close(fd);
-  }
-#elif hpux_TARGET_OS
- ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
-	     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-#elif darwin_TARGET_OS
- ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
-            MAP_FIXED | MAP_ANON | MAP_PRIVATE, -1, 0);
-#else
-  ret = mmap(next_request, size, PROT_READ | PROT_WRITE, 
-	     MAP_ANON | MAP_PRIVATE, -1, 0);
-#endif
+  if (next_request == 0) {
+      // use gen_map_mblocks the first time.
+      ret = gen_map_mblocks(size);
+  } else {
+      ret = my_mmap(next_request, size);
   
-  if (ret == (void *)-1) {
-    if (errno == ENOMEM) {
-      barf("getMBlock: out of memory (blocks requested: %d)", n);
-    } else {
-      barf("GetMBlock: mmap failed");
-    }
+      if (ret == (void *)-1) {
+	  if (errno == ENOMEM) {
+	      belch("out of memory (requested %d bytes)", n * BLOCK_SIZE);
+	      stg_exit(EXIT_FAILURE);
+	  } else {
+	      barf("getMBlock: mmap failed");
+	  }
+      }
+
+      if (((W_)ret & MBLOCK_MASK) != 0) {
+	  // misaligned block!
+#ifdef DEBUG
+	  belch("getMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
+#endif
+	  
+	  // unmap this block...
+	  if (munmap(ret, size) == -1) {
+	      barf("getMBlock: munmap failed");
+	  }
+	  // and do it the hard way
+	  ret = gen_map_mblocks(size);
+      }
   }
 
-  if (((W_)ret & MBLOCK_MASK) != 0) {
-    barf("GetMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
-  }
+  // Next time, we'll try to allocate right after the block we just got.
+  next_request = ret + size;
 
   IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at %p\n",n,ret));
 
-  next_request += size;
+  // fill in the table
+  for (i = 0; i < n; i++) {
+      mblockIsHeap( ret + i * MBLOCK_SIZE );
+  }
 
   mblocks_allocated += n;
-  
+
   return ret;
 }
 
@@ -122,15 +227,6 @@ char* end_non_committed = (char*)0;
 
 /* Number of bytes reserved */
 static unsigned long size_reserved_pool = SIZE_RESERVED_POOL;
-
-/* This predicate should be inlined, really. */
-/* TODO: this only works for a single chunk */
-int
-is_heap_alloced(const void* x)
-{
-  return (((char*)(x) >= base_non_committed) && 
-          ((char*)(x) <= end_non_committed));
-}
 
 void *
 getMBlocks(nat n)
@@ -198,6 +294,11 @@ getMBlocks(nat n)
 
   mblocks_allocated += n;
   
+  // fill in the table
+  for (i = 0; i < n; i++) {
+      mblockIsHeap( ret + i * MBLOCK_SIZE );
+  }
+
   return ret;
 }
 
