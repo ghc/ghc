@@ -6,6 +6,9 @@ module ShouldCompile where
 import Control.Monad.ST
 import Data.STRef
 
+-- The pattern type sig for f makes it monomorphic,
+-- but the 's' scopes over the separate type signature
+-- so that is monomorphic too.
 f:: ST s Int
 f:: ST s Int = do
     v <- newSTRef 5
