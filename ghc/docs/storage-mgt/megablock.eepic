@@ -1,0 +1,35 @@
+\setlength{\unitlength}{0.00054167in}
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+{\renewcommand{\dashlinestretch}{30}
+\begin{picture}(6849,1539)(0,-10)
+\put(687,1062){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}block}}}}}
+\put(687,837){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}descriptor}}}}}
+\path(612,1512)(1737,1512)(1737,462)
+	(612,462)(612,1512)
+\path(4062,1512)(5187,1512)(5187,462)
+	(4062,462)(4062,1512)
+\path(12,1512)(6837,1512)(6837,462)
+	(12,462)(12,1512)
+\path(2337,1512)(2337,462)
+\path(132.000,192.000)(12.000,162.000)(132.000,132.000)
+\path(12,162)(2337,162)
+\path(2217.000,132.000)(2337.000,162.000)(2217.000,192.000)
+\path(2457.000,192.000)(2337.000,162.000)(2457.000,132.000)
+\path(2337,162)(6837,162)
+\path(6717.000,132.000)(6837.000,162.000)(6717.000,192.000)
+\path(2337,12)(2337,312)
+\put(237,912){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}...}}}}}
+\put(1962,912){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}...}}}}}
+\put(2862,912){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(5637,912){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(4362,912){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}block}}}}}
+\put(312,237){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}block descriptors}}}}}
+\put(4212,237){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}blocks}}}}}
+\end{picture}
+}

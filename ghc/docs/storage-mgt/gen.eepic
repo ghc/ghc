@@ -1,0 +1,57 @@
+\setlength{\unitlength}{0.00050000in}
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+{\renewcommand{\dashlinestretch}{30}
+\begin{picture}(9849,5907)(0,-10)
+\path(3237,5562)(4212,5562)(4212,4062)
+	(3237,4062)(3237,5562)
+\path(4212,5562)(5187,5562)(5187,4062)
+	(4212,4062)(4212,5562)
+\path(5187,5562)(6162,5562)(6162,4062)
+	(5187,4062)(5187,5562)
+\path(6162,5562)(7137,5562)(7137,4062)
+	(6162,4062)(6162,5562)
+\put(5487,4737){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(4812,5712){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step[]}}}}}
+\path(7812,2712)(9837,2712)(9837,2112)
+	(7812,2112)(7812,2712)
+\put(7887,2862){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}END\_MUT\_LIST}}}}}
+\path(6687,312)(7812,2412)
+\path(7781.778,2292.056)(7812.000,2412.000)(7728.889,2320.389)
+\path(6687,2412)(7812,2412)
+\path(7692.000,2382.000)(7812.000,2412.000)(7692.000,2442.000)
+\put(6012,312){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(6012,2412){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\path(4662,312)(5787,312)
+\path(5667.000,282.000)(5787.000,312.000)(5667.000,342.000)
+\path(3237,612)(5262,612)(5262,12)
+	(3237,12)(3237,612)
+\path(4662,2412)(5787,2412)
+\path(5667.000,2382.000)(5787.000,2412.000)(5667.000,2442.000)
+\path(3237,2712)(5262,2712)(5262,2112)
+	(3237,2112)(3237,2712)
+\put(3387,237){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}mut\_link}}}}}
+\put(3312,762){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}StgMutClosure}}}}}
+\put(3387,2337){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}mut\_link}}}}}
+\put(3312,2862){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}StgMutClosure}}}}}
+\path(912,3012)(2487,3012)(2487,4887)(3237,4887)
+\path(3117.000,4857.000)(3237.000,4887.000)(3117.000,4917.000)
+\path(1212,2412)(3237,2412)
+\path(3117.000,2382.000)(3237.000,2412.000)(3117.000,2442.000)
+\path(1737,2112)(2487,2112)(2487,312)(3237,312)
+\path(3117.000,282.000)(3237.000,312.000)(3117.000,342.000)
+\path(12,3462)(1887,3462)(1887,1962)
+	(12,1962)(12,3462)
+\put(87,3237){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}no}}}}}
+\put(237,3612){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}generation}}}}}
+\put(87,2937){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}steps}}}}}
+\put(87,2637){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}n\_steps}}}}}
+\put(87,2337){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}mut\_list}}}}}
+\put(87,2052){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}mut\_once\_list}}}}}
+\end{picture}
+}

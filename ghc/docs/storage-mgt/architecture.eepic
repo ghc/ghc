@@ -1,0 +1,48 @@
+\setlength{\unitlength}{0.00054167in}
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+{\renewcommand{\dashlinestretch}{30}
+\begin{picture}(5262,4014)(0,-10)
+\path(2175,912)(4800,912)(4800,1212)
+	(2175,1212)(2175,912)
+\path(2325,12)(4575,12)(4575,312)
+	(2325,312)(2325,12)
+\path(2175,1812)(4800,1812)(4800,2112)
+	(2175,2112)(2175,1812)
+\path(1725,3237)(5250,3237)(5250,762)
+	(1725,762)(1725,3237)
+\path(1800,2712)(3300,2712)(3300,3012)
+	(1800,3012)(1800,2712)
+\path(3300,2712)(5175,2712)(5175,3012)
+	(3300,3012)(3300,2712)
+\path(3300,3687)(5100,3687)(5100,3987)
+	(3300,3987)(3300,3687)
+\path(2100,3687)(3300,3687)(3300,3987)
+	(2100,3987)(2100,3687)
+\path(3270.000,3132.000)(3300.000,3012.000)(3330.000,3132.000)
+\path(3300,3012)(3300,3687)
+\path(3330.000,3567.000)(3300.000,3687.000)(3270.000,3567.000)
+\path(3270.000,2232.000)(3300.000,2112.000)(3330.000,2232.000)
+\path(3300,2112)(3300,2712)
+\path(3330.000,2592.000)(3300.000,2712.000)(3270.000,2592.000)
+\path(3270.000,1332.000)(3300.000,1212.000)(3330.000,1332.000)
+\path(3300,1212)(3300,1812)
+\path(3330.000,1692.000)(3300.000,1812.000)(3270.000,1692.000)
+\path(3330.000,792.000)(3300.000,912.000)(3270.000,792.000)
+\path(3300,912)(3300,312)
+\path(3270.000,432.000)(3300.000,312.000)(3330.000,432.000)
+\put(0,1962){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}storage manager}}}}}
+\put(1875,2787){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}heap allocator}}}}}
+\put(3375,2787){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}garbage collector}}}}}
+\put(2700,1887){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}block allocator}}}}}
+\put(2475,987){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}megablock allocator}}}}}
+\put(2625,87){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}operating system}}}}}
+\put(2175,3762){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}mutatator}}}}}
+\put(3375,3762){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}runtime system}}}}}
+\end{picture}
+}
