@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.16 2001/03/08 09:50:18 simonmar Exp $
+-- $Id: TmpFiles.hs,v 1.17 2001/04/18 11:58:02 sewardj Exp $
 --
 -- Temporary file management
 --
@@ -35,6 +35,7 @@ import Directory
 import IO
 import Monad
 
+#include "../includes/config.h"
 #include "HsVersions.h"
 
 GLOBAL_VAR(v_FilesToClean, [],               [String] )
@@ -99,6 +100,7 @@ removeTmpFiles verb fs = do
 kludgedSystem cmd phase_name
  = do
 #ifndef mingw32_TARGET_OS
+   la la la
    exit_code <- system cmd `catchAllIO` 
 		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
 #else
