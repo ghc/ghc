@@ -634,6 +634,15 @@ everything you need.
 </VariableList>
 </para>
 
+      <para>
+	In order to actually build any documentation, you need to set
+	<constant>SGMLDocWays</constant> in your
+	<filename>build.mk</filename>. Valid values to add to this
+	list are: <literal>dvi</literal>, <literal>ps</literal>,
+	<literal>pdf</literal>, <literal>html</literal>, and
+	<literal>rtf</literal>.
+      </para>
+      
 </Sect2>
 
 <Sect2 id="pre-supposed-other-tools">
