@@ -31,6 +31,7 @@ import ArrBase
 import STBase
 import ST
 import Ix
+import Foreign( Addr(..) )
 import Char (intToDigit)
 import PackedString (unpackPS, packCBytesST)
 import Locale
