@@ -27,6 +27,7 @@ endif
 
 HS_PROG = haddock$(HS_PROG_EXT)
 
+# Why HOST platform, not TARGET platform??? Confusing...
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 Main_HC_OPTS += -Dmingw32_HOST_OS=1
 endif
@@ -55,17 +56,17 @@ ifeq "$(BIN_DIST)"   "1"
 HADDOCKLIB=$$\"\"datadir/haddock
 HADDOCKBIN=$$\"\"libexecdir/$(HS_PROG)
 else
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
 # --mixed is only provided by newer versions of cygpath (1.2 doesn't have it, for instance.)
 #HADDOCKLIB=$(shell cygpath --mixed $(datadir))
 HADDOCKLIB=$(shell cygpath -w $(datadir) | sed -e 's%\\%/%g')
 else
 HADDOCKLIB=$(datadir)
-endif # mingw
+endif
 HADDOCKBIN=$(libexecdir)/$(HS_PROG)
 endif # BIN_DIST
 else
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
 # See above comment re: --mixed
 #HADDOCKLIB=$(shell cygpath --mixed $(FPTOOLS_TOP_ABS)/haddock/html)
 HADDOCKLIB=$(shell cygpath -w $(FPTOOLS_TOP_ABS)/haddock/html | sed -e 's%\\%/%g')
@@ -97,8 +98,8 @@ INTERP=$(SHELL)
 
 SCRIPT_SUBST_VARS = HADDOCKLIB HADDOCKBIN
 
-# The script isn't installed on Windows; we run the binary directly
-ifeq "$(Windows)" "NO"
+# The script isn't installed on MinGW; we run the binary directly
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
 endif
 
