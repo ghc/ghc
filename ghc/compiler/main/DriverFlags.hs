@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.45 2001/02/20 15:44:26 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.46 2001/03/05 10:05:58 simonmar Exp $
 --
 -- Driver flags
 --
@@ -469,7 +469,7 @@ fFlags = [
   ( "glasgow-exts", 		 	Opt_GlasgowExts ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
-  ( "fgenerics",  			Opt_Generics )
+  ( "generics",  			Opt_Generics )
   ]
 
 isFFlag f = f `elem` (map fst fFlags)
