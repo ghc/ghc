@@ -44,14 +44,14 @@ Apart from that, there are the following changes
      except (alas) on stdout/stderr for tiresome reasons.
 
    - Some refinements to the exceptions mechanism:
-     http://www.haskell.org/ghc/docs/4.06/users_guide/release-notes-406.html#exc-changes-406
+     http://www.haskell.org/ghc/docs/4.06/users_guide/release-4-06.html#exc-changes-406
 
    - More performance tuning: compiled programs now allocate 10% less memory
      than 4.04
 
 For full details see the release notes:
 
-	http://www.haskell.org/ghc/docs/4.06/users_guide/release-notes-406.html
+	http://www.haskell.org/ghc/docs/4.06/users_guide/release-4-06.html
 
 + Mailing lists
 ================
