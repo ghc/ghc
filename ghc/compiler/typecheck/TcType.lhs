@@ -2,14 +2,14 @@
 #include "HsVersions.h"
 
 module TcType (
-
+  SYN_IE(TcIdBndr), TcIdOcc(..),
+	
+  -----------------------------------------
   SYN_IE(TcTyVar),
+  SYN_IE(TcTyVarSet),
   newTcTyVar,
   newTyVarTy,	-- Kind -> NF_TcM s (TcType s)
   newTyVarTys,	-- Int -> Kind -> NF_TcM s [TcType s]
-
-
-  SYN_IE(TcTyVarSet),
 
   -----------------------------------------
   SYN_IE(TcType), TcMaybe(..),
@@ -48,11 +48,12 @@ import TyVar	( SYN_IE(TyVar), GenTyVar(..), SYN_IE(TyVarSet), SYN_IE(GenTyVarSet
 		  nullTyVarEnv, mkTyVarEnv,
 		  tyVarSetToList
 		)
+import PprType	( GenType, GenTyVar )	-- Instances only
 
 -- others:
 import Class	( GenClass, SYN_IE(Class) )
 import TyCon	( isFunTyCon )
-import Id	( idType, SYN_IE(Id) )
+import Id	( idType, GenId, SYN_IE(Id) )
 import Kind	( Kind )
 import TcKind	( TcKind )
 import TcMonad
@@ -61,9 +62,11 @@ import Usage	( SYN_IE(Usage), GenUsage, SYN_IE(UVar), duffUsage )
 import TysPrim		( voidTy )
 
 IMP_Ubiq()
+import Name		( NamedThing(..) )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
 import Maybes		( assocMaybe )
+import Outputable	( Outputable(..) )
 import Util		( zipEqual, nOfThem, panic{-, pprPanic, pprTrace ToDo:rm-} )
 \end{code}
 
@@ -71,6 +74,26 @@ import Util		( zipEqual, nOfThem, panic{-, pprPanic, pprTrace ToDo:rm-} )
 
 Data types
 ~~~~~~~~~~
+
+\begin{code}
+type TcIdBndr s = GenId  (TcType s)	-- Binders are all TcTypes
+data TcIdOcc  s = TcId   (TcIdBndr s)	-- Bindees may be either
+		| RealId Id
+
+instance Eq (TcIdOcc s) where
+  (TcId id1)   == (TcId id2)   = id1 == id2
+  (RealId id1) == (RealId id2) = id1 == id2
+  _	       == _	       = False
+
+instance Outputable (TcIdOcc s) where
+  ppr sty (TcId id)   = ppr sty id
+  ppr sty (RealId id) = ppr sty id
+
+instance NamedThing (TcIdOcc s) where
+  getName (TcId id)   = getName id
+  getName (RealId id) = getName id
+\end{code}
+
 
 \begin{code}
 type TcType s = GenType (TcTyVar s) UVar	-- Used during typechecker
@@ -383,7 +406,7 @@ zonkTcTyVar :: TcTyVar s -> NF_TcM s (TcType s)
 zonkTcTyVar tyvar 
   = tcReadTyVar tyvar		`thenNF_Tc` \ maybe_ty ->
     case maybe_ty of
-	BoundTo ty@(TyVarTy tyvar') -> returnNF_Tc ty
+	BoundTo ty@(TyVarTy tyvar') -> returnNF_Tc ty		-- tcReadTyVar never returns a bound tyvar
 	BoundTo other		    -> zonkTcType other
 	other			    -> returnNF_Tc (TyVarTy tyvar)
 
