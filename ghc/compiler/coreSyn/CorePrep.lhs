@@ -560,16 +560,16 @@ maybeSaturate fn expr n_args floats ty
 
 	-- Ensure that the argument of DataToTagOp is evaluated
     eval_data2tag_arg :: CoreExpr -> UniqSM (Floats, CoreExpr)
-    eval_data2tag_arg app@(fun `App` Var arg_id)
-	| isEvaldUnfolding (idUnfolding arg_id)	-- Includes nullary constructors
+    eval_data2tag_arg app@(fun `App` arg)
+	| exprIsValue arg		-- Includes nullary constructors
 	= returnUs (emptyFloats, app)	-- The arg is evaluated
 	| otherwise			-- Arg not evaluated, so evaluate it
-	= newVar (idType arg_id)		`thenUs` \ arg_id1 ->
+	= newVar (exprType arg)		`thenUs` \ arg_id ->
 	  let 
-	     arg_id2   = setIdUnfolding arg_id1 evaldUnfolding
+	     arg_id1 = setIdUnfolding arg_id evaldUnfolding
 	  in
-	  returnUs (unitFloat (FloatCase arg_id2 (Var arg_id) False ),
-		    fun `App` Var arg_id2)
+	  returnUs (unitFloat (FloatCase arg_id1 arg False ),
+		    fun `App` Var arg_id1)
 
     eval_data2tag_arg (Note note app)	-- Scc notes can appear
 	= eval_data2tag_arg app		`thenUs` \ (floats, app') ->
