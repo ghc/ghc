@@ -396,9 +396,9 @@ dynamic_flags = [
   ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
   ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
-  ,  ( "dcore-lint",       	 setDumpFlag Opt_DoCoreLinting)
-  ,  ( "dstg-lint",        	 setDumpFlag Opt_DoStgLinting)
-  ,  ( "dcmm-lint",		 setDumpFlag Opt_DoCmmLinting)
+  ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
+  ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
+  ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting))
   ,  ( "dshow-passes",           NoArg (setRecompFlag False >> setVerbosity "2") )
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
