@@ -6,6 +6,7 @@ module TcEnv(
 	tcGetInstEnv, tcSetInstEnv, 
 	InstInfo(..), pprInstInfo, pprInstInfoDetails,
 	simpleInstInfoTy, simpleInstInfoTyCon, 
+	InstBindings(..),
 
 	-- Global environment
 	tcExtendGlobalEnv, 
@@ -572,19 +573,25 @@ as well as explicit user written ones.
 data InstInfo
   = InstInfo {
       iDFunId :: DFunId,		-- The dfun id
-      iBinds  :: RenamedMonoBinds,	-- Bindings, b
-      iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances
+      iBinds  :: InstBindings
     }
 
-  | NewTypeDerived {		-- Used for deriving instances of newtypes, where the
-				-- witness dictionary is identical to the argument dictionary
-				-- Hence no bindings.
-      iDFunId :: DFunId			-- The dfun id
-    }
+data InstBindings
+  = VanillaInst 		-- The normal case
+	RenamedMonoBinds	-- Bindings
+      	[RenamedSig]		-- User pragmas recorded for generating 
+				-- specialised instances
+
+  | NewTypeDerived 		-- Used for deriving instances of newtypes, where the
+	[Type]			-- witness dictionary is identical to the argument 
+				-- dictionary.  Hence no bindings, no pragmas
+	-- The [Type] are the representation types
+	-- See notes in TcDeriv
 
 pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))]
-pprInstInfoDetails (InstInfo { iBinds = b }) = ppr b
-pprInstInfoDetails (NewTypeDerived _) 	     = text "Derived from the represenation type"
+
+pprInstInfoDetails (InstInfo { iBinds = VanillaInst b _ }) = ppr b
+pprInstInfoDetails (InstInfo { iBinds = NewTypeDerived _}) = text "Derived from the represenation type"
 
 simpleInstInfoTy :: InstInfo -> Type
 simpleInstInfoTy info = case tcSplitDFunTy (idType (iDFunId info)) of

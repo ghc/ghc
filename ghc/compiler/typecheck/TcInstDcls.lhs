@@ -28,29 +28,30 @@ import TcRnMonad
 import TcMType		( tcInstType, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  checkAmbiguity, UserTypeCtxt(..), SourceTyCtxt(..) )
 import TcType		( mkClassPred, mkTyVarTy, tcSplitForAllTys, tyVarsOfType,
-			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe,
+			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
 			  TyVarDetails(..)
 			)
-import Inst		( InstOrigin(..), newDicts, instToId, showLIE )
+import Inst		( InstOrigin(..), newMethod, newMethodAtLoc, 
+			  newDicts, instToId, showLIE )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcExtendGlobalValEnv, tcExtendLocalValEnv2,
+import TcEnv		( tcExtendGlobalValEnv, 
 			  tcLookupClass, tcExtendTyVarEnv2,
 			  tcExtendInstEnv, tcExtendLocalInstEnv, tcLookupGlobalId,
- 			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
+ 			  InstInfo(..), InstBindings(..), pprInstInfo, simpleInstInfoTyCon, 
 			  simpleInstInfoTy, newDFunName
 			)
 import PprType		( pprClassPred )
-import TcMonoType	( tcSigPolyId, tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
+import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
 import HscTypes		( DFunId )
-import Subst		( mkTyVarSubst, substTheta )
+import Subst		( mkTyVarSubst, substTheta, substTy )
 import DataCon		( classDataCon )
 import Class		( Class, classBigSig )
 import Var		( idName, idType )
 import NameSet		
 import Id		( setIdLocalExported )
-import MkId		( mkDictFunId, unsafeCoerceId, rUNTIME_ERROR_ID )
+import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
 import Name		( getSrcLoc )
@@ -59,7 +60,7 @@ import TyCon		( TyCon )
 import TysWiredIn	( genericTyCons )
 import SrcLoc           ( SrcLoc )
 import Unique		( Uniquable(..) )
-import Util             ( lengthExceeds, isSingleton )
+import Util             ( lengthExceeds )
 import BasicTypes	( NewOrData(..) )
 import UnicodeUtil	( stringToUtf8 )
 import ErrUtils		( dumpIfSet_dyn )
@@ -237,8 +238,8 @@ tcLocalInstDecl1 decl@(InstDecl poly_ty binds uprags Nothing src_loc)
     checkTc (checkInstFDs theta clas inst_tys)
 	    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenM_`
     newDFunName clas inst_tys src_loc				`thenM` \ dfun_name ->
-    returnM (Just (InstInfo { iDFunId = mkDictFunId dfun_name clas tyvars inst_tys theta,
-			       iBinds = binds, iPrags = uprags }))
+    returnM (Just (InstInfo { iDFunId = mkDictFunId dfun_name tyvars theta clas inst_tys,
+			      iBinds = VanillaInst binds uprags }))
   where
     msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
 \end{code}
@@ -394,10 +395,10 @@ mkGenericInstance clas loc (hs_ty, binds)
     newDFunName clas [inst_ty] loc		`thenM` \ dfun_name ->
     let
 	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
-	dfun_id    = mkDictFunId dfun_name clas tyvars [inst_ty] inst_theta
+	dfun_id    = mkDictFunId dfun_name tyvars inst_theta clas [inst_ty]
     in
 
-    returnM (InstInfo { iDFunId = dfun_id, iBinds = binds, iPrags = [] })
+    returnM (InstInfo { iDFunId = dfun_id, iBinds = VanillaInst binds [] })
 \end{code}
 
 
@@ -484,25 +485,7 @@ First comes the easy case of a non-local instance decl.
 \begin{code}
 tcInstDecl2 :: InstInfo -> TcM TcMonoBinds
 
-tcInstDecl2 (NewTypeDerived { iDFunId = dfun_id })
-  = tcInstType InstTv (idType dfun_id)		`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
-    newDicts InstanceDeclOrigin dfun_theta'	`thenM` \ rep_dicts ->
-    let
-	rep_dict_id = ASSERT( isSingleton rep_dicts )
-		      instToId (head rep_dicts)		-- Derived newtypes have just one dict arg
-
-	body = TyLam inst_tyvars'    $
-	       DictLam [rep_dict_id] $
-	        (HsVar unsafeCoerceId `TyApp` [idType rep_dict_id, inst_head'])
-			  `HsApp` 
-		(HsVar rep_dict_id)
-	-- You might wonder why we have the 'coerce'.  It's because the
-	-- type equality mechanism isn't clever enough; see comments with Type.eqType.
-	-- So Lint complains if we don't have this. 
-    in
-    returnM (VarMonoBind dfun_id body)
-
-tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags })
+tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
   =	 -- Prime error recovery
     recoverM (returnM EmptyMonoBinds)	$
     addSrcLoc (getSrcLoc dfun_id)			   	$
@@ -533,34 +516,31 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
-	 -- Check that all the method bindings come from this class
-    mkMethodBinds clas inst_tys' op_items monobinds `thenM` \ (meth_insts, meth_infos) ->
-
-    let		 -- These insts are in scope; quite a few, eh?
-	avail_insts = [this_dict] ++ dfun_arg_dicts ++
-		      sc_dicts    ++ meth_insts
-
-	xtve    = inst_tyvars `zip` inst_tyvars'
-	tc_meth = tcMethodBind xtve inst_tyvars' dfun_theta' avail_insts uprags
+	------------------
+	-- Typecheck the methods
+    let		-- These insts are in scope; quite a few, eh?
+	avail_insts = [this_dict] ++ dfun_arg_dicts ++ sc_dicts
     in
-    mappM tc_meth meth_infos 		`thenM` \ meth_binds_s ->
+    tcMethods clas inst_tyvars inst_tyvars' 
+	      dfun_theta' inst_tys' avail_insts 
+	      op_items binds		`thenM` \ (meth_ids, meth_binds) ->
 
 	-- Figure out bindings for the superclass context
     tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts	
 		`thenM` \ (zonked_inst_tyvars, sc_binds_inner, sc_binds_outer) ->
 
-	-- Deal with SPECIALISE instance pragmas by making them
+	-- Deal with 'SPECIALISE instance' pragmas by making them
 	-- look like SPECIALISE pragmas for the dfun
     let
+	uprags = case binds of
+		       VanillaInst _ uprags -> uprags
+		       other		    -> []
 	spec_prags = [ SpecSig (idName dfun_id) ty loc
-		     | SpecInstSig ty loc <- uprags] 
+		     | SpecInstSig ty loc <- uprags ]
+	xtve = inst_tyvars `zip` inst_tyvars'
     in
-     
     tcExtendGlobalValEnv [dfun_id] (
-	tcExtendTyVarEnv2 xtve					$
-	tcExtendLocalValEnv2 [(idName sel_id, tcSigPolyId sig) 
-			     | (sel_id, sig, _) <- meth_infos]	$
-		-- Map sel_id to the local method name we are using
+	tcExtendTyVarEnv2 xtve		$
 	tcSpecSigs spec_prags
     )					`thenM` \ prag_binds ->
 
@@ -570,7 +550,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		-- Reason for setIdLocalExported: see notes with MkId.mkDictFunId
 
         dict_constr   = classDataCon clas
-	scs_and_meths = map instToId (sc_dicts ++ meth_insts)
+	scs_and_meths = map instToId sc_dicts ++ meth_ids
 	this_dict_id  = instToId this_dict
 	inlines       | null dfun_arg_dicts = emptyNameSet
 		      | otherwise	    = unitNameSet (idName dfun_id)
@@ -582,6 +562,8 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 		-- BUT: don't inline it if it's a constant dictionary;
 		-- we'll get all the benefit without inlining, and we get
 		-- a **lot** of code duplication if we inline it
+		--
+		--	See Note [Inline dfuns] below
 
 	dict_rhs
 	  | null scs_and_meths
@@ -607,7 +589,6 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
 	    msg = "Compiler error: bad dictionary " ++ showSDoc (ppr clas)
 
 	dict_bind  = VarMonoBind this_dict_id dict_rhs
-	meth_binds = andMonoBindList meth_binds_s
 	all_binds  = sc_binds_inner `AndMonoBinds` meth_binds `AndMonoBinds` dict_bind
 
 	main_bind = AbsBinds
@@ -618,10 +599,64 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = monobinds, iPrags = uprags }
     in
     showLIE "instance" 		`thenM_`
     returnM (main_bind `AndMonoBinds` prag_binds `AndMonoBinds` sc_binds_outer)
+
+
+tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
+	  avail_insts op_items (VanillaInst monobinds uprags)
+  = 	-- Check that all the method bindings come from this class
+    let
+	sel_names = [idName sel_id | (sel_id, _) <- op_items]
+	bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
+    in
+    mappM (addErrTc . badMethodErr clas) bad_bndrs	`thenM_`
+
+	-- Make the method bindings
+    mapAndUnzipM do_one op_items			`thenM` \ (meth_ids, meth_binds_s) ->
+   
+    returnM (meth_ids, andMonoBindList meth_binds_s)
+
+  where
+    xtve = inst_tyvars `zip` inst_tyvars'
+    do_one op_item 
+	= mkMethodBind InstanceDeclOrigin clas 
+		       inst_tys' monobinds op_item 	`thenM` \ (meth_inst, meth_info) ->
+	  tcMethodBind xtve inst_tyvars' dfun_theta' 
+		       avail_insts uprags meth_info	`thenM` \ meth_bind ->
+		-- Could add meth_insts to avail_insts, but not worth the bother
+	  returnM (instToId meth_inst, meth_bind)
+
+-- Derived newtype instances
+tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
+	  avail_insts op_items (NewTypeDerived rep_tys)
+  = getInstLoc InstanceDeclOrigin			`thenM` \ inst_loc ->
+    getLIE (mapAndUnzipM (do_one inst_loc) op_items)	`thenM` \ ((meth_ids, meth_binds), lie) ->
+    
+    tcSimplifyCheck
+	 (ptext SLIT("newtype derived instance"))
+	 inst_tyvars' avail_insts lie			`thenM` \ lie_binds ->
+
+	-- I don't think we have to do the checkSigTyVars thing
+
+    returnM (meth_ids, lie_binds `AndMonoBinds` andMonoBindList meth_binds)
+
+  where
+    do_one inst_loc (sel_id, _)
+	= newMethodAtLoc inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
+		-- Like in mkMethodBind
+	  newMethod InstanceDeclOrigin sel_id rep_tys'	`thenM` \ rhs_id ->
+		-- The binding is like "op @ NewTy = op @ RepTy"
+	  let
+	     meth_id = instToId meth_inst
+	  in
+	  return (meth_id, VarMonoBind meth_id (HsVar rhs_id))
+
+	-- Instantiate rep_tys with the relevant type variables
+    rep_tys' = map (substTy subst) rep_tys
+    subst    = mkTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars')
 \end{code}
 
-Superclass loops
-~~~~~~~~~~~~~~~~
+Note: [Superclass loops]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 We have to be very, very careful when generating superclasses, lest we
 accidentally build a loop. Here's an example:
 
@@ -673,7 +708,7 @@ tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
 
 	-- We must simplify this all the way down 
 	-- lest we build superclass loops
-	-- See notes about superclass loops above
+	-- See Note [Superclass loops] above
     tcSimplifyTop sc_lie		`thenM` \ sc_binds2 ->
 
     returnM (zonked_inst_tyvars, sc_binds1, sc_binds2)
@@ -682,26 +717,9 @@ tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
     doc = ptext SLIT("instance declaration superclass context")
 \end{code}
 
-\begin{code}
-mkMethodBinds clas inst_tys' op_items monobinds
-  = 	 -- Check that all the method bindings come from this class
-    mappM (addErrTc . badMethodErr clas) bad_bndrs	`thenM_`
-
-	-- Make the method bindings
-    mapAndUnzipM mk_method_bind op_items
-
-  where
-    mk_method_bind op_item = mkMethodBind InstanceDeclOrigin clas 
-					  inst_tys' monobinds op_item 
-
-	-- Find any definitions in monobinds that aren't from the class
-    sel_names = [idName sel_id | (sel_id, _) <- op_items]
-    bad_bndrs = collectMonoBinders monobinds `minusList` sel_names
-\end{code}
-
 
 		------------------------------
-		Inlining dfuns unconditionally
+	[Inline dfuns] Inlining dfuns unconditionally
 		------------------------------
 
 The code above unconditionally inlines dict funs.  Here's why.

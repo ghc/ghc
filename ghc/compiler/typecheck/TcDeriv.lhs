@@ -17,7 +17,8 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl, RenamedHsPr
 import CmdLineOpts	( DynFlag(..) )
 
 import TcRnMonad
-import TcEnv		( tcGetInstEnv, tcSetInstEnv, newDFunName, InstInfo(..), pprInstInfo,
+import TcEnv		( tcGetInstEnv, tcSetInstEnv, newDFunName, 
+			  InstInfo(..), pprInstInfo, InstBindings(..),
 			  pprInstInfoDetails, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
@@ -31,7 +32,8 @@ import TcRnMonad		( thenM, returnM, mapAndUnzipM )
 import HscTypes		( DFunId )
 
 import BasicTypes	( NewOrData(..) )
-import Class		( className, classKey, classTyVars, Class )
+import Class		( className, classKey, classTyVars, classSCTheta, Class )
+import Subst		( mkTyVarSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( dataConRepArgTys, isNullaryDataCon, isExistentialDataCon )
@@ -46,7 +48,8 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
-			  tcSplitTyConApp_maybe, tcEqTypes )
+			  tcSplitTyConApp_maybe, tcEqTypes, mkAppTys )
+import Type		( splitAppTys )
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
@@ -153,8 +156,8 @@ type DerivSoln = DerivRhs
 \end{code}
 
 
-A note about contexts on data decls
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[Data decl contexts] A note about contexts on data decls
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
 	data (RealFloat a) => Complex a = !a :+ !a deriving( Read )
@@ -273,7 +276,7 @@ deriveOrdinaryStuff inst_env_in eqns
 	-- Make a Real dfun instead of the dummy one we have so far
     gen_inst_info :: DFunId -> RenamedMonoBinds -> InstInfo
     gen_inst_info dfun binds
-      = InstInfo { iDFunId = dfun, iBinds = binds, iPrags = [] }
+      = InstInfo { iDFunId = dfun, iBinds = VanillaInst binds [] }
 
     rn_meths (cls, meths) = rnMethodBinds cls [] meths
 \end{code}
@@ -353,20 +356,16 @@ makeDerivEqns tycl_decls
 			not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
 		      ]
 
-	 -- "extra_constraints": see notes above about contexts on data decls
+	 -- "extra_constraints": see note [Data decl contexts] above
 	extra_constraints = tyConTheta tycon
-
-	--    | offensive_class = tyConTheta tycon
-	--    | otherwise	    = []
-	-- offensive_class = classKey clas `elem` PrelInfo.needsDataDeclCtxtClassKeys
-
 
     mk_eqn_help NewType tycon clas tys
       =	doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
         if can_derive_via_isomorphism && (gla_exts || standard_instance) then
 		-- Go ahead and use the isomorphism
        	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
-	   returnM (Nothing, Just (NewTypeDerived (mk_dfun dfun_name)))
+	   returnM (Nothing, Just (InstInfo { iDFunId = mk_dfun dfun_name,
+					      iBinds = NewTypeDerived rep_tys }))
 	else
 	   if standard_instance then
 		mk_eqn_help DataType tycon clas []	-- Go via bale-out route
@@ -374,17 +373,20 @@ makeDerivEqns tycl_decls
 	   	bale_out cant_derive_err
       where
 	-- Here is the plan for newtype derivings.  We see
-	--	  newtype T a1...an = T (t ak...an) deriving (C1...Cm)
-	-- where aj...an do not occur free in t, and the Ci are *partial applications* of
-	-- classes with the last parameter missing
+	--	  newtype T a1...an = T (t ak...an) deriving (.., C s1 .. sm, ...)
+	-- where aj...an do not occur free in t, and the (C s1 ... sm) is a 
+	-- *partial applications* of class C with the last parameter missing
 	--
 	-- We generate the instances
-	--	 instance Ci (t ak...aj) => Ci (T a1...aj)
+	--	 instance C s1 .. sm (t ak...aj) => C s1 .. sm (T a1...aj)
 	-- where T a1...aj is the partial application of the LHS of the correct kind
 	--
 	-- Running example: newtype T s a = MkT (ST s a) deriving( Monad )
+	--	instance Monad (ST s) => Monad (T s) where 
+	--	  fail = coerce ... (fail @ ST s)
 
-	kind = tyVarKind (last (classTyVars clas))
+	clas_tyvars = classTyVars clas
+	kind = tyVarKind (last clas_tyvars)
 		-- Kind of the thing we want to instance
 		--   e.g. argument kind of Monad, *->*
 
@@ -394,24 +396,55 @@ makeDerivEqns tycl_decls
 		-- to get 	instance Monad (ST s) => Monad (T s)
 
 	(tyvars, rep_ty) 	   = newTyConRep tycon
- 	maybe_rep_app		   = tcSplitTyConApp_maybe rep_ty	
-	Just (rep_tc, rep_ty_args) = maybe_rep_app
+	(rep_fn, rep_ty_args)	   = splitAppTys rep_ty
 
 	n_tyvars_to_keep = tyConArity tycon  - n_args_to_drop
 	tyvars_to_drop   = drop n_tyvars_to_keep tyvars
 	tyvars_to_keep   = take n_tyvars_to_keep tyvars
 
-	n_args_to_keep = tyConArity rep_tc - n_args_to_drop
+	n_args_to_keep = length rep_ty_args - n_args_to_drop
 	args_to_drop   = drop n_args_to_keep rep_ty_args
  	args_to_keep   = take n_args_to_keep rep_ty_args
 
-	ctxt_pred = mkClassPred clas (tys ++ [mkTyConApp rep_tc args_to_keep])
+	rep_tys  = tys ++ [mkAppTys rep_fn args_to_keep]
+	rep_pred = mkClassPred clas rep_tys
+		-- rep_pred is the representation dictionary, from where
+		-- we are gong to get all the methods for the newtype dictionary
 
-	mk_dfun dfun_name = mkDictFunId dfun_name clas tyvars 
-		    				  (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars_to_keep)] )
-						  [ctxt_pred]
+	inst_tys = (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars_to_keep)])
+		-- The 'tys' here come from the partial application
+		-- in the deriving clause. The last arg is the new
+		-- instance type.
 
-	-- We can only do this newtype deriving thing if:
+		-- We must pass the superclasses; the newtype might be an instance
+		-- of them in a different way than the representation type
+		-- E.g.		newtype Foo a = Foo a deriving( Show, Num, Eq )
+		-- Then the Show instance is not done via isomprphism; it shows
+		-- 	Foo 3 as "Foo 3"
+		-- The Num instance is derived via isomorphism, but the Show superclass
+		-- dictionary must the Show instance for Foo, *not* the Show dictionary
+		-- gotten from the Num dictionary. So we must build a whole new dictionary
+		-- not just use the Num one.  The instance we want is something like:
+		--	instance (Num a, Show (Foo a), Eq (Foo a)) => Num (Foo a) where
+		--		(+) = ((+)@a)
+		--		...etc...
+		-- There's no 'corece' needed because after the type checker newtypes
+		-- are transparent.
+
+	sc_theta = substTheta (mkTyVarSubst clas_tyvars inst_tys)
+			      (classSCTheta clas)
+
+		-- If there are no tyvars, there's no need
+		-- to abstract over the dictionaries we need
+	dict_args | null tyvars = []
+		  | otherwise   = rep_pred : sc_theta
+
+		-- Finally! Here's where we build the dictionary Id
+	mk_dfun dfun_name = mkDictFunId dfun_name tyvars dict_args clas inst_tys
+
+	-------------------------------------------------------------------
+	--  Figuring out whether we can only do this newtype-deriving thing
+
 	standard_instance = null tys && classKey clas `elem` derivableClassKeys
 
 	can_derive_via_isomorphism
@@ -419,7 +452,6 @@ makeDerivEqns tycl_decls
 	   && not (clas `hasKey` showClassKey)
 	   && n_tyvars_to_keep >= 0		-- Well kinded; 
 						-- eg not: newtype T = T Int deriving( Monad )
-	   && isJust maybe_rep_app	 	-- The rep type is a type constructor app
 	   && n_args_to_keep   >= 0		-- Well kinded: 
 						-- eg not: newtype T a = T Int deriving( Monad )
 	   && eta_ok				-- Eta reduction works
@@ -436,7 +468,12 @@ makeDerivEqns tycl_decls
 	      && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
-				(ptext SLIT("too hard for cunning newtype deriving"))
+				(vcat [ptext SLIT("too hard for cunning newtype deriving"),
+					ppr n_tyvars_to_keep,
+					ppr n_args_to_keep,
+					ppr eta_ok,
+					ppr (isRecursiveTyCon tycon)
+				      ])
 
     bale_out err = addErrTc err `thenM_` returnM (Nothing, Nothing) 
 
@@ -552,9 +589,8 @@ extend_inst_env dflags inst_env new_dfuns
 	-- They'll appear later, when we do the top-level extendInstEnvs
 
 mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
-  = mkDictFunId dfun_name clas tyvars 
-		[mkTyConApp tycon (mkTyVarTys tyvars)] 
-		theta
+  = mkDictFunId dfun_name tyvars theta
+		clas [mkTyConApp tycon (mkTyVarTys tyvars)] 
 \end{code}
 
 %************************************************************************

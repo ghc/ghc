@@ -308,13 +308,12 @@ newMethodFromName origin ty name
 	-- always a class op, but with -fno-implicit-prelude GHC is
 	-- meant to find whatever thing is in scope, and that may
 	-- be an ordinary function. 
-    newMethod origin id [ty]	`thenM` \ inst ->
-    returnM (instToId inst)
+    newMethod origin id [ty]
 
 newMethod :: InstOrigin
 	  -> TcId
 	  -> [TcType]
-	  -> TcM Inst
+	  -> TcM Id
 newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     let
@@ -328,7 +327,7 @@ newMethodWithGivenTy orig id tys theta tau
   = getInstLoc orig			`thenM` \ loc ->
     newMethodWith loc id tys theta tau	`thenM` \ inst ->
     extendLIE inst			`thenM_`
-    returnM inst
+    returnM (instToId inst)
 
 --------------------------------------------
 -- newMethodWith and newMethodAtLoc do *not* drop the 

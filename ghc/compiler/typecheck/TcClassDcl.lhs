@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcClassDcl ( tcClassDecl1, tcClassDecls2, 
-		    tcMethodBind, mkMethodBind, badMethodErr
+		    MethodSpec, tcMethodBind, mkMethodBind, badMethodErr
 		  ) where
 
 #include "HsVersions.h"
@@ -435,6 +435,10 @@ time, because their signatures may have different contexts and
 tyvar sets.
 
 \begin{code}
+type MethodSpec = (Id, 			-- Global selector Id
+		   TcSigInfo, 		-- Signature 
+		   RenamedMonoBinds)	-- Binding for the method
+
 tcMethodBind 
 	:: [(TyVar,TcTyVar)]	-- Bindings for type environment
 	-> [TcTyVar]		-- Instantiated type variables for the
@@ -446,7 +450,7 @@ tcMethodBind
 	-> [Inst]		-- Available from context, used to simplify constraints 
 				-- 	from the method body
 	-> [RenamedSig]		-- Pragmas (e.g. inline pragmas)
-	-> (Id, TcSigInfo, RenamedMonoBinds)	-- Details of this method
+	-> MethodSpec		-- Details of this method
 	-> TcM TcMonoBinds
 
 tcMethodBind xtve inst_tyvars inst_theta avail_insts prags
@@ -508,9 +512,9 @@ mkMethodBind :: InstOrigin
 	     -> RenamedMonoBinds	-- Method binding (pick the right one from in here)
 	     -> ClassOpItem
 	     -> TcM (Inst,		-- Method inst
-		     (Id,			-- Global selector Id
-		      TcSigInfo,		-- Signature 
-		      RenamedMonoBinds))	-- Binding for the method
+		     MethodSpec)
+-- Find the binding for the specified method, or make
+-- up a suitable default method if it isn't there
 
 mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info)
   = getInstLoc origin				`thenM` \ inst_loc ->

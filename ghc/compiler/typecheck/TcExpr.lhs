@@ -44,7 +44,7 @@ import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
 			  newTyVarTy, newTyVarTys, zonkTcType, readHoleResult )
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
-			  isSigmaTy, isTauTy, mkFunTy, mkFunTys,
+			  isSigmaTy, mkFunTy, mkFunTys,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
 			  tyVarsOfTypes, isLinearPred,
 			  liftedTypeKind, openTypeKind, 
@@ -54,7 +54,7 @@ import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( Id, idType, recordSelectorFieldLabel, isRecordSelector, isDataConWrapId_maybe )
 import DataCon		( DataCon, dataConFieldLabels, dataConSig, dataConStrictMarks )
-import Name		( Name, isExternalName )
+import Name		( Name )
 import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
@@ -874,8 +874,8 @@ tcId name	-- Look up the Id and instantiate its type
 	| want_method_inst fun_ty
 	= tcInstType VanillaTv fun_ty		`thenM` \ (tyvars, theta, tau) ->
 	  newMethodWithGivenTy orig fun_id 
-		(mkTyVarTys tyvars) theta tau	`thenM` \ meth ->
-	  loop (HsVar (instToId meth)) tau
+		(mkTyVarTys tyvars) theta tau	`thenM` \ meth_id ->
+	  loop (HsVar meth_id) tau
 
     loop fun fun_ty 
 	| isSigmaTy fun_ty

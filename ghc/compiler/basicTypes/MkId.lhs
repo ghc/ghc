@@ -743,13 +743,13 @@ that they aren't discarded by the occurrence analyser.
 mkDefaultMethodId dm_name ty = mkVanillaGlobal dm_name ty noCafIdInfo
 
 mkDictFunId :: Name		-- Name to use for the dict fun;
-	    -> Class 
 	    -> [TyVar]
-	    -> [Type]
 	    -> ThetaType
+	    -> Class 
+	    -> [Type]
 	    -> Id
 
-mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
+mkDictFunId dfun_name inst_tyvars dfun_theta clas inst_tys
   = mkVanillaGlobal dfun_name dfun_ty noCafIdInfo
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
