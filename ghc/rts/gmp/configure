@@ -4429,7 +4429,13 @@ gmp_mpn_functions="${extra_functions} inlines add_n sub_n mul_1 addmul_1   \
 mpn_objects=
 mpn_objs_in_libgmp="mpn/mp_bases.lo"
 
+# SLPJ trace
+echo "Peering at file structure (takes a while)..." 1>&6
+
 for tmp_fn in ${gmp_mpn_functions} ; do
+# SLPJ trace
+  echo "...$tmp_fn..." 1>&6
+
   rm -f mpn/${tmp_fn}.[Ssc] mpn/${tmp_fn}.asm
 
   # functions that can be provided by multi-function files
@@ -4447,6 +4453,7 @@ for tmp_fn in ${gmp_mpn_functions} ; do
     for tmp_base in $tmp_fn $tmp_mulfunc; do
       for tmp_ext in asm S s c; do
         tmp_file=$srcdir/mpn/$tmp_dir/$tmp_base.$tmp_ext
+
         if test -f $tmp_file; then
           found=yes
 
@@ -4487,7 +4494,12 @@ EOF
   fi
 done
 
+
 # Create link for gmp-mparam.h.
+
+# SLPJ trace
+echo "Creating link for gmp-mparam.h..." 1>&6
+
 for tmp_dir in $path ; do
   rm -f gmp-mparam.h
   if test -f $srcdir/mpn/${tmp_dir}/gmp-mparam.h ; then
@@ -4505,6 +4517,9 @@ echo "define(<KARATSUBA_SQR_THRESHOLD>,<$tmp_gmp_karatsuba_sqr_threshold>)" >> $
     break
   fi
 done
+
+# SLPJ trace
+echo "Digging out links to include in DISTCLEANFILES..." 1>&6
 
 # Dig out the links from `gmp_links' for inclusion in DISTCLEANFILES.
 gmp_srclinks=
