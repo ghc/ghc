@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.139 2002/12/12 13:21:46 ross Exp $
+-- $Id: InteractiveUI.hs,v 1.140 2002/12/19 12:49:27 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -833,9 +833,9 @@ setOptions wds =
       mapM_ setOpt plus_opts
 
       -- now, the GHC flags
-      pkgs_before <- io (readIORef v_Packages)
+      pkgs_before <- io (readIORef v_ExplicitPackages)
       leftovers   <- io (processArgs static_flags minus_opts [])
-      pkgs_after  <- io (readIORef v_Packages)
+      pkgs_after  <- io (readIORef v_ExplicitPackages)
 
       -- update things if the users wants more packages
       let new_packages = pkgs_after \\ pkgs_before
