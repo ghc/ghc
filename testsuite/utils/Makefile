@@ -1,6 +1,4 @@
-TOP=../..
+TOP=..
 include $(TOP)/mk/boilerplate.mk
-
-HS_PROG = normalise_errmsg
-
+SUBDIRS = normalise_errmsg
 include $(TOP)/mk/target.mk
