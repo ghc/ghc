@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.82 2001/07/18 16:06:10 rrt Exp $
+-- $Id: InteractiveUI.hs,v 1.83 2001/07/24 04:41:40 ken Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -8,6 +8,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS -#include "Linker.h" #-}
+{-# OPTIONS -#include "SchedAPI.h" #-}
 module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 #include "../includes/config.h"
