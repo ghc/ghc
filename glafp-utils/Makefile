@@ -14,6 +14,9 @@ include $(TOP)/mk/boilerplate.mk
 #
 # ToDo: remove msub for good
 #
-SUBDIRS = mkdependC lndir ltx mkdirhier runstdtest sgmlverb docbook
+SUBDIRS = mkdependC ltx mkdirhier runstdtest sgmlverb docbook
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+SUBDIRS += lndir
+endif
 
 include $(TOP)/mk/target.mk
