@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.7 2002/05/09 10:34:44 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.8 2002/05/09 12:45:19 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -176,7 +176,8 @@ reserved_ids = [
  ( "where", 	KW_Where ),    
  ( "as", 	KW_As ),       
  ( "qualified", KW_Qualified ),
- ( "hiding", 	KW_Hiding )
+ ( "hiding", 	KW_Hiding ),
+ ( "stdcall",   KW_StdCall )
  ]
 
 isIdent  c = isAlpha c || isDigit c || c == '\'' || c == '_'
