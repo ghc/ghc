@@ -115,19 +115,6 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 
       <variablelist>
 	<varlistentry>
-	  <term>The <literal>Char</literal> type</term>
-	  <indexterm><primary><literal>Char</literal></primary><secondary>size
-	  of</secondary></indexterm>
-	  <listitem>
-	    <para>The Haskell report says that the
-	    <literal>Char</literal> type holds 16 bits.  GHC follows
-	    the ISO-10646 standard a little more closely:
-	    <literal>maxBound :: Char</literal> in GHC is
-	    <literal>0x10FFFF</literal>.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term>Arbitrary-sized tuples</term>
 	  <listitem>
 	    <para>Tuples are currently limited to size 100.  HOWEVER:
@@ -147,7 +134,7 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 	    <listitem>
 	      <para>GHC's implementation of the
 	      <literal>Read</literal> class for integral types accepts
-	      hexadeciaml and octal literals (the code in the Haskell
+	      hexadecimal and octal literals (the code in the Haskell
 	      98 report doesn't).  So, for example,
 <programlisting>read "0xf00" :: Int</programlisting>
               works in GHC.</para>
@@ -167,6 +154,17 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
     left undefined or implementation specific in Haskell 98.</para>
 
     <variablelist>
+      <varlistentry>
+	<term>The <literal>Char</literal> type</term>
+	<indexterm><primary><literal>Char</literal></primary><secondary>size
+	of</secondary></indexterm>
+	<listitem>
+	  <para>Following the ISO-10646 standard,
+	  <literal>maxBound :: Char</literal> in GHC is
+	  <literal>0x10FFFF</literal>.</para>
+	</listitem>
+      </varlistentry>
+
       <varlistentry>
 	<term>Sized integral types</term>
 	<indexterm><primary><literal>Int</literal></primary><secondary>size of</secondary>
