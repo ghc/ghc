@@ -38,7 +38,7 @@ import Control.Monad	( when, foldM )
 import Control.Monad.ST	( runST )
 import Data.Array.IArray ( array )
 
-import GHC.Word		( Word )
+import GHC.Word		( Word(..) )
 import Data.Array.MArray ( MArray, newArray_, readArray, writeArray )
 import Data.Array.ST	( castSTUArray )
 import Data.Array.Base	( UArray(..) )
