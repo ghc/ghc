@@ -8,9 +8,9 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Re-export of Text.PrettyPrint.HughesPJ to provide a default
--- pretty-printing library.  Marked experimental at the moment so we
--- can change the default later if necessary.
+-- Re-export of "Text.PrettyPrint.HughesPJ" to provide a default
+-- pretty-printing library.  Marked experimental at the moment; the 
+-- default library might change at a later date.
 --
 -----------------------------------------------------------------------------
 
