@@ -1835,7 +1835,7 @@ sub runHscAndProcessInterfaces {
    # See if it bailed out early, saying nothing needed doing.  
    # We work this out by seeing if it created an output .hi file
 
-    if ( ! -f $hsc_hi ) {
+    if ( ! -f $hsc_hi && $ProduceHi !~ /-nohifile=/ ) {
 	# Doesn't exist, so we bailed out early.
 	# Tell the C compiler and assembler not to run
 	$do_cc = 0; $do_as = 0;
@@ -1853,8 +1853,10 @@ sub runHscAndProcessInterfaces {
 	# out early, we still need to touch the interface file of B. The reason
         # for this is that B may export A's interface.
 	#
-	&run_something("touch $ofile_target $hifile_target", 
-		       "Touch $ofile_target $hifile_target,  to propagate dependencies");
+	&run_something("touch $ofile_target",
+		       "Touch $ofile_target,  to propagate dependencies") if $HscOut ne '-N=';
+	&run_something("touch $hifile_target", 
+		       "Touch $hifile_target,  to propagate dependencies") if $ProduceHi =~ /-nohifile=/ ;
 
     } else {	
 
@@ -1879,9 +1881,10 @@ sub runHscAndProcessInterfaces {
 
 
 	# Interface-handling is important enough to live off by itself
-	require('ghc-iface.prl') || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
-	&postprocessHiFile($hsc_hi, $hifile_target, $going_interactive);
-	
+        if ( $ProduceHi !~ /-nohifile=/ ) { # If we've produced one, process it.
+	   require('ghc-iface.prl') || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-iface.prl!\n");
+	   &postprocessHiFile($hsc_hi, $hifile_target, $going_interactive);
+	}
 	# if we're going to split up object files,
 	# we inject split markers into the .hc file now
 	if ( $HscOut eq '-C=' && $SplitObjFiles ) {
@@ -2909,8 +2912,8 @@ arg: while($_ = $Args[0]) {
     # --------------- Renamer -------------
 
 
-    /^-fno-tycon-pruning$/ 
-		    && do { push(@HsC_flags, $_); next arg; };
+    /^-fno-prune-tydecls$/     && do { push(@HsC_flags, $_); next arg; };
+    /^-fno-prune-instdecls$/     && do { push(@HsC_flags, $_); next arg; };
 
     # ---------------
 
