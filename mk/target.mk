@@ -515,22 +515,15 @@ CLEAN_FILES += $(GHCI_LIBRARY)
 
 all :: $(GHCI_LIBRARY)
 
-# How come GNU make doesn't support ands and ors?  Duh.
-ifneq "$(GHCI_LIBRARY)" "HSstd.o"
-ifneq "$(GHCI_LIBRARY)" "HSwin32.o"
-# An annoying gotcha is that the Prelude is a bit special,
-# for reasons described in ghc/lib/std/Makefile.
-# So we only put in this standard rule for packages other than std
-# The rule for the Prelude is in ghc/lib/std/Makefile
-# We check for GHCI_LIBRARY being HSstd.o rather than
-# PACKAGE being std, because we want to still use the boilerplate rule 
-# for cbits.
-# JRS 04 Sept 01: The exact same deal applies to hslibs/HSwin32.o.
+ifneq "$(DONT_WANT_STD_GHCI_LIB_RULE)" "YES"
+# If you don't want to build GHCI_LIBRARY the 'standard' way,
+# set DONT_WANT_STD_GHCI_LIB_RULE to YES. The Prelude and
+# hslibs/Win32 uses this 'feature'.
+#
 $(GHCI_LIBRARY) :: $(LIBOBJS)
 	ld -r -x -o $@ $(LIBOBJS) $(STUBOBJS)
 
-endif # GHCI_LIBRARY != "HSwin32.o"
-endif # GHCI_LIBRARY != "HSstd.o"
+endif # DONT_WANT_STD_GHCI_LIB_RULE
 endif # GhcWithInterpreter
 endif # way
 endif # GHCI_LIBRARY != ""
