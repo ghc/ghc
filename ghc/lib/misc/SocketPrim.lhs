@@ -267,7 +267,7 @@ bindSocket :: Socket	-- Unconnected Socket
 
 bindSocket (MkSocket s _family _stype _protocol socketStatus) addr = do
 #ifndef cygwin32_TARGET_OS
- let isDomainSocket = if family == AF_UNIX then 1 else (0::Int)
+ let isDomainSocket = if _family == AF_UNIX then 1 else (0::Int)
 #else
  let isDomainSocket = 0
 #endif
@@ -302,7 +302,7 @@ connect :: Socket	-- Unconnected Socket
 
 connect (MkSocket s _family _stype _protocol socketStatus) addr = do
 #ifndef cygwin32_TARGET_OS
- let isDomainSocket = if family == AF_UNIX then 1 else (0::Int)
+ let isDomainSocket = if _family == AF_UNIX then 1 else (0::Int)
 #else
  let isDomainSocket = 0
 #endif
@@ -1082,7 +1082,7 @@ sIsWritable = sIsReadable -- sort of.
 
 sIsAcceptable :: Socket -> IO Bool
 #ifndef cygwin32_TARGET_OS
-sIsAcceptable (MkSocket _ AF_UNIX Stream _ _) = do
+sIsAcceptable (MkSocket _ AF_UNIX Stream _ status) = do
     value <- readIORef status
     return (value == Connected || value == Bound || value == Listening)
 sIsAcceptable (MkSocket _ AF_UNIX _ _ _) = return False

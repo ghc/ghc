@@ -188,7 +188,7 @@ getServiceEntry = do
 
 setServiceEntry	:: Bool -> IO ()
 setServiceEntry flg = _ccall_ setservent stayOpen
- where stayOpen = if flg then 1 else 0
+ where stayOpen = (if flg then 1 else 0) :: Int
 
 endServiceEntry	:: IO ()
 endServiceEntry = _ccall_ endservent
@@ -252,7 +252,7 @@ getProtocolEntry = do
 
 --setProtocolEntry :: Bool -> IO ()	-- Keep DB Open ?
 setProtocolEntry flg = _ccall_ setprotoent v
- where v = if flg then 1 else 0
+ where v = (if flg then 1 else 0) :: Int
 
 --endProtocolEntry :: IO ()
 endProtocolEntry = _ccall_ endprotoent
@@ -294,7 +294,7 @@ getHostEntry = do
 
 setHostEntry :: Bool -> IO ()
 setHostEntry flg = _ccall_ sethostent v
- where v = if flg then 1 else 0
+ where v = (if flg then 1 else 0) :: Int
 
 endHostEntry :: IO ()
 endHostEntry = _ccall_ endhostent
@@ -352,7 +352,7 @@ getNetworkEntry = do
 
 setNetworkEntry :: Bool -> IO ()
 setNetworkEntry flg = _ccall_ setnetent v
- where v = if flg then 1 else 0
+ where v = (if flg then 1 else 0) :: Int
 
 endNetworkEntry :: IO ()
 endNetworkEntry = _ccall_ endnetent
