@@ -16,8 +16,8 @@ dnl
 # First off, a distrib sanity check..
 AC_INIT(mk/config.mk.in)
 
-dnl * We require autoconf version 2.53 due to the use of AC_SYS_LARGEFILE
-AC_PREREQ(2.52)
+dnl * We require autoconf version 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE
+AC_PREREQ(2.50)
 
 dnl * Declare subdirectories that have a private configure script
 dnl
