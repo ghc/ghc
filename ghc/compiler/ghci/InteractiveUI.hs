@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.33 2001/02/06 16:22:12 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.34 2001/02/07 10:45:43 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -137,7 +137,7 @@ interactiveUI cmstate mod = do
 	  	      []   -> prel
   	  	      m:ms -> m
 
-   (unGHCi uiLoop) GHCiState{ modules = mods,
+   (unGHCi runGHCi) GHCiState{ modules = mods,
 			      current_module = this_mod,
 	  	              target = mod,
 			      cmstate = cmstate,
@@ -146,31 +146,64 @@ interactiveUI cmstate mod = do
    return ()
 
 
-uiLoop :: GHCi ()
-uiLoop = do
-  st <- getGHCiState
+runGHCi :: GHCi ()
+runGHCi = do
+  -- read in ./.ghci
+  dot_ghci <- io (IO.try (openFile "./.ghci" ReadMode))
+  case dot_ghci of
+	Left e -> return ()
+	Right hdl -> fileLoop hdl False
+  
+  -- read in ~/.ghci
+  home <- io (IO.try (getEnv "HOME"))
+  case home of
+   Left e  -> return ()
+   Right dir -> do
+  	dot_ghci <- io (IO.try (openFile (dir ++ "/.ghci") ReadMode))
+	case dot_ghci of
+	   Left e -> return ()
+	   Right hdl -> fileLoop hdl False
+
+  -- read commands from stdin
 #ifndef NO_READLINE
-  l <- io (readline (moduleUserString (current_module st) ++ "> "))
+  readlineLoop
 #else
-  l_ok <- io (hGetLine stdin)
-  let l = Just l_ok
+  fileLoop stdin True
 #endif
-  case l of {
-    Nothing -> exitGHCi;
-    Just l -> 
 
-  case remove_spaces l of {
-    "" -> uiLoop;
-    l  -> do
+  -- and finally, exit
+  io $ do putStrLn "Leaving GHCi." 
+
+
+fileLoop :: Handle -> Bool -> GHCi ()
+fileLoop hdl prompt = do
+   st <- getGHCiState
+   when prompt (io (hPutStr hdl (moduleUserString (current_module st) ++ "> ")))
+   l <- io (IO.try (hGetLine hdl))
+   case l of
+	Left e | isEOFError e -> return ()
+	       | otherwise    -> throw e
+	Right l -> 
+	  case remove_spaces l of
+	    "" -> fileLoop hdl prompt
+	    l  -> do quit <- runCommand l
+          	     if quit then return () else fileLoop hdl prompt
+
 #ifndef NO_READLINE
-          io (addHistory l)
+readlineLoop :: GHCi ()
+readlineLoop = do
+   st <- getGHCiState
+   l <- io (readline (moduleUserString (current_module st) ++ "> "))
+   case l of
+	Nothing -> return ()
+	Just l  ->
+	  case remove_spaces l of
+	    "" -> readlineLoop
+	    l  -> do
+        	  io (addHistory l)
+  	  	  quit <- runCommand l
+          	  if quit then return () else readlineLoop
 #endif
-  	  quit <- runCommand l
-          if quit then exitGHCi else uiLoop
-   }}
-
-
-exitGHCi = io $ do putStrLn "Leaving GHCi." 
 
 -- Top level exception handler, just prints out the exception 
 -- and carries on.
@@ -267,7 +300,10 @@ setContext m | not (isUpper (head m)) || not (all isAlphaNum (tail m))
 setContext mn
   = do m <- io (moduleNameToModule (mkModuleName mn))
        st <- getGHCiState
-       setGHCiState st{current_module = m}
+       if (isHomeModule m && m `notElem` modules st)
+	  then throwDyn (OtherError (showSDoc (quotes (ppr (moduleName m))
+				<+> text "is not currently loaded, use :load")))
+	  else setGHCiState st{current_module = m}
 
 moduleNameToModule :: ModuleName -> IO Module
 moduleNameToModule mn
