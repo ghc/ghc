@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.82 2002/12/13 19:14:58 wolfgang Exp $
+ * $Id: StgMiscClosures.hc,v 1.83 2003/01/08 12:37:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -234,8 +234,8 @@ IF_(stg_apply_interp_entry)
 INFO_TABLE_FUN_GEN(stg_BCO_info,stg_BCO_entry,4,0,
 	      0,0,0,  /* no SRT */
 	      ARG_BCO, 0/*dummy arity*/, 0/*dummy bitmap*/, NULL/*slow_apply*/,
-	      BCO,,IF_,"BCO","BCO");
-IF_(stg_BCO_entry) {
+	      BCO,,EF_,"BCO","BCO");
+FN_(stg_BCO_entry) {
   FB_
   // entering a BCO means "apply it", same as a function
   Sp -= 2;
