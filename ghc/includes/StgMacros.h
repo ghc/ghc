@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.22 2000/03/15 17:36:02 simonmar Exp $
+ * $Id: StgMacros.h,v 1.23 2000/03/16 12:40:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -729,13 +729,11 @@ LoadThreadState (void)
    Module initialisation
    -------------------------------------------------------------------------- */
 
-extern F_ *init_stack;
-
 #define PUSH_INIT_STACK(reg_function)		\
-	*(init_stack++) = (F_)reg_function
+	*(Sp++) = (W_)reg_function
 
 #define POP_INIT_STACK()			\
-	*(--init_stack)
+	*(--Sp)
 
 #define START_MOD_INIT(reg_mod_name)		\
 	static int _module_registered = 0;	\

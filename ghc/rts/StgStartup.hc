@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.7 2000/03/09 11:49:34 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.8 2000/03/16 12:40:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -137,6 +137,8 @@ STGFUN(stg_enterStackTop)
 
 #ifndef INTERPRETER 
 
+extern F_ *init_stack;
+
 STGFUN(stg_init_ret)
 {
   FB_
@@ -149,6 +151,7 @@ STGFUN(stg_init)
   EF_(__init_Main);
   EF_(__init_Prelude);
   FB_
+  Sp = (P_)init_stack;
   PUSH_INIT_STACK(stg_init_ret);
   PUSH_INIT_STACK(__init_Prelude);
   JMP_(__init_Main);
