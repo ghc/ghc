@@ -53,6 +53,9 @@
 
 * include file revision info in module headers
 
+* Allow individual function arguments to be documented when the function
+  type is a record element?
+
 -----------------------------------------------------------------------------
 -- cosmetic
 
