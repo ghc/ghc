@@ -12,6 +12,10 @@ SUBDIRS = ghc-pkg hp2ps hsc2hs parallel stat2resid prof unlit genprimopcode
 endif
 endif
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+SUBDIRS += touchy
+endif
+
 # hstags died when the new parser was introduced.
 #	  hstags	\
 
