@@ -48,6 +48,7 @@ import NHC.IOExtras
     , newIORef
     , readIORef
     , writeIORef
+    , excludeFinalisers
     )
 #endif
 
@@ -86,4 +87,11 @@ atomicModifyIORef = plainModifyIORef	-- Hugs has no preemption
   where plainModifyIORef r f = do
 		a <- readIORef r
 		case f a of (a',b) -> writeIORef r a' >> return b
+#elif defined(__NHC__)
+atomicModifyIORef r f =
+  excludeFinalisers $ do
+    a <- readIORef r
+    let (a',b) = f a
+    writeIORef r a'
+    return b
 #endif
