@@ -297,7 +297,7 @@ tcRnStmt hsc_env pcs ictxt rdr_stmt
     setGblEnv tcg_env $ do {
     
     -- The real work is done here
-    ((bound_ids, tc_expr), lie) <- getLIE (tcUserStmt rn_stmt) ;
+    (bound_ids, tc_expr) <- tcUserStmt rn_stmt ;
     
     traceTc (text "tcs 1") ;
     let {	-- Make all the bound ids "global" ids, now that
@@ -409,15 +409,17 @@ tc_stmts stmts
 
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
-	((ids, tc_stmts), lie) <- 
-		getLIE 						$ 
-		tcStmtsAndThen combine stmt_ctxt all_stmts	$ 
-		do {
-		    -- Look up the names right in the middle,
-		    -- where they will all be in scope
-		    ids <- mappM tcLookupId names ;
-		    return (ids, [])
-		} ;
+	((ids, tc_expr), lie) <- getLIE $ do {
+	    (ids, tc_stmts) <- tcStmtsAndThen combine stmt_ctxt all_stmts	$ 
+			do {
+			    -- Look up the names right in the middle,
+			    -- where they will all be in scope
+			    ids <- mappM tcLookupId names ;
+			    return (ids, []) } ;
+	    io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
+	    return (ids, HsDo DoExpr tc_stmts io_ids
+		 	      (mkTyConApp ioTyCon [ret_ty]) noSrcLoc) 
+	} ;
 
 	-- Simplify the context right here, so that we fail
 	-- if there aren't enough instances.  Notably, when we see
@@ -429,10 +431,7 @@ tc_stmts stmts
 	const_binds <- tcSimplifyTop lie ;
 
 	-- Build result expression and zonk it
-	io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
-	let { expr = mkHsLet const_binds $
-		     HsDo DoExpr tc_stmts io_ids
-		 	  (mkTyConApp ioTyCon [ret_ty]) noSrcLoc } ;
+	let { expr = mkHsLet const_binds tc_expr } ;
 	zonked_expr <- zonkTopExpr expr ;
 	zonked_ids  <- zonkTopBndrs ids ;
 
