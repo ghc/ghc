@@ -278,7 +278,7 @@ data TcGblEnv
 					--	tc_pcs, tc_hpt, *and* tc_insts
 		-- This field is mutable so that it can be updated inside a
 		-- Template Haskell splice, which might suck in some new
-		-- instance declarations.  This is a slightly differen strategy
+		-- instance declarations.  This is a slightly different strategy
 		-- than for the type envt, where we look up first in tcg_type_env
 		-- and then in the mutable EPS, because the InstEnv for this module
 		-- is constructed (in principle at least) only from the modules
@@ -292,7 +292,10 @@ data TcGblEnv
 	tcg_imports :: ImportAvails,		-- Information about what was imported 
 						--    from where, including things bound
 						--    in this module
-		-- The next fields are always fully zonked
+
+		-- The next fields accumulate the payload of the module
+		-- The binds, rules and foreign-decl fiels are collected
+		-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 	tcg_binds   :: MonoBinds Id,		-- Value bindings in this module
 	tcg_deprecs :: Deprecations,		-- ...Deprecations 
 	tcg_insts   :: [DFunId],		-- ...Instances

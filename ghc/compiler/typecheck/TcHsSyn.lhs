@@ -818,6 +818,8 @@ zonkForeignExports env ls = mappM (zonkForeignExport env) ls
 zonkForeignExport :: ZonkEnv -> TcForeignDecl -> TcM (TypecheckedForeignDecl)
 zonkForeignExport env (ForeignExport i hs_ty spec isDeprec src_loc) =
    returnM (ForeignExport (zonkIdOcc env i) undefined spec isDeprec src_loc)
+zonkForeignExport env for_imp 
+  = returnM for_imp	-- Foreign imports don't need zonking
 \end{code}
 
 \begin{code}

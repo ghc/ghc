@@ -156,11 +156,6 @@ tcRnModule hsc_env pcs
 		-- Rename and type check the declarations
 	(tcg_env, src_fvs) <- tcRnSrcDecls local_decls ;
 	setGblEnv tcg_env		$ do {
-	traceRn (text "rn2") ;
-
-		-- Check for 'main'
-	(tcg_env, main_fvs) <- checkMain ;
-	setGblEnv tcg_env		$ do {
 
 	traceRn (text "rn3") ;
 		-- Check whether the entire module is deprecated
@@ -191,13 +186,13 @@ tcRnModule hsc_env pcs
 	setGblEnv tcg_env $ do {
 
 		-- Report unused names
-	let { used_fvs = src_fvs `plusFV` main_fvs `plusFV` export_fvs } ;
+	let { used_fvs = src_fvs `plusFV` export_fvs } ;
  	reportUnusedNames tcg_env used_fvs ;
 
 		-- Dump output and return
 	tcDump tcg_env ;
 	return tcg_env
-    }}}}}}}}
+    }}}}}}}
 \end{code}
 
 
@@ -600,26 +595,67 @@ tcRnExtCore hsc_env pcs
 tcRnSrcDecls :: [RdrNameHsDecl] -> TcM (TcGblEnv, FreeVars)
 	-- Returns the variables free in the decls
 	-- Reason: solely to report unused imports and bindings
-tcRnSrcDecls [] = do { tcg_env <- getGblEnv ; return (tcg_env, emptyFVs) }
-tcRnSrcDecls ds
+
+tcRnSrcDecls decls
+ = do { 	-- Do all the declarations
+	((tc_envs, fvs), lie) <- getLIE (tc_rn_src_decls decls) ;
+
+	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
+	     -- How could there be ambiguous ones?  They can only arise if a
+	     -- top-level decl falls under the monomorphism
+	     -- restriction, and no subsequent decl instantiates its
+	     -- type.  (Usually, ambiguous type variables are resolved
+	     -- during the generalisation step.)
+        traceTc (text "Tc8") ;
+	setEnvs tc_envs		$ do {
+		-- Setting the global env exposes the instances to tcSimplifyTop
+		-- Setting the local env exposes the local Ids, so that
+		-- we get better error messages (monomorphism restriction)
+	inst_binds <- tcSimplifyTop lie ;
+
+	    -- Backsubstitution.  This must be done last.
+	    -- Even tcSimplifyTop may do some unification.
+        traceTc (text "Tc9") ;
+	let { (tcg_env, _) = tc_envs ;
+	      TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
+		         tcg_rules = rules, tcg_fords = fords } = tcg_env } ;
+
+	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `andMonoBinds` inst_binds)
+							   rules fords ;
+
+	return (tcg_env { tcg_type_env = extendTypeEnvWithIds type_env bind_ids,
+			  tcg_binds = binds', tcg_rules = rules', tcg_fords = fords' }, 
+		fvs)
+    }}
+
+tc_rn_src_decls :: [RdrNameHsDecl] -> TcM ((TcGblEnv, TcLclEnv), FreeVars)
+
+tc_rn_src_decls ds
  = do { let { (first_group, group_tail) = findSplice ds } ;
+		-- If ds is [] we get ([], Nothing)
 
 	-- Type check the decls up to, but not including, the first splice
-	(tcg_env, src_fvs1) <- tcRnGroup first_group ;
+	(tc_envs@(_,tcl_env), src_fvs1) <- tcRnGroup first_group ;
 
 	-- Bale out if errors; for example, error recovery when checking
 	-- the RHS of 'main' can mean that 'main' is not in the envt for 
 	-- the subsequent checkMain test
 	failIfErrsM ;
 
-	-- If there is no splice, we're done
+	setEnvs tc_envs $
+
+	-- If there is no splice, we're nearlydone
 	case group_tail of {
-	   Nothing -> return (tcg_env, src_fvs1) ;
+	   Nothing -> do { 	-- Last thing: check for `main'
+			   (tcg_env, main_fvs) <- checkMain ;
+			   return ((tcg_env, tcl_env), src_fvs1 `plusFV` main_fvs)
+		      } ;
+
+	-- If there's a splice, we must carry on
 	   Just (SpliceDecl splice_expr splice_loc, rest_ds) -> 
 #ifndef GHCI
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
-	setGblEnv tcg_env $ do {
 
 	-- Rename the splice expression, and get its supporting decls
 	(rn_splice_expr, fvs) <- initRn SourceMode $
@@ -632,10 +668,10 @@ tcRnSrcDecls ds
 	spliced_decls <- tcSpliceDecls rn_splice_expr ;
 
 	-- Glue them on the front of the remaining decls and loop
-	(tcg_env, src_fvs2) <- tcRnSrcDecls (spliced_decls ++ rest_ds) ;
+	(tc_envs, src_fvs2) <- tc_rn_src_decls (spliced_decls ++ rest_ds) ;
 
-	return (tcg_env, src_fvs1 `plusFV` src_fvs2)
-    }}
+	return (tc_envs, src_fvs1 `plusFV` src_fvs2)
+    }
 #endif /* GHCI */
     }}
 \end{code}
@@ -659,16 +695,16 @@ declarations.  It expects there to be an incoming TcGblEnv in the
 monad; it augments it and returns the new TcGblEnv.
 
 \begin{code}
-tcRnGroup :: HsGroup RdrName -> TcM (TcGblEnv, FreeVars)
-	-- Returns the variables free in the decls
+tcRnGroup :: HsGroup RdrName -> TcM ((TcGblEnv, TcLclEnv), FreeVars)
+	-- Returns the variables free in the decls, for unused-binding reporting
 tcRnGroup decls
  = do {		-- Rename the declarations
 	(tcg_env, rn_decls, src_fvs) <- rnTopSrcDecls decls ;
 	setGblEnv tcg_env $ do {
 
 		-- Typecheck the declarations
-	tcg_env <- tcTopSrcDecls rn_decls ;
-	return (tcg_env, src_fvs)
+	tc_envs <- tcTopSrcDecls rn_decls ;
+	return (tc_envs, src_fvs)
   }}
 
 ------------------------------------------------
@@ -702,43 +738,8 @@ rnTopSrcDecls group
   }}}
 
 ------------------------------------------------
-tcTopSrcDecls :: HsGroup Name -> TcM TcGblEnv
-tcTopSrcDecls rn_decls
- = do {			-- Do the main work
-	((tcg_env, lcl_env, binds, rules, fords), lie) <- getLIE (
-		tc_src_decls rn_decls
-	    ) ;
-
-	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
-	     -- How could there be ambiguous ones?  They can only arise if a
-	     -- top-level decl falls under the monomorphism
-	     -- restriction, and no subsequent decl instantiates its
-	     -- type.  (Usually, ambiguous type variables are resolved
-	     -- during the generalisation step.)
-        traceTc (text "Tc8") ;
-	inst_binds <- setGblEnv tcg_env $
-		      setLclTypeEnv lcl_env $
-		      tcSimplifyTop lie ;
-		-- The setGblEnv exposes the instances to tcSimplifyTop
-		-- The setLclTypeEnv exposes the local Ids, so that
-		-- we get better error messages (monomorphism restriction)
-
-	    -- Backsubstitution.  This must be done last.
-	    -- Even tcSimplifyTop may do some unification.
-        traceTc (text "Tc9") ;
-	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `andMonoBinds` inst_binds)
-							   rules fords ;
-
-	let { tcg_env' = tcg_env { tcg_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) 
-								       bind_ids,
-				   tcg_binds = tcg_binds tcg_env `andMonoBinds` binds',
-				   tcg_rules = tcg_rules tcg_env ++ rules',
-				   tcg_fords = tcg_fords tcg_env ++ fords' } } ;
-	
-	return tcg_env'	
-    }
-
-tc_src_decls
+tcTopSrcDecls :: HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
+tcTopSrcDecls
 	(HsGroup { hs_tyclds = tycl_decls, 
 		   hs_instds = inst_decls,
 		   hs_fords  = foreign_decls,
@@ -806,9 +807,15 @@ tc_src_decls
 	let { all_binds = tc_val_binds	 `AndMonoBinds`
 			  inst_binds	 `AndMonoBinds`
 			  cls_dm_binds	 `AndMonoBinds`
-			  foe_binds } ;
+			  foe_binds  ;
 
-  	return (tcg_env, lcl_env, all_binds, src_rules, foe_decls)
+		-- Extend the GblEnv with the (as yet un-zonked) 
+		-- bindings, rules, foreign decls
+	      tcg_env' = tcg_env {  tcg_binds = tcg_binds tcg_env `andMonoBinds` all_binds,
+				    tcg_rules = tcg_rules tcg_env ++ src_rules,
+				    tcg_fords = tcg_fords tcg_env ++ foe_decls } } ;
+	
+  	return (tcg_env', lcl_env)
      }}}}}}}}}
 \end{code}
 
@@ -1091,26 +1098,19 @@ check_main ghci_mode tcg_env
  = do { main_name <- lookupSrcName main_RDR_Unqual ;
 
 	tcg_env <- importSupportingDecls (unitFV runIOName) ;
-	setGblEnv tcg_env $ do {
+
+	addSrcLoc (getSrcLoc main_name)	$
+	addErrCtxt mainCtxt		$
+	setGblEnv tcg_env 		$ do {
 	
 	-- $main :: IO () = runIO main
 	let { rhs = HsApp (HsVar runIOName) (HsVar main_name) } ;
+	(main_expr, ty) <- tcExpr_id rhs ;
 
-	(main_bind, top_lie) <- getLIE (
-		addSrcLoc (getSrcLoc main_name)	$
-		addErrCtxt mainCtxt		$ do {
-		(main_expr, ty) <- tcExpr_id rhs ;
-		let { dollar_main_id = setIdLocalExported (mkLocalId dollarMainName ty) } ;
-		return (VarMonoBind dollar_main_id main_expr)
-	    }) ;
-
-	inst_binds <- tcSimplifyTop top_lie ;
-
-	(ids, binds') <- zonkTopBinds (main_bind `andMonoBinds` inst_binds) ;
-	
-	let { tcg_env' = tcg_env { 
-		tcg_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) ids,
-		tcg_binds = tcg_binds tcg_env `andMonoBinds` binds' } } ;
+	let { dollar_main_id = setIdLocalExported (mkLocalId dollarMainName ty) ;
+	      main_bind      = VarMonoBind dollar_main_id main_expr ;
+	      tcg_env' 	     = tcg_env { tcg_binds = tcg_binds tcg_env 
+						     `andMonoBinds` main_bind } } ;
 
 	return (tcg_env', unitFV main_name)
     }}

@@ -246,6 +246,12 @@ updLclEnv upd = updEnv (\ env@(Env { env_lcl = lcl }) ->
 
 setLclEnv :: m -> TcRn m a -> TcRn n a
 setLclEnv lcl_env = updEnv (\ env -> env { env_lcl = lcl_env })
+
+getEnvs :: TcRn m (TcGblEnv, m)
+getEnvs = do { env <- getEnv; return (env_gbl env, env_lcl env) }
+
+setEnvs :: (TcGblEnv, m) -> TcRn m a -> TcRn m a
+setEnvs (gbl_env, lcl_env) = updEnv (\ env -> env { env_gbl = gbl_env, env_lcl = lcl_env })
 \end{code}
 
 Command-line flags
