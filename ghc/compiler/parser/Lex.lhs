@@ -890,8 +890,8 @@ lex_id cont exts buf =
 
  case lookupUFM ghcExtensionKeywordsFM lexeme of {
     Just (kwd_token, validExts) 
-      | validExts .&. (I# exts) /= 0 -> cont kwd_token buf';
-    _				     -> var_token
+      | testBit (toInt32 exts) validExts -> cont kwd_token buf';
+    _				         -> var_token
 
  }}}
 
