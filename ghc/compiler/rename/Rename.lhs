@@ -223,7 +223,6 @@ slurpImpDecls source_fvs
 
 	-- And finally get everything else
     closeDecls	 decls2 needed2
-  where
 
 -------------------------------------------------------
 slurpSourceRefs :: NameSet			-- Variables defined in source
