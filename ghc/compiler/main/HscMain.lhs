@@ -38,6 +38,7 @@ import SimplCore
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
 import CoreSat
+import CoreTidy		( tidyCoreExpr )
 import CoreToStg	( coreToStg )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -59,15 +60,14 @@ import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), ModuleLocation(..),
-			  HomeSymbolTable, InteractiveContext(..), TyThing(..),
+			  HomeSymbolTable, InteractiveContext(..),
 			  NameSupply(..), PackageRuleBase, HomeIfaceTable, 
-			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable,
-			  extendLocalRdrEnv
+			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable
 			)
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
 import Name		( Name, nameModule, nameOccName, getName, isGlobalName,
-			  emptyNameEnv, extendNameEnvList
+			  emptyNameEnv
 			)
 import Module		( Module, lookupModuleEnvByName )
 
@@ -480,8 +480,11 @@ hscStmt dflags hst hit pcs0 icontext stmt
 		-- Simplify it
 	; simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr
 
+		-- Tidy it (temporary, until coreSat does cloning)
+	; tidy_expr <- tidyCoreExpr simpl_expr
+
 		-- Saturate it
-	; sat_expr <- coreSatExpr dflags simpl_expr
+	; sat_expr <- coreSatExpr dflags tidy_expr
 
 		-- Convert to BCOs
 	; bcos <- coreExprToBCOs dflags sat_expr

@@ -5,7 +5,7 @@
 
 \begin{code}
 module CoreTidy (
-	tidyCorePgm, tidyExpr, 
+	tidyCorePgm, tidyExpr, tidyCoreExpr,
 	tidyBndr, tidyBndrs
     ) where
 
@@ -157,6 +157,14 @@ tidyCorePgm dflags mod pcs binds_in orphans_in
     init_tidy_env us = (us, orig_env, initTidyOccEnv avoids, emptyVarEnv)
     avoids	     = [getOccName bndr | bndr <- bindersOfBinds binds_in,
 				       isGlobalName (idName bndr)]
+
+
+tidyCoreExpr :: CoreExpr -> IO CoreExpr
+tidyCoreExpr expr
+  = do { us <- mkSplitUniqSupply 't' -- for "tidy"
+       ; let (expr',_) = initUs us (tidyExpr emptyTidyEnv expr) 
+       ; return expr'
+       }
 \end{code}
 
 
