@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.14 2000/06/15 13:16:16 daan Exp $
+ * $Id: RtsAPI.h,v 1.15 2000/06/27 09:18:04 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,18 +9,6 @@
 
 #ifndef RTSAPI_H
 #define RTSAPI_H
-
-/* Make this compilable with Visual C++ */
-#ifndef HAVE_INT64
-#define HAVE_INT64
-#ifdef _MSC_VER 
-typedef __int64            int64;
-typedef unsigned __int64   nat64;
-#else
-typedef long long          int64;
-typedef unsigned long long nat64;
-#endif
-#endif
 
 /*
  * Running the scheduler
@@ -34,6 +22,19 @@ typedef enum {
 } SchedulerStatus;
 
 typedef StgClosure *HaskellObj;
+
+
+/* Make this compilable with Visual C++.  We can't just use StgInt64 here,
+   because this file should be compilable without reference to the rest
+   of the RTS machinery.
+*/
+#if defined(__MSVC__)
+typedef __int64            int64;
+typedef unsigned __int64   nat64;
+#else
+typedef long long          int64;
+typedef unsigned long long nat64;
+#endif
 
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
@@ -52,11 +53,11 @@ HaskellObj   rts_mkInt        ( int i );
 HaskellObj   rts_mkInt8       ( int i );
 HaskellObj   rts_mkInt16      ( int i );
 HaskellObj   rts_mkInt32      ( int i );
-HaskellObj   rts_mkInt64      ( int64 i );
 HaskellObj   rts_mkWord       ( unsigned int w );
 HaskellObj   rts_mkWord8      ( unsigned int w );
 HaskellObj   rts_mkWord16     ( unsigned int w );
 HaskellObj   rts_mkWord32     ( unsigned int w );
+HaskellObj   rts_mkInt64      ( int64 i );
 HaskellObj   rts_mkWord64     ( nat64 w );
 HaskellObj   rts_mkFloat      ( float f );
 HaskellObj   rts_mkDouble     ( double f );

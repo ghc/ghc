@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.15 2000/06/15 13:18:08 daan Exp $
+ * $Id: Assembler.h,v 1.16 2000/06/27 09:18:04 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -14,18 +14,6 @@
 
 /* ToDo: put this somewhere more sensible */
 extern void DEBUG_LoadSymbols( char *name );
-
-/* Make this compilable with Visual C++ */
-#ifndef HAVE_INT64
-#define HAVE_INT64
-#ifdef _MSC_VER
-typedef __int64            int64;
-typedef unsigned __int64   nat64;
-#else
-typedef long long          int64;
-typedef unsigned long long nat64;
-#endif
-#endif
 
 /* This file is supposed to be somewhat self-contained because it is one
  * of the major external interfaces to the runtime system.
