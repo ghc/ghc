@@ -259,7 +259,7 @@ forkOS_createThread ( HsStablePtr entry )
 #else /* !defined(RTS_SUPPORTS_THREADS) */
 
 int
-forkOS_createThread ( HsStablePtr entry )
+forkOS_createThread ( HsStablePtr entry STG_UNUSED )
 {
     return -1;
 }

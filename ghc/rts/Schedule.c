@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.174 2003/09/21 22:20:56 wolfgang Exp $
+ * $Id: Schedule.c,v 1.175 2003/09/26 13:32:14 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -128,6 +128,18 @@
 
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
+
+#ifdef THREADED_RTS
+#define USED_IN_THREADED_RTS
+#else
+#define USED_IN_THREADED_RTS STG_UNUSED
+#endif
+
+#ifdef RTS_SUPPORTS_THREADS
+#define USED_WHEN_RTS_SUPPORTS_THREADS
+#else
+#define USED_WHEN_RTS_SUPPORTS_THREADS STG_UNUSED
 #endif
 
 //@node Variables and Data structures, Prototypes, Includes, Main scheduling code
@@ -358,7 +370,8 @@ startSchedulerTask(void)
    ------------------------------------------------------------------------ */
 //@cindex schedule
 static void
-schedule( StgMainThread *mainThread, Capability *initialCapability )
+schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
+          Capability *initialCapability )
 {
   StgTSO *t;
   Capability *cap = initialCapability;
@@ -1592,7 +1605,7 @@ rtsSupportsBoundThreads(void)
  * ------------------------------------------------------------------------- */
  
 StgBool
-isThreadBound(StgTSO* tso)
+isThreadBound(StgTSO* tso USED_IN_THREADED_RTS)
 {
 #ifdef THREADED_RTS
   StgMainThread *m;
@@ -1609,8 +1622,10 @@ isThreadBound(StgTSO* tso)
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
+#ifdef THREADED_RTS
 static void 
 deleteThreadImmediately(StgTSO *tso);
+#endif
 
 StgInt
 forkProcess(StgTSO* tso)
@@ -3474,6 +3489,7 @@ deleteThread(StgTSO *tso)
   raiseAsync(tso,NULL);
 }
 
+#ifdef THREADED_RTS
 static void 
 deleteThreadImmediately(StgTSO *tso)
 { // for forkProcess only:
@@ -3485,6 +3501,7 @@ deleteThreadImmediately(StgTSO *tso)
   unblockThread(tso);
   tso->what_next = ThreadKilled;
 }
+#endif
 
 void
 raiseAsyncWithLock(StgTSO *tso, StgClosure *exception)
