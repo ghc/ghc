@@ -1298,23 +1298,24 @@ $ cvs checkout nofib/spectral
       </varlistentry>
 
       <varlistentry>
-	<term>Autoreconf</term>
-	<indexterm><primary>pre-supposed: Autoreconf</primary></indexterm>
-	<indexterm><primary>Autoreconf, pre-supposed</primary></indexterm>
+	<term>autoconf</term>
+	<indexterm><primary>pre-supposed: autoconf</primary></indexterm>
+	<indexterm><primary>autoconf, pre-supposed</primary></indexterm>
 	<listitem>
-	  <para>GNU Autoreconf is needed if you intend to build from the
+	  <para>GNU autoconf is needed if you intend to build from the
           CVS sources, it is <emphasis>not</emphasis> needed if you
           just intend to build a standard source distribution.</para>
 
-	  <para>Version 2.52 or later of autoreconf is required.
-	  NB. vesrion 2.13 will no longer work, as of GHC version
+	  <para>Version 2.52 or later of the autoconf package is required.
+	  NB. version 2.13 will no longer work, as of GHC version
 	  6.1.</para>
 
-	  <para>Autoreconf builds the <command>configure</command>
-          script from <filename>configure.ac</filename> and
-          <filename>aclocal.m4</filename>.  If you modify either of
-          these files, you'll need <command>autoreconf</command> to
-          rebuild <filename>configure</filename>.</para>
+	  <para><command>autoreconf</command> (from the autoconf package)
+          recursively builds <command>configure</command> scripts from
+          the corresponding <filename>configure.ac</filename> and
+          <filename>aclocal.m4</filename> files.  If you modify one of
+          the latter files, you'll need <command>autoreconf</command> to
+          rebuild the corresponding <filename>configure</filename>.</para>
 	</listitem>
       </varlistentry>
 
@@ -1606,13 +1607,14 @@ $ make install
 
 	    <para>Change directory to
             <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
-            issue the command
+            issue the command</para>
 <ProgramListing>
 autoreconf
 </ProgramListing>
             <indexterm><primary>autoreconf</primary></indexterm>
-            (with no arguments). This GNU program converts
-            <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.ac</filename>
+            <para>(with no arguments). This GNU program (recursively) converts
+            <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.ac</filename> and
+            <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/aclocal.m4</filename>
             to a shell script called
             <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure</filename>.
 	      If <command>autoreconf</command> bleats that it can't write the file <filename>configure</filename>,
@@ -1621,18 +1623,16 @@ autoreconf
 	      a message like "No rule to make target 'mk/config.h.in'".
             </para>
 
-	    <para>Some projects, including GHC, have their own
-            configure script.  If there's an
-            <constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.ac</constant>,
-            then you need to run <command>autoreconf</command> in that
-            directory too.</para>
+	    <para>Some projects, including GHC, have their own configure script.
+            <command>autoreconf</command> takes care of that, too, so all you have
+             to do is calling <command>autoreconf</command> in the top-level directory
+            <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>.</para>
 
-	    <para>These steps are completely
-            platform-independent; they just mean that the
-            human-written file (<filename>configure.ac</filename>) can
-            be short, although the resulting shell script,
-            <command>configure</command>, and
-            <filename>mk/config.h.in</filename>, are long.</para>
+	    <para>These steps are completely platform-independent; they just mean
+            that the human-written files (<filename>configure.ac</filename> and
+            <filename>aclocal.m4</filename>) can be short, although the resulting
+            files (the <command>configure</command> shell scripts and the C header
+            template <filename>mk/config.h.in</filename>) are long.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1736,13 +1736,6 @@ autoreconf
 		</listitem>
 	      </varlistentry>
 	    </variablelist>
-	    
-	    <para><command>configure</command> caches the results of
-            its run in <filename>config.cache</filename>.  Quite often
-            you don't want that; you're running
-            <command>configure</command> a second time because
-            something has changed.  In that case, simply delete
-            <filename>config.cache</filename>.</para>
 	  </listitem>
 	</varlistentry>
 	
@@ -1914,14 +1907,6 @@ $ autoreconf
           source distribution, and you already have
           <filename>configure</filename> and
           <filename>mk/config.h.in</filename>.)</para>
-
-	  <para>Some projects, including GHC itself, have their own
-	  configure scripts, so it is necessary to run autoreconf again
-	  in the appropriate subdirectories. eg:</para>
-
-<programlisting>
-$ (cd ghc; autoreconf)
-</programlisting>
 	</listitem>
 
 	<listitem>
@@ -4462,10 +4447,7 @@ During the installation dialogue, make sure that you select all of the following
 	      <command>openssh</command>,
 </para></listitem>
 <listitem><para>
-	      <command>autoreconf</command>,
-</para></listitem>
-<listitem><para>
-	      <command>automake</command>,
+	      <command>autoconf</command>,
 </para></listitem>
 <listitem><para>
 	      <command>binutils</command> (includes ld and (I think) ar),
@@ -4725,9 +4707,8 @@ you about Windows-specific wrinkles.</para>
 <ItemizedList>
 <listitem>
 <para>
-Run <Command>autoreconf</Command> both in <filename>fptools</filename>
-and in <filename>fptools/ghc</filename>.  If you omit the latter step you'll
-get an error when you run <filename>./configure</filename>:
+If you used <Command>autoconf</Command> instead of <Command>autoreconf</Command>,
+you'll get an error when you run <filename>./configure</filename>:
 <Screen>
 ...lots of stuff...
 creating mk/config.h
@@ -4744,7 +4725,7 @@ configure: error: ./configure failed for ghc
 read-only.  So if you need to run autoreconf again (which I sometimes do for safety's sake),
 you get
 <screen>
-/usr/bin/autoreconf: cannot create configure: permission denied
+/usr/bin/autoconf: cannot create configure: permission denied
 </screen>
 Solution: delete <filename>configure</filename> first.
 </para></listitem>
