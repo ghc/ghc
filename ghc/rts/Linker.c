@@ -414,6 +414,7 @@ typedef struct _RtsSymbolVal {
       SymX(gcdIntegerIntzh_fast)		\
       SymX(gcdIntzh_fast)			\
       SymX(genSymZh)				\
+      SymX(genericRaise)			\
       SymX(getProgArgv)				\
       SymX(getStablePtr)			\
       SymX(initLinker)  			\

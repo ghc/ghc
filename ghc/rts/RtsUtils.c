@@ -32,6 +32,15 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#if defined(openbsd_TARGET_OS)
+# ifdef HAVE_SIGNAL_H
+#  include <signal.h>
+# endif
+# ifdef HAVE_PTHREAD_H
+#  include <pthread.h>
+# endif
+#endif
+
 /* -----------------------------------------------------------------------------
    Result-checking malloc wrappers.
    -------------------------------------------------------------------------- */
@@ -288,3 +297,19 @@ heapCheckFail( void )
 }
 #endif
 
+/* 
+ * It seems that pthreads and signals interact oddly in OpenBSD
+ * pthreads (and possibly FreeBSD). When linking with -lpthreads, we
+ * have to use pthread_kill to send blockable signals. So use that
+ * when we have a threaded rts. So System.Posix.Signals will call
+ * genericRaise(), rather than raise(3).
+ */
+#if defined(openbsd_TARGET_OS)
+int genericRaise(int sig) {
+# if defined(THREADED_RTS)
+        return pthread_kill(pthread_self(), sig);
+# else
+        return raise(sig);
+# endif
+}
+#endif
