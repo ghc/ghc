@@ -406,6 +406,7 @@ __hscore_PrelHandle_read( HsInt fd, HsAddr ptr, HsInt off, int sz )
 
 }
 
+#if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
 INLINE HsInt
 __hscore_PrelHandle_send( HsInt fd, HsAddr ptr, HsInt off, int sz )
 {
@@ -417,6 +418,7 @@ __hscore_PrelHandle_recv( HsInt fd, HsAddr ptr, HsInt off, int sz )
 {
     return recv(fd,(char *)ptr + off, sz, 0);
 }
+#endif
 
 #if defined(mingw32_TARGET_OS) || defined(_MSC_VER)
 INLINE long *
