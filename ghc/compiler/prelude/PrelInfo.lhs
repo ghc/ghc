@@ -13,21 +13,25 @@ module PrelInfo (
 
 	maybeCharLikeTyCon, maybeIntLikeTyCon,
 
-	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, compare_RDR, 
-	minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, 
-	enumFromThenTo_RDR, fromEnum_RDR, toEnum_RDR, ratioDataCon_RDR,
-	range_RDR, index_RDR, inRange_RDR, readsPrec_RDR, readList_RDR, 
-	showsPrec_RDR, showList_RDR, plus_RDR, times_RDR, ltTag_RDR, eqTag_RDR, gtTag_RDR, 
-	eqH_Char_RDR, ltH_Char_RDR, eqH_Word_RDR, ltH_Word_RDR, eqH_Addr_RDR, ltH_Addr_RDR, 
-	eqH_Float_RDR, ltH_Float_RDR, eqH_Double_RDR, ltH_Double_RDR, eqH_Int_RDR, ltH_Int_RDR, 
-	geH_RDR, leH_RDR, minusH_RDR, false_RDR, true_RDR, and_RDR, not_RDR, append_RDR, 
-	map_RDR, compose_RDR, mkInt_RDR, error_RDR, showString_RDR, showParen_RDR, readParen_RDR, 
-	lex_RDR, showSpace_RDR, showList___RDR, readList___RDR, negate_RDR,
+	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, 
+	compare_RDR, minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR,
+	enumFromThen_RDR, enumFromThenTo_RDR, fromEnum_RDR, toEnum_RDR, 
+	ratioDataCon_RDR, range_RDR, index_RDR, inRange_RDR, readsPrec_RDR,
+	readList_RDR, showsPrec_RDR, showList_RDR, plus_RDR, times_RDR,
+	ltTag_RDR, eqTag_RDR, gtTag_RDR, eqH_Char_RDR, ltH_Char_RDR, 
+	eqH_Word_RDR, ltH_Word_RDR, eqH_Addr_RDR, ltH_Addr_RDR, eqH_Float_RDR,
+	ltH_Float_RDR, eqH_Double_RDR, ltH_Double_RDR, eqH_Int_RDR, 
+	ltH_Int_RDR, geH_RDR, leH_RDR, minusH_RDR, false_RDR, true_RDR,
+	and_RDR, not_RDR, append_RDR, map_RDR, compose_RDR, mkInt_RDR,
+	error_RDR, showString_RDR, showParen_RDR, readParen_RDR, lex_RDR,
+	showSpace_RDR, showList___RDR, readList___RDR, negate_RDR,
 
-	numClass_RDR, fractionalClass_RDR, eqClass_RDR, ccallableClass_RDR, creturnableClass_RDR,
+	numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
+	ccallableClass_RDR, creturnableClass_RDR,
 	monadZeroClass_RDR, enumClass_RDR, evalClass_RDR, ordClass_RDR,
+	ioDataCon_RDR, ioOkDataCon_RDR,
 
-	main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME, allClass_NAME,
+	main_NAME, allClass_NAME, ioTyCon_NAME,
 
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, isNoDictClass,
 	isNumericClass, isStandardClass, isCcallishClass
@@ -150,10 +154,10 @@ data_tycons
     , intTyCon
     , integerTyCon
     , liftTyCon
-    , primIoTyCon
     , return2GMPsTyCon
     , returnIntAndGMPTyCon
     , stTyCon
+    , stRetTyCon
     , stablePtrTyCon
     , stateAndAddrPrimTyCon
     , stateAndArrayPrimTyCon
@@ -169,7 +173,6 @@ data_tycons
     , stateAndStablePtrPrimTyCon
     , stateAndSynchVarPrimTyCon
     , stateAndWordPrimTyCon
-    , stRetTyCon
     , voidTyCon
     , wordTyCon
     ]
@@ -255,19 +258,18 @@ mkKnownKeyGlobal (Qual mod occ hif, uniq)
   = mkGlobalName uniq mod occ (Implicit hif)
 
 allClass_NAME    = mkKnownKeyGlobal (allClass_RDR,   allClassKey)
+ioTyCon_NAME	 = mkKnownKeyGlobal (ioTyCon_RDR,    ioTyConKey)
 main_NAME	 = mkKnownKeyGlobal (main_RDR,	     mainKey)
-mainPrimIO_NAME  = mkKnownKeyGlobal (mainPrimIO_RDR, mainPrimIoKey)
-ioTyCon_NAME     = mkKnownKeyGlobal (ioTyCon_RDR,    iOTyConKey)
-primIoTyCon_NAME = getName primIoTyCon
 
 knownKeyNames :: [Name]
 knownKeyNames
-  = [main_NAME, mainPrimIO_NAME, ioTyCon_NAME, allClass_NAME]
+  = [main_NAME, allClass_NAME, ioTyCon_NAME]
     ++
     map mkKnownKeyGlobal
     [
 	-- Type constructors (synonyms especially)
-      (orderingTyCon_RDR,  orderingTyConKey)
+      (ioOkDataCon_RDR,    ioOkDataConKey)
+    , (orderingTyCon_RDR,  orderingTyConKey)
     , (rationalTyCon_RDR,  rationalTyConKey)
     , (ratioDataCon_RDR,   ratioDataConKey)
     , (ratioTyCon_RDR,     ratioTyConKey)
@@ -344,6 +346,8 @@ prelude_primop op = qual (modAndOcc (primOpName op))
 
 intTyCon_RDR		= qual (modAndOcc intTyCon)
 ioTyCon_RDR		= tcQual (iO_BASE,   SLIT("IO"))
+ioDataCon_RDR  	   	= varQual (iO_BASE,   SLIT("IO"))
+ioOkDataCon_RDR		= varQual (iO_BASE,   SLIT("IOok"))
 orderingTyCon_RDR	= tcQual (pREL_BASE, SLIT("Ordering"))
 rationalTyCon_RDR	= tcQual (pREL_NUM,  SLIT("Rational"))
 ratioTyCon_RDR		= tcQual (pREL_NUM,  SLIT("Ratio"))
@@ -372,8 +376,8 @@ realFracClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFrac"))
 realFloatClass_RDR	= tcQual (pREL_NUM,  SLIT("RealFloat"))
 readClass_RDR		= tcQual (pREL_READ, SLIT("Read"))
 ixClass_RDR		= tcQual (iX,	     SLIT("Ix"))
-ccallableClass_RDR	= tcQual (fOREIGN,   SLIT("CCallable"))
-creturnableClass_RDR	= tcQual (fOREIGN,   SLIT("CReturnable"))
+ccallableClass_RDR	= tcQual (cCALL,     SLIT("CCallable"))
+creturnableClass_RDR	= tcQual (cCALL,     SLIT("CReturnable"))
 
 fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
 fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
@@ -434,7 +438,7 @@ plus_RDR	   = varQual (pREL_BASE, SLIT("+"))
 times_RDR	   = varQual (pREL_BASE, SLIT("*"))
 mkInt_RDR	   = varQual (pREL_BASE, SLIT("I#"))
 
-error_RDR	   = varQual (iO_BASE, SLIT("error"))
+error_RDR	   = varQual (eRROR, SLIT("error"))
 
 eqH_Char_RDR	= prelude_primop CharEqOp
 ltH_Char_RDR	= prelude_primop CharLtOp
@@ -453,7 +457,6 @@ leH_RDR		= prelude_primop IntLeOp
 minusH_RDR	= prelude_primop IntSubOp
 
 main_RDR	= varQual (mAIN,     SLIT("main"))
-mainPrimIO_RDR	= varQual (gHC_MAIN, SLIT("mainPrimIO"))
 
 otherwiseId_RDR = varQual (pREL_BASE, SLIT("otherwise"))
 \end{code}

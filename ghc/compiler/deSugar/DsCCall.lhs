@@ -17,7 +17,7 @@ import DsMonad
 import DsUtils
 
 import CoreUtils	( coreExprType )
-import Id		( dataConArgTys )
+import Id		( dataConArgTys, dataConTyCon, idType )
 import Maybes		( maybeToBool )
 import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instances-} )
@@ -25,12 +25,13 @@ import Pretty
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
 import Type		( isPrimType, maybeAppDataTyConExpandingDicts, maybeAppTyCon,
-			  eqTy, maybeBoxedPrimType, SYN_IE(Type) )
+			  eqTy, maybeBoxedPrimType, SYN_IE(Type), GenType(..),
+			  splitFunTy, splitForAllTy, splitAppTys )
+import TyCon		( tyConDataCons )
 import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( getStatePairingConInfo,
-			  stRetDataCon, pairDataCon, unitDataCon,
-			  stringTy,
+			  unitDataCon, stringTy,
 			  realWorldStateTy, stateDataCon
 			)
 import Util		( pprPanic, pprError, panic )
@@ -77,18 +78,19 @@ dsCCall :: FAST_STRING	-- C routine to invoke
 	-> [CoreExpr]	-- Arguments (desugared)
 	-> Bool		-- True <=> might cause Haskell GC
 	-> Bool		-- True <=> really a "_casm_"
-	-> Type		-- Type of the result (a boxed-prim type)
+	-> Type		-- Type of the result (a boxed-prim IO type)
 	-> DsM CoreExpr
 
-dsCCall label args may_gc is_asm result_ty
+dsCCall label args may_gc is_asm io_result_ty
   = newSysLocalDs realWorldStatePrimTy	`thenDs` \ old_s ->
 
     mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
     let
 	 final_args = Var old_s : unboxed_args
+	 (ioOkDataCon, result_ty) = getIoOkDataCon io_result_ty
     in
 
-    boxResult result_ty		`thenDs` \ (final_result_ty, res_wrapper) ->
+    boxResult ioOkDataCon result_ty `thenDs` \ (final_result_ty, res_wrapper) ->
 
     let
 	the_ccall_op = CCallOp label is_asm may_gc
@@ -183,11 +185,12 @@ can't_see_datacons_error thing ty
 
 
 \begin{code}
-boxResult :: Type			-- Type of desired result
+boxResult :: Id				-- IOok constructor
+	  -> Type			-- Type of desired result
 	  -> DsM (Type,			-- Type of the result of the ccall itself
 		  CoreExpr -> CoreExpr)	-- Wrapper for the ccall
 					-- to box the result
-boxResult result_ty
+boxResult ioOkDataCon result_ty
   | null data_cons
   -- oops! can't see the data constructors
   = can't_see_datacons_error "result" result_ty
@@ -204,8 +207,8 @@ boxResult result_ty
 
     mkConDs the_data_con (map TyArg tycon_arg_tys ++ [VarArg (Var prim_result_id)]) `thenDs` \ the_result ->
 
-    mkConDs stRetDataCon
-	    [TyArg realWorldTy, TyArg result_ty, VarArg (Var prim_state_id), VarArg the_result]
+    mkConDs ioOkDataCon
+	    [TyArg result_ty, VarArg (Var prim_state_id), VarArg the_result]
 							`thenDs` \ the_pair ->
     let
 	the_alt = (state_and_prim_datacon, [prim_state_id, prim_result_id], the_pair)
@@ -221,8 +224,8 @@ boxResult result_ty
   =
     newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
 
-    mkConDs stRetDataCon
-	    [TyArg realWorldTy, TyArg result_ty, VarArg (Var prim_state_id), VarArg (Var unitDataCon)]
+    mkConDs ioOkDataCon
+	    [TyArg result_ty, VarArg (Var prim_state_id), VarArg (Var unitDataCon)]
 						`thenDs` \ the_pair ->
 
     let
@@ -246,3 +249,39 @@ boxResult result_ty
     (state_and_prim_datacon, state_and_prim_ty) = getStatePairingConInfo the_prim_result_ty
 \end{code}
 
+This grimy bit of code is for digging out the IOok constructor from an
+application of the the IO type.  The constructor is needed for
+wrapping the result of a _ccall_.  The alternative is to wire-in IO,
+which brings a whole heap of junk with it.
+
+If the representation of IO changes, this will probably have to be
+brought in line with the new definition.
+
+newtype IO a = IO (State# RealWorld -> IOResult a)
+
+the constructor IO has type (State# RealWorld -> IOResult a) -> IO a
+
+\begin{code}
+getIoOkDataCon :: Type -> (Id,Type)
+getIoOkDataCon io_result_ty =  
+    let 
+  	AppTy (TyConTy ioTyCon _) result_ty = io_result_ty
+  	[ioDataCon]    			= tyConDataCons ioTyCon
+	ioDataConTy			= idType ioDataCon
+	(_,ioDataConTy')                = splitForAllTy ioDataConTy
+	([arg],_) 		        = splitFunTy ioDataConTy'
+	(_,AppTy (TyConTy ioResultTyCon _) _) = splitFunTy arg
+	[ioOkDataCon,ioFailDataCon]     = tyConDataCons ioResultTyCon
+    in
+    (ioOkDataCon, result_ty)
+
+\end{code}
+
+Another way to do it, more sensitive:
+
+     case ioDataConTy of
+	ForAll _ (FunTy (FunTy _ (AppTy (TyConTy ioResultTyCon _) _)) _) ->
+		let [ioOkDataCon,ioFailDataCon] = tyConDataCons ioResultTyCon
+		in
+		(ioOkDataCon, result_ty)
+	_ -> pprPanic "getIoOkDataCon: " (ppr PprDebug ioDataConTy)
