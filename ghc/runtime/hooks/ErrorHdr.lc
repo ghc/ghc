@@ -4,6 +4,8 @@
 void
 ErrorHdrHook (FILE *where)
 {
+    fflush( stdout );			/* Flush out any pending output */
+
     fprintf(where, "\nFail: ");
 }
 \end{code}
