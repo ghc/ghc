@@ -48,7 +48,7 @@ char **argv;
   err = errno;
   fprintf(f,"%d", err);
   fclose(f);
-  closedir(de);
+  closedir(dp);
   rmdir("testdir");
   return 0;
 }],fptools_cv_readdir_eof_errno=`cat conftestval`, fptools_cv_readdir_eof_errno=bogus, fptools_cv_readdir_eof_errno=0)])
