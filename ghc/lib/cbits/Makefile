@@ -1,8 +1,8 @@
-# $Id: Makefile,v 1.3 1997/03/14 05:17:06 sof Exp $
+# $Id: Makefile,v 1.4 1997/03/24 04:37:06 sof Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
-WAYS=
+override WAYS=
 
 LIBRARY=libHS_cbits.a
 INSTALL_LIBS+=$(LIBRARY)
