@@ -285,7 +285,7 @@ catchzh_fast
   
     /* Set up the catch frame */
     Sp = Sp - SIZEOF_StgCatchFrame;
-    SET_HDR(Sp,stg_catch_frame_info,CCCS);
+    SET_HDR(Sp,stg_catch_frame_info,W_[CCCS]);
     
     StgCatchFrame_handler(Sp) = R2;
     StgCatchFrame_exceptions_blocked(Sp) = 
@@ -330,7 +330,7 @@ raisezh_fast
      * the info was only displayed for an *uncaught* exception.
      */
     if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags)) {
-      foreign "C" fprintCCS(stderr,CCCS);
+      foreign "C" fprintCCS(stderr,W_[CCCS]);
     }
 #endif
 
