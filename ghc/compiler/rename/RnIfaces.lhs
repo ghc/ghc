@@ -21,11 +21,14 @@ module RnIfaces (
 
 IMP_Ubiq()
 #if __GLASGOW_HASKELL__ >= 202
+import GlaExts (trace) -- TEMP
 import IO
 #endif
 
 
-import CmdLineOpts	( opt_PruneTyDecls, opt_PruneInstDecls, opt_PprUserLength )
+import CmdLineOpts	( opt_PruneTyDecls,  opt_PruneInstDecls, 
+			  opt_PprUserLength, opt_IgnoreIfacePragmas
+			)
 import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..), HsTyVar, HsExpr, Sig(..), HsType(..),
 			  HsBinds(..), MonoBinds, DefaultDecl, ConDecl(..), ConDetails(..), BangType, IfaceSig(..),
 			  FixityDecl(..), Fixity, Fake, InPat, InstDecl(..), HsIdInfo,
@@ -36,7 +39,7 @@ import BasicTypes	( SYN_IE(Version), NewOrData(..) )
 import RdrHsSyn		( SYN_IE(RdrNameHsDecl), SYN_IE(RdrNameInstDecl), SYN_IE(RdrNameTyDecl),
 			  RdrName, rdrNameOcc
 			)
-import RnEnv		( newGlobalName, lookupRn, addImplicitOccsRn, 
+import RnEnv		( newGlobalName, addImplicitOccsRn, 
 			  availName, availNames, addAvailToNameSet, pprAvail
 			)
 import RnSource		( rnHsSigType )
@@ -163,11 +166,13 @@ count_decls decls
 %*********************************************************
 
 \begin{code}
-loadInterface :: Doc -> Module -> RnMG Ifaces
-loadInterface doc_str load_mod 
+loadInterface :: Doc -> Module -> Bool -> RnMG Ifaces
+loadInterface doc_str load_mod as_source
   = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_vers_map export_envs decls all_names imp_names (insts, tycls_names) deferred_data_decls inst_mods = ifaces
+	Ifaces this_mod mod_vers_map export_envs decls 
+	       all_names imp_names (insts, tycls_names) 
+	       deferred_data_decls inst_mods = ifaces
     in
 	-- CHECK WHETHER WE HAVE IT ALREADY
     if maybeToBool (lookupFM export_envs load_mod) 
@@ -194,9 +199,9 @@ loadInterface doc_str load_mod
 	Just (ParsedIface _ mod_vers usages exports rd_inst_mods fixs rd_decls rd_insts) ->
 
 	-- LOAD IT INTO Ifaces
-    mapRn loadExport exports				`thenRn` \ avails_s ->
-    foldlRn (loadDecl load_mod) decls rd_decls		`thenRn` \ new_decls ->
-    foldlRn (loadInstDecl load_mod) insts rd_insts	`thenRn` \ new_insts ->
+    mapRn loadExport exports				 `thenRn` \ avails_s ->
+    foldlRn (loadDecl load_mod as_source) decls rd_decls `thenRn` \ new_decls ->
+    foldlRn (loadInstDecl load_mod) insts rd_insts	 `thenRn` \ new_insts ->
     let
 	 export_env = (concat avails_s, fixs)
 
@@ -235,15 +240,35 @@ loadExport (mod, entities)
 	        mapRn new_name occs 	`thenRn` \ names ->
 	        returnRn (AvailTC name names)
 
-loadDecl :: Module -> DeclsMap
+loadDecl :: Module 
+         -> Bool 
+	 -> DeclsMap
 	 -> (Version, RdrNameHsDecl)
 	 -> RnMG DeclsMap
-loadDecl mod decls_map (version, decl)
+loadDecl mod as_source decls_map (version, decl)
   = getDeclBinders new_implicit_name decl	`thenRn` \ avail ->
     returnRn (addListToFM decls_map
-			  [(name,(version,avail,decl)) | name <- availNames avail]
+			  [(name,(version,avail,decl')) | name <- availNames avail]
     )
   where
+    {-
+      If a signature decl is being loaded and we're ignoring interface pragmas,
+      toss away unfolding information.
+
+      Also, if the signature is loaded from a module we're importing from source,
+      we do the same. This is to avoid situations when compiling a pair of mutually
+      recursive modules, peering at unfolding info in the interface file of the other, 
+      e.g., you compile A, it looks at B's interface file and may as a result change
+      it's interface file. Hence, B is recompiled, maybe changing it's interface file,
+      which will the ufolding info used in A to become invalid. Simple way out is to
+      just ignore unfolding info.
+    -}
+    decl' = 
+     case decl of
+       SigD (IfaceSig name tp ls loc) | as_source || opt_IgnoreIfacePragmas -> 
+	    SigD (IfaceSig name tp [] loc)
+       _ -> decl
+
     new_implicit_name rdr_name loc = newGlobalName mod (rdrNameOcc rdr_name)
 
 loadInstDecl :: Module
@@ -302,7 +327,7 @@ checkUpToDate mod_name
 checkModUsage [] = returnRn True		-- Yes!  Everything is up to date!
 
 checkModUsage ((mod, old_mod_vers, old_local_vers) : rest)
-  = loadInterface doc_str mod		`thenRn` \ ifaces ->
+  = loadInterface doc_str mod False{-not as source-} `thenRn` \ ifaces ->
     let
 	Ifaces _ mod_vers _ decls _ _ _ _ _ = ifaces
 	maybe_new_mod_vers = lookupFM mod_vers mod
@@ -390,8 +415,8 @@ importDecl name necessity
 \begin{code}
 getNonWiredInDecl :: Name -> Necessity -> RnMG (Maybe RdrNameHsDecl)
 getNonWiredInDecl needed_name necessity
-  = traceRn doc_str 			`thenRn_`
-    loadInterface doc_str mod		`thenRn` \ (Ifaces _ _ _ decls _ _ _ _ _) ->
+  = traceRn doc_str					`thenRn_`
+    loadInterface doc_str mod False{-not as source -}	`thenRn` \ (Ifaces _ _ _ decls _ _ _ _ _) ->
     case lookupFM decls needed_name of
 
 	-- Special case for data/newtype type declarations
@@ -470,9 +495,9 @@ getWiredInDecl name necessity
     (if not main_is_tc || mod == gHC__ then
 	returnRn ()		
     else
-	loadInterface doc_str mod	`thenRn_`
+	loadInterface doc_str mod False{-not as source-}	`thenRn_`
 	returnRn ()
-    )				 	`thenRn_`
+    )								`thenRn_`
 
     returnRn Nothing		-- No declaration to process further
   where
@@ -528,9 +553,9 @@ get_wired_tycon tycon
 %*********************************************************
 
 \begin{code}
-getInterfaceExports :: Module -> RnMG (Avails, [(OccName,Fixity)])
-getInterfaceExports mod
-  = loadInterface doc_str mod		`thenRn` \ (Ifaces _ _ export_envs _ _ _ _ _ _) ->
+getInterfaceExports :: Module -> Bool -> RnMG (Avails, [(OccName,Fixity)])
+getInterfaceExports mod as_source
+  = loadInterface doc_str mod as_source	`thenRn` \ (Ifaces _ _ export_envs _ _ _ _ _ _) ->
     case lookupFM export_envs mod of
 	Nothing ->	-- Not there; it must be that the interface file wasn't found;
 			-- the error will have been reported already.
@@ -667,7 +692,7 @@ getImportedInstDecls
     setIfacesRn new_ifaces	`thenRn_`
     returnRn un_gated_insts
   where
-    load_it mod = loadInterface (doc_str mod) mod
+    load_it mod = loadInterface (doc_str mod) mod False{- not as source-}
     doc_str mod = sep [pprModule PprDebug mod, ptext SLIT("is a special-instance module")]
 
 
@@ -823,7 +848,7 @@ It doesn't deal with source-code specific things: ValD, DefD.  They
 are handled by the sourc-code specific stuff in RnNames.
 
 \begin{code}
-getDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)		-- New-name function
+getDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)	-- New-name function
 		-> RdrNameHsDecl
 		-> RnMG AvailInfo
 
@@ -885,7 +910,7 @@ findAndReadIface doc_str filename
     try dirs dirs
   where
     trace_msg = hang (hcat [ptext SLIT("Reading interface for "), 
-				   ptext filename, semi])
+			    ptext filename, semi])
 		     4 (hcat [ptext SLIT("reason: "), doc_str])
 
     try all_dirs [] = traceRn (ptext SLIT("...failed"))	`thenRn_`
@@ -894,11 +919,11 @@ findAndReadIface doc_str filename
     try all_dirs ((dir,hisuf):dirs)
 	= readIface file_path	`thenRn` \ read_result ->
 	  case read_result of
-		Nothing    -> try all_dirs dirs
-		Just iface -> traceRn (ptext SLIT("...done"))	`thenRn_`
-			      returnRn (Just iface)
+	      Nothing    -> try all_dirs dirs
+	      Just iface -> traceRn (ptext SLIT("...done"))	`thenRn_`
+			    returnRn (Just iface)
 	where
-	  file_path = dir ++ "/" ++ moduleString filename ++ hisuf
+	  file_path = dir ++ '/':moduleString filename ++ hisuf
 \end{code}
 
 @readIface@ trys just one file.
@@ -908,20 +933,25 @@ readIface :: String -> RnMG (Maybe ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 readIface file_path
-  = ioToRnMG (hGetStringBuffer file_path)  	`thenRn` \ read_result ->
---OLD:  = ioToRnMG (readFile file_path)  	`thenRn` \ read_result ->
+  = ioToRnMG (hGetStringBuffer file_path)                       `thenRn` \ read_result ->
+    --traceRn (hcat[ptext SLIT("Opening...."), text file_path])   `thenRn_`
     case read_result of
-	Right contents	  -> case parseIface contents of
-				Failed err      -> --ioToRnMG (freeStringBuffer contents) `thenRn` \ _ -> 
-					           failWithRn Nothing err 
-				Succeeded iface -> --ioToRnMG (freeStringBuffer contents) `thenRn` \ _ ->
-						   returnRn (Just iface)
+	Right contents	  -> 
+             case parseIface contents of
+	          Failed err      ->
+                     --traceRn (ptext SLIT("parse err"))      `thenRn_`
+		     failWithRn Nothing err 
+		  Succeeded iface -> 
+                     --traceRn (ptext SLIT("parse cool"))     `thenRn_`
+		     returnRn (Just iface)
 
 #if __GLASGOW_HASKELL__ >= 202 
         Left err ->
 	  if isDoesNotExistError err then
+             --traceRn (ptext SLIT("no file"))     `thenRn_`
 	     returnRn Nothing
 	  else
+             --traceRn (ptext SLIT("uh-oh.."))     `thenRn_`
 	     failWithRn Nothing (cannaeReadFile file_path err)
 #else /* 2.01 and 0.2x */
 	Left  (NoSuchThing _) -> returnRn Nothing
@@ -932,11 +962,13 @@ readIface file_path
 
 \end{code}
 
-mkSearchPath takes a string consisting of a colon-separated list of directories and corresponding
-suffixes, and turns it into a list of (directory, suffix) pairs.  For example:
+mkSearchPath takes a string consisting of a colon-separated list
+of directories and corresponding suffixes, and turns it into a list
+of (directory, suffix) pairs.  For example:
 
 \begin{verbatim}
- mkSearchPath "foo%.hi:.%.p_hi:baz%.mc_hi" = [("foo",".hi"),( ".", ".p_hi"), ("baz",".mc_hi")]
+ mkSearchPath "foo%.hi:.%.p_hi:baz%.mc_hi"
+   = [("foo",".hi"),( ".", ".p_hi"), ("baz",".mc_hi")]
 \begin{verbatim}
 
 \begin{code}
@@ -955,22 +987,29 @@ mkSearchPath (Just s)
 \end{code}
 
 %*********************************************************
-%*							*
+%*						 	 *
 \subsection{Errors}
-%*							*
+%*							 *
 %*********************************************************
 
 \begin{code}
 noIfaceErr filename sty
-  = hcat [ptext SLIT("Could not find valid interface file "), quotes (pprModule sty filename)]
+  = hcat [ptext SLIT("Could not find valid interface file "), 
+          quotes (pprModule sty filename)]
 --	, text " in"]) 4 (vcat (map text dirs))
 
 cannaeReadFile file err sty
-  = hcat [ptext SLIT("Failed in reading file: "), text file, ptext SLIT("; error="), text (show err)]
+  = hcat [ptext SLIT("Failed in reading file: "), 
+           text file, 
+	  ptext SLIT("; error="), 
+	   text (show err)]
 
 getDeclErr name sty
-  = sep [ptext SLIT("Failed to find interface decl for"), ppr sty name]
+  = sep [ptext SLIT("Failed to find interface decl for"), 
+         ppr sty name]
 
 getDeclWarn name sty
-  = sep [ptext SLIT("Warning: failed to find (optional) interface decl for"), ppr sty name]
+  = sep [ptext SLIT("Warning: failed to find (optional) interface decl for"), 
+         ppr sty name]
+
 \end{code}
