@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.59 2001/10/01 14:28:37 rrt Exp $
+-- $Id: DriverState.hs,v 1.60 2001/10/22 10:33:50 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -47,6 +47,10 @@ data GhcMode
   deriving (Eq)
 
 GLOBAL_VAR(v_GhcMode, error "mode not set", GhcMode)
+
+isCompManagerMode DoMake        = True
+isCompManagerMode DoInteractive = True
+isCompManagerMode _             = False
 
 -----------------------------------------------------------------------------
 -- Global compilation flags

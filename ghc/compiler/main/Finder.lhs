@@ -64,17 +64,21 @@ maybeHomeModule :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
 maybeHomeModule mod_name is_source = do
    home_path <- readIORef v_Import_paths
    hisuf     <- readIORef v_Hi_suf
+   mode      <- readIORef v_GhcMode
 
    let mod_str  = moduleNameUserString mod_name 
        basename = map (\c -> if c == '.' then '/' else c) mod_str
        
-       std_exts =
-        [ ("hs",   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
-	, ("lhs",  \ _ fName path -> mkHomeModuleLocn mod_name path fName)
-	, (hisuf,  \ _ fName path -> mkHiOnlyModuleLocn mod_name fName)
-	]
-	-- look for the .hi file last, because if there's a source file about
-	-- we want to find it.
+	-- In compilation manager modes, we look for source files in the home
+	-- package because we can compile these automatically.  In one-shot
+	-- compilation mode we look for .hi files only.
+       std_exts
+         | isCompManagerMode mode =
+        	[ ("hs",   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
+		, ("lhs",  \ _ fName path -> mkHomeModuleLocn mod_name path fName)
+	        ]
+	 | otherwise =
+		[ (hisuf,  \ _ fName path -> mkHiOnlyModuleLocn mod_name fName) ]
 
         -- last chance: .hi-boot-<ver> and .hi-boot
        hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion
