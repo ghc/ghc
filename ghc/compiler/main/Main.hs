@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.96 2002/03/04 17:01:30 simonmar Exp $
+-- $Id: Main.hs,v 1.97 2002/03/05 11:22:44 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -58,7 +58,8 @@ import Panic		( GhcException(..), panic )
 import IO
 import Directory	( doesFileExist )
 import IOExts		( readIORef, writeIORef )
-import Exception	( throwDyn, Exception(..) )
+import Exception	( throwDyn, Exception(..), 
+			  AsyncException(StackOverflow) )
 import System		( getArgs, exitWith, ExitCode(..) )
 import Monad
 import List
@@ -107,10 +108,7 @@ main =
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
 		IOException _ ->  hPutStr stderr (show exception)
-		AsyncException StackOverflow ->
-			hPutStrLn stderr "stack overflow: use +RTS -K<size> \ 
-					 \to increase it"
-		_other ->  hPutStr stderr (show (Panic (show exception)))
+		_other 	      ->  hPutStr stderr (show (Panic (show exception)))
 	   exitWith (ExitFailure 1)
          ) $ do
 
