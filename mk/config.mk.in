@@ -146,7 +146,7 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 # 
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 2.10
+GhcProjectVersion      = 3.00
 GhcProjectPatchLevel   = 0
 
 #---------------------------------------------------------------
@@ -157,10 +157,6 @@ GhcProjectPatchLevel   = 0
 #
 #   WithGhcHc	   Path name of the compiler to use
 #
-#   Ghc2_0	   Whether this compiler is GHC 2.0 or later
-#		   (which affects gruesome details about
-# 		   how mutually recursive modules are handled)
-#
 #   WithGhcHcType  What "type" of compiler is being used
 #		   Valid options:
 #		       	     HC_CHALMERS_HBC
@@ -168,8 +164,7 @@ GhcProjectPatchLevel   = 0
 #		       	     HC_ROJEMO_NHC
 #		       	     HC_UNSPECIFIED
 
-WithGhcHc = ghc-0.29
-Ghc2_0=NO
+WithGhcHc = ghc-2.10
 
 # Unused, we think
 # WithGhcHcType=HC_GLASGOW_GHC
