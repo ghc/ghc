@@ -41,6 +41,7 @@ import IdInfo		( IdInfo, StrictnessInfo, ArityInfo,
 			  arityInfo, ppArityInfo, strictnessInfo, ppStrictnessInfo, 
 			  bottomIsGuaranteed, workerExists, 
 			)
+import PragmaInfo	( PragmaInfo(..) )
 import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr, GenCoreBinding(..) )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
 import FreeVars		( addExprFVs )
@@ -287,8 +288,13 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     con_list 		   = idSetToList wrapper_cons
 
     ------------  Unfolding  --------------
-    unfold_pretty | show_unfold = hsep [ptext SLIT("_U_"), pprIfaceUnfolding rhs]
+    unfold_pretty | show_unfold = hsep [ptext unfold_herald, pprIfaceUnfolding rhs]
 		  | otherwise   = empty
+
+    unfold_herald = case inline_pragma of
+			IMustBeINLINEd   -> SLIT("_U_")
+			IWantToBeINLINEd -> SLIT("_U_")
+			other		 -> SLIT("_u_")
 
     show_unfold = not implicit_unfolding && 		-- Not unnecessary
 		  not dodgy_unfolding			-- Not dangerous

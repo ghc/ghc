@@ -7,6 +7,7 @@
 module SimplEnv (
 	nullSimplEnv, 
 	getEnvs, setTyEnv, setIdEnv, notInScope, setSubstEnvs, zapSubstEnvs,
+	emptySubstEnvs, getSubstEnvs,
 
 	bindTyVar, bindTyVars, simplTy,
 
@@ -28,7 +29,7 @@ module SimplEnv (
 
 	-- Types
 	SwitchChecker,
-	SimplEnv, 
+	SimplEnv, SubstEnvs,
 	UnfoldConApp,
 	SubstInfo(..),
 
@@ -154,6 +155,8 @@ type SimplValEnv = (IdEnv StuffAboutId,	-- Domain includes *all* in-scope
 	-- Ids in the domain of the substitution are *not* in scope;
 	-- they *must* be substituted for the given OutArg
 
+type SubstEnvs = (TyVarEnv Type, IdEnv SubstInfo)
+
 data SubstInfo 
   = SubstVar OutId		-- The Id maps to an already-substituted atom
   | SubstLit Literal		-- ...ditto literal
@@ -204,9 +207,22 @@ setIdEnv :: SimplEnv -> SimplValEnv -> SimplEnv
 setIdEnv (SimplEnv chkr encl_cc ty_env _ con_apps) id_env
   = SimplEnv chkr encl_cc ty_env id_env con_apps
 
-setSubstEnvs :: SimplEnv -> TyVarEnv Type -> IdEnv SubstInfo -> SimplEnv
+getSubstEnvs :: SimplEnv -> SubstEnvs
+getSubstEnvs (SimplEnv _ _ (_, ty_subst) (_, id_subst) _) = (ty_subst, id_subst)
+
+emptySubstEnvs :: SubstEnvs
+emptySubstEnvs = (emptyTyVarEnv, nullIdEnv)
+
+setSubstEnvs :: SimplEnv -> SubstEnvs -> SimplEnv
 setSubstEnvs (SimplEnv chkr encl_cc (in_scope_tyvars, _) (in_scope_ids, _) con_apps)
-	     ty_subst id_subst
+	     (ty_subst, id_subst)
+  = SimplEnv chkr encl_cc (in_scope_tyvars, ty_subst) (in_scope_ids, id_subst) con_apps
+
+combineEnvs :: SimplEnv		-- Get substitution from here
+	    -> SimplEnv		-- Get in-scope info from here
+	    -> SimplEnv
+combineEnvs (SimplEnv _    _       (_, ty_subst)        (_, id_subst)     _)
+	    (SimplEnv chkr encl_cc (in_scope_tyvars, _) (in_scope_ids, _) con_apps)
   = SimplEnv chkr encl_cc (in_scope_tyvars, ty_subst) (in_scope_ids, id_subst) con_apps
 
 zapSubstEnvs :: SimplEnv -> SimplEnv

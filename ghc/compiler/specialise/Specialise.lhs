@@ -709,8 +709,8 @@ Hence, the invariant is this:
 \begin{code}
 specProgram :: UniqSupply -> [CoreBinding] -> [CoreBinding]
 specProgram us binds
-  = initSM us (go binds 	`thenSM` \ (binds', _) ->
-	       returnSM binds'
+  = initSM us (go binds 	`thenSM` \ (binds', uds') ->
+	       returnSM (dumpAllDictBinds uds' binds')
 	      )
   where
     go []	    = returnSM ([], emptyUDs)
@@ -1064,6 +1064,11 @@ mkDB dict rhs = (dict, rhs, db_ftvs, db_fvs)
 
 addDictBind uds dict rhs = uds { dict_binds = mkDB dict rhs `consBag` dict_binds uds }
 
+dumpAllDictBinds (MkUD {dict_binds = dbs}) binds
+  = foldrBag add binds dbs
+  where
+    add (dict,rhs,_,_) binds = NonRec dict rhs : binds
+
 dumpUDs :: [CoreBinder]
 	-> UsageDetails -> CoreExpr
 	-> (UsageDetails, CoreExpr)
@@ -1174,8 +1179,10 @@ instantiateDictRhs ty_env id_env rhs
     go (Var v)	      = Var (lookupId id_env v)
     go (Lit l)	      = Lit l
     go (Con con args) = Con con (map go_arg args)
+    go (Coerce c t e) = Coerce c (instantiateTy ty_env t) (go e)
     go (Case e alts)  = Case (go e) alts		-- See comment below re alts
     go other	      = pprPanic "instantiateDictRhs" (ppr rhs)
+
 
 dictRhsFVs :: CoreExpr -> IdSet
 	-- Cheapo function for simple RHSs
@@ -1187,6 +1194,7 @@ dictRhsFVs e
     go (Var v)	           = unitIdSet v
     go (Lit l)	           = emptyIdSet
     go (Con _ args)        = mkIdSet [id | VarArg id <- args]
+    go (Coerce _ _ e)	   = go e
 
     go (Case e _)	   = go e	-- Claim: no free dictionaries in the alternatives
 					-- These case expressions are of the form

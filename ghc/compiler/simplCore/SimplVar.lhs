@@ -186,7 +186,7 @@ simplBinder env (id, occ_info)
 #if DEBUG
     -- I  reckon the empty-env thing should catch
     -- most no-free-tyvars things, so this test should be redundant
-    (if idHasNoFreeTyVars id then pprTrace "applyEnvsToId" (ppr id) else (\x -> x))
+--    (if idHasNoFreeTyVars id then pprTrace "applyEnvsToId" (ppr id) else (\x -> x))
 #endif
     (let
        -- id1 has its type zapped

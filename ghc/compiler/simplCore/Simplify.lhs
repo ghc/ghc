@@ -250,7 +250,7 @@ simplExpr env (Var var) args result_ty
   = case lookupIdSubst env var of
   
       Just (SubstExpr ty_subst id_subst expr)
-	-> simplExpr (setSubstEnvs env ty_subst id_subst) expr args result_ty
+	-> simplExpr (setSubstEnvs env (ty_subst, id_subst)) expr args result_ty
 
       Just (SubstLit lit)		-- A boring old literal
 	-> ASSERT( null args )
@@ -398,7 +398,10 @@ Case expressions
 
 \begin{code}
 simplExpr env expr@(Case scrut alts) args result_ty
-  = simplCase env scrut alts (\env rhs -> simplExpr env rhs args result_ty) result_ty
+  = simplCase env scrut
+	      (getSubstEnvs env, alts)
+	      (\env rhs -> simplExpr env rhs args result_ty)
+	      result_ty
 \end{code}
 
 
@@ -709,7 +712,9 @@ simplValLam env expr min_no_of_args expr_ty
 \begin{code}
 -- (coerce (case s of p -> r)) args ==> case s of p -> (coerce r) args
 simplCoerce env coercion ty expr@(Case scrut alts) args result_ty
-  = simplCase env scrut alts (\env rhs -> simplCoerce env coercion ty rhs args result_ty) result_ty
+  = simplCase env scrut (getSubstEnvs env, alts)
+	      (\env rhs -> simplCoerce env coercion ty rhs args result_ty)
+	      result_ty
 
 -- (coerce (let defns in b)) args  ==> let defns' in (coerce b) args
 simplCoerce env coercion ty (Let bind body) args result_ty
@@ -904,7 +909,7 @@ simplNonRec env binder@(id,_) rhs body_c body_ty
 	-- we can't trivially do let-to-case (because there may be some unboxed
 	-- things bound in letrecs that aren't really recursive).
   | isUnpointedType rhs_ty && not rhs_is_whnf
-  = simplCase env rhs (PrimAlts [] (BindDefault binder (Var id)))
+  = simplCase env rhs (getSubstEnvs env, PrimAlts [] (BindDefault binder (Var id)))
 		      (\env rhs -> complete_bind env rhs) body_ty
 
 	-- Try let-to-case; see notes below about let-to-case
@@ -918,7 +923,7 @@ simplNonRec env binder@(id,_) rhs body_c body_ty
 		-- the end of simplification.
     )
   = tick Let2Case				`thenSmpl_`
-    simplCase env rhs (AlgAlts [] (BindDefault binder (Var id)))
+    simplCase env rhs (getSubstEnvs env, AlgAlts [] (BindDefault binder (Var id)))
 		      (\env rhs -> complete_bind env rhs) body_ty
 		-- OLD COMMENT:  [now the new RHS is only "x" so there's less worry]
 		-- NB: it's tidier to call complete_bind not simpl_bind, else
@@ -946,14 +951,15 @@ simplNonRec env binder@(id,_) rhs body_c body_ty
 	-- First, bind large let-body if necessary
 	if ok_to_dup || isSingleton (nonErrorRHSs alts)
 	then
-	    simplCase env scrut alts (\env rhs -> simpl_bind env rhs) body_ty
+	    simplCase env scrut (getSubstEnvs env, alts) 
+		      (\env rhs -> simpl_bind env rhs) body_ty
 	else
 	    bindLargeRhs env [binder] body_ty body_c	`thenSmpl` \ (extra_binding, new_body) ->
 	    let
 		body_c' = \env -> simplExpr env new_body [] body_ty
 		case_c  = \env rhs -> simplNonRec env binder rhs body_c' body_ty
 	    in
-	    simplCase env scrut alts case_c body_ty	`thenSmpl` \ case_expr ->
+	    simplCase env scrut (getSubstEnvs env, alts) case_c body_ty	`thenSmpl` \ case_expr ->
 	    returnSmpl (Let extra_binding case_expr)
 
     -- None of the above; simplify rhs and tidy up

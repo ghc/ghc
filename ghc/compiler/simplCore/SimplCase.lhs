@@ -43,8 +43,8 @@ Float let out of case.
 
 \begin{code}
 simplCase :: SimplEnv
-	  -> InExpr	-- Scrutinee
-	  -> InAlts	-- Alternatives
+	  -> InExpr					-- Scrutinee
+	  -> (SubstEnvs, InAlts)			-- Alternatives, and their static environment
 	  -> (SimplEnv -> InExpr -> SmplM OutExpr)	-- Rhs handler
 	  -> OutType					-- Type of result expression
 	  -> SmplM OutExpr
@@ -99,27 +99,30 @@ All of this works equally well if the outer case has multiple rhss.
 
 
 \begin{code}
-simplCase env (Case inner_scrut inner_alts) outer_alts rhs_c result_ty
+simplCase env (Case inner_scrut inner_alts) (subst_envs, outer_alts) rhs_c result_ty
   | switchIsSet env SimplCaseOfCase
   = 	-- Ha!  Do case-of-case
     tick CaseOfCase	`thenSmpl_`
 
     if no_need_to_bind_large_alts
     then
-	simplCase env inner_scrut inner_alts
-		  (\env rhs -> simplCase env rhs outer_alts rhs_c result_ty) result_ty
+	simplCase env inner_scrut (getSubstEnvs env, inner_alts)
+		  (\env' rhs -> simplCase env' rhs (subst_envs, outer_alts) rhs_c result_ty)
+		  result_ty
     else
-	bindLargeAlts env outer_alts rhs_c result_ty	`thenSmpl` \ (extra_bindings, outer_alts') ->
+	bindLargeAlts env_alts outer_alts rhs_c result_ty	`thenSmpl` \ (extra_bindings, outer_alts') ->
 	let
 	   rhs_c' = \env rhs -> simplExpr env rhs [] result_ty
 	in
-	simplCase env inner_scrut inner_alts
-		  (\env rhs -> simplCase env rhs outer_alts' rhs_c' result_ty)
+	simplCase env inner_scrut (getSubstEnvs env, inner_alts)
+		  (\env rhs -> simplCase env rhs (emptySubstEnvs, outer_alts') rhs_c' result_ty)
 		  result_ty
 						`thenSmpl` \ case_expr ->
 	returnSmpl (mkCoLetsNoUnboxed extra_bindings case_expr)
 
   where
+    env_alts = setSubstEnvs env subst_envs
+
     no_need_to_bind_large_alts = switchIsSet env SimplOkToDupCode ||
    			         isSingleton (nonErrorRHSs inner_alts)
 \end{code}
@@ -143,17 +146,19 @@ simplCase env scrut alts rhs_c result_ty
 Finally the default case
 
 \begin{code}
-simplCase env other_scrut alts rhs_c result_ty
-  = simplTy env scrut_ty			`appEager` \ scrut_ty' ->
-    simplExpr env' other_scrut [] scrut_ty	`thenSmpl` \ scrut' ->
-    completeCase env scrut' alts rhs_c
+simplCase env other_scrut (subst_envs, alts) rhs_c result_ty
+  = simplTy env scrut_ty				`appEager` \ scrut_ty' ->
+    simplExpr env_scrut other_scrut [] scrut_ty'	`thenSmpl` \ scrut' ->
+    completeCase env_alts scrut' alts rhs_c
   where
 	-- When simplifying the scrutinee of a complete case that
 	-- has no default alternative
-    env' = case alts of
+    env_scrut = case alts of
 		AlgAlts _ NoDefault  -> setCaseScrutinee env
 		PrimAlts _ NoDefault -> setCaseScrutinee env
 		other		     -> env
+
+    env_alts = setSubstEnvs env subst_envs
 
     scrut_ty = coreExprType (unTagBinders other_scrut)
 \end{code}

@@ -154,8 +154,9 @@ import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
 			)
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
-import TyVar		( intersectTyVarSets, unionManyTyVarSets,
-			  isEmptyTyVarSet, zipTyVarEnv, emptyTyVarEnv
+import TyVar		( intersectTyVarSets, unionManyTyVarSets, minusTyVarSet,
+			  isEmptyTyVarSet, tyVarSetToList,
+			  zipTyVarEnv, emptyTyVarEnv
 			)
 import FiniteMap
 import BasicTypes	( TopLevelFlag(..) )
@@ -200,8 +201,23 @@ tcSimplify str top_lvl local_tvs wanted_lie
     checkTc (null cant_generalise)
 	    (genCantGenErr cant_generalise)	`thenTc_`
 
-	 -- Finished
-    returnTc (mkLIE frees, binds, mkLIE irreds)
+	-- Check for ambiguous insts.
+	-- You might think these can't happen (I did) because an ambiguous
+	-- inst like (Eq a) will get tossed out with "frees", and eventually
+	-- dealt with by tcSimplifyTop.
+	-- But we can get stuck with 
+	--	C a b
+	-- where "a" is one of the local_tvs, but "b" is unconstrained.
+	-- Then we must yell about the ambiguous b
+    let
+	(irreds', bad_guys) = partition (isEmptyTyVarSet . ambig_tv_fn) irreds
+	ambig_tv_fn dict    = tyVarsOfInst dict `minusTyVarSet` local_tvs
+    in
+    addAmbigErrs ambig_tv_fn bad_guys	`thenNF_Tc_`
+
+
+	-- Finished
+    returnTc (mkLIE frees, binds, mkLIE irreds')
   where
     wanteds = bagToList wanted_lie
 
@@ -865,7 +881,7 @@ tcSimplifyTop wanted_lie
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
     complain d | isEmptyTyVarSet (tyVarsOfInst d) = addTopInstanceErr d
-	       | otherwise			  = addAmbigErr [d]
+	       | otherwise			  = addAmbigErr tyVarsOfInst d
 
 get_tv d   = case getDictClassTys d of
 		   (clas, [ty]) -> getTyVar "tcSimplifyTop" ty
@@ -913,7 +929,7 @@ disambigGroup dicts
     in
 	-- See if any default works, and if so bind the type variable to it
 	-- If not, add an AmbigErr
-    recoverTc (addAmbigErr dicts `thenNF_Tc_` returnTc EmptyMonoBinds)	$
+    recoverTc (complain dicts `thenNF_Tc_` returnTc EmptyMonoBinds)	$
 
     try_default default_tys		 	`thenTc` \ chosen_default_ty ->
 
@@ -932,10 +948,11 @@ disambigGroup dicts
     returnTc EmptyMonoBinds
     
   | otherwise -- No defaults
-  = addAmbigErr dicts	`thenNF_Tc_`
+  = complain dicts	`thenNF_Tc_`
     returnTc EmptyMonoBinds
 
   where
+    complain    = addAmbigErrs tyVarsOfInst
     try_me inst = ReduceMe AddToIrreds		-- This reduce should not fail
     tyvar       = get_tv (head dicts)		-- Should be non-empty
     classes     = map get_clas dicts
@@ -955,10 +972,16 @@ genCantGenErr insts	-- Can't generalise these Insts
 	 nest 4 (pprInstsInFull insts)
 	]
 
-addAmbigErr dicts
-  = tcAddSrcLoc (instLoc (head dicts)) $
-    addErrTc (sep [text "Cannot resolve the ambiguous context" <+> pprInsts dicts,
-	 	   nest 4 (pprInstsInFull dicts)])
+addAmbigErrs ambig_tv_fn dicts = mapNF_Tc (addAmbigErr ambig_tv_fn) dicts
+
+addAmbigErr ambig_tv_fn dict
+  = tcAddSrcLoc (instLoc dict) $
+    addErrTc (sep [text "Ambiguous type variable(s)",
+		   hsep (punctuate comma (map (quotes . ppr) ambig_tvs)),
+		   nest 4 (text "in the constraint" <+> quotes (pprInst dict)),
+	 	   nest 4 (pprOrigin dict)])
+  where
+    ambig_tvs = tyVarSetToList (ambig_tv_fn dict)
 
 -- Used for top-level irreducibles
 addTopInstanceErr dict
