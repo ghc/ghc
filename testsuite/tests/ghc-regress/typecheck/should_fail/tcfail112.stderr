@@ -1,0 +1,15 @@
+
+tcfail112.hs:11:
+    Constructor `S' does not have the required strict fields: y
+    In the record construction: S {}
+    In the definition of `s1': S {}
+
+tcfail112.hs:12:
+    Constructor `S' does not have the required strict fields: y
+    In the record construction: S {x = 3}
+    In the definition of `s2': S {x = 3}
+
+tcfail112.hs:14:
+    Constructor `T' does not have the required strict fields
+    In the record construction: T {}
+    In the definition of `t': T {}
