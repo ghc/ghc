@@ -21,6 +21,7 @@ main = do
   hSetBinaryMode hOut True
 #endif
   bof <- hGetPosn hIn
+  putStrLn (show bof)  -- you can show HandlePosns
   copy hIn hOut
   hSetPosn bof
   copy hIn hOut
