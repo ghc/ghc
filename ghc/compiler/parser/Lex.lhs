@@ -830,6 +830,8 @@ lex_demand cont buf =
     'L'# -> read_em (Lazy : acc) (stepOn buf)
     'A'# -> read_em (Abs : acc) (stepOn buf)
     'V'# -> read_em (Eval : acc) (stepOn buf)
+    'X'# -> read_em (Err : acc) (stepOn buf)
+    'B'# -> read_em (Bot : acc) (stepOn buf)
     ')'# -> (reverse acc, stepOn buf)
     'C'# -> do_call acc (stepOnBy# buf 2#)
     'U'# -> do_unpack1 Drop Now acc (stepOnBy# buf 1#)
