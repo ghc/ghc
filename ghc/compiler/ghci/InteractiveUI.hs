@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.170 2004/08/09 12:15:09 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.171 2004/08/12 13:06:51 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -116,42 +116,42 @@ keepGoingPaths a str = a (toArgs str) >> return False
 shortHelpText = "use :? for help.\n"
 
 -- NOTE: spaces at the end of each line to workaround CPP/string gap bug.
-helpText = "\ 
-\ Commands available from the prompt:\n\ 
-\\n\ 
-\   <stmt>		       evaluate/run <stmt>\n\ 
-\   :add <filename> ...        add module(s) to the current target set\n\ 
-\   :browse [*]<module>	       display the names defined by <module>\n\ 
-\   :cd <dir>		       change directory to <dir>\n\ 
-\   :def <cmd> <expr>          define a command :<cmd>\n\ 
-\   :help, :?		       display this list of commands\n\ 
-\   :info [<name> ...]         display information about the given names\n\ 
-\   :load <filename> ...       load module(s) and their dependents\n\ 
-\   :module [+/-] [*]<mod> ... set the context for expression evaluation\n\ 
-\   :reload		       reload the current module set\n\ 
-\\n\ 
-\   :set <option> ...	       set options\n\ 
-\   :set args <arg> ...	       set the arguments returned by System.getArgs\n\ 
-\   :set prog <progname>       set the value returned by System.getProgName\n\ 
-\\n\ 
-\   :show modules	       show the currently loaded modules\n\ 
-\   :show bindings	       show the current bindings made at the prompt\n\ 
-\\n\ 
-\   :type <expr>	       show the type of <expr>\n\ 
-\   :kind <type>	       show the kind of <type>\n\ 
-\   :undef <cmd> 	       undefine user-defined command :<cmd>\n\ 
-\   :unset <option> ...	       unset options\n\ 
-\   :quit		       exit GHCi\n\ 
-\   :!<command>		       run the shell command <command>\n\ 
-\\n\ 
-\ Options for `:set' and `:unset':\n\ 
-\\n\ 
-\    +r			revert top-level expressions after each evaluation\n\ 
-\    +s                 print timing/memory stats after each evaluation\n\ 
-\    +t			print type after evaluation\n\ 
-\    -<flags>		most GHC command line flags can also be set here\n\ 
-\                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
-\"
+helpText =
+ " Commands available from the prompt:\n" ++
+ "\n" ++
+ "   <stmt>                      evaluate/run <stmt>\n" ++
+ "   :add <filename> ...         add module(s) to the current target set\n" ++
+ "   :browse [*]<module>         display the names defined by <module>\n" ++
+ "   :cd <dir>                   change directory to <dir>\n" ++
+ "   :def <cmd> <expr>           define a command :<cmd>\n" ++
+ "   :help, :?                   display this list of commands\n" ++
+ "   :info [<name> ...]          display information about the given names\n" ++
+ "   :load <filename> ...        load module(s) and their dependents\n" ++
+ "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
+ "   :reload                     reload the current module set\n" ++
+ "\n" ++
+ "   :set <option> ...           set options\n" ++
+ "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
+ "   :set prog <progname>        set the value returned by System.getProgName\n" ++
+ "\n" ++
+ "   :show modules               show the currently loaded modules\n" ++
+ "   :show bindings              show the current bindings made at the prompt\n" ++
+ "\n" ++
+ "   :type <expr>                show the type of <expr>\n" ++
+ "   :kind <type>                show the kind of <type>\n" ++
+ "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
+ "   :unset <option> ...         unset options\n" ++
+ "   :quit                       exit GHCi\n" ++
+ "   :!<command>                 run the shell command <command>\n" ++
+ "\n" ++
+ " Options for ':set' and ':unset':\n" ++
+ "\n" ++
+ "    +r            revert top-level expressions after each evaluation\n" ++
+ "    +s            print timing/memory stats after each evaluation\n" ++
+ "    +t            print type after evaluation\n" ++
+ "    -<flags>      most GHC command line flags can also be set here\n" ++
+ "                         (eg. -v2, -fglasgow-exts, etc.)\n"
+
 
 interactiveUI :: [FilePath] -> Maybe String -> IO ()
 interactiveUI srcs maybe_expr = do
@@ -415,7 +415,7 @@ specialCommand str = do
   let (cmd,rest) = break isSpace str
   cmds <- io (readIORef commands)
   case [ (s,f) | (s,f) <- cmds, prefixMatch cmd s ] of
-     []      -> io (hPutStr stdout ("unknown command `:" ++ cmd ++ "'\n" 
+     []      -> io (hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n" 
 		                    ++ shortHelpText) >> return False)
      [(_,f)] -> f (dropWhile isSpace rest)
      cs      -> io (hPutStrLn stdout ("prefix " ++ cmd ++ 
@@ -423,7 +423,7 @@ specialCommand str = do
 	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs)
 					 ++ ")") >> return False)
 
-noArgs c = throwDyn (CmdLineError ("command `" ++ c ++ "' takes no arguments"))
+noArgs c = throwDyn (CmdLineError ("command '" ++ c ++ "' takes no arguments"))
 
 
 -----------------------------------------------------------------------------
@@ -472,7 +472,7 @@ help :: String -> GHCi ()
 help _ = io (putStr helpText)
 
 info :: String -> GHCi ()
-info "" = throwDyn (CmdLineError "syntax: `:i <thing-you-want-info-about>'")
+info "" = throwDyn (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = do { let names = words s
 	     ; init_cms <- getCmState
 	     ; mapM_ (infoThing init_cms) names }
@@ -590,8 +590,7 @@ changeDirectory :: String -> GHCi ()
 changeDirectory dir = do
   state    <- getGHCiState
   when (targets state /= []) $
-	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded, \n\ 
-	\because the search path has changed.\n"
+	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
   cmstate1 <- io (cmUnload (cmstate state))
   setGHCiState state{ cmstate = cmstate1, targets = [] }
   setContextAfterLoad []
@@ -607,7 +606,7 @@ defineMacro s = do
 	else do
   if (macro_name `elem` map fst cmds) 
 	then throwDyn (CmdLineError 
-		("command `" ++ macro_name ++ "' is already defined"))
+		("command '" ++ macro_name ++ "' is already defined"))
 	else do
 
   -- give the expression a type signature, so we can be sure we're getting
@@ -632,11 +631,11 @@ undefineMacro macro_name = do
   cmds <- io (readIORef commands)
   if (macro_name `elem` map fst builtin_commands) 
 	then throwDyn (CmdLineError
-		("command `" ++ macro_name ++ "' cannot be undefined"))
+		("command '" ++ macro_name ++ "' cannot be undefined"))
 	else do
   if (macro_name `notElem` map fst cmds) 
 	then throwDyn (CmdLineError 
-		("command `" ++ macro_name ++ "' not defined"))
+		("command '" ++ macro_name ++ "' not defined"))
 	else do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
@@ -744,7 +743,7 @@ browseModule m exports_only = do
 
   is_interpreted <- io (cmModuleIsInterpreted cms m)
   when (not is_interpreted && not exports_only) $
-	throwDyn (CmdLineError ("module `" ++ m ++ "' is not interpreted"))
+	throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
 
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
@@ -787,7 +786,7 @@ separate cmstate []           as bs = return (as,bs)
 separate cmstate (('*':m):ms) as bs = do
    b <- io (cmModuleIsInterpreted cmstate m)
    if b then separate cmstate ms (m:as) bs
-   	else throwDyn (CmdLineError ("module `" ++ m ++ "' is not interpreted"))
+   	else throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
 separate cmstate (m:ms)       as bs = separate cmstate ms as (m:bs)
 
 prel = "Prelude"
@@ -896,7 +895,7 @@ unsetOptions str
 	   (plus_opts, rest2)  = partition isPlus rest1
 
        if (not (null rest2)) 
-	  then io (putStrLn ("unknown option: `" ++ head rest2 ++ "'"))
+	  then io (putStrLn ("unknown option: '" ++ head rest2 ++ "'"))
 	  else do
 
        mapM_ unsetOpt plus_opts
@@ -914,12 +913,12 @@ isPlus _ = False
 
 setOpt ('+':str)
   = case strToGHCiOpt str of
-	Nothing -> io (putStrLn ("unknown option: `" ++ str ++ "'"))
+	Nothing -> io (putStrLn ("unknown option: '" ++ str ++ "'"))
 	Just o  -> setOption o
 
 unsetOpt ('+':str)
   = case strToGHCiOpt str of
-	Nothing -> io (putStrLn ("unknown option: `" ++ str ++ "'"))
+	Nothing -> io (putStrLn ("unknown option: '" ++ str ++ "'"))
 	Just o  -> unsetOption o
 
 strToGHCiOpt :: String -> (Maybe GHCiOption)
