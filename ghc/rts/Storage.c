@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.78 2003/03/26 17:33:49 sof Exp $
+ * $Id: Storage.c,v 1.79 2003/03/26 18:59:34 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -314,22 +314,20 @@ void
 allocNurseries( void )
 { 
 #ifdef SMP
-  {
-    Capability *cap;
-    bdescr *bd;
+  Capability *cap;
+  bdescr *bd;
 
-    g0s0->blocks = NULL;
-    g0s0->n_blocks = 0;
-    for (cap = free_capabilities; cap != NULL; cap = cap->link) {
-      cap->r.rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
-      cap->r.rCurrentNursery = cap->r.rNursery;
-      for (bd = cap->r.rNursery; bd != NULL; bd = bd->link) {
-	bd->u.back = (bdescr *)cap;
-      }
-    }
+  g0s0->blocks = NULL;
+  g0s0->n_blocks = 0;
+  for (cap = free_capabilities; cap != NULL; cap = cap->link) {
+    cap->r.rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
+    cap->r.rCurrentNursery = cap->r.rNursery;
     /* Set the back links to be equal to the Capability,
      * so we can do slightly better informed locking.
      */
+    for (bd = cap->r.rNursery; bd != NULL; bd = bd->link) {
+      bd->u.back = (bdescr *)cap;
+    }
   }
 #else /* SMP */
   g0s0->blocks      = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
@@ -565,17 +563,16 @@ allocatePinned( nat n )
     StgPtr p;
     bdescr *bd = pinned_object_block;
 
+    // If the request is for a large object, then allocate()
+    // will give us a pinned object anyway.
+    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+	return allocate(n);
+    }
+
     ACQUIRE_SM_LOCK;
     
     TICK_ALLOC_HEAP_NOCTR(n);
     CCS_ALLOC(CCCS,n);
-
-    // If the request is for a large object, then allocate()
-    // will give us a pinned object anyway.
-    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	RELEASE_SM_LOCK;
-	return allocate(n);
-    }
 
     // we always return 8-byte aligned memory.  bd->free must be
     // 8-byte aligned to begin with, so we just round up n to
