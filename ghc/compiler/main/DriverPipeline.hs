@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.99 2001/08/15 13:27:43 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.100 2001/08/16 14:43:59 rrt Exp $
 --
 -- GHC Driver
 --
@@ -693,9 +693,12 @@ run_phase SplitAs basename _suff _input_fn output_fn
 
 run_phase Ilx2Il _basename _suff input_fn output_fn
   = do	ilx2il_opts <- getOpts opt_I
-        SysTools.runIlx2il (ilx2il_opts
-                           ++ [ "--no-add-suffix-to-assembly", "mscorlib",
-				"-o", output_fn, input_fn ])
+        SysTools.runIlx2il (map SysTools.Option ilx2il_opts
+                           ++ [ SysTools.Option "--no-add-suffix-to-assembly",
+				SysTools.Option "mscorlib",
+				SysTools.Option "-o",
+				SysTools.FileOption output_fn,
+				SysTools.FileOption input_fn ])
 	return (Just output_fn)
 
 -----------------------------------------------------------------------------
@@ -704,8 +707,11 @@ run_phase Ilx2Il _basename _suff input_fn output_fn
 
 run_phase Ilasm _basename _suff input_fn output_fn
   = do	ilasm_opts <- getOpts opt_i
-        SysTools.runIlasm (ilasm_opts
-		           ++ [ "/QUIET", "/DLL", "/OUT="++output_fn, input_fn ])
+        SysTools.runIlasm (map SysTools.Option ilasm_opts
+		           ++ [ SysTools.Option "/QUIET",
+				SysTools.Option "/DLL",
+				SysTools.Option ("/OUT="++output_fn),
+				SysTools.FileOption input_fn ])
 	return (Just output_fn)
 
 #endif -- ILX

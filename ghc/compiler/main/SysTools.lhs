@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: SysTools.lhs,v 1.52 2001/08/15 15:02:04 rrt Exp $
+-- $Id: SysTools.lhs,v 1.53 2001/08/16 14:43:59 rrt Exp $
 --
 -- (c) The University of Glasgow 2001
 --
@@ -495,11 +495,11 @@ runLink args = do p <- readIORef v_Pgm_l
 	          runSomething "Linker" p args
 
 #ifdef ILX
-runIlx2il :: [String] -> IO ()
+runIlx2il :: [Option] -> IO ()
 runIlx2il args = do p <- readIORef v_Pgm_I
 	            runSomething "Ilx2Il" p args
 
-runIlasm :: [String] -> IO ()
+runIlasm :: [Option] -> IO ()
 runIlasm args = do p <- readIORef v_Pgm_i
 	           runSomething "Ilasm" p args
 #endif
@@ -720,11 +720,6 @@ unDosifyPath xs = subst '\\' '/' xs
 
 pgmPath dir pgm = dosifyPath dir ++ '\\' : pgm
 
--- HACK!
-dosifyPath "\"/DLL\"" = "\"/DLL\""
-dosifyPath "\"/QUIET\"" = "\"/QUIET\""
-dosifyPath l@('"':'/':'O':'U':'T':_) = l
--- end of HACK!
 dosifyPath stuff
   = subst '/' '\\' real_stuff
  where
