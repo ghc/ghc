@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.11 1999/05/04 10:19:19 sof Exp $
+ * $Id: RtsStartup.c,v 1.12 1999/05/10 08:23:56 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,7 +35,8 @@
  */
 struct RTS_FLAGS RtsFlags;
 
-extern void startupHaskell(int argc, char *argv[])
+void
+startupHaskell(int argc, char *argv[])
 {
     static int rts_has_started_up = 0;
     int i;
@@ -87,7 +88,7 @@ extern void startupHaskell(int argc, char *argv[])
     prog_argc = argc;
     prog_argv = argv;
 
-#if defined(PAR)
+#ifdef PAR
    /* Initialise the parallel system -- before initHeap! */
     initParallelSystem();
    /* And start GranSim profiling if required: omitted for now
@@ -122,8 +123,6 @@ extern void startupHaskell(int argc, char *argv[])
        filling in the tables with references to where the
        static info tables have been loaded inside the running
        process.
-       
-       Ditto for Bool closure tbl.
     */
 #ifdef ENABLE_WIN32_DLL_SUPPORT
     for(i=0;i<=255;i++)

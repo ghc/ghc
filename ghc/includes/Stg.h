@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.10 1999/05/04 08:52:22 sof Exp $
+ * $Id: Stg.h,v 1.11 1999/05/10 08:23:57 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -119,7 +119,7 @@ void _stgAssert (char *, unsigned int);
 #include "Hooks.h"
 
 /* Misc stuff without a home */
-#ifdef BUILDING_RTS_DLL
+#if defined(ENABLE_WIN32_DLL_SUPPOT) && !defined(COMPILING_RTS)
 extern DLLIMPORT char **prog_argv;	/* so we can get at these from Haskell */
 extern DLLIMPORT int    prog_argc;
 #else

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 1999/05/04 10:19:17 sof Exp $
+# $Id: Makefile,v 1.10 1999/05/10 08:23:55 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -88,14 +88,21 @@ unexport CC
 # 
 ifeq "$(way)" "dll"
 DLL_NAME          = HSrts.dll
-SRC_BLD_DLL_OPTS += --def HSrts.def -lwinmm -lHS_imp -lgmp -L. -Lgmp
+SRC_BLD_DLL_OPTS += --def HSrts.def -lwinmm -lHS_imp_stub -lgmp -L. -Lgmp
 
-LIBOBJS := $(filter-out Main.$(way_)o, $(LIBOBJS))
+#
+# Need an import library containing the symbols the RTS uses from the Prelude.
+# So, to avoid bootstrapping trouble, we build one containing just the syms
+# we need. Weirdly named to avoid clashing later on when compiling the contents
+# of ghc/lib/..
+#
+# Note: if you do change the name of the Prelude DLL, the "--dllname <nm>.dll"
+# below will need to be updated as well.
 
-$(DLL_NAME) :: libHS_imp.a
+$(DLL_NAME) :: libHS_imp_stub.a
 
-libHS_imp.a :
-	dlltool --output-lib libHS_imp.a --def HSprel.def --dllname HSprel.dll
+libHS_imp_stub.a :
+	dlltool --output-lib libHS_imp_stub.a --def HSprel.def --dllname HSprel.dll
 
 # It's not included in the DLL, but we need to compile it up separately.
 all :: Main.dll_o
