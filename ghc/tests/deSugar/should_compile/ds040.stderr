@@ -1,3 +1,0 @@
-
-ds040.hs:9: Warning: Pattern match(es) are overlapped
-    In the definition of `^^^^': ^^^^ _ _ = ...

@@ -1,5 +1,0 @@
-
-ds041.hs:15:
-    Warning: Field `x' is not initialised
-	     In the record construction: Foo {}
-	     In the definition of `foo': Foo {}

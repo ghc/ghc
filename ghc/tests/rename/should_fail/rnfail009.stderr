@@ -1,5 +1,0 @@
-
-rnfail009.hs:1:
-    Multiple declarations of `Foo.A'
-	rnfail009.hs:3
-	rnfail009.hs:5

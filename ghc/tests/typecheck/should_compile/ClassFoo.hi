@@ -1,5 +1,0 @@
-_interface_ ClassFoo 1
-_exports_
-ClassFoo Foo(op1 op2);
-_declarations_
-1 class Foo a where { op1 :: a -> PrelBase.Int; op2 :: a -> a -> PrelBase.Int} ;

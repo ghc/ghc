@@ -1,5 +1,0 @@
-
-rnfail012.hs:2:
-    Multiple declarations of `Main.A'
-	rnfail012.hs:2
-	rnfail012.hs:8

@@ -1,5 +1,0 @@
-Left resource busy
-Action: openFile
-Reason: file is locked
-File: openFile007.out
-hello, world

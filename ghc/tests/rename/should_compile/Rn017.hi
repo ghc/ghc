@@ -1,7 +1,0 @@
-__interface Rn017 1 0 where
-__export Rn017 a b c Wibble{MkWibble} Wobble ;
-1 data Wibble = MkWibble Wobble ;
-1 data Wobble ;
-1 a :: PrelBase.Int -> PrelBase.Int ;
-1 b :: PrelBase.Int -> PrelBase.Int ;
-1 c :: PrelBase.Int -> PrelBase.Int ;

@@ -1,3 +1,0 @@
-
-rnfail021.hs:5:
-    Invalid use of qualified name `Baz.f' in its declaration

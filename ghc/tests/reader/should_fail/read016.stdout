@@ -1,7 +1,0 @@
-
-==================== Parser ====================
-module ShouldFail where
-|- ps q : qs = undefined
-infix 6 |-
-
-
