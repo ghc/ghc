@@ -77,6 +77,7 @@ import HscTypes hiding ( moduleNameToModule )
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
 			  isHomePackageName, isExternalName )
 import NameEnv
+import PrelNames        ( gHC_PRIM_Name )
 import Rename		( mkGlobalContext )
 import RdrName		( emptyRdrEnv )
 import Module
@@ -1230,6 +1231,8 @@ summariseFile file
         (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 
         let (path, basename, _ext) = splitFilename3 file
+	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
+            the_imps = filter (/= gHC_PRIM_Name) imps
 
 	(mod, location)
 	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
@@ -1241,7 +1244,7 @@ summariseFile file
 
         return (ModSummary mod
                            location{ml_hspp_file=Just hspp_fn}
-                           srcimps imps src_timestamp)
+                           srcimps the_imps src_timestamp)
 
 -- Summarise a module, and pick up source and timestamp.
 summarise :: Module -> ModuleLocation -> Maybe ModSummary
@@ -1264,6 +1267,9 @@ summarise mod location old_summary
 
         hspp_fn <- preprocess hs_fn
         (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
+	let
+	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
+           the_imps = filter (/= gHC_PRIM_Name) imps
 
 	when (mod_name /= moduleName mod) $
 		throwDyn (ProgramError 
@@ -1272,7 +1278,7 @@ summarise mod location old_summary
 			      <+> quotes (ppr (moduleName mod)))))
 
         return (Just (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
-                                 srcimps imps src_timestamp))
+                                 srcimps the_imps src_timestamp))
         }
       }
 
