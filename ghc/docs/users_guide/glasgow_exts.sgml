@@ -2627,6 +2627,8 @@ qualifier list has just one element, a boolean expression.
                 "<literal>fromRational 3.2</literal>", not the
                 Prelude-qualified versions; both in expressions and in
                 patterns. </para>
+		<para>However, the standard Prelude <literal>Eq</literal> class
+		is still used for the equality test necessary for literal patterns.</para>
 	      </listitem>
 
 	      <listitem>
