@@ -454,6 +454,9 @@ zonkType unbound_var_fn ty
     go (AppTy fun arg)	 	  = go fun		`thenNF_Tc` \ fun' ->
 				    go arg		`thenNF_Tc` \ arg' ->
 				    returnNF_Tc (mkAppTy fun' arg')
+		-- NB the mkAppTy; we might have instantiated a
+		-- type variable to a type constructor, so we need
+		-- to pull the TyConApp to the top.
 
 	-- The two interesting cases!
     go (TyVarTy tyvar)     = zonkTyVar unbound_var_fn tyvar

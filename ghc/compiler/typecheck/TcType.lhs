@@ -373,11 +373,11 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
 			Nothing	   -> pprPanic "tcSplitTyConApp" (pprType ty)
 
 tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
--- Newtypes are opaque, so they may be split
 tcSplitTyConApp_maybe (TyConApp tc tys) 	= Just (tc, tys)
 tcSplitTyConApp_maybe (FunTy arg res)   	= Just (funTyCon, [arg,res])
 tcSplitTyConApp_maybe (NoteTy n ty)     	= tcSplitTyConApp_maybe ty
 tcSplitTyConApp_maybe (SourceTy (NType tc tys)) = Just (tc,tys)
+	-- Newtypes are opaque, so they may be split
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
 tcSplitTyConApp_maybe other	        	= Nothing
