@@ -80,7 +80,7 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 void initDefaultHandlers(void)
 {
     if ( !SetConsoleCtrlHandler(shutdown_handler, TRUE) ) {
-	prog_belch("warning: failed to install default console handler");
+	errorBelch("warning: failed to install default console handler");
     }
 }
 
@@ -208,13 +208,13 @@ stg_InstallConsoleEvent(int action, StgStablePtr *handler)
     case STG_SIG_IGN:
 	console_handler = STG_SIG_IGN;
 	if ( !SetConsoleCtrlHandler(NULL, TRUE) ) {
-	    prog_belch("warning: unable to ignore console events");
+	    errorBelch("warning: unable to ignore console events");
 	}
 	break;
     case STG_SIG_DFL:
 	console_handler = STG_SIG_IGN;
 	if ( !SetConsoleCtrlHandler(NULL, FALSE) ) {
-	    prog_belch("warning: unable to restore default console event handling");
+	    errorBelch("warning: unable to restore default console event handling");
 	}
 	break;
     case STG_SIG_HAN:
@@ -222,7 +222,7 @@ stg_InstallConsoleEvent(int action, StgStablePtr *handler)
 	if ( previous_hdlr < 0 ) {
 	  /* Only install generic_handler() once */
 	  if ( !SetConsoleCtrlHandler(generic_handler, TRUE) ) {
-	    prog_belch("warning: unable to install console event handler");
+	    errorBelch("warning: unable to install console event handler");
 	  }
 	}
 	break;
