@@ -228,7 +228,7 @@ packNBytesST len@(I# length#) str =
    -- fill in packed string from "str"
  fill_in ch_array 0# str   >>
    -- freeze the puppy:
- freeze_ps_array ch_array
+ freeze_ps_array ch_array length#
  where
   fill_in :: MutableByteArray s Int -> Int# -> [Char] -> ST s ()
   fill_in arr_in# idx [] =
@@ -246,7 +246,7 @@ packNBytesST len@(I# length#) str =
 \begin{code}
 new_ps_array	:: Int# -> ST s (MutableByteArray s Int)
 write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s () 
-freeze_ps_array :: MutableByteArray s Int -> ST s (ByteArray Int)
+freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ (S# s) ->
     case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
@@ -259,9 +259,9 @@ write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ (S# s#) ->
     ((), S# s2#)}
 
 -- same as unsafeFreezeByteArray
-freeze_ps_array (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
+freeze_ps_array (MutableByteArray _ arr#) len# = ST $ \ (S# s#) ->
     case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    (ByteArray ixs frozen#, S# s2#) }
+    (ByteArray (0,I# len#) frozen#, S# s2#) }
 \end{code}
 
 
