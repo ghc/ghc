@@ -359,6 +359,16 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
 @rnMethodBinds@ is used for the method bindings of a class and an instance
 declaration.   like @rnMonoBinds@ but without dependency analysis.
 
+NOTA BENE: we record each *binder* of a method-bind group as a free variable.
+That's crucial when dealing with an instance decl:
+	instance Foo (T a) where
+	   op x = ...
+This might be the *sole* occurrence of 'op' for an imported class Foo,
+and unless op occurs we won't treat the type signature of op in the class
+decl for Foo as a source of instance-decl gates.  But we should!  Indeed,
+in many ways the op in an instance decl is just like an occurrence, not
+a binder.
+
 \begin{code}
 rnMethodBinds :: RdrNameMonoBinds -> RnMS (RenamedMonoBinds, FreeVars)
 
@@ -377,13 +387,13 @@ rnMethodBinds (FunMonoBind name inf matches locn)
 
     mapFvRn rnMatch matches				`thenRn` \ (new_matches, fvs) ->
     mapRn_ (checkPrecMatch inf sel_name) new_matches	`thenRn_`
-    returnRn (FunMonoBind sel_name inf new_matches locn, fvs)
+    returnRn (FunMonoBind sel_name inf new_matches locn, fvs `addOneFV` sel_name)
 
 rnMethodBinds (PatMonoBind (VarPatIn name) grhss locn)
   = pushSrcLocRn locn			$
     lookupGlobalOccRn name		`thenRn` \ sel_name -> 
     rnGRHSs grhss			`thenRn` \ (grhss', fvs) ->
-    returnRn (PatMonoBind (VarPatIn sel_name) grhss' locn, fvs)
+    returnRn (PatMonoBind (VarPatIn sel_name) grhss' locn, fvs `addOneFV` sel_name)
 
 -- Can't handle method pattern-bindings which bind multiple methods.
 rnMethodBinds mbind@(PatMonoBind other_pat _ locn)

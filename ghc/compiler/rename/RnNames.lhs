@@ -73,7 +73,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	-- provenance information into a Name
     fixRn (\ ~(rec_gbl_env, rec_exported_avails, _) ->
 
---       fixRn (\ ~(rec_rn_env, _) ->
 	let
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
 	   rec_unqual_fn = unQualInScope rec_gbl_env
@@ -81,7 +80,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	   rec_exp_fn :: Name -> ExportFlag
 	   rec_exp_fn = mk_export_fn (availsToNameSet rec_exported_avails)
 	in
---	setOmitQualFn rec_unqual_fn		$
 	setModuleRn this_mod			$
 
 		-- PROCESS LOCAL DECLS
@@ -111,8 +109,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	    all_avails :: ExportAvails
 	    all_avails = foldr plusExportAvails local_mod_avails (imp_avails_s2 ++ imp_avails_s1)
 	in
---	returnRn (gbl_env, all_avails)
---      )							`thenRn` \ (gbl_env, all_avails) ->
 
 	-- TRY FOR EARLY EXIT
 	-- We can't go for an early exit before this because we have to check

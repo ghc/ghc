@@ -102,7 +102,6 @@ type RnMG r  = RnM ()    r		-- Getting global names etc
 data RnDown = RnDown {
 		  rn_mod     :: ModuleName,
 		  rn_loc     :: SrcLoc,
-		  rn_omit    :: Name -> Bool, 			-- True <=> omit qualifier when printing
 		  rn_ns      :: IORef RnNameSupply,
 		  rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
 	  	  rn_ifaces  :: IORef Ifaces,
@@ -356,7 +355,7 @@ initRn mod us dirs loc do_rn = do
   errs_var  <- newIORef (emptyBag,emptyBag)
   iface_var <- newIORef emptyIfaces 
   let
-        rn_down = RnDown { rn_loc = loc, rn_omit = \n -> False, rn_ns = names_var, 
+        rn_down = RnDown { rn_loc = loc, rn_ns = names_var, 
 			   rn_errs = errs_var, 
 			   rn_hi_maps = himaps, 
 		  	   rn_ifaces = iface_var,
@@ -632,14 +631,6 @@ setModuleRn new_mod enclosed_thing rn_down l_down
   = enclosed_thing (rn_down {rn_mod = new_mod}) l_down
 \end{code}
 
-\begin{code}
-setOmitQualFn :: (Name -> Bool) -> RnM d a -> RnM d a
-setOmitQualFn fn m g_down l_down = m (g_down { rn_omit = fn }) l_down
-
-getOmitQualFn :: RnM d (Name -> Bool)
-getOmitQualFn (RnDown {rn_omit = omit_fn}) l_down
-  = return omit_fn
-\end{code}
 
 %************************************************************************
 %*									*
