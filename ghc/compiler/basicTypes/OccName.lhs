@@ -753,6 +753,19 @@ decode_num_esc d rest
     go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
     go n ('U' : rest)           = chr n : decode rest
     go n other = pprPanic "decode_num_esc" (ppr n <+> text other)
+
+decode_tuple :: Char -> EncodedString -> UserString
+decode_tuple d rest
+  = go (digitToInt d) rest
+  where
+	-- NB. recurse back to decode after decoding the tuple, because
+	-- the tuple might be embedded in a longer name.
+    go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
+    go 0 ('T':rest)	= "()" ++ decode rest
+    go n ('T':rest)	= '(' : replicate (n-1) ',' ++ ")" ++ decode rest
+    go 1 ('H':rest)	= "(# #)" ++ decode rest
+    go n ('H':rest)	= '(' : '#' : replicate (n-1) ',' ++ "#)" ++ decode rest
+    go n other = pprPanic "decode_tuple" (ppr n <+> text other)
 \end{code}
 
 
@@ -793,17 +806,6 @@ count_commas n cs	  = (n,cs)
 \end{code}
 
 \begin{code}
-decode_tuple :: Char -> EncodedString -> UserString
-decode_tuple d rest
-  = go (digitToInt d) rest
-  where
-    go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
-    go 0 ['T']	 		= "()"
-    go n ['T']			= '(' : replicate (n-1) ',' ++ ")"
-    go 1 ['H']			= "(# #)"
-    go n ['H']			= '(' : '#' : replicate (n-1) ',' ++ "#)"
-    go n other = pprPanic "decode_tuple" (ppr n <+> text other)
-
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 mkTupleOcc ns bx ar
   = OccName ns (mkFastString ('Z' : (show ar ++ bx_char)))
