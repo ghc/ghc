@@ -260,7 +260,9 @@ checkCode macro args assts
 			    assts (gc_d1 : join : xs))
 
 	HP_CHK_UT_ALT  -> 
-		error "unimplemented check"
+                let [words,ptrs,nonptrs,r,ret] = args_stix
+                in (\xs -> assign_hp words : cjmp_hp :
+                           assts (assign_ret r ret : gc_ut ptrs nonptrs : join : xs))
 
 	HP_CHK_GEN     -> 
 		error "unimplemented check"
@@ -276,4 +278,7 @@ gc_unbx_r1         = StJump (StLitLbl (ptext SLIT("stg_gc_unbx_r1")))
 gc_f1              = StJump (StLitLbl (ptext SLIT("stg_gc_f1")))
 gc_d1              = StJump (StLitLbl (ptext SLIT("stg_gc_d1")))
 
+gc_ut (StInt p) (StInt np)
+                   = StJump (StLitLbl (ptext SLIT("stg_gc_ut_") <> int (fromInteger p) 
+                                       <> char '_' <> int (fromInteger np)))
 \end{code}
