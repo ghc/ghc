@@ -1,0 +1,88 @@
+
+==================== Typechecked ====================
+ExportOpaque.Junk11{-r3,l-} =
+    \ a{-ru2-} -> ExportOpaque.Junk11{-r3,l-} {__a a{-ru2-}}
+ExportOpaque.Junk2{-r5,l-} =
+    \ a{-ru2-} -> ExportOpaque.Junk2{-r5,l-} {__a a{-ru2-}}
+ExportOpaque.Con{-r9,l-} =
+    \ a{-ru6-} tpl_B1 -> ExportOpaque.Con{-r9,l-} {__a a{-ru6-} tpl_B1}
+AbsBinds
+[a{-aY7-}]
+[_dOrd{-aYo-}]
+[([a{-aY7-}],
+  ExportOpaque._fShowOpaqueType{-rXt,x-},
+  _dShow{-aXB-})]
+    _mshow{-aZt-} =
+	PrelBase._mshow{-rJ7,i-} (ExportOpaque.OpaqueType{-r7,x-} a{-aY7-})
+	    _dShow{-aYs-}
+    showsPrec{-aZs-} = showsPrec{-aY0-}
+    showsPrec{-aZu-} =
+	PrelBase.showsPrec{-rt1,i-}
+	    (ExportOpaque.FunnyInternalType{-r1,l-} a{-aY7-})
+	    _dShow{-aYv-}
+    _dShow{-aYs-} = _dShow{-aXB-}
+    _dShow{-aYv-} =
+	ExportOpaque._fShowFunnyInternalType{-rXl,x-} a{-aY7-} _dOrd{-aYx-}
+    _dOrd{-aYx-} = _dOrd{-aYo-}
+    AbsBinds [] [] [([], showList{-aXD-}, showList{-aXF-})]
+	showList{-aXF-} = PrelBase.showList__{-ru7,i-}
+			      (ExportOpaque.OpaqueType{-r7,x-} a{-aY7-}) showsPrec{-aZs-} PrelBase.I#{-67,w-} 0#
+    AbsBinds [] [] [([], show{-aXP-}, show{-aXR-})]
+	show{-aXR-} = _mshow{-aZt-}
+    AbsBinds [] [] [([], showsPrec{-aY0-}, showsPrec{-aY2-})]
+	showsPrec{-aY2-} a{-aY8-} (ExportOpaque.Con{-r9,l-} b1{-aYl-})
+			   = PrelBase.showParen{-rtv,i-} a{-aY8-} >={-aZv-} lit_aZw
+							 PrelBase..{-rtD,i-}
+							     [PrelBase.String{-rsZ,i-}, PrelBase.String{-rsZ,i-}, PrelBase.String{-rsZ,i-}] PrelBase.showString{-rtu,i-} "Con "
+																	    showsPrec{-aZu-} PrelBase.I#{-67,w-} 10#
+																			     b1{-aYl-}
+    _dShow{-aXB-} =
+	PrelBase._DShow{-rIw,i-}
+	    (ExportOpaque.OpaqueType{-r7,x-} a{-aY7-}) showList{-aXD-}
+						       show{-aXP-}
+						       showsPrec{-aY0-}
+AbsBinds
+[a{-aYP-}]
+[_dOrd{-aZe-}]
+[([a{-aYP-}],
+  ExportOpaque._fShowFunnyInternalType{-rXl,x-},
+  _dShow{-aYG-})]
+    _mshow{-aZx-} =
+	PrelBase._mshow{-rJ7,i-}
+	    (ExportOpaque.FunnyInternalType{-r1,l-} a{-aYP-})
+	    _dShow{-aZk-}
+    _mshowList{-aZy-} =
+	PrelBase._mshowList{-rJ6,i-}
+	    (ExportOpaque.FunnyInternalType{-r1,l-} a{-aYP-})
+	    _dShow{-aZi-}
+    _mshowsPrec{-aZz-} =
+	PrelBase._mshowsPrec{-rJ5,i-}
+	    (ExportOpaque.FunnyInternalType{-r1,l-} a{-aYP-})
+	    _dShow{-aZm-}
+    _dShow{-aZi-} = _dShow{-aYG-}
+    _dShow{-aZk-} = _dShow{-aYG-}
+    _dShow{-aZm-} = _dShow{-aYG-}
+    AbsBinds [] [] [([], showList{-aYI-}, showList{-aYK-})]
+	showList{-aYK-} = _mshowList{-aZy-}
+    AbsBinds [] [] [([], show{-aYU-}, show{-aYW-})]
+	show{-aYW-} = _mshow{-aZx-}
+    AbsBinds [] [] [([], showsPrec{-aZ5-}, showsPrec{-aZ7-})]
+	showsPrec{-aZ7-} = _mshowsPrec{-aZz-}
+    _dShow{-aYG-} =
+	PrelBase._DShow{-rIw,i-}
+	    (ExportOpaque.FunnyInternalType{-r1,l-} a{-aYP-}) showList{-aYI-}
+							      show{-aYU-}
+							      showsPrec{-aZ5-}
+lit_aZw = PrelBase.I#{-67,w-} 10#
+>={-aZv-} = PrelBase.>={-01M,i-} PrelBase.Int{-3f,W-} _dOrd{-aZr-}
+_dOrd{-aZr-} = PrelBase._fOrdInt{-rJw,i-}
+
+
+ghc: module version changed to 1; reason: no old .hi file
+__export ExportOpaque OpaqueType;
+instance __forall [a] {PrelBase.Ord a} => {PrelBase.Show (FunnyInternalType a)} = _fShowFunnyInternalType;
+instance __forall [a] {PrelBase.Ord a} => {PrelBase.Show (OpaqueType a)} = _fShowOpaqueType;
+1 _fShowFunnyInternalType :: __forall [a] {PrelBase.Ord a} => {PrelBase.Show (FunnyInternalType a)} ;
+1 _fShowOpaqueType :: __forall [a] {PrelBase.Ord a} => {PrelBase.Show (OpaqueType a)} ;
+1 data FunnyInternalType a = Junk11 |  Junk2 ;
+1 data OpaqueType a = Con (FunnyInternalType a) ;
