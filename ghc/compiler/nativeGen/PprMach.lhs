@@ -25,6 +25,7 @@ import Outputable
 import ST
 import MutableArray
 import Char		( chr, ord )
+import Maybe		( isJust )
 \end{code}
 
 %************************************************************************
@@ -1364,7 +1365,7 @@ pprInstr (LD DF (AddrRegReg g1 g2) reg)
 -- Translate to
 --    ld  [addr],%fn
 --    ld  [addr+4],%f(n+1)
-pprInstr (LD DF addr reg) | maybeToBool off_addr
+pprInstr (LD DF addr reg) | isJust off_addr
   = vcat [
        hcat [pp_ld_lbracket, pprAddr addr, pp_rbracket_comma, pprReg reg],
        hcat [pp_ld_lbracket, pprAddr addr2, pp_rbracket_comma,pprReg (fPair reg)]
@@ -1405,7 +1406,7 @@ pprInstr (ST DF reg (AddrRegReg g1 g2))
 -- Translate to
 --    st  %fn,[addr]
 --    st  %f(n+1),[addr+4]
-pprInstr (ST DF reg addr) | maybeToBool off_addr 
+pprInstr (ST DF reg addr) | isJust off_addr 
  = vcat [
       hcat [ptext SLIT("\tst\t"), pprReg reg, pp_comma_lbracket, 
             pprAddr addr, rbrack],
