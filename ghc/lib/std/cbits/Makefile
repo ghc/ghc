@@ -1,7 +1,9 @@
-# $Id: Makefile,v 1.13 2000/03/14 01:52:25 sof Exp $
+# $Id: Makefile,v 1.14 2000/03/17 17:05:27 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
+
+WAYS=$(GhcLibWays)
 
 ifeq "$(filter dll,$(WAYS))" "dll"
 override WAYS=dll
