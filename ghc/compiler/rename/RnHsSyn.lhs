@@ -15,7 +15,6 @@ import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes	( Boxity )
-import Maybes		( orElse )
 import Outputable
 \end{code}
 
@@ -127,8 +126,7 @@ tyClDeclFVs (IfaceSig {tcdType = ty, tcdIdInfo = id_infos})
 tyClDeclFVs (TyData {tcdCtxt = context, tcdTyVars = tyvars, tcdCons = condecls, tcdDerivs = derivings})
   = delFVs (map hsTyVarName tyvars) $
     extractHsCtxtTyNames context	`plusFV`
-    plusFVs (map conDeclFVs condecls)	`plusFV`
-    mkNameSet (derivings `orElse` [])
+    plusFVs (map conDeclFVs condecls)
 
 tyClDeclFVs (TySynonym {tcdTyVars = tyvars, tcdSynRhs = ty})
   = delFVs (map hsTyVarName tyvars) (extractHsTyNames ty)

@@ -99,13 +99,13 @@ rnSourceDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
 			    returnRn (ValD new_binds, fvs)
 
 rnSourceDecl (TyClD tycl_decl)
-  = rnTyClDecl tycl_decl		`thenRn` \ new_decl ->
-    rnClassBinds tycl_decl new_decl	`thenRn` \ (new_decl', fvs) ->
+  = rnTyClDecl tycl_decl			`thenRn` \ new_decl ->
+    finishSourceTyClDecl tycl_decl new_decl	`thenRn` \ (new_decl', fvs) ->
     returnRn (TyClD new_decl', fvs `plusFV` tyClDeclFVs new_decl')
 
 rnSourceDecl (InstD inst)
-  = rnInstDecl inst		`thenRn` \ new_inst ->
-    rnInstBinds inst new_inst	`thenRn` \ (new_inst', fvs) ->
+  = rnInstDecl inst			`thenRn` \ new_inst ->
+    finishSourceInstDecl inst new_inst	`thenRn` \ (new_inst', fvs) ->
     returnRn (InstD new_inst', fvs `plusFV` instDeclFVs new_inst')
 
 rnSourceDecl (RuleD rule)
@@ -169,9 +169,9 @@ rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
     -- The typechecker checks that all the bindings are for the right class.
     returnRn (InstDecl inst_ty' EmptyMonoBinds [] maybe_dfun_name src_loc)
 
--- Compare rnClassBinds
-rnInstBinds (InstDecl _       mbinds uprags _               _      )
-	    (InstDecl inst_ty _      _      maybe_dfun_name src_loc)
+-- Compare finishSourceTyClDecl
+finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
+		     (InstDecl inst_ty _      _      maybe_dfun_name src_loc)
 	-- Used for both source decls only
   = ASSERT( not (maybeToBool maybe_dfun_name) )	-- Source decl!
     let
@@ -286,7 +286,7 @@ rnTyClDecl (IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
 		    tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = nconstrs,
-		    tcdDerivs = derivings, tcdLoc = src_loc, tcdSysNames = sys_names})
+		    tcdLoc = src_loc, tcdSysNames = sys_names})
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
@@ -294,10 +294,9 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
     checkDupOrQualNames data_doc con_names	`thenRn_`
     mapRn rnConDecl condecls			`thenRn` \ condecls' ->
     mapRn lookupSysBinder sys_names	        `thenRn` \ sys_names' ->
-    rnDerivs derivings				`thenRn` \ derivings' ->
     returnRn (TyData {tcdND = new_or_data, tcdCtxt = context', tcdName = tycon',
 		      tcdTyVars = tyvars', tcdCons = condecls', tcdNCons = nconstrs,
-		      tcdDerivs = derivings', tcdLoc = src_loc, tcdSysNames = sys_names'})
+		      tcdDerivs = Nothing, tcdLoc = src_loc, tcdSysNames = sys_names'})
   where
     data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName condecls
@@ -390,10 +389,18 @@ rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op dm_stuff ty locn)
     
     returnRn (ClassOpSig op_name dm_stuff' new_ty locn)
 
-rnClassBinds :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
+finishSourceTyClDecl :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
 	-- Used for source file decls only
-rnClassBinds (ClassDecl {tcdMeths = Just mbinds})		-- Get mbinds from here
- rn_cls_decl@(ClassDecl {tcdTyVars = tyvars, tcdLoc = src_loc})	-- Everything else is here
+	-- Renames the default-bindings of a class decl
+	--	   the derivings of a data decl
+finishSourceTyClDecl (TyData {tcdDerivs = Just derivs, tcdLoc = src_loc})	-- Derivings in here
+		     rn_ty_decl							-- Everything else is here
+  = pushSrcLocRn src_loc	 $
+    mapRn rnDeriv derivs	`thenRn` \ derivs' ->
+    returnRn (rn_ty_decl {tcdDerivs = Just derivs'}, mkNameSet derivs')
+
+finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- Get mbinds from here
+	 rn_cls_decl@(ClassDecl {tcdTyVars = tyvars})				-- Everything else is here
   -- There are some default-method bindings (abeit possibly empty) so 
   -- this is a source-code class declaration
   = 	-- The newLocals call is tiresome: given a generic class decl
@@ -405,6 +412,7 @@ rnClassBinds (ClassDecl {tcdMeths = Just mbinds})		-- Get mbinds from here
 	-- we want to name both "x" tyvars with the same unique, so that they are
 	-- easy to group together in the typechecker.  
 	-- Hence the 
+    pushSrcLocRn src_loc				$
     extendTyVarEnvFVRn (map hsTyVarName tyvars)		$
     getLocalNameEnv					`thenRn` \ name_env ->
     let
@@ -419,7 +427,7 @@ rnClassBinds (ClassDecl {tcdMeths = Just mbinds})		-- Get mbinds from here
   where
     meth_doc = text "the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
 
-rnClassBinds _ tycl_decl = returnRn (tycl_decl, emptyFVs)
+finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 	-- Not a class declaration
 \end{code}
 
@@ -431,19 +439,12 @@ rnClassBinds _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 %*********************************************************
 
 \begin{code}
-rnDerivs :: Maybe [RdrName] -> RnMS (Maybe [Name])
-
-rnDerivs Nothing -- derivs not specified
-  = returnRn Nothing
-
-rnDerivs (Just clss)
-  = mapRn do_one clss	`thenRn` \ clss' ->
-    returnRn (Just clss')
-  where
-    do_one cls = lookupOccRn cls	`thenRn` \ clas_name ->
-		 checkRn (getUnique clas_name `elem` derivableClassKeys)
-			 (derivingNonStdClassErr clas_name)	`thenRn_`
-		 returnRn clas_name
+rnDeriv :: RdrName -> RnMS Name
+rnDeriv cls
+  = lookupOccRn cls	`thenRn` \ clas_name ->
+    checkRn (getUnique clas_name `elem` derivableClassKeys)
+	    (derivingNonStdClassErr clas_name)	`thenRn_`
+    returnRn clas_name
 \end{code}
 
 \begin{code}
