@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.20 2002/06/27 15:38:58 simonmar Exp $
+ * $Id: Prelude.h,v 1.21 2002/07/15 08:41:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -14,19 +14,19 @@
  * modules these names are defined in.
  */
 
-extern DLL_IMPORT const StgClosure GHCziBase_True_closure;
-extern DLL_IMPORT const StgClosure GHCziBase_False_closure;
-extern DLL_IMPORT const StgClosure GHCziPack_unpackCString_closure;
-extern DLL_IMPORT const StgClosure GHCziWeak_runFinalizzerBatch_closure;
-extern const StgClosure Main_zdmain_closure;
-extern DLL_IMPORT const StgClosure GHCziTopHandler_runIO_closure;
-extern DLL_IMPORT const StgClosure GHCziTopHandler_runNonIO_closure;
+extern DLL_IMPORT StgClosure GHCziBase_True_closure;
+extern DLL_IMPORT StgClosure GHCziBase_False_closure;
+extern DLL_IMPORT StgClosure GHCziPack_unpackCString_closure;
+extern DLL_IMPORT StgClosure GHCziWeak_runFinalizzerBatch_closure;
+extern StgClosure Main_zdmain_closure;
+extern DLL_IMPORT StgClosure GHCziTopHandler_runIO_closure;
+extern DLL_IMPORT StgClosure GHCziTopHandler_runNonIO_closure;
 
-extern DLL_IMPORT const StgClosure GHCziIOBase_stackOverflow_closure;
-extern DLL_IMPORT const StgClosure GHCziIOBase_heapOverflow_closure;
-extern DLL_IMPORT const StgClosure GHCziIOBase_BlockedOnDeadMVar_closure;
-extern DLL_IMPORT const StgClosure GHCziIOBase_NonTermination_closure;
-extern DLL_IMPORT const StgClosure GHCziIOBase_Deadlock_closure;
+extern DLL_IMPORT StgClosure GHCziIOBase_stackOverflow_closure;
+extern DLL_IMPORT StgClosure GHCziIOBase_heapOverflow_closure;
+extern DLL_IMPORT StgClosure GHCziIOBase_BlockedOnDeadMVar_closure;
+extern DLL_IMPORT StgClosure GHCziIOBase_NonTermination_closure;
+extern DLL_IMPORT StgClosure GHCziIOBase_Deadlock_closure;
 
 extern DLL_IMPORT const StgInfoTable GHCziBase_Czh_static_info;
 extern DLL_IMPORT const StgInfoTable GHCziBase_Izh_static_info;
