@@ -1,10 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-<<<<<<< Parser.y
-$Id: Parser.y,v 1.13 1999/07/27 09:25:49 simonmar Exp $
-=======
-$Id: Parser.y,v 1.13 1999/07/27 09:25:49 simonmar Exp $
->>>>>>> 1.10
+$Id: Parser.y,v 1.14 1999/09/01 14:08:19 sof Exp $
 
 Haskell grammar.
 
@@ -97,6 +93,8 @@ Conflicts: 14 shift/reduce
  'label'	{ ITlabel } 
  'dynamic'	{ ITdynamic }
  'unsafe'	{ ITunsafe }
+ 'stdcall'      { ITstdcallconv }
+ 'ccall'        { ITccallconv }
  '_ccall_'	{ ITccall (False, False, False) }
  '_ccall_GC_'	{ ITccall (False, False, True)  }
  '_casm_'	{ ITccall (False, True,  False) }
@@ -348,13 +346,13 @@ topdecl :: { RdrBinding }
 
 	| srcloc 'foreign' 'import' callconv ext_name 
 	  unsafe_flag varid_no_unsafe '::' sigtype
-		{ RdrHsDecl (ForD (ForeignDecl $7 (FoImport $6) $9 $5 $4 $1)) }
+		{ RdrHsDecl (ForD (ForeignDecl $7 (FoImport $6) $9 (mkExtName $5 $7) $4 $1)) }
 
 	| srcloc 'foreign' 'export' callconv ext_name varid '::' sigtype
-		{ RdrHsDecl (ForD (ForeignDecl $6 FoExport $8 $5 $4 $1)) }
+		{ RdrHsDecl (ForD (ForeignDecl $6 FoExport $8 (mkExtName $5 $6) $4 $1)) }
 
 	| srcloc 'foreign' 'label' ext_name varid '::' sigtype
-		{ RdrHsDecl (ForD (ForeignDecl $5 FoLabel $7 $4 
+		{ RdrHsDecl (ForD (ForeignDecl $5 FoLabel $7 (mkExtName $4 $5)
 					defaultCallConv $1)) }
 
       	| decl		{ $1 }
@@ -455,17 +453,19 @@ rule_var :: { RdrNameRuleBndr }
 -- Foreign import/export
 
 callconv :: { Int }
-	: VARID			{% checkCallConv $1 }
+	: 'stdcall'		{ stdCallConv }
+	| 'ccall'               { cCallConv }
 	| {- empty -}		{ defaultCallConv }
 
 unsafe_flag :: { Bool }
 	: 'unsafe'		{ True }
 	| {- empty -}		{ False }
 
-ext_name :: { ExtName }
-	: 'dynamic'		{ Dynamic }
-	| STRING		{ ExtName $1 Nothing }
-	| STRING STRING		{ ExtName $2 (Just $1) }
+ext_name :: { Maybe ExtName }
+	: 'dynamic'		{ Just Dynamic }
+	| STRING		{ Just (ExtName $1 Nothing)   }
+	| STRING STRING		{ Just (ExtName $2 (Just $1)) }
+	| {- empty -}           { Nothing }
 
 -----------------------------------------------------------------------------
 -- Types
@@ -875,6 +875,8 @@ varid :: { RdrName }
 	| 'label'		{ label_var_RDR }
 	| 'dynamic'		{ dynamic_var_RDR }
 	| 'unsafe'		{ unsafe_var_RDR }
+	| 'stdcall'             { stdcall_var_RDR }
+	| 'ccall'               { ccall_var_RDR }
 
 varid_no_unsafe :: { RdrName }
 	: VARID			{ mkSrcUnqual varName $1 }
@@ -885,6 +887,8 @@ varid_no_unsafe :: { RdrName }
 	| 'export'		{ export_var_RDR }
 	| 'label'		{ label_var_RDR }
 	| 'dynamic'		{ dynamic_var_RDR }
+	| 'stdcall'             { stdcall_var_RDR }
+	| 'ccall'               { ccall_var_RDR }
 
 -----------------------------------------------------------------------------
 -- ConIds
@@ -981,10 +985,12 @@ tyvar 	:: { RdrName }
 	| 'as'			{ as_tyvar_RDR }
 	| 'qualified'		{ qualified_tyvar_RDR }
 	| 'hiding'		{ hiding_tyvar_RDR }
-	| 'export'		{ export_var_RDR }
-	| 'label'		{ label_var_RDR }
-	| 'dynamic'		{ dynamic_var_RDR }
-	| 'unsafe'		{ unsafe_var_RDR }
+	| 'export'		{ export_tyvar_RDR }
+	| 'label'		{ label_tyvar_RDR }
+	| 'dynamic'		{ dynamic_tyvar_RDR }
+	| 'unsafe'		{ unsafe_tyvar_RDR }
+	| 'stdcall'             { stdcall_tyvar_RDR }
+	| 'ccall'               { ccall_tyvar_RDR }
 	-- NOTE: no 'forall'
 
 -----------------------------------------------------------------------------

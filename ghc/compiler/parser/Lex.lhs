@@ -128,6 +128,8 @@ data Token
   | ITlabel
   | ITdynamic
   | ITunsafe
+  | ITstdcallconv
+  | ITccallconv
 
   | ITinterface			-- interface keywords
   | IT__export
@@ -280,6 +282,8 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "label",	ITlabel ),
 	( "dynamic",	ITdynamic ),
 	( "unsafe",	ITunsafe ),
+	( "stdcall",    ITstdcallconv),
+	( "ccall",      ITccallconv),
         ("_ccall_",	ITccall (False, False, False)),
         ("_ccall_GC_",	ITccall (False, False, True)),
         ("_casm_",	ITccall (False, True,  False)),

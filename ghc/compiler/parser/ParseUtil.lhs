@@ -13,9 +13,10 @@ module ParseUtil (
 
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
 	, groupBindings
+	
+	, mkExtName             -- Maybe ExtName -> RdrName -> ExtName
 
 	, checkPrec 		-- String -> P String
-	, checkCallConv		-- FAST_STRING -> P CallConv
 	, checkContext		-- HsType -> P HsContext
 	, checkInstType		-- HsType -> P HsType
 	, checkAssertion	-- HsType -> P HsAsst
@@ -35,10 +36,11 @@ module ParseUtil (
 	-- pseudo-keywords, in var and tyvar forms (all :: RdrName)
 	, as_var_RDR, hiding_var_RDR, qualified_var_RDR, forall_var_RDR
 	, export_var_RDR, label_var_RDR, dynamic_var_RDR, unsafe_var_RDR
+	, stdcall_var_RDR, ccall_var_RDR
 
 	, as_tyvar_RDR, hiding_tyvar_RDR, qualified_tyvar_RDR
 	, export_tyvar_RDR, label_tyvar_RDR, dynamic_tyvar_RDR
-	, unsafe_tyvar_RDR
+	, unsafe_tyvar_RDR, stdcall_tyvar_RDR, ccall_tyvar_RDR
 
 	, minus_RDR, pling_RDR, dot_RDR
 
@@ -53,7 +55,7 @@ import RdrHsSyn
 import RdrName
 import CallConv
 import PrelMods 	( pRELUDE_Name, mkUbxTupNameStr, mkTupNameStr )
-import OccName  	( dataName, tcName, varName, tvName, setOccNameSpace )
+import OccName  	( dataName, tcName, varName, tvName, setOccNameSpace, occNameFS )
 import CmdLineOpts 	( opt_NoImplicitPrelude )
 import StringBuffer 	( lexemeToString )
 import FastString	( unpackFS )
@@ -354,6 +356,14 @@ mkRecConstrOrUpdate exp fs@(_:_)
 mkRecConstrOrUpdate _ _
   = parseError "Empty record update"
 
+-- supplying the ext_name in a foreign decl is optional ; if it
+-- isn't there, the Haskell name is assumed. Note that no transformation
+-- of the Haskell name is then performed, so if you foreign export (++),
+-- it's external name will be "++". Too bad.
+mkExtName :: Maybe ExtName -> RdrName -> ExtName
+mkExtName Nothing rdrNm = ExtName (occNameFS (rdrNameOcc rdrNm)) Nothing
+mkExtName (Just x) _    = x
+
 -----------------------------------------------------------------------------
 -- group function bindings into equation groups
 
@@ -436,6 +446,8 @@ exportName	    = SLIT("export")
 labelName	    = SLIT("label")
 dynamicName	    = SLIT("dynamic")
 unsafeName          = SLIT("unsafe")
+stdcallName         = SLIT("stdcall")
+ccallName           = SLIT("ccall")
 
 as_var_RDR          = mkSrcUnqual varName asName
 hiding_var_RDR      = mkSrcUnqual varName hidingName
@@ -445,6 +457,8 @@ export_var_RDR      = mkSrcUnqual varName exportName
 label_var_RDR       = mkSrcUnqual varName labelName
 dynamic_var_RDR     = mkSrcUnqual varName dynamicName
 unsafe_var_RDR      = mkSrcUnqual varName unsafeName
+stdcall_var_RDR     = mkSrcUnqual varName stdcallName
+ccall_var_RDR       = mkSrcUnqual varName ccallName
 
 as_tyvar_RDR        = mkSrcUnqual tvName asName
 hiding_tyvar_RDR    = mkSrcUnqual tvName hidingName
@@ -453,6 +467,8 @@ export_tyvar_RDR    = mkSrcUnqual tvName exportName
 label_tyvar_RDR     = mkSrcUnqual tvName labelName
 dynamic_tyvar_RDR   = mkSrcUnqual tvName dynamicName
 unsafe_tyvar_RDR    = mkSrcUnqual tvName unsafeName
+stdcall_tyvar_RDR   = mkSrcUnqual tvName stdcallName
+ccall_tyvar_RDR     = mkSrcUnqual tvName ccallName
 
 minus_RDR           = mkSrcUnqual varName SLIT("-")
 pling_RDR	    = mkSrcUnqual varName SLIT("!")
