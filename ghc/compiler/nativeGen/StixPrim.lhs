@@ -380,10 +380,18 @@ amodeToStix (CMacroExpr _ macro [arg])
   = case macro of
       ENTRY_CODE -> amodeToStix arg
       ARG_TAG    -> amodeToStix arg -- just an integer no. of words
-      GET_TAG    -> StPrim SrlOp 
-			[StInd WordRep (StPrim IntSubOp [amodeToStix arg,
-							 StInt 1]),
+      GET_TAG    -> 
+#ifdef WORDS_BIGENDIAN
+                    StPrim AndOp 
+			[StInd WordRep (StIndex PtrRep (amodeToStix arg)
+                                                (StInt (toInteger (-1)))),
+			 StInt 65535]
+#else
+                    StPrim SrlOp 
+			[StInd WordRep (StIndex PtrRep (amodeToStix arg)
+                                                (StInt (toInteger (-1)))),
 			 StInt 16]
+#endif
       UPD_FRAME_UPDATEE
          -> StInd PtrRep (StIndex PtrRep (amodeToStix arg) 
                                          (StInt (toInteger uF_UPDATEE)))
