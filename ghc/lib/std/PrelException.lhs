@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.7 1999/05/18 14:59:16 simonpj Exp $
+% $Id: PrelException.lhs,v 1.8 1999/07/14 08:33:38 simonmar Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -38,6 +38,7 @@ data Exception
   | AssertionFailed	String		-- Assertions
   | DynException	Dynamic		-- Dynamic exceptions
   | AsyncException	AsyncException	-- Externally generated errors
+  | NonTermination
 
 data ArithException
   = Overflow
@@ -82,6 +83,7 @@ instance Show Exception where
   showsPrec _ (AssertionFailed err)      = showString err
   showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (DynException _err)        = showString "unknown exception"
+  showsPrec _ (NonTermination)           = showString "<<loop>>"
 
 -- Primitives:
 
