@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.13 2000/12/11 14:42:21 sewardj Exp $
+-- $Id: DriverUtil.hs,v 1.14 2000/12/12 12:10:08 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -117,6 +117,9 @@ later = flip finally
 
 handleDyn :: Typeable ex => (ex -> IO a) -> IO a -> IO a
 handleDyn = flip catchDyn
+
+handle :: (Exception -> IO a) -> IO a -> IO a
+handle = flip Exception.catchAllIO
 
 split :: Char -> String -> [String]
 split c s = case rest of
