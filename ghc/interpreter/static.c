@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.40 $
- * $Date: 2000/04/07 10:00:28 $
+ * $Revision: 1.41 $
+ * $Date: 2000/05/17 22:05:44 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1515,9 +1515,6 @@ Cell  m; {
     thd3(m) = t;                                /* Save type               */
     take(cclass(c).arity,tyvars);               /* Delete extra type vars  */
 
-    if (isAmbiguous(t)) {
-        ambigError(line,"class declaration",hd(vs),t);
-    }
     h98CheckType(line,"member type",hd(vs),t);
 }
 
@@ -1527,6 +1524,10 @@ Cell  m; {
     Int  line = intOf(fst3(m));
     List vs   = snd3(m);
     Type t    = thd3(m);
+
+    if (isAmbiguous(t)) {
+        ambigError(line,"class declaration",hd(vs),t);
+    }
 }
 
 static Void local addMembers(c)         /* Add definitions of member funs  */
