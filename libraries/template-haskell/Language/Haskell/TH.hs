@@ -14,6 +14,7 @@ module Language.Haskell.TH(
 	mkName,  	-- :: String -> Name
 	newName, 	-- :: String -> Q Name
 	nameBase,	-- :: Name -> String
+	tupleTypeName, tupleDataName,	-- Int -> Name
 	
 	-- The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
@@ -28,18 +29,18 @@ module Language.Haskell.TH(
 	StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
 	intPrimL, floatPrimL, doublePrimL, integerL, charL, stringL, rationalL, 
 	litP, varP, tupP, conP, infixP, tildeP, asP, wildP, recP, listP, sigP,
-    fieldPat,
+	fieldPat,
 	bindS, letS, noBindS, parS, 
 	fromR, fromThenR, fromToR, fromThenToR, 
 	normalB, guardedB, normalG, normalGE, patG, patGE, match, clause, 
 	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
 	lamE, lam1E, tupE, condE, letE, caseE, doE, compE, arithSeqE, 
 	fromE, fromThenE, fromToE, fromThenToE,
-    listE, sigE, recConE, recUpdE, stringE, fieldExp,
+	listE, sigE, recConE, recUpdE, stringE, fieldExp,
 	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
 	cxt, normalC, recC, infixC,
-    forallT, varT, conT, appT, arrowT, listT, tupleT,
-    isStrict, notStrict, strictType, varStrictType,
+	forallT, varT, conT, appT, arrowT, listT, tupleT,
+	isStrict, notStrict, strictType, varStrictType,
 	cCall, stdCall, unsafe, safe, threadsafe,
 
 	-- Pretty-printer

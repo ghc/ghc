@@ -37,6 +37,7 @@ module Language.Haskell.TH.Syntax(
 	returnQ, bindQ, sequenceQ,
 	NameFlavour(..), NameSpace (..), 
 	mkNameG_v, mkNameG_d, mkNameG_tc, mkNameU,
+ 	tupleTypeName, tupleDataName,
 	OccName, mkOccName, occString,
 	ModName, mkModName, modString
     ) where
@@ -239,26 +240,25 @@ falseName = mkNameG DataName "GHC.Base" "False"
 -----------------------------------------------------
 
 type ModName = PackedString	-- Module name
+
 mkModName :: String -> ModName
 mkModName s = packString s
 
 modString :: ModName -> String
 modString m = unpackPS m
 
+
 -----------------------------------------------------
 --		OccName
 -----------------------------------------------------
 
--- An OccName (occurrence name) records which name space it is from
 type OccName = PackedString
-
 
 mkOccName :: String -> OccName
 mkOccName s = packString s
 
 occString :: OccName -> String
 occString occ = unpackPS occ
-
 
 
 -----------------------------------------------------
@@ -304,7 +304,7 @@ mkNameU :: String -> Uniq -> Name	-- Only used internally
 mkNameU s (I# u) = Name (mkOccName s) (NameU u)
 
 mkNameG :: NameSpace -> String -> String -> Name	-- Used for 'x etc, but not available
-mkNameG ns mod occ 				-- to the programmer
+mkNameG ns mod occ 					-- to the programmer
   = Name (mkOccName occ) (NameG ns (mkModName mod))
 
 mkNameG_v  = mkNameG VarName
@@ -339,6 +339,25 @@ instance Show Name where
   show (Name occ (NameU u))    = occString occ ++ "_" ++ show (I# u)
   show (Name occ NameS)        = occString occ
   show (Name occ (NameG ns m)) = modString m ++ "." ++ occString occ
+
+
+-- 	Tuple data and type constructors
+tupleDataName  :: Int -> Name	-- Data constructor
+tupleTypeName :: Int -> Name 	-- Type constructor
+
+tupleDataName 0 = mk_tup_name 0 DataName 
+tupleDataName 1 = error "tupleDataName 1"
+tupleDataName n = mk_tup_name (n-1) DataName 
+
+tupleTypeName 0 = mk_tup_name 0 TcClsName 
+tupleTypeName 1 = error "tupleTypeName 1"
+tupleTypeName n = mk_tup_name (n-1) TcClsName 
+
+mk_tup_name n_commas space
+  = Name occ (NameG space tup_mod)
+  where
+    occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
+    tup_mod = mkModName "GHC.Tuple"
 
 
 -----------------------------------------------------
