@@ -1,3 +1,7 @@
+* A module re-export should only reference the target module if the
+  target module is imported without hiding any of its exports (otherwise
+  we should inline just the exported bits).
+
 * Put SrcLocs in DocComments
 
 * facilities for saving interfaces so that you can run Haddock against
