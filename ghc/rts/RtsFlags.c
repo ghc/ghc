@@ -2188,20 +2188,25 @@ bad_option(const char *s)
 void
 setProgName(char *argv[])
 {
-    char *last_slash;
-
     /* Remove directory from argv[0] -- default files in current directory */
-    if ((last_slash = (char *) strrchr(argv[0], 
 #if !defined(mingw32_HOST_OS)
-				       '/'
-#else
-				       '\\'
-#endif
-				       )) != NULL) {
+    char *last_slash;
+    if ( (last_slash = (char *) strrchr(argv[0], '/')) != NULL ) {
 	prog_name = last_slash+1;
    } else {
 	prog_name = argv[0];
    }
+#else
+    char* last_slash = argv[0] + (strlen(argv[0]) - 1);
+    while ( last_slash > argv[0] ) {
+	if ( *last_slash == '/' || *last_slash == '\\' ) {
+	    prog_name = last_slash+1;
+	    return;
+	}
+	last_slash--;
+    }
+    prog_name = argv[0];
+#endif
 }
 
 void
