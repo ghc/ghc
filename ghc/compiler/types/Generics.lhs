@@ -254,8 +254,12 @@ mkTyConGenInfo tycon [from_name, to_name]
        | dc <- datacons ]
   = Nothing
 
+  | null datacons	-- There are no constructors; 
+  = Nothing		-- there are no values of this type
+
   | otherwise
-  = Just (EP { fromEP = mkVanillaGlobal from_name from_ty from_id_info,
+  = ASSERT( not (null datacons) )	-- mk_sum_stuff loops if no datacons
+    Just (EP { fromEP = mkVanillaGlobal from_name from_ty from_id_info,
 	       toEP   = mkVanillaGlobal to_name   to_ty   to_id_info })
   where
     maybe_datacons = tyConDataCons_maybe tycon
