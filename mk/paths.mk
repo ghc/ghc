@@ -85,8 +85,19 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #   OBJS - object files (possibly prefixed).
 #
 #   PROG - name of final executable
-#
-#
+
+# We attempt to automatically devine the list of sources $(SRCS) to
+# compile by looking in the current directory.  This is complicated by
+# the fact that a .hsc file gives rise to a .hs file (which needs to
+# be automatically included in $(SRCS)), but the .hs file might
+# already be present in the current directory and we don't want to
+# compile it twice.
+
+# So we figure out the sources in three stages: first figure out
+# what's in the current directory.  Then figure out all the "derived"
+# sources (eg. A.hsc generates A.hs and A_hsc.c), and finally put all
+# these together and remove duplicates (GNU make's handy sort function
+# does the duplicate removing).
 #
 # BOOT_SRCS: list of machine generated Haskell modules.
 # HS_SRCS:   list of Haskell modules you want to compile.
@@ -97,13 +108,14 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #             (caveat: assuming no funny use of -hisuf and that
 #               file name and module name match)
 
-SRCS     = $(sort $(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb) \
-                  $(HSC_HS_SRCS) $(HSC_C_SRCS) )
+PRE_SRCS    = $(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb *.hsc)
 
-HSC_SRCS    = $(wildcard *.hsc)
+HSC_SRCS    = $(filter %.hsc, $(PRE_SRCS))
 HSC_HS_SRCS = $(patsubst %.hsc,%.hs,$(HSC_SRCS))
 HSC_C_SRCS  = $(patsubst %.hsc,%_hsc.c,$(HSC_SRCS))
 HSC_C_OBJS  = $(patsubst %.hsc,%_hsc.o,$(HSC_SRCS))
+
+SRCS        = $(sort $(PRE_SRCS) $(HSC_HS_SRCS) $(HSC_C_SRCS))
 
 HS_SRCS	    = $(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS     = $(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
