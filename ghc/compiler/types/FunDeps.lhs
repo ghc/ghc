@@ -12,14 +12,15 @@ module FunDeps (
 
 #include "HsVersions.h"
 
-import Var		( TyVar )
+import Name		( getSrcLoc )
+import Var		( Id, TyVar )
 import Class		( Class, FunDep, classTvsFds )
-import Type		( Type, ThetaType, PredType(..), predTyUnique, tyVarsOfTypes, tyVarsOfPred )
+import Type		( Type, ThetaType, PredType(..), predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
 import Unify		( unifyTyListsX, unifyExtendTysX )
-import Outputable	( Outputable, SDoc, interppSP, ptext, empty, hsep, punctuate, comma )
 import VarSet
 import VarEnv
+import Outputable
 import List		( tails )
 import Maybes		( maybeToBool )
 import ListSetOps	( equivClassesByUniq )
@@ -143,7 +144,7 @@ grow preds fixed_tvs
 
 \begin{code}
 ----------
-type Equation = (TyVarSet, Type,Type)	-- These two types should be equal, for some
+type Equation = (TyVarSet, Type, Type)	-- These two types should be equal, for some
 					-- substitution of the tyvars in the tyvar set
 	-- For example, ({a,b}, (a,Int,b), (Int,z,Bool))
 	-- We unify z with Int, but since a and b are quantified we do nothing to them
@@ -151,14 +152,16 @@ type Equation = (TyVarSet, Type,Type)	-- These two types should be equal, for so
 	-- to fresh type variables, and then calling the standard unifier.
 	-- 
 	-- INVARIANT: they aren't already equal
+	--
 
 
 
 ----------
-improve :: InstEnv a		-- Gives instances for given class
-	-> [PredType]		-- Current constraints
-	-> [Equation]		-- Derived equalities that must also hold
+improve :: InstEnv Id		-- Gives instances for given class
+	-> [(PredType,SDoc)]	-- Current constraints; doc says where they come from
+	-> [(Equation,SDoc)]	-- Derived equalities that must also hold
 				-- (NB the above INVARIANT for type Equation)
+				-- The SDoc explains why the equation holds (for error messages)
 
 type InstEnv a = Class -> [(TyVarSet, [Type], a)]
 -- This is a bit clumsy, because InstEnv is really
@@ -199,18 +202,18 @@ NOTA BENE:
 
 \begin{code}
 improve inst_env preds
-  = [ eqn | group <- equivClassesByUniq predTyUnique preds,
+  = [ eqn | group <- equivClassesByUniq (predTyUnique . fst) preds,
 	    eqn   <- checkGroup inst_env group ]
 
 ----------
-checkGroup :: InstEnv a -> [PredType] -> [Equation]
+checkGroup :: InstEnv Id -> [(PredType,SDoc)] -> [(Equation, SDoc)]
   -- The preds are all for the same class or implicit param
 
-checkGroup inst_env (IParam _ ty : ips)
+checkGroup inst_env (p1@(IParam _ ty, _) : ips)
   = 	-- For implicit parameters, all the types must match
-    [(emptyVarSet, ty, ty') | IParam _ ty' <- ips, ty /= ty']
+    [((emptyVarSet, ty, ty'), mkEqnMsg p1 p2) | p2@(IParam _ ty', _) <- ips, ty /= ty']
 
-checkGroup inst_env clss@(ClassP cls tys : _)
+checkGroup inst_env clss@((ClassP cls _, _) : _)
   = 	-- For classes life is more complicated  
    	-- Suppose the class is like
 	--	classs C as | (l1 -> r1), (l2 -> r2), ... where ...
@@ -232,23 +235,31 @@ checkGroup inst_env clss@(ClassP cls tys : _)
 
 	-- NOTE that we iterate over the fds first; they are typically
 	-- empty, which aborts the rest of the loop.
-    pairwise_eqns :: [Equation]
+    pairwise_eqns :: [(Equation,SDoc)]
     pairwise_eqns	-- This group comes from pairwise comparison
-      = [ eqn | fd <- cls_fds,
-	      	ClassP _ tys1 : rest <- tails clss,
-	      	ClassP _ tys2	<- rest,
-	      	eqn <- checkClsFD emptyVarSet fd cls_tvs tys1 tys2
+      = [ (eqn, mkEqnMsg p1 p2)
+	| fd <- cls_fds,
+	  p1@(ClassP _ tys1, _) : rest <- tails clss,
+	  p2@(ClassP _ tys2, _)	<- rest,
+	  eqn <- checkClsFD emptyVarSet fd cls_tvs tys1 tys2
 	]
 
-    instance_eqns :: [Equation]
+    instance_eqns :: [(Equation,SDoc)]
     instance_eqns	-- This group comes from comparing with instance decls
-      = [ eqn | fd <- cls_fds,
-	    	(qtvs, tys1, _) <- cls_inst_env,
-	    	ClassP _ tys2    <- clss,
-	    	eqn <- checkClsFD qtvs fd cls_tvs tys1 tys2
+      = [ (eqn, mkEqnMsg p1 p2)
+	| fd <- cls_fds,
+	  (qtvs, tys1, dfun_id)  <- cls_inst_env,
+	  let p1 = (mkClassPred cls tys1, 
+		    ptext SLIT("arising from the instance declaration at") <+> ppr (getSrcLoc dfun_id)),
+	  p2@(ClassP _ tys2, _) <- clss,
+	  eqn <- checkClsFD qtvs fd cls_tvs tys1 tys2
 	]
 
-
+mkEqnMsg (pred1,from1) (pred2,from2)
+  = vcat [ptext SLIT("When using functional dependencies to combine"),
+	  nest 2 (sep [ppr pred1 <> comma, nest 2 from1]), 
+	  nest 2 (sep [ppr pred2 <> comma, nest 2 from2])]
+ 
 ----------
 checkClsFD :: TyVarSet 			-- The quantified type variables, which
 					-- can be instantiated to make the types match

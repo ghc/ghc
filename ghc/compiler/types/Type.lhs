@@ -51,7 +51,7 @@ module Type (
 
 	-- Predicates and the like
 	PredType(..), getClassPredTys_maybe, getClassPredTys, 
-	isPredTy, isClassPred, isTyVarClassPred,
+	isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
 	mkDictTy, mkPredTy, mkPredTys, splitPredTy_maybe, predTyUnique,
 	splitDictTy, splitDictTy_maybe, isDictTy, predRepTy, splitDFunTy,
 	mkClassPred, predMentionsIPs, inheritablePred, isIPPred, mkPredName,
@@ -102,7 +102,7 @@ import VarSet
 import OccName	( mkDictOcc )
 import Name	( Name, NamedThing(..), OccName, mkLocalName, tidyOccName )
 import NameSet
-import Class	( classTyCon, Class )
+import Class	( classTyCon, classHasFDs, Class )
 import TyCon	( TyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isDataTyCon, isNewTyCon, newTyConRep,
@@ -713,6 +713,12 @@ inheritablePred other	     = False
 predMentionsIPs :: PredType -> NameSet -> Bool
 predMentionsIPs (IParam n _) ns = n `elemNameSet` ns
 predMentionsIPs other	     ns = False
+
+predHasFDs :: PredType -> Bool
+-- True if the predicate has functional depenencies; 
+-- I.e. should participate in improvement
+predHasFDs (IParam _ _)   = True
+predHasFDs (ClassP cls _) = classHasFDs cls
 
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = UASSERT2( not (any isUTy tys), ppr clas <+> fsep (map pprType tys) )

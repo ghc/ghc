@@ -229,6 +229,8 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
     in
 
 	-- GENERALISE
+    tcAddSrcLoc  (minimum (map getSrcLoc binder_names))		$
+    tcAddErrCtxt (genCtxt binder_names)				$
     generalise binder_names mbind tau_tvs lie_req tc_ty_sigs
 				`thenTc` \ (tc_tyvars_to_gen, lie_free, dict_binds, dict_ids) ->
 
@@ -482,8 +484,9 @@ generalise binder_names mbind tau_tvs lie_req sigs
 	-- We unify them because, with polymorphic recursion, their types
 	-- might not otherwise be related.  This is a rather subtle issue.
 	-- ToDo: amplify
-checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ _ : other_sigs)
-  = mapTc_ check_one other_sigs		`thenTc_` 
+checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ src_loc : other_sigs)
+  = tcAddSrcLoc src_loc			$
+    mapTc_ check_one other_sigs		`thenTc_` 
     if null theta1 then
 	returnTc ([], [])		-- Non-overloaded type signatures
     else
@@ -501,8 +504,7 @@ checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ _ : other_sigs)
     sig_meths 	  = concat [insts | TySigInfo _ _ _ _ _ _ insts _ <- sigs]
 
     check_one sig@(TySigInfo _ id _ theta _ _ _ src_loc)
-       = tcAddSrcLoc src_loc					$
-	 tcAddErrCtxt (sigContextsCtxt id1 id)			$
+       = tcAddErrCtxt (sigContextsCtxt id1 id)			$
 	 checkTc (length theta == n_sig1_theta) sigContextsErr	`thenTc_`
 	 unifyTauTyLists sig1_dict_tys (map mkPredTy theta)
 
@@ -823,6 +825,9 @@ restrictedBindCtxtErr binder_names
   = hang (ptext SLIT("Illegal overloaded type signature(s)"))
        4 (vcat [ptext SLIT("in a binding group for") <+> pprBinders binder_names,
 		ptext SLIT("that falls under the monomorphism restriction")])
+
+genCtxt binder_names
+  = ptext SLIT("When generalising the type(s) for") <+> pprBinders binder_names
 
 -- Used in error messages
 pprBinders bndrs = pprWithCommas ppr bndrs

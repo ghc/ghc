@@ -51,7 +51,7 @@ import Type		( Type, ThetaType, PredType, mkClassPred,
 			  mkTyVarTy, getTyVar, isTyVarClassPred,
 			  splitSigmaTy, tyVarsOfPred,
 			  getClassPredTys_maybe, isClassPred, isIPPred,
-			  inheritablePred
+			  inheritablePred, predHasFDs
 			)
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import TysWiredIn	( unitTy )
@@ -968,7 +968,12 @@ reduceContext doc try_me givens wanteds
 tcImprove avails
  =  tcGetInstEnv 				`thenTc` \ inst_env ->
     let
-	preds = predsOfInsts (keysFM avails)
+	preds = [ (pred, pp_loc)
+		| inst <- keysFM avails,
+		  let pp_loc = pprInstLoc (instLoc inst),
+		  pred <- predsOfInst inst,
+		  predHasFDs pred
+		]
 		-- Avails has all the superclasses etc (good)
 		-- It also has all the intermediates of the deduction (good)
 		-- It does not have duplicates (good)
@@ -983,10 +988,14 @@ tcImprove avails
         mapTc_ unify eqns	`thenTc_`
 	returnTc False
   where
-    unify (qtvs, t1, t2) = tcInstTyVars (varSetElems qtvs)	`thenNF_Tc` \ (_, _, tenv) ->
-			   unifyTauTy (substTy tenv t1) (substTy tenv t2)
-    ppr_eqn (qtvs, t1, t2) = ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)) <+>
-			     ppr t1 <+> equals <+> ppr t2
+    unify ((qtvs, t1, t2), doc)
+	 = tcAddErrCtxt doc			$
+	   tcInstTyVars (varSetElems qtvs)	`thenNF_Tc` \ (_, _, tenv) ->
+	   unifyTauTy (substTy tenv t1) (substTy tenv t2)
+    ppr_eqn ((qtvs, t1, t2), doc)
+	= vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs))
+				     <+> ppr t1 <+> equals <+> ppr t2,
+		doc]
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.
