@@ -25,3 +25,7 @@ project-specific bits, try <project>/utils/<blah>.)
 
  docbook	scripts to process DocBook files stolen from Cygnus DocBook
  		tools.
+
+ genargs	converts whitespace separated strings into partial
+		Haskell lists.
+
