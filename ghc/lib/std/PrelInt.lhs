@@ -208,7 +208,6 @@ instance Num Int8 where
   signum        = signumReal
   fromInteger (S# i#)    = I8# (intToInt8# i#)
   fromInteger (J# s# d#) = I8# (intToInt8# (integer2Int# s# d#))
-  fromInt       = intToInt8
 
 instance Bounded Int8 where
     minBound = 0x80
@@ -353,7 +352,6 @@ instance Num Int16 where
   signum        = signumReal
   fromInteger (S# i#)    = I16# (intToInt16# i#)
   fromInteger (J# s# d#) = I16# (intToInt16# (integer2Int# s# d#))
-  fromInt       = intToInt16
 
 instance Bounded Int16 where
     minBound = 0x8000
@@ -501,12 +499,14 @@ instance Num Int32 where
   signum        = signumReal
   fromInteger (S# i#)    = I32# (intToInt32# i#)
   fromInteger (J# s# d#) = I32# (intToInt32# (integer2Int# s# d#))
-  fromInt       = intToInt32
 
 
 instance Bounded Int32 where 
-    minBound = fromInt minBound
-    maxBound = fromInt maxBound
+    minBound = int2Int32 minBound
+    maxBound = int2Int32 maxBound
+
+int2Int32 :: Int -> Int32
+int2Int32 (I# i#) = I32# (intToInt32# i#)
 
 instance Real Int32 where
     toRational x = toInteger x % 1
@@ -637,7 +637,6 @@ instance Num Int64 where
   signum              = signumReal
   fromInteger (S# i#)    = I64# i#
   fromInteger (J# s# d#) = I64# (integer2Int# s# d#)
-  fromInt       = intToInt64
 
 instance Bounded Int64 where
   minBound = integerToInt64 (-0x8000000000000000)
@@ -712,7 +711,6 @@ instance Num Int64 where
   abs x               = absReal x
   signum              = signumReal
   fromInteger i       = integerToInt64 i
-  fromInt     i       = intToInt64 i
 
 compareInt64# :: Int64# -> Int64# -> Ordering
 compareInt64# i# j# 

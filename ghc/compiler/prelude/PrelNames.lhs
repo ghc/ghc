@@ -109,7 +109,6 @@ knownKeyNames
 	cReturnableClassName,		-- mentioned, ccallish
 
 	-- ClassOps 
-	fromIntName,
 	fromIntegerName,
 	negateName,
 	geName,
@@ -376,7 +375,6 @@ readClassName	  = clsQual pREL_READ_Name SLIT("Read") readClassKey
 
 -- Module PrelNum
 numClassName	  = clsQual pREL_NUM_Name SLIT("Num") numClassKey
-fromIntName	  = varQual pREL_NUM_Name SLIT("fromInt") fromIntClassOpKey
 fromIntegerName   = varQual pREL_NUM_Name SLIT("fromInteger") fromIntegerClassOpKey
 minusName	  = varQual pREL_NUM_Name SLIT("-") minusClassOpKey
 negateName	  = varQual pREL_NUM_Name SLIT("negate") negateClassOpKey
@@ -808,7 +806,6 @@ uniques so we can look them up easily when we want to conjure them up
 during type checking.
 
 \begin{code}
-fromIntClassOpKey	      = mkPreludeMiscIdUnique 101
 fromIntegerClassOpKey	      = mkPreludeMiscIdUnique 102
 minusClassOpKey		      = mkPreludeMiscIdUnique 103
 fromRationalClassOpKey	      = mkPreludeMiscIdUnique 104
@@ -882,10 +879,10 @@ cCallishTyKeys =
 %*									*
 %************************************************************************
 
-Haskell 98 says that when you say "3" you get the "fromInt" from the
+Haskell 98 says that when you say "3" you get the "fromInteger" from the
 Standard Prelude, regardless of what is in scope.   However, to experiment
 with having a language that is less coupled to the standard prelude, we're
-trying a non-standard extension that instead gives you whatever "Prelude.fromInt"
+trying a non-standard extension that instead gives you whatever "Prelude.fromInteger"
 happens to be in scope.  Then you can
 	import Prelude ()
 	import MyPrelude as Prelude
@@ -902,8 +899,7 @@ type SyntaxList = [(Name, RdrName)]
   -- to a RdrName for the re-mapped version of the built-in thing
 
 syntaxList :: SyntaxList
-syntaxList =[ (fromIntName,		mkUnqual varName SLIT("fromInt"))
-	     , (fromIntegerName,	mkUnqual varName SLIT("fromInteger"))
+syntaxList =[	(fromIntegerName,	mkUnqual varName SLIT("fromInteger"))
 	     ,	(fromRationalName,	mkUnqual varName SLIT("fromRational"))
 	     ,	(negateName,		mkUnqual varName SLIT("negate"))
 	     ,	(minusName,		mkUnqual varName SLIT("-"))
@@ -912,8 +908,8 @@ syntaxList =[ (fromIntName,		mkUnqual varName SLIT("fromInt"))
 
 
 type SyntaxMap = Name -> Name
-  -- Maps a standard built-in name, such as PrelNum.fromInt
-  -- to its re-mapped version, such as MyPrelude.fromInt
+  -- Maps a standard built-in name, such as PrelNum.fromInteger
+  -- to its re-mapped version, such as MyPrelude.fromInteger
 
 vanillaSyntaxMap name = name
 \end{code}

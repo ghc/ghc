@@ -232,6 +232,7 @@ tcModule pcs hst get_fixity this_mod decls check_main
 	
 	-- Value declarations next.
 	-- We also typecheck any extra binds that came out of the "deriving" process
+	traceTc (text "Default types" <+> ppr defaulting_tys)	`thenNF_Tc_`
         traceTc (text "Tc5")				`thenNF_Tc_`
 	tcTopBinds (val_binds `ThenBinds` deriv_binds)	`thenTc` \ ((val_binds, env), lie_valdecls) ->
 	

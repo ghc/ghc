@@ -71,7 +71,7 @@ import TysWiredIn ( isIntTy,
 		    doubleDataCon, isDoubleTy,
 		    isIntegerTy
 		  ) 
-import PrelNames( fromIntName, fromIntegerName, fromRationalName )
+import PrelNames( fromIntegerName, fromRationalName )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Bag
 import Outputable
@@ -625,12 +625,6 @@ lookupInst inst@(LitInst u (HsIntegral i) ty loc)
 
   | isIntegerTy ty				-- Short cut for Integer
   = returnNF_Tc (GenInst [] integer_lit)
-
-  | in_int_range 				-- It's overloaded but small enough to fit into an Int
-  =	-- So we can use the Prelude fromInt 
-    tcLookupSyntaxId fromIntName		`thenNF_Tc` \ from_int ->
-    newMethodAtLoc loc from_int [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) int_lit))
 
   | otherwise   				-- Alas, it is overloaded and a big literal!
   = tcLookupSyntaxId fromIntegerName		`thenNF_Tc` \ from_integer ->

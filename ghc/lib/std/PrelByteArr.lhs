@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelByteArr.lhs,v 1.11 2001/02/20 18:40:54 qrczak Exp $
+% $Id: PrelByteArr.lhs,v 1.12 2001/02/22 13:17:58 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -14,6 +14,7 @@ Byte-arrays are flat arrays of non-pointers only.
 module PrelByteArr where
 
 import {-# SOURCE #-} PrelErr ( error )
+import PrelNum
 import PrelArr
 import PrelFloat
 import PrelST

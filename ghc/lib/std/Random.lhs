@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Random.lhs,v 1.21 2000/06/30 13:39:36 simonmar Exp $
+% $Id: Random.lhs,v 1.22 2001/02/22 13:17:59 simonpj Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -33,7 +33,6 @@ module Random
 
 #ifndef __HUGS__
 import PrelGHC		( RealWorld )
-import PrelNum		( fromInt )
 import PrelShow		( showSignedInt, showSpace )
 import PrelRead		( readDec )
 import PrelIOBase	( unsafePerformIO, stToIO )
@@ -219,7 +218,7 @@ randomIvalInteger (l,h) rng
           let
 	   (x,g')   = next g
 	  in
-	  f (n-1) (fromInt x + acc * b) g'
+	  f (n-1) (fromIntegral x + acc * b) g'
 
 randomIvalDouble :: (RandomGen g, Fractional a) => (Double, Double) -> (Double -> a) -> g -> (a, g)
 randomIvalDouble (l,h) fromDouble rng 

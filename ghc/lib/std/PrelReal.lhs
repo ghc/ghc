@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.7 2000/12/16 17:46:57 qrczak Exp $
+% $Id: PrelReal.lhs,v 1.8 2001/02/22 13:17:59 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -254,7 +254,7 @@ instance  (Integral a)	=> Enum (Ratio a)  where
     succ x	        =  x + 1
     pred x	        =  x - 1
 
-    toEnum n            =  fromInt n :% 1
+    toEnum n            =  fromInteger (int2Integer n) :% 1
     fromEnum            =  fromInteger . truncate
 
     enumFrom		=  numericEnumFrom

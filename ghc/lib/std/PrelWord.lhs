@@ -249,7 +249,6 @@ instance Num Word8 where
   signum        = signumReal
   fromInteger (S# i#)    = W8# (wordToWord8# (int2Word# i#))
   fromInteger (J# s# d#) = W8# (wordToWord8# (integer2Word# s# d#))
-  fromInt       = intToWord8
 
 instance Bounded Word8 where
   minBound = 0
@@ -414,7 +413,6 @@ instance Num Word16 where
   signum        = signumReal
   fromInteger (S# i#)    = W16# (wordToWord16# (int2Word# i#))
   fromInteger (J# s# d#) = W16# (wordToWord16# (integer2Word# s# d#))
-  fromInt       = intToWord16
 
 instance Bounded Word16 where
   minBound = 0
@@ -558,7 +556,6 @@ instance Num Word32 where
   signum          = signumReal
   fromInteger (S# i#)    = W32# (intToWord32# i#)
   fromInteger (J# s# d#) = W32# (wordToWord32# (integer2Word# s# d#))
-  fromInt (I# x)  = W32# (intToWord32# x)
     -- ToDo: restrict fromInt{eger} range.
 
 intToWord32#  :: Int#  -> Word#
@@ -775,7 +772,6 @@ instance Num Word64 where
   signum        = signumReal
   fromInteger (S# i#)    = W64# (int2Word# i#)
   fromInteger (J# s# d#) = W64# (integer2Word# s# d#)
-  fromInt       = intToWord64
 
 -- Note: no need to mask results here 
 -- as they cannot overflow.
@@ -860,7 +856,6 @@ instance Num Word64 where
   abs x         = x
   signum        = signumReal
   fromInteger i = integerToWord64 i
-  fromInt       = intToWord64
 
 -- Note: no need to mask results here  as they cannot overflow.
 -- ToDo: protect against div by zero.

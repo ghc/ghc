@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.34 2000/09/26 16:45:34 simonpj Exp $
+% $Id: PrelNum.lhs,v 1.35 2001/02/22 13:17:59 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -45,13 +45,13 @@ class  (Eq a, Show a) => Num a  where
     negate		:: a -> a
     abs, signum		:: a -> a
     fromInteger		:: Integer -> a
-    fromInt		:: Int -> a -- partain: Glasgow extension
 
     x - y		= x + negate y
     negate x		= 0 - x
-    fromInt (I# i#)	= fromInteger (S# i#)
-					-- Go via the standard class-op if the
-					-- non-standard one ain't provided
+
+fromInt :: Num a => Int -> a
+-- For backward compatibility
+fromInt (I# i#) = fromInteger (S# i#)
 \end{code}
 
 A few small numeric functions
@@ -85,7 +85,6 @@ instance  Num Int  where
 	     | otherwise   = 1
 
     fromInteger n = integer2Int n
-    fromInt n	  = n
 \end{code}
 
 
@@ -320,7 +319,6 @@ instance  Num Integer  where
     (*) = timesInteger
     negate	   = negateInteger
     fromInteger	x  =  x
-    fromInt (I# i) =  S# i
 
     -- ORIG: abs n = if n >= 0 then n else -n
     abs (S# (-2147483648#)) = 2147483648

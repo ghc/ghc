@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelFloat.lhs,v 1.9 2000/08/29 16:37:35 simonpj Exp $
+% $Id: PrelFloat.lhs,v 1.10 2001/02/22 13:17:58 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -151,9 +151,6 @@ instance  Num Float  where
 	-- fromInteger in turn inlines,
 	-- so that if fromInteger is applied to an (S# i) the right thing happens
 
-    {-# INLINE fromInt #-}
-    fromInt i		=  int2Float i
-
 instance  Real Float  where
     toRational x	=  (m%1)*(b%1)^^n
 			   where (m,n) = decodeFloat x
@@ -293,8 +290,9 @@ instance  Num Double  where
 
     {-# INLINE fromInteger #-}
 	-- See comments with Num Float
-    fromInteger n	=  encodeFloat n 0
-    fromInt (I# n#)	=  case (int2Double# n#) of { d# -> D# d# }
+    fromInteger (S# i#)    = case (int2Double# i#) of { d# -> D# d# }
+    fromInteger (J# s# d#) = encodeDouble# s# d# 0
+
 
 instance  Real Double  where
     toRational x	=  (m%1)*(b%1)^^n
@@ -426,17 +424,17 @@ for these (@numericEnumFromTo@ and @numericEnumFromThenTo@ below.)
 instance  Enum Float  where
     succ x	   = x + 1
     pred x	   = x - 1
-    toEnum         =  fromInt
-    fromEnum       =  fromInteger . truncate   -- may overflow
-    enumFrom	   =  numericEnumFrom
-    enumFromTo     =  numericEnumFromTo
-    enumFromThen   =  numericEnumFromThen
-    enumFromThenTo =  numericEnumFromThenTo
+    toEnum         = int2Float
+    fromEnum       = fromInteger . truncate   -- may overflow
+    enumFrom	   = numericEnumFrom
+    enumFromTo     = numericEnumFromTo
+    enumFromThen   = numericEnumFromThen
+    enumFromThenTo = numericEnumFromThenTo
 
 instance  Enum Double  where
     succ x	   = x + 1
     pred x	   = x - 1
-    toEnum         =  fromInt
+    toEnum         =  int2Double
     fromEnum       =  fromInteger . truncate   -- may overflow
     enumFrom	   =  numericEnumFrom
     enumFromTo     =  numericEnumFromTo
@@ -583,7 +581,7 @@ floatToDigits base x =
 	(p - 1 + e0) * 3 `div` 10
      else
         ceiling ((log (fromInteger (f+1)) +
-	         fromInt e * log (fromInteger b)) /
+	         fromInteger (int2Integer e) * log (fromInteger b)) /
 		   log (fromInteger base))
 --WAS:		  fromInt e * log (fromInteger b))
 

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Numeric.lhs,v 1.10 2000/12/16 17:46:57 qrczak Exp $
+% $Id: Numeric.lhs,v 1.11 2001/02/22 13:17:58 simonpj Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -307,7 +307,7 @@ floatToDigits base x =
                         (p - 1 + e0) * 3 `div` 10
                     else
                         ceiling ((log (fromInteger (f+1)) + 
-                                 fromInt e * log (fromInteger b)) / 
+                                 fromIntegral e * log (fromInteger b)) / 
                                   log (fromInteger base))
                 fixup n =
                     if n >= 0 then

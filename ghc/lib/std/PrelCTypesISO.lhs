@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCTypesISO.lhs,v 1.3 2001/01/12 17:38:27 simonmar Exp $
+% $Id: PrelCTypesISO.lhs,v 1.4 2001/02/22 13:17:58 simonpj Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -27,7 +27,6 @@ module PrelCTypesISO
 import PrelBase	( unsafeCoerce# )
 import PrelReal	( Integral(toInt) )
 import PrelBits	( Bits(..) )
-import PrelNum	( Num(fromInt) )
 import PrelInt	( Int8,  Int16,  Int32,  Int64  )
 import PrelWord	( Word8, Word16, Word32, Word64 )
 \end{code}

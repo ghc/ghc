@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: CPUTime.lhs,v 1.27 2001/01/11 17:25:57 simonmar Exp $
+% $Id: CPUTime.lhs,v 1.28 2001/02/22 13:17:58 simonpj Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -60,7 +60,7 @@ getCPUTime = do
 
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % 
-                          fromInt (unsafePerformIO clockTicks))
+                          fromIntegral (unsafePerformIO clockTicks))
 
 foreign import "libHS_cbits" "getCPUTime" unsafe primGetCPUTime :: ByteArray Int -> IO Int
 foreign import "libHS_cbits" "clockTicks" unsafe clockTicks :: IO Int

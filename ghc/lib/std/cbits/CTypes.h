@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.2 2001/02/05 11:49:20 chak Exp $
+ * $Id: CTypes.h,v 1.3 2001/02/22 13:17:59 simonpj Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -230,8 +230,7 @@ instance Num T where { \
    negate		= unsafeCoerce# (negate :: B -> B); \
    abs			= unsafeCoerce# (abs :: B -> B); \
    signum		= unsafeCoerce# (signum :: B -> B); \
-   fromInteger		= unsafeCoerce# (fromInteger :: Integer -> B); \
-   fromInt		= unsafeCoerce# (fromInt :: Int -> B) }
+   fromInteger		= unsafeCoerce# (fromInteger :: Integer -> B); }
 
 #define INSTANCE_BOUNDED(T,B) \
 instance Bounded T where { \

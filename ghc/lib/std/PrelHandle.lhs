@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.66 2001/01/11 17:25:57 simonmar Exp $
+% $Id: PrelHandle.lhs,v 1.67 2001/02/22 13:17:58 simonpj Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -26,7 +26,7 @@ import PrelIOBase
 import PrelMaybe	( Maybe(..) )
 import PrelException
 import PrelEnum
-import PrelNum		( toBig, Integer(..), Num(..) )
+import PrelNum		( toBig, Integer(..), Num(..), int2Integer )
 import PrelShow
 import PrelReal		( toInteger )
 import PrelPack         ( packString )
@@ -610,7 +610,7 @@ hGetPosn handle =
     wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
     posn    <- getFilePosn (haFO__ handle_)   -- ConcHask: SAFE, won't block
     if posn /= -1 then do
-      return (mkHandlePosn handle (fromInt posn))
+      return (mkHandlePosn handle (int2Integer posn))
      else
       constructErrorAndFail "hGetPosn"
 

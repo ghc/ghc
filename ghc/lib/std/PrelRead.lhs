@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelRead.lhs,v 1.16 2000/08/07 23:37:23 qrczak Exp $
+% $Id: PrelRead.lhs,v 1.17 2001/02/22 13:17:59 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -539,7 +539,7 @@ readHex = readInt 16 isHexDigit hex
 readInt :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
 readInt radix isDig digToInt s = do
     (ds,r) <- nonnull isDig s
-    return (foldl1 (\n d -> n * radix + d) (map (fromInt . digToInt) ds), r)
+    return (foldl1 (\n d -> n * radix + d) (map (fromInteger . int2Integer . digToInt) ds), r)
 
 {-# SPECIALISE readSigned ::
 		ReadS Int     -> ReadS Int,

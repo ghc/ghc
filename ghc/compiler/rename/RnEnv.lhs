@@ -35,15 +35,16 @@ import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, 
 			  mkSysModuleNameFS, moduleNameFS, WhereFrom(..) )
-import TysWiredIn	( unitTyCon, intTyCon, boolTyCon, integerTyCon )
-import Type		( funTyCon )
 import PrelNames	( mkUnboundName, syntaxList, SyntaxMap,	vanillaSyntaxMap,
 			  derivingOccurrences,
 			  mAIN_Name, pREL_MAIN_Name, 
-			  ioTyConName, printName,
+			  ioTyConName, integerTyConName, doubleTyConName, intTyConName, 
+			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
-			  eqStringName
+			  eqStringName, printName, 
+			  hasKey, fractionalClassKey, numClassKey
 			)
+import TysWiredIn	( unitTyCon )	-- A little odd
 import FiniteMap
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -399,15 +400,25 @@ ubiquitousNames
 	-- Virtually every program has error messages in it somewhere
 
   `plusFV`
-    mkFVs (map getName [unitTyCon, funTyCon, boolTyCon, intTyCon, integerTyCon])
-	-- Add occurrences for Integer, and (), because they
-	-- are the types to which ambigious type variables may be defaulted by
-	-- the type checker; so they won't always appear explicitly.
-	-- [The () one is a GHC extension for defaulting CCall results.]
-	-- ALSO: funTyCon, since it occurs implicitly everywhere!
-	--  	 (we don't want to be bothered with making funTyCon a
+    mkFVs [getName unitTyCon, funTyConName, boolTyConName, intTyConName]
+	-- Add occurrences for very frequently used types.
+	--  	 (e.g. we don't want to be bothered with making funTyCon a
 	--	  free var at every function application!)
-	-- Double is dealt with separately in getGates
+\end{code}
+
+\begin{code}
+implicitGates :: Name -> FreeVars	
+-- If we load class Num, add Integer to the gates
+-- This takes account of the fact that Integer might be needed for
+-- defaulting, but we don't want to load Integer (and all its baggage)
+-- if there's no numeric stuff needed.
+-- Similarly for class Fractional and Double
+--
+-- NB: If we load (say) Floating, we'll end up loading Fractional too,
+--     since Fractional is a superclass of Floating
+implicitGates cls | cls `hasKey` numClassKey	    = unitFV integerTyConName
+		  | cls `hasKey` fractionalClassKey = unitFV doubleTyConName
+		  | otherwise			    = emptyFVs
 \end{code}
 
 \begin{code}

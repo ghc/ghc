@@ -38,7 +38,7 @@ import Id		( idType )
 import Type		( namesOfType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocalName, nameUnique,
+			  nameModule, isLocalName, 
 			  NamedThing(..)
 			 )
 import Name 		( elemNameEnv, delFromNameEnv )
@@ -50,8 +50,7 @@ import Module		( Module, ModuleEnv,
 			  elemModuleSet, extendModuleSet
 			)
 import NameSet
-import PrelInfo		( wiredInThingEnv, fractionalClassKeys )
-import TysWiredIn	( doubleTyCon )
+import PrelInfo		( wiredInThingEnv )
 import Maybes		( orElse )
 import FiniteMap
 import Outputable
@@ -405,21 +404,11 @@ get_gates is_used (ClassDecl { tcdCtxt = ctxt, tcdName = cls, tcdTyVars = tvs, t
   = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		        (hsTyVarNames tvs)
      `addOneToNameSet` cls)
-    `plusFV` maybe_double
+    `plusFV` implicitGates cls
   where
     get (ClassOpSig n _ ty _) 
 	| is_used n = extractHsTyNames ty
 	| otherwise = emptyFVs
-
-	-- If we load any numeric class that doesn't have
-	-- Int as an instance, add Double to the gates. 
-	-- This takes account of the fact that Double might be needed for
-	-- defaulting, but we don't want to load Double (and all its baggage)
-	-- if the more exotic classes aren't used at all.
-    maybe_double | nameUnique cls `elem` fractionalClassKeys 
-		 = unitFV (getName doubleTyCon)
-		 | otherwise
-		 = emptyFVs
 
 get_gates is_used (TySynonym {tcdTyVars = tvs, tcdSynRhs = ty})
   = delListFromNameSet (extractHsTyNames ty) (hsTyVarNames tvs)

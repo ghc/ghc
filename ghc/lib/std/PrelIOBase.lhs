@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.34 2001/02/20 18:40:54 qrczak Exp $
+% $Id: PrelIOBase.lhs,v 1.35 2001/02/22 13:17:58 simonpj Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -21,7 +21,7 @@ import {-# SOURCE #-} PrelErr ( error )
 
 import PrelST
 import PrelBase
-import PrelNum	  ( fromInt )	-- Integer literals
+import PrelNum	-- To get fromInteger etc, needed because of -fno-implicit-prelude
 import PrelMaybe  ( Maybe(..) )
 import PrelShow
 import PrelList
@@ -119,8 +119,9 @@ returnIO x = IO (\ s -> (# s, x #))
 #ifdef __HUGS__
 /* Hugs doesn't distinguish these types so no coercion required) */
 #else
+-- stToIO     :: (forall s. ST s a) -> IO a
 stToIO	      :: ST RealWorld a -> IO a
-stToIO (ST m) = (IO m)
+stToIO (ST m) = IO m
 
 ioToST	      :: IO a -> ST RealWorld a
 ioToST (IO m) = (ST m)
@@ -139,8 +140,13 @@ ioToST (IO m) = (ST m)
 unsafePerformIO	:: IO a -> a
 unsafePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
 
+{-# NOINLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO = stToIO . unsafeInterleaveST . ioToST
+unsafeInterleaveIO (IO m)
+  = IO ( \ s -> let
+		   r = case m s of (# _, res #) -> res
+		in
+		(# s, r #))
 #endif
 \end{code}
 

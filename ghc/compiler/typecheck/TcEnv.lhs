@@ -351,7 +351,7 @@ tcLookupLocalIds ns
 tcLookupSyntaxId :: Name -> NF_TcM Id
 -- Lookup a name like PrelNum.fromInt, and return the corresponding Id,
 -- after mapping through the SyntaxMap.  This may give us the Id for
--- (say) MyPrelude.fromInt
+-- (say) MyPrelude.fromInteger
 tcLookupSyntaxId name
   = tcGetEnv 		`thenNF_Tc` \ env ->
     returnNF_Tc (case lookup_global env (tcSyntaxMap env name) of

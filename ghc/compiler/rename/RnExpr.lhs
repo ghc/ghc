@@ -29,7 +29,7 @@ import RnHiFiles	( lookupFixityRn )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
-import PrelNames	( hasKey, assertIdKey, minusName, negateName, fromIntName,
+import PrelNames	( hasKey, assertIdKey, minusName, negateName, fromIntegerName,
 			  eqClass_RDR, foldr_RDR, build_RDR, eqString_RDR,
 			  cCallableClass_RDR, cReturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
@@ -825,10 +825,13 @@ litFVs lit		      = pprPanic "RnExpr.litFVs" (ppr lit)	-- HsInteger and HsRat on
 
 rnOverLit (HsIntegral i)
   | inIntRange i
-  = returnRn (HsIntegral i, unitFV fromIntName)
+  = returnRn (HsIntegral i, unitFV fromIntegerName)
   | otherwise
   = lookupOrigNames [fromInteger_RDR, plusInteger_RDR, timesInteger_RDR]	`thenRn` \ ns ->
 	-- Big integers are built, using + and *, out of small integers
+	-- [No particular reason why we use fromIntegerName in one case can 
+	--  fromInteger_RDR in the other; but plusInteger_RDR means we 
+	--  can get away without plusIntegerName altogether.]
     returnRn (HsIntegral i, ns)
 
 rnOverLit (HsFractional i)
