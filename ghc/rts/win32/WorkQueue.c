@@ -154,7 +154,7 @@ FetchWork ( WorkQueue* pq, void** ppw )
 /*
  * Function: SubmitWork
  *
- * Add work item to the queue, blocking if no room not available.
+ * Add work item to the queue, blocking if no room available.
  * Return value indicates of FALSE indicates error/fatal condition.
  */
 BOOL
