@@ -620,7 +620,7 @@ of any type or class mentioned in the head of the instance declaration, then
 GHC has to visit that interface file anyway.  Example:</para>
 <ProgramListing>
   module A where
-    instance C a = D (T a) where ...
+    instance C a =&gt; D (T a) where ...
     data T a = ...
 </ProgramListing>
 <para> The instance declaration is only relevant if the type T is in use, and if
@@ -630,7 +630,7 @@ so, GHC will have visited A's interface file to find T's definition. </para>
 and GHC has no other reason for visiting the module.  Example:
 <ProgramListing>
   module Orphan where
-    instance C a = D (T a) where ...
+    instance C a =&gt; D (T a) where ...
     class C a where ...
 </ProgramListing>
 Here, neither D nor T is declared in module Orphan.
@@ -645,7 +645,7 @@ defined thus:</para>
   <listitem><para> An instance declaration in a module M is an <emphasis>orphan instance</emphasis> if
   <indexterm><primary>orphan instance</primary></indexterm>
   none of the type constructors
-  or classes mentioned in the instance head (the part after the ``<literal>=></literal>'') are declared
+  or classes mentioned in the instance head (the part after the ``<literal>=&gt;</literal>'') are declared
   in M.</para> 
 
   <para> Only the instance head counts.  In the example above, it is not good enough for C's declaration 
