@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.62 2001/03/28 11:01:19 simonmar Exp $
+-- $Id: Main.hs,v 1.63 2001/04/26 13:52:57 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -261,15 +261,21 @@ main =
 	-- mkdependHS is special
    when (mode == DoMkDependHS) beginMkDependHS
 
+	-- -ohi sanity checking
+   ohi    <- readIORef v_Output_hi
+   if (isJust ohi && 
+	(mode == DoMake || mode == DoInteractive || length srcs > 1))
+	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
+	else do
+
 	-- make/interactive require invoking the compilation manager
    if (mode == DoMake)        then beginMake srcs        else do
    if (mode == DoInteractive) then beginInteractive srcs else do
 
-	-- sanity checking
+	-- -o sanity checking
    o_file <- readIORef v_Output_file
-   ohi    <- readIORef v_Output_hi
-   if length srcs > 1 && (isJust ohi || (isJust o_file && mode /= DoLink && mode /= DoMkDLL))
-	then throwDyn (UsageError "can't apply -o or -ohi options to multiple source files")
+   if (length srcs > 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
+	then throwDyn (UsageError "can't apply -o to multiple source files")
 	else do
 
    if null srcs then throwDyn (UsageError "no input files") else do
