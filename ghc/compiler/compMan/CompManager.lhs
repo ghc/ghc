@@ -7,7 +7,6 @@
 {-# OPTIONS -fvia-C #-}
 module CompManager ( 
     ModuleGraph, 
-    CmRunResult(..),
 
     CmState, emptyCmState,  -- abstract
 
@@ -27,6 +26,7 @@ module CompManager (
 #ifdef GHCI
     cmInfoThing,   -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
 
+    CmRunResult(..),
     cmRunStmt,	   -- :: CmState -> DynFlags -> String
 		   --	 -> IO (CmState, CmRunResult)
 
