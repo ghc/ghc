@@ -435,7 +435,7 @@ ppHtmlModule odir doctitle source_url
 	    ifaceToHtml mdl iface </> s15 </>
 	    footer
          )
-  writeFile (odir++moduleHtmlFile mdl) (renderHtml html False)
+  writeFile (odir ++ pathSeparator:moduleHtmlFile mdl) (renderHtml html False)
 
 ifaceToHtml :: String -> Interface -> HtmlTable
 ifaceToHtml _ iface 
