@@ -71,7 +71,7 @@ import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 			)
 import PprStyle
 import Pretty
-import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
+import RnUtils		( RnEnv(..) )
 import TyCon		( derivedFor )
 import Type		( GenType(..),  ThetaType(..), mkTyVarTys,
 			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
@@ -159,13 +159,13 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 tcInstDecls1 :: Bag RenamedInstDecl
 	     -> [RenamedSpecInstSig]
 	     -> Module			-- module name for deriving
-	     -> GlobalNameMappers	-- renamer fns for deriving
+	     -> RnEnv			-- for renaming derivings
 	     -> [RenamedFixityDecl]	-- fixities for deriving
 	     -> TcM s (Bag InstInfo,
 		       RenamedHsBinds,
 		       PprStyle -> Pretty)
 
-tcInstDecls1 inst_decls specinst_sigs mod_name renamer_name_funs fixities
+tcInstDecls1 inst_decls specinst_sigs mod_name rn_env fixities
   = 	-- Do the ordinary instance declarations
     mapBagNF_Tc (tcInstDecl1 mod_name) inst_decls
 			`thenNF_Tc` \ inst_info_bags ->
@@ -176,7 +176,7 @@ tcInstDecls1 inst_decls specinst_sigs mod_name renamer_name_funs fixities
 	-- for things in this module; we ignore deriving decls from
 	-- interfaces! We pass fixities, because they may be used
 	-- in deriving Read and Show.
-    tcDeriving mod_name renamer_name_funs decl_inst_info fixities
+    tcDeriving mod_name rn_env decl_inst_info fixities
 		    	`thenTc` \ (deriv_inst_info, deriv_binds, ddump_deriv) ->
 
     let

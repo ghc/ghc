@@ -285,14 +285,14 @@ zonkGRHSsAndBinds (GRHSsAndBindsOut grhss binds ty)
 %*									*
 %************************************************************************
 
-ToDo: panic on things that can't be in @TypecheckedHsExpr@.
-
 \begin{code}
 zonkExpr :: TcExpr s -> NF_TcM s TypecheckedHsExpr
 
 zonkExpr (HsVar name)
   = zonkId name	`thenNF_Tc` \ new_name ->
     returnNF_Tc (HsVar new_name)
+
+zonkExpr (HsLit _) = panic "zonkExpr:HsLit"
 
 zonkExpr (HsLitOut lit ty)
   = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->
@@ -313,8 +313,8 @@ zonkExpr (OpApp e1 op e2)
     zonkExpr e2	`thenNF_Tc` \ new_e2 ->
     returnNF_Tc (OpApp new_e1 new_op new_e2)
 
-zonkExpr (NegApp _) = panic "zonkExpr:NegApp"
-zonkExpr (HsPar _)  = panic "zonkExpr:HsPar"
+zonkExpr (NegApp _ _) = panic "zonkExpr:NegApp"
+zonkExpr (HsPar _)    = panic "zonkExpr:HsPar"
 
 zonkExpr (SectionL expr op)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
@@ -367,11 +367,17 @@ zonkExpr (ExplicitTuple exprs)
     returnNF_Tc (ExplicitTuple new_exprs)
 
 zonkExpr (RecordCon con rbinds)
-  = panic "zonkExpr:RecordCon"
-zonkExpr (RecordUpd exp rbinds)
-  = panic "zonkExpr:RecordUpd"
-zonkExpr (RecordUpdOut exp ids rbinds)
-  = panic "zonkExpr:RecordUpdOut"
+  = zonkExpr con	`thenNF_Tc` \ new_con ->
+    zonkRbinds rbinds	`thenNF_Tc` \ new_rbinds ->
+    returnNF_Tc (RecordCon new_con new_rbinds)
+
+zonkExpr (RecordUpd _ _) = panic "zonkExpr:RecordUpd"
+
+zonkExpr (RecordUpdOut expr ids rbinds)
+  = zonkExpr expr	`thenNF_Tc` \ new_expr ->
+    mapNF_Tc zonkId ids	`thenNF_Tc` \ new_ids ->
+    zonkRbinds rbinds	`thenNF_Tc` \ new_rbinds ->
+    returnNF_Tc (RecordUpdOut new_expr new_ids new_rbinds)
 
 zonkExpr (ExprWithTySig _ _) = panic "zonkExpr:ExprWithTySig"
 zonkExpr (ArithSeqIn _) = panic "zonkExpr:ArithSeqIn"
@@ -490,6 +496,17 @@ zonkStmts stmts
     zonk_stmt (LetStmt binds)
       = zonkBinds binds	 `thenNF_Tc` \ new_binds ->
 	returnNF_Tc (LetStmt new_binds)
+
+-------------------------------------------------------------------------
+zonkRbinds :: TcRecordBinds s -> NF_TcM s TypecheckedRecordBinds
+
+zonkRbinds rbinds
+  = mapNF_Tc zonk_rbind rbinds
+  where
+    zonk_rbind (field, expr, pun)
+      = zonkId field	`thenNF_Tc` \ new_field ->
+	zonkExpr expr	`thenNF_Tc` \ new_expr ->
+	returnNF_Tc (new_field, new_expr, pun)
 \end{code}
 
 %************************************************************************
@@ -535,8 +552,17 @@ zonkPat (ListPat ty pats)
     returnNF_Tc (ListPat new_ty new_pats)
 
 zonkPat (TuplePat pats)
-  = mapNF_Tc zonkPat pats    `thenNF_Tc` \ new_pats ->
+  = mapNF_Tc zonkPat pats   `thenNF_Tc` \ new_pats ->
     returnNF_Tc (TuplePat new_pats)
+
+zonkPat (RecPat n ty rpats)
+  = zonkTcTypeToType ty	     `thenNF_Tc` \ new_ty ->
+    mapNF_Tc zonk_rpat rpats `thenNF_Tc` \ new_rpats ->
+    returnNF_Tc (RecPat n new_ty new_rpats)
+  where
+    zonk_rpat (f, pat, pun)
+      = zonkPat pat	     `thenNF_Tc` \ new_pat ->
+	returnNF_Tc (f, new_pat, pun)
 
 zonkPat (LitPat lit ty)
   = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->

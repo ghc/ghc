@@ -30,16 +30,17 @@ import Util		( panic, pprPanic, pprTrace{-ToDo:rm-} )
 data RnName
   = WiredInId       Id
   | WiredInTyCon    TyCon
-  | RnName          Name        -- functions/binders/tyvars
-  | RnSyn           Name        -- type synonym
-  | RnData          Name [Name] -- data type   (with constrs)
-  | RnConstr        Name  Name  -- constructor (with data type)
-  | RnClass         Name [Name] -- class       (with class ops)
-  | RnClassOp       Name  Name  -- class op    (with class)
-  | RnImplicit      Name      	-- implicitly imported
-  | RnImplicitTyCon Name      	-- implicitly imported
-  | RnImplicitClass Name      	-- implicitly imported
-  | RnUnbound	    RdrName    	-- place holder
+  | RnName          Name        	-- functions/binders/tyvars
+  | RnSyn           Name        	-- type synonym
+  | RnData          Name [Name] [Name]	-- data type   (with constrs and fields)
+  | RnConstr        Name  Name		-- constructor (with data type)
+  | RnField	    Name  Name	  	-- field       (with data type)
+  | RnClass         Name [Name] 	-- class       (with class ops)
+  | RnClassOp       Name  Name  	-- class op    (with class)
+  | RnImplicit      Name      		-- implicitly imported
+  | RnImplicitTyCon Name      		-- implicitly imported
+  | RnImplicitClass Name      		-- implicitly imported
+  | RnUnbound	    RdrName    		-- place holder
 
 mkRnName          = RnName
 mkRnImplicit      = RnImplicit
@@ -54,10 +55,9 @@ isRnWired _ 	           = False
 isRnLocal (RnName n) = isLocalName n
 isRnLocal _ 	     = False
 
-
 isRnTyCon (WiredInTyCon _)    = True
 isRnTyCon (RnSyn _)    	      = True
-isRnTyCon (RnData _ _) 	      = True
+isRnTyCon (RnData _ _ _)      = True
 isRnTyCon (RnImplicitTyCon _) = True
 isRnTyCon _            	      = False
 
@@ -68,14 +68,19 @@ isRnClass _                   = False
 -- a common need: isRnTyCon || isRnClass:
 isRnTyConOrClass (WiredInTyCon _)    = True
 isRnTyConOrClass (RnSyn _)    	     = True
-isRnTyConOrClass (RnData _ _) 	     = True
+isRnTyConOrClass (RnData _ _ _)	     = True
 isRnTyConOrClass (RnImplicitTyCon _) = True
 isRnTyConOrClass (RnClass _ _)       = True
 isRnTyConOrClass (RnImplicitClass _) = True
 isRnTyConOrClass _                   = False
 
+isRnConstr (RnConstr _ _) = True
+isRnConstr  _		  = False
+
+isRnField  (RnField _ _)  = True
+isRnField  _		  = False
+
 isRnClassOp cls (RnClassOp _ op_cls) = eqUniqsNamed cls op_cls
-isRnClassOp cls (RnImplicit _)	     = True	-- ho hummm ...
 isRnClassOp cls _		     = False
 
 isRnImplicit (RnImplicit _)      = True
@@ -106,8 +111,9 @@ instance NamedThing RnName where
     getName (WiredInTyCon tc)   = getName tc
     getName (RnName n)	        = n
     getName (RnSyn n)	        = n
-    getName (RnData n _)        = n
+    getName (RnData n _ _)      = n
     getName (RnConstr n _)      = n
+    getName (RnField n _)       = n
     getName (RnClass n _)       = n
     getName (RnClassOp n _)     = n
     getName (RnImplicit n)      = n
@@ -122,10 +128,11 @@ instance NamedThing RnName where
 
 instance Outputable RnName where
 #ifdef DEBUG
-    ppr sty@PprShowAll (RnData n cs)   = ppBesides [ppr sty n, ppStr "{-", ppr sty cs, ppStr "-}"]
-    ppr sty@PprShowAll (RnConstr n d)  = ppBesides [ppr sty n, ppStr "{-", ppr sty d, ppStr "-}"]
-    ppr sty@PprShowAll (RnClass n ops) = ppBesides [ppr sty n, ppStr "{-", ppr sty ops, ppStr "-}"]
-    ppr sty@PprShowAll (RnClassOp n c) = ppBesides [ppr sty n, ppStr "{-", ppr sty c, ppStr "-}"]
+    ppr sty@PprShowAll (RnData n cs fs)  = ppBesides [ppr sty n, ppStr "{-", ppr sty cs, ppr sty fs, ppStr "-}"]
+    ppr sty@PprShowAll (RnConstr n d)    = ppBesides [ppr sty n, ppStr "{-", ppr sty d, ppStr "-}"]
+    ppr sty@PprShowAll (RnField  n d)    = ppBesides [ppr sty n, ppStr "{-", ppr sty d, ppStr "-}"]
+    ppr sty@PprShowAll (RnClass n ops)   = ppBesides [ppr sty n, ppStr "{-", ppr sty ops, ppStr "-}"]
+    ppr sty@PprShowAll (RnClassOp n c)   = ppBesides [ppr sty n, ppStr "{-", ppr sty c, ppStr "-}"]
 #endif
     ppr sty (WiredInId id)      = ppr sty id
     ppr sty (WiredInTyCon tycon)= ppr sty tycon

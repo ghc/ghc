@@ -10,7 +10,7 @@ module RnUtils (
 	RnEnv(..), QualNames(..),
 	UnqualNames(..), ScopeStack(..),
 	emptyRnEnv, extendGlobalRnEnv, extendLocalRnEnv,
-	lookupRnEnv, lookupTcRnEnv,
+	lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
 
 	lubExportFlag,
 
@@ -20,9 +20,7 @@ module RnUtils (
 	dupNamesErr,
 	shadowedNameWarn,
 	multipleOccWarn,
-
-	-- ToDo: nuke/move? WDP 96/04/05
-	GlobalNameMapper(..),  GlobalNameMappers(..)
+	negateNameWarn
     ) where
 
 import Ubiq
@@ -37,9 +35,6 @@ import PprStyle		( PprStyle(..) )
 import Pretty
 import RnHsSyn		( RnName )
 import Util		( assertPanic )
-
-type GlobalNameMapper  = RnName -> Maybe Name
-type GlobalNameMappers = (GlobalNameMapper, GlobalNameMapper)
 \end{code}
 
 *********************************************************
@@ -63,6 +58,7 @@ extendGlobalRnEnv :: RnEnv -> [(RdrName,RnName)] -> [(RdrName,RnName)]
 		  -> (RnEnv, Bag (RdrName, RnName, RnName))
 extendLocalRnEnv  :: Bool -> RnEnv -> [RnName] -> (RnEnv, [RnName])
 lookupRnEnv 	  :: RnEnv -> RdrName -> Maybe RnName
+lookupGlobalRnEnv :: RnEnv -> RdrName -> Maybe RnName
 lookupTcRnEnv 	  :: RnEnv -> RdrName -> Maybe RnName
 \end{code}
 
@@ -143,6 +139,11 @@ lookupRnEnv ((qual, unqual, _, _), stack) rdr
 	    found@(Just name) -> found
 	    Nothing   	      -> do_on_fail
 
+lookupGlobalRnEnv ((qual, unqual, _, _), _) rdr
+  = case rdr of 
+      Unqual str   -> lookupFM unqual str
+      Qual mod str -> lookupFM qual (str,mod)
+
 lookupTcRnEnv ((_, _, tc_qual, tc_unqual), _) rdr
   = case rdr of 
       Unqual str   -> lookupFM tc_unqual str
@@ -186,13 +187,14 @@ dupNamesErr descriptor ((name1,locn1) : dup_things) sty
   = ppAboves (item1 : map dup_item dup_things)
   where
     item1
-      = ppBesides [ ppr PprForUser locn1,
-	    ppStr ": multiple declarations of a ", ppStr descriptor, ppStr ": ",
-	    pprNonSym sty name1 ]
+      = addShortErrLocLine locn1 (\ sty ->
+	ppBesides [ppStr "multiple declarations of a ", ppStr descriptor, ppStr " `", 
+		   pprNonSym sty name1, ppStr "'" ]) sty
 
     dup_item (name, locn)
-      = ppBesides [ ppr PprForUser locn,
-	    ppStr ": here was another declaration of `", pprNonSym sty name, ppStr "'" ]
+      = addShortErrLocLine locn (\ sty ->
+	ppBesides [ppStr "here was another declaration of `",
+		   pprNonSym sty name, ppStr "'" ]) sty
 
 shadowedNameWarn locn shadow
   = addShortErrLocLine locn ( \ sty ->
@@ -201,5 +203,9 @@ shadowedNameWarn locn shadow
 multipleOccWarn (name, occs) sty
   = ppBesides [ppStr "multiple names used to refer to `", ppr sty name, ppStr "': ",
 	       ppInterleave ppComma (map (ppr sty) occs)]
+
+negateNameWarn (name,locn) 
+  = addShortErrLocLine locn ( \ sty ->
+    ppBesides [ppStr "local binding of `negate' will be used for prefix `-'"])
 \end{code}
 

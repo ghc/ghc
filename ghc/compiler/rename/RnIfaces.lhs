@@ -29,16 +29,15 @@ import RnHsSyn
 
 import RnMonad
 import RnSource		( rnTyDecl, rnClassDecl, rnInstDecl, rnPolyType )
-import RnUtils		( RnEnv(..), lookupRnEnv, lookupTcRnEnv, extendGlobalRnEnv )
+import RnUtils		( RnEnv(..), emptyRnEnv, lookupRnEnv, lookupTcRnEnv, extendGlobalRnEnv )
 import ParseIface	( parseIface )
 import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..) )
 
-import Bag		( emptyBag, snocBag, unionBags, unionManyBags, isEmptyBag, bagToList )
+import Bag		( emptyBag, consBag, snocBag, unionBags, unionManyBags, isEmptyBag, bagToList )
 import CmdLineOpts	( opt_HiSuffix, opt_SysHiSuffix )
 import ErrUtils		( Error(..), Warning(..) )
-import FiniteMap	( emptyFM, lookupFM, addToFM, plusFM, eltsFM,
-			  fmToList, delListFromFM, keysFM{-ToDo:rm-}
-			)
+import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
+			  fmToList, delListFromFM, sizeFM, keysFM{-ToDo:rm-} )
 import Maybes		( maybeToBool )
 import Name		( moduleNamePair, origName, isRdrLexCon,
 			  RdrName(..){-instance NamedThing-}
@@ -50,7 +49,8 @@ import Pretty
 import Maybes		( MaybeErr(..) )
 import UniqFM		( emptyUFM )
 import UniqSupply	( splitUniqSupply )
-import Util		( startsWith, panic, pprPanic, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( sortLt, removeDups, cmpPString, startsWith,
+			  panic, pprPanic, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 \begin{code}
@@ -206,7 +206,7 @@ cachedDeclByType iface_cache rn
 	  RnUnbound _       -> pprPanic "cachedDeclByType:" (ppr PprDebug rn)
 	  
 	  RnSyn _	    -> return_maybe_decl
-	  RnData _ _	    -> return_maybe_decl
+	  RnData _ _ _	    -> return_maybe_decl
 	  RnImplicitTyCon _ -> if is_tycon_decl if_decl
 			       then return_maybe_decl
 			       else return_failed (badIfaceLookupErr "type constructor" rn if_decl)
@@ -216,25 +216,26 @@ cachedDeclByType iface_cache rn
 			       then return_maybe_decl
 			       else return_failed (badIfaceLookupErr "class" rn if_decl)
 	  
-	  RnName _	    ->  return_maybe_decl
-	  RnConstr _ _	    ->  return_maybe_decl
-	  RnClassOp _ _	    ->  return_maybe_decl
-	  RnImplicit _	    ->  if is_val_decl if_decl
-			        then return_maybe_decl
-			        else return_failed (badIfaceLookupErr "value/method" rn if_decl)
+	  RnName _	    -> return_maybe_decl
+	  RnConstr _ _      -> return_maybe_decl
+	  RnField _ _ 	    -> return_maybe_decl
+	  RnClassOp _ _	    -> return_maybe_decl
+	  RnImplicit _	    -> if is_val_decl if_decl
+			       then return_maybe_decl
+			       else return_failed (badIfaceLookupErr "value" rn if_decl)
   where
     is_tycon_decl (TypeSig _ _ _)	= True
     is_tycon_decl (NewTypeSig _ _ _ _)	= True
-    is_tycon_decl (DataSig _ _ _ _)	= True
+    is_tycon_decl (DataSig _ _ _ _ _)	= True
     is_tycon_decl _			= False
 
     is_class_decl (ClassSig _ _ _ _)	= True
     is_class_decl _			= False
 
     is_val_decl (ValSig _ _ _)		= True
-    is_val_decl (ClassSig _ _ _ _)	= True	-- if the thing we were after *happens* to
-						-- be a class op; we will have fished a ClassSig
-						-- out of the interface for it.
+    is_val_decl (DataSig _ _ _ _ _)	= True	-- may be a constr or field
+    is_val_decl (NewTypeSig _ _ _ _)	= True  -- may be a constr
+    is_val_decl (ClassSig _ _ _ _)	= True	-- may be a method
     is_val_decl _			= False
 \end{code}
 
@@ -252,6 +253,7 @@ readIface file mod
 
 \begin{code}
 rnIfaces :: IfaceCache			-- iface cache (mutvar)
+	 -> [Module]			-- directly imported modules
 	 -> UniqSupply
 	 -> RnEnv			-- defined (in the source) name env
 	 -> RnEnv			-- mentioned (in the source) name env 
@@ -261,18 +263,19 @@ rnIfaces :: IfaceCache			-- iface cache (mutvar)
 					-- Also, all the things we may look up
 					-- later by key (Unique).
 	 -> IO (RenamedHsModule,	-- extended module
+		RnEnv,			-- final env (for renaming derivings)
 		ImplicitEnv,		-- implicit names used (for usage info)
-		Bag Error,
-		Bag Warning)
+		(Bag Error, Bag Warning))
 
-rnIfaces iface_cache us
+rnIfaces iface_cache imp_mods us
 	 def_env@((dqual, dunqual, dtc_qual, dtc_unqual), dstack)
 	 occ_env@((qual, unqual, tc_qual, tc_unqual), stack)
 	 rn_module@(HsModule modname iface_version exports imports fixities
 		      typedecls typesigs classdecls instdecls instsigs
 		      defdecls binds sigs src_loc)
 	 todo
-  = {-pprTrace "rnIfaces:going after:" (ppCat (map (ppr PprDebug) todo)) $
+  = {-
+    pprTrace "rnIfaces:going after:" (ppCat (map (ppr PprDebug) todo)) $
 
     pprTrace "rnIfaces:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (m,n) <- keysFM qual]) $
     pprTrace "rnIfaces:unqual:"    (ppCat (map ppPStr (keysFM unqual))) $
@@ -284,27 +287,16 @@ rnIfaces iface_cache us
     pprTrace "rnIfaces:dtc_qual:"  (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (m,n) <- keysFM dtc_qual]) $
     pprTrace "rnIfaces:dtc_unqual:"(ppCat (map ppPStr (keysFM dtc_unqual))) $
     -}
-    let
-	(us1,us2) = splitUniqSupply us
-    in
 
-    -- do transitive closure to bring in all needed names/defns:
+    -- do transitive closure to bring in all needed names/defns and insts:
 
-    loop todo	      -- initial batch of names to process
-	 (def_env, occ_env, us1) -- init stuff down
-	 empty_return -- init acc results
-	 >>= \ (((if_typedecls, if_classdecls, if_sigs),
-		 if_implicits,
-		 (if_errs, if_warns)),
-		new_occ_env) ->
+    decls_and_insts todo def_env occ_env empty_return us 
+	>>= \ (((if_typedecls, if_classdecls, if_instdecls, if_sigs),
+	        if_implicits,
+	        if_errs_warns),
+	       if_final_env) ->
 
-    -- go back and handle instance things:
-
-    rnIfaceInstStuff iface_cache modname us2 new_occ_env if_implicits
-	 >>= \ (if_instdecls, (ifi_errs, ifi_warns)) ->
-
-    return (
-	HsModule modname iface_version exports imports fixities
+    return (HsModule modname iface_version exports imports fixities
 		 (typedecls ++ if_typedecls)
 		 typesigs
 		 (classdecls ++ if_classdecls)
@@ -312,58 +304,104 @@ rnIfaces iface_cache us
 		 instsigs defdecls binds
 		 (sigs ++ if_sigs)
 		 src_loc,
-	if_implicits,
-	if_errs  `unionBags` ifi_errs,
-	if_warns `unionBags` ifi_warns
-    )
+	    if_final_env,
+	    if_implicits,
+	    if_errs_warns)
   where
-    loop :: [RnName]	  -- Names we're looking for; we keep adding/deleting
-			  -- from this list; we're done when empty (nothing
-			  -- more needs to be looked for)
-	 -> Go_Down	  -- see defn below
-	 -> To_Return	  -- accumulated result
-	 -> IO (To_Return, RnEnv{-final occurrence env; to pass on for doing instances-})
+    decls_and_insts todo def_env occ_env to_return us
+      =	do_decls todo	     		 -- initial batch of names to process
+	 	 (def_env, occ_env, us1) -- init stuff down
+	 	 to_return		 -- acc results
+	   >>= \ (decls_return,
+		  decls_def_env,
+		  decls_occ_env) ->
 
-    loop to_find@[] down to_return = return (to_return, occenv down)
+	cacheInstModules iface_cache imp_mods >>= \ errs ->
 
-    loop to_find@(n:ns) down to_return 
-      = case (lookup_defd down (origName n)) of
+	do_insts decls_def_env decls_occ_env emptyRnEnv emptyFM
+		 (add_errs errs decls_return) us2
+      where
+	(us1,us2) = splitUniqSupply us
+
+    do_insts def_env occ_env prev_env done_insts to_return us
+      | size_tc_env occ_env == size_tc_env prev_env
+      = return (to_return, occ_env)
+
+      | otherwise
+      = rnIfaceInstStuff iface_cache modname us1 occ_env done_insts to_return
+	   >>= \ (insts_return,
+		  new_insts,
+		  insts_occ_env,
+		  new_unknowns) ->
+
+	do_decls new_unknowns	  		-- new batch of names to process
+	 	 (def_env, insts_occ_env, us2) 	-- init stuff down
+	 	 insts_return		 	-- acc results
+	   >>= \ (decls_return,
+		  decls_def_env,
+		  decls_occ_env) ->
+
+	do_insts decls_def_env decls_occ_env occ_env new_insts decls_return us3
+      where
+	(us1,us') = splitUniqSupply us
+	(us2,us3) = splitUniqSupply us'
+
+	size_tc_env ((_, _, qual, unqual), _)
+	  = sizeFM qual + sizeFM unqual
+
+
+    do_decls :: [RnName]	-- Names we're looking for; we keep adding/deleting
+			  	-- from this list; we're done when empty (nothing
+			  	-- more needs to be looked for)
+	     -> Go_Down	 	-- see defn below
+	     -> To_Return	-- accumulated result
+	     -> IO (To_Return,
+		    RnEnv,	-- extended decl env
+		    RnEnv)	-- extended occ env
+
+    do_decls to_find@[] down to_return
+      = return (to_return, defenv down, occenv down)
+
+    do_decls to_find@(n:ns) down to_return 
+      = case (lookup_defd down n) of
 	  Just  _ -> -- previous processing must've found the stuff for this name;
 		     -- continue with the rest:
-		     -- pprTrace "loop:done:" (ppr PprDebug n) $
-		     loop ns down to_return
+		     -- pprTrace "do_decls:done:" (ppr PprDebug n) $
+		     do_decls ns down to_return
 
 	  Nothing -> -- OK, see what the cache has for us...
 
 	    cachedDeclByType iface_cache n >>= \ maybe_ans ->
 	    case maybe_ans of
 	      Failed err -> -- add the error, but keep going:
-			    -- pprTrace "loop:cache error:" (ppr PprDebug n) $
-			    loop ns down (add_err err to_return)
+			    -- pprTrace "do_decls:cache error:" (ppr PprDebug n) $
+			    do_decls ns down (add_err err to_return)
 
 	      Succeeded iface_decl -> -- something needing renaming!
 		let
 		    (us1, us2) = splitUniqSupply (uniqsupply down)
 		in
 		case (initRn False{-iface-} modname (occenv down) us1 (
-			setExtraRn emptyUFM{-ignore fixities-} $
+			setExtraRn emptyUFM{-no fixities-} $
 			rnIfaceDecl iface_decl)) of {
 		  ((if_decl, if_defd, if_implicits), if_errs, if_warns) ->
 		    let
 			new_unknowns = eltsFM (fst if_implicits) ++ eltsFM (snd if_implicits)
 		    in
---		    pprTrace "loop:renamed:" (ppAboves [ppr PprDebug n
---			, ppCat [ppStr "new unknowns:", interpp'SP PprDebug new_unknowns]
---			, ppCat [ppStr "defd vals:", interpp'SP PprDebug [n | (_,n) <- fst if_defd] ]
---			, ppCat [ppStr "defd  tcs:", interpp'SP PprDebug [n | (_,n) <- snd if_defd] ]
---			]) $
-		    loop (new_unknowns ++ ns)
-			 (add_occs       if_defd if_implicits $
-			  new_uniqsupply us2 down)
-			 (add_decl	 if_decl	$
-			  add_implicits  if_implicits	$
-			  add_errs	 if_errs	$
-			  add_warns	 if_warns to_return)
+		    {-
+		    pprTrace "do_decls:renamed:" (ppAboves [ppr PprDebug n
+			, ppCat [ppStr "new unknowns:", interpp'SP PprDebug new_unknowns]
+			, ppCat [ppStr "defd vals:", interpp'SP PprDebug [n | (_,n) <- fst if_defd] ]
+			, ppCat [ppStr "defd  tcs:", interpp'SP PprDebug [n | (_,n) <- snd if_defd] ]
+			]) $
+		    -}
+		    do_decls (new_unknowns ++ ns)
+			     (add_occs       if_defd if_implicits $
+			       new_uniqsupply us2 down)
+			     (add_decl	     if_decl		$
+			       add_implicits if_implicits	$
+			        add_errs     if_errs		$
+			         add_warns   if_warns to_return)
 	        }
 
 -----------
@@ -381,8 +419,12 @@ type Go_Down   = (RnEnv,	-- stuff we already have defns for;
 		 )
 
 lookup_defd (def_env, _, _) n
-  = (if isRdrLexCon n then lookupTcRnEnv else lookupRnEnv) def_env n
+  | isRnTyConOrClass n 
+  = lookupTcRnEnv def_env (origName n)
+  | otherwise 
+  = lookupRnEnv def_env (origName n)
 
+defenv	   (def_env, _, _) = def_env
 occenv	   (_, occ_env, _) = occ_env
 uniqsupply (_, _,      us) = us
 
@@ -398,29 +440,30 @@ add_occs (val_defds, tc_defds) (val_imps, tc_imps) (def_env, occ_env, us)
     case (extendGlobalRnEnv occ_env val_occs tc_occs)   of { (new_occ_env, occ_dups) ->
 
 --  ASSERT(isEmptyBag occ_dups)
--- False because we may get a dup on the name we just shoved in
+--  False because we may get a dup on the name we just shoved in
 
     (new_def_env, new_occ_env, us) }}
 
 ----------------
-type To_Return = (([RenamedTyDecl], [RenamedClassDecl], [RenamedSig]),
+type To_Return = (([RenamedTyDecl], [RenamedClassDecl], [RenamedInstDecl], [RenamedSig]),
 		  ImplicitEnv,	-- new names used implicitly
 		  (Bag Error, Bag Warning)
 		 )
 
 empty_return :: To_Return
-empty_return = (([],[],[]), emptyImplicitEnv, (emptyBag,emptyBag))
+empty_return = (([],[],[],[]), emptyImplicitEnv, (emptyBag,emptyBag))
 
-add_decl decl ((tydecls, classdecls, sigs), implicit, msgs)
+add_decl decl ((tydecls, classdecls, instdecls, sigs), implicit, msgs)
   = case decl of
-      AddedTy	 t -> ((t:tydecls, classdecls, sigs), implicit, msgs)
-      AddedClass c -> ((tydecls, c:classdecls, sigs), implicit, msgs)
-      AddedSig	 s -> ((tydecls, classdecls, s:sigs), implicit, msgs)
+      AddedTy	 t -> ((t:tydecls, classdecls, instdecls, sigs), implicit, msgs)
+      AddedClass c -> ((tydecls, c:classdecls, instdecls, sigs), implicit, msgs)
+      AddedSig	 s -> ((tydecls, classdecls, instdecls, s:sigs), implicit, msgs)
+
+add_insts is ((tydecls, classdecls, instdecls, sigs), implicit, msgs)
+  = ((tydecls, classdecls, is ++ instdecls, sigs), implicit, msgs)
 
 add_implicits (val_imps, tc_imps) (decls, (val_fm, tc_fm), msgs)
   = (decls, (val_fm `plusFM` val_imps, tc_fm `plusFM`  tc_imps), msgs)
-  where
-    pairify rn = (origName rn, rn)
 
 add_err  err (decls,implicit,(errs,warns)) = (decls,implicit,(errs `snocBag`   err,warns))
 add_errs ers (decls,implicit,(errs,warns)) = (decls,implicit,(errs `unionBags` ers,warns))
@@ -464,13 +507,14 @@ rnIfaceDecl (NewTypeSig tc dc _ decl)
     in
     returnRn (AddedTy rn_decl, defds, implicits)
 
-rnIfaceDecl (DataSig tc dcs _ decl)
+rnIfaceDecl (DataSig tc dcs fcs _ decl)
   = rnTyDecl    decl		`thenRn` \ rn_decl   ->
     lookupTyCon tc		`thenRn` \ rn_tc     ->
     mapRn lookupValue dcs	`thenRn` \ rn_dcs    ->
+    mapRn lookupValue fcs	`thenRn` \ rn_fcs    ->
     getImplicitUpRn		`thenRn` \ mentioned ->
     let
-	defds = (dcs `zip` rn_dcs, [(tc, rn_tc)])
+	defds = (zip dcs rn_dcs ++ zip fcs rn_fcs , [(tc, rn_tc)])
 	implicits = mentioned `sub` defds
     in
     returnRn (AddedTy rn_decl, defds, implicits)
@@ -508,69 +552,116 @@ sub (val_ment, tc_ment) (val_defds, tc_defds)
 
 % ------------------------------
 
+@cacheInstModules@: cache instance modules specified in imports
+
+\begin{code}
+cacheInstModules :: IfaceCache -> [Module] -> IO (Bag Error)
+cacheInstModules iface_cache imp_mods
+  = readVar iface_cache		`thenPrimIO` \ (iface_fm, _) ->
+    let
+	imp_ifaces      = [ iface | Just iface <- map (lookupFM iface_fm) imp_mods ]
+	(imp_imods, _)  = removeDups cmpPString (bagToList (unionManyBags (map get_ims imp_ifaces)))
+        get_ims (ParsedIface _ _ _ _ _ ims _ _ _ _ _) = ims
+    in
+    accumulate (map (cachedIface iface_cache) imp_imods) >>= \ err_or_ifaces ->
+
+    -- Sanity Check:
+    -- Assert that instance modules given by direct imports contains
+    -- instance modules extracted from all visited modules
+
+    readVar iface_cache		`thenPrimIO` \ (all_iface_fm, _) ->
+    let
+	all_ifaces     = eltsFM all_iface_fm
+	(all_imods, _) = removeDups cmpPString (bagToList (unionManyBags (map get_ims (all_ifaces))))
+    in
+    ASSERT(sortLt (<) imp_imods == sortLt (<) all_imods)
+
+    return (bag_errs err_or_ifaces)
+  where
+    bag_errs [] = emptyBag
+    bag_errs (Failed err :rest) = err `consBag` bag_errs rest
+    bag_errs (Succeeded _:rest) = bag_errs rest
+\end{code}
+
+
 @rnIfaceInstStuff@: Deal with instance declarations from interface files.
 
 \begin{code}
+type InstanceEnv = FiniteMap (RdrName, RdrName) Int
+
 rnIfaceInstStuff
-	:: IfaceCache	-- all about ifaces we've read
+	:: IfaceCache		-- all about ifaces we've read
 	-> Module
 	-> UniqSupply
-	-> RnEnv
-	-> ImplicitEnv	-- info about all names we've used
-	-> IO ([RenamedInstDecl],
-	       (Bag Error, Bag Warning))
+	-> RnEnv		-- current occ env
+	-> InstanceEnv  	-- instances for these tycon/class pairs done
+	-> To_Return
+	-> IO (To_Return,
+	       InstanceEnv,	-- extended instance env
+	       RnEnv,		-- final occ env
+	       [RnName])	-- new unknown names
 
-rnIfaceInstStuff iface_cache modname us occ_env implicit_env
-  = -- nearly all the instance decls we might even want
-    -- to consider are in the ParsedIfaces that are in our
-    -- cache; any *other* instances to consider are in any
-    -- "instance modules" fields that we've encounted.
-    -- Get both:
+rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
+  = -- all the instance decls we might even want to consider
+    -- are in the ParsedIfaces that are in our cache
 
     readVar iface_cache	`thenPrimIO` \ (iface_fm, _) ->
     let
-	ifaces_so_far	= eltsFM iface_fm
-	all_iface_imods = unionManyBags (map get_ims   ifaces_so_far)
-	insts_so_far	= unionManyBags (map get_insts ifaces_so_far)
-    in
-    -- OK, get all the instance decls out of the "instance module"
-    -- modules:
+	all_ifaces	  = eltsFM iface_fm
+	all_insts	  = unionManyBags (map get_insts all_ifaces)
+	interesting_insts = filter want_inst (bagToList all_insts)
 
-    read_iface_imods iface_fm (bagToList all_iface_imods) emptyBag emptyBag{-accumulators-}
-			>>= \ (more_insts, ims_errs) ->
-    let
-	all_insts = insts_so_far `unionBags` more_insts
+	-- Sanity Check:
+	-- Assert that there are no more instances for the done instances
 
-	-- an instance decl can only be of interest if *both*
-	-- its class and tycon have made their way into our
-	-- purview:
-	interesting_insts = filter (good_inst implicit_env) (bagToList all_insts)
+	claim_done       = filter is_done_inst (bagToList all_insts)
+	claim_done_env   = foldr add_done_inst emptyFM claim_done
+	has_val fm (k,i) = case lookupFM fm k of { Nothing -> False; Just v -> i == v }
     in
---    pprTrace "in implicit:\n"	    (ppCat (map (ppr PprDebug) (keysFM (snd implicit_env)))) $
---    pprTrace "insts_so_far:\n"      (ppr_insts (bagToList insts_so_far)) $
---    pprTrace "more_insts:\n"        (ppr_insts (bagToList more_insts)) $
---    pprTrace "interesting_insts:\n" (ppr_insts interesting_insts) $
-    -- Do the renaming for real:
-    --
+    {-
+      pprTrace "all_insts:\n"         (ppr_insts (bagToList all_insts)) $
+      pprTrace "interesting_insts:\n" (ppr_insts interesting_insts) $
+    -}
+    ASSERT(sizeFM done_inst_env == sizeFM claim_done_env)
+    ASSERT(all (has_val claim_done_env) (fmToList done_inst_env))
+
     case (initRn False{-iface-} modname occ_env us (
-	    setExtraRn emptyUFM{-ignore fixities-} $
-	    mapRn rnIfaceInst interesting_insts)) of {
-      (if_inst_decls, if_errs, if_warns) ->
+	    setExtraRn emptyUFM{-no fixities-}	$
+	    mapRn rnIfaceInst interesting_insts `thenRn` \ insts ->
+	    getImplicitUpRn 			`thenRn` \ implicits ->
+	    returnRn (insts, implicits))) of {
+      ((if_insts, if_implicits), if_errs, if_warns) ->
 
-	return (if_inst_decls, (ims_errs `unionBags` if_errs, if_warns))
+	return (add_insts      if_insts		$
+		 add_implicits if_implicits	$
+		  add_errs     if_errs		$
+		   add_warns   if_warns to_return,
+		foldr add_done_inst done_inst_env interesting_insts,
+		add_imp_occs if_implicits occ_env,
+		eltsFM (fst if_implicits) ++ eltsFM (snd if_implicits))
     }
   where
-    get_insts (ParsedIface _ _ _ _ _   _ _ _ _ insts _) = insts
-    get_ims   (ParsedIface _ _ _ _ _ ims _ _ _     _ _) = ims
+    get_insts (ParsedIface _ _ _ _ _ _ _ _ _ insts _) = insts
 
-    good_inst (_, tc_imp_env) i@(InstSig clas tycon _ _)
-      = -- it's a "good instance" (one to hang onto) if we have
-	-- some chance of referring to *both* the class and tycon
-	-- later on.
-	mentionable clas && mentionable tycon
+    add_done_inst (InstSig clas tycon _ _) inst_env
+      = addToFM_C (+) inst_env (tycon,clas) 1
+
+    is_done_inst (InstSig clas tycon _ _)
+      = maybeToBool (lookupFM done_inst_env (tycon,clas))
+
+    add_imp_occs (val_imps, tc_imps) occ_env
+      = case extendGlobalRnEnv occ_env (fmToList val_imps) (fmToList tc_imps) of
+     	  (ext_occ_env, occ_dups) -> ASSERT(isEmptyBag occ_dups)
+				     ext_occ_env
+
+    want_inst i@(InstSig clas tycon _ _)
+      = -- it's a "good instance" (one to hang onto) if we have a
+	-- chance of referring to *both* the class and tycon later on ...
+
+	mentionable tycon && mentionable clas && not (is_done_inst i)
       where
 	mentionable nm
-	  = case (lookupFM tc_imp_env nm) of
+	  = case lookupTcRnEnv occ_env nm of
 	      Just  _ -> True
 	      Nothing -> -- maybe it's builtin
 		case nm of
@@ -588,26 +679,6 @@ rnIfaceInstStuff iface_cache modname us occ_env implicit_env
       where
 	ppr_inst (InstSig c t _ inst_decl)
 	  = ppCat [ppr PprDebug c, ppr PprDebug t, ppr PprDebug inst_decl]
-
-    read_iface_imods :: ModuleToIfaceContents
-		     -> [Module]
-		     -> Bag RdrIfaceInst -> Bag Error
-		     -> IO (Bag RdrIfaceInst, Bag Error)
-
-    read_iface_imods iface_fm []     iacc eacc = return (iacc, eacc)
-    read_iface_imods iface_fm (m:ms) iacc eacc
-      = case (lookupFM iface_fm m) of
-	  Just  _ -> -- module's already in our cache; keep going
-		     read_iface_imods iface_fm ms iacc eacc
-
-	  Nothing -> -- bring it in
-	    cachedIface iface_cache m	>>= \ read_res ->
-	    case read_res of
-	      Failed msg -> -- oh well, keep going anyway (saving the error)
-		read_iface_imods iface_fm ms iacc (eacc `snocBag` msg)
-
-	      Succeeded iface ->
-		read_iface_imods iface_fm ms (iacc `unionBags` get_insts iface) eacc
 \end{code}
 
 \begin{code}

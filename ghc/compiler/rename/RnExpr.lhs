@@ -25,14 +25,14 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 
-import ErrUtils		( addErrLoc )
+import ErrUtils		( addErrLoc, addShortErrLocLine )
 import Name		( isLocallyDefinedName, pprSym, Name, RdrName )
 import Pretty
 import UniqFM		( lookupUFM )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
 			  UniqSet(..) )
-import Util		( Ord3(..), panic )
+import Util		( Ord3(..), removeDups, panic )
 \end{code}
 
 
@@ -58,20 +58,20 @@ rnPat (LazyPatIn pat)
     returnRn (LazyPatIn pat')
 
 rnPat (AsPatIn name pat)
-  = rnPat pat	`thenRn` \ pat' ->
+  = rnPat pat		`thenRn` \ pat' ->
     lookupValue name	`thenRn` \ vname ->
     returnRn (AsPatIn vname pat')
 
-rnPat (ConPatIn name pats)
-  = lookupValue name	`thenRn` \ name' ->
+rnPat (ConPatIn con pats)
+  = lookupConstr con	`thenRn` \ con' ->
     mapRn rnPat pats  	`thenRn` \ patslist ->
-    returnRn (ConPatIn name' patslist)
+    returnRn (ConPatIn con' patslist)
 
-rnPat (ConOpPatIn pat1 name pat2)
-  = lookupValue name	`thenRn` \ name' ->
+rnPat (ConOpPatIn pat1 con pat2)
+  = lookupConstr con	`thenRn` \ con' ->
     rnPat pat1		`thenRn` \ pat1' ->
     rnPat pat2		`thenRn` \ pat2' ->
-    precParsePat (ConOpPatIn pat1' name' pat2')
+    precParsePat (ConOpPatIn pat1' con' pat2')
 
 rnPat neg@(NegPatIn pat)
   = getSrcLocRn		`thenRn` \ src_loc ->
@@ -97,8 +97,9 @@ rnPat (TuplePatIn pats)
     returnRn (TuplePatIn patslist)
 
 rnPat (RecPatIn con rpats)
-  = panic "rnPat:RecPatIn"
-
+  = lookupConstr con 	`thenRn` \ con' ->
+    rnRpats rpats	`thenRn` \ rpats' ->
+    returnRn (RecPatIn con' rpats')
 \end{code}
 
 ************************************************************************
@@ -194,15 +195,16 @@ ToDo: what about RnClassOps ???
 \end{itemize}
 
 \begin{code}
+fv_set vname@(RnName n) | isLocallyDefinedName n
+		        = unitUniqSet vname
+fv_set _		= emptyUniqSet
+
+
 rnExpr :: RdrNameHsExpr -> RnM_Fixes s (RenamedHsExpr, FreeVars)
 
 rnExpr (HsVar v)
   = lookupValue v	`thenRn` \ vname ->
     returnRn (HsVar vname, fv_set vname)
-  where
-    fv_set vname@(RnName n)
-      | isLocallyDefinedName n = unitUniqSet vname
-    fv_set _		       = emptyUniqSet
 
 rnExpr (HsLit lit)
   = returnRn (HsLit lit, emptyUniqSet)
@@ -223,9 +225,10 @@ rnExpr (OpApp e1 op e2)
     precParseExpr (OpApp e1' op' e2') `thenRn` \ exp ->
     returnRn (exp, (fvs_op `unionUniqSets` fvs_e1) `unionUniqSets` fvs_e2)
 
-rnExpr (NegApp e)
+rnExpr (NegApp e n)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->
-    returnRn (NegApp e', fvs_e)
+    lookupValue n	`thenRn` \ nname ->
+    returnRn (NegApp e' nname, fvs_e `unionUniqSets` fv_set nname)
 
 rnExpr (HsPar e)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->
@@ -278,10 +281,15 @@ rnExpr (ExplicitTuple exps)
   = rnExprs exps	 	`thenRn` \ (exps', fvExps) ->
     returnRn (ExplicitTuple exps', fvExps)
 
-rnExpr (RecordCon con rbinds)
-  = panic "rnExpr:RecordCon"
-rnExpr (RecordUpd exp rbinds)
-  = panic "rnExpr:RecordUpd"
+rnExpr (RecordCon (HsVar con) rbinds)
+  = lookupConstr con 			`thenRn` \ conname ->
+    rnRbinds "construction" rbinds	`thenRn` \ (rbinds', fvRbinds) ->
+    returnRn (RecordCon (HsVar conname) rbinds', fvRbinds)
+
+rnExpr (RecordUpd expr rbinds)
+  = rnExpr expr			`thenRn` \ (expr', fvExpr) ->
+    rnRbinds "update" rbinds	`thenRn` \ (rbinds', fvRbinds) ->
+    returnRn (RecordUpd expr' rbinds', fvExpr `unionUniqSets` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
   = rnExpr expr			 	`thenRn` \ (expr', fvExpr) ->
@@ -319,7 +327,43 @@ rnExpr (ArithSeqIn seq)
        rnExpr expr3	`thenRn` \ (expr3', fvExpr3) ->
        returnRn (FromThenTo expr1' expr2' expr3',
 		  unionManyUniqSets [fvExpr1, fvExpr2, fvExpr3])
+\end{code}
 
+%************************************************************************
+%*									*
+\subsubsection{@Rbinds@s and @Rpats@s: in record expressions}
+%*									*
+%************************************************************************
+
+\begin{code}
+rnRbinds str rbinds 
+  = mapRn field_dup_err dup_fields	`thenRn_`
+    mapAndUnzipRn rn_rbind rbinds	`thenRn` \ (rbinds', fvRbind_s) ->
+    returnRn (rbinds', unionManyUniqSets fvRbind_s)
+  where
+    (_, dup_fields) = removeDups cmp [ f | (f,_,_) <- rbinds ]
+
+    field_dup_err dups = getSrcLocRn `thenRn` \ src_loc ->
+		         addErrRn (dupFieldErr str src_loc dups)
+
+    rn_rbind (field, expr, pun)
+      = lookupField field	`thenRn` \ fieldname ->
+	rnExpr expr		`thenRn` \ (expr', fvExpr) ->
+	returnRn ((fieldname, expr', pun), fvExpr)
+
+rnRpats rpats
+  = mapRn field_dup_err dup_fields 	`thenRn_`
+    mapRn rn_rpat rpats
+  where
+    (_, dup_fields) = removeDups cmp [ f | (f,_,_) <- rpats ]
+
+    field_dup_err dups = getSrcLocRn `thenRn` \ src_loc ->
+		         addErrRn (dupFieldErr "pattern" src_loc dups)
+
+    rn_rpat (field, pat, pun)
+      = lookupField field	`thenRn` \ fieldname ->
+	rnPat pat		`thenRn` \ pat' ->
+	returnRn (fieldname, pat', pun)
 \end{code}
 
 %************************************************************************
@@ -428,13 +472,13 @@ rnStmt (LetStmt binds)
 precParseExpr :: RenamedHsExpr -> RnM_Fixes s RenamedHsExpr
 precParsePat  :: RenamedPat -> RnM_Fixes s RenamedPat
 
-precParseExpr exp@(OpApp (NegApp e1) (HsVar op) e2)
+precParseExpr exp@(OpApp (NegApp e1 n) (HsVar op) e2)
   = lookupFixity op		`thenRn` \ (op_fix, op_prec) ->
     if 6 < op_prec then		
 	-- negate precedence 6 wired in
 	-- (-x)*y  ==> -(x*y)
 	precParseExpr (OpApp e1 (HsVar op) e2) `thenRn` \ op_app ->
-	returnRn (NegApp op_app)
+	returnRn (NegApp op_app n)
     else
 	returnRn exp
 
@@ -534,9 +578,13 @@ checkPrec op pat right
 \end{code}
 
 \begin{code}
+dupFieldErr str src_loc (dup:rest)
+  = addShortErrLocLine src_loc (\ sty ->
+    ppBesides [ppStr "duplicate field name `", ppr sty dup, ppStr "' in record ", ppStr str])
+
 negPatErr pat src_loc
-  = addErrLoc src_loc "prefix `-' not applied to literal in pattern" ( \sty ->
-    ppr sty pat) 
+  = addShortErrLocLine src_loc (\ sty ->
+    ppSep [ppStr "prefix `-' not applied to literal in pattern", ppr sty pat])
 
 precParseNegPatErr op src_loc
   = addErrLoc src_loc "precedence parsing error" (\ sty ->

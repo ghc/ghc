@@ -57,11 +57,11 @@ data ParsedIface
 -----------------------------------------------------------------
 
 data RdrIfaceDecl
-  = TypeSig    RdrName           SrcLoc RdrNameTyDecl
-  | NewTypeSig RdrName RdrName	 SrcLoc RdrNameTyDecl
-  | DataSig    RdrName [RdrName] SrcLoc RdrNameTyDecl
-  | ClassSig   RdrName [RdrName] SrcLoc RdrNameClassDecl
-  | ValSig     RdrName           SrcLoc RdrNamePolyType
+  = TypeSig    RdrName           	   SrcLoc RdrNameTyDecl
+  | NewTypeSig RdrName RdrName	 	   SrcLoc RdrNameTyDecl
+  | DataSig    RdrName [RdrName] [RdrName] SrcLoc RdrNameTyDecl
+  | ClassSig   RdrName [RdrName] 	   SrcLoc RdrNameClassDecl
+  | ValSig     RdrName           	   SrcLoc RdrNamePolyType
 				 
 data RdrIfaceInst		 
   = InstSig    RdrName RdrName   SrcLoc RdrNameInstDecl
@@ -151,14 +151,18 @@ mk_data	:: RdrNameContext
 mk_data ctxt (qtycon, tyvars) names_and_constrs
   = let
 	(qconnames, constrs) = unzip names_and_constrs
-	tycon    = de_qual qtycon
-	connames = map de_qual qconnames
-	qtyvars  = map Unqual tyvars
+	qfieldnames = [] -- ToDo ...
+	tycon      = de_qual qtycon
+	connames   = map de_qual qconnames
+	fieldnames = map de_qual qfieldnames
+	qtyvars    = map Unqual tyvars
 	
-	decl = DataSig qtycon qconnames mkIfaceSrcLoc (
+	decl = DataSig qtycon qconnames qfieldnames mkIfaceSrcLoc (
 		TyData ctxt qtycon qtyvars constrs Nothing noDataPragmas mkIfaceSrcLoc)
     in
-    (unitFM tycon decl, listToFM [(c,decl) | c <- connames])
+    (unitFM tycon decl, listToFM [(c,decl) | c <- connames]
+			`plusFM` 
+			listToFM [(f,decl) | f <- fieldnames])
 
 mk_new	:: RdrNameContext
 	-> (RdrName, [FAST_STRING])

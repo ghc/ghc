@@ -433,6 +433,5 @@ class_op_keys
     , (SLIT("enumFromTo"),	enumFromToClassOpKey)
     , (SLIT("enumFromThenTo"),	enumFromThenToClassOpKey)
     , (SLIT("=="),		eqClassOpKey)
---  , (SLIT(">="),		geClassOpKey)
     ]]
 \end{code}

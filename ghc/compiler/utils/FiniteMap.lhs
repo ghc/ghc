@@ -38,22 +38,24 @@ module FiniteMap (
 
 	emptyFM, unitFM, listToFM,
 
-	addToFM,   addListToFM,
-	IF_NOT_GHC(addToFM_C COMMA)
+	addToFM,
+	addToFM_C,
+	addListToFM,
 	addListToFM_C,
 	IF_NOT_GHC(delFromFM COMMA)
 	delListFromFM,
 
-	plusFM,      plusFM_C,
-	IF_NOT_GHC(intersectFM COMMA intersectFM_C COMMA)
-	minusFM, -- exported for GHCI only
+	plusFM,
+	plusFM_C,
+	minusFM, 		-- exported for GHCI only
 
+	IF_NOT_GHC(intersectFM COMMA)
+	IF_NOT_GHC(intersectFM_C COMMA)
 	IF_NOT_GHC(mapFM COMMA foldFM COMMA filterFM COMMA)
 
-	IF_NOT_GHC(sizeFM COMMA)
-	isEmptyFM, elemFM, lookupFM, lookupWithDefaultFM,
+	sizeFM, isEmptyFM, elemFM, lookupFM, lookupWithDefaultFM,
 
-	fmToList, keysFM, eltsFM{-used in GHCI-}
+	fmToList, keysFM, eltsFM
 
 #ifdef COMPILING_GHC
 	, bagToFM

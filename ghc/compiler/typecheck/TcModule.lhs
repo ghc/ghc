@@ -42,7 +42,7 @@ import Maybes		( catMaybes )
 import Name		( isExported, isLocallyDefined )
 import PrelInfo		( unitTy, mkPrimIoTy )
 import Pretty
-import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
+import RnUtils		( RnEnv(..) )
 import TyCon		( TyCon )
 import Type		( mkSynTy )
 import Unify		( unifyTauTy )
@@ -59,7 +59,7 @@ tycon_specs = emptyFM
 \end{code}
 
 \begin{code}
-tcModule :: GlobalNameMappers		-- final renamer info for derivings
+tcModule :: RnEnv			-- for renaming derivings
 	 -> RenamedHsModule		-- input
 	 -> TcM s ((TypecheckedHsBinds,	-- record selector binds
 		    TypecheckedHsBinds,	-- binds from class decls; does NOT
@@ -81,7 +81,7 @@ tcModule :: GlobalNameMappers		-- final renamer info for derivings
 
 		   PprStyle -> Pretty)	-- -ddump-deriving info
 
-tcModule renamer_name_funs
+tcModule rn_env
 	(HsModule mod_name verion exports imports fixities
 		  ty_decls specdata_sigs cls_decls inst_decls specinst_sigs
 		  default_decls val_decls sigs src_loc)
@@ -111,7 +111,7 @@ tcModule renamer_name_funs
 	    tcSetEnv env (
 	    --trace "tcInstDecls:"	$
 	    tcInstDecls1 inst_decls_bag specinst_sigs
-			 mod_name renamer_name_funs fixities 
+			 mod_name rn_env fixities 
 	    )				`thenTc` \ (inst_info, deriv_binds, ddump_deriv) ->
 
 	    buildInstanceEnvs inst_info	`thenTc` \ inst_mapper ->

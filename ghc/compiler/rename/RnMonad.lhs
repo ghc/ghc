@@ -9,18 +9,18 @@
 module RnMonad (
 	RnMonad(..), RnM(..), RnM_Fixes(..), RnDown, SST_R,
 	initRn, thenRn, thenRn_, andRn, returnRn,
-	mapRn, mapAndUnzipRn,
+	mapRn, mapAndUnzipRn, mapAndUnzip3Rn,
 
 	addErrRn, addErrIfRn, addWarnRn, addWarnIfRn,
 	failButContinueRn, warnAndContinueRn,
-	setExtraRn, getExtraRn,
+	setExtraRn, getExtraRn, getRnEnv,
 	getModuleRn, pushSrcLocRn, getSrcLocRn,
 	getSourceRn, getOccurrenceUpRn,
 	getImplicitUpRn, ImplicitEnv(..), emptyImplicitEnv,
 	rnGetUnique, rnGetUniques,
 
 	newLocalNames,
-	lookupValue, lookupValueMaybe, lookupClassOp,
+	lookupValue, lookupConstr, lookupField, lookupClassOp,
 	lookupTyCon, lookupClass, lookupTyConOrClass,
 	extendSS2, extendSS,
 
@@ -38,12 +38,12 @@ import HsSyn		( FixityDecl )
 import RnHsSyn		( RnName, mkRnName, mkRnUnbound, mkRnImplicit,
 			  mkRnImplicitTyCon, mkRnImplicitClass, 
 			  isRnLocal, isRnWired, isRnTyCon, isRnClass,
-			  isRnTyConOrClass, isRnClassOp,
-			  RenamedFixityDecl(..) )
+			  isRnTyConOrClass, isRnConstr, isRnField,
+			  isRnClassOp, RenamedFixityDecl(..) )
 import RnUtils		( RnEnv(..), extendLocalRnEnv,
-			  lookupRnEnv, lookupTcRnEnv,
+			  lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
 			  unknownNameErr, badClassOpErr, qualNameErr,
-			  dupNamesErr, shadowedNameWarn )
+			  dupNamesErr, shadowedNameWarn, negateNameWarn )
 
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import CmdLineOpts	( opt_WarnNameShadowing )
@@ -161,6 +161,12 @@ mapAndUnzipRn f (x:xs)
   = f x		    	`thenRn` \ (r1,  r2)  ->
     mapAndUnzipRn f xs	`thenRn` \ (rs1, rs2) ->
     returnRn (r1:rs1, r2:rs2)
+
+mapAndUnzip3Rn f [] = returnRn ([],[],[])
+mapAndUnzip3Rn f (x:xs)
+  = f x		    	`thenRn` \ (r1,  r2,  r3)  ->
+    mapAndUnzip3Rn f xs	`thenRn` \ (rs1, rs2, rs3) ->
+    returnRn (r1:rs1, r2:rs2, r3:rs3)
 \end{code}
 
 For errors and warnings ...
@@ -194,6 +200,10 @@ addWarnIfRn False warn = returnRn ()
 
 
 \begin{code}
+getRnEnv :: RnMonad x s RnEnv
+getRnEnv (RnDown _ _ _ _ env _ _)
+  = returnSST env
+
 setExtraRn :: x -> RnMonad x s r -> RnMonad y s r
 setExtraRn x m (RnDown _ mod locn mode env us errs)
   = m (RnDown x mod locn mode env us errs)
@@ -281,11 +291,13 @@ newLocalNames :: String 		-- Documentation string
 	      -> RnMonad x s [RnName]
 
 newLocalNames str names_w_loc
-  = mapRn (addErrRn . qualNameErr str) quals `thenRn_`
-    mapRn (addErrRn . dupNamesErr str) dups  `thenRn_`
+  = mapRn (addWarnRn . negateNameWarn) negs 	`thenRn_`
+    mapRn (addErrRn . qualNameErr str) quals 	`thenRn_`
+    mapRn (addErrRn . dupNamesErr str) dups  	`thenRn_`
     mkLocalNames these
   where
-    quals         = filter (isQual.fst) names_w_loc
+    negs  = filter ((== Unqual SLIT("negate")).fst) names_w_loc
+    quals = filter (isQual.fst) names_w_loc
     (these, dups) = removeDups cmp_fst names_w_loc
     cmp_fst (a,_) (b,_) = cmp a b
 \end{code}
@@ -319,17 +331,26 @@ If not found create new implicit name, adding it to the implicit env.
 
 \begin{code}
 lookupValue      :: RdrName -> RnMonad x s RnName
+lookupConstr     :: RdrName -> RnMonad x s RnName
+lookupField      :: RdrName -> RnMonad x s RnName
 lookupClassOp    :: RnName  -> RdrName -> RnMonad x s RnName
 
 lookupValue rdr
-  = lookup_val rdr (\ rn -> True) (unknownNameErr "value")
+  = lookup_val rdr lookupRnEnv (\ rn -> True) (unknownNameErr "value")
+
+lookupConstr rdr
+  = lookup_val rdr lookupGlobalRnEnv isRnConstr (unknownNameErr "constructor")
+
+lookupField rdr
+  = lookup_val rdr lookupGlobalRnEnv isRnField (unknownNameErr "field")
 
 lookupClassOp cls rdr
-  = lookup_val rdr (\ rn -> True){-WAS:(isRnClassOp cls)-} (badClassOpErr cls)
+  = lookup_val rdr lookupGlobalRnEnv (\ rn -> isRnClassOp cls rn) (badClassOpErr cls)
 
+-- Note: the lookup checks are only performed when renaming source
 
-lookup_val rdr check do_err down@(RnDown _ _ locn (RnSource occ_var) env _ _)
-  = case lookupRnEnv env rdr of
+lookup_val rdr lookup check do_err down@(RnDown _ _ locn (RnSource occ_var) env _ _)
+  = case lookup env rdr of
 	Just name | check name -> succ name
 		  | otherwise  -> fail
 	Nothing                -> fail
@@ -342,11 +363,10 @@ lookup_val rdr check do_err down@(RnDown _ _ locn (RnSource occ_var) env _ _)
 		    returnSST name
     fail = failButContinueRn (mkRnUnbound rdr) (do_err rdr locn) down
 
-lookup_val rdr check do_err down@(RnDown _ _ locn (RnIface b_names b_key imp_var) env us_var _)
-  = case lookupRnEnv env rdr of
-	Just name | check name -> returnSST name
-		  | otherwise  -> failButContinueRn (mkRnUnbound rdr) (do_err rdr locn) down
-	Nothing                -> lookup_nonexisting_val b_names b_key imp_var us_var rdr
+lookup_val rdr lookup check do_err down@(RnDown _ _ locn (RnIface b_names b_key imp_var) env us_var _)
+  = case lookup env rdr of
+	Just name -> returnSST name
+	Nothing   -> lookup_nonexisting_val b_names b_key imp_var us_var rdr
 
 lookup_nonexisting_val (b_names,_) b_key imp_var us_var rdr
   = case rdr of
@@ -374,11 +394,6 @@ lookup_or_create_implicit_val b_key imp_var us_var rdr
 	  in
 	  writeMutVarSST imp_var (new_val_fm, implicit_tc_fm) `thenSST_`
 	  returnSST implicit
-
-
-lookupValueMaybe :: RdrName -> RnMonad x s (Maybe RnName)
-lookupValueMaybe rdr down@(RnDown _ _ _ (RnSource _) env _ _)
-  = returnSST (lookupRnEnv env rdr)
 \end{code}
 
 

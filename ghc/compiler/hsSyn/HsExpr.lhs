@@ -57,8 +57,11 @@ data HsExpr tyvar uvar id pat
 		(HsExpr tyvar uvar id pat)	-- right operand
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
+  -- They are eventually removed by the type checker.
 
   | NegApp	(HsExpr tyvar uvar id pat)	-- negated expr
+		id				-- the negate id
+
   | HsPar	(HsExpr tyvar uvar id pat)	-- parenthesised expr
 
   | SectionL	(HsExpr tyvar uvar id pat)	-- operand
@@ -224,7 +227,7 @@ pprExpr sty (OpApp e1 op e2)
     pp_infixly v
       = ppSep [pp_e1, ppCat [pprSym sty v, pp_e2]]
 
-pprExpr sty (NegApp e)
+pprExpr sty (NegApp e _)
   = ppBeside (ppChar '-') (pprParendExpr sty e)
 
 pprExpr sty (HsPar e)
@@ -401,8 +404,8 @@ pp_rbinds sty thing rbinds
   = ppHang thing 4
 	(ppBesides [ppChar '{', ppInterleave ppComma (map (pp_rbind sty) rbinds), ppChar '}'])
   where
-    pp_rbind sty (v, _, True{-pun-}) = ppr sty v
-    pp_rbind sty (v, e, _) = ppCat [ppr sty v, ppStr "<-", ppr sty e]
+    pp_rbind PprForUser (v, _, True) = ppr PprForUser v
+    pp_rbind sty        (v, e, _)    = ppCat [ppr sty v, ppStr "=", ppr sty e]
 \end{code}
 
 %************************************************************************

@@ -169,7 +169,7 @@ mkDataBinds tycon
     returnTc (con_ids ++ sel_ids, 
 	      SingleBind $ NonRecBind $
 	      foldr AndMonoBinds 
-		    (foldr AndMonoBinds EmptyMonoBinds con_binds)
+		    (foldr AndMonoBinds EmptyMonoBinds sel_binds)
 		    con_binds
     )
   where
@@ -323,7 +323,7 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
       selector_body = HsCase (HsVar record_id) (map mk_match fields) (getSrcLoc tycon)
 
       mk_match (con_id, field_label) 
-    	= PatMatch (RecPat con_id data_ty' [(RealId selector_id, VarPat field_id, False)]) $
+    	= PatMatch (RecPat con_id data_ty' [(selector_id, VarPat field_id, False)]) $
 	  SimpleMatch $
     	  HsVar field_id
     in

@@ -88,7 +88,7 @@ data OutPat tyvar uvar id
 
   | RecPat	    Id 				-- record constructor
 		    (GenType tyvar uvar)    	-- the type of the pattern
-		    [(id, OutPat tyvar uvar id, Bool)]	-- True <=> source used punning
+		    [(Id, OutPat tyvar uvar id, Bool)]	-- True <=> source used punning
 
   | LitPat	    -- Used for *non-overloaded* literal patterns:
 		    -- Int#, Char#, Int, Char, String, etc.
@@ -103,7 +103,7 @@ data OutPat tyvar uvar id
    	    	    (HsExpr tyvar uvar id (OutPat tyvar uvar id))
 						-- of type t -> Bool; detects match
 
-  |  DictPat	    -- Used when destructing Dictionaries with an explicit case
+  | DictPat	    -- Used when destructing Dictionaries with an explicit case
 		    [id]			-- superclass dicts
 		    [id]			-- methods
 \end{code}
@@ -153,10 +153,10 @@ pprInPat sty (TuplePatIn pats)
   = ppBesides [ppLparen, interpp'SP sty pats, ppRparen]
 
 pprInPat sty (RecPatIn con rpats)
-  = ppBesides [ppr sty con, ppSP, ppChar '{', ppInterleave ppComma (map pp_rpat rpats), ppChar '}']
+  = ppBesides [ppr sty con, ppSP, ppChar '{', ppInterleave ppComma (map (pp_rpat sty) rpats), ppChar '}']
   where
-    pp_rpat (v, _, True{-pun-}) = ppr sty v
-    pp_rpat (v, p, _) = ppCat [ppr sty v, ppStr "<-", ppr sty p]
+    pp_rpat PprForUser (v, _, True) = ppr PprForUser v
+    pp_rpat sty        (v, p, _)    = ppCat [ppr sty v, ppStr "=", ppr sty p]
 \end{code}
 
 \begin{code}
@@ -191,10 +191,10 @@ pprOutPat sty (TuplePat pats)
   = ppBesides [ppLparen, interpp'SP sty pats, ppRparen]
 
 pprOutPat sty (RecPat con ty rpats)
-  = ppBesides [ppr sty con, ppChar '{', ppInterleave ppComma (map pp_rpat rpats), ppChar '}']
+  = ppBesides [ppr sty con, ppChar '{', ppInterleave ppComma (map (pp_rpat sty) rpats), ppChar '}']
   where
---  pp_rpat (v, _, True{-pun-}) = ppr sty v
-    pp_rpat (v, p, _) = ppBesides [ppr sty v, ppStr "<-", ppr sty p]
+    pp_rpat PprForUser (v, _, True) = ppr PprForUser v
+    pp_rpat sty (v, p, _)           = ppCat [ppr sty v, ppStr "=", ppr sty p]
 
 pprOutPat sty (LitPat l ty) 	= ppr sty l	-- ToDo: print more
 pprOutPat sty (NPat   l ty e)	= ppr sty l	-- ToDo: print more
@@ -293,14 +293,15 @@ collected is important; see @HsBinds.lhs@.
 \begin{code}
 collectPatBinders :: InPat a -> [a]
 
-collectPatBinders (VarPatIn var)     = [var]
-collectPatBinders (LazyPatIn pat)    = collectPatBinders pat
-collectPatBinders (AsPatIn a pat)    = a : collectPatBinders pat
-collectPatBinders (ConPatIn c pats)  = concat (map collectPatBinders pats)
+collectPatBinders WildPatIn	      = []
+collectPatBinders (VarPatIn var)      = [var]
+collectPatBinders (LazyPatIn pat)     = collectPatBinders pat
+collectPatBinders (AsPatIn a pat)     = a : collectPatBinders pat
+collectPatBinders (ConPatIn c pats)   = concat (map collectPatBinders pats)
 collectPatBinders (ConOpPatIn p1 c p2)= collectPatBinders p1 ++ collectPatBinders p2
-collectPatBinders (NegPatIn  pat)    = collectPatBinders pat
-collectPatBinders (ParPatIn  pat)    = collectPatBinders pat
-collectPatBinders (ListPatIn pats)   = concat (map collectPatBinders pats)
-collectPatBinders (TuplePatIn pats)  = concat (map collectPatBinders pats)
-collectPatBinders any_other_pat	     = [ {-no binders-} ]
+collectPatBinders (NegPatIn  pat)     = collectPatBinders pat
+collectPatBinders (ParPatIn  pat)     = collectPatBinders pat
+collectPatBinders (ListPatIn pats)    = concat (map collectPatBinders pats)
+collectPatBinders (TuplePatIn pats)   = concat (map collectPatBinders pats)
+collectPatBinders (RecPatIn c fields) = concat (map (\ (f,pat,_) -> collectPatBinders pat) fields)
 \end{code}

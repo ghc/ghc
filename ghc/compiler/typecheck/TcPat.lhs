@@ -76,6 +76,13 @@ tcPat WildPatIn
   = newTyVarTy mkTypeKind	`thenNF_Tc` \ tyvar_ty ->
     returnTc (WildPat tyvar_ty, emptyLIE, tyvar_ty)
 
+tcPat (NegPatIn pat)
+  = tcPat (negate_lit pat)
+  where
+    negate_lit (LitPatIn (HsInt  i)) = LitPatIn (HsInt  (-i))
+    negate_lit (LitPatIn (HsFrac f)) = LitPatIn (HsFrac (-f))
+    negate_lit _                     = panic "TcPat:negate_pat"
+
 tcPat (ParPatIn parend_pat)
   = tcPat parend_pat
 \end{code}
@@ -164,7 +171,7 @@ tcPat pat_in@(ConPatIn name pats)
 	      lie, 
 	      data_ty)
 
-tcPat pat_in@(ConOpPatIn pat1 op pat2) -- & in binary-op form...
+tcPat pat_in@(ConOpPatIn pat1 op pat2) 	-- in binary-op form...
   = tcPat pat1				`thenTc` \ (pat1', lie1, ty1) ->
     tcPat pat2				`thenTc` \ (pat2', lie2, ty2) ->
 
@@ -193,13 +200,13 @@ tcPat pat_in@(RecPatIn name rpats)
 	(_, record_ty) = splitFunTy con_tau
     in
 	-- Con is syntactically constrained to be a data constructor
-    ASSERT( maybeToBool (maybeAppDataTyCon record_ty ) )
+    ASSERT( maybeToBool (maybeAppDataTyCon record_ty) )
 
     mapAndUnzipTc (do_bind record_ty) rpats	`thenTc` \ (rpats', lies) ->
 
-    returnTc (panic "tcPat:RecPatIn:avoid type errors"{-RecPat con_id record_ty rpats', 
+    returnTc (RecPat con_id record_ty rpats', 
 	      plusLIEs lies, 
-	      record_ty-})
+	      record_ty)
 
   where
     do_bind expected_record_ty (field_label, rhs_pat, pun_flag)

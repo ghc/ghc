@@ -1013,7 +1013,11 @@ getIdNamePieces show_uniqs id
 
       TupleConId n _ -> [nameOf (origName n)]
 
-      RecordSelId lbl -> panic "getIdNamePieces:RecordSelId"
+      RecordSelId lbl ->
+	let n = fieldLabelName lbl
+        in
+	case (moduleNamePair n) of { (mod, name) ->
+	if isPreludeDefinedName n then [name] else [mod, name] }
 
       ImportedId n -> get_fullname_pieces n
       PreludeId  n -> get_fullname_pieces n

@@ -341,10 +341,11 @@ generic_pair thing
 do_fixity :: -> RenamedFixityDecl -> Pretty
 
 do_fixity fixity_decl
-  = case (getExportFlag (get_name fixity_decl)) of
-      ExportAll -> ppr PprInterface fixity_decl
-      _	    	-> ppNil
+  = case (isLocallyDefined name, getExportFlag name) of
+      (True, ExportAll) -> ppr PprInterface fixity_decl
+      _	    	        -> ppNil
   where
+     name = get_name fixity_decl
      get_name (InfixL n _) = n
      get_name (InfixR n _) = n
      get_name (InfixN n _) = n

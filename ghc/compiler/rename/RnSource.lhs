@@ -17,10 +17,11 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnBinds		( rnTopBinds, rnMethodBinds )
-import RnUtils		( lubExportFlag )
+import RnUtils		( lookupGlobalRnEnv, lubExportFlag )
 
 import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
 import Class		( derivableClassKeys )
+import ErrUtils		( addErrLoc, addShortErrLocLine )
 import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
@@ -31,9 +32,9 @@ import PprStyle -- ToDo:rm
 import Pretty
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )
-import UniqFM		( emptyUFM, addListToUFM, addListToUFM_C, listToUFM, lookupUFM, eltsUFM )
+import UniqFM		( emptyUFM, addListToUFM_C, listToUFM, lookupUFM, eltsUFM )
 import UniqSet		( UniqSet(..) )
-import Util		( isIn, isn'tIn, sortLt, removeDups, cmpPString, panic, assertPanic, pprTrace{-ToDo:rm-} )
+import Util		( isIn, isn'tIn, sortLt, removeDups, cmpPString, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 rnSource `renames' the source module and export list.
@@ -70,12 +71,10 @@ rnSource imp_mods unqual_imps imp_fixes
     rnExports (mod:imp_mods) unqual_imps exports	`thenRn` \ exported_fn ->
     rnFixes fixes					`thenRn` \ src_fixes ->
     let
-	pair_name inf@(InfixL n _) = (n, inf)
-	pair_name inf@(InfixR n _) = (n, inf)
-	pair_name inf@(InfixN n _) = (n, inf)
+	pair_name inf = (nameFixDecl inf, inf)
 
-	imp_fixes_fm = listToUFM (map pair_name (bagToList imp_fixes))
-	all_fixes_fm = addListToUFM imp_fixes_fm (map pair_name src_fixes)
+	all_fixes    = src_fixes ++ bagToList imp_fixes
+	all_fixes_fm = listToUFM (map pair_name all_fixes)
     in
     setExtraRn all_fixes_fm $
 
@@ -91,7 +90,7 @@ rnSource imp_mods unqual_imps imp_fixes
 
     returnRn (
 	      HsModule mod version
-		trashed_exports trashed_imports	src_fixes
+		trashed_exports trashed_imports	all_fixes
 		new_ty_decls new_specdata_sigs new_class_decls
 		new_inst_decls new_specinst_sigs new_defaults
 		new_binds [] src_loc,
@@ -132,16 +131,16 @@ rnExports mods unqual_imps (Just exps)
 
 	-- Build finite map of exported names to export flag
 	exp_map0 = addListToUFM_C lub_expflag emptyUFM (map pair_fst uniq_exp_names)
-	exp_map1 = foldl add_mod_names exp_map0 uniq_exp_mods
+	(exp_map1, empty_mods) = foldl add_mod_names (exp_map0, []) uniq_exp_mods
 
 	mod_fm = addListToFM_C unionBags emptyFM
 		 [(mod, unitBag (getName rn, nameImportFlag (getName rn)))
 		  | (mod,rn) <- bagToList unqual_imps]
 
-        add_mod_names exp_map mod
+        add_mod_names (exp_map, empty) mod
 	  = case lookupFM mod_fm mod of
-	      Nothing        -> exp_map
-	      Just mod_names -> addListToUFM_C lub_expflag exp_map (map pair_fst (bagToList mod_names))
+	      Nothing        -> (exp_map, mod:empty)
+	      Just mod_names -> (addListToUFM_C lub_expflag exp_map (map pair_fst (bagToList mod_names)), empty)
 
 	pair_fst p@(f,_) = (f,p)
 	lub_expflag (n, flag1) (_, flag2) = (n, lubExportFlag flag1 flag2)
@@ -151,16 +150,16 @@ rnExports mods unqual_imps (Just exps)
 	(_, dup_locals) = removeDups cmp_local exp_locals
 	cmp_local (x,_) (y,_) = x `cmpPString` y
 
-
 	-- Build export flag function
 	exp_fn n = case lookupUFM exp_map1 n of
 		     Nothing       -> NotExported
 		     Just (_,flag) -> flag
     in
     getSrcLocRn 						`thenRn` \ src_loc ->
-    mapRn (addWarnRn . dupNameExportWarn   src_loc) dup_names 	`thenRn_`
-    mapRn (addWarnRn . dupModuleExportWarn src_loc) dup_mods 	`thenRn_`
-    mapRn (addErrRn  . dupLocalsExportErr  src_loc) dup_locals 	`thenRn_`
+    mapRn (addWarnRn . dupNameExportWarn  src_loc) dup_names 	`thenRn_`
+    mapRn (addWarnRn . dupModExportWarn   src_loc) dup_mods 	`thenRn_`
+    mapRn (addWarnRn . emptyModExportWarn src_loc) empty_mods 	`thenRn_`
+    mapRn (addErrRn  . dupLocalsExportErr src_loc) dup_locals 	`thenRn_`
     returnRn exp_fn
 
 
@@ -170,21 +169,19 @@ rnIE mods (IEVar name)
     returnRn (Nothing, exps)
   where
     checkIEVar (RnName n)         = returnRn (unitBag (n,ExportAll))
-    checkIEVar (RnUnbound _)      = returnRn emptyBag
     checkIEVar rn@(RnClassOp _ _) = getSrcLocRn `thenRn` \ src_loc ->
 			            failButContinueRn emptyBag (classOpExportErr rn src_loc)
-    checkIEVar rn                 = panic "checkIEVar"
+    checkIEVar rn		  = returnRn emptyBag
 
 rnIE mods (IEThingAbs name)
   = lookupTyConOrClass name	`thenRn` \ rn ->
     checkIEAbs rn		`thenRn` \ exps ->
     returnRn (Nothing, exps)
   where
-    checkIEAbs (RnSyn n)     = returnRn (unitBag (n,ExportAbs))
-    checkIEAbs (RnData n _)  = returnRn (unitBag (n,ExportAbs))
-    checkIEAbs (RnClass n _) = returnRn (unitBag (n,ExportAbs))
-    checkIEAbs (RnUnbound _) = returnRn emptyBag
-    checkIEAbs rn            = panic "checkIEAbs"
+    checkIEAbs (RnSyn n)      = returnRn (unitBag (n,ExportAbs))
+    checkIEAbs (RnData n _ _) = returnRn (unitBag (n,ExportAbs))
+    checkIEAbs (RnClass n _)  = returnRn (unitBag (n,ExportAbs))
+    checkIEAbs rn             = returnRn emptyBag
 
 rnIE mods (IEThingAll name)
   = lookupTyConOrClass name	`thenRn` \ rn ->
@@ -192,12 +189,12 @@ rnIE mods (IEThingAll name)
     checkImportAll rn           `thenRn_`
     returnRn (Nothing, exps)
   where
-    checkIEAll (RnData n cons) = returnRn (consBag (exp_all n) (listToBag (map exp_all cons)))
-    checkIEAll (RnClass n ops) = returnRn (consBag (exp_all n) (listToBag (map exp_all ops)))
-    checkIEAll (RnUnbound _)   = returnRn emptyBag
-    checkIEAll rn@(RnSyn _)    = getSrcLocRn `thenRn` \ src_loc ->
-			         warnAndContinueRn emptyBag (synAllExportErr rn src_loc)
-    checkIEAll rn              = panic "checkIEAll"
+    checkIEAll (RnData n cons fields) = returnRn (exp_all n `consBag` listToBag (map exp_all cons)
+							  `unionBags` listToBag (map exp_all fields))
+    checkIEAll (RnClass n ops)        = returnRn (exp_all n `consBag` listToBag (map exp_all ops))
+    checkIEAll rn@(RnSyn _)           = getSrcLocRn `thenRn` \ src_loc ->
+			                warnAndContinueRn emptyBag (synAllExportErr rn src_loc)
+    checkIEAll rn                     = returnRn emptyBag
 
     exp_all n = (n, ExportAll)
 
@@ -208,16 +205,21 @@ rnIE mods (IEThingWith name names)
     checkImportAll rn    	`thenRn_`
     returnRn (Nothing, exps)
   where
-    checkIEWith rn@(RnData n cons) rns
-		 | same_names cons rns = returnRn (consBag (exp_all n) (listToBag (map exp_all cons)))
-		 | otherwise 	       = rnWithErr "constructrs" rn cons rns 
+    checkIEWith rn@(RnData n cons fields) rns
+	| same_names (cons++fields) rns
+	= returnRn (consBag (exp_all n) (listToBag (map exp_all cons)))
+	| otherwise
+	= rnWithErr "constructrs (and fields)" rn (cons++fields) rns 
     checkIEWith rn@(RnClass n ops) rns
-		 | same_names ops rns  = returnRn (consBag (exp_all n) (listToBag (map exp_all ops)))
-		 | otherwise 	       = rnWithErr "class ops" rn ops rns
-    checkIEWith (RnUnbound _)      rns = returnRn emptyBag
-    checkIEWith rn@(RnSyn _)       rns = getSrcLocRn `thenRn` \ src_loc ->
-			                 failButContinueRn emptyBag (synAllExportErr rn src_loc)
-    checkIEWith rn                 rns = panic "checkIEWith"
+	| same_names ops rns
+	= returnRn (consBag (exp_all n) (listToBag (map exp_all ops)))
+	| otherwise
+	= rnWithErr "class ops" rn ops rns
+    checkIEWith rn@(RnSyn _) rns
+	= getSrcLocRn `thenRn` \ src_loc ->
+	  failButContinueRn emptyBag (synAllExportErr rn src_loc)
+    checkIEWith rn rns
+	= returnRn emptyBag
 
     exp_all n = (n, ExportAll)
 
@@ -323,27 +325,34 @@ rnConDecls tv_env con_decls
   where
     rn_decl (ConDecl name tys src_loc)
       = pushSrcLocRn src_loc $
-	lookupValue name	`thenRn` \ new_name ->
+	lookupConstr name	`thenRn` \ new_name ->
 	mapRn rn_bang_ty tys	`thenRn` \ new_tys  ->
 	returnRn (ConDecl new_name new_tys src_loc)
 
     rn_decl (ConOpDecl ty1 op ty2 src_loc)
       = pushSrcLocRn src_loc $
-	lookupValue op		`thenRn` \ new_op  ->
+	lookupConstr op		`thenRn` \ new_op  ->
 	rn_bang_ty ty1  	`thenRn` \ new_ty1 ->
 	rn_bang_ty ty2  	`thenRn` \ new_ty2 ->
 	returnRn (ConOpDecl new_ty1 new_op new_ty2 src_loc)
 
     rn_decl (NewConDecl name ty src_loc)
       = pushSrcLocRn src_loc $
-	lookupValue name	`thenRn` \ new_name ->
+	lookupConstr name	`thenRn` \ new_name ->
 	rn_mono_ty ty		`thenRn` \ new_ty  ->
 	returnRn (NewConDecl new_name new_ty src_loc)
 
-    rn_decl (RecConDecl con fields src_loc)
-      = panic "rnConDecls:RecConDecl"
+    rn_decl (RecConDecl name fields src_loc)
+      = pushSrcLocRn src_loc $
+	lookupConstr name	`thenRn` \ new_name ->
+	mapRn rn_field fields	`thenRn` \ new_fields ->
+	returnRn (RecConDecl new_name new_fields src_loc)
 
-    ----------
+    rn_field (names, ty)
+      = mapRn lookupField names `thenRn` \ new_names ->
+	rn_bang_ty ty		`thenRn` \ new_ty ->
+	returnRn (new_names, new_ty) 
+
     rn_mono_ty = rnMonoType tv_env
 
     rn_bang_ty (Banged ty)
@@ -530,23 +539,32 @@ rnDefaultDecl defs@(d:ds)
 rnFixes :: [RdrNameFixityDecl]  -> RnM s [RenamedFixityDecl]
 
 rnFixes fixities
-  = mapRn rn_fixity fixities	`thenRn` \ fixes_maybe ->
-    returnRn (catMaybes fixes_maybe)
-  where
-    rn_fixity fix@(InfixL name i)
-      = rn_fixity_pieces InfixL name i fix
-    rn_fixity fix@(InfixR name i)
-      = rn_fixity_pieces InfixR name i fix
-    rn_fixity fix@(InfixN name i)
-      = rn_fixity_pieces InfixN name i fix
+  = getSrcLocRn	`thenRn` \ src_loc ->
+    let
+        (_, dup_fixes) = removeDups cmp_fix fixities
+	cmp_fix fix1 fix2 = nameFixDecl fix1 `cmp` nameFixDecl fix2
 
-    rn_fixity_pieces mk_fixity name i fix
-      = lookupValueMaybe name	`thenRn` \ maybe_res ->
-	case maybe_res of
-	  Just res | isLocallyDefined res
-	    -> returnRn (Just (mk_fixity res i))
-	  _ -> failButContinueRn Nothing (undefinedFixityDeclErr fix)
-		
+        rn_fixity fix@(InfixL name i)
+      	  = rn_fixity_pieces InfixL name i fix
+    	rn_fixity fix@(InfixR name i)
+      	  = rn_fixity_pieces InfixR name i fix
+    	rn_fixity fix@(InfixN name i)
+      	  = rn_fixity_pieces InfixN name i fix
+
+    	rn_fixity_pieces mk_fixity name i fix
+      	  = getRnEnv `thenRn` \ env ->
+	      case lookupGlobalRnEnv env name of
+	  	Just res | isLocallyDefined res
+	  	  -> returnRn (Just (mk_fixity res i))
+	  	_ -> failButContinueRn Nothing (undefinedFixityDeclErr src_loc fix)
+    in
+    mapRn (addErrRn . dupFixityDeclErr src_loc) dup_fixes `thenRn_`
+    mapRn rn_fixity fixities				  `thenRn` \ fixes_maybe ->
+    returnRn (catMaybes fixes_maybe)
+
+nameFixDecl (InfixL name i) = name
+nameFixDecl (InfixR name i) = name
+nameFixDecl (InfixN name i) = name
 \end{code}
 
 %*********************************************************
@@ -640,50 +658,62 @@ rnContext tv_env ctxt
 
 
 \begin{code}
-dupNameExportWarn locn names@((n,_):_) sty
-  = ppHang (ppCat [pprNonSym sty n, ppStr "exported", ppInt (length names), ppStr "times:"])
-	 4 (ppr sty locn)
+dupNameExportWarn locn names@((n,_):_)
+  = addShortErrLocLine locn (\ sty ->
+    ppCat [pprNonSym sty n, ppStr "exported", ppInt (length names), ppStr "times"])
 
-dupModuleExportWarn locn mods@(mod:_) sty
-  = ppHang (ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list:"])
-	 4 (ppr sty locn)
+dupLocalsExportErr locn locals@((str,_):_)
+  = addErrLoc locn "exported names have same local name" (\ sty ->
+    ppInterleave ppSP (map (pprNonSym sty . snd) locals))
 
-dupLocalsExportErr locn locals@((str,_):_) sty
-  = ppHang (ppBesides [ppStr "Exported names have same local name `", ppPStr str, ppStr "': ", ppr sty locn])
-	 4 (ppInterleave ppSP (map (pprNonSym sty . snd) locals))
+classOpExportErr op locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "class operation `", ppr sty op, ppStr "' can only be exported with class"])
 
-classOpExportErr op locn sty 
-  = ppHang (ppStr "Class operation can only be exported with class:")
-         4 (ppCat [ppr sty op, ppr sty locn])
+synAllExportErr syn locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "type synonym `", ppr sty syn, ppStr "' should be exported abstractly"])
 
-synAllExportErr syn locn sty
-  = ppHang (ppStr "Type synonym should be exported abstractly:")
-         4 (ppCat [ppr sty syn, ppr sty locn])
+withExportErr str rn has rns locn
+  = addErrLoc locn "" (\ sty ->
+    ppAboves [ ppBesides [ppStr "inconsistent list of", ppStr str, ppStr "in export list for `", ppr sty rn, ppStr "'"],
+	       ppCat [ppStr "    expected:", ppInterleave ppComma (map (ppr sty) has)],
+	       ppCat [ppStr "    found:   ", ppInterleave ppComma (map (ppr sty) rns)] ])
 
-withExportErr str rn has rns locn sty
-  = ppHang (ppBesides [ppStr "Inconsistent list of ", ppStr str, ppStr ": ", ppr sty locn])
-         4 (ppAbove (ppCat [ppStr "expected:", ppInterleave ppComma (map (ppr sty) has)])
-		    (ppCat [ppStr "found:   ", ppInterleave ppComma (map (ppr sty) rns)]))
+importAllErr rn locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ ppStr "`", pprNonSym sty rn, ppStr "' has been exported with (..), but is only imported abstractly"])
 
-importAllErr rn locn sty
-  = ppHang (ppCat [pprNonSym sty rn, ppStr "exported concretely but only imported abstractly"])
-         4 (ppr sty locn)
+badModExportErr mod locn
+  = addShortErrLocLine locn (\ sty ->
+    ppCat [ ppStr "unknown module in export list:", ppPStr mod])
 
-badModExportErr mod locn sty
-  = ppHang (ppStr "Unknown module in export list:")
-         4 (ppCat [ppStr "module", ppPStr mod, ppr sty locn])
+dupModExportWarn locn mods@(mod:_)
+  = addShortErrLocLine locn (\ sty ->
+    ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list"])
 
-derivingNonStdClassErr clas locn sty
-  = ppHang (ppStr "Non-standard class in deriving:")
-         4 (ppCat [ppr sty clas, ppr sty locn])
+emptyModExportWarn locn mod
+  = addShortErrLocLine locn (\ sty ->
+    ppCat [ppStr "module", ppPStr mod, ppStr "has no unqualified imports to export"])
 
-dupDefaultDeclErr defs sty
-  = ppHang (ppStr "Duplicate default declarations:")
-         4 (ppAboves (map pp_def_loc defs))
+derivingNonStdClassErr clas locn
+  = addShortErrLocLine locn (\ sty ->
+    ppCat [ppStr "non-standard class in deriving:", ppr sty clas])
+
+dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things) sty
+  = ppAboves (item1 : map dup_item dup_things)
   where
-    pp_def_loc (DefaultDecl _ src_loc) = ppr sty src_loc
+    item1
+      = addShortErrLocLine locn1 (\ sty -> ppStr "multiple default declarations") sty
 
-undefinedFixityDeclErr decl sty
-  = ppHang (ppStr "Fixity declaration for unknown operator:")
-	 4 (ppr sty decl)
+    dup_item (DefaultDecl _ locn)
+      = addShortErrLocLine locn (\ sty -> ppStr "here was another default declaration") sty
+
+undefinedFixityDeclErr locn decl
+  = addErrLoc locn "fixity declaration for unknown operator" (\ sty ->
+    ppr sty decl)
+
+dupFixityDeclErr locn dups
+  = addErrLoc locn "multiple fixity declarations for same operator" (\ sty ->
+    ppAboves (map (ppr sty) dups))
 \end{code}

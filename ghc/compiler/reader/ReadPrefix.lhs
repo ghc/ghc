@@ -308,7 +308,7 @@ wlkExpr expr
 
       U_negate nexp ->	 		-- prefix negation
 	wlkExpr nexp	`thenUgn` \ expr ->
-	returnUgn (NegApp expr)
+	returnUgn (NegApp expr (Unqual SLIT("negate")) )
 
       U_llist llist -> -- explicit list
 	wlkList rdExpr llist `thenUgn` \ exprs ->
@@ -899,10 +899,9 @@ rdEntity pt
 				-- with specified constrs/methods
 	wlkQid	x		`thenUgn` \ thing ->
 	wlkList rdQid ns	`thenUgn` \ names -> 
-	returnUgn (IEThingAll thing)
-	-- returnUgn (IEThingWith thing names)
+	returnUgn (IEThingWith thing names)
 
-      U_entmod mod -> -- everything provided by a module
+      U_entmod mod -> 		-- everything provided unqualified by a module
 	returnUgn (IEModuleContents mod)
 \end{code}
 

@@ -21,7 +21,7 @@ import TcHsSyn
 
 import ErrUtils		( Warning(..), Error(..) )
 import Pretty
-import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
+import RnUtils		( RnEnv(..) )
 import Maybes		( MaybeErr(..) )
 \end{code}
 
@@ -35,7 +35,7 @@ ToDo: Interfaces for interpreter ...
 \begin{code}
 typecheckModule
     :: UniqSupply		-- name supply in
-    -> GlobalNameMappers	-- renamer info (for doing derivings)
+    -> RnEnv			-- renamer env (for doing derivings)
     -> RenamedHsModule		-- input module
 
     -> -- OUTPUTS ...
@@ -68,6 +68,6 @@ typecheckModule
       (Bag Error,		-- pretty-print this to get errors
        Bag Warning)		-- pretty-print this to get warnings
 
-typecheckModule us renamer_name_funs mod
-  = initTc us (tcModule renamer_name_funs mod)
+typecheckModule us rn_env mod
+  = initTc us (tcModule rn_env mod)
 \end{code}

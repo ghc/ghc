@@ -109,7 +109,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     of { (wiredin_fm, key_fm, idinfo_fm) ->
 
     renameModule wiredin_fm key_fm rn_uniqs rdr_module `thenMn`
-	\ (rn_mod, import_names,
+	\ (rn_mod, rn_env, import_names,
 	   version_info, instance_modules,
 	   rn_errs_bag, rn_warns_bag) ->
 
@@ -137,10 +137,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     -- ******* TYPECHECKER
     show_pass "TypeCheck" 			`thenMn_`
-    let
-	rn_info = trace "Main.rn_info" (\ x -> Nothing, \ x -> Nothing)
-    in
-    case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_info rn_mod) of
+    case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_env rn_mod) of
 	    Succeeded (stuff, warns)
 		-> (emptyBag, warns, stuff)
 	    Failed (errs, warns)

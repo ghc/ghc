@@ -29,9 +29,9 @@ import TcKind		( TcKind )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
 
---import RnMonad4
-import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
---import RnBinds4		( rnMethodBinds, rnTopBinds )
+import RnMonad
+import RnUtils		( RnEnv(..) )
+import RnBinds		( rnMethodBinds, rnTopBinds )
 
 import Bag		( emptyBag{-ToDo:rm-}, Bag, isEmptyBag, unionBags, listToBag )
 import Class		( GenClass, getClassKey )
@@ -50,7 +50,7 @@ import Type		( GenType(..), TauType(..), mkTyVarTys, applyTyCon,
 			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
 			  getAppTyCon, getAppDataTyCon )
 import TyVar		( GenTyVar )
-import UniqFM		( eltsUFM )
+import UniqFM		( emptyUFM )
 import Unique		-- Keys stuff
 import Util		( zipWithEqual, zipEqual, sortLt, removeDups, 
 			  thenCmp, cmpList, panic, pprPanic, pprPanic# )
@@ -155,7 +155,7 @@ type DerivSoln = DerivRhs
 
 \begin{code}
 tcDeriving  :: Module			-- name of module under scrutiny
-	    -> GlobalNameMappers	-- for "renaming" bits of generated code
+	    -> RnEnv			-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> [RenamedFixityDecl]	-- Fixity info; used by Read and Show
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
@@ -163,11 +163,11 @@ tcDeriving  :: Module			-- name of module under scrutiny
 		      PprStyle -> Pretty)  -- Printable derived instance decls;
 				     	   -- for debugging via -ddump-derivings.
 
-tcDeriving modname renamer_name_funs inst_decl_infos_in fixities
+tcDeriving modname rn_env inst_decl_infos_in fixities
   = returnTc (trace "tcDeriving:ToDo" (emptyBag, EmptyBinds, \ x -> ppNil))
 {- LATER:
 
-tcDeriving modname renamer_name_funs inst_decl_infos_in fixities
+tcDeriving modname rn_env inst_decl_infos_in fixities
   =	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
     makeDerivEqns	    	`thenTc` \ eqns ->
@@ -205,9 +205,9 @@ tcDeriving modname renamer_name_funs inst_decl_infos_in fixities
 	assoc_maybe ((k,v) : vs) key
 	  = if k `eqProtoName` key then Just v else assoc_maybe vs key
     in
-    gen_tag_n_con_binds deriver_name_funs nm_alist_etc `thenTc` \ extra_binds ->
+    gen_tag_n_con_binds deriver_rn_env nm_alist_etc `thenTc` \ extra_binds ->
 
-    mapTc (gen_inst_info maybe_mod fixities deriver_name_funs) new_inst_infos
+    mapTc (gen_inst_info maybe_mod fixities deriver_rn_env) new_inst_infos
 						  `thenTc` \ really_new_inst_infos ->
 
     returnTc (listToBag really_new_inst_infos,
@@ -512,11 +512,11 @@ the renamer.  What a great hack!
 gen_inst_info :: Maybe Module		-- Module name; Nothing => Prelude
 	      -> [RenamedFixityDecl]	-- all known fixities;
 					-- may be needed for Text
-	      -> GlobalNameMappers		-- lookup stuff for names we may use
+	      -> RnEnv			-- lookup stuff for names we may use
 	      -> InstInfo		-- the main stuff to work on
 	      -> TcM s InstInfo		-- the gen'd (filled-in) "instance decl"
 
-gen_inst_info modname fixities deriver_name_funs
+gen_inst_info modname fixities deriver_rn_env
     info@(InstInfo clas tyvars ty inst_decl_theta _ _ _ _ _ _ locn _)
   =
 	-- Generate the various instance-related Ids
@@ -543,7 +543,8 @@ gen_inst_info modname fixities deriver_name_funs
 	  | clas_key == binaryClassKey = gen_Binary_binds tycon
 	  | otherwise = panic "gen_inst_info:bad derived class"
     in
-    rn4MtoTcM deriver_name_funs (
+    rnMtoTcM deriver_rn_env (
+	setExtraRn emptyUFM{-no fixities-} $
 	rnMethodBinds clas_Name proto_mbinds
     )			`thenNF_Tc` \ (mbinds, errs) ->
 
@@ -581,17 +582,18 @@ tag2con_Foo :: Int -> Foo ...	-- easier if Int, not Int#
 maxtag_Foo  :: Int		-- ditto (NB: not unboxed)
 
 \begin{code}
-gen_tag_n_con_binds :: GlobalNameMappers
+gen_tag_n_con_binds :: RnEnv
 		    -> [(RdrName, RnName, TyCon, TagThingWanted)]
 		    -> TcM s RenamedHsBinds
 
-gen_tag_n_con_binds deriver_name_funs nm_alist_etc
+gen_tag_n_con_binds deriver_rn_env nm_alist_etc
   = let
       proto_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
       proto_mbinds     = foldr AndMonoBinds EmptyMonoBinds proto_mbind_list
     in
 
-    rn4MtoTcM deriver_name_funs (
+    rnMtoTcM deriver_rn_env (
+	setExtraRn emptyUFM{-no fixities-} $
 	rnTopBinds (SingleBind (RecBind proto_mbinds))
     )			`thenNF_Tc` \ (binds, errs) ->
 

@@ -24,7 +24,7 @@ module TcMonad(
 
 	tcNewMutVar, tcReadMutVar, tcWriteMutVar,
 
-	rn4MtoTcM,
+	rnMtoTcM,
 
 	TcError(..), TcWarning(..),
 	mkTcErr, arityErr,
@@ -44,8 +44,8 @@ import ErrUtils		( Error(..), Message(..), ErrCtxt(..),
 			  Warning(..) )
 
 import SST
---import RnMonad4
---LATER:import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
+import RnMonad		( RnM(..), RnDown, initRn, setExtraRn )
+import RnUtils		( RnEnv(..) )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
@@ -446,24 +446,21 @@ getErrCtxt (TcDown def us loc ctxt errs)     = ctxt
 %~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-rn4MtoTcM = panic "TcMonad.rn4MtoTcM (ToDo LATER)"
-{- LATER:
-rn4MtoTcM :: GlobalNameMappers -> Rn4M a -> NF_TcM s (a, Bag Error)
+rnMtoTcM :: RnEnv -> RnM _RealWorld a -> NF_TcM s (a, Bag Error)
 
-rn4MtoTcM name_funs rn_action down env
+rnMtoTcM rn_env rn_action down env
   = readMutVarSST u_var				`thenSST` \ uniq_supply ->
     let
       (new_uniq_supply, uniq_s) = splitUniqSupply uniq_supply
     in
     writeMutVarSST u_var new_uniq_supply	`thenSST_`
     let
-	(rn_result, rn_errs)
-	  = rn_action name_funs emptyFM emptyBag uniq_s mkUnknownSrcLoc
+	(rn_result, rn_errs, rn_warns)
+	  = initRn True (panic "rnMtoTcM:module") rn_env uniq_s rn_action
     in
     returnSST (rn_result, rn_errs)
   where
     u_var = getUniqSupplyVar down
--}
 \end{code}
 
 

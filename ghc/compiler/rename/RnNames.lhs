@@ -22,14 +22,14 @@ import RnHsSyn
 import RnMonad
 import RnIfaces		( IfaceCache(..), cachedIface, cachedDecl )
 import RnUtils		( RnEnv(..), emptyRnEnv, extendGlobalRnEnv,
-			  lubExportFlag, qualNameErr, dupNamesErr )
+			  lubExportFlag, qualNameErr, dupNamesErr, negateNameWarn )
 import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst )
 
 
-import Bag		( emptyBag, unitBag, consBag, unionBags, unionManyBags,
-			  mapBag, listToBag, bagToList )
+import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
+			  unionManyBags, mapBag, listToBag, bagToList )
 import CmdLineOpts	( opt_NoImplicitPrelude )
-import ErrUtils		( Error(..), Warning(..), addShortErrLocLine )
+import ErrUtils		( Error(..), Warning(..), addErrLoc, addShortErrLocLine )
 import FiniteMap	( emptyFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM )
 import Id		( GenId )
 import Maybes		( maybeToBool, catMaybes, MaybeErr(..) )
@@ -45,7 +45,8 @@ import SrcLoc		( SrcLoc, mkIfaceSrcLoc )
 import TyCon		( tyConDataCons )
 import UniqFM		( emptyUFM, addListToUFM_C, lookupUFM )
 import UniqSupply	( splitUniqSupply )
-import Util		( isIn, cmpPString, sortLt, removeDups, equivClasses, panic, assertPanic )
+import Util		( isIn, assoc, cmpPString, sortLt, removeDups,
+			  equivClasses, panic, assertPanic )
 \end{code}
 
 
@@ -90,7 +91,7 @@ getGlobalNames iface_cache info us
 
 	dup_errs = map dup_err (equivClasses cmp_rdr (bagToList dups))
 	cmp_rdr (rdr1,_,_) (rdr2,_,_) = cmp rdr1 rdr2
-	dup_err ((rdr,rn,rn'):rest) = globalDupNamesErr rdr (rn:rn': [rn|(_,_,rn)<-rest])
+	dup_err ((_,rn,rn'):rest) = globalDupNamesErr (rn:rn': [rn|(_,_,rn)<-rest])
 
 	all_errs  = src_errs  `unionBags` imp_errs `unionBags` listToBag dup_errs
 	all_warns = src_warns `unionBags` imp_warns
@@ -116,45 +117,66 @@ getSourceNames ::
 		       Bag RnName)	-- tycons/classes
 
 getSourceNames ty_decls cls_decls binds
-  = mapAndUnzipRn getTyDeclNames ty_decls   `thenRn` \ (tycon_s, constrs_s) ->
-    mapAndUnzipRn getClassNames cls_decls  `thenRn` \ (cls_s, cls_ops_s) ->
-    getTopBindsNames binds			   `thenRn` \ bind_names ->
+  = mapAndUnzip3Rn getTyDeclNames ty_decls	`thenRn` \ (tycon_s, constrs_s, fields_s) ->
+    mapAndUnzipRn  getClassNames cls_decls	`thenRn` \ (cls_s, cls_ops_s) ->
+    getTopBindsNames binds			`thenRn` \ bind_names ->
     returnRn (unionManyBags constrs_s `unionBags`
+	      unionManyBags fields_s  `unionBags`
 	      unionManyBags cls_ops_s `unionBags` bind_names,
 	      listToBag tycon_s `unionBags` listToBag cls_s)
 
 
 getTyDeclNames :: RdrNameTyDecl
-	       -> RnM_Info s (RnName, Bag RnName)	-- tycon and constrs
+	       -> RnM_Info s (RnName, Bag RnName, Bag RnName)	-- tycon, constrs and fields
 
 getTyDeclNames (TyData _ tycon _ condecls _ _ src_loc)
   = newGlobalName src_loc Nothing tycon	`thenRn` \ tycon_name ->
-    mapRn (getConDeclName (Just (nameExportFlag tycon_name)))
-			       condecls	`thenRn` \ con_names ->
-    returnRn (RnData tycon_name con_names,
-	      listToBag (map (\ n -> RnConstr n tycon_name) con_names))
+    getConFieldNames (Just (nameExportFlag tycon_name)) emptyBag emptyBag emptyFM
+		     condecls 		`thenRn` \ (con_names, field_names) ->
+    let
+	rn_tycon   = RnData tycon_name con_names field_names
+        rn_constrs = [ RnConstr name tycon_name | name <- con_names]
+        rn_fields  = [ RnField name tycon_name | name <- field_names]
+    in
+    returnRn (rn_tycon, listToBag rn_constrs, listToBag rn_fields)
 
-getTyDeclNames (TyNew _ tycon _ condecls _ _ src_loc)
+getTyDeclNames (TyNew _ tycon _ [NewConDecl con _ con_loc] _ _ src_loc)
   = newGlobalName src_loc Nothing tycon	`thenRn` \ tycon_name ->
-    mapRn (getConDeclName (Just (nameExportFlag tycon_name)))
-			       condecls	`thenRn` \ con_names ->
-    returnRn (RnData tycon_name con_names,
-	      listToBag (map (\ n -> RnConstr n tycon_name) con_names))
+    newGlobalName con_loc (Just (nameExportFlag tycon_name)) con
+					`thenRn` \ con_name ->
+    returnRn (RnData tycon_name [con_name] [],
+	      unitBag (RnConstr con_name tycon_name),
+	      emptyBag)
 
 getTyDeclNames (TySynonym tycon _ _ src_loc)
   = newGlobalName src_loc Nothing tycon	`thenRn` \ tycon_name ->
-    returnRn (RnSyn tycon_name, emptyBag)
+    returnRn (RnSyn tycon_name, emptyBag, emptyBag)
 
-getConDeclName exp (ConDecl con _ src_loc)
-  = newGlobalName src_loc exp con
-getConDeclName exp (ConOpDecl _ op _ src_loc)
-  = newGlobalName src_loc exp op
-getConDeclName exp (NewConDecl con _ src_loc)
-  = newGlobalName src_loc exp con
-getConDeclName exp (RecConDecl con fields src_loc)
-  = panic "getConDeclName:RecConDecl"
-    newGlobalName src_loc exp con
 
+getConFieldNames exp constrs fields have []
+  = returnRn (bagToList constrs, bagToList fields)
+
+getConFieldNames exp constrs fields have (ConDecl con _ src_loc : rest)
+  = newGlobalName src_loc exp con	`thenRn` \ con_name ->
+    getConFieldNames exp (constrs `snocBag` con_name) fields have rest
+
+getConFieldNames exp constrs fields have (ConOpDecl _ con _ src_loc : rest)
+  = newGlobalName src_loc exp con	`thenRn` \ con_name ->
+    getConFieldNames exp (constrs `snocBag` con_name) fields have rest
+
+getConFieldNames exp constrs fields have (RecConDecl con fielddecls src_loc : rest)
+  = mapRn (addErrRn . dupFieldErr con src_loc) dups	`thenRn_`
+    newGlobalName src_loc exp con			`thenRn` \ con_name ->
+    mapRn (newGlobalName src_loc exp) new_fields 	`thenRn` \ field_names ->
+    let
+	all_constrs = constrs `snocBag` con_name
+	all_fields  = fields  `unionBags` listToBag field_names
+    in
+    getConFieldNames exp all_constrs all_fields new_have rest
+  where
+    (uniq_fields, dups) = removeDups cmp (concat (map fst fielddecls))
+    new_fields = filter (not . maybeToBool . lookupFM have) uniq_fields
+    new_have   = addListToFM have (zip new_fields (repeat ()))
 
 getClassNames :: RdrNameClassDecl
 	      -> RnM_Info s (RnName, Bag RnName)	-- class and class ops
@@ -266,6 +288,7 @@ newGlobalName locn maybe_exp rdr
 
 	n = mkTopLevName uniq orig locn exp (occ_fn n)
     in
+    addWarnIfRn (rdr == Unqual SLIT("negate")) (negateNameWarn (rdr, locn)) `thenRn_`
     addErrIfRn (isQual rdr) (qualNameErr "name in definition" (rdr, locn)) `thenRn_`
     returnRn n    
 \end{code}
@@ -309,23 +332,20 @@ doImportDecls iface_cache g_info us src_imps
 
 	    i_info = (g_info, emptyFM, emptyFM, rec_imp_fn)
 	in
-	doImports iface_cache i_info us (qprel_imp ++ prel_imp ++ src_imps)
+	doImports iface_cache i_info us all_imps
     ) >>= \ (vals, tcs, unquals, fixes, errs, warns, _) ->
-    let
-	imp_mods      = [ mod | ImportDecl mod _ _ _ _ <- src_imps ]
-	imp_warns     = listToBag (map dupImportWarn imp_dups)
-        prel_warns    = listToBag (map qualPreludeImportWarn qual_prels)
 
-	(_, imp_dups) = removeDups cmp_mod src_imps
-	cmp_mod (ImportDecl m1 _ _ _ _) (ImportDecl m2 _ _ _ _) = cmpPString m1 m2
-        qual_prels = [imp | imp@(ImportDecl mod qual _ _ _) <- src_imps,
-			    fromPrelude mod && qual]
-    in
-    return (vals, tcs, imp_mods, unquals, fixes, errs,
-	    prel_warns `unionBags` imp_warns `unionBags` warns)
+    return (vals, tcs, imp_mods, unquals, fixes,
+	    imp_errs  `unionBags` errs,
+	    imp_warns `unionBags` warns)
   where
+    (ok_imps, src_qprels) = partition not_qual_prel src_imps
+    all_imps = qprel_imp ++ prel_imp ++ ok_imps
+    
+    not_qual_prel (ImportDecl mod qual _ _ _) = not (fromPrelude mod && qual)
+
     explicit_prelude_import
-      = null [() | (ImportDecl mod qual _ _ _) <- src_imps,
+      = null [() | (ImportDecl mod qual _ _ _) <- ok_imps,
 		   fromPrelude mod && not qual]
 
     qprel_imp = if opt_NoImplicitPrelude
@@ -334,9 +354,17 @@ doImportDecls iface_cache g_info us src_imps
 
     prel_imp  = if not explicit_prelude_import || opt_NoImplicitPrelude
 		then
-		   [ {-prelude imported explicitly => no import Prelude-} ]
+		   [{- no "import Prelude" -}]
 	        else
 	           [ImportDecl pRELUDE False Nothing Nothing mkIfaceSrcLoc]
+
+    (uniq_imps, imp_dups) = removeDups cmp_mod all_imps
+    cmp_mod (ImportDecl m1 _ _ _ _) (ImportDecl m2 _ _ _ _) = cmpPString m1 m2
+
+    imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps ]
+    imp_warns = listToBag (map dupImportWarn imp_dups)
+    imp_errs  = listToBag (map qualPreludeImportErr src_qprels)
+
 
 doImports iface_cache i_info us []
   = return (emptyBag, emptyBag, emptyBag, emptyBag, emptyBag, emptyBag, emptyBag)
@@ -423,10 +451,6 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
     pair_as  rn       = (as_mod, rn)
 
 
-getBuiltins info mod maybe_spec
-  | not (fromPrelude mod)
-  = (emptyBag, emptyBag, maybe_spec)
-
 getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
   = case maybe_spec of 
       Nothing           -> (all_vals, all_tcs, Nothing)
@@ -481,7 +505,7 @@ getOrigIEs (ParsedIface _ _ _ _ exps _ _ _ _ _ _) (Just (True, ies))	-- import h
     (found_ies, errs) = lookupIEs exps ies
     exps_left = delListFromFM exps (map (getLocalName.ie_name.fst) found_ies)
 
-getOrigNames (ParsedIface _ _ _ _ exps _ _ _ _ _ _) (Just (False, ies))
+getOrigIEs (ParsedIface _ _ _ _ exps _ _ _ _ _ _) (Just (False, ies))	-- import these
   = (map fst found_ies, found_ies, errs)
   where
     (found_ies, errs) = lookupIEs exps ies
@@ -557,9 +581,9 @@ checkOrigIE iface_cache (IEThingWith n ns, ExportAll)
   = with_decl iface_cache n
 	(\ err  -> (unitBag (\ mod locn -> err), emptyBag))
 	(\ decl -> case decl of
-	     	NewTypeSig _ con _ _  -> (check_with "constructrs" [con] ns, emptyBag)
-	     	DataSig    _ cons _ _ -> (check_with "constructrs" cons  ns, emptyBag)
-             	ClassSig   _ ops _ _  -> (check_with "class ops"   ops   ns, emptyBag))
+	     	NewTypeSig _ con _ _         -> (check_with "constructrs" [con] ns, emptyBag)
+	     	DataSig    _ cons fields _ _ -> (check_with "constructrs (and fields)" (cons++fields) ns, emptyBag)
+             	ClassSig   _ ops _ _         -> (check_with "class ops"   ops   ns, emptyBag))
   where
     check_with str has rdrs
       | sortLt (<) (map getLocalName has) == sortLt (<) (map unqual_str rdrs)
@@ -618,40 +642,48 @@ getIfaceDeclNames :: RdrNameIE -> RdrIfaceDecl
 			 	  Bag (RnName,ExportFlag))	-- import flags
 
 getIfaceDeclNames ie (ValSig val src_loc _)
-  = newImportedName False src_loc Nothing Nothing val `thenRn` \ val_name ->
+  = newImportedName False src_loc Nothing Nothing val 	`thenRn` \ val_name ->
     returnRn (unitBag (RnName val_name),
 	      emptyBag,
 	      unitBag (RnName val_name, ExportAll))
 
 getIfaceDeclNames ie (TypeSig tycon src_loc _)
-  = newImportedName True src_loc Nothing Nothing tycon `thenRn` \ tycon_name ->
+  = newImportedName True src_loc Nothing Nothing tycon  `thenRn` \ tycon_name ->
     returnRn (emptyBag,
 	      unitBag (RnSyn tycon_name),
 	      unitBag (RnSyn tycon_name, ExportAll))
 
 getIfaceDeclNames ie (NewTypeSig tycon con src_loc _)
-  = newImportedName True src_loc Nothing Nothing tycon `thenRn` \ tycon_name ->
-    mapRn (newImportedName False src_loc (Just (nameExportFlag tycon_name))
-				         (Just (nameImportFlag tycon_name)))
-			         	    [con] `thenRn` \ con_names ->
+  = newImportedName True src_loc Nothing Nothing tycon  `thenRn` \ tycon_name ->
+    newImportedName False src_loc (Just (nameExportFlag tycon_name))
+				  (Just (nameImportFlag tycon_name))
+			       	  con 			`thenRn` \ con_name ->
     returnRn (if imp_all (imp_flag ie) then
-		  listToBag (map (\ n -> RnConstr n tycon_name) con_names)
+		  unitBag (RnConstr con_name tycon_name)
 	      else
 		  emptyBag,
-	      unitBag (RnData tycon_name con_names),
-	      unitBag (RnData tycon_name con_names, imp_flag ie))
+	      unitBag (RnData tycon_name [con_name] []),
+	      unitBag (RnData tycon_name [con_name] [], imp_flag ie))
 
-getIfaceDeclNames ie (DataSig tycon cons src_loc _)
+getIfaceDeclNames ie (DataSig tycon cons fields src_loc _)
   = newImportedName True src_loc Nothing Nothing tycon `thenRn` \ tycon_name ->
     mapRn (newImportedName False src_loc (Just (nameExportFlag tycon_name))
 				         (Just (nameImportFlag tycon_name)))
 			         	     cons `thenRn` \ con_names ->
+    mapRn (newImportedName False src_loc (Just (nameExportFlag tycon_name))
+				         (Just (nameImportFlag tycon_name)))
+			         	   fields `thenRn` \ field_names ->
+    let
+	rn_tycon   = RnData tycon_name con_names field_names
+        rn_constrs = [ RnConstr name tycon_name | name <- con_names ]
+	rn_fields  = [ RnField name tycon_name | name <- field_names ]
+    in
     returnRn (if imp_all (imp_flag ie) then
-		  listToBag (map (\ n -> RnConstr n tycon_name) con_names)
+		  listToBag rn_constrs `unionBags` listToBag rn_fields
 	      else
 		  emptyBag,
-	      unitBag (RnData tycon_name con_names),
-	      unitBag (RnData tycon_name con_names, imp_flag ie))
+	      unitBag rn_tycon,
+	      unitBag (rn_tycon, imp_flag ie))
 
 getIfaceDeclNames ie (ClassSig cls ops src_loc _)
   = newImportedName True src_loc Nothing Nothing cls `thenRn` \ cls_name ->
@@ -718,33 +750,68 @@ newImportedName tycon_or_class locn maybe_exp maybe_imp rdr
 \end{code}
 
 \begin{code}
-globalDupNamesErr rdr rns sty
-  = ppHang (ppBesides [pprNonSym sty rdr, ppStr " multiply defined:"])
-	 4 (ppAboves (map pp_def rns))
+globalDupNamesErr (rn1:dup_rns) sty
+  = ppAboves (item1 : map dup_item dup_rns)
   where
-    pp_def rn = addShortErrLocLine (getSrcLoc rn) (\ sty -> ppr sty rn) sty
+    item1 = addShortErrLocLine (getSrcLoc rn1) (\ sty ->
+	    ppBesides [ppStr "multiple declarations of `", 
+		       pprNonSym sty rn1, ppStr "' ", pp_descrip rn1]) sty
 
-dupImportWarn dup_imps sty
-  = ppStr "dupImportWarn"
+    dup_item rn
+          = addShortErrLocLine (getSrcLoc rn) (\ sty ->
+            ppBesides [ppStr "here was another declaration of `",
+		       pprNonSym sty rn, ppStr "' ", pp_descrip rn]) sty
 
-qualPreludeImportWarn imp sty
-  = ppStr "qualPreludeImportWarn"
+    pp_descrip (RnName _)      = ppStr "(as a value)"
+    pp_descrip (RnSyn  _)      = ppStr "(as a type synonym)"
+    pp_descrip (RnData _ _ _)  = ppStr "(as a data type)"
+    pp_descrip (RnConstr _ _)  = ppStr "(as a data constructor)"
+    pp_descrip (RnField _ _)   = ppStr "(as a record field)"
+    pp_descrip (RnClass _ _)   = ppStr "(as a class)"
+    pp_descrip (RnClassOp _ _) = ppStr "(as a class method)"
+    pp_descrip _               = ppNil 
 
-unknownImpSpecErr ie imp_mod locn sty
-  = ppStr "unknownImpSpecErr"
+dupImportWarn (ImportDecl m1 _ _ _ locn1 : dup_imps) sty
+  = ppAboves (item1 : map dup_item dup_imps)
+  where
+    item1 = addShortErrLocLine locn1 (\ sty ->
+	    ppCat [ppStr "multiple imports from module", ppPStr m1]) sty
 
-duplicateImpSpecErr ie imp_mod locn sty
-  = ppStr "duplicateImpSpecErr"
+    dup_item (ImportDecl m _ _ _ locn)
+          = addShortErrLocLine locn (\ sty ->
+            ppCat [ppStr "here was another import from module", ppPStr m]) sty
 
-allWhenSynImpSpecWarn n imp_mod locn sty 
-  = ppStr "allWhenSynImpSpecWarn"
+qualPreludeImportErr (ImportDecl m _ _ _ locn)
+  = addShortErrLocLine locn (\ sty ->
+    ppCat [ppStr "qualified import form prelude module", ppPStr m])
 
-allWhenAbsImpSpecErr n imp_mod locn sty 
-  = ppStr "allWhenAbsImpSpecErr"
+unknownImpSpecErr ie imp_mod locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "module ", ppPStr imp_mod, ppStr " does not export `", ppr sty (ie_name ie), ppStr "'"])
 
-withWhenAbsImpSpecErr n imp_mod locn sty 
-  = ppStr "withWhenAbsImpSpecErr"
+duplicateImpSpecErr ie imp_mod locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "`", ppr sty (ie_name ie), ppStr "' already seen in import list"])
 
-withImpSpecErr str n has ns imp_mod locn sty 
-  = ppStr "withImpSpecErr"
+allWhenSynImpSpecWarn n imp_mod locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "type synonym `", ppr sty n, ppStr "' should not be imported with (..)"])
+
+allWhenAbsImpSpecErr n imp_mod locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "module ", ppPStr imp_mod, ppStr " only exports `", ppr sty n, ppStr "' abstractly"])
+
+withWhenAbsImpSpecErr n imp_mod locn
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "module ", ppPStr imp_mod, ppStr " only exports `", ppr sty n, ppStr "' abstractly"])
+
+withImpSpecErr str n has ns imp_mod locn
+  = addErrLoc locn "" (\ sty ->
+    ppAboves [ ppBesides [ppStr "inconsistent list of", ppStr str, ppStr "in import list for `", ppr sty n, ppStr "'"],
+	       ppCat [ppStr "    expected:", ppInterleave ppComma (map (ppr sty) has)],
+	       ppCat [ppStr "    found:   ", ppInterleave ppComma (map (ppr sty) ns)] ])
+
+dupFieldErr con locn (dup:rest)
+  = addShortErrLocLine locn (\ sty ->
+    ppBesides [ppStr "record field `", ppr sty dup, ppStr "declared multiple times in `", ppr sty con, ppStr "'"])
 \end{code}

@@ -33,6 +33,7 @@ outPatType (ConPat _ ty _)	= ty
 outPatType (ConOpPat _ _ _ ty)	= ty
 outPatType (ListPat ty _)	= mkListTy ty
 outPatType (TuplePat pats)	= mkTupleTy (length pats) (map outPatType pats)
+outPatType (RecPat _ ty _)      = ty
 outPatType (LitPat lit ty)	= ty
 outPatType (NPat lit ty _)	= ty
 outPatType (DictPat ds ms)      = case (length ds + length ms) of
