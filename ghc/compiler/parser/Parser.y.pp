@@ -68,10 +68,10 @@ Conflicts: 34 shift/reduce (1.15)
 	  case v of
 	    (x::T -> T) -> ..	-- Rhs is ...
 
-8 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 11, 253]
+10 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 11, 253]
 	(e::a) `b` c, or 
 	(e :: (a `b` c))
-    As well as `b` we can have !, QCONSYM, and CONSYM, hence 3 cases
+    As well as `b` we can have !, VARSYM, QCONSYM, and CONSYM, hence 5 cases
     Same duplication between states 11 and 253 as the previous case
 
 1 for ambiguity in 'let ?x ...'				[State 329]
@@ -766,7 +766,7 @@ type :: { LHsType RdrName }
 gentype :: { LHsType RdrName }
         : btype                         { $1 }
         | btype qtyconop gentype        { LL $ HsOpTy $1 $2 $3 }
-        | btype  '`' tyvar '`' gentype  { LL $ HsOpTy $1 $3 $5 }
+        | btype tyvarop  gentype  	{ LL $ HsOpTy $1 $2 $3 }
 	| btype '->' gentype		{ LL $ HsFunTy $1 $3 }
 
 btype :: { LHsType RdrName }
@@ -775,7 +775,7 @@ btype :: { LHsType RdrName }
 
 atype :: { LHsType RdrName }
 	: gtycon			{ L1 (HsTyVar (unLoc $1)) }
-	| tyvar				{ L1 (HsTyVar (unLoc $1)) }
+	| tyvarid			{ L1 (HsTyVar (unLoc $1)) }
 	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }
 	| '(' type ',' comma_types1 ')'	{ LL $ HsTupleTy Boxed  ($2:$4) }
 	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy Unboxed $2     }
@@ -1357,10 +1357,6 @@ qtyconop :: { Located RdrName }	-- Qualified or unqualified
 	: qtyconsym			{ $1 }
 	| '`' qtycon '`'		{ LL (unLoc $2) }
 
-tyconop	:: { Located RdrName }	-- Unqualified
-	: tyconsym			{ $1 }
-	| '`' tycon '`'			{ LL (unLoc $2) }
-
 qtycon :: { Located RdrName }	-- Qualified or unqualified
 	: QCONID			{ L1 $! mkQual tcClsName (getQCONID $1) }
 	| tycon				{ $1 }
@@ -1408,12 +1404,26 @@ varid_no_unsafe :: { Located RdrName }
 	| special_id		{ L1 $! mkUnqual varName (unLoc $1) }
 	| 'forall'		{ L1 $! mkUnqual varName FSLIT("forall") }
 
-tyvar 	:: { Located RdrName }
+tyvar   :: { Located RdrName }
+tyvar   : tyvarid		{ $1 }
+	| '(' tyvarsym ')'	{ LL (unLoc $2) }
+
+tyvarop :: { Located RdrName }
+tyvarop : '`' tyvarid '`'	{ LL (unLoc $2) }
+	| tyvarsym		{ $1 }
+
+tyvarid	:: { Located RdrName }
 	: VARID			{ L1 $! mkUnqual tvName (getVARID $1) }
 	| special_id		{ L1 $! mkUnqual tvName (unLoc $1) }
 	| 'unsafe' 		{ L1 $! mkUnqual tvName FSLIT("unsafe") }
 	| 'safe' 		{ L1 $! mkUnqual tvName FSLIT("safe") }
 	| 'threadsafe' 		{ L1 $! mkUnqual tvName FSLIT("threadsafe") }
+
+tyvarsym :: { Located RdrName }
+-- Does not include "!", because that is used for strictness marks
+--	         or ".", because that separates the quantified type vars from the rest
+--		 or "*", because that's used for kinds
+tyvarsym : VARSYM		{ L1 $! mkUnqual tvName (getVARSYM $1) }
 
 -- These special_ids are treated as keywords in various places, 
 -- but as ordinary ids elsewhere.   'special_id' collects all these
