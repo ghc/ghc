@@ -9,14 +9,14 @@ module CmLink ( Linkable(..),
 		modname_of_linkable, is_package_linkable,
 		LinkResult(..),
                 link, 
-                PLS{-abstractly!-}, emptyPLS )
+                PersistentLinkerState{-abstractly!-}, emptyPLS )
 where
 
 import StgInterp	( linkIModules, ClosureEnv, ItblEnv )
 import Linker
 
-import CmStaticInfo	( PCI )
-import CmFind		( Path, PkgName )
+import CmStaticInfo	( PackageConfigInfo )
+import Module		( ModuleName, PackageName )
 import InterpSyn	( UnlinkedIBind, HValue, binder )
 import Module		( Module )
 import Outputable	( SDoc )
@@ -31,8 +31,8 @@ import Panic		( panic )
 \end{code}
 
 \begin{code}
-data PLS 
-   = MkPLS {
+data PersistentLinkerState 
+   = PersistentLinkerState {
         closure_env :: ClosureEnv,
         itbl_env    :: ItblEnv
 	-- notionally here, but really lives in the C part of the linker:
@@ -40,13 +40,13 @@ data PLS
      }
 
 data LinkResult 
-   = LinkOK   PLS
-   | LinkErrs PLS [SDoc]
+   = LinkOK   PersistentLinkerState
+   | LinkErrs PersistentLinkerState [SDoc]
 
 data Unlinked
-   = DotO Path
-   | DotA Path
-   | DotDLL Path
+   = DotO FilePath
+   | DotA FilePath
+   | DotDLL FilePath
    | Trees [UnlinkedIBind]	-- bunch of interpretable bindings
 
 instance Outputable Unlinked where
@@ -65,20 +65,23 @@ isInterpretable (Trees _) = True
 isInterpretable _ = False
 
 data Linkable
-   = LM {-should be:Module-} String{- == ModName-} [Unlinked]
-   | LP PkgName
+   = LM ModuleName [Unlinked]
+   | LP PackageName
 
 instance Outputable Linkable where
-   ppr (LM mod_nm unlinkeds) = text "LinkableM" <+> text mod_nm <+> ppr unlinkeds
-   ppr (LP package_nm)       = text "LinkableP" <+> text package_nm
+   ppr (LM mod_nm unlinkeds) = text "LinkableM" <+> ppr mod_nm <+> ppr unlinkeds
+   ppr (LP package_nm)       = text "LinkableP" <+> ptext package_nm
 
-emptyPLS :: IO PLS
-emptyPLS = return (MkPLS { closure_env = emptyFM, 
-                           itbl_env    = emptyFM })
+emptyPLS :: IO PersistentLinkerState
+emptyPLS = return (PersistentLinkerState { closure_env = emptyFM, 
+                                           itbl_env    = emptyFM })
 \end{code}
 
 \begin{code}
-link :: PCI -> [SCC Linkable] -> PLS -> IO LinkResult
+link :: PackageConfigInfo 
+     -> [SCC Linkable] 
+     -> PersistentLinkerState 
+     -> IO LinkResult
 
 #ifndef GHCI_NOTYET
 --link = panic "CmLink.link: not implemented"
@@ -106,8 +109,9 @@ link pci (group:groups) pls = do
 		   linkIModules	(closure_env pls)
 				(itbl_env pls)
 				[ trees | Trees trees <- group ]
-	        link pci groups MkPLS{closure_env=new_closure_env,
-				      itbl_env=new_itbl_env}
+	        link pci groups (PersistentLinkerState{
+				   closure_env=new_closure_env,
+				   itbl_env=new_itbl_env})
     else
 	return (LinkErrs pls (ptext SLIT("linker: group must contain all objects or all interpreted modules")))
 #endif
@@ -118,7 +122,7 @@ modname_of_linkable (LP _)    = panic "modname_of_linkable: package"
 is_package_linkable (LP _)   = True
 is_package_linkable (LM _ _) = False
 
-filterModuleLinkables :: (String{- ==ModName-} -> Bool) 
+filterModuleLinkables :: (ModuleName -> Bool) 
                       -> [Linkable] 
                       -> [Linkable]
 filterModuleLinkables p [] = []
