@@ -3138,6 +3138,9 @@ genCCall target dest_regs args vols = do
         (reg,code) <- getSomeReg op
 	return (code, reg, cmmExprRep op)
 
+#endif /* i386_TARGET_ARCH */
+
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 outOfLineFloatOp :: CallishMachOp -> CmmReg -> [(CmmExpr,MachHint)]
   -> Maybe [GlobalReg] -> NatM InstrBlock
@@ -3161,6 +3164,10 @@ outOfLineFloatOp mop res args vols
 	lbl = CmmLabel (mkForeignLabel fn Nothing False)
 
 	fn = case mop of
+	      MO_F32_Sqrt  -> FSLIT("sqrt")
+	      MO_F32_Sin   -> FSLIT("sin")
+	      MO_F32_Cos   -> FSLIT("cos")
+	      MO_F32_Tan   -> FSLIT("tan")
 	      MO_F32_Exp   -> FSLIT("exp")
 	      MO_F32_Log   -> FSLIT("log")
 
@@ -3173,6 +3180,10 @@ outOfLineFloatOp mop res args vols
 	      MO_F32_Tanh  -> FSLIT("tanh")
 	      MO_F32_Pwr   -> FSLIT("pow")
 
+	      MO_F64_Sqrt  -> FSLIT("sqrt")
+	      MO_F64_Sin   -> FSLIT("sin")
+	      MO_F64_Cos   -> FSLIT("cos")
+	      MO_F64_Tan   -> FSLIT("tan")
 	      MO_F64_Exp   -> FSLIT("exp")
 	      MO_F64_Log   -> FSLIT("log")
 
@@ -3187,14 +3198,14 @@ outOfLineFloatOp mop res args vols
 
               other -> pprPanic "outOfLineFloatOp" (pprCallishMachOp mop)
 
-#endif /* i386_TARGET_ARCH */
+#endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if x86_64_TARGET_ARCH
 
 genCCall (CmmPrim op) [(r,_)] args vols = 
-  panic "genCCall(CmmPrim)(x86_64)"
+  outOfLineFloatOp op r args vols
 
 genCCall target dest_regs args vols = do
 
@@ -4547,7 +4558,7 @@ coerceFP2Int from to x = do
 coerceFP2Int from to x = do
   (x_op, x_code) <- getOperand x  -- ToDo: could be a safe operand
   let
-        opc  = case to of F32 -> CVTSS2SI; F64 -> CVTSD2SI
+        opc  = case from of F32 -> CVTSS2SI; F64 -> CVTSD2SI
         code dst = x_code `snocOL` opc x_op dst
   -- in
   return (Any to code) -- works even if the destination rep is <I32
