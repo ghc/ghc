@@ -79,7 +79,8 @@ import GHC.Base
 -- allocation
 -- ----------
 
--- |Allocate storage for the given number of elements of a storable type.
+-- |Allocate storage for the given number of elements of a storable type
+-- (like 'Foreign.Marshal.Alloc.malloc', but for multiple elements).
 --
 mallocArray :: Storable a => Int -> IO (Ptr a)
 mallocArray  = doMalloc undefined
@@ -87,14 +88,14 @@ mallocArray  = doMalloc undefined
     doMalloc            :: Storable a => a -> Int -> IO (Ptr a)
     doMalloc dummy size  = mallocBytes (size * sizeOf dummy)
 
--- |Like 'mallocArray', but add an extra element to signal the end of the array
+-- |Like 'mallocArray', but add an extra position to hold a special
+-- termination element.
 --
 mallocArray0      :: Storable a => Int -> IO (Ptr a)
 mallocArray0 size  = mallocArray (size + 1)
 
--- |Temporarily allocate space for the given number of elements.
---
--- * see 'Foreign.Marshal.Alloc.alloca' for the storage lifetime constraints
+-- |Temporarily allocate space for the given number of elements
+-- (like 'Foreign.Marshal.Alloc.alloca', but for multiple elements).
 --
 allocaArray :: Storable a => Int -> (Ptr a -> IO b) -> IO b
 allocaArray  = doAlloca undefined
@@ -102,7 +103,8 @@ allocaArray  = doAlloca undefined
     doAlloca            :: Storable a => a -> Int -> (Ptr a -> IO b) -> IO b
     doAlloca dummy size  = allocaBytes (size * sizeOf dummy)
 
--- |Like 'allocaArray', but add an extra element to signal the end of the array
+-- |Like 'allocaArray', but add an extra position to hold a special
+-- termination element.
 --
 allocaArray0      :: Storable a => Int -> (Ptr a -> IO b) -> IO b
 allocaArray0 size  = allocaArray (size + 1)
@@ -115,7 +117,7 @@ reallocArray  = doRealloc undefined
     doRealloc                :: Storable a => a -> Ptr a -> Int -> IO (Ptr a)
     doRealloc dummy ptr size  = reallocBytes ptr (size * sizeOf dummy)
 
--- |Adjust the size of an array while adding an element for the end marker
+-- |Adjust the size of an array including an extra position for the end marker.
 --
 reallocArray0          :: Storable a => Ptr a -> Int -> IO (Ptr a)
 reallocArray0 ptr size  = reallocArray ptr (size + 1)
@@ -174,6 +176,7 @@ pokeArray0 marker ptr vals = go vals 0#
 
 -- |Write a list of storable elements into a newly allocated, consecutive
 -- sequence of storable values
+-- (like 'Foreign.Marshal.Utils.new', but for multiple elements).
 --
 newArray      :: Storable a => [a] -> IO (Ptr a)
 newArray vals  = do
@@ -191,6 +194,7 @@ newArray0 marker vals  = do
   return ptr
 
 -- |Temporarily store a list of storable values in memory
+-- (like 'Foreign.Marshal.Utils.with', but for multiple elements).
 --
 withArray :: Storable a => [a] -> (Ptr a -> IO b) -> IO b
 withArray vals = withArrayLen vals . const

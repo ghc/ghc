@@ -14,12 +14,14 @@
 -----------------------------------------------------------------------------
 
 module Foreign.Marshal.Alloc (
-  -- * Allocation
-  malloc,       -- :: Storable a =>        IO (Ptr a)
-  mallocBytes,  -- ::               Int -> IO (Ptr a)
-
+  -- * Memory allocation
+  -- ** Local allocation
   alloca,       -- :: Storable a =>        (Ptr a -> IO b) -> IO b
   allocaBytes,  -- ::               Int -> (Ptr a -> IO b) -> IO b
+
+  -- ** Dynamic allocation
+  malloc,       -- :: Storable a =>        IO (Ptr a)
+  mallocBytes,  -- ::               Int -> IO (Ptr a)
 
   realloc,      -- :: Storable b => Ptr a        -> IO (Ptr b)
   reallocBytes, -- ::		    Ptr a -> Int -> IO (Ptr a)
@@ -56,9 +58,12 @@ import Hugs.ForeignPtr		( FinalizerPtr )
 -- exported functions
 -- ------------------
 
--- |Allocate space for storable type.  The size of the area allocated
--- is determined by the 'sizeOf' method from the instance of
--- 'Storable' for the appropriate type.
+-- |Allocate a block of memory that is sufficient to hold values of type
+-- @a@.  The size of the area allocated is determined by the 'sizeOf'
+-- method from the instance of 'Storable' for the appropriate type.
+--
+-- The memory may be deallocated using 'free' or 'finalizerFree' when
+-- no longer required.
 --
 malloc :: Storable a => IO (Ptr a)
 malloc  = doMalloc undefined
@@ -66,16 +71,22 @@ malloc  = doMalloc undefined
     doMalloc       :: Storable a => a -> IO (Ptr a)
     doMalloc dummy  = mallocBytes (sizeOf dummy)
 
--- |Allocate given number of bytes of storage, equivalent to C\'s @malloc()@.
+-- |Allocate a block of memory of the given number of bytes.
+-- The block of memory is sufficiently aligned for any of the basic
+-- foreign types that fits into a memory block of the allocated size.
+--
+-- The memory may be deallocated using 'free' or 'finalizerFree' when
+-- no longer required.
 --
 mallocBytes      :: Int -> IO (Ptr a)
 mallocBytes size  = failWhenNULL "malloc" (_malloc (fromIntegral size))
 
--- |Temporarily allocate space for a storable type.
+-- |@'alloca' f@ executes the computation @f@, passing as argument
+-- a pointer to a temporarily allocated block of memory sufficient to
+-- hold values of type @a@.
 --
--- * the pointer passed as an argument to the function must /not/ escape from
---   this function; in other words, in @alloca f@ the allocated storage must
---   not be used after @f@ returns
+-- The memory is freed when @f@ terminates (either normally or via an
+-- exception), so the pointer passed to @f@ must /not/ be used after this.
 --
 alloca :: Storable a => (Ptr a -> IO b) -> IO b
 alloca  = doAlloca undefined
@@ -83,11 +94,13 @@ alloca  = doAlloca undefined
     doAlloca       :: Storable a => a -> (Ptr a -> IO b) -> IO b
     doAlloca dummy  = allocaBytes (sizeOf dummy)
 
--- |Temporarily allocate the given number of bytes of storage.
+-- |@'allocaBytes' n f@ executes the computation @f@, passing as argument
+-- a pointer to a temporarily allocated block of memory of @n@ bytes.
+-- The block of memory is sufficiently aligned for any of the basic
+-- foreign types that fits into a memory block of the allocated size.
 --
--- * the pointer passed as an argument to the function must /not/ escape from
---   this function; in other words, in @allocaBytes n f@ the allocated storage
---   must not be used after @f@ returns
+-- The memory is freed when @f@ terminates (either normally or via an
+-- exception), so the pointer passed to @f@ must /not/ be used after this.
 --
 #ifdef __GLASGOW_HASKELL__
 allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
@@ -105,8 +118,15 @@ allocaBytes      :: Int -> (Ptr a -> IO b) -> IO b
 allocaBytes size  = bracket (mallocBytes size) free
 #endif
 
--- |Adjust a malloc\'ed storage area to the given size of the required type
--- (corresponds to C\'s @realloc()@).
+-- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'
+-- to the size needed to store values of type @b@.  The returned pointer
+-- may refer to an entirely different memory area, but will be suitably
+-- aligned to hold values of type @b@.  The contents of the referenced
+-- memory area will be the same as of the original pointer up to the
+-- minimum of the original size and the size of values of type @b@.
+--
+-- If the argument to 'realloc' is 'nullPtr', 'realloc' behaves like
+-- 'malloc'.
 --
 realloc :: Storable b => Ptr a -> IO (Ptr b)
 realloc  = doRealloc undefined
@@ -117,16 +137,27 @@ realloc  = doRealloc undefined
 			   in
 			   failWhenNULL "realloc" (_realloc ptr size)
 
--- |Adjust a malloc\'ed storage area to the given size (equivalent to
--- C\'s @realloc()@).
+-- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'
+-- to the given size.  The returned pointer may refer to an entirely
+-- different memory area, but will be sufficiently aligned for any of the
+-- basic foreign types that fits into a memory block of the given size.
+-- The contents of the referenced memory area will be the same as of
+-- the original pointer up to the minimum of the original size and the
+-- given size.
+--
+-- If the pointer argument to 'reallocBytes' is 'nullPtr', 'reallocBytes'
+-- behaves like 'malloc'.  If the requested size is 0, 'reallocBytes'
+-- behaves like 'free'.
 --
 reallocBytes          :: Ptr a -> Int -> IO (Ptr a)
 reallocBytes ptr 0     = do free ptr; return nullPtr
 reallocBytes ptr size  = 
   failWhenNULL "realloc" (_realloc ptr (fromIntegral size))
 
--- |Free malloc\'ed storage (equivalent to
--- C\'s @free()@)
+-- |Free a block of memory that was allocated with 'malloc',
+-- 'mallocBytes', 'realloc', 'reallocBytes', 'Foreign.Marshal.Utils.new'
+-- or any of the @new@/X/ functions in "Foreign.Marshal.Array" or
+-- "Foreign.C.String".
 --
 free :: Ptr a -> IO ()
 free  = _free
@@ -156,6 +187,7 @@ foreign import ccall unsafe "stdlib.h malloc"  _malloc  ::          CSize -> IO 
 foreign import ccall unsafe "stdlib.h realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
 foreign import ccall unsafe "stdlib.h free"    _free    :: Ptr a -> IO ()
 
--- | A pointer to a foreign function equivalent to 'free', which may be used
--- as a finalizer for storage allocated with 'malloc' or 'mallocBytes'.
+-- | A pointer to a foreign function equivalent to 'free', which may be
+-- used as a finalizer (cf 'Foreign.ForeignPtr.ForeignPtr') for storage
+-- allocated with 'malloc', 'mallocBytes', 'realloc' or 'reallocBytes'.
 foreign import ccall unsafe "stdlib.h &free" finalizerFree :: FinalizerPtr a

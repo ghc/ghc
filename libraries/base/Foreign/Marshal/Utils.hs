@@ -70,7 +70,13 @@ import Foreign.C.Types		( CInt(..) )
 -- combined allocation and marshalling
 -- -----------------------------------
 
--- |Allocate storage for a value and marshal it into this storage
+-- |Allocate a block of memory and marshal a value into it
+-- (the combination of 'malloc' and 'poke').
+-- The size of the area allocated is determined by the 'Foreign.Storable.sizeOf'
+-- method from the instance of 'Storable' for the appropriate type.
+--
+-- The memory may be deallocated using 'Foreign.Marshal.Alloc.free' or
+-- 'Foreign.Marshal.Alloc.finalizerFree' when no longer required.
 --
 new     :: Storable a => a -> IO (Ptr a)
 new val  = 
@@ -79,9 +85,12 @@ new val  =
     poke ptr val
     return ptr
 
--- |Allocate temporary storage for a value and marshal it into this storage
+-- |@'with' val f@ executes the computation @f@, passing as argument
+-- a pointer to a temporarily allocated block of memory into which
+-- 'val' has been marshalled (the combination of 'alloca' and 'poke').
 --
--- * see the life time constraints imposed by 'alloca'
+-- The memory is freed when @f@ terminates (either normally or via an
+-- exception), so the pointer passed to @f@ must /not/ be used after this.
 --
 with       :: Storable a => a -> (Ptr a -> IO b) -> IO b
 with val f  =
@@ -123,8 +132,8 @@ maybeNew :: (      a -> IO (Ptr a))
 	 -> (Maybe a -> IO (Ptr a))
 maybeNew  = maybe (return nullPtr)
 
--- |Converts a @withXXX@ combinator into one marshalling a value wrapped into a
--- 'Maybe'
+-- |Converts a @withXXX@ combinator into one marshalling a value wrapped
+-- into a 'Maybe', using 'nullPtr' to represent 'Nothing'.
 --
 maybeWith :: (      a -> (Ptr b -> IO c) -> IO c) 
 	  -> (Maybe a -> (Ptr b -> IO c) -> IO c)

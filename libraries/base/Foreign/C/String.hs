@@ -139,7 +139,9 @@ peekCStringLen = peekCAStringLen
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * new storage is allocated for the C string and must be explicitly freed
+-- * new storage is allocated for the C string and must be
+--   explicitly freed using 'Foreign.Marshal.Alloc.free' or
+--   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCString :: String -> IO CString
 newCString = newCAString
@@ -147,7 +149,9 @@ newCString = newCAString
 -- | Marshal a Haskell string into a C string (ie, character array) with
 -- explicit length information.
 --
--- * new storage is allocated for the C string and must be explicitly freed
+-- * new storage is allocated for the C string and must be
+--   explicitly freed using 'Foreign.Marshal.Alloc.free' or
+--   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCStringLen     :: String -> IO CStringLen
 newCStringLen = newCAStringLen
@@ -157,7 +161,9 @@ newCStringLen = newCAStringLen
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * see the lifetime constraints of 'Foreign.Marshal.Alloc.alloca'
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
 --
 withCString :: String -> (CString -> IO a) -> IO a
 withCString = withCAString
@@ -167,7 +173,9 @@ withCString = withCAString
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * see the lifetime constraints of 'Foreign.Marshal.Alloc.alloca'
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
 --
 withCStringLen         :: String -> (CStringLen -> IO a) -> IO a
 withCStringLen = withCAStringLen
@@ -237,7 +245,9 @@ peekCAStringLen (cp, len)
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * new storage is allocated for the C string and must be explicitly freed
+-- * new storage is allocated for the C string and must be
+--   explicitly freed using 'Foreign.Marshal.Alloc.free' or
+--   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCAString :: String -> IO CString
 #ifndef __GLASGOW_HASKELL__
@@ -255,7 +265,9 @@ newCAString str = do
 -- | Marshal a Haskell string into a C string (ie, character array) with
 -- explicit length information.
 --
--- * new storage is allocated for the C string and must be explicitly freed
+-- * new storage is allocated for the C string and must be
+--   explicitly freed using 'Foreign.Marshal.Alloc.free' or
+--   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCAStringLen     :: String -> IO CStringLen
 #ifndef __GLASGOW_HASKELL__
@@ -279,7 +291,9 @@ newCAStringLen str = do
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * see the lifetime constraints of 'Foreign.Marshal.Alloc.alloca'
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
 --
 withCAString :: String -> (CString -> IO a) -> IO a
 #ifndef __GLASGOW_HASKELL__
@@ -300,7 +314,9 @@ withCAString str f =
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * see the lifetime constraints of 'Foreign.Marshal.Alloc.alloca'
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
 --
 withCAStringLen         :: String -> (CStringLen -> IO a) -> IO a
 #ifndef __GLASGOW_HASKELL__
@@ -376,7 +392,9 @@ peekCWStringLen (cp, len)  = do
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * new storage is allocated for the C string and must be explicitly freed
+-- * new storage is allocated for the C wide string and must
+--   be explicitly freed using 'Foreign.Marshal.Alloc.free' or
+--   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCWString :: String -> IO CWString
 newCWString  = newArray0 wNUL . charsToCWchars
@@ -384,7 +402,9 @@ newCWString  = newArray0 wNUL . charsToCWchars
 -- | Marshal a Haskell string into a C wide string (ie, wide character array)
 -- with explicit length information.
 --
--- * new storage is allocated for the C string and must be explicitly freed
+-- * new storage is allocated for the C wide string and must
+--   be explicitly freed using 'Foreign.Marshal.Alloc.free' or
+--   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCWStringLen     :: String -> IO CWStringLen
 newCWStringLen str  = do
@@ -396,7 +416,9 @@ newCWStringLen str  = do
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * see the lifetime constraints of 'Foreign.Marshal.Alloc.alloca'
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
 --
 withCWString :: String -> (CWString -> IO a) -> IO a
 withCWString  = withArray0 wNUL . charsToCWchars
@@ -406,7 +428,9 @@ withCWString  = withArray0 wNUL . charsToCWchars
 --
 -- * the Haskell string may /not/ contain any NUL characters
 --
--- * see the lifetime constraints of 'Foreign.Marshal.Alloc.alloca'
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
 --
 withCWStringLen         :: String -> (CWStringLen -> IO a) -> IO a
 withCWStringLen str act  = withArray (charsToCWchars str) $ act . pairLength str
