@@ -16,14 +16,14 @@ hidden-modules:
 import-dirs:	IMPORT_DIR
 library-dirs:	LIB_DIR
 hs-libraries:   "HStemplate-haskell"
-extra-libs:
+extra-libraries:
 include-dirs:
 includes:		
 depends:	base, haskell98	
-extra-hugs-opts:
-extra-cc-opts:
-extra-ld-opts:
+hugs-options:
+cc-options:
+ld-options:
 framework-dirs:
-extra-frameworks:
+frameworks:
 haddock-interfaces:	HADDOCK_IFACE
 haddock-html:		HTML_DIR
