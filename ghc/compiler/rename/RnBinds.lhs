@@ -154,7 +154,10 @@ contains bindings for the binders of this particular binding.
 \begin{code}
 rnTopMonoBinds mbinds sigs
  =  mappM lookupBndrRn binder_rdr_names			 `thenM` \ binder_names ->
+	-- No need to extend the environment; that has been done already
+
     bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ 
+	-- Hmm; by analogy with Ids, this doesn't look right
     let
 	bndr_name_set = mkNameSet binder_names
     in
