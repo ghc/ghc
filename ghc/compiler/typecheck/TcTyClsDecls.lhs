@@ -14,8 +14,8 @@ IMP_Ubiq(){-uitous-}
 
 import HsSyn		( HsDecl(..), TyDecl(..),  ConDecl(..), ConDetails(..), BangType(..),
 			  ClassDecl(..), HsType(..), HsTyVar, DefaultDecl, InstDecl,
-			  IfaceSig, Sig(..), MonoBinds, Fake, InPat, HsBinds(..), HsExpr,
-			  hsDeclName, NewOrData(..)
+			  IfaceSig, Sig(..), MonoBinds, Fake, InPat, HsBinds(..), HsExpr, NewOrData,
+			  hsDeclName
 			)
 import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..), SYN_IE(RenamedHsDecl)
 			)
@@ -35,7 +35,6 @@ import Class		( SYN_IE(Class) )
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, getSrcLoc, isTvOcc, nameOccName )
 import Outputable
-import PprStyle
 import Pretty
 import Maybes		( mapMaybe )
 import UniqSet		( SYN_IE(UniqSet), emptyUniqSet,
