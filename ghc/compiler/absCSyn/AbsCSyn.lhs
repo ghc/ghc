@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.22 1999/04/26 16:06:27 simonm Exp $
+% $Id: AbsCSyn.lhs,v 1.23 1999/05/13 17:30:52 simonm Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -92,9 +92,9 @@ stored in a mixed type location.)
     	    	    	-- (for the benefit of the native code generators)
     	    	    	-- Equivalent to CJump in C land
 
-  | CReturn 	    	-- This used to be RetVecRegRel
-    	CAddrMode   	-- Any base address mode
-    	ReturnInfo  	-- How to get the return address from the base address
+  | CReturn		-- Perform a return
+    	CAddrMode   	-- Address of a RET_<blah> info table
+    	ReturnInfo  	-- Whether it's a direct or vectored return
 
   | CSwitch !CAddrMode
 	[(Literal, AbstractC)]	-- alternatives

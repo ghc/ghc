@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.26 1999/05/11 16:44:04 keithw Exp $
+% $Id: CLabel.lhs,v 1.27 1999/05/13 17:30:52 simonm Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -35,7 +35,7 @@ module CLabel (
 	mkAsmTempLabel,
 
 	mkErrorStdEntryLabel,
-	mkUpdEntryLabel,
+	mkUpdInfoLabel,
         mkCAFBlackHoleInfoTableLabel,
         mkSECAFBlackHoleInfoTableLabel,
 	mkRtsPrimOpLabel,
@@ -45,7 +45,7 @@ module CLabel (
 
 	mkCC_Label, mkCCS_Label,
 	
-	needsCDecl, isReadOnly, isAsmTemp, externallyVisibleCLabel,
+	needsCDecl, isAsmTemp, externallyVisibleCLabel,
 
 	CLabelType(..), labelType, labelDynamic,
 
@@ -156,7 +156,7 @@ data RtsLabelInfo
 
   | RtsBlackHoleInfoTbl FAST_STRING  -- black hole with info table name
 
-  | RtsUpdEntry
+  | RtsUpdInfo
 
   | RtsSelectorInfoTbl Bool{-updatable-} Int{-offset-}	-- Selector thunks
   | RtsSelectorEntry   Bool{-updatable-} Int{-offset-}
@@ -210,7 +210,7 @@ mkAsmTempLabel 			= AsmTempLabel
 	-- Some fixed runtime system labels
 
 mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
-mkUpdEntryLabel			= RtsLabel RtsUpdEntry
+mkUpdInfoLabel			= RtsLabel RtsUpdInfo
 mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("CAF_BLACKHOLE_info"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
                                     RtsLabel (RtsBlackHoleInfoTbl SLIT("SE_CAF_BLACKHOLE_info"))
@@ -232,7 +232,6 @@ mkCCS_Label	ccs		= CCS_Label ccs
 
 \begin{code}
 needsCDecl :: CLabel -> Bool	-- False <=> it's pre-declared; don't bother
-isReadOnly :: CLabel -> Bool	-- lives in C "text space"
 isAsmTemp  :: CLabel -> Bool    -- is a local temporary for native code generation
 externallyVisibleCLabel :: CLabel -> Bool -- not C "static"
 \end{code}
@@ -260,21 +259,6 @@ needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
 needsCDecl (CC_Label _)			= False
 needsCDecl (CCS_Label _)		= False
-\end{code}
-
-Whether the labelled thing can be put in C "text space":
-
-\begin{code}
-isReadOnly (IdLabel _ InfoTbl)	= True  -- info-tables: yes
-isReadOnly (IdLabel _ other)	= False -- others: pessimistically, no
-
-isReadOnly (DataConLabel _ _)	= True -- and so on, for other
-isReadOnly (TyConLabel _)	= True
-isReadOnly (CaseLabel _ _)	= True
-isReadOnly (AsmTempLabel _)	= True
-isReadOnly (RtsLabel _)		= True
-isReadOnly (CC_Label _)		= True
-isReadOnly (CCS_Label _)	= True
 \end{code}
 
 Whether the label is an assembler temporary:
@@ -307,6 +291,7 @@ labelType :: CLabel -> CLabelType
 labelType (RtsLabel (RtsBlackHoleInfoTbl _))  = InfoTblType
 labelType (RtsLabel (RtsSelectorInfoTbl _ _)) = InfoTblType
 labelType (RtsLabel (RtsApInfoTbl _ _))       = InfoTblType
+labelType (RtsLabel RtsUpdInfo)       	      = InfoTblType
 labelType (CaseLabel _ CaseReturnInfo)        = InfoTblType
 labelType (CaseLabel _ CaseReturnPt)	      = CodeType
 labelType (CaseLabel _ CaseVecTbl)            = VecTblType
@@ -418,7 +403,7 @@ pprCLbl (CaseLabel u CaseBitmap)
 
 pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("stg_error_entry")
 
-pprCLbl (RtsLabel RtsUpdEntry) = ptext SLIT("Upd_frame_entry")
+pprCLbl (RtsLabel RtsUpdInfo) = ptext SLIT("Upd_frame_info")
 
 pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ptext info
 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.14 1999/03/18 17:57:19 simonm Exp $
+ * $Id: InfoTables.h,v 1.15 1999/05/13 17:31:07 simonm Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -174,11 +174,21 @@ typedef struct _StgInfoTable {
     StgWord         srt_len : 16; /* }                                   */
 #endif
 #if USE_MINIINTERPRETER
-    StgFunPtr       (*vector)[];
     StgFunPtr       entry;
+    StgFunPtr       vector[0];
 #else
     StgCode         code[0];
 #endif
 } StgInfoTable;
+
+/* Info tables are read-only, therefore we uniformly declare them with
+ * C's const attribute.  This isn't just a nice thing to do: it's
+ * necessary because the garbage collector has to distinguish between 
+ * closure pointers and info table pointers when traversing the
+ * stack.  We distinguish the two by checking whether the pointer is
+ * into text-space or not.
+ */
+ 
+#define INFO_TBL_CONST  const
 
 #endif /* INFOTABLES_H */

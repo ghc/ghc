@@ -14,21 +14,15 @@ module CmdLineOpts (
 	intSwitchSet,
 	switchIsOn,
 
-	opt_AllStrict,
-        opt_AllowOverlappingInstances,
- 	opt_AllowUndecidableInstances,
-	opt_AutoSccsOnAllToplevs,
-	opt_AutoSccsOnExportedToplevs,
-	opt_AutoSccsOnIndividualCafs,
-	opt_AutoSccsOnDicts,
-	opt_CompilingPrelude,
+	-- debugging opts
 	opt_D_dump_absC,
 	opt_D_dump_asm,
+	opt_D_dump_cpranal,
 	opt_D_dump_deriv,
 	opt_D_dump_ds,
 	opt_D_dump_flatC,
-	opt_D_dump_inlinings,
 	opt_D_dump_foreign,
+	opt_D_dump_inlinings,
 	opt_D_dump_occur_anal,
 	opt_D_dump_rdr,
 	opt_D_dump_realC,
@@ -38,84 +32,104 @@ module CmdLineOpts (
 	opt_D_dump_spec,
 	opt_D_dump_stg,
 	opt_D_dump_stranal,
-	opt_D_dump_cpranal,
-	opt_D_dump_worker_wrapper,
 	opt_D_dump_tc,
         opt_D_dump_usagesp,
+	opt_D_dump_worker_wrapper,
 	opt_D_show_passes,
-	opt_D_show_rn_trace,
 	opt_D_show_rn_imports,
+	opt_D_show_rn_stats,
+	opt_D_show_rn_trace,
 	opt_D_simplifier_stats,
 	opt_D_source_stats,
 	opt_D_verbose_core2core,
 	opt_D_verbose_stg2stg,
-	opt_DictsStrict,
 	opt_DoCoreLinting,
-        opt_DoUSPLinting,
 	opt_DoStgLinting,
-	opt_DoSemiTagging,
-	opt_DoEtaReduction,
-	opt_DoTickyProfiling,
-	opt_EmitCExternDecls,
-	opt_EnsureSplittableC,
-	opt_FoldrBuildOn,
-	opt_UnboxStrictFields,
-        opt_UsageSPOn,
-	opt_GlasgowExts,
-	opt_GranMacros,
-	opt_HiMap,
-	opt_HiVersion,
-	opt_IgnoreIfacePragmas,
-	opt_IgnoreAsserts,
-	opt_IrrefutableTuples,
-	opt_LiberateCaseThreshold,
-        opt_MaxContextReductionDepth,
-	opt_MultiParamClasses,
-        opt_NoHiCheck,
-	opt_NoImplicitPrelude,
-	opt_NoPreInlining,
-	opt_NumbersStrict,
-	opt_OmitBlackHoling,
-	opt_OmitInterfacePragmas,
-	opt_PprStyle_NoPrags,
+        opt_DoUSPLinting,
 	opt_PprStyle_Debug,
+	opt_PprStyle_NoPrags,
 	opt_PprUserLength,
-	opt_ProduceC,
-	opt_ProduceHi,
-	opt_ProduceS,
-	opt_ProduceExportCStubs,
-	opt_ProduceExportHStubs,
-	opt_ReportCompile,
-	opt_SccGroup,
-	opt_SccProfilingOn,
-	opt_SourceUnchanged,
-	opt_Static,
-	opt_StgDoLetNoEscapes,
-	opt_Parallel,
 
-	opt_InterfaceUnfoldThreshold,
-	opt_UnfoldCasms,
-	opt_UnfoldingCreationThreshold,
-	opt_UnfoldingConDiscount,
-	opt_UnfoldingUseThreshold,
-	opt_UnfoldingKeenessFactor,
-
-	opt_Verbose,
-
-	opt_WarnNameShadowing,
-	opt_WarnUnusedMatches,
-	opt_WarnUnusedBinds,
-	opt_WarnUnusedImports,
+	-- warning opts
+	opt_WarnDuplicateExports,
+	opt_WarnHiShadows,
 	opt_WarnIncompletePatterns,
+	opt_WarnMissingMethods,
+	opt_WarnMissingSigs,
+	opt_WarnNameShadowing,
 	opt_WarnOverlappingPatterns,
 	opt_WarnSimplePatterns,
 	opt_WarnTypeDefaults,
-	opt_WarnMissingMethods,
-	opt_WarnDuplicateExports,
-	opt_WarnHiShadows,
-	opt_WarnMissingSigs,
-	opt_PruneTyDecls, opt_PruneInstDecls,
-	opt_D_show_rn_stats
+	opt_WarnUnusedBinds,
+	opt_WarnUnusedImports,
+	opt_WarnUnusedMatches,
+
+	-- profiling opts
+	opt_AutoSccsOnAllToplevs,
+	opt_AutoSccsOnExportedToplevs,
+	opt_AutoSccsOnIndividualCafs,
+	opt_AutoSccsOnDicts,
+	opt_SccGroup,
+	opt_SccProfilingOn,
+	opt_DoTickyProfiling,
+
+	-- language opts
+	opt_AllStrict,
+	opt_DictsStrict,
+        opt_MaxContextReductionDepth,
+        opt_AllowOverlappingInstances,
+ 	opt_AllowUndecidableInstances,
+	opt_GlasgowExts,
+	opt_IrrefutableTuples,
+	opt_NumbersStrict,
+	opt_Parallel,
+
+	-- optimisation opts
+	opt_DoEtaReduction,
+	opt_DoSemiTagging,
+	opt_FoldrBuildOn,
+	opt_InterfaceUnfoldThreshold,
+	opt_LiberateCaseThreshold,
+	opt_NoPreInlining,
+	opt_StgDoLetNoEscapes,
+	opt_UnfoldCasms,
+	opt_UnfoldingConDiscount,
+	opt_UnfoldingCreationThreshold,
+	opt_UnfoldingKeenessFactor,
+	opt_UnfoldingUseThreshold,
+        opt_UsageSPOn,
+	opt_UnboxStrictFields,
+
+	-- misc opts
+	opt_CompilingPrelude,
+	opt_EmitCExternDecls,
+	opt_EnsureSplittableC,
+	opt_GranMacros,
+	opt_HiMap,
+	opt_HiVersion,
+	opt_IgnoreAsserts,
+	opt_IgnoreIfacePragmas,
+        opt_NoHiCheck,
+	opt_NoImplicitPrelude,
+	opt_OmitBlackHoling,
+	opt_OmitInterfacePragmas,
+	opt_ProduceC,
+	opt_ProduceExportCStubs,
+	opt_ProduceExportHStubs,
+	opt_ProduceHi,
+	opt_ProduceS,
+	opt_PruneInstDecls,
+	opt_PruneTyDecls,
+	opt_ReportCompile,
+	opt_SourceUnchanged,
+	opt_Static,
+	opt_Unregisterised,
+	opt_Verbose,
+
+	opt_UseVanillaRegs,
+	opt_UseFloatRegs,
+	opt_UseDoubleRegs,
+	opt_UseLongRegs
     ) where
 
 #include "HsVersions.h"
@@ -285,28 +299,15 @@ unpacked_opts =
 \end{code}
 
 \begin{code}
-opt_AllStrict			= lookUp  SLIT("-fall-strict")
-opt_AllowOverlappingInstances   = lookUp  SLIT("-fallow-overlapping-instances")
-opt_AllowUndecidableInstances 	= lookUp  SLIT("-fallow-undecidable-instances")
-opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
-opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
-opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
-opt_AutoSccsOnDicts		= lookUp  SLIT("-fauto-sccs-on-dicts")
-  {-
-   It's a bit unfortunate to have to re-introduce this chap, but on Win32
-   platforms we do need a way of distinguishing between the case when we're
-   compiling a static version of the Prelude and one that's going to be
-   put into a DLL. Why? Because the compiler's wired in modules need to
-   be attributed as either coming from a DLL or not.
-  -}
-opt_CompilingPrelude		= lookUp  SLIT("-fcompiling-prelude")
+-- debugging opts
 opt_D_dump_absC			= lookUp  SLIT("-ddump-absC")
 opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
+opt_D_dump_cpranal	        = lookUp  SLIT("-ddump-cpranalyse")
 opt_D_dump_deriv		= lookUp  SLIT("-ddump-deriv")
 opt_D_dump_ds			= lookUp  SLIT("-ddump-ds")
 opt_D_dump_flatC		= lookUp  SLIT("-ddump-flatC")
-opt_D_dump_inlinings		= lookUp  SLIT("-ddump-inlinings")
 opt_D_dump_foreign		= lookUp  SLIT("-ddump-foreign-stubs")
+opt_D_dump_inlinings		= lookUp  SLIT("-ddump-inlinings")
 opt_D_dump_occur_anal		= lookUp  SLIT("-ddump-occur-anal")
 opt_D_dump_rdr			= lookUp  SLIT("-ddump-rdr")
 opt_D_dump_realC		= lookUp  SLIT("-ddump-realC")
@@ -316,84 +317,114 @@ opt_D_dump_simpl_iterations	= lookUp  SLIT("-ddump-simpl-iterations")
 opt_D_dump_spec			= lookUp  SLIT("-ddump-spec")
 opt_D_dump_stg			= lookUp  SLIT("-ddump-stg")
 opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
-opt_D_dump_worker_wrapper	= lookUp  SLIT("-ddump-workwrap")
-opt_D_dump_cpranal	        = lookUp  SLIT("-ddump-cpranalyse")
 opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
 opt_D_dump_usagesp              = lookUp  SLIT("-ddump-usagesp")
+opt_D_dump_worker_wrapper	= lookUp  SLIT("-ddump-workwrap")
 opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
-opt_D_show_rn_trace		= lookUp  SLIT("-dshow-rn-trace")
 opt_D_show_rn_imports		= lookUp  SLIT("-dshow-rn-imports")
+opt_D_show_rn_trace		= lookUp  SLIT("-dshow-rn-trace")
+opt_D_show_rn_stats		= lookUp SLIT("-dshow-rn-stats")
 opt_D_simplifier_stats		= lookUp  SLIT("-dsimplifier-stats")
 opt_D_source_stats		= lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
 opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
-opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
 opt_DoStgLinting		= lookUp  SLIT("-dstg-lint")
-opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
-opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
-opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
-opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 opt_DoUSPLinting		= lookUp  SLIT("-dusagesp-lint")
-opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
-opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
-opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
-opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
-opt_GranMacros			= lookUp  SLIT("-fgransim")
-opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
-opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
-opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
-opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
-opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
-opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
-opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
-opt_MultiParamClasses		= opt_GlasgowExts
-opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
-opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
-opt_NoPreInlining		= lookUp  SLIT("-fno-pre-inlining")
-opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
-opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
-opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 opt_PprStyle_NoPrags		= lookUp  SLIT("-dppr-noprags")
 opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
-opt_ProduceC  			= lookup_str "-C="
-opt_ProduceS  			= lookup_str "-S="
-opt_ProduceExportCStubs		= lookup_str "-F="
-opt_ProduceExportHStubs		= lookup_str "-FH="
-opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
-opt_ReportCompile                = lookUp SLIT("-freport-compile")
-opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
-opt_SourceUnchanged		= lookUp  SLIT("-fsource-unchanged")
-opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
-opt_Parallel			= lookUp  SLIT("-fparallel")
-opt_Static			= lookUp  SLIT("-static")
-opt_SccGroup  			= lookup_str "-G="
-opt_Verbose			= lookUp  SLIT("-v")
 
-opt_UnfoldCasms		        = lookUp SLIT("-funfold-casms-in-hi-file")
-opt_InterfaceUnfoldThreshold	= lookup_def_int "-funfolding-interface-threshold" iNTERFACE_UNFOLD_THRESHOLD
-opt_UnfoldingCreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  uNFOLDING_CREATION_THRESHOLD
-opt_UnfoldingUseThreshold	= lookup_def_int "-funfolding-use-threshold"	   uNFOLDING_USE_THRESHOLD
-opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDING_CON_DISCOUNT_WEIGHT
-			
-opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
-opt_UnfoldingKeenessFactor	= lookup_def_float "-funfolding-keeness-factor"	   uNFOLDING_KEENESS_FACTOR
-opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
+-- warning opts
+opt_WarnDuplicateExports	= lookUp  SLIT("-fwarn-duplicate-exports")
 opt_WarnHiShadows		= lookUp  SLIT("-fwarn-hi-shadowing")
 opt_WarnIncompletePatterns	= lookUp  SLIT("-fwarn-incomplete-patterns")
+opt_WarnMissingMethods		= lookUp  SLIT("-fwarn-missing-methods")
+opt_WarnMissingSigs		= lookUp  SLIT("-fwarn-missing-signatures")
+opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
 opt_WarnOverlappingPatterns	= lookUp  SLIT("-fwarn-overlapping-patterns")
 opt_WarnSimplePatterns	     	= lookUp  SLIT("-fwarn-simple-patterns")
 opt_WarnTypeDefaults		= lookUp  SLIT("-fwarn-type-defaults")
-opt_WarnUnusedMatches		= lookUp  SLIT("-fwarn-unused-matches")
 opt_WarnUnusedBinds		= lookUp  SLIT("-fwarn-unused-binds")
 opt_WarnUnusedImports		= lookUp  SLIT("-fwarn-unused-imports")
-opt_WarnMissingMethods		= lookUp  SLIT("-fwarn-missing-methods")
-opt_WarnDuplicateExports	= lookUp  SLIT("-fwarn-duplicate-exports")
-opt_WarnMissingSigs		= lookUp  SLIT("-fwarn-missing-signatures")
+opt_WarnUnusedMatches		= lookUp  SLIT("-fwarn-unused-matches")
+
+-- profiling opts
+opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
+opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
+opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
+opt_AutoSccsOnDicts		= lookUp  SLIT("-fauto-sccs-on-dicts")
+opt_SccGroup  			= lookup_str "-G="
+opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
+opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
+
+-- language opts
+opt_AllStrict			= lookUp  SLIT("-fall-strict")
+opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
+opt_AllowOverlappingInstances   = lookUp  SLIT("-fallow-overlapping-instances")
+opt_AllowUndecidableInstances 	= lookUp  SLIT("-fallow-undecidable-instances")
+opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
+opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
+opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
+opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
+opt_Parallel			= lookUp  SLIT("-fparallel")
+
+-- optimisation opts
+opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
+opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
+opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
+opt_InterfaceUnfoldThreshold	= lookup_def_int "-funfolding-interface-threshold" iNTERFACE_UNFOLD_THRESHOLD
+opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
+opt_NoPreInlining		= lookUp  SLIT("-fno-pre-inlining")
+opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
+opt_UnfoldCasms		        = lookUp SLIT("-funfold-casms-in-hi-file")
+opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDING_CON_DISCOUNT_WEIGHT
+opt_UnfoldingCreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  uNFOLDING_CREATION_THRESHOLD
+opt_UnfoldingKeenessFactor	= lookup_def_float "-funfolding-keeness-factor"	   uNFOLDING_KEENESS_FACTOR
+opt_UnfoldingUseThreshold	= lookup_def_int "-funfolding-use-threshold"	   uNFOLDING_USE_THRESHOLD
+opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
+opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
+
+  {-
+   It's a bit unfortunate to have to re-introduce this chap, but on Win32
+   platforms we do need a way of distinguishing between the case when we're
+   compiling a static version of the Prelude and one that's going to be
+   put into a DLL. Why? Because the compiler's wired in modules need to
+   be attributed as either coming from a DLL or not.
+  -}
+opt_CompilingPrelude		= lookUp  SLIT("-fcompiling-prelude")
+opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
+opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
+opt_GranMacros			= lookUp  SLIT("-fgransim")
+opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
+opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
+opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
+opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
+opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
+opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
+opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
+opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
+opt_ProduceC  			= lookup_str "-C="
+opt_ProduceExportCStubs		= lookup_str "-F="
+opt_ProduceExportHStubs		= lookup_str "-FH="
+opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
+opt_ProduceS  			= lookup_str "-S="
+opt_ReportCompile                = lookUp SLIT("-freport-compile")
 opt_PruneTyDecls		= not (lookUp SLIT("-fno-prune-tydecls"))
 opt_PruneInstDecls		= not (lookUp SLIT("-fno-prune-instdecls"))
-opt_D_show_rn_stats		= lookUp SLIT("-dshow-rn-stats")
+opt_SourceUnchanged		= lookUp  SLIT("-fsource-unchanged")
+opt_Static			= lookUp  SLIT("-static")
+opt_Unregisterised		= lookUp  SLIT("-funregisterised")
+opt_Verbose			= lookUp  SLIT("-v")
+
+opt_UseVanillaRegs | opt_Unregisterised = 0
+		   | otherwise          = mAX_Real_Vanilla_REG
+opt_UseFloatRegs   | opt_Unregisterised = 0
+		   | otherwise          = mAX_Real_Float_REG
+opt_UseDoubleRegs  | opt_Unregisterised = 0
+		   | otherwise          = mAX_Real_Double_REG
+opt_UseLongRegs    | opt_Unregisterised = 0
+		   | otherwise          = mAX_Real_Long_REG
 
 -- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 \end{code}

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.15 1999/05/11 16:47:39 keithw Exp $
+ * $Id: ClosureMacros.h,v 1.16 1999/05/13 17:31:06 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -63,20 +63,20 @@
 #if USE_MINIINTERPRETER
 #define INIT_ENTRY(e)    entry : (F_)(e)
 #define GET_ENTRY(c)     ((c)->header.info->entry)
-#define ENTRY_CODE(info) (stgCast(StgInfoTable*,info)->entry)
-#define INFO_PTR_TO_STRUCT(info) (info)
+#define ENTRY_CODE(info) (((StgInfoTable *)info)->entry)
+#define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
 #define get_itbl(c)      ((c)->header.info)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return itbl->entry;
 }
 #else
 #define INIT_ENTRY(e)    code : {}
-#define GET_ENTRY(c)     stgCast(StgFunPtr,((c)->header.info))
+#define GET_ENTRY(c)     ((StgFunPtr)((c)->header.info))
 #define ENTRY_CODE(info) (info)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)(info) - 1)
-#define get_itbl(c)      (stgCast(StgInfoTable*,(c)->header.info) -1)
+#define get_itbl(c)      (((c)->header.info) - 1)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
-    return stgCast(StgFunPtr,itbl+1);
+    return (StgFunPtr)(itbl+1);
 }
 #endif
 
@@ -131,8 +131,8 @@ extern int is_heap_alloced(const void* x);
 #define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
 
 /* Tiresome predicates needed to check for pointers into the closure tables */
-#define IS_CHARLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,CHARLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,CHARLIKE_closure) + 255 * sizeof(StgIntCharlikeClosure)))
-#define IS_INTLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,INTLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,INTLIKE_closure) + 32 * sizeof(StgIntCharlikeClosure)))
+#define IS_CHARLIKE_CLOSURE(p)  ( (P_)(p) >= (P_)CHARLIKE_closure && (char*)(p) <= ((char*)CHARLIKE_closure + 255 * sizeof(StgIntCharlikeClosure)) )
+#define IS_INTLIKE_CLOSURE(p)  ( (P_)(p) >= (P_)INTLIKE_closure && (char*)(p) <= ((char*)INTLIKE_closure + 32 * sizeof(StgIntCharlikeClosure)) )
 
 #define LOOKS_LIKE_STATIC_CLOSURE(r) (((*(((unsigned long *)(r))-1)) == 0) || IS_CHARLIKE_CLOSURE(r) || IS_INTLIKE_CLOSURE(r))
 #else
@@ -153,9 +153,13 @@ extern int is_heap_alloced(const void* x);
    approximations.  This absolutely has to be fixed.
    -------------------------------------------------------------------------- */
 
+#ifdef INTERPRETER
 #ifdef USE_MINIINTERPRETER
 /* yoiks: one of the dreaded pointer equality tests */
-#define IS_HUGS_CONSTR_INFO(info) (stgCast(StgInfoTable*,info)->entry == stgCast(StgFunPtr,&Hugs_CONSTR_entry))
+#define IS_HUGS_CONSTR_INFO(info) (((StgInfoTable *)(info))->entry == (StgFunPtr)&Hugs_CONSTR_entry)
+#else
+#define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
+#endif
 #else
 #define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
 #endif

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.29 1999/05/11 16:44:02 keithw Exp $
+% $Id: CgClosure.lhs,v 1.30 1999/05/13 17:30:56 simonm Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -41,7 +41,7 @@ import CgUsages		( setRealAndVirtualSp, getVirtSp,
 			  getSpRelOffset, getHpRelOffset
 			)
 import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
-			  mkRednCountsLabel, mkStdEntryLabel
+			  mkRednCountsLabel, mkInfoTableLabel
 			)
 import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
@@ -401,7 +401,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	    enterCostCentreCode closure_info cc IsFunction False `thenC`
 
 		-- Do the business
-	    funWrapper closure_info arg_regs stk_tags slow_label (cgExpr body)
+	    funWrapper closure_info arg_regs stk_tags info_label (cgExpr body)
     in
  	-- Make a labelled code-block for the slow and fast entry code
     forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)
@@ -429,7 +429,7 @@ closureCodeBody binder_info closure_info cc all_args body
 	-- Manufacture labels
     name       = closureName closure_info
     fast_label = mkFastEntryLabel name stg_arity
-    slow_label = mkStdEntryLabel name
+    info_label = mkInfoTableLabel name
 \end{code}
 
 For lexically scoped profiling we have to load the cost centre from
@@ -572,10 +572,10 @@ thunkWrapper closure_info label thunk_code
 funWrapper :: ClosureInfo 	-- Closure whose code body this is
 	   -> [MagicId] 	-- List of argument registers (if any)
 	   -> [(VirtualSpOffset,Int)] -- tagged stack slots
-	   -> CLabel		-- slow entry point for heap check ret.
+	   -> CLabel		-- info table for heap check ret.
 	   -> Code		-- Body of function being compiled
 	   -> Code
-funWrapper closure_info arg_regs stk_tags slow_label fun_body
+funWrapper closure_info arg_regs stk_tags info_label fun_body
   = 	-- Stack overflow check
     nodeMustPointToIt (closureLFInfo closure_info)  	`thenFC` \ node_points ->
     let
@@ -587,7 +587,7 @@ funWrapper closure_info arg_regs stk_tags slow_label fun_body
       else absC AbsCNop)                                 `thenC`
 
         -- heap and/or stack checks
-    fastEntryChecks arg_regs stk_tags slow_label node_points (
+    fastEntryChecks arg_regs stk_tags info_label node_points (
 
 	-- Finally, do the business
     fun_body

@@ -28,7 +28,7 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 import Constants	( mIN_UPD_SIZE )
 import CallConv		( CallConv, callConvAttribute, cCallConv )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
-			  isReadOnly, needsCDecl, pprCLabel,
+			  needsCDecl, pprCLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
 			  mkStaticClosureLabel,
 			  CLabel, CLabelType(..), labelType, labelDynamic
@@ -143,7 +143,8 @@ pprAbsC (CReturn am return_info)  c
 	     (hcat [text jmp_lit, target, pp_paren_semi ])
   where
    target = case return_info of
-    	DirectReturn -> hcat [char '(', pprAmode am, rparen]
+    	DirectReturn -> hcat [ptext SLIT("ENTRY_CODE"), lparen,
+			      pprAmode am, rparen]
 	DynamicVectoredReturn am' -> mk_vector (pprAmode am')
 	StaticVectoredReturn n -> mk_vector (int n)	-- Always positive
    mk_vector x = hcat [text "RET_VEC", char '(', pprAmode am, comma,
@@ -498,32 +499,24 @@ pprAbsC stmt@(CRetDirect uniq code srt liveness) _
 		   LvLarge _ -> SLIT("RET_BIG")
 
 pprAbsC stmt@(CRetVector label amodes srt liveness) _
-  = vcat [
-	pp_vector,
+  = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
+    vcat [
+	pp_exts,
 	hcat [
-	ptext SLIT("  }"), comma, ptext SLIT("\n  VEC_INFO_TABLE"),
-	lparen, 
-	pp_liveness liveness, comma,	-- bitmap liveness mask
-	pp_srt_info srt,		-- SRT
-	ptext type_str,			-- or big, depending on the size
-					-- of the liveness mask.
-	rparen 
-       ],
-       text "};"
+	  ptext SLIT("VEC_INFO_") <> int size,
+	  lparen, 
+	  pprCLabel label, comma,
+	  pp_liveness liveness, comma,	-- bitmap liveness mask
+	  pp_srt_info srt,		-- SRT
+	  ptext type_str, comma,
+	  ppLocalness label, comma
+	],
+	nest 2 (sep (punctuate comma (map ppr_item amodes))),
+	text ");"
     ]
+    }
 
   where
-    pp_vector = 
-        case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
-	 vcat [
-	    pp_exts,
-	    hcat [ppLocalness label,
-	          ptext SLIT(" vec_info_"), int size, space,
-		  pprCLabel label, text "= { {"
-		  ],
-	    nest 2 (sep (punctuate comma (map ppr_item (reverse amodes))))
-	    ] }
-
     ppr_item item = (<>) (text "(F_) ") (ppr_amode item)
     size = length amodes
 
@@ -538,14 +531,9 @@ pprAbsC (CCostCentreStackDecl ccs)    _ = pprCostCentreStackDecl ccs
 
 \begin{code}
 ppLocalness label
-  = (<>) static const
-  where
-    static = if (externallyVisibleCLabel label) 
+  = if (externallyVisibleCLabel label) 
 		then empty 
 		else ptext SLIT("static ")
-    const  = if not (isReadOnly label)	        
-		then empty 
-		else ptext SLIT("const")
 
 -- Horrible macros for declaring the types and locality of labels (see
 -- StgMacros.h).
@@ -559,10 +547,7 @@ ppLocalnessMacro include_dyn_prefix clabel =
 	  CodeType       -> ptext SLIT("F_")
 	  InfoTblType    -> ptext SLIT("I_")
 	  ClosureTblType -> ptext SLIT("CP_")
-	  DataType       -> ptext SLIT("D_") <>
-				   if isReadOnly clabel 
-				      then ptext SLIT("RO_") 
-				      else empty 
+	  DataType       -> ptext SLIT("D_")
      ]
   where
    is_visible = externallyVisibleCLabel clabel

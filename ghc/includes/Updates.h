@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.10 1999/05/11 16:47:42 keithw Exp $
+ * $Id: Updates.h,v 1.11 1999/05/13 17:31:08 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -77,7 +77,7 @@ extern DLL_IMPORT_DATA const StgPolyInfoTable Upd_frame_info;
 #define PUSH_UPD_FRAME(target, Sp_offset)			\
 	{							\
 		StgUpdateFrame *__frame;			\
-		TICK_UPDF_PUSHED(target, GET_INFO((StgClosure*)target));		        \
+		TICK_UPDF_PUSHED(target, GET_INFO((StgClosure*)target)); \
 		__frame = stgCast(StgUpdateFrame*,Sp + (Sp_offset)) - 1; \
 		SET_INFO(__frame,stgCast(StgInfoTable*,&Upd_frame_info));   \
 		__frame->link = Su;				\

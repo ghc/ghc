@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.15 1999/03/08 17:05:41 simonm Exp $
+% $Id: CgHeapery.lhs,v 1.16 1999/05/13 17:30:56 simonm Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -31,6 +31,7 @@ import ClosureInfo	( closureSize, closureGoodStuffSize,
 			  closureSMRep
 			)
 import PrimRep		( PrimRep(..), isFollowableRep )
+import Unique		( Unique )
 import CmdLineOpts	( opt_SccProfilingOn )
 import GlaExts
 import Outputable
@@ -226,7 +227,7 @@ altHeapCheck
 	-> [MagicId]			-- live registers
 	-> [(VirtualSpOffset,Int)]	-- stack slots to tag
 	-> AbstractC
-	-> Maybe CLabel			-- ret address if not on top of stack.
+	-> Maybe Unique			-- uniq of ret address (possibly)
 	-> Code
 	-> Code
 
@@ -251,6 +252,12 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 	checking_code tag_assts = 
 	  case non_void_regs of
 
+{- no: there might be stuff on top of the retn. addr. on the stack.
+	    [{-no regs-}] ->
+		CCheck HP_CHK_NOREGS
+		    [mkIntCLit words_required]
+		    tag_assts
+-}
 	    -- this will cover all cases for x86
 	    [VanillaReg rep ILIT(1)] 
 
@@ -258,14 +265,14 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 	          CCheck HP_CHK_UT_ALT
 		      [mkIntCLit words_required, mkIntCLit 1, mkIntCLit 0,
 			CReg (VanillaReg RetRep ILIT(2)),
-			CLbl ret_addr RetRep]
+			CLbl (mkReturnInfoLabel ret_addr) RetRep]
 		      tag_assts
 
 	       | otherwise ->
 	          CCheck HP_CHK_UT_ALT
 		      [mkIntCLit words_required, mkIntCLit 0, mkIntCLit 1,
 			CReg (VanillaReg RetRep ILIT(2)),
-			CLbl ret_addr RetRep]
+			CLbl (mkReturnInfoLabel ret_addr) RetRep]
 		      tag_assts
 
 	    several_regs ->
@@ -274,7 +281,10 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 		CCheck HP_CHK_GEN
 		     [mkIntCLit words_required, 
 		      mkIntCLit (IBOX(word2Int# liveness)),
-		      CLbl ret_addr RetRep] 
+			-- HP_CHK_GEN needs a direct return address,
+			-- not an info table (might be different if
+			-- we're not assembly-mangling/tail-jumping etc.)
+		      CLbl (mkReturnPtLabel ret_addr) RetRep] 
 		     tag_assts
 
 -- normal algebraic and primitive case alternatives:

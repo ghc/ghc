@@ -116,7 +116,7 @@ GHC_UNLIT GHC_HSCPP GHC_HSC GHC_SYSMAN
 
 CP RM CONTEXT_DIFF
 
-WAY_*_NAME WAY_*_HC_OPTS
+WAY_*_NAME WAY_*_REAL_OPTS
 
 LeadingUnderscore
 
@@ -302,12 +302,12 @@ Prelude ({\em including} its interface file(s)).
 $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 
 %BuildDescr	= (# system ways begin
-                   '',	    'normal sequential',
-		   '_p',    "$WAY_p_NAME",
-		   '_t',    "$WAY_t_NAME",
-		   '_u',    "$WAY_u_NAME",
-		   '_mp',   "$WAY_mp_NAME",
-		   '_mg',   "$WAY_mg_NAME",
+                   '',	    'Normal Sequential',
+		   '_p',    "Profiling",
+		   '_t',    "Ticky-ticky Profiling",
+		   '_u',    "Unregisterised",
+		   '_mp',   "Parallel",
+		   '_mg',   "Gransim",
 		   # system ways end
 		   '_a',    "$WAY_a_NAME",
 		   '_b',    "$WAY_b_NAME",
@@ -331,30 +331,30 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 #
 %SetupOpts = 
        (
-	'_a', "$WAY_a_HC_OPTS",
-	'_b', "$WAY_b_HC_OPTS",
-	'_c', "$WAY_c_HC_OPTS",
-	'_d', "$WAY_d_HC_OPTS",
-	'_e', "$WAY_e_HC_OPTS",
-	'_f', "$WAY_f_HC_OPTS",
-	'_g', "$WAY_g_HC_OPTS",
-	'_h', "$WAY_h_HC_OPTS",
-	'_i', "$WAY_i_HC_OPTS",
-	'_j', "$WAY_j_HC_OPTS",
-	'_k', "$WAY_k_HC_OPTS",
-	'_l', "$WAY_l_HC_OPTS",
-	'_m', "$WAY_m_HC_OPTS",
-	'_n', "$WAY_n_HC_OPTS",
-	'_o', "$WAY_o_HC_OPTS",
-	'_A', "$WAY_A_HC_OPTS",
-	'_B', "$WAY_B_HC_OPTS",
+	'_a', "$WAY_a_REAL_OPTS",
+	'_b', "$WAY_b_REAL_OPTS",
+	'_c', "$WAY_c_REAL_OPTS",
+	'_d', "$WAY_d_REAL_OPTS",
+	'_e', "$WAY_e_REAL_OPTS",
+	'_f', "$WAY_f_REAL_OPTS",
+	'_g', "$WAY_g_REAL_OPTS",
+	'_h', "$WAY_h_REAL_OPTS",
+	'_i', "$WAY_i_REAL_OPTS",
+	'_j', "$WAY_j_REAL_OPTS",
+	'_k', "$WAY_k_REAL_OPTS",
+	'_l', "$WAY_l_REAL_OPTS",
+	'_m', "$WAY_m_REAL_OPTS",
+	'_n', "$WAY_n_REAL_OPTS",
+	'_o', "$WAY_o_REAL_OPTS",
+	'_A', "$WAY_A_REAL_OPTS",
+	'_B', "$WAY_B_REAL_OPTS",
 
 	# system ways
-	'_p',  "$WAY_p_HC_OPTS",
-	'_t',  "$WAY_t_HC_OPTS",
-	'_u',  "$WAY_u_HC_OPTS",
-	'_mp', "$WAY_mp_HC_OPTS",
-	'_mg', "$WAY_mg_HC_OPTS");
+	'_p',  "-fscc-profiling -DPROFILING -optc-DPROFILING",
+	'_t',  "-fticky-ticky -DTICKY_TICKY -optc-DTICKY_TICKY",
+	'_u',  "-optc-DNO_REGS -optc-DUSE_MINIINTERPRETER -fno-asm-mangling -funregisterised",
+	'_mp', "-fstack-check -fparallel -D__PARALLEL_HASKELL__ -optc-DPAR",
+	'_mg', "-fstack-check -fconcurrent -fgransim -D__GRANSIM__ -D__CONCURRENT_HASKELL__ -optc-DCONCURRENT -optc-DGRAN");
 
 \end{code}
 
@@ -494,6 +494,7 @@ $UNPROFscc_auto = '';	# set to relevant hsc flag if forcing auto sccs without pr
 $TICKYing = '';    	# set to t if compiling for ticky-ticky profiling
 $PARing = '';		# set to p if compiling for PAR
 $GRANing = '';		# set to g if compiling for GRAN
+$UNREGing = '';		# set to u if compiling unregisterised
 $Specific_hi_file = '';		# set by -ohi <file>; "-" for stdout
 $Specific_dump_file = '';	# set by -odump <file>; "-" for stdout
 $Using_dump_file = 0;
@@ -1001,7 +1002,7 @@ if ( $OptLevel <= 0 ) {
 %************************************************************************
 
 Sort out @$BuildTag@, @$PROFing@, @$PARing@,
-@$GRANing@, @$TICKYing@:
+@$GRANing@, @$TICKYing@, @UNREGing@:
 \begin{code}
 sub setupBuildFlags {
 
@@ -1058,6 +1059,9 @@ sub setupBuildFlags {
 
   } elsif ( $TICKYing eq 't' ) {
       $BuildTag = '_t';
+
+  } elsif ( $UNREGing eq 'u' ) {
+      $BuildTag = '_u';
   }
 
 \end{code}
@@ -3203,6 +3207,8 @@ arg: while($_ = $Args[0]) {
 			}
 			next arg; };
 
+    /^-unreg$/		    && do { $UNREGing = 'u'; next arg; };
+    /^-funregisterised$/    && do { push(@HsC_flags, $_); next arg; };
     /^-fno-asm-mangling$/   && do { $DoAsmMangling = 0; next arg; };
 
     /^-fallow-overlapping-instances$/ && do { push(@HsC_flags, $_); next arg; };

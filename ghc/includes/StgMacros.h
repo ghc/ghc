@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.10 1999/05/11 16:47:41 keithw Exp $
+ * $Id: StgMacros.h,v 1.11 1999/05/13 17:31:07 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,9 +52,9 @@
 #define ED_RO_		extern const
 #define ID_		extern
 #define ID_RO_		extern const
-#define EI_             extern const StgInfoTable
-#define EDI_            extern DLLIMPORT const StgInfoTable
-#define II_             extern const StgInfoTable
+#define EI_             extern INFO_TBL_CONST StgInfoTable
+#define EDI_            extern DLLIMPORT INFO_TBL_CONST StgInfoTable
+#define II_             extern INFO_TBL_CONST StgInfoTable
 #define EC_		extern StgClosure
 #define EDC_		extern DLLIMPORT StgClosure
 #define IC_		extern StgClosure
@@ -321,6 +321,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 #define R6_PTR	  1<<5
 #define R7_PTR	  1<<6
 #define R8_PTR	  1<<7
+
 #define HP_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
    if ((Hp += (headroom)) > HpLim ) {			\
 	EF_(stg_gen_chk);				\
@@ -404,7 +405,7 @@ EDI_(stg_gen_chk_info);
    -------------------------------------------------------------------------- */
 
 #ifdef USE_MINIINTERPRETER
-#define RET_VEC(p,t) ((*(stgCast(StgInfoTable*,p)->vector))[t])
+#define RET_VEC(p,t) (((StgInfoTable *)p)->vector[t])
 #else
 #define RET_VEC(p,t) (*((P_)(p) - sizeofW(StgInfoTable) - t - 1))
 #endif

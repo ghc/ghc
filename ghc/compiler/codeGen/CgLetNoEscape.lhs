@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.12 1998/12/18 17:40:51 simonpj Exp $
+% $Id: CgLetNoEscape.lhs,v 1.13 1999/05/13 17:30:57 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -30,12 +30,13 @@ import CgRetConv	( assignRegs )
 import CgStackery	( mkTaggedVirtStkOffsets, 
 			  allocStackTop, deAllocStackTop, freeStackSlots )
 import CgUsages		( setRealAndVirtualSp, getRealSp, getSpRelOffset )
-import CLabel		( mkReturnPtLabel )
+import CLabel		( mkReturnInfoLabel )
 import ClosureInfo	( mkLFLetNoEscape )
 import CostCentre       ( CostCentreStack )
 import Id		( idPrimRep, Id )
 import Var		( idUnique )
 import PrimRep		( PrimRep(..), retPrimRepSize )
+import Unique		( Unique )
 import BasicTypes	( RecFlag(..) )
 \end{code}
 
@@ -160,7 +161,6 @@ cgLetNoEscapeClosure
 	arity   = length args
 	lf_info = mkLFLetNoEscape arity
 	uniq    = idUnique binder
-	lbl     = mkReturnPtLabel uniq
     in
 
     -- saveVolatileVarsAndRegs done earlier in cgExpr.
@@ -173,7 +173,7 @@ cgLetNoEscapeClosure
 
 	(deAllocStackTop retPrimRepSize   `thenFC` \_ ->
 	 buildContLivenessMask uniq 	  `thenFC` \ liveness ->
-     	 forkAbsC (cgLetNoEscapeBody binder cc args body lbl) 
+     	 forkAbsC (cgLetNoEscapeBody binder cc args body uniq) 
 						`thenFC` \ code ->
 	 getSRTLabel 				`thenFC` \ srt_label -> 
 	 absC (CRetDirect uniq code (srt_label,srt) liveness)
@@ -188,10 +188,10 @@ cgLetNoEscapeBody :: Id
 		  -> CostCentreStack
 		  -> [Id]	-- Args
 		  -> StgExpr	-- Body
-		  -> CLabel     -- Entry label
+		  -> Unique     -- Unique for entry label
 		  -> Code
 
-cgLetNoEscapeBody binder cc all_args body lbl
+cgLetNoEscapeBody binder cc all_args body uniq
    = 
      -- this is where the stack frame lives:
      getRealSp   `thenFC` \sp -> 
@@ -221,12 +221,13 @@ cgLetNoEscapeBody binder cc all_args body lbl
  	-- fill in the frame header only if we fail a heap check:
 	-- otherwise it isn't needed.
      getSpRelOffset sp			`thenFC` \sp_rel ->
-     let frame_hdr_asst = CAssign (CVal sp_rel RetRep) (CLbl lbl RetRep)
+     let lbl = mkReturnInfoLabel uniq
+	 frame_hdr_asst = CAssign (CVal sp_rel RetRep) (CLbl lbl RetRep)
      in
 
 	-- Do heap check [ToDo: omit for non-recursive case by recording in
 	--	in envt and absorbing at call site]
-     altHeapCheck False arg_regs stk_tags frame_hdr_asst (Just lbl) (
+     altHeapCheck False arg_regs stk_tags frame_hdr_asst (Just uniq) (
 	cgExpr body
      )
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.18 1999/03/02 14:34:38 sof Exp $
+% $Id: CgMonad.lhs,v 1.19 1999/05/13 17:30:57 simonm Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -49,7 +49,7 @@ import {-# SOURCE #-} CgUsages  ( getSpRelOffset )
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
 import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
-import CLabel           ( CLabel, mkUpdEntryLabel )
+import CLabel           ( CLabel, mkUpdInfoLabel )
 import Module		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
@@ -163,13 +163,19 @@ type JoinDetails
 -- that Sp is pointing to the top word of the return address.  This
 -- seems unclean but there you go.
 
+-- sequelToAmode returns an amode which refers to an info table.  The info
+-- table will always be of the RET(_VEC)?_(BIG|SMALL) kind.  We're careful
+-- not to handle real code pointers, just in case we're compiling for 
+-- an unregisterised/untailcallish architecture, where info pointers and
+-- code pointers aren't the same.
+
 sequelToAmode :: Sequel -> FCode CAddrMode
 
 sequelToAmode (OnStack virt_sp_offset)
   = getSpRelOffset virt_sp_offset `thenFC` \ sp_rel ->
     returnFC (CVal sp_rel RetRep)
 
-sequelToAmode UpdateCode = returnFC (CLbl mkUpdEntryLabel CodePtrRep)
+sequelToAmode UpdateCode = returnFC (CLbl mkUpdInfoLabel RetRep)
 sequelToAmode (CaseAlts amode _) = returnFC amode
 sequelToAmode (SeqFrame _ _) = panic "sequelToAmode: SeqFrame"
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.18 1999/01/22 10:45:21 simonm Exp $
+% $Id: CgRetConv.lhs,v 1.19 1999/05/13 17:30:58 simonm Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -21,9 +21,10 @@ module CgRetConv (
 import AbsCSyn		-- quite a few things
 import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			  mAX_Vanilla_REG, mAX_Float_REG,
-			  mAX_Double_REG, mAX_Real_Double_REG,
-			  mAX_Real_Vanilla_REG, mAX_Real_Float_REG,
-			  mAX_Long_REG, mAX_Real_Long_REG
+			  mAX_Double_REG, mAX_Long_REG
+			)
+import CmdLineOpts	( opt_UseVanillaRegs, opt_UseFloatRegs,
+			  opt_UseDoubleRegs, opt_UseLongRegs
 			)
 import Maybes		( catMaybes )
 import DataCon		( dataConRawArgTys, DataCon )
@@ -182,10 +183,10 @@ that are guaranteed to map to machine registers.
 
 \begin{code}
 vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: [Int]
-vanillaRegNos	 = regList mAX_Real_Vanilla_REG
-floatRegNos	 = regList mAX_Real_Float_REG
-doubleRegNos	 = regList mAX_Real_Double_REG
-longRegNos       = regList mAX_Real_Long_REG
+vanillaRegNos	 = regList opt_UseVanillaRegs
+floatRegNos	 = regList opt_UseFloatRegs
+doubleRegNos	 = regList opt_UseDoubleRegs
+longRegNos       = regList opt_UseLongRegs
 
 allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
 allVanillaRegNos = regList mAX_Vanilla_REG

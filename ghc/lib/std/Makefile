@@ -38,11 +38,6 @@ SRC_HC_OPTS += -static
 endif
 
 #
-# Profiling options
-WAY_p_HC_OPTS += -GPrelude
-WAY_mr_HC_OPTS += -GPrelude
-
-#
 # Object and interface files have suffixes tagged with their ways
 #
 ifneq "$(way)" ""

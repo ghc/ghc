@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.18 1999/01/21 10:31:57 simonm Exp $
+% $Id: CgTailCall.lhs,v 1.19 1999/05/13 17:30:58 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -38,7 +38,7 @@ import CgRetConv	( dataReturnConvPrim,
 import CgStackery	( adjustRealSp, mkTaggedStkAmodes, adjustStackHW )
 import CgUsages		( getSpRelOffset )
 import CgUpdate		( pushSeqFrame )
-import CLabel		( mkUpdEntryLabel, mkRtsPrimOpLabel )
+import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel )
 import ClosureInfo	( nodeMustPointToIt,
 			  getEntryConvention, EntryConvention(..),
 			  LambdaFormInfo
@@ -168,7 +168,7 @@ mkStaticAlgReturnCode con sequel
 	UpdateCode ->	-- Ha!  We can go direct to the update code,
 			-- (making sure to jump to the *correct* update
 			--  code.)
-    			absC (CReturn (CLbl mkUpdEntryLabel CodePtrRep)
+    			absC (CReturn (CLbl mkUpdInfoLabel CodePtrRep)
 				      return_info)
 
 	CaseAlts _ (Just (alts, _)) ->	-- Ho! We know the constructor so

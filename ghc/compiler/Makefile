@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.55 1999/05/11 16:37:29 keithw Exp $
+# $Id: Makefile,v 1.56 1999/05/13 17:30:50 simonm Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -184,6 +184,9 @@ parser/U_maybe_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_tree_HC_OPTS 		= -H12m -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
+
+# Avoids Bug in 3.02, it seems
+usageSP/UsageSPInf_HC_OPTS	= -Onot
 
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.6 1999/03/17 16:25:07 sewardj Exp $
+ * $Id: HeapStackCheck.hc,v 1.7 1999/05/13 17:31:10 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -306,7 +306,7 @@ EXTFUN(stg_gc_noregs)
 
 INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_info, stg_gc_unpt_r1_entry, 0/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL, const, EF_, 0, 0);
+		      RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_unpt_r1_entry)
 {
@@ -331,7 +331,7 @@ EXTFUN(stg_gc_unpt_r1)
 
 INFO_TABLE_SRT_BITMAP(stg_gc_unbx_r1_info, stg_gc_unbx_r1_entry, 1/*BITMAP*/,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL, const, EF_, 0, 0);
+		      RET_SMALL,, EF_, 0, 0);
 /* the 1 is a bitmap - i.e. 1 non-pointer word on the stack. */
 
 EXTFUN(stg_gc_unbx_r1_entry)
@@ -357,7 +357,7 @@ EXTFUN(stg_gc_unbx_r1)
 
 INFO_TABLE_SRT_BITMAP(stg_gc_f1_info, stg_gc_f1_entry, 1/*BITMAP*/,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL, const, EF_, 0, 0);
+		      RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_f1_entry)
 {
@@ -390,7 +390,7 @@ EXTFUN(stg_gc_f1)
 
 INFO_TABLE_SRT_BITMAP(stg_gc_d1_info, stg_gc_d1_entry, DBL_BITMAP,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL, const, EF_, 0, 0);
+		      RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_d1_entry)
 {
@@ -443,14 +443,14 @@ EXTFUN(stg_gc_d1)
 
 INFO_TABLE_SRT_BITMAP(stg_gc_ut_1_0_info, stg_gc_ut_1_0_entry, 1/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL, const, EF_, 0, 0);
+		      RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_ut_1_0_entry)
 {
   FB_
   R1.w = Sp[1];
   Sp += 2;
-  JMP_(Sp[-2]);
+  JMP_(ENTRY_CODE(Sp[-2]));
   FE_
 }
 
@@ -469,14 +469,14 @@ EXTFUN(stg_gc_ut_1_0)
 
 INFO_TABLE_SRT_BITMAP(stg_gc_ut_0_1_info, stg_gc_ut_0_1_entry, 3/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL, const, EF_, 0, 0);
+		      RET_SMALL,, EF_, 0, 0);
 
 EXTFUN(stg_gc_ut_0_1_entry)
 {
   FB_
   R1.w = Sp[1];
   Sp += 2;
-  JMP_(Sp[-2]);
+  JMP_(ENTRY_CODE(Sp[-2]));
   FE_
 }
 
@@ -764,7 +764,7 @@ EXTFUN(stg_chk_8)
 
 INFO_TABLE_SRT_BITMAP(stg_gen_chk_info, stg_gen_chk_ret, 0,
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-	              RET_DYN, const, EF_, 0, 0);
+	              RET_DYN,, EF_, 0, 0);
 
 /* bitmap in the above info table is unused, the real one is on the stack. 
  */
@@ -773,7 +773,7 @@ FN_(stg_gen_chk_ret)
 {
   FB_
   RESTORE_EVERYTHING;
-  JMP_(Sp[RET_OFFSET]);
+  JMP_(Sp[RET_OFFSET]); /* NO ENTRY_CODE() - this is a direct ret address */
   FE_
 }
 
@@ -812,7 +812,7 @@ FN_(stg_gen_yield)
 
 INFO_TABLE_SRT_BITMAP(stg_yield_noregs_info, stg_yield_noregs_ret, 0/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL, const, EF_, 0, 0);
+		      RET_SMALL,, EF_, 0, 0);
 
 FN_(stg_yield_noregs_ret)
 {

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.27 1999/04/27 12:34:52 simonm Exp $
+% $Id: CgCase.lhs,v 1.28 1999/05/13 17:30:55 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -470,7 +470,7 @@ cgEvalAlts cc_slot bndr srt alts
     	if is_alg && isUnboxedTupleTyCon spec_tycon then
 	    case alts of 
          	[alt] -> let lbl = mkReturnInfoLabel uniq in
-			 cgUnboxedTupleAlt lbl cc_slot True alt
+			 cgUnboxedTupleAlt uniq cc_slot True alt
 				`thenFC` \ abs_c ->
 		  	 getSRTLabel `thenFC` \srt_label -> 
 		  	 absC (CRetDirect uniq abs_c (srt_label, srt) 
@@ -515,7 +515,7 @@ cgEvalAlts cc_slot bndr srt alts
 			(srt_label,srt) liveness_mask)	`thenC`
 
 	-- Return an amode for the block
-    	returnFC (CaseAlts (CLbl (mkReturnPtLabel uniq) RetRep) Nothing)
+    	returnFC (CaseAlts (CLbl (mkReturnInfoLabel uniq) RetRep) Nothing)
 \end{code}
 
 
@@ -654,7 +654,7 @@ cgAlgAlt gc_flag uniq cc_slot must_label_branch
     lbl = mkAltLabel uniq tag
 
 cgUnboxedTupleAlt
-	:: CLabel			-- label of the alternative
+	:: Unique			-- unique for label of the alternative
 	-> Maybe VirtualSpOffset	-- Restore cost centre
 	-> Bool				-- ctxt switch
 	-> (DataCon, [Id], [Bool], StgExpr) -- alternative
@@ -978,7 +978,7 @@ possibleHeapCheck
 	-> Bool				--  True <=> algebraic case
 	-> [MagicId]			--  live registers
 	-> [(VirtualSpOffset,Int)]	--  stack slots to tag
-	-> Maybe CLabel			--  return address
+	-> Maybe Unique			--  return address unique
 	-> Code				--  continuation
 	-> Code
 

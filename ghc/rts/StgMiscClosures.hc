@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.22 1999/05/11 16:47:58 keithw Exp $
+ * $Id: StgMiscClosures.hc,v 1.23 1999/05/13 17:31:12 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,7 +25,7 @@
    This code assumes R1 is in a register for now.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(IND_info,IND_entry,1,0,IND,const,EF_,0,0);
+INFO_TABLE(IND_info,IND_entry,1,0,IND,,EF_,0,0);
 STGFUN(IND_entry)
 {
     FB_
@@ -33,11 +33,11 @@ STGFUN(IND_entry)
 
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(*R1.p);
+    JMP_(ENTRY_CODE(*R1.p));
     FE_
 }
 
-INFO_TABLE(IND_STATIC_info,IND_STATIC_entry,1,0,IND_STATIC,const,EF_,0,0);
+INFO_TABLE(IND_STATIC_info,IND_STATIC_entry,1,0,IND_STATIC,,EF_,0,0);
 STGFUN(IND_STATIC_entry)
 {
     FB_
@@ -45,11 +45,11 @@ STGFUN(IND_STATIC_entry)
   
     R1.p = (P_) ((StgIndStatic*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(*R1.p);
+    JMP_(ENTRY_CODE(*R1.p));
     FE_
 }
 
-INFO_TABLE(IND_PERM_info,IND_PERM_entry,1,1,IND_PERM,const,EF_,0,0);
+INFO_TABLE(IND_PERM_info,IND_PERM_entry,1,1,IND_PERM,,EF_,0,0);
 STGFUN(IND_PERM_entry)
 {
     FB_
@@ -88,11 +88,11 @@ STGFUN(IND_PERM_entry)
     TICK_ENT_VIA_NODE();
 #endif
 
-    JMP_(*R1.p);
+    JMP_(ENTRY_CODE(*R1.p));
     FE_
 }  
 
-INFO_TABLE(IND_OLDGEN_info,IND_OLDGEN_entry,1,1,IND_OLDGEN,const,EF_,0,0);
+INFO_TABLE(IND_OLDGEN_info,IND_OLDGEN_entry,1,1,IND_OLDGEN,,EF_,0,0);
 STGFUN(IND_OLDGEN_entry)
 {
     FB_
@@ -100,11 +100,11 @@ STGFUN(IND_OLDGEN_entry)
   
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(*R1.p);
+    JMP_(ENTRY_CODE(*R1.p));
     FE_
 }
 
-INFO_TABLE(IND_OLDGEN_PERM_info,IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,const,EF_,0,0);
+INFO_TABLE(IND_OLDGEN_PERM_info,IND_OLDGEN_PERM_entry,1,1,IND_OLDGEN_PERM,,EF_,0,0);
 STGFUN(IND_OLDGEN_PERM_entry)
 {
     FB_
@@ -128,7 +128,7 @@ STGFUN(IND_OLDGEN_PERM_entry)
 
     R1.p = (P_) ((StgInd*)R1.p)->indirectee;
     TICK_ENT_VIA_NODE();
-    JMP_(*R1.p);
+    JMP_(ENTRY_CODE(*R1.p));
     FE_
 }
 
@@ -138,7 +138,7 @@ STGFUN(IND_OLDGEN_PERM_entry)
    This code assumes R1 is in a register for now.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(CAF_UNENTERED_info,CAF_UNENTERED_entry,1,3,CAF_UNENTERED,const,EF_,0,0);
+INFO_TABLE(CAF_UNENTERED_info,CAF_UNENTERED_entry,1,3,CAF_UNENTERED,,EF_,0,0);
 STGFUN(CAF_UNENTERED_entry)
 {
     FB_
@@ -150,7 +150,7 @@ STGFUN(CAF_UNENTERED_entry)
 }
 
 /* 0,4 is entirely bogus; _do not_ rely on this info */
-INFO_TABLE(CAF_ENTERED_info,CAF_ENTERED_entry,0,4,CAF_ENTERED,const,EF_,0,0);
+INFO_TABLE(CAF_ENTERED_info,CAF_ENTERED_entry,0,4,CAF_ENTERED,,EF_,0,0);
 STGFUN(CAF_ENTERED_entry)
 {
     FB_
@@ -175,7 +175,7 @@ STGFUN(CAF_ENTERED_entry)
  * should be big enough for an old-generation indirection.  
  */
 
-INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,,EF_,0,0);
 STGFUN(BLACKHOLE_entry)
 {
   FB_
@@ -194,7 +194,7 @@ STGFUN(BLACKHOLE_entry)
   FE_
 }
 
-INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,const,EF_,0,0);
+INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,,EF_,0,0);
 STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
@@ -211,7 +211,7 @@ STGFUN(BLACKHOLE_BQ_entry)
 }
 
 /* identical to BLACKHOLEs except for the infotag */
-INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,0,0);
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
@@ -231,7 +231,7 @@ STGFUN(CAF_BLACKHOLE_entry)
 }
 
 #ifdef TICKY_TICKY
-INFO_TABLE(SE_BLACKHOLE_info, SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(SE_BLACKHOLE_info, SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,EF_,0,0);
 STGFUN(SE_BLACKHOLE_entry)
 {
   FB_
@@ -242,7 +242,7 @@ STGFUN(SE_BLACKHOLE_entry)
   FE_
 }
 
-INFO_TABLE(SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,EF_,0,0);
 STGFUN(SE_CAF_BLACKHOLE_entry)
 {
   FB_
@@ -257,7 +257,7 @@ STGFUN(SE_CAF_BLACKHOLE_entry)
 /* -----------------------------------------------------------------------------
    The code for a BCO returns to the scheduler
    -------------------------------------------------------------------------- */
-INFO_TABLE(BCO_info,BCO_entry,0,0,BCO,const,EF_,0,0);
+INFO_TABLE(BCO_info,BCO_entry,0,0,BCO,,EF_,0,0);
 EF_(BCO_entry) {				
   FB_	
     Sp -= 1;
@@ -282,7 +282,7 @@ STGFUN(type##_entry)							\
   FE_									\
 }
 
-INFO_TABLE(TSO_info, TSO_entry, 0,0,TSO,const,EF_,0,0);
+INFO_TABLE(TSO_info, TSO_entry, 0,0,TSO,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(TSO);
 
 /* -----------------------------------------------------------------------------
@@ -290,7 +290,7 @@ NON_ENTERABLE_ENTRY_CODE(TSO);
    one is a real bug.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(EVACUATED_info,EVACUATED_entry,1,0,EVACUATED,const,EF_,0,0);
+INFO_TABLE(EVACUATED_info,EVACUATED_entry,1,0,EVACUATED,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(EVACUATED);
 
 /* -----------------------------------------------------------------------------
@@ -301,10 +301,10 @@ NON_ENTERABLE_ENTRY_CODE(EVACUATED);
    live weak pointers with dead ones).
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(WEAK_info,WEAK_entry,0,4,WEAK,const,EF_,0,0);
+INFO_TABLE(WEAK_info,WEAK_entry,0,4,WEAK,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(WEAK);
 
-INFO_TABLE_CONSTR(DEAD_WEAK_info,DEAD_WEAK_entry,0,1,0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(DEAD_WEAK_info,DEAD_WEAK_entry,0,1,0,CONSTR,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 
 /* -----------------------------------------------------------------------------
@@ -314,7 +314,7 @@ NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
    finalizer in a weak pointer object.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(NO_FINALIZER_info,NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(NO_FINALIZER_info,NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(NO_FINALIZER);
 
 SET_STATIC_HDR(NO_FINALIZER_closure,NO_FINALIZER_info,0/*CC*/,,EI_)
@@ -324,14 +324,14 @@ SET_STATIC_HDR(NO_FINALIZER_closure,NO_FINALIZER_info,0/*CC*/,,EI_)
    Foreign Objects are unlifted and therefore never entered.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(FOREIGN_info,FOREIGN_entry,0,1,FOREIGN,const,EF_,0,0);
+INFO_TABLE(FOREIGN_info,FOREIGN_entry,0,1,FOREIGN,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(FOREIGN);
 
 /* -----------------------------------------------------------------------------
    Stable Names are unlifted too.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(STABLE_NAME_info,STABLE_NAME_entry,0,1,STABLE_NAME,const,EF_,0,0);
+INFO_TABLE(STABLE_NAME_info,STABLE_NAME_entry,0,1,STABLE_NAME,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(STABLE_NAME);
 
 /* -----------------------------------------------------------------------------
@@ -341,10 +341,10 @@ NON_ENTERABLE_ENTRY_CODE(STABLE_NAME);
    and entry code for each type.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(FULL_MVAR_info,FULL_MVAR_entry,4,0,MVAR,const,EF_,0,0);
+INFO_TABLE(FULL_MVAR_info,FULL_MVAR_entry,4,0,MVAR,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(FULL_MVAR);
 
-INFO_TABLE(EMPTY_MVAR_info,EMPTY_MVAR_entry,4,0,MVAR,const,EF_,0,0);
+INFO_TABLE(EMPTY_MVAR_info,EMPTY_MVAR_entry,4,0,MVAR,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
 
 /* -----------------------------------------------------------------------------
@@ -354,7 +354,7 @@ NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
    end of a linked TSO queue.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(END_TSO_QUEUE_info,END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(END_TSO_QUEUE_info,END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(END_TSO_QUEUE);
 
 SET_STATIC_HDR(END_TSO_QUEUE_closure,END_TSO_QUEUE_info,0/*CC*/,,EI_)
@@ -368,13 +368,13 @@ SET_STATIC_HDR(END_TSO_QUEUE_closure,END_TSO_QUEUE_info,0/*CC*/,,EI_)
    an END_MUT_LIST closure.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(END_MUT_LIST_info,END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(END_MUT_LIST_info,END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 
 SET_STATIC_HDR(END_MUT_LIST_closure,END_MUT_LIST_info,0/*CC*/,,EI_)
 };
 
-INFO_TABLE(MUT_CONS_info, MUT_CONS_entry, 1, 1, MUT_VAR, const, EF_, 0, 0);
+INFO_TABLE(MUT_CONS_info, MUT_CONS_entry, 1, 1, MUT_VAR, , EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 
 /* -----------------------------------------------------------------------------
@@ -393,7 +393,7 @@ NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
    -------------------------------------------------------------------------- */
 
 #define ArrayInfo(type)					\
-INFO_TABLE(type##_info, type##_entry, 0, 0, type, const, EF_,0,0);
+INFO_TABLE(type##_info, type##_entry, 0, 0, type, , EF_,0,0);
 
 ArrayInfo(ARR_WORDS);
 NON_ENTERABLE_ENTRY_CODE(ARR_WORDS);
@@ -408,7 +408,7 @@ NON_ENTERABLE_ENTRY_CODE(MUT_ARR_PTRS_FROZEN);
    Mutable Variables
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(MUT_VAR_info, MUT_VAR_entry, 1, 1, MUT_VAR, const, EF_, 0, 0);
+INFO_TABLE(MUT_VAR_info, MUT_VAR_entry, 1, 1, MUT_VAR, , EF_, 0, 0);
 NON_ENTERABLE_ENTRY_CODE(MUT_VAR);
 
 /* -----------------------------------------------------------------------------
@@ -436,7 +436,7 @@ STGFUN(stg_error_entry)							\
    just enter the top stack word to start the thread.  (see deleteThread)
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(dummy_ret_info, dummy_ret_entry, 0, 0, CONSTR_NOCAF_STATIC, const, EF_, 0, 0);
+INFO_TABLE(dummy_ret_info, dummy_ret_entry, 0, 0, CONSTR_NOCAF_STATIC, , EF_, 0, 0);
 FN_(dummy_ret_entry)
 {
   W_ ret_addr;
@@ -489,26 +489,26 @@ VEC_POLY_INFO_TABLE(ret_bco,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO)
 
 #ifndef COMPILER
 
-INFO_TABLE_CONSTR(Czh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(Izh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(I64zh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(Fzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(Dzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(Azh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(Wzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR,const,EF_,0,0);
-INFO_TABLE_CONSTR(StablePtr_con_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR,const,EF_,0,0);
+INFO_TABLE_CONSTR(Czh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(Izh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(I64zh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(Fzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(Dzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(Azh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(Wzh_con_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(StablePtr_con_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR,,EF_,0,0);
 
 /* These might seem redundant but {I,C}zh_static_info are used in
  * {INT,CHAR}LIKE and the rest are used in RtsAPI.c
  */
-INFO_TABLE_CONSTR(Czh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(Izh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(I64zh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(Fzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(Dzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(Azh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(Wzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
-INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+INFO_TABLE_CONSTR(Czh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgChar),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(Izh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(I64zh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgInt64),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(Fzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgFloat),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(Dzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgDouble),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(Azh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgAddr),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(Wzh_static_info,Hugs_CONSTR_entry,0,sizeofW(StgWord),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
+INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr),0,CONSTR_NOCAF_STATIC,,EF_,0,0);
 
 #endif /* !defined(COMPILER) */
 
@@ -527,8 +527,8 @@ INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr
  * when we've got the real addresses to the C# and I# closures.
  *
  */
-static const StgInfoTable czh_static_info;
-static const StgInfoTable izh_static_info;
+static INFO_TBL_CONST StgInfoTable czh_static_info;
+static INFO_TBL_CONST StgInfoTable izh_static_info;
 #define Char_hash_static_info czh_static_info
 #define Int_hash_static_info izh_static_info
 #else

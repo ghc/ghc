@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.4 1999/03/15 17:11:27 simonm Exp $
+ * $Id: StgStartup.hc,v 1.5 1999/05/13 17:31:13 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -60,7 +60,7 @@ EXTFUN(stg_stop_thread_entry);
 #define stg_stop_thread_6_entry stg_stop_thread_entry 
 #define stg_stop_thread_7_entry stg_stop_thread_entry 
 
-VEC_POLY_INFO_TABLE(stg_stop_thread,STOP_THREAD_BITMAP,0,0,0,STOP_FRAME);
+VEC_POLY_INFO_TABLE(stg_stop_thread,STOP_THREAD_BITMAP,0,0,0,STOP_FRAME,,EF_);
 
 STGFUN(stg_stop_thread_entry)
 {
@@ -105,7 +105,7 @@ STGFUN(stg_returnToStackTop)
   LoadThreadState();
   CHECK_SENSIBLE_REGS();
   Sp++;
-  JMP_(Sp[-1]);
+  JMP_(ENTRY_CODE(Sp[-1]));
   FE_
 }
 

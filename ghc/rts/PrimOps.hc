@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.26 1999/05/07 11:10:45 simonm Exp $
+ * $Id: PrimOps.hc,v 1.27 1999/05/13 17:31:11 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -168,7 +168,7 @@ W_ GHC_ZCCReturnable_static_info[0];
 # define RET_NP(a,b)   PUSH_N(3,a); PUSH_P(1,b); PUSHED(3)
 
 # define RET_PPP(a,b,c) PUSH_P(3,a); PUSH_P(2,b); PUSH_P(1,c); PUSHED(3)
-# define RET_NNP(a,b,c) PUSH_N(6,a); PUSH_N(4,b); PUSH_N(2,c); PUSHED(6)
+# define RET_NNP(a,b,c) PUSH_N(5,a); PUSH_N(3,b); PUSH_P(1,c); PUSHED(5)
 
 # define RET_NNNP(a,b,c,d) PUSH_N(7,a); PUSH_N(5,b); PUSH_N(3,c); PUSH_P(1,d); PUSHED(7)	
 # define RET_NPNP(a,b,c,d) PUSH_N(6,a); PUSH_P(4,b); PUSH_N(3,c); PUSH_P(1,d); PUSHED(6)	

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.16 1999/05/11 16:48:00 keithw Exp $
+ * $Id: Updates.hc,v 1.17 1999/05/13 17:31:14 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -96,7 +96,7 @@ UPD_FRAME_ENTRY_TEMPLATE(Upd_frame_7_entry,RET_VEC(Sp[0],7));
  * there's a cost-centre-stack in there too).
  */
 
-VEC_POLY_INFO_TABLE(Upd_frame,UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, UPDATE_FRAME);
+VEC_POLY_INFO_TABLE(Upd_frame,UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, UPDATE_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
    Entry Code for a PAP.
@@ -110,7 +110,7 @@ VEC_POLY_INFO_TABLE(Upd_frame,UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*sr
    really an optimisation? --SDM)
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(PAP_info,PAP_entry,/*special layout*/0,0,PAP,const,EF_,0,0);
+INFO_TABLE(PAP_info,PAP_entry,/*special layout*/0,0,PAP,,EF_,0,0);
 STGFUN(PAP_entry)
 {
   nat Words;
@@ -386,7 +386,7 @@ EXTFUN(stg_update_PAP)
    -------------------------------------------------------------------------- */
 
 
-INFO_TABLE(AP_UPD_info,AP_UPD_entry,/*special layout*/0,0,AP_UPD,const,EF_,0,0);
+INFO_TABLE(AP_UPD_info,AP_UPD_entry,/*special layout*/0,0,AP_UPD,,EF_,0,0);
 STGFUN(AP_UPD_entry)
 {
   nat Words;
@@ -461,7 +461,7 @@ SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_5_entry,ENTRY_CODE(Sp[0]));
 SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_6_entry,ENTRY_CODE(Sp[0]));
 SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_7_entry,ENTRY_CODE(Sp[0]));
 
-VEC_POLY_INFO_TABLE(seq_frame, UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, SEQ_FRAME);
+VEC_POLY_INFO_TABLE(seq_frame, UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, SEQ_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
  * The seq infotable
@@ -474,7 +474,7 @@ VEC_POLY_INFO_TABLE(seq_frame, UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*s
  * It is used in deleteThread when reverting blackholes.
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(seq_info,seq_entry,1,0,FUN,const,EF_,0,0);
+INFO_TABLE(seq_info,seq_entry,1,0,FUN,,EF_,0,0);
 STGFUN(seq_entry)
 {
   FB_
@@ -526,7 +526,7 @@ CATCH_FRAME_ENTRY_TEMPLATE(catch_frame_7_entry,RET_VEC(Sp[0],7));
  * kind of return to the activation record underneath us on the stack.
  */
 
-VEC_POLY_INFO_TABLE(catch_frame, CATCH_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, CATCH_FRAME);
+VEC_POLY_INFO_TABLE(catch_frame, CATCH_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, CATCH_FRAME,, EF_);
 
 /* -----------------------------------------------------------------------------
  * The catch infotable
@@ -538,7 +538,7 @@ VEC_POLY_INFO_TABLE(catch_frame, CATCH_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 
  * It is used in deleteThread when reverting blackholes.
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(catch_info,catch_entry,2,0,FUN,const,EF_,0,0);
+INFO_TABLE(catch_info,catch_entry,2,0,FUN,,EF_,0,0);
 STGFUN(catch_entry)
 {
   FB_
@@ -578,7 +578,7 @@ FN_(catchzh_fast)
  * It is used in raisezh_fast to update thunks on the update list
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(raise_info,raise_entry,1,0,FUN,const,EF_,0,0);
+INFO_TABLE(raise_info,raise_entry,1,0,FUN,,EF_,0,0);
 STGFUN(raise_entry)
 {
   FB_
