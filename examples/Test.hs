@@ -28,8 +28,14 @@ module Test (
 	-- ** Records
 	R(..),
 
+	-- | test that we can export record selectors on their own:
+	p, q, u,
+
 	-- * Class declarations
 	C(a,b), D(..), E, F(..),
+	
+	-- | Test that we can export a class method on its own:
+	a,
 
 	-- * Function types
 	f, g,
@@ -132,6 +138,9 @@ class D a where
 -- ^ This is a class declaration with no separate docs for the methods
 
 instance D Int
+
+-- instance with a qualified class name
+instance Test.D Float
 
 class E a where
   ee :: Int
