@@ -1,4 +1,4 @@
--- $Id: net002.hs,v 1.1 2002/03/28 09:45:55 simonmar Exp $
+-- $Id: net002.hs,v 1.2 2002/07/19 15:32:39 sof Exp $
 -- http://www.bagley.org/~doug/shootout/
 -- Haskell echo/client server
 -- written by Brian Gregor
@@ -27,6 +27,11 @@ server_sock = do
     listen s 2
     return s
 
+eofAsEmptyHandler :: IOError -> IO String
+eofAsEmptyHandler e
+ | isEOFError e = return ""
+ | otherwise    = ioError e
+
 echo_server s = do
     (s', clientAddr) <- accept s
     proc <- read_data s' 0
@@ -35,7 +40,7 @@ echo_server s = do
     where
         read_data sock totalbytes = do
             -- (str,i) <- readSocket sock 19
-            str <- recv sock 19
+            str <- recv sock 19 `catch` eofAsEmptyHandler
             -- if (i >= 19) 
             putStr ("Server recv: " ++ str)
             if ((length str) >= 19) 
@@ -74,7 +79,7 @@ echo_client n = do
                 putStr ("Client wrote: " ++ message)
                 --
                 -- (str,i) <- readSocket sock 19
-                str <- recv sock 19
+                str <- recv sock 19 `catch` eofAsEmptyHandler
                 if (str /= message)
                     then do
                         putStr ("Client read error: " ++ str ++ "\n")
