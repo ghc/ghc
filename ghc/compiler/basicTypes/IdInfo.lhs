@@ -26,7 +26,6 @@ module IdInfo (
 	StrictnessInfo(..),				-- Non-abstract
 	Demand(..), NewOrData, 				-- Non-abstract
 
-	getWorkerId_maybe,
 	workerExists,
 	mkStrictnessInfo, mkBottomStrictnessInfo, noStrictnessInfo, bottomIsGuaranteed,
 	strictnessInfo, ppStrictnessInfo, addStrictnessInfo, 
@@ -63,7 +62,6 @@ import {-# SOURCE #-} CoreUnfold
 import {-# SOURCE #-} StdIdInfo
 #endif
 
-import Type		( eqSimpleTy, splitFunTyExpandingDicts )
 import BasicTypes	( NewOrData )
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 
@@ -79,7 +77,6 @@ import Util		( mapAccumL, panic, assertPanic, pprPanic )
 ord = fromEnum :: Char -> Int
 #endif
 
-applySubstToTy = panic "IdInfo.applySubstToTy"
 showTypeCategory = panic "IdInfo.showTypeCategory"
 \end{code}
 
@@ -103,15 +100,11 @@ data IdInfo
 	DemandInfo		-- Whether or not it is definitely
 				-- demanded
 
-	SpecEnv
-				-- Specialisations of this function which exist
+	SpecEnv			-- Specialisations of this function which exist
 
-	(StrictnessInfo Id)
-				-- Strictness properties, notably
-				-- how to conjure up "worker" functions
+	StrictnessInfo		-- Strictness properties
 
-	Unfolding
-				-- Its unfolding; for locally-defined
+	Unfolding		-- Its unfolding; for locally-defined
 				-- things, this can *only* be NoUnfolding
 
 	UpdateInfo		-- Which args should be updated
@@ -139,39 +132,6 @@ apply_to_IdInfo ty_fn idinfo@(IdInfo arity demand spec strictness unfold
   = idinfo
   | otherwise
   = panic "IdInfo:apply_to_IdInfo"
-{- LATER:
-    let
-	new_spec = apply_spec spec
-
-	-- NOT a good idea:
-	--   apply_strict strictness 	`thenLft` \ new_strict ->
-	--   apply_wrap wrap 		`thenLft` \ new_wrap ->
-    in
-    IdInfo arity demand new_spec strictness unfold
-	   update deforest arg_usage fb_ww
-  where
-    apply_spec (SpecEnv is)
-      = SpecEnv (map do_one is)
-      where
-    	do_one (SpecInfo ty_maybes ds spec_id)
-	  = --apply_to_Id ty_fn spec_id	`thenLft` \ new_spec_id ->
-	    SpecInfo (map apply_to_maybe ty_maybes) ds spec_id
-	  where
-	    apply_to_maybe Nothing   = Nothing
-	    apply_to_maybe (Just ty) = Just (ty_fn ty)
--}
-
-{- NOT a good idea;
-    apply_strict info@NoStrictnessInfo = returnLft info
-    apply_strict BottomGuaranteed = ???
-    apply_strict (StrictnessInfo wrap_arg_info id_maybe)
-      = (case id_maybe of
-	   Nothing -> returnLft Nothing
-	   Just xx -> applySubstToId subst xx `thenLft` \ new_xx ->
-		      returnLft (Just new_xx)
-	) `thenLft` \ new_id_maybe ->
-	returnLft (StrictnessInfo wrap_arg_info new_id_maybe)
--}
 \end{code}
 
 Variant of the same thing for the typechecker.
@@ -179,23 +139,6 @@ Variant of the same thing for the typechecker.
 applySubstToIdInfo s0 (IdInfo arity demand spec strictness unfold
 			      update deforest arg_usage fb_ww)
   = panic "IdInfo:applySubstToIdInfo"
-{- LATER:
-    case (apply_spec s0 spec) of { (s1, new_spec) ->
-    (s1, IdInfo arity demand new_spec strictness unfold update deforest arg_usage fb_ww) }
-  where
-    apply_spec s0 (SpecEnv is)
-      = case (mapAccumL do_one s0 is) of { (s1, new_is) ->
-	(s1, SpecEnv new_is) }
-      where
-    	do_one s0 (SpecInfo ty_maybes ds spec_id)
-	  = case (mapAccumL apply_to_maybe s0 ty_maybes) of { (s1, new_maybes) ->
-	    (s1, SpecInfo new_maybes ds spec_id) }
-	  where
-	    apply_to_maybe s0 Nothing   = (s0, Nothing)
-	    apply_to_maybe s0 (Just ty)
-	      = case (applySubstToTy s0 ty) of { (s1, new_ty) ->
-		(s1, Just new_ty) }
--}
 \end{code}
 
 \begin{code}
@@ -324,7 +267,7 @@ version of the function; and (c)~the type signature of that worker (if
 it exists); i.e. its calling convention.
 
 \begin{code}
-data StrictnessInfo bdee
+data StrictnessInfo
   = NoStrictnessInfo
 
   | BottomGuaranteed	-- This Id guarantees never to return;
@@ -332,25 +275,28 @@ data StrictnessInfo bdee
 			-- Useful for "error" and other disguised
 			-- variants thereof.
 
-  | StrictnessInfo	[Demand]	-- The main stuff; see below.
-			(Maybe (bdee,[bdee]))	-- Worker's Id, if applicable, and a list of the constructors
-						-- mentioned by the wrapper.  This is necessary so that the
-						-- renamer can slurp them in.  Without this info, the renamer doesn't
-						-- know which data types to slurp in concretely.  Remember, for
-						-- strict things we don't put the unfolding in the interface file, to save space.
-						-- This constructor list allows the renamer to behave much as if the
-						-- unfolding *was* in the interface file.
-						-- 
-						-- This field might be Nothing even for a strict fn  because the strictness info
-						-- might say just "SSS" or something; so there's no w/w split.
+  | StrictnessInfo [Demand] 
+		   Bool		-- True <=> there is a worker. There might not be, even for a
+				-- strict function, because:
+				-- 	(a) the function might be small enough to inline, 
+				--	    so no need for w/w split
+				-- 	(b) the strictness info might be "SSS" or something, so no w/w split.
+
+				-- Worker's Id, if applicable, and a list of the constructors
+				-- mentioned by the wrapper.  This is necessary so that the
+				-- renamer can slurp them in.  Without this info, the renamer doesn't
+				-- know which data types to slurp in concretely.  Remember, for
+				-- strict things we don't put the unfolding in the interface file, to save space.
+				-- This constructor list allows the renamer to behave much as if the
+				-- unfolding *was* in the interface file.
 \end{code}
 
 \begin{code}
-mkStrictnessInfo :: [Demand] -> Maybe (bdee,[bdee]) -> StrictnessInfo bdee
+mkStrictnessInfo :: [Demand] -> Bool -> StrictnessInfo
 
-mkStrictnessInfo xs wrkr 
+mkStrictnessInfo xs has_wrkr
   | all is_lazy xs	 = NoStrictnessInfo		-- Uninteresting
-  | otherwise		 = StrictnessInfo xs wrkr
+  | otherwise		 = StrictnessInfo xs has_wrkr
   where
     is_lazy (WwLazy False) = True	-- NB "Absent" args do *not* count!
     is_lazy _	           = False	-- (as they imply a worker)
@@ -370,24 +316,14 @@ ppStrictnessInfo sty NoStrictnessInfo = empty
 ppStrictnessInfo sty BottomGuaranteed = ptext SLIT("_bot_")
 
 ppStrictnessInfo sty (StrictnessInfo wrapper_args wrkr_maybe)
-  = hsep [ptext SLIT("_S_"), text (showList wrapper_args ""), pp_wrkr]
-  where
-    pp_wrkr = case wrkr_maybe of
-		 Nothing       -> empty
-		 Just (wrkr,cons) | ifaceStyle sty &&
-				    not (null cons) -> pprId sty wrkr <+> braces (hsep (map (pprId sty) cons)) 
-				  | otherwise       -> pprId sty wrkr
+  = hsep [ptext SLIT("_S_"), text (showList wrapper_args "")]
 \end{code}
 
 
 \begin{code}
-workerExists :: StrictnessInfo bdee -> Bool
-workerExists (StrictnessInfo _ (Just worker_id)) = True
-workerExists other				 = False
-
-getWorkerId_maybe :: StrictnessInfo bdee -> Maybe bdee
-getWorkerId_maybe (StrictnessInfo _ (Just (wrkr,_))) = Just wrkr
-getWorkerId_maybe other				     = Nothing
+workerExists :: StrictnessInfo -> Bool
+workerExists (StrictnessInfo _ worker_exists) = worker_exists
+workerExists other			      = False
 \end{code}
 
 

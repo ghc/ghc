@@ -436,6 +436,10 @@ closureCodeBody binder_info closure_info cc all_args body
   = getEntryConvention id lf_info
 		       (map idPrimRep all_args)		`thenFC` \ entry_conv ->
     let
+    	-- Figure out what is needed and what isn't
+	slow_code_needed   = slowFunEntryCodeRequired id binder_info entry_conv
+	info_table_needed  = funInfoTableRequired id binder_info lf_info
+
 	-- Arg mapping for standard (slow) entry point; all args on stack
     	(spA_all_args, spB_all_args, all_bxd_w_offsets, all_ubxd_w_offsets)
 	   = mkVirtStkOffsets
@@ -551,10 +555,6 @@ closureCodeBody binder_info closure_info cc all_args body
     lf_info = closureLFInfo closure_info
 
     cl_descr mod_name = closureDescription mod_name id all_args body
-
-    	-- Figure out what is needed and what isn't
-    slow_code_needed   = slowFunEntryCodeRequired id binder_info
-    info_table_needed  = funInfoTableRequired id binder_info lf_info
 
 	-- Manufacture labels
     id	       = closureId closure_info

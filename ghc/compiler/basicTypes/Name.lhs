@@ -15,7 +15,7 @@ module Name (
 	OccName(..),
 	pprOccName, occNameString, occNameFlavour, 
 	isTvOcc, isTCOcc, isVarOcc, prefixOccName,
-	quoteInText, parenInCode,
+	uniqToOccName,
 
 	-- The Name type
 	Name,					-- Abstract
@@ -44,7 +44,6 @@ module Name (
 	minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet, isEmptyNameSet,
 
 	-- Misc
-	DefnInfo(..),
 	Provenance(..), pprProvenance,
 	ExportFlag(..),
 
@@ -64,7 +63,7 @@ import {-# SOURCE #-} TyCon ( TyCon )
 
 import CStrings		( identToC, modnameToC, cSEP )
 import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC )
-import BasicTypes	( SYN_IE(Module), moduleString, pprModule )
+import BasicTypes	( SYN_IE(Module), IfaceFlavour(..), moduleString, pprModule )
 
 import Outputable	( Outputable(..), PprStyle(..), codeStyle, ifaceStyle )
 import PrelMods		( gHC__ )
@@ -76,8 +75,7 @@ import Unique		( pprUnique, showUnique, Unique, Uniquable(..) )
 import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, isEmptyUniqSet,
 		 	  unionManyUniqSets, minusUniqSet, mkUniqSet, elementOfUniqSet, addListToUniqSet, addOneToUniqSet )
 import UniqFM		( UniqFM )
-import Util		--( cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
-
+import Util		( Ord3(..), cmpPString, panic, assertPanic {-, pprTrace ToDo:rm-} )
 \end{code}
 
 
@@ -126,7 +124,6 @@ isTvOcc other     = False
 isTCOcc (TCOcc s) = True
 isTCOcc other     = False
 
-
 instance Eq OccName where
     a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
     a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True }
@@ -155,13 +152,6 @@ instance Outputable OccName where
 \end{code}
 
 
-\begin{code}
-parenInCode, quoteInText :: OccName -> Bool
-parenInCode occ = isLexSym (occNameString occ)
-
-quoteInText occ = not (isLexSym (occNameString occ))
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection[Name-datatype]{The @Name@ datatype, and name construction}
@@ -177,8 +167,7 @@ data Name
   | Global   Unique
 	     Module		-- The defining module
 	     OccName		-- Its name in that module
-	     DefnInfo		-- How it is defined
-             Provenance		-- How it was brought into scope
+             Provenance		-- How it was defined
 \end{code}
 
 Things with a @Global@ name are given C static labels, so they finally
@@ -187,14 +176,14 @@ in the form M.n.  If originally-local things have this property they
 must be made @Global@ first.
 
 \begin{code}
-data DefnInfo =	VanillaDefn 	
-	      | WiredInTyCon TyCon	-- There's a wired-in version
-	      | WiredInId    Id		-- ...ditto...
-
 data Provenance
-  = LocalDef ExportFlag SrcLoc	-- Locally defined
-  | Imported Module SrcLoc	-- Directly imported from M; gives locn of import statement
-  | Implicit			-- Implicitly imported
+  = LocalDef ExportFlag SrcLoc		-- Locally defined
+  | Imported Module SrcLoc IfaceFlavour	-- Directly imported from M; 
+					-- 		gives name of module in import statement
+					--		and locn of import statement
+  | Implicit IfaceFlavour		-- Implicitly imported
+  | WiredInTyCon TyCon			-- There's a wired-in version
+  | WiredInId    Id			-- ...ditto...
 \end{code}
 
 Something is "Exported" if it may be mentioned by another module without
@@ -219,7 +208,7 @@ data ExportFlag = Exported  | NotExported
 mkLocalName    :: Unique -> OccName -> SrcLoc -> Name
 mkLocalName = Local
 
-mkGlobalName :: Unique -> Module -> OccName -> DefnInfo -> Provenance -> Name
+mkGlobalName :: Unique -> Module -> OccName -> Provenance -> Name
 mkGlobalName = Global
 
 mkSysLocalName :: Unique -> FAST_STRING -> SrcLoc -> Name
@@ -227,11 +216,11 @@ mkSysLocalName uniq str loc = Local uniq (VarOcc str) loc
 
 mkWiredInIdName :: Unique -> Module -> FAST_STRING -> Id -> Name
 mkWiredInIdName uniq mod occ id 
-  = Global uniq mod (VarOcc occ) (WiredInId id) Implicit
+  = Global uniq mod (VarOcc occ) (WiredInId id)
 
 mkWiredInTyConName :: Unique -> Module -> FAST_STRING -> TyCon -> Name
 mkWiredInTyConName uniq mod occ tycon
-  = Global uniq mod (TCOcc occ) (WiredInTyCon tycon) Implicit
+  = Global uniq mod (TCOcc occ) (WiredInTyCon tycon)
 
 
 mkCompoundName :: (FAST_STRING -> FAST_STRING)	-- Occurrence-name modifier
@@ -239,8 +228,8 @@ mkCompoundName :: (FAST_STRING -> FAST_STRING)	-- Occurrence-name modifier
 	       -> Name				-- Base name (must be a Global)
 	       -> Name		-- Result is always a value name
 
-mkCompoundName str_fn uniq (Global _ mod occ defn prov)
-  = Global uniq mod new_occ defn prov
+mkCompoundName str_fn uniq (Global _ mod occ prov)
+  = Global uniq mod new_occ prov
   where    
     new_occ = VarOcc (str_fn (occNameString occ))		-- Always a VarOcc
 
@@ -250,51 +239,95 @@ mkCompoundName str_fn uniq (Local _ occ loc)
 	-- Rather a wierd one that's used for names generated for instance decls
 mkInstDeclName :: Unique -> Module -> OccName -> SrcLoc -> Bool -> Name
 mkInstDeclName uniq mod occ loc from_here
-  = Global uniq mod occ VanillaDefn prov
+  = Global uniq mod occ prov
   where
     prov | from_here = LocalDef Exported loc
-         | otherwise = Implicit
+         | otherwise = Implicit HiFile		-- Odd
 
 
 setNameProvenance :: Name -> Provenance -> Name	
 	-- setNameProvenance used to only change the provenance of Implicit-provenance things,
 	-- but that gives bad error messages for names defined twice in the same
 	-- module, so I changed it to set the proveance of *any* global (SLPJ Jun 97)
-setNameProvenance (Global uniq mod occ def _) prov = Global uniq mod occ def prov
-setNameProvenance other_name 		      prov = other_name
+setNameProvenance (Global uniq mod occ _) prov = Global uniq mod occ prov
+setNameProvenance other_name 		  prov = other_name
 
 getNameProvenance :: Name -> Provenance
-getNameProvenance (Global uniq mod occ def prov) = prov
-getNameProvenance (Local uniq occ locn) 	 = LocalDef NotExported locn
+getNameProvenance (Global uniq mod occ prov) = prov
+getNameProvenance (Local uniq occ locn)      = LocalDef NotExported locn
 
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.
 changeUnique (Local      _ n l)  u = Local u n l
-changeUnique (Global   _ mod occ def prov) u = Global u mod occ def prov
+changeUnique (Global   _ mod occ  prov) u = Global u mod occ prov
+\end{code}
 
-setNameVisibility :: Module -> Name -> Name
--- setNameVisibility is applied to top-level names in the final program
--- The "visibility" here concerns whether the .o file's symbol table
--- mentions the thing; if so, it needs a module name in its symbol,
--- otherwise we just use its unique.  The Global things are "visible"
--- and the local ones are not
+setNameVisibility is applied to names in the final program
 
-setNameVisibility _ (Global uniq mod occ def (LocalDef NotExported loc))
-  | not all_toplev_ids_visible
-  = Local uniq occ loc
+The Maybe Module argument is (Just mod) for top-level values,
+and Nothing for all others (local values and type variables)
 
-setNameVisibility mod (Local uniq occ loc)
+For top-level things, it globalises Local names 
+				(if all top-level things should be visible)
+			 and localises non-exported Global names
+				 (if only exported things should be visible)
+
+For nested things it localises Global names.
+
+In all cases except an exported global, it gives it a new occurrence name.
+
+The "visibility" here concerns whether the .o file's symbol table
+mentions the thing; if so, it needs a module name in its symbol.
+The Global things are "visible" and the Local ones are not
+
+Why should things be "visible"?  Certainly they must be if they
+are exported.  But also:
+
+(a) In certain (prelude only) modules we split up the .hc file into
+    lots of separate little files, which are separately compiled by the C
+    compiler.  That gives lots of little .o files.  The idea is that if
+    you happen to mention one of them you don't necessarily pull them all
+    in.  (Pulling in a piece you don't need can be v bad, because it may
+    mention other pieces you don't need either, and so on.)
+    
+    Sadly, splitting up .hc files means that local names (like s234) are
+    now globally visible, which can lead to clashes between two .hc
+    files. So unlocaliseWhatnot goes through making all the local things
+    into global things, essentially by giving them full names so when they
+    are printed they'll have their module name too.  Pretty revolting
+    really.
+
+(b) When optimisation is on we want to make all the internal
+    top-level defns externally visible
+
+\begin{code}
+setNameVisibility :: Maybe Module -> Unique -> Name -> Name
+
+setNameVisibility maybe_mod occ_uniq name@(Global uniq mod occ (LocalDef NotExported loc))
+  | not all_toplev_ids_visible || not_top_level maybe_mod
+  = Local uniq (uniqToOccName occ_uniq) loc	-- Localise Global name
+
+setNameVisibility maybe_mod occ_uniq name@(Global _ _ _ _)
+  = name					-- Otherwise don't fiddle with Global
+
+setNameVisibility (Just mod) occ_uniq (Local uniq occ loc)
   | all_toplev_ids_visible
-  = Global uniq mod 
-	   (VarOcc (showUnique uniq)) 	-- It's local name must be unique!
-	   VanillaDefn (LocalDef NotExported loc)
+  = Global uniq mod	 			-- Globalise Local name
+	   (uniqToOccName occ_uniq)
+	   (LocalDef NotExported loc)
 
-setNameVisibility mod name = name
+setNameVisibility maybe_mod occ_uniq (Local uniq occ loc)
+  = Local uniq (uniqToOccName occ_uniq) loc	-- New OccName for Local
+
+uniqToOccName uniq = VarOcc (_PK_ ('$':showUnique uniq))
+	-- The "$" is to make sure that this OccName is distinct from all user-defined ones
+
+not_top_level (Just m) = False
+not_top_level Nothing  = True
 
 all_toplev_ids_visible = not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
 			 opt_EnsureSplittableC            -- Splitting requires visiblilty
-
 \end{code}
 
 %************************************************************************
@@ -318,45 +351,45 @@ isLocalName		:: Name -> Bool
 
 
 nameUnique (Local  u _ _)   = u
-nameUnique (Global u _ _ _ _) = u
+nameUnique (Global u _ _ _) = u
 
-nameOccName (Local _ occ _)      = occ
-nameOccName (Global _ _ occ _ _) = occ
+nameOccName (Local _ occ _)    = occ
+nameOccName (Global _ _ occ _) = occ
 
-nameModule (Global _ mod occ _ _) = mod
+nameModule (Global _ mod occ _) = mod
 
-nameModAndOcc (Global _ mod occ _ _) = (mod,occ)
+nameModAndOcc (Global _ mod occ _) = (mod,occ)
 
-nameString (Local _ occ _)        = occNameString occ
-nameString (Global _ mod occ _ _) = mod _APPEND_ SLIT(".") _APPEND_ occNameString occ
+nameString (Local _ occ _)      = occNameString occ
+nameString (Global _ mod occ _) = mod _APPEND_ SLIT(".") _APPEND_ occNameString occ
 
-isExportedName (Global _ _ _ _ (LocalDef Exported _)) = True
-isExportedName other			 	      = False
+isExportedName (Global _ _ _ (LocalDef Exported _)) = True
+isExportedName other				    = False
 
 nameSrcLoc (Local _ _ loc)     = loc
-nameSrcLoc (Global _ _ _ _ (LocalDef _ loc)) = loc
-nameSrcLoc (Global _ _ _ _ (Imported _ loc)) = loc
+nameSrcLoc (Global _ _ _ (LocalDef _ loc))   = loc
+nameSrcLoc (Global _ _ _ (Imported _ loc _)) = loc
 nameSrcLoc other			     = noSrcLoc
   
 isLocallyDefinedName (Local  _ _ _)	     	     = True
-isLocallyDefinedName (Global _ _ _ _ (LocalDef _ _)) = True
-isLocallyDefinedName other		             = False
+isLocallyDefinedName (Global _ _ _ (LocalDef _ _)) = True
+isLocallyDefinedName other		           = False
 
 -- Things the compiler "knows about" are in some sense
 -- "imported".  When we are compiling the module where
 -- the entities are defined, we need to be able to pick
 -- them out, often in combination with isLocallyDefined.
-isWiredInName (Global _ _ _ (WiredInTyCon _) _) = True
-isWiredInName (Global _ _ _ (WiredInId    _) _) = True
+isWiredInName (Global _ _ _ (WiredInTyCon _)) = True
+isWiredInName (Global _ _ _ (WiredInId    _)) = True
 isWiredInName _				          = False
 
 maybeWiredInIdName :: Name -> Maybe Id
-maybeWiredInIdName (Global _ _ _ (WiredInId id) _) = Just id
-maybeWiredInIdName other			   = Nothing
+maybeWiredInIdName (Global _ _ _ (WiredInId id)) = Just id
+maybeWiredInIdName other			 = Nothing
 
 maybeWiredInTyConName :: Name -> Maybe TyCon
-maybeWiredInTyConName (Global _ _ _ (WiredInTyCon tc) _) = Just tc
-maybeWiredInTyConName other			         = Nothing
+maybeWiredInTyConName (Global _ _ _ (WiredInTyCon tc)) = Just tc
+maybeWiredInTyConName other			       = Nothing
 
 
 isLocalName (Local _ _ _) = True
@@ -373,10 +406,10 @@ isLocalName _ 		  = False
 \begin{code}
 cmpName n1 n2 = c n1 n2
   where
-    c (Local  u1 _ _)   (Local  u2 _ _)       = cmp u1 u2
-    c (Local   _ _ _)	  _		      = LT_
-    c (Global u1 _ _ _ _) (Global u2 _ _ _ _) = cmp u1 u2
-    c (Global  _ _ _ _ _)   _		      = GT_
+    c (Local  u1 _ _)   (Local  u2 _ _)   = cmp u1 u2
+    c (Local   _ _ _)	  _		  = LT_
+    c (Global u1 _ _ _) (Global u2 _ _ _) = cmp u1 u2
+    c (Global  _ _ _ _)   _		  = GT_
 \end{code}
 
 \begin{code}
@@ -410,49 +443,59 @@ instance NamedThing Name where
 
 \begin{code}
 instance Outputable Name where
-    ppr PprQuote name@(Local _ _ _) = quotes (ppr (PprForUser 1) name)
-    ppr (PprForUser _) (Local _ n _)    = ptext (occNameString n)
+    ppr PprQuote name@(Local _ _ _)  = quotes (ppr (PprForUser 1) name)
 
-    ppr sty (Local u n _) | codeStyle sty ||
-			    ifaceStyle sty = pprUnique u
+	-- When printing interfaces, all Locals have been given nice print-names
+    ppr (PprForUser _) (Local _ n _) = ptext (occNameString n)
+    ppr PprInterface   (Local _ n _) = ptext (occNameString n)
 
-    ppr sty  (Local u n _) = hcat [ptext (occNameString n), ptext SLIT("_"), pprUnique u]
+    ppr sty (Local u n _) | codeStyle sty = pprUnique u
 
-    ppr PprQuote name@(Global _ _ _ _ _) = quotes (ppr (PprForUser 1) name)
+    ppr sty (Local u n _) = hcat [ptext (occNameString n), ptext SLIT("_"), pprUnique u]
 
-    ppr sty name@(Global u m n _ _)
+    ppr PprQuote name@(Global _ _ _ _) = quotes (ppr (PprForUser 1) name)
+
+    ppr sty name@(Global u m n _)
 	| codeStyle sty
 	= identToC (m _APPEND_ SLIT(".") _APPEND_ occNameString n)
 
-    ppr sty name@(Global u m n _ prov)
-	= hcat [pp_mod, ptext (occNameString n), pp_debug sty name]
+    ppr sty name@(Global u m n prov)
+	= hcat [pp_mod_dot, ptext (occNameString n), pp_debug sty name]
 	where
-	  pp_mod = case prov of				--- Omit home module qualifier
-			LocalDef _ _ -> empty
-			other	     -> pprModule (PprForUser 1) m <> char '.'
+	  pp_mod = pprModule (PprForUser 1) m 
+	  pp_mod_dot = case prov of				--- Omit home module qualifier
+			LocalDef _ _     -> empty
+			Imported _ _ hif -> pp_mod <> pp_dot hif
+			Implicit hif     -> pp_mod <> pp_dot hif
+			other		 -> pp_mod <> text "."
+
+	  pp_dot HiFile     = text "."		-- Vanilla case
+	  pp_dot HiBootFile = text "!"		-- M!t indicates a name imported from a .hi-boot interface
 
 
-pp_debug PprDebug (Global uniq m n _ prov) = hcat [text "{-", pprUnique uniq, char ',', 
+pp_debug PprDebug (Global uniq m n prov) = hcat [text "{-", pprUnique uniq, char ',', 
 						        pp_prov prov, text "-}"]
 					where
 						pp_prov (LocalDef Exported _)    = char 'x'
 						pp_prov (LocalDef NotExported _) = char 'l'
-						pp_prov (Imported _ _) = char 'i'
-						pp_prov Implicit       = char 'p'
+						pp_prov (Imported _ _ _) = char 'i'
+						pp_prov (Implicit _)     = char 'p'
+						pp_prov (WiredInTyCon _) = char 'W'
+						pp_prov (WiredInId _)    = char 'w'
 pp_debug other    name 		        = empty
 
 -- pprNameProvenance is used in error messages to say where a name came from
 pprNameProvenance :: PprStyle -> Name -> Doc
-pprNameProvenance sty (Local _ _ loc)       = pprProvenance sty (LocalDef NotExported loc)
-pprNameProvenance sty (Global _ _ _ _ prov) = pprProvenance sty prov
+pprNameProvenance sty (Local _ _ loc)     = pprProvenance sty (LocalDef NotExported loc)
+pprNameProvenance sty (Global _ _ _ prov) = pprProvenance sty prov
 
 pprProvenance :: PprStyle -> Provenance -> Doc
-pprProvenance sty (Imported mod loc)
+pprProvenance sty (Imported mod loc _)
   = sep [ptext SLIT("Imported from"), pprModule sty mod, ptext SLIT("at"), ppr sty loc]
-pprProvenance sty (LocalDef _ loc) 
-  = sep [ptext SLIT("Defined at"), ppr sty loc]
-pprProvenance sty Implicit
-  = panic "pprNameProvenance: Implicit"
+pprProvenance sty (LocalDef _ loc)  = sep [ptext SLIT("Defined at"), ppr sty loc]
+pprProvenance sty (Implicit _)      = panic "pprNameProvenance: Implicit"
+pprProvenance sty (WiredInTyCon tc) = ptext SLIT("Wired-in tycon")
+pprProvenance sty (WiredInId id)    = ptext SLIT("Wired-in id")
 \end{code}
 
 

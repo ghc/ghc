@@ -10,7 +10,7 @@ module FieldLabel where
 
 IMP_Ubiq(){-uitous-}
 
-import Name		--( Name{-instance Eq/Outputable-}, nameUnique )
+import Name		( Name{-instance Eq/Outputable-}, NamedThing(..), nameUnique )
 import Type		( SYN_IE(Type) )
 
 import Outputable

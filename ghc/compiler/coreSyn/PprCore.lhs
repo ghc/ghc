@@ -33,7 +33,7 @@ import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
 			) 
 import IdInfo		( ppIdInfo, ppStrictnessInfo )
 import Literal		( Literal{-instances-} )
-import Name		( OccName, parenInCode )
+import Name		( OccName )
 import Outputable	-- quite a few things
 import PprEnv
 import PprType		( pprParendGenType, pprTyVarBndr, GenType{-instances-}, GenTyVar{-instance-} )

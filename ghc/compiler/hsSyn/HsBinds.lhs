@@ -234,7 +234,7 @@ data Sig name
 		SrcLoc
 
   | ClassOpSig	name			-- Selector name
-		name			-- Default-method name
+		(Maybe name)		-- Default-method name (if any)
 		(HsType name)
 		SrcLoc
 

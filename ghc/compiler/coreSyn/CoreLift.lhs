@@ -21,8 +21,9 @@ IMP_Ubiq(){-uitous-}
 import CoreSyn
 import CoreUtils	( coreExprType )
 import Id		( idType, mkSysLocal,
-			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv),
-			  GenId{-instances-}, SYN_IE(Id)
+			  nullIdEnv, growIdEnvList, lookupIdEnv,
+			  mkIdWithNewType,
+			  SYN_IE(IdEnv), GenId{-instances-}, SYN_IE(Id)
 			)
 import Name		( isLocallyDefined, getSrcLoc, getOccString )
 import TyCon		( isBoxedTyCon, TyCon{-instance-} )
@@ -35,7 +36,6 @@ import Util		( zipEqual, zipWithEqual, assertPanic, panic )
 
 infixr 9 `thenL`
 
-updateIdType = panic "CoreLift.updateIdType"
 \end{code}
 
 %************************************************************************
@@ -280,7 +280,7 @@ mkLiftedId id u
     (lifted_id, unlifted_id)
   where
     id_name     = _PK_ (getOccString id)		-- yuk!
-    lifted_id   = updateIdType id lifted_ty
+    lifted_id   = mkIdWithNewType id lifted_ty
     unlifted_id = mkSysLocal id_name u unlifted_ty (getSrcLoc id)
 
     unlifted_ty = idType id
@@ -311,8 +311,8 @@ applyBindUnlifts :: [CoreExpr -> CoreExpr] -> CoreExpr -> CoreExpr
 applyBindUnlifts []     expr = expr
 applyBindUnlifts (f:fs) expr = f (applyBindUnlifts fs expr)
 
-isUnboxedButNotState ty
-  = case (maybeAppDataTyConExpandingDicts ty) of
+isUnboxedButNotState ty = 
+    case (maybeAppDataTyConExpandingDicts ty) of
       Nothing -> False
       Just (tycon, _, _) ->
 	not (isBoxedTyCon tycon) && not (tycon == statePrimTyCon)

@@ -68,7 +68,6 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 import CStrings		( pp_cSEP )
 import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 			  isDataCon, isDictFunId,
-			  isConstMethodId_maybe,
 			  isDefaultMethodId_maybe,
 			  isSuperDictSelId_maybe, fIRST_TAG,
 			  SYN_IE(ConTag), GenId{-instance Outputable-},
@@ -329,7 +328,7 @@ pprCLabel_asm = pprCLabel (PprForAsm underscorePrefix fmtAsmLbl)
 pprCLabel :: PprStyle -> CLabel -> Doc
 
 pprCLabel (PprForAsm _ fmtAsmLbl) (AsmTempLabel u)
-  = text (fmtAsmLbl (_UNPK_ (showUnique u)))
+  = text (fmtAsmLbl (showUnique u))
 
 pprCLabel (PprForAsm prepend_cSEP _) lbl
   = if prepend_cSEP

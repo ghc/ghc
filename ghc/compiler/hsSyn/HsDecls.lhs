@@ -25,7 +25,7 @@ import HsCore		( UfExpr )
 import BasicTypes	( Fixity, NewOrData(..) )
 
 -- others:
-import Name		--( getOccName, OccName )
+import Name		( getOccName, OccName, NamedThing(..) )
 import Outputable	( interppSP, interpp'SP,
 			  PprStyle(..), Outputable(..){-instance * []-}
 			)
@@ -378,11 +378,17 @@ instance (NamedThing name, Outputable name) => Outputable (IfaceSig name) where
 
 data HsIdInfo name
   = HsArity		ArityInfo
-  | HsStrictness	(StrictnessInfo name)
+  | HsStrictness	(HsStrictnessInfo name)
   | HsUnfold		Bool (UfExpr name)	-- True <=> INLINE pragma
   | HsUpdate		UpdateInfo
   | HsDeforest		DeforestInfo
   | HsArgUsage		ArgUsageInfo
   | HsFBType		FBTypeInfo
 	-- ToDo: specialisations
+
+data HsStrictnessInfo name
+  = HsStrictnessInfo [Demand] 
+		     (Maybe (name, [name]))	-- Worker, if any
+						-- and needed constructors
+  | HsBottom
 \end{code}

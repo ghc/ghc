@@ -12,22 +12,15 @@ module PprEnv (
 	initPprEnv,
 
 	pCon, pLit, pMajBndr, pMinBndr, pOcc, pPrim, pSCC, pStyle,
-	pTy, pTyVarB, pTyVarO, pUVar, pUse,
+	pTy, pTyVarB, pTyVarO, pUVar, pUse
 	
-	NmbrEnv(..),
-	SYN_IE(NmbrM), initNmbr,
-	returnNmbr, thenNmbr,
-	mapNmbr, mapAndUnzipNmbr
---	nmbr1, nmbr2, nmbr3
---	rnumValVar,   rnumTyVar,   rnumUVar,
---	lookupValVar, lookupTyVar, lookupUVar
     ) where
 
 IMP_Ubiq(){-uitous-}
 
 import Pretty		( Doc )
 import Outputable
-import Unique		( initRenumberingUniques, Unique )
+import Unique		( Unique )
 import UniqFM		( emptyUFM, UniqFM )
 import Util		( panic )
 #if __GLASGOW_HASKELL__ >= 202
@@ -144,76 +137,4 @@ pOcc     (PE _	_  _  _  _  _  _  _  _  _ pp  _  _) = pp
 	     		       	 
 pTy      (PE _	_  _  _  _  _  _  _  _  _  _ pp  _) = pp
 pUse	 (PE _	_  _  _  _  _  _  _  _  _  _  _ pp) = pp
-\end{code}
-
-We tend to {\em renumber} everything before printing, so that
-we get consistent Uniques on everything from run to run.
-\begin{code}
-data NmbrEnv
-  = NmbrEnv	Unique	-- next "Unique" to give out for a value
-		Unique	-- ... for a tyvar
-		Unique	-- ... for a usage var
-		(UniqFM Id)	-- mapping for value vars we know about
-		(UniqFM TyVar)	-- ... for tyvars
-		(UniqFM Unique{-UVar-})	-- ... for usage vars
-
-type NmbrM a = NmbrEnv -> (NmbrEnv, a)
-
-initNmbr :: NmbrM a -> a
-initNmbr m
-  = let
-	(v1,t1,u1)    = initRenumberingUniques
-	init_nmbr_env = NmbrEnv v1 t1 u1 emptyUFM emptyUFM emptyUFM
-    in
-    snd (m init_nmbr_env)
-
-returnNmbr x nenv = (nenv, x)
-
-thenNmbr m k nenv
-  = let
-	(nenv2, res) = m nenv
-    in
-    k res nenv2
-
-mapNmbr f []     = returnNmbr []
-mapNmbr f (x:xs)
-  = f x		    `thenNmbr` \ r  ->
-    mapNmbr f xs    `thenNmbr` \ rs ->
-    returnNmbr (r:rs)
-
-mapAndUnzipNmbr f [] = returnNmbr ([],[])
-mapAndUnzipNmbr f (x:xs)
-  = f x			    `thenNmbr` \ (r1,  r2)  ->
-    mapAndUnzipNmbr f xs    `thenNmbr` \ (rs1, rs2) ->
-    returnNmbr (r1:rs1, r2:rs2)
-
-{-
-nmbr1 nenv thing x1
-  = let
-	(nenv1, new_x1) = x1 nenv
-    in
-    (nenv1, thing new_x1)
-
-nmbr2 nenv thing x1 x2
-  = let
-	(nenv1, new_x1) = x1 nenv
-	(nenv2, new_x2) = x2 nenv1
-    in
-    (nenv2, thing new_x1 new_x2)
-
-nmbr3 nenv thing x1 x2 x3
-  = let
-	(nenv1, new_x1) = x1 nenv
-	(nenv2, new_x2) = x2 nenv1
-	(nenv3, new_x3) = x3 nenv2
-    in
-    (nenv3, thing new_x1 new_x2 new_x3)
--}
-
-rnumValVar = panic "rnumValVar"
-rnumTyVar = panic "rnumTyVar"
-rnumUVar = panic "rnumUVar"
-lookupValVar = panic "lookupValVar"
-lookupTyVar = panic "lookupTyVar"
-lookupUVar = panic "lookupUVar"
 \end{code}

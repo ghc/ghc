@@ -10,6 +10,7 @@ module HsImpExp where
 
 IMP_Ubiq()
 
+import BasicTypes	( IfaceFlavour(..) )
 import Outputable
 import Pretty
 import SrcLoc		( SrcLoc )
@@ -29,7 +30,7 @@ One per \tr{import} declaration in a module.
 data ImportDecl name
   = ImportDecl	  Module			-- module name
 		  Bool				-- True => qualified
-		  Bool				-- True => source imported module 
+		  IfaceFlavour			-- True => source imported module 
 						--    (current interpretation: ignore ufolding info)
 		  (Maybe Module)		-- as Module
 		  (Maybe (Bool, [IE name]))	-- (True => hiding, names)
@@ -43,8 +44,8 @@ instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) wher
                     pp_qual qual, ptext mod, pp_as as])
 	     4 (pp_spec spec)
       where
-	pp_src False   = empty
-	pp_src True	= ptext SLIT("{-# SOURCE #-}")
+	pp_src HiFile     = empty
+	pp_src HiBootFile = ptext SLIT("{-# SOURCE #-}")
 
 	pp_qual False   = empty
 	pp_qual True	= ptext SLIT("qualified")

@@ -18,9 +18,9 @@ IMPORT_1_3(IO(Handle,hPutStr,openFile,hClose,IOMode(..)))
 import HsSyn
 import RdrHsSyn		( RdrName(..) )
 import RnHsSyn		( SYN_IE(RenamedHsModule) )
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), IfaceFlavour(..) )
 import RnMonad
-import RnEnv		( availName )
+import RnEnv		( availName, ifaceFlavour )
 
 import TcInstUtil	( InstInfo(..) )
 
@@ -29,27 +29,27 @@ import Id		( idType, dataConRawArgTys, dataConFieldLabels,
 			  getIdInfo, getInlinePragma, omitIfaceSigForId,
 			  dataConStrictMarks, StrictnessMark(..), 
 			  SYN_IE(IdSet), idSetToList, unionIdSets, unitIdSet, minusIdSet, 
-			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet,
+			  isEmptyIdSet, elementOfIdSet, emptyIdSet, mkIdSet, pprId,
 			  GenId{-instance NamedThing/Outputable-}, SYN_IE(Id)
 
 			)
 import IdInfo		( StrictnessInfo, ArityInfo, 
 			  arityInfo, ppArityInfo, strictnessInfo, ppStrictnessInfo, 
-			  getWorkerId_maybe, bottomIsGuaranteed, IdInfo
+			  workerExists, bottomIsGuaranteed, IdInfo
 			)
 import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding), GenCoreExpr, GenCoreBinding(..) )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
 import FreeVars		( addExprFVs )
+import WorkWrap		( getWorkerIdAndCons )
 import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule, pprOccName,
 			  OccName, occNameString, nameOccName, nameString, isExported,
 			  Name {-instance NamedThing-}, Provenance, NamedThing(..)
 			)
 import TyCon		( TyCon(..) {-instance NamedThing-} )
-import Class		( GenClass(..){-instance NamedThing-}, SYN_IE(Class), GenClassOp, 
-			  classOpLocalType, classSig )
+import Class		( GenClass(..){-instance NamedThing-}, SYN_IE(Class), classBigSig )
 import FieldLabel	( FieldLabel{-instance NamedThing-}, 
 		          fieldLabelName, fieldLabelType )
-import Type		( mkSigmaTy, mkDictTy, getAppTyCon,
+import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitSigmaTy,
 			  mkTyVarTy, SYN_IE(Type)
 		        )
 import TyVar		( GenTyVar {- instance Eq -} )
@@ -139,7 +139,7 @@ ifaceDecls (Just hdl)
     ifaceTyCons hdl tycons			>>
     ifaceBinds hdl needed_ids final_ids binds	>>
     return ()
-    where
+  where
      null_decls = null binds      && 
 		  null tycons     &&
 	          null classes    && 
@@ -151,9 +151,10 @@ ifaceUsages if_hdl import_usages
   = hPutStr if_hdl "_usages_\n"   >>
     hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
   where
-    upp_uses (m, mv, versions)
-      = hcat [upp_module m, space, int mv, ptext SLIT(" :: "),
-		    upp_import_versions (sort_versions versions), semi]
+    upp_uses (m, hif, mv, versions)
+      = hsep [upp_module m, pp_hif hif, int mv, ptext SLIT("::"),
+	      upp_import_versions (sort_versions versions)
+	] <> semi
 
 	-- For imported versions we do print the version number
     upp_import_versions nvs
@@ -181,10 +182,15 @@ ifaceExports if_hdl avails
 		       mod = nameModule (availName avail)
 
 	-- Print one module's worth of stuff
-    do_one_module (mod_name, avails)
-	= hcat [upp_module mod_name, space, 
-		      hsep (map upp_avail (sortLt lt_avail avails)),
-		      semi]
+    do_one_module (mod_name, avails@(avail1:_))
+	= hsep [pp_hif (ifaceFlavour (availName avail1)), 
+		upp_module mod_name,
+		hsep (map upp_avail (sortLt lt_avail avails))
+	  ] <> semi
+
+-- The "!" indicates that the exported things came from a hi-boot interface 
+pp_hif HiFile     = empty
+pp_hif HiBootFile = char '!'
 
 ifaceFixities if_hdl [] = return ()
 ifaceFixities if_hdl fixities 
@@ -222,7 +228,7 @@ ifaceInstances if_hdl inst_infos
     pp_inst (InstInfo clas tvs ty theta _ dfun_id _ _ _)
       = let			 
 	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas ty)
-	    renumbered_ty = renumber_ty forall_ty
+	    renumbered_ty = nmbrGlobalType forall_ty
 	in			 
 	hcat [ptext SLIT("instance "), ppr_ty renumbered_ty, 
 		    ptext SLIT(" = "), ppr_unqual_name dfun_id, semi]
@@ -259,7 +265,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     idinfo         = get_idinfo id
     inline_pragma  = getInlinePragma id 
 
-    ty_pretty  = pprType PprInterface (initNmbr (nmbrType (idType id)))
+    ty_pretty  = pprType PprInterface (nmbrGlobalType (idType id))
     sig_pretty = hcat [ppr PprInterface (getOccName id), ptext SLIT(" _:_ "), ty_pretty]
 
     prag_pretty 
@@ -271,8 +277,15 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     ------------  Strictness  --------------
     strict_info   = strictnessInfo idinfo
-    maybe_worker  = getWorkerId_maybe strict_info
-    strict_pretty = ppStrictnessInfo PprInterface strict_info
+    has_worker    = workerExists strict_info
+    strict_pretty = ppStrictnessInfo PprInterface strict_info <+> wrkr_pretty
+
+    wrkr_pretty | not has_worker = empty
+		| null con_list  = pprId PprInterface work_id
+		| otherwise      = pprId PprInterface work_id <+> braces (hsep (map (pprId PprInterface) con_list))
+
+    (work_id, wrapper_cons) = getWorkerIdAndCons id rhs
+    con_list 		   = idSetToList wrapper_cons
 
     ------------  Unfolding  --------------
     unfold_pretty | show_unfold = hsep [ptext SLIT("_U_"), pprIfaceUnfolding rhs]
@@ -281,7 +294,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     show_unfold = not implicit_unfolding && 		-- Not unnecessary
 		  not dodgy_unfolding			-- Not dangerous
 
-    implicit_unfolding = maybeToBool maybe_worker ||
+    implicit_unfolding = has_worker ||
 			 bottomIsGuaranteed strict_info
 
     dodgy_unfolding = case guidance of 			-- True <=> too big to show, or the Inline pragma
@@ -301,9 +314,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 	      | otherwise		 = worker_ids	`unionIdSets`
 					   unfold_ids
 
-    worker_ids = case maybe_worker of
-			Just wkr -> unitIdSet wkr
-			Nothing  -> emptyIdSet
+    worker_ids | has_worker = unitIdSet work_id
+	       | otherwise  = emptyIdSet
 
     unfold_ids | show_unfold = free_vars
 	       | otherwise   = emptyIdSet
@@ -450,23 +462,28 @@ ifaceClass sty clas
   = hsep [ptext SLIT("class"),
 	   ppr_decl_context sty theta,
 	   ppr sty clas,			-- Print the name
-	   pprTyVarBndr sty tyvar,
+	   pprTyVarBndr sty clas_tyvar,
 	   pp_ops,
 	   semi
 	  ]
    where
-     (tyvar, super_classes, ops) = classSig clas
-     theta = super_classes `zip` repeat (mkTyVarTy tyvar)
+     (clas_tyvar, super_classes, _, sel_ids, defms) = classBigSig clas
+     theta = super_classes `zip` repeat (mkTyVarTy clas_tyvar)
 
-     pp_ops | null ops  = empty
+     pp_ops | null sel_ids  = empty
 	    | otherwise = hsep [ptext SLIT("where"),
-				 braces (hsep (punctuate semi (map ppr_classop ops)))
+				 braces (hsep (punctuate semi (zipWith ppr_classop sel_ids defms)))
 			  ]
 
-     ppr_classop op = hsep [ppr sty (getOccName op),
-			     ptext SLIT("::"),
-			     ppr sty (classOpLocalType op)
-			    ]
+     ppr_classop sel_id maybe_defm
+	= ASSERT( sel_tyvars == [clas_tyvar])
+	  hsep [ppr sty (getOccName sel_id),
+		if maybeToBool maybe_defm then equals else empty,
+	        ptext SLIT("::"),
+		ppr sty op_ty
+	  ]
+	where
+	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
 
 ppr_decl_context :: PprStyle -> [(Class,Type)] -> Doc
 ppr_decl_context sty [] = empty
@@ -496,13 +513,11 @@ upp_avail (AvailTC name []) = empty
 upp_avail (AvailTC name ns) = hcat [upp_occname (getOccName name), bang, upp_export ns']
 			    where
 			      bang | name `elem` ns = empty
-				   | otherwise	    = char '!'
+				   | otherwise	    = char '|'
 			      ns' = filter (/= name) ns
 
 upp_export []    = empty
-upp_export names = hcat [char '(', 
-			       hsep (map (upp_occname . getOccName) names), 
-			       char ')']
+upp_export names = parens (hsep (map (upp_occname . getOccName) names)) 
 
 upp_fixity (occ, (Fixity prec dir, prov)) = hcat [upp_dir dir, space, 
 						        int prec, space, 
@@ -530,8 +545,6 @@ ppr_tyvar tv = ppr PprInterface tv
 ppr_tyvar_bndr tv = pprTyVarBndr PprInterface tv
 
 ppr_decl decl = ppr PprInterface decl <> semi
-
-renumber_ty ty = initNmbr (nmbrType ty)
 \end{code}
 
 
@@ -558,7 +571,7 @@ lt_lexical :: NamedThing a => a -> a -> Bool
 lt_lexical a1 a2 = getName a1 `lt_name` getName a2
 
 lt_imp_vers :: ImportVersion a -> ImportVersion a -> Bool
-lt_imp_vers (m1,_,_) (m2,_,_) = m1 < m2
+lt_imp_vers (m1,_,_,_) (m2,_,_,_) = m1 < m2
 
 sort_versions vs = sortLt lt_vers vs
 

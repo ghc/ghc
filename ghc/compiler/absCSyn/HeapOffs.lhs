@@ -319,7 +319,7 @@ pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
     case (catMaybes [pp_tothdr_offs, pp_varhdr_offs, pp_fxdhdr_offs, pp_int_offs]) of
 	[]   -> char '0'
 	[pp] -> pp	-- Each blob is parenthesised if necessary
-	pps  -> parens (cat (punctuate (char '+') pps))
+	pps  -> parens (hcat (punctuate (char '+') pps))
   where
     pp_hdrs hdr_pp [] = Nothing
     pp_hdrs hdr_pp [SMRI(rep, n)] | n _EQ_ ILIT(1) = Just ((<>) (text (show rep)) hdr_pp)

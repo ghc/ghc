@@ -149,17 +149,12 @@ doIt (core_cmds, stg_cmds) input_pgm
     checkErrors tc_errs_bag tc_warns_bag	>>
 
     case tc_results
-    of {  (typechecked_quint@(recsel_binds, class_binds, inst_binds, val_binds, const_binds),
+    of {  (all_binds,
 	   local_tycons, local_classes, inst_info, pragma_tycon_specs,
 	   ddump_deriv) ->
 
     doDump opt_D_dump_tc "Typechecked:"
-	(pp_show (vcat [
-	    ppr pprStyle recsel_binds,
-	    ppr pprStyle class_binds,
-	    ppr pprStyle inst_binds,
-	    ppr pprStyle const_binds,
-	    ppr pprStyle val_binds]))   	>>
+	(pp_show (ppr pprStyle all_binds))  	>>
 
     doDump opt_D_dump_deriv "Derived instances:"
 	(pp_show (ddump_deriv pprStyle))	>>
@@ -169,7 +164,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     _scc_     "DeSugar"
     let
 	(desugared,ds_warnings)
-	  = deSugar ds_uniqs mod_name typechecked_quint
+	  = deSugar ds_uniqs mod_name all_binds
     in
     (if isEmptyBag ds_warnings then
 	return ()

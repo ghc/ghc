@@ -36,6 +36,7 @@ import Name
 #endif
 
 import RdrHsSyn		( RdrName(..) )
+import BasicTypes	( IfaceFlavour )
 import SrcLoc		( mkSrcLoc, noSrcLoc, SrcLoc )
 \end{code}
 

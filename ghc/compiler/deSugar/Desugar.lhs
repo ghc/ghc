@@ -17,14 +17,14 @@ module Desugar ( deSugar, pprDsWarnings
 IMP_Ubiq(){-uitous-}
 
 import HsSyn		( HsBinds, HsExpr, MonoBinds,
-			  SYN_IE(RecFlag), nonRecursive
+			  SYN_IE(RecFlag), nonRecursive, recursive
 			)
-import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)
+import TcHsSyn		( SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedHsExpr)
 			)
 import CoreSyn
 import Name             ( isExported )
 import DsMonad
-import DsBinds		( dsBinds )
+import DsBinds		( dsMonoBinds )
 import DsUtils
 
 import Bag		( unionBags )
@@ -45,69 +45,27 @@ start.
 \begin{code}
 deSugar :: UniqSupply		-- name supply
 	-> Module		-- module name
-
-	-> (TypecheckedHsBinds, -- input: recsel, class, instance, and value
-	    TypecheckedHsBinds, --   bindings; see "tcModule" (which produces
-	    TypecheckedHsBinds,	--   them)
-	    TypecheckedHsBinds,
-	    TypecheckedHsBinds)
--- ToDo: handling of const_inst thingies is certainly WRONG ***************************
-
+	-> TypecheckedMonoBinds
 	-> ([CoreBinding],	-- output
 	    DsWarnings)	    -- Shadowing complaints
 
-deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst_binds)
+deSugar us mod_name all_binds
   = let
-	(us0, us0a) = splitUniqSupply us
-	(us1, us1a) = splitUniqSupply us0a
-	(us2, us2a) = splitUniqSupply us1a
-	(us3, us3a) = splitUniqSupply us2a
-	(us4, us5)  = splitUniqSupply us3a
+	(us1, us2) = splitUniqSupply us
 
         module_and_group = (mod_name, grp_name)
-
 	grp_name  = case opt_SccGroup of
 		    	Just xx -> _PK_ xx
 		    	Nothing -> mod_name	-- default: module name
 
-	(core_const_binds, shadows1)
-	    = initDs us0 nullIdEnv module_and_group (dsBinds False const_inst_binds)
-	core_const_prs = pairsFromCoreBinds core_const_binds
+	(core_prs, shadows) = initDs us1 nullIdEnv module_and_group 
+			      (dsMonoBinds opt_SccProfilingOn recursive all_binds [])
 
-	(core_clas_binds, shadows2)
-			= initDs us1 nullIdEnv module_and_group (dsBinds False clas_binds)
-	core_clas_prs	= pairsFromCoreBinds core_clas_binds
-
-	(core_inst_binds, shadows3)
-			= initDs us2 nullIdEnv module_and_group (dsBinds False inst_binds)
-	core_inst_prs	= pairsFromCoreBinds core_inst_binds
-
-	(core_val_binds, shadows4)
-			= initDs us3 nullIdEnv module_and_group (dsBinds opt_SccProfilingOn val_binds)
-	core_val_pairs	= pairsFromCoreBinds core_val_binds
-
-	(core_recsel_binds, shadows5)
-			= initDs us4 nullIdEnv module_and_group (dsBinds False recsel_binds)
-	core_recsel_prs	= pairsFromCoreBinds core_recsel_binds
-
-    	final_binds
-	  = if (null core_clas_prs && null core_inst_prs
-	     && null core_recsel_prs {-???dont know???-} && null core_const_prs) then
-		-- we don't have to make the whole thing recursive
-		core_clas_binds ++ core_val_binds
-
-	    else -- gotta make it recursive (sigh)
-	       [Rec (core_clas_prs ++ core_inst_prs
-		  ++ core_const_prs ++ core_val_pairs ++ core_recsel_prs)]
-
-	lift_final_binds = liftCoreBindings us5 final_binds
+	lift_final_binds = liftCoreBindings us2 [Rec core_prs]
 
 	really_final_binds = if opt_DoCoreLinting
 			     then lintCoreBindings PprDebug "Desugarer" False lift_final_binds
 			     else lift_final_binds
-
-	shadows = shadows1 `unionBags` shadows2 `unionBags`
-		  shadows3 `unionBags` shadows4 `unionBags` shadows5
     in
     (really_final_binds, shadows)
 \end{code}

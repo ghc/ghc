@@ -24,7 +24,7 @@ module HsSyn (
 	EXP_MODULE(HsMatches) ,
 	EXP_MODULE(HsPat) ,
 	EXP_MODULE(HsTypes),
-	Fixity, NewOrData,
+	Fixity, NewOrData, IfaceFlavour,
 
 	collectTopBinders, collectMonoBinders
      ) where
@@ -49,7 +49,7 @@ import HsTypes
 import HsPragmas	( ClassPragmas, ClassOpPragmas,
 			  DataPragmas, GenPragmas, InstancePragmas )
 import HsCore
-import BasicTypes	( Fixity, SYN_IE(Version), NewOrData )
+import BasicTypes	( Fixity, SYN_IE(Version), NewOrData, IfaceFlavour )
 
 -- others:
 import FiniteMap	( FiniteMap )

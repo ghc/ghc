@@ -13,10 +13,11 @@ import CoreUnfold 	( Unfolding(..), UnfoldingGuidance(..), mkUnfolding,
 			  SimpleUnfolding(..), FormSummary(..), noUnfolding  )
 import CoreUtils	( unTagBinders )
 import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
-			  unfoldingUnfriendlyId, getIdInfo, nmbrId, pprId,
+			  unfoldingUnfriendlyId, getIdInfo, nmbrId, pprId, idName,
 			  nullIdEnv, lookupIdEnv, IdEnv(..),
 			  Id(..), GenId
 			)
+import Name		( Name )
 import CostCentre	( CostCentre,
 			  noCostCentre, subsumedCosts, cafifyCC,
 			  useCurrentCostCentre, dontCareCostCentre,
@@ -30,7 +31,6 @@ import Literal		( Literal )
 import MagicUFs		( mkMagicUnfoldingFun, MagicUnfoldingFun )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import Outputable	( Outputable(..), PprStyle )
-import PprEnv		( NmbrEnv )
 import PprType		( pprParendGenType )
 import PragmaInfo	( PragmaInfo )
 import Pretty		( Doc )
@@ -54,9 +54,9 @@ isNullSpecEnv :: SpecEnv -> Bool
 externallyVisibleId	:: Id	    -> Bool
 isDataCon		:: GenId ty -> Bool
 isWorkerId		:: GenId ty -> Bool
-nmbrId			:: Id -> NmbrEnv -> (NmbrEnv, Id)
 pprId			:: Outputable ty => PprStyle -> GenId ty -> Doc
 mkMagicUnfoldingFun	:: Unique -> MagicUnfoldingFun
+idName			:: Id -> Name
 
 
 type IdEnv a = UniqFM a
@@ -75,7 +75,6 @@ instance (Eq a, Outputable a, Eq b, Outputable b) => Outputable (GenType a b)
 
 data DemandInfo
 data SpecEnv
-data NmbrEnv
 data MagicUnfoldingFun
 data FormSummary = VarForm | ValueForm | BottomForm | OtherForm
 

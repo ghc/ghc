@@ -96,7 +96,6 @@ data Imm
   | LO Imm		    -- Possible restrictions...
   | HI Imm
   ,)
-
 strImmLit s = ImmLit (text s)
 dblImmLit r
   = strImmLit (
@@ -296,7 +295,6 @@ data Reg
   | UnmappedReg Unique PrimRep	-- One of an infinite supply of registers,
 				-- always mapped to one of the earlier
 				-- two (?)  before we're done.
-
 mkReg :: Unique -> PrimRep -> Reg
 mkReg = UnmappedReg
 

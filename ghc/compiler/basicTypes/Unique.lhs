@@ -30,7 +30,8 @@ module Unique (
 	mkUniqueGrimily,		-- Used in UniqSupply only!
 
 	incrUnique,			-- Used for renumbering
-	initRenumberingUniques,
+	initTyVarUnique, mkTyVarUnique,
+	initTidyUniques,
 
 	-- now all the built-in Uniques (and functions to make them)
 	-- [the Oh-So-Wonderful Haskell module system wins again...]
@@ -229,9 +230,7 @@ import PreludeGlaST
 #else
 import GlaExts
 import ST
-#if __GLASGOW_HASKELL__ == 202
-import PrelBase ( Char(..) )
-#endif
+import PrelBase ( Char(..), chr, ord )
 #endif
 
 IMP_Ubiq(){-uitous-}
@@ -350,28 +349,20 @@ pprUnique10 uniq	-- in base-10, dudes
   = case unpkUnique uniq of
       (tag, u) -> finish_ppr tag u (int u)
 
-finish_ppr tag u pp_u
-  = if tag /= 't' -- this is just to make v common tyvars, t1, t2, ...
-		  -- come out as a, b, ... (shorter, easier to read)
-    then pp_all
-    else case u of
-	   1 -> char 'a'
-	   2 -> char 'b'
-	   3 -> char 'c'
-	   4 -> char 'd'
-	   5 -> char 'e'
-	   _ -> pp_all
-  where
-    pp_all = (<>) (char tag) pp_u
+finish_ppr 't' u pp_u | u < 26
+  =	-- Special case to make v common tyvars, t1, t2, ...
+	-- come out as a, b, ... (shorter, easier to read)
+    char (chr (ord 'a' + u))
+finish_ppr tag u pp_u = char tag <> pp_u
 
-showUnique :: Unique -> FAST_STRING
-showUnique uniq = _PK_ (show (pprUnique uniq))
+showUnique :: Unique -> String
+showUnique uniq = show (pprUnique uniq)
 
 instance Outputable Unique where
     ppr sty u = pprUnique u
 
 instance Text Unique where
-    showsPrec p uniq rest = _UNPK_ (showUnique uniq)
+    showsPrec p uniq rest = showUnique uniq
 \end{code}
 
 %************************************************************************
@@ -464,7 +455,17 @@ mkTupleDataConUnique a		= mkUnique '6' a	-- ditto (*may* be used in C labels)
 mkPrimOpIdUnique op		= mkUnique '7' op
 mkPreludeMiscIdUnique i		= mkUnique '8' i
 
-initRenumberingUniques = (mkUnique 'v' 1, mkUnique 't' 1, mkUnique 'u' 1)
+-- The "tyvar uniques" print specially nicely: a, b, c, etc.
+-- See pprUnique for details
+
+initTyVarUnique :: Unique
+initTyVarUnique = mkUnique 't' 0
+
+mkTyVarUnique :: Int -> Unique
+mkTyVarUnique n = mkUnique 't' n
+
+initTidyUniques :: (Unique, Unique)	-- Global and local
+initTidyUniques = (mkUnique 'g' 0, mkUnique 'x' 0)
 
 mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
  mkBuiltinUnique :: Int -> Unique

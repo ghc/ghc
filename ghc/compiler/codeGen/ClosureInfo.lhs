@@ -54,8 +54,6 @@ module ClosureInfo (
 IMP_Ubiq(){-uitous-}
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)		-- here for paranoia-checking
-#else
-import {-# SOURCE #-} CLabel ( CLabel )
 #endif
 
 import AbsCSyn
@@ -70,7 +68,7 @@ import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject,
 import CgRetConv	( assignRegs, dataReturnConvAlg,
 			  DataReturnConvention(..)
 			)
-import CLabel		( mkStdEntryLabel, mkFastEntryLabel,
+import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 			  mkPhantomInfoTableLabel, mkInfoTableLabel,
 			  mkConInfoTableLabel, mkStaticClosureLabel, 
 			  mkBlackHoleInfoTableLabel, mkVapInfoTableLabel,
@@ -736,7 +734,7 @@ nodeMustPointToIt lf_info
 	-- having Node point to the result of an update.  SLPJ
 	-- 27/11/92.
 
-	LFThunk _ no_fvs updatable _
+	LFThunk _ no_fvs updatable NonStandardThunk
 	  -> returnFC (updatable || not no_fvs || do_profiling)
 
 	  -- For the non-updatable (single-entry case):
@@ -745,6 +743,15 @@ nodeMustPointToIt lf_info
 	  --		    should black-hole it)
 	  -- or profiling (in which case we need to recover the cost centre
 	  --		 from inside it)
+
+	LFThunk _ no_fvs updatable some_standard_form_thunk
+	  -> returnFC True
+	  -- Node must point to any standard-form thunk.
+	  -- For example,
+	  --		x = f y
+	  -- generates a Vap thunk for (f y), and even if y is a global
+	  -- variable we must still make Node point to the thunk before entering it
+	  -- because that's what the standard-form code expects.
 
 	LFArgument  -> returnFC True
 	LFImported  -> returnFC True
@@ -981,14 +988,17 @@ staticClosureRequired binder other_binder_info other_lf_info = True
 slowFunEntryCodeRequired	-- Assumption: it's a function, not a thunk.
 	:: Id
 	-> StgBinderInfo
+	-> EntryConvention
 	-> Bool
-slowFunEntryCodeRequired binder (StgBinderInfo arg_occ unsat_occ _ _ _)
+slowFunEntryCodeRequired binder (StgBinderInfo arg_occ unsat_occ _ _ _) entry_conv
   = arg_occ 		-- There's an argument occurrence
     || unsat_occ	-- There's an unsaturated call
     || externallyVisibleId binder
-    {- HAS FREE VARS AND IS PARALLEL WORLD -}
+    || (case entry_conv of { DirectEntry _ _ _ -> False; other -> True })
+	    {- The last case deals with the parallel world; a function usually
+	       as a DirectEntry convention, but if it doesn't we must generate slow-entry code -}
 
-slowFunEntryCodeRequired binder NoStgBinderInfo = True
+slowFunEntryCodeRequired binder NoStgBinderInfo _ = True
 
 funInfoTableRequired
 	:: Id

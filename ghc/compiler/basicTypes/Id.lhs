@@ -15,29 +15,30 @@ module Id (
 	SYN_IE(DataCon), SYN_IE(DictFun), SYN_IE(DictVar),
 
 	-- CONSTRUCTION
-	mkConstMethodId,
 	mkDataCon,
 	mkDefaultMethodId,
 	mkDictFunId,
-	mkIdWithNewUniq, mkIdWithNewName,
+	mkIdWithNewUniq, mkIdWithNewName, mkIdWithNewType,
 	mkImported,
 	mkInstId,
 	mkMethodSelId,
 	mkRecordSelId,
+	mkSameSpecCon,
 	mkSuperDictSelId,
 	mkSysLocal,
 	mkTemplateLocals,
 	mkTupleCon,
 	mkUserId,
 	mkUserLocal,
-	mkWorkerId,
 	mkPrimitiveId, 
+	mkWorkerId,
 	setIdVisibility,
 
 	-- DESTRUCTION (excluding pragmatic info)
 	idPrimRep,
 	idType,
 	idUnique,
+	idName,
 
 	dataConRepType,
 	dataConArgTys,
@@ -61,8 +62,6 @@ module Id (
 	idWantsToBeINLINEd, getInlinePragma, 
 	idMustBeINLINEd, idMustNotBeINLINEd,
 	isBottomingId,
-	isConstMethodId,
-	isConstMethodId_maybe,
 	isDataCon, isAlgCon, isNewCon,
 	isDefaultMethodId,
 	isDefaultMethodId_maybe,
@@ -76,7 +75,6 @@ module Id (
 	isPrimitiveId_maybe,
 	isSysLocalId,
 	isTupleCon,
-	isWorkerId,
 	isWrapperId,
 	toplevelishId,
 	unfoldingUnfriendlyId,
@@ -86,9 +84,6 @@ module Id (
 	apply_to_Id,
 	
 	-- PRINTING and RENUMBERING
-	addId,
-	nmbrDataCon,
-	nmbrId,
 	pprId,
 	showId,
 
@@ -154,16 +149,12 @@ import {-# SOURCE #-} SpecEnv    ( SpecEnv   )
 import {-# SOURCE #-} CoreUnfold ( Unfolding )
 import {-# SOURCE #-} StdIdInfo  ( addStandardIdInfo )
 -- Let's see how much we can leave out..
---import {-# SOURCE #-} TyCon
---import {-# SOURCE #-} Type
---import {-# SOURCE #-} Class
---import {-# SOURCE #-} TysWiredIn
 --import {-# SOURCE #-} TysPrim
---import {-# SOURCE #-} TyVar
 #endif
 
 import Bag
-import Class		( classOpString, SYN_IE(Class), GenClass, SYN_IE(ClassOp), GenClassOp )
+import Class		( SYN_IE(Class), GenClass )
+import BasicTypes	( SYN_IE(Arity) )
 import IdInfo
 import Maybes		( maybeToBool )
 import Name	 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
@@ -171,7 +162,7 @@ import Name	 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
 			  isLocallyDefinedName, occNameString, modAndOcc,
 			  isLocallyDefined, changeUnique, isWiredInName,
 			  nameString, getOccString, setNameVisibility,
-			  isExported, ExportFlag(..), DefnInfo, Provenance,
+			  isExported, ExportFlag(..), Provenance,
 			  OccName(..), Name, SYN_IE(Module),
 			  NamedThing(..)
 			) 
@@ -182,34 +173,34 @@ import PragmaInfo	( PragmaInfo(..) )
 #if __GLASGOW_HASKELL__ >= 202
 import PrimOp	        ( PrimOp )
 #endif
-import PprEnv		-- ( SYN_IE(NmbrM), NmbrEnv(..) )
 import PprType		( getTypeString, specMaybeTysSuffix,
-			  nmbrType, nmbrTyVar,
 			  GenType, GenTyVar
 			)
 import Pretty
 import MatchEnv		( MatchEnv )
-import SrcLoc		--( mkBuiltinSrcLoc )
+import SrcLoc		( mkBuiltinSrcLoc )
 import TysWiredIn	( tupleTyCon )
-import TyCon		--( TyCon, tyConDataCons )
-import Type	{-	( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
+import TyCon		( TyCon, tyConDataCons, isDataTyCon, isNewTyCon, mkSpecTyCon )
+import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy, splitSigmaTy,
 			  applyTyCon, instantiateTy, mkForAllTys,
 			  tyVarsOfType, applyTypeEnvToTy, typePrimRep,
+			  specialiseTy, instantiateTauTy,
 			  GenType, SYN_IE(ThetaType), SYN_IE(TauType), SYN_IE(Type)
-			) -}
-import TyVar		--( alphaTyVars, isEmptyTyVarSet, SYN_IE(TyVarEnv) )
+			)
+import TyVar		( SYN_IE(TyVar), GenTyVar, alphaTyVars, isEmptyTyVarSet, SYN_IE(TyVarEnv) )
 import Usage		( SYN_IE(UVar) )
 import UniqFM
 import UniqSet		-- practically all of it
-import Unique		( getBuiltinUniques, pprUnique, showUnique,
+import Unique		( getBuiltinUniques, pprUnique,
 			  incrUnique, 
 			  Unique{-instance Ord3-},
 			  Uniquable(..)
 			)
 import Outputable	( ifPprDebug, Outputable(..), PprStyle(..) )
-import Util	{-	( mapAccumL, nOfThem, zipEqual, assoc,
+import SrcLoc		( SrcLoc )
+import Util		( Ord3(..), mapAccumL, nOfThem, zipEqual, assoc,
 			  panic, panic#, pprPanic, assertPanic
-			) -}
+			)
 \end{code}
 
 Here are the @Id@ and @IdDetails@ datatypes; also see the notes that
@@ -286,8 +277,7 @@ data IdDetails
   | MethodSelId	Class		-- An overloaded class operation, with
 				-- a fully polymorphic type.  Its code
 				-- just selects a method from the
-				-- dictionary.  The class.
-		ClassOp		-- The operation
+				-- dictionary.
 
 	-- NB: The IdInfo for a MethodSelId has all the info about its
 	-- related "constant method Ids", which are just
@@ -295,10 +285,6 @@ data IdDetails
 
   | DefaultMethodId		-- Default method for a particular class op
 		Class		-- same class, <blah-blah> info as MethodSelId
-		ClassOp		-- (surprise, surprise)
-		Bool		-- True <=> I *know* this default method Id
-				-- is a generated one that just says
-				-- `error "No default method for <op>"'.
 
 				-- see below
   | DictFunId	Class		-- A DictFun is uniquely identified
@@ -308,14 +294,6 @@ data IdDetails
 				-- The "a" is irrelevant.  As it is too painful to
 				-- actually do comparisons that way, we kindly supply
 				-- a Unique for that purpose.
-
-				-- see below
-  | ConstMethodId		-- A method which depends only on the type of the
-				-- instance, and not on any further dictionaries etc.
-		Class		-- Uniquely identified by:
-		Type		-- (class, type, classop) triple
-		ClassOp
-		Module		-- module where instance came from
 
   | InstId			-- An instance of a dictionary, class operation,
 				-- or overloaded value (Local name)
@@ -329,11 +307,6 @@ data IdDetails
 				-- to know about the unspec version, because
 				-- we may specialise to a type w/ free tyvars
 				-- (i.e., in one of the "Maybe Type" dudes).
-
--- Scheduled for deletion: SLPJ Nov 96
--- Nobody seems to depend on knowing this.
-  | WorkerId			-- A "worker" for some other Id
-		Id		-- Id for which this is a worker
 
 type ConTag	= Int
 type DictVar	= Id
@@ -456,9 +429,6 @@ include dictionaries for the immediate superclasses of C at the type
 \item[@SpecId@:]
 
 %----------------------------------------------------------------------
-\item[@WorkerId@:]
-
-%----------------------------------------------------------------------
 \item[@LocalId@:] A purely-local value, e.g., a function argument,
 something defined in a @where@ clauses, ... --- but which appears in
 the original program text.
@@ -540,13 +510,11 @@ toplevelishId (Id _ _ _ details _ _)
     chk (RecordSelId _)   	    = True
     chk ImportedId	    	    = True
     chk (SuperDictSelId _ _)	    = True
-    chk (MethodSelId _ _)	    = True
-    chk (DefaultMethodId _ _ _)     = True
+    chk (MethodSelId _)		    = True
+    chk (DefaultMethodId _)         = True
     chk (DictFunId     _ _)	    = True
-    chk (ConstMethodId _ _ _ _)     = True
     chk (SpecId unspec _ _)	    = toplevelishId unspec
 				    -- depends what the unspecialised thing is
-    chk (WorkerId unwrkr)	    = toplevelishId unwrkr
     chk (InstId	      _)	    = False	-- these are local
     chk (LocalId      _)	    = False
     chk (SysLocalId   _)	    = False
@@ -561,11 +529,9 @@ idHasNoFreeTyVars (Id _ _ _ details _ info)
     chk (RecordSelId _)   	  = True
     chk ImportedId	    	  = True
     chk (SuperDictSelId _ _)	  = True
-    chk (MethodSelId _ _)	  = True
-    chk (DefaultMethodId _ _ _)   = True
+    chk (MethodSelId _)		  = True
+    chk (DefaultMethodId _)       = True
     chk (DictFunId     _ _)	  = True
-    chk (ConstMethodId _ _ _ _)   = True
-    chk (WorkerId unwrkr)	  = idHasNoFreeTyVars unwrkr
     chk (SpecId _     _   no_free_tvs) = no_free_tvs
     chk (InstId         no_free_tvs) = no_free_tvs
     chk (LocalId        no_free_tvs) = no_free_tvs
@@ -598,7 +564,7 @@ omitIfaceSigForId (Id _ name _ details _ _)
         (TupleConId _)    	  -> True
         (RecordSelId _)   	  -> True
         (SuperDictSelId _ _)	  -> True
-        (MethodSelId _ _)	  -> True
+        (MethodSelId _)		  -> True
 
 	other			  -> False	-- Don't omit!
 		-- NB DefaultMethodIds are not omitted
@@ -616,46 +582,32 @@ isSysLocalId other			   = False
 isSpecPragmaId (Id _ _ _ (SpecPragmaId _ _) _ _) = True
 isSpecPragmaId other			         = False
 
-isMethodSelId_maybe (Id _ _ _ (MethodSelId cls op) _ _) = Just (cls,op)
-isMethodSelId_maybe _				        = Nothing
+isSpecId_maybe (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
+  = ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
+    Just (unspec, ty_maybes)
+isSpecId_maybe other_id
+  = Nothing
 
-isDefaultMethodId (Id _ _ _ (DefaultMethodId _ _ _) _ _) = True
-isDefaultMethodId other				         = False
+isMethodSelId_maybe (Id _ _ _ (MethodSelId cls) _ _) = Just cls
+isMethodSelId_maybe _				     = Nothing
 
-isDefaultMethodId_maybe (Id _ _ _ (DefaultMethodId cls clsop err) _ _)
-  = Just (cls, clsop, err)
+isDefaultMethodId (Id _ _ _ (DefaultMethodId _) _ _) = True
+isDefaultMethodId other				     = False
+
+isDefaultMethodId_maybe (Id _ _ _ (DefaultMethodId cls) _ _)
+  = Just cls
 isDefaultMethodId_maybe other = Nothing
 
 isDictFunId (Id _ _ _ (DictFunId _ _) _ _) = True
 isDictFunId other		    	   = False
 
-isConstMethodId (Id _ _ _ (ConstMethodId _ _ _ _) _ _) = True
-isConstMethodId other		    		       = False
-
-isConstMethodId_maybe (Id _ _ _ (ConstMethodId cls ty clsop _) _ _)
-  = Just (cls, ty, clsop)
-isConstMethodId_maybe other = Nothing
-
 isSuperDictSelId_maybe (Id _ _ _ (SuperDictSelId c sc) _ _) = Just (c, sc)
 isSuperDictSelId_maybe other_id				  = Nothing
-
-isWorkerId (Id _ _ _ (WorkerId _) _ _) = True
-isWorkerId other		     = False
 
 isWrapperId id = workerExists (getIdStrictness id)
 
 isPrimitiveId_maybe (Id _ _ _ (PrimitiveId primop) _ _) = Just primop
 isPrimitiveId_maybe other				= Nothing
-\end{code}
-
-Tell them who my wrapper function is.
-\begin{code}
-{-LATER:
-myWrapperMaybe :: Id -> Maybe Id
-
-myWrapperMaybe (Id _ _ _ (WorkerId my_wrapper) _ _) = Just my_wrapper
-myWrapperMaybe other_id			    	  = Nothing
--}
 \end{code}
 
 \begin{code}
@@ -684,18 +636,11 @@ CLAIM (not ASSERTed) for @applyTypeEnvToId@ and @applySubstToId@:
 `Top-levelish Ids'' cannot have any free type variables, so applying
 the type-env cannot have any effect.  (NB: checked in CoreLint?)
 
-The special casing is in @applyTypeEnvToId@, not @apply_to_Id@, as the
-former ``should be'' the usual crunch point.
-
 \begin{code}
 type TypeEnv = TyVarEnv Type
 
 applyTypeEnvToId :: TypeEnv -> Id -> Id
-
 applyTypeEnvToId type_env id@(Id _ _ ty _ _ _)
-  | idHasNoFreeTyVars id
-  = id
-  | otherwise
   = apply_to_Id ( \ ty ->
 	applyTypeEnvToTy type_env ty
     ) id
@@ -704,11 +649,11 @@ applyTypeEnvToId type_env id@(Id _ _ ty _ _ _)
 \begin{code}
 apply_to_Id :: (Type -> Type) -> Id -> Id
 
-apply_to_Id ty_fn (Id u n ty details prag info)
-  = let
-	new_ty = ty_fn ty
-    in
-    Id u n new_ty (apply_to_details details) prag (apply_to_IdInfo ty_fn info)
+apply_to_Id ty_fn id@(Id u n ty details prag info)
+  | idHasNoFreeTyVars id
+  = id
+  | otherwise
+  = Id u n (ty_fn ty) (apply_to_details details) prag (apply_to_IdInfo ty_fn info)
   where
     apply_to_details (SpecId unspec ty_maybes no_ftvs)
       = let
@@ -721,56 +666,9 @@ apply_to_Id ty_fn (Id u n ty details prag info)
 	apply_to_maybe Nothing   = Nothing
 	apply_to_maybe (Just ty) = Just (ty_fn ty)
 
-    apply_to_details (WorkerId unwrkr)
-      = let
-	    new_unwrkr = apply_to_Id ty_fn unwrkr
-	in
-	WorkerId new_unwrkr
-
     apply_to_details other = other
 \end{code}
 
-Sadly, I don't think the one using the magic typechecker substitution
-can be done with @apply_to_Id@.  Here we go....
-
-Strictness is very important here.  We can't leave behind thunks
-with pointers to the substitution: it {\em must} be single-threaded.
-
-\begin{code}
-{-LATER:
-applySubstToId :: Subst -> Id -> (Subst, Id)
-
-applySubstToId subst id@(Id u n ty info details)
-  -- *cannot* have a "idHasNoFreeTyVars" get-out clause
-  -- because, in the typechecker, we are still
-  -- *concocting* the types.
-  = case (applySubstToTy     subst ty)		of { (s2, new_ty)      ->
-    case (applySubstToIdInfo s2    info)	of { (s3, new_info)    ->
-    case (apply_to_details   s3 new_ty details) of { (s4, new_details) ->
-    (s4, Id u n new_ty new_info new_details) }}}
-  where
-    apply_to_details subst _ (InstId inst no_ftvs)
-      = case (applySubstToInst subst inst) of { (s2, new_inst) ->
-	(s2, InstId new_inst no_ftvs{-ToDo:right???-}) }
-
-    apply_to_details subst new_ty (SpecId unspec ty_maybes _)
-      = case (applySubstToId subst unspec)  	     of { (s2, new_unspec) ->
-	case (mapAccumL apply_to_maybe s2 ty_maybes) of { (s3, new_maybes) ->
-	(s3, SpecId new_unspec new_maybes (no_free_tvs new_ty)) }}
-	-- NB: recalc no_ftvs (I think it's necessary (?) WDP 95/04)
-      where
-	apply_to_maybe subst Nothing   = (subst, Nothing)
-	apply_to_maybe subst (Just ty)
-	  = case (applySubstToTy subst ty) of { (s2, new_ty) ->
-	    (s2, Just new_ty) }
-
-    apply_to_details subst _ (WorkerId unwrkr)
-      = case (applySubstToId subst unwrkr) of { (s2, new_unwrkr) ->
-	(s2, WorkerId new_unwrkr) }
-
-    apply_to_details subst _ other = (subst, other)
--}
-\end{code}
 
 %************************************************************************
 %*									*
@@ -779,21 +677,12 @@ applySubstToId subst id@(Id u n ty info details)
 %************************************************************************
 
 \begin{code}
+idName :: GenId ty -> Name
+idName (Id _ n _ _ _ _) = n
+
 idType :: GenId ty -> ty
-
 idType (Id _ _ ty _ _ _) = ty
-\end{code}
 
-\begin{code}
-{-LATER:
-getMentionedTyConsAndClassesFromId :: Id -> (Bag TyCon, Bag Class)
-
-getMentionedTyConsAndClassesFromId id
- = getMentionedTyConsAndClassesFromType (idType id)
--}
-\end{code}
-
-\begin{code}
 idPrimRep i = typePrimRep (idType i)
 \end{code}
 
@@ -815,61 +704,27 @@ mkSuperDictSelId u clas sc ty
 
 	-- For method selectors the clean thing to do is
 	-- to give the method selector the same name as the class op itself.
-mkMethodSelId op_name rec_c op ty
+mkMethodSelId op_name rec_c ty
   = addStandardIdInfo $
-    Id (uniqueOf op_name) op_name ty (MethodSelId rec_c op) NoPragmaInfo noIdInfo
+    Id (uniqueOf op_name) op_name ty (MethodSelId rec_c) NoPragmaInfo noIdInfo
 
-mkDefaultMethodId dm_name rec_c op gen ty
-  = Id (uniqueOf dm_name) dm_name ty (DefaultMethodId rec_c op gen) NoPragmaInfo noIdInfo
+mkDefaultMethodId dm_name rec_c ty
+  = Id (uniqueOf dm_name) dm_name ty (DefaultMethodId rec_c) NoPragmaInfo noIdInfo
 
 mkDictFunId dfun_name full_ty clas ity
   = Id (nameUnique dfun_name) dfun_name full_ty details NoPragmaInfo noIdInfo
   where
     details  = DictFunId clas ity
 
-mkConstMethodId	uniq clas op ity full_ty from_here locn mod info
-  = Id uniq name full_ty details NoPragmaInfo info
-  where
-    name     = mkInstDeclName uniq mod (VarOcc occ_name) locn from_here
-    details  = ConstMethodId clas ity op mod
-    occ_name = classOpString op _APPEND_ 
-	       SLIT("_cm_") _APPEND_ renum_type_string full_ty ity
-
 mkWorkerId u unwrkr ty info
   = Id u name ty details NoPragmaInfo info
   where
+    details = LocalId (no_free_tvs ty)
     name    = mkCompoundName name_fn u (getName unwrkr)
-    details = WorkerId unwrkr
     name_fn wkr_str = SLIT("$w") _APPEND_ wkr_str
 
 mkInstId u ty name 
   = Id u name ty (InstId (no_free_tvs ty)) NoPragmaInfo noIdInfo
-
-{-LATER:
-getConstMethodId clas op ty
-  = -- constant-method info is hidden in the IdInfo of
-    -- the class-op id (as mentioned up above).
-    let
-	sel_id = getMethodSelId clas op
-    in
-    case (lookupConstMethodId (getIdSpecialisation sel_id) ty) of
-      Just xx -> xx
-      Nothing -> pprError "ERROR: getConstMethodId:" (vcat [
-	hsep [ppr PprDebug ty, ppr PprDebug ops, ppr PprDebug op_ids,
-	       ppr PprDebug sel_id],
-	text "(This can arise if an interface pragma refers to an instance",
-	text "but there is no imported interface which *defines* that instance.",
-	text "The info above, however ugly, should indicate what else you need to import."
-	])
--}
-
-
-renum_type_string full_ty ity
-  = initNmbr (
-	nmbrType full_ty    `thenNmbr` \ _ -> -- so all the tyvars get added to renumbering...
-	nmbrType ity	    `thenNmbr` \ rn_ity ->
-	returnNmbr (getTypeString rn_ity)
-    )
 \end{code}
 
 %************************************************************************
@@ -886,6 +741,7 @@ mkPrimitiveId n ty primop
     Id (nameUnique n) n ty (PrimitiveId primop) IMustBeINLINEd noIdInfo
 	-- The pragma @IMustBeINLINEd@ says that this Id absolutely must be inlined.
 	-- It's only true for primitives, because we don't want to make a closure for each of them.
+
 \end{code}
 
 \begin{code}
@@ -911,42 +767,11 @@ mkUserId name ty pragma_info
   = Id (nameUnique name) name ty (LocalId (no_free_tvs ty)) pragma_info noIdInfo
 \end{code}
 
-
 \begin{code}
-{-LATER:
-
--- for a SpecPragmaId being created by the compiler out of thin air...
-mkSpecPragmaId :: OccName -> Unique -> Type -> Maybe Id -> SrcLoc -> Id
-mkSpecPragmaId str uniq ty specid loc
-  = Id uniq (mkShortName str loc) ty noIdInfo (SpecPragmaId specid (no_free_tvs ty))
-
--- for new SpecId
-mkSpecId u unspec ty_maybes ty info
-  = ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
-    Id u n ty info (SpecId unspec ty_maybes (no_free_tvs ty))
-
--- Specialised version of constructor: only used in STG and code generation
--- Note: The specialsied Id has the same unique as the unspeced Id
-
-mkSameSpecCon ty_maybes unspec@(Id u n ty info details)
-  = ASSERT(isDataCon unspec)
-    ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
-    Id u n new_ty info (SpecId unspec ty_maybes (no_free_tvs new_ty))
-  where
-    new_ty = specialiseTy ty ty_maybes 0
-
-localiseId :: Id -> Id
-localiseId id@(Id u n ty info details)
-  = Id u (mkShortName name loc) ty info (LocalId (no_free_tvs ty))
-  where
-    name = getOccName id
-    loc  = getSrcLoc id
--}
-
 -- See notes with setNameVisibility (Name.lhs)
-setIdVisibility :: Module -> Id -> Id
-setIdVisibility mod (Id uniq name ty details prag info)
-  = Id uniq (setNameVisibility mod name) ty details prag info
+setIdVisibility :: Maybe Module -> Unique -> Id -> Id
+setIdVisibility maybe_mod u (Id uniq name ty details prag info)
+  = Id uniq (setNameVisibility maybe_mod u name) ty details prag info
 
 mkIdWithNewUniq :: Id -> Unique -> Id
 mkIdWithNewUniq (Id _ n ty details prag info) u
@@ -955,6 +780,23 @@ mkIdWithNewUniq (Id _ n ty details prag info) u
 mkIdWithNewName :: Id -> Name -> Id
 mkIdWithNewName (Id _ _ ty details prag info) new_name
   = Id (uniqueOf new_name) new_name ty details prag info
+
+mkIdWithNewType :: Id -> Type -> Id
+mkIdWithNewType (Id u name _ details pragma info) ty 
+  = Id u name ty details pragma info
+
+-- Specialised version of constructor: only used in STG and code generation
+-- Note: The specialsied Id has the same unique as the unspeced Id
+
+mkSameSpecCon ty_maybes unspec@(Id u name ty details pragma info)
+  = ASSERT(isDataCon unspec)
+    ASSERT(not (maybeToBool (isSpecId_maybe unspec)))
+    Id u name new_ty (SpecId unspec ty_maybes (no_free_tvs new_ty)) pragma info
+  where
+    new_ty = specialiseTy ty ty_maybes 0
+
+    -- pprTrace "SameSpecCon:Unique:"
+    --	        (ppSep (ppr PprDebug unspec: [pprMaybeTy PprDebug ty | ty <- ty_maybes]))
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -1076,6 +918,7 @@ dataConNumFields id
     length con_theta + length arg_tys }
 
 isNullaryDataCon con = dataConNumFields con == 0 -- function of convenience
+
 \end{code}
 
 
@@ -1100,6 +943,29 @@ dataConSig (Id _ _ _ (TupleConId arity) _ _)
   where
     tyvars	= take arity alphaTyVars
     tyvar_tys	= mkTyVarTys tyvars
+dataConSig (Id _ _ _ (SpecId unspec ty_maybes _) _ _)
+  = (spec_tyvars, spec_theta_ty, spec_con_tyvars, spec_con_theta, spec_arg_tys, spec_tycon)
+  where
+    (tyvars, theta_ty, con_tyvars, con_theta, arg_tys, tycon) = dataConSig unspec
+
+    ty_env = tyvars `zip` ty_maybes
+
+    spec_tyvars     = foldr nothing_tyvars [] ty_env
+    spec_con_tyvars = foldr nothing_tyvars [] (con_tyvars `zip` ty_maybes) -- Hmm..
+
+    nothing_tyvars (tyvar, Nothing) l = tyvar : l
+    nothing_tyvars (tyvar, Just ty) l = l
+
+    spec_env = foldr just_env [] ty_env
+    just_env (tyvar, Nothing) l = l
+    just_env (tyvar, Just ty) l = (tyvar, ty) : l
+    spec_arg_tys = map (instantiateTauTy spec_env) arg_tys
+
+    spec_theta_ty  = if null theta_ty then []
+		     else panic "dataConSig:ThetaTy:SpecDataCon1"
+    spec_con_theta = if null con_theta then []
+		     else panic "dataConSig:ThetaTy:SpecDataCon2"
+    spec_tycon     = mkSpecTyCon tycon ty_maybes
 
 
 -- dataConRepType returns the type of the representation of a contructor
@@ -1283,11 +1149,11 @@ addIdSpecialisation (Id u n ty details prags info) spec_info
 Strictness: we snaffle the info out of the IdInfo.
 
 \begin{code}
-getIdStrictness :: Id -> StrictnessInfo Id
+getIdStrictness :: Id -> StrictnessInfo
 
 getIdStrictness (Id _ _ _ _ _ info) = strictnessInfo info
 
-addIdStrictness :: Id -> StrictnessInfo Id -> Id
+addIdStrictness :: Id -> StrictnessInfo -> Id
 addIdStrictness (Id u n ty details prags info) strict_info
   = Id u n ty details prags (info `addStrictnessInfo` strict_info)
 \end{code}
@@ -1481,92 +1347,4 @@ elementOfIdSet	= elementOfUniqSet
 minusIdSet	= minusUniqSet
 isEmptyIdSet	= isEmptyUniqSet
 mkIdSet		= mkUniqSet
-\end{code}
-
-\begin{code}
-addId, nmbrId, nmbrDataCon :: Id -> NmbrM Id
-
-addId id@(Id u n ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
-  = case (lookupUFM_Directly idenv u) of
-      Just xx -> trace "addId: already in map!" $
-		 (nenv, xx)
-      Nothing ->
-	if toplevelishId id then
-	    trace "addId: can't add toplevelish!" $
-	    (nenv, id)
-	else -- alloc a new unique for this guy
-	     -- and add an entry in the idenv
-	     -- NB: *** KNOT-TYING ***
-	    let
-		nenv_plus_id	= NmbrEnv (incrUnique ui) ut uu
-					  (addToUFM_Directly idenv u new_id)
-					  tvenv uvenv
-
-		(nenv2, new_ty)  = nmbrType     ty  nenv_plus_id
-		(nenv3, new_det) = nmbr_details det nenv2
-
-		new_id = Id ui n new_ty new_det prag info
-	    in
-	    (nenv3, new_id)
-
-nmbrId id@(Id u n ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
-  = case (lookupUFM_Directly idenv u) of
-      Just xx -> (nenv, xx)
-      Nothing ->
-	if not (toplevelishId id) then
-	    trace "nmbrId: lookup failed" $
-	    (nenv, id)
-	else
-	    let
-		(nenv2, new_ty)  = nmbrType     ty  nenv
-		(nenv3, new_det) = nmbr_details det nenv2
-
-		new_id = Id u n new_ty new_det prag info
-	    in
-	    (nenv3, new_id)
-
-    -- used when renumbering TyCons to produce data decls...
-nmbrDataCon id@(Id _ _ _ (TupleConId _) _ _) nenv
-  = (nenv, id) -- nothing to do for tuples
-
-nmbrDataCon id@(Id u n ty (AlgConId tag marks fields tvs theta con_tvs con_theta arg_tys tc) prag info)
-	    nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
-  = case (lookupUFM_Directly idenv u) of
-      Just xx -> trace "nmbrDataCon: in env???\n" (nenv, xx)
-      Nothing ->
-	let
-	    (nenv2, new_fields)  = (mapNmbr nmbrField  fields)  nenv
-	    (nenv3, new_arg_tys) = (mapNmbr nmbrType   arg_tys) nenv2
-
-	    new_det = AlgConId tag marks new_fields (bottom "tvs") (bottom "theta") (bottom "tvs") (bottom "theta") new_arg_tys tc
-	    new_id  = Id u n (bottom "ty") new_det prag info
-	in
-	(nenv3, new_id)
-  where
-    bottom msg = panic ("nmbrDataCon"++msg)
-
-------------
-nmbr_details :: IdDetails -> NmbrM IdDetails
-
-nmbr_details (AlgConId tag marks fields tvs theta con_tvs con_theta arg_tys tc)
-  = mapNmbr nmbrTyVar  tvs	`thenNmbr` \ new_tvs ->
-    mapNmbr nmbrTyVar  con_tvs	`thenNmbr` \ new_con_tvs ->
-    mapNmbr nmbrField  fields	`thenNmbr` \ new_fields ->
-    mapNmbr nmbr_theta theta	`thenNmbr` \ new_theta ->
-    mapNmbr nmbr_theta con_theta	`thenNmbr` \ new_con_theta ->
-    mapNmbr nmbrType   arg_tys	`thenNmbr` \ new_arg_tys ->
-    returnNmbr (AlgConId tag marks new_fields new_tvs new_theta new_con_tvs new_con_theta new_arg_tys tc)
-  where
-    nmbr_theta (c,t)
-      = --nmbrClass c	`thenNmbr` \ new_c ->
-        nmbrType  t	`thenNmbr` \ new_t ->
-	returnNmbr (c, new_t)
-
-    -- ToDo:add more cases as needed
-nmbr_details other_details = returnNmbr other_details
-
-------------
-nmbrField (FieldLabel n ty tag)
-  = nmbrType ty `thenNmbr` \ new_ty ->
-    returnNmbr (FieldLabel n new_ty tag)
 \end{code}

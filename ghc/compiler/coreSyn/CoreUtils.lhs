@@ -37,7 +37,7 @@ import Maybes		( catMaybes, maybeToBool )
 import PprCore
 import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instances-}, GenTyVar )
-import Pretty		( vcat, text )
+import Pretty		( Doc, vcat )
 import PrimOp		( primOpType, PrimOp(..) )
 import SrcLoc		( noSrcLoc )
 import TyVar		( cloneTyVar,
@@ -57,7 +57,6 @@ import UniqSupply	( initUs, returnUs, thenUs,
 			)
 import Usage		( SYN_IE(UVar) )
 import Util		( zipEqual, panic, pprTrace, pprPanic, assertPanic )
-import Pretty
 
 type TypeEnv = TyVarEnv Type
 applyUsage = panic "CoreUtils.applyUsage:ToDo"

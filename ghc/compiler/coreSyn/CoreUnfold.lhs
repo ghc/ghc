@@ -39,7 +39,6 @@ IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 IMPORT_DELOOPER(SmplLoop)
 #else
 import {-# SOURCE #-} MagicUFs
-import {-# SOURCE #-} Id ( Id )
 #endif
 
 import Bag		( emptyBag, unitBag, unionBags, Bag )
@@ -61,7 +60,7 @@ import RdrHsSyn		( RdrName )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
 --import CostCentre	( ccMentionsId )
-import Id		( idType, getIdArity,  isBottomingId, isDataCon, isPrimitiveId_maybe,
+import Id		( SYN_IE(Id), idType, getIdArity,  isBottomingId, isDataCon, --rm: isPrimitiveId_maybe,
 			  SYN_IE(IdSet), GenId{-instances-} )
 import PrimOp		( primOpCanTriggerGC, fragilePrimOp, PrimOp(..) )
 import IdInfo		( ArityInfo(..), bottomIsGuaranteed )
@@ -434,7 +433,7 @@ data ExprSize = TooBig
 sizeZero     	= SizeIs 0# [] 0#
 sizeOne      	= SizeIs 1# [] 0#
 sizeN (I# n) 	= SizeIs n  [] 0#
-conSizeN (I# n) = SizeIs n [] n
+conSizeN (I# n) = SizeIs n  [] n
 scrutArg v	= SizeIs 0# [v] 0#
 
 nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
@@ -488,15 +487,7 @@ smallEnoughToInline arg_is_evald_s result_is_scruted
     enough_args n [] | n > 0 = False	-- A function with no value args => don't unfold
     enough_args _ _	     = True	-- Otherwise it's ok to try
 
-{-	OLD: require saturated args
-    enough_args 0 evals  = True
-    enough_args n []     = False
-    enough_args n (e:es) = enough_args (n-1) es
-	-- NB: don't take the length of arg_is_evald_s because when
-	-- called from couldBeSmallEnoughToInline it is infinite!
--}
-
-    discounted_size = size - args_discount - result_discount
+    discounted_size = (size - args_discount) - result_discount
 
     args_discount = sum (zipWith arg_discount discount_vec arg_is_evald_s)
     result_discount | result_is_scruted = scrut_discount

@@ -10,7 +10,7 @@ lower levels it is preserved with @let@/@letrec@s).
 \begin{code}
 #include "HsVersions.h"
 
-module DsBinds ( dsBinds ) where
+module DsBinds ( dsBinds, dsMonoBinds ) where
 
 IMP_Ubiq()
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
@@ -68,7 +68,7 @@ dsBinds auto_scc (ThenBinds binds_1 binds_2)
   = andDs (++) (dsBinds auto_scc binds_1) (dsBinds auto_scc binds_2)
 
 dsBinds auto_scc (MonoBind binds sigs is_rec)
-  = dsMonoBinds auto_scc is_rec binds  `thenDs` \ prs ->
+  = dsMonoBinds auto_scc is_rec binds []  `thenDs` \ prs ->
     returnDs (if is_rec then
 		[Rec prs]
 	      else
@@ -86,60 +86,62 @@ dsBinds auto_scc (MonoBind binds sigs is_rec)
 \begin{code}
 dsMonoBinds :: Bool		-- False => don't (auto-)annotate scc on toplevs.
 	    -> RecFlag 
-	    -> TypecheckedMonoBinds 
-	    -> DsM [(Id,CoreExpr)]
+	    -> TypecheckedMonoBinds
+	    -> [(Id,CoreExpr)]		-- Put this on the end (avoid quadratic append)
+	    -> DsM [(Id,CoreExpr)]	-- Result
 
-dsMonoBinds _ is_rec EmptyMonoBinds = returnDs []
+dsMonoBinds _ is_rec EmptyMonoBinds rest = returnDs rest
 
-dsMonoBinds auto_scc is_rec (AndMonoBinds  binds_1 binds_2)
-  = andDs (++) (dsMonoBinds auto_scc is_rec binds_1) (dsMonoBinds auto_scc is_rec binds_2)
+dsMonoBinds auto_scc is_rec (AndMonoBinds  binds_1 binds_2) rest
+  = dsMonoBinds auto_scc is_rec binds_2 rest	`thenDs` \ rest' ->
+    dsMonoBinds auto_scc is_rec binds_1 rest'
 
-dsMonoBinds _ is_rec (CoreMonoBind var core_expr)
-  = returnDs [(var, core_expr)]
+dsMonoBinds _ is_rec (CoreMonoBind var core_expr) rest
+  = returnDs ((var, core_expr) : rest)
 
-dsMonoBinds _ is_rec (VarMonoBind var expr)
+dsMonoBinds _ is_rec (VarMonoBind var expr) rest
   = dsExpr expr			`thenDs` \ core_expr ->
 
 	-- Dictionary bindings are always VarMonoBinds, so
 	-- we only need do this here
     addDictScc var core_expr	`thenDs` \ core_expr' ->
 
-    returnDs [(var, core_expr')]
+    returnDs ((var, core_expr') : rest)
 
-dsMonoBinds auto_scc is_rec (FunMonoBind fun _ matches locn)
+dsMonoBinds auto_scc is_rec (FunMonoBind fun _ matches locn) rest
   = putSrcLocDs locn	$
     matchWrapper (FunMatch fun) matches error_string	`thenDs` \ (args, body) ->
     addAutoScc auto_scc (fun, mkValLam args body)       `thenDs` \ pair ->
-    returnDs [pair]
+    returnDs (pair : rest)
   where
     error_string = "function " ++ showForErr fun
 
-dsMonoBinds _ is_rec (PatMonoBind pat grhss_and_binds locn)
+dsMonoBinds _ is_rec (PatMonoBind pat grhss_and_binds locn) rest
   = putSrcLocDs locn $
     dsGuarded grhss_and_binds		`thenDs` \ body_expr ->
-    mkSelectorBinds pat body_expr
+    mkSelectorBinds pat body_expr	`thenDs` \ sel_binds ->
+    returnDs (sel_binds ++ rest)
 
 	-- Common special case: no type or dictionary abstraction
-dsMonoBinds auto_scc is_rec (AbsBinds [] [] exports binds)
-  = dsMonoBinds False is_rec binds			`thenDs` \ prs ->
-    mapDs (addAutoScc auto_scc) [(global, Var local) | (_, global, local) <- exports] `thenDs` \ exports' ->
-    returnDs (prs ++ exports')
+dsMonoBinds auto_scc is_rec (AbsBinds [] [] exports binds) rest
+  = mapDs (addAutoScc auto_scc) [(global, Var local) | (_, global, local) <- exports] `thenDs` \ exports' ->
+    dsMonoBinds False is_rec binds (exports' ++ rest)
 
 	-- Another common case: one exported variable
 	-- All non-recursive bindings come through this way
-dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds)
+dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds) rest
   = ASSERT( all (`elem` tyvars) all_tyvars )
-    dsMonoBinds False is_rec binds			`thenDs` \ core_prs ->
+    dsMonoBinds False is_rec binds []			`thenDs` \ core_prs ->
     let 
 	core_binds | is_rec    = [Rec core_prs]
 		   | otherwise = [NonRec b e | (b,e) <- core_prs]
     in
     addAutoScc auto_scc (global, mkLam tyvars dicts $ 
 			         mkCoLetsAny core_binds (Var local)) `thenDs` \ global' ->
-    returnDs [global']
+    returnDs (global' : rest)
 
-dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts exports binds)
-  = dsMonoBinds False is_rec binds			`thenDs` \ core_prs ->
+dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts exports binds) rest
+  = dsMonoBinds False is_rec binds []			`thenDs` \ core_prs ->
     let 
 	core_binds | is_rec    = [Rec core_prs]
 		   | otherwise = [NonRec b e | (b,e) <- core_prs]
@@ -170,7 +172,7 @@ dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts exports binds)
     in
     zipWithDs mk_bind exports [0..]		`thenDs` \ export_binds ->
      -- don't scc (auto-)annotate the tuple itself.
-    returnDs ((tup_id, tup_expr) : export_binds)
+    returnDs ((tup_id, tup_expr) : (export_binds ++ rest))
 \end{code}
 
 
