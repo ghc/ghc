@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Package.hs,v 1.3 2002/06/12 22:04:27 wolfgang Exp $
+-- $Id: Package.hs,v 1.4 2002/09/09 11:32:38 simonmar Exp $
 --
 -- Package configuration defn.
 -----------------------------------------------------------------------------
@@ -17,7 +17,11 @@ module Package (
 #endif
 
 #ifdef WANT_PRETTY
+#if __GLASGOW_HASKELL__ >= 504
+import Text.PrettyPrint
+#else
 import Pretty
+#endif
 #endif
 
 data PackageConfig

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.26 2002/07/02 10:31:39 wolfgang Exp $
+-- $Id: Main.hs,v 1.27 2002/09/09 11:32:37 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -8,11 +8,16 @@ module Main where
 
 import Package
 
-#ifdef __GLASGOW_HASKELL__
-import qualified Exception
-#endif
+#if __GLASGOW_HASKELL__ >= 504
+import System.Console.GetOpt
+import Text.PrettyPrint
+import qualified Control.Exception as Exception
+#else
 import GetOpt
 import Pretty
+import qualified Exception
+#endif
+
 import Monad
 import Directory
 import System	( getEnv, getArgs, 

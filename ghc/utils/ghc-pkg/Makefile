@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.17 2002/05/29 22:11:59 sof Exp $
+# $Id: Makefile,v 1.18 2002/09/09 11:32:38 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,8 +10,13 @@ INSTALLING=1
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
 
-SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -package lang \
-		    -package util -package text
+SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY
+
+ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
+
+ifeq "$(ghc_ge_504)" "NO"
+SRC_HC_OPTS +=  -package lang -package util -package text
+endif
 
 HS_PROG           = ghc-pkg.bin
 INSTALL_LIBEXECS += $(HS_PROG)
