@@ -345,8 +345,7 @@ libraries (OpenGL, for example) will not work from a thread created using
 from @main@ or from a @foreign export@.
 -}
 
-#ifdef
- __GLASGOW_HASKELL__
+#ifdef __GLASGOW_HASKELL__
 
 -- | 'True' if bound threads are supported.
 -- If @rtsSupportsBoundThreads@ is 'False', 'isCurrentThreadBound'
@@ -451,9 +450,9 @@ runInUnboundThread action = do
 	if bound
 		then do
 			mv <- newEmptyMVar
-			forkIO (E.try action >>= putMVar mv)
+			forkIO (Exception.try action >>= putMVar mv)
 			takeMVar mv >>= \either -> case either of
-			Left exception -> E.throw exception
+			Left exception -> Exception.throw exception
 			Right result -> return result
 		else action
 	
