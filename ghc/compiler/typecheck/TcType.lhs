@@ -94,7 +94,7 @@ module TcType (
   -- Type substitutions
   TvSubst(..), 	-- Representation visible to a few friends
   TvSubstEnv, emptyTvSubst,
-  mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
+  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst,
   getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
   extendTvSubst, extendTvSubstList, isInScope,
   substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
@@ -146,7 +146,7 @@ import Type		(	-- Re-exports
 
 			  TvSubst(..),
 			  TvSubstEnv, emptyTvSubst,
-			  mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
+			  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst,
 			  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
 			  extendTvSubst, extendTvSubstList, isInScope,
 		  	  substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,

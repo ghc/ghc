@@ -29,7 +29,7 @@ import RnEnv		( bindLocalNames )
 import HscTypes		( DFunId, FixityEnv )
 
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
-import Type		( zipTvSubst, substTheta )
+import Type		( zipOpenTvSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConOrigArgTys )
@@ -441,7 +441,7 @@ makeDerivEqns tycl_decls
 		-- There's no 'corece' needed because after the type checker newtypes
 		-- are transparent.
 
-	sc_theta = substTheta (zipTvSubst clas_tyvars inst_tys)
+	sc_theta = substTheta (zipOpenTvSubst clas_tyvars inst_tys)
 			      (classSCTheta clas)
 
 		-- If there are no tyvars, there's no need

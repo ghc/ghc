@@ -26,7 +26,7 @@ import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
 import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars, readMetaTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcTauType, zipTopTvSubst,
 			  SkolemInfo(PatSkol), isSkolemTyVar, isMetaTyVar, pprSkolemTyVar, 
-			  TvSubst, mkTvSubst, substTyVar, substTy, MetaDetails(..),
+			  TvSubst, mkOpenTvSubst, substTyVar, substTy, MetaDetails(..),
 			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy )
 import VarEnv		( mkVarEnv )	-- ugly
 import Kind		( argTypeKind, liftedTypeKind )
@@ -535,7 +535,7 @@ refineTyVars :: [TcTyVar] 	-- Newly instantiated meta-tyvars of the function
 -- Just one level of de-wobblification though.  What a hack! 
 refineTyVars tvs
   = do	{ mb_prs <- mapM mk_pr tvs
-	; return (mkTvSubst (mkVarEnv (catMaybes mb_prs))) }
+	; return (mkOpenTvSubst (mkVarEnv (catMaybes mb_prs))) }
   where
     mk_pr tv = do { details <- readMetaTyVar tv
 		  ; case details of

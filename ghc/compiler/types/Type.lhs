@@ -65,7 +65,7 @@ module Type (
 	-- Type substitutions
 	TvSubstEnv, emptyTvSubstEnv,	-- Representation widely visible
 	TvSubst(..), emptyTvSubst,	-- Representation visible to a few friends
-	mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
+	mkTvSubst, mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
 	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
  	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst,
 
@@ -1031,18 +1031,22 @@ emptyTvSubstEnv = emptyVarEnv
 composeTvSubst :: InScopeSet -> TvSubstEnv -> TvSubstEnv -> TvSubstEnv
 -- (compose env1 env2)(x) is env1(env2(x)); i.e. apply env2 then env1
 -- It assumes that both are idempotent
+-- Typically, env1 is the refinement to a base substitution env2
 composeTvSubst in_scope env1 env2
   = env1 `plusVarEnv` mapVarEnv (substTy subst1) env2
 	-- First apply env1 to the range of env2
 	-- Then combine the two, making sure that env1 loses if
 	-- both bind the same variable; that's why env1 is the
-	-- *left* argument to plusVarEnv, becuause the right arg wins
+	-- *left* argument to plusVarEnv, because the right arg wins
   where
     subst1 = TvSubst in_scope env1
 
 emptyTvSubst = TvSubst emptyInScopeSet emptyVarEnv
 isEmptyTvSubst :: TvSubst -> Bool
 isEmptyTvSubst (TvSubst _ env) = isEmptyVarEnv env
+
+mkTvSubst :: InScopeSet -> TvSubstEnv -> TvSubst
+mkTvSubst = TvSubst
 
 getTvSubstEnv :: TvSubst -> TvSubstEnv
 getTvSubstEnv (TvSubst _ env) = env
@@ -1069,16 +1073,15 @@ extendTvSubstList :: TvSubst -> [TyVar] -> [Type] -> TvSubst
 extendTvSubstList (TvSubst in_scope env) tvs tys 
   = TvSubst in_scope (extendVarEnvList env (tvs `zip` tys))
 
--- mkTvSubst and zipTvSubst generate the in-scope set from
+-- mkOpenTvSubst and zipOpenTvSubst generate the in-scope set from
 -- the types given; but it's just a thunk so with a bit of luck
 -- it'll never be evaluated
 
-mkTvSubst :: TvSubstEnv -> TvSubst
-mkTvSubst env 
-  = TvSubst (mkInScopeSet (tyVarsOfTypes (varEnvElts env))) env
+mkOpenTvSubst :: TvSubstEnv -> TvSubst
+mkOpenTvSubst env = TvSubst (mkInScopeSet (tyVarsOfTypes (varEnvElts env))) env
 
-zipTvSubst :: [TyVar] -> [Type] -> TvSubst
-zipTvSubst tyvars tys 
+zipOpenTvSubst :: [TyVar] -> [Type] -> TvSubst
+zipOpenTvSubst tyvars tys 
   = TvSubst (mkInScopeSet (tyVarsOfTypes tys)) (zipTyEnv tyvars tys)
 
 -- mkTopTvSubst is called when doing top-level substitutions.
@@ -1131,7 +1134,7 @@ instance Outputable TvSubst where
 
 \begin{code}
 substTyWith :: [TyVar] -> [Type] -> Type -> Type
-substTyWith tvs tys = substTy (zipTvSubst tvs tys)
+substTyWith tvs tys = substTy (zipOpenTvSubst tvs tys)
 
 substTy :: TvSubst -> Type  -> Type
 substTy subst ty | isEmptyTvSubst subst = ty

@@ -34,7 +34,7 @@ import TcSimplify	( bindInstsOfLocalFuns )
 import TcMType		( newTyFlexiVarTy, tcSkolType, zonkQuantifiedTyVar, zonkTcTypes )
 import TcType		( TcTyVar, SkolemInfo(SigSkol), 
 			  TcTauType, TcSigmaType, 
-			  TvSubstEnv, mkTvSubst, substTheta, substTy, 
+			  TvSubstEnv, mkOpenTvSubst, substTheta, substTy, 
 			  mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkForAllTy, isUnLiftedType, tcGetTyVar_maybe, 
 			  mkTyVarTys )
@@ -605,7 +605,7 @@ checkSigCtxt sig1 sig@(TcSigInfo { sig_tvs = tvs, sig_theta = theta, sig_tau = t
 	Just tvs' -> 
 
     let 
-	subst  = mkTvSubst tenv
+	subst  = mkOpenTvSubst tenv
     in
     return (sig { sig_tvs   = tvs', 
 		  sig_theta = substTheta subst theta, 

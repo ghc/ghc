@@ -27,7 +27,7 @@ import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv,
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
-import Type		( zipTvSubst, substTheta, substTys )
+import Type		( zipOpenTvSubst, substTheta, substTys )
 import DataCon		( classDataCon )
 import Class		( classBigSig )
 import Var		( Id, idName, idType )
@@ -328,7 +328,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
         -- Instantiate the super-class context with inst_tys
-	sc_theta' = substTheta (zipTvSubst class_tyvars inst_tys') sc_theta
+	sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys') sc_theta
 	origin	  = SigOrigin rigid_info
     in
 	 -- Create dictionary Ids from the specified instance contexts.
@@ -512,7 +512,7 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
 	-- of the type variables in the instance declaration; but rep_tys doesn't
 	-- have the skolemised version, so we substitute them in here
     rep_tys' = substTys subst rep_tys
-    subst    = zipTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
+    subst    = zipOpenTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
 \end{code}
 
 Note: [Superclass loops]
