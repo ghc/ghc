@@ -1,0 +1,11 @@
+
+Deficiencies
+~~~~~~~~~~~~
+
+typecheck/should_compile tc056,tc115,tc116: stderr not checked
+   (maybe fixed; ToDo: check)
+
+typecheck/should_fail
+   Data82.hs Digraph.hs Digraph.stderr Inst82_1.hs Inst82_2.hs   
+   have not been assimilated.
+
