@@ -91,7 +91,8 @@ import Prelude
 import Control.Exception as Exception
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Conc
+import GHC.Conc		( ThreadId(..), myThreadId, killThread, yield,
+			  threadDelay, threadWaitRead, threadWaitWrite )
 import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase	( IO(..) )
 import GHC.IOBase	( unsafeInterleaveIO )
