@@ -595,21 +595,14 @@ Here's how to install Cygwin.
 Install the latest Cygwin 1.1.x from <ULink
 URL="http://sources.redhat.com/cygwin/">sources.redhat.com/cygwin</ULink>.
 If you have a pre-1.1 version, you should deinstall this first. Choose DOS
-text mode. After installation, start up a Cygwin shell and issue the
-following command:
-
-<Screen>
-mount -f c: /</Screen>
-
-assuming you installed Cygwin at <Filename>C:\cygwin</Filename>; otherwise
-change the drive and directory as appropriate.
+text file type.
 </Para>
 </ListItem>
 
 <ListItem>
 <Para>
 Create <Filename>C:/Temp</Filename> if it doesn't already exist; substitute
-the drive you installed Cygwin on for <Filename>C:</Filename>).
+the drive you installed Cygwin on for <Filename>C:</Filename>.
 </Para>
 </ListItem>
 
