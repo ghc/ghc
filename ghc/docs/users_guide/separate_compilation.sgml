@@ -96,7 +96,7 @@
 	  <term><replaceable>hidir</replaceable></term>
 	  <listitem>
 	    <para>is the value of the <option>-hidir</option> option if
-	    one was given (see below), or
+	    one was given (<xref linkend="options-output">), or
 	    <replaceable>root-path</replaceable> otherwise.</para>
 	  </listitem>
 	</varlistentry>
@@ -104,7 +104,7 @@
 	  <term><replaceable>hisuf</replaceable></term>
 	  <listitem>
 	    <para>is the value of the <option>-hisuf</option> option if
-	    one was given (see below), or <literal>hi</literal>
+	    one was given (<xref linkend="options-output">), or <literal>hi</literal>
 	    otherwise.</para>
 	  </listitem>
 	</varlistentry>
@@ -113,7 +113,7 @@
 	  <term><replaceable>odir</replaceable></term>
 	  <listitem>
 	    <para>is the value of the <option>-odir</option> option if
-	    one was given (see below), or
+	    one was given (<xref linkend="options-output">), or
 	    <replaceable>root-path</replaceable> otherwise.</para>
 	  </listitem>
 	</varlistentry>
@@ -121,7 +121,7 @@
 	  <term><replaceable>osuf</replaceable></term>
 	  <listitem>
 	    <para>is the value of the <option>-osuf</option> option if
-	    one was given (see below), or <literal>o</literal>
+	    one was given (<xref linkend="options-output">), or <literal>o</literal>
 	    otherwise (<literal>obj</literal> on Windows).</para>
 	  </listitem>
 	</varlistentry>
