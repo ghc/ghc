@@ -1,4 +1,4 @@
-TOP=..
+TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 SCRIPT_PROG=../db2rtf
