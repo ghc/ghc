@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section{Packed strings}
 
@@ -21,7 +21,6 @@ module PackedString (
 	unsafeByteArrayToPS, -- :: ByteArray a   -> Int -> PackedString
 
 	psToByteArray,       -- :: PackedString  -> ByteArray Int
-	psToByteArrayST,     -- :: PackedString  -> ST s (ByteArray Int)
 	psToCString,	     -- :: PackedString  -> Addr
         isCString,	     -- :: PackedString  -> Bool
 
@@ -30,6 +29,7 @@ module PackedString (
 	unpackPSIO,      -- :: PackedString -> IO [Char]
 
 	hPutPS,      -- :: Handle -> PackedString -> IO ()
+	hGetPS,      -- :: Handle -> Int -> IO PackedString
 
 	nilPS,       -- :: PackedString
 	consPS,      -- :: Char -> PackedString -> PackedString
@@ -67,22 +67,17 @@ module PackedString (
          -}
 	substrPS,    -- :: PackedString -> Int -> Int -> PackedString
 
-	comparePS,
-
- 	  -- Converting to C strings
-	packCString#, 
-	unpackCString#,
-	unpackCString2#,
-	unpackAppendCString#,
-	unpackFoldrCString#,
-	unpackCString,
-	unpackCStringIO,
-	unpackCStringLenIO
+	comparePS    -- :: PackedString -> PackedString -> Ordering
 
     ) where
 
 import GlaExts
 import PrelBase ( showList__  ) -- ToDo: better
+import PrelPack
+	  (  new_ps_array
+	  ,  freeze_ps_array
+	  ,  write_ps_array
+	  )
 import Addr
 
 import PrelArr  ( StateAndMutableByteArray#(..) , StateAndByteArray#(..) )
@@ -90,6 +85,7 @@ import PrelST
 import ST
 import IOExts   ( unsafePerformIO )
 import IO
+import PrelHandle ( hFillBufBA )
 
 import Ix
 import Char (isSpace)
@@ -245,7 +241,7 @@ packNCharsST len@(I# length#) str =
    -- fill in packed string from "str"
  fill_in ch_array 0# str   >>
    -- freeze the puppy:
- freeze_ps_array ch_array >>= \ (ByteArray _ frozen#) ->
+ freeze_ps_array ch_array length# >>= \ (ByteArray _ frozen#) ->
  let has_null = byteArrayHasNUL# frozen# length# in
  return (PS frozen# length# has_null)
  where
@@ -405,20 +401,19 @@ The dual to @_putPS@, note that the size of the chunk specified
 is the upper bound of the size of the chunk returned.
 
 \begin{code}
-{-
-getPS :: _FILE -> Int -> IO PackedString
-getPS file len@(I# len#)
+hGetPS :: Handle -> Int -> IO PackedString
+hGetPS hdl len@(I# len#)
  | len# <=# 0# = return nilPS -- I'm being kind here.
  | otherwise   =
     -- Allocate an array for system call to store its bytes into.
-   new_ps_array len#      >>= \ ch_arr ->
-   freeze_ps_array ch_arr >>= \ (ByteArray _ frozen#) ->
+   stToIO (new_ps_array len# )		 >>= \ ch_arr ->
+   stToIO (freeze_ps_array ch_arr len#)  >>= \ (ByteArray _ frozen#) ->
    let
     byte_array = ByteArray (0, I# len#) frozen#
    in
-   _ccall_ fread byte_array (1::Int) len file >>= \  (I# read#) ->
+   hFillBufBA hdl byte_array len >>= \  (I# read#) ->
    if read# ==# 0# then -- EOF or other error
-      error "getPS: EOF reached or other error"
+      fail (userError "hGetPS: EOF reached or other error")
    else
      {-
        The system call may not return the number of
@@ -431,7 +426,7 @@ getPS file len@(I# len#)
       has_null = byteArrayHasNUL# frozen# read#
      in 
      return (PS frozen# read# has_null)
-END LATER -}
+
 \end{code}
 
 %************************************************************************
@@ -521,7 +516,7 @@ mapPS f xs =
      runST (
        new_ps_array (length +# 1#)         >>= \ ps_arr ->
        whizz ps_arr length 0#              >>
-       freeze_ps_array ps_arr	           >>= \ (ByteArray _ frozen#) ->
+       freeze_ps_array ps_arr length       >>= \ (ByteArray _ frozen#) ->
        let has_null = byteArrayHasNUL# frozen# length in
        return (PS frozen# length has_null))
   where
@@ -574,9 +569,9 @@ filterPS pred ps =
        else if len_filtered# ==# 0# then
 	 return nilPS
        else
-         new_ps_array (len_filtered# +# 1#) >>= \ ps_arr ->
-         copy_arr ps_arr rle 0# 0#          >>
-         freeze_ps_array ps_arr	            >>= \ (ByteArray _ frozen#) ->
+         new_ps_array (len_filtered# +# 1#)   >>= \ ps_arr ->
+         copy_arr ps_arr rle 0# 0#            >>
+         freeze_ps_array ps_arr len_filtered# >>= \ (ByteArray _ frozen#) ->
          let has_null = byteArrayHasNUL# frozen# len_filtered# in
          return (PS frozen# len_filtered# has_null))
   where
@@ -753,7 +748,7 @@ reversePS ps =
     runST (
       new_ps_array (length +# 1#)    >>= \ arr# -> -- incl NUL byte!
       fill_in arr# (length -# 1#) 0# >>
-      freeze_ps_array arr#	     >>= \ (ByteArray _ frozen#) ->
+      freeze_ps_array arr# length    >>= \ (ByteArray _ frozen#) ->
       let has_null = byteArrayHasNUL# frozen# length in
       return (PS frozen# length has_null))
  where
@@ -781,7 +776,7 @@ concatPS pss
     runST (
     new_ps_array (tot_len# +# 1#)   >>= \ arr# -> -- incl NUL byte!
     packum arr# pss 0#		    >>
-    freeze_ps_array arr#	    >>= \ (ByteArray _ frozen#) ->
+    freeze_ps_array arr# tot_len#   >>= \ (ByteArray _ frozen#) ->
 
     let has_null = byteArrayHasNUL# frozen# tot_len# in
 	  
@@ -881,9 +876,9 @@ substrPS# ps s e
 
   | otherwise
   = runST (
-	new_ps_array (result_len# +# 1#) >>= \ ch_arr -> -- incl NUL byte!
-	fill_in ch_arr 0#	         >>
-	freeze_ps_array ch_arr	         >>= \ (ByteArray _ frozen#) ->
+	new_ps_array (result_len# +# 1#)   >>= \ ch_arr -> -- incl NUL byte!
+	fill_in ch_arr 0#	           >>
+	freeze_ps_array ch_arr result_len# >>= \ (ByteArray _ frozen#) ->
 
 	let has_null = byteArrayHasNUL# frozen# result_len# in
 	  
@@ -910,30 +905,6 @@ substrPS# ps s e
 	fill_in arr_in# (idx +# 1#)
 \end{code}
 
-(Very :-) ``Specialised'' versions of some CharArray things...
-
-\begin{code}
-new_ps_array	:: Int# -> ST s (MutableByteArray s Int)
-write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s () 
-freeze_ps_array :: MutableByteArray s Int -> ST s (ByteArray Int)
-
-new_ps_array size = ST $ \ s# ->
-    case newCharArray# size s#  of { StateAndMutableByteArray# s2# barr# ->
-    STret s2# (MutableByteArray bot barr#)}
-  where
-    bot = error "new_ps_array"
-
-write_ps_array (MutableByteArray _ barr#) n ch = ST $ \ s# ->
-    case writeCharArray# barr# n ch s#	of { s2#   ->
-    STret s2# ()}
-
--- same as unsafeFreezeByteArray
-freeze_ps_array (MutableByteArray ixs arr#) = ST $ \ s# ->
-    case unsafeFreezeByteArray# arr# s# of { StateAndByteArray# s2# frozen# ->
-    STret s2# (ByteArray ixs frozen#) }
-\end{code}
-
-
 %*********************************************************
 %*							*
 \subsection{Packing and unpacking C strings}
@@ -941,102 +912,11 @@ freeze_ps_array (MutableByteArray ixs arr#) = ST $ \ s# ->
 %*********************************************************
 
 \begin{code}
-unpackCString :: Addr -> [Char]
-
--- Calls to the next four are injected by the compiler itself, 
--- to deal with literal strings
-packCString#	     :: [Char]          -> ByteArray#
-unpackCString#       :: Addr#           -> [Char]
-unpackCString2#      :: Addr# -> Int#   -> [Char]
-unpackAppendCString# :: Addr# -> [Char] -> [Char]
-unpackFoldrCString#  :: Addr# -> (Char  -> a -> a) -> a -> a 
-
-packCString# str = case (packString str) of { PS bytes _ _ -> bytes }
-
-unpackCString a@(A# addr) = 
- if a == ``NULL'' then
-    []
- else
-    unpackCString# addr
-
-unpackCString# addr
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = []
-      | otherwise	   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
-
-unpackCStringIO :: Addr -> IO String
-unpackCStringIO addr
- | addr == ``NULL'' = return ""
- | otherwise        = unpack 0#
-  where
-    unpack nh = do
-       ch <- readCharOffAddr addr (I# nh)
-       if ch == '\0'
-        then return []
-	else do
-	   ls <- unpack (nh +# 1#)
-	   return (ch : ls)
-
--- unpack 'len' chars
-unpackCStringLenIO :: Addr -> Int -> IO String
-unpackCStringLenIO addr l@(I# len#)
- | len# <# 0#  = fail (userError ("PackedString.unpackCStringLenIO: negative length (" ++ show l ++ ")"))
- | len# ==# 0# = return ""
- | otherwise   = unpack [] (len# -# 1#)
-  where
-    unpack acc 0# = do
-       ch <- readCharOffAddr addr (I# 0#)
-       return (ch:acc)
-    unpack acc nh = do
-       ch <- readCharOffAddr addr (I# nh)
-       unpack (ch:acc) (nh -# 1#)
-
-unpackCString2# addr len
-  -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
-  = unpackPS (packCBytes (I# len) (A# addr))
-
-unpackAppendCString# addr rest
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = rest
-      | otherwise	   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
-
-unpackFoldrCString# addr f z 
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = z
-      | otherwise	   = C# ch `f` unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
-
-
 cStringToPS	 :: Addr  -> PackedString
 cStringToPS (A# a#) =	-- the easy one; we just believe the caller
  CPS a# len
  where
   len = case (strlen# a#) of { I# x -> x }
-
-packBytesForC :: [Char] -> ByteArray Int
-packBytesForC str = psToByteArray (packString str)
-
-psToByteArrayST :: [Char] -> ST s (ByteArray Int)
-psToByteArrayST str =
-  packStringST str	>>= \ (PS bytes n has_null) -> 
-   --later? ASSERT(not has_null)
-  return (ByteArray (0, I# (n -# 1#)) bytes)
-
-packNBytesForCST :: Int -> [Char] -> ST s (ByteArray Int)
-packNBytesForCST len str =
-  packNCharsST len str	>>= \ (PS bytes n has_null) -> 
-  return (ByteArray (0, I# (n -# 1#)) bytes)
 
 packCBytes :: Int -> Addr -> PackedString
 packCBytes len addr = runST (packCBytesST len addr)
@@ -1051,7 +931,7 @@ packCBytesST len@(I# length#) (A# addr) =
    -- fill in packed string from "addr"
   fill_in ch_array 0#   >>
    -- freeze the puppy:
-  freeze_ps_array ch_array >>= \ (ByteArray _ frozen#) ->
+  freeze_ps_array ch_array length# >>= \ (ByteArray _ frozen#) ->
   let has_null = byteArrayHasNUL# frozen# length# in
   return (PS frozen# length# has_null)
   where
