@@ -12,7 +12,6 @@ import {-# SOURCE #-} RnHiFiles
 
 import HscTypes		( ModIface(..) )
 import HsSyn
-import RnHsSyn		( RenamedHsDecl )
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, mkRdrQual, qualifyRdrName, lookupRdrEnv, foldRdrEnv
@@ -352,41 +351,20 @@ lookupSysBinder rdr_name
 %*							*
 %*********************************************************
 
-@addImplicitFVs@ forces the renamer to slurp in some things which aren't
+@getXImplicitFVs@ forces the renamer to slurp in some things which aren't
 mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
-addImplicitFVs :: GlobalRdrEnv
-	       -> Maybe (ModuleName, [RenamedHsDecl]) 	-- Nothing when compling an expression
-	       -> FreeVars				-- Free in the source
-	       -> RnMG (FreeVars, SyntaxMap)		-- Augmented source free vars
-
-addImplicitFVs gbl_env maybe_mod source_fvs
-  = 	-- Find out what re-bindable names to use for desugaring
-     rnSyntaxNames gbl_env source_fvs		`thenRn` \ (source_fvs1, sugar_map) ->
-
-	-- Find implicit FVs thade
-    extra_implicits maybe_mod		`thenRn` \ extra_fvs ->
-    
-    let
-	implicit_fvs = ubiquitousNames `plusFV` extra_fvs
-	slurp_fvs    = implicit_fvs `plusFV` source_fvs1
-		-- It's important to do the "plus" this way round, so that
-		-- when compiling the prelude, locally-defined (), Bool, etc
-		-- override the implicit ones. 
-    in
-    returnRn (slurp_fvs, sugar_map)
-
-  where
-    extra_implicits Nothing		-- Compiling a statement
-      = returnRn (mkFVs [printName, bindIOName, returnIOName, failIOName])
+getImplicitStmtFVs 	-- Compiling a statement
+  = returnRn (mkFVs [printName, bindIOName, returnIOName, failIOName]
+	      `plusFV` ubiquitousNames)
 		-- These are all needed implicitly when compiling a statement
 		-- See TcModule.tc_stmts
 
-    extra_implicits (Just (mod_name, decls))	-- Compiling a module
-      = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
-	returnRn (deriving_names `plusFV` implicit_main)
-      where
+getImplicitModuleFVs mod_name decls	-- Compiling a module
+  = lookupOrigNames deriv_occs		`thenRn` \ deriving_names ->
+    returnRn (deriving_names `plusFV` implicit_main `plusFV` ubiquitousNames)
+  where
 	-- Add occurrences for IO or PrimIO
 	implicit_main |  mod_name == mAIN_Name
 		      || mod_name == pREL_MAIN_Name = unitFV ioTyConName

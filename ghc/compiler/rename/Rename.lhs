@@ -34,7 +34,7 @@ import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
-			  lookupSrcName, addImplicitFVs,
+			  lookupSrcName, getImplicitStmtFVs, getImplicitModuleFVs, rnSyntaxNames,
 			  newGlobalName, unQualInScope,, ubiquitousNames
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
@@ -45,7 +45,7 @@ import Name		( Name, nameIsLocalOrFrom, nameModule )
 import NameEnv
 import NameSet
 import RdrName		( foldRdrEnv, isQual )
-import PrelNames	( SyntaxMap, pRELUDE_Name )
+import PrelNames	( SyntaxMap, vanillaSyntaxMap, pRELUDE_Name )
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, 
 			  printErrorsAndWarnings, errorsFound )
 import Bag		( bagToList )
@@ -133,15 +133,16 @@ renameStmt dflags hit hst pcs scope_module this_module local_env stmt
         doDump [] stmt [] `thenRn_` returnRn (print_unqual, Nothing)
     else
 
-    let filtered_fvs = fvs `delListFromNameSet` rdrEnvElts local_env in
-
 	-- Add implicit free vars, and close decls
-    addImplicitFVs rdr_env Nothing filtered_fvs
-				`thenRn` \ (slurp_fvs, syntax_map) ->
-    slurpImpDecls slurp_fvs	`thenRn` \ decls ->
+    getImplicitStmtFVs 				`thenRn` \ implicit_fvs ->
+    let
+	filtered_fvs = fvs `delListFromNameSet` rdrEnvElts local_env 
+	source_fvs   = implicit_fvs `plusFV` filtered_fvs
+    in
+    slurpImpDecls source_fvs			`thenRn` \ decls ->
 
     doDump binders stmt decls  `thenRn_`
-    returnRn (print_unqual, Just (binders, (syntax_map, stmt, decls)))
+    returnRn (print_unqual, Just (binders, (vanillaSyntaxMap, stmt, decls)))
 
   where
      doc = text "context for compiling expression"
@@ -237,15 +238,30 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     else
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
-    addImplicitFVs gbl_env (Just (mod_name, rn_local_decls)) 
-		   source_fvs							`thenRn` \ (slurp_fvs, sugar_map) -> 
-    traceRn (text "Source FVs:" <+> fsep (map ppr (nameSetToList slurp_fvs)))	`thenRn_`
-    slurpImpDecls slurp_fvs		`thenRn` \ rn_imp_decls ->
+   	-- Find out what re-bindable names to use for desugaring
+    getImplicitModuleFVs mod_name rn_local_decls	`thenRn` \ implicit_fvs ->
+    rnSyntaxNames gbl_env source_fvs			`thenRn` \ (source_fvs1, sugar_map) ->
+    let
+	export_fvs  = availsToNameSet export_avails
+	source_fvs2 = source_fvs1 `plusFV` export_fvs
+		-- The export_fvs make the exported names look just as if they
+		-- occurred in the source program.  For the reasoning, see the
+		-- comments with RnIfaces.mkImportInfo
+		-- It also helps reportUnusedNames, which of course must not complain
+		-- that 'f' isn't mentioned if it is mentioned in the export list
 
+	source_fvs3 = implicit_fvs `plusFV` source_fvs2
+		-- It's important to do the "plus" this way round, so that
+		-- when compiling the prelude, locally-defined (), Bool, etc
+		-- override the implicit ones. 
+
+    in
+    traceRn (text "Source FVs:" <+> fsep (map ppr (nameSetToList source_fvs3)))	`thenRn_`
+    slurpImpDecls source_fvs3			`thenRn` \ rn_imp_decls ->
     rnDump rn_imp_decls rn_local_decls		`thenRn_` 
 
 	-- GENERATE THE VERSION/USAGE INFO
-    mkImportInfo mod_name imports 			`thenRn` \ my_usages ->
+    mkImportInfo mod_name imports 		`thenRn` \ my_usages ->
 
 	-- BUILD THE MODULE INTERFACE
     let
@@ -280,7 +296,9 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_iface print_unqualified 
 		      imports global_avail_env
-		      source_fvs export_avails rn_imp_decls 	`thenRn_`
+		      source_fvs2 rn_imp_decls		`thenRn_`
+		-- NB: source_fvs2: include exports (else we get bogus 
+		--     warnings of unused things) but not implicit FVs.
 
     returnRn (print_unqualified, Just (is_exported, mod_iface, (sugar_map, final_decls)))
   where
@@ -582,11 +600,10 @@ reportUnusedNames :: ModIface -> PrintUnqualified
 		  -> [RdrNameImportDecl] 
 		  -> AvailEnv
 		  -> NameSet 		-- Used in this module
-		  -> Avails		-- Exported by this module
 		  -> [RenamedHsDecl] 
 		  -> RnMG ()
 reportUnusedNames my_mod_iface unqual imports avail_env 
-		  source_fvs export_avails imported_decls
+		  used_names imported_decls
   = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imp_names				`thenRn_`
@@ -595,11 +612,6 @@ reportUnusedNames my_mod_iface unqual imports avail_env
     this_mod   = mi_module my_mod_iface
     gbl_env    = mi_globals my_mod_iface
     
-	-- The export_fvs make the exported names look just as if they
-	-- occurred in the source program.  
-    export_fvs = availsToNameSet export_avails
-    used_names = source_fvs `plusFV` export_fvs
-
     -- Now, a use of C implies a use of T,
     -- if C was brought into scope by T(..) or T(C)
     really_used_names = used_names `unionNameSets`

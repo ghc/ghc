@@ -68,17 +68,63 @@ import Util		( sortLt )
 %*							*
 %*********************************************************
 
-mkImportInof figures out what the ``usage information'' for this
+mkImportInfo figures out what the ``usage information'' for this
 moudule is; that is, what it must record in its interface file as the
 things it uses.  
 
 We produce a line for every module B below the module, A, currently being
 compiled:
 	import B <n> ;
-to record the fact that A does import B indireclty.  This is used to decide
+to record the fact that A does import B indirectly.  This is used to decide
 to look to look for B.hi rather than B.hi-boot when compiling a module that
 imports A.  This line says that A imports B, but uses nothing in it.
 So we'll get an early bale-out when compiling A if B's version changes.
+
+The usage information records:
+
+\begin{itemize}
+\item	(a) anything reachable from its body code
+\item	(b) any module exported with a @module Foo@
+\item   (c) anything reachable from an exported item
+\end{itemize}
+
+Why (b)?  Because if @Foo@ changes then this module's export list
+will change, so we must recompile this module at least as far as
+making a new interface file --- but in practice that means complete
+recompilation.
+
+Why (c)?  Consider this:
+\begin{verbatim}
+	module A( f, g ) where	|	module B( f ) where
+	  import B( f )		|	  f = h 3
+	  g = ...		|	  h = ...
+\end{verbatim}
+
+Here, @B.f@ isn't used in A.  Should we nevertheless record @B.f@ in
+@A@'s usages?  Our idea is that we aren't going to touch A.hi if it is
+*identical* to what it was before.  If anything about @B.f@ changes
+than anyone who imports @A@ should be recompiled in case they use
+@B.f@ (they'll get an early exit if they don't).  So, if anything
+about @B.f@ changes we'd better make sure that something in A.hi
+changes, and the convenient way to do that is to record the version
+number @B.f@ in A.hi in the usage list.  If B.f changes that'll force a
+complete recompiation of A, which is overkill but it's the only way to 
+write a new, slightly different, A.hi.
+
+But the example is tricker.  Even if @B.f@ doesn't change at all,
+@B.h@ may do so, and this change may not be reflected in @f@'s version
+number.  But with -O, a module that imports A must be recompiled if
+@B.h@ changes!  So A must record a dependency on @B.h@.  So we treat
+the occurrence of @B.f@ in the export list *just as if* it were in the
+code of A, and thereby haul in all the stuff reachable from it.
+
+	*** Conclusion: if A mentions B.f in its export list,
+	    behave just as if A mentioned B.f in its source code,
+	    and slurp in B.f and all its transitive closure ***
+
+[NB: If B was compiled with -O, but A isn't, we should really *still*
+haul in all the unfoldings for B, in case the module that imports A *is*
+compiled with -O.  I think this is the case.]
 
 \begin{code}
 mkImportInfo :: ModuleName			-- Name of this module
@@ -132,9 +178,14 @@ mkImportInfo this_mod imports
 
 	import_info0 = foldModuleEnv mk_imp_info  []	       pit
 	import_info1 = foldModuleEnv mk_imp_info  import_info0 hit
-	import_info  = [ (mod_name, orphans, is_boot, NothingAtAll) 
-		       | (mod_name, (orphans, is_boot)) <- fmToList (iImpModInfo ifaces) ] ++ 
-		       import_info1
+	import_info  = not_even_opened_imports ++ import_info1
+
+		-- Recall that iImpModInfo describes modules that have been mentioned
+		-- in the import lists of interfaces we have opened, but which we have
+		-- not even opened when compiling this module
+	not_even_opened_imports = [ (mod_name, orphans, is_boot, NothingAtAll) 
+				  | (mod_name, (orphans, is_boot)) <- fmToList (iImpModInfo ifaces) ]
+
 	
 	mk_imp_info :: ModIface -> [ImportVersion Name] -> [ImportVersion Name]
 	mk_imp_info iface so_far
@@ -149,6 +200,8 @@ mkImportInfo this_mod imports
 	  | import_all_mod				-- Case (a) and (b); the import-all part
 	  = if is_home_pkg_mod then
 		go_for_it (Specifically mod_vers (Just export_vers) [] rules_vers)
+		-- Since the module isn't in the mv_map, presumably we
+		-- didn't actually import anything at all from it
 	    else
 		go_for_it (Everything mod_vers)
 		
