@@ -37,7 +37,6 @@ import CONCURRENT	( myThreadId )
 
 # if __GLASGOW_HASKELL__ < 500
 import EXCEPTION        ( raiseInThread )
-#define throwTo  raiseInThread
 # else
 import EXCEPTION	( throwTo )
 # endif
