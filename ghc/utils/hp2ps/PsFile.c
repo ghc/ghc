@@ -59,22 +59,13 @@ static void Scaling   PROTO((floatish));		/* forward */
 static void
 Prologue()
 {
-    floatish epsfscale;
-
-    if (eflag) epsfscale = epsfwidth / (floatish) borderwidth;
-
     if (eflag) {
+	floatish epsfscale = epsfwidth / (floatish) borderwidth;
 	EPSFSpecialComments(epsfscale);
+	Scaling(epsfscale);
     } else {
 	StandardSpecialComments();
-    }
-
-    if (eflag) {
-	Scaling(epsfscale);
-    } else if (gflag) {
-	Portrait();
-    } else {
-	Landscape();
+	if (gflag) Portrait(); else Landscape();
     }
 }
 
