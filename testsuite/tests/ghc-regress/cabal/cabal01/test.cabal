@@ -6,10 +6,10 @@ C-Sources: hello.c, c_src/hello.c
 Extensions: ForeignFunctionInterface
 
 Executable: testA
-Executable-Modules: A, MainA
+Hidden-Modules: A, MainA
 Main-is: MainA.hs
 Extensions: OverlappingInstances
 
 Executable: testB
-Executable-Modules: B.A, B.MainB
+Hidden-Modules: B.A, B.MainB
 Main-is: B/MainB.hs
