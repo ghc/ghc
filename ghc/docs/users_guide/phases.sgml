@@ -146,7 +146,9 @@
 	    <para>(For reference: the comparable symbols for other
             systems are:
             <constant>&lowbar;&lowbar;HUGS&lowbar;&lowbar;</constant>
-            for Hugs and
+            for Hugs,
+            <constant>&lowbar;&lowbar;NHC&lowbar;&lowbar;</constant>
+            for nhc98, and
             <constant>&lowbar;&lowbar;HBC&lowbar;&lowbar;</constant>
             for Chalmers.)</para>
 
