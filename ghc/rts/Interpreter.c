@@ -1198,7 +1198,7 @@ run_BCO:
 	    marshall_fn ( (void*)(cap->r.rCurrentTSO->sp + ret_dyn_size) );
 #else
 	    // Threaded RTS:
-	    // We already made a malloced copy of the arguments above.
+	    // We already made a copy of the arguments above.
 
 	    marshall_fn ( arguments );
 #endif
