@@ -1,8 +1,0 @@
-
-==================== Typechecked ====================
-AbsBinds [a{-aSM-}] [_dBits{-aSL-}] []
-
-
-ghc: module version changed to 1; reason: no old .hi file
-__export Word Bits{bitLsh bitRsh};
-1 class Bits a where {bitLsh :: a -> PrelBase.Int -> a; bitRsh :: a -> PrelBase.Int -> a} ;
