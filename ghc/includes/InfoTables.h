@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.25 2002/01/29 16:50:08 simonmar Exp $
+ * $Id: InfoTables.h,v 1.26 2002/05/01 13:12:11 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -106,6 +106,10 @@ typedef struct {
 } StgDebugInfo;
 
 #endif /* DEBUG_CLOSURE */
+
+/* -----------------------------------------------------------------------------
+   Closure flags
+   -------------------------------------------------------------------------- */
 
 /* The type flags provide quick access to certain properties of a closure. */
 
