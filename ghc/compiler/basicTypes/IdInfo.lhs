@@ -112,20 +112,18 @@ noIdInfo = IdInfo {
 
 \begin{code}
 ppIdInfo :: IdInfo -> SDoc
-ppIdInfo (IdInfo {arityInfo, 
-		  demandInfo,
-		  specInfo,
-		  strictnessInfo, 
-		  unfoldingInfo,
-		  updateInfo, 
-		  cafInfo,
-		  inlinePragInfo})
+ppIdInfo (IdInfo {arityInfo      = a,
+		  demandInfo	 = d,
+		  strictnessInfo = s,
+		  updateInfo 	 = u,
+		  cafInfo	 = c
+		  }) 
   = hsep [
-	    ppArityInfo arityInfo,
-	    ppUpdateInfo updateInfo,
-	    ppStrictnessInfo strictnessInfo,
-	    ppr demandInfo,
-	    ppCafInfo cafInfo
+	    ppArityInfo a,
+	    ppUpdateInfo u,
+	    ppStrictnessInfo s,
+	    ppr d,
+	    ppCafInfo c
 	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
 	]
 \end{code}
