@@ -326,7 +326,6 @@ getVolatileRegs vars = do
 			in
 			case volatile_loc of
 				RegLoc reg   -> consider_reg reg
-				VirHpLoc _   -> consider_reg Hp
 				VirNodeLoc _ -> consider_reg node
 				non_reg_loc  -> returnFC Nothing
 
