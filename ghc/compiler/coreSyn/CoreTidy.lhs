@@ -19,8 +19,9 @@ module CoreTidy (
 import CoreSyn
 import CoreUtils	( exprArity )
 import PprCore		( pprIdRules )
-import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique, idType, idCoreRules )
-import IdInfo		( vanillaIdInfo, setArityInfo, 
+import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique,
+			  idType, idCoreRules )
+import IdInfo		( setArityInfo, noCafIdInfo,
 			  newStrictnessInfo, setAllStrictnessInfo,
 			  newDemandInfo, setNewDemandInfo )
 import Type		( tidyType, tidyTyVarBndr )
@@ -50,11 +51,11 @@ tidyBind :: TidyEnv
 	 ->  (TidyEnv, CoreBind)
 
 tidyBind env (NonRec bndr rhs)
-  = tidyLetBndr env (bndr,rhs)		=: \ (env', bndr') ->
+  = tidyLetBndr env (bndr,rhs) =: \ (env', bndr') ->
     (env', NonRec bndr' (tidyExpr env' rhs))
 
 tidyBind env (Rec prs)
-  = mapAccumL tidyLetBndr env prs	=: \ (env', bndrs') ->
+  = mapAccumL tidyLetBndr  env prs	=: \ (env', bndrs') ->
     map (tidyExpr env') (map snd prs)	=: \ rhss' ->
     (env', Rec (zip bndrs' rhss'))
 
@@ -135,8 +136,9 @@ tidyLetBndr env (id,rhs)
   where
     ((tidy_env,var_env), new_id) = tidyIdBndr env id
 
-	-- We need to keep around any interesting strictness and demand info
-	-- because later on we may need to use it when converting to A-normal form.
+	-- We need to keep around any interesting strictness and
+	-- demand info because later on we may need to use it when
+	-- converting to A-normal form.
 	-- eg.
 	--	f (g x),  where f is strict in its argument, will be converted
 	--	into  case (g x) of z -> f z  by CorePrep, but only if f still
@@ -146,9 +148,12 @@ tidyLetBndr env (id,rhs)
 	-- CorePrep to turn the let into a case.
 	--
 	-- Similarly arity info for eta expansion in CorePrep
+	--
+	-- CafInfo is NoCafRefs, because this is not a top-level Id.
+	--
     final_id = new_id `setIdInfo` new_info
     idinfo   = idInfo id
-    new_info = vanillaIdInfo 
+    new_info = noCafIdInfo -- NB. no CAF refs!
 		`setArityInfo`		exprArity rhs
 		`setAllStrictnessInfo`	newStrictnessInfo idinfo
 		`setNewDemandInfo`	newDemandInfo idinfo
@@ -168,11 +173,12 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- The SrcLoc isn't important now, 
 	-- though we could extract it from the Id
 	-- 
-	-- All nested Ids now have the same IdInfo, namely none,
+	-- All nested Ids now have the same IdInfo, namely noCafIdInfo,
 	-- which should save some space.
 	-- But note that tidyLetBndr puts some of it back.
         ty'          	  = tidyType env (idType id)
 	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc
+				`setIdInfo` noCafIdInfo
 	var_env'	  = extendVarEnv var_env id id'
     in
      ((tidy_env', var_env'), id')
@@ -182,5 +188,3 @@ tidyIdBndr env@(tidy_env, var_env) id
 \begin{code}
 m =: k = m `seq` k m
 \end{code}
-
-

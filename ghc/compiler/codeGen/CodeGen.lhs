@@ -40,7 +40,7 @@ import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
 import CmdLineOpts	( DynFlags, DynFlag(..),
 			  opt_SccProfilingOn, opt_EnsureSplittableC )
-import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..),
+import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..), TypeEnv,
 			  typeEnvTyCons )
 import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
@@ -48,6 +48,7 @@ import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalNa
 import OccName		( mkLocalOcc )
 import PrimRep		( PrimRep(..) )
 import TyCon            ( isDataTyCon )
+import Module		( Module )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
 import ErrUtils		( dumpIfSet_dyn, showPass )
@@ -62,13 +63,15 @@ import DATA_IOREF	( readIORef )
 
 \begin{code}
 codeGen :: DynFlags
-	-> ModGuts
+	-> Module
+	-> TypeEnv
+	-> ForeignStubs
+	-> [Module]		-- directly-imported modules
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
 	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
 	-> IO AbstractC		-- Output
 
-codeGen dflags 
-	mod_impl@(ModGuts { mg_module = mod_name, mg_types = type_env })
+codeGen dflags this_mod type_env foreign_stubs imported_mods 
 	cost_centre_info stg_binds
   = do	
 	showPass dflags "CodeGen"
@@ -78,11 +81,17 @@ codeGen dflags
 	let
 	    tycons	   = typeEnvTyCons type_env
 	    data_tycons    = filter isDataTyCon tycons
-	    cinfo          = MkCompInfo mod_name
+
+	mapM_ (\x -> seq x (return ())) data_tycons
+
+	let
+
+	    cinfo          = MkCompInfo this_mod
 
 	    datatype_stuff = genStaticConBits cinfo data_tycons
 	    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
-	    init_stuff     = mkModuleInit way cost_centre_info mod_impl
+	    init_stuff     = mkModuleInit way cost_centre_info this_mod
+				foreign_stubs imported_mods
 
 	    abstractC = mkAbstractCs [ maybeSplitCode,
 				       init_stuff, 
@@ -108,17 +117,16 @@ codeGen dflags
 mkModuleInit 
 	:: String		-- the "way"
 	-> CollectedCCs         -- cost centre info
-	-> ModGuts
+	-> Module
+	-> ForeignStubs
+	-> [Module]
 	-> AbstractC
-mkModuleInit way cost_centre_info
-	     (ModGuts { mg_module  = mod,
-			mg_foreign = for_stubs,
-			mg_dir_imps = imported_modules })
+mkModuleInit way cost_centre_info this_mod foreign_stubs imported_mods
   = let
 	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
 
 	register_foreign_exports 
-		= case for_stubs of
+		= case foreign_stubs of
 			NoStubs			    -> []
 			ForeignStubs _ _ _ fe_bndrs -> map mk_export_register fe_bndrs
 
@@ -134,12 +142,12 @@ mkModuleInit way cost_centre_info
 				   CLbl (mkModuleInitLabel mod way) AddrRep
 				]
 
-	register_mod_imports = map mk_import_register imported_modules
+	register_mod_imports = map mk_import_register imported_mods
     in
     mkAbstractCs [
 	cc_decls,
-        CModuleInitBlock (mkPlainModuleInitLabel mod)
-			 (mkModuleInitLabel mod way)
+        CModuleInitBlock (mkPlainModuleInitLabel this_mod)
+			 (mkModuleInitLabel this_mod way)
 		         (mkAbstractCs (register_foreign_exports ++
 				        cc_regs :
 				        register_mod_imports))

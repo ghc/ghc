@@ -66,11 +66,11 @@ import List             ( partition )
 
 \begin{code}
 core2core :: HscEnv
-	  -> PersistentCompilerState
+	  -> PackageRuleBase
 	  -> ModGuts
 	  -> IO ModGuts
 
-core2core hsc_env pcs 
+core2core hsc_env pkg_rule_base
 	  mod_impl@(ModGuts { mg_exports = exports, 
 			      mg_binds = binds_in, 
 			      mg_rules = rules_in })
@@ -79,7 +79,6 @@ core2core hsc_env pcs
 	    hpt		  = hsc_HPT hsc_env
 	    ghci_mode	  = hsc_mode hsc_env
 	    core_todos    = dopt_CoreToDo dflags
-	    pkg_rule_base = eps_rule_base (pcs_EPS pcs)	-- Rule-base accumulated from imported packages
 
 	us <-  mkSplitUniqSupply 's'
 	let (cp_us, ru_us) = splitUniqSupply us

@@ -32,7 +32,7 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  arityInfo, ppArityInfo, 
 			  specInfo, pprNewStrictness,
 			  workerInfo, ppWorkerInfo,
-			  newStrictnessInfo,
+			  newStrictnessInfo, cafInfo, ppCafInfo,
 #ifdef OLD_STRICTNESS
 			  cprInfo, ppCprInfo, 
 			  strictnessInfo, ppStrictnessInfo, 
@@ -321,6 +321,7 @@ ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo b info
   = hsep [  ppArityInfo a,
 	    ppWorkerInfo (workerInfo info),
+	    ppCafInfo (cafInfo info),
 #ifdef OLD_STRICTNESS
 	    ppStrictnessInfo s,
             ppCprInfo m,

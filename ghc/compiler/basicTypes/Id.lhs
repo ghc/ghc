@@ -48,7 +48,7 @@ module Id (
 	setIdNewStrictness, zapIdNewStrictness,
 	setIdWorkerInfo,
 	setIdSpecialisation,
-	setIdCgInfo,
+	setIdCafInfo,
 	setIdOccInfo,
 
 #ifdef OLD_STRICTNESS
@@ -66,7 +66,6 @@ module Id (
 	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation, idCoreRules,
-	idCgInfo,
 	idCafInfo,
 	idLBVarInfo,
 	idOccInfo,
@@ -398,20 +397,6 @@ setIdSpecialisation :: Id -> CoreRules -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 
 	---------------------------------
-	-- CG INFO
-idCgInfo :: Id -> CgInfo
-#ifdef OLD_STRICTNESS
-idCgInfo id = case cgInfo (idInfo id) of
-		  NoCgInfo -> pprPanic "idCgInfo" (ppr id)
-		  info     -> info
-#else
-idCgInfo id = cgInfo (idInfo id)
-#endif		
-
-setIdCgInfo :: Id -> CgInfo -> Id
-setIdCgInfo id cg_info = modifyIdInfo (`setCgInfo` cg_info) id
-
-	---------------------------------
 	-- CAF INFO
 idCafInfo :: Id -> CafInfo
 #ifdef OLD_STRICTNESS
@@ -419,8 +404,12 @@ idCafInfo id = case cgInfo (idInfo id) of
 		  NoCgInfo -> pprPanic "idCafInfo" (ppr id)
 		  info     -> cgCafInfo info
 #else
-idCafInfo id = cgCafInfo (idCgInfo id)
+idCafInfo id = cafInfo (idInfo id)
 #endif
+
+setIdCafInfo :: Id -> CafInfo -> Id
+setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
+
 	---------------------------------
 	-- CPR INFO
 #ifdef OLD_STRICTNESS

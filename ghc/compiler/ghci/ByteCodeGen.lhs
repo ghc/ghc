@@ -19,7 +19,8 @@ import Name		( Name, getName, mkSystemName )
 import Id
 import FiniteMap
 import ForeignCall	( ForeignCall(..), CCallTarget(..), CCallSpec(..) )
-import HscTypes		( ModGuts(..), ModGuts, typeEnvTyCons, typeEnvClasses )
+import HscTypes		( ModGuts(..), ModGuts, 
+			  TypeEnv, typeEnvTyCons, typeEnvClasses )
 import CoreUtils	( exprType )
 import CoreSyn
 import PprCore		( pprCoreExpr )
@@ -71,9 +72,10 @@ import Data.Bits
 -- Generating byte code for a complete module 
 
 byteCodeGen :: DynFlags
-            -> ModGuts
+            -> [CoreBind]
+	    -> TypeEnv
             -> IO CompiledByteCode
-byteCodeGen dflags (ModGuts { mg_binds = binds, mg_types = type_env })
+byteCodeGen dflags binds type_env
    = do showPass dflags "ByteCodeGen"
         let  local_tycons  = typeEnvTyCons  type_env
 	     local_classes = typeEnvClasses type_env

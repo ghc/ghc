@@ -28,6 +28,7 @@ import RdrHsSyn		( RdrNameStmt )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
+import SrcLoc		( noSrcLoc )
 import Name		( Name )
 import CoreLint		( lintUnfolding )
 #endif
@@ -35,19 +36,15 @@ import CoreLint		( lintUnfolding )
 import HsSyn
 
 import RdrName		( nameRdrName )
-import Id		( idName )
-import IdInfo		( CafInfo(..), CgInfoEnv, CgInfo(..) )
 import StringBuffer	( hGetStringBuffer, freeStringBuffer )
 import Parser
 import Lex		( ParseResult(..), ExtFlags(..), mkPState )
-import SrcLoc		( mkSrcLoc, noSrcLoc )
+import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( checkOldIface, tcRnModule, tcRnExtCore, tcRnIface )
 import RnEnv		( extendOrigNameCache )
-import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, knownKeyNames )
 import PrelRules	( builtinRules )
 import MkIface		( mkIface )
-import InstEnv		( emptyInstEnv )
 import Desugar
 import Flattening       ( flatten )
 import SimplCore
@@ -63,7 +60,7 @@ import CodeOutput	( codeOutput )
 import Module		( emptyModuleEnv )
 import CmdLineOpts
 import DriverPhases     ( isExtCore_file )
-import ErrUtils		( dumpIfSet_dyn, showPass, printError )
+import ErrUtils		( dumpIfSet_dyn, showPass )
 import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( consBag, emptyBag )
@@ -75,14 +72,11 @@ import ParserCore
 import ParserCoreUtils
 import FiniteMap	( emptyFM )
 import Name		( nameModule )
-import NameEnv		( emptyNameEnv, mkNameEnv )
+import NameEnv		( emptyNameEnv )
 import NameSet		( emptyNameSet )
 import Module		( Module, ModLocation(..), showModMsg )
 import FastString
 import Maybes		( expectJust )
-
-import DATA_IOREF	( newIORef, readIORef, writeIORef )
-import UNSAFE_IO	( unsafePerformIO )
 
 import Monad		( when )
 import Maybe		( isJust, fromJust )
@@ -204,84 +198,48 @@ hscRecomp hsc_env pcs_ch have_object
 	; flat_result <- _scc_ "Flattening"
  			 flatten hsc_env pcs_tc ds_result
 
-	; let pcs_middle = pcs_tc
 
-{-	Again, omit this because it loses the usage info
-	which is needed in mkIface.  Maybe we should compute
-	usage info earlier.
+	; let 	-- Rule-base accumulated from imported packages
+	     pkg_rule_base = eps_rule_base (pcs_EPS pcs_tc)
 
-	; pcs_middle
-	    <- _scc_ "pcs_middle"
-	        if one_shot then
-		       do init_pcs <- initPersistentCompilerState
-			  init_prs <- initPersistentRenamerState
-		          let 
-			      rules   = pcs_rules pcs_tc	
-			      orig_tc = prsOrig (pcs_PRS pcs_tc)
-			      new_prs = init_prs{ prsOrig=orig_tc }
+		-- In one-shot mode, ZAP the external package state at
+		-- this point, because we aren't going to need it from
+		-- now on.  We keep the name cache, however, because
+		-- tidyCore needs it.
+	     pcs_middle 
+		 | one_shot  = pcs_tc{ pcs_EPS = error "pcs_EPS missing" }
+		 | otherwise = pcs_tc
 
-			  orig_tc `seq` rules `seq` new_prs `seq`
-			    return init_pcs{ pcs_PRS = new_prs,
-			                     pcs_rules = rules }
-		else return pcs_tc
--}
-
--- Should we remove bits of flat_result at this point?
--- 	   ; flat_result <- case flat_result of
--- 			       ModResult { md_binds = binds } ->
--- 				   return ModDetails { md_binds = binds,
--- 						       md_rules = [],
--- 						       md_types = emptyTypeEnv,
--- 						       md_insts = [] }
+	; pkg_rule_base `seq` pcs_middle `seq` return ()
 
 	-- alive at this point:  
 	--	pcs_middle
 	--	flat_result
+	--      pkg_rule_base
 
  	    -------------------
  	    -- SIMPLIFY
  	    -------------------
 	; simpl_result <- _scc_     "Core2Core"
-			  core2core hsc_env pcs_middle flat_result
+			  core2core hsc_env pkg_rule_base flat_result
 
  	    -------------------
  	    -- TIDY
  	    -------------------
-	; cg_info_ref <- newIORef Nothing ;
-	; let cg_info :: CgInfoEnv
-	      cg_info = unsafePerformIO $ do {
-			   maybe_cg_env <- readIORef cg_info_ref ;
-			   case maybe_cg_env of
-			     Just env -> return env
-			     Nothing  -> do { printError "Urk! Looked at CgInfo too early!";
-					      return emptyNameEnv } }
-		-- cg_info_ref will be filled in just after restOfCodeGeneration
-		-- Meanwhile, tidyCorePgm is careful not to look at cg_info!
-
 	; (pcs_simpl, tidy_result) 
 	     <- _scc_ "CoreTidy"
-	        tidyCorePgm dflags pcs_middle cg_info simpl_result
+	        tidyCorePgm dflags pcs_middle simpl_result
 
---		Space-saving ploy doesn't work so well now
---		because mkIface needs the populated PIT to 
---		generate usage info.  Maybe we should re-visit this.
---	; pcs_final <- if one_shot then initPersistentCompilerState
---				   else return pcs_simpl
-	; let pcs_final = pcs_simpl
+	-- ZAP the persistent compiler state altogether now if we're
+	-- in one-shot mode, to save space.
+	; pcs_final <- if one_shot then return (error "pcs_final missing")
+				   else return pcs_simpl
+
+	; emitExternalCore dflags tidy_result
 
 	-- Alive at this point:  
 	--	tidy_result, pcs_final
-
- 	    -------------------
- 	    -- PREPARE FOR CODE GENERATION
-	    -- Do saturation and convert to A-normal form
-	; prepd_result <- _scc_ "CorePrep" 
-			   corePrepPgm dflags tidy_result
-
- 	    -------------------
- 	    -- CONVERT TO STG and COMPLETE CODE GENERATION
-	; (stub_h_exists, stub_c_exists, maybe_bcos)
-		<- hscBackEnd dflags cg_info_ref prepd_result
+	--      hsc_env
 
  	    -------------------
 	    -- BUILD THE NEW ModIface and ModDetails
@@ -289,13 +247,31 @@ hscRecomp hsc_env pcs_ch have_object
 	    -- This has to happen *after* code gen so that the back-end
 	    -- info has been set.  Not yet clear if it matters waiting
 	    -- until after code output
-	; final_iface <- _scc_ "MkFinalIface" 
+	; new_iface <- _scc_ "MkFinalIface" 
 			mkIface hsc_env location 
                          	maybe_checked_iface tidy_result
-	; let final_details = ModDetails { md_types = mg_types tidy_result,
+
+
+	    -- Space leak reduction: throw away the new interface if
+	    -- we're in one-shot mode; we won't be needing it any
+	    -- more.
+	; final_iface <-
+	     if one_shot then return (error "no final iface")
+			 else return new_iface
+
+	    -- Build the final ModDetails (except in one-shot mode, where
+	    -- we won't need this information after compilation).
+	; final_details <- 
+	     if one_shot then return (error "no final details")
+		 	 else return $! ModDetails { 
+					   md_types = mg_types tidy_result,
 					   md_insts = mg_insts tidy_result,
 					   md_rules = mg_rules tidy_result }
-	; emitExternalCore dflags tidy_result
+
+ 	    -------------------
+ 	    -- CONVERT TO STG and COMPLETE CODE GENERATION
+	; (stub_h_exists, stub_c_exists, maybe_bcos)
+		<- hscBackEnd dflags tidy_result
 
       	  -- and the answer is ...
 	; return (HscRecomp pcs_final
@@ -340,7 +316,7 @@ hscFrontEnd hsc_env pcs_ch location = do {
  	    -------------------
  	    -- RENAME and TYPECHECK
  	    -------------------
-	; (pcs_tc, maybe_tc_result) <- _scc_ "Typecheck and Rename" 
+	; (pcs_tc, maybe_tc_result) <- _scc_ "Typecheck-Rename" 
 				        tcRnModule hsc_env pcs_ch rdr_module
 	; case maybe_tc_result of {
       	     Nothing -> return (Left (HscFail pcs_ch));
@@ -355,24 +331,35 @@ hscFrontEnd hsc_env pcs_ch location = do {
 	}}}}}
 
 
-hscBackEnd dflags cg_info_ref prepd_result
-  = case dopt_HscLang dflags of
+hscBackEnd dflags 
+    ModGuts{  -- This is the last use of the ModGuts in a compilation.
+	      -- From now on, we just use the bits we need.
+        mg_module   = this_mod,
+	mg_binds    = core_binds,
+	mg_types    = type_env,
+	mg_dir_imps = dir_imps,
+	mg_foreign  = foreign_stubs,
+	mg_deps     = dependencies     }  = do {
+
+ 	    -------------------
+ 	    -- PREPARE FOR CODE GENERATION
+	    -- Do saturation and convert to A-normal form
+  prepd_binds <- _scc_ "CorePrep"
+		 corePrepPgm dflags core_binds type_env;
+
+  case dopt_HscLang dflags of
       HscNothing -> return (False, False, Nothing)
 
       HscInterpreted ->
 #ifdef GHCI
 	do  -----------------  Generate byte code ------------------
-	    comp_bc <- byteCodeGen dflags prepd_result
+	    comp_bc <- byteCodeGen dflags core_binds type_env
 	
-	    -- Fill in the code-gen info
-	    writeIORef cg_info_ref (Just emptyNameEnv)
-	    
 	    ------------------ Create f-x-dynamic C-side stuff ---
 	    (istub_h_exists, istub_c_exists) 
-	       <- outputForeignStubs dflags (mg_foreign prepd_result)
+	       <- outputForeignStubs dflags foreign_stubs
 	    
-	    return ( istub_h_exists, istub_c_exists, 
-	             Just comp_bc )
+	    return ( istub_h_exists, istub_c_exists, Just comp_bc )
 #else
 	panic "GHC not compiled with interpreter"
 #endif
@@ -380,23 +367,21 @@ hscBackEnd dflags cg_info_ref prepd_result
       other ->
 	do
 	    -----------------  Convert to STG ------------------
-	    (stg_binds, cost_centre_info, stg_back_end_info) 
-	    	      <- _scc_ "CoreToStg"
-	    		 myCoreToStg dflags prepd_result
-		    
-	    -- Fill in the code-gen info for the earlier tidyCorePgm
-	    writeIORef cg_info_ref (Just stg_back_end_info)
+	    (stg_binds, cost_centre_info) <- _scc_ "CoreToStg"
+	    		 myCoreToStg dflags this_mod prepd_binds	
 
             ------------------  Code generation ------------------
 	    abstractC <- _scc_ "CodeGen"
-		         codeGen dflags prepd_result
-			         cost_centre_info stg_binds
-			  
+		         codeGen dflags this_mod type_env foreign_stubs
+				 dir_imps cost_centre_info stg_binds
+
 	    ------------------  Code output -----------------------
 	    (stub_h_exists, stub_c_exists)
-		     <- codeOutput dflags prepd_result abstractC
-			      
+		     <- codeOutput dflags this_mod foreign_stubs 
+				dependencies abstractC
+
 	    return (stub_h_exists, stub_c_exists, Nothing)
+   }
 
 
 myParseModule dflags src_filename
@@ -429,30 +414,15 @@ myParseModule dflags src_filename
       }}
 
 
-myCoreToStg dflags (ModGuts {mg_module = this_mod, mg_binds = tidy_binds})
+myCoreToStg dflags this_mod prepd_binds
  = do 
-      () <- coreBindsSize tidy_binds `seq` return ()
-      -- TEMP: the above call zaps some space usage allocated by the
-      -- simplifier, which for reasons I don't understand, persists
-      -- thoroughout code generation -- JRS
-      --
-      -- This is still necessary. -- SDM (10 Dec 2001)
-
       stg_binds <- _scc_ "Core2Stg" 
-	     coreToStg dflags tidy_binds
+	     coreToStg dflags prepd_binds
 
       (stg_binds2, cost_centre_info) <- _scc_ "Core2Stg" 
 	     stg2stg dflags this_mod stg_binds
 
-      let env_rhs :: CgInfoEnv
-	  env_rhs = mkNameEnv [ caf_info `seq` (idName bndr, CgInfo caf_info)
-			      | (bind,_) <- stg_binds2, 
-			        let caf_info 
-				     | stgBindHasCafRefs bind = MayHaveCafRefs
-				     | otherwise	      = NoCafRefs,
-			        bndr <- stgBinders bind ]
-
-      return (stg_binds2, cost_centre_info, env_rhs)
+      return (stg_binds2, cost_centre_info)
 \end{code}
 
 
@@ -700,17 +670,10 @@ initNameCache :: IO NameCache
 
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState
-  = EPS { 
-      eps_decls      = (emptyNameEnv, 0),
-      eps_insts      = (emptyBag, 0),
-      eps_inst_gates = emptyNameSet,
-      eps_rules      = foldr add_rule (emptyBag, 0) builtinRules,
-
-      eps_PIT       = emptyPackageIfaceTable,
-      eps_PTE       = wiredInThingEnv,
-      eps_inst_env  = emptyInstEnv,
-      eps_rule_base = emptyRuleBase }
-	      
+  = emptyExternalPackageState { 
+      eps_rules  = foldr add_rule (emptyBag, 0) builtinRules,
+      eps_PTE    = wiredInThingEnv,
+    }
   where
     add_rule (name,rule) (rules, n_slurped)
 	 = (gated_decl `consBag` rules, n_slurped)

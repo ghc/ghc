@@ -29,12 +29,10 @@ import CostCentre	( noCCS )
 import VarSet
 import VarEnv
 import Maybes		( maybeToBool )
-import Name		( getOccName, isExternalName, isDllName )
-import OccName		( occNameUserString )
+import Name		( getOccName, isExternalName, nameOccName )
+import OccName		( occNameUserString, occNameFS )
 import BasicTypes       ( Arity )
 import CmdLineOpts	( DynFlags, opt_RuntimeTypes )
-import FastTypes	hiding ( fastOr )
-import Util             ( listLengthCmp, mapAndUnzip )
 import Outputable
 
 infixr 9 `thenLne`
@@ -104,8 +102,7 @@ A top-level Id has CafInfo, which is
 	  one or more CAFs, or
 	- NoCafRefs if it definitely doesn't
 
-we collect the CafInfo first by analysing the original Core expression, and
-also place this information in the environment.
+The CafInfo has already been calculated during the CoreTidy pass.
 
 During CoreToStg, we then pin onto each binding and case expression, a
 list of Ids which represents the "live" CAFs at that point.  The meaning
@@ -174,21 +171,20 @@ coreTopBindToStg
 
 coreTopBindToStg env body_fvs (NonRec id rhs)
   = let 
-	(caf_info, upd) = hasCafRefs env rhs
 	env' 	  = extendVarEnv env id how_bound
-	how_bound = LetBound (TopLet caf_info) (manifestArity rhs)
+	how_bound = LetBound TopLet (manifestArity rhs)
 
         (stg_rhs, fvs', lv_info) = 
 	    initLne env (
-              coreToTopStgRhs body_fvs ((id,rhs), upd)	`thenLne` \ (stg_rhs, fvs') ->
-	      freeVarsToLiveVars fvs'			`thenLne` \ lv_info ->
+              coreToTopStgRhs body_fvs (id,rhs)	`thenLne` \ (stg_rhs, fvs') ->
+	      freeVarsToLiveVars fvs'		`thenLne` \ lv_info ->
 	      returnLne (stg_rhs, fvs', lv_info)
            )
 	
 	bind = StgNonRec (mkSRT lv_info) id stg_rhs
     in
     ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id)
-    ASSERT2(consistent caf_info bind, ppr id)
+    ASSERT2(consistentCafInfo id bind, ppr id)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
@@ -196,26 +192,14 @@ coreTopBindToStg env body_fvs (Rec pairs)
   = let 
 	(binders, rhss) = unzip pairs
 
-	-- To calculate caf_info, we initially map 
-	-- all the binders to NoCafRefs
-	extra_env = [ (b, LetBound (TopLet NoCafRefs) (manifestArity rhs)) 
-		    | (b,rhs) <- pairs ]
-	env1      = extendVarEnvList env extra_env
-	(caf_infos, upd_flags) = mapAndUnzip (hasCafRefs env1) rhss
-		-- NB: use env1 not env'
-	
-	-- If any has a CAF ref, they all do
-	caf_info | any mayHaveCafRefs caf_infos = MayHaveCafRefs
-		 | otherwise			= NoCafRefs
-
-	extra_env' = [ (b, LetBound (TopLet caf_info) arity)
-		     | (b, LetBound _                 arity) <- extra_env ]
+	extra_env' = [ (b, LetBound TopLet (manifestArity rhs))
+		     | (b, rhs) <- pairs ]
 	env' = extendVarEnvList env extra_env'
 
         (stg_rhss, fvs', lv_info)
 	  = initLne env' (
-	       mapAndUnzipLne (coreToTopStgRhs body_fvs) 
-			       (pairs `zip` upd_flags)	`thenLne` \ (stg_rhss, fvss') ->
+	       mapAndUnzipLne (coreToTopStgRhs body_fvs) pairs
+						`thenLne` \ (stg_rhss, fvss') ->
 	       let fvs' = unionFVInfos fvss' in
 	       freeVarsToLiveVars fvs'			`thenLne` \ lv_info ->
 	       returnLne (stg_rhss, fvs', lv_info)
@@ -224,28 +208,42 @@ coreTopBindToStg env body_fvs (Rec pairs)
 	bind = StgRec (mkSRT lv_info) (zip binders stg_rhss)
     in
     ASSERT2(and [manifestArity rhs == stgRhsArity stg_rhs | (rhs,stg_rhs) <- rhss `zip` stg_rhss], ppr binders)
-    ASSERT2(consistent caf_info bind, ppr binders)
+    ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
 --    WARN(not (consistent caf_info bind), ppr binders <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
--- assertion helper
-consistent caf_info bind = mayHaveCafRefs caf_info == stgBindHasCafRefs bind
+#ifdef DEBUG
+-- Assertion helper: this checks that the CafInfo on the Id matches
+-- what CoreToStg has figured out about the binding's SRT.  The
+-- CafInfo will be exact in all cases except when CorePrep has
+-- floated out a binding, in which case it will be approximate.
+consistentCafInfo id bind
+  | occNameFS (nameOccName (idName id)) == FSLIT("sat")
+  = id_marked_caffy || not binding_is_caffy
+  | otherwise
+  = id_marked_caffy == binding_is_caffy
+  where
+	id_marked_caffy  = mayHaveCafRefs (idCafInfo id)
+	binding_is_caffy = stgBindHasCafRefs bind
+#endif
 \end{code}
 
 \begin{code}
 coreToTopStgRhs
 	:: FreeVarsInfo		-- Free var info for the scope of the binding
-	-> ((Id,CoreExpr), UpdateFlag)
+	-> (Id,CoreExpr)
 	-> LneM (StgRhs, FreeVarsInfo)
 
-coreToTopStgRhs scope_fv_info ((bndr, rhs), upd)
+coreToTopStgRhs scope_fv_info (bndr, rhs)
   = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, _) ->
     returnLne (mkTopStgRhs upd rhs_fvs bndr_info new_rhs, rhs_fvs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
 
-mkTopStgRhs :: UpdateFlag -> FreeVarsInfo -> StgBinderInfo
-	    -> StgExpr -> StgRhs
+    upd  | rhsIsNonUpd rhs = SingleEntry
+	 | otherwise       = Updatable
+
+mkTopStgRhs :: UpdateFlag -> FreeVarsInfo -> StgBinderInfo -> StgExpr -> StgRhs
 
 mkTopStgRhs upd rhs_fvs binder_info (StgLam _ bndrs body)
   = StgRhsClosure noCCS binder_info
@@ -253,14 +251,14 @@ mkTopStgRhs upd rhs_fvs binder_info (StgLam _ bndrs body)
 		  ReEntrant
 		  bndrs body
 	
-mkTopStgRhs ReEntrant rhs_fvs binder_info (StgConApp con args)
-	-- StgConApps can be Updatable: see isCrossDllConApp below
+mkTopStgRhs upd rhs_fvs binder_info (StgConApp con args)
+  | not (isUpdatable upd) -- StgConApps can be updatable (see isCrossDllConApp)
   = StgRhsCon noCCS con args
 
-mkTopStgRhs upd_flag rhs_fvs binder_info rhs
+mkTopStgRhs upd rhs_fvs binder_info rhs
   = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
-	          upd_flag
+	          upd
 	          [] rhs
 \end{code}
 
@@ -766,12 +764,10 @@ We do it here, because the arity information is accurate, and we need
 to do it before the SRT pass to save the SRT entries associated with
 any top-level PAPs.
 
-\begin{code}
 isPAP env (StgApp f args) = listLengthCmp args arity == LT -- idArity f > length args
 			  where
 			    arity = stgArity f (lookupBinding env f)
 isPAP env _ 	          = False
-\end{code}
 
 
 %************************************************************************
@@ -806,18 +802,19 @@ data HowBound
 
   | LambdaBound		-- Used for both lambda and case
 
-data LetInfo = NestedLet LiveInfo	-- For nested things, what is live if this thing is live?
-					-- Invariant: the binder itself is always a member of
-					--	      the dynamic set of its own LiveInfo
-
-	     | TopLet CafInfo		-- For top level things, is it a CAF, or can it refer to one?
+data LetInfo
+  = TopLet		-- top level things
+  | NestedLet LiveInfo	-- For nested things, what is live if this
+			-- thing is live?  Invariant: the binder
+			-- itself is always a member of
+			-- the dynamic set of its own LiveInfo
 
 isLetBound (LetBound _ _) = True
 isLetBound other 	  = False
 
-topLevelBound ImportBound	      = True
-topLevelBound (LetBound (TopLet _) _) = True
-topLevelBound other		      = False
+topLevelBound ImportBound	  = True
+topLevelBound (LetBound TopLet _) = True
+topLevelBound other		  = False
 \end{code}
 
 For a let(rec)-bound variable, x, we record LiveInfo, the set of
@@ -946,9 +943,9 @@ freeVarsToLiveVars fvs env live_in_cont
       = case how_bound of
 	  ImportBound 		          -> unitLiveCaf v	-- Only CAF imports are 
 								-- recorded in fvs
-	  LetBound (TopLet caf_info) _ 
-		| mayHaveCafRefs caf_info -> unitLiveCaf v
-		| otherwise		  -> emptyLiveInfo
+	  LetBound TopLet _ 		 
+		| mayHaveCafRefs (idCafInfo v) -> unitLiveCaf v
+		| otherwise		       -> emptyLiveInfo
 
 	  LetBound (NestedLet lvs) _      -> lvs	-- lvs already contains v
 							-- (see the invariant on NestedLet)
@@ -1060,7 +1057,7 @@ check_eq_how_bound (LetBound li1 ar1) (LetBound li2 ar2) = ar1 == ar2 && check_e
 check_eq_how_bound hb1		      hb2		 = False
 
 check_eq_li (NestedLet _) (NestedLet _) = True
-check_eq_li (TopLet _)    (TopLet _)    = True
+check_eq_li TopLet        TopLet        = True
 check_eq_li li1 	  li2		= False
 #endif
 \end{code}
@@ -1097,127 +1094,9 @@ myCollectArgs expr
     go _		as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Figuring out CafInfo for an expression}
-%*									*
-%************************************************************************
-
-hasCafRefs decides whether a top-level closure can point into the dynamic heap.
-We mark such things as `MayHaveCafRefs' because this information is
-used to decide whether a particular closure needs to be referenced
-in an SRT or not.
-
-There are two reasons for setting MayHaveCafRefs:
-	a) The RHS is a CAF: a top-level updatable thunk.
-	b) The RHS refers to something that MayHaveCafRefs
-
-Possible improvement: In an effort to keep the number of CAFs (and 
-hence the size of the SRTs) down, we could also look at the expression and 
-decide whether it requires a small bounded amount of heap, so we can ignore 
-it as a CAF.  In these cases however, we would need to use an additional
-CAF list to keep track of non-collectable CAFs.  
-
 \begin{code}
-hasCafRefs  :: IdEnv HowBound -> CoreExpr -> (CafInfo, UpdateFlag)
-hasCafRefs p expr 
-  | is_caf || mentions_cafs = (MayHaveCafRefs, upd_flag)
-  | otherwise 		    = (NoCafRefs,      ReEntrant)
-  where
-    mentions_cafs = isFastTrue (cafRefs p expr)
-    is_caf = not (rhsIsNonUpd p expr)
-    upd_flag | is_caf    = Updatable
-	     | otherwise = ReEntrant
-
--- The environment that cafRefs uses has top-level bindings *only*.
--- We don't bother to add local bindings as cafRefs traverses the expression
--- because they will all be for LocalIds (all nested things are LocalIds)
--- However, we must look in the env first, because some top level things
--- might be local Ids
-
-cafRefs p (Var id)
-  = case lookupVarEnv p id of
-	Just (LetBound (TopLet caf_info) _) -> fastBool (mayHaveCafRefs caf_info)
-        Nothing | isGlobalId id		    -> fastBool (mayHaveCafRefs (idCafInfo id)) -- Imported
-		| otherwise		    -> fastBool False				-- Nested binder
-	_other				    -> error ("cafRefs " ++ showSDoc (ppr id))  -- No nested things in env
-
-cafRefs p (Lit l) 	     = fastBool False
-cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
-cafRefs p (Lam x e) 	     = cafRefs p e
-cafRefs p (Let b e) 	     = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
-cafRefs p (Case e bndr alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
-cafRefs p (Note n e) 	     = cafRefs p e
-cafRefs p (Type t) 	     = fastBool False
-
-cafRefss p [] 	  = fastBool False
-cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es
-
--- hack for lazy-or over FastBool.
-fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
-
-
-rhsIsNonUpd :: IdEnv HowBound -> CoreExpr -> Bool
-  -- True => Value-lambda, constructor, PAP
-  -- This is a bit like CoreUtils.exprIsValue, with the following differences:
-  -- 	a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
-  --
-  --    b) (C x xs), where C is a contructors is updatable if the application is
-  --	   dynamic: see isDynConApp
-  -- 
-  --    c) don't look through unfolding of f in (f x).  I'm suspicious of this one
-
--- This function has to line up with what the update flag
--- for the StgRhs gets set to in mkStgRhs (above)
---
--- When opt_RuntimeTypes is on, we keep type lambdas and treat
--- them as making the RHS re-entrant (non-updatable).
-rhsIsNonUpd p (Lam b e)          = isRuntimeVar b || rhsIsNonUpd p e
-rhsIsNonUpd p (Note (SCC _) e)   = False
-rhsIsNonUpd p (Note _ e)         = rhsIsNonUpd p e
-rhsIsNonUpd p other_expr
-  = go other_expr 0 []
-  where
-    go (Var f) n_args args = idAppIsNonUpd p f n_args args
-	
-    go (App f a) n_args args
-	| isTypeArg a = go f n_args args
-	| otherwise   = go f (n_args + 1) (a:args)
-
-    go (Note (SCC _) f) n_args args = False
-    go (Note _ f) n_args args       = go f n_args args
-
-    go other n_args args = False
-
-idAppIsNonUpd :: IdEnv HowBound -> Id -> Int -> [CoreExpr] -> Bool
-idAppIsNonUpd p id n_val_args args
-  | Just con <- isDataConWorkId_maybe id = not (isCrossDllConApp con args)
-  | otherwise = False 	-- SDM: disbled.  See comment with isPAP above.
-			-- n_val_args < stgArity id (lookupBinding p id)
-
 stgArity :: Id -> HowBound -> Arity
 stgArity f (LetBound _ arity) = arity
 stgArity f ImportBound	      = idArity f
 stgArity f LambdaBound        = 0
-
-isCrossDllConApp :: DataCon -> [CoreExpr] -> Bool
-isCrossDllConApp con args = isDllName (dataConName con) || any isCrossDllArg args
--- Top-level constructor applications can usually be allocated 
--- statically, but they can't if 
--- 	a) the constructor, or any of the arguments, come from another DLL
---	b) any of the arguments are LitLits
--- (because we can't refer to static labels in other DLLs).
--- If this happens we simply make the RHS into an updatable thunk, 
--- and 'exectute' it rather than allocating it statically.
--- All this should match the decision in (see CoreToStg.mkStgRhs)
-
-
-isCrossDllArg :: CoreExpr -> Bool
--- True if somewhere in the expression there's a cross-DLL reference
-isCrossDllArg (Type _)    = False
-isCrossDllArg (Var v)     = isDllName (idName v)
-isCrossDllArg (Note _ e)  = isCrossDllArg e
-isCrossDllArg (Lit lit)   = isLitLitLit lit
-isCrossDllArg (App e1 e2) = isCrossDllArg e1 || isCrossDllArg e2	-- must be a type app
-isCrossDllArg (Lam v e)   = isCrossDllArg e	-- must be a type lam
 \end{code}

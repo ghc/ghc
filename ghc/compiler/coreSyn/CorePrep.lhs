@@ -26,7 +26,7 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  isLocalId, hasNoBinding, idNewStrictness, 
 		  idUnfolding, isDataConWorkId_maybe
 		)
-import HscTypes ( ModGuts(..), ModGuts, typeEnvElts )
+import HscTypes   ( ModGuts(..), ModGuts, TypeEnv, typeEnvElts )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
@@ -97,23 +97,23 @@ any trivial or useless bindings.
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-corePrepPgm :: DynFlags -> ModGuts -> IO ModGuts
-corePrepPgm dflags mod_impl
+corePrepPgm :: DynFlags -> [CoreBind] -> TypeEnv -> IO [CoreBind]
+corePrepPgm dflags binds types
   = do	showPass dflags "CorePrep"
 	us <- mkSplitUniqSupply 's'
 
-	let implicit_binds = mkImplicitBinds (mg_types mod_impl)
+	let implicit_binds = mkImplicitBinds types
 		-- NB: we must feed mkImplicitBinds through corePrep too
 		-- so that they are suitably cloned and eta-expanded
 
 	    binds_out = initUs_ us (
-			  corePrepTopBinds (mg_binds mod_impl)	`thenUs` \ floats1 ->
+			  corePrepTopBinds binds	`thenUs` \ floats1 ->
 			  corePrepTopBinds implicit_binds	`thenUs` \ floats2 ->
 			  returnUs (deFloatTop (floats1 `appOL` floats2))
 			)
 	    
         endPass dflags "CorePrep" Opt_D_dump_prep binds_out
-	return (mod_impl { mg_binds = binds_out })
+	return binds_out
 
 corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
 corePrepExpr dflags expr
@@ -232,6 +232,19 @@ corePrepTopBinds binds
 --	a = g y
 --	x* = f a
 -- And then x will actually end up case-bound
+--
+-- What happens to the CafInfo on the floated bindings?  By
+-- default, all the CafInfos will be set to MayHaveCafRefs,
+-- which is safe.
+--
+-- This might be pessimistic, because eg. s1 & s2
+-- might not refer to any CAFs and the GC will end up doing
+-- more traversal than is necessary, but it's still better
+-- than not floating the bindings at all, because then
+-- the GC would have to traverse the structure in the heap
+-- instead.  Given this, we decided not to try to get
+-- the CafInfo on the floated bindings correct, because
+-- it looks difficult.
 
 --------------------------------
 corePrepTopBind :: CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)

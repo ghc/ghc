@@ -144,14 +144,14 @@ tcGroup edge_map scc
 
 	-- Tie the knot
     traceTc (text "starting" <+> ppr final_kinds)		`thenM_`
-    fixM ( \ ~(rec_details_list, _, rec_all_tyclss) ->
+    fixM ( \ ~(rec_details_list, _, _) ->
 		-- Step 4 
  	let
 	    kind_env    = mkNameEnv final_kinds
 	    rec_details = mkNameEnv rec_details_list
 
 		-- Calculate variances, and feed into buildTyConOrClass
-            rec_vrcs = calcTyConArgVrcs [tc | ATyCon tc <- rec_all_tyclss]
+            rec_vrcs = calcTyConArgVrcs [tc | ATyCon tc <- tyclss]
 
 	    build_one = buildTyConOrClass is_rec_tycon kind_env
 					  rec_vrcs rec_details

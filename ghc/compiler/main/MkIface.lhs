@@ -38,8 +38,9 @@ import HscTypes		( VersionInfo(..), ModIface(..),
 			)
 
 import CmdLineOpts
-import Id		( idType, idInfo, isImplicitId, idCgInfo )
-import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks, dataConWrapId )
+import Id		( idType, idInfo, isImplicitId, idCafInfo )
+import DataCon		( dataConName, dataConSig, dataConFieldLabels,
+			  dataConStrictMarks, dataConWrapId )
 import IdInfo		-- Lots
 import CoreSyn		( CoreRule(..), IdCoreRule )
 import CoreFVs		( ruleLhsFreeNames )
@@ -339,9 +340,8 @@ ifaceTyThing (AnId id) = iface_sig
 
     id_type = idType id
     id_info = idInfo id
-    cg_info = idCgInfo id
     arity_info = arityInfo id_info
-    caf_info   = cgCafInfo cg_info
+    caf_info   = idCafInfo id
 
     hs_idinfo | opt_OmitInterfacePragmas
 	      = []

@@ -11,7 +11,7 @@ module TcRnTypes(
 	-- Non-standard operations
 	runTcRn, fixM, tryM, ioToTcRn,
 	newMutVar, readMutVar, writeMutVar,
-	getEnv, setEnv, updEnv, unsafeInterleaveM, 
+	getEnv, setEnv, updEnv, unsafeInterleaveM, zapEnv,
 		
 	-- The environment types
 	Env(..), TopEnv(..), TcGblEnv(..), 
@@ -46,13 +46,14 @@ module TcRnTypes(
 
 import HsSyn		( PendingSplice, HsOverLit, MonoBinds, RuleDecl, ForeignDecl )
 import RnHsSyn		( RenamedHsExpr, RenamedPat, RenamedArithSeqInfo )
-import HscTypes		( GhciMode, ExternalPackageState, HomePackageTable, NameCache,
-			  GlobalRdrEnv, LocalRdrEnv, FixityEnv, TypeEnv, TyThing, 
-			  Avails, GenAvailInfo(..), AvailInfo, availName,
-			  IsBootInterface, Deprecations )
+import HscTypes		( GhciMode, ExternalPackageState, HomePackageTable, 
+			  NameCache, GlobalRdrEnv, LocalRdrEnv, FixityEnv,
+			  TypeEnv, TyThing, Avails, GenAvailInfo(..), AvailInfo,
+			   availName, IsBootInterface, Deprecations,
+			   ExternalPackageState(..), emptyExternalPackageState )
 import Packages		( PackageName )
-import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, TcPredType, TcKind,
-			  tcCmpPred, tcCmpType, tcCmpTypes )
+import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, 
+			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes )
 import InstEnv		( DFunId, InstEnv )
 import Name		( Name )
 import NameEnv
@@ -74,10 +75,10 @@ import Outputable
 import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
 import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
-import EXCEPTION	( Exception )
+import EXCEPTION	( Exception(..), tryJust )
+import IO		( isUserError )
 import Maybe		( mapMaybe )
 import ListSetOps	( unionLists )
-import Panic		( tryMost )
 \end{code}
 
 
@@ -157,7 +158,15 @@ Error recovery
 \begin{code}
 tryM :: TcRn m r -> TcRn m (Either Exception r)
 -- Reflect exception into TcRn monad
-tryM (TcRn thing) = TcRn (\ env -> tryMost (thing env))
+tryM (TcRn thing) = TcRn (\ env -> tryJust tc_errors (thing env))
+  where 
+#if __GLASGOW_HASKELL__ > 504
+	tc_errors e@(IOException ioe) | isUserError ioe = Just e
+#else
+	tc_errors e@(IOException _) | isUserError e = Just e
+#endif
+	tc_errors _other = Nothing
+	-- type checker failures show up as UserErrors only
 \end{code}
 
 Lazy interleave 
@@ -201,6 +210,47 @@ updEnv :: (Env m -> Env n) -> TcRn n a -> TcRn m a
 updEnv upd (TcRn m) = TcRn (\ env -> m (upd env))
 \end{code}
 
+\begin{code}
+zapEnv :: TcRn m a -> TcRn m a
+zapEnv act = TcRn $ \env@Env{ env_top=top, env_gbl=gbl, env_lcl=lcl } ->
+  case top of {
+   TopEnv{ 
+     top_mode    = mode,
+     top_dflags  = dflags,
+     top_hpt     = hpt,
+     top_eps     = eps,
+     top_us      = us
+    } -> do
+
+  eps_snap <- readIORef eps
+  ref <- newIORef $! emptyExternalPackageState{ eps_PTE = eps_PTE eps_snap }
+
+  let
+     top' = TopEnv {
+		top_mode   = mode,
+		top_dflags = dflags,
+		top_hpt    = hpt,
+		top_eps    = ref,
+		top_us	   = us
+	    }
+
+     type_env = tcg_type_env gbl
+     mod = tcg_mod gbl
+     gbl' = TcGblEnv {
+		tcg_mod = mod,
+		tcg_type_env = type_env
+	    }
+
+     env' = Env {
+		env_top = top',
+		env_gbl = gbl',
+		env_lcl = lcl
+		-- leave the rest empty
+	     }
+
+  case act of { TcRn f -> f env' }
+ }
+\end{code}
 
 %************************************************************************
 %*									*

@@ -34,7 +34,8 @@ import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
 import Pretty		( Mode(..), printDoc )
-import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
+import Module		( Module )
+
 import Monad		( when )
 import IO
 \end{code}
@@ -48,17 +49,13 @@ import IO
 
 \begin{code}
 codeOutput :: DynFlags
-	   -> ModGuts
+	   -> Module
+	   -> ForeignStubs
+	   -> Dependencies
 	   -> AbstractC			-- Compiled abstract C
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
 
-codeOutput dflags 
-	   (ModGuts {mg_module = mod_name,
-		     mg_types  = type_env,
-		     mg_foreign = foreign_stubs,
-		     mg_deps	= deps,
-		     mg_binds   = core_binds})
-	   flat_abstractC
+codeOutput dflags this_mod foreign_stubs deps flat_abstractC
   = 
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on

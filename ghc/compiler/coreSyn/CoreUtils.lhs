@@ -32,7 +32,13 @@ module CoreUtils (
 	hashExpr,
 
 	-- Equality
-	cheapEqExpr, eqExpr, applyTypeToArgs, applyTypeToArg
+	cheapEqExpr, eqExpr, applyTypeToArgs, applyTypeToArg,
+
+	-- CAF info
+	hasCafRefs, rhsIsNonUpd,
+
+	-- Cross-DLL references
+	isCrossDllConApp,
     ) where
 
 #include "HsVersions.h"
@@ -44,18 +50,22 @@ import CoreSyn
 import PprCore		( pprCoreExpr )
 import Var		( Var, isId, isTyVar )
 import VarEnv
-import Name		( hashName )
-import Literal		( hashLiteral, literalType, litIsDupable, litIsTrivial, isZeroLit )
-import DataCon		( DataCon, dataConRepArity, dataConArgTys, isExistentialDataCon, dataConTyCon )
+import Name		( hashName, isDllName )
+import Literal		( hashLiteral, literalType, litIsDupable, 
+			  litIsTrivial, isZeroLit, isLitLitLit )
+import DataCon		( DataCon, dataConRepArity, dataConArgTys,
+			  isExistentialDataCon, dataConTyCon, dataConName )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
-			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
-			  isDataConWorkId_maybe, mkSysLocal, isDataConWorkId, isBottomingId
+			  mkWildId, idArity, idName, idUnfolding, idInfo,
+			  isOneShotLambda, isDataConWorkId_maybe, mkSysLocal,
+			  isDataConWorkId, isBottomingId, idCafInfo
 			)
-import IdInfo		( GlobalIdDetails(..),
-			  megaSeqIdInfo )
+import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo,
+			  CafInfo(..), mayHaveCafRefs )
 import NewDemand	( appIsBottom )
-import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, splitFunTy,
+import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
+			  splitFunTy,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, 
 			  splitTyConApp_maybe, eqType, funResultTy, applyTy,
@@ -70,6 +80,7 @@ import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
 import Util             ( equalLength, lengthAtLeast )
 import TysPrim		( statePrimTyCon )
+import FastTypes	hiding ( fastOr )
 \end{code}
 
 
@@ -1127,4 +1138,143 @@ fast_hash_expr other	        = 1
 
 hashId :: Id -> Int
 hashId id = hashName (idName id)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Cross-DLL references}
+%*									*
+%************************************************************************
+
+Top-level constructor applications can usually be allocated 
+statically, but they can't if 
+   a) the constructor, or any of the arguments, come from another DLL
+   b) any of the arguments are LitLits
+(because we can't refer to static labels in other DLLs).
+
+If this happens we simply make the RHS into an updatable thunk, 
+and 'exectute' it rather than allocating it statically.
+
+We also catch lit-lit arguments here, because those cannot be used in
+static constructors either.  (litlits are deprecated, so I'm not going
+to bother cleaning up this infelicity --SDM).
+
+\begin{code}
+isCrossDllConApp :: DataCon -> [CoreExpr] -> Bool
+isCrossDllConApp con args =
+  isDllName (dataConName con) || any isCrossDllArg args
+
+isCrossDllArg :: CoreExpr -> Bool
+-- True if somewhere in the expression there's a cross-DLL reference
+isCrossDllArg (Type _)    = False
+isCrossDllArg (Var v)     = isDllName (idName v)
+isCrossDllArg (Note _ e)  = isCrossDllArg e
+isCrossDllArg (Lit lit)   = isLitLitLit lit
+isCrossDllArg (App e1 e2) = isCrossDllArg e1 || isCrossDllArg e2
+				-- must be a type app
+isCrossDllArg (Lam v e)   = isCrossDllArg e
+				-- must be a type lam
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Figuring out CafInfo for an expression}
+%*									*
+%************************************************************************
+
+hasCafRefs decides whether a top-level closure can point into the dynamic heap.
+We mark such things as `MayHaveCafRefs' because this information is
+used to decide whether a particular closure needs to be referenced
+in an SRT or not.
+
+There are two reasons for setting MayHaveCafRefs:
+	a) The RHS is a CAF: a top-level updatable thunk.
+	b) The RHS refers to something that MayHaveCafRefs
+
+Possible improvement: In an effort to keep the number of CAFs (and 
+hence the size of the SRTs) down, we could also look at the expression and 
+decide whether it requires a small bounded amount of heap, so we can ignore 
+it as a CAF.  In these cases however, we would need to use an additional
+CAF list to keep track of non-collectable CAFs.  
+
+\begin{code}
+hasCafRefs  :: (Var -> Bool) -> Arity -> CoreExpr -> CafInfo
+hasCafRefs p arity expr 
+  | is_caf || mentions_cafs = MayHaveCafRefs
+  | otherwise 		    = NoCafRefs
+ where
+  mentions_cafs = isFastTrue (cafRefs p expr)
+  is_caf = not (arity > 0 || rhsIsNonUpd expr)
+  -- NB. we pass in the arity of the expression, which is expected
+  -- to be calculated by exprArity.  This is because exprArity
+  -- knows how much eta expansion is going to be done by 
+  -- CorePrep later on, and we don't want to duplicate that
+  -- knowledge in rhsIsNonUpd below.
+
+cafRefs p (Var id)
+  | isId id && p id = fastBool (mayHaveCafRefs (idCafInfo id))
+  | otherwise       = fastBool False
+
+cafRefs p (Lit l) 	     = fastBool False
+cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
+cafRefs p (Lam x e) 	     = cafRefs p e
+cafRefs p (Let b e) 	     = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
+cafRefs p (Case e bndr alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
+cafRefs p (Note n e) 	     = cafRefs p e
+cafRefs p (Type t) 	     = fastBool False
+
+cafRefss p [] 	  = fastBool False
+cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es
+
+-- hack for lazy-or over FastBool.
+fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
+
+
+rhsIsNonUpd :: CoreExpr -> Bool
+-- True => Value-lambda, saturated constructor
+-- This is a bit like CoreUtils.exprIsValue, with the following differences:
+--    a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
+--
+--    b) (C x xs), where C is a contructors is updatable if the application is
+--	   dynamic
+-- 
+--    c) don't look through unfolding of f in (f x).
+--
+-- When opt_RuntimeTypes is on, we keep type lambdas and treat
+-- them as making the RHS re-entrant (non-updatable).
+--
+rhsIsNonUpd (Lam b e)          = isRuntimeVar b || rhsIsNonUpd e
+rhsIsNonUpd (Note (SCC _) e)   = False
+rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
+rhsIsNonUpd other_expr
+  = go other_expr 0 []
+  where
+    go (Var f) n_args args = idAppIsNonUpd f n_args args
+	
+    go (App f a) n_args args
+	| isTypeArg a = go f n_args args
+	| otherwise   = go f (n_args + 1) (a:args)
+
+    go (Note (SCC _) f) n_args args = False
+    go (Note _ f) n_args args       = go f n_args args
+
+    go other n_args args = False
+
+idAppIsNonUpd :: Id -> Int -> [CoreExpr] -> Bool
+idAppIsNonUpd id n_val_args args
+  -- saturated constructors are not updatable
+  | Just con <- isDataConWorkId_maybe id,
+    n_val_args == dataConRepArity con,
+    not (isCrossDllConApp con args),
+    all exprIsAtom args
+    = True
+   -- NB. args sometimes not atomic.  eg.
+   --   x = D# (1.0## /## 2.0##)
+   -- can't float because /## can fail.
+
+  | otherwise = False
+    -- Historical note: we used to make partial applications
+    -- non-updatable, so they behaved just like PAPs, but this
+    -- doesn't work too well with eval/apply so it is disabled
+    -- now.
 \end{code}

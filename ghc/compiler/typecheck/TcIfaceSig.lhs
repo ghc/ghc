@@ -28,7 +28,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkVanillaGlobal, mkLocalId )
+import Id		( Id, mkVanillaGlobal, mkLocalId, idInfo )
 import MkId		( mkFCallId )
 import IdInfo
 import TyCon		( tyConDataCons, tyConTyVars )
@@ -55,7 +55,10 @@ signatures.
 tcInterfaceSigs :: [RenamedTyClDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM TcGblEnv
 		
-tcInterfaceSigs decls = fixM (tc_interface_sigs decls)
+tcInterfaceSigs decls = 
+  zapEnv (fixM (tc_interface_sigs decls)) `thenM` \ (_,sig_ids) ->
+  tcExtendGlobalValEnv sig_ids getGblEnv  `thenM` \ gbl_env ->
+  returnM gbl_env
 	-- We tie a knot so that the Ids read out of interfaces are in scope
 	--   when we read their pragmas.
 	-- What we rely on is that pragmas are typechecked lazily; if
@@ -86,10 +89,10 @@ tcInterfaceSigs decls = fixM (tc_interface_sigs decls)
 	-- bound in this module (and hence not yet processed).
 	-- The discarding happens when forkM finds a type error.
 
-tc_interface_sigs decls unf_env 
+tc_interface_sigs decls ~(unf_env, _)
   = sequenceM [do_one d | d@(IfaceSig {}) <- decls]	`thenM` \ sig_ids ->
-    tcExtendGlobalValEnv sig_ids getGblEnv
-	-- Return the extended environment
+    tcExtendGlobalValEnv sig_ids getGblEnv		`thenM` \ gbl_env ->
+    returnM (gbl_env, sig_ids)
   where
     in_scope_vars = typeEnvIds (tcg_type_env unf_env)
 	-- When we have hi-boot files, an unfolding might refer to
@@ -116,7 +119,7 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
   where
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
-    init_info = hasCafIdInfo
+    init_info = vanillaIdInfo
 
     tcPrag info HsNoCafRefs         = returnM (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)     = returnM (info `setArityInfo` arity)

@@ -15,22 +15,22 @@ import CoreFVs		( ruleLhsFreeIds, ruleRhsFreeVars, exprSomeFreeVars )
 import CoreTidy		( tidyExpr, tidyVarOcc, tidyIdRules )
 import PprCore 		( pprIdRules )
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprArity )
+import CoreUtils	( exprArity, hasCafRefs )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, idCoreRules, 
 			  isExportedId, mkVanillaGlobal, isLocalId, 
-			  isImplicitId 
+			  isImplicitId, idArity, setIdInfo
 			) 
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( isNeverActive )
-import Name		( getOccName, nameOccName, mkInternalName, 
+import Name		( getOccName, nameOccName, mkInternalName,
 		  	  localiseName, isExternalName, nameSrcLoc
 			)
 import RnEnv		( lookupOrigNameCache, newExternalName )
-import NameEnv		( filterNameEnv )
+import NameEnv		( lookupNameEnv, filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType )
 import Module		( Module )
@@ -48,7 +48,6 @@ import Util		( mapAccumL )
 import Maybe		( isJust )
 import Outputable
 \end{code}
-
 
 
 %************************************************************************
@@ -120,12 +119,10 @@ RHSs, so that they print nicely in interfaces.
 \begin{code}
 tidyCorePgm :: DynFlags
 	    -> PersistentCompilerState
-	    -> CgInfoEnv		-- Information from the back end,
-					-- to be splatted into the IdInfo
 	    -> ModGuts
 	    -> IO (PersistentCompilerState, ModGuts)
 
-tidyCorePgm dflags pcs cg_info_env
+tidyCorePgm dflags pcs
 	    mod_impl@(ModGuts { mg_module = mod, 
 				mg_types = env_tc, mg_insts = insts_tc, 
 				mg_binds = binds_in, mg_rules = orphans_in })
@@ -160,25 +157,30 @@ tidyCorePgm dflags pcs cg_info_env
 		-- The type environment is a convenient source of such things.
 
 	; let ((orig_ns', occ_env, subst_env), tidy_binds) 
-	       		= mapAccumL (tidyTopBind mod ext_ids cg_info_env) 
+	       		= mapAccumL (tidyTopBind mod ext_ids) 
 				    init_tidy_env binds_in
 
 	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
 
 	; let pcs' = pcs { pcs_nc = orig_ns' }
 
-	; let final_ids  = [ id 
-			   | bind <- tidy_binds
-			   , id <- bindersOf bind
-			   , isExternalName (idName id)]
+	; let tidy_type_env = mkFinalTypeEnv env_tc tidy_binds
 
 		-- Dfuns are local Ids that might have
-		-- changed their unique during tidying
-	; let lookup_dfun_id id = lookupVarEnv subst_env id `orElse` 
-				  pprPanic "lookup_dfun_id" (ppr id)
+		-- changed their unique during tidying.  Remember
+		-- to lookup the id in the TypeEnv too, because
+		-- those Ids have had their IdInfo stripped if
+		-- necessary.
+	; let lookup_dfun_id id = 
+		 case lookupVarEnv subst_env id of
+		   Nothing -> dfun_panic
+		   Just id -> 
+		      case lookupNameEnv tidy_type_env (idName id) of
+			Just (AnId id) -> id
+			_other -> dfun_panic
+	      	where 
+		   dfun_panic = pprPanic "lookup_dfun_id" (ppr id)
 
-
-	; let tidy_type_env = mkFinalTypeEnv env_tc final_ids
 	      tidy_dfun_ids = map lookup_dfun_id insts_tc
 
 	; let tidy_result = mod_impl { mg_types = tidy_type_env,
@@ -206,28 +208,53 @@ tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
 %************************************************************************
 
 \begin{code}
-mkFinalTypeEnv :: TypeEnv	-- From typechecker
-	       -> [Id]		-- Final Ids
+mkFinalTypeEnv :: TypeEnv 	-- From typechecker
+	       -> [CoreBind]	-- Final Ids
 	       -> TypeEnv
 
-mkFinalTypeEnv type_env final_ids
-  = extendTypeEnvList (filterNameEnv keep_it type_env)
-		      (map AnId final_ids)
+-- The competed type environment is gotten from
+-- 	a) keeping the types and classes
+--	b) removing all Ids, 
+--	c) adding Ids with correct IdInfo, including unfoldings,
+--		gotten from the bindings
+-- From (c) we keep only those Ids with Global names;
+--	    the CoreTidy pass makes sure these are all and only
+--	    the externally-accessible ones
+-- This truncates the type environment to include only the 
+-- exported Ids and things needed from them, which saves space
+--
+-- However, we do keep things like constructors, which should not appear 
+-- in interface files, because they are needed by importing modules when
+-- using the compilation manager
+
+mkFinalTypeEnv type_env tidy_binds
+  = extendTypeEnvList (filterNameEnv keep_it type_env) final_ids
   where
-	-- The competed type environment is gotten from
-	-- 	a) keeping the types and classes
-	--	b) removing all Ids, 
-	--	c) adding Ids with correct IdInfo, including unfoldings,
-	--		gotten from the bindings
-	-- From (c) we keep only those Ids with Global names;
-	--	    the CoreTidy pass makes sure these are all and only
-	--	    the externally-accessible ones
-	-- This truncates the type environment to include only the 
-	-- exported Ids and things needed from them, which saves space
+    final_ids  = [ AnId (strip_id_info id)
+		 | bind <- tidy_binds,
+		   id <- bindersOf bind,
+		   isExternalName (idName id)]
+
+    strip_id_info id
+	  | opt_OmitInterfacePragmas = id `setIdInfo` vanillaIdInfo
+	  | otherwise		     = id
+	-- If the interface file has no pragma info then discard all
+	-- info right here.
 	--
-	-- However, we do keep things like constructors, which should not appear 
-	-- in interface files, because they are needed by importing modules when
-	-- using the compilation manager
+	-- This is not so important for *this* module, but it's
+	-- vital for ghc --make:
+	--   subsequent compilations must not see (e.g.) the arity if
+	--   the interface file does not contain arity
+	-- If they do, they'll exploit the arity; then the arity might
+	-- change, but the iface file doesn't change => recompilation
+	-- does not happen => disaster
+	--
+	-- This IdInfo will live long-term in the Id => vanillaIdInfo makes
+	-- a conservative assumption about Caf-hood
+	-- 
+	-- We're not worried about occurrences of these Ids in unfoldings,
+	-- because in OmitInterfacePragmas mode we're stripping all the
+	-- unfoldings anyway.
 
 	-- We keep implicit Ids, because they won't appear 
 	-- in the bindings from which final_ids are derived!
@@ -388,20 +415,20 @@ type TopTidyEnv = (NameCache, TidyOccEnv, VarEnv Var)
 tidyTopBind :: Module
 	    -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
-	    -> CgInfoEnv
 	    -> TopTidyEnv -> CoreBind
 	    -> (TopTidyEnv, CoreBind)
 
-tidyTopBind mod ext_ids cg_info_env top_tidy_env (NonRec bndr rhs)
+tidyTopBind mod ext_ids top_tidy_env (NonRec bndr rhs)
   = ((orig,occ,subst) , NonRec bndr' rhs')
   where
     ((orig,occ,subst), bndr')
-	 = tidyTopBinder mod ext_ids cg_info_env 
+	 = tidyTopBinder mod ext_ids caf_info
 			 rec_tidy_env rhs rhs' top_tidy_env bndr
     rec_tidy_env = (occ,subst)
     rhs' = tidyExpr rec_tidy_env rhs
+    caf_info = hasCafRefs (const True) (idArity bndr') rhs'
 
-tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
+tidyTopBind mod ext_ids top_tidy_env (Rec prs)
   = (final_env, Rec prs')
   where
     (final_env@(_,occ,subst), prs') = mapAccumL do_one top_tidy_env prs
@@ -411,12 +438,20 @@ tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
 	= ((orig,occ,subst), (bndr',rhs'))
 	where
 	((orig,occ,subst), bndr')
-	   = tidyTopBinder mod ext_ids cg_info_env
+	   = tidyTopBinder mod ext_ids caf_info
 		rec_tidy_env rhs rhs' top_tidy_env bndr
 
         rhs' = tidyExpr rec_tidy_env rhs
 
-tidyTopBinder :: Module -> IdEnv Bool -> CgInfoEnv
+	-- the CafInfo for a recursive group says whether *any* rhs in
+	-- the group may refer indirectly to a CAF (because then, they all do).
+    pred v = v `notElem` map fst prs'
+    caf_info 
+	| or [ mayHaveCafRefs (hasCafRefs pred (idArity bndr) rhs)
+	     | (bndr,rhs) <- prs' ] = MayHaveCafRefs
+	| otherwise = NoCafRefs
+
+tidyTopBinder :: Module -> IdEnv Bool -> CafInfo
 	      -> TidyEnv 	-- The TidyEnv is used to tidy the IdInfo
 	      -> CoreExpr	-- RHS *before* tidying
 	      -> CoreExpr	-- RHS *after* tidying
@@ -425,7 +460,7 @@ tidyTopBinder :: Module -> IdEnv Bool -> CgInfoEnv
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
   -- NB: tidyTopBinder doesn't affect the unique supply
 
-tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs tidy_rhs
+tidyTopBinder mod ext_ids caf_info rec_tidy_env rhs tidy_rhs
 	      env@(ns2, occ_env2, subst_env2) id
 	-- This function is the heart of Step 2
 	-- The rec_tidy_env is the one to use for the IdInfo
@@ -443,7 +478,7 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs tidy_rhs
     ty'	   = tidyTopType (idType id)
     idinfo = tidyTopIdInfo rec_tidy_env is_external 
 			   (idInfo id) unfold_info arity
-			   (lookupCgInfo cg_info_env name')
+			   caf_info
 
     id' = mkVanillaGlobal name' ty' idinfo
 
@@ -468,7 +503,6 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs tidy_rhs
     arity = exprArity rhs
 
 
-
 -- tidyTopIdInfo creates the final IdInfo for top-level
 -- binders.  There are two delicate pieces:
 --
@@ -476,44 +510,24 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs tidy_rhs
 --	Indeed, CorePrep must eta expand where necessary to make
 --	the manifest arity equal to the claimed arity.
 --
--- * CAF info, which comes from the CoreToStg pass via a knot.
--- 	The CAF info will not be looked at by the downstream stuff:
--- 	it *generates* it, and knot-ties it back.  It will only be
--- 	looked at by (a) MkIface when generating an interface file
--- 		     (b) In GHCi, importing modules
--- 	Nevertheless, we add the info here so that it propagates to all
+--  * CAF info.  This must also remain valid through to code generation.
+-- 	We add the info here so that it propagates to all
 -- 	occurrences of the binders in RHSs, and hence to occurrences in
 -- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
---     
--- 	An alterative would be to do a second pass over the unfoldings 
--- 	of Ids, and rules, right at the top, but that would be a pain.
+--	CoreToStg makes use of this when constructing SRTs.
 
-tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
-  | opt_OmitInterfacePragmas	-- If the interface file has no pragma info
-  = hasCafIdInfo		-- then discard all info right here
-	-- This is not so important for *this* module, but it's
-	-- vital for ghc --make:
-	--   subsequent compilations must not see (e.g.) the arity if
-	--   the interface file does not contain arity
-	-- If they do, they'll exploit the arity; then the arity might
-	-- change, but the iface file doesn't change => recompilation
-	-- does not happen => disaster
-	--
-	-- This IdInfo will live long-term in the Id => need to make
-	-- conservative assumption about Caf-hood
-
+tidyTopIdInfo tidy_env is_external idinfo unfold_info arity caf_info
   | not is_external	-- For internal Ids (not externally visible)
   = vanillaIdInfo	-- we only need enough info for code generation
 			-- Arity and strictness info are enough;
 			--	c.f. CoreTidy.tidyLetBndr
-	-- Use vanillaIdInfo (whose CafInfo is a panic) because we 
-	-- should not need the CafInfo
+	`setCafInfo` 	       caf_info
 	`setArityInfo`	       arity
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
 
   | otherwise		-- Externally-visible Ids get the whole lot
   = vanillaIdInfo
-	`setCgInfo` 	       cg_info
+	`setCafInfo` 	       caf_info
 	`setArityInfo`	       arity
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
 	`setInlinePragInfo`    inlinePragInfo idinfo
@@ -521,6 +535,7 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
 	`setWorkerInfo`	       tidyWorker tidy_env (workerInfo idinfo)
 		-- NB: we throw away the Rules
 		-- They have already been extracted by findExternalRules
+
 
 -- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name

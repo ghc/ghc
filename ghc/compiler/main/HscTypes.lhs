@@ -14,7 +14,7 @@ module HscTypes (
 
 	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
 
-	ExternalPackageState(..), 
+	ExternalPackageState(..),  emptyExternalPackageState,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
 	lookupIface, lookupIfaceByModName, moduleNameToModule,
 	emptyModIface,
@@ -96,9 +96,11 @@ import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( IdCoreRule )
 import PrelNames	( isBuiltInSyntaxName )
+import InstEnv		( emptyInstEnv )
+import Rules		( emptyRuleBase )
 
 import FiniteMap
-import Bag		( Bag )
+import Bag		( Bag, emptyBag )
 import Maybes		( orElse )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
@@ -677,7 +679,8 @@ compiler.
 data PersistentCompilerState 
    = PCS {
 	pcs_nc  :: !NameCache,
-        pcs_EPS :: !ExternalPackageState
+        pcs_EPS :: ExternalPackageState
+		-- non-strict because we fill it with error in HscMain
      }
 \end{code}
 
@@ -729,6 +732,17 @@ data ExternalPackageState
 		-- for the home package we have all the instance
 		-- declarations anyhow
   }
+
+emptyExternalPackageState = EPS { 
+      eps_decls      = (emptyNameEnv, 0),
+      eps_insts      = (emptyBag, 0),
+      eps_inst_gates = emptyNameSet,
+      eps_rules      = (emptyBag, 0),
+      eps_PIT        = emptyPackageIfaceTable,
+      eps_PTE        = emptyTypeEnv,
+      eps_inst_env   = emptyInstEnv,
+      eps_rule_base  = emptyRuleBase
+   }
 \end{code}
 
 The NameCache makes sure that there is just one Unique assigned for

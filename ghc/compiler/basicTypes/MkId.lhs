@@ -72,10 +72,9 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, mkLocalId,
 			  mkTemplateLocals, mkTemplateLocalsNum, setIdLocalExported,
 			  mkTemplateLocal, idNewStrictness, idName
 			)
-import IdInfo		( IdInfo, noCafIdInfo, hasCafIdInfo,
-			  setUnfoldingInfo, 
+import IdInfo		( IdInfo, noCafIdInfo,  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo, setCafInfo,
-			  setAllStrictnessInfo,
+			  setAllStrictnessInfo, vanillaIdInfo,
 			  GlobalIdDetails(..), CafInfo(..)
 			)
 import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
@@ -970,7 +969,7 @@ pcMiscPrelId name ty info
 pc_bottoming_Id name ty
  = pcMiscPrelId name ty bottoming_info
  where
-    bottoming_info = hasCafIdInfo `setAllStrictnessInfo` Just strict_sig
+    bottoming_info = vanillaIdInfo `setAllStrictnessInfo` Just strict_sig
 	-- Do *not* mark them as NoCafRefs, because they can indeed have
 	-- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
 	-- which has some CAFs
