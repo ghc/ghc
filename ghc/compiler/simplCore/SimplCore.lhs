@@ -305,6 +305,8 @@ tidyAlt env (con, vs, rhs)   = (con, vs', tidyExpr env' rhs)
 			       (env', vs') = mapAccumL tidyNestedBndr env vs
 
 tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)
+
+tidyNote env note            = note
 \end{code}
 
 \begin{code}
