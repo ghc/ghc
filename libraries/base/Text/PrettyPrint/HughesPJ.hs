@@ -257,9 +257,9 @@ doubleQuotes :: Doc -> Doc;	-- ^ Wrap document in @\"...\"@
 -- Combining @Doc@ values
 
 (<>)   :: Doc -> Doc -> Doc;     -- ^Beside
-hcat   :: [Doc] -> Doc;          -- ^List version of '\<>'
+hcat   :: [Doc] -> Doc;          -- ^List version of '<>'
 (<+>)  :: Doc -> Doc -> Doc;     -- ^Beside, separated by space
-hsep   :: [Doc] -> Doc;          -- ^List version of '\<+>'
+hsep   :: [Doc] -> Doc;          -- ^List version of '<+>'
 
 ($$)   :: Doc -> Doc -> Doc;     -- ^Above; if there is no
                                 -- overlap it \"dovetails\" the two
