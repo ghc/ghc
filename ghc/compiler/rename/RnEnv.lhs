@@ -8,6 +8,9 @@ module RnEnv where		-- Export everything
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} RnHiFiles
+
+import HscTypes		( ModIface(..) )
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
@@ -27,7 +30,9 @@ import Name		( Name,
 import Name		( extendNameEnv_C, plusNameEnv_C, nameEnvElts )
 import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
-import Module		( ModuleName, moduleName, mkVanillaModule, mkSysModuleNameFS, moduleNameFS )
+import Module		( ModuleName, moduleName, mkVanillaModule, 
+			  mkSysModuleNameFS, moduleNameFS,
+			  WhereFrom(..) )
 import FiniteMap
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -238,9 +243,23 @@ lookupGlobalOccRn rdr_name
 	 | otherwise -> 
 		case lookupRdrEnv global_env rdr_name of
 		       Just _  -> lookupSrcName global_env rdr_name
-		       Nothing -> newGlobalName (rdrNameModule rdr_name)
-						(rdrNameOcc rdr_name)
+		       Nothing -> lookupQualifiedName rdr_name
 
+-- a qualified name on the command line can refer to any module at all: we
+-- try to load the interface if we don't already have it.
+lookupQualifiedName :: RdrName -> RnM d Name
+lookupQualifiedName rdr_name
+ = let 
+       mod = rdrNameModule rdr_name
+       occ = rdrNameOcc rdr_name
+   in
+   loadInterface (ppr rdr_name) mod ImportBySystem `thenRn` \ iface ->
+   case  [ name | (_,avails) <- mi_exports iface,
+    	   avail	     <- avails,
+    	   name 	     <- availNames avail,
+    	   nameOccName name == occ ] of
+      (n:ns) -> ASSERT (null ns) returnRn n
+      _      -> failWithRn (mkUnboundName rdr_name) (unknownNameErr rdr_name)
 
 lookupSrcName :: GlobalRdrEnv -> RdrName -> RnM d Name
 -- NB: passed GlobalEnv explicitly, not necessarily in RnMS monad
