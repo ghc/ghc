@@ -93,10 +93,11 @@ compileFile mode dflags src = do
    ghc_link <- readIORef v_GhcLink	-- Set by -c or -no-link
 	-- When linking, the -o argument refers to the linker's output.	
 	-- otherwise, we use it as the name for the pipeline's output.
-   let maybe_o_file | isLinkMode mode && not (isNoLink ghc_link) 
-		    = Nothing	-- -o foo applies to linker
-		    | otherwise
-	     	    = o_file	-- -o foo applies to the file we are compiling now
+   let maybe_o_file
+	 | isLinkMode mode && not (isNoLink ghc_link) = Nothing
+		-- -o foo applies to linker
+	 | otherwise = o_file
+		-- -o foo applies to the file we are compiling now
 
        stop_phase = case mode of 
 			StopBefore As | split -> SplitAs
@@ -104,8 +105,8 @@ compileFile mode dflags src = do
 			other		      -> StopLn
 
    mode_flag_string <- readIORef v_GhcModeFlag
-   (_, out_file) <- runPipeline stop_phase mode_flag_string dflags True maybe_o_file
-				src Nothing{-no ModLocation-}
+   (_, out_file) <- runPipeline stop_phase mode_flag_string dflags
+			 True maybe_o_file src Nothing{-no ModLocation-}
    return out_file
 
 

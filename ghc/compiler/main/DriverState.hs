@@ -78,9 +78,11 @@ isInterpretiveMode _             = False
 isMakeMode DoMake = True
 isMakeMode _      = False
 
-isLinkMode (StopBefore p) = True
-isLinkMode DoMake	  = True
-isLinkMode _   		  = False
+-- True if we are going to attempt to link in this mode.
+-- (we might not actually link, depending on the GhcLink flag)
+isLinkMode (StopBefore StopLn) = True
+isLinkMode DoMake	       = True
+isLinkMode _   		       = False
 
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
