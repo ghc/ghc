@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.92 2003/06/23 10:35:17 simonpj Exp $
+-- $Id: DriverState.hs,v 1.93 2003/06/24 12:56:44 stolz Exp $
 --
 -- Settings for the driver
 --
@@ -780,7 +780,9 @@ way_details =
     (WaySMP, Way  "s" "SMP"
 	[ "-fsmp"
 	, "-optc-pthread"
+#ifndef freebsd_TARGET_OS
 	, "-optl-pthread"
+#endif
 	, "-optc-DSMP"
 	, "-fvia-C" ]),
 

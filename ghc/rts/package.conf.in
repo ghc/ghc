@@ -43,7 +43,7 @@ Package {
                               ,"mingwex"
 # endif
 #endif
-#if defined(THREADED_RTS) && !defined(mingw32_TARGET_OS)
+#if defined(THREADED_RTS) && !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS)
 			      ,"pthread"
 # ifdef osf3_TARGET_OS
 			      ,"exc"
@@ -64,7 +64,11 @@ Package {
         c_includes     = [ "Stg.h" ],
         package_deps   = [],
         extra_ghc_opts = [],
+#if defined(THREADED_RTS) && defined(freebsd_TARGET_OS)
+        extra_cc_opts  = [ "-pthread" ],
+#else
         extra_cc_opts  = [],
+#endif
                /* the RTS forward-references to a bunch of stuff in the prelude,
                   so we force it to be included with special options to ld. */
         extra_ld_opts  =
@@ -135,6 +139,9 @@ Package {
          , "-u", "GHCziIOBase_Deadlock_closure"
          , "-u", "GHCziWeak_runFinalizzerBatch_closure"
          , "-u", "__stginit_Prelude"
+#endif
+#if defined(THREADED_RTS) && defined(freebsd_TARGET_OS)
+	 , "-pthread"
 #endif
          ]
 #ifdef HAVE_FRAMEWORK_HASKELLSUPPORT
