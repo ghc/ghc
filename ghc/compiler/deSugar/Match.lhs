@@ -9,10 +9,15 @@
 module Match ( match, matchWrapper, matchSimply ) where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(DsLoop)		-- here for paranoia-checking reasons
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(DsLoop)	-- here for paranoia-checking reasons
 			-- and to break dsExpr/dsBinds-ish loop
+#else
+import {-# SOURCE #-} DsExpr  ( dsExpr  )
+import {-# SOURCE #-} DsBinds ( dsBinds )
+#endif
 
-import CmdLineOpts	( opt_WarnIncompletePatterns )
+import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappedPatterns )
 import HsSyn		
 import TcHsSyn		( SYN_IE(TypecheckedPat), SYN_IE(TypecheckedMatch),
 			  SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)	)
@@ -168,8 +173,9 @@ match [] eqns_info shadows
 	-- If at this stage we find that at least one of the shadowing
 	-- equations is guaranteed not to fail, then warn of an overlapping pattern
     complete_match (EqnInfo [] match_result@(MatchResult _ _ _ cxt)) is_shadowed
-	| is_shadowed = dsShadowWarn cxt 	`thenDs` \ _ ->
-			returnDs match_result
+	| opt_WarnOverlappedPatterns && is_shadowed = 
+	    dsShadowWarn cxt 	`thenDs` \ _ ->
+	    returnDs match_result
 
 	| otherwise   = returnDs match_result
 
@@ -613,8 +619,8 @@ matchWrapper kind [(PatMatch (WildPat ty) match)] error_string
 
 matchWrapper kind [(GRHSMatch
 		     (GRHSsAndBindsOut [OtherwiseGRHS expr _] binds _))] error_string
-  = dsBinds binds	`thenDs` \ core_binds ->
-    dsExpr  expr	`thenDs` \ core_expr ->
+  = dsBinds Nothing binds   `thenDs` \ core_binds ->
+    dsExpr  expr	    `thenDs` \ core_expr ->
     returnDs ([], mkCoLetsAny core_binds core_expr)
 
 ----------------------------------------------------------------------------
@@ -712,7 +718,7 @@ flattenMatches kind (match : matches)
       = flatten_match (pat:pats_so_far) match
 
     flatten_match pats_so_far (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
-      = dsBinds binds				`thenDs` \ core_binds ->
+      = dsBinds Nothing binds			`thenDs` \ core_binds ->
 	dsGRHSs ty kind pats grhss 		`thenDs` \ match_result ->
 	returnDs (EqnInfo pats (mkCoLetsMatchResult core_binds match_result))
       where
