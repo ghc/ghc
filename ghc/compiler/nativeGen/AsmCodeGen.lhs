@@ -43,7 +43,9 @@ import FastString
 -- DEBUGGING ONLY
 --import OrdList
 
+#ifdef NCG_DEBUG
 import List		( intersperse )
+#endif
 \end{code}
 
 The 96/03 native-code generator has machine-independent and

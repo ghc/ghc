@@ -24,7 +24,7 @@ import RnEnv
 import TcRnMonad
 
 import FiniteMap
-import PrelNames	( pRELUDE_Name, mAIN_Name, isBuiltInSyntaxName )
+import PrelNames	( pRELUDE_Name, isBuiltInSyntaxName )
 import Module		( Module, ModuleName, ModuleEnv, moduleName, 
 			  moduleNameUserString, isHomeModule,
 			  emptyModuleEnv, unitModuleEnvByName, unitModuleEnv, 
@@ -40,9 +40,8 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  Deprecations(..), ModIface(..), Dependencies(..),
 		  	  GlobalRdrElt(..), unQualInScope, isLocalGRE, pprNameProvenance
 			)
-import OccName		( varName )
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, lookupRdrEnv, rdrEnvToList,
-			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual, mkUnqual )
+			  emptyRdrEnv, foldRdrEnv, rdrEnvElts, mkRdrUnqual, isQual )
 import Outputable
 import Maybe		( isJust, isNothing, catMaybes )
 import Maybes		( orElse )

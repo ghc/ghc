@@ -19,7 +19,6 @@ import MachMisc
 
 import CLabel		( pprCLabel, externallyVisibleCLabel, labelDynamic )
 import Stix		( CodeSegment(..) )
-import Unique		( pprUnique )
 import Panic		( panic )
 import Pretty
 import FastString

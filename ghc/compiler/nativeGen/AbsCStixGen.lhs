@@ -34,9 +34,8 @@ import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe )
 import Panic		( panic )
 import TyCon		( tyConDataCons )
-import Constants	( wORD_SIZE, bITMAP_BITS_SHIFT )
 import Name             ( NamedThing(..) )
-import CmdLineOpts	( opt_Static, opt_EnsureSplittableC )
+import CmdLineOpts	( opt_EnsureSplittableC )
 import Outputable	( assertPanic )
 
 -- DEBUGGING ONLY

@@ -63,11 +63,10 @@ module MachRegs (
 
 import AbsCSyn		( MagicId(..) )
 import CLabel           ( CLabel, mkMainCapabilityLabel )
-import MachOp		( MachOp(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
 import Stix		( StixExpr(..), StixReg(..),
                           getUniqueNat, returnNat, thenNat, NatM )
-import Unique		( mkPseudoUnique2, Uniquable(..), Unique )
+import Unique		( Unique )
 import Pretty
 import Outputable	( Outputable(..), pprPanic, panic )
 import qualified Outputable

@@ -48,7 +48,6 @@ import MkIface		( mkIface )
 import Desugar
 import Flattening       ( flatten )
 import SimplCore
-import CoreUtils	( coreBindsSize )
 import TidyPgm		( tidyCorePgm )
 import CorePrep		( corePrepPgm )
 import StgSyn
@@ -72,8 +71,6 @@ import ParserCore
 import ParserCoreUtils
 import FiniteMap	( emptyFM )
 import Name		( nameModule )
-import NameEnv		( emptyNameEnv )
-import NameSet		( emptyNameSet )
 import Module		( Module, ModLocation(..), showModMsg )
 import FastString
 import Maybes		( expectJust )

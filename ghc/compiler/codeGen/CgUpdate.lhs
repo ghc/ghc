@@ -12,7 +12,7 @@ import CgMonad
 import AbsCSyn
 
 import CgStackery	( allocStackTop, updateFrameSize, setStackFrame )
-import CgUsages		( getVirtSp, getSpRelOffset )
+import CgUsages		( getVirtSp )
 import Panic		( assertPanic )
 \end{code}
 

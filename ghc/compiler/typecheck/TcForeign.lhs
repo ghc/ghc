@@ -32,8 +32,7 @@ import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignDecl )
 import TcExpr		( tcCheckSigma )			
 
 import ErrUtils		( Message )
-import Id		( Id, mkLocalId, mkVanillaGlobal, setIdLocalExported )
-import IdInfo		( noCafIdInfo )
+import Id		( Id, mkLocalId, setIdLocalExported )
 import PrimRep		( getPrimRepSize, isFloatingRep )
 import Type		( typePrimRep )
 import OccName		( mkForeignExportOcc )
@@ -46,7 +45,7 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  isFFIDynResultTy, isFFIDotnetTy, isFFIDotnetObjTy,
 			  toDNType
 			)
-import ForeignCall	( CExportSpec(..), CCallTarget(..), CCallConv(..),
+import ForeignCall	( CExportSpec(..), CCallTarget(..), 
 			  isDynamicTarget, isCasmTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )

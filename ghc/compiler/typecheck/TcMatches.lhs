@@ -48,7 +48,7 @@ import BasicTypes	( RecFlag(..) )
 import VarSet
 import Var		( Id )
 import Bag
-import Util		( isSingleton, lengthExceeds, notNull, zipEqual )
+import Util		( isSingleton, notNull, zipEqual )
 import Outputable
 
 import List		( nub )

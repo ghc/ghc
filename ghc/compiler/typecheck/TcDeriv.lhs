@@ -10,10 +10,10 @@ module TcDeriv ( tcDeriving ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsBinds(..), MonoBinds(..), TyClDecl(..),
+import HsSyn		( HsBinds(..), TyClDecl(..),
 			  andMonoBindList, collectMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
-import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds, RenamedTyClDecl, RenamedHsPred )
+import RnHsSyn		( RenamedHsBinds, RenamedTyClDecl, RenamedHsPred )
 import CmdLineOpts	( DynFlag(..) )
 
 import TcRnMonad
@@ -38,7 +38,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
 import Maybes		( maybeToBool, catMaybes )
-import Name		( Name, getSrcLoc, nameUnique )
+import Name		( Name, getSrcLoc )
 import Unique		( getUnique )
 import NameSet
 import RdrName		( RdrName )

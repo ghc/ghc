@@ -19,8 +19,7 @@ import Literal		( Literal(..), word2IntLit )
 import MachOp		( MachOp(..) )
 import PrimRep		( PrimRep(..), getPrimRepSizeInBytes )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
-import Constants	( wORD_SIZE,
-			  mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
+import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 			  rESERVED_STACK_WORDS )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, 

@@ -31,7 +31,6 @@ import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
 			  isPrimitiveType, splitTyConApp_maybe, 
 			  splitNewType_maybe, splitForAllTy_maybe,
-			  splitTyConApp,
 			  isUnboxedTupleType
 			)
 
@@ -46,7 +45,7 @@ import TysWiredIn	( unitDataConId,
 			  unboxedSingletonTyCon, unboxedPairTyCon,
 			  trueDataCon, falseDataCon, 
 			  trueDataConId, falseDataConId,
-			  listTyCon, charTyCon, stringTy,
+			  listTyCon, charTyCon, 
 			  tupleTyCon, tupleCon
 			)
 import BasicTypes       ( Boxity(..) )

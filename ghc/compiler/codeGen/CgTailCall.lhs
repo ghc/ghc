@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.37 2003/05/14 09:13:56 simonmar Exp $
+% $Id: CgTailCall.lhs,v 1.38 2003/06/02 13:27:34 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -32,7 +32,7 @@ import ClosureInfo
 
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import AbsCSyn
-import CLabel		( mkUpdInfoLabel, mkRtsPrimOpLabel, mkSeqInfoLabel )
+import CLabel		( mkRtsPrimOpLabel, mkSeqInfoLabel )
 
 import Id		( Id, idType, idName )
 import DataCon		( DataCon, dataConTyCon, dataConTag, fIRST_TAG )
