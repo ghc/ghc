@@ -410,7 +410,7 @@ command line, you can override the defaults.
 
 <Para>
 Owing to the vagaries of DLL linking, these hooks don't work under Windows when
-the compiler is built dynamically.
+the program is built dynamically.
 </Para>
 
 <Para>
