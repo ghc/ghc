@@ -31,7 +31,7 @@ module LazyST (
 import qualified ST
 import qualified STBase
 import ArrBase
-import qualified Unsafe   ( unsafeInterleaveST )
+import qualified UnsafeST   ( unsafeInterleaveST )
 import PrelBase	( Eq(..), Int, Bool, ($), ()(..) )
 import Monad
 import Ix

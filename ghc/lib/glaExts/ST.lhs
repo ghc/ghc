@@ -29,7 +29,7 @@ module ST (
     ) where
 
 import ArrBase
-import Unsafe   ( unsafeInterleaveST )
+import UnsafeST
 import STBase
 import PrelBase	( Eq(..), Int, Bool, ($), ()(..) )
 import Monad
