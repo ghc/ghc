@@ -4,6 +4,7 @@ test('arrowapply3', normal, compile, [''])
 test('arrowcase1', normal, compile, [''])
 test('arrowdo1', normal, compile, [''])
 test('arrowdo2', normal, compile, [''])
+# test('arrowdo3', normal, compile, [''])	# takes too long
 test('arrowform1', normal, compile, [''])
 test('arrowif1', normal, compile, [''])
 test('arrowlet1', normal, compile, [''])
