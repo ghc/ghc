@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.77 2001/12/29 09:24:42 sof Exp $
+ * $Id: Linker.c,v 1.78 2002/01/23 11:29:12 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -582,6 +582,7 @@ lookupSymbol( char *lbl )
 }
 
 static 
+__attribute((unused))
 void *
 lookupLocalSymbol( ObjectCode* oc, char *lbl )
 {
@@ -1609,6 +1610,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
  */
 
 #include <elf.h>
+#include <ctype.h>
 
 static char *
 findElfSection ( void* objImage, Elf32_Word sh_type )
@@ -1625,7 +1627,7 @@ findElfSection ( void* objImage, Elf32_Word sh_type )
           && i != ehdr->e_shstrndx
 	  /* Ignore string tables named .stabstr, as they contain
              debugging info. */
-          && 0 != strcmp(".stabstr", sh_strtab + shdr[i].sh_name)
+          && 0 != strncmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
          ) {
          ptr = ehdrC + shdr[i].sh_offset;
          break;
@@ -1735,7 +1737,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
           && i != ehdr->e_shstrndx
 	  /* Ignore string tables named .stabstr, as they contain
              debugging info. */
-          && 0 != strcmp(".stabstr", sh_strtab + shdr[i].sh_name)
+          && 0 != strncmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
          ) {
          IF_DEBUG(linker,belch("   section %d is a normal string table", i ));
          strtab = ehdrC + shdr[i].sh_offset;
@@ -1813,7 +1815,6 @@ ocGetNames_ELF ( ObjectCode* oc )
    Elf32_Ehdr* ehdr       = (Elf32_Ehdr*)ehdrC;
    char*       strtab     = findElfSection ( ehdrC, SHT_STRTAB );
    Elf32_Shdr* shdr       = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
-   char*       sh_strtab  = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
 
    ASSERT(symhash != NULL);
 
@@ -1824,19 +1825,39 @@ ocGetNames_ELF ( ObjectCode* oc )
 
    k = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
+      /* Figure out what kind of section it is.  Logic derived from
+         Figure 1.14 ("Special Sections") of the ELF document
+         ("Portable Formats Specification, Version 1.1"). */
+      Elf32_Shdr  hdr    = shdr[i];
+      SectionKind kind   = SECTIONKIND_OTHER;
+      int         is_bss = FALSE;
 
-      /* make a section entry for relevant sections */
-      SectionKind kind = SECTIONKIND_OTHER;
-      if (!strcmp(".data",sh_strtab+shdr[i].sh_name) ||
-          !strcmp(".data1",sh_strtab+shdr[i].sh_name) ||
-          !strcmp(".bss",sh_strtab+shdr[i].sh_name))
-	  kind = SECTIONKIND_RWDATA;
-      if (!strcmp(".text",sh_strtab+shdr[i].sh_name) ||
-          !strcmp(".rodata",sh_strtab+shdr[i].sh_name) ||
-          !strcmp(".rodata1",sh_strtab+shdr[i].sh_name))
-	  kind = SECTIONKIND_CODE_OR_RODATA;
+      if (hdr.sh_type == SHT_PROGBITS 
+          && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_EXECINSTR)) {
+         /* .text-style section */
+         kind = SECTIONKIND_CODE_OR_RODATA;
+      }
+      else
+      if (hdr.sh_type == SHT_PROGBITS 
+          && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_WRITE)) {
+         /* .data-style section */
+         kind = SECTIONKIND_RWDATA;
+      }
+      else
+      if (hdr.sh_type == SHT_PROGBITS 
+          && (hdr.sh_flags & SHF_ALLOC) && !(hdr.sh_flags & SHF_WRITE)) {
+         /* .rodata-style section */
+         kind = SECTIONKIND_CODE_OR_RODATA;
+      }
+      else
+      if (hdr.sh_type == SHT_NOBITS 
+          && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_WRITE)) {
+         /* .bss-style section */
+         kind = SECTIONKIND_RWDATA;
+         is_bss = TRUE;
+      }
 
-      if (!strcmp(".bss",sh_strtab+shdr[i].sh_name) && shdr[i].sh_size > 0) {
+      if (is_bss && shdr[i].sh_size > 0) {
          /* This is a non-empty .bss section.  Allocate zeroed space for
             it, and set its .sh_offset field such that 
             ehdrC + .sh_offset == addr_of_zeroed_space.  */
@@ -1910,8 +1931,6 @@ ocGetNames_ELF ( ObjectCode* oc )
             */
             ad = ehdrC + shdr[ secno ].sh_offset + stab[j].st_value;
             if (ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL) {
-               IF_DEBUG(linker,belch( "addOTabName(LOCL): %10p  %s %s",
-                                      ad, oc->fileName, nm ));
                isLocal = TRUE;
             } else {
                IF_DEBUG(linker,belch( "addOTabName(GLOB): %10p  %s %s",
@@ -1927,7 +1946,7 @@ ocGetNames_ELF ( ObjectCode* oc )
 	    oc->symbols[j] = nm;
             /* Acquire! */
             if (isLocal) {
-               ghciInsertStrHashTable(oc->fileName, oc->lochash, nm, ad);
+               /* Ignore entirely. */
             } else {
                ghciInsertStrHashTable(oc->fileName, symhash, nm, ad);
             }
@@ -1987,20 +2006,21 @@ do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          IF_DEBUG(linker,belch( " ZERO" ));
          S = 0;
       } else {
-         /* First see if it is a nameless local symbol. */
-         if (stab[ ELF32_R_SYM(info)].st_name == 0) {
-            symbol = "(noname)";
+         Elf32_Sym sym = stab[ELF32_R_SYM(info)];
+	 /* First see if it is a local symbol. */
+         if (ELF32_ST_BIND(sym.st_info) == STB_LOCAL) {
+            /* Yes, so we can get the address directly from the ELF symbol
+               table. */
+            symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
             S = (Elf32_Addr)
-                (ehdrC + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
+                (ehdrC + shdr[ sym.st_shndx ].sh_offset
                        + stab[ELF32_R_SYM(info)].st_value);
-         } else {
-            /* No?  Should be in a symbol table then; first try the
-               local one. */
-            symbol = strtab+stab[ ELF32_R_SYM(info)].st_name;
-            (void*)S = lookupLocalSymbol( oc, symbol );
-            if ((void*)S == NULL)
-               (void*)S = lookupSymbol( symbol );
-         }
+
+	 } else {
+            /* No, so look up the name in our global table. */
+            symbol = strtab + sym.st_name;
+            (void*)S = lookupSymbol( symbol );
+	 }
          if (!S) {
             belch("%s: unknown symbol `%s'", oc->fileName, symbol);
 	    return 0;
@@ -2049,7 +2069,7 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       Elf32_Word  info   = rtab[j].r_info;
       Elf32_Sword addend = rtab[j].r_addend;
       Elf32_Addr  P  = ((Elf32_Addr)targ) + offset;
-      Elf32_Addr  A  = addend;
+      Elf32_Addr  A  = addend; /* Do not delete this; it is used on sparc. */
       Elf32_Addr  S;
 #     if defined(sparc_TARGET_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
@@ -2064,20 +2084,21 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          IF_DEBUG(linker,belch( " ZERO" ));
          S = 0;
       } else {
-         /* First see if it is a nameless local symbol. */
-         if (stab[ ELF32_R_SYM(info)].st_name == 0) {
-            symbol = "(noname)";
+         Elf32_Sym sym = stab[ELF32_R_SYM(info)];
+	 /* First see if it is a local symbol. */
+         if (ELF32_ST_BIND(sym.st_info) == STB_LOCAL) {
+            /* Yes, so we can get the address directly from the ELF symbol
+               table. */
+            symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
             S = (Elf32_Addr)
-                (ehdrC + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
+                (ehdrC + shdr[ sym.st_shndx ].sh_offset
                        + stab[ELF32_R_SYM(info)].st_value);
-         } else {
-            /* No?  Should be in a symbol table then; first try the
-               local one. */
-            symbol = strtab+stab[ ELF32_R_SYM(info)].st_name;
-            (void*)S = lookupLocalSymbol( oc, symbol );
-            if ((void*)S == NULL)
-               (void*)S = lookupSymbol( symbol );
-         }
+
+	 } else {
+            /* No, so look up the name in our global table. */
+            symbol = strtab + sym.st_name;
+            (void*)S = lookupSymbol( symbol );
+	 }
          if (!S) {
 	   belch("%s: unknown symbol `%s'", oc->fileName, symbol);
 	   return 0;
@@ -2170,7 +2191,7 @@ ocResolve_ELF ( ObjectCode* oc )
          relocation entries that, when done, make the stabs debugging
          info point at the right places.  We ain't interested in all
          dat jazz, mun. */
-      if (0 == strcmp(".rel.stab", sh_strtab + shdr[shnum].sh_name))
+      if (0 == strncmp(".rel.stab", sh_strtab + shdr[shnum].sh_name, 9))
          continue;
 
       if (shdr[shnum].sh_type == SHT_REL ) {
