@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.135 2002/04/23 06:34:27 sof Exp $
+ * $Id: GC.c,v 1.136 2002/07/10 09:28:54 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1286,6 +1286,7 @@ isAlive(StgClosure *p)
 
   loop:
     bd = Bdescr((P_)p);
+
     // ignore closures in generations that we're not collecting. 
     if (LOOKS_LIKE_STATIC(p) || bd->gen_no > N) {
 	return p;
@@ -1595,9 +1596,6 @@ evacuate(StgClosure *q)
 loop:
   if (HEAP_ALLOCED(q)) {
     bd = Bdescr((P_)q);
-
-    // not a group head: find the group head
-    if (bd->blocks == 0) { bd = bd->link; }
 
     if (bd->gen_no > N) {
 	/* Can't evacuate this object, because it's in a generation

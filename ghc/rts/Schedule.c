@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.146 2002/06/26 08:18:42 stolz Exp $
+ * $Id: Schedule.c,v 1.147 2002/07/10 09:28:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1130,11 +1130,22 @@ schedule( void )
 	      }		  
 	      cap->r.rCurrentNursery->u.back = bd;
 
-	      // initialise it as a nursery block
-	      bd->step = g0s0;
-	      bd->gen_no = 0;
-	      bd->flags = 0;
-	      bd->free = bd->start;
+	      // initialise it as a nursery block.  We initialise the
+	      // step, gen_no, and flags field of *every* sub-block in
+	      // this large block, because this is easier than making
+	      // sure that we always find the block head of a large
+	      // block whenever we call Bdescr() (eg. evacuate() and
+	      // isAlive() in the GC would both have to do this, at
+	      // least).
+	      { 
+		  bdescr *x;
+		  for (x = bd; x < bd + blocks; x++) {
+		      x->step = g0s0;
+		      x->gen_no = 0;
+		      x->flags = 0;
+		      x->free = x->start;
+		  }
+	      }
 
 	      // don't forget to update the block count in g0s0.
 	      g0s0->n_blocks += blocks;
