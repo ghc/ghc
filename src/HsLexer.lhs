@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.2 2002/04/09 11:23:24 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.3 2002/04/24 15:12:41 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -561,8 +561,12 @@ slurpExtraCommentLines s lines y
   = case rest of
 	'\n':nextline -> 
 		case dropWhile nonNewlineSpace nextline of 
-		  '-':'-':s -> slurpExtraCommentLines s 
-					((line++"\n"):lines) (y+1)
+		  -- stop slurping if we see a string of more than two '-';
+		  -- strings of dashes are useful as separators but we don't
+		  -- want them in the doc.
+		  '-':'-':c:s | c /= '-'
+			 -> slurpExtraCommentLines (c:s)
+				((line++"\n"):lines) (y+1)
 		  _ -> (rest, finished, y)
 	other -> (rest, finished, y)
   where
