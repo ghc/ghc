@@ -425,11 +425,11 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
     cmd = 'cd ' + testdir + " && '" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
+          + to_do + ' ' + srcname + ' ' \
+          + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + testopts.extra_hc_opts + ' ' \
-          + join(config.way_flags[way],' ') + ' ' \
-          + to_do + ' ' \
-          + srcname + ' >' + errname + ' 2>&1'
+          + '>' + errname + ' 2>&1'
 
     result = runCmd(cmd)
 
