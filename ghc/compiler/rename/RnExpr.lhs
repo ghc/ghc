@@ -616,8 +616,6 @@ rnStmt :: RdrNameStmt
 -- The thing list of names returned is the list returned by the
 -- thing_inside, plus the binders of the arguments stmt
 
--- Because of mutual recursion we have to pass in rnExpr.
-
 rnStmt (ParStmt stmtss) thing_inside
   = mapFvRn rnStmts stmtss		`thenRn` \ (bndrstmtss, fv_stmtss) ->
     let binderss = map fst bndrstmtss
