@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgRun.h,v 1.5 1999/11/03 15:01:51 simonmar Exp $
+ * $Id: StgRun.h,v 1.6 2001/05/25 18:33:46 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,4 +14,5 @@ extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
 EXTFUN(StgReturn);
 
-#endif STGRUN_H
+#endif /* STGRUN_H */
+

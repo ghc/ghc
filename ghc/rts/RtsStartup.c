@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.50 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: RtsStartup.c,v 1.51 2001/05/25 18:33:46 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -259,7 +259,7 @@ shutdownHaskellAndExit(int n)
   exit(n);
 #else
   stg_exit(n);
-#endif;
+#endif
 }
 
 void
