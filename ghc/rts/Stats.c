@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.29 2001/07/03 16:26:03 rrt Exp $
+ * $Id: Stats.c,v 1.30 2001/07/08 17:04:04 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -131,6 +131,8 @@ getTimes(void)
     if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
 		          &exitTime, &kernelTime, &userTime)) {
 	/* Probably on a Win95 box..*/
+	CurrentElapsedTime = 0;
+	CurrentUserTime = 0;
 	return;
     }
 
