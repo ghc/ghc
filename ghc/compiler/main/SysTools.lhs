@@ -24,6 +24,7 @@ module SysTools (
 
 	touch,			-- String -> String -> IO ()
 	copy,			-- String -> String -> String -> IO ()
+	unDosifyPath,           -- String -> String
 	
 	-- Temporary-file management
 	setTmpDir,
@@ -61,10 +62,8 @@ import System		( system, ExitCode(..), exitWith, getEnv )
 import qualified Posix
 #else
 import Win32DLL
-import List		( isPrefixOf )
+import List		( isPrefixOf, isSuffixOf )
 #endif
-
-import List		( isSuffixOf )
 
 #include "HsVersions.h"
 
@@ -242,7 +241,7 @@ initSysTools minusB_args
 	--	pick up whatever happens to be lying around in the path,
 	--	possibly including those from a cygwin install on the target,
 	--	which is exactly what we're trying to avoid.
-	; let gcc_path 	| am_installed = installed_bin ("gcc -B" ++ installed "gcc-lib/")
+	; let gcc_path 	| am_installed = installed_bin ("gcc -B" ++ "\"" ++ (installed "gcc-lib/") ++ "\"")
 		       	| otherwise    = cGCC
 	      perl_path | am_installed = installed_bin cGHC_PERL
 		        | otherwise    = cGHC_PERL
@@ -361,7 +360,7 @@ getTopDir minusbs
        ; return (am_installed, top_dir)
        }
   where
-    -- get_proto returns a Unix-format path
+    -- get_proto returns a Unix-format path (relying on getExecDir to do so too)
     get_proto | not (null minusbs)
 	      = return (unDosifyPath (drop 2 (last minusbs)))	-- 2 for "-B"
 	      | otherwise	   
@@ -369,7 +368,7 @@ getTopDir minusbs
 		   ; case maybe_exec_dir of	  -- (only works on Windows; 
 						  --  returns Nothing on Unix)
 			Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
-			Just dir -> return (unDosifyPath dir)
+			Just dir -> return dir
 		   }
 \end{code}
 
@@ -548,8 +547,10 @@ runSomething phase_name pgm args
   	  else return ()
 	}
   where
-    cmd_line = unwords (pgm : dosifyPaths args)
+    cmd_line = unwords (pgm : dosifyPaths (map quote args))
 	-- The pgm is already in native format (appropriate dir separators)
+    quote "" = ""
+    quote s  = "\"" ++ s ++ "\""
 
 traceCmd :: String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
@@ -674,7 +675,7 @@ slash s1 s2 = s1 ++ ('/' : s2)
 getExecDir :: IO (Maybe String)
 getExecDir = do h <- getModuleHandle Nothing
 		n <- getModuleFileName h
-		return (Just (reverse (tail (dropWhile (not . isSlash) (reverse (unDosifyPath n))))))
+		return (Just (reverse (drop (length "/bin/ghc.exe") (reverse (unDosifyPath n)))))
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif

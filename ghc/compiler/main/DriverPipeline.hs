@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.89 2001/07/11 19:48:07 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.90 2001/07/17 14:48:04 rrt Exp $
 --
 -- GHC Driver
 --
@@ -34,7 +34,7 @@ import DriverUtil
 import DriverMkDepend
 import DriverPhases
 import DriverFlags
-import SysTools		( newTempName, addFilesToClean, getSysMan )
+import SysTools		( newTempName, addFilesToClean, getSysMan, unDosifyPath )
 import qualified SysTools	
 import HscMain
 import Finder
@@ -324,7 +324,10 @@ run_phase :: Phase
 
 run_phase Unlit _basename _suff input_fn output_fn
   = do unlit_flags <- getOpts opt_L
-       SysTools.runUnlit (unlit_flags ++ ["-h", input_fn, input_fn, output_fn])
+       -- The -h option passes the file name for unlit to put in a #line directive;
+       -- we undosify it so that it doesn't contain backslashes in Windows, which
+       -- would disappear in error messages
+       SysTools.runUnlit (unlit_flags ++ ["-h", unDosifyPath input_fn, input_fn, output_fn])
        return (Just output_fn)
 
 -------------------------------------------------------------------------------
@@ -800,11 +803,11 @@ doLink o_files = do
 	 	      ++ extra_ld_opts
 	              ++ if static && not no_hs_main then
 #ifdef LEADING_UNDERSCORE
-			    [ "-u _PrelMain_mainIO_closure" ,
-			      "-u ___init_PrelMain"] 
+			    [ "-u", "_PrelMain_mainIO_closure" ,
+			      "-u", "___init_PrelMain"] 
 #else
-			    [ "-u PrelMain_mainIO_closure" ,
-			      "-u __init_PrelMain"] 
+			    [ "-u", "PrelMain_mainIO_closure" ,
+			      "-u", "__init_PrelMain"] 
 #endif
 			 else [])
 
