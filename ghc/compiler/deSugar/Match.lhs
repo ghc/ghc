@@ -248,7 +248,7 @@ match [] ty eqns_info
     returnDs (foldr1 combineMatchResults match_results)
   where
     match_results = [ ASSERT( null (eqn_pats eqn) ) 
-		      eqn_rhs eqn
+		      adjustMatchResult (eqn_wrap eqn) (eqn_rhs eqn)
 		    | eqn <- eqns_info ]
 \end{code}
 
@@ -357,15 +357,15 @@ tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
 	--	NPlusKPat
 	-- but no other
 
-tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_rhs = rhs })
-  = tidy1 v pat rhs 	`thenDs` \ (pat', rhs') ->
-    returnDs (eqn { eqn_pats = pat' : pats, eqn_rhs = rhs' })
+tidyEqnInfo v eqn@(EqnInfo { eqn_wrap = wrap, eqn_pats = pat : pats })
+  = tidy1 v wrap pat 	`thenDs` \ (wrap', pat') ->
+    returnDs (eqn { eqn_wrap = wrap', eqn_pats = pat' : pats })
 
 tidy1 :: Id 			-- The Id being scrutinised
+      -> DsWrapper		-- Previous wrapping bindings
       -> Pat Id 		-- The pattern against which it is to be matched
-      -> MatchResult		-- What to do afterwards
-      -> DsM (Pat Id, 		-- Equivalent pattern
-	      MatchResult)	-- Extra bindings around what to do afterwards
+      -> DsM (DsWrapper,	-- Extra bindings around what to do afterwards
+	      Pat Id) 		-- Equivalent pattern
 
 -- The extra bindings etc are all wrapped around the RHS of the match
 -- so they are only available when matching is complete.  But that's ok
@@ -392,25 +392,24 @@ tidy1 :: Id 			-- The Id being scrutinised
 --	NPat
 --	NPlusKPat
 
-tidy1 v (ParPat pat)      wrap = tidy1 v (unLoc pat) wrap 
-tidy1 v (SigPatOut pat _) wrap = tidy1 v (unLoc pat) wrap 
-tidy1 v (WildPat ty)      wrap = returnDs (WildPat ty, wrap)
+tidy1 v wrap (ParPat pat)      = tidy1 v wrap (unLoc pat) 
+tidy1 v wrap (SigPatOut pat _) = tidy1 v wrap (unLoc pat) 
+tidy1 v wrap (WildPat ty)      = returnDs (wrap, WildPat ty)
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
-tidy1 v (VarPat var) rhs
-  = returnDs (WildPat (idType var), bindOneInMatchResult var v rhs)
+tidy1 v wrap (VarPat var)
+  = returnDs (wrap . wrapBind var v, WildPat (idType var)) 
 
-tidy1 v (VarPatOut var binds) rhs
+tidy1 v wrap (VarPatOut var binds)
   = do	{ prs <- dsHsNestedBinds binds
-	; return (WildPat (idType var), 
-		  bindOneInMatchResult var v $
-		  mkCoLetMatchResult (Rec prs) rhs) }
+	; return (wrap . wrapBind var v . mkDsLet (Rec prs),
+		  WildPat (idType var)) }
 
 	-- case v of { x@p -> mr[] }
 	-- = case v of { p -> let x=v in mr[] }
-tidy1 v (AsPat (L _ var) pat) rhs
-  = tidy1 v (unLoc pat) (bindOneInMatchResult var v rhs)
+tidy1 v wrap (AsPat (L _ var) pat)
+  = tidy1 v (wrap . wrapBind var v) (unLoc pat)
 
 
 {- now, here we handle lazy patterns:
@@ -424,23 +423,22 @@ tidy1 v (AsPat (L _ var) pat) rhs
     The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
-tidy1 v (LazyPat pat) rhs
+tidy1 v wrap (LazyPat pat)
   = do	{ v' <- newSysLocalDs (idType v)
 	; sel_prs <- mkSelectorBinds pat (Var v)
 	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
-	; returnDs (WildPat (idType v), 
-		    bindOneInMatchResult v' v $
-		    mkCoLetsMatchResult sel_binds rhs) }
+	; returnDs (wrap . wrapBind v' v . mkDsLets sel_binds,
+		    WildPat (idType v)) }
 
 -- re-express <con-something> as (ConPat ...) [directly]
 
-tidy1 v (ConPatOut (L loc con) ex_tvs dicts binds ps pat_ty) rhs
-  = returnDs (ConPatOut (L loc con) ex_tvs dicts binds tidy_ps pat_ty, rhs)
+tidy1 v wrap (ConPatOut (L loc con) ex_tvs dicts binds ps pat_ty)
+  = returnDs (wrap, ConPatOut (L loc con) ex_tvs dicts binds tidy_ps pat_ty)
   where
     tidy_ps = PrefixCon (tidy_con con pat_ty ps)
 
-tidy1 v (ListPat pats ty) rhs
-  = returnDs (unLoc list_ConPat, rhs)
+tidy1 v wrap (ListPat pats ty)
+  = returnDs (wrap, unLoc list_ConPat)
   where
     list_ty     = mkListTy ty
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] list_ty)
@@ -449,40 +447,40 @@ tidy1 v (ListPat pats ty) rhs
 
 -- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
-tidy1 v (PArrPat pats ty) rhs
-  = returnDs (unLoc parrConPat, rhs)
+tidy1 v wrap (PArrPat pats ty)
+  = returnDs (wrap, unLoc parrConPat)
   where
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
-tidy1 v (TuplePat pats boxity) rhs
-  = returnDs (unLoc tuple_ConPat, rhs)
+tidy1 v wrap (TuplePat pats boxity)
+  = returnDs (wrap, unLoc tuple_ConPat)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats
 				  (mkTupleTy boxity arity (map hsPatType pats))
 
-tidy1 v (DictPat dicts methods) rhs
+tidy1 v wrap (DictPat dicts methods)
   = case num_of_d_and_ms of
-	0 -> tidy1 v (TuplePat [] Boxed) rhs
-	1 -> tidy1 v (unLoc (head dict_and_method_pats)) rhs
-	_ -> tidy1 v (TuplePat dict_and_method_pats Boxed) rhs
+	0 -> tidy1 v wrap (TuplePat [] Boxed) 
+	1 -> tidy1 v wrap (unLoc (head dict_and_method_pats))
+	_ -> tidy1 v wrap (TuplePat dict_and_method_pats Boxed)
   where
     num_of_d_and_ms	 = length dicts + length methods
     dict_and_method_pats = map nlVarPat (dicts ++ methods)
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 v pat@(LitPat lit) rhs
-  = returnDs (unLoc (tidyLitPat lit (noLoc pat)), rhs)
+tidy1 v wrap pat@(LitPat lit)
+  = returnDs (wrap, unLoc (tidyLitPat lit (noLoc pat)))
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 v pat@(NPatOut lit lit_ty _) rhs
-  = returnDs (unLoc (tidyNPat lit lit_ty (noLoc pat)), rhs)
+tidy1 v wrap pat@(NPatOut lit lit_ty _)
+  = returnDs (wrap, unLoc (tidyNPat lit lit_ty (noLoc pat)))
 
 -- and everything else goes through unchanged...
 
-tidy1 v non_interesting_pat rhs
-  = returnDs (non_interesting_pat, rhs)
+tidy1 v wrap non_interesting_pat
+  = returnDs (wrap, non_interesting_pat)
 
 
 tidy_con data_con pat_ty (PrefixCon ps)   = ps
@@ -673,7 +671,8 @@ matchWrapper ctxt (MatchGroup matches match_ty)
     mk_eqn_info (L _ (Match pats _ grhss))
       = do { let upats = map unLoc pats
 	   ; match_result <- dsGRHSs ctxt upats grhss rhs_ty
-	   ; return (EqnInfo { eqn_pats = upats, 
+	   ; return (EqnInfo { eqn_wrap = idWrapper,
+			       eqn_pats = upats, 
 			       eqn_rhs = match_result}) }
 
     match_fun dflags ds_ctxt
@@ -717,7 +716,8 @@ matchSinglePat :: CoreExpr -> DsMatchContext -> LPat Id
 	       -> Type -> MatchResult -> DsM MatchResult
 matchSinglePat (Var var) ctx pat ty match_result
   = getDOptsDs					`thenDs` \ dflags ->
-    match_fn dflags [var] ty [EqnInfo { eqn_pats = [unLoc pat],
+    match_fn dflags [var] ty [EqnInfo { eqn_wrap = idWrapper,
+					eqn_pats = [unLoc pat],
 					eqn_rhs  = match_result }]
   where
     match_fn dflags

@@ -106,34 +106,27 @@ wouldn't).  Cf.~@shift_lit_pats@ in @MatchLits@.
 match_con vars ty eqns
   = do	{ -- Make new vars for the con arguments; avoid new locals where possible
 	  arg_vars <- selectMatchVars (map unLoc arg_pats1) arg_tys
-
-	; match_result <- match (arg_vars ++ vars) ty (shiftEqns eqns)
-
-	; binds <- mapM ds_binds [ bind | ConPatOut _ _ _ bind _ _ <- pats,
-					  not (isEmptyLHsBinds bind) ]
-
-	; let match_result' = bindInMatchResult (line_up other_pats) $
-			      mkCoLetsMatchResult binds match_result
-	
-	; return (data_con, tvs1 ++ dicts1 ++ arg_vars, match_result') }
+	; eqns' <- mapM shift eqns 
+	; match_result <- match (arg_vars ++ vars) ty eqns'
+	; return (con, tvs1 ++ dicts1 ++ arg_vars, match_result) }
   where
-    pats@(pat1 : other_pats) = map firstPat eqns
-    ConPatOut (L _ data_con) tvs1 dicts1 _ (PrefixCon arg_pats1) pat_ty = pat1
+    ConPatOut (L _ con) tvs1 dicts1 _ (PrefixCon arg_pats1) pat_ty = firstPat (head eqns)
 
-    ds_binds bind = do { prs <- dsHsNestedBinds bind; return (Rec prs) }
-
-    line_up pats 
-	| null tvs1 && null dicts1 = []		-- Common case
-	| otherwise = [ pr | ConPatOut _ ts ds _ _ _ <- pats,
-			     pr <- (ts `zip` tvs1) ++ (ds `zip` dicts1)]
+    shift eqn@(EqnInfo { eqn_wrap = wrap, 
+		         eqn_pats = ConPatOut _ tvs ds bind (PrefixCon arg_pats) _ : pats })
+	= do { prs <- dsHsNestedBinds bind
+	     ; return (eqn { eqn_wrap = wrap . wrapBinds (tvs `zip` tvs1) 
+					     . wrapBinds (ds  `zip` dicts1)
+					     . mkDsLet (Rec prs),
+			     eqn_pats = map unLoc arg_pats ++ pats }) }
 
      	-- Get the arg types, which we use to type the new vars
 	-- to match on, from the "outside"; the types of pats1 may 
 	-- be more refined, and hence won't do
-    arg_tys = substTys (zipTopTvSubst (dataConTyVars data_con) inst_tys)
-		       (dataConOrigArgTys data_con)
-    inst_tys | isVanillaDataCon data_con = tcTyConAppArgs pat_ty	-- Newtypes opaque!
-	     | otherwise		 = mkTyVarTys tvs1
+    arg_tys = substTys (zipTopTvSubst (dataConTyVars con) inst_tys)
+		       (dataConOrigArgTys con)
+    inst_tys | isVanillaDataCon con = tcTyConAppArgs pat_ty	-- Newtypes opaque!
+	     | otherwise	    = mkTyVarTys tvs1
 \end{code}
 
 Note [Existentials in shift_con_pat]

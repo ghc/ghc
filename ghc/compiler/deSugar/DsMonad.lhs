@@ -25,7 +25,7 @@ module DsMonad (
 
 	-- Data types
 	DsMatchContext(..),
-	EquationInfo(..), MatchResult(..), 
+	EquationInfo(..), MatchResult(..), DsWrapper, idWrapper,
 	CanItFail(..), orFail
     ) where
 
@@ -74,8 +74,12 @@ data DsMatchContext
   deriving ()
 
 data EquationInfo
-  = EqnInfo { eqn_pats :: [Pat Id],    	-- The patterns for an eqn
+  = EqnInfo { eqn_wrap :: DsWrapper,	-- Bindings
+	      eqn_pats :: [Pat Id],    	-- The patterns for an eqn
 	      eqn_rhs  :: MatchResult }	-- What to do after match
+
+type DsWrapper = CoreExpr -> CoreExpr
+idWrapper e = e
 
 -- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult
 --	\fail. wrap (case vs of { pats -> rhs fail })

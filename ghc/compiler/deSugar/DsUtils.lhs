@@ -10,16 +10,16 @@ module DsUtils (
 	EquationInfo(..), 
 	firstPat, shiftEqns,
 
-	mkDsLet,
+	mkDsLet, mkDsLets,
 
 	MatchResult(..), CanItFail(..), 
 	cantFailMatchResult, alwaysFailMatchResult,
 	extractMatchResult, combineMatchResults, 
 	adjustMatchResult,  adjustMatchResultDs,
-	mkCoLetsMatchResult, mkCoLetMatchResult,
+	mkCoLetMatchResult,
 	mkGuardedMatchResult, 
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
-	bindInMatchResult, bindOneInMatchResult,
+	wrapBind, wrapBinds,
 
 	mkErrorAppDs, mkNilExpr, mkConsExpr, mkListExpr,
 	mkIntExpr, mkCharExpr,
@@ -191,13 +191,8 @@ firstPat :: EquationInfo -> Pat Id
 firstPat eqn = head (eqn_pats eqn)
 
 shiftEqns :: [EquationInfo] -> [EquationInfo]
--- Drop the outermost layer of the first pattern in each equation
-shiftEqns eqns = [ eqn { eqn_pats = shiftPats (eqn_pats eqn) }
-		 | eqn <- eqns ]
-
-shiftPats :: [Pat Id] -> [Pat Id]
-shiftPats (ConPatOut _ _ _ _ (PrefixCon arg_pats) _ : pats) = map unLoc arg_pats ++ pats
-shiftPats (pat_with_no_sub_pats			    : pats) = pats
+-- Drop the first pattern in each equation
+shiftEqns eqns = [ eqn { eqn_pats = tail (eqn_pats eqn) } | eqn <- eqns ]
 \end{code}
 
 Functions on MatchResults
@@ -242,23 +237,15 @@ adjustMatchResultDs encl_fn (MatchResult can_it_fail body_fn)
   = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
 				      encl_fn body)
 
-bindInMatchResult :: [(Var,Var)] -> MatchResult -> MatchResult
-bindInMatchResult binds = adjustMatchResult (\e -> foldr bind e binds)
-  where
-    bind (new,old) body = bindMR new old body
+wrapBinds :: [(Var,Var)] -> CoreExpr -> CoreExpr
+wrapBinds [] e = e
+wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 
-bindOneInMatchResult :: Var -> Var -> MatchResult -> MatchResult
-bindOneInMatchResult new old = adjustMatchResult (bindMR new old)
-
-bindMR :: Var -> Var -> CoreExpr -> CoreExpr
-bindMR new old body
+wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
+wrapBind new old body
   | new==old    = body
   | isTyVar new = App (Lam new body) (Type (mkTyVarTy old))
   | otherwise   = Let (NonRec new (Var old)) body
-
-mkCoLetsMatchResult :: [CoreBind] -> MatchResult -> MatchResult
-mkCoLetsMatchResult binds match_result
-  = adjustMatchResult (mkDsLets binds) match_result
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
 mkCoLetMatchResult bind match_result
@@ -292,7 +279,7 @@ mkCoAlgCaseMatchResult :: Id					-- Scrutinee
 mkCoAlgCaseMatchResult var ty match_alts 
   | isNewTyCon tycon		-- Newtype case; use a let
   = ASSERT( null (tail match_alts) && null (tail arg_ids1) )
-    mkCoLetsMatchResult [NonRec arg_id1 newtype_rhs] match_result1
+    mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
 
   | isPArrFakeAlts match_alts	-- Sugared parallel array; use a literal case 
   = MatchResult CanFail mk_parrCase

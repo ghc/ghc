@@ -167,12 +167,16 @@ matchNPats (var:vars) ty eqns
 	  return (foldr1 combineMatchResults match_results) }
   where
     match_group :: [EquationInfo] -> DsM MatchResult
-    match_group eqns
+    match_group (eqn1:eqns)
 	= do { pred_expr <- dsExpr (HsApp (noLoc eq_chk) (nlHsVar var))
-	     ; match_result <- match vars ty (shiftEqns eqns)
-	     ; return (mkGuardedMatchResult pred_expr match_result) }
+	     ; match_result <- match vars ty (eqn1' : shiftEqns eqns)
+	     ; return (adjustMatchResult (eqn_wrap eqn1) $
+			-- Bring the eqn1 wrapper stuff into scope because
+			-- it may be used in pred_expr
+		       mkGuardedMatchResult pred_expr match_result) }
 	where
-	  NPatOut _ _ eq_chk = firstPat (head eqns)
+	  NPatOut _ _ eq_chk : pats1 = eqn_pats eqn1
+	  eqn1' = eqn1 { eqn_wrap = idWrapper, eqn_pats = pats1 }
 \end{code}
 
 
@@ -216,17 +220,23 @@ matchNPlusKPats all_vars@(var:vars) ty eqns
 	  return (foldr1 combineMatchResults match_results) }
   where
     match_group :: [EquationInfo] -> DsM MatchResult
-    match_group eqns
+    match_group (eqn1:eqns)
 	= do { ge_expr      <- dsExpr (HsApp (noLoc ge)  (nlHsVar var))
 	     ; minusk_expr  <- dsExpr (HsApp (noLoc sub) (nlHsVar var))
-	     ; match_result <- match vars ty (shiftEqns eqns)
-	     ; return  (mkGuardedMatchResult ge_expr 		     $
-			mkCoLetsMatchResult [NonRec n1 minusk_expr]  $
-			bindInMatchResult (map line_up other_pats)   $
+	     ; match_result <- match vars ty (eqn1' : map shift eqns)
+	     ; return  (adjustMatchResult (eqn_wrap eqn1) 	     $
+			-- Bring the eqn1 wrapper stuff into scope because
+			-- it may be used in ge_expr, minusk_expr
+		        mkGuardedMatchResult ge_expr 		    $
+			mkCoLetMatchResult (NonRec n1 minusk_expr)  $
 			match_result) }
 	where
-	  (NPlusKPatOut (L _ n1) _ ge sub : other_pats) = map firstPat eqns 
-	  line_up (NPlusKPatOut (L _ n) _ _ _) = (n,n1)
+	  NPlusKPatOut (L _ n1) _ ge sub : pats1 = eqn_pats eqn1
+	  eqn1' = eqn1 { eqn_wrap = idWrapper, eqn_pats = pats1 }
+
+	  shift eqn@(EqnInfo { eqn_wrap = wrap,
+			       eqn_pats = NPlusKPatOut (L _ n) _ _ _ : pats })
+	    = eqn { eqn_wrap = wrap . wrapBind n n1, eqn_pats = pats }  
 \end{code}
 
 
