@@ -10,6 +10,8 @@ Changes made since 3.02:
 
 <item> Remove restrictions on superclasses in class declarations.
 
+<item> Add Sven Panne's Haskell GetOpt library (in <tt/-syslib misc/).
+
 </itemize>
 
 
