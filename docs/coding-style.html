@@ -2,11 +2,11 @@
 <HTML>
 <HEAD>
    <meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
-   <TITLE>GHC Style Guidelines for C code</TITLE>
+   <TITLE>Style Guidelines for fptools</TITLE>
 </HEAD>
 <BODY>
 
-<H1>GHC Style guidelines for C code</h1>
+<H1>Style Guidelines for fptools</h1>
 
 <h2>Comments</h2>
 
@@ -511,6 +511,32 @@ changes that commit and give advance warning that you're about to do
 it in case anyone else is changing that file.
 </ul>
 
+
+<h2>Commandline arguments</h2>
+
+A program in fptools should try follow the following rules for
+commandline arguments:
+
+<ul>
+<li> The <code>-v</code> and <code>--verbose</code> options should be
+used to generate verbose output (intended for the user).
+
+<li> The <code>-d</code> and <code>--debug</code> options should be
+used to generate debugging output (intended for the developer).
+
+<li> The <code>-?</code> and <code>--help</code> options should be used
+to display usage information on stdout. The program should exit
+successfully afterwards.
+
+<li> The <code>-V</code> and <code>--version</code> options should be
+used to output version information on stdout, which includes one line
+of the form '<code><em>Program</em> version
+<em>Major.Minor[.Patchlevel]</em> ... </code>'.  The program
+should exit successfully afterwards.
+</ul>
+
+When an unknown commandline argument is encountered, the program
+should display usage information on stderr and exit unsuccessfully.
 
 </body>
 </html>
