@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.16 2002/02/17 13:02:44 panne Exp $
+-- $Id: primops.txt.pp,v 1.17 2002/03/27 12:35:44 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -18,16 +18,15 @@
 --	  strictness attributes, whether it is defined as a macro
 --	  or as out-of-line code, etc.)
 --
---	- ghc/lib/std/PrelGHC.hi-boot, to declare the primop
---
 --	- if the primop is inline (i.e. a macro), then:
---		ghc/includes/PrimOps.h
---		ghc/compiler/nativeGen/StixPrim.lhs 
---              ghc/compiler/nativeGen/MachCode.lhs (if implementation is machine-dependent)
+--	  	ghc/compiler/AbsCUtils.lhs (dscCOpStmt)
+--		  defines the translation of the primop into simpler
+--		  abstract C operations.
 --		
 --	- or, for an out-of-line primop:
 --	        ghc/includes/PrimOps.h (just add the declaration)
 --		ghc/rts/PrimOps.hc     (define it here)
+--		ghc/rts/Linker.c       (declare the symbol for GHCi)
 --
 --	- the User's Guide 
 --
