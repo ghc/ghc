@@ -7,23 +7,25 @@
 \begin{code}
 module Foreign 
        ( 
-	 ForeignObj       -- abstract, instance of: Eq
-       , makeForeignObj   -- :: Addr{-obj-} -> IO ForeignObj
-       , writeForeignObj  -- :: ForeignObj  -> Addr{-new obj-}   -> IO ()
+	 ForeignObj          -- abstract, instance of: Eq
+       , makeForeignObj      -- :: Addr{-obj-} -> Addr{-finaliser-} -> IO ForeignObj
+       , mkForeignObj        -- :: Addr -> IO ForeignObj
+       , writeForeignObj     -- :: ForeignObj  -> Addr{-new obj-}   -> IO ()
        , addForeignFinalizer -- :: ForeignObj -> IO () -> IO ()
-       , foreignObjToAddr -- :: ForeignObj  -> IO Addr
-           -- the coercion from a foreign obj. to an addr. is unsafe,
+
+           -- the coercion from a foreign obj to an addr is unsafe,
 	   -- and should not be used unless absolutely necessary.
+       , foreignObjToAddr    -- :: ForeignObj  -> IO Addr
        
-       , StablePtr {-a-} -- abstract.
-       , makeStablePtr   -- :: a -> IO (StablePtr a)
-       , deRefStablePtr  -- :: StablePtr a -> IO a
-       , freeStablePtr   -- :: StablePtr a -> IO ()
+       , StablePtr {-a-}     -- abstract.
+       , makeStablePtr       -- :: a -> IO (StablePtr a)
+       , deRefStablePtr      -- :: StablePtr a -> IO a
+       , freeStablePtr       -- :: StablePtr a -> IO ()
        ) where
 
-import PrelForeign --hiding ( makeForeignObj )
+import PrelForeign hiding ( makeForeignObj )
 import PrelStable
---import qualified PrelForeign as PF ( makeForeignObj )
+import qualified PrelForeign as PF ( makeForeignObj )
 import PrelBase    ( Int(..), Double(..), Float(..), Char(..) )
 import PrelGHC     ( indexCharOffForeignObj#, indexIntOffForeignObj#, 
 		     indexAddrOffForeignObj#, indexFloatOffForeignObj#, 
@@ -70,15 +72,18 @@ foreignObjToAddr :: ForeignObj -> IO Addr
 foreignObjToAddr fo = _casm_ `` %r=(StgAddr)%0; '' fo
 \end{code}
 
-begin{code}
+\begin{code}
 makeForeignObj :: Addr -> Addr -> IO ForeignObj
 makeForeignObj obj finalizer = do
    fobj <- PF.makeForeignObj obj
-   addForeignFinalizer fobj (app0 finalizer)
+   addForeignFinalizer fobj (app0 finalizer fobj)
    return fobj
 
-foreign import dynamic unsafe app0 :: Addr -> IO ()
-end{code}
+mkForeignObj :: Addr -> IO ForeignObj
+mkForeignObj = PF.makeForeignObj
+
+foreign import dynamic unsafe app0 :: Addr -> (ForeignObj -> IO ())
+\end{code}
 
 
 
