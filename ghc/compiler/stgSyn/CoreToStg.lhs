@@ -157,9 +157,8 @@ coreTopBindToStg
 coreTopBindToStg env body_fvs (NonRec id rhs)
   = let 
 	caf_info = hasCafRefs env rhs
-	arity = exprArity rhs
 
-	env' = extendVarEnv env id (LetBound how_bound emptyLVS arity)
+	env' = extendVarEnv env id (LetBound how_bound emptyLVS (predictArity rhs))
 
 	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
 		  | otherwise               = TopLevelNoCafs
@@ -174,6 +173,7 @@ coreTopBindToStg env body_fvs (NonRec id rhs)
 	
 	bind = StgNonRec (SRTEntries cafs) id stg_rhs
     in
+    ASSERT2(predictArity rhs == stgRhsArity stg_rhs, ppr id)
     ASSERT2(consistent caf_info bind, ppr id)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
@@ -191,7 +191,7 @@ coreTopBindToStg env body_fvs (Rec pairs)
 	caf_info = hasCafRefss env1{-NB: not env'-} rhss
 
 	env' = extendVarEnvList env 
-		[ (b, LetBound how_bound emptyLVS (exprArity rhs)) 
+		[ (b, LetBound how_bound emptyLVS (predictArity rhs)) 
 	        | (b,rhs) <- pairs ]
 
 	how_bound | mayHaveCafRefs caf_info = TopLevelHasCafs
@@ -208,6 +208,7 @@ coreTopBindToStg env body_fvs (Rec pairs)
 
 	bind = StgRec (SRTEntries cafs) (zip binders stg_rhss)
     in
+    ASSERT2(and [predictArity rhs == stgRhsArity stg_rhs | (rhs,stg_rhs) <- rhss `zip` stg_rhss], ppr binders)
     ASSERT2(consistent caf_info bind, ppr binders)
 --    WARN(not (consistent caf_info bind), ppr binders <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
@@ -523,12 +524,6 @@ coreToStgApp maybe_thunk_body f args
 	not_letrec_bound = not (isLetBound how_bound)
 	fun_fvs	 	 = singletonFVInfo f how_bound fun_occ
 
-	-- Mostly, the arity info of a function is in the fn's IdInfo
-	-- But new bindings introduced by CoreSat may not have no
-	-- arity info; it would do us no good anyway.  For example:
-	--	let f = \ab -> e in f
-	-- No point in having correct arity info for f!
-	-- Hence the hasArity stuff below.
 	f_arity = case how_bound of 
 			LetBound _ _ arity -> arity
 			_                  -> 0
@@ -695,7 +690,7 @@ coreToStgLet let_no_escape bind body
 
     mk_binding bind_lvs bind_cafs binder rhs
 	= (binder,  LetBound  NotTopLevelBound	-- Not top level
-			live_vars (exprArity rhs)
+			live_vars (predictArity rhs)
 	   )
 	where
 	   live_vars = if let_no_escape then
@@ -719,9 +714,9 @@ coreToStgLet let_no_escape bind body
 
 	freeVarsToLiveVars bind_fvs `thenLne` \ (bind_lvs, bind_cafs) ->
 	let
-	    env_ext_item@(binder', _) = mk_binding bind_lvs bind_cafs binder rhs
+	    env_ext_item = mk_binding bind_lvs bind_cafs binder rhs
 	in
-	returnLne (StgNonRec (SRTEntries bind_cafs) binder' rhs2, 
+	returnLne (StgNonRec (SRTEntries bind_cafs) binder rhs2, 
 			bind_fvs, escs, bind_lvs, bind_cafs, [env_ext_item])
 
 
@@ -753,6 +748,29 @@ is_join_var :: Id -> Bool
 -- a variable started life as a join point ($j)
 is_join_var j = occNameUserString (getOccName j) == "$j"
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Arity prediction}
+%*									*
+%************************************************************************
+
+To avoid yet another knot, we predict the arity of each function from
+its Core form, based on the number of visible top-level lambdas.  
+It should be the same as the arity of the STG RHS!
+
+\begin{code}
+predictArity :: CoreExpr -> Int
+predictArity (Lam x e)
+  | isTyVar x = predictArity e
+  | otherwise = 1 + predictArity e
+predictArity (Note _ e)
+  -- Ignore coercions.   Top level sccs are removed by the final 
+  -- profiling pass, so we ignore those too.
+  = predictArity e
+predictArity _ = 0
+\end{code}
+
 
 %************************************************************************
 %*									*

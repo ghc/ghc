@@ -578,20 +578,6 @@ exprIsConApp_maybe expr
     analyse other = Nothing
 \end{code}
 
-The arity of an expression (in the code-generator sense, i.e. the
-number of lambdas at the beginning).
-
-\begin{code}
-exprArity :: CoreExpr -> Int
-exprArity (Lam x e)
-  | isTyVar x = exprArity e
-  | otherwise = 1 + exprArity e
-exprArity (Note _ e)
-  -- Ignore coercions.   Top level sccs are removed by the final 
-  -- profiling pass, so we ignore those too.
-  = exprArity e
-exprArity _ = 0
-\end{code}
 
 
 %************************************************************************
@@ -652,7 +638,8 @@ exprEtaExpandArity :: CoreExpr -> (Int, Bool)
 --
 -- Consider	let x = expensive in \y z -> E
 -- We want this to have arity 2 if the \y-abstraction is a 1-shot lambda
--- Hence the extra Bool returned by go1
+-- 
+-- Hence the list of Bools returned by go1
 --	NB: this is particularly important/useful for IO state 
 --	transformers, where we often get
 --		let x = E in \ s -> ...
@@ -680,7 +667,7 @@ exprEtaExpandArity e
     go1 (Note n e) | ok_note n	= go1 e
     go1 (Var v)			= replicate (idArity v) False	-- When the type of the Id
 								-- encodes one-shot-ness, use
-								-- th iinfo here
+								-- the idinfo here
 
 	-- Lambdas; increase arity
     go1 (Lam x e)  | isId x     = isOneShotLambda x : go1 e
@@ -771,6 +758,42 @@ etaExpand n us expr ty
   
  	  Nothing -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
     	}}}
+\end{code}
+
+
+exprArity is a cheap-and-cheerful version of exprEtaExpandArity.
+It tells how many things the expression can be applied to before doing
+any work.  It doesn't look inside cases, lets, etc.  The idea is that
+exprEtaExpandArity will do the hard work, leaving something that's easy
+for exprArity to grapple with.  In particular, Simplify uses exprArity to
+compute the ArityInfo for the Id. 
+
+Originally I thought that it was enough just to look for top-level lambdas, but
+it isn't.  I've seen this
+
+	foo = PrelBase.timesInt
+
+We want foo to get arity 2 even though the eta-expander will leave it
+unchanged, in the expectation that it'll be inlined.  But occasionally it
+isn't, because foo is blacklisted (used in a rule).  
+
+Similarly, see the ok_note check in exprEtaExpandArity.  So 
+	f = __inline_me (\x -> e)
+won't be eta-expanded.
+
+And in any case it seems more robust to have exprArity be a bit more intelligent.
+
+\begin{code}
+exprArity :: CoreExpr -> Int
+exprArity e = go e `max` 0
+	    where
+	      go (Lam x e) | isId x    = go e + 1
+			   | otherwise = go e
+	      go (Note _ e)	       = go e
+	      go (App e (Type t))      = go e
+	      go (App f a) 	       = go f - 1
+	      go (Var v) 	       = idArity v
+	      go _		       = 0
 \end{code}
 
 
