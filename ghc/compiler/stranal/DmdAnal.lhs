@@ -791,6 +791,7 @@ lub :: Demand -> Demand -> Demand
 lub Bot d = d
 
 lub Err Bot = Err 
+lub Err Abs = Lazy	-- E.g. f x = if ... then True else error x
 lub Err d   = d 
 
 lub Lazy d = Lazy
