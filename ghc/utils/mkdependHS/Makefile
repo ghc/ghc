@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.18 1999/10/05 10:30:33 simonmar Exp $
+# $Id: Makefile,v 1.19 1999/11/22 11:54:36 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -33,7 +33,7 @@ SCRIPT_OBJS=mkdependHS.prl
 ifeq "$(BIN_DIST)" "1"
 SCRIPT_PREFIX_FILES += prefix.txt
 else
-SCRIPT_SUBST_VARS += libdir datadir TMPDIR SED
+SCRIPT_SUBST_VARS += libdir libexecdir datadir TMPDIR SED
 endif
 
 # don't recurse on 'make install'
