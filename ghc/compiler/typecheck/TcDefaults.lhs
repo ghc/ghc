@@ -22,14 +22,24 @@ import HscTypes		( TyThing(..) )
 
 \begin{code}
 tcDefaults :: [DefaultDecl Name]
-	   -> TcM [Type] 	    -- defaulting types to heave
+	   -> TcM [Type]	    -- Defaulting types to heave
 				    -- into Tc monad for later use
 				    -- in Disambig.
 
-tcDefaults [] = returnM defaultDefaultTys
+tcDefaults [] 
+  = getDefaultTys		-- No default declaration, so get the
+				-- default types from the envt; 
+				-- i.e. use the curent ones
+				-- (the caller will put them back there)
+	-- It's important not to return defaultDefaultTys here (which
+	-- we used to do) because in a TH program, tcDefaults [] is called
+	-- repeatedly, once for each group of declarations between top-level
+	-- splices.  We don't want to carefully set the default types in
+	-- one group, only for the next group to ignore them and install
+	-- defaultDefaultTys
 
 tcDefaults [DefaultDecl [] locn]
-  = returnM []		-- no defaults
+  = returnM []			-- Default declaration specifying no types
 
 tcDefaults [DefaultDecl mono_tys locn]
   = tcLookupGlobal_maybe numClassName	`thenM` \ maybe_num ->
