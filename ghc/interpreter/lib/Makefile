@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.9 2000/04/04 01:07:50 andy Exp $ 
+# $Id: Makefile,v 1.10 2000/04/04 18:27:46 andy Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -49,7 +49,7 @@ LANG_LIBS = Addr.lhs Bits.lhs ByteArray.lhs Dynamic.lhs \
 
 UTIL_LIBS = QuickCheck.hs QuickCheckBatch.hs QuickCheckPoly.hs \
 	QuickCheckUtils.hs GetOpt.lhs \
-	Regex.lhs RegexString.lhs Observe.lhs Memo.lhs Readline.lhs \
+	Regex.lhs RegexString.lhs Memo.lhs Readline.lhs \
 	Select.lhs 
 
 CONC_LIBS = Channel.lhs ChannelVar.lhs Concurrent.lhs Merge.lhs \
