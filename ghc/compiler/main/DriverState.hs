@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.58 2001/09/26 15:12:34 simonpj Exp $
+-- $Id: DriverState.hs,v 1.59 2001/10/01 14:28:37 rrt Exp $
 --
 -- Settings for the driver
 --
@@ -63,6 +63,7 @@ v_Hs_source_cpp_opts = global
 -- Keep output from intermediate phases
 GLOBAL_VAR(v_Keep_hi_diffs, 		False, 		Bool)
 GLOBAL_VAR(v_Keep_hc_files,		False,		Bool)
+GLOBAL_VAR(v_Keep_il_files,		False,		Bool)
 GLOBAL_VAR(v_Keep_s_files,		False,		Bool)
 GLOBAL_VAR(v_Keep_raw_s_files,		False,		Bool)
 GLOBAL_VAR(v_Keep_tmp_files, 		False, 		Bool)
