@@ -486,9 +486,16 @@ tcRnThing hsc_env pcs ictxt rdr_name
 	do { addMessages (head msgs_s) ; failM }
     else do {
 
-    mapM_ addMessages msgs_s ;	-- Add deprecation warnings
-    mapM tcLookupGlobal names	-- and lookup up the entities
-    }}
+	-- Add deprecation warnings
+    mapM_ addMessages msgs_s ;	
+
+	-- Slurp in the supporting declarations
+    tcg_env <- importSupportingDecls (mkFVs names) ;
+    setGblEnv tcg_env $ do {
+
+	-- And lookup up the entities
+    mapM tcLookupGlobal names
+    }}}
 \end{code}
 
 
