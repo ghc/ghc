@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.22 2001/05/28 03:31:19 sof Exp $
+-- $Id: DriverUtil.hs,v 1.23 2001/06/02 09:45:51 qrczak Exp $
 --
 -- Utils for the driver
 --
@@ -108,7 +108,13 @@ handleDyn :: Typeable ex => (ex -> IO a) -> IO a -> IO a
 handleDyn = flip catchDyn
 
 handle :: (Exception -> IO a) -> IO a -> IO a
+#if __GLASGOW_HASKELL__ < 501
 handle = flip Exception.catchAllIO
+#else
+handle h f = f `Exception.catch` \e -> case e of
+    ExitException _ -> throw e
+    _               -> h e
+#endif
 
 split :: Char -> String -> [String]
 split c s = case rest of
