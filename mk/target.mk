@@ -66,17 +66,12 @@ ifneq "$(DOC_SRCS)" ""
 	$(MKDEPENDLIT) -o .depend $(MKDEPENDLIT_OPTS) $(filter %.lit,$(DOC_SRCS))
 endif
 ifneq "$(MKDEPENDC_SRCS)" ""
-	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) \
-                -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
+	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
 ifeq ($(notdir $(MKDEPENDHS)),ghc)
 #	New way of doing dependencies: the ghc driver knows how to invoke script
-	$(MKDEPENDHS) -M -optdep-f -optdep.depend \
-		$(foreach way,$(WAYS),-optdep-s -optdep$(way)) \
-		$(MKDEPENDHS_OPTS) \
-		$(HC_OPTS) \
-		$(MKDEPENDHS_SRCS)
+	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS)
 else
 #	Old way: call mkdependHS-1.2
 	$(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) \
@@ -382,8 +377,12 @@ $(SCRIPT_PROG) :: $(SCRIPT_OBJS)
 	$(RM) $@
 	@echo Creating $@...
 ifeq "$(INTERP)" "perl"
+ifneq "$(BIN_DIST)" "1"
 	@echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"  > $@
 	@echo "      if $$""running_under_some_shell;"     >> $@
+else
+	@touch $@
+endif
 else
 ifneq "$(INTERP)" ""
 	@echo "#!"$(INTERP) > $@
@@ -411,6 +410,7 @@ endif
 # get one install rule
 #
 #	INSTALL_PROGS 	 install these executable programs in $(bindir)
+#	INSTALL_SCRIPTS	 install these executable scripts in $(bindir)
 #	INSTALL_LIBS	 install these platform-dependent libraries in $(libdir)
 #	INSTALL_LIBEXECS install these platform-dependent execs in $(libdir)
 #	INSTALL_DATAS	 install these platform-independent files in $(datadir)
@@ -429,17 +429,42 @@ endif
 # from the installation itself.
 #
 installdirs ::
-	$(INSTALL_DIR) $(bindir)
-	$(INSTALL_DIR) $(libdir)
-	$(INSTALL_DIR) $(libexecdir)
-	$(INSTALL_DIR) $(datadir)
+	@$(INSTALL_DIR) $(bindir)
+	@$(INSTALL_DIR) $(libdir)
+	@$(INSTALL_DIR) $(libexecdir)
+	@$(INSTALL_DIR) $(datadir)
 
 # Better do this first...
 install:: installdirs
 
 ifneq "$(INSTALL_PROGS)" ""
 install:: $(INSTALL_PROGS)
-	$(INSTALL_PROGRAM) $(INSTALL_OPTS) $(INSTALL_PROGS) $(bindir)
+	$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $(INSTALL_PROGS) $(bindir)
+endif
+
+
+ifneq "$(INSTALL_SCRIPTS)" ""
+install:: $(INSTALL_SCRIPTS)
+ifeq "$(INTERP)" "perl"
+ifneq "$(BIN_DIST)" "1"
+	@for i in $(INSTALL_SCRIPTS); do \
+	   $(RM) $$i.tmp; \
+	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'"  > $$i.tmp ; \
+	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	   echo $$"bindir='$(bindir);'"                            >> $$i.tmp ; \
+	   echo $$"libdir='$(real_libdir)';"                       >> $$i.tmp ; \
+	   echo $$"datadir='$(real_datadir)';"                     >> $$i.tmp ; \
+	   cat  $$i                                                >> $$i.tmp ; \
+	   echo $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $(bindir) ;    \
+	   $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i.tmp $(bindir)/$$i ; \
+	   $(RM) $$i.tmp; \
+	done
+else
+	$(INSTALL_PROGRAM) $(INSTALL_OPTS) $(INSTALL_SCRIPTS) $(bindir)
+endif
+else
+	$(INSTALL_PROGRAM) $(INSTALL_OPTS) $(INSTALL_SCRIPTS) $(bindir)
+endif
 endif
 
 ifneq "$(INSTALL_LIBS)" ""
@@ -449,7 +474,7 @@ endif
 
 ifneq "$(INSTALL_LIBEXECS)" ""
 install:: $(INSTALL_LIBEXECS)
-	$(INSTALL_PROGRAM) $(INSTALL_OPTS) $(INSTALL_LIBEXECS) $(libexecdir)
+	$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $(INSTALL_LIBEXECS) $(libexecdir)
 endif
 
 ifneq "$(INSTALL_DATAS)" ""
@@ -520,7 +545,7 @@ endif
 #   
 # does not expand the {}, it has to be a separate argument (i.e. `a {}').
 # GNU find is (IMHO) more sensible here, expanding any {} it comes across
-# inside an -exec, whether it is a separate argument or part of a word:
+# inside an -exec, whether it is a separate arg or part of a word:
 #
 #  $ touch yes
 #  $ find --version
@@ -528,8 +553,8 @@ endif
 #  $ find yes -exec echo oh,{}! \;
 #    oh,yes!
 #
-# I'm not claiming that the above is not possible to achieve with
-# other finds, just that GNU find does the Patently Right Thing here :)
+# Of course, the above is not impossible toi achieve with other finds,
+# just that GNU find does the Patently Right Thing here :)
 #
 # ====> if you're using these dist rules, get hold of GNU findutils.
 #
@@ -589,14 +614,26 @@ binary-dist-pre::
 	-rm -f $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
 	@for i in $(BIN_DIST_DIRS); do 		 	 \
 	  if (test -d "$$i"); then 			 \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
+	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
 	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
 	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
-	   echo $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
-	   $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
+	   echo $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
+			prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+			exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
+			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
+			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
+			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion) ; \
+	   $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
+			prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+			exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+			bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
+			libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
+			libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
+			datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion) ; \
 	  fi; \
 	done
 
@@ -605,6 +642,17 @@ binary-dist-pre::
 # 
 binary-pack::
 	( cd $(BIN_DIST_TMPDIR); $(TAR) chzf $(BIN_DIST_NAME).tar.gz $(BIN_DIST_NAME); rm -rf $(BIN_DIST_NAME) )
+
+ifneq "$(way)" ""
+package-way-dist::
+	( cd $(BIN_DIST_TMPDIR); find $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print | xargs tar cvf $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar )
+	gzip $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar
+endif
+
+ifneq "$(way)" ""
+remove-way-dist::
+	( cd $(BIN_DIST_TMPDIR); find $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print -exec rm -f {} \; )
+endif
 
 ###########################################
 #
