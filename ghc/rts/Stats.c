@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.22 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: Stats.c,v 1.23 2000/12/19 14:30:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -58,34 +58,47 @@
 /* huh? */
 #define BIG_STRING_LEN              512
 
-static double ElapsedTimeStart = 0.0;
-static double TicksPerSecond   = 0.0;
+/* We're not trying to be terribly accurate here, using the 
+ * basic times() function to get a resolution of about 100ths of a 
+ * second, depending on the OS.  A long int will do fine for holding
+ * these values.
+ */
+#define TICK_TYPE long int
+#define TICK_TO_DBL(t) ((double)(t) / TicksPerSecond)
 
-static double InitUserTime = 0.0;
-static double InitElapsedTime = 0.0;
-static double InitElapsedStamp = 0.0;
+static int TicksPerSecond = 0;
 
-static double MutUserTime = 0.0;
-static double MutElapsedTime = 0.0;
-static double MutElapsedStamp = 0.0;
+static TICK_TYPE ElapsedTimeStart = 0;
+static TICK_TYPE CurrentElapsedTime = 0;
+static TICK_TYPE CurrentUserTime    = 0;
 
-static double ExitUserTime = 0.0;
-static double ExitElapsedTime = 0.0;
+static TICK_TYPE InitUserTime     = 0;
+static TICK_TYPE InitElapsedTime  = 0;
+static TICK_TYPE InitElapsedStamp = 0;
 
-static ullong GC_tot_alloc = 0;
-static ullong GC_tot_copied = 0;
+static TICK_TYPE MutUserTime      = 0;
+static TICK_TYPE MutElapsedTime   = 0;
+static TICK_TYPE MutElapsedStamp  = 0;
 
-static double GC_start_time,  GC_tot_time = 0;  /* User GC Time */
-static double GCe_start_time, GCe_tot_time = 0; /* Elapsed GC time */
+static TICK_TYPE ExitUserTime     = 0;
+static TICK_TYPE ExitElapsedTime  = 0;
+
+static ullong GC_tot_alloc        = 0;
+static ullong GC_tot_copied       = 0;
+
+static TICK_TYPE GC_start_time,  GC_tot_time = 0;  /* User GC Time */
+static TICK_TYPE GCe_start_time, GCe_tot_time = 0; /* Elapsed GC time */
 
 lnat MaxResidency = 0;     /* in words; for stats only */
+lnat AvgResidency = 0;
 lnat ResidencySamples = 0; /* for stats only */
 
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
-static double *GC_coll_times;
+static TICK_TYPE *GC_coll_times;
 
-/* ToDo: convert this to use integers? --SDM */
+static void  getTimes(void);
+static nat   pageFaults(void);
 
 /* elapsedtime() -- The current elapsed time in seconds */
 
@@ -101,12 +114,11 @@ static double *GC_coll_times;
 
 #ifdef _WIN32
 /* cygwin32 or mingw32 version */
-double
-elapsedtime(void)
+static void
+getTimes(void)
 {
     FILETIME creationTime, exitTime, kernelTime, userTime;
     long long int kT, uT;
- 
  
     /* ToDo: pin down elapsed times to just the OS thread(s) that
        are evaluating/managing Haskell code.
@@ -119,42 +131,31 @@ elapsedtime(void)
 
     FT2longlong(kT,kernelTime);
     FT2longlong(uT,userTime);
-    return (((StgDouble)(uT + kT))/TicksPerSecond);
+    CurrentElapsedTime = uT + kT;
+    CurrentUserTime = uT;
 }
 
-#else 
+#else /* !_WIN32 */
 
-double
-elapsedtime(void)
+static void
+getTimes(void)
 {
 
-# if ! (defined(HAVE_TIMES) || defined(HAVE_FTIME))
+# if !defined(HAVE_TIMES)
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
-    fprintf(stderr, "NOTE: `elapsedtime' does nothing!\n");
+    fprintf(stderr, "NOTE: `getTimes' does nothing!\n");
     return 0.0;
 
 # else /* not stumped */
-
-/* "ftime" may be nicer, but "times" is more standard;
-   but, on a Sun, if you do not get the SysV one, you are *hosed*...
- */
-
-#  if defined(HAVE_TIMES) && ! sunos4_TARGET_OS
     struct tms t;
     clock_t r = times(&t);
 
-    return (((double)r)/TicksPerSecond);
+    CurrentElapsedTime = r;
+    CurrentUserTime = t.tms_utime;
+#endif
 
-#  else /* HAVE_FTIME */
-    struct timeb t;
-
-    ftime(&t);
-    return (fabs(t.time + 1e-3*t.millitm));
-
-#  endif /* HAVE_FTIME */
-# endif /* not stumped */
 }
 #endif /* !_WIN32 */
 
@@ -173,18 +174,18 @@ elapsedtime(void)
 double
 mut_user_time_during_GC(void)
 {
-  return (GC_start_time - GC_tot_time);
+    return ((double)GC_start_time - (double)GC_tot_time);
 }
 
 double
 mut_user_time(void)
 {
-  return (usertime() - GC_tot_time);
+    getTimes();
+    return ((double)CurrentUserTime - (double)GC_tot_time);
 }
 
-
 static nat
-pagefaults(void)
+pageFaults(void)
 {
   /* ToDo (on NT): better, get this via the performance data
      that's stored in the registry. */
@@ -198,14 +199,38 @@ pagefaults(void)
 # endif
 }
 
-/* ToDo: use gettimeofday on systems that support it (u-sec accuracy) */
+void
+initStats(void)
+{
+    nat i;
+    FILE *sf = RtsFlags.GcFlags.statsFile;
+  
+    if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
+	fprintf(sf, "    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
+	fprintf(sf, "    bytes     bytes     bytes  user  elap    user    elap\n");
+    }
+    GC_coll_times = 
+	(TICK_TYPE *)stgMallocBytes(
+	    sizeof(TICK_TYPE)*RtsFlags.GcFlags.generations,
+	    "initStats");
+    for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
+	GC_coll_times[i] = 0;
+    }
+}    
+
+/* -----------------------------------------------------------------------------
+   Initialisation time...
+   -------------------------------------------------------------------------- */
 
 void
-start_time(void)
+stat_startInit(void)
 {
-#ifdef HAVE_SYSCONF
-    long ticks;
     /* Determine TicksPerSecond ... */
+#if defined(CLK_TCK)		/* defined by POSIX */
+    TicksPerSecond = CLK_TCK;
+
+#elif defined(HAVE_SYSCONF)
+    long ticks;
 
     ticks = sysconf(_SC_CLK_TCK);
     if ( ticks == -1 ) {
@@ -214,7 +239,7 @@ start_time(void)
     }
     TicksPerSecond = (double) ticks;
 
-/* no "sysconf"; had better guess */
+/* no "sysconf" or CLK_TCK; had better guess */
 #elif defined(HZ)
     TicksPerSecond = (StgDouble) (HZ);
 
@@ -228,86 +253,21 @@ start_time(void)
     TicksPerSecond = 60.0;
 #endif
 
-    ElapsedTimeStart = elapsedtime();
+    getTimes();
+    ElapsedTimeStart = CurrentElapsedTime;
 }
-
-
-void
-initStats(void)
-{
-  nat i;
-  FILE *sf = RtsFlags.GcFlags.statsFile;
-  
-  if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-    fprintf(sf, "    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
-    fprintf(sf, "    bytes     bytes     bytes  user  elap    user    elap\n");
-  }
-  GC_coll_times = 
-    (double *)stgMallocBytes(sizeof(double) * RtsFlags.GcFlags.generations,
-			   "initStats");
-  for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
-    GC_coll_times[i] = 0.0;
-  }
-}    
-
-#ifdef _WIN32
-double
-usertime(void)
-{
-    FILETIME creationTime, exitTime, kernelTime, userTime;
-    long long int uT;
-
-    /* Convert FILETIMEs into long longs */
-
-    if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
-		          &exitTime, &kernelTime, &userTime)) {
-	/* Probably exec'ing this on a Win95 box..*/
-	return 0;
-    }
-
-    FT2longlong(uT,userTime);
-    return (((StgDouble)uT)/TicksPerSecond);
-}
-#else
-
-double
-usertime(void)
-{
-# if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
-    /* We will #ifdef around the fprintf for machines
-       we *know* are unsupported. (WDP 94/05)
-    */
-    fprintf(stderr, "NOTE: `usertime' does nothing!\n");
-    return 0.0;
-
-# else /* not stumped */
-
-#  if defined(HAVE_TIMES) 
-    struct tms t;
-
-    times(&t);
-    return(((double)(t.tms_utime))/TicksPerSecond);
-
-#  else /* HAVE_GETRUSAGE */
-    struct rusage t;
-
-    getrusage(RUSAGE_SELF, &t);
-    return(t.ru_utime.tv_sec + 1e-6*t.ru_utime.tv_usec);
-
-#  endif /* HAVE_GETRUSAGE */
-# endif /* not stumped */
-}
-#endif /* ! _WIN32 */
 
 void 
-end_init(void)
+stat_endInit(void)
 {
-  InitUserTime = usertime();
-  InitElapsedStamp = elapsedtime(); 
-  InitElapsedTime = InitElapsedStamp - ElapsedTimeStart;
-  if (InitElapsedTime < 0.0) {
-    InitElapsedTime = 0.0;
-  }
+    getTimes();
+    InitUserTime = CurrentUserTime;
+    InitElapsedStamp = CurrentElapsedTime; 
+    if (ElapsedTimeStart > CurrentElapsedTime) {
+	InitElapsedTime = 0;
+    } else {
+	InitElapsedTime = CurrentElapsedTime - ElapsedTimeStart;
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -319,39 +279,41 @@ end_init(void)
 void
 stat_startExit(void)
 {
-  MutElapsedStamp = elapsedtime(); 
-  MutElapsedTime = MutElapsedStamp - GCe_tot_time - InitElapsedStamp;
-  if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
-
-  /* for SMP, we don't know the mutator time yet, we have to inspect
-   * all the running threads to find out, and they haven't stopped
-   * yet.  So we just timestamp MutUserTime at this point so we can
-   * calculate the EXIT time.  The real MutUserTime is calculated
-   * in stat_exit below.
-   */
+    getTimes();
+    MutElapsedStamp = CurrentElapsedTime;
+    MutElapsedTime = CurrentElapsedTime - GCe_tot_time - InitElapsedStamp;
+    if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
+    
+    /* for SMP, we don't know the mutator time yet, we have to inspect
+     * all the running threads to find out, and they haven't stopped
+     * yet.  So we just timestamp MutUserTime at this point so we can
+     * calculate the EXIT time.  The real MutUserTime is calculated
+     * in stat_exit below.
+     */
 #ifdef SMP
-  MutUserTime = usertime();
+    MutUserTime = CurrentUserTime;
 #else
-  MutUserTime = usertime() - GC_tot_time - InitUserTime;
-  if (MutUserTime < 0) { MutUserTime = 0; }
+    MutUserTime = CurrentUserTime - GC_tot_time - InitUserTime;
+    if (MutUserTime < 0) { MutUserTime = 0; }
 #endif
 }
 
 void
 stat_endExit(void)
 {
+    getTimes();
 #ifdef SMP
-  ExitUserTime = usertime() - MutUserTime;
+    ExitUserTime = CurrentUserTime - MutUserTime;
 #else
-  ExitUserTime = usertime() - MutUserTime - GC_tot_time - InitUserTime;
+    ExitUserTime = CurrentUserTime - MutUserTime - GC_tot_time - InitUserTime;
 #endif
-  ExitElapsedTime = elapsedtime() - MutElapsedStamp;
-  if (ExitUserTime < 0.0) {
-    ExitUserTime = 0.0;
-  }
-  if (ExitElapsedTime < 0.0) {
-    ExitElapsedTime = 0.0;
-  }
+    ExitElapsedTime = CurrentElapsedTime - MutElapsedStamp;
+    if (ExitUserTime < 0) {
+	ExitUserTime = 0;
+    }
+    if (ExitElapsedTime < 0) {
+	ExitElapsedTime = 0;
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -368,8 +330,6 @@ static nat rub_bell = 0;
 void
 stat_startGC(void)
 {
-    FILE *sf = RtsFlags.GcFlags.statsFile;
-
     nat bell = RtsFlags.GcFlags.ringBell;
 
     if (bell) {
@@ -382,16 +342,18 @@ stat_startGC(void)
     }
 
 #if defined(PROFILING) || defined(DEBUG)
-    GC_start_time = usertime();  /* needed in mut_user_time_during_GC() */
+    getTimes();
+    GC_start_time = CurrentUserTime;  /* needed in mut_user_time_during_GC() */
 #endif
 
-    if (sf != NULL) {
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 #if !defined(PROFILING) && !defined(DEBUG)
-        GC_start_time = usertime();
+	getTimes();
+        GC_start_time = CurrentUserTime;
 #endif
-	GCe_start_time = elapsedtime();
+	GCe_start_time = CurrentElapsedTime;
 	if (RtsFlags.GcFlags.giveStats) {
-	  GC_start_faults = pagefaults();
+	    GC_start_faults = pageFaults();
 	}
     }
 }
@@ -405,22 +367,25 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 {
     FILE *sf = RtsFlags.GcFlags.statsFile;
 
-    if (sf != NULL) {
-	double time     = usertime();
-	double etime    = elapsedtime();
-	double gc_time  = time - GC_start_time;
-	double gc_etime = etime - GCe_start_time;
-
-	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-	    nat faults = pagefaults();
-
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
+	TICK_TYPE time, etime, gc_time, gc_etime;
+	
+	getTimes();
+	time     = CurrentUserTime;
+	etime    = CurrentElapsedTime;
+	gc_time  = time - GC_start_time;
+	gc_etime = etime - GCe_start_time;
+	
+	if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS && sf != NULL) {
+	    nat faults = pageFaults();
+	    
 	    fprintf(sf, "%9ld %9ld %9ld",
 		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_));
 	    fprintf(sf, " %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
-		    gc_time, 
-		    gc_etime,
-		    time,
-		    etime - ElapsedTimeStart,
+		    TICK_TO_DBL(gc_time),
+		    TICK_TO_DBL(gc_etime),
+		    TICK_TO_DBL(time),
+		    TICK_TO_DBL(etime - ElapsedTimeStart),
 		    faults - GC_start_faults,
 		    GC_start_faults - GC_end_faults,
 		    gen);
@@ -435,27 +400,28 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	GC_tot_alloc  += (ullong) alloc;
 	GC_tot_time   += gc_time;
 	GCe_tot_time  += gc_etime;
-
+	
 #ifdef SMP
 	{
-	  nat i;
-	  pthread_t me = pthread_self();
+	    nat i;
+	    pthread_t me = pthread_self();
 
-	  for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-	    if (me == task_ids[i].id) {
-	      task_ids[i].gc_time += gc_time;
-	      task_ids[i].gc_etime += gc_etime;
-	      break;
+	    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
+		if (me == task_ids[i].id) {
+		    task_ids[i].gc_time += gc_time;
+		    task_ids[i].gc_etime += gc_etime;
+		    break;
+		}
 	    }
-	  }
 	}
 #endif
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
-	  if (live > MaxResidency) {
-	    MaxResidency = live;
-	  }
-	  ResidencySamples++;
+	    if (live > MaxResidency) {
+		MaxResidency = live;
+	    }
+	    ResidencySamples++;
+	    AvgResidency += live;
 	}
     }
 
@@ -476,19 +442,19 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 void
 stat_workerStop(void)
 {
-  nat i;
-  pthread_t me = pthread_self();
+    nat i;
+    pthread_t me = pthread_self();
 
-  for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-    if (task_ids[i].id == me) {
-      task_ids[i].mut_time = usertime() - task_ids[i].gc_time;
-      task_ids[i].mut_etime = elapsedtime()
-	                         - GCe_tot_time
-	                         - task_ids[i].elapsedtimestart;
-      if (task_ids[i].mut_time < 0.0)  { task_ids[i].mut_time = 0.0;  }
-      if (task_ids[i].mut_etime < 0.0) { task_ids[i].mut_etime = 0.0; }
+    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
+	if (task_ids[i].id == me) {
+	    task_ids[i].mut_time = usertime() - task_ids[i].gc_time;
+	    task_ids[i].mut_etime = elapsedtime()
+		- GCe_tot_time
+		- task_ids[i].elapsedtimestart;
+	    if (task_ids[i].mut_time < 0.0)  { task_ids[i].mut_time = 0.0;  }
+	    if (task_ids[i].mut_etime < 0.0) { task_ids[i].mut_etime = 0.0; }
+	}
     }
-  }
 }
 #endif
 
@@ -504,93 +470,132 @@ void
 stat_exit(int alloc)
 {
     FILE *sf = RtsFlags.GcFlags.statsFile;
+    
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 
-    if (sf != NULL){
 	char temp[BIG_STRING_LEN];
-	double time = usertime();
-	double etime = elapsedtime() - ElapsedTimeStart;
+	TICK_TYPE time;
+	TICK_TYPE etime;
+	nat g, total_collections = 0;
 
-	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
-	if (time  == 0.0)  time = 0.0001;
-	if (etime == 0.0) etime = 0.0001;
-	
-	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-	  fprintf(sf, "%9ld %9.9s %9.9s",	(lnat)alloc*sizeof(W_), "", "");
-	  fprintf(sf, " %5.2f %5.2f\n\n", 0.0, 0.0);
-	}
+	getTimes();
+	time = CurrentUserTime;
+	etime = CurrentElapsedTime - ElapsedTimeStart;
 
 	GC_tot_alloc += alloc;
 
-	ullong_format_string(GC_tot_alloc*sizeof(W_), temp, rtsTrue/*commas*/);
-	fprintf(sf, "%11s bytes allocated in the heap\n", temp);
-
-	ullong_format_string(GC_tot_copied*sizeof(W_), temp, rtsTrue/*commas*/);
-	fprintf(sf, "%11s bytes copied during GC\n", temp);
-
-	if ( ResidencySamples > 0 ) {
-	    ullong_format_string(MaxResidency*sizeof(W_), temp, rtsTrue/*commas*/);
-	    fprintf(sf, "%11s bytes maximum residency (%ld sample(s))\n",
-			      temp,
-			      ResidencySamples);
-	}
-	fprintf(sf,"\n");
-
-	{ /* Count garbage collections */
-	  nat g;
-	  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	    fprintf(sf, "%11d collections in generation %d (%6.2fs)\n", 
-		    generations[g].collections, g, GC_coll_times[g]);
-	  }
-	}
-	fprintf(sf,"\n%11ld Mb total memory in use\n\n", 
-		mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
+	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
+	if (time  == 0.0)  time = 1;
+	if (etime == 0.0) etime = 1;
+	
+	/* Count total garbage collections */
+	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
+	    total_collections += generations[g].collections;
 
 	/* For SMP, we have to get the user time from each thread
 	 * and try to work out the total time.
 	 */
 #ifdef SMP
-	{
-	  nat i;
-	  MutUserTime = 0.0;
-	  for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-	    MutUserTime += task_ids[i].mut_time;
-	    fprintf(sf, "  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
-		        "            GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
-		    i, 
-		    task_ids[i].mut_time, task_ids[i].mut_etime,
-		    task_ids[i].gc_time, task_ids[i].gc_etime);
-	  }
+	{   nat i;
+	    MutUserTime = 0.0;
+	    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
+		MutUserTime += task_ids[i].mut_time;
+	    }
 	}
 	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
 	if (MutUserTime < 0) { MutUserTime = 0; }
 #endif
 
-	fprintf(sf, "  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
-		InitUserTime, InitElapsedTime);
-	fprintf(sf, "  MUT   time  %6.2fs  (%6.2fs elapsed)\n",
-		MutUserTime, MutElapsedTime);
-	fprintf(sf, "  GC    time  %6.2fs  (%6.2fs elapsed)\n",
-		GC_tot_time, GCe_tot_time);
-	fprintf(sf, "  EXIT  time  %6.2fs  (%6.2fs elapsed)\n",
-		ExitUserTime, ExitElapsedTime);
-	fprintf(sf, "  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
-		time, etime);
+	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS && sf != NULL) {
+	    fprintf(sf, "%9ld %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
+	    fprintf(sf, " %5.2f %5.2f\n\n", 0.0, 0.0);
+	}
 
-	fprintf(sf, "  %%GC time     %5.1f%%  (%.1f%% elapsed)\n\n",
-		GC_tot_time*100./time, GCe_tot_time*100./etime);
+	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS && sf != NULL) {
+	    ullong_format_string(GC_tot_alloc*sizeof(W_), 
+				 temp, rtsTrue/*commas*/);
+	    fprintf(sf, "%11s bytes allocated in the heap\n", temp);
 
-	if (time - GC_tot_time == 0.0)
-		ullong_format_string(0, temp, rtsTrue/*commas*/);
-	else
-		ullong_format_string((ullong)(GC_tot_alloc*sizeof(W_)/
-					      (time - GC_tot_time)),
+	    ullong_format_string(GC_tot_copied*sizeof(W_), 
+				 temp, rtsTrue/*commas*/);
+	    fprintf(sf, "%11s bytes copied during GC\n", temp);
+
+	    if ( ResidencySamples > 0 ) {
+		ullong_format_string(MaxResidency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
+		fprintf(sf, "%11s bytes maximum residency (%ld sample(s))\n",
+			temp, ResidencySamples);
+	    }
+	    fprintf(sf,"\n");
 
-	fprintf(sf, "  Alloc rate    %s bytes per MUT second\n\n", temp);
+	    /* Print garbage collections in each gen */
+	    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+		fprintf(sf, "%11d collections in generation %d (%6.2fs)\n", 
+			generations[g].collections, g, 
+			TICK_TO_DBL(GC_coll_times[g]));
+	    }
 
-	fprintf(sf, "  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
-		(time - GC_tot_time - InitUserTime) * 100. / time, 
-                (time - GC_tot_time - InitUserTime) * 100. / etime);
+	    fprintf(sf,"\n%11ld Mb total memory in use\n\n", 
+		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
+
+#ifdef SMP
+	    {
+		nat i;
+		for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
+		    fprintf(sf, "  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
+			    "            GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
+			    i, 
+			    TICK_TO_DBL(task_ids[i].mut_time),
+			    TICK_TO_DBL(task_ids[i].mut_etime),
+			    TICK_TO_DBL(task_ids[i].gc_time),
+			    TICK_TO_DBL(task_ids[i].gc_etime));
+		}
+	    }
+#endif
+
+	    fprintf(sf, "  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
+		    TICK_TO_DBL(InitUserTime), TICK_TO_DBL(InitElapsedTime));
+	    fprintf(sf, "  MUT   time  %6.2fs  (%6.2fs elapsed)\n",
+		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime));
+	    fprintf(sf, "  GC    time  %6.2fs  (%6.2fs elapsed)\n",
+		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
+	    fprintf(sf, "  EXIT  time  %6.2fs  (%6.2fs elapsed)\n",
+		    TICK_TO_DBL(ExitUserTime), TICK_TO_DBL(ExitElapsedTime));
+	    fprintf(sf, "  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
+		    TICK_TO_DBL(time), TICK_TO_DBL(etime));
+	    fprintf(sf, "  %%GC time     %5.1f%%  (%.1f%% elapsed)\n\n",
+		    TICK_TO_DBL(GC_tot_time)*100/time, 
+		    TICK_TO_DBL(GCe_tot_time)*100/etime);
+
+	    if (time - GC_tot_time == 0)
+		ullong_format_string(0, temp, rtsTrue/*commas*/);
+	    else
+		ullong_format_string(
+		    (ullong)((GC_tot_alloc*sizeof(W_))/
+			     TICK_TO_DBL(time - GC_tot_time)),
+		    temp, rtsTrue/*commas*/);
+	    
+	    fprintf(sf, "  Alloc rate    %s bytes per MUT second\n\n", temp);
+	
+	    fprintf(sf, "  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
+		    TICK_TO_DBL(time - GC_tot_time - InitUserTime) * 100 
+		    / TICK_TO_DBL(time), 
+		    TICK_TO_DBL(time - GC_tot_time - InitUserTime) * 100 
+		    / TICK_TO_DBL(etime));
+	}
+
+	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS && sf != NULL) {
+	    fprintf(sf, "<<ghc: %lld bytes, %d GCs, %ld/%ld avg/max bytes residency (%ld samples), %ldM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
+		    GC_tot_alloc*sizeof(W_), total_collections,
+		    AvgResidency*sizeof(W_)/ResidencySamples, 
+		    MaxResidency*sizeof(W_), 
+		    ResidencySamples, 
+		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024),
+		    TICK_TO_DBL(InitUserTime), TICK_TO_DBL(InitElapsedTime),
+		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime),
+		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
+	}
+
 	fflush(sf);
 	fclose(sf);
     }
