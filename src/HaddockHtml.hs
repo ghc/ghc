@@ -17,7 +17,7 @@ import HsSyn
 import IO
 import Maybe	( fromJust, isJust )
 import List 	( sortBy )
-import Char	( toUpper, toLower, isAlpha, ord )
+import Char	( isUpper, toUpper, isAlpha, ord )
 import Monad	( when, unless )
 
 #if __GLASGOW_HASKELL__ < 503
@@ -83,8 +83,8 @@ contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
 indexHtmlFile    = "doc-index.html"
 
-subIndexHtmlFile :: Char -> Char -> String
-subIndexHtmlFile k a = "doc-index-" ++ [k] ++ b ++ ".html"
+subIndexHtmlFile :: Char -> String
+subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
    where b | isAlpha a = [a]
            | otherwise = show (ord a)
 
@@ -226,87 +226,105 @@ ppHtmlIndex odir doctitle ifaces = do
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
 	    simpleHeader doctitle </>
-	    tda [theclass "section1"] << toHtml "Type/Class Index" </>
-	    index_html tycls_index 't' </>
-	    tda [theclass "section1"] << toHtml "Function/Constructor Index" </>
-	    index_html var_index 'v'
+	    index_html
 	   )
 
-  when split_indices
-    (do mapM_ (do_sub_index "Type/Class" tycls_index 't') initialChars
-        mapM_ (do_sub_index "Function/Constructor" var_index 'v') initialChars
-    )
+  when split_indices $
+    mapM_ (do_sub_index index) initialChars
 
   writeFile (odir ++ pathSeparator:indexHtmlFile) (renderHtml html)
 
  where
-  split_indices = length tycls_index > 50 || length var_index > 50
+  split_indices = length index > 50
 
-  index_html this_ix kind
+  index_html
     | split_indices = 
-	td << table ! [cellpadding 0, cellspacing 5] <<
-	    besides [ td << anchor ! [href (subIndexHtmlFile kind c)] <<
-			 toHtml [c]
-		    | c <- initialChars
-                    , any ((`nameBeginsWith` c) . fst) this_ix ]
+	tda [theclass "section1"] << 
+	      	toHtml ("Index") </>
+	indexInitialLetterLinks
    | otherwise =
 	td << table ! [cellpadding 0, cellspacing 5] <<
-	  aboves (map indexElt this_ix) 
+	  aboves (map indexElt index) 
  	
-  do_sub_index descr this_ix kind c
+  indexInitialLetterLinks = 
+	td << table ! [cellpadding 0, cellspacing 5] <<
+	    besides [ td << anchor ! [href (subIndexHtmlFile c)] <<
+			 toHtml [c]
+		    | c <- initialChars
+                    , any ((==c) . head . fst) index ]
+
+  do_sub_index this_ix c
     = unless (null index_part) $
-        writeFile (odir ++ pathSeparator:subIndexHtmlFile kind c)
+        writeFile (odir ++ pathSeparator:subIndexHtmlFile c)
                   (renderHtml html)
     where 
-      html = header (thetitle (toHtml (doctitle ++ " (" ++ descr ++ "Index)")) +++
+      html = header (thetitle (toHtml (doctitle ++ " (Index)")) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
              body << vanillaTable << (
 	        simpleHeader doctitle </>
+		indexInitialLetterLinks </>
 	        tda [theclass "section1"] << 
-	      	toHtml (descr ++ " Index (" ++ c:")") </>
+	      	toHtml ("Index (" ++ c:")") </>
 	        td << table ! [cellpadding 0, cellspacing 5] <<
 	      	  aboves (map indexElt index_part) 
 	       )
 
-      index_part = [(n,stuff) | (n,stuff) <- this_ix, n `nameBeginsWith` c]
+      index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
 
-  tycls_index = index isTyClsName
-  var_index   = index (not.isTyClsName)
-
-  isTyClsName (HsTyClsName _) = True
-  isTyClsName _ = False
-
-  index :: (HsName -> Bool) -> [(HsName, [(Module,Bool)])]
-  index f = sortBy cmp (fmToList (full_index f))
+  index :: [(String, FiniteMap HsQName [(Module,Bool)])]
+  index = sortBy cmp (fmToList full_index)
     where cmp (n1,_) (n2,_) = n1 `compare` n2
 
-  iface_indices f = map (getIfaceIndex f) ifaces
-  full_index f = foldr (plusFM_C (++)) emptyFM (iface_indices f)
+  -- for each name (a plain string), we have a number of original HsNames that
+  -- it can refer to, and for each of those we have a list of modules
+  -- that export that entity.  Each of the modules exports the entity
+  -- in a visible or invisible way (hence the Bool).
+  full_index :: FiniteMap String (FiniteMap HsQName [(Module,Bool)])
+  full_index = addListToFM_C (plusFM_C (++)) emptyFM
+		(concat (map getIfaceIndex ifaces))
 
-  getIfaceIndex f (mdl,iface) = listToFM
-    [ (nm, [(mdl, not (nm `elemFM` iface_reexported iface))]) 
-    | (nm, Qual mdl' _) <- fmToList (iface_env iface), f nm ]
+  getIfaceIndex (mdl,iface) = 
+    [ (hsNameStr nm, 
+	listToFM [(orig, [(mdl, not (nm `elemFM` iface_reexported iface))])])
+    | (nm, orig) <- fmToList (iface_env iface) ]
 
-  indexElt :: (HsName, [(Module,Bool)]) -> HtmlTable
-  indexElt (nm, entries) = 
-     td << ppHsName nm
-     <-> td << (hsep [ if visible then
-			 linkId (Module mdl) (Just nm) << toHtml mdl
-		       else
-			 toHtml mdl
-	             | (Module mdl, visible) <- entries ])
+  indexElt :: (String, FiniteMap HsQName [(Module,Bool)]) -> HtmlTable
+  indexElt (str, entities) = 
+     case fmToList entities of
+	[(nm,entries)] ->  
+	    tda [ theclass "indexentry" ] << toHtml str <-> 
+			indexLinks (unQual nm) entries
+	many_entities ->
+	    tda [ theclass "indexentry" ] << toHtml str </> 
+		aboves (map doAnnotatedEntity (zip [1..] many_entities))
+
+  unQual (Qual _ nm) = nm
+  unQual (UnQual nm) = nm
+
+  doAnnotatedEntity (j,(qnm,entries))
+	= tda [ theclass "indexannot" ] << 
+		toHtml (show j) <+> parens (ppAnnot nm) <->
+		 indexLinks nm entries
+	where nm = unQual qnm
+
+  ppAnnot (HsTyClsName n)
+       = toHtml "Type/Class"
+  ppAnnot (HsVarName n)
+       | isUpper c || c == ':'  = toHtml "Data Constructor"
+       | otherwise		= toHtml "Function"
+      where c = head (ppHsIdentifier n)
+
+  indexLinks nm entries = 
+     tda [ theclass "indexlinks" ] << 
+	hsep (punctuate comma 
+	[ if visible then
+	     linkId (Module mdl) (Just nm) << toHtml mdl
+	  else
+	     toHtml mdl
+	| (Module mdl, visible) <- entries ])
 
   initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
-
-nameBeginsWith :: HsName -> Char -> Bool
-nameBeginsWith (HsTyClsName id0) c = idBeginsWith id0 c
-nameBeginsWith (HsVarName   id0) c = idBeginsWith id0 c
-
-idBeginsWith :: HsIdentifier -> Char -> Bool
-idBeginsWith (HsIdent   s) c = head s `elem` [toLower c, toUpper c]
-idBeginsWith (HsSymbol  s) c = head s `elem` [toLower c, toUpper c]
-idBeginsWith (HsSpecial s) c = head s `elem` [toLower c, toUpper c]
 
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module

@@ -76,6 +76,21 @@ TD.body  {
   padding-left: 10px
   }
 
+TD.indexentry {
+  vertical-align: top;
+  padding-right: 10px
+  }
+
+TD.indexannot {
+  vertical-align: top;
+  padding-left: 20px;
+  white-space: nowrap
+  }
+
+TD.indexlinks {
+  width: 100%
+  }
+
 /* ------- Section Headings ------- */
 
 TD.section1 {
