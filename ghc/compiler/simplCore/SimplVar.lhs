@@ -28,7 +28,7 @@ import Id		( idType, getIdUnfolding,
 			  mkIdWithNewUniq, mkIdWithNewType, 
 			  IdEnv, lookupIdEnv, delOneFromIdEnv, elemIdEnv, isNullIdEnv, addOneToIdEnv
 			)
-import SpecEnv		( lookupSpecEnv, substSpecEnv, isEmptySpecEnv )
+import SpecEnv		( lookupSpecEnv )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
@@ -196,10 +196,6 @@ simplBinder env (id, occ_info)
        -- id1 has its type zapped
        id1 | empty_ty_subst = id
            | otherwise      = mkIdWithNewType id ty'
-
-       -- id2 has its SpecEnv zapped
-       id2 | isEmptySpecEnv spec_env = id1
-           | otherwise               = setIdSpecialisation id1 spec_env'
     in
     if not_in_scope then
 	-- No need to clone, but we *must* zap any current substitution
@@ -207,19 +203,19 @@ simplBinder env (id, occ_info)
 	--	(\x.e) with id_subst = [x |-> e']
 	-- Here we must simply zap the substitution for x
 	let
-	    env' = setIdEnv env (new_in_scope_ids id2, 
+	    env' = setIdEnv env (new_in_scope_ids id1, 
 				 delOneFromIdEnv id_subst id)
 	in
-	returnSmpl (env', id2)
+	returnSmpl (env', id1)
     else
 	-- Must clone
 	getUniqueSmpl         `thenSmpl` \ uniq ->
 	let
-	    id3 = mkIdWithNewUniq id2 uniq
-	    env' = setIdEnv env (new_in_scope_ids id3,
-				 addOneToIdEnv id_subst id (SubstVar id3))
+	    id2 = mkIdWithNewUniq id1 uniq
+	    env' = setIdEnv env (new_in_scope_ids id2,
+				 addOneToIdEnv id_subst id (SubstVar id2))
 	in
-	returnSmpl (env', id3)
+	returnSmpl (env', id2)
     )
   where
     ((in_scope_tyvars, ty_subst), (in_scope_ids, id_subst)) = getEnvs env
@@ -231,9 +227,6 @@ simplBinder env (id, occ_info)
     
     ty               	 = idType id
     ty'              	 = instantiateTy ty_subst ty
-    
-    spec_env         	 = getIdSpecialisation id
-    spec_env'        	 = substSpecEnv ty_subst (substSpecEnvRhs ty_subst id_subst) spec_env
 
 simplBinders :: SimplEnv -> [InBinder] -> SmplM (SimplEnv, [OutId])
 simplBinders env binders = mapAccumLSmpl simplBinder env binders
@@ -266,33 +259,3 @@ simplTyBinders :: SimplEnv -> [TyVar] -> SmplM (SimplEnv, [TyVar])
 simplTyBinders env binders = mapAccumLSmpl simplTyBinder env binders
 \end{code}
 
-
-substSpecEnvRhs applies a substitution to the RHS's of a SpecEnv
-It exploits the known structure of a SpecEnv's RHS to have fewer
-equations.
-
-\begin{code}
-substSpecEnvRhs te ve rhs
-  = go te ve rhs
-  where
-    go te ve (App f (TyArg ty)) = App (go te ve f) (TyArg (instantiateTy te ty))
-    go te ve (App f (VarArg v)) = App (go te ve f) (case lookupIdEnv ve v of
-							Just (SubstVar v') -> VarArg v'
-							Just (SubstLit l)  -> LitArg l
-							Nothing            -> VarArg v)
-    go te ve (Var v)		  = case lookupIdEnv ve v of
-						Just (SubstVar v') -> Var v'
-						Just (SubstLit l)  -> Lit l
-						Nothing 	   -> Var v
-
-	-- These equations are a bit half baked, because
-	-- they don't deal properly wih capture.
-	-- But I'm sure it'll never matter... sigh.
-    go te ve (Lam b@(TyBinder tyvar) e) = Lam b (go te' ve e)
-				        where
-					  te' = delFromTyVarEnv te tyvar
-
-    go te ve (Lam b@(ValBinder v) e) = Lam b (go te ve' e)
-				     where
-				       ve' = delOneFromIdEnv ve v
-\end{code}

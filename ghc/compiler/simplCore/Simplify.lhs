@@ -11,7 +11,7 @@ module Simplify ( simplTopBinds, simplExpr, simplBind ) where
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import ConFold		( completePrim )
-import CoreUnfold	( Unfolding, mkFormSummary, 
+import CoreUnfold	( Unfolding, mkFormSummary, noUnfolding,
 			  exprIsTrivial, whnfOrBottom, inlineUnconditionally,
 			  FormSummary(..)
 			)
@@ -21,7 +21,7 @@ import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			  unTagBinders, squashableDictishCcExpr
 			)
 import Id		( idType, idMustBeINLINEd, idWantsToBeINLINEd, idMustNotBeINLINEd, 
-			  addIdArity, getIdArity,
+			  addIdArity, getIdArity, getIdSpecialisation, setIdSpecialisation,
 			  getIdDemandInfo, addIdDemandInfo
 			)
 import Name		( isExported, isLocallyDefined )
@@ -35,6 +35,7 @@ import SimplEnv
 import SimplMonad
 import SimplVar		( completeVar, simplBinder, simplBinders, simplTyBinder, simplTyBinders )
 import SimplUtils
+import SpecEnv		( isEmptySpecEnv, substSpecEnv )
 import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, applyTys,
 			  mkFunTys, splitAlgTyConApp_maybe,
 			  splitFunTys, splitFunTy_maybe, isUnpointedType
@@ -1079,10 +1080,7 @@ completeBind :: SimplEnv
 	     -> InBinder -> OutId -> OutExpr		-- Id and RHS
 	     -> (SimplEnv, [(OutId, OutExpr)])		-- Final envt and binding(s)
 
-completeBind env binder@(_,occ_info) new_id new_rhs
-  | idMustNotBeINLINEd new_id		-- Occurrence analyser says "don't inline"
-  = (env, new_binds)
-
+completeBind env binder@(old_id,occ_info) new_id new_rhs
   |  atomic_rhs			-- If rhs (after eta reduction) is atomic
   && not (isExported new_id)	-- and binder isn't exported
   = 	-- Drop the binding completely
@@ -1092,31 +1090,31 @@ completeBind env binder@(_,occ_info) new_id new_rhs
     in
     (env2, [])
 
-{-	This case is WRONG.  It attempts to exploit knowledge that indirections
-	are eliminated (by OccurAnal), but they *aren't* for recursive bindings.
-	If this case is enabled, then 
-		rec { local = (a,b)
-		      global = local
-		      ... = case global of ...
-		    }
-	never gets simplified
-
-  |  atomic_rhs 		-- Rhs is atomic, and new_id is exported
-  && case eta'd_rhs of { Var v -> isLocallyDefined v && not (isExported v); other -> False }
-  =	-- The local variable v will be eliminated next time round
-	-- in favour of new_id, so it's a waste to replace all new_id's with v's
-	-- this time round.
-	-- This case is an optional improvement; saves a simplifier iteration
-    (env, [(new_id, eta'd_rhs)])
--}
-
   | otherwise				-- Non-atomic
+	-- The big deal here is that we simplify the 
+	-- SpecEnv of the Id, if any. We used to do that in simplBinders, but
+	-- that didn't work because it didn't take account of the fact that
+	-- one of the mutually recursive group might mention one of the others
+	-- in its SpecEnv
   = let
-	env1 = extendEnvGivenBinding env occ_info new_id new_rhs
-    in 
+	id_w_specenv | isEmptySpecEnv spec_env = new_id
+		     | otherwise	       = setIdSpecialisation new_id spec_env'
+
+	env1 | idMustNotBeINLINEd new_id	-- Occurrence analyser says "don't inline"
+	     = extendEnvGivenUnfolding env id_w_specenv occ_info noUnfolding
+			-- Still need to record the new_id with its SpecEnv
+
+	     | otherwise			-- Can inline it
+	     = extendEnvGivenBinding env occ_info id_w_specenv new_rhs
+
+    in
     (env1, new_binds)
 	     
   where
+    spec_env         	= getIdSpecialisation old_id
+    spec_env'        	= substSpecEnv ty_subst (substSpecEnvRhs ty_subst id_subst) spec_env
+    (ty_subst,id_subst) = getSubstEnvs env
+
     new_binds  = [(new_id, new_rhs)]
     atomic_rhs = is_atomic eta'd_rhs
     eta'd_rhs  = case lookForConstructor env new_rhs of 

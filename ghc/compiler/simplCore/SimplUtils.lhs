@@ -16,7 +16,9 @@ module SimplUtils (
 
 	simplIdWantsToBeINLINEd,
 
-	singleConstructorType, typeOkForCase
+	singleConstructorType, typeOkForCase,
+
+	substSpecEnvRhs
     ) where
 
 #include "HsVersions.h"
@@ -29,6 +31,7 @@ import MkId		( mkSysLocal )
 import Id		( idType, isBottomingId, getIdArity,
 			  addInlinePragma, addIdDemandInfo,
 			  idWantsToBeINLINEd, dataConArgTys, Id,
+			  lookupIdEnv, delOneFromIdEnv
 			)
 import IdInfo		( ArityInfo(..), DemandInfo )
 import Maybes		( maybeToBool )
@@ -37,10 +40,10 @@ import PrimOp		( primOpIsCheap )
 import SimplEnv
 import SimplMonad
 import Type		( tyVarsOfType, mkForAllTys, mkTyVarTys, getTyVar_maybe,
-			  splitAlgTyConApp_maybe, Type
+			  splitAlgTyConApp_maybe, instantiateTy, Type
 			)
 import TyCon		( isDataTyCon )
-import TyVar		( elementOfTyVarSet )
+import TyVar		( elementOfTyVarSet, delFromTyVarEnv )
 import SrcLoc		( noSrcLoc )
 import Util		( isIn, zipWithEqual, panic, assertPanic )
 
@@ -493,4 +496,36 @@ typeOkForCase ty
       -- Null data cons => type is abstract, which code gen can't 
       -- currently handle.  (ToDo: when return-in-heap is universal we
       -- don't need to worry about this.)
+\end{code}
+
+
+
+substSpecEnvRhs applies a substitution to the RHS's of a SpecEnv
+It exploits the known structure of a SpecEnv's RHS to have fewer
+equations.
+
+\begin{code}
+substSpecEnvRhs te ve rhs
+  = go te ve rhs
+  where
+    go te ve (App f (TyArg ty)) = App (go te ve f) (TyArg (instantiateTy te ty))
+    go te ve (App f (VarArg v)) = App (go te ve f) (case lookupIdEnv ve v of
+							Just (SubstVar v') -> VarArg v'
+							Just (SubstLit l)  -> LitArg l
+							Nothing            -> VarArg v)
+    go te ve (Var v)		  = case lookupIdEnv ve v of
+						Just (SubstVar v') -> Var v'
+						Just (SubstLit l)  -> Lit l
+						Nothing 	   -> Var v
+
+	-- These equations are a bit half baked, because
+	-- they don't deal properly wih capture.
+	-- But I'm sure it'll never matter... sigh.
+    go te ve (Lam b@(TyBinder tyvar) e) = Lam b (go te' ve e)
+				        where
+					  te' = delFromTyVarEnv te tyvar
+
+    go te ve (Lam b@(ValBinder v) e) = Lam b (go te ve' e)
+				     where
+				       ve' = delOneFromIdEnv ve v
 \end{code}
