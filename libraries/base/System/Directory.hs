@@ -526,7 +526,7 @@ canonicalizePath :: FilePath -> IO FilePath
 canonicalizePath fpath =
   withCString fpath $ \pInPath ->
   allocaBytes long_path_size $ \pOutPath ->
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
   alloca $ \ppFilePart ->
     do c_GetFullPathName pInPath (fromIntegral long_path_size) pOutPath ppFilePart
 #else
@@ -534,7 +534,7 @@ canonicalizePath fpath =
 #endif
        peekCString pOutPath
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 foreign import stdcall unsafe "GetFullPathName"
             c_GetFullPathName :: CString
                               -> CInt
@@ -832,7 +832,7 @@ cannot be found.
 -}
 getHomeDirectory :: IO FilePath
 getHomeDirectory =
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_PROFILE nullPtr 0 pPath
      if (r < 0)
@@ -872,7 +872,7 @@ cannot be found.
 -}
 getAppUserDataDirectory :: String -> IO FilePath
 getAppUserDataDirectory appName = do
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
      s <- peekCString pPath
@@ -905,7 +905,7 @@ cannot be found.
 -}
 getUserDocumentsDirectory :: IO FilePath
 getUserDocumentsDirectory = do
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_PERSONAL nullPtr 0 pPath
      peekCString pPath
@@ -941,7 +941,7 @@ The function doesn\'t verify whether the path exists.
 -}
 getTemporaryDirectory :: IO FilePath
 getTemporaryDirectory = do
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_GetTempPath (fromIntegral long_path_size) pPath
      peekCString pPath
@@ -949,7 +949,7 @@ getTemporaryDirectory = do
   catch (getEnv "TMPDIR") (\ex -> return "/tmp")
 #endif
 
-#if __GLASGOW_HASKELL__ && defined(mingw32_TARGET_OS)
+#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
 foreign import stdcall unsafe "SHGetFolderPath" 
             c_SHGetFolderPath :: Ptr () 
                               -> CInt 

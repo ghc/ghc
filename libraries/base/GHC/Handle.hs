@@ -27,7 +27,7 @@ module GHC.Handle (
   readRawBuffer, readRawBufferPtr,
   writeRawBuffer, writeRawBufferPtr,
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
   unlockFile,
 #endif
 
@@ -374,7 +374,7 @@ newEmptyBuffer b state size
 
 allocateBuffer :: Int -> BufferState -> IO Buffer
 allocateBuffer sz@(I# size) state = IO $ \s -> 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
    -- To implement asynchronous I/O under Win32, we have to pass
    -- buffer references to external threads that handles the
    -- filling/emptying of their contents. Hence, the buffer cannot
@@ -525,7 +525,7 @@ fillReadBufferWithoutBlocking fd is_stream
  
 -- Low level routines for reading/writing to (raw)buffers:
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBuffer loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
@@ -568,7 +568,7 @@ foreign import ccall unsafe "__hscore_PrelHandle_write"
 foreign import ccall unsafe "__hscore_PrelHandle_write"
    write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
-#else /* mingw32_TARGET_OS.... */
+#else /* mingw32_HOST_OS.... */
 
 readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBuffer loc fd is_stream buf off len
@@ -787,7 +787,7 @@ openFile' filepath mode binary =
     let 
       oflags1 = case mode of
 	    	  ReadMode      -> read_flags
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 	    	  WriteMode     -> write_flags .|. o_TRUNC
 #else
 	    	  WriteMode     -> write_flags
@@ -818,7 +818,7 @@ openFile' filepath mode binary =
 	-- ASSERT: if we just created the file, then openFd won't fail
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
     if mode == WriteMode
       then throwErrnoIf (/=0) "openFile" 
               (c_ftruncate (fromIntegral fd) 0)
@@ -913,7 +913,7 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
 
 	-- regular files need to be locked
 	RegularFile -> do
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 	   r <- lockFile (fromIntegral fd) (fromBool write) 1{-exclusive-}
 	   when (r == -1)  $
 		ioException (IOError Nothing ResourceBusy "openFile"
@@ -929,7 +929,7 @@ fdToHandle fd = do
    openFd fd Nothing False{-XXX!-} fd_str mode True{-bin mode-}
 
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 foreign import ccall unsafe "lockFile"
   lockFile :: CInt -> CInt -> CInt -> IO CInt
 
@@ -1043,7 +1043,7 @@ hClose_handle_ handle_ = do
     case haOtherSide handle_ of
       Nothing -> 
   		  throwErrnoIfMinus1Retry_ "hClose" 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 	    			(closeFd (haIsStream handle_) c_fd)
 #else
 	    			(c_close c_fd)
@@ -1053,7 +1053,7 @@ hClose_handle_ handle_ = do
     -- free the spare buffers
     writeIORef (haBuffers handle_) BufferListNil
   
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
     -- unlock it
     unlockFile c_fd
 #endif
@@ -1205,7 +1205,7 @@ hSetBuffering handle mode =
 	  is_tty <- fdIsTTY (haFD handle_)
 	  when (is_tty && isReadableHandleType (haType handle_)) $
 		case mode of
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 	-- 'raw' mode under win32 is a bit too specialised (and troublesome
 	-- for most common uses), so simply disable its use here.
 		  NoBuffering -> setCooked (haFD handle_) False
@@ -1358,7 +1358,7 @@ hTell :: Handle -> IO Integer
 hTell handle = 
     wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 	-- urgh, on Windows we have to worry about \n -> \r\n translation, 
 	-- so we can't easily calculate the file position using the
 	-- current buffer size.  Just flush instead.

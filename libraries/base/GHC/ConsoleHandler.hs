@@ -13,7 +13,7 @@
 -- 
 -----------------------------------------------------------------------------
 module GHC.ConsoleHandler
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 	where
 import Prelude -- necessary to get dependencies right
 #else /* whole file */
@@ -88,4 +88,4 @@ installHandler handler =
 
 foreign import ccall unsafe "Signals.h stg_InstallConsoleEvent" 
   rts_installHandler :: CInt -> Ptr (StablePtr (CInt -> IO ())) -> IO CInt
-#endif /* mingw32_TARGET_OS */
+#endif /* mingw32_HOST_OS */

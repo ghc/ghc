@@ -444,7 +444,7 @@ wNUL = 0
 cWcharsToChars :: [CWchar] -> [Char]
 charsToCWchars :: [Char] -> [CWchar]
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 
 -- On Windows, wchar_t is 16 bits wide and CWString uses the UTF-16 encoding.
 
@@ -465,7 +465,7 @@ charsToCWchars = foldr utf16Char [] . map ord
                     fromIntegral (c' `div` 0x400 + 0xd800) :
                     fromIntegral (c' `mod` 0x400 + 0xdc00) : wcs
 
-#else /* !mingw32_TARGET_OS */
+#else /* !mingw32_HOST_OS */
 
 cWcharsToChars xs  = map castCWcharToChar xs
 charsToCWchars xs  = map castCharToCWchar xs
@@ -479,4 +479,4 @@ castCWcharToChar ch = chr (fromIntegral ch )
 castCharToCWchar :: Char -> CWchar
 castCharToCWchar ch = fromIntegral (ord ch)
 
-#endif /* !mingw32_TARGET_OS */
+#endif /* !mingw32_HOST_OS */

@@ -16,14 +16,14 @@
 -- #hide
 module System.Process.Internals (
 	ProcessHandle(..), PHANDLE,
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 	 pPrPr_disableITimers, c_execvpe
 #endif
   ) where
 
 import Prelude -- necessary to get dependencies right
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 import System.Posix.Types ( CPid )
 #else
 import Data.Word ( Word32 )
@@ -46,7 +46,7 @@ import Foreign.Ptr ( Ptr )
      termination: they all return a 'ProcessHandle' which may be used
      to wait for the process later.
 -}
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 type PHANDLE = CPid
 #else
 type PHANDLE = Word32
@@ -56,7 +56,7 @@ newtype ProcessHandle = ProcessHandle PHANDLE
 
 -- ----------------------------------------------------------------------------
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 -- this function disables the itimer, which would otherwise cause confusing
 -- signals to be sent to the new process.

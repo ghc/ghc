@@ -46,7 +46,7 @@ import Foreign.C
 getCPUTime :: IO Integer
 getCPUTime = do
 
-#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
+#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
 -- getrusage() is right royal pain to deal with when targetting multiple
 -- versions of Solaris, since some versions supply it in libc (2.3 and 2.5),
 -- while 2.4 has got it in libucb (I wouldn't be too surprised if it was back
@@ -54,7 +54,7 @@ getCPUTime = do
 --
 -- Avoid the problem by resorting to times() instead.
 --
-#if defined(HAVE_GETRUSAGE) && ! irix_TARGET_OS && ! solaris2_TARGET_OS
+#if defined(HAVE_GETRUSAGE) && ! irix_HOST_OS && ! solaris2_HOST_OS
     allocaBytes (#const sizeof(struct rusage)) $ \ p_rusage -> do
     getrusage (#const RUSAGE_SELF) p_rusage
 

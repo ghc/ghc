@@ -15,7 +15,7 @@
 #include "ghcconfig.h"
 
 module System.Posix.Signals (
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
   -- * The Signal type
   Signal,
 
@@ -76,7 +76,7 @@ module System.Posix.Signals (
 
   -- * Waiting for signals
   getPendingSignals,
-#ifndef cygwin32_TARGET_OS
+#ifndef cygwin32_HOST_OS
   awaitSignal,
 #endif
 
@@ -108,7 +108,7 @@ import System.IO.Unsafe
 import System.Posix.Types
 import System.Posix.Internals
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 -- WHOLE FILE...
 
 -- -----------------------------------------------------------------------------
@@ -289,7 +289,7 @@ foreign import ccall unsafe "killpg"
 raiseSignal :: Signal -> IO ()
 raiseSignal sig = throwErrnoIfMinus1_ "raiseSignal" (c_raise sig)
 
-#if defined(__GLASGOW_HASKELL__) && (defined(openbsd_TARGET_OS) || defined(freebsd_TARGET_OS))
+#if defined(__GLASGOW_HASKELL__) && (defined(openbsd_HOST_OS) || defined(freebsd_HOST_OS))
 foreign import ccall unsafe "genericRaise"
   c_raise :: CInt -> IO CInt
 #else
@@ -457,7 +457,7 @@ getPendingSignals = do
    throwErrnoIfMinus1_ "getPendingSignals" (c_sigpending p)
   return (SignalSet fp)
 
-#ifndef cygwin32_TARGET_OS
+#ifndef cygwin32_HOST_OS
 awaitSignal :: Maybe SignalSet -> IO ()
 awaitSignal maybe_sigset = do
   fp <- case maybe_sigset of
@@ -506,5 +506,5 @@ foreign import ccall unsafe "__hsposix_SIG_SETMASK" c_SIG_SETMASK :: CInt
 foreign import ccall unsafe "__hsposix_SIG_UNBLOCK" c_SIG_UNBLOCK :: CInt
 #endif /* __HUGS__ */
 
-#endif /* mingw32_TARGET_OS */
+#endif /* mingw32_HOST_OS */
 

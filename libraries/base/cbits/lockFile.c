@@ -1,12 +1,12 @@
 /*
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-2004
  *
- * $Id: lockFile.c,v 1.4 2005/01/01 23:59:59 krasimir Exp $
+ * $Id: lockFile.c,v 1.5 2005/01/28 13:36:32 simonmar Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 
 #include "HsBase.h"
 #include "Rts.h"

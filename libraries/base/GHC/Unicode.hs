@@ -122,7 +122,7 @@ toLower                 :: Char -> Char
 -- -----------------------------------------------------------------------------
 -- Win32 implementation
 
-#if (defined(HAVE_WCTYPE_H) && HAVE_ISWSPACE && defined(HTYPE_WINT_T)) || mingw32_TARGET_OS
+#if (defined(HAVE_WCTYPE_H) && HAVE_ISWSPACE && defined(HTYPE_WINT_T)) || mingw32_HOST_OS
 
 -- Use the wide-char classification functions if available.  Glibc
 -- seems to implement these properly, even for chars > 0xffff, as long

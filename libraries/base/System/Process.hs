@@ -71,7 +71,7 @@ runCommand
 
 runCommand string = do
   (cmd,args) <- commandToProcess string
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
   runProcess1 "runCommand" cmd args Nothing Nothing Nothing Nothing Nothing
 #else
   runProcess1 "runCommand" cmd [] Nothing Nothing Nothing Nothing Nothing args
@@ -97,7 +97,7 @@ runProcess
   -> Maybe Handle		-- ^ Handle to use for @stderr@
   -> IO ProcessHandle
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 runProcess cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
  = runProcess1 "runProcess" cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
@@ -183,7 +183,7 @@ runInteractiveCommand
 
 runInteractiveCommand string = do
   (cmd,args) <- commandToProcess string
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
   runInteractiveProcess1 "runInteractiveCommand" cmd args Nothing Nothing
 #else
   runInteractiveProcess1 "runInteractiveCommand" cmd [] Nothing Nothing args
@@ -207,7 +207,7 @@ runInteractiveProcess
   -> Maybe [(String,String)]	-- ^ Optional environment (otherwise inherit)
   -> IO (Handle,Handle,Handle,ProcessHandle)
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 runInteractiveProcess cmd args mb_cwd mb_env = 
   runInteractiveProcess1 "runInteractiveProcess" cmd args mb_cwd mb_env
@@ -350,7 +350,7 @@ getProcessExitCode (ProcessHandle handle) =
    Windows isn't required (or desirable) here.
 -}
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 commandToProcess
   :: String
@@ -388,7 +388,7 @@ withFilePathException fpath act = handle mapEx act
     mapEx (IOException (IOError h iot fun str _)) = ioError (IOError h iot fun str (Just fpath))
     mapEx e                                       = throwIO e
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 withCEnvironment :: [(String,String)] -> (Ptr CString  -> IO a) -> IO a
 withCEnvironment env act =
   let env' = map (\(name, val) -> name ++ ('=':val)) env 
@@ -475,7 +475,7 @@ expects (namely the application name).  So it seems simpler to just
 use lpCommandLine alone, which CreateProcess supports.
 -}
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 
 -- Translate command-line arguments for passing to CreateProcess().
 translate :: String -> String

@@ -13,19 +13,20 @@
 --
 -----------------------------------------------------------------------------
 
-#ifndef __NHC__
-#include "MachDeps.h"
-#endif
-
 module System.Info
    (
        os,		    -- :: String
-       arch		    -- :: String
+       arch,		    -- :: String
+       compilerName,	    -- :: String
+       compilerVersion	    -- :: Version
    ) where
 
 import Prelude
+import Data.Version
 
 #ifndef __NHC__
+
+#include "ghcplatform.h"
 
 arch :: String
 arch = HOST_ARCH
@@ -36,4 +37,21 @@ os = HOST_OS
 #else
 os,arch ::String
 #include "OSInfo.hs"
+#endif
+
+compilerName :: String
+#if defined(__NHC__)
+compilerName = "nhc98"
+#elif defined(__GLASGOW_HASKELL__)
+compilerName = "ghc"
+#elif defined(__HUGS__)
+compilerName = "hugs"
+#else
+#error Unknown compiler name
+#endif
+
+compilerVersion :: Version
+#ifdef __GLASGOW_HASKELL__
+compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
+  where (maj,min) = __GLASGOW_HASKELL__ `divMod` 100
 #endif

@@ -22,7 +22,7 @@ module Debug.Trace (
 	-- ** Tracers
 	-- | The tracer is a function that monitors the trace messages.
 	fileTracer,       -- :: Handle -> String -> IO ()
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 	winDebugTracer,   -- :: String -> IO ()
 #endif
 	addTracer,        -- :: String -> (String -> IO ()) -> IO ()
@@ -38,7 +38,7 @@ import Data.IORef
 import System.IO.Unsafe
 import System.IO
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 import Foreign.C.String
 #endif
 
@@ -54,7 +54,7 @@ fileTracer handle msg = do
    hPutStr handle msg
    hPutChar handle '\n'
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 -- | A tracer function that outputs the message to the debuger (Windows only)
 winDebugTracer :: String  -- ^ trace message
                -> IO ()

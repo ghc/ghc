@@ -102,7 +102,7 @@ unpackProgName argv = do
 
    isPathSeparator :: Char -> Bool
    isPathSeparator '/'  = True
-#ifdef mingw32_TARGET_OS 
+#ifdef mingw32_HOST_OS 
    isPathSeparator '\\' = True
 #endif
    isPathSeparator _    = False

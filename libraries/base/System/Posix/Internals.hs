@@ -118,7 +118,7 @@ statGetType p_stat = do
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
 
-#if defined(mingw32_TARGET_OS) || defined(__MINGW32__)
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
 closeFd :: Bool -> CInt -> IO CInt
 closeFd isStream fd 
   | isStream  = c_closesocket fd
@@ -130,7 +130,7 @@ foreign import stdcall unsafe "HsBase.h closesocket"
 
 fdGetMode :: Int -> IO IOMode
 fdGetMode fd = do
-#if defined(mingw32_TARGET_OS) || defined(__MINGW32__)
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
     -- XXX: this code is *BROKEN*, _setmode only deals with O_TEXT/O_BINARY
     flags1 <- throwErrnoIfMinus1Retry "fdGetMode" 
                 (c__setmode (fromIntegral fd) (fromIntegral o_WRONLY))
@@ -285,7 +285,7 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 -- ---------------------------------------------------------------------------
 -- Turning on non-blocking for a file descriptor
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
@@ -384,7 +384,7 @@ foreign import ccall unsafe "HsBase.h unlink"
 foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
@@ -496,7 +496,7 @@ foreign import ccall unsafe "HsBase.h __hscore_poke_lflag" poke_c_lflag :: Ptr C
 foreign import ccall unsafe "HsBase.h __hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
 #endif
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 foreign import ccall unsafe "HsBase.h __hscore_s_issock" s_issock :: CMode -> Bool
 #else
 s_issock :: CMode -> Bool

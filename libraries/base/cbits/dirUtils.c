@@ -8,13 +8,13 @@
 
 // The following is required on Solaris to force the POSIX versions of
 // the various _r functions instead of the Solaris versions.
-#ifdef solaris2_TARGET_OS
+#ifdef solaris2_HOST_OS
 #define _POSIX_PTHREAD_SEMANTICS
 #endif
 
 #include "HsBase.h"
 
-#if defined(mingw32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
 #include <windows.h>
 
 static
@@ -117,7 +117,7 @@ HsInt
 __hscore_renameFile( HsAddr src,
 		     HsAddr dest)
 {
-#if defined(mingw32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
     static int forNT = -1;
     
     /* ToDo: propagate error codes back */

@@ -168,7 +168,7 @@ library-dirs:	LIB_DIR
 		, LIB_DIR"/cbits"
 #endif
 
-#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
+#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
 hs-libraries:   "HSbase"
 #else
 /*
@@ -181,7 +181,7 @@ hs-libraries:	"HSbase1", "HSbase2", "HSbase3"
 #endif
 
 extra-libs:  "HSbase_cbits"
-#if defined(mingw32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
 	     , "wsock32", "msvcrt", "kernel32", "user32", "shell32"
 #endif
 

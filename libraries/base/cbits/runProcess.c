@@ -6,7 +6,7 @@
 
 #include "HsBase.h"
 
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 #include <windows.h>
 #include <stdlib.h>
 #endif
@@ -23,7 +23,7 @@
 #include <signal.h>
 #endif
 
-#if !defined(mingw32_TARGET_OS) && !defined(__MINGW32__)
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 /* ----------------------------------------------------------------------------
    UNIX versions
    ------------------------------------------------------------------------- */

@@ -353,10 +353,10 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x
 
 #else /* ! HAVE_TM_ZONE */
 # if HAVE_TZNAME || defined(_WIN32)
-#  if cygwin32_TARGET_OS
+#  if cygwin32_HOST_OS
 #   define tzname _tzname
 #  endif
-#  ifndef mingw32_TARGET_OS
+#  ifndef mingw32_HOST_OS
 foreign import ccall unsafe "time.h &tzname" tzname :: Ptr (Ptr CChar)
 #  else
 foreign import ccall unsafe "__hscore_timezone" timezone :: Ptr CLong
@@ -381,7 +381,7 @@ gmtoff x = do
   return (-fromIntegral (realToInteger tz))
 # else /* ! HAVE_DECL_ALTZONE */
 
-#if !defined(mingw32_TARGET_OS)
+#if !defined(mingw32_HOST_OS)
 foreign import ccall "time.h &timezone" timezone :: Ptr CLong
 #endif
 
@@ -744,7 +744,7 @@ foreign import ccall unsafe "time.h gettimeofday"
 
 #if HAVE_FTIME
 type CTimeB = ()
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO CInt
 #else
 foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO ()

@@ -17,7 +17,7 @@ int
 inputReady(int fd, int msecs, int isSock)
 {
     if 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
     ( 1 ) {
 #else
     ( isSock ) {
@@ -45,7 +45,7 @@ inputReady(int fd, int msecs, int isSock)
 	/* 1 => Input ready, 0 => not ready, -1 => error */
 	return (ready);
     }
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
     else {
 	DWORD rc;
 	HANDLE hFile = (HANDLE)_get_osfhandle(fd);

@@ -83,16 +83,16 @@ rawSystem cmd args = do
 rawSystem cmd args = system (unwords (map translate (cmd:args)))
 
 translate :: String -> String
-#if defined(mingw32_TARGET_OS)
+#if defined(mingw32_HOST_OS)
 -- copied from System.Process (qv)
 translate str = '"' : snd (foldr escape (True,"\"") str)
   where	escape '"'  (b,     str) = (True,  '\\' : '"'  : str)
 	escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
 	escape '\\' (False, str) = (False, '\\' : str)
 	escape c    (b,     str) = (False, c : str)
-#else /* ! mingw32_TARGET_OS */
+#else /* ! mingw32_HOST_OS */
 translate str = '\'' : foldr escape "'" str
   where	escape '\'' cs = '\'' : '\\' : '\'' : '\'' : cs
 	escape c    cs = c : cs
-#endif /* ! mingw32_TARGET_OS */
+#endif /* ! mingw32_HOST_OS */
 #endif /* ! __GLASGOW_HASKELL__ */

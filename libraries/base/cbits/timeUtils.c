@@ -5,7 +5,7 @@
  */
 #include "HsBase.h"
 
-#if defined(mingw32_TARGET_OS) /* to the end */
+#if defined(mingw32_HOST_OS) /* to the end */
 
 HsAddr __hscore_timezone( void )
 { return (HsAddr)&_timezone; }

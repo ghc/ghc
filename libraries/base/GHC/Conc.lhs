@@ -55,7 +55,7 @@ module GHC.Conc
 	, writeTVar	-- :: a -> TVar a -> STM ()
 	, unsafeIOToSTM	-- :: IO a -> STM a
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 	, asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 	, asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 	, asyncDoProc   -- :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
@@ -388,7 +388,7 @@ addMVarFinalizer (MVar m) finalizer =
 %************************************************************************
 
 \begin{code}
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 
 -- Note: threadDelay, threadWaitRead and threadWaitWrite aren't really functional
 -- on Win32, but left in there because lib code (still) uses them (the manner
@@ -432,7 +432,7 @@ asyncWriteBA fd isSock len off bufB =
 -- given file descriptor (GHC only).
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
   | threaded  = waitForReadEvent fd
 #endif
   | otherwise = IO $ \s -> 
@@ -444,7 +444,7 @@ threadWaitRead fd
 -- given file descriptor (GHC only).
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
   | threaded  = waitForWriteEvent fd
 #endif
   | otherwise = IO $ \s -> 
@@ -465,7 +465,7 @@ threadWaitWrite fd
 --
 threadDelay :: Int -> IO ()
 threadDelay time
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
   | threaded  = waitForDelayEvent time
 #else
   | threaded  = c_Sleep (fromIntegral (time `quot` 1000))
@@ -476,7 +476,7 @@ threadDelay time
 	}}
 
 -- On Windows, we just make a safe call to 'Sleep' to implement threadDelay.
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 foreign import ccall safe "Sleep" c_Sleep :: CInt -> IO ()
 #endif
 
@@ -514,7 +514,7 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 --	- forkProcess will kill the IO manager thread.  Let's just
 --	  hope we don't need to do any blocking IO between fork & exec.
 
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
 
 data IOReq
   = Read   {-# UNPACK #-} !Fd {-# UNPACK #-} !(MVar ())

@@ -47,7 +47,7 @@ import GHC.Show
 import GHC.List
 import GHC.Exception    ( ioError, catch )
 
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
 import GHC.Conc
 #endif
 
@@ -727,7 +727,7 @@ writeChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return off
   loop off bytes = do
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
     ssize <- c_write (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes)
     let r = fromIntegral ssize :: Int
     if (r == -1)
@@ -901,7 +901,7 @@ bufReadNonBlocking fd ref is_stream ptr so_far count =
 
 readChunkNonBlocking :: FD -> Bool -> Ptr a -> Int -> IO Int
 readChunkNonBlocking fd is_stream ptr bytes = do
-#ifndef mingw32_TARGET_OS
+#ifndef mingw32_HOST_OS
     ssize <- c_read (fromIntegral fd) (castPtr ptr) (fromIntegral bytes)
     let r = fromIntegral ssize :: Int
     if (r == -1)
