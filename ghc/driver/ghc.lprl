@@ -228,6 +228,7 @@ sub setupOptFlags {
    $Oopt_FinalStgProfilingMassage = '';
    $Oopt_StgStats		  = '';
    $Oopt_DoSpecialise		  = '-fspecialise';
+   $Oopt_DoCpr			  = '-fcpr-analyse';
    $Oopt_FoldrBuild		  = 0; # *Off* by default!
    $Oopt_UsageSPInf               = ''; # Off by default
 } # end of setupOptFlags
@@ -766,7 +767,7 @@ sub setupOptimiseFlags {
 
 
 	'-fstrictness',
-	'-fcpr-analyse',
+	$Oopt_DoCpr,
 	'-fworker-wrapper',
 
 	'-fsimplify',
@@ -3085,6 +3086,9 @@ arg: while($_ = $Args[0]) {
 		&& do { $Oopt_DoSpecialise = '-fspecialise'; next arg; };
     /^-fno-speciali[sz]e$/
 		&& do { $Oopt_DoSpecialise = ''; next arg; };
+
+    /^-fno-cpr$/
+		&& do { $Oopt_DoCpr = ''; next arg; };
 
     /^-fusagesp$/
                 && do {  $Oopt_UsageSPInf = '-fusagesp';
