@@ -451,7 +451,7 @@ lexer cont buf s@(PState{
 
 		else skip_to_end (stepOnBy# buf 2#) s'
 		where
-		    skip_to_end = nested_comment (lexer cont)
+		    skip_to_end = skipNestedComment (lexer cont)
 
 		-- special GHC extension: we grok cpp-style #line pragmas
 	    '#'# | lexemeIndex buf ==# bol -> 	-- the '#' must be in column 0
@@ -497,15 +497,20 @@ line_prag cont buf s@PState{loc=loc} =
      _other -> cont (stepOverLexeme buf3) s{loc = replaceSrcLine loc l}
   }}}}
 
-nested_comment :: P a -> P a
-nested_comment cont buf orig_state@PState{loc=loc} = loop buf orig_state
+skipNestedComment :: P a -> P a
+skipNestedComment cont buf state = skipNestedComment' (loc state) cont buf state
+
+skipNestedComment' :: SrcLoc -> P a -> P a
+skipNestedComment' orig_loc cont buf = loop buf
  where
    loop buf = 
      case currentChar# buf of
 	'-'# | lookAhead# buf 1# `eqChar#` '}'# -> cont (stepOnBy# buf 2#)
 
 	'{'# | lookAhead# buf 1# `eqChar#` '-'# ->
-	      nested_comment (nested_comment cont) (stepOnBy# buf 2#)
+	      skipNestedComment 
+		(skipNestedComment' orig_loc cont) 
+		(stepOnBy# buf 2#)
 
 	'\n'# -> \ s@PState{loc=loc} ->
 		 let buf' = stepOn buf in
@@ -513,11 +518,11 @@ nested_comment cont buf orig_state@PState{loc=loc} = loop buf orig_state
 			     bol = currentIndex# buf',
 			     atbol = 1#}
 
-	-- pass the original state to lexError so that the error is
+	-- pass the original SrcLoc to lexError so that the error is
 	-- reported at the line it was originally on, not the line at
 	-- the end of the file.
 	'\NUL'# | bufferExhausted (stepOn buf) -> 
-		\_ -> lexError "unterminated `{-'" buf orig_state -- -}
+		\s -> lexError "unterminated `{-'" buf s{loc=orig_loc} -- -}
 
 	_   -> loop (stepOn buf)
 
