@@ -51,7 +51,7 @@ import NameSet
 import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused,
 			  isVarOcc )
 import Module		( Module, ModuleName, moduleName, mkHomeModule )
-import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE )
+import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE, consDataConKey, hasKey )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
@@ -433,16 +433,22 @@ dataTcOccs :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type
 -- constructor.  This is useful when we aren't sure which we are
 -- looking at.
---
--- ToDo: If the user typed "[]" or "(,,)", we'll generate an Exact RdrName,
---	 and we don't have a systematic way to find the TyCon's Name from
---	 the DataCon's name.  Sigh
 dataTcOccs rdr_name
-  | isDataOcc occ = [rdr_name_tc, rdr_name]
-  | otherwise 	  = [rdr_name]
+  | Just n <- isExact_maybe rdr_name		-- Ghastly special case
+  , n `hasKey` consDataConKey = [rdr_name]	-- see note below
+  | isDataOcc occ 	      = [rdr_name_tc, rdr_name]
+  | otherwise 	  	      = [rdr_name]
   where    
     occ 	= rdrNameOcc rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
+
+-- If the user typed "[]" or "(,,)", we'll generate an Exact RdrName,
+-- and setRdrNameSpace generates an Orig, which is fine
+-- But it's not fine for (:), because there *is* no corresponding type
+-- constructor.  If we generate an Orig tycon for GHC.Base.(:), it'll
+-- appear to be in scope (because Orig's simply allocate a new name-cache
+-- entry) and then we get an error when we use dataTcOccs in 
+-- TcRnDriver.tcRnGetInfo.  Large sigh.
 \end{code}
 
 %************************************************************************
