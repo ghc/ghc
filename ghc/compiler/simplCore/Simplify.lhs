@@ -30,8 +30,6 @@ import IdInfo		( willBeDemanded, noDemandInfo, DemandInfo, ArityInfo(..),
 			  atLeastArity, unknownArity )
 import Literal		( isNoRepLit )
 import Maybes		( maybeToBool )
---import Name		( isExported )
-import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{- instance Outputable -} )
 #if __GLASGOW_HASKELL__ <= 30
 import PprCore		( GenCoreArg, GenCoreExpr )
@@ -49,7 +47,7 @@ import Type		( mkTyVarTy, mkTyVarTys, mkAppTy, applyTy, mkFunTys,
 			  splitFunTy, splitFunTyExpandingDicts, getFunTy_maybe, eqTy
 			)
 import TysWiredIn	( realWorldStateTy )
-import Outputable	( Outputable(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import Util		( SYN_IE(Eager), appEager, returnEager, runEager, mapEager,
 			  isSingleton, zipEqual, zipWithEqual, mapAndUnzip, panic, pprPanic, assertPanic, pprTrace )
 \end{code}
@@ -539,36 +537,11 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
 
     returnSmpl (rhs', arity)
   where
-    rhs_env | 	-- Don't ever inline in a INLINE thing's rhs, because
-		-- doing so will inline a worker straight back into its wrapper!
-	      idWantsToBeINLINEd id
-	    = switchOffInlining env
+    rhs_env | idWantsToBeINLINEd id  	-- Don't ever inline in a INLINE thing's rhs
+	    = switchOffInlining env	-- See comments with switchOffInlining
 	    | otherwise	
             = env
 
-	-- Switch off all inlining in the RHS of things that have an INLINE pragma.
-	-- They are going to be inlined wherever they are used, and then all the
-	-- inlining will take effect.  Meanwhile, there isn't
-	-- much point in doing anything to the as-yet-un-INLINEd rhs.
-	-- It's very important to switch off inlining!  Consider:
-	--
-	-- let f = \pq -> BIG
-	-- in
-	-- let g = \y -> f y y
-	--     {-# INLINE g #-}
-	-- in ...g...g...g...g...g...
-	--
-	-- Now, if that's the ONLY occurrence of f, it will be inlined inside g,
-	-- and thence copied multiple times when g is inlined.
-
-	-- Andy disagrees! Example:
-	--	all xs = foldr (&&) True xs
-	--	any p = all . map p  {-# INLINE any #-}
-	--
-	-- Problem: any won't get deforested, and so if it's exported and
-	-- the importer doesn't use the inlining, (eg passes it as an arg)
-	-- then we won't get deforestation at all.
-	-- We havn't solved this problem yet!
 
     (uvars, tyvars, body) = collectUsageAndTyBinders rhs
 \end{code}
