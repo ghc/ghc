@@ -278,6 +278,16 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
 type IPr = (Int, Int)
 
 data Ix i => Array     i e = Array   !i !i (Array# e)
+
+-- | Mutable, boxed, non-strict arrays in the 'ST' monad.  The type
+-- arguments are as follows:
+--
+--  * @s@: the state variable argument for the 'ST' type
+--
+--  * @i@: the index type of the array (should be an instance of @Ix@)
+--
+--  * @e@: the element type of the array.
+--
 data         STArray s i e = STArray !i !i (MutableArray# s e)
 	-- No Ix context for STArray.  They are stupid,
 	-- and force an Ix context on the equality instance.

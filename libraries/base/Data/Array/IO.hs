@@ -14,10 +14,17 @@
 -----------------------------------------------------------------------------
 
 module Data.Array.IO (
-   module Data.Array.MArray,
+   -- * @IO@ arrays with boxed elements
    IOArray,		-- instance of: Eq, Typeable
+
+   -- * @IO@ arrays with unboxed elements
    IOUArray,		-- instance of: Eq, Typeable
    castIOUArray,	-- :: IOUArray i a -> IO (IOUArray i b)
+
+   -- * Overloaded mutable array interface
+   module Data.Array.MArray,
+
+   -- * Doing I\/O with @IOUArray@s
    hGetArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO Int
    hPutArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO ()
  ) where
@@ -50,8 +57,13 @@ import GHC.Conc
 import GHC.Base
 
 -----------------------------------------------------------------------------
--- Polymorphic non-strict mutable arrays (IO monad)
-
+-- | Mutable, boxed, non-strict arrays in the 'IO' monad.  The type
+-- arguments are as follows:
+--
+--  * @i@: the index type of the array (should be an instance of @Ix@)
+--
+--  * @e@: the element type of the array.
+--
 newtype IOArray i e = IOArray (STArray RealWorld i e) deriving Eq
 
 iOArrayTc :: TyCon
@@ -80,6 +92,14 @@ instance MArray IOArray e IO where
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (IO monad)
 
+-- | Mutable, unboxed, strict arrays in the 'IO' monad.  The type
+-- arguments are as follows:
+--
+--  * @i@: the index type of the array (should be an instance of @Ix@)
+--
+--  * @e@: the element type of the array.  Only certain element types
+--    are supported: see 'MArray' for a list of instances.
+--
 newtype IOUArray i e = IOUArray (STUArray RealWorld i e) deriving Eq
 
 iOUArrayTc :: TyCon
@@ -362,6 +382,9 @@ unsafeThawIOUArray arr = stToIO $ do
 castSTUArray :: STUArray s ix a -> ST s (STUArray s ix b)
 castSTUArray (STUArray l u marr#) = return (STUArray l u marr#)
 
+-- | Casts an 'IOUArray' with one element type into one with a
+-- different element type.  All the elements of the resulting array
+-- are undefined (unless you know what you\'re doing...).
 castIOUArray :: IOUArray ix a -> IO (IOUArray ix b)
 castIOUArray (IOUArray marr) = stToIO $ do
     marr' <- castSTUArray marr
@@ -370,7 +393,17 @@ castIOUArray (IOUArray marr) = stToIO $ do
 -- ---------------------------------------------------------------------------
 -- hGetArray
 
-hGetArray :: Handle -> IOUArray Int Word8 -> Int -> IO Int
+-- | Reads a number of 'Word8's from the specified 'Handle' directly
+-- into an array.
+hGetArray
+ 	:: Handle		-- ^ Handle to read from
+	-> IOUArray Int Word8	-- ^ Array in which to place the values
+	-> Int			-- ^ Number of 'Word8's to read
+	-> IO Int
+		-- ^ Returns: the number of 'Word8's actually 
+		-- read, which might be smaller than the number requested
+		-- if the end of file was reached.
+
 hGetArray handle (IOUArray (STUArray l u ptr)) count
   | count <= 0 || count > rangeSize (l,u)
   = illegalBufferSize handle "hGetArray" count
@@ -416,10 +449,11 @@ readChunk fd is_stream ptr init_off bytes = loop init_off bytes
 -- ---------------------------------------------------------------------------
 -- hPutArray
 
+-- | Writes an array of 'Word8' to the specified 'Handle'.
 hPutArray
-	:: Handle			-- handle to write to
-	-> IOUArray Int Word8		-- buffer
-	-> Int				-- number of bytes of data to write
+	:: Handle			-- ^ Handle to write to
+	-> IOUArray Int Word8		-- ^ Array to write from
+	-> Int				-- ^ Number of 'Word8's to write
 	-> IO ()
 
 hPutArray handle (IOUArray (STUArray l u raw)) count

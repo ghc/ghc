@@ -8,13 +8,16 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Unboxed immutable array type.
+-- Unboxed immutable arrays.
 --
 -----------------------------------------------------------------------------
 
 module Data.Array.Unboxed (
-   module Data.Array.IArray,
+   -- * Arrays with unboxed elements
    UArray,
+
+   -- * The overloaded immutable array interface
+   module Data.Array.IArray,
  ) where
 
 import Prelude

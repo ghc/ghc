@@ -42,9 +42,19 @@ import Data.Dynamic
 -----------------------------------------------------------------------------
 -- Class of immutable arrays
 
+-- | Class of array types with bounds
 class HasBounds a where
+    -- | Extracts the bounds of an array
     bounds :: Ix i => a i e -> (i,i)
 
+{- | Class of immutable array types.
+
+An array type has the form @(a i e)@ where @a@ is the array type
+constructor (kind @* -> * -> *@), @i@ is the index type (a member of
+the class 'Ix'), and @e@ is the element type.  The @IArray@ class is
+parameterised over both @a@ and @e@, so that instances specialised to
+certain element types can be defined.
+-}
 class HasBounds a => IArray a e where
     unsafeArray      :: Ix i => (i,i) -> [(Int, e)] -> a i e
     unsafeAt         :: Ix i => a i e -> Int -> e
@@ -83,8 +93,44 @@ unsafeAccumArrayST f e (l,u) ies = do
         | (i, new) <- ies]
     return marr
 
-{-# INLINE array #-}
-array :: (IArray a e, Ix i) => (i,i) -> [(i, e)] -> a i e
+
+{-# INLINE array #-} 
+
+{-| Constructs an immutable array from a pair of bounds and a list of
+initial associations.
+
+The bounds are specified as a pair of the lowest and highest bounds in
+the array respectively.  For example, a one-origin vector of length 10
+has bounds (1,10), and a one-origin 10 by 10 matrix has bounds
+((1,1),(10,10)).
+
+An association is a pair of the form @(i,x)@, which defines the value
+of the array at index @i@ to be @x@.  The array is undefined if any
+index in the list is out of bounds.  If any two associations in the
+list have the same index, the value at that index is undefined.
+
+Because the indices must be checked for these errors, 'array' is
+strict in the bounds argument and in the indices of the association
+list.  Whether @array@ is strict or non-strict in the elements depends
+on the array type: 'Data.Array.Array' is a non-strict array type, but
+all of the 'Data.Array.Unboxed.UArray' arrays are strict.  Thus in a
+non-strict array, recurrences such as the following are possible:
+
+> a = array (1,100) ((1,1) : [(i, i * a!(i-1)) | i \<- [2..100]])
+
+Not every index within the bounds of the array need appear in the
+association list, but the values associated with indices that do not
+appear will be undefined.
+
+If, in any dimension, the lower bound is greater than the upper bound,
+then the array is legal, but empty. Indexing an empty array always
+gives an array-bounds error, but 'bounds' still yields the bounds with
+which the array was constructed.
+-}
+array 	:: (IArray a e, Ix i) 
+	=> (i,i)	-- ^ bounds of the array: (lowest,highest)
+	-> [(i, e)]	-- ^ list of associations
+	-> a i e
 array (l,u) ies = unsafeArray (l,u) [(index (l,u) i, e) | (i, e) <- ies]
 
 -- Since unsafeFreeze is not guaranteed to be only a cast, we will
@@ -95,6 +141,10 @@ array (l,u) ies = unsafeArray (l,u) [(index (l,u) i, e) | (i, e) <- ies]
 -- almost all cases).
 
 {-# INLINE listArray #-}
+
+-- | Constructs an immutable array from a list of initial elements.
+-- The list gives the elements of the array in ascending order
+-- beginning with the lowest index.
 listArray :: (IArray a e, Ix i) => (i,i) -> [e] -> a i e
 listArray (l,u) es = unsafeArray (l,u) (zip [0 .. rangeSize (l,u) - 1] es)
 
@@ -176,44 +226,91 @@ listUArrayST (l,u) es = do
     #-}
 
 {-# INLINE (!) #-}
+-- | Returns the element of an immutable array at the specified index.
 (!) :: (IArray a e, Ix i) => a i e -> i -> e
 arr ! i | (l,u) <- bounds arr = unsafeAt arr (index (l,u) i)
 
 {-# INLINE indices #-}
+-- | Returns a list of all the valid indices in an array.
 indices :: (HasBounds a, Ix i) => a i e -> [i]
 indices arr | (l,u) <- bounds arr = range (l,u)
 
 {-# INLINE elems #-}
+-- | Returns a list of all the elements of an array, in the same order
+-- as their indices.
 elems :: (IArray a e, Ix i) => a i e -> [e]
 elems arr | (l,u) <- bounds arr =
     [unsafeAt arr i | i <- [0 .. rangeSize (l,u) - 1]]
 
 {-# INLINE assocs #-}
+-- | Returns the contents of an array as a list of associations.
 assocs :: (IArray a e, Ix i) => a i e -> [(i, e)]
 assocs arr | (l,u) <- bounds arr =
     [(i, unsafeAt arr (unsafeIndex (l,u) i)) | i <- range (l,u)]
 
 {-# INLINE accumArray #-}
-accumArray :: (IArray a e, Ix i) => (e -> e' -> e) -> e -> (i,i) -> [(i, e')] -> a i e
+
+{-| 
+Constructs an immutable array from a list of associations.  Unlike
+'array', the same index is allowed to occur multiple times in the list
+of associations; an /accumulating function/ is used to combine the
+values of elements with the same index.
+
+For example, given a list of values of some index type, hist produces
+a histogram of the number of occurrences of each index within a
+specified range:
+
+> hist :: (Ix a, Num b) => (a,a) -> [a] -> Array a b
+> hist bnds is = accumArray (+) 0 bnds [(i, 1) | i\<-is, inRange bnds i]
+-}
+accumArray :: (IArray a e, Ix i) 
+	=> (e -> e' -> e) 	-- ^ An accumulating function
+	-> e			-- ^ A default element
+	-> (i,i)		-- ^ The bounds of the array
+	-> [(i, e')]		-- ^ List of associations
+	-> a i e		-- ^ Returns: the array
 accumArray f init (l,u) ies =
     unsafeAccumArray f init (l,u) [(index (l,u) i, e) | (i, e) <- ies]
 
 {-# INLINE (//) #-}
+{-|
+Takes an array and a list of pairs and returns an array identical to
+the left argument except that it has been updated by the associations
+in the right argument. (As with the array function, the indices in the
+association list must be unique for the updated elements to be
+defined.) For example, if m is a 1-origin, n by n matrix, then
+@m\/\/[((i,i), 0) | i \<- [1..n]]@ is the same matrix, except with the
+diagonal zeroed.
+
+For most array types, this operation is O(/n/) where /n/ is the size
+of the array.  However, the 'Data.Array.Diff.DiffArray' type provides
+this operation with complexity linear in the number of updates.
+-}
 (//) :: (IArray a e, Ix i) => a i e -> [(i, e)] -> a i e
 arr // ies | (l,u) <- bounds arr =
     unsafeReplace arr [(index (l,u) i, e) | (i, e) <- ies]
 
 {-# INLINE accum #-}
+{-|
+@accum f@ takes an array and an association list and accumulates pairs
+from the list into the array with the accumulating function @f@. Thus
+'accumArray' can be defined using 'accum':
+
+> accumArray f z b = accum f (array b [(i, z) | i \<- range b])
+-}
 accum :: (IArray a e, Ix i) => (e -> e' -> e) -> a i e -> [(i, e')] -> a i e
 accum f arr ies | (l,u) <- bounds arr =
     unsafeAccum f arr [(index (l,u) i, e) | (i, e) <- ies]
 
 {-# INLINE amap #-}
+-- | Returns a new array derived from the original array by applying a
+-- function to each of the elements.
 amap :: (IArray a e', IArray a e, Ix i) => (e' -> e) -> a i e' -> a i e
 amap f arr | (l,u) <- bounds arr =
     unsafeArray (l,u) [(i, f (unsafeAt arr i)) | i <- [0 .. rangeSize (l,u) - 1]]
-
 {-# INLINE ixmap #-}
+-- | Returns a new array derived from the original array by applying a
+-- function to each of the indices.
 ixmap :: (IArray a e, Ix i, Ix j) => (i,i) -> (i -> j) -> a j e -> a i e
 ixmap (l,u) f arr =
     unsafeArray (l,u) [(unsafeIndex (l,u) i, arr ! f i) | i <- range (l,u)]
@@ -240,6 +337,22 @@ instance IArray GHC.Arr.Array e where
 -----------------------------------------------------------------------------
 -- Flat unboxed arrays
 
+-- | Arrays with unboxed elements.  Instances of 'IArray' are provided
+-- for 'UArray' with certain element types ('Int', 'Float', 'Char',
+-- etc.; see the 'UArray' class for a full list).
+--
+-- A 'UArray' will generally be more efficient (in terms of both time
+-- and space) than the equivalent 'Data.Array.Array' with the same
+-- element type.  However, 'UArray' is strict in its elements - so
+-- don\'t use 'UArray' if you require the non-strictness that
+-- 'Data.Array.Array' provides.
+--
+-- Because the @IArray@ interface provides operations overloaded on
+-- the type of the array, it should be possible to just change the
+-- array type being used by a program from say @Array@ to @UArray@ to
+-- get the benefits of unboxed arrays (don\'t forget to import
+-- "Data.Array.Unboxed" instead of "Data.Array").
+--
 data UArray i e = UArray !i !i ByteArray#
 
 INSTANCE_TYPEABLE2(UArray,uArrayTc,"UArray")
@@ -691,9 +804,26 @@ instance (Ix ix, Show ix) => Show (UArray ix Word64) where
 arrEleBottom :: a
 arrEleBottom = error "MArray: undefined array element"
 
+{-| Class of mutable array types.
+
+An array type has the form @(a i e)@ where @a@ is the array type
+constructor (kind @* -> * -> *@), @i@ is the index type (a member of
+the class 'Ix'), and @e@ is the element type.
+
+The @MArray@ class is parameterised over both @a@ and @e@ (so that
+instances specialised to certain element types can be defined, in the
+same way as for 'IArray'), and also over the type of the monad, @m@,
+in which the mutable array will be manipulated.
+-}
 class (HasBounds a, Monad m) => MArray a e m where
+
+    -- | Builds a new array, with every element initialised to the supplied 
+    -- value.
     newArray    :: Ix i => (i,i) -> e -> m (a i e)
+
+    -- | Builds a new array, with every element initialised to undefined.
     newArray_   :: Ix i => (i,i) -> m (a i e)
+
     unsafeRead  :: Ix i => a i e -> Int -> m e
     unsafeWrite :: Ix i => a i e -> Int -> e -> m ()
 
@@ -719,6 +849,9 @@ class (HasBounds a, Monad m) => MArray a e m where
     -- initial value and it is constant for all elements.
 
 {-# INLINE newListArray #-}
+-- | Constructs a mutable array from a list of initial elements.
+-- The list gives the elements of the array in ascending order
+-- beginning with the lowest index.
 newListArray :: (MArray a e m, Ix i) => (i,i) -> [e] -> m (a i e)
 newListArray (l,u) es = do
     marr <- newArray_ (l,u)
@@ -731,27 +864,34 @@ newListArray (l,u) es = do
     return marr
 
 {-# INLINE readArray #-}
+-- | Read an element from a mutable array
 readArray :: (MArray a e m, Ix i) => a i e -> i -> m e
 readArray marr i | (l,u) <- bounds marr =
     unsafeRead marr (index (l,u) i)
 
 {-# INLINE writeArray #-}
+-- | Write an element in a mutable array
 writeArray :: (MArray a e m, Ix i) => a i e -> i -> e -> m ()
 writeArray marr i e | (l,u) <- bounds marr =
     unsafeWrite marr (index (l,u) i) e
 
 {-# INLINE getElems #-}
+-- | Return a list of all the elements of a mutable array
 getElems :: (MArray a e m, Ix i) => a i e -> m [e]
 getElems marr | (l,u) <- bounds marr =
     sequence [unsafeRead marr i | i <- [0 .. rangeSize (l,u) - 1]]
 
 {-# INLINE getAssocs #-}
+-- | Return a list of all the associations of a mutable array, in
+-- index order.
 getAssocs :: (MArray a e m, Ix i) => a i e -> m [(i, e)]
 getAssocs marr | (l,u) <- bounds marr =
     sequence [do e <- unsafeRead marr (index (l,u) i); return (i,e)
               | i <- range (l,u)]
 
 {-# INLINE mapArray #-}
+-- | Constructs a new array derived from the original array by applying a
+-- function to each of the elements.
 mapArray :: (MArray a e' m, MArray a e m, Ix i) => (e' -> e) -> a i e' -> m (a i e)
 mapArray f marr | (l,u) <- bounds marr = do
     marr' <- newArray_ (l,u)
@@ -762,6 +902,8 @@ mapArray f marr | (l,u) <- bounds marr = do
     return marr'
 
 {-# INLINE mapIndices #-}
+-- | Constructs a new array derived from the original array by applying a
+-- function to each of the indices.
 mapIndices :: (MArray a e m, Ix i, Ix j) => (i,i) -> (i -> j) -> a j e -> m (a i e)
 mapIndices (l,u) f marr = do
     marr' <- newArray_ (l,u)
@@ -800,6 +942,21 @@ instance (Typeable a, Typeable b, Typeable c) => Typeable (STArray a b c) where
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (ST monad)
 
+-- | A mutable array with unboxed elements, that can be manipulated in
+-- the 'ST' monad.  The type arguments are as follows:
+--
+--  * @s@: the state variable argument for the 'ST' type
+--
+--  * @i@: the index type of the array (should be an instance of @Ix@)
+--
+--  * @e@: the element type of the array.  Only certain element types
+--    are supported.
+--
+-- An 'STUArray' will generally be more efficient (in terms of both time
+-- and space) than the equivalent boxed version ('STArray') with the same
+-- element type.  However, 'STUArray' is strict in its elements - so
+-- don\'t use 'STUArray' if you require the non-strictness that
+-- 'STArray' provides.
 data STUArray s i a = STUArray !i !i (MutableByteArray# s)
 
 INSTANCE_TYPEABLE3(STUArray,stUArrayTc,"STUArray")
@@ -1108,6 +1265,9 @@ bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb# where W# mb# = maxBound
 -----------------------------------------------------------------------------
 -- Freezing
 
+-- | Converts a mutable array (any instance of 'MArray') to an
+-- immutable array (any instance of 'IArray') by taking a complete
+-- copy of it.
 freeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
 freeze marr | (l,u) <- bounds marr = do
     ies <- sequence [do e <- unsafeRead marr i; return (i,e)
@@ -1133,6 +1293,13 @@ freezeSTUArray (STUArray l u marr#) = ST $ \s1# ->
 -- freeze it (and, subsequently mutate it, I suspect).
 
 {-# INLINE unsafeFreeze #-}
+
+-- | Converts a mutable array to an immutable array /without taking a
+-- copy/.  This function is \"unsafe\" because if any further
+-- modifications are made to the original mutable array then they will
+-- be shared with the immutable version.  It is safe to use,
+-- therefore, if the mutable version is never modified after the
+-- freeze operation.
 unsafeFreeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
 unsafeFreeze = freeze
 
@@ -1144,6 +1311,9 @@ unsafeFreeze = freeze
 -----------------------------------------------------------------------------
 -- Thawing
 
+-- | Converts an immutable array (any instance of 'IArray') into a
+-- mutable array (any instance of 'MArray') by taking a complete copy
+-- of it.
 thaw :: (Ix i, IArray a e, MArray b e m) => a i e -> m (b i e)
 thaw arr | (l,u) <- bounds arr = do
     marr <- newArray_ (l,u)
@@ -1172,6 +1342,12 @@ foreign import ccall unsafe "memcpy"
 -- thaw it (and, subsequently mutate it, I suspect).
 
 {-# INLINE unsafeThaw #-}
+
+-- | Converts an immutable array into a mutable array /without taking
+-- a copy/.  This function is \"unsafe\" because any subsequent
+-- modifications made to the mutable version of the array will be
+-- shared with the immutable version.  It is safe to use, therefore, if
+-- the immutable version is never referenced again.
 unsafeThaw :: (Ix i, IArray a e, MArray b e m) => a i e -> m (b i e)
 unsafeThaw = thaw
 
