@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.75 2001/06/15 08:29:57 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.76 2001/06/15 11:40:29 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -13,6 +13,7 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 #include "../includes/config.h"
 #include "HsVersions.h"
 
+import Packages
 import CompManager
 import HscTypes		( GhciMode(..) )
 import ByteCodeLink
@@ -267,27 +268,28 @@ readlineLoop = do
 -- and carries on.
 runCommand :: String -> GHCi Bool
 runCommand c = 
-  ghciHandle ( \exception -> 
-	(case exception of
-	   DynException dyn -> 
-	      case fromDynamic dyn of
-		Nothing -> io (putStrLn ("*** Exception: (unknown)"))
-		Just ghc_ex -> 
-		  case ghc_ex of
-		    PhaseFailed phase code ->
-			io ( putStrLn ("Phase " ++ phase ++ " failed (code "
-				        ++ show code ++ ")"))
-		    Interrupted -> io (putStrLn "Interrupted.")
-			-- omit the location for CmdLineError
-		    CmdLineError s -> io (putStrLn s)
-		    other -> io (putStrLn (show (ghc_ex :: GhcException)))
+  ghciHandle ( \exception -> do
+		flushEverything
+		showException exception
+		return False
+	     ) $
+  doCommand c
 
-	   other -> io (putStrLn ("*** Exception: " ++ show exception))
-
-	) >> return False
-     ) $
-
-   doCommand c
+showException (DynException dyn) =
+  case fromDynamic dyn of
+    Nothing -> 
+	io (putStrLn ("*** Exception: (unknown)"))
+    Just (PhaseFailed phase code) ->
+	io (putStrLn ("Phase " ++ phase ++ " failed (code "
+		       ++ show code ++ ")"))
+    Just Interrupted ->
+	io (putStrLn "Interrupted.")
+    Just (CmdLineError s) -> 
+	io (putStrLn s)	 -- omit the location for CmdLineError
+    Just other_ghc_ex ->
+	io (putStrLn (show other_ghc_ex))
+showException other_exception
+  = io (putStrLn ("*** Exception: " ++ show other_exception))
 
 doCommand (':' : command) = specialCommand command
 doCommand stmt
