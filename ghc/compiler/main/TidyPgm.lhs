@@ -469,8 +469,10 @@ tidyTopBinder mod ext_ids caf_info rec_tidy_env rhs tidy_rhs
 	-- in the IdInfo of one early in the group
 
 	-- The rhs is already tidied
-	
-  = ((orig_env', occ_env', subst_env'), id')
+
+  = ASSERT(isLocalId id)  -- "all Ids defined in this module are local
+			  -- until the CoreTidy phase"  --GHC comentary
+    ((orig_env', occ_env', subst_env'), id')
   where
     (orig_env', occ_env', name') = tidyTopName mod ns2 occ_env2
 					       is_external
