@@ -369,7 +369,7 @@ endif # $(HS_SRCS)
 ifeq "$(StripLibraries)" "YES"
 ifeq "$(SplitObjs)" "YES"
 SRC_HC_POST_OPTS += \
-  for i in $(basename $@)_split/*; do \
+  for i in $(basename $@)_split/*.$(way_)o; do \
 	$(LD) -r $(LD_X) -o $$i.tmp $$i; \
 	$(MV) $$i.tmp $$i; \
   done
