@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.118 2003/03/31 14:02:32 simonmar Exp $
+ * $Id: Linker.c,v 1.119 2003/04/29 21:37:31 wolfgang Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -92,7 +92,7 @@ static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
 
-static void machoInitSymbolsWithoutUnderscore();
+static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -551,15 +551,17 @@ typedef struct _RtsSymbolVal {
 /* force these symbols to be present */
 #define RTS_EXTRA_SYMBOLS			\
       Sym(__divsf3)
-#elif defined(powerpc_TARGET_ARCH)
+#else
+#define RTS_EXTRA_SYMBOLS /* nothing */
+#endif
+
+#ifdef darwin_TARGET_OS
       // Symbols that don't have a leading underscore
       // on Mac OS X. They have to receive special treatment,
       // see machoInitSymbolsWithoutUnderscore()
 #define RTS_MACHO_NOUNDERLINE_SYMBOLS		\
       Sym(saveFP)				\
       Sym(restFP)
-#else
-#define RTS_EXTRA_SYMBOLS /* nothing */
 #endif
 
 /* entirely bogus claims about types of these symbols */
