@@ -91,7 +91,7 @@ import PrelAddr		( Addr(..) )
 import MutableArray	( MutableArray(..) )
 #else
 import PrelArr		( STArray(..), newSTArray )
-import IOExts		( hPutBuf, hPutBufBA )
+import IOExts		( hPutBufFull, hPutBufBAFull )
 #endif
 
 -- ForeignObj is now exported abstractly.
@@ -639,8 +639,7 @@ hPutFS handle (FastString _ l# ba#)
   | otherwise  = hPutBufBA handle (ByteArray bot bot ba#) (I# l#)
 #else
   | otherwise  = do mba <- stToIO $ unsafeThawByteArray (ByteArray (bot::Int) bot ba#)
-                    hPutBufBA  handle mba (I# l#)
-                    return ()
+                    hPutBufBAFull  handle mba (I# l#)
 #endif
  where
   bot = error "hPutFS.ba"
@@ -649,8 +648,11 @@ hPutFS handle (FastString _ l# ba#)
 
 hPutFS handle (CharStr a# l#)
   | l# ==# 0#  = return ()
-  | otherwise  = do hPutBuf handle (A# a#) (I# l#) ; return ()
-
+#if __GLASGOW_HASKELL__ < 407
+  | otherwise  = hPutBuf handle (A# a#) (I# l#)
+#else
+  | otherwise  = hPutBufFull handle (A# a#) (I# l#)
+#endif
 
 #endif
 \end{code}
