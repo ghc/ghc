@@ -316,7 +316,7 @@ instance Ppr Range where
 ------------------------------
 where_clause :: [Dec] -> Doc
 where_clause [] = empty
-where_clause ds = text "where" <+> vcat (map ppr ds)
+where_clause ds = nest nestDepth $ text "where" <+> vcat (map ppr ds)
 
 showtextl :: Show a => a -> Doc
 showtextl = text . map toLower . show
