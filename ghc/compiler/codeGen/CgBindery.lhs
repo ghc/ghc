@@ -176,41 +176,40 @@ The name should not already be bound. (nice ASSERT, eh?)
 
 \begin{code}
 addBindC :: Id -> CgIdInfo -> Code
-addBindC name stuff_to_bind info_down (MkCgState absC binds usage)
-  = MkCgState absC (extendVarEnv binds name stuff_to_bind) usage
+addBindC name stuff_to_bind = do
+	binds <- getBinds
+	setBinds $ extendVarEnv binds name stuff_to_bind
 
 addBindsC :: [(Id, CgIdInfo)] -> Code
-addBindsC new_bindings info_down (MkCgState absC binds usage)
-  = MkCgState absC new_binds usage
-  where
-    new_binds = foldl (\ binds (name,info) -> extendVarEnv binds name info)
-		      binds
-		      new_bindings
+addBindsC new_bindings = do
+	binds <- getBinds
+	let new_binds = foldl (\ binds (name,info) -> extendVarEnv binds name info)
+		binds
+		new_bindings
+	setBinds new_binds
 
 modifyBindC :: Id -> (CgIdInfo -> CgIdInfo) -> Code
-modifyBindC name mangle_fn info_down (MkCgState absC binds usage)
-  = MkCgState absC (modifyVarEnv mangle_fn binds name) usage
+modifyBindC name mangle_fn = do
+	binds <- getBinds
+	setBinds $ modifyVarEnv mangle_fn binds name
 
 lookupBindC :: Id -> FCode CgIdInfo
-lookupBindC name info_down@(MkCgInfoDown _ static_binds srt ticky _)
-		 state@(MkCgState absC local_binds usage)
-  = (val, state)
-  where
-    val = case (lookupVarEnv local_binds name) of
-	    Nothing	-> try_static
-	    Just this	-> this
-
-    try_static = 
-      case (lookupVarEnv static_binds name) of
-	Just this -> this
-	Nothing
-	  -> cgPanic (text "lookupBindC: no info for" <+> ppr name) info_down state
-
-cgPanic :: SDoc -> CgInfoDownwards -> CgState -> a
-cgPanic doc info_down@(MkCgInfoDown _ static_binds srt ticky _)
-	    state@(MkCgState absC local_binds usage)
-  = pprPanic "cgPanic"
-	     (vcat [doc,
+lookupBindC name = do
+	static_binds <- getStaticBinds
+	local_binds <- getBinds
+	case (lookupVarEnv local_binds name) of
+		Nothing -> case (lookupVarEnv static_binds name) of
+			Nothing -> cgPanic (text "lookupBindC: no info for" <+> ppr name)
+			Just this -> return this
+		Just this -> return this
+			
+cgPanic :: SDoc -> FCode a
+cgPanic doc = do
+	static_binds <- getStaticBinds
+	local_binds <- getBinds
+	srt <- getSRTLabel
+	pprPanic "cgPanic"
+		(vcat [doc,
 		ptext SLIT("static binds for:"),
 		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv static_binds ],
 		ptext SLIT("local binds for:"),
@@ -256,20 +255,20 @@ getCAddrModeAndInfo id
 	-- deals with imported or locally defined but externally visible ids
 	-- (CoreTidy makes all these into global names).
 
-  | otherwise = -- *might* be a nested defn: in any case, it's something whose
+  | otherwise = do -- *might* be a nested defn: in any case, it's something whose
 		-- definition we will know about...
-    lookupBindC id `thenFC` \ (MkCgIdInfo id' volatile_loc stable_loc lf_info) ->
-    idInfoPiecesToAmode kind volatile_loc stable_loc `thenFC` \ amode ->
-    returnFC (id', amode, lf_info)
+	(MkCgIdInfo id' volatile_loc stable_loc lf_info) <- lookupBindC id
+	amode <- idInfoPiecesToAmode kind volatile_loc stable_loc
+	return (id', amode, lf_info)
   where
     name = getName id
     global_amode = CLbl (mkClosureLabel name) kind
     kind = idPrimRep id
 
 getCAddrMode :: Id -> FCode CAddrMode
-getCAddrMode name
-  = getCAddrModeAndInfo name `thenFC` \ (_, amode, _) ->
-    returnFC amode
+getCAddrMode name = do
+	(_, amode, _) <- getCAddrModeAndInfo name
+	return amode
 \end{code}
 
 \begin{code}
@@ -277,13 +276,13 @@ getCAddrModeIfVolatile :: Id -> FCode (Maybe CAddrMode)
 getCAddrModeIfVolatile name
 --  | toplevelishId name = returnFC Nothing
 --  | otherwise
-  = lookupBindC name `thenFC` \ ~(MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
-    case stable_loc of
-	NoStableLoc ->	-- Aha!  So it is volatile!
-	    idInfoPiecesToAmode (idPrimRep name) volatile_loc NoStableLoc `thenFC` \ amode ->
-	    returnFC (Just amode)
-
-	a_stable_loc -> returnFC Nothing
+	= do
+	(MkCgIdInfo _ volatile_loc stable_loc lf_info) <- lookupBindC name
+	case stable_loc of
+		NoStableLoc -> do -- Aha!  So it is volatile!
+			amode <- idInfoPiecesToAmode (idPrimRep name) volatile_loc NoStableLoc
+			return $ Just amode
+		a_stable_loc -> return Nothing
 \end{code}
 
 @getVolatileRegs@ gets a set of live variables, and returns a list of
@@ -296,50 +295,50 @@ forget the volatile one.
 \begin{code}
 getVolatileRegs :: StgLiveVars -> FCode [MagicId]
 
-getVolatileRegs vars
-  = mapFCs snaffle_it (varSetElems vars) `thenFC` \ stuff ->
-    returnFC (catMaybes stuff)
-  where
-    snaffle_it var
-      = lookupBindC var	`thenFC` \ (MkCgIdInfo _ volatile_loc stable_loc lf_info) ->
-	let
-	    -- commoned-up code...
-	    consider_reg reg
-	      =	if not (isVolatileReg reg) then
-			-- Potentially dies across C calls
-			-- For now, that's everything; we leave
-			-- it to the save-macros to decide which
-			-- regs *really* need to be saved.
-		    returnFC Nothing
-		else
-		    case stable_loc of
-		      NoStableLoc -> returnFC (Just reg) -- got one!
-		      is_a_stable_loc ->
-			-- has both volatile & stable locations;
-			-- force it to rely on the stable location
-			modifyBindC var nuke_vol_bind `thenC`
-			returnFC Nothing
-	in
-	case volatile_loc of
-	  RegLoc reg   -> consider_reg reg
-    	  VirHpLoc _   -> consider_reg Hp
-	  VirNodeLoc _ -> consider_reg node
-	  non_reg_loc  -> returnFC Nothing
+getVolatileRegs vars = do
+	stuff <- mapFCs snaffle_it (varSetElems vars)
+	returnFC $ catMaybes stuff
+	where
+	snaffle_it var = do
+		(MkCgIdInfo _ volatile_loc stable_loc lf_info) <- lookupBindC var 
+		let
+		-- commoned-up code...
+			consider_reg reg =
+				if not (isVolatileReg reg) then
+				-- Potentially dies across C calls
+				-- For now, that's everything; we leave
+				-- it to the save-macros to decide which
+				-- regs *really* need to be saved.
+					returnFC Nothing
+				else
+					case stable_loc of
+						NoStableLoc -> returnFC (Just reg) -- got one!
+						is_a_stable_loc -> do
+							-- has both volatile & stable locations;
+							-- force it to rely on the stable location
+							modifyBindC var nuke_vol_bind 
+							return Nothing
+			in
+			case volatile_loc of
+				RegLoc reg   -> consider_reg reg
+				VirHpLoc _   -> consider_reg Hp
+				VirNodeLoc _ -> consider_reg node
+				non_reg_loc  -> returnFC Nothing
 
-    nuke_vol_bind (MkCgIdInfo i _ stable_loc lf_info)
-      = MkCgIdInfo i NoVolatileLoc stable_loc lf_info
+	nuke_vol_bind (MkCgIdInfo i _ stable_loc lf_info)
+		= MkCgIdInfo i NoVolatileLoc stable_loc lf_info
 \end{code}
 
 \begin{code}
 getArgAmodes :: [StgArg] -> FCode [CAddrMode]
 getArgAmodes [] = returnFC []
 getArgAmodes (atom:atoms)
-  | isStgTypeArg atom 
-  = getArgAmodes atoms
-  | otherwise
-  = getArgAmode  atom  `thenFC` \ amode ->
-    getArgAmodes atoms `thenFC` \ amodes ->
-    returnFC ( amode : amodes )
+	| isStgTypeArg atom 
+	= getArgAmodes atoms
+	| otherwise = do
+		amode <- getArgAmode  atom 
+		amodes <- getArgAmodes atoms
+		return ( amode : amodes )
 
 getArgAmode :: StgArg -> FCode CAddrMode
 
@@ -375,9 +374,9 @@ bindNewToTemp name
 		-- This is used only for things we don't know
 		-- anything about; values returned by a case statement,
 		-- for example.
-    in
-    addBindC name id_info	`thenC`
-    returnFC temp_amode
+    in do
+		addBindC name id_info
+		return temp_amode
 
 bindNewToReg :: Id -> MagicId -> LambdaFormInfo -> Code
 bindNewToReg name magic_id lf_info
@@ -425,6 +424,8 @@ rebindToStack name offset
 %*									*
 %************************************************************************
 
+ToDo: remove the dependency on 32-bit words.
+
 There are four kinds of things on the stack:
 
 	- pointer variables (bound in the environment)
@@ -450,34 +451,35 @@ buildLivenessMask
 	-> VirtualSpOffset	-- offset from which the bitmap should start
 	-> FCode Liveness	-- mask for free/unlifted slots
 
-buildLivenessMask uniq sp info_down
-	state@(MkCgState abs_c binds ((vsp, free, _, _), heap_usage))
-  = ASSERT(all (>=0) rel_slots) 
-    livenessToAbsC uniq liveness_mask info_down state 
-  where
+buildLivenessMask uniq sp = do	
 	-- find all unboxed stack-resident ids
-	unboxed_slots = 		   
-	  [ (ofs, size) | 
-		     (MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
-	        let rep = idPrimRep id; size = getPrimRepSize rep,
+	binds <- getBinds
+	((vsp, free, _, _), heap_usage) <- getUsage
+	
+	let unboxed_slots = 
+		[ (ofs, size) | 
+		(MkCgIdInfo id _ (VirStkLoc ofs) _) <- rngVarEnv binds,
+		let rep = idPrimRep id; size = getPrimRepSize rep,
 		not (isFollowableRep rep),
 		size > 0
-	  ]
-
+		]	
+		
 	-- flatten this list into a list of unboxed stack slots
-	flatten_slots = sortLt (<) 
+	let flatten_slots = sortLt (<) 
 		(foldr (\(ofs,size) r -> [ofs-size+1 .. ofs] ++ r) []
 		      unboxed_slots)
 
 	-- merge in the free slots
-	all_slots = mergeSlots flatten_slots (map fst free) ++ 
+	let all_slots = mergeSlots flatten_slots (map fst free) ++ 
 		    if vsp < sp then [vsp+1 .. sp] else []
 
         -- recalibrate the list to be sp-relative
-	rel_slots = reverse (map (sp-) all_slots)
+	let rel_slots = reverse (map (sp-) all_slots)
 
 	-- build the bitmap
-	liveness_mask = listToLivenessMask rel_slots
+	let liveness_mask = ASSERT(all (>=0) rel_slots) (listToLivenessMask rel_slots)
+	
+	livenessToAbsC uniq liveness_mask
 
 mergeSlots :: [Int] -> [Int] -> [Int]
 mergeSlots cs [] = cs
@@ -497,10 +499,10 @@ listToLivenessMask slots =
    where (this,rest) = span (<32) slots
 
 livenessToAbsC :: Unique -> LivenessMask -> FCode Liveness
-livenessToAbsC uniq mask  = 
-  	absC (CBitmap lbl mask) `thenC`
-  	returnFC (Liveness lbl mask)
-  where lbl = mkBitmapLabel uniq
+livenessToAbsC uniq mask  =
+        absC (CBitmap lbl mask) `thenC`
+        returnFC (Liveness lbl mask)
+  where lbl = mkBitmapLabel uniq       
 \end{code}
 
 In a continuation, we want a liveness mask that starts from just after
@@ -510,9 +512,9 @@ the return address, which is on the stack at realSp.
 buildContLivenessMask
 	:: Unique
 	-> FCode Liveness
-buildContLivenessMask uniq
-  = getRealSp  `thenFC` \ realSp ->
-    buildLivenessMask uniq (realSp-1)
+buildContLivenessMask uniq = do
+	realSp <- getRealSp
+	buildLivenessMask uniq (realSp-1)
 \end{code}
 
 %************************************************************************
@@ -539,16 +541,15 @@ Probably *naughty* to look inside monad...
 \begin{code}
 nukeDeadBindings :: StgLiveVars  -- All the *live* variables
 		 -> Code
-
-nukeDeadBindings live_vars info_down (MkCgState abs_c binds usage)
-  = freeStackSlots extra_free info_down (MkCgState abs_c (mkVarEnv bs') usage)
-  where
-    (dead_stk_slots, bs')
-      = dead_slots live_vars
-		   [] []
-		   [ (i, b) | b@(MkCgIdInfo i _ _ _) <- rngVarEnv binds ]
-
-    extra_free = sortLt (<) dead_stk_slots
+nukeDeadBindings live_vars = do
+	binds <- getBinds
+	let (dead_stk_slots, bs') =
+		dead_slots live_vars 
+			[] []
+			[ (i, b) | b@(MkCgIdInfo i _ _ _) <- rngVarEnv binds ]
+	let extra_free = sortLt (<) dead_stk_slots
+	setBinds $ mkVarEnv bs'
+	freeStackSlots extra_free
 \end{code}
 
 Several boring auxiliary functions to do the dirty work.
