@@ -9,22 +9,11 @@
 module HsBasic where
 
 IMP_Ubiq(){-uitous-}
+
 IMPORT_1_3(Ratio(Rational))
 
 import Pretty
-#if __GLASGOW_HASKELL__ >= 202
 import Outputable
-#endif
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Version]{Module and identifier version numbers}
-%*									*
-%************************************************************************
-
-\begin{code}
-type Version = Int
 \end{code}
 
 %************************************************************************
@@ -80,26 +69,4 @@ instance Outputable HsLit where
     ppr sty (HsLitLit s)	= hcat [text "``", ptext s, text "''"]
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection[Fixity]{Fixity info}
-%*									*
-%************************************************************************
-
-\begin{code}
-data Fixity = Fixity Int FixityDirection
-data FixityDirection = InfixL | InfixR | InfixN 
-		     deriving(Eq)
-
-instance Outputable Fixity where
-    ppr sty (Fixity prec dir) = hcat [ppr sty dir, space, int prec]
-
-instance Outputable FixityDirection where
-    ppr sty InfixL = ptext SLIT("infixl")
-    ppr sty InfixR = ptext SLIT("infixr")
-    ppr sty InfixN = ptext SLIT("infix")
-
-instance Eq Fixity where		-- Used to determine if two fixities conflict
-  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
-\end{code}
 
