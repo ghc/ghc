@@ -41,10 +41,13 @@ module MachMisc (
 #endif
     ) where
 
+IMPORT_1_3(Char(isDigit))
 IMP_Ubiq(){-uitous-}
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords ) -- paranoia
 IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl ) -- paranoia
-IMPORT_1_3(Char(isDigit))
+#endif
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
