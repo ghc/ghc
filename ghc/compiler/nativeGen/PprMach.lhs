@@ -1950,7 +1950,7 @@ pprInstr (MTCTR reg) = hcat [
 	char '\t',
 	pprReg reg
     ]
-pprInstr (BCTR) = hcat [
+pprInstr (BCTR _) = hcat [
 	char '\t',
 	ptext SLIT("bctr")
     ]
@@ -1965,7 +1965,7 @@ pprInstr (BCTRL _) = hcat [
 	ptext SLIT("bctrl")
     ]
 pprInstr (ADD reg1 reg2 ri) = pprLogic SLIT("add") reg1 reg2 ri
-pprInstr (SUBF reg1 reg2 ri) = pprLogic SLIT("subf") reg1 reg2 ri
+pprInstr (SUBF reg1 reg2 reg3) = pprLogic SLIT("subf") reg1 reg2 (RIReg reg3)
 pprInstr (MULLW reg1 reg2 ri@(RIReg _)) = pprLogic SLIT("mullw") reg1 reg2 ri
 pprInstr (MULLW reg1 reg2 ri@(RIImm _)) = pprLogic SLIT("mull") reg1 reg2 ri
 pprInstr (DIVW reg1 reg2 reg3) = pprLogic SLIT("divw") reg1 reg2 (RIReg reg3)

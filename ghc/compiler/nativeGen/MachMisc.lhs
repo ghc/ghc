@@ -736,12 +736,12 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 	      
 	      | BCC     Cond CLabel
 	      | MTCTR	Reg
-	      | BCTR
+	      | BCTR    DestInfo
 	      | BL	Imm [Reg]	-- with list of argument regs
 	      | BCTRL	[Reg]
 	      
 	      | ADD     Reg Reg RI -- dst, src1, src2    
-	      | SUBF    Reg Reg RI -- dst, src1, src2    
+	      | SUBF    Reg Reg Reg -- dst, src1, src2 ; dst = src2 - src1  
 	      | MULLW	Reg Reg RI
 	      | DIVW	Reg Reg Reg
 	      | DIVWU	Reg Reg Reg

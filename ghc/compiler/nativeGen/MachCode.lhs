@@ -51,6 +51,8 @@ import qualified Outputable
 import CmdLineOpts	( opt_Static )
 import Stix		( pprStixStmt )
 
+import Maybe		( fromMaybe )
+
 -- DEBUGGING ONLY
 import Outputable	( assertPanic )
 import FastString
@@ -1684,7 +1686,12 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
       MO_Dbl_Le -> condFltReg LE x y
 
       MO_Nat_Add -> trivialCode ADD x y
-      MO_Nat_Sub -> trivialCode SUBF y x
+      MO_Nat_Sub -> fromMaybe (trivialCode2 SUBF y x) $
+        case y of    -- subfi ('substract from' with immediate) doesn't exist
+          StInt imm -> if fits16Bits imm && imm /= (-32768)
+            then Just $ trivialCode ADD x (StInt (-imm))
+            else Nothing
+          _ -> Nothing
 
       MO_NatS_Mul -> trivialCode MULLW x y
       MO_NatU_Mul -> trivialCode MULLW x y
@@ -2883,7 +2890,8 @@ genJump dsts tree
 
 #if powerpc_TARGET_ARCH
 genJump dsts (StCLbl lbl)
-    = returnNat (toOL [BCC ALWAYS lbl])
+  | hasDestInfo dsts = panic "genJump(powerpc): CLbl and dsts"
+  | otherwise        = returnNat (toOL [BCC ALWAYS lbl])
 
 genJump dsts tree
   = getRegister tree	    	    	    `thenNat` \ register ->
@@ -2892,7 +2900,7 @@ genJump dsts tree
     	code   = registerCode register tmp
     	target = registerName register tmp
     in
-    returnNat (code `snocOL` MTCTR target `snocOL` BCTR)
+    returnNat (code `snocOL` MTCTR target `snocOL` BCTR dsts)
 #endif {- sparc_TARGET_ARCH -}
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -4290,7 +4298,7 @@ remainderCode div x y
     	code__2 dst = code1 `appOL` code2 `appOL` toOL [
 		div dst src1 src2,
 		MULLW dst dst (RIReg src2),
-		SUBF dst dst (RIReg src1)
+		SUBF dst dst src1
 	    ]
     in
     returnNat (Any IntRep code__2)

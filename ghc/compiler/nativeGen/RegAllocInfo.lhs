@@ -400,11 +400,11 @@ regUsage instr = case instr of
     CMPL  sz reg ri	-> usage (reg : regRI ri,[])
     BCC	  cond lbl	-> noUsage
     MTCTR reg		-> usage ([reg],[])
-    BCTR		-> noUsage
+    BCTR  dsts		-> noUsage
     BL    imm params	-> usage (params, callClobberedRegs)
     BCTRL params	-> usage (params, callClobberedRegs)
     ADD	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
-    SUBF  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    SUBF  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
     MULLW reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     DIVW  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
     DIVWU reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
@@ -611,7 +611,8 @@ insnFuture insn
     BCC _ clbl 	    | isAsmTemp clbl -> NextOrBranch clbl
     BCC _ _ -> panic "insnFuture: conditional jump to non-local label"
     
-    BCTR -> NoFuture
+    BCTR (DestInfo dsts) -> MultiFuture dsts
+    BCTR NoDestInfo -> NoFuture
     boring	-> Next
 #endif {- powerpc_TARGET_ARCH -}
 \end{code}
@@ -833,11 +834,11 @@ patchRegs instr env = case instr of
     CMPL  sz reg ri	-> CMPL sz (env reg) (fixRI ri)
     BCC	  cond lbl	-> BCC cond lbl
     MTCTR reg		-> MTCTR (env reg)
-    BCTR		-> BCTR
+    BCTR  dsts		-> BCTR dsts
     BL    imm argRegs	-> BL imm argRegs	-- argument regs
     BCTRL argRegs	-> BCTRL argRegs 	-- cannot be remapped
     ADD	  reg1 reg2 ri	-> ADD (env reg1) (env reg2) (fixRI ri)
-    SUBF  reg1 reg2 ri	-> SUBF (env reg1) (env reg2) (fixRI ri)
+    SUBF  reg1 reg2 reg3-> SUBF (env reg1) (env reg2) (env reg3)
     MULLW reg1 reg2 ri	-> MULLW (env reg1) (env reg2) (fixRI ri)
     DIVW  reg1 reg2 reg3-> DIVW (env reg1) (env reg2) (env reg3)
     DIVWU reg1 reg2 reg3-> DIVWU (env reg1) (env reg2) (env reg3)
