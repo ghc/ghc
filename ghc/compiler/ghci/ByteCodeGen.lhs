@@ -312,7 +312,7 @@ schemeE d s p (fvs, AnnLet binds b)
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
          n     = length xs
 
-	 is_local id = not (isTyVar id) && elemFM id p
+	 is_local id = not (isTyVar id) && elemFM id p'
          fvss  = map (filter is_local . varSetElems . fst) rhss
 
          -- Sizes of tagged free vars, + 1 for the fn
