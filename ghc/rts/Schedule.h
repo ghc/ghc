@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.39 2003/09/21 22:20:56 wolfgang Exp $
+ * $Id: Schedule.h,v 1.40 2003/10/01 10:49:09 wolfgang Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -190,9 +190,10 @@ typedef struct StgMainThread_ {
   SchedulerStatus  stat;
   StgClosure **    ret;
 #if defined(RTS_SUPPORTS_THREADS)
-  Condition        wakeup;
 #if defined(THREADED_RTS)
   Condition        bound_thread_cond;
+#else
+  Condition        wakeup;
 #endif
 #endif
   struct StgMainThread_ *link;
@@ -297,12 +298,12 @@ void labelThread(StgPtr tso, char *label);
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* If no task is waiting for a capability,
+ * and if there is work to be done
+ * or if we need to wait for IO or delay requests,
  * spawn a new worker thread.
- *
- * (Used by the RtsAPI)
  */
 void
-startSchedulerTask(void);
+startSchedulerTaskIfNecessary(void);
 #endif
 
 #endif /* __SCHEDULE_H__ */

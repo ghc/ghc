@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.29 2003/06/26 12:22:59 stolz Exp $
+ * $Id: Select.c,v 1.30 2003/10/01 10:49:09 wolfgang Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -350,5 +350,21 @@ wakeBlockedWorkerThread()
     	write(workerWakeupPipe[1],&dummy,1);
     	workerWakeupPending = rtsTrue;
     }
+}
+
+/* resetWorkerWakeupPipeAfterFork
+ *
+ * To be called right after a fork().
+ * After the fork(), the worker wakeup pipe will be shared
+ * with the parent process, and that's something we don't want.
+ */
+void
+resetWorkerWakeupPipeAfterFork()
+{
+    if(workerWakeupInited) {
+	close(workerWakeupPipe[0]);
+	close(workerWakeupPipe[1]);
+    }
+    workerWakeupInited = rtsFalse;
 }
 #endif

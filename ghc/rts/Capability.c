@@ -199,6 +199,8 @@ void releaseCapability(Capability* cap
 #endif
     /* Signal that a capability is available */
     signalCondition(&thread_ready_cond);
+    startSchedulerTaskIfNecessary();  // if there is more work to be done,
+				      // we'll need a new thread
   }
 #endif
 #ifdef RTS_SUPPORTS_THREADS
@@ -324,6 +326,7 @@ yieldToReturningWorker(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
  */
  
 static Condition *passTarget = NULL;
+static rtsBool passingCapability = rtsFalse;
  
 void 
 waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
@@ -334,8 +337,7 @@ waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
   IF_DEBUG(scheduler,
 	   fprintf(stderr,"worker thread (%p): wait for cap (cond: %p)\n",
 	      osThreadId(),pThreadCond));
-  while ( noCapabilities() || (pThreadCond && passTarget != pThreadCond)
-      || (!pThreadCond && passTarget)) {
+  while ( noCapabilities() || (passingCapability && passTarget != pThreadCond)) {
     if(pThreadCond)
     {
       waitCondition(pThreadCond, pMutex);
@@ -353,7 +355,7 @@ waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
 		  osThreadId()));
     }
   }
-  passTarget = NULL;
+  passingCapability = rtsFalse;
   grabCapability(pCap);
   return;
 }
@@ -378,10 +380,39 @@ passCapability(Mutex* pMutex, Capability* cap, Condition *pTargetThreadCond)
     rts_n_free_capabilities = 1;
     signalCondition(pTargetThreadCond);
     passTarget = pTargetThreadCond;
+	passingCapability = rtsTrue;
     IF_DEBUG(scheduler,
 	     fprintf(stderr,"worker thread (%p): passCapability\n",
 	     	osThreadId()));
 }
+
+/*
+ * Function: passCapabilityToWorker(Mutex*, Capability*)
+ *
+ * Purpose:  Let go of the capability and make sure that a
+ *	     "plain" worker thread (not a bound thread) gets it next.
+ *
+ * Pre-condition: pMutex is held and cap is held by the current thread
+ * Post-condition: pMutex is held; cap will be grabbed by the "target"
+ *		   thread when pMutex is released.
+ */
+
+void
+passCapabilityToWorker(Mutex* pMutex, Capability* cap)
+{
+#ifdef SMP
+  #error SMP version not implemented
+#endif
+    rts_n_free_capabilities = 1;
+    signalCondition(&thread_ready_cond);
+    startSchedulerTaskIfNecessary();
+    passTarget = NULL;
+    passingCapability = rtsTrue;
+    IF_DEBUG(scheduler,
+	     fprintf(stderr,"worker thread (%p): passCapabilityToWorker\n",
+	     	osThreadId()));
+}
+
 
 
 #endif /* RTS_SUPPORTS_THREADS */

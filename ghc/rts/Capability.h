@@ -42,6 +42,7 @@ extern void grabReturnCapability(Mutex* pMutex, Capability** pCap);
 extern void yieldToReturningWorker(Mutex* pMutex, Capability** pCap, Condition *pThreadCond);
 extern void waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition *pThreadCond);
 extern void passCapability(Mutex* pMutex, Capability* cap, Condition *pTargetThreadCond);
+extern void passCapabilityToWorker(Mutex* pMutex, Capability* cap);
 
 static inline rtsBool needToYieldToReturningWorker(void)
 {

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.175 2003/09/26 13:32:14 panne Exp $
+ * $Id: Schedule.c,v 1.176 2003/10/01 10:49:08 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -313,20 +313,38 @@ StgTSO * activateSpark (rtsSpark spark);
 StgTSO   *MainTSO;
  */
 
-#if defined(PAR) || defined(RTS_SUPPORTS_THREADS)
+#if defined(RTS_SUPPORTS_THREADS)
+static rtsBool startingWorkerThread = rtsFalse;
+
 static void taskStart(void);
 static void
 taskStart(void)
 {
-  schedule(NULL,NULL);
+  Capability *cap;
+  
+  ACQUIRE_LOCK(&sched_mutex);
+  startingWorkerThread = rtsFalse;
+  waitForWorkCapability(&sched_mutex, &cap, NULL);
+  RELEASE_LOCK(&sched_mutex);
+  
+  schedule(NULL,cap);
 }
-#endif
 
-#if defined(RTS_SUPPORTS_THREADS)
 void
-startSchedulerTask(void)
+startSchedulerTaskIfNecessary(void)
 {
-    startTask(taskStart);
+  if(run_queue_hd != END_TSO_QUEUE
+    || blocked_queue_hd != END_TSO_QUEUE
+    || sleeping_queue != END_TSO_QUEUE)
+  {
+    if(!startingWorkerThread)
+    { // we don't want to start another worker thread
+      // just because the last one hasn't yet reached the
+      // "waiting for capability" state
+      startingWorkerThread = rtsTrue;
+      startTask(taskStart);
+    }
+  }
 }
 #endif
 
@@ -475,7 +493,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
       // so just exit right away.
       prog_belch("interrupted");
       releaseCapability(cap);
-      startTask(taskStart);	// thread-safe-call to shutdownHaskellAndExit
       RELEASE_LOCK(&sched_mutex);
       shutdownHaskellAndExit(EXIT_SUCCESS);
 #else
@@ -1151,7 +1168,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	  // no, the current native thread is bound to a different
 	  // Haskell thread, so pass it to any worker thread
 	  PUSH_ON_RUN_QUEUE(t);
-	  releaseCapability(cap);
+	  passCapabilityToWorker(&sched_mutex, cap);
 	  cap = NULL;
 	  continue; 
 	}
@@ -1830,9 +1847,6 @@ suspendThread( StgRegTable *reg,
      waiting to take over.
   */
   IF_DEBUG(scheduler, sched_belch("worker thread (%d, osthread %p): leaving RTS", tok, osThreadId()));
-  //if (concCall) { // implementing "safe" as opposed to "threadsafe" is more difficult
-      startTask(taskStart);
-  //}
 #endif
 
   /* Other threads _might_ be available for execution; signal this */
@@ -2245,9 +2259,10 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *initialCap
   m->ret = ret;
   m->stat = NoStatus;
 #if defined(RTS_SUPPORTS_THREADS)
-  initCondition(&m->wakeup);
 #if defined(THREADED_RTS)
   initCondition(&m->bound_thread_cond);
+#else
+  initCondition(&m->wakeup);
 #endif
 #endif
 
@@ -2459,9 +2474,10 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret, Capability *initialCapability)
   m->ret = ret;
   m->stat = NoStatus;
 #if defined(RTS_SUPPORTS_THREADS)
-  initCondition(&m->wakeup);
 #if defined(THREADED_RTS)
   initCondition(&m->bound_thread_cond);
+#else
+  initCondition(&m->wakeup);
 #endif
 #endif
 
@@ -2512,9 +2528,10 @@ waitThread_(StgMainThread* m, Capability *initialCapability)
   stat = m->stat;
 
 #if defined(RTS_SUPPORTS_THREADS)
-  closeCondition(&m->wakeup);
 #if defined(THREADED_RTS)
   closeCondition(&m->bound_thread_cond);
+#else
+  closeCondition(&m->wakeup);
 #endif
 #endif
 
@@ -3498,7 +3515,11 @@ deleteThreadImmediately(StgTSO *tso)
   if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
       return;
   }
-  unblockThread(tso);
+#if defined(RTS_SUPPORTS_THREADS)
+  if (tso->why_blocked != BlockedOnCCall
+      && tso->why_blocked != BlockedOnCCall_NoUnblockExc)
+#endif
+    unblockThread(tso);
   tso->what_next = ThreadKilled;
 }
 #endif

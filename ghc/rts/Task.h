@@ -28,6 +28,7 @@ extern TaskInfo *taskIds;
 
 extern void startTaskManager ( nat maxTasks, void (*taskStart)(void) );
 extern void stopTaskManager ( void );
+void resetTaskManagerAfterFork ();
 
 extern void startTask ( void (*taskStart)(void) );
 

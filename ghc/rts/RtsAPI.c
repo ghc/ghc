@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.48 2003/10/01 10:36:49 wolfgang Exp $
+ * $Id: RtsAPI.c,v 1.49 2003/10/01 10:49:07 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -501,12 +501,6 @@ rts_lock()
 		// b) wake the current worker thread from awaitEvent()
 		//       (so that a thread started by rts_eval* will start immediately)
 	grabReturnCapability(&sched_mutex,&rtsApiCapability);
-	
-		// In the RTS hasn't been entered yet,
-		// start a RTS task.
-		// If there is already a task available (waiting for the work capability),
-		// this will do nothing.
-	startSchedulerTask();
 #endif
 }
 

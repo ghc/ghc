@@ -134,6 +134,12 @@ stopTaskManager ()
   return;
 }
 
+void
+resetTaskManagerAfterFork ()
+{
+	barf("resetTaskManagerAfterFork not implemented for SMP");
+}
+
 #else
 /************ THREADS version *****************/
 
@@ -191,6 +197,13 @@ void
 stopTaskManager ()
 {
 
+}
+
+void
+resetTaskManagerAfterFork ()
+{
+	rts_n_waiting_tasks = 0;
+	taskCount = 0;
 }
 #endif
 
