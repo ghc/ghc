@@ -8,22 +8,63 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Weak references, weak pairs, weak pointers, and finalizers.
+-- In general terms, a weak pointer is a reference to an object that is
+-- not followed by the garbage collector - that is, the existence of a
+-- weak pointer to an object has no effect on the lifetime of that
+-- object.  A weak pointer can be de-referenced to find out
+-- whether the object it refers to is still alive or not, and if so
+-- to return the object itself.
+-- 
+-- Weak pointers are particularly useful for caches and memo tables.
+-- To build a memo table, you build a data structure 
+-- mapping from the function argument (the key) to its result (the
+-- value).  When you apply the function to a new argument you first
+-- check whether the key\/value pair is already in the memo table.
+-- The key point is that the memo table itself should not keep the
+-- key and value alive.  So the table should contain a weak pointer
+-- to the key, not an ordinary pointer.  The pointer to the value must
+-- not be weak, because the only reference to the value might indeed be
+-- from the memo table.   
+-- 
+-- So it looks as if the memo table will keep all its values
+-- alive for ever.  One way to solve this is to purge the table
+-- occasionally, by deleting entries whose keys have died.
+-- 
+-- The weak pointers in this library
+-- support another approach, called /finalization/.
+-- When the key referred to by a weak pointer dies, the storage manager
+-- arranges to run a programmer-specified finalizer.  In the case of memo
+-- tables, for example, the finalizer could remove the key\/value pair
+-- from the memo table.  
+-- 
+-- Another difficulty with the memo table is that the value of a
+-- key\/value pair might itself contain a pointer to the key.
+-- So the memo table keeps the value alive, which keeps the key alive,
+-- even though there may be no other references to the key so both should
+-- die.  The weak pointers in this library provide a slight 
+-- generalisation of the basic weak-pointer idea, in which each
+-- weak pointer actually contains both a key and a value.
 --
 -----------------------------------------------------------------------------
 
 module System.Mem.Weak (
+	-- * The @Weak@ type
 	Weak,	    		-- abstract
-	-- instance Eq (Weak v)  
 
+	-- * The general interface
 	mkWeak,      		-- :: k -> v -> Maybe (IO ()) -> IO (Weak v)
 	deRefWeak, 		-- :: Weak v -> IO (Maybe v)
 	finalize,		-- :: Weak v -> IO ()
+
+	-- * Specialised versions
+	mkWeakPtr, 		-- :: k -> Maybe (IO ()) -> IO (Weak k)
+	addFinalizer, 		-- :: key -> IO () -> IO ()
+	mkWeakPair, 		-- :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
 	-- replaceFinaliser	-- :: Weak v -> IO () -> IO ()
 
-	mkWeakPtr, 		-- :: k -> Maybe (IO ()) -> IO (Weak k)
-	mkWeakPair, 		-- :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
-	addFinalizer 		-- :: key -> IO () -> IO ()
+	-- * A precise semantics
+	
+	-- $precise
    ) where
 
 import Prelude
@@ -38,6 +79,14 @@ import GHC.Weak
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
 
+{-|
+Dereferences a weak pointer.  If the key is still alive, then
+@'Just' v@ is returned (where @v@ is the /value/ in the weak pointer), otherwise
+'Nothing' is returned.
+
+The return value of 'deRefWeak' depends on when the garbage collector
+runs, hence it is in the 'IO' monad.
+-}
 deRefWeak :: Weak v -> IO (Maybe v)
 deRefWeak (Weak w) = IO $ \s ->
    case deRefWeak# w s of
@@ -45,9 +94,18 @@ deRefWeak (Weak w) = IO $ \s ->
 				0# -> (# s1, Nothing #)
 				_  -> (# s1, Just p #)
 
+-- | A specialised version of 'mkWeak' where the value is actually a pair
+-- of the key and value passed to 'mkWeakPair':
+--
+-- > mkWeakPair key val finalizer = mkWeak key (key,val) finalizer
+--
+-- The advantage of this is that the key can be retrieved by 'deRefWeak'
+-- in addition to the value.
 mkWeakPair :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
 mkWeakPair key val finalizer = mkWeak key (key,val) finalizer
 
+-- | Causes a the finalizer associated with a weak pointer to be run
+-- immediately.
 finalize :: Weak v -> IO ()
 finalize (Weak w) = IO $ \s ->
    case finalizeWeak# w s of 
@@ -55,3 +113,35 @@ finalize (Weak w) = IO $ \s ->
 	(# s1, _,  f #) -> f s1
 #endif
 
+
+{- $precise
+
+The above informal specification is fine for simple situations, but
+matters can get complicated.  In particular, it needs to be clear
+exactly when a key dies, so that any weak pointers that refer to it
+can be finalized.  Suppose, for example, the value of one weak pointer
+refers to the key of another...does that keep the key alive?
+
+The behaviour is simply this:
+
+ *  If a weak pointer (object) refers to an /unreachable/
+    key, it may be finalized.
+
+ *  Finalization means (a) arrange that subsequent calls
+    to 'deRefWeak' return 'Nothing'; and (b) run the finalizer.
+
+This behaviour depends on what it means for a key to be reachable.
+Informally, something is reachable if it can be reached by following
+ordinary pointers from the root set, but not following weak pointers.
+We define reachability more precisely as follows A heap object is
+reachable if:
+
+ * It is a member of the /root set/.
+
+ * It is directly pointed to by a reachable object, other than
+   a weak pointer object.
+
+ * It is a weak pointer object whose key is reachable.
+
+ * It is the value or finalizer of an object whose key is reachable.
+-}

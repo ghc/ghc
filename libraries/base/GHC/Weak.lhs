@@ -20,21 +20,71 @@ import GHC.Base
 import Data.Maybe
 import GHC.IOBase	( IO(..), unIO )
 
+{-|
+A weak pointer object with a key and a value.  The value has type @v@.
+
+A weak pointer expresses a relationship between two objects, the
+/key/ and the /value/:  if the key is considered to be alive by the
+garbage collector, then the value is also alive.  A reference from
+the value to the key does /not/ keep the key alive.
+
+A weak pointer may also have a finalizer of type @IO ()@; if it does,
+then the finalizer will be run once, and once only, at a time after
+the key has become unreachable by the program (\"dead\").  The storage
+manager attempts to run the finalizer(s) for an object soon after the
+object dies, but promptness is not guaranteed.  
+
+References from the finalizer to the key are treated in the same way
+as references from the value to the key: they do not keep the key
+alive.  A finalizer may therefore ressurrect the key, perhaps by
+storing it in the same data structure.
+
+The finalizer, and the relationship between the key and the value,
+exist regardless of whether the program keeps a reference to the
+'Weak' object or not.
+
+There may be multiple weak pointers with the same key.  In this
+case, the finalizers for each of these weak pointers will all be
+run in some arbitrary order, or perhaps concurrently, when the key
+dies.  If the programmer specifies a finalizer that assumes it has
+the only reference to an object (for example, a file that it wishes
+to close), then the programmer must ensure that there is only one
+such finalizer.
+
+If there are no other threads to run, the runtime system will check
+for runnable finalizers before declaring the system to be deadlocked.
+-}
 data Weak v = Weak (Weak# v)
 
-mkWeak  :: k				-- key
-	-> v				-- value
-	-> Maybe (IO ())		-- finalizer
-	-> IO (Weak v)			-- weak pointer
+-- | Establishes a weak pointer to @k@, with value @v@ and a finalizer.
+--
+-- This is the most general interface for building a weak pointer.
+--
+mkWeak  :: k				-- ^ key
+	-> v				-- ^ value
+	-> Maybe (IO ())		-- ^ finalizer
+	-> IO (Weak v)			-- ^ returns: a weak pointer object
 
 mkWeak key val (Just finalizer) = IO $ \s ->
    case mkWeak# key val finalizer s of { (# s1, w #) -> (# s1, Weak w #) }
 mkWeak key val Nothing = IO $ \s ->
    case mkWeak# key val (unsafeCoerce# 0#) s of { (# s1, w #) -> (# s1, Weak w #) }
 
+{-|
+  A specialised version of 'mkWeak', where the key and the value are the
+  same object:
+
+  > mkWeakPtr key finalizer = mkWeak key key finalizer
+-}
 mkWeakPtr :: k -> Maybe (IO ()) -> IO (Weak k)
 mkWeakPtr key finalizer = mkWeak key key finalizer
 
+{-|
+  A specialised version of 'mkWeakPtr', where the 'Weak' object
+  returned is simply thrown away (however the finalizer will be
+  remembered by the garbage collector, and will still be run
+  when the key becomes unreachable).
+-}
 addFinalizer :: key -> IO () -> IO ()
 addFinalizer key finalizer = do
    mkWeakPtr key (Just finalizer)	-- throw it away
