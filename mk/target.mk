@@ -823,8 +823,9 @@ install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-
 	@for i in $(XMLDocWays); do \
 		if [ $$i = "html" ]; then \
 			$(INSTALL_DIR) $(datadir)/html; \
-			echo "( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html )" ; \
-			( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html ) ; \
+			$(INSTALL_DIR) $(datadir)/html/$(INSTALL_XML_DOC); \
+			echo "( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html/$(INSTALL_XML_DOC) )" ; \
+			( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html/$(INSTALL_XML_DOC) ) ; \
 		else \
 			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
 			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
