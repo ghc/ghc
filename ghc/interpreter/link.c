@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.57 $
- * $Date: 2000/04/06 00:01:26 $
+ * $Revision: 1.58 $
+ * $Date: 2000/04/07 16:22:12 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -228,7 +228,7 @@ static Tycon linkTycon( String s )
        tc = findTyconInAnyModule(findText(s));
        if (nonNull(tc)) return tc;
     }
-fprintf(stderr, "frambozenvla!  unknown tycon %s\n", s );
+FPrintf(stderr, "frambozenvla!  unknown tycon %s\n", s );
 return NIL;
     ERRMSG(0) "Prelude does not define standard type \"%s\"", s
     EEND;
@@ -242,7 +242,7 @@ static Class linkClass( String s )
        cc = findClassInAnyModule(findText(s));
        if (nonNull(cc)) return cc;
     }   
-fprintf(stderr, "frambozenvla!  unknown class %s\n", s );
+FPrintf(stderr, "frambozenvla!  unknown class %s\n", s );
 return NIL;
     ERRMSG(0) "Prelude does not define standard class \"%s\"", s
     EEND;
@@ -256,7 +256,7 @@ static Name linkName( String s )
        n = findNameInAnyModule(findText(s));
        if (nonNull(n)) return n;
     }   
-fprintf(stderr, "frambozenvla!  unknown  name %s\n", s );
+FPrintf(stderr, "frambozenvla!  unknown  name %s\n", s );
 return NIL;
     ERRMSG(0) "Prelude does not define standard name \"%s\"", s
     EEND;
