@@ -33,7 +33,7 @@ import Type		( Type, tyVarsOfType, coreEqType,
 			  isUnLiftedType, typeKind, mkForAllTy, mkFunTy,
 			  isUnboxedTupleType, isSubKind,
 			  substTyWith, emptyTvSubst, extendTvInScope, 
-			  TvSubst, TvSubstEnv, setTvSubstEnv, substTy,
+			  TvSubst, TvSubstEnv, mkTvSubst, setTvSubstEnv, substTy,
 			  extendTvSubst, composeTvSubst, isInScope,
 			  getTvSubstEnv, getTvInScope )
 import TyCon		( isPrimTyCon )
@@ -425,9 +425,8 @@ checkAltExpr expr ann_ty
   = do { actual_ty <- lintCoreExpr expr 
        ; checkTys actual_ty ann_ty (mkCaseAltMsg expr actual_ty ann_ty) }
 
-lintCoreAlt :: Type  			-- Type of scrutinee; a fixed point of 
-					--		      the substitution
-            -> Type                     -- Type of the alternative
+lintCoreAlt :: OutType 		-- Type of scrutinee
+            -> OutType          -- Type of the alternative
 	    -> CoreAlt
 	    -> LintM ()
 
@@ -437,8 +436,7 @@ lintCoreAlt scrut_ty alt_ty alt@(DEFAULT, args, rhs) =
 
 lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) = 
   do { checkL (null args) (mkDefaultArgsMsg args)
-     ; checkTys lit_ty scrut_ty
-	  (mkBadPatMsg lit_ty scrut_ty)	
+     ; checkTys lit_ty scrut_ty (mkBadPatMsg lit_ty scrut_ty)	
      ; checkAltExpr rhs alt_ty } 
   where
     lit_ty = literalType lit
@@ -477,7 +475,11 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 	; con_type <- lintTyApps (dataConRepType con) tvs'
 	; mapM lintBinder ids	-- Lint Ids in the refined world
 	; lintCoreArgs con_type (map Var ids)
-	; checkAltExpr rhs alt_ty
+	; let refined_alt_ty = substTy (mkTvSubst in_scope refine) alt_ty
+		-- alt_ty is already an OutType, so don't re-apply 
+		-- the current substitution.  But we must apply the
+		-- refinement so that the check in checkAltExpr is ok
+	; checkAltExpr rhs refined_alt_ty
     } } }
 
   | otherwise	-- Scrut-ty is wrong shape
