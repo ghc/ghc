@@ -2117,10 +2117,10 @@ selector_loop:
 
 	  // check that we don't recurse too much, re-using the
 	  // depth bound also used in evacuate().
-	  thunk_selector_depth++;
-	  if (thunk_selector_depth > MAX_THUNK_SELECTOR_DEPTH) {
+	  if (thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
 	      break;
 	  }
+	  thunk_selector_depth++;
 
 	  val = eval_thunk_selector(info->layout.selector_offset, 
 				    (StgSelector *)selectee);
