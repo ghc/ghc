@@ -194,7 +194,6 @@ isAlphaNum c		=  isAlpha c || isDigit c
 
 -- Case-changing operations
 
-toUpper, toLower	:: Char -> Char
 toUpper c@(C## c##)
   | isAsciiLower c    = C## (chr## (ord## c## -## 32##))
   | isAscii c         = c
