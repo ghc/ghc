@@ -1223,8 +1223,7 @@ addAmbigErrs ambig_tv_fn dicts = mapNF_Tc (addAmbigErr ambig_tv_fn) dicts
 addAmbigErr ambig_tv_fn dict
   = addInstErrTcM (instLoc dict)
 	(tidy_env,
-	 sep [text "Ambiguous type variable(s)" <+>
-			hsep (punctuate comma (map (quotes . ppr) ambig_tvs)),
+	 sep [text "Ambiguous type variable(s)" <+> pprQuotedList ambig_tvs,
 	      nest 4 (text "in the constraint" <+> quotes (pprInst tidy_dict))])
   where
     ambig_tvs = varSetElems (ambig_tv_fn tidy_dict)

@@ -59,7 +59,7 @@ import Type		( Type, ThetaType, ClassContext,
 			)
 import PprType          ( {- instance Outputable Type -} )
 import Var		( tyVarKind, TyVar )
-import VarSet		( mkVarSet )
+import VarSet		( mkVarSet, emptyVarSet )
 import TyCon		( mkAlgTyCon )
 import Unique		( Unique, Uniquable(..) )
 import Util
@@ -599,15 +599,14 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
 	-- Now check that the instance type variables
 	-- (or, in the case of a class decl, the class tyvars)
 	-- have not been unified with anything in the environment
-   tcAddErrCtxtM (sigCtxt sig_msg (mkSigmaTy inst_tyvars inst_theta (idType meth_id)))	$
-   checkSigTyVars inst_tyvars						`thenTc_` 
+   tcAddErrCtxtM (sigCtxt sig_msg inst_tyvars inst_theta (idType meth_id))	$
+   checkSigTyVars inst_tyvars emptyVarSet					`thenTc_` 
 
    returnTc (binds `AndMonoBinds` prag_binds1 `AndMonoBinds` prag_binds2, 
 	     insts `plusLIE` prag_lie', 
 	     meth)
  where
-   sig_msg ty = sep [ptext SLIT("When checking the expected type for"),
-		    nest 4 (ppr sel_name <+> dcolon <+> ppr ty)]
+   sig_msg = ptext SLIT("When checking the expected type for class method") <+> ppr sel_name
 
    sel_name = idName sel_id
 

@@ -131,6 +131,7 @@ tcPolyExpr arg expected_arg_ty
     tcInstTcType expected_arg_ty 	`thenNF_Tc` \ (sig_tyvars, sig_rho) ->
     let
 	(sig_theta, sig_tau) = splitRhoTy sig_rho
+	free_tyvars	     = tyVarsOfType expected_arg_ty
     in
 	-- Type-check the arg and unify with expected type
     tcMonoExpr arg sig_tau				`thenTc` \ (arg', lie_arg) ->
@@ -146,10 +147,10 @@ tcPolyExpr arg expected_arg_ty
 	-- Conclusion: include the free vars of the expected arg type in the
 	-- list of "free vars" for the signature check.
 
-    tcExtendGlobalTyVars (tyVarsOfType expected_arg_ty)		$
-    tcAddErrCtxtM (sigCtxt sig_msg expected_arg_ty)		$
+    tcExtendGlobalTyVars free_tyvars				  $
+    tcAddErrCtxtM (sigCtxt sig_msg sig_tyvars sig_theta sig_tau)  $
 
-    checkSigTyVars sig_tyvars			`thenTc` \ zonked_sig_tyvars ->
+    checkSigTyVars sig_tyvars free_tyvars	`thenTc` \ zonked_sig_tyvars ->
 
     newDicts SignatureOrigin sig_theta		`thenNF_Tc` \ (sig_dicts, dict_ids) ->
 	-- ToDo: better origin
@@ -170,8 +171,7 @@ tcPolyExpr arg expected_arg_ty
     returnTc ( generalised_arg, free_insts,
 	       arg', sig_tau, lie_arg )
   where
-    sig_msg ty = sep [ptext SLIT("In an expression with expected type:"),
-		      nest 4 (ppr ty)]
+    sig_msg = ptext SLIT("When checking an expression type signature")
 \end{code}
 
 %************************************************************************

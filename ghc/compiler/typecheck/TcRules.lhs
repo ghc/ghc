@@ -67,7 +67,7 @@ tcRule (RuleDecl name sig_tvs vars lhs rhs src_loc)
 
 		-- Check that LHS has no overloading at all
     tcSimplifyToDicts lhs_lie				`thenTc` \ (lhs_dicts, lhs_binds) ->
-    checkSigTyVars sig_tyvars				`thenTc_`
+    checkSigTyVars sig_tyvars emptyVarSet		`thenTc_`
 
 	-- Gather the template variables and tyvars
     let

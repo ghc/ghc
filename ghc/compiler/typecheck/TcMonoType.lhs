@@ -26,7 +26,7 @@ import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcGetValueEnv, tcGetInScopeTyVars,
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			  typeToTcType, kindToTcKind,
 			  newKindVar, tcInstSigVar,
-			  zonkTcKindToKind, zonkTcTypeToType, zonkTcTyVars, zonkTcType
+			  zonkTcKindToKind, zonkTcTypeToType, zonkTcTyVars, zonkTcType, zonkTcTyVar
 			)
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr )
 import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
@@ -34,13 +34,13 @@ import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
                           mkUsForAllTy, zipFunTys, hoistForAllTys,
 			  mkSigmaTy, mkDictTy, mkPredTy, mkTyConApp,
-			  mkAppTys, splitForAllTys, splitRhoTy,
+			  mkAppTys, splitForAllTys, splitRhoTy, mkRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
-		  	  tidyOpenType, tidyOpenTypes, tidyTyVar,
+		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
 			  tyVarsOfType, tyVarsOfTypes
 			)
-import PprType		( pprConstraint )
+import PprType		( pprConstraint, pprType )
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkVanillaId, idName, idType, idFreeTyVars )
 import Var		( TyVar, mkTyVar, mkNamedUVar, varName )
@@ -55,7 +55,7 @@ import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy )
 import UniqFM		( elemUFM, foldUFM )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, Uniquable(..) )
-import Util		( zipWithEqual, zipLazy, mapAccumL )
+import Util		( mapAccumL, isSingleton )
 import Outputable
 \end{code}
 
@@ -532,12 +532,15 @@ So we revert to ordinary type variables for signatures, and try to
 give a helpful message in checkSigTyVars.
 
 \begin{code}
-checkSigTyVars :: [TcTyVar]		-- The original signature type variables
+checkSigTyVars :: [TcTyVar]		-- Universally-quantified type variables in the signature
+	       -> TcTyVarSet		-- Tyvars that are free in the type signature
+					-- These should *already* be in the global-var set, and are
+					-- used here only to improve the error message
 	       -> TcM s [TcTyVar]	-- Zonked signature type variables
 
-checkSigTyVars [] = returnTc []
+checkSigTyVars [] free = returnTc []
 
-checkSigTyVars sig_tyvars
+checkSigTyVars sig_tyvars free_tyvars
   = zonkTcTyVars sig_tyvars		`thenNF_Tc` \ sig_tys ->
     tcGetGlobalTyVars			`thenNF_Tc` \ globals ->
 
@@ -600,9 +603,10 @@ checkSigTyVars sig_tyvars
 
 	    if tv `elemVarSet` globals	-- Error (c)! Type variable escapes
 					-- The least comprehensible, so put it last
-	    then   tcGetValueEnv 			`thenNF_Tc` \ ve ->
-        	   find_globals tv env (valueEnvIds ve) `thenNF_Tc` \ (env1, globs) ->
-		   returnNF_Tc (env1, acc, escape_msg sig_tyvar tv globs : msgs)
+	    then   tcGetValueEnv 					`thenNF_Tc` \ ve ->
+        	   find_globals tv env  [] (valueEnvIds ve)		`thenNF_Tc` \ (env1, globs) ->
+        	   find_frees   tv env1 [] (varSetElems free_tyvars)	`thenNF_Tc` \ (env2, frees) ->
+		   returnNF_Tc (env2, acc, escape_msg sig_tyvar tv globs frees : msgs)
 
 	    else 	-- All OK
 	    returnNF_Tc (env, extendVarEnv acc tv sig_tyvar, msgs)
@@ -612,37 +616,57 @@ checkSigTyVars sig_tyvars
 -- whose types mention the offending type variable.  It has to be 
 -- careful to zonk the Id's type first, so it has to be in the monad.
 -- We must be careful to pass it a zonked type variable, too.
-find_globals tv tidy_env ids
-  | null ids
-  = returnNF_Tc (tidy_env, [])
+find_globals tv tidy_env acc []
+  = returnNF_Tc (tidy_env, acc)
 
-find_globals tv tidy_env (id:ids) 
+find_globals tv tidy_env acc (id:ids) 
   | not (isLocallyDefined id) ||
     isEmptyVarSet (idFreeTyVars id)
-  = find_globals tv tidy_env ids
+  = find_globals tv tidy_env acc ids
 
   | otherwise
   = zonkTcType (idType id)	`thenNF_Tc` \ id_ty ->
     if tv `elemVarSet` tyVarsOfType id_ty then
     	let 
     	   (tidy_env', id_ty') = tidyOpenType tidy_env id_ty
+	   acc'		       = (idName id, id_ty') : acc
     	in
-    	find_globals tv tidy_env' ids	`thenNF_Tc` \ (tidy_env'', globs) ->
-    	returnNF_Tc (tidy_env'', (idName id, id_ty') : globs)
+    	find_globals tv tidy_env' acc' ids
     else
-    	find_globals tv tidy_env ids
+    	find_globals tv tidy_env  acc  ids
 
-escape_msg sig_tv tv globs
-  = vcat [mk_msg sig_tv <+> ptext SLIT("escapes"),
-	  pp_escape,
-	  ptext SLIT("The following variables in the environment mention") <+> quotes (ppr tv),
-	  nest 4 (vcat_first 10 [ppr name <+> dcolon <+> ppr ty | (name,ty) <- globs])
-    ]
+find_frees tv tidy_env acc []
+  = returnNF_Tc (tidy_env, acc)
+find_frees tv tidy_env acc (ftv:ftvs)
+  = zonkTcTyVar ftv	`thenNF_Tc` \ ty ->
+    if tv `elemVarSet` tyVarsOfType ty then
+	let
+	    (tidy_env', ftv') = tidyTyVar tidy_env ftv
+	in
+	find_frees tv tidy_env' (ftv':acc) ftvs
+    else
+	find_frees tv tidy_env  acc        ftvs
+
+
+escape_msg sig_tv tv globs frees
+  = mk_msg sig_tv <+> ptext SLIT("escapes") $$
+    if not (null globs) then
+	vcat [pp_it <+> ptext SLIT("is mentioned in the environment"),
+	      ptext SLIT("The following variables in the environment mention") <+> quotes (ppr tv),
+	      nest 2 (vcat_first 10 [ppr name <+> dcolon <+> ppr ty | (name,ty) <- globs])
+	]
+     else if not (null frees) then
+	vcat [ptext SLIT("It is reachable from the type variable(s)") <+> pprQuotedList frees,
+	      nest 2 (ptext SLIT("which") <+> is_are <+> ptext SLIT("free in the signature"))
+	]
+     else
+	empty	-- Sigh.  It's really hard to give a good error message
+		-- all the time.   One bad case is an existential pattern match
   where
-    pp_escape | sig_tv /= tv = ptext SLIT("It unifies with") <+>
-			       quotes (ppr tv) <> comma <+>
-			       ptext SLIT("which is mentioned in the environment")
-	      | otherwise    = ptext SLIT("It is mentioned in the environment")
+    is_are | isSingleton frees = ptext SLIT("is")
+	   | otherwise         = ptext SLIT("are")
+    pp_it | sig_tv /= tv = ptext SLIT("It unifies with") <+> quotes (ppr tv) <> comma <+> ptext SLIT("which")
+	  | otherwise    = ptext SLIT("It")
 
     vcat_first :: Int -> [SDoc] -> SDoc
     vcat_first n []     = empty
@@ -656,13 +680,22 @@ mk_msg tv          = ptext SLIT("Quantified type variable") <+> quotes (ppr tv)
 These two context are used with checkSigTyVars
     
 \begin{code}
-sigCtxt :: (Type -> Message) -> Type
+sigCtxt :: Message -> [TcTyVar] -> TcThetaType -> TcTauType
 	-> TidyEnv -> NF_TcM s (TidyEnv, Message)
-sigCtxt mk_msg sig_ty tidy_env
-  = let
-	(env1, tidy_sig_ty) = tidyOpenType tidy_env sig_ty
+sigCtxt when sig_tyvars sig_theta sig_tau tidy_env
+  = zonkTcType sig_tau		`thenNF_Tc` \ actual_tau ->
+    let
+	(env1, tidy_sig_tyvars)  = tidyTyVars tidy_env sig_tyvars
+	(env2, tidy_sig_rho)	 = tidyOpenType env1 (mkRhoTy sig_theta sig_tau)
+	(env3, tidy_actual_tau)  = tidyOpenType env1 actual_tau
+	forall | null sig_tyvars = empty
+	       | otherwise	 = ptext SLIT("forall") <+> hsep (map ppr tidy_sig_tyvars) <> dot
+	msg = vcat [ptext SLIT("Signature type:    ") <+> forall <+> pprType tidy_sig_rho,
+		    ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau,
+		    when
+		   ]
     in
-    returnNF_Tc (env1, mk_msg tidy_sig_ty)
+    returnNF_Tc (env3, msg)
 
 sigPatCtxt bound_tvs bound_ids tidy_env
   = returnNF_Tc (env1,

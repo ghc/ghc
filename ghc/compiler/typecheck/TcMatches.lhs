@@ -150,7 +150,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	-- Check that the scoped type variables from the patterns
 	-- have not been constrained
         tcAddErrCtxtM (sigPatCtxt sig_tyvars pat_ids)		(
-		checkSigTyVars sig_tyvars
+		checkSigTyVars sig_tyvars emptyVarSet
 	)							`thenTc_`
 
 	-- *Now* we're free to unify with expected_ty
@@ -191,7 +191,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	-- STEP 5: Check for existentially bound type variables
 	tcExtendGlobalTyVars (tyVarsOfType rhs_ty)	(
 	    tcAddErrCtxtM (sigPatCtxt ex_tv_list pat_ids)	$
-	    checkSigTyVars ex_tv_list				`thenTc` \ zonked_ex_tvs ->
+	    checkSigTyVars ex_tv_list emptyVarSet		`thenTc` \ zonked_ex_tvs ->
 	    tcSimplifyAndCheck 
 		(text ("the existential context of a data constructor"))
 		(mkVarSet zonked_ex_tvs)
@@ -334,7 +334,7 @@ tcStmts do_or_lc m (stmt@(BindStmt pat exp src_loc) : stmts) elt_ty
     tcExtendGlobalTyVars (tyVarsOfType (m elt_ty))	$
     tcAddErrCtxtM (sigPatCtxt pat_tv_list pat_ids)	$
 
-    checkSigTyVars pat_tv_list				`thenTc` \ zonked_pat_tvs ->
+    checkSigTyVars pat_tv_list emptyVarSet		`thenTc` \ zonked_pat_tvs ->
 
     tcSimplifyAndCheck 
 	(text ("the existential context of a data constructor"))

@@ -44,7 +44,7 @@ import TcUnify		( unifyTauTy, unifyTauTyLists )
 
 import PrelInfo		( main_NAME, ioTyCon_NAME )
 
-import Id		( Id, mkVanillaId, setInlinePragma )
+import Id		( Id, mkVanillaId, setInlinePragma, idFreeTyVars )
 import Var		( idType, idName )
 import IdInfo		( setInlinePragInfo, InlinePragInfo(..) )
 import Name		( Name, getName, getOccName, getSrcLoc )
@@ -767,10 +767,10 @@ checkSigMatch top_lvl binder_names mono_ids sigs
 		      
    	-- CHECK THAT THE SIGNATURE TYVARS AND TAU_TYPES ARE OK
 	-- Doesn't affect substitution
-    check_one_sig (TySigInfo _ id sig_tyvars _ sig_tau _ _ src_loc)
+    check_one_sig (TySigInfo _ id sig_tyvars sig_theta sig_tau _ _ src_loc)
       = tcAddSrcLoc src_loc					$
-	tcAddErrCtxtM (sigCtxt (sig_msg id) (idType id))	$
-	checkSigTyVars sig_tyvars
+	tcAddErrCtxtM (sigCtxt (sig_msg id) sig_tyvars sig_theta sig_tau)	$
+	checkSigTyVars sig_tyvars (idFreeTyVars id)
 
 
 	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
@@ -797,8 +797,7 @@ checkSigMatch top_lvl binder_names mono_ids sigs
 
     mk_dict_tys theta = map mkPredTy theta
 
-    sig_msg id tidy_ty = sep [ptext SLIT("When checking the type signature"),
-			      nest 4 (ppr id <+> dcolon <+> ppr tidy_ty)]
+    sig_msg id = ptext SLIT("When checking the type signature for") <+> ppr id
 
 	-- Search for Main.main in the binder_names, return corresponding mono_id
     find_main NotTopLevel binder_names mono_ids = Nothing
