@@ -4,8 +4,7 @@
 
 <ArtHeader>
 
-<Title>Building and Installing the Glasgow Functional Programming Tools Suite
-Version 4.06</Title>
+<Title>Building and Installing the Glasgow Functional Programming Tools Suite</Title>
 <Author><OtherName>The GHC Team</OtherName></Author>
 <Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email></Address>
 <PubDate>January 2000</PubDate>
@@ -48,7 +47,7 @@ as suggested:
 <VariableList>
 
 <VarListEntry>
-<Term><IndexTerm><Primary>Binary distribution</Primary></IndexTerm>.</Term>
+<Term><IndexTerm><Primary>Binary distribution</Primary></IndexTerm>Binary distribution.</Term>
 <ListItem>
 <Para>
 If your only purpose is to install some of the <Literal>fptools</Literal> suite then the easiest thing to do is to get a binary distribution. In the
@@ -74,7 +73,7 @@ if you want to read or modify the souce code.
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
-<Term><IndexTerm><Primary>Source distribution</Primary></IndexTerm>.</Term>
+<Term><IndexTerm><Primary>Source distribution</Primary></IndexTerm>Source distribution.</Term>
 <ListItem>
 <Para>
 You have a supported
@@ -183,7 +182,7 @@ Here's a list of things to check before you get started.
 <ListItem>
 
 <Para>
-<IndexTerm><Primary>Disk space needed</Primary></IndexTerm>: About 30MB (five hamburgers' worth) of disk space
+<IndexTerm><Primary>Disk space needed</Primary></IndexTerm>Disk space needed: About 30MB (five hamburgers' worth) of disk space
 for the most basic binary distribution of GHC; more for some
 platforms, e.g., Alphas.  An extra ``bundle'' (e.g., concurrent
 Haskell libraries) might take you to 8&ndash;10 hamburgers.
@@ -259,9 +258,6 @@ If in doubt, please send a message to <Email>glasgow-haskell-bugs@dcs.gla.ac.uk<
 <IndexTerm><Primary>GHC ports</Primary></IndexTerm>
 <IndexTerm><Primary>supported platforms</Primary></IndexTerm>
 <IndexTerm><Primary>platforms, supported</Primary></IndexTerm>
-</Para>
-
-<Para>
 The main question is whether or not the Haskell compiler (GHC) runs on
 your platform.
 </Para>
@@ -294,9 +290,6 @@ supports the underlying BSDisms.
 <IndexTerm><Primary>native-code generator</Primary></IndexTerm>
 <IndexTerm><Primary>registerised ports</Primary></IndexTerm>
 <IndexTerm><Primary>unregisterised ports</Primary></IndexTerm>
-</Para>
-
-<Para>
 The GHC hierarchy of Porting Goodness: (a)&nbsp;Best is a native-code
 generator; (b)&nbsp;next best is a ``registerised''
 port; (c)&nbsp;the bare minimum is an ``unregisterised'' port.
@@ -367,7 +360,7 @@ details).
 <Term>HP-PA box running HP</Term>
 <ListItem>
 <Para>
-UX 9.x:/
+UX 9.x:
 <IndexTerm><Primary>hppa1.1-hp-hpux: registerised port</Primary></IndexTerm>
 </Para>
 
@@ -415,14 +408,11 @@ On old Linux a.out systems: should be the same.
 NetBSD/OpenBSD using FreeBSD emulation):</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>i386-*-freebsd:registerised port</Primary></IndexTerm> 
+<IndexTerm><Primary>i386-*-freebsd:registerised port</Primary></IndexTerm>
 </Para>
 
 <Para>
 GHC works registerised. Supports same set of bundles as the above.
-</Para>
-
-<Para>
 <IndexTerm><Primary>i386-*-freebsd: profiling&mdash;yes</Primary></IndexTerm>
 <IndexTerm><Primary>i386-*-freebsd: concurrent&mdash;yes</Primary></IndexTerm>
 <IndexTerm><Primary>i386-*-freebsd: parallel&mdash;maybe</Primary></IndexTerm>
@@ -433,16 +423,10 @@ GHC works registerised. Supports same set of bundles as the above.
 <ListItem>
 <Para>
 <IndexTerm><Primary>i386-unknown-cygwin32: fully supported</Primary></IndexTerm>
-</Para>
-
-<Para>
 Fully supported under Win95/NT, including a native code
 generator. Requires the <Literal>cygwin32</Literal> compatibility library and a
 healthy collection of GNU tools (i.e., gcc, GNU ld, bash etc.)
 Profiling works, so does Concurrent Haskell.  
-</Para>
-
-<Para>
 <IndexTerm><Primary>i386-*-cygwin32: profiling&mdash;yes</Primary></IndexTerm> 
 <IndexTerm><Primary>i386-*-cygwin32: concurrent&mdash;yes</Primary></IndexTerm>
 </Para>
@@ -452,9 +436,6 @@ Profiling works, so does Concurrent Haskell.
 <ListItem>
 <Para>
 <IndexTerm><Primary>mips-sgi-irix5: registerised port</Primary></IndexTerm>
-</Para>
-
-<Para>
 GHC works registerised (no native-code generator).  I suspect any
 GCC&nbsp;2.6.x (or later) is OK.  The GCC that I used was built with
 <Option>--with-gnu-as</Option>; turns out that is important!
@@ -473,9 +454,6 @@ Profiling might work, but it is untested.
 <ListItem>
 <Para>
 <IndexTerm><Primary>mips-sgi-irix6: registerised port</Primary></IndexTerm>
-</Para>
-
-<Para>
 Thanks to the fine efforts of Tomasz Cholewo <ULink
 URL="mailto:tjchol01@mecca.spd.louisville.edu"
 >tjchol01@mecca.spd.louisville.edu</ULink
@@ -484,9 +462,6 @@ native code generator) under IRIX 6.2 and 6.3. Depends on having a
 <ULink
 URL="http://mecca.spd.louisville.edu/~tjchol01/software/"
 >specially tweaked version of gcc-2.7.2 around</ULink>.
-</Para>
-
-<Para>
 Profiling works, Concurrent/Parallel Haskell might work (AFAIK, untested).
 <IndexTerm><Primary>mips-sgi-irix6: concurrent&mdash;maybe</Primary></IndexTerm>
 <IndexTerm><Primary>mips-sgi-irix6: parallel&mdash;maybe</Primary></IndexTerm>
@@ -515,8 +490,8 @@ Profiling might work, but it is untested.
 <ListItem>
 <Para>
 <IndexTerm><Primary>m68k-apple-macos7: historically ported</Primary></IndexTerm>
-Once upon a time, David Wright in Tasmania has actually
-gotten GHC to run on a Macintosh.  Ditto James Thomson here at Glasgow.
+Once upon a time, David Wright in Tasmania actually
+got GHC to run on a Macintosh.  Ditto James Thomson here at Glasgow.
 You may be able to get Thomson's from here.  (Not sure that it will
 excite you to death, but&hellip;)
 </Para>
