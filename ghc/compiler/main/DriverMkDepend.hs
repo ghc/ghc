@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.19 2002/03/20 20:20:26 sof Exp $
+-- $Id: DriverMkDepend.hs,v 1.20 2002/03/21 09:00:54 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -29,6 +29,10 @@ import Directory
 import IO
 import Monad            ( when )
 import Maybe            ( isJust )
+
+#if __GLASGOW_HASKELL__ <= 408
+import Util		( catchJust, ioErrors )
+#endif
 
 -------------------------------------------------------------------------------
 -- mkdependHS
