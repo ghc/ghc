@@ -6,12 +6,12 @@
 
 \begin{code}
 module NumExts
-
        (
          doubleToFloat   -- :: Double -> Float
        , floatToDouble   -- :: Double -> Float
        , showHex         -- :: Integral a => a -> ShowS
        , showOct         -- :: Integral a => a -> ShowS
+       , showIntAtBase   -- :: Integral a => a -> (a -> Char) -> a -> ShowS
        ) where
 
 import Char (ord, chr)
