@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.100 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Schedule.c,v 1.101 2001/10/23 10:54:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -582,12 +582,14 @@ schedule( void )
 		StgMainThread *m = main_threads;
 #ifdef SMP
 		for (; m != NULL; m = m->link) {
+		    deleteThread(m->tso);
 		    m->ret = NULL;
 		    m->stat = Deadlock;
 		    pthread_cond_broadcast(&m->wakeup);
 		}
 		main_threads = NULL;
 #else
+		deleteThread(m->tso);
 		m->ret = NULL;
 		m->stat = Deadlock;
 		main_threads = m->link;
