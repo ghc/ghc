@@ -241,7 +241,8 @@ rnExpr (HsSplice n e loc)
     checkGHCI (thErr "splice")		`thenM_`
     newLocalsRn [(n,loc)]		`thenM` \ [n'] ->
     rnExpr e 				`thenM` \ (e', fvs_e) ->
-    returnM (HsSplice n' e' loc, fvs_e)    
+    returnM (HsSplice n' e' loc, fvs_e `addOneFV` qTyConName)
+	-- The qTyCon brutally pulls in all the meta stuff
 
 rnExpr (HsReify (Reify flavour name))
   = checkGHCI (thErr "reify")		`thenM_`
