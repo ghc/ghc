@@ -549,9 +549,9 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_name
              nest 4 (fsep (punctuate comma [ text (occNameFlavour (nameOccName n)) <+> ppr n
                                            | n <- non_locally_used]))) `thenRn_`
     getIfacesRn								`thenRn` \ ifaces ->
-    if opt_WarnDeprecations
+    (if opt_WarnDeprecations
 	then mapRn_ warnDeprec (deprec_used (iDeprecs ifaces))
-	else returnRn ()						`thenRn_`
+	else returnRn ())						`thenRn_`
     warnUnusedLocalBinds bad_locals					`thenRn_`
     warnUnusedImports bad_imps
 
