@@ -252,10 +252,10 @@ module X where
 
     <variablelist>
       <varlistentry>
-	<term><literal>--help</literal></term>
-	<term><literal>-?</literal></term>
-	<indexterm><primary><literal>-?</literal></primary></indexterm>
-	<indexterm><primary><literal>--help</literal></primary></indexterm>
+	<term><option>--help</option></term>
+	<term><option>-?</option></term>
+	<indexterm><primary><option>-?</option></primary></indexterm>
+	<indexterm><primary><option>--help</option></primary></indexterm>
 	<listitem>
 	  <para>Cause GHC to spew a long usage message to standard
           output and then exit.</para>
@@ -263,8 +263,8 @@ module X where
       </varlistentry>
 
       <varlistentry>
-	<term><literal>-v</literal></term>
-	<indexterm><primary><literal>-v</literal></primary></indexterm>
+	<term><option>-v</option></term>
+	<indexterm><primary><option>-v</option></primary></indexterm>
 	<listitem>
 	  <para>The <option>-v</option> option makes GHC
           <emphasis>verbose</emphasis>: it reports its version number
@@ -281,7 +281,7 @@ module X where
       </varlistentry>
 	
       <varlistentry>
-	<term><literal>-v</literal><replaceable>n</replaceable></term>
+	<term><option>-v</option><replaceable>n</replaceable></term>
 	<indexterm><primary><option>-v</option></primary></indexterm>
 	<listitem>
 	  <para>To provide more control over the compiler's verbosity,
@@ -292,7 +292,7 @@ module X where
 	  
 	  <variablelist>
 	    <varlistentry>
-	      <term><literal>-v0</literal></term>
+	      <term><option>-v0</option></term>
 	      <listitem>
 		<para>Disable all non-essential messages (this is the
 		default).</para>
@@ -300,7 +300,7 @@ module X where
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><literal>-v1</literal></term>
+	      <term><option>-v1</option></term>
 	      <listitem>
 		<para>Minimal verbosity: print one line per
 		compilation (this is the default when
@@ -310,7 +310,7 @@ module X where
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><literal>-v2</literal></term>
+	      <term><option>-v2</option></term>
 	      <listitem>
 		<para>Print the name of each compilation phase as it
 		is executed. (equivalent to
@@ -319,7 +319,7 @@ module X where
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><literal>-v3</literal></term>
+	      <term><option>-v3</option></term>
 	      <listitem>
 		<para>The same as <option>-v2</option>, except that in
                 addition the full command line (if appropriate) for
@@ -328,7 +328,7 @@ module X where
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><literal>-v4</literal></term>
+	      <term><option>-v4</option></term>
 	      <listitem>
 		<para>The same as <option>-v3</option> except that the
 		intermediate program representation after each
@@ -341,20 +341,36 @@ module X where
       </varlistentry>
       
       <varlistentry>
-	<term><literal>--version</literal></term>
-	<indexterm><primary><literal>--version</literal></primary></indexterm>
+	<term><option>--version</option></term>
+	<indexterm><primary><option>--version</option></primary></indexterm>
 	<listitem>
 	  <para>Print a one-line string including GHC's version number.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><literal>--numeric-version</literal></term>
-	<indexterm><primary><literal>--numeric-version</literal></primary></indexterm>
+	<term><option>--numeric-version</option></term>
+	<indexterm><primary><option>--numeric-version</option></primary></indexterm>
 	<listitem>
 	  <para>Print GHC's numeric version number only.</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term><option>--print-libdir</option></term>
+	<indexterm><primary><option>--print-libdir</option></primary></indexterm>
+	<listitem>
+	  <para>Print the path to GHC's library directory.  This is
+	  the top of the directory tree containing GHC's libraries,
+	  interfaces, and include files (usually something like
+	  <literal>/usr/local/lib/ghc-5.02</literal> on Unix).  This
+	  is the value of
+	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary>
+	  </indexterm>in the package configuration file (see <xref
+	  linkend="packages">).</para>
+	</listitem>
+      </varlistentry>
+
     </variablelist>
   </sect1>
 
@@ -538,8 +554,8 @@ ghc --make Main.hs
 
     <variablelist>
       <varlistentry>
-	<term><literal>-o</literal></term>
-	<indexterm><primary><literal>-o</literal></primary></indexterm>
+	<term><option>-o</option></term>
+	<indexterm><primary><option>-o</option></primary></indexterm>
 	<listitem>
 	  <para>GHC's compiled output normally goes into a
           <filename>.hc</filename>, <filename>.o</filename>, etc.,
@@ -556,8 +572,8 @@ ghc --make Main.hs
       </varlistentry>
 
       <varlistentry>
-	<term><literal>-odir</literal></term>
-	<indexterm><primary><literal>-odir</literal></primary></indexterm>
+	<term><option>-odir</option></term>
+	<indexterm><primary><option>-odir</option></primary></indexterm>
 	<listitem>
 	  <para>The <option>-o</option> option isn't of much use if
           you have <emphasis>several</emphasis> input files&hellip;
@@ -676,24 +692,24 @@ ghc --make Main.hs
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>-keep-hc-files</literal></term>
+	  <term><option>-keep-hc-files</option></term>
 	  <indexterm>
-	    <primary><literal>-keep-hc-files</literal></primary>
+	    <primary><option>-keep-hc-files</option></primary>
 	  </indexterm>
 	  <listitem>
 	    <para>Keep intermediate <literal>.hc</literal> files when
 	    doing <literal>.hs</literal>-to-<literal>.o</literal>
 	    compilations via C (NOTE: <literal>.hc</literal> files
 	    aren't generated when using the native code generator, you
-	    may need to use <literal>-fvia-C</literal> to force them
+	    may need to use <option>-fvia-C</option> to force them
 	    to be produced).</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>-keep-s-files</literal></term>
+	  <term><option>-keep-s-files</option></term>
 	  <indexterm>
-	    <primary><literal>-keep-s-files</literal></primary>
+	    <primary><option>-keep-s-files</option></primary>
 	  </indexterm>
 	  <listitem>
 	    <para>Keep intermediate <literal>.s</literal> files.</para>
@@ -701,9 +717,9 @@ ghc --make Main.hs
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>-keep-raw-s-files</literal></term>
+	  <term><option>-keep-raw-s-files</option></term>
 	  <indexterm>
-	    <primary><literal>-keep-raw-s-files</literal></primary>
+	    <primary><option>-keep-raw-s-files</option></primary>
 	  </indexterm>
 	  <listitem>
 	    <para>Keep intermediate <literal>.raw-s</literal> files.
@@ -715,9 +731,9 @@ ghc --make Main.hs
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>-keep-tmp-files</literal></term>
+	  <term><option>-keep-tmp-files</option></term>
 	  <indexterm>
-	    <primary><literal>-keep-tmp-files</literal></primary>
+	    <primary><option>-keep-tmp-files</option></primary>
 	  </indexterm>
 	  <indexterm>
 	    <primary>temporary files</primary>
@@ -728,7 +744,7 @@ ghc --make Main.hs
 	    temporary files, which it normally keeps in
 	    <literal>/tmp</literal> (or possibly elsewhere; see <xref
 	    linkend="temp-files">).  Running GHC with
-	    <literal>-v</literal> will show you what temporary files
+	    <option>-v</option> will show you what temporary files
 	    were generated along the way.</para>
 	  </listitem>
 	</varlistentry>
@@ -745,8 +761,8 @@ ghc --make Main.hs
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>-tmpdir</literal></term>
-	  <indexterm><primary><literal>-tmpdir</literal></primary></indexterm>
+	  <term><option>-tmpdir</option></term>
+	  <indexterm><primary><option>-tmpdir</option></primary></indexterm>
 	  <listitem>
 	    <para>If you have trouble because of running out of space
             in <filename>/tmp</filename> (or wherever your
@@ -1866,9 +1882,9 @@ statements or clauses.
     <variablelist>
 
   	<varlistentry>
-	  <term><literal>-fext-core</literal></term>
+	  <term><option>-fext-core</option></term>
 	  <indexterm>
-	    <primary><literal>-fext-core</literal></primary>
+	    <primary><option>-fext-core</option></primary>
 	  </indexterm>
 	  <listitem>
 	    <para>Generate <literal>.hcr</literal> files.</para>
