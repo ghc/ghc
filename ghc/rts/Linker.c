@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.81 2002/02/01 02:05:52 sof Exp $
+ * $Id: Linker.c,v 1.82 2002/02/04 16:30:20 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -857,6 +857,10 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
    s->kind      = kind;
    s->next      = oc->sections;
    oc->sections = s;
+   /* 
+   fprintf(stderr, "addSection: %p-%p (size %d), kind %d\n", 
+                   start, ((char*)end)-1, end - start + 1, kind ); 
+   */
 }
 
 
@@ -1936,10 +1940,11 @@ ocGetNames_ELF ( ObjectCode* oc )
       }
 
       /* fill in the section info */
-      addSection(oc, kind, ehdrC + shdr[i].sh_offset, 
-                     ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1);
-      if (kind != SECTIONKIND_OTHER && shdr[i].sh_size > 0)
+      if (kind != SECTIONKIND_OTHER && shdr[i].sh_size > 0) {
          addProddableBlock(oc, ehdrC + shdr[i].sh_offset, shdr[i].sh_size);
+         addSection(oc, kind, ehdrC + shdr[i].sh_offset, 
+                        ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1);
+      }
 
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
 
