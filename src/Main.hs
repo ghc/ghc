@@ -864,7 +864,7 @@ buildImportEnv :: ModuleMap -> Module
 	-> [HsImportDecl]  -- the import decls
 	-> Map HsQName HsQName
 buildImportEnv mod_map this_mod exported_names imp_decls
-  = foldr (flip (Map.unionWith best_name)) Map.empty (map build imp_decls)
+  = foldr (flip (Map.unionWith (flip best_name))) Map.empty (map build imp_decls)
   where
 	-- choose qualified results over unqualified ones.  In the future
 	-- we might make more intelligent decisions about which name to
