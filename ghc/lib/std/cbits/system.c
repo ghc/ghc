@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.14 2001/06/12 17:19:34 rrt Exp $
+ * $Id: system.c,v 1.15 2001/06/29 11:35:14 simonpj Exp $
  *
  * system Runtime Support
  */
@@ -18,6 +18,7 @@
 HsInt
 systemCmd(HsAddr cmd)
 {
+  /* -------------------- WINDOWS VERSION --------------------- */
 #if defined(mingw32_TARGET_OS)
   STARTUPINFO sInfo;
   PROCESS_INFORMATION pInfo;
@@ -38,7 +39,9 @@ systemCmd(HsAddr cmd)
   CloseHandle(pInfo.hProcess);
   CloseHandle(pInfo.hThread);
   return retCode;
+
 #else
+  /* -------------------- UNIX VERSION --------------------- */
     int pid;
     int wstat;
 
