@@ -59,7 +59,7 @@ import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( OccName, Name, mkDictOcc, mkMethodOcc, mkIPOcc,
 		  getOccName, nameUnique )
 import PprType	( pprPred )	
-import InstEnv	( InstEnv, lookupInstEnv )
+import InstEnv	( InstEnv, lookupInstEnv, InstEnvResult(..) )
 import SrcLoc	( SrcLoc )
 import Type	( Type, PredType(..), ThetaType,
 		  mkTyVarTy, isTyVarTy, mkDictTy, mkPredTy,
@@ -659,9 +659,9 @@ lookupInst :: Inst
 -- Dictionaries
 
 lookupInst dict@(Dict _ (Class clas tys) loc)
-  = case lookupInstEnv (ppr clas) (classInstEnv clas) tys of
+  = case lookupInstEnv (classInstEnv clas) tys of
 
-      Just (tenv, dfun_id)
+      FoundInst tenv dfun_id
 	-> let
 		subst	      = mkSubst (tyVarsOfTypes tys) tenv
 		(tyvars, rho) = splitForAllTys (idType dfun_id)
@@ -682,7 +682,7 @@ lookupInst dict@(Dict _ (Class clas tys) loc)
 	   in
 	   returnNF_Tc (GenInst dicts rhs)
 
-      Nothing	-> returnNF_Tc NoInstance
+      other	-> returnNF_Tc NoInstance
 lookupInst dict@(Dict _ _ loc) = returnNF_Tc NoInstance
 
 -- Methods
@@ -760,12 +760,12 @@ lookupSimpleInst :: InstEnv
 	         -> NF_TcM s (Maybe [(Class,[Type])])	-- Here are the needed (c,t)s
 
 lookupSimpleInst class_inst_env clas tys
-  = case lookupInstEnv (ppr clas) class_inst_env tys of
-      Nothing	 -> returnNF_Tc Nothing
-
-      Just (tenv, dfun)
+  = case lookupInstEnv class_inst_env tys of
+      FoundInst tenv dfun
 	-> returnNF_Tc (Just (substClasses (mkSubst emptyInScopeSet tenv) theta'))
         where
 	   (_, theta, _) = splitSigmaTy (idType dfun)
 	   theta' = map (\(Class clas tys) -> (clas,tys)) theta
+
+      other  -> returnNF_Tc Nothing
 \end{code}

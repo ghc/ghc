@@ -136,7 +136,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  isStdClassTyVarDict, isMethodFor,
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld, newFunDepFromDict,
-			  getDictClassTys, getIPs,
+			  getDictClassTys, getIPs, isTyVarDict,
 			  getDictPred_maybe, getMethodTheta_maybe,
 			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
@@ -154,7 +154,7 @@ import Type		( Type, ThetaType, TauType, ClassContext,
 			  mkTyVarTy, getTyVar,
 			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
 			)
-import InstEnv		( InstEnv )
+import InstEnv		( InstEnv, lookupInstEnv, InstEnvResult(..) )
 import Subst		( mkTopTyVarSubst, substClasses )
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
@@ -1266,21 +1266,44 @@ addTopInstanceErr dict
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 addNoInstanceErr str givens dict
-  = addInstErrTcM (instLoc dict) 
-	(tidy_env, 
-	 sep [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
-	      nest 4 $ ptext SLIT("from the context:") <+> pprInsts tidy_givens]
-	$$
-	 ptext SLIT("Probable cause:") <+> 
-	      vcat [sep [ptext SLIT("missing") <+> quotes (pprInst tidy_dict),
-		    ptext SLIT("in") <+> str],
-		    if isClassDict dict && all_tyvars then empty else
-		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst tidy_dict)]
-    )
+  = addInstErrTcM (instLoc dict) (tidy_env, doc)
   where
-    all_tyvars = all isTyVarTy tys
-    (_, tys)   = getDictClassTys dict
+    doc = vcat [herald <+> quotes (pprInst tidy_dict),
+	        nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens,
+		ambig_doc,
+		ptext SLIT("Probable fix:"),
+		nest 4 fix1,
+		nest 4 fix2]
+
+    herald = ptext SLIT("Could not") <+> unambig_doc <+> ptext SLIT("deduce")
+    unambig_doc | ambig_overlap = ptext SLIT("unambiguously")	
+		| otherwise     = empty
+
+    ambig_doc 
+	| not ambig_overlap = empty
+	| otherwise 	    
+	= vcat [ptext SLIT("The choice of (overlapping) instance declaration"),
+		nest 4 (ptext SLIT("depends on the instantiation of") <+> 
+		     	quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst tidy_dict))))]
+
+    fix1 = sep [ptext SLIT("Add") <+> quotes (pprInst tidy_dict),
+		ptext SLIT("to the") <+> str]
+
+    fix2 | isTyVarDict dict || ambig_overlap
+	   = empty
+	   | otherwise
+	   = ptext SLIT("Or add an instance declaration for") <+> quotes (pprInst tidy_dict)
+
     (tidy_env, tidy_dict:tidy_givens) = tidyInsts emptyTidyEnv (dict:givens)
+
+	-- Checks for the ambiguous case when we have overlapping instances
+    ambig_overlap | isClassDict dict
+		  = case lookupInstEnv (classInstEnv clas) tys of
+			NoMatch ambig -> ambig
+		      	other 	    -> False
+		  | otherwise = False
+	 	  where
+		    (clas,tys) = getDictClassTys dict
 
 -- Used for the ...Thetas variants; all top level
 addNoInstErr (c,ts)

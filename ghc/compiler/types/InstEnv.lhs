@@ -5,7 +5,8 @@
 
 \begin{code}
 module InstEnv (
-	InstEnv, emptyInstEnv,  addToInstEnv, lookupInstEnv
+	InstEnv, emptyInstEnv,  addToInstEnv, 
+	lookupInstEnv, InstEnvResult(..)
     ) where
 
 #include "HsVersions.h"
@@ -147,30 +148,52 @@ emptyInstEnv = []
 isEmptyInstEnv env = null env
 \end{code}
 
-@lookupInstEnv@ looks up in a @InstEnv@, using a one-way match.  Since the env is kept
-ordered, the first match must be the only one.
-The thing we are looking up can have an
-arbitrary "flexi" part.
+@lookupInstEnv@ looks up in a @InstEnv@, using a one-way match.  Since
+the env is kept ordered, the first match must be the only one.  The
+thing we are looking up can have an arbitrary "flexi" part.
 
 \begin{code}
-lookupInstEnv :: SDoc		-- For error report
-	      -> InstEnv 	-- The envt
+lookupInstEnv :: InstEnv 	-- The envt
 	      -> [Type]		-- Key
-	      -> Maybe (TyVarSubstEnv, Id)
+	      -> InstEnvResult
 
-lookupInstEnv doc env key
+data InstEnvResult 
+  = FoundInst 			-- There is a (template,substitution) pair 
+				-- that makes the template match the key, 
+				-- and no template is an instance of the key
+	TyVarSubstEnv Id
+
+  | NoMatch Bool	-- Boolean is true iff there is at least one
+			-- template that matches the key.
+			-- (but there are other template(s) that are
+			--  instances of the key, so we don't report 
+			--  FoundInst)
+	-- The NoMatch True case happens when we look up
+	--	Foo [a]
+	-- in an InstEnv that has entries for
+	--	Foo [Int]
+	--	Foo [b]
+	-- Then which we choose would depend on the way in which 'a'
+	-- is instantiated.  So we say there is no match, but identify
+	-- it as ambiguous case in the hope of giving a better error msg.
+	-- See the notes above from Jeff Lewis
+
+lookupInstEnv env key
   = find env
   where
     key_vars = tyVarsOfTypes key
-    find [] = Nothing
+    find [] = NoMatch False
     find ((tpl_tyvars, tpl, val) : rest)
       = case matchTys tpl_tyvars tpl key of
 	  Nothing                 ->
 	    case matchTys key_vars key tpl of
 	      Nothing             -> find rest
-	      Just (_, _)         -> Nothing
+	      Just (_, _)         -> NoMatch (any_match rest)
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
-				     Just (subst, val)
+				     FoundInst subst val
+    any_match rest = or [ maybeToBool (matchTys tvs tpl key)
+		        | (tvs,tpl,_) <- rest
+			]
 \end{code}
 
 @addToInstEnv@ extends a @InstEnv@, checking for overlaps.
