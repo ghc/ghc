@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.51 2005/03/29 14:02:06 simonmar Exp $
+# $Id: package.mk,v 1.52 2005/03/29 14:06:02 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -154,29 +154,27 @@ endif # $(way) == ""
 # -----------------------------------------------------------------------------
 # Building the static library libHS<pkg>.a
 
-ifeq "$(STANDALONE_PACKAGE)" "NO"
-HC = $(GHC_INPLACE)
-endif
-
 SRC_HSC2HS_OPTS += -I.
 
-ifeq "$(NON_HS_PACKAGE)" ""
+ifeq "$(STANDALONE_PACKAGE)" "NO"
+HC = $(GHC_INPLACE)
+IGNORE_PACKAGE_FLAG = -ignore-package
+else
 # Only use -ignore-package if supported by HC; i.e., ghc-6.3 and later.
 # (Don't like the use of slow $(shell ..) in Makefiles, but can't see a way around it here.)
-ifeq "$(STANDALONE_PACKAGE)" "NO"
-SRC_HC_OPTS 	+= -ignore-package $(PACKAGE)
+ifeq "$(strip $(GHC))" ""
+IGNORE_PACKAGE_FLAG = -ignore-package
 else
-ifneq "$(strip $(GHC))" ""
 # Making the assumption here that standalone packages will be using mk/config.mk:GHC
-SRC_HC_OPTS = $(shell if (test $(GhcCanonVersion) -ge 603); then echo "-ignore-package"; else echo "-package-name"; fi) $(PACKAGE)
-else
-SRC_HC_OPTS 	+= -ignore-package $(PACKAGE)
-endif
+IGNORE_PACKAGE_FLAG = $(shell if (test $(GhcCanonVersion) -ge 603); then echo "-ignore-package"; else echo "-package-name"; fi)
+endif 
 endif # STANDALONE_PACKAGE
 
+ifeq "$(NON_HS_PACKAGE)" ""
+SRC_HC_OPTS	+= $(IGNORE_PACKAGE_FLAG) $(PACKAGE)
 SRC_HC_OPTS 	+= $(GhcLibHcOpts)
 SRC_HC_OPTS     += $(patsubst %, -package %, $(PACKAGE_DEPS))
-endif # NON_HS_PACKAGE
+endif
 
 #	-fgenerics switches on generation of support code for 
 #		derivable type classes.  This is now off by default,
