@@ -86,10 +86,10 @@ tcFImport fo@(ForeignImport nm hs_ty imp_decl isDeprec src_loc)
       -- of the foreign type.
 	(_, t_ty)	  = tcSplitForAllTys sig_ty
 	(arg_tys, res_ty) = tcSplitFunTys t_ty
-	id		  = mkVanillaGlobal nm sig_ty noCafIdInfo
-		-- Foreign-imported things don't neeed zonking etc
-		-- They are rather like constructors; we make the final
-		-- Global Id right away.
+	id		  = mkLocalId nm sig_ty
+ 		-- Use a LocalId to obey the invariant that locally-defined 
+		-- things are LocalIds.  However, it does not need zonking,
+		-- (so TcHsSyn.zonkForeignExports ignores it).
    in
    tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenM_` 
    -- can't use sig_ty here because it :: Type and we need HsType Id
