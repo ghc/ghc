@@ -58,7 +58,6 @@ import TyCon		( TyCon, isSynTyCon )
 import Class		( GenClass, SYN_IE(Class), classGlobalIds )
 import Type		( applyTyCon, mkSynTy, SYN_IE(Type) )
 import PprType		( GenType, GenTyVar )
-import PprStyle         ( PprStyle )
 import TysWiredIn	( unitTy )
 import PrelMods		( gHC_MAIN, mAIN )
 import PrelInfo		( main_NAME, mainPrimIO_NAME, ioTyCon_NAME, primIoTyCon_NAME )
@@ -73,9 +72,7 @@ import Bag		( Bag, isEmptyBag )
 
 import FiniteMap	( emptyFM, FiniteMap )
 
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
+import Outputable	( Outputable(..), PprStyle )
 
 tycon_specs = emptyFM
 \end{code}
