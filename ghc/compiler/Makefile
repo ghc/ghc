@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.171 2001/07/09 10:46:46 simonmar Exp $
+# $Id: Makefile,v 1.172 2001/07/09 13:21:09 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -247,7 +247,7 @@ main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
-ifeq "$(ghc_411_at_least)" "NO"
+ifeq "$(bootstrapped)" "NO"
 rename/ParseIface_HC_OPTS 	+= -K2m
 parser/Parser_HC_OPTS 		+= -K2m
 endif
