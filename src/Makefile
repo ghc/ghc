@@ -17,13 +17,21 @@ ifeq "$(BIN_DIST)"   "1"
 HADDOCKLIB=$$\"\"libdir/haddock
 HADDOCKBIN=$$\"\"libexecdir/$(HS_PROG)
 else
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+HADDOCKLIB=$(shell cygpath --mixed $(libdir))
+else
 HADDOCKLIB=$(libdir)
+endif # mingw
 HADDOCKBIN=$(libexecdir)/$(HS_PROG)
 endif # BIN_DIST
 else
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+HADDOCKLIB=$(shell cygpath --mixed $(FPTOOLS_TOP_ABS)/haddock/html)
+else
 HADDOCKLIB=$(FPTOOLS_TOP_ABS)/haddock/html
-HADDOCKBIN=$(FPTOOLS_TOP_ABS)/haddock/src/$(HS_PROG)
 endif
+HADDOCKBIN=$(FPTOOLS_TOP_ABS)/haddock/src/$(HS_PROG)
+endif # INSTALLING
 
 HAPPY_OPTS += $(GHC_HAPPY_OPTS)
 
