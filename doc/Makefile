@@ -1,7 +1,7 @@
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SGML_DOC = haddock
-INSTALL_SGML_DOC = haddock
+XML_DOC = haddock
+INSTALL_XML_DOC = haddock
 
 include $(TOP)/mk/target.mk
