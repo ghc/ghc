@@ -1,7 +1,7 @@
 /* 
  * (c) The GHC Team 2001
  *
- * $Id: ilxstubs.c,v 1.3 2001/08/15 09:23:25 rrt Exp $
+ * $Id: ilxstubs.c,v 1.4 2001/08/15 10:16:46 rrt Exp $
  *
  * ILX stubs for external function calls
  */
@@ -33,22 +33,6 @@
 ../PrelTopHandler.lhs:49:foreign import ccall "shutdownHaskellAndExit" 
 ../PrelTopHandler.lhs:77:foreign import ccall "stackOverflow" unsafe
 ../PrelTopHandler.lhs:80:foreign import ccall "stg_exit" unsafe */
-
-/* Fake this for now, as a DLL can't refer to main() */
-int argc = 0;
-char **argv = NULL;
-
-int
-prog_argc_addr(void)
-{
-  return &argc;
-}
-
-char ***
-prog_argv_addr(void)
-{
-  return &argv;
-}
 
 void
 stg_exit(I_ n)
