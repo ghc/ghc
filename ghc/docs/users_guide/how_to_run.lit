@@ -132,9 +132,16 @@ The option \tr{-cpp}\index{-cpp option} must be given for the C
 pre-processor phase to be run, that is, the pre-processor will be run
 over your Haskell source file before continuing.
 
-The option \tr{-E}\index{-E option} runs just the C-preprocessor part
-of the C-compiling phase, sending the result to stdout [I think].  (For
-debugging, usually.)
+The option \tr{-E}\index{-E option} runs just the pre-processing
+passes of the compiler, outputting the result on stdout before
+stopping. If used in conjunction with -cpp, the output is the
+code blocks of the original (literal) source after having put it
+through the grinder that is the C pre-processor. Sans \tr{-cpp}, the
+output is the de-litted version of the original source.
+
+The option \tr{-optcpp-E}\index{-optcpp-E option} runs just the
+pre-processing stage of the C-compiling phase, sending the result to
+stdout.  (For debugging or obfuscation contests, usually.)
 
 %************************************************************************
 %*                                                                      *
