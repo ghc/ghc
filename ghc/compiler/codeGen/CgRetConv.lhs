@@ -23,7 +23,9 @@ module CgRetConv (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)		-- paranoia checking
+#endif
 
 import AbsCSyn		-- quite a few things
 import AbsCUtils	( mkAbstractCs, getAmodeRep,

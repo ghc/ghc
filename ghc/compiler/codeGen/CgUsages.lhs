@@ -21,7 +21,9 @@ module CgUsages (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(CgLoop1)	-- here for paranoia-checking
+#endif
 
 import AbsCSyn		( RegRelative(..), AbstractC, CAddrMode )
 import CgMonad
