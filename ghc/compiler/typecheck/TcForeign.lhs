@@ -222,7 +222,8 @@ checkForeignRes pred_res_ty ty =
         | (uniqueOf io) == ioTyConKey &&
           pred_res_ty res_ty 
 	-> returnTc ()
-    _   -> check False (illegalForeignTyErr False{-Res-} ty)
+    _   | pred_res_ty ty -> returnTc ()
+        | otherwise      -> check False (illegalForeignTyErr False{-Res-} ty)
 
 \end{code}
 

@@ -10,6 +10,7 @@ module DsCCall
 	,  getIoOkDataCon
 	,  unboxArg
 	,  boxResult
+	,  wrapUnboxedValue
 	,  can'tSeeDataConsPanic
 	) where
 
@@ -205,10 +206,8 @@ boxResult ioOkDataCon result_ty
     isUnpointedType the_prim_result_ty				-- of primitive type
   =
     newSysLocalDs realWorldStatePrimTy		`thenDs` \ prim_state_id ->
-    newSysLocalDs the_prim_result_ty 		`thenDs` \ prim_result_id ->
-
-    mkConDs the_data_con (map TyArg tycon_arg_tys ++ [VarArg (Var prim_result_id)]) `thenDs` \ the_result ->
-
+    wrapUnboxedValue result_ty			`thenDs` \ (state_and_prim_datacon,
+							    state_and_prim_ty, prim_result_id, the_result) ->
     mkConDs ioOkDataCon
 	    [TyArg result_ty, VarArg (Var prim_state_id), VarArg the_result]
 							`thenDs` \ the_pair ->
@@ -239,7 +238,6 @@ boxResult ioOkDataCon result_ty
 
   | otherwise
   = pprPanic "boxResult: " (ppr result_ty)
-
   where
     maybe_data_type 			   = splitAlgTyConApp_maybe result_ty
     Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
@@ -248,7 +246,43 @@ boxResult ioOkDataCon result_ty
     data_con_arg_tys		           = dataConArgTys the_data_con tycon_arg_tys
     (the_prim_result_ty : other_args_tys)  = data_con_arg_tys
 
-    (state_and_prim_datacon, state_and_prim_ty) = getStatePairingConInfo the_prim_result_ty
+--    (state_and_prim_datacon, state_and_prim_ty) = getStatePairingConInfo the_prim_result_ty
+
+-- wrap up an unboxed value.
+wrapUnboxedValue :: Type -> DsM (Id, Type, Id, CoreExpr)
+wrapUnboxedValue ty
+  | null data_cons
+      -- oops! can't see the data constructors
+  = can'tSeeDataConsPanic "result" ty
+    -- Data types with a single constructor, which has a single, primitive-typed arg
+  | (maybeToBool maybe_data_type) &&				-- Data type
+    (null other_data_cons) &&					-- Just one constr
+    not (null data_con_arg_tys) && null other_args_tys	&& 	-- Just one arg
+    isUnpointedType the_prim_result_ty				-- of primitive type
+  =
+    newSysLocalDs the_prim_result_ty 		         `thenDs` \ prim_result_id ->
+    mkConDs the_data_con (map TyArg tycon_arg_tys ++ 
+                          [VarArg (Var prim_result_id)]) `thenDs` \ the_result ->
+    returnDs (state_and_prim_datacon, state_and_prim_ty, prim_result_id, the_result)
+
+  -- Data types with a single nullary constructor
+  | (maybeToBool maybe_data_type) &&				-- Data type
+    (null other_data_cons) &&					-- Just one constr
+    (null data_con_arg_tys)
+  =
+    let unit = unitDataCon in
+    returnDs (stateDataCon, realWorldStateTy, unit, Var unit)
+  | otherwise
+  = pprPanic "boxResult: " (ppr ty)
+ where
+   maybe_data_type			  = splitAlgTyConApp_maybe ty
+   Just (tycon, tycon_arg_tys, data_cons) = maybe_data_type
+   (the_data_con : other_data_cons)       = data_cons
+
+   data_con_arg_tys		          = dataConArgTys the_data_con tycon_arg_tys
+   (the_prim_result_ty : other_args_tys)  = data_con_arg_tys
+   (state_and_prim_datacon, state_and_prim_ty) = getStatePairingConInfo the_prim_result_ty
+
 \end{code}
 
 This grimy bit of code is for digging out the IOok constructor from an

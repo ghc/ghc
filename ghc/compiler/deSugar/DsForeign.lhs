@@ -14,7 +14,7 @@ module DsForeign ( dsForeigns ) where
 import CoreSyn
 
 import DsCCall		( getIoOkDataCon, boxResult, unboxArg,
-			  can'tSeeDataConsPanic
+			  can'tSeeDataConsPanic, wrapUnboxedValue
 			)
 import DsMonad
 import DsUtils
@@ -31,7 +31,7 @@ import IdInfo		( noIdInfo )
 import Literal		( Literal(..), mkMachInt )
 import Maybes		( maybeToBool )
 import Name		( nameString, occNameString, nameOccName, nameUnique )
-import PrelVals		( packStringForCId, eRROR_ID )
+import PrelVals		( packStringForCId, eRROR_ID, realWorldPrimId )
 import PrimOp		( PrimOp(..) )
 import Type		( isUnpointedType, splitAlgTyConApp_maybe, 
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
@@ -54,6 +54,7 @@ import TysWiredIn	( getStatePairingConInfo,
 			  stateAndPtrPrimDataCon,
 			  addrDataCon
 			)
+import Unique
 import Outputable
 \end{code}
 
@@ -125,13 +126,29 @@ dsFImport nm ty may_not_gc ext_name cconv =
     mkArgs ty				`thenDs` \ (tvs, args, io_res_ty)  ->
     mapAndUnzipDs unboxArg args		`thenDs` \ (unboxed_args, arg_wrappers) ->
     let
-	 final_args = Var old_s : unboxed_args
+	 the_state_arg
+	   | is_io_action = old_s
+	   | otherwise    = realWorldPrimId
+
+	 final_args = Var the_state_arg : unboxed_args
 	 (ioOkDataCon, ioDataCon, result_ty) = getIoOkDataCon io_res_ty
+
+	 is_io_action =
+	   case (splitTyConApp_maybe io_res_ty) of
+	     Just (iot,[_]) -> (uniqueOf iot) == ioTyConKey
+	     _		    -> False
     in
-    boxResult ioOkDataCon result_ty	`thenDs` \ (final_result_ty, res_wrapper) ->
+    (if not is_io_action then
+	newSysLocalDs realWorldStatePrimTy `thenDs` \ state_tok ->
+	wrapUnboxedValue io_res_ty         `thenDs` \ (state_and_foo, state_and_foo_ty, v, res_v) ->
+	let the_alt = (state_and_foo, [state_tok,v], res_v) in
+        returnDs (state_and_foo_ty, \ prim_app -> Case prim_app (AlgAlts [the_alt] NoDefault))
+     else
+        boxResult ioOkDataCon result_ty)      `thenDs` \ (final_result_ty, res_wrapper) ->
     (case ext_name of
-       Dynamic       -> getUniqueDs `thenDs` \ u -> returnDs (Right u)
-       ExtName fs _  -> returnDs (Left fs)) `thenDs` \ label ->
+       Dynamic       -> getUniqueDs `thenDs` \ u -> 
+			returnDs (Right u)
+       ExtName fs _  -> returnDs (Left fs))   `thenDs` \ label ->
     let
 	the_ccall_op = CCallOp label False (not may_not_gc) cconv
 			       (map coreExprType final_args)
@@ -139,12 +156,18 @@ dsFImport nm ty may_not_gc ext_name cconv =
     in
     mkPrimDs the_ccall_op (map VarArg final_args) `thenDs` \ the_prim_app ->
     let
-	the_body = mkValLam [old_s]
-			    (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
+	body = foldr ($) (res_wrapper the_prim_app) arg_wrappers 
+
+	the_body
+	  | not is_io_action = body
+	  | otherwise        = mkValLam [old_s] body
     in
     newSysLocalDs (coreExprType the_body) `thenDs` \ ds ->
     let
-      io_app = mkValApp (mkTyApp (Var ioDataCon) [result_ty]) [VarArg ds]
+      io_app 
+       | is_io_action = mkValApp (mkTyApp (Var ioDataCon) [result_ty]) [VarArg ds]
+       | otherwise    = Var ds
+
       fo_rhs = mkTyLam  tvs $
 	       mkValLam (map (\ (Var x) -> x) args)
 			(mkCoLetAny (NonRec ds the_body) io_app)
