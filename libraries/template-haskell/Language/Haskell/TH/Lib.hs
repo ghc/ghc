@@ -29,6 +29,7 @@ type StmtQ          = Q Stmt
 type RangeQ         = Q Range
 type StrictTypeQ    = Q StrictType
 type VarStrictTypeQ = Q VarStrictType
+type FieldExpQ      = Q FieldExp
 
 ----------------------------------------------------------
 -- Lowercase pattern syntax functions
