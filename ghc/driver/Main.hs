@@ -268,14 +268,14 @@ odir_ify f = do
   odir_opt <- readIORef output_dir
   case odir_opt of
 	Nothing -> return f
-	Just d  -> return (newdir f d)
+	Just d  -> return (newdir d f)
 
 osuf_ify :: String -> IO String
 osuf_ify f = do
   osuf_opt <- readIORef output_suf
   case osuf_opt of
 	Nothing -> return f
-	Just s  -> return (newsuf f s)
+	Just s  -> return (newsuf s f)
 
 -----------------------------------------------------------------------------
 -- Hi Files
@@ -1499,19 +1499,20 @@ run_phase SplitAs basename input_fn output_fn
 	
 	split_s_prefix <- readIORef split_prefix
 	n <- readIORef n_split_files
-	
+
 	odir <- readIORef output_dir
 	let real_odir = case odir of
 				Nothing -> basename
 				Just d  -> d
-	
+
 	let assemble_file n = do
 		    let input_s  = split_s_prefix ++ "__" ++ show n ++ ".s"
 		    let output_o = newdir real_odir 
 					(basename ++ "__" ++ show n ++ ".o")
+		    real_o <- osuf_ify output_o
 		    run_something "Assembler" 
 			    (unwords (as : as_opts
-				      ++ [ "-c", "-o ", output_o, input_s ]
+				      ++ [ "-c", "-o", real_o, input_s ]
 			    ))
 	
 	mapM_ assemble_file [1..n]
@@ -1596,6 +1597,10 @@ data OptKind
 	| OptPrefix (String -> IO ())   -- flag may be a prefix
 	| AnySuffix (String -> IO ())   -- flag is a prefix, pass whole arg to fn
 	| PassFlag  (String -> IO ())   -- flag with no arg, pass flag to fn
+
+-- note that ordering is important in the following list: any flag which
+-- is a prefix flag (i.e. HasArg, Prefix, OptPrefix, AnySuffix) will override
+-- flags further down the list with the same prefix.
 
 opts = 
   [  ------- help -------------------------------------------------------
@@ -1701,8 +1706,8 @@ opts =
   ,  ( "optdep"		, HasArg (add opt_dep) )
   ,  ( "optL"		, HasArg (add opt_L) )
   ,  ( "optP"		, HasArg (add opt_P) )
-  ,  ( "optC"		, HasArg (add opt_C) )
   ,  ( "optCrts"        , HasArg (add opt_Crts) )
+  ,  ( "optC"		, HasArg (add opt_C) )
   ,  ( "optc"		, HasArg (add opt_c) )
   ,  ( "optm"		, HasArg (add opt_m) )
   ,  ( "opta"		, HasArg (add opt_a) )
