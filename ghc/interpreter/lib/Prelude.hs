@@ -104,14 +104,24 @@ module Prelude (
 
     , MVar, newEmptyMVar, newMVar, putMVar, takeMVar, readMVar, swapMVar
     , ThreadId, forkIO
-    ,trace
+    , trace
 
+
+    , ST(..)
     , STRef, newSTRef, readSTRef, writeSTRef
     , IORef, newIORef, readIORef, writeIORef
+    , PrimMutableArray, PrimMutableByteArray
+    , RealWorld
 
     -- This lot really shouldn't be exported, but are needed to
     -- implement various libs.
+    , runST , fixST, unsafeInterleaveST 
+    , stToIO , ioToST
+    , unsafePerformIO
+    , primReallyUnsafePtrEquality
     ,hugsprimCompAux,PrimArray,primRunST,primNewArray,primWriteArray
+    ,primReadArray, primIndexArray, primSizeMutableArray
+    ,primSizeArray
     ,primUnsafeFreezeArray,primIndexArray,primGetRawArgs,primGetEnv
     ,nh_stdin,nh_stdout,nh_stderr,copy_String_to_cstring,nh_open
     ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
@@ -1801,7 +1811,7 @@ primGetEnv v
      nh_getenv ptr                >>= \ptr2 ->
      nh_free ptr                  >>
      if   isNullAddr ptr2
-     then return []
+     then ioError (IOError "getEnv failed")
      else
      copy_cstring_to_String ptr2  >>= \result ->
      return result
@@ -1813,17 +1823,39 @@ primGetEnv v
 
 newtype ST s a = ST (s -> (a,s))
 
-data RealWorld
-type IO a = ST RealWorld a
-
---primRunST :: (forall s. ST s a) -> a
 primRunST :: ST RealWorld a -> a
 primRunST m = fst (unST m theWorld)
    where
       theWorld :: RealWorld
       theWorld = error "primRunST: entered the RealWorld"
 
+runST :: (__forall s . ST s a) -> a
+runST m = fst (unST m alpha)
+   where
+      alpha = error "primRunST: entered the RealWorld"
+
+fixST :: (a -> ST s a) -> ST s a
+fixST m = ST (\ s -> 
+		let 
+		   (r,s) = unST (m r) s
+		in
+		   (r,s))
+
 unST (ST a) = a
+
+data RealWorld
+-- Should IO not be abstract? 
+-- Is "instance (IO a)" allowed, for example ?
+type IO a = ST RealWorld a
+
+stToIO	      :: ST RealWorld a -> IO a
+stToIO = id
+
+ioToST	      :: IO a -> ST RealWorld a
+ioToST = id
+
+unsafePerformIO :: IO a -> a
+unsafePerformIO m = primRunST (ioToST m)
 
 instance Functor (ST s) where
    fmap f x  = x >>= (return . f)
