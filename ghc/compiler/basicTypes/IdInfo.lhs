@@ -654,6 +654,10 @@ isn't necessarily correct in the transformed program.
 Also forget specialisations and unfoldings because they would need
 substitution to be correct.  (They get pinned back on separately.)
 
+Hoever, we REMEMBER loop-breaker and dead-variable information.  The loop-breaker
+information is used (for example) in MkIface to avoid exposing the unfolding of
+a loop breaker.
+
 \begin{code}
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 zapFragileInfo info@(IdInfo {occInfo		= occ, 
