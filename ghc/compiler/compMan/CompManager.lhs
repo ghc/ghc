@@ -263,7 +263,8 @@ cmLoadModule cmstate1 rootname
                                                           gmode=ghci_mode }
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
-                          return (cmstate3, True, map name_of_summary modsDone)
+                          return (cmstate3, True, 
+                                  reverse (map name_of_summary modsDone))
 
          else 
            -- Tricky.  We need to back out the effects of compiling any
@@ -298,7 +299,7 @@ cmLoadModule cmstate1 rootname
                                                           gmode=ghci_mode }
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
-                          return (cmstate4, False, mods_to_keep_names)
+                          return (cmstate4, False, reverse mods_to_keep_names)
 
 
 -- Return (names of) all those in modsDone who are part of a cycle
