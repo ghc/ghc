@@ -4817,6 +4817,11 @@ so you will need to add <filename>emacs/bin</filename> to your <literal>PATH</li
 </para>
 </listitem>
 
+	  <listitem>
+	    <para>You might want to install GLUT in your MSYS/Cygwin
+	      installation, otherwise the GLUT package will not be built with
+	      GHC.</para>
+	  </listitem>
 
 <listitem>
 <para> Finally, check out a copy of GHC sources from
