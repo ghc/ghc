@@ -178,7 +178,6 @@ cvtOverLit (Int i) = mkHsIntegral (fromInt i)
 
 cvtLit :: Lit -> HsLit
 cvtLit (Char c)	      = HsChar (ord c)
-cvtLit (CrossStage s) = error "What do we do about crossStage constants?"
 
 cvtp :: Meta.Pat -> Hs.Pat RdrName
 cvtp (Plit l)
