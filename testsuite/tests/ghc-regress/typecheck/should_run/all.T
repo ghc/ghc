@@ -18,3 +18,5 @@ test "tcrun010" { vtr("", "", "") }
 test "tcrun011" { vtr("", "", "") }
 test "tcrun012" { vtr("", "", "") }
 test "tcrun013" { vtr("", "", "") }
+test "tcrun014" { vtr("", "", "") }
+test "tcrun015" { vtr("", "", "") }
