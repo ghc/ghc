@@ -279,10 +279,10 @@ these are turned off by -Wnot.
 \begin{code}
 @StandardWarnings = ('-fwarn-overlapping-patterns', 
 		     '-fwarn-missing-methods',
-		     '-fwarn-unused-binds',
-		     '-fwarn-unused-matches',
 		     '-fwarn-duplicate-exports');
 @MinusWOpts    	  = (@StandardWarnings, 
+		     '-fwarn-unused-binds',
+		     '-fwarn-unused-matches',
 		     '-fwarn-incomplete-patterns', 
 		     '-fwarn-unused-imports');
 @MinusWallOpts 	  = (@MinusWOpts, 
