@@ -504,6 +504,8 @@ TEXI2HTML_PREFIX        = $(LITERATE_PREFIX)texi2html/
 HAPPY_PREFIX    	= $(FPTOOLS_TOP)/happy/src/
 GREENCARD_PREFIX	= $(FPTOOLS_TOP)/green-card/src/
 
+RTS_PREFIX		= $(FPTOOLS_TOP)/common-rts/
+
 UNLIT_PREFIX    	= $(FPTOOLS_TOP)/ghc/utils/unlit/
 UGEN_PREFIX             = $(FPTOOLS_TOP)/ghc/utils/ugen/
 STAT2RESID_PREFIX       = $(FPTOOLS_TOP)/ghc/utils/stat2resid/
