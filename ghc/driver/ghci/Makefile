@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 2001/10/12 14:28:08 rrt Exp $
+# $Id: Makefile,v 1.10 2002/01/10 10:33:48 sof Exp $
 #
 
 TOP=../..
@@ -29,6 +29,7 @@ INPLACE_SCRIPT_PROG    = ghci-inplace
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 C_PROG = ghci
+C_OBJS += ghci.res
 else
 C_SRCS=
 endif
@@ -57,6 +58,11 @@ endif
 ifeq "$(INSTALLING)" "1"
 all clean distclean maintainer-clean ::
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+endif
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ghci.res : ghci.rc ghci.ico
+	windres -o ghci.res -i ghci.rc -O coff
 endif
 
 include $(TOP)/mk/target.mk
