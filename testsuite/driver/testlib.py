@@ -361,6 +361,16 @@ def run_command_ignore_output( name, way, cmd ):
     return simple_run( name, cmd, '', 1 )
 
 # -----------------------------------------------------------------------------
+# GHCi tests
+
+def ghci_script( name, way, script ):
+    cmd = "'" + config.compiler + "'" + \
+          ' --interactive -v0 ' + \
+          join(config.compiler_always_flags,' ')
+    testopts.stdin = script
+    return simple_run( name, cmd, '', 0 )
+
+# -----------------------------------------------------------------------------
 # Compile-only tests
 
 def compile( name, way, extra_hc_opts ):
