@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.39 2004/10/02 15:12:48 wolfgang Exp $
+# $Id: package.mk,v 1.40 2004/11/03 12:31:42 ross Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -62,7 +62,7 @@ CLEAN_FILES += package.conf.installed package.conf.inplace
 else # $(STANDALONE_PACKAGE) == "YES"
 
 PACKAGE_CPP_OPTS += -DPACKAGE=\"${PACKAGE}\"
-PACKAGE_CPP_OPTS += -DPACKAGE_DEPS='$(patsubst %,"%"$(comma),$(PACKAGE_DEPS))'
+PACKAGE_CPP_OPTS += -DPACKAGE_DEPS='$(subst " ","$(comma) ",$(patsubst %,"%",$(PACKAGE_DEPS)))'
 PACKAGE_CPP_OPTS += -DLIBRARY=\"HS$(PACKAGE)\"
 PACKAGE_CPP_OPTS += -DLIBDIR=\"$(libdir)\"
 PACKAGE_CPP_OPTS += -DFPTOOLS_TOP_ABS=\"${FPTOOLS_TOP_ABS}\"
