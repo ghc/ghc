@@ -20,7 +20,6 @@ module Control.Monad.Error (
 	Error(..),
 	MonadError(..),
 	ErrorT(..),
-	runErrorT,
 	mapErrorT,
 	module Control.Monad,
 	module Control.Monad.Fix,

@@ -21,7 +21,6 @@
 
 module Control.Monad.Identity (
 	Identity(..),
-	runIdentity,
 	module Control.Monad,
 	module Control.Monad.Fix,
    ) where

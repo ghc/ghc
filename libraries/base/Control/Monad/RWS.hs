@@ -20,13 +20,11 @@
 
 module Control.Monad.RWS (
 	RWS(..),
-	runRWS,
 	evalRWS,
 	execRWS,
 	mapRWS,
 	withRWS,
 	RWST(..),
-	runRWST,
 	evalRWST,
 	execRWST,
 	mapRWST,

@@ -15,7 +15,6 @@
 
 module Control.Monad.List (
 	ListT(..),
-	runListT,
 	mapListT,
 	module Control.Monad,
 	module Control.Monad.Trans,

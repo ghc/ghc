@@ -15,11 +15,9 @@
 module Control.Monad.Cont (
 	MonadCont(..),
 	Cont(..),
-	runCont,
 	mapCont,
 	withCont,
 	ContT(..),
-	runContT,
 	mapContT,
 	withContT,
 	module Control.Monad,
