@@ -23,14 +23,6 @@ SRCS	= \
 	Foreign/Marshal/Utils.hs Foreign/Marshal/Error.hs \
 	Foreign/Marshal/Pool.hs Foreign/Marshal.hs \
 	Foreign/C/String.hs Foreign/C/Error.hs Foreign/C.hs Foreign.hs \
-	Text/ParserCombinators/Parsec/Char.hs \
-	Text/ParserCombinators/Parsec/Combinator.hs \
-	Text/ParserCombinators/Parsec/Error.hs \
-	Text/ParserCombinators/Parsec/Expr.hs \
-	Text/ParserCombinators/Parsec/Perm.hs \
-	Text/ParserCombinators/Parsec/Pos.hs \
-	Text/ParserCombinators/Parsec/Prim.hs \
-	Text/ParserCombinators/Parsec.hs \
 	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
 	Text/Html/BlockTable.hs Text/Html.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs
@@ -41,8 +33,6 @@ SRCS	= \
 #	System/CPUTime.hsc System/Time.hsc
 #	System/Mem.hs System/Mem/StableName.hs System/Mem/Weak.hs
 #	System/Posix/Types.hs System/Posix/Signals.hsc
-#	Text/ParserCombinators/Parsec/Token.hs \
-#	Text/ParserCombinators/Parsec/Language.hs \
 #	Text/ParserCombinators/ReadP.hs Text/ParserCombinators/ReadPrec.hs
 #	Text/Read/Lex.hs
 #	Text/Regex/* Text/Regex.hs
@@ -84,26 +74,6 @@ $(OBJDIR)/Foreign/Marshal/Utils.$O:  $(OBJDIR)/Data/Maybe.$O \
 $(OBJDIR)/Foreign/Marshal/Error.$O: $(OBJDIR)/Foreign/Ptr.$O
 $(OBJDIR)/Foreign/C/String.$O: $(OBJDIR)/Data/Word.$O $(OBJDIR)/Foreign/Ptr.$O \
 	$(OBJDIR)/Foreign/Marshal/Array.$O $(OBJDIR)/Foreign/C/Types.$O 
-$(OBJDIR)/Text/ParserCombinators/Parsec/Char.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Pos.$O \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Prim.$O
-$(OBJDIR)/Text/ParserCombinators/Parsec/Combinator.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Prim.$O
-$(OBJDIR)/Text/ParserCombinators/Parsec/Error.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Pos.$O
-$(OBJDIR)/Text/ParserCombinators/Parsec/Expr.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Prim.$O \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Combinator.$O
-$(OBJDIR)/Text/ParserCombinators/Parsec/Language.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec.$O \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Token.$O
-$(OBJDIR)/Text/ParserCombinators/Parsec/Perm.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec.$O
-$(OBJDIR)/Text/ParserCombinators/Parsec/Prim.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Pos.$O \
-	$(OBJDIR)/Text/ParserCombinators/Parsec/Error.$O
-$(OBJDIR)/Text/ParserCombinators/Parsec/Token.$O: \
-	$(OBJDIR)/Text/ParserCombinators/Parsec.$O
 
 # C-files dependencies.
 Data/FiniteMap.$C: Data/Maybe.$C
@@ -129,24 +99,4 @@ Foreign/Marshal/Utils.$C:  Data/Maybe.$C Foreign/Ptr.$C Foreign/Storable.$C \
 Foreign/Marshal/Error.$C:  Foreign/Ptr.$C
 Foreign/C/String.$C:       Data/Word.$C Foreign/Ptr.$C Foreign/C/Types.$C \
 	Foreign/Marshal/Array.$C
-Text/ParserCombinators/Parsec/Char.$C: \
-	Text/ParserCombinators/Parsec/Pos.$C \
-	Text/ParserCombinators/Parsec/Prim.$C
-Text/ParserCombinators/Parsec/Combinator.$C: \
-	Text/ParserCombinators/Parsec/Prim.$C
-Text/ParserCombinators/Parsec/Error.$C: \
-	Text/ParserCombinators/Parsec/Pos.$C
-Text/ParserCombinators/Parsec/Expr.$C: \
-	Text/ParserCombinators/Parsec/Prim.$C \
-	Text/ParserCombinators/Parsec/Combinator.$C
-Text/ParserCombinators/Parsec/Language.$C: \
-	Text/ParserCombinators/Parsec.$C \
-	Text/ParserCombinators/Parsec/Token.$C
-Text/ParserCombinators/Parsec/Perm.$C: \
-	Text/ParserCombinators/Parsec.$C
-Text/ParserCombinators/Parsec/Prim.$C: \
-	Text/ParserCombinators/Parsec/Pos.$C \
-	Text/ParserCombinators/Parsec/Error.$C
-Text/ParserCombinators/Parsec/Token.$C: \
-	Text/ParserCombinators/Parsec.$C
 

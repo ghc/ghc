@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.46 2003/07/24 13:53:20 simonmar Exp $
+# $Id: Makefile,v 1.47 2003/07/31 17:45:22 ross Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -33,7 +33,6 @@ ALL_DIRS = \
 	Text/Html \
 	Text/PrettyPrint \
 	Text/ParserCombinators \
-	Text/ParserCombinators/Parsec \
 	Text/Regex \
 	Text/Show \
 	Text/Read
