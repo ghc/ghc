@@ -322,9 +322,11 @@ hscFrontEnd hsc_env pcs_ch location = do {
  	    -------------------
  	    -- DESUGAR
  	    -------------------
-	; ds_result <- _scc_ "DeSugar" 
-		       deSugar hsc_env pcs_tc tc_result
-	; return (Right (pcs_tc, ds_result))
+	; maybe_ds_result <- _scc_ "DeSugar" 
+			       deSugar hsc_env pcs_tc tc_result
+	; case maybe_ds_result of
+	    Nothing        -> return (Left (HscFail pcs_ch));
+	    Just ds_result -> return (Right (pcs_tc, ds_result));
 	}}}}}
 
 

@@ -32,9 +32,10 @@ import Id		( Id )
 import NameEnv		( lookupNameEnv )
 import VarEnv
 import VarSet
-import Bag		( isEmptyBag, mapBag )
+import Bag		( isEmptyBag, mapBag, emptyBag )
 import CoreLint		( showPass, endPass )
-import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, addShortWarnLocLine )
+import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
+			  addShortWarnLocLine, errorsFound )
 import Outputable
 import qualified Pretty
 import UniqSupply	( mkSplitUniqSupply )
@@ -52,7 +53,7 @@ import DATA_IOREF	( readIORef )
 
 \begin{code}
 deSugar :: HscEnv -> PersistentCompilerState
-        -> TcGblEnv -> IO ModGuts
+        -> TcGblEnv -> IO (Maybe ModGuts)
 
 deSugar hsc_env pcs
         (TcGblEnv { tcg_mod      = mod,
@@ -76,14 +77,20 @@ deSugar hsc_env pcs
 		= initDs dflags us lookup mod
 			 (dsProgram binds rules fords)
 	
-	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns)
+	      warns    = mapBag mk_warn ds_warns
+	      warn_doc = pprBagOfWarnings warns
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
 		  (printErrs warn_doc)
 
+	    -- if warnings are considered errors, leave.
+	; if errorsFound dflags (warns, emptyBag)
+	   then return Nothing
+	   else do {
+
 	-- Lint result if necessary
-        ; endPass dflags "Desugar" Opt_D_dump_ds ds_binds
+          endPass dflags "Desugar" Opt_D_dump_ds ds_binds
 
 	-- Dump output
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
@@ -108,8 +115,8 @@ deSugar hsc_env pcs
 		mg_binds    = ds_binds,
 		mg_foreign  = ds_fords }
 	
-        ; return mod_guts
-	}
+        ; return (Just mod_guts)
+	}}
 
   where
     dflags       = hsc_dflags hsc_env
@@ -148,7 +155,8 @@ deSugarExpr hsc_env pcs this_mod rdr_env type_env tc_expr
 	; let (core_expr, ds_warns) = initDs dflags us lookup this_mod (dsExpr tc_expr)    
 	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns)
 
-	-- Display any warnings
+	-- Display any warnings 
+	-- Note: if -Werror is used, we don't signal an error here.
         ; doIfSet (not (isEmptyBag ds_warns))
 		  (printErrs warn_doc)
 
