@@ -1469,13 +1469,13 @@ addFree avails free = returnNF_Tc (addToFM avails free IsFree)
 addWanted :: Avails -> Inst -> TcExpr -> [Inst] -> NF_TcM Avails
 addWanted avails wanted rhs_expr wanteds
 -- Do *not* add superclasses as well.  Here's an example of why not
--- 	class Eq a => Foo a b
+-- 	class Eq b => Foo a b
 --	instance Eq a => Foo [a] a
 -- If we are reducing
 --	(Foo [t] t)
 -- we'll first deduce that it holds (via the instance decl).  We
 -- must not then overwrite the Eq t constraint with a superclass selection!
--- 	ToDo: this isn't entirely unsatisfactory, because
+-- 	ToDo: this isn't entirely satisfactory, because
 --	      we may also lose some entirely-legitimate sharing this way
 
   = ASSERT( not (wanted `elemFM` avails) )

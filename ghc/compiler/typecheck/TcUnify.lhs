@@ -311,7 +311,19 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 
     newDicts SignatureOrigin theta			`thenNF_Tc` \ dicts ->
     tcSimplifyCheck sig_msg forall_tvs dicts lie	`thenTc` \ (free_lie, inst_binds) ->
+
+#ifdef DEBUG
+    zonkTcTyVars forall_tvs `thenNF_Tc` \ forall_tys ->
+    traceTc (text "tcGen" <+> vcat [text "extra_tvs" <+> ppr extra_tvs,
+				    text "expected_ty" <+> ppr expected_ty,
+				    text "inst ty" <+> ppr forall_tvs <+> ppr theta <+> ppr phi_ty,
+				    text "free_tvs" <+> ppr free_tvs,
+				    text "forall_tys" <+> ppr forall_tys])	`thenNF_Tc_`
+#endif
+
     checkSigTyVarsWrt free_tvs forall_tvs		`thenTc` \ zonked_tvs ->
+
+    traceTc (text "tcGen:done") `thenNF_Tc_`
 
     let
 	    -- This HsLet binds any Insts which came out of the simplification.
@@ -1060,6 +1072,10 @@ check_sig_tyvars extra_tvs sig_tvs
     let
 	env_tvs = gbl_tvs `unionVarSet` extra_tvs
     in
+    traceTc (text "check_sig_tyvars" <+> (vcat [text "sig_tys" <+> ppr sig_tys,
+				      text "gbl_tvs" <+> ppr gbl_tvs,
+				      text "extra_tvs" <+> ppr extra_tvs]))	`thenNF_Tc_`
+
     checkTcM (allDistinctTyVars sig_tys env_tvs)
 	     (complain sig_tys env_tvs)		`thenTc_`
 
