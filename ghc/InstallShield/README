@@ -1,0 +1,14 @@
+This is the InstallShield setup for GHC; it can be used as a model for other
+IS setups. I've put it in a zip file because CVS doesn't like file names and
+directory names with spaces in.
+
+Notes:
+
+1. This IS setup is for the free (ha!) version of IS, such as the one that
+comes with MS Visual Studio. The GHC team is hoping to get hold of the full
+version, so we might well update this setup in the future to be simpler and
+better, but also not usable with the cut-down IS any more.
+
+2. This directory is liable to change/expansion/removal as we get IS
+projects for all the major fptools bits together and add them to the
+repository.
