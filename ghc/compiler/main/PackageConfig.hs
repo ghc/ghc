@@ -19,7 +19,7 @@ module PackageConfig (
 
 import Distribution.InstalledPackageInfo
 import Distribution.Package
-import Data.Version
+import Distribution.Version
 import FastString
 
 -- -----------------------------------------------------------------------------
