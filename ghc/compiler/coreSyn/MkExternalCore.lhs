@@ -96,6 +96,7 @@ collect_tdefs tcon tdefs
   where
     tdef | isNewTyCon tcon = 
                 C.Newtype (make_con_qid (tyConName tcon)) (map make_tbind tyvars) repclause 
+         | null (tyConDataCons tcon) = error "MkExternalCore died: can't handle datatype declarations with no data constructors"
          | otherwise = 
                 C.Data (make_con_qid (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
          where repclause | isRecursiveTyCon tcon = Nothing
@@ -135,7 +136,7 @@ make_exp (Var v) =
     FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (unpackFS nm) (make_ty (varType v))
     FCallId _ -> error "MkExternalCore died: can't handle non-static-C foreign call"
     _ -> C.Var (make_var_qid (Var.varName v))
-make_exp (Lit (l@(MachLabel s _))) = C.External (unpackFS s) (make_ty (literalType l))
+make_exp (Lit (l@(MachLabel s _))) = error "MkExternalCore died: can't handle \"foreign label\" declarations"
 make_exp (Lit l) = C.Lit (make_lit l)
 make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
