@@ -8,9 +8,9 @@ This module defines Haskell {\em handles} and the basic operations
 which are supported for them.
 
 \begin{code}
+{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 #include "error.h"
 
-{-# OPTIONS -fno-implicit-prelude -#include "cbits/stgio.h" #-}
 
 module IOHandle where
 
@@ -23,7 +23,7 @@ import IOBase
 import PrelTup
 import PrelBase
 import GHC
-import Foreign  ( makeForeignObj, writeForeignObj )
+import Foreign  ( ForeignObj, Addr, makeForeignObj, writeForeignObj )
 import PrelList (span)
 #if defined(__CONCURRENT_HASKELL__)
 import ConcBase
