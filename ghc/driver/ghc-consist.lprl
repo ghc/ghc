@@ -7,9 +7,11 @@
 \begin{code}
 sub chk_consistency_info {
     local($executable) = @_;
-
+    
     local($major_version, $minor_version);
     local($phase, $infile, $opts);
+
+    $executable = "${executable}.exe" if $TargetPlatform eq 'i386-unknown-cygwin32';
 
     print STDERR "Checking consistency of: $executable\n" if $Verbose;
 
