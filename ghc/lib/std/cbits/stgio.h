@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: stgio.h,v 1.11 1999/09/12 14:26:32 sof Exp $
+ * $Id: stgio.h,v 1.12 1999/09/19 19:26:57 sof Exp $
  *
  * Helper code for GHC's IO subsystem.
  */
@@ -104,7 +104,7 @@ StgInt  fill_up_line_buffer(IOFileObject*);
 
 /* filePosn.c */
 StgInt	getFilePosn (StgForeignPtr);
-StgInt	setFilePosn (StgForeignPtr, StgInt);
+StgInt	setFilePosn (StgForeignPtr, StgInt, StgByteArray);
 
 /* filePutc.c */
 StgInt	filePutc    (StgForeignPtr, StgChar);
@@ -154,9 +154,9 @@ StgInt	getLock	    (StgInt, StgInt);
 StgInt	inputReady  (StgForeignPtr, StgInt);
 
 /* openFile.c */
-IOFileObject* openFile    (StgByteArray, StgInt, StgInt, StgInt);
+IOFileObject* openFile    (StgByteArray, StgInt, StgInt);
 IOFileObject* openFd      (StgInt, StgInt, StgInt);
-IOFileObject* openStdFile (StgInt, StgInt, StgInt);
+IOFileObject* openStdFile (StgInt, StgInt);
 
 /* progargs.c */
 StgAddr get_prog_argv(void);
@@ -184,6 +184,9 @@ StgInt renameFile (StgByteArray, StgByteArray);
 StgInt	seekFile  (StgForeignPtr, StgInt, StgInt, StgByteArray);
 StgInt	seekFile_int64 (StgForeignPtr, StgInt, StgInt64);
 StgInt	seekFileP (StgForeignPtr);
+
+/* setBinaryMode.c */
+StgInt	setBinaryMode__ (StgForeignPtr, StgInt);
 
 /* setBuffering.c */
 StgInt	setBuffering (StgForeignPtr, StgInt);
@@ -225,8 +228,7 @@ StgAddr toUTCTime (StgInt, StgByteArray, StgByteArray);
 StgInt prim_toUTCTime ( StgInt64,StgByteArray );
 
 /* toClockSec.c */
-StgAddr toClockSec (StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray);
-StgInt prim_toClockSec(StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray);
+StgInt toClockSec (StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray);
 
 /* writeError.c */
 void    writeErrString__ (StgAddr, StgByteArray, StgInt);
