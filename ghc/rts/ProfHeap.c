@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.12 2000/04/19 12:42:48 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.13 2000/05/12 12:48:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -50,6 +50,7 @@ static void fprint_data(FILE *fp);
  *
  * -------------------------------------------------------------------------- */
 
+#ifdef PROFILING
 typedef struct _ctr {
     const char *str;
     unsigned long mem_resid;
@@ -142,6 +143,7 @@ reportCtrResid(FILE *fp)
 	}
     }
 }
+#endif /* PROFILING */
 
 /* -------------------------------------------------------------------------- */
 
@@ -410,7 +412,7 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat components)
 
   } else {
     fprint_ccs(fp, ccs->prevStack,components-1);
-    fprintf(fp,"/%s",cc->label);
+    fprintf(fp,"/%s (%d)",cc->label,ccs->ccsID);
   }
 }
 
