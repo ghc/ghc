@@ -104,7 +104,17 @@ isCasmTarget other	    = False
 \end{code}
 
 
-Stuff to do with calling convention
+Stuff to do with calling convention:
+
+ccall:		Caller allocates parameters, *and* deallocates them.
+
+stdcall: 	Caller allocates parameters, callee deallocates.
+		Function name has @N after it, where N is number of arg bytes
+		e.g.  _Foo@8
+
+ToDo: The stdcall calling convention is x86 (win32) specific,
+so perhaps we should emit a warning if it's being used on other
+platforms.
 
 \begin{code}
 data CCallConv = CCallConv | StdCallConv
@@ -124,10 +134,6 @@ ccallConvToInt CCallConv   = 1
 
 Generate the gcc attribute corresponding to the given
 calling convention (used by PprAbsC):
-
-ToDo: The stdcall calling convention is x86 (win32) specific,
-so perhaps we should emit a warning if it's being used on other
-platforms.
 
 \begin{code}
 ccallConvAttribute :: CCallConv -> String

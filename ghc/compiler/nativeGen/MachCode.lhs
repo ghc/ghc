@@ -2441,9 +2441,12 @@ genCCall fn cconv kind args
 	call = toOL (
                   [CALL (fn__2 tot_arg_size)]
                   ++
+			-- Deallocate parameters after call for ccall;
+			-- but not for stdcall (callee does it)
                   (if cconv == StdCallConv then [] else 
 		   [ADD L (OpImm (ImmInt tot_arg_size)) (OpReg esp)])
                   ++
+
                   [DELTA (delta + tot_arg_size)]
                )
     in
@@ -2459,7 +2462,7 @@ genCCall fn cconv kind args
     fn__2 tot_arg_size
        | head fn_u == '.'
        = ImmLit (text (fn_u ++ stdcallsize tot_arg_size))
-       | otherwise 
+       | otherwise 	-- General case
        = ImmLab False (text (fn_u ++ stdcallsize tot_arg_size))
 
     stdcallsize tot_arg_size
