@@ -11,7 +11,11 @@ module SimplVar (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(SmplLoop)		( simplExpr )
+#else
+import {-# SOURCE #-} Simplify ( simplExpr )
+#endif
 
 import Constants	( uNFOLDING_USE_THRESHOLD,
 			  uNFOLDING_CON_DISCOUNT_WEIGHT
@@ -23,7 +27,7 @@ import CoreUnfold	( Unfolding(..), UfExpr, RdrName, UnfoldingGuidance(..), Simpl
 			  okToInline, smallEnoughToInline )
 import BinderInfo	( BinderInfo, noBinderInfo )
 
-import CostCentre	( CostCentre, noCostCentreAttached )
+import CostCentre	( CostCentre, isCurrentCostCentre )
 import Id		( idType, getIdInfo, getIdUnfolding, getIdSpecialisation,
 			  idMustBeINLINEd, GenId{-instance Outputable-}
 			)
@@ -31,7 +35,7 @@ import SpecEnv		( SpecEnv, lookupSpecEnv )
 import IdInfo		( DeforestInfo(..) )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
-import Outputable	( PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import SimplEnv
 import SimplMonad
@@ -59,15 +63,12 @@ completeVar env var args result_ty
   | not do_deforest &&
     maybeToBool maybe_unfolding_info &&
     (not essential_unfoldings_only || idMustBeINLINEd var) && 
-    ok_to_inline &&
 	-- If "essential_unfolds_only" is true we do no inlinings at all,
 	-- EXCEPT for things that absolutely have to be done
 	-- (see comments with idMustBeINLINEd)
-	--
-	-- Need to be careful: the RHS of INLINE functions is protected against inlining
-	-- by essential_unfoldings_only being set true; we must not inline workers back into
-	-- wrappers, even though the former have an unfold-always guidance.
+    ok_to_inline &&
     costCentreOk (getEnclosingCC env) (getEnclosingCC unfold_env)
+    
   = 
 {-
     simplCount		`thenSmpl` \ n ->
@@ -134,8 +135,6 @@ completeVar env var args result_ty
     sw_chkr		      = getSwitchChecker env
     essential_unfoldings_only = switchIsOn sw_chkr EssentialUnfoldingsOnly
     is_case_scrutinee	      = switchIsOn sw_chkr SimplCaseScrutinee
-    always_inline	      = case guidance of {UnfoldAlways -> True; other -> False}
-
     ok_to_inline	      = okToInline form occ_info small_enough
     small_enough	      = smallEnoughToInline arg_evals is_case_scrutinee guidance
     arg_evals		      = [is_evald arg | arg <- args, isValArg arg]
@@ -156,10 +155,10 @@ completeVar env var args result_ty
 --	f x = let y = E in
 --	      scc "foo" (...y...)
 --
--- Here y has a subsumed cost centre, and we can't inline it inside "foo",
+-- Here y has a "current cost centre", and we can't inline it inside "foo",
 -- regardless of whether E is a WHNF or not.
 
 costCentreOk cc_encl cc_rhs
-  = noCostCentreAttached cc_encl || not (noCostCentreAttached cc_rhs)
+  = isCurrentCostCentre cc_encl || not (isCurrentCostCentre cc_rhs)
 \end{code}		   
 
