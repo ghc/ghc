@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.8 2000/03/08 17:48:26 simonmar Exp $
+ * $Id: Profiling.h,v 1.9 2000/03/13 10:21:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -31,19 +31,6 @@
 #define CC_IS_CAF      'c'            /* 'c'  => *is* a CAF cc           */
 #define CC_IS_SUBSUMED 's'            /* 's'  => *is* a subsumed cc      */
 #define CC_IS_BORING   'B'            /* 'B'  => *not* a CAF/sub cc      */
-
-/* Constants used for abreviated output of data in binary format.  The order
- * is important and corresponds to the "item" elementType in the XML log 
- * description.   */
-
-#define END_TAG 0 
-#define CC_TAG 1
-#define CCS_TAG 2
-#define TYPE_CON_TAG 3
-#define HEAP_OBJ_TAG 4
-#define TIME_UPDATE_TAG 5
-#define HEAP_UPDATE_TAG 6
-
 
 /* -----------------------------------------------------------------------------
  * Data Structures 
