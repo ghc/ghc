@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.2 1999/02/05 16:02:28 simonm Exp $
+ * $Id: Stable.h,v 1.3 1999/02/26 12:46:45 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,9 +22,9 @@ extern StgStablePtr   splitStablePtr(StgStablePtr sp);
 extern StgStablePtr getStablePtr(StgPtr p);
 
 typedef struct { 
-  StgPtr  addr;			/* either Haskell object or free list */
+  StgPtr  addr;			/* Haskell object, free list, or NULL */
   StgWord weight;		/* used for reference counting */
-  unsigned int keep;		/* set by the garbage collector */
+  StgClosure *sn_obj;		/* the StableName object (or NULL) */
 } snEntry;
 
 extern snEntry *stable_ptr_table;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.42 1999/02/25 17:52:33 simonm Exp $
+ * $Id: GC.c,v 1.43 1999/02/26 12:46:46 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1099,10 +1099,6 @@ loop:
     recordMutable((StgMutClosure *)to);
     return to;
 
-  case STABLE_NAME:
-    stable_ptr_table[((StgStableName *)q)->sn].keep = rtsTrue;
-    return copy(q,sizeofW(StgStableName),step);
-
   case FUN_1_0:
   case FUN_0_1:
   case CONSTR_1_0:
@@ -1140,6 +1136,7 @@ loop:
   case CAF_ENTERED:
   case WEAK:
   case FOREIGN:
+  case STABLE_NAME:
     return copy(q,sizeW_fromITBL(info),step);
 
   case CAF_BLACKHOLE:

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.16 1999/02/17 15:57:39 simonm Exp $
+ * $Id: PrimOps.hc,v 1.17 1999/02/26 12:46:48 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -880,9 +880,15 @@ FN_(makeStableNamezh_fast)
   
   index = RET_STGCALL1(StgWord,lookupStableName,R1.p);
 
-  sn_obj = (StgStableName *) (Hp - sizeofW(StgStableName) + 1);
-  sn_obj->header.info = &STABLE_NAME_info;
-  sn_obj->sn = index;
+  /* Is there already a StableName for this heap object? */
+  if (stable_ptr_table[index].sn_obj == NULL) {
+    sn_obj = (StgStableName *) (Hp - sizeofW(StgStableName) + 1);
+    sn_obj->header.info = &STABLE_NAME_info;
+    sn_obj->sn = index;
+    stable_ptr_table[index].sn_obj = (StgClosure *)sn_obj;
+  } else {
+    (StgClosure *)sn_obj = stable_ptr_table[index].sn_obj;
+  }
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(sn_obj);
