@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.8 2002/02/11 12:29:27 simonmar Exp $
+-- $Id: Time.hsc,v 1.9 2002/02/14 07:32:17 sof Exp $
 --
 -- The standard Time library.
 --
@@ -319,8 +319,8 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x
 #  ifndef mingw32_TARGET_OS
 foreign label tzname :: Ptr (Ptr CChar)
 #  else
-foreign import "ghcTimezone" unsafe timezone :: Ptr CLong
-foreign import "ghcTzname" unsafe tzname :: Ptr (Ptr CChar)
+foreign import "__hscore_timezone" unsafe timezone :: Ptr CLong
+foreign import "__hscore_tzname" unsafe tzname :: Ptr (Ptr CChar)
 #  endif
 zone x = do 
   dst <- (#peek struct tm,tm_isdst) x
