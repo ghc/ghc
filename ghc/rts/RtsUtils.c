@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.7 1999/03/02 20:05:41 sof Exp $
+ * $Id: RtsUtils.c,v 1.8 1999/03/17 13:19:23 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -112,16 +112,13 @@ raiseError( StgStablePtr handler STG_UNUSED )
    -------------------------------------------------------------------------- */
 
 void
-stackOverflow(nat max_stack_size)
+stackOverflow(void)
 {
-    fflush(stdout);
-    StackOverflowHook(max_stack_size * sizeof(W_)); /*msg*/
+    StackOverflowHook(RtsFlags.GcFlags.maxStkSize * sizeof(W_));
 
 #if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
-
-    stg_exit(EXIT_FAILURE);
 }
 
 void

@@ -1201,6 +1201,8 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelBase_False_static_closure"
           ,'-u', "${uscore}PrelBase_True_static_closure"
           ,'-u', "${uscore}PrelPack_unpackCString_closure"
+          ,'-u', "${uscore}PrelException_stackOverflow_closure"
+          ,'-u', "${uscore}PrelException_heapOverflow_closure"
 	));
   if (!$NoHaskellMain) {
    unshift (@Ld_flags,'-u', "${uscore}PrelMain_mainIO_closure");

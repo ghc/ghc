@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.3 1999/02/05 16:02:51 simonm Exp $
+ * $Id: RtsUtils.h,v 1.4 1999/03/17 13:19:23 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,7 +19,7 @@ extern void _stgAssert (char *filename, unsigned int linenum);
 extern StgStablePtr errorHandler;
 extern void raiseError( StgStablePtr handler );
 
-extern void stackOverflow(nat stk_size);
+extern void stackOverflow(void);
 extern void heapOverflow(void);
 
 extern nat stg_strlen(char *str);

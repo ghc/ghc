@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.17 1999/03/17 09:50:08 simonm Exp $
+ * $Id: Schedule.c,v 1.18 1999/03/17 13:19:24 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -515,13 +515,14 @@ threadStackOverflow(StgTSO *tso)
   StgTSO *dest;
 
   if (tso->stack_size >= tso->max_stack_size) {
-    /* ToDo: just kill this thread? */
-#ifdef DEBUG
+#ifdef 0
     /* If we're debugging, just print out the top of the stack */
     printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
 				     tso->sp+64));
 #endif
-    stackOverflow(tso->max_stack_size);
+    /* Send this thread the StackOverflow exception */
+    raiseAsync(tso, (StgClosure *)&stackOverflow_closure);
+    return tso;
   }
 
   /* Try to double the current stack size.  If that takes us over the
@@ -640,9 +641,10 @@ unblockThread(StgTSO *tso)
 	  if (mvar->tail == tso) {
 	    mvar->tail = last_tso;
 	  }
-	  break;
+	  goto done;
 	}
       }
+      barf("unblockThread (MVAR): TSO not found");
     }
 
   case BLACKHOLE_BQ:
@@ -654,17 +656,20 @@ unblockThread(StgTSO *tso)
 	   last = &t->link, t = t->link) {
 	if (t == tso) {
 	  *last = tso->link;
-	  break;
+	  goto done;
 	}
       }
+      barf("unblockThread (BLACKHOLE): TSO not found");
     }
 
   default:
     barf("unblockThread");
   }
 
+ done:
   tso->link = END_TSO_QUEUE;
   tso->blocked_on = NULL;
+  PUSH_ON_RUN_QUEUE(tso);
 }
 
 /* -----------------------------------------------------------------------------
@@ -761,10 +766,6 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
       tso->su = cf->link;
       tso->sp = sp;
       tso->whatNext = ThreadEnterGHC;
-      /* wake up the thread */
-      if (tso->link == END_TSO_QUEUE) {
-	PUSH_ON_RUN_QUEUE(tso);
-      }
       return;
     }
 

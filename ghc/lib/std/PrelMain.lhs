@@ -34,14 +34,30 @@ handler err = catchException (real_handler err) handler
 real_handler :: Exception -> IO ()
 real_handler ex =
   case ex of
+	AsyncException StackOverflow -> reportStackOverflow
 	ErrorCall s -> reportError s
 	other       -> reportError (showsPrec 0 other "\n")
+
+reportStackOverflow :: IO ()
+reportStackOverflow = do
+   (hFlush stdout) `catchException` (\ _ -> return ())
+   callStackOverflowHook
+   stg_exit 2  
 
 reportError :: String -> IO ()
 reportError str = do
    (hFlush stdout) `catchException` (\ _ -> return ())
    let bs@(ByteArray (_,len) _) = packString str
-   _ccall_ writeErrString__ (``&ErrorHdrHook''::Addr) bs len
-   _ccall_ stg_exit (1::Int)
+   writeErrString (``&ErrorHdrHook''::Addr) bs len
+   stg_exit 1
+
+foreign import ccall "writeErrString__" 
+	writeErrString :: Addr -> ByteArray Int -> Int -> IO ()
+
+foreign import ccall "stackOverflow"
+	callStackOverflowHook :: IO ()
+
+foreign import ccall "stg_exit"
+	stg_exit :: Int -> IO ()
 
 \end{code}

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.4 1999/03/16 13:20:15 simonm Exp $
+ * $Id: HeapStackCheck.hc,v 1.5 1999/03/17 13:19:21 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -798,6 +798,10 @@ FN_(stg_gen_hp)
   FE_
 }	  
 
+/* -----------------------------------------------------------------------------
+   Yields
+   -------------------------------------------------------------------------- */
+
 FN_(stg_gen_yield)
 {
   FB_
@@ -806,10 +810,23 @@ FN_(stg_gen_yield)
   FE_
 }
 
+INFO_TABLE_SRT_BITMAP(stg_yield_noregs_info, stg_yield_noregs_ret, 0/*BITMAP*/, 
+		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		      RET_SMALL, const, EF_, 0, 0);
+
+FN_(stg_yield_noregs_ret)
+{
+  FB_
+  JMP_(ENTRY_CODE(Sp[0]))
+  FE_
+}
+
 FN_(stg_yield_noregs)
 {
   FB_
-  YIELD_GENERIC  
+  Sp--;
+  Sp[0] = (W_)&stg_yield_noregs_info;
+  YIELD_GENERIC;
   FE_
 }
 
@@ -820,6 +837,10 @@ FN_(stg_yield_to_Hugs)
   YIELD_TO_HUGS
   FE_
 }
+
+/* -----------------------------------------------------------------------------
+   Blocks
+   -------------------------------------------------------------------------- */
 
 FN_(stg_gen_block)
 {

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.4 1999/01/14 18:12:57 sof Exp $
+% $Id: PrelException.lhs,v 1.5 1999/03/17 13:19:20 simonm Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -51,6 +51,10 @@ data AsyncException
   | HeapOverflow
   | ThreadKilled
   deriving (Eq, Ord)
+
+stackOverflow, heapOverflow :: Exception -- for the RTS
+stackOverflow = AsyncException StackOverflow
+heapOverflow  = AsyncException HeapOverflow
 
 instance Show ArithException where
   showsPrec _ Overflow        = showString "arithmetic overflow"

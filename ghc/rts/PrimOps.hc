@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.22 1999/03/16 13:20:15 simonm Exp $
+ * $Id: PrimOps.hc,v 1.23 1999/03/17 13:19:22 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -845,6 +845,7 @@ FN_(takeMVarzh_fast)
       mvar->tail->link = CurrentTSO;
     }
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
+    CurrentTSO->blocked_on = (StgClosure *)mvar;
     mvar->tail = CurrentTSO;
 
     BLOCK(R1_PTR, takeMVarzh_fast);
