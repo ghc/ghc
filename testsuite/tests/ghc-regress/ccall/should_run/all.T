@@ -10,7 +10,9 @@ def f( opts ):
 setTestOpts(f)
 
 # Doesn't work with External Core due to __labels
-test('fed001', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+test('fed001', compose(only_compiler_types(['ghc']),
+			expect_fail_for(['extcore','optextcore'])),
+		compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
@@ -52,3 +54,6 @@ test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 
 test('ffi011', normal, compile_and_run, [''])
 test('ffi012', normal, compile_and_run, [''])
+
+# Doesn't work with External Core due to __labels
+test('ffi013', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
