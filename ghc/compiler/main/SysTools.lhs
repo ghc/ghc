@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: SysTools.lhs,v 1.51 2001/08/15 14:59:34 rrt Exp $
+-- $Id: SysTools.lhs,v 1.52 2001/08/15 15:02:04 rrt Exp $
 --
 -- (c) The University of Glasgow 2001
 --
@@ -805,12 +805,12 @@ getProcessID = Posix.getProcessID
 rawSystem :: String -> IO ExitCode
 rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
 rawSystem cmd =
-  withUnsafeCString cmd $ \s -> do
+  withCString cmd $ \s -> do
     status <- throwErrnoIfMinus1 "rawSystem" (primRawSystem s)
     case status of
         0  -> return ExitSuccess
         n  -> return (ExitFailure n)
 
-foreign import ccall "rawSystemCmd" unsafe primRawSystem :: UnsafeCString -> IO Int
+foreign import ccall "rawSystemCmd" unsafe primRawSystem :: CString -> IO Int
 
 \end{code}
