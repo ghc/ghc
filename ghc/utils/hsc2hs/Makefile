@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.35 2002/10/27 10:38:33 mthomas Exp $
+# $Id: Makefile,v 1.36 2002/10/29 04:01:01 mthomas Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -24,10 +24,6 @@ SRC_HC_OPTS +=  -package util
 endif
 
 SRC_HC_OPTS      += -cpp
-
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-SRC_HC_OPTS      += -fglasgow-exts '-\#include <process.h>' -optl "-Wl,-lkernel32"
-endif 
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALLED_SCRIPT_PROG  = hsc2hs

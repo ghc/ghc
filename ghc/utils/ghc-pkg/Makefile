@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.19 2002/10/27 10:38:33 mthomas Exp $
+# $Id: Makefile,v 1.20 2002/10/29 04:00:59 mthomas Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -24,7 +24,6 @@ INSTALL_LIBEXECS += $(HS_PROG)
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = ghc-pkg.exe
 INSTALL_PROGS    += $(HS_PROG)
-SRC_HC_OPTS      += -fglasgow-exts '-\#include <process.h>' -optl "-Wl,-lkernel32"
 endif
 
 # -----------------------------------------------------------------------------
