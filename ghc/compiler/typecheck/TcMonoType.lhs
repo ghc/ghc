@@ -767,8 +767,8 @@ find_thing ignore_it tidy_env (ATcId id)
     else let
 	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
 	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
-		   nest 2 (sep [quotes (ppr id) <+> ptext SLIT("is bound at"),
-				ptext SLIT("at") <+> ppr (getSrcLoc id)])]
+		   nest 2 (parens (ptext SLIT("bound at") <+>
+			 	   ppr (getSrcLoc id)))]
     in
     returnNF_Tc (tidy_env', Just msg)
 
@@ -788,7 +788,7 @@ find_thing ignore_it tidy_env (ATyVar tv)
 	bound_at | isMutTyVar tv = mut_info	-- The expected case
 		 | otherwise     = empty
 	
-	mut_info = sep [ptext SLIT("is bound by") <+> ppr (mutTyVarDetails tv),
+	mut_info = sep [ptext SLIT("is bound by the") <+> ppr (mutTyVarDetails tv),
 	     	        ptext SLIT("at") <+> ppr (getSrcLoc tv)]
     in
     returnNF_Tc (tidy_env2, Just msg)
@@ -810,7 +810,8 @@ find_frees tv tidy_env acc (ftv:ftvs)
 escape_msg sig_tv tv globs frees
   = mk_msg sig_tv <+> ptext SLIT("escapes") $$
     if not (null globs) then
-	vcat [pp_it <+> ptext SLIT("is mentioned in the environment:"), vcat globs]
+	vcat [pp_it <+> ptext SLIT("is mentioned in the environment:"), 
+	      nest 2 (vcat globs)]
      else if not (null frees) then
 	vcat [ptext SLIT("It is reachable from the type variable(s)") <+> pprQuotedList frees,
 	      nest 2 (ptext SLIT("which") <+> is_are <+> ptext SLIT("free in the signature"))

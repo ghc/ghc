@@ -162,7 +162,8 @@ rnTopBinds (MonoBind bind sigs _) 	  = rnTopMonoBinds bind sigs
 
 
 rnTopMonoBinds mbinds sigs
- =  mapRn lookupBndrRn binder_rdr_names		`thenRn` \ binder_names ->
+ =  mapRn lookupBndrRn binder_rdr_names			 `thenRn` \ binder_names ->
+    bindPatSigTyVars (collectSigTysFromMonoBinds mbinds) $ 
     let
 	bndr_name_set = mkNameSet binder_names
     in
