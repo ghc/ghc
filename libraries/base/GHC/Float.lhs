@@ -443,6 +443,9 @@ instance  Enum Double  where
 
 
 \begin{code}
+-- | Show a signed 'RealFloat' value to full precision
+-- using standard decimal notation for arguments whose absolute value lies 
+-- between @0.1@ and @9,999,999@, and scientific notation otherwise.
 showFloat :: (RealFloat a) => a -> ShowS
 showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 
@@ -534,21 +537,19 @@ roundTo base d is =
 -- by R.G. Burger and R.K. Dybvig in PLDI 96.
 -- This version uses a much slower logarithm estimator. It should be improved.
 
--- | @floatToDigits@ takes a base and a non-negative RealFloat number,
+-- | 'floatToDigits' takes a base and a non-negative 'RealFloat' number,
 -- and returns a list of digits and an exponent. 
--- In particular, if x>=0, and
+-- In particular, if @x>=0@, and
 --
--- @
---	floatToDigits base x = ([d1,d2,...,dn], e)
--- @
+-- > floatToDigits base x = ([d1,d2,...,dn], e)
 --
 -- then
 --
---	(1) n >= 1
+--	(1) @n >= 1@
 --
---	(2) x = 0.d1d2...dn * (base**e)
+--	(2) @x = 0.d1d2...dn * (base**e)@
 --
--- 	(3) 0 <= di <= base-1
+-- 	(3) @0 <= di <= base-1@
 
 floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
 floatToDigits _ 0 = ([0], 0)
@@ -679,6 +680,7 @@ fromRat x = x'
 Now, here's Lennart's code (which works)
 
 \begin{code}
+-- | Converts a 'Rational' value into any type in class 'RealFloat'.
 {-# SPECIALISE fromRat :: Rational -> Double,
 			  Rational -> Float #-}
 fromRat :: (RealFloat a) => Rational -> a

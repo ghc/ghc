@@ -175,6 +175,7 @@ lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
 readLitChar :: ReadS Char	-- As defined by H98
 readLitChar = readP_to_S L.lexChar
 
+-- | Reads a non-empty string of decimal digits.
 lexDigits :: ReadS String
 lexDigits = readP_to_S (P.munch1 isDigit)
 

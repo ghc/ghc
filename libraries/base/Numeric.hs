@@ -10,14 +10,34 @@
 -- Portability :  portable
 --
 -- Odds and ends, mostly functions for reading and showing
--- RealFloat-like kind of values.
+-- 'RealFloat'-like kind of values.
 --
 -----------------------------------------------------------------------------
 
 module Numeric (
 
-        fromRat,          -- :: (RealFloat a) => Rational -> a
+	-- * Showing
+
 	showSigned,       -- :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
+
+        showIntAtBase,    -- :: Integral a => a -> (a -> Char) -> a -> ShowS
+	showInt,          -- :: Integral a => a -> ShowS
+        showHex,          -- :: Integral a => a -> ShowS
+        showOct,          -- :: Integral a => a -> ShowS
+
+	showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
+	showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
+	showGFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
+	showFloat,        -- :: (RealFloat a) => a -> ShowS
+
+	floatToDigits,    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
+
+	-- * Reading
+
+	-- | /NB:/ 'readInt' is the \'dual\' of 'showIntAtBase',
+	-- and 'readDec' is the \`dual\' of 'showInt'.
+	-- The inconsistent naming is a historical accident.
+
 	readSigned,       -- :: (Real a) => ReadS a -> ReadS a
 
 	readInt,          -- :: (Integral a) => a -> (Char -> Bool)
@@ -26,19 +46,13 @@ module Numeric (
 	readOct,          -- :: (Integral a) => ReadS a
 	readHex,          -- :: (Integral a) => ReadS a
 
-	showInt,          -- :: Integral a => a -> ShowS
-        showIntAtBase,    -- :: Integral a => a -> (a -> Char) -> a -> ShowS
-        showHex,          -- :: Integral a => a -> ShowS
-        showOct,          -- :: Integral a => a -> ShowS
-
-	showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-	showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-	showGFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-	showFloat,        -- :: (RealFloat a) => a -> ShowS
 	readFloat,        -- :: (RealFloat a) => ReadS a
 	
-	floatToDigits,    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
 	lexDigits,        -- :: ReadS String
+
+	-- * Miscellaneous
+
+        fromRat,          -- :: (RealFloat a) => Rational -> a
 
 	) where
 
@@ -65,14 +79,29 @@ import Hugs.Numeric
 -- -----------------------------------------------------------------------------
 -- Reading
 
-readInt :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
+-- | Reads an /unsigned/ 'Integral' value in an arbitrary base.
+readInt :: Num a
+  => a			-- ^ the base
+  -> (Char -> Bool)	-- ^ a predicate distinguishing valid digits in this base
+  -> (Char -> Int)	-- ^ a function converting a valid digit character to an 'Int'
+  -> ReadS a
 readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
 
-readOct, readDec, readHex :: Num a => ReadS a
+-- | Read an unsigned number in octal notation.
+readOct :: Num a => ReadS a
 readOct = readP_to_S L.readOctP
+
+-- | Read an unsigned number in decimal notation.
+readDec :: Num a => ReadS a
 readDec = readP_to_S L.readDecP
+
+-- | Read an unsigned number in hexadecimal notation.
+-- Both upper or lower case letters are allowed.
+readHex :: Num a => ReadS a
 readHex = readP_to_S L.readHexP 
 
+-- | Reads an /unsigned/ 'RealFrac' value,
+-- expressed in decimal scientific notation.
 readFloat :: RealFrac a => ReadS a
 readFloat = readP_to_S readFloatP
 
@@ -87,6 +116,8 @@ readFloatP =
 -- It's turgid to have readSigned work using list comprehensions,
 -- but it's specified as a ReadS to ReadS transformer
 -- With a bit of luck no one will use it.
+
+-- | Reads a /signed/ 'Real' value, given a reader for an unsigned value.
 readSigned :: (Real a) => ReadS a -> ReadS a
 readSigned readPos = readParen False read'
 		     where read' r  = read'' r ++
@@ -102,6 +133,7 @@ readSigned readPos = readParen False read'
 -- -----------------------------------------------------------------------------
 -- Showing
 
+-- | Show /non-negative/ 'Integral' numbers in base 10.
 showInt :: Integral a => a -> ShowS
 showInt n cs
     | n < 0     = error "Numeric.showInt: can't show negative numbers"
@@ -129,8 +161,29 @@ showInt n cs
 	Maybe Int -> Float  -> ShowS,
 	Maybe Int -> Double -> ShowS #-}
 
+-- | Show a signed 'RealFloat' value
+-- using scientific (exponential) notation (e.g. @2.45e2@, @1.5e-3@).
+--
+-- In the call @'showEFloat' digs val@, if @digs@ is 'Nothing',
+-- the value is shown to full precision; if @digs@ is @'Just' d@,
+-- then at most @d@ digits after the decimal point are shown.
 showEFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
+
+-- | Show a signed 'RealFloat' value
+-- using standard decimal notation (e.g. @245000@, @0.0015@).
+--
+-- In the call @'showFFloat' digs val@, if @digs@ is 'Nothing',
+-- the value is shown to full precision; if @digs@ is @'Just' d@,
+-- then at most @d@ digits after the decimal point are shown.
 showFFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
+
+-- | Show a signed 'RealFloat' value
+-- using standard decimal notation for arguments whose absolute value lies 
+-- between @0.1@ and @9,999,999@, and scientific notation otherwise.
+--
+-- In the call @'showGFloat' digs val@, if @digs@ is 'Nothing',
+-- the value is shown to full precision; if @digs@ is @'Just' d@,
+-- then at most @d@ digits after the decimal point are shown.
 showGFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 
 showEFloat d x =  showString (formatRealFloat FFExponent d x)
@@ -141,6 +194,8 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 -- ---------------------------------------------------------------------------
 -- Integer printing functions
 
+-- | Shows a /non-negative/ 'Integral' number using the base specified by the
+-- first argument, and the character representation specified by the second.
 showIntAtBase :: Integral a => a -> (Int -> Char) -> a -> ShowS
 showIntAtBase base toChr n r
   | base <= 1 = error ("Numeric.showIntAtBase: applied to unsupported base " ++ show base)
@@ -155,6 +210,10 @@ showIntAtBase base toChr n r
       c  = toChr (fromIntegral d) 
       r' = c : r
 
-showHex, showOct :: Integral a => a -> ShowS
+-- | Show /non-negative/ 'Integral' numbers in base 16.
+showHex :: Integral a => a -> ShowS
 showHex = showIntAtBase 16 intToDigit
+
+-- | Show /non-negative/ 'Integral' numbers in base 8.
+showOct :: Integral a => a -> ShowS
 showOct = showIntAtBase 8  intToDigit

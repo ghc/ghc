@@ -13,17 +13,21 @@
 -----------------------------------------------------------------------------
 
 module Data.Complex
-	( Complex((:+))
-	
+	(
+	-- * Rectangular form
+	  Complex((:+))
+
 	, realPart	-- :: (RealFloat a) => Complex a -> a
 	, imagPart      -- :: (RealFloat a) => Complex a -> a
-	, conjugate     -- :: (RealFloat a) => Complex a -> Complex a
+	-- * Polar form
 	, mkPolar       -- :: (RealFloat a) => a -> a -> Complex a
 	, cis           -- :: (RealFloat a) => a -> Complex a
 	, polar         -- :: (RealFloat a) => Complex a -> (a,a)
 	, magnitude     -- :: (RealFloat a) => Complex a -> a
 	, phase         -- :: (RealFloat a) => Complex a -> a
-	
+	-- * Conjugate
+	, conjugate     -- :: (RealFloat a) => Complex a -> Complex a
+
 	-- Complex instances:
 	--
 	--  (RealFloat a) => Eq         (Complex a)
@@ -52,32 +56,52 @@ infix  6  :+
 -- -----------------------------------------------------------------------------
 -- The Complex type
 
-data  (RealFloat a)     => Complex a = !a :+ !a  deriving (Eq, Read, Show)
-
+-- | Complex numbers are an algebraic type.
+--
+-- For a complex number @z@, @'abs' z@ is a number with the magnitude of @z@,
+-- but oriented in the positive real direction, whereas @'signum' z@
+-- has the phase of @z@, but unit magnitude.
+data (RealFloat a) => Complex a
+  = !a :+ !a	-- ^ forms a complex number from its real and imaginary
+		-- rectangular components.
+  deriving (Eq, Read, Show)
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex
 
-realPart, imagPart :: (RealFloat a) => Complex a -> a
+-- | Extracts the real part of a complex number.
+realPart :: (RealFloat a) => Complex a -> a
 realPart (x :+ _) =  x
+
+-- | Extracts the imaginary part of a complex number.
+imagPart :: (RealFloat a) => Complex a -> a
 imagPart (_ :+ y) =  y
 
+-- | The conjugate of a complex number.
 {-# SPECIALISE conjugate :: Complex Double -> Complex Double #-}
 conjugate	 :: (RealFloat a) => Complex a -> Complex a
 conjugate (x:+y) =  x :+ (-y)
 
+-- | Form a complex number from polar components of magnitude and phase.
 {-# SPECIALISE mkPolar :: Double -> Double -> Complex Double #-}
 mkPolar		 :: (RealFloat a) => a -> a -> Complex a
 mkPolar r theta	 =  r * cos theta :+ r * sin theta
 
+-- | @'cis' t@ is a complex value with magnitude @1@
+-- and phase @t@ (modulo @2*'pi'@).
 {-# SPECIALISE cis :: Double -> Complex Double #-}
 cis		 :: (RealFloat a) => a -> Complex a
 cis theta	 =  cos theta :+ sin theta
 
+-- | The function 'polar' takes a complex number and
+-- returns a (magnitude, phase) pair in canonical form:
+-- the magnitude is nonnegative, and the phase in the range @(-'pi', 'pi']@;
+-- if the magnitude is zero, then so is the phase.
 {-# SPECIALISE polar :: Complex Double -> (Double,Double) #-}
 polar		 :: (RealFloat a) => Complex a -> (a,a)
 polar z		 =  (magnitude z, phase z)
 
+-- | The nonnegative magnitude of a complex number.
 {-# SPECIALISE magnitude :: Complex Double -> Double #-}
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
@@ -85,6 +109,8 @@ magnitude (x:+y) =  scaleFloat k
 		    where k  = max (exponent x) (exponent y)
 		          mk = - k
 
+-- | The phase of a complex number, in the range @(-'pi', 'pi']@.
+-- If the magnitude is zero, then so is the phase.
 {-# SPECIALISE phase :: Complex Double -> Double #-}
 phase :: (RealFloat a) => Complex a -> a
 phase (0 :+ 0)   = 0		-- SLPJ July 97 from John Peterson

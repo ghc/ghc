@@ -40,6 +40,7 @@ default ()		-- Double isn't available yet,
 %*********************************************************
 
 \begin{code}
+-- | Rational numbers, with numerator and denominator of some 'Integral' type.
 data  (Integral a)	=> Ratio a = !a :% !a  deriving (Eq)
 
 -- | Arbitrary-precision rational numbers, represented as a ratio of
@@ -61,9 +62,19 @@ notANumber = 0 :% 0
 
 
 \begin{code}
+-- | Forms the ratio of two integral numbers.
 {-# SPECIALISE (%) :: Integer -> Integer -> Rational #-}
 (%)			:: (Integral a) => a -> a -> Ratio a
-numerator, denominator	:: (Integral a) => Ratio a -> a
+
+-- | Extract the numerator of the ratio in reduced form:
+-- the numerator and denominator have no common factor and the denominator
+-- is positive.
+numerator	:: (Integral a) => Ratio a -> a
+
+-- | Extract the denominator of the ratio in reduced form:
+-- the numerator and denominator have no common factor and the denominator
+-- is positive.
+denominator	:: (Integral a) => Ratio a -> a
 \end{code}
 
 \tr{reduce} is a subsidiary function used only in this module .
@@ -310,7 +321,12 @@ realToFrac = fromRational . toRational
 %*********************************************************
 
 \begin{code}
-showSigned :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
+-- | Converts a possibly-negative 'Real' value to a string.
+showSigned :: (Real a)
+  => (a -> ShowS)	-- ^ a function that can show unsigned values
+  -> Int		-- ^ the precedence of the enclosing context
+  -> a			-- ^ the value to show
+  -> ShowS
 showSigned showPos p x 
    | x < 0     = showParen (p > 6) (showChar '-' . showPos (-x))
    | otherwise = showPos x
