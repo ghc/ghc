@@ -623,11 +623,8 @@ baseRegOffset (DoubleReg 2#)         = OFFSET_D2
 baseRegOffset Sp		     = OFFSET_Sp
 baseRegOffset Su		     = OFFSET_Su
 baseRegOffset SpLim		     = OFFSET_SpLim
-#ifdef OFFSET_Lng1
-baseRegOffset (LongReg _ 1))         = OFFSET_Lng1
-#endif
-#ifdef OFFSET_Lng2
-baseRegOffset (LongReg _ 2))         = OFFSET_Lng2
+#ifdef OFFSET_L1
+baseRegOffset (LongReg _ 1#)         = OFFSET_L1
 #endif
 baseRegOffset Hp		     = OFFSET_Hp
 baseRegOffset HpLim		     = OFFSET_HpLim
