@@ -606,7 +606,10 @@ GHC_INPLACE 	= $(FPTOOLS_TOP)/ghc/compiler/ghc-inplace
 #-----------------------------------------------------------------------------
 # C compiler
 #
-#
+# NB. Don't override $(WhatGccIsCalled) using build.mk,  re-configure using
+# the flag --with-gcc=<blah> instead.  The reason is that the configure script
+# needs to know which gcc you're using in order to perform its tests.
+
 HaveGcc 	= @HaveGcc@
 UseGcc  	= YES
 WhatGccIsCalled = @WhatGccIsCalled@
