@@ -7,3 +7,4 @@ _declarations_
        -> TcMonad.TcType
        -> TcMonad.TcM s (TcHsSyn.TcExpr, Inst.LIE) ;;
 
+

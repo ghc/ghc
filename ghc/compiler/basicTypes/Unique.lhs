@@ -49,11 +49,13 @@ module Unique (
 	arrayPrimTyConKey,
 	assertIdKey,
 	augmentIdKey,
+	bindIOIdKey,
 	boolTyConKey,
 	boundedClassKey,
 	boxedConKey,
 	buildIdKey,
 	byteArrayPrimTyConKey,
+	byteArrayTyConKey,
 	cCallableClassKey,
 	cReturnableClassKey,
 	charDataConKey,
@@ -61,6 +63,7 @@ module Unique (
 	charTyConKey,
 	concatIdKey,
 	consDataConKey,
+	deRefStablePtrIdKey,
 	doubleDataConKey,
 	doublePrimTyConKey,
 	doubleTyConKey,
@@ -73,6 +76,7 @@ module Unique (
 	eqClassOpKey,
 	errorIdKey,
 	falseDataConKey,
+	failMClassOpKey,
 	filterIdKey,
 	floatDataConKey,
 	floatPrimTyConKey,
@@ -83,7 +87,6 @@ module Unique (
 	foreignObjDataConKey,
 	foreignObjPrimTyConKey,
 	foreignObjTyConKey,
-	weakPrimTyConKey,
 	fractionalClassKey,
 	fromEnumClassOpKey,
 	fromIntClassOpKey,
@@ -117,13 +120,14 @@ module Unique (
 	ixClassKey,
 	listTyConKey,
 	mainKey,
+	makeStablePtrIdKey,
 	mapIdKey,
 	minusClassOpKey,
 	monadClassKey,
 	monadPlusClassKey,
-	monadZeroClassKey,
 	mutableArrayPrimTyConKey,
 	mutableByteArrayPrimTyConKey,
+	mutableByteArrayTyConKey,
 	mutVarPrimTyConKey,
 	nilDataConKey,
 	noMethodBindingErrorIdKey,
@@ -169,6 +173,7 @@ module Unique (
 	toEnumClassOpKey,
 	traceIdKey,
 	trueDataConKey,
+	unboundKey,
 	unboxedConKey,
 	unpackCString2IdKey,
 	unpackCStringAppendIdKey,
@@ -176,8 +181,7 @@ module Unique (
 	unpackCStringIdKey,
 	unsafeCoerceIdKey,
 	ushowListIdKey,
-	voidIdKey,
-	voidTyConKey,
+	weakPrimTyConKey,
 	wordDataConKey,
 	wordPrimTyConKey,
 	wordTyConKey,
@@ -190,14 +194,7 @@ module Unique (
 	word64DataConKey,
 	word64PrimTyConKey,
 	word64TyConKey,
-	zeroClassOpKey,
-	zipIdKey,
-	bindIOIdKey,
-	deRefStablePtrIdKey,
-	makeStablePtrIdKey,
-	unboundKey,
-	byteArrayTyConKey,
-	mutableByteArrayTyConKey
+	zipIdKey
     ) where
 
 #include "HsVersions.h"
@@ -464,21 +461,20 @@ floatingClassKey	= mkPreludeClassUnique 5
 fractionalClassKey	= mkPreludeClassUnique 6 
 integralClassKey	= mkPreludeClassUnique 7 
 monadClassKey		= mkPreludeClassUnique 8 
-monadZeroClassKey	= mkPreludeClassUnique 9 
-monadPlusClassKey	= mkPreludeClassUnique 10
-functorClassKey		= mkPreludeClassUnique 11
-numClassKey		= mkPreludeClassUnique 12
-ordClassKey		= mkPreludeClassUnique 13
-readClassKey		= mkPreludeClassUnique 14
-realClassKey		= mkPreludeClassUnique 15
-realFloatClassKey	= mkPreludeClassUnique 16
-realFracClassKey	= mkPreludeClassUnique 17
-showClassKey		= mkPreludeClassUnique 18
+monadPlusClassKey	= mkPreludeClassUnique 9
+functorClassKey		= mkPreludeClassUnique 10
+numClassKey		= mkPreludeClassUnique 11
+ordClassKey		= mkPreludeClassUnique 12
+readClassKey		= mkPreludeClassUnique 13
+realClassKey		= mkPreludeClassUnique 14
+realFloatClassKey	= mkPreludeClassUnique 15
+realFracClassKey	= mkPreludeClassUnique 16
+showClassKey		= mkPreludeClassUnique 17
 					       
-cCallableClassKey	= mkPreludeClassUnique 19
-cReturnableClassKey	= mkPreludeClassUnique 20
+cCallableClassKey	= mkPreludeClassUnique 18
+cReturnableClassKey	= mkPreludeClassUnique 19
 
-ixClassKey		= mkPreludeClassUnique 21
+ixClassKey		= mkPreludeClassUnique 20
 \end{code}
 
 %************************************************************************
@@ -534,14 +530,13 @@ word16TyConKey				= mkPreludeTyConUnique 60
 word32TyConKey				= mkPreludeTyConUnique 61
 word64PrimTyConKey			= mkPreludeTyConUnique 62
 word64TyConKey				= mkPreludeTyConUnique 63
-voidTyConKey				= mkPreludeTyConUnique 64
-boxedConKey				= mkPreludeTyConUnique 65
-unboxedConKey				= mkPreludeTyConUnique 66
-anyBoxConKey				= mkPreludeTyConUnique 67
-kindConKey				= mkPreludeTyConUnique 68
-boxityConKey				= mkPreludeTyConUnique 69
-typeConKey				= mkPreludeTyConUnique 70
-threadIdPrimTyConKey			= mkPreludeTyConUnique 71
+boxedConKey				= mkPreludeTyConUnique 64
+unboxedConKey				= mkPreludeTyConUnique 65
+anyBoxConKey				= mkPreludeTyConUnique 66
+kindConKey				= mkPreludeTyConUnique 67
+boxityConKey				= mkPreludeTyConUnique 68
+typeConKey				= mkPreludeTyConUnique 69
+threadIdPrimTyConKey			= mkPreludeTyConUnique 70
 \end{code}
 
 %************************************************************************
@@ -615,15 +610,14 @@ unpackCString2IdKey	      = mkPreludeMiscIdUnique 27
 unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 28
 unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 29
 unpackCStringIdKey	      = mkPreludeMiscIdUnique 30
-voidIdKey		      = mkPreludeMiscIdUnique 31
-ushowListIdKey		      = mkPreludeMiscIdUnique 32
-unsafeCoerceIdKey	      = mkPreludeMiscIdUnique 33
-concatIdKey		      = mkPreludeMiscIdUnique 34
-filterIdKey		      = mkPreludeMiscIdUnique 35
-zipIdKey		      = mkPreludeMiscIdUnique 36
-bindIOIdKey		      = mkPreludeMiscIdUnique 37
-deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
-makeStablePtrIdKey	      = mkPreludeMiscIdUnique 39
+ushowListIdKey		      = mkPreludeMiscIdUnique 31
+unsafeCoerceIdKey	      = mkPreludeMiscIdUnique 32
+concatIdKey		      = mkPreludeMiscIdUnique 33
+filterIdKey		      = mkPreludeMiscIdUnique 34
+zipIdKey		      = mkPreludeMiscIdUnique 35
+bindIOIdKey		      = mkPreludeMiscIdUnique 36
+deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 37
+makeStablePtrIdKey	      = mkPreludeMiscIdUnique 38
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own
@@ -641,7 +635,7 @@ enumFromToClassOpKey	      = mkPreludeMiscIdUnique 107
 enumFromThenToClassOpKey      = mkPreludeMiscIdUnique 108
 eqClassOpKey		      = mkPreludeMiscIdUnique 109
 geClassOpKey		      = mkPreludeMiscIdUnique 110
-zeroClassOpKey		      = mkPreludeMiscIdUnique 112
+failMClassOpKey		      = mkPreludeMiscIdUnique 112
 thenMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
 	-- Just a place holder for  unbound variables  produced by the renamer:
 unboundKey		      = mkPreludeMiscIdUnique 114 

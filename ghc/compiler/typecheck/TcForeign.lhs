@@ -29,7 +29,7 @@ import TcMonad
 import TcEnv		( newLocalId )
 import TcType		( tcInstTcType, typeToTcType, tcSplitRhoTy, zonkTcTypeToType )
 import TcMonoType	( tcHsType )
-import TcHsSyn		( TcMonoBinds, maybeBoxedPrimType, TypecheckedForeignDecl,
+import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
 import TcExpr		( tcId, tcPolyExpr )			
 import Inst		( emptyLIE, LIE, plusLIE )

@@ -137,6 +137,8 @@ static void new_filename PROTO((char *));
 static int  Return	 PROTO((int));
 static void hsentercontext PROTO((int));
 
+static BOOLEAN is_commment PROTO((char*, int));
+
 /* Special file handling for IMPORTS */
 /*  Note: imports only ever go *one deep* (hence no need for a stack) WDP 94/09 */
 
@@ -242,7 +244,7 @@ F   	    	    	{N}"."{N}(("e"|"E")("+"|"-")?{N})?
 S			[!#$%&*+./<=>?@\\^|\-~:\xa1-\xbf\xd7\xf7]
 SId			{S}{S}*
 L			[A-Z\xc0-\xd6\xd8-\xde]
-l			[a-z\xdf-\xf6\xf8-\xff]
+l			[a-z_\xdf-\xf6\xf8-\xff]
 I			{L}|{l}
 i			{L}|{l}|[0-9'_]
 Id			{I}{i}*
@@ -268,7 +270,6 @@ NL  	    	    	[\n\r]
      */
 %}
 
-<Code,GlaExt,StringEsc>"--"[^\n\r]*{NL}?{WS}* |
 <Code,GlaExt,UserPragma,StringEsc>{WS}+	{ noGap = FALSE; }
 
 %{
@@ -430,7 +431,6 @@ NL  	    	    	[\n\r]
 <Code,GlaExt,UserPragma>","	{ RETURN(COMMA); }
 <Code,GlaExt>";"		{ RETURN(SEMI); }
 <Code,GlaExt>"`"		{ RETURN(BQUOTE); }
-<Code,GlaExt>"_"		{ RETURN(WILDCARD); }
 
 <Code,GlaExt>"."		{ RETURN(DOT); }
 <Code,GlaExt>".."		{ RETURN(DOTDOT); }
@@ -536,8 +536,16 @@ NL  	    	    	[\n\r]
 			 RETURN(isconstr(yytext) ? CONID : VARID);
 			}
 <Code,GlaExt,UserPragma>{SId}	{
-    	    		 hsnewid(yytext, yyleng);
-			 RETURN(isconstr(yytext) ? CONSYM : VARSYM);
+			 if (is_commment(yytext,yyleng)) {
+				int c;
+				while ((c = input()) != '\n' && c != '\r' && c!= EOF )
+					;
+				if (c != EOF)
+				   unput(c);
+			 } else {
+	    	    	    hsnewid(yytext, yyleng);
+			    RETURN(isconstr(yytext) ? CONSYM : VARSYM);
+			 }
 			}
 <Code,GlaExt,UserPragma>{Mod}"."{Id}"#"	{
 			 BOOLEAN is_constr;
@@ -737,6 +745,19 @@ NL  	    	    	[\n\r]
 <CharEsc>\\    	    	{ addchar(*yytext); POP_STATE; }
 <StringEsc>\\	    	{ if (noGap) { addchar(*yytext); } POP_STATE; }
 
+%{
+/*
+ Not 100% correct, tokenizes "foo \  --<>--
+                                 \ bar"
+
+ as "foo  bar", but this is not correct as per Haskell 98 report and its
+ maximal munch rule for "--"-style comments.
+
+ For the moment, not deemed worthy to fix.
+*/
+%}
+<StringEsc>"--"[^\n\r]*{NL}?{WS}*  { noGap=FALSE; }
+
 <CharEsc,StringEsc>["']	{ addchar(*yytext); POP_STATE; }
 <CharEsc,StringEsc>NUL 	{ addchar('\000'); POP_STATE; }
 <CharEsc,StringEsc>SOH 	{ addchar('\001'); POP_STATE; }
@@ -836,6 +857,7 @@ NL  	    	    	[\n\r]
 <Comment>"{-"		{ nested_comments++; }
 <Comment>"-}"	    	{ if (--nested_comments == 0) POP_STATE; }
 <Comment>(.|\n)	    	;
+
 
 %{
     /*
@@ -974,6 +996,11 @@ new_filename(char *f) /* This looks pretty dodgy to me (WDP) */
 	forcing insertion of ; or } as appropriate
 */
 
+#ifdef HSP_DEBUG
+#define LAYOUT_DEBUG
+#endif
+
+
 static BOOLEAN
 hsshouldindent(void)
 {
@@ -985,7 +1012,7 @@ hsshouldindent(void)
 void
 hssetindent(void)
 {
-#ifdef HSP_DEBUG
+#ifdef LAYOUT_DEBUG
     fprintf(stderr, "hssetindent:hscolno=%d,hspcolno=%d,INDENTPT[%d]=%d\n", hscolno, hspcolno, icontexts, INDENTPT);
 #endif
 
@@ -1014,7 +1041,7 @@ hssetindent(void)
 void
 hsincindent(void)
 {
-#ifdef HSP_DEBUG
+#ifdef LAYOUT_DEBUG
     fprintf(stderr, "hsincindent:hscolno=%d,hspcolno=%d,INDENTPT[%d]=%d\n", hscolno, hspcolno, icontexts, INDENTPT);
 #endif
     hsentercontext(indenttab[icontexts] & ~1);
@@ -1042,7 +1069,7 @@ hsentercontext(int indent)
     }
     forgetindent = FALSE;
     indenttab[icontexts] = indent;
-#ifdef HSP_DEBUG
+#ifdef LAYOUT_DEBUG
     fprintf(stderr, "hsentercontext:indent=%d,hscolno=%d,hspcolno=%d,INDENTPT[%d]=%d\n", indent, hscolno, hspcolno, icontexts, INDENTPT);
 #endif
 }
@@ -1053,7 +1080,7 @@ void
 hsendindent(void)
 {
     --icontexts;
-#ifdef HSP_DEBUG
+#ifdef LAYOUT_DEBUG
     fprintf(stderr, "hsendindent:hscolno=%d,hspcolno=%d,INDENTPT[%d]=%d\n", hscolno, hspcolno, icontexts, INDENTPT);
 #endif
 }
@@ -1061,14 +1088,12 @@ hsendindent(void)
 /*
  * 	Return checks the indentation level and returns ;, } or the specified token.
  */
-
 static int
 Return(int tok)
 {
 #ifdef HSP_DEBUG
     extern int yyleng;
 #endif
-
     if (hsshouldindent()) {
 	if (hspcolno < INDENTPT) {
 #ifdef HSP_DEBUG
@@ -1084,6 +1109,7 @@ Return(int tok)
 	    return (SEMI);
 	}
     }
+
     hssttok = -1;
 #ifdef HSP_DEBUG
     fprintf(stderr, "returning %d (%d:%d)\n", tok, hspcolno, INDENTPT);
@@ -1344,3 +1370,21 @@ hsnewqid(char *name, int length)
 
     return isconstr(dot+1);
 }
+
+static
+BOOLEAN
+is_commment(char* lexeme, int len)
+{
+   char* ptr;
+   int i;
+   	
+   if (len < 2) {
+      return FALSE;
+   }
+
+   for(i=0;i<len;i++) {
+     if (lexeme[i] != '-') return FALSE;
+   }        
+   return TRUE;
+}
+   

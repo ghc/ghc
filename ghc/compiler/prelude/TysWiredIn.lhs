@@ -30,8 +30,6 @@ module TysWiredIn (
 	isFloatTy,
 	floatTyCon,
 
-	voidTyCon, voidTy, 
-
 	intDataCon,
 	intTy,
 	intTyCon,
@@ -43,8 +41,6 @@ module TysWiredIn (
 	int32TyCon,
 
 	int64TyCon,
-	int64DataCon,
---	int64Ty,
 
 	integerTy,
 	integerTyCon,
@@ -73,6 +69,7 @@ module TysWiredIn (
 	stringTy,
 	trueDataCon,
 	unitTy,
+	voidTy,
 	wordDataCon,
 	wordTy,
 	wordTyCon,
@@ -80,9 +77,6 @@ module TysWiredIn (
 	word8TyCon,
 	word16TyCon,
 	word32TyCon,
-
-	word64DataCon,
---	word64Ty,
 	word64TyCon,
 	
 	isFFIArgumentTy,  -- :: Type -> Bool
@@ -271,11 +265,12 @@ unboxedPairDataCon = unboxedTupleCon 2
 --
 -- ) It's boxed; there is only one value of this
 -- type, namely "void", whose semantics is just bottom.
-
-voidTy    = mkTyConTy voidTyCon
-voidTyCon = pcNonRecDataTyCon voidTyConKey pREL_GHC SLIT("Void") [] [{-No data cons-}]
-
+--
+-- Haskell 98 drops the definition of a Void type, so we just 'simulate'
+-- voidTy using ().
+voidTy = unitTy
 \end{code}
+
 
 \begin{code}
 charTy = mkTyConTy charTyCon
@@ -317,10 +312,9 @@ int32TyCon = pcNonRecDataTyCon int32TyConKey iNT SLIT("Int32") [] [int32DataCon]
   where
    int32DataCon = pcDataCon int32DataConKey iNT SLIT("I32#") [] [] [intPrimTy] int32TyCon
 
-int64Ty = mkTyConTy int64TyCon 
-
 int64TyCon = pcNonRecDataTyCon int64TyConKey pREL_ADDR SLIT("Int64") [] [int64DataCon]
-int64DataCon = pcDataCon int64DataConKey pREL_ADDR SLIT("I64#") [] [] [int64PrimTy] int64TyCon
+  where
+   int64DataCon = pcDataCon int64DataConKey pREL_ADDR SLIT("I64#") [] [] [int64PrimTy] int64TyCon
 \end{code}
 
 \begin{code}
@@ -342,10 +336,9 @@ word32TyCon = pcNonRecDataTyCon word32TyConKey   wORD SLIT("Word32") [] [word32D
   where
    word32DataCon = pcDataCon word32DataConKey wORD SLIT("W32#") [] [] [wordPrimTy] word32TyCon
 
-word64Ty = mkTyConTy word64TyCon
-
 word64TyCon = pcNonRecDataTyCon word64TyConKey   pREL_ADDR SLIT("Word64") [] [word64DataCon]
-word64DataCon = pcDataCon word64DataConKey pREL_ADDR SLIT("W64#") [] [] [word64PrimTy] word64TyCon
+  where
+    word64DataCon = pcDataCon word64DataConKey pREL_ADDR SLIT("W64#") [] [] [word64PrimTy] word64TyCon
 \end{code}
 
 \begin{code}

@@ -426,7 +426,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 
 	dict_rhs
 	  | null scs_and_meths
-	  = 	-- Blatant special case for CCallable, CReturnable [and Eval  -- sof 5/98]
+	  = 	-- Blatant special case for CCallable, CReturnable
 		-- If the dictionary is empty then we should never
 		-- select anything from it, so we make its RHS just
 		-- emit an error message.  This in turn means that we don't

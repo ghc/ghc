@@ -16,7 +16,7 @@ import TcEnv		( tcLookupClassByKey )
 import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyCheckThetas )
 
-import TysWiredIn	( intTy, doubleTy )
+import TysWiredIn	( integerTy, doubleTy )
 import Type             ( Type )
 import Unique		( numClassKey )
 import ErrUtils		( addShortErrLocLine )
@@ -25,7 +25,7 @@ import Util
 \end{code}
 
 \begin{code}
-default_default = [intTy, doubleTy] 	    -- language-specified default `default'
+default_default = [integerTy, doubleTy ]
 
 tcDefaults :: [RenamedHsDecl]
 	   -> TcM s [Type] 	    -- defaulting types to heave

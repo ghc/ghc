@@ -285,7 +285,7 @@ qid_to_pmod(q)
 
 	ARROWCON   function arrow ->
 	LISTCON	   list type constructor [], or the empty list []
-	UNITCON	   unit type constructor (), or the unity value ()
+	UNITCON	   unit type constructor (), or the unit value ()
 	n	   n-tuple type constructor (,,,)
 */
 		

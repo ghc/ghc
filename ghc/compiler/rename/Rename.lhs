@@ -286,13 +286,14 @@ reportUnusedNames (RnEnv gbl_env _) avail_env (ExportEnv export_avails _) mentio
 	defined_names = mkNameSet (concat (rdrEnvElts gbl_env))
 	defined_but_not_used = defined_names `minusNameSet` really_used_names
 
-	-- Filter out the ones only defined implicitly
+	-- Filter out the ones only defined implicitly or whose OccNames
+	-- start with an '_', which we won't report.
 	bad_guys = filter is_explicit (nameSetToList defined_but_not_used)
 	is_explicit n = case getNameProvenance n of
 			  LocalDef _ _ 				    -> True
 			  NonLocalDef (UserImport _ _ explicit) _ _ -> explicit
 			  other					    -> False
-
+  
 	-- Now group by whether locally defined or imported; 
 	-- one group is the locally-defined ones, one group per import module
 	groups = equivClasses cmp bad_guys

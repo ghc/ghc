@@ -33,7 +33,7 @@ import Class		( Class )
 import DataCon		( DataCon, dataConSig, mkDataCon, isNullaryDataCon,
 			  dataConFieldLabels, dataConId
 			)
-import MkId		( mkDataConId, mkRecordSelId )
+import MkId		( mkDataConId, mkRecordSelId, mkNewTySelId )
 import Id		( getIdUnfolding )
 import CoreUnfold	( getUnfoldingTemplate )
 import FieldLabel
@@ -41,7 +41,7 @@ import Var		( Id, TyVar )
 import Name		( isLocallyDefined, OccName, NamedThing(..) )
 import Outputable
 import TyCon		( TyCon, mkSynTyCon, mkAlgTyCon, isAlgTyCon, 
-			  isSynTyCon, tyConDataCons
+			  isSynTyCon, tyConDataCons, isNewTyCon
 			)
 import Type		( getTyVar, tyVarsOfTypes,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
@@ -86,7 +86,7 @@ kcConDecl (ConDecl _ ex_tvs ex_ctxt details loc)
   where
     kc_con (VanillaCon btys)    = mapTc kc_bty btys		`thenTc_` returnTc ()
     kc_con (InfixCon bty1 bty2) = mapTc kc_bty [bty1,bty2]	`thenTc_` returnTc ()
-    kc_con (NewCon ty)	        = tcHsType ty			`thenTc_` returnTc ()
+    kc_con (NewCon ty _)        = tcHsType ty			`thenTc_` returnTc ()
     kc_con (RecCon flds)        = mapTc kc_field flds		`thenTc_` returnTc ()
 
     kc_bty (Banged ty)   = tcHsType ty
@@ -168,7 +168,7 @@ tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
   = case details of
 	VanillaCon btys    -> tc_datacon btys
 	InfixCon bty1 bty2 -> tc_datacon [bty1,bty2]
-	NewCon ty	   -> tc_newcon ty
+	NewCon ty mb_f	   -> tc_newcon ty mb_f
 	RecCon fields	   -> tc_rec_con fields
   where
     tc_datacon btys
@@ -179,11 +179,17 @@ tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
 	mapTc tcHsTopType tys `thenTc` \ arg_tys ->
 	mk_data_con arg_stricts arg_tys []
 
-    tc_newcon ty 
+    tc_newcon ty mb_f
       = tcHsTopBoxedType ty	`thenTc` \ arg_ty ->
 	    -- can't allow an unboxed type here, because we're effectively
 	    -- going to remove the constructor while coercing it to a boxed type.
-	mk_data_con [NotMarkedStrict] [arg_ty] []
+	let
+	  field_label =
+	    case mb_f of
+	      Nothing -> []
+	      Just f  -> [mkFieldLabel (getName f) arg_ty (head allFieldLabelTags)]
+        in	      
+	mk_data_con [NotMarkedStrict] [arg_ty] field_label
 
     tc_rec_con fields
       = checkTc (null ex_tyvars) (exRecConErr name)	    `thenTc_`
@@ -254,8 +260,7 @@ mkDataBinds (tycon : tycons)
 		       returnTc (ids1++ids2, b1 `AndMonoBinds` b2)
 
 mkDataBinds_one tycon
-  = ASSERT( isAlgTyCon tycon )
-    mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
+  = mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
     let
 	data_ids = map dataConId data_cons ++ sel_ids
 
@@ -303,7 +308,9 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 		   field_ty
       
     selector_id :: Id
-    selector_id = mkRecordSelId first_field_label selector_ty
+    selector_id 
+      | isNewTyCon tycon    = mkNewTySelId  first_field_label selector_ty
+      | otherwise	    = mkRecordSelId first_field_label selector_ty
 \end{code}
 
 

@@ -6,3 +6,4 @@ _declarations_
 1 isTupleTyCon _:_ TyCon -> PrelBase.Bool ;;
 1 isUnboxedTupleTyCon _:_ TyCon -> PrelBase.Bool ;;
 1 isFunTyCon _:_ TyCon -> PrelBase.Bool ;;
+

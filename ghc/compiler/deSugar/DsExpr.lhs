@@ -35,7 +35,7 @@ import FieldLabel	( FieldLabel )
 import Id		( Id, idType, recordSelectorFieldLabel )
 import Const		( Con(..) )
 import DataCon		( DataCon, dataConId, dataConTyCon, dataConArgTys, dataConFieldLabels )
-import Const		( mkMachInt, Literal(..) )
+import Const		( mkMachInt, Literal(..), mkStrLit )
 import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import TyCon		( isNewTyCon )
 import DataCon		( isExistentialDataCon )
@@ -328,7 +328,7 @@ dsExpr (HsLet binds body)
   = dsExpr body		`thenDs` \ body' ->
     dsLet binds body'
     
-dsExpr (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty src_loc)
+dsExpr (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty src_loc)
   | maybeToBool maybe_list_comp
   =	-- Special case for list comprehensions
     putSrcLocDs src_loc $
@@ -336,7 +336,7 @@ dsExpr (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty src_loc)
 
   | otherwise
   = putSrcLocDs src_loc $
-    dsDo do_or_lc stmts return_id then_id zero_id result_ty
+    dsDo do_or_lc stmts return_id then_id fail_id result_ty
   where
     maybe_list_comp 
 	= case (do_or_lc, splitTyConApp_maybe result_ty) of
@@ -563,7 +563,6 @@ dsExpr (DictApp expr dicts)	-- becomes a curried application
 
 \begin{code}
 
-
 #ifdef DEBUG
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (HsDo _ _ _)	    = panic "dsExpr:HsDo"
@@ -585,11 +584,11 @@ dsDo	:: StmtCtxt
 	-> [TypecheckedStmt]
 	-> Id		-- id for: return m
 	-> Id		-- id for: (>>=) m
-	-> Id		-- id for: zero m
+	-> Id		-- id for: fail m
 	-> Type		-- Element type; the whole expression has type (m t)
 	-> DsM CoreExpr
 
-dsDo do_or_lc stmts return_id then_id zero_id result_ty
+dsDo do_or_lc stmts return_id then_id fail_id result_ty
   = let
 	(_, b_ty) = splitAppTy result_ty	-- result_ty must be of the form (m b)
 	
@@ -600,7 +599,12 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 	go (GuardStmt expr locn : stmts)
 	  = do_expr expr locn			`thenDs` \ expr2 ->
 	    go stmts				`thenDs` \ rest ->
-	    returnDs (mkIfThenElse expr2 rest (App (Var zero_id) (Type b_ty)))
+	    let msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn) in
+	    returnDs (mkIfThenElse expr2 
+				   rest 
+				   (App (App (Var fail_id) 
+					     (Type b_ty))
+					     (mkLit (mkStrLit msg stringTy))))
     
 	go (ExprStmt expr locn : stmts)
 	  = do_expr expr locn		`thenDs` \ expr2 ->
@@ -624,13 +628,17 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 	    dsExpr expr 	   `thenDs` \ expr2 ->
 	    let
 		(_, a_ty)  = splitAppTy (coreExprType expr2)	-- Must be of form (m a)
-		zero_expr  = TyApp (HsVar zero_id) [b_ty]
-		main_match = mkSimpleMatch [pat] (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty locn)
+		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty]) (HsLitOut (HsString (_PK_ msg)) stringTy)
+	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
+		main_match = mkSimpleMatch [pat] 
+					   (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty locn)
 					   (Just result_ty) locn
 		the_matches
-		  = if failureFreePat pat
-		    then [main_match]
-		    else [main_match, mkSimpleMatch [WildPat a_ty] zero_expr (Just result_ty) locn]
+		  | failureFreePat pat = [main_match]
+		  | otherwise	       =
+		      [ main_match
+		      , mkSimpleMatch [WildPat a_ty] fail_expr (Just result_ty) locn
+		      ]
 	    in
 	    matchWrapper DoBindMatch the_matches match_msg
 				`thenDs` \ (binders, matching_code) ->

@@ -217,7 +217,7 @@ lexIface cont buf =
 -- Numbers and comments
     '-'#  ->
       case lookAhead# buf 1# of
-        '-'# -> lex_comment cont (stepOnBy# buf 2#)
+--        '-'# -> lex_comment cont (stepOnBy# buf 2#)
         c    -> 
 	  if is_digit c
           then lex_num cont (negate) (ord# c -# ord# '0'#) (incLexeme (incLexeme buf))
@@ -486,7 +486,10 @@ lex_id cont buf =
 
 lex_sym cont buf =
  case expandWhile# is_symbol buf of
-   buf' -> case lookupUFM haskellKeySymsFM lexeme of {
+   buf'
+     | is_comment lexeme -> lex_comment cont new_buf
+     | otherwise         ->
+	   case lookupUFM haskellKeySymsFM lexeme of {
 	 	Just kwd_token -> --trace ("keysym: "++unpackFS lexeme) $
 				  cont kwd_token new_buf ;
 	 	Nothing        -> --trace ("sym: "++unpackFS lexeme) $
@@ -494,6 +497,15 @@ lex_sym cont buf =
            }
    	where lexeme = lexemeToFastString buf'
 	      new_buf = stepOverLexeme buf'
+
+	      is_comment fs 
+	        | len < 2   = False
+		| otherwise = trundle 0
+		  where
+		   len = lengthFS fs
+		   
+		   trundle n | n == len  = True
+			     | otherwise = indexFS fs n == '-' && trundle (n+1)
 
 lex_con cont buf = 
  case expandWhile# is_ident buf of 	  { buf1 ->

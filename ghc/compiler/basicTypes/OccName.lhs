@@ -20,6 +20,7 @@ module OccName (
  	mkClassTyConOcc, mkClassDataConOcc,
 	
 	isTvOcc, isTCOcc, isVarOcc, isConSymOcc, isConOcc, isSymOcc,
+	isWildCardOcc, isAnonOcc, 
 	pprOccName, occNameString, occNameFlavour, 
 
 	-- The basic form of names
@@ -390,7 +391,7 @@ occNameFlavour (OccName TvOcc _ _ _)		     = "Type variable"
 occNameFlavour (OccName TCOcc s _ _)  		     = "Type constructor or class"
 
 isVarOcc, isTCOcc, isTvOcc,
- isConSymOcc, isSymOcc :: OccName -> Bool
+ isConSymOcc, isSymOcc, isWildCardOcc :: OccName -> Bool
 
 isVarOcc (OccName VarOcc _ _ _) = True
 isVarOcc other                  = False
@@ -406,6 +407,10 @@ isConSymOcc (OccName _ s _ _) = isLexConSym s
 isSymOcc (OccName _ s _ _) = isLexSym s
 
 isConOcc (OccName _ s _ _) = isLexCon s
+
+isWildCardOcc (OccName _ s _ _) = (_HEAD_ s) == '_' && _LENGTH_ s == 1 
+
+isAnonOcc (OccName _ s _ _) = (_HEAD_ s) == '_'
 \end{code}
 
 

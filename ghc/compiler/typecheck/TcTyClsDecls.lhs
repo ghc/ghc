@@ -296,7 +296,7 @@ get_con (ConDecl _ _ ctxt details _)
 ----------------------------------------------------
 get_con_details (VanillaCon btys)    = unionManyUniqSets (map get_bty btys)
 get_con_details (InfixCon bty1 bty2) = unionUniqSets (get_bty bty1) (get_bty bty2)
-get_con_details (NewCon ty)          = get_ty ty
+get_con_details (NewCon ty _)        = get_ty ty
 get_con_details (RecCon nbtys)       = unionManyUniqSets (map (get_bty.snd) nbtys)
 
 ----------------------------------------------------

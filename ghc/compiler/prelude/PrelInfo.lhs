@@ -44,7 +44,7 @@ module PrelInfo (
 	-- RdrNames for lots of things, mainly used in derivings
 	eq_RDR, ne_RDR, le_RDR, lt_RDR, ge_RDR, gt_RDR, max_RDR, min_RDR, 
 	compare_RDR, minBound_RDR, maxBound_RDR, enumFrom_RDR, enumFromTo_RDR,
-	enumFromThen_RDR, enumFromThenTo_RDR, fromEnum_RDR, toEnum_RDR, 
+	enumFromThen_RDR, enumFromThenTo_RDR, succ_RDR, pred_RDR, fromEnum_RDR, toEnum_RDR, 
 	ratioDataCon_RDR, range_RDR, index_RDR, inRange_RDR, readsPrec_RDR,
 	readList_RDR, showsPrec_RDR, showList_RDR, plus_RDR, times_RDR,
 	ltTag_RDR, eqTag_RDR, gtTag_RDR, eqH_Char_RDR, ltH_Char_RDR, 
@@ -58,7 +58,7 @@ module PrelInfo (
 
 	numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 	ccallableClass_RDR, creturnableClass_RDR,
-	monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
+	monadClass_RDR, enumClass_RDR, ordClass_RDR,
 	ioDataCon_RDR,
 
 	mkTupConRdrName, mkUbxTupConRdrName
@@ -193,7 +193,6 @@ data_tycons
     , int64TyCon
     , integerTyCon
     , listTyCon
-    , voidTyCon
     , wordTyCon
     , word8TyCon
     , word16TyCon
@@ -212,8 +211,13 @@ data_tycons
 \begin{code}
 wired_in_ids
   = [ 	-- These error-y things are wired in because we don't yet have
-	-- a way to express in an inteface file that the result type variable
+	-- a way to express in an interface file that the result type variable
 	-- is 'open'; that is can be unified with an unboxed type
+	-- 
+	-- [The interface file format now carry such information, but there's
+	--  no way yet of expressing at the definition site for these error-reporting
+	--  functions that they have an 'open' result type. -- sof 1/99]
+	-- 
       aBSENT_ERROR_ID
     , eRROR_ID
     , iRREFUT_PAT_ERROR_ID
@@ -368,7 +372,6 @@ knownKeyNames
     , (numClass_RDR, 		numClassKey)		-- mentioned, numeric
     , (enumClass_RDR,		enumClassKey)		-- derivable
     , (monadClass_RDR,		monadClassKey)
-    , (monadZeroClass_RDR,	monadZeroClassKey)
     , (monadPlusClass_RDR,	monadPlusClassKey)
     , (functorClass_RDR,	functorClassKey)
     , (showClass_RDR, 		showClassKey)		-- derivable
@@ -397,7 +400,7 @@ knownKeyNames
     , (eq_RDR,			eqClassOpKey)
     , (thenM_RDR,		thenMClassOpKey)
     , (returnM_RDR,		returnMClassOpKey)
-    , (zeroM_RDR,		zeroClassOpKey)
+    , (failM_RDR,		failMClassOpKey)
     , (fromRational_RDR,	fromRationalClassOpKey)
     
     , (deRefStablePtr_RDR,	deRefStablePtrIdKey)
@@ -466,7 +469,6 @@ boundedClass_RDR	= tcQual (pREL_BASE, SLIT("Bounded"))
 numClass_RDR		= tcQual (pREL_BASE, SLIT("Num"))
 enumClass_RDR 		= tcQual (pREL_BASE, SLIT("Enum"))
 monadClass_RDR		= tcQual (pREL_BASE, SLIT("Monad"))
-monadZeroClass_RDR	= tcQual (pREL_BASE, SLIT("MonadZero"))
 monadPlusClass_RDR	= tcQual (pREL_BASE, SLIT("MonadPlus"))
 functorClass_RDR	= tcQual (pREL_BASE, SLIT("Functor"))
 showClass_RDR		= tcQual (pREL_BASE, SLIT("Show"))
@@ -484,6 +486,8 @@ creturnableClass_RDR	= tcQual (pREL_GHC,  SLIT("CReturnable"))
 fromInt_RDR	   = varQual (pREL_BASE, SLIT("fromInt"))
 fromInteger_RDR	   = varQual (pREL_BASE, SLIT("fromInteger"))
 minus_RDR	   = varQual (pREL_BASE, SLIT("-"))
+succ_RDR	   = varQual (pREL_BASE, SLIT("succ"))
+pred_RDR	   = varQual (pREL_BASE, SLIT("pred"))
 toEnum_RDR	   = varQual (pREL_BASE, SLIT("toEnum"))
 fromEnum_RDR	   = varQual (pREL_BASE, SLIT("fromEnum"))
 enumFrom_RDR	   = varQual (pREL_BASE, SLIT("enumFrom"))
@@ -493,7 +497,7 @@ enumFromThenTo_RDR = varQual (pREL_BASE, SLIT("enumFromThenTo"))
 
 thenM_RDR	   = varQual (pREL_BASE,    SLIT(">>="))
 returnM_RDR	   = varQual (pREL_BASE,    SLIT("return"))
-zeroM_RDR	   = varQual (pREL_BASE,    SLIT("zero"))
+failM_RDR	   = varQual (pREL_BASE,    SLIT("fail"))
 
 fromRational_RDR   = varQual (pREL_NUM,     SLIT("fromRational"))
 negate_RDR	   = varQual (pREL_BASE, SLIT("negate"))
@@ -518,8 +522,8 @@ not_RDR		   = varQual (pREL_BASE,  SLIT("not"))
 compose_RDR	   = varQual (pREL_BASE, SLIT("."))
 append_RDR	   = varQual (pREL_BASE, SLIT("++"))
 map_RDR		   = varQual (pREL_BASE, SLIT("map"))
-concat_RDR	   = varQual (mONAD,     SLIT("concat"))
-filter_RDR	   = varQual (mONAD,     SLIT("filter"))
+concat_RDR	   = varQual (pREL_LIST, SLIT("concat"))
+filter_RDR	   = varQual (pREL_LIST, SLIT("filter"))
 zip_RDR		   = varQual (pREL_LIST, SLIT("zip"))
 
 showList___RDR     = varQual (pREL_BASE,  SLIT("showList__"))
@@ -602,15 +606,20 @@ deriving_occ_info
     , (ordClassKey, 	[intTyCon_RDR, compose_RDR, eqTag_RDR])
 				-- EQ (from Ordering) is needed to force in the constructors
 				-- as well as the type constructor.
-    , (enumClassKey, 	[intTyCon_RDR, map_RDR])
+    , (enumClassKey, 	[intTyCon_RDR, map_RDR, plus_RDR, showsPrec_RDR, append_RDR]) 
+				-- The last two Enum deps are only used to produce better
+				-- error msgs for derived toEnum methods.
     , (boundedClassKey,	[intTyCon_RDR])
     , (showClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, compose_RDR, showString_RDR, 
 			 showParen_RDR, showSpace_RDR, showList___RDR])
     , (readClassKey,	[intTyCon_RDR, numClass_RDR, ordClass_RDR, append_RDR, 
-			 lex_RDR, readParen_RDR, readList___RDR])
+			 lex_RDR, readParen_RDR, readList___RDR, thenM_RDR])
+			     -- returnM (and the rest of the Monad class decl) 
+			     -- will be forced in as result of depending
+			     -- on thenM.   -- SOF 1/99
     , (ixClassKey,	[intTyCon_RDR, numClass_RDR, and_RDR, map_RDR, enumFromTo_RDR, 
-			 returnM_RDR, zeroM_RDR])
-			     -- the last two are needed to force returnM, thenM and zeroM
+			 returnM_RDR, failM_RDR])
+			     -- the last two are needed to force returnM, thenM and failM
 			     -- in before typechecking the list(monad) comprehension
 			     -- generated for derived Ix instances (range method)
 			     -- of single constructor types.  -- SOF 8/97

@@ -38,7 +38,8 @@ import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkDataBinds )
 import TcType		( TcType, typeToTcType,
-			  TcKind, kindToTcKind
+			  TcKind, kindToTcKind,
+			  newTyVarTy
 			)
 
 import RnMonad		( RnNameSupply )
@@ -51,7 +52,8 @@ import Name		( Name, nameUnique, isLocallyDefined, pprModule, NamedThing(..) )
 import TyCon		( TyCon, tyConKind )
 import DataCon		( dataConId )
 import Class		( Class, classSelIds, classTyCon )
-import Type		( mkTyConApp, Type )
+import Type		( mkTyConApp, mkForAllTy, mkTyVarTy, 
+			  boxedTypeKind, getTyVar, Type )
 import TysWiredIn	( unitTy )
 import PrelMods		( mAIN )
 import PrelInfo		( main_NAME, ioTyCon_NAME,
@@ -285,12 +287,15 @@ tcCheckMainSig mod_name
     tcLookupTyCon ioTyCon_NAME		`thenTc`    \ ioTyCon ->
     tcLookupValueMaybe main_NAME	`thenNF_Tc` \ maybe_main_id ->
     case maybe_main_id of {
-	Nothing	 -> failWithTc noMainErr ;
+	Nothing	       -> failWithTc noMainErr ;
 	Just main_id   ->
 
 	-- Check that it has the right type (or a more general one)
+	-- As of Haskell 98, anything that unifies with (IO a) is OK.
+    newTyVarTy boxedTypeKind		`thenNF_Tc` \ t_tv ->
     let 
-	expected_tau = typeToTcType (mkTyConApp ioTyCon [unitTy])
+        tv	     = getTyVar "tcCheckMainSig" t_tv
+	expected_tau = typeToTcType ((mkTyConApp ioTyCon [t_tv]))
     in
     tcId main_NAME				`thenNF_Tc` \ (_, lie, main_tau) ->
     tcSetErrCtxt mainTyCheckCtxt $

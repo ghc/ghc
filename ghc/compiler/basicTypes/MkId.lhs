@@ -20,6 +20,7 @@ module MkId (
 
 	mkDataConId,
 	mkRecordSelId,
+	mkNewTySelId,
 	mkPrimitiveId
     ) where
 
@@ -237,6 +238,40 @@ mkRecordSelId field_label selector_ty
 
     error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type rhs_ty, mkStringLit full_msg]
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Newtype field selectors}
+%*									*
+%************************************************************************
+
+Possibly overkill to do it this way:
+
+\begin{code}
+mkNewTySelId field_label selector_ty = sel_id
+  where
+    sel_id = mkId (fieldLabelName field_label) selector_ty
+		  (RecordSelId field_label) info
+
+    info = exactArity 1	`setArityInfo` (
+	   unfolding	`setUnfoldingInfo`
+	   noIdInfo)
+	-- ToDo: consider adding further IdInfo
+
+    unfolding = mkUnfolding sel_rhs
+
+    (tyvars, theta, tau)  = splitSigmaTy selector_ty
+    (data_ty,rhs_ty)      = expectJust "StdIdInfoRec" (splitFunTy_maybe tau)
+					-- tau is of form (T a b c -> field-type)
+    (tycon, _, data_cons) = splitAlgTyConApp data_ty
+    tyvar_tys	          = mkTyVarTys tyvars
+	
+    [data_id] = mkTemplateLocals [data_ty]
+    sel_rhs   = mkLams tyvars $ Lam data_id $
+		Note (Coerce rhs_ty data_ty) (Var data_id)
+
 \end{code}
 
 

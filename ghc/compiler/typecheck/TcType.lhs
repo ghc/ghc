@@ -333,7 +333,7 @@ zonkTcTypeToType ty = zonkType zonk_unbound_tyvar ty
     zonk_unbound_tyvar tv
 	= zonkTcKindToKind (tyVarKind tv)	`thenNF_Tc` \ kind ->
 	  if kind == boxedTypeKind then
-		tcPutTyVar tv voidTy	-- Just to creating a new tycon in
+		tcPutTyVar tv voidTy	-- Just to avoid creating a new tycon in
 					-- this vastly common case
 	  else
 		tcPutTyVar tv (TyConApp (mk_void_tycon tv) [])

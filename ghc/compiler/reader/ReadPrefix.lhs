@@ -21,7 +21,7 @@ import CallConv
 import CmdLineOpts      ( opt_NoImplicitPrelude, opt_GlasgowExts )
 import Name		( OccName, srcTvOcc, srcVarOcc, srcTCOcc, 
 			  Module, mkModuleFS,
-			  isConOcc, isLexConId
+			  isConOcc, isLexConId, isWildCardOcc
 			)
 import Outputable
 import SrcLoc		( SrcLoc )
@@ -311,7 +311,6 @@ wlkExpr expr
       U_hmodule _ _ _ _ _ _   -> error "U_hmodule"
       U_as _ _ 		      -> error "U_as"
       U_lazyp _ 	      -> error "U_lazyp"
-      U_wildp 		      -> error "U_wildp"
       U_qual _ _ 	      -> error "U_qual"
       U_guard _ 	      -> error "U_guard"
       U_seqlet _ 	      -> error "U_seqlet"
@@ -395,19 +394,18 @@ wlkPat pat
 	wlkLiteral lit	`thenUgn` \ lit ->
 	returnUgn (NPlusKPatIn var lit)
 
-      U_wildp -> returnUgn WildPatIn 	-- wildcard pattern
-
       U_lit lit ->			-- literal pattern
 	wlkLiteral lit	`thenUgn` \ lit ->
 	returnUgn (LitPatIn lit)
 
       U_ident nn ->			-- simple identifier
 	wlkVarId nn	`thenUgn` \ n ->
+	let occ = rdrNameOcc n in
 	returnUgn (
-	  if isConOcc (rdrNameOcc n) then
+	  if isConOcc occ then
 		ConPatIn n []
 	  else
-		VarPatIn n
+		if (isWildCardOcc occ) then WildPatIn else (VarPatIn n)
 	)
 
       U_ap l r ->	-- "application": there's a list of patterns lurking here!
@@ -429,6 +427,8 @@ wlkPat pat
 		U_ap l r ->
 		  wlkPat r	`thenUgn` \ rpat  ->
 		  collect_pats l (rpat:acc)
+		U_par l ->
+		  collect_pats l acc
 		other ->
 		  wlkPat other	`thenUgn` \ pat ->
 		  returnUgn (pat,acc)
@@ -839,24 +839,25 @@ wlkConDecl (U_constrinf cty1 cop cty2 srcline)
     wlkBangType cty2		`thenUgn` \ ty2	    ->
     returnUgn (ConDecl op [] [] (InfixCon ty1 ty2) src_loc)
 
-wlkConDecl (U_constrnew ccon cty srcline)
-  = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkDataId	ccon		`thenUgn` \ con	    ->
-    wlkHsSigType cty		`thenUgn` \ ty	    ->
-    returnUgn (ConDecl con [] [] (NewCon ty) src_loc)
+wlkConDecl (U_constrnew ccon cty mb_lab srcline)
+  = mkSrcLocUgn srcline			 $ \ src_loc ->
+    wlkDataId	ccon		 `thenUgn` \ con	    ->
+    wlkHsSigType cty		 `thenUgn` \ ty	    ->
+    wlkMaybe     rdVarId  mb_lab `thenUgn` \ mb_lab  ->
+    returnUgn (ConDecl con [] [] (NewCon ty mb_lab) src_loc)
 
 wlkConDecl (U_constrrec ccon cfields srcline)
   = mkSrcLocUgn srcline			$ \ src_loc      ->
     wlkDataId	ccon		`thenUgn` \ con		 ->
     wlkList rd_field cfields	`thenUgn` \ fields_lists ->
     returnUgn (ConDecl con [] [] (RecCon fields_lists) src_loc)
-  where
+   where
     rd_field :: ParseTree -> UgnM ([RdrName], BangType RdrName)
-    rd_field pt
-      = rdU_constr pt		`thenUgn` \ (U_field fvars fty) ->
-	wlkList rdVarId	fvars	`thenUgn` \ vars ->
-	wlkBangType fty		`thenUgn` \ ty ->
-	returnUgn (vars, ty)
+    rd_field pt =
+      rdU_constr pt		`thenUgn` \ (U_field fvars fty) ->
+      wlkList rdVarId	fvars	`thenUgn` \ vars ->
+      wlkBangType fty		`thenUgn` \ ty ->
+      returnUgn (vars, ty)
 
 -----------------
 rdBangType pt = rdU_ttype pt `thenUgn` wlkBangType

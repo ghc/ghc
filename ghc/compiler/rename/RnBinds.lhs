@@ -454,7 +454,9 @@ renameSigs top_lev inst_decl binders sigs
 	(goodies, dups) = removeDups cmp_sig (sigsForMe (not . isUnboundName) sigs')
 	not_this_group  = sigsForMe (not . (`elemNameSet` binders)) goodies
 	spec_inst_sigs  = [s | s@(SpecInstSig _ _) <- goodies]
-	type_sig_vars	= [n | Sig n _ _ <- goodies]
+	type_sig_vars	= [n | Sig n _ _     <- goodies]
+	fixes		= [f | f@(FixSig _)  <- goodies]
+	idecl_type_sigs	= [s | s@(Sig _ _ _) <- goodies]
 	sigs_required   = case top_lev of {TopLevel -> opt_WarnMissingSigs; NotTopLevel -> False}
 	un_sigd_binders | sigs_required = nameSetToList binders `minusList` type_sig_vars
 			| otherwise	= []
@@ -464,7 +466,9 @@ renameSigs top_lev inst_decl binders sigs
     (if not inst_decl then
 	mapRn unknownSigErr spec_inst_sigs
      else
-	returnRn []
+	 -- We're being strict here, outlawing the presence
+	 -- of type signatures within an instance declaration.
+	mapRn unknownSigErr (fixes  ++ idecl_type_sigs)
     )							`thenRn_`
     mapRn (addWarnRn.missingSigWarn) un_sigd_binders	`thenRn_`
 
@@ -532,6 +536,7 @@ sig_tag (SpecSig n1 _ _ _)    	   = ILIT(2)
 sig_tag (InlineSig n1 _)  	   = ILIT(3)
 sig_tag (NoInlineSig n1 _)  	   = ILIT(4)
 sig_tag (SpecInstSig _ _)	   = ILIT(5)
+sig_tag (FixSig _)		   = ILIT(6)
 sig_tag _			   = panic# "tag(RnBinds)"
 \end{code}
 
@@ -558,12 +563,13 @@ unknownSigErr sig
   where
     (what_it_is, loc) = sig_doc sig
 
-sig_doc (Sig        _ _ loc) 	    = (SLIT("type signature"),loc)
-sig_doc (ClassOpSig _ _ _ loc) 	    = (SLIT("class-method type signature"), loc)
-sig_doc (SpecSig    _ _ _ loc) 	    = (SLIT("SPECIALISE pragma"),loc)
-sig_doc (InlineSig  _     loc) 	    = (SLIT("INLINE pragma"),loc)
-sig_doc (NoInlineSig  _   loc) 	    = (SLIT("NOINLINE pragma"),loc)
-sig_doc (SpecInstSig _ loc)	    = (SLIT("SPECIALISE instance pragma"),loc)
+sig_doc (Sig        _ _ loc) 	     = (SLIT("type signature"),loc)
+sig_doc (ClassOpSig _ _ _ loc) 	     = (SLIT("class-method type signature"), loc)
+sig_doc (SpecSig    _ _ _ loc) 	     = (SLIT("SPECIALISE pragma"),loc)
+sig_doc (InlineSig  _     loc) 	     = (SLIT("INLINE pragma"),loc)
+sig_doc (NoInlineSig  _   loc) 	     = (SLIT("NOINLINE pragma"),loc)
+sig_doc (SpecInstSig _ loc)	     = (SLIT("SPECIALISE instance pragma"),loc)
+sig_doc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
 
 missingSigWarn var
   = sep [ptext SLIT("definition but no type signature for"), quotes (ppr var)]

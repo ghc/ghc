@@ -276,8 +276,9 @@ data ConDetails name
   | RecCon			-- record-style con decl
 		[([name], BangType name)]	-- list of "fields"
 
-  | NewCon	 		-- newtype con decl
+  | NewCon	 		-- newtype con decl, possibly with a labelled field.
 		(HsType name)
+		(Maybe name)	-- Just x => labelled field 'x'
 
 data BangType name
   = Banged   (HsType name)	-- HsType: to allow Haskell extensions
@@ -295,9 +296,14 @@ ppr_con_details con (InfixCon ty1 ty2)
 ppr_con_details con (VanillaCon tys)
   = ppr con <+> hsep (map (ppr_bang) tys)
 
-ppr_con_details con (NewCon ty)
+ppr_con_details con (NewCon ty Nothing)
   = ppr con <+> pprParendHsType ty
 
+ppr_con_details con (NewCon ty (Just x))
+  = ppr con <+> braces pp_field 
+   where
+    pp_field = ppr x <+> dcolon <+> pprParendHsType ty
+ 
 ppr_con_details con (RecCon fields)
   = ppr con <+> braces (hsep (punctuate comma (map ppr_field fields)))
   where

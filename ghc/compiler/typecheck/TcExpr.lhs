@@ -9,12 +9,11 @@ module TcExpr ( tcExpr, tcPolyExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsBinds(..), Stmt(..), StmtCtxt(..),
-			  failureFreePat
+			  HsBinds(..), Stmt(..), StmtCtxt(..)
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds,
-			  mkHsTyApp
+			  mkHsTyApp, maybeBoxedPrimType
 			)
 
 import TcMonad
@@ -69,7 +68,7 @@ import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy,
 import Unique		( cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
-			  thenMClassOpKey, zeroClassOpKey, returnMClassOpKey
+			  thenMClassOpKey, failMClassOpKey, returnMClassOpKey
 			)
 import Outputable
 import Maybes		( maybeToBool )
@@ -365,7 +364,6 @@ tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	-- constraints on the argument and result types.
     mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenNF_Tc` \ ccarg_dicts_s ->
     newDicts result_origin [(cReturnableClass, [result_ty])]		`thenNF_Tc` \ (ccres_dict, _) ->
-
     returnTc (HsApp (HsVar (dataConId ioDataCon) `TyApp` [result_ty])
 		    (CCall lbl args' may_gc is_asm result_ty),
 		      -- do the wrapping in the newtype constructor here
@@ -849,6 +847,12 @@ tcDoStmts do_or_lc stmts src_loc res_ty
     newTyVarTy (mkArrowKind boxedTypeKind boxedTypeKind)	`thenNF_Tc` \ m ->
     newTyVarTy boxedTypeKind 					`thenNF_Tc` \ elt_ty ->
     unifyTauTy res_ty (mkAppTy m elt_ty)			`thenTc_`
+	-- If it's a comprehension we're dealing with, 
+	-- force it to be a list comprehension.
+	-- (as of Haskell 98, monad comprehensions are no more.)
+    (case do_or_lc of
+       ListComp -> unifyListTy res_ty `thenTc_` returnTc ()
+       _	-> returnTc ())					`thenTc_`
 
     tcStmts do_or_lc (mkAppTy m) stmts elt_ty		 	`thenTc`   \ (stmts', stmts_lie) ->
 
@@ -862,20 +866,14 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 	--
     tcLookupValueByKey returnMClassOpKey	`thenNF_Tc` \ return_sel_id ->
     tcLookupValueByKey thenMClassOpKey		`thenNF_Tc` \ then_sel_id ->
-    tcLookupValueByKey zeroClassOpKey		`thenNF_Tc` \ zero_sel_id ->
+    tcLookupValueByKey failMClassOpKey		`thenNF_Tc` \ fail_sel_id ->
     newMethod DoOrigin return_sel_id [m]	`thenNF_Tc` \ (return_lie, return_id) ->
     newMethod DoOrigin then_sel_id [m]		`thenNF_Tc` \ (then_lie, then_id) ->
-    newMethod DoOrigin zero_sel_id [m]		`thenNF_Tc` \ (zero_lie, zero_id) ->
+    newMethod DoOrigin fail_sel_id [m]		`thenNF_Tc` \ (fail_lie, fail_id) ->
     let
-      monad_lie = then_lie `plusLIE` return_lie `plusLIE` perhaps_zero_lie
-      perhaps_zero_lie | all failure_free stmts' = emptyLIE
-		       | otherwise		 = zero_lie
-
-      failure_free (BindStmt pat _ _) = failureFreePat pat
-      failure_free (GuardStmt _ _)    = False
-      failure_free other_stmt	      = True
+      monad_lie = then_lie `plusLIE` return_lie `plusLIE` fail_lie
     in
-    returnTc (HsDoOut do_or_lc stmts' return_id then_id zero_id res_ty src_loc,
+    returnTc (HsDoOut do_or_lc stmts' return_id then_id fail_id res_ty src_loc,
 	      stmts_lie `plusLIE` monad_lie)
 \end{code}
 
@@ -1037,4 +1035,14 @@ recordUpdCtxt = ptext SLIT("In a record update construct")
 
 notSelector field
   = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]
+
+illegalCcallTyErr isArg ty
+  = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, ptext SLIT("type in _ccall_ or _casm_:")])
+	 4 (hsep [ppr ty])
+  where
+   arg_or_res
+    | isArg     = ptext SLIT("argument")
+    | otherwise = ptext SLIT("result")
+
+
 \end{code}

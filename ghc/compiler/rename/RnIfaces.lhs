@@ -25,7 +25,7 @@ import CmdLineOpts	( opt_PruneTyDecls,  opt_PruneInstDecls,
 import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
 			  FixitySig(..),
-			  hsDeclName, countTyClDecls, isDataDecl
+			  hsDeclName, countTyClDecls, isDataDecl, nonFixitySigs
 			)
 import BasicTypes	( Version, NewOrData(..), IfaceFlavour(..) )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl,
@@ -925,7 +925,11 @@ getDeclBinders new_name (TyClD (ClassDecl _ cname _ sigs _ _ tname dname src_loc
   = new_name cname src_loc			`thenRn` \ class_name ->
 
 	-- Record the names for the class ops
-    mapRn (getClassOpNames new_name) sigs	`thenRn` \ sub_names ->
+    let
+	-- ignoring fixity declarations
+	nonfix_sigs = nonFixitySigs sigs
+    in
+    mapRn (getClassOpNames new_name) nonfix_sigs	`thenRn` \ sub_names ->
 
     returnRn (AvailTC class_name (class_name : sub_names))
 
@@ -946,10 +950,15 @@ getConFieldNames new_name (ConDecl con _ _ (RecCon fielddecls) src_loc : rest)
   where
     fields = concat (map fst fielddecls)
 
-getConFieldNames new_name (ConDecl con _ _ _ src_loc : rest)
+getConFieldNames new_name (ConDecl con _ _ condecl src_loc : rest)
   = new_name con src_loc		`thenRn` \ n ->
+    (case condecl of
+      NewCon _ (Just f) -> 
+        new_name f src_loc `thenRn` \ new_f ->
+	returnRn [n,new_f]
+      _ -> returnRn [n])		`thenRn` \ nn ->
     getConFieldNames new_name rest	`thenRn` \ ns -> 
-    returnRn (n:ns)
+    returnRn (nn ++ ns)
 
 getConFieldNames new_name [] = returnRn []
 

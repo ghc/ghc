@@ -21,7 +21,7 @@ import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
 			  mkLocalName, mkGlobalName, 
 			  nameOccName, 
-			  pprOccName, isLocalName, isLocallyDefined, 
+			  pprOccName, isLocalName, isLocallyDefined, isAnonOcc,
 			  setNameProvenance, getNameProvenance, pprNameProvenance
 			)
 import NameSet
@@ -169,6 +169,7 @@ newLocalNames rdr_names
 	n	   = length rdr_names
 	(us', us1) = splitUniqSupply us
 	uniqs	   = uniqsFromSupply n us1
+	  -- Note: we're not making use of the source location. Not good.
 	locals	   = [ mkLocalName uniq (rdrNameOcc rdr_name)
 		     | ((rdr_name,loc), uniq) <- rdr_names `zip` uniqs
 		     ]
@@ -680,8 +681,8 @@ warnUnusedTopNames ns
   = returnRn ()	-- Don't force ns unless necessary
 
 warnUnusedTopNames (n:ns)
-  | is_local     && opt_WarnUnusedBinds   = warnUnusedNames ns
-  | not is_local && opt_WarnUnusedImports = warnUnusedNames ns
+  | is_local     && opt_WarnUnusedBinds   = warnUnusedNames False{-include name's provenance-} ns
+  | not is_local && opt_WarnUnusedImports = warnUnusedNames False ns
   where
     is_local = isLocallyDefined n
 
@@ -689,23 +690,35 @@ warnUnusedTopName other = returnRn ()
 
 warnUnusedBinds ns
   | not opt_WarnUnusedBinds = returnRn ()
-  | otherwise		    = warnUnusedNames ns
+  | otherwise		    = warnUnusedNames False ns
 
+{-
+ Haskell 98 encourages compilers to suppress warnings about
+ unused names in a pattern if they start with "_". Which
+ we do here.
+
+ Note: omit the inclusion of the names' provenance in the
+ generated warning -- it's already given in the header
+ of the warning (+ the local names we've been given have
+ a provenance that's ultra low in content.)
+
+-}
 warnUnusedMatches names
-  | opt_WarnUnusedMatches = warnUnusedNames names
+  | opt_WarnUnusedMatches = warnUnusedNames True (filter (not.isAnonOcc.getOccName) names)
   | otherwise 		  = returnRn ()
 
-warnUnusedNames :: [Name] -> RnM s d ()
-warnUnusedNames []
+warnUnusedNames :: Bool{-display provenance-} -> [Name] -> RnM s d ()
+warnUnusedNames _ []
   = returnRn ()
 
-warnUnusedNames names 
+warnUnusedNames short_msg names 
   = addWarnRn $
     sep [text "The following names are unused:",
-	 nest 4 (vcat (map pp names))]
+	 nest 4 ((if short_msg then hsep else vcat) (map pp names))]
   where
-    pp n = ppr n <> comma <+> pprNameProvenance n
-
+    pp n 
+     | short_msg = ppr n
+     | otherwise = ppr n <> comma <+> pprNameProvenance n
 
 addNameClashErrRn rdr_name names
 {-	NO LONGER NEEDED WITH LAZY NAME-CLASH REPORTING

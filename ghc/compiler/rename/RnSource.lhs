@@ -396,9 +396,15 @@ rnConDetails doc locn (InfixCon ty1 ty2)
     rnBangTy doc ty2  		`thenRn` \ (new_ty2, fvs2) ->
     returnRn (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2)
 
-rnConDetails doc locn (NewCon ty)
-  = rnHsType doc ty			`thenRn` \ (new_ty, fvs)  ->
-    returnRn (NewCon new_ty, fvs)
+rnConDetails doc locn (NewCon ty mb_field)
+  = rnHsType doc ty			`thenRn` \ (new_ty, fvs) ->
+    rn_field mb_field			`thenRn` \ new_mb_field  ->
+    returnRn (NewCon new_ty new_mb_field, fvs)
+  where
+    rn_field Nothing  = returnRn Nothing
+    rn_field (Just f) =
+       lookupBndrRn f	    `thenRn` \ new_f ->
+       returnRn (Just new_f)
 
 rnConDetails doc locn (RecCon fields)
   = checkDupOrQualNames doc field_names	`thenRn_`

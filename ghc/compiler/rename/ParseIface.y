@@ -315,7 +315,9 @@ constr		:  src_loc ex_stuff data_fs batypes		{ mkConDecl (ifaceUnqualVar $3) $2 
 
 newtype_constr	:: { [RdrNameConDecl] {- Empty if handwritten abstract -} }
 newtype_constr	:  					{ [] }
-		| src_loc '=' ex_stuff data_name atype	{ [mkConDecl $4 $3 (NewCon $5) $1] }
+		| src_loc '=' ex_stuff data_name atype	{ [mkConDecl $4 $3 (NewCon $5 Nothing) $1] }
+		| src_loc '=' ex_stuff data_name '{' var_name '::' atype '}'
+							{ [mkConDecl $4 $3 (NewCon $8 (Just $6)) $1] }
 
 ex_stuff :: { ([HsTyVar RdrName], RdrNameContext) }
 ex_stuff	:                                       { ([],[]) }

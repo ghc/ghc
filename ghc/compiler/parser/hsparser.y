@@ -128,7 +128,7 @@ BOOLEAN pat_check=TRUE;
 
 %token	OCURLY		CCURLY		VCCURLY	
 %token  COMMA		SEMI		OBRACK		CBRACK
-%token	WILDCARD	BQUOTE		OPAREN		CPAREN
+%token	BQUOTE		OPAREN		CPAREN
 %token  OUNBOXPAREN     CUNBOXPAREN
 
 
@@ -232,10 +232,10 @@ BOOLEAN pat_check=TRUE;
 		dorest stmts stmt
 		rbinds rbinds1 rpats rpats1 list_exps list_rest
 		qvarsk qvars_list
-		constrs constr1 fields conargatypes
+		constrs fields conargatypes
 		tautypes atypes
 		types_and_maybe_ids
-  		pats simple_context simple_context_list 
+  		pats simple_context simple_context_list
 		export_list enames
   		import_list inames
  		impdecls maybeimpdecls impdecl
@@ -274,10 +274,10 @@ BOOLEAN pat_check=TRUE;
 		gcon gconk gtycon itycon qop1 qvarop1 
 		ename iname
 
-%type <ubinding>  topdecl topdecls letdecls
+%type <ubinding>  topdecl topdecls topdecls1 letdecls
 		  typed datad newtd classd instd defaultd foreignd
-		  decl decls fixdecl fix_op fix_ops valdef
- 		  maybe_where cbody rinst type_and_maybe_id
+		  decl decls decls1 fixdecl fix_op fix_ops valdef
+ 		  maybe_where type_and_maybe_id
 
 %type <uttype>    polytype
 		  conargatype conapptype
@@ -286,7 +286,7 @@ BOOLEAN pat_check=TRUE;
 		  atype polyatype
 		  simple_con_app simple_con_app1 inst_type
 
-%type <uconstr>	  constr constr_after_context field
+%type <uconstr>	  constr constr_after_context field constr1
 
 %type <ustring>   FLOAT INTEGER INTPRIM
 		  FLOATPRIM DOUBLEPRIM CLITLIT
@@ -368,7 +368,7 @@ enames  :  ename				{ $$ = lsing($1); }
 	|  enames COMMA ename			{ $$ = lapp($1,$3); }
 	;
 ename   :  qvar
-	|  qcon
+	|  gcon
 	;
 
 
@@ -392,11 +392,12 @@ impdecl	:  importkey modid impspec
 	;
 
 impspec	:  /* empty */				  { $$ = mknothing(); }
-	|  OPAREN CPAREN			  { $$ = mkjust(mkleft(Lnil)); }
-	|  OPAREN import_list CPAREN		  { $$ = mkjust(mkleft($2));   }
-	|  OPAREN import_list COMMA CPAREN	  { $$ = mkjust(mkleft($2));   }
-	|  HIDING OPAREN import_list CPAREN	  { $$ = mkjust(mkright($3));  }
-	|  HIDING OPAREN import_list COMMA CPAREN { $$ = mkjust(mkright($3));  }
+	|  OPAREN CPAREN			  { $$ = mkjust(mkleft(Lnil));  }
+	|  OPAREN import_list CPAREN		  { $$ = mkjust(mkleft($2));    }
+	|  OPAREN import_list COMMA CPAREN	  { $$ = mkjust(mkleft($2));    }
+	|  HIDING OPAREN CPAREN	  		  { $$ = mkjust(mkright(Lnil)); }
+	|  HIDING OPAREN import_list CPAREN	  { $$ = mkjust(mkright($3));   }
+	|  HIDING OPAREN import_list COMMA CPAREN { $$ = mkjust(mkright($3));   }
   	;
 
 import_list:
@@ -432,8 +433,10 @@ iname   :  var					{ $$ = mknoqual($1); }
 *                                                                     *
 **********************************************************************/
 
-topdecls:  topdecl
-	|  topdecls SEMI topdecl
+topdecls: topdecls1 opt_semi	{ $$ = $1; }
+
+topdecls1:  topdecl
+	 |  topdecls1 SEMI topdecl
 		{
 		  if($1 != NULL)
 		    if($3 != NULL)
@@ -473,31 +476,26 @@ datad	:  datakey simple_con_app EQUAL constrs deriving
 	;
 
 newtd	:  newtypekey simple_con_app EQUAL constr1 deriving
-		{ $$ = mkntbind(Lnil,$2,$4,$5,startlineno); }
+		{ $$ = mkntbind(Lnil,$2,lsing($4),$5,startlineno); }
 	|  newtypekey simple_context DARROW simple_con_app EQUAL constr1 deriving
-		{ $$ = mkntbind($2,$4,$6,$7,startlineno); }
+		{ $$ = mkntbind($2,$4,lsing($6),$7,startlineno); }
 	;
 
 deriving: /* empty */				{ $$ = mknothing(); }
         | DERIVING dtyclses                     { $$ = mkjust($2); }
 	;
 
-classd	:  classkey apptype DARROW simple_con_app1 cbody
+classd	:  classkey apptype DARROW simple_con_app1 maybe_where
 		/* Context can now be more than simple_context */
 		{ $$ = mkcbind(type2context($2),$4,$5,startlineno); }
-	|  classkey apptype cbody
+	|  classkey apptype maybe_where
 		/* We have to say apptype rather than simple_con_app1, else
 		   we get reduce/reduce errs */
 		{ check_class_decl_head($2);
 		  $$ = mkcbind(Lnil,$2,$3,startlineno); }
 	;
 
-cbody	:  /* empty */				{ $$ = mknullbind(); }
-	|  WHERE ocurly decls ccurly		{ checkorder($3); $$ = $3; }
-	|  WHERE vocurly decls vccurly		{ checkorder($3); $$ = $3; }
-	;
-
-instd	:  instkey inst_type rinst		{ $$ = mkibind($2,$3,startlineno); }
+instd	:  instkey inst_type maybe_where	{ $$ = mkibind($2,$3,startlineno); }
 	;
 
 /* Compare polytype */
@@ -508,11 +506,6 @@ inst_type : apptype DARROW apptype		{ is_context_format( $3, 0 );   /* Check the
 						  $$ = $1; }
 	  ;
 
-
-rinst	:  /* empty */					{ $$ = mknullbind(); }
-	|  WHERE ocurly  decls ccurly  			{ $$ = $3; }
-	|  WHERE vocurly decls vccurly 			{ $$ = $3; }
-	;
 
 defaultd:  defaultkey OPAREN tautypes CPAREN       { $$ = mkdbind($3,startlineno); }
 	|  defaultkey OPAREN CPAREN		{ $$ = mkdbind(Lnil,startlineno); }
@@ -543,10 +536,10 @@ unsafe_flag: UNSAFE	{ $$ = 1; }
 	   | /*empty*/  { $$ = 0; }
 	   ;
 
+decls  : decls1 opt_semi { $$ = $1; }
 
-
-decls	: decl
-	| decls SEMI decl
+decls1	: decl
+	| decls1 SEMI decl
 		{
 		  if(SAMEFN)
 		    {
@@ -557,6 +550,10 @@ decls	: decl
 		    $$ = mkabind($1,$3);
 		}
 	;
+
+opt_semi : /*empty*/
+	 | SEMI	
+	 ;
 
 /*
     Note: if there is an iclasop_pragma here, then we must be
@@ -622,7 +619,6 @@ decl	: fixdecl
 	/* end of user-specified pragmas */
 
 	|  valdef
-	|  /* empty */ { $$ = mknullbind(); FN = NULL; SAMEFN = 0; }
   	;
 
 fixdecl	:  INFIXL INTEGER	{ Precedence = checkfixity($2); Fixity = INFIXL; }
@@ -769,10 +765,11 @@ simple_con_app1:  gtycon tyvar			{ $$ = mktapp(mktname($1),mknamedtvar($2)); }
 	;
 
 simple_context	:  OPAREN simple_context_list CPAREN		{ $$ = $2; }
+	| OPAREN CPAREN						{ $$ = Lnil; }
 	|  simple_con_app1					{ $$ = lsing($1); }
 	;
 
-simple_context_list:  simple_con_app1				{ $$ = lsing($1); }
+simple_context_list :  simple_con_app1				{ $$ = lsing($1); }
 	|  simple_context_list COMMA simple_con_app1		{ $$ = lapp($1,$3); }
 	;
 
@@ -819,6 +816,7 @@ constr_after_context :
 	|  conargatype qconop conargatype	{ $$ = mkconstrinf($1,$2,$3,hsplineno); }
 
 /* Con { op1 :: Int } */
+	| qtycon OCURLY CCURLY			{ $$ = mkconstrrec($1,Lnil,hsplineno); }
 	| qtycon OCURLY fields CCURLY		{ $$ = mkconstrrec($1,$3,hsplineno); }
 	| OPAREN qconsym CPAREN OCURLY fields CCURLY { $$ = mkconstrrec($2,$5,hsplineno); }
 	;
@@ -845,7 +843,8 @@ field	:  qvars_list DCOLON polytype		{ $$ = mkfield($1,$3); }
  	|  qvars_list DCOLON BANG polyatype	{ $$ = mkfield($1,mktbang($4)); }
 	; 
 
-constr1 :  gtycon conargatype			{ $$ = lsing(mkconstrnew($1,$2,hsplineno)); }
+constr1 : gtycon conargatype			    { $$ = mkconstrnew($1,$2,mknothing(),hsplineno); }
+	| gtycon OCURLY qvar DCOLON polytype CCURLY { $$ = mkconstrnew($1,$5,mkjust($3),hsplineno); }
 	;
 
 
@@ -916,7 +915,7 @@ maybe_where:
 	   WHERE ocurly decls ccurly		{ $$ = $3; }
 	|  WHERE vocurly decls vccurly		{ $$ = $3; }
            /* A where containing no decls is OK */
-	|  WHERE SEMI				{ $$ = mknullbind(); }
+	|  WHERE 				{ $$ = mknullbind(); }
 	|  /* empty */				{ $$ = mknullbind(); }
 	;
 
@@ -1070,7 +1069,6 @@ aexp	:  qvar					{ $$ = mkident($1); }
 	/* these add 2 S/R conflict with with  aexp . OCURLY rbinds CCURLY */
 	|  qvar AT aexp				{ checkinpat(); $$ = mkas($1,$3); }
 	|  LAZY aexp				{ checkinpat(); $$ = mklazyp($2); }
-	|  WILDCARD				{ checkinpat(); $$ = mkwildp();   }
 	;
 
 	/* ccall arguments */
@@ -1093,8 +1091,7 @@ rbinds1	:  rbind				{ $$ = lsing($1); }
 	|  rbinds1 COMMA rbind			{ $$ = lapp($1,$3); }
 	;
 
-rbind  	:  qvar					{ $$ = mkrbind($1,mknothing()); }
-	|  qvar EQUAL exp			{ $$ = mkrbind($1,mkjust($3)); }
+rbind  	:  qvar EQUAL exp			{ $$ = mkrbind($1,mkjust($3)); }
 ;	
 
 texps	:  exp					{ $$ = lsing($1); }
@@ -1261,7 +1258,6 @@ apat	:  gcon		 			{ $$ = mkident($1); }
 apatc	:  qvar		 			{ $$ = mkident($1); }
 	|  qvar AT apat			 	{ $$ = mkas($1,$3); }
 	|  lit_constant				{ $$ = mklit($1); }
-	|  WILDCARD				{ $$ = mkwildp(); }
 	|  OPAREN pat CPAREN			{ $$ = mkpar($2); }
 	|  OPAREN pat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
 	|  OUNBOXPAREN pat COMMA pats CUNBOXPAREN { $$ = mkutuple(mklcons($2,$4)); }
@@ -1303,8 +1299,7 @@ rpats1	: rpat					{ $$ = lsing($1); }
 	| rpats1 COMMA rpat			{ $$ = lapp($1,$3); }
 	;
 
-rpat	:  qvar					{ $$ = mkrbind($1,mknothing()); }
-	|  qvar EQUAL pat			{ $$ = mkrbind($1,mkjust($3)); }
+rpat	:  qvar EQUAL pat			{ $$ = mkrbind($1,mkjust($3)); }
 	;
 
 
@@ -1330,7 +1325,6 @@ conpatk	:  gconk				{ $$ = mkident($1); }
 apatck	:  qvark		 		{ $$ = mkident($1); }
 	|  qvark AT apat			{ $$ = mkas($1,$3); }
 	|  lit_constant				{ $$ = mklit($1); setstartlineno(); }
-	|  WILDCARD				{ $$ = mkwildp(); setstartlineno(); }
 	|  oparenkey pat CPAREN			{ $$ = mkpar($2); }
 	|  oparenkey pat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
 	|  ounboxparenkey pat COMMA pats CUNBOXPAREN

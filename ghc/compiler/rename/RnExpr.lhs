@@ -29,7 +29,7 @@ import CmdLineOpts	( opt_GlasgowExts )
 import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
 import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
-			  monadZeroClass_RDR, enumClass_RDR, ordClass_RDR,
+			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
 			  ioDataCon_RDR
 			)
@@ -355,7 +355,7 @@ rnExpr (HsLet binds expr)
 
 rnExpr (HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
-    lookupImplicitOccRn monadZeroClass_RDR	`thenRn_`	-- Forces Monad to come too
+    lookupImplicitOccRn monadClass_RDR		`thenRn_`
     rnStmts rnExpr stmts			`thenRn` \ (stmts', fvs) ->
     returnRn (HsDo do_or_lc stmts' src_loc, fvs)
 

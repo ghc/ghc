@@ -34,6 +34,7 @@ type constr;
 	/* constr in simple "newtype" form: */
 	constrnew   : < gconnid	    : qid;
 			gconnty	    : ttype;
+			gconnla     : maybe; /* Maybe qvar */
 			gconnline   : long; >;
 
 	/* constr with a existential prefixed context C => ... */

@@ -148,7 +148,7 @@ import VarSet		( mkVarSet )
 
 import Bag		( bagToList )
 import Class		( Class, ClassInstEnv, classBigSig, classInstEnv )
-import PrelInfo		( isNumericClass, isCreturnableClass )
+import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
 import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
 			  isTyVarTy, substTopTheta, splitSigmaTy, tyVarsOfTypes
@@ -997,7 +997,11 @@ disambigGroup :: [Inst]	-- All standard classes of form (C a)
 	      -> TcM s TcDictBinds
 
 disambigGroup dicts
-  |  any isNumericClass classes 	-- Guaranteed all standard classes
+  |   any isNumericClass classes 	-- Guaranteed all standard classes
+	  -- see comment at the end of function for reasons as to 
+	  -- why the defaulting mechanism doesn't apply to groups that
+	  -- include CCallable or CReturnable dicts.
+   && not (any isCcallishClass classes)
   = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
 	-- SO, TRY DEFAULT TYPES IN ORDER
 
@@ -1051,7 +1055,37 @@ disambigGroup dicts
     classes     = map get_clas dicts
 \end{code}
 
+[Aside - why the defaulting mechanism is turned off when
+ dealing with arguments and results to ccalls.
 
+When typechecking _ccall_s, TcExpr ensures that the external
+function is only passed arguments (and in the other direction,
+results) of a restricted set of 'native' types. This is
+implemented via the help of the pseudo-type classes,
+@CReturnable@ (CR) and @CCallable@ (CC.)
+ 
+The interaction between the defaulting mechanism for numeric
+values and CC & CR can be a bit puzzling to the user at times.
+For example,
+
+    x <- _ccall_ f
+    if (x /= 0) then
+       _ccall_ g x
+     else
+       return ()
+
+What type has 'x' got here? That depends on the default list
+in operation, if it is equal to Haskell 98's default-default
+of (Integer, Double), 'x' has type Double, since Integer
+is not an instance of CR. If the default list is equal to
+Haskell 1.4's default-default of (Int, Double), 'x' has type
+Int. 
+
+To try to minimise the potential for surprises here, the
+defaulting mechanism is turned off in the presence of
+CCallable and CReturnable.
+
+]
 
 Errors and contexts
 ~~~~~~~~~~~~~~~~~~~

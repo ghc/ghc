@@ -563,7 +563,6 @@ checknobangs(app)
     }
 }
 
-
 /* Check that a type is of the form
 	C a1 a2 .. an
    where n>=1, and the ai are all type variables

@@ -417,6 +417,9 @@ we use both @con2tag_Foo@ and @tag2con_Foo@ functions, as well as a
 
 \begin{verbatim}
 instance ... Enum (Foo ...) where
+    succ x   = toEnum (1 + fromEnum x)
+    pred x   = toEnum (fromEnum x - 1)
+
     toEnum i = tag2con_Foo i
 
     enumFrom a = map tag2con_Foo [con2tag_Foo a .. maxtag_Foo]
@@ -443,16 +446,49 @@ For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 gen_Enum_binds :: TyCon -> RdrNameMonoBinds
 
 gen_Enum_binds tycon
-  = to_enum             `AndMonoBinds`
+  = succ_enum		`AndMonoBinds`
+    pred_enum		`AndMonoBinds`
+    to_enum             `AndMonoBinds`
     enum_from		`AndMonoBinds`
     enum_from_then	`AndMonoBinds`
     from_enum
   where
     tycon_loc = getSrcLoc tycon
+    occ_nm    = getOccString tycon
+
+    succ_enum
+      = mk_easy_FunMonoBind tycon_loc succ_RDR [a_Pat] [] $
+	untag_Expr tycon [(a_RDR, ah_RDR)] $
+	HsIf (HsApp (HsApp (HsVar eq_RDR) 
+			   (HsVar (maxtag_RDR tycon)))
+			   (mk_easy_App mkInt_RDR [ah_RDR]))
+	     (illegal_Expr "succ" occ_nm "tried to take `succ' of last tag in enumeration")
+	     (HsApp (HsVar (tag2con_RDR tycon))
+		    (HsApp (HsApp (HsVar plus_RDR)
+				  (mk_easy_App mkInt_RDR [ah_RDR]))
+ 			   (HsLit (HsInt 1))))
+	     tycon_loc
+		    
+    pred_enum
+      = mk_easy_FunMonoBind tycon_loc pred_RDR [a_Pat] [] $
+	untag_Expr tycon [(a_RDR, ah_RDR)] $
+	HsIf (HsApp (HsApp (HsVar eq_RDR) (HsLit (HsInt 0)))
+		    (mk_easy_App mkInt_RDR [ah_RDR]))
+	     (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
+	     (HsApp (HsVar (tag2con_RDR tycon))
+			   (HsApp (HsApp (HsVar plus_RDR)
+					 (mk_easy_App mkInt_RDR [ah_RDR]))
+				  (HsLit (HsInt (-1)))))
+	     tycon_loc
 
     to_enum
       = mk_easy_FunMonoBind tycon_loc toEnum_RDR [a_Pat] [] $
-        mk_easy_App (tag2con_RDR tycon) [a_RDR]
+	HsIf (HsApp (HsApp (HsVar gt_RDR) 
+			   (HsVar a_RDR))
+			   (HsVar (maxtag_RDR tycon)))
+	     (illegal_toEnum_tag occ_nm (maxtag_RDR tycon))
+             (mk_easy_App (tag2con_RDR tycon) [a_RDR])
+	     tycon_loc
 
     enum_from
       = mk_easy_FunMonoBind tycon_loc enumFrom_RDR [a_Pat] [] $
@@ -1156,6 +1192,30 @@ nested_compose_Expr (e:es)
 -- impossible_Expr is used in case RHSs that should never happen.
 -- We generate these to keep the desugarer from complaining that they *might* happen!
 impossible_Expr = HsApp (HsVar error_RDR) (HsLit (HsString (_PK_ "Urk! in TcGenDeriv")))
+
+-- illegal_Expr is used when signalling error conditions in the RHS of a derived
+-- method. It is currently only used by Enum.{succ,pred}
+illegal_Expr meth tp msg = 
+   HsApp (HsVar error_RDR) (HsLit (HsString (_PK_ (meth ++ '{':tp ++ "}: " ++ msg))))
+
+-- illegal_toEnum_tag is an extended version of illegal_Expr, which also allows you
+-- to include the value of a_RDR in the error string.
+illegal_toEnum_tag tp maxtag =
+   HsApp (HsVar error_RDR) 
+         (HsApp (HsApp (HsVar append_RDR)
+	               (HsLit (HsString (_PK_ ("toEnum{" ++ tp ++ "}: tag (")))))
+	               (HsApp (HsApp (HsApp 
+		           (HsVar showsPrec_RDR)
+			   (HsLit (HsInt 0)))
+   		           (HsVar a_RDR))
+			   (HsApp (HsApp 
+			       (HsVar append_RDR)
+			       (HsLit (HsString (_PK_ ") is outside of enumeration's range (0,"))))
+			       (HsApp (HsApp (HsApp 
+					(HsVar showsPrec_RDR)
+				        (HsLit (HsInt 0)))
+					(HsVar maxtag))
+					(HsLit (HsString (_PK_ ")")))))))
 
 parenify e@(HsVar _) = e
 parenify e	     = HsPar e

@@ -44,14 +44,22 @@ type2context(t)
 
 	return(gttuple(t)); /* args */
 	
-
-      case tapp:
       case tname:
+	switch(tqid(gtypeid(t))) {
+   	  case gid:
+	     if (strcmp("()",gidname(gtypeid(t))) == 0)
+	       return (Lnil);
+          default: ;
+        }
+      case tapp:
 	/* a single item, ensure correct format */
 	is_context_format(t, 0);
 	return(lsing(t));
 
       case namedtvar:
+	fprintf(stderr, "namedtvar: %d %s\n", hashIds, gnamedtvar(t));
+        if (strcmp("()", gnamedtvar(t)) == 0)
+	       return (Lnil);
     	hsperror ("type2context: unexpected namedtvar found in a context");
 
       case tllist:
