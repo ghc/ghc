@@ -176,17 +176,9 @@ SRC_HC_PRE_OPTS  += $(HC_PRE__)
 #
 # ToDo: make these more robust
 #
-%.dvi : %.tex
-	@$(RM) $@
-	$(LTX) $<
-
 %.ps : %.dvi
 	@$(RM) $@
 	dvips $< -o $@
-
-%.tex : %.verb
-	@$(RM) $*.tex
-	expand $*.verb | $(VERBATIM) > $*.tex
 
 %.tex : %.tib
 	@$(RM) $*.tex $*.verb-t.tex
