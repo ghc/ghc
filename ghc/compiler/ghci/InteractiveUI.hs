@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.19 2000/11/28 12:58:02 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.20 2000/11/28 14:41:54 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -43,20 +43,23 @@ ghciWelcomeMsg = "\
 \||   || ||   || ||     (|     Bug reports to: glasgow-haskell-bugs@haskell.org \n\ 
 \(|___|| ||   || (|__|) \\\\______________________________________________________\n"
 
-commands :: [(String, String -> GHCi ())]
+commands :: [(String, String -> GHCi Bool)]
 commands = [
-  ("add",	addModule),
-  ("cd",    	changeDirectory),
-  ("help",	help),
-  ("?",		help),
-  ("load",	loadModule),
-  ("module",	setContext),
-  ("reload",	reloadModule),
-  ("set",	setOptions),
-  ("type",	typeOfExpr),
-  ("unset",	unsetOptions),
+  ("add",	keepGoing addModule),
+  ("cd",    	keepGoing changeDirectory),
+  ("help",	keepGoing help),
+  ("?",		keepGoing help),
+  ("load",	keepGoing loadModule),
+  ("module",	keepGoing setContext),
+  ("reload",	keepGoing reloadModule),
+  ("set",	keepGoing setOptions),
+  ("type",	keepGoing typeOfExpr),
+  ("unset",	keepGoing unsetOptions),
   ("quit",	quit)
   ]
+
+keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
+keepGoing a str = a str >> return False
 
 shortHelpText = "use :? for help.\n"
 
@@ -128,15 +131,19 @@ uiLoop = do
 #ifndef NO_READLINE
           io (addHistory l)
 #endif
-  	  runCommand l
-	  uiLoop  
+  	  quit <- runCommand l
+          if quit then exitGHCi else uiLoop
 
 exitGHCi = io $ do putStrLn "Leaving GHCi." 
 
 -- Top level exception handler, just prints out the exception 
 -- and carries on.
+runCommand :: String -> GHCi Bool
 runCommand c = 
-  ghciHandle ( \other_exception ->io (putStrLn (show other_exception) )) $
+  ghciHandle ( 
+     \other_exception 
+        -> io (putStrLn (show other_exception)) >> return False
+  ) $
   ghciHandleDyn
     (\dyn -> case dyn of
 		PhaseFailed phase code ->
@@ -144,11 +151,12 @@ runCommand c =
 				        ++ show code ++ ")"))
 		Interrupted -> io (putStrLn "Interrupted.")
 		_ -> io (putStrLn (show (dyn :: BarfKind)))
+             >> return False
     ) $
    doCommand c
 
 doCommand (':' : command) = specialCommand command
-doCommand expr            = timeIt (evalExpr expr)
+doCommand expr            = timeIt (evalExpr expr) >> return False
 
 evalExpr expr
  = do st <- getGHCiState
@@ -172,17 +180,18 @@ evalExpr expr
   return ()
 -}
 
-specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
+specialCommand :: String -> GHCi Bool
+specialCommand ('!':str) = shellEscape (dropWhile isSpace str) 
 specialCommand str = do
   let (cmd,rest) = break isSpace str
   case [ (s,f) | (s,f) <- commands, prefixMatch cmd s ] of
-     []      -> io $ hPutStr stdout ("unknown command `:" ++ cmd ++ "'\n" 
-				    ++ shortHelpText)
+     []      -> io (hPutStr stdout ("unknown command `:" ++ cmd ++ "'\n" 
+		                    ++ shortHelpText) >> return False)
      [(_,f)] -> f (dropWhile isSpace rest)
-     cs      -> io $ hPutStrLn stdout ("prefix " ++ cmd ++ 
-			    	       " matches multiple commands (" ++ 
+     cs      -> io (hPutStrLn stdout ("prefix " ++ cmd ++ 
+			    	      " matches multiple commands (" ++ 
 	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs)
-					 ++ ")")
+					 ++ ")") >> return False)
 
 noArgs c = io (hPutStrLn stdout ("command `:" ++ c ++ "' takes no arguments"))
 
@@ -205,7 +214,7 @@ setContext m
        setGHCiState st{current_module = mkModuleName m}
 
 changeDirectory :: String -> GHCi ()
-changeDirectory = io . setCurrentDirectory
+changeDirectory d = io (setCurrentDirectory d)
 
 loadModule :: String -> GHCi ()
 loadModule path = timeIt (loadModule' path)
@@ -261,13 +270,13 @@ typeOfExpr str
 				(current_module st) str)
        case maybe_ty of
 	 Nothing -> return ()
-	 Just (_, unqual, ty) -> io (printForUser stdout unqual (ppr ty))
+	 Just (_, unqual, ty) -> io (printForUser stdout unqual (ppr ty)) 
 
-quit :: String -> GHCi ()
-quit _ = exitGHCi
+quit :: String -> GHCi Bool
+quit _ = return True
 
-shellEscape :: String -> GHCi ()
-shellEscape str = io (system str >> return ())
+shellEscape :: String -> GHCi Bool
+shellEscape str = io (system str >> return False)
 
 ----------------------------------------------------------------------------
 -- Code for `:set'
