@@ -20,6 +20,8 @@
 
 module Control.Arrow where
 
+import Prelude
+
 import Control.Monad
 import Control.Monad.Fix
 

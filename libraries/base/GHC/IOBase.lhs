@@ -24,7 +24,10 @@ import Data.Maybe  ( Maybe(..) )
 import GHC.Show
 import GHC.List
 import GHC.Read
+
+#ifndef __HADDOCK__
 import {-# SOURCE #-} Data.Dynamic
+#endif
 
 -- ---------------------------------------------------------------------------
 -- The IO Monad
@@ -270,22 +273,22 @@ type FilePath = String
 -- effects. For output, items are written out from the internal
 -- buffer according to the buffer mode:
 --
--- * line-buffering  the entire output buffer is written
+-- o line-buffering  the entire output buffer is written
 --   out whenever a newline is output, the output buffer overflows, 
 --   a flush is issued, or the handle is closed.
 --
--- * block-buffering the entire output buffer is written out whenever 
+-- o block-buffering the entire output buffer is written out whenever 
 --   it overflows, a flush is issued, or the handle
 --   is closed.
 --
--- * no-buffering output is written immediately, and never stored
+-- o no-buffering output is written immediately, and never stored
 --   in the output buffer.
 --
 -- The output buffer is emptied as soon as it has been written out.
 
 -- Similarly, input occurs according to the buffer mode for handle {\em hdl}.
 
--- * line-buffering when the input buffer for the handle is not empty,
+-- o line-buffering when the input buffer for the handle is not empty,
 --   the next item is obtained from the buffer;
 --   otherwise, when the input buffer is empty,
 --   characters up to and including the next newline
@@ -293,10 +296,10 @@ type FilePath = String
 --   are available until the newline character is
 --   available.
 --
--- * block-buffering when the input buffer for the handle becomes empty,
+-- o block-buffering when the input buffer for the handle becomes empty,
 --   the next block of data is read into this buffer.
 --
--- * no-buffering the next input item is read and returned.
+-- o no-buffering the next input item is read and returned.
 
 -- For most implementations, physical files will normally be block-buffered 
 -- and terminals will normally be line-buffered. (the IO interface provides

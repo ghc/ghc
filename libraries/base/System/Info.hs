@@ -9,7 +9,7 @@
 -- Portability :  portable
 --
 -- Misc information about the characteristics of the host 
--- architecture/machine lucky enough to run your program.
+-- architecture\/machine lucky enough to run your program.
 --
 -----------------------------------------------------------------------------
 

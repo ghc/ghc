@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- A Haskell port of GNU's getopt library 
+-- A Haskell port of the GNU getopt library 
 --
 -----------------------------------------------------------------------------
 

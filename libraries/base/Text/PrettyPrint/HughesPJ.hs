@@ -8,12 +8,12 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- John Hughes's and Simon Peyton Jones's Pretty Printer Combinators
+-- John Hughes\'s and Simon Peyton Jones\'s Pretty Printer Combinators
 -- 
--- Based on "The Design of a Pretty-printing Library"
+-- Based on /The Design of a Pretty-printing Library/
 -- in Advanced Functional Programming,
 -- Johan Jeuring and Erik Meijer (eds), LNCS 925
--- http://www.cs.chalmers.se/~rjmh/Papers/pretty.ps
+-- <http://www.cs.chalmers.se/~rjmh/Papers/pretty.ps>
 --
 -- Heavily modified by Simon Peyton Jones, Dec 96
 --

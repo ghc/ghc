@@ -11,12 +11,11 @@
 --
 -- The Fix monad.
 --
---	  Inspired by the paper:
---	  \em{Functional Programming with Overloading and
---	      Higher-Order Polymorphism},
---	    \A[HREF="http://www.cse.ogi.edu/~mpj"]{Mark P Jones},
---		  Advanced School of Functional Programming, 1995.}
---
+--	  Inspired by the paper
+--	  /Functional Programming with Overloading and
+--	      Higher-Order Polymorphism/, 
+--	    Mark P Jones (<http://www.cse.ogi.edu/~mpj>)
+--		  Advanced School of Functional Programming, 1995.
 -----------------------------------------------------------------------------
 
 module Control.Monad.Fix (

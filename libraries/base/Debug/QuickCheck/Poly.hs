@@ -26,6 +26,8 @@ module Debug.QuickCheck.Poly
   , OrdGAMMA
   ) where
 
+import Prelude
+
 import Debug.QuickCheck
 import Debug.QuickCheck.Utils
 

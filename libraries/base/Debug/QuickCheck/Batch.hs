@@ -88,6 +88,8 @@ module Debug.QuickCheck.Batch
    , bottom		-- :: a 		{- _|_ -}
    ) where
 
+import Prelude
+
 import System.Random
 import Control.Concurrent
 import Control.Exception hiding (catch, evaluate)

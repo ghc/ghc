@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Mutable boxed/unboxed arrays in the IO monad.
+-- Mutable boxed and unboxed arrays in the IO monad.
 --
 -----------------------------------------------------------------------------
 

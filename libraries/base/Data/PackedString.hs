@@ -10,7 +10,7 @@
 --
 -- The PackedString type, and associated operations.
 --
--- Original GHC implementation by Bryan O'Sullivan, 
+-- Original GHC implementation by Bryan O\'Sullivan, 
 -- rewritten to use UArray by Simon Marlow.
 --
 -----------------------------------------------------------------------------

@@ -20,6 +20,8 @@ module Debug.QuickCheck.Utils
   , isTotalOrder
   ) where
 
+import Prelude
+
 import Debug.QuickCheck
 
 isAssociativeBy :: (Show a,Testable prop) 

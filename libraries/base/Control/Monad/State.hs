@@ -7,16 +7,15 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable ( requires mulit-parameter type classes,
---				 requires functional dependencies )
+-- Portability :  non-portable ( mulit-param classes, functional dependencies )
 --
 -- State monads.
 --
 --	  Inspired by the paper
---	  \em{Functional Programming with Overloading and
---	      Higher-Order Polymorphism},
---	    \A[HREF="http://www.cse.ogi.edu/~mpj"]{Mark P Jones},
---		  Advanced School of Functional Programming, 1995.}
+--	  /Functional Programming with Overloading and
+--	      Higher-Order Polymorphism/, 
+--	    Mark P Jones (<http://www.cse.ogi.edu/~mpj>)
+--		  Advanced School of Functional Programming, 1995.
 -----------------------------------------------------------------------------
 
 module Control.Monad.State (

@@ -67,6 +67,8 @@ module Debug.QuickCheck
   )
  where
 
+import Prelude
+
 import System.Random
 import Data.List( group, sort, intersperse )
 import Control.Monad( liftM2, liftM3, liftM4 )

@@ -10,9 +10,9 @@
 --
 -- The Error monad.
 --
--- Rendered by Michael Weber <michael.weber@post.rwth-aachen.de>,
+-- Rendered by Michael Weber <mailto:michael.weber@post.rwth-aachen.de>,
 --	inspired by the Haskell Monad Template Library from
---	 \A[HREF="http://www.cse.ogi.edu/~andy"]{Andy Gill}}
+--	Andy Gill (<http://www.cse.ogi.edu/~andy>)
 --
 -----------------------------------------------------------------------------
 
