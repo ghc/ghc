@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.3 1999/01/13 17:25:42 simonm Exp $
+ * $Id: RtsFlags.c,v 1.4 1999/01/19 15:07:55 simonm Exp $
  *
  * Functions for parsing the argument list.
  *
@@ -62,8 +62,10 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
 
     RtsFlags.GcFlags.minAllocAreaSize   = (256 * 1024)        / BLOCK_SIZE;
+    RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize	= (64  * 1024 * 1024) / BLOCK_SIZE;
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
+    RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.generations        = 2;
 
     RtsFlags.GcFlags.forceGC		= rtsFalse;
@@ -429,6 +431,13 @@ error = rtsTrue;
 		RtsFlags.GcFlags.ringBell = rtsTrue;
 		break;
 
+	      case 'F':
+	        RtsFlags.GcFlags.oldGenFactor = atof(rts_argv[arg]+2);
+	      
+		if (RtsFlags.GcFlags.oldGenFactor < 0)
+		  bad_option( rts_argv[arg] );
+		break;
+	      
 #ifdef DEBUG
 	      case 'D':
   	        /* hack warning: interpret the flags as a binary number */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.12 1999/01/18 16:05:15 simonm Exp $
+ * $Id: GC.c,v 1.13 1999/01/19 15:07:53 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -386,8 +386,8 @@ void GarbageCollect(void (*get_roots)(void))
    */
   if (major_gc) {
     oldest_gen->max_blocks = 
-      stg_max(oldest_gen->steps[0].to_blocks * 2,
-	      RtsFlags.GcFlags.minAllocAreaSize * 4);
+      stg_max(oldest_gen->steps[0].to_blocks * RtsFlags.GcFlags.oldGenFactor,
+	      RtsFlags.GcFlags.minOldGenSize);
     if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
       oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
       if (((int)oldest_gen->max_blocks - (int)oldest_gen->steps[0].to_blocks) < 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.3 1999/01/13 17:25:47 simonm Exp $
+ * $Id: Storage.c,v 1.4 1999/01/19 15:07:56 simonm Exp $
  *
  * Storage manager front end
  *
@@ -70,7 +70,7 @@ initStorage (void)
   generations[g].n_steps = 1;
   generations[g].steps = 
     stgMallocBytes(1 * sizeof(struct _step), "initStorage: last step");
-  generations[g].max_blocks = RtsFlags.GcFlags.minAllocAreaSize * 4;
+  generations[g].max_blocks = RtsFlags.GcFlags.minOldGenSize;
   step = &generations[g].steps[0];
   step->no = 0;
   step->gen = &generations[g];
@@ -86,7 +86,7 @@ initStorage (void)
     generations[g].n_steps = 2;
     generations[g].steps  = stgMallocBytes (2 * sizeof(struct _step),
 					    "initStorage: steps");
-    generations[g].max_blocks = RtsFlags.GcFlags.minAllocAreaSize * 4;
+    generations[g].max_blocks = RtsFlags.GcFlags.minOldGenSize;
   }
 
   for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {

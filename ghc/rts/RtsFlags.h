@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.3 1999/01/13 17:25:43 simonm Exp $
+ * $Id: RtsFlags.h,v 1.4 1999/01/19 15:07:55 simonm Exp $
  *
  * Datatypes that holds the command-line flag settings.
  *
@@ -21,6 +21,8 @@ struct GC_FLAGS {
 
     nat	    maxHeapSize;        /* in *blocks* */
     nat     minAllocAreaSize;   /* in *blocks* */
+    nat     minOldGenSize;      /* in *blocks* */
+    double  oldGenFactor;
     double  pcFreeHeap;
 
     nat     generations;
