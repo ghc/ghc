@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.6 2002/04/29 15:28:54 simonmar Exp $
+$Id: HsParser.ly,v 1.7 2002/05/06 12:32:32 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -294,9 +294,9 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 > topdecl :: { HsDecl }
 >	: 'type' simpletype srcloc '=' type	
 >			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
->	| 'data' ctype srcloc '=' constrs deriving
+>	| 'data' ctype srcloc constrs deriving
 >			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
->			   returnP (HsDataDecl $3 cs c t (reverse $5) $6) }
+>			   returnP (HsDataDecl $3 cs c t (reverse $4) $5) }
 >	| 'newtype' ctype srcloc '=' constr deriving
 >			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
 >			   returnP (HsNewTypeDecl $3 cs c t $5 $6) }
@@ -439,7 +439,11 @@ C a, or (C1 a, C2 b, ... Cn z) and convert it into a context.  Blaach!
 Datatype declarations
 
 > constrs :: { [HsConDecl] }
->	: constrs '|' constr		{ $3 : $1 }
+> 	  : {- empty; a GHC extension -}  { [] }
+> 	  | '=' constrs1                  { $2 }
+
+> constrs1 :: { [HsConDecl] }
+>	: constrs1 '|' constr		{ $3 : $1 }
 >	| constr			{ [$1] }
 
 > constr :: { HsConDecl }
