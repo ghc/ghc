@@ -304,6 +304,10 @@ dnl AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 
+AC_PATH_PROG(GHC,ghc)
+AC_PATH_PROGS(NHC,nhc nhc98)
+AC_PATH_PROG(HBC,hbc)
+
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options
 dnl --------------------------------------------------------------
@@ -321,7 +325,7 @@ AC_ARG_WITH(hc,
          recent version of GHC, but you could always try...)
 ],
 [WithHc="$withval"],
-[WithHc="ghc"]
+[WithHc=$GHC]
 )
 AC_SUBST(WithHc)
 

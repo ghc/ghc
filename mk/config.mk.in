@@ -147,7 +147,7 @@ IncludeTestDirsInBuild=NO
 #		       	     HC_ROJEMO_NHC
 #		       	     HC_UNSPECIFIED
 
-WithGhcHc = @WithHc@
+WithGhcHc = $(HC)
 
 # Variable which is set to the version number of the $(WithGhcHc) we're using.
 # Not currently used, but might come in handy sometime soon.
@@ -190,9 +190,13 @@ GhcWithNativeCodeGen=$(shell if (test x$(findstring $(HostArch_CPP),i386 alpha s
 BuildingParallel=$(subst mp,YES,$(filter mp,$(WAYS)))
 BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 
-#---------------------------------------------------------------
+# Include compiler support for letting the compiler (optionally) report
+# your compilation to a central server for generation of fun stats.
 #
-# Variables that control how the prelude libraries and runtime system are built
+GhcReportCompiles=NO
+
+#------------------------------------------------------------------------------
+# Options for GHC's Prelude
 
 # What extra ways to build the libraries in
 # In addition to the normal sequential way, the default is to also build
@@ -217,13 +221,46 @@ else
 GhcLibHcOpts=-O -split-objs -odir $*
 endif
 
-# Option flags to pass to GHC when it's compiling RTS modules
-# This is a good way to set things like -optc-g and -optc-DDEBUG for the RTS.
-# GhcRtsHcOpts is used when compiling .hc files.
-# GhcRtsCcOpts is used when compiling .c  files.
+# Win32 only: Enable the RTS and libraries to be built as DLLs
+#
+EnableWin32DLLs=@EnableWin32DLLs@
 
+# Strip local symbols from libraries?  This can make the libraries smaller,
+# but makes debugging somewhat more difficult.  Doesn't work with all ld's.
+#
+StripLibraries=NO
+
+# ----------------------------------------------------------------------------
+# Options for GHC's RTS
+
+# This is a good way to set things like -optc-g and -optc-DDEBUG for the RTS.
+# GhcRtsHcOpts is used when compiling .hc files and .c files.
+# GhcRtsCcOpts is used when compiling .c  files only.
+
+# For a debugging RTS:
+# GhcRtsHcOpts = -optc-DDEBUG
+# GhcRtsCcOpts = -optc-g
+
+# For an optimised RTS:
 GhcRtsHcOpts=-O2
 GhcRtsCcOpts=-O2 -optc-fomit-frame-pointer
+
+################################################################################
+#
+#		hslibs project
+#
+################################################################################
+
+# Build HsLibs for which compiler?  
+
+# If $(HsLibsFor) == hugs or ghc, we assume we're building for the
+# compiler/interpreter in the same source tree.
+
+# HsLibsFor = ghc | hugs | nhc | hbc
+HsLibsFor	= ghc
+
+# hslibs for GHC also uses the following variables (defined above):
+#   GhcLibWays, GhcLibHcOpts, EnableWin32DLLs, StripLibraries
 
 # Build the Haskell Readline bindings?
 #
@@ -235,20 +272,6 @@ GhcLibsWithReadline=NO
 ReadlineIncludePath=
 HaveLibReadline=@HaveLibReadline@
 
-# Strip local symbols from libraries?  This can make the libraries smaller,
-# but makes debugging somewhat more difficult.  Doesn't work with all ld's.
-#
-StripLibraries=NO
-
-# Include compiler support for letting the compiler (optionally) report
-# your compilation to a central server for generation of fun stats.
-#
-GhcReportCompiles=NO
-
-# Win32 only: Enable the RTS and libraries to be built as DLLs
-#
-EnableWin32DLLs=@EnableWin32DLLs@
-
 ################################################################################
 #
 #		happy project
@@ -258,7 +281,7 @@ EnableWin32DLLs=@EnableWin32DLLs@
 ################################################################################
 
 # The compiler you'd like to use to compile Happy
-WithHappyHc = @WithHc@
+WithHappyHc = $(HC)
 
 # HappyHcOpts gives the flags to pass to the Haskell compiler used
 # 	      to compile the Happy sources with.
@@ -466,11 +489,20 @@ HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
 
 
 #-----------------------------------------------------------------------------
-# Haskell compiler and mkdependHS
+# Haskell compilers and mkdependHS
 
-# ToDo: $(HC) should be a local installation of some Haskell compiler
-HC		= $(FPTOOLS_TOP)/ghc/driver/ghc-inplace
-MKDEPENDHS	= $(HC)
+# $(GHC), $(HBC) and $(NHC) point to installed versions of the relevant
+# compilers, if available.
+#
+# $(HC) is a generic Haskell 98 compiler, set to $(GHC) by default.
+# $(MKDEPENDHS) is the Haskell dependency generator (ghc -M).
+
+GHC		= @GHC@
+HBC		= @HBC@
+NHC		= @NHC@
+
+HC		= @WithHc@
+MKDEPENDHS	= $(GHC)
 
 #-----------------------------------------------------------------------------
 # C compiler
