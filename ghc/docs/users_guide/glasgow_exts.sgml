@@ -2162,86 +2162,6 @@ declarations.  Define your own instances!
 
 </sect1>
 
-<sect1 id="sec-assertions">
-<title>Assertions
-<indexterm><primary>Assertions</primary></indexterm>
-</title>
-
-<para>
-If you want to make use of assertions in your standard Haskell code, you
-could define a function like the following:
-</para>
-
-<para>
-
-<programlisting>
-assert :: Bool -> a -> a
-assert False x = error "assertion failed!"
-assert _     x = x
-</programlisting>
-
-</para>
-
-<para>
-which works, but gives you back a less than useful error message --
-an assertion failed, but which and where?
-</para>
-
-<para>
-One way out is to define an extended <function>assert</function> function which also
-takes a descriptive string to include in the error message and
-perhaps combine this with the use of a pre-processor which inserts
-the source location where <function>assert</function> was used.
-</para>
-
-<para>
-Ghc offers a helping hand here, doing all of this for you. For every
-use of <function>assert</function> in the user's source:
-</para>
-
-<para>
-
-<programlisting>
-kelvinToC :: Double -> Double
-kelvinToC k = assert (k &gt;= 0.0) (k+273.15)
-</programlisting>
-
-</para>
-
-<para>
-Ghc will rewrite this to also include the source location where the
-assertion was made,
-</para>
-
-<para>
-
-<programlisting>
-assert pred val ==> assertError "Main.hs|15" pred val
-</programlisting>
-
-</para>
-
-<para>
-The rewrite is only performed by the compiler when it spots
-applications of <function>Exception.assert</function>, so you can still define and
-use your own versions of <function>assert</function>, should you so wish. If not,
-import <literal>Exception</literal> to make use <function>assert</function> in your code.
-</para>
-
-<para>
-To have the compiler ignore uses of assert, use the compiler option
-<option>-fignore-asserts</option>. <indexterm><primary>-fignore-asserts option</primary></indexterm> That is,
-expressions of the form <literal>assert pred e</literal> will be rewritten to <literal>e</literal>.
-</para>
-
-<para>
-Assertion failures can be caught, see the documentation for the
-<literal>Exception</literal> library (<xref linkend="sec-Exception">)
-for the details.
-</para>
-
-</sect1>
-
 <sect1 id="scoped-type-variables">
 <title>Scoped Type Variables
 </title>
@@ -2623,7 +2543,146 @@ in <literal>f4</literal>'s scope.
 </para>
 
 </sect2>
+</sect1>
 
+<sect1 id="sec-kinding">
+<title>Explicitly-kinded quantification</title>
+
+<para>
+Haskell infers the kind of each type variable.  Sometimes it is nice to be able
+to give the kind explicitly as (machine-checked) documentation, 
+just as it is nice to give a type signature for a function.  On some occasions,
+it is essential to do so.  For example, in his paper "Restricted Data Types in Haskell" (Haskell Workshop 1999)
+John Hughes had to define the data type:
+<Screen>
+     data Set cxt a = Set [a]
+                    | Unused (cxt a -> ())
+</Screen>
+The only use for the <literal>Unused</literal> constructor was to force the correct
+kind for the type variable <literal>cxt</literal>.
+</para>
+<para>
+GHC allows you to specify the kind of a type variable directly, wherever
+a type variable is explicitly bound.  Namely:
+<itemizedlist>
+<listitem><para><literal>data</literal> declarations:
+<Screen>
+  data Set (cxt :: * -> *) a = Set [a]
+</Screen></para></listitem>
+<listitem><para><literal>type</literal> declarations:
+<Screen>
+  type T (f :: * -> *) = f Int
+</Screen></para></listitem>
+<listitem><para><literal>class</literal> declarations:
+<Screen>
+  class (Eq a) => C (f :: * -> *) a where ...
+</Screen></para></listitem>
+<listitem><para><literal>forall</literal>'s in type signatures:
+<Screen>
+  f :: forall (cxt :: * -> *). Set cxt Int
+</Screen></para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+The parentheses are required.  Some of the spaces are required too, to
+separate the lexemes.  If you write <literal>(f::*->*)</literal> you
+will get a parse error, because "<literal>::*->*</literal>" is a
+single lexeme in Haskell.
+</para>
+
+<para>
+As part of the same extension, you can put kind annotations in types
+as well.  Thus:
+<Screen>
+   f :: (Int :: *) -> Int
+   g :: forall a. a -> (a :: *)
+</Screen>
+The syntax is
+<Screen>
+   atype ::= '(' ctype '::' kind ')
+</Screen>
+The parentheses are required.
+</para>
+</sect1>
+  
+<sect1 id="sec-assertions">
+<title>Assertions
+<indexterm><primary>Assertions</primary></indexterm>
+</title>
+
+<para>
+If you want to make use of assertions in your standard Haskell code, you
+could define a function like the following:
+</para>
+
+<para>
+
+<programlisting>
+assert :: Bool -> a -> a
+assert False x = error "assertion failed!"
+assert _     x = x
+</programlisting>
+
+</para>
+
+<para>
+which works, but gives you back a less than useful error message --
+an assertion failed, but which and where?
+</para>
+
+<para>
+One way out is to define an extended <function>assert</function> function which also
+takes a descriptive string to include in the error message and
+perhaps combine this with the use of a pre-processor which inserts
+the source location where <function>assert</function> was used.
+</para>
+
+<para>
+Ghc offers a helping hand here, doing all of this for you. For every
+use of <function>assert</function> in the user's source:
+</para>
+
+<para>
+
+<programlisting>
+kelvinToC :: Double -> Double
+kelvinToC k = assert (k &gt;= 0.0) (k+273.15)
+</programlisting>
+
+</para>
+
+<para>
+Ghc will rewrite this to also include the source location where the
+assertion was made,
+</para>
+
+<para>
+
+<programlisting>
+assert pred val ==> assertError "Main.hs|15" pred val
+</programlisting>
+
+</para>
+
+<para>
+The rewrite is only performed by the compiler when it spots
+applications of <function>Exception.assert</function>, so you can still define and
+use your own versions of <function>assert</function>, should you so wish. If not,
+import <literal>Exception</literal> to make use <function>assert</function> in your code.
+</para>
+
+<para>
+To have the compiler ignore uses of assert, use the compiler option
+<option>-fignore-asserts</option>. <indexterm><primary>-fignore-asserts option</primary></indexterm> That is,
+expressions of the form <literal>assert pred e</literal> will be rewritten to <literal>e</literal>.
+</para>
+
+<para>
+Assertion failures can be caught, see the documentation for the
+<literal>Exception</literal> library (<xref linkend="sec-Exception">)
+for the details.
+</para>
 
 </sect1>
 
