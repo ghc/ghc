@@ -143,10 +143,6 @@ type ModuleName = EncodedFS
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
 
-type ModuleNameSet = FiniteMap ModuleName
-elemModuleNameSet  s x = elemFM s x
-moduleNameSetElems s   = eltsFM s
-
 
 pprModuleName :: ModuleName -> SDoc
 pprModuleName nm = pprEncodedFS nm
