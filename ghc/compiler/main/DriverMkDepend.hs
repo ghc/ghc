@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.7 2000/12/12 14:35:08 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.8 2001/03/28 11:01:19 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -164,8 +164,8 @@ endMkDependHS = do
 	(unwords [ "cp", tmp_file, makefile ])
 
 
-findDependency :: Bool -> String -> ModuleName -> IO (Maybe (String, Bool))
-findDependency is_source mod imp = do
+findDependency :: Bool -> FilePath -> ModuleName -> IO (Maybe (String, Bool))
+findDependency is_source src imp = do
    dir_contents <- readIORef v_Dep_dir_contents
    ignore_dirs  <- readIORef v_Dep_ignore_dirs
    hisuf <- readIORef v_Hi_suf
@@ -181,9 +181,8 @@ findDependency is_source mod imp = do
      deps | is_source = [ imp_hiboot_v, imp_hiboot, imp_hs, imp_lhs ]
      	  | otherwise = [ imp_hi, imp_hs, imp_lhs ]
 
-     search [] = throwDyn (OtherError ("can't find one of the following: " ++
-				      unwords (map (\d -> '`': d ++ "'") deps) ++
-				      " (imported from `" ++ mod ++ "')"))
+     search [] = throwDyn (UserError (src ++ ": " ++ "can't find one of the following: " ++
+				      unwords (map (\d -> '`': d ++ "'") deps)))
      search ((dir, contents) : dirs)
 	   | null present = search dirs
 	   | otherwise = 

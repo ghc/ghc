@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.60 2001/03/27 16:32:46 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.61 2001/03/28 11:01:19 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -94,7 +94,7 @@ getGhcMode flags
 	([]   , rest) -> return (rest, DoLink,  "") -- default is to do linking
 	([(flag,one)], rest) -> return (rest, one, flag)
 	(_    , _   ) -> 
-	  throwDyn (OtherError 
+	  throwDyn (UsageError 
 		"only one of the flags -M, -E, -C, -S, -c, --make, --interactive, -mk-dll is allowed")
 
 -----------------------------------------------------------------------------
@@ -199,13 +199,13 @@ genPipeline todo stop_flag persistent_output lang filename
 
 	-- ToDo: this is somewhat cryptic
 
-    not_valid = throwDyn (OtherError ("invalid option combination"))
+    not_valid = throwDyn (UsageError ("invalid option combination"))
    ----------- -----  ----   ---   --   --  -  -  -
 
 	-- this shouldn't happen.
    if start_phase /= Ln && start_phase `notElem` pipeline
-	then throwDyn (OtherError ("can't find starting phase for "
-				    ++ filename))
+	then throwDyn (CmdLineError ("can't find starting phase for "
+				     ++ filename))
 	else do
 
    let
@@ -256,7 +256,7 @@ genPipeline todo stop_flag persistent_output lang filename
 	-- is already in linkable form (for example).
    if start_phase `elem` pipeline && 
  	(stop_phase /= Ln && stop_phase `notElem` pipeline)
-      then throwDyn (OtherError 
+      then throwDyn (UsageError 
 		("flag " ++ stop_flag
 		 ++ " is incompatible with source file `" ++ filename ++ "'"))
       else do
@@ -366,8 +366,8 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
    src <- readFile input_fn
    let (import_sources, import_normals, module_name) = getImports src
 
-   deps_sources <- mapM (findDependency True basename)  import_sources
-   deps_normals <- mapM (findDependency False basename) import_normals
+   deps_sources <- mapM (findDependency True  src)  import_sources
+   deps_normals <- mapM (findDependency False src) import_normals
    let deps = deps_sources ++ deps_normals
 
    osuf_opt <- readIORef v_Object_suf
@@ -762,7 +762,7 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
 -- Complain about non-dynamic flags in OPTIONS pragmas
 
 checkProcessArgsResult flags basename suff
-  = do when (not (null flags)) (throwDyn (OtherError (
+  = do when (not (null flags)) (throwDyn (UserError (
            basename ++ "." ++ suff 
            ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
            ++ unwords flags)) (ExitFailure 1))
@@ -838,7 +838,7 @@ doLink o_files = do
     when (WayPar `elem` ways_) (do 
                                   success <- run_phase_MoveBinary output_fn
                                   if success then return ()
-                                             else throwDyn (OtherError ("cannot move binary to PVM dir")))
+                                             else throwDyn (InstallationError ("cannot move binary to PVM dir")))
 
 -----------------------------------------------------------------------------
 -- Making a DLL

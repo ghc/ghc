@@ -260,8 +260,7 @@ linkInterpretedCode (l@(LM _ m uls) : ls) ul_trees pls
 	linkInterpretedCode ls (uls++ul_trees) 
 		pls{objects_loaded = l : objects_loaded pls}
    | any isObject uls
-        = throwDyn (OtherError 
-	     "can't link object code that depends on interpreted code")
+        = panic "linkInterpretedCode: trying to link object code to interpreted code")
    | otherwise = invalidLinkable
 
 invalidLinkable = panic "CmLink: linkable doesn't contain entirely objects or interpreted code"

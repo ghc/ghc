@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.50 2001/03/27 16:55:03 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.51 2001/03/28 11:01:19 simonmar Exp $
 --
 -- Driver flags
 --
@@ -352,7 +352,7 @@ setVerbosityAtLeast n =
 setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
 setVerbosity n 
   | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
-  | otherwise     = throwDyn (OtherError "can't parse verbosity flag (-v<n>)")
+  | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
 
 getVerbFlag = do
    verb <- dynFlag verbosity
@@ -483,7 +483,7 @@ decodeSize str
   | c == "K" || c == "k" = truncate (n * 1000)
   | c == "M" || c == "m" = truncate (n * 1000 * 1000)
   | c == "G" || c == "g" = truncate (n * 1000 * 1000 * 1000)
-  | otherwise            = throwDyn (OtherError ("can't decode size: " ++ str))
+  | otherwise            = throwDyn (CmdLineError ("can't decode size: " ++ str))
   where (m, c) = span pred str
         n      = read m  :: Double
 	pred c = isDigit c || c == '.'

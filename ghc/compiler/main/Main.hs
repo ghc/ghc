@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.61 2001/03/27 10:33:24 simonmar Exp $
+-- $Id: Main.hs,v 1.62 2001/03/28 11:01:19 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -139,7 +139,9 @@ main =
 	else do am_inplace <- doesFileExist inplace_pkgconfig
 	        if am_inplace
 		    then writeIORef v_Path_package_config inplace_pkgconfig
-		    else throwDyn (OtherError ("Can't find package.conf in " ++ inplace_pkgconfig))
+		    else throwDyn (InstallationError 
+			             ("Can't find package.conf in " ++ 
+				      inplace_pkgconfig))
 
 	-- set the location of our various files
    if am_installed
@@ -157,7 +159,7 @@ main =
    conf_file <- readIORef v_Path_package_config
    r <- parsePkgConf conf_file
    case r of {
-	Left err -> throwDyn (OtherError (showSDoc err));
+	Left err -> throwDyn (InstallationError (showSDoc err));
 	Right pkg_details -> do
 
    writeIORef v_Package_details pkg_details
@@ -183,7 +185,7 @@ main =
          writeIORef v_OptLevel 0
    orig_ways <- readIORef v_Ways
    when (not (null orig_ways) && mode == DoInteractive) $
-      do throwDyn (OtherError 
+      do throwDyn (UsageError 
                    "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
 
 	-- Find the build tag, and re-process the build-specific options.
@@ -275,9 +277,12 @@ main =
    let compileFile src = do
 	  writeIORef v_DynFlags init_dyn_flags
 
+	  exists <- doesFileExist src
+          when (not exists) $ 
+		throwDyn (CmdLineError ("file `" ++ src ++ "' does not exist"))
+
 	  -- We compile in two stages, because the file may have an
 	  -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
-
 	  let (basename, suffix) = splitFilename src
 
 	  -- just preprocess
@@ -307,7 +312,7 @@ setTopDir :: [String] -> IO [String]
 setTopDir args = do
   let (minusbs, others) = partition (prefixMatch "-B") args
   (case minusbs of
-    []   -> throwDyn (OtherError ("missing -B<dir> option"))
+    []   -> throwDyn (InstallationError ("missing -B<dir> option"))
     some -> writeIORef v_TopDir (drop 2 (last some)))
   return others
 
@@ -326,7 +331,7 @@ beginMake fileish_args
 
 beginInteractive :: [String] -> IO ()
 #ifndef GHCI
-beginInteractive = throwDyn (OtherError "not built for interactive use")
+beginInteractive = throwDyn (CmdLineError "not built for interactive use")
 #else
 beginInteractive fileish_args
   = do minus_ls <- readIORef v_Cmdline_libraries

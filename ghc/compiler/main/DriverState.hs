@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.36 2001/03/27 10:33:03 simonmar Exp $
+-- $Id: DriverState.hs,v 1.37 2001/03/28 11:01:19 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -336,7 +336,7 @@ addPackage :: String -> IO ()
 addPackage package
   = do pkg_details <- readIORef v_Package_details
        case lookupPkg package pkg_details of
-	  Nothing -> throwDyn (OtherError ("unknown package name: " ++ package))
+	  Nothing -> throwDyn (CmdLineError ("unknown package name: " ++ package))
 	  Just details -> do
 	    ps <- readIORef v_Packages
 	    unless (package `elem` ps) $ do
@@ -470,7 +470,7 @@ findBuildTag = do
 	       return (wayOpts details)
 
      ws  -> if not (allowed_combination ws)
-		then throwDyn (OtherError $
+		then throwDyn (CmdLineError $
 				"combination not supported: "  ++
    				foldr1 (\a b -> a ++ '/':b) 
 				(map (wayName . lkupWay) ws))
