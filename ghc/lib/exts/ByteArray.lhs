@@ -15,26 +15,14 @@ module ByteArray
         --Indexing of ordinary @Arrays@ is standard Haskell and isn't defined here.
         indexCharArray,     --:: Ix ix => ByteArray ix -> ix -> Char 
         indexIntArray,      --:: Ix ix => ByteArray ix -> ix -> Int
+        indexWordArray,     --:: Ix ix => ByteArray ix -> ix -> Word
         indexAddrArray,     --:: Ix ix => ByteArray ix -> ix -> Addr
         indexFloatArray,    --:: Ix ix => ByteArray ix -> ix -> Float
         indexDoubleArray,   --:: Ix ix => ByteArray ix -> ix -> Double
-        
-        --Indexing off @Addrs@ is similar, and therefore given here.
-        indexCharOffAddr,   --:: Addr -> Int -> Char
-        indexIntOffAddr,    --:: Addr -> Int -> Int
-        indexAddrOffAddr,   --:: Addr -> Int -> Addr
-        indexFloatOffAddr,  --:: Addr -> Int -> Float
-        indexDoubleOffAddr, --:: Addr -> Int -> Double
-
-        Addr,
-	Word
 
        ) where
 
 import PrelArr
 import Ix
-import Foreign (Word)
-import Addr
-
 \end{code}
 
