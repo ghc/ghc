@@ -164,7 +164,7 @@ rnTopMonoBinds mbinds sigs
 	-- (This is important when renaming bindings from 'deriving' clauses.)
     getModeRn						`thenM` \ mode ->
     doptM Opt_WarnMissingSigs 				`thenM` \ warn_missing_sigs ->
-    (if not (isInterfaceMode mode && warn_missing_sigs) then
+    (if warn_missing_sigs && not (isInterfaceMode mode) then
 	let
 	    type_sig_vars   = [n | Sig n _ _ <- siglist]
 	    un_sigd_binders = nameSetToList (delListFromNameSet bndr_name_set type_sig_vars)
