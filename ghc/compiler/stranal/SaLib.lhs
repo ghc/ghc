@@ -107,7 +107,7 @@ lookupAbsValEnv (AbsValEnv idenv) y
 \end{code}
 
 \begin{code}
-absValFromStrictness :: AnalysisKind -> StrictnessInfo bdee -> AbsVal
+absValFromStrictness :: AnalysisKind -> StrictnessInfo -> AbsVal
 
 absValFromStrictness anal NoStrictnessInfo 	       = AbsTop
 

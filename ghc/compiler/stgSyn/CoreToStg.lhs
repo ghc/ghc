@@ -42,7 +42,9 @@ import Type		( getAppDataTyConExpandingDicts, SYN_IE(Type) )
 import TysWiredIn	( stringTy )
 import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
 import UniqSupply	-- all of it, really
-import Util		( zipLazy, panic, assertPanic{-, pprTrace ToDo:rm-} )
+import Util		( zipLazy, panic, assertPanic, pprTrace {-TEMP-} )
+import Pretty
+import Outputable
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
@@ -293,7 +295,6 @@ coreExprToStg env expr@(App _ _)
 			    coreExprToStg env non_var_fun
 
       other ->	-- A non-variable applied to things; better let-bind it.
---		pprTrace "coreExprToStg" (ppr PprDebug expr) $
 		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
 		coreExprToStg env fun		`thenUs` \ (stg_fun) ->
 		let

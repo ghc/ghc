@@ -394,7 +394,7 @@ addStrictnessInfoToId str_val abs_val binder body
   = case (collectBinders body) of
 	(_, _, [], rhs) 	   -> binder
 	(_, _, lambda_bounds, rhs) -> binder `addIdStrictness` 
-				      mkStrictnessInfo strictness Nothing
+				      mkStrictnessInfo strictness False
 		where
 		    tys        = map idType lambda_bounds
 		    strictness = findStrictness tys str_val abs_val
