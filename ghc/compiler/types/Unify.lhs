@@ -7,7 +7,7 @@ module Unify (
 
 	gadtRefineTys, BindFlag(..),
 
-	coreRefineTys,
+	coreRefineTys, TypeRefinement,
 
 	-- Re-export
 	MaybeErr(..)
@@ -19,9 +19,10 @@ import Var		( Var, TyVar, tyVarKind )
 import VarEnv
 import VarSet
 import Kind		( isSubKind )
-import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, 
+import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, mkTyVarTys,
 			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX )
 import TypeRep          ( Type(..), PredType(..), funTyCon )
+import DataCon 		( DataCon, dataConResTy )
 import Util		( snocView )
 import ErrUtils		( Message )
 import Outputable
@@ -207,23 +208,36 @@ tcUnifyTys bind_fn tys1 tys2
     tvs2 = tyVarsOfTypes tys2
 
 ----------------------------
-coreRefineTys :: InScopeSet	-- Superset of free vars of either type
-	      -> [TyVar]	-- Try to unify these
-	      -> Type		-- Both types should be a fixed point 
-	      -> Type		--   of the incoming substitution
-	      -> Maybe TvSubstEnv	-- In-scope set is unaffected
--- Used by Core Lint and the simplifier.  Takes a full apply-once substitution.
--- The incoming substitution's in-scope set should mention all the variables free 
--- in the incoming types
-coreRefineTys in_scope ex_tvs ty1 ty2
-  = maybeErrToMaybe $ initUM (tryToBind (mkVarSet ex_tvs)) $
+coreRefineTys :: InScopeSet		-- Superset of free vars of either type
+	      -> DataCon -> [TyVar]	-- Case pattern (con tv1 .. tvn ...)
+	      -> Type			-- Type of scrutinee
+	      -> Maybe TypeRefinement
+
+type TypeRefinement = (TvSubstEnv, Bool)
+	-- The Bool is True iff all the bindings in the 
+	-- env are for the pattern type variables
+	-- In this case, there is no type refinement 
+	-- for already-in-scope type variables
+
+-- Used by Core Lint and the simplifier.
+coreRefineTys in_scope con tvs scrut_ty
+  = maybeErrToMaybe $ initUM (tryToBind tv_set) $
     do	{ 	-- Run the unifier, starting with an empty env
-	; subst_env <- unify emptyTvSubstEnv ty1 ty2
+	; subst_env <- unify emptyTvSubstEnv pat_res_ty scrut_ty
 
 	-- Find the fixed point of the resulting non-idempotent substitution
 	; let subst  	      = TvSubst in_scope subst_env_fixpt
 	      subst_env_fixpt = mapVarEnv (substTy subst) subst_env
-	; return subst_env_fixpt }
+		
+	; return (subst_env_fixpt, all_bound_here subst_env) }
+  where
+    pat_res_ty = dataConResTy con (mkTyVarTys tvs)
+
+	-- 'tvs' are the tyvars bound by the pattern
+    tv_set 	       = mkVarSet tvs
+    all_bound_here env = all bound_here (varEnvKeys env)
+    bound_here uniq    = elemVarSetByKey uniq tv_set
+    
 
 ----------------------------
 gadtRefineTys

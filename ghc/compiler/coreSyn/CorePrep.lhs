@@ -20,11 +20,13 @@ import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import Var 	( Var, Id, setVarUnique )
 import VarSet
 import VarEnv
-import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
+import Id	( mkSysLocal, idType, idNewDemandInfo, idArity, setIdUnfolding, setIdType,
 		  isFCallId, isGlobalId, isImplicitId,
 		  isLocalId, hasNoBinding, idNewStrictness, 
-		  idUnfolding, isDataConWorkId_maybe
+		  idUnfolding, isDataConWorkId_maybe, isPrimOpId_maybe
 		)
+import DataCon	  ( isVanillaDataCon )
+import PrimOp	  ( PrimOp( DataToTagOp ) )
 import HscTypes   ( TypeEnv, typeEnvElts, TyThing( AnId ) )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
@@ -118,7 +120,7 @@ corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
 corePrepExpr dflags expr
   = do showPass dflags "CorePrep"
        us <- mkSplitUniqSupply 's'
-       let new_expr = initUs_ us (corePrepAnExpr emptyVarEnv expr)
+       let new_expr = initUs_ us (corePrepAnExpr emptyCorePrepEnv expr)
        dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" 
 		     (ppr new_expr)
        return new_expr
@@ -224,8 +226,6 @@ instance Outputable FloatingBind where
   ppr (FloatLet bind)        = text "FloatLet" <+> ppr bind
   ppr (FloatCase b rhs spec) = text "FloatCase" <+> ppr b <+> ppr spec <+> equals <+> ppr rhs
 
-type CloneEnv = IdEnv Id	-- Clone local Ids
-
 deFloatTop :: Floats -> [CoreBind]
 -- For top level only; we don't expect any FloatCases
 deFloatTop (Floats _ floats)
@@ -237,7 +237,7 @@ deFloatTop (Floats _ floats)
 allLazy :: TopLevelFlag -> RecFlag -> Floats -> Bool
 allLazy top_lvl is_rec (Floats ok_to_spec _)
   = case ok_to_spec of
-	OkToSpec -> True
+	OkToSpec    -> True
 	NotOkToSpec -> False
 	IfUnboxedOk -> isNotTopLevel top_lvl && isNonRec is_rec
 
@@ -247,7 +247,7 @@ allLazy top_lvl is_rec (Floats ok_to_spec _)
 
 corePrepTopBinds :: [CoreBind] -> UniqSM Floats
 corePrepTopBinds binds 
-  = go emptyVarEnv binds
+  = go emptyCorePrepEnv binds
   where
     go env []		  = returnUs emptyFloats
     go env (bind : binds) = corePrepTopBind env bind	`thenUs` \ (env', bind') ->
@@ -282,7 +282,7 @@ corePrepTopBinds binds
 -- it looks difficult.
 
 --------------------------------
-corePrepTopBind :: CloneEnv -> CoreBind -> UniqSM (CloneEnv, Floats)
+corePrepTopBind :: CorePrepEnv -> CoreBind -> UniqSM (CorePrepEnv, Floats)
 corePrepTopBind env (NonRec bndr rhs) 
   = cloneBndr env bndr					`thenUs` \ (env', bndr') ->
     corePrepRhs TopLevel NonRecursive env (bndr, rhs)	`thenUs` \ (floats, rhs') -> 
@@ -291,21 +291,23 @@ corePrepTopBind env (NonRec bndr rhs)
 corePrepTopBind env (Rec pairs) = corePrepRecPairs TopLevel env pairs
 
 --------------------------------
-corePrepBind ::  CloneEnv -> CoreBind -> UniqSM (CloneEnv, Floats)
+corePrepBind ::  CorePrepEnv -> CoreBind -> UniqSM (CorePrepEnv, Floats)
 	-- This one is used for *local* bindings
 corePrepBind env (NonRec bndr rhs)
   = etaExpandRhs bndr rhs				`thenUs` \ rhs1 ->
     corePrepExprFloat env rhs1				`thenUs` \ (floats, rhs2) ->
-    cloneBndr env bndr					`thenUs` \ (env', bndr') ->
-    mkLocalNonRec bndr' (bdrDem bndr') floats rhs2	`thenUs` \ floats' ->
-    returnUs (env', floats')
+    cloneBndr env bndr					`thenUs` \ (_, bndr') ->
+    mkLocalNonRec bndr' (bdrDem bndr) floats rhs2	`thenUs` \ (floats', bndr'') ->
+	-- We want bndr'' in the envt, because it records
+	-- the evaluated-ness of the binder
+    returnUs (extendCorePrepEnv env bndr bndr'', floats')
 
 corePrepBind env (Rec pairs) = corePrepRecPairs NotTopLevel env pairs
 
 --------------------------------
-corePrepRecPairs :: TopLevelFlag -> CloneEnv
+corePrepRecPairs :: TopLevelFlag -> CorePrepEnv
 		 -> [(Id,CoreExpr)]	-- Recursive bindings
-		 -> UniqSM (CloneEnv, Floats)
+		 -> UniqSM (CorePrepEnv, Floats)
 -- Used for all recursive bindings, top level and otherwise
 corePrepRecPairs lvl env pairs
   = cloneBndrs env (map fst pairs)				`thenUs` \ (env', bndrs') ->
@@ -321,7 +323,7 @@ corePrepRecPairs lvl env pairs
 
 --------------------------------
 corePrepRhs :: TopLevelFlag -> RecFlag
-	    -> CloneEnv -> (Id, CoreExpr)
+	    -> CorePrepEnv -> (Id, CoreExpr)
 	    -> UniqSM (Floats, CoreExpr)
 -- Used for top-level bindings, and local recursive bindings
 corePrepRhs top_lvl is_rec env (bndr, rhs)
@@ -335,15 +337,15 @@ corePrepRhs top_lvl is_rec env (bndr, rhs)
 -- ---------------------------------------------------------------------------
 
 -- This is where we arrange that a non-trivial argument is let-bound
-corePrepArg :: CloneEnv -> CoreArg -> RhsDemand
+corePrepArg :: CorePrepEnv -> CoreArg -> RhsDemand
 	   -> UniqSM (Floats, CoreArg)
 corePrepArg env arg dem
   = corePrepExprFloat env arg		`thenUs` \ (floats, arg') ->
     if exprIsTrivial arg'
     then returnUs (floats, arg')
     else newVar (exprType arg')			`thenUs` \ v ->
-	 mkLocalNonRec v dem floats arg'	`thenUs` \ floats' -> 
-	 returnUs (floats', Var v)
+	 mkLocalNonRec v dem floats arg'	`thenUs` \ (floats', v') -> 
+	 returnUs (floats', Var v')
 
 -- version that doesn't consider an scc annotation to be trivial.
 exprIsTrivial (Var v)		       = True
@@ -359,13 +361,13 @@ exprIsTrivial other	      	       = False
 -- Dealing with expressions
 -- ---------------------------------------------------------------------------
 
-corePrepAnExpr :: CloneEnv -> CoreExpr -> UniqSM CoreExpr
+corePrepAnExpr :: CorePrepEnv -> CoreExpr -> UniqSM CoreExpr
 corePrepAnExpr env expr
   = corePrepExprFloat env expr		`thenUs` \ (floats, expr) ->
     mkBinds floats expr
 
 
-corePrepExprFloat :: CloneEnv -> CoreExpr -> UniqSM (Floats, CoreExpr)
+corePrepExprFloat :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CoreExpr)
 -- If
 --	e  ===>  (bs, e')
 -- then	
@@ -376,9 +378,10 @@ corePrepExprFloat :: CloneEnv -> CoreExpr -> UniqSM (Floats, CoreExpr)
 
 corePrepExprFloat env (Var v)
   = fiddleCCall v				`thenUs` \ v1 ->
-    let v2 = lookupVarEnv env v1 `orElse` v1 in
-    maybeSaturate v2 (Var v2) 0 (idType v2) 	`thenUs` \ app ->
-    returnUs (emptyFloats, app)
+    let 
+	v2 = lookupCorePrepEnv env v1
+    in
+    maybeSaturate v2 (Var v2) 0 emptyFloats (idType v2)
 
 corePrepExprFloat env expr@(Type _)
   = returnUs (emptyFloats, expr)
@@ -410,13 +413,20 @@ corePrepExprFloat env expr@(Lam _ _)
 corePrepExprFloat env (Case scrut bndr ty alts)
   = corePrepExprFloat env scrut		`thenUs` \ (floats1, scrut1) ->
     deLamFloat scrut1			`thenUs` \ (floats2, scrut2) ->
-    cloneBndr env bndr			`thenUs` \ (env', bndr') ->
+    let
+	bndr1 = bndr `setIdUnfolding` evaldUnfolding
+	-- Record that the case binder is evaluated in the alternatives
+    in
+    cloneBndr env bndr1			`thenUs` \ (env', bndr2) ->
     mapUs (sat_alt env') alts		`thenUs` \ alts' ->
-    returnUs (floats1 `appendFloats` floats2 , Case scrut2 bndr' ty alts')
+    returnUs (floats1 `appendFloats` floats2 , Case scrut2 bndr2 ty alts')
   where
     sat_alt env (con, bs, rhs)
-	  = cloneBndrs env bs		`thenUs` \ (env', bs') ->
-	    corePrepAnExpr env' rhs  	`thenUs` \ rhs1 ->
+	  = let 
+		env1 = setGadt env con
+	    in
+	    cloneBndrs env1 bs		`thenUs` \ (env2, bs') ->
+	    corePrepAnExpr env2 rhs  	`thenUs` \ rhs1 ->
 	    deLam rhs1			`thenUs` \ rhs2 ->
 	    returnUs (con, bs', rhs2)
 
@@ -426,9 +436,7 @@ corePrepExprFloat env expr@(App _ _)
 
 	-- Now deal with the function
     case head of
-      Var fn_id -> maybeSaturate fn_id app depth ty `thenUs` \ app' -> 
-	    	   returnUs (floats, app')
-
+      Var fn_id -> maybeSaturate fn_id app depth floats ty
       _other    -> returnUs (floats, app)
 
   where
@@ -467,7 +475,9 @@ corePrepExprFloat env expr@(App _ _)
 
     collect_args (Var v) depth
 	= fiddleCCall v `thenUs` \ v1 ->
-	  let v2 = lookupVarEnv env v1 `orElse` v1 in
+	  let 
+		v2 = lookupCorePrepEnv env v1
+	  in
 	  returnUs (Var v2, (Var v2, depth), idType v2, emptyFloats, stricts)
 	where
 	  stricts = case idNewStrictness v of
@@ -491,14 +501,14 @@ corePrepExprFloat env expr@(App _ _)
         = collect_args fun depth   `thenUs` \ (fun', hd, fun_ty, floats, ss) ->
 	  returnUs (Note note fun', hd, fun_ty, floats, ss)
 
-	-- non-variable fun, better let-bind it
+	-- N-variable fun, better let-bind it
 	-- ToDo: perhaps we can case-bind rather than let-bind this closure,
 	-- since it is sure to be evaluated.
     collect_args fun depth
 	= corePrepExprFloat env fun			`thenUs` \ (fun_floats, fun') ->
 	  newVar ty			 		`thenUs` \ fn_id ->
-          mkLocalNonRec fn_id onceDem fun_floats fun'	`thenUs` \ floats ->
-	  returnUs (Var fn_id, (Var fn_id, depth), ty, floats, [])
+          mkLocalNonRec fn_id onceDem fun_floats fun'	`thenUs` \ (floats, fn_id') ->
+	  returnUs (Var fn_id', (Var fn_id', depth), ty, floats, [])
         where
 	  ty = exprType fun
 
@@ -514,15 +524,32 @@ corePrepExprFloat env expr@(App _ _)
 
 -- maybeSaturate deals with saturating primops and constructors
 -- The type is the type of the entire application
-maybeSaturate :: Id -> CoreExpr -> Int -> Type -> UniqSM CoreExpr
-maybeSaturate fn expr n_args ty
+maybeSaturate :: Id -> CoreExpr -> Int -> Floats -> Type -> UniqSM (Floats, CoreExpr)
+maybeSaturate fn expr n_args floats ty
   | hasNoBinding fn = saturate_it
-  | otherwise       = returnUs expr
+  | otherwise       = returnUs (floats, expr)
   where
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
-    saturate_it  = getUniquesUs 		`thenUs` \ us ->
-		   returnUs (etaExpand excess_arity us expr ty)
+    saturate_it  = getUniquesUs		`thenUs` \ us ->
+		   let expr' = etaExpand excess_arity us expr ty in
+		   case isPrimOpId_maybe fn of
+			Just DataToTagOp -> hack_data2tag expr'
+			other		 -> returnUs (floats, expr')
+
+	-- Ensure that the argument of DataToTagOp is evaluated
+    hack_data2tag app@(Var _fn `App` _ty `App` Var arg_id)
+	| isEvaldUnfolding (idUnfolding arg_id)	-- Includes nullary constructors
+	= returnUs (floats, app)	-- The arg is evaluated
+    hack_data2tag app@(Var fn `App` Type ty `App` arg)
+	| otherwise			-- Arg not evaluated, so evaluate it
+	= newVar ty		`thenUs` \ arg_id1 ->
+	  let arg_id2   = setIdUnfolding arg_id1 evaldUnfolding
+	      new_float = FloatCase arg_id2 arg False 
+	  in
+	  returnUs (addFloat floats new_float, 
+		    Var fn `App` Type ty `App` Var arg_id2)
+
 
 -- ---------------------------------------------------------------------------
 -- Precipitating the floating bindings
@@ -541,8 +568,6 @@ floatRhs top_lvl is_rec bndr (floats, rhs)
 	--	v = f (x `divInt#` y)
 	-- we don't want to float the case, even if f has arity 2,
 	-- because floating the case would make it evaluated too early
-	--
-	-- Finally, eta-expand the RHS, for the benefit of the code gen
     returnUs (floats, rhs)
     
   | otherwise
@@ -553,7 +578,8 @@ floatRhs top_lvl is_rec bndr (floats, rhs)
 -- mkLocalNonRec is used only for *nested*, *non-recursive* bindings
 mkLocalNonRec :: Id  -> RhsDemand 	-- Lhs: id with demand
 	      -> Floats -> CoreExpr	-- Rhs: let binds in body
-	      -> UniqSM Floats
+	      -> UniqSM (Floats, Id)	-- The new Id may have an evaldUnfolding, 
+					-- to record that it's been evaluated
 
 mkLocalNonRec bndr dem floats rhs
   | isUnLiftedType (idType bndr)
@@ -562,7 +588,7 @@ mkLocalNonRec bndr dem floats rhs
     let
 	float = FloatCase bndr rhs (exprOkForSpeculation rhs)
     in
-    returnUs (addFloat floats float)
+    returnUs (addFloat floats float, evald_bndr)
 
   | isStrict dem 
 	-- It's a strict let so we definitely float all the bindings
@@ -572,11 +598,16 @@ mkLocalNonRec bndr dem floats rhs
 	float | exprIsValue rhs = FloatLet (NonRec bndr rhs)
 	      | otherwise	= FloatCase bndr rhs (exprOkForSpeculation rhs)
     in
-    returnUs (addFloat floats float)
+    returnUs (addFloat floats float, evald_bndr)
 
   | otherwise
   = floatRhs NotTopLevel NonRecursive bndr (floats, rhs)	`thenUs` \ (floats', rhs') ->
-    returnUs (addFloat floats' (FloatLet (NonRec bndr rhs')))
+    returnUs (addFloat floats' (FloatLet (NonRec bndr rhs')),
+	      if exprIsValue rhs' then evald_bndr else bndr)
+
+  where
+    evald_bndr = bndr `setIdUnfolding` evaldUnfolding
+	-- Record if the binder is evaluated
 
 
 mkBinds :: Floats -> CoreExpr -> UniqSM CoreExpr
@@ -733,21 +764,59 @@ onceDem = RhsDemand False True   -- used at most once
 %************************************************************************
 
 \begin{code}
+-- ---------------------------------------------------------------------------
+-- 			The environment
+-- ---------------------------------------------------------------------------
+
+data CorePrepEnv = CPE (IdEnv Id)	-- Clone local Ids
+		       Bool		-- True <=> inside a GADT case; see Note [GADT]
+
+-- Note [GADT]
+--
+-- Be careful with cloning inside GADTs.  For example, 
+--	/\a. \f::a. \x::T a. case x of { T -> f True; ... }
+-- The case on x may refine the type of f to be a function type.
+-- Without this type refinement, exprType (f True) may simply fail,
+-- which is bad.  
+--
+-- Solution: remember when we are inside a potentially-type-refining case,
+-- 	     and in that situation use the type from the old occurrence
+--	     when looking up occurrences
+
+emptyCorePrepEnv :: CorePrepEnv
+emptyCorePrepEnv = CPE emptyVarEnv False
+
+extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
+extendCorePrepEnv (CPE env gadt) id id' = CPE (extendVarEnv env id id') gadt
+
+lookupCorePrepEnv :: CorePrepEnv -> Id -> Id
+-- See Note [GADT] above
+lookupCorePrepEnv (CPE env gadt) id
+  = case lookupVarEnv env id of
+	Nothing		     -> id
+	Just id' | gadt      -> setIdType id' (idType id)
+		 | otherwise -> id'
+
+setGadt :: CorePrepEnv -> AltCon -> CorePrepEnv
+setGadt env@(CPE id_env _) (DataAlt data_con) | not (isVanillaDataCon data_con) = CPE id_env True
+setGadt env 		   other 						= env
+
+
 ------------------------------------------------------------------------------
 -- Cloning binders
 -- ---------------------------------------------------------------------------
 
-cloneBndrs :: CloneEnv -> [Var] -> UniqSM (CloneEnv, [Var])
+cloneBndrs :: CorePrepEnv -> [Var] -> UniqSM (CorePrepEnv, [Var])
 cloneBndrs env bs = mapAccumLUs cloneBndr env bs
 
-cloneBndr  :: CloneEnv -> Var -> UniqSM (CloneEnv, Var)
+cloneBndr  :: CorePrepEnv -> Var -> UniqSM (CorePrepEnv, Var)
 cloneBndr env bndr
   | isLocalId bndr
   = getUniqueUs   `thenUs` \ uniq ->
     let
 	bndr' = setVarUnique bndr uniq
     in
-    returnUs (extendVarEnv env bndr bndr', bndr')
+    returnUs (extendCorePrepEnv env bndr bndr', bndr')
 
   | otherwise	-- Top level things, which we don't want
 		-- to clone, have become GlobalIds by now

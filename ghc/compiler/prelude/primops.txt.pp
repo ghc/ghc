@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.31 2004/11/18 09:56:15 tharris Exp $
+-- $Id: primops.txt.pp,v 1.32 2005/01/31 13:25:38 simonpj Exp $
 --
 -- Primitive Operations
 --
@@ -1714,6 +1714,9 @@ section "Tag to enum stuff"
 
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#
+   with
+   strictness  = { \ arity -> mkStrictSig (mkTopDmdType [seqDmd] TopRes) }
+	-- dataToTag# must have an evaluated argument
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp     
    Int# -> a

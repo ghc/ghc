@@ -18,7 +18,7 @@ import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
 import Unify      	( coreRefineTys )
 import Bag
 import Literal		( literalType )
-import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon, dataConResTy, dataConWorkId )
+import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon, dataConWorkId )
 import TysWiredIn	( tupleCon )
 import Var		( Var, Id, TyVar, idType, tyVarKind, mustHaveLocalBinding )
 import VarSet
@@ -462,14 +462,12 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 
     else 	-- GADT
     do	{ let (tvs,ids) = span isTyVar args
-	      pat_res_ty = dataConResTy con (mkTyVarTys tvs)	      
-
         ; subst <- getTvSubst 
 	; let in_scope  = getTvInScope subst
 	      subst_env = getTvSubstEnv subst
-        ; case coreRefineTys in_scope tvs pat_res_ty scrut_ty of {
-             Nothing     -> return () ;	-- Alternative is dead code
-             Just refine -> updateTvSubstEnv (composeTvSubst in_scope refine subst_env) $
+        ; case coreRefineTys in_scope con tvs scrut_ty of {
+             Nothing          -> return () ;	-- Alternative is dead code
+             Just (refine, _) -> updateTvSubstEnv (composeTvSubst in_scope refine subst_env) $
     do 	{ tvs'     <- mapM lintTy (mkTyVarTys tvs)
 	; con_type <- lintTyApps (dataConRepType con) tvs'
 	; mapM lintBinder ids	-- Lint Ids in the refined world

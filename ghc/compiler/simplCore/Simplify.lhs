@@ -36,11 +36,11 @@ import IdInfo		( OccInfo(..), isLoopBreaker,
 			)
 import NewDemand	( isStrictDmd )
 import Unify		( coreRefineTys )
-import DataCon		( dataConTyCon, dataConRepStrictness, isVanillaDataCon, dataConResTy )
+import DataCon		( dataConTyCon, dataConRepStrictness, isVanillaDataCon )
 import TyCon		( tyConArity )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
-import CoreUnfold	( mkOtherCon, mkUnfolding, callSiteInline )
+import CoreUnfold	( mkOtherCon, mkUnfolding, evaldUnfolding, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, exprIsValue, 
@@ -51,7 +51,7 @@ import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, coreEqType, mkTyVarTys
+			  splitFunTy_maybe, splitFunTy, coreEqType 
 			)
 import VarEnv		( elemVarEnv )
 import TysPrim		( realWorldStatePrimTy )
@@ -1498,11 +1498,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 	(tvs,ids) = span isTyVar vs
     in
     simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
-    let
-	pat_res_ty = dataConResTy con (mkTyVarTys tvs')
-	in_scope   = getInScope env1
-    in
-    case coreRefineTys in_scope tvs' pat_res_ty (idType case_bndr') of {
+    case coreRefineTys (getInScope env1) con tvs' (idType case_bndr') of {
 	Nothing 	-- Dead code; for now, I'm just going to put in an
 			-- error case so I can see them
 	    ->	let rhs' = mkApps (Var eRROR_ID) 
@@ -1512,13 +1508,14 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 		simplBinders env1 ids		`thenSmpl` \ (env2, ids') -> 
 		returnSmpl (Nothing, (DataAlt con, tvs' ++ ids', rhs')) ;
 
-	Just tv_subst_env -> 	-- The normal case
+	Just refine@(tv_subst_env, _) -> 	-- The normal case
 
     let 
-	env2 = refineSimplEnv env1 tv_subst_env tvs'
+	env2 = refineSimplEnv env1 refine
 	-- Simplify the Ids in the refined environment, so their types
 	-- reflect the refinement.  Usually this doesn't matter, but it helps
 	-- in mkDupableAlt, when we want to float a lambda that uses these binders
+	-- Furthermore, it means the binders contain maximal type information
     in
     simplBinders env2 (add_evals con ids)	`thenSmpl` \ (env3, ids') ->
     let unf        = mkUnfolding False con_app
@@ -1551,7 +1548,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 	    | otherwise          = zapped_v : go vs strs
 	    where
 	      zapped_v = zap_occ_info v
-	      evald_v  = zapped_v `setIdUnfolding` mkOtherCon []
+	      evald_v  = zapped_v `setIdUnfolding` evaldUnfolding
 	  go _ _ = pprPanic "cat_evals" (ppr dc $$ ppr vs $$ ppr strs)
 
 	-- If the case binder is alive, then we add the unfolding
