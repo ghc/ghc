@@ -62,7 +62,7 @@ This should be a stable release.  Major changes since 4.08.2 are:
      by type, closure description, cost centre, and module.
 
    - Support for the latest Foreign Function Interface (FFI)
-     proposals.
+     proposals.  Marcin Kowalczyk's hsc2hs tool is included.
 
    - A language extension: parallel list comprehensions.
 
