@@ -13,7 +13,7 @@ name="How to report a bug in the GHC system" id="bug-reports"> for a
 list of things we'd like to know about your bug.  If in doubt, send a
 report---we love mail from irate users :-!
 
-(Section <ref name="Haskell 1.4 vs. Glasgow Haskell 4.00: language
+(Section <ref name="Haskell 98 vs. Glasgow Haskell: language
 non-compliance" id="vs-Haskell-defn">, which describes Glasgow
 Haskell's shortcomings vs.~the Haskell language definition, may also
 be of interest.)

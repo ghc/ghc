@@ -1,15 +1,15 @@
 %************************************************************************
 %*                                                                      *
-<sect1>Haskell~1.4 vs.~Glasgow Haskell~4.00: language non-compliance
+<sect1>Haskell~98 vs.~Glasgow Haskell: language non-compliance
 <label id="vs-Haskell-defn">
 <p>
-<nidx>GHC vs the Haskell 1.4 language</nidx>
-<nidx>Haskell 1.4 language vs GHC</nidx>
+<nidx>GHC vs the Haskell 98 language</nidx>
+<nidx>Haskell 98 language vs GHC</nidx>
 %*                                                                      *
 %************************************************************************
 
 This section lists Glasgow Haskell infelicities in its implementation
-of Haskell~1.4.  See also the ``when things go wrong'' section
+of Haskell~98.  See also the ``when things go wrong'' section
 (Section <ref name="What to do when something goes wrong" id="wrong">)
 for information about crashes, space leaks, and other undesirable
 phenomena.
@@ -56,12 +56,6 @@ It might work, but it's just begging for trouble.
 
 <descrip>
 %-------------------------------------------------------------------
-<tag>Derived instances of @Read@ and @Show@ for infix constructors:</tag>
-All the carry-on about derived @readsPrec@ and @showsPrec@ for infix
-constructors---we don't do it (yet).  We treat them the same way as
-all other constructors.
-
-%-------------------------------------------------------------------
 <tag>Derived instances for records:</tag> Hmmm.
 </descrip>
 
@@ -82,11 +76,6 @@ All of these modules begin with @Prel@, so the rule is: don't use any
 modules beginning with @Prel@ in your program, or you will be
 comprehensively screwed.
 
-% Not true anymore? -- Simon M.
-%-------------------------------------------------------------------
-% <tag>Can't export primitive types (e.g., @Int#@):</tag>
-% Don't even try...
-
 </descrip>
 
 %************************************************************************
@@ -98,19 +87,6 @@ comprehensively screwed.
 %************************************************************************
 
 <descrip>
-% Not true anymore? We use Rationals all the way -- Simon M.
-%-------------------------------------------------------------------
-% <tag>Very large/small fractional constants:</tag>
-% (i.e., with a decimal point somewhere) GHC does not check that these
-% are out of range (e.g., for a @Float@), and bad things will inevitably
-% follow.  (To be corrected?)
-% 
-% This problem does <em>not</em> exist for integral constants.
-% 
-% For very large/small fractional constants near the limits of your
-% floating-point precision, things may go wrong.  (It's better than it
-% used to be.)  Please report any such bugs.
-
 %-------------------------------------------------------------------
 <tag>Unchecked arithmetic:</tag>
 
@@ -143,9 +119,7 @@ main = print (array (1,1) [ 1:=2, 1:=3 ])
 <descrip>
 %-------------------------------------------------------------------
 <tag>Arbitrary-sized tuples:</tag>
-Plain old tuples of arbitrary size <em>do</em> work.  Note that lots of
-overloading can give rise to large tuples ``under the hood'' of your
-program.
+Plain old tuples of arbitrary size <em>do</em> work.
 
 HOWEVER: standard instances for tuples (@Eq@, @Ord@, @Bounded@, @Ix@
 @Read@, and @Show@) are available <em>only</em> up to 5-tuples.
@@ -155,7 +129,7 @@ stuck on them.
 
 %-------------------------------------------------------------------
 <tag>Unicode character set:</tag>
-Haskell 1.4 embraces the Unicode character set, but GHC 4.00 doesn't
+Haskell 98 embraces the Unicode character set, but GHC doesn't
 handle it. Yet.
 
 </descrip>

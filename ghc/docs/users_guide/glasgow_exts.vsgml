@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.5 1999/02/22 10:22:35 sof Exp $
+% $Id: glasgow_exts.vsgml,v 1.6 1999/03/16 17:07:21 simonm Exp $
 %
 % GHC Language Extensions.
 %
@@ -59,6 +59,12 @@ id="scoped-type-variables">.
 Just what it sounds like.  We provide <em>lots</em> of rope that you
 can dangle around your neck.  Please see Section <ref name="Calling~C
 directly from Haskell" id="glasgow-ccalls">.
+
+<tag>Pragmas</tag>
+
+Pragmas are special instructions to the compiler placed in the source
+file.  The pragmas GHC supports are described in Section <ref
+name="Pragmas" id="pragmas">.
 
 </descrip>
 
@@ -1730,3 +1736,149 @@ For example:
 </verb></tscreen>
 
 </itemize>
+
+%-----------------------------------------------------------------------------
+<sect1>Pragmas
+<label id="pragmas">
+<p>
+
+GHC supports several pragmas, or instructions to the compiler placed
+in the source code.  Pragmas don't affect the meaning of the program,
+but they might affect the efficiency of the generated code.
+
+<sect2>INLINE pragma
+<label id="inline-pragma">
+<nidx>INLINE pragma</nidx>
+<nidx>pragma, INLINE</nidx>
+<p>
+
+GHC (with @-O@, as always) tries to inline (or ``unfold'')
+functions/values that are ``small enough,'' thus avoiding the call
+overhead and possibly exposing other more-wonderful optimisations.
+
+You will probably see these unfoldings (in Core syntax) in your
+interface files.
+
+Normally, if GHC decides a function is ``too expensive'' to inline, it
+will not do so, nor will it export that unfolding for other modules to
+use.
+
+The sledgehammer you can bring to bear is the
+@INLINE@<nidx>INLINE pragma</nidx> pragma, used thusly:
+<tscreen><verb>
+key_function :: Int -> String -> (Bool, Double) 
+
+#ifdef __GLASGOW_HASKELL__
+{-# INLINE key_function #-}
+#endif
+</verb></tscreen>
+(You don't need to do the C pre-processor carry-on unless you're going
+to stick the code through HBC---it doesn't like @INLINE@ pragmas.)
+
+The major effect of an @INLINE@ pragma is to declare a function's
+``cost'' to be very low.  The normal unfolding machinery will then be
+very keen to inline it.
+
+An @INLINE@ pragma for a function can be put anywhere its type
+signature could be put.
+
+@INLINE@ pragmas are a particularly good idea for the
+@then@/@return@ (or @bind@/@unit@) functions in a monad.
+For example, in GHC's own @UniqueSupply@ monad code, we have:
+<tscreen><verb>
+#ifdef __GLASGOW_HASKELL__
+{-# INLINE thenUs #-}
+{-# INLINE returnUs #-}
+#endif
+</verb></tscreen>
+
+<sect2>NOINLINE pragma
+<label id="noinline-pragma">
+<p>
+<nidx>NOINLINE pragma</nidx>
+<nidx>pragma, NOINLINE</nidx>
+
+The @NOINLINE@ pragma does exactly what you'd expect: it stops the
+named function from being inlined by the compiler.  You shouldn't ever
+need to do this, unless you're very cautious about code size.
+
+<sect2>SPECIALIZE pragma
+<label id="specialize-pragma">
+<p>
+<nidx>SPECIALIZE pragma</nidx>
+<nidx>pragma, SPECIALIZE</nidx>
+<nidx>overloading, death to</nidx>
+
+(UK spelling also accepted.)  For key overloaded functions, you can
+create extra versions (NB: more code space) specialised to particular
+types.  Thus, if you have an overloaded function:
+
+<tscreen><verb>
+hammeredLookup :: Ord key => [(key, value)] -> key -> value
+</verb></tscreen>
+
+If it is heavily used on lists with @Widget@ keys, you could
+specialise it as follows:
+<tscreen><verb>
+{-# SPECIALIZE hammeredLookup :: [(Widget, value)] -> Widget -> value #-}
+</verb></tscreen>
+
+To get very fancy, you can also specify a named function to use for
+the specialised value, by adding @= blah@, as in:
+<tscreen><verb>
+{-# SPECIALIZE hammeredLookup :: ...as before... = blah #-}
+</verb></tscreen>
+It's <em>Your Responsibility</em> to make sure that @blah@ really
+behaves as a specialised version of @hammeredLookup@!!!
+
+NOTE: the @=blah@ feature isn't implemented in GHC 4.xx.
+
+An example in which the @= blah@ form will Win Big:
+<tscreen><verb>
+toDouble :: Real a => a -> Double
+toDouble = fromRational . toRational
+
+{-# SPECIALIZE toDouble :: Int -> Double = i2d #-}
+i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
+</verb></tscreen>
+The @i2d@ function is virtually one machine instruction; the
+default conversion---via an intermediate @Rational@---is obscenely
+expensive by comparison.
+
+By using the US spelling, your @SPECIALIZE@ pragma will work with
+HBC, too.  Note that HBC doesn't support the @= blah@ form.
+
+A @SPECIALIZE@ pragma for a function can be put anywhere its type
+signature could be put.
+
+<sect2>SPECIALIZE instance pragma
+<label id="specialize-instance-pragma">
+<p>
+<nidx>SPECIALIZE pragma</nidx>
+<nidx>overloading, death to</nidx>
+Same idea, except for instance declarations.  For example:
+<tscreen><verb>
+instance (Eq a) => Eq (Foo a) where { ... usual stuff ... }
+
+{-# SPECIALIZE instance Eq (Foo [(Int, Bar)] #-}
+</verb></tscreen>
+Compatible with HBC, by the way.
+
+<sect2>LINE pragma
+<label id="line-pragma">
+<p>
+<nidx>LINE pragma</nidx>
+<nidx>pragma, LINE</nidx>
+
+This pragma is similar to C's @#line@ pragma, and is mainly for use in
+automatically generated Haskell code.  It lets you specify the line
+number and filename of the original code; for example
+
+<tscreen><verb>
+{-# LINE 42 "Foo.vhs" #-}
+</verb></tscreen>
+
+if you'd generated the current file from something called @Foo.vhs@
+and this line corresponds to line 42 in the original.  GHC will adjust
+its error messages to refer to the line/file named in the @LINE@
+pragma.
