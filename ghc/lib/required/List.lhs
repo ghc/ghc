@@ -6,16 +6,27 @@
 
 \begin{code}
 module List ( 
+    {- 
+      This list follows the type signatures for the
+      standard List interface.
+    -}
     elemIndex, elemIndices,
     find, findIndex, findIndices,
-    nub, nubBy, delete, deleteBy, (\\), deleteFirstsBy,
-    union, intersect,
-    intersperse, transpose, partition, group, groupBy,
-    inits, tails, isPrefixOf, isSuffixOf,
+    nub, nubBy, 
+    delete, deleteBy, (\\), deleteFirstsBy,
+    union, unionBy, 
+    intersect, intersectBy,
+    group, groupBy,
+    inits, tails,
+    isPrefixOf, isSuffixOf,
+    intersperse, transpose, partition, 
     mapAccumL, mapAccumR,
-    sort, sortBy, insertBy, maximumBy, minimumBy,
-    genericLength, genericTake, genericDrop,
-    genericSplitAt, genericIndex, genericReplicate,
+    sort, sortBy, 
+    insertBy, 
+    maximumBy, minimumBy,
+    genericTake,  genericDrop, genericSplitAt, 
+    genericIndex, genericReplicate, genericLength, 
+    
     zip4, zip5, zip6, zip7,
     zipWith4, zipWith5, zipWith6, zipWith7,
     unzip4, unzip5, unzip6, unzip7
@@ -79,7 +90,13 @@ nubBy eq l              = nubBy' l []
   where
     nubBy' [] _		= []
     nubBy' (x:xs) l	= if elemBy eq x l then nubBy' xs l else x : nubBy' xs (x:l)
+
+--not exported:
+elemBy :: (a -> a -> Bool) -> a -> [a] -> Bool
+elemBy eq _ []		=  False
+elemBy eq x (y:ys)	=  x `eq` y || elemBy eq x ys
 #endif
+
 
 -- delete x removes the first occurrence of x from its list argument.
 delete                  :: (Eq a) => a -> [a] -> [a]
@@ -129,21 +146,45 @@ partition		:: (a -> Bool) -> [a] -> ([a],[a])
 partition p xs		=  foldr select ([],[]) xs
 			   where select x (ts,fs) | p x       = (x:ts,fs)
                                                   | otherwise = (ts, x:fs)
+\end{code}
 
+@mapAccumL@ behaves like a combination
+of  @map@ and @foldl@;
+it applies a function to each element of a list, passing an accumulating
+parameter from left to right, and returning a final value of this
+accumulator together with the new list.
 
-                           
+\begin{code}
 
-mapAccumL 		:: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
+mapAccumL :: (acc -> x -> (acc, y)) -- Function of elt of input list
+				    -- and accumulator, returning new
+				    -- accumulator and elt of result list
+   	  -> acc	    -- Initial accumulator 
+	  -> [x]	    -- Input list
+	  -> (acc, [y])	    -- Final accumulator and result list
 mapAccumL f s []     	=  (s, [])
 mapAccumL f s (x:xs) 	=  (s'',y:ys)
 		           where (s', y ) = f s x
 			         (s'',ys) = mapAccumL f s' xs
+\end{code}
 
-mapAccumR 		:: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
+@mapAccumR@ does the same, but working from right to left instead.  Its type is
+the same as @mapAccumL@, though.
+
+\begin{code}
+mapAccumR :: (acc -> x -> (acc, y)) 	-- Function of elt of input list
+					-- and accumulator, returning new
+					-- accumulator and elt of result list
+	    -> acc 		-- Initial accumulator
+	    -> [x] 		-- Input list
+	    -> (acc, [y])		-- Final accumulator and result list
 mapAccumR f s []     	=  (s, [])
 mapAccumR f s (x:xs)	=  (s'', y:ys)
 		           where (s'',y ) = f s' x
 			         (s', ys) = mapAccumR f s xs
+\end{code}
+
+\begin{code}
 sort :: (Ord a) => [a] -> [a]
 sort = sortBy compare
 
@@ -195,6 +236,10 @@ genericIndex (_:xs) n
  | n > 0     = genericIndex xs (n-1)
  | otherwise = error "List.genericIndex: negative argument."
 genericIndex _ _      = error "List.genericIndex: index too large."
+
+genericReplicate	:: (Integral i) => i -> a -> [a]
+genericReplicate n x	=  genericTake n (repeat x)
+
 
 zip4			:: [a] -> [b] -> [c] -> [d] -> [(a,b,c,d)]
 zip4			=  zipWith4 (,,,)
@@ -258,28 +303,6 @@ unzip7		=  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
 deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 
--- elem, notElem, lookup, maximumBy and minimumBy are in PreludeList
-elemBy, notElemBy       :: (a -> a -> Bool) -> a -> [a] -> Bool
-elemBy eq _ []		=  False
-elemBy eq x (y:ys)	=  x `eq` y || elemBy eq x ys
-
-notElemBy eq x xs       =  not (elemBy eq x xs)
-
-lookupBy                :: (a -> a -> Bool) -> a -> [(a, b)] -> Maybe b
-lookupBy eq key []      =  Nothing
-lookupBy eq key ((x,y):xys)
-    | key `eq` x	=  Just y
-    | otherwise		=  lookupBy eq key xys
-
-
--- sums and products give a list of running sums or products from
--- a list of numbers.  e.g., sums [1,2,3] == [0,1,3,6]
-sums, products		:: (Num a) => [a] -> [a]
-sums 			=  scanl (+) 0 
-products 		=  scanl (*) 1 
-
-genericReplicate	:: (Integral i) => i -> a -> [a]
-genericReplicate n x	=  genericTake n (repeat x)
 
 -- group splits its list argument into a list of lists of equal, adjacent
 -- elements.  e.g.,
@@ -304,25 +327,4 @@ tails 			:: [a] -> [[a]]
 tails []	        =  [[]]
 tails xxs@(_:xs) 	=  xxs : tails xs
 
-{-	Old stuff now not in List
-
-elemIndexBy 		:: (a -> a -> Bool) -> [a] -> a -> Int
-elemIndexBy eq [] x 	 = error "List.elemIndexBy: empty list"
-elemIndexBy eq (x:xs) x' = if x `eq` x' then 0 else 1 + elemIndexBy eq xs x'
-
--- subsequences xs returns the list of all subsequences of xs.
--- e.g., subsequences "abc" == ["","c","b","bc","a","ac","ab","abc"]
-subsequences 		:: [a] -> [[a]]
-subsequences []		=  [[]]
-subsequences (x:xs) 	=  subsequences xs ++ map (x:) (subsequences xs)
-
--- permutations xs returns the list of all permutations of xs.
--- e.g., permutations "abc" == ["abc","bac","bca","acb","cab","cba"]
-permutations            :: [a] -> [[a]]
-permutations []         =  [[]]
-permutations (x:xs)     =  [zs | ys <- permutations xs, zs <- interleave x ys ]
-  where interleave          :: a -> [a] -> [[a]]
-        interleave x []     =  [[x]]
-        interleave x (y:ys) =  [x:y:ys] ++ map (y:) (interleave x ys)
--}
 \end{code}
