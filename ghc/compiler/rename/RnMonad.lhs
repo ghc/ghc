@@ -57,17 +57,13 @@ import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
 import NameSet		
 import CmdLineOpts	( opt_D_dump_rn_trace, opt_HiMap )
 import PrelInfo		( builtinNames )
-import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique, getUnique, unboundKey )
 import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM, 
 			  addListToFM_C, addToFM_C, eltsFM, fmToList
 			)
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
-import Maybes		( mapMaybe )
-import UniqSet
 import UniqSupply
-import Util
 import Outputable
 
 infixr 9 `thenRn`, `thenRn_`

@@ -24,7 +24,6 @@ module UConSet ( UConSet,
 import VarEnv
 import Type		( UsageAnn(..) )
 import Var		( UVar )
-import Monad		( foldM )
 import Bag              ( Bag, unitBag, emptyBag, unionBags, foldlBag, bagToList )
 import Outputable
 import PprType

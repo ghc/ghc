@@ -19,11 +19,9 @@ import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType )
 import VarEnv
 import CoreLint		( beginPass, endPass )
-import PprCore
 import SetLevels	( setLevels,
 		 	  Level(..), tOP_LEVEL, ltMajLvl, ltLvl, isTopLvl
 			)
-import BasicTypes	( Unused )
 import Type		( isUnLiftedType )
 import Var		( TyVar )
 import UniqSupply       ( UniqSupply )

@@ -30,7 +30,6 @@ import Type		( PredType(..), ThetaType,
 import Var		( TyVar, tyVarKind,
 			  tyVarName, setTyVarName
 			)
-import VarEnv
 import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, isUnboxedTupleTyCon, 
 			  maybeTyConSingleCon, isEnumerationTyCon, 
 			  tyConArity, tyConUnique
@@ -44,7 +43,6 @@ import Outputable
 import PprEnv
 import Unique		( Uniquable(..) )
 import Unique		-- quite a few *Keys
-import Util
 \end{code}
 
 %************************************************************************

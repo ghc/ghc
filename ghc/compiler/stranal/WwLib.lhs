@@ -29,7 +29,6 @@ import Type		( isUnLiftedType,
 			  mkTyConApp, mkFunTys,
 			  Type
 			)
-import TyCon            ( isNewTyCon, isProductTyCon, TyCon )
 import BasicTypes	( NewOrData(..), Arity, Boxity(..) )
 import Var              ( TyVar, Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, 

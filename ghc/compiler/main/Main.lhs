@@ -10,13 +10,12 @@ module Main ( main ) where
 
 import IO		( hPutStr, stderr )
 import HsSyn
-import BasicTypes	( NewOrData(..) )
 
 import RdrHsSyn		( RdrNameHsModule )
-import FastString	( mkFastCharString, unpackFS )
+import FastString	( unpackFS )
 import StringBuffer	( hGetStringBuffer )
 import Parser		( parse )
-import Lex		( PState(..), P, ParseResult(..) )
+import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 
 import Rename		( renameModule )
@@ -26,25 +25,19 @@ import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
 import SimplCore	( core2core )
 import OccurAnal	( occurAnalyseBinds )
-import CoreLint		( endPass )
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
 import CoreToStg	( topCoreBindsToStg )
-import StgSyn		( collectFinalStgBinders, pprStgBindings )
+import StgSyn		( collectFinalStgBinders )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
 import Module		( ModuleName, moduleNameUserString )
-import AbsCSyn		( absCNop )
 import CmdLineOpts
 import ErrUtils		( ghcExit, doIfSet, dumpIfSet )
-import Maybes		( maybeToBool, MaybeErr(..) )
-import TyCon		( isDataTyCon )
-import Class		( classTyCon )
 import UniqSupply	( mkSplitUniqSupply )
 
-import FiniteMap	( emptyFM )
 import Outputable
 import Char		( isSpace )
 #if REPORT_TO_MOTHERLODE && __GLASGOW_HASKELL__ >= 303

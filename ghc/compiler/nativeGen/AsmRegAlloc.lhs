@@ -10,16 +10,13 @@ module AsmRegAlloc ( runRegAllocate ) where
 
 import MachCode		( InstrBlock )
 import MachMisc		( Instr(..) )
-import PprMach		( pprUserReg, pprInstr ) -- debugging
 import MachRegs
 import RegAllocInfo
 
 import FiniteMap	( FiniteMap, emptyFM, addListToFM, delListFromFM, 
 			  lookupFM, keysFM, eltsFM, mapFM, addToFM_C, addToFM,
 			  listToFM, fmToList, lookupWithDefaultFM )
-import Maybes		( maybeToBool )
 import Unique		( mkBuiltinUnique )
-import Util		( mapAccumB )
 import OrdList		( unitOL, appOL, fromOL, concatOL )
 import Outputable
 import Unique		( Unique, Uniquable(..), mkPseudoUnique3 )

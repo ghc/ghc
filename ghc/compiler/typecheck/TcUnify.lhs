@@ -28,17 +28,15 @@ import Type	( tyVarsOfType,
 import TyCon	( TyCon, isTupleTyCon, tupleTyConBoxity, tyConArity )
 import Name	( hasBetterProv )
 import Var	( TyVar, tyVarKind, varName, isSigTyVar )
-import VarEnv	
 import VarSet	( varSetElems )
 import TcType	( TcType, TcTauType, TcTyVar, TcKind, 
 		  newTyVarTy, newOpenTypeKind, newTyVarTy_OpenKind,
 		  tcGetTyVar, tcPutTyVar, zonkTcType, tcTypeKind
 		)
+
 -- others:
 import BasicTypes ( Arity, Boxity, isBoxed )
 import TysWiredIn ( listTyCon, mkListTy, mkTupleTy )
-import PprType	()		-- Instances
-import Util
 import Outputable
 \end{code}
 

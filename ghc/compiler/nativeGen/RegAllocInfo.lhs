@@ -37,16 +37,11 @@ module RegAllocInfo (
 #include "HsVersions.h"
 
 import List		( partition, sort )
-import OrdList		( unitOL )
 import MachMisc
 import MachRegs
-import MachCode		( InstrBlock )
 
-import BitSet		( unitBS, mkBS, minusBS, unionBS, listBS, BitSet )
 import CLabel		( pprCLabel_asm, isAsmTemp, CLabel{-instance Ord-} )
 import FiniteMap	( addToFM, lookupFM, FiniteMap )
-import PrimRep		( PrimRep(..) )
-import UniqSet		-- quite a bit of it
 import Outputable
 import Constants	( rESERVED_C_STACK_BYTES )
 import Unique		( Unique, Uniquable(..) )

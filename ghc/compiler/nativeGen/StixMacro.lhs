@@ -10,7 +10,6 @@ module StixMacro ( macroCode, checkCode ) where
 
 import {-# SOURCE #-} StixPrim ( amodeToStix )
 
-import MachMisc
 import MachRegs
 import AbsCSyn		( CStmtMacro(..), MagicId(..), CAddrMode, tagreg,
 			  CCheckMacro(..) )
@@ -20,7 +19,6 @@ import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix
 import UniqSupply	( returnUs, thenUs, UniqSM )
-import Outputable
 import CLabel		( mkBlackHoleInfoTableLabel, mkIndStaticInfoLabel,
 			  mkIndInfoLabel, mkUpdInfoLabel, mkSeqInfoLabel,
 			  mkRtsGCEntryLabel, mkStgUpdatePAPLabel )

@@ -61,7 +61,6 @@ import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
 import Unique		( ioTyConKey, mainKey, hasKey, Uniquable(..) )
-import SrcLoc           ( SrcLoc )
 import Outputable
 \end{code}
 

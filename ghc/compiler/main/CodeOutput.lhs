@@ -24,13 +24,12 @@ import Id		( Id )
 import Class		( Class )
 import CoreSyn		( CoreBind )
 import StgSyn		( StgBinding )
-import AbsCSyn		( AbstractC, absCNop )
+import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
 import UniqSupply	( UniqSupply )
-import Module		( Module, moduleString )
+import Module		( Module )
 import CmdLineOpts
-import Maybes		( maybeToBool )
-import ErrUtils		( doIfSet, dumpIfSet )
+import ErrUtils		( dumpIfSet )
 import Outputable
 import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}

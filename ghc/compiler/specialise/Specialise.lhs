@@ -21,7 +21,6 @@ import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, applyTys,
 			  mkForAllTys, boxedTypeKind
 			)
-import PprType		( {- instance Outputable Type -} )
 import Subst		( Subst, mkSubst, substTy, mkSubst, substBndrs, extendSubstList,
 			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst, substInScope
 			) 

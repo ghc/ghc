@@ -13,9 +13,9 @@ module PrelRules ( primOpRule, builtinRules ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import Rules		( ProtoCoreRule(..) )
-import Id		( idUnfolding, mkWildId, isDataConId_maybe )
-import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord, literalType
+import Id		( mkWildId )
+import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
+			, inIntRange, inWordRange, literalType
 			, word2IntLit, int2WordLit, char2IntLit, int2CharLit
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 			, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
@@ -24,30 +24,16 @@ import RdrName		( RdrName )
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
 import TyCon		( tyConDataConsIfAvailable, isEnumerationTyCon, isNewTyCon )
-import DataCon		( DataCon, dataConTag, dataConRepArity, dataConTyCon, dataConId, fIRST_TAG )
-import CoreUnfold	( maybeUnfoldingTemplate )
+import DataCon		( dataConTag, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
 import Type		( splitTyConApp_maybe )
 import OccName		( occNameUserString)
 import PrelNames	( unpackCStringFoldr_RDR )
 import Unique		( unpackCStringFoldrIdKey, hasKey )
-import Maybes		( maybeToBool )
-import Char		( ord, chr )
 import Bits		( Bits(..) )
-import PrelAddr		( wordToInt )
 import Word		( Word64 )
 import Outputable
-
-#if __GLASGOW_HASKELL__ > 405
-import PrelAddr ( intToWord )
-#else
-import PrelAddr ( Word(..) )
-import PrelGHC  ( int2Word# )
-intToWord :: Int -> Word
-intToWord (I# i#) = W# (int2Word# i#)
-#endif
 \end{code}
-
 
 
 \begin{code}

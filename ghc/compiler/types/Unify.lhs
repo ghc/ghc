@@ -27,7 +27,6 @@ import VarEnv	( TyVarSubstEnv, emptySubstEnv, lookupSubstEnv, extendSubstEnv,
 		  SubstResult(..)
 		)
 
-import Unique	( Uniquable(..) )
 import Outputable( panic )
 import Util	( snocView )
 \end{code}

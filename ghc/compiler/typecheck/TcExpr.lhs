@@ -44,7 +44,6 @@ import TcType		( TcType, TcTauType,
 			  tcInstTcType, tcSplitRhoTy,
 			  newTyVarTy, newTyVarTy_OpenKind, zonkTcType )
 
-import Class		( Class )
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
 import Id		( idType, recordSelectorFieldLabel, isRecordSelector,
 			  Id, mkVanillaId

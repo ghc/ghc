@@ -59,7 +59,6 @@ import CmdLineOpts 	( opt_NoImplicitPrelude )
 import StringBuffer 	( lexemeToString )
 import FastString	( unpackFS )
 import BasicTypes	( Boxity(..) )
-import ErrUtils
 import UniqFM		( UniqFM, listToUFM, lookupUFM )
 import Outputable
 

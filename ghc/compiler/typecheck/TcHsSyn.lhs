@@ -49,16 +49,11 @@ import TcMonad
 import TcType	( TcType, TcTyVar,
 		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcTyVarBndr, zonkTcType
 		)
-import Type	( mkTyVarTy, isUnLiftedType, Type )
 import Name	( isLocallyDefined )
-import Var	( TyVar )
-import VarEnv	( TyVarEnv, emptyVarEnv, extendVarEnvList )
-import VarSet	( isEmptyVarSet )
 import CoreSyn  ( Expr )
 import CoreUnfold( unfoldingTemplate )
 import BasicTypes ( RecFlag(..) )
 import Bag
-import UniqFM
 import Outputable
 \end{code}
 

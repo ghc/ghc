@@ -46,7 +46,6 @@ import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
 import Maybes	( maybeToBool, catMaybes, mapMaybe )
 import UniqFM   ( emptyUFM, listToUFM, plusUFM_C )
-import Unique	( getUnique )
 import Util	( removeDups, equivClassesByUniq, sortLt )
 import List	( partition )
 \end{code}

@@ -24,7 +24,6 @@ import CmdLineOpts	( opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
 			)
 import Id		( Id )
 import Module		( Module, moduleString )
-import VarEnv
 import ErrUtils		( doIfSet, dumpIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import IO		( hPutStr, stdout )

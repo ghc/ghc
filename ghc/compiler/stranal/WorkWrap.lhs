@@ -15,21 +15,17 @@ import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core,
 			)
 import CoreLint		( beginPass, endPass )
 import CoreUtils	( exprType, exprArity, exprEtaExpandArity )
-import DataCon		( DataCon )
 import MkId		( mkWorkerId )
 import Id		( Id, idType, idStrictness, setIdArityInfo, isOneShotLambda,
 			  setIdStrictness, idInlinePragma, 
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
-import VarSet
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			  CprInfo(..), exactArity, InlinePragInfo(..), isNeverInlinePrag,
 			  WorkerInfo(..)
 			)
 import Demand           ( Demand, wwLazy )
-import SaLib
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
-import UniqSet
 import WwLib
 import Outputable
 \end{code}

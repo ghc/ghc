@@ -46,24 +46,19 @@ module SimplMonad (
 #include "HsVersions.h"
 
 import Id		( Id, mkSysLocal, idUnfolding, isDataConWrapId )
-import IdInfo		( InlinePragInfo(..) )
-import Demand		( Demand )
 import CoreSyn
-import CoreUnfold	( isCompulsoryUnfolding, isEvaldUnfolding )
+import CoreUnfold	( isCompulsoryUnfolding )
 import PprCore		()	-- Instances
-import Rules		( RuleBase )
 import CostCentre	( CostCentreStack, subsumedCCS )
 import Name		( isLocallyDefined )
 import OccName		( UserFS )
-import Var		( TyVar )
 import VarEnv
 import VarSet
 import qualified Subst
-import Subst		( Subst, emptySubst, mkSubst, 
-			  substTy, substEnv, 
+import Subst		( Subst, mkSubst, substEnv, 
 			  InScopeSet, substInScope, isInScope
 			)
-import Type             ( Type, TyVarSubst, applyTy )
+import Type             ( Type )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)

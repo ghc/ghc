@@ -33,7 +33,6 @@ import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
 import TcExpr		( tcId, tcPolyExpr )			
 import Inst		( emptyLIE, LIE, plusLIE )
-import CoreSyn
 
 import ErrUtils		( Message )
 import Id		( Id, idName, mkVanillaId )
@@ -42,16 +41,12 @@ import Type		( splitFunTys
 			, splitTyConApp_maybe
 			, splitForAllTys
 			)
-import PprType		( {- instance Outputable Type -} )
 import TysWiredIn	( isFFIArgumentTy, isFFIResultTy, 
 			  isFFIExternalTy, isAddrTy
 			)
 import Type             ( Type )
 import Unique
 import Outputable
-import Util
-import CmdLineOpts	( opt_GlasgowExts )
-import Maybes		( maybeToBool )
 
 \end{code}
 

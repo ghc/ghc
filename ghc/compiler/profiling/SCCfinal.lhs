@@ -31,15 +31,11 @@ import StgSyn
 
 import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
-import Id		( Id, mkSysLocal, idType, idName )
+import Id		( Id )
 import Module		( Module )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Unique           ( Unique )
-import Type		( splitForAllTys, splitTyConApp_maybe )
-import TyCon		( isFunTyCon )
 import VarSet
-import UniqSet
-import Name		( isLocallyDefined )
 import Util		( removeDups )
 import Outputable	
 

@@ -20,7 +20,6 @@ import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..), getSMRepClosureTypeInt )
 import Stix		-- all of it
 import UniqSupply	( returnUs, UniqSM )
-import Outputable	( int )
 import BitSet		( intBS )
 import Maybes		( maybeToBool )
 

@@ -49,7 +49,6 @@ import Name		( getOccString, getOccName, getSrcLoc, occNameString,
 			  isDataSymOcc, isSymOcc
 			)
 
-import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
@@ -65,7 +64,6 @@ import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool )
 import Constants
 import List		( partition, intersperse )
-import Char		( isAlpha )
 
 #if __GLASGOW_HASKELL__ >= 404
 import GlaExts		( fromInt )

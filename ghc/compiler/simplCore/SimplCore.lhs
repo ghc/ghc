@@ -9,11 +9,11 @@ module SimplCore ( core2core ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), 
-			  SwitchResult(..), switchIsOn, intSwitchSet,
+			  SwitchResult(..), intSwitchSet,
 			  opt_D_dump_occur_anal, opt_D_dump_rules,
 			  opt_D_dump_simpl_iterations,
 			  opt_D_dump_simpl_stats,
-			  opt_D_dump_simpl, opt_D_dump_rules,
+			  opt_D_dump_rules,
 			  opt_D_verbose_core2core,
 			  opt_D_dump_occur_anal,
                           opt_UsageSPOn,
@@ -22,34 +22,19 @@ import CoreLint		( beginPass, endPass )
 import CoreSyn
 import CSE		( cseProgram )
 import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareLocalRuleBase,
-                          prepareOrphanRuleBase, unionRuleBase, localRule, orphanRule )
+                          prepareOrphanRuleBase, unionRuleBase, localRule )
 import CoreUnfold
 import PprCore		( pprCoreBindings )
 import OccurAnal	( occurAnalyseBinds )
 import CoreUtils	( exprIsTrivial, etaReduceExpr, coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
-import SimplUtils	( findDefault, simplBinders )
+import SimplUtils	( simplBinders )
 import SimplMonad
-import Literal		( Literal(..), literalType, mkMachInt )
 import ErrUtils		( dumpIfSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( Id, mkSysLocal, mkVanillaId, isBottomingId, isDataConWrapId,
-			  idType, setIdType, idName, idInfo, setIdNoDiscard
-			)
-import VarEnv
+import Id		( isDataConWrapId )
 import VarSet
-import Module		( Module )
-import Name		( mkLocalName, tidyOccName, tidyTopName, 
-			  NamedThing(..), OccName
-			)
-import TyCon		( TyCon, isDataTyCon )
-import Type		( Type, 
-			  isUnLiftedType,
-			  tidyType, tidyTypes, tidyTopType, tidyTyVar, tidyTyVars,
-			  Type
-			)
-import TysWiredIn	( smallIntegerDataCon, isIntegerTy )
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
@@ -58,16 +43,10 @@ import StrictAnal	( saBinds )
 import WorkWrap	        ( wwTopBinds )
 import CprAnalyse       ( cprAnalyse )
 
-import Unique		( Unique, Uniquable(..) )
-import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply, uniqFromSupply )
-import Util		( mapAccumL )
-import SrcLoc		( noSrcLoc )
-import Bag
-import Maybes
+import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
 
-import Ratio 		( numerator, denominator )
 import List             ( partition )
 \end{code}
 

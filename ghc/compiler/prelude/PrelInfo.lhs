@@ -41,13 +41,11 @@ import PrelNames	-- Prelude module names
 
 import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName )
 import DataCon		( DataCon, dataConId, dataConWrapId )
-import PrimRep		( PrimRep(..) )
 import TysPrim		-- TYPES
 import TysWiredIn
 
 -- others:
 import RdrName		( RdrName )
-import Var		( varUnique, Id )
 import Name		( Name, OccName, Provenance(..), 
 			  NameSpace, tcName, clsName, varName, dataName,
 			  mkKnownKeyGlobal,
@@ -61,7 +59,6 @@ import BasicTypes	( Boxity(..) )
 import Unique		-- *Key stuff
 import UniqFM		( UniqFM, listToUFM )
 import Util		( isIn )
-import Panic		( panic )
 \end{code}
 
 %************************************************************************

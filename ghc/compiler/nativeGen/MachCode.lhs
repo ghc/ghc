@@ -18,7 +18,6 @@ import MachMisc		-- may differ per-platform
 import MachRegs
 import OrdList		( OrdList, nilOL, isNilOL, unitOL, appOL, toOL,
 			  snocOL, consOL, concatOL )
-import AbsCSyn		( MagicId )
 import AbsCUtils	( magicIdPrimRep )
 import CallConv		( CallConv )
 import CLabel		( isAsmTemp, CLabel, pprCLabel_asm, labelDynamic )

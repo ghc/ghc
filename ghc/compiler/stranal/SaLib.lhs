@@ -18,9 +18,7 @@ module SaLib (
 
 #include "HsVersions.h"
 
-import Id		( Id )
 import Type		( Type )
-import CoreSyn		( CoreExpr )
 import VarEnv
 import IdInfo		( StrictnessInfo(..) )
 import Demand		( Demand, pprDemands )

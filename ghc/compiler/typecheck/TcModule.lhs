@@ -31,7 +31,6 @@ import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
 			  initEnv, 
 			  ValueEnv, TcTyThing(..)
 			)
-import TcExpr		( tcId )
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
@@ -56,19 +55,13 @@ import Name		( Name, nameUnique, nameOccName, isLocallyDefined,
 			)
 import TyCon		( TyCon, tyConKind )
 import Class		( Class, classSelIds, classTyCon )
-import Type		( mkTyConApp, mkForAllTy,
-			  boxedTypeKind, getTyVar, Type )
-import TysWiredIn	( unitTy )
 import PrelInfo		( mAIN_Name )
-import TcUnify		( unifyTauTy )
 import Unique		( Unique, mainKey )
 import UniqSupply       ( UniqSupply )
 import Maybes		( maybeToBool )
 import Util
 import Bag		( Bag, isEmptyBag )
 import Outputable
-
-import IOExts
 \end{code}
 
 Outside-world interface:

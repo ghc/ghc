@@ -50,7 +50,6 @@ import Type		( TauType, mkTyVarTys, mkTyConApp,
 			  mkSigmaTy, mkDictTy, isUnboxedType,
 			  splitAlgTyConApp, classesToPreds
 			)
-import PprType		( {- instance Outputable Type -} )
 import TysWiredIn	( voidTy )
 import Var		( TyVar )
 import Unique		-- Keys stuff

@@ -30,11 +30,8 @@ import TcType		( TcKind, newKindVar, newKindVars, kindToTcKind, zonkTcKindToKind
 
 import Type		( mkArrowKind, boxedTypeKind )
 
-import Class		( Class )
-import Var		( TyVar, tyVarKind )
 import FiniteMap
 import Bag	
-import VarSet
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, NamedThing(..), getSrcLoc, isTvOcc, nameOccName )
 import Outputable
@@ -43,7 +40,6 @@ import UniqSet		( UniqSet, emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import ErrUtils		( Message )
-import SrcLoc		( SrcLoc )
 import TyCon		( TyCon, ArgVrcs )
 import Variance         ( calcTyConArgVrcs )
 import Unique		( Unique, Uniquable(..) )

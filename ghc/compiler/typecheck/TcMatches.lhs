@@ -34,7 +34,6 @@ import BasicTypes	( RecFlag(..) )
 import Type		( Kind, tyVarsOfType, isTauTy, mkFunTy, boxedTypeKind )
 import VarSet
 import Var		( Id )
-import Util
 import Bag
 import Outputable
 import List		( nub )

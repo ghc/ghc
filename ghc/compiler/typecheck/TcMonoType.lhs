@@ -48,15 +48,12 @@ import Id		( mkVanillaId, idName, idType, idFreeTyVars )
 import Var		( TyVar, mkTyVar, mkNamedUVar, varName )
 import VarEnv
 import VarSet
-import Bag		( bagToList )
 import ErrUtils		( Message )
-import TyCon		( TyCon )
 import Name		( Name, OccName, isLocallyDefined )
 import TysWiredIn	( mkListTy, mkTupleTy )
 import UniqFM		( elemUFM, foldUFM )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
-import Unique		( Unique, Uniquable(..) )
 import Util		( mapAccumL, isSingleton, removeDups )
 import Outputable
 \end{code}

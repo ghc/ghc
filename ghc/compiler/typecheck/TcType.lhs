@@ -51,7 +51,6 @@ module TcType (
 
 
 -- friends:
-import PprType		( pprType )
 import TypeRep		( Type(..), Kind, TyNote(..), 
 			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
 			)  -- friend
@@ -63,8 +62,6 @@ import Type		( ThetaType, PredType(..),
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import TyCon		( tyConKind, mkPrimTyCon )
 import PrimRep		( PrimRep(VoidRep) )
-import VarEnv
-import VarSet		( emptyVarSet )
 import Var		( TyVar, tyVarKind, tyVarName, isTyVar, isMutTyVar, mkTyVar )
 
 -- others:

@@ -38,7 +38,6 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
 import Class		( classBigSig, Class )
 import Var		( idName, idType, Id, TyVar )
-import DataCon		( isNullaryDataCon, splitProductType_maybe )
 import Maybes 		( maybeToBool, catMaybes, expectJust )
 import MkId		( mkDictFunId )
 import Module		( ModuleName )
@@ -46,7 +45,6 @@ import Name		( isLocallyDefined, NamedThing(..)	)
 import NameSet		( emptyNameSet )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint )
-import SrcLoc		( SrcLoc )
 import TyCon		( isSynTyCon, tyConDerivings )
 import Type		( Type, isUnLiftedType, mkTyVarTys,
 			  splitSigmaTy, isTyVarTy,
@@ -57,7 +55,6 @@ import Type		( Type, isUnLiftedType, mkTyVarTys,
 			)
 import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
-import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 import TysWiredIn	( stringTy, isFFIArgumentTy, isFFIResultTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, hasKey, Uniquable(..) )
 import Outputable

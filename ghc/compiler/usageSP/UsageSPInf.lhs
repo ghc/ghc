@@ -27,13 +27,11 @@ import Type             ( UsageAnn(..),
                           mkUsgTy, splitUsgTy, isUsgTy, isNotUsgTy, unUsgTy, tyUsg,
                           splitUsForAllTys, substUsTy,
                           mkFunTy, mkForAllTy )
-import PprType		( {- instance Outputable Type -} )
 import TyCon            ( tyConArgVrcs_maybe, isFunTyCon )
 import Literal          ( Literal(..), literalType )
 import Var              ( Var, UVar, varType, setVarType, mkUVar, modifyIdInfo )
 import IdInfo           ( setLBVarInfo, LBVarInfo(..) )
 import Id               ( isExportedId )
-import Name             ( isLocallyDefined )
 import VarEnv
 import VarSet
 import UniqSupply       ( UniqSupply, UniqSM,

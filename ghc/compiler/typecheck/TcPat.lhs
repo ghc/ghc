@@ -8,8 +8,6 @@ module TcPat ( tcPat, tcPatBndr_NoSigs, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcExpr )
-
 import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsExpr(..), Sig(..) )
 import RnHsSyn		( RenamedPat )
 import TcHsSyn		( TcPat, TcId )
@@ -34,13 +32,11 @@ import DataCon		( DataCon, dataConSig, dataConFieldLabels,
 			)
 import Id		( Id, idType, isDataConWrapId_maybe )
 import Type		( Type, isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
-import PprType		( {- instance Outputable Type -} )
 import Subst		( substTy, substClasses )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, stringTy, intTy )
-import SrcLoc		( SrcLoc )
 import Unique		( eqClassOpKey, geClassOpKey, minusClassOpKey,
 			  cCallableClassKey
 			)

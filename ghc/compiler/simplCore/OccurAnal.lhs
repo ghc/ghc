@@ -18,11 +18,9 @@ module OccurAnal (
 #include "HsVersions.h"
 
 import BinderInfo
-import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
-import Literal		( Literal(..) )
 import Id		( isSpecPragmaId, isDataConId, isOneShotLambda, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo,
 			  isExportedId, modifyIdInfo, idInfo,

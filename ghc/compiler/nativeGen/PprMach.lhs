@@ -18,8 +18,6 @@ import MachRegs		-- may differ per-platform
 import MachMisc
 
 import CLabel		( pprCLabel_asm, externallyVisibleCLabel, labelDynamic )
-import CStrings		( charToC )
-import Maybes		( maybeToBool )
 import Stix		( CodeSegment(..), StixTree(..) )
 import Char		( isPrint, isDigit )
 import Outputable

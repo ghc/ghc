@@ -38,7 +38,6 @@ module Inst (
 #include "HsVersions.h"
 
 import HsSyn	( HsLit(..), HsExpr(..) )
-import RnHsSyn	( RenamedArithSeqInfo, RenamedHsExpr, RenamedPat )
 import TcHsSyn	( TcExpr, TcId, 
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
@@ -59,7 +58,6 @@ import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( OccName, Name, mkDictOcc, mkMethodOcc, mkIPOcc,
 		  getOccName, nameUnique )
 import PprType	( pprPred )	
-import SrcLoc	( SrcLoc )
 import Type	( Type, PredType(..), ThetaType,
 		  mkTyVarTy, isTyVarTy, mkDictTy, mkPredTy,
 		  splitForAllTys, splitSigmaTy,
@@ -69,9 +67,7 @@ import Type	( Type, PredType(..), ThetaType,
 import Subst	( emptyInScopeSet, mkSubst,
 		  substTy, substClasses, mkTyVarSubst, mkTopTyVarSubst
 		)
-import TyCon	( TyCon )
 import Literal	( inIntRange )
-import Var	( TyVar )
 import VarEnv	( lookupVarEnv, TidyEnv,
 		  lookupSubstEnv, SubstResult(..)
 		)
@@ -86,7 +82,6 @@ import TysWiredIn ( intDataCon, isIntTy,
 import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
 		)
-import Maybes	( expectJust )
 import Maybe	( catMaybes )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Outputable

@@ -17,32 +17,26 @@ module CoreToStg ( topCoreBindsToStg ) where
 import CoreSyn		-- input
 import StgSyn		-- output
 
-import PprCore		( {- instance Outputable Bind/Expr -} )
 import CoreUtils	( exprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
-import Id		( Id, mkSysLocal, idType, idStrictness, idUnique, isExportedId, mkVanillaId,
-			  externallyVisibleId, setIdUnique, idName, 
-			  idDemandInfo, idArity, setIdType, idFlavour
+import Id		( Id, mkSysLocal, idType, idStrictness, isExportedId, 
+			  mkVanillaId, idName, idDemandInfo, idArity, setIdType,
+			  idFlavour, idUnique
 			)
-import Var		( Var, varType, modifyIdInfo )
-import IdInfo		( setDemandInfo, StrictnessInfo(..), IdFlavour(..) )
-import UsageSPUtils     ( primOpUsgTys )
-import DataCon		( DataCon, dataConName, dataConWrapId )
-import Demand		( Demand, isStrict, wwStrict, wwLazy )
-import Name	        ( Name, nameModule, isLocallyDefinedName, setNameUnique )
-import Literal	        ( Literal(..) )
+import IdInfo		( StrictnessInfo(..), IdFlavour(..) )
+import DataCon		( dataConWrapId )
+import Demand		( Demand, isStrict, wwLazy )
+import Name	        ( setNameUnique )
 import VarEnv
-import PrimOp		( PrimOp(..), setCCallUnique, primOpUsg )
+import PrimOp		( PrimOp(..), setCCallUnique )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
-                          UsageAnn(..), tyUsg, applyTy, mkUsgTy, repType, seqType,
+                          UsageAnn(..), tyUsg, applyTy, repType, seqType,
 			  splitRepFunTys, mkFunTys
 			)
-import TysPrim		( intPrimTy )
 import UniqSupply	-- all of it, really
-import Util		( lengthExceeds )
-import BasicTypes	( TopLevelFlag(..), isNotTopLevel, Arity )
-import CmdLineOpts	( opt_D_verbose_stg2stg, opt_UsageSPOn )
+import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
+import CmdLineOpts	( opt_D_verbose_stg2stg )
 import UniqSet		( emptyUniqSet )
 import Maybes
 import Outputable

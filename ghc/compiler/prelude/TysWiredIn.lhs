@@ -87,17 +87,14 @@ import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, tyConDataCons,
 			  mkAlgTyCon, mkSynTyCon, mkTupleTyCon, isUnLiftedTyCon
 			)
-import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), isBoxed )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
 			  mkFunTy, mkFunTys,
 			  splitTyConApp_maybe, repType,
 			  TauType, ClassContext )
-import PrimRep		( PrimRep(..) )
 import Unique
 import CmdLineOpts      ( opt_GlasgowExts )
-import Util		( assoc )
-import Panic		( panic )
 import Array
 
 alpha_tyvar	  = [alphaTyVar]

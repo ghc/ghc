@@ -49,7 +49,6 @@ import HsSyn		( HsLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
 import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
 			)
-import PprType		( {- instance Outputable Type -} )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, pprBagOfErrors, ErrMsg, Message, WarnMsg )
 import CmdLineOpts      ( opt_PprStyle_Debug )
 
@@ -63,11 +62,9 @@ import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
 			  UniqSM, initUs_ )
 import SrcLoc		( SrcLoc, noSrcLoc )
-import FiniteMap	( FiniteMap, emptyFM )
 import UniqFM		( UniqFM, emptyUFM )
 import Unique		( Unique )
 import BasicTypes	( Unused )
-import Util
 import Outputable
 import FastString	( FastString )
 

@@ -21,7 +21,6 @@ import TcEnv		( ValueEnv, tcExtendTyVarEnv,
 			  tcLookupValueMaybe,
 			  explicitLookupValue, badCon, badPrimOp, valueEnvIds
 			)
-import TcType		( TcKind, kindToTcKind )
 
 import RnHsSyn		( RenamedHsDecl )
 import HsCore
@@ -31,7 +30,6 @@ import CoreUtils	( exprType )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
-import PrimOp		( PrimOp(..) )
 
 import Id		( Id, mkId, mkVanillaId,
 			  isDataConWrapId_maybe
@@ -41,12 +39,9 @@ import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
 import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, splitAlgTyConApp_maybe, splitFunTys, unUsgTy )
 import Var		( mkTyVar, tyVarKind )
-import VarEnv
 import Name		( Name, NamedThing(..), isLocallyDefined )
-import TysWiredIn	( integerTy, stringTy )
 import Demand		( wwLazy )
 import ErrUtils		( pprBagOfErrors )
-import Maybes		( maybeToBool, MaybeErr(..) )
 import Outputable	
 import Util		( zipWithEqual )
 \end{code}

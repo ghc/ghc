@@ -8,9 +8,8 @@ module Simplify ( simplTopBinds, simplExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( intSwitchSet, switchIsOn,
-			  opt_SccProfilingOn, opt_PprStyle_Debug, opt_SimplDoEtaReduction,
-			  opt_SimplNoPreInlining, opt_DictsStrict, opt_SimplPedanticBottoms,
+import CmdLineOpts	( switchIsOn, opt_SimplDoEtaReduction,
+			  opt_SimplNoPreInlining, opt_DictsStrict,
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
@@ -19,60 +18,50 @@ import SimplUtils	( mkCase, transformRhs, findAlt,
 			  SimplCont(..), DupFlag(..), contResultType, analyseCont, 
 			  discardInline, countArgs, countValArgs, discardCont, contIsDupable
 			)
-import Var		( TyVar, mkSysTyVar, tyVarKind, maybeModifyIdInfo )
+import Var		( mkSysTyVar, tyVarKind )
 import VarEnv
-import VarSet
-import Id		( Id, idType, idInfo, idUnique, isDataConId, isDataConId_maybe,
+import Id		( Id, idType, idInfo, isDataConId,
 			  idUnfolding, setIdUnfolding, isExportedId, isDeadBinder,
-			  idSpecialisation, setIdSpecialisation,
-			  idDemandInfo, 
-			  setIdInfo,
+			  idDemandInfo, setIdInfo,
 			  idOccInfo, setIdOccInfo,
-			  zapLamIdInfo, zapFragileIdInfo,
-			  idStrictness, isBottomingId,
-			  setInlinePragma, 
-			  setOneShotLambda, maybeModifyIdInfo
+			  zapLamIdInfo, idStrictness, setOneShotLambda, 
 			)
-import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..), 
-		 	  ArityInfo(..), atLeastArity, arityLowerBound, unknownArity,
-			  specInfo, inlinePragInfo, setArityInfo, setInlinePragInfo, setUnfoldingInfo,
-			  CprInfo(..), cprInfo, occInfo
+import IdInfo		( OccInfo(..), StrictnessInfo(..), ArityInfo(..),
+			  setArityInfo, setUnfoldingInfo,
+			  occInfo
 			)
 import Demand		( Demand, isStrict, wwLazy )
-import DataCon		( DataCon, dataConNumInstArgs, dataConRepStrictness, dataConRepArity,
+import DataCon		( dataConNumInstArgs, dataConRepStrictness,
 			  dataConSig, dataConArgTys
 			)
 import CoreSyn
-import CoreFVs		( exprFreeVars, mustHaveLocalBinding )
-import CoreUnfold	( Unfolding, mkOtherCon, mkUnfolding, otherCons, maybeUnfoldingTemplate,
-			  callSiteInline, hasSomeUnfolding, noUnfolding
+import CoreFVs		( mustHaveLocalBinding )
+import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
+			  callSiteInline
 			)
-import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsCheap, exprIsTrivial, exprIsConApp_maybe,
+import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, exprIsConApp_maybe,
 			  exprType, coreAltsType, exprArity, exprIsValue, idAppIsCheap,
 			  exprOkForSpeculation, etaReduceExpr,
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
 			)
 import Rules		( lookupRule )
-import CostCentre	( isSubsumedCCS, currentCCS, isEmptyCC )
-import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType, seqType,
-			  mkFunTy, splitFunTy, splitFunTys, splitFunTy_maybe,
-			  splitTyConApp_maybe, 
-			  funResultTy, isDictTy, isDataType, applyTy, applyTys, mkFunTys
+import CostCentre	( currentCCS )
+import Type		( mkTyVarTys, isUnLiftedType, seqType,
+			  mkFunTy, splitFunTy, splitTyConApp_maybe, 
+			  funResultTy, isDictTy, isDataType, applyTy 
 			)
-import Subst		( Subst, mkSubst, emptySubst, substTy, substExpr,
-			  substEnv, isInScope, lookupIdSubst, substIdInfo
+import Subst		( mkSubst, substTy, substExpr,
+			  isInScope, lookupIdSubst, substIdInfo
 			)
 import TyCon		( isDataTyCon, tyConDataConsIfAvailable, 
-			  tyConClass_maybe, tyConArity, isDataTyCon
+			  isDataTyCon
 			)
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
-import BasicTypes	( TopLevelFlag(..), isTopLevel, isLoopBreaker )
+import BasicTypes	( isLoopBreaker )
 import Maybes		( maybeToBool )
 import Util		( zipWithEqual, lengthExceeds )
-import PprCore
 import Outputable
-import Unique		( foldrIdKey )	-- Temp
 \end{code}
 
 

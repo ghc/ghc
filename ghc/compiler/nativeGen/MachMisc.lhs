@@ -50,12 +50,10 @@ import MachRegs		( stgReg, callerSaves, RegLoc(..),
 #                         endif
 			)
 import PrimRep		( PrimRep(..) )
-import SMRep		( SMRep(..) )
 import Stix		( StixTree(..), StixReg(..), CodeSegment )
 import Panic		( panic )
-import Char		( isDigit )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
-import Outputable	( text, pprPanic, ppr )
+import Outputable	( pprPanic, ppr )
 import IOExts		( trace )
 \end{code}
 

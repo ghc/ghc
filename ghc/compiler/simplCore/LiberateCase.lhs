@@ -15,8 +15,6 @@ import CoreUnfold	( couldBeSmallEnoughToInline )
 import Var		( Id )
 import VarEnv
 import Maybes
-import Outputable
-import Util
 \end{code}
 
 This module walks over @Core@, and looks for @case@ on free variables.

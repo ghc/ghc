@@ -19,9 +19,7 @@ import TcSimplify	( tcSimplifyCheckThetas )
 import TysWiredIn	( integerTy, doubleTy )
 import Type             ( Type )
 import Unique		( numClassKey )
-import ErrUtils		( addShortErrLocLine )
 import Outputable
-import Util
 \end{code}
 
 \begin{code}

@@ -28,7 +28,6 @@ module Stix (
 import Ratio		( Rational )
 
 import AbsCSyn		( node, tagreg, MagicId(..) )
-import AbsCUtils	( magicIdPrimRep )
 import CallConv		( CallConv, pprCallConv )
 import CLabel		( mkAsmTempLabel, CLabel, pprCLabel, pprCLabel_asm )
 import PrimRep          ( PrimRep(..), showPrimRep )
@@ -37,7 +36,6 @@ import Unique           ( Unique )
 import SMRep		( fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply,
                           UniqSM, thenUs, returnUs, getUniqueUs )
-import CmdLineOpts	( opt_Static )
 import Outputable
 \end{code}
 

@@ -23,13 +23,13 @@ import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
 import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, getInterfaceExports,
-			  getImportedRules, loadHomeInterface, getSlurped, removeContext,
+			  getImportedRules, getSlurped, removeContext,
 			  loadBuiltinRules, getDeferredDecls, ImportDeclResult(..)
 			)
 import RnEnv		( availName, availsToNameSet, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, 
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupImplicitOccsRn, pprAvail, unknownNameErr,
+			  lookupImplicitOccsRn, unknownNameErr,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
@@ -38,7 +38,7 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
 			  nameOccName, nameUnique, nameModule, maybeUserImportedFrom,
 			  isUserImportedExplicitlyName, isUserImportedName,
-			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName,
+			  maybeWiredInTyConName, maybeWiredInIdName,
 			  isUserExportedName, toRdrName
 			)
 import OccName		( occNameFlavour, isValOcc )

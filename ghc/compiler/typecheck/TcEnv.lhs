@@ -36,7 +36,6 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import HsTypes	( HsTyVarBndr, getTyVarName )
 import Id	( mkUserLocal, isDataConWrapId_maybe )
 import MkId 	( mkSpecPragmaId )
 import Var	( TyVar, Id, setVarName,
@@ -46,7 +45,6 @@ import TcType	( TcType, TcTyVar, TcTyVarSet, TcThetaType,
 		  tcInstTyVars, zonkTcTyVars,
 		  TcKind, kindToTcKind
 		)
-import VarEnv
 import VarSet
 import Type	( Kind, Type, superKind,
 		  tyVarsOfType, tyVarsOfTypes, mkTyVarTy,
@@ -71,11 +69,9 @@ import Name		( Name, OccName, nameOccName, getSrcLoc,
 			)
 import Unify		( unifyTyListsX, matchTys )
 import Unique		( pprUnique10, Unique, Uniquable(..) )
-import FiniteMap	( lookupFM, addToFM )
 import UniqFM
 import Unique		( Uniquable(..) )
 import Util		( zipEqual, zipWith3Equal, mapAccumL )
-import Bag		( bagToList )
 import SrcLoc		( SrcLoc )
 import FastString	( FastString )
 import Maybes

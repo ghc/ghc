@@ -48,12 +48,10 @@ import CostCentre	( CostCentreStack, CostCentre )
 import Id		( Id, idName, idPrimRep, idType )
 import Name		( isDllName )
 import Literal		( Literal, literalType, isLitLitLit, literalPrimRep )
-import DataCon		( DataCon, dataConName, isNullaryDataCon )
+import DataCon		( DataCon, dataConName )
 import PrimOp		( PrimOp )
-import PrimRep		( PrimRep(..) )
 import Outputable
 import Type             ( Type )
-import PprType		( {- instance Outputable Type -} )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 \end{code}
 

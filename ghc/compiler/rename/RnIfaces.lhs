@@ -30,19 +30,13 @@ import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..),
 			)
 import HsImpExp		( ieNames )
 import CoreSyn		( CoreRule )
-import BasicTypes	( Version, NewOrData(..), defaultFixity )
-import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyClDecl, RdrNameRuleDecl,
-			  RdrNameFixitySig, RdrNameDeprecation, RdrNameIE,
+import BasicTypes	( Version, NewOrData(..) )
+import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameRuleDecl,
+			  RdrNameDeprecation, RdrNameIE,
 			  extractHsTyRdrNames 
 			)
-import RnEnv		( mkImportedGlobalName, newTopBinder, mkImportedGlobalFromRdrName,
-			  lookupOccRn, lookupImplicitOccRn,
-			  pprAvail, rdrAvailInfo,
-			  availName, availNames, addAvailToNameSet, addSysAvails,
-			  FreeVars, emptyFVs
-			)
+import RnEnv
 import RnMonad
-import RnHsSyn          ( RenamedHsDecl, RenamedDeprecation )
 import ParseIface	( parseIface, IfaceStuff(..) )
 
 import Name		( Name {-instance NamedThing-}, nameOccName,
@@ -56,22 +50,19 @@ import Module		( Module, moduleString, pprModule,
 			)
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
-import Var		( Id )
 import SrcLoc		( mkSrcLoc, SrcLoc )
-import PrelInfo		( pREL_GHC, cCallishTyKeys )
+import PrelInfo		( cCallishTyKeys )
 import Maybes		( MaybeErr(..), maybeToBool, orElse )
-import ListSetOps	( unionLists )
-import Unique		( Unique, Uniquable(..) )
-import StringBuffer     ( StringBuffer, hGetStringBuffer )
+import Unique		( Uniquable(..) )
+import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
-import Util		( sortLt, lengthExceeds )
+import Util		( sortLt )
 import Lex
 import FiniteMap
 import Outputable
 import Bag
 
-import IO	( isDoesNotExistError )
 import List	( nub )
 \end{code}
 

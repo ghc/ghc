@@ -17,7 +17,6 @@ import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  andMonoBinds, andMonoBindList, getTyVarName, 
 			  isClassDecl, isClassOpSig, isPragSig, collectMonoBinders
 			)
-import HsPragmas	( ClassPragmas(..) )
 import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, RenamedClassPragmas,
 			  RenamedClassOpSig, RenamedMonoBinds,
@@ -32,7 +31,6 @@ import TcEnv		( TcId, ValueEnv, TcTyThing(..), tcAddImportedIdInfo,
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcTyDecls	( mkNewTyConRep )
-import TcUnify		( unifyKinds )
 import TcMonad
 import TcMonoType	( kcHsType, tcHsTopType, tcExtendTopTyVarScope, 
 			  tcContext, checkSigTyVars, sigCtxt, mkTcSig
@@ -41,15 +39,12 @@ import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcTyVarBndr, tcGetTyVar )
 import TcInstUtil	( classDataCon )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import FieldLabel	( firstFieldLabelTag )
 import Bag		( unionManyBags, bagToList )
 import Class		( mkClass, classBigSig, classSelIds, Class, ClassOpItem )
 import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, dataConId, dataConWrapId, notMarkedStrict )
 import Id		( Id, setInlinePragma, idUnfolding, idType, idName )
-import CoreUnfold	( unfoldingTemplate )
-import IdInfo
 import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
 import NameSet		( emptyNameSet )
 import Outputable
@@ -61,8 +56,6 @@ import Type		( Type, ThetaType, ClassContext,
 import Var		( tyVarKind, TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
 import TyCon		( AlgTyConFlavour(..), mkClassTyCon )
-import Unique		( Unique, Uniquable(..) )
-import Util
 import Maybes		( seqMaybe )
 import FiniteMap        ( lookupWithDefaultFM )
 \end{code}

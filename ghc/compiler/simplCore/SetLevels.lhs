@@ -49,7 +49,7 @@ import Id		( Id, idType, idFreeTyVars, mkSysLocal, isOneShotLambda, modifyIdInfo
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
 import IdInfo		( workerExists, vanillaIdInfo, demandInfo, setDemandInfo )
-import Var		( Var, TyVar, setVarUnique )
+import Var		( Var, setVarUnique )
 import VarSet
 import VarEnv
 import Name		( getOccName )

@@ -21,15 +21,12 @@ import UsageSPUtils
 import CoreSyn
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
 import Type             ( UsageAnn(..), isUsgTy, tyUsg )
-import PprType		( {- instance Outputable Type -} )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import Var              ( Var, varType )
 import Id		( idLBVarInfo )
 import IdInfo           ( LBVarInfo(..) )
-import SrcLoc           ( noSrcLoc )
-import ErrUtils         ( Message, ghcExit )
+import ErrUtils         ( ghcExit )
 import Util             ( zipWithEqual )
-import PprCore
 import Bag
 import Outputable
 \end{code}

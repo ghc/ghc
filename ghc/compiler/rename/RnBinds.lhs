@@ -38,12 +38,8 @@ import Name		( OccName, Name, nameOccName, mkUnboundName, isUnboundName )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc  )
 import BasicTypes	( RecFlag(..), TopLevelFlag(..) )
-import Util		( thenCmp, removeDups )
 import List		( partition )
-import ListSetOps	( minusList )
 import Bag		( bagToList )
-import FiniteMap	( lookupFM, listToFM )
-import Maybe		( isJust )
 import Outputable
 \end{code}
 

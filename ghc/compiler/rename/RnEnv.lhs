@@ -35,9 +35,7 @@ import OccName		( OccName,
 import TysWiredIn	( listTyCon )
 import Type		( funTyCon )
 import Module		( ModuleName, mkThisModule, moduleName, mkVanillaModule, pprModuleName )
-import TyCon		( TyCon )
 import FiniteMap
-import Unique		( Unique, Uniquable(..) )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable

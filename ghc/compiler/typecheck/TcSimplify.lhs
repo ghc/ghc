@@ -161,7 +161,6 @@ import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
 import VarSet
 import FiniteMap
-import BasicTypes	( TopLevelFlag(..) )
 import CmdLineOpts	( opt_GlasgowExts )
 import Outputable
 import Util

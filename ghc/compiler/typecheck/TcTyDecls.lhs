@@ -55,7 +55,6 @@ import VarSet		( intersectVarSet, isEmptyVarSet )
 import Unique		( unpackCStringIdKey )
 import Util		( equivClasses )
 import FiniteMap        ( FiniteMap, lookupWithDefaultFM )
-import CmdLineOpts	( opt_GlasgowExts )
 \end{code}
 
 %************************************************************************

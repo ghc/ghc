@@ -15,32 +15,28 @@ module Rules (
 
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseRule )
-import BinderInfo	( markMany )
 import CoreFVs		( exprFreeVars, idRuleVars, ruleRhsFreeVars, ruleSomeLhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
-import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
-			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
-			  unBindSubst, bindSubstList, unBindSubstList, substInScope
+import Subst		( Subst, InScopeSet, lookupSubst, extendSubst,
+			  substEnv, setSubstEnv, emptySubst, isInScope,
+			  bindSubstList, unBindSubstList, substInScope
 			)
 import Id		( Id, idUnfolding, zapLamIdInfo, 
 			  idSpecialisation, setIdSpecialisation,
-			  setIdNoDiscard, maybeModifyIdInfo, modifyIdInfo
+			  setIdNoDiscard
 			) 
-import Name		( Name, isLocallyDefined )
+import Name		( isLocallyDefined )
 import Var		( isTyVar, isId )
 import VarSet
 import VarEnv
-import Type		( mkTyVarTy, getTyVar_maybe )
+import Type		( mkTyVarTy )
 import qualified Unify	( match )
-import CmdLineOpts	( opt_D_dump_simpl, opt_D_verbose_core2core )
 
 import UniqFM
-import ErrUtils		( dumpIfSet )
 import Outputable
 import Maybes		( maybeToBool )
-import List		( partition )
 import Util		( sortLt )
 \end{code}
 

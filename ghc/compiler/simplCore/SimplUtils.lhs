@@ -18,12 +18,9 @@ module SimplUtils (
 
 #include "HsVersions.h"
 
-import BinderInfo
 import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
-import PprCore		( {- instance Outputable Expr -} )
 import CoreUnfold	( isValueUnfolding )
-import CoreFVs		( exprFreeVars )
 import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity, bindNonRec )
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, lookupIdSubst )
 import Id		( Id, idType, isId, idName, 
@@ -38,14 +35,9 @@ import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType, repType,
 			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
 import TyCon		( tyConDataConsIfAvailable )
-import PprType		( {- instance Outputable Type -} )
 import DataCon		( dataConRepArity )
-import TysPrim		( statePrimTyCon )
-import Var		( setVarUnique )
 import VarSet
 import VarEnv		( SubstEnv, SubstResult(..) )
-import UniqSupply	( splitUniqSupply, uniqFromSupply )
-import Util		( zipWithEqual, mapAccumL )
 import Outputable
 \end{code}
 

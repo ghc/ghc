@@ -26,21 +26,17 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
 
 import CoreSyn
 import CoreFVs		( mustHaveLocalBinding )
-import Literal          ( Literal(..) )
 import Var              ( Var, varName, varType, setVarType, mkUVar )
 import Id               ( isExportedId )
 import Name             ( isLocallyDefined )
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
 import Type             ( UsageAnn(..), isUsgTy, splitFunTys )
-import PprType		( {- instance Outputable Type -} )
 import Subst		( substTy, mkTyVarSubst )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import VarEnv
 import PrimOp           ( PrimOp, primOpUsg )
-import Maybes           ( expectJust )
 import UniqSupply       ( UniqSupply, UniqSM, initUs, getUniqueUs, thenUs, returnUs )
 import Outputable
-import PprCore          ( )  -- instances only
 \end{code}
 
 ======================================================================

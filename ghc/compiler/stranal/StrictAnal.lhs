@@ -13,7 +13,7 @@ module StrictAnal ( saBinds ) where
 
 import CmdLineOpts	( opt_D_dump_stranal, opt_D_dump_simpl_stats,  opt_D_verbose_core2core )
 import CoreSyn
-import Id		( idType, setIdStrictness, setInlinePragma, 
+import Id		( setIdStrictness, setInlinePragma, 
 			  idDemandInfo, setIdDemandInfo, isBottomingId,
 			  Id
 			)
@@ -23,7 +23,6 @@ import ErrUtils		( dumpIfSet )
 import SaAbsInt
 import SaLib
 import Demand		( Demand, wwStrict, isStrict, isLazy )
-import UniqSupply       ( UniqSupply )
 import Util		( zipWith3Equal, stretchZipWith )
 import Outputable
 \end{code}

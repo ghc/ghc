@@ -43,7 +43,6 @@ import Name		( Name, OccName,
 			)
 import NameSet
 import OccName		( mkDefaultMethodOcc )
-import BasicTypes	( TopLevelFlag(..) )
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys,
 			  deRefStablePtr_RDR, makeStablePtr_RDR, 
@@ -55,7 +54,6 @@ import Outputable
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_GlasgowExts, opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
-import UniqFM		( lookupUFM )
 import ErrUtils		( Message )
 import CStrings		( isCLabelString )
 import Maybes		( maybeToBool, catMaybes )
