@@ -4,14 +4,14 @@
    .method public static void Main(class [mscorlib]System.String[]) {
        .entrypoint
            ldstr "LOG: loading main value\n"   call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String)
-      ldsfld (func () --> class [ilx std]'()') class Main::'Main_main'
+      ldsfld (func (unit) --> class [ilx std]'()') class Main::'Main_main'
 
            ldstr "LOG: evaluating main value\n"
            call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String) 
-      callfunc --> (func () --> class [ilx std]PrelBase_Z0T)
+      callfunc () --> (func (unit) --> class [ilx std]PrelBase_Z0T)
            ldstr "LOG: calling main value\n"
            call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String) 
-      ldvoid
+      ldunit
       callfunc (void) --> class [ilx std]PrelBase_Z0T
 
       pop
@@ -25,27 +25,27 @@
       ldstr "LOG: calling critical finalizers manually in main()\n"
            call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String)
 
-ldsfld (func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func () --> class [ilx std]PrelBase_Z0T))  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
+ldsfld (func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func (unit) --> class [ilx std]PrelBase_Z0T))  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
 ldsfld thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>  [ilx std]'PrelHandle'::'PrelHandle_stdin'
-      callfunc (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func () -->  class [ilx std]PrelBase_Z0T)
-      callfunc --> (func () --> class [ilx std]PrelBase_Z0T)
-      ldvoid
+      callfunc (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func (unit) -->  class [ilx std]PrelBase_Z0T)
+      callfunc () --> (func (unit) --> class [ilx std]PrelBase_Z0T)
+      ldunit
       callfunc (void) --> class [ilx std]PrelBase_Z0T
       pop
 
-ldsfld (func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func () --> class [ilx std]PrelBase_Z0T))  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
+ldsfld (func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func (unit) --> class [ilx std]PrelBase_Z0T))  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
 ldsfld thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>  [ilx std]'PrelHandle'::'PrelHandle_stdout'
-      callfunc (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func () -->  class [ilx std]PrelBase_Z0T)
-      callfunc --> (func () --> class [ilx std]PrelBase_Z0T)
-      ldvoid
+      callfunc (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func (unit) -->  class [ilx std]PrelBase_Z0T)
+      callfunc () --> (func (unit) --> class [ilx std]PrelBase_Z0T)
+      ldunit
       callfunc (void) --> class [ilx std]PrelBase_Z0T
       pop
 
-ldsfld (func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func () --> class [ilx std]PrelBase_Z0T))  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
+ldsfld (func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func (unit) --> class [ilx std]PrelBase_Z0T))  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
 ldsfld thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>  [ilx std]'PrelHandle'::'PrelHandle_stderr'
-      callfunc (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func () -->  class [ilx std]PrelBase_Z0T)
-      callfunc --> (func () --> class [ilx std]PrelBase_Z0T)
-      ldvoid
+      callfunc (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func (unit) -->  class [ilx std]PrelBase_Z0T)
+      callfunc () --> (func (unit) --> class [ilx std]PrelBase_Z0T)
+      ldunit
       callfunc (void) --> class [ilx std]PrelBase_Z0T
       pop
 

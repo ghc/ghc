@@ -2,8 +2,6 @@
 {-# OPTIONS -fglasgow-exts -fno-implicit-prelude #-}
 
 
-module Foo where
-
 import PrelBase
 import PrelList
 import PrelEnum

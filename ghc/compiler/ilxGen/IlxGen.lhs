@@ -30,8 +30,10 @@ import PrimRep		( PrimRep(..) )
 import Name		( nameModule, nameOccName, isGlobalName, isLocalName, isDllName, NamedThing(getName) )
 import Subst   		( substTy, mkTyVarSubst )
 
-import Module		( Module, PackageName, ModuleName, moduleName, modulePackage, preludePackage,
-			  isHomeModule, pprModuleName, mkHomeModule, mkModuleName
+import Module		( Module, PackageName, ModuleName, moduleName, 
+                          modulePackage, preludePackage,
+			  isPrelModule, isHomeModule, isVanillaModule,
+                          pprModuleName, mkHomeModule, mkModuleName
 			)
 
 import UniqFM
@@ -73,7 +75,7 @@ ilxGen mod tycons binds_w_srts
 	 ]
     where
       binds = map fst binds_w_srts
-      (import_packages,import_modules,import_tycons) = importsBinds binds `unionImpInfo` importsPrelude
+      (import_packages,import_modules,import_tycons) = importsBinds binds (importsPrelude emptyImpInfo)
       toppairs = ilxPairs binds
       topenv = extendIlxEnvWithTops (emptyIlxEnv False mod) mod toppairs
  	-- Generate info from class decls as well
@@ -88,102 +90,105 @@ ilxGen mod tycons binds_w_srts
 
 \begin{code}
 
-importsBinds :: [StgBinding] -> ImportsInfo
-importsBinds binds = unionImpInfos (map importsBind binds)
+importsBinds :: [StgBinding] -> ImportsInfo-> ImportsInfo
+importsBinds binds = foldR importsBind binds
 
-importsBind :: StgBinding -> ImportsInfo
-importsBind (StgNonRec _ b rhs) = importsRhs rhs  `unionImpInfo` importsVar b
-importsBind (StgRec _ pairs)    = unionImpInfos (map (\(b,rhs) -> importsRhs rhs `unionImpInfo` importsVar b) pairs)
+importsNone :: ImportsInfo -> ImportsInfo
+importsNone sofar = sofar
 
-importsRhs (StgRhsCon _ con args) = importsDataCon con   `unionImpInfo` importsStgArgs args
-importsRhs (StgRhsClosure _ _ _ upd args body) = importsExpr body `unionImpInfo` importsVars args
+importsBind :: StgBinding -> ImportsInfo -> ImportsInfo
+importsBind (StgNonRec _ b rhs) = importsRhs rhs.importsVar b
+importsBind (StgRec _ pairs) = foldR (\(b,rhs) -> importsRhs rhs . importsVar b) pairs
 
-importsExpr :: StgExpr -> ImportsInfo
-importsExpr (StgLit l)	 = emptyImpInfo
-importsExpr (StgApp f args) = importsVar f  `unionImpInfo` importsStgArgs args
-importsExpr (StgConApp con args) = importsDataCon con  `unionImpInfo` importsStgArgs args
-importsExpr (StgPrimApp op args res_ty) = importsType res_ty `unionImpInfo` importsStgArgs args
+importsRhs (StgRhsCon _ con args) = importsDataCon con . importsStgArgs args
+importsRhs (StgRhsClosure _ _ _ upd args body) = importsExpr body. importsVars args
+
+importsExpr :: StgExpr -> ImportsInfo -> ImportsInfo
+importsExpr (StgLit l) = importsNone
+importsExpr (StgApp f args) = importsVar f.importsStgArgs args
+importsExpr (StgConApp con args) = importsDataCon con.importsStgArgs args
+importsExpr (StgPrimApp op args res_ty) = importsType res_ty. importsStgArgs args
 importsExpr (StgSCC cc expr) = importsExpr expr
 importsExpr (StgCase scrut _ _ bndr srt alts)
-  = importsExpr scrut  `unionImpInfo` imports_alts alts  `unionImpInfo` importsVar bndr
+  = importsExpr scrut. imports_alts alts. importsVar bndr
    where
     imports_alts (StgAlgAlts _ alts deflt) 	-- The Maybe TyCon part is dealt with 
 						-- by the case-binder's type
-      = unionImpInfos (map imports_alg_alt alts) `unionImpInfo` imports_deflt deflt
+      = foldR imports_alg_alt alts .  imports_deflt deflt
        where
         imports_alg_alt (con, bndrs, _, rhs)
-	  = importsExpr rhs `unionImpInfo` importsDataCon con  `unionImpInfo` importsVars bndrs
+	  = importsExpr rhs . importsDataCon con. importsVars bndrs
 
     imports_alts (StgPrimAlts _ alts deflt)
-      = unionImpInfos (map imports_prim_alt alts) `unionImpInfo` imports_deflt deflt
+      = foldR imports_prim_alt alts . imports_deflt deflt
        where
         imports_prim_alt (lit, rhs) = importsExpr rhs
-    imports_deflt StgNoDefault = emptyImpInfo
+    imports_deflt StgNoDefault = importsNone
     imports_deflt (StgBindDefault rhs) = importsExpr rhs
+
 
 importsExpr (StgLetNoEscape _ _ bind body) = importsExpr (StgLet bind body)
 importsExpr (StgLet bind body)
-  = importsBind bind `unionImpInfo`  importsExpr body
+  = importsBind bind .  importsExpr body
 
-importsApp v args = importsVar v  `unionImpInfo`  importsStgArgs args
-importsStgArgs args = unionImpInfos (map importsStgArg args)
+importsApp v args = importsVar v.  importsStgArgs args
+importsStgArgs args = foldR importsStgArg args
 
-importsStgArg :: StgArg -> ImportsInfo
+importsStgArg :: StgArg -> ImportsInfo -> ImportsInfo
 importsStgArg (StgTypeArg ty) = importsType ty
 importsStgArg (StgVarArg v) = importsVar v
-importsStgArg _ = emptyImpInfo
+importsStgArg _ = importsNone
 
-importsVars vs = unionImpInfos (map importsVar vs)
-importsVar v = importsName (idName v) `unionImpInfo`  importsType (idType v)
+importsVars vs = foldR importsVar vs
+importsVar v = importsName (idName v). importsType (idType v)
 
 importsName n
-   | isLocalName n = emptyImpInfo
-   | thisModule == nameModule n  = emptyImpInfo
-   | isDllName n = singlePackageImpInfo (modulePackage (nameModule n))
-   | otherwise = singleModuleImpInfo (moduleName (nameModule n))
+   | isLocalName n = importsNone
+   | thisModule == nameModule n  = importsNone
+   | isHomeModule (nameModule n) =  addModuleImpInfo (moduleName (nameModule n))
+   | isVanillaModule (nameModule n) =  addPackageImpInfo preludePackage
+   | otherwise = addPackageImpInfo (modulePackage (nameModule n))
+
 
 importsModule m
-   | thisModule   == m = emptyImpInfo
-   | isHomeModule m =  singleModuleImpInfo (moduleName m)
-   | otherwise       = singlePackageImpInfo (modulePackage m)
+   | thisModule   == m = importsNone
+   | isHomeModule m =  trace "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" (addModuleImpInfo (moduleName m))
+   | isVanillaModule m =  addPackageImpInfo preludePackage
+   | otherwise       = addPackageImpInfo (modulePackage m)
 
-importsType :: Type -> ImportsInfo
+importsType :: Type -> ImportsInfo -> ImportsInfo
 importsType ty = importsType2 (deepIlxRepType ty)
 
-importsType2 :: Type -> ImportsInfo
-importsType2 (AppTy f x) =  importsType2 f  `unionImpInfo`  importsType2 x
-importsType2 (TyVarTy _) = emptyImpInfo
-importsType2 (TyConApp tc args) =importsTyCon tc  `unionImpInfo` importsTypeArgs2 args
-importsType2 (FunTy arg res) =  importsType arg  `unionImpInfo`  importsType2 res
+importsType2 :: Type -> ImportsInfo -> ImportsInfo
+importsType2 (AppTy f x) =  importsType2 f .  importsType2 x
+importsType2 (TyVarTy _) = importsNone
+importsType2 (TyConApp tc args) =importsTyCon tc . importsTypeArgs2 args
+importsType2 (FunTy arg res) =  importsType arg .  importsType2 res
 importsType2 (ForAllTy tv body_ty) =  importsType2 body_ty
 importsType2 (NoteTy _ ty) = importsType2 ty
-importsTypeArgs2 tys =unionImpInfos (map importsType2 tys)
+importsTypeArgs2 tys = foldR importsType2 tys
 
 importsDataCon dcon = importsTyCon (dataConTyCon dcon)
 
-importsMaybeTyCon Nothing   = emptyImpInfo
+importsMaybeTyCon Nothing   = importsNone
 importsMaybeTyCon (Just tc) = importsName (getName tc)
 
 importsTyCon tc | (not (isDataTyCon tc) || 
                    isLocalName (getName tc) || 
-                   thisModule == nameModule (getName tc)) = emptyImpInfo
-importsTyCon tc | otherwise = importsName (getName tc) `unionImpInfo` (emptyUniqSet, emptyUniqSet,unitUniqSet tc)
+                   thisModule == nameModule (getName tc)) = importsNone
+importsTyCon tc | otherwise = importsName (getName tc) . addTyConImpInfo tc
 
-importsPrelude | preludePackage == opt_InPackage = singleModuleImpInfo (mkModuleName "PrelGHC")
-	       | otherwise			 = singlePackageImpInfo preludePackage
+importsPrelude | preludePackage == opt_InPackage = addModuleImpInfo (mkModuleName "PrelGHC")
+	       | otherwise			 = addPackageImpInfo preludePackage
 
-type ImportsInfo = (UniqSet PackageName, UniqSet ModuleName, UniqSet TyCon) -- (Packages, Modules, Datatypes)
+type ImportsInfo = (UniqSet PackageName, UniqSet ModuleName, UniqSet TyCon) 
+   -- (Packages, Modules, Datatypes)
 
 emptyImpInfo :: ImportsInfo
 emptyImpInfo = (emptyUniqSet, emptyUniqSet, emptyUniqSet)
-singlePackageImpInfo p = (unitUniqSet p, emptyUniqSet, emptyUniqSet)
-singleModuleImpInfo m = (emptyUniqSet, unitUniqSet m, emptyUniqSet)
-
-unionImpInfo :: ImportsInfo -> ImportsInfo -> ImportsInfo
-unionImpInfo (w1,x1,y1) (w2,x2,y2) = (unionUniqSets w1 w2, unionUniqSets x1 x2, unionUniqSets y1 y2)
-
-unionImpInfos :: [ImportsInfo] -> ImportsInfo
-unionImpInfos fvs = foldr unionImpInfo emptyImpInfo fvs
+addPackageImpInfo p (w,x,y) = (addOneToUniqSet w p, x, y)
+addModuleImpInfo m (w,x,y) = (w, addOneToUniqSet x m, y)
+addTyConImpInfo tc (w,x,y) = (w, x, addOneToUniqSet y tc)
 
 ilxImportTyCon :: IlxEnv -> TyCon -> SDoc
 ilxImportTyCon env tycon | isDataTyCon tycon = pprIlxTyConDef True env tycon
@@ -273,8 +278,9 @@ ilxRhsClosures env (bndr, StgRhsClosure _ _ fvs upd args rhs)
 
 
     closure_sig_text =     
-      vcat [(case args of 
-               []    ->  empty
+      vcat [ text "()",
+             (case args of 
+               []    -> empty
                other -> args_text),
              text "-->" <+>  rty_text]
 
@@ -345,7 +351,7 @@ pprArgBinders env (arg:args)
 -- We could probably omit some void argument binders, but
 -- don't...
 pprArgBinder env arg 
-  | isVoidIlxRepId arg = (text "()", extendIlxEnvWithArgs env [arg])
+  | isVoidIlxRepId arg = (text "(unit)", extendIlxEnvWithArgs env [arg])
   | otherwise 
       = if isTyVar arg then 
          let env' = extendIlxEnvWithTyArgs env [arg] in 
@@ -705,13 +711,16 @@ ilxFunApp env fun args tail_call
 -- Recurse until we're done.
 ilxFunAppArgs env num_sofar funty args tail_call known_clo
  =   vcat [vcat (ilxMapPlaceArgs num_sofar pushArgWithVoids env now_args),
-	   call_instr <+> now_args_text
+	   call_instr <+> text "()" <+> now_args_text
                      <+> text "-->" 
                      <+> (pprIlxTypeR env_after_now_tyvs later_ty),
            later
           ]
   where
-    now_args_text = hsep (map (pprIlxArgInfo env_after_now_tyvs) now_arg_tys)
+    now_args_text = 
+      case now_arg_tys of
+        [] -> empty
+        _ -> hsep (map (pprIlxArgInfo env_after_now_tyvs) now_arg_tys)
 
     (now_args,now_arg_tys,env_after_now_tyvs,later_args,later_ty) = 
 	case args of
@@ -990,7 +999,7 @@ pushId = pushId_aux False
 
 pushId_aux :: Bool -> IlxEnv -> Id -> SDoc
 pushId_aux voids _ id | isVoidIlxRepId id =
-   if voids then  text "ldvoid" else ilxComment (text "pushId: void rep skipped")
+   if voids then  text "ldunit" else ilxComment (text "pushId: void rep skipped")
 pushId_aux _ env var 
   = case lookupIlxVarEnv env var of
 	  Just Arg    -> text "ldarg"    <+> pprId var
@@ -1054,22 +1063,6 @@ isVoidIlxRepId id = isVoidIlxRepType (idType id)
 
 -- Get rid of all NoteTy and NewTy artifacts
 deepIlxRepType :: Type -> Type
-
--- Eliminate state variables on left of arrow types...
--- We have to be careful not to erase too much information here - 
--- the type may not accurately describe
--- the "functionness" of the result.   For example, 
--- State# -> Int# 
--- reduces to 
---    Int#
--- which looks like an unboxed type.  It isn't - it's
--- just a function taking no arguments.  As such, we 
--- have to rely on the context in which a function type is being
--- used to know what to do.
---
--- deepIlxRepType (FunTy l r) | isVoidIlxRepType l 
---   = deepIlxRepType r
-
 deepIlxRepType (FunTy l r)
   = FunTy (deepIlxRepType l) (deepIlxRepType r)
 
@@ -1097,42 +1090,22 @@ deepIlxRepType ty@(TyVarTy tv) = ty
 idIlxRepType id = deepIlxRepType (idType id)
 
 --------------------------
--- Function types and type functions are implicitly thunkable.
 -- Some primitive type constructors are not thunkable.
 -- Everything else needs to be marked thunkable.
 pprIlxTypeL :: IlxEnv -> Type -> SDoc
 
-pprIlxTypeL env ty | isVoidIlxRepType ty 
-  = trace "pprIlxTypeL: VoidRep" pprIlxTypeR env ty
-
-pprIlxTypeL env ty@(FunTy arg res) 
-  = pprIlxTypeR env ty
-
-pprIlxTypeL env ty@(ForAllTy arg res) 
-  = pprIlxTypeR env ty
- 
-pprIlxTypeL env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && null (tyConTyVars tc)
-   = ilxComment (text "what the fuck?") <+> (pprIlxTypeR env ty)
-pprIlxTypeL env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && not (isIlxTyVar (hd (tyConTyVars tc)))
-  = pprIlxTypeR env ty
-
-pprIlxTypeL env ty | isUnLiftedType ty  -- must come after cases above because isUnLiftedType strips Forall's
-  = pprIlxTypeR env ty
-
-pprIlxTypeL env ty
-  = text "thunk" <> angleBrackets (pprIlxTypeR env ty)
+pprIlxTypeL env ty | isUnLiftedType ty ||  isVoidIlxRepType ty = pprIlxTypeR env ty
+pprIlxTypeL env ty = text "thunk" <> angleBrackets (pprIlxTypeR env ty)
 
 --------------------------
 -- Print non-thunkable version of type.
 --
 
 pprIlxTypeR :: IlxEnv -> Type -> SDoc
-pprIlxTypeR env ty | isVoidIlxRepType ty = text "void"
-pprIlxTypeR env ty =  pprIlxTypeR2 env ty 
-
-pprIlxTypeR2 env ty@(AppTy f _) | isTyVarTy f    = ilxComment (text "type app:" <+> pprId ty) <+> (text "class [mscorlib]System.Object")
-pprIlxTypeR2 env ty@(AppTy f x)     = trace "pprIlxTypeR: should I be beta reducing types?!" (ilxComment (text "pprIlxTypeR: should I be beta reducing types...") <+> pprIlxTypeR env (applyTy f x))
-pprIlxTypeR2 env (TyVarTy tv)       = pprIlxTyVar env tv
+pprIlxTypeR env ty | isVoidIlxRepType ty = text "unit"
+pprIlxTypeR env ty@(AppTy f _) | isTyVarTy f    = ilxComment (text "type app:" <+> pprId ty) <+> (text "class [mscorlib]System.Object")
+pprIlxTypeR env ty@(AppTy f x)     = trace "pprIlxTypeR: should I be beta reducing types?!" (ilxComment (text "pprIlxTypeR: should I be beta reducing types...") <+> pprIlxTypeR env (applyTy f x))
+pprIlxTypeR env (TyVarTy tv)       = pprIlxTyVar env tv
 
 -- The following is a special rule for types constructed out of 
 -- higher kinds, e.g. Monad f or Functor f.  
@@ -1140,36 +1113,31 @@ pprIlxTypeR2 env (TyVarTy tv)       = pprIlxTyVar env tv
 -- The code below is not as general as it should be, but as I
 -- have no idea if this approach will even work, I'm going to
 -- just try it out on some simple cases arising from the prelude.
-pprIlxTypeR2 env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && null (tyConTyVars tc)
+pprIlxTypeR env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && null (tyConTyVars tc)
    = ilxComment (text "what the fuck? 2") <+> (pprIlxTypeR env (TyConApp tc t))
-pprIlxTypeR2 env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && not (isIlxTyVar (hd (tyConTyVars tc)))
+pprIlxTypeR env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && not (isIlxTyVar (hd (tyConTyVars tc)))
    = pprIlxTypeR env (TyConApp tc t)
-pprIlxTypeR2 env (TyConApp tc args) = pprIlxTyConApp env tc args
+pprIlxTypeR env (TyConApp tc args) = pprIlxTyConApp env tc args
 
   -- nb. the only legitimate place for VoidIlxRepTypes to occur in normalized IlxRepTypes 
   -- is on the left of an arrow
   --  We could probably eliminate all but a final occurrence of these.
-  --pprIlxTypeR2 env (FunTy arg res@(FunTy _ _)) | isVoidIlxRepType arg  
-  --   = pprIlxTypeR env res
-pprIlxTypeR2 env (FunTy arg res) | isVoidIlxRepType arg  
-  = parens (text "func () -->" <+> pprIlxTypeR env res)
-pprIlxTypeR2 env (FunTy arg res)
+pprIlxTypeR env (FunTy arg res)
     = pprIlxFunTy (pprIlxTypeL env arg) (pprIlxTypeR env res)
 
-pprIlxTypeR2 env ty@(ForAllTy tv body_ty) | isIlxTyVar tv
+pprIlxTypeR env ty@(ForAllTy tv body_ty) | isIlxTyVar tv
   = parens (text "forall" <+> pprTyVarBinders env' [tv] <+> nest 2 (pprIlxTypeR env' body_ty))
     where
        env' = extendIlxEnvWithFormalTyVars env [tv]
 
-pprIlxTypeR2 env ty@(ForAllTy tv body_ty) | otherwise
+pprIlxTypeR env ty@(ForAllTy tv body_ty) | otherwise
   = ilxComment (text "higher order type var " <+> pprId tv) <+>
     pprIlxFunTy (text "class [mscorlib]System.Object") (pprIlxTypeR env body_ty)
 
-pprIlxTypeR2 env (NoteTy _ ty)       
+pprIlxTypeR env (NoteTy _ ty)       
    = trace "WARNING! non-representation type given to pprIlxTypeR: see generated ILX for context where this occurs"
      (vcat [text "/* WARNING! non-representation type given to pprIlxTypeR! */",
            pprIlxTypeR env ty ])
-
 
 pprIlxFunTy dom ran = parens (hsep [text "func",parens dom,text "-->", ran])
 
@@ -1393,23 +1361,20 @@ line = text "// ----------------------------------"
 hscOptionQual = if opt_SimplDoEtaReduction then text ".O" else text ".Onot"
 
 nameReference (IlxEnv (thisMod, _, _, _, _, _)) n
-  | isLocalName n = text "/* local */"
+  | isLocalName n = empty
   | thisMod == nameModule n  = text ""
-  | isDllName n = brackets ((text "ilx") <+> singleQuotes (ppr (modulePackage (nameModule n)) <> hscOptionQual))
-  | otherwise   = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName (moduleName (nameModule n)) <> hscOptionQual))
+  | isHomeModule (nameModule n)   = moduleNameReference (moduleName (nameModule n))
+  | isVanillaModule (nameModule n) =  packageReference preludePackage
+  | otherwise = packageReference (modulePackage (nameModule n))
+
+packageReference p = brackets ((text "ilx") <+> singleQuotes (ppr p  <> hscOptionQual))
+moduleNameReference m = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName m <> hscOptionQual))
 
 moduleReference (IlxEnv (thisMod, _, _, _, _, _)) m
   | thisMod   == m = text ""
-  | isHomeModule m = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName (moduleName m) <> hscOptionQual))
-  | otherwise      = brackets ((text "ilx") <+> singleQuotes (ppr (modulePackage m) <> hscOptionQual))
-
-prelGHCReference =
-   if preludePackage == opt_InPackage then brackets (text ".module ilx PrelGHC" <> hscOptionQual) 
-   else brackets (text "ilx" <+> text (_UNPK_ preludePackage)  <> hscOptionQual)
-
-prelBaseReference =
-   if preludePackage == opt_InPackage then brackets (text ".module ilx PrelBase" <> hscOptionQual) 
-   else brackets (text "ilx" <+> text (_UNPK_ preludePackage) <> hscOptionQual)
+  | isHomeModule m = moduleNameReference (moduleName m)
+  | isVanillaModule m =  packageReference preludePackage
+  | otherwise  =  packageReference (modulePackage m)
 
 ------------------------------------------------
 -- This code is copied from absCSyn/CString.lhs,
@@ -1574,47 +1539,6 @@ tyPrimConTable = listToUFM [(addrPrimTyConKey, 	(\_ _ -> repAddr)),
 
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{C Calls}
-%*									*
-%************************************************************************
-
-\begin{code}
-
--- We eliminate voids in and around an IL C Call.  We don't yet emit PInvoke stubs.
--- We also do some type-directed translation for pinning Haskell-managed blobs
--- of data as we throw them across the boundary.
-ilxCCall env (CCall (StaticTarget c) casm gc cconv) args ret_ty =
-   ilxComment (text "C call <+> pprCLabelString c") <+> 
-	vcat [vcat (ilxMapPlaceArgs 0 pushCArg env args),
-              text "call" <+> retdoc <+> text "class " <+> prelGHCReference <+> text "PrelGHC::" <+> pprCLabelString c  <+> pprTypeArgs pprIlxTypeR env ty_args
-                    <+> pprCValArgTys pprIlxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) (map stgArgType tm_args))) ]
-  where 
-    retdoc = 
-          if isVoidIlxRepType ret_ty then text "void" 
-          else pprIlxTypeR env (deepIlxRepType ret_ty)
-    (ty_args,tm_args) = splitTyArgs1 args 
-
-
-hasTyCon (TyConApp tc _) tc2 = tc == tc2
-hasTyCon _  _ = False
-
-isByteArrayCArgTy ty = hasTyCon ty byteArrayPrimTyCon || hasTyCon ty mutableByteArrayPrimTyCon
-isByteArrayCArg v = isByteArrayCArgTy (deepIlxRepType (idType v))
-pinCCallArg v = isByteArrayCArg v 
-
-ilxAddrOfPinnedByteArr = text "ldc.i4 0 ldelema unsigned int8"
-
-pushCArg env arg@(StgVarArg v) | isByteArrayCArg v = pushArg env arg <+> text "dup stloc" <+> squotes (ilxEnvQualifyByExact env (ppr v) <> text "pin") <+> ilxAddrOfPinnedByteArr
-pushCArg env arg | otherwise = pushArg env arg
-
-pprCValArgTys f env tys = parens (pprSepWithCommas (pprCValArgTy f env) tys)
-pprCValArgTy f env ty | isByteArrayCArgTy ty = text "void *" <+> ilxComment (text "interior pointer into ByteArr#")
-pprCValArgTy f env ty | otherwise = f env ty
-
-
-\end{code}
 
 %************************************************************************
 %*									*
@@ -1623,6 +1547,20 @@ pprCValArgTy f env ty | otherwise = f env ty
 %************************************************************************
 
 \begin{code}
+
+
+
+prelGHCReference =
+   if preludePackage == opt_InPackage then 
+	brackets (text ".module ilx PrelGHC" <> hscOptionQual) 
+   else brackets (text "ilx" <+> text (_UNPK_ preludePackage)  <> hscOptionQual)
+
+
+prelBaseReference =
+   if preludePackage == opt_InPackage then 
+	brackets (text ".module ilx PrelBase" <> hscOptionQual) 
+   else brackets (text "ilx" <+> text (_UNPK_ preludePackage) <> hscOptionQual)
+
 
 ilxPrimApp env (CCallOp ccall) args ret_ty = ilxCCall env ccall args ret_ty
 ilxPrimApp env op 	       args ret_ty = ilxPrimOpTable op env args
@@ -1962,7 +1900,7 @@ ilxPrimOpTable op
 
 	RaiseOp -> ty2_op (\ty1 ty2 -> text "throw")
 	CatchOp -> ty2_op (\ty1 ty2 -> 
-			text "call" <+> ilxSuppMeth ilxMethA "catch" [ty1,ty2] [text "(func () --> !!0)", text "(func (!!1) --> (func () --> !!0))"])
+			text "call" <+> ilxSuppMeth ilxMethA "catch" [ty1,ty2] [text "(func (unit) --> !!0)", text "(func (!!1) --> (func (unit) --> !!0))"])
 	                    {-        (State# RealWorld -> (# State# RealWorld, a #) )
 	                           -> (b -> State# RealWorld -> (# State# RealWorld, a #) ) 
 	                           -> State# RealWorld
@@ -1970,14 +1908,14 @@ ilxPrimOpTable op
 	                     -} 
 
 	BlockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [text "(func () --> !!0)"])
+		text "call" <+> ilxSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [text "(func (unit) --> !!0)"])
 
                 {-     (State# RealWorld -> (# State# RealWorld, a #))
                     -> (State# RealWorld -> (# State# RealWorld, a #))
                 -}
 
 	UnblockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [text "(func () --> !!0)"])
+		text "call" <+> ilxSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [text "(func (unit) --> !!0)"])
 
                 {-
 		    State# RealWorld -> (# State# RealWorld, a #))
@@ -1990,6 +1928,15 @@ ilxPrimOpTable op
 
 	TakeMVarOp -> ty2_op (\sty ty -> 
 		text "call" <+> ilxSuppMeth ilxMethA "takeMVar" [ty] [repMVar ilxMethA])
+                  {-  MVar# s a -> State# s -> (# State# s, a #) -}
+
+	-- These aren't yet right
+        TryTakeMVarOp -> ty2_op (\sty ty -> 
+		text "call" <+> ilxSuppMeth ilxMethA "tryTakeMVar" [ty] [repMVar ilxMethA])
+                  {-  MVar# s a -> State# s -> (# State# s, a #) -}
+
+	TryPutMVarOp -> ty2_op (\sty ty -> 
+		text "call" <+> ilxSuppMeth ilxMethA "tryPutMVar" [ty] [repMVar ilxMethA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
 	PutMVarOp -> ty2_op (\sty ty -> 
@@ -2028,7 +1975,7 @@ ilxPrimOpTable op
                  {- o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #) -}
 
 	DeRefWeakOp -> ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "!0")) (repWeak ty1) "deref" [] [])
-	FinalizeWeakOp -> ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "(func () --> class '()')")) (repWeak ty1) "finalizer" [] [])
+	FinalizeWeakOp -> ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "(func (unit) --> class '()')")) (repWeak ty1) "finalizer" [] [])
                    {-    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
 	State# RealWorld -> (# State# RealWorld, Unit #)) #) -}
 
@@ -2082,3 +2029,55 @@ hd2 (h:t) = h
 simp_op  op env args    = vcat (ilxMapPlaceArgs 0 pushArg env args) $$ op
 warn_op  warning f args = trace ("WARNING! IlxGen cannot translate primop " ++ warning) (f args)
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{C Calls}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+-- We eliminate voids in and around an IL C Call.  We don't yet emit PInvoke stubs.
+-- We also do some type-directed translation for pinning Haskell-managed blobs
+-- of data as we throw them across the boundary.
+ilxCCall env (CCall (StaticTarget c) casm gc cconv) args ret_ty =
+   ilxComment (text "C call <+> pprCLabelString c") <+> 
+	vcat [vcat (ilxMapPlaceArgs 0 pushCArg env args),
+              text "call" <+> retdoc <+> text "class " <+> prelGHCReference <+> text "PrelGHC::" <+> pprCLabelString c  <+> pprTypeArgs pprIlxTypeR env ty_args
+                    <+> pprCValArgTys pprIlxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) (map stgArgType tm_args))) ]
+  where 
+    retdoc = 
+          if isVoidIlxRepType ret_ty then text "void" 
+          else pprIlxTypeR env (deepIlxRepType ret_ty)
+    (ty_args,tm_args) = splitTyArgs1 args 
+
+
+hasTyCon (TyConApp tc _) tc2 = tc == tc2
+hasTyCon _  _ = False
+
+isByteArrayCArgTy ty = hasTyCon ty byteArrayPrimTyCon || hasTyCon ty mutableByteArrayPrimTyCon
+isByteArrayCArg v = isByteArrayCArgTy (deepIlxRepType (idType v))
+pinCCallArg v = isByteArrayCArg v 
+
+ilxAddrOfPinnedByteArr = text "ldc.i4 0 ldelema unsigned int8"
+
+pushCArg env arg@(StgVarArg v) | isByteArrayCArg v = pushArg env arg <+> text "dup stloc" <+> squotes (ilxEnvQualifyByExact env (ppr v) <> text "pin") <+> ilxAddrOfPinnedByteArr
+pushCArg env arg | otherwise = pushArg env arg
+
+pprCValArgTys f env tys = parens (pprSepWithCommas (pprCValArgTy f env) tys)
+pprCValArgTy f env ty | isByteArrayCArgTy ty = text "void *" <+> ilxComment (text "interior pointer into ByteArr#")
+pprCValArgTy f env ty | otherwise = f env ty
+
+
+foldR            :: (a -> b -> b) -> [a] -> b -> b
+-- foldR _ [] z     =  z
+-- foldR f (x:xs) z =  f x (foldR f xs z) 
+{-# INLINE foldR #-}
+foldR k xs z = go xs
+	     where
+	       go []     = z
+	       go (y:ys) = y `k` go ys
+
+\end{code}
+
