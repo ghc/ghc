@@ -1,7 +1,7 @@
 
 # Yes, it's a hack.  Complaints to /dev/null.
 
-TESTDRIVER_SRCS= \
+RUNTESTS_SRCS= \
 	CmdLexer.hs CmdParser.hs CmdSemantics.hs CmdSyntax.hs Main.hs \
 	RunOneTest.hs basicRxLib/AbsTreeDefs.hs basicRxLib/Assertions.hs  \
 	basicRxLib/AugTreeDefs.hs basicRxLib/AugmentTree.hs \
@@ -17,14 +17,14 @@ TESTDRIVER_SRCS= \
 	basicRxLib/ParseStringRegexp.hs basicRxLib/Parsers.hs basicRxLib/Regexp.hs
 
 
-all: testdriver
+all: runtests
 
 boot:
 	@echo "Make boot is not needed here"
 
-testdriver: $(TESTDRIVER_SRCS)
-	../../ghc/compiler/ghc-inplace --make Main -o testdriver -i -ibasicRxLib -package lang -cpp
+runtests: $(RUNTESTS_SRCS)
+	../../ghc/compiler/ghc-inplace --make Main -o runtests -i -ibasicRxLib -package lang -cpp
 
 clean:
-	/bin/rm -f testdriver *.o *.hi basicRxLib/*.o basicRxLib/*.hi
+	/bin/rm -f runtests *.o *.hi basicRxLib/*.o basicRxLib/*.hi
 
