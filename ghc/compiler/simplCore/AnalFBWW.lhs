@@ -180,7 +180,7 @@ analBind (NonRec (v,bnd) e) env =
 analBind (Rec binds) env =
    let
 	first_set = [ (v,IsFB (FBType [FBBadConsum | _ <- args ] FBGoodProd)) | ((v,_),e) <- binds,
-				(_,_,args,_) <- [digForLambdas e]]
+				(_,_,args,_) <- [collectBinders e]]
 	env' = delManyFromIdEnv env (map (fst.fst) binds)
    in
 	growIdEnvList env' (fixpoint 0 binds env' first_set)

@@ -18,14 +18,14 @@ import Ubiq
 import TcMonad
 import Inst		( Inst, InstOrigin(..), LIE(..), plusLIE, 
 			  newDicts, tyVarsOfInst, instToId )
-import TcEnv		( tcGetGlobalTyVars, newMonoIds )
+import TcEnv		( tcGetGlobalTyVars )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyWithExtraGlobals )
 import TcType		( TcType(..), TcThetaType(..), TcTauType(..), 
 			  TcTyVarSet(..), TcTyVar(..), tcInstType, zonkTcType )
 
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), HsExpr, OutPat(..), 
-			  Sig, HsLit, ArithSeqInfo, InPat, GRHSsAndBinds, Match, Fake,
-			  collectBinders )
+			  Sig, HsLit, ArithSeqInfo, InPat, GRHSsAndBinds, Match, Fake
+			)
 import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcHsBinds(..), TcBind(..), TcExpr(..) )
 
 import Bag		( Bag, foldBag, bagToList, listToBag, isEmptyBag )

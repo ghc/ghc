@@ -20,14 +20,14 @@ import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
 import TyCon		( mkPrimTyCon, mkDataTyCon,
 			  ConsVisible(..), NewOrData(..) )
 import TyVar		( GenTyVar(..), alphaTyVars )
-import Type		( applyTyCon, mkTyVarTy )
+import Type		( applyTyCon, mkTyVarTys )
 import Usage		( usageOmega )
 import Unique
 
 \end{code}
 
 \begin{code}
-alphaTys = map mkTyVarTy alphaTyVars
+alphaTys = mkTyVarTys alphaTyVars
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 \end{code}
 

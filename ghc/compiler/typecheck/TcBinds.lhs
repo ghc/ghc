@@ -39,7 +39,8 @@ import Maybes		( assocMaybe, catMaybes, Maybe(..) )
 import Outputable	( pprNonOp )
 import PragmaInfo	( PragmaInfo(..) )
 import Pretty
-import Type		( mkTyVarTy, isTyVarTy, mkSigmaTy, splitSigmaTy,
+import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy,
+			  mkSigmaTy, splitSigmaTy,
 			  splitRhoTy, mkForAllTy, splitForAllTy )
 import Util		( panic )
 \end{code}
@@ -401,7 +402,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
     let
 	(main_tyvars, main_rho) = splitForAllTy main_ty
 	(main_theta,main_tau)   = splitRhoTy main_rho
-	main_arg_tys	        = map mkTyVarTy main_tyvars
+	main_arg_tys	        = mkTyVarTys main_tyvars
     in
 
 	-- Check that the specialised type is indeed an instance of

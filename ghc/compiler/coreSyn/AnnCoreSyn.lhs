@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1994
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[AnnCoreSyntax]{Annotated core syntax}
 
@@ -16,106 +16,91 @@ module AnnCoreSyn (
 	AnnCoreCaseAlts(..), AnnCoreCaseDefault(..),
 
 	deAnnotate -- we may eventually export some of the other deAnners
-
-	-- and to make the interface self-sufficient
     ) where
 
-import PrelInfo		( PrimOp(..), PrimRep
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Literal		( Literal )
+import Ubiq{-uitous-}
+
 import CoreSyn
-import Outputable
-import CostCentre	( CostCentre )
-#if USE_ATTACK_PRAGMAS
-import Util
-#endif
 \end{code}
 
 \begin{code}
-data AnnCoreBinding binder bindee annot
-  = AnnCoNonRec binder (AnnCoreExpr binder bindee annot)
-  | AnnCoRec	[(binder, AnnCoreExpr binder bindee annot)]
+data AnnCoreBinding val_bdr val_occ tyvar uvar annot
+  = AnnNonRec val_bdr (AnnCoreExpr val_bdr val_occ tyvar uvar annot)
+  | AnnRec    [(val_bdr, AnnCoreExpr val_bdr val_occ tyvar uvar annot)]
 \end{code}
 
 \begin{code}
-type AnnCoreExpr binder bindee annot = (annot, AnnCoreExpr' binder bindee annot)
+type AnnCoreExpr val_bdr val_occ tyvar uvar annot
+  = (annot, AnnCoreExpr' val_bdr val_occ tyvar uvar annot)
 
-data AnnCoreExpr' binder bindee annot
-  = AnnCoVar	 bindee
-  | AnnCoLit Literal
+data AnnCoreExpr' val_bdr val_occ tyvar uvar annot
+  = AnnVar	val_occ
+  | AnnLit 	Literal
 
-  | AnnCoCon	 Id [Type] [GenCoreAtom bindee]
+  | AnnCon	Id     [GenCoreArg val_occ tyvar uvar]
+  | AnnPrim	PrimOp [GenCoreArg val_occ tyvar uvar]
 
-  | AnnCoPrim    PrimOp [Type] [GenCoreAtom bindee]
+  | AnnLam	(GenCoreBinder val_bdr tyvar uvar)
+		(AnnCoreExpr val_bdr val_occ tyvar uvar annot)
 
-  | AnnCoLam	 binder
-		 (AnnCoreExpr binder bindee annot)
-  | AnnCoTyLam   TyVar
-		 (AnnCoreExpr binder bindee annot)
+  | AnnApp	(AnnCoreExpr val_bdr val_occ tyvar uvar annot)
+		(GenCoreArg  val_occ tyvar uvar)
 
-  | AnnCoApp	 (AnnCoreExpr binder bindee annot)
-		 (GenCoreAtom    bindee)
-  | AnnCoTyApp   (AnnCoreExpr binder bindee annot)
-		 Type
+  | AnnCase	(AnnCoreExpr val_bdr val_occ tyvar uvar annot)
+		(AnnCoreCaseAlts val_bdr val_occ tyvar uvar annot)
 
-  | AnnCoCase    (AnnCoreExpr binder bindee annot)
-		 (AnnCoreCaseAlts binder bindee annot)
+  | AnnLet	(AnnCoreBinding val_bdr val_occ tyvar uvar annot)
+		(AnnCoreExpr val_bdr val_occ tyvar uvar annot)
 
-  | AnnCoLet	 (AnnCoreBinding binder bindee annot)
-		 (AnnCoreExpr binder bindee annot)
-
-  | AnnCoSCC	 CostCentre
-		 (AnnCoreExpr binder bindee annot)
+  | AnnSCC	CostCentre
+		(AnnCoreExpr val_bdr val_occ tyvar uvar annot)
 \end{code}
 
 \begin{code}
-data AnnCoreCaseAlts binder bindee annot
-  = AnnCoAlgAlts	[(Id,
-		  	 [binder],
-		  	 AnnCoreExpr binder bindee annot)]
-			(AnnCoreCaseDefault binder bindee annot)
-  | AnnCoPrimAlts	[(Literal,
-			  AnnCoreExpr binder bindee annot)]
-			(AnnCoreCaseDefault binder bindee annot)
+data AnnCoreCaseAlts val_bdr val_occ tyvar uvar annot
+  = AnnAlgAlts	[(Id,
+		  [val_bdr],
+		  AnnCoreExpr val_bdr val_occ tyvar uvar annot)]
+		(AnnCoreCaseDefault val_bdr val_occ tyvar uvar annot)
+  | AnnPrimAlts	[(Literal,
+		  AnnCoreExpr val_bdr val_occ tyvar uvar annot)]
+		(AnnCoreCaseDefault val_bdr val_occ tyvar uvar annot)
 
-data AnnCoreCaseDefault binder bindee annot
-  = AnnCoNoDefault
-  | AnnCoBindDefault	binder
-			(AnnCoreExpr binder bindee annot)
+data AnnCoreCaseDefault val_bdr val_occ tyvar uvar annot
+  = AnnNoDefault
+  | AnnBindDefault  val_bdr
+		    (AnnCoreExpr val_bdr val_occ tyvar uvar annot)
 \end{code}
 
 \begin{code}
-deAnnotate :: AnnCoreExpr bndr bdee ann -> GenCoreExpr bndr bdee
+deAnnotate :: AnnCoreExpr val_bdr val_occ tyvar uvar ann
+	   -> GenCoreExpr val_bdr val_occ tyvar uvar
 
-deAnnotate (_, AnnCoVar v)            = Var v
-deAnnotate (_, AnnCoLit lit)      = Lit lit
-deAnnotate (_, AnnCoCon	con tys args) = Con con tys args
-deAnnotate (_, AnnCoPrim op tys args) = Prim op tys args
-deAnnotate (_, AnnCoLam	binder body)  = Lam binder (deAnnotate body)
-deAnnotate (_, AnnCoTyLam tyvar body) = CoTyLam tyvar (deAnnotate body)
-deAnnotate (_, AnnCoApp	fun arg)      = App (deAnnotate fun) arg
-deAnnotate (_, AnnCoTyApp fun ty)     = CoTyApp (deAnnotate fun) ty
-deAnnotate (_, AnnCoSCC	lbl body)     = SCC lbl (deAnnotate body)
+deAnnotate (_, AnnVar	v)          = Var v
+deAnnotate (_, AnnLit	lit)	    = Lit lit
+deAnnotate (_, AnnCon	con args)   = Con con args
+deAnnotate (_, AnnPrim	op args)    = Prim op args
+deAnnotate (_, AnnLam	binder body)= Lam binder (deAnnotate body)
+deAnnotate (_, AnnApp	fun arg)    = App (deAnnotate fun) arg
+deAnnotate (_, AnnSCC	lbl body)   = SCC lbl (deAnnotate body)
 
-deAnnotate (_, AnnCoLet	bind body)
+deAnnotate (_, AnnLet bind body)
   = Let (deAnnBind bind) (deAnnotate body)
   where
-    deAnnBind (AnnCoNonRec var rhs) = NonRec var (deAnnotate rhs)
-    deAnnBind (AnnCoRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
+    deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
+    deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
-deAnnotate (_, AnnCoCase scrut alts)
+deAnnotate (_, AnnCase scrut alts)
   = Case (deAnnotate scrut) (deAnnAlts alts)
   where
-    deAnnAlts (AnnCoAlgAlts alts deflt)
+    deAnnAlts (AnnAlgAlts alts deflt)
       = AlgAlts [(con,args,deAnnotate rhs) | (con,args,rhs) <- alts]
 		 (deAnnDeflt deflt)
 
-    deAnnAlts (AnnCoPrimAlts alts deflt)
+    deAnnAlts (AnnPrimAlts alts deflt)
       = PrimAlts [(lit,deAnnotate rhs) | (lit,rhs) <- alts]
 		   (deAnnDeflt deflt)
 
-    deAnnDeflt AnnCoNoDefault 	      = NoDefault
-    deAnnDeflt (AnnCoBindDefault var rhs) = BindDefault var (deAnnotate rhs)
+    deAnnDeflt AnnNoDefault 	        = NoDefault
+    deAnnDeflt (AnnBindDefault var rhs) = BindDefault var (deAnnotate rhs)
 \end{code}

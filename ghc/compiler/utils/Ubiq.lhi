@@ -21,7 +21,7 @@ import HsPragmas	( ClassOpPragmas, ClassPragmas, DataPragmas, GenPragmas,
 			  InstancePragmas
 			)
 import Id		( StrictnessMark, GenId, Id(..) )
-import IdInfo		( IdInfo, OptIdInfo(..), DeforestInfo, Demand, StrictnessInfo, UpdateInfo )
+import IdInfo		( IdInfo, OptIdInfo(..), ArityInfo, DeforestInfo, Demand, StrictnessInfo, UpdateInfo )
 import Kind		( Kind )
 import Literal		( Literal )
 import Maybes		( MaybeErr )
@@ -72,6 +72,7 @@ class Outputable a where
 -- used everywhere and (b) the compiler doesn't lose much
 -- optimisation-wise by not seeing their pragma-gunk.
 
+data ArityInfo
 data Bag a
 data BinderInfo
 data ClassOpPragmas a

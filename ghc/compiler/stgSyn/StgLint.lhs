@@ -172,7 +172,7 @@ lintStgExpr e@(StgCase scrut _ _ _ alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
 
 	-- Check that it is a data type
-    case maybeDataTyCon scrut_ty of
+    case maybeAppDataTyCon scrut_ty of
       Nothing -> addErrL (mkCaseDataConMsg e)	`thenL_`
 		 returnL Nothing
       Just (tycon, _, _)
@@ -218,7 +218,7 @@ lintStgAlts alts scrut_ty case_tycon
 	  Just  _ -> returnL () -- that's cool
 
 lintAlgAlt scrut_ty (con, args, _, rhs)
-  = (case maybeDataTyCon scrut_ty of
+  = (case maybeAppDataTyCon scrut_ty of
       Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)
       Just (tycon, tys_applied, cons) ->

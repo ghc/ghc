@@ -21,7 +21,7 @@
 >#endif
 
 > import Type		( cloneTyVar, mkTyVarTy, applyTypeEnvToTy,
-> 			  extractTyVarsFromTy, TyVar, SigmaType(..)
+> 			  tyVarsOfType, TyVar, SigmaType(..)
 >			  IF_ATTACK_PRAGMAS(COMMA cmpTyVar)
 >			)
 > import Literal	( Literal )	-- for Eq Literal
@@ -158,8 +158,8 @@ but l is guranteed to be finite so we choose that one.
 >       	Let (Rec bs) e      -> foldr freeBind (free e tvs) bs
 >       	SCC l e               -> free e tvs
 >
->	freeId id tvs = extractTyVarsFromTy (idType id) `union` tvs
->	freeTy t  tvs = extractTyVarsFromTy t `union` tvs
+>	freeId id tvs = tyVarsOfType (idType id) `union` tvs
+>	freeTy t  tvs = tyVarsOfType t `union` tvs
 >	freeBind (v,e) tvs = freeId v (free e tvs)
 
 > 	freeAtom (VarArg (DefArgExpr e)) tvs = free e tvs

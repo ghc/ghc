@@ -42,7 +42,7 @@ import PrelInfo		( stringTy )
 import Id		( idType, getInstantiatedDataConSig, mkTupleCon,
 			  DataCon(..), DictVar(..), Id(..), GenId )
 import TyCon		( mkTupleTyCon )
-import Type		( mkTyVarTy, mkRhoTy, mkFunTys,
+import Type		( mkTyVarTys, mkRhoTy, mkFunTys,
 			  applyTyCon, getAppDataTyCon )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic )
@@ -400,7 +400,7 @@ mkTupleBind tyvars dicts local_global_prs tuple_expr
     globals = [global | (local,global) <- local_global_prs]
 
     no_of_binders = length local_global_prs
-    tyvar_tys = map mkTyVarTy tyvars
+    tyvar_tys = mkTyVarTys tyvars
 
     tuple_var_ty :: Type
     tuple_var_ty

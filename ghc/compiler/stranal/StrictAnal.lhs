@@ -400,7 +400,7 @@ addStrictnessInfoToId strflags str_val abs_val binder body
     if (isBot str_val) then
 	binder `addIdStrictness` mkBottomStrictnessInfo
     else
-	case (digForLambdas body) of { (_, _, lambda_bounds, rhs) ->
+	case (collectBinders body) of { (_, _, lambda_bounds, rhs) ->
 	let
 		tys        = map idType lambda_bounds
 		strictness = findStrictness strflags tys str_val abs_val

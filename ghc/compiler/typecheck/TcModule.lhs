@@ -26,7 +26,8 @@ import TcBinds		( tcBindsAndThen )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, getEnv_LocalIds,
-			  getEnv_TyCons, getEnv_Classes)
+			  getEnv_TyCons, getEnv_Classes,
+			  tcLookupLocalValueByKey, tcLookupTyConByKey )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcInstUtil	( buildInstanceEnvs, InstInfo )
@@ -68,10 +69,10 @@ tcModule :: GlobalNameMappers		-- final renamer info for derivings
 
 		    [(Id, TypecheckedHsExpr)]), -- constant instance binds
 
-		   ([RenamedFixityDecl], [Id], UniqFM TyCon, UniqFM Class, Bag InstInfo),
+		   ([RenamedFixityDecl], [Id], [TyCon], [Class], Bag InstInfo),
 					-- things for the interface generator
 
-		   (UniqFM TyCon, UniqFM Class),
+		   ([TyCon], [Class]),
 					-- environments of info from this module only
 
 		   FiniteMap TyCon [(Bool, [Maybe Type])],
@@ -169,10 +170,10 @@ tcModule renamer_name_funs
 	tycons   = getEnv_TyCons final_env
 	classes  = getEnv_Classes final_env
 
-	local_tycons  = filterUFM isLocallyDefined tycons
-	local_classes = filterUFM isLocallyDefined classes
+	local_tycons  = filter isLocallyDefined tycons
+	local_classes = filter isLocallyDefined classes
 
-	exported_ids = [v | v <- eltsUFM localids,
+	exported_ids = [v | v <- localids,
 		        isExported v && not (isDataCon v) && not (isMethodSelId v)]
     in
 	-- Backsubstitution.  Monomorphic top-level decls may have
@@ -219,27 +220,27 @@ checkTopLevelIds checks that Main.main or Main.mainPrimIO has correct type.
 \begin{code}
 checkTopLevelIds :: FAST_STRING -> TcEnv s -> TcM s ()
 checkTopLevelIds mod final_env
-  = if (mod /= SLIT("Main")) then
-	returnTc ()
-    else
-	case (lookupUFM_Directly localids mainIdKey,
-	      lookupUFM_Directly localids mainPrimIOIdKey) of 
+  | mod /= SLIT("Main")
+  = returnTc ()
+
+  | otherwise
+  = tcSetEnv final_env (
+	tcLookupLocalValueByKey mainIdKey	`thenNF_Tc` \ maybe_main ->
+	tcLookupLocalValueByKey mainPrimIOIdKey	`thenNF_Tc` \ maybe_prim ->
+	tcLookupTyConByKey iOTyConKey		`thenNF_Tc` \ io_tc ->
+	
+	case (maybe_main, maybe_prim) of
 	  (Just main, Nothing) -> tcAddErrCtxt mainCtxt $
-		                  unifyTauTy ty_main (idType main)
+		                  unifyTauTy (applyTyCon io_tc [unitTy])
+					     (idType main)
+
 	  (Nothing, Just prim) -> tcAddErrCtxt primCtxt $
-		                  unifyTauTy ty_prim (idType prim)
+		                  unifyTauTy (mkPrimIoTy unitTy)
+					     (idType prim)
+
 	  (Just _ , Just _ )   -> failTc mainBothIdErr
 	  (Nothing, Nothing)   -> failTc mainNoneIdErr
-    where
-      localids = getEnv_LocalIds final_env
-      tycons   = getEnv_TyCons final_env
-
-      io_tc    = lookupWithDefaultUFM_Directly tycons io_panic iOTyConKey
-      io_panic = panic "TcModule: type IO not in scope"
-
-      ty_main  = applyTyCon io_tc [unitTy]
-      ty_prim  = mkPrimIoTy unitTy
-
+    )
 
 mainCtxt sty
   = ppStr "main should have type IO ()"

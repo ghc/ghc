@@ -10,7 +10,7 @@ module SimplUtils (
 
 	floatExposesHNF,
 
-	mkCoTyLamTryingEta, mkCoLamTryingEta,
+	mkTyLamTryingEta, mkValLamTryingEta,
 
 	etaExpandCount,
 
@@ -21,33 +21,21 @@ module SimplUtils (
 	type_ok_for_let_to_case
     ) where
 
-IMPORT_Trace		-- ToDo: rm (debugging)
-import Pretty
-
-import SimplEnv
-import SimplMonad
+import Ubiq{-uitous-}
 
 import BinderInfo
+import CoreSyn
+import CoreUtils	( manifestlyWHNF )
+import Id		( idType, isBottomingId, getIdArity )
+import IdInfo		( arityMaybe )
+import Maybes		( maybeToBool )
+import PrelInfo		( augmentId, buildId, realWorldStateTy )
+import SimplEnv
+import SimplMonad
+import Type		( isPrimType, maybeAppDataTyCon, getTyVar_maybe )
+import Util		( isIn, panic )
 
-import PrelInfo		( primOpIsCheap, realWorldStateTy,
-			  buildId, augmentId
-			  IF_ATTACK_PRAGMAS(COMMA realWorldTy)
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Type		( extractTyVarsFromTy, getTyVarMaybe, isPrimType,
-			  splitTypeWithDictsAsArgs, maybeDataTyCon,
-			  applyTy, isFunType, TyVar, TyVarTemplate
-			)
-import Id		( getInstantiatedDataConSig, isDataCon, idType,
-			  getIdArity, isBottomingId, idWantsToBeINLINEd,
-			  DataCon(..), Id
-			)
-import IdInfo
-import CmdLineOpts	( SimplifierSwitch(..) )
-import Maybes		( maybeToBool, Maybe(..) )
-import Outputable	-- isExported ...
-import Util
+primOpIsCheap = panic "SimplUtils. (ToDo)"
 \end{code}
 
 
@@ -79,8 +67,8 @@ floatExposesHNF float_lets float_primops ok_to_dup rhs
     -- because it *will* become one.
     -- likewise for `augment g h'
     --
-    try (App (CoTyApp (Var bld) _) _) | bld == buildId = True
-    try (App (App (CoTyApp (Var bld) _) _) _) | bld == augmentId = True
+    try (App (App (Var bld) _) _)	  | bld == buildId   = True
+    try (App (App (App (Var aug) _) _) _) | aug == augmentId = True
 
     try other = manifestlyWHNF other
 	{- but *not* necessarily "manifestlyBottom other"...
@@ -99,7 +87,7 @@ floatExposesHNF float_lets float_primops ok_to_dup rhs
 	    to allocate it eagerly as that's a waste.
 	-}
 
-    try_alt (lit,rhs)               = try rhs
+    try_alt (lit,rhs) = try rhs
 
     try_deflt NoDefault           = False
     try_deflt (BindDefault _ rhs) = try rhs
@@ -127,13 +115,13 @@ gives rise to a recursive function for the list comprehension, and
 f turns out to be just a single call to this recursive function.
 
 \begin{code}
-mkCoLamTryingEta :: [Id]		-- Args to the lambda
+mkValLamTryingEta :: [Id]		-- Args to the lambda
 	       -> CoreExpr		-- Lambda body
 	       -> CoreExpr
 
-mkCoLamTryingEta [] body = body
+mkValLamTryingEta [] body = body
 
-mkCoLamTryingEta orig_ids body
+mkValLamTryingEta orig_ids body
   = reduce_it (reverse orig_ids) body
   where
     bale_out = mkValLam orig_ids body
@@ -150,16 +138,18 @@ mkCoLamTryingEta orig_ids body
 
     reduce_it ids other = bale_out
 
-    is_elem = isIn "mkCoLamTryingEta"
+    is_elem = isIn "mkValLamTryingEta"
 
     -----------
     residual_ok :: CoreExpr -> Bool	-- Checks for type application
-						-- and function not one of the
-						-- bound vars
-    residual_ok (CoTyApp fun ty) = residual_ok fun
-    residual_ok (Var v)        = not (v `is_elem` orig_ids)	-- Fun mustn't be one of
-								-- the bound ids
-    residual_ok other	         = False
+					-- and function not one of the
+					-- bound vars
+
+    residual_ok (Var v)	= not (v `is_elem` orig_ids)
+			  -- Fun mustn't be one of the bound ids
+    residual_ok (App fun arg)
+      | notValArg arg	= residual_ok fun
+    residual_ok other	= False
 \end{code}
 
 Eta expansion
@@ -169,20 +159,22 @@ such that
 
 	E  ===>   (\x1::t1 x1::t2 ... xn::tn -> E x1 x2 ... xn)
 
-is a safe transformation.  In particular, the transformation should not
-cause work to be duplicated, unless it is ``cheap'' (see @manifestlyCheap@ below).
+is a safe transformation.  In particular, the transformation should
+not cause work to be duplicated, unless it is ``cheap'' (see
+@manifestlyCheap@ below).
 
-@etaExpandCount@ errs on the conservative side.  It is always safe to return 0.
+@etaExpandCount@ errs on the conservative side.  It is always safe to
+return 0.
 
 An application of @error@ is special, because it can absorb as many
-arguments as you care to give it.  For this special case we return 100,
-to represent "infinity", which is a bit of a hack.
+arguments as you care to give it.  For this special case we return
+100, to represent "infinity", which is a bit of a hack.
 
 \begin{code}
 etaExpandCount :: GenCoreExpr bdr Id
-	       -> Int			-- Number of extra args you can safely abstract
+	       -> Int	-- Number of extra args you can safely abstract
 
-etaExpandCount (Lam _ body)
+etaExpandCount (Lam (ValBinder _) body)
   = 1 + etaExpandCount body
 
 etaExpandCount (Let bind body)
@@ -193,37 +185,38 @@ etaExpandCount (Case scrut alts)
   | manifestlyCheap scrut
   = minimum [etaExpandCount rhs | rhs <- rhssOfAlts alts]
 
-etaExpandCount (App fun _) = case etaExpandCount fun of
-				0 -> 0
-				n -> n-1	-- Knock off one
-
-etaExpandCount fun@(CoTyApp _ _) = eta_fun fun
 etaExpandCount fun@(Var _)     = eta_fun fun
+etaExpandCount (App fun arg)
+  | notValArg arg = eta_fun fun
+  | otherwise     = case etaExpandCount fun of
+		      0 -> 0
+		      n -> n-1	-- Knock off one
 
-etaExpandCount other = 0			-- Give up
+etaExpandCount other = 0    -- Give up
 	-- Lit, Con, Prim,
-	-- CoTyLam,
+	-- non-val Lam,
 	-- Scc (pessimistic; ToDo),
 	-- Let with non-whnf rhs(s),
 	-- Case with non-whnf scrutinee
 
+-----------------------------
 eta_fun :: GenCoreExpr bdr Id 	-- The function
 	-> Int			-- How many args it can safely be applied to
 
-eta_fun (CoTyApp fun ty) = eta_fun fun
+eta_fun (App fun arg) | notValArg arg = eta_fun fun
 
 eta_fun expr@(Var v)
-  | isBottomingId v			-- Bottoming ids have "infinite arity"
-  = 10000				-- Blargh.  Infinite enough!
+  | isBottomingId v		-- Bottoming ids have "infinite arity"
+  = 10000			-- Blargh.  Infinite enough!
 
 eta_fun expr@(Var v)
-  | maybeToBool arity_maybe		-- We know the arity
+  | maybeToBool arity_maybe	-- We know the arity
   = arity
   where
     arity_maybe = arityMaybe (getIdArity v)
     arity 	= case arity_maybe of { Just arity -> arity }
 
-eta_fun other = 0			-- Give up
+eta_fun other = 0		-- Give up
 \end{code}
 
 @manifestlyCheap@ looks at a Core expression and returns \tr{True} if
@@ -252,9 +245,10 @@ manifestlyCheap :: GenCoreExpr bndr Id -> Bool
 manifestlyCheap (Var _)       = True
 manifestlyCheap (Lit _)       = True
 manifestlyCheap (Con _ _ _)   = True
-manifestlyCheap (Lam _ _)     = True
-manifestlyCheap (CoTyLam _ e)   = manifestlyCheap e
 manifestlyCheap (SCC _ e)     = manifestlyCheap e
+
+manifestlyCheap (Lam (ValBinder _) _) = True
+manifestlyCheap (Lam other_binder e)  = manifestlyCheap e
 
 manifestlyCheap (Prim op _ _) = primOpIsCheap op
 
@@ -268,20 +262,20 @@ manifestlyCheap other_expr   -- look for manifest partial application
   = case (collectArgs other_expr) of { (fun, args) ->
     case fun of
 
-      Var f | isBottomingId f -> True		-- Application of a function which
-						-- always gives bottom; we treat this as
-						-- a WHNF, because it certainly doesn't
-						-- need to be shared!
+      Var f | isBottomingId f -> True	-- Application of a function which
+					-- always gives bottom; we treat this as
+					-- a WHNF, because it certainly doesn't
+					-- need to be shared!
 
       Var f -> let
-		    num_val_args = length [ a | (ValArg a) <- args ]
-		 in
-		 num_val_args == 0 ||		-- Just a type application of
-						-- a variable (f t1 t2 t3)
-						-- counts as WHNF
-		 case (arityMaybe (getIdArity f)) of
-		   Nothing     -> False
-		   Just arity  -> num_val_args < arity
+		    num_val_args = numValArgs args
+	       in
+	       num_val_args == 0 ||	-- Just a type application of
+					-- a variable (f t1 t2 t3)
+					-- counts as WHNF
+	       case (arityMaybe (getIdArity f)) of
+		 Nothing     -> False
+		 Just arity  -> num_val_args < arity
 
       _ -> False
     }
@@ -321,9 +315,9 @@ applications since this breaks the specialiser:
 	/\ a -> f Char# a  	=NO=> f Char#
 
 \begin{code}
-mkCoTyLamTryingEta :: [TyVar] -> CoreExpr -> CoreExpr
+mkTyLamTryingEta :: [TyVar] -> CoreExpr -> CoreExpr
 
-mkCoTyLamTryingEta tyvars tylam_body
+mkTyLamTryingEta tyvars tylam_body
   = if
 	tyvars == tyvar_args &&	-- Same args in same order
 	check_fun fun		-- Function left is ok
@@ -332,14 +326,17 @@ mkCoTyLamTryingEta tyvars tylam_body
 	fun
     else
 	-- The vastly common case
-	mkCoTyLam tyvars tylam_body
+	mkTyLam tyvars tylam_body
   where
     (tyvar_args, fun) = strip_tyvar_args [] tylam_body
 
-    strip_tyvar_args args_so_far tyapp@(CoTyApp fun ty)
-      = case getTyVarMaybe ty of
+    strip_tyvar_args args_so_far tyapp@(App fun (TyArg ty))
+      = case getTyVar_maybe ty of
 	  Just tyvar_arg -> strip_tyvar_args (tyvar_arg:args_so_far) fun
 	  Nothing        -> (args_so_far, tyapp)
+
+    strip_tyvar_args args_so_far (App _ (UsageArg _))
+      = panic "SimplUtils.mkTyLamTryingEta: strip_tyvar_args UsageArg"
 
     strip_tyvar_args args_so_far fun
       = (args_so_far, fun)
@@ -373,7 +370,7 @@ mkIdentityAlts rhs_ty
     returnSmpl (PrimAlts [] (BindDefault (binder, bad_occ_info) (Var binder)))
 
   | otherwise
-  = case maybeDataTyCon rhs_ty of
+  = case (maybeAppDataTyCon rhs_ty) of
 	Just (tycon, ty_args, [data_con]) ->  -- algebraic type suitable for unpacking
 	    let
 		(_,inst_con_arg_tys,_) = getInstantiatedDataConSig data_con ty_args
@@ -406,7 +403,7 @@ simplIdWantsToBeINLINEd id env
 type_ok_for_let_to_case :: Type -> Bool
 
 type_ok_for_let_to_case ty
-  = case maybeDataTyCon ty of
+  = case (maybeAppDataTyCon ty) of
       Nothing                                   -> False
       Just (tycon, ty_args, [])                 -> False
       Just (tycon, ty_args, non_null_data_cons) -> True

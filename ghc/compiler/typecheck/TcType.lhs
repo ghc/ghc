@@ -132,13 +132,13 @@ tcInstType tenv ty_to_inst
 				   do env ty			`thenNF_Tc` \ ty' ->
 				   returnNF_Tc (SynTy tycon tys' ty')
 
-    do env (FunTy arg res usage)  = do env arg		`thenNF_Tc` \ arg' ->
-				    do env res		`thenNF_Tc` \ res' ->
-				    returnNF_Tc (FunTy arg' res' usage)
+    do env (FunTy arg res usage) = do env arg		`thenNF_Tc` \ arg' ->
+				   do env res		`thenNF_Tc` \ res' ->
+				   returnNF_Tc (FunTy arg' res' usage)
 
-    do env (AppTy fun arg)	  = do env fun		`thenNF_Tc` \ fun' ->
-				    do env arg		`thenNF_Tc` \ arg' ->
-				    returnNF_Tc (AppTy fun' arg')
+    do env (AppTy fun arg)	 = do env fun		`thenNF_Tc` \ fun' ->
+				   do env arg		`thenNF_Tc` \ arg' ->
+				   returnNF_Tc (AppTy fun' arg')
 
     do env (DictTy clas ty usage)= do env ty		`thenNF_Tc` \ ty' ->
 				   returnNF_Tc (DictTy clas ty' usage)

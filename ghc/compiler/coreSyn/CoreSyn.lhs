@@ -8,7 +8,7 @@
 
 module CoreSyn (
 	GenCoreBinding(..), GenCoreExpr(..),
-	GenCoreArg(..),GenCoreBinder(..), GenCoreCaseAlts(..),
+	GenCoreArg(..), GenCoreBinder(..), GenCoreCaseAlts(..),
 	GenCoreCaseDefault(..),
 
 	bindersOf, pairsFromCoreBinds, rhssOfBind,
@@ -17,9 +17,9 @@ module CoreSyn (
 	mkApp, mkCon, mkPrim,
 	mkValLam, mkTyLam, mkUseLam,
 	mkLam,
-	digForLambdas,
+	collectBinders,
 	
-	collectArgs, isValArg,
+	collectArgs, isValArg, notValArg, numValArgs,
 
 	mkCoLetAny, mkCoLetNoUnboxed, mkCoLetUnboxedToCase,
 	mkCoLetsAny, mkCoLetsNoUnboxed, mkCoLetsUnboxedToCase,
@@ -143,10 +143,10 @@ desugarer sets up constructors as applications of global @Vars@s.
 Ye olde abstraction and application operators.
 \begin{code}
      | Lam	(GenCoreBinder val_bdr tyvar uvar)
-		(GenCoreExpr val_bdr val_occ tyvar uvar)
+		(GenCoreExpr   val_bdr val_occ tyvar uvar)
 
      | App	(GenCoreExpr val_bdr val_occ tyvar uvar)
-		(GenCoreArg val_occ tyvar uvar)
+		(GenCoreArg  val_occ tyvar uvar)
 \end{code}
 
 Case expressions (\tr{case <expr> of <List of alternatives>}): there
@@ -369,23 +369,23 @@ mkLam tyvars valvars body
 \end{code}
 
 We often want to strip off leading lambdas before getting down to
-business.  @digForLambdas@ is your friend.
+business.  @collectBinders@ is your friend.
 
 We expect (by convention) usage-, type-, and value- lambdas in that
 order.
 
 \begin{code}
-digForLambdas ::
+collectBinders ::
   GenCoreExpr val_bdr val_occ tyvar uvar ->
   ([uvar], [tyvar], [val_bdr], GenCoreExpr val_bdr val_occ tyvar uvar)
 
-digForLambdas (Lam (UsageBinder u) body)
+collectBinders (Lam (UsageBinder u) body)
   = let
-	(uvars, tyvars, args, final_body) = digForLambdas body
+	(uvars, tyvars, args, final_body) = collectBinders body
     in
     (u:uvars, tyvars, args, final_body)
 
-digForLambdas other
+collectBinders other
   = let
 	(tyvars, args, body) = dig_for_tyvars other
     in
@@ -468,6 +468,10 @@ is_Lit_or_Var a
 isValArg (LitArg _) = True  -- often used for sanity-checking
 isValArg (VarArg _) = True
 isValArg _	    = False
+
+notValArg = not . isValArg -- exists only because it's a common use of isValArg
+
+numValArgs as = length [ a | a <- as, isValArg a ] -- again, convenience
 \end{code}
 
 \begin{code}

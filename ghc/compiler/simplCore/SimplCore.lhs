@@ -473,12 +473,12 @@ calcInlinings scc_s_OK sw_chkr inline_env_so_far top_binds
 	rhs_looks_like_a_caf = not (manifestlyWHNF rhs)
 
 	rhs_looks_like_a_data_val
-	  = case (digForLambdas rhs) of
+	  = case (collectBinders rhs) of
 	      (_, _, [], Con _ _ _) -> True
 	      other		    -> False
 
 	rhs_arg_tys
-	  = case (digForLambdas rhs) of
+	  = case (collectBinders rhs) of
 	      (_, _, val_binders, _) -> map idType val_binders
 
 	(mentioned_ids, _, _, mentions_litlit)

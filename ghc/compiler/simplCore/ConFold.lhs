@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[ConFold]{Constant Folder}
 
@@ -12,22 +12,22 @@ ToDo:
 
 module ConFold	( completePrim ) where
 
+import Ubiq{-uitous-}
+
+import CoreSyn
+import CoreUnfold	( UnfoldingDetails(..), FormSummary(..) )
+import Id		( idType )
+import Literal		( mkMachInt, mkMachWord, Literal(..) )
+import MagicUFs		( MagicUnfoldingFun )
+import PrelInfo		( trueDataCon, falseDataCon )
+import PrimOp		( PrimOp(..) )
 import SimplEnv
 import SimplMonad
-
-import PrelInfo		( trueDataCon, falseDataCon, PrimOp(..), PrimRep
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
-			)
-import Literal		( mkMachInt, mkMachWord, Literal(..) )
-import Id 		( Id, idType )
-import Maybes		( Maybe(..) )
-import Util
 \end{code}
 
 \begin{code}
 completePrim :: SimplEnv
-	     -> PrimOp -> [OutType] -> [OutAtom]
+	     -> PrimOp -> [OutArg]
 	     -> SmplM OutExpr
 \end{code}
 
@@ -86,58 +86,57 @@ NB: If we ever do case-floating, we have an extra worry:
 The second case must never be floated outside of the first!
 
 \begin{code}
-completePrim env SeqOp [ty] [LitArg lit]
+completePrim env SeqOp [TyArg ty, LitArg lit]
   = returnSmpl (Lit (mkMachInt 1))
 
-completePrim env op@SeqOp tys@[ty] args@[VarArg var]
+completePrim env op@SeqOp args@[TyArg ty, VarArg var]
   = case (lookupUnfolding env var) of
-      NoUnfoldingDetails -> give_up
-      LitForm _ -> hooray
-      OtherLitForm _ -> hooray
-      ConForm _ _ _ -> hooray
-      OtherConForm _ -> hooray
+      NoUnfoldingDetails     -> give_up
+      LitForm _		     -> hooray
+      OtherLitForm _	     -> hooray
+      ConForm _ _	     -> hooray
+      OtherConForm _	     -> hooray
       GenForm _ WhnfForm _ _ -> hooray
-      _ -> give_up
+      _			     -> give_up
   where
-    give_up = returnSmpl (Prim op tys args)
-    hooray = returnSmpl (Lit (mkMachInt 1))
+    give_up = returnSmpl (Prim op args)
+    hooray  = returnSmpl (Lit (mkMachInt 1))
 \end{code}
 
 \begin{code}
-completePrim env op tys args
+completePrim env op args
   = case args of
-      [LitArg (MachChar char_lit)]	   -> oneCharLit   op char_lit
-      [LitArg (MachInt int_lit signed)] -> (if signed then oneIntLit else oneWordLit)
-							   op int_lit
-      [LitArg (MachFloat float_lit)]    -> oneFloatLit  op float_lit
-      [LitArg (MachDouble double_lit)]  -> oneDoubleLit op double_lit
-      [LitArg other_lit]		   -> oneLit       op other_lit
+     [LitArg (MachChar char_lit)]      -> oneCharLit   op char_lit
+     [LitArg (MachInt int_lit signed)] -> (if signed then oneIntLit else oneWordLit)
+							  op int_lit
+     [LitArg (MachFloat float_lit)]    -> oneFloatLit  op float_lit
+     [LitArg (MachDouble double_lit)]  -> oneDoubleLit op double_lit
+     [LitArg other_lit]		       -> oneLit       op other_lit
 
-      [LitArg (MachChar char_lit1),
-       LitArg (MachChar char_lit2)]     -> twoCharLits op char_lit1 char_lit2
+     [LitArg (MachChar char_lit1),
+      LitArg (MachChar char_lit2)]     -> twoCharLits op char_lit1 char_lit2
 
-      [LitArg (MachInt int_lit1 True),     -- both *signed* literals
-       LitArg (MachInt int_lit2 True)]  -> twoIntLits op int_lit1 int_lit2
+     [LitArg (MachInt int_lit1 True),  -- both *signed* literals
+      LitArg (MachInt int_lit2 True)]  -> twoIntLits op int_lit1 int_lit2
 
-      [LitArg (MachInt int_lit1 False),    -- both *unsigned* literals
-       LitArg (MachInt int_lit2 False)] -> twoWordLits op int_lit1 int_lit2
+     [LitArg (MachInt int_lit1 False), -- both *unsigned* literals
+      LitArg (MachInt int_lit2 False)] -> twoWordLits op int_lit1 int_lit2
 
-      [LitArg (MachInt int_lit1 False),    -- unsigned+signed (shift ops)
-       LitArg (MachInt int_lit2 True)]  -> oneWordOneIntLit op int_lit1 int_lit2
+     [LitArg (MachInt int_lit1 False), -- unsigned+signed (shift ops)
+      LitArg (MachInt int_lit2 True)]  -> oneWordOneIntLit op int_lit1 int_lit2
 
-      [LitArg (MachFloat float_lit1),
-       LitArg (MachFloat float_lit2)]   -> twoFloatLits op float_lit1 float_lit2
+     [LitArg (MachFloat float_lit1),
+      LitArg (MachFloat float_lit2)]   -> twoFloatLits op float_lit1 float_lit2
 
-      [LitArg (MachDouble double_lit1),
-       LitArg (MachDouble double_lit2)] -> twoDoubleLits op double_lit1 double_lit2
+     [LitArg (MachDouble double_lit1),
+      LitArg (MachDouble double_lit2)] -> twoDoubleLits op double_lit1 double_lit2
 
-      [LitArg lit, VarArg var]       -> litVar op lit var
-      [VarArg var, LitArg lit]       -> litVar op lit var
+     [LitArg lit, VarArg var]	       -> litVar op lit var
+     [VarArg var, LitArg lit]	       -> litVar op lit var
 
-      other				   -> give_up
-
+     other			       -> give_up
   where
-    give_up = returnSmpl (Prim op tys args)
+    give_up = returnSmpl (Prim op args)
 
     return_char c   = returnSmpl (Lit (MachChar   c))
     return_int i    = returnSmpl (Lit (mkMachInt  i))
@@ -157,9 +156,7 @@ completePrim env op tys args
 		  (PrimAlts [(lit,val_if_eq)]
 		  (BindDefault unused_binder val_if_neq))
 	in
---	pprTrace "return_prim_case:" (ppr PprDebug result) (
 	returnSmpl result
---	)
 
 	---------   Ints --------------
     oneIntLit IntNegOp     i = return_int (-i)
@@ -188,7 +185,7 @@ completePrim env op tys args
     twoIntLits IntLtOp	 i1 i2		 = return_bool (i1 <  i2)
     twoIntLits IntLeOp	 i1 i2		 = return_bool (i1 <= i2)
     -- ToDo: something for integer-shift ops?
-    twoIntLits _	 _  _	         = {-trace "twoIntLits: giving up"-} give_up
+    twoIntLits _	 _  _	         = give_up
 
     twoWordLits WordGtOp w1 w2 = return_bool (w1 >  w2)
     twoWordLits WordGeOp w1 w2 = return_bool (w1 >= w2)
@@ -197,10 +194,10 @@ completePrim env op tys args
     twoWordLits WordLtOp w1 w2 = return_bool (w1 <  w2)
     twoWordLits WordLeOp w1 w2 = return_bool (w1 <= w2)
     -- ToDo: something for AndOp, OrOp?
-    twoWordLits _	 _  _  = {-trace "twoWordLits: giving up"-} give_up
+    twoWordLits _	 _  _  = give_up
 
     -- ToDo: something for shifts
-    oneWordOneIntLit _ _  _  = {-trace "oneWordOneIntLit: giving up"-} give_up
+    oneWordOneIntLit _ _  _    = give_up
 
 	---------   Floats --------------
     oneFloatLit FloatNegOp  f 	= return_float (-f)
@@ -220,7 +217,7 @@ completePrim env op tys args
 #else
     -- hard to do all that in Rationals ?? (WDP 94/10) ToDo
 #endif
-    oneFloatLit _	    _   = {-trace "oneFloatLits: giving up"-} give_up
+    oneFloatLit _	    _   = give_up
 
     twoFloatLits FloatGtOp    f1 f2	      = return_bool (f1 >  f2)
     twoFloatLits FloatGeOp    f1 f2	      = return_bool (f1 >= f2)
@@ -232,32 +229,11 @@ completePrim env op tys args
     twoFloatLits FloatSubOp   f1 f2	      = return_float (f1 - f2)
     twoFloatLits FloatMulOp   f1 f2	      = return_float (f1 * f2)
     twoFloatLits FloatDivOp   f1 f2 | f2 /= 0 = return_float (f1 / f2)
-#if __GLASGOW_HASKELL__ <= 22
-    twoFloatLits FloatPowerOp f1 f2 	      = return_float (f1 ** f2)
-#else
-    -- hard to do all that in Rationals ?? (WDP 94/10) ToDo
-#endif
-    twoFloatLits _	      _  _	      = {-trace "twoFloatLits: giving up"-} give_up
+    twoFloatLits _	      _  _	      = give_up
 
 	---------   Doubles --------------
     oneDoubleLit DoubleNegOp  d = return_double (-d)
-#if __GLASGOW_HASKELL__ <= 22
-    oneDoubleLit DoubleExpOp  d	= return_double (exp d)
-    oneDoubleLit DoubleLogOp  d	= return_double (log d)
-    oneDoubleLit DoubleSqrtOp d	= return_double (sqrt d)
-    oneDoubleLit DoubleSinOp  d	= return_double (sin d)
-    oneDoubleLit DoubleCosOp  d	= return_double (cos d)
-    oneDoubleLit DoubleTanOp  d	= return_double (tan d)
-    oneDoubleLit DoubleAsinOp d	= return_double (asin d)
-    oneDoubleLit DoubleAcosOp d	= return_double (acos d)
-    oneDoubleLit DoubleAtanOp d	= return_double (atan d)
-    oneDoubleLit DoubleSinhOp d	= return_double (sinh d)
-    oneDoubleLit DoubleCoshOp d	= return_double (cosh d)
-    oneDoubleLit DoubleTanhOp d	= return_double (tanh d)
-#else
-    -- hard to do all that in Rationals ?? (WDP 94/10) ToDo
-#endif
-    oneDoubleLit _	      _ = {-trace "oneDoubleLit: giving up"-} give_up
+    oneDoubleLit _	      _ = give_up
 
     twoDoubleLits DoubleGtOp    d1 d2		= return_bool (d1 >  d2)
     twoDoubleLits DoubleGeOp    d1 d2		= return_bool (d1 >= d2)
@@ -269,16 +245,11 @@ completePrim env op tys args
     twoDoubleLits DoubleSubOp   d1 d2		= return_double (d1 - d2)
     twoDoubleLits DoubleMulOp   d1 d2		= return_double (d1 * d2)
     twoDoubleLits DoubleDivOp   d1 d2 | d2 /= 0 = return_double (d1 / d2)
-#if __GLASGOW_HASKELL__ <= 22
-    twoDoubleLits DoublePowerOp d1 d2 	        = return_double (d1 ** d2)
-#else
-    -- hard to do all that in Rationals ?? (WDP 94/10) ToDo
-#endif
-    twoDoubleLits _             _  _ 	        = {-trace "twoDoubleLits: giving up"-} give_up
+    twoDoubleLits _             _  _ 	        = give_up
 
 	---------   Characters --------------
     oneCharLit OrdOp c = return_int (fromInt (ord c))
-    oneCharLit _     _ = {-trace "oneCharLIt: giving up"-} give_up
+    oneCharLit _     _ = give_up
 
     twoCharLits CharGtOp c1 c2 = return_bool (c1 >  c2)
     twoCharLits CharGeOp c1 c2 = return_bool (c1 >= c2)
@@ -286,7 +257,7 @@ completePrim env op tys args
     twoCharLits CharNeOp c1 c2 = return_bool (c1 /= c2)
     twoCharLits CharLtOp c1 c2 = return_bool (c1 <  c2)
     twoCharLits CharLeOp c1 c2 = return_bool (c1 <= c2)
-    twoCharLits _        _  _  = {-trace "twoCharLits: giving up"-} give_up
+    twoCharLits _        _  _  = give_up
 
 	---------   Miscellaneous --------------
     oneLit Addr2IntOp (MachAddr i) = return_int i
@@ -319,6 +290,6 @@ completePrim env op tys args
     litVar other_op lit var = give_up
 
 
-trueVal  = Con trueDataCon  [] []
-falseVal = Con falseDataCon [] []
+trueVal  = Con trueDataCon  []
+falseVal = Con falseDataCon []
 \end{code}

@@ -15,8 +15,8 @@ module CoreUtils (
 	, mkErrorApp, escErrorMsg
 	, argToExpr
 	, unTagBinders, unTagBindersAlts
+	, manifestlyWHNF, manifestlyBottom
 {-	exprSmallEnoughToDup,
-	manifestlyWHNF, manifestlyBottom,
 	coreExprArity,
 	isWrapperFor,
 	maybeErrorApp,
@@ -31,11 +31,12 @@ import IdLoop	-- for pananoia-checking purposes
 import CoreSyn
 
 import CostCentre	( isDictCC )
-import Id		( idType, mkSysLocal,
+import Id		( idType, mkSysLocal, getIdArity, isBottomingId,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, IdEnv(..),
 			  GenId{-instances-}
 			)
+import IdInfo		( arityMaybe )
 import Literal		( literalType, isNoRepLit, Literal(..) )
 import Maybes		( catMaybes )
 import PprCore		( GenCoreExpr{-instances-}, GenCoreArg{-instances-} )
@@ -259,6 +260,7 @@ exprSmallEnoughToDup expr  -- for now, just: <var> applied to <args>
 		 && length args <= 6 -- or 10 or 1 or 4 or anything smallish.
       _       -> False
     }
+-}
 \end{code}
 Question (ADR): What is the above used for?  Is a _ccall_ really small
 enough?
@@ -269,29 +271,31 @@ errs on the conservative side (returning \tr{False})---I've probably
 left something out... [WDP]
 
 \begin{code}
-manifestlyWHNF :: GenCoreExpr bndr Id -> Bool
+manifestlyWHNF :: GenCoreExpr bndr Id tyvar uvar -> Bool
 
-manifestlyWHNF (Var _)     = True
-manifestlyWHNF (Lit _)     = True
-manifestlyWHNF (Con _ _ _) = True  -- ToDo: anything for Prim?
-manifestlyWHNF (Lam _ _)   = True
-manifestlyWHNF (CoTyLam _ e) = manifestlyWHNF e
-manifestlyWHNF (SCC _ e)   = manifestlyWHNF e
-manifestlyWHNF (Let _ e)   = False
-manifestlyWHNF (Case _ _)  = False
+manifestlyWHNF (Var _)	  = True
+manifestlyWHNF (Lit _)	  = True
+manifestlyWHNF (Con _ _)  = True
+manifestlyWHNF (SCC _ e)  = manifestlyWHNF e
+manifestlyWHNF (Let _ e)  = False
+manifestlyWHNF (Case _ _) = False
+
+manifestlyWHNF (Lam (ValBinder _) _) = True
+manifestlyWHNF (Lam other_binder  e) = manifestlyWHNF e
 
 manifestlyWHNF other_expr   -- look for manifest partial application
   = case (collectArgs other_expr) of { (fun, args) ->
     case fun of
-      Var f -> let
-		    num_val_args = length [ a | (ValArg a) <- args ]
-		 in
-		 num_val_args == 0 ||		-- Just a type application of
-						-- a variable (f t1 t2 t3)
-						-- counts as WHNF
-		 case (arityMaybe (getIdArity f)) of
-		   Nothing     -> False
-		   Just arity  -> num_val_args < arity
+      Var f ->  let
+		    num_val_args = numValArgs args
+		in
+		num_val_args == 0 -- Just a type application of
+				  -- a variable (f t1 t2 t3);
+				  -- counts as WHNF.
+		||
+		case (arityMaybe (getIdArity f)) of
+		  Nothing     -> False
+		  Just arity  -> num_val_args < arity
 
       _ -> False
     }
@@ -303,16 +307,18 @@ some point.  It isn't a disaster if it errs on the conservative side
 (returning \tr{False}).
 
 \begin{code}
-manifestlyBottom :: GenCoreExpr bndr Id -> Bool
+manifestlyBottom :: GenCoreExpr bndr Id tyvar uvar -> Bool
 
 manifestlyBottom (Var v)     = isBottomingId v
 manifestlyBottom (Lit _)     = False
-manifestlyBottom (Con _ _ _) = False
-manifestlyBottom (Prim _ _ _)= False
-manifestlyBottom (Lam _ _)   = False  -- we do not assume \x.bottom == bottom. should we? ToDo
-manifestlyBottom (CoTyLam _ e) = manifestlyBottom e
+manifestlyBottom (Con  _ _)  = False
+manifestlyBottom (Prim _ _)  = False
 manifestlyBottom (SCC _ e)   = manifestlyBottom e
 manifestlyBottom (Let _ e)   = manifestlyBottom e
+
+  -- We do not assume \x.bottom == bottom:
+manifestlyBottom (Lam (ValBinder _) _) = False
+manifestlyBottom (Lam other_binder  e) = manifestlyBottom e
 
 manifestlyBottom (Case e a)
   = manifestlyBottom e
@@ -331,15 +337,16 @@ manifestlyBottom (Case e a)
 manifestlyBottom other_expr   -- look for manifest partial application
   = case (collectArgs other_expr) of { (fun, args) ->
     case fun of
-      Var f | isBottomingId f -> True		-- Application of a function which
-						-- always gives bottom; we treat this as
-						-- a WHNF, because it certainly doesn't
-						-- need to be shared!
+      Var f | isBottomingId f -> True
+		-- Application of a function which always gives
+		-- bottom; we treat this as a WHNF, because it
+		-- certainly doesn't need to be shared!
       _ -> False
     }
 \end{code}
 
 \begin{code}
+{-LATER:
 coreExprArity
 	:: (Id -> Maybe (GenCoreExpr bndr Id))
 	-> GenCoreExpr bndr Id
@@ -371,7 +378,7 @@ Probably a little too HACKY [WDP].
 isWrapperFor :: CoreExpr -> Id -> Bool
 
 expr `isWrapperFor` var
-  = case (digForLambdas  expr) of { (_, _, args, body) -> -- lambdas off the front
+  = case (collectBinders  expr) of { (_, _, args, body) -> -- lambdas off the front
     unravel_casing args body
     --NO, THANKS: && not (null args)
     }

@@ -31,8 +31,8 @@ import IdInfo		-- lots of things
 import Maybes		( maybeToBool, Maybe(..), MaybeErr )
 import SaLib
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( mkTyVarTy, mkFunTys, isPrimType,
-			  maybeDataTyCon, quantifyTy
+import Type		( mkTyVarTys, mkFunTys, isPrimType,
+			  maybeAppDataTyCon, quantifyTy
 			)
 import UniqSupply
 -}
@@ -230,7 +230,7 @@ mkWwBodies body_ty tyvars args arg_infos
 	wrapper_w_hole = \ worker_id ->
 				mkLam tyvars args (
 				wrap_frag (
-				mkCoTyApps (Var worker_id) (map mkTyVarTy tyvars)
+				mkCoTyApps (Var worker_id) (mkTyVarTys tyvars)
 			 ))
 
 	worker_w_hole = \ orig_body ->
@@ -326,7 +326,7 @@ mk_ww_arg_processing (arg : args) (WwUnpack cmpnt_infos : infos) max_extra_args
   | new_max_extra_args > 0	-- Check that we are prepared to add arguments
   = 	-- this is the complicated one.
     --pprTrace "Unpack; num_wrkr_args=" (ppCat [ppInt num_wrkr_args, ppStr "; new_max=", ppInt new_num_wrkr_args, ppStr "; arg=", ppr PprDebug arg, ppr PprDebug (WwUnpack cmpnt_infos)]) (
-    case maybeDataTyCon arg_ty of
+    case maybeAppDataTyCon arg_ty of
 
 	  Nothing 	  -> 	   -- Not a data type
 				   panic "mk_ww_arg_processing: not datatype"

@@ -3,7 +3,8 @@
 
 module Type (
 	GenType(..), Type(..), TauType(..),
-	mkTyVarTy, getTyVar, getTyVar_maybe, isTyVarTy,
+	mkTyVarTy, mkTyVarTys,
+	getTyVar, getTyVar_maybe, isTyVarTy,
 	mkAppTy, mkAppTys, splitAppTy,
 	mkFunTy, mkFunTys, splitFunTy, getFunTy_maybe,
 	mkTyConTy, getTyCon_maybe, applyTyCon,
@@ -154,19 +155,20 @@ expandTy ty = ty
 Simple construction and analysis functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-mkTyVarTy :: t -> GenType t u
-mkTyVarTy = TyVarTy
--- could we use something for (map mkTyVarTy blahs) ?? WDP
+mkTyVarTy  :: t   -> GenType t u
+mkTyVarTys :: [t] -> [GenType t y]
+mkTyVarTy  = TyVarTy
+mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 getTyVar :: String -> GenType t u -> t
-getTyVar msg (TyVarTy tv) = tv
-getTyVar msg (SynTy _ _ t) = getTyVar msg t
-getTyVar msg other = error ("getTyVar" ++ msg)
+getTyVar msg (TyVarTy tv)   = tv
+getTyVar msg (SynTy _ _ t)  = getTyVar msg t
+getTyVar msg other	    = panic ("getTyVar: " ++ msg)
 
 getTyVar_maybe :: GenType t u -> Maybe t
-getTyVar_maybe (TyVarTy tv) = Just tv
+getTyVar_maybe (TyVarTy tv)  = Just tv
 getTyVar_maybe (SynTy _ _ t) = getTyVar_maybe t
-getTyVar_maybe other = Nothing
+getTyVar_maybe other	     = Nothing
 
 isTyVarTy :: GenType t u -> Bool
 isTyVarTy (TyVarTy tv)  = True

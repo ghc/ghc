@@ -46,7 +46,7 @@ tcTyDecl (TySynonym tycon_name tyvar_names rhs src_loc)
     tcAddErrCtxt (tySynCtxt tycon_name) $
 
 	-- Look up the pieces
-    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind,  rec_tycon) ->
+    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind,  _, rec_tycon) ->
     mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
 
 	-- Look at the rhs
@@ -88,7 +88,7 @@ tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pra
     tcAddErrCtxt (tyDataCtxt tycon_name) $
 
 	-- Lookup the pieces
-    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind,  rec_tycon) ->
+    tcLookupTyCon tycon_name			`thenNF_Tc` \ (tycon_kind, _, rec_tycon) ->
     mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (tyvar_kinds, rec_tyvars) ->
     tc_derivs derivings				`thenNF_Tc` \ derived_classes ->
 

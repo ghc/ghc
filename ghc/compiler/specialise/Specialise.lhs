@@ -965,7 +965,7 @@ addDictBinds dbinders dbind (UsageDetails db_cis db_tycon_cis db_dbs db_fvs db_c
 	-- to look at the type of the dictionary itself.
 	-- Doing the proper job would entail keeping track of free tyvars as
 	-- well as free vars, which would be a bore.
-    db_ftvs = mkUniqSet (extractTyVarsFromTys (map idType dbinders))
+    db_ftvs = tyVarsOfTypes (map idType dbinders)
 \end{code}
 
 %************************************************************************

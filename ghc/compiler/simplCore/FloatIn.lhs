@@ -20,11 +20,16 @@ module FloatIn (
 	-- and to make the interface self-sufficient...
     ) where
 
+import Ubiq{-uitous-}
+
 import AnnCoreSyn
+import CoreSyn
 
 import FreeVars
-import UniqSet
-import Util
+import Id		( emptyIdSet, unionIdSets, unionManyIdSets,
+			  elementOfIdSet, IdSet(..)
+			)
+import Util		( panic )
 \end{code}
 
 Top-level interface function, @floatInwards@.  Note that we do not
@@ -113,7 +118,7 @@ the closure for a is not built.
 %************************************************************************
 
 \begin{code}
-type FreeVarsSet   = UniqSet Id
+type FreeVarsSet   = IdSet
 
 type FloatingBinds = [(CoreBinding, FreeVarsSet)]
 	-- In dependency order (outermost first)
@@ -127,23 +132,26 @@ fiExpr :: FloatingBinds		-- binds we're trying to drop
        -> CoreExprWithFVs	-- input expr
        -> CoreExpr		-- result
 
-fiExpr to_drop (_,AnnCoVar v) = mkCoLets' to_drop (Var v)
+fiExpr to_drop (_,AnnVar v) = mkCoLets' to_drop (Var v)
 
-fiExpr to_drop (_,AnnCoLit k) = mkCoLets' to_drop (Lit k)
+fiExpr to_drop (_,AnnLit k) = mkCoLets' to_drop (Lit k)
 
-fiExpr to_drop (_,AnnCoCon c tys atoms)
-  = mkCoLets' to_drop (Con c tys atoms)
+fiExpr to_drop (_,AnnCon c atoms)
+  = mkCoLets' to_drop (Con c atoms)
 
-fiExpr to_drop (_,AnnCoPrim c tys atoms)
-  = mkCoLets' to_drop (Prim c tys atoms)
+fiExpr to_drop (_,AnnPrim c atoms)
+  = mkCoLets' to_drop (Prim c atoms)
 \end{code}
 
 Here we are not floating inside lambda (type lambdas are OK):
 \begin{code}
-fiExpr to_drop (_,AnnCoLam binder body)
-  = mkCoLets' to_drop (Lam binder (fiExpr [] body))
+fiExpr to_drop (_,AnnLam (UsageBinder binder) body)
+  = panic "FloatIn.fiExpr:AnnLam UsageBinder"
 
-fiExpr to_drop (_,AnnCoTyLam tyvar body)
+fiExpr to_drop (_,AnnLam b@(ValBinder binder) body)
+  = mkCoLets' to_drop (Lam b (fiExpr [] body))
+
+fiExpr to_drop (_,AnnLam b@(TyBinder tyvar) body)
   | whnf body
   -- we do not float into type lambdas if they are followed by
   -- a whnf (actually we check for lambdas and constructors).
@@ -157,28 +165,30 @@ fiExpr to_drop (_,AnnCoTyLam tyvar body)
   -- 	let f = /\t -> let v = ... in \a -> ...
   -- which is bad as now f is an updatable closure (update PAP)
   -- and has arity 0. This example comes from cichelli.
-  = mkCoLets' to_drop (CoTyLam tyvar (fiExpr [] body))
+
+  = mkCoLets' to_drop (Lam b (fiExpr [] body))
   | otherwise
-  = CoTyLam tyvar (fiExpr to_drop body)
+  = Lam b (fiExpr to_drop body)
   where
     whnf :: CoreExprWithFVs -> Bool
-    whnf (_,AnnCoLit _)     = True
-    whnf (_,AnnCoCon _ _ _) = True
-    whnf (_,AnnCoLam _ _)   = True
-    whnf (_,AnnCoTyLam _ e) = whnf e
-    whnf (_,AnnCoSCC _ e)   = whnf e
-    whnf _                  = False
+
+    whnf (_,AnnLit _)		    = True
+    whnf (_,AnnCon _ _)		    = True
+    whnf (_,AnnLam (ValBinder _) _) = True
+    whnf (_,AnnLam _             e) = whnf e
+    whnf (_,AnnSCC _ e)		    = whnf e
+    whnf _			    = False
 \end{code}
 
 Applications: we could float inside applications, but it's probably
 not worth it (a purely practical choice, hunch- [not experience-]
 based).
 \begin{code}
-fiExpr to_drop (_,AnnCoApp fun atom)
-  = mkCoLets' to_drop (App (fiExpr [] fun) atom)
-
-fiExpr to_drop (_,AnnCoTyApp expr ty)
-  = CoTyApp (fiExpr to_drop expr) ty
+fiExpr to_drop (_,AnnApp fun arg)
+  | isValArg arg
+  = mkCoLets' to_drop (App (fiExpr [] fun) arg)
+  | otherwise
+  = App (fiExpr to_drop fun) arg
 \end{code}
 
 We don't float lets inwards past an SCC.
@@ -187,7 +197,7 @@ ToDo: SCC: {\em should} keep info on current cc, and when passing
 one, if it is not the same, annotate all lets in binds with current
 cc, change current cc to the new one and float binds into expr.
 \begin{code}
-fiExpr to_drop (_, AnnCoSCC cc expr)
+fiExpr to_drop (_, AnnSCC cc expr)
   = mkCoLets' to_drop (SCC cc (fiExpr [] expr))
 \end{code}
 
@@ -214,7 +224,7 @@ things to drop in the outer let's body, and let nature take its
 course.
 
 \begin{code}
-fiExpr to_drop (_,AnnCoLet (AnnCoNonRec id rhs) body)
+fiExpr to_drop (_,AnnLet (AnnNonRec id rhs) body)
   = fiExpr new_to_drop body
   where
     rhs_fvs  = freeVarsOf rhs
@@ -228,9 +238,9 @@ fiExpr to_drop (_,AnnCoLet (AnnCoNonRec id rhs) body)
 
 	-- Push rhs_binds into the right hand side of the binding
     rhs'     = fiExpr rhs_binds rhs
-    rhs_fvs' = rhs_fvs `unionUniqSets` (floatedBindsFVs rhs_binds)
+    rhs_fvs' = rhs_fvs `unionIdSets` floatedBindsFVs rhs_binds
 
-fiExpr to_drop (_,AnnCoLet (AnnCoRec bindings) body)
+fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
   = fiExpr new_to_drop body
   where
     (binders, rhss) = unzip bindings
@@ -248,8 +258,8 @@ fiExpr to_drop (_,AnnCoLet (AnnCoRec bindings) body)
 		  -- the bindings used both in rhs and body or in more than one rhs
 		  shared_binds
 
-    rhs_fvs' = unionUniqSets (unionManyUniqSets rhss_fvs)
-		     (unionManyUniqSets (map floatedBindsFVs rhss_binds))
+    rhs_fvs' = unionIdSets (unionManyIdSets rhss_fvs)
+		     (unionManyIdSets (map floatedBindsFVs rhss_binds))
 
     -- Push rhs_binds into the right hand side of the binding
     fi_bind :: [FloatingBinds]	    -- one per "drop pt" conjured w/ fvs_of_rhss
@@ -265,7 +275,7 @@ bindings are: (a)~inside the scrutinee, (b)~inside one of the
 alternatives/default [default FVs always {\em first}!].
 
 \begin{code}
-fiExpr to_drop (_, AnnCoCase scrut alts)
+fiExpr to_drop (_, AnnCase scrut alts)
   = let
 	fvs_scrut    = freeVarsOf scrut
 	drop_pts_fvs = fvs_scrut : (get_fvs_from_deflt_and_alts alts)
@@ -279,30 +289,30 @@ fiExpr to_drop (_, AnnCoCase scrut alts)
     ----------------------------
     -- pin default FVs on first!
     --
-    get_fvs_from_deflt_and_alts (AnnCoAlgAlts alts deflt)
+    get_fvs_from_deflt_and_alts (AnnAlgAlts alts deflt)
       = get_deflt_fvs deflt : [ freeVarsOf rhs | (_, _, rhs) <- alts ]
 
-    get_fvs_from_deflt_and_alts (AnnCoPrimAlts alts deflt)
+    get_fvs_from_deflt_and_alts (AnnPrimAlts alts deflt)
       = get_deflt_fvs deflt : [ freeVarsOf rhs | (_, rhs) <- alts]
 
-    get_deflt_fvs AnnCoNoDefault	   = emptyUniqSet
-    get_deflt_fvs (AnnCoBindDefault b rhs) = freeVarsOf rhs
+    get_deflt_fvs AnnNoDefault	   = emptyIdSet
+    get_deflt_fvs (AnnBindDefault b rhs) = freeVarsOf rhs
 
     ----------------------------
-    fi_alts to_drop_deflt to_drop_alts (AnnCoAlgAlts alts deflt)
+    fi_alts to_drop_deflt to_drop_alts (AnnAlgAlts alts deflt)
       = AlgAlts
 	    [ (con, params, fiExpr to_drop rhs)
 	    | ((con, params, rhs), to_drop) <- alts `zip` to_drop_alts ]
 	    (fi_default to_drop_deflt deflt)
 
-    fi_alts to_drop_deflt to_drop_alts (AnnCoPrimAlts alts deflt)
+    fi_alts to_drop_deflt to_drop_alts (AnnPrimAlts alts deflt)
       = PrimAlts
 	    [ (lit, fiExpr to_drop rhs)
 	    | ((lit, rhs), to_drop) <- alts `zip` to_drop_alts ]
 	    (fi_default to_drop_deflt deflt)
 
-    fi_default to_drop AnnCoNoDefault	      = NoDefault
-    fi_default to_drop (AnnCoBindDefault b e) = BindDefault b (fiExpr to_drop e)
+    fi_default to_drop AnnNoDefault	      = NoDefault
+    fi_default to_drop (AnnBindDefault b e) = BindDefault b (fiExpr to_drop e)
 \end{code}
 
 %************************************************************************
@@ -341,7 +351,7 @@ sepBindsByDropPoint drop_pts []
 sepBindsByDropPoint drop_pts floaters
   = let
 	(per_drop_pt, must_stay_here, _)
-	    --= sep drop_pts emptyUniqSet{-fvs of prev drop_pts-} floaters
+	    --= sep drop_pts emptyIdSet{-fvs of prev drop_pts-} floaters
 	    = split' drop_pts floaters [] empty_boxes
 	empty_boxes = take (length drop_pts) (repeat [])
 
@@ -353,16 +363,16 @@ sepBindsByDropPoint drop_pts floaters
 
     -- only in a or unused
     split' (a:as) (bind:binds) mult_branch (drop_box_a:drop_boxes)
-      | all (\b -> {-b `elementOfUniqSet` a &&-}
-		   not (b `elementOfUniqSet` (unionManyUniqSets as)))
+      | all (\b -> {-b `elementOfIdSet` a &&-}
+		   not (b `elementOfIdSet` (unionManyIdSets as)))
 	    (bindersOf (fst bind))
       = split' (a':as) binds mult_branch ((bind:drop_box_a):drop_boxes)
       where
-	a' = a `unionUniqSets` fvsOfBind bind
+	a' = a `unionIdSets` fvsOfBind bind
 
     -- not in a
     split' (a:as) (bind:binds) mult_branch (drop_box_a:drop_boxes)
-      | all (\b -> not (b `elementOfUniqSet` a)) (bindersOf (fst bind))
+      | all (\b -> not (b `elementOfIdSet` a)) (bindersOf (fst bind))
       = split' (a:as') binds mult_branch' (drop_box_a:drop_boxes')
       where
 	(drop_boxes',mult_branch',as') = split' as [bind] mult_branch drop_boxes
@@ -371,13 +381,13 @@ sepBindsByDropPoint drop_pts floaters
     split' aas@(a:as) (bind:binds) mult_branch drop_boxes
       = split' aas' binds (bind : mult_branch) drop_boxes
       where
-	aas' = map (unionUniqSets (fvsOfBind bind)) aas
+	aas' = map (unionIdSets (fvsOfBind bind)) aas
 
     -------------------------
     fvsOfBind (_,fvs)	= fvs
 
 --floatedBindsFVs ::
-floatedBindsFVs binds = foldr unionUniqSets emptyUniqSet (map snd binds)
+floatedBindsFVs binds = unionManyIdSets (map snd binds)
 
 --mkCoLets' :: [FloatingBinds] -> CoreExpr -> CoreExpr
 mkCoLets' to_drop e = mkCoLetsNoUnboxed (reverse (map fst to_drop)) e

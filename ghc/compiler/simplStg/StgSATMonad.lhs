@@ -14,8 +14,8 @@ module StgSATMonad (
 	getArgLists, saTransform
     ) where
 
-import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
-			  extractTyVarsFromTy, splitSigmaTy, splitTyArgs,
+import Type		( mkSigmaTy, TyVarTemplate,
+			  splitSigmaTy, splitTyArgs,
 			  glueTyArgs, instantiateTy, TauType(..),
 			  Class, ThetaType(..), SigmaType(..),
 			  InstTyEnv(..)

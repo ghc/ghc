@@ -18,7 +18,7 @@ import RnHsSyn		( RenamedPolyType(..), RenamedMonoType(..),
 
 import TcMonad
 import TcEnv		( tcLookupTyVar, tcLookupClass, tcLookupTyCon, 
-			  tcExtendTyVarEnv, tcTyVarScope
+			  tcTyVarScope, tcTyVarScopeGivenKinds
 			)
 import TcKind		( TcKind, mkTcTypeKind, mkBoxedTypeKind,
 			  mkTcArrowKind, unifyKind, newKindVar,
@@ -33,6 +33,7 @@ import TyVar		( GenTyVar, TyVar(..), mkTyVar )
 import PrelInfo		( mkListTy, mkTupleTy )
 import Type		( mkDictTy )
 import Class		( cCallishClassKeys )
+import TyCon		( TyCon, Arity(..) )
 import Unique		( Unique )
 import Name		( Name(..), getNameShortName, isTyConName, getSynNameArity )
 import PprStyle
@@ -81,30 +82,33 @@ tcMonoTypeKind (MonoFunTy ty1 ty2)
 tcMonoTypeKind (MonoTyApp name tys)
   = mapAndUnzipTc tcMonoTypeKind tys	`thenTc`    \ (arg_kinds, arg_tys) ->
 
-    tc_mono_name name			`thenNF_Tc` \ (fun_kind, fun_ty) ->
+    tc_mono_name name			`thenNF_Tc` \ (fun_kind, maybe_arity, fun_ty) ->
 
     newKindVar				`thenNF_Tc` \ result_kind ->
     unifyKind fun_kind (foldr mkTcArrowKind result_kind arg_kinds)	`thenTc_`
 
 	-- Check for saturated application in the special case of
-	-- type synoyms.  Here the renamer has kindly attached the
-	-- arity to the Name.
-    synArityCheck name (length tys)	`thenTc_`
+	-- type synoyms.
+    (case maybe_arity of
+	Just arity | arity /= n_args -> failTc (err arity)
+	other			     -> returnTc ()
+    )									`thenTc_`
 
     returnTc (result_kind, foldl mkAppTy fun_ty arg_tys)
+  where
+    err arity = arityErr "Type synonym constructor" name arity n_args
+    n_args    = length tys
 
 -- for unfoldings only:
 tcMonoTypeKind (MonoForAllTy tyvars_w_kinds ty)
-  = tcExtendTyVarEnv tyvar_names (tc_kinds `zip` tyvars) (
+  = tcTyVarScopeGivenKinds names tc_kinds (\ tyvars ->
 	tcMonoTypeKind ty		`thenTc` \ (kind, ty') ->
 	unifyKind kind mkTcTypeKind	`thenTc_`
 	returnTc (mkTcTypeKind, ty')
     )
   where
-    (tyvar_names, kinds) = unzip tyvars_w_kinds
-    tyvars   = zipWithEqual mk_tyvar tyvar_names kinds
+    (names, kinds) = unzip tyvars_w_kinds
     tc_kinds = map kindToTcKind kinds
-    mk_tyvar name kind = mkTyVar (getNameShortName name) (getItsUnique name) kind
 
 -- for unfoldings only:
 tcMonoTypeKind (MonoDictTy class_name ty)
@@ -114,14 +118,14 @@ tcMonoTypeKind (MonoDictTy class_name ty)
     returnTc (mkTcTypeKind, mkDictTy clas arg_ty)
 
 
-tc_mono_name :: Name -> NF_TcM s (TcKind s, Type)
+tc_mono_name :: Name -> NF_TcM s (TcKind s, Maybe Arity, Type)
 tc_mono_name name@(Short _ _) 		-- Must be a type variable
   = tcLookupTyVar name			`thenNF_Tc` \ (kind,tyvar) ->
-    returnNF_Tc (kind, mkTyVarTy tyvar)
+    returnNF_Tc (kind, Nothing, mkTyVarTy tyvar)
 
 tc_mono_name name | isTyConName name 	-- Must be a type constructor
-  = tcLookupTyCon name			`thenNF_Tc` \ (kind,tycon) ->
-    returnNF_Tc (kind, mkTyConTy tycon)
+  = tcLookupTyCon name			`thenNF_Tc` \ (kind,maybe_arity,tycon) ->
+    returnNF_Tc (kind, maybe_arity, mkTyConTy tycon)
 	
 tc_mono_name name 			-- Renamer should have got it right
   = panic ("tc_mono_name:" ++ ppShow 1000 (ppr PprDebug name))
@@ -173,18 +177,6 @@ tcPolyType (HsForAllTy tyvar_names context ty)
 	tcMonoType ty		`thenTc` \ tau ->
 	returnTc (mkSigmaTy tyvars theta tau)
     )
-\end{code}
-
-Auxilliary functions
-~~~~~~~~~~~~~~~~~~~~
-\begin{code}
-synArityCheck :: Name -> Int -> TcM s ()
-synArityCheck name n_args
-  = case getSynNameArity name of
-	Just arity | arity /= n_args -> failTc (err arity)
-	other			     -> returnTc ()
-  where
-    err arity = arityErr "Type synonym constructor" name arity n_args
 \end{code}
 
 Errors and contexts

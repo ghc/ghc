@@ -36,7 +36,7 @@ import Inst		( Inst, InstOrigin(..), InstanceMapper(..),
 			  newDicts, newMethod, LIE(..), emptyLIE, plusLIE )
 import TcBinds		( tcPragmaSigs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcLookupClass, tcTyVarScope, newLocalIds )
+import TcEnv		( tcLookupClass, tcTyVarScope, newLocalId )
 import TcGRHSs		( tcGRHSsAndBinds )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcKind		( TcKind, unifyKind )
@@ -57,7 +57,7 @@ import Class		( GenClass, GenClassOp,
 			  isCcallishClass, getClassBigSig,
 			  getClassOps, getClassOpLocalType )
 import CoreUtils	( escErrorMsg )
-import Id		( idType, isDefaultMethodId_maybe )
+import Id		( GenId, idType, isDefaultMethodId_maybe )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust )
 import Name		( Name, getTagFromClassOpName )
@@ -69,10 +69,10 @@ import PprStyle
 import Pretty
 import RnUtils		( GlobalNameMappers(..), GlobalNameMapper(..) )
 import TyCon		( derivedFor )
-import Type		( GenType(..),  ThetaType(..), mkTyVarTy,
-			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy,
+import Type		( GenType(..),  ThetaType(..), mkTyVarTys,
+			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
 			  getTyCon_maybe, maybeBoxedPrimType )
-import TyVar		( GenTyVar, tyVarListToSet )
+import TyVar		( GenTyVar, mkTyVarSet )
 import TysWiredIn	( stringTy )
 import Unique		( Unique )
 import Util		( panic )
@@ -348,7 +348,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	-- Get the class signature
     mapNF_Tc tcInstTyVar inst_tyvars	`thenNF_Tc` \ inst_tyvars' ->
     let 
-	tenv = inst_tyvars `zip` (map mkTyVarTy inst_tyvars')
+	tenv = inst_tyvars `zip` (mkTyVarTys inst_tyvars')
 
         (class_tyvar,
 	 super_classes, sc_sel_ids,
@@ -360,7 +360,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     let
 	sc_theta'        = super_classes `zip` (repeat inst_ty')
  	origin    	 = InstanceDeclOrigin
-	mk_method sel_id = newMethod origin (RealId sel_id) [inst_ty']
+	mk_method sel_id = newMethodId sel_id inst_ty' origin locn
     in
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
@@ -392,7 +392,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	dict_and_method_binds
 	    = dict_bind `AndMonoBinds` method_mbinds
 
-	inst_tyvars_set' = tyVarListToSet inst_tyvars'
+	inst_tyvars_set' = mkTyVarSet inst_tyvars'
     in
 	-- Check the overloading constraints of the methods and superclasses
     tcAddErrCtxt (bindSigCtxt meth_ids) (
@@ -439,7 +439,55 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     returnTc (const_lie `plusLIE` spec_lie, inst_binds)
 \end{code}
 
-This function makes a default method which calls the global default method, at
+@mkMethodId@ manufactures an id for a local method.
+It's rather turgid stuff, because there are two cases:
+
+  (a) For methods with no local polymorphism, we can make an Inst of the 
+      class-op selector function and a corresp InstId; 
+      which is good because then other methods which call
+      this one will do so directly.
+
+  (b) For methods with local polymorphism, we can't do this.  For example,
+
+	 class Foo a where
+		op :: (Num b) => a -> b -> a
+
+      Here the type of the class-op-selector is
+
+	forall a b. (Foo a, Num b) => a -> b -> a
+
+      The locally defined method at (say) type Float will have type
+
+	forall b. (Num b) => Float -> b -> Float
+
+      and the one is not an instance of the other.
+
+      So for these we just make a local (non-Inst) id with a suitable type.
+
+How disgusting.
+
+\begin{code}
+newMethodId sel_id inst_ty origin loc
+  = let (sel_tyvars,sel_theta,sel_tau) = splitSigmaTy (idType sel_id)
+	(_:meth_theta) = sel_theta	-- The local theta is all except the
+					-- first element of the context
+    in 
+       case sel_tyvars of
+	-- Ah! a selector for a class op with no local polymorphism
+	-- Build an Inst for this
+	[clas_tyvar] -> newMethod origin (RealId sel_id) [inst_ty]
+
+	-- Ho! a selector for a class op with local polymorphism.
+	-- Just make a suitably typed local id for this
+	(clas_tyvar:local_tyvars) -> 
+		tcInstType [(clas_tyvar,inst_ty)]
+			   (mkSigmaTy local_tyvars meth_theta sel_tau)
+								`thenNF_Tc` \ method_ty ->
+		newLocalId (getOccurrenceName sel_id) method_ty	`thenNF_Tc` \ meth_id ->
+		returnNF_Tc (emptyLIE, meth_id)
+\end{code}
+
+The next function makes a default method which calls the global default method, at
 the appropriate instance type.
 
 See the notes under default decls in TcClassDcl.lhs.
@@ -465,7 +513,7 @@ makeInstanceDeclDefaultMethodExpr origin this_dict class_ops defm_ids inst_ty ta
       mkHsTyLam op_tyvars (
       mkHsDictLam op_dicts (
       mkHsDictApp (mkHsTyApp (HsVar (RealId defm_id))
-			     (inst_ty :  map mkTyVarTy op_tyvars))
+			     (inst_ty :  mkTyVarTys op_tyvars))
 		  (this_dict : op_dicts)
       )))
  where
@@ -640,9 +688,9 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
 		-- The latter is needed just so we can return an AbsBinds wrapped
 		-- up inside a MonoBinds.
 
-	newLocalIds [occ,occ] [method_tau,method_ty] `thenNF_Tc` \ new_ids ->
+	newLocalId occ method_tau		`thenNF_Tc` \ local_id ->
+	newLocalId occ method_ty		`thenNF_Tc` \ copy_id ->
 	let
-	    [local_id, copy_id] = map TcId new_ids
 	    inst_method_tyvars = inst_tyvars ++ method_tyvars
 	in
 		-- Typecheck the method
@@ -665,7 +713,7 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
 		-- the Bar-ish things.
 	tcAddErrCtxt (methodSigCtxt op method_ty) (
 	  tcSimplifyAndCheck
-		(tyVarListToSet inst_method_tyvars)
+		(mkTyVarSet inst_method_tyvars)
 		(method_dicts `plusLIE` avail_insts)
 		lieIop
 	) 					 `thenTc` \ (f_dicts, dict_binds) ->
@@ -747,7 +795,7 @@ tcSpecInstSig e ce tce inst_infos inst_mapper (SpecInstSig class_name ty src_loc
     babyTcMtoTcM (tcInstanceType ce tce tmpl_e True src_loc ty)
 				`thenTc` \ inst_ty ->
     let
-	maybe_tycon = case maybeDataTyCon inst_ty of
+	maybe_tycon = case maybeAppDataTyCon inst_ty of
 			 Just (tc,_,_) -> Just tc
 			 Nothing       -> Nothing
 
@@ -818,7 +866,7 @@ lookup_unspec_inst clas maybe_tycon inst_infos
 		      Just tycon -> match_tycon tycon
 		      Nothing    -> match_fun
 
-    match_tycon tycon inst_ty = case (maybeDataTyCon inst_ty) of
+    match_tycon tycon inst_ty = case (maybeAppDataTyCon inst_ty) of
 	  Just (inst_tc,_,_) -> tycon == inst_tc
 	  Nothing            -> False
 
@@ -826,7 +874,7 @@ lookup_unspec_inst clas maybe_tycon inst_infos
 
 
 is_plain_instance inst_ty
-  = case (maybeDataTyCon inst_ty) of
+  = case (maybeAppDataTyCon inst_ty) of
       Just (_,tys,_) -> all isTyVarTemplateTy tys
       Nothing	     -> case maybeUnpackFunTy inst_ty of
 			  Just (arg, res) -> isTyVarTemplateTy arg && isTyVarTemplateTy res

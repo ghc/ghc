@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 Taken quite directly from the Peyton Jones/Lester paper.
 
@@ -18,24 +18,28 @@ module FreeVars (
 	CoreExprWithFVs(..),		-- For the above functions
 	AnnCoreExpr(..),		-- Dito
 	FVInfo(..), LeakInfo(..)
-
-	-- and to make the interface self-sufficient...
     ) where
 
+import Ubiq{-uitous-}
 
 import AnnCoreSyn	-- output
 
-import PrelInfo		( PrimOp(..), PrimRep -- for CCallOp
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
+import CoreSyn
+import Id		( idType, getIdArity, isBottomingId,
+			  emptyIdSet, singletonIdSet, mkIdSet,
+			  elementOfIdSet, minusIdSet, unionManyIdSets,
+			  IdSet(..)
 			)
-import Type		( extractTyVarsFromTy )
-import Id		( idType, getIdArity, toplevelishId, isBottomingId )
-import IdInfo		-- Wanted for arityMaybe, but it seems you have
-			-- to import it all...  (Death to the Instance Virus!)
-import Maybes
-import UniqSet
-import Util
+import IdInfo		( arityMaybe )
+import PrimOp		( PrimOp(..) )
+import Type		( tyVarsOfType )
+import TyVar		( emptyTyVarSet, singletonTyVarSet, minusTyVarSet,
+			  intersectTyVarSets,
+			  TyVarSet(..)
+			)
+import UniqSet		( unionUniqSets )
+import Usage		( UVar(..) )
+import Util		( panic, assertPanic )
 \end{code}
 
 %************************************************************************
@@ -55,35 +59,36 @@ I've half-convinced myself we don't for case- and letrec bound ids
 but I might be wrong. (SLPJ, date unknown)
 
 \begin{code}
-type CoreExprWithFVs =  AnnCoreExpr Id Id FVInfo
+type CoreExprWithFVs =  AnnCoreExpr Id Id TyVar UVar FVInfo
 
 type TyVarCands = TyVarSet  -- for when we carry around lists of
 type IdCands	= IdSet	    -- "candidate" TyVars/Ids.
-noTyVarCands    = emptyUniqSet
-noIdCands       = emptyUniqSet
+noTyVarCands    = emptyTyVarSet
+noIdCands       = emptyIdSet
 
-data FVInfo = FVInfo
-		IdSet	    -- Free ids
-		TyVarSet    -- Free tyvars
-		LeakInfo
+data FVInfo
+  = FVInfo  IdSet	-- Free ids
+	    TyVarSet    -- Free tyvars
+	    LeakInfo
 
-noFreeIds      = emptyUniqSet
-noFreeTyVars   = emptyUniqSet
-aFreeId i      = singletonUniqSet i
-aFreeTyVar t   = singletonUniqSet t
-is_among       = elementOfUniqSet
-combine	       = unionUniqSets
-munge_id_ty  i = mkUniqSet (extractTyVarsFromTy (idType i))
+noFreeIds      = emptyIdSet
+noFreeTyVars   = emptyTyVarSet
+noFreeAnything = (noFreeIds, noFreeTyVars)
+aFreeId i      = singletonIdSet i
+aFreeTyVar t   = singletonTyVarSet t
+is_among       = elementOfIdSet
+munge_id_ty  i = tyVarsOfType (idType i)
+combine	       = unionUniqSets -- used both for {Id,TyVar}Sets
 
 combineFVInfo (FVInfo fvs1 tfvs1 leak1) (FVInfo fvs2 tfvs2 leak2)
   = FVInfo (fvs1  `combine` fvs2)
 	   (tfvs1 `combine` tfvs2)
-	   (leak1 `orLeak`	  leak2)
+	   (leak1 `orLeak`  leak2)
 \end{code}
 
-Leak-free-ness is based only on the value, not the type.
-In particular, nested collections of constructors are guaranteed leak free.
-Function applications are not, except for PAPs.
+Leak-free-ness is based only on the value, not the type.  In
+particular, nested collections of constructors are guaranteed leak
+free.  Function applications are not, except for PAPs.
 
 Applications of error gets (LeakFree bigArity) -- a hack!
 
@@ -111,7 +116,11 @@ freeVars :: CoreExpr -> CoreExprWithFVs
 freeVars expr = fvExpr noIdCands noTyVarCands expr
 \end{code}
 
+%************************************************************************
+%*									*
 \subsection{Free variables (and types)}
+%*									*
+%************************************************************************
 
 We do the free-variable stuff by passing around ``candidates lists''
 of @Ids@ and @TyVars@ that may be considered free.  This is useful,
@@ -131,7 +140,7 @@ fvExpr id_cands tyvar_cands (Var v)
 	     else noFreeIds)
 	    noFreeTyVars
 	    leakiness,
-     AnnCoVar v)
+     AnnVar v)
   where
     leakiness
       | isBottomingId v = lEAK_FREE_BIG	-- Hack
@@ -140,96 +149,94 @@ fvExpr id_cands tyvar_cands (Var v)
 			    Just arity -> LeakFree arity
 
 fvExpr id_cands tyvar_cands (Lit k)
-  = (FVInfo noFreeIds noFreeTyVars lEAK_FREE_0, AnnCoLit k)
+  = (FVInfo noFreeIds noFreeTyVars lEAK_FREE_0, AnnLit k)
 
-fvExpr id_cands tyvar_cands (Con c tys args)
-  = (FVInfo args_fvs tfvs lEAK_FREE_0, AnnCoCon c tys args)
+fvExpr id_cands tyvar_cands (Con c args)
+  = (FVInfo args_fvs tfvs lEAK_FREE_0, AnnCon c args)
   where
-    args_fvs = foldr (combine . freeAtom id_cands)  noFreeIds    args
-    tfvs     = foldr (combine . freeTy tyvar_cands) noFreeTyVars tys
+    (args_fvs, tfvs) = freeArgs id_cands tyvar_cands args
 
-fvExpr id_cands tyvar_cands (Prim op@(CCallOp _ _ _ _ res_ty) tys args)
-  = ASSERT (null tys)
-    (FVInfo args_fvs tfvs lEAK_FREE_0, AnnCoPrim op tys args)
+fvExpr id_cands tyvar_cands (Prim op args)
+  = (FVInfo args_fvs tfvs lEAK_FREE_0, AnnPrim op args)
   where
-    args_fvs = foldr (combine . freeAtom id_cands)  noFreeIds    args
-    tfvs     = foldr (combine . freeTy tyvar_cands) noFreeTyVars (res_ty:tys)
+    (args_fvs, tfvs) = freeArgs id_cands tyvar_cands args_to_use{-NB-}
+    args_to_use
+      = case op of
+	  CCallOp _ _ _ _ res_ty -> TyArg res_ty : args
+	  _			 -> args
 
-fvExpr id_cands tyvar_cands (Prim op tys args)
-  = (FVInfo args_fvs tfvs lEAK_FREE_0, AnnCoPrim op tys args)
-  where
-    args_fvs = foldr (combine . freeAtom id_cands)  noFreeIds    args
-    tfvs     = foldr (combine . freeTy tyvar_cands) noFreeTyVars tys
+-- this Lam stuff could probably be improved by rewriting (WDP 96/03)
 
-fvExpr id_cands tyvar_cands (Lam binder body)
-  = (FVInfo (freeVarsOf body2   `minusUniqSet`  singletonUniqSet binder)
-	    (freeTyVarsOf body2 `combine` munge_id_ty binder)
+fvExpr id_cands tyvar_cands (Lam (UsageBinder uvar) body)
+  = panic "fvExpr:Lam UsageBinder"
+
+fvExpr id_cands tyvar_cands (Lam b@(ValBinder binder) body)
+  = (FVInfo (freeVarsOf body2   `minusIdSet` singletonIdSet binder)
+	    (freeTyVarsOf body2 `combine`    munge_id_ty binder)
 	    leakiness,
-     AnnCoLam binder body2)
+     AnnLam b body2)
   where
 	-- We need to collect free tyvars from the binders
-    body2 = fvExpr (singletonUniqSet binder `combine` id_cands) tyvar_cands body
+    body2 = fvExpr (singletonIdSet binder `combine` id_cands) tyvar_cands body
 
     leakiness = case leakinessOf body2 of
 		  MightLeak  -> LeakFree 1
 		  LeakFree n -> LeakFree (n + 1)
 
-fvExpr id_cands tyvar_cands (CoTyLam tyvar body)
+fvExpr id_cands tyvar_cands (Lam b@(TyBinder tyvar) body)
   = (FVInfo (freeVarsOf body2)
-	    (freeTyVarsOf body2 `minusUniqSet` aFreeTyVar tyvar)
+	    (freeTyVarsOf body2 `minusTyVarSet` aFreeTyVar tyvar)
 	    (leakinessOf body2),
-     AnnCoTyLam tyvar body2)
+     AnnLam b body2)
   where
     body2 = fvExpr id_cands (aFreeTyVar tyvar `combine` tyvar_cands) body
 
+-- ditto on rewriting this App stuff (WDP 96/03)
+
 fvExpr id_cands tyvar_cands (App fun arg)
-  = (FVInfo (freeVarsOf fun2 `combine` fvs_arg)
-	    (freeTyVarsOf fun2)
+  = (FVInfo (freeVarsOf fun2   `combine` fvs_arg)
+	    (freeTyVarsOf fun2 `combine` tfvs_arg)
 	    leakiness,
-     AnnCoApp fun2 arg)
+     AnnApp fun2 arg)
   where
     fun2 = fvExpr id_cands tyvar_cands fun
-    fvs_arg = freeAtom id_cands arg
+    fun2_leakiness = leakinessOf fun2
 
-    leakiness = case leakinessOf fun2 of
-		   LeakFree n | n>1 -> LeakFree (n-1)	-- Note > not >=
-		   other            -> MightLeak
+    (fvs_arg, tfvs_arg) = freeArgs id_cands tyvar_cands [arg]
 
-fvExpr id_cands tyvar_cands (CoTyApp expr ty)
-  = (FVInfo (freeVarsOf expr2)
-	    (freeTyVarsOf expr2 `combine` tfvs_arg)
-	    (leakinessOf expr2),
-     AnnCoTyApp expr2 ty)
-  where
-    expr2    = fvExpr id_cands tyvar_cands expr
-    tfvs_arg = freeTy tyvar_cands ty
+    leakiness = if (notValArg arg) then
+		    fun2_leakiness
+		else
+		    case fun2_leakiness of
+		       LeakFree n | n>1 -> LeakFree (n-1) -- Note > not >=
+		       other            -> MightLeak
 
 fvExpr id_cands tyvar_cands (Case expr alts)
   = (combineFVInfo expr_fvinfo alts_fvinfo,
-     AnnCoCase expr2 alts')
+     AnnCase expr2 alts')
   where
     expr2@(expr_fvinfo,_) = fvExpr id_cands tyvar_cands expr
     (alts_fvinfo, alts') = annotate_alts alts
 
     annotate_alts (AlgAlts alts deflt)
-      = (fvinfo, AnnCoAlgAlts alts' deflt')
+      = (fvinfo, AnnAlgAlts alts' deflt')
       where
     	(alts_fvinfo_s, alts') = unzip (map ann_boxed_alt alts)
     	(deflt_fvinfo, deflt') = annotate_default deflt
 	fvinfo = foldr combineFVInfo deflt_fvinfo alts_fvinfo_s
 
 	ann_boxed_alt (con, params, rhs)
-	  = (FVInfo (freeVarsOf rhs' `minusUniqSet` mkUniqSet params)
+	  = (FVInfo (freeVarsOf rhs' `minusIdSet` mkIdSet params)
 		    (freeTyVarsOf rhs' `combine` param_ftvs)
 		    (leakinessOf rhs'),
 	     (con, params, rhs'))
     	  where
-	    rhs' = fvExpr (mkUniqSet params `combine` id_cands) tyvar_cands rhs
+	    rhs' = fvExpr (mkIdSet params `combine` id_cands) tyvar_cands rhs
 	    param_ftvs = foldr (combine . munge_id_ty) noFreeTyVars params
 		-- We need to collect free tyvars from the binders
 
     annotate_alts (PrimAlts alts deflt)
-      = (fvinfo, AnnCoPrimAlts alts' deflt')
+      = (fvinfo, AnnPrimAlts alts' deflt')
       where
     	(alts_fvinfo_s, alts') = unzip (map ann_unboxed_alt alts)
     	(deflt_fvinfo, deflt') = annotate_default deflt
@@ -240,13 +247,13 @@ fvExpr id_cands tyvar_cands (Case expr alts)
 	    rhs'@(rhs_info,_) = fvExpr id_cands tyvar_cands rhs
 
     annotate_default NoDefault = (FVInfo noFreeIds noFreeTyVars lEAK_FREE_BIG,
-				    AnnCoNoDefault)
+				    AnnNoDefault)
 
     annotate_default (BindDefault binder rhs)
-      = (FVInfo (freeVarsOf   rhs' `minusUniqSet` aFreeId binder)
+      = (FVInfo (freeVarsOf   rhs' `minusIdSet` aFreeId binder)
 		(freeTyVarsOf rhs' `combine` binder_ftvs)
 		(leakinessOf rhs'),
-	 AnnCoBindDefault binder rhs')
+	 AnnBindDefault binder rhs')
       where
 	rhs' = fvExpr (aFreeId binder `combine` id_cands) tyvar_cands rhs
 	binder_ftvs = munge_id_ty binder
@@ -256,11 +263,11 @@ fvExpr id_cands tyvar_cands (Let (NonRec binder rhs) body)
   = (FVInfo (freeVarsOf rhs'   `combine` body_fvs)
 	    (freeTyVarsOf rhs' `combine` freeTyVarsOf body2 `combine` binder_ftvs)
 	    (leakinessOf rhs' `orLeak` leakinessOf body2),
-     AnnCoLet (AnnCoNonRec binder rhs') body2)
+     AnnLet (AnnNonRec binder rhs') body2)
   where
     rhs'	= fvExpr id_cands tyvar_cands rhs
     body2	= fvExpr (aFreeId binder `combine` id_cands) tyvar_cands body
-    body_fvs	= freeVarsOf body2 `minusUniqSet` aFreeId binder
+    body_fvs	= freeVarsOf body2 `minusIdSet` aFreeId binder
     binder_ftvs = munge_id_ty binder
 	-- We need to collect free tyvars from the binder
 
@@ -268,38 +275,56 @@ fvExpr id_cands tyvar_cands (Let (Rec binds) body)
   = (FVInfo (binds_fvs `combine` body_fvs)
 	    (rhss_tfvs `combine` freeTyVarsOf body2 `combine` binders_ftvs)
 	    (leakiness_of_rhss `orLeak` leakinessOf body2),
-     AnnCoLet (AnnCoRec (binders `zip` rhss')) body2)
+     AnnLet (AnnRec (binders `zip` rhss')) body2)
   where
     (binders, rhss)   = unzip binds
     new_id_cands      = binders_set `combine` id_cands
-    binders_set	      = mkUniqSet binders
+    binders_set	      = mkIdSet binders
     rhss'	      = map (fvExpr new_id_cands tyvar_cands) rhss
 
     FVInfo rhss_fvs rhss_tfvs leakiness_of_rhss
 	= foldr1 combineFVInfo [info | (info,_) <- rhss']
 
-    binds_fvs	      = rhss_fvs `minusUniqSet` binders_set
+    binds_fvs	      = rhss_fvs `minusIdSet` binders_set
     body2	      = fvExpr new_id_cands tyvar_cands body
-    body_fvs	      = freeVarsOf body2 `minusUniqSet` binders_set
+    body_fvs	      = freeVarsOf body2 `minusIdSet` binders_set
     binders_ftvs      = foldr (combine . munge_id_ty) noFreeTyVars binders
 	-- We need to collect free tyvars from the binders
 
 fvExpr id_cands tyvar_cands (SCC label expr)
-  = (fvinfo, AnnCoSCC label expr2)
+  = (fvinfo, AnnSCC label expr2)
   where
     expr2@(fvinfo,_) = fvExpr id_cands tyvar_cands expr
 \end{code}
 
 \begin{code}
-freeAtom :: IdCands -> CoreArg ->  IdSet
+freeArgs :: IdCands -> TyVarCands
+	 -> [CoreArg]
+	 -> (IdSet, TyVarSet)
 
-freeAtom cands (LitArg k) = noFreeIds
-freeAtom cands (VarArg v) | v `is_among` cands = aFreeId v
-			     | otherwise	  = noFreeIds
+freeArgs icands tcands [] = noFreeAnything
+freeArgs icands tcands (arg:args)
+  -- this code is written this funny way only for "efficiency" purposes
+  = let
+	free_first_arg@(arg_fvs, tfvs) = free_arg arg
+    in
+    if (null args) then
+	free_first_arg
+    else
+	case (freeArgs icands tcands args) of { (irest, trest) ->
+	(arg_fvs `combine` irest, tfvs `combine` trest) }
+  where
+    free_arg (LitArg   _) = noFreeAnything
+    free_arg (UsageArg _) = noFreeAnything
+    free_arg (TyArg   ty) = (noFreeIds, freeTy tcands ty)
+    free_arg (VarArg   v)
+      | v `is_among` icands = (aFreeId v, noFreeTyVars)
+      | otherwise	    = noFreeAnything
 
+---------
 freeTy :: TyVarCands -> Type -> TyVarSet
 
-freeTy cands ty = mkUniqSet (extractTyVarsFromTy ty) `intersectUniqSets` cands
+freeTy cands ty = tyVarsOfType ty `intersectTyVarSets` cands
 
 freeVarsOf :: CoreExprWithFVs -> IdSet
 freeVarsOf (FVInfo free_vars _ _, _) = free_vars
@@ -348,8 +373,8 @@ As it happens this is only ever used by the Specialiser!
 
 \begin{code}
 type FVCoreBinder  = (Id, IdSet)
-type FVCoreExpr    = GenCoreExpr    FVCoreBinder Id
-type FVCoreBinding = GenCoreBinding FVCoreBinder Id
+type FVCoreExpr    = GenCoreExpr    FVCoreBinder Id TyVar UVar
+type FVCoreBinding = GenCoreBinding FVCoreBinder Id TyVar UVar
 
 type InterestingIdFun
   =  IdSet	-- Non-top-level in-scope variables
@@ -370,38 +395,31 @@ addExprFVs fv_cand in_scope (Var v)
 
 addExprFVs fv_cand in_scope (Lit lit) = (Lit lit, noFreeIds)
 
-addExprFVs fv_cand in_scope (Con con tys args)
-  = (Con con tys args,
+addExprFVs fv_cand in_scope (Con con args)
+  = (Con con args,
      if fv_cand in_scope con
      then aFreeId con
-     else noFreeIds
-	`combine`
-     unionManyUniqSets (map (fvsOfAtom fv_cand in_scope) args))
+     else noFreeIds `combine` fvsOfArgs fv_cand in_scope args)
 
-addExprFVs fv_cand in_scope (Prim op tys args)
-  = (Prim op tys args,
-     unionManyUniqSets (map (fvsOfAtom fv_cand in_scope) args))
+addExprFVs fv_cand in_scope (Prim op args)
+  = (Prim op args, fvsOfArgs fv_cand in_scope args)
 
 addExprFVs fv_cand in_scope (Lam binder body)
-  = (Lam (binder,lam_fvs) new_body, lam_fvs)
+  = (Lam new_binder new_body, lam_fvs)
   where
-    binder_set = singletonUniqSet binder
-    new_in_scope = in_scope `combine` binder_set
-    (new_body, body_fvs) = addExprFVs fv_cand new_in_scope body
-    lam_fvs = body_fvs `minusUniqSet` binder_set
+    (new_binder, binder_set)
+      = case binder of
+	  TyBinder    t -> (TyBinder t, emptyIdSet)
+	  UsageBinder u -> (UsageBinder u, emptyIdSet)
+          ValBinder   b -> (ValBinder (b, lam_fvs),
+			    singletonIdSet b)
 
-addExprFVs fv_cand in_scope (CoTyLam tyvar body)
-  = (CoTyLam tyvar body2, body_fvs)
-  where
-    (body2, body_fvs) = addExprFVs fv_cand in_scope body
+    new_in_scope	 = in_scope `combine` binder_set
+    (new_body, body_fvs) = addExprFVs fv_cand new_in_scope body
+    lam_fvs	         = body_fvs `minusIdSet` binder_set
 
 addExprFVs fv_cand in_scope (App fun arg)
-  = (App fun2 arg, fun_fvs `combine` fvsOfAtom fv_cand in_scope arg)
-  where
-    (fun2, fun_fvs) = addExprFVs fv_cand in_scope fun
-
-addExprFVs fv_cand in_scope (CoTyApp fun ty)
-  = (CoTyApp fun2 ty, fun_fvs)
+  = (App fun2 arg, fun_fvs `combine` fvsOfArgs fv_cand in_scope [arg])
   where
     (fun2, fun_fvs) = addExprFVs fv_cand in_scope fun
 
@@ -416,13 +434,13 @@ addExprFVs fv_cand in_scope (Case scrut alts)
 	    where
 	      (alg_alts', alt_fvs) = unzip (map do_alg_alt alg_alts)
 	      (deflt', deflt_fvs) = do_deflt deflt
-	      fvs = unionManyUniqSets (deflt_fvs : alt_fvs)
+	      fvs = unionManyIdSets (deflt_fvs : alt_fvs)
 
 	  PrimAlts prim_alts deflt -> (PrimAlts prim_alts' deflt', fvs)
 	    where
 	      (prim_alts', alt_fvs) = unzip (map do_prim_alt prim_alts)
 	      (deflt', deflt_fvs) = do_deflt deflt
-	      fvs = unionManyUniqSets (deflt_fvs : alt_fvs)
+	      fvs = unionManyIdSets (deflt_fvs : alt_fvs)
 
     do_alg_alt :: (Id, [Id], CoreExpr)
 	       -> ((Id, [FVCoreBinder], FVCoreExpr), IdSet)
@@ -431,8 +449,8 @@ addExprFVs fv_cand in_scope (Case scrut alts)
       where
 	new_in_scope = in_scope `combine` arg_set
 	(rhs', rhs_fvs) = addExprFVs fv_cand new_in_scope rhs
-	fvs = rhs_fvs `minusUniqSet` arg_set
-	arg_set = mkUniqSet args
+	fvs = rhs_fvs `minusIdSet` arg_set
+	arg_set = mkIdSet args
 
     do_prim_alt (lit, rhs) = ((lit, rhs'), rhs_fvs)
       where
@@ -444,11 +462,11 @@ addExprFVs fv_cand in_scope (Case scrut alts)
       where
 	new_in_scope = in_scope `combine` var_set
 	(rhs', rhs_fvs) = addExprFVs fv_cand new_in_scope rhs
-	fvs = rhs_fvs `minusUniqSet` var_set
+	fvs = rhs_fvs `minusIdSet` var_set
 	var_set = aFreeId var
 
 addExprFVs fv_cand in_scope (Let binds body)
-  = (Let binds' body2, fvs_binds `combine` (fvs_body `minusUniqSet` binder_set))
+  = (Let binds' body2, fvs_binds `combine` (fvs_body `minusIdSet` binder_set))
   where
     (binds', fvs_binds, new_in_scope, binder_set)
       = addBindingFVs fv_cand in_scope binds
@@ -479,10 +497,10 @@ addBindingFVs fv_cand in_scope (NonRec binder rhs)
     binder_set = aFreeId binder
 
 addBindingFVs fv_cand in_scope (Rec pairs)
-  = (Rec pairs', unionManyUniqSets fvs_s, new_in_scope, binder_set)
+  = (Rec pairs', unionManyIdSets fvs_s, new_in_scope, binder_set)
   where
     binders = [binder | (binder,_) <- pairs]
-    binder_set = mkUniqSet binders
+    binder_set = mkIdSet binders
     new_in_scope = in_scope `combine` binder_set
     (pairs', fvs_s) = unzip (map (do_pair fv_cand new_in_scope binder_set) pairs)
 \end{code}
@@ -504,17 +522,22 @@ addTopBindsFVs fv_cand (b:bs)
 \end{code}
 
 \begin{code}
-fvsOfAtom   :: InterestingIdFun	-- "Interesting id" predicate
+fvsOfArgs   :: InterestingIdFun	-- "Interesting id" predicate
 	    -> IdSet		-- In scope ids
-	    -> CoreArg
+	    -> [CoreArg]
 	    -> IdSet
 
-fvsOfAtom fv_cand in_scope (VarArg v)
-  = if fv_cand in_scope v
-    then aFreeId v
-    else noFreeIds
-fvsOfAtom _ _ _ = noFreeIds -- if a literal...
+fvsOfArgs _ _ [] = noFreeIds
 
+fvsOfArgs fv_cand in_scope [VarArg v] -- this is only a short-cut...
+  = if (fv_cand in_scope v) then aFreeId v else noFreeIds
+fvsOfArgs _	  _	   [ _ ] = noFreeIds
+
+fvsOfArgs fv_cand in_scope args
+  = mkIdSet [ v | (VarArg v) <- args, fv_cand in_scope v ]
+    -- all other types of args are uninteresting here...
+
+----------
 do_pair	:: InterestingIdFun -- "Interesting id" predicate
 	-> IdSet   	    -- In scope ids
 	-> IdSet
@@ -525,5 +548,5 @@ do_pair fv_cand in_scope binder_set (binder,rhs)
  = (((binder, fvs), rhs'), fvs)
  where
    (rhs', rhs_fvs) = addExprFVs fv_cand in_scope rhs
-   fvs = rhs_fvs `minusUniqSet` binder_set
+   fvs = rhs_fvs `minusIdSet` binder_set
 \end{code}

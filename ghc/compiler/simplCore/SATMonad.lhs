@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %************************************************************************
 %*									*
@@ -7,8 +7,19 @@
 %*									*
 %************************************************************************
 
+96/03: We aren't using the static-argument transformation right now.
+
 \begin{code}
 #include "HsVersions.h"
+
+module SATMonad where
+
+import Ubiq{-uitous-}
+import Util		( panic )
+
+junk_from_SATMonad = panic "SATMonad.junk"
+
+{- LATER: to end of file:
 
 module SATMonad (
 	SATInfo(..), updSAEnv,
@@ -20,7 +31,7 @@ module SATMonad (
     ) where
 
 import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
-			  extractTyVarsFromTy, splitSigmaTy, splitTyArgs,
+			  splitSigmaTy, splitTyArgs,
 			  glueTyArgs, instantiateTy, TauType(..),
 			  Class, ThetaType(..), SigmaType(..),
 			  InstTyEnv(..)
@@ -135,7 +146,7 @@ newSATName id ty us env
 getArgLists :: CoreExpr -> ([Arg Type],[Arg Id])
 getArgLists expr
   = let
-	(uvs, tvs, lambda_bounds, body) = digForLambdas expr
+	(uvs, tvs, lambda_bounds, body) = collectBinders expr
     in
     ([ Static (mkTyVarTy tv) | tv <- tvs ],
      [ Static v		     | v <- lambda_bounds ])
@@ -201,7 +212,7 @@ saTransform binder rhs
 	    -- this binder *will* get inlined but if it happen to be
 	    -- a top level binder it is never removed as dead code,
 	    -- therefore we have to remove that information (of it being
-	    -- top-level or exported somehow.
+	    -- top-level or exported somehow.)
 	    -- A better fix is to use binder directly but with the TopLevel
 	    -- tag (or Exported tag) modified.
 	    fake_binder = mkSysLocal
@@ -250,4 +261,5 @@ dropStatics (_:args)	    (t:ts) = t:dropStatics args ts
 isStatic :: Arg a -> Bool
 isStatic NotStatic = False
 isStatic _	   = True
+-}
 \end{code}

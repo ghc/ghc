@@ -13,7 +13,7 @@
 > import DefUtils
 > import Def2Core 	( d2c, defPanic )
 
-> import Type		( glueTyArgs, quantifyTy, mkForallTy, mkTyVarTy,
+> import Type		( glueTyArgs, quantifyTy, mkForallTy, mkTyVarTys,
 >			  TyVarTemplate
 >			)
 > import Digraph	( dfs )
@@ -372,7 +372,7 @@ expressions and function right hand sides that call this function.
 > mkLoopFunApp val_args ty_args f =
 > 	foldl App
 >	  (foldl CoTyApp (Var (DefArgVar f))
->	    (map mkTyVarTy ty_args))
+>	    (mkTyVarTys ty_args))
 >	  	(map mkVar val_args)
 
 -----------------------------------------------------------------------------

@@ -21,7 +21,7 @@ import PrelInfo		( getPrimOpResultInfo, PrimOpResultInfo(..),
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
-import Type		( maybeDataTyCon, mkTyVarTy, applyTy,
+import Type		( maybeAppDataTyCon, mkTyVarTy, mkTyVarTys, applyTy,
 			  splitTyArgs, splitTypeWithDictsAsArgs,
 			  maybeUnpackFunTy, isPrimType
 			)
@@ -349,7 +349,7 @@ Type lambdas
 
 We only eta-reduce a type lambda if all type arguments in the body can
 be eta-reduced. This requires us to collect up all tyvar parameters so
-we can pass them all to @mkCoTyLamTryingEta@.
+we can pass them all to @mkTyLamTryingEta@.
 
 \begin{code}
 simplExpr env (CoTyLam tyvar body) (TypeArg ty : args)
@@ -375,7 +375,7 @@ simplExpr env tylam@(CoTyLam tyvar body) []
       =	simplExpr env body []		`thenSmpl` \ body' ->
 	returnSmpl (
 	   (if switchIsSet env SimplDoEtaReduction
-	   then mkCoTyLamTryingEta
+	   then mkTyLamTryingEta
 	   else mkCoTyLam) (reverse tyvars')  body'
 	)
 
@@ -548,7 +548,7 @@ simplRhsExpr env binder@(id,occ_info) rhs
   = 	-- Deal with the big lambda part
     mapSmpl cloneTyVarSmpl tyvars			`thenSmpl` \ tyvars' ->
     let
-	lam_env  = extendTyEnvList rhs_env (tyvars `zip` (map mkTyVarTy tyvars'))
+	lam_env  = extendTyEnvList rhs_env (tyvars `zip` (mkTyVarTys tyvars'))
     in
 	-- Deal with the little lambda part
 	-- Note that we call simplLam even if there are no binders, in case
@@ -558,7 +558,7 @@ simplRhsExpr env binder@(id,occ_info) rhs
 	-- Put it back together
     returnSmpl (
        (if switchIsSet env SimplDoEtaReduction
-       then mkCoTyLamTryingEta
+       then mkTyLamTryingEta
        else mkCoTyLam) tyvars' lambda'
     )
   where
@@ -569,7 +569,7 @@ simplRhsExpr env binder@(id,occ_info) rhs
     rhs_env | simplIdWantsToBeINLINEd id env = filterUnfoldEnvForInlines env
 	    | otherwise			     = env
 
-    (uvars, tyvars, binders, body) = digForLambdas rhs
+    (uvars, tyvars, binders, body) = collectBinders rhs
 
     min_no_of_args | not (null binders)			&& 	-- It's not a thunk
 		     switchIsSet env SimplDoArityExpand	 	-- Arity expansion on
@@ -618,7 +618,7 @@ simplLam env binders body min_no_of_args
     simplExpr new_env body []		`thenSmpl` \ body' ->
     returnSmpl (
       (if switchIsSet new_env SimplDoEtaReduction
-       then mkCoLamTryingEta
+       then mkValLamTryingEta
        else mkValLam) binders' body'
     )
 
@@ -632,7 +632,7 @@ simplLam env binders body min_no_of_args
     simplExpr new_env body (map (ValArg.VarArg) extra_binders')	`thenSmpl` \ body' ->
     returnSmpl (
       (if switchIsSet new_env SimplDoEtaReduction
-       then mkCoLamTryingEta
+       then mkValLamTryingEta
        else mkValLam) (binders' ++ extra_binders') body'
     )
 

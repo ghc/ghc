@@ -216,8 +216,7 @@ stranal/WwLib.lhs \
 stranal/WorkWrap.lhs \
 \
 profiling/SCCauto.lhs \
-profiling/SCCfinal.lhs \
-profiling/CostCentre.lhs
+profiling/SCCfinal.lhs
 
 #if GhcWithDeforester != YES
 #define __omit_deforester_flag -DOMIT_DEFORESTER=1
@@ -924,7 +923,7 @@ compile(parser/U_ttype,hs,$(PARSER_HS_OPTS) '-#include"hspincl.h"')
 
 /* *** misc *************************************************** */
 
-DEPSRCS = $(ALLSRCS_LHS) $(ALLSRCS_HS)
+DEPSRCS = $(ALLSRCS_LHS) $(ALLSRCS_HS) SIMPL_SRCS_LHS
 
 #if GhcWithHscBuiltViaC == NO
 MKDEPENDHS_OPTS= -I$(MAIN_INCLUDE_DIR) -I$(COMPINFO_DIR) -x HsVersions.h

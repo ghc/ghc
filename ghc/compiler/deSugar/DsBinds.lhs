@@ -34,13 +34,13 @@ import ListSetOps	( minusList, intersectLists )
 import PprType		( GenType, GenTyVar )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
-import Type		( mkTyVarTy, splitSigmaTy )
-import TyVar		( GenTyVar )
+import Type		( mkTyVarTys, splitSigmaTy,
+			  tyVarsOfType, tyVarsOfTypes
+			)
+import TyVar		( tyVarSetToList, GenTyVar )
 import Unique		( Unique )
 import Util		( isIn, panic )
 
-extractTyVarsFromTy = panic "DsBinds.extractTyVarsFromTy"
-extractTyVarsFromTys = panic "DsBinds.extractTyVarsFromTys"
 isDictTy = panic "DsBinds.isDictTy"
 quantifyTy = panic "DsBinds.quantifyTy"
 \end{code}
@@ -158,7 +158,7 @@ dsBinds (AbsBinds tyvars [] local_global_prs inst_binds val_binds)
     binders	    = collectTypedBinders val_binds
     mk_poly_private_binder id = newSysLocalDs (snd (quantifyTy tyvars (idType id)))
 
-    tyvar_tys = map mkTyVarTy tyvars
+    tyvar_tys = mkTyVarTys tyvars
 \end{code}
 
 
@@ -240,10 +240,10 @@ dsBinds (AbsBinds all_tyvars dicts local_global_prs dict_binds val_binds)
     returnDs [ NonRec binder rhs | (binder,rhs) <- core_bind_prs ]
   where
     locals = [local | (local,global) <- local_global_prs]
-    non_ov_tyvar_tys = map mkTyVarTy non_overloaded_tyvars
+    non_ov_tyvar_tys = mkTyVarTys non_overloaded_tyvars
 
-    overloaded_tyvars     = extractTyVarsFromTys (map idType dicts)
-    non_overloaded_tyvars = all_tyvars `minusList` overloaded_tyvars
+    overloaded_tyvars     = tyVarsOfTypes (map idType dicts)
+    non_overloaded_tyvars = all_tyvars `minusList` (tyVarSetToList{-????-} overloaded_tyvars)
 
     binders      = collectTypedBinders val_binds
     mk_binder id = newSysLocalDs (snd (quantifyTy non_overloaded_tyvars (idType id)))
@@ -266,7 +266,7 @@ mkSatTyApp id tys
   = returnDs ty_app	-- Common case
   | otherwise
   = newTyVarsDs (drop (length tys) tvs)	`thenDs` \ tyvars ->
-    returnDs (mkTyLam tyvars (mkTyApp ty_app (map mkTyVarTy tyvars)))
+    returnDs (mkTyLam tyvars (mkTyApp ty_app (mkTyVarTys tyvars)))
   where
     (tvs, theta, tau_ty) = splitSigmaTy (idType id)
     ty_app = mkTyApp (Var id) tys
@@ -351,8 +351,8 @@ dsInstBinds tyvars ((inst, expr) : bs)
 	      subst_item : subst_env)
   where
     inst_ty    = idType inst
-    abs_tyvars = extractTyVarsFromTy inst_ty `intersectLists` tyvars
-    abs_tys    = map mkTyVarTy abs_tyvars
+    abs_tyvars = tyVarsOfType inst_ty `intersectLists` tyvars
+    abs_tys    = mkTyVarTys abs_tyvars
     (_, poly_inst_ty) = quantifyTy abs_tyvars inst_ty
 
     ------------------------

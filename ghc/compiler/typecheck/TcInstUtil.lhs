@@ -34,7 +34,7 @@ import PprType		( GenClass, GenType, GenTyVar )
 import Pretty
 import SpecEnv		( SpecEnv(..), nullSpecEnv, addOneToSpecEnv )
 import SrcLoc		( SrcLoc )
-import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTy,
+import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys,
 			  splitForAllTy, instantiateTy, matchTy, ThetaType(..) )
 import TyVar		( GenTyVar )
 import Unique		( Unique )
@@ -272,9 +272,9 @@ addClassInstance
 	         Succeeded spec_env' -> spec_env' )
         where
 	  (local_tyvars, _) = splitForAllTy (getClassOpLocalType op)
-	  local_tyvar_tys   = map mkTyVarTy local_tyvars
+	  local_tyvar_tys   = mkTyVarTys local_tyvars
 	  rhs = mkValLam [dict] (mkTyApp (mkTyApp (Var meth_id) 
-						  (map mkTyVarTy inst_tyvars)) 
+						  (mkTyVarTys inst_tyvars)) 
 				         local_tyvar_tys)
     in
     returnTc (class_inst_env', op_spec_envs')

@@ -500,7 +500,7 @@ prbind(b)
 			  PUTTAG('e');
 			  printf("#%lu\t",gibindline(b));
 			  pid(gibindfile(b));
-			  pid(gibindmod(b));
+			  pid(gibindimod(b));
 			  /* plist(pentid,giebindexp(b)); ??? */
 			  /* prbind(giebinddef(b)); ???? */
 			  break;
@@ -661,12 +661,12 @@ ppragma(p)
 				break;
 
       case iinst_simpl_pragma:	PUTTAGSTR("Pis");
-				pid(gprag_imod_simpl(p));
-				ppragma(gprag_dfun_simpl(p));
+/*				pid(gprag_imod_simpl(p));
+*/				ppragma(gprag_dfun_simpl(p));
 				break;
       case iinst_const_pragma:	PUTTAGSTR("Pic");
-				pid(gprag_imod_const(p));
-				ppragma(gprag_dfun_const(p));
+/*				pid(gprag_imod_const(p));
+*/				ppragma(gprag_dfun_const(p));
 				plist(ppragma, gprag_constms(p));
 				break;
 

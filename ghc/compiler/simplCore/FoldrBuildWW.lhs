@@ -108,7 +108,7 @@ try_split_bind id expr =
 	|  FBGoodProd == prod ->
 {-      || any (== FBGoodConsum) consum -}
       let
-	(use_args,big_args,args,body) = digForLambdas expr'
+	(use_args,big_args,args,body) = collectBinders expr'
       in
 	if length args /= length consum   -- funny number of arguments
 	then returnWw [(id,expr')]

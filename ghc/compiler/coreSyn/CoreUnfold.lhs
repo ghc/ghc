@@ -248,7 +248,7 @@ calcUnfoldingGuidance
 
 calcUnfoldingGuidance scc_s_OK bOMB_OUT_SIZE expr
   = let
-    	(use_binders, ty_binders, val_binders, body) = digForLambdas expr
+    	(use_binders, ty_binders, val_binders, body) = collectBinders expr
     in
     case (sizeExpr scc_s_OK bOMB_OUT_SIZE val_binders body) of
 
@@ -292,7 +292,7 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
       = if scc_s_OK then size_up body else Nothing
 
     size_up (Con con args) = -- 1 + # of val args
-			     sizeN (1 + length [ va | va <- args, isValArg va ])
+			     sizeN (1 + numValArgs args)
     size_up (Prim op args) = sizeN op_cost -- NB: no charge for PrimOp args
       where
 	op_cost = if primOpCanTriggerGC op
@@ -303,7 +303,7 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
 
     size_up expr@(Lam _ _)
       = let
-	    (uvars, tyvars, args, body) = digForLambdas expr
+	    (uvars, tyvars, args, body) = collectBinders expr
 	in
 	size_up body `addSizeN` length args
 
@@ -528,7 +528,7 @@ ment_expr (Lit l) = consider_lit l
 
 ment_expr expr@(Lam _ _)
   = let
-	(uvars, tyvars, args, body) = digForLambdas expr
+	(uvars, tyvars, args, body) = collectBinders expr
     in
     extractIdsUf args		`thenUf` \ bs_ids ->
     addInScopesUf bs_ids (

@@ -25,7 +25,7 @@ import PrelInfo		( PrimOp(..),
 			  floatTyCon, wordTyCon, addrTyCon,
 			  PrimRep
 			)
-import Type		( isPrimType, maybeDataTyCon,
+import Type		( isPrimType, maybeAppDataTyCon,
 			  maybeSingleConstructorTyCon,
 			  returnsRealWorld,
 			  isEnumerationTyCon, TyVarTemplate, TyCon
@@ -833,7 +833,7 @@ findRecDemand strflags seen str_fn abs_fn ty
 
     else -- It's strict (or we're pretending it is)!
 
-       case maybeDataTyCon ty of
+       case maybeAppDataTyCon ty of
 
 	 Nothing    -> wwStrict
 
@@ -874,7 +874,7 @@ findRecDemand strflags seen str_fn abs_fn ty
     (all_strict, num_strict) = strflags
 
     is_numeric_type ty
-      = case (maybeDataTyCon ty) of -- NB: duplicates stuff done above
+      = case (maybeAppDataTyCon ty) of -- NB: duplicates stuff done above
 	  Nothing -> False
 	  Just (tycon, _, _)
 	    | tycon `is_elem`

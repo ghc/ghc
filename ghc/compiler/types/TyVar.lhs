@@ -15,8 +15,10 @@ module TyVar (
 	growTyVarEnvList, isNullTyVarEnv, lookupTyVarEnv,
 
 	GenTyVarSet(..), TyVarSet(..),
-	emptyTyVarSet, singletonTyVarSet, unionTyVarSets, tyVarListToSet,
-	tyVarSetToList, elementOfTyVarSet, minusTyVarSet, isEmptyTyVarSet
+	emptyTyVarSet, singletonTyVarSet, unionTyVarSets,
+	unionManyTyVarSets, intersectTyVarSets, mkTyVarSet,
+	tyVarSetToList, elementOfTyVarSet, minusTyVarSet,
+	isEmptyTyVarSet
   ) where
 
 CHK_Ubiq() 	-- debugging consistency check
@@ -27,11 +29,10 @@ import Usage		( GenUsage, Usage(..), usageOmega )
 import Kind		( Kind, mkBoxedTypeKind )
 
 -- others
-import UniqSet		( uniqSetToList, emptyUniqSet, singletonUniqSet, minusUniqSet,
-			  unionUniqSets, elementOfUniqSet, isEmptyUniqSet, mkUniqSet,
-			  UniqSet(..) )
+import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
-			  plusUFM, sizeUFM, UniqFM )
+			  plusUFM, sizeUFM, UniqFM
+			)
 import Maybes		( Maybe(..) )
 import NameTypes	( ShortName )
 import Pretty		( Pretty(..), PrettyRep, ppBeside, ppPStr )
@@ -107,22 +108,26 @@ type GenTyVarSet flexi	= UniqSet (GenTyVar flexi)
 type TyVarSet		= UniqSet TyVar
 
 emptyTyVarSet     :: GenTyVarSet flexi
+intersectTyVarSets:: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
 unionTyVarSets    :: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
+unionManyTyVarSets:: [GenTyVarSet flexi] -> GenTyVarSet flexi
 tyVarSetToList    :: GenTyVarSet flexi -> [GenTyVar flexi]
 singletonTyVarSet :: GenTyVar flexi -> GenTyVarSet flexi
 elementOfTyVarSet :: GenTyVar flexi -> GenTyVarSet flexi -> Bool
 minusTyVarSet	  :: GenTyVarSet flexi -> GenTyVarSet flexi -> GenTyVarSet flexi
 isEmptyTyVarSet   :: GenTyVarSet flexi -> Bool
-tyVarListToSet	  :: [GenTyVar flexi] -> GenTyVarSet flexi
+mkTyVarSet	  :: [GenTyVar flexi] -> GenTyVarSet flexi
 
 emptyTyVarSet  	  = emptyUniqSet
 singletonTyVarSet = singletonUniqSet
+intersectTyVarSets= intersectUniqSets
 unionTyVarSets 	  = unionUniqSets
+unionManyTyVarSets= unionManyUniqSets
 tyVarSetToList 	  = uniqSetToList
 elementOfTyVarSet = elementOfUniqSet
 minusTyVarSet	  = minusUniqSet
 isEmptyTyVarSet   = isEmptyUniqSet
-tyVarListToSet	  = mkUniqSet
+mkTyVarSet	  = mkUniqSet
 \end{code}
 
 Instance delarations

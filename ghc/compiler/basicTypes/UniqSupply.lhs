@@ -14,7 +14,7 @@ module UniqSupply (
 
 	UniqSM(..),		-- type: unique supply monad
 	initUs, thenUs, returnUs,
-	mapUs, mapAndUnzipUs,
+	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 
 	mkSplitUniqSupply,
 	splitUniqSupply,
@@ -156,12 +156,19 @@ mapUs f (x:xs)
     returnUs (r:rs)
 
 mapAndUnzipUs  :: (a -> UniqSM (b,c))   -> [a] -> UniqSM ([b],[c])
+mapAndUnzip3Us :: (a -> UniqSM (b,c,d)) -> [a] -> UniqSM ([b],[c],[d])
 
 mapAndUnzipUs f [] = returnUs ([],[])
 mapAndUnzipUs f (x:xs)
   = f x		    	`thenUs` \ (r1,  r2)  ->
     mapAndUnzipUs f xs	`thenUs` \ (rs1, rs2) ->
     returnUs (r1:rs1, r2:rs2)
+
+mapAndUnzip3Us f [] = returnUs ([],[],[])
+mapAndUnzip3Us f (x:xs)
+  = f x		    	`thenUs` \ (r1,  r2,  r3)  ->
+    mapAndUnzip3Us f xs	`thenUs` \ (rs1, rs2, rs3) ->
+    returnUs (r1:rs1, r2:rs2, r3:rs3)
 \end{code}
 
 %************************************************************************

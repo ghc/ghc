@@ -1,11 +1,13 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 %************************************************************************
 %*									*
 \section[SAT]{Static Argument Transformation pass}
 %*									*
 %************************************************************************
+
+96/03: We aren't using the static-argument transformation right now.
 
 May be seen as removing invariants from loops:
 Arguments of recursive functions that do not change in recursive
@@ -38,11 +40,14 @@ Experimental Evidence: Heap: +/- 7%
 \begin{code}
 #include "HsVersions.h"
 
-module SAT (
-	doStaticArgs
+module SAT ( doStaticArgs ) where
 
-	-- and to make the interface self-sufficient...
-    ) where
+import Ubiq{-uitous-}
+import Util		( panic )
+
+doStaticArgs = panic "SAT.doStaticArgs (ToDo)"
+
+{- LATER: to end of file:
 
 import Maybes		( Maybe(..) )
 import SATMonad
@@ -205,5 +210,5 @@ getAppArgs app
     get e
       = satExpr e	`thenSAT` \ e2 ->
 	returnSAT (e2, Nothing)
+-}
 \end{code}
-

@@ -21,7 +21,7 @@ import TcMonad
 import Inst		( InstanceMapper(..) )
 import TcClassDcl	( tcClassDecl1 )
 import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,
-			  tcExtendGlobalValEnv, tcExtendKindEnv,
+			  tcExtendGlobalValEnv, 
 			  tcTyVarScope, tcGetEnv )
 import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl )
@@ -82,14 +82,18 @@ Dealing with a group
 \begin{code}
 tcGroup :: InstanceMapper -> Bag Decl -> TcM s (TcEnv s)
 tcGroup inst_mapper decls
-  = fixTc ( \ ~(tycons,classes,_) ->
+  = pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
 
-      pprTrace "tcGroup: " (ppCat (map (fst.fmt_decl) (bagToList decls))) $
+	-- TIE THE KNOT
+    fixTc ( \ ~(tycons,classes,_) ->
 
 		-- EXTEND TYPE AND CLASS ENVIRONMENTS
 		-- including their data constructors and class operations
-      tcExtendTyConEnv tycons					  $
-      tcExtendClassEnv classes					  $
+		-- NB: it's important that the tycons and classes come back in just
+		-- the same order from this fix as from get_binders, so that these
+		-- extend-env things work properly.  A bit UGH-ish.
+      tcExtendTyConEnv tycon_names_w_arities tycons		  $
+      tcExtendClassEnv class_names classes			  $
       tcExtendGlobalValEnv (concat (map getTyConDataCons tycons)) $
       tcExtendGlobalValEnv (concat (map getClassSelIds classes))  $
 
@@ -98,13 +102,6 @@ tcGroup inst_mapper decls
 
 		-- DEAL WITH TYPE VARIABLES
       tcTyVarScope tyvar_names 			( \ tyvars ->
-
-		-- MANUFACTURE NEW KINDS, AND EXTEND KIND ENV
-	newKindVars (length tycon_names)	`thenNF_Tc` \ tycon_kinds ->
-	newKindVars (length class_names)	`thenNF_Tc` \ class_kinds ->
-	tcExtendKindEnv tycon_names tycon_kinds		$
-	tcExtendKindEnv class_names class_kinds		$
-
 
 		-- DEAL WITH THE DEFINITIONS THEMSELVES
 	foldBag combine (tcDecl inst_mapper)
@@ -117,7 +114,7 @@ tcGroup inst_mapper decls
     returnTc final_env
 
   where
-    (tyvar_names, tycon_names, class_names) = get_binders decls
+    (tyvar_names, tycon_names_w_arities, class_names) = get_binders decls
 
     combine do_a do_b
       = do_a `thenTc` \ (a1,a2) ->
@@ -238,6 +235,9 @@ set_name name = singletonUniqSet (getItsUnique name)
 set_to_bag set = listToBag (uniqSetToList set)
 \end{code}
 
+
+get_binders
+~~~~~~~~~~~
 Extract *binding* names from type and class decls.  Type variables are
 bound in type, data, newtype and class declarations and the polytypes
 in the class op sigs.
@@ -260,9 +260,9 @@ Monad c in bop's type signature means that D must have kind Type->Type.
 
 \begin{code}
 get_binders :: Bag Decl
-	    -> ([Name],	-- TyVars;  no dups
-		[Name],	-- Tycons;  no dups
-		[Name])	-- Classes; no dups
+	    -> ([Name],			-- TyVars;  no dups
+		[(Name, Maybe Arity)],	-- Tycons;  no dups; arities for synonyms
+		[Name])			-- Classes; no dups
 
 get_binders decls = (bagToList tyvars, bagToList tycons, bagToList classes)
   where
@@ -274,21 +274,19 @@ get_binders decls = (bagToList tyvars, bagToList tycons, bagToList classes)
       = (a1 `unionBags` b1, a2 `unionBags` b2, a3 `unionBags` b3)
 
 get_binders1 (TyD (TyData _ name tyvars _ _ _ _))
- = (listToBag tyvars, unitBag name, emptyBag)
+ = (listToBag tyvars, unitBag (name,Nothing), emptyBag)
 get_binders1 (TyD (TyNew _ name tyvars _ _ _ _))
- = (listToBag tyvars, unitBag name, emptyBag)
+ = (listToBag tyvars, unitBag (name,Nothing), emptyBag)
 get_binders1 (TyD (TySynonym name tyvars _ _))
- = (listToBag tyvars, unitBag name, emptyBag)
+ = (listToBag tyvars, unitBag (name, Just (length tyvars)), emptyBag)
 get_binders1 (ClD (ClassDecl _ name tyvar sigs _ _ _))
  = (unitBag tyvar `unionBags` sigs_tvs sigs,
     emptyBag, unitBag name)
 
--- ToDo: will this duplicate the class tyvar
-
 sigs_tvs sigs = unionManyBags (map sig_tvs sigs)
   where 
     sig_tvs (ClassOpSig _ ty  _ _) = pty_tvs ty
-    pty_tvs (HsForAllTy tvs _ _)   = listToBag tvs 
+    pty_tvs (HsForAllTy tvs _ _)   = listToBag tvs 	-- tvs doesn't include the class tyvar
 \end{code}
 
 

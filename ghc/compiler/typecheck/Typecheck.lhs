@@ -50,10 +50,10 @@ typecheckModule
 	 [(Id, TypecheckedHsExpr)] -- constant instance binds
 	),
 
-        ([RenamedFixityDecl], [Id], UniqFM TyCon, UniqFM Class, Bag InstInfo),
+        ([RenamedFixityDecl], [Id], [TyCon], [Class], Bag InstInfo),
 				-- things for the interface generator
 
-        (UniqFM TyCon, UniqFM Class),
+        ([TyCon], [Class]),
 				-- environments of info from this module only
 
 	FiniteMap TyCon [(Bool, [Maybe Type])],

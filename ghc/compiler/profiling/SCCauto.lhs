@@ -73,7 +73,7 @@ addAutoCostCentres mod_name binds
 
 	scc_rhs rhs
 	  = let
-		(usevars, tyvars, vars, body) = digForLambdas rhs
+		(usevars, tyvars, vars, body) = collectBinders rhs
 	    in
 	    case body of
 	      SCC _ _ -> rhs -- leave it

@@ -206,7 +206,7 @@ tryWW fn_id rhs
 
 	-- OK, it looks as if a worker is worth a try
 	let
-	     (uvars, tyvars, args, body) = digForLambdas rhs
+	     (uvars, tyvars, args, body) = collectBinders rhs
 	     body_ty			 = coreExprType body
 	in
 	uniqSMtoWwM (mkWwBodies body_ty tyvars args args_info) `thenWw` \ result ->

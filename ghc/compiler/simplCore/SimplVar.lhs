@@ -199,7 +199,7 @@ considerUnfolding env var args txt_occ form_summary template guidance
 
     rhs_looks_like_a_Con
       = let
-	    (_,_,val_binders,body) = digForLambdas template
+	    (_,_,val_binders,body) = collectBinders template
     	in
     	case (val_binders, body) of
     	  ([], Con _ _ _) -> True

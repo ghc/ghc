@@ -24,6 +24,7 @@ import TcHsSyn		( TcIdOcc )
 import TcMonad
 import Inst		( InstOrigin(..), InstanceMapper(..) )
 import TcEnv		( getEnv_TyCons )
+import TcKind		( TcKind )
 import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
@@ -47,7 +48,7 @@ import ProtoName	( eqProtoName, ProtoName(..), Name )
 import SrcLoc		( mkGeneratedSrcLoc, mkUnknownSrcLoc, SrcLoc )
 import TyCon		( getTyConTyVars, getTyConDataCons, getTyConDerivings,
 			  maybeTyConSingleCon, isEnumerationTyCon, TyCon )
-import Type		( GenType(..), TauType(..), mkTyVarTy, applyTyCon,
+import Type		( GenType(..), TauType(..), mkTyVarTys, applyTyCon,
 			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
 			  getAppTyCon, getAppDataTyCon )
 import TyVar		( GenTyVar )
@@ -249,7 +250,7 @@ makeDerivEqns :: TcM s [DerivEqn]
 makeDerivEqns
   = tcGetEnv `thenNF_Tc` \ env ->
     let
-	tycons = eltsUFM (getEnv_TyCons env)
+	tycons = getEnv_TyCons env
 	think_about_deriving = need_deriving tycons
     in
     mapTc (chk_out think_about_deriving) think_about_deriving `thenTc_`
@@ -303,7 +304,7 @@ makeDerivEqns
       = (clas, tycon, tyvars, constraints)
       where
 	tyvars    = getTyConTyVars tycon	-- ToDo: Do we need new tyvars ???
-	tyvar_tys = map mkTyVarTy tyvars
+	tyvar_tys = mkTyVarTys tyvars
 	data_cons = getTyConDataCons tycon
 	constraints = concat (map mk_constraints data_cons)
 
@@ -420,7 +421,7 @@ add_solns modname inst_infos_in eqns solns
     all_inst_infos = inst_infos_in `unionBags` listToBag new_inst_infos
 
     mk_deriv_inst_info (clas, tycon, tyvars, _) theta
-      = InstInfo clas tyvars (applyTyCon tycon (map mkTyVarTy tyvars))
+      = InstInfo clas tyvars (applyTyCon tycon (mkTyVarTys tyvars))
 		 theta
 		 theta			-- Blarg.  This is the dfun_theta slot,
 					-- which is needed by buildInstanceEnv;

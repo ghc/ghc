@@ -47,7 +47,7 @@ import Pretty
 import PprType		( GenType, GenTyVar, GenClassOp )
 import SpecEnv		( SpecEnv(..) )
 import SrcLoc		( mkGeneratedSrcLoc )
-import Type		( mkFunTy, mkTyVarTy, mkDictTy,
+import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
 			  mkForAllTy, mkSigmaTy, splitSigmaTy)
 import TysWiredIn	( stringTy )
 import TyVar		( GenTyVar )			 
@@ -283,7 +283,7 @@ buildSelectors :: Class			-- The class object
 buildSelectors clas clas_tyvar scs sc_sel_ids ops op_sel_ids
   =
 	-- Make new Ids for the components of the dictionary
-    mapNF_Tc (tcInstType [] . getClassOpLocalType) ops	`thenNF_Tc` \ op_tys ->
+    mapNF_Tc (tcInstType [] . getClassOpLocalType) ops  `thenNF_Tc` \ op_tys ->
 
     newLocalIds (map getClassOpString ops) op_tys	`thenNF_Tc` \ method_ids ->
 
@@ -296,13 +296,11 @@ buildSelectors clas clas_tyvar scs sc_sel_ids ops op_sel_ids
 
 	 -- Make suitable bindings for the selectors
     let
-        tc_method_ids = map TcId method_ids
-
 	mk_sel sel_id method_or_dict
-	  = mkSelBind sel_id clas_tyvar clas_dict dict_ids tc_method_ids method_or_dict
+	  = mkSelBind sel_id clas_tyvar clas_dict dict_ids method_ids method_or_dict
     in
-    listNF_Tc (zipWithEqual mk_sel op_sel_ids tc_method_ids) `thenNF_Tc` \ op_sel_binds ->
-    listNF_Tc (zipWithEqual mk_sel sc_sel_ids dict_ids)      `thenNF_Tc` \ sc_sel_binds ->
+    listNF_Tc (zipWithEqual mk_sel op_sel_ids method_ids) `thenNF_Tc` \ op_sel_binds ->
+    listNF_Tc (zipWithEqual mk_sel sc_sel_ids dict_ids)   `thenNF_Tc` \ sc_sel_binds ->
 
     returnNF_Tc (SingleBind (
 		 NonRecBind (
@@ -366,7 +364,7 @@ mkSelBind :: Id 			-- the selector id
 mkSelBind sel_id clas_tyvar clas_dict dicts methods method_or_dict@(TcId op)
   = let
 	(op_tyvars,op_theta,op_tau) = splitSigmaTy (idType op)
-	op_tys = map mkTyVarTy op_tyvars
+	op_tys = mkTyVarTys op_tyvars
     in
     newDicts ClassDeclOrigin op_theta	`thenNF_Tc` \ (_, op_dicts) ->
 

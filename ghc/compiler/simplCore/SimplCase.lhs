@@ -20,7 +20,7 @@ import PrelInfo		( getPrimOpResultInfo, PrimOpResultInfo(..), PrimOp,
 			)
 import Type		( splitSigmaTy, splitTyArgs, glueTyArgs,
 			  getTyConFamilySize, isPrimType,
-			  maybeDataTyCon
+			  maybeAppDataTyCon
 			)
 import Literal		( isNoRepLit, Literal )
 import CmdLineOpts	( SimplifierSwitch(..) )
@@ -463,7 +463,7 @@ bindLargeRhs env args rhs_ty rhs_c
     let
 	final_rhs
 	  = (if switchIsSet new_env SimplDoEtaReduction
-	     then mkCoLamTryingEta
+	     then mkValLamTryingEta
 	     else mkValLam) used_args' rhs'
     in
     returnSmpl (NonRec rhs_fun_id final_rhs,
@@ -789,7 +789,7 @@ mkCoCase scrut (AlgAlts outer_alts
 	 v | scrut_is_var = Var scrut_var
 	   | otherwise    = Con con arg_tys (map VarArg args)
 
-    arg_tys = case maybeDataTyCon (idType deflt_var) of
+    arg_tys = case maybeAppDataTyCon (idType deflt_var) of
 		Just (_, arg_tys, _) -> arg_tys
 
 mkCoCase scrut (PrimAlts

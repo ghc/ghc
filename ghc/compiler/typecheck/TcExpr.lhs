@@ -32,6 +32,7 @@ import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
 import TcType		( TcType(..), TcMaybe(..), tcReadTyVar,
 			  tcInstType, tcInstTcType, 
 			  tcInstTyVar, newTyVarTy, zonkTcTyVars )
+import TcKind		( TcKind )
 
 import Class		( Class(..), getClassSig )
 import Id		( Id(..), GenId, idType )
@@ -41,11 +42,11 @@ import PrelInfo		( intPrimTy, charPrimTy, doublePrimTy,
 			  floatPrimTy, addrPrimTy, addrTy,
 			  boolTy, charTy, stringTy, mkListTy,
 			  mkTupleTy, mkPrimIoTy )
-import Type		( mkFunTy, mkAppTy, mkTyVarTy,
+import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  getTyVar_maybe, getFunTy_maybe,
 			  splitForAllTy, splitRhoTy, splitSigmaTy,
 			  isTauTy, mkFunTys, tyVarsOfType, getForAllTy_maybe )
-import TyVar		( GenTyVar, TyVarSet(..), unionTyVarSets, tyVarListToSet )
+import TyVar		( GenTyVar, TyVarSet(..), unionTyVarSets, mkTyVarSet )
 import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
@@ -432,7 +433,7 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty)
 
 	-- Check overloading constraints
    tcSimplifyAndCheck
-	(tyVarListToSet sig_tyvars')
+	(mkTyVarSet sig_tyvars')
 	sig_dicts lie				`thenTc_`
 
 	-- If everything is ok, return the stuff unchanged, except for
@@ -576,7 +577,7 @@ tcArg expected_arg_ty arg
 	-- Even if there isn't, there may be some Insts which mention the arg_tyvars,
 	-- but which, on simplification, don't actually need a dictionary involving
 	-- the tyvar.  So we have to do a proper simplification right here.
-    tcSimplifyRank2 (tyVarListToSet arg_tyvars') 
+    tcSimplifyRank2 (mkTyVarSet arg_tyvars') 
 		    lie_arg				`thenTc` \ (free_insts, inst_binds) ->
 
 	-- This HsLet binds any Insts which came out of the simplification.
@@ -616,7 +617,7 @@ tcId name
     let
 	(tyvars, rho) = splitForAllTy ty
 	(theta,tau)   = splitRhoTy rho
-	arg_tys	      = map mkTyVarTy tyvars
+	arg_tys	      = mkTyVarTys tyvars
     in
 	-- Is it overloaded?
     case theta of

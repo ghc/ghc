@@ -67,7 +67,7 @@ dsListComp expr quals
     new_alpha_tyvar :: DsM (TyVar, Type)
     new_alpha_tyvar
       = newTyVarsDs [alphaTyVar]    `thenDs` \ [new_ty] ->
-	returnDs (new_ty,mkTyVarTy new_ty)
+	returnDs (new_ty, mkTyVarTy new_ty)
 \end{code}
 
 %************************************************************************

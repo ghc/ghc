@@ -110,12 +110,14 @@ import PprStyle
 import Pretty
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( TyCon, mkTupleTyCon, getTyConDataCons )
-import Type		( mkSigmaTy, mkTyVarTy, mkFunTys, mkDictTy,
-			  applyTyCon, isPrimType, instantiateTy, 
-			  GenType, ThetaType(..), TauType(..), Type(..) )
-import TyVar		( GenTyVar, alphaTyVars )
+import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
+			  applyTyCon, isPrimType, instantiateTy,
+			  tyVarsOfType,
+			  GenType, ThetaType(..), TauType(..), Type(..)
+			)
+import TyVar		( GenTyVar, alphaTyVars, isEmptyTyVarSet )
 import UniqFM
-import UniqSet		( UniqSet(..) )
+import UniqSet		-- practically all of it
 import Unique		( Unique, mkTupleDataConUnique, pprUnique, showUnique )
 import Util		( mapAccumL, nOfThem, panic, pprPanic, assertPanic )
 \end{code}
@@ -480,7 +482,7 @@ toplevelishId (Id _ _ details _ _)
     chk (PreludeId  _)	    	  = True
     chk (TopLevId   _)	    	  = True	-- NB: see notes
     chk (SuperDictSelId _ _)	  = True
-    chk (MethodSelId _ _)		  = True
+    chk (MethodSelId _ _)	  = True
     chk (DefaultMethodId _ _ _)   = True
     chk (DictFunId     _ _ _ _)	  = True
     chk (ConstMethodId _ _ _ _ _) = True
@@ -501,7 +503,7 @@ idHasNoFreeTyVars (Id _ _ details _ info)
     chk (PreludeId  _)	    	  = True
     chk (TopLevId   _)	    	  = True
     chk (SuperDictSelId _ _)	  = True
-    chk (MethodSelId _ _)		  = True
+    chk (MethodSelId _ _)	  = True
     chk (DefaultMethodId _ _ _)   = True
     chk (DictFunId     _ _ _ _)	  = True
     chk (ConstMethodId _ _ _ _ _) = True
@@ -814,10 +816,11 @@ externallyVisibleId id@(Id _ _ details _ _)
 \end{code}
 
 \begin{code}
-{-LATER:
 idWantsToBeINLINEd :: Id -> Bool
 
 idWantsToBeINLINEd id
+  = panic "Id.idWantsToBeINLINEd"
+{- LATER:
   = case (getIdUnfolding id) of
       IWantToBeINLINEd _ -> True
       _ -> False
@@ -1176,11 +1179,14 @@ updateIdType (Id u _ info details) ty = Id u ty info details
 \end{code}
 
 \begin{code}
-no_free_tvs ty = panic "Id:no_free_tvs" -- null (extractTyVarsFromTy ty)
+type MyTy a b = GenType (GenTyVar a) b
+type MyId a b = GenId (MyTy a b)
+
+no_free_tvs ty = isEmptyTyVarSet (tyVarsOfType ty)
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
-mkSysLocal, mkUserLocal :: FAST_STRING -> Unique -> ty -> SrcLoc -> GenId ty
+mkSysLocal, mkUserLocal :: FAST_STRING -> Unique -> MyTy a b -> SrcLoc -> MyId a b
 
 mkSysLocal str uniq ty loc
   = Id uniq ty (SysLocalId (mkShortName str loc) (no_free_tvs ty)) NoPragmaInfo noIdInfo
@@ -1189,7 +1195,7 @@ mkUserLocal str uniq ty loc
   = Id uniq ty (LocalId (mkShortName str loc) (no_free_tvs ty)) NoPragmaInfo noIdInfo
 
 -- mkUserId builds a local or top-level Id, depending on the name given
-mkUserId :: Name -> ty -> PragmaInfo -> GenId ty
+mkUserId :: Name -> MyTy a b -> PragmaInfo -> MyId a b
 mkUserId (Short uniq short) ty pragma_info
   = Id uniq ty (LocalId short (no_free_tvs ty)) pragma_info noIdInfo
 mkUserId (ValName uniq full) ty pragma_info
@@ -1342,7 +1348,7 @@ mkDataCon k n stricts tvs ctxt args_tys tycon
 
     type_of_constructor
       = mkSigmaTy tvs ctxt
-	(mkFunTys args_tys (applyTyCon tycon (map mkTyVarTy tvs)))
+	(mkFunTys args_tys (applyTyCon tycon (mkTyVarTys tvs)))
 
     datacon_info = noIdInfo `addInfo_UF` unfolding
 			    `addInfo` mkArityInfo arity
@@ -1358,7 +1364,7 @@ mkDataCon k n stricts tvs ctxt args_tys tycon
 	-- else -- do some business...
 	let
 	    (tyvars, dict_vars, vars) = mk_uf_bits tvs ctxt args_tys tycon
-	    tyvar_tys = map mkTyVarTy tyvars
+	    tyvar_tys = mkTyVarTys tyvars
 	in
 	BIND (Con data_con tyvar_tys [VarArg v | v <- vars]) _TO_ plain_Con ->
 
@@ -1406,7 +1412,7 @@ mkTupleCon arity
 		   (mkFunTys tyvar_tys (applyTyCon tycon tyvar_tys))
     tycon	= mkTupleTyCon arity
     tyvars	= take arity alphaTyVars
-    tyvar_tys	= map mkTyVarTy tyvars
+    tyvar_tys	= mkTyVarTys tyvars
 
     tuplecon_info
       = noIdInfo `addInfo_UF` unfolding
@@ -1421,7 +1427,7 @@ mkTupleCon arity
 	-- else -- do some business...
 	let
 	    (tyvars, dict_vars, vars) = mk_uf_bits arity
-	    tyvar_tys = map mkTyVarTy tyvars
+	    tyvar_tys = mkTyVarTys tyvars
 	in
 	BIND (Con data_con tyvar_tys [VarArg v | v <- vars]) _TO_ plain_Con ->
 
@@ -1463,7 +1469,7 @@ getDataConSig (Id _ _ (TupleConId arity) _ _)
   = (tyvars, [], tyvar_tys, mkTupleTyCon arity)
   where
     tyvars	= take arity alphaTyVars
-    tyvar_tys	= map mkTyVarTy tyvars
+    tyvar_tys	= mkTyVarTys tyvars
 \end{code}
 
 {- LATER
@@ -1758,7 +1764,7 @@ is_prelude_core_ty :: Type -> Bool
 is_prelude_core_ty inst_ty
   = panic "Id.is_prelude_core_ty"
 {- LATER
-  = case maybeDataTyCon inst_ty of
+  = case maybeAppDataTyCon inst_ty of
       Just (tycon,_,_) -> fromPreludeCore tycon
       Nothing 	       -> panic "Id: is_prelude_core_ty"
 -}
@@ -2042,4 +2048,26 @@ modifyIdEnv env mangle_fn key
 \begin{code}
 type GenIdSet ty = UniqSet (GenId ty)
 type IdSet 	 = UniqSet (GenId Type)
+
+emptyIdSet	:: GenIdSet ty
+intersectIdSets	:: GenIdSet ty -> GenIdSet ty -> GenIdSet ty
+unionIdSets	:: GenIdSet ty -> GenIdSet ty -> GenIdSet ty
+unionManyIdSets	:: [GenIdSet ty] -> GenIdSet ty
+idSetToList	:: GenIdSet ty -> [GenId ty]
+singletonIdSet	:: GenId ty -> GenIdSet ty
+elementOfIdSet	:: GenId ty -> GenIdSet ty -> Bool
+minusIdSet	:: GenIdSet ty -> GenIdSet ty -> GenIdSet ty
+isEmptyIdSet	:: GenIdSet ty -> Bool
+mkIdSet		:: [GenId ty] -> GenIdSet ty
+
+emptyIdSet	= emptyUniqSet
+singletonIdSet	= singletonUniqSet
+intersectIdSets	= intersectUniqSets
+unionIdSets	= unionUniqSets
+unionManyIdSets	= unionManyUniqSets
+idSetToList	= uniqSetToList
+elementOfIdSet	= elementOfUniqSet
+minusIdSet	= minusUniqSet
+isEmptyIdSet	= isEmptyUniqSet
+mkIdSet		= mkUniqSet
 \end{code}

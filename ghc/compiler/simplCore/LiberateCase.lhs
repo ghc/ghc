@@ -1,14 +1,21 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994
+% (c) The AQUA Project, Glasgow University, 1994-1996
 %
 \section[LiberateCase]{Unroll recursion to allow evals to be lifted from a loop}
 
+96/03: We aren't using this at the moment
 
 \begin{code}
 #include "HsVersions.h"
 
 module LiberateCase ( liberateCase ) where
 
+import Ubiq{-uitous-}
+import Util		( panic )
+
+liberateCase = panic "LiberateCase.liberateCase: ToDo"
+
+{- LATER: to end of file:
 import CoreUnfold	( UnfoldingGuidance(..) )
 import Id		( localiseId, toplevelishId{-debugging-} )
 import Maybes
@@ -327,4 +334,5 @@ freeScruts (LibCaseEnv bomb lvl lvl_env rec_env scruts) rec_bind_lvl
   = not (null free_scruts)
   where
     free_scruts = [v | (v,lvl) <- scruts, lvl > rec_bind_lvl]
+-}
 \end{code}

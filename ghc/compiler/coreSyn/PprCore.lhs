@@ -335,7 +335,7 @@ ppr_expr pe (Prim prim args)
 
 ppr_expr pe expr@(Lam _ _)
   = let
-	(uvars, tyvars, vars, body) = digForLambdas expr
+	(uvars, tyvars, vars, body) = collectBinders expr
     in
     ppHang (ppCat [pp_vars SLIT("_/u\\_") (puvar    pe) uvars,
 		   pp_vars SLIT("_/\\_")  (ptyvar   pe) tyvars,
