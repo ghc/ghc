@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.39 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Stats.c,v 1.40 2001/11/27 16:35:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -106,7 +106,7 @@ static TICK_TYPE HCe_start_time, HCe_tot_time = 0;   // heap census prof elap ti
 #endif
 
 #ifdef PROFILING
-#define PROF_VAL(x)   x
+#define PROF_VAL(x)   (x)
 #else
 #define PROF_VAL(x)   0
 #endif
@@ -354,9 +354,10 @@ stat_startExit(void)
 {
     getTimes();
     MutElapsedStamp = CurrentElapsedTime;
-    MutElapsedTime = CurrentElapsedTime - GCe_tot_time - InitElapsedStamp;
+    MutElapsedTime = CurrentElapsedTime - GCe_tot_time -
+	PROF_VAL(RPe_tot_time + HCe_tot_time) - InitElapsedStamp;
     if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
-    
+
     /* for SMP, we don't know the mutator time yet, we have to inspect
      * all the running threads to find out, and they haven't stopped
      * yet.  So we just timestamp MutUserTime at this point so we can
