@@ -237,7 +237,7 @@ castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- parameterised by one type into another type.
 castForeignPtr f = unsafeCoerce# f
 
--- | Causes a the finalizers associated with a foreign pointer to be run
+-- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
 finalizeForeignPtr foreignPtr = do
