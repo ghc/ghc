@@ -17,6 +17,7 @@ IMP_Ubiq()
 import TcMonad
 import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe )
 import TyCon	( TyCon, mkFunTyCon )
+import Class	( GenClass )
 import TyVar	( GenTyVar(..), SYN_IE(TyVar), tyVarKind )
 import TcType	( SYN_IE(TcType), TcMaybe(..), SYN_IE(TcTauType), SYN_IE(TcTyVar),
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
@@ -28,6 +29,11 @@ import PprType	( GenTyVar, GenType )	-- instances
 import Pretty
 import Unique	( Unique )		-- instances
 import Util
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable
+#endif
+
 \end{code}
 
 
@@ -100,6 +106,7 @@ uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar tyvar2 ps_ty1 ty1
 	-- Applications and functions; just check the two parts
 uTys _ (FunTy fun1 arg1 _) _ (FunTy fun2 arg2 _)
   = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
+
 uTys _ (AppTy s1 t1) _ (AppTy s2 t2)
   = uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
 
@@ -119,6 +126,12 @@ uTys _ (FunTy fun1 arg1 _) _ (AppTy s2 t2)
 	-- Type constructors must match
 uTys ps_ty1 (TyConTy con1 _) ps_ty2 (TyConTy con2 _)
   = checkTc (con1 == con2) (unifyMisMatch ps_ty1 ps_ty2)
+
+	-- Dictionary types must match.  (They can only occur when
+	-- unifying signature contexts in TcBinds.)
+uTys ps_ty1 (DictTy c1 t1 _) ps_ty2 (DictTy c2 t2 _)
+  = checkTc (c1 == c2) (unifyMisMatch ps_ty1 ps_ty2)	`thenTc_`
+    uTys t1 t1 t2 t2
 
 	-- Always expand synonyms (see notes at end)
 uTys ps_ty1 (SynTy con1 args1 ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
@@ -238,7 +251,7 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
 	(_, BoundTo ty2') -> uUnboundVar tv1 maybe_ty1 ty2' ty2'
 
 	(UnBound, _) |  kind2 `hasMoreBoxityInfo` kind1
-		     -> tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
+		     -> tcWriteTyVar tv1 ps_ty2		`thenNF_Tc_` returnTc ()
 	
 	(_, UnBound) |  kind1 `hasMoreBoxityInfo` kind2
 		     -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
@@ -250,7 +263,7 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
 -- TEMPORARILY allow two type-sig variables to be bound together.
 -- See notes in tcCheckSigVars
 	(DontBind,DontBind) |  kind2 `hasMoreBoxityInfo` kind1
-		            -> tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
+		            -> tcWriteTyVar tv1 ps_ty2		`thenNF_Tc_` returnTc ()
 	
 			    |  kind1 `hasMoreBoxityInfo` kind2
 			    -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
@@ -283,7 +296,13 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1) maybe_ty1 ps_ty2 non_var_ty2
     occur_check (FunTy fun arg _) = occur_check fun `thenTc_` occur_check arg
     occur_check (TyConTy _ _)	  = returnTc ()
     occur_check (SynTy _ _ ty2)   = occur_check ty2
-    occur_check other		  = panic "Unexpected Dict or ForAll in occurCheck"
+
+	-- DictTys and ForAllTys can occur when pattern matching against
+	-- constructors with universally quantified fields.
+    occur_check (DictTy c ty2 _)  = occur_check ty2
+    occur_check (ForAllTy tv ty2) | tv == tv1 = returnTc ()
+				  | otherwise = occur_check ty2
+    occur_check other		  = panic "Unexpected ForAllUsage in occurCheck"
 \end{code}
 
 %************************************************************************
@@ -332,33 +351,33 @@ unifyCtxt ty1 ty2		-- ty1 expected, ty2 inferred
     zonkTcType ty2	`thenNF_Tc` \ ty2' ->
     returnNF_Tc (err ty1' ty2')
   where
-    err ty1' ty2' sty = ppAboves [
-			   ppCat [ppPStr SLIT("Expected:"), ppr sty ty1'],
-			   ppCat [ppPStr SLIT("Inferred:"), ppr sty ty2']
+    err ty1' ty2' sty = vcat [
+			   hsep [ptext SLIT("Expected:"), ppr sty ty1'],
+			   hsep [ptext SLIT("Inferred:"), ppr sty ty2']
 		        ]
 
 unifyMisMatch ty1 ty2 sty
-  = ppHang (ppPStr SLIT("Couldn't match the type"))
-	 4 (ppSep [ppr sty ty1, ppPStr SLIT("against"), ppr sty ty2])
+  = hang (ptext SLIT("Couldn't match the type"))
+	 4 (sep [ppr sty ty1, ptext SLIT("against"), ppr sty ty2])
 
 expectedFunErr ty sty
-  = ppHang (ppStr "Function type expected, but found the type")
+  = hang (text "Function type expected, but found the type")
 	 4 (ppr sty ty)
 
 unifyKindErr tyvar ty sty
-  = ppHang (ppPStr SLIT("Compiler bug: kind mis-match between"))
-	 4 (ppSep [ppCat [ppr sty tyvar, ppPStr SLIT("::"), ppr sty (tyVarKind tyvar)],
-		   ppPStr SLIT("and"), 
-		   ppCat [ppr sty ty, ppPStr SLIT("::"), ppr sty (typeKind ty)]])
+  = hang (ptext SLIT("Compiler bug: kind mis-match between"))
+	 4 (sep [hsep [ppr sty tyvar, ptext SLIT("::"), ppr sty (tyVarKind tyvar)],
+		   ptext SLIT("and"), 
+		   hsep [ppr sty ty, ptext SLIT("::"), ppr sty (typeKind ty)]])
 
 unifyDontBindErr tyvar ty sty
-  = ppHang (ppPStr SLIT("Couldn't match the signature/existential type variable"))
-	 4 (ppSep [ppr sty tyvar,
-		   ppPStr SLIT("with the type"), 
+  = hang (ptext SLIT("Couldn't match the signature/existential type variable"))
+	 4 (sep [ppr sty tyvar,
+		   ptext SLIT("with the type"), 
 		   ppr sty ty])
 
 unifyOccurCheck tyvar ty sty
-  = ppHang (ppPStr SLIT("Cannot construct the infinite type (occur check)"))
-	 4 (ppSep [ppr sty tyvar, ppChar '=', ppr sty ty])
+  = hang (ptext SLIT("Cannot construct the infinite type (occur check)"))
+	 4 (sep [ppr sty tyvar, char '=', ppr sty ty])
 \end{code}
 
