@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.22 2003/01/14 13:43:11 simonmar Exp $
+# $Id: package.mk,v 1.23 2003/03/31 12:42:04 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -30,7 +30,9 @@ $(PACKAGE).conf.installed : $(PACKAGE).conf.in
 STAMP_PKG_CONF = $(GHC_DRIVER_DIR)/stamp-pkg-conf-$(PACKAGE)
 CLEAN_FILES += $(STAMP_PKG_CONF)
 
+ifneq "$(BootingFromHc)" "YES"
 boot all :: $(STAMP_PKG_CONF)
+endif
 
 $(STAMP_PKG_CONF) : $(PACKAGE).conf.inplace $(PACKAGE).conf.installed
 	$(GHC_PKG_INPLACE) --update-package <$(PACKAGE).conf.inplace
