@@ -208,7 +208,8 @@ C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 SCRIPT_SRCS = $(filter %.lprl,$(SRCS))
 SCRIPT_OBJS = $(addsuffix .prl,$(basename $(SCRIPT_SRCS)))
 
-OBJS        = $(HS_OBJS) $(C_OBJS) $(GC_C_OBJS) $(SCRIPT_OBJS)
+OBJS        = $(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
+STUBOBJS    = $(GC_C_OBJS) 
 
 # The default is for $(LIBOBJS) to be the same as $(OBJS)
 LIBOBJS	    = $(OBJS)
