@@ -147,6 +147,10 @@ adjustor thunks, we only allow 16 bytes of arguments!
 So for example, args (Int,Double,Int) would be OK (1+2+1)
 as would (Int,Int,Int,Int) (1+1+1+1) but not (Int,Double,Double) (1+2+2).
 
+On an Alpha, due to a similar hack, we only allow 4 integer arguments with
+foreign export dynamic (i.e., 32 bytes of arguments after padding each
+argument to a quadword, excluding floating-point arguments).
+
 The check is needed for both via-C and native-code routes
 
 \begin{code}
@@ -157,6 +161,13 @@ checkFEDArgs arg_tys
   where
     words_of_args = sum (map (getPrimRepSize . typePrimRep) arg_tys)
     err = ptext SLIT("On SPARC, I can only handle 4 words of arguments to foreign export dynamic")
+#elsif alpha_TARGET_ARCH
+checkFEDArgs arg_tys
+  = check (integral_args <= 4) err
+  where
+    integral_args = sum (map (getPrimRepSize . filter (not . isFloatingRep)
+                                             . typePrimRep) arg_tys)
+    err = ptext SLIT("On Alpha, I can only handle 4 non-floating-point arguments to foreign export dynamic")
 #else
 checkFEDArgs arg_tys = returnNF_Tc ()
 #endif
