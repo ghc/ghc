@@ -1,25 +1,22 @@
 import Foreign
 import Monad
-import Addr
-
-newtype XPtr a = XPtr Addr
-unXPtr (XPtr (A# x)) = x
+import Foreign.Ptr
 
 type CInt  = Int32
 type CSize = Word32
 
 foreign export dynamic 
-   mkComparator :: (XPtr Int -> XPtr Int -> IO CInt) 
-		-> IO (XPtr (XPtr Int -> XPtr Int -> IO CInt))
+   mkComparator :: (Ptr Int -> Ptr Int -> IO CInt) 
+		-> IO (Ptr (Ptr Int -> Ptr Int -> IO CInt))
 
 foreign import 
-   qsort :: Ptr Int -> CSize -> CSize -> XPtr (XPtr Int -> XPtr Int -> IO CInt) 
+   qsort :: Ptr Int -> CSize -> CSize -> Ptr (Ptr Int -> Ptr Int -> IO CInt) 
 	 -> IO ()
 
-compareInts :: XPtr Int -> XPtr Int -> IO CInt
+compareInts :: Ptr Int -> Ptr Int -> IO CInt
 compareInts a1 a2 = do
-   i1 <- peek (Ptr (unXPtr a1))
-   i2 <- peek (Ptr (unXPtr a2))
+   i1 <- peek a1
+   i2 <- peek a2
    return (fromIntegral (i1 - i2 :: Int))
 
 main :: IO ()
