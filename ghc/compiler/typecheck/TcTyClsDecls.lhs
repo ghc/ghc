@@ -134,6 +134,7 @@ tcGroup unf_env scc
     zonkKindEnv initial_kinds			`thenNF_Tc` \ final_kinds ->
 
 	-- Tie the knot
+    traceTc (text "starting" <+> ppr final_kinds)		`thenTc_`
     fixTc ( \ ~(rec_details_list, _, _) ->
 		-- Step 4 
  	let
@@ -164,6 +165,8 @@ tcGroup unf_env scc
 
     tcSetEnv env				$
 
+    traceTc (text "ready for pass 2" <+> ppr (isRec is_rec))			`thenTc_`
+
 	-- Step 6
 	-- For a recursive group, check all the types again,
 	-- this time with the wimp flag off
@@ -172,6 +175,8 @@ tcGroup unf_env scc
      else
 	returnTc ()
     )						`thenTc_`
+
+    traceTc (text "done")			`thenTc_`
 
 	-- Step 7
 	-- Extend the environment with the final TyCons/Classes 
