@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.32 2001/01/10 17:21:18 sewardj Exp $
+ * $Id: Printer.c,v 1.33 2001/01/15 16:55:25 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -385,8 +385,11 @@ StgPtr printStackObj( StgPtr sp )
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
 #ifdef GHCI
-        if (c == (StgClosure*)&stg_ctoi_ret_R1_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1_info\n" );
+        if (c == (StgClosure*)&stg_ctoi_ret_R1p_info) {
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1p_info\n" );
+	} else
+        if (c == (StgClosure*)&stg_ctoi_ret_R1n_info) {
+           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1n_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_ret_F1_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_F1_info\n" );

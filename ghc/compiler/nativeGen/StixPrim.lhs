@@ -55,9 +55,6 @@ and modify our heap check accordingly.
 \begin{code}
 -- NB: ordering of clauses somewhere driven by
 -- the desire to getting sane patt-matching behavior
-primCode res@[sr,dr] IntegerNegOp arg@[sa,da]
-  = gmpNegate (sr,dr) (sa,da)
-
 primCode [res] IntegerCmpOp args@[sa1,da1, sa2,da2]
   = gmpCompare res (sa1,da1, sa2,da2)
 

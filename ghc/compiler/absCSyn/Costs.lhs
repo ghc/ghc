@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.27 2000/10/24 07:35:00 simonpj Exp $
+% $Id: Costs.lhs,v 1.28 2001/01/15 16:55:24 sewardj Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -358,7 +358,7 @@ floatOps =
 gmpOps :: [PrimOp]
 gmpOps	=
   [   IntegerAddOp , IntegerSubOp , IntegerMulOp
-    , IntegerQuotRemOp , IntegerDivModOp , IntegerNegOp
+    , IntegerQuotRemOp , IntegerDivModOp
     , IntegerCmpOp
     , Integer2IntOp  , Int2IntegerOp
   ]

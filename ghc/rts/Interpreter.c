@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.12 $
- * $Date: 2001/01/15 09:55:41 $
+ * $Revision: 1.13 $
+ * $Date: 2001/01/15 16:55:25 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef GHCI
@@ -429,7 +429,8 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int           tag         = StackWord(0);
                  StgInfoTable* ret_itbl    = (StgInfoTable*)StackWord(tag +1);
                  ASSERT(tag <= 2); /* say ... */
-                 if (ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1_info
+                 if (ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1p_info
+                     || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1n_info
                      || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_F1_info
                      || ret_itbl == (StgInfoTable*)&stg_ctoi_ret_D1_info) {
                      /* Returning to interpreted code.  Interpret the BCO 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.14 2001/01/15 09:55:41 sewardj Exp $
+-- $Id: primops.txt,v 1.15 2001/01/15 16:55:24 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -361,9 +361,6 @@ primop   Int64ToIntegerOp   "int64ToInteger#" GenPrimOp
 ------------------------------------------------------------------------
 --- Integer#                                                         ---
 ------------------------------------------------------------------------
-
-primop   IntegerNegOp   "negateInteger#" GenPrimOp    
-   Int# -> ByteArr# -> (# Int#, ByteArr# #)
 
 primop   IntegerAddOp   "plusInteger#" GenPrimOp   
    Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
@@ -771,9 +768,6 @@ primop ReadOffAddrOp_Double "readDoubleOffAddr#" GenPrimOp
 
 primop ReadOffAddrOp_StablePtr "readStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, StablePtr# a #)
-
-primop ReadOffAddrOp_ForeignObj "readForeignObjOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, ForeignObj# #)
 
 primop ReadOffAddrOp_Int8 "readInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
@@ -1256,17 +1250,21 @@ primop  ParAtForNowOp  "parAtForNow#" GenPrimOp
    usage            = { mangle ParAtForNowOp [mkO, mkZ, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
-primop  CopyableOp  "copyable#" GenPrimOp
-   a -> Int#
-   with
-   usage            = { mangle CopyableOp [mkZ] mkR }
-   has_side_effects = True
-
-primop  NoFollowOp "noFollow#" GenPrimOp
-   a -> Int#
-   with
-   usage            = { mangle NoFollowOp [mkZ] mkR }
-   has_side_effects = True
+-- copyable# and noFollow# have no corresponding entry in
+-- PrelGHC.hi-boot, so I don't know whether they should still
+-- be here or not.  JRS, 15 Jan 01
+--
+--primop  CopyableOp  "copyable#" GenPrimOp
+--   a -> Int#
+--   with
+--   usage            = { mangle CopyableOp [mkZ] mkR }
+--   has_side_effects = True
+--
+--primop  NoFollowOp "noFollow#" GenPrimOp
+--   a -> Int#
+--   with
+--   usage            = { mangle NoFollowOp [mkZ] mkR }
+--   has_side_effects = True
 
 
 ------------------------------------------------------------------------

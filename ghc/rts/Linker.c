@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.7 2001/01/10 17:21:18 sewardj Exp $
+ * $Id: Linker.c,v 1.8 2001/01/15 16:55:25 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -138,6 +138,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(stg_INTLIKE_closure)			\
       SymX(stg_CAF_UNENTERED_entry)		\
       SymX(newCAF)				\
+      SymX(newBCOzh_fast)			\
       SymX(putMVarzh_fast)			\
       SymX(newMVarzh_fast)			\
       SymX(takeMVarzh_fast)			\

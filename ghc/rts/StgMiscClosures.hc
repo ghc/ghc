@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.57 2001/01/10 17:21:18 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.58 2001/01/15 16:55:25 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -77,7 +77,7 @@ FN_(stg_interp_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
 /* Some info tables to be used when compiled code returns a value to
    the interpreter, i.e. the interpreter pushes one of these onto the
    stack before entering a value.  What the code does is to
-   impedance-match the compiled return convention (in R1/F1/D1 etc) to
+   impedance-match the compiled return convention (in R1p/R1n/F1/D1 etc) to
    the interpreter's convention (returned value is on top of stack),
    and then cause the scheduler to enter the interpreter.
 
@@ -87,7 +87,7 @@ FN_(stg_interp_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
       ptr to one of these info tables.
  
    The info table code, both direct and vectored, must:
-      * push R1/F1/D1 on the stack
+      * push R1/F1/D1 on the stack, and its tag if necessary
       * push the BCO (so it's now on the stack twice)
       * Yield, ie, go to the scheduler.
 
@@ -108,8 +108,9 @@ FN_(stg_interp_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
    haven't got a good story about that yet.
 */
 
-/* When the returned value is in R1 ... */
-#define STG_CtoI_RET_R1_Template(label) 	\
+/* When the returned value is in R1 and it is a pointer, so doesn't
+   need tagging ... */
+#define STG_CtoI_RET_R1p_Template(label) 	\
    IFN_(label)			        \
    {                                    \
       StgPtr bco;                       \
@@ -123,17 +124,50 @@ FN_(stg_interp_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
       FE_                               \
    }
 
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_0_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_1_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_2_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_3_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_4_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_5_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_6_entry);
-STG_CtoI_RET_R1_Template(stg_ctoi_ret_R1_7_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_0_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_1_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_2_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_3_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_4_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_5_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_6_entry);
+STG_CtoI_RET_R1p_Template(stg_ctoi_ret_R1p_7_entry);
 
-VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1p,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+
+
+
+/* When the returned value is in R1 and it isn't a pointer. */
+#define STG_CtoI_RET_R1n_Template(label) 	\
+   IFN_(label)			        \
+   {                                    \
+      StgPtr bco;                       \
+      FB_				\
+      bco = ((StgPtr*)Sp)[1];           \
+      Sp -= 1;				\
+      ((StgPtr*)Sp)[0] = (StgPtr)R1.i;	\
+      Sp -= 1;                          \
+      ((StgPtr*)Sp)[0] = (StgPtr)1; /* tag */   \
+      Sp -= 1;				\
+      ((StgPtr*)Sp)[0] = bco;		\
+      JMP_(stg_yield_to_interpreter);   \
+      FE_                               \
+   }
+
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_0_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_1_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_2_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_3_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_4_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_5_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_6_entry);
+STG_CtoI_RET_R1n_Template(stg_ctoi_ret_R1n_7_entry);
+
+VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1n,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
+
+
 
 /* When the returned value is in F1 ... */
 #define STG_CtoI_RET_F1_Template(label) 	\
@@ -144,6 +178,8 @@ VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, 
       bco = ((StgPtr*)Sp)[1];           \
       Sp -= sizeofW(StgFloat);		\
       ASSIGN_FLT((W_*)Sp, F1);          \
+      Sp -= 1;                          \
+      ((StgPtr*)Sp)[0] = (StgPtr)sizeofW(StgFloat); \
       Sp -= 1;				\
       ((StgPtr*)Sp)[0] = bco;		\
       JMP_(stg_yield_to_interpreter);   \
@@ -172,6 +208,8 @@ VEC_POLY_INFO_TABLE(stg_ctoi_ret_F1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, 
       bco = ((StgPtr*)Sp)[1];           \
       Sp -= sizeofW(StgDouble);		\
       ASSIGN_DBL((W_*)Sp, D1);          \
+      Sp -= 1;                          \
+      ((StgPtr*)Sp)[0] = (StgPtr)sizeofW(StgDouble); \
       Sp -= 1;				\
       ((StgPtr*)Sp)[0] = bco;		\
       JMP_(stg_yield_to_interpreter);   \

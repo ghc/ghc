@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.31 2000/12/20 15:26:50 rrt Exp $
+ * $Id: StgMiscClosures.h,v 1.32 2001/01/15 16:55:25 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -69,7 +69,8 @@ STGFUN(stg_interp_constr8_entry);
 
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
    to the interpreter. */
-extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1_info;
+extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1p_info;
+extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1n_info;
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_F1_info;
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_D1_info;
 
