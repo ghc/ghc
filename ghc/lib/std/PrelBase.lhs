@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.58 2001/12/14 12:05:15 simonmar Exp $
+% $Id: PrelBase.lhs,v 1.59 2001/12/14 17:24:19 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -283,7 +283,8 @@ augment g xs = g (:) xs
 -- for short lists, I suppose.
 -- "foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
 
-"foldr/nil"	forall k z.	 foldr k z []     = z 
+"foldr/single"	forall k z x. foldr k z [x] = k x z
+"foldr/nil"	forall k z.   foldr k z []  = z 
 
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
 		       (h::forall b. (a->b->b) -> b -> b) .
