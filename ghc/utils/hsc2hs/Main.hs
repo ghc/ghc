@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.25 2001/03/05 00:07:23 qrczak Exp $
+-- $Id: Main.hs,v 1.26 2001/03/16 09:07:41 qrczak Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -137,11 +137,9 @@ Parser m `fakeOutput` out =
         Success pos' _ s' a -> Success pos' out s' a
         Failure pos' msg    -> Failure pos' msg
 
-{-# INLINE lookAhead #-}
 lookAhead :: Parser String
 lookAhead = Parser $ \pos s -> Success pos [] s s
 
-{-# INLINE satisfy #-}
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy p =
     Parser $ \pos s -> case s of
@@ -282,7 +280,6 @@ unescapeHashes []          = []
 unescapeHashes ('#':'#':s) = '#' : unescapeHashes s
 unescapeHashes (c:s)       = c   : unescapeHashes s
 
-{-# INLINE lookAheadC #-}
 lookAheadC :: Parser String
 lookAheadC = liftM joinLines lookAhead
     where
@@ -290,7 +287,6 @@ lookAheadC = liftM joinLines lookAhead
     joinLines ('\\':'\n':s) = joinLines s
     joinLines (c:s)         = c : joinLines s
 
-{-# INLINE satisfyC #-}
 satisfyC :: (Char -> Bool) -> Parser Char
 satisfyC p = do
     s <- lookAhead
