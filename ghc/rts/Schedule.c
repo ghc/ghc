@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.129 2002/02/15 22:15:09 sof Exp $
+ * $Id: Schedule.c,v 1.130 2002/02/16 00:30:05 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1344,7 +1344,9 @@ schedule( void )
 #if defined(RTS_SUPPORTS_THREADS)
       IF_DEBUG(scheduler,sched_belch("doing GC"));
 #endif
+      RELEASE_LOCK(&sched_mutex);
       GarbageCollect(GetRoots,rtsFalse);
+      ACQUIRE_LOCK(&sched_mutex);
       ready_to_gc = rtsFalse;
 #ifdef SMP
       broadcastCondition(&gc_pending_cond);
