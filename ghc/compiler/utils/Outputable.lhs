@@ -57,7 +57,7 @@ import Pretty		( Doc, Mode(..) )
 import Panic
 
 import Word		( Word32 )
-import IO		( Handle, stderr, stdout )
+import IO		( Handle, stderr, stdout, hFlush )
 import Char             ( chr )
 #if __GLASGOW_HASKELL__ < 410
 import Char		( ord, isDigit )
@@ -165,23 +165,30 @@ ifPprDebug d sty	  = Pretty.empty
 \end{code}
 
 \begin{code}
+-- Unused [7/02 sof]
 printSDoc :: SDoc -> PprStyle -> IO ()
-printSDoc d sty = Pretty.printDoc PageMode stdout (d sty)
+printSDoc d sty = do
+  Pretty.printDoc PageMode stdout (d sty)
+  hFlush stdout
 
 -- I'm not sure whether the direct-IO approach of Pretty.printDoc
 -- above is better or worse than the put-big-string approach here
 printErrs :: PrintUnqualified -> SDoc -> IO ()
-printErrs unqual doc = Pretty.printDoc PageMode stderr (doc style)
-		     where
-		       style = mkUserStyle unqual (PartWay opt_PprUserLength)
+printErrs unqual doc = do
+   Pretty.printDoc PageMode stderr (doc style)
+   hFlush stderr
+ where
+   style = mkUserStyle unqual (PartWay opt_PprUserLength)
 
 printDump :: SDoc -> IO ()
-printDump doc = Pretty.printDoc PageMode stdout (better_doc defaultUserStyle)
-  	      where
-		better_doc = doc $$ text ""
-	-- We used to always print in debug style, but I want
-	-- to try the effect of a more user-ish style (unless you
-	-- say -dppr-debug
+printDump doc = do
+   Pretty.printDoc PageMode stdout (better_doc defaultUserStyle)
+   hFlush stdout
+ where
+   better_doc = doc $$ text ""
+    -- We used to always print in debug style, but I want
+    -- to try the effect of a more user-ish style (unless you
+    -- say -dppr-debug
 
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
