@@ -32,9 +32,18 @@ Happy.
 \item add some suffix rules for SGML, we can use SGML-Tools for
 documentation now.
 
+\item added an new manual for Happy, in SGML format.
+
 \item added the GHC/Hugs extension library documentation as a separate
 document, and removed that information from the Users' Guide.
 
 \item Fixed a bug where ':::' wasn't being parsed properly in interface files.
+
+\item Fixed a long-standing bug in the strictness analyser.
+
+\item Fixed the cause of the @getWorkerIdAndCons@ panic.
+
+\item Moved the array tests from ghc/lib into the test framework.
+ghc/lib/tests now doesn't exist.
 
 \end{itemize}
