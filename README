@@ -1,23 +1,29 @@
-This is the root directory for functional-programming tools
-distributed by the Computing Science Department at Glasgow University.
-Simon Peyton Jones <simonpj@microsoft.com> is the ringleader of this
-effort.  The tools are:
+fptools build system
+====================
 
-    ghc		the Glasgow Haskell compilation system
-    hslibs	collection of Haskell libraries
-    haggis	the Haggis GUI toolkit
-    happy	the Happy Haskell parser generator
-    hdirect     Haskell interop tool
-    green-card	a foreign function interface pre-processor for Haskell.
-    nofib	the NoFib Haskell benchmarking suite
-    literate	the Glasgow "literate programming" system
-    glafp-utils shared utility programs
-    mk	        GNU make setup used by all of fptools
-    docs        documentation on the installing and using
-                the fptools suite.
+This is the top-level directory of the fptools build system.  Several
+packages are part of this build system; if you got this as part of a
+source distribution (eg. for GHC), then you will have one or more of
+the following directories:
 
-Components which are always part of a distribution (never stand-alone)
-are "glafp-utils" and "mk" (a configuration system).
+    ghc		  The Glasgow Haskell Compiler
+    hslibs	  A Collection of Haskell libraries
+    haggis	  The Haggis GUI toolkit
+    happy	  The Happy Haskell parser generator
+    hdirect       Haskell interop tool
+    green-card	  A foreign function interface pre-processor for Haskell.
+    nofib	  The NoFib Haskell benchmarking suite
+
+Additional documentation for each project can be found in its
+respective directory.
+
+In addition, the following directories contain project-independent bits:
+
+    mk	          GNU make setup used by all of fptools
+    glafp-utils   Shared utility programs
+    docs          Documentation on the installing and using
+                  the fptools build system.
+    distrib	  Tools and additional bits for building distributions
 
 Quick start:  the following is *supposed* to work
 
@@ -26,11 +32,19 @@ Quick start:  the following is *supposed* to work
 	$ make
 	$ make install
 
-where 'make' is whatever GNU make is called on your system.  The
-configuration script is a standard GNU autoconf script which accepts
-all the normal arguments, eg. --prefix=<blah> to install the package
-somewhere other than /usr/local.  Try ./configure --help to get a full
-list of the options.
+where 'make' is whatever GNU make is called on your system (GNU make
+is *required*).  The configuration script is a standard GNU autoconf
+script which accepts all the normal arguments, eg. --prefix=<blah> to
+install the package somewhere other than /usr/local.  Try ./configure
+--help to get a full list of the options.
 
 There is usually an ANNOUNCE* file with any distribution.  Please
 consult that, or the <piece>/README file, to find out how to proceed.
+
+Full documentation for the fptools build system can be found on the
+GHC web pages: 
+
+	http://www.haskell.org/ghc/
+
+--
+The GHC Team,  glasgow-haskell-users@haskell.org
