@@ -37,10 +37,9 @@ variant, too, for that matter).
 GCC will have assumed that pushing/popping of C-stack frames is going
 on when it generated its code, and used stack space accordingly.
 However, we actually {\em post-process away} all such stack-framery
-(see \tr{ghc/driver/ghc-asm.lprl}).
-Thing will be OK however, if we initially make sure there are
-@RESERVED_C_STACK_BYTES@ on the C-stack to begin with, for local
-variables.
+(see \tr{ghc/driver/ghc-asm.lprl}). Things will be OK however, if we
+initially make sure there are @RESERVED_C_STACK_BYTES@ on the C-stack
+to begin with, for local variables.
 
 \begin{code}
 #define RESERVED_C_STACK_BYTES (512 * sizeof(I_))  /* MUST BE OF GENEROUS ALIGNMENT */
@@ -327,7 +326,7 @@ extern void __DISCARD__(STG_NO_ARGS);
 		      "\tmovl 12(%%eax),%%ebp"		\
 			: : "n" (RESERVED_C_STACK_BYTES) : "%eax");
 
-#endif /* __i[34]86__ */
+#endif /* __i[3456]86__ */
 \end{code}
 
 %************************************************************************
