@@ -67,5 +67,13 @@ cmCompile finder summary old_iface hst pcs
                        pcs
                        []
                )
+
+-- should be somewhere else?
+emptyPCS :: IO PersistentCompilerState
+emptyPCS = return (PersistentCompilerState 
+                      { pcs_modmap = emptyFM,
+                        pcs_pit    = emptyPIT,
+                        pcs_pst    = emptyPST,
+                        pcs_hp     = emptyHoldingPen })
 \end{code}
 
