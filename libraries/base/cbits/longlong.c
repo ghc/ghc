@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: longlong.c,v 1.3 2002/03/19 11:24:52 simonmar Exp $
+ * $Id: longlong.c,v 1.4 2002/12/13 14:23:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -96,9 +96,9 @@ StgWord64 stg_integerToWord64 (I_ sa, StgByteArray /* Really: mp_limb_t* */ da)
   switch (s) {
     case  0: res = 0;     break;
     case  1: res = d[0];  break;
-    case -1: res = -d[0]; break;
+    case -1: res = -(StgWord64)d[0]; break;
     default:
-      res = d[0] + ((StgWord64) d[1] << (BITS_IN (mp_limb_t)));
+      res = (StgWord64)d[0] + ((StgWord64)d[1] << (BITS_IN (mp_limb_t)));
       if (s < 0) res = -res;
   }
   return res;
@@ -114,9 +114,9 @@ StgInt64 stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da
   switch (s) {
     case  0: res = 0;     break;
     case  1: res = d[0];  break;
-    case -1: res = -d[0]; break;
+    case -1: res = -(StgInt64)d[0]; break;
     default:
-      res = d[0] + ((StgWord64) d[1] << (BITS_IN (mp_limb_t)));
+      res = (StgInt64)d[0] + ((StgWord64)d[1] << (BITS_IN (mp_limb_t)));
       if (s < 0) res = -res;
   }
   return res;
