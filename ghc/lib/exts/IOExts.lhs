@@ -48,8 +48,6 @@ module IOExts
 #endif
 	
 	, unsafePtrEq
-	, unsafeIOToST
-	, stToIO
 
         ) where
 
@@ -158,18 +156,6 @@ trace string expr = unsafePerformIO $ do
     hPutChar stderr '\n'
     _ccall_ PostTraceHook fd
     return expr
-#endif
-\end{code}
-
-\begin{code}
-unsafeIOToST	   :: IO a -> ST s a
-#ifdef __HUGS__
-unsafeIOToST = primUnsafeCoerce
-#else
-unsafeIOToST (IO io) = ST $ \ s ->
-    case ((unsafeCoerce# io) s) of
-      (#  new_s, a #) -> unsafeCoerce# (STret new_s a)
---      IOfail new_s e -> error ("I/O Error (unsafeIOToST): " ++ showsPrec 0 e "\n")
 #endif
 \end{code}
 

@@ -21,6 +21,8 @@ module ST (
 	STRef,
 	newSTRef, readSTRef, writeSTRef,
 
+	unsafeIOToST, stToIO,
+
 	STArray,
 	newSTArray, readSTArray, writeSTArray, boundsSTArray, 
 	thawSTArray, freezeSTArray, unsafeFreezeSTArray, 
@@ -37,7 +39,8 @@ import PreludeBuiltin
 #else
 import PrelArr
 import PrelST
-import PrelBase	( Eq(..), Int, Bool, ($), ()(..) )
+import PrelBase	( Eq(..), Int, Bool, ($), ()(..), unsafeCoerce# )
+import PrelIOBase ( IO(..), stToIO )
 #endif
 import Monad
 import Ix
@@ -149,3 +152,15 @@ unsafeFreezeSTArray (STArray arr) = unsafeFreezeArray arr
 #endif
 \end{code}
 
+
+\begin{code}
+unsafeIOToST	   :: IO a -> ST s a
+#ifdef __HUGS__
+unsafeIOToST = primUnsafeCoerce
+#else
+unsafeIOToST (IO io) = ST $ \ s ->
+    case ((unsafeCoerce# io) s) of
+      (#  new_s, a #) -> unsafeCoerce# (STret new_s a)
+--      IOfail new_s e -> error ("I/O Error (unsafeIOToST): " ++ showsPrec 0 e "\n")
+#endif
+\end{code}

@@ -26,6 +26,8 @@ module LazyST (
 	thawSTArray, freezeSTArray, unsafeFreezeSTArray, 
 	Ix,
 
+	ST.unsafeIOToST, ST.stToIO,
+
 	strictToLazyST, lazyToStrictST
     ) where
 
@@ -80,6 +82,7 @@ writeSTRef :: ST.STRef s a -> a -> ST s ()
 newSTRef   = strictToLazyST . ST.newSTRef
 readSTRef  = strictToLazyST . ST.readSTRef
 writeSTRef r a = strictToLazyST (ST.writeSTRef r a)
+
 \end{code}
 
 %*********************************************************
