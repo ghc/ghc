@@ -39,6 +39,7 @@ module FastString
         tailFS,		    -- :: FastString -> FastString
 	concatFS,	    -- :: [FastString] -> FastString
         consFS,             -- :: Char -> FastString -> FastString
+	indexFS,	    -- :: FastString -> Int -> Char
 
         hPutFS		    -- :: Handle -> FastString -> IO ()
        ) where
@@ -175,6 +176,18 @@ headFS f@(FastString _ l# ba#) =
  if l# ># 0# then C# (indexCharArray# ba# 0#) else error ("headFS: empty FS: " ++ unpackFS f)
 headFS f@(CharStr a# l#) = 
  if l# ># 0# then C# (indexCharOffAddr# a# 0#) else error ("headFS: empty FS: " ++ unpackFS f)
+
+indexFS :: FastString -> Int -> Char
+indexFS f i@(I# i#) =
+ case f of
+   FastString _ l# ba#
+     | l# ># 0# && l# ># i#  -> C# (indexCharArray# ba# i#)
+     | otherwise	     -> error (msg (I# l#))
+   CharStr a# l#
+     | l# ># 0# && l# ># i#  -> C# (indexCharOffAddr# a# i#)
+     | otherwise	     -> error (msg (I# l#))
+ where
+  msg l =  "indexFS: out of range: " ++ show (l,i)
 
 tailFS :: FastString -> FastString
 tailFS (FastString _ l# ba#) = mkFastSubStringBA# ba# 1# (l# -# 1#)
