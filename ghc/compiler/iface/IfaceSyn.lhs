@@ -446,6 +446,10 @@ ppr_hs_info (HsWorker w a)	= ptext SLIT("Worker:") <+> ppr w <+> int a
 tyThingToIfaceDecl :: Bool 
 		   -> NameSet		-- Tycons and classes to export abstractly
 		   -> (Name -> IfaceExtName) -> TyThing -> IfaceDecl
+-- Assumption: the thing is already tidied, so that locally-bound names
+-- 	       (lambdas, for-alls) already have non-clashing OccNames
+-- Reason: Iface stuff uses OccNames, and the conversion here does
+--	   not do tidying on the way
 tyThingToIfaceDecl discard_id_info _ ext (AnId id)
   = IfaceId { ifName   = getOccName id, 
 	      ifType   = toIfaceType ext (idType id),
