@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.17 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Stable.c,v 1.18 2001/11/21 10:09:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -96,6 +96,9 @@ unsigned int SPT_size;
  * call to lookupStableName on a given object will return the same
  * stable name.
  *
+ * OLD COMMENTS about reference counting follow.  The reference count
+ * in a stable name entry is now just a counter.
+ *
  * Reference counting
  * ------------------
  * A plain stable name entry has a zero reference count, which means
@@ -134,7 +137,7 @@ initFreeList(snEntry *table, nat n, snEntry *free)
   for (p = table + n - 1; p >= table; p--) {
     p->addr   = (P_)free;
     p->old    = NULL;
-    p->weight = 0;
+    p->ref    = 0;
     p->sn_obj = NULL;
     free = p;
   }
@@ -196,7 +199,7 @@ lookupStableName(StgPtr p)
   } else {
     sn = stable_ptr_free - stable_ptr_table;
     (P_)stable_ptr_free  = stable_ptr_free->addr;
-    stable_ptr_table[sn].weight = 0;
+    stable_ptr_table[sn].ref = 0;
     stable_ptr_table[sn].addr = p;
     stable_ptr_table[sn].sn_obj = NULL;
     /* IF_DEBUG(stable,fprintf(stderr,"new stable name %d at
@@ -214,7 +217,7 @@ freeStableName(snEntry *sn)
 {
   ASSERT(sn->sn_obj == NULL);
   if (sn->addr != NULL) {
-    removeHashTable(addrToStableHash, (W_)sn->addr, NULL);
+      removeHashTable(addrToStableHash, (W_)sn->addr, NULL);
   }
   sn->addr = (P_)stable_ptr_free;
   stable_ptr_free = sn;
@@ -223,26 +226,11 @@ freeStableName(snEntry *sn)
 StgStablePtr
 getStablePtr(StgPtr p)
 {
-  StgWord sn = lookupStableName(p);
-  StgWord weight, n;
-  weight = stable_ptr_table[sn].weight;
-  if (weight == 0) {
-    weight = (StgWord)1 << (BITS_IN(StgWord)-1);
-    stable_ptr_table[sn].weight = weight;
-    return (StgStablePtr)(sn + (BITS_IN(StgWord) << STABLEPTR_WEIGHT_SHIFT));
-  } 
-  else if (weight == 1) {
-    barf("getStablePtr: too light");
-  } 
-  else {
-    weight /= 2;
-    /* find log2(weight) */
-    for (n = 0; weight != 1; n++) {
-      weight >>= 1;
-    }
-    stable_ptr_table[sn].weight -= 1 << n;
-    return (StgStablePtr)(sn + ((n+1) << STABLEPTR_WEIGHT_SHIFT));
-  }
+  StgWord sn;
+
+  sn = lookupStableName(p);
+  stable_ptr_table[sn].ref++;
+  return (StgStablePtr)(sn);
 }
 
 void
@@ -277,7 +265,7 @@ enlargeStablePtrTable(void)
 /* -----------------------------------------------------------------------------
  * Treat stable pointers as roots for the garbage collector.
  *
- * A stable pointer is any stable name entry with a weight > 0.  We'll
+ * A stable pointer is any stable name entry with a ref > 0.  We'll
  * take the opportunity to zero the "keep" flags at the same time.
  * -------------------------------------------------------------------------- */
 
@@ -304,8 +292,8 @@ markStablePtrTable(evac_fn evac)
 	    // the hash table later.
 	    p->old = p->addr;
 
-	    // if the weight is non-zero, treat addr as a root
-	    if (p->weight != 0) {
+	    // if the ref is non-zero, treat addr as a root
+	    if (p->ref != 0) {
 		evac((StgClosure **)&p->addr);
 	    }
 	}
@@ -346,7 +334,7 @@ threadStablePtrTable( evac_fn evac )
  *
  * A dead entry has:
  *
- *          - a weight of zero (i.e. 2^32)
+ *          - a zero reference count
  *          - a dead sn_obj
  *
  * Both of these conditions must be true in order to re-use the stable
@@ -378,7 +366,7 @@ gcStablePtrTable( void )
 	if (q && (q < (P_)stable_ptr_table || q >= (P_)end_stable_ptr_table)) {
 
 	    // StableNames only:
-	    if (p->weight == 0) {
+	    if (p->ref == 0) {
 		if (p->sn_obj == NULL) {
 		    // StableName object is dead
 		    freeStableName(p);
@@ -388,7 +376,7 @@ gcStablePtrTable( void )
 		    
 		} else {
 		    (StgClosure *)p->addr = isAlive((StgClosure *)p->addr);
-		    IF_DEBUG(stable, fprintf(stderr,"Stable name %d still alive at %p, weight %d\n", p - stable_ptr_table, p->addr, p->weight));
+		    IF_DEBUG(stable, fprintf(stderr,"Stable name %d still alive at %p, ref %d\n", p - stable_ptr_table, p->addr, p->ref));
 		}
 	    }
 	}

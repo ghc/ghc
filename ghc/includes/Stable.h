@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.9 2001/10/23 11:28:02 simonmar Exp $
+ * $Id: Stable.h,v 1.10 2001/11/21 10:09:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -13,9 +13,6 @@
  * a void*.
  *
  * ----------------------------------------------------------------------------*/
-
-#define STABLEPTR_WEIGHT_MASK   ((StgWord)0xff << ((sizeof(StgWord)-1) * BITS_PER_BYTE))
-#define STABLEPTR_WEIGHT_SHIFT  (BITS_IN(StgWord) - 8)
 
 /* -----------------------------------------------------------------------------
    External C Interface
@@ -33,7 +30,7 @@ extern StgStablePtr   getStablePtr(StgPtr p);
 typedef struct { 
   StgPtr  addr;			/* Haskell object, free list, or NULL */
   StgPtr  old;			/* old Haskell object, used during GC */
-  StgWord weight;		/* used for reference counting */
+  StgWord ref;			/* used for reference counting */
   StgClosure *sn_obj;		/* the StableName object (or NULL) */
 } snEntry;
 
@@ -45,29 +42,27 @@ extern DLL_IMPORT_RTS unsigned int SPT_size;
 extern inline StgPtr
 deRefStablePtr(StgStablePtr sp)
 {
-  ASSERT(stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].weight > 0);
-  return stable_ptr_table[stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK].addr;
+    ASSERT(stable_ptr_table[(StgWord)sp].ref > 0);
+    return stable_ptr_table[(StgWord)sp].addr;
 }
-
+    
 extern inline void
 freeStablePtr(StgStablePtr sp)
 {
-  StgWord sn = stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK;
-  
-  ASSERT(sn < SPT_size
-	 && stable_ptr_table[sn].addr != NULL
-	 && stable_ptr_table[sn].weight > 0);
-  
-  stable_ptr_table[sn].weight += 
-      1 << ((((StgWord)sp & STABLEPTR_WEIGHT_MASK) >> STABLEPTR_WEIGHT_SHIFT) - 1);
+    StgWord sn = (StgWord)sp;
+    
+    ASSERT(sn < SPT_size
+	   && stable_ptr_table[sn].addr != NULL
+	   && stable_ptr_table[sn].ref > 0);
+    
+    stable_ptr_table[sn].ref --;
 }
 
 extern inline StgStablePtr
 splitStablePtr(StgStablePtr sp)
 {
-  /* doesn't need access to the stable pointer table */
-  StgWord weight = (stgCast(StgWord,sp) & STABLEPTR_WEIGHT_MASK) / 2;
-  return stgCast(StgStablePtr,(stgCast(StgWord,sp) & ~STABLEPTR_WEIGHT_MASK) + weight);
+    stable_ptr_table[(StgWord)sp].ref ++;
+    return sp;
 }
 
 /* No deRefStableName, because the existence of a stable name doesn't
