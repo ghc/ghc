@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.16 2000/04/11 16:36:54 sewardj Exp $
+ * $Id: StgCRun.c,v 1.17 2000/04/17 14:42:30 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -67,35 +67,20 @@ static jmp_buf jmp_environment;
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg)
 {
-    jmp_buf save_buf;
-    /* Save jmp_environment for previous call to miniInterpret  */
-    memcpy((void *) jmp_environment, (void *) save_buf, sizeof(jmp_buf));
-    if (setjmp(jmp_environment) == 0) {
-	while ( 1 ) {
-StgFunPtr f_old;
-            IF_DEBUG(evaluator,
-		     fprintf(stderr,"Jumping to ");
-		     printPtr((P_)f);
-		     fprintf(stderr,"\n");
-		     );
-f_old = f;
-	    f = (StgFunPtr) (f)();
- if (!IS_CODE_PTR(f)) {
-fprintf ( stderr,"bad ptr given by %p %s\n", f_old, nameFromOPtr(f_old) );
-assert(IS_CODE_PTR(f));
- }
-
-	}
-    }
-    /* Restore jmp_environment for previous call */
-    memcpy((void*) save_buf, (void*) jmp_environment, sizeof(jmp_buf));
-
-    return (StgThreadReturnCode)R1.i;
+   while (f) {
+      IF_DEBUG(evaluator,
+	       fprintf(stderr,"Jumping to ");
+	       printPtr((P_)f);
+	       fprintf(stderr," %s\n",nameFromOPtr(f));
+	      );
+      f = (StgFunPtr) (f)();
+   }
+   return (StgThreadReturnCode)R1.i;
 }
 
 EXTFUN(StgReturn)
 {
-    longjmp(jmp_environment, 1);
+   return 0;
 }
 
 #else
