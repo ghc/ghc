@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.46 2003/02/21 13:35:18 simonpj Exp $
+-- $Id: Main.hs,v 1.47 2003/05/20 11:07:54 stolz Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -524,7 +524,7 @@ output flags name toks = do
     writeFile cProgName $
         concatMap outFlagHeaderCProg flags++
         concatMap outHeaderCProg specials++
-        "\nint main (void)\n{\n"++
+        "\nint main (int argc, char *argv [])\n{\n"++
         outHeaderHs flags (if needsH then Just outHName else Nothing) specials++
         outHsLine (SourcePos name 0)++
         concatMap outTokenHs toks++
