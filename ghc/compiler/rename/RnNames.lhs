@@ -18,13 +18,13 @@ import HsSyn		( IE(..), ieName, ImportDecl(..),
 			)
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl, main_RDR_Unqual )
 import RnEnv
-import IfaceEnv		( lookupOrig, lookupImplicitOrig )
+import IfaceEnv		( lookupOrig, newGlobalBinder )
 import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
 import FiniteMap
 import PrelNames	( pRELUDE_Name, isBuiltInSyntaxName, isUnboundName )
-import Module		( Module, ModuleName, moduleName, 
+import Module		( Module, ModuleName, moduleName, mkPackageModule,
 			  moduleNameUserString, isHomeModule,
 			  unitModuleEnvByName, unitModuleEnv, 
 			  lookupModuleEnvByName, moduleEnvElts )
@@ -46,6 +46,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 			  isLocalGRE, pprNameProvenance )
 import Outputable
 import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes )
+import SrcLoc		( noSrcLoc )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )
 import List		( partition, insert )
@@ -245,15 +246,24 @@ exportsToAvails exports
 	; return (concat avails_by_module) }
   where
     do_one (mod_name, exports) = mapM (do_avail mod_name) exports
-    do_avail mod (Avail n)      = do { n' <- lookupOrig mod n; 
-			 	     ; return (Avail n') }
-    do_avail mod (AvailTC n ns) = do { n' <- lookupOrig mod n
-				     ; ns' <- mappM (lookupImplicitOrig n') ns
-				     ; return (AvailTC n' ns') }
-	-- Note the lookupImplicitOrig.  It ensures that the subordinate names
-	-- record their parent; and that in turn ensures that the GlobalRdrEnv
-	-- has the correct parent for all the names in its range.
-	-- For imported things, we only suck in the binding site later, if ever.
+    do_avail mod_nm (Avail n)      = do { n' <- lookupOrig mod_nm n; 
+					; return (Avail n') }
+    do_avail mod_nm (AvailTC n ns) = do { n' <- lookupOrig mod_nm n
+					; ns' <- mappM (lookup_sub n') ns
+					; return (AvailTC n' ns') }
+	where
+	  mod = mkPackageModule mod_nm	-- Not necessarily right yet
+	  lookup_sub parent occ = newGlobalBinder mod occ (Just parent) noSrcLoc
+		-- Hack alert! Notice the newGlobalBinder.  It ensures that the subordinate 
+		-- names record their parent; and that in turn ensures that the GlobalRdrEnv
+		-- has the correct parent for all the names in its range.
+		-- For imported things, we only suck in the binding site later, if ever.
+	-- Reason for all this:
+	--   Suppose module M exports type A.T, and constructor A.MkT
+	--   Then, we know that A.MkT is a subordinate name of A.T,
+	--   even though we aren't at the binding site of A.T
+	--   And it's important, because we may simply re-export A.T
+	--   without ever sucking in the declaration itself.
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")

@@ -4,7 +4,7 @@
 module IfaceEnv (
 	newGlobalBinder, newIPName, newImplicitBinder, 
 	lookupIfaceTop, lookupIfaceExt,
-	lookupOrig, lookupImplicitOrig, lookupIfaceTc,
+	lookupOrig, lookupIfaceTc,
 	newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv,
 	tcIfaceGlobal, tcIfaceTyCon, tcIfaceClass, tcIfaceExtId,
@@ -145,24 +145,10 @@ lookupOrig :: ModuleName -> OccName -> TcRnIf a b Name
 -- We fake up 
 --	Module to AnotherPackage
 -- 	SrcLoc to noSrcLoc
+--	Parent no Nothing
 -- They'll be overwritten, in due course, by LoadIface.loadDecl.
-lookupOrig mod_name occ = lookupOrig_help mod_name occ Nothing
 
-lookupImplicitOrig :: Name -> OccName -> TcRnIf m n Name
--- Same as lookupOrig, but install (Just parent) as the 
--- parent Name.   This is used when looking at the exports 
--- of an interface:
---   Suppose module M exports type A.T, and constructor A.MkT
---   Then, we know that A.MkT is an implicit name of A.T,
---   even though we aren't at the binding site of A.T
---   And it's important, because we may simply re-export A.T
---   without ever sucking in the declaration itself.
-lookupImplicitOrig name occ
-  = lookupOrig_help (nameModuleName name) occ (Just name)
-
-lookupOrig_help :: ModuleName -> OccName -> Maybe Name -> TcRnIf a b Name
--- Local helper, not exported
-lookupOrig_help mod_name occ mb_parent
+lookupOrig mod_name occ 
   = do 	{ 	-- First ensure that mod_name and occ are evaluated
 		-- If not, chaos can ensue:
 		-- 	we read the name-cache
@@ -178,7 +164,7 @@ lookupOrig_help mod_name occ mb_parent
 
 	{ let { (us', us1)      = splitUniqSupply (nsUniqs name_supply)
 	      ;	uniq   	  	= uniqFromSupply us1
-	      ;	name            = mkExternalName uniq tmp_mod occ mb_parent noSrcLoc
+	      ;	name            = mkExternalName uniq tmp_mod occ Nothing noSrcLoc
 	      ;	new_cache       = extend_name_cache (nsNames name_supply) tmp_mod occ name
 	      ;	new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
 	      ;	tmp_mod    	= mkPackageModule mod_name 
