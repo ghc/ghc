@@ -49,4 +49,13 @@ SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
 
 SRC_HC_OPTS +=  -fglasgow-exts
 
+# libghccompat is needed to build ghc-pkg, which is built during 'make boot',
+# so we must build this library during 'make boot' too.
+# Do a recursive 'make all' after generating dependencies, because this
+# will work with 'make -j'.
+ifneq "$(BootingFromHc)" "YES"
+boot :: depend
+	$(MAKE) all
+endif
+
 include $(TOP)/mk/target.mk
