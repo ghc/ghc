@@ -38,6 +38,7 @@ import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 		  tryTakeMVar, tryPutMVar, isEmptyMVar,
                   readMVar, swapMVar,
 		)
+import Hugs.Exception ( throwIO )
 #endif
 
 #ifdef __GLASGOW_HASKELL__

@@ -17,15 +17,21 @@ module Control.Exception (
 
 	-- * The Exception type
 	Exception(..),		-- instance Eq, Ord, Show, Typeable
+#ifdef __GLASGOW_HASKELL__
 	IOException,		-- instance Eq, Ord, Show, Typeable
 	ArithException(..),	-- instance Eq, Ord, Show, Typeable
 	ArrayException(..),	-- instance Eq, Ord, Show, Typeable
 	AsyncException(..),	-- instance Eq, Ord, Show, Typeable
+#endif
 
 	-- * Throwing exceptions
+#ifndef __HUGS__
 	throw,		-- :: Exception -> a
+#endif
 	ioError,	-- :: Exception -> IO a
+#ifndef __HUGS__
 	throwTo,	-- :: ThreadId -> Exception -> a
+#endif
 
 	-- * Catching Exceptions
 
@@ -53,19 +59,23 @@ module Control.Exception (
 	-- $preds
 
 	ioErrors,		-- :: Exception -> Maybe IOError
+#ifndef __HUGS__
 	arithExceptions, 	-- :: Exception -> Maybe ArithException
 	errorCalls,		-- :: Exception -> Maybe String
 	dynExceptions,		-- :: Exception -> Maybe Dynamic
 	assertions,		-- :: Exception -> Maybe String
 	asyncExceptions, 	-- :: Exception -> Maybe AsyncException
+#endif /* __HUGS__ */
 	userErrors,		-- :: Exception -> Maybe String
 
+#ifdef __GLASGOW_HASKELL__
 	-- * Dynamic exceptions
 
 	-- $dynamic
 	throwDyn, 	-- :: Typeable ex => ex -> b
 	throwDynTo, 	-- :: Typeable ex => ThreadId -> ex -> b
 	catchDyn, 	-- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
+#endif
 	
 	-- * Asynchronous Exceptions
 
@@ -102,32 +112,35 @@ module Control.Exception (
 
 #ifdef __GLASGOW_HASKELL__
 import Prelude 		hiding (catch)
-import System.IO.Error
 import GHC.Base		( assert )
-import GHC.Exception 	hiding (try, catch, bracket, bracket_)
+import GHC.Exception 	as ExceptionBase hiding (try, catch, bracket, bracket_)
 import GHC.Conc		( throwTo, ThreadId )
 import GHC.IOBase	( IO(..) )
 #endif
 
 #ifdef __HUGS__
-import Prelude hiding ( catch )
-import PrelPrim	( catchException 
-		, Exception(..)
-		, throw
-		, ArithException(..)
-		, AsyncException(..)
-		, assert
-		)
+import Prelude 		hiding ( catch, ioError )
+import Hugs.Exception	hiding ( evaluate )
+import qualified Hugs.Exception as ExceptionBase
 #endif
 
+import System.IO.Error
 import Data.Dynamic
 
 #include "Dynamic.h"
 INSTANCE_TYPEABLE0(Exception,exceptionTc,"Exception")
+#ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE0(IOException,ioExceptionTc,"IOException")
 INSTANCE_TYPEABLE0(ArithException,arithExceptionTc,"ArithException")
 INSTANCE_TYPEABLE0(ArrayException,arrayExceptionTc,"ArrayException")
 INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
+#endif
+
+#ifdef __HUGS__
+-- This is as close as Hugs gets to providing throw
+throw :: Exception -> IO a
+throw = ioError
+#endif
 
 -----------------------------------------------------------------------------
 -- Catching exceptions
@@ -174,7 +187,7 @@ INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
 catch  	:: IO a 		-- ^ The computation to run
   	-> (Exception -> IO a)	-- ^ Handler to invoke if an exception is raised
   	-> IO a			
-catch =  GHC.Exception.catchException
+catch =  ExceptionBase.catchException
 
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
@@ -223,10 +236,14 @@ handleJust p =  flip (catchJust p)
 --
 -- NOTE: @(evaluate a)@ is /not/ the same as @(a \`seq\` return a)@.
 evaluate :: a -> IO a
+#if defined(__GLASGOW_HASKELL__)
 evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
 	-- NB. can't write  
 	-- 	a `seq` (# s, a #)
 	-- because we can't have an unboxed tuple as a function argument
+#elif defined(__HUGS__)
+evaluate = ExceptionBase.evaluate
+#endif
 
 -----------------------------------------------------------------------------
 -- 'try' and variations.
@@ -256,6 +273,7 @@ tryJust p a = do
 			Nothing -> throw e
 			Just b  -> return (Left b)
 
+#ifdef __GLASGOW_HASKELL__
 -----------------------------------------------------------------------------
 -- Dynamic exceptions
 
@@ -291,6 +309,7 @@ catchDyn m k = catchException m handle
 				    Just exception  -> k exception
 				    Nothing -> throw ex
 			   _ -> throw ex
+#endif /* __GLASGOW_HASKELL__ */
 
 -----------------------------------------------------------------------------
 -- Exception Predicates
@@ -301,13 +320,21 @@ catchDyn m k = catchException m handle
 -- classes of exceptions.
 
 ioErrors		:: Exception -> Maybe IOError
+#ifdef __GLASGOW_HASKELL__
 arithExceptions 	:: Exception -> Maybe ArithException
 errorCalls		:: Exception -> Maybe String
 dynExceptions		:: Exception -> Maybe Dynamic
 assertions		:: Exception -> Maybe String
 asyncExceptions 	:: Exception -> Maybe AsyncException
+#endif /* __GLASGOW_HASKELL__ */
 userErrors		:: Exception -> Maybe String
 
+#ifdef __HUGS__
+ioErrors = justIoErrors
+userErrors = justUserErrors
+#endif
+
+#ifdef __GLASGOW_HASKELL__
 ioErrors e@(IOException _) = Just e
 ioErrors _ = Nothing
 
@@ -328,6 +355,7 @@ asyncExceptions _ = Nothing
 
 userErrors e@IOException{} | isUserError e = Just (ioeGetErrorString e)
 userErrors _ = Nothing
+#endif /* __GLASGOW_HASKELL__ */
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions
@@ -477,4 +505,10 @@ Similar arguments apply for other interruptible operations like
 -- argument to 'assert' is ignored, and the second argument is
 -- returned as the result.
 assert :: Bool -> a -> a
+#endif
+
+#ifndef __GLASGOW_HASKELL__
+assert :: Bool -> a -> a
+assert True x = x
+assert False _ = error "Assertion failure"
 #endif
