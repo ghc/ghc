@@ -114,7 +114,7 @@ gen_primop_tag (Info defaults pos)
    = unlines (zipWith f pos [1..])
      where
         f i n = "tagOf_PrimOp " ++ cons i 
-                ++ " = ILIT(" ++ show n ++ ") :: FAST_INT"
+                ++ " = _ILIT(" ++ show n ++ ") :: FastInt"
 
 gen_enum_decl (Info defaults pos)
    = let conss = map cons pos
