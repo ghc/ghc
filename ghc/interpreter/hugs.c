@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.40 $
- * $Date: 2000/03/09 21:35:38 $
+ * $Revision: 1.41 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -19,12 +19,9 @@
 
 #include "prelude.h"
 #include "storage.h"
-#include "command.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
 #include "version.h"
-#include "link.h"
 
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -789,21 +786,13 @@ struct options toggle[] = {             /* List of command line toggles    */
     {'w', 1, "Always show which modules are loaded",  &listScripts},
     {'k', 1, "Show kind errors in full",              &kindExpert},
     {'o', 0, "Allow overlapping instances",           &allowOverlap},
-
-
-#if DEBUG_CODE
-    {'D', 1, "Debug: show generated code",            &debugCode},
-#endif
+    {'S', 1, "Debug: show generated SC code",         &debugSC},
 #if EXPLAIN_INSTANCE_RESOLUTION
     {'x', 1, "Explain instance resolution",           &showInstRes},
 #endif
 #if MULTI_INST
     {'m', 0, "Use multi instance resolution",         &multiInstRes},
 #endif
-#if DEBUG_CODE
-    {'D', 1, "Debug: show generated G code",          &debugCode},
-#endif
-    {'S', 1, "Debug: show generated SC code",         &debugSC},
     {0,   0, 0,                                       0}
 };
 

@@ -10,17 +10,16 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.26 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.27 $
+ * $Date: 2000/03/10 20:03:37 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
 #include "link.h"
-#include "dynamic.h"
+
 #include "Assembler.h"
 
 
@@ -438,22 +437,6 @@ StgExpr failExpr;
         }
     }
 }
-
-#if 0 /* apparently not used */
-static Void ppExp( Name n, Int arity, Cell e )
-{
-    if (1 || debugCode) {
-        Int i;
-        printf("%s", textToStr(name(n).text));
-        for (i = arity; i > 0; i--) {
-            printf(" o%d", i);
-        }
-        printf(" = ");
-        printExp(stdout,e); 
-        printf("\n");
-    }
-}
-#endif
 
 
 Void stgDefn( Name n, Int arity, Cell e )

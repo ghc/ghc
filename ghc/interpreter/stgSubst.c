@@ -9,13 +9,12 @@
  * included in the distribution.
  *
  * $RCSfile: stgSubst.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/11/12 17:32:46 $
+ * $Revision: 1.7 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
 

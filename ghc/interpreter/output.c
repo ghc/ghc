@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.14 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.15 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -215,7 +215,7 @@ Cell e; {
                           break;
 
         case LETREC     : OPEN(d>WHERE_PREC);
-#if DEBUG_CODE
+#if 0
                           putStr("let {");
                           put(NEVER,fst(snd(e)));
                           putStr("} in ");
@@ -271,7 +271,7 @@ Cell e; {
 
         case CASE       : putStr("case ");
                           put(NEVER,fst(snd(e)));
-#if DEBUG_CODE
+#if 0
                           putStr(" of {");
                           put(NEVER,snd(snd(e)));
                           putChr('}');
@@ -357,7 +357,7 @@ Cell q; {
 
 static Bool local isDictVal(e)          /* Look for dictionary value       */
 Cell e; {
-#if !DEBUG_CODE
+#if 0   /* was !DEBUG_CODE -- is it necessary? */
     Cell h = getHead(e);
     switch (whatIs(h)) {
         case DICTVAR : return TRUE;

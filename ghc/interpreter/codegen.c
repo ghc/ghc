@@ -9,18 +9,16 @@
  * included in the distribution.
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.17 $
- * $Date: 2000/03/07 16:18:25 $
+ * $Revision: 1.18 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "Assembler.h"
-#include "link.h"
 
+#include "Assembler.h"
 #include "Rts.h"    /* IF_DEBUG */
 #include "RtsFlags.h"
 
@@ -163,7 +161,7 @@ print(e,10);printf("\n");
 	       pushVar(bco,name(e).stgVar);
             } else {
                Cell /*CPtr*/ addr = cptrFromName(e);
-#              ifdef DEBUG_CODEGEN
+#              if DEBUG_CODEGEN
                fprintf ( stderr, "nativeAtom: name %s\n", 
                                  nameFromOPtr(cptrOf(addr)) );
 #              endif
@@ -553,7 +551,7 @@ static Void build( AsmBCO bco, StgVar v )
             if (isCPtr(fun)) {
                assert(isName(fun0));
                itsaPAP = name(fun0).arity > length(args);
-#              ifdef DEBUG_CODEGEN
+#              if DEBUG_CODEGEN
                fprintf ( stderr, "nativeCall: name %s, arity %d, args %d\n",
                          nameFromOPtr(cptrOf(fun)), name(fun0).arity,
                          length(args) );

@@ -9,17 +9,15 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.19 $
- * $Date: 2000/03/09 02:47:13 $
+ * $Revision: 1.20 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
-#include "command.h"
 #include "errors.h"
-#include "link.h"
+
 #include <ctype.h>
 #if HAVE_GETDELIM_H
 #include "getdelim.h"

@@ -9,17 +9,15 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.29 $
+ * $Date: 2000/03/10 20:03:37 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
-#include "link.h"
 #include "errors.h"
-#include "subst.h"
+
 #include "Assembler.h" /* for AsmCTypes */
 
 /*#define DEBUG_TYPES*/
@@ -28,11 +26,6 @@
 /*#define DEBUG_SELS*/
 /*#define DEBUG_DEPENDS*/
 /*#define DEBUG_DERIVING*/
-/*#define DEBUG_CODE*/
-
-Bool catchAmbigs       = FALSE;         /* TRUE => functions with ambig.   */
-                                        /*         types produce error     */
-
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -150,6 +143,10 @@ static List skolVars;                   /*::[[Var]] skolem vars            */
 static List localEvs;                   /*::[[(Pred,offset,ev)]]           */
 static List savedPs;                    /*::[[(Pred,offset,ev)]]           */
 static Cell dummyVar;                   /* Used to put extra tvars into ass*/
+
+Bool catchAmbigs       = FALSE;         /* TRUE => functions with ambig.   */
+                                        /*         types produce error     */
+
 
 #define saveVarsAss()     List saveAssump = hd(varsBounds)
 #define restoreVarsAss()  hd(varsBounds)  = saveAssump
@@ -2730,11 +2727,6 @@ Type primType( Int /*AsmMonad*/ monad, String a_kinds, String r_kinds )
         assert(length(tvars) == nextVar);
         r = mkPolyType(simpleKind(length(tvars)),r);
     }
-#if DEBUG_CODE
-    if (debugCode) {
-        printType(stdout,r); printf("\n");
-    }
-#endif
     return r;
 }    
 

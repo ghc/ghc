@@ -9,16 +9,15 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.12 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.13 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "link.h"      /* for nameTrue/False     */
+
 #include "Assembler.h" /* for AsmRep and primops */
 
 /* --------------------------------------------------------------------------

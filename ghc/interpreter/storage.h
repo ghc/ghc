@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.32 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.33 $
+ * $Date: 2000/03/10 20:03:37 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -950,110 +950,6 @@ extern Void        dropScriptsFrom  Args((Script));
 
 
 /* --------------------------------------------------------------------------
- * Plugins
- * ------------------------------------------------------------------------*/
-
-#if PLUGINS
-/* This is an exact copy of the declaration found in GreenCard.h */
-
-typedef int     HugsStackPtr;
-typedef int     HugsStablePtr;
-typedef Pointer HugsForeign;
-
-typedef struct {
-
-  /* evaluate next argument */
-  int            (*getInt   )     Args(());  
-  unsigned int   (*getWord  )     Args(());
-  void*          (*getAddr  )     Args(());
-  float          (*getFloat )     Args(());
-  double         (*getDouble)     Args(());
-  char           (*getChar  )     Args(());
-  HugsForeign    (*getForeign)    Args(());
-  HugsStablePtr  (*getStablePtr)  Args(());
-
-  /* push part of result   */
-  void           (*putInt   )     Args((int));           
-  void           (*putWord  )     Args((unsigned int));
-  void           (*putAddr  )     Args((void*));
-  void           (*putFloat )     Args((double));
-  void           (*putDouble)     Args((double));
-  void           (*putChar  )     Args((char));
-  void           (*putForeign)    Args((HugsForeign, void (*)(HugsForeign)));
-  void           (*putStablePtr)  Args((HugsStablePtr));
-
-  /* return n values in IO monad or Id monad */
-  void           (*returnIO)      Args((HugsStackPtr, int));
-  void           (*returnId)      Args((HugsStackPtr, int));
-  int            (*runIO)         Args((int));
-
-  /* free a stable pointer */                            
-  void           (*freeStablePtr) Args((HugsStablePtr));
-
-  /* register the prim table */                          
-  void           (*registerPrims) Args((struct primInfo*));
-                           
-  /* garbage collect */
-  void           (*garbageCollect) Args(());
-
-} HugsAPI2;
-
-extern  HugsAPI2* hugsAPI2     Args((Void));
-typedef Void (*InitModuleFun2) Args((HugsAPI2*));
-
-typedef struct {
-  Name  nameTrue, nameFalse;
-  Name  nameNil,  nameCons;
-  Name  nameJust, nameNothing;
-  Name  nameLeft, nameRight;
-  Name  nameUnit;
-  Name  nameIORun;
-
-  Cell  (*makeInt)         Args((Int));
-                           
-  Cell  (*makeChar)        Args((Char));
-  Char  (*CharOf)          Args((Cell));
-                           
-  Cell  (*makeFloat)       Args((FloatPro));
-  Cell  (*makeTuple)       Args((Int));
-  Pair  (*pair)            Args((Cell,Cell));
-                           
-  Cell  (*mkMallocPtr)     Args((Void *, Void (*)(Void *)));
-  Void *(*derefMallocPtr)  Args((Cell));
-                           
-  Int   (*mkStablePtr)     Args((Cell));
-  Cell  (*derefStablePtr)  Args((Int));
-  Void  (*freeStablePtr)   Args((Int));
-                           
-  Void  (*eval)            Args((Cell));
-  Cell  (*evalWithNoError) Args((Cell));
-  Void  (*evalFails)       Args((StackPtr));
-  Int   *whnfArgs;         
-  Cell  *whnfHead;         
-  Int   *whnfInt;          
-  Float *whnfFloat;        
-                           
-  Void  (*garbageCollect)  Args(());
-  Void  (*stackOverflow)   Args(());
-  Void  (*internal)        Args((String)) HUGS_noreturn;
-
-  Void  (*registerPrims)   Args((struct primInfo*));
-  Name  (*addPrimCfun)     Args((Text,Int,Int,Cell));
-  Text  (*inventText)      Args(());
-
-  Cell *(*Fst)             Args((Cell));
-  Cell *(*Snd)             Args((Cell));
-
-  Cell  *cellStack;
-  StackPtr *sp;
-} HugsAPI1;
-
-extern  HugsAPI1* hugsAPI1     Args((Void));
-typedef Void (*InitModuleFun1) Args((HugsAPI1*));
-#endif /* PLUGINS */
-
-
-/* --------------------------------------------------------------------------
  * Misc:
  * ------------------------------------------------------------------------*/
 
@@ -1071,13 +967,5 @@ extern void dumpName ( Int n );
 extern void dumpClass ( Int c );
 extern void dumpInst ( Int i );
 extern void locateSymbolByName ( Text t );
-
-#if LEADING_UNDERSCORE
-#define MAYBE_LEADING_UNDERSCORE(sss)     _##sss
-#define MAYBE_LEADING_UNDERSCORE_STR(sss) "_" sss
-#else
-#define MAYBE_LEADING_UNDERSCORE(sss)     sss
-#define MAYBE_LEADING_UNDERSCORE_STR(sss) sss
-#endif
 
 /*-------------------------------------------------------------------------*/

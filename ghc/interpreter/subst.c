@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.12 $
- * $Date: 2000/03/09 10:19:33 $
+ * $Revision: 1.13 $
+ * $Date: 2000/03/10 20:03:37 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -19,7 +19,7 @@
 #include "connect.h"
 #include "errors.h"
 #include "link.h"
-#include "subst.h"
+
 
 /*#define DEBUG_TYPES*/
 

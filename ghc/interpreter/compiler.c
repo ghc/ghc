@@ -11,28 +11,19 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.20 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.21 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
+
 #include "Rts.h"                       /* for rts_eval and related stuff   */
 #include "RtsAPI.h"                    /* for rts_eval and related stuff   */
 #include "SchedAPI.h"                  /* for RevertCAFs                   */
 #include "Schedule.h"
-#include "link.h"
-
-Addr inputCode;                        /* Addr of compiled code for expr   */
-static Name currentName;               /* Top level name being processed   */
-#if DEBUG_CODE
-Bool   debugCode     = FALSE;          /* TRUE => print G-code to screen   */
-#endif
-
-
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -85,6 +76,7 @@ static Void local compileGenFunction    Args((Name));
 static Name local compileSelFunction    Args((Pair));
 static List local addStgVar             Args((List,Pair));
 
+static Name currentName;               /* Top level name being processed   */
 
 /* --------------------------------------------------------------------------
  * Translation:    Convert input expressions into a less complex language

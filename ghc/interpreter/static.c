@@ -9,17 +9,14 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.29 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
-#include "link.h"
 #include "errors.h"
-#include "subst.h"
 
 /* --------------------------------------------------------------------------
  * local function prototypes:

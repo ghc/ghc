@@ -7,18 +7,17 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.36 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.37 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
-#include "link.h"
-#include "Assembler.h"  /* for wrapping GHC objects */
 #include "object.h"
+
+#include "Assembler.h"  /* for wrapping GHC objects */
 
 
 /*#define DEBUG_IFACE*/

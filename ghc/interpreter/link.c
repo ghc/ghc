@@ -9,18 +9,16 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.48 $
- * $Date: 2000/03/10 14:53:00 $
+ * $Revision: 1.49 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
 #include "Assembler.h" /* for asmPrimOps and AsmReps */
 
-#include "link.h"
 
 
 Type typeArrow;                         /* Function spaces                 */
@@ -334,11 +332,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
 
         stdDefaults              = NIL;
         stdDefaults              = cons(typeDouble,stdDefaults);
-#       if DEFAULT_BIGNUM
         stdDefaults              = cons(typeInteger,stdDefaults);
-#       else
-        stdDefaults              = cons(typeInt,stdDefaults);
-#       endif
 
         predNum                  = ap(classNum,aVar);
         predFractional           = ap(classFractional,aVar);

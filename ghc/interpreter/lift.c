@@ -12,13 +12,12 @@
  * included in the distribution.
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/12/10 15:59:47 $
+ * $Revision: 1.11 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
 

@@ -9,17 +9,15 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/12/10 15:59:43 $
+ * $Revision: 1.12 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
 #include "Assembler.h"
-#include "link.h"
 
 List cfunSfuns;                        /* List of (Cfun,[SelectorVar])    */
 

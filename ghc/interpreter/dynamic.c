@@ -9,14 +9,13 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/25 10:19:15 $
+ * $Revision: 1.14 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
 #include "errors.h"
-#include "dynamic.h"
 #include "connect.h"
 
 #if HAVE_WINDOWS_H && !defined(__MSDOS__)

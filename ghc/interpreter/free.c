@@ -9,13 +9,12 @@
  * included in the distribution.
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.8 $
- * $Date: 2000/02/03 13:55:21 $
+ * $Revision: 1.9 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
 #include "storage.h"
-#include "backend.h"
 #include "connect.h"
 #include "errors.h"
 

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.7 $
- * $Date: 2000/03/10 17:30:36 $
+ * $Revision: 1.8 $
+ * $Date: 2000/03/10 20:03:36 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE
@@ -338,3 +338,5 @@ extern Void   hugsPutc              Args((int, FILE*));
 #define Putc                 putc
 
 #endif
+
+/*-------------------------------------------------------------------------*/
