@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/10/15 11:03:01 $
+ * $Revision: 1.19 $
+ * $Date: 1999/10/19 11:01:26 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1551,11 +1551,11 @@ static inline void            PushTaggedWord     ( StgWord       x )
    { Sp -= sizeofW(StgWord);       *Sp = x;          PushTag(WORD_TAG);   }
        inline void            PushTaggedAddr     ( StgAddr       x ) 
    { Sp -= sizeofW(StgAddr);       *Sp = (W_)x;      PushTag(ADDR_TAG);   }
-static inline void            PushTaggedChar     ( StgChar       x ) 
+       inline void            PushTaggedChar     ( StgChar       x ) 
    { Sp -= sizeofW(StgChar);         *Sp = stgCast(StgWord,x); PushTag(CHAR_TAG); }
-static inline void            PushTaggedFloat    ( StgFloat      x ) 
+       inline void            PushTaggedFloat    ( StgFloat      x ) 
    { Sp -= sizeofW(StgFloat);      ASSIGN_FLT(Sp,x); PushTag(FLOAT_TAG);  }
-static inline void            PushTaggedDouble   ( StgDouble     x ) 
+       inline void            PushTaggedDouble   ( StgDouble     x ) 
    { Sp -= sizeofW(StgDouble);     ASSIGN_DBL(Sp,x); PushTag(DOUBLE_TAG); }
 static inline void            PushTaggedStablePtr   ( StgStablePtr  x ) 
    { Sp -= sizeofW(StgStablePtr);  *Sp = x;          PushTag(STABLE_TAG); }
@@ -3044,10 +3044,17 @@ off the stack.
         case i_ccall_Id:
         case i_ccall_IO:
             {
+                int r;
                 CFunDescriptor* descriptor = PopTaggedAddr();
                 void (*funPtr)(void)       = PopTaggedAddr();
-                ccall(descriptor,funPtr,bco);
-                break;
+                r = ccall(descriptor,funPtr,bco);
+                if (r == 0) break;
+                if (r == 1) 
+                   return makeErrorCall(
+                      "unhandled type or too many args/results in ccall");
+                if (r == 2)
+                   barf("ccall not configured correctly for this platform");
+                barf("unknown return code from ccall");
             }
         default:
                 barf("Unrecognised primop2");

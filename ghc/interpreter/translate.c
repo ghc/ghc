@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 21:41:00 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/19 11:01:24 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -852,6 +852,11 @@ Void implementForeignImport ( Name n )
     mapOver(foreignInboundTy,resultTys); /* doesn't */
     descriptor = mkDescriptor(charListToString(argTys),
                               charListToString(resultTys));
+    if (!descriptor) {
+       ERRMSG(0) "Can't allocate memory for call descriptor"
+       EEND;
+    }
+
     name(n).primop = addState ? &ccall_IO : &ccall_Id;
     {
         Pair    extName = name(n).defn;
