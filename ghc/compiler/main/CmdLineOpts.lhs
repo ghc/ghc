@@ -282,6 +282,7 @@ data DynFlag
 
    -- optimisation opts
    | Opt_Strictness
+   | Opt_FullLaziness
    | Opt_CSE
    | Opt_IgnoreInterfacePragmas
    | Opt_OmitInterfacePragmas
@@ -373,8 +374,9 @@ defaultDynFlags = DynFlags {
 	    Opt_Strictness,
 			-- strictness is on by default, but this only
 			-- applies to -O.
-	    Opt_CSE,
-			-- similarly for CSE.
+	    Opt_CSE,		-- similarly for CSE.
+	    Opt_FullLaziness,	-- ...and for full laziness
+
 	    Opt_DoLambdaEtaExpansion,
 			-- This one is important for a tiresome reason:
 			-- we want to make sure that the bindings for data 
@@ -478,11 +480,12 @@ opt_1_dopts = [
 buildCoreToDo :: DynFlags -> [CoreToDo]
 buildCoreToDo dflags = core_todo
   where
-    opt_level  = optLevel dflags
-    max_iter   = maxSimplIterations dflags
-    strictness = dopt Opt_Strictness dflags
-    cse        = dopt Opt_CSE dflags
-    rule_check = ruleCheck dflags
+    opt_level  	  = optLevel dflags
+    max_iter   	  = maxSimplIterations dflags
+    strictness    = dopt Opt_Strictness dflags
+    full_laziness = dopt Opt_FullLaziness dflags
+    cse           = dopt Opt_CSE dflags
+    rule_check    = ruleCheck dflags
 
     core_todo = 
      if opt_level == 0 then
@@ -516,7 +519,9 @@ buildCoreToDo dflags = core_todo
 	-- so that overloaded functions have all their dictionary lambdas manifest
 	CoreDoSpecialising,
 
-	CoreDoFloatOutwards (FloatOutSw False False),
+	if full_laziness then CoreDoFloatOutwards (FloatOutSw False False)
+			 else CoreDoNothing,
+
 	CoreDoFloatInwards,
 
 	CoreDoSimplify (SimplPhase 2) [
@@ -564,8 +569,10 @@ buildCoreToDo dflags = core_todo
 	   MaxSimplifierIterations max_iter
 	],
 
-	CoreDoFloatOutwards (FloatOutSw False	-- Not lambdas
-					True),	-- Float constants
+	if full_laziness then
+	  CoreDoFloatOutwards (FloatOutSw False	  -- Not lambdas
+					  True)   -- Float constants
+	else CoreDoNothing,
 		-- nofib/spectral/hartel/wang doubles in speed if you
 		-- do full laziness late in the day.  It only happens
 		-- after fusion and other stuff, so the early pass doesn't

@@ -811,6 +811,13 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fno-full-laziness</option></entry>
+	      <entry>Turn off full laziness (floating bindings outwards)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fno-pre-inlining</option></entry>
 	      <entry>Turn off pre-inlining</entry>
 	      <entry>static</entry>

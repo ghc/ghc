@@ -464,6 +464,7 @@ fFlags = [
   ( "allow-incoherent-instances", 	Opt_AllowIncoherentInstances ),
   ( "generics",  			Opt_Generics ),
   ( "strictness",			Opt_Strictness ),
+  ( "full-laziness",			Opt_FullLaziness ),
   ( "cse",				Opt_CSE ),
   ( "ignore-interface-pragmas",		Opt_IgnoreInterfacePragmas ),
   ( "omit-interface-pragmas",		Opt_OmitInterfacePragmas ),
