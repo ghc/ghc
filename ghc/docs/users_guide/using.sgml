@@ -574,6 +574,16 @@ ghc &ndash;&ndash;make Main.hs
           counterintuitive: <command>ghc -C -o foo.o foo.hs</command>
           will put the intermediate C code in the file
           <filename>foo.o</filename>, name notwithstanding!</para>
+
+	  <para>Note: on Windows, if the result is an executable file, the
+          extension "<filename>.exe</filename>" is added if the specified filename
+	    does not already have an extension.  Thus
+           <programlisting>
+                ghc -o foo Main.hs
+           </programlisting>
+          will compile and link the module <filename>Main.hs</filename>, and put the
+          resulting executable in <filename>foo.exe</filename> (not <filename>foo</filename>).
+	  </para>
 	</listitem>
       </varlistentry>
 
