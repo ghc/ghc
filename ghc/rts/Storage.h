@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.46 2002/12/11 15:36:54 simonmar Exp $
+ * $Id: Storage.h,v 1.47 2002/12/13 14:43:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -420,6 +420,7 @@ static inline StgWord stack_frame_sizeW( StgClosure *frame )
 	return sizeofW(StgRetFun) + ((StgRetFun *)frame)->size;
 
     case RET_BIG:
+    case RET_VEC_BIG:
 	return 1 + info->i.layout.large_bitmap->size;
 
     case RET_BCO:
