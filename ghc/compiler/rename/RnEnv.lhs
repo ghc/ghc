@@ -8,6 +8,7 @@
 
 module RnEnv where		-- Export everything
 
+IMPORT_1_3(List (nub))
 IMP_Ubiq()
 
 import CmdLineOpts	( opt_WarnNameShadowing )
@@ -37,9 +38,7 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 import Pretty
 import Outputable	( PprStyle(..) )
 import Util		--( panic, removeDups, pprTrace, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import List (nub)
-#endif
+
 \end{code}
 
 
@@ -363,8 +362,12 @@ plusNameEnvRn n1 n2
   = mapRn (addErrRn.nameClashErr) (conflictsFM (/=) n1 n2)		`thenRn_`
     returnRn (n1 `plusFM` n2)
 
-addOneToNameEnv :: NameEnv -> RdrName -> Name -> NameEnv
-addOneToNameEnv env rdr_name name = addToFM env rdr_name name
+addOneToNameEnv :: NameEnv -> RdrName -> Name -> RnM s d NameEnv
+addOneToNameEnv env rdr_name name
+ = case lookupFM env rdr_name of
+	Nothing    -> returnRn (addToFM env rdr_name name)
+	Just name2 -> addErrRn (nameClashErr (rdr_name, (name, name2)))	`thenRn_`
+		      returnRn env
 
 lookupNameEnv :: NameEnv -> RdrName -> Maybe Name
 lookupNameEnv = lookupFM
@@ -535,12 +538,12 @@ conflictFM bad fm key elt
 nameClashErr (rdr_name, (name1,name2)) sty
   = hang (hsep [ptext SLIT("Conflicting definitions for:"), ppr sty rdr_name])
 	4 (vcat [pprNameProvenance sty name1,
-		     pprNameProvenance sty name2])
+		 pprNameProvenance sty name2])
 
 fixityClashErr (rdr_name, (fp1,fp2)) sty
   = hang (hsep [ptext SLIT("Conflicting fixities for:"), ppr sty rdr_name])
 	4 (vcat [pprFixityProvenance sty fp1,
-		     pprFixityProvenance sty fp2])
+		 pprFixityProvenance sty fp2])
 
 shadowedNameWarn shadow sty
   = hcat [ptext SLIT("This binding for"), 
