@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.58 2000/09/12 13:19:20 simonmar Exp $
+-- $Id: Main.hs,v 1.59 2000/09/14 08:17:54 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -506,7 +506,6 @@ hsc_minusO_flags = do
 		"-finline-phase2",
 		"-fmax-simplifier-iterations2",
 	  "]",
-
 
 	"-fsimplify",
 	  "[", 
@@ -1770,17 +1769,26 @@ run_phase Hsc	basename suff input_fn output_fn
   -- figure out if the source has changed, for recompilation avoidance.
   -- only do this if we're eventually going to generate a .o file.
   -- (ToDo: do when generating .hc files too?)
+  --
+  -- Setting source_unchanged to "-fsource_unchanged" means that M.o seems
+  -- to be up to date wrt M.hs; so no need to recompile unless imports have
+  -- changed (which the compiler itself figures out).
+  -- Setting source_unchanged to "" tells the compiler that M.o is out of
+  -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef recomp
 	todo <- readIORef v_todo
 	source_unchanged <- 
-          if do_recomp && ( todo == DoLink || todo == StopBefore Ln )
-	     then do t1 <- getModificationTime (basename ++ '.':suff)
+          if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
+	     then return ""
+	     else do t1 <- getModificationTime (basename ++ '.':suff)
 		     o_file <- odir_ify (basename ++ '.':phase_input_ext Ln)
-		     t2 <- getModificationTime o_file
-		     if t2 > t1
-			then return "-fsource-unchanged"
-			else return ""
-	     else return ""
+		     o_file_exists <- doesFileExist o_file
+		     if not o_file_exists
+		        then return ""	-- Need to recompile
+			else do t2 <- getModificationTime o_file
+			        if t2 > t1
+				  then return "-fsource-unchanged"
+				  else return ""
 
   -- run the compiler!
 	run_something "Haskell Compiler" 
