@@ -1,5 +1,4 @@
-dnl $Id: aclocal.m4,v 1.63 2001/01/15 22:24:54 lewie Exp $
-dnl do not read me
+dnl $Id: aclocal.m4,v 1.64 2001/01/16 06:02:29 qrczak Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -544,11 +543,11 @@ main()
 {
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
-  fprintf(f, "(%d)\n", $1);
+  fprintf(f, "%d\n", $1);
   exit(0);
 }], 
 eval "$cv_name=`cat conftestval`",
-eval "$cv_name='(-1)'",
+eval "$cv_name=-1",
 ifelse([$2], , , eval "$cv_name=$2"))])dnl
 eval "fptools_check_cconst_result=`echo '$'{$cv_name}`"
 AC_MSG_RESULT($fptools_check_cconst_result)
@@ -861,7 +860,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.63 2001/01/15 22:24:54 lewie Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.64 2001/01/16 06:02:29 qrczak Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -949,7 +948,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.63 2001/01/15 22:24:54 lewie Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.64 2001/01/16 06:02:29 qrczak Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,
