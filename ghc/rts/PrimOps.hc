@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.86 2001/12/05 17:35:15 sewardj Exp $
+ * $Id: PrimOps.hc,v 1.87 2001/12/06 13:05:03 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1357,7 +1357,6 @@ FN_(deRefStablePtrzh_fast)
   StgStablePtr sp;
   FB_
   sp = (StgStablePtr)R1.w;
-  ASSERT(stable_ptr_table[(StgWord)sp].weight > 0);
   r = stable_ptr_table[(StgWord)sp].addr;
   RET_P(r);
   FE_
