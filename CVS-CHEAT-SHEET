@@ -22,8 +22,25 @@ not sure about feel free to bug the local CVS meister (namely Me
 The following guidelines should mean we don't step on each other's
 toes too much.  Ok, here's what you do:
 
-* Firstly, identify which areas of the source tree you'll be working
-  on.  The directory structure looks like this:
+* (only if using CVS remotely, i.e. not at Glasgow):
+
+  To use remote CVS, you need to supply me with a username and
+  encrypted password.  Once you've done that and the account has been
+  set up, you need to do:
+
+     cvs -d <username>@solander.dcs.gla.ac.uk:/local/fp/src/cvsroot login
+
+  CVS will ask for a password.  You only need to enter the password once, 
+  it will be recorded in .cvspass in your home directory.
+
+     setenv CVSROOT :pserver:<username>@solander.dcs.gla.ac.uk:/local/fp/src/cvsroot
+
+  The CVSROOT environment variable will be recorded in the checked-out
+  tree, so you don't need to set this every time either.  Ignore the
+  instructions for setting CVSROOT below.
+
+* (ok, everybody now...) Firstly, identify which areas of the source
+  tree you'll be working on.  The directory structure looks like this:
 
 	fptools/ghc		GHC
 	fptools/hslibs		Haskell Libraries
