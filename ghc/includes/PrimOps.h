@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.60 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: PrimOps.h,v 1.61 2000/08/21 14:16:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -859,6 +859,9 @@ EXTFUN_RTS(finalizzeWeakzh_fast);
 
 #define ForeignObj_CLOSURE_DATA(c)  (((StgForeignObj *)c)->data)
 
+#define foreignObjToAddrzh(r,fo)    r=ForeignObj_CLOSURE_DATA(fo)
+#define touchzh(o)                  /* nothing */
+
 EXTFUN_RTS(mkForeignObjzh_fast);
 
 #define writeForeignObjzh(res,datum) \
@@ -879,6 +882,7 @@ EXTFUN_RTS(mkForeignObjzh_fast);
 #endif
 
 #endif
+
 
 /* -----------------------------------------------------------------------------
    Constructor tags

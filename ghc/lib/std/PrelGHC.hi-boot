@@ -325,6 +325,8 @@ __export PrelGHC
   ForeignObjzh
   mkForeignObjzh
   writeForeignObjzh
+  foreignObjToAddrzh
+  touchzh
 
   StablePtrzh
   makeStablePtrzh
