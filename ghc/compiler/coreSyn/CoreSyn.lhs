@@ -44,7 +44,7 @@ module CoreSyn (
 	IdCoreRule,
 	RuleName,
 	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules,
-	isBuiltinRule
+	isBuiltinRule, ruleName
     ) where
 
 #include "HsVersions.h"
@@ -174,11 +174,15 @@ data CoreRule
 	 CoreExpr	-- RHS
 
   | BuiltinRule		-- Built-in rules are used for constant folding
-			-- and suchlike.  It has no free variables.
-	([CoreExpr] -> Maybe (RuleName, CoreExpr))
+	RuleName	-- and suchlike.  It has no free variables.
+	([CoreExpr] -> Maybe CoreExpr)
 
-isBuiltinRule (BuiltinRule _) = True
-isBuiltinRule _		      = False
+isBuiltinRule (BuiltinRule _ _) = True
+isBuiltinRule _		        = False
+
+ruleName :: CoreRule -> RuleName
+ruleName (Rule n _ _ _)    = n
+ruleName (BuiltinRule n _) = n
 \end{code}
 
 
@@ -568,7 +572,7 @@ seqRules (Rules rules fvs) = seq_rules rules `seq` seqVarSet fvs
 
 seq_rules [] = ()
 seq_rules (Rule fs bs es e : rules) = seqBndrs bs `seq` seqExprs (e:es) `seq` seq_rules rules
-seq_rules (BuiltinRule _ : rules) = seq_rules rules
+seq_rules (BuiltinRule _ _ : rules) = seq_rules rules
 \end{code}
 
 

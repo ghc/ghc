@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.69 2001/09/06 15:43:35 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.70 2001/09/14 15:51:42 simonpj Exp $
 --
 -- Driver flags
 --
@@ -271,6 +271,9 @@ static_flags =
 
   ,  ( "fmax-simplifier-iterations", 
 		Prefix (writeIORef v_MaxSimplifierIterations . read) )
+
+  ,  ( "frule-check", 
+		SepArg (\s -> writeIORef v_RuleCheck (Just s)) )
 
   ,  ( "fusagesp"	   , NoArg (do writeIORef v_UsageSPInf True
 				       add v_Opt_C "-fusagesp-on") )

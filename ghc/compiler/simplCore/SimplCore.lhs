@@ -12,7 +12,6 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			  SwitchResult(..), intSwitchSet,
 			  DynFlags, DynFlag(..), dopt, dopt_CoreToDo
 			)
-import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )
 import HscTypes		( PersistentCompilerState(..),
@@ -20,7 +19,8 @@ import HscTypes		( PersistentCompilerState(..),
 			)
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, 
-			  extendRuleBaseList, addRuleBaseFVs, pprRuleBase )
+			  extendRuleBaseList, addRuleBaseFVs, pprRuleBase, 
+			  ruleCheckProgram )
 import Module		( moduleEnvElts )
 import CoreUnfold
 import PprCore		( pprCoreBindings, pprCoreExpr )
@@ -29,7 +29,8 @@ import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplUtils	( simplBinders )
 import SimplMonad
-import ErrUtils		( dumpIfSet, dumpIfSet_dyn )
+import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
+import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import Id		( idName, isDataConWrapId, setIdLocalExported, isImplicitId )
@@ -171,6 +172,8 @@ doCorePass dfs rb us binds CoreDoUSPInf
    = _scc_ "CoreUsageSPInf" noStats dfs (doUsageSPInf dfs us binds)
 doCorePass dfs rb us binds CoreDoGlomBinds	        
    = noStats dfs (glomBinds dfs binds)
+doCorePass dfs rb us binds (CoreDoRuleCheck pat)
+   = noStats dfs (ruleCheck dfs pat binds)
 doCorePass dfs rb us binds CoreDoNothing
    = noStats dfs (return binds)
 
@@ -178,8 +181,13 @@ printCore binds = do dumpIfSet True "Print Core"
 			       (pprCoreBindings binds)
 		     return binds
 
+ruleCheck dflags pat binds = do showPass dflags "RuleCheck"
+			        printDump (ruleCheckProgram pat binds)
+			        return binds
+
 -- most passes return no stats and don't change rules
 noStats dfs thing = do { binds <- thing; return (zeroSimplCount dfs, binds) }
+
 \end{code}
 
 
@@ -304,7 +312,7 @@ which without simplification looked like:
 This doesn't match unless you do eta reduction on the build argument.
 
 \begin{code}
-simplRule rule@(id, BuiltinRule _)
+simplRule rule@(id, BuiltinRule _ _)
   = returnSmpl rule
 simplRule rule@(id, Rule name bndrs args rhs)
   = simplBinders bndrs			$ \ bndrs' -> 

@@ -310,7 +310,7 @@ ifaceInstance dfun_id
 		-- and this instance decl wouldn't get imported into a module
 		-- that mentioned T but not Tibble.
 
-ifaceRule (id, BuiltinRule _)
+ifaceRule (id, BuiltinRule _ _)
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule id)
 
 ifaceRule (id, Rule name bndrs args rhs)

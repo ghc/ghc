@@ -541,7 +541,7 @@ tidyIdRules env ((fn,rule) : rules)
      ((tidyVarOcc env fn, rule) : rules)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule
-tidyRule env rule@(BuiltinRule _) = rule
+tidyRule env rule@(BuiltinRule _ _) = rule
 tidyRule env (Rule name vars tpl_args rhs)
   = tidyBndrs env vars			=: \ (env', vars) ->
     map (tidyExpr env') tpl_args  	=: \ tpl_args ->

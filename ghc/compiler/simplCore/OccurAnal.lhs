@@ -69,7 +69,7 @@ occurAnalyseGlobalExpr expr
     snd (occurAnalyseExpr (\_ -> False) expr)
 
 occurAnalyseRule :: CoreRule -> CoreRule
-occurAnalyseRule rule@(BuiltinRule _) = rule
+occurAnalyseRule rule@(BuiltinRule _ _) = rule
 occurAnalyseRule (Rule str tpl_vars tpl_args rhs)
 		-- Add occ info to tpl_vars, rhs
   = Rule str tpl_vars' tpl_args rhs'

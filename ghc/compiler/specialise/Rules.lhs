@@ -8,7 +8,7 @@ module Rules (
 	RuleBase, emptyRuleBase, 
 	extendRuleBase, extendRuleBaseList, addRuleBaseFVs, 
 	ruleBaseIds, ruleBaseFVs,
-	pprRuleBase,
+	pprRuleBase, ruleCheckProgram,
 
         lookupRule, addRule, addIdSpecialisations
     ) where
@@ -22,7 +22,7 @@ import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
 import Subst		( Subst, InScopeSet, mkInScopeSet, lookupSubst, extendSubst,
-			  substEnv, setSubstEnv, emptySubst, isInScope,
+			  substEnv, setSubstEnv, emptySubst, isInScope, emptyInScopeSet,
 			  bindSubstList, unBindSubstList, substInScope, uniqAway
 			)
 import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation ) 
@@ -35,6 +35,8 @@ import qualified TcType ( match )
 import Outputable
 import Maybe		( isJust, isNothing, fromMaybe )
 import Util		( sortLt )
+import Bag
+import List		( isPrefixOf )
 \end{code}
 
 
@@ -134,7 +136,10 @@ matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 --	(\x->E)	matches (\x->F x)
 
 
-matchRule in_scope rule@(BuiltinRule match_fn) args = match_fn args
+matchRule in_scope rule@(BuiltinRule name match_fn) args
+  = case match_fn args of
+	Just expr -> Just (name,expr)
+	Nothing   -> Nothing
 
 matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
   = go tpl_args args emptySubst
@@ -395,7 +400,11 @@ match_ty ty1 ty2 tpl_vars kont subst
 %************************************************************************
 
 \begin{code}
-addRule :: CoreRules -> Id -> CoreRule -> CoreRules
+addRule :: Id -> CoreRules -> CoreRule -> CoreRules
+
+-- Add a new rule to an existing bunch of rules.
+-- The rules are for the given Id; the Id argument is needed only
+-- so that we can exclude the Id from its own RHS free-var set
 
 -- Insert the new rule just before a rule that is *less specific*
 -- than the new one; or at the end if there isn't such a one.
@@ -405,11 +414,11 @@ addRule :: CoreRules -> Id -> CoreRule -> CoreRules
 -- We make no check for rules that unify without one dominating
 -- the other.   Arguably this would be a bug.
 
-addRule (Rules rules rhs_fvs) id rule@(BuiltinRule _)
+addRule id (Rules rules rhs_fvs) rule@(BuiltinRule _ _)
   = Rules (rule:rules) rhs_fvs
 	-- Put it at the start for lack of anything better
 
-addRule (Rules rules rhs_fvs) id rule
+addRule id (Rules rules rhs_fvs) rule
   = Rules (insertRule rules new_rule) (rhs_fvs `unionVarSet` new_rhs_fvs)
   where
     new_rule    = occurAnalyseRule rule
@@ -437,14 +446,13 @@ addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id rules
   = setIdSpecialisation id new_specs
   where
-    new_specs = foldr add (idSpecialisation id) rules
-    add rule rules = addRule rules id rule
+    new_specs = foldl (addRule id) (idSpecialisation id) rules
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Preparing the rule base
+\subsection{Looking up a rule}
 %*									*
 %************************************************************************
 
@@ -453,6 +461,118 @@ lookupRule :: InScopeSet -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 lookupRule in_scope fn args
   = case idSpecialisation fn of
 	Rules rules _ -> matchRules in_scope rules args
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Checking a program for failing rule applications}
+%*									*
+%************************************************************************
+
+-----------------------------------------------------
+			Game plan
+-----------------------------------------------------
+
+We want to know what sites have rules that could have fired but didn't.
+This pass runs over the tree (without changing it) and reports such.
+
+NB: we assume that this follows a run of the simplifier, so every Id
+occurrence (including occurrences of imported Ids) is decorated with
+all its (active) rules.  No need to construct a rule base or anything
+like that.
+
+\begin{code}
+ruleCheckProgram :: String -> [CoreBind] -> SDoc
+-- Report partial matches for rules beginning 
+-- with the specified string
+ruleCheckProgram rule_pat binds 
+  | isEmptyBag results
+  = text "Rule check results: no rule application sites"
+  | otherwise
+  = vcat [text "Rule check results:",
+	  line,
+	  vcat [ p $$ line | p <- bagToList results ]
+	 ]
+  where
+    results = unionManyBags (map (ruleCheckBind rule_pat) binds)
+    line = text (take 20 (repeat '-'))
+	  
+type RuleCheckEnv = String 	-- Pattern
+
+ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
+   -- The Bag returned has one SDoc for each call site found
+ruleCheckBind env (NonRec b r) = ruleCheck env r
+ruleCheckBind env (Rec prs)    = unionManyBags [ruleCheck env r | (b,r) <- prs]
+
+ruleCheck :: RuleCheckEnv -> CoreExpr -> Bag SDoc
+ruleCheck env (Var v) 	    = emptyBag
+ruleCheck env (Lit l) 	    = emptyBag
+ruleCheck env (Type ty)     = emptyBag
+ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
+ruleCheck env (Note n e)    = ruleCheck env e
+ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
+ruleCheck env (Lam b e)     = ruleCheck env e
+ruleCheck env (Case e _ as) = ruleCheck env e `unionBags` 
+			      unionManyBags [ruleCheck env r | (_,_,r) <- as]
+
+ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)
+ruleCheckApp env (Var f) as   = ruleCheckFun env f as
+ruleCheckApp env other as     = ruleCheck env other
+
+ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
+ruleCheckFun env fun args 
+  = ruleAppCheck match fun args
+  where
+    match rule_name = env `isPrefixOf` _UNPK_ rule_name
+\end{code}
+
+\begin{code}
+ruleAppCheck :: (RuleName -> Bool) -> Id -> [CoreExpr] -> Bag SDoc
+-- Produce a report for all rules matching the predicate
+-- saying why it doesn't match the specified application
+
+ruleAppCheck name_match fn args
+  | null name_match_rules = emptyBag
+  | otherwise		  = unitBag (ruleAppCheck_help fn args name_match_rules)
+  where
+    name_match_rules = case idSpecialisation fn of
+			  Rules rules _ -> filter match rules
+    match rule = name_match (ruleName rule)
+
+ruleAppCheck_help :: Id -> [CoreExpr] -> [CoreRule] -> SDoc
+ruleAppCheck_help fn args rules
+  = 	-- The rules match the pattern, so we want to print something
+    vcat [text "Expression:" <+> ppr (mkApps (Var fn) args),
+	  vcat (map check_rule rules)]
+  where
+    n_args = length args
+    i_args = args `zip` [1::Int ..]
+
+    check_rule rule = rule_herald rule <> colon <+> rule_info rule
+
+    rule_herald (BuiltinRule name _) = text "Builtin rule" <+> doubleQuotes (ptext name)
+    rule_herald (Rule name _ _ _)    = text "Rule" <+> doubleQuotes (ptext name)
+
+    rule_info rule
+	| Just (name,_) <- matchRule emptyInScopeSet rule args
+	= text "matches (which is very peculiar!)"
+
+    rule_info (BuiltinRule name fn) = text "does not match"
+
+    rule_info (Rule name rule_bndrs rule_args _)
+	| n_args < n_rule_args	      = text "too few arguments"
+	| n_mismatches == n_rule_args = text "no arguments match"
+	| n_mismatches == 0	      = text "all arguments match (considered individually), but the rule as a whole does not"
+	| otherwise		      = text "arguments" <+> ppr mismatches <+> text "do not match (1-indexing)"
+	where
+	  n_rule_args  = length rule_args
+	  n_mismatches = length mismatches
+	  mismatches   = [i | (rule_arg, (arg,i)) <- rule_args `zip` i_args,
+			      not (isJust (match_fn rule_arg arg))]
+
+	  bndr_set 	        = mkVarSet rule_bndrs
+	  match_fn rule_arg arg = match rule_arg arg bndr_set (\s -> Just ()) emptySubst
 \end{code}
 
 
@@ -492,7 +612,7 @@ extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
   = RuleBase (extendVarSet rule_ids new_id)
 	     (rule_fvs `unionVarSet` extendVarSet lhs_fvs id)
   where
-    new_id = setIdSpecialisation id (addRule old_rules id rule)
+    new_id = setIdSpecialisation id (addRule id old_rules rule)
 
     old_rules = idSpecialisation (fromMaybe id (lookupVarSet rule_ids id))
 	-- Get the old rules from rule_ids if the Id is already there, but

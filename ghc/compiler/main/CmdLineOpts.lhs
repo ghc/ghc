@@ -201,6 +201,8 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoCPResult
   | CoreDoGlomBinds
   | CoreCSE
+  | CoreDoRuleCheck String	-- Check for non-application of rules 
+				-- matching this string
 
   | CoreDoNothing 	 -- useful when building up lists of these things
 \end{code}

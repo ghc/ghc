@@ -530,11 +530,14 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon cs -> Nothing ;
-	CompulsoryUnfolding unf_template | black_listed -> Nothing 
-					 | otherwise 	-> Just unf_template ;
-		-- Constructors have compulsory unfoldings, but
-		-- may have rules, in which case they are 
-		-- black listed till later
+
+	CompulsoryUnfolding unf_template -> Just unf_template ;
+		-- CompulsoryUnfolding => there is no top-level binding
+		-- for these things, so we must inline it.
+		-- Only a couple of primop-like things have 
+		-- compulsory unfoldings (see MkId.lhs).
+		-- We don't allow them to be black-listed
+
 	CoreUnfolding unf_template is_top is_value is_cheap guidance ->
 
     let

@@ -373,8 +373,8 @@ pprIdCoreRule :: IdCoreRule -> SDoc
 pprIdCoreRule (id,rule) = pprCoreRule (ppr id) rule
 
 pprCoreRule :: SDoc -> CoreRule -> SDoc
-pprCoreRule pp_fn (BuiltinRule _)
-  = ifPprDebug (ptext SLIT("A built in rule"))
+pprCoreRule pp_fn (BuiltinRule name _)
+  = ifPprDebug (ptext SLIT("Built in rule") <+> doubleQuotes (ptext name))
 
 pprCoreRule pp_fn (Rule name tpl_vars tpl_args rhs)
   = doubleQuotes (ptext name) <+> 

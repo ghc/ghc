@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.56 2001/09/04 16:35:02 sewardj Exp $
+-- $Id: DriverState.hs,v 1.57 2001/09/14 15:51:42 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -149,6 +149,7 @@ GLOBAL_VAR(v_UsageSPInf,  	     	False, Bool)  -- Off by default
 GLOBAL_VAR(v_Strictness,  		True,  Bool)
 GLOBAL_VAR(v_CPR,         		True,  Bool)
 GLOBAL_VAR(v_CSE,         		True,  Bool)
+GLOBAL_VAR(v_RuleCheck,       		Nothing,  Maybe String)
 
 -- these are the static flags you get without -O.
 hsc_minusNoO_flags =
@@ -188,6 +189,7 @@ buildCoreToDo = do
    strictness <- readIORef v_Strictness
    cpr        <- readIORef v_CPR
    cse        <- readIORef v_CSE
+   rule_check <- readIORef v_RuleCheck
 
    if opt_level == 0 then return
       [
@@ -308,7 +310,9 @@ buildCoreToDo = do
 	CoreDoSimplify (isAmongSimpl [
 	  MaxSimplifierIterations max_iter
 		-- No -finline-phase: allow all Ids to be inlined now
-	])
+	]),
+
+	case rule_check of { Just pat -> CoreDoRuleCheck pat; Nothing -> CoreDoNothing }
      ]
 
 buildStgToDo :: IO [ StgToDo ]

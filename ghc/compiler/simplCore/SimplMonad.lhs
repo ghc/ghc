@@ -633,14 +633,12 @@ getBlackList dflags env us sc = (seBlackList env, us, sc)
 
 noInlineBlackList :: SimplM BlackList
 	-- Inside inlinings, black list anything that is in scope or imported.
-	-- except for things that must be unfolded (Compulsory)
-	-- and data con wrappers.  The latter is a hack, like the one in
+	-- except for data con wrappers.  The exception is a hack, like the one in
 	-- SimplCore.simplRules, to make wrappers inline in rule LHSs.
 	-- We may as well do the same here.
 noInlineBlackList dflags env us sc = (blacklisted,us,sc)
 	where blacklisted v =
-	   	  not (isCompulsoryUnfolding (idUnfolding v)) &&
-		  not (isDataConWrapId v) &&
+	   	  not (isDataConWrapId v) &&
 		  (v `isInScope` (seSubst env) || isGlobalId v)
 	-- NB: An earlier version omitted the last clause; this meant 
 	-- that even inlinings *completely within* an INLINE didn't happen. 
