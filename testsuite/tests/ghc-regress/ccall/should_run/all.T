@@ -38,8 +38,14 @@ test('ffi008', compose(expect_fail_for(['extcore','optextcore']), exit_code(1)),
 
 # expect fail for way optasm, because the native code generator
 # doesn't do -ffloat-store and gets different answers when
-# optimisation is on.
-test('ffi009', expect_fail_for(['optasm','extcore', 'optextcore']), compile_and_run, [''])
+# optimisation is on. Doesn't have this issue on OpenBSD. Why?
+
+if config.platform == 'i386-unknown-openbsd':
+	ways = expect_fail_for(['extcore','optextcore'])
+else:
+	ways = expect_fail_for(['optasm','extcore', 'optextcore'])
+
+test('ffi009', ways ,compile_and_run, [''])
 
 # Doesn't work with External Core due to __labels
 test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
