@@ -168,7 +168,7 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 	</varlistentry>
 
 	<varlistentry>
-	  <term>Arbitrary-sized tuples:</term>
+	  <term>Arbitrary-sized tuples</term>
 	  <listitem>
 	    <para>Tuples are currently limited to size 61.  HOWEVER:
             standard instances for tuples (<literal>Eq</literal>,
@@ -179,6 +179,18 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 
 	    <para>This limitation is easily subvertible, so please ask
             if you get stuck on it.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><literal>Read</literal>ing integers</term>
+	    <listitem>
+	      <para>GHC's implementation of the
+	      <literal>Read</literal> class for integral types accepts
+	      hexadeciaml and octal literals (the code in the Haskell
+	      98 report doesn't).  So, for example,
+<programlisting>read "0xf00" :: Int</programlisting>
+              works in GHC.</para>
 	    </listitem>
 	  </varlistentry>
 	</variablelist>
