@@ -106,5 +106,3 @@ INSTALL_LIBS  += $(LIBRARY)
 INSTALL_DATAS += $(HS_IFACES)
 
 include $(TOP)/mk/target.mk
-
-
