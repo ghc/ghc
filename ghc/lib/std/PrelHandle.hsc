@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.15 2001/07/13 15:01:28 simonmar Exp $
+-- $Id: PrelHandle.hsc,v 1.16 2001/08/23 10:36:50 sewardj Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -441,10 +441,10 @@ flushWriteBuffer fd buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
      then flushWriteBuffer fd (buf{ bufRPtr = r + res' })
      else return buf{ bufRPtr=0, bufWPtr=0 }
 
-foreign import "write_wrap" unsafe
+foreign import "write_PrelHandle_wrap" unsafe
    write_off :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
 #def inline \
-int write_wrap(int fd, void *ptr, HsInt off, int size) \
+int write_PrelHandle_wrap(int fd, void *ptr, HsInt off, int size) \
 { return write(fd, ptr + off, size); }
 
 
@@ -484,10 +484,10 @@ fillReadBufferLoop fd is_line buf b w size = do
      	     then fillReadBufferLoop fd is_line buf b (w+res') size
      	     else return buf{ bufRPtr=0, bufWPtr=w+res' }
  
-foreign import "read_wrap" unsafe
+foreign import "read_PrelHandle_wrap" unsafe
    read_off :: FD -> RawBuffer -> Int -> CInt -> IO CInt
 #def inline \
-int read_wrap(int fd, void *ptr, HsInt off, int size) \
+int read_PrelHandle_wrap(int fd, void *ptr, HsInt off, int size) \
 { return read(fd, ptr + off, size); }
 
 -- ---------------------------------------------------------------------------
