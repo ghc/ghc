@@ -28,6 +28,7 @@ import DsMonad
 import qualified Language.Haskell.TH as TH
 
 import HsSyn
+import Class (FunDep)
 import PrelNames  ( rationalTyConName, integerTyConName, negateName )
 import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
 -- To avoid clashes with DsMeta.varName we must make a local alias for OccName.varName
@@ -198,16 +199,17 @@ repTyClD (L loc (TySynonym { tcdLName = tc, tcdTyVars = tvs, tcdSynRhs = ty }))
 
 repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, 
 		      tcdTyVars = tvs, 
-		      tcdFDs = [], 	-- We don't understand functional dependencies
+		      tcdFDs = fds,
 		      tcdSigs = sigs, tcdMeths = meth_binds }))
  = do { cls1 <- lookupLOcc cls ;		-- See note [Binders and occurrences] 
     	dec  <- addTyVarBinds tvs $ \bndrs -> do {
  		  cxt1   <- repLContext cxt ;
  		  sigs1  <- rep_sigs sigs ;
  		  binds1 <- rep_binds meth_binds ;
+          fds1 <- repLFunDeps fds;
  		  decls1 <- coreList decQTyConName (sigs1 ++ binds1) ;
 	          bndrs1 <- coreList nameTyConName bndrs ;
- 		  repClass cxt1 cls1 bndrs1 decls1 } ;
+ 		  repClass cxt1 cls1 bndrs1 fds1 decls1 } ;
     	return $ Just (loc, dec) }
 
 -- Un-handled cases
@@ -215,6 +217,19 @@ repTyClD (L loc d) = do { dsWarn (loc, hang ds_msg 4 (ppr d)) ;
 	          	   return Nothing
 	     		 }
 
+-- represent fundeps
+--
+repLFunDeps :: [Located (FunDep Name)] -> DsM (Core [TH.FunDep])
+repLFunDeps fds = do fds' <- mapM repLFunDep fds
+                     fdList <- coreList funDepTyConName fds'
+                     return fdList
+
+repLFunDep :: Located (FunDep Name) -> DsM (Core TH.FunDep)
+repLFunDep (L _ (xs, ys)) = do xs' <- mapM lookupBinder xs
+                               ys' <- mapM lookupBinder ys
+                               xs_list <- coreList nameTyConName xs'
+                               ys_list <- coreList nameTyConName ys'
+                               repFunDep xs_list ys_list
 
 repInstD' (L loc (InstDecl ty binds _))		-- Ignore user pragmas for now
  = do	{ i <- addTyVarBinds tvs $ \tv_bndrs ->
@@ -1147,8 +1162,11 @@ repTySyn (MkC nm) (MkC tvs) (MkC rhs) = rep2 tySynDName [nm, tvs, rhs]
 repInst :: Core TH.CxtQ -> Core TH.TypeQ -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
 repInst (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceDName [cxt, ty, ds]
 
-repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.Name] -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
-repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC ds) = rep2 classDName [cxt, cls, tvs, ds]
+repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.Name] -> Core [TH.FunDep] -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
+repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds) = rep2 classDName [cxt, cls, tvs, fds, ds]
+
+repFunDep :: Core [TH.Name] -> Core [TH.Name] -> DsM (Core TH.FunDep)
+repFunDep (MkC xs) (MkC ys) = rep2 funDepName [xs, ys]
 
 repProto :: Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
 repProto (MkC s) (MkC ty) = rep2 sigDName [s, ty]
@@ -1359,6 +1377,8 @@ templateHaskellNames = [
     unsafeName,
     safeName,
     threadsafeName,
+    -- FunDep
+    funDepName,
 
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
@@ -1366,7 +1386,7 @@ templateHaskellNames = [
     decQTyConName, conQTyConName, strictTypeQTyConName,
     varStrictTypeQTyConName, typeQTyConName, expTyConName, decTyConName,
     typeTyConName, matchTyConName, clauseTyConName, patQTyConName,
-    fieldPatQTyConName, fieldExpQTyConName]
+    fieldPatQTyConName, fieldExpQTyConName, funDepTyConName]
 
 tH_SYN_Name = mkModuleName "Language.Haskell.TH.Syntax"
 tH_LIB_Name = mkModuleName "Language.Haskell.TH.Lib"
@@ -1386,16 +1406,17 @@ thFun  = mk_known_key_name thSyn OccName.varName
 thTc   = mk_known_key_name thSyn OccName.tcName
 
 -------------------- TH.Syntax -----------------------
-qTyConName        = thTc FSLIT("Q")             qTyConKey
-nameTyConName      = thTc FSLIT("Name")           nameTyConKey
-fieldExpTyConName = thTc FSLIT("FieldExp")      fieldExpTyConKey
-patTyConName      = thTc FSLIT("Pat")           patTyConKey
-fieldPatTyConName = thTc FSLIT("FieldPat")      fieldPatTyConKey
-expTyConName      = thTc  FSLIT("Exp")          expTyConKey
-decTyConName      = thTc  FSLIT("Dec")          decTyConKey
-typeTyConName     = thTc  FSLIT("Type")         typeTyConKey
-matchTyConName    = thTc  FSLIT("Match")        matchTyConKey
-clauseTyConName   = thTc  FSLIT("Clause")       clauseTyConKey
+qTyConName        = thTc FSLIT("Q")            qTyConKey
+nameTyConName     = thTc FSLIT("Name")         nameTyConKey
+fieldExpTyConName = thTc FSLIT("FieldExp")     fieldExpTyConKey
+patTyConName      = thTc FSLIT("Pat")          patTyConKey
+fieldPatTyConName = thTc FSLIT("FieldPat")     fieldPatTyConKey
+expTyConName      = thTc FSLIT("Exp")          expTyConKey
+decTyConName      = thTc FSLIT("Dec")          decTyConKey
+typeTyConName     = thTc FSLIT("Type")         typeTyConKey
+matchTyConName    = thTc FSLIT("Match")        matchTyConKey
+clauseTyConName   = thTc FSLIT("Clause")       clauseTyConKey
+funDepTyConName   = thTc FSLIT("FunDep")       funDepTyConKey
 
 returnQName   = thFun FSLIT("returnQ")   returnQIdKey
 bindQName     = thFun FSLIT("bindQ")     bindQIdKey
@@ -1533,6 +1554,9 @@ unsafeName     = libFun FSLIT("unsafe") unsafeIdKey
 safeName       = libFun FSLIT("safe") safeIdKey
 threadsafeName = libFun FSLIT("threadsafe") threadsafeIdKey
              
+-- data FunDep = ...
+funDepName     = libFun FSLIT("funDep") funDepIdKey
+
 matchQTyConName         = libTc FSLIT("MatchQ")        matchQTyConKey
 clauseQTyConName        = libTc FSLIT("ClauseQ")       clauseQTyConKey
 expQTyConName           = libTc FSLIT("ExpQ")          expQTyConKey
@@ -1571,6 +1595,7 @@ nameTyConKey            = mkPreludeTyConUnique 118
 patQTyConKey            = mkPreludeTyConUnique 119
 fieldPatQTyConKey       = mkPreludeTyConUnique 120
 fieldExpQTyConKey       = mkPreludeTyConUnique 121
+funDepTyConKey          = mkPreludeTyConUnique 122
 
 -- 	IdUniques available: 200-399
 -- 	If you want to change this, make sure you check in PrelNames
@@ -1707,4 +1732,7 @@ stdCallIdKey    = mkPreludeMiscIdUnique 301
 unsafeIdKey     = mkPreludeMiscIdUnique 305
 safeIdKey       = mkPreludeMiscIdUnique 306
 threadsafeIdKey = mkPreludeMiscIdUnique 307
+
+-- data FunDep = ...
+funDepIdKey = mkPreludeMiscIdUnique 320
 

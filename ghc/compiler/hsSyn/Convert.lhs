@@ -14,6 +14,7 @@ import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 
 import HsSyn as Hs
+import qualified Class (FunDep)
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, nameRdrName, getRdrName )
 import Module   ( ModuleName, mkModuleName )
 import RdrHsSyn	( mkHsIntegral, mkHsFractional, mkClassDecl, mkTyData )
@@ -95,10 +96,13 @@ cvt_top (NewtypeD ctxt tc tvs constr derivs)
                            Nothing [mk_con constr]
                            (mk_derivs derivs))
 
-cvt_top (ClassD ctxt cl tvs decs)
-  = Left $ TyClD (mkClassDecl (cvt_context ctxt, noLoc (tconName cl), cvt_tvs tvs)
-                              noFunDeps sigs
-			      binds)
+cvt_top (ClassD ctxt cl tvs fds decs)
+  = Left $ TyClD $ mkClassDecl (cvt_context ctxt,
+                                noLoc (tconName cl),
+                                cvt_tvs tvs)
+                               (map (noLoc . cvt_fundep) fds)
+                               sigs
+                               binds
   where
     (binds,sigs) = cvtBindsAndSigs decs
 
@@ -132,6 +136,9 @@ cvt_top (ForeignD (ExportF callconv as nm typ))
     where callconv' = case callconv of
                           CCall -> CCallConv
                           StdCall -> StdCallConv
+
+cvt_fundep :: FunDep -> Class.FunDep RdrName
+cvt_fundep (FunDep xs ys) = (map tName xs, map tName ys)
 
 parse_ccall_impent :: String -> String -> Maybe (FastString, CImportSpec)
 parse_ccall_impent nm s
@@ -175,7 +182,6 @@ lex_ccall_impent xs = case span is_valid xs of
 
 noContext      = noLoc []
 noExistentials = []
-noFunDeps      = []
 
 -------------------------------------------------------------------
 convertToHsExpr :: TH.Exp -> LHsExpr RdrName

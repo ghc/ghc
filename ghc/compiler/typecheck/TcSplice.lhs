@@ -43,7 +43,7 @@ import Var		( Id, TyVar, idType )
 import Module		( moduleUserString, mkModuleName )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
-import Class		( Class, classBigSig )
+import Class		( Class, classExtraBigSig )
 import TyCon		( TyCon, AlgTyConRhs(..), tyConTyVars, getSynTyConDefn, 
 			  isSynTyCon, isNewTyCon, tyConDataCons, algTyConRhs )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
@@ -608,9 +608,10 @@ reifyClass :: Class -> TcM TH.Dec
 reifyClass cls 
   = do	{ cxt <- reifyCxt theta
 	; ops <- mapM reify_op op_stuff
-	; return (TH.ClassD cxt (reifyName cls) (reifyTyVars tvs) ops) }
+	; return (TH.ClassD cxt (reifyName cls) (reifyTyVars tvs) fds' ops) }
   where
-    (tvs, theta, _, op_stuff) = classBigSig cls
+    (tvs, fds, theta, _, op_stuff) = classExtraBigSig cls
+    fds' = map reifyFunDep fds
     reify_op (op, _) = do { ty <- reifyType (idType op)
 			  ; return (TH.SigD (reifyName op) ty) }
 
@@ -628,6 +629,9 @@ reifyType ty@(ForAllTy _ _) = do { cxt' <- reifyCxt cxt;
 				(tvs, cxt, tau) = tcSplitSigmaTy ty
 reifyTypes = mapM reifyType
 reifyCxt   = mapM reifyPred
+
+reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
+reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
 reifyTyVars :: [TyVar] -> [TH.Name]
 reifyTyVars = map reifyName
