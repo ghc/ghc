@@ -276,7 +276,7 @@ package_details installing =
 			  ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = []
+         extra_ld_opts  = words cLibsReadline
         },
 
         -- no cbits at the moment, we'll need to add one if this library
