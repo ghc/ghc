@@ -49,9 +49,11 @@ ppHtml	:: String
 	-> String			-- $libdir
 	-> InstMaps
 	-> Maybe Doc			-- prologue text, maybe
+	-> Bool				-- do MS Help stuff
 	-> IO ()
 
-ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue =  do
+ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue
+ do_ms_help =  do
   let 
 	css_file = case maybe_css of
 			Nothing -> libdir ++ pathSeparator:cssFile
@@ -71,9 +73,14 @@ ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue =  do
 
   ppHtmlContents odir title source_url (map fst visible_ifaces) prologue
   ppHtmlIndex odir title visible_ifaces
-  ppHHContents odir (map fst visible_ifaces)
-  ppHHIndex odir visible_ifaces
+
+  -- Generate index and contents page for MS help if requested
+  when do_ms_help $ do
+    ppHHContents odir (map fst visible_ifaces)
+    ppHHIndex odir visible_ifaces
+
   mapM_ (ppHtmlModule odir title source_url inst_maps) visible_ifaces
+
 
 contentsHtmlFile = "index.html"
 indexHtmlFile    = "doc-index.html"

@@ -55,19 +55,20 @@ main = do
 usage = usageInfo "usage: haddock [OPTION] file...\n" options
 
 data Flag
-  = Flag_Verbose
-  | Flag_DocBook
+  = Flag_CSS String
   | Flag_Debug
-  | Flag_Html
-  | Flag_Heading String
-  | Flag_Prologue FilePath
-  | Flag_SourceURL String
-  | Flag_CSS String
-  | Flag_Lib String
-  | Flag_OutputDir FilePath
-  | Flag_ReadInterface FilePath
+  | Flag_DocBook
   | Flag_DumpInterface FilePath
+  | Flag_Heading String
+  | Flag_Html
+  | Flag_Lib String
+  | Flag_MSHtmlHelp
   | Flag_NoImplicitPrelude
+  | Flag_OutputDir FilePath
+  | Flag_Prologue FilePath
+  | Flag_ReadInterface FilePath
+  | Flag_SourceURL String
+  | Flag_Verbose
   deriving (Eq)
 
 options =
@@ -95,9 +96,11 @@ options =
     Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
 	"The CSS file to use for HTML output",
     Option []  ["lib"]         (ReqArg Flag_Lib "DIR") 
-	"Directory containing Haddock's auxiliary files",
+	"Location of Haddock's auxiliary files",
     Option []  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
- 	"Do not assume Prelude is imported"
+ 	"Do not assume Prelude is imported",
+    Option []  ["ms-help"]    (NoArg Flag_MSHtmlHelp)
+	"Produce Microsoft HTML Help files (with -h)"
   ]
 
 saved_flags :: IORef [Flag]
@@ -178,7 +181,7 @@ run flags files = do
 
   when (Flag_Html `elem` flags) $
     ppHtml title source_url these_mod_ifaces odir css_file 
-	libdir inst_maps prologue
+	libdir inst_maps prologue (Flag_MSHtmlHelp `elem` flags)
 
   -- dump an interface if requested
   case dump_iface of

@@ -1,8 +1,8 @@
 module HaddockHH(ppHHContents, ppHHIndex) where
 
 import HsSyn hiding(Doc)
-import Text.PrettyPrint
-import Data.FiniteMap
+import Pretty
+import FiniteMap
 import HaddockModuleTree
 import HaddockUtil
 import HaddockTypes
