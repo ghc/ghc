@@ -13,8 +13,7 @@ instance Data Test
   where
     gfoldl _ z x = z x -- folding without descent 
     toConstr (Test _) = testConstr
-    fromConstr c = case constrIndex c of
-                     1 -> Test undefined
+    gunfold _ _ = error "gunfold"
     dataTypeOf _ = testDataType
 
 testConstr   = mkConstr testDataType "Test" [] Prefix

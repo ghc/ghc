@@ -332,7 +332,7 @@ shallowTerm cust
 
   -- The worker, also used for type disambiguation
   gdefault = case con of
-              Just (con, Just _) -> gunfoldB con (shallowTerm cust)
+              Just (con, Just _) -> fromConstrB (shallowTerm cust) con
               _ -> error "no shallow term!"
 
   -- The type to be constructed

@@ -41,9 +41,9 @@ instance (Data a, Data [a]) => Data (Nest a)
     gmapT f (Wrap w) = Wrap (f w)
     toConstr (Box _)  = boxConstr
     toConstr (Wrap _) = wrapConstr
-    fromConstr c = case constrIndex c of
-                     1 -> Box undefined
-                     2 -> Wrap undefined
+    gunfold k z c = case constrIndex c of
+                      1 -> k (z Box)
+                      2 -> k (z Wrap)
     dataTypeOf _ = nestDataType
 
 boxConstr    = mkConstr nestDataType "Box"  [] Prefix

@@ -169,7 +169,7 @@ readBin = result
   result = if isAlgType myDataType
 
              then do bin <- readB (lengthNat (max - 1))
-                     gunfoldR (bin2con bin) readBin
+                     fromConstrM readBin (bin2con bin)
 
              else do str <- readBin
                      con <- str2con (map (chr . bin2nat) str)
