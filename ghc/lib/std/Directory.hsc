@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.6 2001/02/14 12:36:06 rrt Exp $
+-- $Id: Directory.hsc,v 1.7 2001/02/14 12:37:10 rrt Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -340,7 +340,7 @@ The path refers to an existing non-directory object.
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
    p <- withUnsafeCString path $ \s ->
-	  throwErrnoIfNullRetry "getDirectoryContents1" (opendir s)
+	  throwErrnoIfNullRetry "getDirectoryContents" (opendir s)
    loop p
   where
     loop :: Ptr CDir -> IO [String]
@@ -359,14 +359,14 @@ getDirectoryContents path = do
 		 return (entry:entries)
 	 else do errno <- getErrno
 		 if (errno == eINTR) then loop dir else do
-		 throwErrnoIfMinus1_ "getDirectoryContents2" $ closedir dir
+		 throwErrnoIfMinus1_ "getDirectoryContents" $ closedir dir
 #ifndef mingw32_TARGET_OS
 		 if (errno == eOK)
 #else
 		 if (errno == eNOENT) -- mingwin (20001111) cunningly sets errno to ENOENT when it runs out of files
 #endif
 		    then return []
-		    else throwErrno "getDirectoryContents3"
+		    else throwErrno "getDirectoryContents"
 
 {-
 If the operating system has a notion of current directories,
