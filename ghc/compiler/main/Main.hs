@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.127 2003/06/23 10:35:17 simonpj Exp $
+-- $Id: Main.hs,v 1.128 2003/06/27 18:28:33 sof Exp $
 --
 -- GHC Driver program
 --
@@ -233,6 +233,12 @@ main =
 	---------------- Final sanity checking -----------
    checkOptions mode srcs objs
 
+    -- We always link in the base package in
+    -- one-shot linking.  Any other packages
+    -- required must be given using -package
+    -- options on the command-line.
+   let def_hs_pkgs = [basePackage, haskell98Package]
+
 	---------------- Do the business -----------
    case mode of
 	DoMake 	       -> doMake srcs
@@ -242,16 +248,11 @@ main =
 			       endMkDependHS }
 	StopBefore p   -> do { compileFiles mode srcs; return () }
 	DoMkDLL	       -> do { o_files <- compileFiles mode srcs; 
-			       doMkDLL o_files }
+			       doMkDLL o_files def_hs_pkgs }
 	DoLink	       -> do { o_files <- compileFiles mode srcs; 
 			       omit_linking <- readIORef v_NoLink;
 			       when (not omit_linking)
-				    (staticLink o_files 
-					[basePackage, haskell98Package]) }
-			-- We always link in the base package in
-			-- one-shot linking.  Any other packages
-			-- required must be given using -package
-			-- options on the command-line.
+				    (staticLink o_files def_hs_pkgs) }
 
 #ifndef GHCI
 	DoInteractive -> throwDyn (CmdLineError "not built for interactive use")

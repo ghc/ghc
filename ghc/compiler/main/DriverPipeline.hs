@@ -1048,8 +1048,8 @@ staticLink o_files dep_packages = do
 -----------------------------------------------------------------------------
 -- Making a DLL (only for Win32)
 
-doMkDLL :: [String] -> IO ()
-doMkDLL o_files = do
+doMkDLL :: [String] -> [PackageName] -> IO ()
+doMkDLL o_files dep_packages = do
     verb       <- getVerbFlag
     static     <- readIORef v_Static
     no_hs_main <- readIORef v_NoHsMain
@@ -1057,13 +1057,13 @@ doMkDLL o_files = do
     o_file <- readIORef v_Output_file
     let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
 
-    pkg_lib_paths <- getPackageLibraryPath []
+    pkg_lib_paths <- getPackageLibraryPath dep_packages
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
 
     lib_paths <- readIORef v_Library_paths
     let lib_path_opts = map ("-L"++) lib_paths
 
-    pkg_link_opts <- getPackageLinkOpts []
+    pkg_link_opts <- getPackageLinkOpts dep_packages
 
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
