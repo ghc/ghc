@@ -791,13 +791,15 @@ And in any case it seems more robust to have exprArity be a bit more intelligent
 exprArity :: CoreExpr -> Int
 exprArity e = go e `max` 0
 	    where
-	      go (Lam x e) | isId x    = go e + 1
-			   | otherwise = go e
-	      go (Note _ e)	       = go e
-	      go (App e (Type t))      = go e
-	      go (App f a) 	       = go f - 1
-	      go (Var v) 	       = idArity v
-	      go _		       = 0
+	      go (Lam x e) | isId x    	   = go e + 1
+			   | otherwise 	   = go e
+	      go (Note _ e)	       	   = go e
+	      go (App e (Type t))      	   = go e
+	      go (App f a) | exprIsCheap a = go f - 1
+		-- Important!  f (fac x) does not have arity 2, 
+		-- 	       even if f does!
+	      go (Var v) 	       	   = idArity v
+	      go _		       	   = 0
 \end{code}
 
 
