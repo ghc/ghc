@@ -720,7 +720,12 @@ ppFilesFromSummaries summaries
       
        -- better make extra sure 'a' and 'b' are in canonical form 
        -- before using this equality test.
-      isSameFilePath a b = a == b
+      isSameFilePath a b = fmap normalise a == fmap normalise b
+
+      -- a hack, because sometimes we strip off the leading "./" from a 
+      -- a filename.
+      normalise ('.':'/':f) = f
+      normalise f = f
 
 -----------------------------------------------------------------------------
 -- getValidLinkables
@@ -1230,12 +1235,11 @@ summariseFile file
    = do hspp_fn <- preprocess file
         (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 
-        let (path, basename, ext) = splitFilename3 file
+        let (basename, ext) = splitFilename file
 	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
             the_imps = filter (/= gHC_PRIM_Name) imps
 
-	(mod, location) <- mkHomeModLocation mod_name True{-is a root-}
-				path basename ext
+	(mod, location) <- mkHomeModLocation mod_name "." basename ext
 
         src_timestamp
            <- case ml_hs_file location of 

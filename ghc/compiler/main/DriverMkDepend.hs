@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.28 2003/06/04 15:47:58 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.29 2003/07/17 12:04:53 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -19,7 +19,8 @@ import SysTools		( newTempName )
 import qualified SysTools
 import Module		( ModuleName, ModLocation(..),
 			  moduleNameUserString, isHomeModule )
-import Finder		( findModule, hiBootExt, hiBootVerExt )
+import Finder		( findModule, hiBootExt, hiBootVerExt,
+			  mkHomeModLocation )
 import Util             ( global )
 import Panic
 
@@ -131,7 +132,14 @@ beginMkDependHS = do
 
 doMkDependHSPhase basename suff input_fn
  = do src <- readFile input_fn
-      let (import_sources, import_normals, _) = getImports src
+      let (import_sources, import_normals, mod_name) = getImports src
+      (_, location') <- mkHomeModLocation mod_name "." basename suff
+
+      -- take -ohi into account if present
+      ohi <- readIORef v_Output_hi
+      let location | Just fn <- ohi = location'{ ml_hi_file = fn }
+		   | otherwise      = location'
+
       let orig_fn = basename ++ '.':suff
       deps_sources <- mapM (findDependency True  orig_fn) import_sources
       deps_normals <- mapM (findDependency False orig_fn) import_normals
@@ -164,7 +172,7 @@ doMkDependHSPhase basename suff input_fn
 	     sequence_ (zipWith (\o d -> hPutStrLn hdl (escapeSpaces o ++ " : " ++ escapeSpaces d)) objs deps)
 
       sequence_ (map genDep [ d | Just d <- deps ])
-      return True
+      return location
 
 -- add the lines to dep_makefile:
 	   -- always:

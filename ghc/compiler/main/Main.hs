@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.129 2003/07/16 13:33:55 simonmar Exp $
+-- $Id: Main.hs,v 1.130 2003/07/17 12:04:53 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -318,7 +318,7 @@ compileFile mode stop_flag src = do
 	  | mode==DoLink || mode==DoMkDLL  = Nothing
 	  | otherwise                      = o_file
 
-   runPipeline mode stop_flag True maybe_o_file src
+   runPipeline mode stop_flag True maybe_o_file src Nothing{-no ModLocation-}
 
 
 -- ----------------------------------------------------------------------------

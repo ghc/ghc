@@ -121,8 +121,8 @@ maybeHomeModule mod_name = do
 
    let
      source_exts = 
-      [ ("hs",   mkHomeModLocation mod_name False)
-      , ("lhs",  mkHomeModLocation mod_name False)
+      [ ("hs",   mkHomeModLocation mod_name)
+      , ("lhs",  mkHomeModLocation mod_name)
       ]
      
      hi_exts = [ (hisuf,  mkHiOnlyModLocation hisuf mod_name) ]
@@ -131,7 +131,7 @@ maybeHomeModule mod_name = do
        [ (hiBootVerExt, mkHiOnlyModLocation hisuf mod_name)
        , (hiBootExt,    mkHiOnlyModLocation hisuf mod_name)
        ]
-     
+
      	-- In compilation manager modes, we look for source files in the home
      	-- package because we can compile these automatically.  In one-shot
      	-- compilation mode we look for .hi and .hi-boot files only.
@@ -195,8 +195,7 @@ searchPathExts
 
 searchPathExts path mod_name exts = search to_search
   where
-    mod_str = moduleNameUserString mod_name
-    basename = map (\c -> if c == '.' then '/' else c) mod_str
+    basename = dots_to_slashes (moduleNameUserString mod_name)
 
     to_search :: [(FilePath, IO (Module,ModLocation))]
     to_search = [ (file, fn p basename ext)
@@ -217,13 +216,15 @@ searchPathExts path mod_name exts = search to_search
 -- -----------------------------------------------------------------------------
 -- Building ModLocations
 
-mkHiOnlyModLocation hisuf mod_name path basename extension = do
+mkHiOnlyModLocation hisuf mod_name path basename _ext = do
+  -- basename == dots_to_slashes (moduleNameUserString mod_name)
   loc <- hiOnlyModLocation path basename hisuf
   let result = (mkHomeModule mod_name, loc)
   addToFinderCache mod_name result
   return result
 
-mkPackageModLocation hisuf mod_name path basename _extension = do
+mkPackageModLocation hisuf mod_name path basename _ext = do
+  -- basename == dots_to_slashes (moduleNameUserString mod_name)
   loc <- hiOnlyModLocation path basename hisuf
   let result = (mkPackageModule mod_name, loc)
   addToFinderCache mod_name result
@@ -244,65 +245,52 @@ hiOnlyModLocation path basename hisuf
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location
 
--- The .hi file always follows the module name, whereas the object
--- file may follow the name of the source file in the case where the
--- two differ (see summariseFile in compMan/CompManager.lhs).
+-- This is where we construct the ModLocation for a module in the home
+-- package, for which we have a source file.  It is called from three
+-- places:
+--
+--  (a) Here in the finder, when we are searching for a module to import,
+--      using the search path (-i option).
+--
+--  (b) The compilation manager, when constructing the ModLocation for
+--      a "root" module (a source file named explicitly on the command line
+--      or in a :load command in GHCi).
+--
+--  (c) The driver in one-shot mode, when we need to construct a
+--      ModLocation for a source file named on the command-line.
+--
+-- Parameters are:
+--
+-- mod_name
+--      The name of the module
+--
+-- path
+--      (a): The search path component where the source file was found.
+--      (b) and (c): Nothing
+--
+-- src_basename
+--      (a): dots_to_slashes (moduleNameUserString mod_name)
+--      (b) and (c): The filename of the source file, minus its extension
+--
+-- ext
+--	The filename extension of the source file (usually "hs" or "lhs").
 
--- The source filename is specified in three components.  For example,
--- if we have a module "A.B.C" which was found along the patch "/P/Q/R"
--- with extension ".hs", then the full filename is "/P/Q/R/A/B/C.hs".  The
--- components passed to mkHomeModLocation are
---
---   path:      "/P/Q/R"
---   basename:  "A/B/C"
---   extension: "hs"
---
--- the object file and interface file are constructed by possibly
--- replacing the path component with the values of the -odir or the
--- -hidr options respectively, and the extension with the values of
--- the -osuf and -hisuf options respectively.  That is, the basename
--- always remains intact.
---
--- mkHomeModLocation is called directly by the compilation manager to
--- construct the information for a root module.  For a "root" module,
--- the rules are slightly different. The filename is allowed to
--- diverge from the module name, but we have to name the interface
--- file after the module name.  For example, a root module
--- "/P/Q/R/foo.hs" will have components
---
---  path:       "/P/Q/R"
---  basename:   "foo"
---  extension:  "hs"
--- 
--- and we set the flag is_root to True, to indicate that the basename
--- portion for the .hi file should be replaced by the last component
--- of the module name.  eg. if the module name is "A.B.C" then basename
--- will be replaced by "C" for the .hi file only, resulting in an
--- .hi file like "/P/Q/R/C.hi" (subject to -hidir and -hisuf as usual).
-
-mkHomeModLocation mod_name is_root path basename extension = do
-
+mkHomeModLocation mod_name path src_basename ext = do
    hisuf  <- readIORef v_Hi_suf
    hidir  <- readIORef v_Hi_dir
 
-   obj_fn <- mkObjPath path basename
+   let mod_basename = dots_to_slashes (moduleNameUserString mod_name)
 
-   let  -- hi filename
-       mod_str = moduleNameUserString mod_name
-       (_,mod_suf) = split_longest_prefix mod_str (=='.')
+   obj_fn <- mkObjPath path mod_basename
 
-       hi_basename
-	  | is_root   = mod_suf
-	  | otherwise = basename
-
+   let  -- hi filename, always follows the module name
        hi_path | Just d <- hidir = d
 	       | otherwise       = path
-       hi_fn = hi_path ++ '/':hi_basename ++ '.':hisuf
 
-	-- source filename (extension is always .hs or .lhs)
-       source_fn
-	 | path == "."  = basename ++ '.':extension
-	 | otherwise    = path ++ '/':basename ++ '.':extension
+       hi_fn = hi_path ++ '/':mod_basename ++ '.':hisuf
+
+	-- source filename
+       source_fn = path ++ '/':src_basename ++ '.':ext
 
        result = ( mkHomeModule mod_name,
            	  ModLocation{ ml_hspp_file = Nothing,
@@ -314,23 +302,21 @@ mkHomeModLocation mod_name is_root path basename extension = do
    addToFinderCache mod_name result
    return result
 
-mkObjPath :: String -> FilePath -> IO FilePath
--- Construct the filename of a .o file from the path/basename
--- derived either from a .hs file or a .hi file.
---
+mkObjPath :: FilePath -> String -> IO FilePath
+-- Construct the filename of a .o file.
 -- Does *not* check whether the .o file exists
 mkObjPath path basename
   = do  odir   <- readIORef v_Output_dir
 	osuf   <- readIORef v_Object_suf
+
 	let obj_path | Just d <- odir = d
 	   	     | otherwise      = path
-        return (obj_path ++ '/':basename ++ '.':osuf)
 
-  
+        return (obj_path ++ '/':basename ++ '.':osuf)
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 
--- but there' no other obvious place for it
+-- but there's no other obvious place for it
 
 findLinkable :: ModuleName -> ModLocation -> IO (Maybe Linkable)
 findLinkable mod locn
@@ -346,4 +332,10 @@ findLinkable mod locn
             if stub_exist
              then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
              else return (Just (LM obj_time mod [DotO obj_fn]))
+
+-- -----------------------------------------------------------------------------
+-- Utils
+
+dots_to_slashes = map (\c -> if c == '.' then '/' else c)
+
 \end{code}

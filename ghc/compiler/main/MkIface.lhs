@@ -64,6 +64,7 @@ import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  extendModuleEnv_C, moduleEnvElts 
 			)
 import Outputable
+import DriverUtil	( createDirectoryHierarchy, directoryOf )
 import Util		( sortLt, dropList, seqList )
 import Binary		( getBinFileWithDict )
 import BinIface		( writeBinIface, v_IgnoreHiVersion )
@@ -168,9 +169,9 @@ mkIface hsc_env location maybe_old_iface
 	; let (final_iface, maybe_diffs) = _scc_ "versioninfo" addVersionInfo maybe_old_iface iface_w_decls
 
 		-- Write the interface file, if necessary
-	; when (must_write_hi_file maybe_diffs)
-		(writeBinIface hi_file_path final_iface)
---		(writeIface hi_file_path final_iface)
+	; when (must_write_hi_file maybe_diffs) $ do
+		createDirectoryHierarchy (directoryOf hi_file_path)
+		writeBinIface hi_file_path final_iface
 
 		-- Debug printing
 	; write_diffs dflags final_iface maybe_diffs
