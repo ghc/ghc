@@ -60,12 +60,12 @@ module Foreign.Marshal.Array (
 ) where
 
 import Control.Monad
-
-#ifdef __GLASGOW_HASKELL__
-import Foreign.Ptr	        (Ptr, plusPtr)
-import GHC.Storable     (Storable(sizeOf,peekElemOff,pokeElemOff))
+import Foreign.Ptr	(Ptr, plusPtr)
+import Foreign.Storable	(Storable(sizeOf,peekElemOff,pokeElemOff))
 import Foreign.Marshal.Alloc (alloca, mallocBytes, allocaBytes, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
+
+#ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
 import GHC.Num
 import GHC.List

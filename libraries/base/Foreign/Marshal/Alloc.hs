@@ -39,6 +39,8 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
+#else
+import Control.Exception	( bracket )
 #endif
 
 
@@ -140,6 +142,6 @@ failWhenNULL name f = do
 
 -- basic C routines needed for memory allocation
 --
-foreign import ccall unsafe "malloc"  _malloc  ::          CSize -> IO (Ptr a)
-foreign import ccall unsafe "realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
-foreign import ccall unsafe "free"    _free    :: Ptr a -> IO ()
+foreign import ccall unsafe "stdlib.h malloc"  _malloc  ::          CSize -> IO (Ptr a)
+foreign import ccall unsafe "stdlib.h realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
+foreign import ccall unsafe "stdlib.h free"    _free    :: Ptr a -> IO ()

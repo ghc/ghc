@@ -51,12 +51,12 @@ module Foreign.Marshal.Utils (
 ) where
 
 import Data.Maybe
-
-#ifdef __GLASGOW_HASKELL__
 import Foreign.Ptr	        ( Ptr, nullPtr )
-import GHC.Storable		( Storable(poke) )
+import Foreign.Storable		( Storable(poke) )
 import Foreign.C.TypesISO    	( CSize )
 import Foreign.Marshal.Alloc 	( malloc, alloca )
+
+#ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
 import GHC.Real			( fromIntegral )
 import GHC.Num
@@ -170,5 +170,5 @@ moveBytes dest src size  = memmove dest src (fromIntegral size)
 
 -- |Basic C routines needed for memory copying
 --
-foreign import ccall unsafe memcpy  :: Ptr a -> Ptr a -> CSize -> IO ()
-foreign import ccall unsafe memmove :: Ptr a -> Ptr a -> CSize -> IO ()
+foreign import ccall unsafe "string.h" memcpy  :: Ptr a -> Ptr a -> CSize -> IO ()
+foreign import ccall unsafe "string.h" memmove :: Ptr a -> Ptr a -> CSize -> IO ()
