@@ -1,6 +1,9 @@
 # -----------------------------------------------------------------------------
 # Utils
 
+def eq(x):
+    return lambda y,z=x: y == z
+
 def append(x,y):
     return x + y
 

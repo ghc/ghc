@@ -30,6 +30,7 @@ long_options = [
   "rootdir=", 		# root of tree containing tests (default: .)
   "output-summary=", 	# file in which to save the (human-readable) summary
   "only=",		# just this test (can be give multiple --only= flags)
+  "way=",		# just this way
   ]
 
 opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
@@ -51,6 +52,14 @@ for opt,arg in opts:
 
     if opt == '--only':
         config.only.append(arg)
+
+    if opt == '--way':
+        if (arg not in config.run_ways and arg not in config.compile_ways):
+            sys.stderr.write("ERROR: requested way \'" +
+                             arg + "\' does not exist\n")
+            sys.exit(1)
+        config.run_ways = filter(eq(arg), config.run_ways)
+        config.compile_ways = filter(eq(arg), config.compile_ways)
 
 # -----------------------------------------------------------------------------
 # The main dude

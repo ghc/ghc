@@ -30,22 +30,26 @@ CONFIG       = $(TOP)/config/ghc
 # can be overriden from the command line
 TEST_HC = $(GHC_INPLACE_ABS)
 
-RUNTEST_OPTS = \
+RUNTEST_OPTS =
+
+ifeq "$(GhcWithNativeCodeGen)" "YES"
+RUNTEST_OPTS += -e ghc_with_native_codegen=1
+else
+RUNTEST_OPTS += -e ghc_with_native_codegen=0
+endif
+
+ifeq "$(filter p, $(GhcLibWays))" "p"
+RUNTEST_OPTS += -e ghc_with_profiling=1
+else
+RUNTEST_OPTS += -e ghc_with_profiling=0
+endif
+
+RUNTEST_OPTS +=  \
 	--config=$(CONFIG) \
 	-e config.compiler=\"$(TEST_HC)\" \
 	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	$(EXTRA_RUNTEST_OPTS)
-
-ifeq "$(GhcWithNativeCodeGen)" "YES"
-RUNTEST_OPTS += -e config.compile_ways.append"(\"optasm\")"
-RUNTEST_OPTS += -e config.run_ways.append"(\"optasm\")"
-endif
-
-ifeq "$(filter p, $(GhcLibWays))" "p"
-RUNTEST_OPTS += -e config.compile_ways.append"(\"prof\")"
-RUNTEST_OPTS += -e config.run_ways.append"(\"prof\")"
-endif
 
 TESTS	     = 
 TEST	     = 
