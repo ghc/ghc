@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.11 2001/05/18 16:54:04 simonmar Exp $
+-- $Id: Directory.hsc,v 1.12 2001/06/13 17:01:37 rrt Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -65,7 +65,6 @@ import PrelPtr
 import PrelIOBase
 import PrelBase
 
--- Fix mingw stat problem
 #include "../includes/config.h"
 #include <sys/stat.h>
 #include <dirent.h>
