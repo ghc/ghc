@@ -1,3 +1,5 @@
+{-# OPTIONS -fglasgow-exts #-}
+
 -- !!! Illegal conflicting parallel bindings
 
 module ShouldFail where
