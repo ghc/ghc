@@ -651,6 +651,7 @@ instance Eq Exception where
   BlockedOnDeadMVar   == BlockedOnDeadMVar   = True
   NonTermination      == NonTermination      = True
   Deadlock            == Deadlock            = True
+  _                   == _                   = False
 
 -- -----------------------------------------------------------------------------
 -- The ExitCode type
