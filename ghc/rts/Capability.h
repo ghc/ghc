@@ -31,6 +31,10 @@ extern void initCapabilities( void );
 //
 extern void releaseCapability( Capability* cap );
 
+// Signal that a thread has become runnable
+//
+extern void threadRunnable ( void );
+
 #ifdef RTS_SUPPORTS_THREADS
 // Gives up the current capability IFF there is a higher-priority
 // thread waiting for it.  This happens in one of two ways:

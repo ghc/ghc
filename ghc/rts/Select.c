@@ -37,13 +37,6 @@
 /* last timestamp */
 nat timestamp = 0;
 
-#ifdef RTS_SUPPORTS_THREADS
-static rtsBool isWorkerBlockedInAwaitEvent = rtsFalse;
-static rtsBool workerWakeupPending = rtsFalse;
-static int workerWakeupPipe[2];
-static rtsBool workerWakeupInited = rtsFalse;
-#endif
-
 /* There's a clever trick here to avoid problems when the time wraps
  * around.  Since our maximum delay is smaller than 31 bits of ticks
  * (it's actually 31 bits of microseconds), we can safely check
@@ -163,34 +156,6 @@ awaitEvent(rtsBool wait)
 	}
       }
 
-#ifdef RTS_SUPPORTS_THREADS
-      if(!workerWakeupInited) {
-          pipe(workerWakeupPipe);
-          workerWakeupInited = rtsTrue;
-      }
-      FD_SET(workerWakeupPipe[0], &rfd);
-      maxfd = workerWakeupPipe[0] > maxfd ? workerWakeupPipe[0] : maxfd;
-#endif
-      
-      /* Release the scheduler lock while we do the poll.
-       * this means that someone might muck with the blocked_queue
-       * while we do this, but it shouldn't matter:
-       *
-       *   - another task might poll for I/O and remove one
-       *     or more threads from the blocked_queue.
-       *   - more I/O threads may be added to blocked_queue.
-       *   - more delayed threads may be added to blocked_queue. We'll
-       *     just subtract delta from their delays after the poll.
-       *
-       * I believe none of these cases lead to trouble --SDM.
-       */
-      
-#ifdef RTS_SUPPORTS_THREADS
-      isWorkerBlockedInAwaitEvent = rtsTrue;
-      workerWakeupPending = rtsFalse;
-#endif
-      RELEASE_LOCK(&sched_mutex);
-
       /* Check for any interesting events */
       
       tv.tv_sec  = min / 1000000;
@@ -223,10 +188,6 @@ awaitEvent(rtsBool wait)
 	      barf("select failed");
 	    }
 	  }
-	  ACQUIRE_LOCK(&sched_mutex);
-#ifdef RTS_SUPPORTS_THREADS
-          isWorkerBlockedInAwaitEvent = rtsFalse;
-#endif
 
 	  /* We got a signal; could be one of ours.  If so, we need
 	   * to start up the signal handler straight away, otherwise
@@ -235,9 +196,7 @@ awaitEvent(rtsBool wait)
 	   */
 #if defined(RTS_USER_SIGNALS)
 	  if (signals_pending()) {
-	      RELEASE_LOCK(&sched_mutex); /* ToDo: kill */
 	      startSignalHandlers();
-	      ACQUIRE_LOCK(&sched_mutex);
 	      return; /* still hold the lock */
 	  }
 #endif
@@ -258,23 +217,7 @@ awaitEvent(rtsBool wait)
 	  if (run_queue_hd != END_TSO_QUEUE) {
 	      return; /* still hold the lock */
 	  }
-	  
-#ifdef RTS_SUPPORTS_THREADS
-	  /* If another worker thread wants to take over,
-	   * return to the scheduler
-	   */
-	  if (needToYieldToReturningWorker()) {
-	      return; /* still hold the lock */
-	  }
-#endif
-	  
-#ifdef RTS_SUPPORTS_THREADS
-          isWorkerBlockedInAwaitEvent = rtsTrue;
-#endif
-	  RELEASE_LOCK(&sched_mutex);
       }
-
-      ACQUIRE_LOCK(&sched_mutex);
 
       /* Step through the waiting queue, unblocking every thread that now has
        * a file descriptor in a ready state.
@@ -317,51 +260,5 @@ awaitEvent(rtsBool wait)
 	  }
       }
       
-#if defined(RTS_SUPPORTS_THREADS)
-      	// if we were woken up by wakeBlockedWorkerThread,
-      	// read the dummy byte from the pipe
-      if(select_succeeded && FD_ISSET(workerWakeupPipe[0], &rfd)) {
-          unsigned char dummy;
-          wait = rtsFalse;
-          read(workerWakeupPipe[0],&dummy,1);
-      }
-#endif
     } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);
 }
-
-
-#ifdef RTS_SUPPORTS_THREADS
-/* wakeBlockedWorkerThread
- *
- * If a worker thread is currently blocked within awaitEvent,
- * wake it.
- * Must be called with sched_mutex held.
- */
-void
-wakeBlockedWorkerThread()
-{
-    if(isWorkerBlockedInAwaitEvent && !workerWakeupPending) {
-    	unsigned char dummy = 42;	// Any value will do here
-    	
-			// write something so that select() wakes up
-    	write(workerWakeupPipe[1],&dummy,1);
-    	workerWakeupPending = rtsTrue;
-    }
-}
-
-/* resetWorkerWakeupPipeAfterFork
- *
- * To be called right after a fork().
- * After the fork(), the worker wakeup pipe will be shared
- * with the parent process, and that's something we don't want.
- */
-void
-resetWorkerWakeupPipeAfterFork()
-{
-    if(workerWakeupInited) {
-	close(workerWakeupPipe[0]);
-	close(workerWakeupPipe[1]);
-    }
-    workerWakeupInited = rtsFalse;
-}
-#endif

@@ -1342,6 +1342,10 @@ mkApUpd0zh_fast
 waitReadzh_fast
 {
     /* args: R1 */
+#ifdef THREADED_RTS
+    foreign "C" barf("waitRead# on threaded RTS");
+#endif
+
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
     StgTSO_block_info(CurrentTSO) = R1;
@@ -1354,6 +1358,10 @@ waitReadzh_fast
 waitWritezh_fast
 {
     /* args: R1 */
+#ifdef THREADED_RTS
+    foreign "C" barf("waitWrite# on threaded RTS");
+#endif
+
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
     StgTSO_block_info(CurrentTSO) = R1;
@@ -1372,6 +1380,10 @@ delayzh_fast
     CInt reqID;
 #else
     W_ t, prev, target;
+#endif
+
+#ifdef THREADED_RTS
+    foreign "C" barf("delay# on threaded RTS");
 #endif
 
     /* args: R1 (microsecond delay amount) */
@@ -1432,6 +1444,10 @@ asyncReadzh_fast
     W_ ares;
     CInt reqID;
 
+#ifdef THREADED_RTS
+    foreign "C" barf("asyncRead# on threaded RTS");
+#endif
+
     /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
@@ -1453,6 +1469,10 @@ asyncWritezh_fast
 {
     W_ ares;
     CInt reqID;
+
+#ifdef THREADED_RTS
+    foreign "C" barf("asyncWrite# on threaded RTS");
+#endif
 
     /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);

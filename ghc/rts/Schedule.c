@@ -453,13 +453,13 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     // run queue is empty, and there are no other tasks running, we
     // can wait indefinitely for something to happen.
     //
-    if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue)
-#if defined(RTS_SUPPORTS_THREADS)
-		|| EMPTY_RUN_QUEUE()
-#endif
-	)
+    if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue) )
     {
-      awaitEvent( EMPTY_RUN_QUEUE() );
+#if defined(RTS_SUPPORTS_THREADS)
+	// We shouldn't be here...
+	barf("schedule: awaitEvent() in threaded RTS");
+#endif
+	awaitEvent( EMPTY_RUN_QUEUE() );
     }
     // we can be interrupted while waiting for I/O...
     if (interrupted) continue;
@@ -479,18 +479,13 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     if (   EMPTY_THREAD_QUEUES() )
     {
 	IF_DEBUG(scheduler, sched_belch("deadlocked, forcing major GC..."));
+
 	// Garbage collection can release some new threads due to
 	// either (a) finalizers or (b) threads resurrected because
-	// they are about to be send BlockedOnDeadMVar.  Any threads
-	// thus released will be immediately runnable.
+	// they are unreachable and will therefore be sent an
+	// exception.  Any threads thus released will be immediately
+	// runnable.
 	GarbageCollect(GetRoots,rtsTrue);
-
-	if ( !EMPTY_RUN_QUEUE() ) { goto not_deadlocked; }
-
-	IF_DEBUG(scheduler, 
-		 sched_belch("still deadlocked, checking for black holes..."));
-	detectBlackHoles();
-
 	if ( !EMPTY_RUN_QUEUE() ) { goto not_deadlocked; }
 
 #if defined(RTS_USER_SIGNALS)
@@ -1457,12 +1452,6 @@ forkProcess(HsStablePtr *entry
       stgFree(m);
     }
     
-# ifdef RTS_SUPPORTS_THREADS
-    resetTaskManagerAfterFork();      // tell startTask() and friends that
-    startingWorkerThread = rtsFalse;  // we have no worker threads any more
-    resetWorkerWakeupPipeAfterFork();
-# endif
-    
     rc = rts_evalStableIO(entry, NULL);  // run the action
     rts_checkSchedStatus("forkProcess",rc);
     
@@ -1568,8 +1557,6 @@ suspendThread( StgRegTable *reg )
   IF_DEBUG(scheduler, sched_belch("worker (token %d): leaving RTS", tok));
 #endif
 
-  /* Other threads _might_ be available for execution; signal this */
-  THREAD_RUNNABLE();
   RELEASE_LOCK(&sched_mutex);
   
   errno = saved_errno;
@@ -1933,11 +1920,10 @@ static void scheduleThread_ (StgTSO* tso);
 void
 scheduleThread_(StgTSO *tso)
 {
-  // Precondition: sched_mutex must be held.
   // The thread goes at the *end* of the run-queue, to avoid possible
   // starvation of any threads already on the queue.
   APPEND_TO_RUN_QUEUE(tso);
-  THREAD_RUNNABLE();
+  threadRunnable();
 }
 
 void
@@ -1997,7 +1983,7 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
     IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)", tso->id));
     
     APPEND_TO_RUN_QUEUE(tso);
-    // NB. Don't call THREAD_RUNNABLE() here, because the thread is
+    // NB. Don't call threadRunnable() here, because the thread is
     // bound and only runnable by *this* OS thread, so waking up other
     // workers will just slow things down.
 
@@ -2428,7 +2414,7 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
       next = bqe->link;
       ((StgTSO *)bqe)->link = END_TSO_QUEUE; // debugging?
       APPEND_TO_RUN_QUEUE((StgTSO *)bqe); 
-      THREAD_RUNNABLE();
+      threadRunnable();
       unblockCount(bqe, node);
       /* reset blocking status after dumping event */
       ((StgTSO *)bqe)->why_blocked = NotBlocked;
@@ -2473,7 +2459,7 @@ unblockOneLocked(StgTSO *tso)
   next = tso->link;
   tso->link = END_TSO_QUEUE;
   APPEND_TO_RUN_QUEUE(tso);
-  THREAD_RUNNABLE();
+  threadRunnable();
   IF_DEBUG(scheduler,sched_belch("waking up thread %ld", (long)tso->id));
   return next;
 }
@@ -2644,9 +2630,6 @@ interruptStgRts(void)
 {
     interrupted    = 1;
     context_switch = 1;
-#ifdef RTS_SUPPORTS_THREADS
-    wakeBlockedWorkerThread();
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -3276,70 +3259,6 @@ resurrectThreads( StgTSO *threads )
     }
   }
 }
-
-/* -----------------------------------------------------------------------------
- * Blackhole detection: if we reach a deadlock, test whether any
- * threads are blocked on themselves.  Any threads which are found to
- * be self-blocked get sent a NonTermination exception.
- *
- * This is only done in a deadlock situation in order to avoid
- * performance overhead in the normal case.
- *
- * Locks: sched_mutex is held upon entry and exit.
- * -------------------------------------------------------------------------- */
-
-#if !defined(PAR) && !defined(RTS_SUPPORTS_THREADS)
-static void
-detectBlackHoles( void )
-{
-    StgTSO *tso = all_threads;
-    StgPtr frame;
-    StgClosure *blocked_on;
-    StgRetInfoTable *info;
-
-    for (tso = all_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
-
-	while (tso->what_next == ThreadRelocated) {
-	    tso = tso->link;
-	    ASSERT(get_itbl(tso)->type == TSO);
-	}
-      
-	if (tso->why_blocked != BlockedOnBlackHole) {
-	    continue;
-	}
-	blocked_on = tso->block_info.closure;
-
-	frame = tso->sp;
-
-	while(1) {
-	    info = get_ret_itbl((StgClosure *)frame);
-	    switch (info->i.type) {
-	    case UPDATE_FRAME:
-		if (((StgUpdateFrame *)frame)->updatee == blocked_on) {
-		    /* We are blocking on one of our own computations, so
-		     * send this thread the NonTermination exception.  
-		     */
-		    IF_DEBUG(scheduler, 
-			     sched_belch("thread %d is blocked on itself", tso->id));
-		    raiseAsync(tso, (StgClosure *)NonTermination_closure);
-		    goto done;
-		}
-		
-		frame = (StgPtr)((StgUpdateFrame *)frame + 1);
-		continue;
-
-	    case STOP_FRAME:
-		goto done;
-
-		// normal stack frames; do nothing except advance the pointer
-	    default:
-		frame += stack_frame_sizeW((StgClosure *)frame);
-	    }
-	}   
-	done: ;
-    }
-}
-#endif
 
 /* ----------------------------------------------------------------------------
  * Debugging: why is a thread blocked

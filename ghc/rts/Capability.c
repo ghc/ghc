@@ -56,8 +56,8 @@ nat rts_n_waiting_workers = 0;
  * exclusive access to the RTS and all its data structures (that are not
  * locked by the Scheduler's mutex).
  *
- * thread_ready_cond is signalled whenever noCapabilities doesn't hold.
- *
+ * thread_ready_cond is signalled whenever
+ *      !noCapabilities && !EMPTY_RUN_QUEUE().
  */
 Condition thread_ready_cond = INIT_COND_VAR;
 
@@ -80,6 +80,12 @@ static rtsBool passingCapability = rtsFalse;
 #define UNUSED_IF_NOT_SMP
 #else
 #define UNUSED_IF_NOT_SMP STG_UNUSED
+#endif
+
+#if defined(RTS_USER_SIGNALS)
+#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted || signals_pending())
+#else
+#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted)
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -211,7 +217,7 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 	rts_n_free_capabilities = 1;
 #endif
 	// Signal that a capability is available
-	if (rts_n_waiting_tasks > 0) {
+	if (rts_n_waiting_tasks > 0 && ANY_WORK_TO_DO()) {
 	    signalCondition(&thread_ready_cond);
 	}
 	startSchedulerTaskIfNecessary();
@@ -263,7 +269,6 @@ waitForReturnCapability( Mutex* pMutex, Capability** pCap )
 
     if ( noCapabilities() || passingCapability ) {
 	rts_n_waiting_workers++;
-	wakeBlockedWorkerThread();
 	context_switch = 1;	// make sure it's our turn soon
 	waitCondition(&returning_worker_cond, pMutex);
 #if defined(SMP)
@@ -294,8 +299,16 @@ yieldCapability( Capability** pCap )
     // Pre-condition:  pMutex is assumed held, the current thread
     // holds the capability pointed to by pCap.
 
-    if ( rts_n_waiting_workers > 0 || passingCapability ) {
-	IF_DEBUG(scheduler, sched_belch("worker: giving up capability"));
+    if ( rts_n_waiting_workers > 0 || passingCapability || !ANY_WORK_TO_DO()) {
+	IF_DEBUG(scheduler, 
+		 if (rts_n_waiting_workers > 0) {
+		     sched_belch("worker: giving up capability (returning wkr)");
+		 } else if (passingCapability) {
+		     sched_belch("worker: giving up capability (passing capability)");
+		 } else {
+		     sched_belch("worker: giving up capability (no threads to run)");
+		 }
+	    );
 	releaseCapability(*pCap);
 	*pCap = NULL;
     }
@@ -324,13 +337,14 @@ yieldCapability( Capability** pCap )
  *           passed to this thread using passCapability.
  * ------------------------------------------------------------------------- */
  
-void 
+void
 waitForCapability( Mutex* pMutex, Capability** pCap, Condition* pThreadCond )
 {
     // Pre-condition: pMutex is held.
 
-    while ( noCapabilities() || 
-	    (passingCapability && passTarget != pThreadCond)) {
+    while ( noCapabilities() ||
+	    (passingCapability && passTarget != pThreadCond) ||
+	    !ANY_WORK_TO_DO()) {
 	IF_DEBUG(scheduler,
 		 sched_belch("worker: wait for capability (cond: %p)",
 			     pThreadCond));
@@ -383,6 +397,27 @@ passCapabilityToWorker( void )
 }
 
 #endif /* RTS_SUPPORTS_THREADS */
+
+/* ----------------------------------------------------------------------------
+   threadRunnable()
+
+   Signals that a thread has been placed on the run queue, so a worker
+   might need to be woken up to run it.
+
+   ToDo: should check whether the thread at the front of the queue is
+   bound, and if so wake up the appropriate worker.
+   -------------------------------------------------------------------------- */
+
+void
+threadRunnable ( void )
+{
+#if defined(RTS_SUPPORTS_THREADS)
+    if ( !noCapabilities && ANY_WORK_TO_DO() && rts_n_waiting_tasks > 0 ) {
+	signalCondition(&thread_ready_cond);
+    }
+    startSchedulerTaskIfNecessary();
+#endif
+}
 
 /* ------------------------------------------------------------------------- */
 

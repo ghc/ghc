@@ -156,7 +156,6 @@ extern nat         RTS_VAR(rts_n_waiting_workers);
 extern nat         RTS_VAR(rts_n_waiting_tasks);
 #endif
 
-StgBool rtsSupportsBoundThreads(void);
 StgBool isThreadBound(StgTSO *tso);
 
 extern SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
@@ -279,17 +278,6 @@ void labelThread(StgPtr tso, char *label);
       blocked_queue_tl->link = tso;		\
     }						\
     blocked_queue_tl = tso;
-
-/* Signal that a runnable thread has become available, in
- * case there are any waiting tasks to execute it.
- */
-#if defined(RTS_SUPPORTS_THREADS)
-#define THREAD_RUNNABLE()			\
-  wakeBlockedWorkerThread();			\
-  context_switch = 1;
-#else
-#define THREAD_RUNNABLE()  /* nothing */
-#endif
 
 /* Check whether various thread queues are empty
  */

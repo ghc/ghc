@@ -54,21 +54,24 @@ static nat n_haskell_handlers = 0;
 StgPtr pending_handler_buf[N_PENDING_HANDLERS];
 StgPtr *next_pending_handler = pending_handler_buf;
 
+/* -----------------------------------------------------------------------------
+ * Signal handling
+ * -------------------------------------------------------------------------- */
+
 #ifdef RTS_SUPPORTS_THREADS
 pthread_t signalHandlingThread;
 #endif
 
-	// Handle all signals in the current thread.
-	// Called from Capability.c whenever the main capability is granted to a thread
-	// and in installDefaultHandlers
+// Handle all signals in the current thread.
+// Called from Capability.c whenever the main capability is granted to a thread
+// and in installDefaultHandlers
 void
-handleSignalsInThisThread()
+handleSignalsInThisThread(void)
 {
 #ifdef RTS_SUPPORTS_THREADS
     signalHandlingThread = pthread_self();
 #endif
 }
-
 
 /* -----------------------------------------------------------------------------
  * Allocate/resize the table of signal handlers.

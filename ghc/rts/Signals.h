@@ -28,6 +28,7 @@ extern void markSignalHandlers (evac_fn evac);
 extern void initDefaultHandlers(void);
 
 extern void handleSignalsInThisThread(void);
+extern void handleSignalsInPrevThread(void);
 
 #elif defined(mingw32_TARGET_OS)
 #define RTS_USER_SIGNALS 1
