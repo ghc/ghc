@@ -121,7 +121,9 @@ static TICK_TYPE *GC_coll_times;
 static void  getTimes(void);
 static nat   pageFaults(void);
 
-static void statsPrintf( char *s, ... );
+static void statsPrintf( char *s, ... ) 
+    GNUC3_ATTRIBUTE(format (printf, 1, 2));
+
 static void statsFlush( void );
 static void statsClose( void );
 
