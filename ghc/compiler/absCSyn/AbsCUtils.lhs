@@ -802,10 +802,10 @@ dscCOpStmt [res_r,res_c] IntSubCOp [aa,bb] vols
    = mkTemps [IntRep,IntRep,IntRep]		`thenFlt` \ [t1,t2,t3] ->
      getBitsPerWordMinus1			`thenFlt` \ (bpw1_code,bpw1_t) ->
      (returnFlt . CSequential) [
-        CMachOpStmt (Just res_r) MO_Nat_Add [aa,bb] Nothing,
+        CMachOpStmt (Just res_r) MO_Nat_Sub [aa,bb] Nothing,
         CMachOpStmt (Just t1) MO_Nat_Xor [aa,bb] Nothing,
         CMachOpStmt (Just t2) MO_Nat_Xor [aa,res_r] Nothing,
-        CMachOpStmt (Just t3) MO_Nat_And [t2,t3] Nothing,
+        CMachOpStmt (Just t3) MO_Nat_And [t1,t2] Nothing,
         bpw1_code,
         CMachOpStmt (Just res_c) MO_Nat_Shr [t3, bpw1_t] Nothing
      ]

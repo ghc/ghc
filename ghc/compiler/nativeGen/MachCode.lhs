@@ -1013,7 +1013,8 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
              code2 = registerCode reg2 t2
              src1  = registerName reg1 t1
              src2  = registerName reg2 t2
-             code dst = toOL [
+             code dst = code1 `appOL` code2 `appOL`
+                        toOL [
                            MOV L (OpReg src1) (OpReg res_hi),
                            MOV L (OpReg src2) (OpReg res_lo),
                            IMUL64 res_hi res_lo, 		-- result in res_hi:res_lo
@@ -1406,7 +1407,8 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
              code2 = registerCode reg2 t2
              src1  = registerName reg1 t1
              src2  = registerName reg2 t2
-             code dst = toOL [
+             code dst = code1 `appOL` code2 `appOL`
+                        toOL [
                            SMUL False src1 (RIReg src2) res_lo,
                            RDY res_hi,
                            SRA res_lo (RIImm (ImmInt 31)) res_lo,

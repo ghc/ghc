@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.89 2001/12/14 15:26:16 sewardj Exp $
+ * $Id: PrimOps.h,v 1.90 2001/12/18 15:23:16 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -39,6 +39,10 @@
  * we use a crude approximation, testing whether either operand is
  * larger than 32-bits; if neither is, then we go ahead with the
  * multiplication.
+ *
+ * Return non-zero if there is any possibility that the signed multiply
+ * of a and b might overflow.  Return zero only if you are absolutely sure
+ * that it won't overflow.  If in doubt, return non-zero.
  */
 
 #if SIZEOF_VOID_P == 4

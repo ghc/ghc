@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.14 2001/12/14 15:26:16 sewardj Exp $
+-- $Id: primops.txt.pp,v 1.15 2001/12/18 15:23:16 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -184,14 +184,15 @@ primop   IntMulOp    "*#"
    with commutable = True
 
 primop   IntMulMayOfloOp  "mulIntMayOflo#" 
-   GenPrimOp   Int# -> Int# -> Bool
-   {Return True if there is any possibility that the upper word of a
+   Dyadic   Int# -> Int# -> Int#
+   {Return non-zero if there is any possibility that the upper word of a
     signed integer multiply might contain useful information.  Return
-    False only if you are completely sure that no overflow can occur.
+    zero only if you are completely sure that no overflow can occur.
     On a 32-bit platform, the recommmended implementation is to do a 
-    32 x 32 -> 64 signed multiply, and compare result[63:32] with 
-    (result[31] >>signed 31).  If they are identical, meaning that the 
-    upper word is merely a sign extension of the lower one, return 0, else 1.
+    32 x 32 -> 64 signed multiply, and subtract result[63:32] from
+    (result[31] >>signed 31).  If this is zero, meaning that the 
+    upper word is merely a sign extension of the lower one, no
+    overflow can occur.
 
     On a 64-bit platform it is not always possible to 
     acquire the top 64 bits of the result.  Therefore, a recommended 

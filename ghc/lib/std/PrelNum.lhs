@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.44 2001/12/14 15:26:16 sewardj Exp $
+% $Id: PrelNum.lhs,v 1.45 2001/12/18 15:23:16 sewardj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -352,8 +352,9 @@ minusInteger i1@(J# _ _) i2@(S# _) = i1 - toBig i2
 minusInteger i1@(S# _) i2@(J# _ _) = toBig i1 - i2
 minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
-timesInteger i1@(S# i) i2@(S# j)   = if mulIntMayOflo# i j then toBig i1 * toBig i2 
-                                                           else S# (i *# j)
+timesInteger i1@(S# i) i2@(S# j)   = if   mulIntMayOflo# i j ==# 0#
+                                     then S# (i *# j)
+                                     else toBig i1 * toBig i2 
 timesInteger i1@(J# _ _) i2@(S# _) = i1 * toBig i2
 timesInteger i1@(S# _) i2@(J# _ _) = toBig i1 * i2
 timesInteger (J# s1 d1) (J# s2 d2) = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
