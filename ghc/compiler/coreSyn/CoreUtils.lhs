@@ -10,6 +10,9 @@ module CoreUtils (
 	bindNonRec, mkIfThenElse, mkAltExpr,
         mkPiType,
 
+	-- Taking expressions apart
+	findDefault, findAlt,
+
 	-- Properties of expressions
 	exprType, coreAltsType, 
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
@@ -241,6 +244,35 @@ mkIfThenElse guard then_expr else_expr
 	 [ (DataAlt trueDataCon,  [], then_expr),
 	   (DataAlt falseDataCon, [], else_expr) ]
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Taking expressions apart}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+findDefault :: [CoreAlt] -> ([CoreAlt], Maybe CoreExpr)
+findDefault []				= ([], Nothing)
+findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null alts && null args ) 
+					  ([], Just rhs)
+findDefault (alt : alts) 	        = case findDefault alts of 
+					    (alts', deflt) -> (alt : alts', deflt)
+
+findAlt :: AltCon -> [CoreAlt] -> CoreAlt
+findAlt con alts
+  = go alts
+  where
+    go [] 	    = pprPanic "Missing alternative" (ppr con $$ vcat (map ppr alts))
+    go (alt : alts) | matches alt = alt
+    		    | otherwise   = go alts
+
+    matches (DEFAULT, _, _) = True
+    matches (con1, _, _)    = con == con1
+\end{code}
+
 
 %************************************************************************
 %*									*
