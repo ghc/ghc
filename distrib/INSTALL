@@ -49,37 +49,3 @@ Bug reports/suggestions for improvement to the installation procedure/setup
 gratefully received at glasgow-haskell-bugs@dcs.gla.ac.uk
 
 Enjoy.
-
-
--------Win32 users only----------------------------------------
-NOTE to Win32 users: to enjoy any sort of happiness with the GHC
-tools, you will have to install the cygwin toolchain, which dresses
-up the Win32 environment into something more UNIX-like (which
-this initial port of ghc relies on being the case). The cygwin tools
-are available from
-
-    http://sourceware.cygnus.com/cygwin/
-
-GHC was built with beta20.1 of the cygwin tools and depends on it
-to work.
-
-Install cygwin before continuing. Couple of things to remember
-doing while installing these two:
-
-  - Create a toplevel /bin directory, and copy bash.exe into it
-    as sh.exe (we'll need this for running the configure script.)
-    Add /bin to your PATH.
-  - Create a toplevel /tmp directory.
-
-Additionally, ghc requires perl to operate, so included in the
-binary distribution is a perl binary, (perl.exe in the toplevel
-directory.) Install (as in copy :-) this somewhere along your
-PATH too (/bin is a good choice.)
-
-This is hardly beatiful, but it avoids having to download and install
-yet another package, including piles of (useful) perl libraries that the
-ghc perl code does not require to operate. Besides which, there's a
-dearth of readily useable perl distributions 'out there' that contain
-cygwin-compiled binaries, something we really do depend on.
-
--------Win32 users only----------------------------------------
