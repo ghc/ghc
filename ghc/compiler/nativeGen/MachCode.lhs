@@ -49,6 +49,8 @@ stmt2Instrs stmt = case stmt of
     StFunBegin lab -> returnInstr (IF_ARCH_alpha(FUNBEGIN lab,LABEL lab))
 #else
     -- StFunBegin, special tracing code for x86-Linux only
+    -- requires you to supply
+    -- void native_trace ( char* str )
     StFunBegin lab -> getUniqLabelNCG `thenUs` \ str_lbl ->
                       returnUs (mkSeqInstrs [
                          LABEL lab,
