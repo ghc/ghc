@@ -8,7 +8,6 @@ SRCS	= \
 	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
 	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
-	Data/Dynamic.hs \
 	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Trans.hs \
 	Control/Arrow.hs Debug/Trace.hs \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
@@ -33,6 +32,7 @@ SRCS	= \
 	Text/Html/BlockTable.hs Text/Html.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs
 
+#	Data/Dynamic.hs \
 #	[Data/Dynamic.hs] Data/Generics.hs Data/STRef.hs Data/Unique.hs
 #	Control/Monad/Identity.hs
 #	Debug/QuickCheck.hs
