@@ -34,13 +34,10 @@ import Util		( sortLe, global )
 import Outputable
 import qualified Pretty
 import SrcLoc		( srcSpanStart )
-import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt,
-			  opt_ErrorSpans )
-
-import List             ( replicate, sortBy )
+import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt, opt_ErrorSpans )
 import System		( ExitCode(..), exitWith )
 import DATA_IOREF
-import IO		( hPutStrLn, stderr, stdout )
+import IO		( hPutStrLn, stderr )
 
 
 -- -----------------------------------------------------------------------------
@@ -92,17 +89,8 @@ mkLongErrMsg :: SrcSpan -> PrintUnqualified -> Message -> Message -> ErrMsg
 mkLongErrMsg locn print_unqual msg extra 
  = ErrMsg [locn] print_unqual msg extra
 
--- A long (multi-line) error message, with context to tell us whether
--- to qualify names in the message or not.
-mkLongMultiLocErrMsg :: [SrcSpan] -> PrintUnqualified -> Message -> Message -> ErrMsg
-mkLongMultiLocErrMsg locns print_unqual msg extra
-  = ErrMsg locns print_unqual msg extra
-
 mkWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> WarnMsg
 mkWarnMsg = mkErrMsg
-
-mkLongWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> Message -> WarnMsg
-mkLongWarnMsg = mkLongErrMsg
 
 type Messages = (Bag WarnMsg, Bag ErrMsg)
 
