@@ -693,7 +693,7 @@ sub setupOptimiseFlags {
 
    @HsC_minusNoO_flags 
     = (	'-fsimplify',
-	  '\(',
+	  '[',
 	  $Oopt_FB_Support,
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
@@ -715,7 +715,7 @@ sub setupOptimiseFlags {
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
-	  '\)',
+	  ']',
 	$Oopt_AddAutoSccs,
 #	'-ffull-laziness',	# removed 95/04 WDP following Andr\'e's lead
 	
@@ -728,7 +728,7 @@ sub setupOptimiseFlags {
 
 	# initial simplify: mk specialiser happy: minimum effort please
 	'-fsimplify',
-	  '\(', 
+	  '[', 
 	  $Oopt_FB_Support,
 	  '-fkeep-spec-pragma-ids',	# required before specialisation
 
@@ -750,7 +750,7 @@ sub setupOptimiseFlags {
 
 	  '-fmax-simplifier-iterations1',
 	  $Oopt_PedanticBottoms,
-	  '\)',
+	  ']',
 
 	($Oopt_DoSpecialise) ? (
 	  '-fspecialise-overloaded',
@@ -759,7 +759,7 @@ sub setupOptimiseFlags {
 	) : (),
 
 	'-fsimplify', 			# need dependency anal after specialiser ...
-	  '\(', 			# need tossing before calc-inlinings ...
+	  '[', 			# need tossing before calc-inlinings ...
 	  $Oopt_FB_Support,
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
@@ -774,7 +774,7 @@ sub setupOptimiseFlags {
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
-	  '\)',
+	  ']',
 
 #LATER:	'-fcalc-inlinings1', -- pointless for 2.01
 
@@ -782,7 +782,7 @@ sub setupOptimiseFlags {
 #		'-ffoldr-build-ww-anal',
 #		'-ffoldr-build-worker-wrapper',
 #		'-fsimplify', 
-#		  '\(', 
+#		  '[', 
 #		  $Oopt_FB_Support,
 #		  '-ffloat-lets-exposing-whnf',
 #		  '-ffloat-primops-ok',
@@ -797,7 +797,7 @@ sub setupOptimiseFlags {
 #		  $Oopt_UnfoldingUseThreshold,
 #		  $Oopt_MaxSimplifierIterations,
 #		  $Oopt_ShowSimplifierProgress,
-#		  '\)',
+#		  ']',
 #	 ) : (),
 
 	# this pass-ordering sequence was agreed by Simon and Andr\'e
@@ -808,7 +808,7 @@ sub setupOptimiseFlags {
 	  '-ffoldr-build-on',		# desugar list comprehensions for foldr/build
 
 	  '-fsimplify', 
-	    '\(', 
+	    '[', 
 	    '-fignore-inline-pragma',	# **** NB!
 	    '-fdo-foldr-build',		# NB
 	    $Oopt_FB_Support,
@@ -825,13 +825,13 @@ sub setupOptimiseFlags {
 	    $Oopt_UnfoldingUseThreshold,
 	    $Oopt_MaxSimplifierIterations,
 	    $Oopt_ShowSimplifierProgress,
-	    '\)',
+	    ']',
 	) : (),
 
 	'-ffloat-inwards',
 
 	'-fsimplify',
-	  '\(', 
+	  '[', 
 	  $Oopt_FB_Support,
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
@@ -850,12 +850,12 @@ sub setupOptimiseFlags {
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
-	  '\)',
+	  ']',
 
 	'-fstrictness',
 
 	'-fsimplify',
-	  '\(', 
+	  '[', 
 	  $Oopt_FB_Support,
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
@@ -871,7 +871,7 @@ sub setupOptimiseFlags {
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
-	  '\)',
+	  ']',
 
 	'-ffloat-inwards',
 
@@ -880,12 +880,12 @@ sub setupOptimiseFlags {
 
 #	( ($OptLevel != 2)
 #        ? ''
-#	: "-fliberate-case -fsimplify \\( $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress \\)" ),
+#	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
 
 # Final clean-up simplification:
 
 	'-fsimplify',
-	  '\(', 
+	  '[', 
 	  $Oopt_FB_Support,
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
@@ -905,7 +905,7 @@ sub setupOptimiseFlags {
 	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
-	  '\)',
+	  ']',
 
       #	'-fstatic-args',
 
@@ -1709,7 +1709,7 @@ sub runLit2pgm {
     $to_do  = "echo '#line 1 \"$in_lit2pgm\"' > $lit2pgm_hscpp && " if ($Cpp_flag_set);
     $to_do .= "$Unlit @Unlit_flags $in_lit2pgm -  >> $lit2pgm_hscpp";
      
-    @Files_to_tidy = ( $lit2pgm_hscpp );
+    push(@Files_to_tidy, $lit2pgm_hscpp );
 
     &run_something($to_do, 'literate pre-processor');
 }
@@ -1731,12 +1731,12 @@ sub runHscpp {
 
     if ($HsCpp eq $Cat) {
 	$to_do .= "$HsCpp $lit2pgm_hscpp >> $hscpp_hsc";
-	@Files_to_tidy = ( $hscpp_hsc );
+	push(@Files_to_tidy, $hscpp_hsc );
 	&run_something($to_do, 'Ineffective C pre-processor');
     } else {
 	local($includes) = '-I' . join(' -I',@Include_dir);
 	$to_do .= "$HsCpp $Verbose $genSPECS_flag @HsCpp_flags -D__HASKELL1__=$Haskell1Version -D__GLASGOW_HASKELL__=$GhcVersionInfo $includes $lit2pgm_hscpp >> $hscpp_hsc";
-	@Files_to_tidy = ( $hscpp_hsc );
+	push(@Files_to_tidy, $hscpp_hsc );
 	&run_something($to_do, 'Haskellised C pre-processor');
     }
    
@@ -1882,7 +1882,7 @@ sub runHsc {
 
     # here, we may produce .hc/.s and/or .hi files
     local($output) = '';
-    @Files_to_tidy = ();
+    #@Files_to_tidy = ();
 
     if ( $going_interactive ) {
 	# don't need .hi unless going to show it on stdout:
@@ -1893,7 +1893,7 @@ sub runHsc {
     # set up for producing output/.hi; note that flag twiddling
     # may mean that nothing will actually be produced:
     $output = "$ProduceHi$hsc_hi $HscOut$hsc_out";
-    @Files_to_tidy = ( $hsc_hi, $hsc_out );
+    push(@Files_to_tidy, $hsc_hi, $hsc_out );
 
     # if we're compiling foo.hs, we want the GC stats to end up in foo.stat
     if ( $CollectingGCstats ) {
@@ -2043,7 +2043,7 @@ EOINCL
     if ( $Only_preprocess_hc ) { # HACK ALERT!
 	$to_do =~ s/ -S\b//g;
     }
-    @Files_to_tidy = ( $cc_help, $cc_help_s, $s_output );
+    push(@Files_to_tidy, $cc_help, $cc_help_s, $s_output );
     $PostprocessCcOutput = 1 if ! $Only_preprocess_hc;	# hack, dear hack...
     &run_something($to_do, 'C compiler');
     $PostprocessCcOutput = 0;
@@ -2123,7 +2123,7 @@ sub runAs {
 
     if ( ! $SplitObjFiles ) {
 	local($to_do)  = "$asmblr -o $as_out -c @As_flags $cc_as";
-	@Files_to_tidy = ( $as_out );
+	push(@Files_to_tidy, $as_out );
 	&run_something($to_do, 'Unix assembler');
 
     } else { # more complicated split-ification...
@@ -2143,7 +2143,7 @@ sub runAs {
 	for ($f = 1; $f <= $NoOfSplitFiles; $f++ ) {
 	    local($split_out) = &odir_ify("${ifile_root}__${f}",'o');
 	    local($to_do) = "$asmblr -o $split_out -c @As_flags ${Tmp_prefix}__${f}.s";
-	    @Files_to_tidy = ( $split_out );
+	    push(@Files_to_tidy, $split_out );
 
 	    &run_something($to_do, 'Unix assembler');
 	}
@@ -2542,7 +2542,7 @@ arg: while($_ = $Args[0]) {
     /^-v$/	    && do { $Verbose = '-v'; $Time = 'time'; next arg; };
 
     #---------- what phases are to be run ----------------------------------
-    /^-recomp/	    && do { $Do_recomp_chkr = 1; next arg; };
+    /^-(no-)?recomp/	    && do { $Do_recomp_chkr = ($1 ne '') ? 1 : 0; next arg; };
 
     /^-cpp$/	    && do { $Cpp_flag_set = 1; next arg; };
     # change the global default:
