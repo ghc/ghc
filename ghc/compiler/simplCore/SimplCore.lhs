@@ -55,7 +55,7 @@ import PrelVals		( unpackCStringId, unpackCString2Id,
 			  integerPlusTwoId, integerMinusOneId
 			)
 import Type		( maybeAppDataTyCon, isPrimType, SYN_IE(Type) )
-import TysWiredIn	( stringTy )
+import TysWiredIn	( stringTy, isIntegerTy )
 import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
 import Outputable	( PprStyle(..), Outputable(..){-instance * (,) -} )
@@ -692,15 +692,10 @@ litToRep (NoRepRational r rational_ty)
     (ratio_data_con, integer_ty)
       = case (maybeAppDataTyCon rational_ty) of
 	  Just (tycon, [i_ty], [con])
-	    -> ASSERT(is_integer_ty i_ty && uniqueOf tycon == ratioTyConKey)
+	    -> ASSERT(isIntegerTy i_ty && uniqueOf tycon == ratioTyConKey)
 	       (con, i_ty)
 
 	  _ -> (panic "ratio_data_con", panic "integer_ty")
-
-    is_integer_ty ty
-      = case (maybeAppDataTyCon ty) of
-	  Just (tycon, [], _) -> uniqueOf tycon == integerTyConKey
-	  _		      -> False
 
 litToRep other_lit = returnTM (literalType other_lit, Lit other_lit)
 \end{code}
