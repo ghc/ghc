@@ -169,7 +169,9 @@ odd that the wrapper doesn't include the stupid context.]
 data DataCon
   = MkData {			-- Used for data constructors only;
 				-- there *is* no constructor for a newtype
-	dcName    :: Name,	
+
+	dcName    :: Name,	-- This is the name of the *source data con*
+				-- (see "Note [Data Constructor Naming]" above)
 
 	dcUnique :: Unique, 		-- Cached from Name
 	dcTag    :: ConTag,
