@@ -132,8 +132,8 @@ cseBinds env (b:bs) = (b':bs')
 		      bs'        = cseBinds env1 bs
 
 cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
-cseBind env (NonRec b e) = let (env', (_,e')) = do_one env (b, e)
-			   in (env', NonRec b e')
+cseBind env (NonRec b e) = let (env', (b',e')) = do_one env (b, e)
+			   in (env', NonRec b' e')
 cseBind env (Rec pairs)  = let (env', pairs') = mapAccumL do_one env pairs
 			   in (env', Rec pairs')
 			 
@@ -175,7 +175,6 @@ cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind
 				     in Let bind' (cseExpr env' e)
--- gaw 2004
 cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr' ty (cseAlts env' scrut' bndr bndr' alts)
 				   where
 				     scrut' = tryForCSE env scrut
