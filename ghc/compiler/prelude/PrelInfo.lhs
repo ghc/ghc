@@ -32,6 +32,7 @@ import PrelNames	( basicKnownKeyNames,
 			  noDictClassKeys )
 #ifdef GHCI
 import DsMeta		( templateHaskellNames )
+import NameSet		( nameSetToList )
 #endif
 
 import PrimOp		( allThePrimOps, primOpOcc )
@@ -40,7 +41,6 @@ import Id		( idName )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import Name		( Name, nameOccName )
-import NameSet		( nameSetToList )
 import RdrName		( mkRdrUnqual, getRdrName )
 import HsSyn		( HsTyVarBndr(..) )
 import OccName		( mkVarOcc )

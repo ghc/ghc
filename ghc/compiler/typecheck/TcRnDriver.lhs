@@ -20,7 +20,7 @@ import {-# SOURCE #-} TcSplice( tcSpliceDecls )
 #endif
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
-import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
+import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsExpr(..),
 			  Stmt(..), Pat(VarPat), HsStmtContext(..), RuleDecl(..),
 			  HsGroup(..), SpliceDecl(..),
 			  mkSimpleMatch, placeHolderType, toHsType, andMonoBinds,
@@ -37,7 +37,7 @@ import MkId		( unsafeCoerceId )
 import RdrName		( RdrName, getRdrName, mkUnqual, mkRdrUnqual, 
 			  lookupRdrEnv, elemRdrEnv )
 
-import RnHsSyn		( RenamedHsDecl, RenamedStmt, RenamedTyClDecl, 
+import RnHsSyn		( RenamedStmt, RenamedTyClDecl, 
 			  ruleDeclFVs, instDeclFVs, tyClDeclFVs )
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkTopDecls, mkHsLet,
