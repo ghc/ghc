@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.187 2004/02/26 16:13:46 simonmar Exp $
+ * $Id: Schedule.c,v 1.188 2004/02/26 16:19:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -223,12 +223,6 @@ static void     detectBlackHoles  ( void );
  */
 Mutex     sched_mutex       = INIT_MUTEX_VAR;
 Mutex     term_mutex        = INIT_MUTEX_VAR;
-
-/*
- * A heavyweight solution to the problem of protecting
- * the thread_id from concurrent update.
- */
-Mutex     thread_id_mutex   = INIT_MUTEX_VAR;
 
 #endif /* RTS_SUPPORTS_THREADS */
 
@@ -1761,14 +1755,7 @@ createThread(nat size)
   // Always start with the compiled code evaluator
   tso->what_next = ThreadRunGHC;
 
-  /* tso->id needs to be unique.  For now we use a heavyweight mutex to
-   * protect the increment operation on next_thread_id.
-   * In future, we could use an atomic increment instead.
-   */
-  ACQUIRE_LOCK(&thread_id_mutex);
   tso->id = next_thread_id++; 
-  RELEASE_LOCK(&thread_id_mutex);
-
   tso->why_blocked  = NotBlocked;
   tso->blocked_exceptions = NULL;
 
@@ -2079,7 +2066,6 @@ initScheduler(void)
    * the scheduler. */
   initMutex(&sched_mutex);
   initMutex(&term_mutex);
-  initMutex(&thread_id_mutex);
 #endif
   
 #if defined(RTS_SUPPORTS_THREADS)
