@@ -21,12 +21,11 @@ import DsUtils		( EquationInfo(..),
 			  CanItFail(..)
  			)
 import Id		( idType )
-import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon,
+import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon, dataConArgTys,
 			  dataConSourceArity, dataConFieldLabels )
 import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkSrcVarOcc )
-import Type		( Type, 
-                          isUnboxedType, 
-                          splitTyConApp_maybe
+import Type		( Type, splitAlgTyConApp, mkTyVarTys,
+                          isUnboxedType, splitTyConApp_maybe
 			)
 import TysPrim		( intPrimTy, 
                           charPrimTy, 
@@ -230,7 +229,7 @@ check' qs@((EqnInfo n ctx ps result):_)
    | literals     = split_by_literals qs
    | constructors = split_by_constructor qs
    | only_vars    = first_column_only_vars qs
-   | otherwise    = panic ("Check.check': Not implemented :-(")
+   | otherwise    = panic "Check.check': Not implemented :-("
   where
      -- Note: RecPats will have been simplified to ConPats
      --       at this stage.
@@ -618,14 +617,17 @@ simplify_pat (TuplePat ps False)
   where
     arity = length ps
 
-simplify_pat (RecPat dc ty tvs dicts [])   
-  = ConPat dc ty tvs dicts all_wild_pats
+simplify_pat (RecPat dc ty ex_tvs dicts [])   
+  = ConPat dc ty ex_tvs dicts all_wild_pats
   where
-    all_wild_pats = map (\ _ -> WildPat gt) (dataConFieldLabels dc)
-    gt = panic "Check.symplify_pat{RecPat-1}"
+    all_wild_pats = map WildPat con_arg_tys
 
-simplify_pat (RecPat dc ty tvs dicts idps) 
-  = ConPat dc ty tvs dicts pats
+      -- identical to machinations in Match.tidy1:
+    (_, inst_tys, _) = splitAlgTyConApp ty
+    con_arg_tys      = dataConArgTys dc (inst_tys ++ mkTyVarTys ex_tvs)
+
+simplify_pat (RecPat dc ty ex_tvs dicts idps) 
+  = ConPat dc ty ex_tvs dicts pats
   where
     pats = map (simplify_pat.snd) all_pats
 
