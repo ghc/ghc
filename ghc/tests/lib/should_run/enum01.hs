@@ -3,6 +3,7 @@ module Main(main) where
 
 import Exception
 import Char
+import Ratio
 
 main = do
    -- Enum Int

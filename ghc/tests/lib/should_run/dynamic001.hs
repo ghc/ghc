@@ -52,8 +52,8 @@ fromDyn_test = do
    print (fromDyn (toDyn (Left True::Either Bool Bool)) (Right False :: Either Bool Bool))
    print (fromDyn (toDyn LT) GT)
    print (fromDyn (toDyn ((+1)::Int->Int)) False)
-   print (fromDyn (toDyn ((+1)::Int->Int)) ((+2)::Int->Int))
-   print (fromDyn (toDyn ((++)::[Int]->[Int]->[Int])) ((undefined)::[Int]->[Int]->[Int]))
+   print ((fromDyn (toDyn ((+1)::Int->Int)) ((+2)::Int->Int)) 3)
+   print ((fromDyn (toDyn ((++)::[Int]->[Int]->[Int])) ((undefined)::[Int]->[Int]->[Int])) [1] [2])
 
     
 -- Misc test utilities:
