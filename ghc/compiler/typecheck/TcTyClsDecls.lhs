@@ -289,7 +289,7 @@ tcTyClDecl calc_vrcs calc_isrec decl
   = tcAddDeclCtxt decl (tcTyClDecl1 calc_vrcs calc_isrec decl)
 
 tcTyClDecl1 calc_vrcs calc_isrec 
-	  (TySynonym {tcdName = tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
+  (TySynonym {tcdName = tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
   =   tcTyVarBndrs tvs		$ \ tvs' -> do 
     { rhs_ty' <- tcHsKindedType rhs_ty
     ; return (ATyCon (buildSynTyCon tc_name tvs' rhs_ty' arg_vrcs)) }
@@ -297,8 +297,8 @@ tcTyClDecl1 calc_vrcs calc_isrec
     arg_vrcs = calc_vrcs tc_name
 
 tcTyClDecl1 calc_vrcs calc_isrec 
-	  (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
-		   tcdName = tc_name, tcdCons = cons})
+  (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
+	   tcdName = tc_name, tcdCons = cons})
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' 	 <- tcHsKindedContext ctxt
   ; want_generic <- doptM Opt_Generics
@@ -315,9 +315,9 @@ tcTyClDecl1 calc_vrcs calc_isrec
     is_rec   = calc_isrec tc_name
 
 tcTyClDecl1 calc_vrcs calc_isrec 
-	  (ClassDecl {tcdName = class_name, tcdTyVars = tvs, 
-		      tcdCtxt = ctxt, tcdMeths = meths,
-		      tcdFDs = fundeps, tcdSigs = sigs} )
+  (ClassDecl {tcdName = class_name, tcdTyVars = tvs, 
+	      tcdCtxt = ctxt, tcdMeths = meths,
+	      tcdFDs = fundeps, tcdSigs = sigs} )
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM tc_fundep fundeps
@@ -340,7 +340,7 @@ tcTyClDecl1 calc_vrcs calc_isrec
 
 
 tcTyClDecl1 calc_vrcs calc_isrec 
-	  (ForeignType {tcdName = tc_name, tcdExtName = tc_ext_name})
+  (ForeignType {tcdName = tc_name, tcdExtName = tc_ext_name})
   = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0 []))
 
 -----------------------------------

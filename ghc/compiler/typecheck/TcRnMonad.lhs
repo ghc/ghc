@@ -12,7 +12,7 @@ import IOEnv		-- Re-export all
 
 import HsSyn		( MonoBinds(..) )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
-			  TyThing, Dependencies(..),
+			  TyThing, Dependencies(..), TypeEnv, emptyTypeEnv,
 			  ExternalPackageState(..), HomePackageTable,
 			  ModDetails(..), HomeModInfo(..), 
 			  Deprecs(..), FixityEnv, FixItem,
@@ -754,15 +754,22 @@ initIfaceCheck hsc_env do_this
 	; initTcRnIf 'i' hsc_env gbl_env () do_this
     }
 
-initIfaceTc :: HscEnv -> ModIface -> IfG a -> IO a
+initIfaceTc :: HscEnv -> ModIface 
+ 	    -> (TcRef TypeEnv -> IfL a) -> IO a
 -- Used when type-checking checking an up-to-date interface file
 -- No type envt from the current module, but we do know the module dependencies
 initIfaceTc hsc_env iface do_this
- = do	{ let { gbl_env = IfGblEnv { if_is_boot   = mkModDeps (dep_mods (mi_deps iface)),
-				     if_rec_types = Nothing } ;
+ = do	{ tc_env_var <- newIORef emptyTypeEnv
+	; let { gbl_env = IfGblEnv { if_is_boot   = mkModDeps (dep_mods (mi_deps iface)),
+				     if_rec_types = Just (mod, readMutVar tc_env_var) } ;
+	      ; if_lenv = IfLclEnv { if_mod     = moduleName mod,
+				     if_tv_env  = emptyOccEnv,
+				     if_id_env  = emptyOccEnv }
 	   }
-	; initTcRnIf 'i' hsc_env gbl_env () do_this
+	; initTcRnIf 'i' hsc_env gbl_env if_lenv (do_this tc_env_var)
     }
+  where
+    mod = mi_module iface
 
 initIfaceRules :: HscEnv -> ModGuts -> IfG a -> IO a
 -- Used when sucking in new Rules in SimplCore

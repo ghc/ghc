@@ -296,7 +296,7 @@ tcIfaceGlobal name
     }}}
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon IfaceIntTc = return intTyCon
+tcIfaceTyCon IfaceIntTc  = return intTyCon
 tcIfaceTyCon IfaceBoolTc = return boolTyCon
 tcIfaceTyCon IfaceCharTc = return charTyCon
 tcIfaceTyCon IfaceListTc = return listTyCon
@@ -362,24 +362,6 @@ extendIfaceTyVarEnv tyvars thing_inside
 %*									*
 %************************************************************************
 
-IfaceDecls etc are populated with RdrNames.  The RdrNames may either be
-
-  Orig or Unqual	when the interface is read from a file
-
-  Exact			when the interface is kept by GHCi, and is now 
-			being re-linked with the type environment
-
-At an occurrence site, to convert the RdrName to Name:
-  Unqual	look up in LocalRdrEnv
-  Orig		look up in OrigNameCache
-  Exact	 	return the Name
-
-At a binding site, to bind the RdrName
-  Unqual		we extend the LocalRdrEnv
-  Orig or Unqual	we don't extend the LocalRdrEnv (no need)
-
-First, we deal with the RdrName -> Name mapping
- 
 \begin{code}
 lookupIfaceTc :: IfaceTyCon -> IfL Name
 lookupIfaceTc (IfaceTc ext) = lookupIfaceExt ext

@@ -42,7 +42,8 @@ import StringBuffer	( hGetStringBuffer )
 import Parser
 import Lexer		( P(..), ParseResult(..), mkPState, showPFailed )
 import SrcLoc		( mkSrcLoc )
-import TcRnDriver	( tcRnModule, tcRnExtCore, tcRnIface )
+import TcRnDriver	( tcRnModule, tcRnExtCore )
+import TcIface		( typecheckIface )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
@@ -182,7 +183,7 @@ hscNoRecomp hsc_env have_object
 			showModMsg have_object mod location);
 
       new_details <- _scc_ "tcRnIface"
-		     tcRnIface hsc_env old_iface ;
+		     typecheckIface hsc_env old_iface ;
       dumpIfaceStats hsc_env ;
 
       return (HscNoRecomp new_details old_iface)

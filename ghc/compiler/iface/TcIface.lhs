@@ -32,6 +32,7 @@ import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
 			  DeclPool, RulePool, Pool(..), Gated, addRuleToPool )
 import InstEnv		( extendInstEnv )
 import CoreSyn
+import PprType		( pprClassPred )
 import PprCore		( pprIdRules )
 import Rules		( extendRuleBaseList )
 import CoreUtils	( exprType )
@@ -58,7 +59,7 @@ import Module		( Module, ModuleName, moduleName )
 import UniqSupply	( initUs_ )
 import Outputable	
 import SrcLoc		( noSrcLoc )
-import Util		( zipWithEqual, dropList, equalLength )
+import Util		( zipWithEqual, dropList, equalLength, zipLazy )
 import Maybes		( expectJust )
 import CmdLineOpts	( DynFlag(..) )
 \end{code}
@@ -208,22 +209,50 @@ selectDecl (Pool decls_map n_in n_out) name
 
 %************************************************************************
 %*									*
-		Other interfaces
+		Type-checking a complete interface
 %*									*
 %************************************************************************
 
+Suppose we discover we don't need to recompile.  Then we must type
+check the old interface file.  This is a bit different to the
+incremental type checking we do as we suck in interface files.  Instead
+we do things similarly as when we are typechecking source decls: we
+bring into scope the type envt for the interface all at once, using a
+knot.  Remember, the decls aren't necessarily in dependency order --
+and even if they were, the type decls might be mutually recursive.
+
 \begin{code}
-typecheckIface :: ModIface -> IfG ModDetails
--- Used when we decide not to recompile, but intead to use the
--- interface to construct the type environment for the module
-typecheckIface iface
-  = initIfaceLcl (moduleName (mi_module iface)) $
-    do	{ ty_things <- mapM (tcIfaceDecl . snd) (mi_decls iface)
-	; rules <- mapM tcIfaceRule (mi_rules iface)
+typecheckIface :: HscEnv
+	       -> ModIface 	-- Get the decls from here
+	       -> IO ModDetails
+typecheckIface hsc_env iface@(ModIface { mi_module = mod, mi_decls = ver_decls,
+				         mi_rules = rules, mi_insts = dfuns })
+  = initIfaceTc hsc_env iface $ \ tc_env_var -> do
+	{ 	-- Typecheck the decls
+	  names <- mappM (lookupOrig (moduleName mod) . ifName) decls
+	; ty_things <- fixM (\ rec_ty_things -> do
+		{ writeMutVar tc_env_var (mkNameEnv (names `zipLazy` rec_ty_things))
+			-- This only makes available the "main" things,
+			-- but that's enough for the strictly-checked part
+		; mapM tcIfaceDecl decls })
+	
+		-- Now augment the type envt with all the implicit things
+		-- These will be needed when type-checking the unfoldings for
+		-- the IfaceIds, but this is done lazily, so writing the thing
+		-- now is sufficient
+	; let	{ add_implicits main_thing = main_thing : implicitTyThings main_thing
+		; type_env = mkTypeEnv (concatMap add_implicits ty_things) }
+	; writeMutVar tc_env_var type_env
+
+		-- Now do those rules and instances
 	; dfuns <- mapM tcIfaceInst (mi_insts iface)
-	; return (ModDetails { md_types = mkTypeEnv ty_things,
-			       md_insts = dfuns,
-			       md_rules = rules }) }
+	; rules <- mapM tcIfaceRule (mi_rules iface)
+
+		-- Finished
+	; return (ModDetails { md_types = type_env, md_insts = dfuns, md_rules = rules }) 
+    }
+  where
+    decls = map snd ver_decls
 \end{code}
 
 
@@ -440,6 +469,9 @@ loadImportedInsts cls tys
 		return (eps_inst_env eps)
 	  else do
 	{ writeMutVar eps_var (eps {eps_insts = inst_pool'})
+
+	; traceIf (sep [ptext SLIT("Importing instances for") <+> pprClassPred cls tys, 
+			nest 2 (vcat (map ppr iface_insts))])
 
 	-- Typecheck the new instances
 	; dfuns <- initIfaceTcRn (mappM tc_inst iface_insts)

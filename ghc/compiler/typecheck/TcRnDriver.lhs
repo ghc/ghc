@@ -10,7 +10,7 @@ module TcRnDriver (
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
-	tcRnIface, tcRnExtCore
+	tcRnExtCore
     ) where
 
 #include "HsVersions.h"
@@ -42,7 +42,7 @@ import TcEnv		( tcExtendGlobalValEnv, tcLookupGlobal )
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcIface		( typecheckIface, tcExtCoreBindings )
+import TcIface		( tcExtCoreBindings )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
@@ -196,24 +196,6 @@ tcRnModule hsc_env
 	tcDump final_env ;
 	return final_env
     }}}}
-\end{code}
-
-
-%*********************************************************
-%*						 	 *
-\subsection{Closing up the interface decls}
-%*							 *
-%*********************************************************
-
-Suppose we discover we don't need to recompile.   Then we start from the
-IfaceDecls in the ModIface, and fluff them up by sucking in all the decls they need.
-
-\begin{code}
-tcRnIface :: HscEnv
-	  -> ModIface 	-- Get the decls from here
-	  -> IO ModDetails
-tcRnIface hsc_env iface
-  = initIfaceTc hsc_env iface (typecheckIface iface)
 \end{code}
 
 
