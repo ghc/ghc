@@ -724,12 +724,12 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 
 -- Loads and stores.
 
-	      | LD	Size Reg MachRegsAddr -- size, dst, src
-	      | ST	Size Reg MachRegsAddr -- size, src, dst 
-	      | STU	Size Reg MachRegsAddr -- size, src, dst 
-	      | LIS	Reg Imm -- dst, src
-	      | LI	Reg Imm -- dst, src
-	      | MR	Reg Reg -- dst, src -- also for fmr
+	      | LD	Size Reg MachRegsAddr -- Load size, dst, src
+	      | ST	Size Reg MachRegsAddr -- Store size, src, dst 
+	      | STU	Size Reg MachRegsAddr -- Store with Update size, src, dst 
+	      | LIS	Reg Imm -- Load Immediate Shifted dst, src
+	      | LI	Reg Imm -- Load Immediate dst, src
+	      | MR	Reg Reg -- Move Register dst, src -- also for fmr
 	      
 	      | CMP     Size Reg RI --- size, src1, src2
 	      | CMPL    Size Reg RI --- size, src1, src2
@@ -749,20 +749,25 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 	      | AND	Reg Reg RI -- dst, src1, src2
 	      | OR	Reg Reg RI -- dst, src1, src2
 	      | XOR	Reg Reg RI -- dst, src1, src2
+	      | XORIS	Reg Reg Imm -- XOR Immediate Shifted dst, src1, src2
 	      
 	      | NEG	Reg Reg
 	      | NOT	Reg Reg
 	      
-	      | SLW	Reg Reg RI
-	      | SRW	Reg Reg RI
-	      | SRAW	Reg Reg RI
+	      | SLW	Reg Reg RI	-- shift left word
+	      | SRW	Reg Reg RI	-- shift right word
+	      | SRAW	Reg Reg RI	-- shift right arithmetic word
 	      
 	      | FADD	Size Reg Reg Reg
 	      | FSUB	Size Reg Reg Reg
 	      | FMUL	Size Reg Reg Reg
 	      | FDIV	Size Reg Reg Reg
+	      | FNEG	Reg Reg	 -- negate is the same for single and double prec.
 	      
 	      | FCMP	Reg Reg
+	      
+	      | FCTIWZ	Reg Reg		-- convert to integer word
+					-- (but destination is a FP register)
 	      
 data RI = RIReg Reg
 	| RIImm Imm

@@ -1595,8 +1595,10 @@ getRegister (StMachOp mop [x]) -- unary MachOps
       MO_16S_to_NatS  -> integerExtend True  16 x
       MO_8U_to_32U    -> integerExtend False 24 x
 
-      other -> pprPanic "getRegister(powerpc) - unary StMachOp" 
-                                (pprMachOp mop)
+      MO_Flt_Neg      -> trivialUFCode FloatRep FNEG x
+      MO_Dbl_Neg      -> trivialUFCode FloatRep FNEG x
+
+      other_op -> getRegister (StCall (Left fn) CCallConv DoubleRep [x])
     where
         integerExtend signed nBits x
            = getRegister (
@@ -1606,6 +1608,44 @@ getRegister (StMachOp mop [x]) -- unary MachOps
         conversionNop new_rep expr
             = getRegister expr		`thenNat` \ e_code ->
               returnNat (swizzleRegisterRep e_code new_rep)
+
+	(is_float_op, fn)
+	  = case mop of
+	      MO_Flt_Exp    -> (True,  FSLIT("exp"))
+	      MO_Flt_Log    -> (True,  FSLIT("log"))
+	      MO_Flt_Sqrt   -> (True,  FSLIT("sqrt"))
+
+	      MO_Flt_Sin    -> (True,  FSLIT("sin"))
+	      MO_Flt_Cos    -> (True,  FSLIT("cos"))
+	      MO_Flt_Tan    -> (True,  FSLIT("tan"))
+
+	      MO_Flt_Asin   -> (True,  FSLIT("asin"))
+	      MO_Flt_Acos   -> (True,  FSLIT("acos"))
+	      MO_Flt_Atan   -> (True,  FSLIT("atan"))
+
+	      MO_Flt_Sinh   -> (True,  FSLIT("sinh"))
+	      MO_Flt_Cosh   -> (True,  FSLIT("cosh"))
+	      MO_Flt_Tanh   -> (True,  FSLIT("tanh"))
+
+	      MO_Dbl_Exp    -> (False, FSLIT("exp"))
+	      MO_Dbl_Log    -> (False, FSLIT("log"))
+	      MO_Dbl_Sqrt   -> (False, FSLIT("sqrt"))
+
+	      MO_Dbl_Sin    -> (False, FSLIT("sin"))
+	      MO_Dbl_Cos    -> (False, FSLIT("cos"))
+	      MO_Dbl_Tan    -> (False, FSLIT("tan"))
+
+	      MO_Dbl_Asin   -> (False, FSLIT("asin"))
+	      MO_Dbl_Acos   -> (False, FSLIT("acos"))
+	      MO_Dbl_Atan   -> (False, FSLIT("atan"))
+
+	      MO_Dbl_Sinh   -> (False, FSLIT("sinh"))
+	      MO_Dbl_Cosh   -> (False, FSLIT("cosh"))
+	      MO_Dbl_Tanh   -> (False, FSLIT("tanh"))
+	      
+	      other -> pprPanic "getRegister(powerpc) - unary StMachOp" 
+                                (pprMachOp mop)
+
 
 getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
@@ -1648,9 +1688,13 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
 
       MO_NatS_Mul -> trivialCode MULLW x y
       MO_NatU_Mul -> trivialCode MULLW x y
+      -- MO_NatS_MulMayOflo -> 
 
       MO_NatS_Quot -> trivialCode2 DIVW x y
       MO_NatU_Quot -> trivialCode2 DIVWU x y
+      
+      MO_NatS_Rem  -> remainderCode DIVW x y
+      MO_NatU_Rem  -> remainderCode DIVWU x y
       
       MO_Nat_And   -> trivialCode AND x y
       MO_Nat_Or    -> trivialCode OR x y
@@ -1659,17 +1703,7 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
       MO_Nat_Shl   -> trivialCode SLW x y
       MO_Nat_Shr   -> trivialCode SRW x y
       MO_Nat_Sar   -> trivialCode SRAW x y
-
-     {-  MO_NatS_Mul  -> trivialCode (SMUL False) x y
-      MO_NatU_Mul  -> trivialCode (UMUL False) x y
-      MO_NatS_MulMayOflo -> imulMayOflo x y
-			    imulMayOflo
-     -- ToDo: teach about V8+ SPARC div instructions
-      MO_NatS_Quot -> idiv FSLIT(".div")  x y
-      MO_NatS_Rem  -> idiv FSLIT(".rem")  x y
-      MO_NatU_Quot -> idiv FSLIT(".udiv")  x y
-      MO_NatU_Rem  -> idiv FSLIT(".urem")  x y -}
-
+      			    
       MO_Flt_Add   -> trivialFCode FloatRep  FADD x y
       MO_Flt_Sub   -> trivialFCode FloatRep  FSUB x y
       MO_Flt_Mul   -> trivialFCode FloatRep  FMUL x y
@@ -1679,13 +1713,12 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
       MO_Dbl_Sub   -> trivialFCode DoubleRep FSUB x y
       MO_Dbl_Mul   -> trivialFCode DoubleRep FMUL x y
       MO_Dbl_Div   -> trivialFCode DoubleRep FDIV x y
-{-
+
       MO_Flt_Pwr  -> getRegister (StCall (Left FSLIT("pow")) CCallConv DoubleRep 
-                                         [promote x, promote y])
-		       where promote x = StMachOp MO_Flt_to_Dbl [x]
+                                         [x, y])
       MO_Dbl_Pwr -> getRegister (StCall (Left FSLIT("pow")) CCallConv DoubleRep 
                                         [x, y])
-	-}
+	
       other -> pprPanic "getRegister(powerpc) - binary StMachOp (1)" (pprMachOp mop)
 
 getRegister (StInd pk mem)
@@ -2729,15 +2762,8 @@ assignMem_FltCode pk addr src
 
     	src__2  = registerName register tmp1
     	pk__2   = registerRep register
-    	sz__2   = primRepToSize pk__2
 
-	code__2 = if pk__2 == DoubleRep || pk == pk__2
-	    then code1 `appOL` code2 `snocOL` ST sz src__2 dst__2
-	    else panic "###PPC MachCode.assignMem_FltCode: FloatRep"
-    	{- code__2 = code1 `appOL` code2 `appOL`
-	    if   pk == pk__2 
-            then unitOL (ST sz src__2 dst__2)
-	    else toOL [FxTOy sz__2 sz src__2 tmp1, ST sz tmp1 dst__2] -}
+	code__2 = code1 `appOL` code2 `snocOL` ST sz src__2 dst__2
     in
     returnNat code__2
 
@@ -4217,13 +4243,13 @@ trivialFCode pk instr x y
     	code2 = registerCode register2 tmp2
     	src2  = registerName register2 tmp2
 
+	dstRep = if pk1 == FloatRep && pk2 == FloatRep then FloatRep else DoubleRep
+
     	code__2 dst =
-    	    	if pk1 == pk2 then
     	            code1 `appOL` code2 `snocOL`
-    	    	    instr (primRepToSize pk) dst src1 src2
-    	    	else panic "###PPC MachCode.trivialFCode: type mismatch"
+    	    	    instr (primRepToSize dstRep) dst src1 src2
     in
-    returnNat (Any (if pk1 == pk2 then pk1 else DoubleRep) code__2)
+    returnNat (Any dstRep code__2)
 
 trivialUCode instr x
   = getRegister x		`thenNat` \ register ->
@@ -4234,7 +4260,41 @@ trivialUCode instr x
     	code__2 dst = code `snocOL` instr dst src
     in
     returnNat (Any IntRep code__2)
-trivialUFCode pk instr x  = panic "###PPC MachCode.trivialUFCode"
+trivialUFCode pk instr x
+  = getRegister x		`thenNat` \ register ->
+    getNewRegNCG (registerRep register)
+				`thenNat` \ tmp ->
+    let
+    	code = registerCode register tmp
+    	src  = registerName register tmp
+    	code__2 dst = code `snocOL` instr dst src
+    in
+    returnNat (Any pk code__2)
+  
+-- There is no "remainder" instruction on the PPC, so we have to do
+-- it the hard way.
+-- The "div" parameter is the division instruction to use (DIVW or DIVWU)
+
+remainderCode :: (Reg -> Reg -> Reg -> Instr)
+    -> StixExpr -> StixExpr -> NatM Register
+remainderCode div x y
+  = getRegister x		`thenNat` \ register1 ->
+    getRegister y		`thenNat` \ register2 ->
+    getNewRegNCG IntRep		`thenNat` \ tmp1 ->
+    getNewRegNCG IntRep		`thenNat` \ tmp2 ->
+    let
+    	code1 = registerCode register1 tmp1
+    	src1  = registerName register1 tmp1
+    	code2 = registerCode register2 tmp2
+    	src2  = registerName register2 tmp2
+    	code__2 dst = code1 `appOL` code2 `appOL` toOL [
+		div dst src1 src2,
+		MULLW dst dst (RIReg src2),
+		SUBF dst dst (RIReg src1)
+	    ]
+    in
+    returnNat (Any IntRep code__2)
+
 #endif {- powerpc_TARGET_ARCH -}
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -4391,8 +4451,50 @@ coerceFlt2Dbl x
 #endif {- sparc_TARGET_ARCH -}
 
 #if powerpc_TARGET_ARCH
-coerceInt2FP pk x	= panic "###PPC MachCode.coerceInt2FP"
-coerceFP2Int fprep x	= panic "###PPC MachCode.coerceFP2Int"
+coerceInt2FP pk x
+  = ASSERT(pk == DoubleRep)
+    getRegister x		    `thenNat` \ register ->
+    getNewRegNCG IntRep		    `thenNat` \ reg ->
+    getNatLabelNCG 	    	    `thenNat` \ lbl ->
+    getNewRegNCG PtrRep    	    `thenNat` \ itmp ->
+    getNewRegNCG DoubleRep    	    `thenNat` \ ftmp ->
+    let
+        code = registerCode register reg
+    	src  = registerName register reg
+    	code__2 dst = code `appOL` toOL [
+		SEGMENT RoDataSegment,
+		LABEL lbl,
+		DATA W [ImmInt 0x43300000, ImmInt 0x80000000],
+		SEGMENT TextSegment,
+		XORIS itmp src (ImmInt 0x8000),
+		ST W itmp (spRel (-1)),
+		LIS itmp (ImmInt 0x4330),
+		ST W itmp (spRel (-2)),
+		LD DF ftmp (spRel (-2)),
+		LIS itmp (HA (ImmCLbl lbl)),
+		LD DF dst (AddrRegImm itmp (LO (ImmCLbl lbl))),
+		FSUB DF dst ftmp dst
+	    ]
+    in
+	returnNat (Any DoubleRep code__2)
+
+coerceFP2Int fprep x
+  = ASSERT(fprep == DoubleRep || fprep == FloatRep)
+    getRegister x		`thenNat` \ register ->
+    getNewRegNCG fprep		`thenNat` \ reg ->
+    getNewRegNCG DoubleRep	`thenNat` \ tmp ->
+    let
+    	code = registerCode register reg
+    	src  = registerName register reg
+    	code__2 dst = code `appOL` toOL [
+		-- convert to int in FP reg
+    	    FCTIWZ tmp src,
+		-- store value (64bit) from FP to stack
+    	    ST DF tmp (spRel (-2)),
+		-- read low word of value (high word is undefined)
+    	    LD W dst (spRel (-1))]	
+    in
+    returnNat (Any IntRep code__2)
 coerceDbl2Flt x		= panic "###PPC MachCode.coerceDbl2Flt"
 coerceFlt2Dbl x		= panic "###PPC MachCode.coerceFlt2Dbl"
 #endif {- powerpc_TARGET_ARCH -}

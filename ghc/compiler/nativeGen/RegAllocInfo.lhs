@@ -121,7 +121,7 @@ intersectionRegSets (MkRegSet xs1) (MkRegSet xs2)
 
 %************************************************************************
 %*									*
-\subsection{@RegUsage@ type; @noUsage@, @endUsage@, @regUsage@ functions}
+\subsection{@RegUsage@ type; @noUsage@ and @regUsage@ functions}
 %*									*
 %************************************************************************
 
@@ -398,7 +398,11 @@ regUsage instr = case instr of
     MR	  reg1 reg2     -> usage ([reg2], [reg1])
     CMP   sz reg ri	-> usage (reg : regRI ri,[])
     CMPL  sz reg ri	-> usage (reg : regRI ri,[])
+    BCC	  cond lbl	-> noUsage
     MTCTR reg		-> usage ([reg],[])
+    BCTR		-> noUsage
+    BL    imm params	-> usage (params, callClobberedRegs)
+    BCTRL params	-> usage (params, callClobberedRegs)
     ADD	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     SUBF  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     MULLW reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
@@ -407,18 +411,19 @@ regUsage instr = case instr of
     AND	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     OR	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     XOR	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
+    XORIS reg1 reg2 imm -> usage ([reg2], [reg1])
+    NEG	  reg1 reg2	-> usage ([reg2], [reg1])
+    NOT	  reg1 reg2	-> usage ([reg2], [reg1])
     SLW	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     SRW	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     SRAW  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
-    NEG	  reg1 reg2	-> usage ([reg2], [reg1])
-    NOT	  reg1 reg2	-> usage ([reg2], [reg1])
-    BL    imm params	-> usage (params, callClobberedRegs)
-    BCTRL params	-> usage (params, callClobberedRegs)
     FADD  sz r1 r2 r3   -> usage ([r2,r3], [r1])
     FSUB  sz r1 r2 r3   -> usage ([r2,r3], [r1])
     FMUL  sz r1 r2 r3   -> usage ([r2,r3], [r1])
     FDIV  sz r1 r2 r3   -> usage ([r2,r3], [r1])
+    FNEG  r1 r2		-> usage ([r2], [r1])
     FCMP  r1 r2		-> usage ([r1,r2], [])
+    FCTIWZ r1 r2	-> usage ([r2], [r1])
     _ 	    	    	-> noUsage
   where
     usage (src, dst) = RU (regSetFromList (filter interesting src))
@@ -829,6 +834,8 @@ patchRegs instr env = case instr of
     BCC	  cond lbl	-> BCC cond lbl
     MTCTR reg		-> MTCTR (env reg)
     BCTR		-> BCTR
+    BL    imm argRegs	-> BL imm argRegs	-- argument regs
+    BCTRL argRegs	-> BCTRL argRegs 	-- cannot be remapped
     ADD	  reg1 reg2 ri	-> ADD (env reg1) (env reg2) (fixRI ri)
     SUBF  reg1 reg2 ri	-> SUBF (env reg1) (env reg2) (fixRI ri)
     MULLW reg1 reg2 ri	-> MULLW (env reg1) (env reg2) (fixRI ri)
@@ -837,16 +844,19 @@ patchRegs instr env = case instr of
     AND	  reg1 reg2 ri	-> AND (env reg1) (env reg2) (fixRI ri)
     OR 	  reg1 reg2 ri	-> OR  (env reg1) (env reg2) (fixRI ri)
     XOR	  reg1 reg2 ri	-> XOR (env reg1) (env reg2) (fixRI ri)
+    XORIS reg1 reg2 imm -> XORIS (env reg1) (env reg2) imm
+    NEG	  reg1 reg2	-> NEG (env reg1) (env reg2)
+    NOT	  reg1 reg2	-> NOT (env reg1) (env reg2)
     SLW	  reg1 reg2 ri	-> SLW (env reg1) (env reg2) (fixRI ri)
     SRW	  reg1 reg2 ri	-> SRW (env reg1) (env reg2) (fixRI ri)
     SRAW  reg1 reg2 ri	-> SRAW (env reg1) (env reg2) (fixRI ri)
-    NEG	  reg1 reg2	-> NEG (env reg1) (env reg2)
-    NOT	  reg1 reg2	-> NOT (env reg1) (env reg2)
     FADD  sz r1 r2 r3   -> FADD sz (env r1) (env r2) (env r3)
     FSUB  sz r1 r2 r3   -> FSUB sz (env r1) (env r2) (env r3)
     FMUL  sz r1 r2 r3   -> FMUL sz (env r1) (env r2) (env r3)
     FDIV  sz r1 r2 r3   -> FDIV sz (env r1) (env r2) (env r3)
+    FNEG  r1 r2		-> FNEG (env r1) (env r2)
     FCMP  r1 r2		-> FCMP (env r1) (env r2)
+    FCTIWZ r1 r2	-> FCTIWZ (env r1) (env r2)
     _ -> instr
   where
     fixAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)

@@ -1892,7 +1892,9 @@ pprInstr (LI reg imm) = hcat [
 	ptext SLIT(", "),
 	pprImm imm
     ]
-pprInstr (MR reg1 reg2) = hcat [
+pprInstr (MR reg1 reg2) 
+    | reg1 == reg2 = empty
+    | otherwise = hcat [
 	char '\t',
 	case regClass reg1 of
 	    RcInteger -> ptext SLIT("mr")
@@ -1968,9 +1970,35 @@ pprInstr (MULLW reg1 reg2 ri@(RIReg _)) = pprLogic SLIT("mullw") reg1 reg2 ri
 pprInstr (MULLW reg1 reg2 ri@(RIImm _)) = pprLogic SLIT("mull") reg1 reg2 ri
 pprInstr (DIVW reg1 reg2 reg3) = pprLogic SLIT("divw") reg1 reg2 (RIReg reg3)
 pprInstr (DIVWU reg1 reg2 reg3) = pprLogic SLIT("divwu") reg1 reg2 (RIReg reg3)
+
+    	-- for some reason, "andi" doesn't exist.
+	-- we'll use "andi." instead.
+pprInstr (AND reg1 reg2 (RIImm imm)) = hcat [
+	char '\t',
+	ptext SLIT("andi."),
+	char '\t',
+	pprReg reg1,
+	ptext SLIT(", "),
+	pprReg reg2,
+	ptext SLIT(", "),
+	pprImm imm
+    ]
 pprInstr (AND reg1 reg2 ri) = pprLogic SLIT("and") reg1 reg2 ri
+
 pprInstr (OR reg1 reg2 ri) = pprLogic SLIT("or") reg1 reg2 ri
 pprInstr (XOR reg1 reg2 ri) = pprLogic SLIT("xor") reg1 reg2 ri
+
+pprInstr (XORIS reg1 reg2 imm) = hcat [
+	char '\t',
+	ptext SLIT("xoris"),
+	char '\t',
+	pprReg reg1,
+	ptext SLIT(", "),
+	pprReg reg2,
+	ptext SLIT(", "),
+	pprImm imm
+    ]
+
 pprInstr (SLW reg1 reg2 ri) = pprLogic SLIT("slw") reg1 reg2 ri
 pprInstr (SRW reg1 reg2 ri) = pprLogic SLIT("srw") reg1 reg2 ri
 pprInstr (SRAW reg1 reg2 ri) = pprLogic SLIT("sraw") reg1 reg2 ri
@@ -1981,6 +2009,7 @@ pprInstr (FADD sz reg1 reg2 reg3) = pprBinaryF SLIT("fadd") sz reg1 reg2 reg3
 pprInstr (FSUB sz reg1 reg2 reg3) = pprBinaryF SLIT("fsub") sz reg1 reg2 reg3
 pprInstr (FMUL sz reg1 reg2 reg3) = pprBinaryF SLIT("fmul") sz reg1 reg2 reg3
 pprInstr (FDIV sz reg1 reg2 reg3) = pprBinaryF SLIT("fdiv") sz reg1 reg2 reg3
+pprInstr (FNEG reg1 reg2) = pprUnary SLIT("fneg") reg1 reg2
 
 pprInstr (FCMP reg1 reg2) = hcat [
 	char '\t',
@@ -1992,6 +2021,8 @@ pprInstr (FCMP reg1 reg2) = hcat [
 	ptext SLIT(", "),
 	pprReg reg2
     ]
+
+pprInstr (FCTIWZ reg1 reg2) = pprUnary SLIT("fctiwz") reg1 reg2
 
 pprInstr _ = ptext SLIT("something")
 
