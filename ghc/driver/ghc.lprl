@@ -2649,7 +2649,19 @@ sub add_syslib {
        return;
     }
 
-    return if ( exists $Syslibs_added{$syslib} );
+    # This check is here to avoid syslib loops from
+    # spoiling the party. A side-effect of it is that
+    # it disallows multiple mentions of a syslib on a command-line,
+    # explicit *and* implicit ones (i.e., "-syslib exts -syslib misc"
+    # is not equal to "-syslib exts -syslib misc -syslib exts",
+    # which it needs to be)
+    # 
+    # Since our current collection of syslibs don't have any
+    # loops, this test is disabled.
+    #
+    # ToDo: loop avoidance scheme when the need arises
+    #
+    #return if ( exists $Syslibs_added{$syslib} );
     	
     $Syslibs_added{$syslib} = 1;
 
