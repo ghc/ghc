@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/15 21:41:04 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/15 23:52:00 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -198,6 +198,7 @@ extern  Void   projInput        Args((String));
 extern  Void   stringInput      Args((String));
 extern  Void   parseScript      Args((String,Long));
 extern  Void   parseExp         Args((Void));
+extern  Void   parseContext     Args((Void));
 extern  String readFilename     Args((Void));
 extern  String readLine         Args((Void));
 extern  Syntax defaultSyntax    Args((Text));

@@ -11,8 +11,8 @@
  * in the distribution for details.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/15 11:02:20 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/15 23:52:01 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -73,7 +73,7 @@ static Void   local noTREX       Args((String));
 
 %}
 
-%token EXPR       SCRIPT
+%token EXPR       CONTEXT    SCRIPT
 %token CASEXP     OF         DATA       TYPE       IF
 %token THEN       ELSE       WHERE      LET        IN
 %token INFIXN     INFIXL     INFIXR     FOREIGN    TNEWTYPE

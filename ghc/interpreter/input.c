@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/15 21:40:50 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/15 23:52:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -25,7 +25,11 @@
 #include "getdelim.h"
 #endif
 
-#if HUGS_FOR_WINDOWS
+#if IS_WIN32
+#include <windows.h>
+#endif
+
+#if IS_WIN32 | HUGS_FOR_WINDOWS
 #undef IN
 #endif
 
@@ -48,6 +52,7 @@ Int  defaultLine     = 0;               /* line in which default defs occur*/
 List evalDefaults    = NIL;             /* defaults for evaluator          */
 
 Cell inputExpr       = NIL;             /* input expression                */
+Cell inputContext    = NIL;             /* input context                   */
 Bool literateScripts = FALSE;           /* TRUE => default to lit scripts  */
 Bool literateErrors  = TRUE;            /* TRUE => report errs in lit scrs */
 Bool offsideON       = TRUE;            /* TRUE => implement offside rule  */
@@ -117,6 +122,9 @@ static Text textCase,    textOfK,      textData,   textType,   textIf;
 static Text textThen,    textElse,     textWhere,  textLet,    textIn;
 static Text textInfix,   textInfixl,   textInfixr, textForeign, textNewtype;
 static Text textDefault, textDeriving, textDo,     textClass,  textInstance;
+#if IPARAM
+static Text textWith,  textDlet;
+#endif
 
 static Text textCoco,    textEq,       textUpto,   textAs,     textLambda;
 static Text textBar,     textMinus,    textFrom,   textArrow,  textLazy;
@@ -546,11 +554,14 @@ static Void local skip() {              /* move forward one char in input  */
                 c1 = EOF;
             else {
                 c1 = nextConsoleChar();
-                /* On Win32, hitting ctrl-C causes the next getchar to
-                 * fail - returning "-1" to indicate an error.
-                 * This is one of the rare cases where "-1" does not mean EOF.
-                 */
-                if (EOF == c1 && !feof(stdin)) {
+#if IS_WIN32 && !HUGS_FOR_WINDOWS
+		Sleep(0);
+#endif
+  		/* On Win32, hitting ctrl-C causes the next getchar to
+  		 * fail - returning "-1" to indicate an error.
+  		 * This is one of the rare cases where "-1" does not mean EOF.
+  		 */
+ 		if (EOF == c1 && (!feof(stdin) || broken==TRUE)) {
                     c1 = ' ';
                 }
             }
@@ -1405,6 +1416,15 @@ static Int local yylex() {             /* Read next input token ...        */
                     return STRINGLIT;
     }
 
+#if IPARAM
+    if (c0=='?' && isIn(c1,SMALL) && !haskell98) {
+	Text it;			/* Look for implicit param name    */
+	skip();
+	it    = readIdent();
+	top() = yylval = ap(IPVAR,it);
+	return identType=IPVARID;
+    }
+#endif
 #if TREX
     if (c0=='#' && isIn(c1,SMALL) && !haskell98) {
         Text it;                        /* Look for record selector name   */
@@ -1479,6 +1499,10 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textAsMod)             return ASMOD;
         if (it==textWildcard)          return '_';
         if (it==textAll && !haskell98) return ALL;
+#if IPARAM
+	if (it==textWith && !haskell98) lookAhead(WITH);
+	if (it==textDlet && !haskell98) lookAhead(DLET);
+#endif
         if (it==textUUAll)             return ALL;
         if (it==textRepeat && reading==KEYBOARD)
             return repeatLast();
@@ -1618,6 +1642,10 @@ Void parseExp() {                      /* Read an expression to evaluate   */
     setLastExpr(inputExpr);
 }
 
+Void parseContext() {                  /* Read a context to prove   */
+    parseInput(CONTEXT);
+}
+
 Void parseInterface(nm,len)            /* Read a GHC interface file        */
 String nm;
 Long   len; {                          /* Used to set a target for reading */
@@ -1655,6 +1683,10 @@ Int what; {
                        textDeriving   = findText("deriving");
                        textDo         = findText("do");
                        textClass      = findText("class");
+#if IPARAM
+		       textWith       = findText("with");
+		       textDlet       = findText("dlet");
+#endif
                        textInstance   = findText("instance");
                        textCoco       = findText("::");
                        textEq         = findText("=");
