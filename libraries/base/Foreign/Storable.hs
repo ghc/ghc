@@ -30,7 +30,8 @@ module Foreign.Storable
 
 
 #ifdef __NHC__
-import NHC.FFI (Storable(..))
+import NHC.FFI (Storable(..),Ptr,FunPtr,StablePtr
+               ,Int8,Int16,Int32,Int64,Word8,Word16,Word32,Word64)
 #else
 
 import Control.Monad		( liftM )
