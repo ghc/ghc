@@ -374,7 +374,11 @@ ifneq "$(SCRIPT_PROG)" ""
 #
 # ToDo: make this work for shell scripts (drop the initial $).
 #
+ifeq "$(INTERP)" "$(SHELL)"
+SCRIPT_SUBST=$(foreach val,$(SCRIPT_SUBST_VARS),"echo \"$(val)=\\\"$($(val))\\\";\" >> $@;")
+else
 SCRIPT_SUBST=$(foreach val,$(SCRIPT_SUBST_VARS),"echo \"$$\"\"$(val)=\\\"$($(val))\\\";\" >> $@;")
+endif
 
 all :: $(SCRIPT_PROG)
 
@@ -911,7 +915,7 @@ ifneq "$(HS_OBJS)" ""
 ifneq "$(filter -split-objs,$(HC_OPTS))" ""
 clean ::
 	find $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
-	rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS))
+	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS))
 endif
 endif
 
