@@ -113,6 +113,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\.text\n\t\.align 3\n";
     $T_HDR_vector   = "\.text\n\t\.align 3\n";
     $T_HDR_direct   = "\.text\n\t\.align 3\n";
+    $T_create_word  = "\t.quad";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^hppa/ ) {
@@ -140,6 +141,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_HDR_vector   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
+    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|openbsd|nextstep3|cygwin32|mingw32)$/ ) {
@@ -171,6 +173,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\.text\n\t\.align 2,0x90\n";
     $T_HDR_vector   = "\.text\n\t\.align 2\n"; # NB: requires padding
     $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
+    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd|netbsd)$/ ) {
@@ -207,6 +210,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
+    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^m68k-.*-sunos4/ ) {
@@ -234,6 +238,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\.text\n\t\.even\n";
     $T_HDR_vector   = "\.text\n\t\.even\n";
     $T_HDR_direct   = "\.text\n\t\.even\n";
+    $T_create_word  = "\t.long";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^mips-.*/ ) {
@@ -261,6 +266,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
     $T_HDR_direct   = "\t\.text\n\t\.align 2\n";
+    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^powerpc-.*|^rs6000-.*/ ) {
@@ -289,6 +295,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "# fast\n\.csect \.text[PR]\n\t\.align 2\n";
     $T_HDR_vector   = "# vector\n\.csect \.data[RW]\n\t\.align 2\n"; #not RO!?
     $T_HDR_direct   = "# direct\n";
+    $T_create_word  = "\t.long";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^sparc-.*-solaris2/ ) {
@@ -316,6 +323,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
+    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^sparc-.*-sunos4/ ) {
@@ -343,6 +351,7 @@ sub init_TARGET_STUFF {
     $T_HDR_fast	    = "\.text\n\t\.align 4\n";
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
     $T_HDR_direct   = "\.text\n\t\.align 4\n";
+    $T_create_word  = "\t.word";
 
     #--------------------------------------------------------#
     } else {
@@ -1152,6 +1161,25 @@ sub mangle_asm {
 		  print OUTASM $chk[$vectorchk{$symb}];
 		} else {
   		  print OUTASM &rev_tbl($symb, $chk[$vectorchk{$symb}], 0);
+                  # DO NOT DELETE THE NEXT LINE.  It fixes a rather subtle GC bug 
+                  # which showed up as a segfault reported by Ryszard Kubiak.
+                  # Problem is with vector tables.  They wind up as follows:
+                  #      .word some-word
+                  #      .word some-other-word
+                  #   fooble_vtbl:
+                  # Problem is that we want the label fooble_vtbl to be considered 
+                  # in the same section as the vtbl itself, but the label actually 
+                  # lives at the next word along.  If a data segment should happen 
+                  # to immediately follow the vtbl, as it can in GHCi, the label will 
+                  # be malclassified as in the data rather than text segment (during 
+                  # GC), and so we will regard references to it as static closure 
+                  # pointers rather than as code pointers, which is an error which 
+                  # usually crashes the garbage collectors.
+                  # To fix this, we place a dummy word after the label, so as to
+                  # ensure that the label is in the same segment as the vtbl proper.
+                  # The native code generator has an analogous fix; see
+                  # ghc/compiler/nativeGen/AbsCStixGen.lhs line 107.
+                  print OUTASM "${T_create_word} 0\n";
 		}
 		# direct return code will be put here!
 		$chkcat[$vectorchk{$symb}] = 'DONE ALREADY';

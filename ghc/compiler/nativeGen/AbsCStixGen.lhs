@@ -96,7 +96,17 @@ Here we handle top-level things, like @CCodeBlock@s and
 
  gentopcode stmt@(CRetVector lbl _ _ _)
   = genCodeVecTbl stmt				`thenUs` \ code ->
-    returnUs (StSegment TextSegment : code [StLabel lbl])
+    returnUs (StSegment TextSegment 
+              : code [StLabel lbl, vtbl_post_label_word])
+    where
+       -- We put a dummy word after the vtbl label so as to ensure the label
+       -- is in the same (Text) section as the vtbl it labels.  This is critical
+       -- for ensuring the GC works correctly, although GC crashes due to
+       -- misclassification are much more likely to show up in the interactive 
+       -- system than in compile code.  For details see comment near line 1164 
+       -- of ghc/driver/mangler/ghc-asm.lprl, which contains an analogous fix for 
+       -- the mangled via-C route.
+       vtbl_post_label_word = StData PtrRep [StInt 0]
 
  gentopcode stmt@(CRetDirect uniq absC srt liveness)
   = gencode absC				       `thenUs` \ code ->
