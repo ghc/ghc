@@ -177,7 +177,13 @@ exactLog2 x
        }
   where
     pow2 x# | x# ==# 1# = 0#
-            | otherwise = 1# +# pow2 (w2i (i2w x# `shiftRL#` 1#))
+            | otherwise = 1# +# pow2 (w2i (i2w x# `shiftr` 1#))
+
+#if __GLASGOW_HASKELL__ >= 503
+    shiftr x y = uncheckedShiftRL# x y
+#else
+    shiftr x y = shiftRL# x y
+#endif
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
