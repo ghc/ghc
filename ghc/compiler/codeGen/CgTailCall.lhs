@@ -334,7 +334,7 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 		([],
 		     mkAbstractCs [
 			CCallProfCtrMacro SLIT("ENT_VIA_NODE") [],
-			CJump (CMacroExpr CodePtrKind ENTRY_CODE [(CMacroExpr DataPtrKind INFO_PTR [CReg node])])
+			CJump (CMacroExpr CodePtrRep ENTRY_CODE [(CMacroExpr DataPtrRep INFO_PTR [CReg node])])
 		     ])
 	      StdEntry lbl Nothing	  -> ([], CJump (CLbl lbl CodePtrRep))
 	      StdEntry lbl (Just itbl)	  -> ([], CAssign (CReg infoptr) (CLbl itbl DataPtrRep)
