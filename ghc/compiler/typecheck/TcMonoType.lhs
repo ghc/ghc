@@ -983,9 +983,10 @@ ambigErr pred ppr_ty
 		 ptext SLIT("must be reachable from the type after the =>"))]
 
 freeErr pred ppr_ty
-  = sep [ptext SLIT("The constraint") <+> quotes (pprPred pred) <+>
-		   ptext SLIT("does not mention any of the universally quantified type variables"),
-	 nest 4 (ptext SLIT("in the type") <+> quotes ppr_ty)
+  = sep [ptext SLIT("All of the type variables in the constraint") <+> quotes (pprPred pred) <+>
+		   ptext SLIT("are already in scope"),
+	 nest 4 (ptext SLIT("At least one must be universally quantified here")),
+	 ptext SLIT("In the type") <+> quotes ppr_ty
     ]
 
 polyArgTyErr ty = ptext SLIT("Illegal polymorphic type as argument:")   <+> ppr ty
