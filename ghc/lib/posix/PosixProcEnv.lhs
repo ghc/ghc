@@ -111,10 +111,18 @@ getGroups = do
 
 getEffectiveUserName :: IO String
 getEffectiveUserName = do
+ {- cuserid() is deprecated, using getpwuid() instead. -}
+    euid <- getEffectiveUserID
+    ptr  <- _ccall_ getpwuid euid
+    str  <- _casm_ ``%r = ((struct passwd *)%0)->pw_name;'' (ptr::Addr)
+    strcpy str   
+
+{- OLD:
     str <- _ccall_ cuserid (``NULL''::Addr)
     if str == ``NULL''
        then syserr "getEffectiveUserName"
        else strcpy str
+-}
 
 getProcessGroupID :: IO ProcessGroupID
 getProcessGroupID = _ccall_ getpgrp
@@ -222,7 +230,7 @@ getControllingTerminalName :: IO FilePath
 getControllingTerminalName = do
     str <- _ccall_ ctermid (``NULL''::Addr)
     if str == ``NULL''
-       then fail (IOError Nothing NoSuchThing "getControllingTerminalName: no controlling terminal")
+       then fail (IOError Nothing NoSuchThing "getControllingTerminalName" "no controlling terminal")
        else strcpy str
 #endif
 
@@ -234,9 +242,9 @@ getTerminalName fd = do
         err <- try (queryTerminal fd)
         either (\err -> syserr "getTerminalName")
                (\succ -> if succ then fail (IOError Nothing NoSuchThing
-					    "getTerminalName: no name")
+					    "getTerminalName" "no name")
                          else fail (IOError Nothing InappropriateType
-					    "getTerminalName: not a terminal"))
+					    "getTerminalName" "not a terminal"))
            err
        else strcpy str
 
@@ -276,6 +284,7 @@ sysconf n = do
  if rc /= -1
     then return rc
     else fail (IOError Nothing NoSuchThing
-		       "getSysVar: no such system limit or option")
+		       "getSysVar" 
+		       "no such system limit or option")
 
 \end{code}

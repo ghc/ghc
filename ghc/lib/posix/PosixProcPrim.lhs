@@ -212,7 +212,7 @@ getEnvVar name = do
     str <- _ccall_ getenv str
     if str == ``NULL''
        then fail (IOError Nothing NoSuchThing
-		 "getEnvVar: no such environment variable")
+		 "getEnvVar" "no such environment variable")
        else strcpy str
 
 setEnvVar :: String -> String -> IO ()
@@ -378,7 +378,7 @@ installHandler :: Signal
                -> IO Handler		-- old handler
 
 #ifdef __PARALLEL_HASKELL__
-installHandler = error "installHandler: not available for Parallel Haskell"
+installHandler = fail (userError "installHandler: not available for Parallel Haskell")
 #else
 installHandler int handler maybe_mask = (
     case handler of
