@@ -14,7 +14,7 @@ module DriverFlags (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/config.h"
+#include "../includes/ghcconfig.h"
 
 import MkIface		( showIface )
 import DriverState
@@ -347,7 +347,7 @@ dynamic_flags = [
 	------ Debugging ----------------------------------------------------
   ,  ( "dstg-stats",	NoArg (writeIORef v_StgStats True) )
 
-  ,  ( "ddump-absC",         	 NoArg (setDynFlag Opt_D_dump_absC) )
+  ,  ( "ddump-cmm",         	 NoArg (setDynFlag Opt_D_dump_cmm) )
   ,  ( "ddump-asm",          	 NoArg (setDynFlag Opt_D_dump_asm) )
   ,  ( "ddump-cpranal",      	 NoArg (setDynFlag Opt_D_dump_cpranal) )
   ,  ( "ddump-deriv",        	 NoArg (setDynFlag Opt_D_dump_deriv) )
@@ -357,7 +357,6 @@ dynamic_flags = [
   ,  ( "ddump-inlinings",    	 NoArg (setDynFlag Opt_D_dump_inlinings) )
   ,  ( "ddump-occur-anal",   	 NoArg (setDynFlag Opt_D_dump_occur_anal) )
   ,  ( "ddump-parsed",       	 NoArg (setDynFlag Opt_D_dump_parsed) )
-  ,  ( "ddump-realC",        	 NoArg (setDynFlag Opt_D_dump_realC) )
   ,  ( "ddump-rn",           	 NoArg (setDynFlag Opt_D_dump_rn) )
   ,  ( "ddump-simpl",        	 NoArg (setDynFlag Opt_D_dump_simpl) )
   ,  ( "ddump-simpl-iterations", NoArg (setDynFlag Opt_D_dump_simpl_iterations) )
@@ -376,7 +375,7 @@ dynamic_flags = [
   ,  ( "ddump-tc-trace",         NoArg (setDynFlag Opt_D_dump_tc_trace) )
   ,  ( "ddump-splices",          NoArg (setDynFlag Opt_D_dump_splices) )
   ,  ( "ddump-rn-stats",         NoArg (setDynFlag Opt_D_dump_rn_stats) )
-  ,  ( "ddump-stix",             NoArg (setDynFlag Opt_D_dump_stix) )
+  ,  ( "ddump-opt-cmm",          NoArg (setDynFlag Opt_D_dump_opt_cmm) )
   ,  ( "ddump-simpl-stats",      NoArg (setDynFlag Opt_D_dump_simpl_stats) )
   ,  ( "ddump-bcos",             NoArg (setDynFlag Opt_D_dump_BCOs) )
   ,  ( "dsource-stats",          NoArg (setDynFlag Opt_D_source_stats) )
@@ -388,6 +387,7 @@ dynamic_flags = [
   ,  ( "ddump-vect",         	 NoArg (setDynFlag Opt_D_dump_vect) )
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting) )
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting) )
+  ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting) )
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 

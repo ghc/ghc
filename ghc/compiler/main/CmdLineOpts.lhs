@@ -210,7 +210,7 @@ data FloatOutSwitches
 data DynFlag
 
    -- debugging flags
-   = Opt_D_dump_absC
+   = Opt_D_dump_cmm
    | Opt_D_dump_asm
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
@@ -220,7 +220,6 @@ data DynFlag
    | Opt_D_dump_inlinings
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
-   | Opt_D_dump_realC
    | Opt_D_dump_rn
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
@@ -235,7 +234,7 @@ data DynFlag
    | Opt_D_dump_worker_wrapper
    | Opt_D_dump_rn_trace
    | Opt_D_dump_rn_stats
-   | Opt_D_dump_stix
+   | Opt_D_dump_opt_cmm
    | Opt_D_dump_simpl_stats
    | Opt_D_dump_tc_trace
    | Opt_D_dump_if_trace
@@ -250,6 +249,7 @@ data DynFlag
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
+   | Opt_DoCmmLinting
 
    | Opt_WarnIsError		-- -Werror; makes warnings fatal
    | Opt_WarnDuplicateExports

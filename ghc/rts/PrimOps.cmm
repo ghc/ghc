@@ -1,0 +1,1511 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Out-of-line primitive operations
+ *
+ * This file contains the implementations of all the primitive
+ * operations ("primops") which are not expanded inline.  See
+ * ghc/compiler/prelude/primops.txt.pp for a list of all the primops;
+ * this file contains code for most of those with the attribute
+ * out_of_line=True.
+ *
+ * Entry convention: the entry convention for a primop is that all the
+ * args are in Stg registers (R1, R2, etc.).  This is to make writing
+ * the primops easier.  (see compiler/codeGen/CgCallConv.hs).
+ *
+ * Return convention: results from a primop are generally returned
+ * using the ordinary unboxed tuple return convention.  The C-- parser
+ * implements the RET_xxxx() macros to perform unboxed-tuple returns
+ * based on the prevailing return convention.
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+/*-----------------------------------------------------------------------------
+  Array Primitives
+
+  Basically just new*Array - the others are all inline macros.
+
+  The size arg is always passed in R1, and the result returned in R1.
+
+  The slow entry point is for returning from a heap check, the saved
+  size argument must be re-loaded from the stack.
+  -------------------------------------------------------------------------- */
+
+/* for objects that are *less* than the size of a word, make sure we
+ * round up to the nearest word for the size of the array.
+ */
+
+newByteArrayzh_fast
+{
+    W_ words, payload_words, n, p;
+    MAYBE_GC(NO_PTRS,newByteArrayzh_fast);
+    n = R1;
+    payload_words = ROUNDUP_BYTES_TO_WDS(n);
+    words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
+    "ptr" p = foreign "C" allocate(words);
+    TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
+    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    StgArrWords_words(p) = payload_words;
+    RET_P(p);
+}
+
+newPinnedByteArrayzh_fast
+{
+    W_ words, payload_words, n, p;
+
+    MAYBE_GC(NO_PTRS,newPinnedByteArrayzh_fast);
+    n = R1;
+    payload_words = ROUNDUP_BYTES_TO_WDS(n);
+
+    // We want an 8-byte aligned array.  allocatePinned() gives us
+    // 8-byte aligned memory by default, but we want to align the
+    // *goods* inside the ArrWords object, so we have to check the
+    // size of the ArrWords header and adjust our size accordingly.
+    words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
+    if ((SIZEOF_StgArrWords & 7) != 0) {
+	words = words + 1;
+    }
+
+    "ptr" p = foreign "C" allocatePinned(words);
+    TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
+
+    // Again, if the ArrWords header isn't a multiple of 8 bytes, we
+    // have to push the object forward one word so that the goods
+    // fall on an 8-byte boundary.
+    if ((SIZEOF_StgArrWords & 7) != 0) {
+	p = p + WDS(1);
+    }
+
+    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    StgArrWords_words(p) = payload_words;
+    RET_P(p);
+}
+
+newArrayzh_fast
+{
+    W_ words, n, init, arr, p;
+    /* Args: R1 = words, R2 = initialisation value */
+
+    n = R1;
+    MAYBE_GC(R2_PTR,newArrayzh_fast);
+
+    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
+    "ptr" arr = foreign "C" allocate(words);
+    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
+
+    SET_HDR(arr, stg_MUT_ARR_PTRS_info, W_[CCCS]);
+    StgMutArrPtrs_ptrs(arr) = n;
+
+    // Initialise all elements of the the array with the value in R2
+    init = R2;
+    p = arr + SIZEOF_StgMutArrPtrs;
+  for:
+    if (p < arr + WDS(words)) {
+	W_[p] = init;
+	p = p + WDS(1);
+	goto for;
+    }
+
+    RET_P(arr);
+}
+
+unsafeThawArrayzh_fast
+{
+  SET_INFO(R1,stg_MUT_ARR_PTRS_info);
+
+  // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
+  //
+  // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN 
+  // normally doesn't.  However, when we freeze a MUT_ARR_PTRS, we leave
+  // it on the mutable list for the GC to remove (removing something from
+  // the mutable list is not easy, because the mut_list is only singly-linked).
+  // 
+  // So, when we thaw a MUT_ARR_PTRS_FROZEN, we must cope with two cases:
+  // either it is on a mut_list, or it isn't.  We adopt the convention that
+  // the mut_link field is NULL if it isn't on a mut_list, and the GC
+  // maintains this invariant.
+  //
+  if (StgMutClosure_mut_link(R1) == NULL) {
+	foreign "C" recordMutable(R1 "ptr");
+  }
+
+  RET_P(R1);
+}
+
+/* -----------------------------------------------------------------------------
+   MutVar primitives
+   -------------------------------------------------------------------------- */
+
+newMutVarzh_fast
+{
+    W_ mv;
+    /* Args: R1 = initialisation value */
+
+    ALLOC_PRIM( SIZEOF_StgMutVar, R1_PTR, newMutVarzh_fast);
+
+    mv = Hp - SIZEOF_StgMutVar + WDS(1);
+    SET_HDR(mv,stg_MUT_VAR_info,W_[CCCS]);
+    StgMutVar_var(mv) = R1;
+    
+    RET_P(mv);
+}
+
+atomicModifyMutVarzh_fast
+{
+    W_ mv, z, x, y, r;
+    /* Args: R1 :: MutVar#,  R2 :: a -> (a,b) */
+
+    /* If x is the current contents of the MutVar#, then 
+       We want to make the new contents point to
+
+         (sel_0 (f x))
+ 
+       and the return value is
+	 
+	 (sel_1 (f x))
+
+        obviously we can share (f x).
+
+         z = [stg_ap_2 f x]  (max (HS + 2) MIN_UPD_SIZE)
+	 y = [stg_sel_0 z]   (max (HS + 1) MIN_UPD_SIZE)
+         r = [stg_sel_1 z]   (max (HS + 1) MIN_UPD_SIZE)
+    */
+
+#if MIN_UPD_SIZE > 1
+#define THUNK_1_SIZE (SIZEOF_StgHeader + WDS(MIN_UPD_SIZE))
+#define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),WDS(MIN_UPD_SIZE-1))
+#else
+#define THUNK_1_SIZE (SIZEOF_StgHeader + WDS(1))
+#define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),0)
+#endif
+
+#if MIN_UPD_SIZE > 2
+#define THUNK_2_SIZE (SIZEOF_StgHeader + WDS(MIN_UPD_SIZE))
+#define TICK_ALLOC_THUNK_2() TICK_ALLOC_UP_THK(WDS(2),WDS(MIN_UPD_SIZE-2))
+#else
+#define THUNK_2_SIZE (SIZEOF_StgHeader + WDS(2))
+#define TICK_ALLOC_THUNK_2() TICK_ALLOC_UP_THK(WDS(2),0)
+#endif
+
+#define SIZE (THUNK_2_SIZE + THUNK_1_SIZE + THUNK_1_SIZE)
+
+   HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, atomicModifyMutVarzh_fast);
+
+   x = StgMutVar_var(R1);
+
+   TICK_ALLOC_THUNK_2();
+   CCCS_ALLOC(THUNK_2_SIZE);
+   z = Hp - THUNK_2_SIZE + WDS(1);
+   SET_HDR(z, stg_ap_2_upd_info, W_[CCCS]);
+   LDV_RECORD_CREATE(z);
+   StgClosure_payload(z,0) = R2;
+   StgClosure_payload(z,1) = x;
+
+   TICK_ALLOC_THUNK_1();
+   CCCS_ALLOC(THUNK_1_SIZE);
+   y = z - THUNK_1_SIZE;
+   SET_HDR(y, stg_sel_0_upd_info, W_[CCCS]);
+   LDV_RECORD_CREATE(y);
+   StgClosure_payload(y,0) = z;
+
+   StgMutVar_var(R1) = y;
+
+   TICK_ALLOC_THUNK_1();
+   CCCS_ALLOC(THUNK_1_SIZE);
+   r = y - THUNK_1_SIZE;
+   SET_HDR(r, stg_sel_1_upd_info, W_[CCCS]);
+   LDV_RECORD_CREATE(r);
+   StgClosure_payload(r,0) = z;
+
+   RET_P(r);
+}
+
+/* -----------------------------------------------------------------------------
+   Foreign Object Primitives
+   -------------------------------------------------------------------------- */
+
+mkForeignObjzh_fast
+{
+  /* R1 = ptr to foreign object,
+  */
+  W_ result;
+
+  ALLOC_PRIM( SIZEOF_StgForeignObj, NO_PTRS, mkForeignObjzh_fast);
+
+  result = Hp - SIZEOF_StgForeignObj + WDS(1);
+  SET_HDR(result,stg_FOREIGN_info,W_[CCCS]);
+  StgForeignObj_data(result) = R1;
+
+  /* returns (# s#, ForeignObj# #) */
+  RET_P(result);
+}
+
+/* -----------------------------------------------------------------------------
+   Weak Pointer Primitives
+   -------------------------------------------------------------------------- */
+
+STRING(stg_weak_msg,"New weak pointer at %p\n")
+
+mkWeakzh_fast
+{
+  /* R1 = key
+     R2 = value
+     R3 = finalizer (or NULL)
+  */
+  W_ w;
+
+  if (R3 == NULL) {
+    R3 = stg_NO_FINALIZER_closure;
+  }
+
+  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, mkWeakzh_fast );
+
+  w = Hp - SIZEOF_StgWeak + WDS(1);
+  SET_HDR(w, stg_WEAK_info, W_[CCCS]);
+
+  StgWeak_key(w)       = R1;
+  StgWeak_value(w)     = R2;
+  StgWeak_finalizer(w) = R3;
+
+  StgWeak_link(w)	= W_[weak_ptr_list];
+  W_[weak_ptr_list] 	= w;
+
+  IF_DEBUG(weak, foreign "C" fprintf(stderr,stg_weak_msg,w));
+
+  RET_P(w);
+}
+
+
+finalizzeWeakzh_fast
+{
+  /* R1 = weak ptr
+   */
+  W_ w, f;
+
+  w = R1;
+
+  // already dead?
+  if (GET_INFO(w) == stg_DEAD_WEAK_info) {
+      RET_NP(0,stg_NO_FINALIZER_closure);
+  }
+
+  // kill it
+#ifdef PROFILING
+  // @LDV profiling
+  // A weak pointer is inherently used, so we do not need to call
+  // LDV_recordDead_FILL_SLOP_DYNAMIC():
+  //    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)w);
+  // or, LDV_recordDead():
+  //    LDV_recordDead((StgClosure *)w, sizeofW(StgWeak) - sizeofW(StgProfHeader));
+  // Furthermore, when PROFILING is turned on, dead weak pointers are exactly as 
+  // large as weak pointers, so there is no need to fill the slop, either.
+  // See stg_DEAD_WEAK_info in StgMiscClosures.hc.
+#endif
+
+  //
+  // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+  //
+  SET_INFO(w,stg_DEAD_WEAK_info);
+  LDV_RECORD_CREATE(w);
+
+  f = StgWeak_finalizer(w);
+
+  /* return the finalizer */
+  if (f == stg_NO_FINALIZER_closure) {
+      RET_NP(0,stg_NO_FINALIZER_closure);
+  } else {
+      RET_NP(1,f);
+  }
+}
+
+deRefWeakzh_fast
+{
+  /* R1 = weak ptr */
+  W_ w, code, val;
+
+  w = R1;
+  if (GET_INFO(w) == stg_WEAK_info) {
+    code = 1;
+    val = StgWeak_value(w);
+  } else {
+    code = 0;
+    val = w;
+  }
+  RET_NP(code,val);
+}
+
+/* -----------------------------------------------------------------------------
+   Arbitrary-precision Integer operations.
+
+   There are some assumptions in this code that mp_limb_t == W_.  This is
+   the case for all the platforms that GHC supports, currently.
+   -------------------------------------------------------------------------- */
+
+int2Integerzh_fast
+{
+   /* arguments: R1 = Int# */
+
+   W_ val, s, p;	/* to avoid aliasing */
+
+   val = R1;
+   ALLOC_PRIM( SIZEOF_StgArrWords + WDS(1), NO_PTRS, int2Integerzh_fast );
+
+   p = Hp - SIZEOF_StgArrWords;
+   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   StgArrWords_words(p) = 1;
+
+   /* mpz_set_si is inlined here, makes things simpler */
+   if (%lt(val,0)) { 
+	s  = -1;
+	Hp(0) = -val;
+   } else { 
+     if (%gt(val,0)) {
+	s = 1;
+	Hp(0) = val;
+     } else {
+	s = 0;
+     }
+  }
+
+   /* returns (# size  :: Int#, 
+		 data  :: ByteArray# 
+	       #)
+   */
+   RET_NP(s,p);
+}
+
+word2Integerzh_fast
+{
+   /* arguments: R1 = Word# */
+
+   W_ val, s, p;	/* to avoid aliasing */
+
+   val = R1;
+
+   ALLOC_PRIM( SIZEOF_StgArrWords + WDS(1), NO_PTRS, word2Integerzh_fast);
+
+   p = Hp - SIZEOF_StgArrWords;
+   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   StgArrWords_words(p) = 1;
+
+   if (val != 0) {
+	s = 1;
+	W_[Hp] = val;
+   } else {
+	s = 0;
+   }
+
+   /* returns (# size  :: Int#, 
+		 data  :: ByteArray# #)
+   */
+   RET_NP(s,p);
+}
+
+
+/*
+ * 'long long' primops for converting to/from Integers.
+ */
+
+#ifdef SUPPORT_LONG_LONGS
+
+int64ToIntegerzh_fast
+{
+   /* arguments: L1 = Int64# */
+
+   L_ val;
+   W_ hi, s, neg, words_needed, p;
+
+   val = L1;
+   neg = 0;
+
+   if ( %ge(val,0x100000000::L_) || %le(val,-0x100000000::L_) )  { 
+       words_needed = 2;
+   } else { 
+       // minimum is one word
+       words_needed = 1;
+   }
+
+   ALLOC_PRIM( SIZEOF_StgArrWords + WDS(words_needed),
+	       NO_PTRS, int64ToIntegerzh_fast );
+
+   p = Hp - SIZEOF_StgArrWords - WDS(words_needed) + WDS(1);
+   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   StgArrWords_words(p) = words_needed;
+
+   if ( %lt(val,0::L_) ) {
+     neg = 1;
+     val = -val;
+   }
+
+   hi = TO_W_(val >> 32);
+
+   if ( words_needed == 2 )  { 
+      s = 2;
+      Hp(-1) = TO_W_(val);
+      Hp(0) = hi;
+   } else { 
+       if ( val != 0::L_ ) {
+	   s = 1;
+	   Hp(0) = TO_W_(val);
+       } else /* val==0 */  {
+	   s = 0;
+       }
+   }
+   if ( neg != 0 ) {
+	s = -s;
+   }
+
+   /* returns (# size  :: Int#, 
+		 data  :: ByteArray# #)
+   */
+   RET_NP(s,p);
+}
+
+word64ToIntegerzh_fast
+{
+   /* arguments: L1 = Word64# */
+
+   L_ val;
+   W_ hi, s, words_needed, p;
+
+   val = L1;
+   if ( val >= 0x100000000::L_ ) {
+      words_needed = 2;
+   } else {
+      words_needed = 1;
+   }
+
+   ALLOC_PRIM( SIZEOF_StgArrWords + WDS(words_needed),
+	       NO_PTRS, word64ToIntegerzh_fast );
+
+   p = Hp - SIZEOF_StgArrWords - WDS(words_needed) + WDS(1);
+   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   StgArrWords_words(p) = words_needed;
+
+   hi = TO_W_(val >> 32);
+   if ( val >= 0x100000000::L_ ) { 
+     s = 2;
+     Hp(-1) = TO_W_(val);
+     Hp(0)  = hi;
+   } else {
+      if ( val != 0::L_ ) {
+        s = 1;
+        Hp(0) = TO_W_(val);
+     } else /* val==0 */  {
+      s = 0;
+     }
+  }
+
+   /* returns (# size  :: Int#, 
+		 data  :: ByteArray# #)
+   */
+   RET_NP(s,p);
+}
+
+
+#endif /* SUPPORT_LONG_LONGS */
+
+/* ToDo: this is shockingly inefficient */
+
+section "bss" {
+  mp_tmp1:
+    bits8 [SIZEOF_MP_INT];
+}
+
+section "bss" {
+  mp_tmp2:
+    bits8 [SIZEOF_MP_INT];
+}
+
+section "bss" {
+  result1:
+    bits8 [SIZEOF_MP_INT];
+}
+
+section "bss" {
+  result2:
+    bits8 [SIZEOF_MP_INT];
+}
+
+#define GMP_TAKE2_RET1(name,mp_fun)			\
+name							\
+{							\
+  W_ s1, s2, d1, d2;					\
+							\
+  /* call doYouWantToGC() */				\
+  MAYBE_GC(R2_PTR & R4_PTR, name);			\
+							\
+  s1 = R1;						\
+  d1 = R2;						\
+  s2 = R3;						\
+  d2 = R4;						\
+							\
+  MP_INT__mp_alloc(mp_tmp1) = StgArrWords_words(d1);	\
+  MP_INT__mp_size(mp_tmp1)  = (s1);			\
+  MP_INT__mp_d(mp_tmp1)	    = BYTE_ARR_CTS(d1);		\
+  MP_INT__mp_alloc(mp_tmp2) = StgArrWords_words(d2);	\
+  MP_INT__mp_size(mp_tmp2)  = (s2);			\
+  MP_INT__mp_d(mp_tmp2)	    = BYTE_ARR_CTS(d2);		\
+							\
+  foreign "C" mpz_init(result1);			\
+							\
+  /* Perform the operation */				\
+  foreign "C" mp_fun(result1,mp_tmp1,mp_tmp2);		\
+							\
+  RET_NP(MP_INT__mp_size(result1),			\
+         MP_INT__mp_d(result1) - SIZEOF_StgArrWords);	\
+}
+
+#define GMP_TAKE1_RET1(name,mp_fun)				\
+name								\
+{								\
+  W_ s1, d1;							\
+								\
+  /* call doYouWantToGC() */					\
+  MAYBE_GC(R2_PTR, name);					\
+								\
+  d1 = R2;							\
+  s1 = R1;							\
+								\
+  MP_INT__mp_alloc(mp_tmp1)	= StgArrWords_words(d1);	\
+  MP_INT__mp_size(mp_tmp1)	= (s1);				\
+  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);		\
+								\
+  foreign "C" mpz_init(result1);				\
+								\
+  /* Perform the operation */					\
+  foreign "C" mp_fun(result1,mp_tmp1);				\
+								\
+  RET_NP(MP_INT__mp_size(result1),				\
+         MP_INT__mp_d(result1) - SIZEOF_StgArrWords);		\
+}
+
+#define GMP_TAKE2_RET2(name,mp_fun)				\
+name								\
+{								\
+  W_ s1, s2, d1, d2;						\
+								\
+  /* call doYouWantToGC() */					\
+  MAYBE_GC(R2_PTR & R4_PTR, name);				\
+								\
+  s1 = R1;							\
+  d1 = R2;							\
+  s2 = R3;							\
+  d2 = R4;							\
+								\
+  MP_INT__mp_alloc(mp_tmp1)	= StgArrWords_words(d1);	\
+  MP_INT__mp_size(mp_tmp1)	= (s1);				\
+  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);		\
+  MP_INT__mp_alloc(mp_tmp2)	= StgArrWords_words(d2);	\
+  MP_INT__mp_size(mp_tmp2)	= (s2);				\
+  MP_INT__mp_d(mp_tmp2)		= BYTE_ARR_CTS(d2);		\
+								\
+  foreign "C" mpz_init(result1);				\
+  foreign "C" mpz_init(result2);				\
+								\
+  /* Perform the operation */					\
+  foreign "C" mp_fun(result1,result2,mp_tmp1,mp_tmp2);		\
+								\
+  RET_NPNP(MP_INT__mp_size(result1),				\
+           MP_INT__mp_d(result1) - SIZEOF_StgArrWords,		\
+	   MP_INT__mp_size(result2),				\
+           MP_INT__mp_d(result2) - SIZEOF_StgArrWords);		\
+}
+
+GMP_TAKE2_RET1(plusIntegerzh_fast,     mpz_add)
+GMP_TAKE2_RET1(minusIntegerzh_fast,    mpz_sub)
+GMP_TAKE2_RET1(timesIntegerzh_fast,    mpz_mul)
+GMP_TAKE2_RET1(gcdIntegerzh_fast,      mpz_gcd)
+GMP_TAKE2_RET1(quotIntegerzh_fast,     mpz_tdiv_q)
+GMP_TAKE2_RET1(remIntegerzh_fast,      mpz_tdiv_r)
+GMP_TAKE2_RET1(divExactIntegerzh_fast, mpz_divexact)
+GMP_TAKE2_RET1(andIntegerzh_fast,      mpz_and)
+GMP_TAKE2_RET1(orIntegerzh_fast,       mpz_ior)
+GMP_TAKE2_RET1(xorIntegerzh_fast,      mpz_xor)
+GMP_TAKE1_RET1(complementIntegerzh_fast, mpz_com)
+
+GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr)
+GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr)
+
+section "bss" {
+  aa:  W_; // NB. aa is really an mp_limb_t
+}
+
+gcdIntzh_fast
+{
+    /* R1 = the first Int#; R2 = the second Int# */
+    W_ r; 
+
+    W_[aa] = R1;
+    r = foreign "C" mpn_gcd_1(aa, 1, R2);
+
+    R1 = r;
+    /* Result parked in R1, return via info-pointer at TOS */
+    jump %ENTRY_CODE(Sp(0));
+}
+
+
+gcdIntegerIntzh_fast
+{
+    /* R1 = s1; R2 = d1; R3 = the int */
+    R1 = foreign "C" mpn_gcd_1( BYTE_ARR_CTS(R2) "ptr", R1, R3);
+    
+    /* Result parked in R1, return via info-pointer at TOS */
+    jump %ENTRY_CODE(Sp(0));
+}
+
+
+cmpIntegerIntzh_fast
+{
+    /* R1 = s1; R2 = d1; R3 = the int */
+    W_ usize, vsize, v_digit, u_digit;
+
+    usize = R1;
+    vsize = 0;
+    v_digit = R3;
+
+    // paraphrased from mpz_cmp_si() in the GMP sources
+    if (%gt(v_digit,0)) {
+	vsize = 1;
+    } else { 
+	if (%lt(v_digit,0)) {
+	    vsize = -1;
+	    v_digit = -v_digit;
+	}
+    }
+
+    if (usize != vsize) {
+	R1 = usize - vsize; 
+	jump %ENTRY_CODE(Sp(0));
+    }
+
+    if (usize == 0) {
+	R1 = 0; 
+	jump %ENTRY_CODE(Sp(0));
+    }
+
+    u_digit = W_[BYTE_ARR_CTS(R2)];
+
+    if (u_digit == v_digit) {
+	R1 = 0; 
+	jump %ENTRY_CODE(Sp(0));
+    }
+
+    if (%gtu(u_digit,v_digit)) { // NB. unsigned: these are mp_limb_t's
+	R1 = usize; 
+    } else {
+	R1 = -usize; 
+    }
+
+    jump %ENTRY_CODE(Sp(0));
+}
+
+cmpIntegerzh_fast
+{
+    /* R1 = s1; R2 = d1; R3 = s2; R4 = d2 */
+    W_ usize, vsize, size, up, vp;
+    CInt cmp;
+
+    // paraphrased from mpz_cmp() in the GMP sources
+    usize = R1;
+    vsize = R3;
+
+    if (usize != vsize) {
+	R1 = usize - vsize; 
+	jump %ENTRY_CODE(Sp(0));
+    }
+
+    if (usize == 0) {
+	R1 = 0; 
+	jump %ENTRY_CODE(Sp(0));
+    }
+
+    if (%lt(usize,0)) { // NB. not <, which is unsigned
+	size = -usize;
+    } else {
+	size = usize;
+    }
+
+    up = BYTE_ARR_CTS(R2);
+    vp = BYTE_ARR_CTS(R4);
+
+    cmp = foreign "C" mpn_cmp(up "ptr", vp "ptr", size);
+
+    if (cmp == 0) {
+	R1 = 0; 
+	jump %ENTRY_CODE(Sp(0));
+    }
+
+    if (%lt(cmp,0) == %lt(usize,0)) {
+	R1 = 1;
+    } else {
+	R1 = (-1); 
+    }
+    /* Result parked in R1, return via info-pointer at TOS */
+    jump %ENTRY_CODE(Sp(0));
+}
+
+integer2Intzh_fast
+{
+    /* R1 = s; R2 = d */
+    W_ r, s;
+
+    s = R1;
+    if (s == 0) {
+	r = 0;
+    } else {
+	r = W_[R2 + SIZEOF_StgArrWords];
+	if (%lt(s,0)) {
+	    r = -r;
+	}
+    }
+    /* Result parked in R1, return via info-pointer at TOS */
+    R1 = r;
+    jump %ENTRY_CODE(Sp(0));
+}
+
+integer2Wordzh_fast
+{
+  /* R1 = s; R2 = d */
+  W_ r, s;
+
+  s = R1;
+  if (s == 0) {
+    r = 0;
+  } else {
+    r = W_[R2 + SIZEOF_StgArrWords];
+    if (%lt(s,0)) {
+	r = -r;
+    }
+  }
+  /* Result parked in R1, return via info-pointer at TOS */
+  R1 = r;
+  jump %ENTRY_CODE(Sp(0));
+}
+
+section "bss" {
+  exponent:  W_;
+}
+
+decodeFloatzh_fast
+{ 
+    W_ p;
+    F_ arg;
+    
+    /* arguments: F1 = Float# */
+    arg = F1;
+    
+    ALLOC_PRIM( SIZEOF_StgArrWords + WDS(1), NO_PTRS, decodeFloatzh_fast );
+    
+    /* Be prepared to tell Lennart-coded __decodeFloat
+       where mantissa._mp_d can be put (it does not care about the rest) */
+    p = Hp - SIZEOF_StgArrWords;
+    SET_HDR(p,stg_ARR_WORDS_info,W_[CCCS]);
+    StgArrWords_words(p) = 1;
+    MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
+    
+    /* Perform the operation */
+    foreign "C" __decodeFloat(mp_tmp1,exponent,arg);
+    
+    /* returns: (Int# (expn), Int#, ByteArray#) */
+    RET_NNP(W_[exponent], MP_INT__mp_size(mp_tmp1), p);
+}
+
+#define DOUBLE_MANTISSA_SIZE SIZEOF_DOUBLE
+#define ARR_SIZE (SIZEOF_StgArrWords + DOUBLE_MANTISSA_SIZE)
+
+decodeDoublezh_fast
+{ 
+    D_ arg;
+    W_ p;
+
+    /* arguments: D1 = Double# */
+    arg = D1;
+
+    ALLOC_PRIM( ARR_SIZE, NO_PTRS, decodeDoublezh_fast );
+    
+    /* Be prepared to tell Lennart-coded __decodeDouble
+       where mantissa.d can be put (it does not care about the rest) */
+    p = Hp - ARR_SIZE + WDS(1);
+    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    StgArrWords_words(p) = BYTES_TO_WDS(DOUBLE_MANTISSA_SIZE);
+    MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
+
+    /* Perform the operation */
+    foreign "C" __decodeDouble(mp_tmp1,exponent,arg);
+    
+    /* returns: (Int# (expn), Int#, ByteArray#) */
+    RET_NNP(W_[exponent], MP_INT__mp_size(mp_tmp1), p);
+}
+
+/* -----------------------------------------------------------------------------
+ * Concurrency primitives
+ * -------------------------------------------------------------------------- */
+
+forkzh_fast
+{
+  /* args: R1 = closure to spark */
+  
+  MAYBE_GC(R1_PTR, forkzh_fast);
+
+  // create it right now, return ThreadID in R1
+  "ptr" R1 = foreign "C" createIOThread( RtsFlags_GcFlags_initialStkSize(RtsFlags), 
+				   R1 "ptr");
+  foreign "C" scheduleThread(R1 "ptr");
+
+  // switch at the earliest opportunity
+  CInt[context_switch] = 1;
+  
+  RET_P(R1);
+}
+
+yieldzh_fast
+{
+  jump stg_yield_noregs;
+}
+
+myThreadIdzh_fast
+{
+  /* no args. */
+  RET_P(CurrentTSO);
+}
+
+labelThreadzh_fast
+{
+  /* args: 
+	R1 = ThreadId#
+	R2 = Addr# */
+#ifdef DEBUG
+  foreign "C" labelThread(R1 "ptr", R2 "ptr");
+#endif
+  jump %ENTRY_CODE(Sp(0));
+}
+
+isCurrentThreadBoundzh_fast
+{
+  /* no args */
+  W_ r;
+  r = foreign "C" isThreadBound(CurrentTSO);
+  RET_N(r);
+}
+
+/* -----------------------------------------------------------------------------
+ * MVar primitives
+ *
+ * take & putMVar work as follows.  Firstly, an important invariant:
+ *
+ *    If the MVar is full, then the blocking queue contains only
+ *    threads blocked on putMVar, and if the MVar is empty then the
+ *    blocking queue contains only threads blocked on takeMVar.
+ *
+ * takeMvar:
+ *    MVar empty : then add ourselves to the blocking queue
+ *    MVar full  : remove the value from the MVar, and
+ *                 blocking queue empty     : return
+ *                 blocking queue non-empty : perform the first blocked putMVar
+ *                                            from the queue, and wake up the
+ *                                            thread (MVar is now full again)
+ *
+ * putMVar is just the dual of the above algorithm.
+ *
+ * How do we "perform a putMVar"?  Well, we have to fiddle around with
+ * the stack of the thread waiting to do the putMVar.  See
+ * stg_block_putmvar and stg_block_takemvar in HeapStackCheck.c for
+ * the stack layout, and the PerformPut and PerformTake macros below.
+ *
+ * It is important that a blocked take or put is woken up with the
+ * take/put already performed, because otherwise there would be a
+ * small window of vulnerability where the thread could receive an
+ * exception and never perform its take or put, and we'd end up with a
+ * deadlock.
+ *
+ * -------------------------------------------------------------------------- */
+
+isEmptyMVarzh_fast
+{
+    /* args: R1 = MVar closure */
+
+    if (GET_INFO(R1) == stg_EMPTY_MVAR_info) {
+	RET_N(0);
+    } else {
+	RET_N(1);
+    }
+}
+
+newMVarzh_fast
+{
+    /* args: none */
+    W_ mvar;
+
+    ALLOC_PRIM ( SIZEOF_StgMVar, NO_PTRS, newMVarzh_fast );
+  
+    mvar = Hp - SIZEOF_StgMVar + WDS(1);
+    SET_HDR(mvar,stg_EMPTY_MVAR_info,W_[CCCS]);
+    StgMVar_head(mvar)  = stg_END_TSO_QUEUE_closure;
+    StgMVar_tail(mvar)  = stg_END_TSO_QUEUE_closure;
+    StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
+    RET_P(mvar);
+}
+
+
+/* If R1 isn't available, pass it on the stack */
+#ifdef REG_R1
+#define PerformTake(tso, value)				\
+    W_[StgTSO_sp(tso) + WDS(1)] = value;		\
+    W_[StgTSO_sp(tso) + WDS(0)] = stg_gc_unpt_r1_info;
+#else
+#define PerformTake(tso, value)					\
+    W_[StgTSO_sp(tso) + WDS(1)] = value;			\
+    W_[StgTSO_sp(tso) + WDS(0)] = stg_ut_1_0_unreg_info;
+#endif
+
+#define PerformPut(tso,lval)			\
+    StgTSO_sp(tso) = StgTSO_sp(tso) + WDS(3);	\
+    lval = W_[StgTSO_sp(tso) - WDS(1)];
+
+
+takeMVarzh_fast
+{
+    W_ mvar, val, info, tso;
+
+    /* args: R1 = MVar closure */
+    mvar = R1;
+
+    info = GET_INFO(mvar);
+
+    /* If the MVar is empty, put ourselves on its blocking queue,
+     * and wait until we're woken up.
+     */
+    if (info == stg_EMPTY_MVAR_info) {
+	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+	    StgMVar_head(mvar) = CurrentTSO;
+	} else {
+	    StgTSO_link(StgMVar_tail(mvar)) = CurrentTSO;
+	}
+	StgTSO_link(CurrentTSO)        = stg_END_TSO_QUEUE_closure;
+	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
+	StgTSO_block_info(CurrentTSO)  = mvar;
+	StgMVar_tail(mvar) = CurrentTSO;
+	
+	jump stg_block_takemvar;
+  }
+
+  /* we got the value... */
+  val = StgMVar_value(mvar);
+
+  if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure)
+  {
+      /* There are putMVar(s) waiting... 
+       * wake up the first thread on the queue
+       */
+      ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
+
+      /* actually perform the putMVar for the thread that we just woke up */
+      tso = StgMVar_head(mvar);
+      PerformPut(tso,StgMVar_value(mvar));
+
+#if defined(GRAN) || defined(PAR)
+      /* ToDo: check 2nd arg (mvar) is right */
+      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar),mvar);
+      StgMVar_head(mvar) = tso;
+#else
+      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+      StgMVar_head(mvar) = tso;
+#endif
+      if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+	  StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
+      }
+      RET_P(val);
+  } 
+  else
+  {
+      /* No further putMVars, MVar is now empty */
+      
+      /* do this last... we might have locked the MVar in the SMP case,
+       * and writing the info pointer will unlock it.
+       */
+      SET_INFO(mvar,stg_EMPTY_MVAR_info);
+      StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
+      RET_P(val);
+  }
+}
+
+
+tryTakeMVarzh_fast
+{
+    W_ mvar, val, info, tso;
+
+    /* args: R1 = MVar closure */
+
+    mvar = R1;
+
+    info = GET_INFO(mvar);
+
+    if (info == stg_EMPTY_MVAR_info) {
+	/* HACK: we need a pointer to pass back, 
+	 * so we abuse NO_FINALIZER_closure
+	 */
+	RET_NP(0, stg_NO_FINALIZER_closure);
+    }
+
+    /* we got the value... */
+    val = StgMVar_value(mvar);
+
+    if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
+	/* There are putMVar(s) waiting... 
+	 * wake up the first thread on the queue
+	 */
+	ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
+
+	/* actually perform the putMVar for the thread that we just woke up */
+	tso = StgMVar_head(mvar);
+	PerformPut(tso,StgMVar_value(mvar));
+
+#if defined(GRAN) || defined(PAR)
+	/* ToDo: check 2nd arg (mvar) is right */
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr");
+	StgMVar_head(mvar) = tso;
+#else
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	StgMVar_head(mvar) = tso;
+#endif
+
+	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
+	}
+    }
+    else 
+    {
+	/* No further putMVars, MVar is now empty */
+	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
+	
+	/* do this last... we might have locked the MVar in the SMP case,
+	 * and writing the info pointer will unlock it.
+	 */
+	SET_INFO(mvar,stg_EMPTY_MVAR_info);
+    }
+    
+    RET_NP(1, val);
+}
+
+
+putMVarzh_fast
+{
+    W_ mvar, info, tso;
+
+    /* args: R1 = MVar, R2 = value */
+    mvar = R1;
+
+    info = GET_INFO(mvar);
+
+    if (info == stg_FULL_MVAR_info) {
+	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+	    StgMVar_head(mvar) = CurrentTSO;
+	} else {
+	    StgTSO_link(StgMVar_tail(mvar)) = CurrentTSO;
+	}
+	StgTSO_link(CurrentTSO)        = stg_END_TSO_QUEUE_closure;
+	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
+	StgTSO_block_info(CurrentTSO)  = mvar;
+	StgMVar_tail(mvar) = CurrentTSO;
+	
+	jump stg_block_putmvar;
+    }
+  
+    if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
+	/* There are takeMVar(s) waiting: wake up the first one
+	 */
+	ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
+
+	/* actually perform the takeMVar */
+	tso = StgMVar_head(mvar);
+	PerformTake(tso, R2);
+      
+#if defined(GRAN) || defined(PAR)
+	/* ToDo: check 2nd arg (mvar) is right */
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
+	StgMVar_head(mvar) = tso;
+#else
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	StgMVar_head(mvar) = tso;
+#endif
+
+	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
+	}
+
+	jump %ENTRY_CODE(Sp(0));
+    }
+    else
+    {
+	/* No further takes, the MVar is now full. */
+	StgMVar_value(mvar) = R2;
+	/* unlocks the MVar in the SMP case */
+	SET_INFO(mvar,stg_FULL_MVAR_info);
+	jump %ENTRY_CODE(Sp(0));
+    }
+    
+    /* ToDo: yield afterward for better communication performance? */
+}
+
+
+tryPutMVarzh_fast
+{
+    W_ mvar, info, tso;
+
+    /* args: R1 = MVar, R2 = value */
+    mvar = R1;
+
+    info = GET_INFO(mvar);
+
+    if (info == stg_FULL_MVAR_info) {
+	RET_N(0);
+    }
+  
+    if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
+	/* There are takeMVar(s) waiting: wake up the first one
+	 */
+	ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
+	
+	/* actually perform the takeMVar */
+	tso = StgMVar_head(mvar);
+	PerformTake(tso, R2);
+      
+#if defined(GRAN) || defined(PAR)
+	/* ToDo: check 2nd arg (mvar) is right */
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
+	StgMVar_head(mvar) = tso;
+#else
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	StgMVar_head(mvar) = tso;
+#endif
+
+	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
+	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
+	}
+
+	jump %ENTRY_CODE(Sp(0));
+    }
+    else
+    {
+	/* No further takes, the MVar is now full. */
+	StgMVar_value(mvar) = R2;
+	/* unlocks the MVar in the SMP case */
+	SET_INFO(mvar,stg_FULL_MVAR_info);
+	jump %ENTRY_CODE(Sp(0));
+    }
+    
+    /* ToDo: yield afterward for better communication performance? */
+}
+
+
+/* -----------------------------------------------------------------------------
+   Stable pointer primitives
+   -------------------------------------------------------------------------  */
+
+makeStableNamezh_fast
+{
+    W_ index, sn_obj;
+
+    ALLOC_PRIM( SIZEOF_StgStableName, R1_PTR, makeStableNamezh_fast );
+  
+    index = foreign "C" lookupStableName(R1 "ptr");
+
+    /* Is there already a StableName for this heap object?
+     *  stable_ptr_table is an array of snEntry structs.
+     */
+    if ( snEntry_sn_obj(stable_ptr_table + index*SIZEOF_snEntry) == NULL ) {
+	sn_obj = Hp - SIZEOF_StgStableName + WDS(1);
+	SET_HDR(sn_obj, stg_STABLE_NAME_info, W_[CCCS]);
+	StgStableName_sn(sn_obj) = index;
+	snEntry_sn_obj(stable_ptr_table + index*SIZEOF_snEntry) = sn_obj;
+    } else {
+	sn_obj = snEntry_sn_obj(stable_ptr_table + index*SIZEOF_snEntry);
+    }
+    
+    RET_P(sn_obj);
+}
+
+
+makeStablePtrzh_fast
+{
+    /* Args: R1 = a */
+    W_ sp;
+    MAYBE_GC(R1_PTR, makeStablePtrzh_fast);
+    "ptr" sp = foreign "C" getStablePtr(R1 "ptr");
+    RET_N(sp);
+}
+
+deRefStablePtrzh_fast
+{
+    /* Args: R1 = the stable ptr */
+    W_ r, sp;
+    sp = R1;
+    r = snEntry_addr(stable_ptr_table + sp*SIZEOF_snEntry);
+    RET_P(r);
+}
+
+/* -----------------------------------------------------------------------------
+   Bytecode object primitives
+   -------------------------------------------------------------------------  */
+
+newBCOzh_fast
+{
+    /* R1 = instrs
+       R2 = literals
+       R3 = ptrs
+       R4 = itbls
+       R5 = arity
+       R6 = bitmap array
+    */
+    W_ bco, bitmap_arr, bytes, words;
+    
+    bitmap_arr = R6;
+    words = BYTES_TO_WDS(SIZEOF_StgBCO) + StgArrWords_words(bitmap_arr);
+    bytes = WDS(words);
+
+    ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R4_PTR&R6_PTR, newBCOzh_fast );
+
+    bco = Hp - bytes + WDS(1);
+    SET_HDR(bco, stg_BCO_info, W_[CCCS]);
+    
+    StgBCO_instrs(bco)     = R1;
+    StgBCO_literals(bco)   = R2;
+    StgBCO_ptrs(bco)       = R3;
+    StgBCO_itbls(bco)      = R4;
+    StgBCO_arity(bco)      = HALF_W_(R5);
+    StgBCO_size(bco)       = HALF_W_(words);
+    
+    // Copy the arity/bitmap info into the BCO
+    W_ i;
+    i = 0;
+for:
+    if (i < StgArrWords_words(bitmap_arr)) {
+	StgBCO_bitmap(bco,i) = StgArrWords_payload(bitmap_arr,i);
+	i = i + 1;
+	goto for;
+    }
+    
+    RET_P(bco);
+}
+
+
+mkApUpd0zh_fast
+{
+    // R1 = the BCO# for the AP
+    //	
+    W_ ap;
+
+    // This function is *only* used to wrap zero-arity BCOs in an
+    // updatable wrapper (see ByteCodeLink.lhs).  An AP thunk is always
+    // saturated and always points directly to a FUN or BCO.
+    ASSERT(%INFO_TYPE(%GET_STD_INFO(R1)) == BCO::I16 &&
+	   StgBCO_arity(R1) == 0::I16);
+
+    HP_CHK_GEN_TICKY(SIZEOF_StgAP, R1_PTR, mkApUpd0zh_fast);
+    TICK_ALLOC_UP_THK(0, 0);
+    CCCS_ALLOC(SIZEOF_StgAP);
+
+    ap = Hp - SIZEOF_StgAP + WDS(1);
+    SET_HDR(ap, stg_AP_info, W_[CCCS]);
+    
+    StgAP_n_args(ap) = 0::I16;
+    StgAP_fun(ap) = R1;
+    
+    RET_P(ap);
+}
+
+/* -----------------------------------------------------------------------------
+   Thread I/O blocking primitives
+   -------------------------------------------------------------------------- */
+
+/* Add a thread to the end of the blocked queue. (C-- version of the C
+ * macro in Schedule.h).
+ */
+#define APPEND_TO_BLOCKED_QUEUE(tso)			\
+    ASSERT(StgTSO_link(tso) == END_TSO_QUEUE);		\
+    if (W_[blocked_queue_hd] == END_TSO_QUEUE) {	\
+      W_[blocked_queue_hd] = tso;			\
+    } else {						\
+      StgTSO_link(W_[blocked_queue_tl]) = tso;		\
+    }							\
+    W_[blocked_queue_tl] = tso;
+
+waitReadzh_fast
+{
+    /* args: R1 */
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
+    StgTSO_block_info(CurrentTSO) = R1;
+    // No locking - we're not going to use this interface in the
+    // threaded RTS anyway.
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    jump stg_block_noregs;
+}
+
+waitWritezh_fast
+{
+    /* args: R1 */
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
+    StgTSO_block_info(CurrentTSO) = R1;
+    // No locking - we're not going to use this interface in the
+    // threaded RTS anyway.
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    jump stg_block_noregs;
+}
+
+
+STRING(stg_delayzh_malloc_str, "delayzh_fast")
+delayzh_fast
+{
+#ifdef mingw32_TARGET_OS
+    W_ ares;
+    CInt reqID;
+#else
+    W_ t, prev, target;
+#endif
+
+    /* args: R1 (microsecond delay amount) */
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
+
+#ifdef mingw32_TARGET_OS
+
+    /* could probably allocate this on the heap instead */
+    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+					    stg_delayzh_malloc_str);
+    reqID = foreign "C" addDelayRequest(R1);
+    StgAsyncIOResult_reqID(ares)   = reqID;
+    StgAsyncIOResult_len(ares)     = 0;
+    StgAsyncIOResult_errCode(ares) = 0;
+    StgTSO_block_info(CurrentTSO)  = ares;
+
+    /* Having all async-blocked threads reside on the blocked_queue
+     * simplifies matters, so change the status to OnDoProc put the
+     * delayed thread on the blocked_queue.
+     */
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+
+#else
+
+    CInt time;
+    time = foreign "C" getourtimeofday();
+    target = (R1 / (TICK_MILLISECS*1000)) + TO_W_(time);
+    StgTSO_block_info(CurrentTSO) = target;
+
+    /* Insert the new thread in the sleeping queue. */
+    prev = NULL;
+    t = W_[sleeping_queue];
+while:
+    if (t != END_TSO_QUEUE && StgTSO_block_info(t) < target) {
+	prev = t;
+	t = StgTSO_link(t);
+	goto while;
+    }
+
+    StgTSO_link(CurrentTSO) = t;
+    if (prev == NULL) {
+	W_[sleeping_queue] = CurrentTSO;
+    } else {
+	StgTSO_link(prev) = CurrentTSO;
+    }
+#endif
+
+    jump stg_block_noregs;
+}
+
+
+#ifdef mingw32_TARGET_OS
+STRING(stg_asyncReadzh_malloc_str, "asyncReadzh_fast")
+asyncReadzh_fast
+{
+    W_ ares;
+    CInt reqID;
+
+    /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
+
+    /* could probably allocate this on the heap instead */
+    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+					    stg_asyncReadzh_malloc_str);
+    reqID = foreign "C" addIORequest(R1,FALSE,R2,R3,R4);
+    StgAsyncIOResult_reqID(ares)   = reqID;
+    StgAsyncIOResult_len(ares)     = 0;
+    StgAsyncIOResult_errCode(ares) = 0;
+    StgTSO_block_info(CurrentTSO)  = ares;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    jump stg_block_async;
+}
+
+STRING(asyncWritezh_malloc_str, "asyncWritezh_fast")
+asyncWritezh_fast
+{
+    W_ ares;
+    CInt reqID;
+
+    /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
+
+    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+					    asyncWritezh_malloc_str);
+    reqID = foreign "C" addIORequest(R1,TRUE,R2,R3,R4);
+
+    StgAsyncIOResult_reqID(ares)   = reqID;
+    StgAsyncIOResult_len(ares)     = 0;
+    StgAsyncIOResult_errCode(ares) = 0;
+    StgTSO_block_info(CurrentTSO)  = ares;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    jump stg_block_async;
+}
+
+STRING(asyncDoProczh_malloc_str, "asyncDoProczh_fast")
+asyncDoProczh_fast
+{
+    W_ ares;
+    CInt reqID;
+
+    /* args: R1 = proc, R2 = param */
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
+
+    /* could probably allocate this on the heap instead */
+    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+					    asyncDoProczh_malloc_str);
+    reqID = foreign "C" addDoProcRequest(R1,R2);
+    StgAsyncIOResult_reqID(ares)   = reqID;
+    StgAsyncIOResult_len(ares)     = 0;
+    StgAsyncIOResult_errCode(ares) = 0;
+    StgTSO_block_info(CurrentTSO) = ares;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    jump stg_block_async;
+}
+#endif
+
+/* -----------------------------------------------------------------------------
+  ** temporary **
+
+   classes CCallable and CReturnable don't really exist, but the
+   compiler insists on generating dictionaries containing references
+   to GHC_ZcCCallable_static_info etc., so we provide dummy symbols
+   for these.  Some C compilers can't cope with zero-length static arrays,
+   so we have to make these one element long.
+  --------------------------------------------------------------------------- */
+
+section "rodata" {
+  GHC_ZCCCallable_static_info:   W_ 0;
+}
+
+section "rodata" {
+  GHC_ZCCReturnable_static_info: W_ 0;
+}

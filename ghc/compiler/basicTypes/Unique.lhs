@@ -41,7 +41,10 @@ module Unique (
 	mkPArrDataConUnique,
 
 	mkBuiltinUnique,
-	mkPseudoUnique3
+	mkPseudoUniqueC,
+	mkPseudoUniqueD,
+	mkPseudoUniqueE,
+	mkPseudoUniqueH
     ) where
 
 #include "HsVersions.h"
@@ -255,12 +258,21 @@ iToBase62 n@(I# n#)
 
 Allocation of unique supply characters:
 	v,t,u : for renumbering value-, type- and usage- vars.
-	other a-z: lower case chars for unique supplies (see Main.lhs)
 	B:   builtin
 	C-E: pseudo uniques	(used in native-code generator)
 	X:   uniques derived by deriveUnique
 	_:   unifiable tyvars   (above)
 	0-9: prelude things below
+
+	other a-z: lower case chars for unique supplies.  Used so far:
+
+	d	desugarer
+	f	AbsC flattener
+	g	SimplStg
+	l	ndpFlatten
+	n	Native codegen
+	r	Hsc name cache
+	s	simplifier
 
 \begin{code}
 mkAlphaTyVarUnique i            = mkUnique '1' i
@@ -303,15 +315,13 @@ mkPArrDataConUnique a	        = mkUnique ':' (2*a)
 initTyVarUnique :: Unique
 initTyVarUnique = mkUnique 't' 0
 
-mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3, 
+mkPseudoUniqueC, mkPseudoUniqueD, mkPseudoUniqueE, mkPseudoUniqueH,
    mkBuiltinUnique :: Int -> Unique
 
-builtinUniques :: [Unique]
-builtinUniques = map mkBuiltinUnique [1..]
-
 mkBuiltinUnique i = mkUnique 'B' i
-mkPseudoUnique1 i = mkUnique 'C' i -- used for getUnique on Regs
-mkPseudoUnique2 i = mkUnique 'D' i -- used in NCG for getUnique on RealRegs
-mkPseudoUnique3 i = mkUnique 'E' i -- used in NCG spiller to create spill VirtualRegs
+mkPseudoUniqueC i = mkUnique 'C' i -- used for getUnique on Regs
+mkPseudoUniqueD i = mkUnique 'D' i -- used in NCG for getUnique on RealRegs
+mkPseudoUniqueE i = mkUnique 'E' i -- used in NCG spiller to create spill VirtualRegs
+mkPseudoUniqueH i = mkUnique 'H' i -- used in NCG spiller to create spill VirtualRegs
 \end{code}
 

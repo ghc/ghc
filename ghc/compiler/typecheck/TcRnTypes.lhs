@@ -167,10 +167,10 @@ data TcGblEnv
 		-- accumulated, but never consulted until the end.  
 		-- Nevertheless, it's convenient to accumulate them along 
 		-- with the rest of the info from this module.
-	tcg_exports :: NameSet,			-- What is exported
-	tcg_imports :: ImportAvails,		-- Information about what was imported 
-						--    from where, including things bound
-						--    in this module
+	tcg_exports :: NameSet,		-- What is exported
+	tcg_imports :: ImportAvails,	-- Information about what was imported 
+					--    from where, including things bound
+					--    in this module
 
 	tcg_dus :: DefUses,  	-- What is defined in this module and what is used.
 				-- The latter is used to generate 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.15 2003/07/28 15:59:09 simonmar Exp $
+ * $Id: StgTicky.h,v 1.16 2004/08/13 13:09:38 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -10,6 +10,23 @@
 
 #ifndef TICKY_H
 #define TICKY_H
+
+/* -----------------------------------------------------------------------------
+   The StgEntCounter type - needed regardless of TICKY_TICKY
+   -------------------------------------------------------------------------- */
+
+typedef struct _StgEntCounter {
+    StgWord16	registeredp;	/* 0 == no, 1 == yes */
+    StgWord16	arity;		/* arity (static info) */
+    StgWord16	stk_args;	/* # of args off stack */
+				/* (rest of args are in registers) */
+    char   	*str;		/* name of the thing */
+    char   	*arg_kinds;	/* info about the args types */
+    StgInt	entry_count;	/* Trips to fast entry code */
+    StgInt      allocs;         /* number of allocations by this fun */
+    struct _StgEntCounter *link;/* link to chain them all together */
+} StgEntCounter;
+
 
 #ifdef TICKY_TICKY
 
@@ -77,6 +94,8 @@
 	ALLOC_BH_gds += (g);	ALLOC_BH_slp += (s);	\
 	TICK_ALLOC_HISTO(BH,_HS,g,s)
 
+// admin size doesn't take into account the FUN, that is accounted for
+// in the "goods".
 #define TICK_ALLOC_PAP(g,s)					\
 	ALLOC_PAP_ctr++;      ALLOC_PAP_adm += sizeofW(StgPAP)-1; \
 	ALLOC_PAP_gds += (g); ALLOC_PAP_slp += (s);	\
@@ -138,18 +157,6 @@
 #define TICK_ENT_STATIC_THK()	ENT_STATIC_THK_ctr++ 
 #define TICK_ENT_DYN_THK()	ENT_DYN_THK_ctr++
 
-typedef struct _StgEntCounter {
-    unsigned	registeredp:16,	/* 0 == no, 1 == yes */
-    		arity:16,	/* arity (static info) */
-    		stk_args:16;	/* # of args off stack */
-				/* (rest of args are in registers) */
-    char   	*str;		/* name of the thing */
-    char   	*arg_kinds;	/* info about the args types */
-    I_		entry_count;	  /* Trips to fast entry code */
-    I_          allocs;         /* number of allocations by this fun */
-    struct _StgEntCounter *link;/* link to chain them all together */
-} StgEntCounter;
-
 #define TICK_CTR(f_ct, str, arity, args, arg_kinds)	\
    static StgEntCounter f_ct			\
 	= { 0, arity, args,			\
@@ -196,16 +203,65 @@ extern StgEntCounter *ticky_entry_ctrs;
    SLOW_CALL_hst[((__idx > 8) ? 8 : __idx)] += 1;	\
  }
 
-// A slow call with n arguments
-#define TICK_SLOW_CALL(n)       SLOW_CALL_ctr++; \
-                                TICK_SLOW_HISTO(n)
+#define UNDO_TICK_SLOW_HISTO(n)				\
+ { unsigned __idx;					\
+   __idx = (n);						\
+   SLOW_CALL_hst[((__idx > 8) ? 8 : __idx)] -= 1;	\
+ }
+
+// A slow call with n arguments.  In the unevald case, this call has
+// already been counted once, so don't count it again.
+#define TICK_SLOW_CALL(n) \
+  SLOW_CALL_ctr++; \
+  TICK_SLOW_HISTO(n)
+
+// This slow call was found to be to an unevaluated function; undo the
+// ticks we did in TICK_SLOW_CALL.
+#define TICK_SLOW_CALL_UNEVALD(n) \
+  SLOW_CALL_UNEVALD_ctr++; \
+  SLOW_CALL_ctr--; \
+  UNDO_TICK_SLOW_HISTO(n)
+
+#define TICK_MULTI_CHUNK_SLOW_CALL(pattern, chunks) \
+  fprintf(stderr, "Multi-chunk slow call: %s\n", pattern); \
+  MULTI_CHUNK_SLOW_CALL_ctr++; \
+  MULTI_CHUNK_SLOW_CALL_CHUNKS_ctr += chunks;
+
+// A completely unknown tail-call
+#define TICK_UNKNOWN_CALL()               UNKNOWN_CALL_ctr++
+
+// slow call patterns (includes "extra" args to known calls,
+// so the total of these will be greater than UNKNOWN_CALL_ctr).
+#define TICK_SLOW_CALL_v()             SLOW_CALL_v_ctr++
+#define TICK_SLOW_CALL_f()             SLOW_CALL_f_ctr++
+#define TICK_SLOW_CALL_d()             SLOW_CALL_d_ctr++
+#define TICK_SLOW_CALL_l()             SLOW_CALL_l_ctr++
+#define TICK_SLOW_CALL_n()             SLOW_CALL_n_ctr++
+#define TICK_SLOW_CALL_p()             SLOW_CALL_p_ctr++
+#define TICK_SLOW_CALL_pv()            SLOW_CALL_pv_ctr++
+#define TICK_SLOW_CALL_pp()            SLOW_CALL_pp_ctr++
+#define TICK_SLOW_CALL_ppv()           SLOW_CALL_ppv_ctr++
+#define TICK_SLOW_CALL_ppp()           SLOW_CALL_ppp_ctr++
+#define TICK_SLOW_CALL_pppv()          SLOW_CALL_pppv_ctr++
+#define TICK_SLOW_CALL_pppp()          SLOW_CALL_pppp_ctr++
+#define TICK_SLOW_CALL_ppppp()         SLOW_CALL_ppppp_ctr++
+#define TICK_SLOW_CALL_pppppp()        SLOW_CALL_pppppp_ctr++
+#define TICK_SLOW_CALL_OTHER(pattern) \
+     fprintf(stderr,"slow call: %s\n", pattern); \
+     SLOW_CALL_OTHER_ctr++
+
+#define TICK_KNOWN_CALL()               KNOWN_CALL_ctr++
+#define TICK_KNOWN_CALL_TOO_FEW_ARGS()  KNOWN_CALL_TOO_FEW_ARGS_ctr++
+#define TICK_KNOWN_CALL_EXTRA_ARGS()    KNOWN_CALL_EXTRA_ARGS_ctr++
 
 // A slow call to a FUN found insufficient arguments, and built a PAP
-#define TICK_SLOW_CALL_BUILT_PAP() SLOW_CALL_BUILT_PAP_ctr++
-
-// A slow call to a PAP found insufficient arguments, and build a new PAP
-#define TICK_SLOW_CALL_NEW_PAP()   SLOW_CALL_NEW_PAP_ctr++
-
+#define TICK_SLOW_CALL_FUN_TOO_FEW()	    SLOW_CALL_FUN_TOO_FEW_ctr++
+#define TICK_SLOW_CALL_FUN_CORRECT()	    SLOW_CALL_FUN_CORRECT_ctr++
+#define TICK_SLOW_CALL_FUN_TOO_MANY()	    SLOW_CALL_FUN_TOO_MANY_ctr++
+#define TICK_SLOW_CALL_PAP_TOO_FEW()	    SLOW_CALL_PAP_TOO_FEW_ctr++
+#define TICK_SLOW_CALL_PAP_CORRECT()	    SLOW_CALL_PAP_CORRECT_ctr++
+#define TICK_SLOW_CALL_PAP_TOO_MANY()	    SLOW_CALL_PAP_TOO_MANY_ctr++
+  
 /* -----------------------------------------------------------------------------
    Returns
    -------------------------------------------------------------------------- */
@@ -475,9 +531,38 @@ EXTERN unsigned long ENT_AP_ctr INIT(0);
 EXTERN unsigned long ENT_AP_STACK_ctr INIT(0);
 EXTERN unsigned long ENT_BH_ctr INIT(0);
 
+EXTERN unsigned long UNKNOWN_CALL_ctr INIT(0);
+
+EXTERN unsigned long SLOW_CALL_v_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_f_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_d_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_l_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_n_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_p_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_pv_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_pp_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_ppv_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_ppp_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_pppv_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_pppp_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_ppppp_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_pppppp_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_OTHER_ctr INIT(0);
+
+EXTERN unsigned long ticky_slow_call_unevald INIT(0);
 EXTERN unsigned long SLOW_CALL_ctr INIT(0);
-EXTERN unsigned long SLOW_CALL_BUILT_PAP_ctr INIT(0);
-EXTERN unsigned long SLOW_CALL_NEW_PAP_ctr INIT(0);
+EXTERN unsigned long MULTI_CHUNK_SLOW_CALL_ctr INIT(0);
+EXTERN unsigned long MULTI_CHUNK_SLOW_CALL_CHUNKS_ctr INIT(0);
+EXTERN unsigned long KNOWN_CALL_ctr INIT(0);
+EXTERN unsigned long KNOWN_CALL_TOO_FEW_ARGS_ctr INIT(0);
+EXTERN unsigned long KNOWN_CALL_EXTRA_ARGS_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_FUN_TOO_FEW_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_FUN_CORRECT_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_FUN_TOO_MANY_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_PAP_TOO_FEW_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_PAP_CORRECT_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_PAP_TOO_MANY_ctr INIT(0);
+EXTERN unsigned long SLOW_CALL_UNEVALD_ctr INIT(0);
 
 EXTERN unsigned long SLOW_CALL_hst[8]
 #ifdef TICKY_C
@@ -608,8 +693,34 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_ENT_BH()
 
 #define TICK_SLOW_CALL(n)
-#define TICK_SLOW_CALL_BUILT_PAP()
-#define TICK_SLOW_CALL_NEW_PAP()
+#define TICK_SLOW_CALL_UNEVALD(n)
+#define TICK_SLOW_CALL_FUN_TOO_FEW()
+#define TICK_SLOW_CALL_FUN_CORRECT()
+#define TICK_SLOW_CALL_FUN_TOO_MANY()
+#define TICK_SLOW_CALL_PAP_TOO_FEW()
+#define TICK_SLOW_CALL_PAP_CORRECT()
+#define TICK_SLOW_CALL_PAP_TOO_MANY()
+
+#define TICK_SLOW_CALL_v()
+#define TICK_SLOW_CALL_f()
+#define TICK_SLOW_CALL_d()
+#define TICK_SLOW_CALL_l()
+#define TICK_SLOW_CALL_n()
+#define TICK_SLOW_CALL_p()
+#define TICK_SLOW_CALL_pv()
+#define TICK_SLOW_CALL_pp()
+#define TICK_SLOW_CALL_ppv()
+#define TICK_SLOW_CALL_ppp()
+#define TICK_SLOW_CALL_pppv()
+#define TICK_SLOW_CALL_pppp()
+#define TICK_SLOW_CALL_ppppp()
+#define TICK_SLOW_CALL_pppppp()
+#define TICK_SLOW_CALL_OTHER(pattern)
+
+#define TICK_KNOWN_CALL()
+#define TICK_KNOWN_CALL_TOO_FEW_ARGS()
+#define TICK_KNOWN_CALL_EXTRA_ARGS()
+#define TICK_UNKNOWN_CALL()
 
 #define TICK_RET_NEW(n)
 #define TICK_RET_OLD(n)

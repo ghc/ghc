@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.8 2003/06/24 08:49:55 stolz Exp $
+ * $Id: FrontPanel.c,v 1.9 2004/08/13 13:09:49 simonmar Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -17,7 +17,6 @@
 #include "MBlock.h"
 #include "FrontPanel.h"
 #include "Storage.h"
-#include "StoragePriv.h"
 #include "Stats.h"
 #include "RtsFlags.h"
 #include "Schedule.h"

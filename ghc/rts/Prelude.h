@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.25 2004/03/01 14:11:01 simonmar Exp $
+ * $Id: Prelude.h,v 1.26 2004/08/13 13:10:12 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2001
+ * (c) The GHC Team, 1998-2004
  *
  * Prelude identifiers that we sometimes need to refer to in the RTS.
  *
@@ -10,65 +10,77 @@
 #ifndef PRELUDE_H
 #define PRELUDE_H
 
+/* These definitions are required by the RTS .cmm files too, so we
+ * need declarations that we can #include into the generated .hc files.
+ */
+#if IN_STG_CODE
+#define PRELUDE_INFO(i)       extern W_(i)[]
+#define PRELUDE_CLOSURE(i)    extern W_(i)[]
+#else
+#define PRELUDE_INFO(i)       extern DLL_IMPORT const StgInfoTable i
+#define PRELUDE_CLOSURE(i)    extern DLL_IMPORT StgClosure i
+#endif
+
 /* Define canonical names so we can abstract away from the actual
  * modules these names are defined in.
  */
 
-extern DLL_IMPORT StgClosure GHCziBase_True_closure;
-extern DLL_IMPORT StgClosure GHCziBase_False_closure;
-extern DLL_IMPORT StgClosure GHCziPack_unpackCString_closure;
-extern DLL_IMPORT StgClosure GHCziWeak_runFinalizzerBatch_closure;
+PRELUDE_CLOSURE(GHCziBase_True_closure);
+PRELUDE_CLOSURE(GHCziBase_False_closure);
+PRELUDE_CLOSURE(GHCziPack_unpackCString_closure);
+PRELUDE_CLOSURE(GHCziWeak_runFinalizzerBatch_closure);
+
+#ifdef IN_STG_CODE
+extern W_ ZCMain_main_closure[];
+#else
 extern StgClosure ZCMain_main_closure;
-extern DLL_IMPORT StgClosure GHCziTopHandler_runIO_closure;
-extern DLL_IMPORT StgClosure GHCziTopHandler_runNonIO_closure;
+#endif
 
-extern DLL_IMPORT StgClosure GHCziIOBase_stackOverflow_closure;
-extern DLL_IMPORT StgClosure GHCziIOBase_heapOverflow_closure;
-extern DLL_IMPORT StgClosure GHCziIOBase_BlockedOnDeadMVar_closure;
-extern DLL_IMPORT StgClosure GHCziIOBase_NonTermination_closure;
+PRELUDE_CLOSURE(GHCziIOBase_stackOverflow_closure);
+PRELUDE_CLOSURE(GHCziIOBase_heapOverflow_closure);
+PRELUDE_CLOSURE(GHCziIOBase_BlockedOnDeadMVar_closure);
+PRELUDE_CLOSURE(GHCziIOBase_NonTermination_closure);
 
-extern DLL_IMPORT const StgInfoTable GHCziBase_Czh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziBase_Izh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziFloat_Fzh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziFloat_Dzh_static_info;
-extern DLL_IMPORT const StgInfoTable Addr_Azh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziPtr_Ptr_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziPtr_FunPtr_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I8zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I16zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I32zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I64zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_Wzh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W8zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W16zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W32zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W64zh_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziBase_Czh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziBase_Izh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziFloat_Fzh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziFloat_Dzh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziPtr_Ptr_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziPtr_FunPtr_con_info;
-extern DLL_IMPORT const StgInfoTable Addr_Azh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_Wzh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I8zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I16zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I32zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziInt_I64zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W8zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W16zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W32zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziWord_W64zh_con_info;
-extern DLL_IMPORT const StgInfoTable GHCziStable_StablePtr_static_info;
-extern DLL_IMPORT const StgInfoTable GHCziStable_StablePtr_con_info;
+PRELUDE_INFO(GHCziBase_Czh_static_info);
+PRELUDE_INFO(GHCziBase_Izh_static_info);
+PRELUDE_INFO(GHCziFloat_Fzh_static_info);
+PRELUDE_INFO(GHCziFloat_Dzh_static_info);
+PRELUDE_INFO(Addr_Azh_static_info);
+PRELUDE_INFO(GHCziPtr_Ptr_static_info);
+PRELUDE_INFO(GHCziPtr_FunPtr_static_info);
+PRELUDE_INFO(GHCziInt_I8zh_static_info);
+PRELUDE_INFO(GHCziInt_I16zh_static_info);
+PRELUDE_INFO(GHCziInt_I32zh_static_info);
+PRELUDE_INFO(GHCziInt_I64zh_static_info);
+PRELUDE_INFO(GHCziWord_Wzh_static_info);
+PRELUDE_INFO(GHCziWord_W8zh_static_info);
+PRELUDE_INFO(GHCziWord_W16zh_static_info);
+PRELUDE_INFO(GHCziWord_W32zh_static_info);
+PRELUDE_INFO(GHCziWord_W64zh_static_info);
+PRELUDE_INFO(GHCziBase_Czh_con_info);
+PRELUDE_INFO(GHCziBase_Izh_con_info);
+PRELUDE_INFO(GHCziFloat_Fzh_con_info);
+PRELUDE_INFO(GHCziFloat_Dzh_con_info);
+PRELUDE_INFO(GHCziPtr_Ptr_con_info);
+PRELUDE_INFO(GHCziPtr_FunPtr_con_info);
+PRELUDE_INFO(Addr_Azh_con_info);
+PRELUDE_INFO(GHCziWord_Wzh_con_info);
+PRELUDE_INFO(GHCziInt_I8zh_con_info);
+PRELUDE_INFO(GHCziInt_I16zh_con_info);
+PRELUDE_INFO(GHCziInt_I32zh_con_info);
+PRELUDE_INFO(GHCziInt_I64zh_con_info);
+PRELUDE_INFO(GHCziWord_W8zh_con_info);
+PRELUDE_INFO(GHCziWord_W16zh_con_info);
+PRELUDE_INFO(GHCziWord_W32zh_con_info);
+PRELUDE_INFO(GHCziWord_W64zh_con_info);
+PRELUDE_INFO(GHCziStable_StablePtr_static_info);
+PRELUDE_INFO(GHCziStable_StablePtr_con_info);
 
 #define True_closure              (&GHCziBase_True_closure)
 #define False_closure             (&GHCziBase_False_closure)
 #define unpackCString_closure     (&GHCziPack_unpackCString_closure)
 #define runFinalizerBatch_closure (&GHCziWeak_runFinalizzerBatch_closure)
 #define mainIO_closure            (&ZCMain_main_closure)
-#define runIO_closure		  (&GHCziTopHandler_runIO_closure)
-#define runNonIO_closure	  (&GHCziTopHandler_runNonIO_closure)
 
 #define stackOverflow_closure     (&GHCziIOBase_stackOverflow_closure)
 #define heapOverflow_closure      (&GHCziIOBase_heapOverflow_closure)

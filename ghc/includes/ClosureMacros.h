@@ -1,7 +1,6 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.38 2003/11/12 17:27:00 sof Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * Macros for building and manipulating closures
  *
@@ -52,7 +51,6 @@
  
    -------------------------------------------------------------------------- */
 
-#define INIT_INFO(i)  info : (StgInfoTable *)&(i)
 #define SET_INFO(c,i) ((c)->header.info = (i))
 #define GET_INFO(c)   ((c)->header.info)
 #define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
@@ -62,30 +60,21 @@
 #define get_fun_itbl(c) (FUN_INFO_PTR_TO_STRUCT((c)->header.info))
 #define get_thunk_itbl(c) (THUNK_INFO_PTR_TO_STRUCT((c)->header.info))
 
+#define GET_TAG(con) (get_itbl(con)->srt_bitmap)
 
 #ifdef TABLES_NEXT_TO_CODE
-#define INIT_ENTRY(e)
-#define ENTRY_CODE(info) (info)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)(info) - 1)
 #define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)(info) - 1)
 #define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)(info) - 1)
 #define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)(info) - 1)
-INLINE_HEADER StgFunPtr get_entry(const StgInfoTable *itbl) {
-    return (StgFunPtr)(itbl+1);
-}
 #define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
 #define itbl_to_ret_itbl(i) ((StgRetInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
 #define itbl_to_thunk_itbl(i) ((StgThunkInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
 #else
-#define INIT_ENTRY(e)    entry : (F_)(e)
-#define ENTRY_CODE(info) (((StgInfoTable *)info)->entry)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
 #define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)info)
 #define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)info)
 #define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)info)
-INLINE_HEADER StgFunPtr get_entry(const StgInfoTable *itbl) {
-    return itbl->entry;
-}
 #define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(i))
 #define itbl_to_ret_itbl(i) ((StgRetInfoTable *)(i))
 #define itbl_to_thunk_itbl(i) ((StgThunkInfoTable *)(i))
@@ -104,7 +93,6 @@ INLINE_HEADER StgFunPtr get_entry(const StgInfoTable *itbl) {
   Note: change those functions building Haskell objects from C datatypes, i.e.,
   all rts_mk???() functions in RtsAPI.c, as well.
  */
-extern StgWord flip;
 #define SET_PROF_HDR(c,ccs_)            \
         ((c)->header.prof.ccs = ccs_, (c)->header.prof.hp.rs = (retainerSet *)((StgWord)NULL | flip))
 #else
@@ -125,10 +113,10 @@ extern StgWord flip;
  */
 #define SET_PROF_HDR(c,ccs_)            \
         ((c)->header.prof.ccs = ccs_,   \
-        LDV_recordCreate((c)))
+        LDV_RECORD_CREATE((c)))
 #endif  // DEBUG_RETAINER
 #define SET_STATIC_PROF_HDR(ccs_)       \
-        prof : { ccs : ccs_, hp : { rs : NULL } },
+        prof : { ccs : (CostCentreStack *)ccs_, hp : { rs : NULL } },
 #else
 #define SET_PROF_HDR(c,ccs)
 #define SET_STATIC_PROF_HDR(ccs)
@@ -158,9 +146,9 @@ extern StgWord flip;
 #define SET_STATIC_TICKY_HDR(stuff)
 #endif
 
-#define SET_HDR(c,info,ccs)				\
+#define SET_HDR(c,_info,ccs)				\
    {							\
-	SET_INFO(c,info);				\
+	(c)->header.info = _info;			\
 	SET_GRAN_HDR((StgClosure *)(c),ThisPE);		\
 	SET_PAR_HDR((StgClosure *)(c),LOCAL_GA);	\
 	SET_PROF_HDR((StgClosure *)(c),ccs);		\
@@ -172,34 +160,13 @@ extern StgWord flip;
    (c)->words = n_words;
 
 /* -----------------------------------------------------------------------------
-   Static closures are defined as follows:
-
-
-   SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,closure_class,info_class);
-
-   The info argument must have type 'StgInfoTable' or
-   'StgSRTInfoTable', since we use '&' to get its address in the macro.
+   How to get hold of the static link field for a static closure.
+   
+   Note that we have to use (*cast(T*,&e)) instead of cast(T,e)
+   because C won't let us take the address of a casted
+   expression. Huh?
    -------------------------------------------------------------------------- */
 
-#define SET_STATIC_HDR(label,info,costCentreStack,closure_class,info_class)	\
-   info_class info;								\
-   closure_class StgClosure label = {						\
-   STATIC_HDR(info,costCentreStack)
-
-#define STATIC_HDR(info,ccs)			\
-	header : {				\
-		INIT_INFO(info),		\
-		SET_STATIC_GRAN_HDR		\
-		SET_STATIC_PAR_HDR(LOCAL_GA)	\
-		SET_STATIC_PROF_HDR(ccs)	\
-		SET_STATIC_TICKY_HDR(0)		\
-	}
-
-/* how to get hold of the static link field for a static closure.
- *
- * Note that we have to use (*cast(T*,&e)) instead of cast(T,e)
- * because C won't let us take the address of a casted expression. Huh?
- */
 #define STATIC_LINK(info,p)						\
    (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +		\
 					info->layout.payload.nptrs])))
@@ -229,18 +196,5 @@ extern StgWord flip;
 
 #define CHARLIKE_CLOSURE(n) ((P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE])
 #define INTLIKE_CLOSURE(n)  ((P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE])
-
-/* -----------------------------------------------------------------------------
-   Closure Tables (for enumerated data types)
-   -------------------------------------------------------------------------- */
-
-#define CLOSURE_TBL(lbl) const StgClosure *lbl[] = {
-
-/* -----------------------------------------------------------------------------
-   CONSTRs.
-   -------------------------------------------------------------------------- */
-
-/* constructors don't have SRTs */
-#define GET_TAG(info) (INFO_PTR_TO_STRUCT(info)->srt_bitmap)
 
 #endif /* CLOSUREMACROS_H */

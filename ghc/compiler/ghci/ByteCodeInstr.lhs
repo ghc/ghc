@@ -17,11 +17,10 @@ import Id		( Id )
 import CoreSyn
 import PprCore		( pprCoreExpr, pprCoreAlt )
 import Literal		( Literal )
-import PrimRep		( PrimRep )
 import DataCon		( DataCon )
 import VarSet		( VarSet )
 import PrimOp		( PrimOp )
-import SMRep		( StgWord )
+import SMRep		( StgWord, CgRep )
 import GHC.Ptr
 
 -- ----------------------------------------------------------------------------
@@ -59,7 +58,7 @@ data BCInstr
 
    -- Push an alt continuation
    | PUSH_ALTS          (ProtoBCO Name)
-   | PUSH_ALTS_UNLIFTED (ProtoBCO Name) PrimRep
+   | PUSH_ALTS_UNLIFTED (ProtoBCO Name) CgRep
 
    -- Pushing literals
    | PUSH_UBX  (Either Literal (Ptr ())) Int
@@ -125,7 +124,7 @@ data BCInstr
    -- To Infinity And Beyond
    | ENTER
    | RETURN		-- return a lifted value
-   | RETURN_UBX PrimRep -- return an unlifted value, here's its rep
+   | RETURN_UBX CgRep -- return an unlifted value, here's its rep
 
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions

@@ -1,10 +1,9 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.20 2003/11/12 17:27:05 sof Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2004
  *
  * Various C datatypes used in the run-time system.  This is the
- * lowest-level include file, after config.h and Derived.h.
+ * lowest-level include file, after ghcconfig.h and RtsConfig.h.
  *
  * This module should define types *only*, all beginning with "Stg".
  *
@@ -27,7 +26,7 @@
 
  * WARNING: Keep this file, MachDeps.h, and HsFFI.h in synch!
  *
- * NOTE: assumes #include "config.h"
+ * NOTE: assumes #include "ghcconfig.h"
  * 
  * Works with or without _POSIX_SOURCE.
  *
@@ -35,8 +34,6 @@
 
 #ifndef STGTYPES_H
 #define STGTYPES_H
-
-#include "Derived.h"
 
 /*
  * First, platform-dependent definitions of size-specific integers.
@@ -149,19 +146,5 @@ typedef void*		   StgStablePtr;
 
 typedef void  *(*(*StgFunPtr)(void))(void);
 typedef StgFunPtr StgFun(void);
-
-typedef union {
-    StgWord        w;
-    StgAddr        a;
-    StgChar        c;
-    StgInt8        i8;
-    StgFloat       f;
-    StgInt         i;
-    StgPtr         p;
-    StgClosurePtr  cl;
-    StgStackOffset offset;	/* unused? */
-    StgByteArray   b;
-    StgTSOPtr      t;
-} StgUnion;
 
 #endif /* STGTYPES_H */

@@ -7,6 +7,9 @@
 module TyCon(
 	TyCon, ArgVrcs, 
 
+	PrimRep(..),
+	tyConPrimRep,
+
 	AlgTyConRhs(..), visibleDataCons,
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, isAbstractTyCon,
@@ -33,7 +36,6 @@ module TyCon(
 	algTyConRhs, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
 	tyConSelIds,
 	tyConTheta,
-	tyConPrimRep,
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
 	getSynTyConDefn,
@@ -60,7 +62,6 @@ import Kind		( Kind )
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..) )
-import PrimRep		( PrimRep(..) )
 import Maybes		( orElse )
 import Outputable
 import FastString
@@ -109,13 +110,15 @@ data TyCon
 
   | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
 				-- Now includes foreign-imported types
-	tyConUnique  :: Unique,
-	tyConName    :: Name,
-	tyConKind    :: Kind,
-	tyConArity   :: Arity,
-	argVrcs      :: ArgVrcs,
-	primTyConRep :: PrimRep,	-- Many primitive tycons are unboxed, but some are
-					-- boxed (represented by pointers). The PrimRep tells.
+	tyConUnique   :: Unique,
+	tyConName     :: Name,
+	tyConKind     :: Kind,
+	tyConArity    :: Arity,
+	argVrcs       :: ArgVrcs,
+
+	primTyConRep  :: PrimRep,
+			-- Many primitive tycons are unboxed, but some are
+			-- boxed (represented by pointers). The CgRep tells.
 
 	isUnLifted   :: Bool,		-- Most primitive tycons are unlifted, 
 					-- but foreign-imported ones may not be
@@ -186,6 +189,42 @@ visibleDataCons (DataTyCon cs _) = cs
 visibleDataCons (NewTyCon c _ _) = [c]
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{PrimRep}
+%*									*
+%************************************************************************
+
+A PrimRep is an abstraction of a type.  It contains information that
+the code generator needs in order to pass arguments, return results,
+and store values of this type.
+
+A PrimRep is somewhat similar to a CgRep (see codeGen/SMRep) and a
+MachRep (see cmm/MachOp), although each of these types has a distinct
+and clearly defined purpose:
+
+  - A PrimRep is a CgRep + information about signedness + information
+    about primitive pointers (AddrRep).  Signedness and primitive
+    pointers are required when passing a primitive type to a foreign
+    function, but aren't needed for call/return conventions of Haskell
+    functions.
+
+  - A MachRep is a basic machine type (non-void, doesn't contain
+    information on pointerhood or signedness, but contains some
+    reps that don't have corresponding Haskell types).
+
+\begin{code}
+data PrimRep
+  = VoidRep
+  | PtrRep
+  | IntRep		-- signed, word-sized
+  | WordRep		-- unsinged, word-sized
+  | Int64Rep		-- signed, 64 bit (32-bit words only)
+  | Word64Rep		-- unsigned, 64 bit (32-bit words only)
+  | AddrRep		-- a pointer, but not to a Haskell value
+  | FloatRep
+  | DoubleRep
+\end{code}
 
 %************************************************************************
 %*									*
@@ -261,7 +300,6 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
 -- as primitive, but *lifted*, TyCons for now. They are lifted
 -- because the Haskell type T representing the (foreign) .NET
 -- type T is actually implemented (in ILX) as a thunk<T>
--- They have PtrRep
 mkForeignTyCon name ext_name kind arity arg_vrcs
   = PrimTyCon {
 	tyConName    = name,
@@ -269,7 +307,7 @@ mkForeignTyCon name ext_name kind arity arg_vrcs
 	tyConKind    = kind,
 	tyConArity   = arity,
         argVrcs      = arg_vrcs,
-	primTyConRep = PtrRep,
+	primTyConRep = PtrRep, -- they all do
 	isUnLifted   = False,
 	tyConExtName = ext_name
     }
@@ -447,13 +485,12 @@ newTyConRep (AlgTyCon {tyConTyVars = tvs, algRhs = NewTyCon _ _ rep}) = (tvs, re
 
 newTyConRhs :: TyCon -> ([TyVar], Type)
 newTyConRhs (AlgTyCon {tyConTyVars = tvs, algRhs = NewTyCon _ rhs _}) = (tvs, rhs)
+\end{code}
 
+\begin{code}
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
-tyConPrimRep tc			              = ASSERT( not (isUnboxedTupleTyCon tc) )
-						PtrRep
-	-- We should not be asking what the representation of an
-	-- unboxed tuple is, because it isn't a first class value.
+tyConPrimRep tc = ASSERT(not (isUnboxedTupleTyCon tc)) PtrRep
 \end{code}
 
 \begin{code}

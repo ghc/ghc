@@ -11,48 +11,52 @@ with {\em constructors} on the RHSs of let(rec)s.  See also
 module CgCon (
 	cgTopRhsCon, buildDynCon,
 	bindConArgs, bindUnboxedTupleComponents,
-	cgReturnDataCon
+	cgReturnDataCon,
+	cgTyCon
     ) where
 
 #include "HsVersions.h"
 
 import CgMonad
-import AbsCSyn
 import StgSyn
 
-import AbsCUtils	( getAmodeRep )
 import CgBindery	( getArgAmodes, bindNewToNode,
-			  bindArgsToRegs, 
-			  idInfoToAmode, stableAmodeIdInfo,
-			  heapIdInfo, CgIdInfo, bindNewToStack
+			  bindArgsToRegs, idInfoToAmode, stableIdInfo,
+			  heapIdInfo, CgIdInfo, bindArgsToStack
 			)
-import CgStackery	( mkVirtStkOffsets, freeStackSlots )
-import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp )
-import CgRetConv	( assignRegs )
+import CgStackery	( mkVirtStkOffsets, freeStackSlots,
+			  getRealSp, getVirtSp, setRealAndVirtualSp )
+import CgUtils		( addIdReps, cmmLabelOffW, emitRODataLits, emitDataLits )
+import CgCallConv	( assignReturnRegs )
 import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE )
-import CgHeapery	( allocDynClosure )
-import CgTailCall	( performReturn, mkStaticAlgReturnCode,
-			  returnUnboxedTuple )
-import CLabel		( mkClosureLabel )
-import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynConstr, 
-			  layOutStaticConstr, mkStaticClosure
-			)
+import CgHeapery	( allocDynClosure, layOutDynConstr, 
+			  layOutStaticConstr, mkStaticClosureFields )
+import CgTailCall	( performReturn, emitKnownConReturnCode, returnUnboxedTuple )
+import CgProf		( mkCCostCentreStack, ldvEnter, curCCS )
+import CgTicky
+import CgInfoTbls	( emitClosureCodeAndInfoTable, dataConTagZ )
+import CLabel		( mkClosureLabel, mkRtsDataLabel, mkClosureTblLabel )
+import ClosureInfo	( mkConLFInfo, mkLFArgument )
+import CmmUtils		( mkLblExpr )
+import Cmm
+import SMRep		( WordOff, CgRep, separateByPtrFollowness,
+			  fixedHdrSize, typeCgRep )
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
-import DataCon		( DataCon, dataConTag, 
+import Constants	( mIN_INTLIKE, mAX_INTLIKE, mIN_CHARLIKE, mAX_CHARLIKE )
+import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, tyConName )
+import DataCon		( DataCon, dataConRepArgTys, isNullaryDataCon,
 			  isUnboxedTupleCon, dataConWorkId, 
 			  dataConName, dataConRepArity
 			)
-import Id		( Id, idName, idPrimRep, isDeadBinder )
-import Literal		( Literal(..) )
+import Id		( Id, idName, isDeadBinder )
+import Type		( Type )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
-import PrimRep		( PrimRep(..), isFollowableRep )
-import Util
 import Outputable
-
-import List		( partition )
-import Char		( ord )
+import Util		( lengthIs )
+import ListSetOps	( assocMaybe )
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -68,34 +72,32 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 cgTopRhsCon id con args
   = ASSERT( not (isDllConApp con args) )
     ASSERT( args `lengthIs` dataConRepArity con )
+    do	{ 	-- LAY IT OUT
+	; amodes <- getArgAmodes args
 
-	-- LAY IT OUT
-    getArgAmodes args		`thenFC` \ amodes ->
+	; let
+	    name          = idName id
+	    lf_info	  = mkConLFInfo con
+    	    closure_label = mkClosureLabel name
+	    caffy         = any stgArgHasCafRefs args
+	    (closure_info, amodes_w_offsets) = layOutStaticConstr con amodes
+	    closure_rep = mkStaticClosureFields
+	    		     closure_info
+	    		     dontCareCCS		-- Because it's static data
+	    		     caffy			-- Has CAF refs
+			     payload
 
-    let
-	name          = idName id
-	lf_info	      = mkConLFInfo con
-    	closure_label = mkClosureLabel name
-	(closure_info, amodes_w_offsets) 
-		= layOutStaticConstr con getAmodeRep amodes
-	caffy = any stgArgHasCafRefs args
-    in
+	    payload = map get_lit amodes_w_offsets	
+	    get_lit (CmmLit lit, _offset) = lit
+	    get_lit other = pprPanic "CgCon.get_lit" (ppr other)
+		-- NB1: amodes_w_offsets is sorted into ptrs first, then non-ptrs
+		-- NB2: all the amodes should be Lits!
 
-	-- BUILD THE OBJECT
-    absC (mkStaticClosure
-	    closure_label
-	    closure_info
-	    dontCareCCS			-- because it's static data
-	    (map fst amodes_w_offsets)  -- Sorted into ptrs first, then nonptrs
-	    caffy			-- has CAF refs
-	  )					`thenC`
-		-- NOTE: can't use idCafInfo instead of nonEmptySRT above,
-		-- because top-level constructors that were floated by
-		-- CorePrep don't have CafInfo attached.  The SRT is more
-		-- reliable.
+		-- BUILD THE OBJECT
+	; emitDataLits closure_label closure_rep
 
-	-- RETURN
-    returnFC (id, stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info)
+		-- RETURN
+	; returnFC (id, stableIdInfo id (mkLblExpr closure_label) lf_info) }
 \end{code}
 
 %************************************************************************
@@ -106,13 +108,13 @@ cgTopRhsCon id con args
 \subsection[code-for-constructors]{The code for constructors}
 
 \begin{code}
-buildDynCon :: Id		-- Name of the thing to which this constr will
-				-- be bound
-	    -> CostCentreStack	-- Where to grab cost centre from;
-				-- current CCS if currentOrSubsumedCCS
-	    -> DataCon		-- The data constructor
-	    -> [CAddrMode]	-- Its args
-	    -> FCode CgIdInfo	-- Return details about how to find it
+buildDynCon :: Id		  -- Name of the thing to which this constr will
+				  -- be bound
+	    -> CostCentreStack	  -- Where to grab cost centre from;
+				  -- current CCS if currentOrSubsumedCCS
+	    -> DataCon		  -- The data constructor
+	    -> [(CgRep,CmmExpr)] -- Its args
+	    -> FCode CgIdInfo	  -- Return details about how to find it
 
 -- We used to pass a boolean indicating whether all the
 -- args were of size zero, so we could use a static
@@ -135,9 +137,9 @@ at all.
 
 \begin{code}
 buildDynCon binder cc con []
-  = returnFC (stableAmodeIdInfo binder
-				(CLbl (mkClosureLabel (dataConName con)) PtrRep)
-    				(mkConLFInfo con))
+  = returnFC (stableIdInfo binder
+			   (mkLblExpr (mkClosureLabel (dataConName con)))
+    			   (mkConLFInfo con))
 \end{code}
 
 The following three paragraphs about @Char@-like and @Int@-like
@@ -163,36 +165,41 @@ Because of this, we use can safely return an addressing mode.
 
 \begin{code}
 buildDynCon binder cc con [arg_amode]
-  | maybeIntLikeCon con && in_range_int_lit arg_amode
-  = returnFC (stableAmodeIdInfo binder (CIntLike arg_amode) (mkConLFInfo con))
-  where
-    in_range_int_lit (CLit (MachInt val)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
-    in_range_int_lit _other_amode	  = False
+  | maybeIntLikeCon con 
+  , (_, CmmLit (CmmInt val _)) <- arg_amode
+  , let val_int = (fromIntegral val) :: Int
+  , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
+  = do 	{ let intlike_lbl   = mkRtsDataLabel SLIT("stg_INTLIKE_closure")
+	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
+		-- INTLIKE closures consist of a header and one word payload
+	      intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
+	; returnFC (stableIdInfo binder intlike_amode (mkConLFInfo con)) }
 
 buildDynCon binder cc con [arg_amode]
-  | maybeCharLikeCon con && in_range_char_lit arg_amode
-  = returnFC (stableAmodeIdInfo binder (CCharLike arg_amode) (mkConLFInfo con))
-  where
-    in_range_char_lit (CLit (MachChar val)) = 
-	ord val <= mAX_CHARLIKE && ord val >= mIN_CHARLIKE
-    in_range_char_lit _other_amode	    = False
+  | maybeCharLikeCon con 
+  , (_, CmmLit (CmmInt val _)) <- arg_amode
+  , let val_int = (fromIntegral val) :: Int
+  , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
+  = do 	{ let charlike_lbl   = mkRtsDataLabel SLIT("stg_CHARLIKE_closure")
+	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
+		-- CHARLIKE closures consist of a header and one word payload
+	      charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
+	; returnFC (stableIdInfo binder charlike_amode (mkConLFInfo con)) }
 \end{code}
 
 Now the general case.
 
 \begin{code}
 buildDynCon binder ccs con args
-  = allocDynClosure closure_info use_cc blame_cc amodes_w_offsets `thenFC` \ hp_off ->
-    returnFC (heapIdInfo binder hp_off lf_info)
+  = do	{ hp_off <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
+ 	; returnFC (heapIdInfo binder hp_off lf_info) }
   where
     lf_info = mkConLFInfo con
-
-    (closure_info, amodes_w_offsets) = layOutDynConstr con getAmodeRep args
+    (closure_info, amodes_w_offsets) = layOutDynConstr con args
 
     use_cc	-- cost-centre to stick in the object
-      = if currentOrSubsumedCCS ccs
-	then CReg CurCostCentre
-	else mkCCostCentreStack ccs
+      | currentOrSubsumedCCS ccs = curCCS
+      | otherwise		 = CmmLit (mkCCostCentreStack ccs)
 
     blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
 \end{code}
@@ -211,16 +218,13 @@ binders $args$, assuming that we have just returned from a @case@ which
 found a $con$.
 
 \begin{code}
-bindConArgs 
-	:: DataCon -> [Id]		-- Constructor and args
-	-> Code
-
+bindConArgs :: DataCon -> [Id] -> Code
 bindConArgs con args
   = ASSERT(not (isUnboxedTupleCon con))
     mapCs bind_arg args_w_offsets
    where
      bind_arg (arg, offset) = bindNewToNode arg offset (mkLFArgument arg)
-     (_, args_w_offsets)    = layOutDynConstr con idPrimRep args
+     (_, args_w_offsets)    = layOutDynConstr con (addIdReps args)
 \end{code}
 
 Unboxed tuples are handled slightly differently - the object is
@@ -228,56 +232,53 @@ returned in registers and on the stack instead of the heap.
 
 \begin{code}
 bindUnboxedTupleComponents
-	:: [Id]				-- Aargs
-	-> FCode ([MagicId], 		-- Regs assigned
-		  Int,			-- Number of pointer stack slots
-		  Int,			-- Number of non-pointer stack slots
+	:: [Id]				-- Args
+	-> FCode ([(Id,GlobalReg)],	-- Regs assigned
+		  WordOff,		-- Number of pointer stack slots
+		  WordOff,		-- Number of non-pointer stack slots
 		  VirtualSpOffset)	-- Offset of return address slot
 					-- (= realSP on entry)
 
 bindUnboxedTupleComponents args
- =      -- Assign as many components as possible to registers
-    let (arg_regs, _leftovers) = assignRegs [] (map idPrimRep args)
-	(reg_args, stk_args)   = splitAtList arg_regs args
+ =  do	{   
+	  vsp <- getVirtSp
+	; rsp <- getRealSp
 
-	-- separate the rest of the args into pointers and non-pointers
-	(ptr_args, nptr_args) = 
-	   partition (isFollowableRep . idPrimRep) stk_args
-    in
+	   -- Assign as many components as possible to registers
+	; let (reg_args, stk_args) = assignReturnRegs (addIdReps args)
+
+		-- Separate the rest of the args into pointers and non-pointers
+	      (ptr_args, nptr_args) = separateByPtrFollowness stk_args
   
-    -- Allocate the rest on the stack
-    -- The real SP points to the return address, above which any 
-    -- leftover unboxed-tuple components will be allocated
-    getVirtSp `thenFC` \ vsp ->
-    getRealSp `thenFC` \ rsp ->
-    let 
-	(ptr_sp,  ptr_offsets)  = mkVirtStkOffsets rsp    idPrimRep ptr_args
-	(nptr_sp, nptr_offsets) = mkVirtStkOffsets ptr_sp idPrimRep nptr_args
-        ptrs  = ptr_sp - rsp
-	nptrs = nptr_sp - ptr_sp
-    in
+		-- Allocate the rest on the stack
+		-- The real SP points to the return address, above which any 
+	 	-- leftover unboxed-tuple components will be allocated
+	      (ptr_sp,  ptr_offsets)  = mkVirtStkOffsets rsp    ptr_args
+	      (nptr_sp, nptr_offsets) = mkVirtStkOffsets ptr_sp nptr_args
+              ptrs  = ptr_sp  - rsp
+	      nptrs = nptr_sp - ptr_sp
 
-    -- The stack pointer points to the last stack-allocated component
-    setRealAndVirtualSp nptr_sp  		`thenC`
+	    -- The stack pointer points to the last stack-allocated component
+    	; setRealAndVirtualSp nptr_sp
 
-    -- We have just allocated slots starting at real SP + 1, and set the new
-    -- virtual SP to the topmost allocated slot.  
-    -- If the virtual SP started *below* the real SP, we've just jumped over
-    -- some slots that won't be in the free-list, so put them there
-    -- This commonly happens because we've freed the return-address slot
-    -- (trimming back the virtual SP), but the real SP still points to that slot
-    freeStackSlots [vsp+1,vsp+2 .. rsp]		`thenC`
+	    -- We have just allocated slots starting at real SP + 1, and set the new
+	    -- virtual SP to the topmost allocated slot.  
+	    -- If the virtual SP started *below* the real SP, we've just jumped over
+	    -- some slots that won't be in the free-list, so put them there
+	    -- This commonly happens because we've freed the return-address slot
+	    -- (trimming back the virtual SP), but the real SP still points to that slot
+	; freeStackSlots [vsp+1,vsp+2 .. rsp]
 
-    bindArgsToRegs reg_args arg_regs 		`thenC`
-    mapCs bindNewToStack ptr_offsets 		`thenC`
-    mapCs bindNewToStack nptr_offsets 		`thenC`
+	; bindArgsToRegs reg_args
+	; bindArgsToStack ptr_offsets
+	; bindArgsToStack nptr_offsets
 
-    returnFC (arg_regs, ptrs, nptrs, rsp)
+	; returnFC (reg_args, ptrs, nptrs, rsp) }
 \end{code}
 
 %************************************************************************
 %*									*
-\subsubsection[CgRetConv-cgReturnDataCon]{Actually generate code for a constructor return}
+	Actually generate code for a constructor return
 %*									*
 %************************************************************************
 
@@ -285,47 +286,41 @@ bindUnboxedTupleComponents args
 Note: it's the responsibility of the @cgReturnDataCon@ caller to be
 sure the @amodes@ passed don't conflict with each other.
 \begin{code}
-cgReturnDataCon :: DataCon -> [CAddrMode] -> Code
+cgReturnDataCon :: DataCon -> [(CgRep, CmmExpr)] -> Code
 
 cgReturnDataCon con amodes
   = ASSERT( amodes `lengthIs` dataConRepArity con )
-    getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_sp sequel) ->
-
-    case sequel of
-
-      CaseAlts _ (Just (alts, Just (deflt_bndr, (_,deflt_lbl)))) False
-	| not (dataConTag con `is_elem` map fst alts)
-	->
-		-- Special case!  We're returning a constructor to the default case
-		-- of an enclosing case.  For example:
-		--
-		--	case (case e of (a,b) -> C a b) of
-		--	  D x -> ...
-		--	  y   -> ...<returning here!>...
-		--
-		-- In this case,
-		--	if the default is a non-bind-default (ie does not use y),
-		--	then we should simply jump to the default join point;
-
-		if isDeadBinder deflt_bndr
-		then performReturn AbsCNop {- No reg assts -} jump_to_join_point
-		else build_it_then jump_to_join_point
-	where
-	  is_elem = isIn "cgReturnDataCon"
-	  jump_to_join_point sequel = absC (CJump (CLbl deflt_lbl CodePtrRep))
-		-- Ignore the sequel: we've already looked at it above
-
-      other_sequel	-- The usual case
-	  | isUnboxedTupleCon con -> returnUnboxedTuple amodes
-          | otherwise ->	     build_it_then (mkStaticAlgReturnCode con)
-
+    do	{ EndOfBlockInfo _ sequel <- getEndOfBlockInfo
+	; case sequel of
+	    CaseAlts _ (Just (alts, deflt_lbl)) bndr _ 
+	      ->    -- Ho! We know the constructor so we can
+		    -- go straight to the right alternative
+		 case assocMaybe alts (dataConTagZ con) of {
+		    Just join_lbl -> build_it_then (jump_to join_lbl) ;
+		    Nothing
+			-- Special case!  We're returning a constructor to the default case
+			-- of an enclosing case.  For example:
+			--
+			--	case (case e of (a,b) -> C a b) of
+			--	  D x -> ...
+			--	  y   -> ...<returning here!>...
+			--
+			-- In this case,
+			--	if the default is a non-bind-default (ie does not use y),
+			--  	then we should simply jump to the default join point;
+    
+			| isDeadBinder bndr -> performReturn (jump_to deflt_lbl)
+			| otherwise	    -> build_it_then (jump_to deflt_lbl) }
+    
+	    other_sequel	-- The usual case
+	      | isUnboxedTupleCon con -> returnUnboxedTuple amodes
+              | otherwise -> build_it_then (emitKnownConReturnCode con)
+	}
   where
-    move_to_reg :: CAddrMode -> MagicId -> AbstractC
-    move_to_reg src_amode dest_reg = CAssign (CReg dest_reg) src_amode
-
-    build_it_then return =
-		-- BUILD THE OBJECT IN THE HEAP
-		-- The first "con" says that the name bound to this
+    jump_to lbl = stmtC (CmmJump (CmmLit (CmmLabel lbl)) [])
+    build_it_then return_code
+      = do { 	-- BUILD THE OBJECT IN THE HEAP
+	   	-- The first "con" says that the name bound to this
 		-- closure is "con", which is a bit of a fudge, but it only
 		-- affects profiling
 
@@ -333,12 +328,108 @@ cgReturnDataCon con amodes
 		-- temporary variable, if the closure is a CHARLIKE.
 		-- funnily enough, this makes the unique always come
 		-- out as '54' :-)
-	  buildDynCon (dataConWorkId con) currentCCS con amodes	`thenFC` \ idinfo ->
-	  idInfoToAmode PtrRep idinfo				`thenFC` \ amode ->
+	     tickyReturnNewCon (length amodes)
+	   ; idinfo <- buildDynCon (dataConWorkId con) currentCCS con amodes
+	   ; amode <- idInfoToAmode idinfo
+	   ; checkedAbsC (CmmAssign nodeReg amode)
+	   ; performReturn return_code }
+\end{code}
 
 
-		-- RETURN
-	  profCtrC FSLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
-	  -- could use doTailCall here.
-	  performReturn (move_to_reg amode node) return
+%************************************************************************
+%*									*
+	Generating static stuff for algebraic data types
+%*									*
+%************************************************************************
+
+	[These comments are rather out of date]
+
+\begin{tabular}{lll}
+Info tbls &	 Macro  &     	     Kind of constructor \\
+\hline
+info & @CONST_INFO_TABLE@&    Zero arity (no info -- compiler uses static closure)\\
+info & @CHARLIKE_INFO_TABLE@& Charlike   (no info -- compiler indexes fixed array)\\
+info & @INTLIKE_INFO_TABLE@&  Intlike; the one macro generates both info tbls\\
+info & @SPEC_INFO_TABLE@&     SPECish, and bigger than or equal to @MIN_UPD_SIZE@\\
+info & @GEN_INFO_TABLE@&      GENish (hence bigger than or equal to @MIN_UPD_SIZE@)\\
+\end{tabular}
+
+Possible info tables for constructor con:
+
+\begin{description}
+\item[@_con_info@:]
+Used for dynamically let(rec)-bound occurrences of
+the constructor, and for updates.  For constructors
+which are int-like, char-like or nullary, when GC occurs,
+the closure tries to get rid of itself.
+
+\item[@_static_info@:]
+Static occurrences of the constructor
+macro: @STATIC_INFO_TABLE@.
+\end{description}
+
+For zero-arity constructors, \tr{con}, we NO LONGER generate a static closure;
+it's place is taken by the top level defn of the constructor.
+
+For charlike and intlike closures there is a fixed array of static
+closures predeclared.
+
+\begin{code}
+cgTyCon :: TyCon -> FCode [Cmm]  -- each constructor gets a separate Cmm
+cgTyCon tycon
+  = do	{ constrs <- mapM (getCmm . cgDataCon) (tyConDataCons tycon)
+
+	    -- Generate a table of static closures for an enumeration type
+	    -- Put the table after the data constructor decls, because the
+	    -- datatype closure table (for enumeration types)
+	    -- to (say) PrelBase_$wTrue_closure, which is defined in code_stuff
+	; extra <- 
+	   if isEnumerationTyCon tycon then do
+	        tbl <- getCmm (emitRODataLits (mkClosureTblLabel 
+						(tyConName tycon))
+			   [ CmmLabel (mkClosureLabel (dataConName con))
+    			   | con <- tyConDataCons tycon])
+		return [tbl]
+	   else
+		return []
+
+	; return (extra ++ constrs)
+    }
+\end{code}
+
+Generate the entry code, info tables, and (for niladic constructor) the
+static closure, for a constructor.
+
+\begin{code}
+cgDataCon :: DataCon -> Code
+cgDataCon data_con
+  = do	{     -- Don't need any dynamic closure code for zero-arity constructors
+	  whenC (not (isNullaryDataCon data_con))
+	 	(emit_info dyn_cl_info tickyEnterDynCon)
+
+		-- Dynamic-Closure first, to reduce forward references
+	; emit_info static_cl_info tickyEnterStaticCon }
+
+  where
+    emit_info cl_info ticky_code
+	= do { code_blks <- getCgStmts the_code
+	     ; emitClosureCodeAndInfoTable cl_info [] code_blks }
+	where
+	  the_code = do	{ ticky_code
+			; ldvEnter (CmmReg nodeReg)
+			; body_code }
+
+    arg_reps :: [(CgRep, Type)]
+    arg_reps = [(typeCgRep ty, ty) | ty <- dataConRepArgTys data_con]
+
+    -- To allow the debuggers, interpreters, etc to cope with static
+    -- data structures (ie those built at compile time), we take care that
+    -- info-table contains the information we need.
+    (static_cl_info, _)       = layOutStaticConstr data_con arg_reps
+    (dyn_cl_info, arg_things) = layOutDynConstr    data_con arg_reps
+
+    body_code = do { 	-- NB: We don't set CC when entering data (WDP 94/06)
+		     tickyReturnOldCon (length arg_things)
+		   ; performReturn (emitKnownConReturnCode data_con) }
+			-- noStmts: Ptr to thing already in Node
 \end{code}

@@ -10,7 +10,7 @@ module Literal
 	, mkMachInt64, mkMachWord64
 	, litSize
 	, litIsDupable, litIsTrivial
-	, literalType, literalPrimRep
+	, literalType, 
 	, hashLiteral
 
 	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
@@ -29,10 +29,7 @@ module Literal
 import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 			  intPrimTy, wordPrimTy, int64PrimTy, word64PrimTy
 			)
-import PrimRep		( PrimRep(..) )
 import Type		( Type )
-import CStrings		( pprFSInCStyle )
-
 import Outputable
 import FastTypes
 import FastString
@@ -298,31 +295,16 @@ litSize _other	      = 1
 	~~~~~
 \begin{code}
 literalType :: Literal -> Type
-literalType (MachChar _)	  = charPrimTy
-literalType (MachStr  _)	  = addrPrimTy
-literalType (MachNullAddr)	  = addrPrimTy
-literalType (MachInt  _)	  = intPrimTy
-literalType (MachWord  _)	  = wordPrimTy
-literalType (MachInt64  _)	  = int64PrimTy
-literalType (MachWord64  _)	  = word64PrimTy
-literalType (MachFloat _)	  = floatPrimTy
-literalType (MachDouble _)	  = doublePrimTy
-literalType (MachLabel _ _)	  = addrPrimTy
-\end{code}
-
-\begin{code}
-literalPrimRep :: Literal -> PrimRep
-
-literalPrimRep (MachChar _)	  = CharRep
-literalPrimRep (MachStr _)	  = AddrRep  -- specifically: "char *"
-literalPrimRep (MachNullAddr)	  = AddrRep
-literalPrimRep (MachInt _) 	  = IntRep
-literalPrimRep (MachWord _) 	  = WordRep
-literalPrimRep (MachInt64 _)	  = Int64Rep
-literalPrimRep (MachWord64 _)	  = Word64Rep
-literalPrimRep (MachFloat _)	  = FloatRep
-literalPrimRep (MachDouble _)	  = DoubleRep
-literalPrimRep (MachLabel _ _)	  = AddrRep
+literalType MachNullAddr    = addrPrimTy
+literalType (MachChar _)    = charPrimTy
+literalType (MachStr  _)    = addrPrimTy
+literalType (MachInt  _)    = intPrimTy
+literalType (MachWord  _)   = wordPrimTy
+literalType (MachInt64  _)  = int64PrimTy
+literalType (MachWord64  _) = word64PrimTy
+literalType (MachFloat _)   = floatPrimTy
+literalType (MachDouble _)  = doublePrimTy
+literalType (MachLabel _ _) = addrPrimTy
 \end{code}
 
 
@@ -360,71 +342,24 @@ litTag (MachLabel   _ _)   = _ILIT(10)
   exceptions: MachFloat gets an initial keyword prefix.
 
 \begin{code}
-pprLit lit
-  = getPprStyle $ \ sty ->
-    let
-      code_style  = codeStyle  sty
-    in
-    case lit of
-      MachChar ch | code_style -> hcat [ptext SLIT("(C_)"), text (show (ord ch))]
-	          | otherwise  -> pprHsChar ch
-
-      MachStr s | code_style -> pprFSInCStyle s
-	        | otherwise  -> pprHsString s
-      -- Warning: printing MachStr in code_style assumes it contains
-      -- only characters '\0'..'\xFF'!
-
-      MachInt i | code_style && i == tARGET_MIN_INT -> parens (integer (i+1) <> text "-1")
-				-- Avoid a problem whereby gcc interprets
-				-- the constant minInt as unsigned.
-		| otherwise -> pprIntVal i
-
-      MachInt64 i | code_style -> pprIntVal i		-- Same problem with gcc???
-		  | otherwise -> ptext SLIT("__int64") <+> integer i
-
-      MachWord w | code_style -> pprHexVal w
-		 | otherwise  -> ptext SLIT("__word") <+> integer w
-
-      MachWord64 w | code_style -> pprHexVal w
-		   | otherwise  -> ptext SLIT("__word64") <+> integer w
-
-      MachFloat f | code_style -> ptext SLIT("(StgFloat)") <> code_rational f
-                  | otherwise  -> ptext SLIT("__float") <+> rational f
-
-      MachDouble d | code_style -> code_rational d
-		   | otherwise  -> rational d
-
-      MachNullAddr | code_style -> ptext SLIT("(void*)0")
-	           | otherwise  -> ptext SLIT("__NULL")
-
-      MachLabel l mb
-         | code_style -> ptext SLIT("(&") <> ftext l <> char ')'
-	 | otherwise  -> ptext SLIT("__label") <+> 
-	     case mb of
-	       Nothing -> pprHsString l
-	       Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
-
--- negative floating literals in code style need parentheses to avoid
--- interacting with surrounding syntax.
-code_rational d | d < 0     = parens (rational d)
-                | otherwise = rational d
+pprLit (MachChar ch)  	= pprHsChar ch
+pprLit (MachStr s)    	= pprHsString s
+pprLit (MachInt i)    	= pprIntVal i
+pprLit (MachInt64 i)  	= ptext SLIT("__int64") <+> integer i
+pprLit (MachWord w)   	= ptext SLIT("__word") <+> integer w
+pprLit (MachWord64 w) 	= ptext SLIT("__word64") <+> integer w
+pprLit (MachFloat f)  	= ptext SLIT("__float") <+> rational f
+pprLit (MachDouble d) 	= rational d
+pprLit (MachNullAddr) 	= ptext SLIT("__NULL")
+pprLit (MachLabel l mb) = ptext SLIT("__label") <+> 
+			     case mb of
+			       Nothing -> pprHsString l
+			       Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
 
 pprIntVal :: Integer -> SDoc
 -- Print negative integers with parens to be sure it's unambiguous
 pprIntVal i | i < 0     = parens (integer i)
 	    | otherwise = integer i
-		
-pprHexVal :: Integer -> SDoc
--- Print in C hex format: 0x13fa 
-pprHexVal 0 = ptext SLIT("0x0")
-pprHexVal w = ptext SLIT("0x") <> go w
-	    where
-	      go 0 = empty
-	      go w = go quot <> dig
-		   where
-		     (quot,rem) = w `quotRem` 16
-		     dig | rem < 10  = char (chr (fromInteger rem + ord '0'))
-			 | otherwise = char (chr (fromInteger rem - 10 + ord 'a'))
 \end{code}
 
 

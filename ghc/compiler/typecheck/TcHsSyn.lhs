@@ -48,9 +48,8 @@ import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 import TysWiredIn ( charTy, stringTy, intTy, 
 		    mkListTy, mkPArrTy, mkTupleTy, unitTy,
 		    voidTy, listTyCon, tupleTyCon )
-import TyCon	  ( mkPrimTyCon, tyConKind )
+import TyCon	  ( mkPrimTyCon, tyConKind, PrimRep(..) )
 import Kind	  ( splitKindFunTys )
-import PrimRep	  ( PrimRep(VoidRep) )
 import Name	  ( getOccName, mkInternalName, mkDerivedTyConOcc )
 import Var	  ( Var, isId, isLocalVar, tyVarKind )
 import VarSet

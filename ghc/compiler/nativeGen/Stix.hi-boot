@@ -1,5 +1,0 @@
-_interface_ Stix 1
-_exports_
-Stix StixTree;
-_declarations_
-1 data StixTree;

@@ -1,7 +1,6 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.199 2004/08/09 14:27:53 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2003
+ * (c) The GHC Team, 1998-2004
  *
  * Scheduler
  *
@@ -42,9 +41,9 @@
 #include "SchedAPI.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+#include "BlockAlloc.h"
 #include "Storage.h"
 #include "StgRun.h"
-#include "StgStartup.h"
 #include "Hooks.h"
 #define COMPILING_SCHEDULER
 #include "Schedule.h"
@@ -59,6 +58,8 @@
 #include "Timer.h"
 #include "Prelude.h"
 #include "ThreadLabels.h"
+#include "LdvProfile.h"
+#include "Updates.h"
 #ifdef PROFILING
 #include "Proftimer.h"
 #include "ProfHeap.h"
@@ -234,6 +235,7 @@ rtsBool emitSchedule = rtsTrue;
 
 #if DEBUG
 static char *whatNext_strs[] = {
+  "(unknown)",
   "ThreadRunGHC",
   "ThreadInterpret",
   "ThreadKilled",
@@ -340,7 +342,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 # endif
 #endif
   rtsBool was_interrupted = rtsFalse;
-  StgTSOWhatNext prev_what_next;
+  nat prev_what_next;
   
   // Pre-condition: sched_mutex is held.
   // We might have a capability, passed in as initialCapability.
@@ -958,12 +960,12 @@ run_thread:
 #endif
 
       // did the task ask for a large block?
-      if (cap->r.rHpAlloc > BLOCK_SIZE_W) {
+      if (cap->r.rHpAlloc > BLOCK_SIZE) {
 	  // if so, get one and push it on the front of the nursery.
 	  bdescr *bd;
 	  nat blocks;
 	  
-	  blocks = (nat)BLOCK_ROUND_UP(cap->r.rHpAlloc * sizeof(W_)) / BLOCK_SIZE;
+	  blocks = (nat)BLOCK_ROUND_UP(cap->r.rHpAlloc) / BLOCK_SIZE;
 
 	  IF_DEBUG(scheduler,belch("--<< thread %ld (%s) stopped: requesting a large block (size %d)", 
 				   t->id, whatNext_strs[t->what_next], blocks));
@@ -1522,12 +1524,7 @@ deleteAllThreads ( void )
  * ------------------------------------------------------------------------- */
    
 StgInt
-suspendThread( StgRegTable *reg, 
-	       rtsBool concCall
-#if !defined(DEBUG)
-	       STG_UNUSED
-#endif
-	       )
+suspendThread( StgRegTable *reg )
 {
   nat tok;
   Capability *cap;
@@ -1541,7 +1538,7 @@ suspendThread( StgRegTable *reg,
   ACQUIRE_LOCK(&sched_mutex);
 
   IF_DEBUG(scheduler,
-	   sched_belch("thread %d did a _ccall_gc (is_concurrent: %d)", cap->r.rCurrentTSO->id,concCall));
+	   sched_belch("thread %d did a _ccall_gc", cap->r.rCurrentTSO->id));
 
   // XXX this might not be necessary --SDM
   cap->r.rCurrentTSO->what_next = ThreadRunGHC;
@@ -1579,8 +1576,7 @@ suspendThread( StgRegTable *reg,
 }
 
 StgRegTable *
-resumeThread( StgInt tok,
-	      rtsBool concCall STG_UNUSED )
+resumeThread( StgInt tok )
 {
   StgTSO *tso, **prev;
   Capability *cap;
@@ -3144,7 +3140,8 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	    //
 	    if (!closure_IND(((StgUpdateFrame *)frame)->updatee)) {
 		// revert the black hole
-		UPD_IND_NOLOCK(((StgUpdateFrame *)frame)->updatee,ap);
+		UPD_IND_NOLOCK(((StgUpdateFrame *)frame)->updatee,
+			       (StgClosure *)ap);
 	    }
 	    sp += sizeofW(StgUpdateFrame) - 1;
 	    sp[0] = (W_)ap; // push onto stack
@@ -3163,6 +3160,77 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 	}
     }
     barf("raiseAsync");
+}
+
+/* -----------------------------------------------------------------------------
+   raiseExceptionHelper
+   
+   This function is called by the raise# primitve, just so that we can
+   move some of the tricky bits of raising an exception from C-- into
+   C.  Who knows, it might be a useful re-useable thing here too.
+   -------------------------------------------------------------------------- */
+
+StgWord
+raiseExceptionHelper (StgTSO *tso, StgClosure *exception)
+{
+    StgClosure *raise_closure = NULL;
+    StgPtr p, next;
+    StgRetInfoTable *info;
+    //
+    // This closure represents the expression 'raise# E' where E
+    // is the exception raise.  It is used to overwrite all the
+    // thunks which are currently under evaluataion.
+    //
+
+    //    
+    // LDV profiling: stg_raise_info has THUNK as its closure
+    // type. Since a THUNK takes at least MIN_UPD_SIZE words in its
+    // payload, MIN_UPD_SIZE is more approprate than 1.  It seems that
+    // 1 does not cause any problem unless profiling is performed.
+    // However, when LDV profiling goes on, we need to linearly scan
+    // small object pool, where raise_closure is stored, so we should
+    // use MIN_UPD_SIZE.
+    //
+    // raise_closure = (StgClosure *)RET_STGCALL1(P_,allocate,
+    // 				       sizeofW(StgClosure)+1);
+    //
+
+    //
+    // Walk up the stack, looking for the catch frame.  On the way,
+    // we update any closures pointed to from update frames with the
+    // raise closure that we just built.
+    //
+    p = tso->sp;
+    while(1) {
+	info = get_ret_itbl((StgClosure *)p);
+	next = p + stack_frame_sizeW((StgClosure *)p);
+	switch (info->i.type) {
+	    
+	case UPDATE_FRAME:
+	    // Only create raise_closure if we need to.
+	    if (raise_closure == NULL) {
+		raise_closure = 
+		    (StgClosure *)allocate(sizeofW(StgClosure)+MIN_UPD_SIZE);
+		SET_HDR(raise_closure, &stg_raise_info, CCCS);
+		raise_closure->payload[0] = exception;
+	    }
+	    UPD_IND(((StgUpdateFrame *)p)->updatee,raise_closure);
+	    p = next;
+	    continue;
+	    
+	case CATCH_FRAME:
+	    tso->sp = p;
+	    return CATCH_FRAME;
+	    
+	case STOP_FRAME:
+	    tso->sp = p;
+	    return STOP_FRAME;
+
+	default:
+	    p = next; 
+	    continue;
+	}
+    }
 }
 
 /* -----------------------------------------------------------------------------

@@ -232,8 +232,8 @@ CLEAN_FILES += $(CONFIG_HS)
 
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
-  specialise simplCore stranal stgSyn simplStg codeGen absCSyn main \
-  profiling parser cprAnalysis compMan ndpFlatten cbits iface
+  specialise simplCore stranal stgSyn simplStg codeGen main \
+  profiling parser cprAnalysis compMan ndpFlatten cbits iface cmm
 
 # Make sure we include Config.hs even if it doesn't exist yet...
 ALL_SRCS += $(CONFIG_HS)
@@ -410,9 +410,6 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 main/SysTools_HC_OPTS		+= '-\#include <windows.h>' '-\#include <process.h>'
 endif
 
-# Required due to use of Concurrent.myThreadId
-utils/Panic_HC_OPTS += -fvia-C
-
 parser/Lexer_HC_OPTS += -funbox-strict-fields
 
 # ghc_strlen percolates through so many modules that it is easier to get its
@@ -553,8 +550,6 @@ endif
 # typecheck/TcTyDecls_HC_OPTS += -auto-all
 # typecheck/TcType_HC_OPTS += -auto-all
 # typecheck/TcUnify_HC_OPTS += -auto-all
-# 
-# absCSyn/PprAbsC_HC_OPTS += -auto-all
 
 coreSyn/CorePrep_HC_OPTS += -auto-all
 

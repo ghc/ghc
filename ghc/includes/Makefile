@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.22 2003/09/04 09:56:16 simonmar Exp $
+# $Id: Makefile,v 1.23 2004/08/13 13:09:18 simonmar Exp $
 #
 
 TOP = ..
@@ -20,11 +20,11 @@ endif
 #
 # Header file built from the configure script's findings
 #
-H_CONFIG = config.h
+H_CONFIG = ghcconfig.h
 
 boot :: gmp.h
 
-all :: $(H_CONFIG) NativeDefs.h
+all :: $(H_CONFIG)
 
 # gmp.h is copied from the GMP directory
 gmp.h : $(FPTOOLS_TOP)/ghc/rts/gmp/gmp.h
@@ -39,8 +39,8 @@ $(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h $(FPTOOLS_TOP)/mk/config.mk
 $(H_CONFIG) :
 	@echo "Creating $@..."
 	@$(RM) $@
-	@echo "#ifndef __FPTOOLS_CONFIG_H__"  >$@
-	@echo "#define __FPTOOLS_CONFIG_H__" >>$@
+	@echo "#ifndef __GHCCONFIG_H__"  >$@
+	@echo "#define __GHCCONFIG_H__" >>$@
 	@echo >> $@
 	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)" >> $@
 	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
@@ -72,8 +72,8 @@ endif
 	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
 	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
 	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 	1" >> $@
-	@cat $(FPTOOLS_TOP)/mk/$@ >> $@
-	@echo "#endif /* __FPTOOLS_CONFIG_H__ */"          >> $@
+	@cat $(FPTOOLS_TOP)/mk/config.h >> $@
+	@echo "#endif /* __GHCCONFIG_H__ */"          >> $@
 	@echo "Done."
 
 # ---------------------------------------------------------------------------
@@ -87,24 +87,27 @@ mkDerivedConstantsHdr : mkDerivedConstants.o
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkDerivedConstants.o
 
 DerivedConstants.h : mkDerivedConstantsHdr
-	./mkDerivedConstantsHdr >DerivedConstants.h
+	./mkDerivedConstantsHdr >$@
 
 CLEAN_FILES += mkDerivedConstantsHdr$(exeext) DerivedConstants.h
 
-# ---------------------------------------------------------------------------
-# Make NativeDefs.h for the NCG
+# -----------------------------------------------------------------------------
+#
 
-all :: NativeDefs.h
+all :: GHCConstants.h
 
-mkNativeHdr.o : DerivedConstants.h
+mkGHCConstants.c : $(H_CONFIG)
 
-mkNativeHdr : mkNativeHdr.o
-	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkNativeHdr.o
+mkGHCConstants : mkGHCConstants.o
+	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkGHCConstants.o
 
-NativeDefs.h : mkNativeHdr
-	./mkNativeHdr >NativeDefs.h
+mkGHCConstants.o : mkDerivedConstants.c
+	$(CC) -o $@ -c $<  -DGEN_HASKELL
 
-CLEAN_FILES += mkNativeHdr$(exeext) NativeDefs.h
+GHCConstants.h : mkGHCConstants
+	./mkGHCConstants >$@
+
+CLEAN_FILES += mkDerivedConstantsHdr$(exeext) DerivedConstants.h
 
 # ---------------------------------------------------------------------------
 # boot setup:

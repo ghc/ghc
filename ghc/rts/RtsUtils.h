@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.21 2004/03/23 10:04:18 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * General utility functions used in the RTS.
  *

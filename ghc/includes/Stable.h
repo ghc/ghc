@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.15 2003/11/12 17:27:03 sof Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2004
  *
  * Stable Pointers: A stable pointer is represented as an index into
  * the stable pointer table in the low BITS_PER_WORD-8 bits with a
@@ -54,5 +53,14 @@ StgPtr deRefStablePtr(StgStablePtr sp)
 /* No support for 'extern inline' */
 extern StgPtr deRefStablePtr(StgStablePtr sp);
 #endif
+
+extern void    initStablePtrTable    ( void );
+extern void    enlargeStablePtrTable ( void );
+extern StgWord lookupStableName      ( StgPtr p );
+
+extern void    markStablePtrTable    ( evac_fn evac );
+extern void    threadStablePtrTable  ( evac_fn evac );
+extern void    gcStablePtrTable      ( void );
+extern void    updateStablePtrTable  ( rtsBool full );
 
 #endif

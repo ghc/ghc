@@ -18,6 +18,8 @@ import DsMonad
 
 import HsSyn		( ForeignDecl(..), ForeignExport(..), LForeignDecl,
 			  ForeignImport(..), CImportSpec(..) )
+import MachOp		( machRepByteWidth )
+import SMRep		( argMachRep, primRepToCgRep )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..) )
@@ -34,14 +36,12 @@ import BasicTypes       ( Boxity(..) )
 import HscTypes		( ForeignStubs(..) )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
 			  Safety(..), playSafe,
-			  CExportSpec(..),
+			  CExportSpec(..), CLabelString,
 			  CCallConv(..), ccallConvToInt,
 			  ccallConvAttribute
 			)
-import CStrings		( CLabelString )
 import TysWiredIn	( unitTy, tupleTyCon )
 import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy )
-import PrimRep          ( getPrimRepSizeInBytes )
 import PrelNames	( hasKey, ioTyConKey, stablePtrTyConName, newStablePtrName, bindIOName,
 			  checkDotnetResName )
 import BasicTypes	( Activation( NeverActive ) )
@@ -389,7 +389,7 @@ dsFExportDynamic id cconv
 	-- (probably in the RTS.) 
       adjustor	 = FSLIT("createAdjustor")
       
-      sz_args	 = sum (map (getPrimRepSizeInBytes . typePrimRep) stub_args)
+      sz_args	 = sum (map (machRepByteWidth.argMachRep.primRepToCgRep.typePrimRep) stub_args)
       mb_sz_args = case cconv of
 		      StdCallConv -> Just sz_args
 		      _ 	  -> Nothing

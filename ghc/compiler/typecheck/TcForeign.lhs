@@ -17,7 +17,7 @@ module TcForeign
         , tcForeignExports
 	) where
 
-#include "config.h"
+#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import HsSyn
@@ -43,8 +43,9 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 			  toDNType
 			)
 import ForeignCall	( CExportSpec(..), CCallTarget(..), 
+			  CLabelString, isCLabelString,
 			  isDynamicTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
-import CStrings		( CLabelString, isCLabelString )
+import MachOp		( machRepByteWidth )
 import PrelNames	( hasKey, ioTyConKey )
 import CmdLineOpts	( dopt_HscLang, HscLang(..) )
 import Outputable
@@ -177,11 +178,11 @@ The check is needed for both via-C and native-code routes
 #include "nativeGen/NCG.h"
 #if alpha_TARGET_ARCH
 checkFEDArgs arg_tys
-  = check (integral_args <= 4) err
+  = check (integral_args <= 32) err
   where
-    integral_args = sum (map getPrimRepSize $
-                         filter (not . isFloatingRep) $
-                         map typePrimRep arg_tys)
+    integral_args = sum [ machRepByteWidth rep
+			| (rep,hint) <- map typeMachRepRep arg_tys,
+			  hint /= FloatHint ]
     err = ptext SLIT("On Alpha, I can only handle 4 non-floating-point arguments to foreign export dynamic")
 #else
 checkFEDArgs arg_tys = returnM ()

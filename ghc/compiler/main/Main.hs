@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.137 2004/08/12 13:10:40 simonmar Exp $
+-- $Id: Main.hs,v 1.138 2004/08/13 13:07:05 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 
 -- with path so that ghc -M can find config.h
-#include "../includes/config.h"
+#include "../includes/ghcconfig.h"
 
 module Main (main) where
 
@@ -168,14 +168,10 @@ main =
    -- by module basis, using only the -fvia-C and -fasm flags.  If the global
    -- HscLang is not HscC or HscAsm, -fvia-C and -fasm have no effect.
    dyn_flags <- getDynFlags
-   build_tag <- readIORef v_Build_tag
    let lang = case mode of 
 		 DoInteractive  -> HscInterpreted
 		 DoEval _	-> HscInterpreted
-		 _other | build_tag /= "" -> HscC
-			| otherwise       -> hscLang dyn_flags
-		-- for ways other that the normal way, we must 
-		-- compile via C.
+		 _other		-> hscLang dyn_flags
 
    setDynFlags (dyn_flags{ stgToDo  = stg_todo,
                   	   hscLang  = lang,

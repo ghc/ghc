@@ -4,12 +4,7 @@
  * Copyright (c) The GHC Team, 1994-2002.
  * ---------------------------------------------------------------------------*/
 
-#if !defined(SMP)
 #include "PosixSource.h"
-#else
-/* Hack and slash.. */
-#include "Stg.h"
-#endif
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "RtsUtils.h"
@@ -20,6 +15,7 @@
 #include "Storage.h"
 #include "Updates.h"
 #include "Sanity.h"
+#include "Liveness.h"
 
 #include "Bytecodes.h"
 #include "Printer.h"
@@ -165,7 +161,6 @@ static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_pppp_info,
     (W_)&stg_ap_ppppp_info,
     (W_)&stg_ap_pppppp_info,
-    (W_)&stg_ap_ppppppp_info
 };
 
 StgThreadReturnCode
@@ -399,9 +394,6 @@ do_return:
 	}
 	if (info == (StgInfoTable *)&stg_ap_pppppp_info) {
 	    n = 6; m = 6; goto do_apply;
-	}
-	if (info == (StgInfoTable *)&stg_ap_ppppppp_info) {
-	    n = 7; m = 7; goto do_apply;
 	}
 	goto do_return_unrecognised;
     }
@@ -815,7 +807,7 @@ run_BCO:
 
 	case bci_PUSH_ALTS: {
 	    int o_bco  = BCO_NEXT;
-	    Sp[-2] = (W_)&stg_ctoi_ret_R1p_info;
+	    Sp[-2] = (W_)&stg_ctoi_R1p_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
 	    goto nextInsn;
@@ -823,7 +815,7 @@ run_BCO:
 
 	case bci_PUSH_ALTS_P: {
 	    int o_bco  = BCO_NEXT;
-	    Sp[-2] = (W_)&stg_ctoi_ret_R1unpt_info;
+	    Sp[-2] = (W_)&stg_ctoi_R1unpt_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
 	    goto nextInsn;
@@ -831,7 +823,7 @@ run_BCO:
 
 	case bci_PUSH_ALTS_N: {
 	    int o_bco  = BCO_NEXT;
-	    Sp[-2] = (W_)&stg_ctoi_ret_R1n_info;
+	    Sp[-2] = (W_)&stg_ctoi_R1n_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
 	    goto nextInsn;
@@ -839,7 +831,7 @@ run_BCO:
 
 	case bci_PUSH_ALTS_F: {
 	    int o_bco  = BCO_NEXT;
-	    Sp[-2] = (W_)&stg_ctoi_ret_F1_info;
+	    Sp[-2] = (W_)&stg_ctoi_F1_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
 	    goto nextInsn;
@@ -847,7 +839,7 @@ run_BCO:
 
 	case bci_PUSH_ALTS_D: {
 	    int o_bco  = BCO_NEXT;
-	    Sp[-2] = (W_)&stg_ctoi_ret_D1_info;
+	    Sp[-2] = (W_)&stg_ctoi_D1_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
 	    goto nextInsn;
@@ -855,7 +847,7 @@ run_BCO:
 
 	case bci_PUSH_ALTS_L: {
 	    int o_bco  = BCO_NEXT;
-	    Sp[-2] = (W_)&stg_ctoi_ret_L1_info;
+	    Sp[-2] = (W_)&stg_ctoi_L1_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
 	    goto nextInsn;
@@ -863,7 +855,7 @@ run_BCO:
 
 	case bci_PUSH_ALTS_V: {
 	    int o_bco  = BCO_NEXT;
-	    Sp[-2] = (W_)&stg_ctoi_ret_V_info;
+	    Sp[-2] = (W_)&stg_ctoi_V_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
 	    goto nextInsn;
@@ -901,9 +893,6 @@ run_BCO:
 	    goto nextInsn;
 	case bci_PUSH_APPLY_PPPPPP:
 	    Sp--; Sp[0] = (W_)&stg_ap_pppppp_info;
-	    goto nextInsn;
-	case bci_PUSH_APPLY_PPPPPPP:
-	    Sp--; Sp[0] = (W_)&stg_ap_ppppppp_info;
 	    goto nextInsn;
 	    
 	case bci_PUSH_UBX: {
@@ -1018,7 +1007,7 @@ run_BCO:
 	    int discr  = BCO_NEXT;
 	    int failto = BCO_NEXT;
 	    StgClosure* con = (StgClosure*)Sp[0];
-	    if (constrTag(con) >= discr) {
+	    if (GET_TAG(con) >= discr) {
 		bciPtr = failto;
 	    }
 	    goto nextInsn;
@@ -1028,7 +1017,7 @@ run_BCO:
 	    int discr  = BCO_NEXT;
 	    int failto = BCO_NEXT;
 	    StgClosure* con = (StgClosure*)Sp[0];
-	    if (constrTag(con) != discr) {
+	    if (GET_TAG(con) != discr) {
 		bciPtr = failto;
 	    }
 	    goto nextInsn;
@@ -1191,11 +1180,11 @@ run_BCO:
 	    // on the stack frame to describe this chunk of stack.
 	    //
 	    Sp -= ret_dyn_size;
-	    ((StgRetDyn *)Sp)->liveness = ALL_NON_PTRS | N_NONPTRS(stk_offset);
+	    ((StgRetDyn *)Sp)->liveness = NO_PTRS | N_NONPTRS(stk_offset);
 	    ((StgRetDyn *)Sp)->info = (StgInfoTable *)&stg_gc_gen_info;
 
 	    SAVE_STACK_POINTERS;
-	    tok = suspendThread(&cap->r,rtsFalse);
+	    tok = suspendThread(&cap->r);
 
 #ifndef RTS_SUPPORTS_THREADS
 	    // Careful:
@@ -1212,7 +1201,7 @@ run_BCO:
 #endif
 
 	    // And restart the thread again, popping the RET_DYN frame.
-	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok,rtsFalse) - sizeof(StgFunTable)));
+	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - sizeof(StgFunTable)));
 	    LOAD_STACK_POINTERS;
 	    Sp += ret_dyn_size;
 	    

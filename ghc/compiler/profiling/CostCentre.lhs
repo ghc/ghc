@@ -13,16 +13,18 @@ module CostCentre (
 	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
 	noCostCentre, noCCAttached,
 	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
-	isDerivedFromCurrentCCS,
+	isDerivedFromCurrentCCS, maybeSingletonCCS,
+	decomposeCCS,
 
 	mkUserCC, mkAutoCC, mkAllCafsCC, 
 	mkSingletonCCS, dupifyCC, pushCCOnCCS,
-	isCafCCS,
+	isCafCCS, isCafCC,
 	isSccCountCostCentre,
 	sccAbleCostCentre,
 	ccFromThisModule,
 
-	pprCostCentreDecl, pprCostCentreStackDecl, pprCostCentreCore,
+	pprCostCentreCore,
+	costCentreUserName,
 
 	cmpCostCentre	-- used for removing dups in a list
     ) where
@@ -33,11 +35,8 @@ import Var		( Id )
 import Name		( UserFS, EncodedFS, encodeFS, decode,
 			  getOccName, occNameFS
 			)
-import Module		( Module, ModuleName, moduleName,
-			  moduleNameUserString
-			)
+import Module		( Module, ModuleName, moduleName )
 import Outputable	
-import CStrings		( pprStringInCStyle )
 import FastTypes
 import FastString
 import Util	        ( thenCmp )
@@ -193,6 +192,9 @@ isDerivedFromCurrentCCS _		= False
 currentOrSubsumedCCS SubsumedCCS	= True
 currentOrSubsumedCCS CurrentCCS		= True
 currentOrSubsumedCCS _			= False
+
+maybeSingletonCCS (PushCC cc NoCCS)	= Just cc
+maybeSingletonCCS _			= Nothing
 \end{code}
 
 Building cost centres
@@ -222,10 +224,7 @@ pushCCOnCCS = PushCC
 
 dupifyCC cc = cc {cc_is_dupd = DupdCC}
 
-isEmptyCC, isCafCC, isDupdCC :: CostCentre -> Bool
-
-isEmptyCC (NoCostCentre)		= True
-isEmptyCC _				= False
+isCafCC, isDupdCC :: CostCentre -> Bool
 
 isCafCC (AllCafsCC {})		         = True
 isCafCC (NormalCC {cc_is_caf = CafCC}) = True
@@ -288,6 +287,11 @@ cmp_caf NotCafCC CafCC     = LT
 cmp_caf NotCafCC NotCafCC  = EQ
 cmp_caf CafCC    CafCC     = EQ
 cmp_caf CafCC    NotCafCC  = GT
+
+decomposeCCS :: CostCentreStack -> ([CostCentre],CostCentreStack)
+decomposeCCS (PushCC cc ccs) = (cc:more, ccs') 
+  where (more,ccs') = decomposeCCS ccs
+decomposeCCS ccs = ([],ccs)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -310,20 +314,8 @@ instance Outputable CostCentreStack where
   ppr SubsumedCCS	= ptext SLIT("CCS_SUBSUMED")
   ppr (PushCC cc NoCCS) = ppr cc <> ptext SLIT("_ccs")
   ppr (PushCC cc ccs)   = ptext SLIT("PushCostCentre") <> 
-			   parens (ppr ccs <> comma <> ppr cc)
-
--- print the static declaration for a singleton CCS.
-pprCostCentreStackDecl :: CostCentreStack -> SDoc
-pprCostCentreStackDecl ccs@(PushCC cc NoCCS)
-  = hcat [ ptext SLIT("CCS_DECLARE"), char '(',
-    	   ppr ccs,	 	comma,	-- better be codeStyle
-    	   ppCostCentreLbl cc, 	comma,
-	   empty,	-- Now always externally visible
-    	   text ");"
-	 ]
-
-pprCostCentreStackDecl ccs 
-  = pprPanic "pprCostCentreStackDecl: " (ppr ccs)
+			   parens (ppr ccs <> comma <> 
+			   parens(ptext SLIT("void *")) <> ppr cc)
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -379,33 +371,4 @@ costCentreUserName (NoCostCentre)  = "NO_CC"
 costCentreUserName (AllCafsCC {})  = "CAF"
 costCentreUserName cc@(NormalCC {cc_name = name, cc_is_caf = is_caf})
   =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ decode (unpackFS name)
-\end{code}
-
-Cost Centre Declarations
-
-\begin{code}
-#ifdef DEBUG
-pprCostCentreDecl is_local (NoCostCentre)
-  = panic "pprCostCentreDecl: no cost centre!"
-#endif
-pprCostCentreDecl is_local cc
-  = if is_local then
-	hcat [
-	    ptext SLIT("CC_DECLARE"),char '(',
-	    cc_ident, 		  					comma,
-	    pprStringInCStyle (costCentreUserName cc),			comma,
-	    pprStringInCStyle (moduleNameUserString mod_name),		comma,
-	    is_subsumed,						comma,
-	    empty,	-- Now always externally visible
-	    text ");"]
-    else
-	hcat [ ptext SLIT("CC_EXTERN"),char '(', cc_ident, text ");" ]
-  where
-    cc_ident    = ppCostCentreLbl cc
-    mod_name 	= cc_mod cc
-    is_subsumed = ccSubsumed cc
-
-ccSubsumed :: CostCentre -> SDoc		-- subsumed value
-ccSubsumed cc | isCafCC  cc = ptext SLIT("CC_IS_CAF")
-	      | otherwise   = ptext SLIT("CC_IS_BORING")
 \end{code}

@@ -23,7 +23,8 @@ import CoreUtils	( exprType, mkCoerce2 )
 import Id		( Id, mkWildId )
 import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
-import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, CCallConv(..) )
+import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, 
+			  CCallConv(..), CLabelString )
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
 import ForeignCall	( ForeignCall, CCallTarget(..) )
 
@@ -51,7 +52,6 @@ import TysWiredIn	( unitDataConId,
 			)
 import BasicTypes       ( Boxity(..) )
 import Literal		( mkMachInt )
-import CStrings		( CLabelString )
 import PrelNames	( Unique, hasKey, ioTyConKey, boolTyConKey, unitTyConKey,
 			  int8TyConKey, int16TyConKey, int32TyConKey,
 			  word8TyConKey, word16TyConKey, word32TyConKey

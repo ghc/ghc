@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: cgprof.c,v 1.5 2004/07/09 16:47:59 sof Exp $
+ * $Id: cgprof.c,v 1.6 2004/08/13 13:11:22 simonmar Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -17,7 +17,7 @@
  *	 form, be without fee and subject to these same conditions.
  * --------------------------------------------------------------------- */
 
-#include "config.h"
+#include "ghcconfig.h"
 #if HAVE_STRING_H
 #include <string.h>
 #endif

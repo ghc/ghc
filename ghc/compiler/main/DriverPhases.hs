@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.28 2003/10/22 14:31:09 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.29 2004/08/13 13:06:57 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -7,7 +7,7 @@
 --
 -----------------------------------------------------------------------------
 
-#include "../includes/config.h"
+#include "../includes/ghcconfig.h"
 
 module DriverPhases (
    Phase(..),
@@ -54,6 +54,8 @@ data Phase
 	| SplitAs
 	| As
 	| Ln
+	| CmmCpp	-- pre-process Cmm source
+	| Cmm		-- parse & compile Cmm code
 #ifdef ILX
         | Ilx2Il
 	| Ilasm
@@ -65,10 +67,13 @@ data Phase
 -- pipeline will stop at some point (see DriverPipeline.runPipeline).
 x `happensBefore` y 
 	| x `elem` haskell_pipe = y `elem` tail (dropWhile (/= x) haskell_pipe)
+	| x `elem` cmm_pipe     = y `elem` tail (dropWhile (/= x) cmm_pipe)
 	| x `elem` c_pipe       = y `elem` tail (dropWhile (/= x) c_pipe)
 	| otherwise = False
 
-haskell_pipe = [Unlit,Cpp,HsPp,Hsc,HCc,Mangle,SplitMangle,As,SplitAs,Ln]
+haskell_post_hsc = [HCc,Mangle,SplitMangle,As,SplitAs,Ln]
+haskell_pipe = Unlit : Cpp : HsPp : Hsc : haskell_post_hsc
+cmm_pipe     = CmmCpp : Cmm : haskell_post_hsc
 c_pipe       = [Cc,As,Ln]
 
 -- the first compilation phase for a given file is determined
@@ -88,6 +93,8 @@ startPhase "raw_s" = Mangle
 startPhase "s"     = As
 startPhase "S"     = As
 startPhase "o"     = Ln
+startPhase "cmm"   = CmmCpp
+startPhase "cmmcpp" = Cmm
 startPhase _       = Ln	   -- all unknown file types
 
 -- the output suffix for a given phase is uniquely determined by
@@ -103,13 +110,15 @@ phaseInputExt SplitMangle = "split_s"	-- not really generated
 phaseInputExt As          = "s"
 phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
+phaseInputExt CmmCpp	  = "cmm"
+phaseInputExt Cmm	  = "cmmcpp"
 #ifdef ILX
 phaseInputExt Ilx2Il      = "ilx"
 phaseInputExt Ilasm       = "il"
 #endif
 
-haskellish_suffixes          = [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s" ]
-haskellish_src_suffixes      = [ "hs", "lhs", "hspp", "hscpp", "hcr"]
+haskellish_suffixes          = [ "hs", "lhs", "hspp", "hscpp", "hcr", "hc", "raw_s", "cmm" ]
+haskellish_src_suffixes      = [ "hs", "lhs", "hspp", "hscpp", "hcr", "cmm" ]
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S" ]
 extcoreish_suffixes          = [ "hcr" ]
 haskellish_user_src_suffixes = [ "hs", "lhs" ]

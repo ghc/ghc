@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.83 2004/07/21 10:47:28 simonmar Exp $
+ * $Id: Storage.c,v 1.84 2004/08/13 13:11:01 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,7 +22,6 @@
 #include "Storage.h"
 #include "Schedule.h"
 #include "OSThreads.h"
-#include "StoragePriv.h"
 
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
 
@@ -621,7 +620,7 @@ stgAllocForGMP (size_t size_in_bytes)
   SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
   
   /* and return a ptr to the goods inside the array */
-  return(BYTE_ARR_CTS(arr));
+  return arr->payload;
 }
 
 static void *

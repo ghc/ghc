@@ -22,10 +22,11 @@
 
 {
 module Lexer (
-   Token(..), lexer, mkPState,
+   Token(..), lexer, mkPState, PState(..),
    P(..), ParseResult(..), getSrcLoc, 
-   failMsgP, failLocMsgP, failSpanMsgP, srcParseFail,
-   popContext, pushCurrentContext,
+   failLocMsgP, failSpanMsgP, srcParseFail,
+   popContext, pushCurrentContext, setLastToken, setSrcLoc,
+   getLexState, popLexState, pushLexState
   ) where
 
 #include "HsVersions.h"
@@ -39,7 +40,7 @@ import SrcLoc
 import UniqFM
 import CmdLineOpts
 import Ctype
-import Util		( maybePrefixMatch )
+import Util		( maybePrefixMatch, readRational )
 
 import DATA_BITS
 import Char
@@ -153,14 +154,14 @@ $white_no_nl+ 				;
 
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
-<line_prag1> $digit+			{ set_line line_prag1a }
-<line_prag1a> \" [$graphic \ ]* \"	{ set_file line_prag1b }
+<line_prag1> $digit+			{ setLine line_prag1a }
+<line_prag1a> \" [$graphic \ ]* \"	{ setFile line_prag1b }
 <line_prag1b> .*			{ pop }
 
 -- Haskell-style line pragmas, of the form
 --    {-# LINE <line> "<file>" #-}
-<line_prag2> $digit+			{ set_line line_prag2a }
-<line_prag2a> \" [$graphic \ ]* \"	{ set_file line_prag2b }
+<line_prag2> $digit+			{ setLine line_prag2a }
+<line_prag2a> \" [$graphic \ ]* \"	{ setFile line_prag2b }
 <line_prag2b> "#-}"|"-}"		{ pop }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
    -- with older versions of GHC which generated these.
@@ -709,32 +710,26 @@ sym con span buf len =
 	fs = lexemeToFastString buf len
 
 tok_decimal span buf len 
-  = return (L span (ITinteger  $! parseInteger buf len 10 oct_or_dec))
+  = return (L span (ITinteger  $! parseInteger buf len 10 octDecDigit))
 
 tok_octal span buf len 
-  = return (L span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 8 oct_or_dec))
+  = return (L span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 8 octDecDigit))
 
 tok_hexadecimal span buf len 
-  = return (L span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 16 hex))
+  = return (L span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 16 hexDigit))
 
 prim_decimal span buf len 
-  = return (L span (ITprimint  $! parseInteger buf (len-1) 10 oct_or_dec))
+  = return (L span (ITprimint  $! parseInteger buf (len-1) 10 octDecDigit))
 
 prim_octal span buf len 
-  = return (L span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 8 oct_or_dec))
+  = return (L span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 8 octDecDigit))
 
 prim_hexadecimal span buf len 
-  = return (L span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 16 hex))
+  = return (L span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 16 hexDigit))
 
-tok_float        str = ITrational $! readRational__ str
-prim_float       str = ITprimfloat  $! readRational__ str
-prim_double      str = ITprimdouble $! readRational__ str
-
-parseInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
-parseInteger buf len radix to_int 
-  = go 0 0
-  where go i x | i == len  = x
-	       | otherwise = go (i+1) (x * radix + toInteger (to_int (lookAhead buf i)))
+tok_float        str = ITrational   $! readRational str
+prim_float       str = ITprimfloat  $! readRational str
+prim_double      str = ITprimdouble $! readRational str
 
 -- -----------------------------------------------------------------------------
 -- Layout processing
@@ -800,17 +795,17 @@ do_layout_left span _buf _len = do
 -- -----------------------------------------------------------------------------
 -- LINE pragmas
 
-set_line :: Int -> Action
-set_line code span buf len = do
-  let line = parseInteger buf len 10 oct_or_dec
+setLine :: Int -> Action
+setLine code span buf len = do
+  let line = parseInteger buf len 10 octDecDigit
   setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 0)
 	-- subtract one: the line number refers to the *following* line
   popLexState
   pushLexState code
   lexToken
 
-set_file :: Int -> Action
-set_file code span buf len = do
+setFile :: Int -> Action
+setFile code span buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
   setSrcLoc (mkSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
   popLexState
@@ -957,9 +952,9 @@ lex_escape = do
 			then return (chr (ord c - ord '@'))
 			else lit_error
 
-	'x'   -> readNum is_hexdigit 16 hex
-	'o'   -> readNum is_octdigit  8 oct_or_dec
-	x | is_digit x -> readNum2 is_digit 10 oct_or_dec (oct_or_dec x)
+	'x'   -> readNum is_hexdigit 16 hexDigit
+	'o'   -> readNum is_octdigit  8 octDecDigit
+	x | is_digit x -> readNum2 is_digit 10 octDecDigit (octDecDigit x)
 
 	c1 ->  do
 	   i <- getInput
@@ -999,22 +994,6 @@ readNum2 is_digit base conv i = do
 		if i >= 0 && i <= 0x10FFFF
 		   then return (chr i)
 		   else lit_error
-
-is_hexdigit c
-	=  is_digit c 
-	|| (c >= 'a' && c <= 'f')
-	|| (c >= 'A' && c <= 'F')
-
-hex c | is_digit c = ord c - ord '0'
-      | otherwise  = ord (to_lower c) - ord 'a' + 10
-
-oct_or_dec c = ord c - ord '0'
-
-is_octdigit c = c >= '0' && c <= '7'
-
-to_lower c 
-  | c >=  'A' && c <= 'Z' = chr (ord c - (ord 'A' - ord 'a'))
-  | otherwise = c
 
 silly_escape_chars = [
 	("NUL", '\NUL'),
@@ -1063,54 +1042,6 @@ getCharOrFail =  do
 	Just (c,i)  -> do setInput i; return c
 
 -- -----------------------------------------------------------------------------
--- Floats
-
-readRational :: ReadS Rational -- NB: doesn't handle leading "-"
-readRational r = do 
-     (n,d,s) <- readFix r
-     (k,t)   <- readExp s
-     return ((n%1)*10^^(k-d), t)
- where
-     readFix r = do
-	(ds,s)  <- lexDecDigits r
-	(ds',t) <- lexDotDigits s
-	return (read (ds++ds'), length ds', t)
-
-     readExp (e:s) | e `elem` "eE" = readExp' s
-     readExp s			   = return (0,s)
-
-     readExp' ('+':s) = readDec s
-     readExp' ('-':s) = do
-			(k,t) <- readDec s
-			return (-k,t)
-     readExp' s	      = readDec s
-
-     readDec s = do
-        (ds,r) <- nonnull isDigit s
-        return (foldl1 (\n d -> n * 10 + d) [ ord d - ord '0' | d <- ds ],
-                r)
-
-     lexDecDigits = nonnull isDigit
-
-     lexDotDigits ('.':s) = return (span isDigit s)
-     lexDotDigits s       = return ("",s)
-
-     nonnull p s = do (cs@(_:_),t) <- return (span p s)
-                      return (cs,t)
-
-readRational__ :: String -> Rational -- NB: *does* handle a leading "-"
-readRational__ top_s
-  = case top_s of
-      '-' : xs -> - (read_me xs)
-      xs       -> read_me xs
-  where
-    read_me s
-      = case (do { (x,"") <- readRational s ; return x }) of
-	  [x] -> x
-	  []  -> error ("readRational__: no parse:"        ++ top_s)
-	  _   -> error ("readRational__: ambiguous parse:" ++ top_s)
-
--- -----------------------------------------------------------------------------
 -- The Parse Monad
 
 data LayoutContext
@@ -1135,7 +1066,10 @@ data PState = PState {
 	lex_state  :: [Int]
      }
 	-- last_loc and last_len are used when generating error messages,
-	-- and in pushCurrentContext only.
+	-- and in pushCurrentContext only.  Sigh, if only Happy passed the
+	-- current token to happyError, we could at least get rid of last_len.
+	-- Getting rid of last_loc would require finding another way to 
+	-- implement pushCurrentContext (which is only called from one place).
 
 newtype P a = P { unP :: PState -> ParseResult a }
 
@@ -1301,7 +1235,7 @@ srcParseErr buf len
 -- detected during parsing.
 srcParseFail :: P a
 srcParseFail = P $ \PState{ buffer = buf, last_len = len, 	
-				last_loc = last_loc, loc = loc } ->
+			    last_loc = last_loc } ->
     PFailed last_loc (srcParseErr buf len)
 
 -- A lexical error is reported at a particular position in the source file,

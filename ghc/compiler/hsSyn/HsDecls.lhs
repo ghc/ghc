@@ -40,12 +40,11 @@ import HscTypes		( DeprecTxt )
 import CoreSyn		( RuleName )
 import BasicTypes	( Activation(..) )
 import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
-			  CExportSpec(..)) 
+			  CExportSpec(..), CLabelString ) 
 
 -- others:
 import FunDeps		( pprFundeps )
 import Class		( FunDep )
-import CStrings		( CLabelString )
 import Outputable	
 import Util		( count )
 import SrcLoc		( Located(..), unLoc )

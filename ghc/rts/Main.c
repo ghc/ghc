@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.40 2003/09/21 22:20:55 wolfgang Exp $
+ * $Id: Main.c,v 1.41 2004/08/13 13:10:10 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -21,10 +21,6 @@
 
 #ifdef DEBUG
 # include "Printer.h"   /* for printing        */
-#endif
-
-#ifdef INTERPRETER
-# include "Assembler.h"
 #endif
 
 #ifdef PAR

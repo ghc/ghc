@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.41 2003/12/10 11:35:26 wolfgang Exp $
+ * $Id: StgCRun.c,v 1.42 2004/08/13 13:10:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -50,7 +50,7 @@
  * that we don't use but which are callee-save registers.  The __divq() routine
  * in libc.a clobbers $s6.
  */
-#include "config.h"
+#include "ghcconfig.h"
 #ifdef alpha_TARGET_ARCH
 #define alpha_EXTRA_CAREFUL
 register long   fake_ra __asm__("$26");
@@ -68,9 +68,10 @@ register double fake_f9 __asm__("$f9");
 #include "Stg.h"
 #include "Rts.h"
 #include "StgRun.h"
+#include "RtsFlags.h"
+#include "Capability.h"
 
 #ifdef DEBUG
-#include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Printer.h"
 #endif
@@ -81,22 +82,22 @@ register double fake_f9 __asm__("$f9");
    any architecture (using miniinterpreter)
    -------------------------------------------------------------------------- */
 
-extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
+StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
-   while (f) {
-      IF_DEBUG(interpreter,
-	       fprintf(stderr,"Jumping to ");
-	       printPtr((P_)f); fflush(stdout);
-	       fprintf(stderr,"\n");
-	      );
-      f = (StgFunPtr) (f)();
-   }
-   return (StgThreadReturnCode)R1.i;
+    while (f) {
+	if (RtsFlags[0].DebugFlags.interpreter) {
+	    fprintf(stderr,"Jumping to ");
+	    printPtr((P_)f); fflush(stdout);
+	    fprintf(stderr,"\n");
+	}
+	f = (StgFunPtr) (f)();
+    }
+    return (StgThreadReturnCode)R1.i;
 }
 
-EXTFUN(StgReturn)
+StgFunPtr StgReturn(void)
 {
-   return 0;
+    return 0;
 }
 
 #else /* !USE_MINIINTERPRETER */
@@ -540,6 +541,7 @@ static void StgRunIsImplementedInAssembler(void)
 		"\tbl saveFP # f14\n"
 		"\tstmw r13,-220(r1)\n"
 		"\tstwu r1,-%0(r1)\n"
+                "\tmr r27,r4\n" // BaseReg == r27
 		"\tmtctr r3\n"
 		"\tmr r12,r3\n"
 		"\tbctr\n"
@@ -592,6 +594,7 @@ static void StgRunIsImplementedInAssembler(void)
 		"\tstfd 29,-24(5)\n"
 		"\tstfd 30,-16(5)\n"
 		"\tstfd 31,-8(5)\n"
+		"\tmr 27,4\n"  // BaseReg == r27
 		"\tmtctr 3\n"
 		"\tmr 12,3\n"
 		"\tbctr\n"

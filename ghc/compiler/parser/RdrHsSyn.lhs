@@ -61,13 +61,12 @@ import Kind		( liftedTypeKind )
 import HscTypes		( GenAvailInfo(..) )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
-			  DNCallSpec(..), DNKind(..))
+			  DNCallSpec(..), DNKind(..), CLabelString )
 import OccName  	( OccName, srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameUserString, isValOcc )
 import BasicTypes	( initialVersion, StrictnessMark(..) )
 import Module		( ModuleName )
 import SrcLoc
-import CStrings		( CLabelString )
 import CmdLineOpts	( opt_InPackage )
 import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )

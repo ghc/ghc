@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.34 2004/03/01 14:18:35 simonmar Exp $
+ * $Id: TSO.h,v 1.35 2004/08/13 13:09:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -36,79 +36,64 @@ typedef struct {
 } StgTSOStatBuf;
 #endif
 
-#if defined(PROFILING)
+/*
+ * PROFILING info in a TSO
+ */
 typedef struct {
   CostCentreStack *CCCS;	/* thread's current CCS */
 } StgTSOProfInfo;
-#else /* !PROFILING */
-# if defined(SUPPORTS_EMPTY_STRUCTS)
-typedef struct {
-    /* empty */
-} StgTSOProfInfo;
-# endif
-#endif /* PROFILING */
 
-#if defined(PAR)
+/*
+ * PAR info in a TSO
+ */
+#ifdef PAR
 typedef StgTSOStatBuf StgTSOParInfo;
-#else /* !PAR */
-# if defined(SUPPORTS_EMPTY_STRUCTS)
+#else
+#ifdef SUPPORTS_EMPTY_STRUCTS
 typedef struct {
-    /* empty */
+	/* empty */
 } StgTSOParInfo;
-# endif
-#endif /* PAR */
+#endif
+#endif
 
-#if defined(DIST)
+/*
+ * DIST info in a TSO
+ */
+#ifdef DIST
 typedef struct {
   StgThreadPriority  priority;   
   StgInt             revalTid;   /* ToDo: merge both into 1 word */
   StgInt             revalSlot;
 } StgTSODistInfo;
-#else /* !DIST */
-# if defined(SUPPORTS_EMPTY_STRUCTS)
+#else
+#ifdef SUPPORTS_EMPTY_STRUCTS
 typedef struct {
-    /* empty */
+	/* empty */
 } StgTSODistInfo;
-# endif
-#endif /* DIST */
-
-#if defined(GRAN)
-typedef StgTSOStatBuf StgTSOGranInfo;
-#else /* !GRAN */
-# if defined(SUPPORTS_EMPTY_STRUCTS)
-typedef struct {
-    /* empty */
-} StgTSOGranInfo;
-# endif
-#endif /* GRAN */
-
-
-#if defined(TICKY)
-typedef struct {
-} StgTSOTickyInfo;
-#else /* !TICKY_TICKY */
-# if defined(SUPPORTS_EMPTY_STRUCTS)
-typedef struct {
-    /* empty */
-} StgTSOTickyInfo;
-# endif
-#endif /* TICKY_TICKY */
-
-typedef enum {
-    tso_state_runnable,
-    tso_state_stopped
-} StgTSOState;
+#endif
+#endif
 
 /*
- * The what_next field of a TSO indicates how the thread is to be run. 
+ * GRAN info in a TSO
  */
-typedef enum {
-  ThreadRunGHC,			/* return to address on top of stack */
-  ThreadInterpret,		/* interpret this thread */
-  ThreadKilled,			/* thread has died, don't run it */
-  ThreadRelocated,		/* thread has moved, link points to new locn */
-  ThreadComplete		/* thread has finished */
-} StgTSOWhatNext;
+#ifdef GRAN
+typedef StgTSOStatBuf StgTSOGranInfo;
+#else
+#ifdef SUPPORTS_EMPTY_STRUCTS
+typedef struct {
+	/* empty */
+} StgTSOGranInfo;
+#endif
+#endif
+
+/*
+ * TICKY_TICKY info in a TSO
+ */
+#ifdef SUPPORTS_EMPTY_STRUCTS
+typedef struct {
+    /* empty */
+} StgTSOTickyInfo;
+#endif
 
 /*
  * Thread IDs are 32 bits.
@@ -116,17 +101,11 @@ typedef enum {
 typedef StgWord32 StgThreadID;
 
 /*
- * This type is returned to the scheduler by a thread that has
- * stopped for one reason or another.
+ * Type returned after running a thread.  Values of this type
+ * include HeapOverflow, StackOverflow etc.  See Constants.h for the
+ * full list.
  */
-
-typedef enum {
-  HeapOverflow,			/* might also be StackOverflow */
-  StackOverflow,
-  ThreadYielding,
-  ThreadBlocked,
-  ThreadFinished
-} StgThreadReturnCode;
+typedef unsigned int StgThreadReturnCode;
 
 /*
  * We distinguish between the various classes of threads in the system.
@@ -137,34 +116,6 @@ typedef enum {
   MandatoryPriority,
   RevalPriority
 } StgThreadPriority;
-
-/* 
- * Threads may be blocked for several reasons.  A blocked thread will
- * have the reason in the why_blocked field of the TSO, and some
- * further info (such as the closure the thread is blocked on, or the
- * file descriptor if the thread is waiting on I/O) in the block_info
- * field.
- */
-
-typedef enum {
-  NotBlocked,
-  BlockedOnMVar,
-  BlockedOnBlackHole,
-  BlockedOnException,
-  BlockedOnRead,
-  BlockedOnWrite,
-  BlockedOnDelay
-#if defined(mingw32_TARGET_OS)
-  , BlockedOnDoProc
-#endif
-#if defined(PAR)
-  , BlockedOnGA  // blocked on a remote closure represented by a Global Address
-  , BlockedOnGA_NoSend // same as above but without sending a Fetch message
-#endif
-  , BlockedOnCCall
-  , BlockedOnCCall_NoUnblockExc // same as above but don't unblock
-				// async exceptions in resumeThread()
-} StgTSOBlockReason;
 
 #if defined(mingw32_TARGET_OS)
 /* results from an async I/O request + it's ID. */
@@ -192,30 +143,42 @@ typedef union {
  */
 
 /* 
+ * Threads may be blocked for several reasons.  A blocked thread will
+ * have the reason in the why_blocked field of the TSO, and some
+ * further info (such as the closure the thread is blocked on, or the
+ * file descriptor if the thread is waiting on I/O) in the block_info
+ * field.
+ */
+
+/* 
  * ToDo: make this structure sensible on a non-32-bit arch.
  */
 
 typedef struct StgTSO_ {
   StgHeader          header;
 
-  struct StgTSO_*    link;	     /* Links threads onto blocking queues */
-  StgMutClosure *    mut_link;	     /* TSO's are mutable of course! */
-  struct StgTSO_*    global_link;    /* Links all threads together */
+  struct StgTSO_*    link;	     // Links threads onto blocking queues */
+  StgMutClosure *    mut_link;	     // TSO's are mutable of course! */
+  struct StgTSO_*    global_link;    // Links all threads together */
   
-  StgTSOWhatNext         what_next   : 16;
-  StgTSOBlockReason      why_blocked : 16;
-  StgTSOBlockInfo        block_info;
-  struct StgTSO_*        blocked_exceptions;
-  StgThreadID            id;
-  int                    saved_errno;
-  struct StgMainThread_* main;
+  StgWord16           what_next;  // Values defined in Constants.h
+  StgWord16           why_blocked;  // Values defined in Constants.h
+  StgTSOBlockInfo    block_info;
+  struct StgTSO_*    blocked_exceptions;
+  StgThreadID        id;
+  int                saved_errno;
   
+#ifdef TICKY_TICKY
   MAYBE_EMPTY_STRUCT(StgTSOTickyInfo,ticky)
-  MAYBE_EMPTY_STRUCT(StgTSOProfInfo,prof)
-  MAYBE_EMPTY_STRUCT(StgTSOParInfo,par)
-  MAYBE_EMPTY_STRUCT(StgTSOGranInfo,gran)
-  MAYBE_EMPTY_STRUCT(StgTSODistInfo,dist)
-    
+#endif
+#ifdef PROFILING
+   StgTSOProfInfo prof;
+#endif
+
+   MAYBE_EMPTY_STRUCT(StgTSOParInfo,par);
+   MAYBE_EMPTY_STRUCT(StgTSOGranInfo,gran);
+   MAYBE_EMPTY_STRUCT(StgTSODistInfo,dist);
+
   /* The thread stack... */
   StgWord    	     stack_size;     /* stack size in *words* */
   StgWord            max_stack_size; /* maximum stack size in *words* */
@@ -299,5 +262,17 @@ extern StgTSO dummy_tso;
    ((char *)&dummy_tso.stack - (char *)&dummy_tso.header)
 
 #define TSO_STRUCT_SIZEW (TSO_STRUCT_SIZE / sizeof(W_))
+
+
+/* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
+#define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
+
+#if defined(PAR) || defined(GRAN)
+/* this is the NIL ptr for a blocking queue */
+# define END_BQ_QUEUE  ((StgBlockingQueueElement *)(void*)&stg_END_TSO_QUEUE_closure)
+/* this is the NIL ptr for a blocked fetch queue (as in PendingFetches in GUM) */
+# define END_BF_QUEUE  ((StgBlockedFetch *)(void*)&stg_END_TSO_QUEUE_closure)
+#endif
+/* ToDo?: different name for end of sleeping queue ? -- HWL */
 
 #endif /* TSO_H */

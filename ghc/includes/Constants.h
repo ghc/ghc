@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.25 2003/04/28 09:55:20 simonmar Exp $
+ * $Id: Constants.h,v 1.26 2004/08/13 13:09:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -62,14 +62,24 @@
  * space. 
  */
 
-#define MAX_SPEC_AP_SIZE       8
-/* ToDo: make it 8 again */
+#define MAX_SPEC_AP_SIZE       7
 
 /* Specialised FUN/THUNK/CONSTR closure types */
 
 #define MAX_SPEC_THUNK_SIZE    2
 #define MAX_SPEC_FUN_SIZE      2
 #define MAX_SPEC_CONSTR_SIZE   2
+
+/* Range of built-in table of static small int-like and char-like closures. 
+ * 
+ *   NB. This corresponds with the number of actual INTLIKE/CHARLIKE
+ *   closures defined in rts/StgMiscClosures.cmm.
+ */
+#define MAX_INTLIKE 		16
+#define MIN_INTLIKE 		(-16)
+
+#define MAX_CHARLIKE		255
+#define MIN_CHARLIKE		0
 
 /* -----------------------------------------------------------------------------
    STG Registers.
@@ -81,23 +91,17 @@
 #define MAX_VANILLA_REG 8
 #define MAX_FLOAT_REG   4
 #define MAX_DOUBLE_REG  2
-/* register is only used for returning (unboxed) 64-bit vals */
 #define MAX_LONG_REG    1
 
-/*---- Maximum number of constructors in a data type for direct-returns.  */
+/* -----------------------------------------------------------------------------
+ *  Maximum number of constructors in a data type for direct-returns. 
+ *
+ *   NB. There are various places that assume the value of this
+ *   constant, such as the polymorphic return frames for updates
+ *   (stg_upd_frame_info) and catch frames (stg_catch_frame_info).
+ * -------------------------------------------------------------------------- */
 
 #define MAX_VECTORED_RTN 8
-
-/*---- Range of built-in table of static small int-like and char-like closures. */
-
-#define MAX_INTLIKE 		16
-#define MIN_INTLIKE 		(-16)
-
-#define MAX_CHARLIKE		255
-#define MIN_CHARLIKE		0
-
-/* You can change these constants (I hope) but be sure to modify
-   rts/StgMiscClosures.hs accordingly. */
 
 /* -----------------------------------------------------------------------------
    Semi-Tagging constants
@@ -168,6 +172,98 @@
 #define BITMAP_BITS_SHIFT    6
 #else
 #error unknown SIZEOF_VOID_P
+#endif
+
+/* -----------------------------------------------------------------------------
+   Lag/Drag/Void constants
+   -------------------------------------------------------------------------- */
+
+/*
+  An LDV word is divided into 3 parts: state bits (LDV_STATE_MASK), creation 
+  time bits (LDV_CREATE_MASK), and last use time bits (LDV_LAST_MASK). 
+ */
+#if SIZEOF_VOID_P == 8
+#define LDV_SHIFT               30
+#define LDV_STATE_MASK          0x1000000000000000
+#define LDV_CREATE_MASK         0x0FFFFFFFC0000000
+#define LDV_LAST_MASK           0x000000003FFFFFFF
+#define LDV_STATE_CREATE        0x0000000000000000
+#define LDV_STATE_USE           0x1000000000000000
+#else
+#define LDV_SHIFT               15
+#define LDV_STATE_MASK          0x40000000 
+#define LDV_CREATE_MASK         0x3FFF8000
+#define LDV_LAST_MASK           0x00007FFF
+#define LDV_STATE_CREATE        0x00000000
+#define LDV_STATE_USE           0x40000000
+#endif  // SIZEOF_VOID_P
+
+/* -----------------------------------------------------------------------------
+   TSO related constants
+   -------------------------------------------------------------------------- */
+
+/*
+ * Constants for the what_next field of a TSO, which indicates how it
+ * is to be run.
+ */
+#define ThreadRunGHC    1	/* return to address on top of stack */
+#define ThreadInterpret 2	/* interpret this thread */
+#define ThreadKilled	3	/* thread has died, don't run it */
+#define ThreadRelocated	4	/* thread has moved, link points to new locn */
+#define ThreadComplete	5	/* thread has finished */
+
+/*
+ * Constants for the why_blocked field of a TSO
+ */
+#define NotBlocked          0
+#define BlockedOnMVar       1
+#define BlockedOnBlackHole  2
+#define BlockedOnException  3
+#define BlockedOnRead       4
+#define BlockedOnWrite      5
+#define BlockedOnDelay      6
+
+/* Win32 only: */
+#define BlockedOnDoProc     7
+
+/* Only relevant for PAR: */
+  /* blocked on a remote closure represented by a Global Address: */
+#define BlockedOnGA         8
+  /* same as above but without sending a Fetch message */
+#define BlockedOnGA_NoSend  9
+/* Only relevant for RTS_SUPPORTS_THREADS: */
+#define BlockedOnCCall      10
+#define BlockedOnCCall_NoUnblockExc 11
+   /* same as above but don't unblock async exceptions in resumeThread() */
+
+/*
+ * These constants are returned to the scheduler by a thread that has
+ * stopped for one reason or another.  See typedef StgThreadReturnCode
+ * in TSO.h.
+ */
+#define HeapOverflow   1		/* might also be StackOverflow */
+#define StackOverflow  2
+#define ThreadYielding 3
+#define ThreadBlocked  4
+#define ThreadFinished 5
+
+/* -----------------------------------------------------------------------------
+   RET_DYN stack frames
+   -------------------------------------------------------------------------- */
+
+/* VERY MAGIC CONSTANTS! 
+ * must agree with code in HeapStackCheck.c, stg_gen_chk, and
+ * RESERVED_STACK_WORDS in Constants.h.
+ */
+#define RET_DYN_BITMAP_SIZE 8
+#define RET_DYN_NONPTR_REGS_SIZE 10
+
+/* Sanity check that RESERVED_STACK_WORDS is reasonable.  We can't
+ * just derive RESERVED_STACK_WORDS because it's used in Haskell code
+ * too.
+ */
+#if RESERVED_STACK_WORDS != (3 + RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE)
+#error RESERVED_STACK_WORDS may be wrong!
 #endif
 
 #endif /* CONSTANTS_H */

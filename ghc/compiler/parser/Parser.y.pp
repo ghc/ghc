@@ -21,7 +21,7 @@ import RdrName
 import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
 			  listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR )
 import Type		( funTyCon )
-import ForeignCall	( Safety(..), CExportSpec(..), 
+import ForeignCall	( Safety(..), CExportSpec(..), CLabelString,
 			  CCallConv(..), CCallTarget(..), defaultCCallConv
 			)
 import OccName		( UserFS, varName, dataName, tcClsName, tvName )
@@ -38,7 +38,6 @@ import OrdList
 import Bag		( emptyBag )
 import Panic
 
-import CStrings		( CLabelString )
 import FastString
 import Maybes		( orElse )
 import Outputable

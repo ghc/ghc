@@ -1,0 +1,186 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Code for starting, stopping and restarting threads.
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+/*
+ * This module contains the two entry points and the final exit point
+ * to/from the Haskell world.  We can enter either by:
+ *
+ *   a) returning to the address on the top of the stack, or
+ *   b) entering the closure on the top of the stack
+ *
+ * the function stg_stop_thread_entry is the final exit for a
+ * thread: it is the last return address on the stack.  It returns
+ * to the scheduler marking the thread as finished.
+ */
+
+#define CHECK_SENSIBLE_REGS() \
+    ASSERT(Hp != 0);			\
+    ASSERT(Sp != 0);			\
+    ASSERT(SpLim != 0);			\
+    ASSERT(HpLim != 0);			\
+    ASSERT(SpLim - RESERVED_STACK_WORDS <= Sp); \
+    ASSERT(HpLim >= Hp);
+
+/* -----------------------------------------------------------------------------
+   Returning from the STG world.
+
+   This is a polymorphic return address, meaning that any old constructor
+   can be returned, we don't care (actually, it's probably going to be
+   an IOok constructor, which will indirect through the vector table
+   slot 0).
+   -------------------------------------------------------------------------- */
+
+#if defined(PROFILING)
+#define STOP_THREAD_BITMAP 3
+#define STOP_THREAD_WORDS  2
+#else
+#define STOP_THREAD_BITMAP 0
+#define STOP_THREAD_WORDS  0
+#endif
+
+/* A polymorhpic return address, where all the vector slots point to the
+   direct entry point. */
+INFO_TABLE_RET( stg_stop_thread, STOP_THREAD_WORDS, STOP_THREAD_BITMAP,
+		STOP_FRAME, 
+		RET_LBL(stg_stop_thread),
+		RET_LBL(stg_stop_thread),
+		RET_LBL(stg_stop_thread),
+		RET_LBL(stg_stop_thread),
+		RET_LBL(stg_stop_thread),
+		RET_LBL(stg_stop_thread),
+		RET_LBL(stg_stop_thread),
+		RET_LBL(stg_stop_thread) )
+{
+    /* 
+       The final exit.
+      
+       The top-top-level closures (e.g., "main") are of type "IO a".
+       When entered, they perform an IO action and return an 'a' in R1.
+      
+       We save R1 on top of the stack where the scheduler can find it,
+       tidy up the registers and return to the scheduler.
+      
+       We Leave the stack looking like this:
+      
+            	+----------------+
+                |      -------------------> return value
+            	+----------------+
+            	| stg_enter_info |
+            	+----------------+
+      
+       The stg_enter_info is just a dummy info table so that the
+       garbage collector can understand the stack (there must always
+       be an info table on top of the stack).
+    */
+
+    Sp = Sp + SIZEOF_StgStopFrame - WDS(2);
+    Sp(1) = R1;
+    Sp(0) = stg_enter_info;
+
+    StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
+
+    SAVE_THREAD_STATE();
+
+    /* R1 contains the return value of the thread */
+    R1 = ThreadFinished;
+
+    jump StgReturn;
+}
+
+/* -----------------------------------------------------------------------------
+   Start a thread from the scheduler by returning to the address on
+   the top of the stack.  This is used for all entries to STG code
+   from C land.
+   -------------------------------------------------------------------------- */
+
+stg_returnToStackTop
+{
+  LOAD_THREAD_STATE();
+  CHECK_SENSIBLE_REGS();
+  jump %ENTRY_CODE(Sp(0));
+}
+
+/* -----------------------------------------------------------------------------
+    Strict IO application - performing an IO action and entering its result.
+    
+    rts_evalIO() lets you perform Haskell IO actions from outside of
+    Haskell-land, returning back to you their result. Want this result
+    to be evaluated to WHNF by that time, so that we can easily get at
+    the int/char/whatever using the various get{Ty} functions provided
+    by the RTS API.
+
+    forceIO takes care of this, performing the IO action and entering the
+    results that comes back.
+    ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET( stg_forceIO, 0/*size*/, 0/*bitmap*/, RET_SMALL)
+
+#ifdef REG_R1
+{
+  Sp_adj(1);
+  ENTER();
+}
+#else
+{
+  R1 = Sp(0);
+  Sp_adj(2);
+  ENTER();
+}
+#endif
+
+/* -----------------------------------------------------------------------------
+    Non-strict IO application.
+
+    This stack frame works like stg_forceIO_info except that it
+    doesn't evaluate the return value.  We need the layer because the
+    return convention for an IO action differs depending on whether R1
+    is a register or not.
+    ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET( stg_noforceIO, 0/*size*/, 0/*bitmap*/, RET_SMALL )
+
+#ifdef REG_R1
+{
+  Sp_adj(1);
+  jump %ENTRY_CODE(Sp(0));
+}
+#else
+{
+  R1 = Sp(0);
+  Sp_adj(2);
+  jump %ENTRY_CODE(Sp(0));
+}
+#endif
+
+/* -----------------------------------------------------------------------------
+   Special STG entry points for module registration.
+   -------------------------------------------------------------------------- */
+
+stg_init_finish
+{
+  jump StgReturn;
+}
+
+/* On entry to stg_init:
+ *    init_stack[0] = &stg_init_ret;
+ *    init_stack[1] = __stginit_Something;
+ */
+stg_init
+{
+  W_ next;
+  Sp = W_[MainCapability + OFFSET_Capability_r + OFFSET_StgRegTable_rSp];
+  next = W_[Sp];
+  Sp_adj(1);
+  jump next;
+}

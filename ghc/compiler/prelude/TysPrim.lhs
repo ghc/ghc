@@ -47,8 +47,8 @@ module TysPrim(
 import Var		( TyVar, mkTyVar )
 import Name		( Name, mkInternalName, mkWiredInName )
 import OccName		( mkVarOcc, mkOccFS, tcName )
-import PrimRep		( PrimRep(..) )
-import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon )
+import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon,
+			  PrimRep(..) )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, 
 			  Kind, mkArrowKinds,
@@ -204,13 +204,13 @@ pcPrimTyCon0 name rep
     result_kind = unliftedTypeKind -- all primitive types are unlifted
 
 charPrimTy	= mkTyConTy charPrimTyCon
-charPrimTyCon	= pcPrimTyCon0 charPrimTyConName CharRep
+charPrimTyCon	= pcPrimTyCon0 charPrimTyConName WordRep
 
 intPrimTy	= mkTyConTy intPrimTyCon
 intPrimTyCon	= pcPrimTyCon0 intPrimTyConName IntRep
 
 int32PrimTy	= mkTyConTy int32PrimTyCon
-int32PrimTyCon	= pcPrimTyCon0 int32PrimTyConName Int32Rep
+int32PrimTyCon	= pcPrimTyCon0 int32PrimTyConName IntRep
 
 int64PrimTy	= mkTyConTy int64PrimTyCon
 int64PrimTyCon	= pcPrimTyCon0 int64PrimTyConName Int64Rep
@@ -219,7 +219,7 @@ wordPrimTy	= mkTyConTy wordPrimTyCon
 wordPrimTyCon	= pcPrimTyCon0 wordPrimTyConName WordRep
 
 word32PrimTy	= mkTyConTy word32PrimTyCon
-word32PrimTyCon	= pcPrimTyCon0 word32PrimTyConName Word32Rep
+word32PrimTyCon	= pcPrimTyCon0 word32PrimTyConName WordRep
 
 word64PrimTy	= mkTyConTy word64PrimTyCon
 word64PrimTyCon	= pcPrimTyCon0 word64PrimTyConName Word64Rep
@@ -256,7 +256,7 @@ statePrimTyCon	 = pcPrimTyCon statePrimTyConName vrcsZ VoidRep
 \end{code}
 
 RealWorld is deeply magical.  It is *primitive*, but it is not
-*unlifted* (hence PtrRep).  We never manipulate values of type
+*unlifted* (hence ptrArg).  We never manipulate values of type
 RealWorld; it's only used in the type system, to parameterise State#.
 
 \begin{code}
@@ -318,7 +318,7 @@ mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName vrcsP StablePtrRep
+stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName vrcsP AddrRep
 
 mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 \end{code}

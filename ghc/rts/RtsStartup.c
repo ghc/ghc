@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.80 2004/03/19 23:17:06 panne Exp $
+ * $Id: RtsStartup.c,v 1.81 2004/08/13 13:10:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -13,7 +13,6 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"  
 #include "Storage.h"    /* initStorage, exitStorage */
-#include "StablePriv.h" /* initStablePtrTable */
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "Signals.h"
@@ -21,11 +20,11 @@
 #include "Weak.h"
 #include "Ticky.h"
 #include "StgRun.h"
-#include "StgStartup.h"
 #include "Prelude.h"		/* fixupRTStoPreludeRefs */
 #include "HsFFI.h"
 #include "Linker.h"
 #include "ThreadLabels.h"
+#include "BlockAlloc.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -67,9 +66,6 @@
 #include <signal.h>
 #endif
 
-// Flag Structure
-struct RTS_FLAGS RtsFlags;
-
 // Count of how many outstanding hs_init()s there have been.
 static int hs_init_count = 0;
 
@@ -92,6 +88,10 @@ __hscore_set_saved_termios(int fd, void* ts)
     saved_termios[fd] = ts;
   }
 }
+
+#if i386_TARGET_ARCH
+static void x86_init_fpu ( void );
+#endif
 
 /* -----------------------------------------------------------------------------
    Starting up the RTS
@@ -202,6 +202,10 @@ hs_init(int *argc, char **argv[])
     setlocale(LC_CTYPE,"");
 #endif
 
+#if i386_TARGET_ARCH
+//    x86_init_fpu();
+#endif
+
     /* Record initialization times */
     stat_endInit();
 }
@@ -285,12 +289,14 @@ hs_add_root(void (*init_root)(void))
 	barf("hs_add_root() must be called after hs_init()");
     }
 
-    init_sp = 0;
+    /* The initialisation stack grows downward, with sp pointing 
+       to the last occupied word */
+    init_sp = INIT_STACK_BLOCKS*BLOCK_SIZE_W;
     bd = allocGroup(INIT_STACK_BLOCKS);
     init_stack = (F_ *)bd->start;
-    init_stack[init_sp++] = (F_)stg_init_ret;
+    init_stack[--init_sp] = (F_)stg_init_finish;
     if (init_root != NULL) {
-	init_stack[init_sp++] = (F_)init_root;
+	init_stack[--init_sp] = (F_)init_root;
     }
     
     cap.r.rSp = (P_)(init_stack + init_sp);
@@ -457,4 +463,29 @@ stg_exit(int n)
 #endif
   exit(n);
 }
+
+/* -----------------------------------------------------------------------------
+   Initialise floating point unit on x86
+   -------------------------------------------------------------------------- */
+
+#if i386_TARGET_ARCH
+static void
+x86_init_fpu ( void )
+{
+  __volatile unsigned short int fpu_cw;
+
+  // Grab the control word
+  __asm __volatile ("fnstcw %0" : "=m" (fpu_cw));
+
+#if 0
+  printf("fpu_cw: %x\n", fpu_cw);
+#endif
+
+  // Set bits 8-9 to 10 (64-bit precision).
+  fpu_cw = (fpu_cw & 0xfcff) | 0x0200;
+
+  // Store the new control word back
+  __asm __volatile ("fldcw %0" : : "m" (fpu_cw));
+}
+#endif
 

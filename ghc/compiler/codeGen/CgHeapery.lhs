@@ -1,43 +1,234 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.39 2003/07/28 16:05:35 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.40 2004/08/13 13:06:00 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
 \begin{code}
 module CgHeapery (
-	funEntryChecks, altHeapCheck, unbxTupleHeapCheck, thunkChecks,
-	allocDynClosure,
+	initHeapUsage, getVirtHp, setVirtHp, setRealHp, 
+	getHpRelOffset,	hpRel,
 
-        -- new functions, basically inserting macro calls into Code -- HWL
-        ,fetchAndReschedule, yield
+	funEntryChecks, thunkEntryChecks, 
+	altHeapCheck, unbxTupleHeapCheck, 
+	hpChkGen, hpChkNodePointsAssignSp0,
+	stkChkGen, stkChkNodePoints,
+
+	layOutDynConstr, layOutStaticConstr,
+	mkVirtHeapOffsets, mkStaticClosureFields, mkStaticClosure,
+
+	allocDynClosure, emitSetDynHdr
     ) where
 
 #include "HsVersions.h"
 
-import AbsCSyn
+import Constants	( mIN_UPD_SIZE )
 import StgSyn		( AltType(..) )
-import CLabel
+import CLabel		( CLabel, mkRtsCodeLabel )
+import CgUtils		( mkWordCLit, cmmRegOffW, cmmOffsetW,
+			  cmmOffsetExprB )
 import CgMonad
-import CgStackery	( getFinalStackHW )
-import AbsCUtils	( mkAbstractCs, getAmodeRep )
-import CgUsages		( getVirtAndRealHp, getRealSp, setVirtHp, setRealHp,
-			  initHeapUsage
-			)
-import CgRetConv	( dataReturnConvPrim )
-import ClosureInfo	( closureSize, closureGoodStuffSize,
-			  slopSize, allocProfilingMsg, ClosureInfo
-			)
+import CgProf		( staticProfHdr, profDynAlloc, dynProfHdr )
+import CgTicky		( staticTickyHdr, tickyDynAlloc, tickyAllocHeap )
+import CgParallel	( staticGranHdr, staticParHdr, doGranAllocate )
+import CgStackery	( getFinalStackHW, getRealSp )
+import CgCallConv	( mkRegLiveness )
+import ClosureInfo	( closureSize, closureUpdReqd,
+			  staticClosureNeedsLink, 
+			  mkConInfo, 
+			  infoTableLabelFromCI, closureLabelFromCI,
+			  nodeMustPointToIt, closureLFInfo, 			
+			  ClosureInfo )
+import SMRep		( CgRep(..), cgRepSizeW, separateByPtrFollowness,
+			  WordOff, fixedHdrSize, isVoidArg, primRepToCgRep )
+
+import Cmm		( CmmLit(..), CmmStmt(..), CmmExpr(..), GlobalReg(..),
+			  CmmReg(..), hpReg, nodeReg, spReg )
+import MachOp		( mo_wordULt, mo_wordUGt, mo_wordSub )
+import CmmUtils		( mkIntCLit, CmmStmts, noStmts, oneStmt, plusStmts,
+			  mkStmts )
+import Id		( Id )
+import DataCon		( DataCon )
 import TyCon		( tyConPrimRep )
-import PrimRep		( PrimRep(..), isFollowableRep )
-import CmdLineOpts	( opt_GranMacros )
+import CostCentre	( CostCentreStack )
+import Util		( mapAccumL, filterOut )
+import Constants	( wORD_SIZE )
 import Outputable
-#ifdef DEBUG
-import PprAbsC		( pprMagicId ) 
-#endif
 
 import GLAEXTS
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[CgUsages-heapery]{Monad things for fiddling with heap usage}
+%*									*
+%************************************************************************
+
+The heap always grows upwards, so hpRel is easy
+
+\begin{code}
+hpRel :: VirtualHpOffset 	-- virtual offset of Hp
+      -> VirtualHpOffset 	-- virtual offset of The Thing
+      -> WordOff			-- integer word offset
+hpRel hp off = off - hp
+\end{code}
+
+@initHeapUsage@ applies a function to the amount of heap that it uses.
+It initialises the heap usage to zeros, and passes on an unchanged
+heap usage.
+
+It is usually a prelude to performing a GC check, so everything must
+be in a tidy and consistent state.
+
+rje: Note the slightly suble fixed point behaviour needed here
+
+\begin{code}
+initHeapUsage :: (VirtualHpOffset -> Code) -> Code
+initHeapUsage fcode
+  = do	{ orig_hp_usage <- getHpUsage
+	; setHpUsage initHpUsage
+	; fixC (\heap_usage2 -> do
+		{ fcode (heapHWM heap_usage2)
+		; getHpUsage })
+	; setHpUsage orig_hp_usage }
+
+setVirtHp :: VirtualHpOffset -> Code
+setVirtHp new_virtHp
+  = do	{ hp_usage <- getHpUsage
+	; setHpUsage (hp_usage {virtHp = new_virtHp}) }
+
+getVirtHp :: FCode VirtualHpOffset
+getVirtHp 
+  = do	{ hp_usage <- getHpUsage
+	; return (virtHp hp_usage) }
+
+setRealHp ::  VirtualHpOffset -> Code
+setRealHp new_realHp
+  = do	{ hp_usage <- getHpUsage
+	; setHpUsage (hp_usage {realHp = new_realHp}) }
+
+getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
+getHpRelOffset virtual_offset
+  = do	{ hp_usg <- getHpUsage
+	; return (cmmRegOffW hpReg (hpRel (realHp hp_usg) virtual_offset)) }
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Layout of heap objects
+%*									*
+%************************************************************************
+
+\begin{code}
+layOutDynConstr, layOutStaticConstr
+	:: DataCon 	
+	-> [(CgRep,a)]
+	-> (ClosureInfo,
+	    [(a,VirtualHpOffset)])
+
+layOutDynConstr    = layOutConstr False
+layOutStaticConstr = layOutConstr True
+
+layOutConstr is_static data_con args
+   = (mkConInfo is_static data_con tot_wds ptr_wds,
+      things_w_offsets)
+  where
+    (tot_wds,		 -- #ptr_wds + #nonptr_wds
+     ptr_wds,		 -- #ptr_wds
+     things_w_offsets) = mkVirtHeapOffsets args
+\end{code}
+
+@mkVirtHeapOffsets@ always returns boxed things with smaller offsets
+than the unboxed things, and furthermore, the offsets in the result
+list
+
+\begin{code}
+mkVirtHeapOffsets
+	  :: [(CgRep,a)]	-- Things to make offsets for
+	  -> (WordOff,		-- *Total* number of words allocated
+	      WordOff,		-- Number of words allocated for *pointers*
+	      [(a, VirtualHpOffset)])
+				-- Things with their offsets from start of 
+				--  object in order of increasing offset
+
+-- First in list gets lowest offset, which is initial offset + 1.
+
+mkVirtHeapOffsets things
+  = let non_void_things		      = filterOut (isVoidArg . fst) things
+	(ptrs, non_ptrs)    	      = separateByPtrFollowness non_void_things
+    	(wds_of_ptrs, ptrs_w_offsets) = mapAccumL computeOffset 0 ptrs
+	(tot_wds, non_ptrs_w_offsets) = mapAccumL computeOffset wds_of_ptrs non_ptrs
+    in
+    (tot_wds, wds_of_ptrs, ptrs_w_offsets ++ non_ptrs_w_offsets)
+  where
+    computeOffset wds_so_far (rep, thing)
+      = (wds_so_far + cgRepSizeW rep, (thing, fixedHdrSize + wds_so_far))
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Lay out a static closure
+%*									*
+%************************************************************************
+
+Make a static closure, adding on any extra padding needed for CAFs,
+and adding a static link field if necessary.
+
+\begin{code}
+mkStaticClosureFields 
+	:: ClosureInfo 
+	-> CostCentreStack 
+	-> Bool 		-- Has CAF refs
+	-> [CmmLit]		-- Payload
+	-> [CmmLit]		-- The full closure
+mkStaticClosureFields cl_info ccs caf_refs payload
+  = mkStaticClosure info_lbl ccs payload padding_wds static_link_field
+  where
+    info_lbl = infoTableLabelFromCI cl_info
+
+    upd_reqd = closureUpdReqd cl_info
+
+    -- for the purposes of laying out the static closure, we consider all
+    -- thunks to be "updatable", so that the static link field is always
+    -- in the same place.
+    padding_wds
+	| not upd_reqd = []
+	| otherwise    = replicate n (mkIntCLit 0) -- a bunch of 0s
+	where n = max 0 (mIN_UPD_SIZE - length payload)
+
+	-- We always have a static link field for a thunk, it's used to
+	-- save the closure's info pointer when we're reverting CAFs
+	-- (see comment in Storage.c)
+    static_link_field
+	| upd_reqd || staticClosureNeedsLink cl_info = [static_link_value]
+	| otherwise 	     		             = []
+
+	-- for a static constructor which has NoCafRefs, we set the
+	-- static link field to a non-zero value so the garbage
+	-- collector will ignore it.
+    static_link_value
+	| caf_refs	= mkIntCLit 0
+	| otherwise	= mkIntCLit 1
+
+mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]
+  -> [CmmLit] -> [CmmLit] -> [CmmLit]
+mkStaticClosure info_lbl ccs payload padding_wds static_link_field
+  =  [CmmLabel info_lbl]
+  ++ variable_header_words
+  ++ payload
+  ++ padding_wds
+  ++ static_link_field
+  where
+    variable_header_words
+	=  staticGranHdr
+	++ staticParHdr
+	++ staticProfHdr ccs
+	++ staticTickyHdr
 \end{code}
 
 %************************************************************************
@@ -54,86 +245,53 @@ beginning of every slow entry code in order to simulate the fetching of
 closures. If fetching is necessary (i.e. current closure is not local) then
 an automatic context switch is done.
 
------------------------------------------------------------------------------
+--------------------------------------------------------------
 A heap/stack check at a function or thunk entry point.
 
 \begin{code}
-funEntryChecks :: Maybe CLabel -> AbstractC -> Code -> Code
-funEntryChecks closure_lbl reg_save_code code 
-  = hpStkCheck closure_lbl True reg_save_code code
+funEntryChecks :: ClosureInfo -> CmmStmts -> Code -> Code
+funEntryChecks cl_info reg_save_code code 
+  = hpStkCheck cl_info True reg_save_code code
 
-thunkChecks :: Maybe CLabel -> Code -> Code
-thunkChecks closure_lbl code 
-  = hpStkCheck closure_lbl False AbsCNop code
+thunkEntryChecks :: ClosureInfo -> Code -> Code
+thunkEntryChecks cl_info code 
+  = hpStkCheck cl_info False noStmts code
 
-hpStkCheck
-	:: Maybe CLabel			-- function closure
-	-> Bool 			-- is a function? (not a thunk)
-	-> AbstractC			-- register saves
-	-> Code
-	-> Code
+hpStkCheck :: ClosureInfo	-- Function closure
+	   -> Bool 		-- Is a function? (not a thunk)
+	   -> CmmStmts		-- Register saves
+	   -> Code
+	   -> Code
 
-hpStkCheck closure_lbl is_fun reg_save_code code
-  =  getFinalStackHW				 (\ spHw -> 
-     getRealSp					 `thenFC` \ sp ->
-     let stk_words = spHw - sp in
-     initHeapUsage				 (\ hHw  ->
-
-     getTickyCtrLabel `thenFC` \ ticky_ctr ->
-
-     absC (checking_code stk_words hHw ticky_ctr) `thenC`
-
-     setRealHp hHw `thenC`
-     code))
-
+hpStkCheck cl_info is_fun reg_save_code code
+  =  getFinalStackHW	$ \ spHw -> do
+	{ sp <- getRealSp
+	; let stk_words = spHw - sp
+	; initHeapUsage	$ \ hpHw  -> do
+	    {	-- Emit heap checks, but be sure to do it lazily so 
+		-- that the conditionals on hpHw don't cause a black hole
+	      codeOnly $ do
+		{ do_checks stk_words hpHw full_save_code rts_label
+		; tickyAllocHeap hpHw }
+	    ; setRealHp hpHw
+	    ; code }
+	}
   where
-    node_asst
-	| Just lbl <- closure_lbl = CAssign nodeReg (CLbl lbl PtrRep)
-	| otherwise = AbsCNop
+    node_asst 
+	| nodeMustPointToIt (closureLFInfo cl_info)
+	= noStmts
+	| otherwise
+	= oneStmt (CmmAssign nodeReg (CmmLit (CmmLabel closure_lbl)))
+    closure_lbl = closureLabelFromCI cl_info
 
-    save_code = mkAbstractCs [node_asst, reg_save_code]
+    full_save_code = node_asst `plusStmts` reg_save_code
 
-    checking_code stk hp ctr
-        = mkAbstractCs 
-	  [ if is_fun
-		then do_checks_fun stk hp save_code
-		else do_checks_np  stk hp save_code,
-            if hp == 0
-		then AbsCNop 
-	    	else profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
-			  [ mkIntCLit hp, CLbl ctr DataPtrRep ]
-	  ]
-
-
--- For functions:
-
-do_checks_fun
-	:: Int		-- stack headroom
-	-> Int		-- heap  headroom
-	-> AbstractC	-- assignments to perform on failure
-	-> AbstractC
-do_checks_fun 0 0 _ = AbsCNop
-do_checks_fun 0 hp_words assts =
-    CCheck HP_CHK_FUN [ mkIntCLit hp_words ] assts
-do_checks_fun stk_words 0 assts =
-    CCheck STK_CHK_FUN [ mkIntCLit stk_words ] assts
-do_checks_fun stk_words hp_words assts =
-    CCheck HP_STK_CHK_FUN [ mkIntCLit stk_words, mkIntCLit hp_words ] assts
-
--- For thunks:
-
-do_checks_np
-	:: Int		-- stack headroom
-	-> Int		-- heap  headroom
-	-> AbstractC	-- assignments to perform on failure
-	-> AbstractC
-do_checks_np 0 0 _ = AbsCNop
-do_checks_np 0 hp_words assts =
-    CCheck HP_CHK_NP [ mkIntCLit hp_words ] assts
-do_checks_np stk_words 0 assts =
-    CCheck STK_CHK_NP [ mkIntCLit stk_words ] assts
-do_checks_np stk_words hp_words assts =
-    CCheck HP_STK_CHK_NP [ mkIntCLit stk_words, mkIntCLit hp_words ] assts
+    rts_label | is_fun    = CmmReg (CmmGlobal GCFun)
+				-- Function entry point
+	      | otherwise = CmmReg (CmmGlobal GCEnter1)
+				-- Thunk or case return
+	-- In the thunk/case-return case, R1 points to a closure
+	-- which should be (re)-entered after GC
 \end{code}
 
 Heap checks in a case alternative are nice and easy, provided this is
@@ -153,12 +311,6 @@ For primitive returns, we have an unlifted value in some register
 (either R1 or FloatReg1 or DblReg1).  This means using specialised
 heap-check code for these cases.
 
-For unboxed tuple returns, there are an arbitrary number of possibly
-unboxed return values, some of which will be in registers, and the
-others will be on the stack.  We always organise the stack-resident
-fields into pointers & non-pointers, and pass the number of each to
-the heap check code.
-
 \begin{code}
 altHeapCheck 
     :: AltType	-- PolyAlt, PrimAlt, AlgAlt, but *not* UbxTupAlt
@@ -166,150 +318,183 @@ altHeapCheck
     -> Code	-- Continuation
     -> Code
 altHeapCheck alt_type code
-  = initHeapUsage (\ hHw -> 
-	do_heap_chk hHw	`thenC` 
-	setRealHp hHw	`thenC`
-	code)
+  = initHeapUsage $ \ hpHw -> do
+	{ codeOnly $ do
+	     { do_checks 0 {- no stack chk -} hpHw
+			 noStmts {- nothign to save -}
+			 (rts_label alt_type)
+	     ; tickyAllocHeap hpHw }
+	; setRealHp hpHw
+	; code }
   where
-    do_heap_chk :: HeapOffset -> Code
-    do_heap_chk words_required
-      = getTickyCtrLabel 	`thenFC` \ ctr ->
-	absC ( 	-- NB The conditional is inside the absC,
-		-- so the monadic stuff doesn't depend on
-		-- the value of words_required!
-	       if words_required == 0
-	       then  AbsCNop
-	       else  mkAbstractCs 
-		       [ CCheck (checking_code alt_type) 
-			    [mkIntCLit words_required] AbsCNop,
-          	         profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
-			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
-		       ])
+    rts_label PolyAlt = CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "stg_gc_unpt_r1")))
+      	-- Do *not* enter R1 after a heap check in
+	-- a polymorphic case.  It might be a function
+	-- and the entry code for a function (currently)
+	-- applies it
+	--
+	-- However R1 is guaranteed to be a pointer
 
-    checking_code PolyAlt
-      = HP_CHK_UNPT_R1	-- Do *not* enter R1 after a heap check in
-			-- a polymorphic case.  It might be a function
-			-- and the entry code for a function (currently)
-			-- applies it
-			--
-			-- However R1 is guaranteed to be a pointer
-
-    checking_code (AlgAlt tc)
-      =	HP_CHK_NP	-- Enter R1 after the heap check; it's a pointer
-			-- The "NP" is short for "Node (R1) Points to it"
+    rts_label (AlgAlt tc) = stg_gc_enter1
+	-- Enter R1 after the heap check; it's a pointer
  	
-    checking_code (PrimAlt tc)
-      = case dataReturnConvPrim (tyConPrimRep tc) of
-	  VoidReg      -> HP_CHK_NOREGS
-	  FloatReg  1# -> HP_CHK_F1
-	  DoubleReg 1# -> HP_CHK_D1
-	  LongReg _ 1# -> HP_CHK_L1
-	  VanillaReg rep 1# 
-	    | isFollowableRep rep -> HP_CHK_UNPT_R1	-- R1 is boxed but unlifted: 
-	    | otherwise		  -> HP_CHK_UNBX_R1	-- R1 is unboxed
-#ifdef DEBUG
-	  other_reg -> pprPanic "CgHeapery.altHeapCheck" (ppr tc <+> pprMagicId other_reg)
-#endif
+    rts_label (PrimAlt tc)
+      = CmmLit $ CmmLabel $ 
+	case primRepToCgRep (tyConPrimRep tc) of
+	  VoidArg   -> mkRtsCodeLabel SLIT( "stg_gc_noregs")
+	  FloatArg  -> mkRtsCodeLabel SLIT( "stg_gc_f1")
+	  DoubleArg -> mkRtsCodeLabel SLIT( "stg_gc_d1")
+	  LongArg   -> mkRtsCodeLabel SLIT( "stg_gc_l1")
+				-- R1 is boxed but unlifted: 
+	  PtrArg    -> mkRtsCodeLabel SLIT( "stg_gc_unpt_r1")
+				-- R1 is unboxed:
+	  NonPtrArg -> mkRtsCodeLabel SLIT( "stg_gc_unbx_r1")
 
--- Unboxed tuple alternatives and let-no-escapes (the two most annoying
--- constructs to generate code for!):
+    rts_label (UbxTupAlt _) = panic "altHeapCheck"
+\end{code}
 
+
+Unboxed tuple alternatives and let-no-escapes (the two most annoying
+constructs to generate code for!)  For unboxed tuple returns, there
+are an arbitrary number of possibly unboxed return values, some of
+which will be in registers, and the others will be on the stack.  We
+always organise the stack-resident fields into pointers &
+non-pointers, and pass the number of each to the heap check code.
+
+\begin{code}
 unbxTupleHeapCheck 
-	:: [MagicId]		-- live registers
-	-> Int			-- no. of stack slots containing ptrs
-	-> Int			-- no. of stack slots containing nonptrs
-	-> AbstractC		-- code to insert in the failure path
+	:: [(Id, GlobalReg)]	-- Live registers
+	-> WordOff	-- no. of stack slots containing ptrs
+	-> WordOff	-- no. of stack slots containing nonptrs
+	-> CmmStmts	-- code to insert in the failure path
 	-> Code
 	-> Code
 
 unbxTupleHeapCheck regs ptrs nptrs fail_code code
-  -- we can't manage more than 255 pointers/non-pointers in a generic
-  -- heap check.
+  -- We can't manage more than 255 pointers/non-pointers 
+  -- in a generic heap check.
   | ptrs > 255 || nptrs > 255 = panic "altHeapCheck"
-  | otherwise = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
+  | otherwise 
+  = initHeapUsage $ \ hpHw -> do
+	{ codeOnly $ do { do_checks 0 {- no stack check -} hpHw
+				    full_fail_code rts_label
+			; tickyAllocHeap hpHw }
+	; setRealHp hpHw
+	; code }
   where
-    do_heap_chk words_required 
-      = getTickyCtrLabel `thenFC` \ ctr ->
-	absC ( if words_required == 0
-		  then  AbsCNop
-		  else  mkAbstractCs 
-			[ checking_code words_required,
-          	          profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
-			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
-			]
-	)  `thenC`
-	setRealHp words_required
+    full_fail_code  = fail_code `plusStmts` oneStmt assign_liveness
+    assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9)) 	-- Ho ho ho!
+				(CmmLit (mkWordCLit liveness))
+    liveness 	    = mkRegLiveness regs ptrs nptrs
+    rts_label	    = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("stg_gc_ut")))
 
-    liveness = I# (word2Int# (mkRegLiveness regs ptrs nptrs))
-    checking_code words_required = CCheck HP_CHK_UNBX_TUPLE
-					     [mkIntCLit words_required, 
-					      mkIntCLit liveness]
-					     fail_code
-
--- build up a bitmap of the live pointer registers
-
-#if __GLASGOW_HASKELL__ >= 503
-shiftL = uncheckedShiftL#
-#else
-shiftL = shiftL#
-#endif
-
-mkRegLiveness :: [MagicId] -> Int -> Int -> Word#
-mkRegLiveness [] (I# ptrs) (I# nptrs) =  
-  (int2Word# nptrs `shiftL` 16#) `or#` (int2Word# ptrs `shiftL` 24#)
-mkRegLiveness (VanillaReg rep i : regs) ptrs nptrs | isFollowableRep rep 
-  =  ((int2Word# 1#) `shiftL` (i -# 1#)) `or#` mkRegLiveness regs ptrs nptrs
-mkRegLiveness (_ : regs)  ptrs nptrs =  mkRegLiveness regs ptrs nptrs
-
--- The two functions below are only used in a GranSim setup
--- Emit macro for simulating a fetch and then reschedule
-
-fetchAndReschedule ::   [MagicId]               -- Live registers
-			-> Bool                 -- Node reqd?
-			-> Code
-
-fetchAndReschedule regs node_reqd  = 
-      if (node `elem` regs || node_reqd)
-	then fetch_code `thenC` reschedule_code
-	else absC AbsCNop
-      where
-        liveness_mask = mkRegLiveness regs 0 0
-	reschedule_code = absC  (CMacroStmt GRAN_RESCHEDULE [
-                                 mkIntCLit (I# (word2Int# liveness_mask)), 
-				 mkIntCLit (if node_reqd then 1 else 0)])
-
-	 --HWL: generate GRAN_FETCH macro for GrAnSim
-	 --     currently GRAN_FETCH and GRAN_FETCH_AND_RESCHEDULE are miai
-	fetch_code = absC (CMacroStmt GRAN_FETCH [])
 \end{code}
 
-The @GRAN_YIELD@ macro is taken from JSM's  code for Concurrent Haskell. It
-allows to context-switch at  places where @node@ is  not alive (it uses the
-@Continue@ rather  than the @EnterNodeCode@  function in the  RTS). We emit
-this kind of macro at the beginning of the following kinds of basic bocks:
-\begin{itemize}
- \item Slow entry code where node is not alive (see @CgClosure.lhs@). Normally 
-       we use @fetchAndReschedule@ at a slow entry code.
- \item Fast entry code (see @CgClosure.lhs@).
- \item Alternatives in case expressions (@CLabelledCode@ structures), provided
-       that they are not inlined (see @CgCases.lhs@). These alternatives will 
-       be turned into separate functions.
-\end{itemize}
+
+%************************************************************************
+%*									*
+		Heap/Stack Checks.
+%*									*
+%************************************************************************
+
+When failing a check, we save a return address on the stack and
+jump to a pre-compiled code fragment that saves the live registers
+and returns to the scheduler.
+
+The return address in most cases will be the beginning of the basic
+block in which the check resides, since we need to perform the check
+again on re-entry because someone else might have stolen the resource
+in the meantime.
 
 \begin{code}
-yield ::   [MagicId]               -- Live registers
-             -> Bool                 -- Node reqd?
-             -> Code 
+do_checks :: WordOff	-- Stack headroom
+	  -> WordOff	-- Heap  headroom
+	  -> CmmStmts	-- Assignments to perform on failure
+	  -> CmmExpr	-- Rts address to jump to on failure
+	  -> Code
+do_checks 0 0 _ _   = nopC
+do_checks stk hp reg_save_code rts_lbl
+  = do_checks' (CmmLit (mkIntCLit (stk*wORD_SIZE))) 
+	       (CmmLit (mkIntCLit (hp*wORD_SIZE)))
+	 (stk /= 0) (hp /= 0) reg_save_code rts_lbl
 
-yield regs node_reqd = 
-   if opt_GranMacros && node_reqd
-     then yield_code
-     else absC AbsCNop
-   where
-     liveness_mask = mkRegLiveness regs 0 0
-     yield_code = 
-       absC (CMacroStmt GRAN_YIELD 
-                          [mkIntCLit (I# (word2Int# liveness_mask))])
+-- The offsets are now in *bytes*
+do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl
+  = do	{ doGranAllocate hp_expr
+
+	-- Emit a block for the heap-check-failure code
+	; blk_id <- forkLabelledCode $ do
+			{ whenC hp_nonzero $
+				stmtC (CmmAssign (CmmGlobal HpAlloc) hp_expr)
+			; emitStmts reg_save_code
+			; stmtC (CmmJump rts_lbl []) }
+
+	-- Check for stack overflow *FIRST*; otherwise
+	-- we might bumping Hp and then failing stack oflo
+	; whenC stk_nonzero
+		(stmtC (CmmCondBranch stk_oflo blk_id))
+
+	; whenC hp_nonzero
+		(stmtsC [CmmAssign hpReg 
+				(cmmOffsetExprB (CmmReg hpReg) hp_expr),
+		        CmmCondBranch hp_oflo blk_id]) 
+		-- Bump heap pointer, and test for heap exhaustion
+		-- Note that we don't move the heap pointer unless the 
+		-- stack check succeeds.  Otherwise we might end up
+		-- with slop at the end of the current block, which can 
+		-- confuse the LDV profiler.
+    }
+  where
+	-- Stk overflow if (Sp - stk_bytes < SpLim)
+    stk_oflo = CmmMachOp mo_wordULt 
+		  [CmmMachOp mo_wordSub [CmmReg spReg, stk_expr],
+		   CmmReg (CmmGlobal SpLim)]
+
+	-- Hp overflow if (Hpp > HpLim)
+	-- (Hp has been incremented by now)
+	-- HpLim points to the LAST WORD of valid allocation space.
+    hp_oflo = CmmMachOp mo_wordUGt 
+		  [CmmReg hpReg, CmmReg (CmmGlobal HpLim)]
+\end{code}
+
+%************************************************************************
+%*									*
+     Generic Heap/Stack Checks - used in the RTS
+%*									*
+%************************************************************************
+
+\begin{code}
+hpChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
+hpChkGen bytes liveness reentry
+  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assigns stg_gc_gen
+  where
+    assigns = mkStmts [
+    		CmmAssign (CmmGlobal (VanillaReg 9))  liveness,
+    		CmmAssign (CmmGlobal (VanillaReg 10)) reentry
+		]
+
+-- a heap check where R1 points to the closure to enter on return, and
+-- we want to assign to Sp[0] on failure (used in AutoApply.cmm:BUILD_PAP).
+hpChkNodePointsAssignSp0 :: CmmExpr -> CmmExpr -> Code
+hpChkNodePointsAssignSp0 bytes sp0
+  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assign stg_gc_enter1
+  where assign = oneStmt (CmmStore (CmmReg spReg) sp0)
+
+stkChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
+stkChkGen bytes liveness reentry
+  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False assigns stg_gc_gen
+  where
+    assigns = mkStmts [
+    		CmmAssign (CmmGlobal (VanillaReg 9))  liveness,
+    		CmmAssign (CmmGlobal (VanillaReg 10)) reentry
+		]
+
+stkChkNodePoints :: CmmExpr -> Code
+stkChkNodePoints bytes
+  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False noStmts stg_gc_enter1
+
+stg_gc_gen = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("stg_gc_gen")))
+stg_gc_enter1 = CmmReg (CmmGlobal GCEnter1)
 \end{code}
 
 %************************************************************************
@@ -324,47 +509,65 @@ to account for this.
 \begin{code}
 allocDynClosure
 	:: ClosureInfo
-	-> CAddrMode		-- Cost Centre to stick in the object
-	-> CAddrMode		-- Cost Centre to blame for this alloc
+	-> CmmExpr 		-- Cost Centre to stick in the object
+	-> CmmExpr 		-- Cost Centre to blame for this alloc
 				-- (usually the same; sometimes "OVERHEAD")
 
-	-> [(CAddrMode, VirtualHeapOffset)]	-- Offsets from start of the object
-						-- ie Info ptr has offset zero.
-	-> FCode VirtualHeapOffset		-- Returns virt offset of object
+	-> [(CmmExpr, VirtualHpOffset)]	-- Offsets from start of the object
+					-- ie Info ptr has offset zero.
+	-> FCode VirtualHpOffset	-- Returns virt offset of object
 
-allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
-  = getVirtAndRealHp				`thenFC` \ (virtHp, realHp) ->
+allocDynClosure cl_info use_cc blame_cc amodes_with_offsets
+  = do	{ virt_hp <- getVirtHp
 
 	-- FIND THE OFFSET OF THE INFO-PTR WORD
-	-- virtHp points to last allocated word, ie 1 *before* the
-	-- info-ptr word of new object.
-    let  info_offset = virtHp + 1
+	; let	info_offset = virt_hp + 1
+		-- info_offset is the VirtualHpOffset of the first
+		-- word of the new object
+		-- Remember, virtHp points to last allocated word, 
+		-- ie 1 *before* the info-ptr word of new object.
 
-	-- do_move IS THE ASSIGNMENT FUNCTION
-	 do_move (amode, offset_from_start)
-	   = CAssign (CVal (hpRel realHp
-				  (info_offset + offset_from_start))
-			   (getAmodeRep amode))
-		     amode
-    in
+		info_ptr = CmmLit (CmmLabel (infoTableLabelFromCI cl_info))
+		hdr_w_offsets = initDynHdr info_ptr use_cc `zip` [0..]
+
 	-- SAY WHAT WE ARE ABOUT TO DO
-    profCtrC (allocProfilingMsg closure_info)
-			   [mkIntCLit (closureGoodStuffSize closure_info),
-			    mkIntCLit slop_size]	`thenC`
+	; profDynAlloc cl_info use_cc	
+		-- ToDo: This is almost certainly wrong
+		-- We're ignoring blame_cc. But until we've
+		-- fixed the boxing hack in chooseDynCostCentres etc,
+		-- we're worried about making things worse by "fixing"
+		-- this part to use blame_cc!
 
-	-- GENERATE THE CODE
-    absC ( mkAbstractCs (
-	   [ CInitHdr closure_info 
-		(CAddr (hpRel realHp info_offset)) 
-		use_cc closure_size ]
-	   ++ (map do_move amodes_with_offsets)))	`thenC`
+	; tickyDynAlloc cl_info
+
+	-- ALLOCATE THE OBJECT
+	; base <- getHpRelOffset info_offset
+	; hpStore base (hdr_w_offsets ++ amodes_with_offsets)
 
 	-- BUMP THE VIRTUAL HEAP POINTER
-    setVirtHp (virtHp + closure_size)			`thenC`
-
+	; setVirtHp (virt_hp + closureSize cl_info)
+	
 	-- RETURN PTR TO START OF OBJECT
-    returnFC info_offset
-  where
-    closure_size = closureSize closure_info
-    slop_size    = slopSize closure_info
+	; returnFC info_offset }
+
+
+initDynHdr :: CmmExpr 
+	   -> CmmExpr		-- Cost centre to put in object
+	   -> [CmmExpr]
+initDynHdr info_ptr cc
+  =  [info_ptr]
+     	-- ToDo: Gransim stuff
+	-- ToDo: Parallel stuff
+  ++ dynProfHdr cc
+	-- No ticky header
+
+hpStore :: CmmExpr -> [(CmmExpr, VirtualHpOffset)] -> Code
+-- Store the item (expr,off) in base[off]
+hpStore base es
+  = stmtsC [ CmmStore (cmmOffsetW base off) val 
+	   | (val, off) <- es ]
+
+emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> Code
+emitSetDynHdr base info_ptr ccs 
+  = hpStore base (zip (initDynHdr info_ptr ccs) [0..])
 \end{code}

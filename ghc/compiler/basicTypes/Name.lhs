@@ -323,9 +323,7 @@ pprExternal sty name uniq mod occ mb_p is_wired
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | debugStyle sty = hsep [pprOccName occ, text "{-", 
-			   text (briefOccNameFlavour occ), 
-			   pprUnique uniq, text "-}"]
+  | debugStyle sty = pprOccName occ <> text "{-" <> pprUnique uniq <> text "-}"
   | otherwise      = pprOccName occ	-- User style
 
 -- Like Internal, except that we only omit the unique in Iface style

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.19 2004/04/12 16:26:40 panne Exp $
+ * $Id: HsFFI.h,v 1.20 2004/08/13 13:09:13 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -18,7 +18,8 @@ extern "C" {
 #endif
 
 /* get types from GHC's runtime system */
-#include "config.h"
+#include "ghcconfig.h"
+#include "RtsConfig.h"
 #include "StgTypes.h"
 
 /* get limits for integral types */

@@ -10,7 +10,7 @@ module Util (
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith,
 	mapAndUnzip, mapAndUnzip3,
-	nOfThem, 
+	nOfThem, filterOut,
 	lengthExceeds, lengthIs, lengthAtLeast, listLengthCmp, atLength,
 	isSingleton, only,
 	notNull, snocView,
@@ -47,10 +47,13 @@ module Util (
 	-- module names
 	looksLikeModuleName,
 	
-	toArgs
+	toArgs,
+
+	-- Floating point stuff
+	readRational,
     ) where
 
-#include "../includes/config.h"
+#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import Panic		( panic, trace )
@@ -68,7 +71,8 @@ import qualified List	( elem, notElem )
 import List		( zipWith4 )
 #endif
 
-import Char		( isUpper, isAlphaNum, isSpace )
+import Char		( isUpper, isAlphaNum, isSpace, ord, isDigit )
+import Ratio		( (%) )
 
 infixr 9 `thenCmp`
 \end{code}
@@ -127,6 +131,14 @@ nTimes n f = f . nTimes (n-1) f
 \subsection[Utils-lists]{General list processing}
 %*									*
 %************************************************************************
+
+\begin{code}
+filterOut :: (a->Bool) -> [a] -> [a]
+-- Like filter, only reverses the sense of the test
+filterOut p [] = []
+filterOut p (x:xs) | p x       = filterOut p xs
+		   | otherwise = x : filterOut p xs
+\end{code}
 
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
 are of equal length.  Alastair Reid thinks this should only happen if
@@ -825,4 +837,54 @@ toArgs s  =
    stripQuotes :: String -> String
    stripQuotes ('"':xs)  = init xs
    stripQuotes xs        = xs
+\end{code}
+
+-- -----------------------------------------------------------------------------
+-- Floats
+
+\begin{code}
+readRational__ :: ReadS Rational -- NB: doesn't handle leading "-"
+readRational__ r = do 
+     (n,d,s) <- readFix r
+     (k,t)   <- readExp s
+     return ((n%1)*10^^(k-d), t)
+ where
+     readFix r = do
+	(ds,s)  <- lexDecDigits r
+	(ds',t) <- lexDotDigits s
+	return (read (ds++ds'), length ds', t)
+
+     readExp (e:s) | e `elem` "eE" = readExp' s
+     readExp s			   = return (0,s)
+
+     readExp' ('+':s) = readDec s
+     readExp' ('-':s) = do
+			(k,t) <- readDec s
+			return (-k,t)
+     readExp' s	      = readDec s
+
+     readDec s = do
+        (ds,r) <- nonnull isDigit s
+        return (foldl1 (\n d -> n * 10 + d) [ ord d - ord '0' | d <- ds ],
+                r)
+
+     lexDecDigits = nonnull isDigit
+
+     lexDotDigits ('.':s) = return (span isDigit s)
+     lexDotDigits s       = return ("",s)
+
+     nonnull p s = do (cs@(_:_),t) <- return (span p s)
+                      return (cs,t)
+
+readRational :: String -> Rational -- NB: *does* handle a leading "-"
+readRational top_s
+  = case top_s of
+      '-' : xs -> - (read_me xs)
+      xs       -> read_me xs
+  where
+    read_me s
+      = case (do { (x,"") <- readRational__ s ; return x }) of
+	  [x] -> x
+	  []  -> error ("readRational: no parse:"        ++ top_s)
+	  _   -> error ("readRational: ambiguous parse:" ++ top_s)
 \end{code}

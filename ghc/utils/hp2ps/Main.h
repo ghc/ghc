@@ -1,7 +1,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include "config.h"
+#include "../includes/ghcconfig.h"
 
 #ifdef __STDC__
 #define PROTO(x)	x

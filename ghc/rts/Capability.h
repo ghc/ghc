@@ -23,10 +23,6 @@
 #ifndef __CAPABILITY_H__
 #define __CAPABILITY_H__
 
-#if !defined(SMP)
-extern Capability MainCapability;
-#endif
-
 // Initialised the available capabilities.
 //
 extern void initCapabilities( void );

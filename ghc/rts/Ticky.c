@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.17 2002/12/11 15:36:54 simonmar Exp $
+ * $Id: Ticky.c,v 1.18 2004/08/13 13:11:08 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -33,36 +33,35 @@ PrintTickyInfo(void)
   unsigned long i;
   unsigned long tot_allocs = /* total number of things allocated */
 	ALLOC_FUN_ctr + ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr + ALLOC_CON_ctr + ALLOC_TUP_ctr +
-    	ALLOC_TSO_ctr +
+    	+ ALLOC_TSO_ctr + ALLOC_BH_ctr  + ALLOC_PAP_ctr + ALLOC_PRIM_ctr
 #ifdef PAR
-	ALLOC_FMBQ_ctr + ALLOC_FME_ctr + ALLOC_BF_ctr +
+	+ ALLOC_FMBQ_ctr + ALLOC_FME_ctr + ALLOC_BF_ctr
 #endif
-	ALLOC_BH_ctr  + ALLOC_PAP_ctr + ALLOC_PRIM_ctr;
+      ;	
 
   unsigned long tot_adm_wds = /* total number of admin words allocated */
-	ALLOC_FUN_adm + ALLOC_THK_adm + ALLOC_CON_adm + ALLOC_TUP_adm +
-    	ALLOC_TSO_adm +
+	ALLOC_FUN_adm + ALLOC_THK_adm + ALLOC_CON_adm + ALLOC_TUP_adm
+    	+ ALLOC_TSO_adm + ALLOC_BH_adm  + ALLOC_PAP_adm + ALLOC_PRIM_adm
 #ifdef PAR
-	ALLOC_FMBQ_adm + ALLOC_FME_adm + ALLOC_BF_adm +
+	+ ALLOC_FMBQ_adm + ALLOC_FME_adm + ALLOC_BF_adm
 #endif
-	ALLOC_BH_adm  + ALLOC_PAP_adm + ALLOC_PRIM_adm;
+      ;
 
   unsigned long tot_gds_wds = /* total number of words of ``good stuff'' allocated */
-	ALLOC_FUN_gds + ALLOC_THK_gds + ALLOC_CON_gds + ALLOC_TUP_gds +
-    	ALLOC_TSO_gds +
+	ALLOC_FUN_gds + ALLOC_THK_gds + ALLOC_CON_gds + ALLOC_TUP_gds
+    	+ ALLOC_TSO_gds + ALLOC_BH_gds  + ALLOC_PAP_gds + ALLOC_PRIM_gds
 #ifdef PAR
-	ALLOC_FMBQ_gds + ALLOC_FME_gds + ALLOC_BF_gds +
+	+ ALLOC_FMBQ_gds + ALLOC_FME_gds + ALLOC_BF_gds
 #endif
-
-	ALLOC_BH_gds  + ALLOC_PAP_gds + ALLOC_PRIM_gds;
+      ;
 
   unsigned long tot_slp_wds = /* total number of ``slop'' words allocated */
-	ALLOC_FUN_slp + ALLOC_THK_slp + ALLOC_CON_slp + ALLOC_TUP_slp +
-    	ALLOC_TSO_slp +
+	ALLOC_FUN_slp + ALLOC_THK_slp + ALLOC_CON_slp + ALLOC_TUP_slp
+    	+ ALLOC_TSO_slp + ALLOC_BH_slp  + ALLOC_PAP_slp + ALLOC_PRIM_slp
 #ifdef PAR
-	ALLOC_FMBQ_slp + ALLOC_FME_slp + ALLOC_BF_slp +
+	+ ALLOC_FMBQ_slp + ALLOC_FME_slp + ALLOC_BF_slp
 #endif
-	ALLOC_BH_slp  + ALLOC_PAP_slp + ALLOC_PRIM_slp;
+      ;
 
   unsigned long tot_wds = /* total words */
 	tot_adm_wds + tot_gds_wds + tot_slp_wds;
@@ -72,10 +71,19 @@ PrintTickyInfo(void)
   unsigned long tot_fun_direct_enters = ENT_STATIC_FUN_DIRECT_ctr + ENT_DYN_FUN_DIRECT_ctr;
   unsigned long tot_ind_enters = ENT_STATIC_IND_ctr + ENT_DYN_IND_ctr;
   
-  // This is the number of function calls which went via a
-  // slow/unknown application (one of the stg_ap_ functions).
-  unsigned long tot_fun_slow_enters =
-      SLOW_CALL_ctr - SLOW_CALL_BUILT_PAP_ctr - SLOW_CALL_NEW_PAP_ctr;
+  // This is the number of times we entered a function via some kind
+  // of slow call.  It amounts to all the slow applications, not
+  // counting those that were to too few arguments.
+  unsigned long tot_fun_slow_enters = 
+      SLOW_CALL_ctr - 
+      SLOW_CALL_FUN_TOO_FEW_ctr -
+      SLOW_CALL_PAP_TOO_FEW_ctr;
+
+  unsigned long tot_known_calls =
+      KNOWN_CALL_ctr + KNOWN_CALL_TOO_FEW_ARGS_ctr + 
+      + KNOWN_CALL_EXTRA_ARGS_ctr;
+  unsigned long tot_tail_calls =
+      UNKNOWN_CALL_ctr + tot_known_calls;
 
   unsigned long tot_enters =
 	tot_con_enters + tot_fun_direct_enters +
@@ -201,11 +209,21 @@ PrintTickyInfo(void)
 	ENT_PERM_IND_ctr,
 	PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
 
-  fprintf(tf,"\nCALLS: %ld  of which %ld (%.lf%%) were slow/unknown calls\n\t\t  [the rest went direct to the fast entry point]\n",
-	  tot_fun_direct_enters,
-	  tot_fun_slow_enters,
-	  PC(INTAVG(tot_fun_slow_enters,tot_fun_direct_enters))
-      );
+  fprintf(tf,"\nFUNCTION ENTRIES: %ld\n", tot_fun_direct_enters);
+
+  fprintf(tf, "\nTAIL CALLS: %ld, of which %ld (%.lf%%) were to known functions\n", 
+	  tot_tail_calls, tot_known_calls,
+	  PC(INTAVG(tot_known_calls,tot_tail_calls)));
+
+  fprintf(tf, "\nSLOW APPLICATIONS: %ld evaluated, %ld unevaluated\n",
+	  SLOW_CALL_ctr, SLOW_CALL_UNEVALD_ctr);
+  fprintf(tf, "\n");
+  fprintf(tf, "         Too few args   Correct args   Too many args\n");
+  fprintf(tf, "   FUN     %8ld       %8ld        %8ld\n", 
+	  SLOW_CALL_FUN_TOO_FEW_ctr, SLOW_CALL_FUN_CORRECT_ctr, SLOW_CALL_FUN_TOO_MANY_ctr);
+  fprintf(tf, "   PAP     %8ld       %8ld        %8ld\n", 
+	  SLOW_CALL_PAP_TOO_FEW_ctr, SLOW_CALL_PAP_CORRECT_ctr, SLOW_CALL_PAP_TOO_MANY_ctr);
+  fprintf(tf, "\n");
 
   fprintf(tf,"\nRETURNS: %ld\n", tot_returns);
   fprintf(tf,"%7ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
@@ -434,9 +452,36 @@ PrintTickyInfo(void)
   PR_CTR(ENT_STATIC_THK_ctr);
   PR_CTR(ENT_DYN_THK_ctr);
 
+  PR_CTR(SLOW_CALL_v_ctr);
+  PR_CTR(SLOW_CALL_f_ctr);
+  PR_CTR(SLOW_CALL_d_ctr);
+  PR_CTR(SLOW_CALL_l_ctr);
+  PR_CTR(SLOW_CALL_n_ctr);
+  PR_CTR(SLOW_CALL_p_ctr);
+  PR_CTR(SLOW_CALL_pv_ctr);
+  PR_CTR(SLOW_CALL_pp_ctr);
+  PR_CTR(SLOW_CALL_ppv_ctr);
+  PR_CTR(SLOW_CALL_ppp_ctr);
+  PR_CTR(SLOW_CALL_pppv_ctr);
+  PR_CTR(SLOW_CALL_pppp_ctr);
+  PR_CTR(SLOW_CALL_ppppp_ctr);
+  PR_CTR(SLOW_CALL_pppppp_ctr);
+  PR_CTR(SLOW_CALL_OTHER_ctr);
+
+  PR_CTR(UNKNOWN_CALL_ctr);
+  PR_CTR(KNOWN_CALL_ctr);
+  PR_CTR(KNOWN_CALL_TOO_FEW_ARGS_ctr);
+  PR_CTR(KNOWN_CALL_EXTRA_ARGS_ctr);
+  PR_CTR(MULTI_CHUNK_SLOW_CALL_ctr);
+  PR_CTR(MULTI_CHUNK_SLOW_CALL_CHUNKS_ctr);
   PR_CTR(SLOW_CALL_ctr);
-  PR_CTR(SLOW_CALL_BUILT_PAP_ctr);
-  PR_CTR(SLOW_CALL_NEW_PAP_ctr);
+  PR_CTR(SLOW_CALL_FUN_TOO_FEW_ctr);
+  PR_CTR(SLOW_CALL_FUN_CORRECT_ctr);
+  PR_CTR(SLOW_CALL_FUN_TOO_MANY_ctr);
+  PR_CTR(SLOW_CALL_PAP_TOO_FEW_ctr);
+  PR_CTR(SLOW_CALL_PAP_CORRECT_ctr);
+  PR_CTR(SLOW_CALL_PAP_TOO_MANY_ctr);
+  PR_CTR(SLOW_CALL_UNEVALD_ctr);
   PR_HST(SLOW_CALL_hst,0);
   PR_HST(SLOW_CALL_hst,1);
   PR_HST(SLOW_CALL_hst,2);
@@ -553,8 +598,8 @@ printRegisteredCounterInfo (FILE *tf)
     if ( ticky_entry_ctrs != NULL ) {
       fprintf(tf,"\n**************************************************\n\n");
     }
-    fprintf(tf, "%11s%11s%11s %6s%6s    %-11s%-30s\n",
-	    "Entries", "Slow ent", "Allocs", "Arity", "Stack", "Kinds", "Function");
+    fprintf(tf, "%11s%11s %6s%6s    %-11s%-30s\n",
+	    "Entries", "Allocs", "Arity", "Stack", "Kinds", "Function");
     fprintf(tf, "--------------------------------------------------------------------------------\n");
     /* Function name at the end so it doesn't mess up the tabulation */
 

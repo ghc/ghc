@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgRun.h,v 1.6 2001/05/25 18:33:46 sof Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * Tiny assembler 'layer' between the C and STG worlds.
  * 
@@ -12,7 +11,6 @@
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
-EXTFUN(StgReturn);
+RTS_FUN(StgReturn);
 
 #endif /* STGRUN_H */
-

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.172 2004/08/12 13:10:35 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.173 2004/08/13 13:06:42 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -12,7 +12,7 @@ module InteractiveUI (
 	ghciWelcomeMsg
    ) where
 
-#include "../includes/config.h"
+#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import CompManager

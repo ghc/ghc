@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.58 2004/08/10 09:02:41 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.59 2004/08/13 13:05:58 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -17,38 +17,39 @@ module CgExpr ( cgExpr ) where
 import Constants	( mAX_SPEC_SELECTEE_SIZE, mAX_SPEC_AP_SIZE )
 import StgSyn
 import CgMonad
-import AbsCSyn
-import AbsCUtils	( mkAbstractCs, getAmodeRep, shimFCallArg )
-import CLabel		( mkClosureTblLabel )
 
-import SMRep		( fixedHdrSize )
+import SMRep		( fixedHdrSize, isFollowableArg, CgRep(..), argMachRep,
+			  nonVoidArg, idCgRep, typeCgRep, typeHint,
+			  primRepToCgRep )
 import CoreSyn		( AltCon(..) )
+import CgProf		( emitSetCCC )
+import CgHeapery	( layOutDynConstr )
 import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, 
 			  nukeDeadBindings, addBindC, addBindsC )
 import CgCase		( cgCase, saveVolatileVarsAndRegs )
 import CgClosure	( cgRhsClosure, cgStdRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
 import CgLetNoEscape	( cgLetNoEscapeClosure )
-import CgRetConv	( dataReturnConvPrim )
-import CgTailCall	( cgTailCall, performReturn, performPrimReturn,
-			  mkDynamicAlgReturnCode, mkPrimReturnCode,
-			  tailCallPrimOp, ccallReturnUnboxedTuple
-			)
-import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo,
-			  mkApLFInfo, layOutDynConstr )
-import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
-import Id		( idPrimRep, Id )
+import CgCallConv	( dataReturnConvPrim )
+import CgTailCall
+import CgInfoTbls	( emitDirectReturnInstr )
+import CgForeignCall	( emitForeignCall, shimForeignCallArg )
+import CgPrimOp		( cgPrimOp )
+import CgUtils		( addIdReps, newTemp, assignTemp, cgLit, tagToClosure )
+import ClosureInfo	( mkSelectorLFInfo, mkApLFInfo )
+import Cmm		( CmmExpr(..), CmmStmt(..), CmmReg, nodeReg )
+import MachOp		( wordRep, MachHint )
 import VarSet
+import Literal		( literalType )
 import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, 
 			  PrimOp(..), PrimOpResultInfo(..) )
-import PrimRep		( PrimRep(..), isFollowableRep )
+import Id		( Id )
 import TyCon		( isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, typePrimRep, tyConAppArgs, 
-			  tyConAppTyCon, repType )
+import Type		( Type, tyConAppArgs, tyConAppTyCon, repType,
+			  PrimRep(VoidRep) )
 import Maybes		( maybeToBool )
 import ListSetOps	( assocMaybe )
-import Unique		( mkBuiltinUnique )
-import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
+import BasicTypes	( RecFlag(..) )
 import Util             ( lengthIs )
 import Outputable
 \end{code}
@@ -84,8 +85,8 @@ cgExpr (StgApp fun args) = cgTailCall fun args
 
 \begin{code}
 cgExpr (StgConApp con args)
-  = getArgAmodes args `thenFC` \ amodes ->
-    cgReturnDataCon con amodes
+  = do	{ amodes <- getArgAmodes args
+	; cgReturnDataCon con amodes }
 \end{code}
 
 Literals are similar to constructors; they return by putting
@@ -94,99 +95,100 @@ top of the stack.
 
 \begin{code}
 cgExpr (StgLit lit)
-  = performPrimReturn (text "literal" <+> ppr lit) (CLit lit)
+  = do  { cmm_lit <- cgLit lit
+	; performPrimReturn rep (CmmLit cmm_lit) }
+  where
+    rep = typeCgRep (literalType lit)
 \end{code}
 
 
 %********************************************************
 %*							*
-%*		STG PrimApps  (unboxed primitive ops)	*
+%* 	PrimOps and foreign calls.
 %*							*
 %********************************************************
 
-Here is where we insert real live machine instructions.
+NOTE about "safe" foreign calls: a safe foreign call is never compiled
+inline in a case expression.  When we see
 
-NOTE about _ccall_GC_:
-
-A _ccall_GC_ is treated as an out-of-line primop (returns True
-for primOpOutOfLine) so that when we see the call in case context
 	case (ccall ...) of { ... }
-we get a proper stack frame on the stack when we perform it.  When we
-get in a tail-call position, however, we need to actually perform the
-call, so we treat it as an inline primop.
+
+We generate a proper return address for the alternatives and push the
+stack frame before doing the call, so that in the event that the call
+re-enters the RTS the stack is in a sane state.
 
 \begin{code}
-cgExpr (StgOpApp op@(StgFCallOp _ _) args res_ty)
-  = primRetUnboxedTuple op args res_ty
+cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
+    {-
+	First, copy the args into temporaries.  We're going to push
+	a return address right before doing the call, so the args
+	must be out of the way.
+    -}
+    reps_n_amodes <- getArgAmodes stg_args
+    let 
+	-- Get the *non-void* args, and jiggle them with shimForeignCall
+	arg_exprs = [ shimForeignCallArg stg_arg expr 
+		    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
+		      nonVoidArg rep]
 
+    -- in
+    arg_tmps <- mapM assignTemp arg_exprs
+    let
+	arg_hints = zip arg_tmps (map (typeHint.stgArgType) stg_args)
+    -- in
+    {-
+	Now, allocate some result regs.
+    -}
+    (res_reps,res_regs,res_hints)  <- newUnboxedTupleRegs res_ty
+    ccallReturnUnboxedTuple (zip res_reps (map CmmReg res_regs)) $
+	emitForeignCall (zip res_regs res_hints) fcall 
+	   arg_hints emptyVarSet{-no live vars-}
+      
 -- tagToEnum# is special: we need to pull the constructor out of the table,
 -- and perform an appropriate return.
 
 cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty) 
   = ASSERT(isEnumerationTyCon tycon)
-    getArgAmode arg `thenFC` \amode ->
-	-- save the tag in a temporary in case amode overlaps
-	-- with node.
-    absC (CAssign dyn_tag amode)	`thenC`
-    performReturn (
-		CAssign (CReg node) 
-			(CVal (CIndex
-		          (CLbl (mkClosureTblLabel tycon) PtrRep)
-		          dyn_tag PtrRep) PtrRep))
-	    (\ sequel -> mkDynamicAlgReturnCode tycon dyn_tag sequel)
+    do	{ (_,amode) <- getArgAmode arg
+	; amode' <- assignTemp amode	-- We're going to use it twice,
+					-- so save in a temp if non-trivial
+	; stmtC (CmmAssign nodeReg (tagToClosure tycon amode'))
+	; performReturn (emitAlgReturnCode tycon amode') }
    where
-        dyn_tag = CTemp (mkBuiltinUnique 0) IntRep
-		-- The '0' is just to get a random spare temp
-	  --
-	  -- if you're reading this code in the attempt to figure
+	  -- If you're reading this code in the attempt to figure
 	  -- out why the compiler panic'ed here, it is probably because
 	  -- you used tagToEnum# in a non-monomorphic setting, e.g., 
 	  --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
-          --
 	  -- That won't work.
-          --
 	tycon = tyConAppTyCon res_ty
 
 
 cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
-  | primOpOutOfLine primop 
-  = tailCallPrimOp primop args
+  | primOpOutOfLine primop
+	= tailCallPrimOp primop args
 
-  | otherwise
-  = getArgAmodes args	`thenFC` \ arg_amodes ->
+  | ReturnsPrim VoidRep <- result_info
+	= do cgPrimOp [] primop args emptyVarSet
+	     performReturn emitDirectReturnInstr
 
-    case (getPrimOpResultInfo primop) of
+  | ReturnsPrim rep <- result_info
+	= do cgPrimOp [dataReturnConvPrim (primRepToCgRep rep)] 
+			primop args emptyVarSet
+	     performReturn emitDirectReturnInstr
 
-	ReturnsPrim kind ->
-	    let result_amode = CReg (dataReturnConvPrim kind) in
-	    performReturn 
-	      (COpStmt [result_amode] op arg_amodes [{-no vol_regs-}])
-	      (mkPrimReturnCode (text "primapp)" <+> ppr x))
-			  
-	-- otherwise, must be returning an enumerated type (eg. Bool).
-	-- we've only got the tag in R2, so we have to load the constructor
-	-- itself into R1.
+  | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
+	= do (reps, regs, _hints) <- newUnboxedTupleRegs res_ty
+	     cgPrimOp regs primop args emptyVarSet{-no live vars-}
+	     returnUnboxedTuple (zip reps (map CmmReg regs))
 
-	ReturnsAlg tycon
-	    | isUnboxedTupleTyCon tycon -> primRetUnboxedTuple op args res_ty
-
-	    | isEnumerationTyCon  tycon ->
-	     	performReturn
-	      	     (COpStmt [dyn_tag] op arg_amodes [{-no vol_regs-}])
-			  (\ sequel -> 
-			  absC (CAssign (CReg node) closure_lbl) `thenC`
-			  mkDynamicAlgReturnCode tycon dyn_tag sequel)
-
-            where
-	       -- Pull a unique out of thin air to put the tag in.  
-	       -- It shouldn't matter if this overlaps with anything - we're
-	       -- about to return anyway.
-	       dyn_tag = CTemp (mkBuiltinUnique 0) IntRep
-
-	       closure_lbl = CVal (CIndex
-			       (CLbl (mkClosureTblLabel tycon) PtrRep)
-			       dyn_tag PtrRep) PtrRep
-
+  | ReturnsAlg tycon <- result_info, isEnumerationTyCon tycon
+	-- c.f. cgExpr (...TagToEnumOp...)
+	= do tag_reg <- newTemp wordRep
+	     cgPrimOp [tag_reg] primop args emptyVarSet
+	     stmtC (CmmAssign nodeReg (tagToClosure tycon (CmmReg tag_reg)))
+	     performReturn (emitAlgReturnCode tycon (CmmReg tag_reg))
+  where
+	result_info = getPrimOpResultInfo primop
 \end{code}
 
 %********************************************************
@@ -227,20 +229,21 @@ cgExpr (StgLet (StgRec pairs) expr)
 
 \begin{code}
 cgExpr (StgLetNoEscape live_in_whole_let live_in_rhss bindings body)
-  =    	-- Figure out what volatile variables to save
-    nukeDeadBindings live_in_whole_let	`thenC`
-    saveVolatileVarsAndRegs live_in_rhss
-    	    `thenFC` \ (save_assts, rhs_eob_info, maybe_cc_slot) ->
+  = do	{  	-- Figure out what volatile variables to save
+	; nukeDeadBindings live_in_whole_let
+	; (save_assts, rhs_eob_info, maybe_cc_slot) 
+		<- saveVolatileVarsAndRegs live_in_rhss
 
 	-- Save those variables right now!
-    absC save_assts				`thenC`
+	; emitStmts save_assts
 
 	-- Produce code for the rhss
 	-- and add suitable bindings to the environment
-    cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot bindings `thenC`
+	; cgLetNoEscapeBindings live_in_rhss rhs_eob_info 
+			 	maybe_cc_slot bindings
 
 	-- Do the body
-    setEndOfBlockInfo rhs_eob_info (cgExpr body)
+	; setEndOfBlockInfo rhs_eob_info (cgExpr body) }
 \end{code}
 
 
@@ -252,17 +255,10 @@ cgExpr (StgLetNoEscape live_in_whole_let live_in_rhss bindings body)
 
 SCC expressions are treated specially. They set the current cost
 centre.
-\begin{code}
-cgExpr (StgSCC cc expr)
-  = ASSERT(sccAbleCostCentre cc)
-    costCentresC
-	FSLIT("SET_CCC")
-	[mkCCostCentre cc, mkIntCLit (if isSccCountCostCentre cc then 1 else 0)]
-    `thenC`
-    cgExpr expr
-\end{code}
 
-ToDo: counting of dict sccs ...
+\begin{code}
+cgExpr (StgSCC cc expr) = do emitSetCCC cc; cgExpr expr
+\end{code}
 
 %********************************************************
 %*							*
@@ -279,9 +275,9 @@ cgRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along so a binding can be set up
 
 cgRhs name (StgRhsCon maybe_cc con args)
-  = getArgAmodes args				`thenFC` \ amodes ->
-    buildDynCon name maybe_cc con amodes	`thenFC` \ idinfo ->
-    returnFC (name, idinfo)
+  = do	{ amodes <- getArgAmodes args
+	; idinfo <- buildDynCon name maybe_cc con amodes
+	; returnFC (name, idinfo) }
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
   = mkRhsClosure name cc bi srt fvs upd_flag args body
@@ -328,7 +324,7 @@ mkRhsClosure	bndr cc	bi srt
     cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr con idPrimRep params
+    (_, params_w_offsets) = layOutDynConstr con (addIdReps params)
 				-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
@@ -359,7 +355,7 @@ mkRhsClosure 	bndr cc bi srt
 		body@(StgApp fun_id args)
 
   | args `lengthIs` (arity-1)
- 	&& all isFollowableRep (map idPrimRep fvs) 
+ 	&& all isFollowableArg (map idCgRep fvs) 
  	&& isUpdatable upd_flag
  	&& arity <= mAX_SPEC_AP_SIZE 
 
@@ -370,17 +366,15 @@ mkRhsClosure 	bndr cc bi srt
 	lf_info = mkApLFInfo bndr upd_flag arity
 	-- the payload has to be in the correct order, hence we can't
  	-- just use the fvs.
-	payload    = StgVarArg fun_id : args
-	arity 	   = length fvs
+	payload = StgVarArg fun_id : args
+	arity 	= length fvs
 \end{code}
 
 The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
 mkRhsClosure bndr cc bi srt fvs upd_flag args body
-  = cgRhsClosure bndr cc bi srt fvs args body lf_info
-  where
-    lf_info = mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
+  = cgRhsClosure bndr cc bi srt fvs upd_flag args body
 \end{code}
 
 
@@ -392,20 +386,19 @@ mkRhsClosure bndr cc bi srt fvs upd_flag args body
 \begin{code}
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot 
 	(StgNonRec binder rhs)
-  = cgLetNoEscapeRhs live_in_rhss rhs_eob_info maybe_cc_slot 	
-		     NonRecursive binder rhs 
-    	    	    	    	`thenFC` \ (binder, info) ->
-    addBindC binder info
+  = do	{ (binder,info) <- cgLetNoEscapeRhs live_in_rhss rhs_eob_info 
+					    maybe_cc_slot 	
+					    NonRecursive binder rhs 
+	; addBindC binder info }
 
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot (StgRec pairs)
-  = fixC (\ new_bindings ->
-		addBindsC new_bindings 	`thenC`
-		listFCs [ cgLetNoEscapeRhs full_live_in_rhss 
+  = do	{ new_bindings <- fixC (\ new_bindings -> do
+		{ addBindsC new_bindings
+		; listFCs [ cgLetNoEscapeRhs full_live_in_rhss 
 				rhs_eob_info maybe_cc_slot Recursive b e 
-			| (b,e) <- pairs ]
-    ) `thenFC` \ new_bindings ->
+			  | (b,e) <- pairs ] })
 
-    addBindsC new_bindings
+	; addBindsC new_bindings }
   where
     -- We add the binders to the live-in-rhss set so that we don't
     -- delete the bindings for the binder from the environment!
@@ -443,41 +436,15 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
 
 Little helper for primitives that return unboxed tuples.
 
-
 \begin{code}
-primRetUnboxedTuple :: StgOp -> [StgArg] -> Type -> Code
-primRetUnboxedTuple op args res_ty
-  = getArgAmodes args	    `thenFC` \ arg_amodes1 ->
-    {-
-      For a foreign call, we might need to fiddle with some of the args:
-      for example, when passing a ByteArray#, we pass a ptr to the goods
-      rather than the heap object.
-    -}
-    let 
-	arg_amodes
-	  | StgFCallOp{} <- op = zipWith shimFCallArg args arg_amodes1
-	  | otherwise          = arg_amodes1
-    in
-    {-
-      put all the arguments in temporaries so they don't get stomped when
-      we push the return address.
-    -}
-    let
-      n_args		  = length args
-      arg_uniqs	          = map mkBuiltinUnique [0 .. n_args-1]
-      arg_reps		  = map getAmodeRep arg_amodes
-      arg_temps		  = zipWith CTemp arg_uniqs arg_reps
-    in
-    absC (mkAbstractCs (zipWith CAssign arg_temps arg_amodes)) `thenC`
-    {-
-      allocate some temporaries for the return values.
-    -}
-    let
-      ty_args     = tyConAppArgs (repType res_ty)
-      prim_reps   = map typePrimRep ty_args
-      temp_uniqs  = map mkBuiltinUnique [ n_args .. n_args + length ty_args - 1]
-      temp_amodes = zipWith CTemp temp_uniqs prim_reps
-    in
-    ccallReturnUnboxedTuple temp_amodes
-	(absC (COpStmt temp_amodes op arg_temps []))
+newUnboxedTupleRegs :: Type -> FCode ([CgRep], [CmmReg], [MachHint])
+newUnboxedTupleRegs res_ty =
+   let
+	ty_args = tyConAppArgs (repType res_ty)
+	(reps,hints) = unzip [ (rep, typeHint ty) | ty <- ty_args, 
+					   	    let rep = typeCgRep ty,
+					 	    nonVoidArg rep ]
+   in do
+   regs <- mapM (newTemp . argMachRep) reps
+   return (reps,regs,hints)
 \end{code}

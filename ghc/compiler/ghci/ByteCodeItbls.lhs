@@ -13,11 +13,11 @@ module ByteCodeItbls ( ItblEnv, ItblPtr, mkITbls ) where
 
 import Name		( Name, getName )
 import NameEnv
-import Type		( typePrimRep )
+import SMRep		( typeCgRep )
 import DataCon		( DataCon, dataConRepArgTys )
 import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Constants	( mIN_SIZE_NonUpdHeapObject )
-import ClosureInfo	( mkVirtHeapOffsets )
+import CgHeapery	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
 import Util             ( lengthIs, listLengthCmp )
 
@@ -87,8 +87,10 @@ make_constr_itbls cons
 
         mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr
-           = let (tot_wds, ptr_wds, _) 
-                    = mkVirtHeapOffsets typePrimRep (dataConRepArgTys dcon)
+           = let rep_args = [ (typeCgRep arg,arg) 
+			    | arg <- dataConRepArgTys dcon ]
+		 (tot_wds, ptr_wds, _) = mkVirtHeapOffsets rep_args
+
                  ptrs  = ptr_wds
                  nptrs = tot_wds - ptr_wds
                  nptrs_really

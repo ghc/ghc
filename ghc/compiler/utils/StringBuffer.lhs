@@ -27,6 +27,9 @@ module StringBuffer
          -- * Conversion
         lexemeToString,     -- :: StringBuffer -> Int -> String
         lexemeToFastString, -- :: StringBuffer -> Int -> FastString
+
+	 -- * Parsing integers
+	 parseInteger,
        ) where
 
 #include "HsVersions.h"
@@ -174,4 +177,13 @@ lexemeToFastString :: StringBuffer -> Int -> FastString
 lexemeToFastString _ 0 = mkFastString ""
 lexemeToFastString (StringBuffer fo _ current#) (I# len) =
     mkFastSubStringBA# fo current# len
+
+-- -----------------------------------------------------------------------------
+-- Parsing integer strings in various bases
+
+parseInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
+parseInteger buf len radix to_int 
+  = go 0 0
+  where go i x | i == len  = x
+	       | otherwise = go (i+1) (x * radix + toInteger (to_int (lookAhead buf i)))
 \end{code}

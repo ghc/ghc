@@ -24,24 +24,26 @@ import qualified PrintJava
 import OccurAnal	( occurAnalyseBinds )
 #endif
 
+import PprC		( writeCs )
+import CmmLint		( cmmLint )
 import Packages
 import DriverState	( getExplicitPackagesAnd, getPackageCIncludes )
 import FastString	( unpackFS )
-import AbsCSyn		( AbstractC )
-import PprAbsC		( dumpRealC, writeRealC )
+import Cmm		( Cmm )
 import HscTypes
 import CmdLineOpts
-import ErrUtils		( dumpIfSet_dyn, showPass )
+import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )
 import Module		( Module )
 import ListSetOps	( removeDupsEq )
+import Maybes		( firstJust )
 
-import Directory ( doesFileExist )
+import Directory	( doesFileExist )
+import Data.List	( intersperse )
 import Monad		( when )
 import IO
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -54,7 +56,7 @@ codeOutput :: DynFlags
 	   -> Module
 	   -> ForeignStubs
 	   -> Dependencies
-	   -> AbstractC			-- Compiled abstract C
+	   -> [Cmm]			-- Compiled C--
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
 
 codeOutput dflags this_mod foreign_stubs deps flat_abstractC
@@ -65,7 +67,17 @@ codeOutput dflags this_mod foreign_stubs deps flat_abstractC
 
     -- Dunno if the above comment is still meaningful now.  JRS 001024.
 
-    do	{ showPass dflags "CodeOutput"
+    do	{ when (dopt Opt_DoCmmLinting dflags) $ do
+		{ showPass dflags "CmmLint"
+		; let lints = map cmmLint flat_abstractC
+		; case firstJust lints of
+			Just err -> do { printDump err
+				       ; ghcExit 1
+				       }
+			Nothing  -> return ()
+		}
+
+	; showPass dflags "CodeOutput"
 	; let filenm = dopt_OutName dflags 
 	; stubs_exist <- outputForeignStubs dflags foreign_stubs
 	; case dopt_HscLang dflags of {
@@ -104,8 +116,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 \begin{code}
 outputC dflags filenm flat_absC 
 	(stub_h_exists, _) dependencies foreign_stubs
-  = do dumpIfSet_dyn dflags Opt_D_dump_realC "Real C" (dumpRealC flat_absC)
-
+  = do 
        -- figure out which header files to #include in the generated .hc file:
        --
        --   * extra_includes from packages
@@ -142,7 +153,7 @@ outputC dflags filenm flat_absC
 	  hPutStr h cc_injects
 	  when stub_h_exists $ 
 	     hPutStrLn h ("#include \"" ++ (hscStubHOutName dflags) ++ "\"")
-	  writeRealC h flat_absC
+	  writeCs h flat_absC
 \end{code}
 
 
@@ -158,9 +169,8 @@ outputAsm dflags filenm flat_absC
 #ifndef OMIT_NATIVE_CODEGEN
 
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
-       let (stix_final, ncg_output_d) = _scc_ "NativeCodeGen" 
-				        nativeCodeGen flat_absC ncg_uniqs
-       dumpIfSet_dyn dflags Opt_D_dump_stix "Final stix code" stix_final
+       ncg_output_d <- _scc_ "NativeCodeGen" 
+			  nativeCodeGen dflags flat_absC ncg_uniqs
        dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" (docToSDoc ncg_output_d)
        _scc_ "OutputAsm" doOutput filenm $
 	   \f -> printDoc LeftMode f ncg_output_d
@@ -247,7 +257,7 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
 	stub_c_file_exists
            <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
 		("#define IN_STG_CODE 0\n" ++ 
-		 "#include \"RtsAPI.h\"\n" ++
+		 "#include \"Rts.h\"\n" ++
 		 rts_includes ++
 		 cplusplus_hdr)
 		 cplusplus_ftr

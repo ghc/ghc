@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.45 2004/03/01 14:18:36 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -60,6 +59,9 @@ StgTSO *unblockOne(StgTSO *tso);
  */
 void raiseAsync(StgTSO *tso, StgClosure *exception);
 void raiseAsyncWithLock(StgTSO *tso, StgClosure *exception);
+
+/* raiseExceptionHelper */
+StgWord raiseExceptionHelper (StgTSO *tso, StgClosure *exception);
 
 /* awaitEvent(rtsBool wait)
  *
@@ -125,11 +127,11 @@ void    initThread(StgTSO *tso, nat stack_size);
 /* Context switch flag.
  * Locks required  : sched_mutex
  */
-extern nat context_switch;
-extern rtsBool interrupted;
+extern nat RTS_VAR(context_switch);
+extern rtsBool RTS_VAR(interrupted);
 
 /* In Select.c */
-extern nat timestamp;
+extern nat RTS_VAR(timestamp);
 
 /* Thread queues.
  * Locks required  : sched_mutex
@@ -139,19 +141,19 @@ extern nat timestamp;
 #if defined(GRAN)
 // run_queue_hds defined in GranSim.h
 #else
-extern  StgTSO *run_queue_hd, *run_queue_tl;
-extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
-extern  StgTSO *sleeping_queue;
+extern  StgTSO *RTS_VAR(run_queue_hd), *RTS_VAR(run_queue_tl);
+extern  StgTSO *RTS_VAR(blocked_queue_hd), *RTS_VAR(blocked_queue_tl);
+extern  StgTSO *RTS_VAR(sleeping_queue);
 #endif
 /* Linked list of all threads. */
-extern  StgTSO *all_threads;
+extern  StgTSO *RTS_VAR(all_threads);
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* Schedule.c has detailed info on what these do */
-extern Mutex       sched_mutex;
-extern Condition   returning_worker_cond;
-extern nat         rts_n_waiting_workers;
-extern nat         rts_n_waiting_tasks;
+extern Mutex       RTS_VAR(sched_mutex);
+extern Condition   RTS_VAR(returning_worker_cond);
+extern nat         RTS_VAR(rts_n_waiting_workers);
+extern nat         RTS_VAR(rts_n_waiting_tasks);
 #endif
 
 StgBool rtsSupportsBoundThreads(void);

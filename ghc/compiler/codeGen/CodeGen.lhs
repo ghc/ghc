@@ -19,39 +19,41 @@ module CodeGen ( codeGen ) where
 
 #include "HsVersions.h"
 
+import DriverState	( v_Build_tag, v_MainModIs )
+
 -- Kludge (??) so that CgExpr is reached via at least one non-SOURCE
 -- import.  Before, that wasn't the case, and CM therefore didn't 
 -- bother to compile it.
 import CgExpr           ( {-NOTHING!-} )	-- DO NOT DELETE THIS IMPORT
-
-import DriverState	( v_Build_tag, v_MainModIs )
-import StgSyn
+import CgProf
 import CgMonad
-import AbsCSyn
-import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN_Name, pREL_TOP_HANDLER )
-import CLabel		( mkSRTLabel, mkClosureLabel, 
-			  mkPlainModuleInitLabel, mkModuleInitLabel )
-import PprAbsC		( dumpRealC )
-import AbsCUtils	( mkAbstractCs, flattenAbsC )
-import CgBindery	( CgIdInfo, addBindC, addBindsC, getCAddrModeAndInfo )
+import CgBindery	( CgIdInfo, addBindC, addBindsC, getCgIdInfo,
+			  cgIdInfoId )
 import CgClosure	( cgTopRhsClosure )
-import CgCon		( cgTopRhsCon )
-import CgConTbls	( genStaticConBits )
-import ClosureInfo	( mkClosureLFInfo )
-import CmdLineOpts	( DynFlags, DynFlag(..),
-			  opt_SccProfilingOn, opt_EnsureSplittableC )
+import CgCon		( cgTopRhsCon, cgTyCon )
+import CgUtils		( cmmRegOffW, emitRODataLits, cmmNeWord, emitRtsCall )
+
+import CLabel		( mkSRTLabel, mkClosureLabel, moduleRegdLabel,
+			  mkPlainModuleInitLabel, mkModuleInitLabel )
+import Cmm
+import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
+import PprCmm		( pprCmms )
+import MachOp		( wordRep, MachHint(..) )
+
+import StgSyn
+import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN_Name, pREL_TOP_HANDLER )
+import CmdLineOpts	( DynFlags, DynFlag(..), opt_EnsureSplittableC,
+			  opt_SccProfilingOn )
+
 import HscTypes		( ForeignStubs(..), TypeEnv, typeEnvTyCons )
 import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
 import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
 import OccName		( mkLocalOcc )
-import PrimRep		( PrimRep(..) )
 import TyCon            ( isDataTyCon )
 import Module		( Module, mkModuleName )
-import BasicTypes	( TopLevelFlag(..) )
-import UniqSupply	( mkSplitUniqSupply )
 import ErrUtils		( dumpIfSet_dyn, showPass )
-import Panic		( assertPanic )
+import Panic		( assertPanic, trace )
 import qualified Module ( moduleName )
 
 #ifdef DEBUG
@@ -69,44 +71,37 @@ codeGen :: DynFlags
 	-> [Module]		-- directly-imported modules
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
 	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
-	-> IO AbstractC		-- Output
+	-> IO [Cmm]		-- Output
 
 codeGen dflags this_mod type_env foreign_stubs imported_mods 
 	cost_centre_info stg_binds
   = do	
-	showPass dflags "CodeGen"
-	fl_uniqs <- mkSplitUniqSupply 'f'
-	way <- readIORef v_Build_tag
-	mb_main_mod <- readIORef v_MainModIs
+  { showPass dflags "CodeGen"
+  ; way <- readIORef v_Build_tag
+  ; mb_main_mod <- readIORef v_MainModIs
 
-	let
-	    tycons	   = typeEnvTyCons type_env
-	    data_tycons    = filter isDataTyCon tycons
+  ; let     tycons	= typeEnvTyCons type_env
+	    data_tycons = filter isDataTyCon tycons
 
-	mapM_ (\x -> seq x (return ())) data_tycons
+-- Why?
+--   ; mapM_ (\x -> seq x (return ())) data_tycons
 
-	let
-
-	    cinfo          = MkCompInfo this_mod
-
-	    datatype_stuff = genStaticConBits cinfo data_tycons
-	    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
-	    init_stuff     = mkModuleInit way cost_centre_info 
-					  this_mod mb_main_mod
-			  	   	  foreign_stubs imported_mods
-
-	    abstractC = mkAbstractCs [ maybeSplitCode,
-				       init_stuff, 
-				       code_stuff,
-				       datatype_stuff]
+  ; code_stuff <- initC this_mod $ do 
+			{ cmm_binds  <- mapM (getCmm . cgTopBinding) stg_binds
+			; cmm_tycons <- mapM cgTyCon data_tycons
+			; cmm_init   <- getCmm (mkModuleInit way cost_centre_info 
+						     this_mod mb_main_mod
+					  	     foreign_stubs imported_mods)
+			; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init]) 
+			}
 		-- Put datatype_stuff after code_stuff, because the
 		-- datatype closure table (for enumeration types) to
 		-- (say) PrelBase_True_closure, which is defined in
 		-- code_stuff
 
-	dumpIfSet_dyn dflags Opt_D_dump_absC "Abstract C" (dumpRealC abstractC)
+  ; dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms code_stuff)
 
-	return $! flattenAbsC fl_uniqs abstractC
+  ; return code_stuff }
 \end{code}
 
 %************************************************************************
@@ -114,6 +109,43 @@ codeGen dflags this_mod type_env foreign_stubs imported_mods
 \subsection[codegen-init]{Module initialisation code}
 %*									*
 %************************************************************************
+
+/* -----------------------------------------------------------------------------
+   Module initialisation
+
+   The module initialisation code looks like this, roughly:
+
+	FN(__stginit_Foo) {
+ 	  JMP_(__stginit_Foo_1_p)
+	}
+
+	FN(__stginit_Foo_1_p) {
+	...
+	}
+
+   We have one version of the init code with a module version and the
+   'way' attached to it.  The version number helps to catch cases
+   where modules are not compiled in dependency order before being
+   linked: if a module has been compiled since any modules which depend on
+   it, then the latter modules will refer to a different version in their
+   init blocks and a link error will ensue.
+
+   The 'way' suffix helps to catch cases where modules compiled in different
+   ways are linked together (eg. profiled and non-profiled).
+
+   We provide a plain, unadorned, version of the module init code
+   which just jumps to the version with the label and way attached.  The
+   reason for this is that when using foreign exports, the caller of
+   startupHaskell() must supply the name of the init function for the "top"
+   module in the program, and we don't want to require that this name
+   has the version and way info appended to it.
+   -------------------------------------------------------------------------- */
+
+We initialise the module tree by keeping a work-stack, 
+	* pointed to by Sp
+	* that grows downward
+	* Sp points to the last occupied slot
+
 
 \begin{code}
 mkModuleInit 
@@ -123,60 +155,94 @@ mkModuleInit
 	-> Maybe String		-- Just m ==> we have flag: -main-is Foo.baz 
 	-> ForeignStubs
 	-> [Module]
-	-> AbstractC
+	-> Code
 mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
-  = let
-	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
+  = do	{ 	
 
-	register_foreign_exports 
-		= case foreign_stubs of
-			NoStubs			    -> []
-			ForeignStubs _ _ _ fe_bndrs -> map mk_export_register fe_bndrs
+	-- Allocate the static boolean that records if this
+	-- module has been registered already
+	; emitData Data [CmmDataLabel moduleRegdLabel, 
+			 CmmStaticLit zeroCLit]
 
-	mk_export_register bndr
-	  = CMacroStmt REGISTER_FOREIGN_EXPORT [lbl]
-	  where
-	    lbl = CLbl (mkClosureLabel (idName bndr)) PtrRep
-		-- we don't want/need to init GHC.Prim, so filter it out
+	; emitSimpleProc real_init_lbl $ do
+	    { 	-- The return-code pops the work stack by 
+	 	-- incrementing Sp, and then jumpd to the popped item
+	      ret_blk <- forkLabelledCode $ stmtsC
+			[ CmmAssign spReg (cmmRegOffW spReg 1)
+			, CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
 
-	mk_import_register mod
-	    | mod == gHC_PRIM = AbsCNop
-	    | otherwise	      = CMacroStmt REGISTER_IMPORT [
-				   CLbl (mkModuleInitLabel mod way) AddrRep
-				]
+	    ; init_blk <- forkLabelledCode $ do
+			    { mod_init_code; stmtC (CmmBranch ret_blk) }
+			
+	    ; stmtC (CmmCondBranch (cmmNeWord (CmmLit zeroCLit) mod_reg_val)
+			ret_blk)
+	    ; stmtC (CmmBranch init_blk)	    
+	    }
 
-	extra_imported_mods
-	  | Module.moduleName this_mod == main_mod_name = [ pREL_TOP_HANDLER ]
-	  | otherwise					= [ ]
 
-	register_mod_imports = 
-		map mk_import_register (imported_mods ++ extra_imported_mods)
+ 	    -- Make the "plain" procedure jump to the "real" init procedure
+	; emitSimpleProc plain_init_lbl jump_to_init
 
 	-- When compiling the module in which the 'main' function lives,
+	-- (that is, Module.moduleName this_mod == main_mod_name)
 	-- we inject an extra stg_init procedure for stg_init_ZCMain, for the 
 	-- RTS to invoke.  We must consult the -main-is flag in case the
 	-- user specified a different function to Main.main
-	main_mod_name = case mb_main_mod of
-			  Just mod_name -> mkModuleName mod_name
-			  Nothing	-> mAIN_Name
-	main_init_block
-	  | Module.moduleName this_mod /= main_mod_name 
-  	  = AbsCNop	-- The normal case
-	  | otherwise	-- this_mod contains the main function
-	  = CCodeBlock (mkPlainModuleInitLabel rOOT_MAIN)
-		       (CJump (CLbl (mkPlainModuleInitLabel this_mod) CodePtrRep))
-			     
-    in
-    mkAbstractCs [
-	cc_decls,
-        CModuleInitBlock (mkPlainModuleInitLabel this_mod)
-			 (mkModuleInitLabel this_mod way)
-		         (mkAbstractCs (register_foreign_exports ++
-				        cc_regs :
-				        register_mod_imports)),
-	main_init_block
-    ]
+	; whenC (Module.moduleName this_mod == main_mod_name)
+		(emitSimpleProc plain_main_init_lbl jump_to_init)
+    }
+  where
+    plain_init_lbl = mkPlainModuleInitLabel this_mod
+    real_init_lbl  = mkModuleInitLabel this_mod way
+    plain_main_init_lbl = mkPlainModuleInitLabel rOOT_MAIN
+
+    jump_to_init = stmtC (CmmJump (mkLblExpr real_init_lbl) [])
+
+    mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) wordRep
+
+    main_mod_name = case mb_main_mod of
+			Just mod_name -> mkModuleName mod_name
+			Nothing	      -> mAIN_Name
+
+    -- Main refers to GHC.TopHandler.runIO, so make sure we call the
+    -- init function for GHC.TopHandler.
+    extra_imported_mods
+	| Module.moduleName this_mod == main_mod_name = [pREL_TOP_HANDLER]
+	| otherwise			 	      = []
+
+    mod_init_code = do
+	{ 	-- Set mod_reg to 1 to record that we've been here
+	  stmtC (CmmStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1)))
+
+		-- Now do local stuff
+	; registerForeignExports foreign_stubs
+	; initCostCentres cost_centre_info
+	; mapCs (registerModuleImport way) (imported_mods++extra_imported_mods)
+	} 
+
+
+-----------------------
+registerModuleImport :: String -> Module -> Code
+registerModuleImport way mod 
+  | mod == gHC_PRIM
+  = nopC 
+  | otherwise 	-- Push the init procedure onto the work stack
+  = stmtsC [ CmmAssign spReg (cmmRegOffW spReg (-1))
+	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel mod way)) ]
+
+-----------------------
+registerForeignExports :: ForeignStubs -> Code
+registerForeignExports NoStubs 
+  = nopC
+registerForeignExports (ForeignStubs _ _ _ fe_bndrs)
+  = mapM_ mk_export_register fe_bndrs
+  where
+	mk_export_register bndr
+	  = emitRtsCall SLIT("getStablePtr") 
+		[ (CmmLit (CmmLabel (mkClosureLabel (idName bndr))), PtrHint) ]
 \end{code}
+
+
 
 Cost-centre profiling: Besides the usual stuff, we must produce
 declarations for the cost-centres defined in this module;
@@ -185,28 +251,16 @@ declarations for the cost-centres defined in this module;
 code-generator.)
 
 \begin{code}
-mkCostCentreStuff (local_CCs, extern_CCs, singleton_CCSs)
-  | not opt_SccProfilingOn = (AbsCNop, AbsCNop)
-  | otherwise = 
-	( mkAbstractCs (
-		map (CCostCentreDecl True)   local_CCs ++
-		map (CCostCentreDecl False)  extern_CCs ++
-		map CCostCentreStackDecl     singleton_CCSs),
-  	  mkAbstractCs (mkCcRegister local_CCs singleton_CCSs)
-	)
-  where
-    mkCcRegister ccs cc_stacks
-      = let
-	    register_ccs       = mkAbstractCs (map mk_register ccs)
-	    register_cc_stacks = mkAbstractCs (map mk_register_ccs cc_stacks)
-	in
-	[ register_ccs, register_cc_stacks ]
-      where
-	mk_register cc
-	  = CCallProfCCMacro FSLIT("REGISTER_CC") [mkCCostCentre cc]
-
-	mk_register_ccs ccs
-	  = CCallProfCCMacro FSLIT("REGISTER_CCS") [mkCCostCentreStack ccs]
+initCostCentres :: CollectedCCs -> Code
+-- Emit the declarations, and return code to register them
+initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
+  | not opt_SccProfilingOn = nopC
+  | otherwise
+  = do	{ mapM_ emitCostCentreDecl  	 local_CCs
+	; mapM_ emitCostCentreStackDecl  singleton_CCSs
+	; mapM_ emitRegisterCC           local_CCs
+	; mapM_ emitRegisterCCS          singleton_CCSs
+	}
 \end{code}
 
 %************************************************************************
@@ -228,44 +282,37 @@ variable.
 \begin{code}
 cgTopBinding :: (StgBinding,[(Id,[Id])]) -> Code
 cgTopBinding (StgNonRec id rhs, srts)
-  = absC maybeSplitCode	  	`thenC`
-    maybeExternaliseId id	`thenFC` \ id' ->
-    mapM_ (mkSRT [id']) srts	`thenC`
-    cgTopRhs id' rhs 	  	`thenFC` \ (id, info) ->
-    addBindC id info		`thenC`
-	-- Add the un-externalised Id to the envt, so we
-	-- find it when we look up occurrences
-    nopC
+  = do	{ id' <- maybeExternaliseId id
+	; mapM_ (mkSRT [id']) srts
+	; (id,info) <- cgTopRhs id' rhs
+	; addBindC id info 	-- Add the *un-externalised* Id to the envt,
+				-- so we find it when we look up occurrences
+	}
 
 cgTopBinding (StgRec pairs, srts)
-  = absC maybeSplitCode		  	`thenC`
-    let
-        (bndrs, rhss) = unzip pairs
-    in
-    mapFCs maybeExternaliseId bndrs	`thenFC` \ bndrs' ->
-    let
-	pairs' = zip bndrs' rhss
-    in
-    mapM_ (mkSRT bndrs')  srts		`thenC`
-    fixC (\ new_binds -> 
-		addBindsC new_binds		`thenC`
-		mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs'
-     )  `thenFC` \ new_binds -> 
-     nopC
+  = do	{ let (bndrs, rhss) = unzip pairs
+	; bndrs' <- mapFCs maybeExternaliseId bndrs
+	; let pairs' = zip bndrs' rhss
+	; mapM_ (mkSRT bndrs')  srts
+	; new_binds <- fixC (\ new_binds -> do 
+		{ addBindsC new_binds
+		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
+	; nopC }
 
 mkSRT :: [Id] -> (Id,[Id]) -> Code
 mkSRT these (id,[])  = nopC
 mkSRT these (id,ids)
-  = mapFCs remap ids `thenFC` \ ids ->
-    remap id	     `thenFC` \ id ->
-    absC (CSRT (mkSRTLabel (idName id)) (map (mkClosureLabel . idName) ids))
+  = do	{ ids <- mapFCs remap ids
+	; id  <- remap id
+	; emitRODataLits (mkSRTLabel (idName id)) 
+		       (map (CmmLabel . mkClosureLabel . idName) ids)
+	}
   where
-	-- sigh, better map all the ids against the environment in case they've
-	-- been externalised (see maybeExternaliseId below).
+	-- Sigh, better map all the ids against the environment in 
+	-- case they've been externalised (see maybeExternaliseId below).
     remap id = case filter (==id) these of
-		[] ->  getCAddrModeAndInfo id 
-				`thenFC` \ (id, _, _) -> returnFC id
 		(id':_) -> returnFC id'
+		[] -> do { info <- getCgIdInfo id; return (cgIdInfoId info) }
 
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the
@@ -280,12 +327,8 @@ cgTopRhs bndr (StgRhsCon cc con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
   = ASSERT(null fvs)    -- There should be no free variables
-    let 
-	srt_label = mkSRTLabel (idName bndr)
-	lf_info = mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args
-    in
-    setSRTLabel srt_label $ 
-      forkStatics (cgTopRhsClosure bndr cc bi srt args body lf_info)
+    setSRTLabel (mkSRTLabel (idName bndr)) $ 
+    forkStatics (cgTopRhsClosure bndr cc bi srt upd_flag args body)
 \end{code}
 
 
@@ -303,21 +346,17 @@ which refers to this name).
 maybeExternaliseId :: Id -> FCode Id
 maybeExternaliseId id
   | opt_EnsureSplittableC, 	-- Externalise the name for -split-objs
-    isInternalName name
-  = moduleName				 `thenFC` \ mod ->
-    returnFC (setIdName id (mkExternalName uniq mod new_occ Nothing (nameSrcLoc name)))
-  | otherwise		
-  = returnFC id
+    isInternalName name = do { mod <- moduleName
+			     ; returnFC (setIdName id (externalise mod)) }
+  | otherwise		= returnFC id
   where
-    name       = idName id
-    uniq       = nameUnique name
-    new_occ    = mkLocalOcc uniq (nameOccName name)
+    externalise mod = mkExternalName uniq mod new_occ Nothing loc
+    name    = idName id
+    uniq    = nameUnique name
+    new_occ = mkLocalOcc uniq (nameOccName name)
+    loc     = nameSrcLoc name
 	-- We want to conjure up a name that can't clash with any
 	-- existing name.  So we generate
 	--	Mod_$L243foo
 	-- where 243 is the unique.
-
-maybeSplitCode
-  | opt_EnsureSplittableC = CSplitMarker 
-  | otherwise             = AbsCNop
 \end{code}

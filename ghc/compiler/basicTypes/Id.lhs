@@ -15,7 +15,7 @@ module Id (
 
 	-- Taking an Id apart
 	idName, idType, idUnique, idInfo,
-	idPrimRep, isId, globalIdDetails,
+	isId, globalIdDetails, idPrimRep,
 	recordSelectorFieldLabel,
 
 	-- Modifying an Id
@@ -90,7 +90,8 @@ import Var		( Id, DictId,
 			  globalIdDetails
 			)
 import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId, mkExportedLocalId )
-import Type		( Type, typePrimRep, addFreeTyVars, seqType, splitTyConApp_maybe )
+import Type		( Type, typePrimRep, addFreeTyVars, seqType, 
+			  splitTyConApp_maybe, PrimRep )
 import TysPrim		( statePrimTyCon )
 import IdInfo 
 
@@ -105,7 +106,6 @@ import Name	 	( Name, OccName, nameIsLocalOrFrom,
 			) 
 import Module		( Module )
 import OccName		( EncodedFS, mkWorkerOcc )
-import PrimRep		( PrimRep )
 import FieldLabel	( FieldLabel )
 import Maybes		( orElse )
 import SrcLoc		( SrcLoc )

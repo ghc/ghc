@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.16 2003/11/26 12:14:26 simonmar Exp $
+ * $Id: Block.h,v 1.17 2004/08/13 13:09:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -47,12 +47,13 @@
  * on a 32-bit machine.
  */
 
-typedef struct _bdescr {
+#ifndef CMINUSMINUS
+typedef struct bdescr_ {
   StgPtr start;			/* start addr of memory */
   StgPtr free;			/* first free byte of memory */
-  struct _bdescr *link;		/* used for chaining blocks together */
+  struct bdescr_ *link;		/* used for chaining blocks together */
   union { 
-      struct _bdescr *back;	/* used (occasionally) for doubly-linked lists*/
+      struct bdescr_ *back;	/* used (occasionally) for doubly-linked lists*/
       StgWord *bitmap;
   } u;
   unsigned int gen_no;		/* generation */
@@ -65,6 +66,7 @@ typedef struct _bdescr {
   StgWord32 _padding[0];
 #endif
 } bdescr;
+#endif
 
 #if SIZEOF_VOID_P == 8
 #define BDESCR_SIZE  0x40
@@ -76,16 +78,24 @@ typedef struct _bdescr {
 #define BDESCR_SHIFT 5
 #endif
 
-// Block contains objects evacuated during this GC
+/* Block contains objects evacuated during this GC */
 #define BF_EVACUATED 1
-// Block is a large object
+/* Block is a large object */
 #define BF_LARGE     2
-// Block is pinned
+/* Block is pinned */
 #define BF_PINNED    4
-// Block is part of a compacted generation
+/* Block is part of a compacted generation */
 #define BF_COMPACTED 8
 
 /* Finding the block descriptor for a given block -------------------------- */
+
+#ifdef CMINUSMINUS
+
+#define Bdescr(p) \
+    ((((p) &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) \
+     | ((p) & ~MBLOCK_MASK))
+
+#else
 
 INLINE_HEADER bdescr *Bdescr(StgPtr p)
 {
@@ -94,6 +104,8 @@ INLINE_HEADER bdescr *Bdescr(StgPtr p)
      | ((W_)p & ~MBLOCK_MASK)
      );
 }
+
+#endif
 
 /* Useful Macros ------------------------------------------------------------ */
 
@@ -128,5 +140,21 @@ INLINE_HEADER bdescr *Bdescr(StgPtr p)
 
 #define BLOCKS_TO_MBLOCKS(n) \
    (1 + (W_)MBLOCK_ROUND_UP((n-BLOCKS_PER_MBLOCK) * BLOCK_SIZE) / MBLOCK_SIZE)
+
+
+/* Double-linked block lists: --------------------------------------------- */
+
+#ifndef CMINUSMINUS
+INLINE_HEADER void
+dbl_link_onto(bdescr *bd, bdescr **list)
+{
+  bd->link = *list;
+  bd->u.back = NULL;
+  if (*list) {
+    (*list)->u.back = bd; /* double-link the list */
+  }
+  *list = bd;
+}
+#endif
 
 #endif /* BLOCK_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.74 2004/03/22 11:48:30 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.75 2004/08/13 13:10:29 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -36,7 +36,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern struct RTS_FLAGS RtsFlags;
+// Flag Structure
+RTS_FLAGS RtsFlags;
 
 /*
  * Split argument lists

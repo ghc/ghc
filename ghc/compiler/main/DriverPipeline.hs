@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-#include "../includes/config.h"
+#include "../includes/ghcconfig.h"
 
 module DriverPipeline (
 
@@ -491,40 +491,8 @@ runPhase Cpp basename suff input_fn get_output_fn maybe_loc
 	   -- to the next phase of the pipeline.
           return (Just HsPp, maybe_loc, input_fn)
 	else do
-	    hscpp_opts	    <- getOpts opt_P
-       	    hs_src_cpp_opts <- readIORef v_Hs_source_cpp_opts
-
-	    cmdline_include_paths <- readIORef v_Include_paths
-
-	    pkg_include_dirs <- getPackageIncludePath []
-	    let include_paths = foldr (\ x xs -> "-I" : x : xs) []
-				  (cmdline_include_paths ++ pkg_include_dirs)
-
-	    verb <- getVerbFlag
-	    (md_c_flags, _) <- machdepCCOpts
-
 	    output_fn <- get_output_fn HsPp maybe_loc
-
-	    SysTools.runCpp ([SysTools.Option verb]
-			    ++ map SysTools.Option include_paths
-			    ++ map SysTools.Option hs_src_cpp_opts
-			    ++ map SysTools.Option hscpp_opts
-			    ++ map SysTools.Option md_c_flags
-			    ++ [ SysTools.Option     "-x"
-			       , SysTools.Option     "c"
-			       , SysTools.Option     input_fn
-	-- We hackily use Option instead of FileOption here, so that the file
-	-- name is not back-slashed on Windows.  cpp is capable of
-	-- dealing with / in filenames, so it works fine.  Furthermore
-	-- if we put in backslashes, cpp outputs #line directives
-	-- with *double* backslashes.   And that in turn means that
-	-- our error messages get double backslashes in them.
-	-- In due course we should arrange that the lexer deals
-	-- with these \\ escapes properly.
-			       , SysTools.Option     "-o"
-			       , SysTools.FileOption "" output_fn
-			       ])
-
+	    doCpp True{-raw-} False{-no CC opts-} input_fn output_fn
 	    return (Just HsPp, maybe_loc, output_fn)
 
 -------------------------------------------------------------------------------
@@ -660,6 +628,34 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
 		case hscLang dyn_flags of
                       HscNothing -> return (Nothing, Just location, output_fn)
 		      _ -> return (Just next_phase, Just location, output_fn)
+
+-----------------------------------------------------------------------------
+-- Cmm phase
+
+runPhase CmmCpp basename suff input_fn get_output_fn maybe_loc
+  = do
+       output_fn <- get_output_fn Cmm maybe_loc
+       doCpp False{-not raw-} True{-include CC opts-} input_fn output_fn	
+       return (Just Cmm, maybe_loc, output_fn)
+
+runPhase Cmm basename suff input_fn get_output_fn maybe_loc
+  = do
+        dyn_flags <- getDynFlags
+	hsc_lang <- hscMaybeAdjustLang (hscLang dyn_flags)
+	next_phase <- hscNextPhase hsc_lang
+	output_fn <- get_output_fn next_phase maybe_loc
+
+        let dyn_flags' = dyn_flags { hscLang = hsc_lang,
+				     hscOutName = output_fn,
+		   		     hscStubCOutName = basename ++ "_stub.c",
+				     hscStubHOutName = basename ++ "_stub.h",
+				     extCoreName = basename ++ ".hcr" }
+
+	ok <- hscCmmFile dyn_flags' input_fn
+
+	when (not ok) $ throwDyn (PhaseFailed "cmm" (ExitFailure 1))
+
+	return (Just next_phase, maybe_loc, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cc phase
@@ -1150,6 +1146,50 @@ doMkDLL o_files dep_packages = do
 -- -----------------------------------------------------------------------------
 -- Misc.
 
+doCpp :: Bool -> Bool -> FilePath -> FilePath -> IO ()
+doCpp raw include_cc_opts input_fn output_fn = do
+    hscpp_opts	    <- getOpts opt_P
+
+    cmdline_include_paths <- readIORef v_Include_paths
+
+    pkg_include_dirs <- getPackageIncludePath []
+    let include_paths = foldr (\ x xs -> "-I" : x : xs) []
+			  (cmdline_include_paths ++ pkg_include_dirs)
+
+    verb <- getVerbFlag
+
+    cc_opts <- if not include_cc_opts 
+		  then return []
+		  else do optc <- getOpts opt_c
+			  (md_c_flags, _) <- machdepCCOpts
+			  return (optc ++ md_c_flags)
+
+    let cpp_prog args | raw       = SysTools.runCpp args
+	              | otherwise = SysTools.runCc (SysTools.Option "-E" : args)
+
+    cpp_prog       ([SysTools.Option verb]
+		    ++ map SysTools.Option include_paths
+		    ++ map SysTools.Option hsSourceCppOpts
+		    ++ map SysTools.Option hscpp_opts
+		    ++ map SysTools.Option cc_opts
+		    ++ [ SysTools.Option     "-x"
+		       , SysTools.Option     "c"
+		       , SysTools.Option     input_fn
+	-- We hackily use Option instead of FileOption here, so that the file
+	-- name is not back-slashed on Windows.  cpp is capable of
+	-- dealing with / in filenames, so it works fine.  Furthermore
+	-- if we put in backslashes, cpp outputs #line directives
+	-- with *double* backslashes.   And that in turn means that
+	-- our error messages get double backslashes in them.
+	-- In due course we should arrange that the lexer deals
+	-- with these \\ escapes properly.
+		       , SysTools.Option     "-o"
+		       , SysTools.FileOption "" output_fn
+		       ])
+
+-- -----------------------------------------------------------------------------
+-- Misc.
+
 hscNextPhase :: HscLang -> IO Phase
 hscNextPhase hsc_lang = do
   split <- readIORef v_Split_object_files
@@ -1171,8 +1211,6 @@ hscMaybeAdjustLang current_hsc_lang = do
 	 | current_hsc_lang == HscInterpreted = current_hsc_lang
 	-- force -fvia-C if we are being asked for a .hc file
 	 | todo == StopBefore HCc  || keep_hc = HscC
-	-- force -fvia-C when profiling or ticky-ticky is on
-	 | opt_SccProfilingOn || opt_DoTickyProfiling = HscC
 	-- otherwise, stick to the plan
 	 | otherwise = current_hsc_lang
   return hsc_lang

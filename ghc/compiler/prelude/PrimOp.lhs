@@ -17,15 +17,15 @@ module PrimOp (
 
 #include "HsVersions.h"
 
-import PrimRep		-- most of it
 import TysPrim
 import TysWiredIn
 
 import NewDemand
 import Var		( TyVar )
 import OccName		( OccName, pprOccName, mkVarOcc )
-import TyCon		( TyCon, isPrimTyCon, tyConPrimRep )
-import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep, tyConAppTyCon )
+import TyCon		( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
+import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
+			  typePrimRep )
 import BasicTypes	( Arity, Boxity(..) )
 import Outputable
 import FastTypes

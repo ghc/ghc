@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.59 2004/08/12 12:12:54 simonmar Exp $
+-- $Id: Main.hs,v 1.60 2004/08/13 13:11:21 simonmar Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.17 2003/11/12 17:27:04 sof Exp $
+ * $Id: StgProf.h,v 1.18 2004/08/13 13:09:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -13,38 +13,34 @@
  * Data Structures 
  * ---------------------------------------------------------------------------*/  
 typedef struct _CostCentre {
-  int ccID;
+  StgInt ccID;
 
-  char *label;
-  char *module;
+  char * label;
+  char * module;
  
   /* used for accumulating costs at the end of the run... */
-  unsigned long time_ticks;
-  ullong        mem_alloc;
+  StgWord   time_ticks;
+  StgWord64 mem_alloc;
 
-  char is_caf;
+  StgInt    is_caf;
 
   struct _CostCentre *link;
 } CostCentre;
 
 
 typedef struct _CostCentreStack {
-  int ccsID;
+  StgInt ccsID;
 
   CostCentre *cc;
   struct _CostCentreStack *prevStack;
   struct _IndexTable *indexTable;
 
-  unsigned int selected;
-
-  ullong scc_count;
-
-  unsigned long time_ticks;
-
-  ullong mem_alloc;
-
-  unsigned long inherited_ticks;
-  ullong inherited_alloc;
+  StgWord    selected;
+  StgWord64  scc_count;
+  StgWord    time_ticks;
+  StgWord64  mem_alloc;
+  StgWord    inherited_ticks;
+  StgWord64  inherited_alloc;
 
   CostCentre *root;
 } CostCentreStack;
@@ -85,8 +81,30 @@ typedef struct _IndexTable {
    Pre-defined cost centres and cost centre stacks
    -------------------------------------------------------------------------- */
 
-extern CostCentreStack *CCCS;	        /* current CCS */
+extern CostCentreStack * RTS_VAR(CCCS);	        /* current CCS */
  
+#if IN_STG_CODE
+
+extern StgWord CC_MAIN[];	
+extern StgWord CCS_MAIN[];      /* Top CCS */
+
+extern StgWord CC_SYSTEM[];	
+extern StgWord CCS_SYSTEM[];    /* RTS costs */
+
+extern StgWord CC_GC[];
+extern StgWord CCS_GC[];	 /* Garbage collector costs */
+
+extern StgWord CC_SUBSUMED[];	
+extern StgWord CCS_SUBSUMED[];   /* Costs are subsumed by caller */
+
+extern StgWord CC_OVERHEAD[];
+extern StgWord CCS_OVERHEAD[];   /* Profiling overhead */
+
+extern StgWord CC_DONT_CARE[];
+extern StgWord CCS_DONT_CARE[];  /* shouldn't ever get set */
+
+#else
+
 extern CostCentre      CC_MAIN[];	
 extern CostCentreStack CCS_MAIN[];      /* Top CCS */
 
@@ -105,19 +123,23 @@ extern CostCentreStack CCS_OVERHEAD[];   /* Profiling overhead */
 extern CostCentre      CC_DONT_CARE[];
 extern CostCentreStack CCS_DONT_CARE[];  /* shouldn't ever get set */
 
-extern unsigned int CC_ID;	/* global ids */
-extern unsigned int CCS_ID;
-extern unsigned int HP_ID;
+#endif // IN_STG_CODE
+
+extern unsigned int RTS_VAR(CC_ID);	/* global ids */
+extern unsigned int RTS_VAR(CCS_ID);
+extern unsigned int RTS_VAR(HP_ID);
+
+extern unsigned int RTS_VAR(era);
 
 /* -----------------------------------------------------------------------------
  * Functions 
  * ---------------------------------------------------------------------------*/
 
-CostCentreStack *EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn );
+void EnterFunCCS ( CostCentreStack *ccsfn );
 CostCentreStack *PushCostCentre ( CostCentreStack *, CostCentre * );
 CostCentreStack *AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
 
-extern unsigned int entering_PAP;
+extern unsigned int RTS_VAR(entering_PAP);
 
 /* -----------------------------------------------------------------------------
  * Registering CCs
@@ -142,8 +164,8 @@ extern unsigned int entering_PAP;
 
  -------------------------------------------------------------------------- */
 
-extern CostCentre *CC_LIST;               /* registered CC list */
-extern CostCentreStack *CCS_LIST;         /* registered CCS list */
+extern CostCentre * RTS_VAR(CC_LIST);               /* registered CC list */
+extern CostCentreStack * RTS_VAR(CCS_LIST);         /* registered CCS list */
 
 #define REGISTER_CC(cc)					\
 	do {						\
@@ -208,7 +230,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 /* Restore the CCCS from a stack frame.
  * (addr should always be Sp->header.prof.ccs) 
  */
-#define RESTORE_CCCS(addr)   (CCCS = (CostCentreStack *)(addr))
+#define RESTORE_CCCS(addr)   (*CCCS = (CostCentreStack *)(addr))
 
 /* -----------------------------------------------------------------------------
  * Pushing a new cost centre (i.e. for scc annotations)
@@ -291,7 +313,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 
 #define ENTER_CCS_T(ccs)				\
         do {						\
-        CCCS = (CostCentreStack *)(ccs);		\
+        *CCCS = (CostCentreStack *)(ccs);		\
         CCCS_DETAIL_COUNT(CCCS->thunk_count);		\
         } while(0)      
  
@@ -305,12 +327,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  *  (b) The CCS is CAF-ish.
  * -------------------------------------------------------------------------- */
 
-#define ENTER_CCS_F(stack)						\
-        do {								\
-        CostCentreStack *ccs = (CostCentreStack *) (stack);		\
-        CCCS_DETAIL_COUNT(CCCS->function_count);			\
-        CCCS = EnterFunCCS(CCCS,ccs);				  	\
-        } while(0)
+#define ENTER_CCS_F(stack) EnterFunCCS(stack)
  
 #define ENTER_CCS_FCL(closure)  ENTER_CCS_F(CCS_HDR(closure))
 
@@ -343,7 +360,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 #define ENTER_CCS_PAP(stack) 			\
         do {					\
 	ENTER_CCS_F(stack);			\
-	entering_PAP = rtsTrue;			\
+	*entering_PAP = rtsTrue;		\
 	} while(0)
 
 #define ENTER_CCS_PAP_CL(closure)  \

@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachDeps.h,v 1.8 2002/12/11 15:36:37 simonmar Exp $
  *
  * (c) The University of Glasgow 2002
  * 
@@ -14,7 +13,7 @@
 #define MACHDEPS_H
 
 /* Sizes of C types come from here... */
-#include "config.h"
+#include "ghcconfig.h"
 
 /* Sizes of Haskell types follow.  These sizes correspond to:
  *   - the number of bytes in the primitive type (eg. Int#)

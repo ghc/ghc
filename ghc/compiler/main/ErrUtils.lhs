@@ -178,9 +178,7 @@ dumpIfSet_core dflags flag hdr doc
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
   | dopt flag dflags || verbosity dflags >= 4 
-  = if   flag `elem` [Opt_D_dump_stix, Opt_D_dump_asm]
-    then printForC stdout (mkDumpDoc hdr doc)
-    else printDump (mkDumpDoc hdr doc)
+  = printDump (mkDumpDoc hdr doc)
   | otherwise
   = return ()
 

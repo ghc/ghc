@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.37 2003/08/22 22:24:13 sof Exp $
+ * $Id: Profiling.c,v 1.38 2004/08/13 13:10:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -328,19 +328,19 @@ endProfiling ( void )
    -------------------------------------------------------------------------- */
 rtsBool entering_PAP;
 
-CostCentreStack *
-EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn )
+void
+EnterFunCCS ( CostCentreStack *ccsfn )
 {
   /* PAP_entry has already set CCCS for us */
   if (entering_PAP) {
     entering_PAP = rtsFalse;
-    return CCCS;
+    return;
   }
 
   if (ccsfn->root->is_caf == CC_IS_CAF) {
-    return AppendCCS(cccs,ccsfn);
+    CCCS = AppendCCS(CCCS,ccsfn);
   } else {
-    return ccsfn;
+    CCCS = ccsfn;
   }
 }
 

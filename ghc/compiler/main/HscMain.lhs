@@ -6,7 +6,7 @@
 
 \begin{code}
 module HscMain ( 
-	HscResult(..), hscMain, newHscEnv, hscBufferFrontEnd
+	HscResult(..), hscMain, newHscEnv, hscCmmFile, hscBufferFrontEnd
 #ifdef GHCI
 	, hscStmt, hscTcExpr, hscKcType, hscThing, 
 	, compileExpr
@@ -57,6 +57,7 @@ import CoreToStg	( coreToStg )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
+import CmmParse		( parseCmmFile )
 import CodeOutput	( codeOutput )
 
 import CmdLineOpts
@@ -447,6 +448,18 @@ hscBackEnd dflags
 
 	    return (stub_h_exists, stub_c_exists, Nothing)
    }
+
+
+hscCmmFile :: DynFlags -> FilePath -> IO Bool
+hscCmmFile dflags filename = do
+  maybe_cmm <- parseCmmFile dflags filename
+  case maybe_cmm of
+    Nothing -> return False
+    Just cmm -> do
+	codeOutput dflags no_mod NoStubs noDependencies [cmm]
+	return True
+  where
+	no_mod = panic "hscCmmFile: no_mod"
 
 
 myParseModule dflags src_filename

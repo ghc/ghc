@@ -1,21 +1,41 @@
+TODO in new NCG
+~~~~~~~~~~~~~~~
 
-Known bugs/issues in nativeGen, 000228 (JRS)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Are we being careful enough about narrowing those out-of-range CmmInts?
 
--- absC -> stix translation for GET_TAG and in fact anything
-   to do with the packed-halfword layout info itbl field is
-   pretty dubious.  I think I have it fixed for big and little
-   endian 32-bit, but it won't work at all on a 64 bit platform.
+- Register allocator:
+    - fixup code
+    - keep track of free stack slots
 
--- There may or may not be bugs in some of the x86 insn selector 
-   code in MachCode.lhs.  I have checked all of it against the 
-   Rules of the Game (+ Rules of the game for Amodes) recorded in 
-   that file, but am not 100% convinced that it is all correct.
-   I think most of it is, tho.
+    Optimisations:
 
--- It won't compile on Solaris or Alphas because the insn selectors
-   are not up-to-date.
+    - picking the assignment on entry to a block: better to defer this
+      until we know all the assignments.  In a loop, we should pick
+      the assignment from the looping jump (fixpointing?), so that any
+      fixup code ends up *outside* the loop.  Otherwise, we should
+      pick the assignment that results in the least fixup code.
 
--- NCG introduces a massive space leak; I think it generates all the
-   assembly code before printing any of it out (a depressingly 
-   familiar story ...).  Fixing this will await a working heap profiler.
+- splitting?
+
+-- -----------------------------------------------------------------------------
+-- x86 ToDos
+
+- x86 genCCall needs to tack on the @size for stdcalls (might not be in the
+  foreignlabel).
+
+- x86: should really clean up that IMUL64 stuff, and tell the code gen about
+  Intel imul instructions.
+
+- x86: we're not careful enough about making sure that we only use
+  byte-addressable registers in byte instructions.  Should we do it this
+  way, or stick to using 32-bit registers everywhere?
+
+- Use SSE for floating point, optionally.
+
+------------------------------------------------------------------------------
+-- Further optimisations:
+
+- We might be able to extend the scope of the inlining phase so it can
+  skip over more statements that don't affect the value of the inlined
+  expr.
+

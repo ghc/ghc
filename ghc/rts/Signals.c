@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.40 2003/10/31 23:24:47 sof Exp $
+ * $Id: Signals.c,v 1.41 2004/08/13 13:10:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,7 +16,6 @@
 #include "Signals.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-#include "StablePriv.h"
 
 #ifdef alpha_TARGET_ARCH
 # if defined(linux_TARGET_OS)

@@ -4,7 +4,6 @@
 % The Compilation Manager
 %
 \begin{code}
-{-# OPTIONS -fvia-C #-}
 module CompManager ( 
     ModuleGraph, ModSummary(..),
 

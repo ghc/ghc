@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: main.c,v 1.2 2003/08/01 14:50:50 panne Exp $
+ * $Id: main.c,v 1.3 2004/08/13 13:11:23 simonmar Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -17,7 +17,7 @@
  *	 form, be without fee and subject to these same conditions.
  * --------------------------------------------------------------------- */
 
-#include "config.h"
+#include "ghcconfig.h"
 
 #include <stdio.h>
 

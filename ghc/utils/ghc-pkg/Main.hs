@@ -29,7 +29,7 @@ import List ( isPrefixOf, isSuffixOf )
 
 import ParsePkgConfLite
 
-#include "../../includes/config.h"
+#include "../../includes/ghcconfig.h"
 
 #ifdef mingw32_HOST_OS
 import Foreign

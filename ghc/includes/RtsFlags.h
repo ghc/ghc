@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.45 2003/01/23 12:13:10 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.46 2004/08/13 13:09:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -73,15 +73,8 @@ struct COST_CENTRE_FLAGS {
     int	    msecsPerTick;    /* derived */
 };
 
-#ifdef PROFILING
 struct PROFILING_FLAGS {
     unsigned int	doHeapProfile;
-
-    nat                 profileInterval;      /* delta between samples (in ms) */
-    nat                 profileIntervalTicks; /* delta between samples (in 'ticks') */
-    rtsBool             includeTSOs;
-
-
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
 # define HEAP_BY_CCS		1
 # define HEAP_BY_MOD		2
@@ -89,6 +82,14 @@ struct PROFILING_FLAGS {
 # define HEAP_BY_TYPE		5
 # define HEAP_BY_RETAINER       6
 # define HEAP_BY_LDV            7
+
+# define HEAP_BY_INFOPTR        1      /* DEBUG only */
+# define HEAP_BY_CLOSURE_TYPE   2      /* DEBUG only */
+
+    nat                 profileInterval;      /* delta between samples (in ms) */
+    nat                 profileIntervalTicks; /* delta between samples (in 'ticks') */
+    rtsBool             includeTSOs;
+
 
     rtsBool		showCCSOnException;
 
@@ -103,15 +104,6 @@ struct PROFILING_FLAGS {
     char*               bioSelector;
 
 };
-#elif defined(DEBUG)
-# define NO_HEAP_PROFILING	0
-# define HEAP_BY_INFOPTR        1
-# define HEAP_BY_CLOSURE_TYPE   2
-struct PROFILING_FLAGS {
-    unsigned int  doHeapProfile;     /* heap profile using symbol table */
-
-};
-#endif /* DEBUG || PROFILING */
 
 struct CONCURRENT_FLAGS {
     int ctxtSwitchTime;		/* in milliseconds */
@@ -288,44 +280,38 @@ struct GRAN_FLAGS {
 };
 #endif /* GRAN */
 
-#ifdef TICKY_TICKY
 struct TICKY_FLAGS {
     rtsBool showTickyStats;
     FILE   *tickyFile;
 };
-#endif /* TICKY_TICKY */
 
 
 /* Put them together: */
 
-struct RTS_FLAGS {
-    struct GC_FLAGS	GcFlags;
-    struct CONCURRENT_FLAGS ConcFlags;
-
-#ifdef DEBUG
-    struct DEBUG_FLAGS	DebugFlags;
-#endif
-#if defined(PROFILING) || defined(PAR)
+typedef struct _RTS_FLAGS {
+	// The first portion of RTS_FLAGS is invariant.
+    struct GC_FLAGS	     GcFlags;
+    struct CONCURRENT_FLAGS  ConcFlags;
+    struct DEBUG_FLAGS	     DebugFlags;
     struct COST_CENTRE_FLAGS CcFlags;
-#endif
-#if defined(PROFILING) || defined(DEBUG)
-    struct PROFILING_FLAGS ProfFlags;
-#endif
+    struct PROFILING_FLAGS   ProfFlags;
+    struct TICKY_FLAGS	     TickyFlags;
+
 #if defined(SMP) || defined(PAR)
     struct PAR_FLAGS	ParFlags;
 #endif
 #ifdef GRAN
     struct GRAN_FLAGS	GranFlags;
 #endif
-#ifdef TICKY_TICKY
-    struct TICKY_FLAGS	TickyFlags;
-#endif
-};
+} RTS_FLAGS;
 
 #ifdef COMPILING_RTS_MAIN
-extern DLLIMPORT struct RTS_FLAGS RtsFlags;
+extern DLLIMPORT RTS_FLAGS RtsFlags;
+#elif IN_STG_CODE
+// Hack because the C code generator can't generate '&label'.
+extern RTS_FLAGS RtsFlags[];
 #else
-extern struct RTS_FLAGS RtsFlags;
+extern RTS_FLAGS RtsFlags;
 #endif
 
 /* Routines that operate-on/to-do-with RTS flags: */

@@ -1,106 +1,138 @@
-%
-% (c) The AQUA Project, Glasgow University, 1996-1998
-%
-\section[MachRegs]{Machine-specific info about registers}
-
-Also includes stuff about immediate operands, which are
-often/usually quite entangled with registers.
-
-(Immediates could be untangled from registers at some cost in tangled
-modules --- the pleasure has been foregone.)
+-- -----------------------------------------------------------------------------
+--
+-- (c) The University of Glasgow 1994-2004
+-- 
+-- Machine-specific info about registers.
+-- 
+-- Also includes stuff about immediate operands, which are
+-- often/usually quite entangled with registers.
+-- 
+-- (Immediates could be untangled from registers at some cost in tangled
+-- modules --- the pleasure has been foregone.)
+-- 
+-- -----------------------------------------------------------------------------
 
 \begin{code}
 #include "nativeGen/NCG.h"
 
 module MachRegs (
 
-        RegClass(..), regClass,
-	VRegUnique(..), pprVRegUnique, getHiVRegFromLo, 
-	Reg(..), isRealReg, isVirtualReg, getVRegUnique,
-        allocatableRegs, argRegs, allArgRegs, callClobberedRegs,
+	-- * Immediate values
+	Imm(..), strImmLit, litToImm,
 
-	Imm(..),
-	MachRegsAddr(..),
-
+	-- * Addressing modes
+	AddrMode(..),
 	addrOffset,
-	baseRegOffset,
-	callerSaves,
-	freeReg,
-	getNewRegNCG,
+
+	-- * The 'Reg' type
+	RegNo,
+	Reg(..), isRealReg, isVirtualReg,
+        RegClass(..), regClass,
+	getHiVRegFromLo, 
 	mkVReg,
-        get_MagicId_reg_or_addr,
-        get_MagicId_addr,
-        get_Regtable_addr_from_offset,
+
+	-- * Global registers
+        get_GlobalReg_reg_or_addr,
+	callerSaves,
+
+	-- * Machine-dependent register-related stuff
+        allocatableRegs, argRegs, allArgRegs, callClobberedRegs,
+	freeReg,
 	spRel,
-	strImmLit
 
 #if alpha_TARGET_ARCH
-	, allArgRegs
-	, fits8Bits
-	, fReg
-	, gp, pv, ra, sp, t9, t10, t11, t12, v0, f0, zeroh
+	allArgRegs,
+	fits8Bits,
+	fReg,
+	gp, pv, ra, sp, t9, t10, t11, t12, v0, f0, zeroh,
 #endif
 #if i386_TARGET_ARCH
-	, eax, ebx, ecx, edx, esi, esp
-	, fake0, fake1, fake2, fake3, fake4, fake5
+	eax, ebx, ecx, edx, esi, edi, ebp, esp,
+	fake0, fake1, fake2, fake3, fake4, fake5,
+	addrModeRegs,
 #endif
 #if sparc_TARGET_ARCH
-	, fits13Bits
-	, fpRel, gReg, iReg, lReg, oReg, largeOffsetError
-	, fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27
-	
+	fits13Bits,
+	fpRel, gReg, iReg, lReg, oReg, largeOffsetError,
+	fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27,
 #endif
 #if powerpc_TARGET_ARCH
-	, allFPArgRegs
-	, fits16Bits
-	, sp
-	, r3, r4, r27, r28
-	, f1, f20, f21
+	allFPArgRegs,
+	makeImmediate,
+	sp,
+	r3, r4, r27, r28,
+	f1, f20, f21,
 #endif
     ) where
 
 #include "HsVersions.h"
 
-import AbsCSyn		( MagicId(..) )
+#if i386_TARGET_ARCH
+# define STOLEN_X86_REGS 4
+-- HACK: go for the max
+#endif
+
+#include "../includes/MachRegs.h"
+
+import Cmm
+import MachOp		( MachRep(..) )
+
 import CLabel           ( CLabel, mkMainCapabilityLabel )
-import PrimRep		( PrimRep(..), isFloatingRep )
-import Stix		( StixExpr(..), StixReg(..),
-                          getUniqueNat, returnNat, thenNat, NatM )
 import Unique		( Unique )
 import Pretty
 import Outputable	( Outputable(..), pprPanic, panic )
 import qualified Outputable
+import Unique
+import Constants
 import FastTypes
-\end{code}
 
-% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#if powerpc_TARGET_ARCH
+#if __GLASGOW_HASKELL__ >= 504
+import Data.Word	( Word8, Word16, Word32 )
+import Data.Int 	( Int8, Int16, Int32 )
+#else
+import Word     	( Word8, Word16, Word32 )
+import Int 	        ( Int8, Int16, Int32 )
+#endif
+#endif
 
-\begin{code}
+-- -----------------------------------------------------------------------------
+-- Immediates
+
 data Imm
   = ImmInt	Int
   | ImmInteger	Integer	    -- Sigh.
   | ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-  | ImmLab	Bool Doc    -- Simple string label (underscore-able)
-                             -- Bool==True ==> in a different DLL
-  | ImmLit	Doc    -- Simple string
+  | ImmLit	Doc	    -- Simple string
   | ImmIndex    CLabel Int
   | ImmFloat	Rational
   | ImmDouble	Rational
-  IF_ARCH_sparc(
+#if sparc_TARGET_ARCH
   | LO Imm		    {- Possible restrictions... -}
   | HI Imm
-  ,IF_ARCH_powerpc(
+#endif
+#if powerpc_TARGET_ARCH
   | LO Imm
   | HI Imm
   | HA Imm	{- high halfword adjusted -}
-  ,))
+#if darwin_TARGET_OS
+        -- special dyld (dynamic linker) things
+  | ImmDyldNonLazyPtr CLabel  -- Llabel$non_lazy_ptr
+#endif
+#endif
 strImmLit s = ImmLit (text s)
-\end{code}
 
-% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+litToImm :: CmmLit -> Imm
+litToImm (CmmInt i _)        = ImmInteger i
+litToImm (CmmFloat f F32)    = ImmFloat f
+litToImm (CmmFloat f F64)    = ImmDouble f
+litToImm (CmmLabel l)        = ImmCLbl l
+litToImm (CmmLabelOff l off) = ImmIndex l off
 
-\begin{code}
-data MachRegsAddr
+-- -----------------------------------------------------------------------------
+-- Addressing modes
+
+data AddrMode
 #if alpha_TARGET_ARCH
   = AddrImm	Imm
   | AddrReg	Reg
@@ -126,7 +158,17 @@ type Displacement = Imm
   | AddrRegImm	Reg Imm
 #endif
 
-addrOffset :: MachRegsAddr -> Int -> Maybe MachRegsAddr
+#if i386_TARGET_ARCH
+addrModeRegs :: AddrMode -> [Reg]
+addrModeRegs (AddrBaseIndex b i _) =  b_regs ++ i_regs
+  where
+   b_regs = case b of { Just r -> [r]; _ -> [] }
+   i_regs = case i of { Just (r,_) -> [r]; _ -> [] }
+addrModeRegs _ = []
+#endif
+
+
+addrOffset :: AddrMode -> Int -> Maybe AddrMode
 
 addrOffset addr off
   = case addr of
@@ -135,10 +177,18 @@ addrOffset addr off
 #endif
 #if i386_TARGET_ARCH
       ImmAddr i off0	  -> Just (ImmAddr i (off0 + off))
+
       AddrBaseIndex r i (ImmInt n) -> Just (AddrBaseIndex r i (ImmInt (n + off)))
       AddrBaseIndex r i (ImmInteger n)
 	-> Just (AddrBaseIndex r i (ImmInt (fromInteger (n + toInteger off))))
-      _ -> Nothing
+
+      AddrBaseIndex r i (ImmCLbl lbl)
+	-> Just (AddrBaseIndex r i (ImmIndex lbl off))
+
+      AddrBaseIndex r i (ImmIndex lbl ix)
+	-> Just (AddrBaseIndex r i (ImmIndex lbl (ix+off)))
+
+      _ -> Nothing  -- in theory, shouldn't happen
 #endif
 #if sparc_TARGET_ARCH
       AddrRegImm r (ImmInt n)
@@ -156,7 +206,6 @@ addrOffset addr off
        | otherwise     -> Nothing
        
       _ -> Nothing
-
 #endif /* sparc */
 #if powerpc_TARGET_ARCH
       AddrRegImm r (ImmInt n)
@@ -168,10 +217,6 @@ addrOffset addr off
        | fits16Bits n2 -> Just (AddrRegImm r (ImmInt (fromInteger n2)))
        | otherwise     -> Nothing
        where n2 = n + toInteger off
-
-      AddrRegReg r (RealReg 0)
-       | fits16Bits off -> Just (AddrRegImm r (ImmInt off))
-       | otherwise     -> Nothing
        
       _ -> Nothing
 #endif /* powerpc */
@@ -201,118 +246,110 @@ largeOffsetError i
 #if powerpc_TARGET_ARCH
 fits16Bits :: Integral a => a -> Bool
 fits16Bits x = x >= -32768 && x < 32768
+
+makeImmediate :: Integral a => MachRep -> Bool -> a -> Maybe Imm
+
+makeImmediate rep signed x = fmap ImmInt (toI16 rep signed)
+    where
+        narrow I32 False = fromIntegral (fromIntegral x :: Word32)
+        narrow I16 False = fromIntegral (fromIntegral x :: Word16)
+        narrow I8  False = fromIntegral (fromIntegral x :: Word8)
+        narrow I32 True  = fromIntegral (fromIntegral x :: Int32)
+        narrow I16 True  = fromIntegral (fromIntegral x :: Int16)
+        narrow I8  True  = fromIntegral (fromIntegral x :: Int8)
+        
+        narrowed = narrow rep signed
+        
+        toI16 I32 True
+            | narrowed >= -32768 && narrowed < 32768 = Just narrowed
+            | otherwise = Nothing
+        toI16 I32 False
+            | narrowed >= 0 && narrowed < 65536 = Just narrowed
+            | otherwise = Nothing
+        toI16 _ _  = Just narrowed
 #endif
-\end{code}
 
-% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-@stgReg@: we map STG registers onto appropriate Stix Trees.  Either
-they map to real machine registers or stored as offsets from BaseReg.
-Given a MagicId, get_MagicId_reg_or_addr produces either the real
-register it is in, on this platform, or a StixExpr denoting the
-address in the register table holding it.  get_MagicId_addr always
-produces the register table address for it.
+-- @spRel@ gives us a stack relative addressing mode for volatile
+-- temporaries and for excess call arguments.  @fpRel@, where
+-- applicable, is the same but for the frame pointer.
 
-\begin{code}
-get_MagicId_reg_or_addr       :: MagicId -> Either Reg StixExpr
-get_MagicId_addr              :: MagicId -> StixExpr
-get_Regtable_addr_from_offset :: Int -> StixExpr
-
-get_MagicId_reg_or_addr mid
-   = case magicIdRegMaybe mid of
-        Just rr -> Left rr
-        Nothing -> Right (get_MagicId_addr mid)
-
-get_MagicId_addr BaseReg
-   = -- This arch doesn't have BaseReg in a register, so we have to 
-     -- use &MainRegTable.r instead.
-     StIndex PtrRep (StCLbl mkMainCapabilityLabel)
-                    (StInt (toInteger OFFW_Capability_r))
-get_MagicId_addr mid
-   = get_Regtable_addr_from_offset (baseRegOffset mid)
-
-get_Regtable_addr_from_offset offset_in_words
-   = let ptr_to_RegTable
-            = case magicIdRegMaybe BaseReg of
-                 Nothing 
-                    -> -- This arch doesn't have BaseReg in a register, so we have to 
-                       -- use &MainRegTable.r instead.
-                       StIndex PtrRep (StCLbl mkMainCapabilityLabel)
-                                      (StInt (toInteger OFFW_Capability_r))
-                 Just _
-                    -> -- It's in a reg, so leave it as it is
-                       StReg (StixMagicId BaseReg)
-     in
-         StIndex PtrRep ptr_to_RegTable (StInt (toInteger offset_in_words))
-\end{code}
-
-% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-@spRel@ gives us a stack relative addressing mode for volatile
-temporaries and for excess call arguments.  @fpRel@, where
-applicable, is the same but for the frame pointer.
-
-\begin{code}
 spRel :: Int	-- desired stack offset in words, positive or negative
-      -> MachRegsAddr
+      -> AddrMode
 
 spRel n
 #if i386_TARGET_ARCH
-  = AddrBaseIndex (Just esp) Nothing (ImmInt (n * BYTES_PER_WORD))
+  = AddrBaseIndex (Just esp) Nothing (ImmInt (n * wORD_SIZE))
 #else
-  = AddrRegImm sp (ImmInt (n * BYTES_PER_WORD))
+  = AddrRegImm sp (ImmInt (n * wORD_SIZE))
 #endif
 
 #if sparc_TARGET_ARCH
-fpRel :: Int -> MachRegsAddr
+fpRel :: Int -> AddrMode
     -- Duznae work for offsets greater than 13 bits; we just hope for
     -- the best
 fpRel n
-  = AddrRegImm fp (ImmInt (n * BYTES_PER_WORD))
+  = AddrRegImm fp (ImmInt (n * wORD_SIZE))
 #endif
-\end{code}
 
-%************************************************************************
-%*									*
-\subsection[Reg]{Real registers}
-%*									*
-%************************************************************************
 
-RealRegs are machine regs which are available for allocation, in the
-usual way.  We know what class they are, because that's part of the
-processor's architecture.
+-- -----------------------------------------------------------------------------
+-- Global registers
 
-VirtualRegs are virtual registers.  The register allocator will
-eventually have to map them into RealRegs, or into spill slots.
-VirtualRegs are allocated on the fly, usually to represent a single
-value in the abstract assembly code (i.e. dynamic registers are
-usually single assignment).  With the new register allocator, the
-single assignment restriction isn't necessary to get correct code,
-although a better register allocation will result if single assignment
-is used -- because the allocator maps a VirtualReg into a single
-RealReg, even if the VirtualReg has multiple live ranges.
+-- We map STG registers onto appropriate CmmExprs.  Either they map
+-- to real machine registers or stored as offsets from BaseReg.  Given
+-- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
+-- register it is in, on this platform, or a StixExpr denoting the
+-- address in the register table holding it.  get_MagicId_addr always
+-- produces the register table address for it.
 
-Virtual regs can be of either class, so that info is attached.
+get_GlobalReg_reg_or_addr       :: GlobalReg -> Either Reg CmmExpr
+get_GlobalReg_addr              :: GlobalReg -> CmmExpr
+get_Regtable_addr_from_offset   :: MachRep -> Int -> CmmExpr
 
-\begin{code}
+get_GlobalReg_reg_or_addr mid
+   = case globalRegMaybe mid of
+        Just rr -> Left rr
+        Nothing -> Right (get_GlobalReg_addr mid)
 
-data VRegUnique
-   = VRegUniqueLo Unique		-- lower part of a split quantity
-   | VRegUniqueHi Unique		-- upper part thereof
-     deriving (Eq, Ord)
+get_GlobalReg_addr BaseReg = regTableOffset 0
+get_GlobalReg_addr mid     = get_Regtable_addr_from_offset 
+				(globalRegRep mid) (baseRegOffset mid)
 
-instance Show VRegUnique where
-   show (VRegUniqueLo u) = show u
-   show (VRegUniqueHi u) = "_hi_" ++ show u
+-- Calculate a literal representing an offset into the register table.
+-- Used when we don't have an actual BaseReg to offset from.
+regTableOffset n = 
+  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
 
-pprVRegUnique :: VRegUnique -> Outputable.SDoc
-pprVRegUnique 
-   = Outputable.text . show
+get_Regtable_addr_from_offset rep offset
+   = case globalRegMaybe BaseReg of
+                 Nothing -> regTableOffset offset
+                 Just _  -> CmmRegOff (CmmGlobal BaseReg) offset
+
+-- ---------------------------------------------------------------------------
+-- Registers
+
+-- RealRegs are machine regs which are available for allocation, in
+-- the usual way.  We know what class they are, because that's part of
+-- the processor's architecture.
+
+-- VirtualRegs are virtual registers.  The register allocator will
+-- eventually have to map them into RealRegs, or into spill slots.
+-- VirtualRegs are allocated on the fly, usually to represent a single
+-- value in the abstract assembly code (i.e. dynamic registers are
+-- usually single assignment).  With the new register allocator, the
+-- single assignment restriction isn't necessary to get correct code,
+-- although a better register allocation will result if single
+-- assignment is used -- because the allocator maps a VirtualReg into
+-- a single RealReg, even if the VirtualReg has multiple live ranges.
+
+-- Virtual regs can be of either class, so that info is attached.
 
 -- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform
 -- when supplied with the vreg for the lower-half of the quantity.
-getHiVRegFromLo (VirtualRegI (VRegUniqueLo u)) 
-   = VirtualRegI (VRegUniqueHi u)
+-- (NB. Not reversible).
+getHiVRegFromLo (VirtualRegI u) 
+   = VirtualRegHi (newTagUnique u 'H') -- makes a pseudo-unique with tag 'H'
 getHiVRegFromLo other 
    = pprPanic "getHiVRegFromLo" (ppr other)
 
@@ -322,90 +359,66 @@ data RegClass
    | RcDouble
      deriving Eq
 
+type RegNo = Int
+
 data Reg
-   = RealReg     Int
-   | VirtualRegI VRegUnique
-   | VirtualRegF VRegUnique
-   | VirtualRegD VRegUnique
+   = RealReg      {-# UNPACK #-} !RegNo
+   | VirtualRegI  {-# UNPACK #-} !Unique
+   | VirtualRegHi {-# UNPACK #-} !Unique  -- High part of 2-word register
+   | VirtualRegF  {-# UNPACK #-} !Unique
+   | VirtualRegD  {-# UNPACK #-} !Unique
+   deriving (Eq,Ord)
 
-unRealReg (RealReg i) = i
-unRealReg vreg        = pprPanic "unRealReg on VirtualReg" (ppr vreg)
+-- We like to have Uniques for Reg so that we can make UniqFM and UniqSets 
+-- in the register allocator.
+instance Uniquable Reg where
+   getUnique (RealReg i)      = mkUnique 'C' i
+   getUnique (VirtualRegI u)  = u
+   getUnique (VirtualRegHi u) = u
+   getUnique (VirtualRegF u)  = u
+   getUnique (VirtualRegD u)  = u
 
-getVRegUnique :: Reg -> VRegUnique
-getVRegUnique (VirtualRegI vu) = vu
-getVRegUnique (VirtualRegF vu) = vu
-getVRegUnique (VirtualRegD vu) = vu
-getVRegUnique rreg             = pprPanic "getVRegUnique on RealReg" (ppr rreg)
-
-mkVReg :: Unique -> PrimRep -> Reg
-mkVReg u pk
+mkVReg :: Unique -> MachRep -> Reg
+mkVReg u rep
+   = case rep of
 #if sparc_TARGET_ARCH
-   = case pk of
-        FloatRep  -> VirtualRegF (VRegUniqueLo u)
-        DoubleRep -> VirtualRegD (VRegUniqueLo u)
-        other     -> VirtualRegI (VRegUniqueLo u)
+        F32   -> VirtualRegF u
 #else
-   = if isFloatingRep pk then VirtualRegD (VRegUniqueLo u) 
-                         else VirtualRegI (VRegUniqueLo u)
+        F32   -> VirtualRegD u
 #endif
+        F64   -> VirtualRegD u
+        other -> VirtualRegI u
 
-isVirtualReg (RealReg _)     = False
-isVirtualReg (VirtualRegI _) = True
-isVirtualReg (VirtualRegF _) = True
-isVirtualReg (VirtualRegD _) = True
+isVirtualReg :: Reg -> Bool
+isVirtualReg (RealReg _)      = False
+isVirtualReg (VirtualRegI _)  = True
+isVirtualReg (VirtualRegHi _) = True
+isVirtualReg (VirtualRegF _)  = True
+isVirtualReg (VirtualRegD _)  = True
+
+isRealReg :: Reg -> Bool
 isRealReg = not . isVirtualReg
 
-getNewRegNCG :: PrimRep -> NatM Reg
-getNewRegNCG pk
-   = getUniqueNat `thenNat` \ u -> returnNat (mkVReg u pk)
-
-instance Eq Reg where
-   (==) (RealReg i1)     (RealReg i2)     = i1 == i2
-   (==) (VirtualRegI u1) (VirtualRegI u2) = u1 == u2
-   (==) (VirtualRegF u1) (VirtualRegF u2) = u1 == u2
-   (==) (VirtualRegD u1) (VirtualRegD u2) = u1 == u2
-   (==) reg1             reg2             = False
-
-instance Ord Reg where
-   compare (RealReg i1)     (RealReg i2)     = compare i1 i2
-   compare (RealReg _)      (VirtualRegI _)  = LT
-   compare (RealReg _)      (VirtualRegF _)  = LT
-   compare (RealReg _)      (VirtualRegD _)  = LT
-
-   compare (VirtualRegI _)  (RealReg _)      = GT
-   compare (VirtualRegI u1) (VirtualRegI u2) = compare u1 u2
-   compare (VirtualRegI _)  (VirtualRegF _)  = LT
-   compare (VirtualRegI _)  (VirtualRegD _)  = LT
-
-   compare (VirtualRegF _)  (RealReg _)      = GT
-   compare (VirtualRegF _)  (VirtualRegI _)  = GT
-   compare (VirtualRegF u1) (VirtualRegF u2) = compare u1 u2
-   compare (VirtualRegF _)  (VirtualRegD _)  = LT
-
-   compare (VirtualRegD _)  (RealReg _)      = GT
-   compare (VirtualRegD _)  (VirtualRegI _)  = GT
-   compare (VirtualRegD _)  (VirtualRegF _)  = GT
-   compare (VirtualRegD u1) (VirtualRegD u2) = compare u1 u2
-
-
 instance Show Reg where
-    show (RealReg i)     = showReg i
-    show (VirtualRegI u) = "%vI_" ++ show u
-    show (VirtualRegF u) = "%vF_" ++ show u
-    show (VirtualRegD u) = "%vD_" ++ show u
+    show (RealReg i)      = showReg i
+    show (VirtualRegI u)  = "%vI_" ++ show u
+    show (VirtualRegHi u) = "%vHi_" ++ show u
+    show (VirtualRegF u)  = "%vF_" ++ show u
+    show (VirtualRegD u)  = "%vD_" ++ show u
 
 instance Outputable Reg where
     ppr r = Outputable.text (show r)
-\end{code}
 
-** Machine-specific Reg stuff: **
 
-The Alpha has 64 registers of interest; 32 integer registers and 32 floating
-point registers.  The mapping of STG registers to alpha machine registers
-is defined in StgRegs.h.  We are, of course, prepared for any eventuality.
-\begin{code}
+-- -----------------------------------------------------------------------------
+-- Machine-specific register stuff
+
+-- The Alpha has 64 registers of interest; 32 integer registers and 32 floating
+-- point registers.  The mapping of STG registers to alpha machine registers
+-- is defined in StgRegs.h.  We are, of course, prepared for any eventuality.
+
 #if alpha_TARGET_ARCH
-fReg :: Int -> Int
+fReg :: Int -> RegNo
 fReg x = (32 + x)
 
 v0, f0, ra, pv, gp, sp, zeroh :: Reg
@@ -423,8 +436,8 @@ t10 = realReg 24
 t11 = realReg 25
 t12 = realReg 27
 #endif
-\end{code}
 
+{-
 Intel x86 architecture:
 - All registers except 7 (esp) are available for use.
 - Only ebx, esi, edi and esp are available across a C call (they are callee-saves).
@@ -437,8 +450,8 @@ Intel x86 architecture:
 The fp registers are all Double registers; we don't have any RcFloat class
 regs.  @regClass@ barfs if you give it a VirtualRegF, and mkVReg above should
 never generate them.
+-}
 
-\begin{code}
 #if i386_TARGET_ARCH
 
 fake0, fake1, fake2, fake3, fake4, fake5, 
@@ -458,25 +471,30 @@ fake3 = RealReg 11
 fake4 = RealReg 12
 fake5 = RealReg 13
 
+-- On x86, we might want to have an 8-bit RegClass, which would
+-- contain just regs 1-4 (the others don't have 8-bit versions).
+-- However, we can get away without this at the moment because the
+-- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
 regClass (RealReg i)     = if i < 8 then RcInteger else RcDouble
-regClass (VirtualRegI u) = RcInteger
-regClass (VirtualRegD u) = RcDouble
-regClass (VirtualRegF u) = pprPanic "regClass(x86):VirtualRegF" 
+regClass (VirtualRegI  u) = RcInteger
+regClass (VirtualRegHi u) = RcInteger
+regClass (VirtualRegD  u) = RcDouble
+regClass (VirtualRegF  u) = pprPanic "regClass(x86):VirtualRegF" 
                                     (ppr (VirtualRegF u))
 
 regNames 
    = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp", 
       "%fake0", "%fake1", "%fake2", "%fake3", "%fake4", "%fake5", "%fake6"]
 
-showReg :: Int -> String
+showReg :: RegNo -> String
 showReg n
    = if   n >= 0 && n < 14
      then regNames !! n
      else "%unknown_x86_real_reg_" ++ show n
 
 #endif
-\end{code}
 
+{-
 The SPARC has 64 registers of interest; 32 integer registers and 32
 floating point registers.  The mapping of STG registers to SPARC
 machine registers is defined in StgRegs.h.  We are, of course,
@@ -485,18 +503,18 @@ prepared for any eventuality.
 The whole fp-register pairing thing on sparcs is a huge nuisance.  See
 fptools/ghc/includes/MachRegs.h for a description of what's going on
 here.
+-}
 
-\begin{code}
 #if sparc_TARGET_ARCH
 
-gReg,lReg,iReg,oReg,fReg :: Int -> Int
+gReg,lReg,iReg,oReg,fReg :: Int -> RegNo
 gReg x = x
 oReg x = (8 + x)
 lReg x = (16 + x)
 iReg x = (24 + x)
 fReg x = (32 + x)
 
-nCG_FirstFloatReg :: Int
+nCG_FirstFloatReg :: RegNo
 nCG_FirstFloatReg = unRealReg NCG_FirstFloatReg
 
 regClass (VirtualRegI u) = RcInteger
@@ -506,7 +524,7 @@ regClass (RealReg i) | i < 32                = RcInteger
                      | i < nCG_FirstFloatReg = RcDouble
                      | otherwise             = RcFloat
 
-showReg :: Int -> String
+showReg :: RegNo -> String
 showReg n
    | n >= 0  && n < 8   = "%g" ++ show n
    | n >= 8  && n < 16  = "%o" ++ show (n-8)
@@ -538,24 +556,25 @@ f0  = RealReg (fReg 0)
 f1  = RealReg (fReg 1)
 
 #endif
-\end{code}
 
+{-
 The PowerPC has 64 registers of interest; 32 integer registers and 32 floating
 point registers.
-\begin{code}
+-}
+
 #if powerpc_TARGET_ARCH
-fReg :: Int -> Int
+fReg :: Int -> RegNo
 fReg x = (32 + x)
 
-regClass (VirtualRegI u) = RcInteger
-regClass (VirtualRegF u) = RcFloat
+regClass (VirtualRegI  u) = RcInteger
+regClass (VirtualRegHi u) = RcInteger
+regClass (VirtualRegF  u) = pprPanic "regClass(ppc):VirtualRegF" 
+                                    (ppr (VirtualRegF u))
 regClass (VirtualRegD u) = RcDouble
 regClass (RealReg i) | i < 32                = RcInteger 
 		     | otherwise	     = RcDouble
-                  --   | i < nCG_FirstFloatReg = RcDouble
-                  --   | otherwise             = RcFloat
 
-showReg :: Int -> String
+showReg :: RegNo -> String
 showReg n
     | n >= 0 && n <= 31	  = "%r" ++ show n
     | n >= 32 && n <= 63  = "%f" ++ show (n - 32)
@@ -570,11 +589,12 @@ f1 = RealReg $ fReg 1
 f20 = RealReg $ fReg 20
 f21 = RealReg $ fReg 21
 #endif
-\end{code}
 
+{-
 Redefine the literals used for machine-registers with non-numeric
 names in the header files.  Gag me with a spoon, eh?
-\begin{code}
+-}
+
 #if alpha_TARGET_ARCH
 #define f0 32
 #define f1 33
@@ -795,201 +815,10 @@ names in the header files.  Gag me with a spoon, eh?
 #define fr31 63
 #endif
 #endif
-\end{code}
 
-\begin{code}
-baseRegOffset :: MagicId -> Int
 
-baseRegOffset (VanillaReg _ 1#)      = OFFSET_R1
-baseRegOffset (VanillaReg _ 2#)      = OFFSET_R2
-baseRegOffset (VanillaReg _ 3#)      = OFFSET_R3
-baseRegOffset (VanillaReg _ 4#)      = OFFSET_R4
-baseRegOffset (VanillaReg _ 5#)      = OFFSET_R5
-baseRegOffset (VanillaReg _ 6#)      = OFFSET_R6
-baseRegOffset (VanillaReg _ 7#)      = OFFSET_R7
-baseRegOffset (VanillaReg _ 8#)      = OFFSET_R8
-baseRegOffset (VanillaReg _ 9#)      = OFFSET_R9
-baseRegOffset (VanillaReg _ 10#)     = OFFSET_R10
-baseRegOffset (FloatReg  1#)         = OFFSET_F1
-baseRegOffset (FloatReg  2#)         = OFFSET_F2
-baseRegOffset (FloatReg  3#)         = OFFSET_F3
-baseRegOffset (FloatReg  4#)         = OFFSET_F4
-baseRegOffset (DoubleReg 1#)         = OFFSET_D1
-baseRegOffset (DoubleReg 2#)         = OFFSET_D2
-baseRegOffset Sp		     = OFFSET_Sp
-baseRegOffset SpLim		     = OFFSET_SpLim
-#ifdef OFFSET_L1
-baseRegOffset (LongReg _ 1#)         = OFFSET_L1
-#endif
-baseRegOffset Hp		     = OFFSET_Hp
-baseRegOffset HpLim		     = OFFSET_HpLim
-baseRegOffset CurrentTSO	     = OFFSET_CurrentTSO
-baseRegOffset CurrentNursery	     = OFFSET_CurrentNursery
-baseRegOffset HpAlloc		     = OFFSET_HpAlloc
-#ifdef NCG_DEBUG
-baseRegOffset BaseReg		     = panic "baseRegOffset:BaseReg"
-baseRegOffset CurCostCentre	     = panic "baseRegOffset:CurCostCentre"
-baseRegOffset VoidReg		     = panic "baseRegOffset:VoidReg"
-#endif
-\end{code}
-
-\begin{code}
-callerSaves :: MagicId -> Bool
-
-#ifdef CALLER_SAVES_Base
-callerSaves BaseReg			= True
-#endif
-#ifdef CALLER_SAVES_R1
-callerSaves (VanillaReg _ ILIT(1))	= True
-#endif
-#ifdef CALLER_SAVES_R2
-callerSaves (VanillaReg _ ILIT(2))    	= True
-#endif
-#ifdef CALLER_SAVES_R3
-callerSaves (VanillaReg _ ILIT(3))    	= True
-#endif
-#ifdef CALLER_SAVES_R4
-callerSaves (VanillaReg _ ILIT(4))	= True
-#endif
-#ifdef CALLER_SAVES_R5
-callerSaves (VanillaReg _ ILIT(5))	= True
-#endif
-#ifdef CALLER_SAVES_R6
-callerSaves (VanillaReg _ ILIT(6))	= True
-#endif
-#ifdef CALLER_SAVES_R7
-callerSaves (VanillaReg _ ILIT(7))	= True
-#endif
-#ifdef CALLER_SAVES_R8
-callerSaves (VanillaReg _ ILIT(8))	= True
-#endif
-#ifdef CALLER_SAVES_F1
-callerSaves (FloatReg 1#)		= True
-#endif
-#ifdef CALLER_SAVES_F2
-callerSaves (FloatReg 2#)		= True
-#endif
-#ifdef CALLER_SAVES_F3
-callerSaves (FloatReg 3#)		= True
-#endif
-#ifdef CALLER_SAVES_F4
-callerSaves (FloatReg 4#)		= True
-#endif
-#ifdef CALLER_SAVES_D1
-callerSaves (DoubleReg 1#)		= True
-#endif
-#ifdef CALLER_SAVES_D2
-callerSaves (DoubleReg 2#)		= True
-#endif
-#ifdef CALLER_SAVES_L1
-callerSaves (LongReg _ ILIT(1))		= True
-#endif
-#ifdef CALLER_SAVES_Sp
-callerSaves Sp				= True
-#endif
-#ifdef CALLER_SAVES_SpLim
-callerSaves SpLim			= True
-#endif
-#ifdef CALLER_SAVES_Hp
-callerSaves Hp				= True
-#endif
-#ifdef CALLER_SAVES_HpLim
-callerSaves HpLim			= True
-#endif
-#ifdef CALLER_SAVES_CurrentTSO
-callerSaves CurrentTSO			= True
-#endif
-#ifdef CALLER_SAVES_CurrentNursery
-callerSaves CurrentNursery		= True
-#endif
-callerSaves _				= False
-\end{code}
-
-\begin{code}
-magicIdRegMaybe :: MagicId -> Maybe Reg
-
-#ifdef REG_Base
-magicIdRegMaybe BaseReg			= Just (RealReg REG_Base)
-#endif
-#ifdef REG_R1
-magicIdRegMaybe (VanillaReg _ 1#) 	= Just (RealReg REG_R1)
-#endif 
-#ifdef REG_R2 
-magicIdRegMaybe (VanillaReg _ 2#) 	= Just (RealReg REG_R2)
-#endif 
-#ifdef REG_R3 
-magicIdRegMaybe (VanillaReg _ 3#) 	= Just (RealReg REG_R3)
-#endif 
-#ifdef REG_R4 
-magicIdRegMaybe (VanillaReg _ 4#) 	= Just (RealReg REG_R4)
-#endif 
-#ifdef REG_R5 
-magicIdRegMaybe (VanillaReg _ 5#) 	= Just (RealReg REG_R5)
-#endif 
-#ifdef REG_R6 
-magicIdRegMaybe (VanillaReg _ 6#) 	= Just (RealReg REG_R6)
-#endif 
-#ifdef REG_R7 
-magicIdRegMaybe (VanillaReg _ 7#) 	= Just (RealReg REG_R7)
-#endif 
-#ifdef REG_R8 
-magicIdRegMaybe (VanillaReg _ 8#) 	= Just (RealReg REG_R8)
-#endif
-#ifdef REG_R9 
-magicIdRegMaybe (VanillaReg _ 9#) 	= Just (RealReg REG_R9)
-#endif
-#ifdef REG_R10 
-magicIdRegMaybe (VanillaReg _ 10#)	= Just (RealReg REG_R10)
-#endif
-#ifdef REG_F1
-magicIdRegMaybe (FloatReg 1#)	= Just (RealReg REG_F1)
-#endif				 	
-#ifdef REG_F2			 	
-magicIdRegMaybe (FloatReg 2#)	= Just (RealReg REG_F2)
-#endif				 	
-#ifdef REG_F3			 	
-magicIdRegMaybe (FloatReg 3#)	= Just (RealReg REG_F3)
-#endif				 	
-#ifdef REG_F4			 	
-magicIdRegMaybe (FloatReg 4#)	= Just (RealReg REG_F4)
-#endif				 	
-#ifdef REG_D1			 	
-magicIdRegMaybe (DoubleReg 1#)	= Just (RealReg REG_D1)
-#endif				 	
-#ifdef REG_D2			 	
-magicIdRegMaybe (DoubleReg 2#)	= Just (RealReg REG_D2)
-#endif
-#ifdef REG_Sp	    
-magicIdRegMaybe Sp		   	= Just (RealReg REG_Sp)
-#endif
-#ifdef REG_Lng1			 	
-magicIdRegMaybe (LongReg _ ILIT(1))	= Just (RealReg REG_Lng1)
-#endif				 	
-#ifdef REG_Lng2			 	
-magicIdRegMaybe (LongReg _ ILIT(2))	= Just (RealReg REG_Lng2)
-#endif
-#ifdef REG_SpLim	    			
-magicIdRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
-#endif	    				
-#ifdef REG_Hp	   			
-magicIdRegMaybe Hp		   	= Just (RealReg REG_Hp)
-#endif	    				
-#ifdef REG_HpLim      			
-magicIdRegMaybe HpLim		   	= Just (RealReg REG_HpLim)
-#endif	    				
-#ifdef REG_CurrentTSO      			
-magicIdRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
-#endif	    				
-#ifdef REG_CurrentNursery      			
-magicIdRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
-#endif	    				
-magicIdRegMaybe _		   	= Nothing
-\end{code}
-
-\begin{code}
--------------------------------
 -- allMachRegs is the complete set of machine regs.
-allMachRegNos :: [Int]
+allMachRegNos :: [RegNo]
 allMachRegNos
    = IF_ARCH_alpha( [0..63],
      IF_ARCH_i386(  [0..13],
@@ -998,15 +827,15 @@ allMachRegNos
                      ++ [nCG_FirstFloatReg .. f31]),
      IF_ARCH_powerpc([0..63],
                    ))))
+
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
-allocatableRegs :: [Reg]
+allocatableRegs :: [RegNo]
 allocatableRegs
    = let isFree i = isFastTrue (freeReg i)
-     in  map RealReg (filter isFree allMachRegNos)
+     in  filter isFree allMachRegNos
 
--------------------------------
 -- these are the regs which we cannot assume stay alive over a
 -- C call.  
 callClobberedRegs :: [Reg]
@@ -1031,15 +860,19 @@ callClobberedRegs
           [fReg i | i <- [0..31]] )
 #endif /* sparc_TARGET_ARCH */
 #if powerpc_TARGET_ARCH
-    map RealReg ([0..12] ++ map fReg [0..13])
+#if darwin_TARGET_OS
+    map RealReg (0:[2..12] ++ map fReg [0..13])
+#elif linux_TARGET_OS
+    map RealReg (0:[2..13] ++ map fReg [0..13])
+#endif
 #endif /* powerpc_TARGET_ARCH */
 
--------------------------------
+
 -- argRegs is the set of regs which are read for an n-argument call to C.
 -- For archs which pass all args on the stack (x86), is empty.
 -- Sparc passes up to the first 6 args in regs.
 -- Dunno about Alpha.
-argRegs :: Int -> [Reg]
+argRegs :: RegNo -> [Reg]
 
 #if i386_TARGET_ARCH
 argRegs _ = panic "MachRegs.argRegs(x86): should not be used!"
@@ -1080,7 +913,7 @@ argRegs 8 = map RealReg [3..10]
 argRegs _ = panic "MachRegs.argRegs(powerpc): don't know about >8 arguments!"
 #endif /* powerpc_TARGET_ARCH */
 
--------------------------------
+
 -- all of the arg regs ??
 #if alpha_TARGET_ARCH
 allArgRegs :: [(Reg, Reg)]
@@ -1101,12 +934,16 @@ allArgRegs = panic "MachRegs.allArgRegs(x86): should not be used!"
 allArgRegs :: [Reg]
 allArgRegs = map RealReg [3..10]
 allFPArgRegs :: [Reg]
+#if darwin_TARGET_OS
 allFPArgRegs = map (RealReg . fReg) [1..13]
+#elif linux_TARGET_OS
+allFPArgRegs = map (RealReg . fReg) [1..8]
+#endif
 #endif /* powerpc_TARGET_ARCH */
 \end{code}
 
 \begin{code}
-freeReg :: Int -> FastBool
+freeReg :: RegNo -> FastBool
 
 #if alpha_TARGET_ARCH
 freeReg 26 = fastBool False  -- return address (ra)
@@ -1204,4 +1041,201 @@ freeReg REG_Hp   = fastBool False
 freeReg REG_HpLim = fastBool False
 #endif
 freeReg n               = fastBool True
+
+
+-- -----------------------------------------------------------------------------
+-- Information about global registers
+
+baseRegOffset :: GlobalReg -> Int
+
+baseRegOffset (VanillaReg 1)      = oFFSET_StgRegTable_rR1
+baseRegOffset (VanillaReg 2)      = oFFSET_StgRegTable_rR2
+baseRegOffset (VanillaReg 3)      = oFFSET_StgRegTable_rR3
+baseRegOffset (VanillaReg 4)      = oFFSET_StgRegTable_rR4
+baseRegOffset (VanillaReg 5)      = oFFSET_StgRegTable_rR5
+baseRegOffset (VanillaReg 6)      = oFFSET_StgRegTable_rR6
+baseRegOffset (VanillaReg 7)      = oFFSET_StgRegTable_rR7
+baseRegOffset (VanillaReg 8)      = oFFSET_StgRegTable_rR8
+baseRegOffset (VanillaReg 9)      = oFFSET_StgRegTable_rR9
+baseRegOffset (VanillaReg 10)     = oFFSET_StgRegTable_rR10
+baseRegOffset (FloatReg  1)       = oFFSET_StgRegTable_rF1
+baseRegOffset (FloatReg  2)       = oFFSET_StgRegTable_rF2
+baseRegOffset (FloatReg  3)       = oFFSET_StgRegTable_rF3
+baseRegOffset (FloatReg  4)       = oFFSET_StgRegTable_rF4
+baseRegOffset (DoubleReg 1)       = oFFSET_StgRegTable_rD1
+baseRegOffset (DoubleReg 2)       = oFFSET_StgRegTable_rD2
+baseRegOffset Sp		  = oFFSET_StgRegTable_rSp
+baseRegOffset SpLim		  = oFFSET_StgRegTable_rSpLim
+baseRegOffset (LongReg 1)         = oFFSET_StgRegTable_rL1
+baseRegOffset Hp		  = oFFSET_StgRegTable_rHp
+baseRegOffset HpLim		  = oFFSET_StgRegTable_rHpLim
+baseRegOffset CurrentTSO	  = oFFSET_StgRegTable_rCurrentTSO
+baseRegOffset CurrentNursery	  = oFFSET_StgRegTable_rCurrentNursery
+baseRegOffset HpAlloc		  = oFFSET_StgRegTable_rHpAlloc
+baseRegOffset GCEnter1		  = oFFSET_stgGCEnter1
+baseRegOffset GCFun		  = oFFSET_stgGCFun
+#ifdef DEBUG
+baseRegOffset BaseReg		  = panic "baseRegOffset:BaseReg"
+baseRegOffset _			  = panic "baseRegOffset:other"
+#endif
+
+
+-- | Returns 'True' if this global register is stored in a caller-saves
+-- machine register.
+
+callerSaves :: GlobalReg -> Bool
+
+#ifdef CALLER_SAVES_Base
+callerSaves BaseReg			= True
+#endif
+#ifdef CALLER_SAVES_R1
+callerSaves (VanillaReg _ ILIT(1))	= True
+#endif
+#ifdef CALLER_SAVES_R2
+callerSaves (VanillaReg _ ILIT(2))    	= True
+#endif
+#ifdef CALLER_SAVES_R3
+callerSaves (VanillaReg _ ILIT(3))    	= True
+#endif
+#ifdef CALLER_SAVES_R4
+callerSaves (VanillaReg _ ILIT(4))	= True
+#endif
+#ifdef CALLER_SAVES_R5
+callerSaves (VanillaReg _ ILIT(5))	= True
+#endif
+#ifdef CALLER_SAVES_R6
+callerSaves (VanillaReg _ ILIT(6))	= True
+#endif
+#ifdef CALLER_SAVES_R7
+callerSaves (VanillaReg _ ILIT(7))	= True
+#endif
+#ifdef CALLER_SAVES_R8
+callerSaves (VanillaReg _ ILIT(8))	= True
+#endif
+#ifdef CALLER_SAVES_F1
+callerSaves (FloatReg 1#)		= True
+#endif
+#ifdef CALLER_SAVES_F2
+callerSaves (FloatReg 2#)		= True
+#endif
+#ifdef CALLER_SAVES_F3
+callerSaves (FloatReg 3#)		= True
+#endif
+#ifdef CALLER_SAVES_F4
+callerSaves (FloatReg 4#)		= True
+#endif
+#ifdef CALLER_SAVES_D1
+callerSaves (DoubleReg 1#)		= True
+#endif
+#ifdef CALLER_SAVES_D2
+callerSaves (DoubleReg 2#)		= True
+#endif
+#ifdef CALLER_SAVES_L1
+callerSaves (LongReg _ ILIT(1))		= True
+#endif
+#ifdef CALLER_SAVES_Sp
+callerSaves Sp				= True
+#endif
+#ifdef CALLER_SAVES_SpLim
+callerSaves SpLim			= True
+#endif
+#ifdef CALLER_SAVES_Hp
+callerSaves Hp				= True
+#endif
+#ifdef CALLER_SAVES_HpLim
+callerSaves HpLim			= True
+#endif
+#ifdef CALLER_SAVES_CurrentTSO
+callerSaves CurrentTSO			= True
+#endif
+#ifdef CALLER_SAVES_CurrentNursery
+callerSaves CurrentNursery		= True
+#endif
+callerSaves _				= False
+
+
+-- | Returns 'Nothing' if this global register is not stored
+-- in a real machine register, otherwise returns @'Just' reg@, where
+-- reg is the machine register it is stored in.
+
+globalRegMaybe :: GlobalReg -> Maybe Reg
+
+#ifdef REG_Base
+globalRegMaybe BaseReg			= Just (RealReg REG_Base)
+#endif
+#ifdef REG_R1
+globalRegMaybe (VanillaReg 1) 		= Just (RealReg REG_R1)
+#endif 
+#ifdef REG_R2 
+globalRegMaybe (VanillaReg 2) 		= Just (RealReg REG_R2)
+#endif 
+#ifdef REG_R3 
+globalRegMaybe (VanillaReg 3) 		= Just (RealReg REG_R3)
+#endif 
+#ifdef REG_R4 
+globalRegMaybe (VanillaReg 4) 		= Just (RealReg REG_R4)
+#endif 
+#ifdef REG_R5 
+globalRegMaybe (VanillaReg 5) 		= Just (RealReg REG_R5)
+#endif 
+#ifdef REG_R6 
+globalRegMaybe (VanillaReg 6) 		= Just (RealReg REG_R6)
+#endif 
+#ifdef REG_R7 
+globalRegMaybe (VanillaReg 7) 		= Just (RealReg REG_R7)
+#endif 
+#ifdef REG_R8 
+globalRegMaybe (VanillaReg 8) 		= Just (RealReg REG_R8)
+#endif
+#ifdef REG_R9 
+globalRegMaybe (VanillaReg 9) 		= Just (RealReg REG_R9)
+#endif
+#ifdef REG_R10 
+globalRegMaybe (VanillaReg 10)		= Just (RealReg REG_R10)
+#endif
+#ifdef REG_F1
+globalRegMaybe (FloatReg 1)		= Just (RealReg REG_F1)
+#endif				 	
+#ifdef REG_F2			 	
+globalRegMaybe (FloatReg 2)		= Just (RealReg REG_F2)
+#endif				 	
+#ifdef REG_F3			 	
+globalRegMaybe (FloatReg 3)		= Just (RealReg REG_F3)
+#endif				 	
+#ifdef REG_F4			 	
+globalRegMaybe (FloatReg 4)		= Just (RealReg REG_F4)
+#endif				 	
+#ifdef REG_D1			 	
+globalRegMaybe (DoubleReg 1)		= Just (RealReg REG_D1)
+#endif				 	
+#ifdef REG_D2			 	
+globalRegMaybe (DoubleReg 2)		= Just (RealReg REG_D2)
+#endif
+#ifdef REG_Sp	    
+globalRegMaybe Sp		   	= Just (RealReg REG_Sp)
+#endif
+#ifdef REG_Lng1			 	
+globalRegMaybe (LongReg 1)		= Just (RealReg REG_Lng1)
+#endif				 	
+#ifdef REG_Lng2			 	
+globalRegMaybe (LongReg 2)		= Just (RealReg REG_Lng2)
+#endif
+#ifdef REG_SpLim	    			
+globalRegMaybe SpLim		   	= Just (RealReg REG_SpLim)
+#endif	    				
+#ifdef REG_Hp	   			
+globalRegMaybe Hp		   	= Just (RealReg REG_Hp)
+#endif	    				
+#ifdef REG_HpLim      			
+globalRegMaybe HpLim		   	= Just (RealReg REG_HpLim)
+#endif	    				
+#ifdef REG_CurrentTSO      			
+globalRegMaybe CurrentTSO	   	= Just (RealReg REG_CurrentTSO)
+#endif	    				
+#ifdef REG_CurrentNursery      			
+globalRegMaybe CurrentNursery	   	= Just (RealReg REG_CurrentNursery)
+#endif	    				
+globalRegMaybe _		   	= Nothing
+
+
 \end{code}

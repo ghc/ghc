@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LdvProfile.c,v 1.6 2003/11/12 17:49:08 sof Exp $
+ * $Id: LdvProfile.c,v 1.7 2004/08/13 13:10:05 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -10,7 +10,6 @@
 
 #ifdef PROFILING
 
-#include "Stg.h"
 #include "Rts.h"
 #include "LdvProfile.h"
 #include "RtsFlags.h"

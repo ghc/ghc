@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.23 2003/11/12 17:27:03 sof Exp $
+ * $Id: Rts.h,v 1.24 2004/08/13 13:09:27 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -18,6 +18,171 @@ extern "C" {
 #define IN_STG_CODE 0
 #endif
 #include "Stg.h"
+
+#include "RtsTypes.h"
+
+#if __GNUC__ >= 3
+/* Assume that a flexible array member at the end of a struct
+ * can be defined thus: T arr[]; */
+#define FLEXIBLE_ARRAY
+#else
+/* Assume that it must be defined thus: T arr[0]; */
+#define FLEXIBLE_ARRAY 0
+#endif
+
+#if defined(SMP) || defined(THREADED_RTS)
+#define RTS_SUPPORTS_THREADS 1
+#endif
+
+/* Fix for mingw stat problem (done here so it's early enough) */
+#ifdef mingw32_TARGET_OS
+#define __MSVCRT__ 1
+#endif
+
+#if defined(__GNUC__)
+#define GNU_ATTRIBUTE(at) __attribute__((at))
+#else
+#define GNU_ATTRIBUTE(at)
+#endif
+
+#if __GNUC__ >= 3 
+#define GNUC3_ATTRIBUTE(at) __attribute__((at))
+#else
+#define GNUC3_ATTRIBUTE(at)
+#endif
+
+/* 
+ * Empty structures isn't supported by all, so to define
+ * empty structures, please protect the defn with an
+ * #if SUPPORTS_EMPTY_STRUCTS. Similarly for use,
+ * employ the macro MAYBE_EMPTY_STRUCT():
+ *
+ *     MAYBE_EMPTY_STRUCT(structFoo, fieldName);
+ */
+#if SUPPORTS_EMPTY_STRUCTS
+# define MAYBE_EMPTY_STRUCT(a,b) a b;
+#else
+# define MAYBE_EMPTY_STRUCT(a,b) /* empty */
+#endif
+
+/*
+ * We often want to know the size of something in units of an
+ * StgWord... (rounded up, of course!)
+ */
+#define sizeofW(t) ((sizeof(t)+sizeof(W_)-1)/sizeof(W_))
+
+/* 
+ * It's nice to be able to grep for casts
+ */
+#define stgCast(ty,e) ((ty)(e))
+
+/* -----------------------------------------------------------------------------
+   Assertions and Debuggery
+   -------------------------------------------------------------------------- */
+
+#ifndef DEBUG
+#define ASSERT(predicate) /* nothing */
+#else
+
+void _stgAssert (char *, unsigned int);
+
+#define ASSERT(predicate)			\
+	if (predicate)				\
+	    /*null*/;				\
+	else					\
+	    _stgAssert(__FILE__, __LINE__)
+#endif /* DEBUG */
+
+/* 
+ * Use this on the RHS of macros which expand to nothing
+ * to make sure that the macro can be used in a context which
+ * demands a non-empty statement.
+ */
+
+#define doNothing() do { } while (0)
+
+/* -----------------------------------------------------------------------------
+   Include everything STG-ish
+   -------------------------------------------------------------------------- */
+
+/* System headers: stdlib.h is eeded so that we can use NULL.  It must
+ * come after MachRegs.h, because stdlib.h might define some inline
+ * functions which may only be defined after register variables have
+ * been declared.
+ */
+#include <stdlib.h>
+
+/* Global constaints */
+#include "Constants.h"
+
+/* Profiling information */
+#include "StgProf.h"
+#include "StgLdvProf.h"
+
+/* Storage format definitions */
+#include "StgFun.h"
+#include "Closures.h"
+#include "Liveness.h"
+#include "ClosureTypes.h"
+#include "InfoTables.h"
+#include "TSO.h"
+
+/* Info tables, closures & code fragments defined in the RTS */
+#include "StgMiscClosures.h"
+
+/* Simulated-parallel information */
+#include "GranSim.h"
+
+/* Parallel information */
+#include "Parallel.h"
+
+/* STG/Optimised-C related stuff */
+#include "SMP.h"
+#include "Block.h"
+
+#ifdef SMP
+#include <pthread.h>
+#endif
+
+/* GNU mp library */
+#include "gmp.h"
+
+/* Macros for STG/C code */
+#include "ClosureMacros.h"
+#include "StgTicky.h"
+#include "Stable.h"
+
+/* Runtime-system hooks */
+#include "Hooks.h"
+
+#include "ieee-flpt.h"
+
+#include "Signals.h"
+
+/* Misc stuff without a home */
+DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */
+DLL_IMPORT_RTS extern int    prog_argc;
+DLL_IMPORT_RTS extern char  *prog_name;
+
+extern void stackOverflow(void);
+
+extern void      __decodeDouble (MP_INT *man, I_ *_exp, StgDouble dbl);
+extern void      __decodeFloat  (MP_INT *man, I_ *_exp, StgFloat flt);
+
+#if defined(WANT_DOTNET_SUPPORT)
+#include "DNInvoke.h"
+#endif
+
+/* Creating and destroying an adjustor thunk and initialising the whole
+   adjustor thunk machinery. I cannot make myself create a separate .h file
+   for these three (sof.) 
+   
+*/
+extern void*   createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
+extern void    freeHaskellFunctionPtr(void* ptr);
+extern rtsBool initAdjustor(void);
+
+extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 
 /* -----------------------------------------------------------------------------
    RTS Exit codes

@@ -12,6 +12,8 @@ module Type (
 	-- Re-exports from Kind
 	module Kind,
 
+	-- Re-exports from TyCon
+	PrimRep(..),
 
 	mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, isTyVarTy,
 
@@ -86,14 +88,12 @@ import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
 		  isAlgTyCon, isSynTyCon, tyConArity, 
-	          tyConKind, getSynTyConDefn, 
-		  tyConPrimRep, 
+	          tyConKind, getSynTyConDefn, PrimRep(..), tyConPrimRep,
 		)
 
 -- others
 import CmdLineOpts	( opt_DictsStrict )
 import SrcLoc		( noSrcLoc )
-import PrimRep		( PrimRep(..) )
 import Unique		( Uniquable(..) )
 import Util		( mapAccumL, seqList, lengthIs, snocView )
 import Outputable
@@ -391,13 +391,20 @@ repType (NewTcApp tc tys) = ASSERT( tys `lengthIs` tyConArity tc )
 repType ty	 	  = ty
 
 
+-- ToDo: this could be moved to the code generator, using splitTyConApp instead
+-- of inspecting the type directly.
 typePrimRep :: Type -> PrimRep
 typePrimRep ty = case repType ty of
 		   TyConApp tc _ -> tyConPrimRep tc
 		   FunTy _ _	 -> PtrRep
-		   AppTy _ _	 -> PtrRep	-- ??
+		   AppTy _ _	 -> PtrRep	-- See note below
 		   TyVarTy _	 -> PtrRep
 		   other	 -> pprPanic "typePrimRep" (ppr ty)
+	-- Types of the form 'f a' must be of kind *, not *#, so
+	-- we are guaranteed that they are represented by pointers.
+	-- The reason is that f must have kind *->*, not *->*#, because
+	-- (we claim) there is no way to constrain f's kind any other
+	-- way.
 
 -- new_type_rep doesn't ask any questions: 
 -- it just expands newtype, whether recursive or not
@@ -405,7 +412,6 @@ new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
 			     case newTyConRep new_tycon of
 				 (tvs, rep_ty) -> substTyWith tvs tys rep_ty
 \end{code}
-
 
 
 ---------------------------------------------------------------------

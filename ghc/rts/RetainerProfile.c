@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.10 2003/05/16 14:39:29 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.11 2004/08/13 13:10:28 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -26,11 +26,9 @@
 #include "Schedule.h"
 #include "Printer.h"
 #include "Storage.h"
-#include "StoragePriv.h"
 #include "RtsFlags.h"
 #include "Weak.h"
 #include "Sanity.h"
-#include "StablePriv.h"
 #include "Profiling.h"
 #include "Stats.h"
 #include "BlockAlloc.h"
@@ -334,11 +332,11 @@ init_srt_fun( stackPos *info, StgFunInfoTable *infoTable )
 {
     if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
 	info->type = posTypeLargeSRT;
-	info->next.large_srt.srt = (StgLargeSRT *)infoTable->srt;
+	info->next.large_srt.srt = (StgLargeSRT *)infoTable->f.srt;
 	info->next.large_srt.offset = 0;
     } else {
 	info->type = posTypeSRT;
-	info->next.srt.srt = (StgClosure **)(infoTable->srt);
+	info->next.srt.srt = (StgClosure **)(infoTable->f.srt);
 	info->next.srt.srt_bitmap = infoTable->i.srt_bitmap;
     }
 }
@@ -1357,16 +1355,16 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    dyn = ((StgRetDyn *)p)->liveness;
 
 	    // traverse the bitmap first
-	    bitmap = GET_LIVENESS(dyn);
+	    bitmap = RET_DYN_LIVENESS(dyn);
 	    p      = (P_)&((StgRetDyn *)p)->payload[0];
 	    size   = RET_DYN_BITMAP_SIZE;
 	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 	    
 	    // skip over the non-ptr words
-	    p += GET_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
+	    p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
 	    
 	    // follow the ptr words
-	    for (size = GET_PTRS(dyn); size > 0; size--) {
+	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
 		retainClosure((StgClosure *)*p, c, c_child_r);
 		p++;
 	    }
@@ -1381,21 +1379,21 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    fun_info = get_fun_itbl(ret_fun->fun);
 	    
 	    p = (P_)&ret_fun->payload;
-	    switch (fun_info->fun_type) {
+	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
-		bitmap = BITMAP_BITS(fun_info->bitmap);
-		size = BITMAP_SIZE(fun_info->bitmap);
+		bitmap = BITMAP_BITS(fun_info->f.bitmap);
+		size = BITMAP_SIZE(fun_info->f.bitmap);
 		p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 		break;
 	    case ARG_GEN_BIG:
-		size = ((StgLargeBitmap *)fun_info->bitmap)->size;
-		retain_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, 
+		size = ((StgLargeBitmap *)fun_info->f.bitmap)->size;
+		retain_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, 
 				    size, c, c_child_r);
 		p += size;
 		break;
 	    default:
-		bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
-		size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->fun_type]);
+		bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+		size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
 		p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 		break;
 	    }
@@ -1437,14 +1435,14 @@ retain_PAP (StgPAP *pap, retainer c_child_r)
     p = (StgPtr)pap->payload;
     size = pap->n_args;
 
-    switch (fun_info->fun_type) {
+    switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.bitmap);
 	p = retain_small_bitmap(p, pap->n_args, bitmap, 
 				(StgClosure *)pap, c_child_r);
 	break;
     case ARG_GEN_BIG:
-	retain_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap,
+	retain_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap,
 			    size, (StgClosure *)pap, c_child_r);
 	p += size;
 	break;
@@ -1454,7 +1452,7 @@ retain_PAP (StgPAP *pap, retainer c_child_r)
 	p += size;
 	break;
     default:
-	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
 	p = retain_small_bitmap(p, pap->n_args, bitmap, 
 				(StgClosure *)pap, c_child_r);
 	break;

@@ -1,5 +1,5 @@
-#include "config.h"
-#include "Derived.h"
+#include "ghcconfig.h"
+#include "RtsConfig.h"
 
 /* The RTS is just another package! */
 Package {

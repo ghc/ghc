@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TailCalls.h,v 1.15 2003/10/12 13:24:52 igloo Exp $
+ * $Id: TailCalls.h,v 1.16 2004/08/13 13:09:41 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,7 +16,7 @@
 
 #ifdef USE_MINIINTERPRETER
 
-#define JMP_(cont) return(stgCast(StgFunPtr,cont))
+#define JMP_(cont) return((StgFunPtr)(cont))
 #define FB_
 #define FE_
 

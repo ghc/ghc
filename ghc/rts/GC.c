@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.167 2004/05/21 13:28:59 simonmar Exp $
+ * $Id: GC.c,v 1.168 2004/08/13 13:09:49 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -13,7 +13,8 @@
 #include "RtsUtils.h"
 #include "Apply.h"
 #include "Storage.h"
-#include "StoragePriv.h"
+#include "LdvProfile.h"
+#include "Updates.h"
 #include "Stats.h"
 #include "Schedule.h"
 #include "SchedAPI.h"		// for ReverCAFs prototype
@@ -23,7 +24,6 @@
 #include "ProfHeap.h"
 #include "SchedAPI.h"
 #include "Weak.h"
-#include "StablePriv.h"
 #include "Prelude.h"
 #include "ParTicky.h"		// ToDo: move into Rts.h
 #include "GCCompact.h"
@@ -44,7 +44,6 @@
 #endif
 
 #include "RetainerProfile.h"
-#include "LdvProfile.h"
 
 #include <string.h>
 
@@ -584,17 +583,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   /* Mark the stable pointer table.
    */
   markStablePtrTable(mark_root);
-
-#ifdef INTERPRETER
-  { 
-      /* ToDo: To fix the caf leak, we need to make the commented out
-       * parts of this code do something sensible - as described in 
-       * the CAF document.
-       */
-      extern void markHugsObjects(void);
-      markHugsObjects();
-  }
-#endif
 
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
@@ -1435,7 +1423,7 @@ upd_evacuee(StgClosure *p, StgClosure *dest)
     ASSERT((Bdescr((P_)p)->flags & BF_EVACUATED) == 0);
     // not true: (ToDo: perhaps it should be)
     // ASSERT(Bdescr((P_)dest)->flags & BF_EVACUATED);
-    p->header.info = &stg_EVACUATED_info;
+    SET_INFO(p, &stg_EVACUATED_info);
     ((StgEvacuated *)p)->evacuee = dest;
 }
 
@@ -2172,15 +2160,15 @@ selector_loop:
 	      // For the purposes of LDV profiling, we have destroyed
 	      // the original selector thunk.
 	      SET_INFO(p, info_ptr);
-	      LDV_recordDead_FILL_SLOP_DYNAMIC(selectee);
+	      LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(selectee);
 #endif
 	      ((StgInd *)selectee)->indirectee = val;
 	      SET_INFO(selectee,&stg_IND_info);
-#ifdef PROFILING
+
 	      // For the purposes of LDV profiling, we have created an
 	      // indirection.
-	      LDV_recordCreate(selectee);
-#endif
+	      LDV_RECORD_CREATE(selectee);
+
 	      selectee = val;
 	      goto selector_loop;
 	  }
@@ -2326,7 +2314,7 @@ scavenge_fun_srt(const StgInfoTable *info)
     StgFunInfoTable *fun_info;
 
     fun_info = itbl_to_fun_itbl(info);
-    scavenge_srt((StgClosure **)fun_info->srt, fun_info->i.srt_bitmap);
+    scavenge_srt((StgClosure **)fun_info->f.srt, fun_info->i.srt_bitmap);
 }
 
 STATIC_INLINE void
@@ -2379,19 +2367,19 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     nat size;
 
     p = (StgPtr)args;
-    switch (fun_info->fun_type) {
+    switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->bitmap);
-	size = BITMAP_SIZE(fun_info->bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.bitmap);
+	size = BITMAP_SIZE(fun_info->f.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
-	size = ((StgLargeBitmap *)fun_info->bitmap)->size;
-	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, size);
+	size = ((StgLargeBitmap *)fun_info->f.bitmap)->size;
+	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, size);
 	p += size;
 	break;
     default:
-	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
-	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->fun_type]);
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
@@ -2420,12 +2408,12 @@ scavenge_PAP (StgPAP *pap)
     p = (StgPtr)pap->payload;
     size = pap->n_args;
 
-    switch (fun_info->fun_type) {
+    switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
-	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, size);
+	scavenge_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, size);
 	p += size;
 	break;
     case ARG_BCO:
@@ -2433,7 +2421,7 @@ scavenge_PAP (StgPAP *pap)
 	p += size;
 	break;
     default:
-	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
 	size = pap->n_args;
 	while (size > 0) {
@@ -2619,14 +2607,12 @@ scavenge(step *stp)
         LDV_recordDead((StgClosure *)p, sizeofW(StgInd));
 #endif        
         // 
-        // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+        // Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
         //
 	SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
-#ifdef PROFILING
-        // @LDV profiling
+
         // We pretend that p has just been created.
-        LDV_recordCreate((StgClosure *)p);
-#endif
+        LDV_RECORD_CREATE((StgClosure *)p);
       }
 	// fall through 
     case IND_OLDGEN_PERM:
@@ -3829,16 +3815,16 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	dyn = ((StgRetDyn *)p)->liveness;
 
 	// traverse the bitmap first
-	bitmap = GET_LIVENESS(dyn);
+	bitmap = RET_DYN_LIVENESS(dyn);
 	p      = (P_)&((StgRetDyn *)p)->payload[0];
 	size   = RET_DYN_BITMAP_SIZE;
 	p = scavenge_small_bitmap(p, size, bitmap);
 
 	// skip over the non-ptr words
-	p += GET_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
+	p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
 	
 	// follow the ptr words
-	for (size = GET_PTRS(dyn); size > 0; size--) {
+	for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
 	    (StgClosure *)*p = evacuate((StgClosure *)*p);
 	    p++;
 	}
@@ -3949,7 +3935,7 @@ revertCAFs( void )
     for (c = (StgIndStatic *)caf_list; c != NULL; 
 	 c = (StgIndStatic *)c->static_link) 
     {
-	c->header.info = c->saved_info;
+	SET_INFO(c, c->saved_info);
 	c->saved_info = NULL;
 	// could, but not necessary: c->static_link = NULL; 
     }
@@ -4070,11 +4056,9 @@ threadLazyBlackHole(StgTSO *tso)
 		LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
 #endif
 		SET_INFO(bh,&stg_BLACKHOLE_info);
-#ifdef PROFILING
-		// @LDV profiling
+
 		// We pretend that bh has just been created.
-		LDV_recordCreate(bh);
-#endif
+		LDV_RECORD_CREATE(bh);
 	    }
 	    
 	    frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
@@ -4217,12 +4201,11 @@ threadSqueezeStack(StgTSO *tso)
 		    // We pretend that bh is now dead.
 		    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
 #endif
-		    // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+		    // Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
 		    SET_INFO(bh,&stg_BLACKHOLE_info);
-#ifdef PROFILING
+
 		    // We pretend that bh has just been created.
-		    LDV_recordCreate(bh);
-#endif
+		    LDV_RECORD_CREATE(bh);
 		}
 
 		prev_was_update_frame = rtsTrue;

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.24 2003/07/21 11:01:07 simonmar Exp $
+% $Id: CgLetNoEscape.lhs,v 1.25 2004/08/13 13:06:03 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -18,21 +18,23 @@ import {-# SOURCE #-} CgExpr ( cgExpr )
 
 import StgSyn
 import CgMonad
-import AbsCSyn
 
 import CgBindery	( CgIdInfo, letNoEscapeIdInfo, nukeDeadBindings	)
-import CgCase		( mkRetDirectTarget, restoreCurrentCostCentre )
+import CgCase		( restoreCurrentCostCentre )
 import CgCon		( bindUnboxedTupleComponents )
 import CgHeapery	( unbxTupleHeapCheck )
-import CgStackery	( allocStackTop, deAllocStackTop )
-import CgUsages		( getSpRelOffset )
+import CgInfoTbls	( emitDirectReturnTarget )
+import CgStackery	( allocStackTop, deAllocStackTop, getSpRelOffset )
+import Cmm		( CmmStmt(..) )
+import CmmUtils		( mkLblExpr, oneStmt )
 import CLabel		( mkReturnInfoLabel )
 import ClosureInfo	( mkLFLetNoEscape )
 import CostCentre       ( CostCentreStack )
-import Id		( Id )
+import Id		( Id, idName )
 import Var		( idUnique )
-import PrimRep		( PrimRep(..), retPrimRepSize )
+import SMRep		( retAddrSizeW )
 import BasicTypes	( RecFlag(..) )
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -156,25 +158,23 @@ cgLetNoEscapeClosure
 	arity   = length args
 	lf_info = mkLFLetNoEscape arity
     in
-
     -- saveVolatileVarsAndRegs done earlier in cgExpr.
 
-    forkEvalHelp
-	rhs_eob_info
+    do  { (vSp, _) <- forkEvalHelp rhs_eob_info
 
-	(allocStackTop retPrimRepSize	`thenFC` \_ ->
-	 nukeDeadBindings full_live_in_rhss)
+		(do { allocStackTop retAddrSizeW
+		    ; nukeDeadBindings full_live_in_rhss })
 
-	(deAllocStackTop retPrimRepSize		`thenFC` \_ ->
-	 forkAbsC (
-	    cgLetNoEscapeBody bndr cc cc_slot args body
-	 )					`thenFC` \ abs_c ->
-	 mkRetDirectTarget bndr abs_c srt
-		-- Ignore the label that comes back from
-		-- mkRetDirectTarget.  It must be conjured up elswhere
-	)    	    	    	     	`thenFC` \ (vSp, _) ->
+		(do { deAllocStackTop retAddrSizeW
+		    ; abs_c <- forkProc $ cgLetNoEscapeBody bndr cc 
+						  cc_slot args body
 
-    returnFC (bndr, letNoEscapeIdInfo bndr vSp lf_info)
+			-- Ignore the label that comes back from
+			-- mkRetDirectTarget.  It must be conjured up elswhere
+		    ; emitDirectReturnTarget (idName bndr) abs_c srt
+		    ; return () })
+
+	; returnFC (bndr, letNoEscapeIdInfo bndr vSp lf_info) }
 \end{code}
 
 \begin{code}
@@ -185,28 +185,28 @@ cgLetNoEscapeBody :: Id		-- Name of the joint point
 		  -> StgExpr	-- Body
 		  -> Code
 
-cgLetNoEscapeBody bndr cc cc_slot all_args body
-   = bindUnboxedTupleComponents all_args	`thenFC` \ (arg_regs, ptrs, nptrs, ret_slot) ->
+cgLetNoEscapeBody bndr cc cc_slot all_args body = do
+  { (arg_regs, ptrs, nptrs, ret_slot) <- bindUnboxedTupleComponents all_args
 
      -- restore the saved cost centre.  BUT: we must not free the stack slot
      -- containing the cost centre, because it might be needed for a
      -- recursive call to this let-no-escape.
-     restoreCurrentCostCentre cc_slot False{-don't free-}	`thenC`
+  ; restoreCurrentCostCentre cc_slot False{-don't free-}
 
 	-- Enter the closures cc, if required
-     --enterCostCentreCode closure_info cc IsFunction  `thenC`
+  ; -- enterCostCentreCode closure_info cc IsFunction
 
  	-- The "return address" slot doesn't have a return address in it;
 	-- but the heap-check needs it filled in if the heap-check fails.
 	-- So we pass code to fill it in to the heap-check macro
-     getSpRelOffset ret_slot			`thenFC` \ sp_rel ->
-     let lbl 		= mkReturnInfoLabel (idUnique bndr)
-	 frame_hdr_asst = CAssign (CVal sp_rel RetRep) (CLbl lbl RetRep)
-     in
+  ; sp_rel <- getSpRelOffset ret_slot
+
+  ; let	lbl 	       = mkReturnInfoLabel (idUnique bndr)
+	frame_hdr_asst = oneStmt (CmmStore sp_rel (mkLblExpr lbl))
 
 	-- Do heap check [ToDo: omit for non-recursive case by recording in
 	--	in envt and absorbing at call site]
-     unbxTupleHeapCheck arg_regs ptrs nptrs frame_hdr_asst (
-	cgExpr body
-     )
+  ; unbxTupleHeapCheck arg_regs ptrs nptrs frame_hdr_asst 
+			(cgExpr body)
+  }
 \end{code}

@@ -1,0 +1,396 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Exception support
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+/* -----------------------------------------------------------------------------
+   Exception Primitives
+
+   A thread can request that asynchronous exceptions not be delivered
+   ("blocked") for the duration of an I/O computation.  The primitive
+   
+	blockAsyncExceptions# :: IO a -> IO a
+
+   is used for this purpose.  During a blocked section, asynchronous
+   exceptions may be unblocked again temporarily:
+
+	unblockAsyncExceptions# :: IO a -> IO a
+
+   Furthermore, asynchronous exceptions are blocked automatically during
+   the execution of an exception handler.  Both of these primitives
+   leave a continuation on the stack which reverts to the previous
+   state (blocked or unblocked) on exit.
+
+   A thread which wants to raise an exception in another thread (using
+   killThread#) must block until the target thread is ready to receive
+   it.  The action of unblocking exceptions in a thread will release all
+   the threads waiting to deliver exceptions to that thread.
+
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
+ 		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
+{
+    ASSERT(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
+#if defined(GRAN) || defined(PAR)
+    foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
+				   NULL "ptr"); 
+#else
+    foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr");
+#endif
+    StgTSO_blocked_exceptions(CurrentTSO) = NULL;
+#ifdef REG_R1
+    Sp_adj(1);
+    jump %ENTRY_CODE(Sp(0));
+#else
+    Sp(1) = Sp(0);
+    Sp_adj(1);
+    jump %ENTRY_CODE(Sp(1));
+#endif
+}
+
+INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret,
+  		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
+{
+    ASSERT(StgTSO_blocked_exceptions(CurrentTSO) == NULL);
+    StgTSO_blocked_exceptions(CurrentTSO) = END_TSO_QUEUE;
+#ifdef REG_R1
+    Sp_adj(1);
+    jump %ENTRY_CODE(Sp(0));
+#else
+    Sp(1) = Sp(0);
+    Sp_adj(1);
+    jump %ENTRY_CODE(Sp(1));
+#endif
+}
+
+blockAsyncExceptionszh_fast
+{
+    /* Args: R1 :: IO a */
+    STK_CHK_GEN( WDS(2)/* worst case */, R1_PTR, blockAsyncExceptionszh_fast);
+
+    if (StgTSO_blocked_exceptions(CurrentTSO) == NULL) {
+      StgTSO_blocked_exceptions(CurrentTSO) = END_TSO_QUEUE;
+      /* avoid growing the stack unnecessarily */
+      if (Sp(0) == stg_blockAsyncExceptionszh_ret_info) {
+	Sp_adj(1);
+      } else {
+	Sp_adj(-1);
+	Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
+      }
+    }
+    Sp_adj(-1);
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_v();
+    jump RET_LBL(stg_ap_v);
+}
+
+unblockAsyncExceptionszh_fast
+{
+    /* Args: R1 :: IO a */
+    STK_CHK_GEN( WDS(2), R1_PTR, unblockAsyncExceptionszh_fast);
+
+    if (StgTSO_blocked_exceptions(CurrentTSO) != NULL) {
+#if defined(GRAN) || defined(PAR)
+      foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
+	          		     StgTSO_block_info(CurrentTSO) "ptr");
+#else
+      foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr");
+#endif
+      StgTSO_blocked_exceptions(CurrentTSO) = NULL;
+
+      /* avoid growing the stack unnecessarily */
+      if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
+	Sp_adj(1);
+      } else {
+	Sp_adj(-1);
+	Sp(0) = stg_blockAsyncExceptionszh_ret_info;
+      }
+    }
+    Sp_adj(-1);
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_v();
+    jump RET_LBL(stg_ap_v);
+}
+
+
+#define interruptible(what_next) 		\
+        (   what_next == BlockedOnMVar		\
+         || what_next == BlockedOnException	\
+         || what_next == BlockedOnRead		\
+         || what_next == BlockedOnWrite		\
+         || what_next == BlockedOnDelay		\
+         || what_next == BlockedOnDoProc)
+
+killThreadzh_fast
+{
+  /* args: R1 = TSO to kill, R2 = Exception */
+
+  W_ why_blocked;
+
+  /* This thread may have been relocated.
+   * (see Schedule.c:threadStackOverflow)
+   */
+ while:
+  if (StgTSO_what_next(R1) == ThreadRelocated::I16) {
+    R1 = StgTSO_link(R1);
+    goto while;
+  }
+
+  /* Determine whether this thread is interruptible or not */
+
+  /* If the target thread is currently blocking async exceptions,
+   * we'll have to block until it's ready to accept them.  The
+   * exception is interruptible threads - ie. those that are blocked
+   * on some resource.
+   */
+  why_blocked = TO_W_(StgTSO_why_blocked(R1));
+  if (StgTSO_blocked_exceptions(R1) != NULL && !interruptible(why_blocked))
+  {
+      StgTSO_link(CurrentTSO) = StgTSO_blocked_exceptions(R1);
+      StgTSO_blocked_exceptions(R1) = CurrentTSO;
+      
+      StgTSO_why_blocked(CurrentTSO) = BlockedOnException::I16;
+      StgTSO_block_info(CurrentTSO) = R1;
+      
+      BLOCK( R1_PTR & R2_PTR, killThreadzh_fast );
+  }
+
+  /* Killed threads turn into zombies, which might be garbage
+   * collected at a later date.  That's why we don't have to
+   * explicitly remove them from any queues they might be on.
+   */
+
+  /* We might have killed ourselves.  In which case, better be *very*
+   * careful.  If the exception killed us, then return to the scheduler.
+   * If the exception went to a catch frame, we'll just continue from
+   * the handler.
+   */
+  if (R1 == CurrentTSO) {
+	SAVE_THREAD_STATE();
+	foreign "C" raiseAsyncWithLock(R1 "ptr", R2 "ptr");
+	if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+		R1 = ThreadFinished;
+		jump StgReturn;
+	} else {
+		LOAD_THREAD_STATE();
+		ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+		jump %ENTRY_CODE(Sp(0));
+	}
+  } else {
+	foreign "C" raiseAsyncWithLock(R1 "ptr", R2 "ptr");
+  }
+
+  jump %ENTRY_CODE(Sp(0));
+}
+
+/* -----------------------------------------------------------------------------
+   Catch frames
+   -------------------------------------------------------------------------- */
+
+#ifdef REG_R1
+#define CATCH_FRAME_ENTRY_TEMPLATE(label,ret) 	\
+   label					\
+   {						\
+      Sp = Sp + SIZEOF_StgCatchFrame; 		\
+      jump ret;					\
+   }
+#else
+#define CATCH_FRAME_ENTRY_TEMPLATE(label,ret) 	\
+   label					\
+   {						\
+      W_ rval;					\
+      rval = Sp(0);				\
+      Sp_adj(1);				\
+      Sp = Sp + SIZEOF_StgCatchFrame - WDS(1);  \
+      Sp(0) = rval;				\
+      jump ret;					\
+   }
+#endif
+
+#ifdef REG_R1
+#define SP_OFF 0
+#else
+#define SP_OFF 1
+#endif
+
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_0_ret,%RET_VEC(Sp(SP_OFF),0))
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_1_ret,%RET_VEC(Sp(SP_OFF),1))
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_2_ret,%RET_VEC(Sp(SP_OFF),2))
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_3_ret,%RET_VEC(Sp(SP_OFF),3))
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_4_ret,%RET_VEC(Sp(SP_OFF),4))
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_5_ret,%RET_VEC(Sp(SP_OFF),5))
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_6_ret,%RET_VEC(Sp(SP_OFF),6))
+CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
+
+#if MAX_VECTORED_RTN > 8
+#error MAX_VECTORED_RTN has changed: please modify stg_catch_frame too.
+#endif
+
+#if defined(PROFILING)
+#define CATCH_FRAME_BITMAP 7
+#define CATCH_FRAME_WORDS  4
+#else
+#define CATCH_FRAME_BITMAP 1
+#define CATCH_FRAME_WORDS  2
+#endif
+
+/* Catch frames are very similar to update frames, but when entering
+ * one we just pop the frame off the stack and perform the correct
+ * kind of return to the activation record underneath us on the stack.
+ */
+
+INFO_TABLE_RET(stg_catch_frame,
+	       CATCH_FRAME_WORDS, CATCH_FRAME_BITMAP,
+	       CATCH_FRAME,
+	       stg_catch_frame_0_ret,
+	       stg_catch_frame_1_ret,
+	       stg_catch_frame_2_ret,
+	       stg_catch_frame_3_ret,
+	       stg_catch_frame_4_ret,
+	       stg_catch_frame_5_ret,
+	       stg_catch_frame_6_ret,
+	       stg_catch_frame_7_ret)
+CATCH_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
+
+/* -----------------------------------------------------------------------------
+ * The catch infotable
+ *
+ * This should be exactly the same as would be generated by this STG code
+ *
+ * catch = {x,h} \n {} -> catch#{x,h}
+ *
+ * It is used in deleteThread when reverting blackholes.
+ * -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_catch,2,0,FUN,"catch","catch")
+{
+  R2 = StgClosure_payload(R1,1); /* h */
+  R1 = StgClosure_payload(R1,0); /* x */
+  jump catchzh_fast;
+}
+
+catchzh_fast
+{
+    /* args: R1 = m :: IO a, R2 = handler :: Exception -> IO a */
+    STK_CHK_GEN(SIZEOF_StgCatchFrame + WDS(1), R1_PTR & R2_PTR, catchzh_fast);
+  
+    /* Set up the catch frame */
+    Sp = Sp - SIZEOF_StgCatchFrame;
+    SET_HDR(Sp,stg_catch_frame_info,CCCS);
+    
+    StgCatchFrame_handler(Sp) = R2;
+    StgCatchFrame_exceptions_blocked(Sp) = 
+	(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
+    TICK_CATCHF_PUSHED();
+
+    /* Apply R1 to the realworld token */
+    Sp_adj(-1);
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_v();
+    jump RET_LBL(stg_ap_v);
+}      
+
+/* -----------------------------------------------------------------------------
+ * The raise infotable
+ * 
+ * This should be exactly the same as would be generated by this STG code
+ *
+ *   raise = {err} \n {} -> raise#{err}
+ *
+ * It is used in raisezh_fast to update thunks on the update list
+ * -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_raise,1,0,THUNK,"raise","raise")
+{
+  R1 = StgClosure_payload(R1,0);
+  jump raisezh_fast;
+}
+
+raisezh_fast
+{
+    W_ handler;
+    W_ raise_closure;
+    W_ frame_type;
+    /* args : R1 :: Exception */
+
+
+#if defined(PROFILING)
+    /* Debugging tool: on raising an  exception, show where we are. */
+
+    /* ToDo: currently this is a hack.  Would be much better if
+     * the info was only displayed for an *uncaught* exception.
+     */
+    if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags)) {
+      foreign "C" fprintCCS(stderr,CCCS);
+    }
+#endif
+
+    StgTSO_sp(CurrentTSO) = Sp;
+    frame_type = foreign "C" raiseExceptionHelper(CurrentTSO "ptr", R1 "ptr");
+    Sp = StgTSO_sp(CurrentTSO);
+
+    if (frame_type == STOP_FRAME) {
+	/* We've stripped the entire stack, the thread is now dead. */
+	Sp = CurrentTSO + OFFSET_StgTSO_stack 
+		+ WDS(StgTSO_stack_size(CurrentTSO)) - WDS(1);
+	Sp(0) = R1;		/* save the exception */
+	StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
+	SAVE_THREAD_STATE();	/* inline! */
+	R1 = ThreadFinished;
+	jump StgReturn;
+    }
+
+    /* Ok, Sp points to the enclosing CATCH_FRAME.  Pop everything down to
+     * and including this frame, update Su, push R1, and enter the handler.
+     */
+    handler = StgCatchFrame_handler(Sp);
+
+    /* Restore the blocked/unblocked state for asynchronous exceptions
+     * at the CATCH_FRAME.  
+     *
+     * If exceptions were unblocked, arrange that they are unblocked
+     * again after executing the handler by pushing an
+     * unblockAsyncExceptions_ret stack frame.
+     */
+    W_ frame;
+    frame = Sp;
+    Sp = Sp + SIZEOF_StgCatchFrame;
+
+    if (StgCatchFrame_exceptions_blocked(frame) == 0) {
+      Sp_adj(-1);
+      Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
+    }
+
+    /* Ensure that async excpetions are blocked when running the handler.
+    */
+    if (StgTSO_blocked_exceptions(CurrentTSO) == NULL) {
+      StgTSO_blocked_exceptions(CurrentTSO) = END_TSO_QUEUE;
+    }
+
+    /* Call the handler, passing the exception value and a realworld
+     * token as arguments.
+     */
+    Sp_adj(-1);
+    Sp(0) = R1;
+    R1 = handler;
+    Sp_adj(-1);
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_pv();
+    jump RET_LBL(stg_ap_pv);
+}
+
+raiseIOzh_fast
+{
+  /* Args :: R1 :: Exception */
+  jump raisezh_fast;
+}

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.52 2004/05/11 18:36:10 panne Exp $
+ * $Id: ProfHeap.c,v 1.53 2004/08/13 13:10:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -250,6 +250,7 @@ LDV_recordDead( StgClosure *c, nat size )
 
     if (era > 0 && closureSatisfiesConstraints(c)) {
 	size -= sizeofW(StgProfHeader);
+	ASSERT(LDVW(c) != 0);
 	if ((LDVW((c)) & LDV_STATE_MASK) == LDV_STATE_CREATE) {
 	    t = (LDVW((c)) & LDV_CREATE_MASK) >> LDV_SHIFT;
 	    if (t < era) {

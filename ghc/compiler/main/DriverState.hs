@@ -1,5 +1,4 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.104 2004/04/30 15:51:10 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -9,7 +8,7 @@
 
 module DriverState where
 
-#include "../includes/config.h"
+#include "../includes/ghcconfig.h"
 #include "HsVersions.h"
 
 import ParsePkgConf	( loadPackageConfig )
@@ -71,14 +70,13 @@ isCompManagerMode _             = False
 -----------------------------------------------------------------------------
 -- Global compilation flags
 
--- Cpp-related flags
-v_Hs_source_cpp_opts = global
+-- Default CPP defines in Haskell source
+hsSourceCppOpts =
 	[ "-D__HASKELL1__="++cHaskell1Version
 	, "-D__GLASGOW_HASKELL__="++cProjectVersionInt				
 	, "-D__HASKELL98__"
 	, "-D__CONCURRENT_HASKELL__"
 	]
-{-# NOINLINE v_Hs_source_cpp_opts #-}
 
 
 -- Keep output from intermediate phases

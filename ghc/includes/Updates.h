@@ -1,9 +1,8 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.34 2003/11/12 17:27:06 sof Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
- * Definitions related to updates.
+ * Performing updates.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -11,20 +10,18 @@
 #define UPDATES_H
 
 /* -----------------------------------------------------------------------------
-   Update a closure with an indirection.  This may also involve waking
-   up a queue of blocked threads waiting on the result of this
-   computation.
+   Updates
+
+   We have two layers of update macros.  The top layer, UPD_IND() and
+   friends perform all the work of an update.  In detail:
+
+      - if the closure being updated is a blocking queue, then all the
+        threads waiting on the blocking queue are updated.
+
+      - then the lower level updateWithIndirection() macro is invoked 
+        to actually replace the closure with an indirection (see below).
+
    -------------------------------------------------------------------------- */
-
-/* ToDo: overwrite slop words with something safe in case sanity checking 
- *       is turned on.  
- *       (I think the fancy version of the GC is supposed to do this too.)
- */
-
-/* This expands to a fair chunk of code, what with waking up threads 
- * and checking whether we're updating something in a old generation.
- * preferably don't use this macro inline in compiled code.
- */
 
 #ifdef TICKY_TICKY
 # define UPD_IND(updclosure, heapptr) \
@@ -34,96 +31,68 @@
 #else
 #  define SEMI ;
 # define UPD_IND(updclosure, heapptr) \
-   UPD_REAL_IND(updclosure,&stg_IND_info,heapptr,SEMI)
+   UPD_REAL_IND(updclosure,INFO_PTR(stg_IND_info),heapptr,SEMI)
 # define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
    UPD_REAL_IND(updclosure,ind_info,heapptr,and_then)
+#endif
+
+/* These macros have to work in both C and C--, so here's the
+ * impedence matching:
+ */
+#ifdef CMINUSMINUS
+#define DECLARE_IPTR(info)  W_ info
+#define FCALL               foreign "C"
+#define INFO_PTR(info)      info
+#define ARG_PTR             "ptr"
+#else
+#define DECLARE_IPTR(info)  const StgInfoTable *(info)
+#define FCALL               /* nothing */
+#define INFO_PTR(info)      &info
+#define StgBlockingQueue_blocking_queue(closure) \
+    (((StgBlockingQueue *)closure)->blocking_queue)
+#define ARG_PTR             /* nothing */
 #endif
 
 /* UPD_IND actually does a PERM_IND if TICKY_TICKY is on;
    if you *really* need an IND use UPD_REAL_IND
  */
-#ifdef SMP
 #define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)		\
-   {									\
-	const StgInfoTable *info;					\
-	if (Bdescr((P_)updclosure)->u.back != (bdescr *)BaseReg) {	\
-		info = LOCK_CLOSURE(updclosure);			\
-	} else {							\
-		info = updclosure->header.info;				\
-	}								\
+	DECLARE_IPTR(info);						\
+	info = GET_INFO(updclosure);					\
         AWAKEN_BQ(info,updclosure);					\
-	updateWithIndirection(info, ind_info,				\
-			      (StgClosure *)updclosure,			\
-			      (StgClosure *)heapptr,			\
-	                      and_then);				\
-   }
-#else
-#define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)	\
-   {							\
-	const StgInfoTable *info;			\
-	info = ((StgClosure *)updclosure)->header.info;	\
-        AWAKEN_BQ(info,updclosure);			\
-	updateWithIndirection(((StgClosure *)updclosure)->header.info, ind_info,		\
-			      (StgClosure *)updclosure,	\
-			      (StgClosure *)heapptr,	\
-			      and_then);		\
-   }
-#endif
-
-#define UPD_STATIC_IND(updclosure, heapptr)			\
-   {								\
-	const StgInfoTable *info;				\
-	info = ((StgClosure *)updclosure)->header.info;		\
-        AWAKEN_STATIC_BQ(info,updclosure);			\
-	updateWithStaticIndirection(info,			\
-			            (StgClosure *)updclosure,	\
-  			            (StgClosure *)heapptr);	\
-   }
+	updateWithIndirection(GET_INFO(updclosure), ind_info,		\
+			      updclosure,				\
+			      heapptr,					\
+			      and_then);
 
 #if defined(PROFILING) || defined(TICKY_TICKY)
-#define UPD_PERM_IND(updclosure, heapptr)			\
-   {								\
-	const StgInfoTable *info;				\
-	info = ((StgClosure *)updclosure)->header.info;		\
-        AWAKEN_BQ(info,updclosure);				\
-	updateWithPermIndirection(info,				\
-				  (StgClosure *)updclosure,	\
-				  (StgClosure *)heapptr);	\
-   }
+#define UPD_PERM_IND(updclosure, heapptr)	\
+	DECLARE_IPTR(info);			\
+	info = GET_INFO(updclosure);		\
+        AWAKEN_BQ(info,updclosure);		\
+	updateWithPermIndirection(info,		\
+				  updclosure,	\
+				  heapptr);
 #endif
 
-#ifdef SMP
-#define UPD_IND_NOLOCK(updclosure, heapptr)				\
-   {									\
-	const StgInfoTable *info;					\
-	info = updclosure->header.info;					\
-        AWAKEN_BQ(info,updclosure);					\
-	updateWithIndirection(info,&stg_IND_info,			\
-			      (StgClosure *)updclosure,			\
-			      (StgClosure *)heapptr,);			\
-   }
-#elif defined(RTS_SUPPORTS_THREADS)
+#if defined(RTS_SUPPORTS_THREADS)
 
 # ifdef TICKY_TICKY
-#  define UPD_IND_NOLOCK(updclosure, heapptr)			\
-   {								\
-	const StgInfoTable *info;				\
-	info = ((StgClosure *)updclosure)->header.info;		\
-        AWAKEN_BQ_NOLOCK(info,updclosure);			\
-	updateWithPermIndirection(info,				\
-				  (StgClosure *)updclosure,	\
-				  (StgClosure *)heapptr);	\
-   }
+#  define UPD_IND_NOLOCK(updclosure, heapptr)	\
+	DECLARE_IPTR(info);			\
+	info = GET_INFO(updclosure);		\
+        AWAKEN_BQ_NOLOCK(info,updclosure);	\
+	updateWithPermIndirection(info,		\
+				  updclosure,	\
+				  heapptr)
 # else
 #  define UPD_IND_NOLOCK(updclosure, heapptr)		\
-   {							\
-	const StgInfoTable *info;			\
-	info = ((StgClosure *)updclosure)->header.info;	\
+	DECLARE_IPTR(info);				\
+	info = GET_INFO(updclosure);			\
         AWAKEN_BQ_NOLOCK(info,updclosure);		\
-	updateWithIndirection(info,&stg_IND_info,	\
-			      (StgClosure *)updclosure,	\
-			      (StgClosure *)heapptr,);	\
-   }
+	updateWithIndirection(info,stg_IND_info,	\
+			      updclosure,		\
+			      heapptr,); 
 # endif
 
 #else
@@ -131,7 +100,7 @@
 #endif
 
 /* -----------------------------------------------------------------------------
-   Awaken any threads waiting on this computation
+   Awaken any threads waiting on a blocking queue (BLACKHOLE_BQ).
    -------------------------------------------------------------------------- */
 
 #if defined(PAR) 
@@ -189,99 +158,209 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 
 #else /* !GRAN && !PAR */
 
-extern void awakenBlockedQueue(StgTSO *q);
 #define DO_AWAKEN_BQ(closure)  	\
-        STGCALL1(awakenBlockedQueue,		\
-		 ((StgBlockingQueue *)closure)->blocking_queue);
+        FCALL awakenBlockedQueue(StgBlockingQueue_blocking_queue(closure) ARG_PTR);
 
 #define AWAKEN_BQ(info,closure)						\
-     	if (info == &stg_BLACKHOLE_BQ_info) {				\
+     	if (info == INFO_PTR(stg_BLACKHOLE_BQ_info)) {			\
           DO_AWAKEN_BQ(closure);                                        \
 	}
 
 #define AWAKEN_STATIC_BQ(info,closure)					\
-     	if (info == &stg_BLACKHOLE_BQ_STATIC_info) {			\
+     	if (info == INFO_PTR(stg_BLACKHOLE_BQ_STATIC_info)) {		\
           DO_AWAKEN_BQ(closure);                                        \
 	}
 
 #ifdef RTS_SUPPORTS_THREADS
-extern void awakenBlockedQueueNoLock(StgTSO *q);
-#define DO_AWAKEN_BQ_NOLOCK(closure)					\
-        STGCALL1(awakenBlockedQueueNoLock,				\
-		 ((StgBlockingQueue *)closure)->blocking_queue);
+#define DO_AWAKEN_BQ_NOLOCK(closure) \
+        FCALL awakenBlockedQueueNoLock(StgBlockingQueue_blocking_queue(closure) ARG_PTR);
 
 #define AWAKEN_BQ_NOLOCK(info,closure)					\
-     	if (info == &stg_BLACKHOLE_BQ_info) {				\
+     	if (info == INFO_PTR(stg_BLACKHOLE_BQ_info)) {			\
           DO_AWAKEN_BQ_NOLOCK(closure);                                 \
 	}
 #endif
 #endif /* GRAN || PAR */
 
-/* -------------------------------------------------------------------------
-   Push an update frame on the stack.
-   ------------------------------------------------------------------------- */
-
-#if defined(PROFILING)
-// frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) is unnecessary 
-// because it is not used anyhow.
-#define PUSH_STD_CCCS(frame) (frame->header.prof.ccs = CCCS)
-#else
-#define PUSH_STD_CCCS(frame)
-#endif
-
-extern DLL_IMPORT_RTS const StgPolyInfoTable stg_upd_frame_info; 
-extern DLL_IMPORT_RTS const StgPolyInfoTable stg_noupd_frame_info; 
-
-#define PUSH_UPD_FRAME(target, Sp_offset)			\
-	{							\
-		StgUpdateFrame *__frame;			\
-		TICK_UPDF_PUSHED(target, GET_INFO((StgClosure*)target)); \
-		__frame = (StgUpdateFrame *)(Sp + (Sp_offset)) - 1; \
-		SET_INFO(__frame, (StgInfoTable *)&stg_upd_frame_info);   \
-		__frame->updatee = (StgClosure *)(target);	\
-		PUSH_STD_CCCS(__frame);				\
-	}
-
 /* -----------------------------------------------------------------------------
-   Entering CAFs
+   Updates: lower-level macros which update a closure with an
+   indirection to another closure.
 
-   When a CAF is first entered, it creates a black hole in the heap,
-   and updates itself with an indirection to this new black hole.
+   There are several variants of this code.
 
-   We update the CAF with an indirection to a newly-allocated black
-   hole in the heap.  We also set the blocking queue on the newly
-   allocated black hole to be empty.
-
-   Why do we make a black hole in the heap when we enter a CAF?
-      
-       - for a  generational garbage collector, which needs a fast
-         test for whether an updatee is in an old generation or not
-
-       - for the parallel system, which can implement updates more
-         easily if the updatee is always in the heap. (allegedly).
-
-   When debugging, we maintain a separate CAF list so we can tell when
-   a CAF has been garbage collected.
+       PROFILING:
    -------------------------------------------------------------------------- */
-   
-/* ToDo: only call newCAF when debugging. */
 
-extern void newCAF(StgClosure*);
+/* LDV profiling:
+ * We call LDV_recordDead_FILL_SLOP_DYNAMIC(p1) regardless of the generation in 
+ * which p1 resides.
+ *
+ * Note: 
+ *   After all, we do *NOT* need to call LDV_RECORD_CREATE() for both IND and 
+ *   IND_OLDGEN closures because they are inherently used. But, it corrupts
+ *   the invariants that every closure keeps its creation time in the profiling
+ *  field. So, we call LDV_RECORD_CREATE().
+ */
 
-/* newCAF must be called before the itbl ptr is overwritten, since
-   newCAF records the old itbl ptr in order to do CAF reverting
-   (which Hugs needs to do in order that combined mode works right.)
-*/
-#define UPD_CAF(cafptr, bhptr)						\
-  {									\
-    LOCK_CLOSURE(cafptr);						\
-    STGCALL1(newCAF,(StgClosure *)cafptr);				\
-    ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);		\
-    SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&stg_IND_STATIC_info);\
+/* In the DEBUG case, we also zero out the slop of the old closure,
+ * so that the sanity checker can tell where the next closure is.
+ *
+ * Two important invariants: we should never try to update a closure
+ * to point to itself, and the closure being updated should not
+ * already have been updated (the mutable list will get messed up
+ * otherwise).
+ */
+#if !defined(DEBUG)
+
+#define DEBUG_FILL_SLOP(p) /* nothing */
+
+#else  /* DEBUG */
+
+#ifdef CMINUSMINUS
+
+#define DEBUG_FILL_SLOP(p)			\
+  W_ inf;					\
+  W_ np;					\
+  W_ nw;					\
+  W_ i;						\
+  inf = %GET_STD_INFO(p);			\
+  np = TO_W_(%INFO_PTRS(inf));			\
+  nw = TO_W_(%INFO_NPTRS(inf));			\
+  if (%INFO_TYPE(inf) != THUNK_SELECTOR::I16) {	\
+    i = 0;					\
+    for:					\
+      if (i < np + nw) {			\
+        StgClosure_payload(p,i) = 0;		\
+        i = i + 1;				\
+        goto for;				\
+      }						\
   }
 
-/* -----------------------------------------------------------------------------
-   Update-related prototypes
-   -------------------------------------------------------------------------- */
+
+#else /* !CMINUSMINUS */
+
+INLINE_HEADER void
+DEBUG_FILL_SLOP(StgClosure *p)
+{						
+    StgInfoTable *inf = get_itbl(p);		
+    nat np = inf->layout.payload.ptrs,		
+	nw = inf->layout.payload.nptrs, i;
+    if (inf->type != THUNK_SELECTOR) {
+	for (i = 0; i < np + nw; i++) {
+	    ((StgClosure *)p)->payload[i] = 0;
+	}
+    }
+}
+
+#endif /* CMINUSMINUS */
+#endif /* DEBUG */
+
+/* We have two versions of this macro (sadly), one for use in C-- code,
+ * and the other for C.
+ *
+ * The and_then argument is a performance hack so that we can paste in
+ * the continuation code directly.  It helps shave a couple of
+ * instructions off the common case in the update code, which is
+ * worthwhile (the update code is often part of the inner loop).
+ * (except that gcc now appears to common up this code again and
+ * invert the optimisation.  Grrrr --SDM).
+ */
+#ifdef CMINUSMINUS
+#define generation(n) (W_[generations] + n*SIZEOF_generation)
+#define updateWithIndirection(info, ind_info, p1, p2, and_then)	\
+    W_ bd;							\
+								\
+/*    ASSERT( p1 != p2 && !closure_IND(p1) );			\
+ */ LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
+    bd = Bdescr(p1);						\
+    if (bdescr_gen_no(bd) == 0) {				\
+      StgInd_indirectee(p1) = p2;				\
+      SET_INFO(p1, ind_info);					\
+      LDV_RECORD_CREATE(p1);					\
+      TICK_UPD_NEW_IND();					\
+      and_then;							\
+    } else {							\
+      if (info != stg_BLACKHOLE_BQ_info) {			\
+        DEBUG_FILL_SLOP(p1);					\
+        W_ __mut_once_list;					\
+        __mut_once_list = generation(bdescr_gen_no(bd)) +	\
+                             OFFSET_generation_mut_once_list;	\
+        StgMutClosure_mut_link(p1) = W_[__mut_once_list];	\
+        W_[__mut_once_list] = p1;				\
+      }								\
+      StgInd_indirectee(p1) = p2;				\
+      SET_INFO(p1, stg_IND_OLDGEN_info);			\
+      LDV_RECORD_CREATE(p1);					\
+      TICK_UPD_OLD_IND();					\
+      and_then;							\
+  }
+#else
+#define updateWithIndirection(_info, ind_info, p1, p2, and_then)	\
+  {									\
+    bdescr *bd;								\
+									\
+    ASSERT( (P_)p1 != (P_)p2 && !closure_IND(p1) );			\
+    LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);				\
+    bd = Bdescr((P_)p1);						\
+    if (bd->gen_no == 0) {						\
+      ((StgInd *)p1)->indirectee = p2;					\
+      SET_INFO(p1, ind_info);						\
+      LDV_RECORD_CREATE(p1);						\
+      TICK_UPD_NEW_IND();						\
+      and_then;								\
+    } else {								\
+      if (_info != &stg_BLACKHOLE_BQ_info) {				\
+        DEBUG_FILL_SLOP(p1);						\
+        ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;	\
+        generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;    \
+      }									\
+      ((StgIndOldGen *)p1)->indirectee = p2;				\
+      SET_INFO(p1, &stg_IND_OLDGEN_info);				\
+      TICK_UPD_OLD_IND();						\
+      and_then;								\
+    }									\
+  }
+#endif
+
+/* The permanent indirection version isn't performance critical.  We
+ * therefore use an inline C function instead of the C-- macro.
+ */
+#ifndef CMINUSMINUS
+INLINE_HEADER void
+updateWithPermIndirection(const StgInfoTable *info, 
+	                  StgClosure *p1,
+	                  StgClosure *p2) 
+{
+  bdescr *bd;
+
+  ASSERT( p1 != p2 && !closure_IND(p1) );
+
+  // @LDV profiling
+  // Destroy the old closure.
+  // Nb: LDV_* stuff cannot mix with ticky-ticky
+  LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);
+
+  bd = Bdescr((P_)p1);
+  if (bd->gen_no == 0) {
+    ((StgInd *)p1)->indirectee = p2;
+    SET_INFO(p1, &stg_IND_PERM_info);
+    // @LDV profiling
+    // We have just created a new closure.
+    LDV_RECORD_CREATE(p1);
+    TICK_UPD_NEW_PERM_IND(p1);
+  } else {
+    if (info != &stg_BLACKHOLE_BQ_info) {
+      ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;
+      generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;
+    }
+    ((StgIndOldGen *)p1)->indirectee = p2;
+    SET_INFO(p1, &stg_IND_OLDGEN_PERM_info);
+    // @LDV profiling
+    // We have just created a new closure.
+    LDV_RECORD_CREATE(p1);
+    TICK_UPD_OLD_PERM_IND();
+  }
+}
+#endif
 
 #endif /* UPDATES_H */

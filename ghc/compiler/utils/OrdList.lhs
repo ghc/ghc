@@ -48,6 +48,15 @@ appOL None bs   = bs
 appOL as   None = as
 appOL as   bs   = Two as bs
 
+mapOL :: (a -> b) -> OrdList a -> OrdList b
+mapOL f None = None
+mapOL f (One x) = One (f x)
+mapOL f (Two x y) = Two (mapOL f x) (mapOL f y)
+mapOL f (Many xs) = Many (map f xs)
+
+instance Functor OrdList where
+  fmap = mapOL
+
 foldrOL :: (a->b->b) -> b -> OrdList a -> b
 foldrOL k z None        = z
 foldrOL k z (One x)     = k x z

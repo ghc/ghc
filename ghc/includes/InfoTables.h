@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.32 2003/11/14 14:28:08 stolz Exp $
+ * $Id: InfoTables.h,v 1.33 2004/08/13 13:09:17 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-2002
  *
@@ -169,6 +169,8 @@ extern StgWord16 closure_flags[];
    (usually on the stack) to the garbage collector.  The two primary
    uses are for stack frames, and functions (where we need to describe
    the layout of a PAP to the GC).
+
+   In these bitmaps: 0 == ptr, 1 == non-ptr.
    -------------------------------------------------------------------------- */
 
 //
@@ -285,21 +287,29 @@ typedef struct _StgInfoTable {
       bitmap fields have also been omitted.
    -------------------------------------------------------------------------- */
 
-typedef struct _StgFunInfoTable {
-#if defined(TABLES_NEXT_TO_CODE)
+typedef struct _StgFunInfoExtraRev {
     StgFun         *slow_apply; // apply to args on the stack
     StgWord        bitmap;	// arg ptr/nonptr bitmap
     StgSRT         *srt;	// pointer to the SRT table
     StgHalfWord    fun_type;    // function type
     StgHalfWord    arity;       // function arity
+} StgFunInfoExtraRev;
+
+typedef struct _StgFunInfoExtraFwd {
+    StgHalfWord    fun_type;    // function type
+    StgHalfWord    arity;       // function arity
+    StgSRT         *srt;	// pointer to the SRT table
+    StgWord        bitmap;	// arg ptr/nonptr bitmap
+    StgFun         *slow_apply; // apply to args on the stack
+} StgFunInfoExtraFwd;
+
+typedef struct {
+#if defined(TABLES_NEXT_TO_CODE)
+    StgFunInfoExtraRev f;
     StgInfoTable i;
 #else
     StgInfoTable i;
-    StgHalfWord    fun_type;    // function type
-    StgHalfWord    arity;       // function arity
-    StgSRT         *srt;	// pointer to the SRT table
-    StgWord        bitmap;	// arg ptr/nonptr bitmap
-    StgFun         *slow_apply; // apply to args on the stack
+    StgFunInfoExtraFwd f;
 #endif
 } StgFunInfoTable;
 
@@ -310,15 +320,13 @@ typedef struct _StgFunInfoTable {
 // When info tables are laid out backwards, we can omit the SRT
 // pointer iff srt_bitmap is zero.
 
-typedef struct _StgRetInfoTable {
-#if !defined(TABLES_NEXT_TO_CODE)
-    StgInfoTable i;
-#endif
-    StgSRT         *srt;	// pointer to the SRT table
+typedef struct {
 #if defined(TABLES_NEXT_TO_CODE)
+    StgSRT      *srt;	// pointer to the SRT table
     StgInfoTable i;
-#endif
-#if !defined(TABLES_NEXT_TO_CODE)
+#else
+    StgInfoTable i;
+    StgSRT      *srt;	// pointer to the SRT table
     StgFunPtr vector[FLEXIBLE_ARRAY];
 #endif
 } StgRetInfoTable;

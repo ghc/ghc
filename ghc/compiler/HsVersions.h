@@ -66,10 +66,10 @@ name = Util.global (value) :: IORef (ty); \
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg))
 #define ASSERTM(e) ASSERT(e) do
 #else
-#define ASSERT(e)
-#define ASSERT2(e,msg)
+#define ASSERT(e)      if False then error "ASSERT"  else
+#define ASSERT2(e,msg) if False then error "ASSERT2" else
 #define ASSERTM(e)
-#define WARN(e,msg)
+#define WARN(e,msg)    if False then error "WARN"    else
 #endif
 
 -- temporary usage assertion control KSW 2000-10

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.47 2004/05/27 09:29:28 simonmar Exp $
+ * $Id: Stats.c,v 1.48 2004/08/13 13:10:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,12 +14,12 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
-#include "StoragePriv.h"
 #include "MBlock.h"
 #include "Schedule.h"
 #include "Stats.h"
 #include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
+#include "Storage.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>

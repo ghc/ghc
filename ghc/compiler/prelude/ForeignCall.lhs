@@ -1,5 +1,3 @@
-{-% DrIFT (Automatic class derivations for Haskell) v1.1 %-}
-{-% DrIFT (Automatic class derivations for Haskell) v1.1 %-}
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
@@ -10,7 +8,7 @@ module ForeignCall (
 	ForeignCall(..),
 	Safety(..), playSafe, playThreadSafe,
 
-	CExportSpec(..),
+	CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
 	CCallSpec(..), 
 	CCallTarget(..), isDynamicTarget,
 	CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
@@ -21,8 +19,8 @@ module ForeignCall (
 
 #include "HsVersions.h"
 
-import CStrings			( CLabelString, pprCLabelString )
-import FastString		( FastString )
+import FastString	( FastString, unpackFS )
+import Char		( isAlphaNum )
 import Binary
 import Outputable
 \end{code}
@@ -154,6 +152,22 @@ ccallConvAttribute :: CCallConv -> String
 ccallConvAttribute StdCallConv = "__stdcall"
 ccallConvAttribute CCallConv   = ""
 \end{code}
+
+\begin{code}
+type CLabelString = FastString		-- A C label, completely unencoded
+
+pprCLabelString :: CLabelString -> SDoc
+pprCLabelString lbl = ftext lbl
+
+isCLabelString :: CLabelString -> Bool	-- Checks to see if this is a valid C label
+isCLabelString lbl 
+  = all ok (unpackFS lbl)
+  where
+    ok c = isAlphaNum c || c == '_' || c == '.'
+	-- The '.' appears in e.g. "foo.so" in the 
+	-- module part of a ExtName.  Maybe it should be separate
+\end{code}
+
 
 Printing into C files:
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.27 2003/11/12 17:49:11 sof Exp $
+ * $Id: Stable.c,v 1.28 2004/08/13 13:10:45 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -13,7 +13,6 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "Hash.h"
-#include "StablePriv.h"
 #include "RtsUtils.h"
 #include "Storage.h"
 #include "RtsAPI.h"

@@ -9,12 +9,16 @@ module Ctype
 	, is_lower	-- Char# -> Bool
 	, is_upper	-- Char# -> Bool
 	, is_digit	-- Char# -> Bool
+
+	, is_hexdigit, is_octdigit
+	, hexDigit, octDecDigit
 	) where
 
 #include "HsVersions.h"
 
 import DATA_INT		( Int32 )
 import DATA_BITS	( Bits((.&.)) )
+import Char		( ord, chr )
 \end{code}
 
 Bit masks
@@ -46,6 +50,28 @@ is_space  = is_ctype cSpace
 is_lower  = is_ctype cLower
 is_upper  = is_ctype cUpper
 is_digit  = is_ctype cDigit
+\end{code}
+
+Utils
+
+\begin{code}
+hexDigit :: Char -> Int
+hexDigit c | is_digit c = ord c - ord '0'
+           | otherwise  = ord (to_lower c) - ord 'a' + 10
+
+octDecDigit :: Char -> Int
+octDecDigit c = ord c - ord '0'
+
+is_hexdigit c
+	=  is_digit c 
+	|| (c >= 'a' && c <= 'f')
+	|| (c >= 'A' && c <= 'F')
+
+is_octdigit c = c >= '0' && c <= '7'
+
+to_lower c 
+  | c >=  'A' && c <= 'Z' = chr (ord c - (ord 'A' - ord 'a'))
+  | otherwise = c
 \end{code}
 
 We really mean .|. instead of + below, but GHC currently doesn't do

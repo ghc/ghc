@@ -1,7 +1,6 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.35 2003/11/14 14:28:07 stolz Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * Closures
  *
@@ -51,8 +50,6 @@ typedef struct {
 	StgGranHeader         gran;
 #endif
 } StgHeader;
-
-#define FIXED_HS (sizeof(StgHeader))
 
 /* -----------------------------------------------------------------------------
    Closure Types
@@ -233,11 +230,53 @@ typedef struct {
 #define BCO_BITMAP_SIZEW(bco) ((BCO_BITMAP_SIZE(bco) + BITS_IN(StgWord) - 1) \
 			        / BITS_IN(StgWord))
 
-/* Dynamic stack frames - these have a liveness mask in the object
- * itself, rather than in the info table.  Useful for generic heap
- * check code.  See StgMacros.h, HEAP_CHK_GEN().
- */
- 
+/* -----------------------------------------------------------------------------
+   Dynamic stack frames for generic heap checks.
+
+   These generic heap checks are slow, but have the advantage of being
+   usable in a variety of situations.
+
+   The one restriction is that any relevant SRTs must already be pointed
+   to from the stack.  The return address doesn't need to have an info
+   table attached: hence it can be any old code pointer.
+
+   The liveness mask contains a 1 at bit n, if register Rn contains a
+   non-pointer.  The contents of all 8 vanilla registers are always saved
+   on the stack; the liveness mask tells the GC which ones contain
+   pointers.
+
+   Good places to use a generic heap check: 
+
+        - case alternatives (the return address with an SRT is already
+	  on the stack).
+
+	- primitives (no SRT required).
+
+   The stack frame layout for a RET_DYN is like this:
+
+          some pointers         |-- RET_DYN_PTRS(liveness) words
+          some nonpointers      |-- RET_DYN_NONPTRS(liveness) words
+			       
+	  L1                    \
+          D1-2                  |-- RET_DYN_NONPTR_REGS_SIZE words
+	  F1-4                  /
+			       
+	  R1-8                  |-- RET_DYN_BITMAP_SIZE words
+			       
+	  return address        \
+	  liveness mask         |-- StgRetDyn structure
+	  stg_gen_chk_info      /
+
+   we assume that the size of a double is always 2 pointers (wasting a
+   word when it is only one pointer, but avoiding lots of #ifdefs).
+
+   See Liveness.h for the macros (RET_DYN_PTRS() etc.).
+
+   NOTE: if you change the layout of RET_DYN stack frames, then you
+   might also need to adjust the value of RESERVED_STACK_WORDS in
+   Constants.h.
+   -------------------------------------------------------------------------- */
+
 typedef struct {
     const struct _StgInfoTable* info;
     StgWord        liveness;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.31 2003/10/24 09:00:59 simonmar Exp $
+ * $Id: Weak.c,v 1.32 2004/08/13 13:11:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,7 +39,7 @@ finalizeWeakPointersNow(void)
   while ((w = weak_ptr_list)) {
     weak_ptr_list = w->link;
     if (w->header.info != &stg_DEAD_WEAK_info) {
-	w->header.info = &stg_DEAD_WEAK_info;
+	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
 	IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
 	if (w->finalizer != &stg_NO_FINALIZER_closure) {
 	    rts_evalLazyIO(w->finalizer,NULL);

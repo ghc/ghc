@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.h,v 1.3 2003/03/21 16:18:38 sof Exp $
+ * $Id: RetainerProfile.h,v 1.4 2004/08/13 13:10:29 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -21,7 +21,7 @@ extern void  printRetainer         ( FILE *, retainer );
 extern void  retainerProfile       ( void );
 extern void  resetStaticObjectForRetainerProfiling ( void );
 
-extern StgWord flip;
+extern StgWord RTS_VAR(flip);
 
 // extract the retainer set field from c
 #define RSET(c)   ((c)->header.prof.hp.rs)

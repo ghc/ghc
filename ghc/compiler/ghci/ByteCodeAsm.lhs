@@ -26,10 +26,9 @@ import FiniteMap	( addToFM, lookupFM, emptyFM )
 import Literal		( Literal(..) )
 import TyCon		( TyCon )
 import PrimOp		( PrimOp )
-import PrimRep		( PrimRep(..), isFollowableRep, is64BitRep )
 import Constants	( wORD_SIZE )
 import FastString	( FastString(..) )
-import SMRep		( StgWord )
+import SMRep		( CgRep(..), StgWord )
 import FiniteMap
 import Outputable
 
@@ -356,27 +355,19 @@ mkBits findLabel st proto_insns
        literal st other            = pprPanic "ByteCodeLink.literal" (ppr other)
 
 
-push_alts WordRep   = bci_PUSH_ALTS_N
-push_alts IntRep    = bci_PUSH_ALTS_N
-push_alts AddrRep   = bci_PUSH_ALTS_N
-push_alts CharRep   = bci_PUSH_ALTS_N
-push_alts FloatRep  = bci_PUSH_ALTS_F
-push_alts DoubleRep = bci_PUSH_ALTS_D
-push_alts VoidRep   = bci_PUSH_ALTS_V
-push_alts pk
- | is64BitRep pk      = bci_PUSH_ALTS_L
- | isFollowableRep pk = bci_PUSH_ALTS_P
+push_alts NonPtrArg = bci_PUSH_ALTS_N
+push_alts FloatArg  = bci_PUSH_ALTS_F
+push_alts DoubleArg = bci_PUSH_ALTS_D
+push_alts VoidArg   = bci_PUSH_ALTS_V
+push_alts LongArg   = bci_PUSH_ALTS_L
+push_alts PtrArg    = bci_PUSH_ALTS_P
 
-return_ubx WordRep   = bci_RETURN_N
-return_ubx IntRep    = bci_RETURN_N
-return_ubx AddrRep   = bci_RETURN_N
-return_ubx CharRep   = bci_RETURN_N
-return_ubx FloatRep  = bci_RETURN_F
-return_ubx DoubleRep = bci_RETURN_D
-return_ubx VoidRep   = bci_RETURN_V
-return_ubx pk
- | is64BitRep pk      = bci_RETURN_L
- | isFollowableRep pk = bci_RETURN_P
+return_ubx NonPtrArg = bci_RETURN_N
+return_ubx FloatArg  = bci_RETURN_F
+return_ubx DoubleArg = bci_RETURN_D
+return_ubx VoidArg   = bci_RETURN_V
+return_ubx LongArg   = bci_RETURN_L
+return_ubx PtrArg    = bci_RETURN_P
 
 
 -- The size in 16-bit entities of an instruction.

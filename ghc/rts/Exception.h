@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.h,v 1.8 2004/03/01 14:18:35 simonmar Exp $
+ * $Id: Exception.h,v 1.9 2004/08/13 13:09:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -33,3 +33,4 @@ interruptible(StgTSO *t)
     return 0;
   }
 }
+

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.18 2003/11/12 17:49:07 sof Exp $
+ * $Id: GCCompact.c,v 1.19 2004/08/13 13:09:56 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -16,7 +16,6 @@
 #include "MBlock.h"
 #include "GCCompact.h"
 #include "Schedule.h"
-#include "StablePriv.h"
 #include "Apply.h"
 
 // Turn off inlining when debugging - it obfuscates things
@@ -214,19 +213,19 @@ thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     nat size;
 
     p = (StgPtr)args;
-    switch (fun_info->fun_type) {
+    switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->bitmap);
-	size = BITMAP_SIZE(fun_info->bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.bitmap);
+	size = BITMAP_SIZE(fun_info->f.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
-	size = ((StgLargeBitmap *)fun_info->bitmap)->size;
-	thread_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, size);
+	size = ((StgLargeBitmap *)fun_info->f.bitmap)->size;
+	thread_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, size);
 	p += size;
 	break;
     default:
-	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
-	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->fun_type]);
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
@@ -267,7 +266,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    dyn = ((StgRetDyn *)p)->liveness;
 
 	    // traverse the bitmap first
-	    bitmap = GET_LIVENESS(dyn);
+	    bitmap = RET_DYN_LIVENESS(dyn);
 	    p      = (P_)&((StgRetDyn *)p)->payload[0];
 	    size   = RET_DYN_BITMAP_SIZE;
 	    while (size > 0) {
@@ -280,10 +279,10 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    }
 	    
 	    // skip over the non-ptr words
-	    p += GET_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
+	    p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
 	    
 	    // follow the ptr words
-	    for (size = GET_PTRS(dyn); size > 0; size--) {
+	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
 		thread(p);
 		p++;
 	    }
@@ -367,12 +366,12 @@ thread_PAP (StgPAP *pap)
     p = (StgPtr)pap->payload;
     size = pap->n_args;
 
-    switch (fun_info->fun_type) {
+    switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->bitmap);
+	bitmap = BITMAP_BITS(fun_info->f.bitmap);
 	goto small_bitmap;
     case ARG_GEN_BIG:
-	thread_large_bitmap(p, (StgLargeBitmap *)fun_info->bitmap, size);
+	thread_large_bitmap(p, (StgLargeBitmap *)fun_info->f.bitmap, size);
 	p += size;
 	break;
     case ARG_BCO:
@@ -380,7 +379,7 @@ thread_PAP (StgPAP *pap)
 	p += size;
 	break;
     default:
-	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]);
+	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
 	size = pap->n_args;
 	while (size > 0) {

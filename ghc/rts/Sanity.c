@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.34 2003/07/03 15:14:58 sof Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -26,7 +25,6 @@
 #include "MBlock.h"
 #include "Storage.h"
 #include "Schedule.h"
-#include "StoragePriv.h"   // for END_OF_STATIC_LIST
 #include "Apply.h"
 
 /* -----------------------------------------------------------------------------
@@ -113,21 +111,21 @@ checkStackFrame( StgPtr c )
 	dyn = r->liveness;
 	
 	p = (P_)(r->payload);
-	checkSmallBitmap(p,GET_LIVENESS(r->liveness),RET_DYN_BITMAP_SIZE);
+	checkSmallBitmap(p,RET_DYN_LIVENESS(r->liveness),RET_DYN_BITMAP_SIZE);
 	p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
 
 	// skip over the non-pointers
-	p += GET_NONPTRS(dyn);
+	p += RET_DYN_NONPTRS(dyn);
 	
 	// follow the ptr words
-	for (size = GET_PTRS(dyn); size > 0; size--) {
+	for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
 	    checkClosureShallow((StgClosure *)*p);
 	    p++;
 	}
 	
 	return sizeofW(StgRetDyn) + RET_DYN_BITMAP_SIZE +
 	    RET_DYN_NONPTR_REGS_SIZE +
-	    GET_NONPTRS(dyn) + GET_PTRS(dyn);
+	    RET_DYN_NONPTRS(dyn) + RET_DYN_PTRS(dyn);
     }
 
     case UPDATE_FRAME:
@@ -165,18 +163,18 @@ checkStackFrame( StgPtr c )
 	ret_fun = (StgRetFun *)c;
 	fun_info = get_fun_itbl(ret_fun->fun);
 	size = ret_fun->size;
-	switch (fun_info->fun_type) {
+	switch (fun_info->f.fun_type) {
 	case ARG_GEN:
 	    checkSmallBitmap((StgPtr)ret_fun->payload, 
-			     BITMAP_BITS(fun_info->bitmap), size);
+			     BITMAP_BITS(fun_info->f.bitmap), size);
 	    break;
 	case ARG_GEN_BIG:
 	    checkLargeBitmap((StgPtr)ret_fun->payload,
-			     (StgLargeBitmap *)fun_info->bitmap, size);
+			     (StgLargeBitmap *)fun_info->f.bitmap, size);
 	    break;
 	default:
 	    checkSmallBitmap((StgPtr)ret_fun->payload,
-			     BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]),
+			     BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
 			     size);
 	    break;
 	}
@@ -355,14 +353,14 @@ checkClosure( StgClosure* p )
 	    fun_info = get_fun_itbl(pap->fun);
 
 	    p = (StgClosure *)pap->payload;
-	    switch (fun_info->fun_type) {
+	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
 		checkSmallBitmap( (StgPtr)pap->payload, 
-				  BITMAP_BITS(fun_info->bitmap), pap->n_args );
+				  BITMAP_BITS(fun_info->f.bitmap), pap->n_args );
 		break;
 	    case ARG_GEN_BIG:
 		checkLargeBitmap( (StgPtr)pap->payload, 
-				  (StgLargeBitmap *)fun_info->bitmap, 
+				  (StgLargeBitmap *)fun_info->f.bitmap, 
 				  pap->n_args );
 		break;
 	    case ARG_BCO:
@@ -372,7 +370,7 @@ checkClosure( StgClosure* p )
 		break;
 	    default:
 		checkSmallBitmap( (StgPtr)pap->payload, 
-				  BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]),
+				  BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
 				  pap->n_args );
 		break;
 	    }

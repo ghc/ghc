@@ -20,7 +20,7 @@ module Panic
    ) where
 
 #include "HsVersions.h"
-#include "config.h"
+#include "../includes/ghcconfig.h"
 
 import Config
 import FastTypes

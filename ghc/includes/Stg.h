@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.62 2004/03/23 10:03:18 simonmar Exp $
+ * $Id: Stg.h,v 1.63 2004/08/13 13:09:30 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * Top-level include file for everything STG-ish.  
  *
@@ -11,6 +11,13 @@
  * define some register variables which must be done before any inline
  * functions are defined (some system headers have been known to
  * define the odd inline function).
+ *
+ * We generally try to keep as little visible as possible when
+ * compiling .hc files.  So for example the definitions of the
+ * InfoTable structs, closure structs and other RTS types are not
+ * visible here.  The compiler knows enough about the representations
+ * of these types to generate code which manipulates them directly
+ * with pointer arithmetic.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -34,82 +41,35 @@
 #endif
 
 /* Configuration */
-#include "config.h"
+#include "ghcconfig.h"
+#include "RtsConfig.h"
 
-/* This needs to be up near the top as the register line on alpha needs
- * to be before all procedures */
-#include "TailCalls.h"
-
-#if __GNUC__ >= 3
-/* Assume that a flexible array member at the end of a struct
- * can be defined thus: T arr[]; */
-#define FLEXIBLE_ARRAY
-#else
-/* Assume that it must be defined thus: T arr[0]; */
-#define FLEXIBLE_ARRAY 0
-#endif
-
-#if defined(SMP) || defined(THREADED_RTS)
-#define RTS_SUPPORTS_THREADS 1
-#endif
-
-/* Some macros to handle DLLing (Win32 only at the moment). */
-#include "StgDLL.h"
-
-/* Fix for mingw stat problem (done here so it's early enough) */
-#ifdef mingw32_TARGET_OS
-#define __MSVCRT__ 1
-#endif
-
-/* Turn lazy blackholing and eager blackholing on/off.
- *
- * Using eager blackholing makes things easier to debug because
- * the blackholes are more predictable - but it's slower and less sexy.
- *
- * For now, do lazy and not eager.
- */
-
-/* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of
- * single-entry thunks.
- *
- * SMP needs EAGER_BLACKHOLING because it has to lock thunks
- * synchronously, in case another thread is trying to evaluate the
- * same thunk simultaneously.
- */
-#if defined(SMP) || defined(TICKY_TICKY)
-#  define EAGER_BLACKHOLING
-#else
-#  define LAZY_BLACKHOLING
-#endif
-
-#if defined(__GNUC__)
-#define GNU_ATTRIBUTE(at) __attribute__((at))
-#else
-#define GNU_ATTRIBUTE(at)
-#endif
-
-#if __GNUC__ >= 3 
-#define GNUC3_ATTRIBUTE(at) __attribute__((at))
-#else
-#define GNUC3_ATTRIBUTE(at)
-#endif
-
-/* 
- * Empty structures isn't supported by all, so to define
- * empty structures, please protect the defn with an
- * #if SUPPORTS_EMPTY_STRUCTS. Similarly for use,
- * employ the macro MAYBE_EMPTY_STRUCT():
- *
- *     MAYBE_EMPTY_STRUCT(structFoo, fieldName);
- */
-#if SUPPORTS_EMPTY_STRUCTS
-# define MAYBE_EMPTY_STRUCT(a,b) a b;
-#else
-# define MAYBE_EMPTY_STRUCT(a,b) /* empty */
-#endif
+/* -----------------------------------------------------------------------------
+   Useful definitions
+   -------------------------------------------------------------------------- */
 
 /*
- * 'Portable' 
+ * The C backend like to refer to labels by just mentioning their
+ * names.  Howevver, when a symbol is declared as a variable in C, the
+ * C compiler will implicitly dereference it when it occurs in source.
+ * So we must subvert this behaviour for .hc files by declaring
+ * variables as arrays, which eliminates the implicit dereference.
+ */
+#if IN_STG_CODE
+#define RTS_VAR(x) (x)[]
+#define RTS_DEREF(x) (*(x))
+#else
+#define RTS_VAR(x) x
+#define RTS_DEREF(x) x
+#endif
+
+/* bit macros
+ */
+#define BITS_PER_BYTE 8
+#define BITS_IN(x) (BITS_PER_BYTE * sizeof(x))
+
+/*
+ * 'Portable' inlining
  */
 #if defined(__GNUC__) || defined( __INTEL_COMPILER)
 # define INLINE_HEADER static inline
@@ -123,51 +83,12 @@
 # error "Don't know how to inline functions with your C compiler."
 #endif
 
-/* TABLES_NEXT_TO_CODE says whether to assume that info tables are
- * assumed to reside just before the code for a function.
- *
- * UNDEFINING THIS WON'T WORK ON ITS OWN.  You have been warned.
- */
-#if !defined(USE_MINIINTERPRETER) && !defined(ia64_TARGET_ARCH)
-#define TABLES_NEXT_TO_CODE
-#endif
-
-/* bit macros
- */
-#define BITS_PER_BYTE 8
-#define BITS_IN(x) (BITS_PER_BYTE * sizeof(x))
-
-/* -----------------------------------------------------------------------------
-   Assertions and Debuggery
-   -------------------------------------------------------------------------- */
-
-#ifndef DEBUG
-#define ASSERT(predicate) /* nothing */
-#else
-
-void _stgAssert (char *, unsigned int);
-
-#define ASSERT(predicate)			\
-	if (predicate)				\
-	    /*null*/;				\
-	else					\
-	    _stgAssert(__FILE__, __LINE__)
-#endif /* DEBUG */
-
-/* 
- * Use this on the RHS of macros which expand to nothing
- * to make sure that the macro can be used in a context which
- * demands a non-empty statement.
- */
-
-#define doNothing() do { } while (0)
-
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
 
+#include "MachDeps.h"
 #include "StgTypes.h"
-#include "RtsTypes.h"
 
 /* -----------------------------------------------------------------------------
    Shorthand forms
@@ -187,107 +108,321 @@ typedef StgClosurePtr   L_;
 typedef StgInt64        LI_;
 typedef StgWord64       LW_;
 
-/*
- * We often want to know the size of something in units of an
- * StgWord... (rounded up, of course!)
- */
+#define IF_(f)		static F_ f(void)
+#define FN_(f)		F_ f(void)
+#define EF_(f)		extern F_ f(void)
 
-#define sizeofW(t) ((sizeof(t)+sizeof(W_)-1)/sizeof(W_))
-
-/* 
- * It's nice to be able to grep for casts
- */
-
-#define stgCast(ty,e) ((ty)(e))
+typedef StgWord StgWordArray[];
+#define EI_             extern StgWordArray
+#define II_             static StgWordArray
 
 /* -----------------------------------------------------------------------------
-   Include everything STG-ish
+   Tail calls
+
+   This needs to be up near the top as the register line on alpha needs
+   to be before all procedures (inline & out-of-line).
    -------------------------------------------------------------------------- */
 
-/* Global constaints */
-#include "Constants.h"
+#include "TailCalls.h"
 
-/* Profiling information */
-#include "StgProf.h"
-#include "StgLdvProf.h"
+/* -----------------------------------------------------------------------------
+   Moving Floats and Doubles
 
-/* Storage format definitions */
-#include "StgFun.h"
-#include "Closures.h"
-#include "ClosureTypes.h"
-#include "InfoTables.h"
-#include "TSO.h"
+   ASSIGN_FLT is for assigning a float to memory (usually the
+              stack/heap).  The memory address is guaranteed to be
+	      StgWord aligned (currently == sizeof(void *)).
 
-/* Simulated-parallel information */
-#include "GranSim.h"
+   PK_FLT     is for pulling a float out of memory.  The memory is
+              guaranteed to be StgWord aligned.
+   -------------------------------------------------------------------------- */
 
-/* Parallel information */
-#include "Parallel.h"
+INLINE_HEADER void	  ASSIGN_FLT (W_ [], StgFloat);
+INLINE_HEADER StgFloat    PK_FLT     (W_ []);
 
-/* STG/Optimised-C related stuff */
-#include "SMP.h"
+#if ALIGNMENT_FLOAT <= ALIGNMENT_LONG
+
+INLINE_HEADER void     ASSIGN_FLT(W_ p_dest[], StgFloat src) { *(StgFloat *)p_dest = src; }
+INLINE_HEADER StgFloat PK_FLT    (W_ p_src[])                { return *(StgFloat *)p_src; }
+
+#else  /* ALIGNMENT_FLOAT > ALIGNMENT_UNSIGNED_INT */
+
+INLINE_HEADER void ASSIGN_FLT(W_ p_dest[], StgFloat src)
+{
+    float_thing y;
+    y.f = src;
+    *p_dest = y.fu;
+}
+
+INLINE_HEADER StgFloat PK_FLT(W_ p_src[])
+{
+    float_thing y;
+    y.fu = *p_src;
+    return(y.f);
+}
+
+#endif /* ALIGNMENT_FLOAT > ALIGNMENT_LONG */
+
+#if ALIGNMENT_DOUBLE <= ALIGNMENT_LONG
+
+INLINE_HEADER void	  ASSIGN_DBL (W_ [], StgDouble);
+INLINE_HEADER StgDouble   PK_DBL     (W_ []);
+
+INLINE_HEADER void      ASSIGN_DBL(W_ p_dest[], StgDouble src) { *(StgDouble *)p_dest = src; }
+INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDouble *)p_src; }
+
+#else	/* ALIGNMENT_DOUBLE > ALIGNMENT_LONG */
+
+/* Sparc uses two floating point registers to hold a double.  We can
+ * write ASSIGN_DBL and PK_DBL by directly accessing the registers
+ * independently - unfortunately this code isn't writable in C, we
+ * have to use inline assembler.
+ */
+#if sparc_TARGET_ARCH
+
+#define ASSIGN_DBL(dst0,src) \
+    { StgPtr dst = (StgPtr)(dst0); \
+      __asm__("st %2,%0\n\tst %R2,%1" : "=m" (((P_)(dst))[0]), \
+	"=m" (((P_)(dst))[1]) : "f" (src)); \
+    }
+
+#define PK_DBL(src0) \
+    ( { StgPtr src = (StgPtr)(src0); \
+        register double d; \
+      __asm__("ld %1,%0\n\tld %2,%R0" : "=f" (d) : \
+	"m" (((P_)(src))[0]), "m" (((P_)(src))[1])); d; \
+    } )
+
+#else /* ! sparc_TARGET_ARCH */
+
+INLINE_HEADER void	  ASSIGN_DBL (W_ [], StgDouble);
+INLINE_HEADER StgDouble   PK_DBL     (W_ []);
+
+typedef struct
+  { StgWord dhi;
+    StgWord dlo;
+  } unpacked_double;
+
+typedef union
+  { StgDouble d;
+    unpacked_double du;
+  } double_thing;
+
+INLINE_HEADER void ASSIGN_DBL(W_ p_dest[], StgDouble src)
+{
+    double_thing y;
+    y.d = src;
+    p_dest[0] = y.du.dhi;
+    p_dest[1] = y.du.dlo;
+}
+
+/* GCC also works with this version, but it generates
+   the same code as the previous one, and is not ANSI
+
+#define ASSIGN_DBL( p_dest, src ) \
+	*p_dest = ((double_thing) src).du.dhi; \
+	*(p_dest+1) = ((double_thing) src).du.dlo \
+*/
+
+INLINE_HEADER StgDouble PK_DBL(W_ p_src[])
+{
+    double_thing y;
+    y.du.dhi = p_src[0];
+    y.du.dlo = p_src[1];
+    return(y.d);
+}
+
+#endif /* ! sparc_TARGET_ARCH */
+
+#endif /* ALIGNMENT_DOUBLE > ALIGNMENT_UNSIGNED_INT */
+
+
+/* -----------------------------------------------------------------------------
+   Moving 64-bit quantities around
+
+   ASSIGN_Word64      assign an StgWord64/StgInt64 to a memory location
+   PK_Word64          load an StgWord64/StgInt64 from a amemory location
+
+   In both cases the memory location might not be 64-bit aligned.
+   -------------------------------------------------------------------------- */
+
+#ifdef SUPPORT_LONG_LONGS
+
+typedef struct
+  { StgWord dhi;
+    StgWord dlo;
+  } unpacked_double_word;
+
+typedef union
+  { StgInt64 i;
+    unpacked_double_word iu;
+  } int64_thing;
+
+typedef union
+  { StgWord64 w;
+    unpacked_double_word wu;
+  } word64_thing;
+
+INLINE_HEADER void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
+{
+    word64_thing y;
+    y.w = src;
+    p_dest[0] = y.wu.dhi;
+    p_dest[1] = y.wu.dlo;
+}
+
+INLINE_HEADER StgWord64 PK_Word64(W_ p_src[])
+{
+    word64_thing y;
+    y.wu.dhi = p_src[0];
+    y.wu.dlo = p_src[1];
+    return(y.w);
+}
+
+INLINE_HEADER void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
+{
+    int64_thing y;
+    y.i = src;
+    p_dest[0] = y.iu.dhi;
+    p_dest[1] = y.iu.dlo;
+}
+
+INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
+{
+    int64_thing y;
+    y.iu.dhi = p_src[0];
+    y.iu.dlo = p_src[1];
+    return(y.i);
+}
+
+#elif SIZEOF_VOID_P == 8
+
+INLINE_HEADER void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
+{
+	p_dest[0] = src;
+}
+
+INLINE_HEADER StgWord64 PK_Word64(W_ p_src[])
+{
+    return p_src[0];
+}
+
+INLINE_HEADER void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
+{
+    p_dest[0] = src;
+}
+
+INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
+{
+    return p_src[0];
+}
+
+#endif
+
+/* -----------------------------------------------------------------------------
+   Other Stg stuff...
+   -------------------------------------------------------------------------- */
+
+#include "StgDLL.h"
 #include "MachRegs.h"
 #include "Regs.h"
-#include "Block.h"
+#include "StgProf.h"  /* ToDo: separate out RTS-only stuff from here */
 
-/* RTS public interface */
-#include "RtsAPI.h"
-
-/* System headers: stdlib.h is eeded so that we can use NULL.  It must
- * come after MachRegs.h, because stdlib.h might define some inline
- * functions which may only be defined after register variables have
- * been declared.
+#if IN_STG_CODE
+/*
+ * This is included later for RTS sources, after definitions of
+ * StgInfoTable, StgClosure and so on. 
  */
-#include <stdlib.h>
-
-#ifdef SMP
-#include <pthread.h>
-#endif
-
-/* GNU mp library */
-#include "gmp.h"
-
-/* Storage Manager */
-#include "StgStorage.h"
-
-/* Macros for STG/C code */
-#include "ClosureMacros.h"
-#include "InfoMacros.h"
-#include "StgMacros.h"
-#include "PrimOps.h"
-#include "Updates.h"
-#include "StgTicky.h"
-#include "CCall.h"
-#include "Stable.h"
-
-/* Built-in entry points */
 #include "StgMiscClosures.h"
-
-/* Runtime-system hooks */
-#include "Hooks.h"
-
-#include "Signals.h"
-
-#include "HsFFI.h"
-
-/* Misc stuff without a home */
-DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */
-DLL_IMPORT_RTS extern int    prog_argc;
-DLL_IMPORT_RTS extern char  *prog_name;
-
-extern void stackOverflow(void);
-
-#if defined(WANT_DOTNET_SUPPORT)
-#include "DNInvoke.h"
 #endif
 
-/* Creating and destroying an adjustor thunk and initialising the whole
-   adjustor thunk machinery. I cannot make myself create a separate .h file
-   for these three (sof.) 
-   
-*/
-extern void*   createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
-extern void    freeHaskellFunctionPtr(void* ptr);
-extern rtsBool initAdjustor(void);
+/* RTS external interface */
+#include "RtsExternal.h"
+
+/* -----------------------------------------------------------------------------
+   Split markers
+   -------------------------------------------------------------------------- */
+
+#if defined(USE_SPLIT_MARKERS)
+#if defined(LEADING_UNDERSCORE)
+#define __STG_SPLIT_MARKER __asm__("\n___stg_split_marker:");
+#else
+#define __STG_SPLIT_MARKER __asm__("\n__stg_split_marker:");
+#endif
+#else
+#define __STG_SPLIT_MARKER /* nothing */
+#endif
+
+/* -----------------------------------------------------------------------------
+   Integer multiply with overflow
+   -------------------------------------------------------------------------- */
+
+/* Multiply with overflow checking.
+ *
+ * This is tricky - the usual sign rules for add/subtract don't apply.  
+ *
+ * On 32-bit machines we use gcc's 'long long' types, finding
+ * overflow with some careful bit-twiddling.
+ *
+ * On 64-bit machines where gcc's 'long long' type is also 64-bits,
+ * we use a crude approximation, testing whether either operand is
+ * larger than 32-bits; if neither is, then we go ahead with the
+ * multiplication.
+ *
+ * Return non-zero if there is any possibility that the signed multiply
+ * of a and b might overflow.  Return zero only if you are absolutely sure
+ * that it won't overflow.  If in doubt, return non-zero.
+ */
+
+#if SIZEOF_VOID_P == 4
+
+#ifdef WORDS_BIGENDIAN
+#define RTS_CARRY_IDX__ 0
+#define RTS_REM_IDX__  1
+#else
+#define RTS_CARRY_IDX__ 1
+#define RTS_REM_IDX__ 0
+#endif
+
+typedef union {
+    StgInt64 l;
+    StgInt32 i[2];
+} long_long_u ;
+
+#define mulIntMayOflo(a,b)			\
+({                                              \
+  StgInt32 r, c;				\
+  long_long_u z;				\
+  z.l = (StgInt64)a * (StgInt64)b;		\
+  r = z.i[RTS_REM_IDX__];			\
+  c = z.i[RTS_CARRY_IDX__];			\
+  if (c == 0 || c == -1) {			\
+    c = ((StgWord)((a^b) ^ r))			\
+      >> (BITS_IN (I_) - 1);			\
+  }						\
+  c;                                            \
+})
+
+/* Careful: the carry calculation above is extremely delicate.  Make sure
+ * you test it thoroughly after changing it.
+ */
+
+#else
+
+#define HALF_INT  (((I_)1) << (BITS_IN (I_) / 2))
+
+#define stg_abs(a) (((I_)(a)) < 0 ? -((I_)(a)) : ((I_)(a)))
+
+#define mulIntMayOflo(a,b)			\
+({                                              \
+  I_ c; 					\
+  if (stg_abs(a) >= HALF_INT ||			\
+      stg_abs(b) >= HALF_INT) {			\
+    c = 1;					\
+  } else {					\
+    c = 0;					\
+  }						\
+  c;                                            \
+})
+#endif
 
 #endif /* STG_H */

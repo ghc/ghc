@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.62 2003/11/12 17:49:08 sof Exp $
+ * $Id: Printer.c,v 1.63 2004/08/13 13:10:23 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -28,7 +28,7 @@
 
 #if defined(GRAN) || defined(PAR)
 // HWL: explicit fixed header size to make debugging easier
-int fixed_hs = FIXED_HS, itbl_sz = sizeofW(StgInfoTable), 
+int fixed_hs = sizeof(StgHeader), itbl_sz = sizeofW(StgInfoTable), 
     uf_sz=sizeofW(StgUpdateFrame); 
 #endif
 
@@ -152,7 +152,7 @@ printClosure( StgClosure *obj )
     case FUN_1_0: case FUN_0_1: 
     case FUN_1_1: case FUN_0_2: case FUN_2_0:
     case FUN_STATIC:
-	fprintf(stderr,"FUN/%d(",itbl_to_fun_itbl(info)->arity);
+	fprintf(stderr,"FUN/%d(",itbl_to_fun_itbl(info)->f.arity);
 	printPtr((StgPtr)obj->header.info);
 #ifdef PROFILING
 	fprintf(stderr,", %s", obj->header.prof.ccs->cc->label);
@@ -458,19 +458,19 @@ printStackObj( StgPtr sp )
 
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
-        if (c == (StgClosure*)&stg_ctoi_ret_R1p_info) {
+        if (c == (StgClosure*)&stg_ctoi_R1p_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_R1p_info\n" );
 	} else
-        if (c == (StgClosure*)&stg_ctoi_ret_R1n_info) {
+        if (c == (StgClosure*)&stg_ctoi_R1n_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_R1n_info\n" );
 	} else
-        if (c == (StgClosure*)&stg_ctoi_ret_F1_info) {
+        if (c == (StgClosure*)&stg_ctoi_F1_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_F1_info\n" );
 	} else
-        if (c == (StgClosure*)&stg_ctoi_ret_D1_info) {
+        if (c == (StgClosure*)&stg_ctoi_D1_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_D1_info\n" );
 	} else
-        if (c == (StgClosure*)&stg_ctoi_ret_V_info) {
+        if (c == (StgClosure*)&stg_ctoi_V_info) {
            fprintf(stderr, "\t\t\tstg_ctoi_ret_V_info\n" );
 	} else
         if (get_itbl(c)->type == BCO) {
@@ -559,16 +559,17 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 	    p = (P_)(r->payload);
 	    printSmallBitmap(spBottom, sp,
-			     GET_LIVENESS(r->liveness), RET_DYN_BITMAP_SIZE);
+			     RET_DYN_LIVENESS(r->liveness), 
+			     RET_DYN_BITMAP_SIZE);
 	    p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
 
-	    for (size = GET_NONPTRS(dyn); size > 0; size--) {
+	    for (size = RET_DYN_NONPTRS(dyn); size > 0; size--) {
 		fprintf(stderr,"   stk[%ld] (%p) = ", (long)(spBottom-p), p);
 		fprintf(stderr,"Word# %ld\n", (long)*p);
 		p++;
 	    }
 	
-	    for (size = GET_PTRS(dyn); size > 0; size--) {
+	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
 		fprintf(stderr,"   stk[%ld] (%p) = ", (long)(spBottom-p), p);
 		printPtr(p);
 		p++;
@@ -608,22 +609,22 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	    ret_fun = (StgRetFun *)sp;
 	    fun_info = get_fun_itbl(ret_fun->fun);
 	    size = ret_fun->size;
-	    fprintf(stderr,"RET_FUN (%p) (type=%d)\n", ret_fun, fun_info->fun_type);
-	    switch (fun_info->fun_type) {
+	    fprintf(stderr,"RET_FUN (%p) (type=%d)\n", ret_fun, fun_info->f.fun_type);
+	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
 		printSmallBitmap(spBottom, sp+1,
-				 BITMAP_BITS(fun_info->bitmap),
-				 BITMAP_SIZE(fun_info->bitmap));
+				 BITMAP_BITS(fun_info->f.bitmap),
+				 BITMAP_SIZE(fun_info->f.bitmap));
 		break;
 	    case ARG_GEN_BIG:
 		printLargeBitmap(spBottom, sp+2,
-				 (StgLargeBitmap *)fun_info->bitmap,
-				 BITMAP_SIZE(fun_info->bitmap));
+				 (StgLargeBitmap *)fun_info->f.bitmap,
+				 BITMAP_SIZE(fun_info->f.bitmap));
 		break;
 	    default:
 		printSmallBitmap(spBottom, sp+1,
-				 BITMAP_BITS(stg_arg_bitmaps[fun_info->fun_type]),
-				 BITMAP_SIZE(stg_arg_bitmaps[fun_info->fun_type]));
+				 BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
+				 BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
 		break;
 	    }
 	    continue;
@@ -1059,8 +1060,6 @@ extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
 }
 
 #endif /* HAVE_BFD_H */
-
-#include "StoragePriv.h"
 
 void findPtr(P_ p, int);		/* keep gcc -Wall happy */
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.19 2003/09/21 13:26:05 igloo Exp $
+ * $Id: MBlock.h,v 1.20 2004/08/13 13:10:10 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,7 +9,8 @@
 
 #ifndef __MBLOCK_H__
 #define __MBLOCK_H__
-extern lnat mblocks_allocated;
+
+extern lnat RTS_VAR(mblocks_allocated);
 
 extern void * getMBlock(void);
 extern void * getMBlocks(nat n);

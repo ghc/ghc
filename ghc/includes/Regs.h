@@ -1,20 +1,27 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.14 2003/11/14 14:28:08 stolz Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
- * Registers used in STG code.  Might or might not correspond to
- * actual machine registers.
+ * Registers in the STG machine.
+ *
+ * The STG machine has a collection of "registers", each one of which
+ * may or may not correspond to an actual machine register when
+ * running code.  
+ *
+ * The register set is backed by a table in memory (struct
+ * StgRegTable).  If a particular STG register is not mapped to a
+ * machine register, then the apprpriate slot in this table is used
+ * instead.  
+ *
+ * This table is itself pointed to by another register, BaseReg.  If
+ * BaseReg is not in a machine register, then the register table is
+ * used from an absolute location (MainCapability).
  *
  * ---------------------------------------------------------------------------*/
 
 #ifndef REGS_H
 #define REGS_H
 
-/*
- * This file should do the right thing if we have no machine-registers
- * defined, i.e. everything lives in the RegTable.
- */
 
 /* 
  * This is the table that holds shadow-locations for all the STG
@@ -36,6 +43,25 @@ typedef struct {
   StgFunPtr      stgGCEnter1;
   StgFunPtr      stgGCFun;
 } StgFunTable;
+
+/*
+ * Vanilla registers are given this union type, which is purely so
+ * that we can cast the vanilla reg to a variety of types with the
+ * minimum of syntax.  eg.  R1.w instead of (StgWord)R1.
+ */
+typedef union {
+    StgWord        w;
+    StgAddr        a;
+    StgChar        c;
+    StgInt8        i8;
+    StgFloat       f;
+    StgInt         i;
+    StgPtr         p;
+    StgClosurePtr  cl;
+    StgStackOffset offset;	/* unused? */
+    StgByteArray   b;
+    StgTSOPtr      t;
+} StgUnion;
 
 typedef struct StgRegTable_ {
   StgUnion 	  rR1;
@@ -59,10 +85,10 @@ typedef struct StgRegTable_ {
   StgPtr 	  rSpLim;
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
-  StgTSO         *rCurrentTSO;
-  struct _bdescr *rNursery;
-  struct _bdescr *rCurrentNursery;
-  StgWord         rHpAlloc;	// number of words being allocated in heap 
+  struct StgTSO_ *rCurrentTSO;
+  struct bdescr_ *rNursery;
+  struct bdescr_ *rCurrentNursery;
+  StgWord         rHpAlloc;	// number of *bytes* being allocated in heap 
 #if defined(SMP) || defined(PAR)
   StgSparkPool   rSparks;	// per-task spark pool
 #endif
@@ -82,11 +108,15 @@ typedef struct Capability_ {
 #endif
 } Capability;
 
-/* No such thing as a MainRegTable under SMP - each thread must
- * have its own MainRegTable.
+/* No such thing as a MainCapability under SMP - each thread must have
+ * its own Capability.
  */
 #ifndef SMP
+#if IN_STG_CODE
+extern W_ MainCapability[];
+#else
 extern DLL_IMPORT_RTS Capability  MainCapability;
+#endif
 #endif
 
 #if IN_STG_CODE
@@ -291,7 +321,7 @@ GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #ifdef SMP
 #error BaseReg must be in a register for SMP
 #endif
-#define BaseReg (&MainCapability.r)
+#define BaseReg (&((Capability *)MainCapability)[0].r)
 #endif
 
 #ifdef REG_Sp
@@ -319,7 +349,7 @@ GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
 #endif
 
 #ifdef REG_CurrentTSO
-GLOBAL_REG_DECL(StgTSO *,CurrentTSO,REG_CurrentTSO)
+GLOBAL_REG_DECL(struct _StgTSO *,CurrentTSO,REG_CurrentTSO)
 #else
 #define CurrentTSO (BaseReg->rCurrentTSO)
 #endif
@@ -712,7 +742,6 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 #define CALLER_RESTORE_SYSTEM  /* nothing */
 
 #endif /* IN_STG_CODE */
-
 #define CALLER_SAVE_ALL				\
   CALLER_SAVE_SYSTEM				\
   CALLER_SAVE_USER
@@ -722,4 +751,3 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
   CALLER_RESTORE_USER
 
 #endif /* REGS_H */
-

@@ -60,15 +60,17 @@ endif
 EXCLUDED_SRCS += parallel/SysMan.c
 
 # The build system doesn't give us these
-HC_SRCS = $(filter %.hc, $(SRCS))
-HC_OBJS = $(patsubst %.hc,%.$(way_)o, $(HC_SRCS))
+CMM_SRCS = $(filter-out AutoApply%.cmm, $(wildcard *.cmm)) $(EXTRA_CMM_SRCS)
+CMM_OBJS = $(patsubst %.cmm,%.$(way_)o, $(CMM_SRCS))
 
-CLEAN_FILES += $(HC_OBJS)
+CLEAN_FILES += $(CMM_OBJS)
 
 # Override the default $(LIBOBJS) (defaults to $(HS_OBJS))
-LIBOBJS = $(C_OBJS) $(HC_OBJS)
+LIBOBJS = $(C_OBJS) $(CMM_OBJS)
 
 SplitObjs=NO
+
+H_FILES = $(wildcard ../includes/*.h) $(wildcard *.h)
 
 #-----------------------------------------------------------------------------
 # Flags for compiling RTS .c and .hc files
@@ -101,7 +103,7 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 STANDARD_OPTS += -Iwin32
 endif
 
-# HC_OPTS is included in both .c and .hc compilations, whereas CC_OPTS is
+# HC_OPTS is included in both .c and .cmm compilations, whereas CC_OPTS is
 # only included in .c compilations.  HC_OPTS included the WAY_* opts, which
 # must be included in both types of compilations.
 
@@ -163,7 +165,6 @@ endif
 #-----------------------------------------------------------------------------
 # make depend setup
 
-MKDEPENDC_SRCS     = $(C_SRCS) $(HC_SRCS)
 SRC_MKDEPENDC_OPTS += -I. -I../includes
 
 # Hack: we define every way-related option here, so that we get (hopefully)
@@ -175,17 +176,20 @@ SRC_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
 # -----------------------------------------------------------------------------
 # The auto-generated apply code
 
-AUTO_APPLY = AutoApply.hc
+# We want a slightly different version for the unregisterised way, so we make
+# AutoApply on a per-way basis (eg. AutoApply_p.cmm).
+
+AUTO_APPLY_CMM = AutoApply$(_way).cmm
 
 ifneq "$(BootingFromHc)" "YES"
-$(AUTO_APPLY): $(GHC_GENAPPLY)
+$(AUTO_APPLY_CMM): $(GHC_GENAPPLY)
 	@$(RM) $@
-	$(GHC_GENAPPLY) >$@
+	$(GHC_GENAPPLY) $(if $(filter u,$(way)), -u) >$@
 endif
 
-EXTRA_SRCS += $(AUTO_APPLY)
+EXTRA_CMM_SRCS += $(AUTO_APPLY_CMM)
 
-CLEAN_FILES += $(AUTO_APPLY)
+CLEAN_FILES += $(AUTO_APPLY_CMM)
 
 # -----------------------------------------------------------------------------
 #
@@ -275,6 +279,50 @@ parallel/SysMan : parallel/SysMan.mp_o parallel/LLComms.mp_o RtsUtils.mp_o RtsFl
 CLEAN_FILES  += parallel/SysMan.mp_o parallel/SysMan
 INSTALL_LIBEXECS += parallel/SysMan
 endif
+
+#-----------------------------------------------------------------------------
+# Compiling the cmm files
+
+# ToDo: should we really include Rts.h here?  Required for GNU_ATTRIBUTE().
+SRC_HC_OPTS += \
+  -\#include Prelude.h \
+  -\#include Rts.h \
+  -\#include RtsFlags.h \
+  -\#include RtsUtils.h \
+  -\#include StgRun.h \
+  -\#include Schedule.h \
+  -\#include Printer.h \
+  -\#include Sanity.h \
+  -\#include Storage.h \
+  -\#include SchedAPI.h \
+  -\#include Timer.h \
+  -\#include Itimer.h \
+  -\#include ProfHeap.h \
+  -\#include LdvProfile.h \
+  -\#include Profiling.h \
+  -\#include Apply.h
+
+# Cmm must be compiled via-C for now, because the NCG can't handle loops
+SRC_HC_OPTS += -fvia-C
+
+# We *want* type-checking of hand-written cmm.
+SRC_HC_OPTS += -dcmm-lint 
+
+# .cmm files depend on all the .h files, to a first approximation.
+%.$(way_)o : %.cmm $(H_FILES)
+	$(HC_PRE_OPTS)
+	$(HC) $(HC_OPTS) -c $< -o $@
+	$(HC_POST_OPTS)
+
+%.$(way_)hc : %.cmm $(H_FILES)
+	$(HC_PRE_OPTS)
+	$(HC) $(HC_OPTS) -C $< -o $@
+	$(HC_POST_OPTS)
+
+%.$(way_)s : %.cmm $(H_FILES)
+	$(HC_PRE_OPTS)
+	$(HC) $(HC_OPTS) -S $< -o $@
+	$(HC_POST_OPTS)
 
 #-----------------------------------------------------------------------------
 #

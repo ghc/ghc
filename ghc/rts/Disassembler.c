@@ -4,8 +4,8 @@
  * Copyright (c) 1994-2002.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.27 $
- * $Date: 2003/03/25 17:04:09 $
+ * $Revision: 1.28 $
+ * $Date: 2004/08/13 13:09:46 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
@@ -139,9 +139,6 @@ disInstr ( StgBCO *bco, int pc )
 	  break;
       case bci_PUSH_APPLY_PPPPPP:
 	  fprintf(stderr, "PUSH_APPLY_PPPPPP\n");
-	  break;
-      case bci_PUSH_APPLY_PPPPPPP:
-	  fprintf(stderr, "PUSH_APPLY_PPPPPPP\n");
 	  break;
       case bci_SLIDE: 
          fprintf(stderr, "SLIDE     %d down by %d\n", instrs[pc], instrs[pc+1] );

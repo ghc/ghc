@@ -1,23 +1,27 @@
 {-# OPTIONS -cpp #-}
 module Main(main) where
 
-#include "../../includes/config.h"
+#include "../../includes/ghcconfig.h"
 #include "../../includes/MachRegs.h"
+#include "../../includes/Constants.h"
+
 
 #if __GLASGOW_HASKELL__ >= 504
 import Text.PrettyPrint
 import Data.Word
 import Data.Bits
 import Data.List	( intersperse )
-import Data.Char	( toUpper )
+import System.Exit
+import System.Environment
+import System.IO
 #else
+import System
+import IO
 import Bits
 import Word
 import Pretty
 import List		( intersperse )
-import Char		( toUpper )
 #endif
-
 
 -- -----------------------------------------------------------------------------
 -- Argument kinds (rougly equivalent to PrimRep)
@@ -55,10 +59,13 @@ isPtr _ = False
 -- -----------------------------------------------------------------------------
 -- Registers
 
+data RegStatus = Registerised | Unregisterised
+
 type Reg = String
 
-availableRegs :: ([Reg],[Reg],[Reg],[Reg])
-availableRegs = 
+availableRegs :: RegStatus -> ([Reg],[Reg],[Reg],[Reg])
+availableRegs Unregisterised = ([],[],[],[])
+availableRegs Registerised =
   ( vanillaRegs MAX_REAL_VANILLA_REG,
     floatRegs   MAX_REAL_FLOAT_REG,
     doubleRegs  MAX_REAL_DOUBLE_REG,
@@ -66,7 +73,7 @@ availableRegs =
   )
 
 vanillaRegs, floatRegs, doubleRegs, longRegs :: Int -> [Reg]
-vanillaRegs n = [ "R" ++ show m ++ ".w" | m <- [2..n] ]  -- never use R1
+vanillaRegs n = [ "R" ++ show m | m <- [2..n] ]  -- never use R1
 floatRegs   n = [ "F" ++ show m | m <- [1..n] ]
 doubleRegs  n = [ "D" ++ show m | m <- [1..n] ]
 longRegs    n = [ "L" ++ show m | m <- [1..n] ]
@@ -74,25 +81,29 @@ longRegs    n = [ "L" ++ show m | m <- [1..n] ]
 -- -----------------------------------------------------------------------------
 -- Loading/saving register arguments to the stack
 
-loadRegArgs :: Int -> [ArgRep] -> (Doc,Int)
-loadRegArgs sp args = (vcat (map (uncurry assign_stk_to_reg) reg_locs), sp')
+loadRegArgs :: RegStatus -> Int -> [ArgRep] -> (Doc,Int)
+loadRegArgs regstatus sp args 
+ = (vcat (map (uncurry assign_stk_to_reg) reg_locs), sp')
  where
-  (reg_locs, sp') = assignRegs sp args
+  (reg_locs, _leftovers, sp') = assignRegs regstatus sp args
 
 -- a bit like assignRegs in CgRetConv.lhs
 assignRegs
-	:: Int			-- Sp of first arg
+	:: RegStatus		-- are we registerised?
+	-> Int			-- Sp of first arg
 	-> [ArgRep]		-- args
-	-> ([(Reg,Int)], Int)	-- Sp and rest of args
-assignRegs sp args = assign sp args availableRegs []
+	-> ([(Reg,Int)],	-- regs and offsets to load
+	    [ArgRep],		-- left-over args
+	    Int)		-- Sp of left-over args
+assignRegs regstatus sp args = assign sp args (availableRegs regstatus) []
 
-assign sp [] regs doc = (doc, sp)
+assign sp [] regs doc = (doc, [], sp)
 assign sp (V : args) regs doc = assign sp args regs doc
 assign sp (arg : args) regs doc
  = case findAvailableReg arg regs of
     Just (reg, regs') -> assign (sp + argSize arg)  args regs' 
 	    		    ((reg, sp) : doc)
-    Nothing -> (doc, sp)
+    Nothing -> (doc, (arg:args), sp)
 
 findAvailableReg N (vreg:vregs, fregs, dregs, lregs) =
   Just (vreg, (vregs,fregs,dregs,lregs))
@@ -106,24 +117,19 @@ findAvailableReg L (vregs, fregs, dregs, lreg:lregs) =
   Just (lreg, (vregs,fregs,dregs,lregs))
 findAvailableReg _ _ = Nothing
 
-assign_reg_to_stk reg@('F':_) sp
-   = text "ASSIGN_FLT(Sp+" <> int sp <> comma <> text reg <> text ");"
-assign_reg_to_stk reg@('D':_) sp
-   = text "ASSIGN_DBL(Sp+" <> int sp <> comma <> text reg <> text ");"
-assign_reg_to_stk reg@('L':_) sp
-   = text "ASSIGN_Word64(Sp+" <> int sp <> comma <> text reg <> text ");"
 assign_reg_to_stk reg sp
-   = text "Sp[" <> int sp <> text "] = " <> text reg <> semi
+   = loadSpWordOff (regRep reg) sp <> text " = " <> text reg <> semi
 
-assign_stk_to_reg reg@('F':_) sp
-   = text reg <> text " = "  <> text "PK_FLT(Sp+" <> int sp <> text ");"
-assign_stk_to_reg reg@('D':_) sp
-   = text reg <> text " = "  <> text "PK_DBL(Sp+" <> int sp <> text ");"
-assign_stk_to_reg reg@('L':_) sp
-   = text reg <> text " = "  <> text "PK_Word64(Sp+" <> int sp <> text ");"
 assign_stk_to_reg reg sp
-   = text reg <> text " = Sp[" <> int sp <> text "];"
+   = text reg <> text " = " <> loadSpWordOff (regRep reg) sp <> semi
 
+regRep ('F':_) = "F_"
+regRep ('D':_) = "D_"
+regRep ('L':_) = "L_"
+regRep _       = "W_"
+
+loadSpWordOff :: String -> Int -> Doc
+loadSpWordOff rep off = text rep <> text "[Sp+WDS(" <> int off <> text ")]"
 
 -- make a ptr/non-ptr bitmap from a list of argument types
 mkBitmap :: [ArgRep] -> Word32
@@ -151,13 +157,17 @@ mkBitmap args = foldr f 0 args
 -- the args anyway (this might not be true of register-rich machines
 -- when we start passing args to stg_ap_* in regs).
 
+mkApplyName args
+  = text "stg_ap_" <> text (map showArg args)
+
 mkApplyRetName args
-  = text "stg_ap_" <> text (map showArg args) <> text "_ret"
+  = mkApplyName args <> text "_ret"
 
 mkApplyInfoName args
-  = text "stg_ap_" <> text (map showArg args) <> text "_info"
+  = mkApplyName args <> text "_info"
 
-genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
+genMkPAP regstatus macro jump ticker disamb stack_apply 
+	is_pap args all_args_size fun_info_label
   =  smaller_arity_cases
   $$ exact_arity_case
   $$ larger_arity_case
@@ -181,21 +191,22 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
 	   let
 	     (reg_doc, sp')
 		| stack_apply = (empty, arg_sp_offset)
-		| otherwise   = loadRegArgs arg_sp_offset these_args
+		| otherwise   = loadRegArgs regstatus arg_sp_offset these_args
 	   in
            nest 4 (vcat [
+	     text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_MANY();",
 	     reg_doc,
 	     vcat [ shuffle_down j | j <- [sp'..these_args_size] ],
-	     text "Sp[" <> int these_args_size <>  text "] = (W_)&" <>
+	     loadSpWordOff "W_" these_args_size <> text " = " <>
                 mkApplyInfoName rest_args <> semi,
-	     text "Sp += " <> int (sp' -  1) <> semi,
+	     text "Sp_adj(" <> int (sp' -  1) <> text ");",
 		-- for a PAP, we have to arrange that the stack contains a
 		-- return address in the even that stg_PAP_entry fails its
 		-- heap check.  See stg_PAP_entry in Apply.hc for details.
 	     if is_pap 
-		then text "R2.w = (W_)&" <> mkApplyInfoName these_args <> semi
+		then text "R2 = " <> mkApplyInfoName these_args <> semi
 		else empty,
-	     text "JMP_" <> parens (text jump) <> semi
+	     text "jump " <> text jump <> semi
 	    ]) $$
  	   text "}"
 	where
@@ -203,8 +214,8 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
 	        these_args_size = sum (map argSize these_args)
 		
 		shuffle_down i = 
-		  text "Sp[" <> int (i-1) <> text "] = Sp["
-		     <> int i <> text "];"
+		  loadSpWordOff "W_" (i-1) <> text " = " <>
+		  loadSpWordOff "W_" i <> semi
 
 -- The EXACT ARITY case
 --
@@ -217,15 +228,16 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
 	  let
 	     (reg_doc, sp')
 		| stack_apply = (empty, arg_sp_offset)
-		| otherwise   = loadRegArgs arg_sp_offset args
+		| otherwise   = loadRegArgs regstatus arg_sp_offset args
 	  in
 	  nest 4 (vcat [
+	    text "TICK_SLOW_CALL_" <> text ticker <> text "_CORRECT();",
 	    reg_doc,
-	    text "Sp += " <> int sp' <> semi,
+	    text "Sp_adj(" <> int sp' <> text ");",
 	    if is_pap 
-		then text "R2.w = (W_)&" <> fun_info_label <> semi
+		then text "R2 = " <> fun_info_label <> semi
 		else empty,
-	    text "JMP_" <> parens (text jump) <> semi
+	    text "jump " <> text jump <> semi
 	  ])
 
 -- The LARGER ARITY cases:
@@ -236,12 +248,14 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
 
     larger_arity_case = 
 	   text "} else {" $$
-	   nest 4 (
+	   nest 4 (vcat [
+	  	text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_FEW();",
 		text macro <> char '(' <> int n_args <> comma <> 
 					int all_args_size <>  
-					text ",(W_)&" <> fun_info_label <>
+					text "," <> fun_info_label <>
+					text "," <> text disamb <>
 					text ");"
-	   ) $$
+	   ]) $$
 	   char '}'
 
 -- -----------------------------------------------------------------------------
@@ -249,23 +263,20 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
 
 -- args is a list of 'p', 'n', 'f', 'd' or 'l'
 
-genApply args =
+genApply regstatus args =
    let
     fun_ret_label  = mkApplyRetName args
     fun_info_label = mkApplyInfoName args
     all_args_size  = sum (map argSize args)
    in
     vcat [
-      text "INFO_TABLE_RET(" <> fun_info_label <> text "," <>
-	fun_ret_label <> text "," <>
-        text "MK_SMALL_BITMAP(" <> int all_args_size <> text "/*framsize*/," <>
-	int (fromIntegral (mkBitmap args)) <> text "/*bitmap*/), " <>
-        text "0,0,0,RET_SMALL,,EF_,0,0);",
-      text "",
-      text "F_ " <> fun_ret_label <> text "( void )\n{",
+      text "INFO_TABLE_RET(" <> mkApplyName args <> text ", " <>
+        int all_args_size <> text "/*framsize*/," <>
+	int (fromIntegral (mkBitmap args)) <> text "/*bitmap*/, " <>
+        text "RET_SMALL)\n{",
       nest 4 (vcat [
-       text "StgInfoTable *info;",
-       text "nat arity;",
+       text "W_ info;",
+       text "W_ arity;",
 
 --    if fast == 1:
 --        print "static void *lbls[] ="
@@ -292,13 +303,12 @@ genApply args =
 --        print "    [IND_OLDGEN_PERM] &&ind_lbl"
 --        print "  };"
     
-       text "FB_",
        text "",
-       text "IF_DEBUG(apply,fprintf(stderr, \"" <> fun_ret_label <> 
-	  text "... \"); printClosure(R1.cl));",
+       text "IF_DEBUG(apply,foreign \"C\" fprintf(stderr, \"" <> fun_ret_label <> 
+	  text "... \"); foreign \"C\" printClosure(R1 \"ptr\"));",
 
-       text "IF_DEBUG(sanity,checkStackFrame(Sp+" <> int (1 + all_args_size)
-	<> text "));",
+       text "IF_DEBUG(sanity,foreign \"C\" checkStackFrame(Sp+WDS(" <> int (1 + all_args_size)
+	<> text ")\"ptr\"));",
 
 --       text "IF_DEBUG(sanity,checkStackChunk(Sp+" <> int (1 + all_args_size) <>
 --	  text ", CurrentTSO->stack + CurrentTSO->stack_size));",
@@ -309,115 +319,121 @@ genApply args =
 	   do_assert (arg:args) offset
 		| isPtr arg = this : rest
 		| otherwise = rest
-	        where this = text "ASSERT(LOOKS_LIKE_CLOSURE_PTR(Sp[" 
-				 <> int offset <> text "]));"
+	        where this = text "ASSERT(LOOKS_LIKE_CLOSURE_PTR(Sp(" 
+				 <> int offset <> text ")));"
 		      rest = do_assert args (offset + argSize arg)
        in
        vcat (do_assert args 1),
-	 
+
        text  "again:",
-       text  "info = get_itbl(R1.cl);",
+       text  "info = %GET_STD_INFO(R1);",
 
 --    if fast == 1:
 --        print "    goto *lbls[info->type];";
 --    else:
-        text "switch (info->type) {" $$
-	 nest 4 (vcat [
+        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (%INFO_TYPE(info)) {",
+	nest 4 (vcat [
 
 --    if fast == 1:
 --        print "    bco_lbl:"
 --    else:
-	text "case BCO:",
+	text "case BCO: {",
 	nest 4 (vcat [
-	  text "arity = ((StgBCO *)R1.p)->arity;",
+	  text "arity = TO_W_(StgBCO_arity(R1));",
 	  text "ASSERT(arity > 0);",
-	  genMkPAP "BUILD_PAP" "stg_BCO_entry" 
+	  genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" "FUN" "BCO"
 		True{-stack apply-} False{-not a PAP-}
 		args all_args_size fun_info_label
 	 ]),
+	text "}",
 
 --    if fast == 1:
 --        print "    fun_lbl:"
 --    else:
-        text "case FUN:",
-        text "case FUN_1_0:",
-        text "case FUN_0_1:",
-        text "case FUN_2_0:",
-        text "case FUN_1_1:",
-        text "case FUN_0_2:",
-        text "case FUN_STATIC:",
+        text "case FUN,",
+        text "     FUN_1_0,",
+        text "     FUN_0_1,",
+        text "     FUN_2_0,",
+        text "     FUN_1_1,",
+        text "     FUN_0_2,",
+        text "     FUN_STATIC: {",
 	nest 4 (vcat [
-	  text "arity = itbl_to_fun_itbl(info)->arity;",
+	  text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
 	  text "ASSERT(arity > 0);",
-          genMkPAP "BUILD_PAP" "GET_ENTRY(R1.cl)" 
+          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(R1)" "FUN" "FUN"
 		False{-reg apply-} False{-not a PAP-}
 		args all_args_size fun_info_label
 	 ]),
+	text "}",
 
 --    if fast == 1:
 --        print "    pap_lbl:"
 --    else:
 
-	text "case PAP:",
+	text "case PAP: {",
 	nest 4 (vcat [
- 	  text "arity = ((StgPAP *)R1.p)->arity;",
+ 	  text "arity = TO_W_(StgPAP_arity(R1));",
 	  text "ASSERT(arity > 0);",
-	  genMkPAP "NEW_PAP" "stg_PAP_entry" 
+	  genMkPAP regstatus "NEW_PAP" "ENTRY_LBL(stg_PAP)" "PAP" "PAP"
 		True{-stack apply-} True{-is a PAP-}
 		args all_args_size fun_info_label
 	 ]),
+	text "}",
 
 	text "",
 
 --    if fast == 1:
 --        print "    thunk_lbl:"
 --    else:
-	text "case AP:",
-	text "case AP_STACK:",
-	text "case CAF_BLACKHOLE:",
-	text "case BLACKHOLE:",
-	text "case BLACKHOLE_BQ:",
-	text "case SE_BLACKHOLE:",
-	text "case SE_CAF_BLACKHOLE:",
-        text "case THUNK:",
-        text "case THUNK_1_0:",
-        text "case THUNK_0_1:",
-        text "case THUNK_2_0:",
-        text "case THUNK_1_1:",
-        text "case THUNK_0_2:",
-        text "case THUNK_STATIC:",
-        text "case THUNK_SELECTOR:",
+	text "case AP,",
+	text "     AP_STACK,",
+	text "     CAF_BLACKHOLE,",
+	text "     BLACKHOLE,",
+	text "     BLACKHOLE_BQ,",
+	text "     SE_BLACKHOLE,",
+	text "     SE_CAF_BLACKHOLE,",
+        text "     THUNK,",
+        text "     THUNK_1_0,",
+        text "     THUNK_0_1,",
+        text "     THUNK_2_0,",
+        text "     THUNK_1_1,",
+        text "     THUNK_0_2,",
+        text "     THUNK_STATIC,",
+        text "     THUNK_SELECTOR: {",
 	nest 4 (vcat [
-	  text "Sp[0] = (W_)&" <> fun_info_label <> text ";",
-	  text "JMP_(GET_ENTRY(R1.cl));",
+          text "TICK_SLOW_CALL_UNEVALD(" <> int (length args) <> text ");",
+	  text "Sp(0) = " <> fun_info_label <> text ";",
+	  text "jump %GET_ENTRY(R1);",
 	  text ""
 	 ]),
+	text "}",
 
 --    if fast == 1:
 --        print "    ind_lbl:"
 --    else:
-        text "case IND:",
-        text "case IND_OLDGEN:",
-        text "case IND_STATIC:",
-        text "case IND_PERM:",
-        text "case IND_OLDGEN_PERM:",
+        text "case IND,",
+        text "     IND_OLDGEN,",
+        text "     IND_STATIC,",
+        text "     IND_PERM,",
+        text "     IND_OLDGEN_PERM: {",
 	nest 4 (vcat [
-	  text "R1.cl = ((StgInd *)R1.p)->indirectee;",
+	  text "R1 = StgInd_indirectee(R1);",
 	  text "goto again;"
 	 ]),
+	text "}",
 	text "",
 
 --    if fast == 0:
 
-       text "default:",
+       text "default: {",
        nest 4 (
-         text "barf(\"" <> fun_ret_label <> text "\");"
+         text "foreign \"C\" barf(\"" <> fun_ret_label <> text "\");"
        ),
        text "}"
 	
-	])
+	]),
+       text "}"
       ]),
-      text "FE_",
       text "}"
     ]
 
@@ -439,20 +455,18 @@ genApply args =
 mkStackApplyEntryLabel:: [ArgRep] -> Doc
 mkStackApplyEntryLabel args = text "stg_ap_stk_" <> text (map showArg args)
 
-genStackApply :: [ArgRep] -> Doc
-genStackApply args = 
+genStackApply :: RegStatus -> [ArgRep] -> Doc
+genStackApply regstatus args = 
   let fn_entry_label = mkStackApplyEntryLabel args in
   vcat [
-    text "IF_" <> parens fn_entry_label,
-    text "{",
-    nest 4 (text "FB_" $$ body $$ text "FE_"),
-    text "}"
+    fn_entry_label,
+    text "{", nest 4 body, text "}"
    ]
  where
-   (assign_regs, sp') = loadRegArgs 0 args
+   (assign_regs, sp') = loadRegArgs regstatus 0 args
    body = vcat [assign_regs,
-		text "Sp += " <> int sp' <> semi,
-		text "JMP_(GET_ENTRY(R1.cl));"
+		text "Sp_adj" <> parens (int sp') <> semi,
+		text "jump %GET_ENTRY(R1);"
 		]
 
 -- -----------------------------------------------------------------------------
@@ -466,49 +480,51 @@ genStackApply args =
 mkStackSaveEntryLabel :: [ArgRep] -> Doc
 mkStackSaveEntryLabel args = text "stg_stk_save_" <> text (map showArg args)
 
-genStackSave :: [ArgRep] -> Doc
-genStackSave args =
+genStackSave :: RegStatus -> [ArgRep] -> Doc
+genStackSave regstatus args =
   let fn_entry_label= mkStackSaveEntryLabel args in
   vcat [
-    text "IF_" <> parens fn_entry_label,
-    text "{",
-    nest 4 (text "FB_" $$ body $$ text "FE_"),
-    text "}"
+    fn_entry_label,
+    text "{", nest 4 body, text "}"
    ]
  where
-   body = vcat [text "Sp -= " <> int sp_offset <> semi,
+   body = vcat [text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
 		vcat (map (uncurry assign_reg_to_stk) reg_locs),
-		text "Sp[2] = R1.w;",
-		text "Sp[1] =" <+> int (sp_offset - std_frame_size) <> semi,
-		text "Sp[0] = (W_)&stg_gc_fun_info;",
-		text "JMP_(stg_gc_noregs);"
+		text "Sp(2) = R1;",
+		text "Sp(1) =" <+> int stk_args <> semi,
+		text "Sp(0) = stg_gc_fun_info;",
+		text "jump stg_gc_noregs;"
 		]
 
    std_frame_size = 3 -- the std bits of the frame. See StgRetFun in Closures.h,
 		      -- and the comment on stg_fun_gc_gen in HeapStackCheck.hc.
-   (reg_locs, sp_offset) = assignRegs std_frame_size args
+   (reg_locs, leftovers, sp_offset) = assignRegs regstatus std_frame_size args
+
+   -- number of words of arguments on the stack.
+   stk_args = sum (map argSize leftovers) + sp_offset - std_frame_size
 
 -- -----------------------------------------------------------------------------
 -- The prologue...
 
-main = putStr (render the_code)
-  where the_code = vcat [
+main = do
+  args <- getArgs
+  regstatus <- case args of
+		 [] -> return Registerised
+		 ["-u"] -> return Unregisterised
+		 _other -> do hPutStrLn stderr "syntax: genapply [-u]"
+			      exitWith (ExitFailure 1)
+  let the_code = vcat [
 		text "// DO NOT EDIT!",
 		text "// Automatically generated by GenApply.hs",
 		text "",
-		text "#include \"Stg.h\"",
-		text "#include \"Rts.h\"",
-		text "#include \"RtsFlags.h\"",
-		text "#include \"Storage.h\"",
-		text "#include \"RtsUtils.h\"",
-		text "#include \"Printer.h\"",
-		text "#include \"Sanity.h\"",
-		text "#include \"Apply.h\"",
+		text "#include \"Cmm.h\"",
+		text "#include \"AutoApply.h\"",
 		text "",
-		text "#include <stdio.h>",
 
-		vcat (intersperse (text "") $ map genApply applyTypes),
-		vcat (intersperse (text "") $ map genStackFns stackApplyTypes),
+		vcat (intersperse (text "") $ 
+		   map (genApply regstatus) applyTypes),
+		vcat (intersperse (text "") $ 
+		   map (genStackFns regstatus) stackApplyTypes),
 
 		genStackApplyArray stackApplyTypes,
 		genStackSaveArray stackApplyTypes,
@@ -516,6 +532,8 @@ main = putStr (render the_code)
 
 		text ""  -- add a newline at the end of the file
 	    ]
+  -- in
+  putStr (render the_code)
 
 -- These have been shown to cover about 99% of cases in practice...
 applyTypes = [
@@ -529,10 +547,10 @@ applyTypes = [
 	[P,P],
 	[P,P,V],
 	[P,P,P],
+	[P,P,P,V],
 	[P,P,P,P],
 	[P,P,P,P,P],
-	[P,P,P,P,P,P],
-	[P,P,P,P,P,P,P]
+	[P,P,P,P,P,P]
    ]
 
 -- No need for V args in the stack apply cases.
@@ -564,36 +582,45 @@ stackApplyTypes = [
 	[P,P,P,P,P,P,P,P]
    ]
 
-genStackFns args = genStackApply args $$ genStackSave args
+genStackFns regstatus args 
+  =  genStackApply regstatus args
+  $$ genStackSave regstatus args
 
 
 genStackApplyArray types =
-  text "StgFun *stg_ap_stack_entries[] = {" $$  
-  vcat (map arr_ent types) $$
-  text "};"
+  vcat [
+    text "section \"rodata\" {",
+    text "stg_ap_stack_entries:",
+    text "W_ 0; W_ 0; W_ 0;", -- ARG_GEN, ARG_GEN_BIG, ARG_BCO
+    vcat (map arr_ent types),
+    text "}"
+  ]
  where
-  arr_ent ty = brackets (arg_const ty) <+> mkStackApplyEntryLabel ty <> comma
+  arr_ent ty = text "W_" <+> mkStackApplyEntryLabel ty <> semi
 
 genStackSaveArray types =
-  text "StgFun *stg_stack_save_entries[] = {" $$  
-  vcat (map arr_ent types) $$
-  text "};"
+  vcat [
+    text "section \"rodata\" {",
+    text "stg_stack_save_entries:",
+    text "W_ 0; W_ 0; W_ 0;", -- ARG_GEN, ARG_GEN_BIG, ARG_BCO
+    vcat (map arr_ent types),
+    text "}"
+  ]
  where
-  arr_ent ty = brackets (arg_const ty) <+> mkStackSaveEntryLabel ty <> comma
+  arr_ent ty = text "W_" <+> mkStackSaveEntryLabel ty <> semi
 
 genBitmapArray :: [[ArgRep]] -> Doc
 genBitmapArray types =
   vcat [
-    text "StgWord stg_arg_bitmaps[] = {",
+    text "section \"rodata\" {",
+    text "stg_arg_bitmaps:",
+    text "W_ 0; W_ 0; W_ 0;", -- ARG_GEN, ARG_GEN_BIG, ARG_BCO
     vcat (map gen_bitmap types),
-    text "};"
+    text "}"
   ]
   where
-   gen_bitmap ty = brackets (arg_const ty) <+> 
-		   text "MK_SMALL_BITMAP" <> parens (
-			int (sum (map argSize ty)) <> comma <>
-			text (show (mkBitmap ty))) <>
-		   comma
-
-arg_const ty = text "ARG_" <> text (map toUpper (map showArg ty))
+   gen_bitmap ty = text "W_" <+> int bitmap_val <> semi
+	where bitmap_val = 
+		(fromIntegral (mkBitmap ty) `shiftL` BITMAP_BITS_SHIFT)
+		 .|. sum (map argSize ty)
 
