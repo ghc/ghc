@@ -1,4 +1,4 @@
-!! N-plus-K pattern in binding
+-- !!! N-plus-K pattern in binding
 
 -- From: Andreas Marth
 -- Sent: Monday, June 07, 1999 5:02 PM
