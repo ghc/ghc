@@ -5,11 +5,6 @@ TOP=..
 CURRENT_DIR=ghc/driver
 include $(TOP)/mk/boilerplate.mk
 
-#
-# The ways setup doesn't apply to the driver
-#
-override WAYS=
-
 INSTALLING=0
 
 DYN_LOADABLE_BITS = \
