@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   $Id: Arena.c,v 1.4 2002/07/28 02:31:11 sof Exp $ 
+   $Id: Arena.c,v 1.5 2003/02/18 05:40:20 sof Exp $ 
    (c) The University of Glasgow 2001
 
    Arena allocation.  Arenas provide fast memory allocation at the
@@ -52,6 +52,13 @@ newArena( void )
     return arena;
 }
 
+// The minimum alignment of an allocated block.
+#define MIN_ALIGN 8
+
+/* 'n' is assumed to be a power of 2 */
+#define ROUNDUP(x,n)  (((x)+((n)-1))&(~((n)-1)))
+#define B_TO_W(x)     ((x) / sizeof(W_))
+
 // Allocate some memory in an arena
 void  *
 arenaAlloc( Arena *arena, size_t size )
@@ -61,12 +68,11 @@ arenaAlloc( Arena *arena, size_t size )
     nat req_blocks;
     bdescr *bd;
 
-// The minimum alignment of an allocated block.
-#define MIN_ALIGN 8
+    // round up to nearest alignment chunk.
+    size = ROUNDUP(size,MIN_ALIGN);
 
-    // size of allocated block in words, rounded up to the nearest 
-    // alignment chunk.
-    size_w = ((size + MIN_ALIGN - 1) / MIN_ALIGN) * (MIN_ALIGN/sizeof(W_));
+    // size of allocated block in words.
+    size_w = B_TO_W(size);
 
     if ( arena->free + size_w < arena->lim ) {
 	// enough room in the current block...
@@ -75,7 +81,7 @@ arenaAlloc( Arena *arena, size_t size )
 	return p;
     } else {
 	// allocate a fresh block...
-	req_blocks =  (lnat)BLOCK_ROUND_UP(size_w*sizeof(W_)) / BLOCK_SIZE;
+	req_blocks =  (lnat)BLOCK_ROUND_UP(size) / BLOCK_SIZE;
 	bd = allocGroup(req_blocks);
 	arena_blocks += req_blocks;
 
