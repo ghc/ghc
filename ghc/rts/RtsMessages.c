@@ -46,6 +46,21 @@ vbarf(char *s, va_list ap)
   stg_exit(EXIT_INTERNAL_ERROR); // just in case fatalInternalErrorFn() returns
 }
 
+void 
+_assertFail(char *filename, unsigned int linenum)
+{
+    internalErrorBelch("ASSERTION FAILED: file %s, line %u\n", filename, linenum);
+    abort();
+}
+
+internalErrorBelch(char *s, ...)
+{
+  va_list ap;
+  va_start(ap,s);
+  (*fatalInternalErrorFn)(s,ap);
+  va_end(ap);
+}
+
 void
 errorBelch(char *s, ...)
 {

@@ -57,13 +57,13 @@ extern "C" {
 #define ASSERT(predicate) /* nothing */
 #else
 
-void _stgAssert (char *, unsigned int);
+extern void _assertFail (char *, unsigned int);
 
 #define ASSERT(predicate)			\
 	if (predicate)				\
 	    /*null*/;				\
 	else					\
-	    _stgAssert(__FILE__, __LINE__)
+	    _assertFail(__FILE__, __LINE__)
 #endif /* DEBUG */
 
 /* 

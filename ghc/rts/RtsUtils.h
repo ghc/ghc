@@ -27,8 +27,6 @@ extern void stgFree(void* p);
  * Misc other utilities
  * -------------------------------------------------------------------------- */
 
-extern void _stgAssert (char *filename, unsigned int linenum);
-
 extern void heapOverflow(void);
 
 extern void setNonBlockingFd(int fd);

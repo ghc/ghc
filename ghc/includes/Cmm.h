@@ -188,7 +188,7 @@
 	if (predicate) {			\
 	    /*null*/;				\
 	} else {				\
-	    foreign "C" _stgAssert(NULL, __LINE__); \
+	    foreign "C" _assertFail(NULL, __LINE__); \
         }
 #else
 #define ASSERT(p) /* nothing */

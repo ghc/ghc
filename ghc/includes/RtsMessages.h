@@ -32,6 +32,9 @@ extern void barf(char *s, ...)
 extern void vbarf(char *s, va_list ap)
    GNUC3_ATTRIBUTE(__noreturn__);
 
+extern void _assertFail(char *filename, unsigned int linenum)
+   GNUC3_ATTRIBUTE(__noreturn__);
+
 /*
  * An error condition which is caused by and/or can be corrected by
  * the user.

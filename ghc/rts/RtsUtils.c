@@ -89,15 +89,6 @@ stgFree(void* p)
   free(p);
 }
 
-void 
-_stgAssert (char *filename, unsigned int linenum)
-{
-  fflush(stdout);
-  fprintf(stderr, "ASSERTION FAILED: file %s, line %u\n", filename, linenum);
-  fflush(stderr);
-  abort();
-}
-
 /* -----------------------------------------------------------------------------
    Stack overflow
    
