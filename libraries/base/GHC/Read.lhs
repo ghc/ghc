@@ -41,7 +41,6 @@ module GHC.Read
   , readListDefault, readListPrecDefault
 
   -- Temporary
-  , readList__
   , readParen
   )
  where
@@ -75,11 +74,10 @@ import GHC.Base
 import GHC.Arr
 \end{code}
 
--------------------------------------------------------
-	TEMPORARY UNTIL I DO DERIVED READ
 
 \begin{code}
 readParen       :: Bool -> ReadS a -> ReadS a
+-- A Haskell 98 function
 readParen b g   =  if b then mandatory else optional
                    where optional r  = g r ++ mandatory r
                          mandatory r = do
@@ -87,21 +85,6 @@ readParen b g   =  if b then mandatory else optional
 				(x,t)   <- optional s
 				(")",u) <- lex t
 				return (x,u)
-
-
-readList__ :: ReadS a -> ReadS [a]
-
-readList__ readx
-  = readParen False (\r -> do
-		       ("[",s) <- lex r
-		       readl s)
-  where readl  s = 
-           (do { ("]",t) <- lex s ; return ([],t) }) ++
-	   (do { (x,t) <- readx s ; (xs,u) <- readl2 t ; return (x:xs,u) })
-
-	readl2 s = 
-	   (do { ("]",t) <- lex s ; return ([],t) }) ++
-	   (do { (",",t) <- lex s ; (x,u) <- readx t ; (xs,v) <- readl2 u ; return (x:xs,v) })
 \end{code}
 
 
