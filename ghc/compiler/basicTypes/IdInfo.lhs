@@ -62,7 +62,7 @@ module IdInfo (
 	specInfo, setSpecInfo,
 
 	-- CG info
-	CgInfo(..), cgInfo, setCgInfo,  cgMayHaveCafRefs, pprCgInfo,
+	CgInfo(..), cgInfo, setCgInfo,  pprCgInfo,
  	cgArity, cgCafInfo, vanillaCgInfo,
 	CgInfoEnv, lookupCgInfo,
 	setCgArity,
@@ -591,8 +591,6 @@ setCafInfo info caf_info =
 setCgArity info arity = 
   case cgInfo info of { CgInfo _ caf_info  -> 
 	info `setCgInfo` CgInfo arity caf_info }
-
-cgMayHaveCafRefs (CgInfo _ caf_info) = mayHaveCafRefs caf_info
 
 seqCg c = c `seq` ()  -- fields are strict anyhow
 
