@@ -738,7 +738,7 @@ tcMonoExpr (HsWith expr binds) res_ty
 		 then expr'
 		 else HsLet (MonoBind dict_binds [] NonRecursive) expr' in
     tcCheckIPBinds binds' types ips'	`thenTc_`
-    returnTc (HsWith expr'' binds', lie')
+    returnTc (HsWith expr'' binds', lie' `plusLIE` lie2)
   where isBound p
 	  = case ipName_maybe p of
 	    Just n -> n `elem` names

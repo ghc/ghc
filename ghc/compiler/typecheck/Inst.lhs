@@ -288,6 +288,8 @@ partMethod pred (ips, lie) m@(Method u id tys theta tau loc)
 	-- newMethodWith id_m1 tys ips_ tau loc	    `thenTc` \ new_m1 ->
 	returnTc (consLIE new_m1 ips, consLIE new_m2 lie)
   where (ips_, theta_) = partition pred theta
+partMethod pred (ips, lie) inst@(LitInst u lit ty loc)
+  = returnTc (ips, consLIE inst lie)
 
 tyVarsOfInst :: Inst -> TcTyVarSet
 tyVarsOfInst (Dict _ pred _)         = tyVarsOfPred pred
