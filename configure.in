@@ -204,9 +204,9 @@ i[[3456]]86-*-mingw32*)
 	exeext='.exe'
 	# We assume you're using mingw32 via the gcc that comes
 	# with cygwin, and not the native port, so let's augment
-	# the gcc command-line used here with -mno-cygwin to
-	# arrange for good things to happen.
-	CFLAGS="-mno-cygwin $CFLAGS"
+	# the gcc command-line used here with -mno-cygwin -mwin32
+	# to arrange for good things to happen.
+	CFLAGS="-mno-cygwin -mwin32 $CFLAGS"
         ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
@@ -512,7 +512,7 @@ dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
 case $HostOS_CPP in
 mingw32)
-   CPP="$CPP -mno-cygwin"
+   CPP="$CPP -mno-cygwin -mwin32"
    ;;
 esac
 
