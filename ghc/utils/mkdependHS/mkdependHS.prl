@@ -2,7 +2,7 @@
 # perl script expect the following variables to be prepended:
 #
 #  RAWCPP TMPDIR TOP_PWD
-#  libdir datadir INSTALLING
+#  libdir libexecdir datadir INSTALLING
 #  PROJECTVERSION SED 
 #
 # tries to work like mkdependC - capable of dealing with:
@@ -87,12 +87,14 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
 }
 
-$TopPwd	         = "${TOP_PWD}";
-$InstLibDirGhc   = "${libdir}";
-$InstHsLibDirGhc = "${libdir}/hslibs";
-$InstDataDirGhc  = "${datadir}";
+$TopPwd	           = "${TOP_PWD}";
+$InstLibDirGhc     = "${libdir}";
+$InstLibExecDirGhc = "${libexecdir}";
+$InstHsLibDirGhc   = "${libdir}/hslibs";
+$InstDataDirGhc    = "${datadir}";
 
-$Unlit = ($INSTALLING) ? "${InstLibDirGhc}/unlit" : "${TopPwd}/ghc/utils/unlit/unlit";
+$Unlit = ($INSTALLING) ? "${InstLibExecDirGhc}/unlit" 
+		       : "${TopPwd}/ghc/utils/unlit/unlit";
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";

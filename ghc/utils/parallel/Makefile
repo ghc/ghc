@@ -35,7 +35,18 @@ $(BASH_PROGS) :
 	@cat $@.bash >> $@
 	@chmod a+x $@
 
-INSTALL_PROGS += $(BASH_PROGS) $(PERL_PROGS)
-CLEAN_FILES   += $(BASH_PROGS) $(PERL_PROGS)
+#
+# You'll only get this with Parallel Haskell or 
+# GranSim..
+#
+ifeq "$(BuildingParallel)" "YES"
+INSTALL_SCRIPTS += $(BASH_PROGS) $(PERL_PROGS)
+else
+ifeq "$(BuildingGranSim)" "YES"
+INSTALL_SCRIPTS += $(BASH_PROGS) $(PERL_PROGS)
+endif
+endif
+
+CLEAN_FILES     += $(BASH_PROGS) $(PERL_PROGS)
 
 include $(TOP)/mk/target.mk

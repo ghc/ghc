@@ -6,6 +6,7 @@
 #   TMPDIR
 #   TOP_PWD
 #   libdir
+#   libexecdir
 #   PROJECTVERSION
 #   HSP_IMPORTS
 
@@ -18,20 +19,21 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
 
 $TopPwd         = "${TOP_PWD}"; # *Only* needed when using it in-situ (i.e., INSTALLING=0).
 $InstLibDirGhc  = "${libdir}";
+$InstLibExecDirGhc  = "${libexecdir}";
 
 $Unlit = ( $INSTALLING ? 
-           "${InstLibDirGhc}/unlit" : 
+           "${InstLibExecDirGhc}/unlit" : 
 	   "${TopPwd}/ghc/utils/unlit/unlit" );
 # but this is re-set to "cat" (after options) if -cpp not seen
 $HsCpp = ( $INSTALLING ? 
 	   "${InstLibDirGhc}/hscpp" : 
 	   "${TopPwd}/ghc/utils/hscpp/hscpp" );
 $HsP   = ( $INSTALLING ? 
-	   "${InstLibDirGhc}/hsp" : 
+	   "${InstLibExecDirGhc}/hsp" : 
 	   "${TopPwd}/ghc/compiler/hsp" );
 $HsTagsHelp = 
 	 ( $INSTALLING ? 
-	   "${InstLibDirGhc}/hstags-help" : 
+	   "${InstLibExecDirGhc}/hstags-help" : 
 	   "${TopPwd}/ghc/utils/hstags/hstags-help" );
 
 $Verbose = 0;

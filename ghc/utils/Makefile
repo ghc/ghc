@@ -15,10 +15,11 @@ SUBDIRS = hp2ps		\
 	  hscpp		\
 	  hstags	\
 	  mkdependHS	\
-	  parallel	\
+	  parallel      \
 	  stat2resid	\
 	  ugen		\
 	  unlit
+
 endif
 
 # "heap-view" is not in the list because (a) it requires
