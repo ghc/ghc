@@ -16,12 +16,16 @@ export gcc_lib=c:/ghc/ghc-5.02.2/gcc-lib
 export perl_dir=c:/ghc/ghc-5.02.2
 export mingw_include=c:/ghc/ghc-5.02.2/include/mingw
 
+# Play safe
+if ! [ -d bin/i386-unknown-mingw32 ] ; then
+  echo "Doesn't look as if I'm in the toplevel directory of a mingw tree"
+  echo "Usage: cd ghc-<version> ; ../distrib/prep-bin-dist-mingw"
+  exit 1;
+fi;
+
 echo "Removing configure script files...not needed"
 rm -f config.guess config.sub configure configure.in mkdirhier
 rm -f Makefile-bin.in Makefile.in aclocal.m4 install-sh
-
-# For reasons unknown, duplicate copies of misc file in share/
-rm -rf share/
 
 echo "rejig bin/"
 mv bin/i386-unknown-mingw32/* bin/
@@ -48,14 +52,18 @@ cp ${perl_dir}/perl.exe .
 cp ${perl_dir}/perl56.dll .
 cp ${perl_dir}/gcc.exe .
 
+# For reasons unknown, duplicate copies of misc package files in share/
+# (leave them be for now.)
+
 echo "formatting documentation"
-mkdir doc
-mkdir doc/user-guide
-cp -Rf html/* doc/user-guide/
-cp pdf/set.pdf doc/
-rm -rf html/
-rm -rf pdf/
-
-
-
+cp README README.txt
+mv share doc
+cp ../ghc/docs/users_guide/users_guide.pdf doc/
+cp ../hslibs/doc/hslibs.pdf doc/
+#mkdir doc
+#mkdir doc/user-guide
+#cp -Rf html/* doc/user-guide/
+#cp pdf/set.pdf doc/
+#rm -rf html/
+#rm -rf pdf/
 
