@@ -126,7 +126,7 @@ tidyCorePgm dflags mod pcs binds_in orphans_in
 	       		= mapAccumL (tidyTopBind mod ext_ids) 
 				    (init_tidy_env us) binds_in
 
-	; let (orphans_out, us2) 
+	; let (orphans_out, _) 
 		   = initUs us1 (tidyIdRules (occ_env,subst_env) orphans_in)
 
 	; let prs' = prs { prsOrig = orig { origNames = orig_env' } }
@@ -285,33 +285,28 @@ tidyTopBind :: Module
 tidyTopBind mod ext_ids env (NonRec bndr rhs)
   = ((us2,orig,occ,subst) , NonRec bndr' rhs')
   where
-    (env1@(us1,orig,occ,subst), bndr') = tidyTopBinder mod ext_ids env rhs' env bndr
-    (rhs',us2)   = initUs us1 (tidyTopRhs env1 rhs)
+    tidy_env			  = (occ,subst)
+    ((us1,orig,occ,subst), bndr') = tidyTopBinder mod ext_ids tidy_env rhs' env bndr
+    (rhs',us2)			  = initUs us1 (tidyExpr tidy_env rhs)
 
 tidyTopBind mod ext_ids env (Rec prs)
   = (final_env, Rec prs')
   where
-    (final_env, prs')     = mapAccumL do_one env prs
+    (final_env@(_,_,occ,subst), prs') = mapAccumL do_one env prs
+    final_tidy_env = (occ,subst)
 
     do_one env (bndr,rhs) 
 	= ((us',orig,occ,subst), (bndr',rhs'))
 	where
-	(env'@(us,orig,occ,subst), bndr') 
-		= tidyTopBinder mod ext_ids final_env rhs' env bndr
-        (rhs', us') = initUs us (tidyTopRhs final_env rhs)
-
-
-tidyTopRhs :: TopTidyEnv -> CoreExpr -> UniqSM CoreExpr
-	-- Just an impedence matcher
-tidyTopRhs (_, _, occ_env, subst_env) rhs
-  = tidyExpr (occ_env, subst_env) rhs
-
+	((us,orig,occ,subst), bndr') = tidyTopBinder mod ext_ids final_tidy_env rhs' env bndr
+        (rhs', us')		     = initUs us (tidyExpr final_tidy_env rhs)
 
 tidyTopBinder :: Module -> IdEnv Bool
-	      -> TopTidyEnv -> CoreExpr
+	      -> TidyEnv -> CoreExpr	-- The TidyEnv is used to tidy the IdInfo
+					-- The expr is the already-tided RHS
+					-- Both are knot-tied: don't look at them!
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
-tidyTopBinder mod ext_ids 
- 	final_env@(_,  orig_env1, occ_env1, subst_env1) rhs 
+tidyTopBinder mod ext_ids tidy_env rhs 
 	      env@(us, orig_env2, occ_env2, subst_env2) id
 
   | omitIfaceSigForId id	-- Don't mess with constructors, 
@@ -334,7 +329,7 @@ tidyTopBinder mod ext_ids
 					       is_external
 					       (idName id)
     ty'	       	    = tidyTopType (idType id)
-    idinfo'         = tidyIdInfo us_l (occ_env1, subst_env1)
+    idinfo'         = tidyIdInfo us_l tidy_env
 			 is_external unfold_info arity_info id
 
     id'	       = mkId name' ty' idinfo'
@@ -360,7 +355,7 @@ tidyIdInfo us tidy_env is_external unfold_info arity_info id
 	-- Keep strictness and arity info; it's used by the code generator
 
   | otherwise
-  =  let (rules', _) = initUs us (tidyRules  tidy_env (specInfo core_idinfo))
+  =  let (rules', _) = initUs us (tidyRules tidy_env (specInfo core_idinfo))
      in
      mkIdInfo new_flavour
 	`setCprInfo`	    cprInfo core_idinfo
@@ -386,28 +381,29 @@ tidyIdInfo us tidy_env is_external unfold_info arity_info id
 		    flavour    -> pprTrace "tidyIdInfo" (ppr id <+> ppFlavourInfo flavour)
 				  flavour
 
--- this is where we set names to local/global based on whether they really are 
+-- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name
 -- was previously local, we have to give it a unique occurrence name if
 -- we intend to globalise it.
 tidyTopName mod orig_env occ_env external name
   | global && internal = (orig_env, occ_env, localiseName name)
-  | local  && internal = (orig_env, occ_env', setNameOcc name occ') -- (*)
+
+  | local  && internal = (orig_env, occ_env', setNameOcc name occ')
+	-- Even local, internal names must get a unique occurrence, because
+	-- if we do -split-objs we globalise the name later, n the code generator
+
   | global && external = (orig_env, occ_env, name)
-  | local  && external = globalise
-	-- (*) just in case we're globalising all top-level names (because of
-	-- -split-objs), we need to give *all* the top-level ids a 
-	-- unique occurrence name.  The actual globalisation now happens in the code
-	-- generator.
-  where
+	-- Global names are assumed to have been allocated by the renamer,
+	-- so they already have the "right" unique
+
+  | local  && external = case lookupFM orig_env key of
+			   Just orig -> (orig_env,			   occ_env', orig)
+			   Nothing   -> (addToFM orig_env key global_name, occ_env', global_name)
 	-- If we want to globalise a currently-local name, check
 	-- whether we have already assigned a unique for it.
 	-- If so, use it; if not, extend the table
-    globalise 
-	= case lookupFM orig_env key of
-	  Just orig -> (orig_env,			  occ_env', orig)
-	  Nothing   -> (addToFM orig_env key global_name, occ_env', global_name)
 
+  where
     (occ_env', occ') = tidyOccName occ_env (nameOccName name)
     key		     = (moduleName mod, occ')
     global_name      = globaliseName (setNameOcc name occ') mod
