@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.54 2001/11/28 14:55:34 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.55 2001/12/03 14:34:45 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -250,7 +250,7 @@ void initRtsFlagsDefaults(void)
 
 #ifdef PROFILING
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
-    RtsFlags.ProfFlags.profileInterval    = 20;
+    RtsFlags.ProfFlags.profileInterval    = 100;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
     RtsFlags.ProfFlags.modSelector        = NULL;
@@ -435,7 +435,7 @@ usage_text[] = {
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
-"  -i<msec>       Time between heap samples (msec, default: 20)",
+"  -i<msec>       Time between heap samples (msec, default: 100)",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 # endif
