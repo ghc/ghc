@@ -16,7 +16,7 @@ import AbsCUtils	( getAmodeRep, mixedTypeLocn )
 import SMRep		( fixedHdrSize )
 import Literal		( Literal(..), word2IntLit )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
-import PrimRep		( PrimRep(..) )
+import PrimRep		( PrimRep(..), getPrimRepSizeInBytes )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 			  rESERVED_STACK_WORDS )
@@ -83,6 +83,20 @@ primCode [res] Word2IntOp [arg]
 
 primCode [res] AddrToHValueOp [arg]
   = simpleCoercion PtrRep res arg
+
+primCode [res] IntToInt8Op [arg]
+  = narrowingCoercion IntRep Int8Rep res arg
+primCode [res] IntToInt16Op [arg]
+  = narrowingCoercion IntRep Int16Rep res arg
+primCode [res] IntToInt32Op [arg]
+  = narrowingCoercion IntRep Int32Rep res arg
+
+primCode [res] WordToWord8Op [arg]
+  = narrowingCoercion WordRep Word8Rep res arg
+primCode [res] WordToWord16Op [arg]
+  = narrowingCoercion WordRep Word16Rep res arg
+primCode [res] WordToWord32Op [arg]
+  = narrowingCoercion WordRep Word32Rep res arg
 \end{code}
 
 \begin{code}
@@ -504,6 +518,40 @@ simpleCoercion
 
 simpleCoercion pk lhs rhs
   = returnUs (\xs -> StAssign pk (amodeToStix lhs) (amodeToStix rhs) : xs)
+
+
+-- Rewrite a narrowing coercion into a pair of shifts.
+narrowingCoercion
+      :: PrimRep   -> PrimRep
+      -> CAddrMode -> CAddrMode
+      -> UniqSM StixTreeList
+
+narrowingCoercion pks pkd dst src
+  | szd > szs 
+  = panic "StixPrim.narrowingCoercion"
+  | szd == szs
+  = returnUs (\xs -> StAssign pkd dst' src' : xs)
+  | otherwise
+  = returnUs (\xs -> assign : xs)
+    where 
+          szs       = getPrimRepSizeInBytes pks
+          szd       = getPrimRepSizeInBytes pkd
+          src'      = amodeToStix src
+          dst'      = amodeToStix dst
+          shift_amt = fromIntegral (8 * (szs - szd))
+
+          assign
+             = StAssign pkd dst'
+                  (StPrim (if signed then ISraOp else SrlOp) 
+                     [StPrim SllOp [src', StInt shift_amt],
+                      StInt shift_amt])
+          signed 
+             = case pkd of 
+                  Int8Rep -> True; Int16Rep -> True
+                  Int32Rep -> True; Int64Rep -> True; IntRep -> True
+                  Word8Rep -> False; Word16Rep -> False
+                  Word32Rep -> False; Word64Rep -> False; WordRep -> False
+                  other -> pprPanic "StixPrim.narrowingCoercion" (ppr pkd)
 \end{code}
 
 Here we try to rewrite primitives into a form the code generator can
