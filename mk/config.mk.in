@@ -370,9 +370,9 @@ NoFibHcOpts = -O
 # to somewhere with more space.  (TMPDIR=. is a good choice).
 
 # DEFAULT_TMPDIR isn't called TMPDIR because GNU make tends to
-# override the environment variable with the value of the make
-# variable when executing sub-processes, so setting the TMPDIR env var
-# would have no effect in the build tree.
+# override an environment variable with the value of the make variable
+# of the same name (if it exists) when executing sub-processes, so
+# setting the TMPDIR env var would have no effect in the build tree.
 
 DEFAULT_TMPDIR		= /tmp
 
@@ -531,7 +531,7 @@ MKDEPENDHS	= $(HC)
 # projects (eg. it's handy to have a nofib & a ghc build in the same
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
 
-GHC_INPLACE 	= $(FPTOOLS_TOP)/ghc/driver/ghc-inplace
+GHC_INPLACE 	= $(FPTOOLS_TOP)/ghc/compiler/ghc-inplace
 
 #-----------------------------------------------------------------------------
 # C compiler
