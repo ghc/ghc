@@ -61,7 +61,7 @@ import PrelPack
 import PrelST		( StateAndPtr#(..) )
 import PrelHandle	( readHandle, 
 #if __GLASGOW_HASKELL__ < 303
-			  filePtr, flushBuf,
+			  filePtr,
 #endif
 			  writeHandle
 			)
