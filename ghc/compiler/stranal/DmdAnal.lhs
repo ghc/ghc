@@ -7,17 +7,20 @@
 			-----------------
 
 \begin{code}
-module DmdAnal ( dmdAnalPgm, both {- needed by WwLib -} ) where
+module DmdAnal ( dmdAnalPgm, dmdAnalTopRhs, 
+		 both {- needed by WwLib -}
+   ) where
 
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_MaxWorkerArgs )
 import NewDemand	-- All of it
 import CoreSyn
+import PprCore	
 import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idDemandInfo,
+import Id		( Id, idType, idDemandInfo, 
 			  isDataConId, isImplicitId, isGlobalId,
 			  idNewStrictness, idNewStrictness_maybe, getNewStrictness, setIdNewStrictness,
 			  idNewDemandInfo, setIdNewDemandInfo, newStrictnessFromOld )
@@ -90,6 +93,18 @@ dmdAnalTopBind sigs (Rec pairs)
     (sigs', Rec pairs')
 \end{code}
 
+\begin{code}
+dmdAnalTopRhs :: CoreExpr -> (StrictSig, CoreExpr)
+-- Analyse the RHS and return
+--	a) appropriate strictness info
+--	b) the unfolding (decorated with stricntess info)
+dmdAnalTopRhs rhs
+  = (sig, rhs')
+  where
+    arity	   = exprArity rhs
+    (rhs_ty, rhs') = dmdAnal emptySigEnv (vanillaCall arity) rhs
+    (_, sig)	   = mkSigTy rhs rhs_ty
+\end{code}
 
 %************************************************************************
 %*									*
@@ -101,6 +116,7 @@ dmdAnalTopBind sigs (Rec pairs)
 dmdAnal :: SigEnv -> Demand -> CoreExpr -> (DmdType, CoreExpr)
 
 dmdAnal sigs Abs  e = (topDmdType, e)
+dmdAnal sigs Bot  e = (botDmdType, e)
 
 dmdAnal sigs Lazy e = let 
 			(res_ty, e') = dmdAnal sigs Eval e
@@ -197,7 +213,7 @@ dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
 	-- The insight is, of course, that a demand on y is a demand on the
 	-- scrutinee, so we need to `both` it with the scrut demand
 
-        scrut_dmd 		 = Seq Drop Now [idNewDemandInfo b | b <- bndrs', isId b]
+        scrut_dmd 		 = mkSeq Drop [idNewDemandInfo b | b <- bndrs', isId b]
 				   `both`
 				   idNewDemandInfo case_bndr'
 
@@ -274,17 +290,18 @@ dmdFix top_lvl sigs pairs
 	 -> [(Id,CoreExpr)] 		
 	 -> (SigEnv, DmdEnv, [(Id,CoreExpr)])
     loop n sigs pairs
-      | all (same_sig sigs sigs') bndrs = (sigs', lazy_fv, pairs')
+      | all (same_sig sigs sigs') bndrs 
+      = (sigs', lazy_fv, pairs')
 		-- Note: use pairs', not pairs.   pairs' is the result of 
 		-- processing the RHSs with sigs (= sigs'), whereas pairs 
 		-- is the result of processing the RHSs with the *previous* 
 		-- iteration of sigs.
-      | n >= 5		    = pprTrace "dmdFix" (ppr n <+> (vcat 
+      | n >= 5       = pprTrace "dmdFix loop" (ppr n <+> (vcat 
 				[ text "Sigs:" <+> ppr [(id,lookup sigs id, lookup sigs' id) | (id,_) <- pairs],
 				  text "env:" <+> ppr (ufmToList sigs),
-				  text "binds:" <+> ppr pairs]))
+				  text "binds:" <+> pprCoreBinding (Rec pairs)]))
 			      (loop (n+1) sigs' pairs')
-      | otherwise	    = {- pprTrace "dmdFixLoop" (ppr id_sigs) -} (loop (n+1) sigs' pairs')
+      | otherwise    = loop (n+1) sigs' pairs'
       where
 		-- Use the new signature to do the next pair
 		-- The occurrence analyser has arranged them in a good order
@@ -325,7 +342,8 @@ downRhs top_lvl sigs (id, rhs)
  where
   arity		    = exprArity rhs   -- The idArity may not be up to date
   (rhs_ty, rhs')    = dmdAnal sigs (vanillaCall arity) rhs
-  (lazy_fv, sig_ty) = mkSigTy id arity rhs rhs_ty
+  (lazy_fv, sig_ty) = WARN( arity /= dmdTypeDepth rhs_ty, ppr id )
+		      mkSigTy rhs rhs_ty
   id'		    = id `setIdNewStrictness` sig_ty
   sigs'		    = extendSigEnv top_lvl sigs id sig_ty
 \end{code}
@@ -337,10 +355,10 @@ downRhs top_lvl sigs (id, rhs)
 %************************************************************************
 
 \begin{code}
-mkSigTy :: Id -> Arity -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
+mkSigTy :: CoreExpr -> DmdType -> (DmdEnv, StrictSig)
 -- Take a DmdType and turn it into a StrictSig
-mkSigTy id arity rhs (DmdType fv dmds res) 
-  = (lazy_fv, mkStrictSig id arity dmd_ty)
+mkSigTy rhs (DmdType fv dmds res) 
+  = (lazy_fv, mkStrictSig dmd_ty)
   where
     dmd_ty = DmdType strict_fv final_dmds res'
 
@@ -376,14 +394,14 @@ mkSigTy id arity rhs (DmdType fv dmds res)
 	-- DmdType, because that makes fixpointing very slow --- the 
 	-- DmdType gets full of lazy demands that are slow to converge.
 
-    lazified_dmds = map lazify dmds
+    lazified_dmds = map funArgDemand dmds
 	-- Get rid of defers in the arguments
     final_dmds = setUnpackStrategy lazified_dmds
 	-- Set the unpacking strategy
 	
-    res' = case (dmds, res) of
-		([], RetCPR) | not (exprIsValue rhs) -> TopRes
-		other	 			     -> res
+    res' = case res of
+		RetCPR | not (exprIsValue rhs) -> TopRes
+		other	 		       -> res
 	-- If the rhs is a thunk, we forget the CPR info, because
 	-- it is presumably shared (else it would have been inlined, and 
 	-- so we'd lose sharing if w/w'd it into a function.
@@ -413,8 +431,8 @@ setUnpackStrategy ds
        -> [Demand]
        -> (Int, [Demand])	-- Args remaining after subcomponents of [Demand] are unpacked
 
-    go n (Seq keep _ cs : ds) 
-	| n' >= 0    = Seq keep Now cs' `cons` go n'' ds
+    go n (Seq keep cs : ds) 
+	| n' >= 0    = Seq keep cs' `cons` go n'' ds
         | otherwise  = Eval `cons` go n ds
 	where
 	  (n'',cs') = go n' cs
@@ -447,11 +465,12 @@ nonAbsentArgs (d   : ds) = 1 + nonAbsentArgs ds
 splitDmdTy :: DmdType -> (Demand, DmdType)
 -- Split off one function argument
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
-splitDmdTy ty@(DmdType fv [] TopRes)         = (topDmd, ty)
-splitDmdTy ty@(DmdType fv [] BotRes)         = (Abs,    ty)
+splitDmdTy ty@(DmdType fv [] TopRes)         = (Lazy, ty)
+splitDmdTy ty@(DmdType fv [] BotRes)         = (Bot,  ty)
+	-- NB: Bot not Abs
+splitDmdTy (DmdType fv [] RetCPR)   	  = panic "splitDmdTy"
 	-- We already have a suitable demand on all
 	-- free vars, so no need to add more!
-splitDmdTy (DmdType fv [] RetCPR)   	  = panic "splitDmdTy"
 \end{code}
 
 \begin{code}
@@ -462,7 +481,35 @@ addVarDmd top_lvl dmd_ty@(DmdType fv ds res) var dmd
   | otherwise	       = DmdType (extendVarEnv fv var dmd) ds res
 
 addLazyFVs (DmdType fv ds res) lazy_fvs
-  = DmdType (plusUFM_C both fv lazy_fvs) ds res
+  = DmdType both_fv1 ds res
+  where
+    both_fv = (plusUFM_C both fv lazy_fvs)
+    both_fv1 = modifyEnv (isBotRes res) (`both` Bot) lazy_fvs fv both_fv
+	-- This modifyEnv is vital.  Consider
+	--	let f = \x -> (x,y)
+	--	in  error (f 3)
+	-- Here, y is treated as a lazy-fv of f, but we must `both` that L
+	-- demand with the bottom coming up from 'error'
+	-- 
+	-- I got a loop in the fixpointer without this, due to an interaction
+	-- with the lazy_fv filtering in mkSigTy.  Roughly, it was
+	--	letrec f n x 
+	--	    = letrec g y = x `fatbar` 
+	--			   letrec h z = z + ...g...
+	--			   in h (f (n-1) x)
+	-- 	in ...
+	-- In the initial iteration for f, f=Bot
+	-- Suppose h is found to be strict in z, but the occurrence of g in its RHS
+	-- is lazy.  Now consider the fixpoint iteration for g, esp the demands it
+	-- places on its free variables.  Suppose it places none.  Then the
+	-- 	x `fatbar` ...call to h...
+	-- will give a x->V demand for x.  That turns into a L demand for x,
+	-- which floats out of the defn for h.  Without the modifyEnv, that
+	-- L demand doesn't get both'd with the Bot coming up from the inner
+	-- call to f.  So we just get an L demand for x for g.
+	--
+	-- A better way to say this is that the lazy-fv filtering should give the
+	-- same answer as putting the lazy fv demands in the function's type.
 
 annotateBndr :: DmdType -> Var -> (DmdType, Var)
 -- The returned env has the var deleted
@@ -470,9 +517,11 @@ annotateBndr :: DmdType -> Var -> (DmdType, Var)
 -- No effect on the argument demands
 annotateBndr dmd_ty@(DmdType fv ds res) var
   | isTyVar var = (dmd_ty, var)
-  | otherwise   = (DmdType fv' ds res, setIdNewDemandInfo var dmd)
+  | otherwise   = (DmdType fv' ds res, setIdNewDemandInfo var hacked_dmd)
   where
     (fv', dmd) = removeFV fv var res
+    hacked_dmd | isUnLiftedType (idType var) = unliftedDemand dmd
+	       | otherwise		     = dmd
 
 annotateBndrs = mapAccumR annotateBndr
 
@@ -483,11 +532,9 @@ annotateLamIdBndr dmd_ty@(DmdType fv ds res) id
     (DmdType fv' (hacked_dmd:ds) res, setIdNewDemandInfo id hacked_dmd)
   where
     (fv', dmd) = removeFV fv id res
-    hacked_dmd = case dmd of
-		    Bot   -> Abs
-		    Err   -> Abs
-		    other -> dmd
-	-- This gross hack is needed because otherwise we label
+    hacked_dmd | isUnLiftedType (idType id) = unliftedDemand dmd
+	       | otherwise		    = funArgDemand dmd
+	-- This call to funArgDemand is vital, because otherwise we label
 	-- a lambda binder with demand 'B'.  But in terms of calling
 	-- conventions that's Abs, because we don't pass it.  But
 	-- when we do a w/w split we get
@@ -536,15 +583,16 @@ dmdTransform sigs var dmd
 
 ------ 	DATA CONSTRUCTOR
   | isDataConId var,		-- Data constructor
-    Seq k Now ds <- res_dmd,	-- and the demand looks inside its fields
+    Seq k ds <- res_dmd,	-- and the demand looks inside its fields
     let StrictSig dmd_ty = idNewStrictness var,	-- It must have a strictness sig
     let DmdType _ con_ds con_res = dmd_ty
   = if length con_ds == length ds then	-- Saturated, so unleash the demand
 	-- ds can be empty, when we are just seq'ing the thing
 	let 
 	   arg_ds = case k of
-			Keep -> zipWith lub ds con_ds
-			Drop -> ds
+			Keep  -> zipWith lub ds con_ds
+			Drop  -> ds
+			Defer -> ds
 		-- Important!  If we Keep the constructor application, then
 		-- we need the demands the constructor places (usually lazy)
 		-- If not, we don't need to.  For example:
@@ -608,17 +656,27 @@ deferType (DmdType fv _ _) = DmdType (mapVarEnv defer fv) [] TopRes
 	-- For example,   f = let ... in \x -> x
 	-- We don't want to get a stricness type V->T for f.
 
-defer :: Demand -> Demand
-defer = lub Abs
+---------------
+bothLazy :: Demand -> Demand
+bothLazy   = both Lazy
+bothLazy_s :: [Demand] -> [Demand]
+bothLazy_s = map bothLazy
 
-lazify :: Demand -> Demand
+funArgDemand :: Demand -> Demand
 -- The 'Defer' demands are just Lazy at function boundaries
 -- Ugly!  Ask John how to improve it.
-lazify (Seq k Defer ds) = Lazy
-lazify (Seq k Now   ds) = Seq k Now (map lazify ds)
-lazify Bot		= Abs	-- Don't pass args that are consumed by bottom/err
-lazify Err		= Abs
-lazify d		= d
+funArgDemand (Seq Defer ds) = Lazy
+funArgDemand (Seq k     ds) = Seq k (map funArgDemand ds)
+funArgDemand Err	    = Eval	-- Args passed to a bottoming function
+funArgDemand Bot	    = Abs	-- Don't pass args that are consumed by bottom/err
+funArgDemand d	            = d
+
+unliftedDemand :: Demand -> Demand
+-- Same idea, but for unlifted types the domain is much simpler:
+-- Either we use it (Lazy) or we don't (Abs)
+unliftedDemand Bot   = Abs
+unliftedDemand Abs   = Abs
+unliftedDemand other = Lazy
 \end{code}
 
 \begin{code}
@@ -634,71 +692,7 @@ betterDemand d1 d2 = (d1 `lub` d2) == d2
 squashDmdEnv (StrictSig (DmdType fv ds res)) = StrictSig (DmdType emptyDmdEnv ds res)
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{LUB and BOTH}
-%*									*
-%************************************************************************
-
 \begin{code}
-lub :: Demand -> Demand -> Demand
-
-lub Bot  d = d
-
-lub Lazy d = Lazy
-
-lub Err Bot = Err 
-lub Err d   = d 
-
-lub Abs Bot 	     = Abs	-- E.g f x y = if ... then x else error x
-				-- Then for y we get Abs `lub` Bot, and we really
-				-- want Abs overall
-lub Abs Err 	     = Abs
-lub Abs Abs 	     = Abs    
-lub Abs (Seq k _ ds) = Seq k Defer ds	-- Very important ('radicals' example)
-lub Abs d 	     = Lazy
-
-lub Eval Abs	          = Lazy
-lub Eval Lazy	          = Lazy
-
-lub Eval (Seq k Now  ds) = Eval		-- Urk!  Is this monotonic?
-	-- Was (incorrectly): 
-	--	lub Eval (Seq k Now ds) = Seq Keep Now ds
-	-- Incorrect because 
-	--	Eval `lub` U(VV) is not S(VV)
-	-- (because the components aren't necessarily evaluated)
-	--
-	-- Was (correctly, but pessimistically): 
-	--	lub Eval (Seq k Now ds) = Eval
-	-- Pessimistic because
-	--	f n []     = n
-	--	f n (x:xs) = f (n+x) xs
-	-- Here we want to do better than just V for n.  It's
-	-- unboxed in the (x:xs) case, and we might be prepared to
-	-- rebox it in the [] case.
-	-- To achieve this we could perhaps consider Eval to be equivalent to
-	--	U(L), or S(A)
-
-lub Eval (Seq k Defer ds) = Lazy
-lub Eval d    	          = Eval
-
-lub (Call d1) (Call d2) = Call (lub d1 d2)
-
-lub (Seq k1 l1 ds1) (Seq k2 l2 ds2) = Seq (k1 `vee` k2) (l1 `or_defer` l2) (lubs ds1 ds2)
-
--- The last clauses deal with the remaining cases for Call and Seq
-lub d1@(Call _) d2@(Seq _ _ _) = pprPanic "lub" (ppr d1 $$ ppr d2)
-lub d1 d2		       = lub d2 d1
-
--- A Seq can have an empty list of demands, in the polymorphic case.
-lubs [] ds2 = ds2
-lubs ds1 [] = ds1
-lubs ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith lub ds1 ds2
-
-or_defer Now Now = Now
-or_defer _   _   = Defer
-
 -------------------------
 -- Consider (if x then y else []) with demand V
 -- Then the first branch gives {y->V} and the second
@@ -708,93 +702,47 @@ lubType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
   = DmdType lub_fv2 (zipWith lub ds1 ds2) (r1 `lubRes` r2)
   where
     lub_fv  = plusUFM_C lub fv1 fv2
-    lub_fv1 = modifyEnv (not (isBotRes r1)) (Abs `lub`) fv2 fv1 lub_fv
-    lub_fv2 = modifyEnv (not (isBotRes r2)) (Abs `lub`) fv1 fv2 lub_fv1
+    lub_fv1 = modifyEnv (not (isBotRes r1)) defer fv2 fv1 lub_fv
+    lub_fv2 = modifyEnv (not (isBotRes r2)) defer fv1 fv2 lub_fv1
 	-- lub is the identity for Bot
 
--------------------------
+-----------------------------------
+-- (t1 `bothType` t2) takes the argument/result info from t1,
+-- using t2 just for its free-var info
+bothType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
+  = DmdType both_fv2 ds1 (r1 `bothRes` r2)
+  where
+    both_fv  = plusUFM_C both fv1 fv2
+    both_fv1 = modifyEnv (isBotRes r1) (`both` Bot) fv2 fv1 both_fv
+    both_fv2 = modifyEnv (isBotRes r2) (`both` Bot) fv1 fv2 both_fv1
+	-- both is the identity for Abs
+\end{code}
+
+
+\begin{code}
 lubRes BotRes r      = r
 lubRes r      BotRes = r
 lubRes RetCPR RetCPR = RetCPR
 lubRes r1     r2     = TopRes
 
------------------------------------
-vee :: Keepity -> Keepity -> Keepity
-vee Drop Drop = Drop
-vee k1   k2   = Keep
+-- If either diverges, the whole thing does
+-- Otherwise take CPR info from the first
+bothRes BotRes r2     = BotRes
+bothRes r1     BotRes = BotRes
+bothRes r1     r2     = r1
+\end{code}
 
------------------------------------
-both :: Demand -> Demand -> Demand
-
--- The normal one
--- both Bot d = Bot
-
--- The experimental one
--- The idea is that (error x) places on x
---	both demand Bot (like on all free vars)
---	and demand Eval (for the arg to error)
--- and we want the result to be Eval.
-both Bot Bot = Bot
-both Bot Abs = Bot
-both Bot d   = d
-
-both Abs d   = d
-
-both Err Bot = Err
-both Err Abs = Err
-both Err d   = d
-
-both Lazy Bot 	       = Lazy
-both Lazy Abs 	       = Lazy
-both Lazy Err 	       = Lazy 
-both Lazy (Seq k l ds) = Seq Keep l ds
-both Lazy d	       = d
-  -- Notice that the Seq case ensures that we have the
-  -- boxed value.  The equation originally said
-  --	both (Seq k Now ds) = Seq Keep Now ds
-  -- but it's important that the Keep is switched on even
-  -- for a deferred demand.  Otherwise a (Seq Drop Now [])
-  -- might both'd with the result, and then we won't pass
-  -- the boxed value.  Here's an example:
-  --	(x-1) `seq` (x+1, x)
-  -- From the (x+1, x) we get (U*(V) `both` L), which must give S*(V)
-  -- From (x-1) we get U(V). Combining, we must get S(V).
-  -- If we got U*(V) from the pair, we'd end up with U(V), and that
-  -- can be a disaster if a component of the data structure is absent.
-  -- [Disaster = enter an absent argument.]
-
-both Eval (Seq k l ds) = Seq Keep Now ds
-both Eval (Call d)     = Call d
-both Eval d   	       = Eval
-
-both (Seq k1 Defer ds1) (Seq k2 Defer ds2) = Seq (k1 `vee` k2) Defer (boths ds1  ds2)
-both (Seq k1 l1 ds1)    (Seq k2 l2 ds2)    = Seq (k1 `vee` k2) Now   (boths ds1' ds2')
-					   where
-					     ds1' = case l1 of { Now -> ds1; Defer -> map defer ds1 }
-					     ds2' = case l2 of { Now -> ds2; Defer -> map defer ds2 }
-
-both (Call d1) (Call d2) = Call (d1 `both` d2)
-
--- The last clauses deal with the remaining cases for Call and Seq
-both d1@(Call _) d2@(Seq _ _ _) = pprPanic "both" (ppr d1 $$ ppr d2)
-both d1 d2		        = both d2 d1
+\begin{code}
+-- A Seq can have an empty list of demands, in the polymorphic case.
+lubs [] ds2 = ds2
+lubs ds1 [] = ds1
+lubs ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith lub ds1 ds2
 
 -----------------------------------
 -- A Seq can have an empty list of demands, in the polymorphic case.
 boths [] ds2  = ds2
 boths ds1 []  = ds1
 boths ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith both ds1 ds2
-
------------------------------------
--- (t1 `bothType` t2) takes the argument/result info from t1,
--- using t2 just for its free-var info
-bothType (DmdType fv1 ds1 r1) (DmdType fv2 ds2 r2)
-  = DmdType both_fv2 ds1 r1
-  where
-    both_fv  = plusUFM_C both fv1 fv2
-    both_fv1 = modifyEnv (isBotRes r1) (`both` Bot) fv2 fv1 both_fv
-    both_fv2 = modifyEnv (isBotRes r2) (`both` Bot) fv1 fv2 both_fv1
-	-- both is the identity for Abs
 \end{code}
 
 \begin{code}
@@ -812,6 +760,120 @@ modifyEnv need_to_modify zapper env1 env2 env
     zap uniq env = addToUFM_Directly env uniq (zapper current_val)
 		 where
 		   current_val = expectJust "modifyEnv" (lookupUFM_Directly env uniq)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{LUB and BOTH}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+lub :: Demand -> Demand -> Demand
+
+lub Bot d = d
+
+lub Err Bot = Err 
+lub Err d   = d 
+
+lub Lazy d = Lazy
+
+lub Abs  d = defer d
+
+lub Eval Abs		   	       = Lazy
+lub Eval Lazy		   	       = Lazy
+lub Eval (Seq Drop ds) | not (null ds) = Seq Drop [Lazy | d <- ds]
+lub Eval d   		   	       = Eval
+	-- For the Seq case, consier
+	--	f n []     = n
+	--	f n (x:xs) = f (n+x) xs
+	-- Here we want to do better than just V for n.  It's
+	-- unboxed in the (x:xs) case, and we might be prepared to
+	-- rebox it in the [] case.
+	-- But if we don't use *any* of the components, give up
+	-- and revert to V
+
+lub (Call d1) (Call d2) = Call (lub d1 d2)
+lub d1@(Call _) d2	= d2 `lub` d1
+
+lub (Seq k1 ds1) (Seq k2 ds2)
+  = Seq (k1 `lub_keep` k2) (lub_ds k1 ds1 k2 ds2)
+  where
+	------------------
+    lub_ds Keep ds1 Keep ds2		     = ds1 `lubs` ds2
+    lub_ds Keep ds1 non_keep ds2 | null ds1  = [Lazy | d <- ds2]
+			         | otherwise = bothLazy_s ds1 `lubs` ds2
+
+    lub_ds non_keep ds1 Keep ds2 | null ds2  = [Lazy | d <- ds1]
+			         | otherwise = ds1 `lubs` bothLazy_s ds2
+
+    lub_ds k1 ds1 k2 ds2		     = ds1 `lubs` ds2
+
+	------------------
+    lub_keep Keep k     = k
+
+    lub_keep Drop Defer = Defer
+    lub_keep Drop k	= Drop
+
+    lub_keep Defer k	= Defer
+
+lub d1@(Seq _ _) d2 = d2 `lub` d1
+
+---------------
+both :: Demand -> Demand -> Demand
+
+both Bot Bot = Bot
+both Bot Abs = Bot
+both Bot d   = Err
+
+both Err d = Err
+
+both Abs d   = d
+
+both Lazy Bot 	     	 = Err
+both Lazy Err 	     	 = Err
+both Lazy Eval 	     	 = Eval
+both Lazy (Call d)       = Call d
+both Lazy (Seq Defer ds) = Lazy
+both Lazy (Seq k ds)     = Seq Keep ds
+both Lazy d	         = Lazy
+
+-- For the (Eval `both` Bot) case, consider
+--	f x = error x
+-- From 'error' itself we get demand Bot on x
+-- From the arg demand on x we get Eval
+-- So we want Eval `both` Bot to be Err.
+-- That's what Err is *for*
+both Eval Bot	     = Err
+both Eval Err	     = Err
+both Eval (Seq k ds) = Seq Keep ds
+both Eval d	     = Eval
+
+both (Call d1)   (Call d2) = Call (d1 `both` d2)
+both d1@(Call _) d2	   = d2 `both` d1
+
+both (Seq k1 ds1) (Seq k2 ds2)
+  = Seq (k1 `both_keep` k2) (both_ds k1 ds1 k2 ds2)
+  where
+	----------------
+    both_keep Keep k2 = Keep
+
+    both_keep Drop Keep = Keep
+    both_keep Drop k2   = Drop
+
+    both_keep Defer k2  = k2
+
+	----------------
+    both_ds Defer ds1 Defer     ds2 = ds1 `boths` ds2
+    both_ds Defer ds1 non_defer ds2 = map defer ds1 `boths` ds2
+
+    both_ds non_defer ds1 Defer ds2 = ds1 `boths` map defer ds2
+
+    both_ds k1 ds1 k2 ds2	    = ds1 `boths` ds2
+
+both d1@(Seq _ _) d2 = d2 `both` d1
 \end{code}
 
 
@@ -869,7 +931,7 @@ get_changes_dmd id
   where
     message word = text word <+> text "demand for" <+> ppr id <+> info
     info = (text "Old" <+> ppr old) $$ (text "New" <+> ppr new)
-    new = lazify (idNewDemandInfo id)	-- Lazify to avoid spurious improvements
+    new = funArgDemand (idNewDemandInfo id)	-- FunArgDemand to avoid spurious improvements
     old = newDemand (idDemandInfo id)
     new_better = new `betterDemand` old 
     old_better = old `betterDemand` new

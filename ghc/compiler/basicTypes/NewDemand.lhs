@@ -5,10 +5,10 @@
 
 \begin{code}
 module NewDemand(
-	Demand(..), Keepity(..), Deferredness(..), 
-	topDmd, lazyDmd, seqDmd, evalDmd, isStrictDmd, isAbsentDmd,
+	Demand(..), Keepity(..), 
+	mkSeq, topDmd, lazyDmd, seqDmd, evalDmd, isStrictDmd, defer,
 
-	DmdType(..), topDmdType, mkDmdType, mkTopDmdType, 
+	DmdType(..), topDmdType, botDmdType, mkDmdType, mkTopDmdType, 
 		dmdTypeDepth, dmdTypeRes,
 	DmdEnv, emptyDmdEnv,
 	DmdResult(..), isBotRes, returnsCPR,
@@ -21,10 +21,8 @@ module NewDemand(
 #include "HsVersions.h"
 
 import BasicTypes	( Arity )
-import Var		( Id )
 import VarEnv		( VarEnv, emptyVarEnv )
 import UniqFM		( ufmToList )
-import qualified Demand
 import Outputable
 \end{code}
 
@@ -145,10 +143,8 @@ instance Outputable StrictSig where
 instance Show StrictSig where
    show (StrictSig ty) = showSDoc (ppr ty)
 
-mkStrictSig :: Id -> Arity -> DmdType -> StrictSig
-mkStrictSig id arity dmd_ty
-  = WARN( arity /= dmdTypeDepth dmd_ty, ppr id <+> (ppr arity $$ ppr dmd_ty) )
-    StrictSig dmd_ty
+mkStrictSig :: DmdType -> StrictSig
+mkStrictSig dmd_ty = StrictSig dmd_ty
 
 splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
@@ -184,58 +180,69 @@ data Demand
   = Lazy		-- L; used for unlifted types too, so that
 			--	A `lub` L = L
   | Abs			-- A
+
   | Call Demand		-- C(d)
   | Eval 		-- V
-  | Seq Keepity		-- S/U(ds)
-	Deferredness
-	[Demand]
+  | Seq Keepity		-- S/U/D(ds)
+	[Demand]	-- 	S(ds) = L `both` U(ds)
+			-- 	D(ds) = A `lub`  U(ds)
+			-- *** Invariant: these demands are never Bot or Abs
+			-- *** Invariant: if all demands are Abs, get []
+
   | Err			-- X
   | Bot			-- B
   deriving( Eq )
 	-- Equality needed for fixpoints in DmdAnal
 
-data Deferredness = Now | Defer
-		  deriving( Eq )
-
-data Keepity = Keep | Drop
+data Keepity = Keep | Drop | Defer
 	     deriving( Eq )
 
+mkSeq :: Keepity -> [Demand] -> Demand
+mkSeq k ds | all is_absent ds = Seq k []
+	   | otherwise	      = Seq k ds
+	   where
+ 	     is_absent Abs = True
+	     is_absent d   = False
+
+defer :: Demand -> Demand
+-- Computes (Abs `lub` d)
+-- For the Bot case consider
+--	f x y = if ... then x else error x
+--   Then for y we get Abs `lub` Bot, and we really
+--   want Abs overall
+defer Bot	    = Abs
+defer Abs	    = Abs
+defer (Seq Keep ds) = Lazy
+defer (Seq _    ds) = Seq Defer ds
+defer d	   	    = Lazy
+
 topDmd, lazyDmd, seqDmd :: Demand
-topDmd  = Lazy			-- The most uninformative demand
+topDmd  = Lazy		-- The most uninformative demand
 lazyDmd = Lazy
-seqDmd  = Seq Keep Now []	-- Polymorphic seq demand
+seqDmd  = Seq Keep []	-- Polymorphic seq demand
 evalDmd = Eval
 
 isStrictDmd :: Demand -> Bool
-isStrictDmd Bot 	  = True
-isStrictDmd Err 	  = True    	   
-isStrictDmd (Seq _ Now _) = True
-isStrictDmd Eval	  = True
-isStrictDmd (Call _)	  = True
-isStrictDmd other	  = False
-
-isAbsentDmd :: Demand -> Bool
-isAbsentDmd Bot	  = True
-isAbsentDmd Err	  = True
-isAbsentDmd Abs	  = True
-isAbsentDmd other = False
+isStrictDmd Bot       = True
+isStrictDmd Err	      = True    	   
+isStrictDmd (Seq _ _) = True
+isStrictDmd Eval      = True
+isStrictDmd (Call _)  = True
+isStrictDmd other     = False
 
 instance Outputable Demand where
-    ppr Lazy 	     = char 'L'
-    ppr Abs	     = char 'A'
-    ppr Eval         = char 'V'
-    ppr Err          = char 'X'
-    ppr Bot          = char 'B'
-    ppr (Call d)     = char 'C' <> parens (ppr d)
-    ppr (Seq k l []) = ppr k <> ppr l
-    ppr (Seq k l ds) = ppr k <> ppr l <> parens (hcat (map ppr ds))
-
-instance Outputable Deferredness where
-  ppr Now   = empty
-  ppr Defer = char '*'
+    ppr Lazy 	   = char 'L'
+    ppr Abs	   = char 'A'
+    ppr Eval       = char 'V'
+    ppr Err        = char 'X'
+    ppr Bot        = char 'B'
+    ppr (Call d)   = char 'C' <> parens (ppr d)
+    ppr (Seq k []) = ppr k
+    ppr (Seq k ds) = ppr k <> parens (hcat (map ppr ds))
 
 instance Outputable Keepity where
-  ppr Keep = char 'S'
-  ppr Drop = char 'U'
+  ppr Keep  = char 'S'
+  ppr Drop  = char 'U'
+  ppr Defer = char 'D'
 \end{code}
 

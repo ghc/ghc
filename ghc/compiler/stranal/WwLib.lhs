@@ -16,7 +16,7 @@ import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
 			)
 import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
-import NewDemand	( Demand(..), Keepity(..), DmdResult(..), isAbsentDmd ) 
+import NewDemand	( Demand(..), Keepity(..), DmdResult(..) ) 
 import DmdAnal		( both )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID, eRROR_CSTRING_ID )
 import TysPrim		( realWorldStatePrimTy )
@@ -271,7 +271,7 @@ mkWWstr :: Type					-- Result type
 						-- but *with* lambdas
 
 mkWWstr res_ty wrap_args
-  = mk_ww_str wrap_args		`thenUs` \ (work_args, take_apart, put_together) ->
+  = mk_ww_str_s wrap_args		`thenUs` \ (work_args, take_apart, put_together) ->
     let
 	work_dmds = [idNewDemandInfo v | v <- work_args, isId v]
 	apply_to args fn = mkVarApps fn args
@@ -297,17 +297,23 @@ mkWWstr res_ty wrap_args
 	      take_apart . applyToVars [realWorldPrimId] . apply_to work_args,
 	      mkLams work_args . Lam void_arg . put_together)
 
-	-- Empty case
-mk_ww_str []
-  = returnUs ([],
-	      \ wrapper_body -> wrapper_body,
-	      \ worker_body  -> worker_body)
+----------------------
+nop_fn body = body
+
+----------------------
+mk_ww_str_s []
+  = returnUs ([], nop_fn, nop_fn)
+
+mk_ww_str_s (arg : args)
+  = mk_ww_str arg		`thenUs` \ (args1, wrap_fn1, work_fn1) ->
+    mk_ww_str_s args		`thenUs` \ (args2, wrap_fn2, work_fn2) ->
+    returnUs (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
 
-mk_ww_str (arg : ds)
+----------------------
+mk_ww_str arg
   | isTyVar arg
-  = mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-    returnUs (arg : worker_args, wrap_fn, work_fn)
+  = returnUs ([arg],  nop_fn, nop_fn)
 
   | otherwise
   = case idNewDemandInfo arg of
@@ -316,19 +322,16 @@ mk_ww_str (arg : ds)
 	-- though, because it's not so easy to manufacture a placeholder
 	-- We'll see if this turns out to be a problem
       Abs | not (isUnLiftedType (idType arg)) ->
-	mk_ww_str ds 		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-	returnUs (worker_args, wrap_fn, mk_absent_let arg . work_fn)
+	returnUs ([], nop_fn, mk_absent_let arg) 
 
 	-- Seq and keep
-      Seq _ _ cs 
-	| all isAbsentDmd cs
-	-> mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
- 	   let
+      Seq _ []
+	-> let
 		arg_w_unf = arg `setIdUnfolding` mkOtherCon []
 		-- Tell the worker arg that it's sure to be evaluated
 		-- so that internal seqs can be dropped
 	   in
-	   returnUs (arg_w_unf : worker_args, mk_seq_case arg . wrap_fn, work_fn)
+	   returnUs ([arg_w_unf], mk_seq_case arg, nop_fn)
 	  	-- Pass the arg, anyway, even if it is in theory discarded
 		-- Consider
 		--	f x y = x `seq` y
@@ -342,9 +345,8 @@ mk_ww_str (arg : ds)
 		-- But the Evald flag is pretty wierd, and I worry that it might disappear
 		-- during simplification, so for now I've just nuked this whole case
 			
-
 	-- Unpack case
-      Seq keep _ cs 
+      Seq keep cs 
 	| Just (arg_tycon, tycon_arg_tys, data_con, inst_con_arg_tys) 
 		<- splitProductType_maybe (idType arg)
 	-> getUniquesUs 		`thenUs` \ uniqs ->
@@ -352,7 +354,8 @@ mk_ww_str (arg : ds)
 	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
 	     unpk_args_w_ds = zipWithEqual "mk_ww_str" set_worker_arg_info unpk_args cs'
 	     unbox_fn       = mk_unpk_case arg unpk_args data_con arg_tycon
-	     rebox_fn	    = mk_pk_let arg data_con tycon_arg_tys unpk_args
+	     rebox_fn	    = Let (NonRec arg con_app) 
+	     con_app	    = mkConApp data_con (map Type tycon_arg_tys ++ map Var unpk_args)
 
 	     cs' = case keep of
 			Keep -> map (DmdAnal.both Lazy) cs	-- Careful! Now we don't pass
@@ -361,7 +364,7 @@ mk_ww_str (arg : ds)
 								-- 	S(LA) -->  U(LL)
 			Drop -> cs
 	   in
-	   mk_ww_str (unpk_args_w_ds ++ ds)		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
+	   mk_ww_str_s unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
 
 --	   case keep of
 --	     Keep -> returnUs (arg : worker_args, unbox_fn . wrap_fn, work_fn)
@@ -380,13 +383,11 @@ mk_ww_str (arg : ds)
 
 	| otherwise -> 
 	   WARN( True, ppr arg )
-	   mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-	   returnUs (arg : worker_args, wrap_fn, work_fn)
+	   returnUs ([arg], nop_fn, nop_fn)
 
 	-- Other cases
-      other_demand ->
-	mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-	returnUs (arg : worker_args, wrap_fn, work_fn)
+      other_demand -> returnUs ([arg], nop_fn, nop_fn)
+
   where
 	-- If the wrapper argument is a one-shot lambda, then
 	-- so should (all) the corresponding worker arguments be
@@ -511,11 +512,6 @@ sanitiseCaseBndr :: Id -> Id
 -- if the case binder says "I'm demanded".  This happened in a situation 
 -- like		(x+y) `seq` ....
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
-
-mk_pk_let arg boxing_con con_tys unpk_args body
-  = Let (NonRec arg (mkConApp boxing_con con_args)) body
-  where
-    con_args = map Type con_tys ++ map Var unpk_args
 
 mk_ww_local uniq ty = mkSysLocal SLIT("ww") uniq ty
 \end{code}

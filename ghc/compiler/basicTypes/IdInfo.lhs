@@ -97,8 +97,8 @@ import FieldLabel	( FieldLabel )
 import Type		( usOnce, usMany )
 import Demand		hiding( Demand )
 import qualified Demand
-import NewDemand	( Demand(..), Keepity(..), Deferredness(..), DmdResult(..),
-			  lazyDmd, topDmd,
+import NewDemand	( Demand(..), Keepity(..), DmdResult(..),
+			  lazyDmd, topDmd, dmdTypeDepth,
 			  StrictSig, mkStrictSig, mkTopDmdType
 			)
 import Outputable	
@@ -138,14 +138,18 @@ mkNewStrictnessInfo id arity (Demand.StrictnessInfo ds res) cpr
   | length ds <= arity
 	-- Sometimes the old strictness analyser has more
 	-- demands than the arity justifies
-  = mkStrictSig id arity $
+  = mk_strict_sig id arity $
     mkTopDmdType (map newDemand ds) (newRes res cpr)
 
 mkNewStrictnessInfo id arity other cpr
   =	-- Either no strictness info, or arity is too small
 	-- In either case we can't say anything useful
-    mkStrictSig id arity $
+    mk_strict_sig id arity $
     mkTopDmdType (replicate arity lazyDmd) (newRes False cpr)
+
+mk_strict_sig id arity dmd_ty
+  = WARN( arity /= dmdTypeDepth dmd_ty, ppr id <+> (ppr arity $$ ppr dmd_ty) )
+    mkStrictSig dmd_ty
 
 newRes True  _ 	        = BotRes
 newRes False ReturnsCPR = RetCPR
@@ -155,18 +159,18 @@ newDemand :: Demand.Demand -> NewDemand.Demand
 newDemand (WwLazy True)      = Abs
 newDemand (WwLazy False)     = Lazy
 newDemand WwStrict	     = Eval
-newDemand (WwUnpack unpk ds) = Seq Drop Now (map newDemand ds)
+newDemand (WwUnpack unpk ds) = Seq Drop (map newDemand ds)
 newDemand WwPrim	     = Lazy
 newDemand WwEnum	     = Eval
 
 oldDemand :: NewDemand.Demand -> Demand.Demand
-oldDemand Abs	       = WwLazy True
-oldDemand Lazy	       = WwLazy False
-oldDemand Bot	       = WwStrict
-oldDemand Err	       = WwStrict
-oldDemand Eval	       = WwStrict
-oldDemand (Seq _ _ ds) = WwUnpack True (map oldDemand ds)
-oldDemand (Call _)     = WwStrict
+oldDemand Abs	     = WwLazy True
+oldDemand Lazy	     = WwLazy False
+oldDemand Bot	     = WwStrict
+oldDemand Err	     = WwStrict
+oldDemand Eval	     = WwStrict
+oldDemand (Seq _ ds) = WwUnpack True (map oldDemand ds)
+oldDemand (Call _)   = WwStrict
 \end{code}
 
 

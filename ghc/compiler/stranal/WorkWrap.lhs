@@ -14,12 +14,9 @@ import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType )
 import Id		( Id, idType, idNewStrictness, idArity, isOneShotLambda,
 			  setIdNewStrictness, zapIdNewStrictness, idInlinePragma, mkWorkerId,
-			  setIdWorkerInfo, idCprInfo, setInlinePragma )
+			  setIdWorkerInfo, setInlinePragma )
 import Type		( Type )
-import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
-			  CprInfo(..), InlinePragInfo(..), isNeverInlinePrag,
-			  WorkerInfo(..)
-			)
+import IdInfo		( InlinePragInfo(..), isNeverInlinePrag, WorkerInfo(..)	)
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
 			  mkTopDmdType, isBotRes, returnsCPR
 			)
@@ -297,9 +294,9 @@ worthSplitting (StrictSig (DmdType _ ds res))
 	-- [We don't do reboxing now, but in general it's better to pass 
 	--  an unboxed thing to f, and have it reboxed in the error cases....]
   where
-    worth_it Abs	  = True	-- Absent arg
-    worth_it (Seq _ _ ds) = True	-- Arg to evaluate
-    worth_it other	  = False
+    worth_it Abs	= True	-- Absent arg
+    worth_it (Seq _ ds) = True	-- Arg to evaluate
+    worth_it other	= False
 \end{code}
 
 
@@ -324,5 +321,3 @@ mkWrapper fun_ty (StrictSig (DmdType _ demands res_info))
 
 noOneShotInfo = repeat False
 \end{code}
-
-

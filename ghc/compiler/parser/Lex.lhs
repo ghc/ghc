@@ -41,7 +41,7 @@ import PrelNames	( mkTupNameStr )
 import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
 import ForeignCall	( Safety(..) )
 import NewDemand	( StrictSig(..), Demand(..), Keepity(..), 
-			  DmdResult(..), Deferredness(..), mkTopDmdType )
+			  DmdResult(..), mkTopDmdType )
 import UniqFM           ( listToUFM, lookupUFM )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile, srcLocLine,
@@ -833,19 +833,19 @@ lex_demand cont buf =
     'B'# -> read_em (Bot : acc) (stepOn buf)
     ')'# -> (reverse acc, stepOn buf)
     'C'# -> do_call acc (stepOnBy# buf 2#)
-    'U'# -> do_unpack1 Drop Now acc (stepOnBy# buf 1#)
-    'S'# -> do_unpack1 Keep Now acc (stepOnBy# buf 1#)
+    'D'# -> do_unpack1 Defer acc (stepOnBy# buf 1#)
+    'U'# -> do_unpack1 Drop acc (stepOnBy# buf 1#)
+    'S'# -> do_unpack1 Keep acc (stepOnBy# buf 1#)
     _    -> (reverse acc, buf)
 
-  do_unpack1 keepity defer acc buf
+  do_unpack1 keepity acc buf
     = case currentChar# buf of
-	'*'# -> do_unpack1 keepity Defer acc (stepOnBy# buf 1#)
-	'('# -> do_unpack2 keepity defer acc (stepOnBy# buf 1#)
-	_    -> read_em (Seq keepity defer [] : acc) buf
+	'('# -> do_unpack2 keepity acc (stepOnBy# buf 1#)
+	_    -> read_em (Seq keepity [] : acc) buf
 
-  do_unpack2 keepity defer acc buf
+  do_unpack2 keepity acc buf
     = case read_em [] buf of
-        (stuff, rest) -> read_em (Seq keepity defer stuff : acc) rest
+        (stuff, rest) -> read_em (Seq keepity stuff : acc) rest
 
   do_call acc buf
     = case read_em [] buf of
