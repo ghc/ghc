@@ -29,21 +29,21 @@ default: all
 # -----------------------------------------------------------------------------
 # 	make sure the autoconf stuff is up to date...
 
-$(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/configure 
+$(TOP)/configure : $(TOP)/configure.ac $(TOP)/aclocal.m4
+	@echo "Running autoreconf in $(FPTOOLS_TOP)  ..."
+	@( cd $(FPTOOLS_TOP) && autoreconf )
+
+$(TOP)/config.status : $(TOP)/configure
 	@if test ! -f $(FPTOOLS_TOP)/config.status; then \
 		echo "You haven't run $(FPTOOLS_TOP)/configure yet."; \
 		exit 1; \
 	fi
-	@if test $(FPTOOLS_TOP)/configure -nt $(FPTOOLS_TOP)/mk/config.mk; then \
-		echo "configure changed, reconfiguring with same settings..."; \
-		( cd $(FPTOOLS_TOP) && ./config.status --recheck ); \
-	fi
+	echo "configure changed, reconfiguring with same settings..."; \
+	( cd $(FPTOOLS_TOP) && ./config.status --recheck ); \
+
+$(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/configure $(TOP)/config.status
 	@echo "Running $(FPTOOLS_TOP)/config.status to update configuration info...";
 	@( cd $(FPTOOLS_TOP) && ./config.status )
-
-$(TOP)/configure : $(TOP)/configure.ac $(TOP)/aclocal.m4
-	@echo "Running autoreconf in $(FPTOOLS_TOP)  ..."
-	@( cd $(FPTOOLS_TOP) && autoreconf )
 
 # -----------------------------------------------------------------------------
 # Misc bits
