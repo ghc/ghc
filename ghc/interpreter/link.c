@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/11/22 16:00:22 $
+ * $Revision: 1.17 $
+ * $Date: 1999/11/23 15:12:08 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -209,6 +209,7 @@ Cell  predFractional;            /* Fractional (mkOffset(0))        */
 Cell  predIntegral;              /* Integral (mkOffset(0))          */
 Kind  starToStar;                /* Type -> Type                    */
 Cell  predMonad;                 /* Monad (mkOffset(0))             */
+Type  typeProgIO;                /* IO a                            */
 
 /* --------------------------------------------------------------------------
  * 
@@ -401,6 +402,7 @@ static Void mkTypes ( void )
         predFractional = ap(classFractional,aVar);
         predIntegral   = ap(classIntegral,aVar);
         predMonad      = ap(classMonad,aVar);
+	typeProgIO     = ap(typeIO,aVar);
 }
 
 Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */

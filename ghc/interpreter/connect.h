@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.16 $
- * $Date: 1999/11/17 16:57:38 $
+ * $Revision: 1.17 $
+ * $Date: 1999/11/23 15:12:10 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -105,6 +105,7 @@ extern String hugsEdit;                 /* String for editor command       */
 extern String hugsPath;                 /* String for file search path     */
 extern String projectPath;              /* String for project search path  */
 
+extern Type  typeProgIO;		/* For the IO monad, IO a	   */
 extern Type  typeArrow;                 /* Builtin type constructors       */
 extern Type  typeList;
 extern Type  typeUnit;

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/19 15:42:08 $
+ * $Revision: 1.16 $
+ * $Date: 1999/11/23 15:12:06 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2748,6 +2748,7 @@ Int what; {
                        mark(predIntegral);
                        mark(starToStar);
                        mark(predMonad);
+		       mark(typeProgIO);
                        break;
 
         case INSTALL : typeChecker(RESET);

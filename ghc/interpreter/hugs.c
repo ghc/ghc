@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.22 $
- * $Date: 1999/11/23 09:59:38 $
+ * $Revision: 1.23 $
+ * $Date: 1999/11/23 15:12:09 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -234,7 +234,9 @@ char *argv[]; {
        main after loading scripts.  Useful for running the nofib suite.    */
     if (argc > 1 && (strcmp(argv[1],"+Q") == 0 || strcmp(argv[1],"-Q")==0)) {
        autoMain = TRUE;
-       hugsEnableOutput(0);
+       if (strcmp(argv[1],"-Q") == 0) {
+	 hugsEnableOutput(0);
+       }
     }
 
     Printf("__   __ __  __  ____   ___      _________________________________________\n");
@@ -1342,7 +1344,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
 #endif
 
 #if 1
-    if (typeMatches(type,ap(typeIO,typeUnit))) {
+    if (isProgType(ks,bd)) {
         inputExpr = ap(nameRunIO,inputExpr);
         evalExp();
         Putchar('\n');

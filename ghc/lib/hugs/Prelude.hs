@@ -1835,13 +1835,13 @@ prelCleanupAfterRunAction :: IORef (Maybe (IO ()))
 prelCleanupAfterRunAction = primRunST (newIORef Nothing)
 
 -- used when Hugs invokes top level function
-primRunIO_hugs_toplevel :: IO () -> ()
+primRunIO_hugs_toplevel :: IO a -> ()
 primRunIO_hugs_toplevel m
    = protect 5 (fst (unST composite_action realWorld))
      where
         composite_action
            = do writeIORef prelCleanupAfterRunAction Nothing
-                m
+                m 
                 cleanup_handles <- readIORef prelCleanupAfterRunAction
                 case cleanup_handles of
                    Nothing -> return ()

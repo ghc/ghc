@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: subst.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/11/17 16:57:49 $
+ * $Revision: 1.9 $
+ * $Date: 1999/11/23 15:12:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1259,7 +1259,21 @@ Bool typeMatches(type,mt)               /* test if type matches monotype mt*/
     return result;
 }
 
-
+Bool isProgType(ks,type)		/* Test if type is of the form	   */
+List ks;				/* IO t for some t.		   */
+Type type; {
+    Bool result;
+    Int  alpha;
+    Int  beta;
+    emptySubstitution();
+    alpha  = newKindedVars(ks);
+    beta   = newTyvars(1);
+    bindOnlyAbove(beta);
+    result = unify(type,alpha,typeProgIO,beta);
+    unrestrictBind();
+    emptySubstitution();
+    return result;
+}
 
 /* --------------------------------------------------------------------------
  * Matching predicates:
