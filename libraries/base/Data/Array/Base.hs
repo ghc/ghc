@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Base.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Base.hs,v 1.2 2001/07/31 13:28:58 simonmar Exp $
 --
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.
@@ -801,6 +801,19 @@ instance HasBounds (STUArray s) where
     bounds (STUArray l u _) = (l,u)
 
 instance MArray (STUArray s) Bool (ST s) where
+    {-# INLINE newArray #-}
+    newArray (l,u) init = ST $ \s1# ->
+        case rangeSize (l,u)            of { I# n# ->
+        case newByteArray# (bOOL_SCALE n#) s1# of { (# s2#, marr# #) ->
+        case bOOL_WORD_SCALE n#         of { n'# ->
+        let loop i# s3# | i# ==# n'# = s3#
+                        | otherwise  =
+                case writeWordArray# marr# i# e# s3# of { s4# ->
+                loop (i# +# 1#) s4# } in
+        case loop 0# s2#                of { s3# ->
+        (# s3#, STUArray l u marr# #) }}}}
+      where
+        W# e# = if init then maxBound else 0
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1064,8 +1077,12 @@ instance MArray (STUArray s) Word64 (ST s) where
 
 #include "config.h"
 
-bOOL_SCALE, wORD_SCALE, dOUBLE_SCALE, fLOAT_SCALE :: Int# -> Int#
-bOOL_SCALE   n# = bOOL_INDEX (n# +# last#) where I# last# = SIZEOF_VOID_P - 1
+bOOL_SCALE, bOOL_WORD_SCALE,
+  wORD_SCALE, dOUBLE_SCALE, fLOAT_SCALE :: Int# -> Int#
+bOOL_SCALE n# = (n# +# last#) `iShiftRA#` 3#
+  where I# last# = SIZEOF_VOID_P * 8 - 1
+bOOL_WORD_SCALE n# = bOOL_INDEX (n# +# last#)
+  where I# last# = SIZEOF_VOID_P * 8 - 1
 wORD_SCALE   n# = scale# *# n# where I# scale# = SIZEOF_VOID_P
 dOUBLE_SCALE n# = scale# *# n# where I# scale# = SIZEOF_DOUBLE
 fLOAT_SCALE  n# = scale# *# n# where I# scale# = SIZEOF_FLOAT
@@ -1079,7 +1096,7 @@ bOOL_INDEX i# = i# `iShiftRA#` 6#
 
 bOOL_BIT, bOOL_NOT_BIT :: Int# -> Word#
 bOOL_BIT     n# = int2Word# 1# `shiftL#` (word2Int# (int2Word# n# `and#` mask#))
-    where W# mask# = SIZEOF_VOID_P * 8 - 1
+  where W# mask# = SIZEOF_VOID_P * 8 - 1
 bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb# where W# mb# = maxBound
 
 -----------------------------------------------------------------------------
