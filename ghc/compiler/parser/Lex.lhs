@@ -16,7 +16,7 @@ An example that provokes the error is
 --------------------------------------------------------
 
 \begin{code}
-{-# OPTIONS -#include "hs_ctype.h" #-}
+
 module Lex (
 
 	ifaceParseErr, srcParseErr,
@@ -397,7 +397,8 @@ lexer cont buf s@(PState{
 		})
 
 	-- first, start a new lexeme and lose all the whitespace
-  =  tab line bol atbol (stepOverLexeme buf)
+  =  _scc_ "Lexer" 
+  tab line bol atbol (stepOverLexeme buf)
   where
 	line = srcLocLine loc
 
@@ -701,7 +702,7 @@ lex_char :: (Int# -> Int -> P a) -> Int# -> P a
 lex_char cont glaexts buf
   = case currentChar# buf of
 	'\\'# -> lex_escape (cont glaexts) (incLexeme buf)
-	c | is_string c -> cont glaexts (I# (ord# c)) (incLexeme buf)
+	c | is_any c -> cont glaexts (I# (ord# c)) (incLexeme buf)
 	other -> charError buf
 
 char_end cont glaexts c buf
@@ -741,7 +742,10 @@ lex_escape cont buf
 			    (c,buf2):_ -> cont (ord c) buf2
 			    [] -> charError buf'
 
-after_charnum cont i buf = cont (fromInteger i) buf
+after_charnum cont i buf
+  = if i >= 0 && i <= 0x10FFFF
+	then cont (fromInteger i) buf
+	else charError buf
 
 readNum cont buf is_digit base conv = read buf 0
   where read buf i 
@@ -916,7 +920,7 @@ lex_id cont glaexts buf =
 
  let lexeme  = lexemeToFastString buf' in
 
- case _scc_ "haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
+ case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
  	Just kwd_token -> --trace ("hkeywd: "++_UNPK_(lexeme)) $
 			  cont kwd_token buf';
  	Nothing        -> 
@@ -1017,7 +1021,7 @@ lex_id3 cont glaexts mod buf just_a_conid
       new_buf     = mergeLexemes buf buf'
       is_a_qvarid = cont (mk_qvar_token mod lexeme) new_buf
      in
-     case _scc_ "haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
+     case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
     	    Nothing          -> is_a_qvarid ;
 
     	    Just kwd_token | isSpecial kwd_token   -- special ids (as, qualified, hiding) shouldn't be
@@ -1180,9 +1184,9 @@ getSrcLocP buf s@(PState{ loc = loc }) = POk s loc
 setSrcLocP :: SrcLoc -> P a -> P a
 setSrcLocP new_loc p buf s = 
   case p buf s{ loc=new_loc } of
-	POk _ a   -> POk s a
-	PFailed e -> PFailed e
-
+      POk _ a   -> POk s a
+      PFailed e -> PFailed e
+  
 getSrcFile :: P FAST_STRING
 getSrcFile buf s@(PState{ loc = loc }) = POk s (srcLocFile loc)
 
