@@ -19,6 +19,11 @@ module CodeGen ( codeGen ) where
 
 #include "HsVersions.h"
 
+-- Kludge (??) so that CgExpr is reached via at least one non-SOURCE
+-- import.  Before, that wasn't the case, and CM therefore didn't 
+-- bother to compile it.
+import CgExpr           ( {-NOTHING!-} )	-- DO NOT DELETE THIS IMPORT
+
 import StgSyn
 import CgMonad
 import AbsCSyn
