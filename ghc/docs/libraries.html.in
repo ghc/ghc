@@ -7,7 +7,11 @@
   <BODY>
     <H1>Haskell Hierarchical Libraries</H1>
 
-    <P>The libraries are divided into several <EM>packages</EM>:</P>
+    <P>The libraries are divided into several <EM>packages</EM>.
+    NOTE: there is not always a clean division between packages in the
+    hierarchy, which means a node and its children might be in
+    different packages.  If you're looking for a specific module, try
+    all the packages below.</P>
 
     <DL>
       <DT>
