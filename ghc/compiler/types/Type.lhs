@@ -398,15 +398,22 @@ repType looks through
 	(b) synonyms
 	(c) predicates
 	(d) usage annotations
+	(e) [recursive] newtypes
 It's useful in the back end.
+
+Remember, non-recursive newtypes get expanded as part of the SourceTy case,
+but recursive ones are represented by TyConApps and have to be expanded
+by steam.
 
 \begin{code}
 repType :: Type -> Type
-repType (ForAllTy _ ty) = repType ty
-repType (NoteTy   _ ty) = repType ty
-repType (SourceTy  p)   = repType (sourceTypeRep p)
-repType (UsageTy  _ ty) = repType ty
-repType ty	 	= ty
+repType (ForAllTy _ ty)   = repType ty
+repType (NoteTy   _ ty)   = repType ty
+repType (SourceTy  p)     = repType (sourceTypeRep p)
+repType (UsageTy  _ ty)   = repType ty
+repType (TyConApp tc tys) | isNewTyCon tc && length tys == tyConArity tc
+			  = repType (newTypeRep tc tys)
+repType ty	 	  = ty
 
 splitRepFunTys :: Type -> ([Type], Type)
 -- Like splitFunTys, but looks through newtypes and for-alls
