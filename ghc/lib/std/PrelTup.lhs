@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelTup.lhs,v 1.11 2001/02/13 15:23:33 rrt Exp $
+% $Id: PrelTup.lhs,v 1.12 2001/08/28 15:11:41 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -26,20 +26,20 @@ default ()		-- Double isn't available yet
 %*********************************************************
 
 \begin{code}
-data (,) a b = (,) a b   deriving (Eq, Ord)
+data (,) a b = (,) a b deriving (Eq, Ord)
 data (,,) a b c = (,,) a b c deriving (Eq, Ord)
 data (,,,) a b c d = (,,,) a b c d deriving (Eq, Ord)
 data (,,,,) a b c d e = (,,,,) a b c d e deriving (Eq, Ord)
-data (,,,,,) a b c d e f = (,,,,,) a b c d e f
-data (,,,,,,) a b c d e f g = (,,,,,,) a b c d e f g
-data (,,,,,,,) a b c d e f g h = (,,,,,,,) a b c d e f g h
-data (,,,,,,,,) a b c d e f g h i = (,,,,,,,,) a b c d e f g h i
-data (,,,,,,,,,) a b c d e f g h i j = (,,,,,,,,,) a b c d e f g h i j
-data (,,,,,,,,,,) a b c d e f g h i j k = (,,,,,,,,,,) a b c d e f g h i j k
-data (,,,,,,,,,,,) a b c d e f g h i j k l = (,,,,,,,,,,,) a b c d e f g h i j k l
-data (,,,,,,,,,,,,) a b c d e f g h i j k l m = (,,,,,,,,,,,,) a b c d e f g h i j k l m
-data (,,,,,,,,,,,,,) a b c d e f g h i j k l m n = (,,,,,,,,,,,,,) a b c d e f g h i j k l m n
-data (,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o = (,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o
+data (,,,,,) a b c d e f = (,,,,,) a b c d e f deriving (Eq, Ord)
+data (,,,,,,) a b c d e f g = (,,,,,,) a b c d e f g deriving (Eq, Ord)
+data (,,,,,,,) a b c d e f g h = (,,,,,,,) a b c d e f g h deriving (Eq, Ord)
+data (,,,,,,,,) a b c d e f g h i = (,,,,,,,,) a b c d e f g h i deriving (Eq, Ord)
+data (,,,,,,,,,) a b c d e f g h i j = (,,,,,,,,,) a b c d e f g h i j deriving (Eq, Ord)
+data (,,,,,,,,,,) a b c d e f g h i j k = (,,,,,,,,,,) a b c d e f g h i j k deriving (Eq, Ord)
+data (,,,,,,,,,,,) a b c d e f g h i j k l = (,,,,,,,,,,,) a b c d e f g h i j k l deriving (Eq, Ord)
+data (,,,,,,,,,,,,) a b c d e f g h i j k l m = (,,,,,,,,,,,,) a b c d e f g h i j k l m deriving (Eq, Ord)
+data (,,,,,,,,,,,,,) a b c d e f g h i j k l m n = (,,,,,,,,,,,,,) a b c d e f g h i j k l m n deriving (Eq, Ord)
+data (,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o = (,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o deriving (Eq, Ord)
 data (,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p = (,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p
 data (,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q
  = (,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q
