@@ -1,8 +1,6 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.36 2003/09/08 17:55:40 sof Exp $
---
 -- Package management tool
 -----------------------------------------------------------------------------
 
@@ -22,12 +20,12 @@ import qualified Exception
 
 import Monad
 import Directory
-import System	( getEnv, getArgs, 
+import System	( getEnv, getArgs, getProgName,
 		  system, exitWith,
 		  ExitCode(..)
 		)
 import IO
-import List ( isPrefixOf )
+import List ( isPrefixOf, isSuffixOf )
 
 import ParsePkgConfLite
 
@@ -47,9 +45,16 @@ main = do
   args <- getArgs
 
   case getOpt Permute flags args of
-	(clis@(_:_),[],[]) -> runit clis
-	(_,_,errors) -> die (concat errors ++ 
-			     usageInfo usageHeader flags)
+	(cli,_,[]) | DumpHelp `elem` cli -> do
+	   prog <- getProgramName
+	   bye (usageInfo (usageHeader prog) flags)
+	(cli,_,[]) | DumpVersion `elem` cli ->
+	   bye copyright
+	(cli@(_:_),[],[]) ->
+	   runit cli
+	(_,_,errors) -> do
+	   prog <- getProgramName
+	   die (concat errors ++ usageInfo (usageHeader prog) flags)
 
 data Flag 
   = Config FilePath
@@ -60,6 +65,8 @@ data Flag
   | Remove String | Show String 
   | Field String | AutoGHCiLibs | Force
   | DefinedName String String
+  | DumpHelp
+  | DumpVersion
   deriving (Eq)
 
 isAction (Config _)     = False
@@ -70,33 +77,46 @@ isAction (Force)	= False
 isAction DefinedName{}  = False
 isAction _              = True
 
-usageHeader = "ghc-pkg [OPTION...]"
+copyright :: String
+copyright = "GHC package manager version " ++ version ++ "\n"
+
+-- hackery to convice cpp to splice GHC_PKG_VERSION into a string
+version :: String
+version = tail "\ 
+   \ GHC_PKG_VERSION"
+
+usageHeader :: String -> String
+usageHeader prog = "Usage: " ++ prog ++ " [OPTION...]\n"
 
 flags = [
   Option ['f'] ["config-file"] (ReqArg Config "FILE")
-	"Use the specified package config file",
+	"use the specified package config file",
   Option ['l'] ["list-packages"] (NoArg List)
- 	"List packages in all config files",
+ 	"list packages in all config files",
   Option ['L'] ["list-local-packages"] (NoArg ListLocal)
- 	"List packages in the specified config file",
+ 	"list packages in the specified config file",
   Option ['a'] ["add-package"] (NoArg (Add False))
- 	"Add a new package",
+ 	"add a new package",
   Option ['u'] ["update-package"] (NoArg (Add True))
- 	"Update package with new configuration",
+ 	"update package with new configuration",
   Option ['i'] ["input-file"] (ReqArg Input "FILE")
-	"Read new package info from specified file",
+	"read new package info from specified file",
   Option ['s'] ["show-package"] (ReqArg Show "NAME")
- 	"Show the configuration for package NAME",
+ 	"show the configuration for package NAME",
   Option [] ["field"] (ReqArg Field "FIELD")
  	"(with --show-package) Show field FIELD only",
   Option [] ["force"] (NoArg Force)
  	"ignore missing directories/libraries",
   Option ['r'] ["remove-package"] (ReqArg Remove "NAME")
- 	"Remove an installed package",
+ 	"remove an installed package",
   Option ['g'] ["auto-ghci-libs"] (NoArg AutoGHCiLibs)
-	"Automatically build libs for GHCi (with -a)",
+	"automatically build libs for GHCi (with -a)",
   Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
-  	"Define NAME as VALUE"
+  	"define NAME as VALUE",
+   Option ['?'] ["help"] (NoArg DumpHelp)
+	"display this help and exit",
+   Option ['V'] ["version"] (NoArg DumpVersion)
+	"output version information and exit"
   ]
  where
   toDefined str = 
@@ -105,7 +125,7 @@ flags = [
       (nm,_:val) -> DefinedName nm val
 
 runit clis = do
-  let err_msg = "missing -f option, location of package.conf unknown"
+  let err_msg = "missing -f option, location of package.conf unknown\n"
   conf_filenames <- 
      case [ f | Config f <- clis ] of
         fs@(_:_) -> return (reverse fs) -- NOTE reverse
@@ -127,7 +147,7 @@ runit clis = do
       toField "extra_ld_opts"   = return extra_ld_opts  
       toField "framework_dirs"  = return framework_dirs  
       toField "extra_frameworks"= return extra_frameworks  
-      toField s			= die ("unknown field: `" ++ s ++ "'")
+      toField s			= die ("unknown field: `" ++ s ++ "'\n")
 
   fields <- mapM toField [ f | Field f <- clis ]
 
@@ -135,7 +155,7 @@ runit clis = do
 	  str <- readFile filename
 	  let packages = parsePackageConfig str
 	  eval_catch packages
-	    (\_ -> die (filename ++ ": parse error in package config file"))
+	    (\_ -> die (filename ++ ": parse error in package config file\n"))
 
   pkg_confs <- mapM read_parse_conf conf_filenames
 
@@ -159,7 +179,8 @@ runit clis = do
 			       auto_ghci_libs upd force
     [ Remove p ] -> removePackage pkg_confs conf_filename p
     [ Show p ]   -> showPackage pkg_confs conf_filename p fields
-    _            -> die (usageInfo usageHeader flags)
+    _            -> do prog <- getProgramName
+		       die (usageInfo (usageHeader prog) flags)
 
 
 listPackages :: [[PackageConfig]] -> [FilePath] -> IO ()
@@ -180,11 +201,11 @@ showPackage :: [[PackageConfig]]
 	    -> IO ()
 showPackage pkg_confs filename pkg_name fields =
   case [ p | pkgs <- pkg_confs, p <- pkgs, name p == pkg_name ] of
-    []    -> die ("can't find package `" ++ pkg_name ++ "'")
+    []    -> die ("can't find package `" ++ pkg_name ++ "'\n")
     [pkg] | null fields -> hPutStrLn stdout (render (dumpPkgGuts pkg))
 	  | otherwise   -> hPutStrLn stdout (render (vcat 
 				(map (vcat . map text) (map ($ pkg) fields))))
-    _     -> die "showPackage: internal error"
+    _     -> die "showPackage: internal error\n"
 
 addPackage :: [[PackageConfig]] -> [(String, String)] 
 	   -> FilePath -> FilePath
@@ -202,7 +223,7 @@ addPackage pkg_confs defines
         hPutStr stdout ("Reading package info from " ++ show f)
 	readFile f
   let new_pkg = parseOnePackageConfig s
-  eval_catch new_pkg (\_ -> die "parse error in package info")
+  eval_catch new_pkg (\_ -> die "parse error in package info\n")
   hPutStrLn stdout "done."
   hPutStr stdout "Expanding embedded variables... "
   new_exp_pkg <- expandEnvVars new_pkg defines force
@@ -217,7 +238,7 @@ removePackage :: [[PackageConfig]] -> FilePath -> String -> IO ()
 removePackage (packages : _) filename pkgName = do  
   checkConfigAccess filename
   when (pkgName `notElem` map name packages)
-       (die (filename ++ ": package `" ++ pkgName ++ "' not found"))
+       (die (filename ++ ": package `" ++ pkgName ++ "' not found\n"))
   savePackageConfig filename
   maybeRestoreOldConfig filename $
     writeNewConfig filename (filter ((/= pkgName) . name) packages)
@@ -226,7 +247,7 @@ checkConfigAccess :: FilePath -> IO ()
 checkConfigAccess filename = do
   access <- getPermissions filename
   when (not (writable access))
-      (die (filename ++ ": you don't have permission to modify this file"))
+      (die (filename ++ ": you don't have permission to modify this file\n"))
 
 maybeRestoreOldConfig :: FilePath -> IO () -> IO ()
 maybeRestoreOldConfig filename io
@@ -278,7 +299,7 @@ validatePackageConfig :: PackageConfig
 		      -> IO [PackageConfig]
 validatePackageConfig pkg pkg_confs@(pkgs:_) auto_ghci_libs updatePkg force = do
   when (not updatePkg && (name pkg `elem` map name pkgs))
-       (die ("package `" ++ name pkg ++ "' is already installed"))
+       (die ("package `" ++ name pkg ++ "' is already installed\n"))
   mapM_	(checkDep pkg_confs force) (package_deps pkg)
   mapM_	(checkDir force) (import_dirs pkg)
   mapM_	(checkDir force) (source_dirs pkg)
@@ -299,12 +320,12 @@ checkDir force d
  | otherwise = do
    there <- doesDirectoryExist d
    when (not there)
-       (dieOrForce force ("`" ++ d ++ "' doesn't exist or isn't a directory"))
+       (dieOrForce force ("`" ++ d ++ "' doesn't exist or isn't a directory\n"))
 
 checkDep :: [[PackageConfig]] -> Bool -> String -> IO ()
 checkDep pkgs force n
   | n `elem` pkg_names = return ()
-  | otherwise = dieOrForce force ("dependency `" ++ n ++ "' doesn't exist")
+  | otherwise = dieOrForce force ("dependency `" ++ n ++ "' doesn't exist\n")
   where
     pkg_names = concat (map (map name) pkgs)
 
@@ -411,13 +432,22 @@ expandEnvVars pkg defines force = do
 
 -----------------------------------------------------------------------------
 
+getProgramName :: IO String
+getProgramName = liftM (`withoutSuffix` ".bin") getProgName
+   where str `withoutSuffix` suff
+            | suff `isSuffixOf` str = take (length str - length suff) str
+            | otherwise             = str
+
+bye :: String -> IO a
+bye s = putStr s >> exitWith ExitSuccess
+
 die :: String -> IO a
-die s = do { hFlush stdout ; hPutStrLn stderr s; exitWith (ExitFailure 1) }
+die s = do { hFlush stdout ; hPutStr stderr s; exitWith (ExitFailure 1) }
 
 dieOrForce :: Bool -> String -> IO ()
 dieOrForce force s 
   | force     = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
-  | otherwise = die s
+  | otherwise = die (s ++ "\n")
 
 -----------------------------------------------------------------------------
 -- Exceptions

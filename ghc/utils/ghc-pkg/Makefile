@@ -1,5 +1,4 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.22 2003/06/04 15:18:29 panne Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,7 +9,7 @@ INSTALLING=1
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
 
-SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY
+SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -DGHC_PKG_VERSION=$(ProjectVersion)
 
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 
