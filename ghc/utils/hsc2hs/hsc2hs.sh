@@ -1,8 +1,8 @@
 
 for arg; do
     case "$arg" in
-        (--cc=*) HSC2HS_EXTRA=;;
-        (--)     break;;
+        --cc=*) HSC2HS_EXTRA=;;
+        --)     break;;
     esac
 done
 
