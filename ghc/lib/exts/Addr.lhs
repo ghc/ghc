@@ -37,6 +37,10 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 		)
 import PrelIOBase ( IO(..), IOResult(..) )
 
+#ifndef __PARALLEL_HASKELL__
+import PrelForeign ( ForeignObj(..) )
+#endif
+
 \end{code}
 
 Coercing between machine ints and words
@@ -124,6 +128,12 @@ writeWordOffAddr (A# a#) (I# i#) (W# e#) = IO $ \ s# ->
 writeAddrOffAddr   :: Addr -> Int -> Addr   -> IO ()
 writeAddrOffAddr (A# a#) (I# i#) (A# e#) = IO $ \ s# ->
       case (writeAddrOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
+
+#ifndef __PARALLEL_HASKELL__
+writeForeignObjOffAddr   :: Addr -> Int -> ForeignObj -> IO ()
+writeForeignObjOffAddr (A# a#) (I# i#) (ForeignObj e#) = IO $ \ s# ->
+      case (writeForeignObjOffAddr#  a# i# e# s#) of s2# -> IOok s2# () 
+#endif
 
 writeFloatOffAddr  :: Addr -> Int -> Float  -> IO ()
 writeFloatOffAddr (A# a#) (I# i#) (F# e#) = IO $ \ s# ->
