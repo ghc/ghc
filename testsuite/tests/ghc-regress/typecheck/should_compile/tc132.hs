@@ -3,7 +3,8 @@
 -- Fails with GHC 5.00.1
 
 module Test where
-import ST
+import Control.Monad.ST
+import Data.STRef
 
 -- Should get
 -- apa :: forall s. ST s ()

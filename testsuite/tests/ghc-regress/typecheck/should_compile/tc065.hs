@@ -1,8 +1,8 @@
 module ShouldSucceed where
 
 -- import TheUtils
-import Set
-import List (partition )
+import Data.Set
+import Data.List (partition )
 
 data Digraph vertex = MkDigraph [vertex]
 

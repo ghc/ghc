@@ -24,7 +24,7 @@ test('tcrun018', normal, compile_and_run, [''])
 test('tcrun019', normal, compile_and_run, [''])
 test('tcrun020', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype with no constructors
-test('tcrun021', expect_fail_for(['extcore','optextcore']), compile_and_run, ['-package data'])
+test('tcrun021', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 test('tcrun022', normal, compile_and_run, ['-O -fglasgow-exts'])
 test('tcrun023', normal, compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])

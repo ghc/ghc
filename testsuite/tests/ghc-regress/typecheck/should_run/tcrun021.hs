@@ -6,8 +6,8 @@
 
 module Main where
 
-import List
-import FiniteMap
+import Data.List
+import Data.FiniteMap
 
 class (Ord oid) => Object o oid | o -> oid where
 
