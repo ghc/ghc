@@ -105,7 +105,6 @@ instance Text StringBuffer where
 \begin{code}
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname =
---    trace ("Renamer: opening " ++ fname) $
     openFile fname ReadMode >>= \ hndl ->
     hFileSize hndl          >>= \ len@(J# _ _ d#) ->
     let len_i = fromInteger len in
@@ -114,7 +113,7 @@ hGetStringBuffer fname =
 --    trace (show ((len_i::Int)+1)) $
     _casm_ `` %r=(char *)malloc(sizeof(char)*(int)%0); '' (len_i::Int)  >>= \ arr@(A# a#) ->
     if addr2Int# a# ==# 0# then
-       failWith MkIOError(hndl,UserError,("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
+       fail (userError ("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
     else
 
 --   _casm_ `` %r=NULL; ''		                     >>= \ free_p ->
@@ -123,10 +122,9 @@ hGetStringBuffer fname =
      writeHandle hndl hndl_ >>
      let ptr = filePtr hndl_ in
      _ccall_ fread arr (1::Int) len_i ptr                     >>= \  (I# read#) ->
---     trace ("DEBUG: opened " ++ fname ++ show (I# read#)) $
      hClose hndl		     >>
-     if read# ==# 0# then -- EOF or other error
-        failWith MkIOError(hndl,UserError,"hGetStringBuffer: EOF reached or some other error")
+     if read# ==# 0# then -- EOF or some other error
+        fail (userError ("hGetStringBuffer: failed to slurp in interface file "++fname))
      else
         -- Add a sentinel NUL
         _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' arr (I# (read# -# 1#)) >>= \ () ->
