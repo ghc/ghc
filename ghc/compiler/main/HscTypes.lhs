@@ -16,7 +16,7 @@ module HscTypes (
 	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
 
-	InstEnv, 
+	InstEnv, ClsInstEnv, DFunId,
 
 	GlobalRdrEnv, RdrAvailInfo,
 
