@@ -231,13 +231,13 @@ hscRecomp ghci_mode dflags have_object
 		filter (/= gHC_PRIM_Name) $
 		map ideclName (hsModuleImports rdr_module);
 
-            imported_modules = 
+            imported_modules =
 		map (moduleNameToModule hit (pcs_PIT pcs_tc))
 			imported_module_names;
 	  }
 
 	-- force this out now, so we don't keep a hold of rdr_module or pcs_tc
-	; seqList imported_modules `seq` return ()
+	; seqList imported_modules (return ())
 
  	    -------------------
  	    -- FLATTENING
@@ -261,12 +261,20 @@ hscRecomp ghci_mode dflags have_object
 			                     pcs_rules = rules }
 		  else return pcs_tc
 
+-- Should we remove bits of flat_details at this point?
+-- 	   ; flat_details <- case flat_details of
+-- 			       ModDetails { md_binds = binds } ->
+-- 				   return ModDetails { md_binds = binds,
+-- 						       md_rules = [],
+-- 						       md_types = emptyTypeEnv,
+-- 						       md_insts = [] }
+
 	-- alive at this point:  
 	--	pcs_middle
 	-- 	foreign_stuff
-	-- 	ds_details
-	--	new_iface		
-	-- 	imported_modules
+	--	flat_details
+	-- 	imported_modules (seq'd)
+	-- 	new_iface
 
  	    -------------------
  	    -- SIMPLIFY
