@@ -60,6 +60,7 @@ Options added:
   ;; "large-type"
   "normal")
 
+(define %generate-set-toc% #t)
 (define %generate-part-toc% #t)
 
 ;; (define %block-start-indent% 10pt)
