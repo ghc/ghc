@@ -879,7 +879,7 @@ lookupVarLne v env lvs_cont = returnLne (lookupBinding env v) env lvs_cont
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
 			Just xx -> xx
-			Nothing -> ASSERT( isGlobalId v ) ImportBound
+			Nothing -> ASSERT2( isGlobalId v, ppr v ) ImportBound
 
 
 -- The result of lookupLiveVarsForSet, a set of live variables, is
@@ -1074,13 +1074,20 @@ hasCafRefss p exprs
   | any isCAF exprs || isFastTrue (cafRefss p exprs) = MayHaveCafRefs
   | otherwise = NoCafRefs
 
--- cafRefs compiles to beautiful code :)
+-- The environment that cafRefs uses has top-level bindings *only*.
+-- We don't bother to add local bindings as cafRefs traverses the expression
+-- because they will all be for LocalIds (all nested things are LocalIds)
+-- However, we must look in the env first, because some top level things
+-- might be local Ids
 
 cafRefs p (Var id)
-  = case lookupBinding p id of
-	ImportBound		     -> fastBool (mayHaveCafRefs (idCafInfo id))
-	LetBound TopLevelHasCafs _ _ -> fastBool True
-        other			     -> fastBool False
+  = case lookupVarEnv p id of
+	Just (LetBound TopLevelHasCafs _ _) -> fastBool True				-- Top level
+	Just (LetBound TopLevelNoCafs  _ _) -> fastBool False				-- Top level
+        Nothing | isLocalId id		    -> fastBool False				-- Nested binder
+		| otherwise		    -> fastBool (mayHaveCafRefs (idCafInfo id))	-- Imported
+	Just _other			    -> error ("cafRefs " ++ showSDoc (ppr id))	-- No nested things in env
+
 
 cafRefs p (Lit l) 	     = fastBool False
 cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
