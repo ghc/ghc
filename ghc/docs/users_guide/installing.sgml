@@ -505,7 +505,7 @@ with a binary distribution, or in source form in
 <Sect1><Title>Installing on Windows</Title>
 
 <Para>
-Getting the Glasgow Haskell Compiler(GHC) to run on Windows95/98 or
+Getting the Glasgow Haskell Compiler (GHC) to run on Windows95/98 or
 Windows NT4 platforms can be a bit of a trying experience. This document
 tries to simplify the task by enumerating the steps you need to
 follow in order to set up and configure your machine to run GHC (at
