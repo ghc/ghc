@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: StablePtr.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: StablePtr.hs,v 1.3 2002/03/14 12:09:50 simonmar Exp $
 --
 -- Stable pointers.
 --
@@ -24,12 +24,7 @@ module Foreign.StablePtr
         , castPtrToStablePtr -- :: Ptr () -> StablePtr a
         ) where
 
-import Data.Dynamic
-
 #ifdef __GLASGOW_HASKELL__
 import GHC.Stable
 import GHC.Err
 #endif
-
-#include "Dynamic.h"
-INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")

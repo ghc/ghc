@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Dynamic.hs,v 1.4 2001/12/21 15:07:21 simonmar Exp $
+-- $Id: Dynamic.hs,v 1.5 2002/03/14 12:09:49 simonmar Exp $
 --
 -- The Dynamic interface provides basic support for dynamic types.
 -- 
@@ -66,6 +66,10 @@ module Data.Dynamic
 
 import Data.Maybe
 import Data.Either
+import Data.Int
+import Data.Word
+import Foreign.Ptr
+import Foreign.StablePtr
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -74,7 +78,6 @@ import GHC.Err
 import GHC.Num
 import GHC.Float
 import GHC.IOBase
-import GHC.Dynamic
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -87,30 +90,22 @@ unsafeCoerce = unsafeCoerce#
 -- The dynamic type is represented by Dynamic, carrying
 -- the dynamic value along with its type representation:
 
--- the instance just prints the type representation.
+data Dynamic = Dynamic TypeRep Obj
+
 instance Show Dynamic where
+   -- the instance just prints the type representation.
    showsPrec _ (Dynamic t _) = 
           showString "<<" . 
 	  showsPrec 0 t   . 
 	  showString ">>"
 
--- Operations for going to and from Dynamic:
+data Obj = Obj  
+ -- dummy type to hold the dynamically typed value.
 
-toDyn :: Typeable a => a -> Dynamic
-toDyn v = Dynamic (typeOf v) (unsafeCoerce v)
-
-fromDyn :: Typeable a => Dynamic -> a -> a
-fromDyn (Dynamic t v) def
-  | typeOf def == t = unsafeCoerce v
-  | otherwise       = def
-
-fromDynamic :: Typeable a => Dynamic -> Maybe a
-fromDynamic (Dynamic t v) =
-  case unsafeCoerce v of 
-    r | t == typeOf r -> Just r
-      | otherwise     -> Nothing
-
--- (Abstract) universal datatype:
+data TypeRep
+ = App TyCon   [TypeRep]
+ | Fun TypeRep TypeRep
+   deriving ( Eq )
 
 instance Show TypeRep where
   showsPrec p (App tycon tys) =
@@ -129,6 +124,31 @@ instance Show TypeRep where
      showParen (p > 8) $
      showsPrec 9 f . showString " -> " . showsPrec 8 a
 
+-- type constructors are 
+data TyCon = TyCon Int String
+
+instance Eq TyCon where
+  (TyCon t1 _) == (TyCon t2 _) = t1 == t2
+
+instance Show TyCon where
+  showsPrec _ (TyCon _ s) = showString s
+
+-- Operations for going to and from Dynamic:
+
+toDyn :: Typeable a => a -> Dynamic
+toDyn v = Dynamic (typeOf v) (unsafeCoerce v)
+
+fromDyn :: Typeable a => Dynamic -> a -> a
+fromDyn (Dynamic t v) def
+  | typeOf def == t = unsafeCoerce v
+  | otherwise       = def
+
+fromDynamic :: Typeable a => Dynamic -> Maybe a
+fromDynamic (Dynamic t v) =
+  case unsafeCoerce v of 
+    r | t == typeOf r -> Just r
+      | otherwise     -> Nothing
+
 -- To make it possible to convert values with user-defined types
 -- into type Dynamic, we need a systematic way of getting
 -- the type representation of an arbitrary type. A type
@@ -144,9 +164,6 @@ class Typeable a where
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon (TyCon _ (',':_)) = True
 isTupleTyCon _		       = False
-
-instance Show TyCon where
-  showsPrec _ (TyCon _ s) = showString s
 
 -- If we enforce the restriction that there is only one
 -- @TyCon@ for a type & it is shared among all its uses,
@@ -282,6 +299,19 @@ INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
 INSTANCE_TYPEABLE1(Maybe,maybeTc,"Maybe")
 INSTANCE_TYPEABLE0(Ordering,orderingTc,"Ordering")
+INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
+INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
+INSTANCE_TYPEABLE1(StablePtr,stablePtrTc,"StablePtr")
+
+INSTANCE_TYPEABLE0(Int8,int8Tc, "Int8")
+INSTANCE_TYPEABLE0(Int16,int16Tc,"Int16")
+INSTANCE_TYPEABLE0(Int32,int32Tc,"Int32")
+INSTANCE_TYPEABLE0(Int64,int64Tc,"Int64")
+
+INSTANCE_TYPEABLE0(Word8,word8Tc, "Word8" )
+INSTANCE_TYPEABLE0(Word16,word16Tc,"Word16")
+INSTANCE_TYPEABLE0(Word32,word32Tc,"Word32")
+INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
 
 INSTANCE_TYPEABLE0(TyCon,tyconTc,"TyCon")
 INSTANCE_TYPEABLE0(TypeRep,typeRepTc,"TypeRep")

@@ -10,7 +10,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Fix.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: Fix.hs,v 1.3 2002/03/14 12:09:49 simonmar Exp $
 --
 -- The Fix monad.
 --
@@ -37,16 +37,21 @@ import GHC.Err
 import Data.Maybe
 #endif
 
+import System.IO
+
 fix :: (a -> a) -> a
 fix f = let x = f x in x
 
 class (Monad m) => MonadFix m where
 	mfix :: (a -> m a) -> m a
 
--- Perhaps these should live beside (the ST & IO) definition.
 instance MonadFix Maybe where
 	mfix f = let
 		a = f $ case a of
 			Just x -> x
 			_      -> error "empty mfix argument"
 		in a
+
+instance MonadFix IO where
+	mfix = fixIO
+

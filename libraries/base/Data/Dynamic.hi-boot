@@ -1,0 +1,3 @@
+__interface "base" DataziDynamic 1 where
+__export DataziDynamic Dynamic ;
+data Dynamic;

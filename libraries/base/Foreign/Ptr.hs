@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Ptr.hs,v 1.4 2002/02/27 14:31:44 simonmar Exp $
+-- $Id: Ptr.hs,v 1.5 2002/03/14 12:09:50 simonmar Exp $
 --
 -- Pointer types.
 --
@@ -40,8 +40,6 @@ module Foreign.Ptr (
 
  ) where
 
-import Data.Dynamic
-
 #ifdef __GLASGOW_HASKELL__
 import GHC.Ptr
 import GHC.IOBase
@@ -71,6 +69,3 @@ instance Show (Ptr a) where
 
 foreign import "freeHaskellFunctionPtr" unsafe
     freeHaskellFunPtr :: FunPtr a -> IO ()
-
-#include "Dynamic.h"
-INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")

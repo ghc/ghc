@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Stable.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Stable.lhs,v 1.2 2002/03/14 12:09:52 simonmar Exp $
 %
 % (c) The GHC Team, 1992-2000
 %
@@ -18,8 +18,7 @@ module GHC.Stable
 	, castPtrToStablePtr	-- :: Ptr () -> StablePtr a
    ) where
 
-import Foreign.Ptr
-
+import GHC.Ptr
 import GHC.Base
 import GHC.IOBase
 

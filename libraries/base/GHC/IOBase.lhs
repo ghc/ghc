@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.6 2002/02/05 17:32:26 simonmar Exp $
+% $Id: IOBase.lhs,v 1.7 2002/03/14 12:09:50 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -20,7 +20,7 @@ import Data.Maybe  ( Maybe(..) )
 import GHC.Show
 import GHC.List
 import GHC.Read
-import GHC.Dynamic
+import {-# SOURCE #-} Data.Dynamic
 
 -- ---------------------------------------------------------------------------
 -- The IO Monad

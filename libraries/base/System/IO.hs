@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: IO.hs,v 1.5 2002/02/27 14:32:23 simonmar Exp $
+-- $Id: IO.hs,v 1.6 2002/03/14 12:09:52 simonmar Exp $
 --
 -- The standard IO library.
 --
@@ -112,21 +112,7 @@ import GHC.Read
 import GHC.Show
 #endif
 
-import Data.Dynamic
-import Control.Monad.Fix
 import System.IO.Error
-
--- -----------------------------------------------------------------------------
--- MonadFix instance
-
-instance MonadFix IO where
-	mfix = fixIO
-
--- -----------------------------------------------------------------------------
--- Typeable instance for Handle
-
-#include "Dynamic.h"
-INSTANCE_TYPEABLE0(Handle,handleTc,"Handle")
 
 -- -----------------------------------------------------------------------------
 -- Standard IO

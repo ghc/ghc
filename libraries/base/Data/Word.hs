@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Word.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Word.hs,v 1.3 2002/03/14 12:09:49 simonmar Exp $
 --
 -- Sized unsigned integer types.
 --
@@ -28,11 +28,3 @@ module Data.Word
 #ifdef __GLASGOW_HASKELL__
 import GHC.Word
 #endif
-
-import Data.Dynamic
-
-#include "Dynamic.h"
-INSTANCE_TYPEABLE0(Word8,word8Tc, "Word8" )
-INSTANCE_TYPEABLE0(Word16,word16Tc,"Word16")
-INSTANCE_TYPEABLE0(Word32,word32Tc,"Word32")
-INSTANCE_TYPEABLE0(Word64,word64Tc,"Word64")
