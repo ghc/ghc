@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.12 1999/12/10 15:50:10 simonmar Exp $
+ * $Id: Weak.c,v 1.13 2000/02/25 17:35:11 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -63,11 +63,7 @@ scheduleFinalizers(StgWeak *list)
   for (w = list; w; w = w->link) {
     IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
     if (w->finalizer != &NO_FINALIZER_closure) {
-#ifdef INTERPRETER
-      t = createGenThread(RtsFlags.GcFlags.initialStkSize, w->finalizer);
-#else
       t = createIOThread(RtsFlags.GcFlags.initialStkSize, w->finalizer);
-#endif
       scheduleThread(t);
     }
     w->header.info = &DEAD_WEAK_info;
