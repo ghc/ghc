@@ -255,7 +255,7 @@ GhcUnregisterised=NO
 # Target platforms supported:
 #   i386, powerpc
 #   sparc has bitrotted
-ifneq "$(findstring $(HostArch_CPP), i386 powerpc)" ""
+ifneq "$(findstring $(HostArch_CPP), i386 x86_64 powerpc)" ""
 GhcWithNativeCodeGen=YES
 else
 GhcWithNativeCodeGen=NO
@@ -268,9 +268,13 @@ HaveLibDL = @HaveLibDL@
 HaveRtldNext = @HaveRtldNext@
 HaveRtldLocal = @HaveRtldLocal@
 
-# Include GHCi in the compiler.  Default to NO for the time being.
+# Whether to include GHCi in the compiler.  Depends on whether the RTS linker
+# has support for this OS/ARCH combination.
 
-ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd netbsd openbsd darwin)" ""
+OsSupportsGHCi=$(strip $(patsubst $(HostOS_CPP), YES, $(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd netbsd openbsd darwin)))
+ArchSupportsGHCi=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 powerpc powerpc64 sparc sparc64)))
+
+ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
 else 
 GhcWithInterpreter=NO
