@@ -135,6 +135,7 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
    split      <- readIORef v_Split_object_files
    mangle     <- readIORef v_Do_asm_mangling
    keep_hc    <- readIORef v_Keep_hc_files
+   keep_il    <- readIORef v_Keep_il_files
    keep_raw_s <- readIORef v_Keep_raw_s_files
    keep_s     <- readIORef v_Keep_s_files
    osuf       <- readIORef v_Object_suf
@@ -188,6 +189,7 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 
     stop_phase = case todo of 
 			StopBefore As | split -> SplitAs
+                                      | real_lang == HscILX -> Ilasm
 			StopBefore phase      -> phase
 			DoMkDependHS	      -> Ln
 			DoLink                -> Ln
@@ -235,6 +237,7 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
      			     Mangle | keep_raw_s -> Persistent
      			     As     | keep_s     -> Persistent
      			     HCc    | keep_hc    -> Persistent
+			     Ilasm  | keep_il    -> Persistent
      			     _other              -> Temporary
 
 	-- add information about output files to the pipeline
@@ -1018,6 +1021,7 @@ compile ghci_mode summary source_unchanged have_object
        (basename, _) = splitFilename input_fn
        
    keep_hc <- readIORef v_Keep_hc_files
+   keep_il <- readIORef v_Keep_il_files
    keep_s  <- readIORef v_Keep_s_files
 
    output_fn <- 
@@ -1028,7 +1032,8 @@ compile ghci_mode summary source_unchanged have_object
 		   | otherwise -> newTempName (phaseInputExt HCc)
            HscJava             -> newTempName "java" -- ToDo
 #ifdef ILX
-	   HscILX              -> return (phaseInputExt Ilx2Il) 	
+	   HscILX  | keep_il   -> return (basename ++ '.':phaseInputExt Ilasm)
+                   | otherwise -> newTempName (phaseInputExt Ilx2Il) 	
 #endif
 	   HscInterpreted      -> return (error "no output file")
            HscNothing	       -> return (error "no output file")
