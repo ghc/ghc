@@ -11,7 +11,7 @@ module CostCentre (
 	CostCentreStack,
 	CollectedCCs,
 	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
-	noCostCentre,
+	noCostCentre, noCCAttached,
 	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
 	isDerivedFromCurrentCCS,
 
