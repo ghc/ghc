@@ -206,6 +206,7 @@ GhcWithJavaGen=NO
 
 HaveLibDL = @HaveLibDL@
 HaveRtldNext = @HaveRtldNext@
+HaveRtldLocal = @HaveRtldLocal@
 
 # Include GHCi in the compiler.  Default to NO for the time being.
 

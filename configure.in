@@ -991,6 +991,24 @@ AC_EGREP_CPP(yes,
   ])    
 AC_SUBST(HaveRtldNext)
 
+dnl ** RTLD_LOCAL isn't available on cygwin
+AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_LOCAL
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_RTLDLOCAL)
+  HaveRtldLocal=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldLocal=NO
+  ])    
+AC_SUBST(HaveRtldLocal)
+
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 
 dnl --------------------------------------------------
