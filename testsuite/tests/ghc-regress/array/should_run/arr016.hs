@@ -155,7 +155,7 @@ array       :: (Ix a) => (a,a) -> [(a,b)] -> Array a b
 array b ivs =
     if and [inRange b i | (i,_) <- ivs]
         then MkArray b
-                     (\j -> case [v | (i,v) <- ivs, index b i == index b j] of
+                     (\j -> case [v | (i,v) <- ivs, i == j] of
                             [v]   -> v
                             []    -> error "Array.!: \
                                            \undefined array element"
@@ -183,11 +183,8 @@ assocs a              =  [(i, a!i) | i <- indices a]
 
 (//)                  :: (Ix a) => Array a b -> [(a,b)] -> Array a b
 a // us               =  array (bounds a)
-                            ([(i,a!i) | i <- indices a, 
-					index b i `notElem` new_indices]
+                            ([(i,a!i) | i <- indices a \\ [i | (i,_) <- us]]
                              ++ us)
-			where b = bounds a
-			      new_indices = map (index b . fst) us
 
 accum                 :: (Ix a) => (b -> c -> b) -> Array a b -> [(a,c)]
                                    -> Array a b
@@ -204,10 +201,10 @@ ixmap b f a           = array b [(i, a ! f i) | i <- range b]
 instance  (Ix a)          => Functor (Array a) where
     fmap fn (MkArray b f) =  MkArray b (fn . f) 
 
-instance  (Ix a, Eq a, Eq b)  => Eq (Array a b)  where
+instance  (Ix a, Eq b)  => Eq (Array a b)  where
     a == a'             =  assocs a == assocs a'
 
-instance  (Ix a, Ord a, Ord b) => Ord (Array a b)  where
+instance  (Ix a, Ord b) => Ord (Array a b)  where
     a <=  a'            =  assocs a <=  assocs a'
 
 instance  (Ix a, Show a, Show b) => Show (Array a b)  where
@@ -216,7 +213,7 @@ instance  (Ix a, Show a, Show b) => Show (Array a b)  where
                     shows (bounds a) . showChar ' ' .
                     shows (assocs a)                  )
 
-instance  (Eq a, Ix a, Read a, Read b) => Read (Array a b)  where
+instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readsPrec p = readParen (p > 9)
            (\r -> [(array b as, u) | ("array",s) <- lex r,
                                      (b,t)       <- reads s,

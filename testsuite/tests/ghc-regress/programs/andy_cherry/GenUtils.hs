@@ -199,7 +199,7 @@ mapAccumL f s (b:bs) = (c:cs,s'')
 -- Here is a version of @elem@ that uses partual application
 -- to optimise lookup.
 
-arrElem :: (Ord a, Ix a) => [a] -> a -> Bool
+arrElem :: (Ix a) => [a] -> a -> Bool
 arrElem obj = \x -> inRange size x && arr ! x 
   where
       size = (maximum obj,minimum obj)
@@ -209,7 +209,7 @@ arrElem obj = \x -> inRange size x && arr ! x
 -- again using arrays, of course. Remember @b@ can be a function !
 -- Note again the use of partiual application.
 
-arrCond :: (Eq a, Ix a) 
+arrCond :: (Ix a) 
         => (a,a)                      -- the bounds
         -> [(Assoc [a] b)]            -- the simple lookups
         -> [(Assoc (a -> Bool) b)]    -- the functional lookups
