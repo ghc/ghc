@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.15 2000/01/14 14:06:48 hwloidl Exp $
+ * $Id: Schedule.h,v 1.16 2000/03/16 17:27:13 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -103,12 +103,6 @@ void    awaken_blocked_queue(StgTSO *q);
 void    initThread(StgTSO *tso, nat stack_size);
 #endif
 
-// debugging only
-#ifdef DEBUG
-extern void printThreadBlockage(StgTSO *tso);
-#endif
-void    print_bq (StgClosure *node);
-
 //@node Scheduler Vars and Data Types, Some convenient macros, Scheduler Functions
 //@subsection Scheduler Vars and Data Types
 
@@ -141,6 +135,7 @@ extern Capability MainRegTable;
  */
 extern  StgTSO *run_queue_hd, *run_queue_tl;
 extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
+extern  StgTSO *all_threads;
 
 #ifdef SMP
 //@cindex sched_mutex
@@ -178,8 +173,19 @@ void interruptStgRts ( void );
 void raiseAsync(StgTSO *tso, StgClosure *exception);
 nat  run_queue_len(void);
 
+void resurrectThreads( StgTSO * );
+
 //@node Some convenient macros, Index, Scheduler Vars and Data Types
 //@subsection Some convenient macros
+
+/* debugging only 
+ */
+#ifdef DEBUG
+void printThreadBlockage(StgTSO *tso);
+void printThreadStatus(StgTSO *tso);
+void printAllThreads(void);
+#endif
+void print_bq (StgClosure *node);
 
 /* -----------------------------------------------------------------------------
  * Some convenient macros...

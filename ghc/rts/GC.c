@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.72 2000/01/22 18:00:03 simonmar Exp $
+ * $Id: GC.c,v 1.73 2000/03/16 17:27:12 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -42,6 +42,7 @@
 #include "SchedAPI.h"
 #include "Weak.h"
 #include "StablePriv.h"
+#include "Prelude.h"
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
 # include "ParallelRts.h"
@@ -108,10 +109,15 @@ static rtsBool major_gc;
  */
 static nat evac_gen;
 
-/* WEAK POINTERS
+/* Weak pointers
  */
 static StgWeak *old_weak_ptr_list; /* also pending finaliser list */
 static rtsBool weak_done;	/* all done for this pass */
+
+/* List of all threads during GC
+ */
+static StgTSO *old_all_threads;
+static StgTSO *resurrected_threads;
 
 /* Flag indicating failure to evacuate an object to the desired
  * generation.
@@ -121,6 +127,7 @@ static rtsBool failed_to_evac;
 /* Old to-space (used for two-space collector only)
  */
 bdescr *old_to_space;
+
 
 /* Data used for allocation area sizing.
  */
@@ -385,6 +392,13 @@ void GarbageCollect(void (*get_roots)(void))
   old_weak_ptr_list = weak_ptr_list;
   weak_ptr_list = NULL;
   weak_done = rtsFalse;
+
+  /* The all_threads list is like the weak_ptr_list.  
+   * See traverse_weak_ptr_list() for the details.
+   */
+  old_all_threads = all_threads;
+  all_threads = END_TSO_QUEUE;
+  resurrected_threads = END_TSO_QUEUE;
 
   /* Mark the stable pointer table.
    */
@@ -718,6 +732,9 @@ void GarbageCollect(void (*get_roots)(void))
   /* start any pending finalizers */
   scheduleFinalizers(old_weak_ptr_list);
   
+  /* send exceptions to any threads which were about to die */
+  resurrectThreads(resurrected_threads);
+
   /* check sanity after GC */
   IF_DEBUG(sanity, checkSanity(N));
 
@@ -825,7 +842,45 @@ traverse_weak_ptr_list(void)
       continue;
     }
   }
-  
+
+  /* Now deal with the all_threads list, which behaves somewhat like
+   * the weak ptr list.  If we discover any threads that are about to
+   * become garbage, we wake them up and administer an exception.
+   */
+  {
+    StgTSO *t, *tmp, *next, **prev;
+
+    prev = &old_all_threads;
+    for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
+
+      /* Threads which have finished or died get dropped from
+       * the list.
+       */
+      switch (t->whatNext) {
+      case ThreadKilled:
+      case ThreadComplete:
+	next = t->global_link;
+	*prev = next;
+	continue;
+      default:
+      }
+
+      /* Threads which have already been determined to be alive are
+       * moved onto the all_threads list.
+       */
+      (StgClosure *)tmp = isAlive((StgClosure *)t);
+      if (tmp != NULL) {
+	next = tmp->global_link;
+	tmp->global_link = all_threads;
+	all_threads  = tmp;
+	*prev = next;
+      } else {
+	prev = &(t->global_link);
+	next = t->global_link;
+      }
+    }
+  }
+
   /* If we didn't make any changes, then we can go round and kill all
    * the dead weak pointers.  The old_weak_ptr list is used as a list
    * of pending finalizers later on.
@@ -835,6 +890,19 @@ traverse_weak_ptr_list(void)
     for (w = old_weak_ptr_list; w; w = w->link) {
       w->finalizer = evacuate(w->finalizer);
     }
+
+    /* And resurrect any threads which were about to become garbage.
+     */
+    {
+      StgTSO *t, *tmp, *next;
+      for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
+	next = t->global_link;
+	(StgClosure *)tmp = evacuate((StgClosure *)t);
+	tmp->global_link = resurrected_threads;
+	resurrected_threads = tmp;
+      }
+    }
+
     weak_done = rtsTrue;
   }
 
@@ -888,6 +956,7 @@ StgClosure *
 isAlive(StgClosure *p)
 {
   const StgInfoTable *info;
+  nat size;
 
   while (1) {
 
@@ -921,6 +990,33 @@ isAlive(StgClosure *p)
     case EVACUATED:
       /* alive! */
       return ((StgEvacuated *)p)->evacuee;
+
+    case BCO:
+      size = bco_sizeW((StgBCO*)p);
+      goto large;
+
+    case ARR_WORDS:
+      size = arr_words_sizeW((StgArrWords *)p);
+      goto large;
+
+    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_FROZEN:
+      size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
+      goto large;
+
+    case TSO:
+      if (((StgTSO *)p)->whatNext == ThreadRelocated) {
+	p = (StgClosure *)((StgTSO *)p)->link;
+	continue;
+      }
+    
+      size = tso_sizeW((StgTSO *)p);
+    large:
+      if (size >= LARGE_OBJECT_THRESHOLD/sizeof(W_)
+	  && Bdescr((P_)p)->evacuated)
+	return p;
+      else
+	return NULL;
 
     default:
       /* dead. */
@@ -1339,15 +1435,15 @@ loop:
       case IND_PERM:
       case IND_OLDGEN:
       case IND_OLDGEN_PERM:
-	selectee = stgCast(StgInd *,selectee)->indirectee;
+	selectee = ((StgInd *)selectee)->indirectee;
 	goto selector_loop;
 
       case CAF_ENTERED:
-	selectee = stgCast(StgCAF *,selectee)->value;
+	selectee = ((StgCAF *)selectee)->value;
 	goto selector_loop;
 
       case EVACUATED:
-	selectee = stgCast(StgEvacuated*,selectee)->evacuee;
+	selectee = ((StgEvacuated *)selectee)->evacuee;
 	goto selector_loop;
 
       case THUNK:
@@ -1436,7 +1532,7 @@ loop:
   case PAP:
     /* these are special - the payload is a copy of a chunk of stack,
        tagging and all. */
-    return copy(q,pap_sizeW(stgCast(StgPAP*,q)),step);
+    return copy(q,pap_sizeW((StgPAP *)q),step);
 
   case EVACUATED:
     /* Already evacuated, just return the forwarding address.
@@ -1458,7 +1554,7 @@ loop:
 
   case ARR_WORDS:
     {
-      nat size = arr_words_sizeW(stgCast(StgArrWords*,q)); 
+      nat size = arr_words_sizeW((StgArrWords *)q); 
 
       if (size >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
 	evacuate_large((P_)q, rtsFalse);
@@ -1472,7 +1568,7 @@ loop:
   case MUT_ARR_PTRS:
   case MUT_ARR_PTRS_FROZEN:
     {
-      nat size = mut_arr_ptrs_sizeW(stgCast(StgMutArrPtrs*,q)); 
+      nat size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)q); 
 
       if (size >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
 	evacuate_large((P_)q, info->type == MUT_ARR_PTRS);
@@ -1639,7 +1735,7 @@ scavenge_srt(const StgInfoTable *info)
    * srt field in the info table.  That's ok, because we'll
    * never dereference it.
    */
-  srt = stgCast(StgClosure **,info->srt);
+  srt = (StgClosure **)(info->srt);
   srt_end = srt + info->srt_len;
   for (; srt < srt_end; srt++) {
     /* Special-case to handle references to closures hiding out in DLLs, since
@@ -1652,7 +1748,7 @@ scavenge_srt(const StgInfoTable *info)
        closure that's fixed at link-time, and no extra magic is required.
     */
 #ifdef ENABLE_WIN32_DLL_SUPPORT
-    if ( stgCast(unsigned long,*srt) & 0x1 ) {
+    if ( (unsigned long)(*srt) & 0x1 ) {
        evacuate(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
     } else {
        evacuate(*srt);
@@ -1740,7 +1836,7 @@ scavenge(step *step)
 
     case BCO:
       {
-	StgBCO* bco = stgCast(StgBCO*,p);
+	StgBCO* bco = (StgBCO *)p;
 	nat i;
 	for (i = 0; i < bco->n_ptrs; i++) {
 	  bcoConstCPtr(bco,i) = evacuate(bcoConstCPtr(bco,i));
@@ -1949,7 +2045,7 @@ scavenge(step *step)
        * evacuate the function pointer too...
        */
       { 
-	StgPAP* pap = stgCast(StgPAP*,p);
+	StgPAP* pap = (StgPAP *)p;
 
 	pap->fun = evacuate(pap->fun);
 	scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
@@ -1959,7 +2055,7 @@ scavenge(step *step)
       
     case ARR_WORDS:
       /* nothing to follow */
-      p += arr_words_sizeW(stgCast(StgArrWords*,p));
+      p += arr_words_sizeW((StgArrWords *)p);
       break;
 
     case MUT_ARR_PTRS:
@@ -2620,7 +2716,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     if (! LOOKS_LIKE_GHC_INFO(q) ) {
 #ifdef DEBUG
       if ( 0 && LOOKS_LIKE_STATIC_CLOSURE(q) ) {  /* Is it a static closure? */
-	ASSERT(closure_STATIC(stgCast(StgClosure*,q)));
+	ASSERT(closure_STATIC((StgClosure *)q));
       }
       /* otherwise, must be a pointer into the allocation space. */
 #endif
@@ -2819,7 +2915,7 @@ scavenge_large(step *step)
     dbl_link_onto(bd, &step->scavenged_large_objects);
 
     p = bd->start;
-    info  = get_itbl(stgCast(StgClosure*,p));
+    info  = get_itbl((StgClosure *)p);
 
     switch (info->type) {
 
@@ -2860,7 +2956,7 @@ scavenge_large(step *step)
 
     case BCO:
       {
-	StgBCO* bco = stgCast(StgBCO*,p);
+	StgBCO* bco = (StgBCO *)p;
 	nat i;
 	evac_gen = saved_evac_gen;
 	for (i = 0; i < bco->n_ptrs; i++) {
@@ -2934,8 +3030,8 @@ void RevertCAFs(void)
     enteredCAFs = caf->link;
     ASSERT(get_itbl(caf)->type == CAF_ENTERED);
     SET_INFO(caf,&CAF_UNENTERED_info);
-    caf->value = stgCast(StgClosure*,0xdeadbeef);
-    caf->link  = stgCast(StgCAF*,0xdeadbeef);
+    caf->value = (StgClosure *)0xdeadbeef;
+    caf->link  = (StgCAF *)0xdeadbeef;
   }
   enteredCAFs = END_CAF_LIST;
 }
@@ -3044,7 +3140,7 @@ threadLazyBlackHole(StgTSO *tso)
     switch (get_itbl(update_frame)->type) {
 
     case CATCH_FRAME:
-      update_frame = stgCast(StgCatchFrame*,update_frame)->link;
+      update_frame = ((StgCatchFrame *)update_frame)->link;
       break;
 
     case UPDATE_FRAME:
@@ -3073,7 +3169,7 @@ threadLazyBlackHole(StgTSO *tso)
       break;
 
     case SEQ_FRAME:
-      update_frame = stgCast(StgSeqFrame*,update_frame)->link;
+      update_frame = ((StgSeqFrame *)update_frame)->link;
       break;
 
     case STOP_FRAME:

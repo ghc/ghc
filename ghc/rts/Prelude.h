@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.4 2000/03/14 14:34:47 sewardj Exp $
+ * $Id: Prelude.h,v 1.5 2000/03/16 17:27:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -20,9 +20,11 @@ extern DLL_IMPORT const StgClosure PrelBase_False_static_closure;
 extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
 extern DLL_IMPORT const StgClosure PrelException_stackOverflow_closure;
 extern DLL_IMPORT const StgClosure PrelException_heapOverflow_closure;
-extern DLL_IMPORT const StgClosure PrelException_PutFullMVar_static_closure;
-extern DLL_IMPORT const StgClosure PrelException_NonTermination_static_closure;
 extern const StgClosure PrelMain_mainIO_closure;
+
+extern DLL_IMPORT const StgClosure PrelException_PutFullMVar_static_closure;
+extern DLL_IMPORT const StgClosure PrelException_BlockedOnDeadMVar_static_closure;
+extern DLL_IMPORT const StgClosure PrelException_NonTermination_static_closure;
 
 extern DLL_IMPORT const StgInfoTable PrelBase_Czh_static_info;
 extern DLL_IMPORT const StgInfoTable PrelBase_Izh_static_info;
@@ -46,6 +48,7 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 #define stackOverflow_closure  (&PrelException_stackOverflow_closure)
 #define heapOverflow_closure   (&PrelException_heapOverflow_closure)
 #define PutFullMVar_closure    (&PrelException_PutFullMVar_static_closure)
+#define BlockedOnDeadMVar_closure (&PrelException_BlockedOnDeadMVar_static_closure)
 #define NonTermination_closure (&PrelException_NonTermination_static_closure)
 #define Czh_static_info        (&PrelBase_Czh_static_info)
 #define Izh_static_info        (&PrelBase_Izh_static_info)
@@ -77,6 +80,7 @@ extern const StgClosure *ind_unpackCString_closure;
 extern const StgClosure *ind_stackOverflow_closure;
 extern const StgClosure *ind_heapOverflow_closure;
 extern const StgClosure *ind_PutFullMVar_static_closure;
+extern const StgClosure *ind_BlockedOnDeadMVar_static_closure;
 extern const StgClosure *ind_NonTermination_static_closure;
 
 extern const StgInfoTable *ind_Czh_static_info;
@@ -101,6 +105,7 @@ extern const StgInfoTable *ind_StablePtr_con_info;
 #define stackOverflow_closure  ind_stackOverflow_closure
 #define heapOverflow_closure   ind_heapOverflow_closure
 #define PutFullMVar_closure    ind_PutFullMVar_static_closure
+#define BlockedOnDeadMVar_closure ind_BlockedOnDeadMVar_static_closure
 #define NonTermination_closure ind_NonTermination_static_closure
 #define Czh_static_info        ind_Czh_static_info
 #define Izh_static_info        ind_Izh_static_info

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.52 2000/03/14 09:55:05 simonmar Exp $
+ * $Id: Schedule.c,v 1.53 2000/03/16 17:27:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -121,7 +121,6 @@ static StgMainThread *main_threads;
 /* Thread queues.
  * Locks required: sched_mutex.
  */
-
 #if defined(GRAN)
 
 StgTSO* ActiveTSO = NULL; /* for assigning system costs; GranSim-Light only */
@@ -137,18 +136,19 @@ StgTSO* ActiveTSO = NULL; /* for assigning system costs; GranSim-Light only */
 StgTSO *run_queue_hds[MAX_PROC], *run_queue_tls[MAX_PROC];
 StgTSO *blocked_queue_hds[MAX_PROC], *blocked_queue_tls[MAX_PROC];
 StgTSO *ccalling_threadss[MAX_PROC];
+StgTSO *all_threadss[MAX_PROC];
 
 #else /* !GRAN */
 
-//@cindex run_queue_hd
-//@cindex run_queue_tl
-//@cindex blocked_queue_hd
-//@cindex blocked_queue_tl
 StgTSO *run_queue_hd, *run_queue_tl;
 StgTSO *blocked_queue_hd, *blocked_queue_tl;
 
+/* Linked list of all threads.
+ * Used for detecting garbage collected threads.
+ */
+StgTSO *all_threads;
+
 /* Threads suspended in _ccall_GC.
- * Locks required: sched_mutex.
  */
 static StgTSO *suspended_ccalling_threads;
 
@@ -311,6 +311,8 @@ schedule( void )
 #else
   while (1) {
 #endif
+
+    IF_DEBUG(scheduler, printAllThreads());
 
     /* If we're interrupted (the user pressed ^C, or some other
      * termination condition occurred), kill all the currently running
@@ -1022,12 +1024,11 @@ createThread_(nat size, rtsBool have_lock)
     size = MIN_STACK_WORDS + TSO_STRUCT_SIZEW;
   }
 
-  tso = (StgTSO *)allocate(size);
-  TICK_ALLOC_TSO(size-sizeofW(StgTSO),0);
-  
   stack_size = size - TSO_STRUCT_SIZEW;
 
-  // Hmm, this CCS_MAIN is not protected by a PROFILING cpp var;
+  tso = (StgTSO *)allocate(size);
+  TICK_ALLOC_TSO(size-TSO_STRUCT_SIZEW, 0);
+
   SET_HDR(tso, &TSO_info, CCS_MAIN);
 #if defined(GRAN)
   SET_GRAN_HDR(tso, ThisPE);
@@ -1035,10 +1036,9 @@ createThread_(nat size, rtsBool have_lock)
   tso->whatNext     = ThreadEnterGHC;
 
   /* tso->id needs to be unique.  For now we use a heavyweight mutex to
-  	 protect the increment operation on next_thread_id.
-  	 In future, we could use an atomic increment instead.
-  */
-  
+   * protect the increment operation on next_thread_id.
+   * In future, we could use an atomic increment instead.
+   */
   if (!have_lock) { ACQUIRE_LOCK(&sched_mutex); }
   tso->id = next_thread_id++; 
   if (!have_lock) { RELEASE_LOCK(&sched_mutex); }
@@ -1071,8 +1071,17 @@ createThread_(nat size, rtsBool have_lock)
   insertThread(tso, CurrentProc);
 #else
   /* In a non-GranSim setup the pushing of a TSO onto the runq is separated
-     from its creation
-  */
+   * from its creation
+   */
+#endif
+
+  /* Link the new thread on the global thread list.
+   */
+#if defined(GRAN)
+#error ToDo
+#else
+  tso->global_link = all_threads;
+  all_threads = tso;
 #endif
 
 #if defined(GRAN)
@@ -1215,6 +1224,7 @@ initScheduler(void)
   suspended_ccalling_threads  = END_TSO_QUEUE;
 
   main_threads = NULL;
+  all_threads  = END_TSO_QUEUE;
 
   context_switch = 0;
   interrupted    = 0;
@@ -2324,6 +2334,41 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
   barf("raiseAsync");
 }
 
+/* -----------------------------------------------------------------------------
+   resurrectThreads is called after garbage collection on the list of
+   threads found to be garbage.  Each of these threads will be woken
+   up and sent a signal: BlockedOnDeadMVar if the thread was blocked
+   on an MVar, or NonTermination if the thread was blocked on a Black
+   Hole.
+   -------------------------------------------------------------------------- */
+
+void
+resurrectThreads( StgTSO *threads )
+{
+  StgTSO *tso, *next;
+
+  for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
+    next = tso->global_link;
+    tso->global_link = all_threads;
+    all_threads = tso;
+    IF_DEBUG(scheduler, sched_belch("resurrecting thread %d", tso->id));
+
+    switch (tso->why_blocked) {
+    case BlockedOnMVar:
+    case BlockedOnException:
+      raiseAsync(tso,(StgClosure *)BlockedOnDeadMVar_closure);
+      break;
+    case BlockedOnBlackHole:
+      raiseAsync(tso,(StgClosure *)NonTermination_closure);
+      break;
+    case NotBlocked:
+      barf("resurrectThreads: thread not blocked");
+    default:
+      barf("resurrectThreads: thread blocked in a strange way");
+    }
+  }
+}
+
 //@node Debugging Routines, Index, Exception Handling Routines, Main scheduling code
 //@subsection Debugging Routines
 
@@ -2333,7 +2378,8 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
 
 #ifdef DEBUG
 
-void printThreadBlockage(StgTSO *tso)
+void
+printThreadBlockage(StgTSO *tso)
 {
   switch (tso->why_blocked) {
   case BlockedOnRead:
@@ -2366,6 +2412,34 @@ void printThreadBlockage(StgTSO *tso)
   }
 }
 
+void
+printThreadStatus(StgTSO *tso)
+{
+  switch (tso->whatNext) {
+  case ThreadKilled:
+    fprintf(stderr,"has been killed");
+    break;
+  case ThreadComplete:
+    fprintf(stderr,"has completed");
+    break;
+  default:
+    printThreadBlockage(tso);
+  }
+}
+
+void
+printAllThreads(void)
+{
+  StgTSO *t;
+
+  sched_belch("all threads:");
+  for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
+    fprintf(stderr, "\tthread %d is ", t->id);
+    printThreadStatus(t);
+    fprintf(stderr,"\n");
+  }
+}
+    
 /* 
    Print a whole blocking queue attached to node (debugging only).
 */
