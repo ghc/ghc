@@ -169,8 +169,10 @@ broadcastCondition ( Condition* pCond )
 rtsBool
 signalCondition ( Condition* pCond )
 {
-  SetEvent(*pCond);
-  return rtsTrue;
+    if (SetEvent(*pCond) == 0) {
+	barf("SetEvent: %d", GetLastError());
+    }
+    return rtsTrue;
 }
 
 rtsBool
