@@ -90,7 +90,11 @@ module CmdLineOpts (
 	opt_Verbose,
 	opt_WarnNameShadowing,
 	opt_WarnUnusedNames,
-	opt_WarnIncompletePatterns, opt_WarnOverlappingPatterns, opt_WarnSimplePatterns,
+	opt_WarnUnusedTopLevel,
+	opt_WarnUnusedImports,
+	opt_WarnIncompletePatterns,
+	opt_WarnOverlappingPatterns,
+	opt_WarnSimplePatterns,
 	opt_WarnMissingMethods,
 	opt_WarnDuplicateExports,
 	opt_PruneTyDecls, opt_PruneInstDecls,
@@ -337,6 +341,8 @@ opt_WarnIncompletePatterns	= lookUp  SLIT("-fwarn-incomplete-patterns")
 opt_WarnOverlappingPatterns	= lookUp  SLIT("-fwarn-overlapping-patterns")
 opt_WarnSimplePatterns	     	= lookUp  SLIT("-fwarn-simple-patterns")
 opt_WarnUnusedNames		= lookUp  SLIT("-fwarn-unused-names")
+opt_WarnUnusedTopLevel		= lookUp  SLIT("-fwarn-unused-toplevel")
+opt_WarnUnusedImports		= lookUp  SLIT("-fwarn-unused-imports")
 opt_WarnMissingMethods		= lookUp  SLIT("-fwarn-missing-methods")
 opt_WarnDuplicateExports	= lookUp  SLIT("-fwarn-duplicate-exports")
 opt_PruneTyDecls		= not (lookUp SLIT("-fno-prune-tydecls"))
