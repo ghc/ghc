@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.6 2001/01/17 16:46:02 sewardj Exp $
+-- $Id: Time.hsc,v 1.7 2001/01/26 16:16:19 rrt Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -240,16 +240,12 @@ getClockTime = do
     usec <- (#peek struct timeval,tv_usec) p_timeval :: IO CLong
     return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000))
  
-#elif HAVE_FTIME && !defined(cygwin32_TARGET_OS)
-  --
-  -- ftime() as implemented by cygwin (in B20.1) is
-  -- not right, so stay away & use time() there instead.
-  --
+#elif HAVE_FTIME
 getClockTime = do
   allocaBytes (#const sizeof(struct timeb)) $ \ p_timeb -> do
   ftime p_timeb
   sec  <- (#peek struct timeb,time) p_timeb :: IO CTime
-  msec <- (#peek struct timeb,millitime) p_timeb :: IO CUShort
+  msec <- (#peek struct timeb,millitm) p_timeb :: IO CUShort
   return (TOD (fromIntegral sec) (fromIntegral msec * 1000{-ToDo: correct???-}))
 
 #else /* use POSIX time() */
@@ -356,7 +352,7 @@ zone x = do
   if dst then peekElemOff tzname 1 else peekElemOff tzname 0
 # else /* ! HAVE_TZNAME */
 -- We're in trouble. If you should end up here, please report this as a bug.
-#  error Dont know how to get at timezone name on your OS.
+#  error "Don't know how to get at timezone name on your OS."
 # endif /* ! HAVE_TZNAME */
 
 -- Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
