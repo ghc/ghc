@@ -661,6 +661,16 @@ dnl --------------------------------------------------------------
 dnl * General configuration checks
 dnl --------------------------------------------------------------
 
+dnl ** Can the unix package be built?
+dnl --------------------------------------------------------------
+
+if test x"$TargetPlatform" = x"i386-unknown-mingw32"; then
+   GhcLibsWithUnix=NO
+else
+   GhcLibsWithUnix=YES
+fi
+AC_SUBST([GhcLibsWithUnix])
+
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
 

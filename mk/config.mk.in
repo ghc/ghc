@@ -407,6 +407,10 @@ X_LIBS=@X_LIBS@
 #
 DotnetSupport=@DotnetSupport@
 
+# Build unix package?
+#
+GhcLibsWithUnix=@GhcLibsWithUnix@
+
 ################################################################################
 #
 #		happy project
