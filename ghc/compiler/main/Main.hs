@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.124 2003/06/04 15:47:59 simonmar Exp $
+-- $Id: Main.hs,v 1.125 2003/06/10 17:54:56 sof Exp $
 --
 -- GHC Driver program
 --
@@ -25,7 +25,8 @@ import InteractiveUI( ghciWelcomeMsg, interactiveUI )
 import CompManager	( cmInit, cmLoadModules, cmDepAnal )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
-import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
+import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles,
+			  normalisePath )
 import Packages		( showPackages, getPackageConfigMap, basePackage,
 			  haskell98Package
 			)
@@ -218,7 +219,12 @@ main =
 			  || looksLikeModuleName m
 			  || '.' `notElem` m
 
-    (srcs, objs) = partition looks_like_an_input fileish_args
+    (raw_srcs, objs) = partition looks_like_an_input fileish_args
+
+     -- To simplify the handling of filepaths, we normalise all source file
+     -- paths right away - e.g., for win32 platforms, backslashes are converted
+     -- into forward slashes.
+    srcs             = map normalisePath raw_srcs
 
    mapM_ (add v_Ld_inputs) objs
 
