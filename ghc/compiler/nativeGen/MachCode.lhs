@@ -671,13 +671,6 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       Double2IntOp -> coerceFP2Int x
       Int2DoubleOp -> coerceInt2FP DoubleRep x
 
-      IntToInt8Op    -> extendIntCode Int8Rep   IntRep  x
-      IntToInt16Op   -> extendIntCode Int16Rep  IntRep  x
-      IntToInt32Op   -> getRegister x
-      WordToWord8Op  -> extendIntCode Word8Rep  WordRep x
-      WordToWord16Op -> extendIntCode Word16Rep WordRep x
-      WordToWord32Op -> getRegister x
-
       other_op ->
 	getRegister (StCall fn cCallConv DoubleRep [x])
        where
@@ -3264,20 +3257,6 @@ coerceFP2Int x
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-extendIntCode :: PrimRep -> PrimRep -> StixTree -> NatM Register
-extendIntCode pks pkd x
-  = coerceIntCode pks x		`thenNat` \ register ->
-    getNewRegNCG pks		`thenNat` \ reg ->
-    let
-    	code = registerCode register reg
-    	src  = registerName register reg
-        opc  = case pkd of IntRep -> MOVSxL ; WordRep -> MOVZxL
-        sz   = primRepToSize pks
-        code__2 dst = code `snocOL` opc sz (OpReg src) (OpReg dst)
-    in
-    returnNat (Any pkd code__2)
-
-------------
 coerceInt2FP pk x
   = getRegister x		`thenNat` \ register ->
     getNewRegNCG IntRep		`thenNat` \ reg ->
