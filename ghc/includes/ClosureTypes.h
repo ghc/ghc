@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureTypes.h,v 1.16 2001/07/23 17:23:19 simonmar Exp $
+ * $Id: ClosureTypes.h,v 1.17 2002/03/26 11:09:34 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -47,41 +47,37 @@
 #define IND_PERM	        31
 #define IND_OLDGEN_PERM	        32
 #define IND_STATIC	        33
-#define RET_BCO                 36
-#define RET_SMALL	        37
-#define RET_VEC_SMALL	        38
-#define RET_BIG		        39
-#define RET_VEC_BIG	        40
-#define RET_DYN		        41
-#define UPDATE_FRAME	        42
-#define CATCH_FRAME	        43
-#define STOP_FRAME	        44
-#define SEQ_FRAME	        45
-#define CAF_BLACKHOLE		46
-#define BLACKHOLE	        47
-#define BLACKHOLE_BQ	        48
-#define SE_BLACKHOLE		49
-#define SE_CAF_BLACKHOLE	50
-#define MVAR		        51
-#define ARR_WORDS	        52
-#define MUT_ARR_PTRS	        53
-#define MUT_ARR_PTRS_FROZEN     54
-#define MUT_VAR		        55
-#define MUT_CONS                56
-#define WEAK		        57
-#define FOREIGN		        58
-#define STABLE_NAME	        59
-
-#define TSO		        60
-#define BLOCKED_FETCH	        61
-#define FETCH_ME                62
-#define FETCH_ME_BQ             63
-#define RBH                     64
-
-#define EVACUATED               65
-
-#define REMOTE_REF              66
-
-#define N_CLOSURE_TYPES         67
+#define RET_BCO                 34
+#define RET_SMALL	        35
+#define RET_VEC_SMALL	        36
+#define RET_BIG		        37
+#define RET_VEC_BIG	        38
+#define RET_DYN		        39
+#define UPDATE_FRAME	        40
+#define CATCH_FRAME	        41
+#define STOP_FRAME	        42
+#define SEQ_FRAME	        43
+#define CAF_BLACKHOLE		44
+#define BLACKHOLE	        45
+#define BLACKHOLE_BQ	        46
+#define SE_BLACKHOLE		47
+#define SE_CAF_BLACKHOLE	48
+#define MVAR		        49
+#define ARR_WORDS	        50
+#define MUT_ARR_PTRS	        51
+#define MUT_ARR_PTRS_FROZEN     52
+#define MUT_VAR		        53
+#define MUT_CONS                54
+#define WEAK		        55
+#define FOREIGN		        56
+#define STABLE_NAME	        57
+#define TSO		        58
+#define BLOCKED_FETCH	        59
+#define FETCH_ME                60
+#define FETCH_ME_BQ             61
+#define RBH                     62
+#define EVACUATED               63
+#define REMOTE_REF              64
+#define N_CLOSURE_TYPES         65
 
 #endif /* CLOSURETYPES_H */
