@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Base.hs,v 1.5 2002/01/02 14:40:10 simonmar Exp $
+-- $Id: Base.hs,v 1.6 2002/03/26 17:09:52 simonmar Exp $
 --
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.
@@ -1159,7 +1159,7 @@ thawSTUArray (UArray l u arr#) = ST $ \s1# ->
     case unsafeCoerce# memcpy marr# arr# n# s2# of { (# s3#, () #) ->
     (# s3#, STUArray l u marr# #) }}}
 
-foreign import "memcpy" unsafe
+foreign import ccall unsafe "memcpy"
     memcpy :: MutableByteArray# RealWorld -> ByteArray# -> Int# -> IO ()
 
 {-# RULES
