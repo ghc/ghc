@@ -274,7 +274,7 @@ eval_obj:
 	break;
 	
     case BCO:
-	ASSERT(BCO_ARITY(obj) > 0);
+	ASSERT(((StgBCO *)obj)->arity > 0);
 	break;
 
     case AP:	/* Copied from stg_AP_entry. */
@@ -576,7 +576,7 @@ do_apply:
 	    nat arity, i;
 
 	    Sp++;
-	    arity = BCO_ARITY(obj);
+	    arity = ((StgBCO *)obj)->arity;
 	    ASSERT(arity > 0);
 	    if (arity < n) {
 		// n must be greater than 1, and the only kinds of
@@ -718,7 +718,7 @@ run_BCO:
     {
 	register int       bciPtr     = 1; /* instruction pointer */
 	register StgBCO*   bco        = (StgBCO*)obj;
-	register StgWord16* instrs    = (StgWord16*)(BCO_INSTRS(bco));
+	register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
 	register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
 	register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
 	register StgInfoTable** itbls = (StgInfoTable**)

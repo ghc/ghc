@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.44 2003/03/18 14:36:56 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.45 2003/03/24 14:46:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -861,6 +861,10 @@ heapCensusChain( Census *census, bdescr *bd )
 		break;
 		
 	    case BCO:
+		prim = rtsTrue;
+		size = bco_sizeW((StgBCO *)p);
+		break;
+
 	    case MVAR:
 	    case WEAK:
 	    case FOREIGN:

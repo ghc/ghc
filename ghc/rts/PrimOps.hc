@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.105 2003/02/22 04:51:51 sof Exp $
+ * $Id: PrimOps.hc,v 1.106 2003/03/24 14:46:54 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1525,20 +1525,36 @@ FN_(newBCOzh_fast)
      R2.p = literals
      R3.p = ptrs
      R4.p = itbls
+     R5.i = arity
+     R6.p = bitmap array
   */
   StgBCO *bco;
+  nat size;
+  StgArrWords *bitmap_arr;
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgBCO),R1_PTR|R2_PTR|R3_PTR|R4_PTR, newBCOzh_fast);
-  TICK_ALLOC_PRIM(sizeofW(StgHeader), sizeofW(StgBCO)-sizeofW(StgHeader), 0);
-  CCS_ALLOC(CCCS,sizeofW(StgBCO)); /* ccs prof */
-  bco = (StgBCO *) (Hp + 1 - sizeofW(StgBCO));
+  bitmap_arr = (StgArrWords *)R6.cl;
+  size = sizeofW(StgBCO) + bitmap_arr->words;
+  HP_CHK_GEN_TICKY(size,R1_PTR|R2_PTR|R3_PTR|R4_PTR|R6_PTR, newBCOzh_fast);
+  TICK_ALLOC_PRIM(size, size-sizeofW(StgHeader), 0);
+  CCS_ALLOC(CCCS,size); /* ccs prof */
+  bco = (StgBCO *) (Hp + 1 - size);
   SET_HDR(bco, (const StgInfoTable *)&stg_BCO_info, CCCS);
 
   bco->instrs     = (StgArrWords*)R1.cl;
   bco->literals   = (StgArrWords*)R2.cl;
   bco->ptrs       = (StgMutArrPtrs*)R3.cl;
   bco->itbls      = (StgArrWords*)R4.cl;
+  bco->arity      = R5.w;
+  bco->size       = size;
+
+  // Copy the arity/bitmap info into the BCO
+  { 
+    int i;
+    for (i = 0; i < bitmap_arr->words; i++) {
+	bco->bitmap[i] = bitmap_arr->payload[i];
+    }
+  }
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(bco);
@@ -1555,7 +1571,7 @@ FN_(mkApUpd0zh_fast)
   // This function is *only* used to wrap zero-arity BCOs in an
   // updatable wrapper (see ByteCodeLink.lhs).  An AP thunk is always
   // saturated and always points directly to a FUN or BCO.
-  ASSERT(get_itbl(R1.cl)->type == BCO && BCO_ARITY(R1.p) == 0);
+  ASSERT(get_itbl(R1.cl)->type == BCO && ((StgBCO *)R1.p)->arity == 0);
 
   HP_CHK_GEN_TICKY(PAP_sizeW(0), R1_PTR, mkApUpd0zh_fast);
   TICK_ALLOC_PRIM(sizeofW(StgHeader), PAP_sizeW(0)-sizeofW(StgHeader), 0);

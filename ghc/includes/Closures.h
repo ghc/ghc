@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.32 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: Closures.h,v 1.33 2003/03/24 14:46:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -204,32 +204,34 @@ typedef struct _StgDeadWeak {	/* Weak v */
  * A BCO represents either a function or a stack frame.  In each case,
  * it needs a bitmap to describe to the garbage collector the
  * pointerhood of its arguments/free variables respectively, and in
- * the case of a function it also needs an arity.  These pieces of
- * information are stored at the beginning of the instruction array.
+ * the case of a function it also needs an arity.  These are stored
+ * directly in the BCO, rather than in the instrs array, for two
+ * reasons:
+ * (a) speed: we need to get at the bitmap info quickly when
+ *     the GC is examining APs and PAPs that point to this BCO
+ * (b) a subtle interaction with the compacting GC.  In compacting
+ *     GC, the info that describes the size/layout of a closure
+ *     cannot be in an object more than one level of indirection
+ *     away from the current object, because of the order in
+ *     which pointers are updated to point to their new locations.
  */
 
 typedef struct {
     StgHeader      header;
-    StgArrWords   *instrs;	/* a pointer to an ArrWords */
-    StgArrWords   *literals;	/* a pointer to an ArrWords */
-    StgMutArrPtrs *ptrs;	/* a pointer to a MutArrPtrs */
-    StgArrWords   *itbls;	/* a pointer to an ArrWords */
+    StgArrWords   *instrs;	// a pointer to an ArrWords
+    StgArrWords   *literals;	// a pointer to an ArrWords
+    StgMutArrPtrs *ptrs;	// a pointer to a  MutArrPtrs
+    StgArrWords   *itbls;	// a pointer to an ArrWords
+    StgHalfWord   arity;        // arity of this BCO
+    StgHalfWord   size;         // size of this BCO (in words)
+    StgWord       bitmap[FLEXIBLE_ARRAY];  // an StgLargeBitmap
 } StgBCO;
 
-typedef struct {
-    StgWord arity;
-    StgWord bitmap[FLEXIBLE_ARRAY];  // really an StgLargeBitmap
-} StgBCOInfo;
-
-#define BCO_INFO(bco)  ((StgBCOInfo *)(((StgBCO *)(bco))->instrs->payload))
-#define BCO_ARITY(bco) (BCO_INFO(bco)->arity)
-#define BCO_BITMAP(bco) ((StgLargeBitmap *)BCO_INFO(bco)->bitmap)
+#define BCO_BITMAP(bco)      ((StgLargeBitmap *)((StgBCO *)(bco))->bitmap)
 #define BCO_BITMAP_SIZE(bco) (BCO_BITMAP(bco)->size)
 #define BCO_BITMAP_BITS(bco) (BCO_BITMAP(bco)->bitmap)
 #define BCO_BITMAP_SIZEW(bco) ((BCO_BITMAP_SIZE(bco) + BITS_IN(StgWord) - 1) \
 			        / BITS_IN(StgWord))
-#define BCO_INSTRS(bco) ((StgWord16 *)(BCO_BITMAP_BITS(bco) + \
-                                       BCO_BITMAP_SIZEW(bco)))
 
 /* Dynamic stack frames - these have a liveness mask in the object
  * itself, rather than in the info table.  Useful for generic heap

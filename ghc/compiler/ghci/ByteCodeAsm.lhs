@@ -37,6 +37,7 @@ import Control.Monad.ST	( ST, runST )
 
 import GHC.Word		( Word(..) )
 import Data.Array.MArray
+import Data.Array.Unboxed ( listArray )
 import Data.Array.Base	( STUArray, UArray(..), unsafeWrite )
 import Data.Array.ST	( castSTUArray )
 import Foreign		( Word16, free )
@@ -65,6 +66,7 @@ data UnlinkedBCO
 	unlinkedBCOName   :: Name,
 	unlinkedBCOArity  :: Int,
 	unlinkedBCOInstrs :: ByteArray#,			 -- insns
+	unlinkedBCOBitmap :: ByteArray#,			 -- bitmap
         unlinkedBCOLits   :: (SizedSeq (Either Word FastString)), -- literals
 			-- Either literal words or a pointer to a asciiz
 			-- string, denoting a label whose *address* should
@@ -84,7 +86,7 @@ bcoFreeNames :: UnlinkedBCO -> NameSet
 bcoFreeNames bco
   = bco_refs bco `minusNameSet` mkNameSet [unlinkedBCOName bco]
   where
-    bco_refs (UnlinkedBCO _ _ _ _ ptrs itbls)
+    bco_refs (UnlinkedBCO _ _ _ _ _ ptrs itbls)
 	= unionManyNameSets (
 	     mkNameSet [ n | BCOPtrName n <- ssElts ptrs ] :
 	     mkNameSet (ssElts itbls) :
@@ -92,7 +94,7 @@ bcoFreeNames bco
 	  )
 
 instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm arity insns lits ptrs itbls)
+   ppr (UnlinkedBCO nm arity insns bitmap lits ptrs itbls)
       = sep [text "BCO", ppr nm, text "with", 
              int (sizeSS lits), text "lits",
              int (sizeSS ptrs), text "ptrs",
@@ -148,11 +150,13 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
 
              insns_arr
 		 | n_insns > 65535 = panic "linkBCO: >= 64k insns in BCO"
-                 | otherwise = runST (mkInstrArray arity bitmap 
-					bsize n_insns asm_insns)
+                 | otherwise = mkInstrArray n_insns asm_insns
              insns_barr = case insns_arr of UArray _lo _hi barr -> barr
 
-         let ul_bco = UnlinkedBCO nm arity insns_barr final_lits 
+	     bitmap_arr = mkBitmapArray bsize bitmap
+             bitmap_barr = case bitmap_arr of UArray _lo _hi barr -> barr
+
+         let ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits 
 					final_ptrs final_itbls
 
          -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
@@ -165,25 +169,13 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
          zonk ptr = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
                            free ptr
 
+mkBitmapArray :: Int -> [StgWord] -> UArray Int StgWord
+mkBitmapArray bsize bitmap
+  = listArray (0, 1 + length bitmap) (fromIntegral bsize : bitmap)
 
-mkInstrArray :: Int -> [StgWord] -> Int -> Int -> [Word16]
-	-> ST s (UArray Int Word16)
-mkInstrArray arity bitmap bsize n_insns asm_insns = do
-  (arr :: STUArray s Int Word16) <- newArray_ (0, n_insns + bco_info_w16s)
-  zipWithM (unsafeWrite arr) [bco_info_w16s ..] 
-	(fromIntegral n_insns : asm_insns)
-  (arr' :: STUArray s Int StgWord) <- castSTUArray arr
-  writeArray arr' 0 (fromIntegral arity)
-  writeArray arr' 1 (fromIntegral bsize)
-  zipWithM (writeArray arr') [2..] bitmap
-  arr <- castSTUArray arr'
-  unsafeFreeze arr
- where
-     -- The BCO info (arity, bitmap) goes at the beginning of
-     -- the instruction stream.  See Closures.h for details.	   
-     bco_info_w16s = (1 {- for the arity -} +
-		      1 {- for the bitmap size -} +
-		      length bitmap) * (wORD_SIZE `quot` 2)
+mkInstrArray :: Int -> [Word16]	-> UArray Int Word16
+mkInstrArray n_insns asm_insns
+  = listArray (0, 1 + n_insns) (fromIntegral n_insns : asm_insns)
 
 -- instrs nonptrs ptrs itbls
 type AsmState = (SizedSeq Word16, 

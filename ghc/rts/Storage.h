@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.48 2003/03/21 16:18:39 sof Exp $
+ * $Id: Storage.h,v 1.49 2003/03/24 14:46:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -397,6 +397,9 @@ static __inline__ StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 
 static __inline__ StgWord tso_sizeW ( StgTSO *tso )
 { return TSO_STRUCT_SIZEW + tso->stack_size; }
+
+static __inline__ StgWord bco_sizeW ( StgBCO *bco )
+{ return bco->size; }
 
 /* -----------------------------------------------------------------------------
    Sizes of stack frames

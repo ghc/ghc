@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.13 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: GCCompact.c,v 1.14 2003/03/24 14:46:54 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -18,6 +18,13 @@
 #include "Schedule.h"
 #include "StablePriv.h"
 #include "Apply.h"
+
+// Turn off inlining when debugging - it obfuscates things
+#ifdef DEBUG
+#define INLINE
+#else
+#define INLINE inline
+#endif
 
 /* -----------------------------------------------------------------------------
    Threading / unthreading pointers.
@@ -41,7 +48,7 @@
    except for the info pointer.
    -------------------------------------------------------------------------- */
 
-static inline void
+static INLINE void
 thread( StgPtr p )
 {
     StgPtr q = (StgPtr)*p;
@@ -64,7 +71,7 @@ thread( StgPtr p )
     }
 }
 
-static inline void
+static INLINE void
 unthread( StgPtr p, StgPtr free )
 {
     StgPtr q = (StgPtr)*p, r;
@@ -78,7 +85,7 @@ unthread( StgPtr p, StgPtr free )
     *p = (StgWord)q;
 }
 
-static inline StgInfoTable *
+static INLINE StgInfoTable *
 get_threaded_info( StgPtr p )
 {
     StgPtr q = (P_)GET_INFO((StgClosure *)p);
@@ -93,7 +100,7 @@ get_threaded_info( StgPtr p )
 
 // A word-aligned memmove will be faster for small objects than libc's or gcc's.
 // Remember, the two regions *might* overlap, but: to <= from.
-static inline void
+static INLINE void
 move(StgPtr to, StgPtr from, nat size)
 {
     for(; size > 0; --size) {
@@ -101,7 +108,7 @@ move(StgPtr to, StgPtr from, nat size)
     }
 }
 
-static inline nat
+static INLINE nat
 obj_sizeW( StgClosure *p, StgInfoTable *info )
 {
     switch (info->type) {
@@ -136,6 +143,8 @@ obj_sizeW( StgClosure *p, StgInfoTable *info )
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
     case TSO:
 	return tso_sizeW((StgTSO *)p);
+    case BCO:
+	return bco_sizeW((StgBCO *)p);
     default:
 	return sizeW_fromITBL(info);
     }
@@ -175,7 +184,7 @@ thread_static( StgClosure* p )
   }
 }
 
-static inline void
+static INLINE void
 thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
 {
     nat i, b;
@@ -198,7 +207,7 @@ thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
     }
 }
 
-static inline StgPtr
+static INLINE StgPtr
 thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
@@ -331,7 +340,8 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    StgRetFun *ret_fun = (StgRetFun *)p;
 	    StgFunInfoTable *fun_info;
 	    
-	    fun_info = get_fun_itbl(ret_fun->fun); // *before* threading it!
+	    fun_info = itbl_to_fun_itbl(get_threaded_info(ret_fun->fun));
+	         // *before* threading it!
 	    thread((StgPtr)&ret_fun->fun);
 	    p = thread_arg_block(fun_info, ret_fun->payload);
 	    continue;
@@ -344,15 +354,14 @@ thread_stack(StgPtr p, StgPtr stack_end)
     }
 }
 
-static inline StgPtr
+static INLINE StgPtr
 thread_PAP (StgPAP *pap)
 {
     StgPtr p;
     StgWord bitmap, size;
     StgFunInfoTable *fun_info;
     
-    thread((StgPtr)&pap->fun);
-    fun_info = get_fun_itbl(pap->fun);
+    fun_info = itbl_to_fun_itbl(get_threaded_info(pap->fun));
     ASSERT(fun_info->i.type != PAP);
 
     p = (StgPtr)pap->payload;
@@ -384,10 +393,12 @@ thread_PAP (StgPAP *pap)
 	}
 	break;
     }
+
+    thread((StgPtr)&pap->fun);
     return p;
 }
 
-static inline StgPtr
+static INLINE StgPtr
 thread_AP_STACK (StgAP_STACK *ap)
 {
     thread((StgPtr)&ap->fun);
@@ -468,7 +479,7 @@ update_fwd_large( bdescr *bd )
   }
 }
 
-static inline StgPtr
+static INLINE StgPtr
 thread_obj (StgInfoTable *info, StgPtr p)
 {
     switch (info->type) {
@@ -504,12 +515,20 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	thread((StgPtr)&((StgClosure *)p)->payload[1]);
 	return p + sizeofW(StgHeader) + 2;
 	
+    case BCO: {
+	StgBCO *bco = (StgBCO *)p;
+	thread((StgPtr)&bco->instrs);
+	thread((StgPtr)&bco->literals);
+	thread((StgPtr)&bco->ptrs);
+	thread((StgPtr)&bco->itbls);
+	return p + bco_sizeW(bco);
+    }
+
     case FUN:
     case THUNK:
     case CONSTR:
     case FOREIGN:
     case STABLE_NAME:
-    case BCO:
     case IND_PERM:
     case MUT_VAR:
     case MUT_CONS:

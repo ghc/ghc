@@ -310,7 +310,7 @@ genApply args =
 --    else:
 	text "case BCO:",
 	nest 4 (vcat [
-	  text "arity = BCO_ARITY((StgBCO *)R1.p);",
+	  text "arity = ((StgBCO *)R1.p)->arity;",
 	  text "ASSERT(arity > 0);",
 	  genMkPAP "BUILD_PAP" "stg_BCO_entry" 
 		True{-stack apply-} False{-not a PAP-}

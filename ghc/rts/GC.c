@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.148 2003/03/19 18:41:18 sof Exp $
+ * $Id: GC.c,v 1.149 2003/03/24 14:46:53 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -1752,8 +1752,10 @@ loop:
   case WEAK:
   case FOREIGN:
   case STABLE_NAME:
-  case BCO:
     return copy(q,sizeW_fromITBL(info),stp);
+
+  case BCO:
+      return copy(q,bco_sizeW((StgBCO *)q),stp);
 
   case CAF_BLACKHOLE:
   case SE_CAF_BLACKHOLE:
@@ -1999,6 +2001,11 @@ eval_thunk_selector( nat field, StgSelector * p )
     SET_INFO(p,&stg_BLACKHOLE_info);
 
 selector_loop:
+
+    if (Bdescr((StgPtr)selectee)->flags & BF_EVACUATED) {
+	SET_INFO(p, info_ptr);
+	return NULL;
+    }
 
     info = get_itbl(selectee);
     switch (info->type) {
@@ -2438,7 +2445,6 @@ scavenge(step *stp)
     case WEAK:
     case FOREIGN:
     case STABLE_NAME:
-    case BCO:
     {
 	StgPtr end;
 
@@ -2447,6 +2453,16 @@ scavenge(step *stp)
 	    (StgClosure *)*p = evacuate((StgClosure *)*p);
 	}
 	p += info->layout.payload.nptrs;
+	break;
+    }
+
+    case BCO: {
+	StgBCO *bco = (StgBCO *)p;
+	(StgClosure *)bco->instrs = evacuate((StgClosure *)bco->instrs);
+	(StgClosure *)bco->literals = evacuate((StgClosure *)bco->literals);
+	(StgClosure *)bco->ptrs = evacuate((StgClosure *)bco->ptrs);
+	(StgClosure *)bco->itbls = evacuate((StgClosure *)bco->itbls);
+	p += bco_sizeW(bco);
 	break;
     }
 
@@ -2767,7 +2783,6 @@ linear_scan:
 	case WEAK:
 	case FOREIGN:
 	case STABLE_NAME:
-	case BCO:
 	{
 	    StgPtr end;
 	    
@@ -2775,6 +2790,15 @@ linear_scan:
 	    for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
 		(StgClosure *)*p = evacuate((StgClosure *)*p);
 	    }
+	    break;
+	}
+
+	case BCO: {
+	    StgBCO *bco = (StgBCO *)p;
+	    (StgClosure *)bco->instrs = evacuate((StgClosure *)bco->instrs);
+	    (StgClosure *)bco->literals = evacuate((StgClosure *)bco->literals);
+	    (StgClosure *)bco->ptrs = evacuate((StgClosure *)bco->ptrs);
+	    (StgClosure *)bco->itbls = evacuate((StgClosure *)bco->itbls);
 	    break;
 	}
 

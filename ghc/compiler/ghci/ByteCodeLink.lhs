@@ -39,7 +39,7 @@ import Control.Exception ( throwDyn )
 import Control.Monad	( zipWithM )
 import Control.Monad.ST ( stToIO )
 
-import GHC.Exts		( BCO#, newBCO#, unsafeCoerce#, 
+import GHC.Exts		( BCO#, newBCO#, unsafeCoerce#, Int#,
 			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
 
 import GHC.Arr		( Array(..) )
@@ -103,7 +103,7 @@ linkBCO ie ce ul_bco
 
 
 linkBCO' :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO BCO
-linkBCO' ie ce (UnlinkedBCO nm arity insns_barr literalsSS ptrsSS itblsSS)
+linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS itblsSS)
    -- Raises an IO exception on failure
    = do let literals = ssElts literalsSS
 	    ptrs     = ssElts ptrsSS
@@ -129,7 +129,9 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr literalsSS ptrsSS itblsSS)
                            :: UArray Int Word
             literals_barr = case literals_arr of UArray lo hi barr -> barr
 
-        newBCO insns_barr literals_barr ptrs_parr itbls_barr
+	    (I# arity#)  = arity
+
+        newBCO insns_barr literals_barr ptrs_parr itbls_barr arity# bitmap
 
 
 -- we recursively link any sub-BCOs while making the ptrs array
@@ -170,9 +172,11 @@ writeArrayBCO (IOArray (STArray _ _ marr#)) (I# i#) bco# = IO $ \s# ->
 
 data BCO = BCO BCO#
 
-newBCO :: ByteArray# -> ByteArray# -> Array# a -> ByteArray# -> IO BCO
-newBCO a b c d
-   = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
+newBCO :: ByteArray# -> ByteArray# -> Array# a
+	 -> ByteArray# -> Int# -> ByteArray# -> IO BCO
+newBCO instrs lits ptrs itbls arity bitmap
+   = IO $ \s -> case newBCO# instrs lits ptrs itbls arity bitmap s of 
+		  (# s1, bco #) -> (# s1, BCO bco #)
 
 
 lookupLiteral :: Either Word FastString -> IO Word

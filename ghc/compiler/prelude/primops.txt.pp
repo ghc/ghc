@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.25 2003/02/21 05:34:14 sof Exp $
+-- $Id: primops.txt.pp,v 1.26 2003/03/24 14:46:53 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -1657,7 +1657,7 @@ primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArr# -> ByteArr# -> Array# a -> ByteArr# -> State# s -> (# State# s, BCO# #)
+   ByteArr# -> ByteArr# -> Array# a -> ByteArr# -> Int# -> ByteArr# -> State# s -> (# State# s, BCO# #)
    with
    has_side_effects = True
    out_of_line      = True

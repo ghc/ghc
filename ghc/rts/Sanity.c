@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.31 2002/12/11 15:36:48 simonmar Exp $
+ * $Id: Sanity.c,v 1.32 2003/03/24 14:46:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -272,7 +272,6 @@ checkClosure( StgClosure* p )
     case BLACKHOLE:
     case CAF_BLACKHOLE:
     case FOREIGN:
-    case BCO:
     case STABLE_NAME:
     case MUT_VAR:
     case MUT_CONS:
@@ -289,6 +288,15 @@ checkClosure( StgClosure* p )
 	    }
 	    return sizeW_fromITBL(info);
 	}
+
+    case BCO: {
+	StgBCO *bco = (StgBCO *)p;
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->instrs));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->literals));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->ptrs));
+	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->itbls));
+	return bco_sizeW(bco);
+    }
 
     case IND_STATIC: /* (1, 0) closure */
       ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgIndStatic*)p)->indirectee));
