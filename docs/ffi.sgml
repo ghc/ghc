@@ -67,7 +67,7 @@ well as handling out and in-out parameters in a convenient, yet protable way.
 </Para>
 
 <Para>
-In the following, we will discuss the language extensions of the FFI (ie, the
+In the following, we will discuss the language extensions of the FFI (i.e. the
 first point above).  They can be split up into two complementary halves; one
 half that provides Haskell constructs for importing foreign functionality into
 Haskell, the other which lets you expose Haskell functions to the outside
