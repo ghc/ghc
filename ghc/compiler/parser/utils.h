@@ -122,6 +122,7 @@ void	checkprec PROTO((tree, qid, BOOLEAN));
 
 #define FOREIGN_IMPORT    0
 #define FOREIGN_EXPORT    1
+#define FOREIGN_LABEL     2
 
 BOOLEAN	isconstr PROTO((char *));
 void	setstartlineno PROTO((void));

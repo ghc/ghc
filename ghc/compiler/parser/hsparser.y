@@ -161,7 +161,7 @@ BOOLEAN pat_check=TRUE;
 
 %token  SCC
 %token	CCALL		CCALL_GC	CASM		CASM_GC
-%token  EXPORT          UNSAFE          STDCALL		C_CALL  
+%token  EXPORT          UNSAFE          STDCALL		C_CALL   LABEL
 %token  PASCAL		FASTCALL	FOREIGN         DYNAMIC
 
 /**********************************************************************
@@ -547,6 +547,8 @@ defaultd:  defaultkey OPAREN types CPAREN       { $$ = mkdbind($3,startlineno); 
 /* FFI primitive declarations - GHC/Hugs specific */
 foreignd:  foreignkey IMPORT callconv ext_name unsafe_flag qvarid DCOLON sigtype { $$ = mkfobind($6,$8,$4,$5,$3,FOREIGN_IMPORT,startlineno); }
         |  foreignkey EXPORT callconv ext_name qvarid DCOLON sigtype             { $$ = mkfobind($5,$7,$4,0,$3,FOREIGN_EXPORT,startlineno); }
+	;
+        |  foreignkey LABEL ext_name qvarid DCOLON sigtype                       { $$ = mkfobind($4,$6,$3,0,-1,FOREIGN_LABEL,startlineno); }
 	;
 
 callconv: STDCALL 	{ $$ = CALLCONV_STDCALL;  }

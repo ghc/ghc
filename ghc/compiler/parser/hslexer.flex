@@ -401,6 +401,7 @@ NL  	    	    	[\n\r]
 <GlaExt>"_casm_GC_"		{ RETURN(CASM_GC); }
 <GlaExt>"foreign"		{ RETURN(FOREIGN); }
 <GlaExt>"export"		{ RETURN(EXPORT); }
+<GlaExt>"label"			{ RETURN(LABEL); }
 <GlaExt>"unsafe"		{ RETURN(UNSAFE); }
 <GlaExt>"_stdcall"		{ RETURN(STDCALL); }
 <GlaExt>"_ccall"		{ RETURN(C_CALL); }
