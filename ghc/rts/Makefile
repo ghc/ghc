@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.53 2001/07/23 21:31:00 sof Exp $
+# $Id: Makefile,v 1.54 2001/07/23 23:27:50 ken Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -51,7 +51,7 @@ WARNING_OPTS += -Winline
 WARNING_OPTS += -Waggregate-return
 #WARNING_OPTS += -Wpointer-arith
 WARNING_OPTS += -Wbad-function-cast
-#WARNING_OPTS += -Wcast-align
+WARNING_OPTS += -Wcast-align
 #WARNING_OPTS += -Wnested-externs
 #WARNING_OPTS += -Wshadow
 #WARNING_OPTS += -Wcast-qual
@@ -175,10 +175,10 @@ endif
 
 install :: gmp/libgmp.a
 
-clean distclean maintainer-clean ::
-	$(MAKE) -C gmp MAKEFLAGS= $@
-
 ifeq "$(way)" ""
+clean distclean maintainer-clean ::
+	-$(MAKE) -C gmp MAKEFLAGS= $@
+
 INSTALL_LIBS += gmp/libgmp.a
 endif
 
