@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.42 2003/01/23 16:39:30 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.43 2003/02/20 15:39:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -593,12 +593,18 @@ closureSatisfiesConstraints( StgClosure* p )
    if (RtsFlags.ProfFlags.retainerSelector) {
        RetainerSet *rs;
        nat i;
-       rs = retainerSetOf((StgClosure *)p);
-       if (rs != NULL) {
-	   for (i = 0; i < rs->num; i++) {
-	       b = strMatchesSelector( rs->element[i]->cc->label,
-					 RtsFlags.ProfFlags.retainerSelector );
-	       if (b) return rtsTrue;
+       // We must check that the retainer set is valid here.  One
+       // reason it might not be valid is if this closure is a
+       // a newly deceased weak pointer (i.e. a DEAD_WEAK), since
+       // these aren't reached by the retainer profiler's traversal.
+       if (isRetainerSetFieldValid((StgClosure *)p)) {
+	   rs = retainerSetOf((StgClosure *)p);
+	   if (rs != NULL) {
+	       for (i = 0; i < rs->num; i++) {
+		   b = strMatchesSelector( rs->element[i]->cc->label,
+					   RtsFlags.ProfFlags.retainerSelector );
+		   if (b) return rtsTrue;
+	       }
 	   }
        }
        return rtsFalse;
