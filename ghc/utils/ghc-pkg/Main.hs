@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.13 2001/08/21 09:03:32 rrt Exp $
+-- $Id: Main.hs,v 1.14 2001/08/21 13:14:51 rrt Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -18,7 +18,7 @@ import Directory
 import System
 import IO
 
-#include "../includes/config.h"
+#include "config.h"
 
 #ifdef mingw32_TARGET_OS
 import Win32DLL
@@ -69,9 +69,7 @@ runit clis = do
 #else
 	[] -> do h <- getModuleHandle Nothing
 	  	 n <- getModuleFileName h
---  		 return (reverse (tail (dropWhile (not . isSlash) 
 		 return (reverse (drop (length "/bin/ghc-pkg.exe") (reverse (unDosifyPath n))) ++ "/package.conf")
---			   (reverse (unDosifyPath n)))) ++ "/package.conf")
 #endif
 
   let toField "import_dirs"     = return import_dirs

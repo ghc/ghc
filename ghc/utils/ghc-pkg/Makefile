@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 2001/08/21 09:03:32 rrt Exp $
+# $Id: Makefile,v 1.10 2001/08/21 13:14:51 rrt Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -12,7 +12,7 @@ INSTALLING=1
 
 HS_PROG           = ghc-pkg.bin
 SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -package lang \
-		    -package util -package text
+		    -package util -package text -I$(GHC_INCLUDE_DIR)
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SRC_HC_OPTS      += -package win32
