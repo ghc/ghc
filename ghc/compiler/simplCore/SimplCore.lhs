@@ -490,9 +490,15 @@ tidyCoreExpr (Lam (UsageBinder uv) body)
 	-- some let-to-case stuff is deferred to now).
 tidyCoreExpr (Let (NonRec bndr rhs) body)
   | willBeDemanded (getIdDemandInfo bndr) && 
+    not rhs_is_whnf &&		-- Don't do it if RHS is already in WHNF
     typeOkForCase (idType bndr)
   = ASSERT( not (isPrimType (idType bndr)) )
     tidyCoreExpr (Case rhs (AlgAlts [] (BindDefault bndr body)))
+  where
+    rhs_is_whnf = case mkFormSummary rhs of
+			VarForm -> True
+			ValueForm -> True
+			other -> False
 
 tidyCoreExpr (Let (NonRec bndr rhs) body)
   = tidyCoreExpr rhs		`thenTM` \ rhs' ->
