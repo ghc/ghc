@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.44 2000/01/13 14:34:00 hwloidl Exp $
+ * $Id: PrimOps.h,v 1.45 2000/01/18 12:37:33 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -802,64 +802,20 @@ extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 
 #endif  /* GRAN */
 
-#if 0
-
-# if defined(GRAN)
-/* ToDo: Use a parallel ticky macro for this */
-# define COUNT_SPARK(node)     { (CurrentTSO->gran.globalsparks)++; sparksCreated++; }
-# elif defined(PAR)
-# define COUNT_SPARK(node)     { (CurrentTSO->par.globalsparks)++; sparksCreated++; }
-# endif
-
-/* 
-   Note that we must bump the required thread count NOW, rather
-   than when the thread is actually created.  
-
-   forkzh not needed any more; see ghc/rts/PrimOps.hc
-*/
-#define forkzh(r,liveness,node)				\
-{							\
-  extern  nat context_switch;                           \
-  while (pending_sparks_tl[REQUIRED_POOL] == pending_sparks_lim[REQUIRED_POOL]) \
-    DO_YIELD((liveness << 1) | 1);			\
-  if (closure_SHOULD_SPARK((StgClosure *)node)) {				\
-    *pending_sparks_tl[REQUIRED_POOL]++ = (P_)(node);	\
-  } else {                                              \
-    sparksIgnored++;                                    \
-  }							\
-  context_switch = 1;					\
-}
-
-// old version of par (previously used in GUM
-
-#define parzh(r,node)					\
-{							\
-  extern  nat context_switch;                           \
-  COUNT_SPARK(node);						\
-  if (closure_SHOULD_SPARK((StgClosure *)node) &&	\
-      pending_sparks_tl[ADVISORY_POOL] < pending_sparks_lim[ADVISORY_POOL]) {\
-    *pending_sparks_tl[ADVISORY_POOL]++ = (StgClosure *)(node);	\
-  } else {						\
-    sparksIgnored++;					\
-  }							\
-  r = context_switch = 1;					\
-}
-#endif /* 0 */
-
 #if defined(SMP) || defined(PAR)
 #define parzh(r,node)					\
 {							\
+  extern unsigned int context_switch; 			\
   if (closure_SHOULD_SPARK((StgClosure *)node) &&	\
       SparkTl < SparkLim) {				\
     *SparkTl++ = (StgClosure *)(node);			\
   }							\
-  r = 1;						\
+  r = context_switch = 1;				\
 }
 #else
 #define parzh(r,node) r = 1
 #endif
 
-/* Hmm, I'll think about these later. */
 /* -----------------------------------------------------------------------------
    Pointer equality
    -------------------------------------------------------------------------- */
