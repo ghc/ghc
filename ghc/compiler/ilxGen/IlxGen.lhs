@@ -53,6 +53,8 @@ import TysPrim  ( foreignObjPrimTyCon, weakPrimTyCon, byteArrayPrimTyCon, mutabl
 -- One day this will be configured by the command line.
 import CmdLineOpts	( opt_InPackage, opt_SimplDoEtaReduction )
 
+import Util		( lengthIs, equalLength )
+
 \end{code}
 
 
