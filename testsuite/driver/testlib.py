@@ -349,7 +349,7 @@ def framework_fail( name ):
 # A generic command test is expected to run and exit successfully.
 
 def generic_command( name, way, cmd, args ):
-    result = runCmd( cmd + ' ' + join(args,' ') );
+    result = runCmd( 'cd ' + testdir + ' && ' + cmd + ' ' + join(args,' ') );
     if result == 0:
         return 'pass'
     else:
