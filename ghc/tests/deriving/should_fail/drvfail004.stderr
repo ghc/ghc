@@ -1,12 +1,10 @@
 
 drvfail004.hs:5:
-    Could not deduce `Eq (Foo a b)'
-	(arising from an instance declaration at drvfail004.hs:5)
-	from the context: (Ord a1, Ord b1)
+    Could not deduce `Eq (Foo a b)' from the context: (Ord a1, Ord b1)
     Probable cause: missing `Eq (Foo a b)'
 		    in instance declaration context
 		    or missing instance declaration for `Eq (Foo a b)'
-    When checking the superclasses of an instance declaration
+    arising from an instance declaration at drvfail004.hs:5
 
 Compilation had errors
 

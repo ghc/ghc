@@ -11,8 +11,8 @@
 , <<Maybe Int>>
 , <<Maybe Int>>
 , <<Maybe Int>>
-, <<Maybe Int Int>>
-, <<Maybe Char Char>>
+, <<Either Int Bool>>
+, <<Either Char Int>>
 , <<()>>
 , <<Ordering>>
 , <<((),Int)>>
