@@ -86,10 +86,16 @@ fdType fd =
 	c_fstat (fromIntegral fd) p_stat
     c_mode <- (#peek struct stat, st_mode) p_stat :: IO CMode
     case () of
-      _ | s_isdir c_mode 	 	     -> return Directory
-        | s_isfifo c_mode || s_issock c_mode -> return Stream
-        | s_isreg c_mode 		     -> return RegularFile
-        | otherwise			     -> ioException ioe_unknownfiletype
+      _ |  s_isdir  c_mode  -> return Directory
+        |  s_isfifo c_mode  -> return Stream
+	|  s_issock c_mode  -> return Stream
+	|  s_ischr  c_mode  -> return Stream
+	|  s_isreg  c_mode  -> return RegularFile
+	|  s_isblk  c_mode  -> return RegularFile
+	| otherwise	    -> ioException ioe_unknownfiletype
+    -- we consider character devices to be streams (eg. ttys),
+    -- whereas block devices are more like regular files because they
+    -- are seekable.
 
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
@@ -102,6 +108,12 @@ foreign import "s_isdir_PrelPosix_wrap" unsafe s_isdir :: CMode -> Bool
 
 foreign import "s_isfifo_PrelPosix_wrap" unsafe s_isfifo :: CMode -> Bool
 #def inline int s_isfifo_PrelPosix_wrap(m) { return S_ISFIFO(m); }
+
+foreign import "s_ischr_PrelPosix_wrap" unsafe s_ischr :: CMode -> Bool
+#def inline int s_ischr_PrelPosix_wrap(m) { return S_ISCHR(m); }
+
+foreign import "s_isblk_PrelPosix_wrap" unsafe s_isblk :: CMode -> Bool
+#def inline int s_isblk_PrelPosix_wrap(m) { return S_ISBLK(m); }
 
 #ifndef mingw32_TARGET_OS
 foreign import "s_issock_PrelPosix_wrap" unsafe s_issock :: CMode -> Bool
