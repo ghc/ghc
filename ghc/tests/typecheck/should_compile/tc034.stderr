@@ -1,5 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed AList{ANull ANode} IntList g;
 1 data AList a = ANull |  ANode a (AList a) ;
-1 g :: __forall [t] {PrelBase.Num t} => AList PrelBase.Bool -> t ;
+1 g :: __forall [t] => {PrelBase.Num t} -> AList PrelBase.Bool -> t ;
 1 type IntList = AList PrelBase.Int ;

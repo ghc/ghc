@@ -4,6 +4,6 @@ instance {Reps PrelBase.Bool} = zdfRepsBool;
 instance __forall [q] => {Reps (X q)} = zdfRepsX;
 1 class Reps r where {f :: r -> r -> r} ;
 1 data X a = Tag a ;
-1 g :: __forall [r] {Reps r} => r -> r ;
+1 g :: __forall [r] => {Reps r} -> r -> r ;
 1 zdfRepsBool :: {Reps PrelBase.Bool} ;
 1 zdfRepsX :: __forall [q] => {Reps (X q)} ;

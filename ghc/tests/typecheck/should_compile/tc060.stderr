@@ -1,7 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed Eq2{deq};
 instance {Eq2 PrelBase.Int} = zdfEq2Int;
-instance __forall [a] {Eq2 a} => {Eq2 [a]} = zdfEq2ZMZN;
+instance __forall [a] => {Eq2 a} -> {Eq2 [a]} = zdfEq2ZMZN;
 1 class Eq2 a where {deq :: a -> a -> PrelBase.Bool} ;
 1 zdfEq2Int :: {Eq2 PrelBase.Int} ;
-1 zdfEq2ZMZN :: __forall [a] {Eq2 a} => {Eq2 [a]} ;
+1 zdfEq2ZMZN :: __forall [a] => {Eq2 a} -> {Eq2 [a]} ;

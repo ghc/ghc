@@ -1,4 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldCompile f g;
-1 f :: __forall [a b] {PrelBase.Eq a} => (a, b) ;
-1 g :: __forall [a b] {PrelBase.Eq a} => (a, b) ;
+1 f :: __forall [a b] => {PrelBase.Eq a} -> (a, b) ;
+1 g :: __forall [a b] => {PrelBase.Eq a} -> (a, b) ;

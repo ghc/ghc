@@ -1,7 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldFail Bar{MkBar};
-instance __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} = zdfEqBar;
-instance __forall [a] {PrelBase.Ord a} => {PrelBase.Ord (Bar a)} = zdfOrdBar;
+instance __forall [a] => {PrelBase.Eq a} -> {PrelBase.Eq (Bar a)} = zdfEqBar;
+instance __forall [a] => {PrelBase.Ord a} -> {PrelBase.Ord (Bar a)} = zdfOrdBar;
 1 data Bar a = MkBar PrelBase.Int a ;
-1 zdfEqBar :: __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (Bar a)} ;
-1 zdfOrdBar :: __forall [a] {PrelBase.Ord a, PrelBase.Eq (Bar a)} => {PrelBase.Ord (Bar a)} ;
+1 zdfEqBar :: __forall [a] => {PrelBase.Eq a} -> {PrelBase.Eq (Bar a)} ;
+1 zdfOrdBar :: __forall [a] => {PrelBase.Ord a} -> {PrelBase.Eq (Bar a)} -> {PrelBase.Ord (Bar a)} ;

@@ -1,13 +1,13 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed fib main1 main2 main3 mem mem1 mem2 mem3 mem4 oR oR1;
-1 fib :: __forall [a] {PrelBase.Num a, PrelBase.Ord a} => a -> a ;
+1 fib :: __forall [a] => {PrelBase.Num a} -> {PrelBase.Ord a} -> a -> a ;
 1 main1 :: PrelBase.Bool ;
 1 main2 :: PrelBase.Bool ;
 1 main3 :: PrelBase.Bool ;
-1 mem :: __forall [a] {PrelBase.Eq a} => a -> [a] -> PrelBase.Bool ;
-1 mem1 :: __forall [a] {PrelBase.Eq a} => a -> [a] -> PrelBase.Bool ;
-1 mem2 :: __forall [a] {PrelBase.Eq a} => a -> [a] -> PrelBase.Bool ;
-1 mem3 :: __forall [t] {PrelBase.Eq [t]} => t -> [t] -> PrelBase.Bool ;
-1 mem4 :: __forall [t] {PrelBase.Eq [t]} => t -> [t] -> PrelBase.Bool ;
+1 mem :: __forall [a] => {PrelBase.Eq a} -> a -> [a] -> PrelBase.Bool ;
+1 mem1 :: __forall [a] => {PrelBase.Eq a} -> a -> [a] -> PrelBase.Bool ;
+1 mem2 :: __forall [a] => {PrelBase.Eq a} -> a -> [a] -> PrelBase.Bool ;
+1 mem3 :: __forall [t] => {PrelBase.Eq [t]} -> t -> [t] -> PrelBase.Bool ;
+1 mem4 :: __forall [t] => {PrelBase.Eq [t]} -> t -> [t] -> PrelBase.Bool ;
 1 oR :: PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;
 1 oR1 :: PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;

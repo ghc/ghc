@@ -1,5 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
-instance __forall [a b] {PrelBase.Eq b} => {PrelBase.Eq (a -> b)} = zdfEqZLzmzgZR;
-instance __forall [a b] {PrelBase.Num b} => {PrelBase.Num (a -> b)} = zdfNumZLzmzgZR;
-1 zdfEqZLzmzgZR :: __forall [a b] {PrelBase.Eq b} => {PrelBase.Eq (a -> b)} ;
-1 zdfNumZLzmzgZR :: __forall [a b] {PrelBase.Num b, PrelBase.Eq (a -> b), PrelBase.Show (a -> b)} => {PrelBase.Num (a -> b)} ;
+instance __forall [a b] => {PrelBase.Eq b} -> {PrelBase.Eq (a -> b)} = zdfEqZLzmzgZR;
+instance __forall [a b] => {PrelBase.Num b} -> {PrelBase.Num (a -> b)} = zdfNumZLzmzgZR;
+1 zdfEqZLzmzgZR :: __forall [a b] => {PrelBase.Eq b} -> {PrelBase.Eq (a -> b)} ;
+1 zdfNumZLzmzgZR :: __forall [a b] => {PrelBase.Num b} -> {PrelBase.Eq (a -> b)} -> {PrelBase.Show (a -> b)} -> {PrelBase.Num (a -> b)} ;
