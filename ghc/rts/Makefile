@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.45 2001/04/03 15:57:30 dsyme Exp $
+# $Id: Makefile,v 1.46 2001/04/04 14:31:30 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -151,8 +151,13 @@ endif
 # and not worth re-implementing in our Makefile framework.
 
 ifneq "$(HaveLibGmp)" "YES"
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+boot ::
+	cd gmp && ./configure --enable-shared=no
+else
 boot ::
 	cd gmp && ./configure --enable-shared=no --target=$(HOSTPLATFORM)
+endif
 
 # Slight cheatage here to past host as target, but x-compilation isn't supported by ghc.
 
