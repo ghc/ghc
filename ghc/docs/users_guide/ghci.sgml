@@ -150,6 +150,21 @@ Main> fac 17
       in the same directory and you can't call them all
       <filename>Main.hs</filename>.</para>
 
+      <para>The search path for finding source files is specified with
+      the <option>-i</option> option on the GHCi command line, like
+      so:</para>
+<screen>ghci -i<replaceable>dir<subscript>1</subscript></replaceable>:...:<replaceable>dir<subscript>n</subscript></replaceable></screen>
+
+      <para>or it can be set using the <literal>:set</literal> command
+      from within GHCi (see <xref
+      linkend="ghci-cmd-line-options">)<footnote><para>Note that in
+      GHCi, and <option>--make</option> mode, the <option>-i</option>
+      option is used to specify the search path for
+      <emphasis>source</emphasis> files, whereas in standard
+      batch-compilation mode the <option>-i</option> option is used to
+      specify the search path for interface files, see <xref
+      linkend="options-finding-imports">.</para> </footnote></para>
+
       <para>One consequence of the way that GHCi follows dependencies
       to find modules to load is that every module must have a source
       file.  The only exception to the rule is modules that come from
@@ -942,7 +957,7 @@ Prelude> :def make (\_ -> return ":! ghc --make Main")
       </variablelist>
     </sect2>
 
-    <sect2>
+    <sect2 id="ghci-cmd-line-options">
       <title>Setting GHC command-line options in GHCi</title>
 
       <para>Normal GHC command-line options may also be set using
