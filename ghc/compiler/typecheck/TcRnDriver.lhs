@@ -82,7 +82,7 @@ import CoreUnfold	( unfoldingTemplate )
 import CoreSyn		( IdCoreRule, Bind(..) )
 import PprCore		( pprIdRules, pprCoreBindings )
 import TysWiredIn	( mkListTy, unitTy )
-import ErrUtils		( mkDumpDoc, showPass )
+import ErrUtils		( mkDumpDoc, showPass, pprBagOfErrors )
 import Id		( Id, mkLocalId, isLocalId, idName, idType, idUnfolding, setIdLocalExported )
 import IdInfo		( GlobalIdDetails(..) )
 import Var		( Var, setGlobalIdDetails )
@@ -899,26 +899,44 @@ check_old_iface iface_path source_unchanged maybe_iface
          returnM (outOfDate, maybe_iface)
     else
 
-    case maybe_iface of
+    case maybe_iface of {
        Just old_iface -> -- Use the one we already have
                          checkVersions source_unchanged old_iface	`thenM` \ recomp ->
 			 returnM (recomp, Just old_iface)
 
-       Nothing		-- Try and read it from a file
-          -> getModule					`thenM` \ this_mod ->
-	     readIface this_mod iface_path False	`thenM` \ read_result ->
-             case read_result of
-               Left err -> -- Old interface file not found, or garbled; give up
-			   traceHiDiffs (
-				text "Cannot read old interface file:"
-			   	   $$ nest 4 (text (showException err))) `thenM_`
-	                   returnM (outOfDate, Nothing)
+    ;  Nothing ->
 
-               Right parsed_iface ->
-                         initRn (InterfaceMode this_mod)
-				(loadOldIface parsed_iface)	`thenM` \ m_iface ->
-                         checkVersions source_unchanged m_iface	`thenM` \ recomp ->
-			 returnM (recomp, Just m_iface)
+	-- Try and read the old interface for the current module
+	-- from the .hi file left from the last time we compiled it
+    getModule					`thenM` \ this_mod ->
+    readIface this_mod iface_path False	`thenM` \ read_result ->
+    case read_result of {
+       Left err ->	-- Old interface file not found, or garbled; give up
+		   traceHiDiffs (text "FYI: cannot read old interface file:"
+			   	 $$ nest 4 (text (showException err))) 	`thenM_`
+	           returnM (outOfDate, Nothing)
+
+    ;  Right parsed_iface ->	
+
+	-- We found the file and parsed it; now load it
+    tryTc (initRn (InterfaceMode this_mod)
+		  (loadOldIface parsed_iface))	`thenM` \ ((_,errs), mb_iface) ->
+    case mb_iface of {
+	Nothing ->	-- Something went wrong in loading.  The main likely thing
+			-- is that the usages mentioned B.f, where B.hi and B.hs no
+			-- longer exist.  Then newGlobalName2 fails with an error message
+			-- This isn't an error; we just don't have an old iface file to
+			-- look at.  Spit out a traceHiDiffs for info though.
+		   traceHiDiffs (text "FYI: loading old interface file failed"
+				   $$ nest 4 (docToSDoc (pprBagOfErrors errs)))	`thenM_`
+		   return (outOfDate, Nothing)
+
+    ;	Just iface -> 
+
+	-- At last, we have got the old iface; check its versions
+    checkVersions source_unchanged iface	`thenM` \ recomp ->
+    returnM (recomp, Just iface)
+    }}}
 \end{code}
 
 
