@@ -1,0 +1,8 @@
+* unboxed the state in ST and IO, and specialised IO (it is no longer built
+  on top of ST).
+
+* reversed the sense of -fwarn-{overlapped,incomplete}-patterns.  The driver
+  now has to have the flag to provide the warning.
+
+* added the -Wnot, -W, and -Wall options.  Set up a default set of warnings,
+  namely -fwarn-{overlapped,incomplete}-patterns.
