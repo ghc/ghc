@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelRead.lhs,v 1.18 2001/02/28 00:01:03 qrczak Exp $
+% $Id: PrelRead.lhs,v 1.19 2001/05/22 19:25:49 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -13,7 +13,7 @@ Instances of the Read class.
 
 module PrelRead where
 
-import PrelErr		( error )
+import {-# SOURCE #-} PrelErr		( error )
 import PrelEnum		( Enum(..), maxBound )
 import PrelNum
 import PrelReal
@@ -24,8 +24,8 @@ import PrelShow		-- isAlpha etc
 import PrelBase
 
 -- needed for readIO and instance Read Buffermode
-import PrelIOBase ( IO, userError, BufferMode(..) )
-import PrelException ( ioError )
+--import PrelIOBase ( IO, userError, BufferMode(..) )
+--import PrelException ( ioError )
 \end{code}
 
 %*********************************************************
@@ -101,19 +101,6 @@ read s          =
     (x,str1) <- reads str
     ("","")  <- lex str1
     return x
-
-  -- raises an exception instead of an error
-readIO          :: Read a => String -> IO a
-readIO s        =  case (do { (x,t) <- reads s ; ("","") <- lex t ; return x }) of
-#ifndef NEW_READS_REP
-			[x]    -> return x
-			[]     -> ioError (userError "Prelude.readIO: no parse")
-			_      -> ioError (userError "Prelude.readIO: ambiguous parse")
-#else
-                        Just x -> return x
-                        Nothing  -> ioError (userError "Prelude.readIO: no parse")
-#endif
-
 \end{code}
 
 \begin{code}
@@ -621,28 +608,5 @@ readRational__ top_s
 	  Just x  -> x
 	  Nothing -> error ("readRational__: no parse:"        ++ top_s)
 #endif
-
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Reading BufferMode}
-%*							*
-%*********************************************************
-
-This instance decl is here rather than somewhere more appropriate in
-order that we can avoid both orphan-instance modules and recursive
-dependencies.
-
-\begin{code}
-instance Read BufferMode where
-    readsPrec _ = 
-      readParen False
-	(\r ->	let lr = lex r
-		in
-		[(NoBuffering, rest)       | ("NoBuffering", rest) <- lr] ++
-		[(LineBuffering,rest)      | ("LineBuffering",rest) <- lr] ++
-		[(BlockBuffering mb,rest2) | ("BlockBuffering",rest1) <- lr,
-		                             (mb, rest2) <- reads rest1])
 
 \end{code}

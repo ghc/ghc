@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.39 2001/05/22 15:06:47 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.40 2001/05/22 19:25:49 qrczak Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -14,13 +14,13 @@
 module PrelIOBase where
 
 import PrelST
-import PrelRead
 import PrelArr
 import PrelBase
 import PrelNum	-- To get fromInteger etc, needed because of -fno-implicit-prelude
 import PrelMaybe  ( Maybe(..) )
 import PrelShow
 import PrelList
+import PrelRead
 import PrelDynamic
 
 -- ---------------------------------------------------------------------------
@@ -219,7 +219,6 @@ bufferIsWritable _other = False
 
 bufferEmpty :: Buffer -> Bool
 bufferEmpty Buffer{ bufRPtr=r, bufWPtr=w } = r == w
-bufferEmpty _other = False
 
 -- only makes sense for a write buffer
 bufferFull :: Buffer -> Bool
@@ -284,7 +283,7 @@ type FilePath = String
 
 data BufferMode  
  = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
-   deriving (Eq, Ord, Show, Read)
+   deriving (Eq, Ord, Read, Show)
 
 -- ---------------------------------------------------------------------------
 -- IORefs
