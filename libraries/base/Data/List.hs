@@ -455,6 +455,8 @@ insertBy cmp x ys@(y:ys')
      GT -> y : insertBy cmp x ys'
      _  -> x : ys
 
+#ifdef __GLASGOW_HASKELL__
+
 -- | 'maximum' returns the maximum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.maximumBy', which allows the
@@ -491,6 +493,8 @@ minimum xs              =  foldl1 min xs
 strictMinimum		:: (Ord a) => [a] -> a
 strictMinimum []        =  errorEmptyList "minimum"
 strictMinimum xs        =  foldl1' min xs
+
+#endif /* __GLASGOW_HASKELL__ */
 
 -- | The 'maximumBy' function takes a comparison function and a list
 -- and returns the greatest element of the list by the comparison function.
@@ -842,11 +846,13 @@ foldl'           :: (a -> b -> a) -> a -> [b] -> a
 foldl' f a []     = a
 foldl' f a (x:xs) = let a' = f a x in a' `seq` foldl' f a' xs
 
+#ifdef __GLASGOW_HASKELL__
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty lists.
 foldl1                  :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
 foldl1 _ []             =  errorEmptyList "foldl1"
+#endif /* __GLASGOW_HASKELL__ */
 
 -- | A strict version of 'foldl1'
 foldl1'                  :: (a -> a -> a) -> [a] -> a
@@ -925,4 +931,11 @@ unwords []		=  ""
 unwords [w]		= w
 unwords (w:ws)		= w ++ ' ' : unwords ws
 #endif
-#endif  /* __GLASGOW_HASKELL__ */
+
+#else  /* !__GLASGOW_HASKELL__ */
+
+errorEmptyList :: String -> a
+errorEmptyList fun =
+  error ("Prelude." ++ fun ++ ": empty list")
+
+#endif /* !__GLASGOW_HASKELL__ */
