@@ -85,9 +85,10 @@ self-explanatory:
 
         http://www.haskell.org/ghc/
 
-We supply binary builds in .rpm/.deb form for all you Linux junkies
-out there, and in InstallShield form for Windows folks.  Everybody
-else gets a .tar.gz which can be installed where you want.
+We supply binary builds in the native package format for various
+flavours of Linux and BSD, and in InstallShield form for Windows
+folks.  Everybody else gets a .tar.gz which can be installed where you
+want.
 
 Once you have the distribution, please follow the pointers in the
 README file to find all of the documentation about this release.
