@@ -11,7 +11,6 @@ SUBDIRS = hp2ps		\
 	  mkdependHS	\
 	  parallel      \
 	  stat2resid	\
-	  ugen		\
 	  unlit
 
 endif
