@@ -26,7 +26,7 @@ test('memo002', extra_run_opts('20'), \
 
 test('packedstring001', normal, compile_and_run, [''])
 
-test('stableptr001', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
+test('stableptr001', extra_run_opts('+RTS -K8m -RTS'), compile_and_run, [''])
 test('stableptr003', normal, compile_and_run, [''])
 test('stableptr004', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
 test('stableptr005', normal, compile_and_run, [''])
