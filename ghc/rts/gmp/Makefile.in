@@ -61,6 +61,10 @@ FLAGS_TO_PASS = "CC=$(CC)" "CFLAGS=$(CFLAGS)" "XCFLAGS=$(XCFLAGS)"
 
 all: libgmp.a
 
+ifeq "(EnableWin32DLLs)" "YES"
+all: gmp.dll
+endif
+
 %.o : %.c
 	$(CC) -c $(INCLUDES) $(CFLAGS) $(XCFLAGS) $<
 
@@ -77,6 +81,11 @@ libgmp.a: mpn/libmpn.a mpz/libmpz.a $(OBJS)
 	if $(RANLIB_TEST) ; then $(RANLIB) tmpdir/$@; else true; fi
 	mv tmpdir/$@ .
 	rm -rf tmpdir
+
+gmp.dll: libgmp.a
+	dllwrap -mno-cygwin --target=i386-unknown-mingw32 \
+		--export-all --dllname gmp.dll --output-lib=libgmp_imp.a \
+		-o gmp.dll libgmp.a
 
 libmp.a: mpn/libmpn.a mpbsd/libmpbsd.a $(OBJS)
 	rm -rf tmpdir
