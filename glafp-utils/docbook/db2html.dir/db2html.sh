@@ -1,13 +1,7 @@
-if [ -z "$SGML_CATALOG_FILES" ] ; then
-  for i in "$FPTOOLS_CATALOG_FILE" /usr/share/sgml/CATALOG.docbkdsl ; do
-    if [ -n "$i" -a -r "$i" ] ;  then
-      SGML_CATALOG_FILES="$i"
-      break
-    fi
-  done
-fi
+DOCBOOK_CATALOG=$1
+shift
 
-if [ -z "$SGML_CATALOG_FILES" ] ; then
+if [ ! -f "$DOCBOOK_CATALOG" ] ; then
   echo "CATALOG file not set up; see installation guide for details."
   exit 1
 fi
@@ -62,10 +56,10 @@ mkdir $TMPDIR
 SAVE_PWD=`pwd`
 if [ $1 = `basename $1` ]; then
   echo "working on ../$1"
-  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html -c $SGML_CATALOG_FILES ../$1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html -c $DOCBOOK_CATALOG ../$1; cd $SAVE_PWD)
 else
   echo "working on $1"
-  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html -c $SGML_CATALOG_FILES $1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html -c $DOCBOOK_CATALOG $1; cd $SAVE_PWD)
 fi
 
 if [ $# -eq 1 ]

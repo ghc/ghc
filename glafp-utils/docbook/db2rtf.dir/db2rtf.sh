@@ -1,13 +1,7 @@
-if [ -z "$SGML_CATALOG_FILES" ] ; then
-  for i in "$FPTOOLS_CATALOG_FILE" /usr/share/sgml/CATALOG.docbkdsl ; do
-    if [ -n "$i" -a -r "$i" ] ;  then
-      SGML_CATALOG_FILES="$i"
-      break
-    fi
-  done
-fi
+DOCBOOK_CATALOG=$1
+shift
 
-if [ -z "$SGML_CATALOG_FILES" ] ; then
+if [ ! -f "$DOCBOOK_CATALOG" ] ; then
   echo "CATALOG file not set up; see installation guide for details."
   exit 1
 fi
@@ -42,7 +36,7 @@ then
   fi
 fi
 
-cat $* | $JADE -t rtf -d ${DB_STYLESHEET}\#print -c $SGML_CATALOG_FILES
+cat $* | $JADE -t rtf -d ${DB_STYLESHEET}\#print -c $DOCBOOK_CATALOG
 
 if [ $# -eq 1 ]
 then
