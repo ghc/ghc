@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.51 2001/02/11 16:32:48 simonmar Exp $
+# $Id: Makefile,v 1.52 2001/02/11 16:48:21 simonmar Exp $
 #
 
 TOP=..
@@ -87,22 +87,17 @@ endif
 INSTALLED_SCRIPT_PROG  = ghci-$(ProjectVersion)
 INPLACE_SCRIPT_PROG    = ghci-inplace
 
+SCRIPT_OBJS	  = ghci.sh
+INTERP		  = $(SHELL)
+SCRIPT_SUBST_VARS = GHCBIN
+INSTALL_SCRIPTS  += $(SCRIPT_PROG)
+
 ifeq "$(INSTALLING)" "1"
-TOP_PWD 	:= $(prefix)
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
 SCRIPT_LINK 	=  ghci
 else
-TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
 SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
 endif
-
-SCRIPT_OBJS=ghci.sh
-
-INTERP=$(SHELL)
-
-SCRIPT_SUBST_VARS = GHCBIN
-
-INSTALL_SCRIPTS += $(SCRIPT_PROG)
 
 # don't recurse on 'make install'
 #
