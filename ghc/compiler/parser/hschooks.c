@@ -10,6 +10,44 @@ in instead of the defaults.
 #include "rtsdefs.h"
 #endif
 
+#if __GLASGOW_HASKELL__ >= 408
+#include "../rts/RtsFlags.h"
+#include "HsFFI.h"
+#endif
+
+void
+defaultsHook (void)
+{
+#if __GLASGOW_HASKELL__ >= 408
+    RtsFlags.GcFlags.heapSizeSuggestion = 6*1024*1024 / BLOCK_SIZE;
+#endif
+#if __GLASGOW_HASKELL__ >= 411
+    RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
+    RtsFlags.GcFlags.statsFile = stderr;
+#endif
+}
+
+void
+enableTimingStats( void )	/* called from the driver */
+{
+#if __GLASGOW_HASKELL__ >= 411
+    RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
+#endif
+    /* ignored when bootstrapping with an older GHC */
+}
+
+void
+setHeapSize( HsInt size )
+{
+#if __GLASGOW_HASKELL__ >= 408
+    RtsFlags.GcFlags.heapSizeSuggestion = size / BLOCK_SIZE;
+    if (RtsFlags.GcFlags.heapSizeSuggestion > 
+	RtsFlags.GcFlags.maxHeapSize) {
+	RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
+    }
+#endif
+}
+
 #if __GLASGOW_HASKELL__ >= 303
 
 void
