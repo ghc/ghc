@@ -69,38 +69,38 @@
 /* Define to alignment constraint on chars */
 #undef ALIGNMENT_CHAR
 
-/* Define to alignment constraint on unsigned chars */
-#undef ALIGNMENT_UNSIGNED_CHAR
-
-/* Define to alignment constraint on shorts */
-#undef ALIGNMENT_SHORT
-
-/* Define to alignment constraint on unsigned shorts */
-#undef ALIGNMENT_UNSIGNED_SHORT
-
-/* Define to alignment constraint on ints */
-#undef ALIGNMENT_INT
-
-/* Define to alignment constraint on unsigned ints */
-#undef ALIGNMENT_UNSIGNED_INT
-
-/* Define to alignment constraint on longs */
-#undef ALIGNMENT_LONG
-
-/* Define to alignment constraint on unsigned longs */
-#undef ALIGNMENT_UNSIGNED_LONG
-
-/* Define to alignment constraint on long longs */
-#undef ALIGNMENT_LONG_LONG
-
-/* Define to alignment constraint on unsigned long longs */
-#undef ALIGNMENT_UNSIGNED_LONG_LONG
-
 /* Define to alignment constraint on doubles */
 #undef ALIGNMENT_DOUBLE
 
 /* Define to alignment constraint on floats */
 #undef ALIGNMENT_FLOAT
+
+/* Define to alignment constraint on ints */
+#undef ALIGNMENT_INT
+
+/* Define to alignment constraint on longs */
+#undef ALIGNMENT_LONG
+
+/* Define to alignment constraint on long longs */
+#undef ALIGNMENT_LONG_LONG
+
+/* Define to alignment constraint on shorts */
+#undef ALIGNMENT_SHORT
+
+/* Define to alignment constraint on unsigned chars */
+#undef ALIGNMENT_UNSIGNED_CHAR
+
+/* Define to alignment constraint on unsigned ints */
+#undef ALIGNMENT_UNSIGNED_INT
+
+/* Define to alignment constraint on unsigned longs */
+#undef ALIGNMENT_UNSIGNED_LONG
+
+/* Define to alignment constraint on unsigned long longs */
+#undef ALIGNMENT_UNSIGNED_LONG_LONG
+
+/* Define to alignment constraint on unsigned shorts */
+#undef ALIGNMENT_UNSIGNED_SHORT
 
 /* Define to alignment constraint on void pointers */
 #undef ALIGNMENT_VOID_P
@@ -164,38 +164,38 @@
 /* The number of bytes in a char.  */
 #undef SIZEOF_CHAR
 
-/* The number of bytes in an unsigned char.  */
-#undef SIZEOF_UNSIGNED_CHAR
-
-/* The number of bytes in a short.  */
-#undef SIZEOF_SHORT
-
-/* The number of bytes in an unsigned short.  */
-#undef SIZEOF_UNSIGNED_SHORT
-
-/* The number of bytes in a int.  */
-#undef SIZEOF_INT
-
-/* The number of bytes in an unsigned int.  */
-#undef SIZEOF_UNSIGNED_INT
-
-/* The number of bytes in a long.  */
-#undef SIZEOF_LONG
-
-/* The number of bytes in an unsigned long.  */
-#undef SIZEOF_UNSIGNED_LONG
-
-/* The number of bytes in a long long.  */
-#undef SIZEOF_LONG_LONG
-
-/* The number of bytes in an unsigned long long.  */
-#undef SIZEOF_UNSIGNED_LONG_LONG
-
 /* The number of bytes in a double.  */
 #undef SIZEOF_DOUBLE
 
 /* The number of bytes in a float.  */
 #undef SIZEOF_FLOAT
+
+/* The number of bytes in a int.  */
+#undef SIZEOF_INT
+
+/* The number of bytes in a long.  */
+#undef SIZEOF_LONG
+
+/* The number of bytes in a long long.  */
+#undef SIZEOF_LONG_LONG
+
+/* The number of bytes in a short.  */
+#undef SIZEOF_SHORT
+
+/* The number of bytes in a unsigned char.  */
+#undef SIZEOF_UNSIGNED_CHAR
+
+/* The number of bytes in a unsigned int.  */
+#undef SIZEOF_UNSIGNED_INT
+
+/* The number of bytes in a unsigned long.  */
+#undef SIZEOF_UNSIGNED_LONG
+
+/* The number of bytes in a unsigned long long.  */
+#undef SIZEOF_UNSIGNED_LONG_LONG
+
+/* The number of bytes in a unsigned short.  */
+#undef SIZEOF_UNSIGNED_SHORT
 
 /* The number of bytes in a void *.  */
 #undef SIZEOF_VOID_P

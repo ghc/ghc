@@ -15,17 +15,44 @@
 
 @TOP@
 
-/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+/* Define to alignment constraint on chars */
+#undef ALIGNMENT_CHAR
+
+/* Define to alignment constraint on doubles */
 #undef ALIGNMENT_DOUBLE
 
-/* Define to alignment constraint on floats or on unsigned int - whichever is the greater */
+/* Define to alignment constraint on floats */
 #undef ALIGNMENT_FLOAT
 
-/* Define to alignment constraint on doubles or on unsigned int - whichever is the greater */
+/* Define to alignment constraint on ints */
+#undef ALIGNMENT_INT
+
+/* Define to alignment constraint on longs */
 #undef ALIGNMENT_LONG
 
-/* Define to alignment constraint on unsigned int - whichever is the greater */
+/* Define to alignment constraint on long longs */
+#undef ALIGNMENT_LONG_LONG
+
+/* Define to alignment constraint on shorts */
+#undef ALIGNMENT_SHORT
+
+/* Define to alignment constraint on unsigned chars */
+#undef ALIGNMENT_UNSIGNED_CHAR
+
+/* Define to alignment constraint on unsigned ints */
 #undef ALIGNMENT_UNSIGNED_INT
+
+/* Define to alignment constraint on unsigned longs */
+#undef ALIGNMENT_UNSIGNED_LONG
+
+/* Define to alignment constraint on unsigned long longs */
+#undef ALIGNMENT_UNSIGNED_LONG_LONG
+
+/* Define to alignment constraint on unsigned shorts */
+#undef ALIGNMENT_UNSIGNED_SHORT
+
+/* Define to alignment constraint on void pointers */
+#undef ALIGNMENT_VOID_P
 
 /* Define if code lives before data in memory */
 #undef CODE_BEFORE_DATA
