@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.57 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Linker.c,v 1.58 2001/08/15 08:57:31 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -274,6 +274,8 @@ typedef struct _RtsSymbolVal {
       SymX(__gmpz_get_ui)			\
       SymX(prog_argv)				\
       SymX(prog_argc)				\
+      SymX(getProgArgv)				\
+      SymX(setProgArgv)				\
       SymX(resetNonBlockingFd)			\
       SymX(performGC)				\
       SymX(getStablePtr)			\
