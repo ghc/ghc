@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.75 2003/01/29 10:28:56 simonmar Exp $
+ * $Id: Storage.c,v 1.76 2003/02/01 09:10:17 mthomas Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -148,6 +148,7 @@ initStorage( void )
       stp = &generations[g].steps[s];
       stp->no = s;
       stp->blocks = NULL;
+      stp->n_to_blocks = 0;
       stp->n_blocks = 0;
       stp->gen = &generations[g];
       stp->gen_no = g;
