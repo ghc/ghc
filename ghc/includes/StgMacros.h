@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.55 2003/07/31 10:07:02 simonmar Exp $
+ * $Id: StgMacros.h,v 1.56 2003/08/05 14:01:34 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -447,6 +447,11 @@ EXTFUN_RTS(stg_gen_block);
 // 
 // This looks like it can't work - we're overwriting the contents of
 // the THUNK with slop!  Perhaps this never worked??? --SDM
+// The problem is that with eager-black-holing we currently perform
+// the black-holing operation at the *beginning* of the basic block,
+// when we still need the contents of the thunk.
+// Perhaps the thing to do is to overwrite it at the *end* of the
+// basic block, when we've already sucked out the thunk's contents? -- SLPJ
 //
 // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
 // 
