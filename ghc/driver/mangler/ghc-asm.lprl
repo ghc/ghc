@@ -421,7 +421,7 @@ sub mangle_asm {
     $i = 0; $chkcat[0] = 'misc'; $chk[0] = '';
 
     while (<INASM>) {
-	tr/\r//d if $TargetPlatform =~ /-mingw32$/;
+	tr/\r//d if $TargetPlatform =~ /-mingw32$/; # In case Perl doesn't convert line endings
 	next if $T_STABBY && /^\.stab.*${T_US}__stg_split_marker/o;
 	next if $T_STABBY && /^\.stab.*ghc.*c_ID/;
 	next if /^\t\.def.*endef$/;

@@ -139,7 +139,7 @@ sub ReadTMPIUpToAMarker {
     print STDERR "### BLOCK:$count:\n$str" if $Dump_asm_splitting_info;
 
     # return str
-    $str =~ tr/\r//d if $TargetPlatform =~ /-mingw32$/;
+    $str =~ tr/\r//d if $TargetPlatform =~ /-mingw32$/; # in case Perl doesn't convert line endings
     $str;
 }
 \end{code}
