@@ -35,7 +35,9 @@ import Text.ParserCombinators.ReadP
 import GHC.Base
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
+#ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
+#endif
 import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral, 
 		 toInteger, (^), (^^), infinity, notANumber )
 import GHC.List
