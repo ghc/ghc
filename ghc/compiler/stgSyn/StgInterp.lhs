@@ -5,13 +5,36 @@
 
 \begin{code}
 
-module StgInterp ( runStgI ) where
+module StgInterp ( 
+    ClosureEnv, ItblEnv,
+
+    linkIModules,	-- :: ItblEnv -> ClosureEnv -> [[UnlinkedIBind]] -> 
+		 	--	([LinkedIBind], ItblEnv, ClosureEnv)
+
+    runStgI  -- tmp, for testing
+ ) where
+
+{- -----------------------------------------------------------------------------
+
+ ToDo:
+   - link should be in the IO monad, so it can modify the symtabs as it
+     goes along
+ 
+   - need a way to remove the bindings for a module from the symtabs. 
+     maybe the symtabs should be indexed by module first.
+
+   - change the representation to something less verbose (?).
+
+   - converting string literals to Addr# is horrible and introduces
+     a memory leak.  See if something can be done about this.
+
+----------------------------------------------------------------------------- -}
 
 #include "HsVersions.h"
 
-import StgSyn
+#ifdef GHCI
+import Linker
 import Id 		( Id, idPrimRep )
-import Panic		( panic )
 import Outputable
 import Var
 import PrimOp		( PrimOp(..) )
@@ -19,101 +42,120 @@ import PrimRep		( PrimRep(..) )
 import Literal		( Literal(..) )
 import Type		( Type, typePrimRep, deNoteType, repType, funResultTy )
 import DataCon		( DataCon, dataConTag, dataConRepArgTys )
-import TyCon		( TyCon, isDataTyCon, tyConFamilySize, tyConDataCons )
 import ClosureInfo	( mkVirtHeapOffsets )
-import Class		( Class, classTyCon )
+import Name		( toRdrName )
+import UniqFM
+import UniqSet
 
-#ifdef GHCI
--- giga-hack
 import {-# SOURCE #-} MCI_make_constr
 
+import IOExts		( unsafePerformIO ) -- ToDo: remove
 import PrelGHC		--( unsafeCoerce#, dataToTag#,
 			--  indexPtrOffClosure#, indexWordOffClosure# )
 import IO		( hPutStr, stderr )
+import Char		( ord )
 import PrelAddr 	( Addr(..) )
-import Addr		( intToAddr, addrToInt )
-import Addr		-- again ...
+import PrelFloat	( Float(..), Double(..) )
 import Word
 import Bits
 import Storable
+import CTypes
+import FastString
 #endif
+
+import TyCon		( TyCon, isDataTyCon, tyConFamilySize, tyConDataCons )
+import Class		( Class, classTyCon )
+import InterpSyn
+import StgSyn
+import Addr
+import RdrName		( RdrName, rdrNameModule, rdrNameOcc )
+import OccName		( occNameString )
+import FiniteMap
+import Panic		( panic )
+import PrelAddr
+
+-- ---------------------------------------------------------------------------
+-- Environments needed by the linker
+-- ---------------------------------------------------------------------------
+
+type ItblEnv    = FiniteMap RdrName Addr
+type ClosureEnv = FiniteMap RdrName HValue
+
+-- ---------------------------------------------------------------------------
+-- Run our STG program through the interpreter
+-- ---------------------------------------------------------------------------
 
 runStgI :: [TyCon] -> [Class] -> [StgBinding] -> IO Int
 
 #ifndef GHCI
-runStgI tycons classes stgbinds
-   = panic "runStgI called in non-GHCI build"
-
+runStgI	      = panic "StgInterp.runStgI: not implemented"
+linkIModules  = panic "StgInterp.linkIModules: not implemented"
 #else
 
 -- the bindings need to have a binding for stgMain, and the
 -- body of it had better represent something of type Int# -> Int#
 runStgI tycons classes stgbinds
-   = do itbl_env <- mkITbls (tycons ++ map classTyCon classes)
-        let binds = concatMap (stg2bind itbl_env) stgbinds
+   = do 
+	let unlinked_binds = concatMap (stg2IBinds emptyUniqSet) stgbinds
+	     
+{-
         let dbg_txt 
-               = "-------------------- Binds --------------------\n" 
-                 ++ showSDoc (vcat (map (\bind -> pprBind bind $$ char ' ') binds))
+               = "-------------------- Unlinked Binds --------------------\n" 
+                 ++ showSDoc (vcat (map (\bind -> pprIBind bind $$ char ' ')
+			 unlinked_binds))
+
+        hPutStr stderr dbg_txt
+-}
+        (linked_binds, ie, ce) <-
+ 		linkIModules emptyFM emptyFM [(tycons,unlinked_binds)]
+
+        let dbg_txt 
+               = "-------------------- Linked Binds --------------------\n" 
+                 ++ showSDoc (vcat (map (\bind -> pprIBind bind $$ char ' ') 
+			linked_binds))
 
         hPutStr stderr dbg_txt
 
         let stgMain
-               = case [rhs | Bind v rhs <- binds, showSDoc (ppr v) == "stgMain"] of
+               = case [rhs | IBind v rhs <- linked_binds, showSDoc (ppr v) == "stgMain"] of
                     (b:_) -> b
-                    []    -> error "\n\nCan't find `stgMain'.  Giving up.\n\n"        
+                    []    -> error "\n\nCan't find `stgMain'.  Giving up.\n\n"  
+
         let result 
                = I# (evalI (AppII stgMain (LitI 0#))
-                           (mkInitialSEnv binds){-initial se (never changes)-}
-                           []{-initial de-}
+                           emptyUFM{-initial de-}
                     )
         return result
 
-type ItblEnv = [(DataCon,Addr)]
+-- ---------------------------------------------------------------------------
+-- Convert STG to an unlinked interpretable
+-- ---------------------------------------------------------------------------
 
--- Make info tables for the data decls in this module
-mkITbls :: [TyCon] -> IO ItblEnv
-mkITbls [] = return []
-mkITbls (tc:tcs) = do itbls  <- mkITbl tc
-                      itbls2 <- mkITbls tcs
-                      return (itbls ++ itbls2)
-
-mkITbl :: TyCon -> IO ItblEnv
-mkITbl tc
---   | trace ("TYCON: " ++ showSDoc (ppr tc)) False
---   = error "?!?!"
-   | not (isDataTyCon tc) 
-   = return []
-   | n == length dcs  -- paranoia; this is an assertion.
-   = make_constr_itbls dcs
-     where
-        dcs = tyConDataCons tc
-        n   = tyConFamilySize tc
-
-
-stg2bind :: ItblEnv -> StgBinding -> [Bind]
-stg2bind ie (StgNonRec v e) = [Bind v (rhs2expr ie e)]
-stg2bind ie (StgRec vs_n_es) = [Bind v (rhs2expr ie e) | (v,e) <- vs_n_es]
+stg2IBinds :: UniqSet Id -> StgBinding -> [UnlinkedIBind]
+stg2IBinds ie (StgNonRec v e)  = [IBind v (rhs2expr ie e)]
+stg2IBinds ie (StgRec vs_n_es) = [IBind v (rhs2expr ie' e) | (v,e) <- vs_n_es]
+  where ie' = addListToUniqSet ie (map fst vs_n_es)
 
 isRec (StgNonRec _ _) = False
 isRec (StgRec _)      = True
 
-rhs2expr :: ItblEnv -> StgRhs -> Expr
+rhs2expr :: UniqSet Id -> StgRhs -> UnlinkedIExpr
 rhs2expr ie (StgRhsClosure ccs binfo srt fvs uflag args rhs)
    = mkLambdas args
      where
-        rhsExpr = stg2expr ie rhs
+        rhsExpr = stg2expr (addListToUniqSet ie args) rhs
         rhsRep  = repOfStgExpr rhs
         mkLambdas [] = rhsExpr
         mkLambdas (v:vs) = mkLam (repOfId v) rhsRep v (mkLambdas vs)
 rhs2expr ie (StgRhsCon ccs dcon args)
    = conapp2expr ie dcon args
 
-conapp2expr :: ItblEnv -> DataCon -> [StgArg] -> Expr
+conapp2expr :: UniqSet Id -> DataCon -> [StgArg] -> UnlinkedIExpr
 conapp2expr ie dcon args
-   = mkAppCon itbl reps exprs
+   = mkConApp con_rdrname reps exprs
      where
-        itbl        = findItbl ie dcon
-        exprs       = map arg2expr inHeapOrder
+	con_rdrname = toRdrName dcon
+        exprs       = map (arg2expr ie) inHeapOrder
         reps        = map repOfArg inHeapOrder
         inHeapOrder = toHeapOrder args
 
@@ -124,54 +166,57 @@ conapp2expr ie dcon args
              in
                  rearranged
 
-        findItbl [] dcon
-           -- Not in the list?  A bit of kludgery for testing purposes.
-           | dconIs dcon "std.PrelBase.Izh"
-           = prelbase_Izh_con_info
-           | otherwise
-           = pprPanic "StgInterp.findItbl for " (ppr dcon)
-        findItbl ((dc,itbl):rest) dcon
-           = if dc == dcon then itbl else findItbl rest dcon
-
-        dconIs dcon str 
-           = let cleaned = takeWhile (/= '{') (showSDocDebug (ppr dcon))
-             in --trace ("Cleaned = `" ++ cleaned ++ "'") (
-                str == cleaned
-                --)
-
 foreign label "PrelBase_Izh_con_info" prelbase_Izh_con_info :: Addr
 
 -- Handle most common cases specially; do the rest with a generic
 -- mechanism (deferred till later :)
-mkAppCon :: Addr -> [Rep] -> [Expr] -> Expr
-mkAppCon itbl []               []         = AppCon itbl
-mkAppCon itbl [RepI]           [a1]       = AppConI itbl a1
-mkAppCon itbl [RepP]           [a1]       = AppConP itbl a1
-mkAppCon itbl [RepP,RepP]      [a1,a2]    = AppConPP itbl a1 a2
-mkAppCon itbl [RepP,RepP,RepP] [a1,a2,a3] = AppConPPP itbl a1 a2 a3
-mkAppCon itbl reps args
-   = pprPanic "StgInterp.mkAppCon: unhandled reps" (hsep (map pprRep reps))
-
+mkConApp :: RdrName -> [Rep] -> [UnlinkedIExpr] -> UnlinkedIExpr
+mkConApp nm []               []         = ConApp    nm
+mkConApp nm [RepI]           [a1]       = ConAppI   nm a1
+mkConApp nm [RepP]           [a1]       = ConAppP   nm a1
+mkConApp nm [RepP,RepP]      [a1,a2]    = ConAppPP  nm a1 a2
+mkConApp nm [RepP,RepP,RepP] [a1,a2,a3] = ConAppPPP nm a1 a2 a3
+mkConApp nm reps args
+   = pprPanic "StgInterp.mkConApp: unhandled reps" (hsep (map ppr reps))
 
 mkLam RepP RepP = LamPP
 mkLam RepI RepP = LamIP
 mkLam RepP RepI = LamPI
 mkLam RepI RepI = LamII
-mkLam repa repr = pprPanic "StgInterp.mkLam" (pprRep repa <+> pprRep repr)
+mkLam repa repr = pprPanic "StgInterp.mkLam" (ppr repa <+> ppr repr)
 
 mkApp RepP RepP = AppPP
 mkApp RepI RepP = AppIP
 mkApp RepP RepI = AppPI
 mkApp RepI RepI = AppII
-mkApp repa repr = pprPanic "StgInterp.mkApp" (pprRep repa <+> pprRep repr)
+mkApp repa repr = pprPanic "StgInterp.mkApp" (ppr repa <+> ppr repr)
 
 repOfId :: Id -> Rep
 repOfId = primRep2Rep . idPrimRep
 
 primRep2Rep primRep
    = case primRep of
-        PtrRep -> RepP
-        IntRep -> RepI
+
+	-- genuine lifted types
+        PtrRep        -> RepP
+
+	-- all these are unboxed, fit into a word, and we assume they
+	-- all have the same call/return convention.
+        IntRep        -> RepI
+	CharRep       -> RepI
+	WordRep       -> RepI
+	AddrRep       -> RepI
+	WeakPtrRep    -> RepI
+	StablePtrRep  -> RepI
+
+	-- these are pretty dodgy: really pointers, but
+	-- we can't let the compiler build thunks with these reps.
+	ForeignObjRep -> RepP
+	StableNameRep -> RepP
+	ThreadIdRep   -> RepP
+	ArrayRep      -> RepP
+	ByteArrayRep  -> RepP
+
         other -> pprPanic "primRep2Rep" (ppr other)
 
 repOfStgExpr :: StgExpr -> Rep
@@ -217,24 +262,35 @@ repOfStgExpr stgexpr
 
 repOfLit lit
    = case lit of
-        MachInt _ -> RepI
-        MachStr _ -> RepI   -- because it's a ptr outside the heap
+        MachInt _    -> RepI
+        MachWord _   -> RepI
+        MachAddr _   -> RepI
+        MachChar _   -> RepI
+        MachFloat _  -> RepF
+        MachDouble _ -> RepD
+        MachStr _    -> RepI   -- because it's a ptr outside the heap
         other -> pprPanic "repOfLit" (ppr lit)
 
-lit2expr :: Literal -> Expr
+lit2expr :: Literal -> UnlinkedIExpr
 lit2expr lit
    = case lit of
-        MachInt i -> case fromIntegral i of I# i# -> LitI i#
+        MachInt  i   -> case fromIntegral i of I# i -> LitI i
+        MachWord i   -> case fromIntegral i of I# i -> LitI i
+        MachAddr i   -> case fromIntegral i of I# i -> LitI i
+	MachChar i   -> case fromIntegral i of I# i -> LitI i
+	MachFloat f  -> case fromRational f of F# f -> LitF f
+	MachDouble f -> case fromRational f of D# f -> LitD f
         MachStr s -> LitS s
         other -> pprPanic "lit2expr" (ppr lit)
 
-stg2expr :: ItblEnv -> StgExpr -> Expr
+stg2expr :: UniqSet Id -> StgExpr -> UnlinkedIExpr
 stg2expr ie stgexpr
    = case stgexpr of
         StgApp var []
-           -> mkVar (repOfId var) var
+           -> mkVar ie (repOfId var) var
+
         StgApp var args
-           -> mkAppChain (repOfStgExpr stgexpr) (mkVar (repOfId var) var) args
+           -> mkAppChain ie (repOfStgExpr stgexpr) (mkVar ie (repOfId var) var) args
         StgLit lit
            -> lit2expr lit
 
@@ -254,16 +310,20 @@ stg2expr ie stgexpr
 
         StgPrimApp op args res_ty
            -> mkPrimOp (repOfStgExpr stgexpr)
-                       op (map arg2expr args)
+                       op (map (arg2expr ie) args)
 
         StgConApp dcon args
            -> conapp2expr ie dcon args
 
-        StgLet binds body
-           |  isRec binds 
-           -> mkRec (repOfStgExpr stgexpr) (stg2bind ie binds) (stg2expr ie body)
-           |  otherwise
-           -> mkNonRec (repOfStgExpr stgexpr) (head (stg2bind ie binds)) (stg2expr ie body)
+        StgLet binds@(StgNonRec v e) body
+	   -> mkNonRec (repOfStgExpr stgexpr) 
+		(head (stg2IBinds ie binds)) 
+		(stg2expr (addOneToUniqSet ie v) body)
+
+        StgLet binds@(StgRec bs) body
+           -> mkRec (repOfStgExpr stgexpr) 
+		(stg2IBinds ie binds) 
+		(stg2expr (addListToUniqSet ie (map fst bs)) body)
 
         other 
            -> pprPanic "stg2expr" (ppr stgexpr)
@@ -272,7 +332,8 @@ stg2expr ie stgexpr
            = AltPrim (lit2expr lit) (stg2expr ie rhs)
         doAlgAlt (dcon,vars,uses,rhs) 
            = AltAlg (dataConTag dcon - 1) 
-                    (map id2VaaRep (toHeapOrder vars)) (stg2expr ie rhs)
+                    (map id2VaaRep (toHeapOrder vars)) 
+			(stg2expr (addListToUniqSet ie vars) rhs)
 
         toHeapOrder vars
            = let (_,_,rearranged_w_offsets) = mkVirtHeapOffsets idPrimRep vars
@@ -283,12 +344,12 @@ stg2expr ie stgexpr
         def2expr StgNoDefault         = Nothing
         def2expr (StgBindDefault rhs) = Just (stg2expr ie rhs)
 
-        mkAppChain result_rep so_far []
+        mkAppChain ie result_rep so_far []
            = panic "mkAppChain"
-        mkAppChain result_rep so_far [a]
-           = mkApp (repOfArg a) result_rep so_far (arg2expr a)
-        mkAppChain result_rep so_far (a:as)
-           = mkAppChain result_rep (mkApp (repOfArg a) RepP so_far (arg2expr a)) as
+        mkAppChain ie result_rep so_far [a]
+           = mkApp (repOfArg a) result_rep so_far (arg2expr ie a)
+        mkAppChain ie result_rep so_far (a:as)
+           = mkAppChain ie result_rep (mkApp (repOfArg a) RepP so_far (arg2expr ie a)) as
 
 mkCasePrim RepI = CasePrimI
 mkCasePrim RepP = CasePrimP
@@ -296,8 +357,10 @@ mkCasePrim RepP = CasePrimP
 mkCaseAlg RepI = CaseAlgI
 mkCaseAlg RepP = CaseAlgP
 
-mkVar RepI = VarI
-mkVar RepP = VarP
+-- any var that isn't in scope is turned into a Native
+mkVar ie rep var
+  | var `elementOfUniqSet` ie = case rep of { RepI -> VarI; RepP -> VarP } $ var
+  | otherwise = Native (toRdrName var)
 
 mkRec RepI = RecI
 mkRec RepP = RecP
@@ -307,314 +370,252 @@ mkNonRec RepP = NonRecP
 mkPrimOp RepI = PrimOpI
 mkPrimOp RepP = PrimOpP        
 
-arg2expr :: StgArg -> Expr
-arg2expr (StgVarArg v)   = mkVar (repOfId v) v
-arg2expr (StgLitArg lit) = lit2expr lit
-arg2expr (StgTypeArg ty) = pprPanic "arg2expr" (ppr ty)
-
-
+arg2expr :: UniqSet Id -> StgArg -> UnlinkedIExpr
+arg2expr ie (StgVarArg v)   = mkVar ie (repOfId v) v
+arg2expr ie (StgLitArg lit) = lit2expr lit
+arg2expr ie (StgTypeArg ty) = pprPanic "arg2expr" (ppr ty)
 
 repOfArg :: StgArg -> Rep
 repOfArg (StgVarArg v)   = repOfId v
 repOfArg (StgLitArg lit) = repOfLit lit
 repOfArg (StgTypeArg ty) = pprPanic "repOfArg" (ppr ty)
 
-id2VaaRep var = VaaRep var (repOfId var)
+id2VaaRep var = (var, repOfId var)
 
---------------------------------------------------------------------
---------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- Link an interpretable into something we can run
+-- ---------------------------------------------------------------------------
 
+linkIModules :: ItblEnv -> ClosureEnv -> [([TyCon],[UnlinkedIBind])] -> 
+	IO ([LinkedIBind], ItblEnv, ClosureEnv)
+linkIModules ie ce mods = do
+  let (tyconss, bindss) = unzip mods
+      tycons = concat tyconss
+      binds  = concat bindss
+      top_level_binders = map (toRdrName.binder) binds
 
-data Bind = Bind Vaa Expr
+  new_ie <- mkITbls (concat tyconss)
+  let new_ce = addListToFM ce (zip top_level_binders new_rhss)
+      new_rhss = map (\b -> evalP (bindee b) emptyUFM) new_binds
+    ---vvvvvvvvv--------------------------------------^^^^^^^^^-- circular
+      (new_binds, final_ie, final_ce) = linkIBinds new_ie new_ce binds
 
-pprBind :: Bind -> SDoc
-pprBind (Bind v e) = ppr v <+> char '=' <+> pprExpr e
+  return (new_binds, final_ie, final_ce)
 
-binder (Bind v e) = v
-bindee (Bind v e) = e
-
-
-data AltAlg = AltAlg Int{-tagNo-} [VaaRep] Expr
-
-pprAltAlg (AltAlg tag vars rhs)
-   = text "Tag_" <> int tag <+> hsep (map pprVaaRep vars)
-     <+> text "->" <+> pprExpr rhs
-
-
-data AltPrim = AltPrim Lit Expr
-
-pprAltPrim (AltPrim tag rhs)
-   = pprExpr tag <+> text "->" <+> pprExpr rhs
-
-
--- HACK ALERT!  A Lit may *only* be one of LitI, LitL, LitF, LitD
-type Lit = Expr
+-- We're supposed to augment the environments with the values of any
+-- external functions/info tables we need as we go along, but that's a
+-- lot of hassle so for now I'll look up external things as they crop
+-- up and not cache them in the source symbol tables.  The interpreted
+-- code will still be referenced in the source symbol tables.
 
 
--- var, no rep info (inferrable from context)
--- Vaa because Var conflicts with Var.Var
---type Vaa = String
-type Vaa = Id
+-- Make info tables for the data decls in this module
+mkITbls :: [TyCon] -> IO ItblEnv
+mkITbls [] = return emptyFM
+mkITbls (tc:tcs) = do itbls  <- mkITbl tc
+                      itbls2 <- mkITbls tcs
+                      return (itbls `plusFM` itbls2)
 
-data VaaRep = VaaRep Vaa Rep
-
-pprVaaRep (VaaRep v r) = ppr v <> text ":" <> pprRep r
-
-
-repOfVaa (VaaRep v r) = r
-varOfVaa (VaaRep v r) = v
-
-data Rep = RepI | RepP deriving Eq
-
-pprRep RepI = text "I"
-pprRep RepP = text "P"
-
-
-
--- LambdaXY indicates a function of reps X -> Y
--- ie var rep = X, result rep = Y
--- NOTE: repOf (LambdaXY _ _) = RepI regardless of X and Y
---
--- AppXY means apply a fn (always of Ptr rep) to 
--- an arg of rep X giving result of Rep Y
--- therefore: repOf (AppXY _ _) = RepY
-
--- index???OffClosure needs to traverse indirection nodes.
-
--- You can always tell the representation of an Expr by examining
--- its root node.
-data Expr
-   = CaseAlgP   Vaa Expr [AltAlg]  (Maybe Expr)
-   | CasePrimP  Vaa Expr [AltPrim] (Maybe Expr)
-
-   | CaseAlgI   Vaa Expr [AltAlg]  (Maybe Expr)
-   | CasePrimI  Vaa Expr [AltPrim] (Maybe Expr)
-
-   -- saturated constructor apps; args are in heap order.
-   -- The Addrs are the info table pointers.  Descriptors refer to the
-   -- arg reps; all constructor applications return pointer rep.
-   | AppCon    Addr
-   | AppConI   Addr Expr
-   | AppConP   Addr Expr
-   | AppConPP  Addr Expr Expr
-   | AppConPPP Addr Expr Expr Expr
-
-   | PrimOpI PrimOp [Expr]
-   | PrimOpP PrimOp [Expr]
-
-   | Native VoidStar
-
-   | NonRecP Bind Expr
-   | RecP    [Bind] Expr
-
-   | NonRecI Bind Expr
-   | RecI    [Bind] Expr
-
-   | LitI   Int#  -- and LitF Float# | LitD Double# | LitL Int64#
-   | LitS   FAST_STRING
-
-   | VarP   Vaa
-   | VarI   Vaa
-
-   | LamPP  Vaa Expr
-   | LamPI  Vaa Expr
-   | LamIP  Vaa Expr
-   | LamII  Vaa Expr
-
-   | AppPP  Expr Expr
-   | AppPI  Expr Expr
-   | AppIP  Expr Expr
-   | AppII  Expr Expr
-
-
-pprDefault Nothing = text "NO_DEFAULT"
-pprDefault (Just e) = text "DEFAULT ->" $$ nest 2 (pprExpr e)
-
-pprExpr expr
-   = case expr of
-        PrimOpI op args -> doPrimOp 'I' op args
-        PrimOpP op args -> doPrimOp 'P' op args
-
-        VarI v    -> ppr v
-        VarP v    -> ppr v
-        LitI i#   -> int (I# i#) <> char '#'
-        LitS s    -> char '"' <> ptext s <> char '"'
-
-        LamPP v e -> doLam "PP" v e
-        LamPI v e -> doLam "PI" v e
-        LamIP v e -> doLam "IP" v e
-        LamII v e -> doLam "II" v e
-
-        AppPP f a -> doApp "PP" f a
-        AppPI f a -> doApp "PI" f a
-        AppIP f a -> doApp "IP" f a
-        AppII f a -> doApp "II" f a
-
-        CasePrimI b sc alts def -> doCasePrim 'I' b sc alts def
-        CasePrimP b sc alts def -> doCasePrim 'P' b sc alts def
-
-        CaseAlgI b sc alts def -> doCaseAlg 'I' b sc alts def
-        CaseAlgP b sc alts def -> doCaseAlg 'P' b sc alts def
-
-        NonRecP bind body -> doNonRec 'P' bind body
-
-        AppCon    i          -> doAppCon "" i []
-        AppConI   i a1       -> doAppCon "" i [a1]
-        AppConP   i a1       -> doAppCon "" i [a1]
-        AppConPP  i a1 a2    -> doAppCon "" i [a1,a2]
-        AppConPPP i a1 a2 a3 -> doAppCon "" i [a1,a2,a3]
-
-        other     -> text "pprExpr: unimplemented tag:" 
-                     <+> text (showExprTag other)
+mkITbl :: TyCon -> IO ItblEnv
+mkITbl tc
+--   | trace ("TYCON: " ++ showSDoc (ppr tc)) False
+--   = error "?!?!"
+   | not (isDataTyCon tc) 
+   = return emptyFM
+   | n == length dcs  -- paranoia; this is an assertion.
+   = make_constr_itbls dcs
      where
-        doAppCon repstr itbl args
-           = text "Con" <> text repstr <> char '_' <> (int (addrToInt itbl)) 
-             <+> char '[' <> hsep (map pprExpr args) <> char ']'
-        doPrimOp repchar op args
-           = char repchar <> ppr op <+> char '[' <> hsep (map pprExpr args) <> char ']'
-        doNonRec repchr bind body
-           = vcat [text "let" <> char repchr <+> pprBind bind, text "in", pprExpr body]
-        doCasePrim repchr b sc alts def
-           = sep [text "CasePrim" <> char repchr 
-                     <+> pprExpr sc <+> text "of" <+> ppr b <+> char '{',
-                  nest 2 (vcat (map pprAltPrim alts) $$ pprDefault def),
-                  char '}'
-                 ]
-
-        doCaseAlg repchr b sc alts def
-           = sep [text "CaseAlg" <> char repchr 
-                     <+> pprExpr sc <+> text "of" <+> ppr b <+> char '{',
-                  nest 2 (vcat (map pprAltAlg alts) $$ pprDefault def),
-                  char '}'
-                 ]
-
-        doApp repstr f a
-           = text "(@" <> text repstr <+> pprExpr f <+> pprExpr a <> char ')'
-        doLam repstr v e 
-           = (char '\\' <> text repstr <+> ppr v <+> text "->") $$ pprExpr e
-
-data VoidStar 
-   = VoidStar
+        dcs = tyConDataCons tc
+        n   = tyConFamilySize tc
 
 
+linkIBinds :: ItblEnv -> ClosureEnv -> [UnlinkedIBind] -> 
+   ([LinkedIBind], ItblEnv, ClosureEnv)
+linkIBinds ie ce binds
+  = (new_binds, ie, ce) 
+  where new_binds = map (linkIBind ie ce) binds
 
-showExprTag :: Expr -> String
-showExprTag expr
-   = case expr of
-        CaseAlgP  _ _ _ _ -> "CaseAlgP"
-        CasePrimP _ _ _ _ -> "CasePrimP"
-        CaseAlgI  _ _ _ _ -> "CaseAlgI"
-        CasePrimI _ _ _ _ -> "CasePrimI"
-        AppCon _          -> "AppCon"
-        AppConI _ _       -> "AppConI"
-        AppConP _ _       -> "AppConP"
-        AppConPP _ _ _    -> "AppConPP"
-        AppConPPP _ _ _ _ -> "AppConPPP"
-        PrimOpI _ _       -> "PrimOpI"
-        Native _          -> "Native"
-        NonRecP _ _       -> "NonRecP"
-        RecP _ _          -> "RecP"
-        NonRecI _ _       -> "NonRecI"
-        RecI _ _          -> "RecI"
-        LitI _            -> "LitI"
-        LitS _            -> "LitS"
-        VarP _            -> "VarP"
-        VarI _            -> "VarI"
-        LamPP _ _         -> "LamPP"
-        LamPI _ _         -> "LamPI"
-        LamIP _ _         -> "LamIP"
-        LamII _ _         -> "LamII"
-        AppPP _ _         -> "AppPP"
-        AppPI _ _         -> "AppPI"
-        AppIP _ _         -> "AppIP"
-        AppII _ _         -> "AppII"
-        other             -> "(showExprTag:unhandled case)"
+linkIBinds' ie ce binds 
+  = new_binds where (new_binds, ie, ce) = linkIBinds ie ce binds
+
+linkIBind ie ce (IBind bndr expr) = IBind bndr (linkIExpr ie ce expr)
+
+linkIExpr ie ce expr = case expr of
+
+   CaseAlgP  bndr expr alts dflt -> 
+	CaseAlgP bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+
+   CaseAlgI  bndr expr alts dflt ->
+	CaseAlgI bndr (linkIExpr ie ce expr) (linkAlgAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+
+   CasePrimP bndr expr alts dflt ->
+	CasePrimP bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+
+   CasePrimI bndr expr alts dflt ->
+	CasePrimI bndr (linkIExpr ie ce expr) (linkPrimAlts ie ce alts)
+	   		(linkDefault ie ce dflt)
+   
+   ConApp con -> 
+	ConApp (lookupCon ie con)
+
+   ConAppI   con arg0 -> 
+	ConAppI (lookupCon ie con) (linkIExpr ie ce arg0)
+
+   ConAppP   con arg0 ->
+	ConAppP (lookupCon ie con) (linkIExpr ie ce arg0)
+
+   ConAppPP  con arg0 arg1 -> 
+	ConAppPP (lookupCon ie con) (linkIExpr ie ce arg0) (linkIExpr ie ce arg1)
+
+   ConAppPPP con arg0 arg1 arg2 -> 
+	ConAppPPP (lookupCon ie con) (linkIExpr ie ce arg0) 
+			(linkIExpr ie ce arg1) (linkIExpr ie ce arg2)
+   
+   PrimOpI op args -> PrimOpI op (map (linkIExpr ie ce) args)
+   PrimOpP op args -> PrimOpP op (map (linkIExpr ie ce) args)
+   
+   NonRecP bind expr  -> NonRecP (linkIBind ie ce bind) (linkIExpr ie ce expr)
+   RecP    binds expr -> RecP (linkIBinds' ie ce binds) (linkIExpr ie ce expr)
+   
+   NonRecI bind expr  -> NonRecI (linkIBind ie ce bind) (linkIExpr ie ce expr)
+   RecI    binds expr -> RecI (linkIBinds' ie ce binds) (linkIExpr ie ce expr)
+   
+   LitI i -> LitI i
+   LitS s -> LitS s
+
+   Native var -> lookupNative ce var
+   
+   VarP v -> lookupVar ce VarP v
+   VarI v -> lookupVar ce VarI v
+   
+   LamPP  bndr expr -> LamPP bndr (linkIExpr ie ce expr)
+   LamPI  bndr expr -> LamPI bndr (linkIExpr ie ce expr)
+   LamIP  bndr expr -> LamIP bndr (linkIExpr ie ce expr)
+   LamII  bndr expr -> LamII bndr (linkIExpr ie ce expr)
+   
+   AppPP  fun arg -> AppPP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppPI  fun arg -> AppPI (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppIP  fun arg -> AppIP (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+   AppII  fun arg -> AppII (linkIExpr ie ce fun) (linkIExpr ie ce arg)
+
+lookupCon ie con = 
+  case lookupFM ie con of
+    Just addr -> addr
+    Nothing   -> 
+	-- try looking up in the object files.
+	case {-HACK!!!-}
+		unsafePerformIO (lookupSymbol (rdrNameToCLabel con "con_info")) of
+	    Just addr -> addr
+	    Nothing   -> pprPanic "linkIExpr" (ppr con)
+
+lookupNative ce var =
+  case lookupFM ce var of
+    Just e  -> Native e
+    Nothing -> 
+        -- try looking up in the object files.
+	let lbl = (rdrNameToCLabel var "closure")
+	    addr = unsafePerformIO (lookupSymbol lbl) in
+	case {- trace (lbl ++ " -> " ++ show addr) $ -} addr of
+	    Just (A# addr) -> Native (unsafeCoerce# addr)
+	    Nothing   -> pprPanic "linkIExpr" (ppr var)
+
+-- some VarI/VarP refer to top-level interpreted functions; we change
+-- them into Natives here.
+lookupVar ce f v =
+  case lookupFM ce (toRdrName v) of
+	Nothing -> f v
+	Just e  -> Native e
+
+-- HACK!!!  ToDo: cleaner
+rdrNameToCLabel :: RdrName -> String{-suffix-} -> String
+rdrNameToCLabel rn suffix = 
+  _UNPK_(rdrNameModule rn) ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
+
+linkAlgAlts ie ce = map (linkAlgAlt ie ce)
+linkAlgAlt ie ce (AltAlg tag args rhs) = AltAlg tag args (linkIExpr ie ce rhs)
+
+linkPrimAlts ie ce = map (linkPrimAlt ie ce)
+linkPrimAlt ie ce (AltPrim lit rhs)
+   = AltPrim (linkIExpr ie ce lit) (linkIExpr ie ce rhs)
+
+linkDefault ie ce Nothing = Nothing
+linkDefault ie ce (Just expr) = Just (linkIExpr ie ce expr)
+
+-- ---------------------------------------------------------------------------
+-- The interpreter proper
+-- ---------------------------------------------------------------------------
 
 -- The dynamic environment contains everything boxed.
 -- eval* functions which look up values in it will know the
 -- representation of the thing they are looking up, so they
 -- can cast/unbox it as necessary.
-type DEnv a = [(Vaa, a)]
 
--- whereas the static env contains trees for top-level binds.
-type SEnv = [(Vaa, Expr)]
+-- ---------------------------------------------------------------------------
+-- Evaluator for things of boxed (pointer) representation
+-- ---------------------------------------------------------------------------
 
-------------------------------------------------------------------------
---- The interpreter proper                                           ---
-------------------------------------------------------------------------
+evalP :: LinkedIExpr -> UniqFM boxed -> boxed
 
-mkInitialSEnv :: [Bind] -> SEnv
-mkInitialSEnv binds
-   = unsafeCoerce# [(var,rhs) | Bind var rhs <- binds]
-
-
---------------------------------------------------------
---- Evaluator for things of boxed (pointer) representation
---------------------------------------------------------
-
-evalP :: Expr -> SEnv -> DEnv boxed -> boxed
-
-evalP expr se de
+evalP expr de
 --   | trace ("evalP: " ++ showExprTag expr) False
-   | trace ("evalP:\n" ++ showSDoc (pprExpr expr) ++ "\n") False
+   | trace ("evalP:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
    = error "evalP: ?!?!"
 
-evalP (Native p) se de
-   = unsafeCoerce# p
+evalP (Native p) de  = unsafeCoerce# p
 
 -- First try the dynamic env.  If that fails, assume it's a top-level
 -- binding and look in the static env.  That gives an Expr, which we
 -- must convert to a boxed thingy by applying evalP to it.  Because
 -- top-level bindings are always ptr-rep'd (either lambdas or boxed
 -- CAFs), it's always safe to use evalP.
-evalP (VarP v) se de 
-   = case lookupDeP de v of
+evalP (VarP v) de 
+   = case lookupUFM de v of
         Just xx -> xx
-        Nothing -> evalP (lookupSe se v) se de 
-
+        Nothing -> error ("evalP: lookupUFM " ++ show v)
 
 -- Deal with application of a function returning a pointer rep
 -- to arguments of any persuasion.  Note that the function itself
 -- always has pointer rep.
-evalP (AppIP e1 e2) se de 
-   = unsafeCoerce# (evalP e1 se de) (evalI e2 se de)
-evalP (AppPP e1 e2) se de 
-   = unsafeCoerce# (evalP e1 se de) (evalP e2 se de)
+evalP (AppIP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalI e2 de)
+evalP (AppPP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalP e2 de)
 
 
 -- Lambdas always return P-rep, but we need to do different things
 -- depending on both the argument and result representations.
-evalP (LamPP x b) se de
+evalP (LamPP x b) de
    = unsafeCoerce# 
-        (\ xP -> evalP b se (augment de x xP))
-evalP (LamPI x b) se de
+        (\ xP -> evalP b (addToUFM de x xP))
+evalP (LamPI x b) de
    = unsafeCoerce# 
-        (\ xP -> evalI b se (augment de x xP))
-evalP (LamIP x b) se de
+        (\ xP -> evalI b (addToUFM de x xP))
+evalP (LamIP x b) de
    = unsafeCoerce# 
-        (\ xI -> evalP b se (augment de x (unsafeCoerce# (I# xI))))
-evalP (LamII x b) se de
+        (\ xI -> evalP b (addToUFM de x (unsafeCoerce# (I# xI))))
+evalP (LamII x b) de
    = unsafeCoerce#
-        (\ xI -> evalI b se (augment de x (unsafeCoerce# (I# xI))))
+        (\ xI -> evalI b (addToUFM de x (unsafeCoerce# (I# xI))))
 
 
 -- NonRec, Rec, CaseAlg and CasePrim are the same for all result reps, 
 -- except in the sense that we go on and evaluate the body with whichever
 -- evaluator was used for the expression as a whole.
-evalP (NonRecP bind b) se de
-   = evalP b se (augment_nonrec bind se de)
-evalP (RecP binds b) se de
-   = evalP b se (augment_rec binds se de)
-evalP (CaseAlgP bndr expr alts def) se de
-   = case helper_caseAlg bndr expr alts def se de of
-        (rhs, de') -> evalP rhs se de'
-evalP (CasePrimP bndr expr alts def) se de
-   = case helper_casePrim bndr expr alts def se de of
-        (rhs, de') -> evalP rhs se de'
+evalP (NonRecP bind e) de
+   = evalP e (augment_nonrec bind de)
+evalP (RecP binds b) de
+   = evalP b (augment_rec binds de)
+evalP (CaseAlgP bndr expr alts def) de
+   = case helper_caseAlg bndr expr alts def de of
+        (rhs, de') -> evalP rhs de'
+evalP (CasePrimP bndr expr alts def) de
+   = case helper_casePrim bndr expr alts def de of
+        (rhs, de') -> evalP rhs de'
 
 {-
--- AppCon can only be handled by evalP
-evalP (AppCon itbl args) se de
+-- ConApp can only be handled by evalP
+evalP (ConApp itbl args) se de
    = loop args
      where
         -- This appalling hack suggested (gleefully) by SDM
@@ -627,35 +628,35 @@ evalP (AppCon itbl args) se de
         loop (a:as) 
            = trace "loop-not-empty" (
              case repOf a of
-                RepI -> case evalI a se de of i# -> loop as i#
-                RepP -> let p = evalP a se de in loop as p                
+                RepI -> case evalI a de of i# -> loop as i#
+                RepP -> let p = evalP a de in loop as p                
              )
 -}
 
-evalP (AppConI (A# itbl) a1) se de
-   = case evalI a1 se de of i1 -> mci_make_constrI itbl i1
+evalP (ConAppI (A# itbl) a1) de
+   = case evalI a1 de of i1 -> mci_make_constrI itbl i1
 
-evalP (AppCon (A# itbl)) se de
+evalP (ConApp (A# itbl)) de
    = mci_make_constr itbl
 
-evalP (AppConP (A# itbl) a1) se de
-   = let p1 = evalP a1 se de
+evalP (ConAppP (A# itbl) a1) de
+   = let p1 = evalP a1 de
      in  mci_make_constrP itbl p1
 
-evalP (AppConPP (A# itbl) a1 a2) se de
-   = let p1 = evalP a1 se de
-         p2 = evalP a2 se de
+evalP (ConAppPP (A# itbl) a1 a2) de
+   = let p1 = evalP a1 de
+         p2 = evalP a2 de
      in  mci_make_constrPP itbl p1 p2
 
-evalP (AppConPPP (A# itbl) a1 a2 a3) se de
-   = let p1 = evalP a1 se de
-         p2 = evalP a2 se de
-         p3 = evalP a3 se de
+evalP (ConAppPPP (A# itbl) a1 a2 a3) de
+   = let p1 = evalP a1 de
+         p2 = evalP a2 de
+         p3 = evalP a3 de
      in  mci_make_constrPPP itbl p1 p2 p3
 
 
 
-evalP other se de
+evalP other de
    = error ("evalP: unhandled case: " ++ showExprTag other)
 
 --------------------------------------------------------
@@ -664,99 +665,133 @@ evalP other se de
 
 
 -- Evaluate something which has an unboxed Int rep
-evalI :: Expr -> SEnv -> DEnv boxed -> Int#
+evalI :: LinkedIExpr -> UniqFM boxed -> Int#
 
-evalI expr se de
+evalI expr de
 --   | trace ("evalI: " ++ showExprTag expr) False
-   | trace ("evalI:\n" ++ showSDoc (pprExpr expr) ++ "\n") False
-   = error "evalP: ?!?!"
+   | trace ("evalI:\n" ++ showSDoc (pprIExpr expr) ++ "\n") False
+   = error "evalI: ?!?!"
 
-evalI (LitI i#) se de = i#
+evalI (LitI i#) de = i#
 
-evalI (VarI v) se de = lookupDeI de v
+evalI (LitS s) de  = 
+  case s of
+     CharStr s i -> addr2Int# s
+
+     FastString _ l ba -> 
+	-- sigh, a string in the heap is no good to us.  We need a static
+	-- C pointer, since the type of a string literal is Addr#.  So,
+	-- copy the string into C land and introduce a memory leak at the
+	-- same time.
+	let n = I# l in
+	case unsafePerformIO (do a <- malloc n; 
+				 strncpy a ba (fromIntegral n); 
+				 writeCharOffAddr a n '\0'
+				 return a) 
+	of  A# a -> addr2Int# a
+
+     _           -> error "StgInterp.evalI: unhandled string constant type"
+
+evalI (VarI v) de = 
+   case lookupUFM de v of
+	Just e  -> case unsafeCoerce# e of I# i -> i
+	Nothing -> error ("evalI: lookupUFM " ++ show v)
 
 -- Deal with application of a function returning an Int# rep
 -- to arguments of any persuasion.  Note that the function itself
 -- always has pointer rep.
-evalI (AppII e1 e2) se de 
-   = unsafeCoerce# (evalP e1 se de) (evalI e2 se de)
-evalI (AppPI e1 e2) se de
-   = unsafeCoerce# (evalP e1 se de) (evalP e2 se de)
+evalI (AppII e1 e2) de 
+   = unsafeCoerce# (evalP e1 de) (evalI e2 de)
+evalI (AppPI e1 e2) de
+   = unsafeCoerce# (evalP e1 de) (evalP e2 de)
 
 -- NonRec, Rec, CaseAlg and CasePrim are the same for all result reps, 
 -- except in the sense that we go on and evaluate the body with whichever
 -- evaluator was used for the expression as a whole.
-evalI (NonRecI bind b) se de
-   = evalI b se (augment_nonrec bind se de)
-evalI (RecI binds b) se de
-   = evalI b se (augment_rec binds se de)
-evalI (CaseAlgI bndr expr alts def) se de
-   = case helper_caseAlg bndr expr alts def se de of
-        (rhs, de') -> evalI rhs se de'
-evalI (CasePrimI bndr expr alts def) se de
-   = case helper_casePrim bndr expr alts def se de of
-        (rhs, de') -> evalI rhs se de'
+evalI (NonRecI bind b) de
+   = evalI b (augment_nonrec bind de)
+evalI (RecI binds b) de
+   = evalI b (augment_rec binds de)
+evalI (CaseAlgI bndr expr alts def) de
+   = case helper_caseAlg bndr expr alts def de of
+        (rhs, de') -> evalI rhs de'
+evalI (CasePrimI bndr expr alts def) de
+   = case helper_casePrim bndr expr alts def de of
+        (rhs, de') -> evalI rhs de'
 
 -- evalI can't be applied to a lambda term, by defn, since those
 -- are ptr-rep'd.
 
-evalI (PrimOpI IntAddOp [e1,e2]) se de  = evalI e1 se de +# evalI e2 se de
-evalI (PrimOpI IntSubOp [e1,e2]) se de  = evalI e1 se de -# evalI e2 se de
+evalI (PrimOpI IntAddOp [e1,e2]) de  = evalI e1 de +# evalI e2 de
+evalI (PrimOpI IntSubOp [e1,e2]) de  = evalI e1 de -# evalI e2 de
 
---evalI (NonRec (Bind v e) b) se de
---   = evalI b (augment se de v (eval e se de))
+--evalI (NonRec (IBind v e) b) de
+--   = evalI b (augment de v (eval e de))
 
-evalI other se de
+evalI other de
    = error ("evalI: unhandled case: " ++ showExprTag other)
-
 
 --------------------------------------------------------
 --- Helper bits and pieces
 --------------------------------------------------------
 
--- Find something in the dynamic environment.  The values are
--- always boxed, but the caller of lookupDe* knows what representation
--- the thing really is, so we unbox it accordingly here.
-
-lookupDeI :: DEnv boxed -> Var -> Int#
-lookupDeI []          v' = error ("lookupDeI: " ++ show v')
-lookupDeI ((v,u):vus) v' 
-   | v == v'   = case unsafeCoerce# u of I# i -> i 
-   | otherwise = lookupDeI vus v' 
-
--- Here, we want to allow the lookup to fail, since in that
--- case the caller (evalP VarP) will then need to search the
--- static environment instead.
-lookupDeP :: DEnv boxed -> Var -> Maybe boxed
-lookupDeP []          v' = Nothing
-lookupDeP ((v,u):vus) v' 
-   | v == v'   = Just u
-   | otherwise = lookupDeP vus v' 
-
--- Find something in the static (top-level-binds) environment.
-lookupSe :: SEnv -> Var -> Expr
-lookupSe []          v' = error ("lookupSe: " ++ show v')
-lookupSe ((v,u):vus) v' 
-   | v == v'   = u
-   | otherwise = lookupSe vus v' 
-
-
 -- Find the Rep of any Expr
-repOf :: Expr -> Rep
+repOf :: LinkedIExpr -> Rep
 
-repOf (LamII _ _)      = RepP    -- careful!  Lambdas are always P-rep
-repOf (LamPP _ _)      = RepP
+repOf (LamPP _ _)      = RepP 
+repOf (LamPI _ _)      = RepP 
+repOf (LamPF _ _)      = RepP 
+repOf (LamPD _ _)      = RepP 
+repOf (LamIP _ _)      = RepP 
+repOf (LamII _ _)      = RepP 
+repOf (LamIF _ _)      = RepP 
+repOf (LamID _ _)      = RepP 
+repOf (LamFP _ _)      = RepP 
+repOf (LamFI _ _)      = RepP 
+repOf (LamFF _ _)      = RepP 
+repOf (LamFD _ _)      = RepP 
+repOf (LamDP _ _)      = RepP 
+repOf (LamDI _ _)      = RepP 
+repOf (LamDF _ _)      = RepP 
+repOf (LamDD _ _)      = RepP 
 
-repOf (NonRecI _ _)    = RepI
-repOf (LitI _)         = RepI
-repOf (VarI _)         = RepI
-repOf (PrimOpI _ _)    = RepI
-
-repOf (AppII _ _)      = RepI
-repOf (AppPI _ _)      = RepI
 repOf (AppPP _ _)      = RepP
+repOf (AppPI _ _)      = RepP
+repOf (AppPF _ _)      = RepP
+repOf (AppPD _ _)      = RepP
+repOf (AppIP _ _)      = RepP
+repOf (AppII _ _)      = RepP
+repOf (AppIF _ _)      = RepP
+repOf (AppID _ _)      = RepP
+repOf (AppFP _ _)      = RepP
+repOf (AppFI _ _)      = RepP
+repOf (AppFF _ _)      = RepP
+repOf (AppFD _ _)      = RepP
+repOf (AppDP _ _)      = RepP
+repOf (AppDI _ _)      = RepP
+repOf (AppDF _ _)      = RepP
+repOf (AppDD _ _)      = RepP
 
-repOf (AppConPP _ _ _) = RepP -- as are all AppCon's
+repOf (NonRecP _ _)    = RepP
+repOf (NonRecI _ _)    = RepI
+
+repOf (LitI _)         = RepI
+repOf (LitS _)         = RepI
+
+repOf (VarI _)         = RepI
+repOf (VarP _)         = RepI
+
+repOf (PrimOpI _ _)    = RepI
+repOf (PrimOpP _ _)    = RepP
+
+repOf (ConApp _)       = RepP
+repOf (ConAppI _ _)    = RepP
+repOf (ConAppP _ _)    = RepP
+repOf (ConAppPP _ _ _) = RepP
+repOf (ConAppPPP _ _ _ _) = RepP
+
+repOf (CaseAlgP _ _ _ _) = RepP
+
 repOf other         
    = error ("repOf: unhandled case: " ++ showExprTag other)
 
@@ -771,75 +806,71 @@ repSizeW RepP = 1
 -- to create values to put in the environment.  You can't use it 
 -- to create a value which might get passed to native code since that
 -- code will have no idea that unboxed things have been boxed.
-eval :: Expr -> SEnv -> DEnv boxed -> boxed
-eval expr se de
+eval :: LinkedIExpr -> UniqFM boxed -> boxed
+eval expr de
    = case repOf expr of
-        RepI -> unsafeCoerce# (I# (evalI expr se de))
-        RepP -> evalP expr se de
+        RepI -> unsafeCoerce# (I# (evalI expr de))
+        RepP -> evalP expr de
 
 
 -- Evaluate the scrutinee of a case, select an alternative,
 -- augment the environment appropriately, and return the alt
 -- and the augmented environment.
-helper_caseAlg :: Var -> Expr -> [AltAlg] -> Maybe Expr 
-                  -> SEnv -> DEnv boxed
-                  -> (Expr, DEnv boxed)
-helper_caseAlg bndr expr alts def se de
-   = let exprEv = evalP expr se de
+helper_caseAlg :: Id -> LinkedIExpr -> [LinkedAltAlg] -> Maybe LinkedIExpr 
+                  -> UniqFM boxed
+                  -> (LinkedIExpr, UniqFM boxed)
+helper_caseAlg bndr expr alts def de
+   = let exprEv = evalP expr de
      in  
      exprEv `seq` -- vitally important; otherwise exprEv is never eval'd
+     trace "returned" $
      case select_altAlg (tagOf exprEv) alts def of
-        (vars,rhs) -> (rhs, augment_from_constr (augment de bndr exprEv) 
+        (vars,rhs) -> (rhs, augment_from_constr (addToUFM de bndr exprEv) 
                                                 exprEv (vars,1))
 
-helper_casePrim :: Var -> Expr -> [AltPrim] -> Maybe Expr 
-                   -> SEnv -> DEnv boxed
-                   -> (Expr, DEnv boxed)
-helper_casePrim bndr expr alts def se de
+helper_casePrim :: Var -> LinkedIExpr -> [LinkedAltPrim] -> Maybe LinkedIExpr 
+                   -> UniqFM boxed
+                   -> (LinkedIExpr, UniqFM boxed)
+helper_casePrim bndr expr alts def de
    = case repOf expr of
         -- Umm, can expr have any other rep?  Yes ...
         -- CharRep, DoubleRep, FloatRep.  What about string reps?
-        RepI -> case evalI expr se de of 
+        RepI -> case evalI expr de of 
                    i# -> (select_altPrim alts def (LitI i#), 
-                          augment de bndr (unsafeCoerce# (I# i#)))
+                          addToUFM de bndr (unsafeCoerce# (I# i#)))
 
 
-augment_from_constr :: DEnv boxed -> a -> ([VaaRep],Int) -> DEnv boxed
+augment_from_constr :: UniqFM boxed -> a -> ([(Id,Rep)],Int) -> UniqFM boxed
 augment_from_constr de con ([],offset) 
    = de
-augment_from_constr de con (v:vs,offset)
+augment_from_constr de con ((v,rep):vs,offset)
    = let v_binding
-            = case repOfVaa v of
+            = case rep of
                  RepP -> indexPtrOffClosure con offset
                  RepI -> unsafeCoerce# (I# (indexIntOffClosure con offset))
      in
-         augment_from_constr ((varOfVaa v,v_binding):de) con 
-                             (vs,offset + repSizeW (repOfVaa v))
+         augment_from_constr (addToUFM de v v_binding) con 
+                             (vs,offset + repSizeW rep)
 
 -- Augment the environment for a non-recursive let.
-augment_nonrec :: Bind -> SEnv -> DEnv boxed -> DEnv boxed
-augment_nonrec (Bind v e) se de
-   = (v, eval e se de) : de
+augment_nonrec :: LinkedIBind -> UniqFM boxed -> UniqFM boxed
+augment_nonrec (IBind v e) de  = addToUFM de v (eval e de)
 
 -- Augment the environment for a recursive let.
-augment_rec :: [Bind] -> SEnv -> DEnv boxed -> DEnv boxed
-augment_rec binds se de
+augment_rec :: [LinkedIBind] -> UniqFM boxed -> UniqFM boxed
+augment_rec binds de
    = let vars   = map binder binds
          rhss   = map bindee binds
-         rhs_vs = map (\rhs -> eval rhs se de') rhss
-         de'    = zip vars rhs_vs ++ de
+         rhs_vs = map (\rhs -> eval rhs de') rhss
+         de'    = addListToUFM de (zip vars rhs_vs)
      in
          de'
-
-augment :: DEnv boxed -> Var -> boxed -> DEnv boxed
-augment de v e = ((v,e):de)
-
 
 -- a must be a constructor?
 tagOf :: a -> Int
 tagOf x = I# (dataToTag# x)
 
-select_altAlg :: Int -> [AltAlg] -> Maybe Expr -> ([VaaRep],Expr)
+select_altAlg :: Int -> [LinkedAltAlg] -> Maybe LinkedIExpr -> ([(Id,Rep)],LinkedIExpr)
 select_altAlg tag [] Nothing = error "select_altAlg: no match and no default?!"
 select_altAlg tag [] (Just def) = ([],def)
 select_altAlg tag ((AltAlg tagNo vars rhs):alts) def
@@ -848,7 +879,7 @@ select_altAlg tag ((AltAlg tagNo vars rhs):alts) def
      else select_altAlg tag alts def
 
 -- literal may only be a literal, not an arbitrary expression
-select_altPrim :: [AltPrim] -> Maybe Expr -> Expr -> Expr
+select_altPrim :: [LinkedAltPrim] -> Maybe LinkedIExpr -> LinkedIExpr -> LinkedIExpr
 select_altPrim [] Nothing    literal = error "select_altPrim: no match and no default?!"
 select_altPrim [] (Just def) literal = def
 select_altPrim ((AltPrim lit rhs):alts) def literal
@@ -880,16 +911,18 @@ cONSTR = 1  -- as defined in ghc/includes/ClosureTypes.h
 make_constr_itbls :: [DataCon] -> IO ItblEnv
 make_constr_itbls cons
    | length cons <= 8
-   = mapM mk_vecret_itbl (zip cons [0..])
+   = do is <- mapM mk_vecret_itbl (zip cons [0..])
+	return (listToFM is)
    | otherwise
-   = mapM mk_dirret_itbl (zip cons [0..])
+   = do is <- mapM mk_dirret_itbl (zip cons [0..])
+	return (listToFM is)
      where
         mk_vecret_itbl (dcon, conNo)
            = mk_itbl dcon conNo (vecret_entry conNo)
         mk_dirret_itbl (dcon, conNo)
            = mk_itbl dcon conNo mci_constr_entry
 
-        mk_itbl :: DataCon -> Int -> Addr -> IO (DataCon,Addr)
+        mk_itbl :: DataCon -> Int -> Addr -> IO (RdrName,Addr)
         mk_itbl dcon conNo entry_addr
            = let (tot_wds, ptr_wds, _) 
                     = mkVirtHeapOffsets typePrimRep (dataConRepArgTys dcon)
@@ -924,7 +957,7 @@ make_constr_itbls cons
                     putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     putStrLn ("# nptrs of itbl is " ++ show nptrs)
                     poke addr itbl
-                    return (dcon, intToAddr (addrToInt addr + 8))
+                    return (toRdrName dcon, intToAddr (addrToInt addr + 8))
 
 
 byte :: Int -> Word32 -> Word32
@@ -1032,7 +1065,10 @@ load :: Storable a => Addr -> IO (Addr, a)
 load addr = do x <- peek addr
                return (addr `plusAddr` fromIntegral (sizeOf x), x)
 
-#endif /* ndef GHCI */
+-----------------------------------------------------------------------------q
 
+foreign import "strncpy" strncpy :: Addr -> ByteArray# -> CInt -> IO ()
+
+#endif /* ndef GHCI */
 \end{code}
 
