@@ -34,15 +34,13 @@ module Debug.Trace (
   ) where
 
 import Prelude
+import Data.IORef
 import System.IO.Unsafe
 import System.IO
 
-#ifdef __GLASGOW_HASKELL__
-import GHC.IOBase
-import GHC.Handle
-#endif
-
+#ifdef mingw32_TARGET_OS
 import Foreign.C.String
+#endif
 
 {-# NOINLINE tracers #-}
 tracers :: IORef [(String, String -> IO ())]
