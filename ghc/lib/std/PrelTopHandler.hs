@@ -1,7 +1,7 @@
+{-# OPTIONS -#include "PrelIOUtils.h" #-}
 -- -----------------------------------------------------------------------------
--- $Id: PrelTopHandler.lhs,v 1.5 2001/08/17 11:13:04 rrt Exp $
 --
--- (c) The University of Glasgow, 2001
+-- (c) The University of Glasgow, 1994-
 --
 -- PrelTopHandler
 --
@@ -16,8 +16,9 @@
 -- These functions can't go in PrelMain, because PrelMain isn't
 -- included in HSstd.o (because PrelMain depends on Main, which
 -- doesn't exist yet...).
-
-\begin{code}
+--
+-- Note: used to be called PrelTopHandler.lhs, so if you're looking
+--       for CVS info, try 'cvs log'ging it too.
 module PrelTopHandler (
    topHandler, reportStackOverflow, reportError 
   ) where
@@ -83,4 +84,4 @@ foreign import ccall "stackOverflow" unsafe
 
 foreign import ccall "stg_exit" unsafe
 	stg_exit :: Int -> IO ()
-\end{code}
+
