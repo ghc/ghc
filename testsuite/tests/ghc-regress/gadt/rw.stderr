@@ -1,0 +1,16 @@
+
+rw.hs:14:46:
+    Couldn't match the rigid variable `a' against `Int'
+      `a' is bound by the type signature for `writeInt'
+      Expected type: a
+      Inferred type: Int
+    In the expression: 1 :: Int
+    In the second argument of `writeIORef', namely `(1 :: Int)'
+
+rw.hs:19:42:
+    Couldn't match the rigid variable `a' against `Bool'
+      `a' is bound by the type signature for `readBool'
+      Expected type: a -> IO b
+      Inferred type: Bool -> IO ()
+    In the expression: print . not
+    In the second argument of `(>>=)', namely `(print . not)'
