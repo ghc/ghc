@@ -21,7 +21,7 @@ module Module
     , mkVanillaModule	    -- :: ModuleName -> Module
     , mkThisModule	    -- :: ModuleName -> Module
     , mkPrelModule          -- :: UserString -> Module
-
+    
     , isDynamicModule       -- :: Module -> Bool
     , isLibModule
 
@@ -192,10 +192,16 @@ pprModule (Module mod _ _) = pprEncodedFS mod
 mkModule = Module
 
 mkVanillaModule :: ModuleName -> Module
-mkVanillaModule name = Module name UserMod NotDll
+mkVanillaModule name = Module name UserMod dell
+ where
+  dell | opt_Static || opt_CompilingPrelude = NotDll
+       | otherwise		 	    = Dll
+
 
 mkThisModule :: ModuleName -> Module	-- The module being comiled
-mkThisModule name = Module name UserMod NotDll	-- ToDo: correct Dll flag?
+mkThisModule name = 
+  Module name UserMod NotDll -- This is fine, a Dll flag is only
+  			     -- pinned on imported modules.
 
 mkPrelModule :: ModuleName -> Module
 mkPrelModule name = Module name sys dll
