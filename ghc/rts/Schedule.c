@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.120 2002/02/08 03:44:01 sof Exp $
+ * $Id: Schedule.c,v 1.121 2002/02/12 15:38:08 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -294,27 +294,30 @@ Mutex     rts_mutex         = INIT_MUTEX_VAR;
  */
 
 static nat threads_waiting = 0;
-/*
- * thread_ready_aux_mutex is used to handle the scenario where the
- * the RTS executing thread runs out of work, but there are
- * active external threads. The RTS executing thread gives up
- * its RTS mutex, and blocks waiting for the thread_ready_cond.
- * Unfortunately, a condition variable needs to be associated
- * with a mutex in pthreads, so rts_thread_waiting_mutex is
- * used for just this purpose.
- * 
- */
-Mutex  thread_ready_aux_mutex = INIT_MUTEX_VAR;
 #endif
 
 
-/* thread_ready_cond: when signalled, a thread has
- * become runnable. When used?
+/* thread_ready_cond: when signalled, a thread has become runnable for a
+ * task to execute.
+ *
+ * In the non-SMP case, it also implies that the thread that is woken up has
+ * exclusive access to the RTS and all its DS (that are not under sched_mutex's
+ * control).
+ *
+ * thread_ready_cond is signalled whenever COND_NO_THREADS_READY doesn't hold.
+ *
  */
 Condition thread_ready_cond = INIT_COND_VAR;
-Condition gc_pending_cond   = INIT_COND_VAR;
+#if 0
+/* For documentation purposes only */
+#define COND_NO_THREADS_READY() (noCapabilities() || EMPTY_RUN_QUEUE())
+#endif
 
+#if defined(SMP)
+Condition gc_pending_cond   = INIT_COND_VAR;
 nat await_death;
+#endif
+
 #endif
 
 #if defined(PAR)
@@ -621,9 +624,8 @@ schedule( void )
      * ToDo: what if another client comes along & requests another
      * main thread?
      */
-    if (blocked_queue_hd != END_TSO_QUEUE || sleeping_queue != END_TSO_QUEUE) {
-      awaitEvent(
-	   (run_queue_hd == END_TSO_QUEUE)
+    if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue) ) {
+      awaitEvent( EMPTY_RUN_QUEUE()
 #if defined(SMP)
 	&& allFreeCapabilities()
 #endif
@@ -644,13 +646,13 @@ schedule( void )
      * inform all the main threads.
      */
 #ifndef PAR
-    if (blocked_queue_hd == END_TSO_QUEUE
-	&& run_queue_hd == END_TSO_QUEUE
-	&& sleeping_queue == END_TSO_QUEUE
+    if (   EMPTY_QUEUE(blocked_queue_hd)
+	&& EMPTY_RUN_QUEUE()
+	&& EMPTY_QUEUE(sleeping_queue)
 #if defined(SMP)
 	&& allFreeCapabilities()
 #elif defined(THREADED_RTS)
-	&& suspended_ccalling_threads == END_TSO_QUEUE
+	&& EMPTY_QUEUE(suspended_ccalling_threads)
 #endif
 	)
     {
@@ -659,9 +661,9 @@ schedule( void )
 	GarbageCollect(GetRoots,rtsTrue);
 	ACQUIRE_LOCK(&sched_mutex);
 	IF_DEBUG(scheduler, sched_belch("GC done."));
-	if (blocked_queue_hd == END_TSO_QUEUE
-	    && run_queue_hd == END_TSO_QUEUE
-	    && sleeping_queue == END_TSO_QUEUE) {
+	if (   EMPTY_QUEUE(blocked_queue_hd)
+	    && EMPTY_RUN_QUEUE()
+	    && EMPTY_QUEUE(sleeping_queue) ) {
 
 	    IF_DEBUG(scheduler, sched_belch("still deadlocked, checking for black holes..."));
 	    detectBlackHoles();
@@ -671,7 +673,7 @@ schedule( void )
 	     * build, send *all* main threads the deadlock exception,
 	     * since none of them can make progress).
 	     */
-	    if (run_queue_hd == END_TSO_QUEUE) {
+	    if ( EMPTY_RUN_QUEUE() ) {
 		StgMainThread *m;
 #if defined(RTS_SUPPORTS_THREADS)
 		for (m = main_threads; m != NULL; m = m->link) {
@@ -703,13 +705,13 @@ schedule( void )
 #endif
 	    }
 #if defined(RTS_SUPPORTS_THREADS)
-	    if ( run_queue_hd == END_TSO_QUEUE ) {
+	    if ( EMPTY_RUN_QUEUE() ) {
 	      IF_DEBUG(scheduler, sched_belch("all done, it seems...shut down."));
 	      shutdownHaskellAndExit(0);
 	    
 	    }
 #endif
-	    ASSERT( run_queue_hd != END_TSO_QUEUE );
+	    ASSERT( !EMPTY_RUN_QUEUE() );
 	}
     }
 #elif defined(PAR)
@@ -730,26 +732,22 @@ schedule( void )
     /* block until we've got a thread on the run queue and a free
      * capability.
      */
-    while ( run_queue_hd == END_TSO_QUEUE 
-	    || noFreeCapabilities() 
-	    ) {
+    while ( noCapabilities() || EMPTY_RUN_QUEUE() ) {
       IF_DEBUG(scheduler, sched_belch("waiting for work"));
       waitCondition( &thread_ready_cond, &sched_mutex );
       IF_DEBUG(scheduler, sched_belch("work now available"));
     }
 #elif defined(THREADED_RTS)
-   if ( run_queue_hd == END_TSO_QUEUE ) {
+   if ( EMPTY_RUN_QUEUErun_queue_hd == END_TSO_QUEUE ) {
      /* no work available, wait for external calls to complete. */
      IF_DEBUG(scheduler, sched_belch("worker thread (%d): waiting for external thread to complete..", osThreadId()));
      taskAvailable();
-     RELEASE_LOCK(&sched_mutex);
      RELEASE_LOCK(&rts_mutex);
 
-     /* Sigh - need to have a mutex locked in order to wait on the
-        condition variable. */
-     ACQUIRE_LOCK(&thread_ready_aux_mutex);
-     waitCondition(&thread_ready_cond, &thread_ready_aux_mutex);
-     RELEASE_LOCK(&thread_ready_aux_mutex);
+     while ( EMPTY_RUN_QUEUE() ) {
+       waitCondition(&thread_ready_cond, &sched_mutex);
+     };
+     RELEASE_LOCK(&sched_mutex);
 
      IF_DEBUG(scheduler, sched_belch("worker thread (%d): re-awakened from no-work slumber..\n", osThreadId()));
      /* ToDo: longjmp() */
@@ -1538,9 +1536,10 @@ suspendThread( StgRegTable *reg )
   startTask(taskStart);
 
 #endif
-  
+
+  THREAD_RUNNABLE();
   RELEASE_LOCK(&sched_mutex);
-  RELEASE_LOCK(&rts_mutex);
+  //  RELEASE_LOCK(&rts_mutex);
   return tok; 
 }
 
@@ -1584,8 +1583,8 @@ resumeThread( StgInt tok )
   }
   tso->link = END_TSO_QUEUE;
 
-#if defined(SMP)
-  while ( noFreeCapabilities() ) {
+#if defined(RTS_SUPPORTS_THREADS)
+  while ( noCapabilities() ) {
     IF_DEBUG(scheduler, sched_belch("waiting to resume"));
     waitCondition(&thread_ready_cond, &sched_mutex);
     IF_DEBUG(scheduler, sched_belch("resuming thread %d", tso->id));
@@ -1976,14 +1975,14 @@ initScheduler(void)
 #if defined(RTS_SUPPORTS_THREADS)
   /* Initialise the mutex and condition variables used by
    * the scheduler. */
-  initMutex(&rts_mutex);
   initMutex(&sched_mutex);
   initMutex(&term_mutex);
+
+  initCondition(&thread_ready_cond);
 #if defined(THREADED_RTS)
-  initMutex(&thread_ready_aux_mutex);
+  initMutex(&rts_mutex);
 #endif
   
-  initCondition(&thread_ready_cond);
   initCondition(&gc_pending_cond);
 #endif
 
