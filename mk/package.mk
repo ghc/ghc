@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.35 2004/01/23 13:37:40 simonmar Exp $
+# $Id: package.mk,v 1.36 2004/02/07 14:08:57 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -24,11 +24,11 @@ endif
 
 package.conf.inplace   : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -x c $(PACKAGE_CPP_OPTS) $< | \
-	sed -e 's/""//g' -e 's/, ]/ ]/g' >$@
+	sed -e 's/""//g' -e 's/\[ *,/[ /g' >$@
 
 package.conf.installed : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< | \
-	sed -e 's/""//g' -e 's/, ]/ ]/g' >$@
+	sed -e 's/""//g' -e 's/\[ *,/[ /g' >$@
 
 # we could be more accurate here and add a dependency on
 # ghc/driver/package.conf, but that doesn't work too well because of
