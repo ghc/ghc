@@ -712,12 +712,19 @@ reportUnusedNames mod_name direct_import_mods
 	-- inst_mods are directly-imported modules that 
 	--	contain instance decl(s) that the renamer decided to suck in
 	-- It's not necessarily redundant to import such modules.
-	-- NOTE: import M () is not necessarily redundant, even if
+	--
+	-- NOTE: Consider 
+	--	      module This
+	--		import M ()
+	--
+	--	 The import M() is not *necessarily* redundant, even if
 	-- 	 we suck in no instance decls from M (e.g. it contains 
-	--	 no instance decls).  It may be that we import M solely to
-	--	 ensure that M's orphan instance decls (or those in its imports)
-	--	 are visible to people who import this module.  Sigh. There's
-	-- 	 really no good way to detect this, so the error message is weakened
+	--	 no instance decls, or This contains no code).  It may be 
+	--	 that we import M solely to ensure that M's orphan instance 
+	--	 decls (or those in its imports) are visible to people who 
+	--	 import This.  Sigh. 
+	--	 There's really no good way to detect this, so the error message 
+	--	 in RnEnv.warnUnusedModules is weakened instead
 	inst_mods = [m | InstD (InstDecl _ _ _ dfun _) <- imported_decls,
 			 let m = moduleName (nameModule dfun),
 			 m `elem` direct_import_mods
