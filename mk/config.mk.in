@@ -180,12 +180,6 @@ IncludeTestDirsInBuild=NO
 IncludeExampleDirsInBuild=NO
 
 #
-# Which ways should SGML documents be built?
-# options are: dvi ps pdf html rtf
-#
-SGMLDocWays=
-
-#
 # Which ways should DocBook XML documents be built?
 # options are: dvi ps pdf html
 #
