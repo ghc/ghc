@@ -549,6 +549,8 @@ tcMethodBind clas origin inst_tys inst_tyvars
 	| name == sel_name = SpecSig meth_name ty spec loc : find_prags meth_name prags
    find_prags meth_name (InlineSig name loc : prags)
 	| name == sel_name = InlineSig meth_name loc : find_prags meth_name prags
+   find_prags meth_name (NoInlineSig name loc : prags)
+	| name == sel_name = NoInlineSig meth_name loc : find_prags meth_name prags
    find_prags meth_name (prag:prags) = find_prags meth_name prags
 
    mk_default_bind local_meth_name loc

@@ -859,6 +859,9 @@ tcPragmaSig (SpecInstSig _ _) = returnTc (Nothing, EmptyMonoBinds, emptyLIE)
 tcPragmaSig (InlineSig name loc)
   = returnTc (Just (name, setInlinePragInfo IWantToBeINLINEd), EmptyMonoBinds, emptyLIE)
 
+tcPragmaSig (NoInlineSig name loc)
+  = returnTc (Just (name, setInlinePragInfo IDontWantToBeINLINEd), EmptyMonoBinds, emptyLIE)
+
 tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
   = 	-- SPECIALISE f :: forall b. theta => tau  =  g
     tcAddSrcLoc src_loc		 		$

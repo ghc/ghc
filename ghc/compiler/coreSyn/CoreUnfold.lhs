@@ -59,7 +59,11 @@ import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe )
 import Unique           ( Unique )
 import Util		( isIn, panic, assertPanic )
+import UniqFM
 import Outputable
+
+import List 		( maximumBy )
+import GlaExts --tmp
 \end{code}
 
 %************************************************************************
@@ -245,7 +249,9 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
       TooBig -> UnfoldNever
 
       SizeIs size cased_args scrut_discount
-	-> UnfoldIfGoodArgs
+	-> {- trace ("calcUnfoldingGuidance: \n" ++ showSDoc (ppr expr) ++ "\n"
+		  ++ show (I# size) ++ "\n" ++ show (map discount_for val_binders)) $ -}
+	   UnfoldIfGoodArgs
 			(length ty_binders)
 			(length val_binders)
 			(map discount_for val_binders)
@@ -253,15 +259,16 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 			(I# scrut_discount)
 	where        
 	    discount_for b
-	         | is_data && b `is_elem` cased_args = tyConFamilySize tycon
+	         | is_data = case lookupUFM cased_args b of
+				Nothing -> 0
+				Just d  -> d
 		 | otherwise = 0
 		 where
 		   (is_data, tycon)
 		     = case (splitAlgTyConApp_maybe (idType b)) of
 			  Nothing       -> (False, panic "discount")
 			  Just (tc,_,_) -> (True,  tc)
-
-	    is_elem = isIn "calcUnfoldingGuidance" }
+    }
 \end{code}
 
 \begin{code}
@@ -319,9 +326,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     size_up (Case scrut alts)
       = nukeScrutDiscount (size_up scrut)
 		`addSize`
-	arg_discount scrut
-		`addSize`
-	size_up_alts (coreExprType scrut) alts
+	size_up_alts scrut (coreExprType scrut) alts
 	    -- We charge for the "case" itself in "size_up_alts"
 
     ------------
@@ -333,11 +338,23 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     size_up_arg other			      = sizeOne
 
     ------------
-    size_up_alts scrut_ty (AlgAlts alts deflt)
-      = (foldr (addSize . size_alg_alt) (size_up_deflt deflt) alts)
+    size_up_alts scrut scrut_ty (AlgAlts alts deflt)
+      = total_size
+	`addSize`
+	scrut_discount scrut
 	`addSizeN`
 	alt_cost
       where
+	alts_sizes = size_up_deflt deflt : map size_alg_alt alts
+	total_size = foldr addSize sizeZero alts_sizes
+
+	biggest_alt = maximumBy (\a b -> if ltSize a b then b else a) alts_sizes
+
+	scrut_discount (Var v) | v `is_elem` args = 
+		scrutArg v (minusSize total_size biggest_alt + alt_cost)
+	scrut_discount _ = sizeZero
+				
+
 	size_alg_alt (con,args,rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
 
@@ -355,7 +372,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 	      Nothing       -> 1
 	      Just (tc,_,_) -> tyConFamilySize tc
 
-    size_up_alts _ (PrimAlts alts deflt)
+    size_up_alts _ _ (PrimAlts alts deflt)
       = foldr (addSize . size_prim_alt) (size_up_deflt deflt) alts
 	    -- *no charge* for a primitive "case"!
       where
@@ -366,10 +383,6 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     size_up_deflt (BindDefault binder rhs) = size_up rhs
 
     ------------
-	-- We want to record if we're case'ing an argument
-    arg_discount (Var v) | v `is_elem` args = scrutArg v
-    arg_discount other			    = sizeZero
-
     is_elem :: Id -> [Id] -> Bool
     is_elem = isIn "size_up_scrut"
 
@@ -384,6 +397,14 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
       where
 	n_tot = n +# m
     
+    -- trying to find a reasonable discount for eliminating this case.
+    -- if the case is eliminated, in the worse case we end up with the
+    -- largest alternative, so subtract the size of the largest alternative
+    -- from the total size of the case to end up with the discount
+    minusSize TooBig _ = 0
+    minusSize _ TooBig = panic "CoreUnfold: minusSize" -- shouldn't happen
+    minusSize (SizeIs n1 xs d1) (SizeIs n2 ys d2) = I# (n1 -# n2)
+
     addSize TooBig _ = TooBig
     addSize _ TooBig = TooBig
     addSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
@@ -392,8 +413,9 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
       where
 	n_tot = n1 +# n2
 	d_tot = d1 +# d2
-	xys   = xs ++ ys
+	xys   = combineArgDiscounts xs ys
 
+    
 
 \end{code}
 
@@ -403,18 +425,25 @@ Code for manipulating sizes
 
 data ExprSize = TooBig
 	      | SizeIs Int#	-- Size found
-		       [Id]	-- Arguments cased herein
+		       (UniqFM Int)	-- discount for each argument
 		       Int#	-- Size to subtract if result is scrutinised 
 				-- by a case expression
 
-sizeZero     	= SizeIs 0# [] 0#
-sizeOne      	= SizeIs 1# [] 0#
-sizeN (I# n) 	= SizeIs n  [] 0#
-conSizeN (I# n) = SizeIs n  [] n
-scrutArg v	= SizeIs 0# [v] 0#
+ltSize a TooBig = True
+ltSize TooBig a = False
+ltSize (SizeIs s1# _ _) (SizeIs s2# _ _) = s1# <=# s2#
+
+sizeZero     	= SizeIs 0# emptyUFM 0#
+sizeOne      	= SizeIs 1# emptyUFM 0#
+sizeN (I# n) 	= SizeIs n  emptyUFM 0#
+conSizeN (I# n) = SizeIs n  emptyUFM n
+scrutArg v d	= SizeIs 0# (unitUFM v d) 0#
 
 nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
 nukeScrutDiscount TooBig	  = TooBig
+
+combineArgDiscounts :: UniqFM Int -> UniqFM Int -> UniqFM Int
+combineArgDiscounts = plusUFM_C (+)
 \end{code}
 
 %************************************************************************
@@ -484,8 +513,8 @@ smallEnoughToInline id arg_is_evald_s result_is_scruted
     result_discount | result_is_scruted = scrut_discount
 		    | otherwise		= 0
 
-    arg_discount no_of_constrs is_evald
-      | is_evald  = no_of_constrs * opt_UnfoldingConDiscount
+    arg_discount discount is_evald
+      | is_evald  = discount
       | otherwise = 0
 \end{code}
 

@@ -183,7 +183,7 @@ long    source_version = 0;
 **********************************************************************/
 
 %token  INTERFACE_UPRAGMA SPECIALISE_UPRAGMA
-%token  INLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA
+%token  INLINE_UPRAGMA NOINLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA
 %token  END_UPRAGMA 
 %token  SOURCE_UPRAGMA
 
@@ -590,6 +590,12 @@ decl	: qvarsk DCOLON sigtype
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
 
+	|  NOINLINE_UPRAGMA qvark END_UPRAGMA
+		{
+		  $$ = mknoinline_uprag($2, startlineno);
+		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		}
+
 	|  MAGIC_UNFOLDING_UPRAGMA qvark vark END_UPRAGMA
 		{
 		  $$ = mkmagicuf_uprag($2, $3, startlineno);
@@ -842,6 +848,12 @@ instdef :
 	|  INLINE_UPRAGMA qvark END_UPRAGMA
 		{
 		  $$ = mkinline_uprag($2, startlineno);
+		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
+		}
+
+	|  NOINLINE_UPRAGMA qvark END_UPRAGMA
+		{
+		  $$ = mknoinline_uprag($2, startlineno);
 		  PREVPATT = NULL; FN = NULL; SAMEFN = 0;
 		}
 

@@ -72,6 +72,9 @@ type binding;
 	inline_uprag: <	ginline_id   : qid;
 			ginline_line : long; >;
 
+	noinline_uprag: < gnoinline_id   : qid;
+			  gnoinline_line : long; >;
+
 	magicuf_uprag:< gmagicuf_id   : qid;
 			gmagicuf_str  : stringId;
 			gmagicuf_line : long; >;

@@ -180,7 +180,9 @@ ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("_A>_"), int arity]
 data InlinePragInfo
   = NoPragmaInfo
 
-  | IWantToBeINLINEd
+  | IWantToBeINLINEd	  -- user requests that we inline this
+
+  | IDontWantToBeINLINEd  -- user requests that we don't inline this
 
   | IMustNotBeINLINEd	-- Used by the simplifier to prevent looping
 			-- on recursive definitions

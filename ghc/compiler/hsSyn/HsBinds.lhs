@@ -222,6 +222,9 @@ data Sig name
   | InlineSig	name		  -- INLINE f
 		SrcLoc
 
+  | NoInlineSig	name		  -- NOINLINE f
+		SrcLoc
+
   | SpecInstSig (HsType name)    -- (Class tys); should be a specialisation of the 
 				  -- current instance decl
 		SrcLoc
@@ -232,11 +235,12 @@ sigsForMe :: (name -> Bool) -> [Sig name] -> [Sig name]
 sigsForMe f sigs
   = filter sig_for_me sigs
   where
-    sig_for_me (Sig        n _ _)    = f n
-    sig_for_me (ClassOpSig n _ _ _)  = f n
-    sig_for_me (SpecSig    n _ _ _)  = f n
-    sig_for_me (InlineSig  n     _)  = f n  
-    sig_for_me (SpecInstSig _ _)     = False
+    sig_for_me (Sig         n _ _)    = f n
+    sig_for_me (ClassOpSig  n _ _ _)  = f n
+    sig_for_me (SpecSig     n _ _ _)  = f n
+    sig_for_me (InlineSig   n     _)  = f n  
+    sig_for_me (NoInlineSig n     _)  = f n  
+    sig_for_me (SpecInstSig _ _)      = False
 \end{code}
 
 \begin{code}
@@ -262,6 +266,9 @@ ppr_sig (SpecSig var ty using _)
 
 ppr_sig (InlineSig var _)
         = hsep [text "{-# INLINE", ppr var, text "#-}"]
+
+ppr_sig (NoInlineSig var _)
+        = hsep [text "{-# NOINLINE", ppr var, text "#-}"]
 
 ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]

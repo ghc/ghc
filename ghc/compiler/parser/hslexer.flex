@@ -325,6 +325,10 @@ NL  	    	    	[\n\r]
 			      PUSH_STATE(UserPragma);
 			      RETURN(INLINE_UPRAGMA);
 			    }
+<Code,GlaExt>"{-#"{WS}*"NOINLINE" {
+			      PUSH_STATE(UserPragma);
+			      RETURN(NOINLINE_UPRAGMA);
+			    }
 <Code,GlaExt>"{-#"{WS}*"MAGIC_UNFOLDING" {
 			      PUSH_STATE(UserPragma);
 			      RETURN(MAGIC_UNFOLDING_UPRAGMA);

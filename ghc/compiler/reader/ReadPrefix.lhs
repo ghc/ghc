@@ -648,6 +648,11 @@ wlk_sig_thing (U_inline_uprag ivar srcline)
   = mkSrcLocUgn	srcline      		$ \ src_loc ->
     wlkVarId	ivar		`thenUgn` \ var     ->
     returnUgn (RdrSig (InlineSig var src_loc))
+
+wlk_sig_thing (U_noinline_uprag ivar srcline)
+  = mkSrcLocUgn	srcline      		$ \ src_loc ->
+    wlkVarId	ivar		`thenUgn` \ var     ->
+    returnUgn (RdrSig (NoInlineSig var src_loc))
 \end{code}
 
 %************************************************************************

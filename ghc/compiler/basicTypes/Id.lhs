@@ -522,8 +522,9 @@ idWantsToBeINLINEd id = case getInlinePragma id of
 			  other		   -> False
 
 idMustNotBeINLINEd id = case getInlinePragma id of
-			  IMustNotBeINLINEd -> True
-			  other		    -> False
+			  IDontWantToBeINLINEd -> True
+			  IMustNotBeINLINEd    -> True
+			  other		       -> False
 
 idMustBeINLINEd id =  case getInlinePragma id of
 			IMustBeINLINEd -> True
@@ -539,9 +540,15 @@ nukeNoInlinePragma id@(Id {idInfo = info})
 	IMustNotBeINLINEd -> id {idInfo = setInlinePragInfo NoPragmaInfo info}
 	other		  -> id
 
+-- If the user has already marked this binding as NOINLINE, then don't
+-- add the IMustNotBeINLINEd tag, since it will get nuked later whereas
+-- IDontWantToBeINLINEd is permanent.
+
 addNoInlinePragma :: Id -> Id
 addNoInlinePragma id@(Id {idInfo = info})
-  = id {idInfo = IMustNotBeINLINEd `setInlinePragInfo` info}
+  = case inlinePragInfo info of
+	IDontWantToBeINLINEd -> id
+	other -> id {idInfo = IMustNotBeINLINEd `setInlinePragInfo` info}
 
 mustInlineInfo   = IMustBeINLINEd   `setInlinePragInfo` noIdInfo
 wantToInlineInfo = IWantToBeINLINEd `setInlinePragInfo` noIdInfo

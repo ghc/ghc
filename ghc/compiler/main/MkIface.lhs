@@ -304,10 +304,11 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     unfolding_is_ok
 	= case inline_pragma of
-	    IMustBeINLINEd    -> True
-	    IWantToBeINLINEd  -> True
-	    IMustNotBeINLINEd -> False
-	    NoPragmaInfo      -> case guidance of
+	    IMustBeINLINEd       -> True
+	    IWantToBeINLINEd     -> True
+	    IDontWantToBeINLINEd -> False
+	    IMustNotBeINLINEd    -> False
+	    NoPragmaInfo         -> case guidance of
 					UnfoldNever -> False	-- Too big
 					other       -> True
 
