@@ -49,7 +49,7 @@ import Var		( TyVar, idType, idName )
 import VarSet		( elemVarSet )
 import Name		( Name )
 import Outputable
-import Util		( zipLazy, isSingleton, notNull )
+import Util		( zipLazy, isSingleton, notNull, sortLe )
 import List		( partition )
 import SrcLoc		( Located(..), unLoc, getLoc )
 import ListSetOps	( equivClasses )
@@ -683,18 +683,25 @@ badGenericMethodType op op_ty
 		ptext SLIT("You can only use type variables, arrows, and tuples")])
 
 recSynErr syn_decls
-  = setSrcSpan (getLoc (head syn_decls)) $
+  = setSrcSpan (getLoc (head sorted_decls)) $
     addErr (sep [ptext SLIT("Cycle in type synonym declarations:"),
-		 nest 2 (vcat (map ppr_decl syn_decls))])
+		 nest 2 (vcat (map ppr_decl sorted_decls))])
   where
+    sorted_decls = sortLocated syn_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
 
 recClsErr cls_decls
-  = setSrcSpan (getLoc (head cls_decls)) $
+  = setSrcSpan (getLoc (head sorted_decls)) $
     addErr (sep [ptext SLIT("Cycle in class declarations (via superclasses):"),
-		 nest 2 (vcat (map ppr_decl cls_decls))])
+		 nest 2 (vcat (map ppr_decl sorted_decls))])
   where
+    sorted_decls = sortLocated cls_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr (decl { tcdSigs = [] })
+
+sortLocated :: [Located a] -> [Located a]
+sortLocated things = sortLe le things
+  where
+    le (L l1 _) (L l2 _) = l1 <= l2
 
 exRecConErr name
   = ptext SLIT("Can't combine named fields with locally-quantified type variables or context")
