@@ -148,7 +148,7 @@ peekArray0 marker ptr  = loop 0
 --
 pokeArray :: Storable a => Ptr a -> [a] -> IO ()
 #ifndef __GLASGOW_HASKELL__
-pokeArray ptrs vals =  zipWithM_ (pokeElemOff ptr) [0..] vals
+pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals
 #else
 pokeArray ptr vals = go vals 0#
   where go [] n#         = return ()
