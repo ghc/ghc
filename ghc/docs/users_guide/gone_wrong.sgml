@@ -248,9 +248,10 @@ changed interface file, before and after, when applicable.
 </Para>
 
 <Para>
-If you are using <Command>make</Command>, a useful tool to make sure that every module
-<Emphasis>is</Emphasis> up-to-date with respect to its imported interfaces is
-<Command>mkdependHS</Command> (which comes with GHC).  Please see <XRef LinkEnd="mkdependHS">.
+If you are using <Command>make</Command>, GHC can automatically
+generate the dependencies required in order to make sure that every
+module <Emphasis>is</Emphasis> up-to-date with respect to its imported
+interfaces.  Please see <XRef LinkEnd="sec-makefile-dependencies">.
 </Para>
 
 <Para>
