@@ -235,7 +235,7 @@ CLEAN_FILES += $(CONFIG_HS)
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen main \
-  profiling parser cprAnalysis compMan ndpFlatten cbits iface cmm
+  profiling parser cprAnalysis compMan ndpFlatten iface cmm
 
 # Make sure we include Config.hs even if it doesn't exist yet...
 ALL_SRCS += $(CONFIG_HS)
@@ -506,6 +506,14 @@ primop-usage.hs-incl: prelude/primops.txt
 
 #-----------------------------------------------------------------------------
 # 		Linking
+
+# Include libghccompat in stage1.  In stage2 onwards, all these libraries
+# will be available from the main libraries.
+ifeq "$(stage)" "1"
+SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
+SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
+SRC_MKDEPENDHS_OPTS += -optdep--exclude-module=Compat.RawSystem
+endif
 
 SRC_LD_OPTS += -no-link-chk 
 

@@ -106,8 +106,8 @@ import CString		( CString, peekCString )
 #endif
 
 #if __GLASGOW_HASKELL__ < 603
-import Foreign		( withMany, withArray0, nullPtr, Ptr )
-import CForeign		( CString, withCString, throwErrnoIfMinus1 )
+-- rawSystem comes from libghccompat.a in stage1
+import Compat.RawSystem	( rawSystem )
 #else
 import System.Cmd	( rawSystem )
 #endif
@@ -774,18 +774,6 @@ traceCmd phase_name cmd_line action
     handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")
 			     ; when (verb >= 3) (hPutStrLn stderr ("Failed: " ++ cmd_line ++ (show exn)))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
-
--- -----------------------------------------------------------------------------
--- rawSystem: run an external command
---
--- In GHC 6.2.1 there's a correct implementation of rawSystem in the
--- library System.Cmd.  If we are compiling with an earlier version of
--- GHC than this, we'd better have a copy of the correct implementation
--- right here.
-
-#if __GLASGOW_HASKELL__ < 603
-#include "../../libraries/base/System/RawSystem.hs-inc"
-#endif
 \end{code}
 
 
