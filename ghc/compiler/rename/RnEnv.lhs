@@ -21,7 +21,7 @@ import RnMonad
 import Name		( Name, NamedThing(..),
 			  getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName,
-			  mkIPName, nameOccName, nameModule,
+			  mkIPName, nameOccName, nameModule_maybe,
 			  extendNameEnv_C, plusNameEnv_C, nameEnvElts,
 			  setNameModuleAndLoc
 			)
@@ -49,9 +49,24 @@ import FastString	( FastString )
 
 \begin{code}
 newTopBinder :: Module -> RdrName -> SrcLoc -> RnM d Name
+	-- newTopBinder puts into the cache the binder with the
+	-- module information set correctly.  When the decl is later renamed,
+	-- the binding site will thereby get the correct module.
+	-- There maybe occurrences that don't have the correct Module, but
+	-- by the typechecker will propagate the binding definition to all 
+	-- the occurrences, so that doesn't matter
+
 newTopBinder mod rdr_name loc
   = 	-- First check the cache
     traceRn (text "newTopBinder" <+> ppr mod <+> ppr loc) `thenRn_`
+
+    	-- There should never be a qualified name in a binding position (except in instance decls)
+	-- The parser doesn't check this because the same parser parses instance decls
+    (if isQual rdr_name then
+	qualNameErr (text "its declaration") (rdr_name,loc)
+     else
+	returnRn ()
+    )				`thenRn_`
 
     getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let 
@@ -639,10 +654,10 @@ filterAvail (IEThingAll _) avail@(AvailTC _ _)   = Just avail
 filterAvail ie avail = Nothing
 
 -------------------------------------
-groupAvails :: Avails -> [(ModuleName, Avails)]
+groupAvails :: Module -> Avails -> [(ModuleName, Avails)]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
-groupAvails avails 
+groupAvails this_mod avails 
   = [ (mkSysModuleNameFS fs, sortLt lt avails)
     | (fs,avails) <- fmToList groupFM
     ]
@@ -654,7 +669,10 @@ groupAvails avails
 
     add env avail = addToFM_C combine env mod_fs [avail]
 		  where
-		    mod_fs = moduleNameFS (moduleName (nameModule (availName avail)))
+		    mod_fs = moduleNameFS (moduleName avail_mod)
+		    avail_mod = case nameModule_maybe (availName avail) of
+					  Just m  -> m
+					  Nothing -> this_mod
 		    combine old _ = avail:old
 
     a1 `lt` a2 = occ1 < occ2

@@ -47,7 +47,7 @@ module Type (
 
 	TauType, RhoType, SigmaType, PredType(..), ThetaType,
 	ClassPred, ClassContext, mkClassPred,
-	getClassTys_maybe, ipName_maybe, classesToPreds, classesOfPreds,
+	getClassTys_maybe, ipName_maybe, classesOfPreds,
 	isTauTy, mkRhoTy, splitRhoTy,
 	mkSigmaTy, isSigmaTy, splitSigmaTy,
 	getDFunTyKey,
@@ -712,9 +712,6 @@ getClassTys_maybe _		   = Nothing
 ipName_maybe :: PredType -> Maybe Name
 ipName_maybe (IParam n _) = Just n
 ipName_maybe _		  = Nothing
-
-classesToPreds :: ClassContext -> ThetaType
-classesToPreds cts = map (uncurry Class) cts
 
 classesOfPreds :: ThetaType -> ClassContext
 classesOfPreds theta = [(clas,tys) | Class clas tys <- theta]

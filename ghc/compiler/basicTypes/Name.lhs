@@ -16,7 +16,8 @@ module Name (
 
 	nameUnique, setNameUnique, setLocalNameSort,
 	tidyTopName, 
-	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModuleAndLoc, 
+	nameOccName, nameModule, nameModule_maybe,
+	setNameOcc, nameRdrName, setNameModuleAndLoc, 
 	toRdrName, hashName,
 
 	isUserExportedName,
@@ -43,13 +44,10 @@ module Name (
 import OccName		-- All of it
 import Module		( Module, moduleName, mkVanillaModule, 
 			  printModulePrefix, isModuleInThisPackage )
-import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, 
-			  rdrNameModule )
-import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, 
-			  opt_OmitInterfacePragmas, opt_EnsureSplittableC )
-
+import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
+import CmdLineOpts	( opt_Static, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
-import Unique		( Unique, Uniquable(..), u2i, pprUnique )
+import Unique		( Unique, Uniquable(..), u2i, pprUnique, pprUnique10 )
 import Maybes		( expectJust )
 import FastTypes
 import UniqFM
@@ -114,8 +112,12 @@ nameSrcLoc		:: Name -> SrcLoc
 nameUnique  name = n_uniq name
 nameOccName name = n_occ  name
 nameSrcLoc  name = n_loc  name
+
 nameModule (Name { n_sort = Global mod }) = mod
 nameModule name				  = pprPanic "nameModule" (ppr name)
+
+nameModule_maybe (Name { n_sort = Global mod }) = Just mod
+nameModule_maybe name				= Nothing
 \end{code}
 
 \begin{code}
@@ -297,16 +299,23 @@ are exported.  But also:
 
 \begin{code}
 tidyTopName :: Module -> TidyOccEnv -> Name -> (TidyOccEnv, Name)
-tidyTopName mod env name
-  = (env', name')
+tidyTopName mod env
+	    name@(Name { n_occ = occ, n_sort = sort, n_uniq = uniq, n_loc = loc })
+  = case sort of
+	System   -> localise		-- System local Ids
+	Local    -> localise		-- User non-exported Ids
+	Exported -> globalise		-- User-exported things
+	Global _ -> no_op		-- Constructors, class selectors etc
+
   where
-    (env', occ') = tidyOccName env (n_occ name)
+    no_op     = (env, name)
 
-    name'        = Name { n_uniq = n_uniq name, n_sort = mk_top_sort mod,
-			  n_occ = occ', n_loc = n_loc name }
+    globalise = (env, name { n_sort = Global mod })	-- Don't change occurrence name
 
-mk_top_sort mod | all_toplev_ids_visible = Global mod
-		| otherwise		 = Local
+    localise     = (env', name')
+    (env', occ') = tidyOccName env occ
+    name' | all_toplev_ids_visible  = name { n_occ = occ', n_sort = Global mod }
+	  | otherwise		    = name { n_occ = occ' }
 
 all_toplev_ids_visible = 
 	not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
@@ -437,24 +446,28 @@ instance Outputable Name where
 
 pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
-    let local | debugStyle sty 
-              = pprOccName occ <> text "{-" <> pprUnique uniq <> text "-}"
-              | codeStyle sty
-              = pprUnique uniq
-              | otherwise
-              = pprOccName occ
+    case sort of
+      Global mod -> pprGlobal sty uniq mod occ
+      System     -> pprSysLocal sty uniq occ
+      Local      -> pprLocal sty uniq occ empty
+      Exported   -> pprLocal sty uniq occ (char 'x')
 
-        global m | codeStyle sty
-                 = ppr (moduleName m) <> char '_' <> pprOccName occ
-                 | debugStyle sty || printModulePrefix m
-                 = ppr (moduleName m) <> dot <> pprOccName occ
-                 | otherwise
-                 = pprOccName occ
-     in case sort of
-           System     -> local
-           Local      -> local
-           Exported   -> local
-           Global mod -> global mod
+pprLocal sty uniq occ pp_export
+  | codeStyle sty  = pprUnique uniq
+  | debugStyle sty = pprOccName occ <> 
+		     text "{-" <> pp_export <+> pprUnique10 uniq <> text "-}"
+  | otherwise      = pprOccName occ
+
+pprGlobal sty uniq mod occ
+  | codeStyle sty         = ppr (moduleName mod) <> char '_' <> pprOccName occ
+  | debugStyle sty        = ppr (moduleName mod) <> dot <> pprOccName occ <> 
+			    text "{-" <> pprUnique10 uniq <> text "-}"
+  | printModulePrefix mod = ppr (moduleName mod) <> dot <> pprOccName occ
+  | otherwise             = pprOccName occ
+
+pprSysLocal sty uniq occ
+  | codeStyle sty  = pprUnique uniq
+  | otherwise	   = pprOccName occ <> char '_' <> pprUnique uniq
 \end{code}
 
 

@@ -25,8 +25,8 @@ import Inst		( plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
-import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, tcLookupGlobal_maybe,
-			  tcEnvTyCons, tcEnvClasses, 
+import TcEnv		( TcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, 
+			  tcEnvTyCons, tcEnvClasses,  isLocalThing,
 			  tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
 			)
 import TcRules		( tcRules )
@@ -42,13 +42,12 @@ import Type		( funResultTy, splitForAllTys )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
 import Id		( idType, idName, idUnfolding )
-import Module           ( Module, moduleName, plusModuleEnv )
-import Name		( Name, nameOccName, isLocallyDefined, isGlobalName,
-			  toRdrName, nameEnvElts, emptyNameEnv, lookupNameEnv
+import Module           ( Module, plusModuleEnv )
+import Name		( Name, nameOccName, isLocallyDefined, isGlobalName, getName,
+			  toRdrName, nameEnvElts, lookupNameEnv, mkNameEnv
 			)
 import TyCon		( tyConGenInfo, isClassTyCon )
 import OccName		( isSysOcc )
-import PrelNames	( mAIN_Name, mainName )
 import Maybes		( thenMaybe )
 import Util
 import BasicTypes       ( EP(..), Fixity )
@@ -58,7 +57,7 @@ import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, HomeIfaceTable,
 			  PackageSymbolTable, DFunId, ModIface(..),
 			  TypeEnv, extendTypeEnv, lookupTable,
 		          TyThing(..), groupTyThings )
-import FiniteMap	( FiniteMap, delFromFM, lookupWithDefaultFM )
+import List		( partition )
 \end{code}
 
 Outside-world interface:
@@ -90,7 +89,7 @@ typecheckModule
 typecheckModule dflags this_mod pcs hst hit decls
   = do	env <- initTcEnv global_symbol_table
 
-        (maybe_result, (errs,warns)) <- initTc dflags env tc_module
+        (maybe_result, (warns,errs)) <- initTc dflags env tc_module
 
 	let { maybe_tc_result :: Maybe TcResults ;
 	      maybe_tc_result = case maybe_result of
@@ -101,9 +100,9 @@ typecheckModule dflags this_mod pcs hst hit decls
         printTcDump dflags maybe_tc_result
 
         if isEmptyBag errs then 
-             return Nothing 
-           else 
              return maybe_tc_result
+           else 
+             return Nothing 
   where
     global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
 
@@ -222,9 +221,6 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     in
     tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
     
-    	-- Check that Main defines main
-    checkMain this_mod				`thenTc_`
-    
         -- Backsubstitution.    This must be done last.
         -- Even tcSimplifyTop may do some unification.
     let
@@ -243,14 +239,14 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     zonkRules local_rules		`thenNF_Tc` \ local_rules' ->
     
     
-    let	groups :: FiniteMap Module TypeEnv
-    	groups = groupTyThings (nameEnvElts (getTcGEnv final_env))
-    
+    let	(local_things, imported_things) = partition (isLocalThing this_mod) 
+						    (nameEnvElts (getTcGEnv final_env))
+
     	local_type_env :: TypeEnv
-    	local_type_env = lookupWithDefaultFM groups emptyNameEnv this_mod 
+    	local_type_env = mkNameEnv [(getName thing, thing) | thing <- local_things]
     
     	new_pst :: PackageSymbolTable
-    	new_pst = extendTypeEnv (pcs_PST pcs) (delFromFM groups this_mod)
+    	new_pst = extendTypeEnv (pcs_PST pcs) (groupTyThings imported_things)
 
 	final_pcs :: PersistentCompilerState
 	final_pcs = pcs { pcs_PST   = new_pst,
@@ -270,22 +266,6 @@ tcModule pcs hst get_fixity this_mod decls unf_env
 get_binds decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 \end{code}
 
-
-\begin{code}
-checkMain :: Module -> TcM ()
-checkMain this_mod 
-  | moduleName this_mod == mAIN_Name 
-  = tcLookupGlobal_maybe mainName		`thenNF_Tc` \ maybe_main ->
-    case maybe_main of
-	Just (AnId _) -> returnTc ()
-	other	      -> addErrTc noMainErr
-
-  | otherwise = returnTc ()
-
-noMainErr
-  = hsep [ptext SLIT("Module"), quotes (ppr mAIN_Name), 
-	  ptext SLIT("must include a definition for"), quotes (ptext SLIT("main"))]
-\end{code}
 
 
 %************************************************************************

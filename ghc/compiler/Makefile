@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.101 2000/10/27 16:30:02 simonmar Exp $
+# $Id: Makefile,v 1.102 2000/10/30 09:52:14 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -366,7 +366,7 @@ parser/Parser.hs : parser/Parser.y
 #-----------------------------------------------------------------------------
 # 		Linking
 
-SRC_LD_OPTS += -no-link-chk -ldl
+SRC_LD_OPTS += -no-link-chk
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 ifeq "$(GhcReportCompiles)" "YES"

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.7 2000/10/27 15:11:37 sewardj Exp $
+-- $Id: TmpFiles.hs,v 1.8 2000/10/30 09:52:15 simonpj Exp $
 --
 -- Temporary file management
 --
@@ -47,12 +47,12 @@ cleanTempFiles verbose = do
   fs <- readIORef v_FilesToClean
 
   let blowAway f =
-	   (do  when verbose (hPutStrLn stderr ("removing: " ++ f))
+	   (do  when verbose (hPutStrLn stderr ("Removing: " ++ f))
 		if '*' `elem` f then system ("rm -f " ++ f) >> return ()
 			        else removeFile f)
 	    `catchAllIO`
 	   (\_ -> when verbose (hPutStrLn stderr 
-				("warning: can't remove tmp file" ++ f)))
+				("Warning: can't remove tmp file " ++ f)))
   mapM_ blowAway fs
 
 type Suffix = String

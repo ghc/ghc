@@ -19,11 +19,10 @@ import TcType		( zonkTcTypes, zonkTcTyVarToTyVar, newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( kcHsSigType, tcHsSigType, tcTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv	)
+import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, isLocalThing )
 import Rules		( extendRuleBase )
 import Inst		( LIE, emptyLIE, plusLIEs, instToId )
 import Id		( idType, idName, mkVanillaId )
-import Name		( nameModule )
 import Module		( Module )
 import VarSet
 import Type		( tyVarsOfTypes, openTypeKind )
@@ -47,7 +46,7 @@ tcRules pkg_rule_base mod decls
 
 	-- When relinking this module from its interface-file decls
 	-- we'll have IfaceRules that are in fact local to this module
-    is_local (IfaceRuleOut n _) = mod == nameModule (idName n)
+    is_local (IfaceRuleOut n _) = isLocalThing mod n
     is_local other		= True
 
 tcRule :: RenamedRuleDecl -> TcM (LIE, TypecheckedRuleDecl)

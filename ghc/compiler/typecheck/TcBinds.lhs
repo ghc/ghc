@@ -758,8 +758,7 @@ checkSigMatch top_lvl binder_names mono_ids sigs
 	-- which is just waht check_one_sig looks for
     mapTc check_one_sig sigs			`thenTc_`
     mapTc check_main_ctxt sigs			`thenTc_` 
-
-	    returnTc (Just ([], emptyLIE))
+    returnTc (Just ([], emptyLIE))
 
   | not (null sigs)
   = mapTc check_one_sig sigs			`thenTc_`

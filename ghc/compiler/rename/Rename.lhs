@@ -10,7 +10,7 @@ module Rename ( renameModule, closeIfaceDecls, checkOldIface ) where
 
 import HsSyn
 import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation, 
-			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl
+			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl, RdrNameImportDecl
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl,
 			  extractHsTyNames, 
@@ -26,24 +26,24 @@ import RnIfaces		( slurpImpDecls, mkImportInfo,
 			  RecompileRequired, recompileRequired
 			)
 import RnHiFiles	( findAndReadIface, removeContext, loadExports, loadFixDecls, loadDeprecs )
-import RnEnv		( availName, availsToNameSet, 
+import RnEnv		( availName, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
 			  lookupOrigNames, lookupGlobalRn, newGlobalName
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
-			  moduleNameUserString, moduleName, 
-			  lookupModuleEnv
+			  moduleNameUserString, moduleName
 			)
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
 			  nameOccName, nameModule,
 			  mkNameEnv, nameEnvElts, extendNameEnv
 			)
+import RdrName		( elemRdrEnv )
 import OccName		( occNameFlavour )
 import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
 import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
-			  ioTyCon_RDR,
+			  ioTyCon_RDR, main_RDR,
 			  unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
 			  eqString_RDR
 			)
@@ -61,9 +61,9 @@ import IO		( openFile, IOMode(..) )
 import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
 			  ModIface(..), WhatsImported(..), 
 			  VersionInfo(..), ImportVersion, IfaceDecls(..),
-			  GlobalRdrEnv, AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
+			  GlobalRdrEnv, AvailEnv, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..), initialVersionInfo,
-			  Deprecations(..), lookupDeprec
+			  Deprecations(..), lookupDeprec, lookupTable
 			 )
 import List		( partition, nub )
 \end{code}
@@ -100,18 +100,21 @@ renameModule dflags hit hst old_pcs this_module rdr_module
 
 \begin{code}
 rename :: Module -> RdrNameHsModule -> RnMG (Maybe (ModIface, [RenamedHsDecl]))
-rename this_module this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec loc)
-  =  	-- FIND THE GLOBAL NAME ENVIRONMENT
-    getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
+rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
+  = pushSrcLocRn loc		$
 
-	-- CHECK FOR EARLY EXIT
-    case maybe_stuff of {
-	Nothing -> 	-- Everything is up to date; no need to recompile further
-		rnDump [] []		`thenRn_`
-		returnRn Nothing ;
+ 	-- FIND THE GLOBAL NAME ENVIRONMENT
+    getGlobalNames this_module contents 	`thenRn` \ (gbl_env, local_gbl_env, 
+							    export_avails, global_avail_env) ->
 
-  	Just (gbl_env, local_gbl_env, export_avails, global_avail_env) ->
-
+	-- Exit if we've found any errors
+    checkErrsRn				`thenRn` \ no_errs_so_far ->
+    if not no_errs_so_far then
+	-- Found errors already, so exit now
+	rnDump [] []		`thenRn_`
+	returnRn Nothing 
+    else
+	
 	-- DEAL WITH DEPRECATIONS
     rnDeprecs local_gbl_env mod_deprec 
 	      [d | DeprecD d <- local_decls]		`thenRn` \ my_deprecs ->
@@ -123,6 +126,9 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
     initRnMS gbl_env local_fixity_env SourceMode (
 	rnSourceDecls local_decls
     )					`thenRn` \ (rn_local_decls, source_fvs) ->
+
+	-- CHECK THAT main IS DEFINED, IF REQUIRED
+    checkMain this_module local_gbl_env		`thenRn_`
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
     implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
@@ -157,9 +163,6 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
     getNameSupplyRn			`thenRn` \ name_supply ->
     getIfacesRn 			`thenRn` \ ifaces ->
     let
-	direct_import_mods :: [ModuleName]
-	direct_import_mods = nub [m | ImportDecl m _ _ _ _ _ <- imports]
-
 	-- We record fixities even for things that aren't exported,
 	-- so that we can change into the context of this moodule easily
 	fixities = mkNameEnv [ (name, fixity)
@@ -168,7 +171,7 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
 
 
 	-- Sort the exports to make them easier to compare for versions
-	my_exports = groupAvails export_avails
+	my_exports = groupAvails this_module export_avails
 	
 	mod_iface = ModIface {	mi_module   = this_module,
 				mi_version  = initialVersionInfo,
@@ -185,13 +188,23 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
-    reportUnusedNames mod_name direct_import_mods
-		      gbl_env global_avail_env
-		      export_avails source_fvs
-		      rn_imp_decls			`thenRn_`
+    reportUnusedNames mod_iface imports global_avail_env
+		      real_source_fvs rn_imp_decls 	`thenRn_`
 
     returnRn (Just (mod_iface, final_decls))
-    }
+  where
+    mod_name = moduleName this_module
+\end{code}
+
+Checking that main is defined
+
+\begin{code}
+checkMain :: Module -> GlobalRdrEnv -> RnMG ()
+checkMain this_mod local_env
+  | moduleName this_mod == mAIN_Name 
+  = checkRn (main_RDR `elemRdrEnv` local_env) noMainErr
+  | otherwise
+  = returnRn ()
 \end{code}
 
 @implicitFVs@ forces the renamer to slurp in some things which aren't
@@ -508,23 +521,22 @@ closeIfaceDecls dflags hit hst pcs
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: ModuleName -> [ModuleName] 
-		  -> GlobalRdrEnv -> AvailEnv
-		  -> Avails -> NameSet -> [RenamedHsDecl] 
+reportUnusedNames :: ModIface -> [RdrNameImportDecl] 
+		  -> AvailEnv
+		  -> NameSet 
+		  -> [RenamedHsDecl] 
 		  -> RnMG ()
-reportUnusedNames mod_name direct_import_mods 
-		  gbl_env avail_env 
-		  export_avails mentioned_names
-		  imported_decls
+reportUnusedNames my_mod_iface imports avail_env 
+		  used_names imported_decls
   = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imp_names				`thenRn_`
-    printMinimalImports mod_name minimal_imports		`thenRn_`
-    warnDeprecations really_used_names				`thenRn_`
+    printMinimalImports my_mod_iface minimal_imports		`thenRn_`
+    warnDeprecations my_mod_iface really_used_names		`thenRn_`
     returnRn ()
 
   where
-    used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
+    gbl_env    = mi_globals my_mod_iface
     
     -- Now, a use of C implies a use of T,
     -- if C was brought into scope by T(..) or T(C)
@@ -603,7 +615,10 @@ reportUnusedNames mod_name direct_import_mods
       | otherwise      = addToFM acc m emptyAvailEnv
     	-- Add an empty collection of imports for a module
     	-- from which we have sucked only instance decls
-    
+   
+    direct_import_mods :: [ModuleName]
+    direct_import_mods = nub [m | ImportDecl m _ _ _ _ _ <- imports]
+
     -- unused_imp_mods are the directly-imported modules 
     -- that are not mentioned in minimal_imports
     unused_imp_mods = [m | m <- direct_import_mods,
@@ -614,7 +629,7 @@ reportUnusedNames mod_name direct_import_mods
     module_unused mod = moduleName mod `elem` unused_imp_mods
 
 
-warnDeprecations used_names
+warnDeprecations my_mod_iface used_names
   = doptRn Opt_WarnDeprecations				`thenRn` \ warn_drs ->
     if not warn_drs then returnRn () else
 
@@ -629,17 +644,16 @@ warnDeprecations used_names
     mapRn_ warnDeprec deprecs
 
   where
-    lookup_deprec hit pit n
-	= case lookupModuleEnv hit mod of
-		Just iface -> lookupDeprec iface n
-		Nothing	   -> case lookupModuleEnv pit mod of
-				Just iface -> lookupDeprec iface n
-				Nothing	   -> pprPanic "warnDeprecations:" (ppr n)
-	where
-	  mod = nameModule n
+    mod	       = mi_module my_mod_iface
+    my_deprecs = mi_deprecs my_mod_iface
+    lookup_deprec hit pit n 
+	| isLocalThing mod n = lookupDeprec my_deprecs n
+	| otherwise	     = case lookupTable hit pit n of
+				 Just iface -> lookupDeprec (mi_deprecs iface) n
+				 Nothing    -> pprPanic "warnDeprecations:" (ppr n)
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
-printMinimalImports mod_name imps
+printMinimalImports my_mod_iface imps
   = doptRn Opt_D_dump_minimal_imports		`thenRn` \ dump_minimal ->
     if not dump_minimal then returnRn () else
 
@@ -649,7 +663,8 @@ printMinimalImports mod_name imps
 	})					`thenRn_`
     returnRn ()
   where
-    filename = moduleNameUserString mod_name ++ ".imports"
+    filename = moduleNameUserString (moduleName (mi_module my_mod_iface)) 
+	       ++ ".imports"
     ppr_mod_ie (mod_name, ies) 
 	| mod_name == pRELUDE_Name 
 	= empty
@@ -786,6 +801,10 @@ dupFixityDecl rdr_name loc1 loc2
 badDeprec d
   = sep [ptext SLIT("Illegal deprecation when whole module is deprecated"),
 	 nest 4 (ppr d)]
+
+noMainErr
+  = hsep [ptext SLIT("Module"), quotes (ppr mAIN_Name), 
+	  ptext SLIT("must include a definition for"), quotes (ptext SLIT("main"))]
 \end{code}
 
 

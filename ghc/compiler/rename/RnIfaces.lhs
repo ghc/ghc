@@ -250,17 +250,7 @@ mkImportInfo this_mod imports
 	-- For (a) a library module, we don't record it at all unless it contains orphans
 	-- 	   (We must never lose track of orphans.)
 	-- 
-	--     (b) a source-imported module, don't record the dependency at all
-	--	
-	-- (b) may seem a bit strange.  The idea is that the usages in a .hi file records
-	-- *all* the module's dependencies other than the loop-breakers.  We use
-	-- this info in findAndReadInterface to decide whether to look for a .hi file or
-	-- a .hi-boot file.  
-	--
-	-- This means we won't track version changes, or orphans, from .hi-boot files.
-	-- The former is potentially rather bad news.  It could be fixed by recording
-	-- whether something is a boot file along with the usage info for it, but 
-	-- I can't be bothered just now.
+	--     (b) a home-package module
 
 	mk_imp_info mod_name (has_orphans, is_boot, opened) so_far
 	   | mod_name == this_mod	-- Check if M appears in the set of modules 'below' M
@@ -279,11 +269,15 @@ mkImportInfo this_mod imports
 	     go_for_it NothingAtAll
 
 
-	   | is_lib_module && not has_orphans
-	   = so_far		
-	   
-	   | is_lib_module 			-- Record the module version only
-	   = go_for_it (Everything module_vers)
+	   | is_lib_module
+			-- Ignore modules from other packages, unless it has
+			-- orphans, in which case we must remember it in our
+			-- dependencies.  But in that case we only record the
+			-- module version, nothing more detailed
+	   = if has_orphans then
+		go_for_it (Everything module_vers)
+	     else
+		so_far		
 
 	   | otherwise
 	   = go_for_it whats_imported
@@ -654,6 +648,9 @@ data ImportDeclResult
 
 importDecl name
   = 	-- Check if it was loaded before beginning this module
+    if isLocallyDefined name then
+	returnRn AlreadySlurped
+    else
     checkAlreadyAvailable name		`thenRn` \ done ->
     if done then
 	returnRn AlreadySlurped

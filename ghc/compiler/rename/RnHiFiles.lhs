@@ -87,9 +87,14 @@ loadInterface doc mod from
 	Just err -> failWithRn ifaces err
 
 tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (Ifaces, Maybe Message)
-	-- Returns (Just err) if an error happened
-	-- Guarantees to return with iImpModInfo m --> (..., True)
-	-- (If the load fails, we plug in a vanilla placeholder)
+  -- Returns (Just err) if an error happened
+  -- It *doesn't* add an error to the monad, because sometimes it's ok to fail...
+  -- Specifically, when we read the usage information from an interface file,
+  -- we try to read the interfaces it mentions.  But it's OK to fail; perhaps
+  -- the module has changed, and that interface is no longer used.
+  
+  -- tryLoadInterface guarantees to return with iImpModInfo m --> (..., True)
+  -- (If the load fails, we plug in a vanilla placeholder)
 tryLoadInterface doc_str mod_name from
  = getHomeIfaceTableRn		`thenRn` \ hit ->
    getIfacesRn 			`thenRn` \ ifaces ->
@@ -271,14 +276,12 @@ loadExport this_mod (mod, entities)
   = mapRn (load_entity mod) entities	`thenRn` \ avails ->
     returnRn (mod, avails)
   where
-    new_name mod occ = newGlobalName mod occ
-
     load_entity mod (Avail occ)
-      =	new_name mod occ	`thenRn` \ name ->
+      =	newGlobalName mod occ	`thenRn` \ name ->
 	returnRn (Avail name)
     load_entity mod (AvailTC occ occs)
-      =	new_name mod occ	      `thenRn` \ name ->
-        mapRn (new_name mod) occs     `thenRn` \ names ->
+      =	newGlobalName mod occ	      	`thenRn` \ name ->
+        mapRn (newGlobalName mod) occs	`thenRn` \ names ->
         returnRn (AvailTC name names)
 
 
@@ -298,7 +301,7 @@ loadDecl :: Module
 	 -> (Version, RdrNameTyClDecl)
 	 -> RnM d (NameEnv Version, DeclsMap)
 loadDecl mod (version_map, decls_map) (version, decl)
-  = getIfaceDeclBinders new_name decl	`thenRn` \ full_avail ->
+  = getIfaceDeclBinders mod decl	`thenRn` \ full_avail ->
     let
 	main_name     = availName full_avail
 	new_decls_map = extendNameEnvList decls_map stuff
@@ -308,15 +311,6 @@ loadDecl mod (version_map, decls_map) (version, decl)
 	new_version_map = extendNameEnv version_map main_name version
     in
     returnRn (new_version_map, new_decls_map)
-  where
-	-- newTopBinder puts into the cache the binder with the
-	-- module information set correctly.  When the decl is later renamed,
-	-- the binding site will thereby get the correct module.
-	-- There maybe occurrences that don't have the correct Module, but
-	-- by the typechecker will propagate the binding definition to all 
-	-- the occurrences, so that doesn't matter
-    new_name rdr_name loc = newTopBinder mod rdr_name loc
-
 
 -----------------------------------------------------
 --	Loading fixity decls
@@ -427,27 +421,27 @@ are handled by the sourc-code specific stuff in @RnNames@.
 
 \begin{code}
 getIfaceDeclBinders, getTyClDeclBinders
-	:: (RdrName -> SrcLoc -> RnM d Name)	-- New-name function
+	:: Module
 	-> RdrNameTyClDecl
 	-> RnM d AvailInfo
 
-getIfaceDeclBinders new_name tycl_decl
-  = getTyClDeclBinders    new_name tycl_decl	`thenRn` \ avail ->
-    getSysTyClDeclBinders new_name tycl_decl	`thenRn` \ extras ->
+getIfaceDeclBinders mod tycl_decl
+  = getTyClDeclBinders    mod tycl_decl	`thenRn` \ avail ->
+    getSysTyClDeclBinders mod tycl_decl	`thenRn` \ extras ->
     returnRn (addSysAvails avail extras)
 		-- Add the sys-binders to avail.  When we import the decl,
 		-- it's full_avail that will get added to the 'already-slurped' set (iSlurp)
 		-- If we miss out sys-binders, we'll read the decl multiple times!
 
-getTyClDeclBinders new_name (IfaceSig var ty prags src_loc)
-  = new_name var src_loc			`thenRn` \ var_name ->
+getTyClDeclBinders mod (IfaceSig var ty prags src_loc)
+  = newTopBinder mod var src_loc			`thenRn` \ var_name ->
     returnRn (Avail var_name)
 
-getTyClDeclBinders new_name tycl_decl
+getTyClDeclBinders mod tycl_decl
   = mapRn do_one (tyClDeclNames tycl_decl)	`thenRn` \ (main_name:sub_names) ->
     returnRn (AvailTC main_name (main_name : sub_names))
   where
-    do_one (name,loc) = new_name name loc
+    do_one (name,loc) = newTopBinder mod name loc
 \end{code}
 
 @getDeclSysBinders@ gets the implicit binders introduced by a decl.
@@ -460,13 +454,13 @@ and the dict fun of an instance decl, because both of these have
 bindings of their own elsewhere.
 
 \begin{code}
-getSysTyClDeclBinders new_name (ClassDecl _ cname _ _ sigs _ names src_loc)
-  = sequenceRn [new_name n src_loc | n <- names]
+getSysTyClDeclBinders mod (ClassDecl _ cname _ _ sigs _ names src_loc)
+  = sequenceRn [newTopBinder mod n src_loc | n <- names]
 
-getSysTyClDeclBinders new_name (TyData _ _ _ _ cons _ _ _ _ _)
-  = sequenceRn [new_name wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
+getSysTyClDeclBinders mod (TyData _ _ _ _ cons _ _ _ _ _)
+  = sequenceRn [newTopBinder mod wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
 
-getSysTyClDeclBinders new_name other_decl
+getSysTyClDeclBinders mod other_decl
   = returnRn []
 \end{code}
 

@@ -28,16 +28,15 @@ import FiniteMap
 import PrelNames	( pRELUDE_Name, mAIN_Name, main_RDR )
 import UniqFM		( lookupUFM )
 import Bag		( bagToList )
-import Module		( ModuleName, mkModuleInThisPackage, WhereFrom(..) )
+import Module		( ModuleName, moduleName, WhereFrom(..) )
 import NameSet
 import Name		( Name, nameSrcLoc,
 			  setLocalNameSort, nameOccName,  nameEnvElts )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv )
-import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isUnqual )
+import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual )
 import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
-import SrcLoc		( SrcLoc )
 import Outputable
 import Maybes		( maybeToBool, catMaybes, mapMaybe )
 import UniqFM		( emptyUFM, listToUFM )
@@ -55,19 +54,17 @@ import List		( partition )
 %************************************************************************
 
 \begin{code}
-getGlobalNames :: RdrNameHsModule
-	       -> RnMG (Maybe (GlobalRdrEnv,	-- Maps all in-scope things
-			       GlobalRdrEnv,	-- Maps just *local* things
-			       Avails,		-- The exported stuff
-			       AvailEnv		-- Maps a name to its parent AvailInfo
-						-- Just for in-scope things only
-			       ))
-			-- Nothing => no need to recompile
+getGlobalNames :: Module -> RdrNameHsModule
+	       -> RnMG (GlobalRdrEnv,	-- Maps all in-scope things
+			GlobalRdrEnv,	-- Maps just *local* things
+			Avails,		-- The exported stuff
+			AvailEnv)	-- Maps a name to its parent AvailInfo
+					-- Just for in-scope things only
 
-getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
+getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
   = 	-- These two fix-loops are to get the right
 	-- provenance information into a Name
-    fixRn ( \ ~(Just (rec_gbl_env, _, rec_export_avails, _)) ->
+    fixRn ( \ ~(rec_gbl_env, _, rec_export_avails, _) ->
 
 	let
 	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
@@ -80,8 +77,7 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 		-- PROCESS LOCAL DECLS
 		-- Do these *first* so that the correct provenance gets
 		-- into the global name cache.
-	importsFromLocalDecls this_mod rec_exp_fn decls
-	`thenRn` \ (local_gbl_env, local_mod_avails) ->
+	importsFromLocalDecls this_mod rec_exp_fn decls		`thenRn` \ (local_gbl_env, local_mod_avails) ->
 
 		-- PROCESS IMPORT DECLS
 		-- Do the non {- SOURCE -} ones first, so that we get a helpful
@@ -91,10 +87,8 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 	  is_source_import (ImportDecl _ ImportByUserSource _ _ _ _) = True
 	  is_source_import other				     = False
 	in
-	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) ordinary
-	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
-	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) source
-	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
+	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) ordinary	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
+	mapAndUnzipRn (importsFromImportDecl rec_unqual_fn) source	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
 
 		-- COMBINE RESULTS
 		-- We put the local env second, so that a local provenance
@@ -106,46 +100,29 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 
 	    all_avails :: ExportAvails
 	    all_avails = foldr plusExportAvails local_mod_avails (imp_avails_s2 ++ imp_avails_s1)
+
 	    (_, global_avail_env) = all_avails
 	in
 
-		-- TRY FOR EARLY EXIT
-		-- We can't go for an early exit before this because we have to check
-		-- for name clashes.  Consider:
-		--
-		--	module A where		module B where
-		--  	   import B		   h = True
-		--   	   f = h
-		--
-		-- Suppose I've compiled everything up, and then I add a
-		-- new definition to module B, that defines "f".
-		--
-		-- Then I must detect the name clash in A before going for an early
-		-- exit.  The early-exit code checks what's actually needed from B
-		-- to compile A, and of course that doesn't include B.f.  That's
-		-- why we wait till after the plusEnv stuff to do the early-exit.
-		
-	-- Check For early exit
-	checkErrsRn				`thenRn` \ no_errs_so_far ->
-        if not no_errs_so_far then
-		-- Found errors already, so exit now
-		returnRn Nothing
-	else
-	
-		-- PROCESS EXPORT LISTS
-	exportsFromAvail this_mod exports all_avails gbl_env	`thenRn` \ export_avails ->
-	
+		-- PROCESS EXPORT LIST (but not if we've had errors already)
+	checkErrsRn		`thenRn` \ no_errs_so_far ->
+	(if no_errs_so_far then
+	    exportsFromAvail this_mod_name exports all_avails gbl_env
+	 else
+	    returnRn []
+	)						`thenRn` \ export_avails ->
 	
 		-- ALL DONE
-	returnRn (Just (gbl_env, local_gbl_env, export_avails, global_avail_env))
+	returnRn (gbl_env, local_gbl_env, export_avails, global_avail_env)
    )
   where
+    this_mod_name = moduleName this_mod
     all_imports = prel_imports ++ imports
 
 	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 	-- because the former doesn't even look at Prelude.hi for instance declarations,
 	-- whereas the latter does.
-    prel_imports | this_mod == pRELUDE_Name ||
+    prel_imports | this_mod_name == pRELUDE_Name ||
 		   explicit_prelude_import ||
 		   opt_NoImplicitPrelude
 		 = []
@@ -197,8 +174,8 @@ importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod i
 
 
 \begin{code}
-importsFromLocalDecls mod_name rec_exp_fn decls
-  = mapRn (getLocalDeclBinders (newLocalName mod rec_exp_fn)) decls	`thenRn` \ avails_s ->
+importsFromLocalDecls this_mod rec_exp_fn decls
+  = mapRn (getLocalDeclBinders this_mod rec_exp_fn) decls	`thenRn` \ avails_s ->
 
     let
 	avails = concat avails_s
@@ -216,32 +193,33 @@ importsFromLocalDecls mod_name rec_exp_fn decls
     recordLocalSlurps avails			`thenRn_`
 
 	-- Build the environment
-    qualifyImports mod_name 
+    qualifyImports (moduleName this_mod)
 		   True			-- Want unqualified names
 		   Nothing		-- no 'as M'
 		   []			-- Hide nothing
 		   (\n -> LocalDef)	-- Provenance is local
 		   avails
-  where
-    mod = mkModuleInThisPackage mod_name
 
 ---------------------------
-getLocalDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)
+getLocalDeclBinders :: Module 
+		    -> (Name -> Bool)	-- Whether exported
 		    -> RdrNameHsDecl -> RnMG Avails
-getLocalDeclBinders new_name (ValD binds)
-  = mapRn do_one (bagToList (collectTopBinders binds))
-  where
-    do_one (rdr_name, loc) = new_name rdr_name loc	`thenRn` \ name ->
-			     returnRn (Avail name)
-
-getLocalDeclBinders new_name (TyClD tycl_decl)
-  = getTyClDeclBinders new_name tycl_decl	`thenRn` \ avail ->
+getLocalDeclBinders mod rec_exp_fn (TyClD tycl_decl)
+  =	-- For type and class decls, we generate Global names, with
+	-- no export indicator.  They need to be global because they get
+	-- permanently bound into the TyCons and Classes.  They don't need
+	-- an export indicator because they are all implicitly exported.
+    getTyClDeclBinders mod tycl_decl	`thenRn` \ avail ->
     returnRn [avail]
 
-getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ ext_nm _ loc))
+getLocalDeclBinders mod rec_exp_fn (ValD binds)
+  = mapRn (newLocalBinder mod rec_exp_fn) 
+	  (bagToList (collectTopBinders binds))
+
+getLocalDeclBinders mod rec_exp_fn (ForD (ForeignDecl nm kind _ ext_nm _ loc))
   | binds_haskell_name kind
-  = new_name nm loc		    `thenRn` \ name ->
-    returnRn [Avail name]
+  = newLocalBinder mod rec_exp_fn (nm, loc)	    `thenRn` \ avail ->
+    returnRn [avail]
 
   | otherwise 		-- a foreign export
   = lookupOrigName nm `thenRn_` 
@@ -251,25 +229,17 @@ getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ ext_nm _ loc))
     binds_haskell_name FoLabel      = True
     binds_haskell_name FoExport     = isDynamicExtName ext_nm
 
-getLocalDeclBinders new_name (FixD _)    = returnRn []
-getLocalDeclBinders new_name (DeprecD _) = returnRn []
-getLocalDeclBinders new_name (DefD _)    = returnRn []
-getLocalDeclBinders new_name (InstD _)   = returnRn []
-getLocalDeclBinders new_name (RuleD _)   = returnRn []
-
+getLocalDeclBinders mod rec_exp_fn (FixD _)    = returnRn []
+getLocalDeclBinders mod rec_exp_fn (DeprecD _) = returnRn []
+getLocalDeclBinders mod rec_exp_fn (DefD _)    = returnRn []
+getLocalDeclBinders mod rec_exp_fn (InstD _)   = returnRn []
+getLocalDeclBinders mod rec_exp_fn (RuleD _)   = returnRn []
 
 ---------------------------
-newLocalName mod rec_exp_fn rdr_name loc 
-  = check_unqual rdr_name loc		`thenRn_`
+newLocalBinder mod rec_exp_fn (rdr_name, loc)
+  =	-- Generate a local name, and with a suitable export indicator
     newTopBinder mod rdr_name loc 	`thenRn` \ name ->
-    returnRn (setLocalNameSort name (rec_exp_fn name))
-  where
-	-- There should never be a qualified name in a binding position (except in instance decls)
-	-- The parser doesn't check this because the same parser parses instance decls
-    check_unqual rdr_name loc
-	| isUnqual rdr_name = returnRn ()
-	| otherwise	    = qualNameErr (text "the binding for" <+> quotes (ppr rdr_name)) 
-				          (rdr_name,loc)
+    returnRn (Avail (setLocalNameSort name (rec_exp_fn name)))
 \end{code}
 
 

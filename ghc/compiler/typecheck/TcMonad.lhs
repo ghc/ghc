@@ -125,7 +125,7 @@ type TcRef a = IORef a
 initTc :: DynFlags 
        -> TcEnv
        -> TcM r
-       -> IO (Maybe r, (Bag ErrMsg, Bag WarnMsg))
+       -> IO (Maybe r, (Bag WarnMsg, Bag ErrMsg))
 
 initTc dflags tc_env do_this
   = do {

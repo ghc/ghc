@@ -33,8 +33,8 @@ module TcEnv(
 	newLocalId, newSpecPragmaId,
 	newDefaultMethodName, newDFunName,
 
-	-- ???
-	tcSetEnv, explicitLookupId
+	-- Misc
+	isLocalThing, tcSetEnv, explicitLookupId
   ) where
 
 #include "HsVersions.h"
@@ -44,7 +44,7 @@ import TcMonad
 import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
 			  tcInstTyVars, zonkTcTyVars,
 			)
-import Id		( idName, mkUserLocal, isDataConWrapId_maybe )
+import Id		( mkUserLocal, isDataConWrapId_maybe )
 import IdInfo		( vanillaIdInfo )
 import MkId	 	( mkSpecPragmaId )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
@@ -60,7 +60,7 @@ import Class		( Class, ClassOpItem, ClassContext )
 import Subst		( substTy )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
-			  isLocallyDefined, nameModule,
+			  isLocallyDefined, nameModule_maybe,
 			  NameEnv, lookupNameEnv, nameEnvElts, 
 			  extendNameEnvList, emptyNameEnv
 			)
@@ -281,6 +281,14 @@ newDefaultMethodName op_name loc
 			      loc)
 \end{code}
 
+\begin{code}
+isLocalThing :: NamedThing a => Module -> a -> Bool
+  -- True if the thing has a Local name, 
+  -- or a Global name from the specified module
+isLocalThing mod thing = case nameModule_maybe (getName thing) of
+			   Nothing -> True	-- A local name
+			   Just m  -> m == mod	-- A global thing
+\end{code}
 
 %************************************************************************
 %*									*
@@ -318,14 +326,14 @@ tcLookupGlobal name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_thing ->
     case maybe_thing of
 	Just thing -> returnNF_Tc thing
-	other	   -> notFound "tcLookupGlobal:" name
+	other	   -> notFound "tcLookupGlobal" name
 
 tcLookupGlobalId :: Name -> NF_TcM Id
 tcLookupGlobalId name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of
 	Just (AnId clas) -> returnNF_Tc clas
-	other		 -> notFound "tcLookupGlobalId:" name
+	other		 -> notFound "tcLookupGlobalId" name
 	
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon con_name
@@ -340,14 +348,14 @@ tcLookupClass name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_clas ->
     case maybe_clas of
 	Just (AClass clas) -> returnNF_Tc clas
-	other		   -> notFound "tcLookupClass:" name
+	other		   -> notFound "tcLookupClass" name
 	
 tcLookupTyCon :: Name -> NF_TcM TyCon
 tcLookupTyCon name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_tc ->
     case maybe_tc of
 	Just (ATyCon tc) -> returnNF_Tc tc
-	other		 -> notFound "tcLookupTyCon:" name
+	other		 -> notFound "tcLookupTyCon" name
 \end{code}
 
 
@@ -368,7 +376,7 @@ tcLookup name
   = tcLookup_maybe name		`thenNF_Tc` \ maybe_thing ->
     case maybe_thing of
 	Just thing -> returnNF_Tc thing
-	other	   -> notFound "tcLookup:" name
+	other	   -> notFound "tcLookup" name
 	-- Extract the IdInfo from an IfaceSig imported from an interface file
 \end{code}
 
@@ -525,7 +533,7 @@ simpleInstInfoTyCon inst
 	Just (tycon, _) -> tycon
 
 isLocalInst :: Module -> InstInfo -> Bool
-isLocalInst mod info = mod == nameModule (idName (iDFunId info))
+isLocalInst mod info = isLocalThing mod (iDFunId info)
 \end{code}
 
 

@@ -21,8 +21,8 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, tyClDeclFVs )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonad
-import TcEnv		( TcEnv, TyThing(..), TyThingDetails(..),
-			  tcExtendKindEnv, tcLookupGlobal, tcExtendGlobalEnv )
+import TcEnv		( TcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
+			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv )
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
 import TcClassDcl	( tcClassDecl1 )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsBoxedSigType, kcHsContext, mkTyClTyVars )
@@ -251,11 +251,12 @@ kcTyClDeclBody :: Name -> [HsTyVarBndr Name] 	-- Kind of the tycon/cls and its t
 -- the kind of the tycon/class.  Give it to the thing inside, and 
 -- check the result kind matches
 kcTyClDeclBody tc_name hs_tyvars thing_inside
-  = tcLookupGlobal tc_name		`thenNF_Tc` \ thing ->
+  = tcLookup tc_name		`thenNF_Tc` \ thing ->
     let
 	kind = case thing of
-		  ATyCon tc -> tyConKind tc
-		  AClass cl -> tyConKind (classTyCon cl)
+		  AGlobal (ATyCon tc) -> tyConKind tc
+		  AGlobal (AClass cl) -> tyConKind (classTyCon cl)
+		  AThing kind	      -> kind
 		-- For some odd reason, a class doesn't include its kind
 
 	(tyvars_w_kinds, result_kind) = zipFunTys (hsTyVarNames hs_tyvars) kind

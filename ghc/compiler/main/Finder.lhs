@@ -34,38 +34,43 @@ source, interface, and object files for a module live.
 
 \begin{code}
 
--- caches contents of package directories, never expunged
+-- v_PkgDirCache caches contents of package directories, never expunged
 GLOBAL_VAR(v_PkgDirCache,    error "no pkg cache!",  FiniteMap String (PackageName, FilePath))
 
--- caches contents of home directories, expunged whenever we
--- create a new finder.
+-- v_HomeDirCache caches contents of home directories, 
+-- expunged whenever we create a new finder.
 GLOBAL_VAR(v_HomeDirCache,   Nothing,  Maybe (FiniteMap String FilePath))
 
 
 initFinder :: PackageConfigInfo -> IO ()
-initFinder pkgs = do
-  -- expunge our home cache
-  writeIORef v_HomeDirCache Nothing
-  -- lazilly fill in the package cache
-  writeIORef v_PkgDirCache (unsafePerformIO (newPkgCache pkgs))
-  pkg_dbg_info <- readIORef v_PkgDirCache
-  putStrLn (unlines (map show (fmToList pkg_dbg_info)))
+initFinder pkgs 
+  = do	{	-- expunge our home cache
+	; writeIORef v_HomeDirCache Nothing
+		-- lazilly fill in the package cache
+	; writeIORef v_PkgDirCache (unsafePerformIO (newPkgCache pkgs))
+	
+-- Debug output
+--	; pkg_dbg_info <- readIORef v_PkgDirCache
+--	; putStrLn (unlines (map show (fmToList pkg_dbg_info)))
+	}
 
 findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-findModule name = do
-  hPutStr stderr ("findModule: " ++ moduleNameUserString name ++ " ... ")
-  maybe_m <- findModule_wrk name
-  case maybe_m of
-     Nothing -> hPutStrLn stderr "Not Found"
-     Just mm -> hPutStrLn stderr (showSDoc (ppr (snd mm)))
-  return maybe_m
-  
+findModule name
+  = do 	{ hPutStr stderr ("findModule: " ++ moduleNameUserString name ++ " ... ")
+	; maybe_m <- findModule_wrk name
+	; case maybe_m of
+	     Nothing -> hPutStrLn stderr "Not Found"
+	     Just mm -> hPutStrLn stderr (showSDoc (ppr (snd mm)))
+	; return maybe_m
+	}
+
 findModule_wrk :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-findModule_wrk name = do
-  j <- maybeHomeModule name
-  case j of
-	Just home_module -> return (Just home_module)
-	Nothing -> maybePackageModule name
+findModule_wrk name
+  = do	{ j <- maybeHomeModule name
+	; case j of
+	    Just home_module -> return (Just home_module)
+	    Nothing		 -> maybePackageModule name
+	}
 
 maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 maybeHomeModule mod_name = do

@@ -308,14 +308,12 @@ data Deprecations = NoDeprecs
 								-- Just "big" names
 		-- We keep the Name in the range, so we can print them out
 
-lookupDeprec :: ModIface -> Name -> Maybe DeprecTxt
-lookupDeprec iface name
-  = case mi_deprecs iface of
-	NoDeprecs      -> Nothing
-	DeprecAll txt  -> Just txt
-	DeprecSome env -> case lookupNameEnv env name of
-			    Just (_, txt) -> Just txt
-			    Nothing	  -> Nothing
+lookupDeprec :: Deprecations -> Name -> Maybe DeprecTxt
+lookupDeprec NoDeprecs        name = Nothing
+lookupDeprec (DeprecAll  txt) name = Just txt
+lookupDeprec (DeprecSome env) name = case lookupNameEnv env name of
+					    Just (_, txt) -> Just txt
+					    Nothing	  -> Nothing
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
 

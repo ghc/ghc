@@ -414,6 +414,9 @@ rnClassBinds (ClassDecl _       _     _      _   _    mbinds _     _      )	-- G
     returnRn (ClassDecl context cname tyvars fds sigs mbinds' names src_loc, meth_fvs)
   where
     meth_doc = text "the default-methods for class"	<+> ppr cname
+
+rnClassBinds _ tycl_decl = returnRn (tycl_decl, emptyFVs)
+	-- Not a class declaration
 \end{code}
 
 

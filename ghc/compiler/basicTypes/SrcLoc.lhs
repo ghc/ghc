@@ -133,4 +133,5 @@ instance Outputable SrcLoc where
 					-- so emacs can find the file
 
     ppr (UnhelpfulSrcLoc s) = ptext s
+    ppr NoSrcLoc	    = ptext SLIT("<No locn>")
 \end{code}

@@ -238,13 +238,13 @@ tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
 tyClDeclNames (TySynonym name _ _ loc)
   = [(name,loc)]
 
-tyClDeclNames (ClassDecl _ name _ _ sigs _ _ loc)
-  = (name,loc) : [(name,loc) | ClassOpSig n _ _ loc <- sigs]
+tyClDeclNames (ClassDecl _ cls_name _ _ sigs _ _ loc)
+  = (cls_name,loc) : [(n,loc) | ClassOpSig n _ _ loc <- sigs]
 
-tyClDeclNames (TyData _ _ name _ cons _ _ loc _ _)
-  = (name,loc) : conDeclsNames cons
+tyClDeclNames (TyData _ _ tc_name _ cons _ _ loc _ _)
+  = (tc_name,loc) : conDeclsNames cons
 
-tyClDeclNames (IfaceSig _ _ _ _) = []
+tyClDeclNames (IfaceSig name _ _ loc) = [(name,loc)]
 
 type ClassDeclSysNames name = [name]
 	-- 	[tycon, datacon wrapper, datacon worker, 

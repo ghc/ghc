@@ -10,13 +10,9 @@ module HscMain ( HscResult(..), hscMain,
 #include "HsVersions.h"
 
 import Maybe		( isJust )
-import Monad		( when )
-import IO		( hPutStr, hPutStrLn, hClose, stderr, 
-			  openFile, IOMode(..) )
+import IO		( hPutStr, hPutStrLn, stderr )
 import HsSyn
 
-import RdrHsSyn		( RdrNameHsModule )
-import FastString	( unpackFS )
 import StringBuffer	( hGetStringBuffer )
 import Parser		( parse )
 import Lex		( PState(..), ParseResult(..) )
@@ -31,7 +27,6 @@ import PrelRules	( builtinRules )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface )
 import TcModule		( TcResults(..), typecheckModule )
-import TcEnv		( tcEnvTyCons, tcEnvClasses )
 import InstEnv		( emptyInstEnv )
 import Desugar		( deSugar )
 import SimplCore	( core2core )
@@ -44,36 +39,28 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
-import Module		( ModuleName, moduleNameUserString, 
-			  moduleUserString, moduleName, emptyModuleEnv,
-			  extendModuleEnv )
+import Module		( ModuleName, moduleName, emptyModuleEnv )
 import CmdLineOpts
-import ErrUtils		( ghcExit, doIfSet, dumpIfSet_dyn )
+import ErrUtils		( dumpIfSet_dyn )
 import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
 import Outputable
-import Char		( isSpace )
 import StgInterp	( stgToInterpSyn )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
-			  PersistentRenamerState(..), WhatsImported(..),
-			  HomeSymbolTable, PackageSymbolTable, ImportVersion, 
-			  GenAvailInfo(..), RdrAvailInfo, OrigNameEnv(..),
-			  PackageRuleBase, HomeIfaceTable, PackageIfaceTable,
-			  extendTypeEnv, groupTyThings, TypeEnv, TyThing,
+			  PersistentRenamerState(..), 
+			  HomeSymbolTable, PackageSymbolTable, 
+			  OrigNameEnv(..), PackageRuleBase, HomeIfaceTable, 
+			  extendTypeEnv, groupTyThings,
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
-import RnMonad		( ExportItem, ParsedIface(..) )
-import CmSummarise	( ModSummary(..), name_of_summary, ms_get_imports,
-			  mimp_name )
+import CmSummarise	( ModSummary(..), ms_get_imports, mimp_name )
 import InterpSyn	( UnlinkedIBind )
 import StgInterp	( ItblEnv )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
-import OccName		( OccName, pprOccName )
-import Name		( Name, nameModule, emptyNameEnv, nameOccName, 
-			  getName, extendNameEnv_C, nameEnvElts )
-import VarEnv		( emptyVarEnv )
-import Module		( Module, mkModuleName,	lookupModuleEnvByName )
+import OccName		( OccName )
+import Name		( Name, nameModule, emptyNameEnv, nameOccName, getName  )
+import Module		( Module, lookupModuleEnvByName )
 
 \end{code}
 
@@ -152,7 +139,6 @@ hscNoRecomp dflags summary maybe_checked_iface hst hit pcs_ch
 
       let pcs_tc        = tc_pcs tc_result
           env_tc        = tc_env tc_result
-          binds_tc      = tc_binds tc_result
           local_insts   = tc_insts tc_result
           local_rules   = tc_rules tc_result
       ;
@@ -192,12 +178,12 @@ hscRecomp dflags summary maybe_checked_iface hst hit pcs_ch
       maybe_tc_result
          <- typecheckModule dflags this_mod pcs_rn hst hit rn_hs_decls;
       case maybe_tc_result of {
-         Nothing -> return (HscFail pcs_rn);
+         Nothing -> do { hPutStrLn stderr "Typechecked failed" 
+		       ; return (HscFail pcs_rn) } ;
          Just tc_result -> do {
 
       let pcs_tc        = tc_pcs tc_result
           env_tc        = tc_env tc_result
-          binds_tc      = tc_binds tc_result
           local_insts   = tc_insts tc_result
       ;
       -- DESUGAR, SIMPLIFY, TIDY-CORE
