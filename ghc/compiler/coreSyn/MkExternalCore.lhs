@@ -87,14 +87,16 @@ collect_exports tyenv (AvailTC n ns) (tcons,dcons,vars) =
 
 collect_tdefs :: TyCon -> [C.Tdef] -> [C.Tdef]
 collect_tdefs tcon tdefs 
-  | isAlgTyCon tcon = tdef : tdefs
+  | isAlgTyCon tcon = tdef: tdefs
   where
-    tdef | isNewTyCon tcon
-	 = C.Newtype (make_con_id (tyConName tcon)) (map make_tbind tyvars) (make_ty rep)
-	 | otherwise
-	 = C.Data (make_con_id (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
-    (_, rep) = newTyConRep tcon
-    tyvars   = tyConTyVars tcon
+    tdef | isNewTyCon tcon = 
+                C.Newtype (make_con_id (tyConName tcon)) (map make_tbind tyvars) repclause 
+         | otherwise = 
+                C.Data (make_con_id (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
+         where repclause | isRecursiveTyCon tcon = Nothing
+		         | otherwise = Just (make_ty rep)
+                                           where (_, rep) = newTyConRep tcon
+    tyvars = tyConTyVars tcon
 
 collect_tdefs _ tdefs = tdefs
 
@@ -151,7 +153,8 @@ make_alt (DEFAULT,[],e) = C.Adefault (make_exp e)
 make_lit :: Literal -> C.Lit
 make_lit l = 
   case l of
-    MachChar i -> C.Lchar (chr i) t
+    MachChar i | i <= 0xff -> C.Lchar (chr i) t
+    MachChar i | otherwise -> C.Lint (toEnum i) t
     MachStr s -> C.Lstring (_UNPK_ s) t
     MachAddr i -> C.Lint i t  
     MachInt i -> C.Lint i t
@@ -185,12 +188,14 @@ make_kind _ = error "MkExternalCore died: make_kind"
 
 {- Id generation. -}
 
-{- Use encoded strings, except restore non-leading '#'s.
+{- Use encoded strings, except restore '#'s.
    Also, adjust casing to work around some badly-chosen internal names. -}
 make_id :: Bool -> Name -> C.Id
 make_id is_var nm = 
   case n of
-    c:cs -> if isUpper c && is_var then (toLower c):(decode cs) else (decode n)
+    c:cs -> if isUpper c && is_var then (toLower c):(decode cs) 
+	    else if isLower c && (not is_var) then (toUpper c):(decode cs)
+            else decode n
   where n = (occNameString . nameOccName) nm
         decode ('z':'h':cs) = '#':(decode cs)
         decode (c:cs) = c:(decode cs)

@@ -55,8 +55,11 @@ ptdef (Data tcon tbinds cdefs) =
   (text "%data" <+> pname tcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
-ptdef (Newtype tcon tbinds ty ) =
-  text "%newtype" <+> pname tcon <+> (hsep (map ptbind tbinds)) <+> char '=' <+> pty ty 
+ptdef (Newtype tcon tbinds rep ) =
+  text "%newtype" <+> pname tcon <+> (hsep (map ptbind tbinds)) <+> repclause
+       where repclause = case rep of
+                           Just ty -> char '=' <+> pty ty 
+			   Nothing -> empty
 
 pcdef (Constr dcon tbinds tys)  =
   (pname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
@@ -160,14 +163,10 @@ pstring s = doubleQuotes(text (escape s))
 escape s = foldr f [] (map ord s)
     where 
      f cv rest | (cv < 0x20 || cv > 0x7e || cv == 0x22 || cv == 0x27 || cv == 0x5c) = 
-	 '\\':'u':h3:h2:h1:h0:rest
-           where (q3,r3) = quotRem cv (16*16*16) 
-		 h3 = toUpper(intToDigit q3)
-		 (q2,r2) = quotRem r3 (16*16)
-                 h2 = toUpper(intToDigit q2)
-		 (q1,r1) = quotRem r2 16
-		 h1 = toUpper(intToDigit q1)
-                 h0 = toUpper(intToDigit r1)
+	 '\\':'x':h1:h0:rest
+           where (q1,r1) = quotRem cv 16
+		 h1 = intToDigit q1
+                 h0 = intToDigit r1
      f cv rest = (chr cv):rest
 
 \end{code}

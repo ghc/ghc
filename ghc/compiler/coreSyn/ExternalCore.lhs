@@ -12,7 +12,7 @@ data Module
 
 data Tdef 
   = Data Tcon [Tbind] [Cdef]
-  | Newtype Tcon [Tbind] Ty
+  | Newtype Tcon [Tbind] (Maybe Ty)
 
 data Cdef 
   = Constr Dcon [Tbind] [Ty]
