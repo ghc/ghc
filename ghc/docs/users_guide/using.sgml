@@ -358,13 +358,79 @@ standard <Filename>.hi</Filename>/<Filename>.o</Filename> suffixes; add <Option>
 <Command>make</Command> rule for GHC compiling&hellip;
 </Para>
 
-<Para>
-FURTHER EXOTICA: If you are doing a normal <Filename>.hs</Filename>-to-<Filename>.o</Filename> compilation
-but would like to hang onto the intermediate <Filename>.hc</Filename> C file, just
-throw in a <Option>-keep-hc-file-too</Option> option<IndexTerm><Primary>-keep-hc-file-too option</Primary></IndexTerm>.
-If you would like to look at the assembler output, toss in a
-<Option>-keep-s-file-too</Option>,<IndexTerm><Primary>-keep-s-file-too option</Primary></IndexTerm> too.
-</Para>
+    <sect2 id="keeping-intermediates">
+      <title>Keeping Intermediate Files</title>
+      <indexterm><primary>intermediate files, saving</primary>
+      </indexterm>
+      <indexterm><primary><literal>.hc</literal> files, saving</primary>
+      </indexterm>
+      <indexterm><primary><literal>.s</literal> files, saving</primary>
+      </indexterm>
+
+      <para>The following options are useful for keeping certain
+      intermediate files around, when normally GHC would throw these
+      away after compilation:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><literal>-keep-hc-files</literal></term>
+	  <indexterm>
+	    <primary><literal>-keep-hc-files</literal></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Keep intermediate <literal>.hc</literal> files when
+	    doing <literal>.hs</literal>-to-<literal>.o</literal>
+	    compilations via C (NOTE: <literal>.hc</literal> files
+	    aren't generated when using the native code generator, you
+	    may need to use <literal>-fvia-C</literal> to force them
+	    to be produced).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-keep-s-files</literal></term>
+	  <indexterm>
+	    <primary><literal>-keep-s-files</literal></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Keep intermediate <literal>.s</literal> files.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-keep-raw-s-files</literal></term>
+	  <indexterm>
+	    <primary><literal>-keep-raw-s-files</literal></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Keep intermediate <literal>.raw-s</literal> files.
+	    These are the direct output from the C compiler, before
+	    GHC does &ldquo;assembly mangling&rdquo; to produce the
+	    <literal>.s</literal> file.  Again, these are not produced
+	    when using the native code generator.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-keep-tmp-files</literal></term>
+	  <indexterm>
+	    <primary><literal>-keep-tmp-files</literal></primary>
+	  </indexterm>
+	  <indexterm>
+	    <primary>temporary files<primary>
+	    <secondary>keeping</secondary>
+	  </indexterm>
+	  <listitem>
+	    <para>Instructs the GHC driver not to delete any of its
+	    temporary files, which it normally keeps in
+	    <literal>/tmp</literal> (or possibly elsewhere; see <xref
+	    linkend="temp-files">).  Running GHC with
+	    <literal>-v</literal> will show you what temporary files
+	    were generated along the way.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
 
 <Sect2 id="saving-ghc-stderr">
 <Title>Saving GHC's standard error output
@@ -387,23 +453,27 @@ output to a particular log file with a <Option>-odump &lt;blah&gt;</Option><Inde
 <Title>Redirecting temporary files
 </Title>
 
+      <indexterm>
+	<primary>temporary files</primary>
+	<secondary>redirecting</secondary>
+      </indexterm>
+
 <Para>
-<IndexTerm><Primary>temporary files, redirecting</Primary></IndexTerm>
+If you have trouble because of running out of space in
+<Filename>/tmp</Filename> (or wherever your installation thinks
+temporary files should go), you may use the <Option>-tmpdir
+&lt;dir&gt;</Option><IndexTerm><Primary>-tmpdir &lt;dir&gt;
+option</Primary></IndexTerm> option to specify an alternate directory.
+For example, <Option>-tmpdir .</Option> says to put temporary files in
+the current working directory.
 </Para>
 
 <Para>
-If you have trouble because of running out of space in <Filename>/tmp</Filename> (or
-wherever your installation thinks temporary files should go), you may
-use the <Option>-tmpdir &lt;dir&gt;</Option><IndexTerm><Primary>-tmpdir &lt;dir&gt; option</Primary></IndexTerm> option
-to specify an alternate directory.  For example, <Option>-tmpdir .</Option> says to
-put temporary files in the current working directory.
-</Para>
-
-<Para>
-Alternatively, use your <Constant>TMPDIR</Constant> environment variable.<IndexTerm><Primary>TMPDIR
-environment variable</Primary></IndexTerm> Set it to the name of the directory where
-temporary files should be put.  GCC and other programs will honour the
-<Constant>TMPDIR</Constant> variable as well.
+Alternatively, use your <Constant>TMPDIR</Constant> environment
+variable.<IndexTerm><Primary>TMPDIR environment
+variable</Primary></IndexTerm> Set it to the name of the directory
+where temporary files should be put.  GCC and other programs will
+honour the <Constant>TMPDIR</Constant> variable as well.
 </Para>
 
 <Para>
