@@ -31,7 +31,7 @@ import WwLib		( mkWrapper )
 import SpecEnv		( SpecEnv )
 import PrimOp		( PrimOp(..) )
 
-import Id		( GenId, mkImported, mkUserId, 
+import Id		( GenId, mkImported, mkUserId, addInlinePragma,
 			  isPrimitiveId_maybe, dataConArgTys, SYN_IE(Id) )
 import Type		( mkSynTy, getAppDataTyConExpandingDicts )
 import TyVar		( mkTyVar )
@@ -42,15 +42,10 @@ import PragmaInfo	( PragmaInfo(..) )
 import ErrUtils		( pprBagOfErrors )
 import Maybes		( maybeToBool )
 import Pretty
-import PprStyle		( PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..) )
 import Util		( zipWithEqual, panic, pprTrace, pprPanic )
 
 import IdInfo
-
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
-
 \end{code}
 
 Ultimately, type signatures in interfaces will have pragmatic
@@ -70,7 +65,12 @@ tcInterfaceSigs (SigD (IfaceSig name ty id_infos src_loc) : rest)
     tcHsType ty					`thenTc` \ sigma_ty ->
     tcIdInfo name sigma_ty noIdInfo id_infos	`thenTc` \ id_info' ->
     let
-	sig_id = mkImported name sigma_ty id_info'
+	imp_id = mkImported name sigma_ty id_info'
+	sig_id | any inline_please id_infos = addInlinePragma imp_id
+	       | otherwise	 	    = imp_id
+
+	inline_please (HsUnfold inline _) = inline
+	inline_please other		  = False
     in
     tcInterfaceSigs rest		`thenTc` \ sig_ids ->
     returnTc (sig_id : sig_ids)
@@ -98,7 +98,7 @@ tcIdInfo name ty info (HsArgUsage au : rest)
 tcIdInfo name ty info (HsDeforest df : rest)
   = tcIdInfo name ty (info `addDeforestInfo` df) rest
 
-tcIdInfo name ty info (HsUnfold expr : rest)
+tcIdInfo name ty info (HsUnfold inline expr : rest)
   = tcUnfolding name expr 	`thenNF_Tc` \ unfold_info ->
     tcIdInfo name ty (info `addUnfoldInfo` unfold_info) rest
 
@@ -114,8 +114,8 @@ tcStrictness ty info (StrictnessInfo demands maybe_worker)
     let
 	-- Watch out! We can't pull on maybe_worker_id too eagerly!
 	info' = case maybe_worker_id of
-			Just worker_id -> info `addUnfoldInfo` mkUnfolding NoPragmaInfo (wrap_fn worker_id)
-			Nothing        -> info
+			Just (worker_id,_) -> info `addUnfoldInfo` mkUnfolding NoPragmaInfo (wrap_fn worker_id)
+			Nothing            -> info
     in
     returnTc (info' `addStrictnessInfo` StrictnessInfo demands maybe_worker_id)
 
@@ -129,13 +129,13 @@ tcStrictness ty info NoStrictnessInfo
 \begin{code}
 tcWorker Nothing = returnNF_Tc Nothing
 
-tcWorker (Just worker_name)
+tcWorker (Just (worker_name,_))
   = tcLookupGlobalValueMaybe worker_name	`thenNF_Tc` \ maybe_worker_id ->
     returnNF_Tc (trace_maybe maybe_worker_id)
   where
 	-- The trace is so we can see what's getting dropped
     trace_maybe Nothing  = pprTrace "tcWorker failed:" (ppr PprDebug worker_name) Nothing
-    trace_maybe (Just x) = Just x
+    trace_maybe (Just x) = Just (x, [])
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check
