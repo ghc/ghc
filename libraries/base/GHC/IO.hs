@@ -695,7 +695,7 @@ bufWrite fd ref is_stream ptr count can_block =
 		   else if can_block
 		   	   then do writeChunk fd is_stream (castPtr ptr) count
 			           return count
-		   	   else writeChunkNonBlocking fd ptr count
+		   	   else writeChunkNonBlocking fd is_stream ptr count
 
 writeChunk :: FD -> Bool -> Ptr CChar -> Int -> IO ()
 writeChunk fd is_stream ptr bytes = loop 0 bytes 
@@ -709,12 +709,13 @@ writeChunk fd is_stream ptr bytes = loop 0 bytes
     -- write can't return 0
     loop (off + r) (bytes - r)
 
-writeChunkNonBlocking :: FD -> Ptr a -> Int -> IO Int
-writeChunkNonBlocking fd ptr bytes = loop 0 bytes 
+writeChunkNonBlocking :: FD -> Bool -> Ptr a -> Int -> IO Int
+writeChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes 
  where
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return off
   loop off bytes = do
+#ifndef mingw32_TARGET_OS
     ssize <- c_write (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes)
     let r = fromIntegral ssize :: Int
     if (r == -1)
@@ -723,6 +724,15 @@ writeChunkNonBlocking fd ptr bytes = loop 0 bytes
 		 then return off
 		 else throwErrno "writeChunk"
       else loop (off + r) (bytes - r)
+#else
+    (ssize, rc) <- asyncWrite fd (fromIntegral $ fromEnum is_stream)
+    				 (fromIntegral bytes)
+				 (ptr `plusPtr` off)
+    let r = fromIntegral ssize :: Int
+    if r == (-1)
+      then ioError (errnoToIOError "hPutBufNonBlocking" (Errno (fromIntegral rc)) Nothing Nothing)
+      else loop (off + r) (bytes - r)
+#endif
 
 -- ---------------------------------------------------------------------------
 -- hGetBuf
@@ -819,6 +829,7 @@ readChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes
   loop :: Int -> Int -> IO Int
   loop off bytes | bytes <= 0 = return off
   loop off bytes = do
+#ifndef mingw32_TARGET_OS
     ssize <- c_read (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes)
     let r = fromIntegral ssize :: Int
     if (r == -1)
@@ -829,6 +840,17 @@ readChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes
       else if (r == 0)
 		then return off
 		else loop (off + r) (bytes - r)
+#else
+    (ssize, rc) <- asyncRead fd (fromIntegral $ fromEnum is_stream)
+   			       (fromIntegral bytes)
+   			       (ptr `plusPtr` off)
+    let r = fromIntegral ssize :: Int
+    if r == (-1)
+     then ioError (errnoToIOError "hGetBufNonBlocking" (Errno (fromIntegral rc)) Nothing Nothing)
+     else if (r  == 0)
+       then return off
+       else loop (off + r) (bytes - r)
+#endif
 
 slurpFile :: FilePath -> IO (Ptr (), Int)
 slurpFile fname = do
