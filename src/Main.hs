@@ -33,11 +33,13 @@ import IO
 #if __GLASGOW_HASKELL__ < 503
 import MonadWriter
 import FiniteMap
+import Set
 import GetOpt
 import IOExts
 #else
 import Control.Monad.Writer
 import Data.FiniteMap
+import Data.Set
 import System.Console.GetOpt
 import Data.IORef
 --import Debug.Trace
@@ -501,56 +503,59 @@ derivedInstances mdl decl = case decl of
   derived srcloc ctxt n tvs cons drv =
      [HsInstDecl srcloc
 		 (ctxt ++ [(cls,[v]) | v <- simple_tvars] ++ extra_constraint)
-		 (cls,[t]) [] |
+		 (cls,[lhs]) [] |
 	cls <- drv]
    where
-     tvar_map = fmToList $ unionMaps (map tvarsConstr cons)
-     simple_tvars = [HsTyVar v | (v,(in_constr,_)) <- tvar_map, in_constr]
-     complex_tvars = [HsTyVar v | (v,(_,in_tycons)) <- tvar_map, in_tycons]
+     targs = map stripDocs (targsConstrs cons)
+     -- a type variable is simple if it occurs as a data constructor argument
+     simple_tvars = map HsTyVar $ setToList $ mkSet $ [tv | HsTyVar tv <- targs]
+     -- a type variable is complex if it occurs inside a data constructor
+     -- argument, except where the argument is identical to the lhs.
+     complex_tvars = map HsTyVar $ setToList $ unionManySets $ map tvarsType $
+			filter (/= lhs) $ filter (not . isVar) targs
+     isVar (HsTyVar _) = True
+     isVar _ = False
      extra_constraint
 	| null complex_tvars = []
 	| otherwise = [(unknownConstraint,complex_tvars)]
-     t  | n == tuple_tycon_name (length tvs - 1) =
+     lhs
+	| n == tuple_tycon_name (length tvs - 1) =
 	   HsTyTuple True (map HsTyVar tvs)
         | otherwise = foldl HsTyApp (HsTyCon (Qual mdl n)) (map HsTyVar tvs)
 
-  -- collect the type variables occurring free in a constr
-  tvarsConstr :: HsConDecl -> FiniteMap HsName (Bool,Bool)
-  -- first Bool: tvar occurs as a data constructor argument
-  -- second Bool: tvar occurs as a type constructor argument
-  tvarsConstr (HsConDecl _ _ vs _ bts _) =
-     unionMaps (map tvarsBangType bts) `delListFromFM` vs
-  tvarsConstr (HsRecDecl _ _ vs _ fs _) =
-     unionMaps (map tvarsField fs) `delListFromFM` vs
+  -- collect type arguments of constructors
+  targsConstrs :: [HsConDecl] -> [HsType]
+  targsConstrs = foldr targsConstr []
 
-  tvarsField (HsFieldDecl _ bt _) = tvarsBangType bt
+  targsConstr :: HsConDecl -> [HsType] -> [HsType]
+  targsConstr (HsConDecl _ _ _ _ bts _) ts = foldr targsBangType ts bts
+  targsConstr (HsRecDecl _ _ _ _ fs _) ts = foldr targsField ts fs
 
-  tvarsBangType (HsBangedTy t) = tvarsType t
-  tvarsBangType (HsUnBangedTy t) = tvarsType t
+  targsField (HsFieldDecl _ bt _) = targsBangType bt
 
-  tvarsType (HsTyTuple _ ts) = unionMaps (map tvarsType ts)
-  tvarsType (HsTyVar tv) = unitFM tv (True,False)
+  targsBangType (HsBangedTy t) ts = t : ts
+  targsBangType (HsUnBangedTy t) ts = t : ts
+
+  -- remove documentation comments from a type
+  stripDocs :: HsType -> HsType
+  stripDocs (HsForAllType n ctxt t) = HsForAllType n ctxt (stripDocs t)
+  stripDocs (HsTyFun t1 t2) = HsTyFun (stripDocs t1) (stripDocs t2)
+  stripDocs (HsTyTuple boxed ts) = HsTyTuple boxed (map stripDocs ts)
+  stripDocs (HsTyApp t1 t2) = HsTyApp (stripDocs t1) (stripDocs t2)
+  stripDocs (HsTyDoc t _) = stripDocs t
+  stripDocs (HsTyIP n t) = HsTyIP n (stripDocs t)
+  stripDocs t = t
+
+  -- collect the type variables occurring free in a type
+  tvarsType (HsForAllType (Just tvs) _ t) = foldl delFromSet (tvarsType t) tvs
+  tvarsType (HsForAllType Nothing _ t) = tvarsType t
+  tvarsType (HsTyFun t1 t2) = tvarsType t1 `union` tvarsType t2
+  tvarsType (HsTyTuple _ ts) = unionManySets (map tvarsType ts)
+  tvarsType (HsTyApp t1 t2) = tvarsType t1 `union` tvarsType t2
+  tvarsType (HsTyVar tv) = unitSet tv
+  tvarsType (HsTyCon _) = emptySet
   tvarsType (HsTyDoc t _) = tvarsType t
-  tvarsType t = tvarsType2 t
-
-  tvarsType2 (HsForAllType (Just tvs) _ t) = tvarsType2 t `delListFromFM` tvs
-  tvarsType2 (HsForAllType Nothing _ t) = tvarsType2 t
-  tvarsType2 (HsTyFun t1 t2) = tvarsType2 t1 `unionMap` tvarsType2 t2
-  tvarsType2 (HsTyTuple _ ts) = unionMaps (map tvarsType2 ts)
-  tvarsType2 (HsTyApp t1 t2) = tvarsType2 t1 `unionMap` tvarsType2 t2
-  tvarsType2 (HsTyVar tv) = unitFM tv (False,True)
-  tvarsType2 (HsTyCon _) = emptyFM
-  tvarsType2 (HsTyDoc t _) = tvarsType2 t
-
-  unionMaps :: [FiniteMap HsName (Bool,Bool)] -> FiniteMap HsName (Bool,Bool)
-  unionMaps = foldr unionMap emptyFM
-
-  unionMap :: FiniteMap HsName (Bool,Bool) -> FiniteMap HsName (Bool,Bool) ->
-	FiniteMap HsName (Bool,Bool)
-  unionMap = plusFM_C or2
-
-  or2 :: (Bool,Bool) -> (Bool,Bool) -> (Bool,Bool)
-  or2 (a1,b1) (a2,b2) = (a1 || a2, b1 || b2)
+  tvarsType (HsTyIP _ t) = tvarsType t
 
 unknownConstraint :: HsQName
 unknownConstraint = UnQual (HsTyClsName (HsIdent "???"))
