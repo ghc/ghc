@@ -13,6 +13,7 @@
 #include "Schedule.h"
 #include "RtsFlags.h"
 #include "Storage.h"
+#include "LdvProfile.h"
 #include "Updates.h"
 #include "Sanity.h"
 #include "Liveness.h"
