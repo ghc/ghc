@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.13 2002/12/11 15:36:39 simonmar Exp $
+ * $Id: StgTicky.h,v 1.14 2002/12/18 01:13:37 mthomas Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -201,10 +201,10 @@ extern StgEntCounter *ticky_entry_ctrs;
                                 TICK_SLOW_HISTO(n)
 
 // A slow call to a FUN found insufficient arguments, and built a PAP
-#define TICK_SLOW_CALL_BUILT_PAP(n) SLOW_CALL_BUILT_PAP_ctr++
+#define TICK_SLOW_CALL_BUILT_PAP() SLOW_CALL_BUILT_PAP_ctr++
 
 // A slow call to a PAP found insufficient arguments, and build a new PAP
-#define TICK_SLOW_CALL_NEW_PAP(n)   SLOW_CALL_NEW_PAP_ctr++
+#define TICK_SLOW_CALL_NEW_PAP()   SLOW_CALL_NEW_PAP_ctr++
 
 /* -----------------------------------------------------------------------------
    Returns
@@ -606,8 +606,8 @@ EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
 #define TICK_ENT_BH()
 
 #define TICK_SLOW_CALL(n)
-#define TICK_SLOW_CALL_BUILT_PAP(n)
-#define TICK_SLOW_CALL_NEW_PAP(n)
+#define TICK_SLOW_CALL_BUILT_PAP()
+#define TICK_SLOW_CALL_NEW_PAP()
 
 #define TICK_RET_NEW(n)
 #define TICK_RET_OLD(n)
