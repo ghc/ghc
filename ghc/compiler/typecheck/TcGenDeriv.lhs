@@ -37,8 +37,6 @@ import HsSyn		( HsBinds(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
 import RdrHsSyn		( RdrName(..), varQual, varUnqual, mkOpApp,
 			  SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat)
 			)
--- import RnHsSyn		( RenamedFixityDecl(..) )
-
 import Id		( GenId, isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
 			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag),
@@ -49,7 +47,7 @@ import Name		( getOccString, getOccName, getSrcLoc, occNameString, modAndOcc, Oc
 import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
-import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
+import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon, maybeTyConSingleCon )
 import Type		( eqTy, isPrimType, SYN_IE(Type) )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
@@ -142,8 +140,9 @@ gen_Eq_binds :: TyCon -> RdrNameMonoBinds
 gen_Eq_binds tycon
   = let
 	tycon_loc = getSrcLoc tycon
-	(nullary_cons, nonnullary_cons)
-	  = partition isNullaryDataCon (tyConDataCons tycon)
+        (nullary_cons, nonnullary_cons)
+           | isNewTyCon tycon = ([], tyConDataCons tycon)
+           | otherwise	      = partition isNullaryDataCon (tyConDataCons tycon)
 
 	rest
 	  = if (null nullary_cons) then
@@ -303,7 +302,8 @@ gen_Ord_binds tycon
 		    (cmp_tags_Expr ltH_Int_RDR ah_RDR bh_RDR ltTag_Expr gtTag_Expr)))
 
     (nullary_cons, nonnullary_cons)
-      = partition isNullaryDataCon (tyConDataCons tycon)
+       | isNewTyCon tycon = ([], tyConDataCons tycon)
+       | otherwise	  = partition isNullaryDataCon (tyConDataCons tycon)
 
     cmp_eq
       = mk_FunMonoBind tycon_loc cmp_eq_RDR (map pats_etc nonnullary_cons ++

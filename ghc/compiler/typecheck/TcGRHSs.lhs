@@ -9,7 +9,9 @@
 module TcGRHSs ( tcGRHSsAndBinds ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(TcLoop) -- for paranoia checking
+#endif
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..), MonoBinds, Stmt, DoOrListComp(..),
 			  HsExpr, HsBinds(..), InPat, OutPat, Sig, Fake )
