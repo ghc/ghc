@@ -25,9 +25,7 @@ data Decl
  = Import [Name]
  | Field [Modifier] Type Name (Maybe Expr)   
  | Constructor [Modifier] Name [Parameter] [Statement]
-				-- Add Throws (list of Names)
-				-- to Method
- | Method [Modifier] Type Name [Parameter] [Statement]
+ | Method [Modifier] Type Name [Parameter] [Name] [Statement]
  | Comment [String]
  | Interface [Modifier] Name [Name] [Decl]
  | Class [Modifier] Name [Name] [Name] [Decl]
@@ -98,7 +96,7 @@ addModifier = \m -> \d ->
    { Import n -> Import n
    ; Field ms t n e -> Field (m:ms) t n e  
    ; Constructor ms n as ss -> Constructor (m:ms) n as ss
-   ; Method ms t n as ss -> Method (m:ms) t n as ss
+   ; Method ms t n as ts ss -> Method (m:ms) t n as ts ss
    ; Comment ss -> Comment ss
    ; Interface ms n xs ds -> Interface (m:ms) n xs ds
    ; Class ms n xs is ds -> Class (m:ms) n xs is ds

@@ -39,7 +39,7 @@ decl = \d ->
     { Import n -> importDecl (hcat (punctuate dot (map text n)))
     ; Field mfs t n e -> field (modifiers mfs) (typ t) (name n) e  
     ; Constructor mfs n as ss -> constructor (modifiers mfs) (name n) (parameters as) (statements ss)
-    ; Method mfs t n as ss -> method (modifiers mfs) (typ t) (name n) (parameters as) (statements ss)
+    ; Method mfs t n as ts ss -> method (modifiers mfs) (typ t) (name n) (parameters as) (throws ts) (statements ss)
     ; Comment s -> comment s
     ; Interface mfs n is ms -> interface (modifiers mfs) (name n) (extends is) (decls ms)
     ; Class mfs n x is ms -> clazz (modifiers mfs) (name n) (extends x) (implements is) (decls ms)
@@ -61,8 +61,8 @@ constructor = \mfs -> \n -> \as -> \ss ->
   $$ indent ss 
   $$ text "}"
 
-method = \mfs -> \t -> \n -> \as -> \ss -> 
-  mfs <+> t <+> n <+> parens (hsep (punctuate comma as)) <+> text "{" 
+method = \mfs -> \t -> \n -> \as -> \ts -> \ss -> 
+  mfs <+> t <+> n <+> parens (hsep (punctuate comma as)) <+> ts <+> text "{" 
   $$ indent ss 
   $$ text "}"
 
@@ -95,6 +95,9 @@ extends xs = text "extends" <+> hsep (punctuate comma (map name xs))
 
 implements [] = empty
 implements xs = text "implements" <+> hsep (punctuate comma (map name xs))
+
+throws [] = empty
+throws xs = text "throws" <+> hsep (punctuate comma (map name xs))
 
 name ns = text ns
 

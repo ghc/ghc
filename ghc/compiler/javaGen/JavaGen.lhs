@@ -32,7 +32,8 @@ javaGen :: Module -> [Module] -> [TyCon] -> [CoreBind] -> CompilationUnit
 javaGen mod import_mods tycons binds
   = liftCompilationUnit package
   where
-    decls = [Import [moduleString mod] | mod <- import_mods] ++
+    decls = [Import ["haskell","runtime","*"]] ++
+	    [Import [moduleString mod] | mod <- import_mods] ++
 	    concat (map javaTyCon (filter isDataTyCon tycons)) ++ 
 	    concat (map javaTopBind binds)
     package = Package (moduleString mod) decls
@@ -66,7 +67,7 @@ javaTyCon tycon
 	where
 	  constr_jname = javaConstrWkrName data_con
 	  constr_jtype = javaConstrWkrType data_con
-	  enter_meth   = Method [Public] objectType enterName [] stmts
+	  enter_meth   = Method [Public] objectType enterName [] [papExcName] stmts
 	  n_val_args   = dataConRepArity data_con
 	  field_names  = map fieldName [1..n_val_args]
 	  field_decls  = [Field [Public] objectType f Nothing | f <- field_names]
@@ -93,7 +94,8 @@ java_top_bind :: Id -> CoreExpr -> Decl
 java_top_bind bndr rhs
   = Class [Public] (javaName bndr) [] [codeName] [enter_meth]
   where
-    enter_meth = Method [Public] objectType enterName [] (javaExpr rhs)
+    enter_meth = Method [Public] objectType enterName [] [papExcName] 
+			(javaExpr rhs)
 \end{code}
 
 
@@ -184,7 +186,7 @@ javaBind (Rec prs)
     mk_class (b,r) = Declaration (Class [] (javaName b) [] [codeName] stmts)
 		   where
 		     stmts = [Field [] codeType (javaName b) Nothing | (b,_) <- prs] ++
-			     [Method [Public] objectType enterName [] (javaExpr r)]	
+			     [Method [Public] objectType enterName [] [papExcName] (javaExpr r)]	
 
     mk_inst (b,r) = var [Final] (javaType b) (javaInstName b)
 			(New (javaType b) [] Nothing)
@@ -268,7 +270,7 @@ instanceOf x data_con
 
 newCode :: [Statement] -> Expr
 newCode [Return e] = e
-newCode stmts	   = New codeType [] (Just [Method [Public] objectType enterName [] stmts])
+newCode stmts	   = New codeType [] (Just [Method [Public] objectType enterName [] [papExcName] stmts])
 
 newThunk :: Expr -> Expr
 newThunk e = New thunkType [e] Nothing
@@ -281,12 +283,13 @@ newThunk e = New thunkType [e] Nothing
 %************************************************************************
 
 \begin{code}
-codeName, enterName, vmName :: Name
+codeName, enterName, vmName,papExcName :: Name
 codeName  = "Code"
 thunkName = "Thunk"
 enterName = "ENTER"
 vmName    = "VM"
 thisName  = "this"
+papExcName = "PartialApplicationException"
 
 fieldName :: Int -> Name	-- Names for fields of a constructor
 fieldName n = "f" ++ show n
@@ -455,10 +458,10 @@ liftDecl = \ top env decl ->
 	 ; (ss,_) <- liftStatements (combineEnv env newBound) ss
 	 ; return (Constructor mfs n (liftParameters env as) ss)
 	 }
-    ; Method mfs t n as ss -> 
+    ; Method mfs t n as ts ss -> 
       do { let newBound = getBoundAtParameters as
 	 ; (ss,_) <- liftStatements (combineEnv env newBound) ss
-	 ; return (Method mfs (liftType env t) n (liftParameters env as) ss)
+	 ; return (Method mfs (liftType env t) n (liftParameters env as) ts ss)
 	 }
     ; Comment s -> return (Comment s)
     ; Interface mfs n is ms -> error "interfaces not supported"
@@ -599,7 +602,7 @@ new env@(Env _ pairs) typ args Nothing =
 new env typ [] (Just inner) =
   -- anon. inner class
   do { innerName <- genAnonInnerClassName 
-     ; frees <- liftClass env innerName inner [unType typ] []
+     ; frees <- liftClass env innerName inner [] [unType typ]
      ; return (New (Type [innerName]) [ Var name | name <- frees ] Nothing)
      }
   where unType (Type [name]) = name
