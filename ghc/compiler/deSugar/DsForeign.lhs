@@ -36,6 +36,7 @@ import Type		( splitAlgTyConApp_maybe,  unUsgTy,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkTyVarTy, mkFunTy, splitAppTy
 			)
+import PprType          ( {- instance Outputable Type -} )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import Var		( TyVar )
 import TysPrim		( realWorldStatePrimTy, addrPrimTy )

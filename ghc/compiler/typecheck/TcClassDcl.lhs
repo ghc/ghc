@@ -57,6 +57,7 @@ import Type		( Type, ThetaType, ClassContext,
 			  mkSigmaTy, mkForAllTys, mkClassPred, classesOfPreds,
 			  boxedTypeKind, mkArrowKind
 			)
+import PprType          ( {- instance Outputable Type -} )
 import Var		( tyVarKind, TyVar )
 import VarSet		( mkVarSet )
 import TyCon		( mkAlgTyCon )

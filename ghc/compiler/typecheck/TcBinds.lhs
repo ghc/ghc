@@ -54,6 +54,7 @@ import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
 			  mkPredTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
 			  isUnboxedType, unboxedTypeKind, boxedTypeKind
 			)
+import PprType          ( {- instance Outputable Type -} )
 import FunDeps		( tyVarFunDep, oclose )
 import Var		( TyVar, tyVarKind )
 import VarSet

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.38 2000/03/23 17:45:19 simonpj Exp $
+% $Id: CgCase.lhs,v 1.39 2000/03/25 12:38:40 panne Exp $
 %
 %********************************************************
 %*							*
@@ -62,6 +62,7 @@ import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  tyConDataCons, tyConFamilySize )
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
 			  splitTyConApp_maybe, repType )
+import PprType          ( {- instance Outputable Type -} )
 import Unique           ( Unique, Uniquable(..), mkPseudoUnique1 )
 import Maybes		( maybeToBool )
 import Util
