@@ -41,8 +41,9 @@ Haskell side.
 #include "RtsFlags.h"
 
 /* Heavily arch-specific, I'm afraid.. */
-#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH)
+#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH) || defined(alpha_TARGET_ARCH)
 
+#if defined(i386_TARGET_ARCH)
 /* Now here's something obscure for you:
 
    When generating an adjustor thunk that uses the C calling
@@ -66,24 +67,17 @@ static unsigned char __obscure_ccall_ret_code [] =
   { 0x83, 0xc4, 0x04 /* addl $0x4, %esp */
   , 0xc3             /* ret */
   };
-
+#endif
 
 void*
 createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 {
-  void *adjustor;
-  unsigned char* adj_code;
-  size_t sizeof_adjustor;
-  
-  if (cconv == 0) { /* the adjustor will be _stdcall'ed */
+  void *adjustor = NULL;
 
-#if defined(sparc_TARGET_ARCH)
-    /* SPARC doesn't have a calling convention other than _ccall */
-    if (cconv == 0) {
-        return NULL;
-    }
-#endif
-
+  switch (cconv)
+  {
+  case 0: /* _stdcall */
+#if defined(i386_TARGET_ARCH)
     /* Magic constant computed by inspecting the code length of
        the following assembly language snippet
        (offset and machine code prefixed):
@@ -96,29 +90,25 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
      <c>: 	ff e0             jmp    %eax        	   # and jump to it.
 		# the callee cleans up the stack
     */
-    sizeof_adjustor = 14*sizeof(char);
+    if ((adjustor = stgMallocBytes(14, "createAdjustor")) != NULL) {
+	unsigned char *const adj_code = (unsigned char *)adjustor;
+	adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
 
-    if ((adjustor = stgMallocBytes(sizeof_adjustor,"createAdjustor")) == NULL) {
-        return NULL;
+	adj_code[0x01] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+	*((StgStablePtr*)(adj_code + 0x02)) = (StgStablePtr)hptr;
+
+	adj_code[0x06] = (unsigned char)0x50; /* pushl %eax */
+
+	adj_code[0x07] = (unsigned char)0xb8; /* movl  $wptr, %eax */
+	*((StgFunPtr*)(adj_code + 0x08)) = (StgFunPtr)wptr;
+
+	adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
+	adj_code[0x0d] = (unsigned char)0xe0;
     }
+#endif
+    break;
 
-    adj_code       = (unsigned char*)adjustor;
-    adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
-
-    adj_code[0x01] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
-    *((StgStablePtr*)(adj_code + 0x02)) = (StgStablePtr)hptr;
-
-    adj_code[0x06] = (unsigned char)0x50; /* pushl %eax */
-
-    adj_code[0x07] = (unsigned char)0xb8; /* movl  $wptr, %eax */
-    *((StgFunPtr*)(adj_code + 0x08)) = (StgFunPtr)wptr;
-
-    adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
-    adj_code[0x0d] = (unsigned char)0xe0;
-
-
-  } else { /* the adjustor will be _ccall'ed */
-
+  case 1: /* _ccall */
 #if defined(i386_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of
      the following assembly language snippet
@@ -143,29 +133,22 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     coming back from the C stub is not stored on the stack.
     That's (thankfully) the case here with the restricted set of 
     return types that we support.
-
-
   */
-    sizeof_adjustor = 17*sizeof(char);
+    if ((adjustor = stgMallocBytes(17, "createAdjustor")) != NULL) {
+	unsigned char *const adj_code = (unsigned char *)adjustor;
 
-    if ((adjustor = stgMallocBytes(sizeof_adjustor,"createAdjustor")) == NULL) {
-        return NULL;
+	adj_code[0x00] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+	*((StgStablePtr*)(adj_code+0x01)) = (StgStablePtr)hptr;
+
+	adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
+	*((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
+
+	adj_code[0x0a] = (unsigned char)0x68;  /* pushl __obscure_ccall_ret_code */
+	*((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)__obscure_ccall_ret_code;
+
+	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
+	adj_code[0x10] = (unsigned char)0xe0; 
     }
-
-    adj_code       = (unsigned char*)adjustor;
-
-    adj_code[0x00] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
-    *((StgStablePtr*)(adj_code+0x01)) = (StgStablePtr)hptr;
-
-    adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
-    *((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
-    
-    adj_code[0x0a] = (unsigned char)0x68;  /* pushl __obscure_ccall_ret_code */
-    *((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)__obscure_ccall_ret_code;
-
-    adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
-    adj_code[0x10] = (unsigned char)0xe0; 
-
 #elif defined(sparc_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of
      the following assembly language snippet
@@ -184,40 +167,77 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     code above contains the input paramter to wptr.) The return address
     is stored in %o7/%i7. Since we don't shift the window in this code,
     the return address is preserved and wptr will return to our caller.
-
   */
-    sizeof_adjustor = 28*sizeof(char);
+    if ((adjustor = stgMallocBytes(28, "createAdjustor")) != NULL) {
+	unsigned char *const adj_code = (unsigned char *)adjustor;
 
-    if ((adjustor = stgMallocBytes(sizeof_adjustor,"createAdjustor")) == NULL) {
-        return NULL;
+	/* sethi %hi(wptr), %o1 */
+	*((unsigned long*)(adj_code+0x00)) = (unsigned long)0x13000000;
+	*((unsigned long*)(adj_code+0x00)) |= ((unsigned long)wptr) >> 10;
+
+	/* sethi %hi(hptr), %o0 */
+	*((unsigned long*)(adj_code+0x04)) = (unsigned long)0x11000000;
+	*((unsigned long*)(adj_code+0x04)) |= ((unsigned long)hptr) >> 10;
+
+	/* jmp %o1+%lo(wptr) */
+	*((unsigned long*)(adj_code+0x08)) = (unsigned long)0x81c26000;
+	*((unsigned long*)(adj_code+0x08)) |= ((unsigned long)wptr) & 0x000003ff;
+
+	/* or %o0, %lo(hptr), %o0 */
+	*((unsigned long*)(adj_code+0x0c)) = (unsigned long)0x90122000;
+	*((unsigned long*)(adj_code+0x0c)) |= ((unsigned long)hptr) & 0x000003ff;
+
+	*((StgStablePtr*)(adj_code+0x10)) = (StgStablePtr)hptr;
     }
+#elif defined(alpha_TARGET_ARCH)
+  /* Magic constant computed by inspecting the code length of
+     the following assembly language snippet
+     (offset and machine code prefixed; note that the machine code
+     shown is longwords stored in little-endian order):
 
-    adj_code       = (unsigned char*)adjustor;
+  <00>: a61b0010	ldq a0, 0x10(pv)	# load up hptr
+  <04>: a77b0018	ldq pv, 0x18(pv)	# load up wptr
+  <08>: 6bfbabcd	jmp (pv), 0xabcd	# jump to wptr (with hint)
+  <0c>: 47ff041f	nop			# padding for alignment
+  <10>: [8 bytes for hptr quadword]
+  <18>: [8 bytes for wptr quadword]
 
-    /* sethi %hi(wptr), %o1 */
-    *((unsigned long*)(adj_code+0x00)) = (unsigned long)0x13000000;
-    *((unsigned long*)(adj_code+0x00)) |= ((unsigned long)wptr) >> 10;
+     The "computed" jump at <08> above is really a jump to a fixed
+     location.  Accordingly, we place an always-correct hint in the
+     jump instruction, namely the address offset from <0c> to wptr,
+     divided by 4, taking the lowest 14 bits.
 
-    /* sethi %hi(hptr), %o0 */
-    *((unsigned long*)(adj_code+0x04)) = (unsigned long)0x11000000;
-    *((unsigned long*)(adj_code+0x04)) |= ((unsigned long)hptr) >> 10;
-    
-    /* jmp %o1+%lo(wptr) */
-    *((unsigned long*)(adj_code+0x08)) = (unsigned long)0x81c26000;
-    *((unsigned long*)(adj_code+0x08)) |= ((unsigned long)wptr) & 0x000003ff;
-    
-    /* or %o0, %lo(hptr), %o0 */
-    *((unsigned long*)(adj_code+0x0c)) = (unsigned long)0x90122000;
-    *((unsigned long*)(adj_code+0x0c)) |= ((unsigned long)hptr) & 0x000003ff;
-    
-    *((StgStablePtr*)(adj_code+0x10)) = (StgStablePtr)hptr;
+TODO: Depending on how much allocation overhead stgMallocBytes uses for
+      header information (more precisely, if the overhead is no more than
+      4 bytes), we should move the first three instructions above down by
+      4 bytes (getting rid of the nop), hence saving memory. [ccshan]
+  */
+    ASSERT(((StgWord64)wptr & 3) == 0);
+    if ((adjustor = stgMallocBytes(32, "createAdjustor")) != NULL) {
+	StgWord64 *const code = (StgWord64 *)adjustor;
+
+	code[0] = 0xa77b0018a61b0010L;
+	code[1] = 0x47ff041f6bfb0000L
+		| (((StgWord32*)(wptr) - (StgWord32*)(code) - 3) & 0x3fff);
+
+	code[2] = (StgWord64)hptr;
+	code[3] = (StgWord64)wptr;
+    }
+#else
+#error Adjustor creation is not supported on this platform.
 #endif
+    break;
   
+  default:
+    ASSERT(0);
+    break;
   }
 
   /* Have fun! */
-  return ((void*)adjustor);
+  return adjustor;
 }
+
+#endif
 
 void
 freeHaskellFunctionPtr(void* ptr)
@@ -243,17 +263,19 @@ freeHaskellFunctionPtr(void* ptr)
 
  /* Free the stable pointer first..*/
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
+#elif defined(sparc_TARGET_ARCH)
+ if ( *(StgWord64*)ptr != 0xa77b0018a61b0010L ) {
+   fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   return;
+ }
+
+ /* Free the stable pointer first..*/
+ freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
+#else
+ ASSERT(0);
 #endif
  *((unsigned char*)ptr) = '\0';
 
  free(ptr);
 }
-
-#else /* Provide dummy */
-void
-freeHaskellFunctionPtr(void* ptr)
-{
-}
-
-#endif /* i386_TARGET_ARCH || sparc_TARGET_ARCH */
 
