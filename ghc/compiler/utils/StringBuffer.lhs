@@ -198,9 +198,14 @@ slurpFileExpandTabs fname = do
 	  then ioError (userError "slurpFile: file too big")
           else do
       	    let sz_i = fromInteger sz
-      	        sz_i' = (sz_i * 12) `div` 10		-- add 20% for tabs
-      	    chunk <- allocMem sz_i'
-      	    trySlurp handle sz_i' chunk
+            if sz_i == 0
+			-- empty file: just allocate a buffer containing '\0'
+		then do chunk <- allocMem 1
+			writeCharOffAddr chunk 0 '\0'
+			return (chunk, 0)
+		else do let sz_i' = (sz_i * 12) `div` 10 -- add 20% for tabs
+	      	        chunk <- allocMem sz_i'
+      	    		trySlurp handle sz_i' chunk
    )
 
 trySlurp :: Handle -> Int -> Addr -> IO (Addr, Int)
