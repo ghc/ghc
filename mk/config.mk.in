@@ -411,6 +411,7 @@ GLUT_LIBS=@GLUT_LIBS@
 
 # X11 stuff
 #
+GhcLibsWithX11=@GhcLibsWithX11@
 X_CFLAGS=@X_CFLAGS@
 X_LIBS=@X_LIBS@
 
