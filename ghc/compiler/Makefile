@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.98 2000/10/27 11:48:54 sewardj Exp $
+# $Id: Makefile,v 1.99 2000/10/27 14:40:40 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -373,6 +373,19 @@ ifeq "$(GhcReportCompiles)" "YES"
 SRC_LD_OPTS += -syslib misc -syslib exts
 endif
 endif
+
+# -----------------------------------------------------------------------------
+# create ghc-inplace, a convenient way to run ghc from the build tree...
+
+all :: ghc-inplace
+
+ghc-inplace : hsc
+	@$(RM) $@
+	echo '#!/bin/sh' >>$@
+	echo exec $(FPTOOLS_TOP_ABS)/ghc/compiler/hsc -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
+	chmod 755 $@
+
+CLEAN_FILES += ghc-inplace
 
 #-----------------------------------------------------------------------------
 # 		install
