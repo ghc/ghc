@@ -205,21 +205,20 @@ GLOBAL_VAR(v_Framework_paths, [], [String])
 GLOBAL_VAR(v_Cmdline_frameworks, [], [String])
 #endif
 
-addToOrDeleteDirList :: IORef [String] -> String -> IO ()
-addToOrDeleteDirList ref ""   = writeIORef ref []
-addToOrDeleteDirList ref path = addToDirList ref path
-
 addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path
   = do paths           <- readIORef ref
-       shiny_new_ones  <- splitUp path
-       writeIORef ref (paths ++ filter notNull shiny_new_ones)
+       shiny_new_ones  <- splitPathList path
+       writeIORef ref (paths ++ shiny_new_ones)
+
+
+splitPathList :: String -> IO [String]
+splitPathList s = do ps <- splitUp s; return (filter notNull ps)
 		-- empty paths are ignored: there might be a trailing
 		-- ':' in the initial list, for example.  Empty paths can
 		-- cause confusion when they are translated into -I options
 		-- for passing to gcc.
   where
-    splitUp ::String -> IO [String]
 #ifdef mingw32_TARGET_OS
      -- 'hybrid' support for DOS-style paths in directory lists.
      -- 

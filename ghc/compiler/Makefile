@@ -190,7 +190,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cProjectPatchLevel    = \"$(ProjectPatchLevel)\"" >> $(CONFIG_HS)
 	@echo "cBooterVersion        = \"$(GhcVersion)\"" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
-	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> $(CONFIG_HS)
 	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
 	@echo "cTARGETOS             = \"$(TargetOS_CPP)\"" >> $(CONFIG_HS)
 	@echo "cTARGETARCH           = \"$(TargetArch_CPP)\"" >> $(CONFIG_HS)

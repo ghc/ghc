@@ -543,7 +543,9 @@ ignorePackage p =
 
 -- -i on its own deletes the import paths
 addImportPath "" = updDynFlags (\s -> s{importPaths = []})
-addImportPath p  = updDynFlags (\s -> s{importPaths = p : importPaths s})
+addImportPath p  = do
+  paths <- splitPathList p
+  updDynFlags (\s -> s{importPaths = importPaths s ++ paths})
 
 -- we can only switch between HscC, HscAsmm, and HscILX with dynamic flags 
 -- (-fvia-C, -fasm, -filx respectively).
