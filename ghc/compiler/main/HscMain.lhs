@@ -77,8 +77,71 @@ hscMain
   -> IO HscResult
 
 hscMain dflags core_cmds stg_cmds summary maybe_old_iface
-	output_filename mod_details pcs1 =
+	output_filename mod_details pcs1 
+ = do
+      source_unchanged :: Bool -- extracted from summary?
 
+      (pcs2, check_errs, (recomp_reqd, maybe_checked_iface))
+         <- checkOldIface dflags finder hit hst pcs1 mod source_unchanged
+                          maybe_old_iface
+
+      -- test check_errs and give up if a problem happened
+      what_next = if recomp_reqd then hscRecomp else hscNoRecomp
+
+      return $
+         what_next dflags core_cmds stg_cmds summary hit hst 
+                   pcs2 maybe_checked_iface
+
+hscNoRecomp = panic "hscNoRecomp"
+
+hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
+ = do 
+      -- parsed :: RdrNameHsModule
+      parsed <- parseModule summary
+      -- check for parse errors
+
+      (pcs_rn, maybe_rn_result) 
+         <- renameModule dflags finder hit hst pcs mod parsed
+
+      -- check maybe_rn_result for failure
+
+      (new_iface, rn_hs_decls) = unJust maybe_rn_result
+
+      maybe_tc_result
+         <- typecheckModule dflags mod pcs hst hit pit rn_hs_decls
+
+      -- check maybe_tc_result for failure
+      let tc_result = unJust maybe_tc_result
+      let tc_pcs = tc_pcs tc_result
+      let tc_env = tc_env tc_result
+      let tc_binds = tc_binds tc_result
+
+      -- desugar, simplify and tidy, to create the unfoldings
+      -- why is this IO-typed?
+      (core_binds, orphan_rules) 
+         <- dsThenSimplThenTidy dflags mod tc_binds rule_base
+
+      -- convert to Stg; needed for binders
+      let (stg_binds, top_level_ids) = myCoreToStg core_binds
+      					-- myCoreToStg does occurAnalyseBinds, 
+					-- `seq`, topCoreBindsToStg
+
+      -- cook up a new ModDetails now we (finally) have all the bits
+      let new_details = completeModDetails tc_env core_binds top_level_ids orphan_rules
+
+      -- and possibly create a new ModIface
+      let maybe_final_iface = completeIface maybe_old_iface new_iface new_details 
+
+      -- do the rest of code generation/emission
+      (unlinkeds, stub_h_filename, stub_c_filename) <- restOfCodeGeneration stg_binds
+
+      -- and the answer is ...
+      return (HscOK new_details maybe_final_iface stub_h_filename stub_c_filename
+                    unlinkeds tc_pcs (unionBags rn_warns tc_warns))
+
+
+#if 0
+-- BEGIN old stuff
 	--------------------------  Reader  ----------------
     show_pass "Parser"	>>
     _scc_     "Parser"
@@ -241,6 +304,8 @@ hscMain dflags core_cmds stg_cmds summary maybe_old_iface
       = if opt_D_show_passes
 	then \ what -> hPutStr stderr ("*** "++what++":\n")
 	else \ what -> return ()
+-- END old stuff
+#endif
 \end{code}
 
 
