@@ -74,12 +74,13 @@ EXTRA_SRCS  += GHC/PrimopWrappers.hs
 CLEAN_FILES += GHC/PrimopWrappers.hs
 
 # -----------------------------------------------------------------------------
-
+ifneq "$(BootingFromHc)" "YES"
 STUBOBJS += \
    Control/Concurrent_stub.$(way_)o
    
 CLEAN_FILES += $(STUBOBJS) \
    Control/Concurrent_stub.[ch]
+endif
 
 #-----------------------------------------------------------------------------
 # 	Building the library for GHCi
