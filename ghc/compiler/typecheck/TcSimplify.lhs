@@ -1226,18 +1226,35 @@ addAmbigErr ambig_tv_fn dict
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 warnDefault dicts default_ty
-  = doptsTc Opt_WarnTypeDefaults  `thenTc` \ warn ->
-    if warn then warnTc True msg else returnNF_Tc ()
+  = doptsTc Opt_WarnTypeDefaults  `thenTc` \ warn_flag ->
+    if warn_flag 
+	then mapNF_Tc warn groups  `thenNF_Tc_`  returnNF_Tc ()
+	else returnNF_Tc ()
 
   where
-    msg | length dicts > 1 
-	= (ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty))
-	  $$ pprInstsInFull tidy_dicts
-	| otherwise
-	= ptext SLIT("Defaulting") <+> quotes (pprInst (head tidy_dicts)) <+> 
-	  ptext SLIT("to type") <+> quotes (ppr default_ty)
-
+	-- Tidy them first
     (_, tidy_dicts) = mapAccumL tidyInst emptyTidyEnv dicts
+
+	-- Group the dictionaries by source location
+    groups      = equivClasses cmp tidy_dicts
+    i1 `cmp` i2 = get_loc i1 `compare` get_loc i2
+    get_loc i   = case instLoc i of { (_,loc,_) -> loc }
+
+    warn [dict] = tcAddSrcLoc (get_loc dict) $
+		  warnTc True (ptext SLIT("Defaulting") <+> quotes (pprInst dict) <+> 
+			       ptext SLIT("to type") <+> quotes (ppr default_ty))
+
+    warn dicts  = tcAddSrcLoc (get_loc (head dicts)) $
+		  warnTc True (vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty),
+				     pprInstsInFull dicts])
+
+addRuleLhsErr dict
+  = addInstErrTcM (instLoc dict)
+	(tidy_env,
+	 vcat [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
+	       nest 4 (ptext SLIT("LHS of a rule must have no overloading"))])
+  where
+    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 addTopIPErr dict
   = addInstErrTcM (instLoc dict) 
