@@ -17,20 +17,18 @@ module System.Environment
       getArgs,	     -- :: IO [String]
       getProgName,   -- :: IO String
       getEnv,        -- :: String -> IO String
-#ifdef __GLASGOW_HASKELL__
+#ifndef __NHC__
       withArgs,
       withProgName,
 #endif
   ) where
 
 import Prelude
-#ifndef __NHC__
-import Control.Exception 	( bracket )
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign
 import Foreign.C
+import Control.Exception 	( bracket )
 import Control.Monad
 import GHC.IOBase
 #include "config.h"
@@ -129,7 +127,7 @@ foreign import ccall unsafe "getenv"
 
 {-|
 @withArgs args act@ - while executing action @act@, have 'System.getArgs'
-return @args@ (GHC only).
+return @args@.
 -}
 withArgs :: [String] -> IO a -> IO a
 withArgs xs act = do
@@ -138,7 +136,7 @@ withArgs xs act = do
 
 {-|
 @withProgName name act@ - while executing action @act@,
-have 'System.getProgName' return @name@ (GHC only).
+have 'System.getProgName' return @name@.
 -}
 withProgName :: String -> IO a -> IO a
 withProgName nm act = do
