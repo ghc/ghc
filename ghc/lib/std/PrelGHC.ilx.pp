@@ -1,5 +1,8 @@
 // The ILX implementation of PrelGHC 
 
+// This file isn't really preprocessed, but it's kept as a .pp file
+// because .ilx files aren't precious, and may be deleted
+
 .module extern 'PrelBase.i_o'
 .classunion import [.module 'PrelBase.i_o']PrelBase_Bool {.alternative 'PrelBase_False' ()
 .alternative 'PrelBase_True' ()}
@@ -456,7 +459,7 @@ end:
    }
    .method public  static  
        class PrelGHC_Weakzh<!!1>
-           bake<any,any>(!!0,!!1 obj,thunk<(func () -> class [.module 'PrelBase.i_o']PrelBase_Z0T)> finalizer) {
+           bake<any,any>(!!0,!!1 obj,thunk<(func () --> class [.module 'PrelBase.i_o']PrelBase_Z0T)> finalizer) {
          ldarg obj 
          ldarg finalizer
          newobj void class 'PrelGHC_Weakzh'<!!1>::.ctor(!0 x, thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.i_o']PrelBase_Z0T)>) 
