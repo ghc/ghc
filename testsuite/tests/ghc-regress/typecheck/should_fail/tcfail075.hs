@@ -4,7 +4,9 @@
 
 module ShouldFail where
 
-import PrelGHC
+--import PrelGHC
+import GHC.Base
+import GHC.Prim
 
 x = 1#
 

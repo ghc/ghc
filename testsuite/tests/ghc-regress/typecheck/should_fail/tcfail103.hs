@@ -4,9 +4,9 @@
 -- This one is a bit crafty
 
 module ShouldCompile where
-
-import PrelST
-import PrelArr
+import GHC.ST
+import GHC.STRef
+import GHC.Arr
 
 -- Note the *pattern* type sig on f, which forces it
 -- to be monomorphic; but the separate type sig makes

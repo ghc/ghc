@@ -41,7 +41,7 @@ test "tcfail040" { vtcf("") }
 test "tcfail042" { vtcf("") }
 test "tcfail043" { vtcf("") }
 test "tcfail044" { vtcf("") }
-test "tcfail045" { vtcf("-fglasgow-exts -package lang") }
+test "tcfail045" { vtcf("-fglasgow-exts") }
 test "tcfail046" { vtcf("") }
 test "tcfail047" { vtcf("") }
 test "tcfail048" { vtcf("") }
@@ -60,7 +60,7 @@ test "tcfail062" { vtcf("") }
 test "tcfail063" { vtcf("") }
 test "tcfail065" { vtcf("") }
 test "tcfail067" { vtcf("") }
-test "tcfail068" { vtcf("-fglasgow-exts -package lang") }
+test "tcfail068" { vtcf("-fglasgow-exts") }
 test "tcfail069" { vtcf("") }
 test "tcfail070" { vtcf("") }
 test "tcfail071" { vtcf("") }

@@ -1,7 +1,7 @@
 
 tcfail013.hs:4:
-    Couldn't match `[a]' against `Bool'
-	Expected type: [a]
-	Inferred type: Bool
+    Couldn't match `Bool' against `[a]'
+	Expected type: Bool
+	Inferred type: [a]
     In the pattern: True
     In the definition of `f': f True = 2

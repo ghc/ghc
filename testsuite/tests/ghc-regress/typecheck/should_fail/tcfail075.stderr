@@ -1,23 +1,23 @@
 
-tcfail075.hs:9:
+tcfail075.hs:11:
     Top-level bindings for unlifted types aren't allowed: x = 1#
     When generalising the type(s) for `x'
 
-tcfail075.hs:12:
+tcfail075.hs:14:
     Couldn't match `#' against `*'
     When matching types `Int#' and `t'
 	Expected type: Int#
 	Inferred type: t
     In the first argument of `(+#)', namely `x'
 
-tcfail075.hs:15:
+tcfail075.hs:17:
     Couldn't match `#' against `*'
     When matching types `Int#' and `t'
 	Expected type: Int#
 	Inferred type: t
     In the first argument of `(-#)', namely `x'
 
-tcfail075.hs:17:
+tcfail075.hs:19:
     Couldn't match `#' against `*'
     When matching types `Int#' and `t'
 	Expected type: Int#

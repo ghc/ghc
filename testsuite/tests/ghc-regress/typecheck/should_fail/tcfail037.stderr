@@ -2,4 +2,4 @@
 tcfail037.hs:7:
     Ambiguous occurrence `+'
     It could refer to either `ShouldFail.+', defined at tcfail037.hs:10
-		          or `PrelNum.+', imported from Prelude at tcfail037.hs:3
+		          or `GHC.Num.+', imported from Prelude at tcfail037.hs:3

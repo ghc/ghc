@@ -2,7 +2,7 @@
 
 module ShouldFail where
 
-import PrelGHC
+import GHC.Base
 
 die :: Int -> ByteArray#
 die _ = undefined
