@@ -1,8 +1,12 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.4 2001/03/27 09:44:56 simonmar Exp $
+# $Id: bootstrap.mk,v 1.5 2001/03/27 11:37:39 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
+# When booting from .hc files without a compiler installed, we don't have
+# the benefit of the GHC driver to add all the magic options required to
+# compile the .hc files, so we have to duplicate that functionality here.
+# The result is unfortunately ugly, but we don't have another choice.
 
 TOP_SAVED := $(TOP)
 TOP:=$(TOP)/ghc
@@ -48,15 +52,15 @@ PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) -D__GLASGOW_HASKELL__=411 $(CC_OPTS)
 
-SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_LIB_DIR)/std/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
+SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
 
 # -----------------------------------------------------------------------------
 # Linking: we have to give all the libraries explicitly.
 
 HC_BOOT_LD_OPTS =				\
-   -L$(GHC_RUNTIME_DIR)				\
-   -L$(GHC_LIB_DIR)/std				\
-   -L$(GHC_LIB_DIR)/std/cbits			\
+   -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
+   -L$(FPTOOLS_TOP_ABS)/ghc/lib/std		\
+   -L$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/concurrent	\
@@ -65,7 +69,7 @@ HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits	\
    -L$(FPTOOLS_TOP_ABS)/hslibs/util		\
    -L$(FPTOOLS_TOP_ABS)/hslibs/util/cbits	\
-   -L$(FPTOOLS_TOP_ABS)/hslibs/text		\
+   -L$(FPTOOLS_TOP_ABS) hslibs/text		\
    -u "PrelBase_Izh_static_info"		\
    -u "PrelBase_Czh_static_info"		\
    -u "PrelFloat_Fzh_static_info"		\
