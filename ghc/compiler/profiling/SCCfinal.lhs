@@ -213,6 +213,10 @@ stgMassageForProfiling mod_name us stg_binds
 	= do_let b e `thenMM` \ (b,e) ->
 	  returnMM (StgLetNoEscape lvs1 lvs2 b e)
 
+#ifdef DEBUG
+    do_expr other = pprPanic "SCCfinal.do_expr" (ppr other)
+#endif
+
     ----------------------------------
 
     do_let (StgNonRec srt b rhs) e
