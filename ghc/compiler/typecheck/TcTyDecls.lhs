@@ -21,7 +21,7 @@ import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..)	)
 import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
 			  TcHsBinds, TcMonoBinds
 			)
-import BasicTypes	( RecFlag(..) )
+import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcHsTypeKind, tcHsType, tcContext )
@@ -54,7 +54,7 @@ import TyCon		( TyCon, mkSynTyCon, mkDataTyCon, isAlgTyCon,
 import Type		( typeKind, getTyVar, tyVarsOfTypes, splitSigmaTy,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
 			  splitFunTys, mkTyVarTy, getTyVar_maybe,
-			  Type, ThetaType
+			  isUnboxedType, Type, ThetaType
 			)
 import TyVar		( tyVarKind, elementOfTyVarSet, intersectTyVarSets, isEmptyTyVarSet,
 			  TyVar )
@@ -113,7 +113,11 @@ Algebraic data and newtype decls
 \begin{code}
 tcTyDecl is_rec (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
   = tcAddSrcLoc src_loc $
-    tcAddErrCtxt (tyDataCtxt tycon_name) $
+    let ctxt = case data_or_new of
+		 NewType  -> tyNewCtxt tycon_name
+		 DataType -> tyDataCtxt tycon_name
+    in
+    tcAddErrCtxt ctxt $
 
 	-- Lookup the pieces
     tcLookupTyCon tycon_name			`thenTc` \ (tycon_kind, _, rec_tycon) ->
@@ -259,6 +263,9 @@ tcConDecl tycon tyvars ctxt (ConDecl op ex_ctxt (InfixCon bty1 bty2) src_loc)
 tcConDecl tycon tyvars ctxt (ConDecl name ex_ctxt (NewCon ty) src_loc)
   = tcAddSrcLoc src_loc	$
     tcHsType ty `thenTc` \ arg_ty ->
+    -- can't allow an unboxed type here, because we're effectively
+    -- going to remove the constructor while coercing it to a boxed type.
+    checkTc (not (isUnboxedType arg_ty)) (newTypeUnboxedField ty) `thenTc_`
     let
       data_con = mkDataCon (getName name)
 			   [NotMarkedStrict]
@@ -348,6 +355,10 @@ tyNewCtxt tycon_name
 
 fieldTypeMisMatch field_name
   = sep [ptext SLIT("Declared types differ for field"), quotes (ppr field_name)]
+
+newTypeUnboxedField ty
+  = sep [ptext SLIT("Newtype constructor field has an unboxed type:"), 
+	 quotes (ppr ty)]
 
 evalCtxt con eval_theta
   = hsep [ptext SLIT("When checking the Eval context for constructor:"), 
