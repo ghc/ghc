@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.42 2000/01/14 11:45:21 hwloidl Exp $
+ * $Id: Schedule.c,v 1.43 2000/01/14 13:17:16 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -1545,9 +1545,10 @@ run_queue_len(void)
 static void GetRoots(void)
 {
   StgMainThread *m;
-  nat i;
 
 #if defined(GRAN)
+  nat i;
+
   for (i=0; i<=RtsFlags.GranFlags.proc; i++) {
     if ((run_queue_hds[i] != END_TSO_QUEUE) && ((run_queue_hds[i] != NULL)))
       run_queue_hds[i]    = (StgTSO *)MarkRoot((StgClosure *)run_queue_hds[i]);
@@ -2798,7 +2799,7 @@ print_bq (StgClosure *node)
        tso=tso->link) {
     ASSERT(tso!=(StgTSO*)NULL && tso!=END_TSO_QUEUE);   // sanity check
     ASSERT(get_itbl(tso)->type == TSO);  // guess what, sanity check
-    fprintf(stderr," TSO %d (%x),", tso->id, tso);
+    fprintf(stderr," TSO %d (%p),", tso->id, tso);
   }
   fputc('\n', stderr);
 }
@@ -2807,17 +2808,6 @@ print_bq (StgClosure *node)
 /* A debugging function used all over the place in GranSim and GUM.
    Dummy function in other setups.
 */
-# if !defined(GRAN) && !defined(PAR)
-char *
-info_type(StgClosure *closure){ 
-  return "petaQ";
-}
-
-char *
-info_type_by_ip(StgInfoTable *ip){ 
-  return "petaQ";
-}
-#endif
 
 static void
 sched_belch(char *s, ...)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.26 2000/01/13 14:34:04 hwloidl Exp $
+ * $Id: RtsStartup.c,v 1.27 2000/01/14 13:17:15 hwloidl Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -20,7 +20,7 @@
 #include "Weak.h"
 #include "Ticky.h"
 
-#if defined(PROFILING)
+#if defined(PROFILING) || defined(DEBUG)
 # include "ProfRts.h"
 # include "ProfHeap.h"
 #endif

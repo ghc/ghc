@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.69 2000/01/13 14:34:02 hwloidl Exp $
+ * $Id: GC.c,v 1.70 2000/01/14 13:17:15 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -937,15 +937,6 @@ MarkRoot(StgClosure *root)
   return evacuate(root);
 }
 
-//@cindex MarkRootHWL
-StgClosure *
-MarkRootHWL(StgClosure *root)
-{
-  StgClosure *new = evacuate(root);
-  upd_evacuee(root, new);
-  return new;
-}
-
 //@cindex addBlock
 static void addBlock(step *step)
 {
@@ -1188,9 +1179,6 @@ evacuate(StgClosure *q)
   bdescr *bd = NULL;
   step *step;
   const StgInfoTable *info;
-
-  nat size, ptrs, nonptrs, vhs;
-  char str[80];
 
 loop:
   if (HEAP_ALLOCED(q)) {
@@ -2724,17 +2712,15 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     case CATCH_FRAME:
     case SEQ_FRAME:
       {
-	StgPtr old_p = p; // debugging only -- HWL
+	// StgPtr old_p = p; // debugging only -- HWL
       /* stack frames like these are ordinary closures and therefore may 
 	 contain setup-specific fixed-header words (as in GranSim!);
 	 therefore, these cases should not use p++ but &(p->payload) -- HWL */
-      IF_DEBUG(gran, IF_DEBUG(sanity, printObj(p)));
+      // IF_DEBUG(gran, IF_DEBUG(sanity, printObj(p)));
       bitmap = info->layout.bitmap;
 
       p = (StgPtr)&(((StgClosure *)p)->payload);
-      IF_DEBUG(sanity, 
-		 belch("HWL: scavenge_stack: (STOP|CATCH|SEQ)_FRAME adjusting p from %p to %p (instead of %p)",
-		       old_p, p, old_p+1));
+      // IF_DEBUG(sanity, belch("HWL: scavenge_stack: (STOP|CATCH|SEQ)_FRAME adjusting p from %p to %p (instead of %p)",		       old_p, p, old_p+1));
       goto small_bitmap;
       }
     case RET_BCO:
@@ -3148,7 +3134,7 @@ threadSqueezeStack(StgTSO *tso)
     frame = prev_frame;
 #if DEBUG
     IF_DEBUG(sanity,
-	     if (!(frame>=top_frame && frame<=bottom)) {
+	     if (!(frame>=top_frame && frame<=(StgUpdateFrame *)bottom)) {
 	       printObj((StgClosure *)prev_frame);
 	       barf("threadSqueezeStack: current frame is rubbish %p; previous was %p\n", 
 		    frame, prev_frame);
@@ -3356,7 +3342,6 @@ threadPaused(StgTSO *tso)
 void
 printMutOnceList(generation *gen)
 {
-  const StgInfoTable *info;
   StgMutClosure *p, *next, *new_list;
 
   p = gen->mut_once_list;
@@ -3378,7 +3363,6 @@ printMutOnceList(generation *gen)
 void
 printMutableList(generation *gen)
 {
-  const StgInfoTable *info;
   StgMutClosure *p, *next;
 
   p = gen->saved_mut_list;

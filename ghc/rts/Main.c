@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.14 2000/01/13 14:34:03 hwloidl Exp $
+ * $Id: Main.c,v 1.15 2000/01/14 13:17:16 hwloidl Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     { /* a wait loop to allow attachment of gdb to UNIX threads */
       nat i, j, s;
 
-      for (i=0, s=0; i<RtsFlags.ParFlags.wait; i++)
+      for (i=0, s=0; i<(nat)RtsFlags.ParFlags.wait; i++)
 	for (j=0; j<1000000; j++) 
 	  s += j % 65536;
     }
