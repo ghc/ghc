@@ -9,20 +9,20 @@
 module HsExpr where
 
 IMP_Ubiq(){-uitous-}
-IMPORT_DELOOPER(HsLoop) -- for paranoia checking
 
 -- friends:
+IMPORT_DELOOPER(HsLoop) ( pprMatches, pprMatch, Match )
 import HsBinds		( HsBinds )
-import HsBasic		( HsLit, Fixity(..), FixityDirection(..) )
-import HsMatches	( pprMatches, pprMatch, Match )
+import HsBasic		( HsLit )
+import BasicTypes	( Fixity(..), FixityDirection(..) )
 import HsTypes		( HsType )
 
 -- others:
 import Id		( SYN_IE(DictVar), GenId, SYN_IE(Id) )
-import Outputable	--( interppSP, interpp'SP, ifnotPprForUser )
+import Outputable	( pprQuote, interppSP, interpp'SP, ifnotPprForUser, 
+			  PprStyle(..), userStyle, Outputable(..) )
 import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
 import Pretty
-import PprStyle		( PprStyle(..), userStyle )
 import SrcLoc		( SrcLoc )
 import Usage		( GenUsage{-instance-} )
 --import Util		( panic{-ToDo:rm eventually-} )
@@ -199,6 +199,10 @@ instance (NamedThing id, Outputable id, Outputable pat,
 \end{code}
 
 \begin{code}
+pprExpr :: (NamedThing id, Outputable id, Outputable pat, 
+	    Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
+        => PprStyle -> HsExpr tyvar uvar id pat -> Doc
+
 pprExpr sty (HsVar v) = ppr sty v
 
 pprExpr sty (HsLit    lit)   = ppr sty lit
@@ -209,7 +213,7 @@ pprExpr sty (HsLam match)
 
 pprExpr sty expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
-    hang (pprExpr sty fun) 4 (sep (map (pprExpr sty) args))
+    (pprExpr sty fun) <+> (sep (map (pprExpr sty) args))
   where
     collect_args (HsApp fun arg) args = collect_args fun (arg:args)
     collect_args fun		 args = (fun, args)
