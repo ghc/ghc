@@ -48,8 +48,8 @@ import Name		( isLocallyDefined, getSrcLoc, ExportFlag(..), Provenance,
 			)
 import Outputable	( PprStyle(..), Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
-import Pretty		( ($$), vcat, hsep, hcat, 
-		          ptext, text, char, hang, Doc )
+import Pretty		( ($$), vcat, hsep, hcat, parens,
+		          ptext, char, hang, Doc )
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
@@ -236,7 +236,7 @@ tcDeriving modname rn_name_supply inst_decl_infos_in
 	-- method bindings for the instances.
 	(dfun_names_w_method_binds, rn_extra_binds)
 		= renameSourceCode modname rn_name_supply (
-			bindLocatedLocalsRn (\_ -> text "deriving") mbinders	$ \ _ ->
+			bindLocatedLocalsRn (\_ -> ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ rn_extra_binds ->
 			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
@@ -339,20 +339,24 @@ makeDerivEqns
 	    is_enumeration = isEnumerationTyCon tycon
 	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
 
-	    chk_clas clas_uniq clas_str cond
+	    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
+	    nullary_why        = SLIT("data type with all nullary constructors expected")
+
+	    chk_clas clas_uniq clas_str clas_why cond
 	      = if (clas_uniq == clas_key)
-		then checkTc cond (derivingThingErr clas_str tycon)
+		then checkTc cond (derivingThingErr clas_str clas_why tycon)
 		else returnTc ()
     	in
 	    -- Are things OK for deriving Enum (if appropriate)?
-	chk_clas enumClassKey "Enum" is_enumeration `thenTc_`
+	chk_clas enumClassKey (SLIT("Enum")) nullary_why is_enumeration `thenTc_`
 
 	    -- Are things OK for deriving Bounded (if appropriate)?
-	chk_clas boundedClassKey "Bounded"
-		(is_enumeration || is_single_con) `thenTc_`
+	chk_clas boundedClassKey (SLIT("Bounded")) single_nullary_why
+		 (is_enumeration || is_single_con) `thenTc_`
 
 	    -- Are things OK for deriving Ix (if appropriate)?
-	chk_clas ixClassKey "Ix.Ix" (is_enumeration || is_single_con)
+	chk_clas ixClassKey (SLIT("Ix.Ix")) single_nullary_why 
+		 (is_enumeration || is_single_con)
 
     ------------------------------------------------------------------
     cmp_deriv :: (Class, TyCon) -> (Class, TyCon) -> TAG_
@@ -712,9 +716,10 @@ gen_taggery_Names inst_infos
 \end{code}
 
 \begin{code}
-derivingThingErr :: String -> TyCon -> Error
+derivingThingErr :: FAST_STRING -> FAST_STRING -> TyCon -> Error
 
-derivingThingErr thing tycon sty
-  = hang (hsep [ptext SLIT("Can't make a derived instance of"), text thing])
-	 4 (hsep [ptext SLIT("for the type"), ppr sty tycon])
+derivingThingErr thing why tycon sty
+  = hang (hsep [ptext SLIT("Can't make a derived instance of"), ptext thing])
+	 0 (hang (hsep [ptext SLIT("for the type"), ppr sty tycon])
+	         0 (parens (ptext why)))
 \end{code}
