@@ -211,7 +211,15 @@ HsInt Main_d1kv ( StgStablePtr the_stableptr,
    In short, we can't think of a really satisfactory solution.  I'd
    vote for introducing some kind of OS-thread-local-state and passing
    it in there, but that introduces complications of its own.
- 
+   <p>
+   <b>OS-thread-safety</b> is of concern in the C stubs, whilst
+   building up the expressions to run.  These need to have exclusive
+   access to the heap whilst allocating in it.  Also, there needs to
+   be some guarantee that no GC will happen in between the
+   <code>deRefStablePtr</code> call and when <code>rts_eval[IO]</code>
+   starts running.  At the moment there are no guarantees for
+   either property.  This needs to be sorted out before the
+   implementation can be regarded as fully safe to use.
 
 <p><small>
    
