@@ -18,7 +18,7 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType )
+import CoreUtils	( exprType, mkCoerce )
 import Id		( Id, mkWildId, idType )
 import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
@@ -26,12 +26,13 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, CC
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
 import ForeignCall	( ForeignCall, CCallTarget(..) )
 
-import TcType		( Type, isUnLiftedType, mkFunTys, mkFunTy,
+import TcType		( tcSplitTyConApp_maybe )
+import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
-			  isBoolTy, isUnitTy, isPrimitiveType,
-			  tcSplitTyConApp_maybe
+			  isPrimitiveType, eqType,
+			  splitTyConApp_maybe, splitNewType_maybe
 			)
-import Type		( repType, eqType )	-- Sees the representation type
+
 import PrimOp		( PrimOp(TouchOp) )
 import TysPrim		( realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
@@ -46,7 +47,7 @@ import TysWiredIn	( unitDataConId,
 			)
 import Literal		( mkMachInt )
 import CStrings		( CLabelString )
-import PrelNames	( Unique, hasKey, ioTyConKey )
+import PrelNames	( Unique, hasKey, ioTyConKey, boolTyConKey, unitTyConKey )
 import VarSet		( varSetElems )
 import Outputable
 \end{code}
@@ -96,7 +97,7 @@ dsCCall :: CLabelString	-- C routine to invoke
 
 dsCCall lbl args may_gc is_asm result_ty
   = mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
-    boxResult [] ({-repType-} result_ty)	`thenDs` \ (ccall_result_ty, res_wrapper) ->
+    boxResult [] result_ty	`thenDs` \ (ccall_result_ty, res_wrapper) ->
     getUniqueDs			`thenDs` \ uniq ->
     let
 	target | is_asm    = CasmTarget lbl
@@ -143,8 +144,13 @@ unboxArg arg
   | isPrimitiveType arg_ty
   = returnDs (arg, \body -> body)
 
+  -- Recursive newtypes
+  | Just rep_ty <- splitNewType_maybe arg_ty
+  = unboxArg (mkCoerce rep_ty arg_ty arg)
+      
   -- Booleans
-  | isBoolTy arg_ty
+  | Just (tc,_) <- splitTyConApp_maybe arg_ty, 
+    tc `hasKey` boolTyConKey
   = newSysLocalDs intPrimTy		`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
 	      \ body -> Case (Case arg (mkWildId arg_ty)
@@ -183,11 +189,7 @@ unboxArg arg
   = getSrcLocDs `thenDs` \ l ->
     pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
-    arg_ty = repType (exprType arg)
-	-- The repType looks through any newtype or 
-	-- implicit-parameter wrappings on the argument;
-	-- this is necessary, because isBoolTy (in particular) does not.
-
+    arg_ty					= exprType arg
     maybe_product_type 			   	= splitProductType_maybe arg_ty
     is_product_type			   	= maybeToBool maybe_product_type
     Just (_, _, data_con, data_con_arg_tys)	= maybe_product_type
@@ -195,7 +197,7 @@ unboxArg arg
     (data_con_arg_ty1 : _)			= data_con_arg_tys
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
-    maybe_arg3_tycon    	   = tcSplitTyConApp_maybe data_con_arg_ty3
+    maybe_arg3_tycon    	   = splitTyConApp_maybe data_con_arg_ty3
     Just (arg3_tycon,_)		   = maybe_arg3_tycon
 \end{code}
 
@@ -304,21 +306,28 @@ resultWrapper :: Type
 		  CoreExpr -> CoreExpr)	-- Wrapper for the result 
 resultWrapper result_ty
   -- Base case 1: primitive types
-  | isPrimitiveType result_ty_rep
+  | isPrimitiveType result_ty
   = (Just result_ty, \e -> e)
 
   -- Base case 2: the unit type ()
-  | isUnitTy result_ty_rep
+  | Just (tc,_) <- maybe_tc_app, tc `hasKey` unitTyConKey
   = (Nothing, \e -> Var unitDataConId)
 
   -- Base case 3: the boolean type
-  | isBoolTy result_ty_rep
+  | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
   = (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
 	                          [(DEFAULT             ,[],Var trueDataConId ),
 				   (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 
+  -- Recursive newtypes
+  | Just rep_ty <- splitNewType_maybe result_ty
+  = let
+        (maybe_ty, wrapper) = resultWrapper rep_ty
+    in
+    (maybe_ty, \e -> mkCoerce result_ty rep_ty (wrapper e))
+
   -- Data types with a single constructor, which has a single arg
-  | Just (_, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty_rep,
+  | Just (_, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
     dataConSourceArity data_con == 1
   = let
         (maybe_ty, wrapper)    = resultWrapper unwrapped_res_ty
@@ -330,5 +339,5 @@ resultWrapper result_ty
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
   where
-    result_ty_rep = repType result_ty	-- Look through any newtypes/implicit parameters
+    maybe_tc_app = splitTyConApp_maybe result_ty
 \end{code}
