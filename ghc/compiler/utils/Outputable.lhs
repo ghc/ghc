@@ -42,7 +42,7 @@ module Outputable (
 
 	-- error handling
 	pprPanic, pprPanic#, pprError, pprTrace, assertPprPanic,
-	trace, panic, panic#, assertPanic
+	trace, panic, panic#, assertPanic, warnPprTrace
     ) where
 
 #include "HsVersions.h"
