@@ -91,6 +91,7 @@ import GHC.Real			( Ratio(..) )
 import GHC.Exts
 import GHC.IOBase	 	( IO(..) )
 import GHC.Word			( Word8(..) )
+import GHC.Handle		( openFileEx, IOModeEx(..) )
 #endif
 
 #if __GLASGOW_HASKELL__ < 503
