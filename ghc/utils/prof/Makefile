@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 2000/04/05 10:06:36 simonmar Exp $
+# $Id: Makefile,v 1.2 2000/04/05 10:27:10 simonmar Exp $
 #
 # (c) The GHC Team, 2000
 #
@@ -10,7 +10,7 @@ include $(TOP)/mk/boilerplate.mk
 INSTALLING=1
 
 ifeq "$(INSTALLING)" "1"
-SUBDIRS = cgprof
+SUBDIRS = cgprof icons
 endif
 
 SCRIPT_SUBST_VARS= \
