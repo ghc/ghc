@@ -939,6 +939,8 @@ Decide what the consistency-checking options are in force for this run:
 
        if ($CompilingPrelude) {
          $HiSuffix_prelude = "$HiSuffix" if $CompilingPrelude;
+       } elsif ($BuildTag eq '_u' && $GhcWithRegisterised eq 'NO') {
+	 $HiSuffix_prelude = 'hi';
        } else {
          local($Tag) = "${BuildTag}";
   
