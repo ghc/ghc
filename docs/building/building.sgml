@@ -1721,6 +1721,9 @@ $ make install
       includes <filename>build.mk</filename> after
       <filename>config.mk</filename>.)</para>
 
+     <para>For your convenience, there's a file called <filename>build.mk.sample</filename>
+     that can serve as a starting point for your <filename>build.mk</filename>.</para>
+
       <para>For example, <filename>config.mk.in</filename> contains
       the definition:</para>
 
@@ -4469,6 +4472,17 @@ you'll have to do something more like:
 <Screen>
   ./configure --with-gcc=...the Cygwin gcc...
 </Screen>
+</para>
+</listitem>
+
+<listitem><para> You almost certainly want to set
+<programlisting>
+  SplitObjs = NO
+</programlisting>
+in your <filename>build.mk</filename> configuration file (see <xref linkend="sec-build-config">).
+This tells the build system not to split each library into a myriad of little object files, one
+for each function.  Doing so reduces binary sizes for statically-linked binaries, but on Windows
+it dramatically increases the time taken to build the libraries in the first place.
 </para>
 </listitem>
 
