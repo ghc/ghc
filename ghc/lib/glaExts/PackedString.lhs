@@ -16,6 +16,7 @@ module PackedString (
          -- Creating the beasts
 	packString,          -- :: [Char] -> PackedString
 	packStringST,        -- :: [Char] -> ST s PackedString
+        packCBytesST,        -- :: Int -> Addr -> ST s PackedString
 
 	byteArrayToPS,       -- :: ByteArray Int -> PackedString
 	unsafeByteArrayToPS, -- :: ByteArray a   -> Int -> PackedString
@@ -70,7 +71,7 @@ module PackedString (
  	  -- Converting to C strings
 	packCString#, 
 	unpackCString#, unpackCString2#, unpackAppendCString#, unpackFoldrCString#,
-	packCBytesST, unpackCString
+	unpackCString
     ) where
 
 import {-# SOURCE #-}	IOBase	( error )
@@ -79,6 +80,7 @@ import PrelList
 import STBase
 import ArrBase
 import PrelBase
+import Foreign	( Addr(..) )
 import GHC
 
 \end{code}
