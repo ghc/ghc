@@ -156,7 +156,9 @@ instance Bits Word where
     (W# x#) `shift` (I# i#)
         | i# >=# 0#          = W# (x# `shiftL#` i#)
         | otherwise          = W# (x# `shiftRL#` negateInt# i#)
-    (W# x#) `rotate` (I# i#) = W# ((x# `shiftL#` i'#) `or#` (x# `shiftRL#` (wsib -# i'#)))
+    (W# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W# x#
+        | otherwise  = W# ((x# `shiftL#` i'#) `or#` (x# `shiftRL#` (wsib -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
 	wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
@@ -255,8 +257,10 @@ instance Bits Word8 where
     (W8# x#) `shift` (I# i#)
         | i# >=# 0#           = W8# (narrow8Word# (x# `shiftL#` i#))
         | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
-    (W8# x#) `rotate` (I# i#) = W8# (narrow8Word# ((x# `shiftL#` i'#) `or#`
-                                                   (x# `shiftRL#` (8# -# i'#))))
+    (W8# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W8# x#
+        | otherwise  = W8# (narrow8Word# ((x# `shiftL#` i'#) `or#`
+                                          (x# `shiftRL#` (8# -# i'#))))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
     bitSize  _                = 8
@@ -355,8 +359,10 @@ instance Bits Word16 where
     (W16# x#) `shift` (I# i#)
         | i# >=# 0#            = W16# (narrow16Word# (x# `shiftL#` i#))
         | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
-    (W16# x#) `rotate` (I# i#) = W16# (narrow16Word# ((x# `shiftL#` i'#) `or#`
-                                                      (x# `shiftRL#` (16# -# i'#))))
+    (W16# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W16# x#
+        | otherwise  = W16# (narrow16Word# ((x# `shiftL#` i'#) `or#`
+                                            (x# `shiftRL#` (16# -# i'#))))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
     bitSize  _                = 16
@@ -449,10 +455,12 @@ instance Bits Word32 where
     (W32# x#) `shift` (I# i#)
         | i# >=# 0#            = W32# (x# `shiftL32#` i#)
         | otherwise            = W32# (x# `shiftRL32#` negateInt# i#)
-    (W32# x#) `rotate` (I# i#) = W32# ((x# `shiftL32#` i'#) `or32#`
-                                       (x# `shiftRL32#` (32# -# i'#)))
+    (W32# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W32# x#
+        | otherwise  = W32# ((x# `shiftL32#` i'#) `or32#`
+                             (x# `shiftRL32#` (32# -# i'#)))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
     isSigned _                = False
 
@@ -575,8 +583,10 @@ instance Bits Word32 where
     (W32# x#) `shift` (I# i#)
         | i# >=# 0#            = W32# (narrow32Word# (x# `shiftL#` i#))
         | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
-    (W32# x#) `rotate` (I# i#) = W32# (narrow32Word# ((x# `shiftL#` i'#) `or#`
-                                                      (x# `shiftRL#` (32# -# i'#))))
+    (W32# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W32# x#
+        | otherwise  = W32# (narrow32Word# ((x# `shiftL#` i'#) `or#`
+                                            (x# `shiftRL#` (32# -# i'#))))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
@@ -703,8 +713,10 @@ instance Bits Word64 where
     (W64# x#) `shift` (I# i#)
         | i# >=# 0#            = W64# (x# `shiftL64#` i#)
         | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
-    (W64# x#) `rotate` (I# i#) = W64# ((x# `shiftL64#` i'#) `or64#`
-                                       (x# `shiftRL64#` (64# -# i'#)))
+    (W64# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W64# x#
+        | otherwise  = W64# ((x# `shiftL64#` i'#) `or64#`
+                             (x# `shiftRL64#` (64# -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
@@ -813,8 +825,10 @@ instance Bits Word64 where
     (W64# x#) `shift` (I# i#)
         | i# >=# 0#            = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
-    (W64# x#) `rotate` (I# i#) = W64# ((x# `shiftL#` i'#) `or#`
-                                       (x# `shiftRL#` (64# -# i'#)))
+    (W64# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W64# x#
+        | otherwise  = W64# ((x# `shiftL#` i'#) `or#`
+                             (x# `shiftRL#` (64# -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64

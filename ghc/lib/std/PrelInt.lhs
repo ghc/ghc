@@ -112,9 +112,12 @@ instance Bits Int8 where
     (I8# x#) `shift` (I# i#)
         | i# >=# 0#           = I8# (narrow8Int# (x# `iShiftL#` i#))
         | otherwise           = I8# (x# `iShiftRA#` negateInt# i#)
-    (I8# x#) `rotate` (I# i#) =
-        I8# (narrow8Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                                    (x'# `shiftRL#` (8# -# i'#)))))
+    (I8# x#) `rotate` (I# i#)
+        | i'# ==# 0# 
+        = I8# x#
+        | otherwise
+        = I8# (narrow8Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
+                                       (x'# `shiftRL#` (8# -# i'#)))))
         where
         x'# = narrow8Word# (int2Word# x#)
         i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
@@ -217,9 +220,12 @@ instance Bits Int16 where
     (I16# x#) `shift` (I# i#)
         | i# >=# 0#            = I16# (narrow16Int# (x# `iShiftL#` i#))
         | otherwise            = I16# (x# `iShiftRA#` negateInt# i#)
-    (I16# x#) `rotate` (I# i#) =
-        I16# (narrow16Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                                      (x'# `shiftRL#` (16# -# i'#)))))
+    (I16# x#) `rotate` (I# i#)
+        | i'# ==# 0# 
+        = I16# x#
+        | otherwise
+        = I16# (narrow16Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
+                                         (x'# `shiftRL#` (16# -# i'#)))))
         where
         x'# = narrow16Word# (int2Word# x#)
         i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
@@ -335,12 +341,15 @@ instance Bits Int32 where
     (I32# x#) `shift` (I# i#)
         | i# >=# 0#            = I32# (x# `iShiftL32#` i#)
         | otherwise            = I32# (x# `iShiftRA32#` negateInt# i#)
-    (I32# x#) `rotate` (I# i#) =
-        I32# (word32ToInt32# ((x'# `shiftL32#` i'#) `or32#`
-                              (x'# `shiftRL32#` (32# -# i'#))))
+    (I32# x#) `rotate` (I# i#)
+        | i'# ==# 0# 
+        = I32# x#
+        | otherwise
+        = I32# (word32ToInt32# ((x'# `shiftL32#` i'#) `or32#`
+                                (x'# `shiftRL32#` (32# -# i'#))))
         where
         x'# = int32ToWord32# x#
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                 = 32
     isSigned _                 = True
 
@@ -459,9 +468,12 @@ instance Bits Int32 where
     (I32# x#) `shift` (I# i#)
         | i# >=# 0#            = I32# (narrow32Int# (x# `iShiftL#` i#))
         | otherwise            = I32# (x# `iShiftRA#` negateInt# i#)
-    (I32# x#) `rotate` (I# i#) =
-        I32# (narrow32Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                                      (x'# `shiftRL#` (32# -# i'#)))))
+    (I32# x#) `rotate` (I# i#)
+        | i'# ==# 0# 
+        = I32# x#
+        | otherwise
+        = I32# (narrow32Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
+                                        (x'# `shiftRL#` (32# -# i'#)))))
         where
         x'# = narrow32Word# (int2Word# x#)
         i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
@@ -598,9 +610,12 @@ instance Bits Int64 where
     (I64# x#) `shift` (I# i#)
         | i# >=# 0#            = I64# (x# `iShiftL64#` i#)
         | otherwise            = I64# (x# `iShiftRA64#` negateInt# i#)
-    (I64# x#) `rotate` (I# i#) =
-        I64# (word64ToInt64# ((x'# `shiftL64#` i'#) `or64#`
-                              (x'# `shiftRL64#` (64# -# i'#))))
+    (I64# x#) `rotate` (I# i#)
+        | i'# ==# 0# 
+        = I64# x#
+        | otherwise
+        = I64# (word64ToInt64# ((x'# `shiftL64#` i'#) `or64#`
+                                (x'# `shiftRL64#` (64# -# i'#))))
         where
         x'# = int64ToWord64# x#
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
@@ -711,9 +726,12 @@ instance Bits Int64 where
     (I64# x#) `shift` (I# i#)
         | i# >=# 0#            = I64# (x# `iShiftL#` i#)
         | otherwise            = I64# (x# `iShiftRA#` negateInt# i#)
-    (I64# x#) `rotate` (I# i#) =
-        I64# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                         (x'# `shiftRL#` (64# -# i'#))))
+    (I64# x#) `rotate` (I# i#)
+        | i'# ==# 0# 
+        = I64# x#
+        | otherwise
+        = I64# (word2Int# ((x'# `shiftL#` i'#) `or#`
+                           (x'# `shiftRL#` (64# -# i'#))))
         where
         x'# = int2Word# x#
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
