@@ -289,6 +289,8 @@ data DynFlags = DynFlags {
   stgToDo    		:: [StgToDo],
   hscLang    		:: HscLang,
   hscOutName 		:: String,  	-- name of the output file
+  hscStubHOutName	:: String,  	-- name of the .stub_h output file
+  hscStubCOutName	:: String,  	-- name of the .stub_c output file
   verbosity  		:: Int,	 	-- verbosity level
   cppFlag    		:: Bool,	-- preprocess with cpp?
   stolen_x86_regs	:: Int,		
@@ -309,6 +311,7 @@ defaultDynFlags = DynFlags {
   coreToDo = [], stgToDo = [], 
   hscLang = HscC, 
   hscOutName = "", 
+  hscStubHOutName = "", hscStubCOutName = "",
   verbosity = 0, 
   cppFlag		= False,
   stolen_x86_regs	= 4,

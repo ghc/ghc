@@ -33,9 +33,9 @@ import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
-import TmpFiles		( newTempName )
 
 import IOExts
+import Monad		( when )
 import IO
 \end{code}
 
@@ -55,7 +55,7 @@ codeOutput :: DynFlags
 	   -> SDoc 		-- C stubs for foreign exported functions
 	   -> SDoc		-- Header file prototype for foreign exported functions
 	   -> AbstractC		-- Compiled abstract C
-	   -> IO (Maybe FilePath, Maybe FilePath)
+	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
 codeOutput dflags mod_name tycons core_binds stg_binds 
 	   c_code h_code flat_abstractC
   = -- You can have C (c_output) or assembly-language (ncg_output),
@@ -98,14 +98,13 @@ doOutput filenm io_action
 %************************************************************************
 
 \begin{code}
-outputC dflags filenm flat_absC (maybe_stub_h, _)
+outputC dflags filenm flat_absC (stub_h_exists, _)
   = do dumpIfSet_dyn dflags Opt_D_dump_realC "Real C" (dumpRealC flat_absC)
        header <- readIORef v_HCHeader
        doOutput filenm $ \ h -> do
 	  hPutStr h header
-	  case maybe_stub_h of
-		Nothing       -> return ()
-		Just filename -> hPutStrLn h ("#include \"" ++ filename ++ "\"")
+	  when stub_h_exists $ 
+	     hPutStrLn h ("#include \"" ++ (hscStubHOutName dflags) ++ "\"")
 	  writeRealC h flat_absC
 \end{code}
 
@@ -184,16 +183,20 @@ outputForeignStubs dflags c_code h_code
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
 
-	maybe_stub_h_file
-           <- outputForeignStubs_help True{-.h output-} stub_h_output_w
+	stub_h_file_exists
+           <- outputForeignStubs_help (hscStubHOutName dflags) stub_h_output_w
+		"#include \"HsFFI.h\"\n"
 
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
 
-        maybe_stub_c_file
-           <- outputForeignStubs_help False{-not .h-} stub_c_output_w
+        hc_header <- readIORef v_HCHeader
 
-        return (maybe_stub_h_file, maybe_stub_c_file)
+	stub_c_file_exists
+           <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
+		(hc_header ++ "#include \"RtsAPI.h\"\n")
+
+        return (stub_h_file_exists, stub_c_file_exists)
   where
     -- C stubs for "foreign export"ed functions.
     stub_c_output_d = pprCode CStyle c_code
@@ -207,17 +210,9 @@ outputForeignStubs dflags c_code h_code
 -- Don't use doOutput for dumping the f. export stubs
 -- since it is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
-outputForeignStubs_help is_header ""      = return Nothing
-outputForeignStubs_help is_header doc_str 
-   = do fname <- newTempName suffix
-        writeFile fname (include_prefix ++ doc_str)
-        return (Just fname)
-  where
-    suffix
-       | is_header   = "h_stub"
-       | otherwise   = "c_stub"
-    include_prefix
-       | is_header   = "#include \"HsFFI.h\"\n"
-       | otherwise   = "#include \"RtsAPI.h\"\n"
+outputForeignStubs_help fname "" injects     = return False
+outputForeignStubs_help fname doc_str injects
+   = do writeFile fname (injects ++ doc_str)
+        return True
 \end{code}
 

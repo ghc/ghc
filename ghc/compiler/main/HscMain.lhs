@@ -99,8 +99,8 @@ data HscResult
    | HscRecomp   PersistentCompilerState -- updated PCS
                  ModDetails  		 -- new details (HomeSymbolTable additions)
                  ModIface		 -- new iface (if any compilation was done)
-	         (Maybe String) 	 -- generated stub_h filename (in TMPDIR)
-	         (Maybe String)  	 -- generated stub_c filename (in TMPDIR)
+	         Bool	 	 	-- stub_h exists
+	         Bool  		 	-- stub_c exists
 	         (Maybe ([UnlinkedBCO],ItblEnv)) -- interpreted code, if any
              
 
@@ -298,8 +298,7 @@ hscRecomp ghci_mode dflags have_object
 			       	(ppr nm)
 		 in  mi_module str_mi
 
-	; (maybe_stub_h_filename, maybe_stub_c_filename,
-	   maybe_bcos, final_iface )
+	; (stub_h_exists, stub_c_exists, maybe_bcos, final_iface )
 	   <- if toInterp
 	        then do 
 		    -----------------  Generate byte code ------------------
@@ -314,8 +313,7 @@ hscRecomp ghci_mode dflags have_object
 			  mkFinalIface ghci_mode dflags location 
                                    maybe_checked_iface new_iface tidy_details
 
-      		    return ( Nothing, Nothing, 
-			     Just (bcos,itbl_env), final_iface )
+      		    return ( False, False, Just (bcos,itbl_env), final_iface )
 
 	        else do
 		    -----------------  Convert to STG ------------------
@@ -338,13 +336,12 @@ hscRecomp ghci_mode dflags have_object
 		    			 local_tycons stg_binds
 		    
 		    ------------------  Code output -----------------------
-		    (maybe_stub_h_name, maybe_stub_c_name)
+		    (stub_h_exists, stub_c_exists)
 		       <- codeOutput dflags this_mod local_tycons
 		    	     binds stg_binds
 		    	     c_code h_code abstractC
 	      		
-	      	    return ( maybe_stub_h_name, maybe_stub_c_name, 
-			     Nothing, final_iface )
+	      	    return (stub_h_exists, stub_c_exists, Nothing, final_iface)
 
 	; let final_details = tidy_details {md_binds = []} 
 
@@ -353,7 +350,7 @@ hscRecomp ghci_mode dflags have_object
 	; return (HscRecomp pcs_simpl
 			    final_details
 			    final_iface
-                            maybe_stub_h_filename maybe_stub_c_filename
+                            stub_h_exists stub_c_exists
       			    maybe_bcos)
       	  }}}}}}}
 

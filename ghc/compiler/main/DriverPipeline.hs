@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.58 2001/03/23 17:04:56 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.59 2001/03/26 12:28:15 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -487,11 +487,14 @@ run_phase Hsc basename suff input_fn output_fn
   -- get the DynFlags
         dyn_flags <- readIORef v_DynFlags
 
+        let dyn_flags' = dyn_flags { hscOutName = output_fn,
+		   		     hscStubCOutName = basename ++ "_stub.c",
+				     hscStubHOutName = basename ++ "_stub.h" }
+
   -- run the compiler!
         pcs <- initPersistentCompilerState
 	result <- hscMain OneShot
-                          dyn_flags{ hscOutName = output_fn }
-			  mod
+                          dyn_flags' mod
 			  location{ ml_hspp_file=Just input_fn }
 			  source_unchanged
 			  False
@@ -510,11 +513,11 @@ run_phase Hsc basename suff input_fn output_fn
 		  return False;
 		};
 
-	    HscRecomp pcs details iface maybe_stub_h maybe_stub_c 
+	    HscRecomp pcs details iface stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 
 	    -- deal with stubs
-	maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
+	maybe_stub_o <- compileStub dyn_flags' stub_c_exists
 	case maybe_stub_o of
 		Nothing -> return ()
 		Just stub_o -> add v_Ld_inputs stub_o
@@ -981,8 +984,13 @@ compile ghci_mode summary source_unchanged have_object
 #endif
 		    HscInterpreted -> return (error "no output file")
 
+   let (basename, _) = splitFilename input_fn
+       dyn_flags' = dyn_flags { hscOutName = output_fn,
+				hscStubCOutName = basename ++ "_stub.c",
+				hscStubHOutName = basename ++ "_stub.h" }
+
    -- run the compiler
-   hsc_result <- hscMain ghci_mode dyn_flags{ hscOutName = output_fn } 
+   hsc_result <- hscMain ghci_mode dyn_flags'
 			 (ms_mod summary) location
 			 source_unchanged have_object old_iface hst hit pcs
 
@@ -992,10 +1000,10 @@ compile ghci_mode summary source_unchanged have_object
       HscNoRecomp pcs details iface -> return (CompOK pcs details iface Nothing)
 
       HscRecomp pcs details iface
-	maybe_stub_h maybe_stub_c maybe_interpreted_code -> do
+	stub_h_exists stub_c_exists maybe_interpreted_code -> do
 	   
-	   let (basename, _) = splitFilename input_fn
-	   maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
+	   let 
+	   maybe_stub_o <- compileStub dyn_flags' stub_c_exists
 	   let stub_unlinked = case maybe_stub_o of
 				  Nothing -> []
 				  Just stub_o -> [ DotO stub_o ]
@@ -1032,33 +1040,13 @@ compile ghci_mode summary source_unchanged have_object
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
 
-dealWithStubs basename maybe_stub_h maybe_stub_c
+compileStub dflags stub_c_exists
+  | not stub_c_exists = return Nothing
+  | stub_c_exists = do
+	-- compile the _stub.c file w/ gcc
+	let stub_c = hscStubCOutName dflags
+	pipeline <- genPipeline (StopBefore Ln) "" True defaultHscLang stub_c
+	stub_o <- runPipeline pipeline stub_c False{-no linking-} 
+			False{-no -o option-}
 
- = do	let stub_h = basename ++ "_stub.h"
-	let stub_c = basename ++ "_stub.c"
-
-  -- copy the .stub_h file into the current dir if necessary
-	case maybe_stub_h of
-	   Nothing -> return ()
-	   Just tmp_stub_h -> do
-	      	runSomething "Copy stub .h file"
-				("cp " ++ tmp_stub_h ++ ' ':stub_h)
-
-  -- copy the .stub_c file into the current dir, and compile it, if necessary
-	case maybe_stub_c of
-	   Nothing -> return Nothing
-	   Just tmp_stub_c -> do  -- copy the _stub.c file into the current dir
-		runSomething "Copy stub .c file" 
-		    (unwords [ 
-			"rm -f", stub_c, "&&",
-			"echo \'#include \"Stg.h\"\n#include \""++stub_h++"\"\' >"++stub_c, " &&",
-			"cat", tmp_stub_c, ">> ", stub_c
-			])
-
-			-- compile the _stub.c file w/ gcc
-		pipeline <- genPipeline (StopBefore Ln) "" True 
-				defaultHscLang stub_c
-		stub_o <- runPipeline pipeline stub_c False{-no linking-} 
-				False{-no -o option-}
-
-		return (Just stub_o)
+	return (Just stub_o)
