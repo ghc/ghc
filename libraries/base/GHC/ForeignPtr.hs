@@ -18,11 +18,12 @@ module GHC.ForeignPtr
 	ForeignPtr(..),
 	FinalizerPtr,
 	newForeignPtr,
+	newForeignPtr_,
 	mallocForeignPtr,
 	mallocForeignPtrBytes,
 	addForeignPtrFinalizer,	
 	touchForeignPtr,
-	foreignPtrToPtr,
+	unsafeForeignPtrToPtr,
 	castForeignPtr,
 	newConcForeignPtr,
 	addForeignPtrConcFinalizer,
@@ -61,13 +62,13 @@ data ForeignPtr a
   | MallocPtr (MutableByteArray# RealWorld) !(IORef [IO ()])
 
 instance Eq (ForeignPtr a) where
-    p == q  =  foreignPtrToPtr p == foreignPtrToPtr q
+    p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
 
 instance Ord (ForeignPtr a) where
-    compare p q  =  compare (foreignPtrToPtr p) (foreignPtrToPtr q)
+    compare p q  =  compare (unsafeForeignPtrToPtr p) (unsafeForeignPtrToPtr q)
 
 instance Show (ForeignPtr a) where
-    showsPrec p f = showsPrec p (foreignPtrToPtr f)
+    showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
 
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
@@ -79,15 +80,15 @@ INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 type FinalizerPtr a = FunPtr (Ptr a -> IO ())
 
 newForeignPtr :: Ptr a -> FinalizerPtr a -> IO (ForeignPtr a)
--- ^Turns a plain memory reference into a foreign object by
--- associating a finaliser with the reference.  The finaliser will be executed
+-- ^Turns a plain memory reference into a foreign pointer, and
+-- associates a finaliser with the reference.  The finaliser will be executed
 -- after the last reference to the foreign object is dropped.  Note that there
 -- is no guarantee on how soon the finaliser is executed after the last
 -- reference was dropped; this depends on the details of the Haskell storage
 -- manager. The only guarantee is that the finaliser runs before the program
 -- terminates.
 newForeignPtr p finalizer
-  = do fObj <- mkForeignPtr p
+  = do fObj <- newForeignPtr_ p
        addForeignPtrFinalizer fObj finalizer
        return fObj
 
@@ -105,7 +106,7 @@ newConcForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- The finalizer, when invoked, will run in a separate thread.
 --
 newConcForeignPtr p finalizer
-  = do fObj <- mkForeignPtr p
+  = do fObj <- newForeignPtr_ p
        addForeignPtrConcFinalizer fObj finalizer
        return fObj
 
@@ -146,7 +147,7 @@ addForeignPtrFinalizer :: ForeignPtr a -> FinalizerPtr a -> IO ()
 -- object which have already been registered.
 addForeignPtrFinalizer fptr finalizer = 
   addForeignPtrConcFinalizer fptr 
-	(mkFinalizer finalizer (foreignPtrToPtr fptr))
+	(mkFinalizer finalizer (unsafeForeignPtrToPtr fptr))
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds a finaliser to the given @ForeignPtr@.  The
@@ -162,7 +163,7 @@ addForeignPtrConcFinalizer f@(ForeignPtr fo r) finalizer = do
   writeIORef r (finalizer : fs)
   if (null fs)
      then IO $ \s ->
-	      let p = foreignPtrToPtr f in
+	      let p = unsafeForeignPtrToPtr f in
 	      case mkWeak# fo () (foreignPtrFinalizer r p) s of 
 		 (# s1, w #) -> (# s1, () #)
      else return ()
@@ -171,7 +172,7 @@ addForeignPtrConcFinalizer f@(MallocPtr fo r) finalizer = do
   writeIORef r (finalizer : fs)
   if (null fs)
      then  IO $ \s -> 
-	       let p = foreignPtrToPtr f in
+	       let p = unsafeForeignPtrToPtr f in
 	       case mkWeak# fo () (foreignPtrFinalizer r p) s of 
 		  (# s1, w #) -> (# s1, () #)
      else return ()
@@ -184,8 +185,10 @@ foreignPtrFinalizer r p = do
   fs <- readIORef r
   sequence_ fs
 
-mkForeignPtr :: Ptr a -> IO (ForeignPtr a) {- not exported -}
-mkForeignPtr (Ptr obj) =  do
+newForeignPtr_ :: Ptr a -> IO (ForeignPtr a)
+-- ^Turns a plain memory reference into a foreign pointer that may be
+-- associated with finalizers by using 'addForeignPtrFinalizer'.
+newForeignPtr_ (Ptr obj) =  do
   r <- newIORef []
   IO $ \ s# ->
     case mkForeignObj# obj s# of
@@ -215,10 +218,10 @@ touchForeignPtr (ForeignPtr fo r)
 touchForeignPtr (MallocPtr fo r)
    = IO $ \s -> case touch# fo s of s -> (# s, () #)
 
-foreignPtrToPtr :: ForeignPtr a -> Ptr a
+unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
 -- pointer.  This is a potentially dangerous operations, as if the
--- argument to 'foreignPtrToPtr' is the last usage
+-- argument to 'unsafeForeignPtrToPtr' is the last usage
 -- occurence of the given foreign pointer, then its finaliser(s) will
 -- be run, which potentially invalidates the plain pointer just
 -- obtained.  Hence, 'touchForeignPtr' must be used
@@ -227,11 +230,11 @@ foreignPtrToPtr :: ForeignPtr a -> Ptr a
 --
 -- To avoid subtle coding errors, hand written marshalling code
 -- should preferably use 'withForeignPtr' rather
--- than combinations of 'foreignPtrToPtr' and
+-- than combinations of 'unsafeForeignPtrToPtr' and
 -- 'touchForeignPtr'.  However, the later routines
 -- are occasionally preferred in tool generated marshalling code.
-foreignPtrToPtr (ForeignPtr fo r) = Ptr (foreignObjToAddr# fo)
-foreignPtrToPtr (MallocPtr  fo r) = Ptr (byteArrayContents# (unsafeCoerce# fo))
+unsafeForeignPtrToPtr (ForeignPtr fo r) = Ptr (foreignObjToAddr# fo)
+unsafeForeignPtrToPtr (MallocPtr  fo r) = Ptr (byteArrayContents# (unsafeCoerce# fo))
 
 castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- ^This function casts a 'ForeignPtr'

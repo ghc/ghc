@@ -21,9 +21,10 @@ module Foreign.ForeignPtr
 	  ForeignPtr
 	, FinalizerPtr
         , newForeignPtr
+        , newForeignPtr_
         , addForeignPtrFinalizer
 	, withForeignPtr
-	, foreignPtrToPtr	-- will soon become unsafeForeignPtrToPtr
+	, unsafeForeignPtrToPtr
 	, touchForeignPtr
 	, castForeignPtr
 
@@ -75,13 +76,13 @@ import Data.Dynamic
 INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 
 instance Eq (ForeignPtr a) where 
-    p == q  =  foreignPtrToPtr p == foreignPtrToPtr q
+    p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
 
 instance Ord (ForeignPtr a) where 
-    compare p q  =  compare (foreignPtrToPtr p) (foreignPtrToPtr q)
+    compare p q  =  compare (unsafeForeignPtrToPtr p) (unsafeForeignPtrToPtr q)
 
 instance Show (ForeignPtr a) where
-    showsPrec p f = showsPrec p (foreignPtrToPtr f)
+    showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
 #endif
 
 
@@ -97,7 +98,7 @@ withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- of the pointer should be inside the
 -- 'withForeignPtr' bracket.  The reason for
 -- this unsafety is the same as for
--- 'foreignPtrToPtr' below: the finalizer
+-- 'unsafeForeignPtrToPtr' below: the finalizer
 -- may run earlier than expected, because the compiler can only
 -- track usage of the 'ForeignPtr' object, not
 -- a 'Ptr' object made from it.
@@ -107,14 +108,14 @@ withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- 'ForeignPtr', using the operations from the
 -- 'Storable' class.
 withForeignPtr fo io
-  = do r <- io (foreignPtrToPtr fo)
+  = do r <- io (unsafeForeignPtrToPtr fo)
        touchForeignPtr fo
        return r
 #endif /* ! __NHC__ */
 
-#ifdef __NHC__
--- temporary aliasing until ghc and hugs catch up
-foreignPtrToPtr = unsafeForeignPtrToPtr
+#ifdef __HUGS__
+-- temporary aliasing until hugs catches up
+unsafeForeignPtrToPtr = foreignPtrToPtr
 #endif
 
 #ifdef __HUGS__
