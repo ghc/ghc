@@ -127,9 +127,11 @@ void writeErrString__(HsAddr msg, HsInt len);
 /* in Signals.c */
 extern HsInt nocldstop;
 
+#if !defined(mingw32_TARGET_OS)
 /* in execvpe.c */
 extern int execvpe(char *name, char *const argv[], char **envp);
 extern void pPrPr_disableITimers (void);
+#endif
 
 /* -----------------------------------------------------------------------------
    64-bit operations, defined in longlong.c

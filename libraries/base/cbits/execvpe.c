@@ -1,8 +1,11 @@
 /* -----------------------------------------------------------------------------
    (c) The University of Glasgow 1995-2004
-   
+
    Our low-level exec() variant.
    -------------------------------------------------------------------------- */
+#include "HsBase.h"
+
+#if !defined(mingw32_TARGET_OS) /* to the end */
 
 /* Evidently non-Posix. */
 /* #include "PosixSource.h" */
@@ -13,7 +16,7 @@
 #include <string.h>
 #include <errno.h>
 
-/* 
+/*
  * We want the search semantics of execvp, but we want to provide our
  * own environment, like execve.  The following copyright applies to
  * this code, as it is a derivative of execvp:
@@ -168,3 +171,5 @@ void pPrPr_disableITimers (void)
    setitimer(ITIMER_PROF, &itv, NULL);
 #  endif
 }
+
+#endif
