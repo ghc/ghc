@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Printf.lhs,v 1.4 2001/08/13 10:27:27 simonmar Exp $
+-- $Id: Printf.lhs,v 1.5 2002/03/14 17:09:46 simonmar Exp $
 
 -- (c) Simon Marlow 1997-2001
 -----------------------------------------------------------------------------
@@ -32,7 +32,8 @@
 #if __GLASGOW_HASKELL__ < 500
 
 >		buf <- malloc bUFSIZE
->		snprintf buf (fromIntegral bUFSIZE) (packString format) num
+>		snprintf buf (fromIntegral bUFSIZE) (packString format) 
+>			(realToFrac num)
 >		let s = unpackCString buf
 >		length s `seq` -- urk! need to force the string before we
 >			       -- free the buffer.  A better solution would
@@ -45,7 +46,8 @@
 
 >		allocaBytes bUFSIZE $ \buf ->
 >		  withCString format $ \cformat -> do
->		    snprintf buf (fromIntegral bUFSIZE) cformat num
+>		    snprintf buf (fromIntegral bUFSIZE) cformat
+>			(realToFrac num)
 >		    peekCString buf
 
 #endif
@@ -73,10 +75,10 @@
 #if __GLASGOW_HASKELL__ < 500
 
 > type PackedString = ByteArray Int
-> foreign import unsafe snprintf :: Addr -> CSize -> PackedString -> Float -> IO ()
+> foreign import unsafe snprintf :: Addr -> CSize -> PackedString -> Double -> IO ()
 
 #else
 
-> foreign import unsafe snprintf :: CString -> CSize -> CString -> Float -> IO ()
+> foreign import unsafe snprintf :: CString -> CSize -> CString -> Double -> IO ()
 
 #endif
