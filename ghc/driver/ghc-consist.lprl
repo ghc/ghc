@@ -13,12 +13,15 @@ sub chk_consistency_info {
 
     # append .exe if it's not there under cygwin32
     $executable = "${executable}.exe" if $TargetPlatform eq 'i386-unknown-cygwin32' &&
-    					 $executable !~ /\.exe$/ ; 
+    					 $executable !~ /\...*$/ ; 
 
     print STDERR "Checking consistency of: $executable\n" if $Verbose;
 
     &tidy_up_and_die(1, "Panic: no such executable: $executable\n")
-	if ! -x $executable;
+	if ( ! -x $executable ) && ( ! -B $executable );
+    # perl apparently determines whether something is executable
+    # by looking at the file suffix under win32/cygwin32 !?!
+    # Hence, we try binary files if (! -x) fails.
 
     # by this point, consistency strings (with commas) have become
     # local symbols (with .'s)
