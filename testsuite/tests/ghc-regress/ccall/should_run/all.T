@@ -38,14 +38,16 @@ test('ffi006', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 test('ffi007', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 test('ffi008', compose(expect_fail_for(['extcore','optextcore']), exit_code(1)), compile_and_run, [''])
 
-# expect fail for way optasm, because the native code generator
+# On i386, expect fail for way optasm, because the native code generator
 # doesn't do -ffloat-store and gets different answers when
 # optimisation is on. Doesn't have this issue on OpenBSD. Why?
 
 if config.platform == 'i386-unknown-openbsd':
 	ways = expect_fail_for(['extcore','optextcore'])
-else:
+elif config.platform.startswith('i386-'):
 	ways = expect_fail_for(['optasm','profasm','extcore', 'optextcore'])
+else:
+	ways = expect_fail_for(['extcore','optextcore'])
 
 test('ffi009', ways ,compile_and_run, [''])
 
@@ -53,7 +55,16 @@ test('ffi009', ways ,compile_and_run, [''])
 test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 
 test('ffi011', normal, compile_and_run, [''])
-test('ffi012', normal, compile_and_run, [''])
+
+# The stdcall calling convention only exists on i386,
+# so ffi012 should fail everywhere else.
+
+if config.platform.startswith("i386-"):
+	f = normal
+else:
+	f = expect_fail
+
+test('ffi012', f, compile_and_run, [''])
 
 # Doesn't work with External Core due to __labels
 test('ffi013', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])

@@ -7,8 +7,15 @@ def f( opts ):
 setTestOpts(f)
 
 test('cc001', normal, compile, [''])
+
 # Non-static C call
-test('cc004', expect_fail_for(['extcore','optextcore']), compile, [''])
+# cc004 test also uses stdcall, so it only works on i386.
+if config.platform.startswith('i386-'):
+	ways = expect_fail_for(['extcore','optextcore'])
+else:
+	ways = expect_fail
+test('cc004', ways, compile, [''])
+
 # foreign label
 test('cc005', expect_fail_for(['extcore','optextcore']), compile, [''])
 
