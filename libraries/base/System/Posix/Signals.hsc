@@ -249,6 +249,7 @@ data Handler = Default
              | Ignore
 	     -- not yet: | Hold 
              | Catch (IO ())
+             | CatchOnce (IO ())
 
 installHandler :: Signal
                -> Handler
@@ -271,9 +272,8 @@ installHandler int handler maybe_mask = do
       rc <- case handler of
       	      Default -> stg_sig_install int (#const STG_SIG_DFL) p_sp mask
       	      Ignore  -> stg_sig_install int (#const STG_SIG_IGN) p_sp mask
-      	      Catch m -> do sptr <- newStablePtr m
-			    poke p_sp sptr
-			    stg_sig_install int (#const STG_SIG_HAN) p_sp mask 
+      	      Catch m -> install'' m p_sp mask int (#const STG_SIG_HAN)
+      	      CatchOnce m -> install'' m p_sp mask int (#const STG_SIG_RST)
 
       case rc of
 	(#const STG_SIG_DFL) -> return Default
@@ -283,6 +283,11 @@ installHandler int handler maybe_mask = do
 		osptr <- peek p_sp
         	m     <- deRefStablePtr osptr
 		return (Catch m)
+
+    install'' m p_sp mask int reset = do
+      sptr <- newStablePtr m
+      poke p_sp sptr
+      stg_sig_install int reset p_sp mask
 
 foreign import ccall unsafe
   stg_sig_install :: CInt -> CInt -> Ptr (StablePtr (IO ())) -> Ptr CSigset
