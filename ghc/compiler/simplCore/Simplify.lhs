@@ -429,7 +429,8 @@ simplNote InlineCall e cont
 simplNote InlineMe e cont
   | keep_inline cont		-- Totally boring continuation
   =				-- Don't inline inside an INLINE expression
-    setBlackList noInlineBlackList (simplExpr e)	`thenSmpl` \ e' ->
+    noInlineBlackList 			`thenSmpl` \ bl ->
+    setBlackList bl (simplExpr e)	`thenSmpl` \ e' ->
     rebuild (mkInlineMe e') cont
 
   | otherwise  	-- Dissolve the InlineMe note if there's
@@ -947,7 +948,8 @@ simplifyArgs is_data_con args cont_ty thing_inside
 		-- Even though x get's an occurrence of 'many', its RHS looks cheap,
 		-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
   = getBlackList				`thenSmpl` \ old_bl ->
-    setBlackList noInlineBlackList		$
+    noInlineBlackList				`thenSmpl` \ ni_bl ->
+    setBlackList ni_bl				$
     go args					$ \ args' ->
     setBlackList old_bl				$
     thing_inside args'

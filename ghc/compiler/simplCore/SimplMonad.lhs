@@ -49,7 +49,8 @@ module SimplMonad (
 
 #include "HsVersions.h"
 
-import Id		( Id, mkSysLocal, idType, idUnfolding, isDataConWrapId )
+import Id		( Id, mkSysLocal, idType, idUnfolding, isDataConWrapId,
+			  isGlobalId )
 import CoreSyn
 import CoreUnfold	( isCompulsoryUnfolding )
 import CoreUtils	( exprOkForSpeculation )
@@ -61,7 +62,8 @@ import VarSet
 import OrdList
 import qualified Subst
 import Subst		( Subst, mkSubst, substEnv, 
-			  InScopeSet, mkInScopeSet, substInScope
+			  InScopeSet, mkInScopeSet, substInScope,
+			  isInScope 
 			)
 import Type             ( Type, isUnLiftedType )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
@@ -629,18 +631,21 @@ setBlackList black_list m dflags env us sc
 getBlackList :: SimplM BlackList
 getBlackList dflags env us sc = (seBlackList env, us, sc)
 
-noInlineBlackList :: BlackList
+noInlineBlackList :: SimplM BlackList
 	-- Inside inlinings, black list anything that is in scope or imported.
 	-- except for things that must be unfolded (Compulsory)
 	-- and data con wrappers.  The latter is a hack, like the one in
 	-- SimplCore.simplRules, to make wrappers inline in rule LHSs.
 	-- We may as well do the same here.
-noInlineBlackList v = not (isCompulsoryUnfolding (idUnfolding v)) &&
-		      not (isDataConWrapId v)
-	-- NB: this implementation means that even inlinings *completely within*
-	-- an INLINE won't happen, which is perhaps overkill. 
-	-- An earlier verion had: (v `isInScope` subst) || not (isLocallyDefined v)
-	-- but it's more expensive, and it probably doesn't matter.
+noInlineBlackList dflags env us sc = (blacklisted,us,sc)
+	where blacklisted v =
+	   	  not (isCompulsoryUnfolding (idUnfolding v)) &&
+		  not (isDataConWrapId v) &&
+		  (v `isInScope` (seSubst env) || isGlobalId v)
+	-- NB: An earlier version omitted the last clause; this meant 
+	-- that even inlinings *completely within* an INLINE didn't happen. 
+	-- This was cheaper, and probably adequate, but produced awful code
+        -- for some dictionary constructions.
 \end{code}
 
 
