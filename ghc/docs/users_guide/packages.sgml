@@ -290,10 +290,13 @@
 	    <literal>extra_libraries</literal>.</para>
 
 	    <para>Also, <literal>extra_libraries</literal> are placed
-	    on the linker command line before the
+	    on the linker command line after the
 	    <literal>hs_libraries</literal> for the same package.  If
-	    your package has dependencies in the other direction, you
-	    might need to make two separate packages.</para>
+	    your package has dependencies in the other direction (i.e.
+	    <literal>extra_libraries</literal> depends on
+	    <literal>hs_libraries</literal>), and the libraries are
+	    static, you might need to make two separate
+	    packages.</para>
 	  </listitem>
 	</varlistentry>
 
