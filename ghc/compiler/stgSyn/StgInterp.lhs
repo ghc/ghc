@@ -23,8 +23,10 @@ import TyCon		( TyCon, isDataTyCon, tyConFamilySize, tyConDataCons )
 import ClosureInfo	( mkVirtHeapOffsets )
 import Class		( Class, classTyCon )
 
+#ifdef GHCI
 -- giga-hack
 import {-# SOURCE #-} MCI_make_constr
+#endif
 
 import PrelGHC		--( unsafeCoerce#, dataToTag#,
 			--  indexPtrOffClosure#, indexWordOffClosure# )
