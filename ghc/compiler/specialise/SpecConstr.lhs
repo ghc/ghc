@@ -506,9 +506,21 @@ spec_one env fn rhs (pats, n)
 	rule_name = _PK_ ("SC:" ++ showSDoc (ppr fn <> int n))
 	spec_rhs  = mkLams bndrs (mkApps rhs pats)
 	spec_id   = mkUserLocal spec_occ spec_uniq (exprType spec_rhs) fn_loc
-	rule      = Rule rule_name AlwaysActive bndrs pats (mkVarApps (Var spec_id) bndrs)
+	rule      = Rule rule_name specConstrActivation
+			 bndrs pats (mkVarApps (Var spec_id) bndrs)
     in
     returnUs (rule, (spec_id, spec_rhs))
+
+-- In which phase should the specialise-constructor rules be active?
+-- Originally I made them always-active, but Manuel found that
+-- this defeated some clever user-written rules.  So Plan B
+-- is to make them active only in Phase 0; after all, currently,
+-- the specConstr transformation is only run after the simplifier
+-- has reached Phase 0.  In general one would want it to be 
+-- flag-controllable, but for now I'm leaving it baked in
+--					[SLPJ Oct 01]
+specConstrActivation :: Activation
+specConstrActivation = ActiveAfter 0	-- Baked in; see comments above
 \end{code}
 
 %************************************************************************
