@@ -273,7 +273,7 @@ It is also possible, according the FFI specification, to put the
 <option>-&num;include</option> option in the foreign import 
 declaration itself:
 <programlisting>
-  foreign import "#include foo.h f" f :: Int -> IO Int
+  foreign import "foo.h f" f :: Int -> IO Int
 </programlisting>
 When compiling this module, GHC will generate a C file that includes
 the specified <option>-&num;include</option>.  However, GHC
