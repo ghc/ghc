@@ -282,8 +282,8 @@ sub readHiFile {
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
 	    } else { # Continuation line
-		print STDERR "$Pgm:junk old iface line?:$_";
-		# $Decl{"$mod:$current_name"} .= $_
+		# print STDERR "$Pgm:junk old iface line?:$_";
+		$Decl{"$mod:$current_name"} .= $_
 	    }
 
        }
