@@ -15,9 +15,15 @@ The following is heavily based on code in
 \end{code}
 
 \begin{code}
+#if 0
+I_ CStackDelta;
+#endif
+W_ SAVE_esp;
+
 STGFUN(stopPerformIODirectReturn)
 {
     FUNBEGIN;
+
     /* The final exit.
 
        The top-top-level closures (e.g., "main") are of type "PrimIO ()".
@@ -27,7 +33,14 @@ STGFUN(stopPerformIODirectReturn)
 
        We just tidy up the register stuff (real regs in *_SAVE, then 
        *_SAVE -> smInfo locs).
+
     */
+
+    /* Pop off saved C stack pointer */
+#if defined(CONCURRENT) && defined(i386_TARGET_ARCH)
+    SAVE_esp = (W_)*SpB;
+    SpB = SpB - 1;
+#endif
 
 #if defined(__STG_GCC_REGS__)
     SaveAllStgRegs();	/* inline! */
@@ -36,7 +49,12 @@ STGFUN(stopPerformIODirectReturn)
     SAVE_HpLim = HpLim;
 #endif
 
-    JMP_(miniInterpretEnd);
+    /* Grimily restore C stack pointer */
+#if defined(CONCURRENT) && defined(i386_TARGET_ARCH)
+    __asm__ volatile ("mov %0,%%esp" : "m=" (SAVE_esp));
+#endif
+
+    RESUME_(miniInterpretEnd);
     FUNEND;
 }
 
@@ -70,22 +88,29 @@ STGFUN(startPerformIO)
 
     /* At this point we are in the threaded-code world.
 
-       io points to a closure of type IO (), which should be
-       performed (by applying it to the state of the world).
+       unstable_Closure points to a closure of type PrimIO (),
+       which should be performed (by applying it to the
+       state of the world).
 
-       The main stg register dump is assumed to be up to date, and is
-       used to load the STG registers.
+       The main stg register dump is assumed to be up to date,
+       and is used to load the STG registers.
     */
+    
+#if defined(CONCURRENT) && defined(i386_TARGET_ARCH)
+    __asm__ volatile ("mov %%esp,%0" : "=m" (SAVE_esp));
+#endif
 
     /* Load up the real registers from the *_SAVE locns. */
     RestoreAllStgRegs();    	/* inline! */
 
     /* ------- STG registers are now valid! -------------------------*/
-
-    /* NB: To work properly with concurrent threads (on a uniprocessor,
-       where stable pointers still make some sense), there must be a 
-       stack overflow check here!  --JSM
-     */
+    
+    /* first off, check for stk space.. */
+#if defined(CONCURRENT) || !defined(STACK_CHECK_BY_PAGE_FAULT) 
+    STK_CHK(LivenessReg,1/*A*/,1/*B*/, 0, 0, 0/*prim*/, 0/*re-enter*/);
+#else
+    STK_CHK(LivenessReg,1/*A*/,0, 0, 0, 0/*prim*/, 0/*re-enter*/);
+#endif
 
     /* Put a suitable return address on the B stack */
     RetReg = (StgRetAddr) UNVEC(stopPerformIODirectReturn,vtbl_stopPerformIO);
@@ -94,6 +119,12 @@ STGFUN(startPerformIO)
     /* This is necessary because we've not unboxed it (to reveal a void) yet */
     SpA -= AREL(1);
     *SpA = (P_) WorldStateToken_closure;
+
+    /* Save away C stack pointer so that we can restore it when we leave
+       the Haskell world.
+    */
+    SpB[1] = (W_)SAVE_esp;
+    SpB    = SpB + 1;
 
     Node = unstable_Closure; /* Point to the closure for main/errorIO-arg */
     ENT_VIA_NODE();
