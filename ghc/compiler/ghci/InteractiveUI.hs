@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.35 2001/02/08 14:58:28 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.36 2001/02/09 10:08:09 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -27,6 +27,7 @@ import PprType		{- instance Outputable Type; do not delete -}
 import Panic		( GhcException(..) )
 
 import Exception
+import Dynamic
 #ifndef NO_READLINE
 import Readline
 #endif
@@ -209,20 +210,24 @@ readlineLoop = do
 -- and carries on.
 runCommand :: String -> GHCi Bool
 runCommand c = 
-  ghciHandle ( 
-     \other_exception 
-        -> io (do putStrLn ("*** Exception: " ++ show other_exception)
-		  return False)
-  ) $
-  ghciHandleDyn
-    (\dyn -> case dyn of
-		PhaseFailed phase code ->
+  ghciHandle ( \exception -> 
+	(case exception of
+	   DynException dyn -> 
+	      case fromDynamic dyn of
+		Nothing -> io (putStrLn ("*** Exception: (unknown)"))
+		Just ghc_ex -> 
+		  case ghc_ex of
+		    PhaseFailed phase code ->
 			io ( putStrLn ("Phase " ++ phase ++ " failed (code "
 				        ++ show code ++ ")"))
-		Interrupted -> io (putStrLn "Interrupted.")
-		_ -> io (putStrLn (show (dyn :: GhcException)))
-             >> return False
-    ) $
+		    Interrupted -> io (putStrLn "Interrupted.")
+		    other -> io (putStrLn (show (ghc_ex :: GhcException)))
+
+	   other -> io (putStrLn ("*** Exception: " ++ show exception))
+
+	) >> return False
+     ) $
+
    doCommand c
 
 doCommand (':' : command) = specialCommand command
@@ -575,13 +580,20 @@ setLastExpr last_expr
 
 io m = GHCi $ \s -> m >>= \a -> return (s,a)
 
+-----------------------------------------------------------------------------
 -- recursive exception handlers
+
+-- Don't forget to unblock async exceptions in the handler, or if we're
+-- in an exception loop (eg. let a = error a in a) the ^C exception
+-- may never be delivered.  Thanks to Marcin for pointing out the bug.
+
 ghciHandle :: (Exception -> GHCi a) -> GHCi a -> GHCi a
 ghciHandle h (GHCi m) = GHCi $ \s -> 
-   Exception.catch (m s) (\e -> unGHCi (ghciHandle h (h e)) s)
+   Exception.catch (m s) 
+	(\e -> unGHCi (ghciHandle h (ghciUnblock (h e))) s)
 
-ghciHandleDyn h (GHCi m) = GHCi $ \s -> 
-   Exception.catchDyn (m s) (\e -> unGHCi (ghciHandleDyn h (h e)) s)
+ghciUnblock :: GHCi a -> GHCi a
+ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 
 -----------------------------------------------------------------------------
 -- package loader
