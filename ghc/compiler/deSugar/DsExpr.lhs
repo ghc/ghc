@@ -9,7 +9,11 @@
 module DsExpr ( dsExpr ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(DsLoop)		-- partly to get dsBinds, partly to chk dsExpr
+#else
+import {-# SOURCE #-} DsBinds (dsBinds )
+#endif
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
@@ -262,8 +266,8 @@ dsExpr expr@(HsCase discrim matches src_loc)
     returnDs ( mkCoLetAny (NonRec discrim_var core_discrim) matching_code )
 
 dsExpr (HsLet binds expr)
-  = dsBinds binds	`thenDs` \ core_binds ->
-    dsExpr expr		`thenDs` \ core_expr ->
+  = dsBinds Nothing binds   `thenDs` \ core_binds ->
+    dsExpr expr		    `thenDs` \ core_expr ->
     returnDs ( mkCoLetsAny core_binds core_expr )
 
 dsExpr (HsDoOut do_or_lc stmts return_id then_id zero_id result_ty src_loc)
@@ -650,8 +654,8 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 				   VarArg (mkValLam [ignored_result_id] rest)]
     
 	go (LetStmt binds : stmts )
-	  = dsBinds binds	`thenDs` \ binds2 ->
-	    go stmts 		`thenDs` \ rest   ->
+	  = dsBinds Nothing binds `thenDs` \ binds2 ->
+	    go stmts 		  `thenDs` \ rest   ->
 	    returnDs (mkCoLetsAny binds2 rest)
     
 	go (BindStmt pat expr locn : stmts)

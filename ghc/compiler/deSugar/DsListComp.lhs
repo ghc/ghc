@@ -9,7 +9,12 @@
 module DsListComp ( dsListComp ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
+#else
+import {-# SOURCE #-} DsExpr ( dsExpr )
+import {-# SOURCE #-} DsBinds ( dsBinds )
+#endif
 
 import HsSyn		( Stmt(..), HsExpr, HsBinds )
 import TcHsSyn		( SYN_IE(TypecheckedStmt), SYN_IE(TypecheckedHsExpr) , SYN_IE(TypecheckedHsBinds) )
@@ -127,7 +132,7 @@ deListComp (GuardStmt guard locn : quals) list	-- rule B above
 
 -- [e | let B, qs] = let B in [e | qs]
 deListComp (LetStmt binds : quals) list
-  = dsBinds binds		`thenDs` \ core_binds ->
+  = dsBinds Nothing binds	`thenDs` \ core_binds ->
     deListComp quals list	`thenDs` \ core_rest ->
     returnDs (mkCoLetsAny core_binds core_rest)
 
@@ -195,7 +200,7 @@ dfListComp c_ty c_id n_ty n_id (GuardStmt guard locn  : quals)
 
 dfListComp c_ty c_id n_ty n_id (LetStmt binds : quals)
   -- new in 1.3, local bindings
-  = dsBinds binds                         `thenDs` \ core_binds ->
+  = dsBinds Nothing binds                 `thenDs` \ core_binds ->
     dfListComp c_ty c_id n_ty n_id quals  `thenDs` \ core_rest ->
     returnDs (mkCoLetsAny core_binds core_rest)
 

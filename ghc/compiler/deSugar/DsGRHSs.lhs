@@ -9,7 +9,13 @@
 module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(DsLoop)		-- break dsExpr/dsBinds-ish loop
+#else
+import {-# SOURCE #-} DsExpr  ( dsExpr )
+import {-# SOURCE #-} DsBinds ( dsBinds )
+import {-# SOURCE #-} Match   ( match )
+#endif
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 			  HsExpr(..), HsBinds, Stmt(..), 
@@ -53,7 +59,7 @@ dsGuarded :: TypecheckedGRHSsAndBinds
 	  -> DsM CoreExpr
 
 dsGuarded (GRHSsAndBindsOut grhss binds err_ty)
-  = dsBinds binds				`thenDs` \ core_binds ->
+  = dsBinds Nothing binds			`thenDs` \ core_binds ->
     dsGRHSs err_ty PatBindMatch [] grhss 	`thenDs` \ (MatchResult can_it_fail _ core_grhss_fn _) ->
     case can_it_fail of
 	CantFail -> returnDs (mkCoLetsAny core_binds (core_grhss_fn (panic "It can't fail")))
@@ -133,7 +139,7 @@ matchGuard (GuardStmt expr _ : stmts) body_result
 
 matchGuard (LetStmt binds : stmts) body_result
   = matchGuard stmts body_result	`thenDs` \ match_result ->
-    dsBinds binds			`thenDs` \ core_binds ->
+    dsBinds Nothing binds		`thenDs` \ core_binds ->
     returnDs (mkCoLetsMatchResult core_binds match_result)
 
 matchGuard (BindStmt pat rhs _ : stmts) body_result
