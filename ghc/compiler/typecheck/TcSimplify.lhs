@@ -27,7 +27,7 @@ import Inst		( lookupInst, lookupSimpleInst,
 			  matchesInst, instToId, instBindingRequired,
 			  instCanBeGeneralised, newDictsAtLoc,
 			  pprInst,
-			  Inst(..), SYN_IE(LIE), zonkLIE, emptyLIE,
+			  Inst(..), SYN_IE(LIE), zonkLIE, emptyLIE, pprLIE, pprLIEInFull,
 			  plusLIE, unitLIE, consLIE, InstOrigin(..),
 			  OverloadedLit )
 import TcEnv		( tcGetGlobalTyVars )
@@ -717,18 +717,23 @@ genCantGenErr insts sty	-- Can't generalise these Insts
 \end{code}
 
 \begin{code}
-ambigErr insts sty
-  = hang (ptext SLIT("Ambiguous overloading"))
-       4 (vcat (map (pprInst sty) insts))
+ambigErr dicts sty
+  = sep [text "Ambiguous context" <+> pprLIE sty lie,
+	 nest 4 (pprLIEInFull sty lie)
+    ]
+  where
+    lie = listToBag dicts	-- Yuk
 \end{code}
 
 @reduceErr@ complains if we can't express required dictionaries in
 terms of the signature.
 
 \begin{code}
-reduceErr insts sty
-  = hang (text "Context required by inferred type, but missing on a type signature")
-       4 (vcat (map (pprInst sty) (bagToList insts)))
+reduceErr lie sty
+  = sep [text "Context" <+> pprLIE sty lie,
+	 nest 4 (text "required by inferred type, but missing on a type signature"),
+	 nest 4 (pprLIEInFull sty lie)
+    ]
 \end{code}
 
 
