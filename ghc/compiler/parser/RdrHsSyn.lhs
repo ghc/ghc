@@ -12,6 +12,7 @@ module RdrHsSyn (
 	RdrNameBangType,
 	RdrNameClassOpSig,
 	RdrNameConDecl,
+	RdrNameConDetails,
 	RdrNameContext,
 	RdrNameSpecDataSig,
 	RdrNameDefaultDecl,
@@ -84,6 +85,7 @@ type RdrNameArithSeqInfo	= ArithSeqInfo		RdrName RdrNamePat
 type RdrNameBangType		= BangType		RdrName
 type RdrNameClassOpSig		= Sig			RdrName
 type RdrNameConDecl		= ConDecl		RdrName
+type RdrNameConDetails		= ConDetails		RdrName
 type RdrNameContext		= Context 		RdrName
 type RdrNameHsDecl		= HsDecl		RdrName RdrNamePat
 type RdrNameSpecDataSig		= SpecDataSig		RdrName

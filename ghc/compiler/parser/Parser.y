@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.5 1999/06/03 14:44:23 simonmar Exp $
+$Id: Parser.y,v 1.6 1999/06/07 14:58:40 simonmar Exp $
 
 Haskell grammar.
 
@@ -501,12 +501,10 @@ inst_type :: { RdrNameHsType }
 	: ctype				{% checkInstType $1 }
 
 ctype	:: { RdrNameHsType }
-	: 'forall' tyvars '.' btype '=>' type
-					{% checkContext $4 `thenP` \c ->
-					   returnP (HsForAllTy (Just $2) c $6) }
+	: 'forall' tyvars '.' context type
+					{ HsForAllTy (Just $2) $4 $5 }
 	| 'forall' tyvars '.' type	{ HsForAllTy (Just $2) [] $4 }
-	| btype '=>' type		{% checkContext $1 `thenP` \c ->
-					   returnP (HsForAllTy Nothing c $3) }
+	| context type			{ HsForAllTy Nothing   $1 $2 }
 	| type				{ $1 }
 
 types0  :: { [RdrNameHsType] }
@@ -531,15 +529,23 @@ constrs :: { [RdrNameConDecl] }
 	: constrs '|' constr		{ $3 : $1 }
 	| constr			{ [$1] }
 
-{- ToDo: existential stuff -}
-
 constr :: { RdrNameConDecl }
-	: srcloc scontype   
-		{ ConDecl (fst $2) [] [] (VanillaCon (snd $2)) $1 }
-	| srcloc sbtype conop sbtype	
-		{ ConDecl $3 [] [] (InfixCon $2 $4) $1 }
-	| srcloc con '{' fielddecls '}' 
-		{ ConDecl $2 [] [] (RecCon (reverse $4)) $1 }
+	: srcloc forall context constr_stuff
+		{ ConDecl (fst $4) $2 $3 (snd $4) $1 }
+	| srcloc forall constr_stuff
+		{ ConDecl (fst $3) $2 [] (snd $3) $1 }
+
+forall :: { [RdrNameHsTyVar] }
+	: 'forall' tyvars '.'		{ $2 }
+	| {- empty -}			{ [] }
+
+context :: { RdrNameContext }
+	: btype '=>'			{% checkContext $1 }
+
+constr_stuff :: { (RdrName, RdrNameConDetails) }
+	: scontype   		 	{ (fst $1, VanillaCon (snd $1)) }
+	| sbtype conop sbtype		{ ($2, InfixCon $1 $3) }
+	| con '{' fielddecls '}' 	{ ($1, RecCon (reverse $3)) }
 
 newconstr :: { RdrNameConDecl }
 	: srcloc conid atype	{ ConDecl $2 [] [] (NewCon $3 Nothing) $1 }
