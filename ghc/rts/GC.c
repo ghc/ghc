@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.74 2000/03/17 13:30:24 simonmar Exp $
+ * $Id: GC.c,v 1.75 2000/03/23 14:30:13 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2813,18 +2813,6 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     case STOP_FRAME:
     case CATCH_FRAME:
     case SEQ_FRAME:
-      {
-	// StgPtr old_p = p; // debugging only -- HWL
-      /* stack frames like these are ordinary closures and therefore may 
-	 contain setup-specific fixed-header words (as in GranSim!);
-	 therefore, these cases should not use p++ but &(p->payload) -- HWL */
-      // IF_DEBUG(gran, IF_DEBUG(sanity, printObj(p)));
-      bitmap = info->layout.bitmap;
-
-      p = (StgPtr)&(((StgClosure *)p)->payload);
-      // IF_DEBUG(sanity, belch("HWL: scavenge_stack: (STOP|CATCH|SEQ)_FRAME adjusting p from %p to %p (instead of %p)",		       old_p, p, old_p+1));
-      goto small_bitmap;
-      }
     case RET_BCO:
     case RET_SMALL:
     case RET_VEC_SMALL:
