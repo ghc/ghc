@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.22 2000/04/17 11:57:55 simonmar Exp $
+# $Id: Makefile,v 1.23 2000/04/28 17:16:10 rrt Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -112,7 +112,7 @@ SRC_BLD_DLL_OPTS += --export-all -lwinmm -lHS_imp_stub -lgmp -L. -Lgmp
 $(DLL_NAME) :: libHS_imp_stub.a
 
 libHS_imp_stub.a :
-	dlltool --output-lib libHS_imp_stub.a --def HSprel.def --dllname HSprel.dll
+	dlltool --output-lib libHS_imp_stub.a --def HSprel.def --dllname HSstd.dll
 
 # It's not included in the DLL, but we need to compile it up separately.
 all :: Main.dll_o
