@@ -1870,7 +1870,6 @@ ilxPrimOpTable op
 	ISrlOp      -> simp_op (ilxOp "shr.un")
 	IntAddCOp   -> simp_op (ilxCallSuppMeth (ilxUnboxedPairRep repInt repInt) "IntAddCOp" [] [repInt, repInt])
 	IntSubCOp   -> simp_op (ilxCallSuppMeth (ilxUnboxedPairRep repInt repInt) "IntSubCOp" [] [repInt, repInt])
-	IntMulCOp   -> simp_op (ilxCallSuppMeth (ilxUnboxedPairRep repInt repInt) "IntMulCOp" [] [repInt, repInt])
 	IntGcdOp    -> simp_op (ilxCallSuppMeth repInt "IntGcdOp" [] [repInt, repInt])
 
 
