@@ -143,10 +143,13 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 #
 # Name variables for ghc:
 # 
+# *ProjectVersion    is treated as a *string*
+# *ProjectVersionInt is treated as an *integer* (for cpp defines)
+
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 3.01
-GhcProjectVersionInt   = 301	# treated as an *integer* (for cpp defines)
+GhcProjectVersion      = 3.02
+GhcProjectVersionInt   = 302
 GhcProjectPatchLevel   = 0
 
 #---------------------------------------------------------------
