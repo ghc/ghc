@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.3 2000/10/11 16:26:04 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.4 2000/10/16 14:26:26 simonmar Exp $
 --
 -- Driver flags
 --
@@ -241,7 +241,6 @@ static_flags =
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg (writeIORef pgm_L) )
   ,  ( "pgmP"           , HasArg (writeIORef pgm_P) )
-  ,  ( "pgmC"           , HasArg (writeIORef pgm_C) )
   ,  ( "pgmc"           , HasArg (writeIORef pgm_c) )
   ,  ( "pgmm"           , HasArg (writeIORef pgm_m) )
   ,  ( "pgms"           , HasArg (writeIORef pgm_s) )
