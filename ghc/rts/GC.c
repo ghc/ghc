@@ -1415,8 +1415,6 @@ mark_root(StgClosure **root)
 STATIC_INLINE void 
 upd_evacuee(StgClosure *p, StgClosure *dest)
 {
-    // Source object must be in from-space:
-    ASSERT((Bdescr((P_)p)->flags & BF_EVACUATED) == 0);
     // not true: (ToDo: perhaps it should be)
     // ASSERT(Bdescr((P_)dest)->flags & BF_EVACUATED);
     SET_INFO(p, &stg_EVACUATED_info);
@@ -1676,6 +1674,9 @@ loop:
 	}
 	return q;
     }
+
+    /* Object is not already evacuated. */
+    ASSERT((bd->flags & BF_EVACUATED) == 0);
 
     stp = bd->step->to;
   }
@@ -3452,11 +3453,21 @@ scavenge_one(StgPtr p)
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
     case IND_STATIC:
-      /* Try to pull the indirectee into this generation, so we can
-       * remove the indirection from the mutable list.  
-       */
-      ((StgInd *)p)->indirectee = evacuate(((StgInd *)p)->indirectee);
-      
+    {
+	/* Careful here: a THUNK can be on the mutable list because
+	 * it contains pointers to young gen objects.  If such a thunk
+	 * is updated, the IND_OLDGEN will be added to the mutable
+	 * list again, and we'll scavenge it twice.  evacuate()
+	 * doesn't check whether the object has already been
+	 * evacuated, so we perform that check here.
+	 */
+	StgClosure *q = ((StgInd *)p)->indirectee;
+	if (HEAP_ALLOCED(q) && Bdescr((StgPtr)q)->flags & BF_EVACUATED) {
+	    break;
+	}
+	((StgInd *)p)->indirectee = evacuate(q);
+    }
+
 #if 0 && defined(DEBUG)
       if (RtsFlags.DebugFlags.gc) 
       /* Debugging code to print out the size of the thing we just
