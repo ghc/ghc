@@ -241,7 +241,7 @@ cast x = r
 	       else Nothing
 
 
--- | A convenient variation for kind "* -> *"
+-- | A convenient variation for kind \"* -> *\"
 castss :: (Typeable a, Typeable b) => t a -> Maybe (t b)
 castss x = r
        where
