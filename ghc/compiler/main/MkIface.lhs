@@ -15,18 +15,20 @@ import Class		( GenClass{-instance NamedThing-} )
 import CmdLineOpts	( opt_ProduceHi )
 import HsSyn
 import Id		( GenId{-instance NamedThing/Outputable-} )
-import Name		( nameOrigName, exportFlagOn, nameExportFlag, ExportFlag(..),
+import Name		( nameOrigName, origName,
+			  exportFlagOn, nameExportFlag, ExportFlag(..),
 			  ltLexical, isExported,
 			  RdrName{-instance Outputable-}
 			)
 import PprStyle		( PprStyle(..) )
-import PprType		( TyCon{-instance Outputable-}, GenClass{-ditto-} )
+import PprType		( pprType, TyCon{-instance Outputable-}, GenClass{-ditto-} )
 import Pretty		-- quite a bit
 import RnHsSyn		( RenamedHsModule(..), RnName{-instance NamedThing-} )
 import RnIfaces		( VersionInfo(..) )
 import TcModule		( TcIfaceInfo(..) )
-import TcInstUtil	( InstInfo )
+import TcInstUtil	( InstInfo(..) )
 import TyCon		( TyCon{-instance NamedThing-} )
+import Type		( mkSigmaTy, mkDictTy, getAppTyCon )
 import Util		( sortLt, assertPanic )
 
 ppSemid x = ppBeside (ppr PprInterface x) ppSemi -- micro util
@@ -176,8 +178,7 @@ ifaceFixities (Just if_hdl) (HsModule _ _ _ _ fixities _ _ _ _ _ _ _ _ _)
 ifaceDecls Nothing{-no iface handle-} _ = return ()
 
 ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
-  = ASSERT(not (null vals && null tycons && null classes))
-    let
+  = let
 	exported_classes = filter isExported classes
 	exported_tycons  = filter isExported tycons
 	exported_vals	 = filter isExported vals
@@ -186,6 +187,8 @@ ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
 	sorted_tycons	 = sortLt ltLexical exported_tycons
 	sorted_vals	 = sortLt ltLexical exported_vals
     in
+    ASSERT(not (null exported_classes && null exported_tycons && null exported_vals))
+
     hPutStr if_hdl "\n__declarations__\n" >>
     hPutStr if_hdl (ppShow 100 (ppAboves [
 	ppAboves (map ppSemid sorted_classes),
@@ -197,23 +200,36 @@ ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
 ifaceInstances Nothing{-no iface handle-} _ = return ()
 
 ifaceInstances (Just if_hdl) (_, _, _, insts)
-  = return ()
-{-
-    let
-	exported_classes = filter isExported classes
-	exported_tycons  = filter isExported tycons
-	exported_vals	 = filter isExported vals
+  = let
+	exported_insts	= filter is_exported_inst (bagToList insts)
 
-	sorted_classes   = sortLt ltLexical exported_classes
-	sorted_tycons	 = sortLt ltLexical exported_tycons
-	sorted_vals	 = sortLt ltLexical exported_vals
+	sorted_insts	= sortLt lt_inst exported_insts
     in
-    hPutStr if_hdl "\n__declarations__\n" >>
-    hPutStr if_hdl (ppShow 100 (ppAboves [
-	ppAboves (map ppSemid sorted_classes),
-	ppAboves (map ppSemid sorted_tycons),
-	ppAboves (map ppSemid sorted_vals)]))
--}
+    if null exported_insts then
+	return ()
+    else
+	hPutStr if_hdl "\n__instances__\n" >>
+	hPutStr if_hdl (ppShow 100 (ppAboves (map pp_inst sorted_insts)))
+  where
+    is_exported_inst (InstInfo clas _ ty _ _ _ _ _ from_here _ _ _)
+      = from_here -- && ...
+
+    -------
+    lt_inst (InstInfo clas1 _ ty1 _ _ _ _ _ _ _ _ _)
+	    (InstInfo clas2 _ ty2 _ _ _ _ _ _ _ _ _)
+      = let
+	    tycon1 = fst (getAppTyCon ty1)
+	    tycon2 = fst (getAppTyCon ty2)
+	in
+	case (origName clas1 `cmp` origName clas2) of
+	  LT_ -> True
+	  GT_ -> False
+	  EQ_ -> origName tycon1 < origName tycon2
+
+    -------
+    pp_inst (InstInfo clas tvs ty theta _ _ _ _ _ _ _ _)
+      = ppBeside (ppPStr SLIT("instance "))
+	    (pprType PprInterface (mkSigmaTy tvs theta (mkDictTy clas ty)))
 \end{code}
 
 === ALL OLD BELOW HERE ==============

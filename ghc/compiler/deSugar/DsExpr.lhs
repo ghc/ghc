@@ -31,7 +31,7 @@ import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
 import CoreUtils	( coreExprType, substCoreExpr, argToExpr,
 			  mkCoreIfThenElse, unTagBinders )
 import CostCentre	( mkUserCC )
-import FieldLabel	( FieldLabel{-instance Eq/Outputable-} )
+import FieldLabel	( fieldLabelType, FieldLabel )
 import Id		( mkTupleCon, idType, nullIdEnv, addOneToIdEnv,
 			  getIdUnfolding, dataConArgTys, dataConFieldLabels,
 			  recordSelectorFieldLabel
@@ -45,9 +45,7 @@ import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,
 			  rEC_UPD_ERROR_ID
 			)
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
-import Type		( splitSigmaTy, splitFunTy, typePrimRep,
-			  getAppDataTyCon
-			)
+import Type		( splitSigmaTy, splitFunTy, typePrimRep, getAppDataTyCon )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv )
 import Usage		( UVar(..) )
 import Util		( zipEqual, pprError, panic, assertPanic )
@@ -361,18 +359,18 @@ dsExpr (RecordCon con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
 	con_id   = get_con_id con_expr'
-	(arg_tys, data_ty) = splitFunTy (idType con_id)
 
-	mk_arg (arg_ty, lbl) = case [rhs | (sel_id,rhs,_) <- rbinds,
-					   lbl == recordSelectorFieldLabel sel_id
-				    ] of
-				 (rhs:rhss) -> ASSERT( null rhss )
-					       dsExpr rhs
+	mk_arg lbl
+	  = case [rhs | (sel_id,rhs,_) <- rbinds,
+			lbl == recordSelectorFieldLabel sel_id] of
+	      (rhs:rhss) -> ASSERT( null rhss )
+		 	    dsExpr rhs
+	      []         -> mkErrorAppDs rEC_CON_ERROR_ID (fieldLabelType lbl) (showForErr lbl)
 
-				 [] -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showForErr lbl)
+	-- ToDo Bug: fieldLabelType lbl needs to be instantiated with appropriate type args
+	--           problem also arises if ty is extraced by splitting the type of the con_id
     in
-    mapDs mk_arg (arg_tys `zip` dataConFieldLabels con_id) `thenDs` \ con_args ->
-
+    mapDs mk_arg (dataConFieldLabels con_id) `thenDs` \ con_args ->
     mkAppDs con_expr' [] con_args
   where
 	-- The "con_expr'" is simply an application of the constructor Id
@@ -385,7 +383,7 @@ dsExpr (RecordCon con_expr rbinds)
 Record update is a little harder. Suppose we have the decl:
 
 	data T = T1 {op1, op2, op3 :: Int}
-	       | T2 {op4, op1 :: Int}
+	       | T2 {op4, op2 :: Int}
 	       | T3
 
 Then we translate as follows:
@@ -405,12 +403,11 @@ dictionaries.
 
 \begin{code}
 dsExpr (RecordUpdOut record_expr dicts rbinds)
-  = dsExpr record_expr	`thenDs` \ record_expr' ->
+  = dsExpr record_expr	 `thenDs` \ record_expr' ->
 
 	-- Desugar the rbinds, and generate let-bindings if
 	-- necessary so that we don't lose sharing
---    dsRbinds rbinds		$ \ rbinds' ->
-    let rbinds' = panic "dsExpr:RecordUpdOut:rbinds'" in
+    dsRbinds rbinds		$ \ rbinds' ->
     let
 	record_ty		= coreExprType record_expr'
 	(tycon, inst_tys, cons) = _trace "getAppDataTyCon.DsExpr" $ getAppDataTyCon record_ty
@@ -420,10 +417,11 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
 	initial_args		= map TyArg inst_tys ++ map VarArg dicts
 		
 	mk_val_arg (field, arg_id) 
-	  = case [arg | (f, arg) <- rbinds', f==field] of
-		(arg:args) -> ASSERT(null args)
-			      arg
-		[]	   -> VarArg arg_id
+	  = case [arg | (f, arg) <- rbinds',
+			field == recordSelectorFieldLabel f] of
+	      (arg:args) -> ASSERT(null args)
+			    arg
+	      []	 -> VarArg arg_id
 
 	mk_alt con
 	  = newSysLocalsDs (dataConArgTys con inst_tys)	`thenDs` \ arg_ids ->
@@ -611,7 +609,7 @@ apply_to_args fun args
 \begin{code}
 dsRbinds :: TypecheckedRecordBinds		-- The field bindings supplied
 	 -> ([(Id, CoreArg)] -> DsM CoreExpr)	-- A continuation taking the field
-						-- bindings with atomic rhss
+	  					-- bindings with atomic rhss
 	 -> DsM CoreExpr			-- The result of the continuation,
 						-- wrapped in suitable Lets
 
@@ -622,7 +620,7 @@ dsRbinds ((sel_id, rhs, pun_flag) : rbinds) continue_with
   = dsExpr rhs		`thenDs` \ rhs' ->
     dsExprToAtom rhs'	$ \ rhs_atom ->
     dsRbinds rbinds	$ \ rbinds' ->
-    continue_with ((panic "dsRbinds:field_label?"{-sel_id-}, rhs_atom) : rbinds')
+    continue_with ((sel_id, rhs_atom) : rbinds')
 \end{code}	
 
 \begin{code}

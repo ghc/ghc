@@ -340,8 +340,9 @@ doImportDecls iface_cache g_info us src_imps
 	    imp_warns `unionBags` warns)
   where
     (ok_imps, src_qprels) = partition not_qual_prel src_imps
-    all_imps = qprel_imp ++ prel_imp ++ ok_imps
-    
+    the_imps = prel_imp ++ ok_imps
+    all_imps = qprel_imp ++ the_imps
+
     not_qual_prel (ImportDecl mod qual _ _ _) = not (fromPrelude mod && qual)
 
     explicit_prelude_import
@@ -358,7 +359,7 @@ doImportDecls iface_cache g_info us src_imps
 	        else
 	           [ImportDecl pRELUDE False Nothing Nothing mkIfaceSrcLoc]
 
-    (uniq_imps, imp_dups) = removeDups cmp_mod all_imps
+    (uniq_imps, imp_dups) = removeDups cmp_mod the_imps
     cmp_mod (ImportDecl m1 _ _ _ _) (ImportDecl m2 _ _ _ _) = cmpPString m1 m2
 
     imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps ]

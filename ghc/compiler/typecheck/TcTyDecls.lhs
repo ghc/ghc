@@ -192,7 +192,7 @@ We're going to build a constructor that looks like:
 	     \d1::Data a, d2::C b ->
 	     \p q r -> case p of { p ->
 		       case q of { q ->
-		       HsCon [a,b,c] [p,q,r]}}
+		       HsCon T1 [a,b] [p,q,r]}}
 
 Notice that
 
@@ -220,12 +220,12 @@ mkConstructor con_id
 	(arg_tys, result_ty) = splitFunTy tau
 	n_args = length arg_tys
     in
-    newLocalIds (take n_args (repeat SLIT("con"))) arg_tys	`thenNF_Tc` {- \ pre_zonk_args ->
-    mapNF_Tc zonkId pre_zonk_args   `thenNF_Tc` -} \ args ->
+    newLocalIds (take n_args (repeat SLIT("con"))) arg_tys
+					`thenNF_Tc` \ args ->
 
-	-- Check that all the types of all the strict
-	-- arguments are in Data.  This is trivially true of everything except
-	-- type variables, for which we must check the context.
+	-- Check that all the types of all the strict arguments are in Data.
+	-- This is trivially true of everything except type variables, for
+	-- which we must check the context.
     let
 	strict_marks = dataConStrictMarks con_id
 	strict_args  = [arg | (arg, MarkedStrict) <- args `zipEqual` strict_marks]
@@ -233,14 +233,13 @@ mkConstructor con_id
 	data_tyvars = -- The tyvars in the constructor's context that are arguments 
 		      -- to the Data class
 	              [getTyVar "mkConstructor" ty
-		      | (clas,ty) <- theta, 
-			uniqueOf clas == evalClassKey]
+		      | (clas,ty) <- theta, uniqueOf clas == evalClassKey]
 
 	check_data arg = case getTyVar_maybe (tcIdType arg) of
 			   Nothing    -> returnTc ()	-- Not a tyvar, so OK
 			   Just tyvar -> checkTc (tyvar `elem` data_tyvars) (missingDataErr tyvar)
     in
-    mapTc check_data strict_args			`thenTc_`
+    mapTc check_data strict_args	`thenTc_`
 
 	-- Build the data constructor
     let
@@ -248,7 +247,7 @@ mkConstructor con_id
 		  mkHsDictLam dicts $
 		  mk_pat_match args $
 		  mk_case strict_args $
-		  HsCon con_id arg_tys (map HsVar args)
+		  HsCon con_id (mkTyVarTys tyvars) (map HsVar args)
 
 	mk_pat_match []         body = body
 	mk_pat_match (arg:args) body = HsLam (PatMatch (VarPat arg) (SimpleMatch (mk_pat_match args body)))
