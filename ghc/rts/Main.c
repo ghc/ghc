@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.7 1999/05/10 08:23:55 sof Exp $
+ * $Id: Main.c,v 1.8 1999/05/10 10:06:24 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -98,7 +98,7 @@ DllMain ( HINSTANCE hInstance
    */
   switch (reason) {
   case DLL_PROCESS_ATTACH:
-    startupHaskell(args,1);
+    startupHaskell(1,args);
     /* ToDo: gracefully handle startupHaskell() failures.. */
     return TRUE;
   case DLL_PROCESS_DETACH:
