@@ -94,7 +94,7 @@ else
 BOOT_TARGET    = boot
 endif
 
-ifneq "$(NO_INSTALL_TARGET)" "YES"
+ifeq "$(NO_INSTALL_TARGET)" "YES"
 INSTALL_TARGET =
 else
 INSTALL_TARGET = install
