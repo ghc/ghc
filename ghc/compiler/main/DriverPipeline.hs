@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.35 2000/11/24 17:09:52 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.36 2000/12/04 16:42:14 rrt Exp $
 --
 -- GHC Driver
 --
@@ -95,7 +95,7 @@ getGhcMode flags
 -- what the suffix of the intermediate files should be, etc.
 
 -- The following compilation pipeline algorithm is fairly hacky.  A
--- better way to do this would be to express the whole comilation as a
+-- better way to do this would be to express the whole compilation as a
 -- data flow DAG, where the nodes are the intermediate files and the
 -- edges are the compilation phases.  This framework would also work
 -- nicely if a haskell dependency generator was included in the
@@ -111,8 +111,8 @@ getGhcMode flags
 -- concurrently, automatically taking advantage of extra processors on
 -- the host machine.  For example, when compiling two Haskell files
 -- where one depends on the other, the data flow graph would determine
--- that the C compiler from the first comilation can be overlapped
--- with the hsc comilation for the second file.
+-- that the C compiler from the first compilation can be overlapped
+-- with the hsc compilation for the second file.
 
 data IntermediateFileType
   = Temporary
@@ -430,7 +430,8 @@ run_phase Hsc basename suff input_fn output_fn
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef v_Recomp
 	todo <- readIORef v_GhcMode
-        o_file <- odir_ify (basename ++ '.':phaseInputExt Ln)
+        o_file' <- odir_ify (basename ++ '.':phase_input_ext Ln)
+        o_file <- osuf_ify o_file'
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
 	     then return False
@@ -551,9 +552,6 @@ run_phase cc_phase _basename _suff input_fn output_fn
 		   ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		   ++ cc_opts
 		   ++ split_opt
-#ifdef mingw32_TARGET_OS
-                   ++ [" -mno-cygwin"]
-#endif
 		   ++ (if excessPrecision then [] else [ "-ffloat-store" ])
 		   ++ include_paths
 		   ++ pkg_extra_cc_opts
@@ -871,7 +869,7 @@ dealWithStubs basename maybe_stub_h maybe_stub_c
 		runSomething "Copy stub .c file" 
 		    (unwords [ 
 			"rm -f", stub_c, "&&",
-			"echo \'#include \""++stub_h++"\"\' >"++stub_c, " &&",
+			"echo \'#include \"Stg.h\"\n#include \""++stub_h++"\"\' >"++stub_c, " &&",
 			"cat", tmp_stub_c, ">> ", stub_c
 			])
 

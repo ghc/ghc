@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.8 2000/10/30 09:52:15 simonpj Exp $
+-- $Id: TmpFiles.hs,v 1.9 2000/12/04 16:42:14 rrt Exp $
 --
 -- Temporary file management
 --
@@ -39,8 +39,10 @@ GLOBAL_VAR(v_TmpDir,       cDEFAULT_TMPDIR,  String   )
 initTempFileStorage = do
 	-- check whether TMPDIR is set in the environment
    IO.try (do dir <- getEnv "TMPDIR" -- fails if not set
-	      writeIORef v_TmpDir dir)
-
+#ifndef mingw32_TARGET_OS
+	      writeIORef v_TmpDir dir
+#endif
+   )
 
 cleanTempFiles :: Bool -> IO ()
 cleanTempFiles verbose = do

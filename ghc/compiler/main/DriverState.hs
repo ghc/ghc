@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.16 2000/11/21 14:35:05 simonmar Exp $
+-- $Id: DriverState.hs,v 1.17 2000/12/04 16:42:14 rrt Exp $
 --
 -- Settings for the driver
 --
@@ -527,7 +527,6 @@ GLOBAL_VAR(v_Build_tag, "", String)
 data WayName
   = WayProf
   | WayUnreg
-  | WayDll
   | WayTicky
   | WayPar
   | WayGran
@@ -554,12 +553,9 @@ data WayName
 
 GLOBAL_VAR(v_Ways, [] ,[WayName])
 
--- ToDo: allow WayDll with any other allowed combination
-
-allowed_combinations = 
-   [  [WayProf,WayUnreg],
-      [WayProf,WaySMP]	   -- works???
-   ]
+allowed_combinations way = ways `elem` combs
+  where  -- the sub-lists must be ordered according to WayName, because findBuildTag sorts them
+    combs                = [ [WayProf,WayUnreg], [WayProf,WaySMP] ]
 
 findBuildTag :: IO [String]  -- new options
 findBuildTag = do
@@ -572,7 +568,7 @@ findBuildTag = do
 	       writeIORef v_Build_tag (wayTag details)
 	       return (wayOpts details)
 
-     ws  -> if  ws `notElem` allowed_combinations
+     ws  -> if not allowed_combination ws
 		then throwDyn (OtherError $
 				"combination not supported: "  ++
    				foldr1 (\a b -> a ++ '/':b) 
@@ -615,9 +611,6 @@ way_details =
 	, "-fno-asm-mangling"
 	, "-funregisterised"
 	, "-fvia-C" ]),
-
-    (WayDll, Way  "dll" "DLLized"
-        [ ]),
 
     (WayPar, Way  "mp" "Parallel" 
 	[ "-fparallel"
@@ -714,7 +707,8 @@ machdepCCOpts
       --   the fp (%ebp) for our register maps.
 	= do n_regs <- readState stolen_x86_regs
 	     sta    <- readIORef v_Static
-	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "" ],
+	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else "",
+                        if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" ],
 		      [ "-fno-defer-pop", "-fomit-frame-pointer",
 	                "-DSTOLEN_X86_REGS="++show n_regs ]
 		    )

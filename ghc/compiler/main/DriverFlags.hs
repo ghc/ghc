@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.24 2000/11/24 09:51:39 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.25 2000/12/04 16:42:14 rrt Exp $
 --
 -- Driver flags
 --
@@ -194,6 +194,7 @@ static_flags =
 
 	------- Miscellaneous -----------------------------------------------
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
+  ,  ( "no-hs-main"     , NoArg (writeIORef no_hs_main True) )
 
 	------- Output Redirection ------------------------------------------
   ,  ( "odir"		, HasArg (writeIORef v_Output_dir  . Just) )
@@ -258,6 +259,7 @@ static_flags =
 
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, NoArg (writeIORef v_Static True) )
+  ,  ( "rdynamic"       , NoArg (return ()) ) -- ignored for compat w/ gcc
 
 	----- RTS opts ------------------------------------------------------
 #ifdef not_yet
@@ -527,7 +529,7 @@ runSomething phase_name cmd
    hPutStrLn h cmd
    hClose h
    exit_code <- system ("sh - " ++ tmp) `catchAllIO` 
-		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
+		   (\_ -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
    removeFile tmp
 #endif
 
