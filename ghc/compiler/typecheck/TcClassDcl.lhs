@@ -251,10 +251,10 @@ tcClassContext class_name rec_class rec_tyvars context sc_sel_names
     rec_tyvar_tys = mkTyVarTys rec_tyvars
 
     mk_super_id name dict_ty
-        = mkDictSelId name rec_class ty
+        = mkDictSelId name rec_class {- SUP:??? ty
         where
 	  ty = mkForAllTys rec_tyvars $
-	       mkFunTy (mkDictTy rec_class rec_tyvar_tys) dict_ty
+	       mkFunTy (mkDictTy rec_class rec_tyvar_tys) dict_ty -}
 
     check_constraint (HsPClass c tys) = checkTc (all is_tyvar tys)
 					 (superClassErr class_name (c, tys))
@@ -289,7 +289,7 @@ tcClassSig rec_env rec_clas rec_clas_tyvars
 			        local_ty
 
 	-- Build the selector id and default method id
-	sel_id      = mkDictSelId op_name rec_clas global_ty
+	sel_id      = mkDictSelId op_name rec_clas {- SUP:??? global_ty -}
 	dm_id	    = mkDefaultMethodId dm_name rec_clas global_ty
 	final_dm_id = tcAddImportedIdInfo rec_env dm_id
     in
