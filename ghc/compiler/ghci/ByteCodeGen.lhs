@@ -788,8 +788,8 @@ doCase d s p (_,scrut)
 -- Deal with a CCall.
 
 -- Taggedly push the args onto the stack R->L,
--- deferencing ForeignObj#s and (ToDo: adjusting addrs to point to
--- payloads in Ptr/Byte arrays).  Then, generate the marshalling
+-- deferencing ForeignObj#s and adjusting addrs to point to
+-- payloads in Ptr/Byte arrays.  Then, generate the marshalling
 -- (machine) code for the ccall, and create bytecodes to call that and
 -- then return in the right way.  
 
