@@ -641,7 +641,9 @@ documentation that comes with the <Literal>fptools</Literal> projects:
 <IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm>
 <ListItem>
 <Para>
-All our documentation is written in SGML, using the DocBook DTD. Instructions on installing and configuring the DocBook tools are in the installation guide (<XRef LinkEnd="building-docs">).
+All our documentation is written in SGML, using the DocBook DTD.
+Instructions on installing and configuring the DocBook tools are in the
+installation guide (in the GHC user guide).
 </Para>
 
 </ListItem></VarListEntry>
