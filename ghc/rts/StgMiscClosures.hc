@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.26 1999/07/06 16:40:27 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.27 1999/08/25 16:11:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,7 +22,7 @@
 /* ToDo: make the printing of panics more Win32-friendly, i.e.,
  *       pop up some lovely message boxes (as well).
  */
-#define DUMP_ERRMSG(msg) STGCALL1(fflush,stdout); STGCALL2(fprintf,stderr,msg)
+#define DUMP_ERRMSG(msg) STGCALL2(fprintf,stderr,msg)
 
 /* -----------------------------------------------------------------------------
    Entry code for an indirection.
@@ -190,7 +190,8 @@ STGFUN(BLACKHOLE_entry)
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
-    CurrentTSO->blocked_on = R1.cl;
+    CurrentTSO->why_blocked = BlockedOnBlackHole;
+    CurrentTSO->block_info.closure = R1.cl;
     recordMutable((StgMutClosure *)R1.cl);
 
     /* stg_gen_block is too heavyweight, use a specialised one */
@@ -205,7 +206,8 @@ STGFUN(BLACKHOLE_BQ_entry)
     TICK_ENT_BH();
 
     /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->blocked_on = R1.cl;
+    CurrentTSO->why_blocked = BlockedOnBlackHole;
+    CurrentTSO->block_info.closure = R1.cl;
     CurrentTSO->link = ((StgBlockingQueue *)R1.p)->blocking_queue;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
 
@@ -219,18 +221,7 @@ INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,0,0);
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
-    TICK_ENT_BH();
-
-    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
-    ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
-    /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
-    ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
-    CurrentTSO->blocked_on = R1.cl;
-    recordMutable((StgMutClosure *)R1.cl);
-
-    /* stg_gen_block is too heavyweight, use a specialised one */
-    BLOCK_NP(1);
+    JMP_(BLACKHOLE_entry);
   FE_
 }
 
@@ -239,10 +230,8 @@ INFO_TABLE(SE_BLACKHOLE_info, SE_BLACKHOLE_entry,0,2,SE_BLACKHOLE,,EF_,0,0);
 STGFUN(SE_BLACKHOLE_entry)
 {
   FB_
-    STGCALL1(fflush,stdout);						
     STGCALL3(fprintf,stderr,"SE_BLACKHOLE at %p entered!\n",R1.p);
-    STGCALL1(raiseError, errorHandler);
-    stg_exit(EXIT_FAILURE); /* not executed */
+    STGCALL1(shutdownHaskellAndExit,EXIT_FAILURE);
   FE_
 }
 
@@ -250,10 +239,8 @@ INFO_TABLE(SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,E
 STGFUN(SE_CAF_BLACKHOLE_entry)
 {
   FB_
-    STGCALL1(fflush,stdout);						
     STGCALL3(fprintf,stderr,"SE_CAF_BLACKHOLE at %p entered!\n",R1.p);
-    STGCALL1(raiseError, errorHandler);
-    stg_exit(EXIT_FAILURE); /* not executed */
+    STGCALL1(shutdownHaskellAndExit,EXIT_FAILURE);
   FE_
 }
 #endif
@@ -280,8 +267,7 @@ STGFUN(type##_entry)							\
 {									\
   FB_									\
     DUMP_ERRMSG(#type " object entered!\n");                            \
-    STGCALL1(raiseError, errorHandler);					\
-    stg_exit(EXIT_FAILURE); /* not executed */				\
+    STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);			\
   FE_									\
 }
 
@@ -425,8 +411,7 @@ STGFUN(stg_error_entry)							\
 {									\
   FB_									\
     DUMP_ERRMSG("fatal: stg_error_entry");                              \
-    STGCALL1(raiseError, errorHandler);					\
-    exit(EXIT_FAILURE); /* not executed */				\
+    STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);			\
   FE_									\
 }
 

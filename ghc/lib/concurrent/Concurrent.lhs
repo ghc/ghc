@@ -31,7 +31,9 @@ module Concurrent (
 	, fork  	-- :: a -> b -> b
 	, yield         -- :: IO ()
 
-	{-threadDelay, threadWaitRead, threadWaitWrite,-}
+	, threadDelay		-- :: Int -> IO ()
+	, threadWaitRead	-- :: Int -> IO ()
+	, threadWaitWrite	-- :: Int -> IO ()
 
 	-- MVars
 	, MVar		-- abstract
@@ -54,7 +56,8 @@ import Channel
 import Semaphore
 import SampleVar
 import PrelConc
-import PrelHandle       ( topHandler )
+import PrelHandle       ( topHandler, threadDelay, 
+			  threadWaitRead, threadWaitWrite )
 import PrelException
 import PrelIOBase	( IO(..) )
 import IO

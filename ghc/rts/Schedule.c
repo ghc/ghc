@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.23 1999/08/25 10:23:53 simonmar Exp $
+ * $Id: Schedule.c,v 1.24 1999/08/25 16:11:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -127,7 +127,7 @@ initThread(StgTSO *tso, nat stack_size)
   SET_INFO(tso,&TSO_info);
   tso->whatNext     = ThreadEnterGHC;
   tso->id           = next_thread_id++;
-  tso->blocked_on   = NULL;
+  tso->why_blocked  = NotBlocked;
 
   tso->splim        = (P_)&(tso->stack) + RESERVED_STACK_WORDS;
   tso->stack_size   = stack_size;
@@ -260,7 +260,7 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     /* If we have more threads on the run queue, set up a context
      * switch at some point in the future.
      */
-    if (run_queue_hd != END_TSO_QUEUE) {
+    if (run_queue_hd != END_TSO_QUEUE || blocked_queue_hd != END_TSO_QUEUE) {
       context_switch = 1;
     } else {
       context_switch = 0;
@@ -392,7 +392,10 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
       break;
 
     case ThreadBlocked:
-      IF_DEBUG(scheduler,belch("Thread %ld stopped, blocking\n", t->id));
+      IF_DEBUG(scheduler,
+	       fprintf(stderr, "Thread %d stopped, ", t->id);
+	       printThreadBlockage(t);
+	       fprintf(stderr, "\n"));
       threadPaused(t);
       /* assume the thread has put itself on some blocked queue
        * somewhere.
@@ -438,6 +441,14 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     }
 
   next_thread:
+    /* Checked whether any waiting threads need to be woken up.
+     * If the run queue is empty, we can wait indefinitely for
+     * something to happen.
+     */
+    if (blocked_queue_hd != END_TSO_QUEUE) {
+      awaitEvent(run_queue_hd == END_TSO_QUEUE);
+    }
+
     t = run_queue_hd;
     if (t != END_TSO_QUEUE) {
       run_queue_hd = t->link;
@@ -448,12 +459,42 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     }
   }
 
-  if (blocked_queue_hd != END_TSO_QUEUE) {
-    return AllBlocked;
-  } else {
-    return Deadlock;
+  /* If we got to here, then we ran out of threads to run, but the
+   * main thread hasn't finished yet.  It must be blocked on an MVar
+   * or a black hole somewhere, so we return deadlock.
+   */
+  return Deadlock;
+}
+
+/* -----------------------------------------------------------------------------
+   Debugging: why is a thread blocked
+   -------------------------------------------------------------------------- */
+
+#ifdef DEBUG
+void printThreadBlockage(StgTSO *tso)
+{
+  switch (tso->why_blocked) {
+  case BlockedOnRead:
+    fprintf(stderr,"blocked on read from fd %d", tso->block_info.fd);
+    break;
+  case BlockedOnWrite:
+    fprintf(stderr,"blocked on write to fd %d", tso->block_info.fd);
+    break;
+  case BlockedOnDelay:
+    fprintf(stderr,"blocked on delay of %d ms", tso->block_info.delay);
+    break;
+  case BlockedOnMVar:
+    fprintf(stderr,"blocked on an MVar");
+    break;
+  case BlockedOnBlackHole:
+    fprintf(stderr,"blocked on a black hole");
+    break;
+  case NotBlocked:
+    fprintf(stderr,"not blocked");
+    break;
   }
 }
+#endif
 
 /* -----------------------------------------------------------------------------
    Where are the roots that we know about?
@@ -588,7 +629,7 @@ threadStackOverflow(StgTSO *tso)
   tso->whatNext = ThreadKilled;
   tso->sp = (P_)&(tso->stack[tso->stack_size]);
   tso->su = (StgUpdateFrame *)tso->sp;
-  tso->blocked_on = NULL;
+  tso->why_blocked = NotBlocked;
   dest->mut_link = NULL;
 
   IF_DEBUG(sanity,checkTSO(tso));
@@ -602,21 +643,26 @@ threadStackOverflow(StgTSO *tso)
 }
 
 /* -----------------------------------------------------------------------------
-   Wake up a queue that was blocked on some resource (usually a
-   computation in progress).
+   Wake up a queue that was blocked on some resource.
    -------------------------------------------------------------------------- */
 
-void awaken_blocked_queue(StgTSO *q)
+StgTSO *unblockOne(StgTSO *tso)
 {
-  StgTSO *tso;
+  StgTSO *next;
 
-  while (q != END_TSO_QUEUE) {
-    ASSERT(get_itbl(q)->type == TSO);
-    tso = q;
-    q = tso->link;
-    PUSH_ON_RUN_QUEUE(tso);
-    tso->blocked_on = NULL;
-    IF_DEBUG(scheduler,belch("Waking up thread %ld", tso->id));
+  ASSERT(get_itbl(tso)->type == TSO);
+  ASSERT(tso->why_blocked != NotBlocked);
+  tso->why_blocked = NotBlocked;
+  next = tso->link;
+  PUSH_ON_RUN_QUEUE(tso);
+  IF_DEBUG(scheduler,belch("Waking up thread %ld", tso->id));
+  return next;
+}
+
+void awakenBlockedQueue(StgTSO *tso)
+{
+  while (tso != END_TSO_QUEUE) {
+    tso = unblockOne(tso);
   }
 }
 
@@ -644,16 +690,16 @@ unblockThread(StgTSO *tso)
 {
   StgTSO *t, **last;
 
-  if (tso->blocked_on == NULL) {
+  switch (tso->why_blocked) {
+
+  case NotBlocked:
     return;  /* not blocked */
-  }
 
-  switch (get_itbl(tso->blocked_on)->type) {
-
-  case MVAR:
+  case BlockedOnMVar:
+    ASSERT(get_itbl(tso->block_info.closure)->type == MVAR);
     {
       StgTSO *last_tso = END_TSO_QUEUE;
-      StgMVar *mvar = (StgMVar *)(tso->blocked_on);
+      StgMVar *mvar = (StgMVar *)(tso->block_info.closure);
 
       last = &mvar->head;
       for (t = mvar->head; t != END_TSO_QUEUE; 
@@ -669,9 +715,10 @@ unblockThread(StgTSO *tso)
       barf("unblockThread (MVAR): TSO not found");
     }
 
-  case BLACKHOLE_BQ:
+  case BlockedOnBlackHole:
+    ASSERT(get_itbl(tso->block_info.closure)->type == BLACKHOLE_BQ);
     {
-      StgBlockingQueue *bq = (StgBlockingQueue *)(tso->blocked_on);
+      StgBlockingQueue *bq = (StgBlockingQueue *)(tso->block_info.closure);
 
       last = &bq->blocking_queue;
       for (t = bq->blocking_queue; t != END_TSO_QUEUE; 
@@ -684,13 +731,20 @@ unblockThread(StgTSO *tso)
       barf("unblockThread (BLACKHOLE): TSO not found");
     }
 
+  case BlockedOnRead:
+  case BlockedOnWrite:
+  case BlockedOnDelay:
+    /* ToDo */
+    barf("unblockThread {read,write,delay}");
+
   default:
     barf("unblockThread");
   }
 
  done:
   tso->link = END_TSO_QUEUE;
-  tso->blocked_on = NULL;
+  tso->why_blocked = NotBlocked;
+  tso->block_info.closure = NULL;
   PUSH_ON_RUN_QUEUE(tso);
 }
 

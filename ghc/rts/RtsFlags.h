@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.14 1999/06/25 09:18:49 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.15 1999/08/25 16:11:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -85,6 +85,7 @@ struct COST_CENTRE_FLAGS {
 #ifdef PROFILING
 struct PROFILING_FLAGS {
     unsigned int	doHeapProfile;
+
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
 # define HEAP_BY_CC		1
 # define HEAP_BY_MOD		2
@@ -118,7 +119,6 @@ struct PROFILING_FLAGS {
 
 struct CONCURRENT_FLAGS {
     int	    ctxtSwitchTime; /* in milliseconds */
-    int	    maxThreads;
 };
 
 #ifdef PAR

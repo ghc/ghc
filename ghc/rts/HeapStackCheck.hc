@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.8 1999/05/24 10:58:09 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.9 1999/08/25 16:11:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -295,6 +295,10 @@ EXTFUN(stg_gc_seq_1)
 
 /*-- No regsiters live (probably a void return) ----------------------------- */
 
+/* If we change the policy for thread startup to *not* remove the
+ * return address from the stack, we can get rid of this little
+ * function/info table...  
+ */
 INFO_TABLE_SRT_BITMAP(stg_gc_noregs_ret_info, stg_gc_noregs_ret, 0/*BITMAP*/, 
 		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
 		      RET_SMALL,, EF_, 0, 0);
@@ -823,22 +827,11 @@ FN_(stg_gen_yield)
   FE_
 }
 
-INFO_TABLE_SRT_BITMAP(stg_yield_noregs_info, stg_yield_noregs_ret, 0/*BITMAP*/, 
-		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
-		      RET_SMALL,, EF_, 0, 0);
-
-FN_(stg_yield_noregs_ret)
-{
-  FB_
-  JMP_(ENTRY_CODE(Sp[0]));
-  FE_
-}
-
 FN_(stg_yield_noregs)
 {
   FB_
   Sp--;
-  Sp[0] = (W_)&stg_yield_noregs_info;
+  Sp[0] = (W_)&stg_gc_noregs_ret_info;
   YIELD_GENERIC;
   FE_
 }
@@ -860,6 +853,15 @@ FN_(stg_gen_block)
   FB_
   SAVE_EVERYTHING;
   BLOCK_GENERIC
+  FE_
+}
+
+FN_(stg_block_noregs)
+{
+  FB_
+  Sp--;
+  Sp[0] = (W_)&stg_gc_noregs_ret_info;
+  BLOCK_GENERIC;
   FE_
 }
 

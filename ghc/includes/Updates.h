@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.11 1999/05/13 17:31:08 simonm Exp $
+ * $Id: Updates.h,v 1.12 1999/08/25 16:11:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -51,13 +51,13 @@
    Awaken any threads waiting on this computation
    -------------------------------------------------------------------------- */
 
-extern void awaken_blocked_queue(StgTSO *q);
+extern void awakenBlockedQueue(StgTSO *q);
 
 #define AWAKEN_BQ(closure)						\
      	if (closure->header.info == &BLACKHOLE_BQ_info) {		\
 		StgTSO *bq = ((StgBlockingQueue *)closure)->blocking_queue;\
 		if (bq != (StgTSO *)&END_TSO_QUEUE_closure) {		\
-			STGCALL1(awaken_blocked_queue, bq);		\
+			STGCALL1(awakenBlockedQueue, bq);		\
 		}							\
 	}
 

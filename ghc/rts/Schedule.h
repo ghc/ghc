@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.5 1999/03/16 13:20:17 simonm Exp $
+ * $Id: Schedule.h,v 1.6 1999/08/25 16:11:51 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -18,15 +18,23 @@ void    initScheduler(void);
  * Miscellany
  */
 
-void    awaken_blocked_queue(StgTSO *tso);
+void    awakenBlockedQueue(StgTSO *tso);
+StgTSO *unblockOne(StgTSO *tso);
 void    initThread(StgTSO *tso, nat stack_size);
 void    interruptStgRts(void);
 void    raiseAsync(StgTSO *tso, StgClosure *exception);
 
 extern  nat context_switch;
 
+void    awaitEvent(rtsBool wait);  /* In Select.c */
+extern  nat ticks_since_select;	   /* ditto */
+
 extern  StgTSO *run_queue_hd, *run_queue_tl;
 extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
+
+#ifdef DEBUG
+extern void printThreadBlockage(StgTSO *tso);
+#endif
 
 #ifdef COMPILING_RTS_MAIN
 extern DLLIMPORT StgTSO *MainTSO; /* temporary hack */
@@ -42,5 +50,13 @@ extern StgTSO *MainTSO; /* temporary hack */
       run_queue_tl->link = tso;			\
     }						\
     run_queue_tl = tso;
+
+#define PUSH_ON_BLOCKED_QUEUE(tso)		\
+    if (blocked_queue_hd == END_TSO_QUEUE) {    \
+      blocked_queue_hd = tso;			\
+    } else {					\
+      blocked_queue_tl->link = tso;		\
+    }						\
+    blocked_queue_tl = tso;
 
 #define END_CAF_LIST  stgCast(StgCAF*,(void*)&END_TSO_QUEUE_closure)

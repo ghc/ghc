@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.7 1999/06/29 13:04:40 panne Exp $
+ * $Id: Profiling.c,v 1.8 1999/08/25 16:11:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -45,7 +45,7 @@ rtsBool time_profiling = rtsFalse;
 
 /* figures for the profiling report.
  */
-static lnat total_alloc, total_ticks;
+static lnat total_alloc, total_prof_ticks;
 
 /* Globals for opening the profiling log file
  */
@@ -183,9 +183,7 @@ initProfiling (void)
     ccs = next;
   }
   
-  /* profiling is the only client of the VTALRM system at the moment,
-   * so just install the profiling tick handler. */
-  install_vtalrm_handler(handleProfTick);
+  /* Start ticking */
   startProfTimer();
 };
 
@@ -196,7 +194,7 @@ endProfiling ( void )
 }
 
 void
-heapCensus ( bdescr *bd UNUSED )
+heapCensus ( bdescr *bd STG_UNUSED )
 {
   /* nothing yet */
 }
@@ -512,7 +510,7 @@ report_ccs_profiling( void )
 
     stopProfTimer();
 
-    total_ticks = 0;
+    total_prof_ticks = 0;
     total_alloc = 0;
     count_ticks(CCS_MAIN);
     
@@ -535,8 +533,8 @@ report_ccs_profiling( void )
     fprintf(prof_file, "\n\n");
 
     fprintf(prof_file, "\ttotal time  = %11.2f secs   (%lu ticks @ %d ms)\n",
-	    total_ticks / (StgFloat) TICK_FREQUENCY, 
-	    total_ticks, TICK_MILLISECS);
+	    total_prof_ticks / (StgFloat) TICK_FREQUENCY, 
+	    total_prof_ticks, TICK_MILLISECS);
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
 	    ullong_format_string((ullong) total_alloc * sizeof(W_),
@@ -596,7 +594,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
 
     fprintf(prof_file, "%8ld  %4.1f  %4.1f %8ld %5ld",
 	    ccs->scc_count, 
-	    total_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_ticks * 100),
+	    total_prof_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_prof_ticks * 100),
 	    total_alloc == 0 ? 0.0 : (ccs->mem_alloc / (StgFloat) total_alloc * 100),
 	    ccs->sub_scc_count, ccs->sub_cafcc_count);
     
@@ -628,7 +626,7 @@ count_ticks(CostCentreStack *ccs)
   
   if (!ccs_to_ignore(ccs)) {
     total_alloc += ccs->mem_alloc;
-    total_ticks += ccs->time_ticks;
+    total_prof_ticks += ccs->time_ticks;
   }
   for (i = ccs->indexTable; i != NULL; i = i->next)
     count_ticks(i->ccs);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.7 1999/05/11 16:47:42 keithw Exp $
+ * $Id: TSO.h,v 1.8 1999/08/25 16:11:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,6 +70,29 @@ typedef enum {
   ThreadFinished
 } StgThreadReturnCode;
 
+/* 
+ * Threads may be blocked for several reasons.  A blocked thread will
+ * have the reason in the why_blocked field of the TSO, and some
+ * further info (such as the closure the thread is blocked on, or the
+ * file descriptor if the thread is waiting on I/O) in the block_info
+ * field.
+ */
+
+typedef enum {
+  NotBlocked,
+  BlockedOnMVar,
+  BlockedOnBlackHole,
+  BlockedOnRead,
+  BlockedOnWrite,
+  BlockedOnDelay
+} StgTSOBlockReason;
+
+typedef union {
+  StgClosure *closure;
+  int fd;
+  unsigned int delay;
+} StgTSOBlockInfo;
+
 /*
  * TSOs live on the heap, and therefore look just like heap objects.
  * Large TSOs will live in their own "block group" allocated by the
@@ -81,7 +104,8 @@ typedef struct StgTSO_ {
   struct StgTSO_*    link;
   StgMutClosure *    mut_link;	/* TSO's are mutable of course! */
   StgTSOWhatNext     whatNext;
-  StgClosure *       blocked_on;
+  StgTSOBlockReason  why_blocked;
+  StgTSOBlockInfo    block_info;
   StgThreadID        id;
   StgTSOTickyInfo    ticky; 
   StgTSOProfInfo     prof;

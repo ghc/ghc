@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.28 1999/07/14 13:42:28 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.29 1999/08/25 16:11:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -842,7 +842,8 @@ FN_(takeMVarzh_fast)
       mvar->tail->link = CurrentTSO;
     }
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
-    CurrentTSO->blocked_on = (StgClosure *)mvar;
+    CurrentTSO->why_blocked = BlockedOnMVar;
+    CurrentTSO->block_info.closure = (StgClosure *)mvar;
     mvar->tail = CurrentTSO;
 
     BLOCK(R1_PTR, takeMVarzh_fast);
@@ -860,7 +861,6 @@ FN_(takeMVarzh_fast)
 FN_(putMVarzh_fast)
 {
   StgMVar *mvar;
-  StgTSO *tso;
 
   FB_
   /* args: R1 = MVar, R2 = value */
@@ -874,15 +874,12 @@ FN_(putMVarzh_fast)
   SET_INFO(mvar,&FULL_MVAR_info);
   mvar->value = R2.cl;
 
-  /* wake up the first thread on the queue,
-   * it will continue with the takeMVar operation and mark the MVar
-   * empty again.
+  /* wake up the first thread on the queue, it will continue with the
+   * takeMVar operation and mark the MVar empty again.
    */
-  tso = mvar->head;
-  if (tso != (StgTSO *)&END_TSO_QUEUE_closure) {
-    PUSH_ON_RUN_QUEUE(tso);
-    mvar->head = tso->link;
-    tso->link = (StgTSO *)&END_TSO_QUEUE_closure;
+  if (mvar->head != (StgTSO *)&END_TSO_QUEUE_closure) {
+    ASSERT(mvar->head->why_blocked == BlockedOnMVar);
+    mvar->head = RET_STGCALL1(StgTSO *,unblockOne,mvar->head);
     if (mvar->head == (StgTSO *)&END_TSO_QUEUE_closure) {
       mvar->tail = (StgTSO *)&END_TSO_QUEUE_closure;
     }
@@ -922,6 +919,51 @@ FN_(makeStableNamezh_fast)
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(sn_obj);
+}
+
+/* -----------------------------------------------------------------------------
+   Thread I/O blocking primitives
+   -------------------------------------------------------------------------- */
+
+FN_(waitReadzh_fast)
+{
+  FB_
+    /* args: R1.i */
+    ASSERT(CurrentTSO->why_blocked == NotBlocked);
+    CurrentTSO->why_blocked = BlockedOnRead;
+    CurrentTSO->block_info.fd = R1.i;
+    PUSH_ON_BLOCKED_QUEUE(CurrentTSO);
+    JMP_(stg_block_noregs);
+  FE_
+}
+
+FN_(waitWritezh_fast)
+{
+  FB_
+    /* args: R1.i */
+    ASSERT(CurrentTSO->why_blocked == NotBlocked);
+    CurrentTSO->why_blocked = BlockedOnWrite;
+    CurrentTSO->block_info.fd = R1.i;
+    PUSH_ON_BLOCKED_QUEUE(CurrentTSO);
+    JMP_(stg_block_noregs);
+  FE_
+}
+
+FN_(delayzh_fast)
+{
+  FB_
+    /* args: R1.i */
+    ASSERT(CurrentTSO->why_blocked == NotBlocked);
+    CurrentTSO->why_blocked = BlockedOnDelay;
+
+    /* Add on ticks_since_select, since these will be subtracted at
+     * the next awaitEvent call.
+     */
+    CurrentTSO->block_info.delay = R1.i + ticks_since_select;
+
+    PUSH_ON_BLOCKED_QUEUE(CurrentTSO);
+    JMP_(stg_block_noregs);
+  FE_
 }
 
 #endif /* COMPILER */

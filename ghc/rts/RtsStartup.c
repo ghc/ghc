@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.17 1999/07/06 15:33:23 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.18 1999/08/25 16:11:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -15,6 +15,8 @@
 #include "StablePriv.h" /* initStablePtrTable */
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
+#include "Signals.h"
+#include "Itimer.h"
 #include "Weak.h"
 #include "Ticky.h"
 
@@ -110,15 +112,18 @@ startupHaskell(int argc, char *argv[])
     initProfiling();
 #endif
 
+    /* start the ticker */
+    install_vtalrm_handler();
+    initialize_virtual_timer(TICK_MILLISECS);
+
     /* Initialise the scheduler */
     initScheduler();
 
     /* Initialise the stats department */
     initStats();
 
-#if 0
+    /* Initialise the user signal handler set */
     initUserSignals();
-#endif
  
     /* When the RTS and Prelude live in separate DLLs,
        we need to patch up the char- and int-like tables
@@ -170,6 +175,9 @@ shutdownHaskell(void)
 
   /* clean up things from the storage manager's point of view */
   exitStorage();
+
+  /* stop the ticker */
+  initialize_virtual_timer(0);
 
 #if defined(PROFILING) || defined(DEBUG)
   endProfiling();

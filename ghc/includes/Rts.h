@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.6 1999/02/05 16:02:27 simonm Exp $
+ * $Id: Rts.h,v 1.7 1999/08/25 16:11:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -84,7 +84,5 @@ typedef enum {
 
 #define stg_min(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _a : _b; })
 #define stg_max(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _b : _a; })
-
-#define UNUSED __attribute__((unused))
 
 #endif RTS_H

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Proftimer.c,v 1.4 1999/08/04 17:03:41 panne Exp $
+ * $Id: Proftimer.c,v 1.5 1999/08/25 16:11:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,8 +16,6 @@
 #include "Itimer.h"
 #include "Proftimer.h"
 
-lnat total_ticks = 0;
-
 nat current_interval = 1;               /* Current interval number -- 
 					   stored in AGE */
 
@@ -27,20 +25,10 @@ nat previous_ticks = 0;                 /* ticks in previous intervals */
 nat current_ticks = 0;                  /* ticks in current interval */
 
 void
-initProfTimer(nat ms)
-{
-  if (initialize_virtual_timer(ms)) {
-    fflush(stdout);
-    fprintf(stderr, "Can't initialize virtual timer.\n");
-    stg_exit(EXIT_FAILURE);
-  }
-};
-
-void
 stopProfTimer(void)
 {				/* Stops time profile */
   if (time_profiling) {
-    initProfTimer(0);
+    do_prof_ticks = rtsFalse;
   }
 };
 
@@ -48,19 +36,8 @@ void
 startProfTimer(void)
 {				/* Starts time profile */
   if (time_profiling) {
-    initProfTimer(TICK_MILLISECS);
+    do_prof_ticks = rtsTrue;
   }
-};
-
-/* For a small collection of signal handler prototypes, see
-   http://web2.airmail.net/sjbaker1/software/signal_collection.html */
-
-void
-handleProfTick(int unused)
-{
-  (void)unused;   /* no warnings, please */
-  CCS_TICK(CCCS);
-  total_ticks++;
 };
 
 #endif /* PROFILING */

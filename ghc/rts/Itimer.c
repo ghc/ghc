@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.4 1999/03/03 19:00:07 sof Exp $
+ * $Id: Itimer.c,v 1.5 1999/08/25 16:11:48 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -24,6 +24,7 @@
 
 #include "Rts.h"
 #include "Itimer.h"
+#include "Schedule.h"
 
 /* As recommended in the autoconf manual */
 # ifdef TIME_WITH_SYS_TIME
@@ -41,6 +42,34 @@
 # include <windows.h>
 #endif
  
+lnat total_ticks = 0;
+rtsBool do_prof_ticks = rtsFalse;
+
+static void handle_tick(int unused STG_UNUSED);
+
+/* -----------------------------------------------------------------------------
+   Tick handler
+
+   We use the ticker for two things: supporting threadDelay, and time
+   profiling.
+   -------------------------------------------------------------------------- */
+
+static void
+handle_tick(int unused STG_UNUSED)
+{
+  total_ticks++;
+
+#ifdef PROFILING
+  if (do_prof_ticks = rtsTrue) {
+    CCS_TICK(CCCS);
+  }
+#endif
+
+  /* For threadDelay etc., see Select.c */
+  ticks_since_select++;
+}
+
+
 /*
  * Handling timer events under cygwin32 is not done with signal/setitimer.
  * Instead of the two steps of first registering a signal handler to handle
@@ -132,19 +161,19 @@ initialize_virtual_timer(nat ms)
 
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 int
-install_vtalrm_handler(void (*handler)(int))
+install_vtalrm_handler(void)
 {
-  vtalrm_cback = handler;
+  vtalrm_cback = handle_tick;
   return 0;
 }
 
 #else
 int
-install_vtalrm_handler(void (*handler)(int))
+install_vtalrm_handler(void)
 {
     struct sigaction action;
 
-    action.sa_handler = handler;
+    action.sa_handler = handle_tick;
 
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;

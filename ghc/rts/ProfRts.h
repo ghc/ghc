@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfRts.h,v 1.3 1999/02/05 16:02:47 simonm Exp $
+ * $Id: ProfRts.h,v 1.4 1999/08/25 16:11:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,9 +22,6 @@ void PrintNewStackDecls ( void );
 void print_ccs (FILE *, CostCentreStack *);
 
 void report_ccs_profiling( void );
-
-# define TICK_FREQUENCY   50                      /* ticks per second */
-# define TICK_MILLISECS   (1000/TICK_FREQUENCY)   /* ms per tick */
 
 # define DEFAULT_INTERVAL TICK_FREQUENCY
 

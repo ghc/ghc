@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.60 1999/06/29 13:04:38 panne Exp $
+ * $Id: GC.c,v 1.61 1999/08/25 16:11:46 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1842,8 +1842,9 @@ scavenge(step *step)
 	evac_gen = 0;
 	/* chase the link field for any TSOs on the same queue */
 	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
-	if (tso->blocked_on) {
-	  tso->blocked_on = evacuate(tso->blocked_on);
+	if (   tso->why_blocked == BlockedOnMVar
+	    || tso->why_blocked == BlockedOnBlackHole) {
+	  tso->block_info.closure = evacuate(tso->block_info.closure);
 	}
 	/* scavenge this thread's stack */
 	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
@@ -2195,8 +2196,9 @@ scavenge_mutable_list(generation *gen)
 	StgTSO *tso = (StgTSO *)p;
 
 	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
-	if (tso->blocked_on) {
-	  tso->blocked_on = evacuate(tso->blocked_on);
+	if (   tso->why_blocked == BlockedOnMVar
+	    || tso->why_blocked == BlockedOnBlackHole) {
+	  tso->block_info.closure = evacuate(tso->block_info.closure);
 	}
 	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
 
@@ -2571,8 +2573,9 @@ scavenge_large(step *step)
 	tso = (StgTSO *)p;
 	/* chase the link field for any TSOs on the same queue */
 	(StgClosure *)tso->link = evacuate((StgClosure *)tso->link);
-	if (tso->blocked_on) {
-	  tso->blocked_on = evacuate(tso->blocked_on);
+	if (   tso->why_blocked == BlockedOnMVar
+	    || tso->why_blocked == BlockedOnBlackHole) {
+	  tso->block_info.closure = evacuate(tso->block_info.closure);
 	}
 	/* scavenge this thread's stack */
 	scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));

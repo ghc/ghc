@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.8 1999/03/17 13:19:23 simonm Exp $
+ * $Id: RtsUtils.c,v 1.9 1999/08/25 16:11:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,7 +27,7 @@ void barf(char *s, ...)
 {
   va_list ap;
   va_start(ap,s);
-  fflush(stdout);
+  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   if (prog_argv != NULL && prog_argv[0] != NULL) {
     fprintf(stderr, "%s: fatal error: ", prog_argv[0]);
   } else {
@@ -43,7 +43,7 @@ void belch(char *s, ...)
 {
   va_list ap;
   va_start(ap,s);
-  fflush(stdout);
+  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
 }
@@ -56,7 +56,7 @@ stgMallocBytes (int n, char *msg)
     char *space;
 
     if ((space = (char *) malloc((size_t) n)) == NULL) {
-	fflush(stdout);
+      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
 	MallocFailHook((W_) n, msg); /*msg*/
 	stg_exit(EXIT_FAILURE);
     }
@@ -69,7 +69,7 @@ stgReallocBytes (void *p, int n, char *msg)
     char *space;
 
     if ((space = (char *) realloc(p, (size_t) n)) == NULL) {
-	fflush(stdout);
+      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
 	MallocFailHook((W_) n, msg); /*msg*/
 	exit(EXIT_FAILURE);
     }
@@ -91,18 +91,9 @@ stgReallocWords (void *p, int n, char *msg)
 void 
 _stgAssert (char *filename, nat linenum)
 {
-  fflush(stdout);
+  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   fprintf(stderr, "ASSERTION FAILED: file %s, line %u\n", filename, linenum);
   abort();
-}
-
-StgStablePtr errorHandler = -1; /* -1 indicates no handler installed */
-
-void
-raiseError( StgStablePtr handler STG_UNUSED )
-{
-  shutdownHaskell();
-  stg_exit(EXIT_FAILURE);
 }
 
 /* -----------------------------------------------------------------------------
@@ -114,25 +105,25 @@ raiseError( StgStablePtr handler STG_UNUSED )
 void
 stackOverflow(void)
 {
-    StackOverflowHook(RtsFlags.GcFlags.maxStkSize * sizeof(W_));
+  StackOverflowHook(RtsFlags.GcFlags.maxStkSize * sizeof(W_));
 
 #if defined(TICKY_TICKY)
-    if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
+  if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 }
 
 void
 heapOverflow(void)
 {
-    fflush(stdout);
-    OutOfHeapHook(0/*unknown request size*/, 
-		  RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
-
+  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+  OutOfHeapHook(0/*unknown request size*/, 
+		RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
+  
 #if defined(TICKY_TICKY)
-    if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
+  if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
-    stg_exit(EXIT_FAILURE);
+  stg_exit(EXIT_FAILURE);
 }
 
 /* -----------------------------------------------------------------------------

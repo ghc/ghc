@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.36 1999/08/25 10:23:51 simonmar Exp $
+ * $Id: PrimOps.h,v 1.37 1999/08/25 16:11:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -663,7 +663,9 @@ EF_(putMVarzh_fast);
    Delay/Wait PrimOps
    -------------------------------------------------------------------------- */
 
-/* Hmm, I'll think about these later. */
+EF_(waitReadzh_fast);
+EF_(waitWritezh_fast);
+EF_(delayzh_fast);
 
 /* -----------------------------------------------------------------------------
    Primitive I/O, error-handling PrimOps

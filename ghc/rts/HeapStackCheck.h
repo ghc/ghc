@@ -1,3 +1,12 @@
+/* -----------------------------------------------------------------------------
+ * $Id: HeapStackCheck.h,v 1.4 1999/08/25 16:11:48 simonmar Exp $
+ *
+ * (c) The GHC Team, 1998-1999
+ *
+ * Prototypes for functions in HeapStackCheck.hc
+ *
+ * ---------------------------------------------------------------------------*/
+
 EXTFUN(stg_gc_entertop);
 EXTFUN(stg_gc_enter_1);
 EXTFUN(stg_gc_enter_2);
@@ -38,4 +47,5 @@ EXTFUN(stg_gen_yield);
 EXTFUN(stg_yield_noregs);
 EXTFUN(stg_yield_to_Hugs);
 EXTFUN(stg_gen_block);
+EXTFUN(stg_block_noregs);
 EXTFUN(stg_block_1);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.14 1999/05/20 10:23:42 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.15 1999/08/25 16:11:50 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -97,23 +97,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.doHeapProfile = rtsFalse;
 #endif
 
-/* there really shouldn't be a threads limit for concurrent mandatory threads.
-   For now, unlimitied means less than 64k (there's a storage overhead) -- SOF
-*/
-#if defined(CONCURRENT) && !defined(GRAN)
     RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
-    RtsFlags.ConcFlags.maxThreads	= 65536;
-    RtsFlags.ConcFlags.stkChunkSize	= 1024;
-    RtsFlags.ConcFlags.maxLocalSparks	= 65536;
-#endif /* CONCURRENT only */
-
-#if GRAN
-    RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
-    RtsFlags.ConcFlags.maxThreads	= 32;
-    RtsFlags.ConcFlags.stkChunkSize	= 1024;
-    RtsFlags.ConcFlags.maxLocalSparks	= 500;
-#endif /* GRAN */
-
 #ifdef PAR
     RtsFlags.ParFlags.parallelStats	= rtsFalse;
     RtsFlags.ParFlags.granSimStats	= rtsFalse;
@@ -279,16 +263,11 @@ usage_text[] = {
 "  -C<secs>  Context-switch interval in seconds",
 "                (0 or no argument means switch as often as possible)",
 "                the default is .01 sec; resolution is .01 sec",
-"  -e<size>        Size of spark pools (default 100)",
 # ifdef PAR
 "  -q        Enable activity profile (output files in ~/<program>*.gr)",
 "  -qb       Enable binary activity profile (output file /tmp/<program>.gb)",
 "  -Q<size>  Set pack-buffer size (default: 1024)",
-# else
-"  -q[v]     Enable quasi-parallel profile (output file <program>.qp)",
 # endif
-"  -t<num>   Set maximum number of advisory threads per PE (default 32)",
-"  -o<num>   Set stack chunk size (default 1024)",
 # ifdef PAR
 "  -d        Turn on PVM-ish debugging",
 "  -O        Disable output for performance measurement",
@@ -734,16 +713,6 @@ error = rtsTrue;
 		    RtsFlags.ConcFlags.ctxtSwitchTime = cst;
 		}
     	    	break;
-
-	      case 't':
-		if (rts_argv[arg][2] != '\0') {
-		    RtsFlags.ConcFlags.maxThreads
-		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
-		} else {
-    	    	    fprintf(stderr, "setupRtsFlags: missing size for -t\n");
-    	    	    error = rtsTrue;
-    	    	}
-		break;
 
 	      /* =========== PARALLEL =========================== */
 	      case 'e':
