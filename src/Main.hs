@@ -619,7 +619,7 @@ extractClassDecl c mdl tvs0 (HsTypeSig loc [n] ty doc)
 	_ -> 
 	  HsTypeSig loc [n] (HsForAllType Nothing ctxt ty) doc
  where
-  ctxt = [(Qual mdl c, map HsTyVar tvs0)]
+  ctxt = [HsAssump (Qual mdl c, map HsTyVar tvs0)]
 extractClassDecl _ _ _ d =
      error $ "Main.extractClassDecl: unexpected decl: " ++ show d
 

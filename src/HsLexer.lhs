@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.13 2003/08/18 10:04:47 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.14 2003/10/20 17:19:22 sof Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -26,6 +26,7 @@ import Char
 \begin{code}
 data Token 
         = VarId String
+	| IPVarId String
         | QVarId (String,String)
 	| ConId String
         | QConId (String,String)
@@ -186,6 +187,9 @@ isIdent  c = isAlpha c || isDigit c || c == '\'' || c == '_'
 isSymbol c = elem c ":!#$%&*+./<=>?@\\^|-~"
 isWhite  c = elem c " \n\r\t\v\f"
 
+isIdentInitial :: Char -> Bool
+isIdentInitial ch = isLower ch || ch == '_'
+
 tAB_LENGTH :: Int
 tAB_LENGTH = 8
 
@@ -307,6 +311,8 @@ lexToken cont s0 loc y x =
 						-- pop context on '}'
                                []       -> error "Internal error: empty context in lexToken"
 
+        '?':s:ss  
+	  | isIdentInitial s -> lexToken ( \ (VarId x) -> cont (IPVarId x)) (s:ss) loc y x
         '\'':s -> lexChar cont s loc y (x+1)
         '\"':s{-"-} -> lexString cont s loc y (x+1)
 
@@ -321,7 +327,7 @@ lexToken cont s0 loc y x =
 	   in
 	   afterNum cont i rest loc y (x+length num)
 
-        c:s | isLower c || c == '_' ->
+        c:s | isIdentInitial c ->
         	let 
         	    (idtail, rest) = slurpIdent s
         	    id0 = c:idtail
@@ -449,7 +455,7 @@ lexCon qual cont s0 loc y x =
   in
   case rest of
     '.':c1:s1 
-     | isLower c1 ->	-- qualified varid?
+     | isIdentInitial c1 ->	-- qualified varid?
 	let
 	    (idtail, rest1) = slurpIdent s1
 	    id0 = c1:idtail

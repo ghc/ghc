@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.18 2002/07/19 10:00:16 simonmar Exp $
+$Id: HsParser.ly,v 1.19 2003/10/20 17:19:23 sof Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -44,6 +44,7 @@ Conflicts: 3 shift/reduce
 
 > %token
 >	VARID 	 { VarId $$ }
+>       IPVARID  { IPVarId $$ }
 >	QVARID 	 { QVarId $$ }
 >	CONID	 { ConId $$ }
 >	QCONID   { QConId $$ }
@@ -407,8 +408,12 @@ Types
 >	| btype docprev			{ HsTyDoc $1 $2 }
 
 > type :: { HsType }
-> 	: btype '->' type		{ HsTyFun $1 $3 }
->	| btype				{ $1 }
+>       : ipvar '::' type1              { HsTyIP $1 $3 }
+>       | type1                         { $1 }
+
+> type1 :: { HsType }
+>       : btype				{ $1 }
+> 	| btype '->' type1		{ HsTyFun $1 $3 }
 
 > btype :: { HsType }
 >	: btype atype			{ HsTyApp $1 $2 }
@@ -450,7 +455,7 @@ C a, or (C1 a, C2 b, ... Cn z) and convert it into a context.  Blaach!
 >	| context '=>' doctype		{ mkHsForAllType Nothing $1 $3 }
 >	| doctype			{ $1 }
 
-> context :: { HsContext }
+> context :: { HsIPContext }
 > 	: btype				{% checkContext $1 }
 
 > types	:: { [HsType] }
@@ -480,11 +485,11 @@ Datatype declarations
 >	: srcloc maybe_docnext forall_stuff constr_stuff maybe_docprev
 >		{ HsConDecl $1 (fst $4) $3 [] (snd $4) ($2 `mplus` $5) }
 >	| srcloc maybe_docnext forall_stuff context '=>' constr_stuff maybe_docprev
->		{ HsConDecl $1 (fst $6) $3 $4 (snd $6) ($2 `mplus` $7) }
+>		{% checkIPContext $4 `thenP` \ ctxt -> returnP (HsConDecl $1 (fst $6) $3 ctxt (snd $6) ($2 `mplus` $7)) }
 > 	| srcloc maybe_docnext forall_stuff con '{' fielddecls '}' maybe_docprev
 > 		{ HsRecDecl $1 $4 $3 [] $6 ($2 `mplus` $8) }
 > 	| srcloc maybe_docnext forall_stuff context '=>' con '{' fielddecls '}' maybe_docprev
-> 		{ HsRecDecl $1 $6 $3 $4 $8 ($2 `mplus` $10) }
+> 		{% checkIPContext $4 `thenP` \ ctxt -> returnP (HsRecDecl $1 $6 $3 ctxt $8 ($2 `mplus` $10)) }
 
 > forall_stuff :: { [HsName] }
 > 	: 'forall' tyvars '.'		 	{ $2 }
@@ -562,6 +567,24 @@ Class declarations
 >	: 'where' decllist		{ $2 }
 >	| {- empty -}			{ [] }
 
+> dbinds :: { [HsDecl] }
+> 	 : dbinds ';' dbind		{ $3 : $1 }
+> 	 | dbinds ';'			{ $1 }
+> 	 | dbind			{ [$1] }
+> 
+> dbind	:: { HsDecl }
+> dbind	: ipvar '=' srcloc exp		{% checkValDef ($3, HsVar (UnQual $1), HsUnGuardedRhs $4, []) }
+
+> binds	::  { [HsDecl] }
+>	: decllist			{ $1 }
+>	| '{'            dbinds '}'	{ $2 }
+> 	|     layout_on  dbinds close	{ $2 }
+
+
+> wherebinds :: { [HsDecl] }
+>	: 'where' binds			{ $2 }
+>	| {- empty -}			{ [] }
+
 -----------------------------------------------------------------------------
 Instance declarations
 
@@ -580,14 +603,13 @@ Instance declarations
 Value definitions
 
 > valdef :: { HsDecl }
->	: exp0b srcloc rhs		{% checkValDef ($2, $1, $3, [])}
->	| exp0b srcloc rhs 'where' decllist
->					{% checkValDef ($2, $1, $3, $5)}
+>	: exp0b srcloc rhs 
+>					{% checkValDef ($2, $1, $3, [])}
 
 > rhs	:: { HsRhs }
->	: '=' exp			{% checkExpr $2 `thenP` \e ->
+>	: '=' exp wherebinds		{% checkExpr $2 `thenP` \e ->
 >					   returnP (HsUnGuardedRhs e) }
->	| gdrhs				{ HsGuardedRhss  (reverse $1) }
+>	| gdrhs	wherebinds		{ HsGuardedRhss  (reverse $1) }
 
 > gdrhs :: { [HsGuardedRhs] }
 >	: gdrhs gdrh			{ $2 : $1 }
@@ -628,7 +650,7 @@ the exp0 productions to distinguish these from the others (exp0a).
 > exp10a :: { HsExp }
 >	: '\\' aexps '->' exp		{% checkPatterns (reverse $2) `thenP` \ps ->
 >					   returnP (HsLambda ps $4) }
->  	| 'let' decllist 'in' exp	{ HsLet $2 $4 }
+>  	| 'let' binds 'in' exp	         { HsLet $2 $4 }
 >	| 'if' exp 'then' exp 'else' exp { HsIf $2 $4 $6 }
 
 > exp10b :: { HsExp }
@@ -667,7 +689,8 @@ different from specifying (exp0b qop).  The only consolation is that
 other implementations don't manage this either.
 
 > aexp1	:: { HsExp }
->	: qvar				{ HsVar $1 }
+>	: ipvar                         { HsIPVar (UnQual $1) }
+>       | qvar				{ HsVar $1 }
 >	| gcon				{ HsCon $1 }
 >  	| literal			{ $1 }
 >	| '(' exp ')'			{ HsParen $2 }
@@ -703,7 +726,7 @@ avoiding another shift/reduce-conflict.
 >	| exp ',' exp '..' 		{ HsEnumFromThen $1 $3 }
 >	| exp '..' exp	 		{ HsEnumFromTo $1 $3 }
 >	| exp ',' exp '..' exp		{ HsEnumFromThenTo $1 $3 $5 }
->	| exp '|' quals			{ HsListComp $1 (reverse $3) }
+>	| exp pquals			{ HsListComp $1 (reverse $2) }
 
 > lexps :: { [HsExp] }
 >	: lexps ',' exp 		{ $3 : $1 }
@@ -712,6 +735,16 @@ avoiding another shift/reduce-conflict.
 -----------------------------------------------------------------------------
 List comprehensions
 
+> pquals :: { [HsStmt] }
+>	 : pquals1			{ case $1 of
+> 					    [qs] -> qs
+> 					    qss  -> [HsParStmt (concat qss)]
+> 					}
+			
+> pquals1 :: { [[HsStmt]] }
+> 	: pquals1 '|' quals		{ $3 : $1 }
+> 	| '|' quals			{ [$2] }
+
 > quals :: { [HsStmt] }
 >	: quals ',' qual		{ $3 : $1 }
 >	| qual				{ [$1] }
@@ -719,7 +752,7 @@ List comprehensions
 > qual  :: { HsStmt }
 >	: pat '<-' exp			{ HsGenerator $1 $3 }
 >	| exp				{ HsQualifier $1 }
->  	| 'let' decllist		{ HsLetStmt $2 }
+>  	| 'let' binds   		{ HsLetStmt $2 }
 
 -----------------------------------------------------------------------------
 Case alternatives
@@ -734,9 +767,8 @@ Case alternatives
 >	| alt				{ [$1] }
 
 > alt :: { HsAlt }
->	: pat srcloc ralt		{ HsAlt $2 $1 $3 [] }
->	| pat srcloc ralt 'where' decllist
->				 	{ HsAlt $2 $1 $3 $5 }
+>	: pat srcloc ralt wherebinds
+>				 	{ HsAlt $2 $1 $3 $4 }
 
 > ralt :: { HsGuardedAlts }
 >	: '->' exp			{ HsUnGuardedAlt $2 }
@@ -802,6 +834,9 @@ Variables, Constructors and Operators.
 > con	:: { HsName }
 >	: conid			{ $1 }
 >	| '(' consym ')'        { $2 }
+
+> ipvar :: { HsName }
+>       : IPVARID               { HsVarName (HsIdent $1) }
 
 > qcon	:: { HsQName }
 >	: qconid		{ $1 }

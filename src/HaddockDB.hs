@@ -112,6 +112,7 @@ ppHsType (HsForAllType (Just tvs) context htype) =
      hsep (text "forall" : map ppHsName tvs ++ text "." : 
 	   ppHsContext context : text "=>" : [ppHsType htype])
 ppHsType (HsTyFun a b) = fsep [ppHsBType a, text "-&gt;", ppHsType b]
+ppHsType (HsTyIP n t)  = fsep [(char '?' <> ppHsName n), text "::", ppHsType t]
 ppHsType t = ppHsBType t
 
 ppHsBType (HsTyApp (HsTyCon (Qual (Module "Prelude") (HsTyClsName (HsSpecial "[]")))) b )

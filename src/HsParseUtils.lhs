@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsParseUtils.lhs,v 1.5 2002/07/24 09:42:18 simonmar Exp $
+-- $Id: HsParseUtils.lhs,v 1.6 2003/10/20 17:19:23 sof Exp $
 --
 -- (c) The GHC Team 1997-2000
 --
@@ -15,7 +15,8 @@ module HsParseUtils (
 	, splitTyConApp		-- HsType -> P (HsName,[HsType])
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
 	, checkPrec 		-- String -> P String
-	, checkContext		-- HsType -> P HsContext
+	, checkContext		-- HsType -> P HsIPContext
+	, checkIPContext        -- HsIPContext -> P HsContext
 	, checkAssertion	-- HsType -> P HsAsst
 	, checkInstHeader	-- HsType -> P (HsContext, HsAsst)
 	, checkClassHeader	-- HsType -> P (HsContext, HsName, [HsType])
@@ -36,6 +37,7 @@ import HsSyn
 import HsParseMonad
 
 import Char(isDigit,isOctDigit,isHexDigit,digitToInt)
+import List(partition)
 import Ratio
 \end{code}
 
@@ -57,13 +59,26 @@ splitTyConApp t0 = split t0 []
 -----------------------------------------------------------------------------
 -- Various Syntactic Checks
 
-checkContext :: HsType -> P HsContext
-checkContext (HsTyTuple True ts) = 
-     mapP checkAssertion ts `thenP` \cs ->
-     returnP cs
+checkContext :: HsType -> P HsIPContext
+checkContext (HsTyTuple True ts) = mapP checkCtxt ts
+  where
+   checkCtxt (HsTyIP n ty) = returnP (HsIP n ty)
+   checkCtxt t0 = 
+      checkAssertion t0 `thenP` \ c ->
+      returnP (HsAssump c)
+checkContext (HsTyIP n t) = returnP [HsIP n t]
 checkContext t = 
      checkAssertion t `thenP` \c ->
-     returnP [c]
+     returnP [HsAssump c]
+
+checkIPContext :: HsIPContext -> P HsContext
+checkIPContext ls = 
+  case partition isIP ls of
+   ([],cs) -> returnP (map (\ (HsAssump c) -> c) cs)
+   (_,_)   -> parseError "Unexpected implicit parameter in context"
+ where
+  isIP HsIP{} = True
+  isIP _      = False
 
 -- Changed for multi-parameter type classes
 
@@ -75,8 +90,9 @@ checkAssertion = checkAssertion' []
 
 checkInstHeader :: HsType -> P (HsContext, HsAsst)
 checkInstHeader (HsForAllType Nothing ctxt ty) =
-  checkAssertion ty `thenP` \asst ->
-  returnP (ctxt, asst)
+  checkAssertion ty   `thenP` \asst ->
+  checkIPContext ctxt `thenP` \ctxt' ->
+  returnP (ctxt', asst)
 checkInstHeader ty =
   checkAssertion ty `thenP` \asst ->
   returnP ([], asst)
@@ -84,7 +100,8 @@ checkInstHeader ty =
 checkDataHeader :: HsType -> P (HsContext,HsName,[HsName])
 checkDataHeader (HsForAllType Nothing cs t) =
 	checkSimple "data/newtype" t [] `thenP` \(c,ts) ->
-	returnP (cs,c,ts)
+        checkIPContext cs `thenP` \cs' ->
+	returnP (cs',c,ts)
 checkDataHeader ty =
 	checkSimple "data/newtype" ty [] `thenP` \(c,ts) ->
 	returnP ([],c,ts)
@@ -92,7 +109,8 @@ checkDataHeader ty =
 checkClassHeader :: HsType -> P (HsContext,HsName,[HsName])
 checkClassHeader (HsForAllType Nothing cs t) = 
 	checkSimple "class" t [] `thenP` \(c,ts) ->
-	returnP (cs,c,ts)
+        checkIPContext cs        `thenP` \cs' ->
+	returnP (cs',c,ts)
 checkClassHeader ty = 
 	checkSimple "class" ty [] `thenP` \(c,ts) ->
 	returnP ([],c,ts)
@@ -157,6 +175,7 @@ patFail = parseError "Parse error in pattern"
 checkExpr :: HsExp -> P HsExp
 checkExpr e0 = case e0 of
 	HsVar _			  -> returnP e0
+	HsIPVar _                 -> returnP e0
 	HsCon _			  -> returnP e0
 	HsLit _			  -> returnP e0
 	HsInfixApp e1 e2 e3	  -> check3Exprs e1 e2 e3 HsInfixApp
@@ -229,6 +248,7 @@ checkGAlt (HsGuardedAlt loc stmts0 e0) =
 
 checkStmt :: HsStmt -> P HsStmt
 checkStmt (HsGenerator p e) = check1Expr e (HsGenerator p)
+checkStmt (HsParStmt ss)    = mapP checkStmt ss `thenP` \ ss1 -> returnP (HsParStmt ss1)
 checkStmt (HsQualifier e)   = check1Expr e HsQualifier
 checkStmt s@(HsLetStmt _)   = returnP s
 

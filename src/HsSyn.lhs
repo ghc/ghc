@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.17 2003/05/06 10:04:47 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.18 2003/10/20 17:19:23 sof Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -14,7 +14,7 @@ module HsSyn (
     HsImportDecl(..), HsImportSpec(..), HsAssoc(..),
     HsDecl(..), HsMatch(..), HsConDecl(..), HsFieldDecl(..), 
     HsBangType(..), HsRhs(..),
-    HsGuardedRhs(..), HsType(..), HsContext, HsAsst,
+    HsGuardedRhs(..), HsType(..), HsContext, HsAsst, HsIPContext, HsCtxt(..),
     HsLiteral(..), HsExp(..), HsPat(..), HsPatField(..), HsStmt(..),
     HsFieldUpdate(..), HsAlt(..), HsGuardedAlts(..), HsGuardedAlt(..),
     HsCallConv(..), HsFISafety(..), HsFunDep,
@@ -194,18 +194,26 @@ data HsGuardedRhs
   deriving (Eq,Show)
 
 data HsType
-	 = HsForAllType (Maybe [HsName]) HsContext HsType
+	 = HsForAllType (Maybe [HsName]) HsIPContext HsType
 	 | HsTyFun   HsType HsType
 	 | HsTyTuple Bool{-boxed-} [HsType]
 	 | HsTyApp   HsType HsType
 	 | HsTyVar   HsName
 	 | HsTyCon   HsQName
 	 | HsTyDoc   HsType Doc
+	 | HsTyIP    HsName HsType
   deriving (Eq,Show)
 
-type HsFunDep  = ([HsName], [HsName])
-type HsContext = [HsAsst]
-type HsAsst    = (HsQName,[HsType])	-- for multi-parameter type classes
+type HsFunDep    = ([HsName], [HsName])
+type HsContext   = [HsAsst]
+type HsIPContext = [HsCtxt]
+
+data HsCtxt
+ = HsAssump HsAsst	-- for multi-parameter type classes
+ | HsIP     HsName HsType
+  deriving (Eq,Show)
+
+type HsAsst = (HsQName,[HsType])
 
 data HsLiteral
 	= HsInt		Integer
@@ -221,7 +229,8 @@ data HsLiteral
   deriving (Eq, Show)
 
 data HsExp
-	= HsVar HsQName
+	= HsIPVar HsQName
+	| HsVar HsQName
 	| HsCon HsQName
 	| HsLit HsLiteral
 	| HsInfixApp HsExp HsExp HsExp
@@ -274,6 +283,7 @@ data HsPatField
 
 data HsStmt
 	= HsGenerator HsPat HsExp
+	| HsParStmt [HsStmt]
 	| HsQualifier HsExp
 	| HsLetStmt [HsDecl]
  deriving (Eq,Show)
@@ -299,7 +309,7 @@ data HsGuardedAlt
 -- Smart constructors
 
 -- pinched from GHC
-mkHsForAllType :: Maybe [HsName] -> [HsAsst] -> HsType -> HsType
+mkHsForAllType :: Maybe [HsName] -> HsIPContext -> HsType -> HsType
 mkHsForAllType (Just []) [] ty = ty	-- Explicit for-all with no tyvars
 mkHsForAllType mtvs1     [] (HsForAllType mtvs2 ctxt ty)
  = mkHsForAllType (mtvs1 `plus` mtvs2) ctxt ty

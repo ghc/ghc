@@ -467,7 +467,7 @@ doDecl summary x d instances = do_decl d
 
 
 ppTypeSig :: Bool -> HsName -> HsType -> Html
-ppTypeSig summary nm ty = ppHsBinder summary nm <+> toHtml "::" <+> ppHsType ty
+ppTypeSig summary nm ty = ppHsBinder summary nm <+> dcolon <+> ppHsType ty
 
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
@@ -566,7 +566,7 @@ ppSideBySideConstr (HsRecDecl _ nm tvs ctxt fields doc) =
 ppSideBySideField :: HsFieldDecl -> HtmlTable
 ppSideBySideField (HsFieldDecl ns ty doc) =
   declBox (hsep (punctuate comma (map (ppHsBinder False) ns))
-	   <+> toHtml "::" <+> ppHsBangType ty) <->
+	   <+> dcolon <+> ppHsBangType ty) <->
   maybeRDocBox doc
 
 {-
@@ -600,14 +600,14 @@ ppShortField :: Bool -> HsFieldDecl -> HtmlTable
 ppShortField summary (HsFieldDecl ns ty _doc) 
   = tda [theclass "recfield"] << (
 	  hsep (punctuate comma (map (ppHsBinder summary) ns))
-	    <+> toHtml "::" <+> ppHsBangType ty
+	    <+> dcolon <+> ppHsBangType ty
    )
 
 {-
 ppFullField :: HsFieldDecl -> Html
 ppFullField (HsFieldDecl [n] ty doc) 
   = declWithDoc False doc (
-	ppHsBinder False n <+> toHtml "::" <+> ppHsBangType ty
+	ppHsBinder False n <+> dcolon <+> ppHsBangType ty
     )
 ppFullField _ = error "ppFullField"
 
@@ -737,11 +737,11 @@ ppFunSig summary nm ty0 doc
 	  = (declBox (
 		leader <+> 
 		hsep (keyword "forall" : map ppHsName tvs ++ [toHtml "."]) <+>
-		ppHsContext ctxt)
+		ppHsIPContext ctxt)
 	      <-> rdocBox noHtml) </> 
 	    do_args darrow ty
 	do_args leader (HsForAllType Nothing ctxt ty)
-	  = (declBox (leader <+> ppHsContext ctxt)
+	  = (declBox (leader <+> ppHsIPContext ctxt)
 		<-> rdocBox noHtml) </> 
 	    do_args darrow ty
 	do_args leader (HsTyFun (HsTyDoc ty doc0) r)
@@ -758,27 +758,37 @@ ppFunSig summary nm ty0 doc
 -- ----------------------------------------------------------------------------
 -- Types and contexts
 
-ppHsAsst	    :: HsAsst -> Html
-ppHsAsst (c,args)   =  ppHsQName c <+> hsep (map ppHsAType args)
+ppHsAsst	  :: HsAsst -> Html
+ppHsAsst (c,args) =  ppHsQName c <+> hsep (map ppHsAType args)
 
-ppHsContext	    :: HsContext -> Html
+ppHsContext	  :: HsContext -> Html
 ppHsContext []      =  empty
-ppHsContext [asst]  =  ppHsAsst asst
+ppHsContext [ctxt]  =  ppHsAsst ctxt
 ppHsContext context =  parenList (map ppHsAsst context)
 
-ppHsForAll :: Maybe [HsName] -> HsContext -> Html
+ppHsCtxt :: HsCtxt -> Html
+ppHsCtxt (HsAssump asst) = ppHsAsst asst
+ppHsCtxt (HsIP n t)      = toHtml "?" +++ ppHsName n <+> dcolon <+> ppHsType t
+
+ppHsIPContext	      :: HsIPContext -> Html
+ppHsIPContext []      =  empty
+ppHsIPContext [ctxt]  =  ppHsCtxt ctxt
+ppHsIPContext context =  parenList (map ppHsCtxt context)
+
+ppHsForAll :: Maybe [HsName] -> HsIPContext -> Html
 ppHsForAll Nothing context = 
-  hsep [ ppHsContext context, darrow ]
+  hsep [ ppHsIPContext context, darrow ]
 ppHsForAll (Just tvs) [] = 
   hsep (keyword "forall" : map ppHsName tvs ++ [toHtml "."])
 ppHsForAll (Just tvs) context =
   hsep (keyword "forall" : map ppHsName tvs ++ 
-	  [toHtml ".", ppHsContext context, darrow])
+	  [toHtml ".", ppHsIPContext context, darrow])
 
 ppHsType :: HsType -> Html
 ppHsType (HsForAllType maybe_tvs context htype) =
   ppHsForAll maybe_tvs context <+> ppHsType htype
 ppHsType (HsTyFun a b) = hsep [ppHsBType a, toHtml "->", ppHsType b]
+ppHsType (HsTyIP n t)  = toHtml "?" +++ ppHsName n <+> dcolon <+> ppHsType t
 ppHsType t = ppHsBType t
 
 ppHsBType :: HsType -> Html

@@ -151,6 +151,12 @@ renameBangTy (HsUnBangedTy ty) = HsUnBangedTy `liftM` renameType ty
 renameContext :: HsContext -> RnM HsContext
 renameContext = mapM renamePred
 
+renameIPContext :: HsIPContext -> RnM HsIPContext
+renameIPContext cs = mapM renameCtxt cs
+ where
+   renameCtxt (HsIP n t)   = liftM (HsIP n) (renameType t)
+   renameCtxt (HsAssump c) = liftM HsAssump (renamePred c)
+
 renamePred :: (HsQName,[HsType]) -> RnM (HsQName,[HsType])
 renamePred (c,tys0) = do
   tys <- mapM renameType tys0
@@ -158,13 +164,16 @@ renamePred (c,tys0) = do
 
 renameType :: HsType -> RnM HsType
 renameType (HsForAllType tvs ctx0 ty0) = do
-  ctx <- mapM renamePred ctx0
+  ctx <- renameIPContext ctx0
   ty <- renameType ty0
   return (HsForAllType tvs ctx ty)
 renameType (HsTyFun arg0 res0) = do
   arg <- renameType arg0
   res <- renameType res0
   return (HsTyFun arg res)
+renameType (HsTyIP n ty0) = do
+  ty <- renameType ty0
+  return (HsTyIP n ty0)
 renameType (HsTyTuple b tys0) = do
   tys <- mapM renameType tys0
   return (HsTyTuple b tys)
