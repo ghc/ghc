@@ -8,6 +8,7 @@ import GHC.Base
 import GHC.Float
 import Language.Haskell.THSyntax
 import Text.PrettyPrint
+import System.IO
 
 main :: IO ()
 main = do putStrLn $ show $ $( do e <- [| I# 20# |]
