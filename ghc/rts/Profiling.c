@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.10 1999/11/02 15:05:59 simonmar Exp $
+ * $Id: Profiling.c,v 1.11 1999/11/04 10:15:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -240,7 +240,7 @@ registerCostCentres ( void )
    */
   register_stack = (F_ *)allocate(REGISTER_STACK_SIZE / sizeof(W_));
 
-  StgRun((StgFunPtr)stg_register);
+  StgRun((StgFunPtr)stg_register, &MainRegTable);
 }
 
 
