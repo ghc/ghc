@@ -92,7 +92,7 @@ module TcType (
 
   isUnLiftedType,	-- Source types are always lifted
   isUnboxedTupleType,	-- Ditto
-  isPrimitiveType,
+  isPrimitiveType, isTyVarTy,
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
@@ -114,7 +114,7 @@ import Type		(	-- Re-exports
 			  Kind, Type, SourceType(..), PredType, ThetaType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
 			  mkForAllTy, mkForAllTys, defaultKind, isTypeKind, isAnyTypeKind,
-			  mkFunTy, mkFunTys, zipFunTys, 
+			  mkFunTy, mkFunTys, zipFunTys, isTyVarTy,
 			  mkTyConApp, mkGenTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
 			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys,
 			  isUnLiftedType, isUnboxedTupleType, isPrimitiveType,

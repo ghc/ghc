@@ -51,7 +51,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
-			  isUnLiftedType, isIPPred, isHoleTyVar,
+			  isUnLiftedType, isIPPred, isHoleTyVar, isTyVarTy,
 
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
@@ -910,7 +910,7 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
   = 	-- Class predicates are valid in all contexts
     mapTc_ check_arg_type tys		`thenTc_`
     checkTc (arity == n_tys) arity_err		`thenTc_`
-    checkTc (all tyvar_head tys || arby_preds_ok)
+    checkTc (check_class_pred_tys dflags ctxt tys)
 	    (predTyVarErr pred $$ how_to_allow)
 
   where
@@ -918,12 +918,6 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
     arity      = classArity cls
     n_tys      = length tys
     arity_err  = arityErr "Class" class_name arity n_tys
-
-    arby_preds_ok = case ctxt of
-			InstHeadCtxt  -> True	-- We check for instance-head formation
-						-- in checkValidInstHead
-			InstThetaCtxt -> dopt Opt_AllowUndecidableInstances dflags
-			other	      -> dopt Opt_GlasgowExts               dflags
 
     how_to_allow = case ctxt of
 		     InstHeadCtxt  -> empty	-- Should not happen
@@ -944,6 +938,17 @@ check_source_ty dflags TypeCtxt  (NType tc tys)   = mapTc_ check_arg_type tys
 
 -- Catch-all
 check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
+
+-------------------------
+check_class_pred_tys dflags ctxt tys 
+  = case ctxt of
+	InstHeadCtxt  -> True	-- We check for instance-head 
+				-- formation in checkValidInstHead
+	InstThetaCtxt -> undecidable_ok || all isTyVarTy tys
+	other	      -> gla_exts       || all tyvar_head tys
+  where
+    undecidable_ok = dopt Opt_AllowUndecidableInstances dflags 
+    gla_exts 	   = dopt Opt_GlasgowExts dflags
 
 -------------------------
 tyvar_head ty			-- Haskell 98 allows predicates of form 
