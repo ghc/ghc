@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.26 2002/01/08 16:38:27 sof Exp $
+ * $Id: MBlock.c,v 1.27 2002/03/26 23:56:45 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -48,7 +48,7 @@ getMBlock(void)
   return getMBlocks(1);
 }
 
-#ifndef _WIN32
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
 void *
 getMBlocks(nat n)
 {
@@ -95,7 +95,7 @@ getMBlocks(nat n)
   return ret;
 }
 
-#else /* _WIN32 */
+#else /* defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS) */
 
 /*
  On Win32 platforms we make use of the two-phased virtual memory API

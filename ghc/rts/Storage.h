@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.43 2002/03/26 10:43:15 simonmar Exp $
+ * $Id: Storage.h,v 1.44 2002/03/26 23:56:44 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -412,7 +412,7 @@ void printMutableList(generation *gen);
 
 
 #undef TEXT_BEFORE_HEAP
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
 #define TEXT_BEFORE_HEAP 1
 #endif
 
