@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.88 2001/08/15 15:39:59 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.89 2001/08/15 15:50:41 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -25,9 +25,11 @@ import DriverUtil
 import Linker
 import Finder		( flushPackageCache )
 import Util
-import Id		( isRecordSelector, isDataConWrapId, idName )
+import Id		( isRecordSelector, recordSelectorFieldLabel, 
+			  isDataConWrapId, idName )
 import Class		( className )
-import TyCon		( tyConName )
+import TyCon		( tyConName, tyConClass_maybe )
+import FieldLabel	( fieldLabelTyCon )
 import SrcLoc		( isGoodSrcLoc )
 import Name		( Name, isHomePackageName, nameSrcLoc )
 import Outputable
@@ -399,12 +401,16 @@ info s = do
     showTyThing (ATyCon ty)
        = hcat [ppr ty, text " is a type constructor", showSrcLoc (tyConName ty)]
     showTyThing (AnId   id)
-       = hcat [ppr id, text " is a ", text (idDescr id), showSrcLoc (idName id)]
+       = hcat [ppr id, text " is a ", idDescr id, showSrcLoc (idName id)]
 
     idDescr id
-       | isRecordSelector id  = "record selector"
-       | isDataConWrapId id   = "data constructor"
-       | otherwise            = "variable"
+       | isRecordSelector id = 
+		case tyConClass_maybe (fieldLabelTyCon (
+				recordSelectorFieldLabel id)) of
+			Nothing -> text "record selector"
+			Just c  -> text "method in class " <> ppr c
+       | isDataConWrapId id  = text "data constructor"
+       | otherwise           = text "variable"
 
 	-- also print out the source location for home things
     showSrcLoc name
