@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 1996/11/21 16:46:32 simonm Exp $
+# $Id: Makefile,v 1.3 1996/11/22 13:33:29 simonm Exp $
 
 TOP = ../..
 FlexSuffixRules = YES
@@ -194,6 +194,8 @@ utils/SST_flags 		= -fvia-C
 
 #-----------------------------------------------------------------------------
 # make depend, clean, tags and install
+
+depend :: $(LOOPS)
 
 MKDEPENDHSFLAGS = -f .depend -I../includes -x HsVersions.h
 ifeq ($(GhcWithDeforester),NO)
