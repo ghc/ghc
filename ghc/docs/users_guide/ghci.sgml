@@ -940,6 +940,7 @@ Prelude> :set -fno-glasgow-exts
 	  doesn't make a great deal of sense for an interpreter, but
 	  the rule was kept for compatibility with GHC.</para>
 	</listitem>
+      </varlistentry>
 
       <varlistentry>
 	<term><literal>System.exit</literal> causes GHCi to exit!</term>
