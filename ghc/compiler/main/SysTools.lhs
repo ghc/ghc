@@ -685,7 +685,7 @@ slash s1 s2 = s1 ++ ('/' : s2)
 getExecDir :: IO (Maybe String)
 getExecDir = do h <- getModuleHandle Nothing
 		n <- getModuleFileName h
-		return (Just (reverse (tail (dropWhile (not .isSlash) (reverse (unDosifyPath n))))))
+		return (Just (reverse (tail (dropWhile (not . isSlash) (reverse (unDosifyPath n))))))
 #else
 getExecDir :: IO (Maybe String) = do return Nothing
 #endif
