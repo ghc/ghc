@@ -281,7 +281,7 @@ sub init_TARGET_STUFF {
     $T_COPY_DIRVS   = '\.(globl)';
 
     $T_hsc_cc_PAT   = '\.byte.*\)(hsc|cc) (.*)"\n\t\.byte \d+\n\t\.byte "(.*)"\n\t\.byte \d+';
-    $T_DOT_WORD	    = '\.(long|short|byte)';
+    $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
     $T_DOT_GLOBAL   = '\.globl';
     $T_HDR_toc      = "\.toc\n";
     $T_HDR_literal  = "\t\.const_data\n\t\.align 2\n";
@@ -598,6 +598,26 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = '';
 
+	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.picsymbol_stub/ )
+	{
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
+	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.lazy_symbol_pointer/ )
+	{
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
+	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.non_lazy_symbol_pointer/ )
+	{
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
+	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.data/ && $chkcat[$i] == 'dyld')
+	{	# non_lazy_symbol_ptrs that point to local symbols
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
 	} else { # simple line (duplicated at the top)
 
 	    $chk[$i] .= $_;
@@ -605,11 +625,9 @@ sub mangle_asm {
     }
     $numchks = $#chk + 1;
 
-    open CHUNKS, ">/tmp/chunks1" or die "Cannot open /tmp/chunks1: $!\n";
-    for (my $i = 0; $i < @chk; ++$i) { print CHUNKS "======= $i =======\n", $chk[$i] }
-    close CHUNKS;
-
-	# ########
+    # open CHUNKS, ">/tmp/chunks1" or die "Cannot open /tmp/chunks1: $!\n";
+    # for (my $i = 0; $i < @chk; ++$i) { print CHUNKS "======= $i =======\n", $chk[$i] }
+    # close CHUNKS;
 
     # the division into chunks is imperfect;
     # we throw some things over the fence into the next
@@ -761,7 +779,7 @@ sub mangle_asm {
 
     	# toss all calls to __DISCARD__
 	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//go;
-# ###WTT###	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
+	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
 
 	# MIPS: that may leave some gratuitous asm macros around
 	# (no harm done; but we get rid of them to be tidier)
@@ -1116,6 +1134,12 @@ sub mangle_asm {
                 $j++;
  	    }
  	    
+ 	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && $chkcat[$i] eq 'dyld' ) {
+	    # powerpc-apple: dynamic linker stubs
+	    if($chk[$i] !~ /\.indirect_symbol ___DISCARD__/)
+	    {	# print them out unchanged, but remove the stubs for __DISCARD__
+		print OUTASM $chk[$i];
+	    }
 	} else {
 	    &tidy_up_and_die(1,"$Pgm: unknown chkcat (ghc-asm: $TargetPlatform)\n$chkcat[$i]\n$chk[$i]\n");
 	}
