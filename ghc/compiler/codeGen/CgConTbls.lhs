@@ -20,7 +20,7 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			)
 import CostCentre	( dontCareCCS )
 import FiniteMap	( fmToList, FiniteMap )
-import DataCon		( DataCon, dataConName, dataConRawArgTys )
+import DataCon		( DataCon, dataConName, dataConAllRawArgTys )
 import Const		( Con(..) )
 import Name		( getOccString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
@@ -161,7 +161,7 @@ genConInfo comp_info tycon data_con
 
     zero_arity_con   = all zero_size arg_tys
 
-    arg_tys	    = dataConRawArgTys 	   data_con
+    arg_tys	    = dataConAllRawArgTys  data_con
     entry_label     = mkConEntryLabel      con_name
     closure_label   = mkStaticClosureLabel con_name
     con_name	    = dataConName data_con
@@ -173,7 +173,7 @@ mkConCodeAndInfo :: DataCon		-- Data constructor
 
 mkConCodeAndInfo con
   = let
-	arg_tys = dataConRawArgTys con
+	arg_tys = dataConAllRawArgTys con
 
 	(closure_info, arg_things)
 		= layOutDynCon con typePrimRep arg_tys

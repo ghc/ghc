@@ -9,7 +9,8 @@ module DataCon (
 	ConTag, fIRST_TAG,
 	mkDataCon,
 	dataConType, dataConSig, dataConName, dataConTag,
-	dataConOrigArgTys, dataConArgTys, dataConRawArgTys, dataConTyCon,
+	dataConOrigArgTys, dataConArgTys, dataConTyCon,
+	dataConRawArgTys, dataConAllRawArgTys,
 	dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
 	dataConNumFields, dataConNumInstArgs, dataConId, dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
@@ -338,9 +339,6 @@ dataConFieldLabels = dcFields
 dataConStrictMarks :: DataCon -> [StrictnessMark]
 dataConStrictMarks = dcRealStricts
 
-dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
-dataConRawArgTys = dcRepArgTys
-
 dataConSourceArity :: DataCon -> Arity
 	-- Source-level arity of the data constructor
 dataConSourceArity dc = length (dcOrigArgTys dc)
@@ -381,6 +379,20 @@ dataConOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
  = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) 
        ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
+\end{code}
+
+These two functions get the real argument types of the constructor,
+without substituting for any type variables.  dataConAllRawArgTys is
+like dataConRawArgTys except that the existential dictionary arguments
+are included.
+
+\begin{code}
+dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
+dataConRawArgTys = dcRepArgTys
+
+dataConAllRawArgTys :: DataCon -> [TauType]
+dataConAllRawArgTys con = 
+  [mkDictTy cls tys | (cls,tys) <- dcExTheta con] ++ dcRepArgTys con
 \end{code}
 
 dataConNumFields gives the number of actual fields in the
