@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/10/15 22:35:04 $
+ * $Revision: 1.14 $
+ * $Date: 1999/10/19 23:51:57 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -1198,7 +1198,13 @@ if (numScripts==namesUpto) ppSmStack( "readscripts-final") ;
 
     { Int  m     = namesUpto-1;
       Text mtext = findText(scriptInfo[m].modName);
-      setCurrModule(mtext);
+      /* Commented out till we understand what
+       * this is trying to do.
+       * Problem, you cant find a module till later.
+       */
+#if 0
+       setCurrModule(findModule(mtext)); 
+#endif
       evalModule = mtext;
     }
 

@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.6 1999/10/19 11:01:26 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.7 1999/10/19 23:52:02 andy Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -113,6 +113,55 @@ extern StgPtr PopPtr         ( void );
 
 
 /* --------------------------------------------------------------------------
+ * This is a generic version of universal call that
+ * only works for specific argument patterns.
+ * 
+ * It allows ports to work on the Hugs Prelude immeduately,
+ * even if univeral_call_c_<os/specific> is not ported.
+ * ------------------------------------------------------------------------*/
+
+void universal_call_c_x86_generic
+( int   n_args,
+  void* args, 
+  char* argstr, 
+  void* fun )
+{
+   unsigned int *p = (unsigned int*) args;
+
+#define ARG(n)  (p[n*2])
+#define CMP(str) ((n_args + 1 == strlen(str)) && \
+		  (!strncmp(str,argstr,n_args + 1)))
+
+#define CALL(retType,callTypes,callVals) \
+	((retType(*)callTypes)(fun))callVals
+
+  if (CMP("i")) {
+    int res = CALL(int,(void),());
+    ARG(0) = res;
+  } else if (CMP("ii")) {
+    int arg1 = (int) ARG(1);
+    int res = CALL(int,(int),(arg1));
+    ARG(0) = res;
+  } else if (CMP("iii")) {
+    int arg1 = (int) ARG(1);
+    int arg2 = (int) ARG(2);
+    int res = CALL(int,(int,int),(arg1,arg2));
+    ARG(0) = res;
+  } else {
+    /* Do not have the generic call for this argument list. */
+    int i;
+    printf("Can not call external function at address %d\n",(int)fun);
+    printf("Argument string = '");
+    for(i=0;i<n_args;i++) {
+      printf("%c",(char)argstr[i]);
+    }
+    printf("' [%d arg(s)]\n",n_args);
+    assert(0);
+  }
+#undef CMP
+}
+
+/* --------------------------------------------------------------------------
  * Move args/results between STG stack and the above API's arg block
  * Returns 0 on success
  *         1 if too many args/results or non-handled type
@@ -204,8 +253,13 @@ int ccall ( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
    //fprintf(stderr, " argc=%d  arg_vec=%p  argd_vec=%p `%s' fun=%p\n", 
    //          d->num_args, arg_vec, argd_vec, argd_vec, fun );
 
+#if 1
    universal_call_c_x86_linux ( 
       d->num_args, (void*)arg_vec, argd_vec, fun );
+#else
+   universal_call_c_x86_generic ( 
+      d->num_args, (void*)arg_vec, argd_vec, fun );
+#endif
    LoadThreadState();
    *bco=(StgBCO*)PopPtr();
 
@@ -251,5 +305,6 @@ CFunDescriptor* mkDescriptor( char* as, char* rs )
     d->num_results = strlen(rs);
     return d;
 }
+
 
 #endif /* INTERPRETER */

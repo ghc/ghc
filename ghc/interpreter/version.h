@@ -2,7 +2,7 @@
  * Version number
  * ------------------------------------------------------------------------*/
 
-/* Define this as a 13 character string uniquely identifying the current 
+/* Define this as a 14 character string uniquely identifying the current 
  * version.
  * Major releases from Nottingham/Yale are of the form "<month><year>"
  * Minor releases from Nottingham/Yale are of the form "[Beta YYMMDD]"
@@ -11,8 +11,8 @@
 #define MAJOR_RELEASE 0
 
 #if MAJOR_RELEASE
-#define HUGS_VERSION "January 1998 "
+#define HUGS_VERSION "October 1999  "
 #else
-#define HUGS_VERSION "STG 27 Apr 99"
+#define HUGS_VERSION "991015 (STG)  "
 #endif
 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/10/16 02:17:32 $
+ * $Revision: 1.12 $
+ * $Date: 1999/10/19 23:51:58 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -319,10 +319,13 @@ Tycon tc; {
 
 static Void local hashTycon(tc)         /* Insert Tycon into hash table    */
 Tycon tc; {
-    Text  t = tycon(tc).text;
-    Int   h = tHash(t);
-    tycon(tc).nextTyconHash = tyconHash[h];
-    tyconHash[h]            = tc;
+  assert(isTycon(tc));
+   if (1) {
+     Text  t = tycon(tc).text;
+     Int   h = tHash(t);
+     tycon(tc).nextTyconHash = tyconHash[h];
+     tyconHash[h]            = tc;
+   }
 }
 
 Tycon findQualTycon(id) /*locate (possibly qualified) Tycon in tycon table */
@@ -975,6 +978,7 @@ printf ( "findQualifier %s\n", textToStr(t));
 Void setCurrModule(m)              /* set lookup tables for current module */
 Module m; {
     Int i;
+    assert(isModule(m));
     if (m!=currentModule) {
         currentModule = m; /* This is the only assignment to currentModule */
         for (i=0; i<TYCONHSZ; ++i)
