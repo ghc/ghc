@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.46 2000/07/17 15:15:40 rrt Exp $
+ * $Id: StgMiscClosures.hc,v 1.47 2000/08/02 14:13:28 rrt Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -583,7 +583,8 @@ NON_ENTERABLE_ENTRY_CODE(MUT_VAR);
    This is used for filling in vector-table entries that can never happen,
    for instance.
    -------------------------------------------------------------------------- */
-
+/* No longer used; we use NULL, because a) it never happens, right? and b)
+   Windows doesn't like DLL entry points being used as static initialisers
 STGFUN(stg_error_entry)							\
 {									\
   FB_									\
@@ -592,7 +593,7 @@ STGFUN(stg_error_entry)							\
     return NULL;							\
   FE_									\
 }
-
+*/
 /* -----------------------------------------------------------------------------
    Dummy return closure
  

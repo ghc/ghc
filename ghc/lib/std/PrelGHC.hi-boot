@@ -5,7 +5,7 @@
 --	primitive operations and types that GHC knows about.
 ---------------------------------------------------------------------------
 
-__interface "std" PrelGHC 1 0 where
+__interface "rts" PrelGHC 1 0 where
 
 __export PrelGHC
 
@@ -343,13 +343,6 @@ __export PrelGHC
 
 -- Export PrelErr.error, so that others don't have to import PrelErr
 __export PrelErr error ;
-
---------------------------------------------------
--- These imports tell modules low down in the hierarchy that
--- PrelErr and PrelBase are in the same package and 
--- should be read from their hi-boot files
-import PrelErr @ ;
-import PrelNum @ ;
 
 
 --------------------------------------------------

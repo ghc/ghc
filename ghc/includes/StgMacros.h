@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.31 2000/07/21 09:48:47 rrt Exp $
+ * $Id: StgMacros.h,v 1.32 2000/08/02 14:13:27 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -49,7 +49,7 @@
 
 #define EXTINFO_RTS	extern DLL_IMPORT_RTS INFO_TBL_CONST StgInfoTable
 #define ED_		extern
-#define EDD_		extern DLLIMPORT 
+#define EDD_		extern DLLIMPORT
 #define ED_RO_		extern const
 #define ID_		static
 #define ID_RO_		static const
@@ -378,11 +378,8 @@ EXTFUN_RTS(stg_gen_block);
    We use a RET_DYN frame the same as for a dynamic heap check.
    ------------------------------------------------------------------------- */
 
-#if COMPILING_RTS
-EI_(stg_gen_chk_info);
-#else
-EDI_(stg_gen_chk_info);
-#endif
+EXTINFO_RTS(stg_gen_chk_info);
+
 /* -----------------------------------------------------------------------------
    Vectored Returns
 
@@ -749,10 +746,8 @@ LoadThreadState (void)
         STGCALL1(getStablePtr,reg_fe_binder)
 	
 #define REGISTER_IMPORT(reg_mod_name)		\
-	do { EXTFUN_RTS(reg_mod_name);			\
-	  PUSH_INIT_STACK(reg_mod_name) ;	\
-	} while (0)
-	
+        PUSH_INIT_STACK(reg_mod_name)
+
 #define END_MOD_INIT()				\
         }};					\
 	JMP_(POP_INIT_STACK());			\

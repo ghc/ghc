@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.33 2000/07/07 11:03:57 simonmar Exp $
+% $Id: PrelBase.lhs,v 1.34 2000/08/02 14:13:27 rrt Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -78,12 +78,15 @@ Other Prelude modules are much easier with fewer complex dependencies.
 module PrelBase
 	(
 	module PrelBase,
-	module PrelGHC		-- Re-export PrelGHC, to avoid lots of people 
-				-- having to import it explicitly
+	module PrelGHC,		-- Re-export PrelGHC, PrelErr & PrelNum, to avoid lots
+	module PrelErr,         -- of people having to import it explicitly
+	module PrelNum
   ) 
 	where
 
 import PrelGHC
+import {-# SOURCE #-} PrelErr
+import {-# SOURCE #-} PrelNum
 
 infixr 9  .
 infixr 5  ++, :

@@ -27,10 +27,10 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 
 import Constants	( mIN_UPD_SIZE )
 import CallConv		( callConvAttribute )
-import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
+import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
-			  mkClosureLabel,
+			  mkClosureLabel, mkErrorStdEntryLabel,
 			  CLabel, CLabelType(..), labelType, labelDynamic
 			)
 
@@ -1162,6 +1162,7 @@ cStmtMacroText UPDATE_SU_FROM_UPD_FRAME	= SLIT("UPDATE_SU_FROM_UPD_FRAME")
 cStmtMacroText SET_TAG			= SLIT("SET_TAG")
 cStmtMacroText REGISTER_FOREIGN_EXPORT	= SLIT("REGISTER_FOREIGN_EXPORT")
 cStmtMacroText REGISTER_IMPORT		= SLIT("REGISTER_IMPORT")
+cStmtMacroText REGISTER_DIMPORT		= SLIT("REGISTER_DIMPORT")
 cStmtMacroText GRAN_FETCH	    	= SLIT("GRAN_FETCH")
 cStmtMacroText GRAN_RESCHEDULE   	= SLIT("GRAN_RESCHEDULE")
 cStmtMacroText GRAN_FETCH_AND_RESCHEDULE= SLIT("GRAN_FETCH_AND_RESCHEDULE")
@@ -1507,7 +1508,7 @@ ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast _)
 		    Nothing -> mkErrorStdEntryLabel
 		    Just _  -> entryLabelFromCI cl_info
 
-ppr_decls_AbsC (CSRT lbl closure_lbls)
+ppr_decls_AbsC (CSRT _ closure_lbls)
   = mapTE labelSeenTE closure_lbls		`thenTE` \ seen ->
     returnTE (Nothing, 
 	      if and seen then Nothing

@@ -457,6 +457,7 @@ isDllName :: Name -> Bool
 isDllName nm = not opt_Static &&
 	       not (isLocallyDefinedName nm) && 
 	       not (isLocalModule (nameModule nm))
+-- Why is the isLocallyDefinedName test needed?
 
 nameSrcLoc name = provSrcLoc (n_prov name)
 

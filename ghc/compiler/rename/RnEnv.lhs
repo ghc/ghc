@@ -705,10 +705,10 @@ mapFvRn f xs = mapRn f xs	`thenRn` \ stuff ->
 
 
 \begin{code}
-warnUnusedModules :: [ModuleName] -> RnM d ()
+warnUnusedModules :: [Module] -> RnM d ()
 warnUnusedModules mods
   | not opt_WarnUnusedImports = returnRn ()
-  | otherwise 		      = mapRn_ (addWarnRn . unused_mod) mods
+  | otherwise 		      = mapRn_ (addWarnRn . unused_mod . moduleName) mods
   where
     unused_mod m = vcat [ptext SLIT("Module") <+> quotes (pprModuleName m) <+> 
 			   text "is imported, but nothing from it is used",

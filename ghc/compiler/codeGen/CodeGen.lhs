@@ -22,7 +22,8 @@ module CodeGen ( codeGen ) where
 import StgSyn
 import CgMonad
 import AbsCSyn
-import CLabel		( CLabel, mkSRTLabel, mkClosureLabel, mkModuleInitLabel )
+import CLabel		( CLabel, mkSRTLabel, mkClosureLabel,
+                          mkModuleInitLabel, labelDynamic )
 
 import PprAbsC		( dumpRealC )
 import AbsCUtils	( mkAbstractCs, flattenAbsC )
@@ -53,7 +54,7 @@ import Panic		( assertPanic )
 
 
 codeGen :: Module		-- Module name
-	-> [ModuleName]		-- Import names
+	-> [Module]		-- Import names
 	-> ([CostCentre],	-- Local cost-centres needing declaring/registering
 	    [CostCentre],	-- "extern" cost-centres needing declaring
 	    [CostCentreStack])  -- Pre-defined "singleton" cost centre stacks
@@ -105,7 +106,7 @@ codeGen mod_name imported_modules cost_centre_info fe_binders
 mkModuleInit 
 	:: [Id]			-- foreign exported functions
 	-> Module		-- module name
-	-> [ModuleName]		-- import names
+	-> [Module]		-- import names
 	-> ([CostCentre],	-- cost centre info
 	    [CostCentre],	
 	    [CostCentreStack])
@@ -120,16 +121,16 @@ mkModuleInit fe_binders mod imps cost_centre_info
 
 	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
 
-	mk_import_register import_name
-	  = CMacroStmt REGISTER_IMPORT [
-		CLbl (mkModuleInitLabel import_name) AddrRep
+	mk_import_register imp =
+	    CMacroStmt REGISTER_IMPORT [
+		CLbl (mkModuleInitLabel imp) AddrRep
 	    ]
 
 	register_imports = map mk_import_register imps
     in
     mkAbstractCs [
 	cc_decls,
-        CModuleInitBlock (mkModuleInitLabel (Module.moduleName mod))
+        CModuleInitBlock (mkModuleInitLabel mod)
 		         (mkAbstractCs (register_fes ++
 				        cc_regs :
 				        register_imports))

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.31 2000/07/06 14:08:31 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.32 2000/08/02 14:13:26 rrt Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -238,6 +238,8 @@ data CStmtMacro
 
   | REGISTER_FOREIGN_EXPORT		-- register a foreign exported fun
   | REGISTER_IMPORT			-- register an imported module
+  | REGISTER_DIMPORT                    -- register an imported module from
+                                        -- another DLL
 
   | GRAN_FETCH	    		-- for GrAnSim only  -- HWL
   | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL

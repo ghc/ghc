@@ -76,7 +76,7 @@ type RenameResult = ( Module		-- This module
 		    , ParsedIface	-- The new interface
 		    , RnNameSupply	-- Final env; for renaming derivings
 		    , FixityEnv		-- The fixity environment; for derivings
-		    , [ModuleName])	-- Imported modules; for profiling
+		    , [Module])		-- Imported modules
 		   
 renameModule :: UniqSupply -> RdrNameHsModule -> IO (Maybe RenameResult)
 renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
@@ -157,10 +157,16 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
     mkImportExportInfo mod_name export_avails exports 	`thenRn` \ (my_exports, my_usages) ->
 
 	-- RETURN THE RENAMED MODULE
-    getNameSupplyRn				`thenRn` \ name_supply ->
+    getNameSupplyRn			`thenRn` \ name_supply ->
+    getIfacesRn 			`thenRn` \ ifaces ->
     let
+	direct_import_mods :: [Module]
+	direct_import_mods = [m | (_, _, Just (m, _, _, _, ImportByUser, _))
+				  <- eltsFM (iImpModInfo ifaces)]
+		-- Pick just the non-back-edge imports
+		-- (Back edges are ImportByUserSource)
+
 	this_module	   = mkThisModule mod_name
-	direct_import_mods = [mod | ImportDecl mod _ _ _ _ _ <- imports]
 
 	-- Export only those fixities that are for names that are
 	--	(a) defined in this module
@@ -657,7 +663,7 @@ rnDeprecs gbl_env mod_deprec decls
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: ModuleName -> [ModuleName] 
+reportUnusedNames :: ModuleName -> [Module] 
 		  -> GlobalRdrEnv -> AvailEnv
 		  -> Avails -> NameSet -> [RenamedHsDecl] 
 		  -> RnMG ()
@@ -727,18 +733,18 @@ reportUnusedNames mod_name direct_import_mods
 	--	 There's really no good way to detect this, so the error message 
 	--	 in RnEnv.warnUnusedModules is weakened instead
 	inst_mods = [m | InstD (InstDecl _ _ _ (Just dfun) _) <- imported_decls,
-			 let m = moduleName (nameModule dfun),
+			 let m = nameModule dfun,
 			 m `elem` direct_import_mods
 		    ]
 
-	minimal_imports :: FiniteMap ModuleName AvailEnv
+	minimal_imports :: FiniteMap Module AvailEnv
 	minimal_imports0 = emptyFM
 	minimal_imports1 = foldNameSet add_name minimal_imports0 really_used_names
 	minimal_imports  = foldr   add_inst_mod minimal_imports1 inst_mods
 	
 	add_name n acc = case maybeUserImportedFrom n of
 			   Nothing -> acc
-			   Just m  -> addToFM_C plusAvailEnv acc (moduleName m)
+			   Just m  -> addToFM_C plusAvailEnv acc m
 					        (unitAvailEnv (mk_avail n))
 	add_inst_mod m acc 
 	  | m `elemFM` acc = acc	-- We import something already
@@ -760,7 +766,7 @@ reportUnusedNames mod_name direct_import_mods
 	module_unused :: Name -> Bool
 	-- Name is imported from a module that's completely unused,
 	-- so don't report stuff about the name (the module covers it)
-	module_unused n = moduleName (expectJust "module_unused" (maybeUserImportedFrom n))
+	module_unused n = expectJust "module_unused" (maybeUserImportedFrom n)
 			  `elem` unused_imp_mods
 				-- module_unused is only called if it's user-imported
     in
@@ -793,7 +799,7 @@ printMinimalImports mod_name imps
 			    parens (fsep (punctuate comma (map ppr ies)))
 
     to_ies (mod, avail_env) = mapRn to_ie (availEnvElts avail_env)	`thenRn` \ ies ->
-			      returnRn (mod, ies)
+			      returnRn (moduleName mod, ies)
 
     to_ie :: AvailInfo -> RnMG (IE Name)
     to_ie (Avail n)       = returnRn (IEVar n)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.44 2000/07/14 08:14:53 simonpj Exp $
+% $Id: CgCase.lhs,v 1.45 2000/08/02 14:13:27 rrt Exp $
 %
 %********************************************************
 %*							*
@@ -946,7 +946,7 @@ mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
     deflt_lbl = 
 	case nonemptyAbsC deflt_absC of
 		 -- the simplifier might have eliminated a case
-	   Nothing -> CLbl mkErrorStdEntryLabel CodePtrRep 
+	   Nothing -> mkIntCLit 0 -- CLbl mkErrorStdEntryLabel CodePtrRep 
  	   Just absC@(CCodeBlock lbl _) -> CLbl lbl CodePtrRep
 
     mk_vector_entry :: ConTag -> (CAddrMode, AbstractC)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.17 2000/07/21 09:31:46 rrt Exp $
+ * $Id: StgMiscClosures.h,v 1.18 2000/08/02 14:13:27 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -126,7 +126,7 @@ extern DLL_IMPORT_DATA StgIntCharlikeClosure INTLIKE_closure[];
 
 /* standard entry points */
 
-extern StgFun stg_error_entry;
+/* EXTFUN_RTS(stg_error_entry); No longer used */
 
   /* (see also below  -- KSW 1998-12) */
 

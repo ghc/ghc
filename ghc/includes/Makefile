@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.11 1998/12/02 13:21:15 simonm Exp $
+# $Id: Makefile,v 1.12 2000/08/02 14:13:27 rrt Exp $
 #
 
 TOP = ..
@@ -8,7 +8,7 @@ include $(TOP)/mk/boilerplate.mk
 #
 # All header files
 #
-H_FILES = $(wildcard *.h)
+H_FILES = $(filter-out gmp.h,$(wildcard *.h)) gmp.h
 
 #
 # Header file built from the configure script's findings
@@ -16,6 +16,10 @@ H_FILES = $(wildcard *.h)
 H_CONFIG = config.h
 
 all :: $(H_CONFIG) NativeDefs.h
+
+# gmp.h is copied from the GMP directory
+gmp.h : $(FPTOOLS_TOP)/ghc/rts/gmp/gmp.h
+	$(CP) $< $@
 
 # The fptools configure script creates the configuration header file 
 # and puts it in fptools/mk/config.h. We copy it down to here, prepending

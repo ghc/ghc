@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.37 2000/07/03 14:59:25 simonmar Exp $
+% $Id: CLabel.lhs,v 1.38 2000/08/02 14:13:26 rrt Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -84,7 +84,7 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 import CmdLineOpts      ( opt_Static, opt_DoTickyProfiling )
 import CStrings		( pp_cSEP )
 import DataCon		( ConTag, DataCon )
-import Module		( ModuleName )
+import Module		( ModuleName, moduleName, Module, isLocalModule )
 import Name		( Name, getName, isDllName, isExternallyVisibleName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
@@ -124,7 +124,7 @@ data CLabel
 
   | AsmTempLabel    Unique
 
-  | ModuleInitLabel ModuleName
+  | ModuleInitLabel Module
 
   | RtsLabel	    RtsLabelInfo
 
@@ -241,8 +241,7 @@ mkModuleInitLabel		= ModuleInitLabel
 
 	-- Some fixed runtime system labels
 
-mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
-
+mkErrorStdEntryLabel 		= RtsLabel RtsShouldNeverHappenCode
 mkStgUpdatePAPLabel		= RtsLabel (Rts_Code "stg_update_PAP")
 mkSplitMarkerLabel		= RtsLabel (Rts_Code "__stg_split_marker")
 mkUpdInfoLabel			= RtsLabel RtsUpdInfo
@@ -305,11 +304,11 @@ let-no-escapes, which can be recursive.
 needsCDecl (IdLabel _ _)		= True
 needsCDecl (CaseLabel _ CaseReturnPt)	= True
 needsCDecl (DataConLabel _ _)		= True
-needsCDecl (CaseLabel _ _)		= False
 needsCDecl (TyConLabel _)		= True
+needsCDecl (ModuleInitLabel _)		= True
 
+needsCDecl (CaseLabel _ _)		= False
 needsCDecl (AsmTempLabel _)		= False
-needsCDecl (ModuleInitLabel _)		= False
 needsCDecl (RtsLabel _)			= False
 needsCDecl (ForeignLabel _ _)		= False
 needsCDecl (CC_Label _)			= False
@@ -354,6 +353,7 @@ labelType (CaseLabel _ CaseReturnInfo)        = InfoTblType
 labelType (CaseLabel _ CaseReturnPt)	      = CodeType
 labelType (CaseLabel _ CaseVecTbl)            = VecTblType
 labelType (TyConLabel _)		      = ClosureTblType
+labelType (ModuleInitLabel _ )                = CodeType
 
 labelType (IdLabel _ info) = 
   case info of
@@ -379,12 +379,16 @@ in a DLL, be it a data reference or not.
 labelDynamic :: CLabel -> Bool
 labelDynamic lbl = 
   case lbl of
-   RtsLabel _  	    -> not opt_Static  -- i.e., is the RTS in a DLL or not?
-   IdLabel n k      -> isDllName n
-   DataConLabel n k -> isDllName n
-   TyConLabel tc    -> isDllName (getName tc)
-   ForeignLabel _ d -> d
-   _ 		    -> False
+   -- The special case for RtsShouldNeverHappenCode is because the associated address is
+   -- NULL, i.e. not a DLL entry point
+   RtsLabel RtsShouldNeverHappenCode -> False
+   RtsLabel _  	     -> not opt_Static  -- i.e., is the RTS in a DLL or not?
+   IdLabel n k       -> isDllName n
+   DataConLabel n k  -> isDllName n
+   TyConLabel tc     -> isDllName (getName tc)
+   ForeignLabel _ d  -> d
+   ModuleInitLabel m -> (not opt_Static) && (not (isLocalModule m))
+   _ 		     -> False
 \end{code}
 
 
@@ -459,7 +463,9 @@ pprCLbl (CaseLabel u CaseDefault)
 pprCLbl (CaseLabel u CaseBitmap)
   = hcat [pprUnique u, pp_cSEP, ptext SLIT("btm")]
 
-pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("stg_error_entry")
+pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("NULL")
+-- used to be stg_error_entry but Windows can't have DLL entry points as static
+-- initialisers, and besides, this ShouldNeverHappen, right?
 
 pprCLbl (RtsLabel RtsUpdInfo)            = ptext SLIT("upd_frame_info")
 pprCLbl (RtsLabel RtsSeqInfo)            = ptext SLIT("seq_frame_info")
@@ -519,7 +525,7 @@ pprCLbl (DataConLabel con flavor) = ppr con <> ppConFlavor flavor
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
-pprCLbl (ModuleInitLabel mod)	= ptext SLIT("__init_") <> ptext mod
+pprCLbl (ModuleInitLabel mod)	= ptext SLIT("__init_") <> ptext (moduleName mod)
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 
