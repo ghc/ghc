@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.44 2001/06/22 12:35:28 rrt Exp $
+ * $Id: Linker.c,v 1.45 2001/06/25 09:44:10 rrt Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -97,6 +97,7 @@ typedef struct _RtsSymbolVal {
       SymX(strncpy)                             \
       SymX(strcpy)                              \
       SymX(strcmp)                              \
+      SymX(strerror)                            \
       Sym(mktime)                               \
       Sym(gmtime)                               \
       Sym(strftime)                             \
@@ -134,11 +135,32 @@ typedef struct _RtsSymbolVal {
       Sym(__udivdi3)                            \
       SymX(GetProcessTimes)                     \
       SymX(GetCurrentProcess)                   \
+      SymX(read)                                \
+      SymX(write)                               \
+      SymX(open)                                \
+      SymX(close)                               \
       SymX(send)                                \
       SymX(recv)                                \
       SymX(malloc)                              \
       SymX(free)                                \
       SymX(realloc)                             \
+      SymX(fstat)                               \
+      SymX(stat)                                \
+      Sym(ftime)                                \
+      SymX(isatty)                              \
+      SymX(lseek)                               \
+      SymX(access)                              \
+      Sym(setmode)                              \
+      SymX(chmod)                               \
+      SymX(chdir)                               \
+      SymX(getcwd)                              \
+      SymX(unlink)                              \
+      SymX(rmdir)                               \
+      SymX(mkdir)                               \
+      SymX(CreateProcessA)                      \
+      SymX(WaitForSingleObject)                 \
+      SymX(GetExitCodeProcess)                  \
+      SymX(CloseHandle)                         \
       SymX(_errno)                              \
       SymX(closesocket)
 #endif
@@ -525,7 +547,6 @@ lookupSymbol( char *lbl )
 #       elif defined(OBJFORMAT_PEi386)
         OpenedDLL* o_dll;
         void* sym;
-        ASSERT(2+2 == 5);
         for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
            sym = GetProcAddress(o_dll->instance, lbl);
            if (sym != NULL) return sym;
@@ -956,7 +977,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    COFF_section* sectab;
    COFF_symbol*  symtab;
    UChar*        strtab;
-
+   fprintf(stderr, "\nLOADING %s\n", oc->fileName);
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
                ((UChar*)(oc->image)) 
@@ -1180,6 +1201,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          addr = ((UChar*)(oc->image))
                 + (sectabent->PointerToRawData
                    + symtab_i->Value);
+         /* fprintf(stderr,"addSymbol %p `%s'\n", addr,sname); */
          IF_DEBUG(linker, belch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          oc->symbols[i] = sname;
