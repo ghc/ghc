@@ -12,7 +12,6 @@ import AbsCSyn
 import CgMonad
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
-import CostCentre	( subsumedCCS )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
 import ClosureInfo	( layOutStaticConstr, layOutDynConstr, ClosureInfo )
 import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
@@ -20,7 +19,7 @@ import Name		( getOccName )
 import OccName		( occNameUserString )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep )
-import Outputable
+import CmdLineOpts	( opt_EnsureSplittableC )
 \end{code}
 
 For every constructor we generate the following info tables:
@@ -107,7 +106,7 @@ genConInfo :: CompilationInfo -> DataCon -> AbstractC
 
 genConInfo comp_info data_con
   = 	-- Order of things is to reduce forward references
-    mkAbstractCs [CSplitMarker,
+    mkAbstractCs [if opt_EnsureSplittableC then CSplitMarker else AbsCNop,
 		  closure_code,
     	    	  static_code]
   where
