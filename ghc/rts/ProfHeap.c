@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.31 2001/11/28 17:45:13 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.32 2001/11/29 16:38:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -442,17 +442,9 @@ endHeapProfiling(void)
 #endif
 
 #ifdef PROFILING
-  // Note: 
-  //   We do not need to perform a major garbage collection because all the
-  //   closures created since the last census will not affect the profiling
-  //   statistics anyhow.
-  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) 
-    LdvCensusKillAll();
-#endif
-
-#ifdef PROFILING
     if (doingLDVProfiling()) {
 	nat t;
+	LdvCensusKillAll();
 	aggregateCensusInfo();
 	for (t = 1; t < era; t++) {
 	    dumpCensus( &censuses[t] );
