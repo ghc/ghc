@@ -483,7 +483,13 @@ sub mangle_asm {
  	    $chk[++$i]   = $_;
  	    $chkcat[$i]  = 'toc';
    	    $chksymb[$i] = $1;
- 
+
+ 	} elsif ( $TargetPlatform =~ /^powerpc-|^rs6000-/ && /^CC_.*$/ ) {
+            # all CC_ symbols go in the data section...
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'data';
+	    $chksymb[$i] = '';
+
 	} elsif ( /^($TUS[@]?(ret_|djn_)[A-Za-z0-9_]+)/o ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
@@ -584,6 +590,7 @@ sub mangle_asm {
 	$chk[$i] =~ s/^\.csect .*\[DS\]$//g;
 
 	if ( $chkcat[$i] eq 'toc' && $chk[$i] !~ /\.byte/ )
+#ToDo: instead of all these changes, just fix mangle_powerpc_tailjump and delete/ignore these tocs?
 	   { $chk[$i] =~ s/$T_MOVE_DIRVS//g;
 	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(\S+_fast\d+)/\t\.tc \1\[TC\],\.\2/; 
 	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(\S+_entry)\n/\t\.tc \1\[TC\],\.\2\n/;
@@ -593,6 +600,11 @@ sub mangle_asm {
 	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],ErrorIO_innards/\t\.tc \1\[TC\],\.ErrorIO_innards/;
 	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],startStgWorld/\t\.tc \1\[TC\],\.startStgWorld/;
 	     $chk[$i] =~ s/\.tc UpdatePAP\[TC\],UpdatePAP/\.tc UpdatePAP\[TC\],\.UpdatePAP/;
+	     $chk[$i] =~ s/\.tc _regMain\[TC\],_regMain/\.tc _regMain\[TC\],\._regMain/; #PROF
+	     $chk[$i] =~ s/\.tc resumeThread\[TC\],resumeThread/\.tc resumeThread\[TC\],\.resumeThread/; #CONC
+	     $chk[$i] =~ s/\.tc EnterNodeCode\[TC\],EnterNodeCode/\.tc EnterNodeCode\[TC\],\.EnterNodeCode/; #CONC
+	     $chk[$i] =~ s/\.tc StackUnderflowEnterNode\[TC\],StackUnderflowEnterNode/\.tc StackUnderflowEnterNode\[TC\],\.StackUnderflowEnterNode/; #CONC
+	     $chk[$i] =~ s/\.tc stopThreadDirectReturn\[TC\],stopThreadDirectReturn/\.tc stopThreadDirectReturn\[TC\],\.stopThreadDirectReturn/; #CONC
 	     $chk[$i] =~ s/\.tc IndUpdRetDir\[TC\],IndUpdRetDir/\.tc IndUpdRetDir\[TC\],\.IndUpdRetDir/;
 	     $chk[$i] =~ s/\t\.tc (_PRStart_\S+)\[TC\],_PRStart_\S+/\t\.tc \1\[TC\],\.\1/;
 
@@ -653,7 +665,9 @@ sub mangle_asm {
  		} elsif ($TargetPlatform =~ /^powerpc-|^rs6000/) {
  		    $p =~ s/^\tmflr 0\n//;
  		    $p =~ s/^\tstm \d+,-\d+\(1\)\n//;
-  		    $p =~ s/^\tstw? 0,\d+\(1\)\n//;
+  		    $p =~ s/^\tstw? 0,\d+\(1\)\n//g;
+  		    $p =~ s/^\tstw? 1,\d+\(1\)\n//g; #mc
+  		    $p =~ s/^\tlw?z 0,0\(1\)\n//g;   #mc
   		    $p =~ s/^\tstw?u 1,-\d+\(1\)\n//; 
   		    $p =~ s/^\tstw? \d+,-\d+\(1\)\n//g; 
   		    $p =~ s/^\tstfd \d+,-\d+\(1\)\n//g; 
@@ -844,7 +858,8 @@ sub mangle_asm {
 #new                   if ($chksymb[$i] =~ /ret.*upd/ || $KNOWN_FUNNY_THING{$chksymb[$i]}
 #new                    || $chksymb[$i] =~ /^$.{T_US}_(PRIn|PRStart).*${T_POST_LBL}$/o )
 #new                      { print OUTASM "\t\.globl $chksymb[$i]\n"; }
-                   if ($chksymb[$i] ne '') 
+#                   if ($chksymb[$i] ne '' && $chksymb[$i] !~ /ret_[a-z]/ && $chksymb[$i] !~ /djn_[a-z]/) 
+                   if ($chksymb[$i] ne '')
                        { print OUTASM "\t\.globl \.$chksymb[$i]\n"; };
                    if ($chk[$i] =~ /TOC\[tc0\], 0\n/)
 	             { ($p, $r) = split(/TOC\[tc0\], 0\n/, $chk[$i]); $printDS = 1;}
@@ -853,8 +868,10 @@ sub mangle_asm {
                 };
  		&print_doctored($chk[$i], 0);
                 if ($TargetPlatform =~ /^powerpc-|^rs6000-/ && $printDS) { 
-  		   print OUTASM "\.csect ${chksymb[$i]}[DS]\n"; 	
-  		   print OUTASM "${p}TOC[tc0], 0\n";
+#ok                   if ($chksymb[$i] !~ /\_regMain/) {
+  		     print OUTASM "\.csect ${chksymb[$i]}[DS]\n"; 	
+  		     print OUTASM "${p}TOC[tc0], 0\n";
+#ok                   }
                 }
 	    }
 
@@ -908,6 +925,11 @@ sub mangle_asm {
 
 		print OUTASM $T_HDR_info;
                 if ($TargetPlatform =~ /^powerpc-|^rs6000-/) {
+	          if ( !defined($slowchk{$symb}) && defined($fastchk{$symb}) ) {
+ 		     $fastname = $chk[$fastchk{$symb}];
+ 		     $fastname =~ s/([_A-Za-z]*_fast\d+):.*(.*\n)*/\1/;
+                     $chk[$infochk{$symb}] =~ s/\.long StdErrorCode/\.long $fastname/;
+                  }
                   $chk[$infochk{$symb}] =~ s/\.long ([_A-Za-z]\S+_entry)/\.long \.\1/;
                   $chk[$infochk{$symb}] =~ s/\.long ([A-Za-z]\S+_upd)/\.long \.\1/;
                   $chk[$infochk{$symb}] =~ s/\.long (IndUpdRet\S+)/\.long \.\1/;
@@ -1001,7 +1023,7 @@ sub mangle_asm {
                     if ( $fullname =~ /^[A-Z]/)
                        { print OUTASM "\t\.globl \.${fullname}\n";
                     } else {
-                       print OUTASM "\t\.lglobl \.${fullname}\n"; #todo: rm - andre
+#                       print OUTASM "\t\.lglobl \.${fullname}\n"; #todo: rm - andre
                     };
                     $c =~ s/((.*\n)*)\t.long \S+, TOC\[tc0\], 0\n\.csect \.text\[PR\]\n((.*\n)*)/\1\3/;
                     $c = &mangle_powerpc_tailjump($c);
@@ -1060,7 +1082,11 @@ sub mangle_asm {
  	    print OUTASM $T_HDR_toc;
             local($j)	= $i;
             while ($chkcat[$j] eq 'toc')
-              { print OUTASM $chk[$j];
+              { if (   $chk[$j] !~ /\.tc UpdatePAP\[TC\]/ # not needed: always turned into a jump.
+                   ) 
+                {
+                  print OUTASM $chk[$j];
+                }
                 $chkcat[$j] = 'DONE ALREADY';
                 $j++;
  	    }
@@ -1521,6 +1547,8 @@ sub mini_mangle_asm_powerpc {
 	s/long _PRMarking_MarkNextCAF\[DS\]/long ._PRMarking_MarkNextCAF/;
 	s/long _PRMarking_MarkNextAStack\[DS\]/long ._PRMarking_MarkNextAStack/;
 	s/long _PRMarking_MarkNextBStack\[DS\]/long ._PRMarking_MarkNextBStack/;
+        s/\.tc EnterNodeCode\[TC]\,EnterNodeCode\[DS\]/\.tc EnterNodeCode\[TC]\,.EnterNodeCode/; # CONC
+        s/\.tc CheckHeapCode\[TC]\,CheckHeapCode\[DS\]/\.tc CheckHeapCode\[TC]\,.CheckHeapCode/; # CONC
 	print OUTASM;
     }
 
