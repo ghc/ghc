@@ -14,9 +14,9 @@ import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core,
                           opt_D_dump_worker_wrapper
 			)
 import CoreLint		( beginPass, endPass )
-import CoreUtils	( exprType, exprArity, exprEtaExpandArity )
+import CoreUtils	( exprType, exprEtaExpandArity )
 import MkId		( mkWorkerId )
-import Id		( Id, idType, idStrictness, setIdArityInfo, isOneShotLambda,
+import Id		( Id, idType, idStrictness, idArity, isOneShotLambda,
 			  setIdStrictness, idInlinePragma, 
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
@@ -186,17 +186,30 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW non_rec fn_id rhs
-  | isNeverInlinePrag inline_prag
+  | isNeverInlinePrag inline_prag || arity == 0
   = 	-- Don't split things that will never be inlined
     returnUs [ (fn_id, rhs) ]
 
-  | non_rec && certainlyWillInline fn_id
-	-- No point in worker/wrappering something that is going to be
+  | non_rec && not do_coerce_ww && certainlyWillInline fn_id
+	-- No point in worker/wrappering a function that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run
 	-- twice, this test also prevents wrappers (which are INLINEd)
 	-- from being re-done.
 	--
+	-- The do_coerce_ww test is so that
+	-- a function with a coerce should w/w to get rid
+	-- of the coerces, which can significantly improve its arity.
+	-- Example:  f []     = return [] :: IO [Int]
+	--	     f (x:xs) = return (x:xs)
+	-- If we aren't careful we end up with
+	--	f = \ x -> case x of {
+	--		     x:xs -> __coerce (IO [Int]) (\ s -> (# s, x:xs #)
+	--		     []   -> lvl_sJ8
+	--
+	--
 	-- OUT OF DATE NOTE, kept for info:
+	-- It's out of date because now wrappers look very cheap 
+	-- even when they are inlined.
 	--   In this case we add an INLINE pragma to the RHS.  Why?
 	--   Because consider
 	--	  f = \x -> g x x
@@ -204,8 +217,6 @@ tryWW non_rec fn_id rhs
 	--   Then f is small, so we don't w/w it.  But g is big, and we do, so
 	--   g's wrapper will get inlined in f's RHS, which makes f look big now.
 	--   So f doesn't get inlined, but it is strict and we have failed to w/w it.
-	-- It's out of date because now wrappers look very cheap 
-	-- even when they are inlined.
   = returnUs [ (fn_id, rhs) ]
 
   | not (do_strict_ww || do_cpr_ww || do_coerce_ww)
@@ -222,13 +233,9 @@ tryWW non_rec fn_id rhs
 	work_id | has_strictness = proto_work_id `setIdStrictness` mkStrictnessInfo (work_demands, result_bot)
 		| otherwise	 = proto_work_id
 
-	wrap_arity = exprArity wrap_rhs		-- Might be greater than the current visible arity
-						-- if the function returns bottom
-						
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdStrictness`      wrapper_strictness
-                         `setIdWorkerInfo`	HasWorker work_id wrap_arity
-			 `setIdArityInfo`	exactArity wrap_arity
+                         `setIdWorkerInfo`	HasWorker work_id arity
 			 `setInlinePragma`	NoInlinePragInfo	-- Put it on the worker instead
 		-- Add info to the wrapper:
 		--	(a) we want to set its arity
@@ -237,12 +244,12 @@ tryWW non_rec fn_id rhs
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
-	-- Arrange to inline the wrapper unconditionally
+	-- mkWwBodies has already built a wrap_rhs with an INLINE pragma wrapped around it
   where
     fun_ty = idType fn_id
-    arity  = exprEtaExpandArity rhs
+    arity  = idArity fn_id	-- The arity is set by the simplifier using exprEtaExpandArity
+				-- So it may be more than the number of top-level-visible lambdas
 
-	-- Don't split something which is marked unconditionally NOINLINE
     inline_prag  = idInlinePragma fn_id
 
     strictness_info           = idStrictness fn_id

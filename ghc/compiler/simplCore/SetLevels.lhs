@@ -133,9 +133,6 @@ ltLvl (Level maj1 min1) (Level maj2 min2)
 
 ltMajLvl :: Level -> Level -> Bool
     -- Tells if one level belongs to a difft *lambda* level to another
-    -- But it returns True regardless if l1 is the top level
-    -- We always like to float to the top!	
-ltMajLvl (Level 0 0)    _	       = True
 ltMajLvl (Level maj1 _) (Level maj2 _) = maj1 < maj2
 
 isTopLvl :: Level -> Bool
@@ -144,6 +141,9 @@ isTopLvl other       = False
 
 instance Outputable Level where
   ppr (Level maj min) = hcat [ char '<', int maj, char ',', int min, char '>' ]
+
+instance Eq Level where
+  (Level maj1 min1) == (Level maj2 min2) = maj1==maj2 && min1==min2
 \end{code}
 
 %************************************************************************
@@ -226,8 +226,8 @@ lvlExpr ctxt_lvl env (_, AnnApp fun arg)
 	-- but we do if the function is big and hairy, like a case
 
 lvlExpr ctxt_lvl env (_, AnnNote InlineMe expr)
-	-- Don't float anything out of an InlineMe
-  = lvlExpr tOP_LEVEL env expr 		`thenLvl` \ expr' ->
+-- Don't float anything out of an InlineMe; hence the tOP_LEVEL
+  = lvlExpr tOP_LEVEL env expr 	`thenLvl` \ expr' ->
     returnLvl (Note InlineMe expr')
 
 lvlExpr ctxt_lvl env (_, AnnNote note expr)
@@ -305,6 +305,8 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
   || not good_destination
   || exprIsTrivial expr				-- Is trivial
   || (strict_ctxt && exprIsBottom expr)		-- Strict context and is bottom
+						--  e.g. \x -> error "foo"
+						-- No gain from floating this
   = 	-- Don't float it out
     lvlExpr ctxt_lvl env ann_expr
 
@@ -734,11 +736,9 @@ subst_id_info (_, _, subst, _) ctxt_lvl dest_lvl v
 	-- VERY IMPORTANT: we must zap the demand info 
 	-- if the thing is going to float out past a lambda
     zap_dmd info
-	| float_past_lam && isStrict (demandInfo info)
-	= setDemandInfo info wwLazy
-	| otherwise
-	= info
+	| stays_put || not (isStrict (demandInfo info)) = info
+	| otherwise					= setDemandInfo info wwLazy
 
-    float_past_lam = ctxt_lvl `ltMajLvl` dest_lvl
+    stays_put = ctxt_lvl == dest_lvl
 \end{code}
 	

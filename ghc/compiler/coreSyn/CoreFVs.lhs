@@ -18,7 +18,7 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idFreeTyVars, mayHaveNoBinding, idSpecialisation )
+import Id		( Id, idFreeTyVars, hasNoBinding, idSpecialisation )
 import VarSet
 import Var		( Var, isId )
 import Name		( isLocallyDefined )
@@ -37,7 +37,7 @@ import Outputable
 mustHaveLocalBinding :: Var -> Bool
 -- True <=> the variable must have a binding in this module
 mustHaveLocalBinding v
-  | isId v    = isLocallyDefined v && not (mayHaveNoBinding v)
+  | isId v    = isLocallyDefined v && not (hasNoBinding v)
   | otherwise = True	-- TyVars etc must
 \end{code}
 

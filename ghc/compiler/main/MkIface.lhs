@@ -24,7 +24,7 @@ import RnMonad
 import TcInstUtil	( InstInfo(..) )
 
 import CmdLineOpts
-import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId,
+import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId, hasNoBinding,
 			  idSpecialisation
 			)
 import Var		( isId )
@@ -68,6 +68,7 @@ import Bag
 import Outputable
 
 import Maybe 		( isNothing )
+import List		( partition )
 import Monad 		( when )
 \end{code}
 
@@ -322,6 +323,7 @@ completeIface new_iface local_tycons local_classes
      all_decls = cls_dcls ++ ty_dcls ++ bagToList val_dcls
      (inst_dcls, inst_ids) = ifaceInstances inst_info
      cls_dcls = map ifaceClass local_classes
+  
      ty_dcls  = map ifaceTyCon (filter (not . isWiredInName . getName) local_tycons)
 
      (val_dcls, emitted_ids) = ifaceBinds (inst_ids `unionVarSet` orphan_rule_ids)
@@ -358,7 +360,10 @@ ifaceRules rules emitted
 				-- We can't print builtin rules in interface files
 				-- Since they are built in, an importing module
 				-- will have access to them anyway
-		     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
+
+			-- Sept 00: I've disabled this test.  It doesn't stop many, if any, rules
+			-- from coming out, and to make it work properly we need to add 
+			     all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
 				-- Spit out a rule only if all its lhs free vars are emitted
 				-- This is a good reason not to do it when we emit the Id itself
 		   ]
@@ -489,6 +494,11 @@ ifaceBinds needed_ids final_ids binds
 			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
 				    idInfo id
 
+	-- The 'needed' set contains the Ids that are needed by earlier
+	-- interface file emissions.  If the Id isn't in this set, and isn't
+	-- exported, there's no need to emit anything
+    need_id needed_set id = id `elemVarSet` needed_set || isUserExportedId id 
+
     go needed [] decls emitted
 	| not (isEmptyVarSet needed) = pprTrace "ifaceBinds: free vars:" 
 					  (sep (map ppr (varSetElems needed)))
@@ -496,18 +506,24 @@ ifaceBinds needed_ids final_ids binds
 	| otherwise 		     = (decls, emitted)
 
     go needed (NonRec id rhs : binds) decls emitted
-	= case ifaceId get_idinfo needed False id rhs of
-		Nothing		      -> go needed binds decls emitted
-		Just (decl, extras) -> let
-			needed' = (needed `unionVarSet` extras) `delVarSet` id
-			-- 'extras' can include the Id itself via a rule
-			emitted' = emitted `extendVarSet` id
-			in
-			go needed' binds (decl `consBag` decls) emitted'
+	| need_id needed id
+	= if omitIfaceSigForId id then
+	    go (needed `delVarSet` id) binds decls (emitted `extendVarSet` id)
+	  else
+	    go ((needed `unionVarSet` extras) `delVarSet` id)
+	       binds
+	       (decl `consBag` decls)
+	       (emitted `extendVarSet` id)
+	| otherwise
+	= go needed binds decls emitted
+	where
+	  (decl, extras) = ifaceId get_idinfo False id rhs
 
 	-- Recursive groups are a bit more of a pain.  We may only need one to
 	-- start with, but it may call out the next one, and so on.  So we
-	-- have to look for a fixed point.
+	-- have to look for a fixed point.  We don't want necessarily them all, 
+	-- because without -O we may only need the first one (if we don't emit
+	-- its unfolding)
     go needed (Rec pairs : binds) decls emitted
 	= go needed' binds decls' emitted' 
 	where
@@ -519,42 +535,29 @@ ifaceBinds needed_ids final_ids binds
     go_rec :: IdSet -> [(Id,CoreExpr)] -> (Bag RdrNameHsDecl, IdSet, IdSet)
     go_rec needed pairs
 	| null decls = (emptyBag, emptyVarSet, emptyVarSet)
-	| otherwise	= (more_decls `unionBags`   listToBag decls, 
-			   more_emitted  `unionVarSet` mkVarSet emitted,
-			   more_extras   `unionVarSet` extras)
+	| otherwise  = (more_decls   `unionBags`   listToBag decls, 
+			more_emitted `unionVarSet` mkVarSet (map fst needed_prs),
+			more_extras  `unionVarSet` extras)
 	where
-	  maybes	     = map do_one pairs
-	  emitted	     = [id   | ((id,_), Just _)  <- pairs `zip` maybes]
-	  reduced_pairs	     = [pair | (pair,   Nothing) <- pairs `zip` maybes]
-	  (decls, extras_s)  = unzip (catMaybes maybes)
-	  extras	     = unionVarSets extras_s
-	  (more_decls, more_emitted, more_extras) = go_rec extras reduced_pairs
-
-	  do_one (id,rhs) = ifaceId get_idinfo needed True id rhs
+	  (needed_prs,leftover_prs) = partition is_needed pairs
+	  (decls, extras_s)         = unzip [ifaceId get_idinfo True id rhs 
+				            | (id,rhs) <- needed_prs, not (omitIfaceSigForId id)]
+	  extras	            = unionVarSets extras_s
+	  (more_decls, more_emitted, more_extras) = go_rec extras leftover_prs
+	  is_needed (id,_) = need_id needed id
 \end{code}
 
 
 \begin{code}
 ifaceId :: (Id -> IdInfo)	-- This function "knows" the extra info added
 				-- by the STG passes.  Sigh
-
-	-> IdSet		-- Set of Ids that are needed by earlier interface
-				-- file emissions.  If the Id isn't in this set, and isn't
-				-- exported, there's no need to emit anything
 	-> Bool			-- True <=> recursive, so don't print unfolding
 	-> Id
 	-> CoreExpr		-- The Id's right hand side
-	-> Maybe (RdrNameHsDecl, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
+	-> (RdrNameHsDecl, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
 
-ifaceId get_idinfo needed_ids is_rec id rhs
-  | not (id `elemVarSet` needed_ids ||		-- Needed [no id in needed_ids has omitIfaceSigForId]
-	(isUserExportedId id && not (omitIfaceSigForId id)))	-- or exported and not to be omitted
-  = Nothing 		-- Well, that was easy!
-
-ifaceId get_idinfo needed_ids is_rec id rhs
-  = ASSERT2( arity_matches_strictness, ppr id )
-    Just (SigD (IfaceSig (toRdrName id) (toHsType id_type) hs_idinfo noSrcLoc),
-	  new_needed_ids)
+ifaceId get_idinfo is_rec id rhs
+  = (SigD (IfaceSig (toRdrName id) (toHsType id_type) hs_idinfo noSrcLoc),  new_needed_ids)
   where
     id_type     = idType id
     core_idinfo = idInfo id
@@ -565,7 +568,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 					   strict_hsinfo ++ wrkr_hsinfo ++ unfold_hsinfo
 
     ------------  Arity  --------------
-    arity_info     = arityInfo stg_idinfo
+    arity_info   = arityInfo stg_idinfo
+    stg_arity	 = arityLowerBound arity_info
     arity_hsinfo = case arityInfo stg_idinfo of
 			a@(ArityExactly n) -> [HsArity a]
 			other		   -> []
@@ -589,11 +593,40 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
 
     ------------  Worker  --------------
-    work_info     = workerInfo core_idinfo
-    has_worker    = workerExists work_info
-    wrkr_hsinfo   = case work_info of
-			HasWorker work_id _ -> [HsWorker (toRdrName work_id)]
-			other		    -> []
+	-- We only treat a function as having a worker if
+	-- the exported arity (which is now the number of visible lambdas)
+	-- is the same as the arity at the moment of the w/w split
+	-- If so, we can safely omit the unfolding inside the wrapper, and
+	-- instead re-generate it from the type/arity/strictness info
+	-- But if the arity has changed, we just take the simple path and
+	-- put the unfolding into the interface file, forgetting the fact
+	-- that it's a wrapper.  
+	--
+	-- How can this happen?  Sometimes we get
+	--	f = coerce t (\x y -> $wf x y)
+	-- at the moment of w/w split; but the eta reducer turns it into
+	--	f = coerce t $wf
+	-- which is perfectly fine except that the exposed arity so far as
+	-- the code generator is concerned (zero) differs from the arity
+	-- when we did the split (2).  
+	--
+	-- All this arises because we use 'arity' to mean "exactly how many
+	-- top level lambdas are there" in interface files; but during the
+	-- compilation of this module it means "how many things can I apply
+	-- this to".
+    work_info           = workerInfo core_idinfo
+    HasWorker work_id _ = work_info
+
+    has_worker = case work_info of
+		  HasWorker work_id wrap_arity 
+		   | wrap_arity == stg_arity -> True
+		   | otherwise		     -> pprTrace "ifaceId: arity change:" (ppr id) 
+						False
+							  
+		  other			     -> False
+
+    wrkr_hsinfo | has_worker = [HsWorker (toRdrName work_id)]
+		| otherwise  = []
 
     ------------  Unfolding  --------------
     inline_pragma  = inlinePragInfo core_idinfo
@@ -623,11 +656,10 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 						unfold_ids	`unionVarSet`
 						spec_ids
 
-    worker_ids = case work_info of
-		   HasWorker work_id _ | interestingId work_id -> unitVarSet work_id
+    worker_ids | has_worker && interestingId work_id = unitVarSet work_id
 			-- Conceivably, the worker might come from
 			-- another module
-		   other -> emptyVarSet
+	       | otherwise = emptyVarSet
 
     spec_ids = filterVarSet interestingId (rulesRhsFreeVars spec_info)
 
@@ -644,7 +676,6 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 	     HasWorker _ wrap_arity -> wrap_arity == arityLowerBound arity_info
 	     other		    -> True
     
-interestingId id = isId id && isLocallyDefined id &&
-		   not (omitIfaceSigForId id)
+interestingId id = isId id && isLocallyDefined id && not (hasNoBinding id)
 \end{code}
 

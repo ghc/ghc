@@ -87,20 +87,20 @@ occurAnalyseRule (Rule str tpl_vars tpl_args rhs)
 
 In @occAnalTop@ we do indirection-shorting.  That is, if we have this:
 
-	loc = <expression>
+	x_local = <expression>
 	...
-	exp = loc
+	x_exported = loc
 
 where exp is exported, and loc is not, then we replace it with this:
 
-	loc = exp
-	exp = <expression>
+	x_local = x_exported
+	x_exported = <expression>
 	...
 
-Without this we never get rid of the exp = loc thing.  This save a
-gratuitous jump (from \tr{x_exported} to \tr{x_local}), and makes
-strictness information propagate better.  This used to happen in the
-final phase, but it's tidier to do it here.
+Without this we never get rid of the x_exported = x_local thing.  This
+save a gratuitous jump (from \tr{x_exported} to \tr{x_local}), and
+makes strictness information propagate better.  This used to happen in
+the final phase, but it's tidier to do it here.
 
 If more than one exported thing is equal to a local thing (i.e., the
 local thing really is shared), then we do one only:
@@ -171,7 +171,7 @@ occurAnalyseBinds binds
 		   ind_env' = extendVarEnv ind_env local_id exported_id
 
 	    other -> 	-- Ho ho! The normal case
-		   (final_usage, ind_env, new_binds ++ binds')
+		     (final_usage, ind_env, new_binds ++ binds')
 		   
 initialTopEnv = OccEnv isLocallyDefined	-- Anything local is interesting
 		       emptyVarSet

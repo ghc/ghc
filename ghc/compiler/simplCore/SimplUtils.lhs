@@ -11,7 +11,7 @@ module SimplUtils (
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), contIsDupable, contResultType,
-	countValArgs, countArgs,
+	countValArgs, countArgs, mkRhsStop, mkStop,
 	getContArgs, interestingCallContext, interestingArg, isStrictType, discardInline
 
     ) where
@@ -44,6 +44,7 @@ import DataCon		( dataConRepArity )
 import VarSet
 import VarEnv		( SubstEnv, SubstResult(..) )
 import Util		( lengthExceeds )
+import BasicTypes	( Arity )
 import Outputable
 \end{code}
 
@@ -56,7 +57,10 @@ import Outputable
 
 \begin{code}
 data SimplCont		-- Strict contexts
-  = Stop OutType		-- Type of the result
+  = Stop     OutType		-- Type of the result
+	     Bool		-- True => This is the RHS of a thunk whose type suggests
+				--	   that update-in-place would be possible
+				--	   (This makes the inliner a little keener.)
 
   | CoerceIt OutType			-- The To-type, simplified
 	     SimplCont
@@ -83,7 +87,7 @@ data SimplCont		-- Strict contexts
 				-- The result expression in the OutExprStuff has type cont_ty
 
 instance Outputable SimplCont where
-  ppr (Stop _)        		     = ptext SLIT("Stop")
+  ppr (Stop _ _)       		     = ptext SLIT("Stop")
   ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
   ppr (ArgOf   dup _ _)   	     = ptext SLIT("ArgOf...") <+> ppr dup
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
@@ -97,9 +101,16 @@ instance Outputable DupFlag where
   ppr OkToDup = ptext SLIT("ok")
   ppr NoDup   = ptext SLIT("nodup")
 
+
+-------------------
+mkRhsStop, mkStop :: OutType -> SimplCont
+mkStop    ty = Stop ty False
+mkRhsStop ty = Stop ty (canUpdateInPlace ty)
+
+
 -------------------
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop _)       		 = True
+contIsDupable (Stop _ _)       		 = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
 contIsDupable (ArgOf    OkToDup _ _)     = True
 contIsDupable (Select   OkToDup _ _ _ _) = True
@@ -115,21 +126,22 @@ discardInline cont		   = cont
 
 -------------------
 discardableCont :: SimplCont -> Bool
-discardableCont (Stop _)	    = False
+discardableCont (Stop _ _)	    = False
 discardableCont (CoerceIt _ cont)   = discardableCont cont
 discardableCont (InlinePlease cont) = discardableCont cont
 discardableCont other		    = True
 
 discardCont :: SimplCont	-- A continuation, expecting
 	    -> SimplCont	-- Replace the continuation with a suitable coerce
-discardCont (Stop to_ty) = Stop to_ty
-discardCont cont	 = CoerceIt to_ty (Stop to_ty)
-			 where
-			   to_ty = contResultType cont
+discardCont cont = case cont of
+		     Stop to_ty _ -> cont
+		     other        -> CoerceIt to_ty (mkStop to_ty)
+		 where
+		   to_ty = contResultType cont
 
 -------------------
 contResultType :: SimplCont -> OutType
-contResultType (Stop to_ty)	     = to_ty
+contResultType (Stop to_ty _)	     = to_ty
 contResultType (ArgOf _ to_ty _)     = to_ty
 contResultType (ApplyTo _ _ _ cont)  = contResultType cont
 contResultType (CoerceIt _ cont)     = contResultType cont
@@ -257,15 +269,19 @@ interestingArg in_scope arg subst
   where
     analyse (Var v)
 	= case lookupIdSubst (mkSubst in_scope subst) v of
-	    DoneId v' _ -> hasSomeUnfolding (idUnfolding v')
-					-- was: isValueUnfolding (idUnfolding v')
-					-- But that seems over-pessimistic
+	    ContEx subst arg -> interestingArg in_scope arg subst
+	    DoneEx arg	     -> analyse arg
+	    DoneId v' _      -> hasSomeUnfolding (idUnfolding v')
+				-- Was: isValueUnfolding (idUnfolding v')
+				-- But that seems over-pessimistic
 
-	    other	-> True		-- was: False
-					-- But that is *definitely* too pessimistic.
-					-- E.g. 	let x = 3 in f 
-					-- Here, x will be unconditionally substituted, via
-					-- the substitution!
+	-- NB: it's too pessimistic to return False for ContEx/DoneEx
+	-- Consider 	let x = 3 in f x
+	-- The substitution will contain (x -> ContEx 3)
+	-- It's also too optimistic to return True for the ContEx/DoneEx case
+	-- Consider (\x. f x y) y
+	-- The substitution will contain (x -> ContEx y).
+
     analyse (Type _)	      = False
     analyse (App fn (Type _)) = analyse fn
     analyse (Note _ a)	      = analyse a
@@ -316,11 +332,15 @@ interestingCallContext :: Bool 		-- False <=> no args at all
 	-- 	as scrutinee of a case		Select
 	--	as arg of a strict fn		ArgOf
 	-- then we should not inline it (unless there is some other reason,
-	-- e.g. is is the sole occurrence).  
-	-- Why not?  At least in the case-scrutinee situation, turning
-	--	case x of y -> ...
+	-- e.g. is is the sole occurrence).  We achieve this by making
+	-- interestingCallContext return False for a lone variable.
+	--
+	-- Why?  At least in the case-scrutinee situation, turning
+	--	let x = (a,b) in case x of y -> ...
 	-- into
-	--	let y = (a,b) in ...
+	--	let x = (a,b) in case (a,b) of y -> ...
+	-- and thence to 
+	--	let x = (a,b) in let y = (a,b) in ...
 	-- is bad if the binding for x will remain.
 	--
 	-- Another example: I discovered that strings
@@ -333,12 +353,13 @@ interestingCallContext :: Bool 		-- False <=> no args at all
 	-- the context can ``see'' the unfolding of the variable (e.g. case or a RULE)
 	-- so there's no gain.
 	--
-	-- However, even a type application isn't a lone variable.  Consider
+	-- However, even a type application or coercion isn't a lone variable.
+	-- Consider
 	--	case $fMonadST @ RealWorld of { :DMonad a b c -> c }
 	-- We had better inline that sucker!  The case won't see through it.
 	--
-	-- For now, I'm treating treating a variable applied to types as
-	-- "lone". The motivating example was
+	-- For now, I'm treating treating a variable applied to types 
+	-- in a *lazy* context "lone". The motivating example was
 	--	f = /\a. \x. BIG
 	--	g = /\a. \y.  h (f a)
 	-- There's no advantage in inlining f here, and perhaps
@@ -347,12 +368,12 @@ interestingCallContext :: Bool 		-- False <=> no args at all
 interestingCallContext some_args some_val_args cont
   = interesting cont
   where
-    interesting (InlinePlease _)   = True
-    interesting (ApplyTo _ _ _ _)  = some_args	-- Can happen if we have (coerce t (f x)) y
-    interesting (Select _ _ _ _ _) = some_args
-    interesting (ArgOf _ _ _)	   = some_val_args
-    interesting (Stop ty) 	   = some_val_args && canUpdateInPlace ty
-    interesting (CoerceIt _ cont)  = interesting cont
+    interesting (InlinePlease _)       = True
+    interesting (Select _ _ _ _ _)     = some_args
+    interesting (ApplyTo _ _ _ _)      = some_args	-- Can happen if we have (coerce t (f x)) y
+    interesting (ArgOf _ _ _)	       = some_val_args
+    interesting (Stop ty upd_in_place) = some_val_args && upd_in_place
+    interesting (CoerceIt _ cont)      = interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
 	-- evaluation information to avoid repeated evals: e.g.
@@ -453,12 +474,13 @@ Try (a) eta expansion
     (b) type-lambda swizzling
 
 \begin{code}
-transformRhs :: InExpr -> SimplM InExpr
-transformRhs rhs 
-  = tryEtaExpansion body		`thenSmpl` \ body' ->
-    mkRhsTyLam tyvars body'
-  where
-    (tyvars, body) = collectTyBinders rhs
+transformRhs :: OutExpr 
+	     -> (Arity -> OutExpr -> SimplM (OutStuff a))
+	     -> SimplM (OutStuff a)
+
+transformRhs rhs thing_inside 
+  = tryRhsTyLam rhs			$ \ rhs1 ->
+    tryEtaExpansion rhs1 thing_inside
 \end{code}
 
 
@@ -491,7 +513,7 @@ let-floating.
 This optimisation is CRUCIAL in eliminating the junk introduced by
 desugaring mutually recursive definitions.  Don't eliminate it lightly!
 
-So far as the implemtation is concerned:
+So far as the implementation is concerned:
 
 	Invariant: go F e = /\tvs -> F e
 	
@@ -533,25 +555,31 @@ as we would normally do.
 
 
 \begin{code}
-mkRhsTyLam tyvars body			-- Only does something if there's a let
+tryRhsTyLam rhs thing_inside		-- Only does something if there's a let
   | null tyvars || not (worth_it body)	-- inside a type lambda, and a WHNF inside that
-  = returnSmpl (mkLams tyvars body)
+  = thing_inside rhs
   | otherwise
-  = go (\x -> x) body
+  = go (\x -> x) body		$ \ body' ->
+    thing_inside (mkLams tyvars body')
+
   where
+    (tyvars, body) = collectTyBinders rhs
+
     worth_it (Let _ e)	     = whnf_in_middle e
     worth_it other     	     = False
     whnf_in_middle (Let _ e) = whnf_in_middle e
     whnf_in_middle e	     = exprIsCheap e
 
 
-    go fn (Let bind@(NonRec var rhs) body) | exprIsTrivial rhs
-      = go (fn . Let bind) body
+    go fn (Let bind@(NonRec var rhs) body) thing_inside
+      | exprIsTrivial rhs
+      = go (fn . Let bind) body thing_inside
 
-    go fn (Let bind@(NonRec var rhs) body)
-      = mk_poly tyvars_here var				`thenSmpl` \ (var', rhs') ->
-	go (fn . Let (mk_silly_bind var rhs')) body	`thenSmpl` \ body' ->
-	returnSmpl (Let (NonRec var' (mkLams tyvars_here (fn rhs))) body')
+    go fn (Let bind@(NonRec var rhs) body) thing_inside
+      = mk_poly tyvars_here var						`thenSmpl` \ (var', rhs') ->
+	addAuxiliaryBind (NonRec var' (mkLams tyvars_here (fn rhs))) 	$
+	go (fn . Let (mk_silly_bind var rhs')) body thing_inside
+
       where
 	tyvars_here = tyvars
 		--	main_tyvar_set = mkVarSet tyvars
@@ -573,13 +601,13 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- abstracting wrt *all* the tyvars.  We'll see if that
 		-- gives rise to problems.   SLPJ June 98
 
-    go fn (Let (Rec prs) body)
+    go fn (Let (Rec prs) body) thing_inside
        = mapAndUnzipSmpl (mk_poly tyvars_here) vars	`thenSmpl` \ (vars', rhss') ->
 	 let
-	    gn body = fn $ foldr Let body (zipWith mk_silly_bind vars rhss')
+	    gn body = fn (foldr Let body (zipWith mk_silly_bind vars rhss'))
 	 in
-	 go gn body				`thenSmpl` \ body' ->
-	 returnSmpl (Let (Rec (vars' `zip` [mkLams tyvars_here (gn rhs) | rhs <- rhss])) body')
+	 addAuxiliaryBind (Rec (vars' `zip` [mkLams tyvars_here (gn rhs) | rhs <- rhss]))	$
+	 go gn body thing_inside
        where
 	 (vars,rhss) = unzip prs
 	 tyvars_here = tyvars
@@ -588,17 +616,19 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- See notes with tyvars_here above
 
 
-    go fn body = returnSmpl (mkLams tyvars (fn body))
+    go fn body thing_inside = thing_inside (fn body)
 
     mk_poly tyvars_here var
       = getUniqueSmpl		`thenSmpl` \ uniq ->
 	let
 	    poly_name = setNameUnique (idName var) uniq		-- Keep same name
 	    poly_ty   = mkForAllTys tyvars_here (idType var)	-- But new type of course
+	    poly_id   = mkId poly_name poly_ty vanillaIdInfo
 
-		-- It's crucial to copy the occInfo of the original var, because
-		-- we're looking at occurrence-analysed but as yet unsimplified code!
-		-- In particular, we mustn't lose the loop breakers.
+		-- In the olden days, it was crucial to copy the occInfo of the original var, 
+		-- because we were looking at occurrence-analysed but as yet unsimplified code!
+		-- In particular, we mustn't lose the loop breakers.  BUT NOW we are looking
+		-- at already simplified code, so it doesn't matter
 		-- 
 		-- It's even right to retain single-occurrence or dead-var info:
 		-- Suppose we started with  /\a -> let x = E in B
@@ -607,14 +637,11 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- where x* has an INLINE prag on it.  Now, once x* is inlined,
 		-- the occurrences of x' will be just the occurrences originally
 		-- pinned on x.
-	    poly_info = vanillaIdInfo `setOccInfo` idOccInfo var
-
-	    poly_id   = mkId poly_name poly_ty poly_info
+		-- 	   poly_info = vanillaIdInfo `setOccInfo` idOccInfo var
 	in
 	returnSmpl (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tyvars_here))
 
     mk_silly_bind var rhs = NonRec var rhs
-		-- We need to be careful about inlining.
 		-- Suppose we start with:
 		--
 		--	x = let g = /\a -> \x -> f x x
@@ -627,8 +654,7 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		--		* so we're back to square one
 		-- We rely on the simplifier not to inline g into the RHS of g*,
 		-- because it's a "lone" occurrence, and there is no benefit in
-		-- inlining.  But it's a slightly delicate property, and there's
-		-- a danger of making the simplifier loop here.
+		-- inlining.  But it's a slightly delicate property; hence this comment
 \end{code}
 
 
@@ -641,61 +667,94 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 	Try eta expansion for RHSs
 
 We go for:
-		\x1..xn -> N	==>   \x1..xn y1..ym -> N y1..ym
-	AND		
-		N E1..En	==>   let z1=E1 .. zn=En in \y1..ym -> N z1..zn y1..ym
+   Case 1    f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
+		 (n >= 0)
+     OR		
+   Case 2    f = N E1..En      ==>   z1=E1
+		 (n > 0)		 .. 
+				     zn=En
+				     f = \y1..ym -> N z1..zn y1..ym
 
-where (in both cases) N is a NORMAL FORM (i.e. no redexes anywhere)
-wanting a suitable number of extra args.
+where (in both cases) 
 
-NB: the Ei may have unlifted type, but the simplifier (which is applied
-to the result) deals OK with this.
+	* The xi can include type variables
 
-There is no point in looking for a combination of the two, 
-because that would leave use with some lets sandwiched between lambdas;
-that's what the final test in the first equation is for.
+	* The yi are all value variables
+
+	* N is a NORMAL FORM (i.e. no redexes anywhere)
+	  wanting a suitable number of extra args.
+
+	* the Ei must not have unlifted type
+
+There is no point in looking for a combination of the two, because
+that would leave use with some lets sandwiched between lambdas; that's
+what the final test in the first equation is for.
 
 \begin{code}
-tryEtaExpansion :: InExpr -> SimplM InExpr
-tryEtaExpansion rhs
+tryEtaExpansion :: OutExpr 
+		-> (Arity -> OutExpr -> SimplM (OutStuff a))
+		-> SimplM (OutStuff a)
+tryEtaExpansion rhs thing_inside
   |  not opt_SimplDoLambdaEtaExpansion
-  || exprIsTrivial rhs				-- Don't eta-expand a trival RHS
-  || null y_tys					-- No useful expansion
-  || not (null x_bndrs || and trivial_args)	-- Not (no x-binders or no z-binds)
-  = returnSmpl rhs
+  || null y_tys				-- No useful expansion
+  || not (is_case1 || is_case2)		-- Neither case matches
+  = thing_inside final_arity rhs	-- So, no eta expansion, but
+					-- return a good arity
 
-  | otherwise	-- Consider eta expansion
-  = newIds SLIT("y") y_tys					$ ( \ y_bndrs ->
-    tick (EtaExpansion (head y_bndrs))				`thenSmpl_`
-    mapAndUnzipSmpl bind_z_arg (args `zip` trivial_args)	`thenSmpl` (\ (maybe_z_binds, z_args) ->
-    returnSmpl (mkLams x_bndrs				$ 
-		mkLets (catMaybes maybe_z_binds)	$
- 		mkLams y_bndrs				$
-		mkApps (mkApps fun z_args) (map Var y_bndrs))))
+  | is_case1
+  = make_y_bndrs			$ \ y_bndrs ->
+    thing_inside final_arity
+		 (mkLams x_bndrs $ mkLams y_bndrs $
+		  mkApps body (map Var y_bndrs))
+
+  | otherwise	-- Must be case 2
+  = mapAndUnzipSmpl bind_z_arg arg_infos		`thenSmpl` \ (maybe_z_binds, z_args) ->
+    addAuxiliaryBinds (catMaybes maybe_z_binds)		$
+    make_y_bndrs					$  \ y_bndrs ->
+    thing_inside final_arity
+	         (mkLams y_bndrs $
+		  mkApps (mkApps fun z_args) (map Var y_bndrs))
   where
-    (x_bndrs, body) = collectValBinders rhs
-    (fun, args)	    = collectArgs body
-    trivial_args    = map exprIsTrivial args
-    fun_arity	    = exprEtaExpandArity fun
+    all_trivial_args = all is_trivial arg_infos
+    is_case1	     = all_trivial_args
+    is_case2	     = null x_bndrs && not (any unlifted_non_trivial arg_infos)
 
-    bind_z_arg (arg, trivial_arg) 
+    (x_bndrs, body)  = collectBinders rhs	-- NB: x_bndrs can include type variables
+    x_arity	     = valBndrCount x_bndrs
+
+    (fun, args)	     = collectArgs body
+    arg_infos        = [(arg, exprType arg, exprIsTrivial arg) | arg <- args]
+
+    is_trivial		 (_, _,  triv) = triv
+    unlifted_non_trivial (_, ty, triv) = not triv && isUnLiftedType ty
+
+    fun_arity	     = exprEtaExpandArity fun
+
+    final_arity | all_trivial_args = x_arity + extra_args_wanted
+	        | otherwise	   = x_arity
+	-- Arity can be more than the number of lambdas
+	-- because of coerces. E.g.  \x -> coerce t (\y -> e) 
+	-- will have arity at least 2
+	-- The worker/wrapper pass will bring the coerce out to the top
+
+    bind_z_arg (arg, arg_ty, trivial_arg) 
 	| trivial_arg = returnSmpl (Nothing, arg)
-        | otherwise   = newId SLIT("z") (exprType arg)	$ \ z ->
+        | otherwise   = newId SLIT("z") arg_ty	$ \ z ->
 			returnSmpl (Just (NonRec z arg), Var z)
 
-	-- Note: I used to try to avoid the exprType call by using
-	-- the type of the binder.  But this type doesn't necessarily
-	-- belong to the same substitution environment as this rhs;
-	-- and we are going to make extra term binders (y_bndrs) from the type
-	-- which will be processed with the rhs substitution environment.
-	-- This only went wrong in a mind bendingly complicated case.
+    make_y_bndrs thing_inside 
+	= ASSERT( not (exprIsTrivial rhs) )
+    	  newIds SLIT("y") y_tys			$ \ y_bndrs ->
+	  tick (EtaExpansion (head y_bndrs))		`thenSmpl_`
+	  thing_inside y_bndrs
+
     (potential_extra_arg_tys, _) = splitFunTys (exprType body)
 	
     y_tys :: [InType]
-    y_tys  = take no_extras_wanted potential_extra_arg_tys
+    y_tys  = take extra_args_wanted potential_extra_arg_tys
 	
-    no_extras_wanted :: Int
-    no_extras_wanted = 0 `max`
+    extra_args_wanted :: Int	-- Number of extra args we want
+    extra_args_wanted = 0 `max` (fun_arity - valArgCount args)
 
 	-- We used to expand the arity to the previous arity fo the
 	-- function; but this is pretty dangerous.  Consdier
@@ -707,25 +766,6 @@ tryEtaExpansion rhs
 	--	f = \xy -> let z = BIG in e
 	--
 	-- (bndr_arity - no_of_xs)		`max`
-
-	-- See if the body could obviously do with more args
-	(fun_arity - valArgCount args)
-
--- This case is now deal with by exprEtaExpandArity
-	-- Finally, see if it's a state transformer, and xs is non-null
-	-- (so it's also a function not a thunk) in which
-	-- case we eta-expand on principle! This can waste work,
-	-- but usually doesn't.
-	-- I originally checked for a singleton type [ty] in this case
-	-- but then I found a situation in which I had
-	--	\ x -> let {..} in \ s -> f (...) s
-	-- AND f RETURNED A FUNCTION.  That is, 's' wasn't the only
-	-- potential extra arg.
---	case (x_bndrs, potential_extra_arg_tys) of
---	    (_:_, ty:_)  -> case splitTyConApp_maybe ty of
---				  Just (tycon,_) | tycon == statePrimTyCon -> 1
---				  other					   -> 0
---	    other -> 0
 \end{code}
 
 

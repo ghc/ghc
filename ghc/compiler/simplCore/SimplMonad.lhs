@@ -39,14 +39,19 @@ module SimplMonad (
 	getSubstEnv, extendSubst, extendSubstList,
 	getInScope, setInScope, modifyInScope, addNewInScopeIds,
 	setSubstEnv, zapSubstEnv,
-	getSimplBinderStuff, setSimplBinderStuff
+	getSimplBinderStuff, setSimplBinderStuff,
+
+	-- Adding bindings
+	addLetBind, addLetBinds, addAuxiliaryBind, addAuxiliaryBinds,
+	addCaseBind, needsCaseBinding, addNonRecBind
     ) where
 
 #include "HsVersions.h"
 
-import Id		( Id, mkSysLocal, idUnfolding, isDataConWrapId )
+import Id		( Id, mkSysLocal, idType, idUnfolding, isDataConWrapId )
 import CoreSyn
 import CoreUnfold	( isCompulsoryUnfolding )
+import CoreUtils	( exprOkForSpeculation )
 import PprCore		()	-- Instances
 import CostCentre	( CostCentreStack, subsumedCCS )
 import Name		( isLocallyDefined )
@@ -57,7 +62,7 @@ import qualified Subst
 import Subst		( Subst, mkSubst, substEnv, 
 			  InScopeSet, mkInScopeSet, substInScope, isInScope
 			)
-import Type             ( Type )
+import Type             ( Type, isUnLiftedType )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
@@ -104,6 +109,45 @@ type OutStuff a   = ([OutBind], a)
 	-- We return something equivalent to (let b in e), but
 	-- in pieces to avoid the quadratic blowup when floating 
 	-- incrementally.  Comments just before simplExprB in Simplify.lhs
+\end{code}
+
+\begin{code}
+addLetBind :: CoreBind -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+addLetBind bind thing_inside
+  = thing_inside	`thenSmpl` \ (binds, res) ->
+    returnSmpl (bind : binds, res)
+
+addLetBinds :: [CoreBind] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+addLetBinds binds1 thing_inside
+  = thing_inside	`thenSmpl` \ (binds2, res) ->
+    returnSmpl (binds1 ++ binds2, res)
+
+addAuxiliaryBinds :: [CoreBind] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+	-- Extends the in-scope environment as well as wrapping the bindings
+addAuxiliaryBinds binds1 thing_inside
+  = addNewInScopeIds (bindersOfBinds binds1)	$
+    addLetBinds binds1 thing_inside
+
+addAuxiliaryBind :: CoreBind -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+	-- Extends the in-scope environment as well as wrapping the bindings
+addAuxiliaryBind bind thing_inside
+  = addNewInScopeIds (bindersOf bind)	$
+    addLetBind bind thing_inside
+
+needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
+	-- Make a case expression instead of a let
+	-- These can arise either from the desugarer,
+	-- or from beta reductions: (\x.e) (x +# y)
+
+addCaseBind bndr rhs thing_inside
+  = getInScope 			`thenSmpl` \ in_scope ->
+    thing_inside		`thenSmpl` \ (floats, (_, body)) ->
+    returnSmpl ([], (in_scope, Case rhs bndr [(DEFAULT, [], mkLets floats body)]))
+
+addNonRecBind bndr rhs thing_inside
+	-- Checks for needing a case binding
+  | needsCaseBinding (idType bndr) rhs = addCaseBind bndr rhs thing_inside
+  | otherwise		     	       = addLetBind  (NonRec bndr rhs) thing_inside
 \end{code}
 
 

@@ -27,16 +27,16 @@ module Id (
 	externallyVisibleId,
 	idFreeTyVars,
 	isIP,
-
-	-- Inline pragma stuff
-	idInlinePragma, setInlinePragma, modifyInlinePragma, 
-
 	isSpecPragmaId,	isRecordSelector,
 	isPrimOpId, isPrimOpId_maybe, 
 	isDataConId, isDataConId_maybe, isDataConWrapId, isDataConWrapId_maybe,
 	isBottomingId,
 	isExportedId, isUserExportedId,
-	mayHaveNoBinding,
+	hasNoBinding,
+
+	-- Inline pragma stuff
+	idInlinePragma, setInlinePragma, modifyInlinePragma, 
+
 
 	-- One shot lambda stuff
 	isOneShotLambda, setOneShotLambda, clearOneShotLambda,
@@ -237,16 +237,13 @@ isSpecPragmaId id = case idFlavour id of
 			SpecPragmaId -> True
 			other	     -> False
 
-mayHaveNoBinding id = case idFlavour id of
+hasNoBinding id = case idFlavour id of
 			DataConId _ -> True
 			PrimOpId _  -> True
 			other	    -> False
-	-- mayHaveNoBinding returns True of an Id which may not have a
+	-- hasNoBinding returns True of an Id which may not have a
 	-- binding, even though it is defined in this module.  Notably,
 	-- the constructors of a dictionary are in this situation.
-	--	
-	-- mayHaveNoBinding returns True of some things that *do* have a local binding,
-	-- so it's only an approximation.  That's ok... it's only use for assertions.
 
 -- Don't drop a binding for an exported Id,
 -- if it otherwise looks dead.  
@@ -294,9 +291,7 @@ exportWithOrigOccName id = omitIfaceSigForId id || isUserExportedId id
 
 \begin{code}
 isDeadBinder :: Id -> Bool
-isDeadBinder bndr | isId bndr = case idOccInfo bndr of
-					IAmDead -> True
-					other	-> False
+isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 		  | otherwise = False	-- TyVars count as not dead
 
 isIP id = isIPOcc (getOccName id)

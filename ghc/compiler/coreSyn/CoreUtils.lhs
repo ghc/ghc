@@ -11,7 +11,7 @@ module CoreUtils (
         mkPiType,
 
 	-- Properties of expressions
-	exprType, coreAltsType, exprArity,
+	exprType, coreAltsType, 
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe,
@@ -300,19 +300,16 @@ shared.  The main examples of things which aren't WHNF but are
 
   * 	case e of
 	  pi -> ei
+	(where e, and all the ei are cheap)
 
-	where e, and all the ei are cheap; and
-
-  *	let x = e
-	in b
-
-	where e and b are cheap; and
+  *	let x = e in b
+	(where e and b are cheap)
 
   *	op x1 ... xn
-
-	where op is a cheap primitive operator
+	(where op is a cheap primitive operator)
 
   *	error "foo"
+	(because we are happy to substitute it inside a lambda)
 
 Notice that a variable is considered 'cheap': we can push it inside a lambda,
 because sharing will make sure it is only evaluated once.
@@ -324,10 +321,18 @@ exprIsCheap (Type _)        	  = True
 exprIsCheap (Var _)         	  = True
 exprIsCheap (Note _ e)      	  = exprIsCheap e
 exprIsCheap (Lam x e)       	  = if isId x then True else exprIsCheap e
-exprIsCheap (Case (Var v) _ alts) = and [exprIsCheap rhs | (_,_,rhs) <- alts]
+exprIsCheap (Case e _ alts)       = exprIsCheap e && 
+				    and [exprIsCheap rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
+	-- (and case __coerce x etc.)
 	-- This improves arities of overloaded functions where
 	-- there is only dictionary selection (no construction) involved
+exprIsCheap (Let (NonRec x _) e)  
+      | isUnLiftedType (idType x) = exprIsCheap e
+      | otherwise		  = False
+	-- strict lets always have cheap right hand sides, and
+	-- do no allocation.
+
 exprIsCheap other_expr 
   = go other_expr 0 True
   where
@@ -337,9 +342,8 @@ exprIsCheap other_expr
 
 	  || idAppIsBottom f n_args 
 			-- Application of a function which
-			-- always gives bottom; we treat this as
-			-- a WHNF, because it certainly doesn't
-			-- need to be shared!
+			-- always gives bottom; we treat this as cheap
+			-- because it certainly doesn't need to be shared!
 	
     go (App f a) n_args args_cheap 
 	| isTypeArg a = go f n_args 	  args_cheap
@@ -473,25 +477,6 @@ idAppIsValue id n_val_args
 	      | otherwise       -> n_val_args < idArity id
 	-- A worry: what if an Id's unfolding is just itself: 
 	-- then we could get an infinite loop...
-\end{code}
-
-\begin{code}
-exprArity :: CoreExpr -> Int	-- How many value lambdas are at the top
-exprArity (Lam b e)     | isTyVar b	= exprArity e
-		        | otherwise	= 1 + exprArity e
-
-exprArity (Note note e) | ok_note note	= exprArity e
-			where
-			  ok_note (Coerce _ _) = True
-				-- We *do* look through coerces when getting arities.
-				-- Reason: arities are to do with *representation* and
-				-- work duplication. 
-			  ok_note InlineMe     = True
-			  ok_note InlineCall   = True
-			  ok_note other	       = False
-				-- SCC and TermUsg might be over-conservative?
-
-exprArity other	= 0
 \end{code}
 
 \begin{code}

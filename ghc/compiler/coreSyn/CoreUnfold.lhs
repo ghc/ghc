@@ -214,7 +214,18 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 
     size_up (Case (Var v) _ alts) 
 	| v `elem` top_args		-- We are scrutinising an argument variable
-	= case alts of
+	= 
+{-	I'm nuking this special case; BUT see the comment with case alternatives.
+
+	(a) It's too eager.  We don't want to inline a wrapper into a
+	    context with no benefit.  
+	    E.g.  \ x. f (x+x)   	o point in inlining (+) here!
+
+	(b) It's ineffective. Once g's wrapper is inlined, its case-expressions 
+	    aren't scrutinising arguments any more
+
+	    case alts of
+
 		[alt] -> size_up_alt alt `addSize` SizeIs 0# (unitBag (v, 1)) 0#
 		-- We want to make wrapper-style evaluation look cheap, so that
 		-- when we inline a wrapper it doesn't make call site (much) bigger
@@ -227,7 +238,9 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 		-- ordering difference, we make (case a of (x,y) -> ...), 
 		-- *where a is one of the arguments* look free.
 
-		other -> alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the scrutinee
+		other -> 
+-}
+			 alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the scrutinee
 				   (foldr1 maxSize alt_sizes)
 
 		-- Good to inline if an arg is scrutinised, because
@@ -301,7 +314,8 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 
     ------------ 
     size_up_alt (con, bndrs, rhs) = size_up rhs
-	    -- Don't charge for args, so that wrappers look cheap
+ 	-- Don't charge for args, so that wrappers look cheap
+	-- (See comments about wrappers with Case)
 
     ------------
 	-- We want to record if we're case'ing, or applying, an argument
@@ -602,7 +616,7 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 #ifdef DEBUG
     if opt_D_dump_inlinings then
 	pprTrace "Considering inlining"
-		 (ppr id <+> vcat [text "black listed" <+> ppr black_listed,
+		 (ppr id <+> vcat [text "black listed:" <+> ppr black_listed,
 				   text "occ info:" <+> ppr occ,
 			  	   text "arg infos" <+> ppr arg_infos,
 				   text "interesting continuation" <+> ppr interesting_cont,
@@ -700,8 +714,8 @@ normal_case rule_vars phase v
 	  | from_INLINE -> has_rules	-- Black list until final phase
 	  | otherwise   -> True		-- Always blacklisted
 
-	IMustNotBeINLINEd from_inline (Just threshold)
-	  | from_inline -> (phase < threshold && has_rules)
+	IMustNotBeINLINEd from_INLINE (Just threshold)
+	  | from_INLINE -> (phase < threshold && has_rules)
 	  | otherwise   -> (phase < threshold || has_rules)
   where
     has_rules =  v `elemVarSet` rule_vars
