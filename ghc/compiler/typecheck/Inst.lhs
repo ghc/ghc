@@ -62,7 +62,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
 		  isClassPred, isTyVarClassPred, isLinearPred, 
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
-		  isInheritablePred, isIPPred, 
+		  isInheritablePred, isIPPred, matchTys,
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy
 		)
 import HscTypes	( ExternalPackageState(..) )
@@ -77,11 +77,13 @@ import Subst	( substTy, substTyWith, substTheta, mkTyVarSubst )
 import Literal	( inIntRange )
 import Var	( TyVar )
 import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )
-import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
+import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
+import CmdLineOpts( DynFlags )
+import Maybes	( isJust )
 import Outputable
 \end{code}
 
@@ -556,7 +558,7 @@ checkNewInst :: DynFlags -> (InstEnv, InstEnv) -> DFunId -> TcM ()
 -- Check that the proposed new instance is OK
 checkNewInst dflags ies dfun
   = do	{ 	-- Check functional dependencies
-	  case checkFunDeps (home_ie, pkg_ie) dfun of
+	  case checkFunDeps ies dfun of
 		Just dfuns -> funDepErr dfun dfuns
 		Nothing    -> return ()
 
@@ -564,9 +566,9 @@ checkNewInst dflags ies dfun
 	; mappM_ (dupInstErr dfun) dup_dfuns }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
-    (matches, _) = lookupInstEnv dflags ies clas tys
+    (matches, _) = lookupInstEnv dflags ies cls tys
     dup_dfuns = [dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
-			isJust (matchTys tvs tys dup_tys)]
+			isJust (matchTys (mkVarSet tvs) tys dup_tys)]
 	-- Find memebers of the match list which 
 	-- dfun itself matches. If the match is 2-way, it's a duplicate
 
