@@ -6,6 +6,7 @@
 Odds and ends, mostly functions for reading and showing
 \tr{RealFloat}-like kind of values.
 
+
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 module Numeric
