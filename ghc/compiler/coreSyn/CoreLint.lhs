@@ -63,7 +63,7 @@ endPass dflags pass_name dump_flag binds
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
 	if verbosity dflags >= 2 then
-	   hPutStrLn stdout ("    Result size = " ++ show (coreBindsSize binds))
+	   hPutStrLn stderr ("    Result size = " ++ show (coreBindsSize binds))
 	 else
 	   return ()
 
