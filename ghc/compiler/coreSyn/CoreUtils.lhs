@@ -62,8 +62,6 @@ import Type		( Type, mkFunTy, mkForAllTy,
 			)
 import TysWiredIn	( boolTy, stringTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
-import Unique		( buildIdKey, augmentIdKey )
-import Util		( zipWithEqual, mapAccumL )
 import Maybes		( maybeToBool )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
