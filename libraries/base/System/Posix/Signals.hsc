@@ -12,7 +12,10 @@
 --
 -----------------------------------------------------------------------------
 
+#include "config.h"
+
 module System.Posix.Signals (
+#ifndef mingw32_TARGET_OS
   -- * The Signal type
   Signal,
 
@@ -76,7 +79,7 @@ module System.Posix.Signals (
   -- sigaltstack()
   -- sighold, sigignore, sigpause, sigrelse, sigset
   -- siginterrupt
-
+#endif
   ) where
 
 #include "Signals.h"
@@ -86,6 +89,9 @@ import Foreign.C
 import System.IO.Unsafe
 import System.Posix.Types
 import GHC.Posix
+
+#ifndef mingw32_TARGET_OS
+-- WHOLE FILE...
 
 -- -----------------------------------------------------------------------------
 -- Specific signals
@@ -390,3 +396,6 @@ foreign import ccall unsafe "sigpending"
 foreign import ccall unsafe "__hsposix_SIG_BLOCK"   c_SIG_BLOCK   :: CInt
 foreign import ccall unsafe "__hsposix_SIG_SETMASK" c_SIG_SETMASK :: CInt
 foreign import ccall unsafe "__hsposix_SIG_UNBLOCK" c_SIG_UNBLOCK :: CInt
+
+#endif /* mingw32_TARGET_OS */
+
