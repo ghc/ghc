@@ -33,6 +33,9 @@ import GlaExts
 import IO
 import ST
 import IOBase
+# if __GLASGOW_HASKELL__ >= 209
+import STBase (ST(..), STret(..) )
+# endif
 #define IOError13 IOError
 #define MkIO IO
 #endif
@@ -84,13 +87,31 @@ infixr 9 `thenRn`, `thenRn_`
 
 \begin{code}
 sstToIO :: SST REAL_WORLD r -> IO r
+#if __GLASGOW_HASKELL__ < 209
 sstToIO sst =
     MkIO (
     sstToST sst 	`thenStrictlyST` \ r -> 
     returnStrictlyST (Right r))
+#else
+sstToIO sst =
+    IO (\ s ->
+      let (ST st_act) = sstToST sst in
+      case st_act s of
+       STret s' v -> IOok s' v)
+#endif
 
 ioToRnMG :: IO r -> RnMG (Either IOError13 r)
+#if __GLASGOW_HASKELL__ < 209
 ioToRnMG (MkIO io) rn_down g_down = stToSST io
+#else
+ioToRnMG (IO io) rn_down g_down 
+  = stToSST (ST io')
+    where
+     io' st =
+      case io st of 
+       IOok   st' v -> STret st' (Right v)
+       IOfail st' e -> STret st' (Left e)
+#endif
 
 traceRn :: Doc -> RnMG ()
 traceRn msg | opt_D_show_rn_trace = putDocRn msg
