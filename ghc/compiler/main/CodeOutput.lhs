@@ -24,13 +24,12 @@ import qualified PrintJava
 import OccurAnal	( occurAnalyseBinds )
 #endif
 
-import Packages		( PackageConfig(name), packageNameString )
+import Packages
 import DriverState	( getExplicitPackagesAnd, getPackageCIncludes )
 import FastString	( unpackFS )
 import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
-import HscTypes		( ModGuts(..), ModGuts, ForeignStubs(..), 
-			  typeEnvTyCons, Dependencies(..) )
+import HscTypes
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
@@ -60,9 +59,7 @@ codeOutput dflags
 		     mg_deps	= deps,
 		     mg_binds   = core_binds})
 	   flat_abstractC
-  = let
-	tycons = typeEnvTyCons type_env
-    in
+  = 
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
@@ -85,6 +82,7 @@ codeOutput dflags
 #endif
 	     HscILX         -> 
 #ifdef ILX
+			       let tycons = typeEnvTyCons type_env in
 	                       outputIlx dflags filenm mod_name tycons stg_binds;
 #else
                                panic "ILX support not compiled into this ghc";
@@ -224,6 +222,11 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
 
+	-- we need the #includes from the rts package for the stub files
+	rts_pkgs <- getPackageDetails [rtsPackage]
+ 	let rts_includes = concatMap mk_include (concatMap c_includes rts_pkgs)
+	    mk_include i = "#include \"" ++ i ++ "\"\n"
+
 	stub_h_file_exists
            <- outputForeignStubs_help (hscStubHOutName dflags) stub_h_output_w
 		("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
@@ -235,6 +238,7 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
            <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
 		("#define IN_STG_CODE 0\n" ++ 
 		 "#include \"RtsAPI.h\"\n" ++
+		 rts_includes ++
 		 cplusplus_hdr)
 		 cplusplus_ftr
 	   -- We're adding the default hc_header to the stub file, but this
