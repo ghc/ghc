@@ -2,7 +2,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 
-	This module defines intereace types and binders
+	This module defines interface types and binders
 
 \begin{code}
 module IfaceType (
