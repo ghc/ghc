@@ -15,6 +15,7 @@
 Options added:
 
 %section-autolabel%: true
+%paper-type%: A4
 
 -->
 
@@ -65,6 +66,9 @@ Options added:
 
 (define %graphic-default-extension% "eps")
 
+(define %paper-type%
+  ;; Name of paper type
+  "A4")
 
 </style-specification-body>
 </style-specification>
