@@ -1,4 +1,0 @@
-__interface RnHiFiles 1 0 where
-__export RnHiFiles loadInterface;
-1 loadInterface :: __forall [m] => Outputable.SDoc -> Module.ModuleName -> TcRnTypes.WhereFrom 
-		-> TcRnTypes.TcRn m HscTypes.ModIface;
