@@ -53,10 +53,10 @@
   (which vary, depending on how you compiled).</para>
 
   <para>NOTE: since GHC is itself compiled by GHC, you can change RTS
-  options in the compiler using the normal 
-  <literal>+RTS ... -RTS</literal> 
+  options in the compiler using the normal
+  <literal>+RTS ... -RTS</literal>
   combination.  eg. to increase the maximum heap
-  size for a compilation to 128M, you would add 
+  size for a compilation to 128M, you would add
   <literal>+RTS -M128m -RTS</literal>
   to the command line.</para>
 
@@ -106,7 +106,7 @@
           used by the garbage collector.  The allocation area
           (actually generation 0 step 0) is fixed and is never resized
           (unless you use <option>-H</option>, below).</para>
-	  
+
 	  <para>Increasing the allocation area size may or may not
           give better performance (a bigger allocation area means
           worse cache behaviour but fewer garbage collections and less
@@ -213,7 +213,7 @@
           use the <option>-H</option> option, see below).</para>
 	</listitem>
       </varlistentry>
-      
+
       <VarListEntry>
 	<term><option>-H</option><replaceable>size</replaceable></term>
 	<indexterm><primary><option>-H</option></primary><secondary>RTS option</secondary></indexterm>
@@ -235,7 +235,7 @@
           <option>-A</option><replaceable>size</replaceable>.</para>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term><option>-k</option><replaceable>size</replaceable></term>
 	<indexterm><primary><option>-k</option></primary><secondary>RTS option</secondary></indexterm>
@@ -463,9 +463,9 @@
 	</listitem>
       </varlistentry>
     </variablelist>
-    
+
   </sect2>
-  
+
   <sect2 id="rts-hooks">
     <title>&ldquo;Hooks&rdquo; to change RTS behaviour</title>
 
@@ -509,15 +509,6 @@ char *ghc_rts_opts = "-H128m -K1m";
     <variablelist>
 
       <varlistentry>
-	<term><Function>void ErrorHdrHook (FILE *)</function></term>
-	<indexterm><primary><function>ErrorHdrHook</function></primary></indexterm>
-	<listitem>
-	  <para>What's printed out before the message from
-	  <function>error</function>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
 	<term><function>void OutOfHeapHook (unsigned long, unsigned long)</function></term>
 	<indexterm><primary><function>OutOfHeapHook</function></primary></indexterm>
 	<ListItem>
@@ -539,34 +530,6 @@ char *ghc_rts_opts = "-H128m -K1m";
 	<listitem>
 	  <para>The message printed if <Function>malloc</Function>
 	  fails.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><function>void PatErrorHdrHook (FILE *)</function></term>
-	<indexterm><primary><function>PatErrorHdrHook</function></primary></indexterm>
-	<listitem>
-	  <para>The message printed if a pattern-match fails (the
-          failures that were not handled by the Haskell
-          programmer).</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><function>void PreTraceHook (FILE *)</function></term>
-	<indexterm><primary><function>PreTraceHook</function></primary></indexterm>
-	<listitem>
-	  <para>What's printed out before a <Function>trace</Function>
-	  message.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><function>void PostTraceHook (FILE *)</function></term>
-	<indexterm><primary><function>PostTraceHook</function></primary></indexterm>
-	<listitem>
-	  <para>What's printed out after a <Function>trace</Function>
-	  message.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
