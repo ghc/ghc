@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 1999/01/13 17:25:41 simonm Exp $
+# $Id: Makefile,v 1.4 1999/01/21 10:30:24 simonm Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -54,11 +54,9 @@ WARNING_OPTS += -optc-Wbad-function-cast
 #WARNING_OPTS += -optc-Wconversion
 
 SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts)
-SRC_CC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsCcOpts)
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
-SRC_CC_OPTS += -I$$PVM_ROOT/include
 endif
 
 C_SRCS = $(SRCS_RTS_C) $(SRCS_RTS_HC) # $(SRCS_RTS_S)???
@@ -74,7 +72,7 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 # ../driver/ghc (a better C compiler :-) to compile the
 # different RTS pieces
 #
-CC=$(HC) $($*_HC_OPTS)
+CC=$(HC) $(HC_OPTS) $($*_HC_OPTS)
 
 # prevent this value from leaking into the GMP makefile
 unexport CC
