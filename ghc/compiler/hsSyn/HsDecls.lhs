@@ -480,7 +480,7 @@ data BangType name = BangType HsBang (LHsType name)
 
 data HsBang = HsNoBang
 	    | HsStrict	-- ! 
-	    | HsUnbox	-- !! (GHC extension, meaning "unbox")
+	    | HsUnbox	-- {-# UNPACK #-} ! (GHC extension, meaning "unbox")
 
 getBangType       (BangType _ ty) = ty
 getBangStrictness (BangType s _)  = s
