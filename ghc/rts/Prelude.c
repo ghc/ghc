@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.c,v 1.6 2000/04/14 16:47:43 panne Exp $
+ * $Id: Prelude.c,v 1.7 2000/05/22 13:09:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -15,12 +15,13 @@
 const StgClosure *ind_True_closure;
 const StgClosure *ind_False_closure;
 const StgClosure *ind_unpackCString_closure;
+const StgClosure *ind_runFinalizerBatch_closure;
+
 const StgClosure *ind_stackOverflow_closure;
 const StgClosure *ind_heapOverflow_closure;
 const StgClosure *ind_PutFullMVar_closure;
 const StgClosure *ind_BlockedOnDeadMVar_closure;
 const StgClosure *ind_NonTermination_closure;
-const StgClosure *ind_mainIO_closure;
 
 const StgInfoTable *ind_Czh_static_info;
 const StgInfoTable *ind_Izh_static_info;
@@ -102,6 +103,7 @@ void fixupRTStoPreludeRefs ( void*(*ask_hugs_dynamic_linker)(char*) )
     /* Hugs standalone mode. */
     ind_True_closure               = NULL; /* True__closure; */
     ind_False_closure              = NULL; /* False_closure; */
+    ind_runFinalizerBatch_closure  = NULL; /* runFinalizerBatch_closure; */
     ind_PutFullMVar_closure        = NULL; /* PutFullMVar_closure; */
     ind_BlockedOnDeadMVar_closure  = NULL; /* BlockedOnDeadMVar_closure; */
     ind_NonTermination_closure     = NULL; /* NonTermination_closure; */
@@ -136,6 +138,8 @@ void fixupRTStoPreludeRefs ( void*(*ask_hugs_dynamic_linker)(char*) )
        = ask("PrelBase_True_closure");
     ind_False_closure          
        = ask("PrelBase_False_closure");
+    ind_runFinalizerBatch_closure    
+       = ask("PrelWeak_runFinalizzerBatch_closure");
     ind_PutFullMVar_closure    
        = ask("PrelException_PutFullMVar_closure");
     ind_BlockedOnDeadMVar_closure    
