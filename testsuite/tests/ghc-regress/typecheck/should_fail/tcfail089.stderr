@@ -1,5 +1,1 @@
-
-tcfail089.hs:10:
-    `++' is not a data constructor
-    When checking the pattern: "hd" ++ _
-    In the definition of `compute': compute ("hd" ++ _) = "_"
+tcfail089.hs:10: Parse error in pattern
