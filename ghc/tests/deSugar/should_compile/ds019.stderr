@@ -4,30 +4,3 @@ ds019.hs:7:
 ds019.hs:8: 
     Warning: Pattern match(es) completely overlapped
 	in the definition of function `f'
-
-
-================================================================================
-Desugared:
-Rec {
-f{-r3y,x-}  ::  _forall_
-		[tazA taz7 taza tazd tazq tazt tazy]
-		=>
-		(taz7, taza, tazd) -> (tazq, tazt) -> tazA -> [tazy]
-{-# L #-}
-f{-r3y,x-} =
-    _/\_ tazA taz7 taza tazd tazq tazt tazy ->
-	_letrec_ {
-	  f_ayl  ::  (taz7, taza, tazd) -> (tazq, tazt) -> tazA -> [tazy]
-	  {-# L #-}
-	  f_ayl =
-	      \ ds_dEd  ::  (taz7, taza, tazd)
-		{-# L #-}
-		ds_dEd i_r3g  ::  (tazq, tazt)
-		       {-# L #-}
-		       i_r3g o_r3h  ::  tazA
-			     {-# L #-}
-			     o_r3h ->
-		  case ds_dEd of { PrelTup.(,,){-63,w-}{i} a_r3d b_r3e c_r3f  ->
-		  PrelBase.[]{-5i,w-}{i} _@_ tazy;};
-	} in  f_ayl
-end Rec }

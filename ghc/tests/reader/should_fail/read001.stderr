@@ -1,7 +1,4 @@
-
-
-================================================================================
-Reader:
+==================== Reader ====================
 module OneOfEverything (
 	fixn, FooData, FooDataB(..), FooDataC(..), EqTree(EqLeaf,
 							  EqBranch), EqClass(..), OrdClass(orda,
@@ -93,6 +90,7 @@ data (Eq a) => EqTree a = EqLeaf a | EqBranch (EqLeaf a) (EqLeaf a)
 data FooDataB = FooConB Double
 data FooData = FooCon Int
 type Pair a b = (a, b)
+
  
 read001.hs:17: Could not find valid interface file `OneA'
  
@@ -105,6 +103,5 @@ read001.hs:19: Could not find valid interface file `OneC'
 read001.hs:19: Module OneC does not export `fC'
  
 read001.hs:20: Module OneC does not export `fC'
-
 
 Compilation had errors

@@ -135,6 +135,10 @@ test_floats
     fill_in arr_in# first# last#
       = if (first# ># last#)
 	then returnST ()
+{-	else let e = ((fromInt (I# first#)) * pi)
+	     in trace (show e) $ writeFloatArray arr_in# (I# first#) e >>
+	     fill_in arr_in# (first# +# 1#) last#
+-}
 	else writeFloatArray arr_in# (I# first#) ((fromInt (I# first#)) * pi) >>
 	     fill_in arr_in# (first# +# 1#) last#
 

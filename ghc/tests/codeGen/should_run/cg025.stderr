@@ -1,4 +1,4 @@
-"cg025"
+"cg025.bin"
 ["cg025.hs"]
 "/bin:/usr/bin:/users/ets/simonm/bin:/users/ets/simonm/bin/i386-unknown-freebsd2.2:/usr/local/bin:/usr/X11R6/bin:/usr/local/X11R6/bin:/local/fp/bin:/local/fp/bin/i386-unknown-freebsd2.2:/local/ets/go/i386-unknown-freebsd2.2:/local/fp/bin/i386-unknown-freebsd2.1.0:/local/ets/go/i386-unknown-freebsd2.1.0:/usr/local/teTeX/bin:/sbin:/usr/sbin"
 --!!! test various I/O Requests
