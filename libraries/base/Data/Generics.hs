@@ -477,9 +477,9 @@ instance Data a => Data [a] where
     gmapQ f (Wrap w) = [f w]
     gmapM f (Box a)  = f a >>= return . Box
     gmapM f (Wrap w) = f w >>= return . Wrap
-    conOf (Box _) = "Box"
-    conOf (Wrap _) = "Wrap"
-    consOf _ = ["Box","Wrap"]
+    conOf (Box _) = Constr "Box"
+    conOf (Wrap _) = Constr "Wrap"
+    consOf _ = map Constr ["Box","Wrap"]
     gunfold f z e "Box"  = f (z Box)
     gunfold f z e "Wrap" = f (z Wrap)
     gunfold _ _ e _      = e
@@ -490,8 +490,8 @@ instance Data a => Data [a] where
    
    instance Data GenericT' where
     gmapT f (T' g) = (T' (f g))
-    conOf _ = "T'"
-    consOf _ = ["T'"]
+    conOf _ = Constr "T'"
+    consOf _ = map Constr ["T'"]
    
    
    -- test code only
@@ -507,8 +507,8 @@ instance Typeable (a -> b) => Data (a -> b) where
  gmapT f = id
  gmapQ f = const []
  gmapM f = return
- conOf _ = "->"
- consOf _ = ["->"]
+ conOf _ = Constr "->"
+ consOf _ = [Constr "->"]
 -}
 
 
