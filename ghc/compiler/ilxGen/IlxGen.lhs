@@ -12,15 +12,16 @@ import Id	( idType, idName, isDeadBinder, idArityInfo )
 import IdInfo   ( arityLowerBound )
 import Var	( Var, Id, TyVar, isId, isTyVar, tyVarKind, tyVarName )
 import VarEnv
+import VarSet   ( isEmptyVarSet )
 import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons, 
 		  tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
 		)
 import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
 		  isUnLiftedType, isTyVarTy, mkTyVarTy, sourceTypeRep,
-		  splitForAllTys, splitFunTys, applyTy, applyTys, eqKind
+		  splitForAllTys, splitFunTys, applyTy, applyTys, eqKind, tyVarsOfTypes
 		)
 import TypeRep	( Type(..) )
-import DataCon	( isUnboxedTupleCon, dataConTyCon, dataConRepType, dataConRepArgTys )
+import DataCon	( isUnboxedTupleCon, dataConTyCon, dataConRepType, dataConRepArgTys, DataCon(..) )
 import Literal	( Literal(..) )
 import PrelNames	-- Lots of keys
 import PrimOp		( PrimOp(..) )
@@ -67,7 +68,7 @@ import CmdLineOpts	( opt_InPackage, opt_SimplDoEtaReduction )
 ilxGen :: Module -> [TyCon] -> [(StgBinding,[Id])] -> SDoc
 	-- The TyCons should include those arising from classes
 ilxGen mod tycons binds_w_srts
-  =  vcat [ text ".assembly extern ilx 'mscorlib' {}",
+  =  vcat [ text ".assembly extern 'mscorlib' {}",
 	    vcat (map (ilxImportPackage topenv) (uniqSetToList import_packages)),
             vcat (map (ilxImportModule topenv) (uniqSetToList import_modules)),
             vcat (map (ilxImportTyCon topenv) (uniqSetToList import_tycons)),
@@ -93,7 +94,7 @@ ilxGen mod tycons binds_w_srts
 
 \begin{code}
 
-importsBinds :: IlxEnv -> [StgBinding] -> ImportsInfo-> ImportsInfo
+importsBinds :: IlxEnv -> [StgBinding] -> ImportsInfo -> ImportsInfo
 importsBinds env binds = foldR (importsBind env) binds
 
 importsNone :: ImportsInfo -> ImportsInfo
@@ -155,7 +156,7 @@ importsVar env v = importsName env (idName v). importsType env (idType v)
 
 importsName env n
    | isLocalName n = importsNone
-   | ilxEnvModule env == nameModule n  = importsNone
+   | ilxEnvModule env == nameModule n = importsNone
    | isHomeModule (nameModule n) =  addModuleImpInfo (moduleName (nameModule n))
 -- See HACK below
    | isVanillaModule (nameModule n)  && not inPrelude =  importsPrelude
@@ -164,11 +165,15 @@ importsName env n
    | otherwise = addPackageImpInfo (modulePackage (nameModule n))
 
 
+importsPrelude | inPrelude = addModuleImpInfo (mkModuleName "PrelGHC")
+	       | otherwise = addPackageImpInfo preludePackage
+
+
 importsType :: IlxEnv -> Type -> ImportsInfo -> ImportsInfo
 importsType env ty = importsType2 env (deepIlxRepType ty)
 
 importsType2 :: IlxEnv -> Type -> ImportsInfo -> ImportsInfo
-importsType2 env (AppTy f x) =  importsType2 env f .  importsType2 env x
+importsType2 env (AppTy f x) =  importsType2 env f . importsType2 env x
 importsType2 env (TyVarTy _) = importsNone
 importsType2 env (TyConApp tc args) =importsTyCon env tc . importsTypeArgs2 env args
 importsType2 env (FunTy arg res) =  importsType env arg .  importsType2 env res
@@ -182,10 +187,31 @@ importsDataCon env dcon = importsTyCon env (dataConTyCon dcon)
 importsTyCon env tc | (not (isDataTyCon tc) || 
                    isLocalName (getName tc) || 
                    ilxEnvModule env == nameModule (getName tc)) = importsNone
-importsTyCon env tc | otherwise = importsName env (getName tc) . addTyConImpInfo tc
+importsTyCon env tc | otherwise = importsName env (getName tc) . addTyConImpInfo tc .
+				    foldR (importsTyConDataCon env) (tyConDataCons tc)
 
-importsPrelude | inPrelude = addModuleImpInfo (mkModuleName "PrelGHC")
-	       | otherwise = addPackageImpInfo preludePackage
+
+importsTyConDataCon :: IlxEnv -> DataCon -> ImportsInfo -> ImportsInfo
+importsTyConDataCon env dcon = foldR (importsTyConDataConType env) (filter (not . isVoidIlxRepType) (dataConRepArgTys dcon))
+
+importsTyConDataConType :: IlxEnv -> Type -> ImportsInfo -> ImportsInfo
+importsTyConDataConType env ty = importsTyConDataConType2 env (deepIlxRepType ty)
+
+importsTyConDataConType2 :: IlxEnv -> Type -> ImportsInfo -> ImportsInfo
+importsTyConDataConType2 env (AppTy f x) =  importsTyConDataConType2 env f . importsTyConDataConType2 env x
+importsTyConDataConType2 env (TyVarTy _) = importsNone
+importsTyConDataConType2 env (TyConApp tc args) = importsTyConDataConTypeTyCon env tc . importsTyConDataConTypeArgs2 env args
+importsTyConDataConType2 env (FunTy arg res) = importsTyConDataConType env arg .  importsTyConDataConType2 env res
+importsTyConDataConType2 env (ForAllTy tv body_ty) = importsTyConDataConType2 env body_ty
+importsTyConDataConType2 env (NoteTy _ ty) = importsTyConDataConType2 env ty
+importsTyConDataConType2 _ _ = panic "IlxGen.lhs: importsTyConDataConType2 ty"
+importsTyConDataConTypeArgs2 env tys = foldR (importsTyConDataConType2 env) tys
+
+importsTyConDataConTypeTyCon env tc | (not (isDataTyCon tc) || 
+                   isLocalName (getName tc) || 
+                   ilxEnvModule env == nameModule (getName tc)) = importsNone
+importsTyConDataConTypeTyCon env tc | otherwise = importsName env (getName tc)
+
 
 type StaticCCallInfo = (CLabelString,CCallConv,[Type],Type)
 type ImportsInfo = (UniqSet PackageName, UniqSet ModuleName, UniqSet TyCon, UniqFM StaticCCallInfo)
@@ -203,10 +229,10 @@ ilxImportTyCon env tycon | isDataTyCon tycon = ilxTyConDef True env tycon
 ilxImportTyCon _ _ | otherwise =  empty
 
 ilxImportPackage :: IlxEnv -> PackageName -> SDoc
-ilxImportPackage _ p = text ".assembly extern ilx" <+> singleQuotes (ppr p <> hscOptionQual) <+> text "{ }"
+ilxImportPackage _ p = text ".assembly extern" <+> singleQuotes (ppr p <> hscOptionQual) <+> text "{ }"
 
 ilxImportModule :: IlxEnv -> ModuleName -> SDoc
-ilxImportModule _ m = text ".module extern ilx" <+> singleQuotes (ppr m  <> hscOptionQual <> text ".dll")
+ilxImportModule _ m = text ".module extern" <+> singleQuotes (ppr m <> hscOptionQual <> text "o")
 
 -- Emit a P/Invoke declaration for the imported C function
 -- TODO: emit the right DLL name
@@ -586,7 +612,7 @@ ilxWipe env ids
 
 ilxWipeOne env id
    = case lookupIlxVarEnv env id of
-	  Just Local  -> text "ldloca " <+> pprId id <+> text "initobj" <+> (ilxTypeL env (idIlxRepType id))
+	  Just Local  -> text "ldloca " <+> pprId id <+> text "initobj.any" <+> (ilxTypeL env (idIlxRepType id))
 	  Just Arg   -> text "deadarg " <+> pprId id <+> text "," <+> (ilxTypeL env (idIlxRepType id))
 	  Just (CloVar _)  -> ilxComment (text "not yet wiping closure variable" <+> pprId id )
 	  _ -> ilxComment (text "cannot wipe non-local/non-argument" <+> pprId id )
@@ -745,7 +771,7 @@ ilxFunAppAfterPush env fun args tail_call
       case lookupIlxBindEnv env fun of
 	  Just (_, StgRhsClosure  _ _ _ Updatable _ _)   -> Nothing 
 	  Just (place, StgRhsClosure  _ _ fvs _ args _)  -> Just (place,fun,args,fvs)
-	  _ ->  trace (show fun ++ " --> " ++ show (arityLowerBound (idArityInfo fun)))  Nothing 
+	  _ -> Nothing -- trace (show fun ++ " --> " ++ show (arityLowerBound (idArityInfo fun)))
 
 type KnownClosure = Maybe (  IlxEnv	-- Of the binding site of the function
 			   , Id		-- The function
@@ -1162,7 +1188,7 @@ ilxTypeL env ty = text "thunk" <> angleBrackets (ilxTypeR env ty)
 ilxTypeR :: IlxEnv -> Type -> SDoc
 ilxTypeR env ty | isVoidIlxRepType ty = text "/* unit skipped */"
 ilxTypeR env ty@(AppTy f _) | isTyVarTy f    = ilxComment (text "type app:" <+> pprType ty) <+> (text "class [mscorlib]System.Object")
-ilxTypeR env ty@(AppTy f x)     = trace "ilxTypeR: should I be beta reducing types?!" (ilxComment (text "ilxTypeR: should I be beta reducing types...") <+> ilxTypeR env (applyTy f x))
+ilxTypeR env ty@(AppTy f x)     = trace "ilxTypeR: should I be beta reducing types?!" (ilxComment (text "ilxTypeR: should I be beta reducing types?!") <+> ilxTypeR env (applyTy f x))
 ilxTypeR env (TyVarTy tv)       = ilxTyVar env tv
 
 -- The following is a special rule for types constructed out of 
@@ -1416,7 +1442,7 @@ singleQuotes pp = char '\'' <> pp <> char '\''
 
 line = text "// ----------------------------------"
 
-hscOptionQual = if opt_SimplDoEtaReduction then text ".ilx-O" else text ".ilx-Onot"
+hscOptionQual = text ".i_"
 
 nameReference env n
   | isLocalName n = empty
@@ -1432,7 +1458,7 @@ nameReference env n
   | otherwise = packageReference (modulePackage (nameModule n))
 
 packageReference p = brackets (singleQuotes (ppr p  <> hscOptionQual))
-moduleNameReference m = brackets ((text ".module") <+> (singleQuotes (pprModuleName m <> hscOptionQual <> text ".dll")))
+moduleNameReference m = brackets ((text ".module") <+> (singleQuotes (pprModuleName m <> hscOptionQual <> text "o")))
 
 moduleReference env m
   | ilxEnvModule env   == m = text ""
@@ -1972,8 +1998,8 @@ ilxPrimOpTable op
 	IndexOffAddrOp_WideChar    -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
 	IndexOffAddrOp_Int     -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
 	IndexOffAddrOp_Word    -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
-	IndexOffAddrOp_Addr    -> simp_op (ilxOp "sizeof unsigned int mul add ldind.i")
-	IndexOffAddrOp_StablePtr   -> simp_op (ilxOp "sizeof unsigned int mul add ldind.ref")
+	IndexOffAddrOp_Addr    -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.i")
+	IndexOffAddrOp_StablePtr   -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.ref")
 	IndexOffAddrOp_Float   -> simp_op (ilxOp "sizeof float32 mul add ldind.r4")
 	IndexOffAddrOp_Double  -> simp_op (ilxOp "sizeof float64 mul add ldind.r8")
 	IndexOffAddrOp_Int8   -> simp_op (ilxOp "sizeof int8 mul add ldind.i1")
@@ -1987,12 +2013,13 @@ ilxPrimOpTable op
 
 	-- ForeignObj: load the address inside the object first
         -- TODO: is this remotely right?
+	EqForeignObj                 -> warn_op "eqForeignObj" (simp_op (ilxOp "pop /* PrimOp eqForeignObj */ "))
         IndexOffForeignObjOp_Char    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int8 mul add ldind.u1"])
 	IndexOffForeignObjOp_WideChar    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int32 mul add ldind.u4"])
 	IndexOffForeignObjOp_Int     -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
 	IndexOffForeignObjOp_Word    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
-	IndexOffForeignObjOp_Addr    ->  arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int mul add ldind.i  "])
-	IndexOffForeignObjOp_StablePtr    ->  ty1_arg2_op (\ty fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int mul add ldind.ref  "])
+	IndexOffForeignObjOp_Addr    ->  arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof native unsigned int mul add ldind.i  "])
+	IndexOffForeignObjOp_StablePtr    ->  ty1_arg2_op (\ty fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof native unsigned int mul add ldind.ref  "])
 	IndexOffForeignObjOp_Float   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof float32 mul add ldind.r4"])
 	IndexOffForeignObjOp_Double  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof float64 mul add ldind.r8"])
 	IndexOffForeignObjOp_Int8   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int8 mul add ldind.i1"])
@@ -2008,10 +2035,10 @@ ilxPrimOpTable op
 	ReadOffAddrOp_WideChar -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
 	ReadOffAddrOp_Int    -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
 	ReadOffAddrOp_Word   -> simp_op (ilxOp "sizeof unsigned int32 mul add ldind.u4")
-	ReadOffAddrOp_Addr   -> simp_op (ilxOp "sizeof unsigned int mul add ldind.i")
+	ReadOffAddrOp_Addr   -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.i")
 	ReadOffAddrOp_Float  -> simp_op (ilxOp "sizeof float32 mul add ldind.r4")
 	ReadOffAddrOp_Double -> simp_op (ilxOp "sizeof float64 mul add ldind.r8")
-	ReadOffAddrOp_StablePtr  -> simp_op (ilxOp "sizeof unsigned int mul add ldind.ref")
+	ReadOffAddrOp_StablePtr  -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.ref")
 	ReadOffAddrOp_Int8  -> simp_op (ilxOp "sizeof int8 mul add ldind.i1")
 	ReadOffAddrOp_Int16  -> simp_op (ilxOp "sizeof int16 mul add ldind.i2")
 	ReadOffAddrOp_Int32  -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
@@ -2026,10 +2053,10 @@ ilxPrimOpTable op
 	WriteOffAddrOp_WideChar   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.u4"])
 	WriteOffAddrOp_Int    -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.i4"])
 	WriteOffAddrOp_Word   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.u4"])
-	WriteOffAddrOp_Addr   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof unsigned int mul add", v, ilxOp "stind.i"])
-	WriteOffAddrOp_ForeignObj   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof unsigned int mul add", v, ilxOp "stind.ref"])
+	WriteOffAddrOp_Addr   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.i"])
+	WriteOffAddrOp_ForeignObj   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.ref"])
 	WriteOffAddrOp_Float  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof float32 mul add", v,ilxOp "stind.r4"])
-	WriteOffAddrOp_StablePtr   -> ty2_arg4_op (\ty1 sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof unsigned int mul add", v, ilxOp "stind.ref"])
+	WriteOffAddrOp_StablePtr   -> ty2_arg4_op (\ty1 sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.ref"])
 	WriteOffAddrOp_Double -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof float64 mul add",v,ilxOp "stind.r8"])
 	WriteOffAddrOp_Int8  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int8 mul add",v,ilxOp "stind.i1"])
 	WriteOffAddrOp_Int16  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int16 mul add",v,ilxOp "stind.i2"])
@@ -2209,6 +2236,7 @@ ilxPrimOpTable op
         MkApUpd0_Op ->  warn_op "MkApUpd0_Op" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw"))
         NewBCOOp ->  warn_op "NewBCOOp" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw"))
                   -- ("newBCO#")  [alphaTyVar, deltaTyVar] [byteArrayPrimTy, byteArrayPrimTy, mkArrayPrimTy alphaTy, byteArrayPrimTy, mkStatePrimTy deltaTy] ((mkTupleTy Unboxed 2 [mkStatePrimTy deltaTy, bcoPrimTy]))
+        _        -> pprPanic "Unimplemented primop" (ppr op)
 
 
 ty1_op :: (IlxTyFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
@@ -2279,14 +2307,16 @@ warn_op  warning f args = trace ("WARNING! IlxGen cannot translate primop " ++ w
 -- We also do some type-directed translation for pinning Haskell-managed blobs
 -- of data as we throw them across the boundary.
 ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc)) args ret_ty
- = ilxComment (text "C call <+> pprCLabelString c") <+> 
+ = ilxComment ((text "C call") <+> pprCLabelString c) <+> 
 	vcat [vcat (ilxMapPlaceArgs 0 pushCArg env args),
-              text "call" <+> retdoc <+> pprCLabelString c  <+> pprTypeArgs ilxTypeR env ty_args
+              text "call" <+> retdoc <+> pprCLabelString c <+> tyarg_doc
                     <+> pprCValArgTys ilxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) (map stgArgType tm_args))) ]
   where 
-    retdoc | isVoidIlxRepType ret_ty = text "void" 
+    retdoc | isVoidIlxRepType ret_ty = text "void"
 	   | otherwise		     = ilxTypeR env (deepIlxRepType ret_ty)
-    (ty_args,tm_args) = splitTyArgs1 args 
+    (ty_args,tm_args) = splitTyArgs1 args
+    tyarg_doc | not (isEmptyVarSet (tyVarsOfTypes ty_args)) = text "/* type variable found */"
+	      | otherwise = pprTypeArgs ilxTypeR env ty_args
 
 ilxFCall env (DNCall (DNCallSpec call_instr)) args ret_ty
   = ilxComment (text "IL call") <+> 
