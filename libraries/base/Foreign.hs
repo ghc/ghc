@@ -16,19 +16,16 @@
 
 module Foreign
         ( module Data.Int
-	, module Data.Word
-	, module Foreign.Ptr
-	, module Foreign.ForeignPtr
-	, module Foreign.StablePtr
+        , module Data.Word
+        , module Foreign.Ptr
+        , module Foreign.ForeignPtr
+        , module Foreign.StablePtr
         , module Foreign.Storable
-	, module Foreign.Marshal.Alloc
-	, module Foreign.Marshal.Array
-	, module Foreign.Marshal.Error
-	, module Foreign.Marshal.Utils
+        , module Foreign.Marshal
 
-	-- For compatibility with the FFI addendum only.  The recommended
-	-- place to get this from is System.IO.Unsafe.
-	, unsafePerformIO
+        -- For compatibility with the FFI addendum only.  The recommended
+        -- place to get this from is System.IO.Unsafe.
+        , unsafePerformIO
         ) where
 
 import Data.Int
@@ -37,9 +34,6 @@ import Foreign.Ptr
 import Foreign.ForeignPtr
 import Foreign.StablePtr
 import Foreign.Storable
-import Foreign.Marshal.Alloc
-import Foreign.Marshal.Array
-import Foreign.Marshal.Error
-import Foreign.Marshal.Utils
+import Foreign.Marshal
 
 import System.IO.Unsafe (unsafePerformIO)
