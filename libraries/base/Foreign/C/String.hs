@@ -89,10 +89,11 @@ peekCString cp  = do cs <- peekArray0 nUL cp; return (cCharsToChars cs)
 peekCString cp = loop 0
   where
     loop i = do
-        val <- peekElemOff cp i
-        if val == nUL then return [] else do
+        xval <- peekElemOff cp i
+	let val = castCCharToChar xval
+        if (val `seq` (xval == nUL)) then return [] else do
             rest <- loop (i+1)
-            return (castCCharToChar val : rest)
+            return (val : rest)
 #endif
 
 -- marshal a C string with explicit length into a Haskell string 
@@ -101,13 +102,17 @@ peekCStringLen           :: CStringLen -> IO String
 #ifndef __GLASGOW_HASKELL__
 peekCStringLen (cp, len)  = do cs <- peekArray len cp; return (cCharsToChars cs)
 #else
-peekCStringLen (cp, len) = loop 0
+peekCStringLen (cp, len) 
+  | len <= 0  = return "" -- being (too?) nice.
+  | otherwise = loop [] (len-1)
   where
-    loop i | i == len  = return []
-	   | otherwise = do
-        	val <- peekElemOff cp i
-        	rest <- loop (i+1)
-        	return (castCCharToChar val : rest)
+    loop acc i = do
+         xval <- peekElemOff cp i
+	 let val = castCCharToChar xval
+	   -- blow away the coercion ASAP.
+	 if (val `seq` (i == 0))
+	  then return (val:acc)
+	  else loop (val:acc) (i-1)
 #endif
 
 -- marshal a Haskell string into a NUL terminated C strings
