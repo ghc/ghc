@@ -360,7 +360,7 @@ sub init_TARGET_STUFF {
     $T_CONST_LBL    = '^\.LLC(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
 
-    $T_MOVE_DIRVS   = '^((\s+\.align\s+\d+|\s+\.proc\s+\d+|\s+\.global\s+\S+|\.text|\.data|\.stab.*|\.section.*|\s+\.type.*|\s+\.size.*)\n)';
+    $T_MOVE_DIRVS   = '^((\s+\.align\s+\d+|\s+\.proc\s+\d+|\s+\.global\s+\S+|\.text|\.data|\.stab.*|\s*\.section.*|\s+\.type.*|\s+\.size.*)\n)';
     $T_COPY_DIRVS   = '\.(global|proc|stab)';
 
     $T_DOT_WORD	    = '\.(long|word|byte|half|skip|uahalf|uaword)';
