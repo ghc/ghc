@@ -23,6 +23,8 @@ module PrelAddr (
 
 import PrelGHC
 import PrelBase
+
+infixl 5 `plusAddr`
 \end{code}
 
 \begin{code}
