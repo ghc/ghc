@@ -342,14 +342,14 @@ zone x = do
 # endif /* ! HAVE_TZNAME */
 
 -- Get the offset in secs from UTC, if (struct tm) doesn't supply it. */
-# if HAVE_ALTZONE
+# if HAVE_DECL_ALTZONE
 foreign import ccall "&altzone"  altzone  :: Ptr CTime
 foreign import ccall "&timezone" timezone :: Ptr CTime
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
   tz <- if dst then peek altzone else peek timezone
   return (-fromIntegral tz)
-# else /* ! HAVE_ALTZONE */
+# else /* ! HAVE_DECL_ALTZONE */
 
 #if !defined(mingw32_TARGET_OS)
 foreign import ccall unsafe "timezone" timezone :: Ptr CLong
@@ -366,7 +366,7 @@ gmtoff x = do
    -- This module assumes the interpretation of tm_gmtoff, i.e., offsets
    -- are > 0 East of the Prime Meridian, so flip the sign.
   return (- (if dst then (fromIntegral tz - 3600) else tz))
-# endif /* ! HAVE_ALTZONE */
+# endif /* ! HAVE_DECL_ALTZONE */
 #endif  /* ! HAVE_TM_ZONE */
 #endif /* ! __HUGS__ */
 
