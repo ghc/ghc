@@ -78,6 +78,9 @@
 /* Define if time.h or sys/time.h define the altzone variable */
 #undef HAVE_ALTZONE
 
+/* Define if C compiler supports long long types */
+#undef HAVE_LONG_LONG
+
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE
 

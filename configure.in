@@ -312,29 +312,13 @@ if test -z "$PerlCmd"; then
    echo "Perhaps it is already installed, but not in your PATH?"
    exit 1
 else
-AC_CHECK_PERL_VERSION
+FPTOOLS_CHECK_PERL_VERSION
 fi
 
 #
 dnl ** does #!.../perl work? (sometimes it's too long...)
 #
-AC_SHEBANG_PERL
-
-# Remove: we work around the problem in the single place
-# where we rely on something (getopts) from the libraries.
-#
-#dnl ** check if perl library is properly installed
-# 
-# (by seeing if a "do 'getopts.pl'" works...
-#if $PerlCmd -e 'do "getopts.pl" || exit(1); exit(0);' > /dev/null 2>&1 ; then
-#    :
-#else
-#    echo "I think your perl library is misinstalled:"
-#    echo "The following script did not work:"
-#    echo '      do "getopts.pl" || exit(1); exit(0);'
-#    echo 'But, anyway, we will continue in our quest..'
-#fi
-#
+FPTOOLS_SHEBANG_PERL
 
 #
 dnl ** look for GCC and find out which version
@@ -342,25 +326,25 @@ dnl ** look for GCC and find out which version
 # If gcc, make sure it's at least 2.1
 #
 AC_PROG_CC
-AC_HAVE_GCC
+FPTOOLS_HAVE_GCC
 
 #
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 #
 AC_PROG_CPP
-AC_PROG_GNUCPP
+FPTOOLS_PROG_GNUCPP
 
 #
 dnl ** figure out how to do context diffs
 #
-AC_PROG_DIFF
+FPTOOLS_PROG_DIFF
 
 #
 dnl ** look for a decent parser generator (bison preferred)
 #
-# (AC_PROG_YACCY is AC_PROG_YACC, but with some extra testing 
+# (FPTOOLS_PROG_YACCY is AC_PROG_YACC, but with some extra testing 
 # on the suitability of the 'yacc' returned.)
-AC_PROG_YACCY
+FPTOOLS_PROG_YACCY
 
 #
 dnl ** Find lex command (lex or flex) and library (-ll or -lfl)
@@ -374,7 +358,7 @@ AC_PROG_INSTALL
 #
 dnl ** how to invoke `ar' and `ranlib'
 #
-AC_PROG_AR_AND_RANLIB
+FPTOOLS_PROG_AR_AND_RANLIB
 
 #
 #
@@ -416,7 +400,7 @@ dnl
 dnl ** check for installed happy binary + version
 dnl    (don't do it if we're booting from .hc files though.)
 if (test "$BootingFromHc" = "NO"); then
-AC_HAPPY
+FPTOOLS_HAPPY
 fi;
 
 #### program checking section ends here ####
@@ -445,11 +429,11 @@ AC_STRUCT_TIMEZONE
 
 # 
 dnl ** what's the type of timezone?
-AC_TYPE_TIMEZONE
+FPTOOLS_TYPE_TIMEZONE
 
 #
 dnl ** do we have altzone?
-AC_ALTZONE
+FPTOOLS_ALTZONE
 
 dnl ** what are the sizes of various types
 dnl    (these must come before GHC_CHECK_ALIGNMENT)
@@ -460,10 +444,13 @@ AC_CHECK_SIZEOF(long,        4)
 AC_CHECK_SIZEOF(void *,      4)
 
 dnl ** what are alignment constraints on various types
-GHC_CHECK_ALIGNMENT(unsigned int) dnl redundant but harmless
-GHC_CHECK_ALIGNMENT(long)
-GHC_CHECK_ALIGNMENT(float)
-GHC_CHECK_ALIGNMENT(double)
+FPTOOLS_CHECK_ALIGNMENT(unsigned int) dnl redundant but harmless
+FPTOOLS_CHECK_ALIGNMENT(long)
+FPTOOLS_CHECK_ALIGNMENT(float)
+FPTOOLS_CHECK_ALIGNMENT(double)
+
+dnl ** do we have long longs?
+FPTOOLS_C_LONG_LONG
 
 #
 dnl ** check for specific library functions that we are interested in
@@ -498,7 +485,7 @@ AC_TYPE_SIGNAL
 #
 dnl ** check for leading underscores in symbol names
 #
-AC_UNDERSCORE
+FPTOOLS_UNDERSCORE
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
 
