@@ -611,7 +611,7 @@ deriving_occ_info
     , (ordClassKey, 	[intTyCon_RDR, compose_RDR, eqTag_RDR])
 				-- EQ (from Ordering) is needed to force in the constructors
 				-- as well as the type constructor.
-    , (enumClassKey, 	[intTyCon_RDR, and_RDR, map_RDR, plus_RDR, showsPrec_RDR, append_RDR]) 
+    , (enumClassKey, 	[intTyCon_RDR, eq_RDR, ge_RDR, and_RDR, map_RDR, plus_RDR, showsPrec_RDR, append_RDR]) 
 				-- The last two Enum deps are only used to produce better
 				-- error msgs for derived toEnum methods.
     , (boundedClassKey,	[intTyCon_RDR])
