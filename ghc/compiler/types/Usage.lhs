@@ -16,7 +16,8 @@ module Usage (
 
 IMP_Ubiq(){-uitous-}
 
-import Pretty	( SYN_IE(Pretty), PrettyRep, ppPStr, ppBeside )
+import Outputable
+import Pretty	( Doc, Mode, ptext, (<>) )
 import UniqFM	( emptyUFM, listToUFM, addToUFM, lookupUFM,
 		  plusUFM, sizeUFM, UniqFM
 		)
@@ -104,9 +105,9 @@ instance Eq u => Eq (GenUsage u) where
 
 \begin{code}
 instance Outputable uvar => Outputable (GenUsage uvar) where
-    ppr sty UsageOne	 = ppPStr SLIT("UsageOne")
-    ppr sty UsageOmega	 = ppPStr SLIT("UsageOmega")
+    ppr sty UsageOne	 = ptext SLIT("UsageOne")
+    ppr sty UsageOmega	 = ptext SLIT("UsageOmega")
     ppr sty (UsageVar u) = pprUVar sty u
 
-pprUVar sty u = ppBeside (ppPStr SLIT("u")) (ppr sty u)
+pprUVar sty u = (<>) (ptext SLIT("u")) (ppr sty u)
 \end{code}
