@@ -684,6 +684,7 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
     while (re.sub('^\s*','',line) != delimiter and line != ''):
         out1.write(line)
         line = infile.readline()
+	line = re.sub('\r', '', line)
 
     line = infile.readline()
     while (line != ''):
