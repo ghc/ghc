@@ -124,6 +124,7 @@ $white_no_nl+ 				;
   \n					;
   ^\# (line)?				{ begin line_prag1 }
   ^\# pragma .* \n			; -- GCC 3.3 CPP generated, apparently
+  ^\# \! .* \n				; -- #!, for scripts
   ()					{ do_bol }
 }
 
