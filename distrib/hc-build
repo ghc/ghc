@@ -72,11 +72,6 @@ PRIMOP_BITS="primop-data-decl.hs-incl \
 	      primop-usage.hs-incl  \
 	      primop-primop-info.hs-incl"
 
-# The reconfigure step updates a few files, which can lead to
-# unnecessary recompilations.  Touch a bunch of things here to avoid
-# having to recompile stuff that we've already built.
-(cd ghc/compiler; touch $PRIMOP_BITS parser/hschooks.o prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
-
 # Remove the old libraries.  Don't use make clean, because we don't
 # want to delete the .hs files generated from the .hsc files, because
 # we don't have hsc2hs built yet.
@@ -95,7 +90,9 @@ $MAKE -C ghc/utils clean && $MAKE -C ghc/utils boot all
 # Now we can build hslibs (hsc2hs is required, so must be after ghc/utils)
 $MAKE -C hslibs  boot all
 
-# Avoid relinking the compiler during 'make install':
-(cd ghc/compiler; touch parser/hschooks.o ghc-*)
+# The reconfigure step updates a few files, which can lead to
+# unnecessary recompilations.  Touch a bunch of things here to avoid
+# having to recompile stuff that we've already built.
+(cd ghc/compiler; touch $PRIMOP_BITS parser/hschooks.o prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
 
 # At this point, the tree should be safe to do 'make install' in.
