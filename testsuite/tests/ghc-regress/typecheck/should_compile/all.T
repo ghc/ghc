@@ -178,3 +178,5 @@ test('tc172', normal, compile, [''])
 
 # The point about this test is that it compiles Tc173a and Tc173b *separately*
 test('tc173', normal, run_command, ['make tc173'])
+
+test('tc174', normal, compile, [''])
