@@ -288,11 +288,14 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
 		-- Stop if we've run out of iterations
 	   if iteration_no == max_iterations then
 		do {
+#ifdef DEBUG
 		    if  max_iterations > 2 then
 			    hPutStr stderr ("NOTE: Simplifier still going after " ++ 
 				    show max_iterations ++ 
 				    " iterations; bailing out.\n")
-		    else return ();
+		    else 
+#endif
+			return ();
 
 		    return ("Simplifier baled out", iteration_no, all_counts, binds')
 		}
