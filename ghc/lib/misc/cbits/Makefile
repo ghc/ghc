@@ -10,7 +10,7 @@ CC:=$(HC)
 C_SRCS=$(wildcard *.c)
 
 # Remove Readline.lhs if readline.h isn't available.
-ifneq "$(HAVE_READLINE)" "YES"
+ifneq "$(GhcLibsWithReadline)" "YES"
   C_SRCS := $(filter-out ghcReadline.c,$(C_SRCS))
 endif
 
