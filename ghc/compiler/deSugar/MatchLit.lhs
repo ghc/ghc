@@ -36,7 +36,6 @@ import Util		( panic, assertPanic )
 \begin{code}
 matchLiterals :: [Id]
 	      -> [EquationInfo]
-	      -> [EquationInfo]		-- Shadows
 	      -> DsM MatchResult
 \end{code}
 
@@ -48,28 +47,26 @@ is much like @matchConFamily@, which uses @match_cons_used@ to create
 the alts---here we use @match_prims_used@.
 
 \begin{code}
-matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo (LitPat literal lit_ty : ps1) _ : eqns) shadows
+matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_ty : ps1) _ : eqns)
   = -- GENERATE THE ALTS
-    match_prims_used vars eqns_info shadows `thenDs` \ prim_alts ->
+    match_prims_used vars eqns_info `thenDs` \ prim_alts ->
 
     -- MAKE THE PRIMITIVE CASE
     mkCoPrimCaseMatchResult var prim_alts
   where
-    match_prims_used _ [{-no more eqns-}] _ = returnDs []
+    match_prims_used _ [{-no more eqns-}] = returnDs []
 
-    match_prims_used vars eqns_info@(EqnInfo ((LitPat literal lit_ty):ps1) _ : eqns) shadows
+    match_prims_used vars eqns_info@(EqnInfo n ctx ((LitPat literal lit_ty):ps1) _ : eqns)
       = let
 	    (shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	      = partitionEqnsByLit Nothing literal eqns_info
-	    (shifted_shadows_for_this_lit, shadows_not_for_this_lit)
-	      = partitionEqnsByLit Nothing literal shadows
 	in
 	-- recursive call to make other alts...
-	match_prims_used vars eqns_not_for_this_lit shadows_not_for_this_lit	`thenDs` \ rest_of_alts ->
+	match_prims_used vars eqns_not_for_this_lit       `thenDs` \ rest_of_alts ->
 
 	-- (prim pats have no args; no selectMatchVars as in match_cons_used)
 	-- now do the business to make the alt for _this_ LitPat ...
-	match vars shifted_eqns_for_this_lit shifted_shadows_for_this_lit	`thenDs` \ match_result ->
+	match vars shifted_eqns_for_this_lit 	`thenDs` \ match_result ->
 	returnDs (
 	    (mk_core_lit lit_ty literal, match_result)
 	    : rest_of_alts
@@ -88,22 +85,20 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo (LitPat literal lit_ty : ps
 \end{code}
 
 \begin{code}
-matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo ((NPat literal lit_ty eq_chk):ps1) _ : eqns) shadows
+matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx ((NPat literal lit_ty eq_chk):ps1) _ : eqns)
   = let
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	  = partitionEqnsByLit Nothing literal eqns_info
-	(shifted_shadows_for_this_lit, shadows_not_for_this_lit)
-	  = partitionEqnsByLit Nothing literal shadows
     in
-    dsExpr (HsApp eq_chk (HsVar var))					`thenDs` \ pred_expr ->
-    match vars shifted_eqns_for_this_lit shifted_shadows_for_this_lit	`thenDs` \ inner_match_result ->
-    mkGuardedMatchResult pred_expr inner_match_result			`thenDs` \ match_result1 ->
+    dsExpr (HsApp eq_chk (HsVar var))			  `thenDs` \ pred_expr ->
+    match vars shifted_eqns_for_this_lit                  `thenDs` \ inner_match_result ->
+    mkGuardedMatchResult pred_expr inner_match_result	  `thenDs` \ match_result1 ->
 
     if (null eqns_not_for_this_lit)
     then
 	returnDs match_result1
     else
-	matchLiterals all_vars eqns_not_for_this_lit shadows_not_for_this_lit 	`thenDs` \ match_result2 ->
+        matchLiterals all_vars eqns_not_for_this_lit  	  `thenDs` \ match_result2 ->
 	combineMatchResults match_result1 match_result2
 \end{code}
 
@@ -119,14 +114,12 @@ We generate:
 
 
 \begin{code}
-matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo ((NPlusKPat master_n k ty ge sub):ps1) _ : eqns) shadows
+matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx ((NPlusKPat master_n k ty ge sub):ps1) _ : eqns)
   = let
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
 	  = partitionEqnsByLit (Just master_n) k eqns_info
-	(shifted_shadows_for_this_lit, shadows_not_for_this_lit)
-	  = partitionEqnsByLit (Just master_n) k shadows
     in
-    match vars shifted_eqns_for_this_lit shifted_shadows_for_this_lit	`thenDs` \ inner_match_result ->
+    match vars shifted_eqns_for_this_lit	`thenDs` \ inner_match_result ->
 
     dsExpr (HsApp ge (HsVar var))		`thenDs` \ ge_expr ->
     dsExpr (HsApp sub (HsVar var))		`thenDs` \ nminusk_expr ->
@@ -140,7 +133,7 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo ((NPlusKPat master_n k ty g
     then 
 	returnDs match_result1
     else 
-	matchLiterals all_vars eqns_not_for_this_lit shadows_not_for_this_lit 	`thenDs` \ match_result2 ->
+	matchLiterals all_vars eqns_not_for_this_lit 	`thenDs` \ match_result2 ->
 	combineMatchResults match_result1 match_result2
 \end{code}
 
@@ -168,24 +161,24 @@ partitionEqnsByLit nPlusK lit eqns
     partition_eqn :: Maybe Id -> HsLit -> EquationInfo ->
 		(Maybe EquationInfo, Maybe EquationInfo)
 
-    partition_eqn Nothing lit (EqnInfo (LitPat k _ : remaining_pats) match_result)
-      | lit `eq_lit` k  = (Just (EqnInfo remaining_pats match_result), Nothing)
+    partition_eqn Nothing lit (EqnInfo n ctx (LitPat k _ : remaining_pats) match_result)
+      | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn Nothing lit (EqnInfo (NPat k _ _ : remaining_pats) match_result)
-      | lit `eq_lit` k  = (Just (EqnInfo remaining_pats match_result), Nothing)
+    partition_eqn Nothing lit (EqnInfo n ctx (NPat k _ _ : remaining_pats) match_result)
+      | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn (Just master_n) lit  (EqnInfo (NPlusKPat n k _ _ _ : remaining_pats) match_result)
-      | lit `eq_lit` k  = (Just (EqnInfo remaining_pats new_match_result), Nothing)
+    partition_eqn (Just master_n) lit  (EqnInfo n ctx (NPlusKPat n' k _ _ _ : remaining_pats) match_result)
+      | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats new_match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
       where
-	new_match_result | master_n == n = match_result
-			 | otherwise 	 = mkCoLetsMatchResult [NonRec n (Var master_n)] match_result
+	new_match_result | master_n == n' = match_result
+			 | otherwise 	  = mkCoLetsMatchResult [NonRec n' (Var master_n)] match_result
 
 	-- Wild-card patterns, which will only show up in the shadows, go into both groups
-    partition_eqn nPlusK lit eqn@(EqnInfo (WildPat _ : remaining_pats) match_result)
-			= (Just (EqnInfo remaining_pats match_result), Just eqn)
+    partition_eqn nPlusK lit eqn@(EqnInfo n ctx (WildPat _ : remaining_pats) match_result)
+			= (Just (EqnInfo n ctx remaining_pats match_result), Just eqn)
 
 	-- Default case; not for this pattern
     partition_eqn nPlusK lit eqn = (Nothing, Just eqn)

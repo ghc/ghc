@@ -78,11 +78,10 @@ have-we-used-all-the-constructors? question; the local function
 \begin{code}
 matchConFamily :: [Id]
 	       -> [EquationInfo]
-	       -> [EquationInfo]	-- Shadows
 	       -> DsM MatchResult
 
-matchConFamily (var:vars) eqns_info shadows
-  = match_cons_used vars eqns_info shadows `thenDs` \ alts ->
+matchConFamily (var:vars) eqns_info
+  = match_cons_used vars eqns_info `thenDs` \ alts ->
     mkCoAlgCaseMatchResult var alts
 \end{code}
 
@@ -90,24 +89,22 @@ And here is the local function that does all the work.  It is
 more-or-less the @matchCon@/@matchClause@ functions on page~94 in
 Wadler's chapter in SLPJ.
 \begin{code}
-match_cons_used _ [{- no more eqns -}] _ = returnDs []
+match_cons_used _ [{- no more eqns -}] = returnDs []
 
-match_cons_used vars eqns_info@(EqnInfo (ConPat data_con _ arg_pats : ps1) _ : eqns) shadows
+match_cons_used vars eqns_info@(EqnInfo n ctx (ConPat data_con _ arg_pats : ps1) _ : eqns)
   = let
 	(eqns_for_this_con, eqns_not_for_this_con)       = splitByCon eqns_info
-	(shadows_for_this_con, shadows_not_for_this_con) = splitByCon shadows
     in
     -- Go ahead and do the recursive call to make the alts
     -- for the other ConPats in this con family...
-    match_cons_used vars eqns_not_for_this_con shadows_not_for_this_con	`thenDs` \ rest_of_alts ->
+    match_cons_used vars eqns_not_for_this_con 	          `thenDs` \ rest_of_alts ->
 
     -- Make new vars for the con arguments; avoid new locals where possible
-    selectMatchVars arg_pats						`thenDs` \ new_vars ->
+    selectMatchVars arg_pats				   `thenDs` \ new_vars ->
 
     -- Now do the business to make the alt for _this_ ConPat ...
     match (new_vars++vars)
-	  (map shift_con_pat eqns_for_this_con)
-	  (map shift_con_pat shadows_for_this_con)			`thenDs` \ match_result ->
+	  (map shift_con_pat eqns_for_this_con)		   `thenDs` \ match_result ->
 
     returnDs (
 	(data_con, new_vars, match_result)
@@ -116,21 +113,18 @@ match_cons_used vars eqns_info@(EqnInfo (ConPat data_con _ arg_pats : ps1) _ : e
   where
     splitByCon :: [EquationInfo] -> ([EquationInfo], [EquationInfo])
     splitByCon [] = ([],[])
-    splitByCon (info@(EqnInfo (pat : _) _) : rest)
+    splitByCon (info@(EqnInfo _ _ (pat : _) _) : rest)
 	= case pat of
 		ConPat n _ _ | n == data_con -> (info:rest_yes, rest_no)
-		WildPat _		     -> (info:rest_yes, info:rest_no)
-			-- WildPats will be in the shadows only,
-			-- and they go into both groups
 		other_pat		     -> (rest_yes,      info:rest_no)
 	where
 	  (rest_yes, rest_no) = splitByCon rest
 
     shift_con_pat :: EquationInfo -> EquationInfo
-    shift_con_pat (EqnInfo (ConPat _ _ pats': pats) match_result)
-      = EqnInfo (pats' ++ pats) match_result
-    shift_con_pat (EqnInfo (WildPat _: pats) match_result)	-- Will only happen in shadow
-      = EqnInfo ([WildPat (outPatType arg_pat) | arg_pat <- arg_pats] ++ pats) match_result
+    shift_con_pat (EqnInfo n ctx (ConPat _ _ pats': pats) match_result)
+      = EqnInfo n ctx (pats' ++ pats) match_result
+    shift_con_pat (EqnInfo n ctx (WildPat _: pats) match_result) -- Will only happen in shadow
+      = EqnInfo n ctx ([WildPat (outPatType arg_pat) | arg_pat <- arg_pats] ++ pats) match_result
     shift_con_pat other = panic "matchConFamily:match_cons_used:shift_con_pat"
 \end{code}
 
