@@ -183,10 +183,10 @@ importsFromLocalDecls this_mod decls
 	(_, dups) = removeDups compare all_names
     in
 	-- Check for duplicate definitions
-    mapRn_ (addErrRn . dupDeclErr) dups		`thenRn_` 
+    mapRn_ (addErrRn . dupDeclErr) dups			`thenRn_` 
 
 	-- Record that locally-defined things are available
-    recordLocalSlurps avails			`thenRn_`
+    recordLocalSlurps (availsToNameSet avails)		`thenRn_`
 
 	-- Build the environment
     qualifyImports (moduleName this_mod)

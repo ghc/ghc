@@ -31,9 +31,9 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  tcExtendTyVarEnvForMeths, 
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
  			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy, 
-			  newDFunName, tcExtendTyVarEnv
+			  newDFunName, tcExtendTyVarEnv, tcGetInstEnv
 			)
-import InstEnv		( InstEnv, extendInstEnv )
+import InstEnv		( InstEnv, extendInstEnv, pprInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
@@ -225,7 +225,6 @@ addInstDFuns dfuns infos
     returnTc inst_env'
   where
     bind x f = f x
-
 \end{code} 
 
 \begin{code}

@@ -14,7 +14,7 @@ module HsDecls (
 	ConDecl(..), ConDetails(..), 
 	BangType(..), getBangType,
 	DeprecDecl(..), DeprecTxt,
-	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames,
+	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames, tyClDeclSysNames,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
 	mkClassDeclSysNames, isIfaceRuleDecl, ifaceRuleDeclName,
 	getClassDeclSysNames, conDetailsTys
@@ -215,6 +215,7 @@ isClassDecl other		 	 = False
 Dealing with names
 
 \begin{code}
+--------------------------------
 tyClDeclName :: TyClDecl name pat -> name
 tyClDeclName (IfaceSig name _ _ _)	     = name
 tyClDeclName (TyData _ _ name _ _ _ _ _ _ _) = name
@@ -222,6 +223,7 @@ tyClDeclName (TySynonym name _ _ _)          = name
 tyClDeclName (ClassDecl _ name _ _ _ _ _ _)  = name
 
 
+--------------------------------
 tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
 -- Returns all the binding names of the decl, along with their SrcLocs
 -- The first one is guaranteed to be the name of the decl
@@ -239,6 +241,17 @@ tyClDeclNames (TyData _ _ tc_name _ cons _ _ loc _ _)
 
 tyClDeclNames (IfaceSig name _ _ loc) = [(name,loc)]
 
+--------------------------------
+tyClDeclSysNames :: TyClDecl name pat -> [(name, SrcLoc)]
+-- Similar to tyClDeclNames, but returns the "implicit" 
+-- or "system" names of the declaration
+
+tyClDeclSysNames (ClassDecl _ _ _ _ _ _ names loc) = [(n,loc)        | n <- names]
+tyClDeclSysNames (TyData _ _ _ _ cons _ _ _ _ _)   = [(wkr_name,loc) | ConDecl _ wkr_name _ _ _ loc <- cons]
+tyClDeclSysNames decl				   = []
+
+
+--------------------------------
 type ClassDeclSysNames name = [name]
 	-- 	[tycon, datacon wrapper, datacon worker, 
 	--	 superclass selector 1, ..., superclass selector n]

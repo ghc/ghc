@@ -585,11 +585,6 @@ availNames (Avail n)      = [n]
 availNames (AvailTC n ns) = ns
 
 -------------------------------------
-addSysAvails :: AvailInfo -> [Name] -> AvailInfo
-addSysAvails avail          []  = avail
-addSysAvails (AvailTC n ns) sys = AvailTC n (sys ++ ns)
-
--------------------------------------
 filterAvail :: RdrNameIE	-- Wanted
 	    -> AvailInfo	-- Available
 	    -> Maybe AvailInfo	-- Resulting available; 

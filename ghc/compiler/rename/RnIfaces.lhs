@@ -344,12 +344,9 @@ recordSlurp ifaces@(Ifaces { iDecls = (decls_map, n_slurped),
     new_vslurp | isModuleInThisPackage mod = (imp_mods, addOneToNameSet imp_names main_name)
     	       | otherwise		   = (extendModuleSet imp_mods mod, imp_names)
 
-recordLocalSlurps local_avails
+recordLocalSlurps new_names
   = getIfacesRn 	`thenRn` \ ifaces ->
-    let
-	new_slurped_names = foldl addAvailToNameSet (iSlurp ifaces) local_avails
-    in
-    setIfacesRn (ifaces { iSlurp  = new_slurped_names })
+    setIfacesRn (ifaces { iSlurp  = iSlurp ifaces `unionNameSets` new_names })
 \end{code}
 
 
@@ -603,19 +600,13 @@ data ImportDeclResult
   | HereItIs (Module, RdrNameTyClDecl)
 
 importDecl name
-  = 	-- STEP 1: Check if it was loaded before beginning this module
-    if isLocalName name then
-	traceRn (text "Already (local)" <+> ppr name) `thenRn_`
-	returnRn AlreadySlurped
-    else
-
-	-- STEP 2: Check if we've slurped it in while compiling this module
+  = 	-- STEP 1: Check if we've slurped it in while compiling this module
     getIfacesRn				`thenRn` \ ifaces ->
     if name `elemNameSet` iSlurp ifaces then	
 	returnRn AlreadySlurped	
     else
 
-	-- STEP 3: Check if it's already in the type environment
+	-- STEP 2: Check if it's already in the type environment
     getTypeEnvRn 			`thenRn` \ lookup ->
     case lookup name of {
 	Just ty_thing | name `elemNameEnv` wiredInThingEnv
@@ -629,13 +620,13 @@ importDecl name
 
 	Nothing -> 
 
-	-- STEP 4: OK, we have to slurp it in from an interface file
+	-- STEP 3: OK, we have to slurp it in from an interface file
 	--	   First load the interface file
     traceRn nd_doc			`thenRn_`
     loadHomeInterface nd_doc name	`thenRn_`
     getIfacesRn				`thenRn` \ ifaces ->
 
-	-- STEP 5: Get the declaration out
+	-- STEP 4: Get the declaration out
     let
 	(decls_map, _) = iDecls ifaces
     in

@@ -22,7 +22,7 @@ import RnMonad
 import RnExpr		( rnExpr )
 import RnNames		( getGlobalNames, exportsFromAvail )
 import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
-import RnIfaces		( slurpImpDecls, mkImportInfo, 
+import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 			  getInterfaceExports, closeDecls,
 			  RecompileRequired, outOfDate, recompileRequired
 			)
@@ -563,7 +563,10 @@ closeIfaceDecls dflags hit hst pcs
 	needed = unionManyNameSets (map ruleDeclFVs rule_decls) `unionNameSets`
 		 unionManyNameSets (map instDeclFVs inst_decls) `unionNameSets`
 		 unionManyNameSets (map tyClDeclFVs tycl_decls)
+	local_names    = foldl add emptyNameSet tycl_decls
+	add names decl = addListToNameSet names (map fst (tyClDeclSysNames decl ++ tyClDeclNames decl))
     in
+    recordLocalSlurps local_names	`thenRn_`
     closeDecls decls needed
 \end{code}
 

@@ -9,7 +9,7 @@ The bits common to TcInstDcls and TcDeriv.
 module InstEnv (
 	DFunId, ClsInstEnv, InstEnv,
 
-	emptyInstEnv, extendInstEnv,
+	emptyInstEnv, extendInstEnv, pprInstEnv,
 	lookupInstEnv, InstLookupResult(..),
 	classInstEnv, simpleDFunClassTyCon
     ) where
@@ -18,7 +18,7 @@ module InstEnv (
 
 import Class		( Class )
 import Var		( Id )
-import VarSet		( TyVarSet, unionVarSet, mkVarSet )
+import VarSet		( TyVarSet, unionVarSet, mkVarSet, varSetElems )
 import VarEnv		( TyVarSubstEnv )
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc )
@@ -29,7 +29,7 @@ import PprType		( )
 import TyCon		( TyCon )
 import Outputable
 import Unify		( matchTys, unifyTyListsX )
-import UniqFM		( UniqFM, lookupWithDefaultUFM, addToUFM, emptyUFM )
+import UniqFM		( UniqFM, lookupWithDefaultUFM, addToUFM, emptyUFM, eltsUFM )
 import Id		( idType )
 import ErrUtils		( Message )
 import CmdLineOpts
@@ -55,6 +55,14 @@ simpleDFunClassTyCon dfun
   where
     (_,_,clas,[ty]) = splitDFunTy (idType dfun)
     tycon  	    = tyConAppTyCon ty 
+
+pprInstEnv :: InstEnv -> SDoc
+pprInstEnv env
+  = vcat [ brackets (pprWithCommas ppr (varSetElems tyvars)) <+> 
+	   brackets (pprWithCommas ppr tys) <+> ppr dfun
+	 | cls_inst_env <-  eltsUFM env
+	 , (tyvars, tys, dfun) <- cls_inst_env
+	 ]
 \end{code}		      
 
 %************************************************************************

@@ -27,9 +27,8 @@ import HscTypes		( ModuleLocation(..),
 			  AvailInfo, GenAvailInfo(..), Avails, Deprecations(..)
 			 )
 import HsSyn		( TyClDecl(..), InstDecl(..),
-			  HsType(..), ConDecl(..), 
-			  FixitySig(..), RuleDecl(..),
-			  tyClDeclNames
+			  HsType(..), FixitySig(..), RuleDecl(..),
+			  tyClDeclNames, tyClDeclSysNames
 			)
 import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl,
 			  extractHsTyRdrNames 
@@ -423,44 +422,30 @@ getIfaceDeclBinders, getTyClDeclBinders
 	-> RdrNameTyClDecl
 	-> RnM d AvailInfo
 
-getIfaceDeclBinders mod tycl_decl
-  = getTyClDeclBinders    mod tycl_decl	`thenRn` \ avail ->
-    getSysTyClDeclBinders mod tycl_decl	`thenRn` \ extras ->
-    returnRn (addSysAvails avail extras)
-		-- Add the sys-binders to avail.  When we import the decl,
-		-- it's full_avail that will get added to the 'already-slurped' set (iSlurp)
-		-- If we miss out sys-binders, we'll read the decl multiple times!
-
+-----------------
 getTyClDeclBinders mod (IfaceSig var ty prags src_loc)
   = newTopBinder mod var src_loc			`thenRn` \ var_name ->
     returnRn (Avail var_name)
 
 getTyClDeclBinders mod tycl_decl
-  = mapRn do_one (tyClDeclNames tycl_decl)	`thenRn` \ (main_name:sub_names) ->
+  = new_top_bndrs mod (tyClDeclNames tycl_decl)		`thenRn` \ (main_name:sub_names) ->
     returnRn (AvailTC main_name (main_name : sub_names))
-  where
-    do_one (name,loc) = newTopBinder mod name loc
+
+-----------------
+getIfaceDeclBinders mod (IfaceSig var ty prags src_loc)
+  = newTopBinder mod var src_loc			`thenRn` \ var_name ->
+    returnRn (Avail var_name)
+
+getIfaceDeclBinders mod tycl_decl
+  = new_top_bndrs mod (tyClDeclNames tycl_decl)		`thenRn` \ (main_name:sub_names) ->
+    new_top_bndrs mod (tyClDeclSysNames tycl_decl)	`thenRn` \ sys_names ->
+    returnRn (AvailTC main_name (main_name : (sys_names ++ sub_names)))
+
+-----------------
+new_top_bndrs mod names_w_locs
+  = sequenceRn [newTopBinder mod name loc | (name,loc) <- names_w_locs]
 \end{code}
 
-@getDeclSysBinders@ gets the implicit binders introduced by a decl.
-A the moment that's just the tycon and datacon that come with a class decl.
-They aren't returned by @getDeclBinders@ because they aren't in scope;
-but they {\em should} be put into the @DeclsMap@ of this module.
-
-Note that this excludes the default-method names of a class decl,
-and the dict fun of an instance decl, because both of these have 
-bindings of their own elsewhere.
-
-\begin{code}
-getSysTyClDeclBinders mod (ClassDecl _ cname _ _ sigs _ names src_loc)
-  = sequenceRn [newTopBinder mod n src_loc | n <- names]
-
-getSysTyClDeclBinders mod (TyData _ _ _ _ cons _ _ _ _ _)
-  = sequenceRn [newTopBinder mod wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
-
-getSysTyClDeclBinders mod other_decl
-  = returnRn []
-\end{code}
 
 %*********************************************************
 %*							*
