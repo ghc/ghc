@@ -1,2 +1,2 @@
 
-./rnfail007.hs:3: Variable not in scope: `main'
+rnfail007.hs:3: No 'main' defined in module Main
