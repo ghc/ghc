@@ -9,9 +9,6 @@ INSTALLING=1
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
 
-ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
-ghc_ge_603 = $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
-
 SRC_HC_OPTS += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
 
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)

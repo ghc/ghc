@@ -8,8 +8,6 @@ ifneq "$(BootingFromHc)" "YES"
 boot :: all
 endif
 
-ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
-
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
 endif

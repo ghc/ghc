@@ -21,8 +21,6 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-cygwinw32"
 HS_PROG           = hsc2hs$(exeext)
 endif
 
-ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
-
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package util
 endif

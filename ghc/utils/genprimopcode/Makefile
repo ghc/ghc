@@ -3,12 +3,10 @@ include $(TOP)/mk/boilerplate.mk
 
 HS_PROG = genprimopcode
 
-ghc_lt_504 = $(shell if (test $(GhcCanonVersion) -lt 504); then echo YES; else echo NO; fi)
-ifeq "$(ghc_lt_504)" "YES"
+ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS += -package text
 endif
 
-ghc_ge_601 = $(shell if (test $(GhcCanonVersion) -ge 601); then echo YES; else echo NO; fi)
 ifeq "$(ghc_ge_601)" "YES"
 SRC_HC_OPTS += -package parsec
 endif

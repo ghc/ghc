@@ -7,6 +7,7 @@ ALL_DIRS = \
 	Distribution \
 	Distribution/Compat \
 	System \
+	System/Directory \
 	cbits
 
 LIBRARY = libghccompat.a
@@ -16,9 +17,7 @@ MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 UseGhcForCc = YES
 
-ghc_603_plus = $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
-
-ifeq "$(ghc_603_plus)" "YES"
+ifeq "$(ghc_ge_603)" "YES"
 # These modules are all provided in GHC 6.3+
 EXCLUDED_SRCS += \
 	System/Directory/Internals.hs \
