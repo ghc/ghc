@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.6 1999/12/08 15:47:08 simonmar Exp $
+ * $Id: system.c,v 1.7 2000/03/17 09:48:48 simonmar Exp $
  *
  * system Runtime Support
  */
@@ -11,6 +11,17 @@
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+
+#if TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
 #endif
 
 #ifndef mingw32_TARGET_OS
@@ -65,9 +76,22 @@ systemCmd(StgByteArray cmd)
 	    return -1;
 	}
     case 0:
+      {
+	/* Reset the itimers in the child, so it doesn't get plagued
+	 * by SIGVTALRM interrupts.
+	 */
+	struct timeval tv_null = { 0, 0 };
+	struct itimerval itv;
+	itv.it_interval = tv_null;
+	itv.it_value = tv_null;
+	setitimer(ITIMER_REAL, &itv, NULL);
+	setitimer(ITIMER_VIRTUAL, &itv, NULL);
+	setitimer(ITIMER_PROF, &itv, NULL);
+
 	/* the child */
 	execl("/bin/sh", "sh", "-c", cmd, NULL);
 	_exit(127);
+      }
     }
 
     while (waitpid(pid, &wstat, 0) < 0) {
