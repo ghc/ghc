@@ -2204,15 +2204,14 @@ We have not played with <Option>-fsemi-tagging</Option> enough to recommend it.
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term><Option>-fstrictfp</Option>:</Term>
+<Term><Option>-fexcess-precision</Option>:</Term>
 <ListItem>
 <Para>
-This option has an effect similar to Java's <Literal>strictfp</Literal>
-modifier: When it is not given, intermediate floating point values can
-have a <Emphasis>greater</Emphasis> precision/range than the final type.
-Generally this is a good thing, but some programs may rely on the exact
-precision/range of <Literal>Float</Literal>/<Literal>Double</Literal>
-values and should use this option for their compilation.
+When this option is given, intermediate floating point values can have
+a <Emphasis>greater</Emphasis> precision/range than the final type.
+Generally this is a good thing, but some programs may rely on the
+exact precision/range of <Literal>Float</Literal>/<Literal>Double</Literal>
+values and should not use this option for their compilation.
 </Para>
 </ListItem>
 </VarListEntry>

@@ -107,7 +107,7 @@ module CmdLineOpts (
 	opt_SimplCaseOfCase,
 	opt_SimplCaseMerge,
 	opt_SimplPedanticBottoms,
-	opt_SimplStrictFP,
+	opt_SimplExcessPrecision,
 
 	-- Unfolding control
 	opt_UF_HiFileThreshold,
@@ -446,7 +446,7 @@ opt_SimplDoLambdaEtaExpansion	= lookUp SLIT("-fdo-lambda-eta-expansion")
 opt_SimplCaseOfCase		= lookUp SLIT("-fcase-of-case")
 opt_SimplCaseMerge		= lookUp SLIT("-fcase-merge")
 opt_SimplPedanticBottoms	= lookUp SLIT("-fpedantic-bottoms")
-opt_SimplStrictFP		= lookUp SLIT("-fstrictfp")
+opt_SimplExcessPrecision	= lookUp SLIT("-fexcess-precision")
 
 -- Unfolding control
 opt_UF_HiFileThreshold		= lookup_def_int "-funfolding-interface-threshold" (45::Int)

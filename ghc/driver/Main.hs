@@ -253,6 +253,7 @@ GLOBAL_VAR(static,              False,          Bool)
 #endif
 GLOBAL_VAR(collect_ghc_timing, 	False,		Bool)
 GLOBAL_VAR(do_asm_mangling,	True,		Bool)
+GLOBAL_VAR(excess_precision,	False,		Bool)
 
 -----------------------------------------------------------------------------
 -- Splitting object files (for libraries)
@@ -1525,6 +1526,8 @@ run_phase cc_phase basename input_fn output_fn
 
 	pkg_extra_cc_opts <- getPackageExtraCcOpts
 
+	excessPrecision <- readIORef excess_precision
+
 	run_something "C Compiler"
 	 (unwords ([ cc, "-x", "c", cc_help, "-o", output_fn ]
 		   ++ md_c_flags
@@ -1537,6 +1540,7 @@ run_phase cc_phase basename input_fn output_fn
 #ifdef mingw32_TARGET_OS
                    ++ [" -mno-cygwin"]
 #endif
+		   ++ (if excessPrecision then [] else [ "-ffloat-store" ])
 		   ++ include_paths
 		   ++ pkg_extra_cc_opts
 --		   ++ [">", ccout]
@@ -1902,8 +1906,8 @@ opts =
   ,  ( "fusagesp"	   , NoArg (do writeIORef opt_UsageSPInf True
 				       add opt_C "-fusagesp-on") )
 
-  ,  ( "fstrictfp"	   , NoArg (do add opt_C "-fstrictfp"
-				       add opt_c "-ffloat-store"))
+  ,  ( "fexcess-precision" , NoArg (do writeIORef excess_precision True
+				       add opt_C "-fexcess-precision"))
 
 	-- flags that are "active negatives"
   ,  ( "fno-implicit-prelude"	, PassFlag (add opt_C) )

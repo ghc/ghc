@@ -37,7 +37,7 @@ import Unique		( unpackCStringFoldrIdKey, hasKey )
 import Bits		( Bits(..) )
 import Word		( Word64 )
 import Outputable
-import CmdLineOpts      ( opt_SimplStrictFP )
+import CmdLineOpts      ( opt_SimplExcessPrecision )
 \end{code}
 
 
@@ -286,9 +286,7 @@ intResult name result
 type RuleFun = [CoreExpr] -> Maybe (RuleName, CoreExpr)
 
 or_rule :: RuleFun -> RuleFun -> RuleFun
-or_rule r1 r2 args = case r1 args of
-		   Just stuff -> Just stuff
-		   Nothing    -> r2 args
+or_rule r1 r2 args = maybe (r2 args) Just (r1 args) -- i.e.: r1 args `mplus` r2 args
 
 twoLits :: (Literal -> Literal -> Maybe (RuleName, CoreExpr)) -> RuleFun
 twoLits rule [Lit l1, Lit l2] = rule (convFloating l1) (convFloating l2)
@@ -298,13 +296,13 @@ oneLit :: (Literal -> Maybe (RuleName, CoreExpr)) -> RuleFun
 oneLit rule [Lit l1] = rule (convFloating l1)
 oneLit rule other    = Nothing
 
--- When we strictfp is requested, cut down the precision of the Rational value
--- to that of Float/Double. We confuse host architecture and target architecture
--- here, but it's convenient (and wrong :-).
+-- When excess precision is not requested, cut down the precision of the
+-- Rational value to that of Float/Double. We confuse host architecture
+-- and target architecture here, but it's convenient (and wrong :-).
 convFloating :: Literal -> Literal
-convFloating (MachFloat  f) | opt_SimplStrictFP =
+convFloating (MachFloat  f) | not opt_SimplExcessPrecision =
    MachFloat  (toRational ((fromRational f) :: Float ))
-convFloating (MachDouble d) | opt_SimplStrictFP =
+convFloating (MachDouble d) | not opt_SimplExcessPrecision =
    MachDouble (toRational ((fromRational d) :: Double))
 convFloating l = l
 
