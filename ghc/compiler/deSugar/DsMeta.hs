@@ -219,6 +219,18 @@ repTyClD' (TyData { tcdND = DataType, tcdCtxt = cxt,
       	       repData cxt1 tc1 (coreList' stringTy bndrs) cons2 derivs1 } ;
         return $ Just (loc, dec) }
 
+repTyClD' (TyData { tcdND = NewType, tcdCtxt = cxt, 
+		   tcdName = tc, tcdTyVars = tvs, 
+		   tcdCons = DataCons [con], tcdDerivs = mb_derivs,
+           tcdLoc = loc}) 
+ = do { tc1 <- lookupOcc tc ;		-- See note [Binders and occurrences] 
+        dec <- addTyVarBinds tvs $ \bndrs -> do {
+      	       cxt1   <- repContext cxt ;
+               con1   <- repC con ;
+      	       derivs1 <- repDerivs mb_derivs ;
+      	       repNewtype cxt1 tc1 (coreList' stringTy bndrs) con1 derivs1 } ;
+        return $ Just (loc, dec) }
+
 repTyClD' (TySynonym { tcdName = tc, tcdTyVars = tvs, tcdSynRhs = ty,
            tcdLoc = loc})
  = do { tc1 <- lookupOcc tc ;		-- See note [Binders and occurrences] 
@@ -1049,6 +1061,9 @@ repFun (MkC nm) (MkC b) = rep2 funName [nm, b]
 repData :: Core M.CxtQ -> Core String -> Core [String] -> Core [M.ConQ] -> Core [String] -> DsM (Core M.DecQ)
 repData (MkC cxt) (MkC nm) (MkC tvs) (MkC cons) (MkC derivs) = rep2 dataDName [cxt, nm, tvs, cons, derivs]
 
+repNewtype :: Core M.CxtQ -> Core String -> Core [String] -> Core M.ConQ -> Core [String] -> DsM (Core M.DecQ)
+repNewtype (MkC cxt) (MkC nm) (MkC tvs) (MkC con) (MkC derivs) = rep2 newtypeDName [cxt, nm, tvs, con, derivs]
+
 repTySyn :: Core String -> Core [String] -> Core M.TypQ -> DsM (Core M.DecQ)
 repTySyn (MkC nm) (MkC tvs) (MkC rhs) = rep2 tySynDName [nm, tvs, rhs]
 
@@ -1225,7 +1240,7 @@ templateHaskellNames
 		fromName, fromThenName, fromToName, fromThenToName,
 		funName, valName, liftName,
 	  	gensymName, returnQName, bindQName, sequenceQName,
-		matchName, clauseName, funName, valName, tySynDName, dataDName, classDName,
+		matchName, clauseName, funName, valName, tySynDName, dataDName, newtypeDName, classDName,
 		instName, protoName, tforallName, tvarName, tconName, tappName,
 		arrowTyConName, tupleTyConName, listTyConName, namedTyConName,
 		ctxtName, constrName, recConstrName, infixConstrName,
@@ -1309,6 +1324,7 @@ clauseName     = varQual FSLIT("clause")        clauseIdKey
 funName        = varQual FSLIT("fun")           funIdKey
 valName        = varQual FSLIT("val")           valIdKey
 dataDName      = varQual FSLIT("dataD")         dataDIdKey
+newtypeDName   = varQual FSLIT("newtypeD")      newtypeDIdKey
 tySynDName     = varQual FSLIT("tySynD")        tySynDIdKey
 classDName     = varQual FSLIT("classD")        classDIdKey
 instName       = varQual FSLIT("inst")          instIdKey
@@ -1479,6 +1495,8 @@ fieldPKey       = mkPreludeMiscIdUnique 274
 intPrimLIdKey    = mkPreludeMiscIdUnique 275
 floatPrimLIdKey  = mkPreludeMiscIdUnique 276
 doublePrimLIdKey = mkPreludeMiscIdUnique 277
+
+newtypeDIdKey      = mkPreludeMiscIdUnique 278
 
 -- %************************************************************************
 -- %*									*

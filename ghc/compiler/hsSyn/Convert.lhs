@@ -46,6 +46,27 @@ import Outputable
 convertToHsDecls :: [Meta.Dec] -> [Either (HsDecl RdrName) Message]
 convertToHsDecls ds = map cvt_top ds
 
+mk_con con = case con of
+	Constr c strtys
+	 -> ConDecl (cName c) noExistentials noContext
+		  (PrefixCon (map mk_arg strtys)) loc0
+	RecConstr c varstrtys
+	 -> ConDecl (cName c) noExistentials noContext
+		  (Hs.RecCon (map mk_id_arg varstrtys)) loc0
+	InfixConstr st1 c st2
+	 -> ConDecl (cName c) noExistentials noContext
+		  (InfixCon (mk_arg st1) (mk_arg st2)) loc0
+  where
+    mk_arg (Strict, ty) = BangType MarkedUserStrict (cvtType ty)
+    mk_arg (NonStrict, ty) = BangType NotMarkedStrict (cvtType ty)
+
+    mk_id_arg (i, Strict, ty)
+        = (vName i, BangType MarkedUserStrict (cvtType ty))
+    mk_id_arg (i, NonStrict, ty)
+        = (vName i, BangType NotMarkedStrict (cvtType ty))
+
+mk_derivs [] = Nothing
+mk_derivs cs = Just [HsClassP (tconName c) [] | c <- cs]
 
 cvt_top :: Meta.Dec -> Either (HsDecl RdrName) Message
 cvt_top d@(Val _ _ _) = Left $ ValD (cvtd d)
@@ -59,27 +80,12 @@ cvt_top (Data ctxt tc tvs constrs derivs)
                            (cvt_context ctxt, tconName tc, cvt_tvs tvs)
                            (DataCons (map mk_con constrs))
                            (mk_derivs derivs) loc0)
-  where
-    mk_con (Constr c strtys)
-	= ConDecl (cName c) noExistentials noContext
-		  (PrefixCon (map mk_arg strtys)) loc0
-    mk_con (RecConstr c varstrtys)
-	= ConDecl (cName c) noExistentials noContext
-		  (Hs.RecCon (map mk_id_arg varstrtys)) loc0
-    mk_con (InfixConstr st1 c st2)
-	= ConDecl (cName c) noExistentials noContext
-		  (InfixCon (mk_arg st1) (mk_arg st2)) loc0
 
-    mk_arg (Strict, ty) = BangType MarkedUserStrict (cvtType ty)
-    mk_arg (NonStrict, ty) = BangType NotMarkedStrict (cvtType ty)
-
-    mk_id_arg (i, Strict, ty)
-        = (vName i, BangType MarkedUserStrict (cvtType ty))
-    mk_id_arg (i, NonStrict, ty)
-        = (vName i, BangType NotMarkedStrict (cvtType ty))
-
-    mk_derivs [] = Nothing
-    mk_derivs cs = Just [HsClassP (tconName c) [] | c <- cs]
+cvt_top (Newtype ctxt tc tvs constr derivs)
+  = Left $ TyClD (mkTyData NewType 
+                           (cvt_context ctxt, tconName tc, cvt_tvs tvs)
+                           (DataCons [mk_con constr])
+                           (mk_derivs derivs) loc0)
 
 cvt_top (Class ctxt cl tvs decs)
   = Left $ TyClD (mkClassDecl (cvt_context ctxt, tconName cl, cvt_tvs tvs)
