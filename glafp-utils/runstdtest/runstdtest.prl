@@ -305,7 +305,7 @@ exit 0;
 sub grab_arg_arg {
     local($option, $rest_of_arg) = @_;
     
-    if ($rest_of_arg) {
+    if ($rest_of_arg ne "") {
 	return($rest_of_arg);
     } elsif ($#ARGV >= 0) {
 	local($temp) = $ARGV[0]; shift(@ARGV); 
