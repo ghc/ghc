@@ -1,4 +1,4 @@
-module Rn017 where
+module RnAux017 where
 
 data Wibble 
 data Wobble

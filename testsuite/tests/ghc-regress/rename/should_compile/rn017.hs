@@ -1,5 +1,5 @@
 -- !! Rexporting
-module Test ( module Test , module Rn017 ) where
+module Test ( module Test , module RnAux017 ) where
 
 import {-# SOURCE #-} RnAux017
 
