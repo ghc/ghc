@@ -8,3 +8,5 @@ CLEAN_FILES += $(C_PROG) $(C_OBJS)
 DESTDIR=$(INSTBINDIR)
 
 include $(TOP)/mk/target.mk
+
+CC_OPTS := $(filter-out -mno-cygwin,$(CC_OPTS))
