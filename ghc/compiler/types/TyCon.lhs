@@ -466,7 +466,10 @@ tyConSelIds other_tycon		       = []
 \begin{code}
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
-tyConPrimRep _			              = PtrRep
+tyConPrimRep tc			              = ASSERT( not (isUnboxedTupleTyCon tc) )
+						PtrRep
+	-- We should not be asking what the representation of an
+	-- unboxed tuple is, because it isn't a first class value.
 \end{code}
 
 \begin{code}
