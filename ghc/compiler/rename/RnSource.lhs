@@ -221,13 +221,6 @@ rnRuleDecl (IfaceRule rule_name vars fn args rhs src_loc)
     returnRn (IfaceRule rule_name vars' fn' args' rhs' src_loc, 
 	      (fvs1 `plusFV` fvs2) `addOneFV` fn')
 
-rnRuleDecl (IfaceRuleOut fn rule)
-	-- This one is used for BuiltInRules
-	-- The rule itself is already done, but the thing
-	-- to attach it to is not.
-  = lookupOccRn fn		`thenRn` \ fn' ->
-    returnRn (IfaceRuleOut fn' rule, unitFV fn')
-
 rnRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
   = ASSERT( null tvs )
     pushSrcLocRn src_loc			$

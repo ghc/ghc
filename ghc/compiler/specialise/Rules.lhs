@@ -5,7 +5,8 @@
 
 \begin{code}
 module Rules (
-	RuleBase, prepareLocalRuleBase, prepareOrphanRuleBase,
+	RuleBase, emptyRuleBase, extendRuleBase, extendRuleBaseList,
+	prepareLocalRuleBase, prepareOrphanRuleBase,
         unionRuleBase, lookupRule, addRule, addIdSpecialisations,
 	ProtoCoreRule(..), pprProtoCoreRule, pprRuleBase,
 	localRule, orphanRule
@@ -476,9 +477,26 @@ orphanRule (ProtoCoreRule local fn _)
 %************************************************************************
 
 \begin{code}
-type RuleBase = (IdSet,		-- Imported Ids that have rules attached
-		 IdSet)		-- Ids (whether local or imported) mentioned on 
-				-- LHS of some rule; these should be black listed
+data RuleBase = RuleBase (IdEnv CoreRules)	-- Maps an Id to its rules
+			 IdSet			-- Ids (whether local or imported) mentioned on 
+						-- LHS of some rule; these should be black listed
+
+emptyRuleBase = RuleBase emptyVarEnv emptyVarSet
+
+extendRuleBaseList :: RuleBase -> [(Name,CoreRule)] -> RuleBase
+extendRuleBaseList rule_base new_guys
+  = foldr extendRuleBase rule_base new_guys
+
+extendRuleBase :: RuleBase -> (Name,CoreRule) -> RuleBase
+extendRuleBase (RuleBase rule_env rule_fvs) (id, rule)
+  = RuleBase (extendVarEnv rule_env id (addRule id rules_for_id rule))
+	     (rule_fvs `unionVarSet` extendVarSet lhs_fvs id)
+  where
+    rules_for_id = case lookupWithDefaultVarEnv rule_env emptyCoreRules id
+
+    lhs_fvs = ruleSomeLhsFreeVars isId rule
+	-- Find *all* the free Ids of the LHS, not just
+	-- locally defined ones!!
 
 unionRuleBase (rule_ids1, black_ids1) (rule_ids2, black_ids2)
   = (plusUFM_C merge_rules rule_ids1 rule_ids2,
@@ -507,7 +525,7 @@ prepareLocalRuleBase :: [CoreBind] -> [ProtoCoreRule] -> ([CoreBind], RuleBase)
 prepareLocalRuleBase binds local_rules
   = (map zap_bind binds, (imported_id_rule_ids, rule_lhs_fvs))
   where
-    (rule_ids, rule_lhs_fvs) = foldr add_rule (emptyVarSet, emptyVarSet) local_rules
+    (rule_ids, rule_lhs_fvs) = foldr add_rule emptyRuleBase local_rules
     imported_id_rule_ids = filterVarSet (not . isLocallyDefined) rule_ids
 
 	-- rule_fvs is the set of all variables mentioned in this module's rules
@@ -535,18 +553,6 @@ prepareLocalRuleBase binds local_rules
 			  Just bndr' 			       -> setIdNoDiscard bndr'
 			  Nothing | bndr `elemVarSet` rule_fvs -> setIdNoDiscard bndr
 				  | otherwise		       -> bndr
-		  
-add_rule (ProtoCoreRule _ id rule)
-	 (rule_id_set, rule_fvs)
-  = (rule_id_set `extendVarSet` new_id,
-     rule_fvs `unionVarSet` extendVarSet lhs_fvs id)
-  where
-    new_id = case lookupVarSet rule_id_set id of
-		Just id' -> addRuleToId id' rule
-		Nothing  -> addRuleToId id  rule
-    lhs_fvs = ruleSomeLhsFreeVars isId rule
-	-- Find *all* the free Ids of the LHS, not just
-	-- locally defined ones!!
 
 addRuleToId id rule = setIdSpecialisation id (addRule id (idSpecialisation id) rule)
 

@@ -69,8 +69,8 @@ import List		( partition )
 \begin{code}
 completeModDetails :: ModDetails
 	  	   -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
-					-- code generator; they have authoritative arity info
-		   -> [ProtoCoreRule]	-- Tidy orphan rules
+						-- code generator; they have authoritative arity info
+		   -> [ProtoCoreRule]		-- Tidy orphan rules
 		   -> ModDetails
 
 completeIface :: Maybe ModIface		-- The old interface, if we have it

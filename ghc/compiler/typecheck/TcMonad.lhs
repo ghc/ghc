@@ -62,7 +62,7 @@ import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, 
 			  splitUniqSupply, mkSplitUniqSupply,
 			  UniqSM, initUs_ )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
 import FiniteMap	( FiniteMap, lookupFM, addToFM, emptyFM )
 import UniqFM		( emptyUFM )
 import Unique		( Unique )

@@ -12,9 +12,9 @@ module TcModule (
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlag(..), DynFlags, opt_PprStyle_Debug )
-import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
+import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..) )
 import HsTypes		( toHsType )
-import RnHsSyn		( RenamedHsModule, RenamedHsDecl )
+import RnHsSyn		( RenamedHsDecl )
 import TcHsSyn		( TypecheckedMonoBinds, 
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkForeignExports, zonkRules
@@ -70,9 +70,11 @@ data TcResults
   = TcResults {
 	tc_pcs	   :: PersistentCompilerState,	-- Augmented with imported information,
 						-- (but not stuff from this module)
-	tc_env	   :: TypeEnv,			-- The TypeEnv just for the stuff from this module
-	tc_insts   :: [DFunId],			-- Instances, just for this module
-	tc_binds   :: TypecheckedMonoBinds,
+
+	-- All these fields have info *just for this module*
+	tc_env	   :: TypeEnv,			-- The top level TypeEnv
+	tc_insts   :: [DFunId],			-- Instances
+	tc_binds   :: TypecheckedMonoBinds,	-- Bindings
 	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
 	tc_rules   :: [TypecheckedRuleDecl]	-- Transformation rules
     }
@@ -82,32 +84,34 @@ typecheckModule
 	:: DynFlags
 	-> Module
 	-> PersistentCompilerState
-	-> HomeSymbolTable
-	-> HomeIfaceTable
-	-> PackageIfaceTable
+	-> HomeSymbolTable -> HomeIfaceTable
 	-> [RenamedHsDecl]
 	-> IO (Maybe TcResults)
 
-typecheckModule dflags this_mod pcs hst hit pit decls
+typecheckModule dflags this_mod pcs hst hit decls
   = do	env <- initTcEnv global_symbol_table
 
         (maybe_result, (errs,warns)) <- initTc dflags env tc_module
 
-	let maybe_tc_result :: Maybe TcResults
-	    maybe_tc_result = mapMaybe snd maybe_result
+	let { maybe_tc_result :: Maybe TcResults ;
+	      maybe_tc_result = case maybe_result of
+				  Nothing    -> Nothing
+				  Just (_,r) -> Just r }
 
-       printErrorsAndWarnings (errs,warns)
-       printTcDump dflags maybe_tc_result
+        printErrorsAndWarnings (errs,warns)
+        printTcDump dflags maybe_tc_result
 
-       if isEmptyBag errs then 
-          return Nothing 
-         else 
-          return maybe_tc_result
+        if isEmptyBag errs then 
+             return Nothing 
+           else 
+             return maybe_tc_result
   where
     global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
 
     tc_module :: TcM (TcEnv, TcResults)
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)
+
+    pit = pcs_PIT pcs
 
     get_fixity :: Name -> Maybe Fixity
     get_fixity nm = lookupTable hit pit nm 	`thenMaybe` \ iface ->
@@ -147,8 +151,9 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     in
     
     	-- Typecheck the instance decls, includes deriving
-    tcInstDecls1 pcs hst unf_env get_fixity this_mod 
-		 local_tycons decls		`thenTc` \ (pcs_with_insts, inst_env, inst_info, deriv_binds) ->
+    tcInstDecls1 (pcs_insts pcs) (pcs_PRS pcs) 
+		 hst unf_env get_fixity this_mod 
+		 local_tycons decls		`thenTc` \ (new_pcs_insts, inst_env, local_inst_info, deriv_binds) ->
     tcSetInstEnv inst_env			$
     
         -- Default declarations
@@ -199,9 +204,9 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     
     	-- Second pass over class and instance declarations,
     	-- to compile the bindings themselves.
-    tcInstDecls2  inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
+    tcInstDecls2  local_inst_info	`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
     tcClassDecls2 decls			`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
-    tcRules decls			`thenNF_Tc` \ (lie_rules,     rules) ->
+    tcRules (pcs_rules pcs) decls	`thenNF_Tc` \ (new_pcs_rules, lie_rules, local_rules) ->
     
          -- Deal with constant or ambiguous InstIds.  How could
          -- there be ambiguous ones?  They can only arise if a
@@ -236,7 +241,7 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     tcSetEnv final_env			$
     	-- zonkTopBinds puts all the top-level Ids into the tcGEnv
     zonkForeignExports foe_decls	`thenNF_Tc` \ foe_decls' ->
-    zonkRules rules			`thenNF_Tc` \ rules' ->
+    zonkRules local_rules		`thenNF_Tc` \ local_rules' ->
     
     
     let	groups :: FiniteMap Module TypeEnv
@@ -249,13 +254,16 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     	new_pst = extendTypeEnv (pcs_PST pcs) (delFromFM groups this_mod)
 
 	final_pcs :: PersistentCompilerState
-	final_pcs = pcs_with_insts {pcs_PST = new_pst}
+	final_pcs = pcs { pcs_PST   = new_pst,
+			  pcs_insts = new_pcs_insts,
+			  pcs_rules = new_pcs_rules
+		    }
     in  
-    returnTc (final_env, -- WAS: really_final_env, 
+    returnTc (final_env,
 	      TcResults { tc_pcs     = final_pcs,
 			  tc_env     = local_type_env,
 			  tc_binds   = all_binds', 
-			  tc_insts   = map iDFunId inst_info,
+			  tc_insts   = map iDFunId local_inst_info,
 			  tc_fords   = foi_decls ++ foe_decls',
 			  tc_rules   = rules'
                         })

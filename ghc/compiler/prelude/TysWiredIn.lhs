@@ -102,9 +102,9 @@ import TyCon		( TyCon, AlgTyConFlavour(..), tyConDataCons,
 			  mkTupleTyCon, isUnLiftedTyCon, mkAlgTyConRep
 			)
 
-import BasicTypes	( Arity, RecFlag(..), EP(..), Boxity(..), isBoxed )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 
-import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
+import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTys, 
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
 			  splitTyConApp_maybe, repType,
 			  TauType, ClassContext )

@@ -48,7 +48,7 @@ deSugar :: DynFlags
 	-> UniqSupply
 	-> HomeSymbolTable
         -> TcResults
-	-> IO ([CoreBind], [ProtoCoreRule], SDoc, SDoc, [CoreBndr])
+	-> IO ([CoreBind], RuleEnv, SDoc, SDoc, [CoreBndr])
 
 deSugar dflags mod_name us hst
         (TcResults {tc_env   = global_val_env,
@@ -110,9 +110,6 @@ ppr_ds_rules rules
 
 \begin{code}
 dsRule :: IdSet -> TypecheckedRuleDecl -> DsM ProtoCoreRule
-dsRule in_scope (IfaceRuleOut fn rule)
-  = returnDs (ProtoCoreRule False {- non-local -} fn rule)
-    
 dsRule in_scope (HsRule name sig_tvs vars lhs rhs loc)
   = putSrcLocDs loc		$
     ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->

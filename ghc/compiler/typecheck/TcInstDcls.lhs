@@ -39,7 +39,8 @@ import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, DFunId,
-			  ModDetails(..) )
+			  ModDetails(..), PackageInstEnv, PersistentRenamerState
+			)
 
 import Bag		( unionManyBags	)
 import Class		( Class, DefMeth(..), classBigSig )
@@ -160,16 +161,17 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 Gather up the instance declarations from their various sources
 
 \begin{code}
-tcInstDecls1 :: PersistentCompilerState
+tcInstDecls1 :: PackageInstEnv
+	     -> PersistentRenamerState	
 	     -> HomeSymbolTable		-- Contains instances
 	     -> TcEnv 			-- Contains IdInfo for dfun ids
 	     -> (Name -> Maybe Fixity)	-- for deriving Show and Read
 	     -> Module			-- Module for deriving
 	     -> [TyCon]
 	     -> [RenamedHsDecl]
-	     -> TcM (PersistentCompilerState, InstEnv, [InstInfo], RenamedHsBinds)
+	     -> TcM (PackageInstEnv, InstEnv, [InstInfo], RenamedHsBinds)
 
-tcInstDecls1 pcs hst unf_env get_fixity mod local_tycons decls
+tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod local_tycons decls
   = let
 	inst_decls = [inst_decl | InstD inst_decl <- decls]
 	clas_decls = [clas_decl | TyClD clas_decl <- decls, isClassDecl clas_decl]
@@ -195,7 +197,7 @@ tcInstDecls1 pcs hst unf_env get_fixity mod local_tycons decls
 			       imported_inst_info
 	hst_dfuns	 = foldModuleEnv ((++) . md_insts) [] hst
     in
-    addInstDFuns (pcs_insts pcs) imported_dfuns	`thenNF_Tc` \ inst_env1 ->
+    addInstDFuns inst_env0 imported_dfuns	`thenNF_Tc` \ inst_env1 ->
     addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
     addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
     addInstInfos inst_env3 generic_inst_info	`thenNF_Tc` \ inst_env4 ->
@@ -205,12 +207,10 @@ tcInstDecls1 pcs hst unf_env get_fixity mod local_tycons decls
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
-    tcDeriving (pcs_PRS pcs) mod inst_env4 get_fixity local_tycons
-					`thenTc` \ (deriv_inst_info, deriv_binds) ->
-    addInstInfos inst_env4 deriv_inst_info			
-					`thenNF_Tc` \ final_inst_env ->
+    tcDeriving prs mod inst_env4 get_fixity local_tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    addInstInfos inst_env4 deriv_inst_info			`thenNF_Tc` \ final_inst_env ->
 
-    returnTc (pcs { pcs_insts = inst_env1 }, 
+    returnTc (inst_env1, 
 	      final_inst_env, 
 	      generic_inst_info ++ deriv_inst_info ++ local_inst_info,
 	      deriv_binds)

@@ -10,7 +10,8 @@ module TcRules ( tcRules ) where
 
 import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..) )
 import CoreSyn		( CoreRule(..) )
-import RnHsSyn		( RenamedHsDecl )
+import RnHsSyn		( RenamedHsDecl, RenamedRuleDecl )
+import HscTypes		( PackageRuleEnv )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyAndCheck )
@@ -19,33 +20,44 @@ import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( kcHsSigType, tcHsSigType, tcTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv	)
-import Inst		( LIE, emptyLIE, plusLIEs, instToId )
+import Rules		( extendRuleBase )
+import Inst		( LIE, plusLIEs, instToId )
 import Id		( idType, idName, mkVanillaId )
+import Name		( Name, extendNameEnvList )
 import VarSet
 import Type		( tyVarsOfTypes, openTypeKind )
 import Bag		( bagToList )
+import List		( partition )
 import Outputable
 \end{code}
 
 \begin{code}
-tcRules :: [RenamedHsDecl] -> TcM (LIE, [TypecheckedRuleDecl])
-tcRules decls = mapAndUnzipTc tcRule [rule | RuleD rule <- decls]	`thenTc` \ (lies, rules) ->
-		returnTc (plusLIEs lies, rules)
+tcRules :: PackageRuleEnv -> [RenamedHsDecl] -> TcM (PackageRuleEnv, LIE, [TypecheckedRuleDecl])
+tcRules pkg_rule_env decls 
+  = mapAndUnzipTc tcLocalRule local_rules	`thenTc` \ (lies, new_local_rules) ->
+    mapTc tcIfaceRule imported_rules		`thenTc` \ new_imported_rules ->
+    returnTc (extendRuleBaseList pkg_rule_env new_imported_rules,
+	      plusLIEs lies, new_local_rules)
+  where
+    rule_decls = [rule | RuleD rule <- decls]
+    (imported_rules, local_rules) = partition is_iface_rule rule_decls
 
-tcRule (IfaceRule name vars fun args rhs src_loc)
+    is_iface_rule (IfaceRule _ _ _ _ _ _) = True
+    is_iface_rule other			  = False
+
+tcIfaceRule :: RenamedRuleDecl -> TcM (Id, CoreRule)
+  -- No zonking necessary!
+tcIfaceRule (IfaceRule name vars fun args rhs src_loc)
   = tcAddSrcLoc src_loc 		$
     tcAddErrCtxt (ruleCtxt name)	$
     tcVar fun				`thenTc` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
     mapTc tcCoreExpr args		`thenTc` \ args' ->
     tcCoreExpr rhs			`thenTc` \ rhs' ->
-    returnTc (emptyLIE, IfaceRuleOut fun' (Rule name vars' args' rhs'))
+    returnTc (fun', Rule name vars' args' rhs')
 
-tcRule (IfaceRuleOut fun rule)
-  = tcVar fun				`thenTc` \ fun' ->
-    returnTc (emptyLIE, IfaceRuleOut fun' rule)
-
-tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
+tcLocalRule :: RenamedRuleDecl -> TcM (LIE, TypecheckedRuleDecl)
+tcLocalRule (HsRule name sig_tvs vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$
     tcAddErrCtxt (ruleCtxt name)			$
     newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->
@@ -111,3 +123,7 @@ tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ptext name)
 \end{code}
+
+
+
+

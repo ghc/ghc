@@ -30,6 +30,7 @@ module HscTypes (
 	Deprecations(..), lookupDeprec,
 
 	InstEnv, ClsInstEnv, DFunId,
+	PackageInstEnv, PackageRuleBase,
 
 	GlobalRdrEnv, RdrAvailInfo,
 
@@ -148,7 +149,7 @@ data ModDetails
 	-- The next three fields are created by the typechecker
         md_types    :: TypeEnv,
         md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: RuleEnv		-- Domain may include Ids from other modules
+        md_rules    :: RuleBase		-- Domain may include Ids from other modules
      }
 \end{code}
 
@@ -157,7 +158,7 @@ emptyModDetails :: ModDetails
 emptyModDetails
   = ModDetails { md_types = emptyTypeEnv,
                  md_insts = [],
-                 md_rules = emptyRuleEnv
+                 md_rules = emptyRuleBase
     }
 
 emptyModIface :: Module -> ModIface
@@ -299,12 +300,9 @@ lookupDeprec iface name
 	DeprecSome env -> lookupNameEnv env name
 
 type InstEnv    = UniqFM ClsInstEnv		-- Maps Class to instances for that class
+
 type ClsInstEnv = [(TyVarSet, [Type], DFunId)]	-- The instances for a particular class
 type DFunId	= Id
-
-type RuleEnv    = NameEnv [CoreRule]
-
-emptyRuleEnv    = emptyVarEnv
 \end{code}
 
 
@@ -381,14 +379,18 @@ data PersistentCompilerState
    = PCS {
         pcs_PIT :: PackageIfaceTable,	-- Domain = non-home-package modules
 					--   the mi_decls component is empty
+
         pcs_PST :: PackageSymbolTable,	-- Domain = non-home-package modules
 					--   except that the InstEnv components is empty
-	pcs_insts :: InstEnv,		-- The total InstEnv accumulated from all
+
+	pcs_insts :: PackageInstEnv,	-- The total InstEnv accumulated from all
 					--   the non-home-package modules
-	pcs_rules :: RuleEnv,		-- Ditto RuleEnv
+
+	pcs_rules :: PackageRuleEnv,	-- Ditto RuleEnv
 
         pcs_PRS :: PersistentRenamerState
      }
+
 \end{code}
 
 The @PersistentRenamerState@ persists across successive calls to the
@@ -411,6 +413,9 @@ It contains:
     interface files but not yet sucked in, renamed, and typechecked
 
 \begin{code}
+type PackageRuleBase = RuleBase
+type PackageInstEnv  = InstEnv
+
 data PersistentRenamerState
   = PRS { prsOrig  :: OrigNameEnv,
 	  prsDecls :: DeclsMap,
