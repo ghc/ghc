@@ -47,9 +47,19 @@ $(odir_)%.$(way_)o : %.hs
 	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi
 	$(HC_POST_OPTS)
 
+$(odir_)%.$(way_)o-boot : %.hs-boot
+	$(HC_PRE_OPTS)
+	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi-boot
+	$(HC_POST_OPTS)
+
 $(odir_)%.$(way_)o : %.lhs	 
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi
+	$(HC_POST_OPTS)
+
+$(odir_)%.$(way_)o-boot : %.lhs-boot
+	$(HC_PRE_OPTS)
+	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi-boot
 	$(HC_POST_OPTS)
 
 $(odir_)%.$(way_)hc : %.lhs	 
@@ -90,6 +100,13 @@ $(odir_)%.$(way_)hc : %.lhc
 # updates the .hi file (if necessary).
 
 %.$(way_)hi : %.$(way_)o
+	@if [ ! -f $@ ] ; then \
+	    echo Panic! $< exists, but $@ does not.; \
+	    exit 1; \
+	else exit 0 ; \
+	fi							
+
+%.$(way_)hi-boot : %.$(way_)o-boot
 	@if [ ! -f $@ ] ; then \
 	    echo Panic! $< exists, but $@ does not.; \
 	    exit 1; \
