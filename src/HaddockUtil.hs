@@ -25,30 +25,24 @@ module HaddockUtil (
   html_xrefs_ref,
  ) where
 
+import Binary
 import HaddockLex
 import HaddockParse
 import HaddockTypes
-
 import HsSyn
 import Map ( Map )
-import qualified Map
+import qualified Map hiding ( Map )
 
-import List	( intersect, isSuffixOf, intersperse )
-import Maybe
-import IO	( hPutStr, stderr )
-import System
-import Binary
-import Monad
-import Char	( isAlpha, isSpace, toUpper, ord )
-
-#if __GLASGOW_HASKELL__ < 503
-import IOExts
-import URI	( escapeString, unreserved )
-#else
-import Data.IORef
-import System.IO.Unsafe	 ( unsafePerformIO )
+import Control.Monad ( liftM, MonadPlus(..) )
+import Data.Char ( isAlpha, isSpace, toUpper, ord )
+import Data.IORef ( IORef, newIORef, readIORef )
+import Data.List ( intersect, isSuffixOf, intersperse )
+import Data.Maybe ( maybeToList, fromMaybe )
 import Network.URI ( escapeString, unreserved )
-#endif
+import System.Environment ( getProgName )
+import System.Exit ( exitWith, ExitCode(..) )
+import System.IO ( hPutStr, stderr )
+import System.IO.Unsafe	 ( unsafePerformIO )
 
 -- -----------------------------------------------------------------------------
 -- Some Utilities

@@ -11,15 +11,11 @@ module Map (
 
 import Prelude hiding ( lookup )
 
-#if __GLASGOW_HASKELL__ < 503
-import FiniteMap
-#elif __GLASGOW_HASKELL__ < 603
-import Data.FiniteMap
-#else
+#if __GLASGOW_HASKELL__ >= 603
 import Data.Map
-#endif
+#else
+import Data.FiniteMap
 
-#if __GLASGOW_HASKELL__ < 603
 type Map k a = FiniteMap k a
 
 member :: Ord k => k -> Map k a -> Bool

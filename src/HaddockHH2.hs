@@ -5,13 +5,10 @@ import HaddockTypes
 import HaddockUtil
 import HsSyn hiding(Doc)
 import qualified Map
-import PrettyPrint
 
-#if __GLASGOW_HASKELL__ >= 503
 import Data.Char ( toUpper )
-#endif
-
-import Maybe	( fromMaybe )
+import Data.Maybe ( fromMaybe )
+import Text.PrettyPrint
 
 ppHH2Contents :: FilePath -> String -> Maybe String -> [ModuleTree] -> IO ()
 ppHH2Contents odir doctitle maybe_package tree = do

@@ -6,10 +6,13 @@
 
 module HaddockDB (ppDocBook) where
 
+{-
 import HaddockTypes
 import HaddockUtil
 import HsSyn
-import PrettyPrint
+
+import Text.PrettyPrint
+-}
 
 -----------------------------------------------------------------------------
 -- Printing the results in DocBook format

@@ -11,31 +11,28 @@ module HaddockHtml (
   ) where
 
 import Prelude hiding (div)
-import HaddockVersion
-import HaddockTypes
-import HaddockUtil
-import HaddockModuleTree
+
+import Binary ( openBinaryFile )
+import HaddockDevHelp
 import HaddockHH
 import HaddockHH2
-import HaddockDevHelp
+import HaddockModuleTree
+import HaddockTypes
+import HaddockUtil
+import HaddockVersion
 import HsSyn
-import Map ( Map )
-import qualified Map
-
-import Maybe	( fromJust, isJust, mapMaybe )
-import List 	( sortBy )
-import Char	( isUpper, toUpper )
-import Monad	( when, unless )
-
-
-import Foreign
-import Control.Exception ( handle, bracket )
-
-import Binary    ( openBinaryFile )
-import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
-
 import Html
 import qualified Html
+import Map ( Map )
+import qualified Map hiding ( Map )
+
+import Control.Exception ( bracket )
+import Control.Monad ( when, unless )
+import Data.Char ( isUpper, toUpper )
+import Data.List ( sortBy )
+import Data.Maybe ( fromJust, isJust, mapMaybe )
+import Foreign.Marshal.Alloc ( allocaBytes )
+import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation

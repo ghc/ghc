@@ -6,52 +6,34 @@
 
 module Main (main) where
 
-import HaddockVersion
-import HaddockRename
-import HaddockParse
-import HaddockLex
+import Binary
+import Digraph
 --import HaddockDB   -- not compiling
 import HaddockHtml
+import HaddockLex
+import HaddockParse
+import HaddockRename
 import HaddockTypes
 import HaddockUtil
-import Digraph
-import Binary
-
-import Map ( Map )
-import qualified Map
-import Set
-import HsParser
+import HaddockVersion
 import HsParseMonad
+import HsParser
 import HsSyn
-import System
+import Map ( Map )
+import qualified Map hiding ( Map )
+import Set
 
---import Pretty
-
-import Maybe	( isJust, maybeToList )
-import List	( nub )
-import Monad	( when )
-import Char	( isSpace )
-import IO
-
-#if __GLASGOW_HASKELL__ < 503
-import MonadWriter
-import GetOpt
-import IOExts
-#else
-import Control.Monad.Writer
-import System.Console.GetOpt
-import Data.IORef
+import Control.Exception ( bracket )
+import Control.Monad ( when )
+import Control.Monad.Writer ( Writer, runWriter, tell )
+import Data.Char ( isSpace )
+import Data.IORef ( writeIORef )
+import Data.List ( nub )
+import Data.Maybe ( isJust, maybeToList )
 --import Debug.Trace
-import System.IO.Unsafe	 ( unsafePerformIO )
-#endif
-
-import Foreign
-import Foreign.C
-
-#if __GLASGOW_HASKELL__ < 500
-import Regex
-import PackedString
-#endif
+import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
+import System.Environment ( getArgs )
+import System.IO ( stderr, IOMode(..), openFile, hClose, hGetContents, hPutStrLn )
 
 -----------------------------------------------------------------------------
 -- Top-level stuff

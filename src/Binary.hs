@@ -105,8 +105,6 @@ import GHC.Word			( Word8(..) )
 -- openFileEx is available from the lang package, but we want to 
 -- be independent of hslibs libraries.
 import GHC.Handle		( openFileEx, IOModeEx(..) )
-#else
-import System.IO		( openBinaryFile )
 #endif
 #endif
 

@@ -5,9 +5,9 @@ import HaddockTypes
 import HaddockUtil
 import HsSyn hiding(Doc)
 import qualified Map
-import PrettyPrint
 
-import Maybe	( fromMaybe )
+import Data.Maybe ( fromMaybe )
+import Text.PrettyPrint
 
 
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> IO ()

@@ -6,11 +6,7 @@ module Set (
    elems, fromList
 ) where
 
-#if __GLASGOW_HASKELL__ < 503
-import Set
-#else
 import Data.Set 
-#endif
 
 #if __GLASGOW_HASKELL__ < 603
 member :: Ord a => a -> Set a -> Bool

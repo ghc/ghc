@@ -16,7 +16,7 @@ module HaddockRename (
 import HaddockTypes
 import HsSyn
 import Map ( Map )
-import qualified Map
+import qualified Map hiding ( Map )
 
 import Monad
 
