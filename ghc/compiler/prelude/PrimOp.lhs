@@ -365,7 +365,7 @@ See also @primOpIsCheap@ (below).
 primOpOkForSpeculation :: PrimOp -> Bool
 	-- See comments with CoreUtils.exprOkForSpeculation
 primOpOkForSpeculation op 
-  = not (primOpCanFail op || primOpHasSideEffects op || primOpOutOfLine op)
+  = primOpIsCheap op && not (primOpCanFail op)
 \end{code}
 
 
