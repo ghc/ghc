@@ -328,6 +328,11 @@ endif
 #-----------------------------------------------------------------------------
 # Preprocessor suffix rule
 
+# We're careful to remove cpp-droppings from the generated file; things like
+# '#line' pragmas.  But we also leave in #include directives, because these
+# are likely to be intentional (perhaps the file is going to be CPP'd again -
+# this is used by ghc/compiler/parser/Parser.y.pp).
+
 % : %.pp
 	@$(RM) $@
-	$(CPP) $(RAWCPP_FLAGS) $(CPP_OPTS) -x c $< | $(SED) -e '/^#/d' > $@
+	$(CPP) $(RAWCPP_FLAGS) $(CPP_OPTS) -x c $< | $(SED) -e '/^#[^i]/d' > $@
