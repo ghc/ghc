@@ -230,16 +230,17 @@ mkPackageModLocation hisuf mod_name path basename _ext = do
   return result
 
 hiOnlyModLocation path basename hisuf 
- = do { obj_fn <- mkObjPath path basename ;
-        return (ModLocation{ ml_hspp_file = Nothing,
+ = do let full_basename = path++'/':basename
+      obj_fn <- mkObjPath full_basename basename
+      return ModLocation{ ml_hspp_file = Nothing,
  	        	     ml_hs_file   = Nothing,
- 	        	     ml_hi_file   = path ++ '/':basename ++ '.':hisuf,
+ 	        	     ml_hi_file   = full_basename ++ '.':hisuf,
 		 		-- Remove the .hi-boot suffix from
 		 		-- hi_file, if it had one.  We always
 		 		-- want the name of the real .hi file
 		 		-- in the ml_hi_file field.
 	   	             ml_obj_file  = obj_fn
-                 })}
+                  }
 
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location
@@ -275,59 +276,57 @@ hiOnlyModLocation path basename hisuf
 --	The filename extension of the source file (usually "hs" or "lhs").
 
 mkHomeModLocation mod_name src_filename = do
-   let mod_basename = dots_to_slashes (moduleNameUserString mod_name)
-       (basename,extension) = splitFilename src_filename
+   let (basename,extension) = splitFilename src_filename
+   mkHomeModLocation' mod_name basename extension
 
-   case maybePrefixMatch (reverse mod_basename) (reverse basename) of
-	Just ""   ->
-	   mkHomeModLocationSearched mod_name "."  mod_basename extension
-	Just rest@(r:_) | isPathSeparator r -> do
-	   let path = reverse (dropWhile (=='/') rest)
-	   mkHomeModLocationSearched mod_name path mod_basename extension
-	_ -> do
-	  -- hPutStrLn stderr ("Warning: " ++ src_filename ++
-	  --			 ": filename and module name do not match")
-	  let (dir,basename,ext) = splitFilename3 src_filename
-	  mkHomeModLocationSearched mod_name dir basename ext
+mkHomeModLocationSearched mod_name path basename ext =
+   mkHomeModLocation' mod_name (path ++ '/':basename) ext
 
-mkHomeModLocationSearched mod_name path src_basename ext = do
-   hisuf  <- readIORef v_Hi_suf
-   hidir  <- readIORef v_Hi_dir
-
+mkHomeModLocation' mod_name src_basename ext = do
    let mod_basename = dots_to_slashes (moduleNameUserString mod_name)
 
-   obj_fn <- mkObjPath path mod_basename
+   obj_fn <- mkObjPath src_basename mod_basename
+   hi_fn  <- mkHiPath  src_basename mod_basename
 
-   let  -- hi filename, always follows the module name
-       hi_path | Just d <- hidir = d
-	       | otherwise       = path
-
-       hi_fn = hi_path ++ '/':mod_basename ++ '.':hisuf
-
-	-- source filename
-       source_fn = path ++ '/':src_basename ++ '.':ext
-
-       result = ( mkHomeModule mod_name,
-           	  ModLocation{ ml_hspp_file = Nothing,
-	   		       ml_hs_file   = Just source_fn,
-			       ml_hi_file   = hi_fn,
-			       ml_obj_file  = obj_fn,
+   let result = ( mkHomeModule mod_name,
+           	   ModLocation{ ml_hspp_file = Nothing,
+	   		        ml_hs_file   = Just (src_basename ++ '.':ext),
+			        ml_hi_file   = hi_fn,
+			        ml_obj_file  = obj_fn
 		       })
 
    addToFinderCache mod_name result
    return result
 
-mkObjPath :: FilePath -> String -> IO FilePath
--- Construct the filename of a .o file.
--- Does *not* check whether the .o file exists
-mkObjPath path basename
+-- | Constructs the filename of a .o file for a given source file.
+-- Does /not/ check whether the .o file exists
+mkObjPath
+  :: FilePath		-- the filename of the source file, minus the extension
+  -> String		-- the module name with dots replaced by slashes
+  -> IO FilePath
+mkObjPath basename mod_basename
   = do  odir   <- readIORef v_Output_dir
 	osuf   <- readIORef v_Object_suf
 
-	let obj_path | Just d <- odir = d
-	   	     | otherwise      = path
+	let obj_basename | Just dir <- odir = dir ++ '/':mod_basename
+	   	         | otherwise        = basename
 
-        return (obj_path ++ '/':basename ++ '.':osuf)
+        return (obj_basename ++ '.':osuf)
+
+-- | Constructs the filename of a .hi file for a given source file.
+-- Does /not/ check whether the .hi file exists
+mkHiPath
+  :: FilePath		-- the filename of the source file, minus the extension
+  -> String		-- the module name with dots replaced by slashes
+  -> IO FilePath
+mkHiPath basename mod_basename
+  = do  hidir   <- readIORef v_Hi_dir
+	hisuf   <- readIORef v_Hi_suf
+
+	let hi_basename | Just dir <- hidir = dir ++ '/':mod_basename
+	   	        | otherwise         = basename
+
+        return (hi_basename ++ '.':hisuf)
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 
