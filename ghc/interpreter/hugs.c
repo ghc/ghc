@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.52 $
- * $Date: 2000/03/31 04:13:27 $
+ * $Revision: 1.53 $
+ * $Date: 2000/04/04 01:07:49 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -906,8 +906,10 @@ static void mgFromList ( List /* of CONID */ modgList )
       for (u = module(mod).uses; nonNull(u); u=tl(u))
          usesT = cons(textOf(hd(u)),usesT);
       /* artifically give all modules a dependency on Prelude */
-      if (mT != textPrelude) 
+#if 0
+      if (mT != textPrelude && mT != textPrimPrel)
          usesT = cons(textPrelude,usesT);
+#endif
       adjList = cons(pair(mT,usesT),adjList);
    }
 
@@ -1518,8 +1520,9 @@ static Bool loadThePrelude ( void )
       achieveTargetModules();
       ok = elemMG(conPrelude) && elemMG(conPrelHugs);
    } else {
-      conPrelude    = mkCon(findText("Prelude"));
-      targetModules = singleton(conPrelude);
+      conPrelude    = mkCon(findText("PrimPrel"));
+      conPrelHugs   = mkCon(findText("Prelude"));
+      targetModules = doubleton(conPrelude,conPrelHugs);
       achieveTargetModules();
       ok = elemMG(conPrelude);
    }
@@ -1683,7 +1686,7 @@ static Module allocEvalModule ( void )
    module(evalMod).tycons  = module(currentModule).tycons;
    module(evalMod).classes = module(currentModule).classes;
    module(evalMod).qualImports 
-     = singleton(pair(mkCon(textPrelude),modulePrelude));
+     = singleton(pair(mkCon(textPrelude),modulePrimPrel)); /* AJG Back to Prelude */
    return evalMod;
 }
 

@@ -1,11 +1,11 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.8 2000/03/20 04:26:23 andy Exp $ 
+# $Id: Makefile,v 1.9 2000/04/04 01:07:50 andy Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
-PRELUDE  = Prelude.hs
+PRELUDE  = Prelude.hs PrimPrel.hs
 
 STD_LIBS = Array.lhs Char.lhs Complex.lhs CPUTime.lhs \
 	   Directory.lhs IO.lhs Ix.lhs List.lhs Locale.lhs \

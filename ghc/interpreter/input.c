@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/24 14:32:03 $
+ * $Revision: 1.25 $
+ * $Date: 2000/04/04 01:07:49 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -151,6 +151,7 @@ Text   textCcall;                       /* ccall                           */
 Text   textStdcall;                     /* stdcall                         */
 
 Text   textNum;                         /* Num                             */
+Text   textPrimPrel;                    /* PrimPrel                        */
 Text   textPrelude;                     /* Prelude                         */
 Text   textPlus;                        /* (+)                             */
 
@@ -1699,6 +1700,7 @@ Int what; {
                        textBang       = findText("!");
                        textDot        = findText(".");
                        textImplies    = findText("=>");
+                       textPrimPrel   = findText("PrimPrel");
                        textPrelude    = findText("Prelude");
                        textNum        = findText("Num");
                        textModule     = findText("module");

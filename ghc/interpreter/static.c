@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/03/31 04:13:27 $
+ * $Revision: 1.34 $
+ * $Date: 2000/04/04 01:07:49 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -5035,18 +5035,21 @@ Void checkDefns ( Module thisModule ) { /* Top level static analysis       */
     mapProc(checkQualImport,  module(thisModule).qualImports);
     mapProc(checkUnqualImport,unqualImports);
     /* Add "import Prelude" if there`s no explicit import */
-    if (thisModule!=modulePrelude
-        && isNull(cellAssoc(modulePrelude,unqualImports))
-        && isNull(cellRevAssoc(modulePrelude,module(thisModule).qualImports))) {
-        unqualImports = cons(pair(modulePrelude,DOTDOT),unqualImports);
+#if 0
+    if (thisModule==modulePrelude || thisModule == modulePrelude2) {
+      /* Nothing. */
+    } else if (isNull(cellAssoc(modulePrelude,unqualImports))
+	       && isNull(cellRevAssoc(modulePrelude,module(thisModule).qualImports))) {
+      unqualImports = cons(pair(modulePrelude,DOTDOT),unqualImports);
     } else {
-        /* Every module (including the Prelude) implicitly contains 
-         * "import qualified Prelude" 
-         */
-        module(thisModule).qualImports
-           =cons(pair(mkCon(textPrelude),modulePrelude),
-                 module(thisModule).qualImports);
+      /* Every module (including the Prelude) implicitly contains 
+       * "import qualified Prelude" 
+       */
+      module(thisModule).qualImports
+	=cons(pair(mkCon(textPrelude),modulePrelude),
+	      module(thisModule).qualImports);
     }
+#endif
     mapProc(checkImportList, unqualImports);
 
     /* Note: there's a lot of side-effecting going on here, so

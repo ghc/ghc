@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.58 $
- * $Date: 2000/04/03 23:43:13 $
+ * $Revision: 1.59 $
+ * $Date: 2000/04/04 01:07:49 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1034,7 +1034,7 @@ Tycon addTupleTycon ( Int n )
 
    if (combined)
       m = findFakeModule(findText(n==0 ? "PrelBase" : "PrelTup")); else
-      m = findModule(findText("Prelude"));
+      m = findModule(findText("PrimPrel"));
 
    setCurrModule(m);
    k = STAR;
@@ -1718,7 +1718,7 @@ Void setCurrModule(m)              /* set lookup tables for current module */
 Module m; {
     Int i;
     assert(isModule(m));
-    /* fprintf(stderr, "SET CURR MODULE %s %d\n", textToStr(module(m).text),m);*/
+    /* fprintf(stderr, "SET CURR MODULE %s %d\n", textToStr(module(m).text),m); */
     {List t;
      for (t = module(m).names; nonNull(t); t=tl(t))
         assert(isName(hd(t)));

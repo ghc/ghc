@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.54 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.55 $
+ * $Date: 2000/04/04 01:07:49 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -188,10 +188,10 @@ Name namePlus;
 Name nameMult;
 Name nameMFail;
 Type typeOrdering;
+Module modulePrimPrel;
 Module modulePrelude;
 Name nameMap;
 Name nameMinus;
-
 
 /* --------------------------------------------------------------------------
  * Frequently used type skeletons:
@@ -296,7 +296,11 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
     if (!initialised) {
         Int i;
         initialised = TRUE;
-        setCurrModule(modulePrelude);
+	if (combined) {
+	  setCurrModule(modulePrelude);
+	} else {
+	  setCurrModule(modulePrimPrel);
+	}
 
         typeChar                 = linkTycon("Char");
         typeInt                  = linkTycon("Int");
@@ -405,7 +409,11 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
         Int i;
         initialised = TRUE;
 
-        setCurrModule(modulePrelude);
+	if (combined) {
+	  setCurrModule(modulePrelude);
+	} else {
+	  setCurrModule(modulePrimPrel);
+	}
 
         /* constructors */
         nameFalse        = linkName("False");
@@ -448,7 +456,11 @@ Void linkPrimNames ( void ) {        /* Hook to names defined in Prelude */
     if (!initialised) {
         initialised = TRUE;
 
-        setCurrModule(modulePrelude);
+	if (combined) {
+	  setCurrModule(modulePrelude);
+	} else {
+	  setCurrModule(modulePrimPrel);
+	}
 
         /* primops */
         nameMkIO           = linkName("hugsprimMkIO");
@@ -532,7 +544,7 @@ Int what; {
            Module modulePrelBase = findModule(findText("PrelBase"));
            assert(nonNull(modulePrelBase));
 	   /* fprintf(stderr, "linkControl(POSTPREL)\n"); */
-           setCurrModule(modulePrelude);
+	   setCurrModule(modulePrelude);
            linkPreludeTC();
            linkPreludeCM();
            linkPrimNames();
@@ -596,7 +608,7 @@ assert(nonNull(namePMFail));
            name(nm).mod  = findModule(findText("PrelErr"));
            name(nm).text = findText("error");
            setCurrModule(modulePrelude);
-           module(modulePrelude).exports
+           module(modulePrimPrel).exports
               = cons ( nm, module(modulePrelude).exports );
 
            /* The GHC prelude doesn't seem to export Addr.  Add it to the
@@ -665,7 +677,7 @@ assert(nonNull(namePMFail));
                //   = addWiredInBoxingTycon("PrelConc","ThreadId","ThreadId#"
                //                           ,1,0,THREADID_REP);
 
-               setCurrModule(modulePrelude);
+               setCurrModule(modulePrimPrel);
 
                typeArrow = addPrimTycon(findText("(->)"),
                                         pair(STAR,pair(STAR,STAR)),
@@ -691,14 +703,14 @@ assert(nonNull(namePMFail));
            } else {
                fixupRTStoPreludeRefs(NULL);
 
-               modulePrelude = //newModule(textPrelude);
-                               findFakeModule(textPrelude);
-               setCurrModule(modulePrelude);
+               modulePrimPrel = findFakeModule(textPrimPrel);
+               modulePrelude = findFakeModule(textPrelude);
+               setCurrModule(modulePrimPrel);
         
                for (i=0; i<NUM_TUPLES; ++i) {
                    if (i != 1) addTupleTycon(i);
                }
-               setCurrModule(modulePrelude);
+               setCurrModule(modulePrimPrel);
 
                typeArrow = addPrimTycon(findText("(->)"),
                                         pair(STAR,pair(STAR,STAR)),
