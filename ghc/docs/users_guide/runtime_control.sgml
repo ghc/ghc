@@ -149,6 +149,20 @@
       </varlistentry>
 
       <varlistentry>
+	<term><option>-c</option><replaceable>n</replaceable></term>
+
+	<listitem>
+	  <para>&lsqb;Default: 30&rsqb; Automatically enable
+	  compacting collection when the live data exceeds
+	  <replaceable>n</replaceable>&percnt; of the maximum heap size
+	  (see the <option>-M</option> option).  Note that the maximum
+	  heap size is unlimited by default, so this option has no
+	  effect unless the maximum heap size is set with
+	  <option>-M</option><replaceable>size</replaceable>. </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-F</option><replaceable>factor</replaceable></Term>
 	<listitem>
 	  <indexterm><primary><option>-F</option></primary><secondary>RTS option</secondary></indexterm>
@@ -269,7 +283,7 @@
 	<indexterm><primary><option>-M</option></primary><secondary>RTS option</secondary></indexterm>
 	<indexterm><primary>heap size, maximum</primary></indexterm>
 	<listitem>
-	  <para>&lsqb;Default: 64M&rsqb; Set the maximum heap size to
+	  <para>&lsqb;Default: unlimited&rsqb; Set the maximum heap size to
           <replaceable>size</replaceable> bytes.  The heap normally
           grows and shrinks according to the memory requirements of
           the program.  The only reason for having this option is to
@@ -277,6 +291,14 @@
           available swap space, which at the least will result in the
           program being summarily killed by the operating
           system.</para>
+
+	  <para>The maximum heap size also affects other garbage
+	  collection parameters: when the amount of live data in the
+	  heap exceeds a certain fraction of the maximum heap size,
+	  compacting collection will be automatically enabled for the
+	  oldest generation, and the <option>-F</option> parameter
+	  will be reduced in order to avoid exceeding the maximum heap
+	  size.</para>
 	</listitem>
       </varlistentry>
 
