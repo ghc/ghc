@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: IO.hs,v 1.4 2002/02/07 11:13:30 simonmar Exp $
+-- $Id: IO.hs,v 1.5 2002/02/11 12:28:31 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -12,7 +12,11 @@ module GHC.IO (
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
    commitBuffer',	-- hack, see below
    hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
-   hGetBuf, hPutBuf, slurpFile
+   hGetBuf, hPutBuf, slurpFile,
+   memcpy_ba_baoff,
+   memcpy_ptr_baoff,
+   memcpy_baoff_ba,
+   memcpy_baoff_ptr,
  ) where
 
 import Foreign
