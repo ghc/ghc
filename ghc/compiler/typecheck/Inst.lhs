@@ -5,10 +5,11 @@
 
 \begin{code}
 module Inst ( 
-	showLIE,
-
 	Inst, 
-	pprInst, pprInsts, pprDFuns, pprDictsTheta, pprDictsInFull,
+
+	pprDFuns, pprDictsTheta, pprDictsInFull,	-- User error messages
+	showLIE, pprInst, pprInsts, pprInstInFull,	-- Debugging messages
+
 	tidyInsts, tidyMoreInsts,
 
 	newDictsFromOld, newDicts, cloneDict, 
@@ -705,8 +706,9 @@ lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
 	; case lookupInstEnv dflags (pkg_ie, tcg_inst_env tcg_env) clas tys of {
 	    ([(tenv, (_,_,dfun_id))], []) -> instantiate_dfun tenv dfun_id pred loc ;
 	    (matches, unifs)		  -> do
-	{ traceTc (text "lookupInst" <+> vcat [text "matches" <+> ppr matches,
-					       text "unifs" <+> ppr unifs])
+	{ traceTc (text "lookupInst fail" <+> vcat [text "dict" <+> ppr pred,
+						    text "matches" <+> ppr matches,
+					            text "unifs" <+> ppr unifs])
 	; return NoInstance } } } }
 		-- In the case of overlap (multiple matches) we report
 		-- NoInstance here.  That has the effect of making the 
@@ -718,7 +720,10 @@ lookupInst (Dict _ _ _) = returnM NoInstance
 
 -----------------
 instantiate_dfun tenv dfun_id pred loc
-  = 	-- Record that this dfun is needed
+  = traceTc (text "lookupInst success" <+> 
+		vcat [text "dict" <+> ppr pred, 
+		      text "witness" <+> ppr dfun_id <+> ppr (idType dfun_id) ]) `thenM_`
+	-- Record that this dfun is needed
     record_dfun_usage dfun_id		`thenM_`
 
  	-- It's possible that not all the tyvars are in

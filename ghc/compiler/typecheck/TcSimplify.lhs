@@ -35,7 +35,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  newDictsFromOld, tcInstClassOp,
 			  getDictClassTys, isTyVarDict,
 			  instLoc, zonkInst, tidyInsts, tidyMoreInsts,
-			  Inst, pprInsts, pprDictsInFull, tcGetInstEnvs,
+			  Inst, pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
 			  isIPDict, isInheritableInst, pprDFuns, pprDictsTheta
 			)
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals )
@@ -1509,7 +1509,8 @@ reduceList (n,stack) try_me wanteds state
   =
 #ifdef DEBUG
    (if n > 8 then
-	pprTrace "Jeepers! ReduceContext:" (reduceDepthMsg n stack)
+	pprTrace "Interesting! Context reduction stack deeper than 8:" 
+		 (nest 2 (pprStack stack))
     else (\x->x))
 #endif
     go wanteds state
@@ -2281,7 +2282,7 @@ badDerivedPred pred
 reduceDepthErr n stack
   = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,
 	  ptext SLIT("Use -fcontext-stack20 to increase stack size to (e.g.) 20"),
-	  nest 4 (pprDictsInFull stack)]
+	  nest 4 (pprStack stack)]
 
-reduceDepthMsg n stack = nest 4 (pprDictsInFull stack)
+pprStack stack = vcat (map pprInstInFull stack)
 \end{code}
