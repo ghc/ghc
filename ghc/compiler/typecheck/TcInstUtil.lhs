@@ -15,7 +15,7 @@ module TcInstUtil (
 
 #include "HsVersions.h"
 
-import RnHsSyn		( RenamedMonoBinds, RenamedSig(..) )
+import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 
 import CmdLineOpts	( opt_AllowOverlappingInstances )
 import TcMonad

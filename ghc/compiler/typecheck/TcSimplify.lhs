@@ -136,7 +136,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  newDictFromOld,
 			  instLoc, getDictClassTys,
 			  pprInst, zonkInst,
-			  Inst(..), LIE, pprInsts, pprInstsInFull, mkLIE, 
+			  Inst, LIE, pprInsts, pprInstsInFull, mkLIE, 
 			  InstOrigin, pprOrigin
 			)
 import TcEnv		( TcIdOcc(..) )

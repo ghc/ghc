@@ -35,7 +35,7 @@ import TcTyDecls	( mkDataBinds )
 import TcType		( TcType, tcInstType )
 import TcKind		( TcKind, kindToTcKind )
 
-import RnMonad		( RnNameSupply(..) )
+import RnMonad		( RnNameSupply )
 import Bag		( isEmptyBag )
 import ErrUtils		( WarnMsg, ErrMsg, 
 			  pprBagOfErrors, dumpIfSet

@@ -19,7 +19,7 @@ import HsSyn	( HsModule(..), ImportDecl(..), HsDecl(..),
 		  FixityDecl(..),
 		  collectTopBinders
 		)
-import RdrHsSyn	( RdrNameHsDecl(..), RdrName(..), RdrNameIE(..), RdrNameImportDecl,
+import RdrHsSyn	( RdrNameHsDecl, RdrName(..), RdrNameIE, RdrNameImportDecl,
 		  RdrNameHsModule, RdrNameFixityDecl,
 		  rdrNameOcc, ieOcc
 		)

@@ -18,7 +18,7 @@ import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv, tcSetGlobalValEnv,
 			)
 import TcKind		( TcKind, kindToTcKind )
 
-import RnHsSyn		( RenamedHsDecl(..) )
+import RnHsSyn		( RenamedHsDecl )
 import HsCore
 import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import Literal		( Literal(..) )

@@ -9,7 +9,7 @@ module TcMonoType ( tcHsType, tcHsTypeKind, tcContext, tcTyVarScope ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsType(..), HsTyVar(..), pprContext )
-import RnHsSyn		( RenamedHsType(..), RenamedContext(..) )
+import RnHsSyn		( RenamedHsType, RenamedContext )
 
 import TcMonad
 import TcEnv		( tcLookupTyVar, tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv	)

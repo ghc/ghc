@@ -32,7 +32,7 @@ import CmdLineOpts	( opt_SigsRequired )
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( OccName(..), Provenance, 
 			  Name, isExportedName,
-			  NameSet(..), emptyNameSet, mkNameSet, unionNameSets, 
+			  NameSet, emptyNameSet, mkNameSet, unionNameSets, 
 		 	  minusNameSet, unionManyNameSets, elemNameSet, unitNameSet, nameSetToList
 			)
 import BasicTypes	( RecFlag(..), TopLevelFlag(..) )

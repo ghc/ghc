@@ -44,12 +44,12 @@ import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM,
 			)
 import Name		( Name {-instance NamedThing-}, Provenance, OccName(..),
 			  nameModule, moduleString, pprModule, isLocallyDefined,
-			  NameSet(..), emptyNameSet, unionNameSets, nameSetToList,
+			  NameSet, emptyNameSet, unionNameSets, nameSetToList,
 			  minusNameSet, mkNameSet, elemNameSet, nameUnique, addOneToNameSet,
 			  isWiredInName, maybeWiredInTyConName, maybeWiredInIdName,
 			  NamedThing(..)
 			 )
-import Id		( GenId, Id(..), idType, dataConTyCon, isAlgCon )
+import Id		( GenId, Id, idType, dataConTyCon, isAlgCon )
 import TyCon		( TyCon, tyConDataCons, isSynTyCon, getSynTyConDefn )
 import Type		( namesOfType )
 import TyVar		( GenTyVar )

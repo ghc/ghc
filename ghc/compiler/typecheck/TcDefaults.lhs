@@ -9,7 +9,7 @@ module TcDefaults ( tcDefaults ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), DefaultDecl(..) )
-import RnHsSyn		( RenamedHsDecl(..) )
+import RnHsSyn		( RenamedHsDecl )
 
 import TcMonad
 import TcEnv		( tcLookupClassByKey )

@@ -15,9 +15,9 @@ import HsSyn		( HsDecl(..), ClassDecl(..), Sig(..), MonoBinds(..),
 			)
 import HsPragmas	( ClassPragmas(..) )
 import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
-import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
-			  RenamedClassOpSig(..), RenamedMonoBinds,
-			  RenamedContext(..), RenamedHsDecl, RenamedSig
+import RnHsSyn		( RenamedClassDecl, RenamedClassPragmas,
+			  RenamedClassOpSig, RenamedMonoBinds,
+			  RenamedContext, RenamedHsDecl, RenamedSig
 			)
 import TcHsSyn		( TcMonoBinds )
 

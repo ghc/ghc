@@ -16,7 +16,7 @@ import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..),
 			  Sig(..),
 			  hsDeclName
 			)
-import RnHsSyn		( RenamedTyDecl(..), RenamedClassDecl(..), RenamedHsDecl )
+import RnHsSyn		( RenamedTyDecl, RenamedClassDecl, RenamedHsDecl )
 import TcHsSyn		( TcHsBinds )
 import BasicTypes	( RecFlag(..) )
 

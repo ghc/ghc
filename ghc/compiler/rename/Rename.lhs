@@ -25,9 +25,10 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpeci
 			)
 import RnEnv		( addImplicitOccsRn, availNames )
 import Name		( Name, PrintUnqualified, Provenance, isLocallyDefined,
-			  NameSet(..),
-			  nameSetToList, minusNameSet, NamedThing(..),
-			  nameModule, pprModule, pprOccName, nameOccName
+			  NameSet,
+			    nameSetToList, minusNameSet,
+			  NamedThing(..),
+			   nameModule, pprModule, pprOccName, nameOccName
 			)
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import TyCon		( TyCon )

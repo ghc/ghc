@@ -24,7 +24,7 @@ import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( newDfunName, bindLocatedLocalsRn )
-import RnMonad		( RnM, RnDown, SDown, RnNameSupply(..), 
+import RnMonad		( RnM, RnDown, SDown, RnNameSupply, 
 			  renameSourceCode, thenRn, mapRn, returnRn )
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )

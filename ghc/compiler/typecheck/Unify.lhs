@@ -19,7 +19,7 @@ import TcMonad
 import Type	( GenType(..), Type, tyVarsOfType,
 		  typeKind, mkFunTy, splitFunTy_maybe, splitTyConApp_maybe )
 import TyCon	( TyCon, mkFunTyCon, isTupleTyCon, tyConArity, Arity )
-import TyVar	( TyVar(..), GenTyVar(..), tyVarKind, tyVarFlexi,
+import TyVar	( TyVar, GenTyVar(..), tyVarKind, tyVarFlexi,
 		  TyVarEnv, lookupTyVarEnv, emptyTyVarEnv, addToTyVarEnv,
 		  tyVarSetToList
 		)

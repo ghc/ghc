@@ -17,7 +17,7 @@ import HsSyn		( MonoBinds(..),
 			  andMonoBinds
 			)
 import HsTypes		( getTyVarName )
-import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..)	)
+import RnHsSyn		( RenamedTyDecl, RenamedConDecl )
 import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
 			  TcHsBinds, TcMonoBinds
 			)

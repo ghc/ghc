@@ -9,7 +9,7 @@ import HsDecls		( HsIdInfo(..), HsStrictnessInfo(..) )
 import HsTypes		( mkHsForAllTy )
 import HsCore
 import Literal
-import BasicTypes	( IfaceFlavour(..), Fixity(..), FixityDirection(..), NewOrData(..), Version(..) )
+import BasicTypes	( IfaceFlavour(..), Fixity(..), FixityDirection(..), NewOrData(..), Version )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind, mkTypeKind )
 import IdInfo           ( ArgUsageInfo, FBTypeInfo, ArityInfo, exactArity )

@@ -12,7 +12,7 @@ import StgSyn
 
 import LambdaLift	( liftProgram )
 import Name		( isLocallyDefined )
-import UniqSet          ( UniqSet(..), mapUniqSet )
+import UniqSet          ( UniqSet, mapUniqSet )
 import CostCentre       ( CostCentre )
 import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
