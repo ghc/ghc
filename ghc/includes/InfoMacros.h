@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.10 2000/03/31 03:09:35 hwloidl Exp $
+ * $Id: InfoMacros.h,v 1.11 2000/04/05 15:27:59 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -24,6 +24,16 @@
 		srt : 0,			\
 		srt_len : tag_,			\
 		type : type_
+
+#ifdef PROFILING
+#define PROF_INFO(type_str, desc_str)		\
+		prof: {				\
+		   closure_type: type_str,	\
+		   closure_desc: desc_str,	\
+		},
+#else
+#define PROF_INFO(type_str, desc_str)
+#endif
 
 #ifdef USE_MINIINTERPRETER
 #define INIT_VECTOR {}
@@ -68,21 +78,23 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
 	       type,				/* closure type */	\
 	       info_class, entry_class,		/* C storage classes */	\
 	       prof_descr, prof_type)		/* profiling info */	\
-        entry_class(RBH_##entry);                                      \
+        entry_class(RBH_##entry);                                      	\
         entry_class(entry);                                             \
-	ED_RO_ StgInfoTable info; \
+	ED_RO_ StgInfoTable info; 					\
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {		\
 		layout : { payload : {ptrs,nptrs} },			\
-		SRT_INFO(RBH,srt_,srt_off_,srt_len_),                  \
+                PROF_INFO(prof_type, prof_descr)			\
+		SRT_INFO(RBH,srt_,srt_off_,srt_len_),                  	\
                 INCLUDE_RBH_INFO(info),			                \
-                INIT_ENTRY(RBH_##entry),                           \
+                INIT_ENTRY(RBH_##entry),                           	\
                 INIT_VECTOR                                             \
-	} ; \
+	} ; 								\
         StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
 		layout : { payload : {ptrs,nptrs} },			\
+                PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
-                INCLUDE_RBH_INFO(RBH_##info),			\
+                INCLUDE_RBH_INFO(RBH_##info),				\
                 INIT_ENTRY(entry),                                      \
                 INIT_VECTOR                                             \
 	}
@@ -100,6 +112,7 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
         entry_class(entry);                                             \
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
 		layout : { payload : {ptrs,nptrs} },			\
+                PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INIT_ENTRY(entry),                                      \
                 INIT_VECTOR                                             \
@@ -115,21 +128,23 @@ INFO_TABLE_SRT(info,				/* info-table label */	\
 INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
 		      type, info_class, entry_class,			\
 		      prof_descr, prof_type)				\
-        entry_class(RBH_##entry);                                      \
-        entry_class(entry);                                             \
-	ED_RO_ StgInfoTable info; \
+        entry_class(RBH_##entry);					\
+        entry_class(entry);						\
+	ED_RO_ StgInfoTable info;					\
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {		\
 		layout : { bitmap : (StgWord32)bitmap_ },		\
+                PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(RBH,srt_,srt_off_,srt_len_),			\
-                INCLUDE_RBH_INFO(info),			                \
+                INCLUDE_RBH_INFO(info),					\
                 INIT_ENTRY(RBH_##entry),				\
                 INIT_VECTOR						\
-	};                                                              \
-        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
+	};								\
+        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;		\
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
 		layout : { bitmap : (StgWord32)bitmap_ },		\
+                PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
-                INCLUDE_RBH_INFO(RBH_##info),		                \
+                INCLUDE_RBH_INFO(RBH_##info),				\
                 INIT_ENTRY(entry),					\
                 INIT_VECTOR						\
 	}
@@ -142,6 +157,7 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
         entry_class(entry);						\
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
 		layout : { bitmap : (StgWord32)bitmap_ },		\
+                PROF_INFO(prof_type, prof_descr)			\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),			\
                 INIT_ENTRY(entry),					\
                 INIT_VECTOR						\
@@ -152,26 +168,28 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_,	\
 
 #if defined(GRAN) || defined(PAR)
 
-#define							\
-INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
-	   entry_class, prof_descr, prof_type)		\
-        entry_class(RBH_##entry);                                      \
-        entry_class(entry);                                             \
-	ED_RO_ StgInfoTable info; \
+#define								\
+INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,		\
+	   entry_class, prof_descr, prof_type)			\
+        entry_class(RBH_##entry);				\
+        entry_class(entry);					\
+	ED_RO_ StgInfoTable info;				\
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {	\
-		layout : { payload : {ptrs,nptrs} },	\
-		STD_INFO(RBH),				\
-                INCLUDE_RBH_INFO(info),	                \
-                INIT_ENTRY(RBH_##entry),		\
-                INIT_VECTOR				\
-	};                                              \
-        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
-	info_class INFO_TBL_CONST StgInfoTable info = {	\
-		layout : { payload : {ptrs,nptrs} },	\
-		STD_INFO(type),				\
-                INCLUDE_RBH_INFO(RBH_##info),		                \
-                INIT_ENTRY(entry),			\
-                INIT_VECTOR				\
+		layout : { payload : {ptrs,nptrs} },		\
+                PROF_INFO(prof_type, prof_descr)		\
+		STD_INFO(RBH),					\
+                INCLUDE_RBH_INFO(info),				\
+                INIT_ENTRY(RBH_##entry),			\
+                INIT_VECTOR					\
+	};							\
+        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;	\
+	info_class INFO_TBL_CONST StgInfoTable info = {		\
+		layout : { payload : {ptrs,nptrs} },		\
+                PROF_INFO(prof_type, prof_descr)		\
+		STD_INFO(type),					\
+                INCLUDE_RBH_INFO(RBH_##info),			\
+                INIT_ENTRY(entry),				\
+                INIT_VECTOR					\
 	}
 
 #else
@@ -182,6 +200,7 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
         entry_class(entry);				\
 	info_class INFO_TBL_CONST StgInfoTable info = {	\
 		layout : { payload : {ptrs,nptrs} },	\
+                PROF_INFO(prof_type, prof_descr)	\
 		STD_INFO(type),				\
                 INIT_ENTRY(entry),			\
                 INIT_VECTOR				\
@@ -193,26 +212,28 @@ INFO_TABLE(info, entry, ptrs, nptrs, type, info_class,	\
 
 #if defined(GRAN) || defined(PAR)
 
-#define							\
-INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
-		    entry_class, prof_descr, prof_type)	\
-        entry_class(RBH_##entry);                                      \
-        entry_class(entry);                                             \
-	ED_RO_ StgInfoTable info; \
+#define								\
+INFO_TABLE_SELECTOR(info, entry, offset, info_class,		\
+		    entry_class, prof_descr, prof_type)		\
+        entry_class(RBH_##entry);				\
+        entry_class(entry);					\
+	ED_RO_ StgInfoTable info;				\
 	info_class INFO_TBL_CONST StgInfoTable RBH_##info = {	\
-		layout : { selector_offset : offset },	\
-		STD_INFO(RBH),		                \
-                INCLUDE_RBH_INFO(info),	                \
-                INIT_ENTRY(RBH_##entry),		\
-                INIT_VECTOR				\
-	};                                              \
-        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;            \
-	info_class INFO_TBL_CONST StgInfoTable info = {	\
-		layout : { selector_offset : offset },	\
-		STD_INFO(THUNK_SELECTOR),		\
-                INCLUDE_RBH_INFO(RBH_##info),           \
-                INIT_ENTRY(entry),			\
-                INIT_VECTOR				\
+		layout : { selector_offset : offset },		\
+                PROF_INFO(prof_type, prof_descr)		\
+		STD_INFO(RBH),					\
+                INCLUDE_RBH_INFO(info),				\
+                INIT_ENTRY(RBH_##entry),			\
+                INIT_VECTOR					\
+	};							\
+        StgFunPtr  RBH_##entry (void) { JMP_(RBH_entry); } ;	\
+	info_class INFO_TBL_CONST StgInfoTable info = {		\
+		layout : { selector_offset : offset },		\
+                PROF_INFO(prof_type, prof_descr)		\
+		STD_INFO(THUNK_SELECTOR),			\
+                INCLUDE_RBH_INFO(RBH_##info),			\
+                INIT_ENTRY(entry),				\
+                INIT_VECTOR					\
 	}
 
 #else
@@ -223,6 +244,7 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
         entry_class(entry);				\
 	info_class INFO_TBL_CONST StgInfoTable info = {	\
 		layout : { selector_offset : offset },	\
+                PROF_INFO(prof_type, prof_descr)	\
 		STD_INFO(THUNK_SELECTOR),		\
                 INIT_ENTRY(entry),			\
                 INIT_VECTOR				\
@@ -232,12 +254,13 @@ INFO_TABLE_SELECTOR(info, entry, offset, info_class,	\
 
 /* constructor info table --------------------------------------------------*/
 
-#define \
+#define									\
 INFO_TABLE_CONSTR(info, entry, ptrs, nptrs, tag_,type_,info_class,	\
 		  entry_class, prof_descr, prof_type)			\
         entry_class(entry);						\
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
 		layout : { payload : {ptrs,nptrs} },			\
+                PROF_INFO(prof_type, prof_descr)			\
                 CONSTR_INFO(type_,tag_),				\
                 INIT_ENTRY(entry),					\
                 INIT_VECTOR						\

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.18 2000/01/13 14:34:00 hwloidl Exp $
+ * $Id: InfoTables.h,v 1.19 2000/04/05 15:27:59 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -16,15 +16,12 @@
 
 #ifdef PROFILING
 
-#define PROF_INFO_WORDS n
-
 typedef struct {
-  /* nothing yet */
+    char *closure_type;
+    char *closure_desc;
 } StgProfInfo;
 
 #else /* !PROFILING */
-
-#define PROF_INFO_WORDS 0
 
 typedef struct {
   /* empty */
@@ -41,15 +38,11 @@ typedef struct {
 // CURRENTLY UNUSED
 // ToDo: use this in StgInfoTable (mutually recursive) -- HWL
 
-#define PAR_INFO_WORDS 1
-
 typedef struct {
   StgInfoTable *rbh_infoptr;     /* infoptr to the RBH  */
 } StgParInfo;
 
 #else /* !PAR */
-
-#define PAR_INFO_WORDS 0
 
 typedef struct {
 	/* empty */
@@ -72,7 +65,6 @@ typedef struct {
 */
 
 #if defined(PAR) || defined(GRAN)
-# define RBH_INFO_OFFSET	    (GEN_INFO_OFFSET+GEN_INFO_WORDS)
 
 # ifdef RBH_MAGIC_OFFSET
 
@@ -111,15 +103,11 @@ typedef struct {
 
 #ifdef DEBUG_CLOSURE
 
-#define DEBUG_INFO_WORDS n
-
 typedef struct {
 	... whatever ...
 } StgDebugInfo;
 
 #else /* !DEBUG_CLOSURE */
-
-#define DEBUG_INFO_WORDS 0
 
 typedef struct {
 	/* empty */
@@ -221,11 +209,10 @@ typedef StgClosure* StgSRT[];
 typedef struct _StgInfoTable {
     StgSRT         *srt;	/* pointer to the SRT table */
 #if defined(PAR) || defined(GRAN)
-  // StgParInfo	    par;
     struct _StgInfoTable    *rbh_infoptr;
 #endif
 #ifdef PROFILING
-  /* StgProfInfo     prof; */
+    StgProfInfo     prof;
 #endif
 #ifdef DEBUG_CLOSURE
     StgDebugInfo    debug;
