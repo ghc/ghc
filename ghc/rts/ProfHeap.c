@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.6 2000/03/08 17:48:24 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.7 2000/03/23 13:13:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -270,7 +270,9 @@ clearCCSResid(CostCentreStack *ccs)
   ccs->mem_resid = 0;
 
   for (i = ccs->indexTable; i != 0; i = i->next) {
-    clearCCSResid(i->ccs);
+    if (!i->back_edge) {
+      clearCCSResid(i->ccs);
+    }
   }
 }
 
@@ -307,7 +309,9 @@ reportCCSResid(FILE *fp, CostCentreStack *ccs)
   }
 
   for (i = ccs->indexTable; i != 0; i = i->next) {
-    reportCCSResid(fp,i->ccs);
+    if (!i->back_edge) {
+      reportCCSResid(fp,i->ccs);
+    }
   }
 }
 #endif
