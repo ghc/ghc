@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.44 $
- * $Date: 2000/03/20 09:42:49 $
+ * $Revision: 1.45 $
+ * $Date: 2000/03/20 15:49:56 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -24,7 +24,7 @@
 #include "ForeignCall.h"
 #include "PrimOps.h"   /* for __{encode,decode}{Float,Double} */
 #include "Prelude.h"
-#include "ITimer.h"
+#include "Itimer.h"
 #include "Evaluator.h"
 #include "sainteger.h"
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.47 2000/03/20 09:42:49 andy Exp $
+ * $Id: PrimOps.hc,v 1.48 2000/03/20 15:49:56 panne Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -19,7 +19,7 @@
 #include "StablePriv.h"
 #include "HeapStackCheck.h"
 #include "StgRun.h"
-#include "ITimer.h"
+#include "Itimer.h"
 #include "Prelude.h"
 
 /* ** temporary **
