@@ -5,7 +5,7 @@ include $(TOP)/mk/boilerplate.mk
 
 #-----------------------------------------------------------------------------
 # Building hsc different ways (default is just `normal' sequential)
-override WAYS=$(GhcCompilerWays)
+WAYS=$(GhcCompilerWays)
 
 #-----------------------------------------------------------------------------
 #		Set SUBDIRS
@@ -187,9 +187,9 @@ rename/ParseIface_HC_OPTS 	+= -Onot -H16m
 rename/ParseType_HC_OPTS 	+= -Onot -H16m
 rename/ParseUnfolding_HC_OPTS 	+= -Onot -H30m
 ifeq "$(Ghc2_0)" "YES"
-rename/ParseIface_HC_OPTS       += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
-rename/ParseType_HC_OPTS        += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
-rename/ParseUnfolding_HC_OPTS   += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
+rename/ParseIface_HC_OPTS       += -fno-warn-incomplete-patterns
+rename/ParseType_HC_OPTS        += -fno-warn-incomplete-patterns
+rename/ParseUnfolding_HC_OPTS   += -fno-warn-incomplete-patterns
 endif
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
@@ -221,6 +221,11 @@ utils/FastString_HC_OPTS	= -fvia-C -monly-3-regs
 utils/StringBuffer_HC_OPTS	= -fvia-C
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
 
+# optimiser misbehaving in 0.29, occurrence analyser fails to terminate when
+# compiling lib/required/Time.lhs
+ifeq "$(Ghc2_0)" "NO"
+simplCore/OccurAnal_HC_OPTS	= -Onot
+endif
 
 # ----------------------------------------------------------------------------
 #		C compilations

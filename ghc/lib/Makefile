@@ -10,6 +10,8 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
+WAYS=$(GhcLibWays)
+
 ifeq "$(way)" ""
 SUBDIRS = cbits
 ifeq ($(IncludeTestDirsInBuild),YES)

@@ -13,9 +13,6 @@ PROJECTPATCHLEVEL=$(GhcProjectPatchLevel)
 #HC			= $(WithGhcHc)
 HaskellCompilerType	= $(WithGhcHcType)
 
-# What ways to build the RTS+libs
-WAYS=$(GhcLibWays)
-
 GCap=-optc-DGCap
 #GC2s=-optc-DGC2s
 #GC1s=-optc-DGC1s

@@ -2,8 +2,6 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 INSTALLING=0
 
-override WAYS=
-
 boot :: all
 
 SCRIPT_PROG=mkdependHS

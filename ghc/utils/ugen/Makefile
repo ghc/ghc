@@ -1,9 +1,8 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 1997/09/03 23:28:47 sof Exp $
+# $Id: Makefile,v 1.6 1997/09/05 09:16:35 simonm Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
-override WAYS=
 
 YACC_OPTS += -d
 C_SRCS = syntax.tab.c lex.c id.c tree.c yyerror.c gen.c main.c

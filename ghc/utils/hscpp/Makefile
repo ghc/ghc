@@ -1,6 +1,5 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
-override WAYS=
 
 SCRIPT_PROG=hscpp
 SCRIPT_OBJS=hscpp.prl

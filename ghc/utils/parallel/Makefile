@@ -1,9 +1,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-# Ways? what ways?
-WAYS=
-
 PERL_PROGS = \
   grs2gr gr2qp qp2ps ghc-fool-sort ghc-unfool-sort gr2pe gr2java \
   qp2ap gr2RTS RTS2gran gran-extr gp-ext-imp tf avg-RTS SPLIT \

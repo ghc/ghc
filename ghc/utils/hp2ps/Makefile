@@ -1,6 +1,5 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
-override WAYS=
 
 C_SRCS  = $(wildcard *.c)
 H_SRCS  = $(wildcard *.h)

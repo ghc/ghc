@@ -1,9 +1,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-# No ways
-override WAYS=
-
 # Note: might be overridden from cmd-line (see install rule below)
 INSTALLING=0
 

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 1997/08/25 21:32:14 sof Exp $
+# $Id: Makefile,v 1.10 1997/09/05 09:16:28 simonm Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -28,6 +28,8 @@
 TOP=..
 DoingRTS=YES
 include $(TOP)/mk/boilerplate.mk
+
+WAYS=$(GhcLibWays)
 
 #
 # A general rule for the grand mk setup is that in a build tree, only
