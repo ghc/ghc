@@ -13,10 +13,9 @@ module HsBinds where
 IMP_Ubiq()
 
 -- friends:
-IMPORT_DELOOPER(HsLoop)
-import HsMatches	( pprMatches, pprGRHSsAndBinds,
-			  Match, GRHSsAndBinds )
-import HsPat		( collectPatBinders, InPat )
+IMPORT_DELOOPER(HsLoop)	( pprMatches, pprGRHSsAndBinds,
+			  Match, GRHSsAndBinds,
+			  HsExpr, pprExpr )
 import HsPragmas	( GenPragmas, ClassOpPragmas )
 import HsTypes		( HsType )
 import CoreSyn		( SYN_IE(CoreExpr) )
@@ -24,7 +23,7 @@ import CoreSyn		( SYN_IE(CoreExpr) )
 --others:
 import Id		( SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Name		( getOccName, OccName, NamedThing(..) )
-import Outputable	( interpp'SP, ifnotPprForUser,
+import Outputable	( interpp'SP, ifnotPprForUser, pprQuote,
 			  Outputable(..){-instance * (,)-}
 			)
 import PprCore		--( GenCoreExpr {- instance Outputable -} )
@@ -79,10 +78,12 @@ instance (Outputable pat, NamedThing id, Outputable id,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
 		Outputable (HsBinds tyvar uvar id pat) where
 
-    ppr sty EmptyBinds = empty
-    ppr sty (ThenBinds binds1 binds2)
-     = ($$) (ppr sty binds1) (ppr sty binds2)
-    ppr sty (MonoBind bind sigs is_rec)
+    ppr sty binds = pprQuote sty (\ sty -> ppr_binds sty binds)
+
+ppr_binds sty EmptyBinds = empty
+ppr_binds sty (ThenBinds binds1 binds2)
+     = ($$) (ppr_binds sty binds1) (ppr_binds sty binds2)
+ppr_binds sty (MonoBind bind sigs is_rec)
      = vcat [
 	ifnotPprForUser sty (ptext rec_str),
 	if null sigs
@@ -178,28 +179,31 @@ andMonoBinds binds = foldr AndMonoBinds EmptyMonoBinds binds
 instance (NamedThing id, Outputable id, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar) =>
 		Outputable (MonoBinds tyvar uvar id pat) where
-    ppr sty EmptyMonoBinds = empty
-    ppr sty (AndMonoBinds binds1 binds2)
-      = ($$) (ppr sty binds1) (ppr sty binds2)
+    ppr sty mbind = pprQuote sty (\ sty -> ppr_monobind sty mbind)
 
-    ppr sty (PatMonoBind pat grhss_n_binds locn)
+
+ppr_monobind sty EmptyMonoBinds = empty
+ppr_monobind sty (AndMonoBinds binds1 binds2)
+      = ($$) (ppr_monobind sty binds1) (ppr_monobind sty binds2)
+
+ppr_monobind sty (PatMonoBind pat grhss_n_binds locn)
       = hang (ppr sty pat) 4 (pprGRHSsAndBinds sty False grhss_n_binds)
 
-    ppr sty (FunMonoBind fun inf matches locn)
+ppr_monobind sty (FunMonoBind fun inf matches locn)
       = pprMatches sty (False, ppr sty fun) matches
       -- ToDo: print infix if appropriate
 
-    ppr sty (VarMonoBind name expr)
+ppr_monobind sty (VarMonoBind name expr)
+      = hang (hsep [ppr sty name, equals]) 4 (pprExpr sty expr)
+
+ppr_monobind sty (CoreMonoBind name expr)
       = hang (hsep [ppr sty name, equals]) 4 (ppr sty expr)
 
-    ppr sty (CoreMonoBind name expr)
-      = hang (hsep [ppr sty name, equals]) 4 (ppr sty expr)
-
-    ppr sty (AbsBinds tyvars dictvars exports val_binds)
+ppr_monobind sty (AbsBinds tyvars dictvars exports val_binds)
      = ($$) (sep [ptext SLIT("AbsBinds"),
-		      brackets (interpp'SP sty tyvars),
-		      brackets (interpp'SP sty dictvars),
-		      brackets (interpp'SP sty exports)])
+		  brackets (interpp'SP sty tyvars),
+		  brackets (interpp'SP sty dictvars),
+		  brackets (interpp'SP sty exports)])
 	       (nest 4 (ppr sty val_binds))
 \end{code}
 
@@ -244,19 +248,22 @@ data Sig name
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (Sig name) where
-    ppr sty (Sig var ty _)
+    ppr sty sig = pprQuote sty (\ sty -> ppr_sig sty sig)
+
+
+ppr_sig sty (Sig var ty _)
       = hang (hsep [ppr sty var, ptext SLIT("::")])
 	     4 (ppr sty ty)
 
-    ppr sty (ClassOpSig var _ ty _)
+ppr_sig sty (ClassOpSig var _ ty _)
       = hang (hsep [ppr sty (getOccName var), ptext SLIT("::")])
 	     4 (ppr sty ty)
 
-    ppr sty (DeforestSig var _)
+ppr_sig sty (DeforestSig var _)
       = hang (hsep [text "{-# DEFOREST", ppr sty var])
 		   4 (text "#-")
 
-    ppr sty (SpecSig var ty using _)
+ppr_sig sty (SpecSig var ty using _)
       = hang (hsep [text "{-# SPECIALIZE", ppr sty var, ptext SLIT("::")])
 	     4 (hsep [ppr sty ty, pp_using using, text "#-}"])
 
@@ -264,44 +271,11 @@ instance (NamedThing name, Outputable name) => Outputable (Sig name) where
 	pp_using Nothing   = empty
 	pp_using (Just me) = hsep [char '=', ppr sty me]
 
-    ppr sty (InlineSig var _)
+ppr_sig sty (InlineSig var _)
 
         = hsep [text "{-# INLINE", ppr sty var, text "#-}"]
 
-    ppr sty (MagicUnfoldingSig var str _)
+ppr_sig sty (MagicUnfoldingSig var str _)
       = hsep [text "{-# MAGIC_UNFOLDING", ppr sty var, ptext str, text "#-}"]
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Collecting binders from @HsBinds@}
-%*									*
-%************************************************************************
-
-Get all the binders in some @MonoBinds@, IN THE ORDER OF
-APPEARANCE; e.g., in:
-\begin{verbatim}
-...
-where
-  (x, y) = ...
-  f i j  = ...
-  [a, b] = ...
-\end{verbatim}
-it should return @[x, y, f, a, b]@ (remember, order important).
-
-\begin{code}
-collectTopBinders :: HsBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
-collectTopBinders EmptyBinds     = emptyBag
-collectTopBinders (MonoBind b _ _) = collectMonoBinders b
-collectTopBinders (ThenBinds b1 b2)
- = collectTopBinders b1 `unionBags` collectTopBinders b2
-
-collectMonoBinders :: MonoBinds tyvar uvar name (InPat name) -> Bag (name,SrcLoc)
-collectMonoBinders EmptyMonoBinds		       = emptyBag
-collectMonoBinders (PatMonoBind pat grhss_w_binds loc) = listToBag (map (\v->(v,loc)) (collectPatBinders pat))
-collectMonoBinders (FunMonoBind f _ matches loc)       = unitBag (f,loc)
-collectMonoBinders (VarMonoBind v expr) 	       = error "collectMonoBinders"
-collectMonoBinders (CoreMonoBind v expr) 	       = error "collectMonoBinders"
-collectMonoBinders (AndMonoBinds bs1 bs2)
- = collectMonoBinders bs1 `unionBags` collectMonoBinders bs2
-\end{code}
