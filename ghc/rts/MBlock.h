@@ -1,12 +1,13 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.11 2001/12/10 01:28:00 sebc Exp $
+ * $Id: MBlock.h,v 1.12 2002/01/21 17:18:43 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
  * MegaBlock Allocator interface.
  *
  * ---------------------------------------------------------------------------*/
-
+#ifndef __MBLOCK_H__
+#define __MBLOCK_H__
 extern lnat mblocks_allocated;
 
 #ifdef ENABLE_WIN32_DLL_SUPPORT
@@ -62,4 +63,6 @@ extern void * getMBlocks(nat n);
 #else
 #error Dont know where to get memory from on this architecture
 /* ToDo: memory locations on other architectures */
+#endif
+
 #endif
