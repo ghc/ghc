@@ -10,7 +10,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
--- GHC's array implementation.
+-- GHC\'s array implementation.
 -- 
 -----------------------------------------------------------------------------
 
