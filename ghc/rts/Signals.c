@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.14 2000/02/29 14:38:19 simonmar Exp $
+ * $Id: Signals.c,v 1.15 2000/03/15 15:31:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -217,8 +217,9 @@ start_signal_handlers(void)
 
     next_pending_handler--;
 
-    createIOThread(RtsFlags.GcFlags.initialStkSize, 
-		   (StgClosure *) *next_pending_handler);
+    scheduleThread(
+       createIOThread(RtsFlags.GcFlags.initialStkSize, 
+		      (StgClosure *) *next_pending_handler));
   }
 
   unblockUserSignals();
