@@ -209,8 +209,6 @@ import IO
   , FilePath                  -- :: String
   )
 import NHC.IOExtras (fixIO)
-openBinaryFile = openFile
-hSetBinaryMode _ _ = return ()
 #endif
 
 import System.IO.Error (
@@ -391,6 +389,12 @@ fixIO k = do
 -- NOTE: we do our own explicit black holing here, because GHC's lazy
 -- blackholing isn't enough.  In an infinite loop, GHC may run the IO
 -- computation a few times before it notices the loop, which is wrong.
+#endif
+
+#if defined(__NHC__)
+-- Assume a unix platform, where text and binary I/O are identical.
+openBinaryFile = openFile
+hSetBinaryMode _ _ = return ()
 #endif
 
 -- $locking
