@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/11/23 18:08:19 $
+ * $Revision: 1.20 $
+ * $Date: 1999/11/29 18:53:15 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -410,6 +410,20 @@ StgExpr failExpr;
                 hd(as) = a;
             }
 
+            /* Special case: saturated constructor application */
+            if (isName(e) && isCfun(e)
+                && name(e).arity > 0 
+                && name(e).arity == length(args)) {
+               StgVar v; 
+               /* fprintf ( stderr, "saturated application of %s\n",
+                                    textToStr(name(e).text)); */
+               v = mkStgVar(mkStgCon(e,args),NIL);
+               binds = cons(v,binds);
+               return mkStgLet(binds,v);
+
+               
+            }
+
             /* Function must be StgVar or Name */
             e = stgRhs(e,co,sc,namePMFail);
             if (!isStgVar(e) && !isName(e)) {
@@ -773,7 +787,8 @@ Void implementForeignImport ( Name n )
     List argTys    = NIL;
     List resultTys = NIL;
     CFunDescriptor* descriptor = 0;
-    Bool addState = TRUE;
+    Bool addState  = TRUE;
+    Bool dynamic   = isNull(name(n).defn);
     while (getHead(t)==typeArrow && argCount==2) {
         Type ta = fullExpand(arg(fun(t)));
         Type tr = arg(t);
@@ -781,6 +796,17 @@ Void implementForeignImport ( Name n )
         t = tr;
     }
     argTys = rev(argTys);
+
+    /* argTys now holds the argument tys.  If this is a dynamic call,
+       the first one had better be an Addr.
+    */
+    if (dynamic) {
+       if (isNull(argTys) || hd(argTys) != typeAddr) {
+          ERRMSG(name(n).line) "First argument in f-i-dynamic must be an Addr"
+          EEND;
+       }
+    }
+
     if (getHead(t) == typeIO) {
         resultTys = getArgs(t);
         assert(length(resultTys) == 1);
@@ -800,8 +826,9 @@ Void implementForeignImport ( Name n )
     }
     mapOver(foreignOutboundTy,argTys);  /* allows foreignObj, byteArrays, etc */
     mapOver(foreignInboundTy,resultTys); /* doesn't */
-    descriptor = mkDescriptor(charListToString(argTys),
-                              charListToString(resultTys));
+    descriptor 
+       = mkDescriptor(charListToString(argTys),
+                      charListToString(resultTys));
     if (!descriptor) {
        ERRMSG(name(n).line) "Can't allocate memory for call descriptor"
        EEND;
@@ -823,24 +850,52 @@ Void implementForeignImport ( Name n )
        internal ( "implementForeignImport: unknown calling convention");
 
     {
-        Pair    extName = name(n).defn;
-        void*   funPtr  = getDLLSymbol(name(n).line,
-                                       textToStr(textOf(fst(extName))),
-                                       textToStr(textOf(snd(extName))));
-        List extra_args = doubleton(mkPtr(descriptor),mkPtr(funPtr));
-        StgRhs rhs = makeStgPrim(n,addState,extra_args,descriptor->arg_tys,
-                                 descriptor->result_tys);
-        StgVar v   = mkStgVar(rhs,NIL);
-        if (funPtr == 0) {
-            ERRMSG(name(n).line) "Could not find foreign function \"%s\" in \"%s\"", 
-                textToStr(textOf(snd(extName))),
-                textToStr(textOf(fst(extName)))
-            EEND;
+        Pair   extName;
+        void*  funPtr;
+        List   extra_args;
+        StgRhs rhs;
+        StgVar v;
+
+        if (dynamic) {
+           funPtr     = NULL;
+           extra_args = singleton(mkPtr(descriptor));
+           /* and we know that the first arg will be the function pointer */
+        } else {
+           extName = name(n).defn;
+           funPtr  = getDLLSymbol(name(n).line,
+                                  textToStr(textOf(fst(extName))),
+                                  textToStr(textOf(snd(extName))));
+           if (funPtr == 0) {
+               ERRMSG(name(n).line) 
+                   "Could not find foreign function \"%s\" in \"%s\"", 
+                   textToStr(textOf(snd(extName))),
+                   textToStr(textOf(fst(extName)))
+               EEND;
+           }
+           extra_args = doubleton(mkPtr(descriptor),mkPtr(funPtr));
         }
+
+        rhs              = makeStgPrim(n,addState,extra_args,
+                                       descriptor->arg_tys,
+                                       descriptor->result_tys);
+        v                = mkStgVar(rhs,NIL);
         name(n).defn     = NIL;
         name(n).stgVar   = v;
-        stgGlobals=cons(pair(n,v),stgGlobals);/*so it will get codegen'd */
+        stgGlobals       = cons(pair(n,v),stgGlobals);
     }
+
+    /* At this point the descriptor contains a tags for all args,
+       because that makes makeStgPrim generate the correct unwrap
+       code.  From now on, the descriptor is only used at the time
+       the actual ccall is made.  So we need to zap the leading
+       addr arg IF this is a f-i-dynamic call.
+    */
+    if (dynamic) {
+       descriptor->arg_tys++;
+       descriptor->num_args--;
+    }
+
+    
 }
 
 

@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/25 11:10:17 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/29 18:53:14 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -140,8 +140,8 @@ checkVersion
           : NUMLIT                      {$$ = gc1(NIL); }
           ;
 ifDecl    
-          : IMPORT CONID opt_bang NUMLIT COCO version_list_junk
-                                        { addGHCImports(intOf($4),textOf($2),
+          : IMPORT CONID NUMLIT opt_bang COCO version_list_junk
+                                        { addGHCImports(intOf($3),textOf($2),
                                                        $6);
                                           $$ = gc6(NIL); 
                                         }
@@ -630,7 +630,9 @@ derivs    : derivs ',' qconid           {$$ = gc3(cons($3,$1));}
 
 /*- Processing definitions of primitives ----------------------------------*/
 
-topDecl   : FOREIGN IMPORT callconv ext_loc ext_name unsafe_flag var COCO type 
+topDecl   : FOREIGN IMPORT callconv DYNAMIC unsafe_flag var COCO type 
+                            {foreignImport($1,$3,NIL,$6,$8); sp-=8;}
+          | FOREIGN IMPORT callconv ext_loc ext_name unsafe_flag var COCO type 
                             {foreignImport($1,$3,pair($4,$5),$7,$9); sp-=9;}
           | FOREIGN EXPORT callconv DYNAMIC qvarid COCO type 
                             {foreignExport($1,$3,$4,$5,$7); sp-=7;}
