@@ -13,7 +13,7 @@ fi
 
 output="`echo $1 | sed 's,\.sgml$,.ps,;s,\.sgm$,.ps,'`"
 outdvi="`echo $1 | sed 's,\.sgml$,.dvi,;s,\.sgm$,.dvi,'`"
-$(DOCBOOK_PREFIX)db2dvi -d ${DB_STYLESHEET} "$@"
+make $outdvi
 dvips $outdvi -o $output
 
 exit 0
