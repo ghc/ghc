@@ -137,6 +137,12 @@
 	  <listitem>
 	    <para>Set your <literal>$CVSROOT</literal> environment variable to
             <literal>:pserver:anoncvs@glass.cse.ogi.edu:/cvs</literal></para>
+	    <para>If you set <literal>$CVSROOT</literal> in a shell script, be sure not to
+	      have any trailing spaces on that line, otherwise CVS will respond with 
+	      a perplexing message like
+	      <programlisting>
+		/cvs : no such repository
+	  </programlisting></para>
 	  </listitem>
 	  <listitem>
             <para>Run the command</para>
