@@ -617,7 +617,7 @@ lex_string cont exts s buf
   = case currentChar# buf of
 	'"'#{-"-} -> 
 	   let buf' = incLexeme buf
-               s' = mkFastStringNarrow (map chr (reverse s)) 
+               s' = mkFastString (map chr (reverse s)) 
            in case currentChar# buf' of
 		'#'# | glaExtsEnabled exts -> if all (<= 0xFF) s
                     then cont (ITprimstring s') (incLexeme buf')
