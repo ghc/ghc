@@ -27,16 +27,17 @@ gcc's assembly output.  If that happens, it's well worth the effort
 fixing this program, rather than trying to infer what's wrong with the
 NCG directly from the -nat input.
 
-This is only known to work on x86 linux (and cygwin).  No idea if the
-same matching heuristics will work on other archs -- if not, we need
-to have multiple versions of this program, on a per-arch basis.
+This is only known to work on x86 linux, sparc-solaris (and possibly
+cygwin).  No idea if the same matching heuristics will work on other
+archs -- if not, we need to have multiple versions of this program, on
+a per-arch basis.
 
 One other IMPORTANT thing: you *must* enable stg-split-markers in the
 native code generator output, otherwise this won't work at all --
 since it won't be able to find out where the code blocks start and
 end.  Enable these markers by compiling ghc (or at least
 ghc/compiler/nativeGen/AsmCodeGen.lhs, function nativeCodeGen) with
--DDEBUG enabled.
+-DDEBUG_NCG enabled.
 
 Matching is simple but inefficient; diff-ing a large module could take
 a minute or two.
