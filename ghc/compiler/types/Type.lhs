@@ -961,7 +961,7 @@ cmpTypeX env _ _ = LT
 -------------
 cmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
 cmpTypesX env []        []        = EQ
-cmpTypesX env (t1:tys1) (t2:tys2) = cmpTypeX env t1 t2 `compare` cmpTypesX env tys1 tys2
+cmpTypesX env (t1:tys1) (t2:tys2) = cmpTypeX env t1 t2 `thenCmp` cmpTypesX env tys1 tys2
 cmpTypesX env []        tys       = LT
 cmpTypesX env ty        []        = GT
 
@@ -972,7 +972,7 @@ cmpPredX env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` cmpTy
 	-- This comparison is used exclusively (I think) for the
 	-- finite map built in TcSimplify
 cmpPredX env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` cmpTypesX env tys1 tys2
-cmpPredX env (IParam _ _)     (ClassP _ _)	= LT
+cmpPredX env (IParam _ _)     (ClassP _ _)     = LT
 cmpPredX env (ClassP _ _)     (IParam _ _)     = GT
 \end{code}
 
