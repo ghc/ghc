@@ -28,7 +28,6 @@ module NumExts
 
 import Char (ord, chr)
 #ifdef __HUGS__
-import PreludeBuiltin
 ord_0 = ord '0'
 #else
 import PrelNum ( ord_0 )
@@ -106,4 +105,13 @@ from @NumExts@.
 \begin{code}
 showListWith :: (a -> ShowS) -> [a] -> ShowS 
 showListWith = showList__
+#ifdef __HUGS__
+showList__ :: (a -> ShowS) ->  [a] -> ShowS
+showList__ _     []     s = "[]" ++ s
+showList__ showx (x:xs) s = '[' : showx x (showl xs)
+  where
+    showl []     = ']' : s
+    showl (y:ys) = ',' : showx y (showl ys)
+#endif
 \end{code}
+

@@ -23,14 +23,12 @@ module Addr
 	    
 	) where
 
-#ifdef __HUGS__
-import PreludeBuiltin
-#else
+import NumExts
+#ifndef __HUGS__
 import PrelAddr
 import PrelForeign
 import PrelStable
 import PrelBase
-import NumExts
 import PrelIOBase ( IO(..) )
 import Word	( indexWord8OffAddr,  indexWord16OffAddr
 		, indexWord32OffAddr, indexWord64OffAddr
@@ -52,6 +50,16 @@ import Int	( indexInt8OffAddr,  indexInt16OffAddr
 \end{code}
 
 \begin{code}
+#ifdef __HUGS__
+instance Show Addr where
+   showsPrec p addr rs = pad_out (showHex int "") rs
+     where
+        -- want 0s prefixed to pad it out to a fixed length.
+       pad_out ('0':'x':ls) rs = 
+	  '0':'x':(replicate (2*ADDR_SIZE_IN_BYTES - length ls) '0') 
+			++ ls ++ rs
+       int = primAddrToInt addr
+#else
 instance Show Addr where
    showsPrec p (A# a) rs = pad_out (showHex int "") rs
      where
@@ -62,7 +70,7 @@ instance Show Addr where
        int = 
 	case word2Integer# (int2Word# (addr2Int# a)) of
 	  (# s, d #) -> J# s d
-
+#endif
 \end{code}
 
 
@@ -93,12 +101,13 @@ indexDoubleOffAddr :: Addr -> Int -> Double
 indexStablePtrOffAddr :: Addr -> Int -> StablePtr a
 
 #ifdef __HUGS__
-indexCharOffAddr   = primIndexCharOffAddr  
-indexIntOffAddr    = primIndexIntOffAddr   
-indexWordOffAddr   = primIndexWordOffAddr  
-indexAddrOffAddr   = primIndexAddrOffAddr  
-indexFloatOffAddr  = primIndexFloatOffAddr 
-indexDoubleOffAddr = primIndexDoubleOffAddr
+indexCharOffAddr   = error "TODO: indexCharOffAddr  "
+indexIntOffAddr    = error "TODO: indexIntOffAddr   "
+indexWordOffAddr   = error "TODO: indexWordOffAddr  "
+indexAddrOffAddr   = error "TODO: indexAddrOffAddr  "
+indexFloatOffAddr  = error "TODO: indexFloatOffAddr "
+indexDoubleOffAddr = error "TODO: indexDoubleOffAddr"
+indexStablePtrOffAddr = error "TODO: indexStablePtrOffAddr"
 #else
 indexCharOffAddr (A# addr#) n
   = case n  	    		    	of { I# n# ->
@@ -144,12 +153,13 @@ readDoubleOffAddr  :: Addr -> Int -> IO Double
 readStablePtrOffAddr  :: Addr -> Int -> IO (StablePtr a)
 
 #ifdef __HUGS__
-readCharOffAddr    = primReadCharOffAddr  
-readIntOffAddr     = primReadIntOffAddr   
-readWordOffAddr    = primReadWordOffAddr  
-readAddrOffAddr    = primReadAddrOffAddr  
-readFloatOffAddr   = primReadFloatOffAddr 
-readDoubleOffAddr  = primReadDoubleOffAddr
+readCharOffAddr      = error "TODO: readCharOffAddr     "
+readIntOffAddr       = error "TODO: readIntOffAddr      "
+readWordOffAddr      = error "TODO: readWordOffAddr     "
+readAddrOffAddr      = error "TODO: readAddrOffAddr     "
+readFloatOffAddr     = error "TODO: readFloatOffAddr    "
+readDoubleOffAddr    = error "TODO: readDoubleOffAddr   "
+readStablePtrOffAddr = error "TODO: readStablePtrOffAddr"
 #else
 readCharOffAddr a i = case indexCharOffAddr a i of { C# o# -> return (C# o#) }
 readIntOffAddr a i  = case indexIntOffAddr a i of { I# o# -> return (I# o#) }
@@ -171,12 +181,12 @@ writeFloatOffAddr  :: Addr -> Int -> Float  -> IO ()
 writeDoubleOffAddr :: Addr -> Int -> Double -> IO ()
 
 #ifdef __HUGS__
-writeCharOffAddr    = primWriteCharOffAddr  
-writeIntOffAddr     = primWriteIntOffAddr   
-writeWordOffAddr    = primWriteWordOffAddr  
-writeAddrOffAddr    = primWriteAddrOffAddr  
-writeFloatOffAddr   = primWriteFloatOffAddr 
-writeDoubleOffAddr  = primWriteDoubleOffAddr
+writeCharOffAddr    = error "TODO: writeCharOffAddr   "
+writeIntOffAddr     = error "TODO: writeIntOffAddr    "
+writeWordOffAddr    = error "TODO: writeWordOffAddr   "
+writeAddrOffAddr    = error "TODO: writeAddrOffAddr   "
+writeFloatOffAddr   = error "TODO: writeFloatOffAddr  "
+writeDoubleOffAddr  = error "TODO: writeDoubleOffAddr "
 #else
 writeCharOffAddr (A# a#) (I# i#) (C# c#) = IO $ \ s# ->
       case (writeCharOffAddr#  a# i# c# s#) of s2# -> (# s2#, () #)
