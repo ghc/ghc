@@ -1,0 +1,476 @@
+%************************************************************************
+%*									*
+\section[Driver-obj-splitting]{Splitting into many \tr{.o} files (for libraries)}
+%*									*
+%************************************************************************
+
+\begin{code}
+sub inject_split_markers {
+    local($hc_file) = @_;
+
+    unlink("$Tmp_prefix.unmkd");
+    local($to_do) = "$Cp $hc_file $Tmp_prefix.unmkd";
+    &run_something($to_do, 'Prepare to number split markers');
+
+    open(TMPI, "< $Tmp_prefix.unmkd") || &tidy_up_and_die(1,"$Pgm: failed to open `$Tmp_prefix.unmkd' (to read)\n");
+    open(TMPO, "> $hc_file") || &tidy_up_and_die(1,"$Pgm: failed to open `$hc_file' (to write)\n");
+
+    local($marker_no) = 1;
+
+    # make sure there is a split marker before any "real" code
+    $_ = <TMPI>;
+    while ( $_ ne '' && ( /^$/ || /^#/ ) ) {
+	print TMPO $_;
+	$_ = <TMPI>;
+    }
+    print TMPO "__STG_SPLIT_MARKER(1)\n";
+    print TMPO $_ if ! /^\s*\/\* SPLIT \*\/\s*$/;
+
+	# Have to be a bit careful detecting /* SPLIT */ comments
+	# since a progam may use a string containing "/* SPLIT */"
+	# We check that there is nothing else on the line
+
+    while (<TMPI>) {
+	if (/^\s*\/\* SPLIT \*\/\s*$/) {
+	    $marker_no++;
+	    print TMPO "__STG_SPLIT_MARKER($marker_no)\n";
+ 	    next;
+	}
+	print TMPO $_;
+    }
+
+    close(TMPI) || &tidy_up_and_die(1,"Failed reading $Tmp_prefix.unmkd\n");
+    close(TMPO) || &tidy_up_and_die(1,"Failed writing $hc_file\n");
+}
+\end{code}
+
+\begin{code}
+sub split_asm_file {
+    local($asm_file) = @_;
+
+    open(TMPI, "< $asm_file") || &tidy_up_and_die(1,"$Pgm: failed to open `$asm_file' (to read)\n");
+
+    &collectExports_hppa() if $TargetPlatform =~ /^hppa/;
+    &collectExports_mips() if $TargetPlatform =~ /^mips/;
+
+    $octr = 0;	# output file counter
+    $* = 1; 	# multi-line matches are OK
+
+    %LocalConstant = (); # we have to subvert C compiler's commoning-up of constants...
+
+    $s_stuff = &ReadTMPIUpToAMarker( '', $octr );
+    # that first stuff is a prologue for all .s outputs
+    $prologue_stuff = &process_asm_block ( $s_stuff );
+    # $_ already has some of the next stuff in it...
+
+#   &tidy_up_and_die(1,"$Pgm: no split markers in .s file!\n")
+#	if $prologue_stuff eq $s_stuff;
+
+    # lie about where this stuff came from
+    $prologue_stuff =~ s|"/tmp/ghc\d+\.c"|"$ifile_root\.hc"|g;
+
+    while ( $_ ne '' ) { # not EOF
+	$octr++;
+
+	# grab and de-mangle a section of the .s file...
+	$s_stuff = &ReadTMPIUpToAMarker ( $_, $octr );
+	$this_piece = &process_asm_block ( $s_stuff );
+
+	# output to a file of its own
+	# open a new output file...
+	$ofname = "${Tmp_prefix}__${octr}.s";
+	open(OUTF, "> $ofname") || die "$Pgm: can't open output file: $ofname\n";
+
+	print OUTF $prologue_stuff;
+	print OUTF $this_piece;
+
+	close(OUTF)
+	  || &tidy_up_and_die(1,"$Pgm:Failed writing ${Tmp_prefix}__${octr}.s\n");
+    }
+
+    $NoOfSplitFiles = $octr;
+
+    close(TMPI) || &tidy_up_and_die(1,"Failed reading $asm_file\n");
+}
+
+sub collectExports_hppa { # Note: HP-PA only
+
+    %LocalExport = (); # NB: global table
+
+    while(<TMPI>) {
+	if (/^\s+\.EXPORT\s+([^,]+),.*\n/) {
+	    local($label) = $1;
+	    local($body)  = "\t.IMPORT $label";
+	    if (/,DATA/) { 
+		$body .= ",DATA\n"; 
+	    } else { 
+		$body .= ",CODE\n"; 
+	    }
+	    $label =~ s/\$/\\\$/g;
+	    $LocalExport{$label} = $body;
+	}
+    }
+
+    seek(TMPI, 0, 0);
+}
+
+sub collectExports_mips { # Note: MIPS only
+    # (not really sure this is necessary [WDP 95/05])
+
+    $UNDEFINED_FUNS = ''; # NB: global table
+
+    while(<TMPI>) {
+	$UNDEFINED_FUNS .= $_ if /^\t\.globl\s+\S+ \.\S+\n/;
+	# just save 'em all
+    }
+
+    seek(TMPI, 0, 0);
+}
+
+sub ReadTMPIUpToAMarker {
+    local($str, $count) = @_; # already read bits
+
+    
+    for ( $_ = <TMPI>; $_ ne '' && ! /_?__stg_split_marker/; $_ = <TMPI> ) {
+	$str .= $_;
+    }
+    # if not EOF, then creep forward until next "real" line
+    # (throwing everything away).
+    # that first "real" line will stay in $_.
+
+    # This loop is intended to pick up the body of the split_marker function
+    # Note that the assembler mangler will already have eliminated this code
+    # if it's been invoked (which it probably has).
+
+    while ($_ ne '' && (/_?__stg_split_marker/
+		     || /^L[^C].*:$/
+		     || /^\.stab/
+		     || /\t\.proc/
+		     || /\t\.stabd/
+		     || /\t\.even/
+		     || /\tunlk a6/
+		     || /^\t!#PROLOGUE/
+		     || /\t\.prologue/
+		     || /\t\.frame/
+                     # || /\t\.end/ NOT!  Let the split_marker regexp catch it
+                     # || /\t\.ent/ NOT!  Let the split_marker regexp catch it
+		     || /^\s+(save|retl?|restore|nop)/)) {
+	$_ = <TMPI>;
+    }
+
+    print STDERR "### BLOCK:$count:\n$str" if $Dump_asm_splitting_info;
+
+    # return str
+    $str;
+}
+\end{code}
+
+We must (a)~strip the marker off the block, (b)~record any literal C
+constants that are defined here, and (c)~inject copies of any C constants
+that are used-but-not-defined here.
+
+\begin{code}
+sub process_asm_block {
+    local($str) = @_;
+
+    return(&process_asm_block_m68k($str))  if $TargetPlatform =~ /^m68k-/;
+    return(&process_asm_block_sparc($str)) if $TargetPlatform =~ /^sparc-/;
+    return(&process_asm_block_iX86($str))  if $TargetPlatform =~ /^i[34]86-/;
+    return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/;
+    return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/;
+    return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/;
+    return(&process_asm_block_powerpc($str))   if $TargetPlatform =~ /^powerpc-|^rs6000-/;
+
+    # otherwise...
+    &tidy_up_and_die(1,"$Pgm: no process_asm_block for $TargetPlatform\n");
+}
+
+sub process_asm_block_sparc {
+    local($str) = @_;
+
+    # strip the marker
+    if ( $OptimiseC ) {
+	$str =~ s/_?__stg_split_marker.*:\n//;
+    } else {
+	$str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
+	$str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
+    }
+
+    # make sure the *.hc filename gets saved; not just ghc*.c (temp name)
+    $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/g; # HACK HACK
+
+    # remove/record any literal constants defined here
+    while ( $str =~ /(\t\.align .\n(LC\d+):\n(\t\.ascii.*\n)+)/ ) {
+	local($label) = $2;
+	local($body)  = $1;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = $body;
+	
+	$str =~ s/\t\.align .\nLC\d+:\n(\t\.ascii.*\n)+//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\b$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+   print STDERR "### STRIPPED BLOCK (sparc):\n$str" if $Dump_asm_splitting_info;
+
+   $str;
+}
+
+sub process_asm_block_m68k {
+    local($str) = @_;
+
+    # strip the marker
+
+    $str =~ s/(\.text\n\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+
+    # it seems prudent to stick on one of these:
+    $str = "\.text\n\t.even\n" . $str;
+
+    # remove/record any literal constants defined here
+    while ( $str =~ /((LC\d+):\n\t\.ascii.*\n)/ ) {
+	local($label) = $2;
+	local($body)  = $1;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = $body;
+	
+	$str =~ s/LC\d+:\n\t\.ascii.*\n//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\b$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+   print STDERR "### STRIPPED BLOCK (m68k):\n$str" if $Dump_asm_splitting_info;
+
+   $str;
+}
+
+sub process_asm_block_alpha {
+    local($str) = @_;
+
+    # strip the marker
+    if ( $OptimiseC ) {
+	$str =~ s/_?__stg_split_marker.*:\n//;
+    } else {
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
+    }
+
+    # remove/record any literal constants defined here
+    while ( $str =~ /(\.rdata\n\t\.align \d\n)?(\$(C\d+):\n\t\..*\n)/ ) {
+	local($label) = $3;
+	local($body)  = $2;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = ".rdata\n\t.align 3\n" . $body . "\t.text\n";
+	
+	$str =~ s/(\.rdata\n\t\.align \d\n)?\$C\d+:\n\t\..*\n//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\$\b$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+    # Slide the dummy direct return code into the vtbl .ent/.end block,
+    # to keep the label fixed if it's the last thing in a module, and
+    # to avoid having any anonymous text that the linker will complain about
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
+
+    print STDERR "### STRIPPED BLOCK (alpha):\n$str" if $Dump_asm_splitting_info;
+
+    $str;
+}
+
+sub process_asm_block_iX86 {
+    local($str) = @_;
+
+    # strip the marker
+
+    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+
+    # it seems prudent to stick on one of these:
+    $str = "\.text\n\t.align 4\n" . $str;
+
+    # remove/record any literal constants defined here
+    while ( ($str =~ /((LC\d+):\n\t\.ascii.*\n)/ )) {
+	local($label) = $2;
+	local($body)  = $1;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = $body;
+	
+	$str =~ s/LC\d+:\n\t\.ascii.*\n//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\b$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+   print STDERR "### STRIPPED BLOCK (iX86):\n$str" if $Dump_asm_splitting_info;
+
+   $str;
+}
+\end{code}
+
+\begin{code}
+sub process_asm_block_hppa {
+    local($str) = @_;
+
+    # strip the marker
+    $str =~ s/___stg_split_marker.*\n//;
+
+    # remove/record any imports defined here
+    while ( $str =~ /^(\s+\.IMPORT\s.*\n)/ ) {
+	$Imports .= $1;
+
+	$str =~ s/^\s+\.IMPORT.*\n//;
+    }
+
+    # remove/record any literal constants defined here
+    while ( $str =~ /^(\s+\.align.*\n(L\$C\d+)\n(\s.*\n)+); end literal\n/ ) {
+	local($label) = $2;
+	local($body)  = $1;
+	$label =~ s/\$/\\\$/g;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$LIT\$\n\n" . $body;
+	
+	$str =~ s/^\s+\.SPACE \$TEXT\$\n\s+\.SUBSPA \$LIT\$\s+\.align.*\nL\$C\d+\n(\s.*\n)+; end literal\n//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\b$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+    # inject required imports for local exports in other chunks
+    foreach $k (keys %LocalExport) {
+	if ( $str =~ /\b$k\b/ && ! /EXPORT\s+$k\b/ ) {
+	    $str = $LocalExport{$k} . $str;
+	}
+    }
+
+    # inject collected imports
+
+    $str = $Imports . $str;
+
+    print STDERR "### STRIPPED BLOCK (hppa):\n$str" if $Dump_asm_splitting_info;
+
+    $str;
+}
+\end{code}
+
+\begin{code}
+sub process_asm_block_mips {
+    local($str) = @_;
+
+    # strip the marker
+    if ( $OptimiseC ) {
+	$str =~ s/_?__stg_split_marker.*:\n//;
+    } else {
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
+    }
+
+    # remove/record any literal constants defined here
+    while ( $str =~ /(\t\.rdata\n\t\.align \d\n)?(\$(LC\d+):\n(\t\.byte\t.*\n)+)/ ) {
+	local($label) = $3;
+	local($body)  = $2;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = "\t.rdata\n\t.align 2\n" . $body . "\t.text\n";
+	
+	$str =~ s/(\t\.rdata\n\t\.align \d\n)?\$LC\d+:\n(\t\.byte\t.*\n)+//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\$\b$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+    # Slide the dummy direct return code into the vtbl .ent/.end block,
+    # to keep the label fixed if it's the last thing in a module, and
+    # to avoid having any anonymous text that the linker will complain about
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
+
+    $str .= $UNDEFINED_FUNS; # pin on gratuitiously-large amount of info
+
+    print STDERR "### STRIPPED BLOCK (mips):\n$str" if $Dump_asm_splitting_info;
+
+    $str;
+}
+\end{code}
+
+\begin{code}
+sub process_asm_block_powerpc {
+    local($str) = @_;
+
+    # strip the marker
+    $str =~ s/___stg_split_marker.*\n//;
+    $str =~ s/___stg_split_marker.*\n//; # yes, twice.
+
+    # remove/record any literal constants defined here
+    while ( $str =~ /^(.csect .data[RW]\n\s+\.align.*\n(LC\.\.\d+):\n(\s\.byte .*\n)+)/ ) {
+	local($label) = $2;
+	local($body)  = $1;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = $body;
+	
+	$str =~ s/^.csect .data[RW]\n\s+\.align.*\nLC\.\.\d+:\n(\s\.byte .*\n)+//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\b$k(\b|\[)/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+    print STDERR "### STRIPPED BLOCK (powerpc/rs6000):\n$str" if $Dump_asm_splitting_info;
+
+    $str = ".toc\n" . $str;
+
+    $str;
+}
+\end{code}
+
+\begin{code}
+# make "require"r happy...
+1;
+\end{code}
+
