@@ -34,7 +34,7 @@ import Inst		( emptyLIE, LIE, plusLIE )
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId )
 import Name		( nameOccName )
-import PrimRep		( getPrimRepSize )
+import PrimRep		( getPrimRepSize, isFloatingRep )
 import Type		( typePrimRep )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  isFFIArgumentTy, isFFIImportResultTy, 
@@ -166,8 +166,9 @@ checkFEDArgs arg_tys
 checkFEDArgs arg_tys
   = check (integral_args <= 4) err
   where
-    integral_args = sum (map (getPrimRepSize . filter (not . isFloatingRep)
-                                             . typePrimRep) arg_tys)
+    integral_args = sum (map getPrimRepSize $
+                         filter (not . isFloatingRep) $
+                         map typePrimRep arg_tys)
     err = ptext SLIT("On Alpha, I can only handle 4 non-floating-point arguments to foreign export dynamic")
 #else
 checkFEDArgs arg_tys = returnNF_Tc ()
