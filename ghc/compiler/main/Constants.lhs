@@ -46,8 +46,6 @@ module Constants (
 	mAX_Float_REG,
 	mAX_Double_REG,
 
-	mIN_BIG_TUPLE_SIZE,
-
     	mIN_MP_INT_SIZE,
 	mP_STRUCT_SIZE,
 
@@ -105,11 +103,6 @@ mAX_SPEC_SELECTEE_SIZE	= (MAX_SPEC_SELECTEE_SIZE :: Int)
 mIN_UPD_SIZE			= (MIN_UPD_SIZE::Int)
 mIN_SIZE_NonUpdHeapObject	= (MIN_NONUPD_SIZE::Int)
 mIN_SIZE_NonUpdStaticHeapObject	= (0::Int)
-\end{code}
-
-A completely random number:
-\begin{code}
-mIN_BIG_TUPLE_SIZE = (16::Int)
 \end{code}
 
 Sizes of gmp objects:
