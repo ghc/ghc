@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.76 2000/08/15 14:18:43 simonmar Exp $
+ * $Id: Schedule.c,v 1.77 2000/08/23 12:51:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -514,7 +514,9 @@ schedule( void )
 #endif
 	);
     }
-    
+    /* we can be interrupted while waiting for I/O... */
+    if (interrupted) continue;
+
     /* check for signals each time around the scheduler */
 #ifndef mingw32_TARGET_OS
     if (signals_pending()) {

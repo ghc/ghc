@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.12 2000/04/03 15:24:21 rrt Exp $
+ * $Id: Select.c,v 1.13 2000/08/23 12:51:03 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -171,6 +171,12 @@ awaitEvent(rtsBool wait)
 	  break;
 	}
 
+	if (interrupted) {
+	    RELEASE_LOCK(&sched_mutex);
+	    select_succeeded = rtsFalse;
+	    break;
+	}
+
 	/* If new runnable threads have arrived, stop waiting for
 	 * I/O and run them.
 	 */
@@ -270,6 +276,6 @@ awaitEvent(rtsBool wait)
 	blocked_queue_tl = prev;
       }
 
-    } while (wait && run_queue_hd == END_TSO_QUEUE);
+    } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);
 #endif
 }
