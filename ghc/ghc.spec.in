@@ -7,13 +7,9 @@
 #
 # This file is subject to the same free software license as GHC.
 
-# Values for @version@ is set by the `configure' script. SNAP releases are 
-# CVS snapshots. Official releases should replace SNAP by an appropriate 
-# release numbers (they are usually numbered starting from 1).
-
 %define name    ghc
 %define version @version@
-%define release SNAP
+%define release @release@
 
 Name:           %{name}
 Version:        %{version}
@@ -22,12 +18,13 @@ License:        BSD-like
 Group:          Development/Languages/Haskell
 URL:            http://haskell.org/ghc/
 Source:         http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src.tar.bz2
+Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Prefix:         %{_prefix}
-Requires:       gmp-devel
+Requires:       gmp, readline
+BuildRequires:  alex >= 2.0, happy >= 1.14, ghc >= 5, haddock, docbk31, jade, jadetex, dvips, gmp, readline-devel
 Provides:       haskell
-BuildRequires:  alex >= 2.0, happy >= 1.14, ghc >= 5, haddock, docbk31, jade, jadetex, dvips
-Summary:        Glasgow Haskell Compilation system
+Summary:        The Glasgow Haskell Compiler
 
 %description
 Haskell is the standard lazy purely functional programming language.
@@ -71,9 +68,9 @@ Authors:
     plus a dozen helping hands...
 
 %package prof
-Summary: Profiling libraries for GHC
-Group: Development/Libraries
-Requires: ghc = %{PACKAGE_VERSION}-%{release}
+Requires:       ghc = %{version}-%{release}
+Summary:        Profiling libraries for GHC
+Group:          Development/Libraries
 
 %description prof
 Profiling libraries for Glorious Glasgow Haskell Compilation System
@@ -81,8 +78,8 @@ Profiling libraries for Glorious Glasgow Haskell Compilation System
 needed.
 
 %package doc
-Summary: Documentation for GHC
-Group: Documentation
+Summary:        Documentation for GHC
+Group:          Documentation
 
 %description doc
 Preformatted documentation for the Glorious Glasgow Haskell
@@ -103,11 +100,7 @@ make ps html
  
 %install
 make prefix=${RPM_BUILD_ROOT}%{prefix} install
-
-mkdir -p ${RPM_BUILD_ROOT}%{prefix}/share/doc/ghc-%{version}
-cp ghc/ANNOUNCE ghc/README ${RPM_BUILD_ROOT}%{prefix}/share/doc/ghc-%{version}
-
-make prefix=${RPM_BUILD_ROOT}%{prefix} datadir=${RPM_BUILD_ROOT}%{prefix}/share/doc/ghc-%{version} SGMLDocWays="html ps" install-docs
+make datadir=`pwd` install-docs
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
 # only
@@ -141,5 +134,29 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %files doc
 %defattr(-,root,root)
-%doc %{prefix}/share/doc/ghc-%{version}/*.ps
-%doc %{prefix}/share/doc/ghc-%{version}/html
+
+%doc docs/building/building
+%doc docs/building/building.ps
+
+%doc docs/docbook-cheat-sheet/docbook-cheat-sheet
+%doc docs/docbook-cheat-sheet/docbook-cheat-sheet.ps
+
+%doc ghc/docs/ext-core/core.ps
+
+%doc ghc/docs/storage-mgt/ldv.ps
+
+%doc ghc/docs/storage-mgt/rp.ps
+
+%doc ghc/docs/storage-mgt/sm.ps
+
+%doc ghc/docs/users_guide/users_guide
+%doc ghc/docs/users_guide/users_guide.ps
+
+%doc hslibs/doc/hslibs
+%doc hslibs/doc/hslibs.ps
+
+%doc ghc/ANNOUNCE
+%doc ghc/LICENSE
+%doc ghc/README
+
+%doc html/*
