@@ -14,20 +14,22 @@ module BSD (
     HostName,
     getHostName,	    -- :: IO HostName
 
-    ServiceName,
-    getServiceByName,	    -- :: ServiceName -> IO ServiceEntry
-    getServicePortNumber,   -- :: ServiceName -> IO PortNumber
-
     ServiceEntry(..),
+    ServiceName,
+    getServiceByName,	    -- :: ServiceName -> ProtocolName -> IO ServiceEntry
+    getServiceByPort,       -- :: PortNumber  -> ProtocolName -> IO ServiceEntry
+    getServicePortNumber,   -- :: ServiceName -> IO PortNumber
     getServiceEntry,	    -- :: IO ServiceEntry
     setServiceEntry,	    -- :: Bool -> IO ()
     endServiceEntry,	    -- :: IO ()
     getServiceEntries,	    -- :: Bool -> IO [ServiceEntry]
 
     ProtocolName,
+    ProtocolNumber,
     ProtocolEntry(..),
     getProtocolByName,	    -- :: ProtocolName   -> IO ProtocolEntry
     getProtocolByNumber,    -- :: ProtocolNumber -> IO ProtcolEntry
+    getProtocolNumber,	    -- :: ProtocolName   -> ProtocolNumber
 
     setProtocolEntry,	    -- :: Bool -> IO ()
     getProtocolEntry,	    -- :: IO ProtocolEntry
@@ -35,11 +37,12 @@ module BSD (
     getProtocolEntries,	    -- :: Bool -> IO [ProtocolEntry]
 
     PortNumber,
-    getProtocolNumber,	    -- :: ProtocolName -> ProtocolNumber
+    mkPortNumber,	    -- :: Int -> PortNumber
 
     HostEntry(..),
     getHostByName,	    -- :: HostName -> IO HostEntry
     getHostByAddr,	    -- :: HostAddress -> Family -> IO HostEntry
+    hostAddress,	    -- :: HostEntry -> HostAddress
 
     setHostEntry,	    -- :: Bool -> IO ()
     getHostEntry,	    -- :: IO HostEntry
@@ -60,14 +63,13 @@ module BSD (
 
 
 import GlaExts
-
-import PrelIOBase
+import PrelIOBase ( IOError (..), IOErrorType(..) )
 
 import Foreign
 import Addr
-import PackedString ( byteArrayToPS, unpackPS )
+import PackedString ( cByteArrayToPS, unpackPS, unpackCStringIO )
   
-import PosixUtil  ( strcpy, unvectorize )
+import PosixUtil  ( unvectorize )
 import SocketPrim
 
 \end{code}
@@ -82,29 +84,37 @@ import SocketPrim
 \begin{code}
 type HostName = String
 type ProtocolName = String
-type ProtocolNumber = Int
 type ServiceName = String
-type PortNumber = Int
 
 data ProtocolEntry = 
-  ProtocolEntry
-     ProtocolName	-- Official Name
-     [ProtocolName]	-- aliases
-     Int		-- Protocol Number
+  ProtocolEntry  {
+     protoName    :: ProtocolName,	-- Official Name
+     protoAliases :: [ProtocolName],	-- aliases
+     protoNumber  :: ProtocolNumber	-- Protocol Number
+  }
 
 data ServiceEntry  = 
-  ServiceEntry
-     ServiceName	-- Official Name
-     [ServiceName]	-- aliases
-     PortNumber		-- Port Number
-     ProtocolName	-- Protocol
- 
+  ServiceEntry  {
+     serviceName     :: ServiceName,	-- Official Name
+     serviceAliases  :: [ServiceName],	-- aliases
+     servicePort     :: PortNumber,	-- Port Number  ( network byte order )
+     serviceProtocol :: ProtocolName	-- Protocol
+  }
+
 data HostEntry = 
-  HostEntry
-     HostName		-- Official Name
-     [HostName]		-- aliases
-     Family		-- Host Type (currently AF_INET)
-     [HostAddress]	-- Set of Network Addresses
+  HostEntry  {
+     hostName      :: HostName,  	-- Official Name
+     hostAliases   :: [HostName],	-- aliases
+     hostFamily    :: Family,	        -- Host Type (currently AF_INET)
+     hostAddresses :: [HostAddress]	-- Set of Network Addresses  (in network byte order)
+  }
+
+-- convenience function:
+hostAddress :: HostEntry -> HostAddress
+hostAddress (HostEntry nm _ _ ls) =
+ case ls of
+   []    -> error ("BSD.hostAddress: empty network address list for " ++ nm)
+   (x:_) -> x
 
 \end{code}
 
@@ -131,16 +141,16 @@ getServiceByName :: ServiceName 	-- Service Name
 		 -> IO ServiceEntry	-- Service Entry
 getServiceByName name proto = do
  ptr <- _ccall_ getservbyname name proto
- if ptr == ``NULL'' 
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "no such service entry")
     else unpackServiceEntry ptr
 
-getServiceByPort :: PortNumber ->	
-		    ProtocolName ->
-		    IO ServiceEntry
-getServiceByPort port proto = do
+getServiceByPort :: PortNumber
+		 -> ProtocolName
+		 -> IO ServiceEntry
+getServiceByPort (PNum port) proto = do
     ptr <- _ccall_ getservbyport port proto
-    if ptr == ``NULL'' 
+    if ptr == nullAddr
        then fail (IOError Nothing NoSuchThing "no such service entry")
        else unpackServiceEntry ptr
 		   
@@ -152,7 +162,7 @@ getServicePortNumber name = do
 getServiceEntry	:: IO ServiceEntry
 getServiceEntry = do
     ptr <- _ccall_ getservent
-    if ptr == ``NULL'' 
+    if ptr == nullAddr
        then fail (IOError Nothing NoSuchThing "no such service entry")
        else unpackServiceEntry ptr
 
@@ -180,9 +190,9 @@ determines whether or not the protocol database file, usually
 @getProtocolEntry@. Similarly, 
 
 \begin{code}
-getProtocolByName   :: ProtocolName -> IO ProtocolEntry
-getProtocolByNumber :: PortNumber   -> IO ProtocolEntry
-getProtocolNumber   :: ProtocolName -> IO ProtocolNumber
+getProtocolByName   :: ProtocolName   -> IO ProtocolEntry
+getProtocolByNumber :: ProtocolNumber -> IO ProtocolEntry
+getProtocolNumber   :: ProtocolName   -> IO ProtocolNumber
 
 setProtocolEntry    :: Bool -> IO ()	-- Keep DB Open ?
 getProtocolEntry    :: IO ProtocolEntry	-- Next Protocol Entry from DB
@@ -194,14 +204,14 @@ getProtocolEntries  :: Bool -> IO [ProtocolEntry]
 --getProtocolByName :: ProtocolName -> IO ProtocolEntry
 getProtocolByName name = do
  ptr <- _ccall_ getprotobyname name
- if (ptr == ``NULL'' )
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "no such protocol entry")
     else unpackProtocolEntry ptr
 
---getProtocolByNumber :: PortNumber -> IO ProtocolEntry
+--getProtocolByNumber :: ProtocolNumber -> IO ProtocolEntry
 getProtocolByNumber num = do
  ptr <- _ccall_ getprotobynumber num
- if ptr == ``NULL''
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "no such protocol entry")
     else unpackProtocolEntry ptr
 
@@ -213,7 +223,7 @@ getProtocolNumber proto = do
 --getProtocolEntry :: IO ProtocolEntry	-- Next Protocol Entry from DB
 getProtocolEntry = do
  ptr <- _ccall_ getprotoent
- if ptr == ``NULL'' 
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "no such protocol entry")
     else unpackProtocolEntry ptr
 
@@ -235,25 +245,25 @@ getProtocolEntries stayOpen = do
 getHostByName :: HostName -> IO HostEntry
 getHostByName name = do
     ptr <- _ccall_ gethostbyname name
-    if ptr == ``NULL''
+    if ptr == nullAddr
        then fail (IOError Nothing NoSuchThing "no such host entry")
        else unpackHostEntry ptr
 
 getHostByAddr :: Family -> HostAddress -> IO HostEntry
 getHostByAddr family addr = do
  ptr <- _casm_ ``struct in_addr addr;
-	         addr.s_addr = htonl(%0);
+	         addr.s_addr = %0;
 	         %r = gethostbyaddr ((char*)&addr, sizeof(struct in_addr), %1);''
                addr
                (packFamily family)
- if ptr == ``NULL'' 
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "no such host entry")
     else unpackHostEntry ptr
 
 getHostEntry :: IO HostEntry
 getHostEntry = do
  ptr <- _ccall_ gethostent
- if ptr == ``NULL'' 
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "unable to retrieve host entry")
     else unpackHostEntry ptr
 
@@ -281,37 +291,37 @@ Same set of access functions as for accessing host,protocol and service
 system info, this time for the types of networks supported.
 
 \begin{code}
+-- network addresses are represented in host byte order.
 type NetworkAddr = Word
+
 type NetworkName = String
 
 data NetworkEntry =
-  NetworkEntry
-     NetworkName   -- official name
-     [NetworkName] -- aliases
-     Family	   -- type
-     NetworkAddr
+  NetworkEntry {
+     networkName	:: NetworkName,   -- official name
+     networkAliases	:: [NetworkName], -- aliases
+     networkFamily	:: Family,	   -- type
+     networkAddress	:: NetworkAddr
+   }
 
 getNetworkByName :: NetworkName -> IO NetworkEntry
 getNetworkByName name = do
  ptr <- _ccall_ getnetbyname name
- if ptr == ``NULL'' 
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "no such network entry")
     else unpackNetworkEntry ptr
 
 getNetworkByAddr :: NetworkAddr -> Family -> IO NetworkEntry
 getNetworkByAddr addr family = do
- ptr <-  _casm_ ``long naddr = htonl(%0);
-	          %r = getnetbyaddr (naddr, (int)%1);''
-                addr
-                (packFamily family)
- if ptr == ``NULL''
+ ptr <-  _ccall_ getnetbyaddr addr (packFamily family)
+ if ptr == nullAddr
     then fail (IOError Nothing NoSuchThing "no such network entry")
     else unpackNetworkEntry ptr
 
 getNetworkEntry :: IO NetworkEntry
 getNetworkEntry = do
  ptr <- _ccall_ getnetent
- if ptr == ``NULL'' 
+ if ptr == nullAddr
    then fail (IOError Nothing NoSuchThing "no more network entries")
    else unpackNetworkEntry ptr
 
@@ -346,7 +356,7 @@ getHostName = do
   ba  <- stToIO (unsafeFreezeByteArray ptr)
   if rc == -1 
      then fail (userError "getHostName: unable to determine host name")
-     else return (unpackPS (byteArrayToPS ba))
+     else return (unpackPS (cByteArrayToPS ba))
 \end{code}
 
 Helper function used by the exported functions that provides a
@@ -388,22 +398,20 @@ getEntries getOne atEnd = loop
 unpackServiceEntry :: Addr -> PrimIO ServiceEntry
 unpackServiceEntry ptr = do
  str     <- _casm_ ``%r = ((struct servent*)%0)->s_name;'' ptr
- name    <- strcpy str
+ name    <- unpackCStringIO str
  alias   <- _casm_ ``%r = ((struct servent*)%0)->s_aliases;'' ptr
  aliases <- unvectorize alias 0
-  -- Note: port numbers are represented as ints in (struct servent), but
-  -- inet port numbers are 16-bit, hence the use of ntohs() rather than ntohl()
- port    <- _casm_ ``%r = (int)ntohs((int)(((struct servent*)%0)->s_port));'' ptr
+ port    <- _casm_ ``%r = (int)(((struct servent*)%0)->s_port);'' ptr
  str     <- _casm_ ``%r = (char *)((struct servent*)%0)->s_proto;'' ptr
- proto   <- strcpy str
- return (ServiceEntry name aliases port proto)
+ proto   <- unpackCStringIO str
+ return (ServiceEntry name aliases (PNum port) proto)
 
 -------------------------------------------------------------------------------
 
 unpackProtocolEntry :: Addr -> IO ProtocolEntry
 unpackProtocolEntry ptr = do
  str     <- _casm_ ``%r = ((struct protoent*)%0)->p_name;'' ptr
- name    <- strcpy str
+ name    <- unpackCStringIO str
  alias   <- _casm_ ``%r = ((struct protoent*)%0)->p_aliases;'' ptr
  aliases <- unvectorize alias 0
  proto   <- _casm_ ``%r = ((struct protoent*)%0)->p_proto;'' ptr
@@ -414,7 +422,7 @@ unpackProtocolEntry ptr = do
 unpackHostEntry :: Addr -> IO HostEntry
 unpackHostEntry ptr = do
   str      <- _casm_ ``%r = ((struct hostent*)%0)->h_name;'' ptr
-  name     <- strcpy str
+  name     <- unpackCStringIO str
   alias    <- _casm_ ``%r = ((struct hostent*)%0)->h_aliases;'' ptr
   aliases  <- unvectorize alias 0
   addrList <- unvectorizeHostAddrs ptr 0
@@ -425,7 +433,7 @@ unpackHostEntry ptr = do
 unpackNetworkEntry :: Addr -> IO NetworkEntry
 unpackNetworkEntry ptr = do
   str     <- _casm_ ``%r = ((struct netent*)%0)->n_name;'' ptr
-  name    <- strcpy str
+  name    <- unpackCStringIO str
   alias   <- _casm_ ``%r = ((struct netent*)%0)->n_aliases;'' ptr
   aliases <- unvectorize alias 0
   fam     <- _casm_ ``%r = ((struct netent*)%0)->n_addrtype;'' ptr
@@ -434,19 +442,19 @@ unpackNetworkEntry ptr = do
 
 -------------------------------------------------------------------------------
 
-unvectorizeHostAddrs :: Addr -> Int -> IO [Word]
-unvectorizeHostAddrs ptr n 
-  | str == ``NULL'' = return []
-  | otherwise = do
+unvectorizeHostAddrs :: Addr -> Int -> IO [HostAddress]
+unvectorizeHostAddrs ptr n  = do
 	x <- _casm_ ``{ unsigned long tmp;
 		   if ((((struct hostent*)%0)->h_addr_list[(int)%1]) == NULL)
 		      tmp=(W_)0;
 		   else
-		      tmp = (W_)ntohl(((struct in_addr *)(((struct hostent*)%0)->h_addr_list[(int)%1]))->s_addr); 
+		      tmp = (W_)((struct in_addr *)(((struct hostent*)%0)->h_addr_list[(int)%1]))->s_addr; 
 		   %r=(W_)tmp;} ''
 		ptr n
-	xs <- unvectorizeHostAddrs ptr (n+1)
-	return (x : xs)
-  where str = indexAddrOffAddr ptr n
+	if x == (W# (int2Word# 0#))
+	 then return []
+	 else do
+	   xs <- unvectorizeHostAddrs ptr (n+1)
+	   return (x : xs)
 
 \end{code}
