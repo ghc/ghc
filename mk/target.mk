@@ -352,6 +352,8 @@ _cbits := _cbits
 STUBOBJS += $(HSC_C_OBJS)
 # Add _hsc.c files to the cbits library
 SRCS       += $(wildcard ../*_hsc.c)
+# Make .hsc.h include files from the directory above visible
+SRC_CC_OPTS += -I..
 endif
 
 LIBRARY      = libHS$(PACKAGE)$(_cbits)$(_way).a
@@ -525,6 +527,8 @@ ifeq "$(DLLized)" "YES"
 ifneq "$(PACKAGE)" ""
 
 SRC_BLD_DLL_OPTS += --export-all --output-def=HS$(PACKAGE)$(_cbits)$(_way).def DllVersionInfo.$(way_)o
+
+ifneq "$(PACKAGE) $(IS_CBITS_LIB)" "std YES"
 ifneq "$(PACKAGE)" "rts"
 SRC_BLD_DLL_OPTS += -lHSstd_cbits_imp -L$(GHC_LIB_DIR)/std/cbits
 SRC_BLD_DLL_OPTS += -lHSrts_$(way_)imp -L$(GHC_RUNTIME_DIR)
@@ -534,6 +538,8 @@ ifneq "$(PACKAGE)" "std"
   endif
 endif
 endif
+endif
+
 SRC_BLD_DLL_OPTS += -lgmp -L. -L$(GHC_RUNTIME_DIR)/gmp
 ifeq "$(IS_CBITS_LIB)" ""
 SRC_BLD_DLL_OPTS += $(patsubst %,-lHS%_$(way_)imp, $(PACKAGE_DEPS))
