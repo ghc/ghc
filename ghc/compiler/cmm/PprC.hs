@@ -178,7 +178,7 @@ pprStmt stmt = case stmt of
     CmmAssign dest src -> pprAssign dest src
 
     CmmStore  dest src
-	| rep == I64
+	| rep == I64 && wordRep /= I64
 	-> ptext SLIT("ASSIGN_Word64") <> 
 		parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
 
@@ -295,7 +295,7 @@ pprExpr :: CmmExpr -> SDoc
 pprExpr e = case e of
     CmmLit lit -> pprLit lit
 
-    CmmLoad e I64
+    CmmLoad e I64 | wordRep /= I64
 	-> ptext SLIT("PK_Word64") <> parens (mkP_ <> pprExpr1 e)
 
     CmmLoad (CmmReg r) rep 
