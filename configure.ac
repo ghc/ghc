@@ -656,10 +656,9 @@ FPTOOLS_PROG_DIFF
 dnl ** Find find command (for Win32's benefit)
 FPTOOLS_FIND_FIND
 
-dnl ** Find lex command (lex or flex) - *doesn't* use autoconf's
-dnl    AC_PROG_LEX, since it doesn't actually check whether 'lex'
-dnl    exists if 'flex' doesn't.
-AC_PROG_LEX_STRICT
+dnl ** Find lex command (flex or lex)
+AC_PROG_LEX
+test -z "$LEX" && AC_MSG_WARN(['flex' or 'lex' not found])
 
 dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL

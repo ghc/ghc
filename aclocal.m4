@@ -1129,19 +1129,6 @@ dnl and we don't want to be global namespace polluters.
 
 # LocalWords:  fi
 
-dnl 
-dnl acspecific.m4's defn of AC_PROG_LEX is a bit too permissive, as it
-dnl defaults to 'lex' if 'flex' isn't found (without checking whether
-dnl 'lex' is actually present along the user's PATH).
-dnl
-AC_DEFUN(AC_PROG_LEX_STRICT,
-[AC_CHECK_PROG(LEX, flex, flex)
-if test -z "$LEX"
-then
-  AC_CHECK_PROG(LEX,lex,lex)
-  test -z "$LEX" && AC_MSG_ERROR(['lex' or 'flex' is required to compile GHC.])
-fi
-])
 
 dnl
 dnl Check to see whether CC (gcc) supports a particular option.
