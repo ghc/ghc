@@ -17,7 +17,7 @@ type tree;
 	>;
 	itemlist : <
 		gitemlist	: tree;
-		gitem		: tree;	
+		gitem		: tree;
 	>;
 	emitemlist: < >;
 	item : <

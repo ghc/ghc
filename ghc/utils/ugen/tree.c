@@ -1,41 +1,7 @@
+
+
 #include "id.h"
 #include "tree.h"
-
-extern char *malloc();
-
-struct Stypdef {
-	Ttree tag;
-	id Xgtid;
-	tree Xgtdeflist;
-};
-
-struct Sdeflist {
-	Ttree tag;
-	tree Xgdeflist;
-	tree Xgdef;
-};
-
-struct Sdef {
-	Ttree tag;
-	id Xgdid;
-	tree Xgditemlist;
-};
-
-struct Sitemlist {
-	Ttree tag;
-	tree Xgitemlist;
-	tree Xgitem;
-};
-
-struct Semitemlist {
-	Ttree tag;
-};
-
-struct Sitem {
-	Ttree tag;
-	id Xgitemfunid;
-	id Xgitemtypid;
-};
 
 Ttree ttree(t)
  tree t;
@@ -61,16 +27,20 @@ tree mktypdef(PPgtid, PPgtdeflist)
 id *Rgtid(t)
  struct Stypdef *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != typdef)
-		printf("gtid: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gtid: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgtid);
 }
 
 tree *Rgtdeflist(t)
  struct Stypdef *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != typdef)
-		printf("gtdeflist: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gtdeflist: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgtdeflist);
 }
 
@@ -91,16 +61,20 @@ tree mkdeflist(PPgdeflist, PPgdef)
 tree *Rgdeflist(t)
  struct Sdeflist *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != deflist)
-		printf("gdeflist: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gdeflist: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgdeflist);
 }
 
 tree *Rgdef(t)
  struct Sdeflist *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != deflist)
-		printf("gdef: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gdef: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgdef);
 }
 
@@ -121,16 +95,20 @@ tree mkdef(PPgdid, PPgditemlist)
 id *Rgdid(t)
  struct Sdef *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != def)
-		printf("gdid: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gdid: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgdid);
 }
 
 tree *Rgditemlist(t)
  struct Sdef *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != def)
-		printf("gditemlist: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gditemlist: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgditemlist);
 }
 
@@ -151,22 +129,26 @@ tree mkitemlist(PPgitemlist, PPgitem)
 tree *Rgitemlist(t)
  struct Sitemlist *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != itemlist)
-		printf("gitemlist: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gitemlist: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgitemlist);
 }
 
 tree *Rgitem(t)
  struct Sitemlist *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != itemlist)
-		printf("gitem: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gitem: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgitem);
 }
 
 /************** emitemlist ******************/
 
-tree mkemitemlist()
+tree mkemitemlist(void)
 {
 	register struct Semitemlist *pp =
 		(struct Semitemlist *) malloc(sizeof(struct Semitemlist));
@@ -191,15 +173,19 @@ tree mkitem(PPgitemfunid, PPgitemtypid)
 id *Rgitemfunid(t)
  struct Sitem *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != item)
-		printf("gitemfunid: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gitemfunid: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgitemfunid);
 }
 
 id *Rgitemtypid(t)
  struct Sitem *t;
 {
+#ifdef UGEN_DEBUG
 	if(t -> tag != item)
-		printf("gitemtypid: illegal selection; was %d\n", t -> tag);
+		fprintf(stderr,"gitemtypid: illegal selection; was %d\n", t -> tag);
+#endif /* UGEN_DEBUG */
 	return(& t -> Xgitemtypid);
 }
