@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.96 2002/07/17 09:21:48 simonmar Exp $
+ * $Id: PrimOps.h,v 1.97 2002/09/06 14:34:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -315,21 +315,6 @@ EXTFUN_RTS(mkForeignObjzh_fast);
 
 EXTFUN_RTS(newBCOzh_fast);
 EXTFUN_RTS(mkApUpd0zh_fast);
-
-
-/* -----------------------------------------------------------------------------
-   Signal handling.  Not really primops, but called directly from Haskell. 
-   -------------------------------------------------------------------------- */
-
-#define STG_SIG_DFL  (-1)
-#define STG_SIG_IGN  (-2)
-#define STG_SIG_ERR  (-3)
-#define STG_SIG_HAN  (-4)
-
-extern StgInt stg_sig_install (StgInt, StgInt, StgStablePtr, void *);
-#define stg_sig_default(sig,mask) stg_sig_install(sig,STG_SIG_DFL,0,(void *)mask)
-#define stg_sig_ignore(sig,mask) stg_sig_install(sig,STG_SIG_IGN,0,(void *)mask)
-#define stg_sig_catch(sig,ptr,mask) stg_sig_install(sig,STG_SIG_HAN,ptr,(void *)mask)
 
 /* ------------------------------------------------------------------------
    Parallel PrimOps

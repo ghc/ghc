@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.27 2002/09/03 14:07:03 simonmar Exp $
+ * $Id: Signals.c,v 1.28 2002/09/06 14:34:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -196,8 +196,8 @@ awaitUserSignals(void)
  * Install a Haskell signal handler.
  * -------------------------------------------------------------------------- */
 
-StgInt 
-stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, void *mask)
+int
+stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 {
     sigset_t signals, osignals;
     struct sigaction action;
@@ -228,7 +228,7 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, void *mask)
     	break;
 
     case STG_SIG_HAN:
-    	handlers[sig] = (StgInt)handler;
+    	handlers[sig] = (StgInt)*handler;
 	sigaddset(&userSignals, sig);
     	action.sa_handler = generic_handler;
 	n_haskell_handlers++;
@@ -257,7 +257,13 @@ stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, void *mask)
 	return STG_SIG_ERR;
     }
     
-    return previous_spi;
+    if (previous_spi == STG_SIG_DFL || previous_spi == STG_SIG_IGN
+	|| previous_spi == STG_SIG_ERR) {
+	return previous_spi;
+    } else {
+	*handler = (StgStablePtr)previous_spi;
+	return STG_SIG_HAN;
+    }
 }
 
 /* -----------------------------------------------------------------------------

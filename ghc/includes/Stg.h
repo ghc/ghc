@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.48 2002/07/22 10:02:13 simonmar Exp $
+ * $Id: Stg.h,v 1.49 2002/09/06 14:34:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -216,6 +216,8 @@ typedef StgWord64       LW_;
 
 /* Runtime-system hooks */
 #include "Hooks.h"
+
+#include "Signals.h"
 
 #include "HsFFI.h"
 
