@@ -207,10 +207,14 @@
     </cmdsynopsis>
 
     <para>Where each <replaceable>file</replaceable> is a filename
-    containing a Haskell source module.  All the modules specified on
-    the command line will be processed together.  When one module
-    refers to an entity in another module being processed, the
-    documentation will link directly to that entity.</para>
+    containing a Haskell source module.  Only plain Haskell source
+    files are accepted (but see <xref linkend="cpp"> for instructions
+    on how to pre-process source files for feeding to Haddock).</para>
+
+    <para>All the modules specified on the command line will be
+    processed together.  When one module refers to an entity in
+    another module being processed, the documentation will link
+    directly to that entity.</para>
 
     <para>Entities that cannot be found, for example because they are
     in a module that isn't being processed as part of the current
@@ -533,6 +537,31 @@
 	</listitem>
       </varlistentry>
     </variablelist>
+
+    <section id="cpp">
+      <title>Using literate or pre-processed source</title>
+
+      <para>Haddock only accepts plain, non-literate, Haskell source.
+      This means that if you program in Literate Haskell, or you need
+      to use the C pre-processor in your Haskell source, then you need
+      to pre-process the files before feeding them to Haddock.  This
+      is easily accomplished using GHC; for example, suppose we have a
+      Literate Haskell source file <filename>Foo.lhs</filename>, on
+      which we also need to run the C pre-processor:</para>
+
+<screen>
+$ ghc -cpp -E -D__HADDOCK__ Foo.lhs -o Foo.hs
+$ haddock -h Foo.hs ...
+</screen>
+
+      <para>The <option>-E</option> option to GHC says "stop after
+      pre-processing", the <option>-cpp</option> turns on the C
+      pre-processor, and the <option>-D__HADDOCK__</option> option
+      defines the symbol <literal>__HADDOCK__</literal> when
+      pre-processing (this is sometimes handy if you need to
+      any pre-processing conditionals in your source which depend on
+      whether the source is going to be fed to Haddock).</para>
+    </section>
 
   </chapter>
   
