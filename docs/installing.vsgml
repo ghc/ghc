@@ -641,8 +641,8 @@ Hello, world!
 Some simple-but-profitable tests are to compile and run the notorious
 @nfib@<ncdx/nfib/ program, using different numeric types.  Start with
 @nfib :: Int -> Int@, and then try @Integer@, @Float@, @Double@,
-@Rational@ and maybe @Complex Float@.  Code for this is distributed in
-@ghc/misc/examples/nfib/@ in a source distribution.
+@Rational@ and perhaps the overloaded version.  Code for this is
+distributed in @ghc/misc/examples/nfib/@ in a source distribution.
 
 For more information on how to ``drive'' GHC, either do @ghc -help@ or
 consult the User's Guide (distributed in several pre-compiled formats
