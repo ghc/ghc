@@ -16,18 +16,20 @@ module Desugar ( deSugar, pprDsWarnings
 
 IMP_Ubiq(){-uitous-}
 
+import CmdLineOpts	( opt_D_dump_ds )
 import HsSyn		( HsBinds, HsExpr, MonoBinds,
 			  SYN_IE(RecFlag), nonRecursive, recursive
 			)
 import TcHsSyn		( SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedHsExpr)
 			)
 import CoreSyn
+import PprCore		( pprCoreBindings )
 import Name             ( isExported )
 import DsMonad
 import DsBinds		( dsMonoBinds )
 import DsUtils
 
-import Bag		( unionBags )
+import Bag		( unionBags, isEmptyBag )
 import BasicTypes       ( SYN_IE(Module) )
 import CmdLineOpts	( opt_DoCoreLinting, opt_SccGroup, opt_SccProfilingOn )
 import CostCentre       ( IsCafCC(..), mkAutoCC )
@@ -35,7 +37,9 @@ import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
 import Id		( nullIdEnv, mkIdEnv, idType, 
 			  SYN_IE(DictVar), GenId, SYN_IE(Id) )
-import Outputable	( PprStyle(..) )
+import ErrUtils		( dumpIfSet, doIfSet )
+import Outputable	( PprStyle(..), pprDumpStyle, pprErrorsStyle, printErrs )
+import Pretty		( Doc )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 \end{code}
 
@@ -46,8 +50,7 @@ start.
 deSugar :: UniqSupply		-- name supply
 	-> Module		-- module name
 	-> TypecheckedMonoBinds
-	-> ([CoreBinding],	-- output
-	    DsWarnings)	    -- Shadowing complaints
+	-> IO [CoreBinding]	-- output
 
 deSugar us mod_name all_binds
   = let
@@ -58,14 +61,22 @@ deSugar us mod_name all_binds
 		    	Just xx -> _PK_ xx
 		    	Nothing -> mod_name	-- default: module name
 
-	(core_prs, shadows) = initDs us1 nullIdEnv module_and_group 
-			      (dsMonoBinds opt_SccProfilingOn recursive all_binds [])
+	(core_prs, ds_warns) = initDs us1 nullIdEnv module_and_group 
+			       (dsMonoBinds opt_SccProfilingOn recursive all_binds [])
 
-	lift_final_binds = liftCoreBindings us2 [Rec core_prs]
-
-	really_final_binds = if opt_DoCoreLinting
-			     then lintCoreBindings PprDebug "Desugarer" False lift_final_binds
-			     else lift_final_binds
+	ds_binds = liftCoreBindings us2 [Rec core_prs]
     in
-    (really_final_binds, shadows)
+
+	-- Display any warnings
+    doIfSet (not (isEmptyBag ds_warns))
+	(printErrs (pprDsWarnings pprErrorsStyle ds_warns)) >>
+
+	-- Lint result if necessary
+    lintCoreBindings "Desugarer" False ds_binds >>
+
+	-- Dump output
+    dumpIfSet opt_D_dump_ds "Desugared:"
+	(pprCoreBindings pprDumpStyle ds_binds)	>>
+
+    return ds_binds    
 \end{code}
