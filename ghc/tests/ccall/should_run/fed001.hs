@@ -1,31 +1,31 @@
 import Foreign
 import Monad
 
-newtype Ptr a = Ptr Addr
-unPtr (Ptr x) = x
+newtype XPtr a = XPtr Addr
+unXPtr (XPtr x) = x
 
 type CInt  = Int32
 type CSize = Word32
 
 foreign export dynamic 
-   mkComparator :: (Ptr Int -> Ptr Int -> IO CInt) 
-		-> IO (Ptr (Ptr Int -> Ptr Int -> IO CInt))
+   mkComparator :: (XPtr Int -> XPtr Int -> IO CInt) 
+		-> IO (XPtr (XPtr Int -> XPtr Int -> IO CInt))
 
 foreign import 
-   qsort :: Addr -> CSize -> CSize -> Ptr (Ptr Int -> Ptr Int -> IO CInt) 
+   qsort :: Ptr Int -> CSize -> CSize -> XPtr (XPtr Int -> XPtr Int -> IO CInt) 
 	 -> IO ()
 
-compareInts :: Ptr Int -> Ptr Int -> IO CInt
+compareInts :: XPtr Int -> XPtr Int -> IO CInt
 compareInts a1 a2 = do
-   i1 <- peek (unPtr a1)
-   i2 <- peek (unPtr a2)
+   i1 <- peek (Ptr (unXPtr a1))
+   i2 <- peek (Ptr (unXPtr a2))
    return (fromIntegral (i1 - i2 :: Int))
 
 main :: IO ()
 main = do
    let values = [ 12, 56, 90, 34, 78 ] :: [Int]
        n      = length values
-   buf <- mallocElems (head values) n
+   buf <- mallocArray n
    zipWithM_ (pokeElemOff buf) [ 0 .. ] values
    c <- mkComparator compareInts
    qsort buf (fromIntegral n) (fromIntegral (sizeOf (head values))) c
