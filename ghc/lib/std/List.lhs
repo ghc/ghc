@@ -65,7 +65,7 @@ module List
    , genericIndex      -- :: (Integral a) => [b] -> a -> b
    , genericReplicate  -- :: (Integral a) => a -> b -> [b]
    
-   , unfoldr		-- :: (a -> Maybe (b,a)) -> a -> (a,[b])
+   , unfoldr		-- :: (b -> Maybe (a, b)) -> b -> [a]
 
    , zip4, zip5, zip6, zip7
    , zipWith4, zipWith5, zipWith6, zipWith7
