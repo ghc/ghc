@@ -1,3 +1,2 @@
-# Although we don't need any local macros currently, we leave this file here.
-# Otherwise autoreconf invokes aclocal from the automake tools, which might
-# be nonexistent or too old.
+# Empty file to avoid a dependency on automake: autoreconf calls aclocal to
+# generate a temporary aclocal.m4t when no aclocal.m4 is present.
