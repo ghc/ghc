@@ -168,6 +168,11 @@ i[[3456]]86-*-mingw32*)
         HostVendor_CPP='unknown'
         HostOS_CPP='mingw32'
 	exeext='.exe'
+	# We assume you're using mingw32 via the gcc that comes
+	# with cygwin, and not the native port, so let's augment
+	# the gcc command-line used here with -mno-cygwin to
+	# arrange for good things to happen.
+	CFLAGS="-mno-cygwin $CFLAGS"
         ;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
@@ -337,6 +342,30 @@ AC_ARG_ENABLE(hc-boot,
 )
 AC_SUBST(BootingFromHc)
 
+
+dnl ** Enable the construction of Win32 DLLs?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(win32-dlls,
+[  --enable-win32-dlls
+        If on a Win32 platform running mingw32/cygwin, enable the
+	construction of DLLs containing ghc-compiled code.
+],
+[
+case $HostOS_CPP in
+cygwin32) ;;
+mingw32)  ;;
+*)    echo "Unrecognised win32 platform: $HostPlatform"
+      exit 1
+      ;;
+esac
+EnableWin32DLLs=YES
+],
+[EnableWin32DLLs=NO]
+)
+AC_SUBST(EnableWin32DLLs)
+if test x"$EnableWin32DLLs" = "xYES" ; then
+ AC_DEFINE(HAVE_WIN32_DLL_SUPPORT)
+fi
 
 dnl --------------------------------------------------------------
 dnl End of configure script option section
