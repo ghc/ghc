@@ -229,19 +229,19 @@ modid	:: { ModuleName }
 
 qname	:: { RdrName }           -- Includes data constructors
 	: name	                 { $1 }
-	| mname '.' NAME	 { mkIfaceOrig varName (mkFastString $1,mkFastString $3) }
+	| mname '.' NAME	 { mkIfaceOrig varName (mkFastString $1) (mkFastString $3) }
         | q_d_name               { $1 }
 
 
 -- Type constructor
 q_tc_name	:: { RdrName }
         : mname '.' cname 
-		{ mkIfaceOrig tcName (mkFastString $1,mkFastString $3) }
+		{ mkIfaceOrig tcName (mkFastString $1) (mkFastString $3) }
 
 -- Data constructor
 q_d_name	:: { RdrName }
         : mname '.' cname 
-		{ mkIfaceOrig dataName (mkFastString $1,mkFastString $3) }
+		{ mkIfaceOrig dataName (mkFastString $1) (mkFastString $3) }
 
 
 {
@@ -253,7 +253,7 @@ convIntLit i (HsTyVar n)
   | n == intPrimRdrName  = MachInt  i  
   | n == wordPrimRdrName = MachWord i
 convIntLit i aty
-  = pprPanic "Unknown literal type" (ppr aty)
+  = pprPanic "Unknown literal type" (ppr aty $$ ppr intPrimRdrName) 
 
 wordPrimRdrName :: RdrName
 wordPrimRdrName = nameRdrName wordPrimTyConName
