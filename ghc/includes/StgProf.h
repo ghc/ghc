@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.4 1999/03/25 13:14:04 simonm Exp $
+ * $Id: StgProf.h,v 1.5 1999/04/08 15:43:44 simonm Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -270,7 +270,8 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  
 /* These ENTER_CC_PAP things are only used in the RTS */
  
-#define ENTER_CCS_PAP(stack)					\
+#define ENTER_CCS_PAP(stack) /* nothing */
+#if 0 /* old version */
         do {							\
         CostCentreStack *ccs = (CostCentreStack *) (stack);	\
         if ( ! IS_CAF_OR_SUB_CCS(ccs) ) {			\
@@ -282,6 +283,7 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
         }							\
         CCCS_DETAIL_COUNT(CCCS->pap_count);			\
         } while(0)                      
+#endif
 
 #define ENTER_CCS_PAP_CL(closure)  \
         ENTER_CCS_PAP((closure)->header.prof.ccs)

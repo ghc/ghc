@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.13 1999/03/26 10:29:06 simonm Exp $
+ * $Id: Updates.hc,v 1.14 1999/04/08 15:43:46 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -200,7 +200,7 @@ EXTFUN(stg_update_PAP)
 {
   nat Words, PapSize;
 #ifdef PROFILING
-  CostCentreStack *CCS_pap;
+  CostCentreStack *CCS_pap, *CCS_blame;
 #endif
   StgPAP* PapClosure;
   StgClosure *Fun, *Updatee;
@@ -228,6 +228,10 @@ EXTFUN(stg_update_PAP)
 #if defined(PROFILING)
     /* set "CC_pap" to go in the updatee (see Sansom thesis, p 183) */
     CCS_pap = Fun->header.prof.ccs;
+    CCS_blame = Fun->header.prof.ccs;
+    if (IS_CAF_OR_SUB_CCS(CCS_pap)) {
+      CCS_blame = CCCS;
+    }
 #endif
 
     if (Words == 0) { 
@@ -264,7 +268,7 @@ EXTFUN(stg_update_PAP)
 
 	TICK_ALLOC_UPD_PAP(1/*fun*/ + Words, 0);
 #ifdef PROFILING
-	CCS_ALLOC(CCS_pap, PapSize);
+	CCS_ALLOC(CCS_blame, PapSize);
 #endif
 
 	PapClosure = (StgPAP *)(Hp + 1 - PapSize); /* The new PapClosure */

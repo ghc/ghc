@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.4 1999/03/25 13:14:06 simonm Exp $
+ * $Id: Profiling.c,v 1.5 1999/04/08 15:43:45 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -291,11 +291,12 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 {
   CostCentreStack *ccs;
   IF_DEBUG(prof, 
-	   fprintf(stderr,"Appending ");
-	   printCCS(ccs1);
-	   fprintf(stderr," to ");
-	   printCCS(ccs2);
-	   fprintf(stderr,"\n"));
+	   if (ccs1 != ccs2) {
+	     fprintf(stderr,"Appending ");
+	     printCCS(ccs1);
+	     fprintf(stderr," to ");
+	     printCCS(ccs2);
+	     fprintf(stderr,"\n");});
   return AppendCCS(ccs1,ccs2);
 }
 #endif
