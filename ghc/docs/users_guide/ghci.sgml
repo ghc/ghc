@@ -837,6 +837,12 @@ $ ghci -lm
 	  beginning of <replaceable>dir</replaceable> will be replaced
 	  by the contents of the environment variable
 	  <literal>HOME</literal>.</para>
+
+	  <para>NOTE: changing directories causes all currently loaded
+	  modules to be unloaded.  This is because the search path is
+	  usually expressed using relative directories, and changing
+	  the search path in the middle of a session is not
+	  supported.</para>
 	</listitem>
       </varlistentry>
 
