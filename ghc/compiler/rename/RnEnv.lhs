@@ -48,7 +48,8 @@ import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isInternalName,
 			  nameSrcLoc, nameOccName, nameModuleName, nameParent )
 import NameSet
-import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused )
+import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused,
+			  isVarOcc )
 import Module		( Module, ModuleName, moduleName, mkHomeModule )
 import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE )
 import UniqSupply
@@ -721,9 +722,12 @@ shadowedNameWarn doc shadow
     $$ doc
 
 unknownNameErr name
-  = sep [ptext SLIT("Not in scope:"), text flavour <+> quotes (ppr name)]
+  = sep [ptext SLIT("Not in scope:"), 
+	 if isVarOcc occ_name then quotes (ppr name)
+			      else text (occNameFlavour occ_name) 
+					<+> quotes (ppr name)]
   where
-    flavour = occNameFlavour (rdrNameOcc name)
+    occ_name = rdrNameOcc name
 
 unknownInstBndrErr cls op
   = quotes (ppr op) <+> ptext SLIT("is not a (visible) method of class") <+> quotes (ppr cls)
