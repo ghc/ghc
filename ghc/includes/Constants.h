@@ -1,5 +1,4 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.28 2005/02/10 13:02:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -196,7 +195,7 @@
 #define LDV_LAST_MASK           0x00007FFF
 #define LDV_STATE_CREATE        0x00000000
 #define LDV_STATE_USE           0x40000000
-#endif  // SIZEOF_VOID_P
+#endif /* SIZEOF_VOID_P */
 
 /* -----------------------------------------------------------------------------
    TSO related constants

@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.48 2005/02/03 10:59:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -45,22 +44,22 @@ struct GC_FLAGS {
 };
 
 struct DEBUG_FLAGS {  
-    // flags to control debugging output & extra checking in various subsystems
-    rtsBool scheduler;      // 's'
-    rtsBool interpreter;    // 'i'
-    rtsBool codegen;        // 'c'
-    rtsBool weak;           // 'w'
-    rtsBool gccafs;         // 'G'
-    rtsBool gc;             // 'g'
-    rtsBool block_alloc;    // 'b'
-    rtsBool sanity;         // 'S'   warning: might be expensive!
-    rtsBool stable;         // 't'
-    rtsBool prof;           // 'p'
-    rtsBool gran;           // 'r'
-    rtsBool par;            // 'P'
-    rtsBool linker;         // 'l'   the object linker
-    rtsBool apply;          // 'a'
-    rtsBool stm;            // 'm'
+    /* flags to control debugging output & extra checking in various subsystems */
+    rtsBool scheduler;      /* 's' */
+    rtsBool interpreter;    /* 'i' */
+    rtsBool codegen;        /* 'c' */
+    rtsBool weak;           /* 'w' */
+    rtsBool gccafs;         /* 'G' */
+    rtsBool gc;             /* 'g' */
+    rtsBool block_alloc;    /* 'b' */
+    rtsBool sanity;         /* 'S'   warning: might be expensive! */
+    rtsBool stable;         /* 't' */
+    rtsBool prof;           /* 'p' */
+    rtsBool gran;           /* 'r' */
+    rtsBool par;            /* 'P' */
+    rtsBool linker;         /* 'l'   the object linker */
+    rtsBool apply;          /* 'a' */
+    rtsBool stm;            /* 'm' */
 };
 
 struct COST_CENTRE_FLAGS {
@@ -238,8 +237,8 @@ struct GRAN_FLAGS {
   struct GRAN_COST_FLAGS Costs;          /* cost metric for simulation */
   struct GRAN_DEBUG_FLAGS Debug;         /* debugging options */
 
-  nat  maxThreads;              // ToDo: share with SMP and GUM
-  // rtsBool labelling;
+  nat  maxThreads;              /* ToDo: share with SMP and GUM */
+  /* rtsBool labelling; */
   nat  packBufferSize;
   nat  packBufferSize_internal;
 
@@ -275,9 +274,9 @@ struct GRAN_FLAGS {
   rtsBool RandomSteal;        /* steal spark/thread from random proc */
   rtsBool NoForward;        /* no forwarding of fetch messages */
 
-  // unsigned int	    debug;
-  //  rtsBool event_trace;
-  //  rtsBool event_trace_all;
+  /* unsigned int	    debug; */
+  /*  rtsBool event_trace; */
+  /*  rtsBool event_trace_all; */
 };
 #endif /* GRAN */
 
@@ -290,7 +289,7 @@ struct TICKY_FLAGS {
 /* Put them together: */
 
 typedef struct _RTS_FLAGS {
-	// The first portion of RTS_FLAGS is invariant.
+    /* The first portion of RTS_FLAGS is invariant. */
     struct GC_FLAGS	     GcFlags;
     struct CONCURRENT_FLAGS  ConcFlags;
     struct DEBUG_FLAGS	     DebugFlags;
@@ -309,7 +308,7 @@ typedef struct _RTS_FLAGS {
 #ifdef COMPILING_RTS_MAIN
 extern DLLIMPORT RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
-// Hack because the C code generator can't generate '&label'.
+/* Hack because the C code generator can't generate '&label'. */
 extern RTS_FLAGS RtsFlags[];
 #else
 extern RTS_FLAGS RtsFlags;

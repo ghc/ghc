@@ -46,4 +46,4 @@
 #define ARG_PPPPPPP  23
 #define ARG_PPPPPPPP 24
 
-#endif // STGFUN_H
+#endif /* STGFUN_H */

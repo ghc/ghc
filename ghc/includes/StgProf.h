@@ -12,11 +12,13 @@
 /* -----------------------------------------------------------------------------
  * Data Structures 
  * ---------------------------------------------------------------------------*/  
-// NB. be careful to avoid unwanted padding between fields, by
-// putting the 8-byte fields on an 8-byte boundary.  Padding can
-// vary between C compilers, and we don't take into account any
-// possible padding when generating CCS and CC decls in the code
-// generator (compiler/codeGen/CgProf.hs).
+/*
+ * NB. be careful to avoid unwanted padding between fields, by
+ * putting the 8-byte fields on an 8-byte boundary.  Padding can
+ * vary between C compilers, and we don't take into account any
+ * possible padding when generating CCS and CC decls in the code
+ * generator (compiler/codeGen/CgProf.hs).
+ */
 
 typedef struct _CostCentre {
   StgInt ccID;
@@ -26,7 +28,7 @@ typedef struct _CostCentre {
  
   /* used for accumulating costs at the end of the run... */
   StgWord   time_ticks;
-  StgWord64 mem_alloc;      // align 8 (see above)
+  StgWord64 mem_alloc;      /* align 8 (see above) */
 
   StgInt    is_caf;
 
@@ -40,11 +42,11 @@ typedef struct _CostCentreStack {
   struct _CostCentreStack *prevStack;
   struct _IndexTable *indexTable;
 
-  StgWord64  scc_count;       // align 8 (see above)
+  StgWord64  scc_count;       /* align 8 (see above) */
   StgWord    selected;
   StgWord    time_ticks;
-  StgWord64  mem_alloc;       // align 8 (see above)
-  StgWord64  inherited_alloc; // align 8 (see above)
+  StgWord64  mem_alloc;       /* align 8 (see above) */
+  StgWord64  inherited_alloc; /* align 8 (see above) */
   StgWord    inherited_ticks;
 
   CostCentre *root;
@@ -128,7 +130,7 @@ extern CostCentreStack CCS_OVERHEAD[];   /* Profiling overhead */
 extern CostCentre      CC_DONT_CARE[];
 extern CostCentreStack CCS_DONT_CARE[];  /* shouldn't ever get set */
 
-#endif // IN_STG_CODE
+#endif /* IN_STG_CODE */
 
 extern unsigned int RTS_VAR(CC_ID);	/* global ids */
 extern unsigned int RTS_VAR(CCS_ID);

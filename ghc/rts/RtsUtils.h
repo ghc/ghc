@@ -48,4 +48,4 @@ extern void heapCheckFail( void );
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
 
-#endif // RTSUTILS_H
+#endif /* RTSUTILS_H */

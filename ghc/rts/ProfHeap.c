@@ -228,7 +228,7 @@ doingRetainerProfiling( void )
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER
 	    || RtsFlags.ProfFlags.retainerSelector != NULL);
 }
-#endif // PROFILING
+#endif /* PROFILING */
 
 // Precesses a closure 'c' being destroyed whose size is 'size'.
 // Make sure that LDV_recordDead() is not invoked on 'inherently used' closures
@@ -341,7 +341,7 @@ nextEra( void )
 				       "nextEra");
 	}
     }
-#endif // PROFILING
+#endif /* PROFILING */
 
     initEra( &censuses[era] );
 }
@@ -560,7 +560,7 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
     }
     fprintf(fp, "%s", buf);
 }
-#endif // PROFILING
+#endif /* PROFILING */
 
 rtsBool
 strMatchesSelector( char* str, char* sel )

@@ -20,7 +20,7 @@ extern void      stat_endRP(nat,
                             nat, int, 
 #endif
                             double);
-#endif // PROFILING
+#endif /* PROFILING */
 
 #if defined(PROFILING) || defined(DEBUG)
 extern void      stat_startHeapCensus(void);
@@ -41,7 +41,7 @@ extern double    mut_user_time(void);
 #ifdef PROFILING
 extern double    mut_user_time_during_RP(void);
 extern double    mut_user_time_during_heap_census(void);
-#endif // PROFILING
+#endif /* PROFILING */
 
 extern void      statDescribeGens( void );
 extern HsInt64   getAllocations( void );

@@ -756,7 +756,7 @@ initLinker( void )
 #   if defined(openbsd_HOST_OS)
     dl_libc_handle = dlopen("libc.so", RTLD_LAZY);
 #   endif
-#   endif // RTLD_DEFAULT
+#   endif /* RTLD_DEFAULT */
 #   endif
 }
 

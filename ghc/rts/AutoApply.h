@@ -76,5 +76,5 @@
      Sp_adj(n+1);						\
      jump %ENTRY_CODE(Sp(0));
 
-#endif // APPLY_H
+#endif /* APPLY_H */
 

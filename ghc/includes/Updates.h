@@ -343,17 +343,21 @@ updateWithPermIndirection(const StgInfoTable *info,
 
   ASSERT( p1 != p2 && !closure_IND(p1) );
 
-  // @LDV profiling
-  // Destroy the old closure.
-  // Nb: LDV_* stuff cannot mix with ticky-ticky
+  /*
+   * @LDV profiling
+   * Destroy the old closure.
+   * Nb: LDV_* stuff cannot mix with ticky-ticky
+   */
   LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);
 
   bd = Bdescr((P_)p1);
   if (bd->gen_no == 0) {
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1, &stg_IND_PERM_info);
-    // @LDV profiling
-    // We have just created a new closure.
+    /*
+     * @LDV profiling
+     * We have just created a new closure.
+     */
     LDV_RECORD_CREATE(p1);
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
@@ -362,8 +366,10 @@ updateWithPermIndirection(const StgInfoTable *info,
     }
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1, &stg_IND_OLDGEN_PERM_info);
-    // @LDV profiling
-    // We have just created a new closure.
+    /*
+     * @LDV profiling
+     * We have just created a new closure.
+     */
     LDV_RECORD_CREATE(p1);
     TICK_UPD_OLD_PERM_IND();
   }

@@ -26,4 +26,4 @@ extern StgFun *stg_stack_save_entries[];
 // canned bitmap for each arg type
 extern StgWord stg_arg_bitmaps[];
 
-#endif // APPLY_H
+#endif /* APPLY_H */

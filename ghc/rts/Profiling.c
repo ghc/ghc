@@ -929,6 +929,6 @@ debugCCS( CostCentreStack *ccs )
   }
   debugBelch(">");
 }
-#endif // DEBUG
+#endif /* DEBUG */
 
 #endif /* PROFILING */

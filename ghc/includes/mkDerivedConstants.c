@@ -13,8 +13,10 @@
 
 #define IN_STG_CODE 0
 
-// We need offsets of profiled things... better be careful that this
-// doesn't affect the offsets of anything else.
+/*
+ * We need offsets of profiled things... better be careful that this
+ * doesn't affect the offsets of anything else.
+ */
 #define PROFILING
 
 #include "Rts.h"
@@ -59,11 +61,11 @@
 #define field_offset(s_type, field) \
     field_offset_(str(s_type,field),s_type,field);
 
-// An access macro for use in C-- sources.  
+/* An access macro for use in C-- sources. */
 #define struct_field_macro(str) \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+OFFSET_" str "]\n");
 
-// Outputs the byte offset and MachRep for a field
+/* Outputs the byte offset and MachRep for a field */
 #define struct_field(s_type, field)		\
     field_offset(s_type, field);		\
     field_type(s_type, field);			\
@@ -92,13 +94,15 @@
 #define struct_size(s_type) \
     def_size(#s_type, sizeof(s_type));
 
-// Size of a closure type, minus the header, named SIZEOF_<type>_NoHdr
-// Also, we #define SIZEOF_<type> to be the size of the whole closure for .cmm.
+/*
+ * Size of a closure type, minus the header, named SIZEOF_<type>_NoHdr
+ * Also, we #define SIZEOF_<type> to be the size of the whole closure for .cmm.
+ */
 #define closure_size(s_type) \
     def_size(#s_type "_NoHdr", sizeof(s_type) - sizeof(StgHeader)); \
     def_closure_size(#s_type, sizeof(s_type) - sizeof(StgHeader));
 
-// An access macro for use in C-- sources.  
+/* An access macro for use in C-- sources. */
 #define closure_field_macro(str) \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+OFFSET_" str "]\n");
 
@@ -115,20 +119,22 @@
     closure_field_offset_(str(s_type,field),s_type,field); \
     closure_payload_macro(str(s_type,field));
 
-// Byte offset and MachRep for a closure field, minus the header
+/* Byte offset and MachRep for a closure field, minus the header */
 #define closure_field(s_type, field) \
     closure_field_offset(s_type,field) \
     field_type(s_type, field); \
     closure_field_macro(str(s_type,field))
 
-// Byte offset and MachRep for a closure field, minus the header
+/* Byte offset and MachRep for a closure field, minus the header */
 #define closure_field_(str, s_type, field) \
     closure_field_offset_(str,s_type,field) \
     field_type_(str, s_type, field); \
     closure_field_macro(str)
 
-// Byte offset and MachRep for a TSO field, minus the header and
-// variable prof bit.
+/*
+ * Byte offset and MachRep for a TSO field, minus the header and
+ * variable prof bit.
+ */
 #define tso_offset(s_type, field) \
     def_offset(str(s_type,field), OFFSET(s_type,field) - sizeof(StgHeader) - sizeof(StgTSOProfInfo));
 
@@ -157,7 +163,7 @@ main(int argc, char *argv[])
     printf("/* This file is created automatically.  Do not edit by hand.*/\n\n");
 
     printf("#define STD_HDR_SIZE   %d\n", sizeofW(StgHeader) - sizeofW(StgProfHeader));
-    // grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader)
+    /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
     printf("#define PROF_HDR_SIZE  %d\n", sizeofW(StgProfHeader));
     printf("#define GRAN_HDR_SIZE  %d\n", sizeofW(StgGranHeader));
 

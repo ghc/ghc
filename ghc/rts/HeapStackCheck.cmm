@@ -629,7 +629,7 @@ __stg_gc_fun
 	jump W_[stg_stack_save_entries + WDS(type)];
 	    // jumps to stg_gc_noregs after saving stuff
     }
-#endif // !NO_ARG_REGS
+#endif /* !NO_ARG_REGS */
 }
 
 /* -----------------------------------------------------------------------------

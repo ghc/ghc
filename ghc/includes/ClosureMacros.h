@@ -114,7 +114,7 @@
 #define SET_PROF_HDR(c,ccs_)            \
         ((c)->header.prof.ccs = ccs_,   \
         LDV_RECORD_CREATE((c)))
-#endif  // DEBUG_RETAINER
+#endif /* DEBUG_RETAINER */
 #define SET_STATIC_PROF_HDR(ccs_)       \
         prof : { ccs : (CostCentreStack *)ccs_, hp : { rs : NULL } },
 #else

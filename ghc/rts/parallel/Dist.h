@@ -15,6 +15,6 @@ StgPEId cGetCertainOwner(StgClosure *mv);
 void cRevalIO(StgClosure *job,StgPEId p);
 StgPEId cGetHostOwner(StgByteArray h);
 
-#endif // DIST
+#endif /* DIST */
 
-#endif // __DIST_H
+#endif /* __DIST_H */

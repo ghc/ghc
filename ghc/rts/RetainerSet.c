@@ -88,7 +88,7 @@ refreshAllRetainerSet(void)
     for (i = 0; i < HASH_TABLE_SIZE; i++)
 	hashTable[i] = NULL;
     nextId = 2;
-#endif // FIRST_APPROACH
+#endif /* FIRST_APPROACH */
 }
 
 /* -----------------------------------------------------------------------------
@@ -493,6 +493,6 @@ outputAllRetainerSet(FILE *prof_file)
 
     stgFree(rsArray);
 }
-#endif // SECOND_APPROACH
+#endif /* SECOND_APPROACH */
 
 #endif /* PROFILING */

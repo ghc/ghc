@@ -234,8 +234,8 @@ recordMutable(StgClosure *p)
 
 void revertCAFs( void );
 
-    // set to disable CAF garbage collection in GHCi.
-    // (needed when dynamic libraries are used).
+/* set to disable CAF garbage collection in GHCi. */
+/* (needed when dynamic libraries are used). */
 extern rtsBool keepCAFs;
 
 /* -----------------------------------------------------------------------------
@@ -400,4 +400,4 @@ extern StgClosure * RTS_VAR(caf_list);
 extern StgClosure * RTS_VAR(revertible_caf_list);
 extern StgTSO     * RTS_VAR(resurrected_threads);
 
-#endif // STORAGE_H
+#endif /* STORAGE_H */

@@ -1,5 +1,4 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.16 2004/08/13 13:09:38 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -94,8 +93,10 @@ typedef struct _StgEntCounter {
 	ALLOC_BH_gds += (g);	ALLOC_BH_slp += (s);	\
 	TICK_ALLOC_HISTO(BH,_HS,g,s)
 
-// admin size doesn't take into account the FUN, that is accounted for
-// in the "goods".
+/*
+ * admin size doesn't take into account the FUN, that is accounted for
+ * in the "goods".
+ */
 #define TICK_ALLOC_PAP(g,s)					\
 	ALLOC_PAP_ctr++;      ALLOC_PAP_adm += sizeofW(StgPAP)-1; \
 	ALLOC_PAP_gds += (g); ALLOC_PAP_slp += (s);	\
@@ -209,14 +210,18 @@ extern StgEntCounter *ticky_entry_ctrs;
    SLOW_CALL_hst[((__idx > 8) ? 8 : __idx)] -= 1;	\
  }
 
-// A slow call with n arguments.  In the unevald case, this call has
-// already been counted once, so don't count it again.
+/*
+ * A slow call with n arguments.  In the unevald case, this call has
+ * already been counted once, so don't count it again.
+ */
 #define TICK_SLOW_CALL(n) \
   SLOW_CALL_ctr++; \
   TICK_SLOW_HISTO(n)
 
-// This slow call was found to be to an unevaluated function; undo the
-// ticks we did in TICK_SLOW_CALL.
+/*
+ * This slow call was found to be to an unevaluated function; undo the
+ * ticks we did in TICK_SLOW_CALL.
+ */
 #define TICK_SLOW_CALL_UNEVALD(n) \
   SLOW_CALL_UNEVALD_ctr++; \
   SLOW_CALL_ctr--; \
@@ -227,11 +232,13 @@ extern StgEntCounter *ticky_entry_ctrs;
   MULTI_CHUNK_SLOW_CALL_ctr++; \
   MULTI_CHUNK_SLOW_CALL_CHUNKS_ctr += chunks;
 
-// A completely unknown tail-call
+/* A completely unknown tail-call */
 #define TICK_UNKNOWN_CALL()               UNKNOWN_CALL_ctr++
 
-// slow call patterns (includes "extra" args to known calls,
-// so the total of these will be greater than UNKNOWN_CALL_ctr).
+/*
+ * slow call patterns (includes "extra" args to known calls,
+ * so the total of these will be greater than UNKNOWN_CALL_ctr).
+ */
 #define TICK_SLOW_CALL_v()             SLOW_CALL_v_ctr++
 #define TICK_SLOW_CALL_f()             SLOW_CALL_f_ctr++
 #define TICK_SLOW_CALL_d()             SLOW_CALL_d_ctr++
@@ -254,7 +261,7 @@ extern StgEntCounter *ticky_entry_ctrs;
 #define TICK_KNOWN_CALL_TOO_FEW_ARGS()  KNOWN_CALL_TOO_FEW_ARGS_ctr++
 #define TICK_KNOWN_CALL_EXTRA_ARGS()    KNOWN_CALL_EXTRA_ARGS_ctr++
 
-// A slow call to a FUN found insufficient arguments, and built a PAP
+/* A slow call to a FUN found insufficient arguments, and built a PAP */
 #define TICK_SLOW_CALL_FUN_TOO_FEW()	    SLOW_CALL_FUN_TOO_FEW_ctr++
 #define TICK_SLOW_CALL_FUN_CORRECT()	    SLOW_CALL_FUN_CORRECT_ctr++
 #define TICK_SLOW_CALL_FUN_TOO_MANY()	    SLOW_CALL_FUN_TOO_MANY_ctr++
@@ -514,7 +521,7 @@ EXTERN unsigned long ALLOC_BF_hst[5]
    = {0,0,0,0,0}
 #endif
 ;
-#endif // PAR
+#endif /* PAR */
 
 EXTERN unsigned long ENT_VIA_NODE_ctr INIT(0);
 EXTERN unsigned long ENT_STATIC_THK_ctr INIT(0);

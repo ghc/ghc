@@ -86,4 +86,4 @@ StgBool slowIsHeapAlloced(void *p);
 # error HEAP_ALLOCED not defined
 #endif
 
-#endif // __MBLOCK_H__
+#endif /* __MBLOCK_H__ */

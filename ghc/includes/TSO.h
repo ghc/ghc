@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.41 2005/02/10 13:02:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -97,7 +96,7 @@ typedef struct {
 typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
-  StgInt fd;	// StgInt instead of int, so that it's the same size as the ptrs
+  StgInt fd;	/* StgInt instead of int, so that it's the same size as the ptrs */
 #if defined(mingw32_HOST_OS)
   StgAsyncIOResult* async_result;
 #endif
@@ -125,20 +124,20 @@ typedef union {
 typedef struct StgTSO_ {
   StgHeader          header;
 
-  struct StgTSO_*    link;	     // Links threads onto blocking queues */
-  struct StgTSO_*    global_link;    // Links all threads together */
+  struct StgTSO_*    link;	     /* Links threads onto blocking queues */
+  struct StgTSO_*    global_link;    /* Links all threads together */
   
-  StgWord16           what_next;  // Values defined in Constants.h
-  StgWord16           why_blocked;  // Values defined in Constants.h
+  StgWord16           what_next;  /* Values defined in Constants.h */
+  StgWord16           why_blocked;  /* Values defined in Constants.h */
   StgTSOBlockInfo    block_info;
   struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;
   int                saved_errno;
   struct StgMainThread_* main;
-  struct StgTRecHeader_ *trec;       // STM transaction record 
+  struct StgTRecHeader_ *trec;       /* STM transaction record */
   
 #ifdef TICKY_TICKY
-  // TICKY-specific stuff would go here.
+  /* TICKY-specific stuff would go here. */
 #endif
 #ifdef PROFILING
    StgTSOProfInfo prof;

@@ -72,8 +72,8 @@ typedef struct StgRegTable_ {
   StgUnion   	  rR6;
   StgUnion   	  rR7;
   StgUnion   	  rR8;
-  StgUnion   	  rR9;		// used occasionally by heap/stack checks
-  StgUnion   	  rR10;		// used occasionally by heap/stack checks
+  StgUnion   	  rR9;		/* used occasionally by heap/stack checks */
+  StgUnion   	  rR10;		/* used occasionally by heap/stack checks */
   StgFloat 	  rF1;
   StgFloat 	  rF2;
   StgFloat 	  rF3;
@@ -88,9 +88,9 @@ typedef struct StgRegTable_ {
   struct StgTSO_ *rCurrentTSO;
   struct bdescr_ *rNursery;
   struct bdescr_ *rCurrentNursery;
-  StgWord         rHpAlloc;	// number of *bytes* being allocated in heap 
+  StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
 #if defined(SMP) || defined(PAR)
-  StgSparkPool   rSparks;	// per-task spark pool
+  StgSparkPool   rSparks;	/* per-task spark pool */
 #endif
 } StgRegTable;
 

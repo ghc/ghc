@@ -15,4 +15,4 @@
 #define STG_SIG_HAN   (-4)
 #define STG_SIG_RST   (-5)
 
-#endif // SIGNALS_H
+#endif /* SIGNALS_H */

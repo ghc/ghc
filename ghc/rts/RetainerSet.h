@@ -197,5 +197,5 @@ void outputAllRetainerSet(FILE *);
 //       the best place to define it.
 void printRetainer(FILE *, retainer);
 
-#endif // PROFILING
-#endif // RETAINERSET_H
+#endif /* PROFILING */
+#endif /* RETAINERSET_H */

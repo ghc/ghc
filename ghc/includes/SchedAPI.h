@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.19 2003/11/12 17:27:03 sof Exp $
  *
  * (c) The GHC Team 1998-2002
  *
@@ -12,7 +11,7 @@
 #define SCHEDAPI_H
 
 #if defined(GRAN)
-// Dummy def for NO_PRI if not in GranSim
+/* Dummy def for NO_PRI if not in GranSim */
 #define NO_PRI  0
 #endif
 

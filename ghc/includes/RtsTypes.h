@@ -48,9 +48,9 @@ typedef ullong        rtsTime;
 typedef struct hashtable ParHashTable;
 typedef struct hashlist ParHashList;
 
-// typedef double REAL_TIME;
-// typedef W_ TIME;
-// typedef GlobalTaskId Proc;
+/* typedef double REAL_TIME; */
+/* typedef W_ TIME; */
+/* typedef GlobalTaskId Proc; */
 typedef int           GlobalTaskId;
 typedef GlobalTaskId  PEs;
 typedef unsigned int  rtsWeight;
@@ -79,8 +79,10 @@ typedef struct gala {
 
 #elif defined(GRAN)
 
-// GlobalTaskId is dummy in GranSim; 
-// we define it to have cleaner code in the RTS
+/*
+ * GlobalTaskId is dummy in GranSim;
+ * we define it to have cleaner code in the RTS
+ */
 typedef int       GlobalTaskId;
 typedef lnat      rtsTime;
 typedef StgWord   PEs;

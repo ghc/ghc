@@ -11,4 +11,4 @@
 
 extern StgThreadReturnCode interpretBCO (Capability* cap);
 
-#endif // INTERPRETER_H
+#endif /* INTERPRETER_H */

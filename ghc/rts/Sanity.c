@@ -418,7 +418,7 @@ checkClosure( StgClosure* p )
 #ifdef DIST
     case REMOTE_REF:
       return sizeofW(StgFetchMe); 
-#endif //DIST
+#endif /*DIST */
       
     case FETCH_ME:
       ASSERT(LOOKS_LIKE_GA(((StgFetchMe *)p)->ga));

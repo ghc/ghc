@@ -3088,7 +3088,7 @@ linear_scan:
 			   p, info_type((StgClosure *)p)));
 	    break;
 	}
-#endif // PAR
+#endif /* PAR */
 
 	case TVAR_WAIT_QUEUE:
 	  {
@@ -4255,4 +4255,4 @@ maybeLarge(StgClosure *closure)
 }
 
   
-#endif // DEBUG
+#endif /* DEBUG */

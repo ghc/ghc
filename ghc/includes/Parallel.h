@@ -1,7 +1,4 @@
 /*
-  Time-stamp: <Tue Mar 06 2001 00:09:10 Stardate: [-30]6285.03 hwloidl>
-  $Id: Parallel.h,v 1.4 2001/03/22 03:51:09 hwloidl Exp $
- 
   Definitions for GUM i.e. running on a parallel machine.
 
   This section contains definitions applicable only to programs compiled
@@ -14,17 +11,19 @@
 
 #if defined(PAR) || defined(GRAN)        /* whole file */
 
-//@node Parallel definitions, End of File
-//@section Parallel definitions
-
-//@menu
-//* Basic definitions::		
-//* GUM::			
-//* GranSim::			
-//@end menu
-
-//@node Basic definitions, GUM, Parallel definitions, Parallel definitions
-//@subsection Basic definitions
+/*
+ * @node Parallel definitions, End of File
+ * @section Parallel definitions
+ *
+ * @menu
+ * * Basic definitions::		
+ * * GUM::			
+ * * GranSim::			
+ * @end menu
+ *
+ * @node Basic definitions, GUM, Parallel definitions, Parallel definitions
+ * @subsection Basic definitions
+ */
 
 /* This clashes with TICKY, but currently TICKY and PAR hate each other anyway */
 #define _HS  sizeofW(StgHeader)
@@ -63,14 +62,15 @@
 # define ADVISORY_POOL 	1   /* idx of pool of advisory sparks (parallelism) */
 #endif
 
-//@menu
-//* GUM::			
-//* GranSim::			
-//@end menu
-//*/
-
-//@node GUM, GranSim, Basic definitions, Parallel definitions
-//@subsection GUM
+/*
+ * @menu
+ * * GUM::			
+ * * GranSim::			
+ * @end menu
+ *
+ * @node GUM, GranSim, Basic definitions, Parallel definitions
+ * @subsection GUM
+ */
 
 #if defined(PAR) 
 /*
@@ -80,16 +80,17 @@
   packet in the parallel (GUM) system.
 */
 
-//@menu
-//* Types::			
-//* Externs::			
-//* Prototypes::		
-//* Macros::			
-//@end menu
-//*/
-
-//@node Types, Externs, GUM, GUM
-//@subsubsection Types
+/*
+ * @menu
+ * * Types::			
+ * * Externs::			
+ * * Prototypes::		
+ * * Macros::			
+ * @end menu
+ *
+ * @node Types, Externs, GUM, GUM
+ * @subsubsection Types
+ */
 
 /* Sparks and spark queues */
 typedef StgClosure  *rtsSpark;
@@ -105,17 +106,19 @@ typedef struct rtsPackBuffer_ {
 
 #define PACK_BUFFER_HDR_SIZE 4
 
-//@node Externs, Prototypes, Types, GUM
-//@subsubsection Externs
+/*
+ * @node Externs, Prototypes, Types, GUM
+ * @subsubsection Externs
+ */
 
-// extern rtsBool do_sp_profile;
+/* extern rtsBool do_sp_profile; */
 
 extern globalAddr theGlobalFromGA, theGlobalToGA;
 extern StgBlockedFetch *PendingFetches;
 extern GlobalTaskId    *allPEs;
 
 extern rtsBool      IAmMainThread, GlobalStopPending;
-//extern rtsBool      fishing;
+/*extern rtsBool      fishing; */
 extern rtsTime      last_fish_arrived_at;
 extern nat          outstandingFishes;
 extern GlobalTaskId SysManTask;
@@ -155,8 +158,10 @@ extern GALA *liveIndirections;
 extern GALA *liveRemoteGAs;
 */
 
-//@node Prototypes, Macros, Externs, GUM
-//@subsubsection Prototypes
+/*
+ * @node Prototypes, Macros, Externs, GUM
+ * @subsubsection Prototypes
+ */
 
 /* From ParInit.c */
 void          initParallelSystem(void);
@@ -167,7 +172,7 @@ PEs           taskIDtoPE (GlobalTaskId gtid);
 void          registerTask (GlobalTaskId gtid);
 globalAddr   *LAGAlookup (StgClosure *addr);
 StgClosure   *GALAlookup (globalAddr *ga);
-//static GALA  *allocIndirection (StgPtr addr);
+/*static GALA  *allocIndirection (StgPtr addr); */
 globalAddr   *makeGlobal (StgClosure *addr, rtsBool preferred);
 globalAddr   *setRemoteGA (StgClosure *addr, globalAddr *ga, rtsBool preferred);
 void          splitWeight (globalAddr *to, globalAddr *from);
@@ -183,15 +188,17 @@ StgWord       PackGA (StgWord pe, int slot);
 StgInt highest_slot (void); 
 # endif
 
-//@node Macros,  , Prototypes, GUM
-//@subsubsection Macros
+/*
+ * @node Macros,  , Prototypes, GUM
+ * @subsubsection Macros
+ */
 
 /* delay (in us) between dying fish returning and sending out a new fish */
 #define FISH_DELAY                   1000
 /* max no. of outstanding spark steals */
 #define MAX_FISHES                   1  
 
-// ToDo: check which of these is actually needed!
+/* ToDo: check which of these is actually needed! */
 
 #    define PACK_HEAP_REQUIRED  ((RtsFlags.ParFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _HS) * (MIN_UPD_SIZE + 2))
 
@@ -267,21 +274,24 @@ rtsBool looks_like_ga(globalAddr *ga);
 
 #endif /* PAR */
 
-//@node GranSim,  , GUM, Parallel definitions
-//@subsection GranSim
+/*
+ * @node GranSim,  , GUM, Parallel definitions
+ * @subsection GranSim
+ */
 
 #if defined(GRAN)
 /* ToDo: Check which of the PAR routines are needed in GranSim -- HWL */
 
-//@menu
-//* Types::			
-//* Prototypes::		
-//* Macros::			
-//@end menu
-//*/
-
-//@node Types, Prototypes, GranSim, GranSim
-//@subsubsection Types
+/*
+ * @menu
+ * * Types::			
+ * * Prototypes::		
+ * * Macros::			
+ * @end menu
+ *
+ * @node Types, Prototypes, GranSim, GranSim
+ * @subsubsection Types
+ */
 
 typedef StgWord *StgBuffer;
 typedef struct rtsPackBuffer_ {
@@ -292,8 +302,10 @@ typedef struct rtsPackBuffer_ {
   StgWord      *buffer;  
 } rtsPackBuffer;
 
-//@node Macros,  , Prototypes, GranSim
-//@subsubsection Macros
+/*
+ * @node Macros,  , Prototypes, GranSim
+ * @subsubsection Macros
+ */
 
 /* max no. of outstanding spark steals */
 #define MAX_FISHES                   1  
@@ -336,8 +348,10 @@ typedef struct rtsPackBuffer_ {
 
 #endif   /* GRAN */
 
-//@node End of File,  , Parallel definitions
-//@section End of File
+/*
+ * @node End of File,  , Parallel definitions
+ * @section End of File
+ */
 
 #endif /* defined(PAR) || defined(GRAN)         whole file */
 

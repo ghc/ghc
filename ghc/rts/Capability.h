@@ -111,6 +111,6 @@ static inline rtsBool allFreeCapabilities (void)
 //
 extern void grabCapability( Capability **pCap );
 
-#endif // !RTS_SUPPORTS_THREADS
+#endif /* !RTS_SUPPORTS_THREADS */
 
 #endif /* __CAPABILITY_H__ */

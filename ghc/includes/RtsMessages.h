@@ -73,4 +73,4 @@ extern RtsMsgFunction rtsFatalInternalErrorFn;
 extern RtsMsgFunction rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
 
-#endif // RTSMESSAGES_H
+#endif /* RTSMESSAGES_H */

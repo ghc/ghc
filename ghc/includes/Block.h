@@ -1,5 +1,4 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.18 2005/02/10 13:02:00 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -143,7 +142,7 @@ INLINE_HEADER bdescr *Bdescr(StgPtr p)
 
 
 #ifndef CMINUSMINUS 
-// to the end...
+/* to the end... */
 
 /* Double-linked block lists: --------------------------------------------- */
 

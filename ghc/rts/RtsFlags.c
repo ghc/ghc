@@ -428,7 +428,7 @@ usage_text[] = {
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
 "",
-#endif // DEBUG
+#endif /* DEBUG */
 #if defined(SMP)
 "  -N<n>     Use <n> OS threads (default: 1)",
 #endif
@@ -973,7 +973,7 @@ error = rtsTrue;
 		    error = rtsTrue;
 		}
 		) 
-#endif // PROFILING
+#endif /* PROFILING */
     	    	break;
 
 #if defined(PROFILING) 

@@ -1,7 +1,4 @@
 /*
-  Time-stamp: <Fri Mar 24 2000 23:55:42 Stardate: [-30]4554.98 hwloidl>
-  $Id: GranSim.h,v 1.4 2004/11/10 04:17:50 wolfgang Exp $
-  
   Headers for GranSim specific objects.
   
   Note that in GranSim we have one run-queue and blocking-queue for each
@@ -31,21 +28,23 @@
 
 extern StgTSO *CurrentTSO;
 
-//@node Headers for GranSim specific objects, , ,
-//@section Headers for GranSim specific objects
-
-//@menu
-//* Externs and prototypes::	
-//* Run and blocking queues::	
-//* Spark queues::		
-//* Processor related stuff::	
-//* GranSim costs::		
-//* STG called GranSim functions::  
-//* STG-called routines::	
-//@end menu
-
-//@node Externs and prototypes, Run and blocking queues, Includes, Headers for GranSim specific objects
-//@subsection Externs and prototypes
+/*
+ * @node Headers for GranSim specific objects, , ,
+ * @section Headers for GranSim specific objects
+ *
+ * @menu
+ * * Externs and prototypes::	
+ * * Run and blocking queues::	
+ * * Spark queues::		
+ * * Processor related stuff::	
+ * * GranSim costs::		
+ * * STG called GranSim functions::  
+ * * STG-called routines::	
+ * @end menu
+ *
+ * @node Externs and prototypes, Run and blocking queues, Includes, Headers for GranSim specific objects
+ * @subsection Externs and prototypes
+ */
 
 /* Global constants */
 extern char *gran_event_names[];
@@ -64,8 +63,10 @@ extern nat SparksAvail;     /* How many sparks are available */
 extern nat SurplusThreads;  /* How many excess threads are there */
 extern nat sparksIgnored, sparksCreated;
 
-//@node Run and blocking queues, Spark queues, Externs and prototypes, Headers for GranSim specific objects
-//@subsection Run and blocking queues
+/*
+ * @node Run and blocking queues, Spark queues, Externs and prototypes, Headers for GranSim specific objects
+ * @subsection Run and blocking queues
+ */
 
 /* declared in Schedule.c */
 extern StgTSO *run_queue_hds[], *run_queue_tls[];
@@ -80,8 +81,10 @@ extern StgTSO *ccalling_threadss[];
 #define pending_sparks_tl    pending_sparks_tls[CurrentProc]
 #define ccalling_threads     ccalling_threadss[CurrentProc]
 
-//@node Spark queues, Processor related stuff, Run and blocking queues, Headers for GranSim specific objects
-//@subsection Spark queues
+/*
+ * @node Spark queues, Processor related stuff, Run and blocking queues, Headers for GranSim specific objects
+ * @subsection Spark queues
+ */
 
 /*
   In GranSim we use a double linked list to represent spark queues.
@@ -113,22 +116,26 @@ extern rtsSparkQ pending_sparks_tls[];
 rtsSpark    *newSpark(StgClosure *node, 
 		      nat name, nat gran_info, nat size_info, 
 		      nat par_info, nat local);
-// void         add_to_spark_queue(rtsSpark *spark);
+/* void         add_to_spark_queue(rtsSpark *spark); */
 
-//@node Processor related stuff, GranSim costs, Spark queues, Headers for GranSim specific objects
-//@subsection Processor related stuff
+/*
+ * @node Processor related stuff, GranSim costs, Spark queues, Headers for GranSim specific objects
+ * @subsection Processor related stuff
+ */
 
 extern PEs CurrentProc;
 extern rtsTime CurrentTime[];  
 
 /* Maximum number of PEs that can be simulated */
-#define MAX_PROC             32 /* (BITS_IN(StgWord))  */ // ToDo: fix this!!
-//#if MAX_PROC==16 
-//#else 
-//#error MAX_PROC should be 32 on this architecture 
-//#endif 
+#define MAX_PROC             32 /* (BITS_IN(StgWord))  */ /* ToDo: fix this!! */
+/*
+#if MAX_PROC==16 
+#else 
+#error MAX_PROC should be 32 on this architecture 
+#endif
+*/
 
-// #define CurrentTSO           CurrentTSOs[CurrentProc]
+/* #define CurrentTSO           CurrentTSOs[CurrentProc] */
 
 /* Processor numbers to bitmasks and vice-versa */
 #define MainProc	     0           /* Id of main processor */
@@ -148,8 +155,10 @@ extern rtsTime CurrentTime[];
 
 #define GRAN_TIME_SLICE       1000        /* max time between 2 ReSchedules */
 
-//@node GranSim costs, STG called GranSim functions, Processor related stuff, Headers for GranSim specific objects
-//@subsection GranSim costs
+/*
+ * @node GranSim costs, STG called GranSim functions, Processor related stuff, Headers for GranSim specific objects
+ * @subsection GranSim costs
+ */
 
 /* Default constants for communication (see RtsFlags on how to change them) */
 
@@ -194,8 +203,10 @@ extern rtsTime CurrentTime[];
 #define PRI_SPARK_OVERHEAD    5
 #define PRI_SCHED_OVERHEAD    5
 
-//@node STG called GranSim functions, STG-called routines, GranSim costs, Headers for GranSim specific objects
-//@subsection STG called GranSim functions
+/*
+ * @node STG called GranSim functions, STG-called routines, GranSim costs, Headers for GranSim specific objects
+ * @subsection STG called GranSim functions
+ */
 
 /* STG called GranSim functions */
 void GranSimAllocate(StgInt n);
@@ -208,8 +219,10 @@ void GranSimSparkAtAbs(rtsSpark *spark, PEs proc, StgInt identifier);
 void GranSimBlock(StgTSO *tso, PEs proc, StgClosure *node);
 
 
-//@node STG-called routines,  , STG called GranSim functions, Headers for GranSim specific objects
-//@subsection STG-called routines
+/*
+ * @node STG-called routines,  , STG called GranSim functions, Headers for GranSim specific objects
+ * @subsection STG-called routines
+ */
 
 /* Wrapped version of calls to GranSim-specific STG routines */
 
@@ -224,13 +237,13 @@ void GranSimBlock(StgTSO *tso, PEs proc, StgClosure *node);
 /* 
    ToDo: Clean up this mess of GRAN macros!!! -- HWL
 */
-// DO_GRAN_FETCH((StgClosure*)R1.p);
+/* DO_GRAN_FETCH((StgClosure*)R1.p); */
 #define GRAN_FETCH()		/* nothing */
 
 #define GRAN_FETCH_AND_RESCHEDULE(liveness,reenter)	\
           DO_GRAN_FETCH((StgClosure*)R1.p); 			        \
           DO_GRAN_YIELD(liveness,ENTRY_CODE((D_)(*R1.p))); 
-// RESTORE_EVERYTHING is done implicitly before entering threaded world agian
+/* RESTORE_EVERYTHING is done implicitly before entering threaded world again */
 
 /*
   This is the only macro currently enabled;
@@ -262,11 +275,11 @@ void GranSimBlock(StgTSO *tso, PEs proc, StgClosure *node);
 	  }
 
 
-//                                                   YIELD(liveness,reenter)
+/*                                                   YIELD(liveness,reenter) */
 
-// GRAN_YIELD(liveness_mask); 
+/* GRAN_YIELD(liveness_mask); */
 
-// GRAN_FETCH_AND_RESCHEDULE(liveness_mask,reenter)
+/* GRAN_FETCH_AND_RESCHEDULE(liveness_mask,reenter) */
 
 #define THREAD_CONTEXT_SWITCH(liveness_mask,reenter)	\
         do { \

@@ -21,8 +21,8 @@
 typedef struct {
   CostCentreStack *ccs;
   union {
-    struct _RetainerSet *rs;  // Retainer Set
-    StgWord ldvw;             // Lag/Drag/Void Word
+    struct _RetainerSet *rs;  /* Retainer Set */
+    StgWord ldvw;             /* Lag/Drag/Void Word */
   } hp;
 } StgProfHeader;
 
@@ -79,14 +79,14 @@ typedef struct {
     StgClosure *payload[FLEXIBLE_ARRAY];
 } StgPAP;
 
-// AP closures have the same layout, for convenience
+/* AP closures have the same layout, for convenience */
 typedef StgPAP StgAP;
 
 typedef struct {
     StgHeader   header;
-    StgWord     size;                    // number of words in payload
+    StgWord     size;                    /* number of words in payload */
     StgClosure *fun;
-    StgClosure *payload[FLEXIBLE_ARRAY]; // contains a chunk of *stack*
+    StgClosure *payload[FLEXIBLE_ARRAY]; /* contains a chunk of *stack* */
 } StgAP_STACK;
 
 typedef struct {
@@ -194,13 +194,13 @@ typedef struct _StgDeadWeak {	/* Weak v */
 
 typedef struct {
     StgHeader      header;
-    StgArrWords   *instrs;	// a pointer to an ArrWords
-    StgArrWords   *literals;	// a pointer to an ArrWords
-    StgMutArrPtrs *ptrs;	// a pointer to a  MutArrPtrs
-    StgArrWords   *itbls;	// a pointer to an ArrWords
-    StgHalfWord   arity;        // arity of this BCO
-    StgHalfWord   size;         // size of this BCO (in words)
-    StgWord       bitmap[FLEXIBLE_ARRAY];  // an StgLargeBitmap
+    StgArrWords   *instrs;	/* a pointer to an ArrWords */
+    StgArrWords   *literals;	/* a pointer to an ArrWords */
+    StgMutArrPtrs *ptrs;	/* a pointer to a  MutArrPtrs */
+    StgArrWords   *itbls;	/* a pointer to an ArrWords */
+    StgHalfWord   arity;        /* arity of this BCO */
+    StgHalfWord   size;         /* size of this BCO (in words) */
+    StgWord       bitmap[FLEXIBLE_ARRAY];  /* an StgLargeBitmap */
 } StgBCO;
 
 #define BCO_BITMAP(bco)      ((StgLargeBitmap *)((StgBCO *)(bco))->bitmap)
@@ -317,8 +317,8 @@ typedef struct {
   StgTVarWaitQueue          *first_wait_queue_entry;
 } StgTVar;
 
-// new_value == expected_value for read-only accesses
-// new_value is a StgTVarWaitQueue entry when trec in state TREC_WAITING
+/* new_value == expected_value for read-only accesses */
+/* new_value is a StgTVarWaitQueue entry when trec in state TREC_WAITING */
 typedef struct {
   StgTVar                   *tvar;
   StgClosure                *expected_value;
@@ -335,12 +335,12 @@ typedef struct StgTRecChunk_ {
 } StgTRecChunk;
 
 typedef enum { 
-  TREC_ACTIVE,        // Transaction in progress, outcome undecided
-  TREC_CANNOT_COMMIT, // Transaction in progress, inconsistent writes performed
-  TREC_MUST_ABORT,    // Transaction in progress, inconsistent / out of date reads
-  TREC_COMMITTED,     // Transaction has committed, now updating tvars
-  TREC_ABORTED,       // Transaction has aborted, now reverting tvars
-  TREC_WAITING,       // Transaction currently waiting
+  TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
+  TREC_CANNOT_COMMIT, /* Transaction in progress, inconsistent writes performed */
+  TREC_MUST_ABORT,    /* Transaction in progress, inconsistent / out of date reads */
+  TREC_COMMITTED,     /* Transaction has committed, now updating tvars */
+  TREC_ABORTED,       /* Transaction has aborted, now reverting tvars */
+  TREC_WAITING,       /* Transaction currently waiting */
 } TRecState;
 
 typedef struct StgTRecHeader_ {

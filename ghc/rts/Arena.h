@@ -22,4 +22,4 @@ extern void    arenaFree  ( Arena * );
 // For internal use only:
 extern unsigned long arenaBlocks( void );
 
-#endif // ARENA_H
+#endif /* ARENA_H */

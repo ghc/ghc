@@ -2335,6 +2335,6 @@ belongToHeap(StgPtr p)
 	}
     }
 }
-#endif // DEBUG_RETAINER
+#endif /* DEBUG_RETAINER */
 
 #endif /* PROFILING */

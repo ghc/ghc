@@ -58,9 +58,11 @@
 #ifndef CMM_H
 #define CMM_H
 
-// In files that are included into both C and C-- (and perhaps
-// Haskell) sources, we sometimes need to conditionally compile bits
-// depending on the language.  CMINUSMINUS==1 in .cmm sources:
+/*
+ * In files that are included into both C and C-- (and perhaps
+ * Haskell) sources, we sometimes need to conditionally compile bits
+ * depending on the language.  CMINUSMINUS==1 in .cmm sources:
+ */
 #define CMINUSMINUS 1
 
 #include "ghcconfig.h"
@@ -146,15 +148,17 @@
 #define W_SHIFT 4
 #endif
 
-// Converting quantities of words to bytes
+/* Converting quantities of words to bytes */
 #define WDS(n) ((n)*SIZEOF_W)
 
-// Converting quantities of bytes to words
-// NB. these work on *unsigned* values only
+/*
+ * Converting quantities of bytes to words
+ * NB. these work on *unsigned* values only
+ */
 #define BYTES_TO_WDS(n) ((n) / SIZEOF_W)
 #define ROUNDUP_BYTES_TO_WDS(n) (((n) + SIZEOF_W - 1) / SIZEOF_W)
 
-// TO_W_(n) converts n to W_ type from a smaller type
+/* TO_W_(n) converts n to W_ type from a smaller type */
 #if SIZEOF_W == 4
 #define TO_W_(x) %sx32(x)
 #define HALF_W_(x) %lobits16(x)
@@ -200,15 +204,15 @@
 #define DEBUG_ONLY(s) /* nothing */
 #endif
 
-//
-// The IF_DEBUG macro is useful for debug messages that depend on one
-// of the RTS debug options.  For example:
-// 
-//   IF_DEBUG(RtsFlags_DebugFlags_apply,
-//      foreign "C" fprintf(stderr, stg_ap_0_ret_str));
-//
-// Note the syntax is slightly different to the C version of this macro.
-//
+/*
+ * The IF_DEBUG macro is useful for debug messages that depend on one
+ * of the RTS debug options.  For example:
+ * 
+ *   IF_DEBUG(RtsFlags_DebugFlags_apply,
+ *      foreign "C" fprintf(stderr, stg_ap_0_ret_str));
+ *
+ * Note the syntax is slightly different to the C version of this macro.
+ */
 #ifdef DEBUG
 #define IF_DEBUG(c,s)  if (RtsFlags_DebugFlags_##c(RtsFlags)) { s; }
 #else
@@ -268,10 +272,10 @@
 #include "ClosureTypes.h"
 #include "StgFun.h"
 
-//
-// Need MachRegs, because some of the RTS code is conditionally
-// compiled based on REG_R1, REG_R2, etc.
-//
+/*
+ * Need MachRegs, because some of the RTS code is conditionally
+ * compiled based on REG_R1, REG_R2, etc.
+ */
 #define STOLEN_X86_REGS 4
 #include "MachRegs.h"
 
@@ -280,10 +284,10 @@
 
 #undef BLOCK_SIZE
 #undef MBLOCK_SIZE
-#include "Block.h"  // For Bdescr()
+#include "Block.h"  /* For Bdescr() */
 
 
-// Can't think of a better place to put this.
+/* Can't think of a better place to put this. */
 #if SIZEOF_mp_limb_t != SIZEOF_VOID_P
 #error mp_limb_t != StgWord: assumptions in PrimOps.cmm are now false
 #endif
@@ -292,20 +296,21 @@
    Allocation and garbage collection
    ------------------------------------------------------------------------- */
 
-// ALLOC_PRIM is for allocating memory on the heap for a primitive
-// object.  It is used all over PrimOps.cmm.
-//
-// We make the simplifying assumption that the "admin" part of a
-// primitive closure is just the header when calculating sizes for
-// ticky-ticky.  It's not clear whether eg. the size field of an array
-// should be counted as "admin", or the various fields of a BCO.
-//
+/*
+ * ALLOC_PRIM is for allocating memory on the heap for a primitive
+ * object.  It is used all over PrimOps.cmm.
+ *
+ * We make the simplifying assumption that the "admin" part of a
+ * primitive closure is just the header when calculating sizes for
+ * ticky-ticky.  It's not clear whether eg. the size field of an array
+ * should be counted as "admin", or the various fields of a BCO.
+ */
 #define ALLOC_PRIM(bytes,liveness,reentry)			\
    HP_CHK_GEN_TICKY(bytes,liveness,reentry);			\
    TICK_ALLOC_PRIM(SIZEOF_StgHeader,bytes-SIZEOF_StgHeader,0);	\
    CCCS_ALLOC(bytes);
 
-// CCS_ALLOC wants the size in words, because ccs->mem_alloc is in words
+/* CCS_ALLOC wants the size in words, because ccs->mem_alloc is in words */
 #define CCCS_ALLOC(__alloc) CCS_ALLOC(BYTES_TO_WDS(__alloc), W_[CCCS])
 
 #define HP_CHK_GEN_TICKY(alloc,liveness,reentry)	\
@@ -323,22 +328,22 @@
    Closures
    -------------------------------------------------------------------------- */
 
-// The offset of the payload of an array
+/* The offset of the payload of an array */
 #define BYTE_ARR_CTS(arr)  ((arr) + SIZEOF_StgArrWords)
 
-// Getting/setting the info pointer of a closure
+/* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info
 #define GET_INFO(p) StgHeader_info(p)
 
-// Determine the size of an ordinary closure from its info table
+/* Determine the size of an ordinary closure from its info table */
 #define sizeW_fromITBL(itbl) \
   SIZEOF_StgHeader + WDS(%INFO_PTRS(itbl)) + WDS(%INFO_NPTRS(itbl))
 
-// NB. duplicated from InfoTables.h!
+/* NB. duplicated from InfoTables.h! */
 #define BITMAP_SIZE(bitmap) ((bitmap) & BITMAP_SIZE_MASK)
 #define BITMAP_BITS(bitmap) ((bitmap) >> BITMAP_BITS_SHIFT)
 
-// Debugging macros
+/* Debugging macros */
 #define LOOKS_LIKE_INFO_PTR(p)				\
    ((p) != NULL && 					\
      (TO_W_(%INFO_TYPE(%STD_INFO(p))) != INVALID_OBJECT) &&	\
@@ -346,14 +351,16 @@
 
 #define LOOKS_LIKE_CLOSURE_PTR(p) (LOOKS_LIKE_INFO_PTR(GET_INFO(p)))
 
-//
-// The layout of the StgFunInfoExtra part of an info table changes
-// depending on TABLES_NEXT_TO_CODE.  So we define field access
-// macros which use the appropriate version here:
-//
+/*
+ * The layout of the StgFunInfoExtra part of an info table changes
+ * depending on TABLES_NEXT_TO_CODE.  So we define field access
+ * macros which use the appropriate version here:
+ */
 #ifdef TABLES_NEXT_TO_CODE
-        // when TABLES_NEXT_TO_CODE, slow_apply is stored as an offset
-        // instead of the normal pointer.
+/*
+ * when TABLES_NEXT_TO_CODE, slow_apply is stored as an offset
+ * instead of the normal pointer.
+ */
         
 #define StgFunInfoExtra_slow_apply(fun_info)    \
         (StgFunInfoExtraRev_slow_apply_offset(fun_info)    \
@@ -447,25 +454,29 @@
 
 #define TICK_HISTO(histo,n) TICK_HISTO_BY(histo,n,1)
 
-// An unboxed tuple with n components.
+/* An unboxed tuple with n components. */
 #define TICK_RET_UNBOXED_TUP(n)			\
   TICK_BUMP(RET_UNBOXED_TUP_ctr++);		\
   TICK_HISTO(RET_UNBOXED_TUP,n)
 
-// A slow call with n arguments.  In the unevald case, this call has
-// already been counted once, so don't count it again.
+/*
+ * A slow call with n arguments.  In the unevald case, this call has
+ * already been counted once, so don't count it again.
+ */
 #define TICK_SLOW_CALL(n)			\
   TICK_BUMP(SLOW_CALL_ctr);			\
   TICK_HISTO(SLOW_CALL,n)
 
-// This slow call was found to be to an unevaluated function; undo the
-// ticks we did in TICK_SLOW_CALL.
+/*
+ * This slow call was found to be to an unevaluated function; undo the
+ * ticks we did in TICK_SLOW_CALL.
+ */
 #define TICK_SLOW_CALL_UNEVALD(n)		\
   TICK_BUMP(SLOW_CALL_UNEVALD_ctr);		\
   TICK_BUMP_BY(SLOW_CALL_ctr,-1);		\
   TICK_HISTO_BY(SLOW_CALL,n,-1);
 
-// Updating a closure with a new CON
+/* Updating a closure with a new CON */
 #define TICK_UPD_CON_IN_NEW(n)			\
   TICK_BUMP(UPD_CON_IN_NEW_ctr);		\
   TICK_HISTO(UPD_CON_IN_NEW,n)
@@ -474,4 +485,4 @@
     TICK_BUMP(ALLOC_HEAP_ctr);			\
     TICK_BUMP_BY(ALLOC_HEAP_tot,n)
 
-#endif // CMM_H
+#endif /* CMM_H */

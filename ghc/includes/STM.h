@@ -84,29 +84,35 @@ extern void stmPreGCHook(void);
 
 */
 
-// Create and enter a new transaction context
+/* Create and enter a new transaction context */
 
 extern StgTRecHeader *stmStartTransaction(StgTRecHeader *outer);
 
-// Exit the current transaction context, abandoning any read/write
-// operations performed within it and removing the thread from any
-// tvar wait queues if it was waitin.  Note that if nested transactions
-// are not fully supported then this may leave the enclosing
-// transaction contexts doomed to abort.
+/*
+ * Exit the current transaction context, abandoning any read/write
+ * operations performed within it and removing the thread from any
+ * tvar wait queues if it was waitin.  Note that if nested transactions
+ * are not fully supported then this may leave the enclosing
+ * transaction contexts doomed to abort.
+ */
 
 extern void stmAbortTransaction(StgTRecHeader *trec);
 
-// Ensure that a subsequent commit / validation will fail.  We use this 
-// in our current handling of transactions that may have become invalid
-// and started looping.  We strip their stack back to the ATOMICALLY_FRAME,
-// and, when the thread is next scheduled, discover it to be invalid and
-// re-execute it.  However, we need to force the transaction to stay invalid
-// in case other threads' updates make it valid in the mean time.
+/*
+ * Ensure that a subsequent commit / validation will fail.  We use this 
+ * in our current handling of transactions that may have become invalid
+ * and started looping.  We strip their stack back to the ATOMICALLY_FRAME,
+ * and, when the thread is next scheduled, discover it to be invalid and
+ * re-execute it.  However, we need to force the transaction to stay invalid
+ * in case other threads' updates make it valid in the mean time.
+ */
 
 extern void stmCondemnTransaction(StgTRecHeader *trec);
 
-// Return the trec within which the specified trec was created (not
-// valid if trec==NO_TREC).
+/*
+ * Return the trec within which the specified trec was created (not
+ * valid if trec==NO_TREC).
+ */
 
 extern StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
 
@@ -145,40 +151,50 @@ extern StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
    is actually still valid.
 */
 
-// Test whether the current transaction context is valid, i.e. whether
-// it is still possible for it to commit successfully.  Note: we assume that
-// once stmValidateTransaction has returned FALSE for a given transaction then
-// that transaction will never again be valid -- we rely on this in Schedule.c when
-// kicking invalid threads at GC (in case they are stuck looping)
+/*
+ * Test whether the current transaction context is valid, i.e. whether
+ * it is still possible for it to commit successfully.  Note: we assume that
+ * once stmValidateTransaction has returned FALSE for a given transaction then
+ * that transaction will never again be valid -- we rely on this in Schedule.c when
+ * kicking invalid threads at GC (in case they are stuck looping)
+ */
 
 extern StgBool stmValidateTransaction(StgTRecHeader *trec);
 
-// Test whether the current transaction context is valid and, if so,
-// commit its memory accesses to the heap.  stmCommitTransaction must
-// unblock any threads which are waiting on tvars that updates have
-// been committed to.
+/*
+ * Test whether the current transaction context is valid and, if so,
+ * commit its memory accesses to the heap.  stmCommitTransaction must
+ * unblock any threads which are waiting on tvars that updates have
+ * been committed to.
+ */
 
 extern StgBool stmCommitTransaction(StgTRecHeader *trec);
 
-// Test whether the current transaction context is valid and, if so,
-// start the thread waiting for updates to any of the tvars it has
-// ready from and mark it as blocked.  It is an error to call stmWait
-// if the thread is already waiting.
+/*
+ * Test whether the current transaction context is valid and, if so,
+ * start the thread waiting for updates to any of the tvars it has
+ * ready from and mark it as blocked.  It is an error to call stmWait
+ * if the thread is already waiting.
+ */
 
 extern StgBool stmWait(StgTSO *tso, StgTRecHeader *trec);
 
-// Test whether the current transaction context is valid and, if so,
-// leave the thread waiting and mark it as blocked again.  If the
-// transaction context is no longer valid then stop the thread waiting
-// and leave it as unblocked.  It is an error to call stmReWait if the
-// thread is not waiting.
+/*
+ * Test whether the current transaction context is valid and, if so,
+ * leave the thread waiting and mark it as blocked again.  If the
+ * transaction context is no longer valid then stop the thread waiting
+ * and leave it as unblocked.  It is an error to call stmReWait if the
+ * thread is not waiting.
+ */
 
 extern StgBool stmReWait(StgTSO *tso);
 
-// Merge the accesses made so far in the second trec into the first trec.
-// Note that the resulting trec is only intended to be used in wait operations.
-// This avoids defining what happens if "trec" and "other" contain conflicting
-// updates.
+/*
+ * Merge the accesses made so far in the second trec into the first trec.
+ * Note that the resulting trec is only intended to be used in wait operations.
+ * This avoids defining what happens if "trec" and "other" contain conflicting
+ * updates.
+ */
 
 extern StgBool stmMergeForWaiting(StgTRecHeader *trec, StgTRecHeader *other);
 
@@ -189,14 +205,17 @@ extern StgBool stmMergeForWaiting(StgTRecHeader *trec, StgTRecHeader *other);
    ----------------------
 */
 
-// Return the logical contents of 'tvar' within the context of the
-// thread's current transaction.
+/*
+ * Return the logical contents of 'tvar' within the context of the
+ * thread's current transaction.
+ */
 
 extern StgClosure *stmReadTVar(StgTRecHeader *trec, 
 			       StgTVar *tvar);
 
-// Update the logical contents of 'tvar' within the context of the
-// thread's current transaction.
+/* Update the logical contents of 'tvar' within the context of the
+ * thread's current transaction.
+ */
 
 extern void stmWriteTVar(StgTRecHeader *trec,
 			 StgTVar *tvar, 
@@ -204,7 +223,7 @@ extern void stmWriteTVar(StgTRecHeader *trec,
 
 /*----------------------------------------------------------------------*/
 
-// NULLs
+/* NULLs */
 
 #define END_STM_WAIT_QUEUE ((StgTVarWaitQueue *)(void *)&stg_END_STM_WAIT_QUEUE_closure)
 #define END_STM_CHUNK_LIST ((StgTRecChunk *)(void *)&stg_END_STM_CHUNK_LIST_closure)
