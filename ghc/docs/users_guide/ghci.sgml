@@ -1,7 +1,865 @@
 <chapter id="ghci">
   <title>Using GHCi</title>
+  <indexterm><primary>GHCi</primary></indexterm>
+  <indexterm><primary>interpreter</primary></indexterm>
   
-  <para>ToDo</para>
+  <para>GHCi<footnote>
+      <para>The &lsquo;i&rsquo; stands for &ldquo;Interactive&rdquo;</para>
+    </footnote>
+  is GHC's interactive environment, in which Haskell expressions can
+  be interactively evaluated and programs can be interpreted.  If
+  you're famililar with Hugs<indexterm><primary>Hugs</primary>
+  </indexterm>, then you'll be right at home with GHCi.  However, GHCi
+  also has support for interactively loading compiled code, as well as
+  supporting all<footnote><para>except the FFI, at the moment</para>
+  </footnote>the language extensions that GHC provides.</para>
+
+  <sect1>
+    <title>Introduction to GHCi</title>
+
+    <para>Let's start with an example GHCi session.  You can fire up
+    GHCi with the command <literal>ghci</literal>:</para>
+
+<screen>
+$ ghci
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> 
+</screen>
+
+    <para>There may be a short pause while GHCi loads the prelude and
+    standard libraries, after which the prompt is shown.  If we follow
+    the instructions and type <literal>:?</literal> for help, we
+    get:</para>
+
+<screen>
+ Commands available from the prompt:
+   &lt;stmt&gt;              evaluate/run &lt;stmt&gt;
+   :cd &lt;dir&gt;           change directory to &lt;dir&gt;
+   :def &lt;cmd&gt; &lt;expr&gt;   define a macro :&lt;cmd&gt;
+   :help, :?           display this list of commands
+   :load &lt;filename&gt;    load a module (and it dependents)
+   :module &lt;mod&gt;       set the context for expression evaluation to &lt;mod&gt;
+   :reload             reload the current module set
+   :set &lt;option&gt; ...   set options
+   :type &lt;expr&gt;        show the type of &lt;expr&gt;
+   :unset &lt;option&gt; ... unset options
+   :quit               exit GHCi
+   :!&lt;command&gt;         run the shell command &lt;command&gt;
+ Options for `:set' and `:unset':
+    +r                 revert top-level expressions after each evaluation
+    +s                 print timing/memory stats after each evaluation
+    +t                 print type after evaluation
+    -&lt;flag&gt;            most GHC command line flags can also be set here
+                         (eg. -v2, -fglasgow-exts, etc.)
+</screen>
+
+    <para>We'll explain most of these commands as we go along.  For
+    Hugs users: many things work the same as in Hugs, so you should be
+    able to get going straight away.</para>
+
+    <para>Haskell expressions can be typed at the prompt:</para>
+    <indexterm><primary>prompt</primary><secondary>GHCi</secondary>
+  </indexterm>
+
+<screen>
+Prelude> 1+2
+3
+PrePrelude> let x = 42 in x / 9
+4.666666666666667
+Prelude> 
+</screen>
+
+    <para>GHCi interprets the whole line as an expression to evaluate.
+    The expression may not span several lines - as soon as you press
+    enter, GHCi will attempt to evaluate it.</para>
+  </sect1>
+
+  <sect1>
+    <title>Loading source files</title>
+
+    <para>Suppose we have the following Haskell source code, which we
+    place in a file <filename>Main.hs</filename> in the current
+    directory:</para>
+
+<programlisting>
+main = print (fac 20)
+
+fac 0 = 1
+fac n = n * fac (n-1)
+</programlisting>
+
+    <para>To load a Haskell source file into GHCi, use the
+    <literal>:load</literal> command:</para>
+
+<screen>
+Prelude> :load Main
+Compiling Main             ( Main.hs, interpreted )
+Ok, modules loaded: Main.
+Main>
+</screen>
+
+    <para>GHCi has loaded the <literal>Main</literal> module, and the
+    prompt has changed to &ldquo;<literal>Main></literal>&rdquo; to
+    indicate that the current context for expressions typed at the
+    prompt is the <literal>Main</literal> module we just
+    loaded.  So we can now type expressions involving the functions
+    from <filename>Main.hs</filename>:</para>
+
+<screen>
+Main> fac 17
+355687428096000
+</screen>
+
+    <para>Loading a multi-module program is just as straightforward;
+    just give the name of the &ldquo;topmost&rdquo; module to the
+    <literal>:load</literal> command (hint: <literal>:load</literal>
+    can be abbreviated to <literal>:l</literal>).  The topmost module
+    will normally be <literal>Main</literal>, but it doesn't have to
+    be.  GHCi will discover which modules are required, directly or
+    indirectly, by the topmost module, and load them all in dependency
+    order.</para>
+
+    <sect2>
+      <title>Modules vs. filenames</title>
+      
+      <para>Question: How does GHC find the filename which contains
+      module <replaceable>M</replaceable>?  Answer: it looks for the
+      file <literal><replaceable>M</replaceable>.hs</literal>, or
+      <literal><replaceable>M</replaceable>.lhs</literal>.  This means
+      that for most modules, the module name must match the filename.
+      If it doesn't, GHCi won't be able to find it.</para>
+
+      <para>There is one exception to this general rule: when you load
+      a program with <literal>:load</literal>, or specify it when you
+      invoke <literal>ghci</literal>, you can give a filename rather
+      than a module name.  This filename is loaded if it exists, and
+      it may contain any module you like.  This is particularly
+      convenient if you have several <literal>Main</literal> modules
+      in the same directory and you can't call them all
+      <filename>Main.hs</filename>.</para>
+
+      <para>One final note: if you load a module called Main, it must
+      contain a <literal>main</literal> function, just like in
+      GHC.</para>
+    </sect2>
+
+    <sect2>
+      <title>Making changes and recompilation</title>
+
+      <para>If you make some changes to the source code and want GHCi
+      to recompile the program, give the <literal>:reload</literal>
+      command.  The program will be recompiled as necessary, with GHCi
+      doing its best to avoid actually recompiling modules if their
+      external dependencies haven't changed.  This is the same
+      mechanism we use to avoid re-compiling modules in the batch
+      compilation setting (see <xref linkend="recomp">).</para>
+    </sect2>
+  </sect1>
+
+  <sect1 id="ghci-compiled">
+    <title>Loading compiled code</title>
+
+    <para>When you load a Haskell source module into GHCi, it is
+    normally converted to byte-code and run using the interpreter.
+    However, interpreted code can also run alongside compiled code in
+    GHCi; indeed, normally when GHCi starts, it loads up a compiled
+    copy of package <literal>std</literal>, which contains the Prelude
+    and standard libraries.</para>
+
+    <para>Why should we want to run compiled code?  Well, compiled
+    code is roughly 10x faster than interpreted code, but takes about
+    2x longer to produce (perhaps longer if optimisation is on).  So
+    it pays to compile the parts of a program that aren't changing
+    very often, and use the interpreter for the code being actively
+    developed.</para>
+
+    <para>When loading up source files with <literal>:load</literal>,
+    GHCi looks for any corresponding compiled object files, and will
+    use one in preference to interpreting the source if possible.  For
+    example, suppose we have a 4-module program consisting of modules
+    A, B, C, and D.  Modules B and C both import D only,
+    and A imports both B & C:</para>
+<screen>
+      A
+     / \
+    B   C
+     \ /
+      D
+</screen>
+    <para>We can compile D, then load the whole program, like this:</para>
+<screen>
+Prelude> :! ghc -c D.hs
+Prelude> :load A
+Skipping  D                ( D.hs, D.o )
+Compiling C                ( C.hs, interpreted )
+Compiling B                ( B.hs, interpreted )
+Compiling A                ( A.hs, interpreted )
+Ok, modules loaded: A, B, C, D.
+Main>
+</screen>
+
+    <para>In the messages from the compiler, we see that it skipped D,
+    and used the object file <filename>D.o</filename>.  The message
+    <literal>Skipping</literal> <replaceable>module</replaceable>
+    indicates that compilation for <replaceable>module</replaceable>
+    isn't necessary, because the source and everything it depends on
+    is unchanged since the last compilation.</para>
+
+    <para>If we now modify the source of D (or pretend to: using Unix
+    command <literal>touch</literal> on the source file is handy for
+    this), the compiler will no longer be able to use the object file,
+    because it might be out of date:</para>
+
+<screen>
+Main> :! touch D.hs
+Main> :reload
+Compiling D                ( D.hs, interpreted )
+Skipping  C                ( C.hs, interpreted )
+Skipping  B                ( B.hs, interpreted )
+Skipping  A                ( A.hs, interpreted )
+Ok, modules loaded: A, B, C, D.
+Main> 
+</screen>
+
+    <para>Note that module D was compiled, but in this instance
+    because its source hadn't really changed, its interface remained
+    the same, and the recompilation checker determined that A, B and C
+    didn't need to be recompiled.</para>
+
+    <para>So let's try compiling one of the other modules:</para>
+
+<screen>
+Main> :! ghc -c C.hs
+Main> :load A
+Compiling D                ( D.hs, interpreted )
+Compiling C                ( C.hs, interpreted )
+Compiling B                ( B.hs, interpreted )
+Compiling A                ( A.hs, interpreted )
+Ok, modules loaded: A, B, C, D.
+</screen>
+
+    <para>We didn't get the compiled version of C!  What happened?
+    Well, in GHCi a compiled module may only depend on other compiled
+    modules, and in this case C depends on D, which doesn't have an
+    object file, so GHCi also rejected C's object file.  Ok, so let's
+    also compile D:</para>
+
+<screen>
+Main> :! ghc -c D.hs
+Main> :reload
+Ok, modules loaded: A, B, C, D.
+</screen>
+
+    <para>Nothing happened!  Here's another lesson: newly compiled
+    modules aren't picked up by <literal>:reload</literal>, only
+    <literal>:load</literal>:</para>
+
+<screen>
+Main> :load A
+Skipping  D                ( D.hs, D.o )
+Skipping  C                ( C.hs, C.o )
+Compiling B                ( B.hs, interpreted )
+Compiling A                ( A.hs, interpreted )
+Ok, modules loaded: A, B, C, D.
+</screen>
+
+    <para>HINT: since GHCi will only use a compiled object file if it
+    can sure that the compiled version is up-to-date, a good technique
+    when working on a large program is to occasionally run
+    <literal>ghc --make</literal> to compile the whole project (say
+    before you go for lunch :-), then continue working in the
+    interpreter.  As you modify code, the new modules will be
+    interpreted, but the rest of the project will remain
+    compiled.</para>
+
+  </sect1>
+
+  <sect1>
+    <title>Interactive evaluation at the prompt</title>
+
+    <para>When you type an expression at the prompt, GHCi immediately
+    evaluates and prints the result.  But that's not the whole story:
+    if you type something of type <literal>IO a</literal> for some
+    <literal>a</literal>, then GHCi <emphasis>executes</emphasis> it
+    as an IO-computation, and doesn't attempt to print the
+    result:.</para>
+
+<screen>
+Prelude> "hello"
+"hello"
+Prelude> putStrLn "hello"
+hello
+</screen>
+
+    <para>What actually happens is that GHCi typechecks the
+    expression, and if it doesn't have an <literal>IO</literal> type,
+    then it transforms it as follows: an expression
+    <replaceable>e</replaceable> turns into <literal>let it =
+    <replaceable>e</replaceable> in print it</literal>.  It then runs
+    the new expression as an IO-action.</para>
+
+    <para>Hence the original expression must have a type which is an
+    instance of the <literal>Show</literal> class, or GHCi will
+    complain:</para>
+
+<screen>
+Prelude> id
+No instance for `Show (a -> a)'
+arising from use of `print'
+in a `do' expression pattern binding: print it
+</screen>
+
+    <para>The error message contains some clues as to the
+    transformation happening internally.</para>
+
+    <sect2 id="ghci-scope">
+      <title>What's really in scope at the prompt?</title> 
+
+       <para>When you type an expression at the prompt, what
+       identifiers and types are in scope?  GHCi has a concept of a
+       <firstterm>context</firstterm> module, which can be set using
+       the <literal>:module</literal> command.</para>
+
+      <para>The context module is shown in the prompt: for example,
+      the prompt <literal>Prelude></literal> indicates that the
+      current context for evaluating expressions is the Haskell
+      <literal>Prelude</literal> module.  This is the default context
+      when you start up GHCi.</para>
+      <indexterm><primary><literal>Prelude</literal></primary></indexterm>
+
+      <para>Exactly which entities are in scope in a given context
+      depends on whether the context module is compiled or
+      interpreted:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>If the context module is interpreted, then everything
+  	  that was in scope during compilation of that module is also
+  	  in scope at the prompt, i.e. all the imports and any
+  	  top-level functions, types and classes defined in that
+  	  module.</para>
+	</listitem>
+
+	<listitem>
+	  <para>If the context module comes from a package, or is
+ 	  otherwise compiled, then only the exports of that module are
+ 	  in scope at the prompt.  So for example, when the current
+ 	  context module is <literal>Prelude</literal>, everything the
+ 	  <literal>Prelude</literal> exports is in scope, but if we
+ 	  switch context to eg. <literal>Time</literal>, then
+ 	  everything from the <literal>Prelude</literal> is now
+ 	  invisible.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>The reason for this unfortunate distinction is boring: for
+      a compiled module when the source isn't available, the compiler
+      has no way of knowing what was in scope when the module was
+      compiled (and we don't store this information in the interface
+      file).  However, in practice it shouldn't be a problem: if you
+      want both <literal>Time</literal> and <literal>Prelude</literal>
+      in scope at the same time, just create a file containing the
+      line <literal>import Time</literal> and load it into
+      GHCi.</para>
+
+      <para>To make life slightly easier, the GHCi prompt also behaves
+      as if there is an implicit <literal>import qualified</literal>
+      declaration for every module in every package, and every module
+      currently loaded into GHCi.  So in the above example where the
+      <literal>Prelude</literal> was invisible, we can always get at
+      <literal>Prelude</literal> identifiers by qualifying them, eg.
+      <literal>Prelude.map</literal>.</para>
+    </sect2>
+  
+    <sect2>
+      <title>Using <literal>do-</literal>notation at the prompt</title>
+      
+      <para>GHCi actually accepts <firstterm>statements</firstterm>
+      rather than just expressions at the prompt.  This means you can
+      bind values and functions to names, and use them in future
+      expressions or statements.</para>
+
+      <para>The syntax of a statement accepted at the GHCi prompt is
+      exactly the same as the syntax of a statement in a Haskell
+      <literal>do</literal> expression.  However, there's no monad
+      overloading here: statements typed at the prompt must be in the
+      <literal>IO</literal> monad.</para>
+
+      <para>Here's an example:</para>
+<screen>
+Prelude> x <- return 42
+Prelude> print x
+42
+Prelude>
+</screen>
+      <para>The statement <literal>x <- return 42</literal> means
+      &ldquo;execute <literal>return 42</literal> in the
+      <literal>IO</literal> monad, and bind the result to
+      <literal>x</literal>&rdquo;.  We can then use
+      <literal>x</literal> in future statements, for example to print
+      it as we did above.</para>
+
+      <para>Of course, you can also bind normal non-IO expressions
+      using the <literal>let</literal>-statement:</para>
+<screen>
+Prelude> let x = 42
+Prelude> print x
+42
+Prelude>
+</screen>
+      <para>An important difference between the two types of binding
+      is that the monadic bind (<literal>p <- e</literal>) is
+      <emphasis>strict</emphasis> (it evaluates <literal>e</literal>),
+      whereas with the <literal>let</literal> form, the expression
+      isn't evaluated immediately:</para>
+<screen>
+Prelude> let x = error "help!"
+Prelude> print x
+*** Exception: help!
+Prelude>
+</screen>
+      <para>Any exceptions raised during the evaluation or execution
+      of the statement are caught and printed by the GHCi command line
+      interface (see <xref linkend="sec-Exception"> for more
+      information on GHC's Exception support).</para>
+
+      <para>Every new binding shadows any existing bindings of the
+      same name, including entities that are in scope in the current
+      module context.</para>
+
+      <para>WARNING: temporary bindings introduced at the prompt only
+      last until the next <literal>:load</literal> or
+      <literal>:reload</literal> command, at which time they will be
+      simply lost.  However, they do survive a change of context with
+      <literal>:module</literal>: the temporary bindings just move to
+      the new location.</para>
+
+      <para>HINT: if you turn on the <literal>+t</literal> option,
+      GHCi will show the type of each variable bound by a statement.
+      For example:</para>
+<screen>
+Prelude> :set +t
+Prelude> let (x:xs) = [1..]
+x :: Integer
+xs :: [Integer]
+</screen>
+
+    </sect2>
+
+    <sect2>
+      <title>The <literal>it</literal> variable</title>
+      <indexterm><primary><literal>it</literal></primary>
+      </indexterm>
+      
+      <para>Whenever an expression (or a non-binding statement, to be
+      precise) is typed at the prompt, GHCi implicitly binds its value
+      to the variable <literal>it</literal>.  For example:</para>
+<screen>
+Prelude> 1+2
+3
+Prelude> it * 2
+6
+</screen>
+
+      <para>If the expression was of type <literal>IO a</literal> for
+      some <literal>a</literal>, then <literal>it</literal> will be
+      bound to the result of the <literal>IO</literal> computation,
+      which is of type <literal>a</literal>.  eg.:</para>
+<screen>
+Prelude> Time.getClockTime
+Prelude> print it
+Wed Mar 14 12:23:13 GMT 2001
+</screen>
+
+      <para>Note that <literal>it</literal> is shadowed by the new
+      value each time you evaluate a new expression, and the old value
+      of <literal>it</literal> is lost.</para>
+
+    </sect2>
+  </sect1>
+
+  <sect1>
+    <title>Invoking GHCi</title>
+
+    <para>GHCi is invoked with the command <literal>ghci</literal> or
+    <literal>ghc --interactive</literal>.  A module or filename can
+    also be specified on the command line; this instructs GHCi to load
+    the that module or filename (and all the modules it depends on),
+    just as if you had said 
+    <literal>:load <replaceable>module</replaceable></literal> at the GHCi prompt
+    (see <xref linkend="ghci-commands">).  For example, to start GHCi
+    and load the program whose topmost module is in the file
+    <literal>Main.hs</literal>, we could say:</para>
+
+<screen>
+$ ghci Main.hs
+</screen>
+
+    <para>Note: only <emphasis>one</emphasis> module name or filename
+    may be given on the command line.</para>
+
+    <para>Most of the command-line options accepted by GHC (see <xref
+    linkend="using-ghc">) also make sense in interactive mode.  The ones
+    that don't make sense are mostly obvious; for example, GHCi
+    doesn't generate interface files, so options related to interface
+    file generation won't have any effect.</para>
+
+    <sect2>
+      <title>Packages</title>
+
+      <para>GHCi can make use of all the packages that come with GHC,
+      but note: packages <emphasis>must</emphasis> be specified on the
+      GHCi command line, you can't add extra packages after GHCi has
+      started up.  For example, to start up GHCi with the
+      <literal>text</literal> package loaded:</para>
+
+<screen>
+$ ghci -package text
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Loading package lang ... linking ... done.
+Loading package text ... linking ... done.
+Prelude> 
+</screen>      
+
+      <para>Note that GHCi also loaded the <literal>lang</literal>
+      package even though we didn't ask for it: that's because the
+      <literal>text</literal> package makes use of one or more of the
+      modules in <literal>lang</literal>, and therefore has a
+      dependency on it.</para>
+    </sect2>
+
+    <sect2>
+      <title>Extra libraries</title>
+      
+      <para>Extra libraries may be specified on the command line using
+      the normal <literal>-l<replaceable>lib</replaceable></literal>
+      option.  For example, to load the &ldquo;m&rdquo; library:</para>
+
+<screen>
+$ ghci -lm
+</screen>
+
+      <para>On systems with <literal>.so</literal>-style shared
+      libraries, the actual library loaded will the
+      <filename>lib<replaceable>lib</replaceable>.so</filename>.  If
+      no such library exists on the standard library search path,
+      including paths given using
+      <literal>-L<replaceable>path</replaceable></literal>, then
+      <literal>ghci</literal> will signal an error.</para>
+
+      <para>On systems with <literal>.dll</literal>-style shared
+      libraries, the actual library loaded will be
+      <filename><replaceable>lib</replaceable>.dll</filename>.  Again,
+      GHCi will signal an error if it can't find the library.</para>
+    </sect2>
+
+  </sect1>
+
+  <sect1 id="ghci-commands">
+    <title>GHCi commands</title>
+
+    <para>GHCi commands all begin with
+    &lsquo;<literal>:</literal>&rsquo; and consist of a single command
+    name followed by zero or more parameters.  The command name may be
+    abbreviated, as long as the abbreviation is not ambiguous.  All of
+    the builtin commands, with the exception of
+    <literal>:unset</literal> and <literal>:undef</literal>, may be
+    abbreviated to a single letter.</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><literal>:cd</literal> <replaceable>dir</replaceable></term>
+	<listitem>
+	  <para>Changes the current working directory to
+	  <replaceable>dir</replaceable>.  A
+	  &lsquo;<literal>&tilde;</literal>&rsquo; symbol at the
+	  beginning of <replaceable>dir</replaceable> will be replaced
+	  by the contents of the environment variable
+	  <literal>HOME</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:def</literal></term>
+	<listitem>
+	  <para>ToDo.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:help</literal></term>
+	<term><literal>:?</literal></term>
+	<listitem>
+	  <para>Displays a list of the available commands.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:load</literal> <replaceable>module</replaceable></term>
+	<listitem>
+	  <para>Recursively loads <replaceable>module</replaceable>
+	  (which may be a module name or filename), and all the
+	  modules it depends on.  All previously loaded modules are
+	  forgotten.  The module <replaceable>module</replaceable> is
+	  known as the <firstterm>target</firstterm>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:module</literal> <replaceable>module</replaceable></term>
+	<listitem>
+	  <para>Sets the current context for statements typed at the
+	  prompt to <replaceable>module</replaceable>, which must be a
+	  module name which is already loaded or in a package.  See
+	  <xref linkend="ghci-scope"> for more information on what
+	  effect the context has on what entities are in scope at the
+	  prompt.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:quit</literal> <replaceable>module</replaceable></term>
+	<listitem>
+	  <para>Quits GHCi.  You can also quit by typing a control-D
+	  at the prompt.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:reload</literal></term>
+	<listitem>
+	  <para>Attempts to reload the current target (see
+	  <literal>:load</literal>) if it, or any module it depends
+	  on, has changed.  Note that this may entail loading new
+	  modules, or even dropping modules which are no longer
+	  indirectly required by the target.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:set</literal> <optional><replaceable>option</replaceable>...</optional></term>
+	<listitem>
+	  <para>Sets various options.  See <xref linkend="ghci-set">
+	  for a list of available options.  The
+	  <literal>:set</literal> command by itself shows which
+	  options are currently set.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:type</literal> <replaceable>expression</replaceable></term>
+	<listitem>
+	  <para>Infers and prints the type of
+	  <replaceable>expression</replaceable>, including explicit
+	  forall quantifiers for polymorphic types.  The monomorphism
+	  restriction is <emphasis>not</emphasis> applied to the
+	  expression during type inference.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:unset</literal> <replaceable>option</replaceable>...</term>
+	<listitem>
+	  <para>Unsets certain options.  See <xref linkend="ghci-set">
+	  for a list of available options.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:!</literal> <replaceable>command</replaceable>...</term>
+	<listitem>
+	  <para>Executes the shell command
+	  <replaceable>command</replaceable>.</para>
+	</listitem>
+      </varlistentry>
+
+    </variablelist>
+  </sect1>
+
+  <sect1 id="ghci-set">
+    <title>The <literal>:set</literal> command</title>
+
+    <para>The <literal>:set</literal> command sets two types of
+    options: GHCi options, which begin with
+    &lsquo;<literal>+</literal>&rdquo; and &ldquo;command-line&rdquo;
+    options, which begin with &lsquo;-&rsquo;.  Either type of option
+    may be set using <literal>:set</literal> and unset using
+    <literal>:unset</literal>.</para>
+
+    <para>The available GHCi options are:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><literal>+r</literal></term>
+	<listitem>
+	  <para>Normally, any evaluation of top-level expressions
+	  (otherwise known as CAFs or Constant Applicative Forms) in
+	  loaded modules is retained between evaluations.  Turning on
+	  <literal>+r</literal> causes all evaluation of top-level
+	  expressions to be discarded after each evaluation (they are
+	  still retained <emphasis>during</emphasis> a single
+	  evaluation).</para>
+	  
+	  <para>This option may help if the evaluated top-level
+	  expressions are consuming large amounts of space, or if you
+	  need repeatable performance measurements.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>+s</literal></term>
+	<listitem>
+	  <para>Display some stats after evaluating each expression,
+	  including the elapsed time and number of bytes allocated.
+	  NOTE: the allocation figure is only accurate to the size of
+	  the storage manager's allocation area, because it is
+	  calculated at every GC.  Hence, you might see values of zero
+	  if no GC has occurred.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>+t</literal></term>
+	<listitem>
+	  <para>Display the type of each variable bound after a
+	  statement is entered at the prompt.  If the statement is a
+	  single expression, then the only variable binding will be
+	  for the variable &lsquo;<literal>it</literal>&rsquo;.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>In addition, any normal GHC command-line option that is
+    designated as <firstterm>dynamic</firstterm> (see the table in
+    <xref linkend="flag-reference">), may be set using
+    <literal>:set</literal>.  Certain static options
+    (<option>-I</option>, <option>-i</option>, and <option>-l</option>
+    in particular) will also work, but may not take effect until the
+    next reload.</para>
+  </sect1>
+
+  <sect1>
+    <title>The <filename>.ghci</filename> file</title> 
+    <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
+    </indexterm>
+    <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
+    </indexterm>
+
+    <para>When it starts, GHCi always reads and executes commands from
+    <filename>$HOME/.ghci</filename>, followed by
+    <filename>./.ghci</filename>.</para>
+
+    <para>The <filename>.ghci</filename> in your home directory is
+    most useful for turning on favourite options (eg. <literal>:set
+    +s</literal>), and defining useful macros.  Placing a
+    <filename>.ghci</filename> file in a directory with a Haskell
+    project is a useful way to set certain project-wide options so you
+    don't have to type them everytime you start GHCi: eg. if your
+    project uses GHC extensions and CPP, and has source files in three
+    subdirectories A B and C, you might put the following lines in
+    <filename>.ghci</filename>:</para>
+
+<screen>
+:set -fglasgow-exts -cpp
+:set -iA:B:C
+</screen>
+
+    <para>(Note that strictly speaking the <option>-i</option> flag is
+    a static one, but in fact it works to set it using
+    <literal>:set</literal> like this.  The changes won't take effect
+    until the next <literal>:load</literal>, though.)</para>
+  </sect1>
+
+  <sect1>
+    <title>FAQ and Things To Watch Out For</title>
+    
+    <variablelist>
+      <varlistentry>
+	<term><literal>System.exit</literal> causes GHCi to exit!</term>
+	<listitem>
+	  <para>Yes, it does.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>System.getArgs</literal> returns GHCi's command
+	line arguments!</term>
+	<listitem>
+	  <para>Yes, it does.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>The interpreter can't load modules with FFI
+	declarations!</term>
+	<listitem>
+	  <para>Unfortunately not.  We haven't implemented it yet.
+	  Please compile any offending modules by hand before loading
+	  them into GHCi.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Hugs has a <literal>:add</literal> command for adding
+	modules without throwing away any that are already loaded.
+	Why doesn't this work in GHCi?</term>
+	<listitem>
+	  <para>We haven't implemented it yet.  Sorry about that.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>-O</literal> doesn't work with GHCi!</term>
+	<indexterm><primary><option>-O</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>For technical reasons, the bytecode compiler doesn't
+	  interact well with one of the optimisation passes, so we
+	  have disabled optimisation when using the interpreter.  This
+	  isn't a great loss: you'll get a much bigger win by
+	  compiling the bits of your code that need to go fast, rather
+	  than interpreting them with optimisation turned on.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Unboxed tuples don't work with GHCi</term>
+	<listitem>
+	  <para>That's right.  You can always compile a module that
+	  uses unboxed tuples and load it into GHCi, however.
+	  (Incidentally the previous point, namely that
+	  <literal>-O</literal> is incompatible with GHCi, is because
+	  the bytecode compiler can't deal with unboxed
+	  tuples).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Concurrent threads don't carry on running when GHCi is
+        waiting for input.</term>
+	<listitem>
+	  <para>No, they don't.  This is because the Haskell binding
+	  to the GNU readline library doesn't support reading from the
+	  terminal in a non-blocking way, which is required to work
+	  properly with GHC's concurrency model.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+  </sect1>
+
 </chapter>
 
 <!-- Emacs stuff:
