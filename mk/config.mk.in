@@ -297,6 +297,17 @@ GhcRtsCcOpts=-O2 -fomit-frame-pointer
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO
 
+#
+# To have the RTS support interoperation with OS threads, set
+# GhcRtsThreaded to YES (preferably via the --enable-threaded-rts
+# configure script option). The consequence of this is spelled out
+# in details elsewhere, but, briefly, Concurrent Haskell threads
+# can now make external (i.e., C) calls without blocking the progress
+# of other CH threads. Multiple native threads can also execute
+# Haskell code without getting in each others way too.
+# 
+GhcRtsThreaded=@ThreadedRts@
+
 ################################################################################
 #
 #		hslibs project

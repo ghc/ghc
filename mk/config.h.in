@@ -351,27 +351,6 @@
 /* The number of bytes in a void *.  */
 #undef SIZEOF_VOID_P
 
-/* Define if you have the PBHSetVolSync function.  */
-#undef HAVE_PBHSETVOLSYNC
-
-/* Define if you have the _fullpath function.  */
-#undef HAVE__FULLPATH
-
-/* Define if you have the _pclose function.  */
-#undef HAVE__PCLOSE
-
-/* Define if you have the _popen function.  */
-#undef HAVE__POPEN
-
-/* Define if you have the _snprintf function.  */
-#undef HAVE__SNPRINTF
-
-/* Define if you have the _stricmp function.  */
-#undef HAVE__STRICMP
-
-/* Define if you have the _vsnprintf function.  */
-#undef HAVE__VSNPRINTF
-
 /* Define if you have the access function.  */
 #undef HAVE_ACCESS
 
@@ -395,6 +374,9 @@
 
 /* Define if you have the ftime function.  */
 #undef HAVE_FTIME
+
+/* Define if you have the _fullpath function.  */
+#undef HAVE__FULLPATH
 
 /* Define if you have the getclock function.  */
 #undef HAVE_GETCLOCK
@@ -426,11 +408,20 @@
 /* Define if you have the mprotect function.  */
 #undef HAVE_MPROTECT
 
+/* Define if you have the PBHSetVolSync function.  */
+#undef HAVE_PBHSETVOLSYNC
+
 /* Define if you have the pclose function.  */
 #undef HAVE_PCLOSE
 
+/* Define if you have the _pclose function.  */
+#undef HAVE__PCLOSE
+
 /* Define if you have the popen function.  */
 #undef HAVE_POPEN
+
+/* Define if you have the _popen function.  */
+#undef HAVE__POPEN
 
 /* Define if you have the readdir_r function.  */
 #undef HAVE_READDIR_R
@@ -447,6 +438,9 @@
 /* Define if you have the snprintf function.  */
 #undef HAVE_SNPRINTF
 
+/* Define if you have the _snprintf function.  */
+#undef HAVE__SNPRINTF
+
 /* Define if you have the stat function.  */
 #undef HAVE_STAT
 
@@ -461,6 +455,9 @@
 
 /* Define if you have the stricmp function.  */
 #undef HAVE_STRICMP
+
+/* Define if you have the _stricmp function.  */
+#undef HAVE__STRICMP
 
 /* Define if you have the symlink function.  */
 #undef HAVE_SYMLINK
@@ -486,11 +483,8 @@
 /* Define if you have the vsnprintf function.  */
 #undef HAVE_VSNPRINTF
 
-/* Define if you have the <Files.h> header file.  */
-#undef HAVE_FILES_H
-
-/* Define if you have the <GL/gl.h> header file.  */
-#undef HAVE_GL_GL_H
+/* Define if you have the _vsnprintf function.  */
+#undef HAVE__VSNPRINTF
 
 /* Define if you have the <arpa/inet.h> header file.  */
 #undef HAVE_ARPA_INET_H
@@ -513,11 +507,11 @@
 /* Define if you have the <dirent.h> header file.  */
 #undef HAVE_DIRENT_H
 
-/* Define if you have the <dl.h> header file.  */
-#undef HAVE_DL_H
-
 /* Define if you have the <dlfcn.h> header file.  */
 #undef HAVE_DLFCN_H
+
+/* Define if you have the <dl.h> header file.  */
+#undef HAVE_DL_H
 
 /* Define if you have the <dos.h> header file.  */
 #undef HAVE_DOS_H
@@ -528,11 +522,17 @@
 /* Define if you have the <fcntl.h> header file.  */
 #undef HAVE_FCNTL_H
 
+/* Define if you have the <Files.h> header file.  */
+#undef HAVE_FILES_H
+
 /* Define if you have the <float.h> header file.  */
 #undef HAVE_FLOAT_H
 
 /* Define if you have the <ftw.h> header file.  */
 #undef HAVE_FTW_H
+
+/* Define if you have the <GL/gl.h> header file.  */
+#undef HAVE_GL_GL_H
 
 /* Define if you have the <grp.h> header file.  */
 #undef HAVE_GRP_H
@@ -570,6 +570,9 @@
 /* Define if you have the <pascal.h> header file.  */
 #undef HAVE_PASCAL_H
 
+/* Define if you have the <pthread.h> header file.  */
+#undef HAVE_PTHREAD_H
+
 /* Define if you have the <pwd.h> header file.  */
 #undef HAVE_PWD_H
 
@@ -585,14 +588,14 @@
 /* Define if you have the <stat.h> header file.  */
 #undef HAVE_STAT_H
 
-/* Define if you have the <std.h> header file.  */
-#undef HAVE_STD_H
-
 /* Define if you have the <stdarg.h> header file.  */
 #undef HAVE_STDARG_H
 
 /* Define if you have the <stddef.h> header file.  */
 #undef HAVE_STDDEF_H
+
+/* Define if you have the <std.h> header file.  */
+#undef HAVE_STD_H
 
 /* Define if you have the <stdint.h> header file.  */
 #undef HAVE_STDINT_H
@@ -639,11 +642,11 @@
 /* Define if you have the <sys/syscall.h> header file.  */
 #undef HAVE_SYS_SYSCALL_H
 
-/* Define if you have the <sys/time.h> header file.  */
-#undef HAVE_SYS_TIME_H
-
 /* Define if you have the <sys/timeb.h> header file.  */
 #undef HAVE_SYS_TIMEB_H
+
+/* Define if you have the <sys/time.h> header file.  */
+#undef HAVE_SYS_TIME_H
 
 /* Define if you have the <sys/timers.h> header file.  */
 #undef HAVE_SYS_TIMERS_H
