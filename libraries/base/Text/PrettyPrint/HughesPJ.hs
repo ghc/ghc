@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Text.PrettyPrint.HughesPJ
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: HughesPJ.hs,v 1.1 2001/08/17 12:46:16 simonmar Exp $
+-- $Id: HughesPJ.hs,v 1.2 2002/04/24 16:31:47 simonmar Exp $
 --
 -- John Hughes's and Simon Peyton Jones's Pretty Printer Combinators
 -- 

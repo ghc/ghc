@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Exception
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Exception.hs,v 1.6 2002/02/05 17:32:25 simonmar Exp $
+-- $Id: Exception.hs,v 1.7 2002/04/24 16:31:37 simonmar Exp $
 --
 -- The External API for exceptions.  The functions provided in this
 -- module allow catching of exceptions in the IO monad.

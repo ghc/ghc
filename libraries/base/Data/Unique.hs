@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Unique
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Unique.hs,v 1.1 2001/07/04 10:48:39 simonmar Exp $
+-- $Id: Unique.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
 --
 -- An infinite supply of unique objects, supporting ordering and equality.
 --

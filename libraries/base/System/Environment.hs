@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Environment
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Environment.hs,v 1.5 2002/04/24 16:09:22 simonmar Exp $
+-- $Id: Environment.hs,v 1.6 2002/04/24 16:31:45 simonmar Exp $
 --
 -- Miscellaneous information about the system environment.
 --

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Random
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Random.hs,v 1.3 2002/04/11 12:03:44 simonpj Exp $
+-- $Id: Random.hs,v 1.4 2002/04/24 16:31:45 simonmar Exp $
 --
 -- Random numbers.
 --

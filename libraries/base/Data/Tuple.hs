@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Tuple
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Tuple.hs,v 1.2 2001/12/21 15:07:22 simonmar Exp $
+-- $Id: Tuple.hs,v 1.3 2002/04/24 16:31:42 simonmar Exp $
 --
 -- The tuple data types, and associated functions.
 --

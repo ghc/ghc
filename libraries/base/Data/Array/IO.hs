@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "HsBase.h" #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Array.IO
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IO.hs,v 1.6 2002/03/26 17:11:15 simonmar Exp $
+-- $Id: IO.hs,v 1.7 2002/04/24 16:31:43 simonmar Exp $
 --
 -- Mutable boxed/unboxed arrays in the IO monad.
 --

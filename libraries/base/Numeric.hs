@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Numeric
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Numeric.hs,v 1.6 2002/04/11 12:03:43 simonpj Exp $
+-- $Id: Numeric.hs,v 1.7 2002/04/24 16:31:37 simonmar Exp $
 --
 -- Odds and ends, mostly functions for reading and showing
 -- RealFloat-like kind of values.

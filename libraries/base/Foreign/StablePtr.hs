@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign.StablePtr
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: StablePtr.hs,v 1.3 2002/03/14 12:09:50 simonmar Exp $
+-- $Id: StablePtr.hs,v 1.4 2002/04/24 16:31:44 simonmar Exp $
 --
 -- Stable pointers.
 --

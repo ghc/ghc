@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Monad.ST
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: ST.hs,v 1.5 2001/12/21 15:07:21 simonmar Exp $
+-- $Id: ST.hs,v 1.6 2002/04/24 16:31:38 simonmar Exp $
 --
 -- The State Transformer Monad, ST
 --

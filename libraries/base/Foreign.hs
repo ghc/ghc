@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Foreign.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: Foreign.hs,v 1.3 2002/04/24 16:31:37 simonmar Exp $
 --
 -- A collection of data types, classes, and functions for interfacing
 -- with another programming language. This is only a convenience module

@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Either
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Either.hs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
+-- $Id: Either.hs,v 1.4 2002/04/24 16:31:39 simonmar Exp $
 --
 -- The Either type, and associated operations.
 --

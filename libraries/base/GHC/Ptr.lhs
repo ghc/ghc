@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
--- $Id: Ptr.lhs,v 1.2 2001/12/21 15:07:25 simonmar Exp $
+-- $Id: Ptr.lhs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
 -- 
 -- (c) The FFI Task Force, 2000
--- 
+-- |
 -- Module GHC.Ptr
 
 \begin{code}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Exit
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Exit.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Exit.hs,v 1.2 2002/04/24 16:31:45 simonmar Exp $
 --
 -- Exiting the program.
 --

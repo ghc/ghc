@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.PackedString
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: PackedString.hs,v 1.3 2001/09/14 11:25:23 simonmar Exp $
+-- $Id: PackedString.hs,v 1.4 2002/04/24 16:31:39 simonmar Exp $
 --
 -- The PackedString type, and associated operations.
 --

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Monad.Error
 -- Copyright   :  (c) Michael Weber <michael.weber@post.rwth-aachen.de>, 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (reqruires multi-param type classes)
 --
--- $Id: Error.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Error.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
 --
 -- The Error monad.
 --

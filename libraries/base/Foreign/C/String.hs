@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign.C.String
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: String.hs,v 1.4 2001/09/13 11:37:43 simonmar Exp $
+-- $Id: String.hs,v 1.5 2002/04/24 16:31:44 simonmar Exp $
 --
 -- Utilities for primitive marshaling
 --

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Debug.QuickCheck
 -- Copyright   :  (c) Koen Claessen, John Hughes 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: QuickCheck.hs,v 1.1 2001/08/17 12:48:38 simonmar Exp $
+-- $Id: QuickCheck.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
 --
 -- QuickCheck v.0.2
 -- DRAFT implementation; last update 000104.

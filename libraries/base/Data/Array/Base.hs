@@ -1,6 +1,6 @@
 {-# OPTIONS -monly-3-regs #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Array.Base
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Base.hs,v 1.6 2002/03/26 17:09:52 simonmar Exp $
+-- $Id: Base.hs,v 1.7 2002/04/24 16:31:43 simonmar Exp $
 --
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Info
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Info.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Info.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
 --
 -- Misc information about the characteristics of the host 
 -- architecture/machine lucky enough to run your program.

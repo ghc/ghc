@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Monad.Trans
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Trans.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Trans.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
 --
 -- The MonadTrans class.
 --

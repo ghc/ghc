@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Array.Storable
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Storable.hs,v 1.2 2001/07/04 10:51:09 simonmar Exp $
+-- $Id: Storable.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
 --
 -- A storable array is an IO-mutable array which stores its
 -- contents in a contiguous memory block living in the C

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Concurrent.QSem
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: QSem.hs,v 1.2 2001/07/04 11:30:52 simonmar Exp $
+-- $Id: QSem.hs,v 1.3 2002/04/24 16:31:37 simonmar Exp $
 --
 -- General semaphores
 --

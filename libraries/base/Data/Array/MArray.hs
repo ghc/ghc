@@ -1,6 +1,6 @@
 {-# OPTIONS -monly-3-regs #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Array.MArray
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: MArray.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: MArray.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
 --
 -- Class of mutable arrays, and operations on them.
 --

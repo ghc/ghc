@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Set
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Set.hs,v 1.1 2001/09/13 11:50:35 simonmar Exp $
+-- $Id: Set.hs,v 1.2 2002/04/24 16:31:40 simonmar Exp $
 --
 -- This implementation of sets sits squarely upon Data.FiniteMap.
 --

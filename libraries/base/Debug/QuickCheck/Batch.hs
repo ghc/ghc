@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Debug.QuickCheck.Batch
 -- Copyright   :  (c) Andy Gill 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Exception, Control.Concurrent)
 --
--- $Id: Batch.hs,v 1.1 2001/08/17 12:48:38 simonmar Exp $
+-- $Id: Batch.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
 --
 -- This is a batch driver for runing QuickCheck.
 --

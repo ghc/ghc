@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign.Marshal.Alloc
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Alloc.hs,v 1.5 2002/02/05 17:32:25 simonmar Exp $
+-- $Id: Alloc.hs,v 1.6 2002/04/24 16:31:44 simonmar Exp $
 --
 -- Marshalling support: basic routines for memory allocation
 --

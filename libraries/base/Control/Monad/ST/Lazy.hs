@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Monad.ST.Lazy
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- $Id: Lazy.hs,v 1.4 2002/01/02 14:40:09 simonmar Exp $
+-- $Id: Lazy.hs,v 1.5 2002/04/24 16:31:39 simonmar Exp $
 --
 -- This module presents an identical interface to Control.Monad.ST,
 -- but the underlying implementation of the state thread is lazy.

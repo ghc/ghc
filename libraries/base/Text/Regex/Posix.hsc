@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Text.Regex.Posix
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide POSIX regexps)
 --
--- $Id: Posix.hsc,v 1.6 2002/02/16 18:04:28 simonmar Exp $
+-- $Id: Posix.hsc,v 1.7 2002/04/24 16:31:47 simonmar Exp $
 --
 -- Interface to the POSIX regular expression library.
 -- ToDo: should have an interface using PackedStrings.

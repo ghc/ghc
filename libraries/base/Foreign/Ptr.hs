@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign.Ptr
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Ptr.hs,v 1.6 2002/03/20 15:38:36 simonmar Exp $
+-- $Id: Ptr.hs,v 1.7 2002/04/24 16:31:44 simonmar Exp $
 --
 -- Pointer types.
 --

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  GHC.Exts
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Exts.hs,v 1.4 2002/04/11 12:03:44 simonpj Exp $
+-- $Id: Exts.hs,v 1.5 2002/04/24 16:31:45 simonmar Exp $
 --
 -- GHC Extensions: this is the Approved Way to get at GHC-specific stuff.
 --

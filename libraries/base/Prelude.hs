@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Prelude
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Prelude.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: Prelude.hs,v 1.3 2002/04/24 16:31:37 simonmar Exp $
 --
 -- Standard module imported by default into Haskell modules.
 --

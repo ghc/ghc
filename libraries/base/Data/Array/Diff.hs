@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Array.Diff
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Diff.hs,v 1.2 2002/01/02 14:40:10 simonmar Exp $
+-- $Id: Diff.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
 --
 -- Functional arrays with constant-time update.
 --

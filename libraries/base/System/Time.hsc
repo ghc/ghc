@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Time
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.11 2002/03/26 21:07:06 sof Exp $
+-- $Id: Time.hsc,v 1.12 2002/04/24 16:31:45 simonmar Exp $
 --
 -- The standard Time library.
 --

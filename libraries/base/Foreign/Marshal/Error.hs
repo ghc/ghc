@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign.Marshal.Error
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Error.hs,v 1.3 2002/04/24 16:31:44 simonmar Exp $
 --
 -- Marshalling support: Handling of common error conditions
 --

@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign.ForeignPtr
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: ForeignPtr.hs,v 1.3 2001/07/31 16:35:29 simonmar Exp $
+-- $Id: ForeignPtr.hs,v 1.4 2002/04/24 16:31:44 simonmar Exp $
 --
 -- This module defines foreign pointers, i.e. addresses with associated
 -- finalizers.

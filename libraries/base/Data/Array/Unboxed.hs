@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Array.Unboxed
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Unboxed.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Unboxed.hs,v 1.2 2002/04/24 16:31:43 simonmar Exp $
 --
 -- Unboxed immutable array type.
 --

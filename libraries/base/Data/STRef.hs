@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.STRef
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires non-portable module ST)
 --
--- $Id: STRef.hs,v 1.3 2002/03/04 17:25:36 panne Exp $
+-- $Id: STRef.hs,v 1.4 2002/04/24 16:31:40 simonmar Exp $
 --
 -- Mutable references in the ST monad.
 --

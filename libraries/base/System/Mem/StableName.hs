@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Mem.StableName
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: StableName.hs,v 1.3 2001/12/21 15:07:26 simonmar Exp $
+-- $Id: StableName.hs,v 1.4 2002/04/24 16:31:45 simonmar Exp $
 --
 -- Giving an object a stable (GC-invariant) name.
 --

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Text.Html
 -- Copyright   :  (c) Andy Gill, and the Oregon Graduate Institute of 
 --		  Science and Technology, 1999-2001
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Html.hs,v 1.1 2001/08/01 13:53:07 simonmar Exp $
+-- $Id: Html.hs,v 1.2 2002/04/24 16:31:46 simonmar Exp $
 --
 -- An Html combinator library
 --

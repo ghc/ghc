@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.CPUTime
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: CPUTime.hsc,v 1.7 2002/04/24 16:03:39 simonmar Exp $
+-- $Id: CPUTime.hsc,v 1.8 2002/04/24 16:31:45 simonmar Exp $
 --
 -- The standard CPUTime library.
 --

@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Word.hs,v 1.3 2002/03/14 12:09:49 simonmar Exp $
+-- $Id: Word.hs,v 1.4 2002/04/24 16:31:43 simonmar Exp $
 --
 -- Sized unsigned integer types.
 --

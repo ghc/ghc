@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Console.GetOpt
 -- Copyright   :  (c) Sven Panne Oct. 1996 (small changes Dec. 1997)
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: GetOpt.hs,v 1.2 2001/07/04 11:30:52 simonmar Exp $
+-- $Id: GetOpt.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
 --
 -- A Haskell port of GNU's getopt library 
 --

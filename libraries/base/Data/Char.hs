@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Char
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Char.hs,v 1.2 2002/04/11 12:03:43 simonpj Exp $
+-- $Id: Char.hs,v 1.3 2002/04/24 16:31:39 simonmar Exp $
 --
 -- The Char type and associated operations.
 --

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Debug.QuickCheck.Utils
 -- Copyright   :  (c) Andy Gill 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Utils.hs,v 1.2 2001/12/21 15:07:22 simonmar Exp $
+-- $Id: Utils.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
 --
 -- These are some general purpose utilities for use with QuickCheck.
 --

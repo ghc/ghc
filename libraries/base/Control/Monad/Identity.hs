@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Monad.Identity
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Identity.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: Identity.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
 --
 -- The Identity monad.
 --

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.IO.Error
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -10,7 +10,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.3 2002/03/27 17:55:26 simonmar Exp $
+-- $Id: Error.hs,v 1.4 2002/04/24 16:31:45 simonmar Exp $
 --
 -- Standard IO Errors.
 --

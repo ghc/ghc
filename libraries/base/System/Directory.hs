@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Directory
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Directory.hs,v 1.2 2002/04/24 15:47:10 sof Exp $
+-- $Id: Directory.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
 --
 -- System-independent interface to directory manipulation.
 --

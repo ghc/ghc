@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.List
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: List.hs,v 1.3 2002/04/02 10:19:21 simonmar Exp $
+-- $Id: List.hs,v 1.4 2002/04/24 16:31:39 simonmar Exp $
 --
 -- Operations on lists.
 --

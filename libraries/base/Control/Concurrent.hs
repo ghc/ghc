@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Concurrent
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Concurrent.hs,v 1.5 2002/04/18 23:32:56 sof Exp $
+-- $Id: Concurrent.hs,v 1.6 2002/04/24 16:31:37 simonmar Exp $
 --
 -- A common interface to a collection of useful concurrency
 -- abstractions.

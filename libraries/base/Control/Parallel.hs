@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Parallel
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Parallel.hs,v 1.1 2001/06/28 14:15:01 simonmar Exp $
+-- $Id: Parallel.hs,v 1.2 2002/04/24 16:31:37 simonmar Exp $
 --
 -- Parallel Constructs
 --

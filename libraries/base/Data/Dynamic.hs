@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.Dynamic
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Dynamic.hs,v 1.5 2002/03/14 12:09:49 simonmar Exp $
+-- $Id: Dynamic.hs,v 1.6 2002/04/24 16:31:39 simonmar Exp $
 --
 -- The Dynamic interface provides basic support for dynamic types.
 -- 

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Text.Regex
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide a regex lib)
 --
--- $Id: Regex.hs,v 1.1 2001/08/02 11:20:50 simonmar Exp $
+-- $Id: Regex.hs,v 1.2 2002/04/24 16:31:46 simonmar Exp $
 --
 -- Regular expression matching.
 -- Uses the POSIX regular expression interface in Text.Regex.Posix for now.

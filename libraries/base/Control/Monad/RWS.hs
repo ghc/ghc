@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Monad.RWS
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
@@ -10,7 +10,7 @@
 -- Portability :  non-portable ( requires mulit-parameter type classes,
 --				 requires functional dependencies )
 --
--- $Id: RWS.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: RWS.hs,v 1.2 2002/04/24 16:31:38 simonmar Exp $
 --
 -- Declaration of the MonadRWS class.
 --

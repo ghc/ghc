@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  System.Mem.Weak
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Weak.hs,v 1.2 2001/09/13 11:36:52 simonmar Exp $
+-- $Id: Weak.hs,v 1.3 2002/04/24 16:31:45 simonmar Exp $
 --
 -- Weak references, weak pairs, weak pointers, and finalizers.
 --

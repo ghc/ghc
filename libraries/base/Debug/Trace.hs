@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Debug.Trace
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Trace.hs,v 1.2 2002/04/24 16:01:51 simonmar Exp $
+-- $Id: Trace.hs,v 1.3 2002/04/24 16:31:43 simonmar Exp $
 --
 -- The trace function.
 --

@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Foreign.C.Types
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Types.hs,v 1.3 2002/02/05 17:32:25 simonmar Exp $
+-- $Id: Types.hs,v 1.4 2002/04/24 16:31:44 simonmar Exp $
 --
 -- Mapping of C types to corresponding Haskell types. A cool hack...
 --

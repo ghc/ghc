@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Data.FiniteMap
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: FiniteMap.hs,v 1.1 2001/08/17 12:44:54 simonmar Exp $
+-- $Id: FiniteMap.hs,v 1.2 2002/04/24 16:31:39 simonmar Exp $
 --
 -- A finite map implementation, derived from the paper:
 -- 	   S Adams, "Efficient sets: a balancing act"

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- 
+-- |
 -- Module      :  Control.Monad.Fix
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Fix.hs,v 1.4 2002/03/22 10:20:24 simonmar Exp $
+-- $Id: Fix.hs,v 1.5 2002/04/24 16:31:38 simonmar Exp $
 --
 -- The Fix monad.
 --
