@@ -366,7 +366,7 @@ main(int argc, char *argv[])
     struct_field(StgFunInfoExtraRev, slow_apply_offset);
     struct_field(StgFunInfoExtraRev, fun_type);
     struct_field(StgFunInfoExtraRev, arity);
-    struct_field(StgFunInfoExtraRev, b.bitmap);
+    struct_field_("StgFunInfoExtraRev_bitmap", StgFunInfoExtraRev, b.bitmap);
 
     struct_field(StgLargeBitmap, size);
     field_offset(StgLargeBitmap, bitmap);
