@@ -135,7 +135,7 @@ type Avails	  = [AvailInfo]
 \begin{code}
 data PersistentCompilerState 
    = PCS {
-        pcsPST    :: PackageSymbolTable,	-- Domain = non-home-package modules
+        pcs_PST    :: PackageSymbolTable,	-- Domain = non-home-package modules
         pcsHP     :: RnMonad.HoldingPen, 	-- Pre-slurped interface bits and pieces
 	pcsNS	  :: NameSupply			-- Allocate uniques for names
      }

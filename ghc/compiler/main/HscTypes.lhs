@@ -6,14 +6,18 @@
 \begin{code}
 module HscTypes ( 
 	ModDetails(..),	GlobalSymbolTable, 
+	HomeSymbolTable, PackageSymbolTable,
 
 	TyThing(..), lookupTypeEnv,
 
 	WhetherHasOrphans, ImportVersion, ExportItem,
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
 	IfaceInsts, IfaceRules, DeprecationEnv, OrigNameEnv, AvailEnv,
+	PersistentCompilerState(..),
 
 	InstEnv, 
+
+	GlobalRdrEnv,
 
 	-- Provenance
 	Provenance(..), ImportReason(..), PrintUnqualified,
@@ -290,13 +294,13 @@ data WhatsImported name  = NothingAtAll				-- The module is below us in the
 \begin{code}
 data PersistentCompilerState 
    = PCS {
-        pcsPST :: PackageSymbolTable,		-- Domain = non-home-package modules
-						--   except that the InstEnv components is empty
-	pcsInsts :: InstEnv,			-- The total InstEnv accumulated from all
-						--   the non-home-package modules
-	pcsRules :: RuleEnv,			-- Ditto RuleEnv
+        pcs_PST :: PackageSymbolTable,	-- Domain = non-home-package modules
+					--   except that the InstEnv components is empty
+	pcs_insts :: InstEnv,		-- The total InstEnv accumulated from all
+					--   the non-home-package modules
+	pcs_rules :: RuleEnv,		-- Ditto RuleEnv
 
-        pcsPRS :: PersistentRenamerState
+        pcs_PRS :: PersistentRenamerState
      }
 \end{code}
 
@@ -307,7 +311,7 @@ It contains:
   * A name supply, which deals with allocating unique names to
     (Module,OccName) original names, 
  
-  * An accumulated InstEnv from all the modules in pcsPST
+  * An accumulated InstEnv from all the modules in pcs_PST
     The point is that we don't want to keep recreating it whenever
     we compile a new module.  The InstEnv component of pcPST is empty.
     (This means we might "see" instances that we shouldn't "really" see;

@@ -182,7 +182,7 @@ tcInstDecls1 pcs hst unf_env this_mod decls mod
     getGenericInstances mod clas_decls			`thenTc` \ generic_inst_info -> 
 
 	-- Next, consruct the instance environment so far, consisting of
-	--	a) cached non-home-package InstEnv (gotten from pcs)	pcsInsts pcs
+	--	a) cached non-home-package InstEnv (gotten from pcs)	pcs_insts pcs
 	--	b) imported instance decls (not in the home package)	inst_env1
 	--	c) other modules in this package (gotten from hst)	inst_env2
 	--	d) local instance decls					inst_env3
@@ -195,7 +195,7 @@ tcInstDecls1 pcs hst unf_env this_mod decls mod
 	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . instInfoDFun) imported_inst_info
 	hst_dfuns	 = foldModuleEnv ((++) . md_insts) [] hst
     in
-    addInstDFuns (pcsInsts pcs) imported_dfuns	`thenNF_Tc` \ inst_env1 ->
+    addInstDFuns (pcs_insts pcs) imported_dfuns	`thenNF_Tc` \ inst_env1 ->
     addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
     addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
     addInstInfos inst_env3 generic_inst_info	`thenNF_Tc` \ inst_env4 ->
@@ -206,10 +206,10 @@ tcInstDecls1 pcs hst unf_env this_mod decls mod
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
-    tcDeriving (pcsPRS pcs) this_mod inst_env4 local_tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    tcDeriving (pcs_PRS pcs) this_mod inst_env4 local_tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
     addInstInfos inst_env4 deriv_inst_info			`thenNF_Tc` \ final_inst_env ->
 
-    returnTc (pcs { pcsInsts = inst_env1 }, 
+    returnTc (pcs { pcs_insts = inst_env1 }, 
 	      final_inst_env, 
 	      generic_inst_info ++ deriv_inst_info ++ local_inst_info,
 	      deriv_binds)

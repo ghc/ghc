@@ -100,7 +100,7 @@ typecheckModule pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
     }
   where
     this_mod	        = mkThisModule
-    global_symbol_table = pcsPST pcs `plusModuleEnv` hst
+    global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
 
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst this_mod decls unf_env)
 \end{code}
@@ -237,10 +237,10 @@ tcModule pcs hst this_mod decls unf_env
     	local_type_env = lookupWithDefaultFM groups this_mod emptyNameEnv
     
     	new_pst :: PackageSymbolTable
-    	new_pst = extendTypeEnv (pcsPST pcs) (delFromFM groups this_mod)
+    	new_pst = extendTypeEnv (pcs_PST pcs) (delFromFM groups this_mod)
 
 	final_pcs :: PersistentCompilerState
-	final_pcs = pcs_with_insts {pcsPST = new_pst}
+	final_pcs = pcs_with_insts {pcs_PST = new_pst}
     in  
     returnTc (really_final_env, 
 	      TcResults { tc_pcs     = final_pcs,

@@ -52,7 +52,7 @@ import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 import Module		( Module, ModuleName, WhereFrom, moduleName )
 import NameSet		
 import CmdLineOpts	( DynFlags, dopt_D_dump_rn_trace )
-import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
+import SrcLoc		( SrcLoc, generatedSrcLoc )
 import Unique		( Unique )
 import FiniteMap	( FiniteMap, emptyFM, listToFM, plusFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
@@ -63,7 +63,9 @@ import PrelNames	( mkUnboundName )
 import HscTypes		( GlobalSymbolTable, OrigNameEnv, AvailEnv, 
 			  WhetherHasOrphans, ImportVersion, ExportItem,
 			  PersistentRenamerState(..), IsBootInterface, Avails,
-			  DeclsMap, IfaceInsts, IfaceRules, DeprecationEnv )
+			  DeclsMap, IfaceInsts, IfaceRules, DeprecationEnv,
+			  HomeSymbolTable, PackageSymbolTable,
+			  PersistentCompilerState(..), GlobalRdrEnv )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -158,7 +160,7 @@ type LocalFixityEnv = NameEnv RenamedFixitySig
 	-- can report line-number info when there is a duplicate
 	-- fixity declaration
 
-lookupLocalFixity :: FixityEnv -> Name -> Fixity
+lookupLocalFixity :: LocalFixityEnv -> Name -> Fixity
 lookupLocalFixity env name
   = case lookupNameEnv env name of 
 	Just (FixitySig _ fix _) -> fix
@@ -250,8 +252,9 @@ data Ifaces = Ifaces {
 		-- Subset of the previous field.
     }
 
-type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface, IsLoaded)
-type IsLoaded = True
+type ImportedModuleInfo = FiniteMap ModuleName 
+				    (WhetherHasOrphans, IsBootInterface, IsLoaded)
+type IsLoaded = Bool
 \end{code}
 
 
@@ -270,7 +273,7 @@ initRn :: DynFlags -> Finder -> HomeSymbolTable
 
 initRn dflags finder hst pcs mod loc do_rn
   = do 
-	let prs = pcsPRS pcs
+	let prs = pcs_PRS pcs
 	uniqs     <- mkSplitUniqSupply 'r'
 	names_var <- newIORef (uniqs, prsOrig prs)
 	errs_var  <- newIORef (emptyBag,emptyBag)
@@ -299,14 +302,14 @@ initRn dflags finder hst pcs mod loc do_rn
 			    prsDecls = iDecls new_ifaces,
 			    prsInsts = iInsts new_ifaces,
 			    prsRules = iRules new_ifaces }
-	let new_pcs = pcs { pcsPST = iPST new_ifaces, 
-			    pcsPRS = new_prs }
+	let new_pcs = pcs { pcs_PST = iPST new_ifaces, 
+			    pcs_PRS = new_prs }
 	
 	return (res, new_pcs, (warns, errs))
 
 
 initIfaces :: PersistentCompilerState -> Ifaces
-initIfaces (PCS { pcsPST = pst, psrPRS = prs })
+initIfaces (PCS { pcs_PST = pst, pcs_PRS = prs })
   = Ifaces { iPST   = pst,
 	     iDecls = prsDecls prs,
 	     iInsts = prsInsts prs,
@@ -321,7 +324,7 @@ initIfaces (PCS { pcsPST = pst, psrPRS = prs })
       }
 
 
-initRnMS :: GlobalRdrEnv -> FixityEnv -> RnMode -> RnMS r -> RnM d r
+initRnMS :: GlobalRdrEnv -> LocalFixityEnv -> RnMode -> RnMS r -> RnM d r
 initRnMS rn_env fixity_env mode thing_inside rn_down g_down
   = let
 	s_down = SDown { rn_genv = rn_env, rn_lenv = emptyRdrEnv, 
@@ -362,7 +365,7 @@ renameSourceCode dflags mod prs m
 	newIORef (emptyBag,emptyBag)		>>= \ errs_var ->
     	let
 	    rn_down = RnDown { rn_dflags = dflags,
-			       rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
+			       rn_loc = generatedSrcLoc, rn_ns = names_var,
 			       rn_errs = errs_var, 
 			       rn_mod = mod, 
 			       rn_ifaces = panic "rnameSourceCode: rn_ifaces"  -- Not required

@@ -241,10 +241,10 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
 \begin{code}
 initPersistentCompilerState :: PersistentCompilerState
 initPersistentCompilerState 
-  = PCS { pcsPST   = initPackageDetails,
-	  pcsInsts = emptyInstEnv,
-	  pcsRules = emptyRuleEnv,
-	  pcsPRS   = initPersistentRenamerState }
+  = PCS { pcs_PST   = initPackageDetails,
+	  pcs_insts = emptyInstEnv,
+	  pcs_rules = emptyRuleEnv,
+	  pcs_PRS   = initPersistentRenamerState }
 
 initPackageDetails :: PackageSymbolTable
 initPackageDetails = extendTypeEnv emptyModuleEnv wiredInThings
