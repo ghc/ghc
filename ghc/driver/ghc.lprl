@@ -1144,7 +1144,6 @@ sub setupIncPaths {
       push (@Include_dir, "$TopPwd/${CURRENT_DIR}/${GHC_INCLUDE_DIR}");
   } else {
       push (@Include_dir, "$InstLibDirGhc/includes");
-      push (@Include_dir, "$InstLibDirGhc/includes");
   }
 } # end of setupIncPaths
 \end{code}
