@@ -872,7 +872,7 @@ isNewType ty = case splitTyConApp_maybe ty of
 			other		   -> False
 
 typePrimRep :: Type -> PrimRep
-typePrimRep ty = case splitTyConApp_maybe ty of
+typePrimRep ty = case splitTyConApp_maybe (repType ty) of
 		   Just (tc, ty_args) -> tyConPrimRep tc
 		   other	      -> PtrRep
 \end{code}
