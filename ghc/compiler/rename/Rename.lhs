@@ -15,8 +15,7 @@ import RnHsSyn		( RenamedHsModule, RenamedHsDecl,
 			)
 
 import CmdLineOpts	( opt_HiMap, opt_D_dump_rn_trace,
-			  opt_D_dump_rn, opt_D_dump_rn_stats,
-			  opt_WarnUnusedBinds, opt_WarnUnusedImports
+			  opt_D_dump_rn, opt_D_dump_rn_stats, opt_WarnDeprecations
 		        )
 import RnMonad
 import RnNames		( getGlobalNames )
@@ -24,21 +23,18 @@ import RnSource		( rnSourceDecls, rnDecl )
 import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions,
 			  getImportedRules, loadHomeInterface, getSlurped, removeContext
 			)
-import RnEnv		( availName, availNames, availsToNameSet, 
-			  warnUnusedImports, warnUnusedLocalBinds, mapFvRn, lookupImplicitOccRn,
+import RnEnv		( availName, availsToNameSet, 
+			  warnUnusedImports, warnUnusedLocalBinds, lookupImplicitOccRn,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs
 			)
-import Module           ( Module, ModuleName, pprModule, mkSearchPath, mkThisModule )
-import Name		( Name, isLocallyDefined,
-			  NamedThing(..), ImportReason(..), Provenance(..),
-			  pprOccName, nameOccName, nameUnique,
-			  getNameProvenance, isUserImportedExplicitlyName,
+import Module           ( Module, ModuleName, mkSearchPath, mkThisModule )
+import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
+			  nameOccName, nameUnique, isUserImportedExplicitlyName,
 			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName
 			)
+import OccName		( occNameFlavour )
 import Id		( idType )
-import DataCon		( dataConTyCon, dataConType )
-import TyCon		( TyCon, tyConDataCons, isSynTyCon, getSynTyConDefn )
-import RdrName		( RdrName )
+import TyCon		( isSynTyCon, getSynTyConDefn )
 import NameSet
 import PrelMods		( mAIN_Name, pREL_MAIN_Name )
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
@@ -47,12 +43,10 @@ import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( NewOrData(..) )
 import Bag		( isEmptyBag, bagToList )
-import FiniteMap	( fmToList, delListFromFM, addToFM, sizeFM, eltsFM )
+import FiniteMap	( eltsFM )
 import UniqSupply	( UniqSupply )
 import UniqFM		( lookupUFM )
-import Util		( equivClasses )
 import Maybes		( maybeToBool )
-import SrcLoc		( mkBuiltinSrcLoc )
 import Outputable
 \end{code}
 
@@ -90,6 +84,8 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ l
 
 
 \begin{code}
+rename :: RdrNameHsModule
+       -> RnMG (Maybe (Module, RenamedHsModule, InterfaceDetails, RnNameSupply, [ModuleName]), IO ())
 rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
@@ -123,14 +119,9 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
 
 	-- COLLECT ALL DEPRECATIONS
 	deprec_sigs = [ ds | ValD bnds <- rn_local_decls, ds <- collectDeprecs bnds ]
-
-	(rn_mod_deprec, deprecs) = case mod_deprec of
-	   Nothing -> (Nothing, deprec_sigs)
-	   Just (DeprecMod t) -> let dm = DeprecMod t in (Just dm, dm:deprec_sigs)
-
-	collectDeprecs EmptyBinds = []
-	collectDeprecs (ThenBinds x y) = collectDeprecs x ++ collectDeprecs y
-	collectDeprecs (MonoBind _ sigs _) = [ d | DeprecSig d _ <- sigs ]
+	deprecs = case mod_deprec of
+	   Nothing -> deprec_sigs
+	   Just txt -> Deprecation (IEModuleContents undefined) txt : deprec_sigs
     in
 
 	-- EXIT IF ERRORS FOUND
@@ -157,7 +148,7 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports
 				  rn_all_decls
-			          rn_mod_deprec
+			          mod_deprec
 			          loc
     in
     rnDump rn_imp_decls	rn_all_decls		`thenRn` \ dump_action ->
@@ -169,6 +160,10 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
   where
     trashed_exports  = {-trace "rnSource:trashed_exports"-} Nothing
     trashed_imports  = {-trace "rnSource:trashed_imports"-} []
+
+    collectDeprecs EmptyBinds = []
+    collectDeprecs (ThenBinds x y) = collectDeprecs x ++ collectDeprecs y
+    collectDeprecs (MonoBind _ sigs _) = [ d | DeprecSig d _ <- sigs ]
 \end{code}
 
 @implicitFVs@ forces the renamer to slurp in some things which aren't
@@ -523,6 +518,7 @@ getInstDeclGates other				    = emptyFVs
 %*********************************************************
 
 \begin{code}
+reportUnusedNames :: GlobalRdrEnv -> NameEnv AvailInfo -> ExportEnv -> NameSet -> RnM d ()
 reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_names
   = let
 	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
@@ -545,9 +541,25 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_name
 	-- Filter out the ones only defined implicitly
 	bad_locals = [n | n <- defined_but_not_used, isLocallyDefined		  n]
 	bad_imps   = [n | n <- defined_but_not_used, isUserImportedExplicitlyName n]
+
+	non_locally_used = [ n | n <- nameSetToList really_used_names, not (isLocallyDefined n) ]
+	deprec_used deprec_env = [ (n,txt) | n <- non_locally_used, Just txt <- [lookupNameEnv deprec_env n] ]
     in
-    warnUnusedLocalBinds bad_locals	`thenRn_`
+    traceRn (text "really used and non-locally defined" <> colon <+>
+             nest 4 (fsep (punctuate comma [ text (occNameFlavour (nameOccName n)) <+> ppr n
+                                           | n <- non_locally_used]))) `thenRn_`
+    getIfacesRn								`thenRn` \ ifaces ->
+    if opt_WarnDeprecations
+	then mapRn_ warnDeprec (deprec_used (iDeprecs ifaces))
+	else returnRn ()						`thenRn_`
+    warnUnusedLocalBinds bad_locals					`thenRn_`
     warnUnusedImports bad_imps
+
+warnDeprec :: (Name, DeprecTxt) -> RnM d ()
+warnDeprec (name, txt)
+  = pushSrcLocRn (getSrcLoc name)	$
+    addWarnRn				$
+    sep [ text "Using deprecated entity" <+> ppr name <> colon, nest 4 (ppr txt) ]
 
 rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
 	-> [RenamedHsDecl] 	-- Renamed local decls

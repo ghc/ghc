@@ -341,15 +341,16 @@ loadRule mod rules decl@(IfaceRuleDecl var body src_loc)
     mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
     returnRn ((unitNameSet var_name, (mod, RuleD decl)) `consBag` rules)
 
+-- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
 loadDeprec :: Module -> DeprecationEnv -> RdrNameDeprecation -> RnM d DeprecationEnv
-loadDeprec mod deprec_env (DeprecMod txt)
+loadDeprec mod deprec_env (Deprecation (IEModuleContents _) txt)
   = traceRn (text "module deprecation not yet implemented:" <+> ppr mod <> colon <+> ppr txt) `thenRn_`
     returnRn deprec_env
-loadDeprec mod deprec_env (DeprecName rdr_name txt)
+loadDeprec mod deprec_env (Deprecation (IEVar rdr_name) txt)
   = setModuleRn (moduleName mod) $
     mkImportedGlobalFromRdrName rdr_name `thenRn` \ name ->
     traceRn (text "loaded deprecation for" <+> ppr name <> colon <+> ppr txt) `thenRn_`
-    returnRn (addToNameEnv deprec_env name (DeprecName name txt))
+    returnRn (addToNameEnv deprec_env name txt)
 \end{code}
 
 

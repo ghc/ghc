@@ -68,6 +68,7 @@ module CmdLineOpts (
 	opt_WarnUnusedBinds,
 	opt_WarnUnusedImports,
 	opt_WarnUnusedMatches,
+	opt_WarnDeprecations,
 
 	-- profiling opts
 	opt_AutoSccsOnAllToplevs,
@@ -358,6 +359,7 @@ opt_WarnTypeDefaults		= lookUp  SLIT("-fwarn-type-defaults")
 opt_WarnUnusedBinds		= lookUp  SLIT("-fwarn-unused-binds")
 opt_WarnUnusedImports		= lookUp  SLIT("-fwarn-unused-imports")
 opt_WarnUnusedMatches		= lookUp  SLIT("-fwarn-unused-matches")
+opt_WarnDeprecations		= lookUp  SLIT("-fwarn-deprecations")
 
 -- profiling opts
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.23 2000/02/20 17:51:45 panne Exp $
+$Id: Parser.y,v 1.24 2000/02/25 14:55:42 panne Exp $
 
 Haskell grammar.
 
@@ -218,8 +218,8 @@ module 	:: { RdrNameHsModule }
 	| srcloc body
 		{ HsModule mAIN_Name Nothing Nothing (fst $2) (snd $2) Nothing $1 }
 
-maybemoddeprec :: { Maybe (Deprecation RdrName) }
-	: '{-# DEPRECATED' STRING '#-}' 	{ Just (DeprecMod $2) }
+maybemoddeprec :: { Maybe DeprecTxt }
+	: '{-# DEPRECATED' STRING '#-}' 	{ Just $2 }
 	|  {- empty -}				{ Nothing }
 
 body 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
@@ -480,17 +480,10 @@ deprecations :: { RdrBinding }
 	| deprecation				{ $1 }
 	| {- empty -}				{ RdrNullBind }
 
+-- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { RdrBinding }
-	: deprecated_names STRING
-		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig (DeprecName n $2) l) | (l,n) <- $1 ] }
-
-deprecated_names :: { [(SrcLoc,RdrName)] }
-	: deprecated_names ',' deprecated_name	{ $3 : $1 }
-	| deprecated_name			{ [$1] }
-
-deprecated_name :: { (SrcLoc,RdrName) }
-	: srcloc var				{ ($1, $2) }
-	| srcloc tycon				{ ($1, $2) }
+	: srcloc exportlist STRING
+		{ foldr1 RdrAndBindings [ RdrSig (DeprecSig (Deprecation n $3) $1) | n <- $2 ] }
 
 -----------------------------------------------------------------------------
 -- Foreign import/export

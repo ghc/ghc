@@ -541,10 +541,11 @@ renameSig lookup_occ_nm (FixSig (FixitySig v fix src_loc))
     lookup_occ_nm v		`thenRn` \ new_v ->
     returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
 
-renameSig lookup_occ_nm (DeprecSig (DeprecName v txt) src_loc)
+-- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
+renameSig lookup_occ_nm (DeprecSig (Deprecation (IEVar v) txt) src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (DeprecSig (DeprecName new_v txt) src_loc, unitFV new_v)
+    returnRn (DeprecSig (Deprecation (IEVar new_v) txt) src_loc, unitFV new_v)
 
 renameSig lookup_occ_nm (InlineSig v p src_loc)
   = pushSrcLocRn src_loc $
@@ -559,14 +560,17 @@ renameSig lookup_occ_nm (NoInlineSig v p src_loc)
 
 Checking for distinct signatures; oh, so boring
 
+
 \begin{code}
 cmp_sig :: RenamedSig -> RenamedSig -> Ordering
-cmp_sig (Sig n1 _ _)                    (Sig n2 _ _)                    = n1 `compare` n2
-cmp_sig (DeprecSig (DeprecName n1 _) _) (DeprecSig (DeprecName n2 _) _) = n1 `compare` n2
-cmp_sig (InlineSig n1 _ _)              (InlineSig n2 _ _)              = n1 `compare` n2
-cmp_sig (NoInlineSig n1 _ _)            (NoInlineSig n2 _ _)            = n1 `compare` n2
-cmp_sig (SpecInstSig ty1 _)             (SpecInstSig ty2 _)             = cmpHsType compare ty1 ty2
-cmp_sig (SpecSig n1 ty1 _)              (SpecSig n2 ty2 _) 
+cmp_sig (Sig n1 _ _)         (Sig n2 _ _)         = n1 `compare` n2
+-- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
+cmp_sig (DeprecSig (Deprecation (IEVar n1) _) _)
+        (DeprecSig (Deprecation (IEVar n2) _) _)  = n1 `compare` n2
+cmp_sig (InlineSig n1 _ _)   (InlineSig n2 _ _)   = n1 `compare` n2
+cmp_sig (NoInlineSig n1 _ _) (NoInlineSig n2 _ _) = n1 `compare` n2
+cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = cmpHsType compare ty1 ty2
+cmp_sig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _) 
   = -- may have many specialisations for one value;
     -- but not ones that are exactly the same...
 	thenCmp (n1 `compare` n2) (cmpHsType compare ty1 ty2)

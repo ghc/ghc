@@ -195,7 +195,7 @@ type FixityEnv = NameEnv RenamedFixitySig
 	-- fixity declaration
 
 --------------------------------
-type DeprecationEnv = NameEnv RenamedDeprecation
+type DeprecationEnv = NameEnv DeprecTxt
 \end{code}
 
 \begin{code}

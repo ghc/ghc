@@ -272,6 +272,8 @@ warnings that you get all the time are
 	
 	-fwarn-overlapping-patterns
 	-fwarn-missing-methods
+	-fwarn-missing-fields
+	-fwarn-deprecations
 	-fwarn-duplicate-exports
 
 these are turned off by -Wnot.
@@ -280,6 +282,7 @@ these are turned off by -Wnot.
 @StandardWarnings = ('-fwarn-overlapping-patterns', 
 		     '-fwarn-missing-methods',
 		     '-fwarn-missing-fields',
+		     '-fwarn-deprecations',
 		     '-fwarn-duplicate-exports');
 @MinusWOpts    	  = (@StandardWarnings, 
 		     '-fwarn-unused-binds',

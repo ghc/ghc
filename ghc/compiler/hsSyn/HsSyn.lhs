@@ -52,17 +52,17 @@ All we actually declare here is the top-level structure for a module.
 \begin{code}
 data HsModule name pat
   = HsModule
-	ModuleName			-- module name
-	(Maybe Version)			-- source interface version number
-	(Maybe [IE name])		-- export list; Nothing => export everything
-					-- Just [] => export *nothing* (???)
-					-- Just [...] => as you would expect...
-	[ImportDecl name]		-- We snaffle interesting stuff out of the
-					-- imported interfaces early on, adding that
-					-- info to TyDecls/etc; so this list is
-					-- often empty, downstream.
-	[HsDecl name pat]		-- Type, class, value, and interface signature decls
-	(Maybe (Deprecation name))	-- reason/explanation for deprecation of this module
+	ModuleName		-- module name
+	(Maybe Version)		-- source interface version number
+	(Maybe [IE name])	-- export list; Nothing => export everything
+				-- Just [] => export *nothing* (???)
+				-- Just [...] => as you would expect...
+	[ImportDecl name]	-- We snaffle interesting stuff out of the
+				-- imported interfaces early on, adding that
+				-- info to TyDecls/etc; so this list is
+				-- often empty, downstream.
+	[HsDecl name pat]	-- Type, class, value, and interface signature decls
+	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
 	SrcLoc
 \end{code}
 

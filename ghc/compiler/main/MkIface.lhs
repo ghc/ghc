@@ -241,8 +241,9 @@ ifaceDeprecations if_hdl deprecations
 		ptext SLIT("##-}")
        ])
   where
-    pprIfaceDeprec (DeprecMod    txt) =           doubleQuotes (ppr txt) 
-    pprIfaceDeprec (DeprecName n txt) = ppr n <+> doubleQuotes (ppr txt)
+    -- SUP: TEMPORARY HACK, ignoring module deprecations and constructors for now
+    pprIfaceDeprec (Deprecation (IEModuleContents _) txt) =           doubleQuotes (ppr txt)
+    pprIfaceDeprec (Deprecation (IEVar            n) txt) = ppr n <+> doubleQuotes (ppr txt)
 \end{code}
 
 %************************************************************************

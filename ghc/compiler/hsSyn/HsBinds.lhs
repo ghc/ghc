@@ -15,6 +15,7 @@ import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSs, GRHSs )
 
 -- friends:
 import HsTypes		( HsType )
+import HsImpExp		( IE(..), ieName )
 import CoreSyn		( CoreExpr )
 import PprCore		()	   -- Instances for Outputable
 
@@ -263,9 +264,9 @@ data Sig name
 
 data FixitySig name  = FixitySig name Fixity SrcLoc
 
-data Deprecation name
-   = DeprecMod       DeprecTxt	-- deprecation of a whole module
-   | DeprecName name DeprecTxt	-- deprecation of a single name
+-- We use exported entities for things to deprecate. Cunning trick (hack?):
+-- `IEModuleContents undefined' is used for module deprecation.
+data Deprecation name = Deprecation (IE name) DeprecTxt
 
 type DeprecTxt = FAST_STRING	-- reason/explanation for deprecation
 \end{code}
@@ -275,15 +276,17 @@ sigsForMe :: (name -> Bool) -> [Sig name] -> [Sig name]
 sigsForMe f sigs
   = filter sig_for_me sigs
   where
-    sig_for_me (Sig         n _ _)            = f n
-    sig_for_me (ClassOpSig  n _ _ _ _)        = f n
-    sig_for_me (SpecSig     n _ _)            = f n
-    sig_for_me (InlineSig   n _   _)          = f n  
-    sig_for_me (NoInlineSig n _   _)          = f n  
-    sig_for_me (SpecInstSig _ _)              = False
-    sig_for_me (FixSig (FixitySig n _ _))     = f n
-    sig_for_me (DeprecSig (DeprecMod    _) _) = False
-    sig_for_me (DeprecSig (DeprecName n _) _) = f n
+    sig_for_me (Sig         n _ _)                         = f n
+    sig_for_me (ClassOpSig  n _ _ _ _)                     = f n
+    sig_for_me (SpecSig     n _ _)                         = f n
+    sig_for_me (InlineSig   n _   _)                       = f n
+    sig_for_me (NoInlineSig n _   _)                       = f n
+    sig_for_me (SpecInstSig _ _)                           = False
+    sig_for_me (FixSig (FixitySig n _ _))                  = f n
+    sig_for_me
+	(DeprecSig (Deprecation (IEModuleContents _) _) _) = False
+    sig_for_me
+	(DeprecSig (Deprecation d                    _) _) = f (ieName d)
 
 isFixitySig :: Sig name -> Bool
 isFixitySig (FixSig _) = True
@@ -307,15 +310,7 @@ isPragSig other		      = False
 instance (Outputable name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
-instance Outputable name => Outputable (FixitySig name) where
-  ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
-
-instance Outputable name => Outputable (Deprecation name) where
-   ppr (DeprecMod txt)
-      = hsep [text "{-# DEPRECATED",        doubleQuotes (ppr txt), text "#-}"]
-   ppr (DeprecName n txt)
-      = hsep [text "{-# DEPRECATED", ppr n, doubleQuotes (ppr txt), text "#-}"]
-
+ppr_sig :: Outputable name => Sig name -> SDoc
 ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
@@ -340,7 +335,17 @@ ppr_sig (FixSig fix_sig) = ppr fix_sig
 
 ppr_sig (DeprecSig deprec _) = ppr deprec
 
-ppr_phase Nothing = empty
+instance Outputable name => Outputable (FixitySig name) where
+  ppr (FixitySig name fixity loc) = sep [ppr fixity, ppr name]
+
+instance Outputable name => Outputable (Deprecation name) where
+   ppr (Deprecation (IEModuleContents _) txt)
+      = hsep [text "{-# DEPRECATED",            doubleQuotes (ppr txt), text "#-}"]
+   ppr (Deprecation thing txt)
+      = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
+
+ppr_phase :: Maybe Int -> SDoc
+ppr_phase Nothing  = empty
 ppr_phase (Just n) = int n
 \end{code}
 

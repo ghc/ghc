@@ -370,12 +370,12 @@ deprecs		: {- empty -}		{ [] }
 		| deprecs deprec ';'	{ $2 : $1 }
 
 deprec		:: { RdrNameDeprecation }
-deprec		: STRING		{ DeprecMod     $1 }
-		| deprec_name STRING	{ DeprecName $1 $2 }
+deprec		: STRING		{ Deprecation (IEModuleContents undefined) $1 }
+		| deprec_name STRING	{ Deprecation $1 $2 }
 
-deprec_name	:: { RdrName }
-		: var_name		{ $1 }
-		| tc_name		{ $1 }
+-- SUP: TEMPORARY HACK
+deprec_name	:: { RdrNameIE }
+		: var_name		{ IEVar $1 }
 
 -----------------------------------------------------------------------------
 
