@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.77 2001/03/26 13:31:46 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.78 2001/03/26 13:43:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1084,7 +1084,7 @@ FN_(makeStableNamezh_fast)
   /* Is there already a StableName for this heap object? */
   if (stable_ptr_table[index].sn_obj == NULL) {
     sn_obj = (StgStableName *) (Hp - sizeofW(StgStableName) + 1);
-    SET_HDR(sn_obj,&STABLE_NAME_info,CCCS);
+    SET_HDR(sn_obj,&stg_STABLE_NAME_info,CCCS);
     sn_obj->sn = index;
     stable_ptr_table[index].sn_obj = (StgClosure *)sn_obj;
   } else {
