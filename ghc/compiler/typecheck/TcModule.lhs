@@ -40,7 +40,7 @@ import TcTyDecls	( mkImplicitDataBinds )
 import CoreUnfold	( unfoldingTemplate )
 import Type		( funResultTy, splitForAllTys )
 import Bag		( isEmptyBag )
-import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
+import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn, showPass )
 import Id		( idType, idUnfolding )
 import Module           ( Module )
 import Name		( Name, toRdrName )
@@ -81,26 +81,29 @@ typecheckModule
 	-> PersistentCompilerState
 	-> HomeSymbolTable
 	-> ModIface		-- Iface for this module
+	-> PrintUnqualified	-- For error printing
 	-> [RenamedHsDecl]
 	-> IO (Maybe TcResults)
 
-typecheckModule dflags this_mod pcs hst mod_iface decls
-  = do	env <- initTcEnv hst (pcs_PTE pcs)
+typecheckModule dflags this_mod pcs hst mod_iface unqual decls
+  = do	{ showPass dflags "Typechecker";
+	; env <- initTcEnv hst (pcs_PTE pcs)
 
-        (maybe_result, (warns,errs)) <- initTc dflags env tc_module
+	; (maybe_result, (warns,errs)) <- initTc dflags env tc_module
 
-	let { maybe_tc_result :: Maybe TcResults ;
-	      maybe_tc_result = case maybe_result of
-				  Nothing    -> Nothing
-				  Just (_,r) -> Just r }
+	; let { maybe_tc_result :: Maybe TcResults ;
+	        maybe_tc_result = case maybe_result of
+					Nothing    -> Nothing
+				 	Just (_,r) -> Just r }
 
-        printErrorsAndWarnings (errs,warns)
-        printTcDump dflags maybe_tc_result
+	; printErrorsAndWarnings unqual (errs,warns)
+	; printTcDump dflags maybe_tc_result
 
-        if isEmptyBag errs then 
+	; if isEmptyBag errs then 
              return maybe_tc_result
            else 
              return Nothing 
+	}
   where
     tc_module :: TcM (RecTcEnv, TcResults)
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)

@@ -25,7 +25,7 @@ import RnEnv
 import RnMonad
 
 import FiniteMap
-import PrelNames	( pRELUDE_Name, mAIN_Name, main_RDR )
+import PrelNames	( pRELUDE_Name, mAIN_Name, main_RDR_Unqual, isUnboundName )
 import UniqFM		( lookupUFM )
 import Bag		( bagToList )
 import Module		( ModuleName, moduleName, WhereFrom(..) )
@@ -67,9 +67,6 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
     fixRn ( \ ~(rec_gbl_env, _, rec_export_avails, _) ->
 
 	let
-	   rec_unqual_fn :: Name -> Bool	-- Is this chap in scope unqualified?
-	   rec_unqual_fn = unQualInScope rec_gbl_env
-
 	   rec_exp_fn :: Name -> Bool
 	   rec_exp_fn = mk_export_fn (availsToNameSet rec_export_avails)
 	in
@@ -89,7 +86,7 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
 	  is_source_import (ImportDecl _ ImportByUserSource _ _ _ _) = True
 	  is_source_import other				     = False
 
-	  get_imports = importsFromImportDecl this_mod_name rec_unqual_fn 
+	  get_imports = importsFromImportDecl this_mod_name
 	in
 	mapAndUnzipRn get_imports ordinary	`thenRn` \ (imp_gbl_envs1, imp_avails_s1) ->
 	mapAndUnzipRn get_imports source	`thenRn` \ (imp_gbl_envs2, imp_avails_s2) ->
@@ -144,12 +141,11 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
 	
 \begin{code}
 importsFromImportDecl :: ModuleName
-		      -> (Name -> Bool)		-- OK to omit qualifier
 		      -> RdrNameImportDecl
 		      -> RnMG (GlobalRdrEnv, 
 			       ExportAvails) 
 
-importsFromImportDecl this_mod_name is_unqual (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
+importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_mod import_spec iloc)
   = pushSrcLocRn iloc $
     getInterfaceExports imp_mod_name from	`thenRn` \ (imp_mod, avails_by_module) ->
 
@@ -186,7 +182,6 @@ importsFromImportDecl this_mod_name is_unqual (ImportDecl imp_mod_name from qual
 
     let
 	mk_provenance name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-					 (is_unqual name)
     in
 
     qualifyImports imp_mod_name
@@ -506,7 +501,7 @@ exportsFromAvail this_mod Nothing export_avails global_name_env
   = exportsFromAvail this_mod true_exports export_avails global_name_env
   where
     true_exports = Just $ if this_mod == mAIN_Name
-                          then [IEVar main_RDR]
+                          then [IEVar main_RDR_Unqual]
                                -- export Main.main *only* unless otherwise specified,
                           else [IEModuleContents this_mod]
                                -- but for all other modules export everything.
@@ -547,9 +542,10 @@ exportsFromAvail this_mod (Just export_items)
 
 		-- See what's available in the current environment
 	  case lookupUFM entity_avail_env name of {
-	    Nothing -> 	-- I can't see why this should ever happen; if the thing 
-			-- is in scope at all it ought to have some availability
-			pprTrace "exportsFromAvail: curious Nothing:" (ppr name)
+	    Nothing -> 	-- Presumably this happens because lookupSrcName didn't find
+			-- the name and returned an unboundName, which won't be in
+			-- the entity_avail_env, of course
+			WARN( not (isUnboundName name), ppr name )
 			returnRn acc ;
 
 	    Just avail ->

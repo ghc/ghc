@@ -108,7 +108,7 @@ dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn
 	       | otherwise                    = empty
 
 pp_context NoMatchContext msg rest_of_msg_fun
-  = dontAddErrLoc "" (ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
+  = dontAddErrLoc (ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
 
 pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
   = case pp_match kind pats of

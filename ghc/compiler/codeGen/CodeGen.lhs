@@ -40,7 +40,7 @@ import PrimRep		( PrimRep(..) )
 import TyCon            ( TyCon, isDataTyCon )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
-import ErrUtils		( dumpIfSet_dyn )
+import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
 \end{code}
 
@@ -60,26 +60,28 @@ codeGen :: DynFlags
 
 codeGen dflags mod_name imported_modules cost_centre_info fe_binders
 	tycons stg_binds
-  = mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
-    let
-	datatype_stuff 	  = genStaticConBits cinfo data_tycons
-	code_stuff     	  = initC cinfo (cgTopBindings maybe_split stg_binds)
-	init_stuff        = mkModuleInit fe_binders mod_name imported_modules 
-					 cost_centre_info
+  = do	{ showPass dflags "CodeGen"
 
-	abstractC = mkAbstractCs [ maybe_split,
-				   init_stuff, 
-				   code_stuff,
-				   datatype_stuff]
+	; fl_uniqs <- mkSplitUniqSupply 'f'
+	; let
+	    datatype_stuff = genStaticConBits cinfo data_tycons
+	    code_stuff     = initC cinfo (cgTopBindings maybe_split stg_binds)
+	    init_stuff     = mkModuleInit fe_binders mod_name imported_modules 
+					  cost_centre_info
+
+	    abstractC = mkAbstractCs [ maybe_split,
+				       init_stuff, 
+				       code_stuff,
+				       datatype_stuff]
 		-- Put datatype_stuff after code_stuff, because the
 		-- datatype closure table (for enumeration types)
 		-- to (say) PrelBase_True_closure, which is defined in code_stuff
 
-	flat_abstractC = flattenAbsC fl_uniqs abstractC
-    in
-    dumpIfSet_dyn dflags Opt_D_dump_absC "Abstract C" (dumpRealC abstractC)	>>
-    return flat_abstractC
+	    flat_abstractC = flattenAbsC fl_uniqs abstractC
 
+	; dumpIfSet_dyn dflags Opt_D_dump_absC "Abstract C" (dumpRealC abstractC)
+	; return flat_abstractC
+	}
   where
     data_tycons = filter isDataTyCon tycons
 

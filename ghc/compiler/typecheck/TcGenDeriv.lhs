@@ -34,7 +34,7 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkUnqual )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
-			, maxPrecedence
+			, maxPrecedence, defaultFixity
 			, Boxity(..)
 			)
 import FieldLabel       ( fieldLabelName )
@@ -60,7 +60,7 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 import Util		( mapAccumL, zipEqual, zipWithEqual,
 			  zipWith3Equal, nOfThem )
 import Panic		( panic, assertPanic )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, orElse )
 import Constants
 import List		( partition, intersperse )
 import Outputable	( pprPanic, ppr, pprTrace )
@@ -1060,15 +1060,14 @@ getPrecedence :: (Name -> Maybe Fixity) -> Name -> Integer
 getPrecedence get_fixity nm 
    = case get_fixity nm of
         Just (Fixity x _) -> fromInt x
-        other	          -> pprTrace "TcGenDeriv.getPrecedence" (ppr nm) defaultPrecedence
+        other	          -> defaultPrecedence
 
 isLRAssoc :: (Name -> Maybe Fixity) -> Name -> (Bool, Bool)
 isLRAssoc get_fixity nm =
-     case get_fixity nm of
-       Just (Fixity _ InfixN) -> (False, False)
-       Just (Fixity _ InfixR) -> (False, True)
-       Just (Fixity _ InfixL) -> (True,  False)
-       other -> pprPanic "TcGenDeriv.isLRAssoc" (ppr nm)
+     case get_fixity nm `orElse` defaultFixity of
+       Fixity _ InfixN -> (False, False)
+       Fixity _ InfixR -> (False, True)
+       Fixity _ InfixL -> (True,  False)
 
 isInfixOccName :: String -> Bool
 isInfixOccName str = 

@@ -13,7 +13,7 @@ module TyCon(
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
 	isRecursiveTyCon, newTyConRep,
 
-	mkAlgTyConRep, --mkAlgTyCon, 
+	mkAlgTyCon, --mkAlgTyCon, 
 	mkClassTyCon,
 	mkFunTyCon,
 	mkPrimTyCon,
@@ -238,7 +238,7 @@ tyConGenIds tycon = case tyConGenInfo tycon of
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyConRep name kind tyvars theta argvrcs cons ncons flavour rec 
+mkAlgTyCon name kind tyvars theta argvrcs cons ncons flavour rec 
 	      gen_info
   = AlgTyCon {	
 	tyConName 		= name,

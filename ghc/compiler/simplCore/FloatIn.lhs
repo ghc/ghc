@@ -19,7 +19,7 @@ module FloatIn ( floatInwards ) where
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import CoreUtils	( exprIsValue, exprIsDupable )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
 import Id		( isOneShotLambda )
 import Var		( Id, idType, isTyVar )
@@ -37,7 +37,7 @@ floatInwards :: DynFlags -> [CoreBind] -> IO [CoreBind]
 
 floatInwards dflags binds
   = do {
-	beginPass dflags "Float inwards";
+	showPass dflags "Float inwards";
 	let { binds' = map fi_top_bind binds };
 	endPass dflags "Float inwards" 
 	 	(dopt Opt_D_verbose_core2core dflags)

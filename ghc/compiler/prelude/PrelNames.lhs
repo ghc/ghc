@@ -38,7 +38,7 @@ module PrelNames (
 
 import Module	  ( ModuleName, mkPrelModule, mkModuleName )
 import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName, mkKindOccFS )
-import RdrName	  ( RdrName, mkOrig, mkRdrOrig )
+import RdrName	  ( RdrName, mkOrig, mkRdrOrig, mkUnqual )
 import UniqFM
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
@@ -236,6 +236,21 @@ mkTupNameStr Unboxed n = (pREL_GHC_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"
 mkTupConRdrName :: NameSpace -> Boxity -> Arity -> RdrName 
 mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of
 					  (mod, occ) -> mkOrig space mod occ
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Unqualified RdrNames}
+%*									*
+%************************************************************************
+
+\begin{code}
+main_RDR_Unqual :: RdrName
+main_RDR_Unqual = mkUnqual varName SLIT("main")
+-- Don't get a RdrName from PrelNames.mainName, because nameRdrName
+-- gets an Orig RdrName, and we want a Qual or Unqual one.  An Unqual
+-- one will do fine.
 \end{code}
 
 
@@ -548,7 +563,6 @@ deRefStablePtr_RDR 	= nameRdrName deRefStablePtrName
 newStablePtr_RDR 	= nameRdrName newStablePtrName
 bindIO_RDR	  	= nameRdrName bindIOName
 returnIO_RDR	  	= nameRdrName returnIOName
-main_RDR	   	= nameRdrName mainName
 fromInteger_RDR		= nameRdrName fromIntegerName
 fromRational_RDR	= nameRdrName fromRationalName
 minus_RDR		= nameRdrName minusName

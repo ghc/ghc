@@ -580,7 +580,7 @@ tcInstDecl2 (InstInfo { iLocal = is_local, iDFunId = dfun_id,
         methods_lie = plusLIEs insts_needed_s
     in
 
-	-- Ditto method bindings
+	-- Simplify the constraints from methods
     tcAddErrCtxt methodCtxt (
       tcSimplifyAndCheck
 		 (ptext SLIT("instance declaration context"))
@@ -589,11 +589,9 @@ tcInstDecl2 (InstInfo { iLocal = is_local, iDFunId = dfun_id,
 		 methods_lie
     )						 `thenTc` \ (const_lie1, lie_binds1) ->
     
-	-- Now do the simplification again, this time to get the
-	-- bindings; this time we use an enhanced "avails"
-	-- Ignore errors because they come from the *previous* tcSimplify
-    discardErrsTc (
-	tcSimplifyAndCheck
+	-- Figure out bindings for the superclass context
+    tcAddErrCtxt superClassCtxt (
+      tcSimplifyAndCheck
 		 (ptext SLIT("instance declaration context"))
 		 inst_tyvars_set
 		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
@@ -788,6 +786,5 @@ nonBoxedPrimCCallErr clas inst_ty
     		        ppr inst_ty])
 
 methodCtxt     = ptext SLIT("When checking the methods of an instance declaration")
+superClassCtxt = ptext SLIT("When checking the super-classes of an instance declaration")
 \end{code}
-
- 

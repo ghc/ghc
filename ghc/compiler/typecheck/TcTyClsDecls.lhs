@@ -35,7 +35,7 @@ import Type		( Kind, mkArrowKind, boxedTypeKind, zipFunTys )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
 import TyCon		( TyCon, tyConKind, ArgVrcs, AlgTyConFlavour(..), 
-			  mkSynTyCon, mkAlgTyConRep, mkClassTyCon )
+			  mkSynTyCon, mkAlgTyCon, mkClassTyCon )
 import DataCon		( isNullaryDataCon )
 import Var		( varName )
 import FiniteMap
@@ -311,7 +311,7 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 	          (TyData data_or_new context tycon_name tyvar_names _ nconstrs _ src_loc name1 name2)
   = (tycon_name, ATyCon tycon)
   where
-	tycon = mkAlgTyConRep tycon_name tycon_kind tyvars ctxt argvrcs
+	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
 			   data_cons nconstrs
 			   flavour is_rec gen_info
 

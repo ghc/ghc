@@ -74,7 +74,7 @@ doCheckIfWorseUSP :: [CoreBind] -> [CoreBind] -> IO ()
 doCheckIfWorseUSP binds binds'
   = case checkIfWorseUSP binds binds' of
       Nothing    -> return ()
-      Just warns -> printErrs warns
+      Just warns -> printDump warns
 \end{code}
 
 ======================================================================

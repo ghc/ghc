@@ -14,7 +14,7 @@ module CoreTidy (
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_UsageSPOn, dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
@@ -35,6 +35,7 @@ import Type		( tidyTopType, tidyType, tidyTyVar )
 import Module		( Module )
 import UniqSupply	( mkSplitUniqSupply )
 import Unique		( Uniquable(..) )
+import ErrUtils		( showPass )
 import SrcLoc		( noSrcLoc )
 import Util		( mapAccumL )
 \end{code}
@@ -72,7 +73,7 @@ tidyCorePgm dflags module_name binds_in orphans_in
   = do
 	us <- mkSplitUniqSupply 'u'
 
-	beginPass dflags "Tidy Core"
+	showPass dflags "Tidy Core"
 
         binds_in1 <- if opt_UsageSPOn
                      then _scc_ "CoreUsageSPInf"

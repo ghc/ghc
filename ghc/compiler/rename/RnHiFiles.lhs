@@ -17,7 +17,7 @@ module RnHiFiles (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes		( ModuleLocation(..),
 			  ModIface(..), emptyModIface,
 			  VersionInfo(..),
@@ -56,13 +56,10 @@ import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
 import Finder		( findModule )
-import Util		( unJust )
 import Lex
 import FiniteMap
 import Outputable
 import Bag
-
-import Monad		( when )
 \end{code}
 
 
@@ -478,16 +475,12 @@ findAndReadIface :: SDoc -> ModuleName
 
 findAndReadIface doc_str mod_name hi_boot_file
   = traceRn trace_msg			`thenRn_`
+
     ioToRnM (findModule mod_name)	`thenRn` \ maybe_found ->
-    doptRn Opt_D_dump_rn_trace		`thenRn` \ rn_trace ->
     case maybe_found of
+
       Right (Just (wanted_mod,locn))
-        -> ioToRnM_no_fail (
-              readIface rn_trace 
-	         (unJust (ml_hi_file locn) "findAndReadIface"
-                  ++ if hi_boot_file then "-boot" else "")
-	   )
-					`thenRn` \ read_result ->
+        -> readIface (mkHiPath hi_boot_file (ml_hi_file locn))	`thenRn` \ read_result ->
 	   case read_result of
               Left bad -> returnRn (Left bad)
               Right iface 
@@ -506,35 +499,42 @@ findAndReadIface doc_str mod_name hi_boot_file
 			   ptext SLIT("interface for"), 
 			   ppr mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
+
+mkHiPath hi_boot_file (Just path)
+  | hi_boot_file = path ++ "-boot"
+  | otherwise    = path
 \end{code}
 
 @readIface@ tries just the one file.
 
 \begin{code}
-readIface :: Bool -> String -> IO (Either Message ParsedIface)
+readIface :: String -> RnM d (Either Message ParsedIface)
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
-readIface tr file_path
-  = when tr (printErrs (ptext SLIT("readIFace") <+> text file_path)) 
-    >>
-    ((hGetStringBuffer False file_path	>>= \ contents ->
-        case parseIface contents
-			PState{ bol = 0#, atbol = 1#,
+readIface file_path
+  = traceRn (ptext SLIT("readIFace") <+> text file_path) 	`thenRn_` 
+
+    ioToRnM (hGetStringBuffer False file_path)			`thenRn` \ read_result ->
+    case read_result of {
+	Left io_error  -> bale_out (text (show io_error)) ;
+	Right contents -> 
+
+    case parseIface contents init_parser_state of
+	POk _ (PIface iface) -> returnRn (Right iface)
+	PFailed err 	     -> bale_out err
+	parse_result 	     -> bale_out empty
+	 	-- This last case can happen if the interface file is (say) empty
+		-- in which case the parser thinks it looks like an IdInfo or
+		-- something like that.  Just an artefact of the fact that the
+		-- parser is used for several purposes at once.
+    }
+  where
+    init_parser_state = PState{ bol = 0#, atbol = 1#,
 				context = [],
 				glasgow_exts = 1#,
-				loc = mkSrcLoc (mkFastString file_path) 1 } of
-		  POk _  (PIface iface) -> return (Right iface)
-		  PFailed err   -> bale_out err
-	          parse_result 	-> bale_out empty
-		 	-- This last case can happen if the interface file is (say) empty
-			-- in which case the parser thinks it looks like an IdInfo or
-			-- something like that.  Just an artefact of the fact that the
-			-- parser is used for several purposes at once.
-   )
-   `catch` 
-   (\ io_err -> bale_out (text (show io_err))))
-  where
-    bale_out err = return (Left (badIfaceFile file_path err))
+				loc = mkSrcLoc (mkFastString file_path) 1 }
+
+    bale_out err = returnRn (Left (badIfaceFile file_path err))
 \end{code}
 
 

@@ -9,7 +9,7 @@ module LiberateCase ( liberateCase ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_LiberateCaseThreshold )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )
 import Var		( Id )
@@ -151,7 +151,7 @@ Programs
 liberateCase :: DynFlags -> [CoreBind] -> IO [CoreBind]
 liberateCase dflags binds
   = do {
-	beginPass dflags "Liberate case" ;
+	showPass dflags "Liberate case" ;
 	let { binds' = do_prog (initEnv opt_LiberateCaseThreshold) binds } ;
 	endPass dflags "Liberate case" 
 	 	(dopt Opt_D_verbose_core2core dflags)

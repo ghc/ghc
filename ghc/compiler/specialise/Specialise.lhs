@@ -29,7 +29,7 @@ import CoreSyn
 import CoreUtils	( applyTypeToArgs )
 import CoreUnfold	( certainlyWillInline )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import PprCore		( pprCoreRules )
 import Rules		( addIdSpecialisations, lookupRule )
 
@@ -580,7 +580,7 @@ Hence, the invariant is this:
 specProgram :: DynFlags -> UniqSupply -> [CoreBind] -> IO [CoreBind]
 specProgram dflags us binds
   = do
-	beginPass dflags "Specialise"
+	showPass dflags "Specialise"
 
 	let binds' = initSM us (go binds 	`thenSM` \ (binds', uds') ->
 			        returnSM (dumpAllDictBinds uds' binds'))

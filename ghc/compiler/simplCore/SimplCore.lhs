@@ -13,7 +13,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
                           opt_UsageSPOn,
 			  DynFlags, DynFlag(..), dopt, dopt_CoreToDo
 			)
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreFVs		( ruleSomeFreeVars )
 import HscTypes		( PackageRuleBase, HomeSymbolTable, ModDetails(..) )
@@ -297,7 +297,7 @@ glomBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
 -- analyser as free in f.
 
 glomBinds dflags binds
-  = do { beginPass dflags "GlomBinds" ;
+  = do { showPass dflags "GlomBinds" ;
 	 let { recd_binds = [Rec (flattenBinds binds)] } ;
 	 return recd_binds }
 	-- Not much point in printing the result... 
@@ -322,7 +322,7 @@ simplifyPgm :: DynFlags
 simplifyPgm dflags rule_base
 	    sw_chkr us binds
   = do {
-	beginPass dflags "Simplify";
+	showPass dflags "Simplify";
 
 	(termination_msg, it_count, counts_out, binds') 
 	   <- iteration us 1 (zeroSimplCount dflags) binds;

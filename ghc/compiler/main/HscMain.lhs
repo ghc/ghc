@@ -10,7 +10,7 @@ module HscMain ( HscResult(..), hscMain,
 #include "HsVersions.h"
 
 import Maybe		( isJust )
-import IO		( hPutStr, hPutStrLn, stderr )
+import IO		( hPutStrLn, stderr )
 import HsSyn
 
 import StringBuffer	( hGetStringBuffer )
@@ -39,7 +39,7 @@ import CodeOutput	( codeOutput )
 
 import Module		( ModuleName, moduleName, mkModuleInThisPackage )
 import CmdLineOpts
-import ErrUtils		( dumpIfSet_dyn )
+import ErrUtils		( dumpIfSet_dyn, showPass )
 import Util		( unJust )
 import UniqSupply	( mkSplitUniqSupply )
 
@@ -93,10 +93,11 @@ hscMain
 hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
  = do {
       putStrLn "CHECKING OLD IFACE";
-      (pcs_ch, check_errs, (recomp_reqd, maybe_checked_iface))
+      (pcs_ch, errs_found, (recomp_reqd, maybe_checked_iface))
          <- checkOldIface dflags hit hst pcs (unJust (ml_hi_file location) "hscMain")
 			  source_unchanged maybe_old_iface;
-      if check_errs then
+
+      if errs_found then
          return (HscFail pcs_ch)
       else do {
 
@@ -126,8 +127,8 @@ hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
       else do {
 
       -- TYPECHECK
-      maybe_tc_result
-         <- typecheckModule dflags this_mod pcs_cl hst old_iface cl_hs_decls;
+      maybe_tc_result <- typecheckModule dflags this_mod pcs_cl hst 
+					 old_iface alwaysQualify cl_hs_decls;
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
          Just tc_result -> do {
@@ -149,71 +150,81 @@ hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
 
 
 hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
- = do {
-      hPutStrLn stderr "COMPILATION IS REQUIRED";
+ = do	{
+      	; hPutStrLn stderr "COMPILATION IS REQUIRED";
 
-      -- what target are we shooting for?
-      let toInterp = dopt_HscLang dflags == HscInterpreted
-      ;
-      -- PARSE
-      maybe_parsed 
-         <- myParseModule dflags (unJust (ml_hspp_file location) "hscRecomp:hspp");
-      case maybe_parsed of {
-         Nothing -> return (HscFail pcs_ch);
-         Just rdr_module -> do {
+      	  -- what target are we shooting for?
+      	; let toInterp = dopt_HscLang dflags == HscInterpreted
 
-      -- RENAME
-      let this_mod = mkModuleInThisPackage (hsModuleName rdr_module)
-      ;
-      show_pass dflags "Renamer";
-      (pcs_rn, maybe_rn_result) 
-         <- renameModule dflags hit hst pcs_ch this_mod rdr_module;
-      case maybe_rn_result of {
-         Nothing -> return (HscFail pcs_rn);
-         Just (new_iface, rn_hs_decls) -> do {
+ 	    -------------------
+ 	    -- PARSE
+ 	    -------------------
+	; maybe_parsed <- myParseModule dflags (unJust (ml_hspp_file location) "hscRecomp:hspp")
+	; case maybe_parsed of {
+      	     Nothing -> return (HscFail pcs_ch);
+      	     Just rdr_module -> do {
+	; let this_mod = mkModuleInThisPackage (hsModuleName rdr_module)
+    
+ 	    -------------------
+ 	    -- RENAME
+ 	    -------------------
+	; (pcs_rn, maybe_rn_result) 
+      	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
+      	; case maybe_rn_result of {
+      	     Nothing -> return (HscFail pcs_rn);
+      	     Just (print_unqualified, new_iface, rn_hs_decls) -> do {
+    
+ 	    -------------------
+ 	    -- TYPECHECK
+ 	    -------------------
+	; maybe_tc_result <- typecheckModule dflags this_mod pcs_rn hst new_iface 
+					     print_unqualified rn_hs_decls
+	; case maybe_tc_result of {
+      	     Nothing -> do { hPutStrLn stderr "Typechecked failed" 
+ 			   ; return (HscFail pcs_rn) } ;
+      	     Just tc_result -> do {
+    
+	; let pcs_tc        = tc_pcs tc_result
+      	      env_tc        = tc_env tc_result
+      	      local_insts   = tc_insts tc_result
 
-      -- TYPECHECK
-      show_pass dflags "Typechecker";
-      maybe_tc_result
-         <- typecheckModule dflags this_mod pcs_rn hst new_iface rn_hs_decls;
-      case maybe_tc_result of {
-         Nothing -> do { hPutStrLn stderr "Typechecked failed" 
-		       ; return (HscFail pcs_rn) } ;
-         Just tc_result -> do {
+ 	    -------------------
+ 	    -- DESUGAR, SIMPLIFY, TIDY-CORE
+ 	    -------------------
+      	  -- We grab the the unfoldings at this point.
+	; simpl_result <- dsThenSimplThenTidy dflags (pcs_rules pcs_tc) this_mod 
+ 					      print_unqualified tc_result hst
+	; let (tidy_binds, orphan_rules, foreign_stuff) = simpl_result
+      	    
+ 	    -------------------
+ 	    -- CONVERT TO STG
+ 	    -------------------
+	; (stg_binds, oa_tidy_binds, cost_centre_info, top_level_ids) 
+      	     <- myCoreToStg dflags this_mod tidy_binds
 
-      let pcs_tc        = tc_pcs tc_result
-          env_tc        = tc_env tc_result
-          local_insts   = tc_insts tc_result
-      ;
-      -- DESUGAR, SIMPLIFY, TIDY-CORE
-      -- We grab the the unfoldings at this point.
-      (tidy_binds, orphan_rules, foreign_stuff)
-         <- dsThenSimplThenTidy dflags (pcs_rules pcs_tc) this_mod tc_result hst
-      ;
-      -- CONVERT TO STG
-      (stg_binds, oa_tidy_binds, cost_centre_info, top_level_ids) 
-         <- myCoreToStg dflags this_mod tidy_binds
-      ;
-      -- cook up a new ModDetails now we (finally) have all the bits
-      let new_details = mkModDetails env_tc local_insts tidy_binds 
-			             top_level_ids orphan_rules
-      ;
-      -- and the final interface
-      final_iface 
-         <- mkFinalIface dflags location maybe_checked_iface new_iface new_details
-      ;
-      -- do the rest of code generation/emission
-      (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
-         <- restOfCodeGeneration dflags toInterp this_mod
-	       (map ideclName (hsModuleImports rdr_module))
-               cost_centre_info foreign_stuff env_tc stg_binds oa_tidy_binds
-               hit (pcs_PIT pcs_tc)       
-      ;
-      -- and the answer is ...
-      return (HscOK new_details (Just final_iface)
-		    maybe_stub_h_filename maybe_stub_c_filename
-                    maybe_ibinds pcs_tc)
-      }}}}}}}
+
+ 	    -------------------
+ 	    -- BUILD THE NEW ModDetails AND ModIface
+ 	    -------------------
+	; let new_details = mkModDetails env_tc local_insts tidy_binds 
+ 					 top_level_ids orphan_rules
+	; final_iface <- mkFinalIface dflags location maybe_checked_iface 
+				      new_iface new_details
+
+ 	    -------------------
+ 	    -- COMPLETE CODE GENERATION
+ 	    -------------------
+	; (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
+      	     <- restOfCodeGeneration dflags toInterp this_mod
+ 		   (map ideclName (hsModuleImports rdr_module))
+      		   cost_centre_info foreign_stuff env_tc stg_binds oa_tidy_binds
+      		   hit (pcs_PIT pcs_tc)       
+
+      	  -- and the answer is ...
+	; return (HscOK new_details (Just final_iface)
+ 			maybe_stub_h_filename maybe_stub_c_filename
+      			maybe_ibinds pcs_tc)
+      	  }}}}}}}
 
 
 
@@ -233,7 +244,7 @@ mkFinalIface dflags location maybe_old_iface new_iface new_details
 
 myParseModule dflags src_filename
  = do --------------------------  Parser  ----------------
-      show_pass dflags "Parser"
+      showPass dflags "Parser"
       -- _scc_     "Parser"
 
       buf <- hGetStringBuffer True{-expand tabs-} src_filename
@@ -268,14 +279,12 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
 
  | otherwise
  = do --------------------------  Code generation -------------------------------
-      show_pass dflags "CodeGen"
       -- _scc_     "CodeGen"
       abstractC <- codeGen dflags this_mod imported_modules
                            cost_centre_info fe_binders
                            local_tycons stg_binds
 
       --------------------------  Code output -------------------------------
-      show_pass dflags "CodeOutput"
       -- _scc_     "CodeOutput"
       (maybe_stub_h_name, maybe_stub_c_name)
          <- codeOutput dflags this_mod local_tycons
@@ -301,22 +310,18 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
                        (ppr nm)
 
 
-dsThenSimplThenTidy dflags rule_base this_mod tc_result hst
+dsThenSimplThenTidy dflags rule_base this_mod print_unqual tc_result hst
  = do --------------------------  Desugaring ----------------
       -- _scc_     "DeSugar"
-      show_pass dflags "DeSugar"
-      ds_uniqs <- mkSplitUniqSupply 'd'
       (desugared, rules, h_code, c_code, fe_binders) 
-         <- deSugar dflags this_mod ds_uniqs hst tc_result
+         <- deSugar dflags this_mod print_unqual hst tc_result
 
       --------------------------  Main Core-language transformations ----------------
       -- _scc_     "Core2Core"
-      show_pass dflags "Core2Core"
       (simplified, orphan_rules) 
          <- core2core dflags rule_base hst desugared rules
 
       -- Do the final tidy-up
-      show_pass dflags "CoreTidy"
       (tidy_binds, tidy_orphan_rules) 
          <- tidyCorePgm dflags this_mod simplified orphan_rules
       
@@ -334,22 +339,16 @@ myCoreToStg dflags this_mod tidy_binds
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
-      show_pass dflags "Core2Stg"
+      showPass dflags "Core2Stg"
       -- _scc_     "Core2Stg"
       let stg_binds   = topCoreBindsToStg c2s_uniqs occ_anal_tidy_binds
 
-      show_pass dflags "Stg2Stg"
+      showPass dflags "Stg2Stg"
       -- _scc_     "Stg2Stg"
       (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod st_uniqs stg_binds
       let final_ids = collectFinalStgBinders (map fst stg_binds2)
 
       return (stg_binds2, occ_anal_tidy_binds, cost_centre_info, final_ids)
-
-
-show_pass dflags what
-  = if   dopt Opt_D_show_passes dflags
-    then hPutStr stderr ("*** "++what++":\n")
-    else return ()
 \end{code}
 
 

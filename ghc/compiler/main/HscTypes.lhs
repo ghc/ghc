@@ -34,17 +34,17 @@ module HscTypes (
 	InstEnv, ClsInstEnv, DFunId,
 	PackageInstEnv, PackageRuleBase,
 
-	GlobalRdrEnv, RdrAvailInfo,
+	GlobalRdrEnv, RdrAvailInfo, pprGlobalRdrEnv,
 
 	-- Provenance
-	Provenance(..), ImportReason(..), PrintUnqualified,
+	Provenance(..), ImportReason(..), 
         pprNameProvenance, hasBetterProv
 
     ) where
 
 #include "HsVersions.h"
 
-import RdrName		( RdrNameEnv, emptyRdrEnv )
+import RdrName		( RdrNameEnv, emptyRdrEnv, rdrEnvToList )
 import Name		( Name, NamedThing, isLocallyDefined, 
 			  getName, nameModule, nameSrcLoc )
 import Name -- Env
@@ -520,6 +520,12 @@ one for each module, corresponding to that module's top-level scope.
 type GlobalRdrEnv = RdrNameEnv [(Name,Provenance)]	-- The list is because there may be name clashes
 							-- These only get reported on lookup,
 							-- not on construction
+
+pprGlobalRdrEnv env
+  = vcat (map pp (rdrEnvToList env))
+  where
+    pp (rn, nps) = ppr rn <> colon <+> 
+		   vcat [ppr n <+> pprNameProvenance n p | (n,p) <- nps]
 \end{code}
 
 The "provenance" of something says how it came to be in scope.
@@ -530,7 +536,6 @@ data Provenance
 
   | NonLocalDef  		-- Defined non-locally
 	ImportReason
-	PrintUnqualified
 
 -- Just used for grouping error messages (in RnEnv.warnUnusedBinds)
 instance Eq Provenance where
@@ -541,10 +546,10 @@ instance Eq ImportReason where
 
 instance Ord Provenance where
    compare LocalDef LocalDef = EQ
-   compare LocalDef (NonLocalDef _ _) = LT
-   compare (NonLocalDef _ _) LocalDef = GT
+   compare LocalDef (NonLocalDef _) = LT
+   compare (NonLocalDef _) LocalDef = GT
 
-   compare (NonLocalDef reason1 _) (NonLocalDef reason2 _) 
+   compare (NonLocalDef reason1) (NonLocalDef reason2) 
       = compare reason1 reason2
 
 instance Ord ImportReason where
@@ -568,11 +573,6 @@ data ImportReason
 	-- This info is used when warning of unused names.
 
   | ImplicitImport			-- Imported implicitly for some other reason
-			
-
-type PrintUnqualified = Bool	-- True <=> the unqualified name of this thing is
-				-- in scope in this module, so print it 
-				-- unqualified in error messages
 \end{code}
 
 \begin{code}
@@ -581,15 +581,14 @@ hasBetterProv :: Provenance -> Provenance -> Bool
 --	a local thing		      over an	imported thing
 --	a user-imported thing	      over a	non-user-imported thing
 -- 	an explicitly-imported thing  over an	implicitly imported thing
-hasBetterProv LocalDef 				    _				   = True
-hasBetterProv (NonLocalDef (UserImport _ _ True) _) _				   = True
-hasBetterProv (NonLocalDef (UserImport _ _ _   ) _) (NonLocalDef ImplicitImport _) = True
-hasBetterProv _					    _				   = False
+hasBetterProv LocalDef 				  _			       = True
+hasBetterProv (NonLocalDef (UserImport _ _ _   )) (NonLocalDef ImplicitImport) = True
+hasBetterProv _					  _			       = False
 
 pprNameProvenance :: Name -> Provenance -> SDoc
-pprNameProvenance name LocalDef   	   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
-pprNameProvenance name (NonLocalDef why _) = sep [ppr_reason why, 
-					      nest 2 (parens (ppr_defn (nameSrcLoc name)))]
+pprNameProvenance name LocalDef   	 = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
+pprNameProvenance name (NonLocalDef why) = sep [ppr_reason why, 
+					        nest 2 (parens (ppr_defn (nameSrcLoc name)))]
 
 ppr_reason ImplicitImport	  = ptext SLIT("implicitly imported")
 ppr_reason (UserImport mod loc _) = ptext SLIT("imported from") <+> ppr mod <+> ptext SLIT("at") <+> ppr loc

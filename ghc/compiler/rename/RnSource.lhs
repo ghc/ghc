@@ -12,6 +12,7 @@ module RnSource ( rnDecl, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl, rnSourceDecls
 
 import RnExpr
 import HsSyn
+import HscTypes		( GlobalRdrEnv )
 import HsTypes		( hsTyVarNames, pprHsContext )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, mkRdrNameWkr, elemRdrEnv )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl, RdrNameTyClDecl,
@@ -73,11 +74,13 @@ Checks the @(..)@ etc constraints in the export list.
 %*********************************************************
 
 \begin{code}
-rnSourceDecls :: [RdrNameHsDecl] -> RnMS ([RenamedHsDecl], FreeVars)
+rnSourceDecls :: GlobalRdrEnv -> LocalFixityEnv
+	      -> [RdrNameHsDecl] 
+	      -> RnMG ([RenamedHsDecl], FreeVars)
 	-- The decls get reversed, but that's ok
 
-rnSourceDecls decls
-  = go emptyFVs [] decls
+rnSourceDecls gbl_env local_fixity_env decls
+  = initRnMS gbl_env local_fixity_env SourceMode (go emptyFVs [] decls)
   where
 	-- Fixity and deprecations have been dealt with already; ignore them
     go fvs ds' []             = returnRn (ds', fvs)

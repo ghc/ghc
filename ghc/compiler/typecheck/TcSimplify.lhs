@@ -1262,8 +1262,8 @@ addTopInstanceErr dict
 addNoInstanceErr str givens dict
   = tcGetInstEnv	`thenNF_Tc` \ inst_env ->
     let
-    	doc = vcat [herald <+> quotes (pprInst tidy_dict),
-		    nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens,
+    	doc = vcat [sep [herald <+> quotes (pprInst tidy_dict),
+			 nest 4 $ ptext SLIT("from the context") <+> pprInsts tidy_givens],
 		    ambig_doc,
 		    ptext SLIT("Probable fix:"),
 		    nest 4 fix1,

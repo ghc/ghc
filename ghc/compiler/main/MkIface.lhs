@@ -41,7 +41,7 @@ import CoreSyn		( CoreExpr, CoreBind, Bind(..), CoreRule(..), IdCoreRule,
 			)
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
 import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold, unfoldingTemplate, noUnfolding )
-import Name		( isLocallyDefined, getName, 
+import Name		( isLocallyDefined, getName, nameModule,
 			  Name, NamedThing(..)
 			)
 import Name 	-- Env
@@ -80,9 +80,10 @@ mkModDetails type_env dfun_ids tidy_binds stg_ids orphan_rules
   where
 	-- The competed type environment is gotten from
 	-- 	a) keeping the types and classes
-	--	b) removing all Ids, and Ids with correct IdInfo
+	--	b) removing all Ids, 
+	--	c) adding Ids with correct IdInfo, including unfoldings,
 	--		gotten from the bindings
-	-- From (b) we keep only those Ids with Global names, plus Ids
+	-- From (c) we keep only those Ids with Global names, plus Ids
 	--	    accessible from them (notably via unfoldings)
 	-- This truncates the type environment to include only the 
 	-- exported Ids and things needed from them, which saves space
@@ -612,9 +613,13 @@ diffDecls old_vers old_fixities new_fixities old new
 writeIface :: FilePath -> ModIface -> IO ()
 writeIface hi_path mod_iface
   = do	{ if_hdl <- openFile hi_path WriteMode
-	; printForIface if_hdl (pprIface mod_iface)
+	; printForIface if_hdl from_this_mod (pprIface mod_iface)
 	; hClose if_hdl
 	}
+  where
+	-- Print names unqualified if they are from this module
+    from_this_mod n = nameModule n == this_mod
+    this_mod = mi_module mod_iface
 	 
 pprIface :: ModIface -> SDoc
 pprIface iface

@@ -7,7 +7,7 @@
 module CoreLint (
 	lintCoreBindings,
 	lintUnfolding, 
-	beginPass, endPass, endPassWithRules
+	showPass, endPass, endPassWithRules
     ) where
 
 #include "HsVersions.h"
@@ -27,7 +27,7 @@ import VarSet
 import Subst		( mkTyVarSubst, substTy )
 import Name		( getSrcLoc )
 import PprCore
-import ErrUtils		( doIfSet_dyn, dumpIfSet, ghcExit, Message, 
+import ErrUtils		( doIfSet_dyn, dumpIfSet, ghcExit, Message, showPass,
 			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
                           WarnMsg, pprBagOfWarnings)
 import SrcLoc		( SrcLoc, noSrcLoc )
@@ -58,14 +58,6 @@ place for them.  They print out stuff before and after core passes,
 and do Core Lint when necessary.
 
 \begin{code}
-beginPass :: DynFlags -> String -> IO ()
-beginPass dflags pass_name
-  | dopt Opt_D_show_passes dflags
-  = hPutStrLn stdout ("*** " ++ pass_name)
-  | otherwise
-  = return ()
-
-
 endPass :: DynFlags -> String -> Bool -> [CoreBind] -> IO [CoreBind]
 endPass dflags pass_name dump_flag binds
   = do  

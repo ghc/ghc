@@ -27,7 +27,7 @@ import AbsCSyn		( AbstractC )
 import PprAbsC		( dumpRealC, writeRealC )
 import Module		( Module )
 import CmdLineOpts
-import ErrUtils		( dumpIfSet_dyn )
+import ErrUtils		( dumpIfSet_dyn, showPass )
 import Outputable
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 import TmpFiles		( newTempName )
@@ -61,16 +61,18 @@ codeOutput dflags mod_name tycons core_binds stg_binds
 
     -- Dunno if the above comment is still meaningful now.  JRS 001024.
 
-    do let filenm = dopt_OutName dflags 
-       stub_names <- outputForeignStubs dflags c_code h_code
-       case dopt_HscLang dflags of
-          HscInterpreted -> return stub_names
-          HscAsm         -> outputAsm dflags filenm flat_abstractC
-                            >> return stub_names
-          HscC           -> outputC dflags filenm flat_abstractC	
-                            >> return stub_names
-          HscJava        -> outputJava dflags filenm mod_name tycons core_binds
-                            >> return stub_names
+    do	{ showPass dflags "CodeOutput"
+	; let filenm = dopt_OutName dflags 
+	; stub_names <- outputForeignStubs dflags c_code h_code
+	; case dopt_HscLang dflags of
+             HscInterpreted -> return stub_names
+             HscAsm         -> outputAsm dflags filenm flat_abstractC
+          		       >> return stub_names
+             HscC           -> outputC dflags filenm flat_abstractC	
+          		       >> return stub_names
+             HscJava        -> outputJava dflags filenm mod_name tycons core_binds
+          		       >> return stub_names
+	}
 
 doOutput :: String -> (Handle -> IO ()) -> IO ()
 doOutput filenm io_action
@@ -130,7 +132,7 @@ outputAsm dflags filenm flat_absC
 
 \begin{code}
 outputJava dflags filenm mod tycons core_binds
-  = doOutput filenm (\ f -> printForUser f pp_java)
+  = doOutput filenm (\ f -> printForUser f alwaysQualify pp_java)
 	-- User style printing for now to keep indentation
   where
     java_code = javaGen mod [{- Should be imports-}] tycons core_binds

@@ -17,7 +17,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDe
 			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnTyClDecl, rnIfaceRuleDecl, rnInstDecl )
@@ -27,31 +27,31 @@ import RnIfaces		( slurpImpDecls, mkImportInfo,
 			)
 import RnHiFiles	( readIface, removeContext, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs )
-import RnEnv		( availsToNameSet, availName,
+import RnEnv		( availsToNameSet, availName, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupOrigNames, lookupSrcName, newGlobalName
+			  lookupOrigNames, lookupSrcName, newGlobalName, unQualInScope
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
-			  mkModuleInThisPackage, mkModuleName, moduleEnvElts
+			  moduleEnvElts
 			)
 import Name		( Name, NamedThing(..), getSrcLoc,
 			  nameIsLocalOrFrom, nameOccName, nameModule,
 			)
 import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
-import RdrName		( rdrEnvToList, elemRdrEnv, foldRdrEnv, isQual )
+import RdrName		( elemRdrEnv, foldRdrEnv, isQual )
 import OccName		( occNameFlavour )
 import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, boolTyCon )
 import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
-			  ioTyCon_RDR, main_RDR,
+			  ioTyCon_RDR, main_RDR_Unqual,
 			  unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
 			  eqString_RDR
 			)
 import PrelInfo		( derivingOccurrences )
 import Type		( funTyCon )
-import ErrUtils		( dumpIfSet )
+import ErrUtils		( dumpIfSet, showPass, printErrorsAndWarnings, errorsFound )
 import Bag		( bagToList )
 import FiniteMap	( FiniteMap, fmToList, emptyFM, lookupFM, 
 			  addToFM_C, elemFM, addToFM
@@ -64,7 +64,8 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  ModIface(..), WhatsImported(..), 
 			  VersionInfo(..), ImportVersion, 
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  GlobalRdrEnv, AvailEnv, GenAvailInfo(..), AvailInfo, Avails,
+			  GlobalRdrEnv, pprGlobalRdrEnv,
+			  AvailEnv, GenAvailInfo(..), AvailInfo, Avails,
 			  Provenance(..), ImportReason(..), initialVersionInfo,
 			  Deprecations(..), lookupDeprec, lookupIface
 			 )
@@ -84,25 +85,35 @@ renameModule :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
-	     -> IO (PersistentCompilerState, Maybe (ModIface, [RenamedHsDecl]))
+	     -> IO (PersistentCompilerState, Maybe (PrintUnqualified, ModIface, [RenamedHsDecl]))
 	-- Nothing => some error occurred in the renamer
 
 renameModule dflags hit hst old_pcs this_module rdr_module
-  = 	-- Initialise the renamer monad
-    do {
-	(new_pcs, errors_found, maybe_rn_stuff) 
-	   <- initRn dflags hit hst old_pcs this_module (rename this_module rdr_module) ;
+  = do	{ showPass dflags "Renamer"
 
-	-- Return results.  No harm in updating the PCS
-	if errors_found then
+		-- Initialise the renamer monad
+	; (new_pcs, msgs, maybe_rn_stuff) <- initRn dflags hit hst old_pcs this_module 
+						    (rename this_module rdr_module)
+
+	; let print_unqualified :: Name -> Bool	-- Is this chap in scope unqualified?
+	      print_unqualified = case maybe_rn_stuff of
+				    Just (unqual, _, _) -> unqual
+				    Nothing	        -> alwaysQualify
+
+
+	 	-- Print errors from renaming
+	;  printErrorsAndWarnings print_unqualified msgs ;
+
+		-- Return results.  No harm in updating the PCS
+	; if errorsFound msgs then
 	    return (new_pcs, Nothing)
-        else
+          else	    
 	    return (new_pcs, maybe_rn_stuff)
     }
 \end{code}
 
 \begin{code}
-rename :: Module -> RdrNameHsModule -> RnMG (Maybe (ModIface, [RenamedHsDecl]))
+rename :: Module -> RdrNameHsModule -> RnMG (Maybe (PrintUnqualified, ModIface, [RenamedHsDecl]))
 rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
   = pushSrcLocRn loc		$
 
@@ -118,6 +129,9 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 	returnRn Nothing 
     else
 	
+    traceRn (text "Local top-level environment" $$ 
+	     nest 4 (pprGlobalRdrEnv local_gbl_env))	`thenRn_`
+
 	-- DEAL WITH DEPRECATIONS
     rnDeprecs local_gbl_env mod_deprec 
 	      [d | DeprecD d <- local_decls]		`thenRn` \ my_deprecs ->
@@ -126,9 +140,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
     fixitiesFromLocalDecls local_gbl_env local_decls	`thenRn` \ local_fixity_env ->
 
 	-- RENAME THE SOURCE
-    initRnMS gbl_env local_fixity_env SourceMode (
-	rnSourceDecls local_decls
-    )					`thenRn` \ (rn_local_decls, source_fvs) ->
+    rnSourceDecls gbl_env local_fixity_env local_decls	`thenRn` \ (rn_local_decls, source_fvs) ->
 
 	-- CHECK THAT main IS DEFINED, IF REQUIRED
     checkMain this_module local_gbl_env		`thenRn_`
@@ -180,13 +192,16 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 				mi_deprecs  = my_deprecs,
 				mi_decls    = panic "mi_decls"
 		    }
+
+	print_unqualified = unQualInScope gbl_env
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
-    reportUnusedNames mod_iface imports global_avail_env
+    reportUnusedNames mod_iface print_unqualified 
+		      imports global_avail_env
 		      source_fvs export_avails rn_imp_decls 	`thenRn_`
 
-    returnRn (Just (mod_iface, final_decls))
+    returnRn (Just (print_unqualified, mod_iface, final_decls))
   where
     mod_name = moduleName this_module
 \end{code}
@@ -197,7 +212,7 @@ Checking that main is defined
 checkMain :: Module -> GlobalRdrEnv -> RnMG ()
 checkMain this_mod local_env
   | moduleName this_mod == mAIN_Name 
-  = checkRn (main_RDR `elemRdrEnv` local_env) noMainErr
+  = checkRn (main_RDR_Unqual `elemRdrEnv` local_env) noMainErr
   | otherwise
   = returnRn ()
 \end{code}
@@ -360,18 +375,20 @@ checkOldIface :: DynFlags
 				-- True <=> errors happened
 
 checkOldIface dflags hit hst pcs iface_path source_unchanged maybe_iface
-  = case maybe_iface of
+  = runRn dflags hit hst pcs (panic "Bogus module") $
+    case maybe_iface of
        Just old_iface -> -- Use the one we already have
-                         startRn (mi_module old_iface) $ 
-                         check_versions old_iface
+                         setModuleRn (mi_module old_iface) (check_versions old_iface)
+
        Nothing -- try and read it from a file
-          -> do read_result <- readIface do_traceRn iface_path
-                case read_result of
-                   Left err -> -- Old interface file not found, or garbled; give up
-			       do { ioTraceRn (text "Bad old interface file" $$ nest 4 err) ;
-	                            return (pcs, False, (outOfDate, Nothing)) }
-                   Right parsed_iface
-                      -> startRn (pi_mod parsed_iface) $
+          -> readIface iface_path	`thenRn` \ read_result ->
+             case read_result of
+               Left err -> -- Old interface file not found, or garbled; give up
+			   traceRn (text "Bad old interface file" $$ nest 4 err) 	`thenRn_`
+	                   returnRn (outOfDate, Nothing)
+
+               Right parsed_iface
+                      -> setModuleRn (pi_mod parsed_iface) $
                          loadOldIface parsed_iface `thenRn` \ m_iface ->
                          check_versions m_iface
     where
@@ -381,10 +398,6 @@ checkOldIface dflags hit hst pcs iface_path source_unchanged maybe_iface
             recompileRequired iface_path source_unchanged iface
 	 						`thenRn` \ recompile ->
             returnRn (recompile, Just iface)
-
-       do_traceRn     = dopt Opt_D_dump_rn_trace dflags
-       ioTraceRn sdoc = if do_traceRn then printErrs sdoc else return ()
-       startRn mod     = initRn dflags hit hst pcs mod
 \end{code}
 
 I think the following function should now have a more representative name,
@@ -487,7 +500,7 @@ closeIfaceDecls :: DynFlags
 				-- True <=> errors happened
 closeIfaceDecls dflags hit hst pcs
 		mod_iface@(ModIface { mi_module = mod, mi_decls = iface_decls })
-  = initRn dflags hit hst pcs mod $
+  = runRn dflags hit hst pcs mod $
 
     let
 	rule_decls = dcl_rules iface_decls
@@ -510,18 +523,19 @@ closeIfaceDecls dflags hit hst pcs
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: ModIface -> [RdrNameImportDecl] 
+reportUnusedNames :: ModIface -> PrintUnqualified
+		  -> [RdrNameImportDecl] 
 		  -> AvailEnv
 		  -> NameSet 		-- Used in this module
 		  -> Avails		-- Exported by this module
 		  -> [RenamedHsDecl] 
 		  -> RnMG ()
-reportUnusedNames my_mod_iface imports avail_env 
+reportUnusedNames my_mod_iface unqual imports avail_env 
 		  source_fvs export_avails imported_decls
   = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
     warnUnusedImports bad_imp_names				`thenRn_`
-    printMinimalImports this_mod minimal_imports		`thenRn_`
+    printMinimalImports this_mod unqual minimal_imports		`thenRn_`
     warnDeprecations this_mod export_avails my_deprecs 
 		     really_used_names
 
@@ -570,7 +584,7 @@ reportUnusedNames my_mod_iface imports avail_env
     bad_locals     = [n     | (n,LocalDef) <- defined_but_not_used]
     
     bad_imp_names :: [(Name,Provenance)]
-    bad_imp_names  = [(n,p) | (n,p@(NonLocalDef (UserImport mod _ True) _)) <- defined_but_not_used,
+    bad_imp_names  = [(n,p) | (n,p@(NonLocalDef (UserImport mod _ True))) <- defined_but_not_used,
   	  		      not (module_unused mod)]
     
     -- inst_mods are directly-imported modules that 
@@ -603,9 +617,9 @@ reportUnusedNames my_mod_iface imports avail_env
     minimal_imports1 = foldr add_name     minimal_imports0 defined_and_used
     minimal_imports  = foldr add_inst_mod minimal_imports1 inst_mods
     
-    add_name (n,NonLocalDef (UserImport m _ _) _) acc = addToFM_C plusAvailEnv acc (moduleName (nameModule n))
-					    			  (unitAvailEnv (mk_avail n))
-    add_name (n,other_prov)			  acc = acc
+    add_name (n,NonLocalDef (UserImport m _ _)) acc = addToFM_C plusAvailEnv acc (moduleName (nameModule n))
+					    			(unitAvailEnv (mk_avail n))
+    add_name (n,other_prov)			acc = acc
 
     mk_avail n = case lookupNameEnv avail_env n of
     		Just (AvailTC m _) | n==m      -> AvailTC n [n]
@@ -667,13 +681,13 @@ warnDeprecations this_mod export_avails my_deprecs used_names
 		Nothing    -> pprPanic "warnDeprecations:" (ppr n)
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
-printMinimalImports this_mod imps
+printMinimalImports this_mod unqual imps
   = doptRn Opt_D_dump_minimal_imports		`thenRn` \ dump_minimal ->
     if not dump_minimal then returnRn () else
 
     mapRn to_ies (fmToList imps)		`thenRn` \ mod_ies ->
     ioToRnM (do { h <- openFile filename WriteMode ;
-		  printForUser h (vcat (map ppr_mod_ie mod_ies))
+		  printForUser h unqual (vcat (map ppr_mod_ie mod_ies))
 	})					`thenRn_`
     returnRn ()
   where
@@ -764,19 +778,6 @@ getRnStats imported_decls ifaces
     	 hsep [ int n_rules_slurped, text "rule decls imported, out of",  
     	        int (n_rules_slurped + n_rules_left), text "read"]
 	]
-
-count_decls decls
-  = (class_decls, 
-     data_decls, 
-     newtype_decls,
-     syn_decls, 
-     val_decls, 
-     inst_decls)
-  where
-    tycl_decls = [d | TyClD d <- decls]
-    (class_decls, data_decls, newtype_decls, syn_decls, val_decls) = countTyClDecls tycl_decls
-
-    inst_decls    = length [() | InstD _  <- decls]
 \end{code}    
 
 

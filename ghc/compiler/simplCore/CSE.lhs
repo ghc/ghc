@@ -19,7 +19,7 @@ import Subst		( InScopeSet, uniqAway, emptyInScopeSet,
 			  extendInScopeSet, elemInScopeSet )
 import CoreSyn
 import VarEnv	
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import Outputable
 import Util		( mapAccumL )
 import UniqFM
@@ -107,7 +107,7 @@ cseProgram :: DynFlags -> [CoreBind] -> IO [CoreBind]
 
 cseProgram dflags binds
   = do {
-	beginPass dflags "Common sub-expression";
+	showPass dflags "Common sub-expression";
 	let { binds' = cseBinds emptyCSEnv binds };
 	endPass dflags "Common sub-expression" 
 	 	(dopt Opt_D_dump_cse dflags || dopt Opt_D_verbose_core2core dflags)

@@ -44,7 +44,7 @@ stg2stg :: DynFlags		-- includes spec of what stg-to-stg passes to do
 stg2stg dflags module_name us binds
   = case (splitUniqSupply us)	of { (us4now, us4later) ->
 
-    doIfSet_dyn dflags Opt_D_verbose_stg2stg (printErrs (text "VERBOSE STG-TO-STG:")) >>
+    doIfSet_dyn dflags Opt_D_verbose_stg2stg (printDump (text "VERBOSE STG-TO-STG:")) >>
 
     end_pass us4now "Core2Stg" ([],[],[]) binds
 		>>= \ (binds', us, ccs) ->

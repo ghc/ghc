@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.48 2000/11/07 15:21:39 simonmar Exp $
+% $Id: CgCase.lhs,v 1.49 2000/11/10 15:12:51 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -402,7 +402,7 @@ getPrimAppResultAmodes uniq (StgAlgAlts ty alts some_default)
 		[ CTemp (getUnique arg) (idPrimRep arg) | arg <- args ]
 	    _ -> panic "getPrimAppResultAmodes: case of unboxed tuple has multiple branches"
 
-  | otherwise = panic ("getPrimAppResultAmodes: case of primop has strange type: " ++ showSDoc (ppr ty))
+  | otherwise = pprPanic "getPrimAppResultAmodes: case of primop has strange type:" (ppr ty)
 
   where (tycon, _, _) = splitAlgTyConApp ty
 

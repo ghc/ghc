@@ -270,7 +270,7 @@ forkNF_Tc m (TcDown dflags deflts u_var df_var src_loc err_cxt err_var) env
 
 \begin{code}
 traceTc :: SDoc -> NF_TcM ()
-traceTc doc down env = printErrs doc
+traceTc doc down env = printDump doc
 
 ioToTc :: IO a -> NF_TcM a
 ioToTc io down env = io

@@ -19,7 +19,7 @@ import HsTypes		( HsType )
 -- others:
 import Name		( Name, isLexSym ) 
 import Outputable	
-import PprType		( pprType, pprParendType )
+import PprType		( pprParendType )
 import Type		( Type )
 import Var		( TyVar )
 import DataCon		( DataCon )
@@ -305,8 +305,7 @@ ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
 ppr_expr (ExplicitList exprs)
   = brackets (fsep (punctuate comma (map ppr_expr exprs)))
 ppr_expr (ExplicitListOut ty exprs)
-  = hcat [ brackets (fsep (punctuate comma (map ppr_expr exprs))),
-	   ifNotPprForUser ((<>) space (parens (pprType ty))) ]
+  = brackets (fsep (punctuate comma (map ppr_expr exprs)))
 
 ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens boxity (sep (punctuate comma (map ppr_expr exprs)))
@@ -394,7 +393,7 @@ pprParendExpr expr
 
 \begin{code}
 isOperator :: Outputable a => a -> Bool
-isOperator v = isLexSym (_PK_ (showSDoc (ppr v)))
+isOperator v = isLexSym (_PK_ (showSDocUnqual (ppr v)))
 	-- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
 	-- that we don't need NamedThing in the context of all these functions.
 	-- Gruesome, but simple.

@@ -14,10 +14,10 @@ Defines classes for pretty-printing and forcing, both forms of
 module Outputable (
 	Outputable(..),			-- Class
 
-	PprStyle, CodeStyle(..), 
+	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
 	getPprStyle, withPprStyle, pprDeeper,
 	codeStyle, ifaceStyle, userStyle, debugStyle, asmStyle,
-	ifPprDebug, ifNotPprForUser,
+	ifPprDebug, unqualStyle,
 
 	SDoc, 		-- Abstract
 	interppSP, interpp'SP, pprQuotedList, pprWithCommas,
@@ -37,7 +37,7 @@ module Outputable (
 	printSDoc, printErrs, printDump,
 	printForC, printForAsm, printForIface, printForUser,
 	pprCode, pprCols,
-	showSDoc, showSDocDebug, showSDocIface, showsPrecSDoc,
+	showSDoc, showSDocDebug, showSDocIface, showSDocUnqual, showsPrecSDoc,
 	pprHsChar, pprHsString,
 
 
@@ -48,6 +48,8 @@ module Outputable (
 
 #include "HsVersions.h"
 
+
+import {-# SOURCE #-} 	Name( Name )
 
 import IO		( Handle, hPutChar, hPutStr, stderr, stdout )
 import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
@@ -67,23 +69,36 @@ import Char             ( chr, ord, isDigit )
 
 \begin{code}
 data PprStyle
-  = PprUser Depth		-- Pretty-print in a way that will
-				-- make sense to the ordinary user;
-				-- must be very close to Haskell
-				-- syntax, etc.
+  = PprUser PrintUnqualified Depth	-- Pretty-print in a way that will
+					-- make sense to the ordinary user;
+					-- must be very close to Haskell
+					-- syntax, etc.
 
-  | PprDebug			-- Standard debugging output
-
-  | PprInterface		-- Interface generation
+  | PprInterface PrintUnqualified	-- Interface generation
 
   | PprCode CodeStyle		-- Print code; either C or assembler
 
+  | PprDebug			-- Standard debugging output
 
 data CodeStyle = CStyle		-- The format of labels differs for C and assembler
 	       | AsmStyle
 
 data Depth = AllTheWay
            | PartWay Int	-- 0 => stop
+
+
+type PrintUnqualified = Name -> Bool
+	-- This function tells when it's ok to print 
+	-- a (Global) name unqualified
+
+alwaysQualify,neverQualify :: PrintUnqualified
+alwaysQualify n = False
+neverQualify  n = True
+
+defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
+
+mkUserStyle unqual depth |  opt_PprStyle_Debug = PprDebug
+	          	 |  otherwise          = PprUser unqual depth
 \end{code}
 
 Orthogonal to the above printing styles are (possibly) some
@@ -107,15 +122,20 @@ withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d sty' = d sty
 
 pprDeeper :: SDoc -> SDoc
-pprDeeper d (PprUser (PartWay 0)) = Pretty.text "..."
-pprDeeper d (PprUser (PartWay n)) = d (PprUser (PartWay (n-1)))
-pprDeeper d other_sty             = d other_sty
+pprDeeper d (PprUser unqual (PartWay 0)) = Pretty.text "..."
+pprDeeper d (PprUser unqual (PartWay n)) = d (PprUser unqual (PartWay (n-1)))
+pprDeeper d other_sty        		 = d other_sty
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df sty = df sty sty
 \end{code}
 
 \begin{code}
+unqualStyle :: PprStyle -> Name -> Bool
+unqualStyle (PprUser    unqual _) n = unqual n
+unqualStyle (PprInterface unqual) n = unqual n
+unqualStyle other		  n = False
+
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)	  = True
 codeStyle _		  = False
@@ -125,22 +145,16 @@ asmStyle (PprCode AsmStyle)  = True
 asmStyle other               = False
 
 ifaceStyle :: PprStyle -> Bool
-ifaceStyle PprInterface	  = True
-ifaceStyle other	  = False
+ifaceStyle (PprInterface _) = True
+ifaceStyle other	    = False
 
 debugStyle :: PprStyle -> Bool
 debugStyle PprDebug	  = True
 debugStyle other	  = False
 
 userStyle ::  PprStyle -> Bool
-userStyle (PprUser _) = True
-userStyle other       = False
-\end{code}
-
-\begin{code}
-ifNotPprForUser :: SDoc -> SDoc	-- Returns empty document for User style
-ifNotPprForUser d sty@(PprUser _) = Pretty.empty
-ifNotPprForUser d sty             = d sty
+userStyle (PprUser _ _) = True
+userStyle other         = False
 
 ifPprDebug :: SDoc -> SDoc	  -- Empty for non-debug style
 ifPprDebug d sty@PprDebug = d sty
@@ -153,20 +167,28 @@ printSDoc d sty = printDoc PageMode stdout (d sty)
 
 -- I'm not sure whether the direct-IO approach of printDoc
 -- above is better or worse than the put-big-string approach here
-printErrs :: SDoc -> IO ()
-printErrs doc = printDoc PageMode stderr (final_doc user_style)
-	      where
-		final_doc = doc 	-- $$ text ""
-		user_style = mkUserStyle (PartWay opt_PprUserLength)
+printErrs :: PrintUnqualified -> SDoc -> IO ()
+printErrs unqual doc = printDoc PageMode stderr (doc style)
+		     where
+		       style = mkUserStyle unqual (PartWay opt_PprUserLength)
 
 printDump :: SDoc -> IO ()
-printDump doc = printForUser stdout (doc $$ text "")
-		-- We used to always print in debug style, but I want
-		-- to try the effect of a more user-ish style (unless you
-		-- say -dppr-debug
+printDump doc = printDoc PageMode stdout (better_doc defaultUserStyle)
+  	      where
+		better_doc = doc $$ text ""
+	-- We used to always print in debug style, but I want
+	-- to try the effect of a more user-ish style (unless you
+	-- say -dppr-debug
 
-printForUser :: Handle -> SDoc -> IO ()
-printForUser handle doc = printDoc PageMode handle (doc (mkUserStyle AllTheWay))
+printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
+printForUser handle unqual doc 
+  = printDoc PageMode handle (doc (mkUserStyle unqual AllTheWay))
+
+-- printForIface prints all on one line for interface files.
+-- It's called repeatedly for successive lines
+printForIface :: Handle -> PrintUnqualified -> SDoc -> IO ()
+printForIface handle unqual doc 
+  = printDoc LeftMode handle (doc (PprInterface unqual))
 
 -- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()
@@ -175,11 +197,6 @@ printForC handle doc = printDoc LeftMode handle (doc (PprCode CStyle))
 printForAsm :: Handle -> SDoc -> IO ()
 printForAsm handle doc = printDoc LeftMode handle (doc (PprCode AsmStyle))
 
--- printForIface prints all on one line for interface files.
--- It's called repeatedly for successive lines
-printForIface :: Handle -> SDoc -> IO ()
-printForIface handle doc = printDoc LeftMode handle (doc PprInterface)
-
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
 
@@ -187,19 +204,20 @@ pprCode cs d = withPprStyle (PprCode cs) d
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
-showSDoc d = show (d (mkUserStyle AllTheWay))
+showSDoc d = show (d defaultUserStyle)
+
+showSDocUnqual :: SDoc -> String
+-- Only used in the gruesome HsExpr.isOperator
+showSDocUnqual d = show (d (mkUserStyle neverQualify AllTheWay))
+
+showsPrecSDoc :: Int -> SDoc -> ShowS
+showsPrecSDoc p d = showsPrec p (d defaultUserStyle)
 
 showSDocIface :: SDoc -> String
-showSDocIface doc = showDocWith OneLineMode (doc PprInterface)
+showSDocIface doc = showDocWith OneLineMode (doc (PprInterface alwaysQualify))
 
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (d PprDebug)
-
-showsPrecSDoc :: Int -> SDoc -> ShowS
-showsPrecSDoc p d = showsPrec p (d (mkUserStyle AllTheWay))
-
-mkUserStyle depth |  opt_PprStyle_Debug = PprDebug
-	          |  otherwise          = PprUser depth
 \end{code}
 
 \begin{code}

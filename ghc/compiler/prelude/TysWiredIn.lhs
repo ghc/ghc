@@ -99,7 +99,7 @@ import RdrName		( rdrNameOcc )
 import DataCon		( DataCon, StrictnessMark(..),  mkDataCon, dataConId )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), tyConDataCons,
-			  mkTupleTyCon, isUnLiftedTyCon, mkAlgTyConRep
+			  mkTupleTyCon, isUnLiftedTyCon, mkAlgTyCon
 			)
 
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
@@ -163,7 +163,7 @@ pcRecDataTyCon = pcTyCon DataTyCon Recursive
 pcTyCon new_or_data is_rec name tyvars argvrcs cons
   = tycon
   where
-    tycon = mkAlgTyConRep name kind
+    tycon = mkAlgTyCon name kind
                 tyvars
                 []              -- No context
                 argvrcs

@@ -43,8 +43,7 @@ module Name (
 #include "HsVersions.h"
 
 import OccName		-- All of it
-import Module		( Module, moduleName, mkVanillaModule, 
-			  printModulePrefix, isModuleInThisPackage )
+import Module		( Module, moduleName, mkVanillaModule, isModuleInThisPackage )
 import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
@@ -456,10 +455,10 @@ instance Outputable Name where
 	-- When printing interfaces, all Locals have been given nice print-names
     ppr name = pprName name
 
-pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
+pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      Global mod -> pprGlobal sty uniq mod occ
+      Global mod -> pprGlobal sty name uniq mod occ
       System     -> pprSysLocal sty uniq occ
       Local      -> pprLocal sty uniq occ empty
       Exported   -> pprLocal sty uniq occ (char 'x')
@@ -470,16 +469,14 @@ pprLocal sty uniq occ pp_export
 		     text "{-" <> pp_export <+> pprUnique10 uniq <> text "-}"
   | otherwise      = pprOccName occ
 
-pprGlobal sty uniq mod occ
-  |  codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
+pprGlobal sty name uniq mod occ
+  | codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
 
-  | debugStyle sty        = ppr (moduleName mod) <> dot <> pprOccName occ <> 
+  | debugStyle sty       = ppr (moduleName mod) <> dot <> pprOccName occ <> 
 			    text "{-" <> pprUnique10 uniq <> text "-}"
 
-  | ifaceStyle sty	
-  || printModulePrefix mod = ppr (moduleName mod) <> dot <> pprOccName occ
-
-  | otherwise              = pprOccName occ
+  | unqualStyle sty name = pprOccName occ
+  | otherwise		 = ppr (moduleName mod) <> dot <> pprOccName occ
 
 pprSysLocal sty uniq occ
   | codeStyle sty  = pprUnique uniq

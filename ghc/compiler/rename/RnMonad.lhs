@@ -46,7 +46,8 @@ import HscTypes		( AvailEnv, lookupType,
 			  RdrAvailInfo )
 import BasicTypes	( Version, defaultFixity )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
-			  pprBagOfErrors, ErrMsg, WarnMsg, Message
+			  pprBagOfErrors, Message, Messages, errorsFound,
+			  printErrorsAndWarnings
 			)
 import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			  RdrNameEnv, emptyRdrEnv, extendRdrEnv, 
@@ -67,7 +68,6 @@ import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
 import PrelNames	( mkUnboundName )
-import ErrUtils		( printErrorsAndWarnings )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -102,7 +102,7 @@ traceHiDiffsRn msg
      if b then putDocRn msg else returnRn ()
 
 putDocRn :: SDoc -> RnM d ()
-putDocRn msg = ioToRnM (printErrs msg)	`thenRn_`
+putDocRn msg = ioToRnM (printDump msg)	`thenRn_`
 	       returnRn ()
 \end{code}
 
@@ -139,7 +139,7 @@ data RnDown
 			-- The Name passed to rn_done is guaranteed to be a Global,
 			-- so it has a Module, so it can be looked up
 
-	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
+	rn_errs    :: IORef Messages,
 
 	-- The second and third components are a flattened-out OrigNameEnv
 	rn_ns      :: IORef (UniqSupply, OrigNameNameEnv, OrigNameIParamEnv),
@@ -300,13 +300,18 @@ type ImportedModuleInfo = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterfa
 %************************************************************************
 
 \begin{code}
+runRn dflags hit hst pcs mod do_rn
+  = do { (pcs, msgs, r) <- initRn dflags hit hst pcs mod do_rn ;
+	 printErrorsAndWarnings alwaysQualify msgs ;
+	 return (pcs, errorsFound msgs, r)
+    }
+
 initRn :: DynFlags
        -> HomeIfaceTable -> HomeSymbolTable
        -> PersistentCompilerState
        -> Module
        -> RnMG t
-       -> IO (PersistentCompilerState, Bool, t)	
-		-- True <=> found errors
+       -> IO (PersistentCompilerState, Messages, t)	
 
 initRn dflags hit hst pcs mod do_rn
   = do 
@@ -358,10 +363,7 @@ initRn dflags hit hst pcs mod do_rn
 	let new_pcs = pcs { pcs_PIT = iPIT new_ifaces, 
 			    pcs_PRS = new_prs }
 	
-	-- Check for warnings
-	printErrorsAndWarnings (warns, errs) ;
-
-	return (new_pcs, not (isEmptyBag errs), res)
+	return (new_pcs, (warns, errs), res)
 
 initRnMS rn_env fixity_env mode thing_inside rn_down g_down
 	-- The fixity_env appears in both the rn_fixenv field

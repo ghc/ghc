@@ -74,16 +74,18 @@ instance (Outputable pat, Outputable id) =>
 
 ppr_binds EmptyBinds = empty
 ppr_binds (ThenBinds binds1 binds2)
-     = ($$) (ppr_binds binds1) (ppr_binds binds2)
+    = ppr_binds binds1 $$ ppr_binds binds2
 ppr_binds (MonoBind bind sigs is_rec)
-     = vcat [ifNotPprForUser (ptext rec_str),
+     = vcat [ppr_isrec,
      	     vcat (map ppr sigs),
 	     ppr bind
        ]
      where
-       rec_str = case is_rec of
-		   Recursive    -> SLIT("{- rec -}")
-		   NonRecursive -> SLIT("{- nonrec -}")
+       ppr_isrec = getPprStyle $ \ sty -> 
+		   if userStyle sty then empty else
+		   case is_rec of
+		   	Recursive    -> ptext SLIT("{- rec -}")
+			NonRecursive -> ptext SLIT("{- nonrec -}")
 \end{code}
 
 %************************************************************************

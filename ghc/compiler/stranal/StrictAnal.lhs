@@ -18,7 +18,7 @@ import Id		( setIdStrictness, setInlinePragma,
 			  Id
 			)
 import IdInfo		( neverInlinePrag )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import ErrUtils		( dumpIfSet_dyn )
 import SaAbsInt
 import SaLib
@@ -83,7 +83,7 @@ saBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
 
 saBinds dflags binds
   = do {
-	beginPass dflags "Strictness analysis";
+	showPass dflags "Strictness analysis";
 
 	-- Mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS

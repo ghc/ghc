@@ -10,7 +10,7 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 import CoreSyn
 import CoreUnfold	( certainlyWillInline )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType )
 import MkId		( mkWorkerId )
 import Id		( Id, idType, idStrictness, idArity, isOneShotLambda,
@@ -63,7 +63,7 @@ wwTopBinds :: DynFlags
 
 wwTopBinds dflags us binds
   = do {
-	beginPass dflags "Worker Wrapper binds";
+	showPass dflags "Worker Wrapper binds";
 
 	-- Create worker/wrappers, and mark binders with their
 	-- "strictness info" [which encodes their worker/wrapper-ness]

@@ -375,7 +375,7 @@ addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc in addErrLocHdrLine l hdr msg
-    mk_msg []      = dontAddErrLoc "" msg
+    mk_msg []      = dontAddErrLoc msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs

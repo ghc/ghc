@@ -5,22 +5,24 @@
 
 \begin{code}
 module ErrUtils (
-	ErrMsg, WarnMsg, Message,
+	ErrMsg, WarnMsg, Message, Messages, errorsFound,
+
 	addShortErrLocLine, addShortWarnLocLine,
-	addErrLocHdrLine,
-	dontAddErrLoc,
+	addErrLocHdrLine, dontAddErrLoc,
+
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
+
 	ghcExit,
-	doIfSet, doIfSet_dyn, dumpIfSet, dumpIfSet_dyn
+	doIfSet, doIfSet_dyn, dumpIfSet, dumpIfSet_dyn, showPass
     ) where
 
 #include "HsVersions.h"
 
 import Bag		( Bag, bagToList, isEmptyBag )
-import SrcLoc		( SrcLoc, noSrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc, isGoodSrcLoc )
 import Util		( sortLt )
 import Outputable
-import CmdLineOpts	( DynFlags, DynFlag, dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 
 import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, stderr )
@@ -38,10 +40,9 @@ addErrLocHdrLine    :: SrcLoc -> Message -> Message -> ErrMsg
 addShortWarnLocLine :: SrcLoc -> Message -> WarnMsg
 
 addShortErrLocLine locn rest_of_err_msg
-  = ( locn
-    , hang (ppr locn <> colon) 
-         4 rest_of_err_msg
-    )
+  | isGoodSrcLoc locn = (locn, hang (ppr locn <> colon) 4 
+				    rest_of_err_msg)
+  | otherwise	      = (locn, rest_of_err_msg)
 
 addErrLocHdrLine locn hdr rest_of_err_msg
   = ( locn
@@ -50,23 +51,28 @@ addErrLocHdrLine locn hdr rest_of_err_msg
     )
 
 addShortWarnLocLine locn rest_of_err_msg
-  = ( locn
-    , hang (ppr locn <> colon)
-	 4 (ptext SLIT("Warning:") <+> rest_of_err_msg)
-    )
+  | isGoodSrcLoc locn = (locn, hang (ppr locn <> colon) 4 
+				    (ptext SLIT("Warning:") <+> rest_of_err_msg))
+  | otherwise	      = (locn, rest_of_err_msg)
 
-dontAddErrLoc :: String -> Message -> ErrMsg
-dontAddErrLoc title rest_of_err_msg
- | null title = (noSrcLoc, rest_of_err_msg)
- | otherwise  =
-    ( noSrcLoc, hang (text title <> colon) 4 rest_of_err_msg )
+dontAddErrLoc :: Message -> ErrMsg
+dontAddErrLoc msg = (noSrcLoc, msg)
 
-printErrorsAndWarnings :: (Bag WarnMsg, Bag ErrMsg) -> IO ()
+\end{code}
+
+
+\begin{code}
+type Messages = (Bag WarnMsg, Bag ErrMsg)
+
+errorsFound :: Messages -> Bool
+errorsFound (warns, errs) = not (isEmptyBag errs)
+
+printErrorsAndWarnings :: PrintUnqualified -> Messages -> IO ()
 	-- Don't print any warnings if there are errors
-printErrorsAndWarnings (warns, errs)
+printErrorsAndWarnings unqual (warns, errs)
   | no_errs && no_warns  = return ()
-  | no_errs		 = printErrs (pprBagOfWarnings warns)
-  | otherwise		 = printErrs (pprBagOfErrors   errs)
+  | no_errs		 = printErrs unqual (pprBagOfWarnings warns)
+  | otherwise		 = printErrs unqual (pprBagOfErrors   errs)
   where
     no_warns = isEmptyBag warns
     no_errs  = isEmptyBag errs
@@ -103,6 +109,11 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 \end{code}
 
 \begin{code}
+showPass :: DynFlags -> String -> IO ()
+showPass dflags what
+  | dopt Opt_D_show_passes dflags = hPutStr stderr ("*** "++what++":\n")
+  | otherwise			  = return ()
+
 dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
   | not flag   = return ()

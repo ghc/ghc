@@ -18,7 +18,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id )
 import VarEnv
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import SetLevels	( setLevels,
 		 	  Level(..), tOP_LEVEL, ltMajLvl, ltLvl, isTopLvl
 			)
@@ -80,7 +80,7 @@ floatOutwards :: DynFlags
 
 floatOutwards dflags float_lams us pgm
   = do {
-	beginPass dflags float_msg ;
+	showPass dflags float_msg ;
 
 	let { annotated_w_levels = setLevels float_lams pgm us ;
 	      (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)

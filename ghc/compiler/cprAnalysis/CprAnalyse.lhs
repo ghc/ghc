@@ -7,7 +7,7 @@ module CprAnalyse ( cprAnalyse ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import CoreSyn
 import CoreUtils	( exprIsValue )
 import Id               ( Id, setIdCprInfo, idCprInfo, idArity,
@@ -137,7 +137,7 @@ ids decorated with their CprInfo pragmas.
 cprAnalyse :: DynFlags -> [CoreBind] -> IO [CoreBind]
 cprAnalyse dflags binds
   = do {
-	beginPass dflags "Constructed Product analysis" ;
+	showPass dflags "Constructed Product analysis" ;
 	let { binds_plus_cpr = do_prog binds } ;
 	endPass dflags "Constructed Product analysis" 
 	 	(dopt Opt_D_dump_cpranal dflags || dopt Opt_D_verbose_core2core dflags)

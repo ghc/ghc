@@ -37,7 +37,7 @@ import Outputable
 import Maybes           ( expectJust )
 import List             ( unzip4 )
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_UsageSPOn )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn )
 import PprCore          ( pprCoreBindings )
 \end{code}
@@ -93,7 +93,7 @@ doUsageSPInf :: DynFlags
 
 doUsageSPInf dflags us binds
   | not opt_UsageSPOn
-  = do { printErrs (text "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on") ;
+  = do { printDump (text "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on") ;
 	 return binds
     }
 
@@ -108,7 +108,7 @@ doUsageSPInf dflags us binds
   = do
         let binds1 = doUnAnnotBinds binds
 
-	beginPass dflags "UsageSPInf"
+	showPass dflags "UsageSPInf"
 
         dumpIfSet_dyn dflags Opt_D_dump_usagesp "UsageSPInf unannot'd" $
                              pprCoreBindings binds1

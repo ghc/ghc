@@ -57,7 +57,7 @@ doStaticArgs :: [CoreBind] -> UniqSupply -> [CoreBind]
 
 doStaticArgs binds
   = do {
-	beginPass "Static argument";
+	showPass "Static argument";
 	let { binds' = initSAT (mapSAT sat_bind binds) };
 	endPass "Static argument" 
 		False		-- No specific flag for dumping SAT

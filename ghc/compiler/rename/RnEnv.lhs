@@ -11,7 +11,7 @@ module RnEnv where		-- Export everything
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
-			  mkRdrUnqual, mkRdrUnqual, qualifyRdrName, lookupRdrEnv
+			  mkRdrUnqual, mkRdrUnqual, qualifyRdrName, lookupRdrEnv, foldRdrEnv
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
@@ -539,11 +539,12 @@ in error messages.
 \begin{code}
 unQualInScope :: GlobalRdrEnv -> Name -> Bool
 unQualInScope env
-  = lookup
+  = (`elemNameSet` unqual_names)
   where
-    lookup name = case lookupRdrEnv env (mkRdrUnqual (nameOccName name)) of
-			   Just [(name',_)] -> name == name'
-			   other            -> False
+    unqual_names :: NameSet
+    unqual_names = foldRdrEnv add emptyNameSet env
+    add rdr_name [(name,_)] unquals | isUnqual rdr_name = addOneToNameSet unquals name
+    add _        _          unquals		 	= unquals
 \end{code}
 
 
@@ -746,7 +747,7 @@ warnUnusedGroup names
 	= case prov1 of
 		LocalDef -> (True, getSrcLoc name1, text "Defined but not used")
 
-		NonLocalDef (UserImport mod loc _) _ 
+		NonLocalDef (UserImport mod loc _)
 			-> (True, loc, text "Imported from" <+> quotes (ppr mod) <+> text "but not used")
 
     reportable (name,_) = case occNameUserString (nameOccName name) of

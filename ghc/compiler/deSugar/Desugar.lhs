@@ -28,10 +28,10 @@ import Id		( Id )
 import VarEnv
 import VarSet
 import Bag		( isEmptyBag )
-import CoreLint		( beginPass, endPass )
+import CoreLint		( showPass, endPass )
 import ErrUtils		( doIfSet, pprBagOfWarnings )
 import Outputable
-import UniqSupply	( UniqSupply )
+import UniqSupply	( mkSplitUniqSupply )
 import HscTypes		( HomeSymbolTable )
 \end{code}
 
@@ -46,34 +46,36 @@ start.
 
 \begin{code}
 deSugar :: DynFlags
-	-> Module 
-	-> UniqSupply
+	-> Module -> PrintUnqualified
 	-> HomeSymbolTable
         -> TcResults
 	-> IO ([CoreBind], [(Id,CoreRule)], SDoc, SDoc, [CoreBndr])
 
-deSugar dflags mod_name us hst
+deSugar dflags mod_name unqual hst
         (TcResults {tc_env   = global_val_env,
 		    tc_pcs   = pcs,
 		    tc_binds = all_binds,
 		    tc_rules = rules,
 		    tc_fords = fo_decls})
   = do
-	beginPass dflags "Desugar"
+	showPass dflags "Desugar"
+	us <- mkSplitUniqSupply 'd'
+
 	-- Do desugaring
 	let (result, ds_warns) = 
 		initDs dflags us (hst,pcs,global_val_env) mod_name
 			(dsProgram mod_name all_binds rules fo_decls)    
 	    (ds_binds, ds_rules, _, _, _) = result
 
-	 -- Display any warnings
+	-- Display any warnings
         doIfSet (not (isEmptyBag ds_warns))
-		(printErrs (pprBagOfWarnings ds_warns))
+		(printErrs unqual (pprBagOfWarnings ds_warns))
 
-	 -- Lint result if necessary
+	-- Lint result if necessary
         let do_dump_ds = dopt Opt_D_dump_ds dflags
         endPass dflags "Desugar" do_dump_ds ds_binds
 
+	-- Dump output
 	doIfSet do_dump_ds (printDump (ppr_ds_rules ds_rules))
 
         return result
