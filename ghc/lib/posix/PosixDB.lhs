@@ -46,7 +46,7 @@ getGroupEntryForID gid =
     _ccall_ getgrgid gid  >>= \ ptr ->
     if ptr == (``NULL'' :: Addr) then
 	fail (IOError Nothing NoSuchThing
-	     "getGroupEntryForID: no such group entry")
+	     "getGroupEntryForID" "no such group entry")
     else
 	unpackGroupEntry ptr
 
@@ -56,7 +56,7 @@ getGroupEntryForName name =
     _ccall_ getgrnam gname		>>= \ ptr ->
     if ptr == (``NULL'' :: Addr) then
 	fail (IOError Nothing NoSuchThing
-	     "getGroupEntryForName: no such group entry")
+	     "getGroupEntryForName" "no such group entry")
     else
 	unpackGroupEntry ptr
 
@@ -65,7 +65,7 @@ getUserEntryForID uid =
     _ccall_ getpwuid uid		>>= \ ptr ->
     if ptr == ``NULL'' then
 	fail (IOError Nothing NoSuchThing
-	     "getUserEntryForID: no such user entry")
+	     "getUserEntryForID" "no such user entry")
     else
 	unpackUserEntry ptr
 
@@ -75,7 +75,7 @@ getUserEntryForName name =
     _ccall_ getpwnam uname		>>= \ ptr ->
     if ptr == ``NULL'' then
 	fail (IOError Nothing NoSuchThing
-	     "getUserEntryForName: no such user entry")
+	     "getUserEntryForName" "no such user entry")
     else
 	unpackUserEntry ptr
 \end{code}

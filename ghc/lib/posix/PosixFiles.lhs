@@ -128,7 +128,7 @@ readDirStream dirp = do
        else do
 	     errno <- getErrorCode
 	     if errno == noError
-		then fail (IOError Nothing EOF "EOF")
+		then fail (IOError Nothing EOF "readDirStream" "EOF")
 		else syserr "readDirStream"
 
 rewindDirStream :: DirStream -> IO ()
@@ -529,7 +529,7 @@ pathconf n name = do
      else do
 	  errno <-  getErrorCode
 	  if errno == invalidArgument
-	     then fail (IOError Nothing NoSuchThing "PosixFiles.getPathVar: no such path limit or option")
+	     then fail (IOError Nothing NoSuchThing "getPathVar" "no such path limit or option")
 	     else syserr "PosixFiles.getPathVar"
 
 
@@ -553,7 +553,7 @@ fpathconf n fd = do
     else do
 	 errno <-  getErrorCode
 	 if errno == invalidArgument
-	    then fail (IOError Nothing NoSuchThing "getFileVar: no such path limit or option")
+	    then fail (IOError Nothing NoSuchThing "getFileVar" "no such path limit or option")
 	    else syserr "getFileVar"
 
 \end{code}
