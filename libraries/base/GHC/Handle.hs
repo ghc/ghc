@@ -1039,11 +1039,9 @@ hClose_handle_ handle_ = do
         c_fd = fromIntegral fd
 
     -- close the file descriptor, but not when this is the read
-    -- side of a duplex handle, and not when this is one of the
-    -- std file handles.
+    -- side of a duplex handle.
     case haOtherSide handle_ of
       Nothing -> 
-  	  when (fd /= fd_stdin && fd /= fd_stdout && fd /= fd_stderr) $
   		  throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_TARGET_OS
 	    			(closeFd (haIsStream handle_) c_fd)
