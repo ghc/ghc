@@ -85,53 +85,14 @@ getInterfaceExports mod_name from
 %*							*
 %*********************************************************
 
-getImportVersions figures out what the ``usage information'' for this
+mkImportInof figures out what the ``usage information'' for this
 moudule is; that is, what it must record in its interface file as the
-things it uses.  It records:
+things it uses.  
 
-\begin{itemize}
-\item	(a) anything reachable from its body code
-\item	(b) any module exported with a @module Foo@
-\item   (c) anything reachable from an exported item
-\end{itemize}
-
-Why (b)?  Because if @Foo@ changes then this module's export list
-will change, so we must recompile this module at least as far as
-making a new interface file --- but in practice that means complete
-recompilation.
-
-Why (c)?  Consider this:
-\begin{verbatim}
-	module A( f, g ) where	|	module B( f ) where
-	  import B( f )		|	  f = h 3
-	  g = ...		|	  h = ...
-\end{verbatim}
-
-Here, @B.f@ isn't used in A.  Should we nevertheless record @B.f@ in
-@A@'s usages?  Our idea is that we aren't going to touch A.hi if it is
-*identical* to what it was before.  If anything about @B.f@ changes
-than anyone who imports @A@ should be recompiled in case they use
-@B.f@ (they'll get an early exit if they don't).  So, if anything
-about @B.f@ changes we'd better make sure that something in A.hi
-changes, and the convenient way to do that is to record the version
-number @B.f@ in A.hi in the usage list.  If B.f changes that'll force a
-complete recompiation of A, which is overkill but it's the only way to 
-write a new, slightly different, A.hi.
-
-But the example is tricker.  Even if @B.f@ doesn't change at all,
-@B.h@ may do so, and this change may not be reflected in @f@'s version
-number.  But with -O, a module that imports A must be recompiled if
-@B.h@ changes!  So A must record a dependency on @B.h@.  So we treat
-the occurrence of @B.f@ in the export list *just as if* it were in the
-code of A, and thereby haul in all the stuff reachable from it.
-
-[NB: If B was compiled with -O, but A isn't, we should really *still*
-haul in all the unfoldings for B, in case the module that imports A *is*
-compiled with -O.  I think this is the case.]
-
-Even if B is used at all we get a usage line for B
-	import B <n> :: ... ;
-in A.hi, to record the fact that A does import B.  This is used to decide
+We produce a line for every module B below the module, A, currently being
+compiled:
+	import B <n> ;
+to record the fact that A does import B indireclty.  This is used to decide
 to look to look for B.hi rather than B.hi-boot when compiling a module that
 imports A.  This line says that A imports B, but uses nothing in it.
 So we'll get an early bale-out when compiling A if B's version changes.
@@ -317,8 +278,12 @@ closeDecls decls needed
     case rule_decls of
 	[]    -> returnRn decls	-- No new rules, so we are done
 	other -> rnIfaceDecls rnIfaceRuleDecl rule_decls	`thenRn` \ rule_decls' ->
-		 closeDecls (map RuleD rule_decls' ++ decls)
-			    (plusFVs (map ruleDeclFVs rule_decls'))
+		 let
+			rule_fvs = plusFVs (map ruleDeclFVs rule_decls')
+		 in
+		 traceRn (text "closeRules" <+> ppr rule_decls' $$ fsep (map ppr (nameSetToList rule_fvs)))	`thenRn_`
+		 closeDecls (map RuleD rule_decls' ++ decls) rule_fvs
+
 		 
 
 -------------------------------------------------------
@@ -644,7 +609,13 @@ importDecl name
 	returnRn AlreadySlurped
     else
 
-	-- STEP 2: Check if it's already in the type environment
+	-- STEP 2: Check if we've slurped it in while compiling this module
+    getIfacesRn				`thenRn` \ ifaces ->
+    if name `elemNameSet` iSlurp ifaces then	
+	returnRn AlreadySlurped	
+    else
+
+	-- STEP 3: Check if it's already in the type environment
     getTypeEnvRn 			`thenRn` \ lookup ->
     case lookup name of {
 	Just ty_thing | name `elemNameEnv` wiredInThingEnv
@@ -657,12 +628,6 @@ importDecl name
 		      -> returnRn (InTypeEnv ty_thing) ;
 
 	Nothing -> 
-
-	-- STEP 3: Check if we've slurped it in while compiling this module
-    getIfacesRn				`thenRn` \ ifaces ->
-    if name `elemNameSet` iSlurp ifaces then	
-	returnRn AlreadySlurped	
-    else
 
 	-- STEP 4: OK, we have to slurp it in from an interface file
 	--	   First load the interface file
@@ -711,11 +676,11 @@ recompileRequired :: FilePath		-- Only needed for debug msgs
 		  -> ModIface 		-- Old interface
 		  -> RnMG RecompileRequired
 recompileRequired iface_path source_unchanged iface
-  = traceRn (text "Considering whether compilation is required for" <+> text iface_path <> colon)	`thenRn_`
+  = traceHiDiffsRn (text "Considering whether compilation is required for" <+> text iface_path <> colon)	`thenRn_`
 
 	-- CHECK WHETHER THE SOURCE HAS CHANGED
     if not source_unchanged then
-	traceRn (nest 4 (text "Source file changed or recompilation check turned off"))	`thenRn_` 
+	traceHiDiffsRn (nest 4 (text "Source file changed or recompilation check turned off"))	`thenRn_` 
 	returnRn outOfDate
     else
 
@@ -819,8 +784,8 @@ checkEntityUsage new_vers (name,old_vers)
 	  | new_vers == old_vers -> returnRn upToDate
 	  | otherwise	 	 -> out_of_date (sep [ptext SLIT("Out of date:"), ppr name])
 
-up_to_date  msg = traceRn msg `thenRn_` returnRn upToDate
-out_of_date msg = traceRn msg `thenRn_` returnRn outOfDate
+up_to_date  msg = traceHiDiffsRn msg `thenRn_` returnRn upToDate
+out_of_date msg = traceHiDiffsRn msg `thenRn_` returnRn outOfDate
 \end{code}
 
 

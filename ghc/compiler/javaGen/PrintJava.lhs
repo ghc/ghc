@@ -81,11 +81,6 @@ clazz = \mfs -> \n -> \x -> \is -> \ms ->
   $$ indent ms 
   $$ text "}"
 
-staticblock = \ss ->
-  text "static" <+> text "{"
-  $$ indent ss
-  $$ text "}"
-    
 modifiers mfs = hsep (map modifier mfs)
     
 modifier mf = text $ map toLower (show mf)

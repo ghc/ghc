@@ -16,8 +16,6 @@ module PprEnv (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon ( DataCon )
-
 import Var		( Id, TyVar )
 import CostCentre	( CostCentre )
 import Type  		( Type )

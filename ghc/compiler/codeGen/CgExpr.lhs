@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.36 2000/10/03 08:43:00 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.37 2000/11/07 13:12:22 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -39,11 +39,9 @@ import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo,
 import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
 import Id		( idPrimRep, idType, Id )
 import VarSet
-import DataCon		( DataCon, dataConTyCon )
-import PrimOp		( primOpOutOfLine, ccallMayGC,
-			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
-			)
-import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
+import DataCon		( dataConTyCon )
+import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..) )
+import PrimRep		( PrimRep(..), isFollowableRep )
 import TyCon		( maybeTyConSingleCon,
 			  isUnboxedTupleTyCon, isEnumerationTyCon )
 import Type		( Type, typePrimRep, splitTyConApp_maybe, repType )

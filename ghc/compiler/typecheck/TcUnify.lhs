@@ -324,7 +324,6 @@ uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
 uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
   = checkKinds swapped tv1 non_var_ty2			`thenTc_`
     occur_check non_var_ty2				`thenTc_`
-    ASSERT( isNotUsgTy ps_ty2 )
     checkTcM (not (isSigTyVar tv1))
 	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
 

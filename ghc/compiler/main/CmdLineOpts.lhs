@@ -341,10 +341,6 @@ lookup_def_int sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> read xx
 
-lookup_def_char sw def = case (lookup_str sw) of
-		  	    Just (xx:_) -> xx
-			    _           -> def		-- Use default
-
 lookup_def_float sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> read xx
@@ -604,11 +600,6 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 			    || sw `is_elem` ss
 \end{code}
 
-Default settings for simplifier switches
-
-\begin{code}
-defaultSimplSwitches = [MaxSimplifierIterations	1]
-\end{code}
 
 %************************************************************************
 %*									*

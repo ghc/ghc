@@ -31,7 +31,6 @@ import ErrUtils		( dumpIfSet_dyn )
 import Outputable
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 import TmpFiles		( newTempName )
-import UniqSupply	( mkSplitUniqSupply )
 
 import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}

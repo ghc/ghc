@@ -165,7 +165,7 @@ getTcGEnv (TcEnv { tcGEnv = genv }) = genv
 -- This data type is used to help tie the knot
 -- when type checking type and class declarations
 data TyThingDetails = SynTyDetails Type
-		    | DataTyDetails ClassContext [DataCon] [Class]
+		    | DataTyDetails ClassContext [DataCon]
 		    | ClassDetails ClassContext [Id] [ClassOpItem] DataCon
 \end{code}
 

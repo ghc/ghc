@@ -17,7 +17,7 @@ module HsTypes (
 
 	-- Equality over Hs things
 	, EqHsEnv, emptyEqHsEnv, extendEqHsEnv,
-	, eqWithHsTyVars, eq_hsVar, eq_hsVars, eq_hsType, eq_hsContext, eqListBy
+	, eqWithHsTyVars, eq_hsVar, eq_hsVars, eq_hsTyVars, eq_hsType, eq_hsContext, eqListBy
 
 	-- Converting from Type to HsType
 	, toHsType, toHsTyVar, toHsTyVars, toHsContext, toHsFDs

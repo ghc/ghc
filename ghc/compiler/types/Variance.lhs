@@ -12,14 +12,13 @@ module Variance(
 #include "HsVersions.h"
 
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
-import TyCon            ( TyCon, ArgVrcs, tyConKind, tyConArity, tyConDataConsIfAvailable, tyConTyVars,
+import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataConsIfAvailable, tyConTyVars,
                           tyConArgVrcs_maybe, getSynTyConDefn, isSynTyCon, isAlgTyCon )
 import DataCon          ( dataConRepArgTys )
 
 import FiniteMap
 import Var              ( TyVar )
 import VarSet
-import Name             ( Name, getName )
 import Maybes           ( expectJust )
 import Outputable
 \end{code}

@@ -40,7 +40,7 @@ module OccName (
 
 #include "HsVersions.h"
 
-import Char	( isDigit, isAlpha, isUpper, isLower, ISALPHANUM, ord, chr, digitToInt )
+import Char	( isDigit, isUpper, isLower, ISALPHANUM, ord, chr, digitToInt )
 import Util	( thenCmp )
 import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )
 import Outputable

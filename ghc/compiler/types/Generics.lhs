@@ -4,7 +4,6 @@ module Generics ( mkTyConGenInfo, mkGenericRhs,
     ) where
 
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import RnHsSyn		( RenamedHsExpr )
 import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch )
 
@@ -219,7 +218,7 @@ valid ty
 %************************************************************************
 
 \begin{code}
-mkTyConGenInfo :: DynFlags -> TyCon -> Name -> Name -> Maybe (EP Id)
+mkTyConGenInfo :: TyCon -> Name -> Name -> Maybe (EP Id)
 -- mkTyConGenInfo is called twice
 --	once from TysWiredIn for Tuples
 --	once the typechecker TcTyDecls 
@@ -230,10 +229,7 @@ mkTyConGenInfo :: DynFlags -> TyCon -> Name -> Name -> Maybe (EP Id)
 -- The two names are the names constructed by the renamer
 -- for the fromT and toT conversion functions.
 
-mkTyConGenInfo dflags tycon from_name to_name
-  | not (dopt Opt_Generics dflags)
-  = Nothing
-
+mkTyConGenInfo tycon from_name to_name
   | null datacons 	-- Abstractly imported types don't have
   = Nothing		-- to/from operations, (and should not need them)
 

@@ -17,16 +17,16 @@ module SaAbsInt (
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
-import CoreUnfold	( Unfolding, maybeUnfoldingTemplate )
-import Id		( Id, idType, idArity, idStrictness, idUnfolding, isDataConId_maybe )
+import CoreUnfold	( maybeUnfoldingTemplate )
+import Id		( Id, idType, idStrictness, idUnfolding, isDataConId_maybe )
 import DataCon		( dataConTyCon, splitProductType_maybe, dataConRepArgTys )
 import IdInfo		( StrictnessInfo(..) )
-import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, wwLazy, wwUnpackNew,
+import Demand		( Demand(..), wwPrim, wwStrict, wwUnpackData, wwLazy, wwUnpackNew,
 			  mkStrictnessInfo, isLazy
 			)
 import SaLib
-import TyCon		( isProductTyCon, isRecursiveTyCon, isEnumerationTyCon, isNewTyCon )
-import BasicTypes	( Arity, NewOrData(..) )
+import TyCon		( isProductTyCon, isRecursiveTyCon, isNewTyCon )
+import BasicTypes	( NewOrData(..) )
 import Type		( splitTyConApp_maybe, 
 		          isUnLiftedType, Type )
 import TyCon		( tyConUnique )

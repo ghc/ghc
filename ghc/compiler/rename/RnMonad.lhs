@@ -96,6 +96,11 @@ traceRn msg
    = doptRn Opt_D_dump_rn_trace `thenRn` \b ->
      if b then putDocRn msg else returnRn ()
 
+traceHiDiffsRn :: SDoc -> RnM d ()
+traceHiDiffsRn msg
+   = doptRn Opt_D_dump_hi_diffs `thenRn` \b ->
+     if b then putDocRn msg else returnRn ()
+
 putDocRn :: SDoc -> RnM d ()
 putDocRn msg = ioToRnM (printErrs msg)	`thenRn_`
 	       returnRn ()

@@ -55,8 +55,6 @@ import FastString
 import qualified Pretty
 import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
 import Panic
-import ST		( runST )
-import Foreign
 import Char             ( chr, ord, isDigit )
 \end{code}
 

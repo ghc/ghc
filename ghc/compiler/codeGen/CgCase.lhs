@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.46 2000/09/06 12:21:15 simonmar Exp $
+% $Id: CgCase.lhs,v 1.47 2000/11/07 13:12:22 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -33,7 +33,7 @@ import CgBindery	( getVolatileRegs, getArgAmodes,
 			  buildContLivenessMask, nukeDeadBindings,
 			)
 import CgCon		( bindConArgs, bindUnboxedTupleComponents )
-import CgHeapery	( altHeapCheck, yield )
+import CgHeapery	( altHeapCheck )
 import CgRetConv	( dataReturnConvPrim, ctrlReturnConvAlg,
 			  CtrlReturnConvention(..)
 			)
@@ -41,13 +41,12 @@ import CgStackery	( allocPrimStack, allocStackTop,
 			  deAllocStackTop, freeStackSlots, dataStackSlots
 			)
 import CgTailCall	( tailCallFun )
-import CgUsages		( getSpRelOffset, getRealSp )
-import CLabel		( CLabel, mkVecTblLabel, mkReturnPtLabel, 
-			  mkDefaultLabel, mkAltLabel, mkReturnInfoLabel,
-			  mkErrorStdEntryLabel, mkClosureTblLabel
+import CgUsages		( getSpRelOffset )
+import CLabel		( mkVecTblLabel, mkClosureTblLabel,
+			  mkDefaultLabel, mkAltLabel, mkReturnInfoLabel
 			)
 import ClosureInfo	( mkLFArgument )
-import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
+import CmdLineOpts	( opt_SccProfilingOn )
 import Id		( Id, idPrimRep, isDeadBinder )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, ConTag,
 			  isUnboxedTupleCon )
@@ -57,7 +56,7 @@ import PrimOp		( primOpOutOfLine, PrimOp(..) )
 import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 			)
 import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
-			  isNewTyCon, isAlgTyCon, isFunTyCon, isPrimTyCon,
+			  isFunTyCon, isPrimTyCon,
 			)
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
 			  splitTyConApp_maybe, repType )

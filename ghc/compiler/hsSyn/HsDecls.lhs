@@ -16,7 +16,7 @@ module HsDecls (
 	DeprecDecl(..), DeprecTxt,
 	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
-	mkClassDeclSysNames, isIfaceRuleDecl,
+	mkClassDeclSysNames, isIfaceRuleDecl, ifaceRuleDeclName,
 	getClassDeclSysNames
     ) where
 
@@ -36,7 +36,7 @@ import CallConv		( CallConv, pprCallConv )
 
 -- others:
 import FunDeps		( pprFundeps )
-import Class		( FunDep )
+import Class		( FunDep, DefMeth(..) )
 import CStrings		( CLabelString, pprCLabelString )
 import Outputable	
 import SrcLoc		( SrcLoc )
@@ -296,13 +296,17 @@ eq_hsFD env (ns1,ms1) (ns2,ms2)
 eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
   = n1==n2 && dm1 `eq_dm` dm2 && eq_hsType env ty1 ty2
   where
-	-- Ignore the name of the default method.
+	-- Ignore the name of the default method for (DefMeth id)
 	-- This is used for comparing declarations before putting
 	-- them into interface files, and the name of the default 
 	-- method isn't relevant
-    (Just (explicit_dm1)) `eq_dm` (Just (explicit_dm2)) = explicit_dm1 == explicit_dm2
-    Nothing		    `eq_dm` Nothing		    = True
-    dm1			    `eq_dm` dm2			    = False
+    Nothing	       `eq_dm` Nothing		  = True
+    (Just NoDefMeth)   `eq_dm` (Just NoDefMeth)   = True
+    (Just GenDefMeth)  `eq_dm` (Just GenDefMeth)  = True
+    (Just (DefMeth _)) `eq_dm` (Just (DefMeth _)) = True
+    dm1		       `eq_dm` dm2		  = False
+
+    
 \end{code}
 
 \begin{code}
@@ -424,7 +428,7 @@ conDeclsNames cons
 eq_ConDecl env (ConDecl n1 _ tvs1 cxt1 cds1 _)
 	       (ConDecl n2 _ tvs2 cxt2 cds2 _)
   = n1 == n2 &&
-    (eqWithHsTyVars tvs1 tvs2	$ \ env ->
+    (eq_hsTyVars env tvs1 tvs2	$ \ env ->
      eq_hsContext env cxt1 cxt2	&&
      eq_ConDetails env cds1 cds2)
 
@@ -641,6 +645,11 @@ data RuleDecl name pat
 
 isIfaceRuleDecl (HsRule _ _ _ _ _ _) = False
 isIfaceRuleDecl other		     = True
+
+ifaceRuleDeclName :: RuleDecl name pat -> name
+ifaceRuleDeclName (IfaceRule _ _ n _ _ _) = n
+ifaceRuleDeclName (IfaceRuleOut n r)	  = n
+ifaceRuleDeclName (HsRule fs _ _ _ _ _)   = pprPanic "ifaceRuleDeclName" (ppr fs)
 
 data RuleBndr name
   = RuleBndr name

@@ -7,8 +7,8 @@ module UnicodeUtil(
 
 #include "HsVersions.h"
 
-import Panic (panic)
-import Char  (chr, ord)
+import Panic ( panic )
+import Char  ( chr )
 \end{code}
 
 \begin{code}

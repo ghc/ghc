@@ -162,9 +162,9 @@ instDeclFVs (InstDecl inst_ty _ _ maybe_dfun _)
 
 ----------------
 ruleDeclFVs (HsRule _ _ _ _ _ _) = emptyFVs
-ruleDeclFVs (IfaceRule _ vars _ _ rhs _)
+ruleDeclFVs (IfaceRule _ vars _ args rhs _)
   = delFVs (map ufBinderName vars) $
-    ufExprFVs rhs
+    ufExprFVs rhs `plusFV` plusFVs (map ufExprFVs args)
 
 ----------------
 conDeclFVs (ConDecl _ _ tyvars context details _)

@@ -56,7 +56,6 @@ import Constants	( sTD_HDR_SIZE, pROF_HDR_SIZE,
 			  sTD_ITBL_SIZE, pROF_ITBL_SIZE,
 			  gRAN_ITBL_SIZE, tICKY_ITBL_SIZE )
 import Outputable
-import GlaExts		( Int(..), Int#, (<#), (==#), (<#), (>#) )
 \end{code}
 
 %************************************************************************

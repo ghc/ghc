@@ -68,7 +68,6 @@ module StringBuffer
 import GlaExts
 import PrelAddr 	( Addr(..) )
 import Foreign
-import ST
 import Char		( chr )
 
 -- urk!

@@ -57,9 +57,7 @@ module FiniteMap (
 #define OUTPUTABLE_key {--}
 #endif
 
-import {-# SOURCE #-} Name ( Name )
 import GlaExts
-import FastString
 import Maybes
 import Bag	  ( Bag, foldrBag )
 import Outputable
@@ -587,8 +585,6 @@ glueVBal fm_l@(Branch key_l elt_l _ fm_ll fm_lr)
   | otherwise		-- We now need the same two cases as in glueBal above.
   = glueBal fm_l fm_r
   where
-    (mid_key_l,mid_elt_l) = findMax fm_l
-    (mid_key_r,mid_elt_r) = findMin fm_r
     size_l = sizeFM fm_l
     size_r = sizeFM fm_r
 \end{code}

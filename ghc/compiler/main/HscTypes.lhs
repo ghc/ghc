@@ -13,7 +13,7 @@ module HscTypes (
 	lookupIface, lookupIfaceByModName,
 	emptyModIface,
 
-	IfaceDecls(..), 
+	IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 
 	VersionInfo(..), initialVersionInfo,
 
@@ -60,7 +60,7 @@ import TyCon		( TyCon )
 
 import BasicTypes	( Version, initialVersion, Fixity )
 
-import HsSyn		( DeprecTxt )
+import HsSyn		( DeprecTxt, tyClDeclName, ifaceRuleDeclName )
 import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameTyClDecl )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
@@ -71,7 +71,7 @@ import Bag		( Bag )
 import Maybes		( seqMaybe )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
-import Util		( thenCmp )
+import Util		( thenCmp, sortLt )
 import UniqSupply	( UniqSupply )
 \end{code}
 
@@ -143,6 +143,32 @@ data ModIface
 data IfaceDecls = IfaceDecls { dcl_tycl  :: [RenamedTyClDecl],	-- Sorted
 			       dcl_rules :: [RenamedRuleDecl],	-- Sorted
 			       dcl_insts :: [RenamedInstDecl] }	-- Unsorted
+
+mkIfaceDecls :: [RenamedTyClDecl] -> [RenamedRuleDecl] -> [RenamedInstDecl] -> IfaceDecls
+mkIfaceDecls tycls rules insts
+  = IfaceDecls { dcl_tycl  = sortLt lt_tycl tycls,
+		 dcl_rules = sortLt lt_rule rules,
+		 dcl_insts = insts }
+  where
+    d1 `lt_tycl` d2 = nameOccName (tyClDeclName      d1) < nameOccName (tyClDeclName      d2)
+    r1 `lt_rule` r2 = nameOccName (ifaceRuleDeclName r1) < nameOccName (ifaceRuleDeclName r2)
+
+	-- I wanted to sort just by the Name, but there's a problem: we are comparing
+	-- the old version of an interface with the new version.  The latter will use
+	-- local names like 'lvl23' that were constructed not by the renamer but by
+	-- the simplifier.  So the unqiues aren't going to line up.
+	--
+	-- It's ok to compare by OccName because this comparison only drives the
+	-- computation of new version numbers.
+	--
+	-- Better solutions: 	Compare in a way that is insensitive to the name used
+	--			for local things.  This would decrease the wobbles due
+	--			to 'lvl23' changing to 'lvl24'.
+	--
+	-- NB: there's a related comparision on MkIface.diffDecls!  
+
+
+
 
 -- typechecker should only look at this, not ModIface
 -- Should be able to construct ModDetails from mi_decls in ModIface

@@ -27,7 +27,7 @@ import RnIfaces		( slurpImpDecls, mkImportInfo,
 			)
 import RnHiFiles	( readIface, removeContext, 
 			  loadExports, loadFixDecls, loadDeprecs )
-import RnEnv		( availName, 
+import RnEnv		( availsToNameSet,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
 			  lookupOrigNames, lookupSrcName, newGlobalName
@@ -63,7 +63,8 @@ import Outputable
 import IO		( openFile, IOMode(..) )
 import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
 			  ModIface(..), WhatsImported(..), 
-			  VersionInfo(..), ImportVersion, IfaceDecls(..),
+			  VersionInfo(..), ImportVersion, 
+			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  GlobalRdrEnv, AvailEnv, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..), initialVersionInfo,
 			  Deprecations(..), lookupDeprec, lookupIface
@@ -136,15 +137,7 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
     implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
     let
-		-- The export_fvs make the exported names look just as if they
-		-- occurred in the source program.  For the reasoning, see the
-		-- comments with RnIfaces.getImportVersions.
-		-- We only need the 'parent name' of the avail;
-		-- that's enough to suck in the declaration.
-	export_fvs 	= mkNameSet (map availName export_avails)
-	real_source_fvs = source_fvs `plusFV` export_fvs
-
-	slurp_fvs	= implicit_fvs `plusFV` real_source_fvs
+	slurp_fvs	= implicit_fvs `plusFV` source_fvs
 		-- It's important to do the "plus" this way round, so that
 		-- when compiling the prelude, locally-defined (), Bool, etc
 		-- override the implicit ones. 
@@ -188,11 +181,19 @@ rename this_module contents@(HsModule _ _ _ imports local_decls mod_deprec loc)
 				mi_deprecs  = my_deprecs,
 				mi_decls    = panic "mi_decls"
 		    }
+
+		-- The export_fvs make the exported names look just as if they
+		-- occurred in the source program.  
+		-- We only need the 'parent name' of the avail;
+		-- that's enough to suck in the declaration.
+	export_fvs = availsToNameSet export_avails
+	used_vars  = source_fvs `plusFV` export_fvs
+
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_iface imports global_avail_env
-		      real_source_fvs rn_imp_decls 	`thenRn_`
+		      used_vars rn_imp_decls 			`thenRn_`
 
     returnRn (Just (mod_iface, final_decls))
   where
@@ -425,9 +426,7 @@ loadOldIface parsed_iface
 				vers_rules   = rule_vers,
 				vers_decls   = decls_vers }
 
-	decls = IfaceDecls { dcl_tycl = new_decls,
-			     dcl_rules = new_rules,
-			     dcl_insts = new_insts }
+	decls = mkIfaceDecls new_decls new_rules new_insts
 
  	mod_iface = ModIface { mi_module = mod, mi_version = version,
 			       mi_exports = avails, mi_usages  = usages,

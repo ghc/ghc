@@ -10,6 +10,7 @@ module TcTyClsDecls (
 
 #include "HsVersions.h"
 
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import HsSyn		( HsDecl(..), TyClDecl(..),
 			  HsTyVarBndr,
 			  ConDecl(..), 
@@ -47,7 +48,6 @@ import Maybes		( mapMaybe )
 import ErrUtils		( Message )
 import HsDecls          ( getClassDeclSysNames )
 import Generics         ( mkTyConGenInfo )
-import CmdLineOpts	( DynFlags )
 \end{code}
 
 
@@ -296,11 +296,12 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
   where
 	tycon = mkAlgTyConRep tycon_name tycon_kind tyvars ctxt argvrcs
 			   data_cons nconstrs
-			   derived_classes
 			   flavour is_rec gen_info
-	gen_info = mkTyConGenInfo dflags tycon name1 name2
 
-	DataTyDetails ctxt data_cons derived_classes = lookupNameEnv_NF rec_details tycon_name
+	gen_info | not (dopt Opt_Generics dflags) = Nothing
+		 | otherwise = mkTyConGenInfo tycon name1 name2
+
+	DataTyDetails ctxt data_cons = lookupNameEnv_NF rec_details tycon_name
 
 	tycon_kind = lookupNameEnv_NF kenv tycon_name
 	tyvars	   = mkTyClTyVars tycon_kind tyvar_names

@@ -24,8 +24,7 @@ module BinderInfo (
 
 #include "HsVersions.h"
 
-import IdInfo		( OccInfo(..), InsideLam, OneBranch, insideLam, notInsideLam, oneBranch )
-import GlaExts		( Int(..), (+#) )
+import IdInfo		( OccInfo(..), InsideLam, insideLam, notInsideLam )
 import Outputable
 \end{code}
 

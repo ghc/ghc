@@ -26,7 +26,6 @@ import Type		( Type, splitTyConApp_maybe,
 			  splitSigmaTy, splitDFunTy, tyVarsOfTypes
 			)
 import PprType		( )
-import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Outputable
 import Unify		( matchTys, unifyTyListsX )

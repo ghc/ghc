@@ -20,7 +20,8 @@ import BasicTypes	( Fixity(..), NewOrData(..),
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import TcHsSyn		( TypecheckedRuleDecl )
-import HscTypes		( VersionInfo(..), IfaceDecls(..), ModIface(..), ModDetails(..),
+import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
+			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  TyThing(..), DFunId, TypeEnv, isTyClThing, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..)
@@ -136,10 +137,7 @@ completeIface :: Maybe ModIface		-- The old interface, if we have it
 completeIface maybe_old_iface new_iface mod_details 
   = addVersionInfo maybe_old_iface (new_iface { mi_decls = new_decls })
   where
-     new_decls = IfaceDecls { dcl_tycl  = ty_cls_dcls,
-			      dcl_insts = inst_dcls,
-			      dcl_rules = rule_dcls }
-
+     new_decls   = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
      inst_dcls   = map ifaceInstance (md_insts mod_details)
      ty_cls_dcls = foldNameEnv ifaceTyCls [] (md_types mod_details)
      rule_dcls   = map ifaceRule (md_rules mod_details)
@@ -585,7 +583,7 @@ diffDecls old_vers old_fixities new_fixities old new
     diff ok_so_far pp new_vers old []      = (False,     pp, new_vers)
     diff ok_so_far pp new_vers [] (nd:nds) = diff False (pp $$ only_new nd) new_vers [] nds
     diff ok_so_far pp new_vers (od:ods) (nd:nds)
-	= case od_name `compare` nd_name of
+	= case nameOccName od_name `compare` nameOccName nd_name of
 		LT -> diff False (pp $$ only_old od) new_vers ods      (nd:nds)
 		GT -> diff False (pp $$ only_new nd) new_vers (od:ods) nds
 		EQ | od `eq_tc` nd -> diff ok_so_far pp 		   new_vers  ods nds

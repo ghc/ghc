@@ -1,4 +1,4 @@
 __interface Generics 1 0 where
 __export Generics mkTyConGenInfo ;
 
-1 mkTyConGenInfo ::  TyCon.TyCon -> Name.Name -> Name.Name -> PrelMaybe.Maybe (BasicTypes.EP Var.Id) ;
+2 mkTyConGenInfo ::  TyCon.TyCon -> Name.Name -> Name.Name -> PrelMaybe.Maybe (BasicTypes.EP Var.Id) ;
