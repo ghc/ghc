@@ -802,7 +802,7 @@ We used to have a form
 	{-# SPECIALISE f :: <type> = g #-}
 which promised that g implemented f at <type>, but we do that with 
 a RULE now:
-	{-# SPECIALISE (f::<type) = g #-}
+	{-# RULES (f::<type>) = g #-}
 
 \begin{code}
 tcSpecSigs :: [LSig Name] -> TcM (LHsBinds TcId)

@@ -70,7 +70,7 @@ data Var
 					-- cached here for speed
 	tyVarKind :: Kind }
 
-  | TcTyVar { 			-- Used only during type inference
+  | TcTyVar { 				-- Used only during type inference
 	varName        :: !Name,	-- Could we get away without a Name?
 	realUnique     :: FastInt,
 	tyVarKind      :: Kind,
