@@ -250,8 +250,8 @@ modifyIdInfo fn var@(Var {varInfo = info})
 -- maybeModifyIdInfo tries to avoid unnecesary thrashing
 maybeModifyIdInfo :: (IdInfo -> Maybe IdInfo) -> Id -> Id
 maybeModifyIdInfo fn var@(Var {varInfo = info}) = case fn info of
-						Nothing       -> var
-						Just new_info -> var {varInfo = new_info}
+							Nothing       -> var
+							Just new_info -> var {varInfo = new_info}
 \end{code}
 
 \begin{code}
