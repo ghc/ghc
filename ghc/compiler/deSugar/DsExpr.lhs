@@ -184,7 +184,19 @@ dsExpr (HsLitOut (HsString str) _)
   = returnDs (mkLit (NoRepStr str stringTy))
 
 dsExpr (HsLitOut (HsLitLit str) ty)
-  = returnDs ( mkConApp data_con [mkLit (MachLitLit str prim_ty)] )
+  = case (maybeBoxedPrimType ty) of
+      Just (boxing_data_con, prim_ty) ->
+	    returnDs ( mkConApp boxing_data_con [mkLit (MachLitLit str prim_ty)] )
+      _ -> 
+	pprError "ERROR:"
+		 (vcat
+		   [ hcat [ text "Cannot see data constructor of ``literal-literal''s type: "
+		         , text "value:", quotes (quotes (ptext str))
+		         , text "; type: ", ppr ty
+		         ]
+		   , text "Try compiling with -fno-prune-tydecls."
+		   ])
+		  
   where
     (data_con, prim_ty)
       = case (maybeBoxedPrimType ty) of
