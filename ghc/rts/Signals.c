@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.13 2000/02/22 12:09:23 simonmar Exp $
+ * $Id: Signals.c,v 1.14 2000/02/29 14:38:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -263,7 +263,7 @@ shutdown_handler(int sig STG_UNUSED)
   } else
 #endif
 
-  shutdownHaskellAndExit(EXIT_INTERRUPTED);
+    interruptStgRts();
 }
 
 /*
