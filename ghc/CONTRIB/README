@@ -3,7 +3,7 @@ Glasgow Haskell compiler.
 
 fptags		Denis Howe <dbh@doc.ic.ac.uk>
 		Bourne-shell script.
-		Create an emacs tags file for one or more functional programs.
+		Create an emacs TAGS file for one or more functional programs.
 
 haskell-modes/	A collection of all known "Haskell modes" for GNU Emacs.	
 
