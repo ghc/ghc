@@ -540,7 +540,10 @@ To run GHC comfortably, your machine should have at least 32M of memory.
 <Sect2><Title>Your environment variables</Title>
 
 <Para>
-Much of the Unixy stuff below involves setting environment variables.  For example, on WinNT/Win2k, to edit your <Constant>PATH</Constant> variable,
+Much of the Unixy stuff below involves setting environment variables.  
+This section summarises  how to set these variables on a Windows machine, in
+case you don't know alread.y
+On WinNT/Win2k, to edit your <Constant>PATH</Constant> variable (for example),
 do the following:
 </Para>
 
@@ -582,10 +585,11 @@ the new settings take effect.
 
 <Sect2 id="sec-required"><Title>Software required</Title>
 
-<VariableList>
-<VarListEntry>
-<Term>The cygwin toolchain (beta20.1)</Term>
-<ListItem>
+You need two chunks of software other than GHC itself: the Cygwin toolchain, and
+Perl.  Here's how to get and install them.
+
+<Sect3><Title>The cygwin toolchain (beta20.1)</Title>
+
 <Para>
 GHC depends at the moment on the cygwin tools to operate, which
 dresses up the Win32 environment into something more UNIX-like.
@@ -659,15 +663,14 @@ Add the two <Filename>bin</Filename> directories to your <Constant>PATH</Constan
 
 <ListItem>
 <Para>
-Copy <Filename>bash.exe</Filename> from the <Filename>bin</Filename> directory of the cygwin tree (<Filename>cygwin-b20/H-i586-cygwin32/bin/bash.exe</Filename>) to
-<Filename>/bin</Filename> as <Filename>sh.exe</Filename>.  This is where Emacs looks for a shell (I think).
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-You might think that it was easier to use bash directly from it original
-Cygwin directory, but (a) some UNIX utils have got <FIlename>/bin/sh</FIlename> hardwired in, and (b) the path following <Literal>#!</Literal> is limited to 32 characters.
+Copy <Filename>bash.exe</Filename> from the <Filename>bin</Filename>
+directory of the cygwin tree
+(<Filename>cygwin-b20/H-i586-cygwin32/bin/bash.exe</Filename>) to
+<Filename>/bin</Filename> as <Filename>sh.exe</Filename>.  You might
+think that it was easier to use bash directly from it original Cygwin
+directory, but (a) some UNIX utils have got
+<Filename>/bin/sh</Filename> hardwired in, and (b) the path following
+<Literal>#!</Literal> is limited to 32 characters.
 </Para>
 </ListItem>
 
@@ -707,9 +710,23 @@ this you get very weird messages when you type `<Command>make</Command>', such a
 
 <ListItem>
 <Para>
-Set the <Constant>TMPDIR</Constant> user environment variable to <Filename>/tmp</Filename>. For some reason, Win2k invisibly sets this variable to point to a temporary directory in your profile, that contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant> variable set, it tries to use it for temporary files, but
-Cygwin doesn't grok filenames with spaces, so disaster results.
+Set the <Constant>TMPDIR</Constant> user environment variable to
+<Filename>c:/tmp</Filename>. For some reason, Win2k invisibly sets
+this variable to point to a temporary directory in your profile, that
+contains embedded spaces.  If GHC sees the <Constant>TMPDIR</Constant>
+variable set, it tries to use it for temporary files, but Cygwin
+doesn't grok filenames with spaces, so disaster results.
 </Para>
+<Para>
+Furthermore, it seems that <Constant>TMPDIR</Constant> must be set to a directory
+in the same file system in which you invoke GHC.  Otherwise you get very werid messages
+when you invoke GHC, such as:
+<Screen>
+  does not exist
+  Action: openFile
+  Reason: file does not exist /tmp/ghc11068.cpp
+</Screen>
+We think this is due to a bug in Cygwin.
 </ListItem>
 
 <ListItem>
@@ -721,80 +738,21 @@ instructions on how to set this up.
 </ListItem>
 
 </ItemizedList>
+</Sect3>
 
-</ListItem>
-</VarListEntry>
+<Sect3><Title>Perl5</Title>
 
-<VarListEntry>
-<Term>Perl5</Term>
-<ListItem><Para>
+<Para>
 The driver script is written in Perl, so you'll need to have this
 installed too. However, the ghc binary distribution includes a
 perl binary for you to make use of, should you not already have a
 cygwin compatible one. Note: GHC does <Emphasis>not</Emphasis>
 work with the ActiveState port of perl.
 </Para>
-</ListItem>
-</VarListEntry>
 
-</VariableList>
+</Sect3>  <!-- Perl -->
 
-</Sect2>
-
-
-<Sect2><Title>Installing the supporting software</Title>
-
-<ItemizedList>
-<ListItem>
-<Para>
-Download <ULink URL="http://sourceware.cygnus.com/cygwin/">cygwin beta20.1</ULink> (<Filename>full.exe</Filename>). Install this somewhere locally.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-After having successfully installed this, make sure you do the following:
-</Para>
-
-<ItemizedList>
-<ListItem>
-<Para>
-Create a <Filename>/bin</Filename> directory (using <Command>mkdir -p /bin</Command>).
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-Copy <Filename>bash.exe</Filename> from the <Filename>bin</Filename> directory of the cygwin tree (<Filename>cygwin-b20/H-i586-cygwin32/bin/bash.exe</Filename>) to
-<Filename>/bin</Filename> as <Filename>sh.exe</Filename>.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-If you haven't already got one, create a <Filename>/tmp</Filename> directory.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-If you're an Emacs user and want to be able to run <Command>bash</Command>
-from within a shell buffer, see the <ULink URL="http://www.cs.washington.edu/homes/voelker/ntemacs.html">NT Emacs home page</ULink> for
-instructions on how to set this up.
-</Para>
-</ListItem>
-
-</ItemizedList>
-
-</ListItem>
-
-</ItemizedList>
-
-<Para>
-With the supporting software in place, we can finally get on to installing GHC itself.
-</Para>
-
-</Sect2>
+</Sect2>  <!-- Reqd software -->
 
 
 <Sect2><Title>Installing GHC</Title>
@@ -869,6 +827,10 @@ along your path too.
 </VarListEntry>
 </VariableList>
 
+<Para>
+Make sure that you set all the environment variables described above
+under Cygwin installation, including <Constant>TMPDIR</Constant>
+</Para>
 <Para>
 To test the fruits of your labour, try now to compile a simple
 Haskell program:
