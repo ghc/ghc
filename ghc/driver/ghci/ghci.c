@@ -1,6 +1,6 @@
 /*
  *
- * $Id: ghci.c,v 1.7 2003/06/11 07:23:06 simonpj Exp $
+ * $Id: ghci.c,v 1.8 2003/06/12 09:48:17 simonpj Exp $
  *
  * ghci wrapper for Win32 only
  * 
@@ -128,6 +128,19 @@ main(int argc, char** argv)
      ==> Just use spawnv(), which is provided by msvcrt.dll, the
          Microsoft C runtime to which mingw delegates almost all
 	 system calls
+
+	 [Sigbjorn adds 12 Jun 03]
+     We probably ought to use CreateProcess() in ghci.c -- or better still an exec()-like
+     that didn't have to create a separate process from the wrapper (which is what that
+     code comment in there is driving at.) 
+      
+     CreateProcess() is a more wieldy function to invoke, which is probably why
+     I opted for spawnv(). spawnv() performs the equivalent of Prelude.unwords
+     (to look at the code itself, or at least an older version, see dospawn.c in the
+     vc98/crt/src/ directory of an MSVC6 installation.)
+      
+     CreateProcess() is a native Win32 API though, which has the merit that it is
+     guaranteed to work the same with both the mingw and cygwin ports.
   */
 #if 0
   fprintf(stderr, "Invoking ghc: ");
