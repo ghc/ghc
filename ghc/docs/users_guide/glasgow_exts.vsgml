@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.10 1999/05/04 08:31:52 sof Exp $
+% $Id: glasgow_exts.vsgml,v 1.11 1999/05/18 15:41:32 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -36,7 +36,7 @@ classes" id="multi-param-type-classes">.
 
 <tag>Local universal quantification:</tag>
 
-GHC's type system supports explicit unversal quantification in
+GHC's type system supports explicit universal quantification in
 constructor fields and function arguments.  This is useful for things
 like defining @runST@ from the state-thread world.  See Section <ref
 name="Local universal quantification" id="universal-quantification">.
@@ -65,6 +65,13 @@ directly from Haskell" id="glasgow-ccalls">.
 Pragmas are special instructions to the compiler placed in the source
 file.  The pragmas GHC supports are described in Section <ref
 name="Pragmas" id="pragmas">.
+
+<tag>Rewrite rules:</tag>
+
+The programmer can specify rewrite rules as part of the source program
+(in a pragma).  GHC applies these rewrite rules wherever it can.
+Details in Section <ref name="Rewrite Rules"
+id="rewrite-rules">.
 
 </descrip>
 
@@ -1986,3 +1993,151 @@ and this line corresponds to line 42 in the original.  GHC will adjust
 its error messages to refer to the line/file named in the @LINE@
 pragma.
 
+<sect2>RULES pragma
+<p>
+The RULES pragma lets you specify rewrite rules.  It is described in
+Section <ref name="Rewrite Rules"
+id="rewrite-rules">.
+
+%-----------------------------------------------------------------------------
+<sect1>Rewrite rules</sect1>
+<label id="rewrite-rules">
+<nidx>RULES pagma</nidx>
+<nidx>pragma, RULES</nidx>
+<nidx>rewrite rules</nidx>
+<p>
+
+The programmer can specify rewrite rules as part of the source program
+(in a pragma).  GHC applies these rewrite rules wherever it can.
+
+Here is an example:
+<tscreen><verb>
+  {-# RULES
+	"map/map"	forall f,g,xs. map f (map g) xs = map (f.g) xs
+  #-}
+</verb></tscreen>
+
+<sect2>Syntax</sect2>
+
+From a syntactic point of view:
+<itemize>
+<item> Each rule has a name, enclosed in double quotes.
+<item> There may be zero or more rules in a @RULES@ pragma.
+<item> Layout applies in a @RULES@ pragma.  Currently no new indentation level
+is set, so you must lay out your rules starting in the same column as the
+enclosing definitions.
+<item> Each variable mentioned in a rule must either be in scope (e.g. @map@),
+or bound by the @forall@ (e.g. @f@, @g@, @xs@).  The variables bound by
+the @forall@ are called the <em>pattern</em> variables.
+<item> A pattern variable may optionally have a type signature.
+If its type is polymorphic, it <em>must</em> have a type signature.
+For example, here is the @foldr/build@ rule:
+<tscreen><verb>
+  "fold/build" 	forall k,z,g::forall b. (a->b->b) -> b -> b . 
+		foldr k z (build g) = g k z
+</verb></tscreen>
+
+
+<item> The left hand side of a rule must consist of a top-level variable applied
+to arbitrary expressions.  For example, this is <em>not</em> OK:
+<tscreen><verb>
+  "wrong1"   forall e1,e2.  case True of { True -> e1; False -> e2 } = e1
+  "wrong2"   forall f.      f True = True
+</verb></tscreen>
+In @"wrong1"@, the LHS is not an application; in @"wrong1"@, the LHS has a pattern variable
+in the head.
+<item> A rule does not need to be in the same module as (any of) the
+variables it mentions, though of course they need to be in scope.
+<item> Rules are automatically exported from a module, just as instance declarations are.
+</itemize>
+
+<sect2>Semantics</sect2>
+
+From a semantic point of view:
+<itemize>
+<item> Rules are only applied if you use the @-O@ flag.
+
+<item> Rules are regarded as left-to-right rewrite rules.  
+When GHC finds an expression that is a substitution instance of the LHS
+of a rule, it replaces the expression by the (appropriately-substituted) RHS.
+By "a substitution instance" we mean that the LHS can be made equal to the 
+expression by substituting for the pattern variables.
+
+<item> The LHS and RHS of a rule are typechecked, and must have the
+same type.
+
+<item> GHC makes absolutely no attempt to verify that the LHS and RHS
+of a rule have the same meaning.  That is undecideable in general, and
+infeasible in most interesting cases.  The responsibility is entirely the programmer's!
+
+<item> GHC makes no attempt to make sure that the rules are confluent or
+terminating.  For example:
+<tscreen><verb>
+  "loop" 	forall x,y.  f x y = f y x
+</verb></tscreen>
+This rule will cause the compiler to go into an infinite loop.
+
+<item> GHC currently uses a very simple, syntactic, matching algorithm
+for matching a rule LHS with an expression.  It seeks a substitution
+which makes the LHS and expression syntactically equal modulo: alpha
+conversion, and (I think) eta conversion.  But not beta conversion (that's
+called higher-order matching).
+
+<item> GHC keeps trying to apply the rules as it optimises the program.
+For example, consider:
+<tscreen><verb>
+  let s = map f
+      t = map g
+  in
+  s (t xs)
+</verb></tscreen>
+The expression @s (t xs)@ does not match the rule @"map/map"@, but GHC
+will substitute for @s@ and @t@, giving an expression which does match.
+If @s@ or @t@ was (a) used more than once, and (b) large or a redex, then it would
+not be substituted, and the rule would not fire.
+
+<item> In the earlier phases of compilation, GHC inlines <em>nothing
+that appears on the LHS of a rule</em>, because once you have substituted
+for something you can't match against it (given the simple minded 
+matching).  So if you write the rule
+<tscreen><verb>
+	"map/map" 	forall f,g.  map f . map g = map (f.g)
+</verb></tscreen>
+this <em>won't</em> match the expression @map f (map g xs)@.
+It will only match something written with explicit use of ".".  
+Well, not quite.  It <em>will</em> match the expression
+<tscreen><verb>
+	wibble f g xs
+</verb></tscreen>
+where @wibble@ is defined:
+<tscreen><verb>
+	wibble f g = map f . map g 
+</verb></tscreen>
+because @wibble@ will be inlined (it's small).
+
+Later on in compilation, GHC starts inlining even things on the
+LHS of rules, but still leaves the rules enabled.  This inlining
+policy is controlled by the per-simplification-pass flag @-finline-phase@n.
+</itemize>
+
+
+<sect2>Controlling what's going on</sect2>
+
+<itemize>
+<item> Use @-fddump-rules@ to see what transformation rules GHC is using.
+<item> Use @-fddump-simpl-stats@ to see what rules are being fired.
+<item> The defintion of (say) @build@ in @PrelBase.lhs@ looks llike this:
+<tscreen><verb>
+	build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
+	{-# INLINE build #-}
+	build g = g (:) []
+</verb></tscreen>
+Notice the @INLINE@!  That prevents @(:)@ from being inlined when compiling
+@PrelBase@, so that an importing module will ``see'' the @(:)@, and can
+match it on the LHS of a rule.  @INLINE@ prevents any inlining happening
+in the RHS of the @INLINE@ thing.  I regret the delicacy of this.
+
+<item> In @ghc/lib/std/PrelBase.lhs@ look at the rules for @map@ to
+see how to write rules that will do fusion and yet give an efficient
+program even if fusion doesn't happen.  More rules in @PrelList.lhs@.
+</itemize>
