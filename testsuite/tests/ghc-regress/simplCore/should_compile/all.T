@@ -15,3 +15,7 @@ test "simpl006" { vtc("-package concurrent") }
 
 test "simpl007" { vtc("") }
 test "simpl008" { vtc("-fglasgow-exts") }
+
+-- these two are really a multi-module test
+test "Simpl009Help" { vtc("-O") }
+test "simpl009" { vtc("-O") }
