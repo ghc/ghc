@@ -628,7 +628,7 @@ AC_ARG_ENABLE([openal],
   [GhcLibsWithOpenAL=yes])
 
 # This is silly! Alas, "YES" and "NO" are currently our standard...
-GhcLibsWithOpenAL=`echo $GhcLibsWithOpenGL | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'`
+GhcLibsWithOpenAL=`echo $GhcLibsWithOpenAL | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'`
 
 AC_SUBST([GhcLibsWithOpenAL])
 
