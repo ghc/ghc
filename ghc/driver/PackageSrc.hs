@@ -138,9 +138,9 @@ package_details installing
                             ,
 	extra_libraries   = [ "HSstd_cbits" ] ++
 #                           ifdef mingw32_TARGET_OS
-                            ["wsock32", "msvcrt"]
+                            [ "wsock32", "msvcrt" ]
 #                           else
-                            ["m"]   -- libm, that is
+                            [ "m" ]   -- libm, that is
 #                           endif
                             ,
         include_dirs   = if installing
