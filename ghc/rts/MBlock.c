@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.5 1999/01/18 09:20:08 sof Exp $
+ * $Id: MBlock.c,v 1.6 1999/01/18 10:54:15 simonm Exp $
  *
  * MegaBlock Allocator Interface.  This file contains all the dirty
  * architecture-dependent hackery required to get a chunk of aligned
@@ -51,6 +51,9 @@
 #elif solaris2_TARGET_OS
 /* guess */
 #define ASK_FOR_MEM_AT 0x50000000
+
+#elif _WIN32
+/* doesn't matter, we use a reserve/commit algorithm */
 
 #else
 #error Dont know where to get memory from on this architecture
