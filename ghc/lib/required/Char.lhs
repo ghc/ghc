@@ -41,10 +41,5 @@ digitToInt c
  | c >= 'A' && c <= 'F' =  fromEnum c - fromEnum 'A' + 10
  | otherwise	        =  error "Char.digitToInt: not a digit" -- sigh
 
-intToDigit :: Int -> Char
-intToDigit i
- | i >= 0  && i <=  9   =  toEnum (fromEnum '0' + i)
- | i >= 10 && i <= 15   =  toEnum (fromEnum 'a' + i -10)
- | otherwise		=  error "Char.intToDigit: not a digit" -- ....
 
 \end{code}
