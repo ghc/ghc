@@ -198,11 +198,15 @@ denounce:
 	@echo
 	@echo Installation of ghc-5.00 was successful.
 	@echo To use, add $(bindir) to your PATH.
-	@echo Docs:
-	@echo "   GHC User Guide  is $(htmldir)/set/book-users-guide.html"
-	@echo "   Libraries Guide is $(htmldir)/set/book-hslibs.html"
-	@echo "   .ps form of both is in $(htmldir)/set/set.ps"
-	@echo
+	@if test -d html ; then \
+	   echo Docs: ;\
+	   echo "   GHC User Guide  is $(htmldir)/set/book-users-guide.html" ; \
+	   echo "   Libraries Guide is $(htmldir)/set/book-hslibs.html" ; \
+	   echo "   .ps form of both is in $(htmldir)/set/set.ps" ; \
+	   echo ; \
+	else \
+	   echo "Warning: this binary distribution does NOT contain documentation!" ; \
+	fi
 
 postinstall:
 	if test -x "./post-install-script" ; then \
@@ -255,8 +259,8 @@ show-install-setup:
 .PHONY: show-install-setup install-docs install-dirs-docs
 
 install-docs : install-dirs-docs
-	$(CP) -r html/* $(htmldir)
-	$(CP) ps/set.ps $(htmldir)/set/set.ps
+	if test -d html ; then $(CP) -r html/* $(htmldir) ; fi
+	if test -f ps/set.ps ; then $(CP) ps/set.ps $(htmldir)/set/set.ps ; fi
 
 install-dirs-docs:
 	$(INSTALL_DIR) $(htmldir) 
