@@ -18,10 +18,15 @@ To run an individual test or tests (eg. tc054):
 
 	cd fptools/testsuite/tests/ghc-regress
 	make TEST=tc054
-	
+
 (you can also go straight to the directory containing the test and say
 'make TEST=tc054' from there, which will save some time).
 
+To run the tests one particular way only (eg. GHCi):
+
+	cd fptools/testsuite/tests/ghc-regress
+	make WAY=ghci
+	
 For more details, see below.
 
 
@@ -57,6 +62,20 @@ The following variables may be set on the make command line:
 	EXTRA_HC_OPTS		-- extra flags to send to the Haskell compiler
 	EXTRA_RUNTEST_OPTS 	-- extra flags to give the test driver
 	CONFIG			-- use a different configuration file
+	WAY			-- just this way
+
+The following ways are defined (for GHC):
+
+	normal			-- no special options
+	opt			-- -O
+	optasm			-- -O -fasm
+	prof			-- -prof -auto-all
+	unreg			-- -unreg
+	ghci			-- (run only, not compile) run test under GHCi
+
+certain ways are enabled automatically if the GHC build in the local
+tree supports them.  Ways that are enabled this way are optasm, prof,
+and ghci.  The unreg way is currently never enabled automatically.
 
 
 Updating tests when the output changes
