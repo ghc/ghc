@@ -167,7 +167,7 @@ It is less well known that
 >     
 >     main = do
 >     	      writeIORef test [42]
->     	      bang \<- readIORef test
+>     	      bang <- readIORef test
 >     	      print (bang :: [Char])
 
 This program will core dump.  This problem with polymorphic references
