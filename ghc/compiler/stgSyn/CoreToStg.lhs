@@ -236,31 +236,31 @@ coreToTopStgRhs
 coreToTopStgRhs scope_fv_info (bndr, rhs)
   = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, _) ->
     freeVarsToLiveVars rhs_fvs	`thenLne` \ lv_info ->
-    returnLne (mkTopStgRhs upd rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
+    returnLne (mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
+    is_static = rhsIsStatic rhs
 
-    upd  | rhsIsStatic rhs = SingleEntry
-	 | otherwise       = Updatable
-
-mkTopStgRhs :: UpdateFlag -> FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr
+mkTopStgRhs :: Bool -> FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr
 	-> StgRhs
 
-mkTopStgRhs upd rhs_fvs srt binder_info (StgLam _ bndrs body)
-  = StgRhsClosure noCCS binder_info
+mkTopStgRhs is_static rhs_fvs srt binder_info (StgLam _ bndrs body)
+  = ASSERT( is_static )
+    StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 		  ReEntrant
 		  srt
 		  bndrs body
 	
-mkTopStgRhs upd rhs_fvs srt binder_info (StgConApp con args)
-  | not (isUpdatable upd) -- StgConApps can be updatable (see isCrossDllConApp)
+mkTopStgRhs is_static rhs_fvs srt binder_info (StgConApp con args)
+  | is_static	 -- StgConApps can be updatable (see isCrossDllConApp)
   = StgRhsCon noCCS con args
 
-mkTopStgRhs upd rhs_fvs srt binder_info rhs
-  = StgRhsClosure noCCS binder_info
+mkTopStgRhs is_static rhs_fvs srt binder_info rhs
+  = ASSERT( not is_static )
+    StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
-	          upd
+	          Updatable
 		  srt
 	          [] rhs
 \end{code}

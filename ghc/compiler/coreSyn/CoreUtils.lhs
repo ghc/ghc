@@ -1238,7 +1238,15 @@ is_static in_arg other_expr = go other_expr 0
   where
     go (Var f) n_val_args
 	| not (isDllName (idName f))
-	= n_val_args == 0 || saturated_data_con f n_val_args
+	=  saturated_data_con f n_val_args
+	|| (in_arg && n_val_args == 0)	
+		-- A naked un-applied variable is *not* deemed a static RHS
+		-- E.g.		f = g
+		-- Reason: better to update so that the indirection gets shorted
+		-- 	   out, and the true value will be seen
+		-- NB: if you change this, you'll break the invariant that THUNK_STATICs
+		--     are always updatable.  If you do so, make sure that non-updatable
+		--     ones have enough space for their static link field!
 
     go (App f a) n_val_args
 	| isTypeArg a 			 = go f n_val_args
