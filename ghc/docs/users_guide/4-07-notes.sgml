@@ -18,8 +18,10 @@
 	compiled program (about 2-4% slower, worse for floating-point
 	intensive programs).</para>
 
-	<para>Add the <option>-fasm-x86</option> flag to GHC's command
-	line to enable it.</para>
+	<para>The NCG is used by default for non-optimising compiles.
+	You can use it with <option>-O</option> by adding the
+	<option>-fasm-x86</option> flag to GHC's command
+	line, <emphasis>after</emphasis> <option>-O</option>.</para>
       </listitem>
 
       <listitem>
@@ -178,7 +180,7 @@
       </listitem>
 
       <listitem>
-	<para>Constant folding now done by Rules.</para>
+	<para>Constant folding is now done by Rules.</para>
       </listitem>
 
       <listitem>
