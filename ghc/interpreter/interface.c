@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.49 $
- * $Date: 2000/04/07 16:25:19 $
+ * $Revision: 1.50 $
+ * $Date: 2000/04/10 15:24:26 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2627,7 +2627,6 @@ Type type; {
       SymX(execl)                    \
       Sym(waitpid)                   \
       SymX(getenv)                   \
-      Sym(chmod)
 
 #define EXTERN_SYMS_cygwin32         \
       SymX(GetCurrentProcess)        \
@@ -2676,6 +2675,7 @@ Type type; {
       SymX(mktime)                   \
       SymX(gmtime)                   \
       Sym(setitimer)                 \
+      Sym(chmod)                     \
 
 
 
