@@ -512,8 +512,11 @@ wlkLiteral ulit
     as_integer s  = readInteger (_UNPK_ s)
 #if __GLASGOW_HASKELL__ == 201
     as_rational s = GHCbase.readRational__ (_UNPK_ s) -- non-std
-#elif __GLASGOW_HASKELL__ >= 202
-    as_rational s = case readRational (_UNPK_ s) of { [(a,_)] -> a } -- ToDo, use non-std readRational__
+#elif __GLASGOW_HASKELL__ == 202
+    as_rational s = case readRational (_UNPK_ s) of { [(a,_)] -> a }
+#elif __GLASGOW_HASKELL__ >= 203
+    as_rational s = readRational__ (_UNPK_ s) -- use non-std readRational__ 
+					      -- to handle rationals with leading '-'
 #else
     as_rational s = _readRational (_UNPK_ s) -- non-std
 #endif
