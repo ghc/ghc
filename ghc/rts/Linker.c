@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.108 2002/12/19 14:33:22 simonmar Exp $
+ * $Id: Linker.c,v 1.109 2002/12/27 10:32:59 panne Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -562,6 +562,7 @@ RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
 #undef Sym
 #undef SymX
+#undef SymX_redirect
 
 #ifdef LEADING_UNDERSCORE
 #define MAYBE_LEADING_UNDERSCORE_STR(s) ("_" s)
