@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.98 2004/02/24 17:33:34 simonmar Exp $
+-- $Id: DriverState.hs,v 1.99 2004/02/25 11:24:34 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -529,6 +529,7 @@ allowed_combination way = and [ x `allowedWith` y
 	WayProf `allowedWith` WayUnreg		= True
 	WayProf `allowedWith` WaySMP		= True
 	WayProf `allowedWith` WayNDP		= True
+	_ `allowedWith` _ 			= False
 
 
 findBuildTag :: IO [String]  -- new options
