@@ -39,7 +39,8 @@ import TysWiredIn	( charTy, mkListTy )
 import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
-import Type		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp, mkTyVarTys,
+import Type		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
+			  mkTyVarTys, repType, isNewType,
 			  mkFunTys, mkFunTy, mkSigmaTy, splitSigmaTy, 
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  splitFunTys, splitForAllTys, mkPredTy
@@ -303,12 +304,25 @@ mkDataConWrapId data_con
 		   | otherwise ->
 			Case (Var arg) arg [(DEFAULT,[], body i (arg:rep_args))]
 
-		MarkedUnboxed ->
-		   Case (Var arg) arg [(DataAlt con, con_args,
+		MarkedUnboxed
+		   | isNewType arg_ty ->
+			Let (NonRec coerced_arg 
+				(Note (Coerce rep_ty arg_ty) (Var arg)))
+			      (do_unbox coerced_arg rep_ty i')
+		   | otherwise ->
+			do_unbox arg arg_ty i
+		  where
+		    ([coerced_arg],i') = mkLocals i [rep_ty]
+		    arg_ty = idType arg
+		    rep_ty = repType arg_ty
+
+		    do_unbox arg ty i = 
+			case splitProductType "do_unbox" ty of
+			   (tycon, tycon_args, con, tys) ->
+				   Case (Var arg) arg [(DataAlt con, con_args,
 					body i' (reverse con_args ++ rep_args))]
-		   where 
-			(con_args, i')   = mkLocals i tys
-			(_, _, con, tys) = splitProductType "mk_case" (idType arg)
+			      where 
+				(con_args, i')   = mkLocals i tys
 \end{code}
 
 
@@ -506,12 +520,25 @@ rebuildConArgs (arg:args) stricts us
 rebuildConArgs (arg:args) (str:stricts) us
   | isMarkedUnboxed str
   = let
-	(_, tycon_args, pack_con, con_arg_tys) = splitProductType "rebuildConArgs" (idType arg)
+	arg_ty  = idType arg
+	prod_ty | isNewType arg_ty = repType arg_ty
+		| otherwise        = arg_ty
+
+	(_, tycon_args, pack_con, con_arg_tys)
+	 	 = splitProductType "rebuildConArgs" prod_ty
+
 	unpacked_args  = zipWith (mkSysLocal SLIT("rb")) us con_arg_tys
-	(binds, args') = rebuildConArgs args stricts (drop (length con_arg_tys) us)
-	con_app	       = mkConApp pack_con (map Type tycon_args ++ map Var  unpacked_args)
+
+	(binds, args') = rebuildConArgs args stricts 
+				(drop (length con_arg_tys) us)
+
+	coerce | isNewType arg_ty = Note (Coerce arg_ty prod_ty) con_app
+	       | otherwise        = con_app
+
+	con_app	       = mkConApp pack_con (map Type tycon_args ++ 
+					    map Var  unpacked_args)
     in
-    (NonRec arg con_app : binds, unpacked_args ++ args')
+    (NonRec arg coerce : binds, unpacked_args ++ args')
 
   | otherwise
   = let (binds, args') = rebuildConArgs args stricts us

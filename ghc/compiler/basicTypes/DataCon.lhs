@@ -28,7 +28,7 @@ import CmdLineOpts	( opt_DictsStrict )
 import Type		( Type, TauType, ThetaType,
 			  mkForAllTys, mkFunTys, mkTyConApp,
 			  mkTyVarTys, mkPredTys, getClassPredTys_maybe,
-			  splitTyConApp_maybe
+			  splitTyConApp_maybe, repType
 			)
 import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isDataTyCon, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
@@ -427,32 +427,34 @@ chooseBoxingStrategy :: TyCon -> Type -> StrictnessMark -> StrictnessMark
 	-- Transforms any MarkedUserStricts into MarkUnboxed or MarkedStrict
 chooseBoxingStrategy tycon arg_ty strict
   = case strict of
-	MarkedUserStrict | unbox arg_ty -> MarkedUnboxed
-			 | otherwise    -> MarkedStrict
-	other			  	-> strict
+	MarkedUserStrict
+	  | opt_UnboxStrictFields
+		&& unbox arg_ty -> MarkedUnboxed
+	  | otherwise -> MarkedStrict
+	other -> strict
   where
-    unbox ty = opt_UnboxStrictFields &&
-	       case splitTyConApp_maybe ty of
-		  Just (arg_tycon, _) -> not (isRecursiveTyCon arg_tycon) && 
-					 isProductTyCon arg_tycon && 
-					 isDataTyCon arg_tycon
-		  Nothing	      -> False
-	-- Recursion: check whether the *argument* type constructor is
-	-- recursive.  Checking the *parent* tycon is over-conservative
-	--
-	-- We can't look through newtypes in arguments (yet); hence isDataTyCon
-
+	-- beware: repType will go into a loop if we try this on a recursive
+	-- type (for reasons unknown...), hence the check for recursion below.
+    unbox ty =  
+	case splitTyConApp_maybe ty of
+		Nothing	-> False
+		Just (arg_tycon, _)
+		  | isRecursiveTyCon arg_tycon -> False
+		  | otherwise ->
+			  case splitTyConApp_maybe (repType ty) of
+		     		Nothing -> False
+		     		Just (arg_tycon, _) -> isProductTyCon arg_tycon
 
 unbox_strict_arg_ty 
 	:: StrictnessMark	-- After strategy choice; can't be MkaredUserStrict
 	-> Type			-- Source argument type
 	-> [(Demand,Type)]	-- Representation argument types and demamds
-	
+
 unbox_strict_arg_ty NotMarkedStrict ty = [(wwLazy,   ty)]
 unbox_strict_arg_ty MarkedStrict    ty = [(wwStrict, ty)]
 unbox_strict_arg_ty MarkedUnboxed   ty 
   = zipEqual "unbox_strict_arg_ty" (dataConRepStrictness arg_data_con) arg_tys
   where
-    (_, _, arg_data_con, arg_tys) = splitProductType "unbox_strict_arg_ty" ty
-
+    (_, _, arg_data_con, arg_tys)
+	 = splitProductType "unbox_strict_arg_ty" (repType ty)
 \end{code}
