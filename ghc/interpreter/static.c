@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/06 08:38:04 $
+ * $Revision: 1.25 $
+ * $Date: 2000/03/09 02:47:13 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -441,6 +441,25 @@ Cell   impList; {
                 }
             }
         }
+    } else if (STAR == impList) {
+      List xs;
+      for(xs=module(m).names; nonNull(xs); xs=tl(xs)) {
+	Cell e = hd(xs);
+	imports = cons(e,imports);
+      }
+      for(xs=module(m).classes; nonNull(xs); xs=tl(xs)) {
+	Cell cl = hd(xs);
+	imports = cons(cl,imports);
+	imports = dupOnto(cclass(cl).members,imports);
+      }
+      for(xs=module(m).tycons; nonNull(xs); xs=tl(xs)) {
+	Cell t = hd(xs);
+	imports = cons(t,imports);
+	if (isTycon(t)
+	    && (tycon(t).what == DATATYPE 
+		|| tycon(t).what == NEWTYPE))
+	  imports = dupOnto(tycon(t).defn,imports);
+      }
     } else {
         map1Accum(checkImportEntity,imports,m,impList);
     }
@@ -5070,7 +5089,7 @@ Void checkDefns() {                     /* Top level static analysis       */
 
     mapProc(allNoPrevDef,valDefns);     /* check against previous defns    */
 
-    if (!combined) linkPreludeNames();  /* link names in Prelude           */
+    if (!combined) linkPrimitiveNames(); /* link primitive names           */
 
     mapProc(checkForeignImport,foreignImports); /* check foreign imports   */
     mapProc(checkForeignExport,foreignExports); /* check foreign exports   */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.46 $
- * $Date: 2000/03/07 06:24:23 $
+ * $Revision: 1.47 $
+ * $Date: 2000/03/09 02:47:13 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -273,7 +273,7 @@ static Name predefinePrim ( String s )
  * 
  * ------------------------------------------------------------------------*/
 
-/* In standalone mode, linkPreludeTC, linkPreludeCM and linkPreludeNames
+/* In standalone mode, linkPreludeTC, linkPreludeCM and linkPrimitiveNames
    are called, in that order, during static analysis of Prelude.hs.
    In combined mode such an analysis does not happen.  Instead these
    calls will be made as a result of a call link(POSTPREL).
@@ -436,10 +436,10 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
     }
 }
 
-Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
+Void linkPrimitiveNames(void) {        /* Hook to names defined in Prelude */
     static Bool initialised = FALSE;
+
     if (!initialised) {
-        Int i;
         initialised = TRUE;
 
         setCurrModule(modulePrelude);
@@ -448,22 +448,29 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         nameMkIO           = linkName("hugsprimMkIO");
 
         if (!combined) {
-           for (i=0; asmPrimOps[i].name; ++i) {
-               Text t = findText(asmPrimOps[i].name);
-               Name n = findName(t);
-               if (isNull(n)) {
-                   n = newName(t,NIL);
-               }
-               name(n).line   = 0;
-               name(n).defn   = NIL;
-               name(n).type   = primType(asmPrimOps[i].monad,
-                                         asmPrimOps[i].args,
-                                         asmPrimOps[i].results);
-               name(n).arity  = strlen(asmPrimOps[i].args);
-               name(n).primop = &(asmPrimOps[i]);
-               implementPrim(n);
-           }
+	  Int i;
+	  for (i=0; asmPrimOps[i].name; ++i) {
+	    Text t = findText(asmPrimOps[i].name);
+	    Name n = findName(t);
+	    if (isNull(n)) {
+	      n = newName(t,NIL);
+	      name(n).line   = 0;
+	      name(n).defn   = NIL;
+	      name(n).type   = primType(asmPrimOps[i].monad,
+					asmPrimOps[i].args,
+					asmPrimOps[i].results);
+	      name(n).arity  = strlen(asmPrimOps[i].args);
+	      name(n).primop = &(asmPrimOps[i]);
+	      implementPrim(n);
+	    } else {
+	      ERRMSG(0) "Link Error in Prelude, surplus definition of \"%s\"", 
+				asmPrimOps[i].name
+              EEND;	      
+	      // Name already defined!
+	    }
+	  }
         }
+
         /* static(tidyInfix)                        */
         nameNegate         = linkName("negate");
         /* user interface                           */
@@ -524,7 +531,7 @@ Int what; {
            setCurrModule(modulePrelude);
            linkPreludeTC();
            linkPreludeCM();
-           linkPreludeNames();
+           linkPrimitiveNames();
 
            nameUnpackString = linkName("hugsprimUnpackString");
            namePMFail       = linkName("hugsprimPmFail");

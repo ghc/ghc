@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.22 $
- * $Date: 2000/02/08 15:32:30 $
+ * $Revision: 1.23 $
+ * $Date: 2000/03/09 02:47:13 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -98,6 +98,7 @@ static Void   local noIP	 Args((String));
 %token EXPORT     UUEXPORT   INTERFACE  REQUIRES   UNSAFE     
 %token INSTIMPORT DYNAMIC    CCALL      STDKALL
 %token UTL        UTR        UUUSAGE
+%token PRIVILEGED
 
 %%
 /*- Top level script/module structure -------------------------------------*/
@@ -528,6 +529,9 @@ impDecl   : IMPORT modid impspec        {addQualImport($2,$2);
           | IMPORT QUALIFIED modid impspec
                                         {addQualImport($3,$3);
                                          $$ = gc4($3);}
+          | IMPORT PRIVILEGED modid     {addQualImport($3,$3);
+                                         addUnqualImport($3,gc0(STAR));
+					 $$ = gc4($3);}
           | IMPORT error                {syntaxError("import declaration");}
           ;
 impspec   : /* empty */                 {$$ = gc0(DOTDOT);}
@@ -1201,6 +1205,7 @@ varid     : VARID                       {$$ = $1;}
           | HIDING                      {$$ = gc1(varHiding);}
           | QUALIFIED                   {$$ = gc1(varQualified);}
           | ASMOD                       {$$ = gc1(varAsMod);}
+          | PRIVILEGED                  {$$ = gc1(varPrivileged);}
           ;
 qconid    : QCONID                      {$$ = $1;}
           | CONID                       {$$ = $1;}
@@ -1269,6 +1274,7 @@ varid1    : VARID                       {$$ = gc1($1);}
           | HIDING                      {$$ = gc1(varHiding);}
           | QUALIFIED                   {$$ = gc1(varQualified);}
           | ASMOD                       {$$ = gc1(varAsMod);}
+          | PRIVILEGED                  {$$ = gc1(varPrivileged);}
           ;
 
 /*- Tricks to force insertion of leading and closing braces ---------------*/
@@ -1413,6 +1419,7 @@ static String local unexpected() {     /* find name for unexpected token   */
                          return buffer;
         case HIDING    : return "symbol \"hiding\"";
         case QUALIFIED : return "symbol \"qualified\"";
+	case PRIVILEGED : return "symbol \"privileged\"";
         case ASMOD     : return "symbol \"as\"";
         case NUMLIT    : return "numeric literal";
         case CHARLIT   : return "character literal";

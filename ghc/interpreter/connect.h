@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.23 $
- * $Date: 2000/01/07 16:56:47 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/09 02:47:13 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -522,7 +522,7 @@ extern  Void   translateControl Args((Int));
 extern  Void   codegen          Args((Int));
 extern  Void   machdep          Args((Int));
 
-extern Void linkPreludeNames(void);
+extern Void linkPrimitiveNames(void);
 
 extern  Kind  starToStar;                /* Type -> Type                    */
 extern Type  boundPair;                 /* (mkOffset(0),mkOffset(0))       */

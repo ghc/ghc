@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/12/10 15:59:45 $
+ * $Revision: 1.19 $
+ * $Date: 2000/03/09 02:47:13 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -145,7 +145,7 @@ static Text textBang,    textDot,      textAll,    textImplies;
 static Text textWildcard;
 
 static Text textModule,  textImport,    textInterface,  textInstImport;
-static Text textHiding,  textQualified, textAsMod;
+static Text textHiding,  textQualified, textAsMod,      textPrivileged;
 static Text textExport,  textDynamic,   textUUExport;
 static Text textUnsafe,  textUUAll,     textUUUsage;
 
@@ -166,6 +166,7 @@ static Cell varDot;                     /* (.)                             */
 static Cell varHiding;                  /* hiding                          */
 static Cell varQualified;               /* qualified                       */
 static Cell varAsMod;                   /* as                              */
+static Cell varPrivileged;              /* privileged                      */
 
 static List imps;                       /* List of imports to be chased    */
 
@@ -1520,6 +1521,7 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textHiding)            return HIDING;
         if (it==textQualified)         return QUALIFIED;
         if (it==textAsMod)             return ASMOD;
+        if (it==textPrivileged)        return PRIVILEGED;
         if (it==textWildcard)          return '_';
         if (it==textAll && !haskell98) return ALL;
 #if IPARAM
@@ -1749,6 +1751,7 @@ Int what; {
                        textHiding     = findText("hiding");
                        textQualified  = findText("qualified");
                        textAsMod      = findText("as");
+                       textPrivileged = findText("privileged");
                        textWildcard   = findText("_");
                        textAll        = findText("forall");
                        textUUAll      = findText("__forall");
@@ -1760,6 +1763,7 @@ Int what; {
                        varHiding      = mkVar(textHiding);
                        varQualified   = mkVar(textQualified);
                        varAsMod       = mkVar(textAsMod);
+                       varPrivileged  = mkVar(textPrivileged);
                        conMain        = mkCon(findText("Main"));
                        varMain        = mkVar(findText("main"));
                        evalDefaults   = NIL;
@@ -1808,6 +1812,7 @@ Int what; {
                        mark(varHiding);
                        mark(varQualified);
                        mark(varAsMod);
+                       mark(varPrivileged);
                        mark(varMain);
                        mark(conMain);
                        mark(imps);
