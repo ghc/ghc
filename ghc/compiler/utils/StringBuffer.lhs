@@ -70,7 +70,11 @@ import PrelAddr 	( Addr(..) )
 import Panic		( panic )
 #else
 import Addr		( Addr(..) )
+#if __GLASGOW_HASKELL__ < 503
 import Ptr		( Ptr(..) )
+#else
+import GHC.Ptr		( Ptr(..) )
+#endif
 #endif
 
 #if __GLASGOW_HASKELL__  < 501

@@ -56,7 +56,7 @@ import ByteCodeFFI	( taggedSizeW, untaggedSizeW, mkMarshalCode, moan64 )
 import Linker		( lookupSymbol )
 
 import List		( intersperse, sortBy, zip4 )
-import Foreign		( Ptr(..), castPtr, mallocBytes, pokeByteOff, Word8 )
+import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8 )
 import CTypes		( CInt )
 import Exception	( throwDyn )
 

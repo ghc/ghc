@@ -201,7 +201,11 @@ import PrimPacked 	( strLength )
 import PrelAddr		( Addr(..) )
 #else
 import Addr		( Addr(..) )
+#if __GLASGOW_HASKELL__ < 503
 import Ptr		( Ptr(..) )
+#else
+import GHC.Ptr		( Ptr(..) )
+#endif
 #endif
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure

@@ -60,7 +60,6 @@ import GlaExts
 import PrelAddr		( Addr(..) )
 #else
 import Addr		( Addr(..) )
-import Ptr		( Ptr(..) )
 #endif
 #if __GLASGOW_HASKELL__ < 503
 import PrelArr		( STArray(..), newSTArray )

@@ -43,8 +43,8 @@ import GHC.Word		( Word(..) )
 import Data.Array.MArray ( MArray, newArray_, readArray, writeArray )
 import Data.Array.ST	( castSTUArray )
 import Data.Array.Base	( UArray(..) )
-import Foreign.Ptr	( Ptr, nullPtr )
-import Foreign		( Word16, Ptr(..), free )
+import Foreign.Ptr	( nullPtr )
+import Foreign		( Word16, free )
 import System.Mem.Weak  ( addFinalizer )
 import Data.Int		( Int64 )
 
@@ -57,9 +57,11 @@ import GlaExts		( BCO#, newBCO#, unsafeCoerce#,
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.Arr		( Array(..) )
 import GHC.IOBase	( IO(..) )
+import GHC.Ptr		( Ptr(..) )
 #else
 import PrelArr		( Array(..) )
 import PrelIOBase	( IO(..) )
+import Ptr		( Ptr(..) )
 #endif
 \end{code}
 

@@ -21,14 +21,18 @@ import ClosureInfo	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
 import Util             ( lengthIs, listLengthCmp )
 
-import Foreign		( Storable(..), Word8, Word16, Word32, Word64, Ptr(..), 
+import Foreign		( Storable(..), Word8, Word16, Word32, Word64,
 			  malloc, castPtr, plusPtr )
 import Bits		( Bits(..), shiftR )
 
 import Monad		( liftM )
 
 import GlaExts		( Int(I#), addr2Int# )
-import Ptr		( Ptr(Ptr) )
+#if __GLASGOW_HASKELL__ < 503
+import Ptr		( Ptr(..) )
+#else
+import GHC.Ptr		( Ptr(..) )
+#endif
 \end{code}
 
 %************************************************************************

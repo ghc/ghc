@@ -18,7 +18,7 @@ import Bits		( Bits(..), shiftR, shiftL )
 import Foreign		( newArray )
 
 import Word		( Word8, Word32 )
-import Foreign		( Ptr(..), mallocBytes )
+import Foreign		( Ptr, mallocBytes )
 import IOExts		( trace, unsafePerformIO )
 import IO		( hPutStrLn, stderr )
 \end{code}
