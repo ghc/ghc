@@ -11,7 +11,9 @@ AC_CHECK_TYPES([long long])
 # check for specific header (.h) files that we are interested in
 AC_CHECK_HEADERS([ctype.h fcntl.h signal.h sys/resource.h termios.h time.h])
 
-AC_CHECK_HEADER([unistd.h], [AC_CHECK_FUNCS(lchown)])
+# Enable large file support. Do this before testing the types ino_t, off_t, and
+# rlim_t, because it will affect the result of that test.
+AC_SYS_LARGEFILE
 
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
