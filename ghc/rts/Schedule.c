@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.64 2000/04/05 15:28:59 simonmar Exp $
+ * $Id: Schedule.c,v 1.65 2000/04/07 09:47:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -539,19 +539,14 @@ schedule( void )
       main_threads = NULL;
     }
 #else /* ! SMP */
-    /* 
-       In GUM all non-main PEs come in here with no work;
-       we ignore multiple main threads for now 
-
     if (blocked_queue_hd == END_TSO_QUEUE
-	&& run_queue_hd == END_TSO_QUEUE) {
-      StgMainThread *m = main_threads;
-      m->ret = NULL;
-      m->stat = Deadlock;
-      main_threads = m->link;
-      return;
+ 	&& run_queue_hd == END_TSO_QUEUE) {
+	StgMainThread *m = main_threads;
+	m->ret = NULL;
+	m->stat = Deadlock;
+	main_threads = m->link;
+	return;
     }
-    */
 #endif
 
 #ifdef SMP
@@ -820,6 +815,7 @@ schedule( void )
   
     /* grab a thread from the run queue
      */
+    ASSERT(run_queue_hd != END_TSO_QUEUE);
     t = POP_RUN_QUEUE();
     IF_DEBUG(sanity,checkTSO(t));
 
@@ -846,12 +842,8 @@ schedule( void )
 
     RELEASE_LOCK(&sched_mutex);
 
-#if defined(GRAN) || defined(PAR)    
-    IF_DEBUG(scheduler, belch("-->> Running TSO %ld (%p) %s ...", 
+    IF_DEBUG(scheduler, sched_belch("-->> Running TSO %ld (%p) %s ...", 
 			      t->id, t, whatNext_strs[t->what_next]));
-#else
-    IF_DEBUG(scheduler,sched_belch("running thread %d", t->id));
-#endif
 
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     /* Run the current thread 
@@ -1044,7 +1036,7 @@ schedule( void )
        * case it'll be on the relevant queue already.
        */
       IF_DEBUG(scheduler,
-	       fprintf(stderr, "--<< thread %d (%p) stopped ", t->id, t);
+	       fprintf(stderr, "--<< thread %d (%p) stopped: ", t->id, t);
 	       printThreadBlockage(t);
 	       fprintf(stderr, "\n"));
 
@@ -1358,9 +1350,6 @@ createThread_(nat size, rtsBool have_lock)
   SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
   tso->su = (StgUpdateFrame*)tso->sp;
 
-  IF_DEBUG(scheduler,belch("---- Initialised TSO %ld (%p), stack size = %lx words", 
-			   tso->id, tso, tso->stack_size));
-
   // ToDo: check this
 #if defined(GRAN)
   tso->link = END_TSO_QUEUE;
@@ -1510,7 +1499,9 @@ scheduleThread(StgTSO *tso)
   PUSH_ON_RUN_QUEUE(tso);
   THREAD_RUNNABLE();
 
+#if 0
   IF_DEBUG(scheduler,printTSO(tso));
+#endif
   RELEASE_LOCK(&sched_mutex);
 }
 
