@@ -50,11 +50,10 @@ inputReady(int fd, int msecs, int isSock)
 	DWORD rc;
 	HANDLE hFile = (HANDLE)_get_osfhandle(fd);
 	
-	rc = MsgWaitForMultipleObjects( 1,
-					&hFile,
-					FALSE, /* wait all */
-					msecs, /*millisecs*/
-					QS_ALLEVENTS);
+	rc = WaitForMultipleObjects( 1,
+				     &hFile,
+				     TRUE,   /* wait all */
+				     msecs); /*millisecs*/
 	
 	/* 1 => Input ready, 0 => not ready, -1 => error */
 	switch (rc) {
