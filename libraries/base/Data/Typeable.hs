@@ -244,8 +244,8 @@ cast x = r
 
 -- | Test for type equivalence
 sameType :: (Typeable a, Typeable b) => TypeVal a -> TypeVal b -> Bool
-sameType (_::a->()) (_::b->()) = typeOf (undefined::a) ==
-                                 typeOf (undefined::b) 
+sameType tva tvb = typeOf (undefinedType tva) ==
+                   typeOf (undefinedType tvb)
 
 
 -------------------------------------------------------------
