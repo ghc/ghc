@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.52 1999/01/27 17:37:18 simonm Exp $
+# $Id: Makefile,v 1.53 1999/03/02 18:54:47 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -154,6 +154,7 @@ SRC_HC_OPTS += -recomp $(GhcHcOpts)
 absCSyn/PprAbsC_HC_OPTS 	= -H10m
 
 basicTypes/IdInfo_HC_OPTS 	= -K2m
+codeGen/CgCase_HC_OPTS		= -fno-prune-tydecls
 hsSyn/HsExpr_HC_OPTS 		= -K2m
 main/Main_HC_OPTS 		= -fvia-C
 main/Constants_HC_OPTS		= -DHscIfaceFileVersion=$(HscIfaceFileVersion)
