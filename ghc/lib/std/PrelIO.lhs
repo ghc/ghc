@@ -500,6 +500,13 @@ write_buf fo buf count = do
 	then  write_buf fo buf (count - rc) -- partial write
 	else  return rc
 
+-- a version of commitBuffer that will free the buffer if an exception is received.
+-- DON'T use this if you intend to use the buffer again!
+checkedCommitBuffer handle buf sz count flush 
+  = catchException (commitBuffer handle buf sz count flush) 
+		   (\e -> do withHandle__ handle (\h_ -> freeBuffer h_ buf sz)
+			     throw e)
+
 foreign import "memcpy" unsafe memcpy :: Addr -> Addr -> Int -> IO ()
 \end{code}
 
@@ -529,7 +536,7 @@ writeLines handle buf bufLen s =
 	let next_n = n + 1
 	if next_n == bufLen || x == '\n'
 	 then do
-	   commitBuffer hdl buf len next_n True{-needs flush-} 
+	   checkedCommitBuffer hdl buf len next_n True{-needs flush-} 
 	   shoveString 0 xs
          else
 	   shoveString next_n xs
@@ -553,7 +560,7 @@ writeLines hdl buf len@(I# bufLen) s =
 	let next_n = n +# 1#
 	if next_n ==# bufLen || x `eqChar#` '\n'#
 	 then do
-	   commitBuffer hdl buf len (I# next_n) True{-needs flush-} 
+	   checkedCommitBuffer hdl buf len (I# next_n) True{-needs flush-} 
 	   shoveString 0# xs
          else
 	   shoveString next_n xs
@@ -575,7 +582,7 @@ writeBlocks hdl buf bufLen s =
 	let next_n = n + 1
 	if next_n == bufLen
 	 then do
-	   commitBuffer hdl buf len next_n True{-needs flush-}
+	   checkedCommitBuffer hdl buf len next_n True{-needs flush-}
 	   shoveString 0 xs
          else
 	   shoveString next_n xs
@@ -597,7 +604,7 @@ writeBlocks hdl buf len@(I# bufLen) s =
 	let next_n = n +# 1#
 	if next_n ==# bufLen
 	 then do
-	   commitBuffer hdl buf len (I# next_n) True{-needs flush-}
+	   checkedCommitBuffer hdl buf len (I# next_n) True{-needs flush-}
 	   shoveString 0# xs
          else
 	   shoveString next_n xs
