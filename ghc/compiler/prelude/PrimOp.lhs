@@ -176,6 +176,7 @@ data PrimOp
     | TakeMVarOp 
     | PutMVarOp
     | SameMVarOp
+    | TakeMaybeMVarOp 
     | IsEmptyMVarOp
 
     -- exceptions
@@ -459,46 +460,47 @@ tagOf_PrimOp NewMVarOp			      = ILIT(217)
 tagOf_PrimOp TakeMVarOp		    	      = ILIT(218)
 tagOf_PrimOp PutMVarOp		    	      = ILIT(219)
 tagOf_PrimOp SameMVarOp		    	      = ILIT(220)
-tagOf_PrimOp IsEmptyMVarOp	    	      = ILIT(221)
-tagOf_PrimOp MkForeignObjOp		      = ILIT(222)
-tagOf_PrimOp WriteForeignObjOp		      = ILIT(223)
-tagOf_PrimOp MkWeakOp			      = ILIT(224)
-tagOf_PrimOp DeRefWeakOp		      = ILIT(225)
-tagOf_PrimOp FinalizeWeakOp		      = ILIT(226)
-tagOf_PrimOp MakeStableNameOp		      = ILIT(227)
-tagOf_PrimOp EqStableNameOp		      = ILIT(228)
-tagOf_PrimOp StableNameToIntOp		      = ILIT(229)
-tagOf_PrimOp MakeStablePtrOp		      = ILIT(230)
-tagOf_PrimOp DeRefStablePtrOp		      = ILIT(231)
-tagOf_PrimOp EqStablePtrOp		      = ILIT(232)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(234)
-tagOf_PrimOp SeqOp			      = ILIT(235)
-tagOf_PrimOp ParOp			      = ILIT(236)
-tagOf_PrimOp ForkOp			      = ILIT(237)
-tagOf_PrimOp KillThreadOp		      = ILIT(238)
-tagOf_PrimOp YieldOp			      = ILIT(239)
-tagOf_PrimOp MyThreadIdOp		      = ILIT(240)
-tagOf_PrimOp DelayOp			      = ILIT(241)
-tagOf_PrimOp WaitReadOp			      = ILIT(242)
-tagOf_PrimOp WaitWriteOp		      = ILIT(243)
-tagOf_PrimOp ParGlobalOp		      = ILIT(244)
-tagOf_PrimOp ParLocalOp			      = ILIT(245)
-tagOf_PrimOp ParAtOp			      = ILIT(246)
-tagOf_PrimOp ParAtAbsOp			      = ILIT(247)
-tagOf_PrimOp ParAtRelOp			      = ILIT(248)
-tagOf_PrimOp ParAtForNowOp		      = ILIT(249)
-tagOf_PrimOp CopyableOp			      = ILIT(250)
-tagOf_PrimOp NoFollowOp			      = ILIT(251)
-tagOf_PrimOp NewMutVarOp		      = ILIT(252)
-tagOf_PrimOp ReadMutVarOp		      = ILIT(253)
-tagOf_PrimOp WriteMutVarOp		      = ILIT(254)
-tagOf_PrimOp SameMutVarOp		      = ILIT(255)
-tagOf_PrimOp CatchOp			      = ILIT(256)
-tagOf_PrimOp RaiseOp			      = ILIT(257)
-tagOf_PrimOp BlockAsyncExceptionsOp	      = ILIT(258)
-tagOf_PrimOp UnblockAsyncExceptionsOp	      = ILIT(259)
-tagOf_PrimOp DataToTagOp		      = ILIT(260)
-tagOf_PrimOp TagToEnumOp		      = ILIT(261)
+tagOf_PrimOp TakeMaybeMVarOp	    	      = ILIT(221)
+tagOf_PrimOp IsEmptyMVarOp	    	      = ILIT(222)
+tagOf_PrimOp MkForeignObjOp		      = ILIT(223)
+tagOf_PrimOp WriteForeignObjOp		      = ILIT(224)
+tagOf_PrimOp MkWeakOp			      = ILIT(225)
+tagOf_PrimOp DeRefWeakOp		      = ILIT(226)
+tagOf_PrimOp FinalizeWeakOp		      = ILIT(227)
+tagOf_PrimOp MakeStableNameOp		      = ILIT(228)
+tagOf_PrimOp EqStableNameOp		      = ILIT(229)
+tagOf_PrimOp StableNameToIntOp		      = ILIT(230)
+tagOf_PrimOp MakeStablePtrOp		      = ILIT(231)
+tagOf_PrimOp DeRefStablePtrOp		      = ILIT(232)
+tagOf_PrimOp EqStablePtrOp		      = ILIT(234)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(235)
+tagOf_PrimOp SeqOp			      = ILIT(236)
+tagOf_PrimOp ParOp			      = ILIT(237)
+tagOf_PrimOp ForkOp			      = ILIT(238)
+tagOf_PrimOp KillThreadOp		      = ILIT(239)
+tagOf_PrimOp YieldOp			      = ILIT(240)
+tagOf_PrimOp MyThreadIdOp		      = ILIT(241)
+tagOf_PrimOp DelayOp			      = ILIT(242)
+tagOf_PrimOp WaitReadOp			      = ILIT(243)
+tagOf_PrimOp WaitWriteOp		      = ILIT(244)
+tagOf_PrimOp ParGlobalOp		      = ILIT(245)
+tagOf_PrimOp ParLocalOp			      = ILIT(246)
+tagOf_PrimOp ParAtOp			      = ILIT(247)
+tagOf_PrimOp ParAtAbsOp			      = ILIT(248)
+tagOf_PrimOp ParAtRelOp			      = ILIT(249)
+tagOf_PrimOp ParAtForNowOp		      = ILIT(250)
+tagOf_PrimOp CopyableOp			      = ILIT(251)
+tagOf_PrimOp NoFollowOp			      = ILIT(252)
+tagOf_PrimOp NewMutVarOp		      = ILIT(253)
+tagOf_PrimOp ReadMutVarOp		      = ILIT(254)
+tagOf_PrimOp WriteMutVarOp		      = ILIT(255)
+tagOf_PrimOp SameMutVarOp		      = ILIT(256)
+tagOf_PrimOp CatchOp			      = ILIT(257)
+tagOf_PrimOp RaiseOp			      = ILIT(258)
+tagOf_PrimOp BlockAsyncExceptionsOp	      = ILIT(259)
+tagOf_PrimOp UnblockAsyncExceptionsOp	      = ILIT(260)
+tagOf_PrimOp DataToTagOp		      = ILIT(261)
+tagOf_PrimOp TagToEnumOp		      = ILIT(262)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 
@@ -749,6 +751,7 @@ allThePrimOps		-- Except CCall, which is really a family of primops
 	TakeMVarOp,
 	PutMVarOp,
 	SameMVarOp,
+	TakeMaybeMVarOp,
 	IsEmptyMVarOp,
 	MkForeignObjOp,
 	WriteForeignObjOp,
@@ -1520,6 +1523,15 @@ primOpInfo SameMVarOp
     in
     mkGenPrimOp SLIT("sameMVar#") [s_tv, elt_tv] [mvar_ty, mvar_ty] boolTy
 
+primOpInfo TakeMaybeMVarOp
+  = let
+	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
+	state = mkStatePrimTy s
+    in
+    mkGenPrimOp SLIT("takeMaybeMVar#") [s_tv, elt_tv]
+	[mkMVarPrimTy s elt, state]
+	(unboxedTriple [state, intPrimTy, elt])
+
 primOpInfo IsEmptyMVarOp
   = let
 	elt = alphaTy; elt_tv = alphaTyVar; s = betaTy; s_tv = betaTyVar
@@ -1902,6 +1914,7 @@ perform a heap check or they block.
 primOpOutOfLine op
   = case op of
     	TakeMVarOp    		     -> True
+    	TakeMaybeMVarOp		     -> True
 	PutMVarOp     		     -> True
 	DelayOp       		     -> True
 	WaitReadOp    		     -> True
@@ -2066,6 +2079,7 @@ primOpHasSideEffects UnsafeFreezeByteArrayOp	= True
 primOpHasSideEffects UnsafeThawArrayOp		= True
 
 primOpHasSideEffects TakeMVarOp        = True
+primOpHasSideEffects TakeMaybeMVarOp   = True
 primOpHasSideEffects PutMVarOp         = True
 primOpHasSideEffects DelayOp           = True
 primOpHasSideEffects WaitReadOp        = True
@@ -2230,6 +2244,7 @@ primOpUsg op
       TakeMVarOp           -> mangle [mkM, mkP          ] mkM
       PutMVarOp            -> mangle [mkM, mkM, mkP     ] mkR
       SameMVarOp           -> mangle [mkP, mkP          ] mkM
+      TakeMaybeMVarOp      -> mangle [mkM, mkP          ] mkM
       IsEmptyMVarOp        -> mangle [mkP, mkP          ] mkM
 
       ForkOp               -> mangle [mkO, mkP          ] mkR
