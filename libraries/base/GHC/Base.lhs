@@ -597,6 +597,9 @@ lazy x = x
 
 -- Assertion function. This simply ignores its boolean argument.
 -- The compiler may rewrite it to (assertError line)
+-- 	SLPJ: in 5.04 etc 'assert' is in GHC.Prim,
+--	but from Template Haskell onwards it's simply
+--	defined here in Base.lhs
 assert :: Bool -> a -> a
 assert pred r = r
  
