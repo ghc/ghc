@@ -52,7 +52,11 @@ module ClosureInfo (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)		-- here for paranoia-checking
+#else
+import {-# SOURCE #-} CLabel ( CLabel )
+#endif
 
 import AbsCSyn
 import StgSyn
