@@ -51,4 +51,6 @@ clean:
 	rm -f reify/reify
 	rm -f shortcut
 	rm -f strings/strings
+	rm -f tree/tree
 	rm -f where
+	rm -f xmlish/xmlish

@@ -22,7 +22,7 @@ findepth d = result
   -- Helper for type disambiguation
   result = concat $ map recurse shapes
 
-  -- Possibles top-level shapes
+  -- Possible top-level shapes
   shapes = map fromConstr consOf
 
   -- Recurse into subterms

@@ -1,0 +1,2 @@
+%.hs: %.dtd
+	DtdToHaskell $< $@

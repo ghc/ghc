@@ -13,4 +13,6 @@ module Main where
 import Data.Generics
 import CompanyDatatypes
 
-main = print (geq genCom genCom)
+main = print ( geq genCom genCom
+             , geq genCom genCom'
+             )
