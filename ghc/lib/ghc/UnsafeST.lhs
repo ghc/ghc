@@ -9,7 +9,7 @@ It turns out that exposing these inlininings can lead to unsound transformations
 such as generating a MutVar only once rather than once each call to unsafePerformIO.
 
 \begin{code}
-{-# OPTIONS -fno-implicit-prelude -Onot #-}
+{-# OPTIONS -fno-implicit-prelude #-}
 \end{code}
 
 
