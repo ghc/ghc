@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.24 2002/04/24 16:13:26 simonmar Exp $
+# $Id: Makefile,v 1.25 2002/04/26 13:26:39 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -92,11 +92,7 @@ endif # TARGETPLATFORM = i386-unknown-mingw32
 EXCLUDED_HADDOCK_SRCS = \
 	GHC/Err.lhs \
 	Data/Generics.hs \
-	GHC/PArr.hs \
-	Control/Monad/Error.hs \
-	Control/Monad/Reader.hs \
-	Control/Monad/State.hs \
-	Control/Monad/Writer.hs
+	GHC/PArr.hs
 
 HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
 
