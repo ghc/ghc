@@ -346,7 +346,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         codeAlt alt@(discr, binds_f, rhs)
            | isAlgCase 
            = let (unpack_code, d_after_unpack, p_after_unpack)
-                    = mkUnpackCode binds_f d' p'
+                    = mkUnpackCode (filter (not.isTyVar) binds_f) d' p'
              in  schemeE d_after_unpack s p_after_unpack rhs
 					`thenBc` \ rhs_code -> 
                  returnBc (my_discr alt, unpack_code `appOL` rhs_code)
