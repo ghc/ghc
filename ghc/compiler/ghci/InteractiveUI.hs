@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.68 2001/05/23 10:26:14 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.69 2001/05/28 03:17:03 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -28,10 +28,10 @@ import CmdLineOpts	( DynFlag(..), dopt_unset )
 import Panic		( GhcException(..) )
 import Config
 
-import CForeign
-import Foreign
-
+#ifndef mingw32_TARGET_OS
 import Posix
+#endif
+
 import Exception
 import Dynamic
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
@@ -49,6 +49,8 @@ import Char
 import Monad 		( when )
 
 import PrelGHC 		( unsafeCoerce# )
+import Foreign		( nullPtr )
+import CString		( peekCString )
 
 -----------------------------------------------------------------------------
 
@@ -132,30 +134,22 @@ interactiveUI cmstate mod cmdline_libs = do
    dflags <- getDynFlags
 
    (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stderr"
+	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stderr"
    case maybe_hval of
 	Just hval -> writeIORef flush_stderr (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stderr"
 
    (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hFlush IO.stdout"
+	<- cmCompileExpr cmstate dflags "IO.hFlush PrelHandle.stdout"
    case maybe_hval of
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
-
-   -- replace the current argv/argc with ["<interactive>"].
-   interactive_str <- newCString "<interactive>"
-   poke prog_argc_label 1	-- sets argc to 1
-   argv <- peek prog_argv_label
-   poke argv interactive_str 	-- sets argv[0] to point to "<interactive>"
 
    (unGHCi runGHCi) GHCiState{ target = mod,
 			       cmstate = cmstate,
 			       options = [] }
    return ()
 
-foreign label "prog_argv" prog_argv_label :: Ptr (Ptr (Ptr CChar))
-foreign label "prog_argc" prog_argc_label :: Ptr CInt
 
 runGHCi :: GHCi ()
 runGHCi = do
@@ -209,6 +203,9 @@ runGHCi = do
 checkPerms :: String -> IO Bool
 checkPerms name =
   handle (\_ -> return False) $ do
+#ifdef mingw32_TARGET_OS
+     doesFileExist name
+#else
      st <- getFileStatus name
      me <- getRealUserID
      if fileOwner st /= me then do
@@ -223,6 +220,7 @@ checkPerms name =
    			  " is writable by someone else, IGNORING!"
    	       return False
    	  else return True
+#endif
 
 fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl prompt = do
