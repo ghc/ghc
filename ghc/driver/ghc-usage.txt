@@ -1,0 +1,66 @@
+Use of the Glasgow Haskell Compiler driver:
+
+    $$ [command-line-options-and-input-files]
+
+------------------------------------------------------------------------
+This driver ($$) guides each input file through (some of the)
+possible phases of a compilation:
+
+    - unlit:	extract code from a "literate program"
+    - hscpp:	run code through the C pre-processor (if -cpp flag given)
+    - hsc:	run the Haskell compiler proper
+    - gcc:	run the C compiler (if compiling via C)
+    - as:	run the assembler
+    - ld:	run the linker
+
+For each input file, the phase to START with is determined by the
+file's suffix:
+    - .lhs	literate Haskell: unlit
+    - .hs	illiterate Haskell: hsc
+    - .hc	C from the Haskell compiler: gcc
+    - .c	C not from the Haskell compiler: gcc
+    - .s	assembly language: as
+    - other	passed directly to the linker: ld
+
+If no files are given on the command line, input is taken from
+standard input, and processing is as for an .hs file.  (All output is
+to stdout or stderr, however).
+
+The phase at which to STOP processing is determined by a command-line
+option:
+    -E		stop after generating preprocessed, de-litted Haskell
+		     (used in conjunction with -cpp)
+    -C		stop after generating C (.hc output)
+    -S		stop after generating assembler (.s output)
+    -c		stop after generating object files (.o output)
+
+Other commonly-used options are:
+
+    -O		An `optimising' package of compiler flags, for faster code
+
+    -prof	Compile for cost-centre profiling
+		 (add -auto for automagic cost-centres on top-level functions)
+
+    -fglasgow-exts  Allow Glasgow extensions (unboxed types, etc.)
+
+    -H14m	Increase compiler's heap size
+
+    -M          Output the Makefile rules recording the
+		 dependencies of a list of Haskell files.
+		 (ghc driver script calls upon the help of a
+		  compatible mkdependHS script to do the actual
+		  processing)
+
+The User's Guide has more information about GHC's *many* options.
+
+Given the above, here are some TYPICAL invocations of $$:
+
+    # compile a Haskell module to a .o file, optimising:
+    % $$ -c -O Foo.hs
+    # link three .o files into an executable called "test":
+    % $$ -o test Foo.o Bar.o Baz.o
+    # compile a Haskell module to C (a .hc file), using a bigger heap:
+    % $$ -C -H16m Foo.hs
+    # compile Haskell-produced C (.hc) to assembly language:
+    % $$ -S Foo.hc
+------------------------------------------------------------------------
