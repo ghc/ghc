@@ -170,6 +170,7 @@ these steps:
 		expect_fail	     this test is an expected failure
 		skip		     skip this test
 		omit_ways(ways)      skip this test for certain ways
+		only_ways(ways)      do this test certain ways only
 		set_stdin(file)      use a different file for stdin
 		exit_code(n)	     expect an exit code of 'n' from the prog
 		extra_run_opts(opts) pass some extra opts to the prog
