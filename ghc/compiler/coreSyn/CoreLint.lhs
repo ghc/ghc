@@ -14,7 +14,7 @@ module CoreLint (
 
 import CoreSyn
 import CoreFVs		( idFreeVars )
-import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
+import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize )
 import Unify      	( coreRefineTys )
 import Bag
 import Literal		( literalType )
@@ -30,7 +30,7 @@ import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
 import Type		( Type, tyVarsOfType, coreEqType,
 			  splitFunTy_maybe, mkTyVarTys,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
-			  isUnLiftedType, typeKind, 
+			  isUnLiftedType, typeKind, mkForAllTy, mkFunTy,
 			  isUnboxedTupleType, isSubKind,
 			  substTyWith, emptyTvSubst, extendTvInScope, 
 			  TvSubst, TvSubstEnv, setTvSubstEnv, substTy,
@@ -197,8 +197,10 @@ lintSingleBinding rec_flag (binder,rhs)
 %************************************************************************
 
 \begin{code}
+type InType  = Type	-- Substitution not yet applied
+type OutType = Type	-- Substitution has been applied to this
 
-lintCoreExpr :: CoreExpr -> LintM Type
+lintCoreExpr :: CoreExpr -> LintM OutType
 -- The returned type has the substitution from the monad 
 -- already applied to it:
 --	lintCoreExpr e subst = exprType (subst e)
@@ -281,10 +283,14 @@ lintCoreExpr e@(App fun arg)
 
 lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $
-    do	{ lintBinder var 	
-	; ty <- addInScopeVars [var] $
-                lintCoreExpr expr
-	; applySubst (mkPiType var ty) }
+    do	{ body_ty <- addInScopeVars [var] $
+                     lintCoreExpr expr
+	; if isId var then do
+		{ var_ty <- lintId var 	
+		; return (mkFunTy var_ty body_ty) }
+	  else
+		return (mkForAllTy var body_ty)
+	}
 	-- The applySubst is needed to apply the subst to var
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
@@ -381,7 +387,7 @@ checkKinds tyvar arg_ty
 %************************************************************************
 
 \begin{code}
-checkCaseAlts :: CoreExpr -> Type -> [CoreAlt] -> LintM ()
+checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty
 -- b1) Check that the DEFAULT comes first, if it exists
 -- b2) Check that the others are in increasing order
@@ -414,11 +420,10 @@ checkCaseAlts e ty alts =
 \end{code}
 
 \begin{code}
-checkAltExpr :: CoreExpr -> Type -> LintM ()
-checkAltExpr expr ty	
+checkAltExpr :: CoreExpr -> OutType -> LintM ()
+checkAltExpr expr ann_ty
   = do { actual_ty <- lintCoreExpr expr 
-       ; ty' <- applySubst ty
-       ; checkTys actual_ty ty' (mkCaseAltMsg expr actual_ty ty') }
+       ; checkTys actual_ty ann_ty (mkCaseAltMsg expr actual_ty ann_ty) }
 
 lintCoreAlt :: Type  			-- Type of scrutinee; a fixed point of 
 					--		      the substitution
@@ -490,7 +495,7 @@ lintBinder :: Var -> LintM ()
 lintBinder var | isId var  = lintId var >> return ()
 	       | otherwise = return ()
 
-lintId :: Var -> LintM Type
+lintId :: Var -> LintM OutType
 -- ToDo: lint its rules
 lintId id
   = do 	{ checkL (not (isUnboxedTupleType (idType id))) 
@@ -498,7 +503,7 @@ lintId id
 		-- No variable can be bound to an unboxed tuple.
 	; lintTy (idType id) }
 
-lintTy :: Type -> LintM Type
+lintTy :: InType -> LintM OutType
 -- Check the type, and apply the substitution to it
 -- ToDo: check the kind structure of the type
 lintTy ty 
