@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.15 2002/08/02 09:25:23 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.16 2002/11/11 09:32:57 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -339,7 +339,7 @@ qualified_name        = HsVarName (HsIdent "qualified")
 hiding_name	      = HsVarName (HsIdent "hiding")
 unsafe_name	      = HsVarName (HsIdent "unsafe")
 safe_name	      = HsVarName (HsIdent "safe")
-forall_name	      = HsVarName (HsIdent "threadsafe")
+forall_name	      = HsVarName (HsIdent "forall")
 threadsafe_name	      = HsVarName (HsIdent "threadsafe")
 export_name	      = HsVarName (HsIdent "export")
 ccall_name	      = HsVarName (HsIdent "ccall")
