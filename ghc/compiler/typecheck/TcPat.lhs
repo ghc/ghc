@@ -22,7 +22,7 @@ import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			)
 import Name		( Name, getOccName, getSrcLoc )
 import FieldLabel	( fieldLabelName )
-import TcEnv		( tcLookupValue, 
+import TcEnv		( tcLookupValue, tcLookupClassByKey,
 			  tcLookupValueByKey, newLocalId, badCon
 			)
 import TcType 		( TcType, TcTyVar, tcInstTyVars, newTyVarTy )
@@ -33,7 +33,9 @@ import TcUnify 		( unifyTauTy, unifyListTy,
 
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
-import DataCon		( DataCon, dataConSig, dataConFieldLabels, dataConSourceArity )
+import DataCon		( DataCon, dataConSig, dataConFieldLabels, 
+			  dataConSourceArity
+			)
 import Id		( Id, idType, isDataConId_maybe )
 import Type		( Type, isTauTy, mkTyConApp, boxedTypeKind )
 import Subst		( substTy, substTheta )
@@ -42,7 +44,9 @@ import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			)
 import TysWiredIn	( charTy, stringTy, intTy )
 import SrcLoc		( SrcLoc )
-import Unique		( eqClassOpKey, geClassOpKey, minusClassOpKey )
+import Unique		( eqClassOpKey, geClassOpKey, minusClassOpKey,
+			  cCallableClassKey
+			)
 import Bag
 import Util		( zipEqual )
 import Outputable

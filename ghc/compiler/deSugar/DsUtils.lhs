@@ -31,7 +31,7 @@ module DsUtils (
 
 import {-# SOURCE #-} Match ( matchSimply )
 
-import HsSyn		( OutPat(..) )
+import HsSyn
 import TcHsSyn		( TypecheckedPat )
 import DsHsSyn		( outPatType, collectTypedPatBinders )
 import CoreSyn
@@ -43,14 +43,29 @@ import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import Id		( idType, Id, mkWildId )
 import Const		( Literal(..), Con(..) )
 import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, dataConStrictMarks, 
-			  dataConId, splitProductType_maybe
+import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, 
+			  dataConStrictMarks, dataConId, splitProductType_maybe
 			)
 import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp, unUsgTy,
 			  Type
 			)
-import TysWiredIn	( unitDataCon, tupleCon, stringTy, unitTy, unitDataCon,
-			  nilDataCon, consDataCon
+import TysPrim		( intPrimTy, 
+                          charPrimTy, 
+                          floatPrimTy, 
+                          doublePrimTy,
+			  addrPrimTy, 
+                          wordPrimTy
+			)
+import TysWiredIn	( nilDataCon, consDataCon, 
+                          tupleCon,
+			  stringTy,
+			  unitDataCon, unitTy,
+                          charTy, charDataCon, 
+                          intTy, intDataCon,
+			  floatTy, floatDataCon, 
+                          doubleTy, doubleDataCon, 
+                          addrTy, addrDataCon,
+                          wordTy, wordDataCon
 			)
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
 import Outputable
@@ -105,7 +120,7 @@ tidyLitPat lit lit_ty default_pat
 
     one_str_lit (HsString s) = _LENGTH_ s == (1::Int)
     one_str_lit other_lit    = False
-    mk_first_char_lit (HsString s) = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim (_HEAD_ s))]
+    mk_first_char_lit (HsString s) = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim (_HEAD_ s)) charPrimTy]
 \end{code}
 
 

@@ -28,24 +28,10 @@ import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, 
 import Type		( Type, splitAlgTyConApp, mkTyVarTys,
                           isUnboxedType, splitTyConApp_maybe
 			)
-import TysPrim		( intPrimTy, 
-                          charPrimTy, 
-                          floatPrimTy, 
-                          doublePrimTy,
-			  addrPrimTy, 
-                          wordPrimTy
-			)
 import TysWiredIn	( nilDataCon, consDataCon, 
-                          mkTupleTy, tupleCon,
-			  mkUnboxedTupleTy, unboxedTupleCon,
                           mkListTy, 
-                          charTy, charDataCon, 
-                          intTy, intDataCon,
-			  floatTy, floatDataCon, 
-                          doubleTy, doubleDataCon, 
-                          addrTy, addrDataCon,
-                          wordTy, wordDataCon,
-			  stringTy
+                          mkTupleTy, tupleCon,
+			  mkUnboxedTupleTy, unboxedTupleCon
 			)
 import Unique		( unboundKey )
 import TyCon            ( tyConDataCons )
