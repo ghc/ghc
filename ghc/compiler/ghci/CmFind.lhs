@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-2000
+% (c) The University of Glasgow, 2000
 %
 \section[CmFind]{Module finder for GHCI}
 

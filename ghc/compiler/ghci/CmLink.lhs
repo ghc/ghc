@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-2000
+% (c) The University of Glasgow, 2000
 %
 \section[CmLink]{Linker for GHCI}
 
@@ -8,39 +8,36 @@ module CmLink ( Linkable(..),
 		filterModuleLinkables, 
 		modname_of_linkable, is_package_linkable,
 		LinkResult(..),
-                HValue,
                 link, 
                 PLS{-abstractly!-}, emptyPLS )
-		  
 where
+
+import StgInterp	( linkIModules, ClosureEnv, ItblEnv )
+import Linker
 
 import CmStaticInfo	( PCI )
 import CmFind		( Path, PkgName )
+import InterpSyn	( UnlinkedIBind, HValue )
 import Module		( Module )
 import Outputable	( SDoc )
 import FiniteMap	( FiniteMap, emptyFM )
 import RdrName		( RdrName )
 import Digraph		( SCC )
 import Addr		( Addr )
+import Outputable
 import Panic		( panic )
 
 #include "HsVersions.h"
-
 \end{code}
 
 \begin{code}
 data PLS 
    = MkPLS {
-        source_symtab :: FiniteMap RdrName HValue,
-        object_symtab :: FiniteMap String Addr
+        closure_env :: ClosureEnv,
+        itbl_env    :: ItblEnv
+	-- notionally here, but really lives in the C part of the linker:
+	--            object_symtab :: FiniteMap String Addr
      }
-
-data HValue = HValue -- fix this ... just temporary?
-
-
-link :: PCI -> [SCC Linkable] -> PLS -> IO LinkResult
-link pci linkabless pls
-   = return (error "link:unimp")
 
 data LinkResult 
    = LinkOK   PLS
@@ -50,11 +47,48 @@ data Unlinked
    = DotO Path
    | DotA Path
    | DotDLL Path
-   -- | Trees [StgTree RdrName]
+   | Trees [UnlinkedIBind]	-- bunch of interpretable bindings
+
+isObject (DotO _) = True
+isObject (DotA _) = True
+isObject (DotDLL _) = True
+isObject _ = False
+
+isInterpretable (Trees _) = True
+isInterpretable _ = False
 
 data Linkable
    = LM {-should be:Module-} String{- == ModName-} [Unlinked]
    | LP PkgName
+
+emptyPLS :: IO PLS
+emptyPLS = return (MkPLS { closure_env = emptyFM, 
+                           itbl_env    = emptyFM })
+\end{code}
+
+\begin{code}
+link :: PCI -> [SCC Linkable] -> PLS -> IO LinkResult
+
+#ifndef GHCI_NOTYET
+link = panic "CmLink.link: not implemented"
+#else
+link pci [] pls = return (LinkOK pls)
+link pci (group:groups) pls = do
+   -- the group is either all objects or all interpretable, for now
+   if all isObject group
+	then do mapM loadObj [ file | DotO file <- group ]
+	        resolveObjs
+		link pci groups pls
+    else if all isInterpretable group
+	then do (new_closure_env, new_itbl_env) <-
+		   linkIModules	(closure_env pls)
+				(itbl_env pls)
+				[ trees | Trees trees <- group ]
+	        link pci groups MkPLS{closure_env=new_closure_env,
+				      itbl_env=new_itbl_env}
+    else
+	return (LinkErrs pls (ptext SLIT("linker: group must contain all objects or all interpreted modules")))
+#endif
 
 modname_of_linkable (LM nm _) = nm
 modname_of_linkable (LP _)    = panic "modname_of_linkable: package"
@@ -73,8 +107,4 @@ filterModuleLinkables p (li:lis)
      where
         dump   = filterModuleLinkables p lis
         retain = li : dump
-
-emptyPLS :: IO PLS
-emptyPLS = return (MkPLS { source_symtab = emptyFM, 
-                           object_symtab = emptyFM })
 \end{code}

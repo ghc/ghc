@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-2000
+% (c) The University of Glasgow, 2000
 %
 \section[CompManager]{The Compilation Manager}
 
@@ -25,12 +25,11 @@ import CmFind 		( Finder, newFinder,
 import CmSummarise 	( summarise, ModSummary(..), 
 			  mi_name, ms_get_imports )
 import CmCompile 	( PCS, emptyPCS, HST, HIT, CompResult(..) )
-import CmLink 		( PLS, emptyPLS, HValue, Linkable, 
+import CmLink 		( PLS, emptyPLS, Linkable, 
 			  link, LinkResult(..), 
 			  filterModuleLinkables, modname_of_linkable,
 			  is_package_linkable )
-
-
+import InterpSyn	( HValue )
 
 cmInit :: FLAGS 
        -> PCI
