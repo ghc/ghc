@@ -103,23 +103,37 @@ module PrelPrim (
     seq, ($!)
 	-- Now we have the extra (non standard) thing.
 
-	, AsyncException(..)
 	, ArithException(..)
+	, AsyncException(..)
 	, Dynamic(..)
+	, Exception
 	, Exception(..)
 	, IORef
+	, MVar
+	, MVar
 	, PrimArray
 	, PrimMutableArray
 	, RealWorld
 	, ST
 	, STRef
+	, ThreadId
 	, TyCon(..)
 	, TypeRep(..)
+	, Word
+	, absReal
+	, absReal
 	, assert
+	, catchException
 	, copy_String_to_cstring
+	, forkIO
 	, ioToST
-	, ioToST
+	, isEmptyMVar
+	, mkST 
+	, newEmptyMVar
+	, newEmptyMVar
 	, newIORef
+	, newMVar
+	, newMVar
 	, newSTRef
 	, nh_close
 	, nh_errno
@@ -139,33 +153,69 @@ module PrelPrim (
 	, nh_system
 	, nh_write
 	, nullAddr
+	, numericEnumFrom
+	, numericEnumFromThen
+	, numericEnumFromThenTo
+	, numericEnumFromTo
 	, prelCleanupAfterRunAction
+	, primAndInt
+	, primAndWord
+	, primDelay
+	, primDoubleToFloat
+	, primFloatToDouble 
 	, primGetEnv
 	, primGetRawArgs
+	, primGetThreadId
+	, primIndexArray
 	, primIndexArray
 	, primIntToChar
+	, primIntToWord
+	, primKillThread
+	, primMaxWord
+	, primMinusWord
+	, primNegateWord
 	, primNewArray
+	, primOrInt
+	, primOrWord
+	, primPlusWord
+	, primRaiseInThread
 	, primReadArray
 	, primReallyUnsafePtrEquality
+	, primShiftLInt
+	, primShiftLWord
+	, primShiftRAInt
+	, primShiftRLWord
 	, primSizeArray
 	, primSizeMutableArray
+	, primTimesWord
 	, primUnsafeCoerce
 	, primUnsafeFreezeArray
+	, primWaitRead
+	, primWaitWrite
+	, primWordToInt
+	, primWriteArray
 	, primWriteArray
 	, primWriteCharOffAddr
+	, primXorInt
+	, primXorWord
+	, primYield
+	, putMVar
 	, readIORef
+	, readMVar
 	, readSTRef
 	, runST
+	, signumReal
+	, signumReal
 	, stToIO
+	, swapMVar
+	, takeMVar
 	, throw
 	, unST
 	, unsafeInterleaveIO
 	, unsafeInterleaveST
 	, unsafePerformIO
-	, unsafePerformIO
 	, writeIORef
 	, writeSTRef
-        , catchException 
     ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
