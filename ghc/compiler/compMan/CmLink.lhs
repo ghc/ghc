@@ -82,8 +82,12 @@ instance Outputable Linkable where
    ppr (LP package_nm)       = text "LinkableP" <+> ptext package_nm
 
 emptyPLS :: IO PersistentLinkerState
-emptyPLS = return (PersistentLinkerState { closure_env = emptyClosureEnv, 
-                                           itbl_env    = emptyItblEnv })
+#ifdef GHCI
+emptyPLS = return (PersistentLinkerState { closure_env = emptyFM, 
+                                           itbl_env    = emptyFM })
+#else
+emptyPLS = return (PersistentLinkerState {})
+#endif
 \end{code}
 
 \begin{code}
