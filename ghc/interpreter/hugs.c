@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.50 $
- * $Date: 2000/03/28 10:20:55 $
+ * $Revision: 1.51 $
+ * $Date: 2000/03/30 12:04:13 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -235,7 +235,7 @@ String argv[]; {
    readOptions(fromEnv("STGHUGSFLAGS",""));
 
    strncpy(argv_0_orig,argv[0],1000);   /* startupHaskell mangles argv[0] */
-   startupHaskell (argc,argv);
+   startupHaskell (argc,argv,NULL);
    argc = prog_argc; 
    argv = prog_argv;
 
