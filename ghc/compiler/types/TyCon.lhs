@@ -101,31 +101,34 @@ data TyCon
 
 	dataCons :: [DataCon],
 		-- Its data constructors, with fully polymorphic types
-		-- 	This list can be empty, when we import a data type abstractly,
-		-- 	either (a) the interface is hand-written and doesn't give
-		--		   the constructors, or
-		--	       (b) in a quest for fast compilation we don't import 
-		--		   the constructors
+		-- 	This list can be empty, when we import a data type
+		--	abstractly, either
+		--	     (a) the interface is hand-written and doesn't give
+		--		 the constructors, or
+		--	     (b) in a quest for fast compilation we don't import 
+		--		 the constructors
 
 	selIds :: [Id],	-- Its record selectors (if any)
 
-	noOfDataCons :: Int,	-- Number of data constructors
-				-- Usually this is the same as the length of the
-				-- dataCons field, but the latter may be empty if
-				-- we imported the type abstractly.  But even if we import
-				-- abstractly we still need to know the number of constructors
-				-- so we can get the return convention right.  Tiresome!
-				
+	noOfDataCons :: Int,
+		-- Number of data constructors.  Usually this is the
+		-- same as the length of the dataCons field, but the
+		-- latter may be empty if we imported the type
+		-- abstractly.  But even if we import abstractly we
+		-- still need to know the number of constructors so we
+		-- can get the return convention right.  Tiresome!
+
 	algTyConFlavour	:: AlgTyConFlavour,
-	algTyConRec     :: RecFlag,		-- Tells whether the data type is part of 
-						-- a mutually-recursive group or not
+	algTyConRec     :: RecFlag,	-- Tells whether the data type is part of 
+					-- a mutually-recursive group or not
 
 	genInfo :: Maybe (EP Id),	-- Convert T <-> Tring
 					-- Some TyCons don't have it; 
 					-- e.g. the TyCon for a Class dictionary,
 					-- and TyCons with unboxed arguments
 
-	algTyConClass :: Maybe Class	-- Just cl if this tycon came from a class declaration
+	algTyConClass :: Maybe Class
+		-- Just cl if this tycon came from a class declaration
     }
 
   | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
