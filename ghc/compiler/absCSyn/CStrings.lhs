@@ -6,7 +6,7 @@ module CStrings(
 
 	cSEP, pp_cSEP,
 
-	stringToC, charToC, pprFSInCStyle,
+	stringToC, charToC, pprFSInCStyle, pprStringInCStyle,
 	charToEasyHaskell
   ) where
 
@@ -37,6 +37,9 @@ pp_cSEP = char '_'
 \begin{code}
 pprFSInCStyle :: FAST_STRING -> SDoc
 pprFSInCStyle fs = doubleQuotes (text (stringToC (_UNPK_ fs)))
+
+pprStringInCStyle :: String -> SDoc
+pprStringInCStyle s = doubleQuotes (text (stringToC s))
 
 stringToC   :: String -> String
 -- Convert a string to the form required by C in a C literal string
