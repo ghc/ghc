@@ -883,4 +883,25 @@ stg_block_async
     BLOCK_GENERIC;
 }
 
+/* Used by threadDelay implementation; it would be desirable to get rid of
+ * this free()'ing void return continuation.
+ */
+INFO_TABLE_RET( stg_block_async_void, 0/*framesize*/, 0/*bitmap*/, RET_SMALL )
+{
+    W_ ares;
+
+    ares = StgTSO_block_info(CurrentTSO);
+    StgTSO_block_info(CurrentTSO) = NULL;
+    foreign "C" free(ares "ptr");
+    Sp_adj(1);
+    jump %ENTRY_CODE(Sp(0));
+}
+
+stg_block_async_void
+{
+    Sp_adj(-1);
+    Sp(0) = stg_block_async_void_info;
+    BLOCK_GENERIC;
+}
+
 #endif

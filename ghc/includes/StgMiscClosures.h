@@ -438,6 +438,7 @@ RTS_FUN(stg_block_putmvar);
 RTS_ENTRY(stg_block_putmvar_ret);
 #ifdef mingw32_TARGET_OS
 RTS_FUN(stg_block_async);
+RTS_FUN(stg_block_async_void);
 #endif
 
 /* Entry/exit points from StgStartup.cmm */

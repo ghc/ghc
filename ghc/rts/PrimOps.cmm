@@ -1407,6 +1407,7 @@ delayzh_fast
      */
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    jump stg_block_async_void;
 
 #else
 
@@ -1431,9 +1432,8 @@ while:
     } else {
 	StgTSO_link(prev) = CurrentTSO;
     }
-#endif
-
     jump stg_block_noregs;
+#endif
 }
 
 
