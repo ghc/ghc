@@ -12,7 +12,7 @@ import CmdLineOpts	( DynFlags, DynFlag(..) )
 import Id		( Id, idName, idType, mkUserLocal ) 
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
-			  mkForAllTys, tcCmpType
+			  tcCmpType, isUnLiftedType
 			)
 import Subst		( Subst, SubstResult(..), mkSubst, mkSubst, extendTvSubstList, 
 			  simplBndr, simplBndrs, substTy,
@@ -23,7 +23,7 @@ import Var		( zapSpecPragmaId )
 import VarSet
 import VarEnv
 import CoreSyn
-import CoreUtils	( applyTypeToArgs )
+import CoreUtils	( applyTypeToArgs, mkPiTypes )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
 import CoreTidy		( pprTidyIdRules )
 import CoreLint		( showPass, endPass )
@@ -34,6 +34,7 @@ import UniqSupply	( UniqSupply,
 			  getUs, mapUs
 			)
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
+import MkId		( voidArgId, realWorldPrimId )
 import FiniteMap
 import Maybes		( catMaybes, maybeToBool )
 import ErrUtils		( dumpIfSet_dyn )
@@ -879,10 +880,15 @@ specDefn subst calls (fn, rhs)
 	   inst_args = ty_args ++ map Var rhs_dicts'
 
 		-- Figure out the type of the specialised function
-	   spec_id_ty = mkForAllTys poly_tyvars (applyTypeToArgs rhs fn_type inst_args)
+	   body_ty = applyTypeToArgs rhs fn_type inst_args
+	   (lam_args, app_args) 		-- Add a dummy argument if body_ty is unlifted
+		| isUnLiftedType body_ty	-- C.f. WwLib.mkWorkerArgs
+		= (poly_tyvars ++ [voidArgId], poly_tyvars ++ [realWorldPrimId])
+		| otherwise = (poly_tyvars, poly_tyvars)
+	   spec_id_ty = mkPiTypes lam_args body_ty
 	in
 	newIdSM fn spec_id_ty				`thenSM` \ spec_f ->
-	specExpr rhs_subst' (mkLams poly_tyvars body)	`thenSM` \ (spec_rhs, rhs_uds) ->	
+	specExpr rhs_subst' (mkLams lam_args body)	`thenSM` \ (spec_rhs, rhs_uds) ->	
 	let
 		-- The rule to put in the function's specialisation is:
 		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
@@ -890,7 +896,7 @@ specDefn subst calls (fn, rhs)
 				AlwaysActive
 			        (poly_tyvars ++ rhs_dicts')
 				inst_args 
-				(mkTyApps (Var spec_f) (map mkTyVarTy poly_tyvars))
+				(mkVarApps (Var spec_f) app_args)
 
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   final_uds = foldr addDictBind rhs_uds (my_zipEqual "spec_call" rhs_dicts' call_ds)
