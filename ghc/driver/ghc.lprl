@@ -339,75 +339,6 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 	'_1s', "$WAY_1s_HC_OPTS",
 	'_du', "$WAY_B_HC_OPTS" );
 
-# per-build code fragments which are eval'd
-#%EvaldSetupOpts	= ('',	    '', # this one must *not* be set!
-
-#			    # profiled sequential
-#		   '_p',    'push(@HsC_flags,  \'-fscc-profiling\');
-#			     push(@CcBoth_flags, \'-DPROFILING\');',
-
-#			    #and maybe ...
-#			    #push(@CcBoth_flags, '-DPROFILING_DETAIL_COUNTS');
-
-#			    # ticky-ticky sequential
-#		   '_t',    'push(@HsC_flags, \'-fticky-ticky\');
-#			     push(@CcBoth_flags, \'-DTICKY_TICKY\');',
-
-##OLD:			    # unregisterized (ToDo????)
-##		   '_u',    '',
-
-#			    # concurrent
-#		   '_mc',   '$StkChkByPageFaultOK = 0;
-#			     push(@HsC_flags,  \'-fconcurrent\');
-#			     push(@HsCpp_flags,\'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\');
-#			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\');',
-
-#			    # profiled concurrent
-#		   '_mr',   '$StkChkByPageFaultOK = 0;
-#			     push(@HsC_flags,  \'-fconcurrent\', \'-fscc-profiling\');
-#			     push(@HsCpp_flags,\'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\');
-#			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DPROFILING\');',
-
-#			    # ticky-ticky concurrent
-#		   '_mt',   '$StkChkByPageFaultOK = 0;
-#			     push(@HsC_flags,  \'-fconcurrent\', \'-fticky-ticky\');
-#			     push(@HsCpp_flags,\'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\');
-#			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DTICKY_TICKY\');',
-
-#			    # parallel
-#		   '_mp',   '$StkChkByPageFaultOK = 0;
-#			     push(@HsC_flags,  \'-fconcurrent\');
-#			     push(@HsCpp_flags,\'-D__PARALLEL_HASKELL__\',   \'-DPAR\');
-#			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DPAR\');',
-
-#			    # GranSim
-#		   '_mg',   '$StkChkByPageFaultOK = 0;
-#			     push(@HsC_flags,  \'-fconcurrent\', \'-fgransim\');
-#			     push(@HsCpp_flags,\'-D__GRANSIM__\',   \'-DGRAN\');
-#			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DGRAN\');',
-
-#		   '_2s',   'push (@CcBoth_flags, \'-DGC2s\');',
-#		   '_1s',   'push (@CcBoth_flags, \'-DGC1s\');',
-#		   '_du',   'push (@CcBoth_flags, \'-DGCdu\');',
-
-#		   '_a',    '', # these user-way guys should not be set!
-#		   '_b',    '',
-#		   '_c',    '',
-#		   '_d',    '',
-#		   '_e',    '',
-#		   '_f',    '',
-#		   '_g',    '',
-#		   '_h',    '',
-#		   '_i',    '',
-#		   '_j',    '',
-#		   '_k',    '',
-#		   '_l',    '',
-#		   '_m',    '',
-#		   '_n',    '',
-#		   '_o',    '',
-#		   '_A',    '',
-#		   '_B',    '' );
-
 \end{code}
 
 Import/include directories (\tr{-I} options) are sufficiently weird to
@@ -454,7 +385,7 @@ $MkDependHS
 	= ( $INSTALLING ) ? "$InstBinDirGhc/mkdependHS"
 			  : "$TopPwd/$CURRENT_DIR/$GHC_UTILS_DIR/mkdependHS/mkdependHS";
 # Fill in later
-@MkDependHS_flags = ( );
+@MkDependHS_flags = ();
 
 # do_link flag should not be reset while rescanning the cmd-line.
 $Do_lnkr    = 1;
@@ -1681,7 +1612,7 @@ phase) to @"$ifile_root.<suffix>"@.
     # -fvia-C (or the equivalent)
     #
     if ( $HscOut ne '-C=' && $Keep_hc_file_too ) {
-	print STDERR "Warning: Native code generator to be used, -keep-hc-file-too will be ignored\n";
+	print STDERR "$Pgm: warning: Native code generator to be used, -keep-hc-file-too will be ignored\n";
     }
 
     if (! $do_cc && ! $do_as) { # stopping after hsc
@@ -2919,7 +2850,7 @@ arg: while($_ = $Args[0]) {
     # ---------------
 
     /^-fasm-(.*)$/  && do { $HscOut = '-S='; next arg; }; # force using nativeGen
-    /^-fvia-C$/	    && do { $HscOut = '-C='; next arg; }; # force using C compiler
+    /^-fvia-[cC]$/	    && do { $HscOut = '-C='; next arg; }; # force using C compiler
 
     # ---------------
 
