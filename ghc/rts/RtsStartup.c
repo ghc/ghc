@@ -55,10 +55,6 @@
 
 #include <stdlib.h>
 
-#ifdef HAVE_LOCALE_H
-#include <locale.h>
-#endif
-
 #ifdef HAVE_TERMIOS_H
 #include <termios.h>
 #endif
@@ -225,10 +221,6 @@ hs_init(int *argc, char **argv[])
     if (RtsFlags.GcFlags.frontpanel) {
 	initFrontPanel();
     }
-#endif
-
-#ifdef HAVE_LOCALE_H
-    setlocale(LC_CTYPE,"");
 #endif
 
 #if X86_INIT_FPU
