@@ -1,14 +1,14 @@
 % 	Building and installing the Glasgow Functional Programming Tools Suite
 %
-%				Version 2.02
-%				Feb 1997
+%				Version 2.04
+%				June 1997
 			
 
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
 \begin{document}
 \title{Building and installing the Glasgow Functional Programming Tools Suite\\
-Version~2.02}
+Version~2.04}
 \author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\
@@ -27,9 +27,9 @@ This guide is intended for people who want to install or modify
 programs from the Glasgow @fptools@ suite (as distinct from those
 who merely want to {\em run} them).
 
-The whole install-and-make system has been completely re-done
-between GHC 2.01 and 2.02, so it will be worth your while to re-read this guide
-even if you have done so before.
+The whole install-and-make system was completely re-done between GHC
+2.01 and 2.02, so it will be worth your while to re-read this guide
+even if you have read earlier versions.
 
 \section{Getting the Glasgow @fptools@ suite}
 
@@ -45,69 +45,80 @@ as suggested:
 \begin{description}
 \item[Binary distribution.]  If your only purpose is to install
 some of the @fptools@ suite then the easiest thing to do is to
-get a binary distribution.  In the binary distribution everything is
+get a binary distribution. In the binary distribution everything is
 pre-compiled for your particular machine architecture and operating
 system, so all you should have to do is install the binaries and libraries
 in suitable places.  {\em Need pointer to info about doing binary installation.}
 
-A binary distribution may not work for you for two reasons.  
-First, we may not have built the suite for the particular
-architecture/OS platform you want.  That may be due to lack of time and
-energy (in which case you can get a source distribution and build from it;
-see below).  Alternatively, it may be because we havn't yet ported the
-suite to your architecture, in which case you are considerably worse off.
+A binary distribution may not work for you for two reasons.  First, we
+may not have built the suite for the particular architecture/OS
+platform you want. That may be due to lack of time and energy (in
+which case you can get a source distribution and build from it; see
+below).  Alternatively, it may be because we haven't yet ported the
+suite to your architecture, in which case you are considerably worse
+off.
 
 The second reason a binary distribution may not be what you want is
 if you want to read or modify the souce code.
 
 \item[Source distribution.]
-You have a supported
-platform, but (a)~you like the warm fuzzy feeling of compiling things
-yourself; (b)~you want to build something ``extra''---e.g., a set of
-libraries with strictness-analysis turned off; or (c)~you want to hack
-on GHC yourself.
+You have a supported platform, but (a)~you like the warm fuzzy feeling
+of compiling things yourself; (b)~you want to build something
+``extra''---e.g., a set of libraries with strictness-analysis turned
+off; or (c)~you want to hack on GHC yourself.
 
 A source distribution contains complete sources for the @fptools@ suite.
 Not only that, but the more awkward machine-independent steps are done
-for you.  For example, if you don't have @flex@ you'll it convenient that
-the source distribution contains the result of running @flex@ on the
-lexical analyser specification.  If you don't want to alter the lexical
-analyser then this saves you having to find and install @flex@.
-You will still need a working version of GHC on your machine in order to 
-compile (most of) the sources, however.
+for you.  For example, if you don't have @flex@ you'll find it
+convenient that the source distribution contains the result of running
+@flex@ on the lexical analyser specification.  If you don't want to
+alter the lexical analyser then this saves you having to find and
+install @flex@. You will still need a working version of GHC on your
+machine in order to compile (most of) the sources, however.
 
+We make source distributions more frequently than binary
+distributions; a release that comes with pre-compiled binaries
+is considered a major release, i.e., a release that we have some
+confidence will work well by having tested it (more) thoroughly.
+
+Source-only distributions are either bugfix releases or snapshots of
+current state of development. The release has undergone some testing.
+
+GHC~2.04 is a source-only release, and it can be compiled up using
+either GHC~2.02 (or the bugfix release, GHC~2.03) or the Good Old
+Compiler, GHC~0.29. Compiling with 0.29 is recommended if you're
+a performance junkie, as 0.29 (still) generates zippier code, but
+GHC~2.04 is catching up.
 
 \item[Build GHC from intermediate C \tr{.hc} files:] 
-You need a working GHC to use a source distribution. What if you don't have a working GHC?
-Then you have no choice but to ``bootstrap'' up from the
-intermediate C (\tr{.hc}) files that we provide.
+You need a working GHC to use a source distribution. What if you don't
+have a working GHC? Then you have no choice but to ``bootstrap'' up
+from the intermediate C (\tr{.hc}) files that we provide.
 Building GHC on an unsupported platform falls into this category.
 Please see \sectionref{booting-from-C}.
-
-NB: For GHC~2.01, bootstrapping from \tr{.hc} files means you will get
-an all-2.01 system---possibly unduly slow.  Building with GHC~0.29
-will get you a faster compiler...
 
 Once you have built GHC, you can build the other Glasgow tools with
 it.
 
-In theory, you can build GHC with another Haskell compiler (e.g.,
-HBC).  We havn't tried to do this for ages and it almost certainly
-doesn't work any more.
+In theory, you can (could?) build GHC with another Haskell compiler
+(e.g., HBC). We haven't tried to do this for ages and it almost
+certainly doesn't work any more (for tedious reasons).
 
 \item[The CVS repository.]
+
 We make source distributions at the same time as binary distributions;
 i.e. infrequently.  They should, however, be pretty thoroughly tested.
 If you want more up-to-the minute (but less tested) source code then you 
 need to get access to our CVS repository.
 
-All the @fptools@ source code is held in a CVS repository.
-CVS is a pretty good source-code control system, and best of all it works over the network.
+All the @fptools@ source code is held in a CVS repository. CVS is a
+pretty good source-code control system, and best of all it works over
+the network.
 
-The repository holds source code only.  It holds no mechanically generated
-files at all.  So if you check out a source tree from CVS you will need
-to install every utility so that you can build all the derived files
-from scratch.
+The repository holds source code only. It holds no mechanically
+generated files at all.  So if you check out a source tree from CVS
+you will need to install every utility so that you can build all the
+derived files from scratch.
 
 Giving you access to the repository entails some systems administration
 at our end; and we are a bit nervous about being submerged in bug reports
@@ -116,8 +127,8 @@ we are a bit cautious about offering CVS access.  Feel free to ask though!
 \end{description} 
 
 If you are going to do any building from sources (either from a source
-distribution or the CVS repository) then you need to read all of this manual in detail.
-
+distribution or the CVS repository) then you need to read all of this
+manual in detail.
 
 %************************************************************************
 %*									*
@@ -137,15 +148,15 @@ Haskell libraries) might take you to 8--10 hamburgers.
 You'll need over 100MB (say, 20 hamburgers' worth) if you need to
 build the basic stuff from scratch.
 
-I don't yet know the disk requirements for the non-GHC tools.
 
-All of the above are {\em estimates} of disk-space needs.
+All of the above are {\em estimates} of disk-space needs.(I don't yet
+know the disk requirements for the non-GHC tools).
 
 \item
 Use an appropriate machine, compilers, and things.
 
 SPARC boxes and DEC Alphas running OSF/1 are fully supported.
-Linux, MIPS, and HP boxes are in pretty good shape.
+Linux, MIPS, AIX, Win32 and HP boxes are in pretty good shape.
 \Sectionref{port-info} gives the full run-down on ports or lack
 thereof.
 
@@ -162,14 +173,13 @@ instructions, please report it.
 For GHC, please see the bug-reporting section of the User's guide
 (separate document), to maximise the usefulness of your report.
 
-If in doubt, please send a message to
-\tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
+If in doubt, please send a message to \tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
 \end{enumerate}
 
 
 %************************************************************************
 %*									*
-\section[port-info]{What machines the Glasgow tools, version~2.01, run on}
+\section[port-info]{What machines the Glasgow tools, version~2.04, run on}
 \index{ports, GHC}
 \index{GHC ports}
 \index{supported platforms}
@@ -185,7 +195,8 @@ architecture/manufacturer/operating-system combination,
 such as @sparc-sun-solaris2.5.1@.  Other common ones are
 @alpha-dec-osf2@, @hppa1.1-hp-hpux9@, @i386-unknown-linux@,
 @i386-unknown-solaris2@, @i386-unknown-freebsd@, @i386-unknown-cygwin32@,
-@m68k-sun-sunos4@, @mips-sgi-irix5@, @sparc-sun-sunos4@, @sparc-sun-solaris2@.
+@m68k-sun-sunos4@, @mips-sgi-irix5@, @sparc-sun-sunos4@,
+@sparc-sun-solaris2@, @powerpc-ibm-aix@.
 
 Bear in mind that certain ``bundles'', e.g. parallel Haskell, may not
 work on all machines for which basic Haskell compiling is supported.
@@ -207,7 +218,7 @@ supports the underlying BSDisms.
 The GHC hierarchy of Porting Goodness: (a)~Best is a native-code
 generator; (b)~next best is a ``registerised''
 port; (c)~the bare minimum is an ``unregisterised'' port.
-``Unregisterised'' is so terrible that we won't say more about it.
+(``Unregisterised'' is so terrible that we won't say more about it).
 
 We use Sun4s running SunOS~4.1.3 and Solaris 2.5, and DEC~Alphas
 running OSF/1~V2.0, so those are the ``fully-supported'' platforms,
@@ -215,8 +226,8 @@ unsurprisingly.  Both have native-code generators, for quicker
 compilations.  The native-code generator for iX86 platforms (e.g.,
 Linux ELF) is {\em nearly} working; but is not turned on by default.
 
-Here's everything that's known about GHC ports, as of 2.02. We
-identify platforms by their ``canonical GNU-style'' names.
+Here's everything that's known about GHC ports, as of 2.04. We
+identify platforms by their ``canonical'' CPU/Manufacturer/OS triple.
 
 Note that some ports are fussy about which GCC version you use; or
 require GAS; or ...
@@ -256,7 +267,7 @@ Concurrent/Parallel Haskell probably don't work (yet).
 %-------------------------------------------------------------------
 \item[\tr{i386-*-linux} (PCs running Linux---ELF format):]
 \index{i386-*-linux: registerised port}
-GHC~2.01 works registerised.
+GHC~2.04 works registerised.
 You {\em must} have GCC 2.7.x or later.
 The iX86 native-code generator is {\em nearly} there, but it
 isn't turned on by default.
@@ -273,7 +284,7 @@ On old Linux a.out systems: should be the same.
 %-------------------------------------------------------------------
 \item[\tr{i386-*-freebsd} (PCs running FreeBSD 2.2 or higher, and
 NetBSD/OpenBSD using FreeBSD emulation):] \index{i386-*-freebsd:
-registerised port} GHC~2.01 works registerised. Supports same set of
+registerised port} GHC~2.04 works registerised. Supports same set of
 bundles as the above.
 
 \index{i386-*-freebsd: profiling---yes}
@@ -295,9 +306,39 @@ Profiling works, so does Concurrent Haskell.
 %-------------------------------------------------------------------
 \item[\tr{mips-sgi-irix5}:]
 \index{mips-sgi-irix5: registerised port}
-GHC~2.01 works registerised (no native-code generator).
+GHC~2.04 works registerised (no native-code generator).
 I suspect any GCC~2.6.x (or later) is OK.  The GCC that I used
 was built with \tr{--with-gnu-as}; turns out that is important!
+
+Concurrent/Parallel Haskell probably don't work (yet).
+Profiling might work, but it is untested.
+\index{mips-sgi-irix5: concurrent---no}
+\index{mips-sgi-irix5: parallel---no}
+\index{mips-sgi-irix5: profiling---maybe}
+
+%-------------------------------------------------------------------
+\item[\tr{mips-sgi-irix6}:]
+\index{mips-sgi-irix6: registerised port}
+Thanks to the fine efforts of Tomasz Cholewo
+\tr{<tjchol01@mecca.spd.louisville.edu>}, GHC~2.04 works registerised
+(no native code generator) under IRIX 6.2 and 6.3. Depends on having
+specially tweaked version of gcc-2.7.2 around, which can be downloaded
+from
+
+\begin{verbatim}
+  http://mecca.spd.louisville.edu/~tjchol01/software/
+\end{verbatim}
+
+Profiling works, Concurrent/Parallel Haskell might work (AFAIK, untested).
+\index{mips-sgi-irix6: concurrent---maybe}
+\index{mips-sgi-irix6: parallel---maybe}
+\index{mips-sgi-irix6: profiling---yes}
+
+%-------------------------------------------------------------------
+\item[\tr{powerpc-ibm-aix}:]
+\index{powerpc-ibm-aix: registerised port}
+GHC~2.04 works registerised (no native-code generator..yet).
+I suspect 2.7.x is what you need together with this.
 
 Concurrent/Parallel Haskell probably don't work (yet).
 Profiling might work, but it is untested.
@@ -318,9 +359,9 @@ No particularly recent GHC is known to work on a Mac.
 %-------------------------------------------------------------------
 \item[\tr{m68k-next-nextstep3}:]
 \index{m68k-next-nextstep3: historically ported}
-Carsten Schultz succeeded with a ``registerised'' port of GHC~0.19.
+Carsten Schultz succeeded with a ``registerised'' port of GHC~0.29.
 There's probably a little bit-rot since then, but otherwise it should
-still be fine.  Had a report that things were basically OK at 0.22.
+still be fine.
 
 Concurrent/Parallel Haskell probably won't work (yet).
 \index{m68k-next-nextstep3: concurrent---no}
@@ -329,7 +370,7 @@ Concurrent/Parallel Haskell probably won't work (yet).
 %-------------------------------------------------------------------
 \item[\tr{m68k-sun-sunos4} (Sun3):]
 \index{m68k-sun-sunos4: registerised port}
-GHC~2.01 hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
+GHC~2.04 hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
 No native-code generator.
 
 Concurrent/Parallel Haskell probably don't work (yet).
@@ -487,7 +528,7 @@ should always invoke @GHC@ version 2.02.
 \subsection{What bundles there are}
 
 There are plenty of ``non-basic'' GHC bundles.  The files for them are
-called \tr{ghc-2.01-<bundle>-<platform>.tar.gz}, where the
+called \tr{ghc-2.04-<bundle>-<platform>.tar.gz}, where the
 \tr{<platform>} is as above, and \tr{<bundle>} is one of these:
 \begin{description}
 \item[\tr{prof}:]  Profiling with cost-centres.  You probably want this.
@@ -530,7 +571,7 @@ main = putStr "Hello, world!\n"
 First, give yourself a convenient way to execute the driver script
 \tr{ghc/driver/ghc}, perhaps something like...
 \begin{verbatim}
-% ln -s /local/src/ghc-2.01/ghc/driver/ghc ~/bin/alpha/ghc
+% ln -s /local/src/ghc-2.04/ghc/driver/ghc ~/bin/alpha/ghc
 % rehash
 \end{verbatim}
 
@@ -593,9 +634,7 @@ be less than 32 characters long.
 \item[GNU C (\tr{gcc}):]
 \index{pre-supposed: GCC (GNU C compiler)}
 \index{GCC (GNU C compiler), pre-supposed}
-The current version is 2.7.2.  It has a bug that it ticked if you
-compile the @gmp@ library without the @-O@ flag.  So the Makefile in
-there has the @-O@ flag switched on!  Otherwise, 2.7.2 has no problems that we know of.
+The current version is 2.7.2.
 
 If your GCC dies with ``internal error'' on some GHC source file,
 please let us know, so we can report it and get things improved.
@@ -607,13 +646,14 @@ please let us know, so we can report it and get things improved.
 \index{PVM3 (Parallel Virtual Machine), pre-supposed}
 PVM is the Parallel Virtual Machine on which Parallel Haskell programs
 run.  (You only need this if you plan to run Parallel Haskell.  
-Concurent Haskell, which runs concurrent threads on a uniprocessor)
+Concurent Haskell, which runs concurrent threads on a uniprocessor
 doesn't need it.)
 Underneath PVM, you can have (for example) a network of
 workstations (slow) or a multiprocessor box (faster).
 
-The current version of PVM is 3.3.11; we use 3.3.7.  It is readily available on
-the net; I think I got it from \tr{research.att.com}, in \tr{netlib}.
+The current version of PVM is 3.3.11; we use 3.3.7.  It is readily
+available on the net; I think I got it from \tr{research.att.com}, in
+\tr{netlib}.
 
 A PVM installation is slightly quirky, but easy to do.  Just follow
 the \tr{Readme} instructions.
@@ -675,8 +715,8 @@ Berkeley yacc, \tr{byacc}, is not OK.
 \index{sed, pre-supposed}
 You need a working @sed@ if you are going to build from sources.
 The build-configuration stuff needs it.
-GNU sed version 2.0.4 is no good! It has a bug in it that is tickled by the
-build-configuration.  2.0.5 is ok. Others are probably ok too
+GNU sed version 2.0.4 is no good! It has a bug in it that is tickled
+by the build-configuration.  2.0.5 is ok. Others are probably ok too
 (assuming we don't create too elaborate configure scripts..)
 \end{description}
 
@@ -684,8 +724,8 @@ Two @fptools@ projects are worth a quick note at this point, because
 they are useful for all the others:
 \begin{itemize}
 \item @glafp-utils@ contains several utilities which aren't
-particularly Glasgow-ish, but Occasionally Indispensable.
-
+particularly Glasgow-ish, but Occasionally Indispensable. Like
+@lndir@ for creating symbolic link trees.
 
 \item @literate@ contains the Glasgow-built tools for generating
 documentation.  (The unoriginal idea is to be able to generate @latex@, @info@,
@@ -693,7 +733,6 @@ and program code from a single source file.) To get anywhere you'll
 need at least @lit2pgm@, either from the @literate@ project, or
 because it's already installed on your system. 
 \end{itemize}
-
 
 
 
@@ -757,28 +796,26 @@ for different architectures, or with different options (e.g. profiling).
 It's very desirable to share a single copy of the source code among
 all these builds.
 
-So for every source tree we have zero or more {\em build trees}.
-Each build tree is initially an exact copy of the source tree,
-except that each file is a symbolic link to the source file, 
-rather than being a copy of the source file.  There are ``standard''
-Unix utilities that make such copies, so standard that they go by
-different names: @lndir@, @mkshadowdir@ are two (If you don't have
-either, the source distribution includes sources for the \tr{X11}
-\tr{lndir} --- check out \tr{fptools/glafp-utils/lndir} ).
+So for every source tree we have zero or more {\em build trees}.  Each
+build tree is initially an exact copy of the source tree, except that
+each file is a symbolic link to the source file, rather than being a
+copy of the source file.  There are ``standard'' Unix utilities that
+make such copies, so standard that they go by different names:
+@lndir@, @mkshadowdir@ are two (If you don't have either, the source
+distribution includes sources for the \tr{X11} \tr{lndir} --- check
+out \tr{fptools/glafp-utils/lndir} ).
 
-The build
-tree does not need to be anywhere near the source tree in the
-file system.
-Indeed, one advantage of separating the build tree from the source
-is that the build tree can be placed in a non-backed-up partition,
-saving your systems support people from backing up untold megabytes 
-of easily-regenerated, and rapidly-changing, gubbins.  The golden rule is 
-that (with a single exception -- Section~\ref{sect_build-config})
-{\em absolutely
+The build tree does not need to be anywhere near the source tree in
+the file system.  Indeed, one advantage of separating the build tree
+from the source is that the build tree can be placed in a
+non-backed-up partition, saving your systems support people from
+backing up untold megabytes of easily-regenerated, and
+rapidly-changing, gubbins.  The golden rule is that (with a single
+exception -- Section~\ref{sect_build-config}) {\em absolutely
 everything in the build tree is either a symbolic link to the source
-tree, or else is mechanically generated}.  It should be perfectly 
-OK for your build tree to vanish overnight; an hour or two compiling 
-and you're on the road again.
+tree, or else is mechanically generated}.  It should be perfectly OK
+for your build tree to vanish overnight; an hour or two compiling and
+you're on the road again.
 
 You need to be a bit careful, though, that any new files you create
 (if you do any development work) are in the source tree, not a build tree!
@@ -796,33 +833,32 @@ but the danger is that you think you've edited the source file whereas
 actually all you've done is edit the build-tree copy.  More commonly
 you do want to edit the source file.)
 
-Like the source tree, the top level of your build tree must (a linked copy of)
-the root directory of the @fptools@ suite.
-Inside Makefiles, the root of your build tree is called @$(FPTOOLS_TOP)@.
-In the rest of this document path names are relative to @$(FPTOOLS_TOP)@ 
-unless otherwise stated.  For example, the file @ghc/mk/target.mk@ is
+Like the source tree, the top level of your build tree must (a linked
+copy of) the root directory of the @fptools@ suite.  Inside Makefiles,
+the root of your build tree is called @$(FPTOOLS_TOP)@.  In the rest
+of this document path names are relative to @$(FPTOOLS_TOP)@ unless
+otherwise stated.  For example, the file @ghc/mk/target.mk@ is
 actually @$(FPTOOLS_TOP)/ghc/mk/target.mk@.
 
 
 \subsection{Getting the build you want}
 \label{sect_build-config}
 
-When you build @fptools@ you will be compiling code 
-on a particular {\em host platform},
-to run on a particular {\em target platform} (usually the same
-as the host platform)\index{platform}.   The difficulty is 
-that there are minor differences between different platforms;
-minor, but enough that the code needs to be a bit different
-for each.  There are some big differences too: for
-a different architecture we need to build GHC with a different
-native-code generator.
+When you build @fptools@ you will be compiling code on a particular
+{\em host platform}, to run on a particular {\em target platform}
+(usually the same as the host platform)\index{platform}.  The
+difficulty is that there are minor differences between different
+platforms; minor, but enough that the code needs to be a bit different
+for each.  There are some big differences too: for a different
+architecture we need to build GHC with a different native-code
+generator.
 
 There are also knobs you can turn to control how the @fptools@
-software is built.  For example, you might want to build GHC
-optimised (so that it runs fast) or unoptimised (so that you can
-compile it fast after you've modified it.
-Or, you might want to compile it with debugging on (so that
-extra consistency-checking code gets included) or off.  And so on.
+software is built.  For example, you might want to build GHC optimised
+(so that it runs fast) or unoptimised (so that you can compile it fast
+after you've modified it.  Or, you might want to compile it with
+debugging on (so that extra consistency-checking code gets included)
+or off.  And so on.
 
 All of this stuff is called the {\em configuration} of your build.
 You set the configuration using an exciting three-step process.
@@ -1668,7 +1704,7 @@ installation, this bug also suggests that you have an old GCC.
 \item
 You {\em may} need to re-\tr{ranlib} your libraries (on Sun4s).
 \begin{verbatim}
-% cd $(libdir)/ghc-2.01/sparc-sun-sunos4
+% cd $(libdir)/ghc-2.04/sparc-sun-sunos4
 % foreach i ( `find . -name '*.a' -print` ) # or other-shell equiv...
 ?    ranlib $i
 ?    # or, on some machines: ar s $i
@@ -1689,53 +1725,53 @@ then try to muddle through, doing them by hand.
 
 
 % ====================================================================
-Here follow pitfalls that apply to pre-2.02 releases.  They should not
-happen any more If they do crop up with 2.02 or later, please let us
-know.
+%Here follow pitfalls that apply to pre-2.02 releases.  They should not
+%happen any more If they do crop up with 2.02 or later, please let us
+%know.
 
 \begin{enumerate}
-%------------------------------------------------------------------------
-\item
-When configuring the support code (mkworld, glafp-utils, etc.), you
-will see mention of \tr{NO_SPECIFIC_PROJECT} and
-\tr{NO_SPECIFIC_VERSION}.  This is cool.
+%%------------------------------------------------------------------------
+%\item
+%When configuring the support code (mkworld, glafp-utils, etc.), you
+%will see mention of \tr{NO_SPECIFIC_PROJECT} and
+%\tr{NO_SPECIFIC_VERSION}.  This is cool.
 
 
 %------------------------------------------------------------------------
-\item
-Sooner or later in your ``make-worlding'' life you will do and see
-something like:
-\begin{verbatim}
+%\item
+%Sooner or later in your ``make-worlding'' life you will do and see
+%something like:
+%\begin{verbatim}
 % make Makefile
-        rm -f Makefile.bak; mv Makefile Makefile.bak
-../.././mkworld/jmake -P ghc -S std -I../.././mkworld -DTopDir=../../. -DTopDir=...
-../.././mkworld/jrestoredeps
-==== The new Makefile is for: ====
-make: Fatal error in reader: Makefile, line 850: Unexpected end of line seen
-Current working directory /export/users/fp/grasp/ghc-0.26/ghc/runtimes/standard
-*** Error code 1
-make: Fatal error: Command failed for target `Makefile'
-\end{verbatim}
+%        rm -f Makefile.bak; mv Makefile Makefile.bak
+%../.././mkworld/jmake -P ghc -S std -I../.././mkworld -DTopDir=../../. -DTopDir=...
+%../.././mkworld/jrestoredeps
+%==== The new Makefile is for: ====
+%make: Fatal error in reader: Makefile, line 850: Unexpected end of line seen
+%Current working directory /export/users/fp/grasp/ghc-0.26/ghc/runtimes/standard
+%*** Error code 1
+%make: Fatal error: Command failed for target `Makefile'
+%\end{verbatim}
 
-Don't panic!  It should restore your previous \tr{Makefile}, and
-leave the junk one in \tr{Makefile.bad}.  Snoop around at your leisure.
+%Don't panic!  It should restore your previous \tr{Makefile}, and
+%leave the junk one in \tr{Makefile.bad}.  Snoop around at your leisure.
 
 % ------------------------------------------------------------------------
-\item
-If you do corrupt a \tr{Makefile} totally, or you need to glue a new
-directory into the directory structure (in \tr{newdir}---which must
-have a \tr{Jmakefile}, even if empty), here's a neat trick:
-\begin{verbatim}
-#
-# move to the directory just above the one where you want a Makefile...
-cd ..
-#
-# make Makefiles, but lie about the directories below...
-make Makefiles SUBDIRS=newdir
-\end{verbatim}
+%\item
+%If you do corrupt a \tr{Makefile} totally, or you need to glue a new
+%directory into the directory structure (in \tr{newdir}---which must
+%have a \tr{Jmakefile}, even if empty), here's a neat trick:
+%\begin{verbatim}
+%#
+%# move to the directory just above the one where you want a Makefile...
+%cd ..
+%#
+%# make Makefiles, but lie about the directories below...
+%make Makefiles SUBDIRS=newdir
+%\end{verbatim}
 
-This will create a \tr{Makefile} {\em ex nihilo} in \tr{newdir}, and
-it will be properly wired into the general make-world structure.
+%This will create a \tr{Makefile} {\em ex nihilo} in \tr{newdir}, and
+%it will be properly wired into the general make-world structure.
 
 % ------------------------------------------------------------------------
 \item
