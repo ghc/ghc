@@ -318,8 +318,11 @@ evalAbsence (WwUnpack _ demand_info) val
   = case val of
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison
-	AbsProd vals -> or (zipWithEqual "evalAbsence" evalAbsence demand_info vals)
-	_	     -> panic "evalAbsence: other"
+	AbsProd vals 
+	   | length vals /= length demand_info -> pprTrace "evalAbsence" (ppr demand_info $$ ppr val)
+						  True
+	   | otherwise -> or (zipWithEqual "evalAbsence" evalAbsence demand_info vals)
+	_	       -> panic "evalAbsence: other"
 
 evalAbsence other val = anyBot val
   -- The demand is conservative; even "Lazy" *might* evaluate the
@@ -505,6 +508,11 @@ absEval anal (Let (Rec pairs) body) env
     in
     absEval anal body new_env
 
+absEval anal (Note (Coerce _ _) expr) env = AbsTop
+	-- Don't look inside coerces, becuase they
+	-- are usually recursive newtypes
+	-- (Could improve, for the error case, but we're about
+	-- to kill this analyser anyway.)
 absEval anal (Note note expr) env = absEval anal expr env
 \end{code}
 
