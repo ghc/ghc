@@ -513,12 +513,25 @@
 	<listitem>
 	  <para>Generate an HTML index containing entries pulled from
 	  all the specified interfaces (interfaces are specified using
-	  <option>-i</option> or <option>--read-interface).  This is
-	  used to generate a single index for multiple sets of Haddock
-	  documentstation.</option>
+	  <option>-i</option> or <option>--read-interface</option>).
+	  This is used to generate a single index for multiple sets of
+	  Haddock documentstation.</para>
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term><option>-k</option> <replaceable>P</replaceable></term>
+	<term><option>--package=</option><replaceable>P</replaceable></term>
+	<indexterm><primary><option>-k</option></primary>
+	</indexterm>
+	<indexterm><primary><option>--package</option></primary></indexterm>
+	<listitem>
+	  <para>Set the package name for these modules to
+	  <replaceable>P</replaceable>.  In a combined index generated
+	  with <option>--gen-index</option>, the package name for each
+	  module is shown in the right-hand column.</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
 
   </chapter>
@@ -1207,6 +1220,47 @@ module A where
 --
 --     2. second item
 </programlisting>
+      </section>
+
+      <section>
+	<title>Definition lists</title>
+	
+	<para>Definition lists are written as follows:</para>
+
+<programlisting>
+-- | This is a definition list:
+--
+--   [@foo@] The description of @foo@.
+--
+--   [@bar@] The description of @bar@.
+</programlisting>
+
+	<para>To produce output something like this:</para>
+	
+	<variablelist>
+	  <varlistentry>
+	    <term><literal>foo</literal></term>
+	    <listitem>
+	      <para>The description of <literal>foo</literal>.</para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><literal>bar</literal></term>
+	    <listitem>
+	      <para>The description of <literal>bar</literal>.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
+	<para>Each paragraph should be preceded by the
+	&ldquo;definition term&rdquo; enclosed in square brackets.
+	The square bracket characters have no special meaning outside
+	the beginning of a definition paragraph.  That is, if a
+	paragraph begins with a <literal>[</literal> character, then
+	it is assumed to be a definition paragraph, and the next
+	<literal>]</literal> character found will close the definition
+	term.  Other markup operators may be used freely within the
+	definition term.</para>
       </section>
 
       <section>
