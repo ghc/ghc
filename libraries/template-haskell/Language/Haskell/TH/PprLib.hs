@@ -200,11 +200,11 @@ nest n = liftM (HPJ.nest n)
 hang d1 n d2 = do d1' <- d1
                   d2' <- d2
                   return (HPJ.hang d1' n d2')
-{-
-punctuate p ds = do p' <- p
-                    ds' <- sequence ds
-                    map return (HPJ.punctuate p' ds')
--}
-punctuate p ds = undefined
--- punctuate :: M Doc -> [M Doc] -> [M Doc]
+
+-- punctuate uses the same definition as Text.PrettyPrint.HughesPJ
+punctuate p []     = []
+punctuate p (d:ds) = go d ds
+                   where
+                     go d [] = [d]
+                     go d (e:es) = (d <> p) : go e es
 
