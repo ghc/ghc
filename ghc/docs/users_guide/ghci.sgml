@@ -779,6 +779,10 @@ $ ghci -lm
       (<literal>.o</literal> or <literal>.obj</literal> depending on
       your platform) from the command-line.  Just add the name the
       object file to the command line.</para>
+
+      <para>Ordering of <option>-l</option> options matters: a library
+      should be mentioned <emphasis>before</emphasis> the libraries it
+      depends on (see <xref linkend="options-linker">).</para>
     </sect2>
 
   </sect1>
