@@ -1,0 +1,86 @@
+["inp","40"]
+Pretty Printed Input:
+Int = a
+Int = b
+Int = c
+Int = a
+fact(Int x,) : Int
+{  fact = 1;
+   while x > 0fact = fact * x;
+              x = x - 1;;
+}
+recfact(Int x,) : Int
+{  if(x == 0)then{  recfact = 1;
+                 }
+   else{  recfact = x * recfact(x - 1);
+       };
+}
+MSP Generated Code:
+MEMORIA DE DADOS
+"a0"  TAM 1
+"b0"  TAM 1
+"c0"  TAM 1
+"a0"  TAM 1
+"fact0"  TAM 1
+"x"  TAM 1
+"recfact1"  TAM 1
+"x"  TAM 2
+CODIGO
+CALL "main"
+HALT
+C_Ident_1 "fact":
+PUSHa "fact" 1
+PUSHi 1
+STORE
+C_Ident_1 "while_1":
+PUSHa "x" 1
+LOAD
+PUSHi 0
+GT
+JMPF "end_while_1"
+PUSHa "fact" 1
+PUSHa "fact" 1
+LOAD
+PUSHa "x" 1
+LOAD
+MUL
+STORE
+PUSHa "x" 1
+PUSHa "x" 1
+LOAD
+PUSHi 1
+SUB
+STORE
+JMP "while_1"
+C_Ident_1 "end_while_1":
+RET
+C_Ident_1 "recfact":
+PUSHa "x" 2
+LOAD
+PUSHi 0
+EQ
+JMPF "else_1"
+PUSHa "recfact" 2
+PUSHi 1
+STORE
+JMPF "end_if_1"
+C_Ident_1 "else_1":
+PUSHa "recfact" 2
+PUSHa "x" 2
+LOAD
+PUSHa "x" 1
+PUSHa "x" 2
+LOAD
+PUSHi 1
+SUB
+STORE
+CALL "recfact"
+MUL
+STORE
+C_Ident_1 "end_if_1":
+RET
+
+
+Detected Semantic Errors:
+[C_E_Name_AD_1 (C_Ident_1 "a")]
+[]
