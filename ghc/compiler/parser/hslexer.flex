@@ -276,7 +276,18 @@ NL  	    	    	[\n\r]
      * Special GHC pragma rules.  Do we need a start state for interface files,
      * so these won't be matched in source files? --JSM
      */
+
 %}
+
+%{
+/* I believe the next rule is not ever matched.
+
+   The '#line ' rule is un-cool, recognising a cpp directive inside hs source.
+   Driver has now been modified to output `standard' {-# LINE ..-} pragmas
+   where possible, so the lexer should now never see cpp directives
+   like '# ' and '#line'.
+
+   -- SOF
 
 <Code,GlaExt>^"# ".*{NL}    {
     	    	    	  char tempf[FILENAME_SIZE];
@@ -291,6 +302,8 @@ NL  	    	    	[\n\r]
 			  new_filename(tempf); 
 			  hsplineno = hslineno; hscolno = 0; hspcolno = 0;
 			}
+*/
+%}
 
 <Code,GlaExt>"{-# LINE ".*"-}"{NL} { 
     	    	    	  /* partain: pragma-style line directive */
