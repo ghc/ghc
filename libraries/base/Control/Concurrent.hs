@@ -317,7 +317,7 @@ Support for multiple operating system threads and bound threads as described
 below is currently only available in the GHC runtime system when the runtime system
 has been compiled using a special option.
 
-When recompiling GHC, use ./configure --enable-threaded-rts to enable this.
+When recompiling GHC, use .\/configure --enable-threaded-rts to enable this.
 To find your GHC has already been compiled that way, use
 'rtsSupportsBoundThreads' from GHCi.
 
