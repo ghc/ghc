@@ -28,9 +28,6 @@ module Maybes (
 	catMaybes
     ) where
 
-CHK_Ubiq()		-- debugging consistency check
-import Unique  (Unique)	-- only for specialising
-
 #if __GLASGOW_HASKELL__ >= 204
 import Maybe( catMaybes, mapMaybe )
 #endif
@@ -131,12 +128,6 @@ assocMaybe alist key
   where
     lookup []		  = Nothing
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
-
-{-# SPECIALIZE assocMaybe
-	:: [(FAST_STRING,   b)] -> FAST_STRING -> Maybe b
-	 , [(Int,           b)] -> Int         -> Maybe b
-	 , [(Unique,        b)] -> Unique      -> Maybe b
-  #-}
 \end{code}
 
 @mkLookupFun eq alist@ is a function which looks up
