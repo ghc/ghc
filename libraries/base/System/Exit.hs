@@ -27,6 +27,7 @@ import GHC.IOBase
 
 #ifdef __HUGS__
 import Hugs.Prelude
+import Hugs.Exception
 #endif
 
 #ifdef __NHC__
