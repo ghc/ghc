@@ -33,11 +33,15 @@ data Interface
 	iface_env :: NameEnv,
 		-- ^ environment mapping names to *original* names
 
+	iface_import_env :: FiniteMap HsQName HsQName,
+
 	iface_reexported :: NameEnv,
-		-- ^ For names exported by this module, but not actually documented
-		-- in this module's documentation (perhaps because they are reexported via
-		-- 'module M' in the export list), this mapping gives the location of
-		-- documentation for the name in another module.
+		-- ^ For names exported by this module, but not
+		-- actually documented in this module's documentation
+		-- (perhaps because they are reexported via 'module M'
+		-- in the export list), this mapping gives the
+		-- location of documentation for the name in another
+		-- module.
 
 	iface_sub :: FiniteMap HsName [HsName],
 		-- ^ maps names to "subordinate" names 
@@ -75,6 +79,7 @@ data ExportItem
   = ExportDecl
 	HsQName		-- the original name
 	HsDecl		-- a declaration (with doc annotations)
+	[InstHead]	-- instances relevant to this declaration
 
   | ExportGroup		-- a section heading
 	Int		-- section level (1, 2, 3, ... )

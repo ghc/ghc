@@ -41,22 +41,17 @@ iconFile = "haskell_icon.gif"
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation
 
-type InstMaps = 
-	(FiniteMap HsQName [InstHead], -- maps class names to instances
-	 FiniteMap HsQName [InstHead]) -- maps type names to instances
-
 ppHtml	:: String
 	-> Maybe String
 	-> [(Module, Interface)]
 	-> FilePath			-- destination directory
 	-> Maybe String			-- CSS file
 	-> String			-- $libdir
-	-> InstMaps
 	-> Maybe Doc			-- prologue text, maybe
 	-> Bool				-- do MS Help stuff
 	-> IO ()
 
-ppHtml doctitle source_url ifaces odir maybe_css libdir inst_maps prologue do_ms_help =  do
+ppHtml doctitle source_url ifaces odir maybe_css libdir prologue do_ms_help =  do
   let 
 	css_file = case maybe_css of
 			Nothing -> libdir ++ pathSeparator:cssFile
@@ -82,7 +77,7 @@ ppHtml doctitle source_url ifaces odir maybe_css libdir inst_maps prologue do_ms
     ppHHContents odir (map fst visible_ifaces)
     ppHHIndex odir visible_ifaces
 
-  mapM_ (ppHtmlModule odir doctitle source_url inst_maps) visible_ifaces
+  mapM_ (ppHtmlModule odir doctitle source_url) visible_ifaces
 
 contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
@@ -316,27 +311,27 @@ idBeginsWith (HsSpecial s) c = head s `elem` [toLower c, toUpper c]
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
 
-ppHtmlModule :: FilePath -> String -> Maybe String -> InstMaps
-	-> (Module,Interface) -> IO ()
-ppHtmlModule odir doctitle source_url inst_maps (Module mdl,iface) = do
+ppHtmlModule :: FilePath -> String -> Maybe String -> 
+	(Module,Interface) -> IO ()
+ppHtmlModule odir doctitle source_url (Module mdl,iface) = do
   let html = 
 	header (thetitle (toHtml mdl) +++
 		thelink ! [href cssFile,
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
 	    pageHeader mdl iface doctitle source_url </> s15 </>
-	    ifaceToHtml mdl iface inst_maps </> s15 </>
+	    ifaceToHtml mdl iface </> s15 </>
 	    footer
          )
   writeFile (moduleHtmlFile odir mdl) (renderHtml html)
 
-ifaceToHtml :: String -> Interface -> InstMaps -> HtmlTable
-ifaceToHtml _ iface inst_maps
+ifaceToHtml :: String -> Interface -> HtmlTable
+ifaceToHtml _ iface 
   = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: bdy)
   where 
 	exports = numberSectionHeadings (iface_exports iface)
 
-	has_doc (ExportDecl _ d) = isJust (declDoc d)
+	has_doc (ExportDecl _ d _) = isJust (declDoc d)
 	has_doc (ExportModule _) = False
 	has_doc _ = True
 
@@ -358,7 +353,7 @@ ifaceToHtml _ iface inst_maps
 	  = (tda [theclass "section1"] << toHtml "Synopsis") </>
 	    s15 </>
             (tda [theclass "body"] << vanillaTable <<
-  	        abovesSep s8 (map (processExport True inst_maps) 
+  	        abovesSep s8 (map (processExport True)
 			(filter forSummary exports))
 	    )
 
@@ -372,7 +367,7 @@ ifaceToHtml _ iface inst_maps
 		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 	     | otherwise  = Html.emptyTable
 
-	bdy = map (processExport False inst_maps) exports
+	bdy = map (processExport False) exports
 
 ppModuleContents :: [ExportItem] -> HtmlTable
 ppModuleContents exports
@@ -408,14 +403,14 @@ numberSectionHeadings exports = go 1 exports
 	go n (other:es)
 	  = other : go n es
 
-processExport :: Bool -> InstMaps -> ExportItem -> HtmlTable
-processExport _ _ (ExportGroup lev id0 doc)
+processExport :: Bool -> ExportItem -> HtmlTable
+processExport _ (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
-processExport summary inst_maps (ExportDecl x decl)
-  = doDecl summary inst_maps x decl
-processExport _       _ (ExportDoc doc)
+processExport summary (ExportDecl x decl insts)
+  = doDecl summary x decl insts
+processExport _ (ExportDoc doc)
   = docBox (docToHtml doc)
-processExport _       _ (ExportModule (Module mdl))
+processExport _ (ExportModule (Module mdl))
   = declBox (toHtml "module" <+> ppHsModule mdl)
 
 forSummary :: ExportItem -> Bool
@@ -439,8 +434,8 @@ declWithDoc False Nothing    html_decl = declBox html_decl
 declWithDoc False (Just doc) html_decl = 
 		declBox html_decl </> docBox (docToHtml doc)
 
-doDecl :: Bool -> InstMaps -> HsQName -> HsDecl -> HtmlTable
-doDecl summary inst_maps x d = do_decl d
+doDecl :: Bool -> HsQName -> HsDecl -> [InstHead] -> HtmlTable
+doDecl summary x d instances = do_decl d
   where
      do_decl (HsTypeSig _ [nm] ty doc) 
 	= ppFunSig summary nm ty doc
@@ -454,15 +449,15 @@ doDecl summary inst_maps x d = do_decl d
 		 ++ map ppHsName args) <+> equals <+> ppHsType ty)
 
      do_decl (HsNewTypeDecl loc ctx nm args con drv doc)
-	= ppHsDataDecl summary inst_maps True{-is newtype-} x
+	= ppHsDataDecl summary instances True{-is newtype-} x
 		(HsDataDecl loc ctx nm args [con] drv doc)
 	  -- print it as a single-constructor datatype
 
      do_decl d0@(HsDataDecl{})
-	= ppHsDataDecl summary inst_maps False{-not newtype-} x d0
+	= ppHsDataDecl summary instances False{-not newtype-} x d0
 
      do_decl d0@(HsClassDecl{})
-	= ppHsClassDecl summary inst_maps x d0
+	= ppHsClassDecl summary instances x d0
 
      do_decl (HsDocGroup _ lev str)
 	= if summary then Html.emptyTable 
@@ -498,9 +493,8 @@ ppShortDataDecl _ _ d =
     error $ "HaddockHtml.ppShortDataDecl: unexpected decl " ++ show d
 
 -- The rest of the cases:
-ppHsDataDecl :: Ord key => Bool	-> (a, FiniteMap key [InstHead])
-	     -> Bool -> key -> HsDecl -> HtmlTable
-ppHsDataDecl summary (_, ty_inst_map) is_newty 
+ppHsDataDecl :: Ord key => Bool	-> [InstHead] -> Bool -> key -> HsDecl -> HtmlTable
+ppHsDataDecl summary instances is_newty 
      x decl@(HsDataDecl _ _ nm args cons _ doc)
   | summary = declWithDoc summary doc (ppShortDataDecl summary is_newty decl)
 
@@ -529,16 +523,10 @@ ppHsDataDecl summary (_, ty_inst_map) is_newty
 			 aboves (map ppSideBySideConstr cons)
 			)
 
-	instances = lookupFM ty_inst_map x
-
 	instances_bit
-	   = case instances of
-		Nothing -> Html.emptyTable
-		Just [] -> Html.emptyTable
-		Just is -> 
-		 inst_hdr </>
+	   =  inst_hdr </>
 		 tda [theclass "body"] << spacedTable1 << (
-			aboves (map (declBox.ppInstHead) is)
+			aboves (map (declBox.ppInstHead) instances)
 		  )
 ppHsDataDecl _ _ _ _ d =
     error $ "HaddockHtml.ppHsDataDecl: unexpected decl " ++ show d
@@ -657,9 +645,8 @@ ppFds fds =
 	fundep (vars1,vars2) = hsep (map ppHsName vars1) <+> toHtml "->" <+>
 			       hsep (map ppHsName vars2)
 
-ppShortClassDecl :: Bool -> a -> HsDecl -> HtmlTable
-ppShortClassDecl summary _
-	(HsClassDecl _ ctxt nm tvs fds decls _) = 
+ppShortClassDecl :: Bool -> HsDecl -> HtmlTable
+ppShortClassDecl summary (HsClassDecl _ ctxt nm tvs fds decls _) = 
   if null decls
     then declBox hdr
     else declBox (hdr <+> keyword "where")
@@ -673,14 +660,13 @@ ppShortClassDecl summary _
          
    where
 	hdr = ppClassHdr summary ctxt nm tvs fds
-ppShortClassDecl _ _ d =
+ppShortClassDecl _ d =
     error $ "HaddockHtml.ppShortClassDecl: unexpected decl: " ++ show d
 
-ppHsClassDecl :: Ord key => Bool -> (FiniteMap key [InstHead], t_a4nrR)
-	      -> key -> HsDecl -> HtmlTable
-ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c 
+ppHsClassDecl :: Ord key => Bool -> [InstHead] -> key -> HsDecl -> HtmlTable
+ppHsClassDecl summary instances orig_c
 	decl@(HsClassDecl _ ctxt nm tvs fds decls doc)
-  | summary = ppShortClassDecl summary inst_maps decl
+  | summary = ppShortClassDecl summary decl
 
   | otherwise
         = classheader </>
@@ -710,16 +696,11 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 			)
 
 	instances_bit
-	   = case instances of
-		Nothing -> Html.emptyTable
-		Just [] -> Html.emptyTable
-		Just is -> 
-		 s8 </> inst_hdr </>
+	   =  s8 </> inst_hdr </>
 		 tda [theclass "body"] << spacedTable1 << (
-			aboves (map (declBox.ppInstHead) is)
+			aboves (map (declBox.ppInstHead) instances)
 		  )
 
-	instances = lookupFM cls_inst_map orig_c
 ppHsClassDecl _ _ _ d =
     error $ "HaddockHtml.ppHsClassDecl: unexpected decl: " ++ show d
 

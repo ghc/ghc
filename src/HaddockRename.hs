@@ -9,7 +9,7 @@ module HaddockRename (
 
 	renameExportList, 
 	renameDecl,
-	renameExportItems,
+	renameExportItems, renameInstHead,
 	renameDoc, renameMaybeDoc,
   ) where
 
@@ -94,19 +94,19 @@ renameDecl decl
 	    doc <- renameMaybeDoc doc0
 	    return (HsTypeDecl loc t args ty doc)
 	HsDataDecl loc ctx0 t args cons0 drv0 doc0 -> do
-	    ctx <- mapM renamePred ctx0
+	    ctx <- renameContext ctx0
 	    cons <- mapM renameConDecl cons0
 	    drv <- mapM (lookupRn id) drv0
 	    doc <- renameMaybeDoc doc0
 	    return (HsDataDecl loc ctx t args cons drv doc)
         HsNewTypeDecl loc ctx0 t args con0 drv0 doc0 -> do
-	    ctx <- mapM renamePred ctx0
+	    ctx <- renameContext ctx0
 	    con <- renameConDecl con0
 	    drv <- mapM (lookupRn id) drv0
 	    doc <- renameMaybeDoc doc0
 	    return (HsNewTypeDecl loc ctx t args con drv doc)
         HsClassDecl loc ctxt0 nm tvs fds decls0 doc0 -> do
-	    ctxt <- mapM renamePred ctxt0
+	    ctxt <- renameContext ctxt0
 	    decls <- mapM renameDecl decls0
 	    doc <- renameMaybeDoc doc0
 	    return (HsClassDecl loc ctxt nm tvs fds decls doc)
@@ -119,7 +119,7 @@ renameDecl decl
 	    doc <- renameMaybeDoc doc0
 	    return (HsForeignImport loc cc safe ent n ty doc)
 	HsInstDecl loc ctxt0 asst0 decls -> do
-	    ctxt <- mapM renamePred ctxt0
+	    ctxt <- renameContext ctxt0
 	    asst <- renamePred asst0
 	    return (HsInstDecl loc ctxt asst decls)
 	HsDocCommentNamed loc name doc0 -> do
@@ -147,6 +147,9 @@ renameField (HsFieldDecl ns ty0 doc0) = do
 renameBangTy :: HsBangType -> RnM HsBangType
 renameBangTy (HsBangedTy ty)   = HsBangedTy   `liftM` renameType ty
 renameBangTy (HsUnBangedTy ty) = HsUnBangedTy `liftM` renameType ty
+
+renameContext :: HsContext -> RnM HsContext
+renameContext = mapM renamePred
 
 renamePred :: (HsQName,[HsType]) -> RnM (HsQName,[HsType])
 renamePred (c,tys0) = do
@@ -177,6 +180,12 @@ renameType (HsTyDoc ty0 doc0) = do
   ty <- renameType ty0
   doc <- renameDoc doc0
   return (HsTyDoc ty doc)
+
+renameInstHead :: InstHead -> RnM InstHead
+renameInstHead (ctx,asst) = do
+  ctx <- renameContext ctx
+  asst <- renamePred asst
+  return (ctx,asst)
 
 -- -----------------------------------------------------------------------------
 -- Renaming documentation
@@ -240,9 +249,10 @@ renameExportItems items = mapM rn items
  	rn (ExportGroup lev id0 doc0) 
 	   = do doc <- renameDoc doc0
 	        return (ExportGroup lev id0 doc)
-	rn (ExportDecl x decl0) -- x is an original name, don't rename it
+	rn (ExportDecl x decl0 insts) -- x is an original name, don't rename it
 	   = do decl <- renameDecl decl0
-		return (ExportDecl x decl)
+		mapM renameInstHead insts
+		return (ExportDecl x decl insts)
 	rn (ExportDoc doc0)
 	   = do doc <- renameDoc doc0
 		return (ExportDoc doc)

@@ -180,14 +180,14 @@ run flags files = do
   module_map <- loop (listToFM read_ifaces) sorted_mod_files
   let mod_ifaces = fmToList module_map
 
-      these_mod_ifaces = [ (mdl, iface) 
-			 | (mdl, iface) <- mod_ifaces,
-			   mdl `notElem` external_mods ]
+      these_mod_ifaces0 = [ (mdl, iface) 
+			  | (mdl, iface) <- mod_ifaces,
+			    mdl `notElem` external_mods ]
 
 --  when (Flag_DocBook `elem` flags) $
 --    putStr (ppDocBook odir mod_ifaces)
 
-  let inst_maps = collectInstances these_mod_ifaces
+  let these_mod_ifaces = attachInstances these_mod_ifaces0
 
   when (Flag_Debug `elem` flags) $ do
     mapM_ putStrLn (map show [ (mdl, fmToList (iface_env i), 
@@ -196,7 +196,7 @@ run flags files = do
 
   when (Flag_Html `elem` flags) $
     ppHtml title source_url these_mod_ifaces odir css_file 
-	libdir inst_maps prologue (Flag_MSHtmlHelp `elem` flags)
+	libdir prologue (Flag_MSHtmlHelp `elem` flags)
 
   -- dump an interface if requested
   case dump_iface of
@@ -226,6 +226,7 @@ readIface filename = do
 	  (mdl, Interface { 
 		   iface_filename     = "",
 		   iface_env          = listToFM env,
+		   iface_import_env   = emptyFM,
 		   iface_sub	      = listToFM sub,
 		   iface_reexported   = emptyFM,
 		   iface_exports      = [],
@@ -395,7 +396,8 @@ mkInterface no_implicit_prelude mod_map filename
   return (mdl, Interface { 
 		   iface_filename     = filename,
 		   iface_env          = name_env,
-		   iface_reexported    = reexports,
+		   iface_import_env   = import_env,
+		   iface_reexported   = reexports,
 		   iface_exports      = renamed_export_list,
 		   iface_sub	      = sub_map,
 		   iface_orig_exports = pruned_export_list,
@@ -525,7 +527,7 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
     declWith (UnQual _)     _ = return []
     declWith t@(Qual mdl x) mb_subs
 	| Just decl <- findDecl t
-	= return [ ExportDecl t (restrictTo subs (extractDecl x mdl decl)) ]
+	= return [ ExportDecl t (restrictTo subs (extractDecl x mdl decl)) [] ]
 	| otherwise
 	= return []
 	where 
@@ -567,7 +569,7 @@ fullContentsOfThisModule :: Module -> [HsDecl] -> [ExportItem]
 fullContentsOfThisModule mdl decls = 
   map mkExportItem (filter keepDecl decls)
   where mkExportItem (HsDocGroup _ lev doc) = ExportGroup lev "" doc
-	mkExportItem decl = ExportDecl (Qual mdl x) decl
+	mkExportItem decl = ExportDecl (Qual mdl x) decl []
 	     where Just x = declMainBinder decl
 
 keepDecl :: HsDecl -> Bool
@@ -636,7 +638,7 @@ extractRecSel nm mdl t tvs (HsRecDecl loc _ _tvs _ fields _mb_doc : rest)
 
 pruneExportItems :: [ExportItem] -> [ExportItem]
 pruneExportItems items = filter has_doc items
-  where has_doc (ExportDecl _ d) = isJust (declDoc d)
+  where has_doc (ExportDecl _ d _) = isJust (declDoc d)
 	has_doc _ = True
 
 -- -----------------------------------------------------------------------------
@@ -954,16 +956,36 @@ sortModules mdls = mapM for_each_scc sccs
 		   unwords (map show (get_mods (map fst hsmodules))))
 
 -- -----------------------------------------------------------------------------
--- Collect instances
+-- Collect instances and attach them to declarations
+
+attachInstances :: [(Module,Interface)] -> [(Module,Interface)]
+attachInstances mod_ifaces
+  = map attach mod_ifaces
+  where
+  inst_map = collectInstances mod_ifaces
+
+  attach (mod,iface) = (mod, iface{ iface_exports = new_exports })
+   where
+	new_exports = map attach_export (iface_exports iface)
+
+	rename_insts :: [InstHead] -> [InstHead]
+	rename_insts insts = fst (runRnFM (iface_import_env iface)
+				    (mapM renameInstHead insts))
+
+	attach_export (ExportDecl nm decl _) =
+	    ExportDecl nm decl (case lookupFM inst_map nm of
+				  Nothing -> []
+				  Just instheads -> rename_insts instheads)
+	attach_export other_export =
+	    other_export
 
 collectInstances
-   :: [(Module,Interface)] 
-   -> (FiniteMap HsQName [InstHead],	-- maps class names to instances
-       FiniteMap HsQName [InstHead])	-- maps type names to instances
+   :: [(Module,Interface)]
+   -> FiniteMap HsQName [InstHead]  -- maps class/type names to instances
 
 collectInstances mod_ifaces
-  = (addListToFM_C (++) emptyFM class_inst_pairs, 
-     addListToFM_C (++) emptyFM ty_inst_pairs)
+  = addListToFM_C (++) emptyFM class_inst_pairs `plusFM` 
+    addListToFM_C (++) emptyFM ty_inst_pairs
   where
     all_instances = concat (map (iface_insts.snd) mod_ifaces)
 
