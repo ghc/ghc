@@ -61,7 +61,7 @@ regcomp pattern flags = do
     	 withForeignPtr regex_fptr $ \p ->
            c_regcomp p cstr (fromIntegral flags)
   if (r == 0)
-     then do addForeignPtrFinalizer regex_fptr ptr_regfree
+     then do addForeignPtrFinalizer ptr_regfree regex_fptr
 	     return (Regex regex_fptr)
      else error "Text.Regex.Posix.regcomp: error in pattern" -- ToDo
 

@@ -127,11 +127,11 @@ mallocForeignPtrBytes (I# size) = do
        (# s, MallocPtr mbarr# r #)
      }
 
-addForeignPtrFinalizer :: ForeignPtr a -> FinalizerPtr a -> IO ()
+addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 -- ^This function adds a finaliser to the given foreign object.  The
 -- finalizer will run /before/ all other finalizers for the same
 -- object which have already been registered.
-addForeignPtrFinalizer fptr finalizer = 
+addForeignPtrFinalizer finalizer fptr = 
   addForeignPtrConcFinalizer fptr 
 	(mkFinalizer finalizer (unsafeForeignPtrToPtr fptr))
 

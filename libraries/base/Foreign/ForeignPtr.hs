@@ -88,7 +88,7 @@ instance Show (ForeignPtr a) where
 
 
 #ifndef __NHC__
-newForeignPtr :: Ptr a -> FinalizerPtr a -> IO (ForeignPtr a)
+newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer, and
 -- associates a finaliser with the reference.  The finaliser will be executed
 -- after the last reference to the foreign object is dropped.  Note that there
@@ -96,9 +96,9 @@ newForeignPtr :: Ptr a -> FinalizerPtr a -> IO (ForeignPtr a)
 -- reference was dropped; this depends on the details of the Haskell storage
 -- manager. The only guarantee is that the finaliser runs before the program
 -- terminates.
-newForeignPtr p finalizer
+newForeignPtr finalizer p
   = do fObj <- newForeignPtr_ p
-       addForeignPtrFinalizer fObj finalizer
+       addForeignPtrFinalizer finalizer fObj
        return fObj
 
 withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
@@ -131,12 +131,12 @@ withForeignPtr fo io
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocForeignPtr = do
   r <- malloc
-  newForeignPtr r finalizerFree
+  newForeignPtr finalizerFree r
 
 mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes n = do
   r <- mallocBytes n
-  newForeignPtr r finalizerFree
+  newForeignPtr finalizerFree r
 #endif /* __HUGS__ || __NHC__ */
 
 mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
