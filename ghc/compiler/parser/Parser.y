@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.90 2002/02/15 22:13:33 sof Exp $
+$Id: Parser.y,v 1.91 2002/03/03 03:59:03 sof Exp $
 
 Haskell grammar.
 
@@ -1218,6 +1218,8 @@ qvarid :: { RdrName }
 varid :: { RdrName }
 	: varid_no_unsafe 	{ $1 }
 	| 'unsafe'		{ mkUnqual varName SLIT("unsafe") }
+	| 'safe'		{ mkUnqual varName SLIT("safe") }
+	| 'threadsafe'		{ mkUnqual varName SLIT("threadsafe") }
 
 varid_no_unsafe :: { RdrName }
 	: VARID			{ mkUnqual varName $1 }
@@ -1228,9 +1230,11 @@ tyvar 	:: { RdrName }
 	: VARID			{ mkUnqual tvName $1 }
 	| special_id		{ mkUnqual tvName $1 }
 	| 'unsafe' 		{ mkUnqual tvName SLIT("unsafe") }
+	| 'safe' 		{ mkUnqual tvName SLIT("safe") }
+	| 'threadsafe' 		{ mkUnqual tvName SLIT("threadsafe") }
 
 -- These special_ids are treated as keywords in various places, 
--- but as ordinary ids elsewhere.   A special_id collects all thsee
+-- but as ordinary ids elsewhere.   'special_id' collects all these
 -- except 'unsafe' and 'forall' whose treatment differs depending on context
 special_id :: { UserFS }
 special_id
