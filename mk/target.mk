@@ -343,7 +343,7 @@ ifeq "$(LIBOBJS)" ""
   endif
 endif
 
-STUBOBJS += $(patsubst %.c,%.o,$(wildcard *_hsc.c))
+STUBOBJS += $(HSC_C_OBJS)
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR)
 
 ifeq "$(IS_CBITS_LIB)" "YES"

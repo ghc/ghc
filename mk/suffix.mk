@@ -115,6 +115,7 @@ endif # BootingViaC
 ifneq "$(BootingFromHc)" "YES"
 %_hsc.c %_hsc.h %.hs : %.hsc
 	$(HSC2HS) $(HSC2HS_OPTS) $<
+	@touch $(patsubst %.hsc,%_hsc.c,$<)
 endif
 
 #-----------------------------------------------------------------------------

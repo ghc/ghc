@@ -97,18 +97,22 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #             (caveat: assuming no funny use of -hisuf and that
 #               file name and module name match)
 
-HSC_SRCS = $(wildcard *.hsc)
-SRCS     = $(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb) \
-           $(patsubst %.hsc,%.hs,$(HSC_SRCS))
+SRCS     = $(sort $(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb) \
+                  $(HSC_HS_SRCS) $(HSC_C_SRCS) )
 
-HS_SRCS=$(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
-HS_OBJS=$(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
-HS_HCS=$(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
-HS_SS=$(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
-HS_IFACES=$(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
+HSC_SRCS    = $(wildcard *.hsc)
+HSC_HS_SRCS = $(patsubst %.hsc,%.hs,$(HSC_SRCS))
+HSC_C_SRCS  = $(patsubst %.hsc,%_hsc.c,$(HSC_SRCS))
+HSC_C_OBJS  = $(patsubst %.hsc,%_hsc.o,$(HSC_SRCS))
 
-C_SRCS=$(filter %.c,$(SRCS))
-C_OBJS=$(addsuffix .$(way_)o,$(basename $(C_SRCS)))
+HS_SRCS	    = $(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
+HS_OBJS     = $(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
+HS_HCS      = $(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
+HS_SS       = $(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
+HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
+
+C_SRCS      = $(filter %.c,$(SRCS)) 
+C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 
 # SCRIPT_SRCS:  list of raw script files (in literate form)
 # SCRIPT_OBJS:  de-litted scripts
@@ -138,7 +142,7 @@ else
 MKDEPENDHS_SRCS=
 endif
 
-MKDEPENDC_SRCS=$(C_SRCS)
+MKDEPENDC_SRCS=$(C_SRCS) 
 
 #------------------------------------------------------------------
 #
