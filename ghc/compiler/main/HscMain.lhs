@@ -18,6 +18,7 @@ import StringBuffer	( stringToStringBuffer, freeStringBuffer )
 import Unique		( Uniquable(..) )
 import Type		( splitTyConApp_maybe )
 import PrelNames	( ioTyConKey )
+import ByteCodeGen	( byteCodeGen )
 #endif
 
 import HsSyn
@@ -372,6 +373,9 @@ myCoreToStg dflags this_mod tidy_binds
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
+      --let bcos = byteCodeGen tidy_binds
+      --putStrLn (showSDoc (vcat (map ppr bcos)))
+
       -- _scc_     "Core2Stg"
       stg_binds <- coreToStg dflags this_mod tidy_binds
 
@@ -456,7 +460,7 @@ hscExpr dflags hst hit pcs0 this_module expr
 	sat_expr <- coreSatExpr dflags simpl_expr;
 
 		-- Convert to STG
-	stg_expr <- coreToStgExpr dflags sat_expr;
+	let stg_expr = coreExprToStg sat_expr;
 
 		-- ToDo: need to do SRTs?
 
