@@ -3,13 +3,12 @@
 module Main ( main ) where
 
 import PrelBase
-import PrelAddr(indexAddrOffAddr)
+import Addr
 import ST
 import IOExts
 import ST
 import MutableArray
 import ByteArray
-import PrelAddr
 import Int( Num(fromInt) )
 import CString (packString)
 	
