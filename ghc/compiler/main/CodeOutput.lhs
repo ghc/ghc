@@ -37,7 +37,7 @@ import Pretty		( Mode(..), printDoc )
 import Module		( Module )
 import ListSetOps	( removeDupsEq )
 
-import System.Directory ( doesFileExist )
+import Directory ( doesFileExist )
 import Monad		( when )
 import IO
 \end{code}
