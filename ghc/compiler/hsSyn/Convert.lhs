@@ -284,6 +284,7 @@ cvtp (TildeP p)   = LazyPat (cvtp p)
 cvtp (Meta.AsP s p) = AsPat (vName s) (cvtp p)
 cvtp Meta.WildP   = WildPat void
 cvtp (RecP c fs)  = ConPatIn (cName c) $ Hs.RecCon (map (\(s,p) -> (vName s,cvtp p)) fs)
+cvtp (ListP ps)   = ListPat (map cvtp ps) void
 
 -----------------------------------------------------------
 --	Types and type variables

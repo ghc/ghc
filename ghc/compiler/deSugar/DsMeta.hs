@@ -760,7 +760,7 @@ repP (VarPat x)      = do { x' <- lookupBinder x; repPvar x' }
 repP (LazyPat p)     = do { p1 <- repP p; repPtilde p1 }
 repP (AsPat x p)     = do { x' <- lookupBinder x; p1 <- repP p; repPaspat x' p1 }
 repP (ParPat p)      = repP p 
-repP (ListPat ps _)  = repListPat ps
+repP (ListPat ps _)  = do { qs <- repPs ps; repPlist qs }
 repP (TuplePat ps _) = do { qs <- repPs ps; repPtup qs }
 repP (ConPatIn dc details)
  = do { con_str <- lookupOcc dc
@@ -776,16 +776,6 @@ repP (ConPatIn dc details)
 repP (NPatIn l (Just _)) = panic "Can't cope with negative overloaded patterns yet (repP (NPatIn _ (Just _)))"
 repP (NPatIn l Nothing) = do { a <- repOverloadedLiteral l; repPlit a }
 repP other = panic "Exotic pattern inside meta brackets"
-
-repListPat :: [Pat Name] -> DsM (Core M.Pat)     
-repListPat [] 	  = do { nil_con <- coreStringLit "[]"
-		       ; nil_args <- coreList patTyConName [] 
-	               ; repPcon nil_con nil_args }
-repListPat (p:ps) = do { p2 <- repP p 
-		       ; ps2 <- repListPat ps
-		       ; cons_con <- coreStringLit ":"
-		       ; repPcon cons_con (nonEmptyCoreList [p2,ps2]) }
-
 
 ----------------------------------------------------------
 -- Declaration ordering helpers
@@ -954,6 +944,9 @@ repPaspat (MkC s) (MkC p) = rep2 asPName [s, p]
 
 repPwild  :: DsM (Core M.Pat)
 repPwild = rep2 wildPName []
+
+repPlist :: Core [M.Pat] -> DsM (Core M.Pat)
+repPlist (MkC ps) = rep2 listPName [ps]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core String -> DsM (Core M.ExpQ)
@@ -1237,7 +1230,7 @@ templateHaskellNames = mkNameSet [
     floatPrimLName, doublePrimLName, rationalLName,
     -- Pat
     litPName, varPName, tupPName, conPName, tildePName,
-    asPName, wildPName, recPName,
+    asPName, wildPName, recPName, listPName,
     -- FieldPat
     fieldPatName,
     -- Match
@@ -1314,6 +1307,7 @@ tildePName = varQual FSLIT("tildeP") tildePIdKey
 asPName    = varQual FSLIT("asP")    asPIdKey
 wildPName  = varQual FSLIT("wildP")  wildPIdKey
 recPName   = varQual FSLIT("recP")   recPIdKey
+listPName  = varQual FSLIT("listP")  listPIdKey
 
 -- type FieldPat = ...
 fieldPatName = varQual FSLIT("fieldPat") fieldPatIdKey
@@ -1470,15 +1464,16 @@ tildePIdKey       = mkPreludeMiscIdUnique 224
 asPIdKey          = mkPreludeMiscIdUnique 225
 wildPIdKey        = mkPreludeMiscIdUnique 226
 recPIdKey         = mkPreludeMiscIdUnique 227
+listPIdKey        = mkPreludeMiscIdUnique 228
 
 -- type FieldPat = ...
-fieldPatIdKey       = mkPreludeMiscIdUnique 228
+fieldPatIdKey       = mkPreludeMiscIdUnique 230
 
 -- data Match = ...
-matchIdKey          = mkPreludeMiscIdUnique 229
+matchIdKey          = mkPreludeMiscIdUnique 231
 
 -- data Clause = ...
-clauseIdKey         = mkPreludeMiscIdUnique 230
+clauseIdKey         = mkPreludeMiscIdUnique 232
 
 -- data Exp = ...
 varEIdKey         = mkPreludeMiscIdUnique 240
