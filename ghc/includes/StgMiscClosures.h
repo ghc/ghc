@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.26 2000/12/19 12:58:50 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.27 2000/12/19 13:07:07 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,6 +55,7 @@ STGFUN(stg_END_MUT_LIST_entry);
 STGFUN(stg_dummy_ret_entry);
 
 #ifdef GHCI
+/* entry code for constructors created by the bytecode interpreter */
 STGFUN(stg_interp_constr_entry);
 STGFUN(stg_interp_constr1_entry);
 STGFUN(stg_interp_constr2_entry);
@@ -64,6 +65,12 @@ STGFUN(stg_interp_constr5_entry);
 STGFUN(stg_interp_constr6_entry);
 STGFUN(stg_interp_constr7_entry);
 STGFUN(stg_interp_constr8_entry);
+
+/* Magic glue code for when compiled code returns a value in R1/F1/D1
+   to the interpreter. */
+extern DLL_IMPORT_RTS const StgInfoTable stg_ctoi_ret_R1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_ctoi_ret_F1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_ctoi_ret_D1_info;
 #endif
 
 #if defined(PAR) || defined(GRAN)
