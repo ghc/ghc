@@ -280,6 +280,7 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	   ; return (ConDecl name ex_tvs' ex_ctxt' details')}
     kc_con_decl (GadtDecl name ty)
         = do { ty' <- kcHsSigType ty
+	     ; traceTc (text "kc_con_decl" <+> ppr name <+> ppr ty')
 	     ; return (GadtDecl name ty') }
 
     kc_con_details (PrefixCon btys) 
@@ -322,6 +323,8 @@ kcTyClDeclBody decl thing_inside
     kcHsTyVars (tyClDeclTyVars decl)	$ \ kinded_tvs ->
     do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
 	; let tc_kind = case tc_ty_thing of { AThing k -> k }
+	; 
+	; traceTc (text "kcbody" <+> ppr decl <+> ppr tc_kind <+> ppr (map kindedTyVarKind kinded_tvs)  <+> ppr (result_kind decl))
 	; unifyKind tc_kind (foldr (mkArrowKind . kindedTyVarKind) 
 				   (result_kind decl)
 				   kinded_tvs)
@@ -491,7 +494,7 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Ordinary data types
 tcConDecl unbox_strict DataType tycon tc_tvs	-- GADTs
 	  decl@(GadtDecl name con_ty)
   = do	{ traceTc (text "tcConDecl"  <+> ppr name)
-	; (tvs, theta, bangs, arg_tys, tc, res_tys) <- tcLHsConSig con_ty
+	; (tvs, theta, bangs, arg_tys, data_tc, res_tys) <- tcLHsConSig con_ty
 		
 	; traceTc (text "tcConDecl1"  <+> ppr name)
 	; let 	-- Now dis-assemble the type, and check its form
@@ -508,7 +511,10 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- GADTs
 	; buildDataCon (unLoc name) False {- Not infix -} is_vanilla
     		       (argStrictness unbox_strict tycon bangs arg_tys)
 		       [{- No field labels -}]
-		       tvs' theta arg_tys' tycon res_tys' }
+		       tvs' theta arg_tys' data_tc res_tys' }
+		-- NB:	we put data_tc, the type constructor gotten from the constructor 
+		--	type signature into the data constructor; that way checkValidDataCon 
+		--	can complain if it's wrong.
 
 -------------------
 tcStupidTheta :: LHsContext Name -> [LConDecl Name] -> TcM (Maybe ThetaType)
@@ -754,8 +760,9 @@ exRecConErr name
     (ptext SLIT("In the declaration of data constructor") <+> ppr name)
 
 badDataConTyCon data_con
-  = hang (ptext SLIT("Data constructor does not return its parent type:"))
-       2 (ppr data_con)
+  = hang (ptext SLIT("Data constructor") <+> quotes (ppr data_con) <+>
+		ptext SLIT("returns type") <+> quotes (ppr (dataConTyCon data_con)))
+       2 (ptext SLIT("instead of its parent type"))
 
 badGadtDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
