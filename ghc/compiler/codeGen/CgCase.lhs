@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.23 1999/01/27 16:54:18 simonpj Exp $
+% $Id: CgCase.lhs,v 1.24 1999/03/22 12:59:32 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -416,11 +416,9 @@ cgEvalAlts cc_slot bndr srt alts
   = 	
     let uniq = getUnique bndr in
 
-    -- Generate the instruction to restore cost centre, if any
-    restoreCurrentCostCentre cc_slot 	`thenFC` \ cc_restore ->
-
     -- get the stack liveness for the info table (after the CC slot has
     -- been freed - this is important).
+    freeCostCentreSlot cc_slot		`thenC`
     buildContLivenessMask uniq	        `thenFC` \ liveness_mask ->
 
     case alts of
@@ -451,7 +449,7 @@ cgEvalAlts cc_slot bndr srt alts
     	if is_alg && isUnboxedTupleTyCon spec_tycon then
 	    case alts of 
          	[alt] -> let lbl = mkReturnInfoLabel uniq in
-			 cgUnboxedTupleAlt lbl cc_restore True alt
+			 cgUnboxedTupleAlt lbl cc_slot True alt
 				`thenFC` \ abs_c ->
 		  	 getSRTLabel `thenFC` \srt_label -> 
 		  	 absC (CRetDirect uniq abs_c (srt_label, srt) 
@@ -475,7 +473,7 @@ cgEvalAlts cc_slot bndr srt alts
 			Nothing -- no semi-tagging info
 
       	in
-      	cgAlgAlts GCMayHappen uniq cc_restore use_labelled_alts (not is_alg) 
+      	cgAlgAlts GCMayHappen uniq cc_slot use_labelled_alts (not is_alg) 
 		alts deflt True	`thenFC` \ (tagged_alt_absCs, deflt_absC) ->
 
       	mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness_mask 
@@ -491,6 +489,7 @@ cgEvalAlts cc_slot bndr srt alts
 
     	-- Generate the labelled block, starting with restore-cost-centre
     	getSRTLabel 					`thenFC` \srt_label ->
+	restoreCurrentCostCentre cc_slot 	`thenFC` \ cc_restore ->
     	absC (CRetDirect uniq (cc_restore `mkAbsCStmts` abs_c) 
 			(srt_label,srt) liveness_mask)	`thenC`
 
@@ -554,7 +553,7 @@ cgInlineAlts bndr (StgAlgAlts ty alts deflt)
 	--		True  -> f1 r
 	--		False -> f2 r
 
-    cgAlgAlts NoGC uniq AbsCNop{-restore_cc-} False{-no semi-tagging-}
+    cgAlgAlts NoGC uniq Nothing{-cc_slot-} False{-no semi-tagging-}
 		False{-not poly case-} alts deflt
                 False{-don't emit yield-}  	`thenFC` \ (tagged_alts, deflt_c) ->
 
@@ -592,7 +591,7 @@ are inlined alternatives.
 \begin{code}
 cgAlgAlts :: GCFlag
 	  -> Unique
-	  -> AbstractC				-- Restore-cost-centre instruction
+	  -> Maybe VirtualSpOffset
 	  -> Bool				-- True <=> branches must be labelled
 	  -> Bool				-- True <=> polymorphic case
 	  -> [(DataCon, [Id], [Bool], StgExpr)]	-- The alternatives
@@ -612,19 +611,20 @@ cgAlgAlts gc_flag uniq restore_cc must_label_branches is_fun alts deflt
 \begin{code}
 cgAlgDefault :: GCFlag
 	     -> Bool 			-- could be a function-typed result?
-	     -> Unique -> AbstractC -> Bool -- turgid state...
+	     -> Unique -> Maybe VirtualSpOffset -> Bool -- turgid state...
 	     -> StgCaseDefault		-- input
 	     -> Bool
 	     -> FCode AbstractC		-- output
 
-cgAlgDefault gc_flag is_fun uniq restore_cc must_label_branch StgNoDefault _
+cgAlgDefault gc_flag is_fun uniq cc_slot must_label_branch StgNoDefault _
   = returnFC AbsCNop
 
-cgAlgDefault gc_flag is_fun uniq restore_cc must_label_branch
+cgAlgDefault gc_flag is_fun uniq cc_slot must_label_branch
 	     (StgBindDefault rhs)
           emit_yield{-should a yield macro be emitted?-}
 
   = 	-- We have arranged that Node points to the thing
+    restoreCurrentCostCentre cc_slot `thenFC` \restore_cc ->
     getAbsC (absC restore_cc `thenC`
              (if opt_GranMacros && emit_yield
                 then yield [node] False
@@ -646,15 +646,17 @@ cgAlgDefault gc_flag is_fun uniq restore_cc must_label_branch
 -- HWL comment on GrAnSim: GRAN_YIELDs needed; emitted in cgAlgAltRhs
 
 cgAlgAlt :: GCFlag
-	 -> Unique -> AbstractC -> Bool		-- turgid state
+	 -> Unique -> Maybe VirtualSpOffset -> Bool	-- turgid state
 	 -> Bool                               -- Context switch at alts?
 	 -> (DataCon, [Id], [Bool], StgExpr)
 	 -> FCode (ConTag, AbstractC)
 
-cgAlgAlt gc_flag uniq restore_cc must_label_branch 
+cgAlgAlt gc_flag uniq cc_slot must_label_branch 
          emit_yield{-should a yield macro be emitted?-}
          (con, args, use_mask, rhs)
-  = getAbsC (absC restore_cc `thenC`
+  = 
+    restoreCurrentCostCentre cc_slot `thenFC` \restore_cc ->
+    getAbsC (absC restore_cc `thenC`
     	     (if opt_GranMacros && emit_yield
       		then yield [node] True		-- XXX live regs wrong
       		else absC AbsCNop)                               `thenC`     
@@ -676,17 +678,19 @@ cgAlgAlt gc_flag uniq restore_cc must_label_branch
 
 cgUnboxedTupleAlt
 	:: CLabel			-- label of the alternative
-	-> AbstractC	 		-- junk
+	-> Maybe VirtualSpOffset	-- Restore cost centre
 	-> Bool				-- ctxt switch
 	-> (DataCon, [Id], [Bool], StgExpr) -- alternative
 	-> FCode AbstractC
 
-cgUnboxedTupleAlt lbl restore_cc emit_yield (con,args,use_mask,rhs)
+cgUnboxedTupleAlt lbl cc_slot emit_yield (con,args,use_mask,rhs)
   = getAbsC (
-	absC restore_cc `thenC`
-
   	bindUnboxedTupleComponents args 
   		      `thenFC` \ (live_regs,tags,stack_res) ->
+
+        restoreCurrentCostCentre cc_slot `thenFC` \restore_cc ->
+	absC restore_cc `thenC`
+
   	(if opt_GranMacros && emit_yield
   	    then yield live_regs True		-- XXX live regs wrong?
   	    else absC AbsCNop)                         `thenC`     
@@ -886,13 +890,14 @@ saveCurrentCostCentre
 	returnFC (Just slot,
 		  CAssign (CVal sp_rel CostCentreRep) (CReg CurCostCentre))
 
-restoreCurrentCostCentre :: Maybe VirtualSpOffset -> FCode AbstractC
+freeCostCentreSlot :: Maybe VirtualSpOffset -> Code
+freeCostCentreSlot Nothing = nopC
+freeCostCentreSlot (Just slot) = freeStackSlots [slot]
 
-restoreCurrentCostCentre Nothing
- = returnFC AbsCNop
+restoreCurrentCostCentre :: Maybe VirtualSpOffset -> FCode AbstractC
+restoreCurrentCostCentre Nothing = returnFC AbsCNop
 restoreCurrentCostCentre (Just slot)
  = getSpRelOffset slot				 `thenFC` \ sp_rel ->
-   freeStackSlots [slot]			 `thenC`
    returnFC (CCallProfCCMacro SLIT("RESTORE_CCCS") [CVal sp_rel CostCentreRep])
     -- we use the RESTORE_CCCS macro, rather than just
     -- assigning into CurCostCentre, in case RESTORE_CCC
