@@ -25,6 +25,11 @@
 	Haskell 98 and FFI Standard Libraries.
       </DD>
       <DT>
+	<A HREF="parsec/index.html"><TT>parsec</TT></a>
+      </DT><DD>
+	monadic parser combinators.
+      </DD>
+      <DT>
 	<A HREF="network/index.html"><TT>network</TT></a>
       </DT><DD>
 	networking support libraries.
@@ -86,12 +91,14 @@
       <DT><A HREF="http://www.haskell.org/hugs/">Hugs 98</A></DT>
       <DD>
 	Hugs provides almost all of the modules in the
-	<A HREF="base/index.html"><TT>base</TT></a> package and all the
-	modules in the <A HREF="haskell98/index.html"><TT>haskell98</TT></a>,
-	<A HREF="network/index.html"><TT>network</TT></a> and
+	<A HREF="base/index.html"><TT>base</TT></a> package
+	and all the modules in the
+	<A HREF="haskell98/index.html"><TT>haskell98</TT></a>,
+	<A HREF="network/index.html"><TT>network</TT></a>,
+	<A HREF="parsec/index.html"><TT>parsec</TT></a> and
 	<A HREF="haskell-src/index.html"><TT>haskell-src</TT></a> packages.
 @unixHTMLStart@
-	Some of the modules in the <A HREF="unix/index.html"><TT>unix</TT></a> package are supported, too.
+	Most of the modules in the <A HREF="unix/index.html"><TT>unix</TT></a> package are supported, too.
 @unixHTMLEnd@
 	All those modules are always available, as a single hierarchy;
 	Hugs does not use the package subdivision.
