@@ -457,26 +457,38 @@ In your program, you import a module @Foo@ by saying
 It has a builtin list of directories (notably including @.@) where
 it looks.
 
-The @-i<dirs>@ option<nidx>-i&lt;dirs&gt; option</nidx> prepends a
-colon-separated list of @dirs@ to the ``import directories'' list.
+<descrip>
 
-A plain @-i@ resets the ``import directories'' list back to nothing.
+<tag>@-i<dirs>@</tag><nidx>-i&lt;dirs&gt; option</nidx> This flag
+prepends a colon-separated list of @dirs@ to the ``import
+directories'' list.
 
-GHC normally imports @Prelude.hi@ files for you.  If you'd rather
-it didn't, then give it a @-fno-implicit-prelude@
-option<nidx>-fno-implicit-prelude option</nidx>.  You are unlikely to get
-very far without a Prelude, but, hey, it's a free country.
+<tag>@-i@</tag> resets the ``import directories'' list back to nothing.
 
-If you are using a system-supplied non-Prelude library (e.g., the HBC
-library), just use a @-syslib hbc@<nidx>-syslib &lt;lib&gt; option</nidx>
-option (for example).  The right interface files should then be
-available.
+<tag>@-fno-implicit-prelude@
+<nidx>-fno-implicit-prelude option</nidx>
+GHC normally imports @Prelude.hi@ files for you.  If you'd rather it
+didn't, then give it a @-fno-implicit-prelude@ option.  You are
+unlikely to get very far without a Prelude, but, hey, it's a free
+country.
+
+<tag>@-syslib <lib>@</tag>
+<nidx>-syslib &lt;lib&gt; option</nidx>
+
+If you are using a system-supplied non-Prelude library (e.g., the
+POSIX library), just use a @-syslib posix@ option (for example).  The
+right interface files should then be available.  Section <ref
+name="The GHC Prelude and Libraries" id="ghc-prelude"> lists the
+libraries available by this mechanism.
+
+<tag>@-I<dir>@</tag>
+<nidx>-I&lt;dir&gt; option</nidx>
 
 Once a Haskell module has been compiled to C (@.hc@ file), you may
-wish to specify where GHC tells the C compiler to look for @.h@
-files.  (Or, if you are using the @-cpp@ option<nidx>-cpp option</nidx>,
-where it tells the C pre-processor to look...)  For this purpose, use
-a @-I<dir>@<nidx>-I&lt;dir&gt; option</nidx> in the usual C-ish way.
+wish to specify where GHC tells the C compiler to look for @.h@ files.
+(Or, if you are using the @-cpp@ option<nidx>-cpp option</nidx>, where
+it tells the C pre-processor to look...)  For this purpose, use a @-I@
+option in the usual C-ish way.
 
 %************************************************************************
 %*                                                                      *
@@ -523,8 +535,9 @@ turned off with @-fno-prune-tydecls@ and @-fno-prune-instdecls@.
 <nidx>-fno-prune-tydecls option</nidx><nidx>-fno-prune-instdecls
 option</nidx>
 
-See also Section <ref name="Linking and consistency-checking" id="options-linker">, which describes how the linker
-finds standard Haskell libraries.
+See also Section <ref name="Linking and consistency-checking"
+id="options-linker">, which describes how the linker finds standard
+Haskell libraries.
 
 %************************************************************************
 %*                                                                      *
@@ -668,6 +681,90 @@ to have full effect.  However, a @make@ run that does nothing
 again, it may take multiple iterations to ``settle.''
 
 </itemize>
+
+%************************************************************************
+%*                                                                      *
+<sect2>How to compile mutually recursive modules
+<label id="mutual-recursion">
+<p>
+<nidx>module system, recursion</nidx>
+<nidx>recursion, between modules</nidx>
+%*                                                                      *
+%************************************************************************
+
+Currently, the compiler does not have proper support for dealing with
+mutually recursive modules:
+
+<tscreen><verb>
+module A where
+
+import B
+
+newtype A = A Int
+
+f :: B -> A
+f (B x) = A x
+--------
+module B where
+
+import A
+
+data B = B !Int
+
+g :: A -> B
+g (A x) = B x
+</verb></tscreen>
+
+When compiling either module A and B, the compiler will try (in vain)
+to look for the interface file of the other. So, to get mutually
+recursive modules off the ground, you need to hand write an interface
+file for A or B, so as to break the loop.  These hand-written
+interface files are called @hi-boot@ files, and are placed in a file
+called @<module>.hi-boot@.  To import from an @hi-boot@ file instead
+of the standard @.hi@ file, use the following syntax in the importing module:
+<nidx>hi-boot files</nidx>
+<nidx>importing, hi-boot files</nidx>
+
+<tscreen> <verb>
+import {-# SOURCE #-} A
+</verb> <tscreen>
+
+The hand-written interface need only contain the bare minimum of
+information needed to get the bootstrapping process started.  For
+example, it doesn't need to contain declarations for <em/everything/
+that module @A@ exports, only the things required by the module that
+imports @A@ recursively.
+
+For the example at hand, the boot interface file for A would like the
+following:
+
+<tscreen><verb>
+_interface_ A 1
+_exports_
+A(A);
+_declarations_
+1 newtype A = A PrelBase.Int ;
+</verb></tscreen>
+
+The syntax is essentially the same as a normal @.hi@ file
+(unfortunately), but you can usually tailor an existing @.hi@ file to
+make a @.hi-boot@ file.
+
+Notice that we only put the declaration for the newtype @A@ in the
+@hi-boot@ file, not the signature for @f@, since @f@ isn't used by
+@B@.
+
+The number ``1'' at the beginning of a declaration is the <em>version
+number</em> of that declaration: for the purposes of @.hi-boot@ files
+these can all be set to 1.  All names must be fully qualified with the
+<em/original/ module that an object comes from: for example, the
+reference to @Int@ in the interface for @A@ comes from @PrelBase@,
+which is a module internal to GHC's prelude.  It's a pain, but that's
+the way it is.
+
+<bf>Note:</bf> This is all a temporary solution, a version of the
+compiler that handles mutually recursive properly without the manual
+construction of interface file, is in the works.
 
 %************************************************************************
 %*                                                                      *
