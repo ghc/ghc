@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Disassembler.h,v 1.3 1999/02/05 16:02:37 simonm Exp $
+ * $Id: Disassembler.h,v 1.4 2000/12/11 12:53:44 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,5 +7,5 @@
  *
  * ---------------------------------------------------------------------------*/
 
-extern InstrPtr disInstr   ( StgBCO *bco, InstrPtr pc );
-extern void     disassemble( StgBCO *bco, char* prefix );
+extern int  disInstr   ( StgBCO *bco, int pc );
+extern void disassemble( StgBCO *bco, char* prefix );
