@@ -51,9 +51,9 @@ import TcEnv	( tcLookupId, checkWellStaged, topIdLvl, tcMetaTy )
 import InstEnv	( DFunId, InstEnv, lookupInstEnv, checkFunDeps, extendInstEnv )
 import TcIface	( loadImportedInsts )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, 
-		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
+		  zonkTcThetaType, tcInstTyVar, tcInstType
 		)
-import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar,
+import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar, TcPredType,
 		  PredType(..), typeKind, mkSigmaTy,
 		  tcSplitForAllTys, tcSplitForAllTys, 
 		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy, tcSplitDFunHead,
@@ -66,7 +66,8 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar,
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
 		  pprPred, pprParendType, pprThetaArrow, pprTheta, pprClassPred
 		)
-import Type	( substTy, substTys, substTyWith, substTheta, zipTopTvSubst )
+import Type	( TvSubst, substTy, substTyVar, substTyWith, substTheta, zipTopTvSubst,
+		  notElemTvSubst, extendTvSubstList )
 import Unify	( tcMatchTys )
 import Kind	( isSubKind )
 import Packages	( isHomeModule )
@@ -80,7 +81,7 @@ import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 import NameSet	( addOneToNameSet )
 import Literal	( inIntRange )
 import Var	( TyVar, tyVarKind, setIdType )
-import VarEnv	( TidyEnv, emptyTidyEnv, lookupVarEnv )
+import VarEnv	( TidyEnv, emptyTidyEnv )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
@@ -577,7 +578,7 @@ addInst dflags home_ie dfun
 	; pkg_ie  <- loadImportedInsts cls tys'
 
 		-- Check functional dependencies
-	; case checkFunDeps (pkg_ie, home_ie) dfun of
+	; case checkFunDeps (pkg_ie, home_ie) dfun' of
 		Just dfuns -> funDepErr dfun dfuns
 		Nothing    -> return ()
 
@@ -622,12 +623,12 @@ addDictLoc dfun thing_inside
 %************************************************************************
 
 \begin{code}
-data LookupInstResult s
+data LookupInstResult
   = NoInstance
   | SimpleInst (LHsExpr TcId)		-- Just a variable, type application, or literal
   | GenInst    [Inst] (LHsExpr TcId)	-- The expression and its needed insts
 
-lookupInst :: Inst -> TcM (LookupInstResult s)
+lookupInst :: Inst -> TcM LookupInstResult
 -- It's important that lookupInst does not put any new stuff into
 -- the LIE.  Instead, any Insts needed by the lookup are returned in
 -- the LookupInstResult, where they can be further processed by tcSimplify
@@ -697,6 +698,7 @@ lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
 lookupInst (Dict _ _ _) = returnM NoInstance
 
 -----------------
+instantiate_dfun :: TvSubst -> DFunId -> TcPredType -> InstLoc -> TcM LookupInstResult
 instantiate_dfun tenv dfun_id pred loc
   = -- tenv is a substitution that instantiates the dfun_id 
     -- to match the requested result type.   However, the dfun
@@ -710,29 +712,28 @@ instantiate_dfun tenv dfun_id pred loc
 	-- Record that this dfun is needed
     record_dfun_usage dfun_id		`thenM_`
 
+    getStage						`thenM` \ use_stage ->
+    checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
+    		    (topIdLvl dfun_id) use_stage	`thenM_`
+
  	-- It's possible that not all the tyvars are in
 	-- the substitution, tenv. For example:
 	--	instance C X a => D X where ...
 	-- (presumably there's a functional dependency in class C)
-	-- Hence the mk_ty_arg to instantiate any un-substituted tyvars.	
-    getStage						`thenM` \ use_stage ->
-    checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
-    		    (topIdLvl dfun_id) use_stage		`thenM_`
+	-- Hence the open_tvs to instantiate any un-substituted tyvars.	
     let
     	(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
-    	mk_ty_arg tv  = case lookupVarEnv tenv tv of
-    			   Just ty -> returnM ty
-    			   Nothing -> tcInstTyVar tv `thenM` \ tc_tv ->
-    				      returnM (mkTyVarTy tc_tv)
+	open_tvs      = filter (`notElemTvSubst` tenv) tyvars
     in
-    mappM mk_ty_arg tyvars	`thenM` \ ty_args ->
+    mappM tcInstTyVar open_tvs	`thenM` \ open_tvs' ->
     let
-    	dfun_rho   = substTy (zipTopTvSubst tyvars ty_args) rho
-		-- Since the tyvars are freshly made,
-		-- they cannot possibly be captured by
-		-- any existing for-alls.  Hence zipTopTyVarSubst
+ 	tenv' = extendTvSubstList tenv open_tvs (mkTyVarTys open_tvs')
+		-- Since the tyvars are freshly made, they cannot possibly be captured by
+		-- any nested for-alls in rho.  So the in-scope set is unchanged
+    	dfun_rho   = substTy tenv' rho
     	(theta, _) = tcSplitPhiTy dfun_rho
-    	ty_app     = mkHsTyApp (L (instLocSrcSpan loc) (HsVar dfun_id)) ty_args
+    	ty_app     = mkHsTyApp (L (instLocSrcSpan loc) (HsVar dfun_id)) 
+			       (map (substTyVar tenv') tyvars)
     in
     if null theta then
     	returnM (SimpleInst ty_app)

@@ -31,7 +31,7 @@ import Inst		( tcSyntaxName, tcInstCall )
 import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendIdEnv, 
 			  tcExtendTyVarEnv )
 import TcPat		( PatCtxt(..), tcPats )
-import TcMType		( newTyFlexiVarTy, newTyFlexiVarTys, zonkTcType, isRigidType ) 
+import TcMType		( newTyFlexiVarTy, newTyFlexiVarTys, zonkTcType ) 
 import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, mkFunTys,
 			  tyVarsOfTypes, tidyOpenTypes, isSigmaTy, mkTyConApp,
 			  liftedTypeKind, openTypeKind, mkArrowKind, mkAppTy )
@@ -282,16 +282,10 @@ tcMatchPats :: [LPat Name]
 -- signatures
 
 tcMatchPats pats tys body_ty thing_inside
-  = do	{ do_refinement <- can_refine body_ty
-	; (pats', ex_tvs, res) <- tcPats (LamPat do_refinement) pats tys thing_inside 
+  = do	{ (pats', ex_tvs, res) <- tcPats LamPat pats tys thing_inside 
 	; tcCheckExistentialPat pats' ex_tvs tys body_ty
 	; returnM (pats', res) }
   where
-	-- Do GADT refinement if we are doing checking (not inference)
-	-- and the body_ty is completely rigid
-	-- ToDo: explain why
-    can_refine (Infer _)  = return False
-    can_refine (Check ty) = isRigidType ty
 
 tcCheckExistentialPat :: [LPat TcId]		-- Patterns (just for error message)
 		      -> [TcTyVar]		-- Existentially quantified tyvars bound by pattern

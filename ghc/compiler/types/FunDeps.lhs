@@ -16,15 +16,15 @@ module FunDeps (
 import Name		( getSrcLoc )
 import Var		( Id, TyVar )
 import Class		( Class, FunDep, classTvsFds )
-import Unify		( tcUnifyTys, tcUnifyTysX )
-import Type		( mkTvSubst, substTy )
+import Unify		( tcUnifyTys, BindFlag(..) )
+import Type		( substTys, notElemTvSubst )
 import TcType		( Type, ThetaType, PredType(..), tcEqType,
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
 import VarSet
 import VarEnv
 import Outputable
 import List		( tails )
-import Maybes		( maybeToBool )
+import Maybe		( isJust )
 import ListSetOps	( equivClassesByUniq )
 \end{code}
 
@@ -299,34 +299,40 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- We can instantiate x to t1, and then we want to force
 -- 	(Tree x) [t1/x]  :=:   t2
 --
--- The same function is also used from InstEnv.badFunDeps, when we need
--- to *unify*; in which case the qtvs are the variables of both ls1 and ls2.
--- However unifying with the qtvs being the left-hand lot *is* just matching,
--- so we can call tcUnifyTys in both cases
-  = case tcUnifyTys qtvs ls1 ls2 of
-	Nothing   -> []
-	Just unif | maybeToBool (tcUnifyTysX qtvs unif rs1 rs2)
+-- This function is also used when matching two Insts (rather than an Inst
+-- against an instance decl. In that case, qtvs is empty, and we are doing
+-- an equality check
+-- 
+-- This function is also used by InstEnv.badFunDeps, which needs to *unify*
+-- For the one-sided matching case, the qtvs are just from the template,
+-- so we get matching
+--
+  = ASSERT2( length tys1 == length tys2     && 
+	     length tys1 == length clas_tvs 
+	    , ppr tys1 <+> ppr tys2 )
+
+    case tcUnifyTys bind_fn ls1 ls2 of
+	Nothing  -> []
+	Just subst | isJust (tcUnifyTys bind_fn rs1' rs2') 
 			-- Don't include any equations that already hold. 
 			-- Reason: then we know if any actual improvement has happened,
 			-- 	   in which case we need to iterate the solver
 			-- In making this check we must taking account of the fact that any 
 			-- qtvs that aren't already instantiated can be instantiated to anything 
 			-- at all
-			-- NB: qtvs, not qtvs' because matchTysX only tries to
-			--     look template tyvars up in the substitution
 		  -> []
 
 		  | otherwise	-- Aha!  A useful equation
-		  -> [ (qtvs', map (substTy full_unif) rs1 `zip` map (substTy full_unif) rs2)]
-			-- We could avoid this substTy stuff by producing the eqn
-			-- (qtvs, ls1++rs1, ls2++rs2)
-			-- which will re-do the ls1/ls2 unification when the equation is
-			-- executed.  What we're doing instead is recording the partial
-			-- work of the ls1/ls2 unification leaving a smaller unification problem
+		  -> [ (qtvs', zip rs1' rs2')]
+		  	-- We could avoid this substTy stuff by producing the eqn
+		  	-- (qtvs, ls1++rs1, ls2++rs2)
+		  	-- which will re-do the ls1/ls2 unification when the equation is
+		  	-- executed.  What we're doing instead is recording the partial
+		  	-- work of the ls1/ls2 unification leaving a smaller unification problem
 		  where
-		    full_unif = mkTvSubst unif
-
-		    qtvs' = filterVarSet (\v -> not (v `elemVarEnv` unif)) qtvs
+		    rs1'  = substTys subst rs1 
+	 	    rs2'  = substTys subst rs2
+		    qtvs' = filterVarSet (`notElemTvSubst` subst) qtvs
 			-- qtvs' are the quantified type variables
 			-- that have not been substituted out
 			--	
@@ -336,6 +342,9 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 			-- we generate the equation
 			--	({y}, [y], z)
   where
+    bind_fn tv | tv `elemVarSet` qtvs = BindMe
+	       | otherwise	      = Skolem
+
     (ls1, rs1) = instFD fd clas_tvs tys1
     (ls2, rs2) = instFD fd clas_tvs tys2
 

@@ -19,11 +19,11 @@ module InstEnv (
 import Class		( Class, classTvsFds )
 import Var		( Id )
 import VarSet
-import Type		( TvSubstEnv )
+import Type		( TvSubst )
 import TcType		( Type, tcTyConAppTyCon, tcIsTyVarTy,
 			  tcSplitDFunTy, tyVarsOfTypes, isExistentialTyVar
 			)
-import Unify		( tcMatchTys, tcUnifyTys )
+import Unify		( tcMatchTys, tcUnifyTys, BindFlag(..) )
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
@@ -41,6 +41,17 @@ import Maybe		( isJust )
 %*									*
 %************************************************************************
 
+A @ClsInstEnv@ all the instances of that class.  The @Id@ inside a
+ClsInstEnv mapping is the dfun for that instance.
+
+If class C maps to a list containing the item ([a,b], [t1,t2,t3], dfun), then
+
+	forall a b, C t1 t2 t3  can be constructed by dfun
+
+or, to put it another way, we have
+
+	instance (...) => C t1 t2 t3,  witnessed by dfun
+
 \begin{code}
 type DFunId	= Id
 type InstEnv    = UniqFM ClsInstEnv	-- Maps Class to instances for that class
@@ -53,7 +64,20 @@ data ClsInstEnv
 			-- NB: use tcIsTyVarTy: don't look through newtypes!!
 		        		
 type InstEnvElt = (TyVarSet, [Type], DFunId)
-	-- INVARIANTs: see notes below
+
+-- INVARIANTS:
+--  * [a,b] must be a superset of the free vars of [t1,t2,t3]
+--
+--  * The dfun must itself be quantified over [a,b]
+--
+--  * The template type variables [a,b] are distinct in each item
+--	of a ClsInstEnv (so we can safely unify them)
+
+-- Thus, the @ClassInstEnv@ for @Eq@ might contain the following entry:
+--	[a] ===> dfun_Eq_List :: forall a. Eq a => Eq [a]
+-- The "a" in the pattern must be one of the forall'd variables in
+-- the dfun type.
+
 
 emptyInstEnv :: InstEnv
 emptyInstEnv = emptyUFM
@@ -106,32 +130,6 @@ simpleDFunClassTyCon dfun
 \subsection{Instance environments: InstEnv and ClsInstEnv}
 %*									*
 %************************************************************************
-
-A @ClsInstEnv@ all the instances of that class.  The @Id@ inside a
-ClsInstEnv mapping is the dfun for that instance.
-
-If class C maps to a list containing the item ([a,b], [t1,t2,t3], dfun), then
-
-	forall a b, C t1 t2 t3  can be constructed by dfun
-
-or, to put it another way, we have
-
-	instance (...) => C t1 t2 t3,  witnessed by dfun
-
-There is an important consistency constraint in the elements of a ClsInstEnv:
-
-  * [a,b] must be a superset of the free vars of [t1,t2,t3]
-
-  * The dfun must itself be quantified over [a,b]
- 
-  * More specific instances come before less specific ones,
-    where they overlap
-
-Thus, the @ClassInstEnv@ for @Eq@ might contain the following entry:
-	[a] ===> dfun_Eq_List :: forall a. Eq a => Eq [a]
-The "a" in the pattern must be one of the forall'd variables in
-the dfun type.
-
 
 
 Notes on overlapping instances
@@ -273,9 +271,9 @@ thing we are looking up can have an arbitrary "flexi" part.
 lookupInstEnv :: DynFlags
 	      -> (InstEnv 	-- External package inst-env
 		 ,InstEnv) 	-- Home-package inst-env
-	      -> Class -> [Type]			-- What we are looking for
-	      -> ([(TvSubstEnv, InstEnvElt)], 	-- Successful matches
-		  [Id])					-- These don't match but do unify
+	      -> Class -> [Type]		-- What we are looking for
+	      -> ([(TvSubst, InstEnvElt)], 	-- Successful matches
+		  [Id])				-- These don't match but do unify
 	-- The second component of the tuple happens when we look up
 	--	Foo [a]
 	-- in an InstEnv that has entries for
@@ -303,11 +301,11 @@ lookupInstEnv dflags (pkg_ie, home_ie) cls tys
     pruned_matches | overlap_ok = foldr insert_overlapping [] all_matches
 		   | otherwise  = all_matches
 
-lookup_inst_env :: InstEnv 				-- The envt
-	      	-> Class -> [Type]			-- What we are looking for
-		-> Bool 				-- All the [Type] are tyvars
-	      	-> ([(TvSubstEnv, InstEnvElt)], 	-- Successful matches
-	 	    [Id])				-- These don't match but do unify
+lookup_inst_env :: InstEnv 			-- The envt
+	      	-> Class -> [Type]		-- What we are looking for
+		-> Bool 			-- All the [Type] are tyvars
+	      	-> ([(TvSubst, InstEnvElt)], 	-- Successful matches
+	 	    [Id])			-- These don't match but do unify
 lookup_inst_env env key_cls key_tys key_all_tvs
   = case lookupUFM env key_cls of
 	Nothing 			    -> ([],[])	-- No instances for this class
@@ -317,8 +315,19 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 		-- the ClsIE has no instances of that form, so don't bother to search
 	  | otherwise -> find insts [] []
   where
-    key_vars = filterVarSet not_existential (tyVarsOfTypes key_tys)
-    not_existential tv = not (isExistentialTyVar tv)
+    find [] ms us = (ms, us)
+    find (item@(tpl_tyvars, tpl, dfun_id) : rest) ms us
+      = case tcMatchTys tpl_tyvars tpl key_tys of
+	  Just subst -> find rest ((subst,item):ms) us
+	  Nothing 
+		-- Does not match, so next check whether the things unify
+		-- [see notes about overlapping instances above]
+	   -> case tcUnifyTys bind_fn tpl key_tys of
+	        Just _   -> find rest ms (dfun_id:us)
+	        Nothing  -> find rest ms us
+
+    bind_fn tv | isExistentialTyVar tv = Skolem
+	       | otherwise	       = BindMe
 	-- The key_tys can contain skolem constants, and we can guarantee that those
 	-- are never going to be instantiated to anything, so we should not involve
 	-- them in the unification test.  Example:
@@ -337,25 +346,8 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 	--	g x = op x
 	-- on the grounds that the correct instance depends on the instantiation of 'a'
 
-    find [] ms us = (ms, us)
-    find (item@(tpl_tyvars, tpl, dfun_id) : rest) ms us
-      = case tcMatchTys tpl_tyvars tpl key_tys of
-	  Just subst -> find rest ((subst,item):ms) us
-	  Nothing 
-		-- Does not match, so next check whether the things unify
-		-- [see notes about overlapping instances above]
-	   -> ASSERT2( not (key_vars `intersectsVarSet` tpl_tyvars),
-		       (ppr key_cls <+> ppr key_tys <+> ppr key_all_tvs) $$
-		       (ppr dfun_id <+> ppr tpl_tyvars <+> ppr tpl)
-		      )
-		-- Unification will break badly if the variables overlap
-		-- They shouldn't because we allocate separate uniques for them
-	      case tcUnifyTys (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
-	        Just _   -> find rest ms (dfun_id:us)
-	        Nothing  -> find rest ms us
-
-insert_overlapping :: (TvSubstEnv, InstEnvElt) -> [(TvSubstEnv, InstEnvElt)] 
-		   -> [(TvSubstEnv, InstEnvElt)]
+insert_overlapping :: (TvSubst, InstEnvElt) -> [(TvSubst, InstEnvElt)] 
+		   -> [(TvSubst, InstEnvElt)]
 -- Add a new solution, knocking out strictly less specific ones
 insert_overlapping new_item [] = [new_item]
 insert_overlapping new_item (item:items)

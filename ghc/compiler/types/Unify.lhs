@@ -3,9 +3,11 @@ module Unify (
 	-- Matching and unification
 	tcMatchTys, tcMatchTyX, tcMatchPreds, MatchEnv(..), 
 
-	tcUnifyTys, tcUnifyTysX,
+	tcUnifyTys, 
 
-	gadtRefineTys, gadtMatchTys, coreRefineTys,
+	gadtRefineTys, BindFlag(..),
+
+	coreRefineTys,
 
 	-- Re-export
 	MaybeErr(..)
@@ -18,7 +20,7 @@ import VarEnv
 import VarSet
 import Kind		( isSubKind )
 import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, 
-			  TvSubstEnv, TvSubst(..), substTy, tcEqTypeX )
+			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX )
 import TypeRep          ( Type(..), PredType(..), funTyCon )
 import Util		( snocView )
 import ErrUtils		( Message )
@@ -65,15 +67,16 @@ data MatchEnv
 tcMatchTys :: TyVarSet		-- Template tyvars
 	 -> [Type]		-- Template
 	 -> [Type]		-- Target
-	 -> Maybe TvSubstEnv	-- One-shot; in principle the template
+	 -> Maybe TvSubst	-- One-shot; in principle the template
 				-- variables could be free in the target
 
 tcMatchTys tmpls tys1 tys2
-  = match_tys (ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope_tyvars})
-	      emptyTvSubstEnv 
-	      tys1 tys2
+  = case match_tys menv emptyTvSubstEnv tys1 tys2 of
+	Just subst_env -> Just (TvSubst in_scope subst_env)
+	Nothing	       -> Nothing
   where
-    in_scope_tyvars = mkInScopeSet (tmpls `unionVarSet` tyVarsOfTypes tys2)
+    menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
+    in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfTypes tys2)
 	-- We're assuming that all the interesting 
 	-- tyvars in tys1 are in tmpls
 
@@ -87,6 +90,7 @@ tcMatchPreds tmpls ps1 ps2
     menv = ME { me_tmpls = mkVarSet tmpls, me_env = mkRnEnv2 in_scope_tyvars }
     in_scope_tyvars = mkInScopeSet (tyVarsOfTheta ps1 `unionVarSet` tyVarsOfTheta ps2)
 
+-- This one is called from the expression matcher, which already has a MatchEnv in hand
 tcMatchTyX :: MatchEnv 
 	 -> TvSubstEnv		-- Substitution to extend
 	 -> Type		-- Template
@@ -179,23 +183,28 @@ match_pred menv subst p1 p2 = Nothing
 
 %************************************************************************
 %*									*
-		The workhorse
+		Unification
 %*									*
 %************************************************************************
 
 \begin{code}
-gadtRefineTys, gadtMatchTys 
-	:: [TyVar]			-- Try to unify these
-	-> TvSubstEnv			-- Not idempotent
-	-> [Type] -> [Type]
-   	-> MaybeErr Message TvSubstEnv	-- Not idempotent
--- This one is used by the type checker.  Neither the input nor result
--- substitition is idempotent
-gadtRefineTys ex_tvs subst tys1 tys2
-  = initUM (tryToBind (mkVarSet ex_tvs)) (unify_tys subst tys1 tys2)
+tcUnifyTys :: (TyVar -> BindFlag)
+	   -> [Type] -> [Type]
+	   -> Maybe TvSubst	-- A regular one-shot substitution
+-- The two types may have common type variables, and indeed do so in the
+-- second call to tcUnifyTys in FunDeps.checkClsFD
+tcUnifyTys bind_fn tys1 tys2
+  = maybeErrToMaybe $ initUM bind_fn $
+    do { subst_env <- unify_tys emptyTvSubstEnv tys1 tys2
 
-gadtMatchTys ex_tvs subst tys1 tys2
-  = initUM (bindOnly (mkVarSet ex_tvs)) (unify_tys subst tys1 tys2)
+	-- Find the fixed point of the resulting non-idempotent substitution
+	; let in_scope	      = mkInScopeSet (tvs1 `unionVarSet` tvs2)
+	      subst  	      = TvSubst in_scope subst_env_fixpt
+	      subst_env_fixpt = mapVarEnv (substTy subst) subst_env
+	; return subst }
+  where
+    tvs1 = tyVarsOfTypes tys1
+    tvs2 = tyVarsOfTypes tys2
 
 ----------------------------
 coreRefineTys :: InScopeSet	-- Superset of free vars of either type
@@ -217,26 +226,20 @@ coreRefineTys in_scope ex_tvs ty1 ty2
 	; return subst_env_fixpt }
 
 ----------------------------
-tcUnifyTys :: TyVarSet -> [Type] -> [Type] -> Maybe TvSubstEnv
-tcUnifyTys bind_these tys1 tys2
-  = maybeErrToMaybe $ initUM (bindOnly bind_these) $
-    unify_tys emptyTvSubstEnv tys1 tys2
-
-tcUnifyTysX :: TyVarSet -> TvSubstEnv -> [Type] -> [Type] -> Maybe TvSubstEnv
-tcUnifyTysX bind_these subst tys1 tys2
-  = maybeErrToMaybe $ initUM (bindOnly bind_these) $
-    unify_tys subst tys1 tys2
+gadtRefineTys
+	:: (TyVar -> BindFlag)		-- Try to unify these
+	-> TvSubstEnv			-- Not idempotent
+	-> [Type] -> [Type]
+   	-> MaybeErr Message TvSubstEnv	-- Not idempotent
+-- This one is used by the type checker.  Neither the input nor result
+-- substitition is idempotent
+gadtRefineTys bind_fn subst tys1 tys2
+  = initUM bind_fn (unify_tys subst tys1 tys2)
 
 ----------------------------
-tryToBind, bindOnly :: TyVarSet -> TyVar -> BindFlag
+tryToBind :: TyVarSet -> TyVar -> BindFlag
 tryToBind tv_set tv | tv `elemVarSet` tv_set = BindMe
 		    | otherwise	             = AvoidMe
-
-bindOnly tv_set tv | tv `elemVarSet` tv_set = BindMe
-		   | otherwise	            = DontBindMe
-
-emptyTvSubstEnv :: TvSubstEnv
-emptyTvSubstEnv = emptyVarEnv
 \end{code}
 
 
@@ -321,9 +324,9 @@ uVar :: Bool            -- Swapped
      -> UM TvSubstEnv
 
 uVar swap subst tv1 ty
- = -- check to see whether tv1 is refined
+ = -- Check to see whether tv1 is refined by the substitution
    case (lookupVarEnv subst tv1) of
-     -- yes, call back into unify'
+     -- Yes, call back into unify'
      Just ty' | swap      -> unify subst ty ty' 
               | otherwise -> unify subst ty' ty
      -- No, continue
@@ -349,49 +352,38 @@ uUnrefined subst tv1 ty2@(TyVarTy tv2)
   = do	{ b1 <- tvBindFlag tv1
 	; b2 <- tvBindFlag tv2
 	; case (b1,b2) of
-	    (DontBindMe, DontBindMe) -> failWith (misMatch ty1 ty2)
-	    (DontBindMe, _) 	     -> bindTv subst tv2 ty1
-	    (BindMe, _) 	     -> bindTv subst tv1 ty2
-	    (AvoidMe, BindMe)	     -> bindTv subst tv2 ty1
-	    (AvoidMe, _)	     -> bindTv subst tv1 ty2
+	    (BindMe, _) 	 -> bind tv1 ty2
+
+	    (AvoidMe, BindMe)	 -> bind tv2 ty1
+	    (AvoidMe, _)	 -> bind tv1 ty2
+
+	    (WildCard, WildCard) -> return subst
+	    (WildCard, Skolem)   -> return subst
+	    (WildCard, _)	 -> bind tv2 ty1
+
+	    (Skolem, WildCard)	 -> return subst
+	    (Skolem, Skolem)	 -> failWith (misMatch ty1 ty2)
+	    (Skolem, _)		 -> bind tv2 ty1
 	}
 
-  | k1 `isSubKind` k2	-- Must update tv2
-  = do	{ b2 <- tvBindFlag tv2
-	; case b2 of
-	    DontBindMe -> failWith (misMatch ty1 ty2)
-	    other      -> bindTv subst tv2 ty1
-	}
-
-  | k2 `isSubKind` k1	-- Must update tv1
-  = do	{ b1 <- tvBindFlag tv1
-	; case b1 of
-	    DontBindMe -> failWith (misMatch ty1 ty2)
-	    other      -> bindTv subst tv1 ty2
-	}
+  | k1 `isSubKind` k2 = bindTv subst tv2 ty1	-- Must update tv2
+  | k2 `isSubKind` k1 = bindTv subst tv1 ty2	-- Must update tv1
 
   | otherwise = failWith (kindMisMatch tv1 ty2)
   where
     ty1 = TyVarTy tv1
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
+    bind tv ty = return (extendVarEnv subst tv ty)
 
 uUnrefined subst tv1 ty2	-- ty2 is not a type variable
-	-- Do occurs check...
   | tv1 `elemVarSet` substTvSet subst (tyVarsOfType ty2)
-  = failWith (occursCheck tv1 ty2)
-	-- And a kind check...
-  | k2 `isSubKind` k1
-  = do	{ b1 <- tvBindFlag tv1
-	; case b1 of		-- And  check that tv1 is bindable
-	    DontBindMe -> failWith (misMatch ty1 ty2)
-	    other      -> bindTv subst tv1 ty2
-	}
+  = failWith (occursCheck tv1 ty2)	-- Occurs check
+  | not (k2 `isSubKind` k1)
+  = failWith (kindMisMatch tv1 ty2)	-- Kind check
   | otherwise
-  = pprTrace "kind" (ppr tv1 <+> ppr k1 $$ ppr ty2 <+> ppr k2) $
-    failWith (kindMisMatch tv1 ty2)
+  = bindTv subst tv1 ty2
   where
-    ty1 = TyVarTy tv1
     k1 = tyVarKind tv1
     k2 = typeKind ty2
 
@@ -405,7 +397,13 @@ substTvSet subst tvs
 		Nothing -> unitVarSet tv
 		Just ty -> substTvSet subst (tyVarsOfType ty)
 
-bindTv subst tv ty = return (extendVarEnv subst tv ty)
+bindTv subst tv ty	-- ty is not a type variable
+  = do	{ b <- tvBindFlag tv
+	; case b of
+	    Skolem   -> failWith (misMatch (TyVarTy tv) ty)
+	    WildCard -> return subst
+	    other    -> return (extendVarEnv subst tv ty)
+	}
 \end{code}
 
 %************************************************************************
@@ -415,7 +413,15 @@ bindTv subst tv ty = return (extendVarEnv subst tv ty)
 %************************************************************************
 
 \begin{code}
-data BindFlag = BindMe | AvoidMe | DontBindMe
+data BindFlag 
+  = BindMe	-- A regular type variable
+  | AvoidMe	-- Like BindMe but, given the choice, avoid binding it
+
+  | Skolem	-- This type variable is a skolem constant
+		-- Don't bind it; it only matches itself
+
+  | WildCard 	-- This type variable matches anything,
+		-- and does not affect the substitution
 
 newtype UM a = UM { unUM :: (TyVar -> BindFlag)
 		         -> MaybeErr Message a }

@@ -63,9 +63,9 @@ module Type (
 	seqType, seqTypes,
 
 	-- Type substitutions
-	TvSubst(..), 	-- Representation visible to a few friends
-	TvSubstEnv, emptyTvSubst,
-	mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
+	TvSubstEnv, emptyTvSubstEnv,	-- Representation widely visible
+	TvSubst(..), emptyTvSubst,	-- Representation visible to a few friends
+	mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
 	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
  	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst,
 
@@ -1025,6 +1025,8 @@ type TvSubstEnv = TyVarEnv Type
 	-- in the middle of matching, and unification (see Types.Unify)
 	-- So you have to look at the context to know if it's idempotent or
 	-- apply-once or whatever
+emptyTvSubstEnv :: TvSubstEnv
+emptyTvSubstEnv = emptyVarEnv
 
 composeTvSubst :: InScopeSet -> TvSubstEnv -> TvSubstEnv -> TvSubstEnv
 -- (compose env1 env2)(x) is env1(env2(x)); i.e. apply env2 then env1
@@ -1050,6 +1052,9 @@ getTvInScope (TvSubst in_scope _) = in_scope
 
 isInScope :: Var -> TvSubst -> Bool
 isInScope v (TvSubst in_scope _) = v `elemInScopeSet` in_scope
+
+notElemTvSubst :: TyVar -> TvSubst -> Bool
+notElemTvSubst tv (TvSubst _ env) = not (tv `elemVarEnv` env)
 
 setTvSubstEnv :: TvSubst -> TvSubstEnv -> TvSubst
 setTvSubstEnv (TvSubst in_scope _) env = TvSubst in_scope env

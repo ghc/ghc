@@ -25,7 +25,7 @@ import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
 			  tcLookupClass, tcLookupDataCon, tcLookupId )
 import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars, readMetaTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcTauType, zipTopTvSubst,
-			  SkolemInfo(PatSkol), isSkolemTyVar, pprSkolemTyVar, 
+			  SkolemInfo(PatSkol), isSkolemTyVar, isMetaTyVar, pprSkolemTyVar, 
 			  TvSubst, mkTvSubst, substTyVar, substTy, MetaDetails(..),
 			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy )
 import VarEnv		( mkVarEnv )	-- ugly
@@ -34,7 +34,7 @@ import TcUnify		( tcSubPat, Expected(..), zapExpectedType,
 			  zapExpectedTo, zapToListTy, zapToTyConApp )  
 import TcHsType		( UserTypeCtxt(..), TcSigInfo( sig_tau ), TcSigFun, tcHsPatSigType )
 import TysWiredIn	( stringTy, parrTyCon, tupleTyCon )
-import Unify		( MaybeErr(..), gadtRefineTys, gadtMatchTys )
+import Unify		( MaybeErr(..), gadtRefineTys, BindFlag(..) )
 import Type		( substTys, substTheta )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import TyCon		( TyCon )
@@ -118,15 +118,12 @@ tcCheckPats ctxt pats tys thing_inside 	-- A trivial wrapper
 %************************************************************************
 
 \begin{code}
-data PatCtxt = LamPat Bool 	-- Used for lambda, case, do-notation etc
+data PatCtxt = LamPat 		-- Used for lambda, case, do-notation etc
 	     | LetPat TcSigFun	-- Used for let(rec) bindings
-	-- True <=> we are checking the case expression, 
-	--		so can do full-blown refinement
-	-- False <=> inferring, do no refinement
 
 -------------------
 tcPatBndr :: PatCtxt -> Name -> Expected TcSigmaType -> TcM TcId
-tcPatBndr (LamPat _) bndr_name pat_ty
+tcPatBndr LamPat bndr_name pat_ty
   = do	{ pat_ty' <- zapExpectedType pat_ty argTypeKind
 		-- If pat_ty is Expected, this returns the appropriate
 		-- SigmaType.  In Infer mode, we create a fresh type variable.
@@ -501,17 +498,15 @@ refineAlt :: PatCtxt -> DataCon
 	    -> TcM a -> TcM a
 refineAlt ctxt con ex_tvs ctxt_tys pat_tys thing_inside 
   = do	{ old_subst <- getTypeRefinement
-	; let refiner | can_i_refine ctxt = gadtRefineTys
-		      | otherwise         = gadtMatchTys
-	; case refiner ex_tvs old_subst pat_tys ctxt_tys of
+	; case gadtRefineTys bind_fn old_subst pat_tys ctxt_tys of
 		Failed msg -> failWithTc (inaccessibleAlt msg)
 		Succeeded new_subst -> do {
 	  traceTc (text "refineTypes:match" <+> ppr con <+> ppr new_subst)
 	; setTypeRefinement new_subst thing_inside } }
 
   where
-    can_i_refine (LamPat can_refine) = can_refine
-    can_i_refine other_ctxt 	     = False
+    bind_fn tv | isMetaTyVar tv = WildCard	-- Wobbly types behave as wild cards
+	       | otherwise	= BindMe
 \end{code}
 
 Note [Type matching]
