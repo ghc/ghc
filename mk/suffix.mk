@@ -147,8 +147,8 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 #-----------------------------------------------------------------------------
 # Runtest rules for calling $(HC) on a single-file Haskell program
 
-%.hs : %.runtest
-	$(TIME) $(RUNTEST) $(HC) $(RUNTEST_FLAGS) -o2 $*.stderr $<
+%.runtest : %.hs
+	$(TIME) $(RUNTEST) $(HC) $(RUNTEST_OPTS) $<
 
 #-----------------------------------------------------------------------------
 # Doc processing suffix rules
