@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.38 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: RtsFlags.c,v 1.39 2001/07/19 07:28:00 andy Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -247,6 +247,7 @@ void initRtsFlagsDefaults(void)
 
 #ifdef PROFILING
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
+    RtsFlags.ProfFlags.profileFrequency   = 20;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
     RtsFlags.ProfFlags.modSelector        = NULL;
     RtsFlags.ProfFlags.descrSelector      = NULL;
@@ -415,6 +416,8 @@ usage_text[] = {
 "    -hm{mod,mod...} all cost centres from the specified modules(s)",
 "    -hd{des,des...} closures with specified closure descriptions",
 "    -hy{typ,typ...} closures with specified type descriptions",
+"",
+"  -i<sec>         how often to sample heap",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 # endif
@@ -811,7 +814,27 @@ error = rtsTrue;
 		) 
 
 #endif
-	        break;
+    	    	break;
+
+#if defined(PROFILING) 
+    	      case 'i':	/* heap sample interval */
+		if (rts_argv[arg][2] == '\0') {
+		  /* use default */
+		} else {
+		    I_ cst; /* tmp */
+
+		    /* Convert to milliseconds */
+		    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
+		    cst = (cst / CS_MIN_MILLISECS) * CS_MIN_MILLISECS;
+		    if (cst != 0 && cst < CS_MIN_MILLISECS)
+			cst = CS_MIN_MILLISECS;
+
+		    RtsFlags.ProfFlags.profileFrequency = cst;
+		}
+		
+		break;
+
+#endif
 
 	      /* =========== CONCURRENT ========================= */
     	      case 'C':	/* context switch interval */

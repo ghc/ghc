@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.38 2001/05/25 18:35:29 sof Exp $
+ * $Id: Storage.c,v 1.39 2001/07/19 07:28:00 andy Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -68,6 +68,10 @@ initStorage (void)
    * fixed-size allocation area so that we get roughly even-spaced
    * samples.
    */
+
+  /* As an experiment, try a 2 generation collector
+   */
+
 #if defined(PROFILING) || defined(DEBUG)
   if (RtsFlags.ProfFlags.doHeapProfile) {
     RtsFlags.GcFlags.generations = 1;

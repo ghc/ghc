@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.21 2001/03/14 11:18:18 sewardj Exp $
+ * $Id: ProfHeap.c,v 1.22 2001/07/19 07:28:00 andy Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -510,6 +510,8 @@ rtsBool satisfies_constraints ( StgClosure* p )
 #endif /* PROFILING */
 
 
+static double time_of_last_heapCensus = 0.0;
+
 void
 heapCensus(void)
 {
@@ -518,7 +520,8 @@ heapCensus(void)
   StgDouble time;
   nat size;
   StgPtr p;
-  
+  nat elapsed;
+    
 #ifdef DEBUG_HEAP_PROF
   switch (RtsFlags.ProfFlags.doHeapProfile) {
   case HEAP_BY_INFOPTR:
@@ -534,6 +537,21 @@ heapCensus(void)
     return;
   }
 #endif
+
+#ifdef PROFILING
+  /*
+   * We only continue iff we've waited long enough,
+   * otherwise, we just dont do the census.
+   */
+
+  time = mut_user_time_during_GC();  
+  elapsed = (time - time_of_last_heapCensus) * 1000;
+  if (elapsed < RtsFlags.ProfFlags.profileFrequency) {
+      return;
+    }
+  time_of_last_heapCensus = time;
+#endif
+
 
 #ifdef PROFILING
   switch (RtsFlags.ProfFlags.doHeapProfile) {
@@ -557,7 +575,6 @@ heapCensus(void)
   ASSERT(RtsFlags.GcFlags.generations == 1);
   bd = g0s0->to_space;
 
-  time = mut_user_time_during_GC();
   fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", time);
   
   while (bd != NULL) {

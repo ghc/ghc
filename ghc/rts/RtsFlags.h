@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.32 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: RtsFlags.h,v 1.33 2001/07/19 07:28:00 andy Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -87,6 +87,10 @@ struct COST_CENTRE_FLAGS {
 struct PROFILING_FLAGS {
     unsigned int	doHeapProfile;
 
+    nat                 profileFrequency;  /* how often do you want */
+                                           /* to sample (in ms) */
+
+
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
 # define HEAP_BY_CCS		1
 # define HEAP_BY_MOD		2
@@ -105,13 +109,15 @@ struct PROFILING_FLAGS {
     char*               typeSelector;
     char*               ccSelector;
 
+
 };
 #elif defined(DEBUG)
 # define NO_HEAP_PROFILING	0
 # define HEAP_BY_INFOPTR        1
 # define HEAP_BY_CLOSURE_TYPE   2
 struct PROFILING_FLAGS {
-    unsigned int      doHeapProfile; /* heap profile using symbol table */
+    unsigned int  doHeapProfile;     /* heap profile using symbol table */
+
 };
 #endif /* DEBUG || PROFILING */
 
