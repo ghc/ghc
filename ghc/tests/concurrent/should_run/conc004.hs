@@ -6,8 +6,14 @@ module Main where
 import Concurrent
 
 main :: IO ()
-main = spawner forkIO 1000000
+main = do
+   mvar <- newEmptyMVar
 
-spawner :: (IO () -> IO ()) -> Int -> IO ()
-spawner c 0 = print "done"
-spawner c n = do { c (spawner c (n-1)); return ()}
+   let 
+   	spawner :: (IO () -> IO ()) -> Int -> IO ()
+   	spawner c 0 = putMVar mvar ()
+   	spawner c n = do { c (spawner c (n-1)); return ()}
+
+   spawner forkIO 1000000
+   takeMVar mvar
+   putStr "done"
