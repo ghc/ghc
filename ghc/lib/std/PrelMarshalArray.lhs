@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelMarshalArray.lhs,v 1.6 2001/08/15 09:24:47 simonmar Exp $
+% $Id: PrelMarshalArray.lhs,v 1.7 2001/08/15 09:28:58 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -126,8 +126,8 @@ reallocArray0 ptr size  = reallocArray ptr (size + 1)
 -- needed linear stack space.
 --
 peekArray          :: Storable a => Int -> Ptr a -> IO [a]
-peekArray size ptr | size < 0   = return []
-		   | othwerwise = f (size-1) []
+peekArray size ptr | size < 0  = return []
+		   | otherwise = f (size-1) []
   where
     f 0 acc = do e <- peekElemOff ptr 0; return (e:acc)
     f n acc = do e <- peekElemOff ptr n; f (n-1) (e:acc)
