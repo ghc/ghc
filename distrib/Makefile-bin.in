@@ -189,9 +189,9 @@ install :: config-pkgs install-dirs install-bin install-libs install-datas posti
 .PHONY: install-bin install-libs install-datas postinstall
 
 postinstall:
-	if test -x "bin/$(platform)/post-install-script" ; then \
+	if test -x "./post-install-script" ; then \
 		echo "Running project-specific post-install script ..." ; \
-		bin/$(platform)/post-install-script $(platform) $(prefix) \
+		./post-install-script $(platform) $(prefix) \
 			$(package)-$(version); \
 		echo "Done" ; \
 	fi

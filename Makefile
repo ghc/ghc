@@ -155,7 +155,7 @@ binary-dist::
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.in 
 	( cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
-
+	cp $(BIN_DIST_MAIN_DIR)/mk/post-install-script $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
 #
 # binary dist'ing the documentation.  
 # Which documentation to build/install is hardcoded below.
