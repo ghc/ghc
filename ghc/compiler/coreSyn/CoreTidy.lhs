@@ -171,8 +171,7 @@ findExternalSet :: [CoreBind] -> [IdCoreRule]
 		-> IdEnv Bool	-- True <=> show unfolding
 	-- Step 1 from the notes above
 findExternalSet binds orphan_rules
-  = pprTrace "fes" (vcat (map pprIdCoreRule orphan_rules) $$ ppr (varSetElems orphan_rule_ids)) $
-    foldr find init_needed binds
+  = foldr find init_needed binds
   where
     orphan_rule_ids :: IdSet
     orphan_rule_ids = unionVarSets [ ruleSomeFreeVars isIdAndLocal rule 
