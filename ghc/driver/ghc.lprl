@@ -677,12 +677,6 @@ The (outwards-)let-floater should be the {\em last} Core-to-Core pass
 that's run.  (Um, well, howzabout the simplifier just once more...)
 \end{description}
 
-STG-TO-STG PASSES:
-\begin{description}
-\item[\tr{-fupdate-analysis}:]
-It really really wants to be the last STG-to-STG pass that is run.
-\end{description}
-
 \begin{code}
 
 sub setupOptimiseFlags {
@@ -835,8 +829,7 @@ sub setupOptimiseFlags {
 
       # SPECIAL FLAGS for -O2
 	($OptLevel == 2) ? (
-	  '-fupdate-analysis',	# virtually useless; relegated to -O2
-	  '-fsemi-tagging',
+	    # none at the present time
 	) : (),
       );
 

@@ -221,7 +221,6 @@ data CoreToDo		-- These are diff core-to-core passes,
 \begin{code}
 data StgToDo
   = StgDoStaticArgs
-  | StgDoUpdateAnalysis
   | StgDoLambdaLift
   | StgDoMassageForProfiling  -- should be (next to) last
   -- There's also setStgVarInfo, but its absolute "lastness"
@@ -492,7 +491,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fcpr-analyse"    -> CORE_TD(CoreDoCPResult)
 
 	  "-fstg-static-args" -> STG_TD(StgDoStaticArgs)
-	  "-fupdate-analysis" -> STG_TD(StgDoUpdateAnalysis)
 	  "-dstg-stats"	      -> STG_TD(D_stg_stats)
 	  "-flambda-lift"     -> STG_TD(StgDoLambdaLift)
 	  "-fmassage-stg-for-profiling" -> STG_TD(StgDoMassageForProfiling)

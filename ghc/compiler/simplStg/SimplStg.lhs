@@ -16,7 +16,6 @@ import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
 import StgVarInfo	( setStgVarInfo )
-import UpdAnal		( updateAnalyse )
 import SRT		( computeSRTs )
 
 import CmdLineOpts	( opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
@@ -91,13 +90,6 @@ stg2stg stg_todos module_name us binds
 	in
 	case to_do of
 	  StgDoStaticArgs ->  panic "STG static argument transformation deleted"
-
-	  StgDoUpdateAnalysis ->
-	     _scc_ "StgUpdAnal"
-		-- NB We have to do setStgVarInfo first!  (There's one
-		-- place free-var info is used) But no let-no-escapes,
-		-- because update analysis doesn't care.
-	     end_pass us2 "UpdAnal" ccs (updateAnalyse (setStgVarInfo False binds))
 
 	  D_stg_stats ->
 	     trace (showStgStats binds)
