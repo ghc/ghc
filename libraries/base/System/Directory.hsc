@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- 
--- Module      :  System.IO.Directory
+-- Module      :  System.Directory
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
 -- 
@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Directory.hsc,v 1.2 2001/07/03 11:37:51 simonmar Exp $
+-- $Id: Directory.hsc,v 1.1 2001/08/17 12:45:27 simonmar Exp $
 --
 -- System-independent interface to directory manipulation.
 --
@@ -29,7 +29,7 @@ some operating systems, it may also be possible to have paths which
 are relative to the current directory.
 -}
 
-module System.IO.Directory 
+module System.Directory 
    ( 
       Permissions(
 	Permissions,
@@ -74,11 +74,7 @@ import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
 -- to get config.h
 #include "HsCore.h"
 
-#include <sys/stat.h>
-#include <dirent.h>
 #include <limits.h>
-#include <errno.h>
-#include <unistd.h>
 
 -----------------------------------------------------------------------------
 -- Permissions
@@ -131,12 +127,12 @@ The path refers to an existing non-directory object.
 
 createDirectory :: FilePath -> IO ()
 createDirectory path = do
-    withUnsafeCString path $ \s -> do
+    withCString path $ \s -> do
       throwErrnoIfMinus1Retry_ "createDirectory" $
 #if defined(mingw32_TARGET_OS)
-        mkdir s
+        c_mkdir s
 #else
-        mkdir s 0o777
+        c_mkdir s 0o777
 #endif
 
 {-
@@ -177,8 +173,8 @@ The operand refers to an existing non-directory object.
 
 removeDirectory :: FilePath -> IO ()
 removeDirectory path = do
-    withUnsafeCString path $ \s ->
-       throwErrnoIfMinus1Retry_ "removeDirectory" (rmdir s)
+    withCString path $ \s ->
+       throwErrnoIfMinus1Retry_ "removeDirectory" (c_rmdir s)
 
 {-
 @Removefile file@ removes the directory entry for an existing file
@@ -212,8 +208,8 @@ The operand refers to an existing directory.
 
 removeFile :: FilePath -> IO ()
 removeFile path = do
-    withUnsafeCString path $ \s ->
-      throwErrnoIfMinus1Retry_ "removeFile" (unlink s)
+    withCString path $ \s ->
+      throwErrnoIfMinus1Retry_ "removeFile" (c_unlink s)
 
 {-
 @renameDirectory@ {\em old} {\em new} changes the name of an existing
@@ -264,9 +260,9 @@ renameDirectory opath npath =
 			    ("not a directory") (Just opath))
 	else do
 
-   withUnsafeCString opath $ \s1 ->
-     withUnsafeCString npath $ \s2 ->
-        throwErrnoIfMinus1Retry_ "renameDirectory" (rename s1 s2)
+   withCString opath $ \s1 ->
+     withCString npath $ \s2 ->
+        throwErrnoIfMinus1Retry_ "renameDirectory" (c_rename s1 s2)
 
 {-
 @renameFile@ {\em old} {\em new} changes the name of an existing file system
@@ -315,9 +311,9 @@ renameFile opath npath =
 			   "is a directory" (Just opath))
 	else do
 
-    withUnsafeCString opath $ \s1 ->
-      withUnsafeCString npath $ \s2 ->
-         throwErrnoIfMinus1Retry_ "renameFile" (rename s1 s2)
+    withCString opath $ \s1 ->
+      withCString npath $ \s2 ->
+         throwErrnoIfMinus1Retry_ "renameFile" (c_rename s1 s2)
 
 {-
 @getDirectoryContents dir@ returns a list of {\em all} entries
@@ -348,14 +344,14 @@ The path refers to an existing non-directory object.
 
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
-   p <- withUnsafeCString path $ \s ->
-	  throwErrnoIfNullRetry "getDirectoryContents" (opendir s)
+   p <- withCString path $ \s ->
+	  throwErrnoIfNullRetry "getDirectoryContents" (c_opendir s)
    loop p
   where
     loop :: Ptr CDir -> IO [String]
     loop dir = do
       resetErrno
-      p <- readdir dir
+      p <- c_readdir dir
       if (p /= nullPtr)
 	 then do
 #ifdef mingw32_TARGET_OS
@@ -368,7 +364,7 @@ getDirectoryContents path = do
 		 return (entry:entries)
 	 else do errno <- getErrno
 		 if (errno == eINTR) then loop dir else do
-		 throwErrnoIfMinus1_ "getDirectoryContents" $ closedir dir
+		 throwErrnoIfMinus1_ "getDirectoryContents" $ c_closedir dir
 #ifdef mingw32_TARGET_OS
 		 if (errno == eNOENT) -- mingwin (20001111) cunningly sets errno to ENOENT when it runs out of files
 #else
@@ -405,7 +401,7 @@ getCurrentDirectory = do
   p <- mallocBytes (#const PATH_MAX)
   go p (#const PATH_MAX)
   where go p bytes = do
-    	  p' <- getcwd p (fromIntegral bytes)
+    	  p' <- c_getcwd p (fromIntegral bytes)
 	  if p' /= nullPtr 
 	     then do s <- peekCString p'
 		     free p'
@@ -447,8 +443,8 @@ The path refers to an existing non-directory object.
 
 setCurrentDirectory :: FilePath -> IO ()
 setCurrentDirectory path = do
-    withUnsafeCString path $ \s -> 
-       throwErrnoIfMinus1Retry_ "setCurrentDirectory" (chdir s)
+    withCString path $ \s -> 
+       throwErrnoIfMinus1Retry_ "setCurrentDirectory" (c_chdir s)
 	-- ToDo: add path to error
 
 {-
@@ -477,10 +473,10 @@ getModificationTime name =
 
 getPermissions :: FilePath -> IO Permissions
 getPermissions name = do
-  withUnsafeCString name $ \s -> do
-  read  <- access s (#const R_OK)
-  write <- access s (#const W_OK)
-  exec  <- access s (#const X_OK)
+  withCString name $ \s -> do
+  read  <- c_access s (#const R_OK)
+  write <- c_access s (#const W_OK)
+  exec  <- c_access s (#const X_OK)
   withFileStatus name $ \st -> do
   is_dir <- isDirectory st
   is_reg <- isRegularFile st
@@ -502,14 +498,14 @@ setPermissions name (Permissions r w e s) = do
 
      mode  = read `unionCMode` (write `unionCMode` exec)
 
-    withUnsafeCString name $ \s ->
-      throwErrnoIfMinus1_ "setPermissions" $ chmod s mode
+    withCString name $ \s ->
+      throwErrnoIfMinus1_ "setPermissions" $ c_chmod s mode
 
 withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileStatus name f = do
     allocaBytes (#const sizeof(struct stat)) $ \p ->
-      withUnsafeCString name $ \s -> do
-        throwErrnoIfMinus1Retry_ "withFileStatus" (stat s p)
+      withCString name $ \s -> do
+        throwErrnoIfMinus1Retry_ "withFileStatus" (c_stat s p)
 	f p
 
 modificationTime :: Ptr CStat -> IO ClockTime
@@ -538,27 +534,3 @@ emptyCMode     = 0
 
 unionCMode     :: CMode -> CMode -> CMode
 unionCMode     = (+)
-
-type UCString = UnsafeCString
-
-#if defined(mingw32_TARGET_OS)
-foreign import ccall unsafe mkdir    :: UCString -> IO CInt
-#else
-foreign import ccall unsafe mkdir    :: UCString -> CInt -> IO CInt
-#endif
-
-foreign import ccall unsafe chmod    :: UCString -> CMode -> IO CInt
-foreign import ccall unsafe access   :: UCString -> CMode -> IO CInt
-foreign import ccall unsafe rmdir    :: UCString -> IO CInt
-foreign import ccall unsafe chdir    :: UCString -> IO CInt
-foreign import ccall unsafe getcwd   :: Ptr CChar -> CInt -> IO (Ptr CChar)
-foreign import ccall unsafe unlink   :: UCString -> IO CInt
-foreign import ccall unsafe rename   :: UCString -> UCString -> IO CInt
-		     
-foreign import ccall unsafe opendir  :: UCString  -> IO (Ptr CDir)
-foreign import ccall unsafe readdir  :: Ptr CDir -> IO (Ptr CDirent)
-foreign import ccall unsafe closedir :: Ptr CDir -> IO CInt
-
-foreign import ccall unsafe stat     :: UCString -> Ptr CStat -> IO CInt
-
-type CDirent = ()
