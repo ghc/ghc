@@ -45,7 +45,7 @@ sub split_asm_file {
 #	if $prologue_stuff eq $s_stuff;
 
     # lie about where this stuff came from
-    $prologue_stuff =~ s|"/tmp/ghc\d+\.c"|"$ifile_root\.hc"|g;
+    $prologue_stuff =~ s|"${Tmp_prefix}\.c"|"$ifile_root\.hc"|g;
 
     while ( $_ ne '' ) { # not EOF
 	$octr++;
